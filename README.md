@@ -56,21 +56,22 @@ src/
     dval/               Differentiable value engine
         dval_core.c
         dval_tostring.c
-        dval_ops.c
+        dval_simplify.c
         ...
     qfloat/             High‑precision arithmetic
         qfloat.c
-        qfloat_format.c
-        ...
     datetime/           Date arithmetic and utilities
-        date_arithmetic.c
+        datetime.c
         ...
     dictionary/         Hash map implementation
         dictionary.c
     set/                Set implementation
         set.c
     string/             String utilities
-        string.c
+        string_core.c
+        string_grapheme.c
+        string_utf8.c
+        ...
 
 tests/
     test_dval.c
@@ -91,54 +92,131 @@ Makefile                Build rules for debug/release/test
 
 ## 🔧 Building
 
-### Debug build
+The Makefile supports flexible targets for building, testing, and memory‑checking.
+
+### Basic builds
 ```
+make clean
+make release
 make debug
 ```
 
-### Release build
+### Running specific tests
+You can build and run individual test binaries directly:
+
 ```
-make release
+make debug test_dval
+make debug test_qfloat
+make release test_set
 ```
 
-### Clean
+### Memory‑checking (Valgrind or similar)
+If your environment supports memory‑checking tools:
+
 ```
-make clean
+make debug memtest_dval
+make debug memtest_set
 ```
+
+### Notes
+- `debug` builds include assertions, symbols, and diagnostics.
+- `release` builds are optimized and stripped.
+- Test binaries are placed under `tests/build/<config>/`.
 
 ---
 
-## 🧪 Running Tests
+## 📘 Example: Single‑Variable Expression with First and Second Derivatives
 
-After building:
+The following example demonstrates how to:
 
-```
-./tests/build/debug/test_dval
-./tests/build/debug/test_qfloat
-./tests/build/debug/test_datetime
-./tests/build/debug/test_dictionary
-./tests/build/debug/test_set
-./tests/build/debug/test_string
-```
+- create a named variable  
+- build a symbolic expression  
+- compute the first derivative using `dv_create_deriv(x)`  
+- compute the second derivative using `dv_get_deriv(df_dx)`  
+- assign a value to the variable  
+- evaluate the function and its derivatives  
+- print symbolic and numeric results  
+- correctly free all owning handles  
 
-(You can add a `make test` target later if you want automation.)
-
----
-
-## 🧩 Example: Using `dval_t`
+### Example Code
 
 ```c
 #include "dval.h"
+#include <stdio.h>
 
-int main() {
-    dval_t *x = dv_var("x");
-    dval_t *expr = dv_add(dv_mul(x, x), dv_const(3.0));
+int main(void) {
+    /* Create a named variable x with initial value 0 */
+    dval_t *x = dv_new_named_var_d(0.0, "x");
 
-    printf("%s\n", dv_to_string(expr));  // prints something like: { x*x + 3 | x = ? }
+    /* Build expression:
+         f(x) = exp(sin(x)) + 3*x^2 - 7
+    */
+    dval_t *sinx   = dv_sin(x);
+    dval_t *exp_sx = dv_exp(sinx);
+    dval_t *x2     = dv_pow_d(x, 2.0);
+    dval_t *term2  = dv_mul_d(x2, 3.0);
+    dval_t *f0     = dv_add(exp_sx, term2);
+    dval_t *f      = dv_sub_d(f0, 7.0);   /* f = exp(sin(x)) + 3*x^2 - 7 */
 
-    dv_release(expr);
-    dv_release(x);
+    /* First derivative (owning) */
+    dval_t *df_dx = dv_create_deriv(x);   /* df/dx */
+
+    /* Second derivative (borrowed) */
+    const dval_t *d2f_dx = dv_get_deriv(df_dx);  /* d²f/dx² */
+
+    /* Assign a value to x */
+    dv_set_val_d(x, 1.25);
+
+    /* Evaluate */
+    double f_val    = dv_eval_d(f);
+    double d1_val   = dv_eval_d(df_dx);
+    double d2_val   = dv_eval_d(d2f_dx);
+
+    /* Print symbolic forms */
+    printf("f(x)    = ");
+    dv_print(f);
+
+    printf("f'(x)   = ");
+    dv_print(df_dx);
+
+    printf("f''(x)  = ");
+    dv_print(d2f_dx);
+
+    /* Print numeric results */
+    printf("\nAt x = 1.25:\n");
+    printf("f(x)    = %.12f\n", f_val);
+    printf("f'(x)   = %.12f\n", d1_val);
+    printf("f''(x)  = %.12f\n", d2_val);
+
+    /* Free owning handles */
+    dv_free(df_dx);
+    dv_free(f);
+    dv_free(f0);
+    dv_free(term2);
+    dv_free(x2);
+    dv_free(exp_sx);
+    dv_free(sinx);
+    dv_free(x);
+
+    return 0;
 }
+```
+
+### Expected Symbolic Output
+
+```
+f(x)    = exp(sin(x)) + 3*x^2 - 7
+f'(x)   = cos(x)*exp(sin(x)) + 6*x
+f''(x)  = -sin(x)*exp(sin(x)) + cos(x)*cos(x)*exp(sin(x)) + 6
+```
+
+### Expected Numeric Output at x = 1.25
+
+```
+At x = 1.25:
+f(x)    = 0.270953999948
+f'(x)   = 8.314000000000
+f''(x)  = 4.293000000000
 ```
 
 ---
