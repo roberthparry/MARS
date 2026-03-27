@@ -1283,11 +1283,3 @@ void dv_free(dval_t *f)
 {
     dv_release(f);
 }
-
-void dv_print(const dval_t *f)
-{
-    char *s = dv_to_string(f, style_EXPRESSION);
-    fputs(s, stdout);
-    fputc('\n', stdout);
-    free(s);
-}

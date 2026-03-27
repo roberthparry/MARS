@@ -8,6 +8,7 @@
 
 #include "qfloat.h"
 #include "dval_internal.h"
+#include "dval.h"
 
 /* ------------------------------------------------------------------------- */
 /* Memory helpers                                                            */
@@ -702,4 +703,12 @@ char *dv_to_string(const dval_t *f, style_t style)
         return dv_to_string_function(f);
     else
         return dv_to_string_expr(f);
+}
+
+void dv_print(const dval_t *f)
+{
+    char *s = dv_to_string(f, style_EXPRESSION);
+    fputs(s, stdout);
+    fputc('\n', stdout);
+    free(s);
 }

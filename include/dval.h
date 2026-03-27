@@ -125,8 +125,6 @@ dval_t *dv_pow(dval_t *f, dval_t *g);
 /* Debug / lifetime                                                          */
 /* ------------------------------------------------------------------------- */
 
-void dv_print(const dval_t *f);
-
 /**
  * @brief Decrement the reference count and free if it reaches zero.
  *
@@ -147,5 +145,11 @@ typedef enum {
 } style_t;
 
 char *dv_to_string(const dval_t *f, style_t style);
+
+/* @brief Print the string representation of @p f to stdout.
+ *
+ * note: this uses dv_to_string with style_EXPRESSION
+ */
+void dv_print(const dval_t *f);
 
 #endif /* DVAL_H */
