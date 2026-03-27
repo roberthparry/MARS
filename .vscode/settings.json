@@ -1,0 +1,64 @@
+{
+    "makefile.configurations": [
+        {
+            "name": "debug",
+            "makeArgs": ["debug"]
+        },
+        {
+            "name": "release",
+            "makeArgs": ["release"]
+        }
+    ],
+
+    "makefile.launchConfigurations": [
+        {
+            "name": "Debug test_string",
+            "cwd": "${workspaceFolder}",
+            "binaryPath": "${workspaceFolder}/tests/build/debug/test_string",
+            "binaryArgs": []
+        },
+        {
+            "name": "Release test_string",
+            "cwd": "${workspaceFolder}",
+            "binaryPath": "${workspaceFolder}/tests/build/release/test_string",
+            "binaryArgs": []
+        },
+        {
+            "cwd": "${workspaceFolder}",
+            "binaryPath": "${workspaceFolder}/tests/build/debug/test_set",
+            "binaryArgs": []
+        },
+        {
+            "cwd": "${workspaceFolder}",
+            "binaryPath": "${workspaceFolder}/tests/build/debug/test_dictionary",
+            "binaryArgs": []
+        },
+        {
+            "cwd": "${workspaceFolder}",
+            "binaryPath": "${workspaceFolder}/tests/build/debug/test_qfloat",
+            "binaryArgs": []
+        },
+        {
+            "cwd": "${workspaceFolder}",
+            "binaryPath": "${workspaceFolder}/tests/build/debug/test_dval",
+            "binaryArgs": []           
+        }
+    ],
+
+    "C_Cpp.default.defines": [
+        "HAVE_UNISTRING",
+        "_GNU_SOURCE"
+    ],
+
+    "C_Cpp.default.includePath": [
+        "${workspaceFolder}/include"
+    ],
+
+    "[makefile]": {
+        "editor.insertSpaces": false,
+        "editor.detectIndentation": false,
+        "editor.tabSize": 4
+    },
+    "makefile.buildLog": "",
+    "terminal.integrated.scrollback": 4000
+}
