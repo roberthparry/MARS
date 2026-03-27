@@ -81,11 +81,8 @@ tests/
     test_set.c
     test_string.c
 
-tests/build/
-    debug/              Debug binaries (ignored)
-    release/            Release binaries (ignored)
-
 Makefile                Build rules for debug/release/test
+README.md               this README file
 ```
 
 ---
@@ -110,7 +107,7 @@ make debug test_qfloat
 make release test_set
 ```
 
-### Memory‑checking (Valgrind or similar)
+### Memory‑checking (Valgrind)
 If your environment supports memory‑checking tools:
 
 ```
