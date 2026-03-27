@@ -142,7 +142,7 @@ The following example demonstrates how to:
 #include <stdio.h>
 
 int main(void) {
-    /* Create a named variable x with initial value 0 */
+    /* Create a named variable x with initial value 1.25 */
     dval_t *x = dv_new_named_var_d(1.25, "x");
 
     /* Build expression:
