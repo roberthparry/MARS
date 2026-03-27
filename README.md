@@ -143,7 +143,7 @@ The following example demonstrates how to:
 
 int main(void) {
     /* Create a named variable x with initial value 0 */
-    dval_t *x = dv_new_named_var_d(0.0, "x");
+    dval_t *x = dv_new_named_var_d(1.25, "x");
 
     /* Build expression:
          f(x) = exp(sin(x)) + 3*x^2 - 7
@@ -156,18 +156,15 @@ int main(void) {
     dval_t *f      = dv_sub_d(f0, 7.0);   /* f = exp(sin(x)) + 3*x^2 - 7 */
 
     /* First derivative (owning) */
-    dval_t *df_dx = dv_create_deriv(x);   /* df/dx */
+    dval_t *df_dx = dv_create_deriv(f);   /* df/dx */
 
     /* Second derivative (borrowed) */
     const dval_t *d2f_dx = dv_get_deriv(df_dx);  /* d²f/dx² */
 
-    /* Assign a value to x */
-    dv_set_val_d(x, 1.25);
-
     /* Evaluate */
-    double f_val    = dv_eval_d(f);
-    double d1_val   = dv_eval_d(df_dx);
-    double d2_val   = dv_eval_d(d2f_dx);
+    qfloat f_val    = dv_eval(f);
+    qfloat d1_val   = dv_eval(df_dx);
+    qfloat d2_val   = dv_eval(d2f_dx);
 
     /* Print symbolic forms */
     printf("f(x)    = ");
@@ -180,10 +177,10 @@ int main(void) {
     dv_print(d2f_dx);
 
     /* Print numeric results */
-    printf("\nAt x = 1.25:\n");
-    printf("f(x)    = %.12f\n", f_val);
-    printf("f'(x)   = %.12f\n", d1_val);
-    printf("f''(x)  = %.12f\n", d2_val);
+    qf_printf("\nAt x = 1.25:\n");
+    qf_printf("f(x)    = %.34q\n", f_val);
+    qf_printf("f'(x)   = %.34q\n", d1_val);
+    qf_printf("f''(x)  = %.34q\n", d2_val);
 
     /* Free owning handles */
     dv_free(df_dx);
@@ -204,16 +201,16 @@ int main(void) {
 ```
 f(x)    = { exp(sin x) + 3x² - 7 | x = 1.25 }
 f'(x)   = { cos(x)*exp(sin(x)) + 6x | x = 1.25 }
-f''(x)  = { -sin(x)*exp(sin(x)) + cos(x)*cos(x)*exp(sin(x)) + 6 | x = 1.25 }
+f''(x)  = { exp(sin x) cos^2 x - sin x exp(sin x) + 6 | x = 1.25 }
 ```
 
 ### Expected Numeric Output at x = 1.25
 
 ```
 At x = 1.25:
-f(x)    = 0.270953999948
-f'(x)   = 8.314000000000
-f''(x)  = 4.293000000000
+f(x)    = 0.2705855122552273437029639300166272
+f'(x)   = 8.3145046259933109960293996152090640
+f''(x)  = 3.8055231012396292258221776404244160
 ```
 
 ---
