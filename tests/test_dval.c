@@ -1840,7 +1840,7 @@ void test_to_string_all(void)
 }
 
 int test_readme_example(void) {
-    /* Create a named variable x with initial value 0 */
+    /* Create a named variable x with initial value 1.25 */
     dval_t *x = dv_new_named_var_d(1.25, "x");
 
     /* Build expression:
