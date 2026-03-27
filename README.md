@@ -205,9 +205,9 @@ int main(void) {
 ### Expected Symbolic Output
 
 ```
-f(x)    = exp(sin(x)) + 3*x^2 - 7
-f'(x)   = cos(x)*exp(sin(x)) + 6*x
-f''(x)  = -sin(x)*exp(sin(x)) + cos(x)*cos(x)*exp(sin(x)) + 6
+f(x)    = { exp(sin x) + 3 x² - 7 | x = 1.25 }
+f'(x)   = { cos(x)*exp(sin(x)) + 6*x | x = 1.25 }
+f''(x)  = { -sin(x)*exp(sin(x)) + cos(x)*cos(x)*exp(sin(x)) + 6 | x = 1.25 }
 ```
 
 ### Expected Numeric Output at x = 1.25
