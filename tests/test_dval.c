@@ -1839,6 +1839,60 @@ void test_to_string_all(void)
     test_to_string_function_style();
 }
 
+int test_readme_example(void) {
+    /* Create a named variable x with initial value 0 */
+    dval_t *x = dv_new_named_var_d(1.25, "x");
+
+    /* Build expression:
+         f(x) = exp(sin(x)) + 3*x^2 - 7
+    */
+    dval_t *sinx   = dv_sin(x);
+    dval_t *exp_sx = dv_exp(sinx);
+    dval_t *x2     = dv_pow_d(x, 2.0);
+    dval_t *term2  = dv_mul_d(x2, 3.0);
+    dval_t *f0     = dv_add(exp_sx, term2);
+    dval_t *f      = dv_sub_d(f0, 7.0);   /* f = exp(sin(x)) + 3*x^2 - 7 */
+
+    /* First derivative (owning) */
+    dval_t *df_dx = dv_create_deriv(f);   /* df/dx */
+
+    /* Second derivative (borrowed) */
+    const dval_t *d2f_dx = dv_get_deriv(df_dx);  /* d²f/dx² */
+
+    /* Evaluate */
+    qfloat f_val    = dv_eval(f);
+    qfloat d1_val   = dv_eval(df_dx);
+    qfloat d2_val   = dv_eval(d2f_dx);
+
+    /* Print symbolic forms */
+    printf("f(x)    = ");
+    dv_print(f);
+
+    printf("f'(x)   = ");
+    dv_print(df_dx);
+
+    printf("f''(x)  = ");
+    dv_print(d2f_dx);
+
+    /* Print numeric results */
+    qf_printf("\nAt x = 1.25:\n");
+    qf_printf("f(x)    = %.34q\n", f_val);
+    qf_printf("f'(x)   = %.34q\n", d1_val);
+    qf_printf("f''(x)  = %.34q\n", d2_val);
+
+    /* Free owning handles */
+    dv_free(df_dx);
+    dv_free(f);
+    dv_free(f0);
+    dv_free(term2);
+    dv_free(x2);
+    dv_free(exp_sx);
+    dv_free(sinx);
+    dv_free(x);
+
+    return 0;
+}
+
 /* ------------------------------------------------------------------------- */
 /* Entry point                                                               */
 /* ------------------------------------------------------------------------- */
@@ -1972,6 +2026,10 @@ int main(void)
 
     /* tests to_string() */
     test_to_string_all();
+
+    printf(CYN "=== example in README.md ===\n" RST);
+
+    test_readme_example();
 
     printf(CYN "=== Done ===\n" RST);
 
