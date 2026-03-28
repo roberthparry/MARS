@@ -39,6 +39,10 @@ dval_t *dv_new_var(qfloat x);
 dval_t *dv_new_named_var(qfloat x, const char *name);
 dval_t *dv_new_named_var_d(double x, const char *name);
 
+/* ------------------------------------------------------------------------- */
+/* Mutators                                                                  */
+/* ------------------------------------------------------------------------- */
+
 void dv_set_val(dval_t *x, qfloat value);
 void dv_set_val_d(dval_t *x, double value);
 void dv_set_name(dval_t *x, const char *name);

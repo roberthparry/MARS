@@ -1224,6 +1224,18 @@ dval_t *dv_d_div(double d, dval_t *f)
     return r;
 }
 
+int dv_cmp(const dval_t *f, const dval_t *g) {
+    double a = dv_eval_d(f);
+    double b = dv_eval_d(g);
+    if (a < b) return -1;
+    if (a > b) return +1;
+    return 0;
+}
+
+int dv_compare(const dval_t *f, const dval_t *g) {
+    return dv_cmp(f, g);
+}
+
 /* ------------------------------------------------------------------------- */
 /* Derivative creation (owning)                                              */
 /* ------------------------------------------------------------------------- */
@@ -1263,7 +1275,7 @@ dval_t *dv_create_3rd_deriv(dval_t *f)
     return k;
 }
 
-dval_t *dv_create_nth_deriv(unsigned n, dval_t *f)
+dval_t *dv_create_nth_deriv(unsigned int n, dval_t *f)
 {
     dval_t *cur = f;
     while (n--) {
