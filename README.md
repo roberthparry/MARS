@@ -1,4 +1,4 @@
-# OOC — A Modular C Library for Numerical Computing, High‑Precision Arithmetic, and Differentiable Values
+## OOC — A Modular C Library for Numerical Computing, High‑Precision Arithmetic, and Differentiable Values
 
 OOC is a modular C library providing high‑precision arithmetic (`qfloat`), differentiable values (`dval_t`), symbolic expression trees, datetime utilities, dictionary and set types, and a suite of supporting algorithms. The project emphasizes correctness, maintainability, and extensibility, with a clean directory structure and a Makefile‑driven build system.
 
