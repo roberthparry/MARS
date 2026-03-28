@@ -232,6 +232,18 @@ static void test_atan(void)
     dv_free(c);
 }
 
+static void test_atan2(void)
+{
+    dval_t *base = dv_new_const_d(2.0);
+    dval_t *expo = dv_new_const_d(3.0);
+    dval_t *f    = dv_atan2(base, expo);
+    check_q_at(__FILE__, __LINE__, 1, "atan2(2,3)", dv_eval(f),
+            qf_atan2(qf_from_double(2.0), qf_from_double(3.0)));
+    dv_free(f);
+    dv_free(expo);
+    dv_free(base);
+}
+
 static void test_asinh(void)
 {
     dval_t *c = dv_new_const_d(0.25);
@@ -537,6 +549,30 @@ static void test_deriv_atan(void)
     check_q_at(__FILE__, __LINE__, 1, "d/dx{atan(x)} | x=0.25", dv_eval(df), expect);
 
     dv_free(f);
+    dv_free(x);
+}
+
+static void test_deriv_atan2(void)
+{
+    /* One variable: x = 0.25 */
+    dval_t *x = dv_new_var_d(0.25);
+
+    /* f(x) = atan2(x, 1) */
+    dval_t *one = dv_new_const_d(1.0);
+    dval_t *f   = dv_atan2(x, one);
+
+    const dval_t *df = dv_get_deriv(f);
+
+    /* Expected derivative: 1 / (1 + x^2) */
+    qfloat X = qf_from_double(0.25);
+    qfloat expect = qf_div(qf_from_double(1.0),
+                           qf_add(qf_from_double(1.0),
+                                  qf_mul(X, X)));
+
+    check_q_at(__FILE__, __LINE__, 1, "d/dx{atan2(x,1)} | x=0.25", dv_eval(df), expect);
+
+    dv_free(f);
+    dv_free(one);
     dv_free(x);
 }
 
@@ -1075,6 +1111,42 @@ static void test_second_deriv_atan(void)
 
     dv_free(df);
     dv_free(f);
+    dv_free(x);
+}
+
+static void test_second_deriv_atan2(void)
+{
+    /* One variable: x = 0.25 */
+    dval_t *x   = dv_new_var_d(0.25);
+
+    /* f(x) = atan2(x, 1) */
+    dval_t *one = dv_new_const_d(1.0);
+    dval_t *f   = dv_atan2(x, one);
+
+    /* First derivative */
+    dval_t *df  = dv_create_deriv(f);
+
+    /* Second derivative */
+    const dval_t *ddf = dv_get_deriv(df);
+
+    /* Expected: -2x / (1 + x^2)^2 */
+    qfloat X = qf_from_double(0.25);
+
+    qfloat denom = qf_mul(
+        qf_add(qf_from_double(1.0), qf_mul(X, X)),
+        qf_add(qf_from_double(1.0), qf_mul(X, X))
+    );
+
+    qfloat expect = qf_div(
+        qf_mul(qf_from_double(-2.0), X),
+        denom
+    );
+
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{atan2(x,1)} | x=0.25", dv_eval(ddf), expect);
+
+    dv_free(df);
+    dv_free(f);
+    dv_free(one);
     dv_free(x);
 }
 
@@ -1682,6 +1754,53 @@ void test_to_string_nested_mul_add(void)
     test_to_string_nested_mul_add_func();
 }
 
+static void test_to_string_atan2_expr(void)
+{
+    dval_t *x = dv_new_named_var_d(2, "x");
+    dval_t *y = dv_new_named_var_d(3, "y");
+
+    dval_t *f = dv_atan2(x, y);
+
+    char *s = dv_to_string(f, style_EXPRESSION);
+    const char *expect = "{ atan2(x, y) | x = 2, y = 3 }";
+
+    if (strcmp(s, expect) == 0)
+        to_string_pass("atan2 (EXPR)", s, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "atan2 (EXPR)", s, expect);
+
+    free(s);
+    dv_free(f);
+}
+
+static void test_to_string_atan2_func(void)
+{
+    dval_t *x = dv_new_named_var_d(2, "x");
+    dval_t *y = dv_new_named_var_d(3, "y");
+
+    dval_t *f = dv_atan2(x, y);
+
+    char *s = dv_to_string(f, style_FUNCTION);
+    const char *expect =
+        "x = 2\n"
+        "y = 3\n"
+        "expr(x,y) = atan2(x,y)\n"
+        "return expr(x,y)\n";
+
+    if (strcmp(s, expect) == 0)
+        to_string_pass("atan2 (FUNC)", s, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "atan2 (FUNC)", s, expect);
+
+    free(s);
+    dv_free(f);
+}
+
+void test_to_string_atan2(void)
+{
+    test_to_string_atan2_expr();
+    test_to_string_atan2_func();
+}
 
 /* ============================================================
  * POW SUPERSCRIPT
@@ -1834,6 +1953,7 @@ void test_to_string_all(void)
     test_to_string_basic_var();
     test_to_string_addition();
     test_to_string_nested_mul_add();
+    test_to_string_atan2();
     test_to_string_pow_superscript();
     test_to_string_unary_sin();
     test_to_string_function_style();
@@ -1927,6 +2047,7 @@ int main(void)
     test_asin();
     test_acos();
     test_atan();
+    test_atan2();
 
     test_asinh();
     test_acosh();
@@ -1965,6 +2086,7 @@ int main(void)
     test_deriv_cos();
     test_deriv_acosh();
     test_deriv_atan();
+    test_deriv_atan2();
 
     test_deriv_pow_xy();
 
@@ -2004,6 +2126,7 @@ int main(void)
     test_second_deriv_asin();
     test_second_deriv_acos();
     test_second_deriv_atan();
+    test_second_deriv_atan2();
 
     /* Inverse hyperbolic */
     test_second_deriv_asinh();

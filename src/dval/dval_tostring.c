@@ -371,6 +371,26 @@ static void emit_expr(dval_t *f, sbuf_t *b, prec_t parent_prec, style_t style)
         return;
     }
 
+    /* atan2(y, x) */
+    if (f->ops == &ops_atan2) {
+        prec_t myp = PREC_ATOM;   /* same precedence as other function calls */
+        int need_paren = (myp < parent_prec);
+
+        if (need_paren)
+            sbuf_putc(b, '(');
+
+        sbuf_puts(b, "atan2(");
+        emit_expr(f->a, b, PREC_LOWEST, style);
+        sbuf_puts(b, ", ");
+        emit_expr(f->b, b, PREC_LOWEST, style);
+        sbuf_putc(b, ')');
+
+        if (need_paren)
+            sbuf_putc(b, ')');
+
+        return;
+    }
+
     /* Power with constant exponent */
     if (f->ops == &ops_pow_d) {
         prec_t myp = PREC_POW;

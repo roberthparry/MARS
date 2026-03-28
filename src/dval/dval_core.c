@@ -395,6 +395,12 @@ static qfloat eval_exp(dval_t *n)   { return qf_exp (dv_eval_qf(n->a)); }
 static qfloat eval_log(dval_t *n)   { return qf_log (dv_eval_qf(n->a)); }
 static qfloat eval_sqrt(dval_t *n)  { return qf_sqrt(dv_eval_qf(n->a)); }
 
+static qfloat eval_atan2(dval_t *n) {
+    qfloat fy = dv_eval_qf(n->a);
+    qfloat gx = dv_eval_qf(n->b);
+    return qf_atan2(fy, gx);
+}
+
 /* ------------------------------------------------------------------------- */
 /* DERIVATIVE FUNCTIONS — lazy, stored in each node                          */
 /* ------------------------------------------------------------------------- */
@@ -802,6 +808,53 @@ static dval_t *deriv_atan(dval_t *n)
     return out;
 }
 
+static dval_t *deriv_atan2(dval_t *self)
+{
+    dval_t *y = self->a;   // first argument
+    dval_t *x = self->b;   // second argument
+
+    /* dy = derivative of y */
+    const dval_t *dy0 = dv_get_deriv(y);
+    dval_t *dy = dy0 ? (dv_retain((dval_t *)dy0), (dval_t *)dy0)
+                     : dv_new_const_d(0.0);
+
+    /* dx = derivative of x */
+    const dval_t *dx0 = dv_get_deriv(x);
+    dval_t *dx = dx0 ? (dv_retain((dval_t *)dx0), (dval_t *)dx0)
+                     : dv_new_const_d(0.0);
+
+    /* numerator = x*dy - y*dx */
+    dv_retain(x);
+    dval_t *x_dy = dv_mul(x, dy);
+    dv_retain(y);
+    dval_t *y_dx = dv_mul(y, dx);
+    dval_t *num = dv_sub(x_dy, y_dx);
+
+    /* denominator = x^2 + y^2 */
+    dv_retain(x);
+    dv_retain(x);
+    dval_t *x2 = dv_mul(x, x);
+    dv_retain(y);
+    dv_retain(y);
+    dval_t *y2 = dv_mul(y, y);
+    dval_t *den = dv_add(x2, y2);
+
+    /* result = num / den */
+    dval_t *out = dv_div(num, den);
+
+    /* cleanup */
+    dv_free(dy);
+    dv_free(dx);
+    dv_free(x_dy);
+    dv_free(y_dx);
+    dv_free(num);
+    dv_free(x2);
+    dv_free(y2);
+    dv_free(den);
+
+    return out;
+}
+
 /* asinh(a) */
 static dval_t *deriv_asinh(dval_t *n)
 {
@@ -963,6 +1016,11 @@ const dval_ops_t ops_acos = {
 const dval_ops_t ops_atan = {
     eval_atan,
     deriv_atan
+};
+
+const dval_ops_t ops_atan2 = {
+    eval_atan2,
+    deriv_atan2
 };
 
 const dval_ops_t ops_asinh = {
@@ -1163,6 +1221,14 @@ dval_t *dv_tanh(dval_t *a)  { dv_retain(a); return dv_new_unary(&ops_tanh, a); }
 dval_t *dv_asin(dval_t *a)  { dv_retain(a); return dv_new_unary(&ops_asin, a); }
 dval_t *dv_acos(dval_t *a)  { dv_retain(a); return dv_new_unary(&ops_acos, a); }
 dval_t *dv_atan(dval_t *a)  { dv_retain(a); return dv_new_unary(&ops_atan, a); }
+
+dval_t *dv_atan2(dval_t *y, dval_t *x)
+{
+    if (!y || !x) return NULL;
+    dv_retain(y);
+    dv_retain(x);
+    return dv_new_binary(&ops_atan2, y, x);
+}
 
 /* ------------------------------------------------------------------------- */
 /* Inverse hyperbolic (retain children)                                      */
