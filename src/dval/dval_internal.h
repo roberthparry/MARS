@@ -34,21 +34,21 @@
  *
  * Both functions must return *new* nodes with refcount = 1.
  */
-typedef struct dval_ops {
-    /**
-     * @brief Evaluate the primal value of this node.
-     *
-     * Implementations must evaluate children lazily via dv_eval_qf().
-     */
-    qfloat  (*eval)(dval_t *self);
+typedef enum {
+    DV_OP_ATOM,
+    DV_OP_UNARY,
+    DV_OP_BINARY
+} dval_arity_t;
 
-    /**
-     * @brief Construct the derivative node of this node.
-     *
-     * Must return a new node with refcount = 1.
-     * The caller takes ownership.
-     */
+typedef struct dval_ops {
+    qfloat  (*eval)(dval_t *self);
     dval_t *(*deriv)(dval_t *self);
+
+    dval_arity_t arity;
+    const char  *name;
+
+    /* NEW: constructor for unary ops */
+    dval_t *(*apply_unary)(dval_t *arg);
 } dval_ops_t;
 
 /* ------------------------------------------------------------------------- */

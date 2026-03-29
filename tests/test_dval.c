@@ -11,6 +11,7 @@
 #define RED "\x1b[31m"
 #define CYN "\x1b[36m"
 #define RST "\x1b[0m"
+#define BLD "\x1b[1m"
 
 /* ------------------------------------------------------------------------- */
 /* Compact qfloat comparison                                                 */
@@ -20,10 +21,19 @@ static void check_q_at(const char *file, int line, int col,
                        const char *label, qfloat got, qfloat expect)
 {
     qfloat diff = qf_sub(got, expect);
-    double d = fabs(qf_to_double(diff));
+    double abs_err = fabs(qf_to_double(diff));
+    double exp_d   = fabs(qf_to_double(expect));
 
-    if (d < 1e-30) {
-        /* PASS — unchanged, colour preserved */
+    /* Relative error when expect != 0 */
+    double rel_err = (exp_d > 0)
+        ? abs_err / exp_d
+        : abs_err;
+
+    /* Tolerances for quad-double */
+    const double ABS_TOL = 2e-30;
+    const double REL_TOL = 2e-30;
+
+    if (abs_err < ABS_TOL || rel_err < REL_TOL) {
         printf("%sPASS %s %-32s  got=",
                GRN, RST, label);
         qf_printf("%.34q", got);
@@ -31,7 +41,6 @@ static void check_q_at(const char *file, int line, int col,
         return;
     }
 
-    /* FAIL — new format, colour preserved */
     printf("%sFAIL%s   %s: %s:%d:%d: got=",
            RED, RST, label, file, line, col);
 
@@ -418,15 +427,36 @@ static void test_deriv_pow3(void)
 
 static void test_deriv_pow_xy(void)
 {
+    /* x = 2 */
     dval_t *x = dv_new_var_d(2.0);
-    dval_t *y = dv_new_var_d(3.0);
+
+    /* y = x^2 + 1 */
+    dval_t *x2 = dv_mul(x, x);              /* x^2 */
+    dval_t *one = dv_new_const_d(1.0);
+    dval_t *y = dv_add(x2, one);            /* x^2 + 1 */
+
+    /* f(x) = x^(x^2 + 1) */
     dval_t *f = dv_pow(x, y);
     const dval_t *df = dv_get_deriv(f);
-    check_q_at(__FILE__, __LINE__, 1, "d/dx{x^y} | x=2", dv_eval(df), qf_from_double(12.0));
+
+    /* Expected derivative at x = 2:
+       f'(2) = 32 * (4*ln(2) + 5/2)
+    */
+    qfloat X = qf_from_double(2.0);
+    qfloat yval = qf_add(qf_mul(X, X), qf_from_double(1.0));   /* 5 */
+    qfloat fval = qf_pow(X, yval);                             /* 32 */
+
+    qfloat term1 = qf_mul(qf_from_double(4.0), qf_log(X));     /* 4 ln 2 */
+    qfloat term2 = qf_div(yval, qf_from_double(2.0));          /* 5/2 */
+    qfloat expect = qf_mul(fval, qf_add(term1, term2));
+
+    check_q_at(__FILE__, __LINE__, 1, "d/dx{x^(x^2+1)} | x=2", dv_eval(df), expect);
 
     dv_free(f);
-    dv_free(x);
     dv_free(y);
+    dv_free(one);
+    dv_free(x2);
+    dv_free(x);
 }
 
 static void test_deriv_sin(void)
@@ -933,19 +963,69 @@ static void test_second_deriv_x3(void)
 
 static void test_second_deriv_pow_xy(void)
 {
-    dval_t *x   = dv_new_var_d(2.0);
-    dval_t *y   = dv_new_var_d(3.0);
+    /* x = 2 */
+    dval_t *x = dv_new_var_d(2.0);
+
+    /* y = x^2 + 1 */
+    dval_t *x2  = dv_mul(x, x);              /* x^2 */
+    dval_t *one = dv_new_const_d(1.0);
+    dval_t *y   = dv_add(x2, one);           /* x^2 + 1 */
+
+    /* f(x) = x^(x^2 + 1) */
     dval_t *f   = dv_pow(x, y);
+
+    /* First derivative */
     dval_t *df  = dv_create_deriv(f);
+
+    /* Second derivative */
     const dval_t *ddf = dv_get_deriv(df);
 
-    qfloat expect = qf_from_double(12.0);
+    /* ------------------------------------------------------------
+       Expected value from the exact closed-form:
 
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{x^y} | x=2", dv_eval(ddf), expect);
+       f''(x) = x^(x^2 + 1) *
+                ( x^2
+                + 4 x^2 ln^2(x)
+                + (4 x^2 + 6) ln(x)
+                + 5 )
+
+       Evaluate at x = 2 using qfloat.
+       ------------------------------------------------------------ */
+
+    qfloat X  = qf_from_double(2.0);
+    qfloat X2 = qf_mul(X, X);                 /* x^2 */
+
+    qfloat lnX   = qf_log(X);
+    qfloat lnX2  = qf_mul(lnX, lnX);          /* ln^2(x) */
+
+    /* x^(x^2+1) */
+    qfloat g     = qf_add(X2, qf_from_double(1.0));
+    qfloat fx    = qf_pow(X, g);
+
+    /* Build the polynomial factor */
+    qfloat term1 = X2;                                        /* x^2 */
+    qfloat term2 = qf_mul(qf_from_double(4.0),
+                          qf_mul(X2, lnX2));                  /* 4 x^2 ln^2(x) */
+    qfloat term3 = qf_mul(qf_add(qf_mul(qf_from_double(4.0), X2),
+                                 qf_from_double(6.0)),
+                          lnX);                               /* (4 x^2 + 6) ln(x) */
+    qfloat term4 = qf_from_double(5.0);                       /* +5 */
+
+    qfloat poly  = qf_add(qf_add(term1, term2),
+                          qf_add(term3, term4));
+
+    /* expect = x^(x^2+1) * poly */
+    qfloat expect = qf_mul(fx, poly);
+
+    check_q_at(__FILE__, __LINE__, 1,
+               "d²/dx²{x^(x^2+1)} | x=2",
+               dv_eval(ddf), expect);
 
     dv_free(df);
     dv_free(f);
     dv_free(y);
+    dv_free(one);
+    dv_free(x2);
     dv_free(x);
 }
 
@@ -1584,8 +1664,8 @@ static void test_to_string_basic_const_func(void)
     char *s = dv_to_string(c, style_FUNCTION);
 
     const char *expect =
-        "expr(x) = 3.5\n"
-        "return expr(x)\n";
+        "c = 3.5\n"
+        "return c\n";
 
     if (strcmp(s, expect) == 0)
         to_string_pass("basic const (FUNC)", s, expect);
@@ -1680,7 +1760,7 @@ static void test_to_string_addition_func(void)
     const char *expect =
         "x = 1\n"
         "y = 2\n"
-        "expr(x,y) = x+y\n"
+        "expr(x,y) = x + y\n"
         "return expr(x,y)\n";
 
     if (strcmp(s, expect) == 0)
@@ -1736,7 +1816,7 @@ static void test_to_string_nested_mul_add_func(void)
         "x = 2\n"
         "y = 3\n"
         "z = 4\n"
-        "expr(x,y,z) = x*y+z\n"
+        "expr(x,y,z) = x*y + z\n"
         "return expr(x,y,z)\n";
 
     if (strcmp(s, expect) == 0)
@@ -1784,7 +1864,7 @@ static void test_to_string_atan2_func(void)
     const char *expect =
         "x = 2\n"
         "y = 3\n"
-        "expr(x,y) = atan2(x,y)\n"
+        "expr(x,y) = atan2(x, y)\n"
         "return expr(x,y)\n";
 
     if (strcmp(s, expect) == 0)
@@ -1957,6 +2037,1651 @@ void test_to_string_all(void)
     test_to_string_pow_superscript();
     test_to_string_unary_sin();
     test_to_string_function_style();
+}
+
+/* ============================================================
+ *  make_expr_01        x*x
+ * ============================================================ */
+static dval_t *make_expr_01(void)
+{
+    dval_t *x = dv_new_named_var_d(1.25, "x");
+
+    dval_t *t1 = dv_mul(x, x);   /* x*x */
+
+    dv_free(x);
+    return t1;
+}
+
+/* ============================================================
+ *  make_expr_02        x*x*x
+ * ============================================================ */
+static dval_t *make_expr_02(void)
+{
+    dval_t *x = dv_new_named_var_d(1.25, "x");
+
+    dval_t *t1 = dv_mul(x, x);   /* x*x      */
+    dval_t *t2 = dv_mul(t1, x);  /* x*x*x    */
+
+    dv_free(x);
+    dv_free(t1);
+    return t2;
+}
+
+/* ============================================================
+ *  make_expr_03        π * x^2
+ * ============================================================ */
+static dval_t *make_expr_03(void)
+{
+    dval_t *x   = dv_new_named_var_d(1.25, "x");
+    dval_t *pi  = dv_new_named_const(QF_PI, "@pi");
+
+    dval_t *t1 = dv_pow_d(x, 2.0);   /* x^2      */
+    dval_t *t2 = dv_mul(pi, t1);     /* π * x^2  */
+
+    dv_free(x);
+    dv_free(pi);
+    dv_free(t1);
+    return t2;
+}
+
+/* ============================================================
+ *  make_expr_04        x*x + x*x
+ * ============================================================ */
+static dval_t *make_expr_04(void)
+{
+    dval_t *x = dv_new_named_var_d(1.25, "x");
+
+    dval_t *t1 = dv_mul(x, x);       /* x*x        */
+    dval_t *t2 = dv_mul(x, x);       /* x*x        */
+    dval_t *t3 = dv_add(t1, t2);     /* x*x + x*x  */
+
+    dv_free(x);
+    dv_free(t1);
+    dv_free(t2);
+    return t3;
+}
+
+/* ============================================================
+ *  make_expr_05        x*x + 3*x*x + 7
+ * ============================================================ */
+static dval_t *make_expr_05(void)
+{
+    dval_t *x = dv_new_named_var_d(1.25, "x");
+
+    dval_t *t1 = dv_mul(x, x);        /* x*x          */
+    dval_t *t2 = dv_mul_d(t1, 3.0);   /* 3*x*x        */
+    dval_t *t3 = dv_add(t1, t2);      /* x*x+3*x*x    */
+    dval_t *t4 = dv_add_d(t3, 7.0);   /* x*x+3*x*x+7  */
+
+    dv_free(x);
+    dv_free(t1);
+    dv_free(t2);
+    dv_free(t3);
+    return t4;
+}
+
+/* ============================================================
+ *  make_expr_06        2*x - 5*x
+ * ============================================================ */
+static dval_t *make_expr_06(void)
+{
+    dval_t *x = dv_new_named_var_d(1.25, "x");
+
+    dval_t *t1 = dv_mul_d(x, 2.0);   /* 2*x   */
+    dval_t *t2 = dv_mul_d(x, 5.0);   /* 5*x   */
+    dval_t *t3 = dv_sub(t1, t2);     /* 2*x-5*x */
+
+    dv_free(x);
+    dv_free(t1);
+    dv_free(t2);
+    return t3;
+}
+
+/* ============================================================
+ *  make_expr_07        x^2 * x^3
+ * ============================================================ */
+static dval_t *make_expr_07(void)
+{
+    dval_t *x = dv_new_named_var_d(1.25, "x");
+
+    dval_t *t1 = dv_pow_d(x, 2.0);   /* x^2      */
+    dval_t *t2 = dv_pow_d(x, 3.0);   /* x^3      */
+    dval_t *t3 = dv_mul(t1, t2);     /* x^2*x^3  */
+
+    dv_free(x);
+    dv_free(t1);
+    dv_free(t2);
+    return t3;
+}
+
+/* ============================================================
+ *  make_expr_08        x^2 * x * x^4
+ * ============================================================ */
+static dval_t *make_expr_08(void)
+{
+    dval_t *x = dv_new_named_var_d(1.25, "x");
+
+    dval_t *t1 = dv_pow_d(x, 2.0);   /* x^2        */
+    dval_t *t2 = dv_mul(t1, x);      /* x^2*x      */
+    dval_t *t3 = dv_pow_d(x, 4.0);   /* x^4        */
+    dval_t *t4 = dv_mul(t2, t3);     /* x^2*x*x^4  */
+
+    dv_free(x);
+    dv_free(t1);
+    dv_free(t2);
+    dv_free(t3);
+    return t4;
+}
+
+/* ============================================================
+ *  make_expr_09        x^2 * y^3 * x
+ * ============================================================ */
+static dval_t *make_expr_09(void)
+{
+    dval_t *x = dv_new_named_var_d(1.25, "x");
+    dval_t *y = dv_new_named_var_d(1.25, "y");
+
+    dval_t *t1 = dv_pow_d(x, 2.0);   /* x^2        */
+    dval_t *t2 = dv_pow_d(y, 3.0);   /* y^3        */
+    dval_t *t3 = dv_mul(t1, t2);     /* x^2*y^3    */
+    dval_t *t4 = dv_mul(t3, x);      /* x^2*y^3*x  */
+
+    dv_free(x);
+    dv_free(y);
+    dv_free(t1);
+    dv_free(t2);
+    dv_free(t3);
+    return t4;
+}
+
+/* ============================================================
+ *  make_expr_10        3*x^2 * 4*x
+ * ============================================================ */
+static dval_t *make_expr_10(void)
+{
+    dval_t *x = dv_new_named_var_d(1.25, "x");
+
+    dval_t *t1 = dv_pow_d(x, 2.0);    /* x^2        */
+    dval_t *t2 = dv_mul_d(t1, 3.0);   /* 3*x^2      */
+    dval_t *t3 = dv_mul_d(x, 4.0);    /* 4*x        */
+    dval_t *t4 = dv_mul(t2, t3);      /* 3*x^2*4*x  */
+
+    dv_free(x);
+    dv_free(t1);
+    dv_free(t2);
+    dv_free(t3);
+    return t4;
+}
+
+/* ============================================================
+ *  make_expr_11        3*x * 2*y * x^2   → 6 x^3 y
+ * ============================================================ */
+static dval_t *make_expr_11(void)
+{
+    dval_t *x = dv_new_named_var_d(1.25, "x");
+    dval_t *y = dv_new_named_var_d(1.25, "y");
+
+    dval_t *t1 = dv_mul_d(x, 3.0);      /* 3*x     */
+    dval_t *t2 = dv_mul_d(y, 2.0);      /* 2*y     */
+    dval_t *t3 = dv_mul(t1, t2);        /* 3*x*2*y */
+    dval_t *t4 = dv_pow_d(x, 2.0);      /* x^2     */
+    dval_t *t5 = dv_mul(t3, t4);        /* 3*x*2*y*x^2 */
+
+    dv_free(x);
+    dv_free(y);
+    dv_free(t1);
+    dv_free(t2);
+    dv_free(t3);
+    dv_free(t4);
+    return t5;
+}
+
+/* ============================================================
+ *  make_expr_12        x*x*y*x   → x^3 y
+ * ============================================================ */
+static dval_t *make_expr_12(void)
+{
+    dval_t *x = dv_new_named_var_d(1.25, "x");
+    dval_t *y = dv_new_named_var_d(1.25, "y");
+
+    dval_t *t1 = dv_mul(x, x);      /* x*x     */
+    dval_t *t2 = dv_mul(t1, y);     /* x*x*y   */
+    dval_t *t3 = dv_mul(t2, x);     /* x*x*y*x */
+
+    dv_free(x);
+    dv_free(y);
+    dv_free(t1);
+    dv_free(t2);
+    return t3;
+}
+
+/* ============================================================
+ *  make_expr_13        3*x
+ * ============================================================ */
+static dval_t *make_expr_13(void)
+{
+    dval_t *x = dv_new_named_var_d(1.25, "x");
+
+    dval_t *t1 = dv_mul_d(x, 3.0);   /* 3*x */
+
+    dv_free(x);
+    return t1;
+}
+
+/* ============================================================
+ *  make_expr_14        3*x*x
+ * ============================================================ */
+static dval_t *make_expr_14(void)
+{
+    dval_t *x = dv_new_named_var_d(1.25, "x");
+
+    dval_t *t1 = dv_mul(x, x);       /* x*x   */
+    dval_t *t2 = dv_mul_d(t1, 3.0);  /* 3*x*x */
+
+    dv_free(x);
+    dv_free(t1);
+    return t2;
+}
+
+/* ============================================================
+ *  make_expr_15        6*x
+ * ============================================================ */
+static dval_t *make_expr_15(void)
+{
+    dval_t *x = dv_new_named_var_d(1.25, "x");
+
+    dval_t *t1 = dv_mul_d(x, 6.0);   /* 6*x */
+
+    dv_free(x);
+    return t1;
+}
+
+/* ============================================================
+ *  make_expr_16        7*x^2
+ * ============================================================ */
+static dval_t *make_expr_16(void)
+{
+    dval_t *x = dv_new_named_var_d(1.25, "x");
+
+    dval_t *t1 = dv_pow_d(x, 2.0);    /* x^2     */
+    dval_t *t2 = dv_mul_d(t1, 7.0);   /* 7*x^2   */
+
+    dv_free(x);
+    dv_free(t1);
+    return t2;
+}
+
+/* ============================================================
+ *  make_expr_17        2*x*y
+ * ============================================================ */
+static dval_t *make_expr_17(void)
+{
+    dval_t *x = dv_new_named_var_d(1.25, "x");
+    dval_t *y = dv_new_named_var_d(1.25, "y");
+
+    dval_t *t1 = dv_mul(x, y);        /* x*y     */
+    dval_t *t2 = dv_mul_d(t1, 2.0);   /* 2*x*y   */
+
+    dv_free(x);
+    dv_free(y);
+    dv_free(t1);
+    return t2;
+}
+
+/* ============================================================
+ *  make_expr_18        sin(x) * cos(x)
+ * ============================================================ */
+static dval_t *make_expr_18(void)
+{
+    dval_t *x = dv_new_named_var_d(1.25, "x");
+
+    dval_t *t1 = dv_sin(x);       /* sin(x) */
+    dval_t *t2 = dv_cos(x);       /* cos(x) */
+    dval_t *t3 = dv_mul(t1, t2);  /* sin(x)*cos(x) */
+
+    dv_free(x);
+    dv_free(t1);
+    dv_free(t2);
+    return t3;
+}
+
+/* ============================================================
+ *  make_expr_19        cos(x) * exp(x)
+ * ============================================================ */
+static dval_t *make_expr_19(void)
+{
+    dval_t *x = dv_new_named_var_d(1.25, "x");
+
+    dval_t *t1 = dv_cos(x);       /* cos(x) */
+    dval_t *t2 = dv_exp(x);       /* exp(x) */
+    dval_t *t3 = dv_mul(t1, t2);  /* cos(x)*exp(x) */
+
+    dv_free(x);
+    dv_free(t1);
+    dv_free(t2);
+    return t3;
+}
+
+/* ============================================================
+ *  make_expr_20        exp(x) * x*x   → x^2 * exp(x)
+ * ============================================================ */
+static dval_t *make_expr_20(void)
+{
+    dval_t *x = dv_new_named_var_d(1.25, "x");
+
+    dval_t *t1 = dv_exp(x);       /* exp(x) */
+    dval_t *t2 = dv_mul(x, x);    /* x*x    */
+    dval_t *t3 = dv_mul(t2, t1);  /* x*x*exp(x) */
+
+    dv_free(x);
+    dv_free(t1);
+    dv_free(t2);
+    return t3;
+}
+
+/* ============================================================
+ *  make_expr_21        3*exp(x) * x^2
+ * ============================================================ */
+static dval_t *make_expr_21(void)
+{
+    dval_t *x = dv_new_named_var_d(1.25, "x");
+
+    dval_t *t1 = dv_exp(x);          /* exp(x)     */
+    dval_t *t2 = dv_mul_d(t1, 3.0);  /* 3*exp(x)   */
+    dval_t *t3 = dv_pow_d(x, 2.0);   /* x^2        */
+    dval_t *t4 = dv_mul(t2, t3);     /* 3*exp(x)*x^2 */
+
+    dv_free(x);
+    dv_free(t1);
+    dv_free(t2);
+    dv_free(t3);
+    return t4;
+}
+
+/* ============================================================
+ *  make_expr_22        sin(x) * x^2
+ * ============================================================ */
+static dval_t *make_expr_22(void)
+{
+    dval_t *x = dv_new_named_var_d(1.25, "x");
+
+    dval_t *t1 = dv_sin(x);          /* sin(x) */
+    dval_t *t2 = dv_pow_d(x, 2.0);   /* x^2    */
+    dval_t *t3 = dv_mul(t1, t2);     /* sin(x)*x^2 */
+
+    dv_free(x);
+    dv_free(t1);
+    dv_free(t2);
+    return t3;
+}
+
+/* ============================================================
+ *  make_expr_23        x*sin(x)*x   → x^2 * sin(x)
+ * ============================================================ */
+static dval_t *make_expr_23(void)
+{
+    dval_t *x = dv_new_named_var_d(1.25, "x");
+
+    dval_t *t1 = dv_sin(x);       /* sin(x) */
+    dval_t *t2 = dv_mul(x, t1);   /* x*sin(x) */
+    dval_t *t3 = dv_mul(t2, x);   /* x*sin(x)*x */
+
+    dv_free(x);
+    dv_free(t1);
+    dv_free(t2);
+    return t3;
+}
+
+/* ============================================================
+ *  make_expr_24        exp(sin(x))
+ * ============================================================ */
+static dval_t *make_expr_24(void)
+{
+    dval_t *x = dv_new_named_var_d(1.25, "x");
+
+    dval_t *t1 = dv_sin(x);       /* sin(x) */
+    dval_t *t2 = dv_exp(t1);      /* exp(sin(x)) */
+
+    dv_free(x);
+    dv_free(t1);
+    return t2;
+}
+
+/* ============================================================
+ *  make_expr_25        cos(x) * exp(sin(x))
+ * ============================================================ */
+static dval_t *make_expr_25(void)
+{
+    dval_t *x = dv_new_named_var_d(1.25, "x");
+
+    dval_t *t1 = dv_cos(x);       /* cos(x) */
+    dval_t *t2 = dv_sin(x);       /* sin(x) */
+    dval_t *t3 = dv_exp(t2);      /* exp(sin(x)) */
+    dval_t *t4 = dv_mul(t1, t3);  /* cos(x)*exp(sin(x)) */
+
+    dv_free(x);
+    dv_free(t1);
+    dv_free(t2);
+    dv_free(t3);
+    return t4;
+}
+
+/* ============================================================
+ *  make_expr_26        x*x * exp(sin(x))
+ * ============================================================ */
+static dval_t *make_expr_26(void)
+{
+    dval_t *x = dv_new_named_var_d(1.25, "x");
+
+    dval_t *t1 = dv_mul(x, x);    /* x*x */
+    dval_t *t2 = dv_sin(x);       /* sin(x) */
+    dval_t *t3 = dv_exp(t2);      /* exp(sin(x)) */
+    dval_t *t4 = dv_mul(t1, t3);  /* x*x*exp(sin(x)) */
+
+    dv_free(x);
+    dv_free(t1);
+    dv_free(t2);
+    dv_free(t3);
+    return t4;
+}
+
+/* ============================================================
+ *  make_expr_27        exp(sin(x)) * exp(cos(x))
+ * ============================================================ */
+static dval_t *make_expr_27(void)
+{
+    dval_t *x = dv_new_named_var_d(1.25, "x");
+
+    dval_t *t1 = dv_sin(x);       /* sin(x) */
+    dval_t *t2 = dv_exp(t1);      /* exp(sin(x)) */
+    dval_t *t3 = dv_cos(x);       /* cos(x) */
+    dval_t *t4 = dv_exp(t3);      /* exp(cos(x)) */
+    dval_t *t5 = dv_mul(t2, t4);  /* exp(sin(x))*exp(cos(x)) */
+
+    dv_free(x);
+    dv_free(t1);
+    dv_free(t2);
+    dv_free(t3);
+    dv_free(t4);
+    return t5;
+}
+
+/* ============================================================
+ *  make_expr_28        exp(x^2) * exp(3*x^2)
+ * ============================================================ */
+static dval_t *make_expr_28(void)
+{
+    dval_t *x = dv_new_named_var_d(1.25, "x");
+
+    dval_t *t1 = dv_pow_d(x, 2.0);     /* x^2       */
+    dval_t *t2 = dv_exp(t1);           /* exp(x^2)  */
+    dval_t *t3 = dv_mul_d(t1, 3.0);    /* 3*x^2     */
+    dval_t *t4 = dv_exp(t3);           /* exp(3*x^2) */
+    dval_t *t5 = dv_mul(t2, t4);       /* exp(x^2)*exp(3*x^2) */
+
+    dv_free(x);
+    dv_free(t1);
+    dv_free(t2);
+    dv_free(t3);
+    dv_free(t4);
+    return t5;
+}
+
+/* ============================================================
+ *  make_expr_29        exp(x) * exp(2*x)
+ * ============================================================ */
+static dval_t *make_expr_29(void)
+{
+    dval_t *x = dv_new_named_var_d(1.25, "x");
+
+    dval_t *t1 = dv_exp(x);          /* exp(x)   */
+    dval_t *t2 = dv_mul_d(x, 2.0);   /* 2*x      */
+    dval_t *t3 = dv_exp(t2);         /* exp(2*x) */
+    dval_t *t4 = dv_mul(t1, t3);     /* exp(x)*exp(2*x) */
+
+    dv_free(x);
+    dv_free(t1);
+    dv_free(t2);
+    dv_free(t3);
+    return t4;
+}
+
+/* ============================================================
+ *  make_expr_30        exp(sin(x)) * exp(cos(x)) * exp(x)
+ * ============================================================ */
+static dval_t *make_expr_30(void)
+{
+    dval_t *x = dv_new_named_var_d(1.25, "x");
+
+    dval_t *t1 = dv_sin(x);       /* sin(x) */
+    dval_t *t2 = dv_exp(t1);      /* exp(sin(x)) */
+    dval_t *t3 = dv_cos(x);       /* cos(x) */
+    dval_t *t4 = dv_exp(t3);      /* exp(cos(x)) */
+    dval_t *t5 = dv_exp(x);       /* exp(x) */
+    dval_t *t6 = dv_mul(t2, t4);  /* exp(sin(x))*exp(cos(x)) */
+    dval_t *t7 = dv_mul(t6, t5);  /* exp(sin(x))*exp(cos(x))*exp(x) */
+
+    dv_free(x);
+    dv_free(t1);
+    dv_free(t2);
+    dv_free(t3);
+    dv_free(t4);
+    dv_free(t5);
+    dv_free(t6);
+    return t7;
+}
+
+/* ============================================================
+ *  make_expr_31        π * sin(x)
+ * ============================================================ */
+static dval_t *make_expr_31(void)
+{
+    dval_t *x  = dv_new_named_var_d(1.25, "x");
+    dval_t *pi = dv_new_named_const(QF_PI, "@pi");
+
+    dval_t *t1 = dv_sin(x);       /* sin(x)   */
+    dval_t *t2 = dv_mul(pi, t1);  /* π*sin(x) */
+
+    dv_free(x);
+    dv_free(pi);
+    dv_free(t1);
+    return t2;
+}
+
+/* ============================================================
+ *  make_expr_32        τ * cos(x)
+ * ============================================================ */
+static dval_t *make_expr_32(void)
+{
+    dval_t *x   = dv_new_named_var_d(1.25, "x");
+    dval_t *tau = dv_new_named_const(QF_2PI, "@tau");
+
+    dval_t *t1 = dv_cos(x);        /* cos(x)   */
+    dval_t *t2 = dv_mul(tau, t1);  /* τ*cos(x) */
+
+    dv_free(x);
+    dv_free(tau);
+    dv_free(t1);
+    return t2;
+}
+
+/* ============================================================
+ *  make_expr_33        e * x^2
+ * ============================================================ */
+static dval_t *make_expr_33(void)
+{
+    dval_t *x = dv_new_named_var_d(1.25, "x");
+    dval_t *e = dv_new_named_const(QF_E, "e");
+
+    dval_t *t1 = dv_pow_d(x, 2.0);   /* x^2    */
+    dval_t *t2 = dv_mul(e, t1);      /* e*x^2  */
+
+    dv_free(x);
+    dv_free(e);
+    dv_free(t1);
+    return t2;
+}
+
+/* ============================================================
+ *  make_expr_34        π * τ * e
+ * ============================================================ */
+static dval_t *make_expr_34(void)
+{
+    dval_t *pi  = dv_new_named_const(QF_PI, "@pi");
+    dval_t *tau = dv_new_named_const(QF_2PI, "@tau");
+    dval_t *e   = dv_new_named_const(QF_E, "e");
+
+    dval_t *t1 = dv_mul(pi, tau);   /* π*τ   */
+    dval_t *t2 = dv_mul(t1, e);     /* π*τ*e */
+
+    dv_free(pi);
+    dv_free(tau);
+    dv_free(e);
+    dv_free(t1);
+    return t2;
+}
+
+/* ============================================================
+ *  make_expr_35        π * x * τ * y
+ * ============================================================ */
+static dval_t *make_expr_35(void)
+{
+    dval_t *x   = dv_new_named_var_d(1.25, "x");
+    dval_t *y   = dv_new_named_var_d(1.25, "y");
+    dval_t *pi  = dv_new_named_const(QF_PI, "@pi");
+    dval_t *tau = dv_new_named_const(QF_2PI, "@tau");
+
+    dval_t *t1 = dv_mul(pi, x);      /* π*x     */
+    dval_t *t2 = dv_mul(t1, tau);    /* π*x*τ   */
+    dval_t *t3 = dv_mul(t2, y);      /* π*x*τ*y */
+
+    dv_free(x);
+    dv_free(y);
+    dv_free(pi);
+    dv_free(tau);
+    dv_free(t1);
+    dv_free(t2);
+    return t3;
+}
+
+/* ============================================================
+ *  make_expr_36        e^(x) * π
+ * ============================================================ */
+static dval_t *make_expr_36(void)
+{
+    dval_t *x  = dv_new_named_var_d(1.25, "x");
+    dval_t *pi = dv_new_named_const(QF_PI, "@pi");
+
+    dval_t *t1 = dv_exp(x);       /* exp(x) */
+    dval_t *t2 = dv_mul(t1, pi);  /* exp(x)*π */
+
+    dv_free(x);
+    dv_free(pi);
+    dv_free(t1);
+    return t2;
+}
+
+/* ============================================================
+ *  make_expr_37        τ * exp(x^2)
+ * ============================================================ */
+static dval_t *make_expr_37(void)
+{
+    dval_t *x   = dv_new_named_var_d(1.25, "x");
+    dval_t *tau = dv_new_named_const(QF_2PI, "@tau");
+
+    dval_t *t1 = dv_pow_d(x, 2.0);   /* x^2        */
+    dval_t *t2 = dv_exp(t1);         /* exp(x^2)   */
+    dval_t *t3 = dv_mul(tau, t2);    /* τ*exp(x^2) */
+
+    dv_free(x);
+    dv_free(tau);
+    dv_free(t1);
+    dv_free(t2);
+    return t3;
+}
+
+/* ============================================================
+ *  make_expr_38        e * sin(x) * cos(y)
+ * ============================================================ */
+static dval_t *make_expr_38(void)
+{
+    dval_t *x = dv_new_named_var_d(1.25, "x");
+    dval_t *y = dv_new_named_var_d(1.25, "y");
+    dval_t *e = dv_new_named_const(QF_E, "e");
+
+    dval_t *t1 = dv_sin(x);       /* sin(x) */
+    dval_t *t2 = dv_cos(y);       /* cos(y) */
+    dval_t *t3 = dv_mul(t1, t2);  /* sin(x)*cos(y) */
+    dval_t *t4 = dv_mul(e, t3);   /* e*sin(x)*cos(y) */
+
+    dv_free(x);
+    dv_free(y);
+    dv_free(e);
+    dv_free(t1);
+    dv_free(t2);
+    dv_free(t3);
+    return t4;
+}
+
+/* ============================================================
+ *  make_expr_39        π * exp(τ * x)
+ * ============================================================ */
+static dval_t *make_expr_39(void)
+{
+    dval_t *x   = dv_new_named_var_d(1.25, "x");
+    dval_t *pi  = dv_new_named_const(QF_PI, "@pi");
+    dval_t *tau = dv_new_named_const(QF_2PI, "@tau");
+
+    dval_t *t1 = dv_mul(tau, x);   /* τ*x        */
+    dval_t *t2 = dv_exp(t1);       /* exp(τ*x)   */
+    dval_t *t3 = dv_mul(pi, t2);   /* π*exp(τ*x) */
+
+    dv_free(x);
+    dv_free(pi);
+    dv_free(tau);
+    dv_free(t1);
+    dv_free(t2);
+    return t3;
+}
+
+/* ============================================================
+ *  make_expr_40        e^(π*x) * τ
+ * ============================================================ */
+static dval_t *make_expr_40(void)
+{
+    dval_t *x   = dv_new_named_var_d(1.25, "x");
+    dval_t *pi  = dv_new_named_const(QF_PI, "@pi");
+    dval_t *tau = dv_new_named_const(QF_2PI, "@tau");
+
+    dval_t *t1 = dv_mul(pi, x);   /* π*x      */
+    dval_t *t2 = dv_exp(t1);      /* exp(π*x) */
+    dval_t *t3 = dv_mul(t2, tau); /* exp(π*x)*τ */
+
+    dv_free(x);
+    dv_free(pi);
+    dv_free(tau);
+    dv_free(t1);
+    dv_free(t2);
+    return t3;
+}
+
+/* ============================================================
+ *  make_expr_41        sin(π * x)
+ * ============================================================ */
+static dval_t *make_expr_41(void)
+{
+    dval_t *x  = dv_new_named_var_d(1.25, "x");
+    dval_t *pi = dv_new_named_const(QF_PI, "@pi");
+
+    dval_t *t1 = dv_mul(pi, x);   /* π*x       */
+    dval_t *t2 = dv_sin(t1);      /* sin(π*x)  */
+
+    dv_free(x);
+    dv_free(pi);
+    dv_free(t1);
+    return t2;
+}
+
+/* ============================================================
+ *  make_expr_42        cos(τ * x)
+ * ============================================================ */
+static dval_t *make_expr_42(void)
+{
+    dval_t *x   = dv_new_named_var_d(1.25, "x");
+    dval_t *tau = dv_new_named_const(QF_2PI, "@tau");
+
+    dval_t *t1 = dv_mul(tau, x);  /* τ*x       */
+    dval_t *t2 = dv_cos(t1);      /* cos(τ*x)  */
+
+    dv_free(x);
+    dv_free(tau);
+    dv_free(t1);
+    return t2;
+}
+
+/* ============================================================
+ *  make_expr_43        exp(π * τ * x)
+ * ============================================================ */
+static dval_t *make_expr_43(void)
+{
+    dval_t *x   = dv_new_named_var_d(1.25, "x");
+    dval_t *pi  = dv_new_named_const(QF_PI, "@pi");
+    dval_t *tau = dv_new_named_const(QF_2PI, "@tau");
+
+    dval_t *t1 = dv_mul(pi, tau);  /* π*τ      */
+    dval_t *t2 = dv_mul(t1, x);    /* π*τ*x    */
+    dval_t *t3 = dv_exp(t2);       /* exp(π*τ*x) */
+
+    dv_free(x);
+    dv_free(pi);
+    dv_free(tau);
+    dv_free(t1);
+    dv_free(t2);
+    return t3;
+}
+
+/* ============================================================
+ *  make_expr_44        sin(x) + cos(x) + exp(x)
+ * ============================================================ */
+static dval_t *make_expr_44(void)
+{
+    dval_t *x = dv_new_named_var_d(1.25, "x");
+
+    dval_t *t1 = dv_sin(x);       /* sin(x) */
+    dval_t *t2 = dv_cos(x);       /* cos(x) */
+    dval_t *t3 = dv_add(t1, t2);  /* sin(x)+cos(x) */
+    dval_t *t4 = dv_exp(x);       /* exp(x) */
+    dval_t *t5 = dv_add(t3, t4);  /* sin(x)+cos(x)+exp(x) */
+
+    dv_free(x);
+    dv_free(t1);
+    dv_free(t2);
+    dv_free(t3);
+    dv_free(t4);
+    return t5;
+}
+
+/* ============================================================
+ *  make_expr_45        x + y + π + τ + e
+ * ============================================================ */
+static dval_t *make_expr_45(void)
+{
+    dval_t *x   = dv_new_named_var_d(1.25, "x");
+    dval_t *y   = dv_new_named_var_d(1.25, "y");
+    dval_t *pi  = dv_new_named_const(QF_PI, "@pi");
+    dval_t *tau = dv_new_named_const(QF_2PI, "@tau");
+    dval_t *e   = dv_new_named_const(QF_E, "e");
+
+    dval_t *t1 = dv_add(x, y);     /* x+y     */
+    dval_t *t2 = dv_add(t1, pi);   /* x+y+π   */
+    dval_t *t3 = dv_add(t2, tau);  /* x+y+π+τ */
+    dval_t *t4 = dv_add(t3, e);    /* x+y+π+τ+e */
+
+    dv_free(x);
+    dv_free(y);
+    dv_free(pi);
+    dv_free(tau);
+    dv_free(e);
+    dv_free(t1);
+    dv_free(t2);
+    dv_free(t3);
+    return t4;
+}
+
+/* ============================================================
+ *  make_expr_46        x*y + π*x + τ*y + e
+ * ============================================================ */
+static dval_t *make_expr_46(void)
+{
+    dval_t *x   = dv_new_named_var_d(1.25, "x");
+    dval_t *y   = dv_new_named_var_d(1.25, "y");
+    dval_t *pi  = dv_new_named_const(QF_PI, "@pi");
+    dval_t *tau = dv_new_named_const(QF_2PI, "@tau");
+    dval_t *e   = dv_new_named_const(QF_E, "e");
+
+    dval_t *t1 = dv_mul(x, y);     /* x*y     */
+    dval_t *t2 = dv_mul(pi, x);    /* π*x     */
+    dval_t *t3 = dv_mul(tau, y);   /* τ*y     */
+    dval_t *t4 = dv_add(t1, t2);   /* x*y + π*x */
+    dval_t *t5 = dv_add(t4, t3);   /* x*y + π*x + τ*y */
+    dval_t *t6 = dv_add(t5, e);    /* x*y + π*x + τ*y + e */
+
+    dv_free(x);
+    dv_free(y);
+    dv_free(pi);
+    dv_free(tau);
+    dv_free(e);
+    dv_free(t1);
+    dv_free(t2);
+    dv_free(t3);
+    dv_free(t4);
+    dv_free(t5);
+    return t6;
+}
+
+/* ============================================================
+ *  make_expr_47        (x + π) * (y + τ)
+ * ============================================================ */
+static dval_t *make_expr_47(void)
+{
+    dval_t *x   = dv_new_named_var_d(1.25, "x");
+    dval_t *y   = dv_new_named_var_d(1.25, "y");
+    dval_t *pi  = dv_new_named_const(QF_PI, "@pi");
+    dval_t *tau = dv_new_named_const(QF_2PI, "@tau");
+
+    dval_t *t1 = dv_add(x, pi);     /* x+π */
+    dval_t *t2 = dv_add(y, tau);    /* y+τ */
+    dval_t *t3 = dv_mul(t1, t2);    /* (x+π)*(y+τ) */
+
+    dv_free(x);
+    dv_free(y);
+    dv_free(pi);
+    dv_free(tau);
+    dv_free(t1);
+    dv_free(t2);
+    return t3;
+}
+
+/* ============================================================
+ *  make_expr_48        exp(x + π) * exp(y + τ)
+ * ============================================================ */
+static dval_t *make_expr_48(void)
+{
+    dval_t *x   = dv_new_named_var_d(1.25, "x");
+    dval_t *y   = dv_new_named_var_d(1.25, "y");
+    dval_t *pi  = dv_new_named_const(QF_PI, "@pi");
+    dval_t *tau = dv_new_named_const(QF_2PI, "@tau");
+
+    dval_t *t1 = dv_add(x, pi);     /* x+π */
+    dval_t *t2 = dv_exp(t1);        /* exp(x+π) */
+    dval_t *t3 = dv_add(y, tau);    /* y+τ */
+    dval_t *t4 = dv_exp(t3);        /* exp(y+τ) */
+    dval_t *t5 = dv_mul(t2, t4);    /* exp(x+π)*exp(y+τ) */
+
+    dv_free(x);
+    dv_free(y);
+    dv_free(pi);
+    dv_free(tau);
+    dv_free(t1);
+    dv_free(t2);
+    dv_free(t3);
+    dv_free(t4);
+    return t5;
+}
+
+/* ============================================================
+ *  make_expr_49        sin(x + π) * cos(y + τ)
+ * ============================================================ */
+static dval_t *make_expr_49(void)
+{
+    dval_t *x   = dv_new_named_var_d(1.25, "x");
+    dval_t *y   = dv_new_named_var_d(1.25, "y");
+    dval_t *pi  = dv_new_named_const(QF_PI, "@pi");
+    dval_t *tau = dv_new_named_const(QF_2PI, "@tau");
+
+    dval_t *t1 = dv_add(x, pi);     /* x+π */
+    dval_t *t2 = dv_sin(t1);        /* sin(x+π) */
+    dval_t *t3 = dv_add(y, tau);    /* y+τ */
+    dval_t *t4 = dv_cos(t3);        /* cos(y+τ) */
+    dval_t *t5 = dv_mul(t2, t4);    /* sin(x+π)*cos(y+τ) */
+
+    dv_free(x);
+    dv_free(y);
+    dv_free(pi);
+    dv_free(tau);
+    dv_free(t1);
+    dv_free(t2);
+    dv_free(t3);
+    dv_free(t4);
+    return t5;
+}
+
+/* ============================================================
+ *  make_expr_50        exp(sin(x + π) + cos(y + τ))
+ * ============================================================ */
+static dval_t *make_expr_50(void)
+{
+    dval_t *x   = dv_new_named_var_d(1.25, "x");
+    dval_t *y   = dv_new_named_var_d(1.25, "y");
+    dval_t *pi  = dv_new_named_const(QF_PI, "@pi");
+    dval_t *tau = dv_new_named_const(QF_2PI, "@tau");
+
+    dval_t *t1 = dv_add(x, pi);     /* x+π */
+    dval_t *t2 = dv_sin(t1);        /* sin(x+π) */
+    dval_t *t3 = dv_add(y, tau);    /* y+τ */
+    dval_t *t4 = dv_cos(t3);        /* cos(y+τ) */
+    dval_t *t5 = dv_add(t2, t4);    /* sin(x+π)+cos(y+τ) */
+    dval_t *t6 = dv_exp(t5);        /* exp(sin(x+π)+cos(y+τ)) */
+
+    dv_free(x);
+    dv_free(y);
+    dv_free(pi);
+    dv_free(tau);
+    dv_free(t1);
+    dv_free(t2);
+    dv_free(t3);
+    dv_free(t4);
+    dv_free(t5);
+    return t6;
+}
+
+static void test_expressions(void)
+{
+    /* ============================================================
+     *  Test table (all 50 entries)
+     * ============================================================ */
+    struct {
+        const char *src;
+        dval_t *(*make)(void);
+        const char *expected_expr;
+        const char *expected_func;
+        int line;   /* NEW: source line of this test entry */
+    } tests[] = {
+        /* 01 */
+        {
+            "x*x",
+            make_expr_01,
+            "{ x² | x = 1.25 }",
+            "x = 1.25\n"
+            "expr(x) = x*x\n"
+            "return expr(x)",
+            __LINE__ 
+        },
+
+        /* 02 */
+        {
+            "x*x*x",
+            make_expr_02,
+            "{ x³ | x = 1.25 }",
+            "x = 1.25\n"
+            "expr(x) = x*x*x\n"
+            "return expr(x)",
+            __LINE__ 
+        },
+
+        /* 03 */
+        {
+            "π * x^2",
+            make_expr_03,
+            "{ πx² | x = 1.25 }",
+            "x = 1.25\n"
+            "π = 3.141592653589793\n"
+            "expr(x,π) = π*x*x\n"
+            "return expr(x,π)",
+            __LINE__ 
+        },
+
+        /* 04 */
+        {
+            "x*x + x*x",
+            make_expr_04,
+            "{ 2x² | x = 1.25 }",
+            "x = 1.25\n"
+            "expr(x) = x*x + x*x\n"
+            "return expr(x)",
+            __LINE__ 
+        },
+
+        /* 05 */
+        {
+            "x*x + 3*x*x + 7",
+            make_expr_05,
+            "{ 4x² + 7 | x = 1.25 }",
+            "x = 1.25\n"
+            "expr(x) = x*x + 3*x*x + 7\n"
+            "return expr(x)",
+            __LINE__ 
+        },
+
+        /* 06 */
+        {
+            "2*x - 5*x",
+            make_expr_06,
+            "{ -3x | x = 1.25 }",
+            "x = 1.25\n"
+            "expr(x) = 2*x - 5*x\n"
+            "return expr(x)",
+            __LINE__ 
+        },
+
+        /* 07 */
+        {
+            "x^2 * x^3",
+            make_expr_07,
+            "{ x⁵ | x = 1.25 }",
+            "x = 1.25\n"
+            "expr(x) = x^2*x^3\n"
+            "return expr(x)",
+            __LINE__ 
+        },
+
+        /* 08 */
+        {
+            "x^2 * x * x^4",
+            make_expr_08,
+            "{ x⁷ | x = 1.25 }",
+            "x = 1.25\n"
+            "expr(x) = x^2*x*x^4\n"
+            "return expr(x)",
+            __LINE__ 
+        },
+
+        /* 09 */
+        {
+            "x^2 * y^3 * x",
+            make_expr_09,
+            "{ x³y³ | x = 1.25 }",
+            "x = 1.25\n"
+            "y = 1.25\n"
+            "expr(x,y) = x^2*y^3*x\n"
+            "return expr(x,y)",
+            __LINE__ 
+        },
+
+        /* 10 */
+        {
+            "3*x^2 * 4*x",
+            make_expr_10,
+            "{ 12x³ | x = 1.25 }",
+            "x = 1.25\n"
+            "expr(x) = 3*x^2*4*x\n"
+            "return expr(x)",
+            __LINE__ 
+        },
+
+        /* 11 */
+        {
+            "3*x * 2*y * x^2",
+            make_expr_11,
+            "{ 6x³y | x = 1.25 }",
+            "x = 1.25\n"
+            "y = 1.25\n"
+            "expr(x,y) = 3*x*2*y*x^2\n"
+            "return expr(x,y)",
+            __LINE__ 
+        },
+
+        /* 12 */
+        {
+            "x*x*y*x",
+            make_expr_12,
+            "{ x³y | x = 1.25 }",
+            "x = 1.25\n"
+            "y = 1.25\n"
+            "expr(x,y) = x*x*y*x\n"
+            "return expr(x,y)",
+            __LINE__ 
+        },
+
+        /* 13 */
+        {
+            "3*x",
+            make_expr_13,
+            "{ 3x | x = 1.25 }",
+            "x = 1.25\n"
+            "expr(x) = 3*x\n"
+            "return expr(x)",
+            __LINE__ 
+        },
+
+        /* 14 */
+        {
+            "3*x*x",
+            make_expr_14,
+            "{ 3x² | x = 1.25 }",
+            "x = 1.25\n"
+            "expr(x) = 3*x*x\n"
+            "return expr(x)",
+            __LINE__ 
+        },
+
+        /* 15 */
+        {
+            "6*x",
+            make_expr_15,
+            "{ 6x | x = 1.25 }",
+            "x = 1.25\n"
+            "expr(x) = 6*x\n"
+            "return expr(x)",
+            __LINE__ 
+        },
+
+        /* 16 */
+        {
+            "7*x^2",
+            make_expr_16,
+            "{ 7x² | x = 1.25 }",
+            "x = 1.25\n"
+            "expr(x) = 7*x^2\n"
+            "return expr(x)",
+            __LINE__ 
+        },
+
+        /* 17 */
+        {
+            "2*x*y",
+            make_expr_17,
+            "{ 2xy | x = 1.25 }",
+            "x = 1.25\n"
+            "y = 1.25\n"
+            "expr(x,y) = 2*x*y\n"
+            "return expr(x,y)",
+            __LINE__ 
+        },
+
+        /* 18 */
+        {
+            "sin(x)*cos(x)",
+            make_expr_18,
+            "{ sin(x)·cos(x) | x = 1.25 }",
+            "x = 1.25\n"
+            "expr(x) = sin(x)*cos(x)\n"
+            "return expr(x)",
+            __LINE__ 
+        },
+
+        /* 19 */
+        {
+            "cos(x)*exp(x)",
+            make_expr_19,
+            "{ cos(x)·eˣ | x = 1.25 }",
+            "x = 1.25\n"
+            "expr(x) = cos(x)*exp(x)\n"
+            "return expr(x)",
+            __LINE__ 
+        },
+
+        /* 20 */
+        {
+            "exp(x)*x*x",
+            make_expr_20,
+            "{ x²·eˣ | x = 1.25 }",
+            "x = 1.25\n"
+            "expr(x) = exp(x)*x*x\n"
+            "return expr(x)",
+            __LINE__ 
+        },
+
+        /* 21 */
+        {
+            "3*exp(x)*x^2",
+            make_expr_21,
+            "{ 3x²·eˣ | x = 1.25 }",
+            "x = 1.25\n"
+            "expr(x) = 3*exp(x)*x^2\n"
+            "return expr(x)",
+            __LINE__ 
+        },
+
+        /* 22 */
+        {
+            "sin(x)*x^2",
+            make_expr_22,
+            "{ x²·sin(x) | x = 1.25 }",
+            "x = 1.25\n"
+            "expr(x) = sin(x)*x^2\n"
+            "return expr(x)",
+            __LINE__ 
+        },
+
+        /* 23 */
+        {
+            "x*sin(x)*x",
+            make_expr_23,
+            "{ x²·sin(x) | x = 1.25 }",
+            "x = 1.25\n"
+            "expr(x) = x*sin(x)*x\n"
+            "return expr(x)",
+            __LINE__ 
+        },
+
+        /* 24 */
+        {
+            "exp(sin(x))",
+            make_expr_24,
+            "{ e^{sin(x)} | x = 1.25 }",
+            "x = 1.25\n"
+            "expr(x) = exp(sin(x))\n"
+            "return expr(x)",
+            __LINE__ 
+        },
+
+        /* 25 */
+        {
+            "cos(x)*exp(sin(x))",
+            make_expr_25,
+            "{ cos(x)·e^{sin(x)} | x = 1.25 }",
+            "x = 1.25\n"
+            "expr(x) = cos(x)*exp(sin(x))\n"
+            "return expr(x)",
+            __LINE__ 
+        },
+
+        /* 26 */
+        {
+            "x*x*exp(sin(x))",
+            make_expr_26,
+            "{ x²·e^{sin(x)} | x = 1.25 }",
+            "x = 1.25\n"
+            "expr(x) = x*x*exp(sin(x))\n"
+            "return expr(x)",
+            __LINE__ 
+        },
+
+        /* 27 */
+        {
+            "exp(sin(x))*exp(cos(x))",
+            make_expr_27,
+            "{ e^{sin(x)}·e^{cos(x)} | x = 1.25 }",
+            "x = 1.25\n"
+            "expr(x) = exp(sin(x))*exp(cos(x))\n"
+            "return expr(x)",
+            __LINE__ 
+        },
+
+        /* 28 */
+        {
+            "exp(x^2)*exp(3*x^2)",
+            make_expr_28,
+            "{ e^{x²}·e^{3x²} | x = 1.25 }",
+            "x = 1.25\n"
+            "expr(x) = exp(x^2)*exp(3*x^2)\n"
+            "return expr(x)",
+            __LINE__ 
+        },
+
+        /* 29 */
+        {
+            "exp(x)*exp(2*x)",
+            make_expr_29,
+            "{ eˣ·e^{2x} | x = 1.25 }",
+            "x = 1.25\n"
+            "expr(x) = exp(x)*exp(2*x)\n"
+            "return expr(x)",
+            __LINE__ 
+        },
+
+        /* 30 */
+        {
+            "exp(sin(x))*exp(cos(x))*exp(x)",
+            make_expr_30,
+            "{ e^{sin(x)}·e^{cos(x)}·eˣ | x = 1.25 }",
+            "x = 1.25\n"
+            "expr(x) = exp(sin(x))*exp(cos(x))*exp(x)\n"
+            "return expr(x)",
+            __LINE__ 
+        },
+
+        /* 31 */
+        {
+            "π*sin(x)",
+            make_expr_31,
+            "{ π·sin(x) | x = 1.25 }",
+            "x = 1.25\n"
+            "π = 3.141592653589793\n"
+            "expr(x,π) = π*sin(x)\n"
+            "return expr(x,π)",
+            __LINE__ 
+        },
+
+        /* 32 */
+        {
+            "τ*cos(x)",
+            make_expr_32,
+            "{ τ·cos(x) | x = 1.25 }",
+            "x = 1.25\n"
+            "τ = 6.283185307179586\n"
+            "expr(x,τ) = τ*cos(x)\n"
+            "return expr(x,τ)",
+            __LINE__ 
+        },
+
+        /* 33 */
+        {
+            "e*x^2",
+            make_expr_33,
+            "{ e·x² | x = 1.25 }",
+            "x = 1.25\n"
+            "e = 2.718281828459045\n"
+            "expr(x,e) = e*x^2\n"
+            "return expr(x,e)",
+            __LINE__ 
+        },
+
+        /* 34 */
+        {
+            "π*τ*e",
+            make_expr_34,
+            "{ π·τ·e | x = 1.25 }",
+            "π = 3.141592653589793\n"
+            "τ = 6.283185307179586\n"
+            "e = 2.718281828459045\n"
+            "expr(π,τ,e) = π*τ*e\n"
+            "return expr(π,τ,e)",
+            __LINE__ 
+        },
+
+        /* 35 */
+        {
+            "π*x*τ*y",
+            make_expr_35,
+            "{ π·τ·x·y | x = 1.25 }",
+            "x = 1.25\n"
+            "y = 1.25\n"
+            "π = 3.141592653589793\n"
+            "τ = 6.283185307179586\n"
+            "expr(x,y,π,τ) = π*x*τ*y\n"
+            "return expr(x,y,π,τ)",
+            __LINE__ 
+        },
+
+        /* 36 */
+        {
+            "exp(x)*π",
+            make_expr_36,
+            "{ π·eˣ | x = 1.25 }",
+            "x = 1.25\n"
+            "π = 3.141592653589793\n"
+            "expr(x,π) = exp(x)*π\n"
+            "return expr(x,π)",
+            __LINE__ 
+        },
+
+        /* 37 */
+        {
+            "τ*exp(x^2)",
+            make_expr_37,
+            "{ τ·e^{x²} | x = 1.25 }",
+            "x = 1.25\n"
+            "τ = 6.283185307179586\n"
+            "expr(x,τ) = τ*exp(x^2)\n"
+            "return expr(x,τ)",
+            __LINE__ 
+        },
+
+        /* 38 */
+        {
+            "e*sin(x)*cos(y)",
+            make_expr_38,
+            "{ e·sin(x)·cos(y) | x = 1.25 }",
+            "x = 1.25\n"
+            "y = 1.25\n"
+            "e = 2.718281828459045\n"
+            "expr(x,y,e) = e*sin(x)*cos(y)\n"
+            "return expr(x,y,e)",
+            __LINE__ 
+        },
+
+        /* 39 */
+        {
+            "π*exp(τ*x)",
+            make_expr_39,
+            "{ π·e^{τx} | x = 1.25 }",
+            "x = 1.25\n"
+            "π = 3.141592653589793\n"
+            "τ = 6.283185307179586\n"
+            "expr(x,π,τ) = π*exp(τ*x)\n"
+            "return expr(x,π,τ)",
+            __LINE__ 
+        },
+
+        /* 40 */
+        {
+            "exp(π*x)*τ",
+            make_expr_40,
+            "{ τ·e^{πx} | x = 1.25 }",
+            "x = 1.25\n"
+            "π = 3.141592653589793\n"
+            "τ = 6.283185307179586\n"
+            "expr(x,π,τ) = exp(π*x)*τ\n"
+            "return expr(x,π,τ)",
+            __LINE__ 
+        },
+
+        /* 41 */
+        {
+            "sin(π*x)",
+            make_expr_41,
+            "{ sin(πx) | x = 1.25 }",
+            "x = 1.25\n"
+            "π = 3.141592653589793\n"
+            "expr(x,π) = sin(π*x)\n"
+            "return expr(x,π)",
+            __LINE__
+        },
+
+        /* 42 */
+        {
+            "cos(τ*x)",
+            make_expr_42,
+            "{ cos(τx) | x = 1.25 }",
+            "x = 1.25\n"
+            "τ = 6.283185307179586\n"
+            "expr(x,τ) = cos(τ*x)\n"
+            "return expr(x,τ)",
+            __LINE__
+        },
+
+        /* 43 */
+        {
+            "exp(π*τ*x)",
+            make_expr_43,
+            "{ e^{πτx} | x = 1.25 }",
+            "x = 1.25\n"
+            "π = 3.141592653589793\n"
+            "τ = 6.283185307179586\n"
+            "expr(x,π,τ) = exp(π*τ*x)\n"
+            "return expr(x,π,τ)",
+            __LINE__
+        },
+
+        /* 44 */
+        {
+            "sin(x)+cos(x)+exp(x)",
+            make_expr_44,
+            "{ sin(x)+cos(x)+eˣ | x = 1.25 }",
+            "x = 1.25\n"
+            "expr(x) = sin(x)+cos(x)+exp(x)\n"
+            "return expr(x)",
+            __LINE__
+        },
+
+        /* 45 */
+        {
+            "x + y + π + τ + e",
+            make_expr_45,
+            "{ x + y + π + τ + e | x = 1.25 }",
+            "x = 1.25\n"
+            "y = 1.25\n"
+            "π = 3.141592653589793\n"
+            "τ = 6.283185307179586\n"
+            "e = 2.718281828459045\n"
+            "expr(x,y,π,τ,e) = x + y + π + τ + e\n"
+            "return expr(x,y,π,τ,e)",
+            __LINE__
+        },
+
+        /* 46 */
+        {
+            "x*y + π*x + τ*y + e",
+            make_expr_46,
+            "{ xy + πx + τy + e | x = 1.25 }",
+            "x = 1.25\n"
+            "y = 1.25\n"
+            "π = 3.141592653589793\n"
+            "τ = 6.283185307179586\n"
+            "e = 2.718281828459045\n"
+            "expr(x,y,π,τ,e) = x*y + π*x + τ*y + e\n"
+            "return expr(x,y,π,τ,e)",
+            __LINE__
+        },
+
+        /* 47 */
+        {
+            "(x+π)*(y+τ)",
+            make_expr_47,
+            "{ (x+π)(y+τ) | x = 1.25 }",
+            "x = 1.25\n"
+            "y = 1.25\n"
+            "π = 3.141592653589793\n"
+            "τ = 6.283185307179586\n"
+            "expr(x,y,π,τ) = (x+π)*(y+τ)\n"
+            "return expr(x,y,π,τ)",
+            __LINE__
+        },
+
+        /* 48 */
+        {
+            "exp(x+π)*exp(y+τ)",
+            make_expr_48,
+            "{ e^{x+π}·e^{y+τ} | x = 1.25 }",
+            "x = 1.25\n"
+            "y = 1.25\n"
+            "π = 3.141592653589793\n"
+            "τ = 6.283185307179586\n"
+            "expr(x,y,π,τ) = exp(x+π)*exp(y+τ)\n"
+            "return expr(x,y,π,τ)",
+            __LINE__
+        },
+
+        /* 49 */
+        {
+            "sin(x+π)*cos(y+τ)",
+            make_expr_49,
+            "{ sin(x+π)·cos(y+τ) | x = 1.25 }",
+            "x = 1.25\n"
+            "y = 1.25\n"
+            "π = 3.141592653589793\n"
+            "τ = 6.283185307179586\n"
+            "expr(x,y,π,τ) = sin(x+π)*cos(y+τ)\n"
+            "return expr(x,y,π,τ)",
+            __LINE__
+        },
+
+        /* 50 */
+        {
+            "exp(sin(x+π) + cos(y+τ))",
+            make_expr_50,
+            "{ e^{sin(x+π)+cos(y+τ)} | x = 1.25 }",
+            "x = 1.25\n"
+            "y = 1.25\n"
+            "π = 3.141592653589793\n"
+            "τ = 6.283185307179586\n"
+            "expr(x,y,π,τ) = exp(sin(x+π) + cos(y+τ))\n"
+            "return expr(x,y,π,τ)",
+            __LINE__
+        },
+    };
+
+    /* ============================================================
+     *  Test loop — formatted with bold PASS/FAIL and file:line
+     * ============================================================ */
+    const int N = (int)(sizeof(tests) / sizeof(tests[0]));
+
+    printf("=== dval_t to_string Tests ===\n");
+
+    for (int i = 0; i < N; i++) {
+        dval_t *f = tests[i].make();
+
+        char *got_expr = dv_to_string(f, style_EXPRESSION);
+        char *got_func = dv_to_string(f, style_FUNCTION);
+
+        int ok_expr = strcmp(got_expr, tests[i].expected_expr) == 0;
+        int ok_func = strcmp(got_func, tests[i].expected_func) == 0;
+
+        /* ---------------- EXPR block ---------------- */
+        if (ok_expr) {
+            printf(BLD GRN "PASS" RST " %s (EXPR)\n", tests[i].src);
+        } else {
+            printf(BLD RED "FAIL" RST " %s (EXPR): tests/test_dval.c:%d:1\n",
+                   tests[i].src, tests[i].line);
+        }
+
+        printf("  got      %s\n", got_expr);
+        printf("  expected %s\n", tests[i].expected_expr);
+
+        /* ---------------- FUNC block ---------------- */
+        if (ok_func) {
+            printf(BLD GRN "PASS" RST " %s (FUNC)\n", tests[i].src);
+        } else {
+            printf(BLD RED "FAIL" RST " %s (FUNC): tests/test_dval.c:%d:1\n",
+                   tests[i].src, tests[i].line);
+        }
+
+        /* got block */
+        {
+            const char *p = got_func;
+            const char *nl;
+            printf("  got      ");
+            while ((nl = strchr(p, '\n'))) {
+                fwrite(p, 1, nl - p, stdout);
+                printf("\n           ");
+                p = nl + 1;
+            }
+            printf("%s\n", p);
+        }
+
+        printf("  ───────────────────────────────\n");
+
+        /* expected block */
+        {
+            const char *p = tests[i].expected_func;
+            const char *nl;
+            printf("  expected ");
+            while ((nl = strchr(p, '\n'))) {
+                fwrite(p, 1, nl - p, stdout);
+                printf("\n           ");
+                p = nl + 1;
+            }
+            printf("%s\n", p);
+        }
+
+        printf("\n");
+
+        free(got_expr);
+        free(got_func);
+        dv_free(f);
+    }
 }
 
 /* Build expression: f(x) = exp(sin(x)) + 3*x^2 - 7 */
@@ -2152,6 +3877,7 @@ int main(void)
 
     /* tests to_string() */
     test_to_string_all();
+    test_expressions();
 
     printf(CYN "=== example in README.md ===\n" RST);
 
