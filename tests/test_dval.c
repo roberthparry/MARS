@@ -3023,7 +3023,7 @@ static void test_expressions(void)
             make_expr_01,
             "{ x² | x = 1.25 }",
             "x = 1.25\n"
-            "expr(x) = x*x\n"
+            "expr(x) = x^2\n"
             "return expr(x)",
             __LINE__ 
         },
@@ -3068,7 +3068,7 @@ static void test_expressions(void)
             make_expr_05,
             "{ 4x² + 7 | x = 1.25 }",
             "x = 1.25\n"
-            "expr(x) = x*x + 3*x*x + 7\n"
+            "expr(x) = 4x^2 + 7\n"
             "return expr(x)",
             __LINE__ 
         },
@@ -3090,7 +3090,7 @@ static void test_expressions(void)
             make_expr_07,
             "{ x⁵ | x = 1.25 }",
             "x = 1.25\n"
-            "expr(x) = x^2*x^3\n"
+            "expr(x) = x^5\n"
             "return expr(x)",
             __LINE__ 
         },
@@ -3101,7 +3101,7 @@ static void test_expressions(void)
             make_expr_08,
             "{ x⁷ | x = 1.25 }",
             "x = 1.25\n"
-            "expr(x) = x^2*x*x^4\n"
+            "expr(x) = x^7\n"
             "return expr(x)",
             __LINE__ 
         },
@@ -3113,7 +3113,7 @@ static void test_expressions(void)
             "{ x³y³ | x = 1.25 }",
             "x = 1.25\n"
             "y = 1.25\n"
-            "expr(x,y) = x^2*y^3*x\n"
+            "expr(x,y) = x^3*y^3\n"
             "return expr(x,y)",
             __LINE__ 
         },
@@ -3124,7 +3124,7 @@ static void test_expressions(void)
             make_expr_10,
             "{ 12x³ | x = 1.25 }",
             "x = 1.25\n"
-            "expr(x) = 3*x^2*4*x\n"
+            "expr(x) = 12*x^3\n"
             "return expr(x)",
             __LINE__ 
         },
@@ -3136,7 +3136,7 @@ static void test_expressions(void)
             "{ 6x³y | x = 1.25 }",
             "x = 1.25\n"
             "y = 1.25\n"
-            "expr(x,y) = 3*x*2*y*x^2\n"
+            "expr(x,y) = 6*x^3*y\n"
             "return expr(x,y)",
             __LINE__ 
         },
@@ -3148,7 +3148,7 @@ static void test_expressions(void)
             "{ x³y | x = 1.25 }",
             "x = 1.25\n"
             "y = 1.25\n"
-            "expr(x,y) = x*x*y*x\n"
+            "expr(x,y) = x^3*y\n"
             "return expr(x,y)",
             __LINE__ 
         },
@@ -3618,7 +3618,7 @@ static void test_expressions(void)
      * ============================================================ */
     const int N = (int)(sizeof(tests) / sizeof(tests[0]));
 
-    printf("=== dval_t to_string Tests ===\n");
+    printf(CYN "=== dval_t to_string - 50 Tests ===\n" RST);
 
     for (int i = 0; i < N; i++) {
         dval_t *f = tests[i].make();
