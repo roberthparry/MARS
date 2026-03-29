@@ -278,208 +278,70 @@ qfloat qf_floor(qfloat x);
 qfloat qf_mul_pow10(qfloat x, int k);
 
 /**
- * @brief Internal printf-style formatter for qfloat values.
+ * @brief Internal printf-style formatter with full qfloat support.
  *
- * This function implements the full formatting engine used by
- * qf_sprintf() and qf_printf(). It parses the format string,
- * consumes the supplied argument list, and writes the formatted
- * output into the provided buffer.
+ * IMPORTANT:
+ *   All qfloat arguments referenced by the format string (%q or %Q)
+ *   MUST be passed by address (qfloat*), not by value.
  *
- * Unlike qf_sprintf(), this function accepts an explicit `va_list`
- * and is responsible for consuming it exactly once. Callers must
- * pass a fresh copy of the argument list (via va_copy) if the
- * arguments need to be reused for a second pass (e.g. for sizing).
+ *   Passing a qfloat struct through `...` is undefined behaviour on
+ *   most ABIs. qf_vsprintf therefore expects:
+ *
+ *       %q → qfloat*
+ *       %Q → qfloat*
+ *
+ *   and will read each argument using:
+ *
+ *       qfloat *xp = va_arg(ap, qfloat*);
+ *       qfloat  x  = *xp;
+ *
+ *   Callers of qf_sprintf() and qf_printf() must therefore pass the
+ *   address of each qfloat:
+ *
+ *       qfloat x = qf_from_string("1e33");
+ *       qf_sprintf(buf, n, "%q", &x);   // correct
  *
  * Supported qfloat-specific format specifiers:
+ *   - %Q : Scientific notation (uppercase exponent)
+ *   - %q : Fixed-format decimal with fallback to scientific
  *
- *   - `%Q` : Scientific notation using an uppercase exponent marker
- *            ('E'). The mantissa is produced by qf_to_string(), and
- *            the exponent marker is converted to uppercase. Width,
- *            alignment, zero-padding, and sign flags (+, space) are
- *            honoured.
- *
- *   - `%q` : Fixed-point formatting with optional precision. If the
- *            value cannot be represented in fixed form (e.g. very
- *            large or very small magnitudes), the formatter falls
- *            back to scientific notation using a lowercase exponent
- *            marker ('e'). Flags (+, space, #), width, alignment,
- *            and zero-padding are supported.
- *
- * All non-qfloat specifiers (e.g. %d, %s) are delegated to the
- * system snprintf() for correctness and consistency.
- *
- * @param[out] out
- *     Destination buffer for the formatted output. May be NULL when
- *     out_size is zero, in which case no output is written but the
- *     function still returns the number of characters that would
- *     have been produced.
- *
- * @param[in] out_size
- *     Size of the output buffer in bytes, including space for the
- *     terminating null character. If the formatted output exceeds
- *     this size, the result is truncated but the returned character
- *     count still reflects the full untruncated length.
- *
- * @param[in] fmt
- *     The printf-style format string.
- *
- * @param[in,out] ap
- *     A `va_list` containing the arguments referenced by the format
- *     string. This list is consumed exactly once. The caller must
- *     not reuse `ap` after calling this function unless it was
- *     duplicated with `va_copy`.
- *
- * @return
- *     The number of characters that would have been written if the
- *     buffer were large enough, excluding the terminating null
- *     character. This matches the behaviour of snprintf().
+ * All non-qfloat specifiers are delegated to snprintf().
  */
 int qf_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap);
 
 /**
- * @defgroup qf_sprintf qf_sprintf — printf-style formatting for qfloat
- * @{
+ * @brief Print formatted text with full qfloat support.
  *
- * @section qd_overview Overview
+ * IMPORTANT:
+ *   qfloat arguments MUST be passed by address (qfloat*), not by value.
  *
- * qf_sprintf extends the standard printf formatting rules with support for
- * printing @ref qfloat values. Two additional format specifiers are provided:
+ *   Example:
+ *       qfloat x = qf_from_double(3.14);
+ *       qf_sprintf(buf, n, "%q", &x);   // correct
  *
- * - `%Q` — scientific notation (canonical qfloat format)
- * - `%q` — fixed-format decimal notation with optional precision
+ *   Passing a qfloat by value to %q or %Q is undefined behaviour.
  *
- * All other format specifiers (`%d`, `%f`, `%s`, etc.) behave exactly as in
- * standard printf. qf_sprintf never exposes the internal representation of
- * a qfloat.
+ * qf_sprintf extends standard printf with:
+ *   - %Q : scientific notation (uppercase exponent)
+ *   - %q : fixed-format decimal with fallback to scientific
  *
- * @section qd_Q Format %Q — scientific notation
- *
- * `%Q` prints a qfloat using the canonical scientific notation produced by
- * qf_to_string(). This format always includes:
- *
- * - one leading digit
- * - a decimal point
- * - 31–32 significant digits
- * - an exponent of the form `e±NNN`
- *
- * The case of the exponent (`e` or `E`) matches the case of the format
- * specifier (`%Q` → `E`, `%q` fallback → `e`).
- *
- * Example:
- * @code
- * qfloat x = qf_from_string("3.1415926535897932384626433832795");
- * qf_sprintf(buf, sizeof(buf), "%Q", x);
- * // → "3.1415926535897932384626433832795E+0"
- * @endcode
- *
- * @section qd_q Format %q — fixed-format decimal notation
- *
- * `%q` prints a qfloat in fixed-format decimal notation with no exponent.
- *
- * Default behaviour:
- * - 32 digits are printed after the decimal point.
- * - Trailing zeros are trimmed.
- * - The decimal point is removed if no fractional digits remain.
- *
- * Explicit precision:
- * - `%.Nq` prints exactly N digits after the decimal point.
- * - No trimming is performed when precision is explicitly specified.
- *
- * Fallback to scientific notation:
- * - If fixed-format output would require shifting the decimal point by more
- *   than `precision + 4` places, `%q` automatically switches to scientific
- *   notation.
- * - The case of the exponent matches the case of the format specifier
- *   (`%q` → `e`, `%Q` → `E`).
- * - Width and flags still apply.
- *
- * Flags (identical to `%f`):
- * - `+`   — always show sign
- * - space — leading space for positive numbers
- * - `#`   — force decimal point even if no fractional digits remain
- * - `0`   — zero-pad on the left (ignored with `-`)
- * - `-`   — left-align within the field width
- *
- * @note
- * `%e`, `%f`, `%g`, etc. accept only `double`. Passing a `qfloat` to these
- * specifiers will silently drop the low components. Use `%Q` or `%q` for
- * full-precision qfloat formatting.
- *
- * Width:
- * - Applied after trimming (default precision) or after printing (explicit
- *   precision).
- * - Still applied when falling back to scientific notation.
- *
- * Examples:
- * @code
- * qf_sprintf(buf, sizeof(buf), "%q", x);
- * // → "3.1415926535897932384626433832795"
- *
- * qf_sprintf(buf, sizeof(buf), "%.10q", x);
- * // → "3.1415926536"
- *
- * qf_sprintf(buf, sizeof(buf), "%.0q", x);
- * // → "3"
- *
- * qf_sprintf(buf, sizeof(buf), "%+q", x);
- * // → "+3.1415926535897932384626433832795"
- *
- * qf_sprintf(buf, sizeof(buf), "%#q", qf_from_string("3"));
- * // → "3."
- *
- * qf_sprintf(buf, sizeof(buf), "%020.5q", x);
- * // → "000000003.14159"
- *
- * qf_sprintf(buf, sizeof(buf), "%q", qf_from_string("1.234e+200"));
- * // → "1.2345678901234567890123456789012e+200"   (fallback)
- * @endcode
- *
- * @section qd_mixing Mixing with standard specifiers
- *
- * qf_sprintf may freely mix `%Q` and `%q` with standard printf specifiers:
- *
- * @code
- * qf_sprintf(buf, sizeof(buf),
- *            "x=%Q  fixed=%q  int=%d  str=%s",
- *            x, x, 42, "hello");
- * @endcode
- *
- * @section qd_safety Safety
- *
- * - Output is always null-terminated.
- * - The function never writes past the provided buffer.
- * - Unsupported specifiers are passed through to the system printf.
- *
- * @}
+ * All other specifiers behave exactly like snprintf().
  */
 int qf_sprintf(char *out, size_t out_size, const char *fmt, ...);
 
 /**
- * @brief Print formatted text with full qfloat support (dynamic, UTF‑8 safe).
+ * @brief Print formatted text with full qfloat support.
  *
- * qf_printf behaves like the standard printf(), but extends formatting to
- * support qfloat values through the `%Q` (scientific) and `%q` (fixed-format)
- * specifiers handled by qf_sprintf().
+ * IMPORTANT:
+ *   qfloat arguments to %q and %Q MUST be passed by address (qfloat*).
  *
- * The function performs two passes:
- *   - a sizing pass using qf_sprintf(NULL, 0, ...) to determine the exact
- *     number of bytes required
- *   - a formatting pass that writes into a dynamically allocated buffer
+ *   Example:
+ *       qfloat x = qf_from_string("3.14159");
+ *       qf_printf("x = %Q\n", &x);   // correct
  *
- * The resulting UTF‑8 text is written to stdout. No fixed-size buffers are
- * used, and there is no risk of overflow.
+ *   Passing a qfloat struct by value is undefined behaviour.
  *
- * Example:
- * @code
- * qfloat x = qf_from_string("3.1415926535897932384626433832795");
- * qf_printf("x = %Q\n", x);
- * // → x = 3.1415926535897932384626433832795E+0
- * @endcode
- *
- * @param fmt Format string (printf-style).
- * @param ... Arguments corresponding to the format string.
- * @return Number of bytes written (excluding the null terminator),
- *         or a negative value on error.
+ * qf_printf behaves like printf(), but supports %q and %Q via qf_sprintf().
  */
 int qf_printf(const char *fmt, ...);
 

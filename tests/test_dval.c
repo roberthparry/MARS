@@ -3034,7 +3034,7 @@ static void test_expressions(void)
             make_expr_02,
             "{ x³ | x = 1.25 }",
             "x = 1.25\n"
-            "expr(x) = x*x*x\n"
+            "expr(x) = x^3\n"
             "return expr(x)",
             __LINE__ 
         },
@@ -3046,7 +3046,7 @@ static void test_expressions(void)
             "{ πx² | x = 1.25 }",
             "x = 1.25\n"
             "π = 3.141592653589793\n"
-            "expr(x,π) = π*x*x\n"
+            "expr(x,π) = π*x^2\n"
             "return expr(x,π)",
             __LINE__ 
         },
@@ -3057,7 +3057,7 @@ static void test_expressions(void)
             make_expr_04,
             "{ 2x² | x = 1.25 }",
             "x = 1.25\n"
-            "expr(x) = x*x + x*x\n"
+            "expr(x) = 2*x^2\n"
             "return expr(x)",
             __LINE__ 
         },
@@ -3068,7 +3068,7 @@ static void test_expressions(void)
             make_expr_05,
             "{ 4x² + 7 | x = 1.25 }",
             "x = 1.25\n"
-            "expr(x) = 4x^2 + 7\n"
+            "expr(x) = 4*x^2 + 7\n"
             "return expr(x)",
             __LINE__ 
         },
@@ -3079,7 +3079,7 @@ static void test_expressions(void)
             make_expr_06,
             "{ -3x | x = 1.25 }",
             "x = 1.25\n"
-            "expr(x) = 2*x - 5*x\n"
+            "expr(x) = -3*x\n"
             "return expr(x)",
             __LINE__ 
         },
@@ -3170,7 +3170,7 @@ static void test_expressions(void)
             make_expr_14,
             "{ 3x² | x = 1.25 }",
             "x = 1.25\n"
-            "expr(x) = 3*x*x\n"
+            "expr(x) = 3*x^2\n"
             "return expr(x)",
             __LINE__ 
         },
@@ -3235,9 +3235,9 @@ static void test_expressions(void)
         {
             "exp(x)*x*x",
             make_expr_20,
-            "{ x²·eˣ | x = 1.25 }",
+            "{ x²·exp(x) | x = 1.25 }",
             "x = 1.25\n"
-            "expr(x) = exp(x)*x*x\n"
+            "expr(x) = x^2*exp(x)\n"
             "return expr(x)",
             __LINE__ 
         },
@@ -3246,9 +3246,9 @@ static void test_expressions(void)
         {
             "3*exp(x)*x^2",
             make_expr_21,
-            "{ 3x²·eˣ | x = 1.25 }",
+            "{ 3x²·exp(x) | x = 1.25 }",
             "x = 1.25\n"
-            "expr(x) = 3*exp(x)*x^2\n"
+            "expr(x) = 3*x^2*exp(x)\n"
             "return expr(x)",
             __LINE__ 
         },
@@ -3259,7 +3259,7 @@ static void test_expressions(void)
             make_expr_22,
             "{ x²·sin(x) | x = 1.25 }",
             "x = 1.25\n"
-            "expr(x) = sin(x)*x^2\n"
+            "expr(x) = x^2*sin(x)\n"
             "return expr(x)",
             __LINE__ 
         },
@@ -3270,7 +3270,7 @@ static void test_expressions(void)
             make_expr_23,
             "{ x²·sin(x) | x = 1.25 }",
             "x = 1.25\n"
-            "expr(x) = x*sin(x)*x\n"
+            "expr(x) = x^2*sin(x)\n"
             "return expr(x)",
             __LINE__ 
         },
@@ -3279,7 +3279,7 @@ static void test_expressions(void)
         {
             "exp(sin(x))",
             make_expr_24,
-            "{ e^{sin(x)} | x = 1.25 }",
+            "{ exp(sin(x)) | x = 1.25 }",
             "x = 1.25\n"
             "expr(x) = exp(sin(x))\n"
             "return expr(x)",
@@ -3290,7 +3290,7 @@ static void test_expressions(void)
         {
             "cos(x)*exp(sin(x))",
             make_expr_25,
-            "{ cos(x)·e^{sin(x)} | x = 1.25 }",
+            "{ cos(x)·exp(sin(x)) | x = 1.25 }",
             "x = 1.25\n"
             "expr(x) = cos(x)*exp(sin(x))\n"
             "return expr(x)",
@@ -3301,9 +3301,9 @@ static void test_expressions(void)
         {
             "x*x*exp(sin(x))",
             make_expr_26,
-            "{ x²·e^{sin(x)} | x = 1.25 }",
+            "{ x²·exp(sin(x)) | x = 1.25 }",
             "x = 1.25\n"
-            "expr(x) = x*x*exp(sin(x))\n"
+            "expr(x) = x^2*exp(sin(x))\n"
             "return expr(x)",
             __LINE__ 
         },
@@ -3312,7 +3312,7 @@ static void test_expressions(void)
         {
             "exp(sin(x))*exp(cos(x))",
             make_expr_27,
-            "{ e^{sin(x)}·e^{cos(x)} | x = 1.25 }",
+            "{ exp(sin(x))·exp(cos(x)) | x = 1.25 }",
             "x = 1.25\n"
             "expr(x) = exp(sin(x))*exp(cos(x))\n"
             "return expr(x)",
@@ -3323,7 +3323,7 @@ static void test_expressions(void)
         {
             "exp(x^2)*exp(3*x^2)",
             make_expr_28,
-            "{ e^{x²}·e^{3x²} | x = 1.25 }",
+            "{ exp(x²)·exp(3x²) | x = 1.25 }",
             "x = 1.25\n"
             "expr(x) = exp(x^2)*exp(3*x^2)\n"
             "return expr(x)",
@@ -3334,7 +3334,7 @@ static void test_expressions(void)
         {
             "exp(x)*exp(2*x)",
             make_expr_29,
-            "{ eˣ·e^{2x} | x = 1.25 }",
+            "{ exp(x)·exp(2x) | x = 1.25 }",
             "x = 1.25\n"
             "expr(x) = exp(x)*exp(2*x)\n"
             "return expr(x)",
@@ -3345,9 +3345,9 @@ static void test_expressions(void)
         {
             "exp(sin(x))*exp(cos(x))*exp(x)",
             make_expr_30,
-            "{ e^{sin(x)}·e^{cos(x)}·eˣ | x = 1.25 }",
+            "{ exp(sin(x) + cos(x) + x) | x = 1.25 }",
             "x = 1.25\n"
-            "expr(x) = exp(sin(x))*exp(cos(x))*exp(x)\n"
+            "expr(x) = exp(sin(x) + cos(x) + x)\n"
             "return expr(x)",
             __LINE__ 
         },

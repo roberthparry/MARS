@@ -169,7 +169,6 @@ dval_t *dv_simplify(dval_t *f)
             return dv_new_const(c);
         }
 
-        /* default */
         return dv_neg(a);
     }
 
@@ -178,19 +177,16 @@ dval_t *dv_simplify(dval_t *f)
        ============================================================ */
     if (f->ops == &ops_add) {
 
-        /* 0 + x → x */
         if (a->ops == &ops_const && is_qf_zero(a->c)) {
             dv_free(a);
             return b;
         }
 
-        /* x + 0 → x */
         if (b->ops == &ops_const && is_qf_zero(b->c)) {
             dv_free(b);
             return a;
         }
 
-        /* const + const */
         if (a->ops == &ops_const && b->ops == &ops_const) {
             qfloat c = qf_add(a->c, b->c);
             dv_free(a);
@@ -206,13 +202,11 @@ dval_t *dv_simplify(dval_t *f)
        ============================================================ */
     if (f->ops == &ops_sub) {
 
-        /* x - 0 → x */
         if (b->ops == &ops_const && is_qf_zero(b->c)) {
             dv_free(b);
             return a;
         }
 
-        /* const - const */
         if (a->ops == &ops_const && b->ops == &ops_const) {
             qfloat c = qf_sub(a->c, b->c);
             dv_free(a);
@@ -224,11 +218,10 @@ dval_t *dv_simplify(dval_t *f)
     }
 
     /* ============================================================
-       MULTIPLICATION (flatten + sign normalization + fold)
+       MULTIPLICATION (flatten + exponent combining)
        ============================================================ */
     if (f->ops == &ops_mul) {
 
-        /* zero rules */
         if ((a->ops == &ops_const && is_qf_zero(a->c)) ||
             (b->ops == &ops_const && is_qf_zero(b->c))) {
             dv_free(a);
@@ -236,7 +229,6 @@ dval_t *dv_simplify(dval_t *f)
             return dv_new_const_d(0.0);
         }
 
-        /* unit rules */
         if (a->ops == &ops_const && is_qf_one(a->c)) {
             dv_free(a);
             return b;
@@ -246,27 +238,14 @@ dval_t *dv_simplify(dval_t *f)
             return a;
         }
 
-        /* --- flatten + sign normalization --- */
+        /* --- flatten --- */
         qfloat c_acc = qf_from_double(1.0);
         int is_zero = 0;
         dval_t **terms = NULL;
         size_t nterms = 0, cap = 0;
 
-        /* absorb sign from left */
-        if (a->ops == &ops_neg) {
-            c_acc = qf_neg(c_acc);
-            collect_mul_flat(a->a, &c_acc, &is_zero, &terms, &nterms, &cap);
-        } else {
-            collect_mul_flat(a, &c_acc, &is_zero, &terms, &nterms, &cap);
-        }
-
-        /* absorb sign from right */
-        if (b->ops == &ops_neg) {
-            c_acc = qf_neg(c_acc);
-            collect_mul_flat(b->a, &c_acc, &is_zero, &terms, &nterms, &cap);
-        } else {
-            collect_mul_flat(b, &c_acc, &is_zero, &terms, &nterms, &cap);
-        }
+        collect_mul_flat(a, &c_acc, &is_zero, &terms, &nterms, &cap);
+        collect_mul_flat(b, &c_acc, &is_zero, &terms, &nterms, &cap);
 
         dv_free(a);
         dv_free(b);
@@ -278,31 +257,52 @@ dval_t *dv_simplify(dval_t *f)
             return dv_new_const_d(0.0);
         }
 
-        /* --- fold repeated factors into powers --- */
+        /* --- exponent combining: merge x, x^2, x^3, ... --- */
         for (size_t i = 0; i < nterms; ++i) {
             if (!terms[i]) continue;
 
-            int count = 1;
+            dval_t *ti = terms[i];
 
+            /* detect base and exponent */
+            dval_t *base = NULL;
+            double exp = 1.0;
+
+            if (ti->ops == &ops_pow_d) {
+                base = ti->a;
+                exp = qf_to_double(ti->c);
+            } else {
+                base = ti;
+                exp = 1.0;
+            }
+
+            /* accumulate same-base factors */
             for (size_t j = i + 1; j < nterms; ++j) {
                 if (!terms[j]) continue;
 
-                if (dv_struct_eq(terms[i], terms[j])) {
-                    count++;
-                    dv_free(terms[j]);
+                dval_t *tj = terms[j];
+
+                if (tj->ops == &ops_pow_d && dv_struct_eq(base, tj->a)) {
+                    exp += qf_to_double(tj->c);
+                    dv_free(tj);
+                    terms[j] = NULL;
+                }
+                else if (dv_struct_eq(base, tj)) {
+                    exp += 1.0;
+                    dv_free(tj);
                     terms[j] = NULL;
                 }
             }
 
-            if (count > 1) {
-                dval_t *base = terms[i];
-                dval_t *pow  = dv_pow_d(base, (double)count);
+            /* rebuild as power if exponent != 1 */
+            if (exp != 1.0 || ti->ops == &ops_pow_d) {
+                dv_retain(base);
+                dv_free(ti);
+                terms[i] = dv_pow_d(base, exp);
                 dv_free(base);
-                terms[i] = pow;
             }
         }
 
-        /* --- rebuild --- */
+        /* --- rebuild multiplication chain --- */
         dval_t *cur = NULL;
 
         if (!is_qf_one(c_acc))
@@ -334,20 +334,17 @@ dval_t *dv_simplify(dval_t *f)
        ============================================================ */
     if (f->ops == &ops_div) {
 
-        /* x / 1 → x */
         if (b->ops == &ops_const && is_qf_one(b->c)) {
             dv_free(b);
             return a;
         }
 
-        /* 0 / x → 0 */
         if (a->ops == &ops_const && is_qf_zero(a->c)) {
             dv_free(a);
             dv_free(b);
             return dv_new_const_d(0.0);
         }
 
-        /* const / const */
         if (a->ops == &ops_const && b->ops == &ops_const) {
             qfloat q = qf_div(a->c, b->c);
             dv_free(a);

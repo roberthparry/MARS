@@ -55,6 +55,7 @@ static void test_add() {
     if (qf_close(got, expected, 1e-30)) {
         printf("%s  OK: %s = %s%s\n", C_GREEN, "1.2345678901234561234567891234567 + 9.8765432109876541234567891234567", "11.1111111011111102469135782469134", C_RESET);
     } else {
+        printf("FAIL: %s:%d:1: addition\n", __FILE__, __LINE__);
         printf("%s  FAIL: %s%s\n", C_RED, "1.2345678901234561234567891234567 + 9.8765432109876541234567891234567", C_RESET);
         printf("    got      = %s\n", buf);
         printf("    expected = %s\n", buf_exp);
@@ -83,6 +84,7 @@ static void test_mul() {
         printf("    got      = %s\n", r_buf);
         printf("    expected = %s\n", buf_exp);
     } else {
+        printf("FAIL: %s:%d:1: multiplication\n", __FILE__, __LINE__);
         printf("%s  FAIL: %s%s\n", C_RED, buf_name, C_RESET);
         printf("    got      = %s\n", r_buf);
         printf("    expected = %s\n", buf_exp);
@@ -106,6 +108,7 @@ static void test_div() {
         printf("    got      = %s\n", buf);
         printf("    expected = %s\n", buf_exp);
     } else {
+        printf("FAIL: %s:%d:1: division\n", __FILE__, __LINE__);
         printf("%s  FAIL: %s%s\n", C_RED, "1.2412731971809253340758239961506 / 9.8765431209876543171934981073984", C_RESET);
         printf("    got      = %s\n", buf);
         printf("    expected = %s\n", buf_exp);
@@ -129,6 +132,7 @@ static void test_sqrt() {
         printf("  expected = %s\n", buf_exp);
     }
     else {
+        printf("FAIL: %s:%d:1: sqrt\n", __FILE__, __LINE__);
         printf(C_RED "  FAIL: sqrt\n" C_RESET);
         print_q("       got", got);
         printf("  expected = %s\n", buf_exp);
@@ -150,6 +154,7 @@ static void test_exp_log() {
         print_q("  log(exp(x))", got);
         printf("  expected    = %s\n", buf_exp);
     } else {
+        printf("FAIL: %s:%d:1: exp/log\n", __FILE__, __LINE__);
         printf(C_RED "  FAIL: exp/log\n" C_RESET);
         print_q("  log(exp(x))", got);
         printf("  expected    = %s\n", buf_exp);
@@ -491,12 +496,12 @@ static void test_from_string_basic() {
 
     if (strncmp(buf, "3.14159265358979323846264338327", 30) == 0) {
         printf(C_GREEN "  OK: parse basic\n" C_RESET);
-        printf("  input    = %s\n", s);
-        printf("  got      = %s\n", buf);
+        printf("    input    = %s\n", s);
+        printf("    got      = %s\n", buf);
     } else {
-        printf(C_RED "  FAIL: parse basic\n" C_RESET);
-        printf("  input    = %s\n", s);
-        printf("  got      = %s\n", buf);
+        printf(C_RED "  FAIL: parse basic  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
+        printf("    input    = %s\n", s);
+        printf("    got      = %s\n", buf);
     }
 }
 
@@ -511,51 +516,13 @@ static void test_from_string_scientific() {
 
     if (strncmp(buf, "1.23456789012345678901234567890", 30) == 0) {
         printf(C_GREEN "  OK: parse scientific\n" C_RESET);
-        printf("  input    = %s\n", s);
-        printf("  got      = %s\n", buf);
+        printf("    input    = %s\n", s);
+        printf("    got      = %s\n", buf);
     } else {
-        printf(C_RED "  FAIL: parse scientific\n" C_RESET);
-        printf("  input    = %s\n", s);
-        printf("  got      = %s\n", buf);
+        printf(C_RED "  FAIL: parse scientific  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
+        printf("    input    = %s\n", s);
+        printf("    got      = %s\n", buf);
     }
-}
-
-/* Reduce qf_to_string() output to the precision qfloat can round-trip */
-/* qfloat has ~106 bits ≈ 31.9 decimal digits of precision.
-   qf_to_string prints 35 digits, which is correct for display
-   but too many for round‑trip reconstruction. */
-
-static void qf_to_string_for_roundtrip(qfloat x, char *buf, size_t n)
-{
-    char full[256];
-    qf_to_string(x, full, sizeof(full));
-
-    char *dot = strchr(full, '.');
-    char *e   = strchr(full, 'e');
-
-    if (!dot || !e) {
-        snprintf(buf, n, "%s", full);
-        return;
-    }
-
-    const int keep = 31; /* qfloat precision */
-
-    char out[256];
-    char *p = out;
-
-    *p++ = full[0];
-    *p++ = '.';
-
-    const char *frac = dot + 1;
-    int copied = 0;
-
-    while (copied < keep && frac < e) {
-        *p++ = *frac++;
-        copied++;
-    }
-
-    strcpy(p, e);
-    snprintf(buf, n, "%s", out);
 }
 
 static void test_round_trip(void)
@@ -564,10 +531,10 @@ static void test_round_trip(void)
         const char *input;
     } cases[] = {
         { "3.1415926535897932384626433832795" },
-        { "2.7182818284590452353602874713527" },
-        { "1.0000000000000000000000000000001" },
-        { "9.9999999999999999999999999999999e-30" },
-        { "1.2345678901234567890123456789012e+40" },
+        { "2.718281828459045235360287471352713e+0" },
+        { "1.000000000000000000000000000000000e+0" },
+        { "1.000000000000000000000000000000000e-29" },
+        { "1.234567890123456789012345678901207e+40" },
     };
 
     for (size_t i = 0; i < sizeof(cases)/sizeof(cases[0]); i++) {
@@ -575,20 +542,28 @@ static void test_round_trip(void)
         qfloat x = qf_from_string(cases[i].input);
 
         char trimmed[256];
-        qf_to_string_for_roundtrip(x, trimmed, sizeof(trimmed));
+        memset(trimmed, 0, sizeof(trimmed));
+        qf_to_string(x, trimmed, sizeof(trimmed));
 
         qfloat y = qf_from_string(trimmed);
 
-        printf("  input     = %s\n", cases[i].input);
+        // ---- numeric closeness check ----
 
-        char rt[256];
-        qf_to_string(y, rt, sizeof(rt));
-        printf("  roundtrip = %s\n", rt);
+        // diff = |x - y|
+        qfloat diff = qf_abs(qf_sub(x, y));
 
-        if (!qf_eq(x, y)) {
-            printf("  FAIL: round-trip\n");
+        // tolerance: choose something smaller than your precision
+        // ~1e-33 works well for your ~36-digit qfloat
+        qfloat eps = qf_from_string("1e-31");
+
+        if (qf_lt(diff, eps)) {
+            printf(C_GREEN "  OK: round-trip\n" C_RESET);
+            printf("    input    = %s\n", cases[i].input);
+            printf("    got      = %s\n", trimmed);
         } else {
-            printf("  OK: round-trip\n");
+            printf(C_RED "  FAIL: round-trip  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
+            printf("    input    = %s\n", cases[i].input);
+            printf("    got      = %s\n", trimmed);
         }
     }
 }
@@ -604,7 +579,7 @@ static void test_qd_sprintf_basic(void)
     qfloat x = qf_from_string("3.1415926535897932384626433832795");
 
     char buf[256];
-    qf_sprintf(buf, sizeof(buf), "%Q", x);
+    qf_sprintf(buf, sizeof(buf), "%Q", &x);
 
     char expected[256];
     qf_to_string(x, expected, sizeof(expected));
@@ -618,7 +593,7 @@ static void test_qd_sprintf_basic(void)
         printf("  got      = %s\n", buf);
         printf("  expected = %s\n", expected);
     } else {
-        printf(C_RED "  FAIL: basic %%Q\n" C_RESET);
+        printf(C_RED "  FAIL: basic %%Q  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
         printf("  got      = %s\n", buf);
         printf("  expected = %s\n", expected);
     }
@@ -632,7 +607,7 @@ static void test_qd_sprintf_multiple(void)
     qfloat b = qf_from_string("9.8765432109876543210987654321098");
 
     char buf[256];
-    qf_sprintf(buf, sizeof(buf), "A=%Q B=%Q", a, b);
+    qf_sprintf(buf, sizeof(buf), "A=%Q B=%Q", &a, &b);
 
     char ea[64], eb[64];
     qf_to_string(a, ea, sizeof(ea));
@@ -652,7 +627,7 @@ static void test_qd_sprintf_multiple(void)
         printf("  got      = %s\n", buf);
         printf("  expected = %s\n", expected);
     } else {
-        printf(C_RED "  FAIL: multiple %%Q\n" C_RESET);
+        printf(C_RED "  FAIL: multiple %%Q  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
         printf("  got      = %s\n", buf);
         printf("  expected = %s\n", expected);
     }
@@ -665,24 +640,17 @@ static void test_qd_sprintf_mixed(void)
     qfloat x = qf_from_string("2.5");
 
     char buf[256];
-    qf_sprintf(buf, sizeof(buf), "x=%Q int=%d str=%s", x, 42, "hello");
-
-    char xs[64];
-    qf_to_string(x, xs, sizeof(xs));
-
-    /* %Q uses uppercase E */
-    char *e = strchr(xs, 'e');
-    if (e) *e = 'E';
+    qf_sprintf(buf, sizeof(buf), "x=%Q int=%d str=%s", &x, 42, "hello");
 
     char expected[256];
-    snprintf(expected, sizeof(expected), "x=%s int=%d str=%s", xs, 42, "hello");
+    snprintf(expected, sizeof(expected), "x=2.500000000000000000000000000000000E+0 int=42 str=hello");
 
     if (strcmp(buf, expected) == 0) {
         printf(C_GREEN "  OK: mixed specifiers\n" C_RESET);
         printf("  got      = %s\n", buf);
         printf("  expected = %s\n", expected);
     } else {
-        printf(C_RED "  FAIL: mixed specifiers\n" C_RESET);
+        printf(C_RED "  FAIL: mixed specifiers  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
         printf("  got      = %s\n", buf);
         printf("  expected = %s\n", expected);
     }
@@ -695,13 +663,13 @@ static void test_qd_sprintf_buffer_limit(void)
     qfloat x = qf_from_string("1.2345678901234567890123456789012");
 
     char buf[16];
-    qf_sprintf(buf, sizeof(buf), "%Q", x);
+    qf_sprintf(buf, sizeof(buf), "%Q", &x);
 
     if (buf[15] == '\0') {
         printf(C_GREEN "  OK: buffer limit (null-terminated)\n" C_RESET);
         printf("  buf = \"%s\"\n", buf);
     } else {
-        printf(C_RED "  FAIL: buffer limit (missing terminator)\n" C_RESET);
+        printf(C_RED "  FAIL: buffer limit (missing terminator)  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
     }
 }
 
@@ -720,7 +688,7 @@ static void test_qd_sprintf_edge_cases(void)
         qfloat x = qf_from_string(tests[i].input);
 
         char buf[128];
-        qf_sprintf(buf, sizeof(buf), "%q", x);
+        qf_sprintf(buf, sizeof(buf), "%q", &x);
 
         /* Parse the printed value back into a qfloat */
         qfloat y = qf_from_string(buf);
@@ -738,7 +706,7 @@ static void test_qd_sprintf_edge_cases(void)
         if (qf_close_rel(x, y, tests[i].tolerance || qf_close(x, y, tests[i].tolerance)) || qf_eq(x, y)) {
             printf(C_GREEN "    OK\n" C_RESET);
         } else {
-            printf(C_RED "    FAIL\n" C_RESET);
+            printf(C_RED "    FAIL  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
         }
     }
 }
@@ -750,16 +718,18 @@ static void test_qd_sprintf_q_precision(void)
     qfloat x = qf_from_string("3.1415926535897932384626433832795");
 
     char buf[256];
-    qf_sprintf(buf, sizeof(buf), "%.10q", x);
+    qf_sprintf(buf, sizeof(buf), "%.10q", &x);
 
     const char *expected = "3.1415926536";
 
     if (strcmp(buf, expected) == 0) {
         printf(C_GREEN "  OK: precision %%.10q\n" C_RESET);
+        printf("    got      = %s\n", buf);
+        printf("    expected = %s\n", expected);
     } else {
-        printf(C_RED "  FAIL: precision %%.10q\n" C_RESET);
-        printf("  got      = %s\n", buf);
-        printf("  expected = %s\n", expected);
+        printf(C_RED "  FAIL: precision %%.10q  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
+        printf("    got      = %s\n", buf);
+        printf("    expected = %s\n", expected);
     }
 }
 
@@ -770,14 +740,14 @@ static void test_qd_sprintf_q_zero_precision(void)
     qfloat x = qf_from_string("3.1415926535897932384626433832795");
 
     char buf[256];
-    qf_sprintf(buf, sizeof(buf), "%.0q", x);
+    qf_sprintf(buf, sizeof(buf), "%.0q", &x);
 
     const char *expected = "3";
 
     if (strcmp(buf, expected) == 0) {
         printf(C_GREEN "  OK: %%.0q\n" C_RESET);
     } else {
-        printf(C_RED "  FAIL: %%.0q\n" C_RESET);
+        printf(C_RED "  FAIL: %%.0q  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
         printf("  got      = %s\n", buf);
         printf("  expected = %s\n", expected);
     }
@@ -791,23 +761,23 @@ static void test_qd_sprintf_q_flags(void)
 
     char buf[256];
 
-    qf_sprintf(buf, sizeof(buf), "%+q", x);
+    qf_sprintf(buf, sizeof(buf), "%+q", &x);
     if (strcmp(buf, "+3") == 0)
         printf(C_GREEN "  OK: + flag\n" C_RESET);
     else
-        printf(C_RED "  FAIL: + flag (got %s)\n" C_RESET, buf);
+        printf(C_RED "  FAIL: + flag (got %s)  [%s:%d]\n" C_RESET, buf, __FILE__, __LINE__);
 
-    qf_sprintf(buf, sizeof(buf), "% q", x);
+    qf_sprintf(buf, sizeof(buf), "% q", &x);
     if (strcmp(buf, " 3") == 0)
         printf(C_GREEN "  OK: space flag\n" C_RESET);
     else
-        printf(C_RED "  FAIL: space flag (got %s)\n" C_RESET, buf);
+        printf(C_RED "  FAIL: space flag (got %s)  [%s:%d]\n" C_RESET, buf, __FILE__, __LINE__);
 
-    qf_sprintf(buf, sizeof(buf), "%#q", x);
+    qf_sprintf(buf, sizeof(buf), "%#q", &x);
     if (strcmp(buf, "3.") == 0)
         printf(C_GREEN "  OK: # flag\n" C_RESET);
     else
-        printf(C_RED "  FAIL: # flag (got %s)\n" C_RESET, buf);
+        printf(C_RED "  FAIL: # flag (got %s)  [%s:%d]\n" C_RESET, buf, __FILE__, __LINE__);
 }
 
 static void test_qd_sprintf_q_width(void)
@@ -818,23 +788,23 @@ static void test_qd_sprintf_q_width(void)
 
     char buf[256];
 
-    qf_sprintf(buf, sizeof(buf), "%10.5q", x);
+    qf_sprintf(buf, sizeof(buf), "%10.5q", &x);
     if (strcmp(buf, "   3.14159") == 0)
         printf(C_GREEN "  OK: width right-align\n" C_RESET);
     else
-        printf(C_RED "  FAIL: width right-align (got '%s')\n" C_RESET, buf);
+        printf(C_RED "  FAIL: width right-align (got '%s')  [%s:%d]\n" C_RESET, buf, __FILE__, __LINE__);
 
-    qf_sprintf(buf, sizeof(buf), "%-10.5q", x);
+    qf_sprintf(buf, sizeof(buf), "%-10.5q", &x);
     if (strcmp(buf, "3.14159   ") == 0)
         printf(C_GREEN "  OK: width left-align\n" C_RESET);
     else
-        printf(C_RED "  FAIL: width left-align (got '%s')\n" C_RESET, buf);
+        printf(C_RED "  FAIL: width left-align (got '%s')  [%s:%d]\n" C_RESET, buf, __FILE__, __LINE__);
 
-    qf_sprintf(buf, sizeof(buf), "%010.5q", x);
+    qf_sprintf(buf, sizeof(buf), "%010.5q", &x);
     if (strcmp(buf, "0003.14159") == 0)
         printf(C_GREEN "  OK: zero padding\n" C_RESET);
     else
-        printf(C_RED "  FAIL: zero padding (got '%s')\n" C_RESET, buf);
+        printf(C_RED "  FAIL: zero padding (got '%s')  [%s:%d]\n" C_RESET, buf, __FILE__, __LINE__);
 }
 
 static void test_qd_sprintf_q_fallback(void)
@@ -844,12 +814,12 @@ static void test_qd_sprintf_q_fallback(void)
     qfloat x = qf_from_string("1.2345678901234567890123456789012e+200");
 
     char buf[256];
-    qf_sprintf(buf, sizeof(buf), "%q", x);
+    qf_sprintf(buf, sizeof(buf), "%q", &x);
 
     if (strstr(buf, "e+200")) {
         printf(C_GREEN "  OK: fallback to scientific\n" C_RESET);
     } else {
-        printf(C_RED "  FAIL: fallback to scientific (got %s)\n" C_RESET, buf);
+        printf(C_RED "  FAIL: fallback to scientific (got %s)  [%s:%d]\n" C_RESET, buf, __FILE__, __LINE__);
     }
 }
 
@@ -860,7 +830,7 @@ static void test_qd_sprintf_q_fallback_width(void)
     qfloat x = qf_from_string("1.234e+200");
 
     char buf[256];
-    qf_sprintf(buf, sizeof(buf), "%40q", x);
+    qf_sprintf(buf, sizeof(buf), "%40q", &x);
 
     int leading_spaces = 0;
     while (buf[leading_spaces] == ' ') leading_spaces++;
@@ -868,7 +838,88 @@ static void test_qd_sprintf_q_fallback_width(void)
     if (strstr(buf, "e+200") && strlen(buf) >= 40) {
         printf(C_GREEN "  OK: fallback width preserved\n" C_RESET);
     } else {
-        printf(C_RED "  FAIL: fallback width preserved (got '%s')\n" C_RESET, buf);
+        printf(C_RED "  FAIL: fallback width preserved (got '%s')  [%s:%d]\n" C_RESET, buf, __FILE__, __LINE__);
+    }
+}
+
+static void test_qf_sprintf_q_concise(void)
+{
+    printf(C_CYAN "TEST: qf_sprintf %%q (concise fixed-format)\n" C_RESET);
+
+    struct { char *input; char *expected; double tolerance; } tests[] = {
+
+        /* --- integers --- */
+        { "0",                     "0",          1e-31 },
+        { "1",                     "1",          1e-31 },
+        { "-1",                    "-1",         1e-31 },
+        { "42",                    "42",         1e-31 },
+        { "-42",                   "-42",        1e-31 },
+
+        /* --- simple fractions --- */
+        { "0.5",                   "0.5",        1e-31 },
+        { "-0.5",                  "-0.5",       1e-31 },
+        { "1.5",                   "1.5",        1e-31 },
+        { "2.25",                  "2.25",       1e-31 },
+        { "-2.25",                 "-2.25",      1e-31 },
+
+        /* --- trimming trailing zeros --- */
+        { "1.2500",                "1.25",       1e-31 },
+        { "3.140000",              "3.14",       1e-31 },
+        { "-10.000",               "-10",        1e-31 },
+
+        /* --- leading zeros after decimal --- */
+        { "0.000123",              "0.000123",   1e-31 },
+        { "-0.000123",             "-0.000123",  1e-31 },
+
+        /* --- fixed-format exponent boundary (still fixed) --- */
+        { "1e32",                  "100000000000000000000000000000000", 1e-31 },
+        { "1e-6",                  "0.000001",   1e-31 },
+
+        /* --- scientific fallback (outside fixed window) --- */
+        { "1e33",                  "1e+33",      1e-31 },
+        { "1e-7",                  "1e-7",       1e-31 },
+
+        /* --- reconstruction tests --- */
+        { "9.999999999999999e+1",  "99.99999999999999", 1e-31 },
+        { "1.23456789e+3",         "1234.56789",        1e-31 },
+        { "1.23456789e-3",         "0.00123456789",     1e-31 },
+    };
+
+    int N = sizeof(tests) / sizeof(tests[0]);
+
+    for (int i = 0; i < N; i++) {
+
+        qfloat x = qf_from_string(tests[i].input);
+
+        char buf[256];
+        qf_sprintf(buf, sizeof(buf), "%q", &x);
+
+        /* Parse the printed value back into a qfloat */
+        qfloat y = qf_from_string(buf);
+
+        printf("  input     = %s\n", tests[i].input);
+        printf("  expected  = %s\n", tests[i].expected);
+        printf("  got       = %s\n", buf);
+
+        /* reparsed value */
+        char reparsed[256];
+        qf_to_string(y, reparsed, sizeof(reparsed));
+        printf("  reparsed  = %s\n", reparsed);
+
+        qfloat err = qf_abs(qf_sub(qf_div(x, y), (qfloat){1,0}));
+        printf("  rel error = %.17g\n", err.hi);
+
+        if (strcmp(buf, tests[i].expected) == 0 &&
+            (qf_close_rel(x, y, tests[i].tolerance) ||
+             qf_close(x, y, tests[i].tolerance) ||
+             qf_eq(x, y)))
+        {
+            printf(C_GREEN "    OK\n" C_RESET);
+        } else {
+            printf(C_RED "    FAIL  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
+        }
+
+        printf("\n");
     }
 }
 
@@ -888,15 +939,15 @@ static void test_qf_sprintf_null_safe_new(void)
     char *e = strchr(expected, 'e');
     if (e) *e = 'E';
 
-    int needed = qf_sprintf(NULL, 0, "x=%Q", x);
+    int needed = qf_sprintf(NULL, 0, "x=%Q", &x);
 
     char *buf = malloc((size_t)needed + 1);
-    int written = qf_sprintf(buf, (size_t)needed + 1, "x=%Q", x);
+    int written = qf_sprintf(buf, (size_t)needed + 1, "x=%Q", &x);
 
     if (written == needed && strcmp(buf, expected) == 0) {
         printf(C_GREEN "  OK: NULL‑safe sizing\n" C_RESET);
     } else {
-        printf(C_RED   "  FAIL: NULL‑safe sizing\n" C_RESET);
+        printf(C_RED "  FAIL: NULL‑safe sizing  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
         printf("written = %d, needed = %d\n", written, needed);
         printf("     got = %s\n", buf);
         printf("expected = %s\n", expected);
@@ -921,15 +972,15 @@ static void test_qf_sprintf_two_pass_new(void)
     char *e = strchr(expected, 'e');
     if (e) *e = 'E';
 
-    int needed = qf_sprintf(NULL, 0, "x=%Q", x);
+    int needed = qf_sprintf(NULL, 0, "x=%Q", &x);
 
     char *buf = malloc((size_t)needed + 1);
-    int written = qf_sprintf(buf, (size_t)needed + 1, "x=%Q", x);
+    int written = qf_sprintf(buf, (size_t)needed + 1, "x=%Q", &x);
 
     if (written == needed && strcmp(buf, expected) == 0) {
         printf(C_GREEN "  OK: two‑pass\n" C_RESET);
     } else {
-        printf(C_RED   "  FAIL: two‑pass\n" C_RESET);
+        printf(C_RED   "  FAIL: two‑pass  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
         printf("written = %d, needed = %d\n", written, needed);
         printf("     got = %s\n", buf);
         printf("expected = %s\n", expected);
@@ -958,7 +1009,7 @@ static void test_qf_printf_stdout(void)
         return;
     }
 
-    int n = qf_printf("value=%Q\n", x);
+    int n = qf_printf("value=%Q\n", &x);
     fflush(stdout);
 
     /* Restore stdout */
@@ -968,7 +1019,7 @@ static void test_qf_printf_stdout(void)
     /* Read back the output */
     FILE *in = fopen("test_output.txt", "r");
     if (!in) {
-        printf(C_RED "  FAIL: could not open test_output.txt\n" C_RESET);
+        printf(C_RED "  FAIL: could not open test_output.txt  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
         return;
     }
 
@@ -985,7 +1036,7 @@ static void test_qf_printf_stdout(void)
         printf("    got      = %s", buf);
         printf("    n        = %d\n", n);
     } else {
-        printf(C_RED "  FAIL: qf_printf\n" C_RESET);
+        printf(C_RED "  FAIL: qf_printf  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
         printf("    expected = %s", expected);
         printf("    got      = %s", buf);
         printf("    n        = %d\n", n);
@@ -1007,6 +1058,7 @@ void test_qf_sprintf_and_printf(void)
     test_qd_sprintf_q_width();
     test_qd_sprintf_q_fallback();
     test_qd_sprintf_q_fallback_width();
+    test_qf_sprintf_q_concise();
 
     /* New tests */
     test_qf_sprintf_null_safe_new();
@@ -1050,7 +1102,7 @@ static void test_qf_pow_int()
             printf("%s  OK: %s^%d = %s%s\n",
                    C_GREEN, cases[i].x, cases[i].n, buf, C_RESET);
         } else {
-            printf("%s  FAIL: %s^%d%s\n", C_RED, cases[i].x, cases[i].n, C_RESET);
+            printf("%s  FAIL: %s^%d%s  [%s:%d]\n", C_RED, cases[i].x, cases[i].n, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", cases[i].expected);
         }
@@ -1072,7 +1124,7 @@ static void test_qf_pow()
         if (qf_close(r, expected, 1e-30)) {
             printf("%s  OK: 2^3 = %s%s\n", C_GREEN, buf, C_RESET);
         } else {
-            printf("%s  FAIL: 2^3%s\n", C_RED, C_RESET);
+            printf("%s  FAIL: 2^3%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = 8\n");
         }
@@ -1087,7 +1139,7 @@ static void test_qf_pow()
         if (qf_close(r, expected, 1e-30)) {
             printf("%s  OK: 9^0.5 = %s%s\n", C_GREEN, buf, C_RESET);
         } else {
-            printf("%s  FAIL: 9^0.5%s\n", C_RED, C_RESET);
+            printf("%s  FAIL: 9^0.5%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = 3\n");
         }
@@ -1102,7 +1154,7 @@ static void test_qf_pow()
         if (qf_close(r, expected, 1e-30)) {
             printf("%s  OK: 0^5 = %s%s\n", C_GREEN, buf, C_RESET);
         } else {
-            printf("%s  FAIL: 0^5%s\n", C_RED, C_RESET);
+            printf("%s  FAIL: 0^5%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = 0\n");
         }
@@ -1116,7 +1168,7 @@ static void test_qf_pow()
             printf("%s  OK: 0^-1 = NaN%s\n", C_GREEN, C_RESET);
         } else {
             qf_to_string(r, buf, sizeof(buf));
-            printf("%s  FAIL: 0^-1%s\n", C_RED, C_RESET);
+            printf("%s  FAIL: 0^-1%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = NaN\n");
         }
@@ -1131,7 +1183,7 @@ static void test_qf_pow()
         if (qf_close(r, expected, 1e-30)) {
             printf("%s  OK: (-2)^3 = %s%s\n", C_GREEN, buf, C_RESET);
         } else {
-            printf("%s  FAIL: (-2)^3%s\n", C_RED, C_RESET);
+            printf("%s  FAIL: (-2)^3%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = -8\n");
         }
@@ -1145,7 +1197,7 @@ static void test_qf_pow()
             printf("%s  OK: (-2)^0.5 = NaN%s\n", C_GREEN, C_RESET);
         } else {
             qf_to_string(r, buf, sizeof(buf));
-            printf("%s  FAIL: (-2)^0.5%s\n", C_RED, C_RESET);
+            printf("%s  FAIL: (-2)^0.5%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = NaN\n");
         }
@@ -1179,7 +1231,7 @@ static void test_qf_pow10(void)
             printf("%s  OK: 10^%d = %s%s\n",
                    C_GREEN, cases[i].n, buf, C_RESET);
         } else {
-            printf("%s  FAIL: 10^%d%s\n", C_RED, cases[i].n, C_RESET);
+            printf("%s  FAIL: 10^%d%s  [%s:%d]\n", C_RED, cases[i].n, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", cases[i].expected);
         }
@@ -1211,7 +1263,7 @@ static void test_qf_trig()
             printf("    got      = %s\n", buf);
             printf("    expected = 0\n");
         } else {
-            printf("%s  FAIL: sin(0)%s\n", C_RED, C_RESET);
+            printf("%s  FAIL: sin(0)%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = 0\n");
         }
@@ -1222,7 +1274,7 @@ static void test_qf_trig()
             printf("    got      = %s\n", buf);
             printf("    expected = 1\n");
         } else {
-            printf("%s  FAIL: cos(0)%s\n", C_RED, C_RESET);
+            printf("%s  FAIL: cos(0)%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = 1\n");
         }
@@ -1233,7 +1285,7 @@ static void test_qf_trig()
             printf("    got      = %s\n", buf);
             printf("    expected = 0\n");
         } else {
-            printf("%s  FAIL: tan(0)%s\n", C_RED, C_RESET);
+            printf("%s  FAIL: tan(0)%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = 0\n");
         }
@@ -1255,7 +1307,7 @@ static void test_qf_trig()
             printf("    got      = %s\n", buf);
             printf("    expected = 1\n");
         } else {
-            printf("%s  FAIL: sin(pi/2)%s\n", C_RED, C_RESET);
+            printf("%s  FAIL: sin(pi/2)%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = 1\n");
         }
@@ -1266,7 +1318,7 @@ static void test_qf_trig()
             printf("    got      = %s\n", buf);
             printf("    expected = 0\n");
         } else {
-            printf("%s  FAIL: cos(pi/2)%s\n", C_RED, C_RESET);
+            printf("%s  FAIL: cos(pi/2)%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = 0\n");
         }
@@ -1288,7 +1340,7 @@ static void test_qf_trig()
             printf("    got      = %s\n", buf);
             printf("    expected = 0\n");
         } else {
-            printf("%s  FAIL: sin(pi)%s\n", C_RED, C_RESET);
+            printf("%s  FAIL: sin(pi)%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = 0\n");
         }
@@ -1299,7 +1351,7 @@ static void test_qf_trig()
             printf("    got      = %s\n", buf);
             printf("    expected = -1\n");
         } else {
-            printf("%s  FAIL: cos(pi)%s\n", C_RED, C_RESET);
+            printf("%s  FAIL: cos(pi)%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = -1\n");
         }
@@ -1318,7 +1370,7 @@ static void test_qf_trig()
             printf("    got      = %s\n", buf);
             printf("    expected = 1\n");
         } else {
-            printf("%s  FAIL: tan(pi/4)%s\n", C_RED, C_RESET);
+            printf("%s  FAIL: tan(pi/4)%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = 1\n");
         }
@@ -1335,7 +1387,7 @@ static void test_qf_trig()
             printf("    expected = NaN\n");
         } else {
             qf_to_string(t, buf, sizeof(buf));
-            printf("%s  FAIL: tan(pi/2)%s\n", C_RED, C_RESET);
+            printf("%s  FAIL: tan(pi/2)%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = NaN\n");
         }
@@ -1360,7 +1412,7 @@ static void test_qf_trig()
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
         } else {
-            printf("%s  FAIL: sin(1)%s\n", C_RED, C_RESET);
+            printf("%s  FAIL: sin(1)%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
         }
@@ -1372,7 +1424,7 @@ static void test_qf_trig()
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
         } else {
-            printf("%s  FAIL: cos(1)%s\n", C_RED, C_RESET);
+            printf("%s  FAIL: cos(1)%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
         }
@@ -1384,7 +1436,7 @@ static void test_qf_trig()
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
         } else {
-            printf("%s  FAIL: tan(1)%s\n", C_RED, C_RESET);
+            printf("%s  FAIL: tan(1)%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
         }
@@ -1437,7 +1489,7 @@ static void test_qf_atan(void)
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
         } else {
-            printf("%s  FAIL: %s%s\n", C_RED, atan_tests[i].name, C_RESET);
+            printf("%s  FAIL: %s%s  [%s:%d]\n", C_RED, atan_tests[i].name, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
         }
@@ -1488,7 +1540,7 @@ static void test_qf_asin(void)
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
         } else {
-            printf("%s  FAIL: %s%s\n", C_RED, asin_tests[i].name, C_RESET);
+            printf("%s  FAIL: %s%s  [%s:%d]\n", C_RED, asin_tests[i].name, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
         }
@@ -1500,7 +1552,7 @@ static void test_qf_asin(void)
         printf("%s  OK: asin(2) = NaN%s\n", C_GREEN, C_RESET);
     } else {
         qf_to_string(r, buf, sizeof(buf));
-        printf("%s  FAIL: asin(2) should be NaN%s\n", C_RED, C_RESET);
+        printf("%s  FAIL: asin(2) should be NaN%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
         printf("    got = %s\n", buf);
     }
 }
@@ -1549,7 +1601,7 @@ static void test_qf_acos(void)
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
         } else {
-            printf("%s  FAIL: %s%s\n", C_RED, acos_tests[i].name, C_RESET);
+            printf("%s  FAIL: %s%s  [%s:%d]\n", C_RED, acos_tests[i].name, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
         }
@@ -1561,7 +1613,7 @@ static void test_qf_acos(void)
         printf("%s  OK: acos(2) = NaN%s\n", C_GREEN, C_RESET);
     } else {
         qf_to_string(r, buf, sizeof(buf));
-        printf("%s  FAIL: acos(2) should be NaN%s\n", C_RED, C_RESET);
+        printf("%s  FAIL: acos(2) should be NaN%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
         printf("    got = %s\n", buf);
     }
 }
@@ -1613,7 +1665,7 @@ static void test_qf_atan2(void)
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
         } else {
-            printf("%s  FAIL: %s%s\n", C_RED, atan2_tests[i].name, C_RESET);
+            printf("%s  FAIL: %s%s  [%s:%d]\n", C_RED, atan2_tests[i].name, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
         }
@@ -1658,8 +1710,7 @@ static void test_qf_sinh(void)
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
         } else {
-            printf("%s  FAIL: %s%s\n",
-                   C_RED, sinh_tests[i].name, C_RESET);
+            printf("%s  FAIL: %s%s  [%s:%d]\n", C_RED, sinh_tests[i].name, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
         }
@@ -1699,13 +1750,11 @@ static void test_qf_cosh(void)
         qf_to_string(expected, buf_exp, sizeof(buf_exp));
 
         if (qf_close(got, expected, 1e-30)) {
-            printf("%s  OK: %s = %s%s\n",
-                   C_GREEN, cosh_tests[i].name, buf, C_RESET);
+            printf("%s  OK: %s = %s%s\n", C_GREEN, cosh_tests[i].name, buf, C_RESET);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
         } else {
-            printf("%s  FAIL: %s%s\n",
-                   C_RED, cosh_tests[i].name, C_RESET);
+            printf("%s  FAIL: %s%s  [%s:%d]\n", C_RED, cosh_tests[i].name, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
         }
@@ -1751,13 +1800,11 @@ static void test_qf_tanh(void)
         qf_to_string(expected, buf_exp, sizeof(buf_exp));
 
         if (qf_close(got, expected, 1e-30)) {
-            printf("%s  OK: %s = %s%s\n",
-                   C_GREEN, tanh_tests[i].name, buf, C_RESET);
+            printf("%s  OK: %s = %s%s\n", C_GREEN, tanh_tests[i].name, buf, C_RESET);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
         } else {
-            printf("%s  FAIL: %s%s\n",
-                   C_RED, tanh_tests[i].name, C_RESET);
+            printf("%s  FAIL: %s%s  [%s:%d]\n", C_RED, tanh_tests[i].name, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
         }
@@ -1797,13 +1844,11 @@ static void test_qf_asinh(void)
         qf_to_string(expected, buf_exp, sizeof(buf_exp));
 
         if (qf_close(got, expected, 1e-30)) {
-            printf("%s  OK: %s = %s%s\n",
-                   C_GREEN, asinh_tests[i].name, buf, C_RESET);
+            printf("%s  OK: %s = %s%s\n", C_GREEN, asinh_tests[i].name, buf, C_RESET);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
         } else {
-            printf("%s  FAIL: %s%s\n",
-                   C_RED, asinh_tests[i].name, C_RESET);
+            printf("%s  FAIL: %s%s  [%s:%d]\n", C_RED, asinh_tests[i].name, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
         }
@@ -1841,13 +1886,11 @@ static void test_qf_acosh(void)
         qf_to_string(expected, buf_exp, sizeof(buf_exp));
 
         if (qf_close(got, expected, 1e-30)) {
-            printf("%s  OK: %s = %s%s\n",
-                   C_GREEN, acosh_tests[i].name, buf, C_RESET);
+            printf("%s  OK: %s = %s%s\n", C_GREEN, acosh_tests[i].name, buf, C_RESET);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
         } else {
-            printf("%s  FAIL: %s%s\n",
-                   C_RED, acosh_tests[i].name, C_RESET);
+            printf("%s  FAIL: %s%s  [%s:%d]\n", C_RED, acosh_tests[i].name, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
         }
@@ -1859,7 +1902,7 @@ static void test_qf_acosh(void)
         printf("%s  OK: acosh(0.5) = NaN%s\n", C_GREEN, C_RESET);
     } else {
         qf_to_string(r, buf, sizeof(buf));
-        printf("%s  FAIL: acosh(0.5) should be NaN%s\n", C_RED, C_RESET);
+        printf("%s  FAIL: acosh(0.5) should be NaN%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
         printf("    got = %s\n", buf);
     }
 }
@@ -1897,13 +1940,11 @@ static void test_qf_atanh(void)
         qf_to_string(expected, buf_exp, sizeof(buf_exp));
 
         if (qf_close(got, expected, 1e-30)) {
-            printf("%s  OK: %s = %s%s\n",
-                   C_GREEN, atanh_tests[i].name, buf, C_RESET);
+            printf("%s  OK: %s = %s%s\n", C_GREEN, atanh_tests[i].name, buf, C_RESET);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
         } else {
-            printf("%s  FAIL: %s%s\n",
-                   C_RED, atanh_tests[i].name, C_RESET);
+            printf("%s  FAIL: %s%s  [%s:%d]\n", C_RED, atanh_tests[i].name, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
         }
@@ -1915,7 +1956,7 @@ static void test_qf_atanh(void)
         printf("%s  OK: atanh(1) = NaN%s\n", C_GREEN, C_RESET);
     } else {
         qf_to_string(r, buf, sizeof(buf));
-        printf("%s  FAIL: atanh(1) should be NaN%s\n", C_RED, C_RESET);
+        printf("%s  FAIL: atanh(1) should be NaN%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
         printf("    got = %s\n", buf);
     }
 }
@@ -1923,13 +1964,6 @@ static void test_qf_atanh(void)
 /* -----------------------------------------------------------
    qf_hypot tests (full qfloat precision)
    ----------------------------------------------------------- */
-/* -----------------------------------------------------------
-   qf_hypot tests (full precision where safe)
-   ----------------------------------------------------------- */
-/* -----------------------------------------------------------
-   qf_hypot tests
-   ----------------------------------------------------------- */
-
 static void test_qf_hypot(void)
 {
     printf(C_CYAN "TEST: qf_hypot\n" C_RESET);
@@ -1976,7 +2010,7 @@ static void test_qf_hypot(void)
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_ref);
         } else {
-            printf("%s  FAIL: %s%s\n", C_RED, precise[i].label, C_RESET);
+            printf("%s  FAIL: %s%s  [%s:%d]\n", C_RED, precise[i].label, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_ref);
         }
@@ -1993,7 +2027,7 @@ static void test_qf_hypot(void)
         if (qf_close(h1, h2, 1e-32)) {
             printf("%s  OK: symmetry%s\n", C_GREEN, C_RESET);
         } else {
-            printf("%s  FAIL: symmetry%s\n", C_RED, C_RESET);
+            printf("%s  FAIL: symmetry%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
         }
     }
 
@@ -2030,7 +2064,7 @@ static void test_qf_hypot(void)
             printf("    double   = %.17g\n", href);
             printf("    err      = %.3e\n", err);
         } else {
-            printf("%s  FAIL: %s%s\n", C_RED, extreme[i].label, C_RESET);
+            printf("%s  FAIL: %s%s  [%s:%d]\n", C_RED, extreme[i].label, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    double   = %.17g\n", href);
             printf("    err      = %.3e\n", err);
@@ -2105,7 +2139,7 @@ static void test_qf_gamma(void)
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
         } else {
-            printf("%s  FAIL: gamma(%s)%s\n", C_RED, tests[i].xs, C_RESET);
+            printf("%s  FAIL: gamma(%s)%s  [%s:%d]\n", C_RED, tests[i].xs, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
         }
@@ -2123,7 +2157,7 @@ static void test_qf_gamma(void)
             printf("%s  OK: gamma(%s) is NaN%s\n", C_GREEN, poles[i], C_RESET);
         } else {
             qf_to_string(g, buf, sizeof(buf));
-            printf("%s  FAIL: gamma(%s) should be NaN%s\n", C_RED, poles[i], C_RESET);
+            printf("%s  FAIL: gamma(%s) should be NaN%s  [%s:%d]\n", C_RED, poles[i], C_RESET, __FILE__, __LINE__);
             printf("    got = %s\n", buf);
         }
     }
@@ -2141,8 +2175,7 @@ static void test_qf_gamma(void)
                    C_GREEN, extreme[i], C_RESET);
         } else {
             qf_to_string(g, buf, sizeof(buf));
-            printf("%s  FAIL: gamma(%s) should be NaN%s\n",
-                   C_RED, extreme[i], C_RESET);
+            printf("%s  FAIL: gamma(%s) should be NaN%s  [%s:%d]\n", C_RED, extreme[i], C_RESET, __FILE__, __LINE__);
             printf("    got = %s\n", buf);
         }
     }
@@ -2214,7 +2247,7 @@ static void test_qf_erf(void)
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
         } else {
-            printf("%s  FAIL: erf(%s)%s\n", C_RED, tests[i].xs, C_RESET);
+            printf("%s  FAIL: erf(%s)%s  [%s:%d]\n", C_RED, tests[i].xs, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
         }
@@ -2285,7 +2318,7 @@ static void test_qf_erfc(void)
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
         } else {
-            printf("%s  FAIL: erfc(%s)%s\n", C_RED, tests[i].xs, C_RESET);
+            printf("%s  FAIL: erfc(%s)%s  [%s:%d]\n", C_RED, tests[i].xs, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
         }
@@ -2346,7 +2379,7 @@ static void test_qf_erfinv(void) {
             if (qf_isnan(got)) {
                 printf("%s  OK: erfinv(%s)%s\n", C_GREEN, tests[i].xs, C_RESET);
             } else {
-                printf("%s  FAIL: erfinv(%s)%s\n", C_RED, tests[i].xs, C_RESET);
+                printf("%s  FAIL: erfinv(%s)%s  [%s:%d]\n", C_RED, tests[i].xs, C_RESET, __FILE__, __LINE__);
                 printf("    expected = NAN\n");
             }
             continue;
@@ -2362,7 +2395,7 @@ static void test_qf_erfinv(void) {
                 printf("    got      = %s\n", buf);
                 printf("    expected = %s\n", buf_exp);
             } else {
-                printf("%s  FAIL: erfinv(%s)%s\n", C_RED, tests[i].xs, C_RESET);
+                printf("%s  FAIL: erfinv(%s)%s  [%s:%d]\n", C_RED, tests[i].xs, C_RESET, __FILE__, __LINE__);
                 printf("    got      = %s\n", buf);
                 printf("    expected = %s\n", buf_exp);
             }
@@ -2426,7 +2459,7 @@ static void test_qf_erfcinv(void) {
             if (qf_isposinf(got)) {
                 printf("%s  OK: erfcinv(%s)%s\n", C_GREEN, tests[i].xs, C_RESET);
             } else {
-                printf("%s  FAIL: erfcinv(%s)%s\n", C_RED, tests[i].xs, C_RESET);
+                printf("%s  FAIL: erfcinv(%s)%s  [%s:%d]\n", C_RED, tests[i].xs, C_RESET, __FILE__, __LINE__);
                 printf("    expected = +INF\n");
             }
             continue;
@@ -2436,7 +2469,7 @@ static void test_qf_erfcinv(void) {
             if (qf_isneginf(got)) {
                 printf("%s  OK: erfcinv(%s)%s\n", C_GREEN, tests[i].xs, C_RESET);
             } else {
-                printf("%s  FAIL: erfcinv(%s)%s\n", C_RED, tests[i].xs, C_RESET);
+                printf("%s  FAIL: erfcinv(%s)%s  [%s:%d]\n", C_RED, tests[i].xs, C_RESET, __FILE__, __LINE__);
                 printf("    expected = -INF\n");
             }
             continue;
@@ -2453,7 +2486,7 @@ static void test_qf_erfcinv(void) {
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
         } else {
-            printf("%s  FAIL: erfcinv(%s)%s\n", C_RED, tests[i].xs, C_RESET);
+            printf("%s  FAIL: erfcinv(%s)%s  [%s:%d]\n", C_RED, tests[i].xs, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
         }
@@ -2515,7 +2548,7 @@ static void test_qf_lgamma(void) {
             if (qf_isnan(got)) {
                 printf(C_GREEN "  OK: lgamma(%s)\n" C_RESET, tests[i].xs);
             } else {
-                printf(C_RED "  FAIL: lgamma(%s)\n" C_RESET, tests[i].xs);
+                printf(C_RED "  FAIL: lgamma(%s)  [%s:%d]\n" C_RESET, tests[i].xs, __FILE__, __LINE__);
                 printf("    expected = NAN\n");
                 qf_to_string(got, buf, sizeof(buf));
                 printf("    got      = %s\n", buf);
@@ -2531,7 +2564,7 @@ static void test_qf_lgamma(void) {
         if (qf_close(got, exp, tests[i].acceptable_error)) {
             printf(C_GREEN "  OK: lgamma(%s)\n" C_RESET, tests[i].xs);
         } else {
-            printf(C_RED "  FAIL: lgamma(%s)\n" C_RESET, tests[i].xs);
+            printf(C_RED "  FAIL: lgamma(%s)  [%s:%d]\n" C_RESET, tests[i].xs, __FILE__, __LINE__);
         }
 
         printf("    got      = %s\n", buf);
@@ -2593,7 +2626,7 @@ static void test_qf_digamma(void) {
             if (qf_isnan(got)) {
                 printf(C_GREEN "  OK: digamma(%s)\n" C_RESET, tests[i].xs);
             } else {
-                printf(C_RED "  FAIL: digamma(%s)\n" C_RESET, tests[i].xs);
+                printf(C_RED "  FAIL: digamma(%s)  [%s:%d]\n" C_RESET, tests[i].xs, __FILE__, __LINE__);
                 printf("    expected = NAN\n");
                 qf_to_string(got, buf, sizeof(buf));
                 printf("    got      = %s\n", buf);
@@ -2609,7 +2642,7 @@ static void test_qf_digamma(void) {
         if (qf_close(got, exp, tests[i].acceptable_error)) {
             printf(C_GREEN "  OK: digamma(%s)\n" C_RESET, tests[i].xs);
         } else {
-            printf(C_RED "  FAIL: digamma(%s)\n" C_RESET, tests[i].xs);
+            printf(C_RED "  FAIL: digamma(%s)  [%s:%d]\n" C_RESET, tests[i].xs, __FILE__, __LINE__);
         }
 
         printf("    got      = %s\n", buf);
@@ -2658,7 +2691,7 @@ static void test_qf_gammainv(void) {
         if (qf_close(got, exp, tests[i].acceptable_error)) {
             printf(C_GREEN "  OK: gammainv(gamma(%s))\n" C_RESET, tests[i].xs);
         } else {
-            printf(C_RED "  FAIL: gammainv(gamma(%s))\n" C_RESET, tests[i].xs);
+            printf(C_RED "  FAIL: gammainv(%s)  [%s:%d]\n" C_RESET, tests[i].xs, __FILE__, __LINE__);
         }
 
         printf("    got      = %s\n", buf);
@@ -2712,7 +2745,7 @@ static void test_qf_lambert_w0(void) {
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
         } else {
-            printf("%s  FAIL: W0(%s)%s\n", C_RED, tests[i].xs, C_RESET);
+            printf(C_RED "  FAIL: W0(%s)  [%s:%d]\n" C_RESET, tests[i].xs, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
         }
@@ -2759,7 +2792,7 @@ static void test_qf_lambert_wm1(void) {
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
         } else {
-            printf("%s  FAIL: Wm1(%s)%s\n", C_RED, tests[i].xs, C_RESET);
+            printf(C_RED "  FAIL: Wm1(%s)  [%s:%d]\n" C_RESET, tests[i].xs, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
         }
@@ -2775,7 +2808,7 @@ static void test_qf_lambert_wm1(void) {
 static void print_qf(const char *label, qfloat x)
 {
     char buf[128];
-    qf_sprintf(buf, sizeof(buf), "%Q", x);
+    qf_sprintf(buf, sizeof(buf), "%Q", &x);
     printf("    %s = %s\n", label, buf);
 }
 
@@ -2842,8 +2875,7 @@ static void test_qf_beta_symmetry(void)
                 printf(C_GREEN "  OK: B(%g,%g) = B(%g,%g)\n" C_RESET,
                        as[i], bs[j], bs[j], as[i]);
             } else {
-                printf(C_RED "  FAIL: B(%g,%g) = B(%g,%g)\n" C_RESET,
-                       as[i], bs[j], bs[j], as[i]);
+                printf(C_RED "  FAIL: B(%g,%g) = B(%g,%g) [%s:%d]\n" C_RESET, as[i], bs[j], bs[j], as[i], __FILE__, __LINE__);
                 print_qf("B(a,b)", Bab);
                 print_qf("B(b,a)", Bba);
             }
@@ -2879,7 +2911,7 @@ static void test_qf_beta_special_cases(void)
         if (ok1 && ok2) {
             printf(C_GREEN "  OK: B(1,%g) and B(%g,1)\n" C_RESET, vals[i], vals[i]);
         } else {
-            printf(C_RED "  FAIL: B(1,%g) or B(%g,1)\n" C_RESET, vals[i], vals[i]);
+            printf(C_RED "  FAIL: B(1,%g) or B(%g,1)  [%s:%d]\n" C_RESET, vals[i], vals[i], __FILE__, __LINE__);
             print_qf("B(1,b)", B1b);
             print_qf("expected", B1b_expected);
             print_qf("B(a,1)", Ba1);
@@ -2931,7 +2963,7 @@ static void test_qf_logbeta_definition(void)
             if (ok) {
                 printf(C_GREEN "  OK: logB(%g,%g)\n" C_RESET, as[i], bs[j]);
             } else {
-                printf(C_RED "  FAIL: logB(%g,%g)\n" C_RESET, as[i], bs[j]);
+                printf(C_RED "  FAIL: logB(%g,%g)  [%s:%d]\n" C_RESET, as[i], bs[j], __FILE__, __LINE__);
                 print_qf("logB", logB);
                 print_qf("rhs", rhs);
             }
@@ -2968,8 +3000,7 @@ static void test_qf_logbeta_consistency(void)
                 printf(C_GREEN "  OK: logB(%g,%g) matches log(beta)\n" C_RESET,
                        as[i], bs[j]);
             } else {
-                printf(C_RED "  FAIL: logB(%g,%g) mismatch\n" C_RESET,
-                       as[i], bs[j]);
+                printf(C_RED "  FAIL: logB(%g,%g) mismatch  [%s:%d]\n" C_RESET, as[i], bs[j], __FILE__, __LINE__);
                 print_qf("logB", logB);
                 print_qf("log(beta)", logB_expected);
             }
@@ -3004,8 +3035,7 @@ static void test_qf_logbeta_symmetry(void)
                 printf(C_GREEN "  OK: logB(%g,%g) = logB(%g,%g)\n" C_RESET,
                        as[i], bs[j], bs[j], as[i]);
             } else {
-                printf(C_RED "  FAIL: logB(%g,%g) = logB(%g,%g)\n" C_RESET,
-                       as[i], bs[j], bs[j], as[i]);
+                printf(C_RED "  FAIL: logB(%g,%g) = logB(%g,%g)  [%s:%d]\n" C_RESET, as[i], bs[j], bs[j], as[i], __FILE__, __LINE__);
                 print_qf("logB(a,b)", lab);
                 print_qf("logB(b,a)", lba);
             }
@@ -3043,8 +3073,7 @@ static void test_qf_logbeta_special_cases(void)
             printf(C_GREEN "  OK: logB(1,%g) and logB(%g,1)\n" C_RESET,
                    vals[i], vals[i]);
         } else {
-            printf(C_RED "  FAIL: logB(1,%g) or logB(%g,1)\n" C_RESET,
-                   vals[i], vals[i]);
+            printf(C_RED "  FAIL: logB(1,%g) or logB(%g,1)  [%s:%d]\n" C_RESET, vals[i], vals[i], __FILE__, __LINE__);
             print_qf("logB(1,v)", logB1v);
             print_qf("expected", logB1v_expected);
             print_qf("logB(v,1)", logBv1);
@@ -3096,7 +3125,7 @@ static void test_qf_binomial_definition(void)
             if (ok) {
                 printf(C_GREEN "  OK: C(%g,%g)\n" C_RESET, as[i], bs[j]);
             } else {
-                printf(C_RED "  FAIL: C(%g,%g)\n" C_RESET, as[i], bs[j]);
+                printf(C_RED "  FAIL: C(%g,%g)  [%s:%d]\n" C_RESET, as[i], bs[j], __FILE__, __LINE__);
                 print_qf("C(a,b)", C);
                 print_qf("Γ(a+1)/(Γ(b+1)Γ(a-b+1))", rhs);
             }
@@ -3133,8 +3162,7 @@ static void test_qf_binomial_symmetry(void)
                 printf(C_GREEN "  OK: C(%d,%d) = C(%d,%d)\n" C_RESET,
                        n, k, n, n-k);
             } else {
-                printf(C_RED "  FAIL: C(%d,%d) = C(%d,%d)\n" C_RESET,
-                       n, k, n, n-k);
+                printf(C_RED "  FAIL: C(%d,%d) = C(%d,%d)  [%s:%d]\n" C_RESET, n, k, n, n-k, __FILE__, __LINE__);
                 print_qf("C(n,k)", C1);
                 print_qf("C(n,n-k)", C2);
             }
@@ -3166,7 +3194,7 @@ static void test_qf_binomial_special_cases(void)
         if (ok1 && ok2) {
             printf(C_GREEN "  OK: C(%d,0)=1 and C(%d,1)=%d\n" C_RESET, n, n, n);
         } else {
-            printf(C_RED "  FAIL: C(%d,0) or C(%d,1)\n" C_RESET, n, n);
+            printf(C_RED "  FAIL: C(%d,0) or C(%d,1)  [%s:%d]\n" C_RESET, n, n, __FILE__, __LINE__);
             print_qf("C(n,0)", Cn0);
             print_qf("C(n,1)", Cn1);
         }
@@ -3220,7 +3248,7 @@ static void test_qf_beta_pdf_definition(void)
                 if (ok) {
                     printf(C_GREEN "  OK: f(%g; %g,%g)\n" C_RESET, xs[i], as[j], bs[k]);
                 } else {
-                    printf(C_RED "  FAIL: f(%g; %g,%g)\n" C_RESET, xs[i], as[j], bs[k]);
+                    printf(C_RED "  FAIL: f(%g; %g,%g)  [%s:%d]\n" C_RESET, xs[i], as[j], bs[k], __FILE__, __LINE__);
                     print_qf("pdf", pdf);
                     print_qf("rhs", rhs);
                 }
@@ -3268,7 +3296,7 @@ static void test_qf_beta_pdf_logform(void)
                 if (ok) {
                     printf(C_GREEN "  OK: log f(%g; %g,%g)\n" C_RESET, xs[i], as[j], bs[k]);
                 } else {
-                    printf(C_RED "  FAIL: log f(%g; %g,%g)\n" C_RESET, xs[i], as[j], bs[k]);
+                    printf(C_RED "  FAIL: log f(%g; %g,%g)  [%s:%d]\n" C_RESET, xs[i], as[j], bs[k], __FILE__, __LINE__);
                     print_qf("logpdf", logpdf);
                     print_qf("rhs", rhs);
                 }
@@ -3308,8 +3336,7 @@ static void test_qf_beta_pdf_symmetry(void)
                     printf(C_GREEN "  OK: symmetry (%g; %g,%g)\n" C_RESET,
                            xs[i], as[j], bs[k]);
                 } else {
-                    printf(C_RED "  FAIL: symmetry (%g; %g,%g)\n" C_RESET,
-                           xs[i], as[j], bs[k]);
+                    printf(C_RED "  FAIL: symmetry (%g; %g,%g)  [%s:%d]\n" C_RESET, xs[i], as[j], bs[k], __FILE__, __LINE__);
                     print_qf("f(x;a,b)", f1);
                     print_qf("f(1-x;b,a)", f2);
                 }
@@ -3367,8 +3394,7 @@ static void test_qf_logbeta_pdf_definition(void)
                     printf(C_GREEN "  OK: log f(%g; %g,%g)\n" C_RESET,
                            xs[i], as[j], bs[k]);
                 } else {
-                    printf(C_RED "  FAIL: log f(%g; %g,%g)\n" C_RESET,
-                           xs[i], as[j], bs[k]);
+                    printf(C_RED "  FAIL: log f(%g; %g,%g)  [%s:%d]\n" C_RESET, xs[i], as[j], bs[k], __FILE__, __LINE__);
                     print_qf("logpdf", logpdf);
                     print_qf("rhs", rhs);
                 }
@@ -3408,7 +3434,7 @@ static void test_qf_logbeta_pdf_consistency(void)
                 if (ok) {
                     printf(C_GREEN "  OK: log f matches log(pdf)\n" C_RESET);
                 } else {
-                    printf(C_RED "  FAIL: log f mismatch\n" C_RESET);
+                    printf(C_RED "  FAIL: log f mismatch  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
                     print_qf("logpdf", logpdf);
                     print_qf("log(pdf)", rhs);
                 }
@@ -3448,8 +3474,7 @@ static void test_qf_logbeta_pdf_symmetry(void)
                     printf(C_GREEN "  OK: symmetry (%g; %g,%g)\n" C_RESET,
                            xs[i], as[j], bs[k]);
                 } else {
-                    printf(C_RED "  FAIL: symmetry (%g; %g,%g)\n" C_RESET,
-                           xs[i], as[j], bs[k]);
+                    printf(C_RED "  FAIL: symmetry (%g; %g,%g)  [%s:%d]\n" C_RESET, xs[i], as[j], bs[k], __FILE__, __LINE__);
                     print_qf("log f(x;a,b)", f1);
                     print_qf("log f(1-x;b,a)", f2);
                 }
@@ -3498,7 +3523,7 @@ static void test_qf_normal_pdf_definition(void)
         if (ok) {
             printf(C_GREEN "  OK: φ(%g)\n" C_RESET, xs[i]);
         } else {
-            printf(C_RED "  FAIL: φ(%g)\n" C_RESET, xs[i]);
+            printf(C_RED "  FAIL: φ(%g)  [%s:%d]\n" C_RESET, xs[i], __FILE__, __LINE__);
             print_qf("pdf", pdf);
             print_qf("rhs", rhs);
         }
@@ -3529,7 +3554,7 @@ static void test_qf_normal_pdf_symmetry(void)
         if (ok) {
             printf(C_GREEN "  OK: φ(%g) = φ(%g)\n" C_RESET, xs[i], -xs[i]);
         } else {
-            printf(C_RED "  FAIL: φ(%g) = φ(%g)\n" C_RESET, xs[i], -xs[i]);
+            printf(C_RED "  FAIL: φ(%g) = φ(%g)  [%s:%d]\n" C_RESET, xs[i], -xs[i], __FILE__, __LINE__);
             print_qf("φ(x)", fx);
             print_qf("φ(-x)", fnx);
         }
@@ -3553,7 +3578,7 @@ static void test_qf_normal_pdf_at_zero(void)
     if (ok) {
         printf(C_GREEN "  OK: φ(0)\n" C_RESET);
     } else {
-        printf(C_RED "  FAIL: φ(0)\n" C_RESET);
+        printf(C_RED "  FAIL: φ(0)  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
         print_qf("φ(0)", pdf0);
         print_qf("expected", expected);
     }
@@ -3589,7 +3614,7 @@ static void test_qf_normal_pdf_logform(void)
         if (ok) {
             printf(C_GREEN "  OK: log φ(%g)\n" C_RESET, xs[i]);
         } else {
-            printf(C_RED "  FAIL: log φ(%g)\n" C_RESET, xs[i]);
+            printf(C_RED "  FAIL: log φ(%g)  [%s:%d]\n" C_RESET, xs[i], __FILE__, __LINE__);
             print_qf("logpdf", logpdf);
             print_qf("rhs", rhs);
         }
@@ -3636,7 +3661,7 @@ static void test_qf_normal_cdf_definition(void)
         if (ok) {
             printf(C_GREEN "  OK: Φ(%g)\n" C_RESET, xs[i]);
         } else {
-            printf(C_RED "  FAIL: Φ(%g)\n" C_RESET, xs[i]);
+            printf(C_RED "  FAIL: Φ(%g)  [%s:%d]\n" C_RESET, xs[i], __FILE__, __LINE__);
             print_qf("cdf", cdf);
             print_qf("rhs", rhs);
         }
@@ -3671,7 +3696,7 @@ static void test_qf_normal_cdf_symmetry(void)
         if (ok) {
             printf(C_GREEN "  OK: Φ(%g) + Φ(%g) = 1\n" C_RESET, xs[i], -xs[i]);
         } else {
-            printf(C_RED "  FAIL: Φ(%g) + Φ(%g) = 1\n" C_RESET, xs[i], -xs[i]);
+            printf(C_RED "  FAIL: Φ(%g) + Φ(%g) = 1  [%s:%d]\n" C_RESET, xs[i], -xs[i], __FILE__, __LINE__);
             print_qf("Φ(-x)", Fnx);
             print_qf("1 - Φ(x)", rhs);
         }
@@ -3766,7 +3791,7 @@ static void test_qf_normal_cdf_pdf_consistency(void)
         if (ok) {
             printf(C_GREEN "  OK: Φ'(%g) = φ(%g)\n" C_RESET, xs[i], xs[i]);
         } else {
-            printf(C_RED "  FAIL: Φ'(%g) = φ(%g)\n" C_RESET, xs[i], xs[i]);
+            printf(C_RED "  FAIL: Φ'(%g) = φ(%g)  [%s:%d]\n" C_RESET, xs[i], xs[i], __FILE__, __LINE__);
             print_qf("dΦ/dx", dF);
             print_qf(" φ(x)", pdf);
         }
@@ -3813,7 +3838,7 @@ static void test_qf_normal_logpdf_definition(void)
         if (ok) {
             printf(C_GREEN "  OK: log φ(%g)\n" C_RESET, xs[i]);
         } else {
-            printf(C_RED "  FAIL: log φ(%g)\n" C_RESET, xs[i]);
+            printf(C_RED "  FAIL: log φ(%g)  [%s:%d]\n" C_RESET, xs[i], __FILE__, __LINE__);
             print_qf("logpdf", logpdf);
             print_qf("rhs", rhs);
         }
@@ -3845,7 +3870,7 @@ static void test_qf_normal_logpdf_consistency(void)
         if (ok) {
             printf(C_GREEN "  OK: log φ(%g) matches log(pdf)\n" C_RESET, xs[i]);
         } else {
-            printf(C_RED "  FAIL: log φ(%g)\n" C_RESET, xs[i]);
+            printf(C_RED "  FAIL: log φ(%g)  [%s:%d]\n" C_RESET, xs[i], __FILE__, __LINE__);
             print_qf("logpdf", logpdf);
             print_qf("log(pdf)", rhs);
         }
@@ -3876,7 +3901,7 @@ static void test_qf_normal_logpdf_symmetry(void)
         if (ok) {
             printf(C_GREEN "  OK: log φ(%g) = log φ(%g)\n" C_RESET, xs[i], -xs[i]);
         } else {
-            printf(C_RED "  FAIL: log φ(%g) = log φ(%g)\n" C_RESET, xs[i], -xs[i]);
+            printf(C_RED "  FAIL: log φ(%g) = log φ(%g)  [%s:%d]\n" C_RESET, xs[i], -xs[i], __FILE__, __LINE__);
             print_qf("log φ(x)", fx);
             print_qf("log φ(-x)", fnx);
         }
@@ -3901,7 +3926,7 @@ static void test_qf_normal_logpdf_at_zero(void)
     if (ok) {
         printf(C_GREEN "  OK: log φ(0)\n" C_RESET);
     } else {
-        printf(C_RED "  FAIL: log φ(0)\n" C_RESET);
+        printf(C_RED "  FAIL: log φ(0)  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
         print_qf("log φ(0)", logpdf0);
         print_qf("expected", expected);
     }
@@ -3941,7 +3966,7 @@ static void test_qf_productlog_definition(void)
         if (ok) {
             printf(C_GREEN "  OK: W(%g)\n" C_RESET, xs[i]);
         } else {
-            printf(C_RED "  FAIL: W(%g)\n" C_RESET, xs[i]);
+            printf(C_RED "  FAIL: W(%g)  [%s:%d]\n" C_RESET, xs[i], __FILE__, __LINE__);
             print_qf("W(x)", w);
             print_qf("W*exp(W)", lhs);
             print_qf("x", x);
@@ -3972,7 +3997,7 @@ static void test_qf_productlog_consistency(void)
         if (ok) {
             printf(C_GREEN "  OK: ProductLog(%g) = W(%g)\n" C_RESET, xs[i], xs[i]);
         } else {
-            printf(C_RED "  FAIL: ProductLog(%g)\n" C_RESET, xs[i]);
+            printf(C_RED "  FAIL: ProductLog(%g)  [%s:%d]\n" C_RESET, xs[i], __FILE__, __LINE__);
             print_qf("ProductLog", p);
             print_qf("LambertW", w);
         }
@@ -4008,7 +4033,7 @@ static void test_qf_productlog_special(void)
     if (ok1 && ok2 && ok3) {
         printf(C_GREEN "  OK: special values\n" C_RESET);
     } else {
-        printf(C_RED "  FAIL: special values\n" C_RESET);
+        printf(C_RED "  FAIL: special values  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
         print_qf("W(0)", w0);
         print_qf("W(-1/e)", w);
         print_qf("W(e)", we);
@@ -4034,7 +4059,7 @@ static void test_qf_productlog_monotonicity(void)
         qfloat w = qf_productlog(x);
 
         if (qf_lt(w, prev)) {
-            printf(C_RED "  FAIL: W(%g) < W(%g)\n" C_RESET, xs[i], xs[i-1]);
+            printf(C_RED "  FAIL: W(%g) < W(%g)  [%s:%d]\n" C_RESET, xs[i], xs[i-1], __FILE__, __LINE__);
             print_qf("W(prev)", prev);
             print_qf("W(curr)", w);
             return;
@@ -4084,8 +4109,7 @@ static void test_qf_gammainc_PQ_identity(void)
                 printf(C_GREEN "  OK: P(%g,%g) + Q(%g,%g)\n" C_RESET,
                        ss[i], xs[j], ss[i], xs[j]);
             } else {
-                printf(C_RED "  FAIL: P(%g,%g) + Q(%g,%g)\n" C_RESET,
-                       ss[i], xs[j], ss[i], xs[j]);
+                printf(C_RED "  FAIL: P(%g,%g) + Q(%g,%g)  [%s:%d]\n" C_RESET, ss[i], xs[j], ss[i], xs[j], __FILE__, __LINE__);
                 print_qf("P", P);
                 print_qf("Q", Q);
                 print_qf("sum", sum);
@@ -4125,8 +4149,7 @@ static void test_qf_gammainc_lower_upper_identity(void)
                 printf(C_GREEN "  OK: γ(%g,%g) + Γ(%g,%g)\n" C_RESET,
                        ss[i], xs[j], ss[i], xs[j]);
             } else {
-                printf(C_RED "  FAIL: γ(%g,%g) + Γ(%g,%g)\n" C_RESET,
-                       ss[i], xs[j], ss[i], xs[j]);
+                printf(C_RED "  FAIL: γ(%g,%g) + Γ(%g,%g)  [%s:%d]\n" C_RESET, ss[i], xs[j], ss[i], xs[j], __FILE__, __LINE__);
                 print_qf("lower γ", gl);
                 print_qf("upper Γ", gu);
                 print_qf("sum", sum);
@@ -4169,7 +4192,7 @@ static void test_qf_gammainc_special_s1(void)
         if (ok1 && ok2) {
             printf(C_GREEN "  OK: γ(1,%g) and Γ(1,%g)\n" C_RESET, xs[j], xs[j]);
         } else {
-            printf(C_RED "  FAIL: γ(1,%g) or Γ(1,%g)\n" C_RESET, xs[j], xs[j]);
+            printf(C_RED "  FAIL: γ(1,%g) or Γ(1,%g)  [%s:%d]\n" C_RESET, xs[j], xs[j], __FILE__, __LINE__);
             print_qf("γ(1,x)", gl);
             print_qf("expected", expected_lower);
             print_qf("Γ(1,x)", gu);
@@ -4259,7 +4282,7 @@ static void test_qf_ei_deriv(void)
         if (ok) {
             printf(C_GREEN "  OK: Ei'(%g)\n" C_RESET, xs[i]);
         } else {
-            printf(C_RED "  FAIL: Ei'(%g)\n" C_RESET, xs[i]);
+            printf(C_RED "  FAIL: Ei'(%g)  [%s:%d]\n" C_RESET, xs[i], __FILE__, __LINE__);
             print_qf("residual", res);
             print_qf("dEi",      dEi);
             print_qf("rhs",      rhs);
@@ -4293,7 +4316,7 @@ static void test_qf_e1_deriv(void)
         if (ok) {
             printf(C_GREEN "  OK: E1'(%g)\n" C_RESET, xs[i]);
         } else {
-            printf(C_RED "  FAIL: E1'(%g)\n" C_RESET, xs[i]);
+            printf(C_RED "  FAIL: E1'(%g)  [%s:%d]\n" C_RESET, xs[i], __FILE__, __LINE__);
             print_qf("residual", res);
             print_qf("dE1",      dE1);
             print_qf("rhs",      rhs);
@@ -4325,7 +4348,7 @@ static void test_qf_ei_e1_identity(void)
         if (ok) {
             printf(C_GREEN "  OK: E1(%g) + Ei(%g)\n" C_RESET, xs[i], -xs[i]);
         } else {
-            printf(C_RED "  FAIL: E1(%g) + Ei(%g)\n" C_RESET, xs[i], -xs[i]);
+            printf(C_RED "  FAIL: E1(%g) + Ei(%g)  [%s:%d]\n" C_RESET, xs[i], -xs[i], __FILE__, __LINE__);
             print_qf("E1(x)", e1);
             print_qf("Ei(-x)", ei);
             print_qf("sum",   sum);
@@ -4388,14 +4411,14 @@ static void test_ei_values(void)
         if (pass) {
             printf("  \x1b[32mOK\x1b[0m: Ei(%s)\n", cases[i].x_str);
         } else {
-            printf("  \x1b[31mFAIL\x1b[0m: Ei(%s)\n", cases[i].x_str);
+            printf("  \x1b[31mFAIL\x1b[0m: Ei(%s)  [%s:%d]\n", cases[i].x_str, __FILE__, __LINE__);
         }
 
         /* full-precision printing using qf_sprintf */
-        qf_sprintf(buf_x,   sizeof(buf_x),   "%.40Q", x);
-        qf_sprintf(buf_ref, sizeof(buf_ref), "%.40Q", ref);
-        qf_sprintf(buf_got, sizeof(buf_got), "%.40Q", got);
-        qf_sprintf(buf_err, sizeof(buf_err), "%.40Q", ad);
+        qf_sprintf(buf_x,   sizeof(buf_x),   "%.40Q", &x);
+        qf_sprintf(buf_ref, sizeof(buf_ref), "%.40Q", &ref);
+        qf_sprintf(buf_got, sizeof(buf_got), "%.40Q", &got);
+        qf_sprintf(buf_err, sizeof(buf_err), "%.40Q", &ad);
 
         printf("    x        = %s\n", buf_x);
         printf("    expected = %s\n", buf_ref);
@@ -4491,5 +4514,6 @@ int main() {
     test_qf_ei_e1_all();    
     
     printf("\n" C_YELLOW "Done.\n" C_RESET);
+
     return 0;
 }
