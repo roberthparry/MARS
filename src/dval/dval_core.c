@@ -546,6 +546,11 @@ static dval_t *deriv_pow(dval_t *n)
     dval_t *db_r = db ? (dv_retain((dval_t *)db), (dval_t *)db)
                       : dv_new_const_d(0.0);
 
+    /* FIX: retain a and b before using them in multiple child nodes */
+    dv_retain(a);
+    dv_retain(a);
+    dv_retain(b);
+
     dval_t *loga  = dv_log(a);
     dval_t *term1 = dv_mul(db_r, loga);
     dval_t *term2 = dv_mul(b, dv_div(da_r, a));
@@ -928,134 +933,211 @@ static dval_t *deriv_atanh(dval_t *n)
 /* Operator vtable instances                                                 */
 /* ------------------------------------------------------------------------- */
 
+/* -------------------- ATOMS -------------------- */
+
 const dval_ops_t ops_const = {
     eval_const,
-    deriv_const
+    deriv_const,
+    DV_OP_ATOM,
+    "const",
+    NULL
 };
 
 const dval_ops_t ops_var = {
     eval_var,
-    deriv_var
+    deriv_var,
+    DV_OP_ATOM,
+    "var",
+    NULL
 };
+
+/* -------------------- BINARY OPS -------------------- */
 
 const dval_ops_t ops_add = {
     eval_add,
-    deriv_add
+    deriv_add,
+    DV_OP_BINARY,
+    "+",
+    NULL
 };
 
 const dval_ops_t ops_sub = {
     eval_sub,
-    deriv_sub
+    deriv_sub,
+    DV_OP_BINARY,
+    "-",
+    NULL
 };
 
 const dval_ops_t ops_mul = {
     eval_mul,
-    deriv_mul
+    deriv_mul,
+    DV_OP_BINARY,
+    "*",
+    NULL
 };
 
 const dval_ops_t ops_div = {
     eval_div,
-    deriv_div
-};
-
-const dval_ops_t ops_neg = {
-    eval_neg,
-    deriv_neg
+    deriv_div,
+    DV_OP_BINARY,
+    "/",
+    NULL
 };
 
 const dval_ops_t ops_pow = {
     eval_pow,
-    deriv_pow
+    deriv_pow,
+    DV_OP_BINARY,
+    "^",
+    NULL
 };
 
 const dval_ops_t ops_pow_d = {
     eval_pow_d,
-    deriv_pow_d
-};
-
-const dval_ops_t ops_sin = {
-    eval_sin,
-    deriv_sin
-};
-
-const dval_ops_t ops_cos = {
-    eval_cos,
-    deriv_cos
-};
-
-const dval_ops_t ops_tan = {
-    eval_tan,
-    deriv_tan
-};
-
-const dval_ops_t ops_sinh = {
-    eval_sinh,
-    deriv_sinh
-};
-
-const dval_ops_t ops_cosh = {
-    eval_cosh,
-    deriv_cosh
-};
-
-const dval_ops_t ops_tanh = {
-    eval_tanh,
-    deriv_tanh
-};
-
-const dval_ops_t ops_asin = {
-    eval_asin,
-    deriv_asin
-};
-
-const dval_ops_t ops_acos = {
-    eval_acos,
-    deriv_acos
-};
-
-const dval_ops_t ops_atan = {
-    eval_atan,
-    deriv_atan
+    deriv_pow_d,
+    DV_OP_BINARY,
+    "^",
+    NULL
 };
 
 const dval_ops_t ops_atan2 = {
     eval_atan2,
-    deriv_atan2
+    deriv_atan2,
+    DV_OP_BINARY,
+    "atan2",
+    NULL
+};
+
+/* -------------------- UNARY OPS -------------------- */
+
+const dval_ops_t ops_neg = {
+    eval_neg,
+    deriv_neg,
+    DV_OP_UNARY,
+    "-",
+    dv_neg
+};
+
+const dval_ops_t ops_sin = {
+    eval_sin,
+    deriv_sin,
+    DV_OP_UNARY,
+    "sin",
+    dv_sin
+};
+
+const dval_ops_t ops_cos = {
+    eval_cos,
+    deriv_cos,
+    DV_OP_UNARY,
+    "cos",
+    dv_cos
+};
+
+const dval_ops_t ops_tan = {
+    eval_tan,
+    deriv_tan,
+    DV_OP_UNARY,
+    "tan",
+    dv_tan
+};
+
+const dval_ops_t ops_sinh = {
+    eval_sinh,
+    deriv_sinh,
+    DV_OP_UNARY,
+    "sinh",
+    dv_sinh
+};
+
+const dval_ops_t ops_cosh = {
+    eval_cosh,
+    deriv_cosh,
+    DV_OP_UNARY,
+    "cosh",
+    dv_cosh
+};
+
+const dval_ops_t ops_tanh = {
+    eval_tanh,
+    deriv_tanh,
+    DV_OP_UNARY,
+    "tanh",
+    dv_tanh
+};
+
+const dval_ops_t ops_asin = {
+    eval_asin,
+    deriv_asin,
+    DV_OP_UNARY,
+    "asin",
+    dv_asin
+};
+
+const dval_ops_t ops_acos = {
+    eval_acos,
+    deriv_acos,
+    DV_OP_UNARY,
+    "acos",
+    dv_acos
+};
+
+const dval_ops_t ops_atan = {
+    eval_atan,
+    deriv_atan,
+    DV_OP_UNARY,
+    "atan",
+    dv_atan
 };
 
 const dval_ops_t ops_asinh = {
     eval_asinh,
-    deriv_asinh
+    deriv_asinh,
+    DV_OP_UNARY,
+    "asinh",
+    dv_asinh
 };
 
 const dval_ops_t ops_acosh = {
     eval_acosh,
-    deriv_acosh
+    deriv_acosh,
+    DV_OP_UNARY,
+    "acosh",
+    dv_acosh
 };
 
 const dval_ops_t ops_atanh = {
     eval_atanh,
-    deriv_atanh
+    deriv_atanh,
+    DV_OP_UNARY,
+    "atanh",
+    dv_atanh
 };
 
 const dval_ops_t ops_exp = {
     eval_exp,
-    deriv_exp
+    deriv_exp,
+    DV_OP_UNARY,
+    "exp",
+    dv_exp
 };
 
 const dval_ops_t ops_log = {
     eval_log,
-    deriv_log
+    deriv_log,
+    DV_OP_UNARY,
+    "log",
+    dv_log
 };
 
 const dval_ops_t ops_sqrt = {
     eval_sqrt,
-    deriv_sqrt
+    deriv_sqrt,
+    DV_OP_UNARY,
+    "sqrt",
+    dv_sqrt
 };
-
-/* ------------------------------------------------------------------------- */
-/* Core node constructors (no retaining here)                                */
-/* ------------------------------------------------------------------------- */
 
 /* ------------------------------------------------------------------------- */
 /* Core node constructors (no retaining here)                                */

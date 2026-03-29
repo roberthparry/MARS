@@ -204,7 +204,7 @@ int main(void) {
 ```
 f(x)    = { exp(sin x) + 3x² - 7 | x = 1.25 }
 f'(x)   = { cos(x)*exp(sin(x)) + 6x | x = 1.25 }
-f''(x)  = { exp(sin x) cos^2 x - sin x exp(sin x) + 6 | x = 1.25 }
+f''(x)  = { cos²(x)·exp(sin(x)) - sin(x)·exp(sin(x)) + 6 | x = 1.25 }
 ```
 
 ### Expected Numeric Output at x = 1.25

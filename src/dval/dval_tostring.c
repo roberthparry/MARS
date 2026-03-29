@@ -1,17 +1,26 @@
-/* dval_tostring.c - symbolic/string conversion for dval_t */
+/* dval_tostring.c - symbolic/string conversion for dval_t
+ *
+ * Responsibilities:
+ *   - precedence and parentheses
+ *   - superscripts for powers (expression style)
+ *   - function vs expression style
+ *   - { expr | x = value } wrapper
+ *
+ * All algebraic simplification (flattening, factoring, ordering, etc.)
+ * is done in dv_simplify.c.
+ */
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
-#include <stdarg.h>
 
 #include "qfloat.h"
 #include "dval_internal.h"
 #include "dval.h"
 
 /* ------------------------------------------------------------------------- */
-/* Memory helpers                                                            */
+/* Small helpers                                                             */
 /* ------------------------------------------------------------------------- */
 
 static void *xmalloc(size_t n)
@@ -90,31 +99,6 @@ static void sbuf_puts(sbuf_t *b, const char *s)
     b->data[b->len] = '\0';
 }
 
-/* not yet used but could be useful later */
-static inline void sbuf_printf(sbuf_t *b, const char *fmt, ...)
-{
-    va_list ap;
-    va_start(ap, fmt);
-    char tmp[256];
-    int n = vsnprintf(tmp, sizeof(tmp), fmt, ap);
-    va_end(ap);
-
-    if (n <= 0) return;
-
-    if ((size_t)n < sizeof(tmp)) {
-        sbuf_puts(b, tmp);
-        return;
-    }
-
-    char *buf = (char *)xmalloc((size_t)n + 1);
-    va_start(ap, fmt);
-    vsnprintf(buf, (size_t)n + 1, fmt, ap);
-    va_end(ap);
-
-    sbuf_puts(b, buf);
-    free(buf);
-}
-
 /* ------------------------------------------------------------------------- */
 /* UTF‑8 decoding (minimal)                                                  */
 /* ------------------------------------------------------------------------- */
@@ -161,10 +145,10 @@ static int is_unicode_letter(unsigned int c)
         (c >= 'a' && c <= 'z'))
         return 1;
 
-    if (c >= 0x0391 && c <= 0x03A9) /* Greek uppercase Α–Ω */
+    if (c >= 0x0391 && c <= 0x03A9)
         return 1;
 
-    if (c >= 0x03B1 && c <= 0x03C9) /* Greek lowercase α–ω */
+    if (c >= 0x03B1 && c <= 0x03C9)
         return 1;
 
     return 0;
@@ -180,19 +164,15 @@ static int is_simple_name(const char *name)
     if (len <= 0)
         return 0;
 
-    /* single Unicode letter */
     if (name[len] == '\0' && is_unicode_letter(c))
         return 1;
 
-    /* first char must be Unicode letter */
     if (!is_unicode_letter(c))
         return 0;
 
-    /* remaining chars: ASCII alnum or '_' */
-    for (const unsigned char *p = (const unsigned char *)name + len; *p; ++p) {
+    for (const unsigned char *p = (const unsigned char *)name + len; *p; ++p)
         if (!(isalnum(*p) || *p == '_'))
             return 0;
-    }
 
     return 1;
 }
@@ -251,24 +231,6 @@ static void emit_superscript_int(sbuf_t *b, long n)
     }
 }
 
-static void emit_superscript_string(sbuf_t *b, const char *s)
-{
-    for (; *s; ++s) {
-        unsigned char c = *s;
-        if (c >= '0' && c <= '9') {
-            sbuf_puts(b, sup_digits[c - '0']);
-        } else if (c == '-') {
-            sbuf_puts(b, "⁻");
-        } else if (c == '+') {
-            sbuf_puts(b, "⁺");
-        } else if (c == '.') {
-            sbuf_puts(b, "⋅");
-        } else {
-            sbuf_putc(b, c);
-        }
-    }
-}
-
 /* ------------------------------------------------------------------------- */
 /* Expression emitter                                                        */
 /* ------------------------------------------------------------------------- */
@@ -279,22 +241,166 @@ static void emit_atom(dval_t *f, sbuf_t *b)
 {
     if (f->ops == &ops_const) {
         if (f->name && *f->name) {
-            emit_name(b, f->name);   /* named constants: π, etc. */
+            emit_name(b, f->name);
         } else {
             char buf[64];
             qf_to_string_simple(f->c, buf, sizeof(buf));
             sbuf_puts(b, buf);
         }
-        return;
     } else if (f->ops == &ops_var) {
         emit_name(b, f->name ? f->name : "x");
-        return;
     } else {
         char buf[64];
         qf_to_string_simple(dv_get_val(f), buf, sizeof(buf));
         sbuf_puts(b, buf);
-        return;
     }
+}
+
+static int is_single_char_name(const dval_t *f)
+{
+    if (!f || !f->name) return 0;
+    unsigned int cp;
+    int len = utf8_decode(f->name, &cp);
+    return (len > 0 && f->name[len] == '\0');
+}
+
+/* -------------------------------------------------------------
+   Helper: atomic factors for implicit multiplication
+   ------------------------------------------------------------- */
+static int is_atomic_for_mul(const dval_t *f)
+{
+    if (!f) return 0;
+
+    if (f->ops == &ops_const)
+        return 1;
+
+    if (f->ops == &ops_var && is_single_char_name(f))
+        return 1;
+
+    if (f->ops == &ops_pow_d &&
+        f->a && f->a->ops == &ops_var &&
+        is_single_char_name(f->a))
+        return 1;
+
+    return 0;
+}
+
+/* -------------------------------------------------------------
+   Factor classification for Option B ordering
+   ------------------------------------------------------------- */
+typedef enum {
+    FACT_CONST = 0,
+    FACT_SINGLE_VAR = 1,
+    FACT_MULTI_VAR = 2,
+    FACT_VAR_POWER = 3,
+    FACT_UNARY_FUNC = 4,
+    FACT_OTHER = 5
+} factor_kind_t;
+
+/* -------------------------------------------------------------
+   Flatten multiplication chain (shape-independent)
+   ------------------------------------------------------------- */
+static void flatten_mul(dval_t *f, dval_t **buf, int *count, int max)
+{
+    if (!f || *count >= max) return;
+
+    if (f->ops == &ops_mul) {
+        flatten_mul(f->a, buf, count, max);
+        flatten_mul(f->b, buf, count, max);
+    } else {
+        buf[(*count)++] = f;
+    }
+}
+
+/* -------------------------------------------------------------
+   MAIN PRINTER
+   ------------------------------------------------------------- */
+
+/* -------------------------------------------------------------
+   Factor comparator (Option B + unary-depth ordering)
+   ------------------------------------------------------------- */
+
+static int expr_depth(const dval_t *f)
+{
+    if (!f) return 0;
+
+    /* Atoms: const, var */
+    if (f->ops == &ops_const || f->ops == &ops_var)
+        return 1;
+
+    /* Negation: do NOT increase depth, just look through it */
+    if (f->ops == &ops_neg)
+        return expr_depth(f->a);
+
+    /* Unary ops (sin, cos, exp, etc.) */
+    if (f->ops->arity == DV_OP_UNARY)
+        return 1 + expr_depth(f->a);
+
+    /* Binary ops (+, -, *, /, pow, etc.) */
+    if (f->ops->arity == DV_OP_BINARY) {
+        int da = expr_depth(f->a);
+        int db = expr_depth(f->b);
+        return 1 + (da > db ? da : db);
+    }
+
+    /* Fallback */
+    return 1;
+}
+
+static int expr_class(const dval_t *f)
+{
+    /* Atoms */
+    if (f->ops == &ops_const || f->ops == &ops_var)
+        return 0;
+
+    /* Simple power: x^n where base is var and exponent is const */
+    if (f->ops == &ops_pow_d && f->a->ops == &ops_var)
+        return 1;
+
+    /* Unary functions */
+    if (f->ops->arity == DV_OP_UNARY)
+        return 2 + expr_class(f->a);  /* nested unary increases class */
+
+    /* Binary expressions */
+    if (f->ops->arity == DV_OP_BINARY)
+        return 4;
+
+    return 5; /* fallback */
+}
+
+static int eff_depth(const dval_t *f)
+{
+    if (f->ops == &ops_neg)
+        return expr_depth(f->a);   /* ignore negation */
+    return expr_depth(f);
+}
+
+static const char *eff_name(const dval_t *f)
+{
+    if (f->ops == &ops_neg)
+        return f->a->ops->name;    /* ignore negation */
+    return f->ops->name;
+}
+
+static int factor_cmp(const void *pa, const void *pb)
+{
+    const dval_t *a = *(const dval_t * const *)pa;
+    const dval_t *b = *(const dval_t * const *)pb;
+
+    int da = eff_depth(a);
+    int db = eff_depth(b);
+
+    if (da != db)
+        return (da < db) ? -1 : 1;
+
+    /* Secondary key: expression class */
+    int ca = expr_class(a);
+    int cb = expr_class(b);
+    if (ca != cb)
+        return (ca < cb) ? -1 : 1;
+
+    /* Tertiary key: alphabetical */
+    return strcmp(eff_name(a), eff_name(b));
 }
 
 static void emit_expr(dval_t *f, sbuf_t *b, prec_t parent_prec, style_t style)
@@ -304,244 +410,219 @@ static void emit_expr(dval_t *f, sbuf_t *b, prec_t parent_prec, style_t style)
         return;
     }
 
-    /* Atoms */
+    /* ============================================================
+       1.  MULTIPLICATION / DIVISION  (must come BEFORE neg/unary)
+       ============================================================ */
+    if (f->ops == &ops_mul || f->ops == &ops_div) {
+        prec_t myp = PREC_MUL;
+        int need_paren = (myp < parent_prec);
+        if (need_paren) sbuf_putc(b, '(');
+
+        /* Division is simple */
+        if (f->ops == &ops_div) {
+            emit_expr(f->a, b, PREC_MUL, style);
+            sbuf_putc(b, '/');
+            emit_expr(f->b, b, PREC_MUL, style);
+            if (need_paren) sbuf_putc(b, ')');
+            return;
+        }
+
+        /* Multiplication: flatten */
+        dval_t *factors[64];
+        int n = 0;
+        flatten_mul(f, factors, &n, 64);
+
+        /* Always sort by structural simplicity */
+        qsort(factors, n, sizeof(dval_t *), factor_cmp);
+
+        /* Leading -1 constant → print '-' */
+        int start = 0;
+        if (n > 0 &&
+            factors[0]->ops == &ops_const &&
+            qf_to_double(factors[0]->c) == -1.0)
+        {
+            sbuf_putc(b, '-');
+            start = 1;
+        }
+
+        /* Emit factors */
+        for (int i = start; i < n; i++) {
+            if (i > start) {
+                int left_atomic  = is_atomic_for_mul(factors[i-1]);
+                int right_atomic = is_atomic_for_mul(factors[i]);
+
+                /* Decide how to print multiplication between factors[i-1] and factors[i] */
+                dval_t *L = factors[i-1];
+                dval_t *R = factors[i];
+
+                /* Case 1: implicit multiplication: const · var or const · var^k */
+                if (L->ops == &ops_const &&
+                    (R->ops == &ops_var || R->ops == &ops_pow_d))
+                {
+                    /* no symbol */
+                }
+                /* Case 2: both atomic → implicit multiplication */
+                else if (left_atomic && right_atomic) {
+                    /* no symbol */
+                }
+                /* Case 3: both non‑atomic → use centered dot */
+                else if (!left_atomic && !right_atomic) {
+                    sbuf_puts(b, "·");
+                }
+                /* Case 4: mixed atomic/non‑atomic → use '*' */
+                else {
+                    sbuf_putc(b, '*');
+                }
+            }
+            emit_expr(factors[i], b, PREC_MUL, style);
+        }
+
+        if (need_paren) sbuf_putc(b, ')');
+        return;
+    }
+
+    /* ============================================================
+       2.  NEGATION
+       ============================================================ */
+    if (f->ops == &ops_neg) {
+        prec_t myp = PREC_UNARY;
+        int need_paren = (myp < parent_prec);
+
+        if (need_paren) sbuf_putc(b, '(');
+        sbuf_putc(b, '-');
+        emit_expr(f->a, b, PREC_MUL, style);
+        if (need_paren) sbuf_putc(b, ')');
+        return;
+    }
+
+    /* ============================================================
+       3.  ATOMS
+       ============================================================ */
     if (f->ops == &ops_const || f->ops == &ops_var) {
         emit_atom(f, b);
         return;
     }
 
-    /* Unary minus */
-    if (f->ops == &ops_neg) {
+    /* ============================================================
+       4.  UNARY FUNCTIONS
+       ============================================================ */
+    if (f->ops->arity == DV_OP_UNARY) {
         prec_t myp = PREC_UNARY;
         int need_paren = (myp < parent_prec);
+
         if (need_paren) sbuf_putc(b, '(');
-        sbuf_putc(b, '-');
-        emit_expr(f->a, b, PREC_UNARY, style);
-        if (need_paren) sbuf_putc(b, ')');
-        return;
-    }
-
-    /* Unary functions */
-    if (f->ops == &ops_sin || f->ops == &ops_cos || f->ops == &ops_tan ||
-        f->ops == &ops_sinh || f->ops == &ops_cosh || f->ops == &ops_tanh ||
-        f->ops == &ops_asin || f->ops == &ops_acos || f->ops == &ops_atan ||
-        f->ops == &ops_asinh || f->ops == &ops_acosh || f->ops == &ops_atanh ||
-        f->ops == &ops_exp || f->ops == &ops_log || f->ops == &ops_sqrt) {
-
-        const char *fname = NULL;
-
-        if      (f->ops == &ops_sin)   fname = "sin";
-        else if (f->ops == &ops_cos)   fname = "cos";
-        else if (f->ops == &ops_tan)   fname = "tan";
-        else if (f->ops == &ops_sinh)  fname = "sinh";
-        else if (f->ops == &ops_cosh)  fname = "cosh";
-        else if (f->ops == &ops_tanh)  fname = "tanh";
-        else if (f->ops == &ops_asin)  fname = "asin";
-        else if (f->ops == &ops_acos)  fname = "acos";
-        else if (f->ops == &ops_atan)  fname = "atan";
-        else if (f->ops == &ops_asinh) fname = "asinh";
-        else if (f->ops == &ops_acosh) fname = "acosh";
-        else if (f->ops == &ops_atanh) fname = "atanh";
-        else if (f->ops == &ops_exp)   fname = "exp";
-        else if (f->ops == &ops_log)   fname = "log";
-        else if (f->ops == &ops_sqrt)  fname = "sqrt";
-
-        prec_t myp = PREC_UNARY;
-        int need_paren = (myp < parent_prec);
-        if (need_paren) sbuf_putc(b, '(');
-
-        sbuf_puts(b, fname);
-
-        if (style == style_FUNCTION) {
-            sbuf_putc(b, '(');
-            emit_expr(f->a, b, PREC_LOWEST, style);
-            sbuf_putc(b, ')');
-        } else {
-            if (f->a && f->a->ops == &ops_var) {
-                sbuf_putc(b, ' ');
-                emit_expr(f->a, b, PREC_UNARY, style);
-            } else {
-                sbuf_putc(b, '(');
-                emit_expr(f->a, b, PREC_LOWEST, style);
-                sbuf_putc(b, ')');
-            }
-        }
-
-        if (need_paren) sbuf_putc(b, ')');
-        return;
-    }
-
-    /* atan2(y, x) */
-    if (f->ops == &ops_atan2) {
-        prec_t myp = PREC_ATOM;   /* same precedence as other function calls */
-        int need_paren = (myp < parent_prec);
-
-        if (need_paren)
-            sbuf_putc(b, '(');
-
-        sbuf_puts(b, "atan2(");
+        sbuf_puts(b, f->ops->name);
+        sbuf_putc(b, '(');
         emit_expr(f->a, b, PREC_LOWEST, style);
-        sbuf_puts(b, ", ");
-        emit_expr(f->b, b, PREC_LOWEST, style);
         sbuf_putc(b, ')');
-
-        if (need_paren)
-            sbuf_putc(b, ')');
-
+        if (need_paren) sbuf_putc(b, ')');
         return;
     }
 
-    /* Power with constant exponent */
+    /* ============================================================
+       5.  POWER
+       ============================================================ */
     if (f->ops == &ops_pow_d) {
         prec_t myp = PREC_POW;
         int need_paren = (myp < parent_prec);
+        dval_t *base = f->a;
+
         if (need_paren) sbuf_putc(b, '(');
 
-        emit_expr(f->a, b, PREC_POW, style);
+        if (base->ops == &ops_var)
+            emit_atom(base, b);
+        else if (base->ops->arity == DV_OP_UNARY)
+            sbuf_puts(b, base->ops->name);
+        else {
+            sbuf_putc(b, '(');
+            emit_expr(base, b, PREC_LOWEST, style);
+            sbuf_putc(b, ')');
+        }
 
         double ed = qf_to_double(f->c);
-        long   ei = (long)ed;
+        long ei = (long)ed;
 
-        if (style == style_EXPRESSION) {
-            if (ed == (double)ei) {
-                emit_superscript_int(b, ei);
-            } else {
-                char buf[64];
-                qf_to_string_simple(f->c, buf, sizeof(buf));
-                emit_superscript_string(b, buf);
-            }
-        } else {
+        if (style == style_EXPRESSION && ed == (double)ei)
+            emit_superscript_int(b, ei);
+        else {
             sbuf_putc(b, '^');
-            if (ed == (double)ei) {
-                char buf[32];
-                snprintf(buf, sizeof(buf), "%ld", ei);
-                sbuf_puts(b, buf);
-            } else {
-                char buf[64];
-                qf_to_string_simple(f->c, buf, sizeof(buf));
-                sbuf_puts(b, buf);
-            }
+            char buf[64];
+            qf_to_string_simple(f->c, buf, sizeof(buf));
+            sbuf_puts(b, buf);
+        }
+
+        if (base->ops->arity == DV_OP_UNARY) {
+            sbuf_putc(b, '(');
+            emit_expr(base->a, b, PREC_LOWEST, style);
+            sbuf_putc(b, ')');
         }
 
         if (need_paren) sbuf_putc(b, ')');
         return;
     }
 
-    /* Addition / subtraction */
+    /* ============================================================
+       6.  ADD / SUB
+       ============================================================ */
     if (f->ops == &ops_add || f->ops == &ops_sub) {
         prec_t myp = PREC_ADD;
         int need_paren = (myp < parent_prec);
+
         if (need_paren) sbuf_putc(b, '(');
 
+        /* print left side */
         emit_expr(f->a, b, PREC_ADD, style);
-        sbuf_putc(b, ' ');
-        sbuf_putc(b, (f->ops == &ops_add) ? '+' : '-');
-        sbuf_putc(b, ' ');
-        emit_expr(f->b, b, PREC_ADD, style);
 
-        if (need_paren) sbuf_putc(b, ')');
-        return;
-    }
-
-    /* Multiplication / division */
-    if (f->ops == &ops_mul || f->ops == &ops_div) {
-        prec_t myp = PREC_MUL;
-        int need_paren = (myp < parent_prec);
-
-        dval_t *lhs = f->a;
         dval_t *rhs = f->b;
 
-        /* FUNCTION: constant-first */
-        if (style == style_FUNCTION && f->ops == &ops_mul) {
-            int lhs_const = (lhs && lhs->ops == &ops_const);
-            int rhs_const = (rhs && rhs->ops == &ops_const);
+        /* Case 1: RHS is a negation node */
+        if (rhs->ops == &ops_neg) {
+            sbuf_puts(b, " - ");
+            emit_expr(rhs->a, b, PREC_ADD, style);
+        }
 
-            if (!lhs_const && rhs_const) {
-                dval_t *tmp = lhs;
-                lhs = rhs;
-                rhs = tmp;
+        /* Case 2: RHS is a MUL whose first factor is -1 */
+        else if (rhs->ops == &ops_mul) {
+
+            dval_t *factors[64];
+            int n = 0;
+            flatten_mul(rhs, factors, &n, 64);
+
+            /* Check for leading -1 */
+            if (n > 0 &&
+                factors[0]->ops == &ops_const &&
+                qf_to_double(factors[0]->c) == -1.0)
+            {
+                sbuf_puts(b, " - ");
+
+                /* Sort factors for consistent ordering */
+                qsort(factors, n, sizeof(dval_t *), factor_cmp);
+
+                /* Skip the -1 and print the rest */
+                for (int i = 1; i < n; i++) {
+                    if (i > 1) sbuf_puts(b, "·");
+                    emit_expr(factors[i], b, PREC_MUL, style);
+                }
+            }
+            else {
+                sbuf_puts(b, " + ");
+                emit_expr(rhs, b, PREC_ADD, style);
             }
         }
 
-        if (need_paren) sbuf_putc(b, '(');
-
-        /* EXPRESSION STYLE MULTIPLICATION */
-        if (style == style_EXPRESSION && f->ops == &ops_mul) {
-
-            int lhs_const = (lhs && lhs->ops == &ops_const);
-            int rhs_const = (rhs && rhs->ops == &ops_const);
-
-            int lhs_var   = (lhs && lhs->ops == &ops_var);
-            int rhs_var   = (rhs && rhs->ops == &ops_var);
-
-            /* Reorder: constant first */
-            if (!lhs_const && rhs_const) {
-                dval_t *tmp = lhs;
-                lhs = rhs;
-                rhs = tmp;
-
-                int tmpc = lhs_const;
-                lhs_const = rhs_const;
-                rhs_const = tmpc;
-
-                int tmpv = lhs_var;
-                lhs_var = rhs_var;
-                rhs_var = tmpv;
-            }
-
-            /* Case 1: constant * variable → 7α */
-            if (lhs_const && rhs_var) {
-                emit_expr(lhs, b, PREC_MUL, style);
-                emit_expr(rhs, b, PREC_MUL, style);
-                if (need_paren) sbuf_putc(b, ')');
-                return;
-            }
-
-            /* Case 2: variable * variable → αβ */
-            if (lhs_var && rhs_var) {
-                emit_expr(lhs, b, PREC_MUL, style);
-                emit_expr(rhs, b, PREC_MUL, style);
-                if (need_paren) sbuf_putc(b, ')');
-                return;
-            }
-
-            /* Case 3: constant * non-atom → 7(x+1) */
-            if (lhs_const) {
-                emit_expr(lhs, b, PREC_MUL, style);
-                sbuf_putc(b, ' ');
-                emit_expr(rhs, b, PREC_MUL, style);
-                if (need_paren) sbuf_putc(b, ')');
-                return;
-            }
-
-            /* Case 4: variable * non-atom → α(x+1) */
-            if (lhs_var) {
-                emit_expr(lhs, b, PREC_MUL, style);
-                sbuf_putc(b, ' ');
-                emit_expr(rhs, b, PREC_MUL, style);
-                if (need_paren) sbuf_putc(b, ')');
-                return;
-            }
-
-            /* Case 5: both composite → (x+1)(y+2) */
-            emit_expr(lhs, b, PREC_MUL, style);
-            sbuf_putc(b, ' ');
-            emit_expr(rhs, b, PREC_MUL, style);
-
-            if (need_paren) sbuf_putc(b, ')');
-            return;
+        /* Case 3: normal addition */
+        else {
+            sbuf_puts(b, " + ");
+            emit_expr(rhs, b, PREC_ADD, style);
         }
-
-        /* FUNCTION STYLE MULTIPLICATION */
-        emit_expr(lhs, b, PREC_MUL, style);
-        sbuf_putc(b, (f->ops == &ops_mul) ? '*' : '/');
-        emit_expr(rhs, b, PREC_MUL, style);
 
         if (need_paren) sbuf_putc(b, ')');
         return;
     }
 
-    /* Fallback */
+    /* ============================================================
+       7.  FALLBACK
+       ============================================================ */
     emit_atom(f, b);
 }
 
@@ -601,44 +682,100 @@ static char *dv_to_string_function(const dval_t *f)
     sbuf_t b;
     sbuf_init(&b);
 
+    /* CRITICAL: simplify first */
+    dval_t *g = dv_simplify((dval_t *)f);
+
     varlist_t vl;
     varlist_init(&vl);
-    find_vars_dfs((dval_t *)f, &vl);
+    find_vars_dfs(g, &vl);
 
+    /* Emit variable bindings (x = value) lines */
     for (size_t i = 0; i < vl.count; ++i) {
         dval_t *v = vl.vars[i];
-        emit_name(&b, v->name ? v->name : "x");
+        const char *vname = (v->name && *v->name) ? v->name : "x";
+
+        emit_name(&b, vname);
         sbuf_puts(&b, " = ");
+
         char valbuf[64];
         qf_to_string_simple(v->c, valbuf, sizeof(valbuf));
         sbuf_puts(&b, valbuf);
         sbuf_putc(&b, '\n');
     }
 
-    const char *fname = (f->name && *f->name) ? f->name : "expr";
-    const char *argname = (vl.count > 0 && vl.vars[0]->name) ? vl.vars[0]->name : "x";
+    /* Pure variable */
+    if (g->ops == &ops_var) {
+        const char *vname = (g->name && *g->name) ? g->name : "x";
 
-    emit_name(&b, fname);
+        sbuf_puts(&b, "return ");
+        emit_name(&b, vname);
+        sbuf_putc(&b, '\n');
+
+        char *out = xstrdup(b.data);
+        sbuf_free(&b);
+        free(vl.vars);
+        dv_free(g);
+        return out;
+    }
+
+    /* Pure constant */
+    if (g->ops == &ops_const) {
+        const char *cname = (g->name && *g->name) ? g->name : "c";
+
+        emit_name(&b, cname);
+        sbuf_puts(&b, " = ");
+
+        char valbuf[64];
+        qf_to_string_simple(g->c, valbuf, sizeof(valbuf));
+        sbuf_puts(&b, valbuf);
+        sbuf_putc(&b, '\n');
+
+        sbuf_puts(&b, "return ");
+        emit_name(&b, cname);
+        sbuf_putc(&b, '\n');
+
+        char *out = xstrdup(b.data);
+        sbuf_free(&b);
+        free(vl.vars);
+        dv_free(g);
+        return out;
+    }
+
+    /* General expression */
+    const char *fname = (g->name && *g->name) ? g->name : "expr";
+
+    sbuf_puts(&b, fname);
     sbuf_putc(&b, '(');
-    emit_name(&b, argname);
+    for (size_t i = 0; i < vl.count; ++i) {
+        if (i > 0) sbuf_putc(&b, ',');
+        const char *vname = (vl.vars[i]->name && *vl.vars[i]->name)
+                            ? vl.vars[i]->name : "x";
+        emit_name(&b, vname);
+    }
     sbuf_puts(&b, ") = ");
-    emit_expr((dval_t *)f, &b, PREC_LOWEST, style_FUNCTION);
+    emit_expr(g, &b, PREC_LOWEST, style_FUNCTION);
     sbuf_putc(&b, '\n');
 
     sbuf_puts(&b, "return ");
-    emit_name(&b, fname);
+    sbuf_puts(&b, fname);
     sbuf_putc(&b, '(');
-    emit_name(&b, argname);
+    for (size_t i = 0; i < vl.count; ++i) {
+        if (i > 0) sbuf_putc(&b, ',');
+        const char *vname = (vl.vars[i]->name && *vl.vars[i]->name)
+                            ? vl.vars[i]->name : "x";
+        emit_name(&b, vname);
+    }
     sbuf_puts(&b, ")\n");
 
     char *out = xstrdup(b.data);
     sbuf_free(&b);
     free(vl.vars);
+    dv_free(g);
     return out;
 }
 
 /* ------------------------------------------------------------------------- */
-/* Expression-style printing                                                 */
+/* EXPRESSION-style printing                                                 */
 /* ------------------------------------------------------------------------- */
 
 static char *dv_to_string_expr(const dval_t *f)
@@ -646,26 +783,26 @@ static char *dv_to_string_expr(const dval_t *f)
     sbuf_t b;
     sbuf_init(&b);
 
-    /* Special case: the entire expression is a constant */
-    if (f->ops == &ops_const) {
+    /* CRITICAL: simplify first */
+    dval_t *g = dv_simplify((dval_t *)f);
 
+    /* Pure constant */
+    if (g->ops == &ops_const) {
         sbuf_putc(&b, '{');
         sbuf_putc(&b, ' ');
 
-        if (f->name && *f->name) {
-            /* Named constant: print in brackets, preserving spaces */
+        if (g->name && *g->name) {
             sbuf_putc(&b, '[');
-            sbuf_puts(&b, f->name);
+            sbuf_puts(&b, g->name);
             sbuf_putc(&b, ']');
         } else {
-            /* Unnamed constant: use generic c */
             sbuf_puts(&b, "c");
         }
 
         sbuf_puts(&b, " = ");
 
         char valbuf[64];
-        qf_to_string_simple(f->c, valbuf, sizeof(valbuf));
+        qf_to_string_simple(g->c, valbuf, sizeof(valbuf));
         sbuf_puts(&b, valbuf);
 
         sbuf_putc(&b, ' ');
@@ -673,42 +810,50 @@ static char *dv_to_string_expr(const dval_t *f)
 
         char *out = xstrdup(b.data);
         sbuf_free(&b);
+        dv_free(g);
         return out;
     }
 
-    /* Normal expression case */
+    /* General expression */
     sbuf_putc(&b, '{');
     sbuf_putc(&b, ' ');
-    emit_expr((dval_t *)f, &b, PREC_LOWEST, style_EXPRESSION);
+    emit_expr(g, &b, PREC_LOWEST, style_EXPRESSION);
     sbuf_putc(&b, ' ');
 
     varlist_t vl;
     varlist_init(&vl);
-    find_vars_dfs((dval_t *)f, &vl);
-
-    dval_t *var = (vl.count > 0) ? vl.vars[0] : NULL;
-    const char *vname = (var && var->name && *var->name) ? var->name : "x";
-
-    qfloat v = var ? var->c : dv_get_val(f);
-    char valbuf[64];
-    qf_to_string_simple(v, valbuf, sizeof(valbuf));
+    find_vars_dfs(g, &vl);
 
     sbuf_putc(&b, '|');
     sbuf_putc(&b, ' ');
-    emit_name(&b, vname);
-    sbuf_puts(&b, " = ");
-    sbuf_puts(&b, valbuf);
+
+    for (size_t i = 0; i < vl.count; ++i) {
+        dval_t *v = vl.vars[i];
+        const char *vname = (v->name && *v->name) ? v->name : "x";
+
+        char valbuf[64];
+        qf_to_string_simple(v->c, valbuf, sizeof(valbuf));
+
+        emit_name(&b, vname);
+        sbuf_puts(&b, " = ");
+        sbuf_puts(&b, valbuf);
+
+        if (i + 1 < vl.count)
+            sbuf_puts(&b, ", ");
+    }
+
     sbuf_putc(&b, ' ');
     sbuf_putc(&b, '}');
 
     char *out = xstrdup(b.data);
     sbuf_free(&b);
     free(vl.vars);
+    dv_free(g);
     return out;
 }
 
 /* ------------------------------------------------------------------------- */
-/* Public entry point                                                        */
+/* Public entry points                                                       */
 /* ------------------------------------------------------------------------- */
 
 char *dv_to_string(const dval_t *f, style_t style)
