@@ -3744,13 +3744,16 @@ int test_readme_example(void) {
 /* ------------------------------------------------------------------------- */
 /* TEST Entry point                                                               */
 /* ------------------------------------------------------------------------- */
+#define RUN_ALL_TESTS 0
 
-#define RUN_ARITH_TESTS      0
-#define RUN_MATH_TESTS       0
-#define RUN_DERIV_TESTS      0
-#define RUN_SECOND_DERIV     0
-#define RUN_TO_STRING_TESTS  1
-#define RUN_README_EXAMPLE   1
+#define TEST_ENABLED(x)  (RUN_ALL_TESTS || (x))
+
+#define RUN_ARITH_TESTS        TEST_ENABLED(0)
+#define RUN_MATH_TESTS         TEST_ENABLED(0)
+#define RUN_DERIV_TESTS        TEST_ENABLED(0)
+#define RUN_SECOND_DERIV_TESTS TEST_ENABLED(0)
+#define RUN_TO_STRING_TESTS    TEST_ENABLED(1)
+#define RUN_README_EXAMPLE     TEST_ENABLED(1)
 
 /* Arithmetic tests */
 #if RUN_ARITH_TESTS
