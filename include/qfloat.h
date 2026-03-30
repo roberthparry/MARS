@@ -278,70 +278,75 @@ qfloat qf_floor(qfloat x);
 qfloat qf_mul_pow10(qfloat x, int k);
 
 /**
- * @brief Internal printf-style formatter with full qfloat support.
+ * @brief Internal printf‑style formatter with full qfloat support.
+ *
+ * qf_vsprintf implements the %q and %Q format specifiers for qfloat values.
  *
  * IMPORTANT:
- *   All qfloat arguments referenced by the format string (%q or %Q)
- *   MUST be passed by address (qfloat*), not by value.
+ *   qfloat arguments to %q and %Q are passed BY VALUE through the variadic
+ *   argument list. Callers of qf_sprintf() and qf_printf() should therefore
+ *   pass qfloat directly, not qfloat*.
  *
- *   Passing a qfloat struct through `...` is undefined behaviour on
- *   most ABIs. qf_vsprintf therefore expects:
+ *       qfloat x = qf_from_double(3.14);
+ *       qf_printf("x = %q\n", x);   // correct
  *
- *       %q → qfloat*
- *       %Q → qfloat*
+ * Supported qfloat‑specific format specifiers:
+ *   - %Q : scientific notation (uppercase exponent)
+ *   - %q : fixed‑format decimal with fallback to scientific
  *
- *   and will read each argument using:
+ * All non‑qfloat specifiers are delegated to snprintf().
  *
- *       qfloat *xp = va_arg(ap, qfloat*);
- *       qfloat  x  = *xp;
- *
- *   Callers of qf_sprintf() and qf_printf() must therefore pass the
- *   address of each qfloat:
- *
- *       qfloat x = qf_from_string("1e33");
- *       qf_sprintf(buf, n, "%q", &x);   // correct
- *
- * Supported qfloat-specific format specifiers:
- *   - %Q : Scientific notation (uppercase exponent)
- *   - %q : Fixed-format decimal with fallback to scientific
- *
- * All non-qfloat specifiers are delegated to snprintf().
+ * @param out       Output buffer.
+ * @param out_size  Size of output buffer.
+ * @param fmt       Format string.
+ * @param ap        Variadic argument list.
+ * @return Number of characters written (excluding null terminator).
  */
 int qf_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap);
 
 /**
  * @brief Print formatted text with full qfloat support.
  *
- * IMPORTANT:
- *   qfloat arguments MUST be passed by address (qfloat*), not by value.
+ * qf_sprintf extends snprintf() with two qfloat‑specific format specifiers:
  *
- *   Example:
- *       qfloat x = qf_from_double(3.14);
- *       qf_sprintf(buf, n, "%q", &x);   // correct
- *
- *   Passing a qfloat by value to %q or %Q is undefined behaviour.
- *
- * qf_sprintf extends standard printf with:
  *   - %Q : scientific notation (uppercase exponent)
- *   - %q : fixed-format decimal with fallback to scientific
+ *   - %q : fixed‑format decimal with fallback to scientific
  *
- * All other specifiers behave exactly like snprintf().
+ * IMPORTANT:
+ *   qfloat arguments to %q and %Q MUST be passed by value.
+ *
+ *       qfloat x = qf_from_double(3.14);
+ *       qf_sprintf(buf, n, "x = %q", x);   // correct
+ *
+ * All non‑qfloat specifiers behave exactly like snprintf().
+ *
+ * @param out       Output buffer.
+ * @param out_size  Size of output buffer.
+ * @param fmt       Format string.
+ * @param ...       Additional arguments.
+ * @return Number of characters written (excluding null terminator).
  */
 int qf_sprintf(char *out, size_t out_size, const char *fmt, ...);
 
 /**
  * @brief Print formatted text with full qfloat support.
  *
+ * qf_printf behaves like printf(), but adds support for:
+ *
+ *   - %Q : scientific notation (uppercase exponent)
+ *   - %q : fixed‑format decimal with fallback to scientific
+ *
  * IMPORTANT:
- *   qfloat arguments to %q and %Q MUST be passed by address (qfloat*).
+ *   qfloat arguments to %q and %Q MUST be passed by value.
  *
- *   Example:
- *       qfloat x = qf_from_string("3.14159");
- *       qf_printf("x = %Q\n", &x);   // correct
+ *       qfloat x = qf_from_double(3.14159);
+ *       qf_printf("x = %Q\n", x);   // correct
  *
- *   Passing a qfloat struct by value is undefined behaviour.
+ * All other format specifiers behave exactly like printf().
  *
- * qf_printf behaves like printf(), but supports %q and %Q via qf_sprintf().
+ * @param fmt Format string.
+ * @param ... Additional arguments.
+ * @return Number of characters written.
  */
 int qf_printf(const char *fmt, ...);
 

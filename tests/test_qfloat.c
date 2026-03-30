@@ -579,7 +579,7 @@ static void test_qd_sprintf_basic(void)
     qfloat x = qf_from_string("3.1415926535897932384626433832795");
 
     char buf[256];
-    qf_sprintf(buf, sizeof(buf), "%Q", &x);
+    qf_sprintf(buf, sizeof(buf), "%Q", x);
 
     char expected[256];
     qf_to_string(x, expected, sizeof(expected));
@@ -607,7 +607,7 @@ static void test_qd_sprintf_multiple(void)
     qfloat b = qf_from_string("9.8765432109876543210987654321098");
 
     char buf[256];
-    qf_sprintf(buf, sizeof(buf), "A=%Q B=%Q", &a, &b);
+    qf_sprintf(buf, sizeof(buf), "A=%Q B=%Q", a, b);
 
     char ea[64], eb[64];
     qf_to_string(a, ea, sizeof(ea));
@@ -640,7 +640,7 @@ static void test_qd_sprintf_mixed(void)
     qfloat x = qf_from_string("2.5");
 
     char buf[256];
-    qf_sprintf(buf, sizeof(buf), "x=%Q int=%d str=%s", &x, 42, "hello");
+    qf_sprintf(buf, sizeof(buf), "x=%Q int=%d str=%s", x, 42, "hello");
 
     char expected[256];
     snprintf(expected, sizeof(expected), "x=2.500000000000000000000000000000000E+0 int=42 str=hello");
@@ -663,7 +663,7 @@ static void test_qd_sprintf_buffer_limit(void)
     qfloat x = qf_from_string("1.2345678901234567890123456789012");
 
     char buf[16];
-    qf_sprintf(buf, sizeof(buf), "%Q", &x);
+    qf_sprintf(buf, sizeof(buf), "%Q", x);
 
     if (buf[15] == '\0') {
         printf(C_GREEN "  OK: buffer limit (null-terminated)\n" C_RESET);
@@ -688,7 +688,7 @@ static void test_qd_sprintf_edge_cases(void)
         qfloat x = qf_from_string(tests[i].input);
 
         char buf[128];
-        qf_sprintf(buf, sizeof(buf), "%q", &x);
+        qf_sprintf(buf, sizeof(buf), "%q", x);
 
         /* Parse the printed value back into a qfloat */
         qfloat y = qf_from_string(buf);
@@ -718,7 +718,7 @@ static void test_qd_sprintf_q_precision(void)
     qfloat x = qf_from_string("3.1415926535897932384626433832795");
 
     char buf[256];
-    qf_sprintf(buf, sizeof(buf), "%.10q", &x);
+    qf_sprintf(buf, sizeof(buf), "%.10q", x);
 
     const char *expected = "3.1415926536";
 
@@ -740,7 +740,7 @@ static void test_qd_sprintf_q_zero_precision(void)
     qfloat x = qf_from_string("3.1415926535897932384626433832795");
 
     char buf[256];
-    qf_sprintf(buf, sizeof(buf), "%.0q", &x);
+    qf_sprintf(buf, sizeof(buf), "%.0q", x);
 
     const char *expected = "3";
 
@@ -761,19 +761,19 @@ static void test_qd_sprintf_q_flags(void)
 
     char buf[256];
 
-    qf_sprintf(buf, sizeof(buf), "%+q", &x);
+    qf_sprintf(buf, sizeof(buf), "%+q", x);
     if (strcmp(buf, "+3") == 0)
         printf(C_GREEN "  OK: + flag\n" C_RESET);
     else
         printf(C_RED "  FAIL: + flag (got %s)  [%s:%d]\n" C_RESET, buf, __FILE__, __LINE__);
 
-    qf_sprintf(buf, sizeof(buf), "% q", &x);
+    qf_sprintf(buf, sizeof(buf), "% q", x);
     if (strcmp(buf, " 3") == 0)
         printf(C_GREEN "  OK: space flag\n" C_RESET);
     else
         printf(C_RED "  FAIL: space flag (got %s)  [%s:%d]\n" C_RESET, buf, __FILE__, __LINE__);
 
-    qf_sprintf(buf, sizeof(buf), "%#q", &x);
+    qf_sprintf(buf, sizeof(buf), "%#q", x);
     if (strcmp(buf, "3.") == 0)
         printf(C_GREEN "  OK: # flag\n" C_RESET);
     else
@@ -788,19 +788,19 @@ static void test_qd_sprintf_q_width(void)
 
     char buf[256];
 
-    qf_sprintf(buf, sizeof(buf), "%10.5q", &x);
+    qf_sprintf(buf, sizeof(buf), "%10.5q", x);
     if (strcmp(buf, "   3.14159") == 0)
         printf(C_GREEN "  OK: width right-align\n" C_RESET);
     else
         printf(C_RED "  FAIL: width right-align (got '%s')  [%s:%d]\n" C_RESET, buf, __FILE__, __LINE__);
 
-    qf_sprintf(buf, sizeof(buf), "%-10.5q", &x);
+    qf_sprintf(buf, sizeof(buf), "%-10.5q", x);
     if (strcmp(buf, "3.14159   ") == 0)
         printf(C_GREEN "  OK: width left-align\n" C_RESET);
     else
         printf(C_RED "  FAIL: width left-align (got '%s')  [%s:%d]\n" C_RESET, buf, __FILE__, __LINE__);
 
-    qf_sprintf(buf, sizeof(buf), "%010.5q", &x);
+    qf_sprintf(buf, sizeof(buf), "%010.5q", x);
     if (strcmp(buf, "0003.14159") == 0)
         printf(C_GREEN "  OK: zero padding\n" C_RESET);
     else
@@ -814,7 +814,7 @@ static void test_qd_sprintf_q_fallback(void)
     qfloat x = qf_from_string("1.2345678901234567890123456789012e+200");
 
     char buf[256];
-    qf_sprintf(buf, sizeof(buf), "%q", &x);
+    qf_sprintf(buf, sizeof(buf), "%q", x);
 
     if (strstr(buf, "e+200")) {
         printf(C_GREEN "  OK: fallback to scientific\n" C_RESET);
@@ -830,7 +830,7 @@ static void test_qd_sprintf_q_fallback_width(void)
     qfloat x = qf_from_string("1.234e+200");
 
     char buf[256];
-    qf_sprintf(buf, sizeof(buf), "%40q", &x);
+    qf_sprintf(buf, sizeof(buf), "%40q", x);
 
     int leading_spaces = 0;
     while (buf[leading_spaces] == ' ') leading_spaces++;
@@ -892,7 +892,7 @@ static void test_qf_sprintf_q_concise(void)
         qfloat x = qf_from_string(tests[i].input);
 
         char buf[256];
-        qf_sprintf(buf, sizeof(buf), "%q", &x);
+        qf_sprintf(buf, sizeof(buf), "%q", x);
 
         /* Parse the printed value back into a qfloat */
         qfloat y = qf_from_string(buf);
@@ -939,10 +939,10 @@ static void test_qf_sprintf_null_safe_new(void)
     char *e = strchr(expected, 'e');
     if (e) *e = 'E';
 
-    int needed = qf_sprintf(NULL, 0, "x=%Q", &x);
+    int needed = qf_sprintf(NULL, 0, "x=%Q", x);
 
     char *buf = malloc((size_t)needed + 1);
-    int written = qf_sprintf(buf, (size_t)needed + 1, "x=%Q", &x);
+    int written = qf_sprintf(buf, (size_t)needed + 1, "x=%Q", x);
 
     if (written == needed && strcmp(buf, expected) == 0) {
         printf(C_GREEN "  OK: NULL‑safe sizing\n" C_RESET);
@@ -972,10 +972,10 @@ static void test_qf_sprintf_two_pass_new(void)
     char *e = strchr(expected, 'e');
     if (e) *e = 'E';
 
-    int needed = qf_sprintf(NULL, 0, "x=%Q", &x);
+    int needed = qf_sprintf(NULL, 0, "x=%Q", x);
 
     char *buf = malloc((size_t)needed + 1);
-    int written = qf_sprintf(buf, (size_t)needed + 1, "x=%Q", &x);
+    int written = qf_sprintf(buf, (size_t)needed + 1, "x=%Q", x);
 
     if (written == needed && strcmp(buf, expected) == 0) {
         printf(C_GREEN "  OK: two‑pass\n" C_RESET);
@@ -1009,7 +1009,7 @@ static void test_qf_printf_stdout(void)
         return;
     }
 
-    int n = qf_printf("value=%Q\n", &x);
+    int n = qf_printf("value=%Q\n", x);
     fflush(stdout);
 
     /* Restore stdout */
@@ -2808,7 +2808,7 @@ static void test_qf_lambert_wm1(void) {
 static void print_qf(const char *label, qfloat x)
 {
     char buf[128];
-    qf_sprintf(buf, sizeof(buf), "%Q", &x);
+    qf_sprintf(buf, sizeof(buf), "%Q", x);
     printf("    %s = %s\n", label, buf);
 }
 
@@ -4415,10 +4415,10 @@ static void test_ei_values(void)
         }
 
         /* full-precision printing using qf_sprintf */
-        qf_sprintf(buf_x,   sizeof(buf_x),   "%.40Q", &x);
-        qf_sprintf(buf_ref, sizeof(buf_ref), "%.40Q", &ref);
-        qf_sprintf(buf_got, sizeof(buf_got), "%.40Q", &got);
-        qf_sprintf(buf_err, sizeof(buf_err), "%.40Q", &ad);
+        qf_sprintf(buf_x,   sizeof(buf_x),   "%.40Q", x);
+        qf_sprintf(buf_ref, sizeof(buf_ref), "%.40Q", ref);
+        qf_sprintf(buf_got, sizeof(buf_got), "%.40Q", got);
+        qf_sprintf(buf_err, sizeof(buf_err), "%.40Q", ad);
 
         printf("    x        = %s\n", buf_x);
         printf("    expected = %s\n", buf_ref);

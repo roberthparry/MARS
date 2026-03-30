@@ -1116,8 +1116,7 @@ int qf_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap)
         if (*p == 'Q') {
             p++;
 
-            qfloat *xp = va_arg(ap_local, qfloat *);
-            qfloat x   = *xp;
+            qfloat x   = va_arg(ap_local, qfloat);
 
             char core[256];
             qf_to_string(x, core, sizeof(core));
@@ -1151,8 +1150,7 @@ int qf_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap)
         else if (*p == 'q') {
             p++;
 
-            qfloat *xp = va_arg(ap_local, qfloat *);
-            qfloat x   = *xp;
+            qfloat x = va_arg(ap_local, qfloat);
 
             /* Step 1: canonical scientific form */
             char sci[128];

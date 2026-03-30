@@ -34,15 +34,13 @@ static void check_q_at(const char *file, int line, int col,
     const double REL_TOL = 2e-30;
 
     if (abs_err < ABS_TOL || rel_err < REL_TOL) {
-        printf("%sPASS %s %-32s  got=",
-               GRN, RST, label);
+        printf("%sPASS %s %-32s  got=", GRN, RST, label);
         qf_printf("%.34q", got);
         printf("\n");
         return;
     }
 
-    printf("%sFAIL%s   %s: %s:%d:%d: got=",
-           RED, RST, label, file, line, col);
+    printf("%sFAIL%s   %s: %s:%d:%d: got=", RED, RST, label, file, line, col);
 
     qf_printf("%.34q", got);
 
@@ -1661,18 +1659,18 @@ static void test_to_string_basic_const_expr(void)
 static void test_to_string_basic_const_func(void)
 {
     dval_t *c = dv_new_const_d(3.5);
-    char *s = dv_to_string(c, style_FUNCTION);
+    char *got = dv_to_string(c, style_FUNCTION);
 
     const char *expect =
         "c = 3.5\n"
         "return c\n";
 
-    if (strcmp(s, expect) == 0)
-        to_string_pass("basic const (FUNC)", s, expect);
+    if (strcmp(got, expect) == 0)
+        to_string_pass("basic const (FUNC)", got, expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "basic const (FUNC)", s, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "basic const (FUNC)", got, expect);
 
-    free(s);
+    free(got);
     dv_free(c);
 }
 
