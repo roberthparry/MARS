@@ -13,6 +13,8 @@
 #define RST "\x1b[0m"
 #define BLD "\x1b[1m"
 
+#pragma GCC diagnostic ignored "-Wunused-function"
+
 /* ------------------------------------------------------------------------- */
 /* Compact qfloat comparison                                                 */
 /* ------------------------------------------------------------------------- */
@@ -1643,16 +1645,16 @@ static void to_string_fail(const char *file, int line, int col,
 static void test_to_string_basic_const_expr(void)
 {
     dval_t *c = dv_new_const_d(3.5);
-    char *s = dv_to_string(c, style_EXPRESSION);
+    char *got = dv_to_string(c, style_EXPRESSION);
 
     const char *expect = "{ c = 3.5 }";
 
-    if (strcmp(s, expect) == 0)
-        to_string_pass("basic const (EXPR)", s, expect);
+    if (strcmp(got, expect) == 0)
+        to_string_pass("basic const (EXPR)", got, expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "basic const (EXPR)", s, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "basic const (EXPR)", got, expect);
 
-    free(s);
+    free(got);
     dv_free(c);
 }
 
@@ -1688,34 +1690,34 @@ void test_to_string_basic_const(void)
 static void test_to_string_basic_var_expr(void)
 {
     dval_t *x = dv_new_named_var_d(42.0, "x");
-    char *s = dv_to_string(x, style_EXPRESSION);
+    char *got = dv_to_string(x, style_EXPRESSION);
 
     const char *expect = "{ x | x = 42 }";
 
-    if (strcmp(s, expect) == 0)
-        to_string_pass("basic var (EXPR)", s, expect);
+    if (strcmp(got, expect) == 0)
+        to_string_pass("basic var (EXPR)", got, expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "basic var (EXPR)", s, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "basic var (EXPR)", got, expect);
 
-    free(s);
+    free(got);
     dv_free(x);
 }
 
 static void test_to_string_basic_var_func(void)
 {
     dval_t *x = dv_new_named_var_d(42.0, "x");
-    char *s = dv_to_string(x, style_FUNCTION);
+    char *got = dv_to_string(x, style_FUNCTION);
 
     const char *expect =
         "x = 42\n"
         "return x\n";
 
-    if (strcmp(s, expect) == 0)
-        to_string_pass("basic var (FUNC)", s, expect);
+    if (strcmp(got, expect) == 0)
+        to_string_pass("basic var (FUNC)", got, expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "basic var (FUNC)", s, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "basic var (FUNC)", got, expect);
 
-    free(s);
+    free(got);
     dv_free(x);
 }
 
@@ -1736,15 +1738,15 @@ static void test_to_string_addition_expr(void)
     dval_t *y = dv_new_named_var_d(2, "y");
     dval_t *f = dv_add(x, y);
 
-    char *s = dv_to_string(f, style_EXPRESSION);
+    char *got = dv_to_string(f, style_EXPRESSION);
     const char *expect = "{ x + y | x = 1, y = 2 }";
 
-    if (strcmp(s, expect) == 0)
-        to_string_pass("addition (EXPR)", s, expect);
+    if (strcmp(got, expect) == 0)
+        to_string_pass("addition (EXPR)", got, expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "addition (EXPR)", s, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "addition (EXPR)", got, expect);
 
-    free(s);
+    free(got);
     dv_free(f);
 }
 
@@ -1754,19 +1756,19 @@ static void test_to_string_addition_func(void)
     dval_t *y = dv_new_named_var_d(2, "y");
     dval_t *f = dv_add(x, y);
 
-    char *s = dv_to_string(f, style_FUNCTION);
+    char *got = dv_to_string(f, style_FUNCTION);
     const char *expect =
         "x = 1\n"
         "y = 2\n"
         "expr(x,y) = x + y\n"
         "return expr(x,y)\n";
 
-    if (strcmp(s, expect) == 0)
-        to_string_pass("addition (FUNC)", s, expect);
+    if (strcmp(got, expect) == 0)
+        to_string_pass("addition (FUNC)", got, expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "addition (FUNC)", s, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "addition (FUNC)", got, expect);
 
-    free(s);
+    free(got);
     dv_free(f);
 }
 
@@ -1789,15 +1791,15 @@ static void test_to_string_nested_mul_add_expr(void)
 
     dval_t *f = dv_add(dv_mul(x, y), z);
 
-    char *s = dv_to_string(f, style_EXPRESSION);
+    char *got = dv_to_string(f, style_EXPRESSION);
     const char *expect = "{ xy + z | x = 2, y = 3, z = 4 }";
 
-    if (strcmp(s, expect) == 0)
-        to_string_pass("nested mul+add (EXPR)", s, expect);
+    if (strcmp(got, expect) == 0)
+        to_string_pass("nested mul+add (EXPR)", got, expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "nested mul+add (EXPR)", s, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "nested mul+add (EXPR)", got, expect);
 
-    free(s);
+    free(got);
     dv_free(f);
 }
 
@@ -1809,7 +1811,7 @@ static void test_to_string_nested_mul_add_func(void)
 
     dval_t *f = dv_add(dv_mul(x, y), z);
 
-    char *s = dv_to_string(f, style_FUNCTION);
+    char *got = dv_to_string(f, style_FUNCTION);
     const char *expect =
         "x = 2\n"
         "y = 3\n"
@@ -1817,12 +1819,12 @@ static void test_to_string_nested_mul_add_func(void)
         "expr(x,y,z) = x*y + z\n"
         "return expr(x,y,z)\n";
 
-    if (strcmp(s, expect) == 0)
-        to_string_pass("nested mul+add (FUNC)", s, expect);
+    if (strcmp(got, expect) == 0)
+        to_string_pass("nested mul+add (FUNC)", got, expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "nested mul+add (FUNC)", s, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "nested mul+add (FUNC)", got, expect);
 
-    free(s);
+    free(got);
     dv_free(f);
 }
 
@@ -1839,15 +1841,15 @@ static void test_to_string_atan2_expr(void)
 
     dval_t *f = dv_atan2(x, y);
 
-    char *s = dv_to_string(f, style_EXPRESSION);
+    char *got = dv_to_string(f, style_EXPRESSION);
     const char *expect = "{ atan2(x, y) | x = 2, y = 3 }";
 
-    if (strcmp(s, expect) == 0)
-        to_string_pass("atan2 (EXPR)", s, expect);
+    if (strcmp(got, expect) == 0)
+        to_string_pass("atan2 (EXPR)", got, expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "atan2 (EXPR)", s, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "atan2 (EXPR)", got, expect);
 
-    free(s);
+    free(got);
     dv_free(f);
 }
 
@@ -1858,19 +1860,19 @@ static void test_to_string_atan2_func(void)
 
     dval_t *f = dv_atan2(x, y);
 
-    char *s = dv_to_string(f, style_FUNCTION);
+    char *got = dv_to_string(f, style_FUNCTION);
     const char *expect =
         "x = 2\n"
         "y = 3\n"
         "expr(x,y) = atan2(x, y)\n"
         "return expr(x,y)\n";
 
-    if (strcmp(s, expect) == 0)
-        to_string_pass("atan2 (FUNC)", s, expect);
+    if (strcmp(got, expect) == 0)
+        to_string_pass("atan2 (FUNC)", got, expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "atan2 (FUNC)", s, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "atan2 (FUNC)", got, expect);
 
-    free(s);
+    free(got);
     dv_free(f);
 }
 
@@ -1889,15 +1891,15 @@ static void test_to_string_pow_superscript_expr(void)
     dval_t *x = dv_new_named_var_d(2, "x");
     dval_t *f = dv_pow_d(x, 3);
 
-    char *s = dv_to_string(f, style_EXPRESSION);
+    char *got = dv_to_string(f, style_EXPRESSION);
     const char *expect = "{ x³ | x = 2 }";
 
-    if (strcmp(s, expect) == 0)
-        to_string_pass("pow superscript (EXPR)", s, expect);
+    if (strcmp(got, expect) == 0)
+        to_string_pass("pow superscript (EXPR)", got, expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "pow superscript (EXPR)", s, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "pow superscript (EXPR)", got, expect);
 
-    free(s);
+    free(got);
     dv_free(f);
 }
 
@@ -1906,18 +1908,18 @@ static void test_to_string_pow_superscript_func(void)
     dval_t *x = dv_new_named_var_d(2, "x");
     dval_t *f = dv_pow_d(x, 3);
 
-    char *s = dv_to_string(f, style_FUNCTION);
+    char *got = dv_to_string(f, style_FUNCTION);
     const char *expect =
         "x = 2\n"
         "expr(x) = x^3\n"
         "return expr(x)\n";
 
-    if (strcmp(s, expect) == 0)
-        to_string_pass("pow superscript (FUNC)", s, expect);
+    if (strcmp(got, expect) == 0)
+        to_string_pass("pow superscript (FUNC)", got, expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "pow superscript (FUNC)", s, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "pow superscript (FUNC)", got, expect);
 
-    free(s);
+    free(got);
     dv_free(f);
 }
 
@@ -1937,15 +1939,15 @@ static void test_to_string_unary_sin_expr(void)
     dval_t *x = dv_new_named_var_d(0.5, "x");
     dval_t *f = dv_sin(x);
 
-    char *s = dv_to_string(f, style_EXPRESSION);
+    char *got = dv_to_string(f, style_EXPRESSION);
     const char *expect = "{ sin x | x = 0.5 }";
 
-    if (strcmp(s, expect) == 0)
-        to_string_pass("unary sin (EXPR)", s, expect);
+    if (strcmp(got, expect) == 0)
+        to_string_pass("unary sin (EXPR)", got, expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "unary sin (EXPR)", s, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "unary sin (EXPR)", got, expect);
 
-    free(s);
+    free(got);
     dv_free(f);
 }
 
@@ -1954,18 +1956,18 @@ static void test_to_string_unary_sin_func(void)
     dval_t *x = dv_new_named_var_d(0.5, "x");
     dval_t *f = dv_sin(x);
 
-    char *s = dv_to_string(f, style_FUNCTION);
+    char *got = dv_to_string(f, style_FUNCTION);
     const char *expect =
         "x = 0.5\n"
         "expr(x) = sin(x)\n"
         "return expr(x)\n";
 
-    if (strcmp(s, expect) == 0)
-        to_string_pass("unary sin (FUNC)", s, expect);
+    if (strcmp(got, expect) == 0)
+        to_string_pass("unary sin (FUNC)", got, expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "unary sin (FUNC)", s, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "unary sin (FUNC)", got, expect);
 
-    free(s);
+    free(got);
     dv_free(f);
 }
 
@@ -1983,34 +1985,34 @@ void test_to_string_unary_sin(void)
 static void test_to_string_function_style_expr(void)
 {
     dval_t *x = dv_new_named_var_d(10, "x");
-    char *s = dv_to_string(x, style_EXPRESSION);
+    char *got = dv_to_string(x, style_EXPRESSION);
 
     const char *expect = "{ x | x = 10 }";
 
-    if (strcmp(s, expect) == 0)
-        to_string_pass("function style identity (EXPR)", s, expect);
+    if (strcmp(got, expect) == 0)
+        to_string_pass("function style identity (EXPR)", got, expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "function style identity (EXPR)", s, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "function style identity (EXPR)", got, expect);
 
-    free(s);
+    free(got);
     dv_free(x);
 }
 
 static void test_to_string_function_style_func(void)
 {
     dval_t *x = dv_new_named_var_d(10, "x");
-    char *s = dv_to_string(x, style_FUNCTION);
+    char *got = dv_to_string(x, style_FUNCTION);
 
     const char *expect =
         "x = 10\n"
         "return x\n";
 
-    if (strcmp(s, expect) == 0)
-        to_string_pass("function style identity (FUNC)", s, expect);
+    if (strcmp(got, expect) == 0)
+        to_string_pass("function style identity (FUNC)", got, expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "function style identity (FUNC)", s, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "function style identity (FUNC)", got, expect);
 
-    free(s);
+    free(got);
     dv_free(x);
 }
 
@@ -3740,148 +3742,175 @@ int test_readme_example(void) {
 }
 
 /* ------------------------------------------------------------------------- */
-/* Entry point                                                               */
+/* TEST Entry point                                                               */
 /* ------------------------------------------------------------------------- */
+
+#define RUN_ARITH_TESTS      0
+#define RUN_MATH_TESTS       0
+#define RUN_DERIV_TESTS      0
+#define RUN_SECOND_DERIV     0
+#define RUN_TO_STRING_TESTS  1
+#define RUN_README_EXAMPLE   1
+
+/* Arithmetic tests */
+#if RUN_ARITH_TESTS
+#define ARITH_TESTS() \
+    test_add();       \
+    test_sub();       \
+    test_mul();       \
+    test_div();       \
+    test_mixed();     \
+    test_add_d();     \
+    test_mul_d();     \
+    test_div_d();
+#else
+#define ARITH_TESTS()
+#endif
+
+
+/* Math function tests */
+#if RUN_MATH_TESTS
+#define MATH_TESTS() \
+    test_sin();      \
+    test_cos();      \
+    test_tan();      \
+    test_sinh();     \
+    test_cosh();     \
+    test_tanh();     \
+    test_asin();     \
+    test_acos();     \
+    test_atan();     \
+    test_atan2();    \
+    test_asinh();    \
+    test_acosh();    \
+    test_atanh();    \
+    test_exp();      \
+    test_log();      \
+    test_sqrt();     \
+    test_pow_d();    \
+    test_pow();
+#else
+#define MATH_TESTS()
+#endif
+
+
+/* First derivatives */
+#if RUN_DERIV_TESTS
+#define DERIV_TESTS() \
+    test_deriv_const(); \
+    test_deriv_var();   \
+    test_deriv_x2();    \
+    test_deriv_sin();   \
+    test_deriv_exp();   \
+    test_deriv_log();   \
+    test_deriv_sqrt();  \
+    test_deriv_pow3();  \
+    test_deriv_neg();   \
+    test_deriv_add_d(); \
+    test_deriv_mul_d(); \
+    test_deriv_div_d(); \
+    test_deriv_tan();   \
+    test_deriv_tanh();  \
+    test_deriv_sinh();  \
+    test_deriv_atanh(); \
+    test_deriv_asin();  \
+    test_deriv_asinh(); \
+    test_deriv_acos();  \
+    test_deriv_cosh();  \
+    test_deriv_cos();   \
+    test_deriv_acosh(); \
+    test_deriv_atan();  \
+    test_deriv_atan2(); \
+    test_deriv_pow_xy(); \
+    test_deriv_composite(); \
+    test_deriv_sin_log(); \
+    test_deriv_exp_tanh(); \
+    test_deriv_sqrt_sin_x2(); \
+    test_deriv_log_cosh(); \
+    test_deriv_x2_exp_negx(); \
+    test_deriv_atan_x_over_sqrt();
+#else
+#define DERIV_TESTS()
+#endif
+
+
+/* Second derivatives */
+#if RUN_SECOND_DERIV_TESTS
+#define SECOND_DERIV_TESTS() \
+    test_second_deriv_var(); \
+    test_second_deriv_neg(); \
+    test_second_deriv_add_d(); \
+    test_second_deriv_mul_d(); \
+    test_second_deriv_div_d(); \
+    test_second_deriv_x2(); \
+    test_second_deriv_x3(); \
+    test_second_deriv_pow_xy(); \
+    test_second_deriv_sin(); \
+    test_second_deriv_cos(); \
+    test_second_deriv_tan(); \
+    test_second_deriv_sinh(); \
+    test_second_deriv_cosh(); \
+    test_second_deriv_tanh(); \
+    test_second_deriv_asin(); \
+    test_second_deriv_acos(); \
+    test_second_deriv_atan(); \
+    test_second_deriv_atan2(); \
+    test_second_deriv_asinh(); \
+    test_second_deriv_acosh(); \
+    test_second_deriv_atanh(); \
+    test_second_deriv_exp(); \
+    test_second_deriv_log(); \
+    test_second_deriv_sqrt(); \
+    test_second_deriv_sin_exp(); \
+    test_second_deriv_sin_log(); \
+    test_second_deriv_exp_tanh(); \
+    test_second_deriv_sqrt_sin_x2(); \
+    test_second_deriv_log_cosh(); \
+    test_second_deriv_atan_x_over_sqrt();
+#else
+#define SECOND_DERIV_TESTS()
+#endif
+
+
+/* to_string tests */
+#if RUN_TO_STRING_TESTS
+#define TO_STRING_TESTS() \
+    test_to_string_all(); \
+    test_expressions();
+#else
+#define TO_STRING_TESTS()
+#endif
+
+
+/* README example */
+#if RUN_README_EXAMPLE
+#define README_EXAMPLE() \
+    test_readme_example();
+#else
+#define README_EXAMPLE()
+#endif
 
 int main(void)
 {
-    printf(CYN "=== dval_t Arithmetic Tests (%%.34q precision) ===\n" RST);
+    printf(CYN "=== dval_t Arithmetic Tests (%%.34q precision) ===\n" RST); \
+    ARITH_TESTS();
 
-    test_add();
-    test_sub();
-    test_mul();
-    test_div();
-    test_mixed();
+    printf(CYN "=== dval_t Maths functions Tests (%%.34q precision) ===\n" RST); \
+    MATH_TESTS();
 
-    test_add_d();
-    test_mul_d();
-    test_div_d();
+    printf(CYN "=== dval_t Derivatives Tests (%%.34q precision) ===\n" RST); \
+    DERIV_TESTS();
 
-    printf(CYN "=== dval_t Maths functions Tests (%%.34q precision) ===\n" RST);
+    printf(CYN "=== dval_t Second Derivative Tests (%%.34q precision) ===\n" RST); \
+    SECOND_DERIV_TESTS();
 
-    test_sin();
-    test_cos();
-    test_tan();
+    printf(CYN "=== dval_t to_string Tests ===\n" RST); \
+    TO_STRING_TESTS();
 
-    test_sinh();
-    test_cosh();
-    test_tanh();
-
-    test_asin();
-    test_acos();
-    test_atan();
-    test_atan2();
-
-    test_asinh();
-    test_acosh();
-    test_atanh();
-
-    test_exp();
-    test_log();
-    test_sqrt();
-    test_pow_d();
-    test_pow();
-
-    printf(CYN "=== dval_t Derivatives Tests (%%.34q precision) ===\n" RST);
-
-    test_deriv_const();
-    test_deriv_var();
-    test_deriv_x2();
-    test_deriv_sin();
-    test_deriv_exp();
-    test_deriv_log();
-    test_deriv_sqrt();
-    test_deriv_pow3();
-
-    test_deriv_neg();
-    test_deriv_add_d();
-    test_deriv_mul_d();
-    test_deriv_div_d();
-
-    test_deriv_tan();
-    test_deriv_tanh();
-    test_deriv_sinh();
-    test_deriv_atanh();
-    test_deriv_asin();
-    test_deriv_asinh();
-    test_deriv_acos();
-    test_deriv_cosh();
-    test_deriv_cos();
-    test_deriv_acosh();
-    test_deriv_atan();
-    test_deriv_atan2();
-
-    test_deriv_pow_xy();
-
-    printf(CYN "=== dval_t Derivatives Tests on composite functions (%%.34q precision) ===\n" RST);
-
-    test_deriv_composite();
-    test_deriv_sin_log();
-    test_deriv_exp_tanh();
-    test_deriv_sqrt_sin_x2();
-    test_deriv_log_cosh();
-    test_deriv_x2_exp_negx();
-    test_deriv_atan_x_over_sqrt();
-
-    printf(CYN "=== dval_t Second Derivative Tests (%%.34q precision) ===\n" RST);
-
-    /* Basic algebraic */
-    test_second_deriv_var();
-    test_second_deriv_neg();
-    test_second_deriv_add_d();
-    test_second_deriv_mul_d();
-    test_second_deriv_div_d();
-    test_second_deriv_x2();
-    test_second_deriv_x3();
-    test_second_deriv_pow_xy();
-
-    /* Trigonometric */
-    test_second_deriv_sin();
-    test_second_deriv_cos();
-    test_second_deriv_tan();
-
-    /* Hyperbolic */
-    test_second_deriv_sinh();
-    test_second_deriv_cosh();
-    test_second_deriv_tanh();
-
-    /* Inverse trig */
-    test_second_deriv_asin();
-    test_second_deriv_acos();
-    test_second_deriv_atan();
-    test_second_deriv_atan2();
-
-    /* Inverse hyperbolic */
-    test_second_deriv_asinh();
-    test_second_deriv_acosh();
-    test_second_deriv_atanh();
-
-    /* Exponential / log / sqrt */
-    test_second_deriv_exp();
-    test_second_deriv_log();
-    test_second_deriv_sqrt();
-
-    /* Composite functions */
-    test_second_deriv_sin_exp();
-    test_second_deriv_sin_log();
-    test_second_deriv_exp_tanh();
-    test_second_deriv_sqrt_sin_x2();
-    test_second_deriv_log_cosh();
-
-    /* Deep composite */
-    test_second_deriv_atan_x_over_sqrt();
-
-    printf(CYN "=== dval_t to_string Tests ===\n" RST);
-
-    /* tests to_string() */
-    test_to_string_all();
-    test_expressions();
-
-    printf(CYN "=== example in README.md ===\n" RST);
-
-    test_readme_example();
+    printf(CYN "=== example in README.md ===\n" RST); \
+    README_EXAMPLE();
 
     printf(CYN "=== Done ===\n" RST);
-
     return 0;
 }
+

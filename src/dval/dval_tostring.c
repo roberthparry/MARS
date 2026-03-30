@@ -131,7 +131,7 @@ static int utf8_decode(const char *s, unsigned int *out)
 
 static void qf_to_string_simple(qfloat v, char *buf, size_t n)
 {
-    qf_sprintf(buf, n, "%q", &v);
+    qf_sprintf(buf, n, "%q", v);
 }
 
 /* ------------------------------------------------------------------------- */
@@ -392,11 +392,13 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
     const int prec_pow = 3;
     const int prec_un  = 4;
 
+    /* Atoms */
     if (f->ops == &ops_const || f->ops == &ops_var) {
         emit_atom((dval_t *)f, b);
         return;
     }
 
+    /* Unary ops */
     if (f->ops->arity == DV_OP_UNARY) {
         int need = prec_un < parent_prec;
         if (need) sbuf_putc(b, '(');
@@ -410,6 +412,7 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
         return;
     }
 
+    /* Power */
     if (f->ops == &ops_pow_d) {
         int need = prec_pow < parent_prec;
         if (need) sbuf_putc(b, '(');
@@ -432,6 +435,7 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
         return;
     }
 
+    /* Multiplication with sign folding */
     if (f->ops == &ops_mul) {
         int need = prec_mul < parent_prec;
         if (need) sbuf_putc(b, '(');
@@ -440,6 +444,22 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
         int n = 0;
         flatten_mul((dval_t *)f, fac, &n, 64);
         qsort(fac, n, sizeof(dval_t *), factor_cmp);
+
+        int sign = 1;
+        for (int i = 0; i < n; i++) {
+            if (fac[i]->ops == &ops_const &&
+                qf_to_double(fac[i]->c) == -1.0)
+            {
+                sign = -sign;
+                for (int j = i; j < n - 1; j++)
+                    fac[j] = fac[j + 1];
+                n--;
+                i--;
+            }
+        }
+
+        if (sign < 0)
+            sbuf_putc(b, '-');
 
         for (int i = 0; i < n; i++) {
             if (i > 0) {
@@ -461,23 +481,91 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
         return;
     }
 
+    /* Addition/subtraction with a + -b → a - b and a - -b → a + b */
     if (f->ops == &ops_add || f->ops == &ops_sub) {
         int need = prec_add < parent_prec;
         if (need) sbuf_putc(b, '(');
 
         emit_expr(f->a, b, prec_add);
 
-        if (f->ops == &ops_add)
-            sbuf_puts(b, " + ");
-        else
-            sbuf_puts(b, " - ");
+        /* Detect if right child is syntactically negative */
+        bool neg = false;
 
-        emit_expr(f->b, b, prec_add);
+        if (f->b->ops == &ops_const) {
+            if (qf_to_double(f->b->c) < 0)
+                neg = true;
+        }
+        else if (f->b->ops == &ops_mul) {
+            dval_t *fac[64];
+            int n = 0;
+            flatten_mul((dval_t *)f->b, fac, &n, 64);
+            for (int i = 0; i < n; i++) {
+                if (fac[i]->ops == &ops_const &&
+                    qf_to_double(fac[i]->c) == -1.0)
+                {
+                    neg = true;
+                    break;
+                }
+            }
+        }
+
+        /* Emit flipped operator if needed */
+        if (f->ops == &ops_add) {
+            sbuf_puts(b, neg ? " - " : " + ");
+        } else { /* subtraction */
+            sbuf_puts(b, neg ? " + " : " - ");
+        }
+
+        /* Emit |b| (absolute value of right operand) */
+        if (neg && f->b->ops == &ops_const) {
+            dval_t tmp = *f->b;
+            tmp.c = qf_neg(tmp.c);
+            emit_expr(&tmp, b, prec_add);
+        }
+        else if (neg && f->b->ops == &ops_mul) {
+            /* Re-emit product without the -1 factor and without a leading '-' */
+            dval_t *fac[64];
+            int n = 0;
+            flatten_mul((dval_t *)f->b, fac, &n, 64);
+            qsort(fac, n, sizeof(dval_t *), factor_cmp);
+
+            /* strip -1 factors but ignore resulting sign (we already used it) */
+            for (int i = 0; i < n; i++) {
+                if (fac[i]->ops == &ops_const &&
+                    qf_to_double(fac[i]->c) == -1.0)
+                {
+                    for (int j = i; j < n - 1; j++)
+                        fac[j] = fac[j + 1];
+                    n--;
+                    i--;
+                }
+            }
+
+            for (int i = 0; i < n; i++) {
+                if (i > 0) {
+                    int left_atomic  = is_atomic_for_mul(fac[i-1]);
+                    int right_atomic = is_atomic_for_mul(fac[i]);
+
+                    if (left_atomic && right_atomic) {
+                        /* implicit */
+                    } else if (!left_atomic && !right_atomic) {
+                        sbuf_puts(b, "·");
+                    } else {
+                        sbuf_putc(b, '*');
+                    }
+                }
+                emit_expr(fac[i], b, prec_mul);
+            }
+        }
+        else {
+            emit_expr(f->b, b, prec_add);
+        }
 
         if (need) sbuf_putc(b, ')');
         return;
     }
 
+    /* Fallback */
     emit_atom((dval_t *)f, b);
 }
 
