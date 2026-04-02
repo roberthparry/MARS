@@ -1,6 +1,7 @@
 #include <stdbool.h>
 
 #include "string_internal.h"
+#include "ustring.h"
 
 /* Creation / destruction */
 
@@ -46,6 +47,14 @@ string_t *string_new_with(const char *init)
     return s;
 }
 
+string_t *string_clone(const string_t *src)
+{
+    if (!src)
+        return NULL;
+
+    return string_new_with(string_c_str(src));
+}
+
 void string_free(string_t *s)
 {
     if (!s) return;
@@ -85,6 +94,26 @@ int string_append_cstr(string_t *s, const char *suffix)
 
     memcpy(s->data + s->len, suffix, add + 1);
     s->len += add;
+    return 0;
+}
+
+int string_append_chars(string_t *s, const char *buffer, size_t size)
+{
+    if (!s || !buffer || size == 0)
+        return -1;
+
+    size_t need = s->len + size + 1;
+
+    /* Ensure capacity */
+    if (string_reserve(s, need) != 0)
+        return -1;
+
+    /* Copy raw bytes */
+    memcpy(s->data + s->len, buffer, size);
+
+    s->len += size;
+    s->data[s->len] = '\0';
+
     return 0;
 }
 

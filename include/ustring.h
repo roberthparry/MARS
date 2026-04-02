@@ -33,6 +33,14 @@ string_t *string_new(void);
 string_t *string_new_with(const char *init);
 
 /**
+ * @brief Deep copy a string.
+ *
+ * @param src String to clone.
+ * @return Newly allocated clone of src, or NULL on allocation failure.
+ */
+string_t *string_clone(const string_t *src);
+
+/**
  * @brief Destroy a string and free all associated memory.
  *
  * @param s String to destroy (may be NULL).
@@ -82,6 +90,23 @@ void string_clear(string_t *s);
  * @return 0 on success, non‑zero on allocation failure.
  */
 int string_append_cstr(string_t *s, const char *suffix);
+
+/**
+ * @brief Append raw bytes to the string.
+ *
+ * Copies exactly @p size bytes from @p buffer into the end of the string.
+ * The bytes are treated as UTF‑8 data but are not validated. A null
+ * terminator is appended automatically after the copied bytes.
+ *
+ * Capacity is expanded as needed.
+ *
+ * @param s      Destination string.
+ * @param buffer Pointer to the bytes to append (need not be null‑terminated).
+ * @param size   Number of bytes to append.
+ *
+ * @return 0 on success, non‑zero on allocation failure.
+ */
+int string_append_chars(string_t *s, const char *buffer, size_t size);
 
 /**
  * @brief Append a single ASCII character.
