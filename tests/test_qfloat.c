@@ -6,12 +6,8 @@
 
 #include "qfloat.h"
 
-/* ANSI colours */
-#define C_RESET   "\033[0m"
-#define C_RED     "\033[31m"
-#define C_GREEN   "\033[32m"
-#define C_YELLOW  "\033[33m"
-#define C_CYAN    "\033[36m"
+#define TEST_CONFIG_MODE TEST_CONFIG_GLOBAL
+#include "test_harness.h"
 
 /* Helper to print qfloat */
 static void print_q(const char *label, qfloat x) {
@@ -1046,24 +1042,24 @@ static void test_qf_printf_stdout(void)
 void test_qf_sprintf_and_printf(void)
 {
     /* Original tests */
-    test_qd_sprintf_basic();
-    test_qd_sprintf_multiple();
-    test_qd_sprintf_mixed();
-    test_qd_sprintf_buffer_limit();
-    test_qd_sprintf_edge_cases();
+    RUN_TEST(test_qd_sprintf_basic, __func__);
+    RUN_TEST(test_qd_sprintf_multiple, __func__);
+    RUN_TEST(test_qd_sprintf_mixed, __func__);
+    RUN_TEST(test_qd_sprintf_buffer_limit, __func__);
+    RUN_TEST(test_qd_sprintf_edge_cases, __func__);
 
-    test_qd_sprintf_q_precision();
-    test_qd_sprintf_q_zero_precision();
-    test_qd_sprintf_q_flags();
-    test_qd_sprintf_q_width();
-    test_qd_sprintf_q_fallback();
-    test_qd_sprintf_q_fallback_width();
-    test_qf_sprintf_q_concise();
+    RUN_TEST(test_qd_sprintf_q_precision, __func__);
+    RUN_TEST(test_qd_sprintf_q_zero_precision, __func__);
+    RUN_TEST(test_qd_sprintf_q_flags, __func__);
+    RUN_TEST(test_qd_sprintf_q_width, __func__);
+    RUN_TEST(test_qd_sprintf_q_fallback, __func__);
+    RUN_TEST(test_qd_sprintf_q_fallback_width, __func__);
+    RUN_TEST(test_qf_sprintf_q_concise, __func__);
 
     /* New tests */
-    test_qf_sprintf_null_safe_new();
-    test_qf_sprintf_two_pass_new();
-    test_qf_printf_stdout();
+    RUN_TEST(test_qf_sprintf_null_safe_new, __func__);
+    RUN_TEST(test_qf_sprintf_two_pass_new, __func__);
+    RUN_TEST(test_qf_printf_stdout, __func__);
 }
 
 static void test_qf_pow_int()
@@ -2927,9 +2923,9 @@ static void test_qf_beta_special_cases(void)
    ------------------------------------------------------------------------- */
 static void test_qf_beta_all(void)
 {
-    test_qf_beta_definition();
-    test_qf_beta_symmetry();
-    test_qf_beta_special_cases();
+    RUN_TEST(test_qf_beta_definition, __func__);
+    RUN_TEST(test_qf_beta_symmetry, __func__);
+    RUN_TEST(test_qf_beta_special_cases, __func__);
 }
 
 /* -------------------------------------------------------------------------
@@ -3089,10 +3085,10 @@ static void test_qf_logbeta_special_cases(void)
    ------------------------------------------------------------------------- */
 static void test_qf_logbeta_all(void)
 {
-    test_qf_logbeta_definition();
-    test_qf_logbeta_consistency();
-    test_qf_logbeta_symmetry();
-    test_qf_logbeta_special_cases();
+    RUN_TEST(test_qf_logbeta_definition, __func__);
+    RUN_TEST(test_qf_logbeta_consistency, __func__);
+    RUN_TEST(test_qf_logbeta_symmetry, __func__);
+    RUN_TEST(test_qf_logbeta_special_cases, __func__);
 }
 
 /* -------------------------------------------------------------------------
@@ -3208,9 +3204,9 @@ static void test_qf_binomial_special_cases(void)
    ------------------------------------------------------------------------- */
 static void test_qf_binomial_all(void)
 {
-    test_qf_binomial_definition();
-    test_qf_binomial_symmetry();
-    test_qf_binomial_special_cases();
+    RUN_TEST(test_qf_binomial_definition, __func__);
+    RUN_TEST(test_qf_binomial_symmetry, __func__);
+    RUN_TEST(test_qf_binomial_special_cases, __func__);
 }
 
 /* -------------------------------------------------------------------------
@@ -3352,9 +3348,9 @@ static void test_qf_beta_pdf_symmetry(void)
    ------------------------------------------------------------------------- */
 static void test_qf_beta_pdf_all(void)
 {
-    test_qf_beta_pdf_definition();
-    test_qf_beta_pdf_logform();
-    test_qf_beta_pdf_symmetry();
+    RUN_TEST(test_qf_beta_pdf_definition, __func__);
+    RUN_TEST(test_qf_beta_pdf_logform, __func__);
+    RUN_TEST(test_qf_beta_pdf_symmetry, __func__);
 }
 
 /* -------------------------------------------------------------------------
@@ -3490,9 +3486,9 @@ static void test_qf_logbeta_pdf_symmetry(void)
    ------------------------------------------------------------------------- */
 static void test_qf_logbeta_pdf_all(void)
 {
-    test_qf_logbeta_pdf_definition();
-    test_qf_logbeta_pdf_consistency();
-    test_qf_logbeta_pdf_symmetry();
+    RUN_TEST(test_qf_logbeta_pdf_definition, __func__);
+    RUN_TEST(test_qf_logbeta_pdf_consistency, __func__);
+    RUN_TEST(test_qf_logbeta_pdf_symmetry, __func__);
 }
 
 /* -------------------------------------------------------------------------
@@ -3628,10 +3624,10 @@ static void test_qf_normal_pdf_logform(void)
    ------------------------------------------------------------------------- */
 static void test_qf_normal_pdf_all(void)
 {
-    test_qf_normal_pdf_definition();
-    test_qf_normal_pdf_symmetry();
-    test_qf_normal_pdf_at_zero();
-    test_qf_normal_pdf_logform();
+    RUN_TEST(test_qf_normal_pdf_definition, __func__);
+    RUN_TEST(test_qf_normal_pdf_symmetry, __func__);
+    RUN_TEST(test_qf_normal_pdf_at_zero, __func__);
+    RUN_TEST(test_qf_normal_pdf_logform, __func__);
 }
 
 /* -------------------------------------------------------------------------
@@ -3805,10 +3801,10 @@ static void test_qf_normal_cdf_pdf_consistency(void)
    ------------------------------------------------------------------------- */
 static void test_qf_normal_cdf_all(void)
 {
-    test_qf_normal_cdf_definition();
-    test_qf_normal_cdf_symmetry();
-    test_qf_normal_cdf_known_values();
-    test_qf_normal_cdf_pdf_consistency();
+    RUN_TEST(test_qf_normal_cdf_definition, __func__);
+    RUN_TEST(test_qf_normal_cdf_symmetry, __func__);
+    RUN_TEST(test_qf_normal_cdf_known_values, __func__);
+    RUN_TEST(test_qf_normal_cdf_pdf_consistency, __func__);
 }
 
 /* -------------------------------------------------------------------------
@@ -3939,10 +3935,10 @@ static void test_qf_normal_logpdf_at_zero(void)
    ------------------------------------------------------------------------- */
 static void test_qf_normal_logpdf_all(void)
 {
-    test_qf_normal_logpdf_definition();
-    test_qf_normal_logpdf_consistency();
-    test_qf_normal_logpdf_symmetry();
-    test_qf_normal_logpdf_at_zero();
+    RUN_TEST(test_qf_normal_logpdf_definition, __func__);
+    RUN_TEST(test_qf_normal_logpdf_consistency, __func__);
+    RUN_TEST(test_qf_normal_logpdf_symmetry, __func__);
+    RUN_TEST(test_qf_normal_logpdf_at_zero, __func__);
 }
 
 /* -------------------------------------------------------------------------
@@ -4077,10 +4073,10 @@ static void test_qf_productlog_monotonicity(void)
    ------------------------------------------------------------------------- */
 static void test_qf_productlog_all(void)
 {
-    test_qf_productlog_definition();
-    test_qf_productlog_consistency();
-    test_qf_productlog_special();
-    test_qf_productlog_monotonicity();
+    RUN_TEST(test_qf_productlog_definition, __func__);
+    RUN_TEST(test_qf_productlog_consistency, __func__);
+    RUN_TEST(test_qf_productlog_special, __func__);
+    RUN_TEST(test_qf_productlog_monotonicity, __func__);
 }
 
 /* -------------------------------------------------------------------------
@@ -4208,9 +4204,9 @@ static void test_qf_gammainc_special_s1(void)
    ------------------------------------------------------------------------- */
 static void test_qf_gammainc_all(void)
 {
-    test_qf_gammainc_PQ_identity();
-    test_qf_gammainc_lower_upper_identity();
-    test_qf_gammainc_special_s1();
+    RUN_TEST(test_qf_gammainc_PQ_identity, __func__);
+    RUN_TEST(test_qf_gammainc_lower_upper_identity, __func__);
+    RUN_TEST(test_qf_gammainc_special_s1, __func__);
 }
 
 /* Approximate derivative using symmetric difference:
@@ -4431,17 +4427,17 @@ static void test_ei_values(void)
 
 static void test_qf_ei_e1_all(void)
 {
-    test_qf_ei_deriv();
-    test_qf_e1_deriv();
-    test_qf_ei_e1_identity();
-    test_ei_values();
+    RUN_TEST(test_qf_ei_deriv, __func__);
+    RUN_TEST(test_qf_e1_deriv, __func__);
+    RUN_TEST(test_qf_ei_e1_identity, __func__);
+    RUN_TEST(test_ei_values, __func__);
 }
 
 /* -----------------------------------------------------------
    Main
    ----------------------------------------------------------- */
 
-int main() {
+int tests_main() {
     // qfloat x = qf_from_string("1.837877066409345483560659472811235");
     // char* s = "QF_LN_2PI";
     // printf("const qfloat %s = {\n    %.17g,\n    %.17g\n};\n", s, x.hi, x.lo);
@@ -4450,68 +4446,68 @@ int main() {
 
     printf(C_YELLOW "Running qfloat tests...\n\n" C_RESET);
 
-    test_add();
-    test_mul();
-    test_div();
-    test_sqrt();
-    test_exp_log();
-    test_qf_exp();
-    test_qf_log();
-    test_stability();
+    RUN_TEST(test_add, NULL);
+    RUN_TEST(test_mul, NULL);
+    RUN_TEST(test_div, NULL);
+    RUN_TEST(test_sqrt, NULL);
+    RUN_TEST(test_exp_log, NULL);
+    RUN_TEST(test_qf_exp, NULL);
+    RUN_TEST(test_qf_log, NULL);
+    RUN_TEST(test_stability, NULL);
 
-    test_qf_to_string();
+    RUN_TEST(test_qf_to_string, NULL);
 
-    test_qf_from_string();
+    RUN_TEST(test_qf_from_string, NULL);
 
-    test_from_string_basic();
-    test_from_string_scientific();
-    test_round_trip();
+    RUN_TEST(test_from_string_basic, NULL);
+    RUN_TEST(test_from_string_scientific, NULL);
+    RUN_TEST(test_round_trip, NULL);
 
-    test_qf_sprintf_and_printf();
+    RUN_TEST(test_qf_sprintf_and_printf, NULL);
 
-    test_qf_pow_int();
-    test_qf_pow();
-    test_qf_pow10();
-    test_qf_trig();
+    RUN_TEST(test_qf_pow_int, NULL);
+    RUN_TEST(test_qf_pow, NULL);
+    RUN_TEST(test_qf_pow10, NULL);
+    RUN_TEST(test_qf_trig, NULL);
 
-    test_qf_atan();
-    test_qf_atan2();
-    test_qf_asin();
-    test_qf_acos();
+    RUN_TEST(test_qf_atan, NULL);
+    RUN_TEST(test_qf_atan2, NULL);
+    RUN_TEST(test_qf_asin, NULL);
+    RUN_TEST(test_qf_acos, NULL);
 
-    test_qf_sinh();
-    test_qf_cosh();
-    test_qf_tanh();
-    test_qf_asinh();
-    test_qf_acosh();
-    test_qf_atanh();
+    RUN_TEST(test_qf_sinh, NULL);
+    RUN_TEST(test_qf_cosh, NULL);
+    RUN_TEST(test_qf_tanh, NULL);
+    RUN_TEST(test_qf_asinh, NULL);
+    RUN_TEST(test_qf_acosh, NULL);
+    RUN_TEST(test_qf_atanh, NULL);
 
-    test_qf_hypot();
+    RUN_TEST(test_qf_hypot, NULL);
 
-    test_qf_gamma();
-    test_qf_erf();
-    test_qf_erfc();
-    test_qf_erfinv();
-    test_qf_erfcinv();
-    test_qf_lgamma();
-    test_qf_digamma();
-    test_qf_gammainv();
+    RUN_TEST(test_qf_gamma, NULL);
+    RUN_TEST(test_qf_erf, NULL);
+    RUN_TEST(test_qf_erfc, NULL);
+    RUN_TEST(test_qf_erfinv, NULL);
+    RUN_TEST(test_qf_erfcinv, NULL);
+    RUN_TEST(test_qf_lgamma, NULL);
+    RUN_TEST(test_qf_digamma, NULL);
+    RUN_TEST(test_qf_gammainv, NULL);
 
-    test_qf_lambert_w0();
-    test_qf_lambert_wm1();
+    RUN_TEST(test_qf_lambert_w0, NULL);
+    RUN_TEST(test_qf_lambert_wm1, NULL);
 
-    test_qf_beta_all();
-    test_qf_logbeta_all();
-    test_qf_binomial_all();
-    test_qf_beta_pdf_all();
-    test_qf_logbeta_pdf_all();
-    test_qf_normal_pdf_all();
-    test_qf_normal_cdf_all();
-    test_qf_normal_logpdf_all();
-    test_qf_productlog_all();
+    RUN_TEST(test_qf_beta_all, NULL);
+    RUN_TEST(test_qf_logbeta_all, NULL);
+    RUN_TEST(test_qf_binomial_all, NULL);
+    RUN_TEST(test_qf_beta_pdf_all, NULL);
+    RUN_TEST(test_qf_logbeta_pdf_all, NULL);
+    RUN_TEST(test_qf_normal_pdf_all, NULL);
+    RUN_TEST(test_qf_normal_cdf_all, NULL);
+    RUN_TEST(test_qf_normal_logpdf_all, NULL);
+    RUN_TEST(test_qf_productlog_all, NULL);
 
-    test_qf_gammainc_all();
-    test_qf_ei_e1_all();    
+    RUN_TEST(test_qf_gammainc_all, NULL);
+    RUN_TEST(test_qf_ei_e1_all, NULL);    
     
     printf("\n" C_YELLOW "Done.\n" C_RESET);
 

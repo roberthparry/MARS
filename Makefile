@@ -15,7 +15,7 @@ endif
 
 CC := gcc
 AR := ar rcs
-INCLUDES := -Iinclude -Itests
+INCLUDES := -I. -Iinclude -Itests
 
 # ------------------------------------------------------------
 # Optional libunistring
