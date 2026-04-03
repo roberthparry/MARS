@@ -4446,6 +4446,7 @@ int tests_main() {
 
     printf(C_YELLOW "Running qfloat tests...\n\n" C_RESET);
 
+    TEST_GROUP("Arithmetic Tests");
     RUN_TEST(test_add, NULL);
     RUN_TEST(test_mul, NULL);
     RUN_TEST(test_div, NULL);
@@ -4455,26 +4456,30 @@ int tests_main() {
     RUN_TEST(test_qf_log, NULL);
     RUN_TEST(test_stability, NULL);
 
+    TEST_GROUP("String Tests");
     RUN_TEST(test_qf_to_string, NULL);
-
     RUN_TEST(test_qf_from_string, NULL);
-
     RUN_TEST(test_from_string_basic, NULL);
     RUN_TEST(test_from_string_scientific, NULL);
     RUN_TEST(test_round_trip, NULL);
 
+    TEST_GROUP("printf Tests");
     RUN_TEST(test_qf_sprintf_and_printf, NULL);
 
+    TEST_GROUP("Power Tests");
     RUN_TEST(test_qf_pow_int, NULL);
     RUN_TEST(test_qf_pow, NULL);
     RUN_TEST(test_qf_pow10, NULL);
-    RUN_TEST(test_qf_trig, NULL);
 
+    TEST_GROUP("Trigonometric Tests");
+    RUN_TEST(test_qf_trig, NULL);
     RUN_TEST(test_qf_atan, NULL);
     RUN_TEST(test_qf_atan2, NULL);
     RUN_TEST(test_qf_asin, NULL);
     RUN_TEST(test_qf_acos, NULL);
 
+    TEST_GROUP("Hyperbolic function Tests");
+    RUN_TEST(test_qf_cosh, NULL);
     RUN_TEST(test_qf_sinh, NULL);
     RUN_TEST(test_qf_cosh, NULL);
     RUN_TEST(test_qf_tanh, NULL);
@@ -4482,8 +4487,10 @@ int tests_main() {
     RUN_TEST(test_qf_acosh, NULL);
     RUN_TEST(test_qf_atanh, NULL);
 
+    TEST_GROUP("Hypotenuse Tests");
     RUN_TEST(test_qf_hypot, NULL);
 
+    TEST_GROUP("Gamma, erf, erfc, erfinv, erfcinv, digamma function Tests");
     RUN_TEST(test_qf_gamma, NULL);
     RUN_TEST(test_qf_erf, NULL);
     RUN_TEST(test_qf_erfc, NULL);
@@ -4493,9 +4500,12 @@ int tests_main() {
     RUN_TEST(test_qf_digamma, NULL);
     RUN_TEST(test_qf_gammainv, NULL);
 
+    TEST_GROUP("Lambert W function Tests");
     RUN_TEST(test_qf_lambert_w0, NULL);
     RUN_TEST(test_qf_lambert_wm1, NULL);
+    RUN_TEST(test_qf_productlog_all, NULL);
 
+    TEST_GROUP("Beta, logbeta, binomial, beta_pdf, logbeta_pdf, normal_pdf/cdf/logpdf, productlog Tests");
     RUN_TEST(test_qf_beta_all, NULL);
     RUN_TEST(test_qf_logbeta_all, NULL);
     RUN_TEST(test_qf_binomial_all, NULL);
@@ -4504,8 +4514,8 @@ int tests_main() {
     RUN_TEST(test_qf_normal_pdf_all, NULL);
     RUN_TEST(test_qf_normal_cdf_all, NULL);
     RUN_TEST(test_qf_normal_logpdf_all, NULL);
-    RUN_TEST(test_qf_productlog_all, NULL);
 
+    TEST_GROUP("Incomplete gamma, Ei, E1 Tests");
     RUN_TEST(test_qf_gammainc_all, NULL);
     RUN_TEST(test_qf_ei_e1_all, NULL);    
     

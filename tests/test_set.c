@@ -1,12 +1,15 @@
-/* test_set.c - tests for the generic value-set container */
-
-#include "set.h"
+// test_set.c — tests for the generic value-set container using the new test harness
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
 #include <time.h>
+
+#define TEST_CONFIG_MODE TEST_CONFIG_GLOBAL
+#include "test_harness.h"
+
+#include "set.h"
 
 /* -------------------------------------------------------------
  * strdup replacement for strict C99
@@ -17,24 +20,6 @@ static char *strclone(const char *s) {
     char *p = malloc(n);
     if (p) memcpy(p, s, n);
     return p;
-}
-
-/* -------------------------------------------------------------
- * Colour helpers
- * ------------------------------------------------------------- */
-
-#define RED     "\x1b[31m"
-#define GREEN   "\x1b[32m"
-#define YELLOW  "\x1b[33m"
-#define BLUE    "\x1b[34m"
-#define RESET   "\x1b[0m"
-
-static void pass(const char *msg) {
-    printf(GREEN "PASS" RESET " %s\n", msg);
-}
-
-static void fail(const char *msg) {
-    printf(RED "FAIL" RESET " %s\n", msg);
 }
 
 /* -------------------------------------------------------------
@@ -128,7 +113,7 @@ static void deep_destroy(void *elem) {
  * Tests
  * ------------------------------------------------------------- */
 
-static void test_ints() {
+void test_ints(void) {
     set_t *s = set_create(sizeof(int), int_hash, int_cmp, NULL, NULL);
 
     int a = 5, b = 10, c = 5;
@@ -136,25 +121,16 @@ static void test_ints() {
     set_add(s, &a);
     set_add(s, &b);
 
-    if (!set_contains(s, &a)) fail("int contains a");
-    else pass("int contains a");
-
-    if (!set_contains(s, &b)) fail("int contains b");
-    else pass("int contains b");
-
-    if (set_add(s, &c)) fail("duplicate int add");
-    else pass("duplicate int add");
-
-    if (!set_remove(s, &a)) fail("remove int a");
-    else pass("remove int a");
-
-    if (set_contains(s, &a)) fail("int a removed");
-    else pass("int a removed");
+    ASSERT_TRUE(set_contains(s, &a));
+    ASSERT_TRUE(set_contains(s, &b));
+    ASSERT_TRUE(!set_add(s, &c));     // duplicate should fail
+    ASSERT_TRUE(set_remove(s, &a));
+    ASSERT_TRUE(!set_contains(s, &a));
 
     set_destroy(s);
 }
 
-static void test_strings() {
+void test_strings(void) {
     set_t *s = set_create(sizeof(char *), str_hash, str_cmp, str_clone, str_destroy);
 
     const char *a = "hello";
@@ -164,22 +140,15 @@ static void test_strings() {
     set_add(s, &a);
     set_add(s, &b);
 
-    if (!set_contains(s, &a)) fail("string contains a");
-    else pass("string contains a");
-
-    if (set_add(s, &c)) fail("duplicate string add");
-    else pass("duplicate string add");
-
-    if (!set_remove(s, &a)) fail("remove string a");
-    else pass("remove string a");
-
-    if (set_contains(s, &a)) fail("string a removed");
-    else pass("string a removed");
+    ASSERT_TRUE(set_contains(s, &a));
+    ASSERT_TRUE(!set_add(s, &c));     // duplicate
+    ASSERT_TRUE(set_remove(s, &a));
+    ASSERT_TRUE(!set_contains(s, &a));
 
     set_destroy(s);
 }
 
-static void test_deep() {
+void test_deep(void) {
     set_t *s = set_create(sizeof(struct deep), deep_hash, deep_cmp, deep_clone, deep_destroy);
 
     struct deep a = { strclone("alpha"), 1 };
@@ -189,17 +158,10 @@ static void test_deep() {
     set_add(s, &a);
     set_add(s, &b);
 
-    if (!set_contains(s, &a)) fail("deep contains a");
-    else pass("deep contains a");
-
-    if (set_add(s, &c)) fail("duplicate deep add");
-    else pass("duplicate deep add");
-
-    if (!set_remove(s, &a)) fail("remove deep a");
-    else pass("remove deep a");
-
-    if (set_contains(s, &a)) fail("deep a removed");
-    else pass("deep a removed");
+    ASSERT_TRUE(set_contains(s, &a));
+    ASSERT_TRUE(!set_add(s, &c));     // duplicate
+    ASSERT_TRUE(set_remove(s, &a));
+    ASSERT_TRUE(!set_contains(s, &a));
 
     free(a.name);
     free(b.name);
@@ -208,25 +170,21 @@ static void test_deep() {
     set_destroy(s);
 }
 
-static void test_sorted() {
+void test_sorted(void) {
     set_t *s = set_create(sizeof(int), int_hash, int_cmp, NULL, NULL);
 
     int vals[] = { 5, 1, 3, 4, 2 };
     for (int i = 0; i < 5; ++i) set_add(s, &vals[i]);
 
-    bool ok = true;
     for (size_t i = 0; i < 5; ++i) {
         const int *p = set_get_sorted(s, i);
-        if (*p != (int)(i + 1)) ok = false;
+        ASSERT_EQ_INT(*p, (int)(i + 1));
     }
-
-    if (!ok) fail("sorted ints");
-    else pass("sorted ints");
 
     set_destroy(s);
 }
 
-static void test_fuzz() {
+void test_fuzz(void) {
     set_t *s = set_create(sizeof(int), int_hash, int_cmp, NULL, NULL);
 
     srand((unsigned)time(NULL));
@@ -239,31 +197,34 @@ static void test_fuzz() {
     for (int i = 0; i < 2000; ++i) {
         int v = i;
         if (set_contains(s, &v)) {
-            if (!set_remove(s, &v)) {
-                fail("fuzz remove");
-                set_destroy(s);
-                return;
-            }
+            ASSERT_TRUE(set_remove(s, &v));
         }
     }
 
-    pass("fuzz test");
     set_destroy(s);
 }
 
 /* -------------------------------------------------------------
- * Main
+ * tests_main() — the harness entry point
  * ------------------------------------------------------------- */
 
-int main(void) {
-    printf(BLUE "Running set tests...\n" RESET);
+int tests_main(void) {
 
-    test_ints();
-    test_strings();
-    test_deep();
-    test_sorted();
-    test_fuzz();
+    TEST_GROUP("Integer Tests");
+    RUN_TEST(test_ints, NULL);
 
-    printf(BLUE "Done.\n" RESET);
+    TEST_GROUP("String Tests");
+    RUN_TEST(test_strings, NULL);
+
+    TEST_GROUP("Deep Struct Tests");
+    RUN_TEST(test_deep, NULL);
+
+    TEST_GROUP("Sorted Order Tests");
+    RUN_TEST(test_sorted, NULL);
+
+    TEST_GROUP("Fuzz Tests");
+    RUN_TEST(test_fuzz, NULL);
+
     return 0;
 }
+
