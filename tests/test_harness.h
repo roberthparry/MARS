@@ -111,7 +111,8 @@ static const char *__group_name = NULL;
 #define RUN_TEST(func, parent) \
     do { \
         if (!test_enabled(__FILE__, #func, parent)) { \
-            printf(C_YELLOW "SKIP: %s\n" C_RESET, #func); \
+            printf(C_YELLOW "SKIP: %s (%s:%d)\n" C_RESET, \
+                   #func, __FILE__, __LINE__); \
             tests_skipped++; \
             break; \
         } \
@@ -123,9 +124,11 @@ static const char *__group_name = NULL;
         tests_run++; \
         func(); \
         if (tests_failed == before) { \
-            printf(C_GREEN "PASS: %s\n" C_RESET, #func); \
+            printf(C_GREEN "PASS: %s (%s:%d)\n" C_RESET, \
+                   #func, __FILE__, __LINE__); \
         } else { \
-            printf(C_RED   "FAIL: %s\n" C_RESET, #func); \
+            printf(C_RED "FAIL: %s (%s:%d)\n" C_RESET, \
+                   #func, __FILE__, __LINE__); \
         } \
     } while (0)
 

@@ -47,7 +47,7 @@ TEST_SRCS := $(wildcard tests/test_*.c)
 TEST_OBJS := $(TEST_SRCS:tests/%.c=$(TEST_BUILD_DIR)/%.o)
 
 HEADERS := $(wildcard include/*.h)
-TEST_HEADERS := tests/test_string.h
+TEST_HEADERS := tests/test_string.h tests/test_harness.h   # ⭐ FIX ADDED HERE
 
 STATIC_LIB := $(BUILD_DIR)/libooc.a
 SHARED_LIB := $(BUILD_DIR)/libooc.so
@@ -99,9 +99,9 @@ $(SHARED_LIB): $(OBJS)
 $(TEST_BUILD_DIR)/test_%: $(TEST_BUILD_DIR)/test_%.o $(STATIC_LIB)
 	mkdir -p $(dir $@)
 	$(CC) -o $@ $< \
-    	-L$(BUILD_DIR) -looc \
-    	-Wl,-rpath,'$$ORIGIN:$$ORIGIN/../../../$(BUILD_DIR)' \
-    	$(LDLIBS)
+		-L$(BUILD_DIR) -looc \
+		-Wl,-rpath,'$$ORIGIN:$$ORIGIN/../../../$(BUILD_DIR)' \
+		$(LDLIBS)
 
 # ------------------------------------------------------------
 # Test targets

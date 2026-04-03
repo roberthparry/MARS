@@ -1,0 +1,20 @@
+{
+  "test_top_level_default_true": {
+    "enabled": true,
+    "test_subtest_default_true": true
+  },
+  "test_repeat_lookup_same_value": true,
+  "parent_group": {
+    "enabled": true,
+    "test_subtest_grouping": {
+      "enabled": true,
+      "test_sub_sub_function": {
+        "enabled": true,
+        "test_sub_sub_sub_function": {
+          "enabled": true,
+          "test_sub_sub_sub_sub_function": true
+        }
+      }
+    }
+  }
+}
