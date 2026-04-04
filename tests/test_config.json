@@ -227,5 +227,198 @@
       "test_ei_values": true,
       "test_qf_ei_deriv": true
     }
+  },
+  "tests/test_dval.c": {
+    "Arithmetic": {
+      "enabled": true,
+      "test_add": true,
+      "test_sub": true,
+      "test_mul": true,
+      "test_div": true,
+      "test_mixed": true
+    },
+    "_d variants": {
+      "enabled": true,
+      "test_add_d": true,
+      "test_mul_d": true,
+      "test_div_d": true
+    },
+    "Math functions": {
+      "enabled": true,
+      "test_sin": true,
+      "test_cos": true,
+      "test_tan": true,
+      "test_sinh": true,
+      "test_cosh": true,
+      "test_tanh": true,
+      "test_asin": true,
+      "test_acos": true,
+      "test_atan": true,
+      "test_atan2": true,
+      "test_asinh": true,
+      "test_acosh": true,
+      "test_atanh": true,
+      "test_exp": true,
+      "test_log": true,
+      "test_sqrt": true,
+      "test_pow_d": true,
+      "test_pow": true
+    },
+    "First derivatives": {
+      "enabled": true,
+      "test_deriv_const": true,
+      "test_deriv_var": true,
+      "test_deriv_neg": true,
+      "test_deriv_add_d": true,
+      "test_deriv_mul_d": true,
+      "test_deriv_div_d": true,
+      "test_deriv_x2": true,
+      "test_deriv_pow3": true,
+      "test_deriv_pow_xy": true,
+      "test_deriv_sin": true,
+      "test_deriv_cos": true,
+      "test_deriv_tan": true,
+      "test_deriv_sinh": true,
+      "test_deriv_cosh": true,
+      "test_deriv_tanh": true,
+      "test_deriv_asin": true,
+      "test_deriv_acos": true,
+      "test_deriv_atan": true,
+      "test_deriv_atan2": true,
+      "test_deriv_asinh": true,
+      "test_deriv_acosh": true,
+      "test_deriv_atanh": true,
+      "test_deriv_exp": true,
+      "test_deriv_log": true,
+      "test_deriv_sqrt": true,
+      "test_deriv_composite": true,
+      "test_deriv_sin_log": true,
+      "test_deriv_exp_tanh": true,
+      "test_deriv_sqrt_sin_x2": true,
+      "test_deriv_log_cosh": true,
+      "test_deriv_x2_exp_negx": true,
+      "test_deriv_atan_x_over_sqrt": true
+    },
+    "Second derivatives": {
+      "enabled": true,
+      "test_second_deriv_var": true,
+      "test_second_deriv_neg": true,
+      "test_second_deriv_add_d": true,
+      "test_second_deriv_mul_d": true,
+      "test_second_deriv_div_d": true,
+      "test_second_deriv_x2": true,
+      "test_second_deriv_x3": true,
+      "test_second_deriv_pow_xy": true,
+      "test_second_deriv_sin": true,
+      "test_second_deriv_cos": true,
+      "test_second_deriv_tan": true,
+      "test_second_deriv_sinh": true,
+      "test_second_deriv_cosh": true,
+      "test_second_deriv_tanh": true,
+      "test_second_deriv_asin": false,
+      "test_second_deriv_acos": false,
+      "test_second_deriv_atan": true,
+      "test_second_deriv_atan2": true,
+      "test_second_deriv_asinh": false,
+      "test_second_deriv_acosh": false,
+      "test_second_deriv_atanh": true,
+      "test_second_deriv_exp": true,
+      "test_second_deriv_log": true,
+      "test_second_deriv_sqrt": false,
+      "test_second_deriv_composite": false,
+      "test_second_deriv_sin_log": false,
+      "test_second_deriv_exp_tanh": false,
+      "test_second_deriv_sqrt_sin_x2": false,
+      "test_second_deriv_log_cosh": false,
+      "test_second_deriv_x2_exp_negx": false,
+      "test_second_deriv_atan_x_over_sqrt": false
+    },
+    "dval_t to_string Tests": {
+      "enabled": true,
+      "test_to_string_basic_const_expr": true,
+      "test_to_string_basic_const_func": true,
+      "test_to_string_basic_const": true,
+      "test_to_string_basic_var_expr": true,
+      "test_to_string_basic_var_func": true,
+      "test_to_string_basic_var": true,
+      "test_to_string_addition_expr": true,
+      "test_to_string_addition_func": true,
+      "test_to_string_addition": true,
+      "test_to_string_nested_mul_add_expr": true,
+      "test_to_string_nested_mul_add_func": true,
+      "test_to_string_nested_mul_add": true,
+      "test_to_string_atan2_expr": true,
+      "test_to_string_atan2_func": true,
+      "test_to_string_atan2": true,
+      "test_to_string_pow_superscript_expr": true,
+      "test_to_string_pow_superscript_func": true,
+      "test_to_string_pow_superscript": true,
+      "test_to_string_unary_sin_expr": true,
+      "test_to_string_unary_sin_func": true,
+      "test_to_string_unary_sin": true,
+      "test_to_string_function_style_expr": true,
+      "test_to_string_function_style_func": true,
+      "test_to_string_function_style": true,
+      "test_to_string_all": true
+    },
+    "test_to_string_all": {
+      "enabled": true,
+      "test_to_string_basic_const": true,
+      "test_to_string_basic_var": true,
+      "test_to_string_addition": true,
+      "test_to_string_nested_mul_add": true,
+      "test_to_string_atan2": true,
+      "test_to_string_pow_superscript": true,
+      "test_to_string_unary_sin": true,
+      "test_to_string_function_style": true
+    },
+    "test_to_string_basic_const": {
+      "enabled": true,
+      "test_to_string_basic_const_expr": true,
+      "test_to_string_basic_const_func": true
+    },
+    "test_to_string_basic_var": {
+      "enabled": true,
+      "test_to_string_basic_var_expr": true,
+      "test_to_string_basic_var_func": true
+    },
+    "test_to_string_addition": {
+      "enabled": true,
+      "test_to_string_addition_expr": true,
+      "test_to_string_addition_func": true
+    },
+    "test_to_string_nested_mul_add": {
+      "enabled": true,
+      "test_to_string_nested_mul_add_expr": true,
+      "test_to_string_nested_mul_add_func": true
+    },
+    "test_to_string_atan2": {
+      "enabled": true,
+      "test_to_string_atan2_expr": true,
+      "test_to_string_atan2_func": true
+    },
+    "test_to_string_pow_superscript": {
+      "enabled": true,
+      "test_to_string_pow_superscript_expr": true,
+      "test_to_string_pow_superscript_func": true
+    },
+    "test_to_string_unary_sin": {
+      "enabled": true,
+      "test_to_string_unary_sin_expr": true,
+      "test_to_string_unary_sin_func": true
+    },
+    "test_to_string_function_style": {
+      "enabled": true,
+      "test_to_string_function_style_expr": true,
+      "test_to_string_function_style_func": true
+    },
+    "dval_t to_string - 50 Tests": {
+      "enabled": true,
+      "test_expressions": true
+    },
+    "README.md example": {
+      "enabled": true,
+      "test_readme_example": true
+    }
   }
 }
