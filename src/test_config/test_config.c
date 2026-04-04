@@ -145,7 +145,6 @@ static dictionary_t *create_file_dict(void)
         test_value_clone,
         test_value_destroy
     );
-    printf("File Dictionary created at %p\n", dict);
     return dict;
 }
 
@@ -168,7 +167,6 @@ static void ensure_root_created(void)
     } else {
         g_root = create_file_dict();
     }
-    printf("Root Dictionary created at %p\n", g_root);
 }
 
 /* ========================================================================= */
