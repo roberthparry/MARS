@@ -5,11 +5,12 @@
 #error "You must #define TEST_CONFIG_MODE before including test_harness.h"
 #endif
 
-#include "test_config.h"
 #include <stdio.h>
 #include <math.h>
 #include <float.h>
 #include <string.h>
+
+#include "test_config.h"
 
 /* ------------------------------------------------------------------------- */
 /* Colours                                                                    */
@@ -20,6 +21,7 @@
 #define C_YELLOW  "\x1b[33m"
 #define C_CYAN    "\x1b[36m"
 #define C_RESET   "\x1b[0m"
+#define C_BOLD    "\x1b[1m"
 
 /* ------------------------------------------------------------------------- */
 /* Global test state                                                          */
@@ -100,8 +102,9 @@ static const char *__group_name = NULL;
 
 #define TEST_GROUP(name) \
     do { \
+        __group_name = name; \
         __group_should_print = 1; \
-        __group_name = (name); \
+        test_config_register_group(__FILE__, name); \
     } while (0)
 
 /* ------------------------------------------------------------------------- */
@@ -110,25 +113,33 @@ static const char *__group_name = NULL;
 
 #define RUN_TEST(func, parent) \
     do { \
+        /* Query enable/disable state */ \
         if (!test_enabled(__FILE__, #func, parent)) { \
-            printf(C_YELLOW "SKIP: %s (%s:%d)\n" C_RESET, \
-                   #func, __FILE__, __LINE__); \
+            printf(C_YELLOW "SKIP: %s\n" C_RESET, #func); \
             tests_skipped++; \
+            if (__group_name) \
+                test_config_mark_test(__FILE__, __group_name, #func, "skipped"); \
             break; \
         } \
-        if (__group_should_print) { \
+        \
+        /* Print group header only if a group exists */ \
+        if (__group_name && __group_should_print) { \
             printf("\n" C_CYAN "== %s ==\n" C_RESET, __group_name); \
             __group_should_print = 0; \
         } \
+        \
         int before = tests_failed; \
         tests_run++; \
         func(); \
+        \
         if (tests_failed == before) { \
-            printf(C_GREEN "PASS: %s (%s:%d)\n" C_RESET, \
-                   #func, __FILE__, __LINE__); \
+            printf(C_BOLD C_GREEN "PASS: %s\n" C_RESET, #func); \
+            if (__group_name) \
+                test_config_mark_test(__FILE__, __group_name, #func, "pass"); \
         } else { \
-            printf(C_RED "FAIL: %s (%s:%d)\n" C_RESET, \
-                   #func, __FILE__, __LINE__); \
+            printf(C_BOLD C_RED "FAIL: %s\n" C_RESET, #func); \
+            if (__group_name) \
+                test_config_mark_test(__FILE__, __group_name, #func, "fail"); \
         } \
     } while (0)
 
@@ -156,6 +167,9 @@ int main(void) {
 
     /* Save config */
     test_config_save();
+
+    /* Release config resources */
+    test_config_shutdown();
 
     /* Summary */
     int passed = tests_run - tests_failed;

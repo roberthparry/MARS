@@ -9,24 +9,24 @@
 
 /**
  * @enum test_config_mode_t
- * @brief Selects how test enable/disable information is resolved.
+ * @brief Selects how test enable/disable information is stored and resolved.
  *
  * The test configuration system supports two independent modes:
  *
  * ### TEST_CONFIG_GLOBAL
- * A single shared JSON file is used for all tests:
+ * A single shared JSON file is used for all test translation units:
  *
  *     tests/test_config.json
  *
  * The JSON structure is:
- *
  * @code{.json}
  * {
  *     "test_file.c": {
- *         "func": true,
- *         "parent": {
- *             "child": false
- *         }
+ *         "group": {
+ *             "enabled": true,
+ *             "test_name": true
+ *         },
+ *         "another_group": { ... }
  *     }
  * }
  * @endcode
@@ -37,12 +37,11 @@
  *     tests/<basename>.json
  *
  * The JSON structure omits the filename wrapper:
- *
  * @code{.json}
  * {
- *     "func": true,
- *     "parent": {
- *         "child": false
+ *     "group": {
+ *         "enabled": true,
+ *         "test_name": true
  *     }
  * }
  * @endcode
@@ -62,13 +61,11 @@ typedef enum {
  * the start of `main()` or in a test framework setup hook.
  *
  * It expands to:
- *
  * @code
  * test_config_set_mode(TEST_CONFIG_MODE);
  * @endcode
  *
  * The value of TEST_CONFIG_MODE is chosen by the test file:
- *
  * @code
  * #define TEST_CONFIG_MODE TEST_CONFIG_LOCAL
  * #include "test_config.h"
@@ -81,12 +78,7 @@ typedef enum {
  * @brief Default configuration mode if the test file does not override it.
  *
  * Test files may override this by defining TEST_CONFIG_MODE before including
- * this header:
- *
- * @code
- * #define TEST_CONFIG_MODE TEST_CONFIG_LOCAL
- * #include "test_config.h"
- * @endcode
+ * this header.
  */
 #ifndef TEST_CONFIG_MODE
 #define TEST_CONFIG_MODE TEST_CONFIG_GLOBAL
@@ -105,6 +97,18 @@ typedef enum {
  */
 void test_config_set_mode(test_config_mode_t mode);
 
+/**
+ * @brief Release all global resources held by the test configuration system.
+ *
+ * This function destroys the global configuration dictionary and frees any
+ * associated dynamically allocated state, including the cached local filename.
+ * 
+ * It is intended to be called once at program shutdown to ensure that all
+ * memory owned by the test configuration subsystem is released.  After this
+ * call, the test configuration API must not be used again.
+ */
+void test_config_shutdown(void);
+
 /* ------------------------------------------------------------------------- */
 /* Public API                                                                */
 /* ------------------------------------------------------------------------- */
@@ -118,9 +122,12 @@ void test_config_set_mode(test_config_mode_t mode);
  *
  * Missing keys always default to "enabled = true".
  *
+ * If a parent group is provided, the test inherits the effective enabled state
+ * of all ancestors.
+ *
  * @param file   The source filename of the test (use `__FILE__`).
- * @param func   The test function name (use `__func__`).
- * @param parent Optional parent key for nested test groups (may be NULL).
+ * @param func   The test function name (use `__func__` or `#func`).
+ * @param parent Optional parent group name (may be NULL).
  *
  * @return 1 if enabled, 0 if disabled.
  */
@@ -135,7 +142,7 @@ int test_enabled(const char *file, const char *func, const char *parent);
  *
  * @param file   The source filename of the test.
  * @param func   The test function name.
- * @param parent Optional parent key for nested test groups (may be NULL).
+ * @param parent Optional parent group name.
  *
  * @return true if the key exists, false otherwise.
  */
@@ -154,5 +161,54 @@ bool test_config_has_key(const char *file, const char *func, const char *parent)
  * This function does nothing if no configuration has been loaded or modified.
  */
 void test_config_save(void);
+
+/**
+ * @brief Register a test group for the given file.
+ *
+ * This ensures that the group exists in the JSON structure and is marked
+ * `"enabled": true` unless explicitly disabled later.
+ *
+ * In GLOBAL mode, the group is created under the file key:
+ * @code{.json}
+ * {
+ *     "tests/test_dval.c": {
+ *         "Arithmetic": { "enabled": true }
+ *     }
+ * }
+ * @endcode
+ *
+ * In LOCAL mode, the group becomes a top-level key.
+ *
+ * @param file        The test file declaring the group (use `__FILE__`).
+ * @param group_name  The name of the group.
+ */
+void test_config_register_group(const char *file,
+                                const char *group_name);
+
+/**
+ * @brief Record the result of a test inside a group.
+ *
+ * This creates (or updates) a leaf entry under the group:
+ * @code{.json}
+ * "Arithmetic": {
+ *     "enabled": true,
+ *     "test_add": true
+ * }
+ * @endcode
+ *
+ * The `result` string is typically `"pass"`, `"fail"`, or `"skipped"`.
+ * The boolean stored in JSON is:
+ * - `true`  for `"pass"`
+ * - `false` for `"fail"` or `"skipped"`
+ *
+ * @param file        The test file declaring the test (use `__FILE__`).
+ * @param group_name  The group under which the test belongs.
+ * @param test_name   The test function name.
+ * @param result      The textual result ("pass", "fail", "skipped").
+ */
+void test_config_mark_test(const char *file,
+                           const char *group_name,
+                           const char *test_name,
+                           const char *result); 
 
 #endif /* TEST_CONFIG_H */
