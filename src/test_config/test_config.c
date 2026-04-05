@@ -68,7 +68,7 @@ void test_value_clone(void *dst, const void *src)
 
     d->is_node  = s->is_node;
     d->enabled  = s->enabled;
-    d->content  = s->content;   // no dictionary_clone
+    d->content  = s->content;
 }
 
 void test_value_destroy(void *value)
@@ -816,7 +816,6 @@ static bool find_effective_enabled(dictionary_t *dict,
 }
 
 /* Returns true if any entry in dict is a node (i.e., a group). */
-/* Returns true if any entry in dict is a node (i.e., a group). */
 static bool dictionary_has_any_group(dictionary_t *dict)
 {
     size_t count = dictionary_size(dict);
@@ -1087,196 +1086,6 @@ void test_config_save(void)
 
     string_free(tmp);
     string_free(path);
-}
-
-void test_config_register_group(const char *file,
-                                const char *group_name)
-{
-    if (g_mode == TEST_CONFIG_LOCAL && !g_local_filename)
-        g_local_filename = string_new_with(file);
-
-    load_json_if_needed();
-
-    dictionary_t *file_dict = ensure_file_dict(file);
-
-    test_value_t  v;
-    dictionary_t *parent_dict = NULL;
-
-    if (find_node_recursive(file_dict, group_name, &v, &parent_dict)) {
-        return;
-    }
-
-    /* New group */
-    v.is_node = true;
-    v.enabled = true;
-    v.content = create_file_dict();
-
-    set_test(file_dict, group_name, &v);
-}
-
-void test_config_set_group_enabled(const char *group_name, bool enabled)
-{
-    load_json_if_needed();
-
-    /* In LOCAL mode we expect g_local_filename to be set by test_enabled().
-       If it is not, there is no file context to update, so just bail out. */
-    if (g_mode == TEST_CONFIG_LOCAL && !g_local_filename)
-        return;
-
-    const char *file =
-        (g_mode == TEST_CONFIG_LOCAL)
-            ? string_c_str(g_local_filename)
-            : string_c_str(g_local_filename); /* currently only meaningful in LOCAL */
-
-    dictionary_t *file_dict = ensure_file_dict(file);
-
-    test_value_t  v;
-    dictionary_t *parent_dict = NULL;
-
-    if (find_node_recursive(file_dict, group_name, &v, &parent_dict)) {
-
-        if (!v.is_node) {
-            v.is_node = true;
-            v.content = create_file_dict();
-        } else if (!v.content) {
-            v.content = create_file_dict();
-        } else {
-            dictionary_t *new_content = dictionary_clone(v.content);
-            v.content = new_content;
-        }
-
-        v.enabled = enabled;
-
-        if (!parent_dict)
-            parent_dict = file_dict;
-
-        set_test(parent_dict, group_name, &v);
-        return;
-    }
-
-    /* Otherwise create a new group node */
-    v.is_node = true;
-    v.enabled = enabled;
-    v.content = create_file_dict();
-
-    set_test(file_dict, group_name, &v);
-}
-
-void test_config_set_test_result(const char *group_name,
-                                 const char *test_name,
-                                 const char *result)
-{
-    (void)result; /* hook for later if you actually store the string */
-
-    load_json_if_needed();
-
-    dictionary_t *file_dict =
-        ensure_file_dict(string_c_str(g_local_filename));
-
-    /* ----- group node ----- */
-    test_value_t  gv;
-    dictionary_t *group_dict = NULL;
-
-    if (!find_node_recursive(file_dict, group_name, &gv, &group_dict)) {
-        gv.is_node = true;
-        gv.enabled = true;
-        gv.content = create_file_dict();
-        group_dict = file_dict;
-        set_test(group_dict, group_name, &gv);
-    } else {
-        if (!gv.is_node) {
-            gv.is_node = true;
-            gv.content = create_file_dict();
-        } else if (gv.content) {
-            dictionary_t *clone = dictionary_clone(gv.content);
-            gv.content = clone;
-        } else {
-            gv.content = create_file_dict();
-        }
-    }
-
-    /* ----- test node under group ----- */
-    test_value_t  tv;
-    dictionary_t *test_dict = NULL;
-
-    if (!find_node_recursive(gv.content, test_name, &tv, &test_dict)) {
-        tv.is_node = true;
-        tv.enabled = true;
-        tv.content = create_file_dict();
-        test_dict  = gv.content;
-        set_test(test_dict, test_name, &tv);
-    } else {
-        if (!tv.is_node) {
-            tv.is_node = true;
-            tv.content = create_file_dict();
-        } else if (tv.content) {
-            dictionary_t *clone = dictionary_clone(tv.content);
-            tv.content = clone;
-        } else {
-            tv.content = create_file_dict();
-        }
-    }
-
-    /* ----- simple “result” leaf for now ----- */
-    test_value_t rv;
-    rv.is_node = false;
-    rv.enabled = true;
-    rv.content = NULL;
-
-    set_test(tv.content, "result", &rv);
-
-    set_test(gv.content, test_name, &tv);
-
-    if (!group_dict)
-        group_dict = file_dict;
-
-    set_test(group_dict, group_name, &gv);
-}
-
-void test_config_mark_test(const char *file,
-                           const char *group_name,
-                           const char *test_name,
-                           const char *result)
-{
-    bool pass = (result && strcmp(result, "pass") == 0);
-
-    if (g_mode == TEST_CONFIG_LOCAL && !g_local_filename)
-        g_local_filename = string_new_with(file);
-
-    load_json_if_needed();
-
-    dictionary_t *file_dict = ensure_file_dict(file);
-
-    /* Ensure group exists */
-    test_value_t  gv;
-    dictionary_t *parent_dict = NULL;
-
-    if (!find_node_recursive(file_dict, group_name, &gv, &parent_dict)) {
-        gv.is_node = true;
-        gv.enabled = true;
-        gv.content = create_file_dict();
-        set_test(file_dict, group_name, &gv);
-        parent_dict = file_dict;
-    }
-
-    if (!gv.is_node || !gv.content) {
-        gv.is_node = true;
-        gv.enabled = true;
-        gv.content = create_file_dict();
-        if (!parent_dict)
-            parent_dict = file_dict;
-        set_test(parent_dict, group_name, &gv);
-    }
-
-    dictionary_t *group_dict = gv.content;
-
-    /* Set/overwrite the test leaf */
-    test_value_t tv;
-    tv.is_node = false;
-    tv.enabled = pass;
-    tv.content = NULL;
-
-    set_test(group_dict, test_name, &tv);
 }
 
 /* ========================================================================= */

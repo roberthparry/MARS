@@ -55,6 +55,7 @@ static void test_add() {
         printf("%s  FAIL: %s%s\n", C_RED, "1.2345678901234561234567891234567 + 9.8765432109876541234567891234567", C_RESET);
         printf("    got      = %s\n", buf);
         printf("    expected = %s\n", buf_exp);
+        TEST_FAIL();
     }
 }
 
@@ -84,6 +85,7 @@ static void test_mul() {
         printf("%s  FAIL: %s%s\n", C_RED, buf_name, C_RESET);
         printf("    got      = %s\n", r_buf);
         printf("    expected = %s\n", buf_exp);
+        TEST_FAIL();
     }
 }
 
@@ -108,6 +110,7 @@ static void test_div() {
         printf("%s  FAIL: %s%s\n", C_RED, "1.2412731971809253340758239961506 / 9.8765431209876543171934981073984", C_RESET);
         printf("    got      = %s\n", buf);
         printf("    expected = %s\n", buf_exp);
+        TEST_FAIL();
     }
 }
 
@@ -132,6 +135,7 @@ static void test_sqrt() {
         printf(C_RED "  FAIL: sqrt\n" C_RESET);
         print_q("       got", got);
         printf("  expected = %s\n", buf_exp);
+        TEST_FAIL();
     }
 }
 
@@ -154,6 +158,7 @@ static void test_exp_log() {
         printf(C_RED "  FAIL: exp/log\n" C_RESET);
         print_q("  log(exp(x))", got);
         printf("  expected    = %s\n", buf_exp);
+        TEST_FAIL();
     }
 }
 
@@ -222,6 +227,7 @@ static void test_qf_exp(void)
                    C_RED, exp_tests[i].name, C_RESET);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
+            TEST_FAIL();
         }
     }
 
@@ -239,6 +245,7 @@ static void test_qf_exp(void)
     } else {
         printf("%s  FAIL: exp(x)*exp(-x) != 1%s\n", C_RED, C_RESET);
         printf("    got = %s\n", buf);
+        TEST_FAIL();
     }
 }
 
@@ -290,6 +297,7 @@ static void test_qf_log(void)
                    C_RED, log_tests[i].name, C_RESET);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
+            TEST_FAIL();
         }
     }
 
@@ -304,6 +312,7 @@ static void test_qf_log(void)
     } else {
         printf("%s  FAIL: log(exp(x)) != x%s\n", C_RED, C_RESET);
         printf("    got = %s\n", buf);
+        TEST_FAIL();
     }
 
     /* Round-trip: exp(log(x)) ≈ x */
@@ -317,6 +326,7 @@ static void test_qf_log(void)
     } else {
         printf("%s  FAIL: exp(log(x)) != x%s\n", C_RED, C_RESET);
         printf("    got = %s\n", buf);
+        TEST_FAIL();
     }
 }
 
@@ -341,6 +351,7 @@ static void test_stability() {
         printf(C_RED "  FAIL: stable subtraction\n" C_RESET);
         print_q("  got", r);
         printf("  expected = %.32g\n", expected);
+        TEST_FAIL();
     }
 }
 
@@ -410,10 +421,12 @@ static void test_qf_to_string(void)
         printf("    expected  = %s\n", tests[i].expected);
         printf("    rel error = %.17g\n", err.hi);
 
-        if (ok)
+        if (ok) {
             printf("    \x1b[32mOK\x1b[0m\n");
-        else
+        } else {
             printf("    \x1b[31mFAIL\x1b[0m\n");
+            TEST_FAIL();
+        }
     }
 }
 
@@ -474,10 +487,12 @@ static void test_qf_from_string(void)
         printf("    expected  = hi=%.17g  lo=%.17g\n", tests[i].expected.hi, tests[i].expected.lo);
         printf("    rel error = %.17g\n", err.hi);
 
-        if (ok)
+        if (ok) {
             printf("    \x1b[32mOK\x1b[0m\n");
-        else
+        } else {
             printf("    \x1b[31mFAIL\x1b[0m\n");
+            TEST_FAIL();
+        }
     }
 }
 
@@ -498,6 +513,7 @@ static void test_from_string_basic() {
         printf(C_RED "  FAIL: parse basic  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
         printf("    input    = %s\n", s);
         printf("    got      = %s\n", buf);
+        TEST_FAIL();
     }
 }
 
@@ -518,6 +534,7 @@ static void test_from_string_scientific() {
         printf(C_RED "  FAIL: parse scientific  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
         printf("    input    = %s\n", s);
         printf("    got      = %s\n", buf);
+        TEST_FAIL();
     }
 }
 
@@ -560,6 +577,7 @@ static void test_round_trip(void)
             printf(C_RED "  FAIL: round-trip  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
             printf("    input    = %s\n", cases[i].input);
             printf("    got      = %s\n", trimmed);
+            TEST_FAIL();
         }
     }
 }
@@ -592,6 +610,7 @@ static void test_qd_sprintf_basic(void)
         printf(C_RED "  FAIL: basic %%Q  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
         printf("  got      = %s\n", buf);
         printf("  expected = %s\n", expected);
+        TEST_FAIL();
     }
 }
 
@@ -626,6 +645,7 @@ static void test_qd_sprintf_multiple(void)
         printf(C_RED "  FAIL: multiple %%Q  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
         printf("  got      = %s\n", buf);
         printf("  expected = %s\n", expected);
+        TEST_FAIL();
     }
 }
 
@@ -649,6 +669,7 @@ static void test_qd_sprintf_mixed(void)
         printf(C_RED "  FAIL: mixed specifiers  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
         printf("  got      = %s\n", buf);
         printf("  expected = %s\n", expected);
+        TEST_FAIL();
     }
 }
 
@@ -666,6 +687,7 @@ static void test_qd_sprintf_buffer_limit(void)
         printf("  buf = \"%s\"\n", buf);
     } else {
         printf(C_RED "  FAIL: buffer limit (missing terminator)  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
+        TEST_FAIL();
     }
 }
 
@@ -703,6 +725,7 @@ static void test_qd_sprintf_edge_cases(void)
             printf(C_GREEN "    OK\n" C_RESET);
         } else {
             printf(C_RED "    FAIL  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
+            TEST_FAIL();
         }
     }
 }
@@ -726,6 +749,7 @@ static void test_qd_sprintf_q_precision(void)
         printf(C_RED "  FAIL: precision %%.10q  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
         printf("    got      = %s\n", buf);
         printf("    expected = %s\n", expected);
+        TEST_FAIL();
     }
 }
 
@@ -746,6 +770,7 @@ static void test_qd_sprintf_q_zero_precision(void)
         printf(C_RED "  FAIL: %%.0q  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
         printf("  got      = %s\n", buf);
         printf("  expected = %s\n", expected);
+        TEST_FAIL();
     }
 }
 
@@ -758,22 +783,28 @@ static void test_qd_sprintf_q_flags(void)
     char buf[256];
 
     qf_sprintf(buf, sizeof(buf), "%+q", x);
-    if (strcmp(buf, "+3") == 0)
+    if (strcmp(buf, "+3") == 0) {
         printf(C_GREEN "  OK: + flag\n" C_RESET);
-    else
+    } else {
         printf(C_RED "  FAIL: + flag (got %s)  [%s:%d]\n" C_RESET, buf, __FILE__, __LINE__);
+        TEST_FAIL();
+    }
 
     qf_sprintf(buf, sizeof(buf), "% q", x);
-    if (strcmp(buf, " 3") == 0)
+    if (strcmp(buf, " 3") == 0) {
         printf(C_GREEN "  OK: space flag\n" C_RESET);
-    else
+    } else {
         printf(C_RED "  FAIL: space flag (got %s)  [%s:%d]\n" C_RESET, buf, __FILE__, __LINE__);
+        TEST_FAIL();
+    }
 
     qf_sprintf(buf, sizeof(buf), "%#q", x);
-    if (strcmp(buf, "3.") == 0)
+    if (strcmp(buf, "3.") == 0) {
         printf(C_GREEN "  OK: # flag\n" C_RESET);
-    else
+    } else {
         printf(C_RED "  FAIL: # flag (got %s)  [%s:%d]\n" C_RESET, buf, __FILE__, __LINE__);
+        TEST_FAIL();
+    }
 }
 
 static void test_qd_sprintf_q_width(void)
@@ -785,22 +816,28 @@ static void test_qd_sprintf_q_width(void)
     char buf[256];
 
     qf_sprintf(buf, sizeof(buf), "%10.5q", x);
-    if (strcmp(buf, "   3.14159") == 0)
+    if (strcmp(buf, "   3.14159") == 0) {
         printf(C_GREEN "  OK: width right-align\n" C_RESET);
-    else
+    } else {
         printf(C_RED "  FAIL: width right-align (got '%s')  [%s:%d]\n" C_RESET, buf, __FILE__, __LINE__);
+        TEST_FAIL();
+    }
 
     qf_sprintf(buf, sizeof(buf), "%-10.5q", x);
-    if (strcmp(buf, "3.14159   ") == 0)
+    if (strcmp(buf, "3.14159   ") == 0) {
         printf(C_GREEN "  OK: width left-align\n" C_RESET);
-    else
+    } else {
         printf(C_RED "  FAIL: width left-align (got '%s')  [%s:%d]\n" C_RESET, buf, __FILE__, __LINE__);
+        TEST_FAIL();
+    }
 
     qf_sprintf(buf, sizeof(buf), "%010.5q", x);
-    if (strcmp(buf, "0003.14159") == 0)
+    if (strcmp(buf, "0003.14159") == 0) {
         printf(C_GREEN "  OK: zero padding\n" C_RESET);
-    else
+    } else {
         printf(C_RED "  FAIL: zero padding (got '%s')  [%s:%d]\n" C_RESET, buf, __FILE__, __LINE__);
+        TEST_FAIL();
+    }
 }
 
 static void test_qd_sprintf_q_fallback(void)
@@ -816,6 +853,7 @@ static void test_qd_sprintf_q_fallback(void)
         printf(C_GREEN "  OK: fallback to scientific\n" C_RESET);
     } else {
         printf(C_RED "  FAIL: fallback to scientific (got %s)  [%s:%d]\n" C_RESET, buf, __FILE__, __LINE__);
+        TEST_FAIL();
     }
 }
 
@@ -835,6 +873,7 @@ static void test_qd_sprintf_q_fallback_width(void)
         printf(C_GREEN "  OK: fallback width preserved\n" C_RESET);
     } else {
         printf(C_RED "  FAIL: fallback width preserved (got '%s')  [%s:%d]\n" C_RESET, buf, __FILE__, __LINE__);
+        TEST_FAIL();
     }
 }
 
@@ -913,6 +952,7 @@ static void test_qf_sprintf_q_concise(void)
             printf(C_GREEN "    OK\n" C_RESET);
         } else {
             printf(C_RED "    FAIL  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
+            TEST_FAIL();
         }
 
         printf("\n");
@@ -947,6 +987,7 @@ static void test_qf_sprintf_null_safe_new(void)
         printf("written = %d, needed = %d\n", written, needed);
         printf("     got = %s\n", buf);
         printf("expected = %s\n", expected);
+        TEST_FAIL();
     }
 
     free(buf);
@@ -980,6 +1021,7 @@ static void test_qf_sprintf_two_pass_new(void)
         printf("written = %d, needed = %d\n", written, needed);
         printf("     got = %s\n", buf);
         printf("expected = %s\n", expected);
+        TEST_FAIL();
     }
 
     free(buf);
@@ -995,6 +1037,7 @@ static void test_qf_printf_stdout(void)
     int saved_stdout = dup(fileno(stdout));
     if (saved_stdout < 0) {
         printf(C_RED "  FAIL: could not save stdout\n" C_RESET);
+        TEST_FAIL();
         return;
     }
 
@@ -1002,6 +1045,7 @@ static void test_qf_printf_stdout(void)
     fflush(stdout);
     if (!freopen("test_output.txt", "w", stdout)) {
         printf(C_RED "  FAIL: could not redirect stdout\n" C_RESET);
+        TEST_FAIL();
         return;
     }
 
@@ -1016,6 +1060,7 @@ static void test_qf_printf_stdout(void)
     FILE *in = fopen("test_output.txt", "r");
     if (!in) {
         printf(C_RED "  FAIL: could not open test_output.txt  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
+        TEST_FAIL();
         return;
     }
 
@@ -1036,6 +1081,7 @@ static void test_qf_printf_stdout(void)
         printf("    expected = %s", expected);
         printf("    got      = %s", buf);
         printf("    n        = %d\n", n);
+        TEST_FAIL();
     }
 }
 
@@ -1101,6 +1147,7 @@ static void test_qf_pow_int()
             printf("%s  FAIL: %s^%d%s  [%s:%d]\n", C_RED, cases[i].x, cases[i].n, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", cases[i].expected);
+            TEST_FAIL();
         }
     }
 }
@@ -1123,6 +1170,7 @@ static void test_qf_pow()
             printf("%s  FAIL: 2^3%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = 8\n");
+            TEST_FAIL();
         }
     }
 
@@ -1138,6 +1186,7 @@ static void test_qf_pow()
             printf("%s  FAIL: 9^0.5%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = 3\n");
+            TEST_FAIL();
         }
     }
 
@@ -1153,6 +1202,7 @@ static void test_qf_pow()
             printf("%s  FAIL: 0^5%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = 0\n");
+            TEST_FAIL();
         }
     }
 
@@ -1167,6 +1217,7 @@ static void test_qf_pow()
             printf("%s  FAIL: 0^-1%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = NaN\n");
+            TEST_FAIL();
         }
     }
 
@@ -1182,6 +1233,7 @@ static void test_qf_pow()
             printf("%s  FAIL: (-2)^3%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = -8\n");
+            TEST_FAIL();
         }
     }
 
@@ -1196,6 +1248,7 @@ static void test_qf_pow()
             printf("%s  FAIL: (-2)^0.5%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = NaN\n");
+            TEST_FAIL();
         }
     }
 }
@@ -1230,6 +1283,7 @@ static void test_qf_pow10(void)
             printf("%s  FAIL: 10^%d%s  [%s:%d]\n", C_RED, cases[i].n, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", cases[i].expected);
+            TEST_FAIL();
         }
     }
 }
@@ -1262,6 +1316,7 @@ static void test_qf_trig()
             printf("%s  FAIL: sin(0)%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = 0\n");
+            TEST_FAIL();
         }
 
         qf_to_string(c, buf, sizeof(buf));
@@ -1273,6 +1328,7 @@ static void test_qf_trig()
             printf("%s  FAIL: cos(0)%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = 1\n");
+            TEST_FAIL();
         }
 
         qf_to_string(t, buf, sizeof(buf));
@@ -1284,6 +1340,7 @@ static void test_qf_trig()
             printf("%s  FAIL: tan(0)%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = 0\n");
+            TEST_FAIL();
         }
     }
 
@@ -1306,6 +1363,7 @@ static void test_qf_trig()
             printf("%s  FAIL: sin(pi/2)%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = 1\n");
+            TEST_FAIL();
         }
 
         qf_to_string(c, buf, sizeof(buf));
@@ -1317,6 +1375,7 @@ static void test_qf_trig()
             printf("%s  FAIL: cos(pi/2)%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = 0\n");
+            TEST_FAIL();
         }
     }
 
@@ -1339,6 +1398,7 @@ static void test_qf_trig()
             printf("%s  FAIL: sin(pi)%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = 0\n");
+            TEST_FAIL();
         }
 
         qf_to_string(c, buf, sizeof(buf));
@@ -1350,6 +1410,7 @@ static void test_qf_trig()
             printf("%s  FAIL: cos(pi)%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = -1\n");
+            TEST_FAIL();
         }
     }
 
@@ -1369,6 +1430,7 @@ static void test_qf_trig()
             printf("%s  FAIL: tan(pi/4)%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = 1\n");
+            TEST_FAIL();
         }
     }
 
@@ -1386,6 +1448,7 @@ static void test_qf_trig()
             printf("%s  FAIL: tan(pi/2)%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = NaN\n");
+            TEST_FAIL();
         }
     }
 
@@ -1411,6 +1474,7 @@ static void test_qf_trig()
             printf("%s  FAIL: sin(1)%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
+            TEST_FAIL();
         }
 
         qf_to_string(c, buf, sizeof(buf));
@@ -1423,6 +1487,7 @@ static void test_qf_trig()
             printf("%s  FAIL: cos(1)%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
+            TEST_FAIL();
         }
 
         qf_to_string(t, buf, sizeof(buf));
@@ -1435,6 +1500,7 @@ static void test_qf_trig()
             printf("%s  FAIL: tan(1)%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
+            TEST_FAIL();
         }
     }
 }
@@ -1488,6 +1554,7 @@ static void test_qf_atan(void)
             printf("%s  FAIL: %s%s  [%s:%d]\n", C_RED, atan_tests[i].name, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
+            TEST_FAIL();
         }
     }
 }
@@ -1539,6 +1606,7 @@ static void test_qf_asin(void)
             printf("%s  FAIL: %s%s  [%s:%d]\n", C_RED, asin_tests[i].name, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
+            TEST_FAIL();
         }
     }
 
@@ -1550,6 +1618,7 @@ static void test_qf_asin(void)
         qf_to_string(r, buf, sizeof(buf));
         printf("%s  FAIL: asin(2) should be NaN%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
         printf("    got = %s\n", buf);
+        TEST_FAIL();
     }
 }
 
@@ -1600,6 +1669,7 @@ static void test_qf_acos(void)
             printf("%s  FAIL: %s%s  [%s:%d]\n", C_RED, acos_tests[i].name, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
+            TEST_FAIL();
         }
     }
 
@@ -1611,6 +1681,7 @@ static void test_qf_acos(void)
         qf_to_string(r, buf, sizeof(buf));
         printf("%s  FAIL: acos(2) should be NaN%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
         printf("    got = %s\n", buf);
+        TEST_FAIL();
     }
 }
 
@@ -1664,6 +1735,7 @@ static void test_qf_atan2(void)
             printf("%s  FAIL: %s%s  [%s:%d]\n", C_RED, atan2_tests[i].name, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
+            TEST_FAIL();
         }
     }
 }
@@ -1709,6 +1781,7 @@ static void test_qf_sinh(void)
             printf("%s  FAIL: %s%s  [%s:%d]\n", C_RED, sinh_tests[i].name, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
+            TEST_FAIL();
         }
     }
 }
@@ -1753,6 +1826,7 @@ static void test_qf_cosh(void)
             printf("%s  FAIL: %s%s  [%s:%d]\n", C_RED, cosh_tests[i].name, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
+            TEST_FAIL();
         }
     }
 }
@@ -1803,6 +1877,7 @@ static void test_qf_tanh(void)
             printf("%s  FAIL: %s%s  [%s:%d]\n", C_RED, tanh_tests[i].name, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
+            TEST_FAIL();
         }
     }
 }
@@ -1847,6 +1922,7 @@ static void test_qf_asinh(void)
             printf("%s  FAIL: %s%s  [%s:%d]\n", C_RED, asinh_tests[i].name, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
+            TEST_FAIL();
         }
     }
 }
@@ -1889,6 +1965,7 @@ static void test_qf_acosh(void)
             printf("%s  FAIL: %s%s  [%s:%d]\n", C_RED, acosh_tests[i].name, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
+            TEST_FAIL();
         }
     }
 
@@ -1900,6 +1977,7 @@ static void test_qf_acosh(void)
         qf_to_string(r, buf, sizeof(buf));
         printf("%s  FAIL: acosh(0.5) should be NaN%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
         printf("    got = %s\n", buf);
+        TEST_FAIL();
     }
 }
 
@@ -1943,6 +2021,7 @@ static void test_qf_atanh(void)
             printf("%s  FAIL: %s%s  [%s:%d]\n", C_RED, atanh_tests[i].name, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
+            TEST_FAIL();
         }
     }
 
@@ -1954,6 +2033,7 @@ static void test_qf_atanh(void)
         qf_to_string(r, buf, sizeof(buf));
         printf("%s  FAIL: atanh(1) should be NaN%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
         printf("    got = %s\n", buf);
+        TEST_FAIL();
     }
 }
 
@@ -2009,6 +2089,7 @@ static void test_qf_hypot(void)
             printf("%s  FAIL: %s%s  [%s:%d]\n", C_RED, precise[i].label, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_ref);
+            TEST_FAIL();
         }
     }
 
@@ -2024,6 +2105,7 @@ static void test_qf_hypot(void)
             printf("%s  OK: symmetry%s\n", C_GREEN, C_RESET);
         } else {
             printf("%s  FAIL: symmetry%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
+            TEST_FAIL();
         }
     }
 
@@ -2064,6 +2146,7 @@ static void test_qf_hypot(void)
             printf("    got      = %s\n", buf);
             printf("    double   = %.17g\n", href);
             printf("    err      = %.3e\n", err);
+            TEST_FAIL();
         }
     }
 
@@ -2138,6 +2221,7 @@ static void test_qf_gamma(void)
             printf("%s  FAIL: gamma(%s)%s  [%s:%d]\n", C_RED, tests[i].xs, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
+            TEST_FAIL();
         }
     }
 
@@ -2155,6 +2239,7 @@ static void test_qf_gamma(void)
             qf_to_string(g, buf, sizeof(buf));
             printf("%s  FAIL: gamma(%s) should be NaN%s  [%s:%d]\n", C_RED, poles[i], C_RESET, __FILE__, __LINE__);
             printf("    got = %s\n", buf);
+            TEST_FAIL();
         }
     }
 
@@ -2173,6 +2258,7 @@ static void test_qf_gamma(void)
             qf_to_string(g, buf, sizeof(buf));
             printf("%s  FAIL: gamma(%s) should be NaN%s  [%s:%d]\n", C_RED, extreme[i], C_RESET, __FILE__, __LINE__);
             printf("    got = %s\n", buf);
+            TEST_FAIL();
         }
     }
 
@@ -2246,6 +2332,7 @@ static void test_qf_erf(void)
             printf("%s  FAIL: erf(%s)%s  [%s:%d]\n", C_RED, tests[i].xs, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
+            TEST_FAIL();
         }
     }
 
@@ -2317,6 +2404,7 @@ static void test_qf_erfc(void)
             printf("%s  FAIL: erfc(%s)%s  [%s:%d]\n", C_RED, tests[i].xs, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
+            TEST_FAIL();
         }
     }
 
@@ -2377,6 +2465,7 @@ static void test_qf_erfinv(void) {
             } else {
                 printf("%s  FAIL: erfinv(%s)%s  [%s:%d]\n", C_RED, tests[i].xs, C_RESET, __FILE__, __LINE__);
                 printf("    expected = NAN\n");
+                TEST_FAIL();
             }
             continue;
         }
@@ -2394,6 +2483,7 @@ static void test_qf_erfinv(void) {
                 printf("%s  FAIL: erfinv(%s)%s  [%s:%d]\n", C_RED, tests[i].xs, C_RESET, __FILE__, __LINE__);
                 printf("    got      = %s\n", buf);
                 printf("    expected = %s\n", buf_exp);
+                TEST_FAIL();
             }
         }
     }
@@ -2457,6 +2547,7 @@ static void test_qf_erfcinv(void) {
             } else {
                 printf("%s  FAIL: erfcinv(%s)%s  [%s:%d]\n", C_RED, tests[i].xs, C_RESET, __FILE__, __LINE__);
                 printf("    expected = +INF\n");
+                TEST_FAIL();
             }
             continue;
         }
@@ -2467,6 +2558,7 @@ static void test_qf_erfcinv(void) {
             } else {
                 printf("%s  FAIL: erfcinv(%s)%s  [%s:%d]\n", C_RED, tests[i].xs, C_RESET, __FILE__, __LINE__);
                 printf("    expected = -INF\n");
+                TEST_FAIL();
             }
             continue;
         }
@@ -2485,6 +2577,7 @@ static void test_qf_erfcinv(void) {
             printf("%s  FAIL: erfcinv(%s)%s  [%s:%d]\n", C_RED, tests[i].xs, C_RESET, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
+            TEST_FAIL();
         }
     }
 
@@ -2548,6 +2641,7 @@ static void test_qf_lgamma(void) {
                 printf("    expected = NAN\n");
                 qf_to_string(got, buf, sizeof(buf));
                 printf("    got      = %s\n", buf);
+                TEST_FAIL();
             }
             continue;
         }
@@ -2561,6 +2655,7 @@ static void test_qf_lgamma(void) {
             printf(C_GREEN "  OK: lgamma(%s)\n" C_RESET, tests[i].xs);
         } else {
             printf(C_RED "  FAIL: lgamma(%s)  [%s:%d]\n" C_RESET, tests[i].xs, __FILE__, __LINE__);
+            TEST_FAIL();
         }
 
         printf("    got      = %s\n", buf);
@@ -2626,6 +2721,7 @@ static void test_qf_digamma(void) {
                 printf("    expected = NAN\n");
                 qf_to_string(got, buf, sizeof(buf));
                 printf("    got      = %s\n", buf);
+                TEST_FAIL();
             }
             continue;
         }
@@ -2639,6 +2735,7 @@ static void test_qf_digamma(void) {
             printf(C_GREEN "  OK: digamma(%s)\n" C_RESET, tests[i].xs);
         } else {
             printf(C_RED "  FAIL: digamma(%s)  [%s:%d]\n" C_RESET, tests[i].xs, __FILE__, __LINE__);
+            TEST_FAIL();
         }
 
         printf("    got      = %s\n", buf);
@@ -2688,6 +2785,7 @@ static void test_qf_gammainv(void) {
             printf(C_GREEN "  OK: gammainv(gamma(%s))\n" C_RESET, tests[i].xs);
         } else {
             printf(C_RED "  FAIL: gammainv(%s)  [%s:%d]\n" C_RESET, tests[i].xs, __FILE__, __LINE__);
+            TEST_FAIL();
         }
 
         printf("    got      = %s\n", buf);
@@ -2744,6 +2842,7 @@ static void test_qf_lambert_w0(void) {
             printf(C_RED "  FAIL: W0(%s)  [%s:%d]\n" C_RESET, tests[i].xs, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
+            TEST_FAIL();
         }
     }
 
@@ -2791,6 +2890,7 @@ static void test_qf_lambert_wm1(void) {
             printf(C_RED "  FAIL: Wm1(%s)  [%s:%d]\n" C_RESET, tests[i].xs, __FILE__, __LINE__);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
+            TEST_FAIL();
         }
     }
 
@@ -2839,6 +2939,7 @@ static void test_qf_beta_definition(void)
                 printf(C_RED "  FAIL: B(%g,%g)\n" C_RESET, as[i], bs[j]);
                 print_qf("B(a,b)", B);
                 print_qf("Γ(a)Γ(b)/Γ(a+b)", rhs);
+                TEST_FAIL();
             }
         }
     }
@@ -2874,6 +2975,7 @@ static void test_qf_beta_symmetry(void)
                 printf(C_RED "  FAIL: B(%g,%g) = B(%g,%g) [%s:%d]\n" C_RESET, as[i], bs[j], bs[j], as[i], __FILE__, __LINE__);
                 print_qf("B(a,b)", Bab);
                 print_qf("B(b,a)", Bba);
+                TEST_FAIL();
             }
         }
     }
@@ -2912,6 +3014,7 @@ static void test_qf_beta_special_cases(void)
             print_qf("expected", B1b_expected);
             print_qf("B(a,1)", Ba1);
             print_qf("expected", Ba1_expected);
+            TEST_FAIL();
         }
     }
 
@@ -2962,6 +3065,7 @@ static void test_qf_logbeta_definition(void)
                 printf(C_RED "  FAIL: logB(%g,%g)  [%s:%d]\n" C_RESET, as[i], bs[j], __FILE__, __LINE__);
                 print_qf("logB", logB);
                 print_qf("rhs", rhs);
+                TEST_FAIL();
             }
         }
     }
@@ -2999,6 +3103,7 @@ static void test_qf_logbeta_consistency(void)
                 printf(C_RED "  FAIL: logB(%g,%g) mismatch  [%s:%d]\n" C_RESET, as[i], bs[j], __FILE__, __LINE__);
                 print_qf("logB", logB);
                 print_qf("log(beta)", logB_expected);
+                TEST_FAIL();
             }
         }
     }
@@ -3034,6 +3139,7 @@ static void test_qf_logbeta_symmetry(void)
                 printf(C_RED "  FAIL: logB(%g,%g) = logB(%g,%g)  [%s:%d]\n" C_RESET, as[i], bs[j], bs[j], as[i], __FILE__, __LINE__);
                 print_qf("logB(a,b)", lab);
                 print_qf("logB(b,a)", lba);
+                TEST_FAIL();
             }
         }
     }
@@ -3074,6 +3180,7 @@ static void test_qf_logbeta_special_cases(void)
             print_qf("expected", logB1v_expected);
             print_qf("logB(v,1)", logBv1);
             print_qf("expected", logBv1_expected);
+            TEST_FAIL();
         }
     }
 
@@ -3124,6 +3231,7 @@ static void test_qf_binomial_definition(void)
                 printf(C_RED "  FAIL: C(%g,%g)  [%s:%d]\n" C_RESET, as[i], bs[j], __FILE__, __LINE__);
                 print_qf("C(a,b)", C);
                 print_qf("Γ(a+1)/(Γ(b+1)Γ(a-b+1))", rhs);
+                TEST_FAIL();
             }
         }
     }
@@ -3161,6 +3269,7 @@ static void test_qf_binomial_symmetry(void)
                 printf(C_RED "  FAIL: C(%d,%d) = C(%d,%d)  [%s:%d]\n" C_RESET, n, k, n, n-k, __FILE__, __LINE__);
                 print_qf("C(n,k)", C1);
                 print_qf("C(n,n-k)", C2);
+                TEST_FAIL();
             }
         }
     }
@@ -3193,6 +3302,7 @@ static void test_qf_binomial_special_cases(void)
             printf(C_RED "  FAIL: C(%d,0) or C(%d,1)  [%s:%d]\n" C_RESET, n, n, __FILE__, __LINE__);
             print_qf("C(n,0)", Cn0);
             print_qf("C(n,1)", Cn1);
+            TEST_FAIL();
         }
     }
 
@@ -3247,6 +3357,7 @@ static void test_qf_beta_pdf_definition(void)
                     printf(C_RED "  FAIL: f(%g; %g,%g)  [%s:%d]\n" C_RESET, xs[i], as[j], bs[k], __FILE__, __LINE__);
                     print_qf("pdf", pdf);
                     print_qf("rhs", rhs);
+                    TEST_FAIL();
                 }
             }
         }
@@ -3295,6 +3406,7 @@ static void test_qf_beta_pdf_logform(void)
                     printf(C_RED "  FAIL: log f(%g; %g,%g)  [%s:%d]\n" C_RESET, xs[i], as[j], bs[k], __FILE__, __LINE__);
                     print_qf("logpdf", logpdf);
                     print_qf("rhs", rhs);
+                    TEST_FAIL();
                 }
             }
         }
@@ -3335,6 +3447,7 @@ static void test_qf_beta_pdf_symmetry(void)
                     printf(C_RED "  FAIL: symmetry (%g; %g,%g)  [%s:%d]\n" C_RESET, xs[i], as[j], bs[k], __FILE__, __LINE__);
                     print_qf("f(x;a,b)", f1);
                     print_qf("f(1-x;b,a)", f2);
+                    TEST_FAIL();
                 }
             }
         }
@@ -3393,6 +3506,7 @@ static void test_qf_logbeta_pdf_definition(void)
                     printf(C_RED "  FAIL: log f(%g; %g,%g)  [%s:%d]\n" C_RESET, xs[i], as[j], bs[k], __FILE__, __LINE__);
                     print_qf("logpdf", logpdf);
                     print_qf("rhs", rhs);
+                    TEST_FAIL();
                 }
             }
         }
@@ -3433,6 +3547,7 @@ static void test_qf_logbeta_pdf_consistency(void)
                     printf(C_RED "  FAIL: log f mismatch  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
                     print_qf("logpdf", logpdf);
                     print_qf("log(pdf)", rhs);
+                    TEST_FAIL();
                 }
             }
         }
@@ -3473,6 +3588,7 @@ static void test_qf_logbeta_pdf_symmetry(void)
                     printf(C_RED "  FAIL: symmetry (%g; %g,%g)  [%s:%d]\n" C_RESET, xs[i], as[j], bs[k], __FILE__, __LINE__);
                     print_qf("log f(x;a,b)", f1);
                     print_qf("log f(1-x;b,a)", f2);
+                    TEST_FAIL();
                 }
             }
         }
@@ -3522,6 +3638,7 @@ static void test_qf_normal_pdf_definition(void)
             printf(C_RED "  FAIL: φ(%g)  [%s:%d]\n" C_RESET, xs[i], __FILE__, __LINE__);
             print_qf("pdf", pdf);
             print_qf("rhs", rhs);
+            TEST_FAIL();
         }
     }
 
@@ -3553,6 +3670,7 @@ static void test_qf_normal_pdf_symmetry(void)
             printf(C_RED "  FAIL: φ(%g) = φ(%g)  [%s:%d]\n" C_RESET, xs[i], -xs[i], __FILE__, __LINE__);
             print_qf("φ(x)", fx);
             print_qf("φ(-x)", fnx);
+            TEST_FAIL();
         }
     }
 
@@ -3577,6 +3695,7 @@ static void test_qf_normal_pdf_at_zero(void)
         printf(C_RED "  FAIL: φ(0)  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
         print_qf("φ(0)", pdf0);
         print_qf("expected", expected);
+        TEST_FAIL();
     }
 
     printf("\n");
@@ -3613,6 +3732,7 @@ static void test_qf_normal_pdf_logform(void)
             printf(C_RED "  FAIL: log φ(%g)  [%s:%d]\n" C_RESET, xs[i], __FILE__, __LINE__);
             print_qf("logpdf", logpdf);
             print_qf("rhs", rhs);
+            TEST_FAIL();
         }
     }
 
@@ -3660,6 +3780,7 @@ static void test_qf_normal_cdf_definition(void)
             printf(C_RED "  FAIL: Φ(%g)  [%s:%d]\n" C_RESET, xs[i], __FILE__, __LINE__);
             print_qf("cdf", cdf);
             print_qf("rhs", rhs);
+            TEST_FAIL();
         }
     }
 
@@ -3695,6 +3816,7 @@ static void test_qf_normal_cdf_symmetry(void)
             printf(C_RED "  FAIL: Φ(%g) + Φ(%g) = 1  [%s:%d]\n" C_RESET, xs[i], -xs[i], __FILE__, __LINE__);
             print_qf("Φ(-x)", Fnx);
             print_qf("1 - Φ(x)", rhs);
+            TEST_FAIL();
         }
     }
 
@@ -3720,6 +3842,7 @@ static void test_qf_normal_cdf_known_values(void)
         printf(C_RED "  FAIL: Φ(0)\n" C_RESET);
         print_qf("Φ(0)", F0);
         print_qf("expected", expected);
+        TEST_FAIL();
     }
 
     printf("\n");
@@ -3790,6 +3913,7 @@ static void test_qf_normal_cdf_pdf_consistency(void)
             printf(C_RED "  FAIL: Φ'(%g) = φ(%g)  [%s:%d]\n" C_RESET, xs[i], xs[i], __FILE__, __LINE__);
             print_qf("dΦ/dx", dF);
             print_qf(" φ(x)", pdf);
+            TEST_FAIL();
         }
     }
 
@@ -3837,6 +3961,7 @@ static void test_qf_normal_logpdf_definition(void)
             printf(C_RED "  FAIL: log φ(%g)  [%s:%d]\n" C_RESET, xs[i], __FILE__, __LINE__);
             print_qf("logpdf", logpdf);
             print_qf("rhs", rhs);
+            TEST_FAIL();
         }
     }
 
@@ -3869,6 +3994,7 @@ static void test_qf_normal_logpdf_consistency(void)
             printf(C_RED "  FAIL: log φ(%g)  [%s:%d]\n" C_RESET, xs[i], __FILE__, __LINE__);
             print_qf("logpdf", logpdf);
             print_qf("log(pdf)", rhs);
+            TEST_FAIL();
         }
     }
 
@@ -3900,6 +4026,7 @@ static void test_qf_normal_logpdf_symmetry(void)
             printf(C_RED "  FAIL: log φ(%g) = log φ(%g)  [%s:%d]\n" C_RESET, xs[i], -xs[i], __FILE__, __LINE__);
             print_qf("log φ(x)", fx);
             print_qf("log φ(-x)", fnx);
+            TEST_FAIL();
         }
     }
 
@@ -3925,6 +4052,7 @@ static void test_qf_normal_logpdf_at_zero(void)
         printf(C_RED "  FAIL: log φ(0)  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
         print_qf("log φ(0)", logpdf0);
         print_qf("expected", expected);
+        TEST_FAIL();
     }
 
     printf("\n");
@@ -3966,6 +4094,7 @@ static void test_qf_productlog_definition(void)
             print_qf("W(x)", w);
             print_qf("W*exp(W)", lhs);
             print_qf("x", x);
+            TEST_FAIL();
         }
     }
 
@@ -3996,6 +4125,7 @@ static void test_qf_productlog_consistency(void)
             printf(C_RED "  FAIL: ProductLog(%g)  [%s:%d]\n" C_RESET, xs[i], __FILE__, __LINE__);
             print_qf("ProductLog", p);
             print_qf("LambertW", w);
+            TEST_FAIL();
         }
     }
 
@@ -4033,6 +4163,7 @@ static void test_qf_productlog_special(void)
         print_qf("W(0)", w0);
         print_qf("W(-1/e)", w);
         print_qf("W(e)", we);
+        TEST_FAIL();
     }
 
     printf("\n");
@@ -4058,6 +4189,7 @@ static void test_qf_productlog_monotonicity(void)
             printf(C_RED "  FAIL: W(%g) < W(%g)  [%s:%d]\n" C_RESET, xs[i], xs[i-1], __FILE__, __LINE__);
             print_qf("W(prev)", prev);
             print_qf("W(curr)", w);
+            TEST_FAIL();
             return;
         }
 
@@ -4110,6 +4242,7 @@ static void test_qf_gammainc_PQ_identity(void)
                 print_qf("Q", Q);
                 print_qf("sum", sum);
                 print_qf("expected", qf_from_double(1.0));
+                TEST_FAIL();
             }
         }
     }
@@ -4150,6 +4283,7 @@ static void test_qf_gammainc_lower_upper_identity(void)
                 print_qf("upper Γ", gu);
                 print_qf("sum", sum);
                 print_qf("expected Γ(s)", gs);
+                TEST_FAIL();
             }
         }
     }
@@ -4193,6 +4327,7 @@ static void test_qf_gammainc_special_s1(void)
             print_qf("expected", expected_lower);
             print_qf("Γ(1,x)", gu);
             print_qf("expected", expected_upper);
+            TEST_FAIL();
         }
     }
 
@@ -4282,6 +4417,7 @@ static void test_qf_ei_deriv(void)
             print_qf("residual", res);
             print_qf("dEi",      dEi);
             print_qf("rhs",      rhs);
+            TEST_FAIL();
         }
     }
 
@@ -4316,6 +4452,7 @@ static void test_qf_e1_deriv(void)
             print_qf("residual", res);
             print_qf("dE1",      dE1);
             print_qf("rhs",      rhs);
+            TEST_FAIL();
         }
     }
 
@@ -4348,6 +4485,7 @@ static void test_qf_ei_e1_identity(void)
             print_qf("E1(x)", e1);
             print_qf("Ei(-x)", ei);
             print_qf("sum",   sum);
+            TEST_FAIL();
         }
     }
 
@@ -4408,6 +4546,7 @@ static void test_ei_values(void)
             printf("  \x1b[32mOK\x1b[0m: Ei(%s)\n", cases[i].x_str);
         } else {
             printf("  \x1b[31mFAIL\x1b[0m: Ei(%s)  [%s:%d]\n", cases[i].x_str, __FILE__, __LINE__);
+            TEST_FAIL();
         }
 
         /* full-precision printing using qf_sprintf */
@@ -4433,6 +4572,90 @@ static void test_qf_ei_e1_all(void)
     RUN_TEST(test_ei_values, __func__);
 }
 
+static void test_arithmetic(void) {
+    RUN_TEST(test_add, __func__);
+    RUN_TEST(test_mul, __func__);
+    RUN_TEST(test_div, __func__);
+    RUN_TEST(test_sqrt, __func__);
+    RUN_TEST(test_exp_log, __func__);
+    RUN_TEST(test_qf_exp, __func__);
+    RUN_TEST(test_qf_log, __func__);
+    RUN_TEST(test_stability, __func__);
+}
+
+void test_strings(void) {
+    RUN_TEST(test_qf_to_string, __func__);
+    RUN_TEST(test_qf_from_string, __func__);
+    RUN_TEST(test_from_string_basic, __func__);
+    RUN_TEST(test_from_string_scientific, __func__);
+    RUN_TEST(test_round_trip, __func__);
+}
+
+void test_printf(void) {
+    RUN_TEST(test_qf_sprintf_and_printf, __func__);
+}
+
+void test_power(void) {
+    RUN_TEST(test_qf_pow_int, __func__);
+    RUN_TEST(test_qf_pow, __func__);
+    RUN_TEST(test_qf_pow10, __func__);
+}
+
+void test_trigonometric(void) {
+    RUN_TEST(test_qf_trig, __func__);
+    RUN_TEST(test_qf_atan, __func__);
+    RUN_TEST(test_qf_atan2, __func__);
+    RUN_TEST(test_qf_asin, __func__);
+    RUN_TEST(test_qf_acos, __func__);
+}
+
+void test_hyperbolic(void) {
+    RUN_TEST(test_qf_cosh, __func__);
+    RUN_TEST(test_qf_sinh, __func__);
+    RUN_TEST(test_qf_cosh, __func__);
+    RUN_TEST(test_qf_tanh, __func__);
+    RUN_TEST(test_qf_asinh, __func__);
+    RUN_TEST(test_qf_acosh, __func__);
+    RUN_TEST(test_qf_atanh, __func__);
+}
+
+void test_hypotenus(void) {
+    RUN_TEST(test_qf_hypot, __func__);
+}
+
+void test_gamma_erf_erfc_erfinv_erfcinv_digamma(void) {
+    RUN_TEST(test_qf_gamma, __func__);
+    RUN_TEST(test_qf_erf, __func__);
+    RUN_TEST(test_qf_erfc, __func__);
+    RUN_TEST(test_qf_erfinv, __func__);
+    RUN_TEST(test_qf_erfcinv, __func__);
+    RUN_TEST(test_qf_lgamma, __func__);
+    RUN_TEST(test_qf_digamma, __func__);
+    RUN_TEST(test_qf_gammainv, __func__);
+}
+
+void test_lambert_w(void) {
+    RUN_TEST(test_qf_lambert_w0, __func__);
+    RUN_TEST(test_qf_lambert_wm1, __func__);
+    RUN_TEST(test_qf_productlog_all, __func__);
+}
+
+void test_beta_logbeta_binomial_beta_pdf_logbeta_pdf_normal_pdf_cdf_logpdf(void) {
+    RUN_TEST(test_qf_beta_all, __func__);
+    RUN_TEST(test_qf_logbeta_all, __func__);
+    RUN_TEST(test_qf_binomial_all, __func__);
+    RUN_TEST(test_qf_beta_pdf_all, __func__);
+    RUN_TEST(test_qf_logbeta_pdf_all, __func__);
+    RUN_TEST(test_qf_normal_pdf_all, __func__);
+    RUN_TEST(test_qf_normal_cdf_all, __func__);
+    RUN_TEST(test_qf_normal_logpdf_all, __func__);
+}
+
+void test_gammainc_ei_e1(void) {
+    RUN_TEST(test_qf_gammainc_all, __func__);
+    RUN_TEST(test_qf_ei_e1_all, __func__);    
+}
+
 /* -----------------------------------------------------------
    Main
    ----------------------------------------------------------- */
@@ -4446,79 +4669,18 @@ int tests_main() {
 
     printf(C_YELLOW "Running qfloat tests...\n\n" C_RESET);
 
-    TEST_GROUP("Arithmetic Tests");
-    RUN_TEST(test_add, NULL);
-    RUN_TEST(test_mul, NULL);
-    RUN_TEST(test_div, NULL);
-    RUN_TEST(test_sqrt, NULL);
-    RUN_TEST(test_exp_log, NULL);
-    RUN_TEST(test_qf_exp, NULL);
-    RUN_TEST(test_qf_log, NULL);
-    RUN_TEST(test_stability, NULL);
+    RUN_TEST(test_arithmetic, NULL);
+    RUN_TEST(test_strings, NULL);
+    RUN_TEST(test_printf, NULL);
+    RUN_TEST(test_power, NULL);
+    RUN_TEST(test_trigonometric, NULL);
+    RUN_TEST(test_hyperbolic, NULL);
+    RUN_TEST(test_hypotenus, NULL);
+    RUN_TEST(test_gamma_erf_erfc_erfinv_erfcinv_digamma, NULL);
+    RUN_TEST(test_lambert_w, NULL);
+    RUN_TEST(test_beta_logbeta_binomial_beta_pdf_logbeta_pdf_normal_pdf_cdf_logpdf, NULL);
+    RUN_TEST(test_gammainc_ei_e1, NULL);
 
-    TEST_GROUP("String Tests");
-    RUN_TEST(test_qf_to_string, NULL);
-    RUN_TEST(test_qf_from_string, NULL);
-    RUN_TEST(test_from_string_basic, NULL);
-    RUN_TEST(test_from_string_scientific, NULL);
-    RUN_TEST(test_round_trip, NULL);
-
-    TEST_GROUP("printf Tests");
-    RUN_TEST(test_qf_sprintf_and_printf, NULL);
-
-    TEST_GROUP("Power Tests");
-    RUN_TEST(test_qf_pow_int, NULL);
-    RUN_TEST(test_qf_pow, NULL);
-    RUN_TEST(test_qf_pow10, NULL);
-
-    TEST_GROUP("Trigonometric Tests");
-    RUN_TEST(test_qf_trig, NULL);
-    RUN_TEST(test_qf_atan, NULL);
-    RUN_TEST(test_qf_atan2, NULL);
-    RUN_TEST(test_qf_asin, NULL);
-    RUN_TEST(test_qf_acos, NULL);
-
-    TEST_GROUP("Hyperbolic function Tests");
-    RUN_TEST(test_qf_cosh, NULL);
-    RUN_TEST(test_qf_sinh, NULL);
-    RUN_TEST(test_qf_cosh, NULL);
-    RUN_TEST(test_qf_tanh, NULL);
-    RUN_TEST(test_qf_asinh, NULL);
-    RUN_TEST(test_qf_acosh, NULL);
-    RUN_TEST(test_qf_atanh, NULL);
-
-    TEST_GROUP("Hypotenuse Tests");
-    RUN_TEST(test_qf_hypot, NULL);
-
-    TEST_GROUP("Gamma, erf, erfc, erfinv, erfcinv, digamma function Tests");
-    RUN_TEST(test_qf_gamma, NULL);
-    RUN_TEST(test_qf_erf, NULL);
-    RUN_TEST(test_qf_erfc, NULL);
-    RUN_TEST(test_qf_erfinv, NULL);
-    RUN_TEST(test_qf_erfcinv, NULL);
-    RUN_TEST(test_qf_lgamma, NULL);
-    RUN_TEST(test_qf_digamma, NULL);
-    RUN_TEST(test_qf_gammainv, NULL);
-
-    TEST_GROUP("Lambert W function Tests");
-    RUN_TEST(test_qf_lambert_w0, NULL);
-    RUN_TEST(test_qf_lambert_wm1, NULL);
-    RUN_TEST(test_qf_productlog_all, NULL);
-
-    TEST_GROUP("Beta, logbeta, binomial, beta_pdf, logbeta_pdf, normal_pdf/cdf/logpdf, productlog Tests");
-    RUN_TEST(test_qf_beta_all, NULL);
-    RUN_TEST(test_qf_logbeta_all, NULL);
-    RUN_TEST(test_qf_binomial_all, NULL);
-    RUN_TEST(test_qf_beta_pdf_all, NULL);
-    RUN_TEST(test_qf_logbeta_pdf_all, NULL);
-    RUN_TEST(test_qf_normal_pdf_all, NULL);
-    RUN_TEST(test_qf_normal_cdf_all, NULL);
-    RUN_TEST(test_qf_normal_logpdf_all, NULL);
-
-    TEST_GROUP("Incomplete gamma, Ei, E1 Tests");
-    RUN_TEST(test_qf_gammainc_all, NULL);
-    RUN_TEST(test_qf_ei_e1_all, NULL);    
-    
     printf("\n" C_YELLOW "Done.\n" C_RESET);
 
     return 0;

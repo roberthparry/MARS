@@ -1,0 +1,175 @@
+{
+  "test_arithmetic": {
+    "enabled": true,
+    "test_add": true,
+    "test_mul": true,
+    "test_div": true,
+    "test_sqrt": true,
+    "test_exp_log": true,
+    "test_qf_exp": true,
+    "test_qf_log": true,
+    "test_stability": true
+  },
+  "test_strings": {
+    "enabled": true,
+    "test_qf_to_string": true,
+    "test_qf_from_string": true,
+    "test_from_string_basic": true,
+    "test_from_string_scientific": true,
+    "test_round_trip": true
+  },
+  "test_printf": {
+    "enabled": true,
+    "test_qf_sprintf_and_printf": true
+  },
+  "test_qf_sprintf_and_printf": {
+    "enabled": true,
+    "test_qd_sprintf_basic": true,
+    "test_qd_sprintf_multiple": true,
+    "test_qd_sprintf_mixed": true,
+    "test_qd_sprintf_buffer_limit": true,
+    "test_qd_sprintf_edge_cases": true,
+    "test_qd_sprintf_q_precision": true,
+    "test_qd_sprintf_q_zero_precision": true,
+    "test_qd_sprintf_q_flags": true,
+    "test_qd_sprintf_q_width": true,
+    "test_qd_sprintf_q_fallback": true,
+    "test_qd_sprintf_q_fallback_width": true,
+    "test_qf_sprintf_q_concise": true,
+    "test_qf_sprintf_null_safe_new": true,
+    "test_qf_sprintf_two_pass_new": true,
+    "test_qf_printf_stdout": true
+  },
+  "test_power": {
+    "enabled": true,
+    "test_qf_pow_int": true,
+    "test_qf_pow": true,
+    "test_qf_pow10": true
+  },
+  "test_trigonometric": {
+    "enabled": true,
+    "test_qf_trig": true,
+    "test_qf_atan": true,
+    "test_qf_atan2": true,
+    "test_qf_asin": true,
+    "test_qf_acos": true
+  },
+  "test_hyperbolic": {
+    "enabled": true,
+    "test_qf_cosh": true,
+    "test_qf_sinh": true,
+    "test_qf_tanh": true,
+    "test_qf_asinh": true,
+    "test_qf_acosh": true,
+    "test_qf_atanh": true
+  },
+  "test_hypotenus": {
+    "enabled": true,
+    "test_qf_hypot": true
+  },
+  "test_gamma_erf_erfc_erfinv_erfcinv_digamma": {
+    "enabled": true,
+    "test_qf_gamma": true,
+    "test_qf_erf": true,
+    "test_qf_erfc": true,
+    "test_qf_erfinv": true,
+    "test_qf_erfcinv": true,
+    "test_qf_lgamma": true,
+    "test_qf_digamma": true,
+    "test_qf_gammainv": true
+  },
+  "test_lambert_w": {
+    "enabled": true,
+    "test_qf_lambert_w0": true,
+    "test_qf_lambert_wm1": true,
+    "test_qf_productlog_all": true
+  },
+  "test_qf_productlog_all": {
+    "enabled": true,
+    "test_qf_productlog_definition": true,
+    "test_qf_productlog_consistency": true,
+    "test_qf_productlog_special": true,
+    "test_qf_productlog_monotonicity": true
+  },
+  "test_beta_logbeta_binomial_beta_pdf_logbeta_pdf_normal_pdf_cdf_logpdf": {
+    "enabled": true,
+    "test_qf_beta_all": true,
+    "test_qf_logbeta_all": true,
+    "test_qf_binomial_all": true,
+    "test_qf_beta_pdf_all": true,
+    "test_qf_logbeta_pdf_all": true,
+    "test_qf_normal_pdf_all": true,
+    "test_qf_normal_cdf_all": true,
+    "test_qf_normal_logpdf_all": true
+  },
+  "test_qf_beta_all": {
+    "enabled": true,
+    "test_qf_beta_definition": true,
+    "test_qf_beta_symmetry": true,
+    "test_qf_beta_special_cases": true
+  },
+  "test_qf_logbeta_all": {
+    "enabled": true,
+    "test_qf_logbeta_definition": true,
+    "test_qf_logbeta_consistency": true,
+    "test_qf_logbeta_symmetry": true,
+    "test_qf_logbeta_special_cases": true
+  },
+  "test_qf_binomial_all": {
+    "enabled": true,
+    "test_qf_binomial_definition": true,
+    "test_qf_binomial_symmetry": true,
+    "test_qf_binomial_special_cases": true
+  },
+  "test_qf_beta_pdf_all": {
+    "enabled": true,
+    "test_qf_beta_pdf_definition": true,
+    "test_qf_beta_pdf_logform": true,
+    "test_qf_beta_pdf_symmetry": true
+  },
+  "test_qf_logbeta_pdf_all": {
+    "enabled": true,
+    "test_qf_logbeta_pdf_definition": true,
+    "test_qf_logbeta_pdf_consistency": true,
+    "test_qf_logbeta_pdf_symmetry": true
+  },
+  "test_qf_normal_pdf_all": {
+    "enabled": true,
+    "test_qf_normal_pdf_definition": true,
+    "test_qf_normal_pdf_symmetry": true,
+    "test_qf_normal_pdf_at_zero": true,
+    "test_qf_normal_pdf_logform": true
+  },
+  "test_qf_normal_cdf_all": {
+    "enabled": true,
+    "test_qf_normal_cdf_definition": true,
+    "test_qf_normal_cdf_symmetry": true,
+    "test_qf_normal_cdf_known_values": true,
+    "test_qf_normal_cdf_pdf_consistency": true
+  },
+  "test_qf_normal_logpdf_all": {
+    "enabled": true,
+    "test_qf_normal_logpdf_definition": true,
+    "test_qf_normal_logpdf_consistency": true,
+    "test_qf_normal_logpdf_symmetry": true,
+    "test_qf_normal_logpdf_at_zero": true
+  },
+  "test_gammainc_ei_e1": {
+    "enabled": true,
+    "test_qf_gammainc_all": true,
+    "test_qf_ei_e1_all": true
+  },
+  "test_qf_gammainc_all": {
+    "enabled": true,
+    "test_qf_gammainc_PQ_identity": true,
+    "test_qf_gammainc_lower_upper_identity": true,
+    "test_qf_gammainc_special_s1": true
+  },
+  "test_qf_ei_e1_all": {
+    "enabled": true,
+    "test_qf_ei_deriv": true,
+    "test_qf_e1_deriv": true,
+    "test_qf_ei_e1_identity": true,
+    "test_ei_values": true
+  }
+}

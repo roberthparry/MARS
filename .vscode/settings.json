@@ -60,5 +60,5 @@
         "editor.tabSize": 4
     },
     "makefile.buildLog": "",
-    "terminal.integrated.scrollback": 4000
+    "terminal.integrated.scrollback": 10000
 }

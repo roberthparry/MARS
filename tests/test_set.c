@@ -210,19 +210,19 @@ void test_fuzz(void) {
 
 int tests_main(void) {
 
-    TEST_GROUP("Integer Tests");
+    printf(C_BOLD C_CYAN "=== Integer Tests ===\n" C_RESET);
     RUN_TEST(test_ints, NULL);
 
-    TEST_GROUP("String Tests");
+    printf(C_BOLD C_CYAN "=== String Tests ===\n" C_RESET);
     RUN_TEST(test_strings, NULL);
 
-    TEST_GROUP("Deep Struct Tests");
+    printf(C_BOLD C_CYAN "=== Deep Struct Tests ===\n" C_RESET);
     RUN_TEST(test_deep, NULL);
 
-    TEST_GROUP("Sorted Order Tests");
+    printf(C_BOLD C_CYAN "=== Sorted Order Tests ===\n" C_RESET);
     RUN_TEST(test_sorted, NULL);
 
-    TEST_GROUP("Fuzz Tests");
+    printf(C_BOLD C_CYAN "=== Fuzz Tests ===\n" C_RESET);
     RUN_TEST(test_fuzz, NULL);
 
     return 0;

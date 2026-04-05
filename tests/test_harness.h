@@ -13,7 +13,7 @@
 #include "test_config.h"
 
 /* ------------------------------------------------------------------------- */
-/* Colours                                                                    */
+/* Colours                                                                   */
 /* ------------------------------------------------------------------------- */
 
 #define C_GREEN   "\x1b[32m"
@@ -24,133 +24,134 @@
 #define C_BOLD    "\x1b[1m"
 
 /* ------------------------------------------------------------------------- */
-/* Global test state                                                          */
+/* Global test state                                                         */
 /* ------------------------------------------------------------------------- */
 
 extern int tests_run;
 extern int tests_failed;
 extern int tests_skipped;
 
-/* Group header state */
-static int __group_should_print = 0;
-static const char *__group_name = NULL;
-
 /* ------------------------------------------------------------------------- */
-/* Assertion helpers                                                          */
+/* Assertion helpers                                                         */
 /* ------------------------------------------------------------------------- */
 
-#define ASSERT_TRUE(expr) \
-    do { \
-        if (!(expr)) { \
-            tests_failed++; \
-            printf(C_RED "    Assertion failed: %s\n" C_RESET, #expr); \
-            return; \
-        } \
+#define ASSERT_TRUE(expr)                                               \
+    do {                                                                \
+        if (!(expr)) {                                                  \
+            tests_failed++;                                             \
+            printf(C_RED "    Assertion failed: %s\n" C_RESET, #expr);  \
+            return;                                                     \
+        }                                                               \
     } while (0)
 
-#define ASSERT_EQ_INT(actual, expected) \
-    do { \
-        if ((actual) != (expected)) { \
-            tests_failed++; \
-            printf(C_RED "    Expected %d, got %d\n" C_RESET, \
-                   (int)(expected), (int)(actual)); \
-            return; \
-        } \
+#define ASSERT_EQ_INT(actual, expected)                         \
+    do {                                                        \
+        if ((actual) != (expected)) {                           \
+            tests_failed++;                                     \
+            printf(C_RED "    Expected %d, got %d\n" C_RESET,   \
+                   (int)(expected), (int)(actual));             \
+            return;                                             \
+        }                                                       \
     } while (0)
 
-#define ASSERT_EQ_LONG(actual, expected) \
-    do { \
-        if ((actual) != (expected)) { \
-            tests_failed++; \
+#define ASSERT_EQ_LONG(actual, expected)                        \
+    do {                                                        \
+        if ((actual) != (expected)) {                           \
+            tests_failed++;                                     \
             printf(C_RED "    Expected %ld, got %ld\n" C_RESET, \
-                   (long)(expected), (long)(actual)); \
-            return; \
-        } \
+                   (long)(expected), (long)(actual));           \
+            return;                                             \
+        }                                                       \
     } while (0)
 
-#define ASSERT_EQ_DOUBLE(actual, expected, eps) \
-    do { \
-        if (fabs((actual) - (expected)) > (eps)) { \
-            tests_failed++; \
+#define ASSERT_EQ_DOUBLE(actual, expected, eps)                     \
+    do {                                                            \
+        if (fabs((actual) - (expected)) > (eps)) {                  \
+            tests_failed++;                                         \
             printf(C_RED "    Expected %.12f, got %.12f\n" C_RESET, \
-                   (double)(expected), (double)(actual)); \
-            return; \
-        } \
+                   (double)(expected), (double)(actual));           \
+            return;                                                 \
+        }                                                           \
     } while (0)
 
-#define ASSERT_NOT_NULL(ptr) \
-    do { \
-        if ((ptr) == NULL) { \
-            tests_failed++; \
-            printf(C_RED "    Expected non-null pointer\n" C_RESET); \
-            return; \
-        } \
+#define ASSERT_NOT_NULL(ptr)                                            \
+    do {                                                                \
+        if ((ptr) == NULL) {                                            \
+            tests_failed++;                                             \
+            printf(C_RED "    Expected non-null pointer\n" C_RESET);    \
+            return;                                                     \
+        }                                                               \
     } while (0)
 
-#define ASSERT_NULL(ptr) \
-    do { \
-        if ((ptr) != NULL) { \
-            tests_failed++; \
-            printf(C_RED "    Expected NULL pointer\n" C_RESET); \
-            return; \
-        } \
-    } while (0)
-
-/* ------------------------------------------------------------------------- */
-/* Group heading macro                                                        */
-/* ------------------------------------------------------------------------- */
-
-#define TEST_GROUP(name) \
-    do { \
-        __group_name = name; \
-        __group_should_print = 1; \
-        test_config_register_group(__FILE__, name); \
+#define ASSERT_NULL(ptr)                                            \
+    do {                                                            \
+        if ((ptr) != NULL) {                                        \
+            tests_failed++;                                         \
+            printf(C_RED "    Expected NULL pointer\n" C_RESET);    \
+            return;                                                 \
+        }                                                           \
     } while (0)
 
 /* ------------------------------------------------------------------------- */
-/* RUN_TEST — SKIP, PASS/FAIL, group headers                                  */
+/* RUN_TEST — SKIP, PASS/FAIL                                                */
 /* ------------------------------------------------------------------------- */
 
-#define RUN_TEST(func, parent) \
-    do { \
-        /* Query enable/disable state */ \
-        if (!test_enabled(__FILE__, #func, parent)) { \
-            printf(C_YELLOW "SKIP: %s\n" C_RESET, #func); \
-            tests_skipped++; \
-            if (__group_name) \
-                test_config_mark_test(__FILE__, __group_name, #func, "skipped"); \
-            break; \
-        } \
-        \
-        /* Print group header only if a group exists */ \
-        if (__group_name && __group_should_print) { \
-            printf("\n" C_CYAN "== %s ==\n" C_RESET, __group_name); \
-            __group_should_print = 0; \
-        } \
-        \
-        int before = tests_failed; \
-        tests_run++; \
-        func(); \
-        \
-        if (tests_failed == before) { \
-            printf(C_BOLD C_GREEN "PASS: %s\n" C_RESET, #func); \
-            if (__group_name) \
-                test_config_mark_test(__FILE__, __group_name, #func, "pass"); \
-        } else { \
-            printf(C_BOLD C_RED "FAIL: %s\n" C_RESET, #func); \
-            if (__group_name) \
-                test_config_mark_test(__FILE__, __group_name, #func, "fail"); \
-        } \
+#define RUN_TEST(func, parent)                                                    \
+    do {                                                                          \
+        /* Check enable/disable state */                                          \
+        if (!test_enabled(__FILE__, #func, parent)) {                             \
+            printf(C_YELLOW "SKIP: %s\n" C_RESET, #func);                         \
+            tests_skipped++;                                                      \
+            break;                                                                \
+        }                                                                         \
+                                                                                  \
+        tests_run++;                                                              \
+                                                                                  \
+        int run_before     = tests_run;                                           \
+        int failed_before  = tests_failed;                                        \
+        int skipped_before = tests_skipped;                                       \
+                                                                                  \
+        func();                                                                   \
+                                                                                  \
+        int run_after     = tests_run;                                            \
+        int failed_after  = tests_failed;                                         \
+        int skipped_after = tests_skipped;                                        \
+                                                                                  \
+        int total   = (run_after - run_before);                                   \
+        int failed  = failed_after  - failed_before;                              \
+        int skipped = skipped_after - skipped_before;                             \
+        int passed  = total - failed;                                             \
+        if (tests_skipped > skipped_before) {                                     \
+            printf(C_CYAN "GROUP: %s"                                             \
+                   " " C_RESET "(" C_YELLOW "%d SKIPPED" C_RESET                  \
+                   "," C_RED " %d FAILED" C_RESET                                 \
+                   "," C_GREEN " %d PASSED" C_RESET ")\n" C_RESET,                \
+                   #func,                                                         \
+                   skipped,                                                       \
+                   failed,                                                        \
+                   passed);                                                       \
+        } else if (tests_failed == failed_before) {                               \
+            printf(C_BOLD C_GREEN "PASS: " C_RESET "%s\n", #func);                \
+        } else {                                                                  \
+            printf(C_BOLD C_RED "FAIL: " C_RESET "%s " C_RED "(%s:%d)\n" C_RESET, \
+                   #func, __FILE__, __LINE__);                                    \
+        }                                                                         \
     } while (0)
 
 /* ------------------------------------------------------------------------- */
-/* User must define this                                                      */
+/* CALL TEST_FAIL() to mark test as failed                                   */
+/* ------------------------------------------------------------------------- */
+
+#define TEST_FAIL() do { tests_failed++; } while (0)
+
+/* ------------------------------------------------------------------------- */
+/* User must define this                                                     */
 /* ------------------------------------------------------------------------- */
 
 int tests_main(void);
 
 /* ------------------------------------------------------------------------- */
-/* Harness-owned main()                                                       */
+/* Harness-owned main()                                                      */
 /* ------------------------------------------------------------------------- */
 
 int tests_run = 0;

@@ -12,18 +12,18 @@
  * Colour helpers
  * ------------------------------------------------------------- */
 
-#define RED     "\x1b[31m"
-#define GREEN   "\x1b[32m"
-#define YELLOW  "\x1b[33m"
+#define C_RED     "\x1b[31m"
+#define C_GREEN   "\x1b[32m"
+#define C_YELLOW  "\x1b[33m"
 #define BLUE    "\x1b[34m"
 #define RESET   "\x1b[0m"
 
 static void pass(const char *msg) {
-    printf(GREEN "PASS" RESET " %s\n", msg);
+    printf(C_GREEN "PASS" RESET " %s\n", msg);
 }
 
 static void fail(const char *msg) {
-    printf(RED "FAIL" RESET " %s\n", msg);
+    printf(C_RED "FAIL" RESET " %s\n", msg);
 }
 
 /* -------------------------------------------------------------
@@ -124,7 +124,7 @@ static void deep_destroy(void *elem) {
  * ------------------------------------------------------------- */
 
 static void test_int_int(void) {
-    printf(YELLOW "test_int_int\n" RESET);
+    printf(C_YELLOW "test_int_int\n" RESET);
 
     dictionary_t *d = dictionary_create(
         sizeof(int), sizeof(int),
@@ -154,7 +154,7 @@ static void test_int_int(void) {
  * ------------------------------------------------------------- */
 
 static void test_str_int(void) {
-    printf(YELLOW "test_str_int\n" RESET);
+    printf(C_YELLOW "test_str_int\n" RESET);
 
     dictionary_t *d = dictionary_create(
         sizeof(char *), sizeof(int),
@@ -185,7 +185,7 @@ static void test_str_int(void) {
  * ------------------------------------------------------------- */
 
 static void test_int_str(void) {
-    printf(YELLOW "test_int_str\n" RESET);
+    printf(C_YELLOW "test_int_str\n" RESET);
 
     dictionary_t *d = dictionary_create(
         sizeof(int), sizeof(char *),
@@ -224,7 +224,7 @@ static void test_int_str(void) {
  * ------------------------------------------------------------- */
 
 static void test_deep_deep(void) {
-    printf(YELLOW "test_deep_deep\n" RESET);
+    printf(C_YELLOW "test_deep_deep\n" RESET);
 
     dictionary_t *d = dictionary_create(
         sizeof(struct deep), sizeof(struct deep),
@@ -276,7 +276,7 @@ static void test_deep_deep(void) {
  * ------------------------------------------------------------- */
 
 static void test_sorted(void) {
-    printf(YELLOW "test_sorted\n" RESET);
+    printf(C_YELLOW "test_sorted\n" RESET);
 
     dictionary_t *d = dictionary_create(
         sizeof(int), sizeof(int),
@@ -318,7 +318,7 @@ static void test_sorted(void) {
  * ------------------------------------------------------------- */
 
 static void test_entries(void) {
-    printf(YELLOW "test_entries\n" RESET);
+    printf(C_YELLOW "test_entries\n" RESET);
 
     dictionary_t *d = dictionary_create(
         sizeof(int), sizeof(int),
@@ -364,7 +364,7 @@ static void foreach_cb(const dict_entry_t *e, void *ud) {
 }
 
 static void test_foreach(void) {
-    printf(YELLOW "test_foreach\n" RESET);
+    printf(C_YELLOW "test_foreach\n" RESET);
 
     dictionary_t *d = dictionary_create(
         sizeof(int), sizeof(int),
@@ -395,7 +395,7 @@ static void test_foreach(void) {
  * ------------------------------------------------------------- */
 
 static void test_fuzz(void) {
-    printf(YELLOW "test_fuzz\n" RESET);
+    printf(C_YELLOW "test_fuzz\n" RESET);
 
     dictionary_t *d = dictionary_create(
         sizeof(int), sizeof(int),
@@ -438,7 +438,7 @@ static void fuzz_foreach_cb(const dict_entry_t *e, void *ud) {
 }
 
 static void test_sorted_fuzz(void) {
-    printf(YELLOW "test_sorted_fuzz\n" RESET);
+    printf(C_YELLOW "test_sorted_fuzz\n" RESET);
 
     dictionary_t *d = dictionary_create(
         sizeof(int), sizeof(int),

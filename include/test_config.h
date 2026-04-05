@@ -55,26 +55,6 @@ typedef enum {
 } test_config_mode_t;
 
 /**
- * @brief Initialise the test configuration system for this translation unit.
- *
- * This macro must be invoked exactly once by each test binary, typically at
- * the start of `main()` or in a test framework setup hook.
- *
- * It expands to:
- * @code
- * test_config_set_mode(TEST_CONFIG_MODE);
- * @endcode
- *
- * The value of TEST_CONFIG_MODE is chosen by the test file:
- * @code
- * #define TEST_CONFIG_MODE TEST_CONFIG_LOCAL
- * #include "test_config.h"
- * @endcode
- */
-#define TEST_CONFIG_INIT() \
-    do { test_config_set_mode(TEST_CONFIG_MODE); } while (0)
-
-/**
  * @brief Default configuration mode if the test file does not override it.
  *
  * Test files may override this by defining TEST_CONFIG_MODE before including
@@ -162,53 +142,5 @@ bool test_config_has_key(const char *file, const char *func, const char *parent)
  */
 void test_config_save(void);
 
-/**
- * @brief Register a test group for the given file.
- *
- * This ensures that the group exists in the JSON structure and is marked
- * `"enabled": true` unless explicitly disabled later.
- *
- * In GLOBAL mode, the group is created under the file key:
- * @code{.json}
- * {
- *     "tests/test_dval.c": {
- *         "Arithmetic": { "enabled": true }
- *     }
- * }
- * @endcode
- *
- * In LOCAL mode, the group becomes a top-level key.
- *
- * @param file        The test file declaring the group (use `__FILE__`).
- * @param group_name  The name of the group.
- */
-void test_config_register_group(const char *file,
-                                const char *group_name);
-
-/**
- * @brief Record the result of a test inside a group.
- *
- * This creates (or updates) a leaf entry under the group:
- * @code{.json}
- * "Arithmetic": {
- *     "enabled": true,
- *     "test_add": true
- * }
- * @endcode
- *
- * The `result` string is typically `"pass"`, `"fail"`, or `"skipped"`.
- * The boolean stored in JSON is:
- * - `true`  for `"pass"`
- * - `false` for `"fail"` or `"skipped"`
- *
- * @param file        The test file declaring the test (use `__FILE__`).
- * @param group_name  The group under which the test belongs.
- * @param test_name   The test function name.
- * @param result      The textual result ("pass", "fail", "skipped").
- */
-void test_config_mark_test(const char *file,
-                           const char *group_name,
-                           const char *test_name,
-                           const char *result); 
 
 #endif /* TEST_CONFIG_H */
