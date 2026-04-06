@@ -41,14 +41,22 @@ Every module is self‑contained, header‑driven, and usable independently.
 
 # 🧩 **Core Modules**
 
+- [🧮 High‑Precision Arithmetic (`qfloat`)](#-highprecision-arithmetic-qfloat)
+- [🔧 Differentiable Values (`dval_t`)](#-differentiable-values-dval_t)
+- [📅 Civil & Astronomical Datetime (`datetime_t`)](#-civil--astronomical-datetime-datetime_t)
+- [📚 Generic Dictionary (`dictionary_t`)](#-generic-dictionary-dictionary_t)
+- [🧩 Generic Hash Set (`set_t`)](#-generic-hash-set-set_t)
+- [🔤 UTF‑8 String Type (`string_t`)](#-utf8-string-type-string_t)
+
 ---
 
 # 🧮 **High‑Precision Arithmetic (`qfloat`)**
 
 ### **Sections**
-- Overview  
-- Example  
-- Internal Architecture  
+- [Overview](#-highprecision-arithmetic-qfloat)
+- [Example](#-example-highprecision-lambert-w-function)
+- [Internal Architecture](#-internal-architecture--qfloat)
+
 
 A double‑double precision floating‑point type (~106 bits, ~32 decimal digits) implemented as an unevaluated sum of two IEEE‑754 doubles. Includes:
 
@@ -251,9 +259,10 @@ This makes `qfloat` suitable for:
 # 🔧 **Differentiable Values (`dval_t`)**
 
 ### **Sections**
-- Overview  
-- Example  
-- Internal Architecture (collapsible)  
+- [Overview](#-differentiable-values-dval_t)
+- [Example](#-example-singlevariable-expression-with-first-and-second-derivatives)
+- [Internal Architecture](#-internal-architecture--dval_t)
+
 
 A lazy, vtable‑driven, reference‑counted DAG of differentiable expressions (automatic differentiation).
 
@@ -355,10 +364,7 @@ f''(x)  = 3.8055231012396292258221776404244160
 
 ---
 
-<details>
-<summary><strong>🧩 Internal Architecture — <code>dval_t</code></strong></summary>
-
-<br>
+### 🧩 **Internal Architecture — `dval_t`**
 
 `dval_t` implements **forward‑mode automatic differentiation** using a compact,
 reference‑counted DAG of computation nodes. Each `dval_t` represents a value
@@ -511,9 +517,10 @@ This makes it suitable for:
 # 📅 **Civil & Astronomical Datetime (`datetime_t`)**
 
 ### **Sections**
-- Overview  
-- Example  
-- Internal Architecture (collapsible)  
+- [Overview](#-civil--astronomical-datetime-datetime_t)
+- [Example](#-example-chinese-new-year-calculation)
+- [Internal Architecture](#-internal-architecture--datetime_t)
+
 
 A high‑level civil datetime type with full Gregorian calendar support, Julian Day conversions, timezone/DST helpers, sunrise/sunset algorithms, moon‑phase computation, and a rich formatting engine.
 
@@ -593,10 +600,7 @@ Chinese New Year 2025: 2025-01-29
 
 ---
 
-<details>
-<summary><strong>🧩 Internal Architecture — <code>datetime_t</code></strong></summary>
-
-<br>
+### 🧩 **Internal Architecture — `datetime_t`**
 
 `datetime_t` provides a unified, high‑precision system for civil timekeeping,
 astronomical time scales, and solar/lunar calculations.
@@ -715,9 +719,10 @@ reliable, high‑precision timekeeping.
 # 📚 **Generic Dictionary (`dictionary_t`)**
 
 ### **Sections**
-- Overview  
-- Examples  
-- Internal Architecture  
+- [Overview](#-generic-dictionary-dictionary_t)
+- [Example](#-example-deepcopied-keys-and-values)
+- [Internal Architecture](#-internal-architecture--dictionary_t)
+
 
 A typed, generic key/value dictionary with user‑defined hash/compare/clone/destroy callbacks, stable entry handles, and lazy sorted views.
 
@@ -978,9 +983,10 @@ numerical computing, or long‑running services.
 # 🧩 **Generic Hash Set (`set_t`)**
 
 ### **Sections**
-- Overview  
-- Example  
-- Internal Architecture  
+- [Overview](#-generic-hash-set-set_t)
+- [Example](#-example-string-set-with-deepcopied-elements)
+- [Internal Architecture](#-internal-architecture--set_t)
+ 
 
 A typed hash set with dense arena storage, precomputed hashes, lazy sorted views,  
 and full set algebra.
