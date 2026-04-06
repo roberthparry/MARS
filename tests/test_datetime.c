@@ -5,6 +5,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <math.h>
 #include <limits.h>
 #include <float.h>
@@ -204,7 +205,7 @@ void test_datetime_initWithEasterSunday_basic(void) {
 }
 
 void test_datetime_initWithEasterSunday_known_dates(void) {
-    struct { int year; month_t month; unsigned char day; } cases[] = {
+    struct { int year; month_t month; uint8_t day; } cases[] = {
         {2000, DT_April, 23},
         {2025, DT_April, 20},
         {2026, DT_April, 5},
@@ -295,7 +296,7 @@ void test_datetime_initWithChineseNewYear_basic(void) {
 }
 
 void test_datetime_initWithChineseNewYear_known_dates(void) {
-    struct { int year; month_t month; unsigned char day; } cases[] = {
+    struct { int year; month_t month; uint8_t day; } cases[] = {
         {2020, DT_January, 25},
         {2021, DT_February, 12},
         {2022, DT_February, 1},
