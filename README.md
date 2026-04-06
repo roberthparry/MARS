@@ -101,7 +101,7 @@ Every module is self‑contained, header‑driven, and usable independently.
 </details>
 
 <details open>
-<summary><strong><a href="#-roadmap">Roadmap</a></strong></summary>
+<summary><strong><a href="#%EF%B8%8F-roadmap">Roadmap</a></strong></summary>
 </details>
 
 <details open>
