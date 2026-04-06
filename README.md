@@ -27,9 +27,9 @@ Every module is self‑contained, header‑driven, and usable independently.
 <summary>🧮 High‑Precision Arithmetic (<code>qfloat</code>)</summary>
 <br>
 
-&nbsp;&nbsp;• <a href="#-highprecision-arithmetic-qfloat">Overview</a><br>
-&nbsp;&nbsp;• <a href="#-example-highprecision-lambert-w-function">Example: High‑Precision Lambert W Function</a><br>
-&nbsp;&nbsp;• <a href="#-internal-architecture--qfloat">Internal Architecture — <code>qfloat</code></a>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• <a href="#-highprecision-arithmetic-qfloat">Overview</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• <a href="#-example-highprecision-lambert-w-function">Example: High‑Precision Lambert W Function</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• <a href="#-internal-architecture--qfloat">Internal Architecture — <code>qfloat</code></a>
 
 </details>
 
@@ -37,9 +37,9 @@ Every module is self‑contained, header‑driven, and usable independently.
 <summary>🔧 Differentiable Values (<code>dval_t</code>)</summary>
 <br>
 
-&nbsp;&nbsp;• <a href="#-differentiable-values-dval_t">Overview</a><br>
-&nbsp;&nbsp;• <a href="#-example-singlevariable-expression-with-first-and-second-derivatives">Example: Single‑Variable Expression</a><br>
-&nbsp;&nbsp;• <a href="#-internal-architecture--dval_t">Internal Architecture — <code>dval_t</code></a>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• <a href="#-differentiable-values-dval_t">Overview</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• <a href="#-example-singlevariable-expression-with-first-and-second-derivatives">Example: Single‑Variable Expression</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• <a href="#-internal-architecture--dval_t">Internal Architecture — <code>dval_t</code></a>
 
 </details>
 
@@ -47,9 +47,9 @@ Every module is self‑contained, header‑driven, and usable independently.
 <summary>📅 Civil & Astronomical Datetime (<code>datetime_t</code>)</summary>
 <br>
 
-&nbsp;&nbsp;• <a href="#-civil--astronomical-datetime-datetime_t">Overview</a><br>
-&nbsp;&nbsp;• <a href="#-example-chinese-new-year-calculation">Example: Chinese New Year Calculation</a><br>
-&nbsp;&nbsp;• <a href="#-internal-architecture--datetime_t">Internal Architecture — <code>datetime_t</code></a>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• <a href="#-civil--astronomical-datetime-datetime_t">Overview</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• <a href="#-example-chinese-new-year-calculation">Example: Chinese New Year Calculation</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• <a href="#-internal-architecture--datetime_t">Internal Architecture — <code>datetime_t</code></a>
 
 </details>
 
@@ -57,10 +57,10 @@ Every module is self‑contained, header‑driven, and usable independently.
 <summary>📚 Generic Dictionary (<code>dictionary_t</code>)</summary>
 <br>
 
-&nbsp;&nbsp;• <a href="#-generic-dictionary-dictionary_t">Overview</a><br>
-&nbsp;&nbsp;• <a href="#-example-deepcopied-keys-and-values">Example: Deep‑Copied Keys and Values</a><br>
-&nbsp;&nbsp;• <a href="#-example-integer-keys-and-deepcopied-string-values">Example: Integer Keys and Deep‑Copied String Values</a><br>
-&nbsp;&nbsp;• <a href="#-internal-architecture--dictionary_t">Internal Architecture — <code>dictionary_t</code></a>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• <a href="#-generic-dictionary-dictionary_t">Overview</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• <a href="#-example-deepcopied-keys-and-values">Example: Deep‑Copied Keys and Values</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• <a href="#-example-integer-keys-and-deepcopied-string-values">Example: Integer Keys and Deep‑Copied String Values</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• <a href="#-internal-architecture--dictionary_t">Internal Architecture — <code>dictionary_t</code></a>
 
 </details>
 
@@ -68,9 +68,9 @@ Every module is self‑contained, header‑driven, and usable independently.
 <summary>🧩 Generic Hash Set (<code>set_t</code>)</summary>
 <br>
 
-&nbsp;&nbsp;• <a href="#-generic-hash-set-set_t">Overview</a><br>
-&nbsp;&nbsp;• <a href="#-example-string-set-with-deepcopied-elements">Example: String Set With Deep‑Copied Elements</a><br>
-&nbsp;&nbsp;• <a href="#-internal-architecture--set_t">Internal Architecture — <code>set_t</code></a>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• <a href="#-generic-hash-set-set_t">Overview</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• <a href="#-example-string-set-with-deepcopied-elements">Example: String Set With Deep‑Copied Elements</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• <a href="#-internal-architecture--set_t">Internal Architecture — <code>set_t</code></a>
 
 </details>
 
@@ -78,11 +78,11 @@ Every module is self‑contained, header‑driven, and usable independently.
 <summary>🔤 UTF‑8 String Type (<code>string_t</code>)</summary>
 <br>
 
-&nbsp;&nbsp;• <a href="#-utf8-string-type-string_t">Overview</a><br>
-&nbsp;&nbsp;• <a href="#-example-basic-utf8-manipulation">Example: Basic UTF‑8 Manipulation</a><br>
-&nbsp;&nbsp;• <a href="#-example-grapheme-iteration">Example: Grapheme Iteration</a><br>
-&nbsp;&nbsp;• <a href="#-example-using-the-builder-api">Example: Using the Builder API</a><br>
-&nbsp;&nbsp;• <a href="#-internal-architecture--string_t">Internal Architecture — <code>string_t</code></a>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• <a href="#-utf8-string-type-string_t">Overview</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• <a href="#-example-basic-utf8-manipulation">Example: Basic UTF‑8 Manipulation</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• <a href="#-example-grapheme-iteration">Example: Grapheme Iteration</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• <a href="#-example-using-the-builder-api">Example: Using the Builder API</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• <a href="#-internal-architecture--string_t">Internal Architecture — <code>string_t</code></a>
 
 </details>
 
