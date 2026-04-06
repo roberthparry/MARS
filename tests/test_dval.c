@@ -39,6 +39,7 @@ static void check_q_at(const char *file, int line, int col,
     }
 
     printf("%s%sFAIL%s %s: %s:%d:%d: got=", C_BOLD, C_RED, C_RESET, label, file, line, col);
+    TEST_FAIL();
 
     qf_printf("%.34q", got);
 
@@ -1849,6 +1850,7 @@ static void to_string_fail(const char *file, int line, int col,
                            const char *expected)
 {
     fprintf(stderr, C_BOLD C_RED "FAIL" C_RESET " %s: " C_RED "%s:%d:%d\n" C_RESET, msg, file, line, col);
+    TEST_FAIL();
 
     int multi = is_multiline(got) || is_multiline(expected);
 
@@ -3845,6 +3847,7 @@ static void test_expressions(void)
         } else {
             printf(C_BOLD C_RED "FAIL" C_RESET " %s (EXPR): " C_RED "%s:%d:1\n" C_RESET,
                    tests[i].src, __FILE__, tests[i].line);
+            TEST_FAIL();
         }
 
         printf(C_BOLD "  got      " C_RESET "%s\n", got_expr);
@@ -3856,6 +3859,7 @@ static void test_expressions(void)
         } else {
             printf(C_BOLD C_RED "FAIL" C_RESET " %s (FUNC): " C_RED "%s:%d:1\n" C_RESET,
                    tests[i].src, __FILE__, tests[i].line);
+            TEST_FAIL();
         }
 
         /* got block */

@@ -40,7 +40,8 @@ extern int tests_skipped;
         if (!(expr)) {                                                  \
             tests_failed++;                                             \
             printf(C_RED "    Assertion failed: %s\n" C_RESET, #expr);  \
-            return;                                                     \
+            TEST_FAIL();                                                \
+            continue;                                                   \
         }                                                               \
     } while (0)
 
@@ -50,7 +51,8 @@ extern int tests_skipped;
             tests_failed++;                                     \
             printf(C_RED "    Expected %d, got %d\n" C_RESET,   \
                    (int)(expected), (int)(actual));             \
-            return;                                             \
+            TEST_FAIL();                                        \
+            continue;                                           \
         }                                                       \
     } while (0)
 
@@ -60,7 +62,8 @@ extern int tests_skipped;
             tests_failed++;                                     \
             printf(C_RED "    Expected %ld, got %ld\n" C_RESET, \
                    (long)(expected), (long)(actual));           \
-            return;                                             \
+            TEST_FAIL();                                        \
+            continue;                                           \
         }                                                       \
     } while (0)
 
@@ -70,7 +73,8 @@ extern int tests_skipped;
             tests_failed++;                                         \
             printf(C_RED "    Expected %.12f, got %.12f\n" C_RESET, \
                    (double)(expected), (double)(actual));           \
-            return;                                                 \
+            TEST_FAIL();                                            \
+            continue;                                               \
         }                                                           \
     } while (0)
 
@@ -79,7 +83,8 @@ extern int tests_skipped;
         if ((ptr) == NULL) {                                            \
             tests_failed++;                                             \
             printf(C_RED "    Expected non-null pointer\n" C_RESET);    \
-            return;                                                     \
+            TEST_FAIL();                                                \
+            continue;                                                   \
         }                                                               \
     } while (0)
 
@@ -88,7 +93,8 @@ extern int tests_skipped;
         if ((ptr) != NULL) {                                        \
             tests_failed++;                                         \
             printf(C_RED "    Expected NULL pointer\n" C_RESET);    \
-            return;                                                 \
+            TEST_FAIL();                                            \
+            continue;                                               \
         }                                                           \
     } while (0)
 
@@ -113,15 +119,16 @@ extern int tests_skipped;
                                                                                   \
         func();                                                                   \
                                                                                   \
-        int run_after     = tests_run;                                            \
-        int failed_after  = tests_failed;                                         \
-        int skipped_after = tests_skipped;                                        \
-                                                                                  \
-        int total   = (run_after - run_before);                                   \
-        int failed  = failed_after  - failed_before;                              \
-        int skipped = skipped_after - skipped_before;                             \
-        int passed  = total - failed;                                             \
         if (tests_skipped > skipped_before) {                                     \
+            int run_after     = tests_run;                                        \
+            int failed_after  = tests_failed;                                     \
+            int skipped_after = tests_skipped;                                    \
+                                                                                  \
+            int total   = (run_after - run_before);                               \
+            int failed  = failed_after  - failed_before;                          \
+            int skipped = skipped_after - skipped_before;                         \
+            int passed  = total - failed;                                         \
+                                                                                  \
             printf(C_CYAN "GROUP: %s"                                             \
                    " " C_RESET "(" C_YELLOW "%d SKIPPED" C_RESET                  \
                    "," C_RED " %d FAILED" C_RESET                                 \
