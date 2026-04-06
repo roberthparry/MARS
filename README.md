@@ -14,14 +14,79 @@ Every module is self‑contained, header‑driven, and usable independently.
 
 ---
 
-## 🧭 **Table of Contents**
+## 🧭 Table of Contents
 
 - [Features](#-features)
-- [Core Modules](#-core-modules)
-- [Directory Structure](#-directory-structure)
-- [Getting Started](#-getting-started)
-- [Building](#-building--running-tests)
-- [Roadmap](#-roadmap)
+
+- **Core Modules**
+
+  <details>
+  <summary>🧮 High‑Precision Arithmetic (<code>qfloat</code>)</summary>
+  <br>
+
+  &nbsp;&nbsp;• [Overview](#-highprecision-arithmetic-qfloat)  
+  &nbsp;&nbsp;• [Example: High‑Precision Lambert W Function](#-example-highprecision-lambert-w-function)  
+  &nbsp;&nbsp;• [Internal Architecture — <code>qfloat</code>](#-internal-architecture--qfloat)
+
+  </details>
+
+  <details>
+  <summary>🔧 Differentiable Values (<code>dval_t</code>)</summary>
+  <br>
+
+  &nbsp;&nbsp;• [Overview](#-differentiable-values-dval_t)  
+  &nbsp;&nbsp;• [Example: Single‑Variable Expression with First and Second Derivatives](#-example-singlevariable-expression-with-first-and-second-derivatives)  
+  &nbsp;&nbsp;• [Internal Architecture — <code>dval_t</code>](#-internal-architecture--dval_t)
+
+  </details>
+
+  <details>
+  <summary>📅 Civil & Astronomical Datetime (<code>datetime_t</code>)</summary>
+  <br>
+
+  &nbsp;&nbsp;• [Overview](#-civil--astronomical-datetime-datetime_t)  
+  &nbsp;&nbsp;• [Example: Chinese New Year Calculation](#-example-chinese-new-year-calculation)  
+  &nbsp;&nbsp;• [Internal Architecture — <code>datetime_t</code>](#-internal-architecture--datetime_t)
+
+  </details>
+
+  <details>
+  <summary>📚 Generic Dictionary (<code>dictionary_t</code>)</summary>
+  <br>
+
+  &nbsp;&nbsp;• [Overview](#-generic-dictionary-dictionary_t)  
+  &nbsp;&nbsp;• [Example: Deep‑Copied Keys and Values](#-example-deepcopied-keys-and-values)  
+  &nbsp;&nbsp;• [Example: Integer Keys and Deep‑Copied String Values](#-example-integer-keys-and-deepcopied-string-values)  
+  &nbsp;&nbsp;• [Internal Architecture — <code>dictionary_t</code>](#-internal-architecture--dictionary_t)
+
+  </details>
+
+  <details>
+  <summary>🧩 Generic Hash Set (<code>set_t</code>)</summary>
+  <br>
+
+  &nbsp;&nbsp;• [Overview](#-generic-hash-set-set_t)  
+  &nbsp;&nbsp;• [Example: String Set With Deep‑Copied Elements](#-example-string-set-with-deepcopied-elements)  
+  &nbsp;&nbsp;• [Internal Architecture — <code>set_t</code>](#-internal-architecture--set_t)
+
+  </details>
+
+  <details>
+  <summary>🔤 UTF‑8 String Type (<code>string_t</code>)</summary>
+  <br>
+
+  &nbsp;&nbsp;• [Overview](#-utf8-string-type-string_t)  
+  &nbsp;&nbsp;• [Example: Basic UTF‑8 Manipulation](#-example-basic-utf8-manipulation)  
+  &nbsp;&nbsp;• [Example: Grapheme Iteration](#-example-grapheme-iteration)  
+  &nbsp;&nbsp;• [Example: Using the Builder API](#-example-using-the-builder-api)  
+  &nbsp;&nbsp;• [Internal Architecture — <code>string_t</code>](#-internal-architecture--string_t)
+
+  </details>
+
+- [Directory Structure](#-directory-structure)  
+- [Getting Started](#-getting-started)  
+- [Building](#-building--running-tests)  
+- [Roadmap](#-roadmap)  
 - [License](#-license)
 
 ---
@@ -510,8 +575,6 @@ This makes it suitable for:
 - symbolic‑numeric hybrid workflows  
 - any system requiring reliable derivative information  
 
-</details>
-
 ---
 
 # 📅 **Civil & Astronomical Datetime (`datetime_t`)**
@@ -711,8 +774,6 @@ This makes it suitable for:
 
 This architecture provides a robust foundation for any system requiring
 reliable, high‑precision timekeeping.
-
-</details>
 
 ---
 
@@ -1161,6 +1222,13 @@ and avoids the pitfalls of pointer‑based hash sets.
 ---
 
 # 🔤 **UTF‑8 String Type (`string_t`)**
+
+### **Sections**
+- [Overview](#-utf8-string-type-string_t)
+- [Example: Basic UTF‑8 Manipulation](#-example-basic-utf8-manipulation)
+- [Example: Grapheme Iteration](#-example-grapheme-iteration)
+- [Example: Using the Builder API](#-example-using-the-builder-api)
+- [Internal Architecture](#-internal-architecture--string_t)
 
 A dynamic, UTF‑8‑aware string type with safe modification, substring extraction,  
 searching, splitting, joining, Unicode normalization, grapheme‑cluster operations,  
