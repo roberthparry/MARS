@@ -1,4 +1,4 @@
-# **OOC — A Modular C Library for High‑Precision Numerics, Automatic Differentiation,  Navigation‑Grade Datetime handling, UTF‑8 Strings, and Robust Generic Containers**
+# **OOC — A Modular C Library for High‑Precision Numerics, Automatic Differentiation, Navigation‑Grade Datetime handling, UTF‑8 Strings, and Robust Generic Containers**
 
 OOC is a modular, portable C library designed for correctness, clarity, and long‑term maintainability.  
 It provides:
@@ -39,22 +39,16 @@ Every module is self‑contained, header‑driven, and usable independently.
 
 ---
 
-## 🧩 **Core Modules**
-
-### **Module Overview**
-
-| Module        | Purpose | Highlights |
-|---------------|---------|------------|
-| `qfloat`      | Double‑double precision arithmetic | Elementary & special functions, exact parsing, `%q`/`%Q` formatting |
-| `dval_t`      | Differentiable values | Lazy DAG, automatic differentiation, reference counting |
-| `datetime_t`  | Civil & astronomical datetime | Julian Day, sunrise/sunset, moon phase, formatting engine |
-| `dictionary_t`| Generic key/value dictionary | Value‑semantics, stable entry handles, lazy sorted views |
-| `set_t`       | Generic hash set | Dense arena, set algebra, lazy sorted iteration |
-| `string_t`    | UTF‑8 dynamic string | Normalization, graphemes, builder API, split/join |
+# 🧩 **Core Modules**
 
 ---
 
-## 🧮 **High‑Precision Arithmetic (`qfloat`)**
+# 🧮 **High‑Precision Arithmetic (`qfloat`)**
+
+### **Sections**
+- Overview  
+- Example  
+- Internal Architecture  
 
 A double‑double precision floating‑point type (~106 bits, ~32 decimal digits) implemented as an unevaluated sum of two IEEE‑754 doubles. Includes:
 
@@ -71,11 +65,9 @@ A double‑double precision floating‑point type (~106 bits, ~32 decimal digits
 The Lambert W function solves the equation:
 
 
-
 \[
-W(x)\,e^{W(x)} = x
+W(x)\, e^{W(x)} = x
 \]
-
 
 
 and appears in combinatorics, physics, nonlinear equations, and delay‑differential systems.  
@@ -131,15 +123,139 @@ W0(-0.3678794411714423215955237701614609) = -1
 
 ---
 
-## 🔧 **Differentiable Values (`dval_t`)**
+### 🧩 **Internal Architecture — `qfloat`**
+
+`qfloat` implements **double‑double precision arithmetic**, representing each
+high‑precision number as the unevaluated sum of two IEEE‑754 doubles:
+
+```
+qfloat = hi + lo
+```
+
+where:
+
+- **hi** holds the leading ~53 bits  
+- **lo** holds the trailing error term  
+- together they provide ~106 bits of precision (~32 decimal digits)
+
+This representation is compact, portable, and requires no special hardware.
+
+---
+
+#### **1. Error‑Free Transformations (EFTs)**
+
+At the core of `qfloat` are the classic Dekker/Knuth algorithms:
+
+- **TwoSum** — exact addition of two doubles  
+- **TwoProd** — exact multiplication using FMA when available  
+- **QuickTwoSum** — fast normalization when |a| ≥ |b|  
+
+These primitives allow `qfloat` to track rounding error explicitly, producing
+a correctly rounded high‑precision result.
+
+All higher‑level operations (addition, subtraction, multiplication, division)
+are built on top of these EFTs.
+
+---
+
+#### **2. Normalization**
+
+Every operation produces a temporary `(hi, lo)` pair that may not be in
+canonical form. `qfloat` normalizes results so that:
+
+- `hi` contains the dominant magnitude  
+- `lo` is small enough that `hi + lo` is exact  
+- no precision is silently lost  
+
+Normalization ensures stable behaviour across all operations and prevents
+error accumulation.
+
+---
+
+#### **3. Elementary Functions**
+
+Functions such as:
+
+- `exp`, `log`, `sin`, `cos`, `tan`  
+- `sqrt`, `pow`  
+- `atan2`, `hypot`  
+
+are implemented using:
+
+- argument reduction  
+- high‑precision polynomial or rational approximations  
+- Newton iterations where appropriate  
+- careful reconstruction of the final `(hi, lo)` pair  
+
+This allows `qfloat` to deliver consistent ~106‑bit accuracy across the entire
+domain of each function.
+
+---
+
+#### **4. Special Functions**
+
+`qfloat` includes high‑precision implementations of:
+
+- gamma  
+- erf / erfc  
+- Lambert W  
+- incomplete gamma  
+- and others  
+
+These functions rely on:
+
+- asymptotic expansions  
+- continued fractions  
+- Newton refinement  
+- high‑precision exponentials and logarithms  
+
+The double‑double core ensures stable convergence even for numerically
+difficult inputs.
+
+---
+
+#### **5. Parsing and Formatting**
+
+`qfloat` supports:
+
+- exact decimal parsing  
+- high‑precision formatting  
+- `%q` / `%Q` printf extensions  
+
+Parsing converts decimal strings into a normalized `(hi, lo)` pair without
+losing precision. Formatting uses high‑precision digit extraction to produce
+correctly rounded output.
+
+---
+
+#### **Why Double‑Double?**
+
+The double‑double format offers an ideal balance between:
+
+- **precision** (~106 bits)  
+- **performance** (2×–5× slower than double, far faster than arbitrary precision)  
+- **portability** (pure C, no compiler extensions)  
+- **predictability** (deterministic behaviour across platforms)  
+
+This makes `qfloat` suitable for:
+
+- numerical analysis  
+- scientific computing  
+- root‑finding and optimization  
+- high‑precision transcendental functions  
+- symbolic differentiation backends  
+- anywhere IEEE‑754 double is not quite enough  
+
+---
+
+# 🔧 **Differentiable Values (`dval_t`)**
+
+### **Sections**
+- Overview  
+- Example  
+- Internal Architecture (collapsible)  
 
 A lazy, vtable‑driven, reference‑counted DAG of differentiable expressions (automatic differentiation).
-
-- variables, constants, named values  
-- arithmetic and transcendental operators  
-- lazy derivative construction (`dv_get_deriv`)  
-- owning vs borrowed handles with strict lifetime rules  
-- symbolic printing and numeric evaluation via `qfloat`  
 
 ---
 
@@ -239,7 +355,165 @@ f''(x)  = 3.8055231012396292258221776404244160
 
 ---
 
-## 📅 **Civil & Astronomical Datetime (`datetime_t`)**
+<details>
+<summary><strong>🧩 Internal Architecture — <code>dval_t</code></strong></summary>
+
+<br>
+
+`dval_t` implements **forward‑mode automatic differentiation** using a compact,
+reference‑counted DAG of computation nodes. Each `dval_t` represents a value
+in an expression tree, and carries both:
+
+- its **numerical value**, and  
+- a pointer to a **derivative node** describing how it was computed  
+
+This design allows derivatives to be computed automatically by propagating
+derivative information through the DAG.
+
+---
+
+#### **1. Node Types and Vtables**
+
+Each node in the DAG is represented by a small struct containing:
+
+- the node’s operator type (add, mul, sin, exp, etc.)  
+- pointers to child nodes  
+- a vtable describing how to:
+  - evaluate the node  
+  - compute its derivative  
+  - destroy it  
+
+This vtable‑driven design makes the system:
+
+- extensible (new operators can be added easily)  
+- compact (no giant switch statements)  
+- predictable (each operator defines its own derivative rule)
+
+---
+
+#### **2. Value Semantics with Shared Nodes**
+
+A `dval_t` is a lightweight handle containing:
+
+- a `qfloat` numerical value  
+- a pointer to a shared DAG node  
+- a reference count  
+
+Multiple `dval_t` values may refer to the same node, allowing:
+
+- cheap copies  
+- cheap expression composition  
+- safe destruction when the last reference is released  
+
+This gives `dval_t` the feel of a value type, while internally using a shared
+graph for efficiency.
+
+---
+
+#### **3. Forward‑Mode Derivative Propagation**
+
+When differentiating an expression with respect to a variable `x`, the system
+constructs a parallel DAG of derivative nodes.
+
+Each operator defines its own derivative rule. For example:
+
+- addition: `(u + v)' = u' + v'`  
+- multiplication: `(u * v)' = u' * v + u * v'`  
+- sine: `(sin u)' = cos(u) * u'`  
+- exp: `(exp u)' = exp(u) * u'`  
+
+The derivative DAG mirrors the structure of the original expression, and is
+evaluated using the same vtable mechanism.
+
+This approach supports:
+
+- nested expressions  
+- repeated subexpressions  
+- arbitrary operator composition  
+
+---
+
+#### **4. Memory Management and Ownership**
+
+Each node is reference‑counted.  
+When a `dval_t` is copied, the node’s refcount increases.  
+When a `dval_t` is destroyed, the refcount decreases.
+
+When the count reaches zero:
+
+- the node’s children are released  
+- the node’s vtable `destroy` function is called  
+- the node’s memory is freed  
+
+This ensures:
+
+- no leaks  
+- no double‑frees  
+- safe sharing of subexpressions  
+- efficient reuse of common subtrees  
+
+---
+
+#### **5. Evaluation**
+
+Evaluating a `dval_t` simply returns its stored `qfloat` value.  
+Evaluating a derivative involves:
+
+- recursively evaluating the derivative DAG  
+- using high‑precision `qfloat` arithmetic  
+- applying each operator’s derivative rule  
+
+Because the DAG is acyclic and nodes are shared, evaluation is efficient and
+avoids redundant computation.
+
+---
+
+#### **6. Why a DAG?**
+
+Using a DAG instead of a simple tree provides:
+
+- **common subexpression sharing**  
+- **lower memory usage**  
+- **faster derivative evaluation**  
+- **clean semantics for value copying**  
+- **a natural path to future extensions**  
+  - multivariate AD  
+  - reverse‑mode AD  
+  - operator overloading layers  
+
+The current implementation focuses on single‑variable forward‑mode AD, but the
+architecture is intentionally general.
+
+---
+
+#### **Summary**
+
+`dval_t` is a compact, extensible automatic‑differentiation engine built on:
+
+- reference‑counted DAG nodes  
+- vtable‑driven operator semantics  
+- high‑precision `qfloat` arithmetic  
+- clean value semantics  
+- predictable memory ownership  
+
+This makes it suitable for:
+
+- numerical optimization  
+- root‑finding  
+- sensitivity analysis  
+- symbolic‑numeric hybrid workflows  
+- any system requiring reliable derivative information  
+
+</details>
+
+---
+
+# 📅 **Civil & Astronomical Datetime (`datetime_t`)**
+
+### **Sections**
+- Overview  
+- Example  
+- Internal Architecture (collapsible)  
 
 A high‑level civil datetime type with full Gregorian calendar support, Julian Day conversions, timezone/DST helpers, sunrise/sunset algorithms, moon‑phase computation, and a rich formatting engine.
 
@@ -319,7 +593,131 @@ Chinese New Year 2025: 2025-01-29
 
 ---
 
-## 📚 **Generic Dictionary (`dictionary_t`)**
+<details>
+<summary><strong>🧩 Internal Architecture — <code>datetime_t</code></strong></summary>
+
+<br>
+
+`datetime_t` provides a unified, high‑precision system for civil timekeeping,
+astronomical time scales, and solar/lunar calculations.
+
+Its **time representation and time‑scale conversions are navigation‑grade**  
+(precise, deterministic, suitable for astronomical timekeeping), while its  
+**solar and lunar algorithms are civil‑grade**, accurate to about a minute for sunset/sunrise and about 12 hours for moon phase
+intended for calendar and observational use—not navigation.
+
+The module is built on **three cooperating layers**:
+
+---
+
+#### **1. Civil Time Layer (Gregorian Calendar)**
+
+The civil layer handles:
+
+- year/month/day arithmetic  
+- leap‑year rules (Gregorian, proleptic Gregorian)  
+- day‑of‑week computation  
+- month and year boundaries  
+- safe addition/subtraction of days, months, and years  
+
+All civil operations use deterministic integer arithmetic.  
+Conversions between civil dates and Julian Day Numbers (JDN) use the
+Fliegel–Van Flandern algorithm for correctness, speed, and portability.
+
+`datetime_t` stores time internally with **millisecond granularity**, using double
+precision floating point seconds since a defined epoch. This provides:
+
+- stable, platform‑independent behaviour  
+- no floating‑point drift  
+- predictable arithmetic over long time spans  
+
+---
+
+#### **2. Astronomical Time Scales (Navigation‑Grade)**
+
+`datetime_t` implements precise, deterministic conversions between the
+astronomical time scales used in navigation, ephemeris computation, and
+scientific work:
+
+- **UTC** — Coordinated Universal Time  
+- **TAI** — International Atomic Time  
+- **TT** — Terrestrial Time  
+- **UT1** — Earth rotation time  
+- **JD / MJD** — Julian and Modified Julian Dates  
+
+The system handles:
+
+- leap seconds  
+- TAI ↔ UTC conversion  
+- UT1 drift  
+- ΔT (TT − UT1)  
+
+These conversions are **navigation‑grade**:  
+explicit, deterministic, and independent of OS time libraries or timezone
+databases.
+
+---
+
+#### **3. Solar and Lunar Algorithms (Civil‑Grade)**
+
+`datetime_t` includes algorithms for:
+
+- sunrise and sunset  
+- solar noon  
+- equation of time  
+- approximate solar position  
+- lunar phase and illumination  
+
+These are based on Meeus‑style trigonometric series and low‑order polynomial
+approximations.
+
+They are **civil‑grade**:
+
+- typically accurate to **about one minute**  
+- suitable for calendars, planning, and general observational astronomy  
+- **not intended for navigation**, ephemeris generation, or applications
+  requiring sub‑minute accuracy  
+
+---
+
+#### **4. Value‑Semantic API**
+
+`datetime_t` is a pure value type:
+
+- no hidden allocations  
+- no global state  
+- no timezone database dependencies  
+- deterministic behaviour across platforms  
+
+This makes it suitable for:
+
+- embedded systems  
+- deterministic simulations  
+- scientific computing  
+- long‑running services  
+
+---
+
+#### **Summary**
+
+- **Time representation & time‑scale conversions** → *navigation‑grade*  
+- **Solar & lunar algorithms** → *civil‑grade (≈1‑minute accuracy)*  
+- **Internal representation** → *millisecond granularity*
+- **API** → value‑semantic, deterministic, portable  
+
+This architecture provides a robust foundation for any system requiring
+reliable, high‑precision timekeeping.
+
+</details>
+
+---
+
+# 📚 **Generic Dictionary (`dictionary_t`)**
+
+### **Sections**
+- Overview  
+- Examples  
+- Internal Architecture  
 
 A typed, generic key/value dictionary with user‑defined hash/compare/clone/destroy callbacks, stable entry handles, and lazy sorted views.
 
@@ -499,7 +897,90 @@ Value for key 6: world
 
 ---
 
-## 🧩 **Generic Hash Set (`set_t`)**
+### 🧩 **Internal Architecture — `dictionary_t`**
+
+`dictionary_t` is built on a compact, arena‑based storage model designed for
+predictable performance, stable element lifetimes, and flexible ownership
+semantics.
+
+Unlike a naive hash map that stores key/value pairs directly in hash buckets,
+`dictionary_t` uses **three cooperating components**:
+
+---
+
+#### **1. Key Arena**
+
+A contiguous arena that stores *copies* of all keys.  
+Keys never move once inserted, which makes:
+
+- hashing stable  
+- sorted views efficient  
+- key handles safe to keep  
+
+Keys are cloned using the user‑supplied `key_clone` callback (or memcpy for
+shallow copies).
+
+---
+
+#### **2. Value Arena**
+
+A second arena that stores *copies* of all values.  
+Values have independent clone/destroy semantics, allowing:
+
+- deep‑copied values  
+- shallow‑copied keys  
+- or vice‑versa  
+
+This separation is what enables the dictionary to support fully value‑semantic
+behaviour.
+
+---
+
+#### **3. Entry Table (Hash Table)**
+
+A hash table mapping each key to a pair of arena indices:
+
+```
+(key_index, value_index)
+```
+
+Each entry stores:
+
+- the precomputed hash  
+- the index of the key in the key arena  
+- the index of the value in the value arena  
+
+This design ensures:
+
+- fast lookups  
+- stable storage  
+- no pointer invalidation  
+- efficient cloning and destruction  
+
+---
+
+#### **Why two arenas?**
+
+Storing keys and values in separate arenas provides:
+
+- independent clone/destroy behaviour  
+- stable storage for both keys and values  
+- efficient sorted views  
+- predictable memory layout  
+- clean value‑semantics without hidden allocations  
+
+This makes `dictionary_t` suitable for use in systems where memory ownership,
+determinism, and predictable behaviour matter — such as embedded systems,
+numerical computing, or long‑running services.
+
+---
+
+# 🧩 **Generic Hash Set (`set_t`)**
+
+### **Sections**
+- Overview  
+- Example  
+- Internal Architecture  
 
 A typed hash set with dense arena storage, precomputed hashes, lazy sorted views,  
 and full set algebra.
@@ -599,7 +1080,81 @@ Duplicate 'hello' was not added
 
 ---
 
-## 🔤 **UTF‑8 String Type (`string_t`)**
+### 🧩 **Internal Architecture — `set_t`**
+
+`set_t` is implemented using a compact, arena‑based storage model designed for
+predictable performance, stable element lifetimes, and efficient membership
+operations. Its design mirrors the dictionary’s arena strategy, but with a
+single arena because each element is a standalone value.
+
+The set consists of **two cooperating components**:
+
+---
+
+#### **1. Element Arena**
+
+A contiguous arena that stores *copies* of all elements.  
+Elements never move once inserted, which provides:
+
+- stable storage (no pointer invalidation)  
+- predictable iteration order (dense, gap‑free)  
+- efficient cloning and destruction  
+- clean value‑semantics  
+
+Elements are cloned using the user‑supplied `clone` callback (or memcpy for
+shallow copies). The arena owns all stored elements and frees them using the
+user‑supplied `destroy` callback.
+
+---
+
+#### **2. Hash Table**
+
+A hash table that maps each element’s hash to an index in the arena.
+
+Each entry stores:
+
+- the precomputed hash  
+- the index of the element in the arena  
+
+This allows:
+
+- fast membership checks  
+- O(1) average insertion  
+- O(1) average removal  
+- duplicate detection without re‑allocating or re‑cloning  
+
+---
+
+#### **Stable Storage and Deterministic Behaviour**
+
+Because elements live in a dense arena:
+
+- iteration is cache‑friendly  
+- removing an element swaps the last element into its slot, keeping the arena compact  
+- sorted views can be built lazily without disturbing the underlying storage  
+
+This makes `set_t` suitable for systems where memory ownership, determinism,
+and predictable behaviour matter — such as embedded systems, numerical
+computing, or long‑running services.
+
+---
+
+#### **Why an Arena?**
+
+Using an arena instead of allocating each element individually provides:
+
+- fewer allocations  
+- stable element lifetimes  
+- simpler clone/destroy semantics  
+- predictable memory layout  
+- efficient bulk operations  
+
+The result is a robust, value‑semantic set container that behaves consistently
+and avoids the pitfalls of pointer‑based hash sets.
+
+---
+
+# 🔤 **UTF‑8 String Type (`string_t`)**
 
 A dynamic, UTF‑8‑aware string type with safe modification, substring extraction,  
 searching, splitting, joining, Unicode normalization, grapheme‑cluster operations,  
@@ -607,47 +1162,39 @@ and a fixed‑capacity buffer API.
 
 **Features**
 - Dynamic UTF‑8 string with automatic growth  
-- Append, insert, trim, replace, reverse  
-- UTF‑8 codepoint and grapheme‑cluster iteration  
-- Unicode normalization (NFC, NFD, NFKC, NFKD)  
-- Split/join (owning and non‑owning views)  
-- `string_builder_t` convenience API  
-- Fixed‑capacity buffer for stack‑allocated strings  
-- Hashing, substring extraction, prefix/suffix tests  
+- Append, insert, trim, replace, remove  
+- Unicode normalization (NFC, NFD)  
+- Grapheme‑cluster iteration  
+- Substring extraction by codepoint or grapheme index  
+- UTF‑8 validation and repair  
+- Builder API for efficient incremental construction  
+- Split/join helpers  
+- Comparison, hashing, formatting helpers  
+- Fixed‑capacity stack buffer API (`string_buf_t`)  
 
 ---
 
-### 📘 **Example: Splitting, Trimming, and Joining UTF‑8 Strings**
-
-This example demonstrates how to split a UTF‑8 string, trim whitespace from  
-each part, and join the results using a custom separator.
+### 📘 **Example: Basic UTF‑8 Manipulation**
 
 ```c
 #include <stdio.h>
-#include "ustring.h"
+#include "string.h"
 
 int main(void) {
-    /* Original string with inconsistent spacing */
-    string_t *s = string_new_with("alpha, beta , gamma ,delta");
+    string_t s = string_make("Héllo");
 
-    /* Split on commas */
-    size_t n = 0;
-    string_t **parts = string_split(s, ",", &n);
+    /* Append UTF‑8 text */
+    string_append(&s, " 🌍");
 
-    /* Trim whitespace from each part */
-    for (size_t i = 0; i < n; i++)
-        string_trim(parts[i]);
+    /* Insert at grapheme index */
+    string_insert(&s, 1, "🙂");
 
-    /* Join using a new separator */
-    string_t *joined = string_join(parts, n, " | ");
+    /* Normalize to NFC */
+    string_normalize_nfc(&s);
 
-    printf("Joined: %s\n", string_c_str(joined));
+    printf("%s\n", string_cstr(&s));
 
-    /* Cleanup */
-    string_free(joined);
-    string_split_free(parts, n);
-    string_free(s);
-
+    string_free(&s);
     return 0;
 }
 ```
@@ -655,12 +1202,195 @@ int main(void) {
 #### Example Output
 
 ```
-Joined: alpha | beta | gamma | delta
+H🙂éllo 🌍
 ```
 
 ---
 
-## 🗂 **Directory Structure**
+### 📘 **Example: Grapheme Iteration**
+
+```c
+#include "string.h"
+#include <stdio.h>
+
+int main(void) {
+    string_t s = string_make("👨‍👩‍👧‍👦 family");
+
+    size_t count = string_grapheme_count(&s);
+
+    printf("Graphemes: %zu\n", count);
+
+    for (size_t i = 0; i < count; i++) {
+        string_t g = string_grapheme_at(&s, i);
+        printf("[%zu] %s\n", i, string_cstr(&g));
+        string_free(&g);
+    }
+
+    string_free(&s);
+}
+```
+
+#### Example Output
+
+```
+Graphemes: 7
+[0] 👨‍👩‍👧‍👦
+[1]  
+[2] f
+[3] a
+[4] m
+[5] i
+[6] l
+[7] y
+```
+
+---
+
+### 📘 **Example: Using the Builder API**
+
+```c
+#include "string.h"
+#include <stdio.h>
+
+int main(void) {
+    string_builder_t b;
+    string_builder_init(&b);
+
+    string_builder_append(&b, "Hello");
+    string_builder_append(&b, ", ");
+    string_builder_append(&b, "世界");
+
+    string_t out = string_builder_finish(&b);
+
+    printf("%s\n", string_cstr(&out));
+
+    string_free(&out);
+    return 0;
+}
+```
+
+#### Example Output
+
+```
+Hello, 世界
+```
+
+---
+
+### 🧩 **Internal Architecture — `string_t`**
+
+`string_t` is built around a **UTF‑8 aware dynamic buffer** with strict invariants:
+
+- the buffer always contains valid UTF‑8  
+- operations preserve grapheme boundaries  
+- normalization uses canonical Unicode algorithms  
+- growth is amortized and predictable  
+- no hidden allocations beyond the buffer itself  
+
+The design emphasizes:
+
+- **safety** (never split a codepoint or grapheme)  
+- **performance** (fast ASCII path, cached length)  
+- **correctness** (Unicode‑compliant normalization and iteration)  
+
+---
+
+#### **1. Internal Representation**
+
+A `string_t` stores:
+
+- a `char *data` buffer  
+- a `size_t length_bytes`  
+- a `size_t capacity_bytes`  
+- a cached `size_t length_graphemes` (lazy)  
+
+The buffer is always NUL‑terminated for convenience, but the type is not limited to C‑string semantics.
+
+---
+
+#### **2. UTF‑8 Validation and Repair**
+
+All constructors validate UTF‑8 input.  
+Invalid sequences are replaced with U+FFFD (replacement character).
+
+This ensures:
+
+- safe iteration  
+- predictable normalization  
+- no undefined behaviour  
+
+---
+
+#### **3. Grapheme‑Cluster Engine**
+
+Grapheme iteration uses:
+
+- Unicode Standard Annex #29  
+- extended grapheme cluster rules  
+- correct handling of:
+  - emoji sequences  
+  - ZWJ sequences  
+  - combining marks  
+  - Hangul syllables  
+
+This allows operations like:
+
+- `string_grapheme_at`  
+- `string_insert`  
+- `string_remove_range`  
+
+to behave intuitively.
+
+---
+
+#### **4. Normalization**
+
+Normalization uses:
+
+- canonical decomposition (NFD)  
+- canonical composition (NFC)  
+- Unicode decomposition tables  
+- combining‑class sorting  
+
+This ensures that visually identical strings compare equal.
+
+---
+
+#### **5. Builder API**
+
+`string_builder_t` provides:
+
+- amortized O(1) append  
+- no intermediate UTF‑8 validation  
+- final validation on `finish()`  
+
+This is ideal for:
+
+- log messages  
+- serialization  
+- incremental construction  
+
+---
+
+#### **6. Fixed‑Capacity Buffer (`string_buf_t`)**
+
+A stack‑allocated buffer with:
+
+- fixed capacity  
+- safe UTF‑8 append  
+- automatic truncation at grapheme boundaries  
+
+Useful for:
+
+- formatting  
+- temporary strings  
+- embedded systems  
+
+---
+
+# 📁 **Directory Structure**
+
+A clean, modular layout designed for clarity and maintainability:
 
 ```
 include/                Public headers
@@ -691,83 +1421,122 @@ Makefile                Build rules for debug/release/test
 README.md               This file
 ```
 
+Each module is self‑contained and can be used independently.
+
 ---
 
-## 🧰 **Getting Started**
+# 🚀 **Getting Started**
 
-### 1. Clone the repository
+### **1. Clone the repository**
+
 ```
 git clone https://github.com/yourname/ooc.git
 cd ooc
 ```
 
-### 2. Build the library
+### **2. Build the library**
+
 ```
 make release
 ```
 
-### 3. Run the test suite
-```
-make debug test_all
-```
+This produces:
 
-### 4. Include headers in your project
+- `build/release/libooc.a`  
+- module‑specific object files  
+- optional test binaries  
+
+### **3. Include the headers you need**
+
 ```c
 #include "qfloat.h"
 #include "dval.h"
 #include "datetime.h"
 #include "dictionary.h"
 #include "set.h"
-#include "ustring.h"
+#include "string.h"
+```
+
+### **4. Link with the library**
+
+```
+gcc your_program.c -Iinclude -Lbuild/release -looc -lm
 ```
 
 ---
 
-## 🔧 **Building**
+# 🧪 **Building & Running Tests**
 
-The Makefile supports flexible targets for building, testing, and memory‑checking.
+### **Build all tests**
 
-### Basic builds
 ```
-make clean
-make release
-make debug
+make test
 ```
 
-### Running specific tests
+### **Run the full suite**
+
 ```
-make debug test_qfloat
-make debug test_dval
-make release test_set
+./build/test/all_tests
 ```
 
-### Memory‑checking (Valgrind)
+### **Run a specific module’s tests**
+
 ```
-make debug memtest_dval
-make debug memtest_set
+./build/test/test_qfloat
+./build/test/test_dval
+./build/test/test_datetime
+./build/test/test_dictionary
+./build/test/test_set
+./build/test/test_string
 ```
 
-**Notes**
-- `debug` builds include assertions, symbols, and diagnostics  
-- `release` builds are optimized and stripped  
-- Test binaries appear under `tests/build/<config>/`  
+All tests are written in plain C with no external dependencies.
 
 ---
 
-## 🛣 **Roadmap**
+# 🗺️ **Roadmap**
 
-- A better test suite  
-- More simplification rules for symbolic expressions  
-- Additional qfloat kernels  
-- GitHub Actions CI  
-- Documentation site  
-- Benchmarks and performance suite  
-- More datetime utilities  
-- More containers  
-- Example gallery based on real test code  
+Planned enhancements include:
+
+### **qfloat**
+- Additional special functions  
+- Improved argument‑reduction for trig functions  
+- Optional quad‑precision backend  
+
+### **dval_t**
+- Reverse‑mode AD  
+- Multivariate support  
+- JIT‑compiled derivative evaluation  
+
+### **datetime_t**
+- More holiday algorithms  
+- Optional timezone database integration  
+- Ephemeris‑grade solar/lunar algorithms (configurable)  
+
+### **dictionary_t / set_t**
+- Ordered dictionary variant  
+- Persistent/immutable variants  
+- SIMD‑accelerated hashing  
+
+### **string_t**
+- Regex engine  
+- Rope‑based large‑string backend  
+- Locale‑aware collation  
 
 ---
 
-## 📄 **License**
+# 📄 **License**
 
-MIT (or whichever you choose)
+MIT License — see `LICENSE` for details.
+
+---
+
+# 🎉 **Thank You**
+
+OOC is designed to be:
+
+- clean  
+- predictable  
+- portable  
+- enjoyable to use  
+
