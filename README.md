@@ -5,7 +5,7 @@ It provides:
 
 - high‑precision arithmetic (`qfloat`)
 - differentiable values (`dval_t`)
-- civil & astronomical datetime utilities (`datetime_t`)
+- a civil & astronomical datetime (`datetime_t`)
 - generic dictionary and set types
 - a UTF‑8 aware dynamic string type
 - a suite of supporting algorithms and helpers
