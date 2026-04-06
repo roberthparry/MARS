@@ -1613,6 +1613,12 @@ Planned enhancements include:
 - Optional quad‑precision backend  
 
 ### **dval_t**
+- better simplification of expressions.
+- when that's all satisfactory, i'll aim to get a working dval_from_string()
+- implement multiple variables with partial derivatives
+- think about going further than forward-mode AD
+- use it to bootstrap my qfloat kernels
+- dval_t must be able to support all the functions in qfloat - so we'll need to be able to differentiate all the special functions.
 - Reverse‑mode AD  
 - Multivariate support  
 - JIT‑compiled derivative evaluation  
