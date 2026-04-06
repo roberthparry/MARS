@@ -130,13 +130,10 @@ extern int tests_skipped;
             int passed  = total - failed;                                         \
                                                                                   \
             printf(C_CYAN "GROUP: %s"                                             \
-                   " " C_RESET "(" C_YELLOW "%d SKIPPED" C_RESET                  \
-                   "," C_RED " %d FAILED" C_RESET                                 \
-                   "," C_GREEN " %d PASSED" C_RESET ")\n" C_RESET,                \
-                   #func,                                                         \
-                   skipped,                                                       \
-                   failed,                                                        \
-                   passed);                                                       \
+                   " " C_RESET "(" C_GREEN "%d passed" C_RESET                    \
+                   "," C_RED " %d failed" C_RESET                                 \
+                   "," C_YELLOW " %d skipped" C_RESET ")\n" C_RESET,              \
+                   #func, passed, failed, skipped);                               \
         } else if (tests_failed == failed_before) {                               \
             printf(C_BOLD C_GREEN "PASS: " C_RESET "%s\n", #func);                \
         } else {                                                                  \
