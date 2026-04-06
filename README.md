@@ -1470,24 +1470,40 @@ gcc your_program.c -Iinclude -Lbuild/release -looc -lm
 ### **Build all tests**
 
 ```
-make test
+make debug
+make release
 ```
 
-### **Run the full suite**
+### **Remove all binaries**
 
 ```
-./build/test/all_tests
+make clean
 ```
 
 ### **Run a specific module’s tests**
 
 ```
-./build/test/test_qfloat
-./build/test/test_dval
-./build/test/test_datetime
-./build/test/test_dictionary
-./build/test/test_set
-./build/test/test_string
+make debug test_qfloat
+```
+or
+```
+make test_qfloat
+```
+```
+make test_dval
+make test_datetime
+make test_dictionary
+make test_set
+make test_string
+```
+
+### **Run a specific test and check for memmory leaks (valgrind)**
+```
+make memtest_dval
+make memtest_datetime
+make memtest_dictionary
+make memtest_set
+make memtest_string
 ```
 
 All tests are written in plain C with no external dependencies.
