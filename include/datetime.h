@@ -6,41 +6,41 @@ typedef struct _datetime_t datetime_t;
 
 /// @brief the month type (1..12)
 typedef enum _month_t {
-    January = 1,
-    February,
-    March,
-    April,
-    May,
-    June,
-    July,
-    August,
-    September,
-    October,
-    November,
-    December
+    DT_January = 1,
+    DT_February,
+    DT_March,
+    DT_April,
+    DT_May,
+    DT_June,
+    DT_July,
+    DT_August,
+    DT_September,
+    DT_October,
+    DT_November,
+    DT_December
 } month_t;
 
 /// @brief the weekday type (1..7)
 typedef enum _weekday_t {
-    Sunday = 1,
-    Monday,
-    Tuesday,
-    Wednesday,
-    Thursday,
-    Friday,
-    Saturday
+    DT_Sunday = 1,
+    DT_Monday,
+    DT_Tuesday,
+    DT_Wednesday,
+    DT_Thursday,
+    DT_Friday,
+    DT_Saturday
 } weekday_t;
 
 /// @brief the moon phase type
 typedef enum _moon_phase_t {
-    NewMoon = 0,
-    WaxingCrescent,
-    FirstQuarter,
-    WaxingGibbous,
-    FullMoon,
-    WaningGibbous,
-    LastQuarter,
-    WaningCrescent
+    DT_NewMoon = 0,
+    DT_WaxingCrescent,
+    DT_FirstQuarter,
+    DT_WaxingGibbous,
+    DT_FullMoon,
+    DT_WaningGibbous,
+    DT_LastQuarter,
+    DT_WaningCrescent
 } moon_phase_t;
 
 /// @brief a struct to represent a span of time, e.g. for representing the difference between two datetimes, or for representing a duration
@@ -460,7 +460,7 @@ void datetime_setToSunsetTime(datetime_t *self, double latitude, double longitud
 ///        desired date, and the time components can be set to any value (they will not affect the moon phase calculation). 
 /// @return the moon phase for the given datetime object. The moon phase is returned as a value of the moon_phase_t enum, which 
 ///         represents the different phases of the moon (e.g. New Moon, Waxing Crescent, First Quarter, etc.). If the datetime object 
-///         is not initialised (i.e. its year component is SHRT_MAX), the function will return NewMoon as a default value.
+///         is not initialised (i.e. its year component is SHRT_MAX), the function will return DT_NewMoon as a default value.
 moon_phase_t datetime_moonPhase(const datetime_t *self);
 
 /// @brief find the next datetime with a specific moon phase after a given datetime. This function calculates the moon phase for 

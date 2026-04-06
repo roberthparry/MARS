@@ -27,7 +27,7 @@ void test_datetime_initWithYearMonthDay(void) {
     datetime_t *dt = datetime_initWithYearMonthDay(datetime_alloc(), 2024, 6, 15);
     ASSERT_NOT_NULL(dt);
     ASSERT_EQ_INT(datetime_getYear(dt), 2024);
-    ASSERT_EQ_INT(datetime_getMonth(dt), June);
+    ASSERT_EQ_INT(datetime_getMonth(dt), DT_June);
     ASSERT_EQ_INT(datetime_getDay(dt), 15);
     datetime_dealloc(dt);
 }
@@ -37,7 +37,7 @@ void test_datetime_initWithYearMonthDayTime(void) {
                                                        2024, 6, 15,
                                                        12, 30, 45.5);
     ASSERT_EQ_INT(datetime_getYear(dt), 2024);
-    ASSERT_EQ_INT(datetime_getMonth(dt), June);
+    ASSERT_EQ_INT(datetime_getMonth(dt), DT_June);
     ASSERT_EQ_INT(datetime_getDay(dt), 15);
     ASSERT_EQ_INT(datetime_getHour(dt), 12);
     ASSERT_EQ_INT(datetime_getMinute(dt), 30);
@@ -193,9 +193,9 @@ void test_datetime_initWithEasterSunday_basic(void) {
 
     ASSERT_NOT_NULL(dt);
     ASSERT_EQ_INT(datetime_getYear(dt), 2024);
-    ASSERT_EQ_INT(datetime_getMonth(dt), March);
+    ASSERT_EQ_INT(datetime_getMonth(dt), DT_March);
     ASSERT_EQ_INT(datetime_getDay(dt), 31);
-    ASSERT_EQ_INT(datetime_getWeekday(dt), Sunday);
+    ASSERT_EQ_INT(datetime_getWeekday(dt), DT_Sunday);
     ASSERT_EQ_INT(datetime_getHour(dt), 0);
     ASSERT_EQ_INT(datetime_getMinute(dt), 0);
     ASSERT_EQ_DOUBLE(datetime_getSecond(dt), 0.0, 1e-9);
@@ -205,9 +205,9 @@ void test_datetime_initWithEasterSunday_basic(void) {
 
 void test_datetime_initWithEasterSunday_known_dates(void) {
     struct { int year; month_t month; unsigned char day; } cases[] = {
-        {2000, April, 23},
-        {2025, April, 20},
-        {2026, April, 5},
+        {2000, DT_April, 23},
+        {2025, DT_April, 20},
+        {2026, DT_April, 5},
     };
 
     for (int i = 0; i < 3; i++) {
@@ -216,7 +216,7 @@ void test_datetime_initWithEasterSunday_known_dates(void) {
         ASSERT_EQ_INT(datetime_getYear(dt), cases[i].year);
         ASSERT_EQ_INT(datetime_getMonth(dt), cases[i].month);
         ASSERT_EQ_INT(datetime_getDay(dt), cases[i].day);
-        ASSERT_EQ_INT(datetime_getWeekday(dt), Sunday);
+        ASSERT_EQ_INT(datetime_getWeekday(dt), DT_Sunday);
 
         datetime_dealloc(dt);
     }
@@ -259,7 +259,7 @@ void test_datetime_initWithEasterSunday_always_sunday(void) {
 
     for (int i = 0; i < 8; i++) {
         datetime_t *dt = datetime_initWithEasterSunday(datetime_alloc(), years[i]);
-        ASSERT_EQ_INT(datetime_getWeekday(dt), Sunday);
+        ASSERT_EQ_INT(datetime_getWeekday(dt), DT_Sunday);
         datetime_dealloc(dt);
     }
 }
@@ -285,7 +285,7 @@ void test_datetime_initWithChineseNewYear_basic(void) {
 
     ASSERT_NOT_NULL(dt);
     ASSERT_EQ_INT(datetime_getYear(dt), 2024);
-    ASSERT_EQ_INT(datetime_getMonth(dt), February);
+    ASSERT_EQ_INT(datetime_getMonth(dt), DT_February);
     ASSERT_EQ_INT(datetime_getDay(dt), 10);
     ASSERT_EQ_INT(datetime_getHour(dt), 12);
     ASSERT_EQ_INT(datetime_getMinute(dt), 0);
@@ -296,12 +296,12 @@ void test_datetime_initWithChineseNewYear_basic(void) {
 
 void test_datetime_initWithChineseNewYear_known_dates(void) {
     struct { int year; month_t month; unsigned char day; } cases[] = {
-        {2020, January, 25},
-        {2021, February, 12},
-        {2022, February, 1},
-        {2023, January, 22},
-        {2024, February, 10},
-        {2025, January, 29},
+        {2020, DT_January, 25},
+        {2021, DT_February, 12},
+        {2022, DT_February, 1},
+        {2023, DT_January, 22},
+        {2024, DT_February, 10},
+        {2025, DT_January, 29},
     };
 
     for (int i = 0; i < 6; i++) {
@@ -443,10 +443,10 @@ void test_datetime_compare_greater(void) {
 }
 
 void test_datetime_daysInMonth(void) {
-    ASSERT_EQ_INT(datetime_daysInMonth(2024, February), 29);
-    ASSERT_EQ_INT(datetime_daysInMonth(2023, February), 28);
-    ASSERT_EQ_INT(datetime_daysInMonth(2024, April),    30);
-    ASSERT_EQ_INT(datetime_daysInMonth(2024, January),  31);
+    ASSERT_EQ_INT(datetime_daysInMonth(2024, DT_February), 29);
+    ASSERT_EQ_INT(datetime_daysInMonth(2023, DT_February), 28);
+    ASSERT_EQ_INT(datetime_daysInMonth(2024, DT_April),    30);
+    ASSERT_EQ_INT(datetime_daysInMonth(2024, DT_January),  31);
 }
 
 /* ------------------------------------------------------------------------- */

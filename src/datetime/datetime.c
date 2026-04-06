@@ -574,8 +574,8 @@ double datetime_getSecond(const datetime_t *self) {
 
 long datetime_julianDayNumberFromYearMonthDay(short year, month_t month, unsigned char day) {
     bool isGregorian = (year > 1582) ||
-                       (year == 1582 && month > October) || 
-                       (year == 1582 && month == October && day >= 15);
+                       (year == 1582 && month > DT_October) || 
+                       (year == 1582 && month == DT_October && day >= 15);
 
     int yr = year;
     int mn = month;
@@ -690,8 +690,8 @@ unsigned short datetime_daysInMonth(short year, month_t month)
 {
     static unsigned short daysInMonth[] = {0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
-    if (month < January || month > December) return 0;
-    if (month == February) return datetime_isLeapYear(year) ? 29 : 28;
+    if (month < DT_January || month > DT_December) return 0;
+    if (month == DT_February) return datetime_isLeapYear(year) ? 29 : 28;
     return daysInMonth[ month ];
 }
 
@@ -784,7 +784,7 @@ datetime_t *datetime_addMonths(datetime_t *self, int months)
     }
 
     if (self->day >= 29) {
-        if (self->month == February) {
+        if (self->month == DT_February) {
             // Handle February separately because of leap years
             int maxDay = datetime_isLeapYear(self->year) ? 29 : 28;
             if (self->day > maxDay) {
@@ -792,7 +792,7 @@ datetime_t *datetime_addMonths(datetime_t *self, int months)
             }
         } else {
             // Handle months with 30 days
-            if (self->month == April || self->month == June || self->month == September || self->month == November) {
+            if (self->month == DT_April || self->month == DT_June || self->month == DT_September || self->month == DT_November) {
                 if (self->day > 30) {
                     self->day = 30;
                 }
@@ -822,7 +822,7 @@ datetime_t *datetime_addYears(datetime_t *self, int years)
     } 
 
     self->year += years;
-    if (self->month == February && self->day == 29 && !datetime_isLeapYear(self->year)) {
+    if (self->month == DT_February && self->day == 29 && !datetime_isLeapYear(self->year)) {
         // If we are on February 29 and the new year is not a leap year, we need to adjust the day to February 28
         self->day = 28;
     }
@@ -1049,7 +1049,7 @@ double datetime_duration(const datetime_t *self, const datetime_t *datetime, dat
         if (days < 0) {
             int month = datetime->month;
             int year = datetime->year;
-            unsigned short daysInPrevMonth = datetime_daysInMonth(year, month == January ? December : month - 1);
+            unsigned short daysInPrevMonth = datetime_daysInMonth(year, month == DT_January ? DT_December : month - 1);
             days += daysInPrevMonth;
             months--;
         }
@@ -1704,14 +1704,14 @@ inline void datetime_setToSunsetTime(datetime_t *self, double latitude, double l
 ///        Julian Day Number and a known new moon date, divided by the length of a synodic month (the average time between new moons). The result is then multiplied by 8 and
 /// @param julianDayNumber the Julian Day Number to calculate the moon phase for. The Julian Day Number is a continuous count of days since the beginning of the Julian Period, which is used in astronomy and other fields to represent dates. It is calculated based on the date and time, and can be used to determine the position of celestial bodies, including the moon phase. 
 /// @return the moon phase for the given Julian Day Number. The moon phases are typically categorized as follows:
-///         NewMoon:        New Moon
-///         WaxingCrescent: Waxing Crescent
-///         FirstQuarter:   First Quarter
-///         WaxingGibbous:  Waxing Gibbous
-///         FullMoon:       Full Moon
-///         WaningGibbous:  Waning Gibbous
-///         LastQuarter:    Last Quarter
-///         WaningCrescent: Waning Crescent
+///         DT_NewMoon:        New Moon
+///         DT_WaxingCrescent: Waxing Crescent
+///         DT_FirstQuarter:   First Quarter
+///         DT_WaxingGibbous:  Waxing Gibbous
+///         DT_FullMoon:       Full Moon
+///         DT_WaningGibbous:  Waning Gibbous
+///         DT_LastQuarter:    Last Quarter
+///         DT_WaningCrescent: Waning Crescent
 static moon_phase_t datetime_moonPhaseOnJulianDayNumber(long julianDayNumber)
 {
     // The moon phase is calculated based on the difference between the given Julian Day Number and a known new moon date,
@@ -1739,7 +1739,7 @@ moon_phase_t datetime_moonPhase(const datetime_t *self)
 {
     long julianDayNumber = datetime_getJulianDayNumber(self);
     if (julianDayNumber == LONG_MAX) {
-        return NewMoon; // Default value if datetime is not initialised
+        return DT_NewMoon; // Default value if datetime is not initialised
     }
     return datetime_moonPhaseOnJulianDayNumber(julianDayNumber);
 }
