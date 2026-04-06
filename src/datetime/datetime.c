@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdint.h>
 #include <limits.h>
 #include <float.h>
 #include <math.h>
@@ -16,9 +17,9 @@
 typedef struct _datetime_t {
     short year;
     month_t month;
-    unsigned char day;
-    unsigned char hour;
-    unsigned char minute;
+    uint8_t day;
+    uint8_t hour;
+    uint8_t minute;
     double second;
     long JulianDayNumber;
     double JulianDay;
@@ -46,7 +47,7 @@ inline void datetime_dealloc(datetime_t *self)
     free(self);
 }
 
-datetime_t *datetime_initWithYearMonthDay(datetime_t *self, short year, month_t month, unsigned char day) {
+datetime_t *datetime_initWithYearMonthDay(datetime_t *self, short year, month_t month, uint8_t day) {
     self->year = year;
     self->month = month;
     self->day = day;
@@ -59,7 +60,7 @@ datetime_t *datetime_initWithYearMonthDay(datetime_t *self, short year, month_t 
 }
 
 datetime_t *datetime_initWithYearMonthDayTime(datetime_t *self,
-    short year, month_t month, unsigned char day, unsigned char hour, unsigned char minute, double second)
+    short year, month_t month, uint8_t day, uint8_t hour, uint8_t minute, double second)
 {
     self->year = year;
     self->month = month;
@@ -118,9 +119,9 @@ datetime_t *datetime_initWithCurrentDateTime(datetime_t *self) {
     tmdate = *localtime(&now);
     self->year = (short)(tmdate.tm_year + 1900);
     self->month = (month_t)(tmdate.tm_mon + 1);
-    self->day = (unsigned char)tmdate.tm_mday;
-    self->hour = (unsigned char)tmdate.tm_hour;
-    self->minute = (unsigned char)tmdate.tm_min;
+    self->day = (uint8_t)tmdate.tm_mday;
+    self->hour = (uint8_t)tmdate.tm_hour;
+    self->minute = (uint8_t)tmdate.tm_min;
     self->second = (double)tmdate.tm_sec;
     self->JulianDayNumber = LONG_MAX; // Mark as uninitialised
     self->JulianDay = DBL_MAX; // Mark as uninitialised
@@ -159,7 +160,7 @@ datetime_t *datetime_initWithEasterSunday(datetime_t *self, int year)
 
     self->year = (short)year;
     self->month = (month_t)(daysIntoYear / 31);
-    self->day = (unsigned char)((daysIntoYear % 31) + 1);
+    self->day = (uint8_t)((daysIntoYear % 31) + 1);
     self->hour = self->minute = self->second = 0.0;
     self->JulianDay = DBL_MAX;
     self->JulianDayNumber = LONG_MAX;
@@ -453,9 +454,9 @@ datetime_t *datetime_toGreenwichMeanTime(datetime_t *self)
     // Update the input datetime with GMT values
     self->year = (short)(gmtm->tm_year + 1900);
     self->month = (month_t)(gmtm->tm_mon + 1);
-    self->day = (unsigned char)gmtm->tm_mday;
-    self->hour = (unsigned char)gmtm->tm_hour;
-    self->minute = (unsigned char)gmtm->tm_min;
+    self->day = (uint8_t)gmtm->tm_mday;
+    self->hour = (uint8_t)gmtm->tm_hour;
+    self->minute = (uint8_t)gmtm->tm_min;
     self->second = (double)gmtm->tm_sec;
     
     if (self->JulianDayNumber != LONG_MAX) {
@@ -512,12 +513,12 @@ short datetime_getYear(const datetime_t *self) {
         date_julianDayNumToMDY(self->JulianDayNumber, &month, &day, &year);
         mutable_self->year = (short)year;
         mutable_self->month = (month_t)month;
-        mutable_self->day = (unsigned char)day;
+        mutable_self->day = (uint8_t)day;
         double fractional_day = self->JulianDay - (double)mutable_self->JulianDayNumber;
         double fractional_hour = fractional_day * 24.0 + 12.0; // Julian Day starts at noon
-        mutable_self->hour = (unsigned char)fractional_hour;
+        mutable_self->hour = (uint8_t)fractional_hour;
         double fractional_minute = (fractional_hour - (double)mutable_self->hour) * 60.0;
-        mutable_self->minute = (unsigned char)fractional_minute;
+        mutable_self->minute = (uint8_t)fractional_minute;
         mutable_self->second = (fractional_minute - (double)mutable_self->minute) * 60.0;
         return (short)year;
     }
@@ -528,7 +529,7 @@ short datetime_getYear(const datetime_t *self) {
         datetime_t *mutable_self = (datetime_t *)self; // Cast away const to store the calculated year
         mutable_self->year = (short)year;
         mutable_self->month = (month_t)month;
-        mutable_self->day = (unsigned char)day;
+        mutable_self->day = (uint8_t)day;
         mutable_self->hour = 12; // Default to noon for the time part when we only have a julian day number
         mutable_self->minute = 0;
         mutable_self->second = 0.0;
@@ -544,21 +545,21 @@ month_t datetime_getMonth(const datetime_t *self) {
     return self->month;
 }
 
-unsigned char datetime_getDay(const datetime_t *self) {
+uint8_t datetime_getDay(const datetime_t *self) {
     if (self->year != SHRT_MAX) return self->day;
     // If we cannot calculate the year, we cannot calculate the day, so we return 0 as a sentinel value.
     if (datetime_getYear(self) == SHRT_MAX) return 0;
     return self->day;
 }
 
-unsigned char datetime_getHour(const datetime_t *self) {
+uint8_t datetime_getHour(const datetime_t *self) {
     if (self->year != SHRT_MAX) return self->hour;
     // If we cannot calculate the year, we cannot calculate the hour, so we return 0 as a sentinel value.
     if (datetime_getYear(self) == SHRT_MAX) return 0;
     return self->hour;
 }
 
-unsigned char datetime_getMinute(const datetime_t *self) {
+uint8_t datetime_getMinute(const datetime_t *self) {
     if (self->year != SHRT_MAX) return self->minute;
     // If we cannot calculate the year, we cannot calculate the minute, so we return 0 as a sentinel value.
     if (datetime_getYear(self) == SHRT_MAX) return 0;
@@ -572,7 +573,7 @@ double datetime_getSecond(const datetime_t *self) {
     return self->second;
 }
 
-long datetime_julianDayNumberFromYearMonthDay(short year, month_t month, unsigned char day) {
+long datetime_julianDayNumberFromYearMonthDay(short year, month_t month, uint8_t day) {
     bool isGregorian = (year > 1582) ||
                        (year == 1582 && month > DT_October) || 
                        (year == 1582 && month == DT_October && day >= 15);
@@ -738,8 +739,8 @@ datetime_t *datetime_addDays(datetime_t *self, long days)
     self->JulianDay = DBL_MAX;
     self->JulianDayNumber = LONG_MAX;
 
-    unsigned char hour = self->hour;
-    unsigned char minute = self->minute;
+    uint8_t hour = self->hour;
+    uint8_t minute = self->minute;
     double second = self->second;
     double jdn = datetime_getJulianDay(self);
     datetime_initWithJulianDay(self, jdn + (double)days);
@@ -788,7 +789,7 @@ datetime_t *datetime_addMonths(datetime_t *self, int months)
             // Handle February separately because of leap years
             int maxDay = datetime_isLeapYear(self->year) ? 29 : 28;
             if (self->day > maxDay) {
-                self->day = (unsigned char)maxDay;
+                self->day = (uint8_t)maxDay;
             }
         } else {
             // Handle months with 30 days
@@ -1059,10 +1060,10 @@ double datetime_duration(const datetime_t *self, const datetime_t *datetime, dat
         }
 
         span->years = (unsigned short)years;
-        span->months = (unsigned char)months;
-        span->days = (unsigned char)days;
-        span->hours = (unsigned char)hours;
-        span->minutes = (unsigned char)minutes;
+        span->months = (uint8_t)months;
+        span->days = (uint8_t)days;
+        span->hours = (uint8_t)hours;
+        span->minutes = (uint8_t)minutes;
         span->seconds = seconds;
     }
 
@@ -1635,8 +1636,8 @@ static void datetime_setToSunriseSunsetTime(datetime_t *self, double latitude, d
     }
 
     // Update the time components of the datetime object
-    self->hour = (unsigned char)time;
-    self->minute = (unsigned char)((time - self->hour) * 60.0);
+    self->hour = (uint8_t)time;
+    self->minute = (uint8_t)((time - self->hour) * 60.0);
     self->second = 0.0;
 }
 
