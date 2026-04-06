@@ -16,78 +16,97 @@ Every module is self‑contained, header‑driven, and usable independently.
 
 ## 🧭 Table of Contents
 
-- [Features](#-features)
+<details open>
+<summary><strong><a href="#-features">Features</a></strong></summary>
+</details>
 
-- **Core Modules**
+<details open>
+<summary><strong>Core Modules</strong></summary>
 
-  <details>
-  <summary>🧮 High‑Precision Arithmetic (<code>qfloat</code>)</summary>
-  <br>
+<details>
+<summary>🧮 High‑Precision Arithmetic (<code>qfloat</code>)</summary>
+<br>
 
-  &nbsp;&nbsp;• [Overview](#-highprecision-arithmetic-qfloat)  
-  &nbsp;&nbsp;• [Example: High‑Precision Lambert W Function](#-example-highprecision-lambert-w-function)  
-  &nbsp;&nbsp;• [Internal Architecture — <code>qfloat</code>](#-internal-architecture--qfloat)
+&nbsp;&nbsp;• <a href="#-highprecision-arithmetic-qfloat">Overview</a><br>
+&nbsp;&nbsp;• <a href="#-example-highprecision-lambert-w-function">Example: High‑Precision Lambert W Function</a><br>
+&nbsp;&nbsp;• <a href="#-internal-architecture--qfloat">Internal Architecture — <code>qfloat</code></a>
 
-  </details>
+</details>
 
-  <details>
-  <summary>🔧 Differentiable Values (<code>dval_t</code>)</summary>
-  <br>
+<details>
+<summary>🔧 Differentiable Values (<code>dval_t</code>)</summary>
+<br>
 
-  &nbsp;&nbsp;• [Overview](#-differentiable-values-dval_t)  
-  &nbsp;&nbsp;• [Example: Single‑Variable Expression with First and Second Derivatives](#-example-singlevariable-expression-with-first-and-second-derivatives)  
-  &nbsp;&nbsp;• [Internal Architecture — <code>dval_t</code>](#-internal-architecture--dval_t)
+&nbsp;&nbsp;• <a href="#-differentiable-values-dval_t">Overview</a><br>
+&nbsp;&nbsp;• <a href="#-example-singlevariable-expression-with-first-and-second-derivatives">Example: Single‑Variable Expression</a><br>
+&nbsp;&nbsp;• <a href="#-internal-architecture--dval_t">Internal Architecture — <code>dval_t</code></a>
 
-  </details>
+</details>
 
-  <details>
-  <summary>📅 Civil & Astronomical Datetime (<code>datetime_t</code>)</summary>
-  <br>
+<details>
+<summary>📅 Civil & Astronomical Datetime (<code>datetime_t</code>)</summary>
+<br>
 
-  &nbsp;&nbsp;• [Overview](#-civil--astronomical-datetime-datetime_t)  
-  &nbsp;&nbsp;• [Example: Chinese New Year Calculation](#-example-chinese-new-year-calculation)  
-  &nbsp;&nbsp;• [Internal Architecture — <code>datetime_t</code>](#-internal-architecture--datetime_t)
+&nbsp;&nbsp;• <a href="#-civil--astronomical-datetime-datetime_t">Overview</a><br>
+&nbsp;&nbsp;• <a href="#-example-chinese-new-year-calculation">Example: Chinese New Year Calculation</a><br>
+&nbsp;&nbsp;• <a href="#-internal-architecture--datetime_t">Internal Architecture — <code>datetime_t</code></a>
 
-  </details>
+</details>
 
-  <details>
-  <summary>📚 Generic Dictionary (<code>dictionary_t</code>)</summary>
-  <br>
+<details>
+<summary>📚 Generic Dictionary (<code>dictionary_t</code>)</summary>
+<br>
 
-  &nbsp;&nbsp;• [Overview](#-generic-dictionary-dictionary_t)  
-  &nbsp;&nbsp;• [Example: Deep‑Copied Keys and Values](#-example-deepcopied-keys-and-values)  
-  &nbsp;&nbsp;• [Example: Integer Keys and Deep‑Copied String Values](#-example-integer-keys-and-deepcopied-string-values)  
-  &nbsp;&nbsp;• [Internal Architecture — <code>dictionary_t</code>](#-internal-architecture--dictionary_t)
+&nbsp;&nbsp;• <a href="#-generic-dictionary-dictionary_t">Overview</a><br>
+&nbsp;&nbsp;• <a href="#-example-deepcopied-keys-and-values">Example: Deep‑Copied Keys and Values</a><br>
+&nbsp;&nbsp;• <a href="#-example-integer-keys-and-deepcopied-string-values">Example: Integer Keys and Deep‑Copied String Values</a><br>
+&nbsp;&nbsp;• <a href="#-internal-architecture--dictionary_t">Internal Architecture — <code>dictionary_t</code></a>
 
-  </details>
+</details>
 
-  <details>
-  <summary>🧩 Generic Hash Set (<code>set_t</code>)</summary>
-  <br>
+<details>
+<summary>🧩 Generic Hash Set (<code>set_t</code>)</summary>
+<br>
 
-  &nbsp;&nbsp;• [Overview](#-generic-hash-set-set_t)  
-  &nbsp;&nbsp;• [Example: String Set With Deep‑Copied Elements](#-example-string-set-with-deepcopied-elements)  
-  &nbsp;&nbsp;• [Internal Architecture — <code>set_t</code>](#-internal-architecture--set_t)
+&nbsp;&nbsp;• <a href="#-generic-hash-set-set_t">Overview</a><br>
+&nbsp;&nbsp;• <a href="#-example-string-set-with-deepcopied-elements">Example: String Set With Deep‑Copied Elements</a><br>
+&nbsp;&nbsp;• <a href="#-internal-architecture--set_t">Internal Architecture — <code>set_t</code></a>
 
-  </details>
+</details>
 
-  <details>
-  <summary>🔤 UTF‑8 String Type (<code>string_t</code>)</summary>
-  <br>
+<details>
+<summary>🔤 UTF‑8 String Type (<code>string_t</code>)</summary>
+<br>
 
-  &nbsp;&nbsp;• [Overview](#-utf8-string-type-string_t)  
-  &nbsp;&nbsp;• [Example: Basic UTF‑8 Manipulation](#-example-basic-utf8-manipulation)  
-  &nbsp;&nbsp;• [Example: Grapheme Iteration](#-example-grapheme-iteration)  
-  &nbsp;&nbsp;• [Example: Using the Builder API](#-example-using-the-builder-api)  
-  &nbsp;&nbsp;• [Internal Architecture — <code>string_t</code>](#-internal-architecture--string_t)
+&nbsp;&nbsp;• <a href="#-utf8-string-type-string_t">Overview</a><br>
+&nbsp;&nbsp;• <a href="#-example-basic-utf8-manipulation">Example: Basic UTF‑8 Manipulation</a><br>
+&nbsp;&nbsp;• <a href="#-example-grapheme-iteration">Example: Grapheme Iteration</a><br>
+&nbsp;&nbsp;• <a href="#-example-using-the-builder-api">Example: Using the Builder API</a><br>
+&nbsp;&nbsp;• <a href="#-internal-architecture--string_t">Internal Architecture — <code>string_t</code></a>
 
-  </details>
+</details>
 
-- [Directory Structure](#-directory-structure)  
-- [Getting Started](#-getting-started)  
-- [Building](#-building--running-tests)  
-- [Roadmap](#-roadmap)  
-- [License](#-license)
+</details>
+
+<details open>
+<summary><strong><a href="#-directory-structure">Directory Structure</a></strong></summary>
+</details>
+
+<details open>
+<summary><strong><a href="#-getting-started">Getting Started</a></strong></summary>
+</details>
+
+<details open>
+<summary><strong><a href="#-building--running-tests">Building</a></strong></summary>
+</details>
+
+<details open>
+<summary><strong><a href="#-roadmap">Roadmap</a></strong></summary>
+</details>
+
+<details open>
+<summary><strong><a href="#-license">License</a></strong></summary>
+</details>
 
 ---
 
