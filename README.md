@@ -1523,7 +1523,7 @@ Each module is self‑contained and can be used independently.
 ### **1. Clone the repository**
 
 ```
-git clone https://github.com/yourname/ooc.git
+git clone https://github.com/roberthparry/ooc.git
 cd ooc
 ```
 
