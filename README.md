@@ -20,7 +20,7 @@ Every module is self‑contained, header‑driven, and usable independently.
 - [Core Modules](#-core-modules)
 - [Directory Structure](#-directory-structure)
 - [Getting Started](#-getting-started)
-- [Building](#-building)
+- [Building](#-building--running-tests)
 - [Roadmap](#-roadmap)
 - [License](#-license)
 
