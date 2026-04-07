@@ -1,5 +1,5 @@
 // test_set.c — tests for the generic value-set container using the new test harness
-// TEST THE RENAMING
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
