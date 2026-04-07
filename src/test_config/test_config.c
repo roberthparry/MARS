@@ -1,14 +1,14 @@
 /* test_config.c - hierarchical test configuration */
 
-#include "test_config.h"
-#include "dictionary.h"
-#include "ustring.h"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <stdbool.h>
+
+#include "dictionary.h"
+#include "ustring.h"
+#include "test_config.h"
 
 /* ========================================================================= */
 /*  Globals                                                                  */
