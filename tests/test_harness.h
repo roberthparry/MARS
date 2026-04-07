@@ -27,9 +27,9 @@
 /* Global test state                                                         */
 /* ------------------------------------------------------------------------- */
 
-extern int tests_run;
-extern int tests_failed;
-extern int tests_skipped;
+extern int tests_run;       // Total number of tests run
+extern int tests_failed;    // Total number of tests failed
+extern int tests_skipped;   // Total number of tests skipped
 
 /* ------------------------------------------------------------------------- */
 /* Assertion helpers                                                         */
