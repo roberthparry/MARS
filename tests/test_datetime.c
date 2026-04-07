@@ -1,11 +1,7 @@
 // test_datetime.c — full test suite for datetime_t using the new test harness
 
-#define TEST_CONFIG_MODE TEST_CONFIG_GLOBAL
-#include "test_harness.h"
-
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
 #include <math.h>
 #include <limits.h>
 #include <float.h>
@@ -13,6 +9,10 @@
 #include <string.h>
 
 #include "datetime.h"
+
+#define TEST_CONFIG_MODE TEST_CONFIG_GLOBAL
+#include "test_harness.h"
+
 
 /* ------------------------------------------------------------------------- */
 /* TEST FUNCTIONS                                                             */
