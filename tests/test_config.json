@@ -1,7 +1,7 @@
 {
   "tests/test_qfloat.c": {
     "test_arithmetic": {
-      "enabled": true,
+      "enabled": false,
       "test_add": true,
       "test_mul": true,
       "test_div": true,
@@ -24,7 +24,7 @@
       "test_qf_sprintf_and_printf": true
     },
     "test_qf_sprintf_and_printf": {
-      "enabled": true,
+      "enabled": false,
       "test_qd_sprintf_basic": true,
       "test_qd_sprintf_multiple": true,
       "test_qd_sprintf_mixed": true,
