@@ -1,6 +1,6 @@
-# **OOC — A Modular C Library for High‑Precision Numerics, Automatic Differentiation, Navigation‑Grade Datetime handling, UTF‑8 Strings, and Robust Generic Containers**
+# **MARS — A Modular C Library for High‑Precision Numerics, Automatic Differentiation, Navigation‑Grade Datetime handling, UTF‑8 Strings, and Robust Generic Containers**
 
-OOC is a modular, portable C library designed for correctness, clarity, and long‑term maintainability.  
+MARS is a modular, portable C library designed for correctness, clarity, and long‑term maintainability.  
 It provides:
 
 - high‑precision arithmetic (`qfloat`)
@@ -1523,8 +1523,8 @@ Each module is self‑contained and can be used independently.
 ### **1. Clone the repository**
 
 ```
-git clone https://github.com/roberthparry/ooc.git
-cd ooc
+git clone https://github.com/roberthparry/MARS.git
+cd MARS
 ```
 
 ### **2. Build the library**
@@ -1535,7 +1535,7 @@ make release
 
 This produces:
 
-- `build/release/libooc.a`  
+- `build/release/libmars.a`  
 - module‑specific object files  
 - optional test binaries  
 
@@ -1553,7 +1553,7 @@ This produces:
 ### **4. Link with the library**
 
 ```
-gcc your_program.c -Iinclude -Lbuild/release -looc -lm
+gcc your_program.c -Iinclude -Lbuild/release -lmars -lm
 ```
 
 ---
@@ -1648,7 +1648,7 @@ MIT License — see `LICENSE` for details.
 
 # 🎉 **Thank You**
 
-OOC is designed to be:
+MARS is designed to be:
 
 - clean  
 - predictable  

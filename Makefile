@@ -49,8 +49,8 @@ TEST_OBJS := $(TEST_SRCS:tests/%.c=$(TEST_BUILD_DIR)/%.o)
 HEADERS := $(wildcard include/*.h)
 TEST_HEADERS := tests/test_string.h tests/test_harness.h   # ⭐ FIX ADDED HERE
 
-STATIC_LIB := $(BUILD_DIR)/libooc.a
-SHARED_LIB := $(BUILD_DIR)/libooc.so
+STATIC_LIB := $(BUILD_DIR)/libmars.a
+SHARED_LIB := $(BUILD_DIR)/libmars.so
 
 TEST_NAMES := $(patsubst tests/test_%.c,%,$(TEST_SRCS))
 TEST_BINS := $(TEST_NAMES:%=$(TEST_BUILD_DIR)/test_%)
@@ -99,7 +99,7 @@ $(SHARED_LIB): $(OBJS)
 $(TEST_BUILD_DIR)/test_%: $(TEST_BUILD_DIR)/test_%.o $(STATIC_LIB)
 	mkdir -p $(dir $@)
 	$(CC) -o $@ $< \
-		-L$(BUILD_DIR) -looc \
+		-L$(BUILD_DIR) -lmars \
 		-Wl,-rpath,'$$ORIGIN:$$ORIGIN/../../../$(BUILD_DIR)' \
 		$(LDLIBS)
 
