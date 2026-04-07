@@ -58,6 +58,10 @@ typedef struct _datetime_span_t {
 
 datetime_t *datetime_alloc();
 
+/// @brief deallocate a datetime structure. This function should be called to free the memory allocated for a datetime structure when it 
+///        is no longer needed. It takes a pointer to the datetime structure to be deallocated and frees the memory associated with it.
+///        After calling this function, the pointer to the datetime structure should not be used, as it will point to deallocated memory.
+/// @param self the datetime structure to be deallocated.
 void datetime_dealloc(datetime_t *self);
 
 /// @brief initialise/set a preallocated datetime with the year, the month and the day.
