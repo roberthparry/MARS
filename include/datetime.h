@@ -1,6 +1,8 @@
 #ifndef _DATETIME_H
 #define _DATETIME_H
 
+#include <stdint.h>
+
 /// @brief the datetime type
 typedef struct _datetime_t datetime_t;
 
@@ -47,10 +49,10 @@ typedef enum _moon_phase_t {
 ///        to add to a datetime.
 typedef struct _datetime_span_t {
     unsigned short years;
-    unsigned char months;
-    unsigned char days;
-    unsigned char hours;
-    unsigned char minutes;
+    uint8_t months;
+    uint8_t days;
+    uint8_t hours;
+    uint8_t minutes;
     double seconds;
 } datetime_span_t;
 
@@ -64,7 +66,7 @@ void datetime_dealloc(datetime_t *self);
 /// @param month the month (1..12).
 /// @param day the day in the month.
 /// @return the address of the initialised datetime.
-datetime_t *datetime_initWithYearMonthDay(datetime_t *self, short year, month_t month, unsigned char day);
+datetime_t *datetime_initWithYearMonthDay(datetime_t *self, short year, month_t month, uint8_t day);
 
 /// @brief initialise/set a preallocated datetime with the year, the month, the day and the time.
 /// @param self the datetime variable to be initialised.
@@ -75,7 +77,7 @@ datetime_t *datetime_initWithYearMonthDay(datetime_t *self, short year, month_t 
 /// @param minute the minute (0..59).
 /// @param second the second (0..59) plus fractions of a second.
 /// @return the address of the initialised datetime.
-datetime_t *datetime_initWithYearMonthDayTime(datetime_t *self, short year, month_t month, unsigned char day, unsigned char hour, unsigned char minute, double second);
+datetime_t *datetime_initWithYearMonthDayTime(datetime_t *self, short year, month_t month, uint8_t day, uint8_t hour, uint8_t minute, double second);
 
 /// @brief initialise/set a preallocated datetime with another datetime.
 /// @param self the datetime variable to be initialised.
@@ -150,19 +152,19 @@ month_t datetime_getMonth(const datetime_t *self);
 /// @param self the datetime to get the day from.
 /// @return the day of the datetime, or 0 if it is not initialised and cannot be calculated. Note that day 0 is not valid, 
 ///         so it can be used as a sentinel value for uninitialised day.
-unsigned char datetime_getDay(const datetime_t *self);
+uint8_t datetime_getDay(const datetime_t *self);
 
 /// @brief get the hour of a datetime. If the hour is not initialised, it will be calculated from the Julian Day Number or the Julian Day.
 /// @param self the datetime to get the hour from.
 /// @return the hour of the datetime, or 0 if it is not initialised and cannot be calculated. Note that hour 0 is not valid, 
 ///         so it can be used as a sentinel value for uninitialised hour.
-unsigned char datetime_getHour(const datetime_t *self);
+uint8_t datetime_getHour(const datetime_t *self);
 
 /// @brief get the minute of a datetime. If the minute is not initialised, it will be calculated from the Julian Day Number or the Julian Day.
 /// @param self the datetime to get the minute from.
 /// @return the minute of the datetime, or 0 if it is not initialised and cannot be calculated. Note that minute 0 is not valid, 
 ///         so it can be used as a sentinel value for uninitialised minute.
-unsigned char datetime_getMinute(const datetime_t *self);
+uint8_t datetime_getMinute(const datetime_t *self);
 
 /// @brief get the second of a datetime. If the second is not initialised, it will be calculated from the Julian Day Number or the Julian Day.
 /// @param self the datetime to get the second from.
@@ -177,7 +179,7 @@ double datetime_getSecond(const datetime_t *self);
 /// @param month the month (January..December)
 /// @param day the day (1..31)
 /// @return the Julian Day Number of the given year, month and day.
-long datetime_julianDayNumberFromYearMonthDay(short year, month_t month, unsigned char day);
+long datetime_julianDayNumberFromYearMonthDay(short year, month_t month, uint8_t day);
 
 /// @brief convert a datetime to a Julian Day Number.
 /// @param self the datetime to convert.
