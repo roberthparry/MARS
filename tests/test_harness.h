@@ -152,10 +152,19 @@ extern int tests_skipped;
 /* User must define this                                                     */
 /* ------------------------------------------------------------------------- */
 
+/// @brief The main test entry point. This function should be defined by the user in their test file and will be called by the test 
+///        harness to execute the tests. It should return 0 on success or a non-zero value if there was an error during test execution.
+/// @return 0 on success, non-zero on error.
+/// @note There is no need to define a main() function in the test file, as the test harness provides its own main() that calls this 
+///       tests_main() function. The test harness will automatically track the number of tests run, passed, failed, and skipped based 
+///       on the assertions and the RUN_TEST macro used in this function. The user should not modify the global test state variables 
+///       directly, but should use the provided macros and functions to ensure accurate tracking of test results. The tests_main() 
+///       function should contain calls to RUN_TEST() for each test function defined in the test file, and can also include any necessary
+///       setup or teardown code for the tests.
 int tests_main(void);
 
 /* ------------------------------------------------------------------------- */
-/* Harness-owned main()                                                      */
+/* Harness-owned main(). do not modify!                                      */
 /* ------------------------------------------------------------------------- */
 
 int tests_run = 0;

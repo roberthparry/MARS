@@ -266,7 +266,38 @@ AS RETURN (
 )
 GO
 
-
+/**
+ *  List all the calendar dates for a given start year and year count, with various attributes of those dates. This select statement
+ *  generates a calendar for the years 2015 to 7 years after the current year.
+ *  The columns in the output are as follows:
+ *      - FullDateAlternateKey:     - the date of type DATE
+ *      - FullDate and End Time:    - the date with time set to 23:59:59
+ *      - Year, Month, Day:         - the year, month and day of the date
+ *      - Days in Month:            - the number of days in the month of the date
+ *      - MC Dates:                 - the first day of the month of the date
+ *      - ME Dates:                 - the last day of the month of the date
+ *      - ME Dates Text:            - the last day of the month of the date in 'MMM yyyy' format
+ *      - WC Dates:                 - the first day of the week (Monday) for the date
+ *      - WE Dates:                 - the last day of the week (Sunday) for the date
+ *      - WEDates (Friday):         - the Friday of the week for the date
+ *      - WE Dates plus End Time:   - the last day of the week with time set to 23:59:59
+ *      - WE Dates Text:            - the last day of the week in 'dd MMM yyyy' format
+ *      - Day of Week:              - a number representing the day of week (0=Monday, 6=Sunday)
+ *      - Day Name:                 - name of the day (e.g. 'Monday')
+ *      - Month Name:               - name of the month (e.g. 'Jan')
+ *      - Fiscal Year End:          - fiscal year end for that date (e.g. 2024 for dates from 1^{st} April 2023 to 31^{st} March 2024)
+ *      - Fiscal Month:             - fiscal month number (1..12)
+ *      - Fiscal Quarter No:        - fiscal quarter number (1..4)
+ *      - Fiscal Qtr:               - fiscal quarter in 'Qtr N' format
+ *      - Fiscal Years:             - fiscal year range in 'YY-YY' format (e.g. '23-24' for fiscal year 2024)
+ *      - UK Holiday:               - name of UK bank holiday if that date is a bank holiday, otherwise null
+ *      - Non working day Type:     - 'Weekend' if that date is a weekend, 'Public Holiday' if that date is a public holiday, otherwise null
+ *      - Workday Type:             - 0 if that date is a non-working day, 1 if it is a working day
+ *      - Day Type:                 - 'NonWorkDay' if that date is a non-working day, 'WorkDay' if it is a working day
+ *      - Sunrise:                  - sunrise time for that date at a specific location in Shrewsbury, UK (52.7073 N, 2.7553 W)
+ *      - Sunset:                   - sunset time for that date at a specific location in Shrewsbury, UK (52.7073 N, 2.7553 W)
+ *      - Moon Phase %:             - the percentage of the moon that is illuminated on that date (0% = new moon, 100% = full moon)
+ **/
 select
     Calendar.*
 from (
