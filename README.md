@@ -5,7 +5,7 @@ It provides:
 
 - high‑precision arithmetic (`qfloat`)
 - differentiable values (`dval_t`)
-- a civil & astronomical datetime (`datetime_t`)
+- a civil & astronomical datetime (`dttm_t`)
 - generic dictionary and set types
 - a UTF‑8 aware dynamic string type
 - a suite of supporting algorithms and helpers
@@ -44,12 +44,12 @@ Every module is self‑contained, header‑driven, and usable independently.
 </details>
 
 <details>
-<summary>📅 Civil & Astronomical Datetime (<code>datetime_t</code>)</summary>
+<summary>📅 Civil & Astronomical Datetime (<code>dttm_t</code>)</summary>
 <br>
 
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• <a href="#-civil--astronomical-datetime-datetime_t">Overview</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• <a href="#-civil--astronomical-datetime-dttm_t">Overview</a><br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• <a href="#-example-chinese-new-year-calculation">Example: Chinese New Year Calculation</a><br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• <a href="#-internal-architecture--datetime_t">Internal Architecture — <code>datetime_t</code></a>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• <a href="#-internal-architecture--dttm_t">Internal Architecture — <code>dttm_t</code></a>
 
 </details>
 
@@ -127,7 +127,7 @@ Every module is self‑contained, header‑driven, and usable independently.
 
 - [🧮 High‑Precision Arithmetic (`qfloat`)](#-highprecision-arithmetic-qfloat)
 - [🔧 Differentiable Values (`dval_t`)](#-differentiable-values-dval_t)
-- [📅 Civil & Astronomical Datetime (`datetime_t`)](#-civil--astronomical-datetime-datetime_t)
+- [📅 Civil & Astronomical Datetime (`dttm_t`)](#-civil--astronomical-datetime-dttm_t)
 - [📚 Generic Dictionary (`dictionary_t`)](#-generic-dictionary-dictionary_t)
 - [🧩 Generic Hash Set (`set_t`)](#-generic-hash-set-set_t)
 - [🔤 UTF‑8 String Type (`string_t`)](#-utf8-string-type-string_t)
@@ -591,12 +591,12 @@ This makes it suitable for:
 
 ---
 
-# 📅 **Civil & Astronomical Datetime (`datetime_t`)**
+# 📅 **Civil & Astronomical Datetime (`dttm_t`)**
 
 ### **Sections**
-- [Overview](#-civil--astronomical-datetime-datetime_t)
+- [Overview](#-civil--astronomical-datetime-dttm_t)
 - [Example](#-example-chinese-new-year-calculation)
-- [Internal Architecture](#-internal-architecture--datetime_t)
+- [Internal Architecture](#-internal-architecture--dttm_t)
 
 
 A high‑level civil datetime type with full Gregorian calendar support, Julian Day conversions, timezone/DST helpers, sunrise/sunset algorithms, moon‑phase computation, and a rich formatting engine.
@@ -606,7 +606,7 @@ A high‑level civil datetime type with full Gregorian calendar support, Julian 
 - Holiday algorithms: Easter Sunday, Chinese New Year  
 - Astronomical utilities: sunrise/sunset (NOAA), moon phase  
 - Full arithmetic: add/subtract years, months, days, hours, minutes, seconds  
-- Duration computation with `datetime_span_t`  
+- Duration computation with `dttm_span_t`  
 - Rich formatting mini‑language (`%ddd`, `%mmmm`, `%O`, `@hh`, etc.)  
 - Comparison, hashing, weekday calculation, leap‑year logic  
 
@@ -614,8 +614,8 @@ A high‑level civil datetime type with full Gregorian calendar support, Julian 
 
 ### 📘 **Example: Chinese New Year Calculation**
 
-`datetime_t` includes helpers for culturally and astronomically significant dates.  
-The function `datetime_initWithChineseNewYear()` computes the date of Chinese New Year for any supported year (1700–2400).
+`dttm_t` includes helpers for culturally and astronomically significant dates.  
+The function `dttm_init_chinese_new_year()` computes the date of Chinese New Year for any supported year (1700–2400).
 
 #### Example Code
 
@@ -639,8 +639,8 @@ int main(void) {
 
     for (int i = 0; i < 6; i++) {
         /* Compute Chinese New Year for the given year */
-        datetime_t *dt = datetime_initWithChineseNewYear(
-            datetime_alloc(),
+        dttm_t *dt = dttm_init_chinese_new_year(
+            dttm_alloc(),
             cases[i].year
         );
 
@@ -650,14 +650,14 @@ int main(void) {
         }
 
         /* Extract components */
-        short y = datetime_getYear(dt);
-        month_t m = datetime_getMonth(dt);
-        unsigned char d = datetime_getDay(dt);
+        short y = dttm_year(dt);
+        month_t m = dttm_month(dt);
+        unsigned char d = dttm_day(dt);
 
         printf("Chinese New Year %d: %d-%02d-%02d\n",
                cases[i].year, y, (int)m, d);
 
-        datetime_dealloc(dt);
+        dttm_dealloc(dt);
     }
 
     return 0;
@@ -677,9 +677,9 @@ Chinese New Year 2025: 2025-01-29
 
 ---
 
-### 🧩 **Internal Architecture — `datetime_t`**
+### 🧩 **Internal Architecture — `dttm_t`**
 
-`datetime_t` provides a unified, high‑precision system for civil timekeeping,
+`dttm_t` provides a unified, high‑precision system for civil timekeeping,
 astronomical time scales, and solar/lunar calculations.
 
 Its **time representation and time‑scale conversions are navigation‑grade**  
@@ -705,7 +705,7 @@ All civil operations use deterministic integer arithmetic.
 Conversions between civil dates and Julian Day Numbers (JDN) use the
 Fliegel–Van Flandern algorithm for correctness, speed, and portability.
 
-`datetime_t` stores time internally with **millisecond granularity**, using double
+`dttm_t` stores time internally with **millisecond granularity**, using double
 precision floating point seconds since a defined epoch. This provides:
 
 - stable, platform‑independent behaviour  
@@ -716,7 +716,7 @@ precision floating point seconds since a defined epoch. This provides:
 
 #### **2. Astronomical Time Scales (Navigation‑Grade)**
 
-`datetime_t` implements precise, deterministic conversions between the
+`dttm_t` implements precise, deterministic conversions between the
 astronomical time scales used in navigation, ephemeris computation, and
 scientific work:
 
@@ -741,7 +741,7 @@ databases.
 
 #### **3. Solar and Lunar Algorithms (Civil‑Grade)**
 
-`datetime_t` includes algorithms for:
+`dttm_t` includes algorithms for:
 
 - sunrise and sunset  
 - solar noon  
@@ -763,7 +763,7 @@ They are **civil‑grade**:
 
 #### **4. Value‑Semantic API**
 
-`datetime_t` is a pure value type:
+`dttm_t` is a pure value type:
 
 - no hidden allocations  
 - no global state  
@@ -1618,7 +1618,7 @@ Planned enhancements include:
 - Multivariate support  
 - JIT‑compiled derivative evaluation  
 
-### **datetime_t**
+### **dttm_t**
 - More holiday algorithms  
 - Optional timezone database integration  
 - Ephemeris‑grade solar/lunar algorithms (configurable)  
