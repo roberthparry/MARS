@@ -1305,18 +1305,17 @@ H🙂éllo 🌍
 int main(void) {
     string_t *s = string_new_with("👨‍👩‍👧‍👦 family");
 
-    size_t count = utf8_grapheme_count(s);
+    size_t count = string_grapheme_count(s);
 
     printf("Graphemes: %zu\n", count);
 
     for (size_t i = 0; i < count; i++) {
-        string_t *g = string_utf8_grapheme_substr(s, i, 1);
+        string_t *g = string_grapheme_at(s, i);
         printf("[%zu] %s\n", i, string_c_str(g));
         string_free(g);
     }
 
     string_free(s);
-
     return 0;
 }
 ```
@@ -1347,7 +1346,7 @@ Graphemes: 11
 #include <stdio.h>
 
 int main(void) {
-    string_builder_t *b = string_builder_new();   /* was: uninitialized pointer + wrong init call */
+    string_builder_t *b = string_builder_new();
     string_builder_append(b, "Hello");
     string_builder_append(b, ", ");
     string_builder_append(b, "世界");
