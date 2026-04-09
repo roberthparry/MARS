@@ -183,8 +183,6 @@ int main(void) {
         NULL
     };
 
-    char buf[256];
-
     for (int i = 0; inputs[i] != NULL; i++) {
         /* Parse x from a decimal string */
         qfloat x = qf_from_string(inputs[i]);
@@ -192,11 +190,8 @@ int main(void) {
         /* Compute the principal branch W0(x) */
         qfloat w = qf_lambert_w0(x);
 
-        /* Convert to a readable high‑precision string */
-        qf_to_string(w, buf, sizeof(buf));
-
-        printf("W0(%s) = %s\n", inputs[i], buf);
-    }
+        qf_printf("W0(%s) = %q\n", inputs[i], w);
+    }    
 
     return 0;
 }
@@ -206,10 +201,10 @@ int main(void) {
 
 ```
 W0(0) = 0
-W0(1e-6) = 9.999990000014999973333385416558667e-7
-W0(0.1) = 0.09127652716086226429989572142317956
-W0(1) = 0.56714329040978387299996866221035555
-W0(5) = 1.3267246652422002236350992977580797
+W0(1e-6) = 9.999990000014999973333385416558944e-7
+W0(0.1) = 0.09127652716086226429989572142317946
+W0(1) = 0.5671432904097838729999686622103575
+W0(5) = 1.326724665242200223635099297758082
 W0(-0.3678794411714423215955237701614609) = -1
 ```
 
@@ -1274,20 +1269,21 @@ and a fixed‑capacity buffer API.
 #include "string.h"
 
 int main(void) {
-    string_t s = string_make("Héllo");
+    string_t *s = string_new_with("Héllo");
 
     /* Append UTF‑8 text */
-    string_append(&s, " 🌍");
+    string_append_cstr(s, " 🌍");
 
     /* Insert at grapheme index */
-    string_insert(&s, 1, "🙂");
+    string_insert(s, 1, "🙂");
 
     /* Normalize to NFC */
-    string_normalize_nfc(&s);
+    string_normalize(s, STRING_NORM_NFC);
 
-    printf("%s\n", string_cstr(&s));
+    printf("%s\n", string_c_str(s));
 
-    string_free(&s);
+    string_free(s);
+
     return 0;
 }
 ```
@@ -1307,34 +1303,39 @@ H🙂éllo 🌍
 #include <stdio.h>
 
 int main(void) {
-    string_t s = string_make("👨‍👩‍👧‍👦 family");
+    string_t *s = string_new_with("👨‍👩‍👧‍👦 family");
 
-    size_t count = string_grapheme_count(&s);
+    size_t count = utf8_grapheme_count(s);
 
     printf("Graphemes: %zu\n", count);
 
     for (size_t i = 0; i < count; i++) {
-        string_t g = string_grapheme_at(&s, i);
-        printf("[%zu] %s\n", i, string_cstr(&g));
-        string_free(&g);
+        string_t *g = string_utf8_grapheme_substr(s, i, 1);
+        printf("[%zu] %s\n", i, string_c_str(g));
+        string_free(g);
     }
 
-    string_free(&s);
+    string_free(s);
+
+    return 0;
 }
 ```
 
 #### Example Output
 
 ```
-Graphemes: 7
-[0] 👨‍👩‍👧‍👦
-[1]  
-[2] f
-[3] a
-[4] m
-[5] i
-[6] l
-[7] y
+Graphemes: 11
+[0] 👨‍
+[1] 👩‍
+[2] 👧‍
+[3] 👦
+[4]  
+[5] f
+[6] a
+[7] m
+[8] i
+[9] l
+[10] y
 ```
 
 ---
@@ -1346,18 +1347,17 @@ Graphemes: 7
 #include <stdio.h>
 
 int main(void) {
-    string_builder_t b;
-    string_builder_init(&b);
+    string_builder_t *b = string_builder_new();   /* was: uninitialized pointer + wrong init call */
+    string_builder_append(b, "Hello");
+    string_builder_append(b, ", ");
+    string_builder_append(b, "世界");
 
-    string_builder_append(&b, "Hello");
-    string_builder_append(&b, ", ");
-    string_builder_append(&b, "世界");
+    string_t *out = b;
 
-    string_t out = string_builder_finish(&b);
+    printf("%s\n", string_c_str(out));
 
-    printf("%s\n", string_cstr(&out));
+    string_free(out);
 
-    string_free(&out);
     return 0;
 }
 ```

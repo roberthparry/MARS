@@ -550,6 +550,77 @@ done:
     dictionary_destroy(d);
 }
 
+void test_readme_example_deep(void) {
+    dictionary_t *dict = dictionary_create(
+        sizeof(struct deep), sizeof(struct deep),
+        deep_hash, deep_cmp,
+        deep_clone, deep_destroy,
+        deep_clone, deep_destroy
+    );
+
+    struct deep k1 = { "k1", 1 };
+    struct deep v1 = { "v1", 10 };
+
+    struct deep k2 = { "k2", 2 };
+    struct deep v2 = { "v2", 20 };
+
+    dictionary_set(dict, &k1, &v1);
+    dictionary_set(dict, &k2, &v2);
+
+    struct deep out;
+
+    if (dictionary_get(dict, &k1, &out)) {
+        printf("Value for key '%s': %s (%d)\n",
+               k1.name, out.name, out.value);
+        free(out.name);
+    }
+
+    if (dictionary_get(dict, &k2, &out)) {
+        printf("Value for key '%s': %s (%d)\n",
+               k2.name, out.name, out.value);
+        free(out.name);
+    }
+
+    dictionary_destroy(dict);
+}
+
+void test_readme_example_shallow(void) {
+    dictionary_t *dict = dictionary_create(
+        sizeof(int), sizeof(char *),
+        int_hash, int_cmp,
+        NULL, NULL,
+        str_clone, str_destroy
+    );
+
+    int k1 = 5, k2 = 6;
+    const char *v1 = "hello";
+    const char *v2 = "world";
+
+    dictionary_set(dict, &k1, &v1);
+    dictionary_set(dict, &k2, &v2);
+
+    char *out;
+
+    if (dictionary_get(dict, &k1, &out)) {
+        printf("Value for key %d: %s\n", k1, out);
+        free(out);
+    }
+
+    if (dictionary_get(dict, &k2, &out)) {
+        printf("Value for key %d: %s\n", k2, out);
+        free(out);
+    }
+
+    dictionary_destroy(dict);
+}
+
+void test_readme_examples(void) {
+    printf(C_YELLOW "\ntesting README examples...\n" RESET);
+
+    test_readme_example_deep();
+    test_readme_example_shallow();
+}
+
 /* -------------------------------------------------------------
  * Main
  * ------------------------------------------------------------- */
@@ -566,6 +637,8 @@ int main(void) {
     test_foreach();
     test_fuzz();
     test_sorted_fuzz();
+    
+    test_readme_examples();
 
     printf(BLUE "Done.\n" RESET);
     return 0;

@@ -450,6 +450,44 @@ void test_datetime_daysInMonth(void) {
     ASSERT_EQ_INT(datetime_daysInMonth(2024, DT_January),  31);
 }
 
+void test_readme_examples(void) {
+    struct {
+        int year;
+        month_t month;
+        unsigned char day;
+    } cases[] = {
+        {2020, DT_January, 25},
+        {2021, DT_February, 12},
+        {2022, DT_February, 1},
+        {2023, DT_January, 22},
+        {2024, DT_February, 10},
+        {2025, DT_January, 29},
+    };
+
+    for (int i = 0; i < 6; i++) {
+        /* Compute Chinese New Year for the given year */
+        datetime_t *dt = datetime_initWithChineseNewYear(
+            datetime_alloc(),
+            cases[i].year
+        );
+
+        if (!dt) {
+            printf("Year %d is outside the supported range.\n", cases[i].year);
+            continue;
+        }
+
+        /* Extract components */
+        short y = datetime_getYear(dt);
+        month_t m = datetime_getMonth(dt);
+        unsigned char d = datetime_getDay(dt);
+
+        printf("Chinese New Year %d: %d-%02d-%02d\n",
+               cases[i].year, y, (int)m, d);
+
+        datetime_dealloc(dt);
+    }
+}
+
 /* ------------------------------------------------------------------------- */
 /* MAIN TEST ENTRY POINT FOR THE HARNESS                                     */
 /* ------------------------------------------------------------------------- */
@@ -502,6 +540,9 @@ int tests_main(void) {
     RUN_TEST(test_datetime_compare_less, NULL);
     RUN_TEST(test_datetime_compare_greater, NULL);
     RUN_TEST(test_datetime_daysInMonth, NULL);
+
+    printf(C_YELLOW "\nRunning README examples...\n" C_RESET);
+    RUN_TEST(test_readme_examples, NULL);
 
     return 0;
 }

@@ -373,6 +373,15 @@
     "test_datetime_compare_equal": true,
     "test_datetime_compare_less": true,
     "test_datetime_compare_greater": true,
-    "test_datetime_daysInMonth": true
+    "test_datetime_daysInMonth": true,
+    "test_readme_examples": true
+  },
+  "tests/test_set.c": {
+    "test_ints": true,
+    "test_strings": true,
+    "test_deep": true,
+    "test_sorted": true,
+    "test_fuzz": true,
+    "test_readme_examples": true
   }
 }
