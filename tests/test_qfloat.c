@@ -4656,6 +4656,28 @@ void test_gammainc_ei_e1(void) {
     RUN_TEST(test_qf_ei_e1_all, __func__);    
 }
 
+void test_readme_examples(void) {
+    /* Compute W0(x) for several representative values */
+    const char *inputs[] = {
+        "0",
+        "1e-6",
+        "0.1",
+        "1",
+        "5",
+        "-0.3678794411714423215955237701614609", /* -1/e */
+        NULL
+    };
+
+    for (int i = 0; inputs[i] != NULL; i++) {
+        /* Parse x from a decimal string */
+        qfloat x = qf_from_string(inputs[i]);
+
+        /* Compute the principal branch W0(x) */
+        qfloat w = qf_lambert_w0(x);
+
+        qf_printf("W0(%s) = %q\n", inputs[i], w);
+    }    
+}
 /* -----------------------------------------------------------
    Main
    ----------------------------------------------------------- */
@@ -4680,6 +4702,9 @@ int tests_main() {
     RUN_TEST(test_lambert_w, NULL);
     RUN_TEST(test_beta_logbeta_binomial_beta_pdf_logbeta_pdf_normal_pdf_cdf_logpdf, NULL);
     RUN_TEST(test_gammainc_ei_e1, NULL);
+
+    printf(C_YELLOW "\nRunning README examples...\n" C_RESET);
+    RUN_TEST(test_readme_examples, NULL);
 
     printf("\n" C_YELLOW "Done.\n" C_RESET);
 

@@ -340,6 +340,65 @@ int test_norm_invalid_form_inplace(void)
     return 0;
 }
 
+int test_readme_example_Basic_UTF_8_Manipulation(void) {
+    string_t *s = string_new_with("Héllo");
+
+    /* Append UTF‑8 text */
+    string_append_cstr(s, " 🌍");
+
+    /* Insert at grapheme index */
+    string_insert(s, 1, "🙂");
+
+    /* Normalize to NFC */
+    string_normalize(s, STRING_NORM_NFC);
+
+    printf("%s\n", string_c_str(s));
+
+    string_free(s);
+
+    return 0;
+}
+
+int test_readme_example_Grapheme_Iteration(void) {
+    string_t *s = string_new_with("👨‍👩‍👧‍👦 family");
+
+    size_t count = utf8_grapheme_count(s);
+
+    printf("Graphemes: %zu\n", count);
+
+    for (size_t i = 0; i < count; i++) {
+        string_t *g = string_utf8_grapheme_substr(s, i, 1);
+        printf("[%zu] %s\n", i, string_c_str(g));
+        string_free(g);
+    }
+
+    string_free(s);
+
+    return 0;
+}
+
+int test_readme_example_Using_the_Builder_API(void) {
+    string_builder_t *b = string_builder_new();   /* was: uninitialized pointer + wrong init call */
+    string_builder_append(b, "Hello");
+    string_builder_append(b, ", ");
+    string_builder_append(b, "世界");
+
+    string_t *out = b;
+
+    printf("%s\n", string_c_str(out));
+
+    string_free(out);
+
+    return 0;
+}
+
+int test_readme_examples(void) {
+    test_readme_example_Basic_UTF_8_Manipulation();
+    test_readme_example_Grapheme_Iteration();
+    test_readme_example_Using_the_Builder_API();
+    return 0;
+}
+
 /* ------------------------------------------------------------------------- */
 /* Main                                                                      */
 /* ------------------------------------------------------------------------- */
@@ -367,6 +426,9 @@ int main(void)
     TEST(test_norm_emoji_inplace);
     TEST(test_norm_empty_inplace);
     TEST(test_norm_invalid_form_inplace);
+
+     printf("Running README examples...\n");
+     TEST(test_readme_examples);
 
     return 0;
 }

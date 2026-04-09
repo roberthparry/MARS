@@ -204,6 +204,37 @@ void test_fuzz(void) {
     set_destroy(s);
 }
 
+void test_readme_examples(void) {
+    /* Create a set of strings with deep‑copy semantics */
+    set_t *s = set_create(
+        sizeof(char *),
+        str_hash,
+        str_cmp,
+        str_clone,
+        str_destroy
+    );
+
+    const char *a = "hello";
+    const char *b = "world";
+    const char *c = "hello"; /* duplicate */
+
+    set_add(s, &a);
+    set_add(s, &b);
+
+    if (set_contains(s, &a))
+        printf("'hello' is in the set\n");
+
+    if (!set_add(s, &c))
+        printf("Duplicate 'hello' was not added\n");
+
+    set_remove(s, &a);
+
+    if (!set_contains(s, &a))
+        printf("'hello' was removed\n");
+
+    set_destroy(s);
+}
+
 /* -------------------------------------------------------------
  * tests_main() — the harness entry point
  * ------------------------------------------------------------- */
@@ -224,6 +255,9 @@ int tests_main(void) {
 
     printf(C_BOLD C_CYAN "=== Fuzz Tests ===\n" C_RESET);
     RUN_TEST(test_fuzz, NULL);
+
+    printf(C_YELLOW "\nRunning README examples...\n" C_RESET);
+    RUN_TEST(test_readme_examples, NULL);
 
     return 0;
 }
