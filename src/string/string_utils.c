@@ -55,49 +55,39 @@ string_t *string_from_view(const string_view_t *v)
 
 /* Zero-copy split into views */
 
+static int views_grow(string_view_t **views, size_t *cap)
+{
+    size_t new_cap = *cap * 2;
+    string_view_t *tmp = realloc(*views, new_cap * sizeof(string_view_t));
+    if (!tmp) { free(*views); *views = NULL; return -1; }
+    *views = tmp;
+    *cap = new_cap;
+    return 0;
+}
+
 string_view_t *string_split_view(const string_t *s, const char *delim, size_t *out_count)
 {
     if (!s || !delim || !out_count) return NULL;
 
     size_t cap = 8;
     size_t count = 0;
+    size_t delim_len = strlen(delim);
 
-    string_view_t *views = (string_view_t *)malloc(cap * sizeof(string_view_t));
+    string_view_t *views = malloc(cap * sizeof(string_view_t));
     if (!views) return NULL;
 
     const char *start = s->data;
     const char *end;
 
-    size_t delim_len = strlen(delim);
-
     while ((end = strstr(start, delim)) != NULL) {
-        if (count == cap) {
-            cap *= 2;
-            string_view_t *tmp = (string_view_t *)realloc(views, cap * sizeof(string_view_t));
-            if (!tmp) {
-                free(views);
-                return NULL;
-            }
-            views = tmp;
-        }
-
+        if (count == cap && views_grow(&views, &cap) != 0) return NULL;
         views[count].data = start;
         views[count].len  = (size_t)(end - start);
         count++;
-
         start = end + delim_len;
     }
 
-    if (count == cap) {
-        cap *= 2;
-        string_view_t *tmp = (string_view_t *)realloc(views, cap * sizeof(string_view_t));
-        if (!tmp) {
-            free(views);
-            return NULL;
-        }
-        views = tmp;
-    }
-
+    if (count == cap && views_grow(&views, &cap) != 0) return NULL;
     views[count].data = start;
     views[count].len  = s->len - (size_t)(start - s->data);
     count++;
@@ -171,13 +161,7 @@ static int utf8_normalize_external(const char *in, size_t in_len,
 
     size_t outsize = 0;
 
-    uint8_t *norm = u8_normalize(
-        nf,
-        (const uint8_t *)in,   // input buffer
-        in_len,                // input length
-        NULL,                  // let libunistring allocate
-        &outsize               // output length
-    );
+    uint8_t *norm = u8_normalize(nf, (const uint8_t *)in, in_len, NULL, &outsize);
 
     if (!norm)
         return -1;
@@ -189,18 +173,8 @@ static int utf8_normalize_external(const char *in, size_t in_len,
 }
 
 
-/**
- * @brief Normalize the string in place.
- *
- * @param s      String to modify.
- * @param form Normalization form.
- * @return 0 on success, non-zero on error or unsupported form.
- *
- * This function normalizes the string in place using the selected normalization
- * form. The string is modified to contain the normalized version of its
- * contents. The function returns 0 on success, or non-zero on error or
- * unsupported normalization form.
- */
+/* Normalize s in place to the given Unicode normalization form.
+   Returns 0 on success, -1 on error or unsupported form. */
 int string_normalize(string_t *s, string_norm_form_t form)
 {
     if (!s) return -1;

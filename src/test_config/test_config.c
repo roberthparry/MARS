@@ -10,9 +10,7 @@
 #include "ustring.h"
 #include "test_config.h"
 
-/* ========================================================================= */
-/*  Globals                                                                  */
-/* ========================================================================= */
+/* Globals */
 
 static dictionary_t *g_root  = NULL;
 static int           g_mode  = TEST_CONFIG_MODE;
@@ -23,9 +21,7 @@ static bool          g_loaded = false;
 /* LOCAL mode: store the real test filename (basename only) */
 static string_t     *g_local_filename = NULL;
 
-/* ========================================================================= */
-/*  string_t* key helpers                                                    */
-/* ========================================================================= */
+/* string_t* key helpers */
 
 static size_t string_key_hash(const void *key)
 {
@@ -51,9 +47,7 @@ static void string_key_destroy(void *elem)
     string_free(*(string_t **)elem);
 }
 
-/* ========================================================================= */
-/*  Value types                                                              */
-/* ========================================================================= */
+/* Value types */
 
 typedef struct _test_value {
     bool         is_node;
@@ -92,9 +86,7 @@ static void dictptr_destroy(void *elem)
     dictionary_destroy(*(dictionary_t **)elem);
 }
 
-/* ========================================================================= */
-/*  Path computation                                                         */
-/* ========================================================================= */
+/* Path computation */
 
 static string_t *compute_global_path(void)
 {
@@ -129,9 +121,7 @@ static string_t *compute_local_path(const char *file)
     return path;
 }
 
-/* ========================================================================= */
-/*  Root dictionary creation                                                 */
-/* ========================================================================= */
+/* Root dictionary creation */
 
 static dictionary_t *create_file_dict(void)
 {
@@ -169,9 +159,7 @@ static void ensure_root_created(void)
     }
 }
 
-/* ========================================================================= */
-/*  File-level dictionary helpers                                            */
-/* ========================================================================= */
+/* File-level dictionary helpers */
 
 static dictionary_t *ensure_file_dict(const char *file)
 {
@@ -211,15 +199,10 @@ static dictionary_t *ensure_file_dict(const char *file)
     }
 
     /* LOCAL mode: g_root *is* the file dictionary */
-    if (!g_root)
-        g_root = create_file_dict();
-
     return g_root;
 }
 
-/* ========================================================================= */
-/*  Per-dictionary test helpers                                              */
-/* ========================================================================= */
+/* Per-dictionary test helpers */
 
 static bool get_test(dictionary_t *dict, const char *name, test_value_t *out)
 {
@@ -237,13 +220,7 @@ static void set_test(dictionary_t *dict,
     if (!key)
         return;
 
-    /* dictionary_set:
-       - clones the key via string_key_clone
-       - clones the value via test_value_clone
-    */
     dictionary_set(dict, &key, value);
-
-    /* We own this key instance; the dictionary has its own clone. */
     string_free(key);
 }
 
@@ -258,9 +235,7 @@ static void ensure_leaf(dictionary_t *dict, const char *name, test_value_t *out)
     set_test(dict, name, out);
 }
 
-/* ========================================================================= */
-/*  JSON loader (rewritten for unlimited depth + "enabled" schema)           */
-/* ========================================================================= */
+/* JSON loader */
 
 typedef struct {
     const char *data;
@@ -555,10 +530,6 @@ static bool parse_root(json_stream_t *s)
     return true;
 }
 
-/* ========================================================================= */
-/*  JSON loader (rewritten for unlimited depth + "enabled" schema)           */
-/* ========================================================================= */
-
 static void load_json_if_needed(void)
 {
     if (g_loaded)
@@ -615,9 +586,7 @@ static void load_json_if_needed(void)
     free(buf);
 }
 
-/* ========================================================================= */
-/*  JSON writer (rewritten for unlimited depth + "enabled" schema)           */
-/* ========================================================================= */
+/* JSON writer */
 
 static void write_indent(FILE *f, int level)
 {
@@ -640,88 +609,19 @@ static void write_escaped_string(FILE *f, const char *s)
     fputc('"', f);
 }
 
-static void write_value(FILE *f, const test_value_t *v, int indent);
+static void write_object_internal(FILE *f, dictionary_t *dict, int indent, bool is_file_level);
 
-/*
- * Write a node object:
- *
- * {
- *   "enabled": true,
- *   "child1": false,
- *   "child2": { ... }
- * }
- *
- * Keys are written in insertion order (dictionary order).
- */
-static void write_object(FILE *f, dictionary_t *dict, int indent)
-{
-    size_t count = dictionary_size(dict);
-
-    fputs("{\n", f);
-
-    /* First write "enabled" explicitly */
-    write_indent(f, indent + 2);
-    write_escaped_string(f, "enabled");
-    fputs(": ", f);
-
-    /* Retrieve the stored enabled flag from the dictionary */
-    test_value_t enabled_val;
-    bool have_enabled = get_test(dict, "enabled", &enabled_val);
-
-    /* If missing (should not happen), default to true */
-    bool enabled_flag = have_enabled ? enabled_val.enabled : true;
-
-    fputs(enabled_flag ? "true" : "false", f);
-
-    /* Now write all other children */
-    for (size_t i = 0; i < count; i++) {
-        const void *key_ptr = dictionary_get_key(dict, i);
-        if (!key_ptr)
-            continue;
-
-        string_t *key = *(string_t * const *)key_ptr;
-        const char *kstr = string_c_str(key);
-
-        /* Skip "enabled" because we already wrote it */
-        if (strcmp(kstr, "enabled") == 0)
-            continue;
-
-        const void *val_ptr = dictionary_get_value(dict, i);
-        if (!val_ptr)
-            continue;
-
-        const test_value_t *child = (const test_value_t *)val_ptr;
-
-        fputs(",\n", f);
-        write_indent(f, indent + 2);
-        write_escaped_string(f, kstr);
-        fputs(": ", f);
-        write_value(f, child, indent + 2);
-    }
-
-    fputc('\n', f);
-    write_indent(f, indent);
-    fputc('}', f);
-}
-
-/* ========================================================================= */
-/*  Write a test_value_t into JSON                                           */
-/* ========================================================================= */
 static void write_value(FILE *f, const test_value_t *v, int indent)
 {
     if (!v->is_node) {
-        /* Leaf: just write true/false */
         fputs(v->enabled ? "true" : "false", f);
         return;
     }
 
-    /* Node: write object */
-    write_object(f, v->content, indent);
+    write_object_internal(f, v->content, indent, /*is_file_level=*/false);
 }
 
-/* ========================================================================= */
-/*  Recursive lookup for unlimited-depth hierarchy                           */
-/* ========================================================================= */
+/* Recursive lookup for unlimited-depth hierarchy */
 
 static bool find_node_recursive(dictionary_t  *dict,
                                 const char    *path,
@@ -771,9 +671,7 @@ static bool find_node_recursive(dictionary_t  *dict,
     return find_node_recursive(v.content, dot + 1, out_value, out_parent);
 }
 
-/* ========================================================================= */
-/*  Compute effective enabled state for a node by name                       */
-/* ========================================================================= */
+/* Compute effective enabled state for a node by name */
 
 static bool find_effective_enabled(dictionary_t *dict,
                                    const char *name,
@@ -833,9 +731,7 @@ static bool dictionary_has_any_group(dictionary_t *dict)
     return false;
 }
 
-/* ========================================================================= */
-/*  Public API: test_enabled (unlimited depth + parent override)             */
-/* ========================================================================= */
+/* Public API */
 
 int test_enabled(const char *file, const char *func, const char *parent)
 {
@@ -858,7 +754,6 @@ int test_enabled(const char *file, const char *func, const char *parent)
         if (get_test(file_dict, func, &v))
             return v.enabled ? 1 : 0;
 
-        /* NEW LEAF CREATED → mark config as loaded */
         ensure_leaf(file_dict, func, &v);
 
         return 1;
@@ -881,7 +776,6 @@ int test_enabled(const char *file, const char *func, const char *parent)
 
     if (!find_node_recursive(file_dict, parent, &pv, &parent_dict)) {
 
-        /* NEW PARENT CREATED → mark config as loaded */
         pv.is_node = true;
         pv.enabled = true;
         pv.content = create_file_dict();
@@ -892,7 +786,6 @@ int test_enabled(const char *file, const char *func, const char *parent)
 
     if (!pv.is_node || !pv.content) {
 
-        /* PARENT NODE REPAIRED → mark config as loaded */
         pv.is_node = true;
         pv.enabled = true;
         pv.content = create_file_dict();
@@ -915,9 +808,6 @@ int test_enabled(const char *file, const char *func, const char *parent)
     return 1;
 }
 
-/* ========================================================================= */
-/*  Public API: test_config_has_key (unlimited depth)                        */
-/* ========================================================================= */
 
 bool test_config_has_key(const char *file, const char *func, const char *parent)
 {
@@ -1006,9 +896,7 @@ static void write_object_internal(FILE *f, dictionary_t *dict, int indent, bool 
     fputc('}', f);
 }
 
-/* ========================================================================= */
-/*  Root writer (GLOBAL + LOCAL)                                             */
-/* ========================================================================= */
+/* Root writer (GLOBAL + LOCAL) */
 
 static void write_root(FILE *f)
 {
@@ -1053,9 +941,6 @@ static void write_root(FILE *f)
     fputs("}\n", f);
 }
 
-/* ========================================================================= */
-/*  Public API: test_config_save                                             */
-/* ========================================================================= */
 
 void test_config_save(void)
 {
@@ -1088,13 +973,10 @@ void test_config_save(void)
     string_free(path);
 }
 
-/* ========================================================================= */
-/*  Mode control + shutdown                                                  */
-/* ========================================================================= */
+/* Mode control + shutdown */
 
-void test_config_set_mode(test_config_mode_t mode)
+static void reset_state(void)
 {
-    /* Tear down any previous state */
     if (g_root) {
         dictionary_destroy(g_root);
         g_root = NULL;
@@ -1104,22 +986,17 @@ void test_config_set_mode(test_config_mode_t mode)
         string_free(g_local_filename);
         g_local_filename = NULL;
     }
+}
 
+void test_config_set_mode(test_config_mode_t mode)
+{
+    reset_state();
     g_mode = mode;
 }
 
 void test_config_shutdown(void)
 {
-    if (g_root) {
-        dictionary_destroy(g_root);
-        g_root = NULL;
-    }
-
-    if (g_local_filename) {
-        string_free(g_local_filename);
-        g_local_filename = NULL;
-    }
-
+    reset_state();
     g_mode   = TEST_CONFIG_MODE;
     g_loaded = false;
 }

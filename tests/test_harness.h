@@ -12,9 +12,7 @@
 
 #include "test_config.h"
 
-/* ------------------------------------------------------------------------- */
-/* Colours                                                                   */
-/* ------------------------------------------------------------------------- */
+/* Colours */
 
 #define C_GREEN   "\x1b[32m"
 #define C_RED     "\x1b[31m"
@@ -23,22 +21,17 @@
 #define C_RESET   "\x1b[0m"
 #define C_BOLD    "\x1b[1m"
 
-/* ------------------------------------------------------------------------- */
-/* Global test state                                                         */
-/* ------------------------------------------------------------------------- */
+/* Global test state */
 
 extern int tests_run;
 extern int tests_failed;
 extern int tests_skipped;
 
-/* ------------------------------------------------------------------------- */
-/* Assertion helpers                                                         */
-/* ------------------------------------------------------------------------- */
+/* Assertion helpers */
 
 #define ASSERT_TRUE(expr)                                               \
     do {                                                                \
         if (!(expr)) {                                                  \
-            tests_failed++;                                             \
             printf(C_RED "    Assertion failed: %s\n" C_RESET, #expr);  \
             TEST_FAIL();                                                \
             continue;                                                   \
@@ -48,7 +41,6 @@ extern int tests_skipped;
 #define ASSERT_EQ_INT(actual, expected)                         \
     do {                                                        \
         if ((actual) != (expected)) {                           \
-            tests_failed++;                                     \
             printf(C_RED "    Expected %d, got %d\n" C_RESET,   \
                    (int)(expected), (int)(actual));             \
             TEST_FAIL();                                        \
@@ -59,7 +51,6 @@ extern int tests_skipped;
 #define ASSERT_EQ_LONG(actual, expected)                        \
     do {                                                        \
         if ((actual) != (expected)) {                           \
-            tests_failed++;                                     \
             printf(C_RED "    Expected %ld, got %ld\n" C_RESET, \
                    (long)(expected), (long)(actual));           \
             TEST_FAIL();                                        \
@@ -70,7 +61,6 @@ extern int tests_skipped;
 #define ASSERT_EQ_DOUBLE(actual, expected, eps)                     \
     do {                                                            \
         if (fabs((actual) - (expected)) > (eps)) {                  \
-            tests_failed++;                                         \
             printf(C_RED "    Expected %.12f, got %.12f\n" C_RESET, \
                    (double)(expected), (double)(actual));           \
             TEST_FAIL();                                            \
@@ -81,7 +71,6 @@ extern int tests_skipped;
 #define ASSERT_NOT_NULL(ptr)                                            \
     do {                                                                \
         if ((ptr) == NULL) {                                            \
-            tests_failed++;                                             \
             printf(C_RED "    Expected non-null pointer\n" C_RESET);    \
             TEST_FAIL();                                                \
             continue;                                                   \
@@ -91,16 +80,13 @@ extern int tests_skipped;
 #define ASSERT_NULL(ptr)                                            \
     do {                                                            \
         if ((ptr) != NULL) {                                        \
-            tests_failed++;                                         \
             printf(C_RED "    Expected NULL pointer\n" C_RESET);    \
             TEST_FAIL();                                            \
             continue;                                               \
         }                                                           \
     } while (0)
 
-/* ------------------------------------------------------------------------- */
-/* RUN_TEST — SKIP, PASS/FAIL                                                */
-/* ------------------------------------------------------------------------- */
+/* RUN_TEST — SKIP, PASS/FAIL */
 
 #define RUN_TEST(func, parent)                                                    \
     do {                                                                          \
@@ -142,50 +128,24 @@ extern int tests_skipped;
         }                                                                         \
     } while (0)
 
-/* ------------------------------------------------------------------------- */
-/* CALL TEST_FAIL() to mark test as failed                                   */
-/* ------------------------------------------------------------------------- */
 
 #define TEST_FAIL() do { tests_failed++; } while (0)
 
-/* ------------------------------------------------------------------------- */
-/* User must define this                                                     */
-/* ------------------------------------------------------------------------- */
-
-/// @brief The main test entry point. This function should be defined by the user in their test file and will be called by the test 
-///        harness to execute the tests. It should return 0 on success or a non-zero value if there was an error during test execution.
-/// @return 0 on success, non-zero on error.
-/// @note There is no need to define a main() function in the test file, as the test harness provides its own main() that calls this 
-///       tests_main() function. The test harness will automatically track the number of tests run, passed, failed, and skipped based 
-///       on the assertions and the RUN_TEST macro used in this function. The user should not modify the global test state variables 
-///       directly, but should use the provided macros and functions to ensure accurate tracking of test results. The tests_main() 
-///       function should contain calls to RUN_TEST() for each test function defined in the test file, and can also include any necessary
-///       setup or teardown code for the tests.
+/* Define this in your test file. Call RUN_TEST() for each test. */
 int tests_main(void);
 
-/* ------------------------------------------------------------------------- */
-/* Harness-owned main(). do not modify!                                      */
-/* ------------------------------------------------------------------------- */
+/* Harness-owned — do not modify */
 
 int tests_run = 0;
 int tests_failed = 0;
 int tests_skipped = 0;
 
 int main(void) {
-
-    /* Load config */
     test_config_set_mode(TEST_CONFIG_MODE);
-
-    /* Run tests */
     int rc = tests_main();
-
-    /* Save config */
     test_config_save();
-
-    /* Release config resources */
     test_config_shutdown();
 
-    /* Summary */
     int passed = tests_run - tests_failed;
 
     printf("\n" C_CYAN "SUMMARY: " C_RESET

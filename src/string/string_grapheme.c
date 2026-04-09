@@ -1,18 +1,18 @@
 #include "string_internal.h"
 
-/* =========================================================================
-   Binary search over sorted codepoint ranges
-   ========================================================================= */
+#define ARRAY_COUNT(a) (sizeof(a) / sizeof((a)[0]))
 
+/* Binary search over the sorted codepoint ranges array. Returns 1 if cp falls
+   within any range, 0 otherwise. */
 typedef struct {
     uint32_t lo;
     uint32_t hi;
 } cp_range_t;
 
-static int range_contains(const cp_range_t *ranges, size_t count, uint32_t cp)
+static int range_contains(const cp_range_t *ranges, size_t n, uint32_t cp)
 {
     size_t lo = 0;
-    size_t hi = count;
+    size_t hi = n;
 
     while (lo < hi) {
         size_t mid = lo + (hi - lo) / 2;
@@ -27,9 +27,7 @@ static int range_contains(const cp_range_t *ranges, size_t count, uint32_t cp)
     return 0;
 }
 
-/* =========================================================================
-   Codepoint range tables
-   ========================================================================= */
+/* Codepoint range tables */
 
 static const cp_range_t combining_mark_ranges[] = {
     { 0x0300, 0x036F },
@@ -38,8 +36,6 @@ static const cp_range_t combining_mark_ranges[] = {
     { 0x20D0, 0x20FF },
     { 0xFE20, 0xFE2F },
 };
-static const size_t combining_mark_count =
-    sizeof(combining_mark_ranges) / sizeof(combining_mark_ranges[0]);
 
 static const cp_range_t spacing_mark_ranges[] = {
     { 0x0900, 0x0903 }, { 0x093B, 0x093C }, { 0x093E, 0x0940 },
@@ -86,8 +82,6 @@ static const cp_range_t spacing_mark_ranges[] = {
     { 0x1134B, 0x1134D }, { 0x11362, 0x11363 }, { 0x11435, 0x11437 },
     { 0x11440, 0x11441 }, { 0x11443, 0x11445 },
 };
-static const size_t spacing_mark_count =
-    sizeof(spacing_mark_ranges) / sizeof(spacing_mark_ranges[0]);
 
 static const cp_range_t extended_pictographic_ranges[] = {
     { 0x00A9, 0x00A9 }, { 0x00AE, 0x00AE }, { 0x203C, 0x203C },
@@ -126,18 +120,12 @@ static const cp_range_t extended_pictographic_ranges[] = {
     { 0x1F700, 0x1F77F }, { 0x1F780, 0x1F7FF }, { 0x1F800, 0x1F8FF },
     { 0x1F900, 0x1F9FF }, { 0x1FA00, 0x1FA6F }, { 0x1FA70, 0x1FAFF },
 };
-static const size_t extended_pictographic_count =
-    sizeof(extended_pictographic_ranges) / sizeof(extended_pictographic_ranges[0]);
 
 static const cp_range_t regional_indicator_ranges[] = {
     { 0x1F1E6, 0x1F1FF },
 };
-static const size_t regional_indicator_count =
-    sizeof(regional_indicator_ranges) / sizeof(regional_indicator_ranges[0]);
 
-/* =========================================================================
-   Grapheme class classification
-   ========================================================================= */
+/* Grapheme class classification */
 
 grapheme_class_t string_grapheme_class(uint32_t cp)
 {
@@ -151,27 +139,25 @@ grapheme_class_t string_grapheme_class(uint32_t cp)
         return GB_ZWJ;
 
     if (range_contains(regional_indicator_ranges,
-                       regional_indicator_count, cp))
+                       ARRAY_COUNT(regional_indicator_ranges), cp))
         return GB_Regional_Indicator;
 
     if (range_contains(extended_pictographic_ranges,
-                       extended_pictographic_count, cp))
+                       ARRAY_COUNT(extended_pictographic_ranges), cp))
         return GB_Extended_Pictographic;
 
     if (range_contains(combining_mark_ranges,
-                       combining_mark_count, cp))
+                       ARRAY_COUNT(combining_mark_ranges), cp))
         return GB_Extend;
 
     if (range_contains(spacing_mark_ranges,
-                       spacing_mark_count, cp))
+                       ARRAY_COUNT(spacing_mark_ranges), cp))
         return GB_SpacingMark;
 
     return GB_Other;
 }
 
-/* =========================================================================
-   Forward grapheme iterator
-   ========================================================================= */
+/* Forward grapheme iterator */
 
 size_t string_grapheme_next(const char *s, size_t len, size_t i)
 {
@@ -212,7 +198,7 @@ size_t string_grapheme_next(const char *s, size_t len, size_t i)
                 size_t adv3;
                 uint32_t cp3 = utf8_decode(s + pos, len - pos, &adv3);
                 if (range_contains(extended_pictographic_ranges,
-                                   extended_pictographic_count, cp3))
+                                   ARRAY_COUNT(extended_pictographic_ranges), cp3))
                     pos += adv3;
             }
         } else {
@@ -231,10 +217,8 @@ size_t string_grapheme_next(const char *s, size_t len, size_t i)
     return pos;
 }
 
-/* =========================================================================
-   Backward grapheme iterator
-   Scans forward from a safe anchor for correctness with ZWJ sequences.
-   ========================================================================= */
+/* Backward grapheme iterator. Scans forward from a safe anchor for
+   correctness with ZWJ sequences. */
 
 size_t string_grapheme_prev(const char *s, size_t len, size_t i)
 {
@@ -272,9 +256,7 @@ size_t string_grapheme_prev(const char *s, size_t len, size_t i)
     return prev_boundary;
 }
 
-/* =========================================================================
-   Count grapheme clusters
-   ========================================================================= */
+/* Count grapheme clusters */
 
 size_t string_grapheme_count(const string_t *s)
 {
@@ -291,9 +273,7 @@ size_t string_grapheme_count(const string_t *s)
     return count;
 }
 
-/* =========================================================================
-   Grapheme-safe reverse
-   ========================================================================= */
+/* Grapheme-safe reverse */
 
 void string_grapheme_reverse(string_t *s)
 {
@@ -325,9 +305,7 @@ void string_grapheme_reverse(string_t *s)
     free(starts);
 }
 
-/* =========================================================================
-   Grapheme-safe substring
-   ========================================================================= */
+/* Grapheme-safe substring */
 
 string_t *string_grapheme_substr(const string_t *s, size_t gpos, size_t glen)
 {
@@ -368,9 +346,7 @@ string_t *string_grapheme_substr(const string_t *s, size_t gpos, size_t glen)
     return out;
 }
 
-/* =========================================================================
-   Convenience: single grapheme by index
-   ========================================================================= */
+/* Convenience: single grapheme by index */
 
 string_t *string_grapheme_at(const string_t *s, size_t index)
 {

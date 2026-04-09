@@ -108,26 +108,15 @@ uint32_t utf8_decode(const char *s, size_t len, size_t *adv)
     if (len == 0) { *adv = 0; return 0; }
 
     unsigned char c = s[0];
+    size_t clen = utf8_char_len(c);
 
-    if (c < 0x80) { *adv = 1; return c; }
-    if ((c >> 5) == 0x6 && len >= 2) {
-        *adv = 2;
-        return ((c & 0x1F) << 6) | (s[1] & 0x3F);
-    }
-    if ((c >> 4) == 0xE && len >= 3) {
-        *adv = 3;
-        return ((c & 0x0F) << 12) |
-               ((s[1] & 0x3F) << 6) |
-               (s[2] & 0x3F);
-    }
-    if ((c >> 3) == 0x1E && len >= 4) {
-        *adv = 4;
-        return ((c & 0x07) << 18) |
-               ((s[1] & 0x3F) << 12) |
-               ((s[2] & 0x3F) << 6) |
-               (s[3] & 0x3F);
-    }
+    if (clen > len) { *adv = 1; return c; }
 
-    *adv = 1;
-    return c;
+    *adv = clen;
+    switch (clen) {
+    case 2: return ((c & 0x1F) << 6)  |  (s[1] & 0x3F);
+    case 3: return ((c & 0x0F) << 12) | ((s[1] & 0x3F) << 6)  |  (s[2] & 0x3F);
+    case 4: return ((c & 0x07) << 18) | ((s[1] & 0x3F) << 12) | ((s[2] & 0x3F) << 6) | (s[3] & 0x3F);
+    default: return c;
+    }
 }

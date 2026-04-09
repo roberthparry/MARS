@@ -3,7 +3,8 @@
 #include "string_internal.h"
 #include "ustring.h"
 
-/* Creation / destruction */
+/* Grow the internal buffer to hold at least `needed` bytes. No-op if capacity
+   is already sufficient. Returns 0 on success, -1 on allocation failure. */
 
 int string_reserve(string_t *s, size_t needed)
 {
@@ -21,6 +22,8 @@ int string_reserve(string_t *s, size_t needed)
     return 0;
 }
 
+/* Allocate and return a new empty string. Returns NULL on allocation failure. */
+
 string_t *string_new(void)
 {
     string_t *s = calloc(1, sizeof(string_t));
@@ -35,6 +38,8 @@ string_t *string_new(void)
     return s;
 }
 
+/* Allocate a new string pre-populated with `init`. Returns NULL on failure. */
+
 string_t *string_new_with(const char *init)
 {
     string_t *s = string_new();
@@ -47,6 +52,8 @@ string_t *string_new_with(const char *init)
     return s;
 }
 
+/* Return a deep copy of `src`, or NULL if src is NULL or allocation fails. */
+
 string_t *string_clone(const string_t *src)
 {
     if (!src)
@@ -55,6 +62,8 @@ string_t *string_clone(const string_t *src)
     return string_new_with(string_c_str(src));
 }
 
+/* Free the string and its internal buffer. No-op if s is NULL. */
+
 void string_free(string_t *s)
 {
     if (!s) return;
@@ -62,19 +71,21 @@ void string_free(string_t *s)
     free(s);
 }
 
-/* Access */
+/* Return the null-terminated C string. Returns "" if s is NULL. */
 
 const char *string_c_str(const string_t *s)
 {
     return s ? s->data : "";
 }
 
+/* Return the number of bytes in the string. Returns 0 if s is NULL. */
+
 size_t string_length(const string_t *s)
 {
     return s ? s->len : 0;
 }
 
-/* Modification */
+/* Reset the string to empty without releasing its allocated memory. */
 
 void string_clear(string_t *s)
 {
@@ -82,6 +93,9 @@ void string_clear(string_t *s)
     s->len = 0;
     s->data[0] = '\0';
 }
+
+/* Append the null-terminated C string `suffix` to s. Returns 0 on success,
+   -1 if either argument is NULL or allocation fails. */
 
 int string_append_cstr(string_t *s, const char *suffix)
 {
@@ -97,6 +111,9 @@ int string_append_cstr(string_t *s, const char *suffix)
     return 0;
 }
 
+/* Append exactly `size` bytes from `buffer` to s (need not be null-terminated).
+   Returns 0 on success, -1 on bad arguments or allocation failure. */
+
 int string_append_chars(string_t *s, const char *buffer, size_t size)
 {
     if (!s || !buffer || size == 0)
@@ -104,11 +121,9 @@ int string_append_chars(string_t *s, const char *buffer, size_t size)
 
     size_t need = s->len + size + 1;
 
-    /* Ensure capacity */
     if (string_reserve(s, need) != 0)
         return -1;
 
-    /* Copy raw bytes */
     memcpy(s->data + s->len, buffer, size);
 
     s->len += size;
@@ -116,6 +131,8 @@ int string_append_chars(string_t *s, const char *buffer, size_t size)
 
     return 0;
 }
+
+/* Append a single character to s. Returns 0 on success, -1 on failure. */
 
 int string_append_char(string_t *s, char c)
 {
@@ -128,6 +145,9 @@ int string_append_char(string_t *s, char c)
     s->data[s->len] = '\0';
     return 0;
 }
+
+/* Insert `text` at byte offset `pos`, shifting existing content right.
+   If pos > len it is clamped to len (append). Returns 0 on success, -1 on failure. */
 
 int string_insert(string_t *s, size_t pos, const char *text)
 {
@@ -145,6 +165,8 @@ int string_insert(string_t *s, size_t pos, const char *text)
     s->len += add;
     return 0;
 }
+
+/* Strip leading and trailing ASCII whitespace (any byte <= 0x20) in-place. */
 
 void string_trim(string_t *s)
 {
@@ -167,7 +189,9 @@ void string_trim(string_t *s)
     s->len = new_len;
 }
 
-/* printf-style */
+/* Append a printf-style formatted string using a va_list. The format is applied
+   via a double-pass vsnprintf to compute the exact size before writing.
+   Returns the number of characters appended, or -1 on error. */
 
 int string_vprintf(string_t *s, const char *fmt, va_list ap)
 {
@@ -190,6 +214,9 @@ int string_vprintf(string_t *s, const char *fmt, va_list ap)
     return written;
 }
 
+/* Append a printf-style formatted string to s. Returns the number of characters
+   appended, or -1 on error. */
+
 int string_printf(string_t *s, const char *fmt, ...)
 {
     va_list ap;
@@ -198,6 +225,8 @@ int string_printf(string_t *s, const char *fmt, ...)
     va_end(ap);
     return r;
 }
+
+/* Alias for string_printf — appends a formatted string to s. */
 
 int string_append_format(string_t *s, const char *fmt, ...)
 {
@@ -208,7 +237,8 @@ int string_append_format(string_t *s, const char *fmt, ...)
     return r;
 }
 
-/* Search / compare */
+/* Return the byte offset of the first occurrence of `needle` in s, or -1 if
+   not found, needle is empty, or either argument is NULL. */
 
 ssize_t string_find(const string_t *s, const char *needle)
 {
@@ -222,6 +252,9 @@ ssize_t string_find(const string_t *s, const char *needle)
     return (ssize_t)(p - s->data);
 }
 
+/* Lexicographically compare a and b. Returns <0, 0, or >0. NULL sorts before
+   any non-NULL string. */
+
 int string_compare(const string_t *a, const string_t *b)
 {
     if (!a && !b) return 0;
@@ -229,6 +262,8 @@ int string_compare(const string_t *a, const string_t *b)
     if (!b) return 1;
     return strcmp(a->data, b->data);
 }
+
+/* Return true if s begins with `prefix`. */
 
 bool string_starts_with(const string_t *s, const char *prefix)
 {
@@ -240,6 +275,8 @@ bool string_starts_with(const string_t *s, const char *prefix)
     return memcmp(s->data, prefix, plen) == 0;
 }
 
+/* Return true if s ends with `suffix`. */
+
 bool string_ends_with(const string_t *s, const char *suffix)
 {
     if (!s || !suffix) return 0;
@@ -249,6 +286,9 @@ bool string_ends_with(const string_t *s, const char *suffix)
 
     return memcmp(s->data + (s->len - slen), suffix, slen) == 0;
 }
+
+/* Return a new string containing `len` bytes starting at `pos`. Both pos and
+   len are clamped to the available content. Returns NULL on failure. */
 
 string_t *string_substr(const string_t *s, size_t pos, size_t len)
 {
@@ -273,6 +313,8 @@ string_t *string_substr(const string_t *s, size_t pos, size_t len)
     return out;
 }
 
+/* Reverse the string in-place. */
+
 void string_reverse(string_t *s)
 {
     if (!s || s->len <= 1) return;
@@ -289,7 +331,10 @@ void string_reverse(string_t *s)
     }
 }
 
-/* Replace */
+/* Replace every occurrence of `search` with `replace` in-place. Uses a
+   two-pass approach: count occurrences first, then rebuild into a temp buffer.
+   Returns 0 on success (including no matches), -1 on bad arguments or
+   allocation failure. */
 
 int string_replace(string_t *s, const char *search, const char *replace)
 {
@@ -312,9 +357,6 @@ int string_replace(string_t *s, const char *search, const char *replace)
 
     size_t new_len = s->len + count * (replace_len - search_len);
 
-    if (string_reserve(s, new_len + 1) != 0)
-        return -1;
-
     char *temp = malloc(new_len + 1);
     if (!temp) return -1;
 
@@ -334,12 +376,14 @@ int string_replace(string_t *s, const char *search, const char *replace)
 
     strcpy(out, in);
 
-    memcpy(s->data, temp, new_len + 1);
-    s->len = new_len;
-
-    free(temp);
+    free(s->data);
+    s->data = temp;
+    s->len  = new_len;
+    s->cap  = new_len + 1;
     return 0;
 }
+
+/* Convert all ASCII lowercase letters to uppercase in-place. */
 
 void string_to_upper(string_t *s)
 {
@@ -352,6 +396,8 @@ void string_to_upper(string_t *s)
     }
 }
 
+/* Convert all ASCII uppercase letters to lowercase in-place. */
+
 void string_to_lower(string_t *s)
 {
     if (!s) return;
@@ -362,6 +408,8 @@ void string_to_lower(string_t *s)
             s->data[i] = (char)(c + ('a' - 'A'));
     }
 }
+
+/* Compute an FNV-1a hash of the string contents. Returns 0 for NULL. */
 
 unsigned long string_hash(const string_t *s)
 {
@@ -380,7 +428,9 @@ unsigned long string_hash(const string_t *s)
     return hash;
 }
 
-/* Split / join */
+/* Split s on any character in `delim`, returning a heap-allocated array of
+   strings. The count is written to *out_count. The array must be freed with
+   string_split_free(). Returns NULL on bad arguments or allocation failure. */
 
 string_t **string_split(const string_t *s, const char *delim, size_t *out_count)
 {
@@ -428,6 +478,8 @@ string_t **string_split(const string_t *s, const char *delim, size_t *out_count)
     return arr;
 }
 
+/* Free an array returned by string_split, including each element. */
+
 void string_split_free(string_t **arr, size_t count)
 {
     if (!arr) return;
@@ -435,6 +487,9 @@ void string_split_free(string_t **arr, size_t count)
         string_free(arr[i]);
     free(arr);
 }
+
+/* Concatenate `count` strings from `arr`, inserting `sep` between each.
+   Returns a new string, or NULL on allocation failure. */
 
 string_t *string_join(string_t **arr, size_t count, const char *sep)
 {
