@@ -3,6 +3,7 @@
 
 #include <stddef.h>
 #include <stdarg.h>
+#include <stdint.h>
 #include <stdbool.h>
 
 /**
@@ -394,34 +395,66 @@ typedef enum {
 } grapheme_class_t;
 
 /**
- * @brief Advance to the next grapheme cluster boundary.
+ * @brief Classify a Unicode codepoint into its grapheme break class.
+ *
+ * @param cp Unicode codepoint.
+ * @return Grapheme break class.
  */
-size_t utf8_grapheme_next(const char *s, size_t len, size_t i);
+grapheme_class_t string_grapheme_class(uint32_t cp);
+
+/**
+ * @brief Advance to the next grapheme cluster boundary.
+ *
+ * @param s   Byte buffer.
+ * @param len Total buffer length in bytes.
+ * @param i   Current byte index.
+ * @return Byte index of the next grapheme cluster boundary.
+ */
+size_t string_grapheme_next(const char *s, size_t len, size_t i);
 
 /**
  * @brief Move to the previous grapheme cluster boundary.
+ *
+ * @param s   Byte buffer.
+ * @param len Total buffer length in bytes.
+ * @param i   Current byte index.
+ * @return Byte index of the previous grapheme cluster boundary.
  */
-size_t utf8_grapheme_prev(const char *s, size_t len, size_t i);
+size_t string_grapheme_prev(const char *s, size_t len, size_t i);
 
 /**
  * @brief Count grapheme clusters in a string.
+ *
+ * @param s String to query.
+ * @return Number of grapheme clusters.
  */
-size_t utf8_grapheme_count(const string_t *s);
+size_t string_grapheme_count(const string_t *s);
 
 /**
  * @brief Reverse the string by grapheme clusters.
+ *
+ * @param s String to modify.
  */
-void string_utf8_grapheme_reverse(string_t *s);
+void string_grapheme_reverse(string_t *s);
 
 /**
  * @brief Extract a substring by grapheme cluster range.
  *
  * @param s    Source string.
  * @param gpos Starting grapheme index.
- * @param glen Number of graphemes.
- * @return Newly allocated substring.
+ * @param glen Number of graphemes to extract.
+ * @return Newly allocated substring, or NULL on error.
  */
-string_t *string_utf8_grapheme_substr(const string_t *s, size_t gpos, size_t glen);
+string_t *string_grapheme_substr(const string_t *s, size_t gpos, size_t glen);
+
+/**
+ * @brief Extract a single grapheme cluster by index.
+ *
+ * @param s     Source string.
+ * @param index Zero-based grapheme index.
+ * @return Newly allocated string containing the grapheme, or NULL on error.
+ */
+string_t *string_grapheme_at(const string_t *s, size_t index);
 
 /* ------------------------------------------------------------------------- */
 /* ASCII case conversion                                                     */

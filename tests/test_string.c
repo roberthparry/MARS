@@ -218,9 +218,9 @@ int test_grapheme(void)
 {
     string_t *s = string_new_with("👩‍👩‍👧‍👦 café 🇬🇧");
 
-    ASSERT_TRUE(utf8_grapheme_count(s) > 0);
+    ASSERT_TRUE(string_grapheme_count(s) > 0);
 
-    string_utf8_grapheme_reverse(s);
+    string_grapheme_reverse(s);
 
     string_free(s);
     return 0;
@@ -230,12 +230,12 @@ int test_grapheme_reverse_and_substr(void)
 {
     string_t *s = string_new_with("👩‍👩‍👧‍👦 café 🇬🇧");
 
-    size_t g = utf8_grapheme_count(s);
+    size_t g = string_grapheme_count(s);
     ASSERT_TRUE(g > 0);
 
-    string_utf8_grapheme_reverse(s);
+    string_grapheme_reverse(s);
 
-    string_t *sub = string_utf8_grapheme_substr(s, 1, 3);
+    string_t *sub = string_grapheme_substr(s, 1, 3);
     ASSERT_TRUE(sub != NULL);
 
     string_free(sub);
@@ -362,23 +362,22 @@ int test_readme_example_Basic_UTF_8_Manipulation(void) {
 int test_readme_example_Grapheme_Iteration(void) {
     string_t *s = string_new_with("👨‍👩‍👧‍👦 family");
 
-    size_t count = utf8_grapheme_count(s);
+    size_t count = string_grapheme_count(s);
 
     printf("Graphemes: %zu\n", count);
 
     for (size_t i = 0; i < count; i++) {
-        string_t *g = string_utf8_grapheme_substr(s, i, 1);
+        string_t *g = string_grapheme_at(s, i);
         printf("[%zu] %s\n", i, string_c_str(g));
         string_free(g);
     }
 
     string_free(s);
-
     return 0;
 }
 
 int test_readme_example_Using_the_Builder_API(void) {
-    string_builder_t *b = string_builder_new();   /* was: uninitialized pointer + wrong init call */
+    string_builder_t *b = string_builder_new();
     string_builder_append(b, "Hello");
     string_builder_append(b, ", ");
     string_builder_append(b, "世界");
