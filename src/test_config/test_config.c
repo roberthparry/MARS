@@ -12,7 +12,7 @@
 
 /* Globals */
 
-static dictionary_t *g_root  = NULL;
+static dict_t *g_root  = NULL;
 static int           g_mode  = TEST_CONFIG_MODE;
 
 /* Track whether we've attempted to load JSON in this process */
@@ -52,7 +52,7 @@ static void string_key_destroy(void *elem)
 typedef struct _test_value {
     bool         is_node;
     bool         enabled;
-    dictionary_t *content;
+    dict_t *content;
 } test_value_t;
 
 void test_value_clone(void *dst, const void *src)
@@ -70,20 +70,20 @@ void test_value_destroy(void *value)
     test_value_t *v = value;
 
     if (v->is_node && v->content) {
-        dictionary_destroy(v->content);
+        dict_destroy(v->content);
         v->content = NULL;
     }
 }
 
-/* GLOBAL mode: filename -> dictionary_t* */
+/* GLOBAL mode: filename -> dict_t* */
 static void dictptr_clone(void *dst, const void *src)
 {
-    *(dictionary_t **)dst = *(dictionary_t * const *)src;
+    *(dict_t **)dst = *(dict_t * const *)src;
 }
 
 static void dictptr_destroy(void *elem)
 {
-    dictionary_destroy(*(dictionary_t **)elem);
+    dict_destroy(*(dict_t **)elem);
 }
 
 /* Path computation */
@@ -123,9 +123,9 @@ static string_t *compute_local_path(const char *file)
 
 /* Root dictionary creation */
 
-static dictionary_t *create_file_dict(void)
+static dict_t *create_file_dict(void)
 {
-    dictionary_t *dict = dictionary_create(
+    dict_t *dict = dict_create(
         sizeof(string_t *),
         sizeof(test_value_t),
         string_key_hash,
@@ -144,9 +144,9 @@ static void ensure_root_created(void)
         return;
 
     if (g_mode == TEST_CONFIG_GLOBAL) {
-        g_root = dictionary_create(
+        g_root = dict_create(
             sizeof(string_t *),
-            sizeof(dictionary_t *),
+            sizeof(dict_t *),
             string_key_hash,
             string_key_cmp,
             string_key_clone,
@@ -161,21 +161,21 @@ static void ensure_root_created(void)
 
 /* File-level dictionary helpers */
 
-static dictionary_t *ensure_file_dict(const char *file)
+static dict_t *ensure_file_dict(const char *file)
 {
     ensure_root_created();
 
     if (g_mode == TEST_CONFIG_GLOBAL) {
-        /* g_root: key = string_t*, value = dictionary_t* */
+        /* g_root: key = string_t*, value = dict_t* */
 
         string_t *file_key = string_new_with(file);
         if (!file_key)
             return NULL;
 
-        dictionary_t *file_dict = NULL;
+        dict_t *file_dict = NULL;
 
         /* Look up existing file dictionary */
-        if (dictionary_get(g_root, &file_key, &file_dict) && file_dict) {
+        if (dict_get(g_root, &file_key, &file_dict) && file_dict) {
             string_free(file_key);
             return file_dict;
         }
@@ -190,7 +190,7 @@ static dictionary_t *ensure_file_dict(const char *file)
         /* Store pointer to file_dict in g_root.
            dictptr_clone/dictptr_destroy handle cloning/destroying the pointed-to dictionary.
         */
-        dictionary_set(g_root, &file_key, &file_dict);
+        dict_set(g_root, &file_key, &file_dict);
 
         /* We own this key instance; g_root has its own clone. */
         string_free(file_key);
@@ -204,15 +204,15 @@ static dictionary_t *ensure_file_dict(const char *file)
 
 /* Per-dictionary test helpers */
 
-static bool get_test(dictionary_t *dict, const char *name, test_value_t *out)
+static bool get_test(dict_t *dict, const char *name, test_value_t *out)
 {
     string_t *key = string_new_with(name);
-    bool ok = dictionary_get(dict, &key, out);
+    bool ok = dict_get(dict, &key, out);
     string_free(key);
     return ok;
 }
 
-static void set_test(dictionary_t *dict,
+static void set_test(dict_t *dict,
                      const char   *name,
                      const test_value_t *value)
 {
@@ -220,11 +220,11 @@ static void set_test(dictionary_t *dict,
     if (!key)
         return;
 
-    dictionary_set(dict, &key, value);
+    dict_set(dict, &key, value);
     string_free(key);
 }
 
-static void ensure_leaf(dictionary_t *dict, const char *name, test_value_t *out)
+static void ensure_leaf(dict_t *dict, const char *name, test_value_t *out)
 {
     if (get_test(dict, name, out))
         return;
@@ -343,7 +343,7 @@ static bool json_parse_string(json_stream_t *s, string_t **out)
 }
 
 /* Forward declarations */
-static bool parse_object(json_stream_t *s, dictionary_t **dict);
+static bool parse_object(json_stream_t *s, dict_t **dict);
 static bool parse_root(json_stream_t *s);
 
 /* Parse a value into test_value_t:
@@ -394,13 +394,13 @@ static bool parse_value(json_stream_t *s, test_value_t *out)
  *
  * All keys except "enabled" become children in the node's dictionary.
  */
-static bool parse_object(json_stream_t *s, dictionary_t **dictp)
+static bool parse_object(json_stream_t *s, dict_t **dictp)
 {
-    dictionary_t *orig = *dictp;
-    dictionary_t *work = dictionary_clone(orig);
+    dict_t *orig = *dictp;
+    dict_t *work = dict_clone(orig);
 
     if (!json_expect(s, '{')) {
-        dictionary_destroy(work);
+        dict_destroy(work);
         return false;
     }
 
@@ -410,7 +410,7 @@ static bool parse_object(json_stream_t *s, dictionary_t **dictp)
     /* Empty object {} */
     if (c == '}') {
         json_get(s);
-        dictionary_destroy(orig);
+        dict_destroy(orig);
         *dictp = work;
         return true;
     }
@@ -418,24 +418,24 @@ static bool parse_object(json_stream_t *s, dictionary_t **dictp)
     while (1) {
         string_t *key = NULL;
         if (!json_parse_string(s, &key)) {
-            dictionary_destroy(work);
+            dict_destroy(work);
             return false;
         }
 
         if (!json_expect(s, ':')) {
             string_free(key);
-            dictionary_destroy(work);
+            dict_destroy(work);
             return false;
         }
 
         test_value_t v;
         if (!parse_value(s, &v)) {
             string_free(key);
-            dictionary_destroy(work);
+            dict_destroy(work);
             return false;
         }
 
-        dictionary_set(work, &key, &v);
+        dict_set(work, &key, &v);
         string_free(key);
 
         json_skip_ws(s);
@@ -451,11 +451,11 @@ static bool parse_object(json_stream_t *s, dictionary_t **dictp)
             break;
         }
 
-        dictionary_destroy(work);
+        dict_destroy(work);
         return false;
     }
 
-    dictionary_destroy(orig);
+    dict_destroy(orig);
     *dictp = work;
     return true;
 }
@@ -500,15 +500,15 @@ static bool parse_root(json_stream_t *s)
             return false;
         }
 
-        dictionary_t *file_dict = create_file_dict();
+        dict_t *file_dict = create_file_dict();
 
         if (!parse_object(s, &file_dict)) {
             string_free(file_key);
-            dictionary_destroy(file_dict);
+            dict_destroy(file_dict);
             return false;
         }
 
-        dictionary_set(g_root, &file_key, &file_dict);
+        dict_set(g_root, &file_key, &file_dict);
         string_free(file_key);
 
         json_skip_ws(s);
@@ -578,7 +578,7 @@ static void load_json_if_needed(void)
     json_stream_init(&s, buf, n);
     if (!parse_root(&s)) {
         if (g_root) {
-            dictionary_destroy(g_root);
+            dict_destroy(g_root);
             g_root = NULL;
         }
     }
@@ -609,7 +609,7 @@ static void write_escaped_string(FILE *f, const char *s)
     fputc('"', f);
 }
 
-static void write_object_internal(FILE *f, dictionary_t *dict, int indent, bool is_file_level);
+static void write_object_internal(FILE *f, dict_t *dict, int indent, bool is_file_level);
 
 static void write_value(FILE *f, const test_value_t *v, int indent)
 {
@@ -623,10 +623,10 @@ static void write_value(FILE *f, const test_value_t *v, int indent)
 
 /* Recursive lookup for unlimited-depth hierarchy */
 
-static bool find_node_recursive(dictionary_t  *dict,
+static bool find_node_recursive(dict_t  *dict,
                                 const char    *path,
                                 test_value_t  *out_value,
-                                dictionary_t **out_parent)
+                                dict_t **out_parent)
 {
     const char *dot = strchr(path, '.');
 
@@ -648,7 +648,7 @@ static bool find_node_recursive(dictionary_t  *dict,
         return false;
 
     test_value_t v;
-    bool found = dictionary_get(dict, &key, &v);
+    bool found = dict_get(dict, &key, &v);
 
     string_free(key);
 
@@ -673,7 +673,7 @@ static bool find_node_recursive(dictionary_t  *dict,
 
 /* Compute effective enabled state for a node by name */
 
-static bool find_effective_enabled(dictionary_t *dict,
+static bool find_effective_enabled(dict_t *dict,
                                    const char *name,
                                    bool ancestors_enabled,
                                    bool *out_enabled)
@@ -681,11 +681,11 @@ static bool find_effective_enabled(dictionary_t *dict,
     if (!dict || !name)
         return false;
 
-    size_t count = dictionary_size(dict);
+    size_t count = dict_size(dict);
 
     for (size_t i = 0; i < count; i++) {
-        const void *key_ptr = dictionary_get_key(dict, i);
-        const void *val_ptr = dictionary_get_value(dict, i);
+        const void *key_ptr = dict_get_key(dict, i);
+        const void *val_ptr = dict_get_value(dict, i);
         if (!key_ptr || !val_ptr)
             continue;
 
@@ -714,12 +714,12 @@ static bool find_effective_enabled(dictionary_t *dict,
 }
 
 /* Returns true if any entry in dict is a node (i.e., a group). */
-static bool dictionary_has_any_group(dictionary_t *dict)
+static bool dict_has_any_group(dict_t *dict)
 {
-    size_t count = dictionary_size(dict);
+    size_t count = dict_size(dict);
 
     for (size_t i = 0; i < count; i++) {
-        const void *val_ptr = dictionary_get_value(dict, i);
+        const void *val_ptr = dict_get_value(dict, i);
         if (!val_ptr)
             continue;
 
@@ -740,13 +740,13 @@ int test_enabled(const char *file, const char *func, const char *parent)
         g_local_filename = string_new_with(file);
 
     load_json_if_needed();
-    dictionary_t *file_dict = ensure_file_dict(file);
+    dict_t *file_dict = ensure_file_dict(file);
 
     /* -------------------- no parent: top-level test -------------------- */
     if (!parent) {
 
         /* If groups exist, do NOT create flat tests */
-        if (dictionary_has_any_group(file_dict))
+        if (dict_has_any_group(file_dict))
             return 1;
 
         test_value_t v;
@@ -772,7 +772,7 @@ int test_enabled(const char *file, const char *func, const char *parent)
 
     /* -------------------- ensure parent node exists --------------------- */
     test_value_t pv;
-    dictionary_t *parent_dict = NULL;
+    dict_t *parent_dict = NULL;
 
     if (!find_node_recursive(file_dict, parent, &pv, &parent_dict)) {
 
@@ -794,7 +794,7 @@ int test_enabled(const char *file, const char *func, const char *parent)
         set_test(parent_dict, parent, &pv);
     }
 
-    dictionary_t *current = pv.content;
+    dict_t *current = pv.content;
 
     /* -------------------- lookup child inside parent -------------------- */
     test_value_t cv;
@@ -815,7 +815,7 @@ bool test_config_has_key(const char *file, const char *func, const char *parent)
         g_local_filename = string_new_with(file);
 
     load_json_if_needed();
-    dictionary_t *file_dict = ensure_file_dict(file);
+    dict_t *file_dict = ensure_file_dict(file);
 
     /* -------------------- no parent: top-level -------------------- */
     if (!parent) {
@@ -825,7 +825,7 @@ bool test_config_has_key(const char *file, const char *func, const char *parent)
 
     /* -------------------- find parent anywhere -------------------- */
     test_value_t pv;
-    dictionary_t *parent_dict = NULL;
+    dict_t *parent_dict = NULL;
 
     if (!find_node_recursive(file_dict, parent, &pv, &parent_dict))
         return false;
@@ -838,9 +838,9 @@ bool test_config_has_key(const char *file, const char *func, const char *parent)
     return get_test(pv.content, func, &cv);
 }
 
-static void write_object_internal(FILE *f, dictionary_t *dict, int indent, bool is_file_level)
+static void write_object_internal(FILE *f, dict_t *dict, int indent, bool is_file_level)
 {
-    size_t count = dictionary_size(dict);
+    size_t count = dict_size(dict);
 
     fputs("{\n", f);
 
@@ -863,7 +863,7 @@ static void write_object_internal(FILE *f, dictionary_t *dict, int indent, bool 
     bool first_child = is_file_level;  /* file-level has no enabled field */
 
     for (size_t i = 0; i < count; i++) {
-        const void *key_ptr = dictionary_get_key(dict, i);
+        const void *key_ptr = dict_get_key(dict, i);
         if (!key_ptr)
             continue;
 
@@ -874,7 +874,7 @@ static void write_object_internal(FILE *f, dictionary_t *dict, int indent, bool 
         if (strcmp(kstr, "enabled") == 0)
             continue;
 
-        const void *val_ptr = dictionary_get_value(dict, i);
+        const void *val_ptr = dict_get_value(dict, i);
         if (!val_ptr)
             continue;
 
@@ -907,23 +907,23 @@ static void write_root(FILE *f)
     }
 
     /* GLOBAL mode: root is { "filename": { ...tests... }, ... } */
-    if (!g_root || dictionary_size(g_root) == 0) {
+    if (!g_root || dict_size(g_root) == 0) {
         fputs("{}", f);
         return;
     }
 
     fputs("{\n", f);
 
-    size_t count = dictionary_size(g_root);
+    size_t count = dict_size(g_root);
 
     for (size_t i = 0; i < count; i++) {
-        const void *key_ptr = dictionary_get_key(g_root, i);
-        const void *val_ptr = dictionary_get_value(g_root, i);
+        const void *key_ptr = dict_get_key(g_root, i);
+        const void *val_ptr = dict_get_value(g_root, i);
         if (!key_ptr || !val_ptr)
             continue;
 
         string_t *file_key = *(string_t * const *)key_ptr;
-        dictionary_t *file_dict = *(dictionary_t * const *)val_ptr;
+        dict_t *file_dict = *(dict_t * const *)val_ptr;
 
         write_indent(f, 2);
         write_escaped_string(f, string_c_str(file_key));
@@ -978,7 +978,7 @@ void test_config_save(void)
 static void reset_state(void)
 {
     if (g_root) {
-        dictionary_destroy(g_root);
+        dict_destroy(g_root);
         g_root = NULL;
     }
 

@@ -1,4 +1,4 @@
-/* test_dictionary.c - tests for arena-backed dictionary_t */
+/* test_dictionary.c - tests for arena-backed dict_t */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -126,7 +126,7 @@ static void deep_destroy(void *elem) {
 static void test_int_int(void) {
     printf(C_YELLOW "test_int_int\n" RESET);
 
-    dictionary_t *d = dictionary_create(
+    dict_t *d = dict_create(
         sizeof(int), sizeof(int),
         int_hash, int_cmp,
         NULL, NULL,
@@ -137,16 +137,16 @@ static void test_int_int(void) {
     int k2 = 2, v2 = 20;
     int out;
 
-    dictionary_set(d, &k1, &v1);
-    dictionary_set(d, &k2, &v2);
+    dict_set(d, &k1, &v1);
+    dict_set(d, &k2, &v2);
 
-    if (!dictionary_get(d, &k1, &out) || out != 10) fail("int-int get k1");
+    if (!dict_get(d, &k1, &out) || out != 10) fail("int-int get k1");
     else pass("int-int get k1");
 
-    if (!dictionary_get(d, &k2, &out) || out != 20) fail("int-int get k2");
+    if (!dict_get(d, &k2, &out) || out != 20) fail("int-int get k2");
     else pass("int-int get k2");
 
-    dictionary_destroy(d);
+    dict_destroy(d);
 }
 
 /* -------------------------------------------------------------
@@ -156,7 +156,7 @@ static void test_int_int(void) {
 static void test_str_int(void) {
     printf(C_YELLOW "test_str_int\n" RESET);
 
-    dictionary_t *d = dictionary_create(
+    dict_t *d = dict_create(
         sizeof(char *), sizeof(int),
         str_hash, str_cmp,
         str_clone, str_destroy,
@@ -168,16 +168,16 @@ static void test_str_int(void) {
     int v1 = 111, v2 = 222;
     int out;
 
-    dictionary_set(d, &k1, &v1);
-    dictionary_set(d, &k2, &v2);
+    dict_set(d, &k1, &v1);
+    dict_set(d, &k2, &v2);
 
-    if (!dictionary_get(d, &k1, &out) || out != 111) fail("str-int get alpha");
+    if (!dict_get(d, &k1, &out) || out != 111) fail("str-int get alpha");
     else pass("str-int get alpha");
 
-    if (!dictionary_get(d, &k2, &out) || out != 222) fail("str-int get beta");
+    if (!dict_get(d, &k2, &out) || out != 222) fail("str-int get beta");
     else pass("str-int get beta");
 
-    dictionary_destroy(d);
+    dict_destroy(d);
 }
 
 /* -------------------------------------------------------------
@@ -187,7 +187,7 @@ static void test_str_int(void) {
 static void test_int_str(void) {
     printf(C_YELLOW "test_int_str\n" RESET);
 
-    dictionary_t *d = dictionary_create(
+    dict_t *d = dict_create(
         sizeof(int), sizeof(char *),
         int_hash, int_cmp,
         NULL, NULL,
@@ -199,24 +199,24 @@ static void test_int_str(void) {
     const char *v2 = "world";
     char *out;
 
-    dictionary_set(d, &k1, &v1);
-    dictionary_set(d, &k2, &v2);
+    dict_set(d, &k1, &v1);
+    dict_set(d, &k2, &v2);
 
-    if (!dictionary_get(d, &k1, &out) || strcmp(out, "hello") != 0) {
+    if (!dict_get(d, &k1, &out) || strcmp(out, "hello") != 0) {
         fail("int-str get 5");
     } else {
         pass("int-str get 5");
     }
     free(out);  /* we own this clone */
 
-    if (!dictionary_get(d, &k2, &out) || strcmp(out, "world") != 0) {
+    if (!dict_get(d, &k2, &out) || strcmp(out, "world") != 0) {
         fail("int-str get 6");
     } else {
         pass("int-str get 6");
     }
     free(out);  /* we own this clone */
 
-    dictionary_destroy(d);
+    dict_destroy(d);
 }
 
 /* -------------------------------------------------------------
@@ -226,7 +226,7 @@ static void test_int_str(void) {
 static void test_deep_deep(void) {
     printf(C_YELLOW "test_deep_deep\n" RESET);
 
-    dictionary_t *d = dictionary_create(
+    dict_t *d = dict_create(
         sizeof(struct deep), sizeof(struct deep),
         deep_hash, deep_cmp,
         deep_clone, deep_destroy,
@@ -241,13 +241,13 @@ static void test_deep_deep(void) {
     struct deep k2 = { "k2", 2 };
     struct deep v2 = { "v2", 20 };
 
-    dictionary_set(d, &k1, &v1);
-    dictionary_set(d, &k2, &v2);
+    dict_set(d, &k1, &v1);
+    dict_set(d, &k2, &v2);
 
     /* 2. Output struct: we own whatever deep_clone puts in here. */
     struct deep out;
 
-    if (!dictionary_get(d, &k1, &out)) {
+    if (!dict_get(d, &k1, &out)) {
         fail("deep-deep get k1");
     } else if (strcmp(out.name, "v1") != 0 || out.value != 10) {
         fail("deep-deep value mismatch k1");
@@ -257,7 +257,7 @@ static void test_deep_deep(void) {
         free(out.name); /* we own this */
     }
 
-    if (!dictionary_get(d, &k2, &out)) {
+    if (!dict_get(d, &k2, &out)) {
         fail("deep-deep get k2");
     } else if (strcmp(out.name, "v2") != 0 || out.value != 20) {
         fail("deep-deep value mismatch k2");
@@ -268,7 +268,7 @@ static void test_deep_deep(void) {
     }
 
     /* 3. Destroy dictionary: it frees only its own arena‑owned clones. */
-    dictionary_destroy(d);
+    dict_destroy(d);
 }
 
 /* -------------------------------------------------------------
@@ -278,7 +278,7 @@ static void test_deep_deep(void) {
 static void test_sorted(void) {
     printf(C_YELLOW "test_sorted\n" RESET);
 
-    dictionary_t *d = dictionary_create(
+    dict_t *d = dict_create(
         sizeof(int), sizeof(int),
         int_hash, int_cmp,
         NULL, NULL,
@@ -289,12 +289,12 @@ static void test_sorted(void) {
     int vals[] = { 50, 10, 40, 30, 20 };
 
     for (int i = 0; i < 5; ++i)
-        dictionary_set(d, &keys[i], &vals[i]);
+        dict_set(d, &keys[i], &vals[i]);
 
     bool ok = true;
 
     for (size_t i = 0; i < 5; ++i) {
-        const int *k = dictionary_get_key_sorted(d, i);
+        const int *k = dict_get_key_sorted(d, i);
         if (*k != (int)(i + 1)) ok = false;
     }
 
@@ -303,14 +303,14 @@ static void test_sorted(void) {
 
     ok = true;
     for (size_t i = 0; i < 5; ++i) {
-        const int *v = dictionary_get_value_sorted(d, i);
+        const int *v = dict_get_value_sorted(d, i);
         if (*v != (int)((i + 1) * 10)) ok = false;
     }
 
     if (!ok) fail("sorted values");
     else pass("sorted values");
 
-    dictionary_destroy(d);
+    dict_destroy(d);
 }
 
 /* -------------------------------------------------------------
@@ -320,7 +320,7 @@ static void test_sorted(void) {
 static void test_entries(void) {
     printf(C_YELLOW "test_entries\n" RESET);
 
-    dictionary_t *d = dictionary_create(
+    dict_t *d = dict_create(
         sizeof(int), sizeof(int),
         int_hash, int_cmp,
         NULL, NULL,
@@ -330,27 +330,27 @@ static void test_entries(void) {
     int k1 = 7, v1 = 70;
     int k2 = 8, v2 = 80;
 
-    dictionary_set(d, &k1, &v1);
-    dictionary_set(d, &k2, &v2);
+    dict_set(d, &k1, &v1);
+    dict_set(d, &k2, &v2);
 
     dict_entry_t *e;
     int out;
 
-    if (!dictionary_get_entry(d, &k1, &e)) fail("entry get k1");
+    if (!dict_get_entry(d, &k1, &e)) fail("entry get k1");
     else {
-        const int *kp = dictionary_entry_key(e);
-        const int *vp = dictionary_entry_value(e);
+        const int *kp = dict_entry_key(e);
+        const int *vp = dict_entry_value(e);
         if (*kp != 7 || *vp != 70) fail("entry key/value mismatch");
         else pass("entry get k1");
     }
 
     int newv = 700;
-    dictionary_set_entry(d, e, &newv);
+    dict_set_entry(d, e, &newv);
 
-    if (!dictionary_get(d, &k1, &out) || out != 700) fail("entry set k1");
+    if (!dict_get(d, &k1, &out) || out != 700) fail("entry set k1");
     else pass("entry set k1");
 
-    dictionary_destroy(d);
+    dict_destroy(d);
 }
 
 /* -------------------------------------------------------------
@@ -359,14 +359,14 @@ static void test_entries(void) {
 
 static void foreach_cb(const dict_entry_t *e, void *ud) {
     int *sum = ud;
-    const int *v = dictionary_entry_value(e);
+    const int *v = dict_entry_value(e);
     *sum += *v;
 }
 
 static void test_foreach(void) {
     printf(C_YELLOW "test_foreach\n" RESET);
 
-    dictionary_t *d = dictionary_create(
+    dict_t *d = dict_create(
         sizeof(int), sizeof(int),
         int_hash, int_cmp,
         NULL, NULL,
@@ -377,17 +377,17 @@ static void test_foreach(void) {
     int k2 = 2, v2 = 20;
     int k3 = 3, v3 = 30;
 
-    dictionary_set(d, &k1, &v1);
-    dictionary_set(d, &k2, &v2);
-    dictionary_set(d, &k3, &v3);
+    dict_set(d, &k1, &v1);
+    dict_set(d, &k2, &v2);
+    dict_set(d, &k3, &v3);
 
     int sum = 0;
-    dictionary_foreach(d, foreach_cb, &sum);
+    dict_foreach(d, foreach_cb, &sum);
 
     if (sum != 60) fail("foreach sum");
     else pass("foreach sum");
 
-    dictionary_destroy(d);
+    dict_destroy(d);
 }
 
 /* -------------------------------------------------------------
@@ -397,7 +397,7 @@ static void test_foreach(void) {
 static void test_fuzz(void) {
     printf(C_YELLOW "test_fuzz\n" RESET);
 
-    dictionary_t *d = dictionary_create(
+    dict_t *d = dict_create(
         sizeof(int), sizeof(int),
         int_hash, int_cmp,
         NULL, NULL,
@@ -409,14 +409,14 @@ static void test_fuzz(void) {
     for (int i = 0; i < 5000; ++i) {
         int k = rand() % 2000;
         int v = k * 2;
-        dictionary_set(d, &k, &v);
+        dict_set(d, &k, &v);
     }
 
     bool ok = true;
 
     for (int k = 0; k < 2000; ++k) {
         int out;
-        if (dictionary_get(d, &k, &out)) {
+        if (dict_get(d, &k, &out)) {
             if (out != k * 2) {
                 ok = false;
                 break;
@@ -427,7 +427,7 @@ static void test_fuzz(void) {
     if (!ok) fail("fuzz test");
     else pass("fuzz test");
 
-    dictionary_destroy(d);
+    dict_destroy(d);
 }
 
 /* C99-compatible foreach callback */
@@ -440,7 +440,7 @@ static void fuzz_foreach_cb(const dict_entry_t *e, void *ud) {
 static void test_sorted_fuzz(void) {
     printf(C_YELLOW "test_sorted_fuzz\n" RESET);
 
-    dictionary_t *d = dictionary_create(
+    dict_t *d = dict_create(
         sizeof(int), sizeof(int),
         int_hash, int_cmp,
         NULL, NULL,
@@ -462,20 +462,20 @@ static void test_sorted_fuzz(void) {
 
         if (op == 0) {
             int v = rand();
-            dictionary_set(d, &k, &v);
+            dict_set(d, &k, &v);
             ref[k] = v;
         } else if (op == 1) {
-            dictionary_remove(d, &k);
+            dict_remove(d, &k);
             ref[k] = -1;
         } else {
             int out;
-            bool got = dictionary_get(d, &k, &out);
+            bool got = dict_get(d, &k, &out);
             if (ref[k] == -1 && got) {
-                fail("fuzz: dictionary_get returned value for missing key");
+                fail("fuzz: dict_get returned value for missing key");
                 goto done;
             }
             if (ref[k] != -1 && (!got || out != ref[k])) {
-                fail("fuzz: dictionary_get mismatch");
+                fail("fuzz: dict_get mismatch");
                 goto done;
             }
         }
@@ -484,10 +484,10 @@ static void test_sorted_fuzz(void) {
             continue;
 
         /* Validate sorted keys */
-        size_t n = dictionary_size(d);
+        size_t n = dict_size(d);
         int last = -2147483648;
         for (size_t i = 0; i < n; ++i) {
-            const int *kp = dictionary_get_key_sorted(d, i);
+            const int *kp = dict_get_key_sorted(d, i);
             if (!kp) {
                 fail("fuzz: NULL key in sorted view");
                 goto done;
@@ -502,7 +502,7 @@ static void test_sorted_fuzz(void) {
         /* Validate sorted values */
         last = -2147483648;
         for (size_t i = 0; i < n; ++i) {
-            const int *vp = dictionary_get_value_sorted(d, i);
+            const int *vp = dict_get_value_sorted(d, i);
             if (!vp) {
                 fail("fuzz: NULL value in sorted view");
                 goto done;
@@ -518,11 +518,11 @@ static void test_sorted_fuzz(void) {
         last = -2147483648;
         for (size_t i = 0; i < n; ++i) {
             dict_entry_t *e;
-            if (!dictionary_get_entry_sorted(d, i, DICT_SORT_BY_KEY, &e)) {
+            if (!dict_get_entry_sorted(d, i, DICT_SORT_BY_KEY, &e)) {
                 fail("fuzz: entry_sorted returned false");
                 goto done;
             }
-            const int *kp = dictionary_entry_key(e);
+            const int *kp = dict_entry_key(e);
             if (i > 0 && *kp < last) {
                 fail("fuzz: entry_sorted keys out of order");
                 goto done;
@@ -532,7 +532,7 @@ static void test_sorted_fuzz(void) {
 
         /* Validate foreach count matches reference */
         int seen = 0;
-        dictionary_foreach(d, fuzz_foreach_cb, &seen);
+        dict_foreach(d, fuzz_foreach_cb, &seen);
 
         int ref_count = 0;
         for (int i = 0; i < MAX; ++i)
@@ -547,11 +547,11 @@ static void test_sorted_fuzz(void) {
     pass("sorted fuzz");
 
 done:
-    dictionary_destroy(d);
+    dict_destroy(d);
 }
 
 void test_readme_example_deep(void) {
-    dictionary_t *dict = dictionary_create(
+    dict_t *dict = dict_create(
         sizeof(struct deep), sizeof(struct deep),
         deep_hash, deep_cmp,
         deep_clone, deep_destroy,
@@ -564,28 +564,28 @@ void test_readme_example_deep(void) {
     struct deep k2 = { "k2", 2 };
     struct deep v2 = { "v2", 20 };
 
-    dictionary_set(dict, &k1, &v1);
-    dictionary_set(dict, &k2, &v2);
+    dict_set(dict, &k1, &v1);
+    dict_set(dict, &k2, &v2);
 
     struct deep out;
 
-    if (dictionary_get(dict, &k1, &out)) {
+    if (dict_get(dict, &k1, &out)) {
         printf("Value for key '%s': %s (%d)\n",
                k1.name, out.name, out.value);
         free(out.name);
     }
 
-    if (dictionary_get(dict, &k2, &out)) {
+    if (dict_get(dict, &k2, &out)) {
         printf("Value for key '%s': %s (%d)\n",
                k2.name, out.name, out.value);
         free(out.name);
     }
 
-    dictionary_destroy(dict);
+    dict_destroy(dict);
 }
 
 void test_readme_example_shallow(void) {
-    dictionary_t *dict = dictionary_create(
+    dict_t *dict = dict_create(
         sizeof(int), sizeof(char *),
         int_hash, int_cmp,
         NULL, NULL,
@@ -596,22 +596,22 @@ void test_readme_example_shallow(void) {
     const char *v1 = "hello";
     const char *v2 = "world";
 
-    dictionary_set(dict, &k1, &v1);
-    dictionary_set(dict, &k2, &v2);
+    dict_set(dict, &k1, &v1);
+    dict_set(dict, &k2, &v2);
 
     char *out;
 
-    if (dictionary_get(dict, &k1, &out)) {
+    if (dict_get(dict, &k1, &out)) {
         printf("Value for key %d: %s\n", k1, out);
         free(out);
     }
 
-    if (dictionary_get(dict, &k2, &out)) {
+    if (dict_get(dict, &k2, &out)) {
         printf("Value for key %d: %s\n", k2, out);
         free(out);
     }
 
-    dictionary_destroy(dict);
+    dict_destroy(dict);
 }
 
 void test_readme_examples(void) {

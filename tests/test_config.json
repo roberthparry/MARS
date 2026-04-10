@@ -416,5 +416,27 @@
     "test_sorted": true,
     "test_fuzz": true,
     "test_readme_examples": true
+  },
+  "tests/test_test_config.c": {
+    "test_top_level_default_true": {
+      "enabled": true,
+      "test_subtest_default_true": true
+    },
+    "parent_group": {
+      "enabled": true,
+      "test_subtest_grouping": true
+    },
+    "test_subtest_grouping": {
+      "enabled": true,
+      "test_sub_sub_function": true
+    },
+    "test_sub_sub_function": {
+      "enabled": true,
+      "test_sub_sub_sub_function": true
+    },
+    "test_sub_sub_sub_function": {
+      "enabled": true,
+      "test_sub_sub_sub_sub_function": true
+    }
   }
 }

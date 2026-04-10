@@ -54,13 +54,13 @@ Every module is self‑contained, header‑driven, and usable independently.
 </details>
 
 <details>
-<summary>📚 Generic Dictionary (<code>dictionary_t</code>)</summary>
+<summary>📚 Generic Dictionary (<code>dict_t</code>)</summary>
 <br>
 
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• <a href="#-generic-dictionary-dictionary_t">Overview</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• <a href="#-generic-dictionary-dict_t">Overview</a><br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• <a href="#-example-deepcopied-keys-and-values">Example: Deep‑Copied Keys and Values</a><br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• <a href="#-example-integer-keys-and-deepcopied-string-values">Example: Integer Keys and Deep‑Copied String Values</a><br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• <a href="#-internal-architecture--dictionary_t">Internal Architecture — <code>dictionary_t</code></a>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• <a href="#-internal-architecture--dict_t">Internal Architecture — <code>dict_t</code></a>
 
 </details>
 
@@ -128,7 +128,7 @@ Every module is self‑contained, header‑driven, and usable independently.
 - [🧮 High‑Precision Arithmetic (`qfloat`)](#-highprecision-arithmetic-qfloat)
 - [🔧 Differentiable Values (`dval_t`)](#-differentiable-values-dval_t)
 - [📅 Civil & Astronomical Datetime (`dttm_t`)](#-civil--astronomical-datetime-dttm_t)
-- [📚 Generic Dictionary (`dictionary_t`)](#-generic-dictionary-dictionary_t)
+- [📚 Generic Dictionary (`dict_t`)](#-generic-dictionary-dict_t)
 - [🧩 Generic Hash Set (`set_t`)](#-generic-hash-set-set_t)
 - [🔤 UTF‑8 String Type (`string_t`)](#-utf8-string-type-string_t)
 
@@ -791,12 +791,12 @@ reliable, high‑precision timekeeping.
 
 ---
 
-# 📚 **Generic Dictionary (`dictionary_t`)**
+# 📚 **Generic Dictionary (`dict_t`)**
 
 ### **Sections**
-- [Overview](#-generic-dictionary-dictionary_t)
+- [Overview](#-generic-dictionary-dict_t)
 - [Example](#-example-deepcopied-keys-and-values)
-- [Internal Architecture](#-internal-architecture--dictionary_t)
+- [Internal Architecture](#-internal-architecture--dict_t)
 
 
 A typed, generic key/value dictionary with user‑defined hash/compare/clone/destroy callbacks, stable entry handles, and lazy sorted views.
@@ -859,7 +859,7 @@ static void deep_destroy(void *elem) {
 }
 
 int main(void) {
-    dictionary_t *dict = dictionary_create(
+    dict_t *dict = dict_create(
         sizeof(struct deep), sizeof(struct deep),
         deep_hash, deep_cmp,
         deep_clone, deep_destroy,
@@ -872,24 +872,24 @@ int main(void) {
     struct deep k2 = { "k2", 2 };
     struct deep v2 = { "v2", 20 };
 
-    dictionary_set(dict, &k1, &v1);
-    dictionary_set(dict, &k2, &v2);
+    dict_set(dict, &k1, &v1);
+    dict_set(dict, &k2, &v2);
 
     struct deep out;
 
-    if (dictionary_get(dict, &k1, &out)) {
+    if (dict_get(dict, &k1, &out)) {
         printf("Value for key '%s': %s (%d)\n",
                k1.name, out.name, out.value);
         free(out.name);
     }
 
-    if (dictionary_get(dict, &k2, &out)) {
+    if (dict_get(dict, &k2, &out)) {
         printf("Value for key '%s': %s (%d)\n",
                k2.name, out.name, out.value);
         free(out.name);
     }
 
-    dictionary_destroy(dict);
+    dict_destroy(dict);
     return 0;
 }
 ```
@@ -937,7 +937,7 @@ static void str_destroy(void *elem) {
 }
 
 int main(void) {
-    dictionary_t *dict = dictionary_create(
+    dict_t *dict = dict_create(
         sizeof(int), sizeof(char *),
         int_hash, int_cmp,
         NULL, NULL,
@@ -948,22 +948,22 @@ int main(void) {
     const char *v1 = "hello";
     const char *v2 = "world";
 
-    dictionary_set(dict, &k1, &v1);
-    dictionary_set(dict, &k2, &v2);
+    dict_set(dict, &k1, &v1);
+    dict_set(dict, &k2, &v2);
 
     char *out;
 
-    if (dictionary_get(dict, &k1, &out)) {
+    if (dict_get(dict, &k1, &out)) {
         printf("Value for key %d: %s\n", k1, out);
         free(out);
     }
 
-    if (dictionary_get(dict, &k2, &out)) {
+    if (dict_get(dict, &k2, &out)) {
         printf("Value for key %d: %s\n", k2, out);
         free(out);
     }
 
-    dictionary_destroy(dict);
+    dict_destroy(dict);
     return 0;
 }
 ```
@@ -977,14 +977,14 @@ Value for key 6: world
 
 ---
 
-### 🧩 **Internal Architecture — `dictionary_t`**
+### 🧩 **Internal Architecture — `dict_t`**
 
-`dictionary_t` is built on a compact, arena‑based storage model designed for
+`dict_t` is built on a compact, arena‑based storage model designed for
 predictable performance, stable element lifetimes, and flexible ownership
 semantics.
 
 Unlike a naive hash map that stores key/value pairs directly in hash buckets,
-`dictionary_t` uses **three cooperating components**:
+`dict_t` uses **three cooperating components**:
 
 ---
 
@@ -1049,7 +1049,7 @@ Storing keys and values in separate arenas provides:
 - predictable memory layout  
 - clean value‑semantics without hidden allocations  
 
-This makes `dictionary_t` suitable for use in systems where memory ownership,
+This makes `dict_t` suitable for use in systems where memory ownership,
 determinism, and predictable behaviour matter — such as embedded systems,
 numerical computing, or long‑running services.
 
@@ -1623,7 +1623,7 @@ Planned enhancements include:
 - Optional timezone database integration  
 - Ephemeris‑grade solar/lunar algorithms (configurable)  
 
-### **dictionary_t / set_t**
+### **dict_t / set_t**
 - Ordered dictionary variant  
 - Persistent/immutable variants  
 - SIMD‑accelerated hashing  
