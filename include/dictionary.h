@@ -24,16 +24,16 @@
 /* ------------------------------------------------------------------------- */
 
 /**
- * @typedef dict_hash_fn
+ * @typedef dictionary_hash_fn
  * @brief Hash function for keys.
  *
  * Must return a stable hash value for the given key. The dictionary relies on
  * this function for key lookup performance.
  */
-typedef size_t (*dict_hash_fn)(const void *key);
+typedef size_t (*dictionary_hash_fn)(const void *key);
 
 /**
- * @typedef dict_cmp_fn
+ * @typedef dictionary_cmp_fn
  * @brief Comparison function for keys or values.
  *
  * Must return:
@@ -43,25 +43,25 @@ typedef size_t (*dict_hash_fn)(const void *key);
  *
  * Used for key equality and for sorted views.
  */
-typedef int (*dict_cmp_fn)(const void *a, const void *b);
+typedef int (*dictionary_cmp_fn)(const void *a, const void *b);
 
 /**
- * @typedef dict_clone_fn
+ * @typedef dictionary_clone_fn
  * @brief Clone function for keys or values.
  *
  * Copies the element from @p src into @p dst. If NULL, the dictionary performs
  * a shallow byte copy.
  */
-typedef void (*dict_clone_fn)(void *dst, const void *src);
+typedef void (*dictionary_clone_fn)(void *dst, const void *src);
 
 /**
- * @typedef dict_destroy_fn
+ * @typedef dictionary_destroy_fn
  * @brief Destroy function for keys or values.
  *
  * Called when an element is removed or replaced. If NULL, no destruction
  * occurs.
  */
-typedef void (*dict_destroy_fn)(void *elem);
+typedef void (*dictionary_destroy_fn)(void *elem);
 
 /* ------------------------------------------------------------------------- */
 /* Opaque types                                                              */
@@ -72,7 +72,7 @@ typedef void (*dict_destroy_fn)(void *elem);
  *
  * The internal structure is hidden. Users interact only through the API.
  */
-typedef struct dictionary dict_t;
+typedef struct dictionary dictionary_t;
 
 /**
  * @brief Opaque entry handle.
@@ -81,20 +81,20 @@ typedef struct dictionary dict_t;
  * Entry handles remain valid until the referenced entry is removed or the
  * dictionary is destroyed.
  */
-typedef struct dict_entry dict_entry_t;
+typedef struct dict_entry dictionary_entry_t;
 
 /* ------------------------------------------------------------------------- */
 /* Sorting mode                                                              */
 /* ------------------------------------------------------------------------- */
 
 /**
- * @enum dict_sort_mode
+ * @enum dictionary_sort_mode
  * @brief Sorting mode for retrieving entries in sorted order.
  */
 typedef enum {
-    DICT_SORT_BY_KEY,   /**< Sort entries by key */
-    DICT_SORT_BY_VALUE  /**< Sort entries by value */
-} dict_sort_mode;
+    DICTIONARY_SORT_BY_KEY,   /**< Sort entries by key */
+    DICTIONARY_SORT_BY_VALUE  /**< Sort entries by value */
+} dictionary_sort_mode;
 
 /* ------------------------------------------------------------------------- */
 /* Creation / destruction                                                    */
@@ -118,14 +118,14 @@ typedef enum {
  * functions (or shallow copies if clone is NULL). The dictionary owns all
  * stored elements and will destroy them when appropriate.
  */
-dict_t *dict_create(size_t key_size,
-                    size_t value_size,
-                    dict_hash_fn key_hash,
-                    dict_cmp_fn key_cmp,
-                    dict_clone_fn key_clone,
-                    dict_destroy_fn key_destroy,
-                    dict_clone_fn value_clone,
-                    dict_destroy_fn value_destroy);
+dictionary_t *dictionary_create(size_t key_size,
+                                size_t value_size,
+                                dictionary_hash_fn key_hash,
+                                dictionary_cmp_fn key_cmp,
+                                dictionary_clone_fn key_clone,
+                                dictionary_destroy_fn key_destroy,
+                                dictionary_clone_fn value_clone,
+                                dictionary_destroy_fn value_destroy);
 
 /**
  * @brief Destroy a dictionary and free all associated memory.
@@ -133,7 +133,7 @@ dict_t *dict_create(size_t key_size,
  * All stored keys and values are destroyed using the provided destroy
  * callbacks.
  */
-void dict_destroy(dict_t *dict);
+void dictionary_destroy(dictionary_t *dict);
 
 /**
  * @brief Remove all entries from the dictionary.
@@ -141,7 +141,7 @@ void dict_destroy(dict_t *dict);
  * All keys and values are destroyed using the provided destroy callbacks.
  * The dictionary remains usable and retains its allocated capacity.
  */
-void dict_clear(dict_t *dict);
+void dictionary_clear(dictionary_t *dict);
 
 /* ------------------------------------------------------------------------- */
 /* Size                                                                      */
@@ -150,7 +150,7 @@ void dict_clear(dict_t *dict);
 /**
  * @brief Return the number of key/value pairs stored in the dictionary.
  */
-size_t dict_size(const dict_t *dict);
+size_t dictionary_size(const dictionary_t *dict);
 
 /* ------------------------------------------------------------------------- */
 /* Insertion / lookup / removal                                              */
@@ -168,7 +168,7 @@ size_t dict_size(const dict_t *dict);
  *
  * @return true on success, false on allocation failure.
  */
-bool dict_set(dict_t *dict, const void *key, const void *value);
+bool dictionary_set(dictionary_t *dict, const void *key, const void *value);
 
 /**
  * @brief Look up a value by key.
@@ -180,7 +180,7 @@ bool dict_set(dict_t *dict, const void *key, const void *value);
  *
  * @return true if the key exists, false otherwise.
  */
-bool dict_get(const dict_t *dict, const void *key, void *out_value);
+bool dictionary_get(const dictionary_t *dict, const void *key, void *out_value);
 
 /**
  * @brief Remove an entry by key.
@@ -190,7 +190,7 @@ bool dict_get(const dict_t *dict, const void *key, void *out_value);
  *
  * @return true if the key was removed, false if it was not present.
  */
-bool dict_remove(dict_t *dict, const void *key);
+bool dictionary_remove(dictionary_t *dict, const void *key);
 
 /* ------------------------------------------------------------------------- */
 /* Direct access in unspecified order                                        */
@@ -205,7 +205,7 @@ bool dict_remove(dict_t *dict, const void *key);
  *
  * @return Pointer to the key, or NULL if the index is out of range.
  */
-const void *dict_get_key(const dict_t *dict, size_t index);
+const void *dictionary_get_key(const dictionary_t *dict, size_t index);
 
 /**
  * @brief Retrieve a value by index.
@@ -214,7 +214,7 @@ const void *dict_get_key(const dict_t *dict, size_t index);
  *
  * @return Pointer to the value, or NULL if the index is out of range.
  */
-const void *dict_get_value(const dict_t *dict, size_t index);
+const void *dictionary_get_value(const dictionary_t *dict, size_t index);
 
 /* ------------------------------------------------------------------------- */
 /* Sorted views                                                              */
@@ -224,14 +224,14 @@ const void *dict_get_value(const dict_t *dict, size_t index);
  * @brief Retrieve the key at a given position in sorted order.
  *
  * Calling this function repeatedly with indices 0 through
- * dict_size(dict)-1 yields all keys in ascending sorted order.
+ * dictionary_size(dict)-1 yields all keys in ascending sorted order.
  *
  * The sorted view is built lazily and automatically refreshed after any
  * modification to the dictionary.
  *
  * @return Pointer to the key, or NULL on error.
  */
-const void *dict_get_key_sorted(dict_t *dict, size_t index);
+const void *dictionary_get_key_sorted(dictionary_t *dict, size_t index);
 
 /**
  * @brief Retrieve the value at a given position in sorted order.
@@ -239,11 +239,11 @@ const void *dict_get_key_sorted(dict_t *dict, size_t index);
  * Values are sorted using the comparison function supplied for keys.
  *
  * Calling this function repeatedly with indices 0 through
- * dict_size(dict)-1 yields all values in ascending sorted order.
+ * dictionary_size(dict)-1 yields all values in ascending sorted order.
  *
  * @return Pointer to the value, or NULL on error.
  */
-const void *dict_get_value_sorted(dict_t *dict, size_t index);
+const void *dictionary_get_value_sorted(dictionary_t *dict, size_t index);
 
 /**
  * @brief Retrieve an entry at a given position in sorted order.
@@ -259,10 +259,10 @@ const void *dict_get_value_sorted(dict_t *dict, size_t index);
  *
  * @return true on success, false on error.
  */
-bool dict_get_entry_sorted(dict_t *dict,
-                           size_t index,
-                           dict_sort_mode mode,
-                           dict_entry_t **out_entry);
+bool dictionary_get_entry_sorted(dictionary_t *dict,
+                                 size_t index,
+                                 dictionary_sort_mode mode,
+                                 dictionary_entry_t **out_entry);
 
 /* ------------------------------------------------------------------------- */
 /* Entry handles                                                             */
@@ -279,58 +279,58 @@ bool dict_get_entry_sorted(dict_t *dict,
  *
  * @return true if the key exists, false otherwise.
  */
-bool dict_get_entry(const dict_t *dict,
-                    const void *key,
-                    dict_entry_t **out_entry);
+bool dictionary_get_entry(const dictionary_t *dict,
+                          const void *key,
+                          dictionary_entry_t **out_entry);
 
 /**
  * @brief Replace the value associated with an existing entry handle.
  *
  * This is the most efficient way to update a value because it avoids a key
- * lookup. The entry must have been obtained from dict_get_entry() or
- * dict_get_entry_sorted().
+ * lookup. The entry must have been obtained from dictionary_get_entry() or
+ * dictionary_get_entry_sorted().
  *
  * @return true on success, false if the entry is invalid.
  */
-bool dict_set_entry(dict_t *dict,
-                    dict_entry_t *entry,
-                    const void *value);
+bool dictionary_set_entry(dictionary_t *dict,
+                          dictionary_entry_t *entry,
+                          const void *value);
 
 /**
  * @brief Retrieve the key associated with an entry handle.
  *
  * @return Pointer to the key, or NULL if the entry is invalid.
  */
-const void *dict_entry_key(const dict_entry_t *entry);
+const void *dictionary_entry_key(const dictionary_entry_t *entry);
 
 /**
  * @brief Retrieve the value associated with an entry handle.
  *
  * @return Pointer to the value, or NULL if the entry is invalid.
  */
-const void *dict_entry_value(const dict_entry_t *entry);
+const void *dictionary_entry_value(const dictionary_entry_t *entry);
 
 /* ------------------------------------------------------------------------- */
 /* Iteration                                                                 */
 /* ------------------------------------------------------------------------- */
 
 /**
- * @typedef dict_foreach_fn
- * @brief Callback type for dict_foreach().
+ * @typedef dictionary_foreach_fn
+ * @brief Callback type for dictionary_foreach().
  *
  * Called once for each entry in the dictionary.
  */
-typedef void (*dict_foreach_fn)(const dict_entry_t *entry, void *user_data);
+typedef void (*dictionary_foreach_fn)(const dictionary_entry_t *entry, void *user_data);
 
 /**
  * @brief Iterate through all entries in unspecified order.
  *
  * The order is not guaranteed and may change after modifications. For sorted
- * iteration, use dict_get_entry_sorted().
+ * iteration, use dictionary_get_entry_sorted().
  */
-void dict_foreach(const dict_t *dict,
-                  dict_foreach_fn fn,
-                  void *user_data);
+void dictionary_foreach(const dictionary_t *dict,
+                        dictionary_foreach_fn fn,
+                        void *user_data);
 
 /* ------------------------------------------------------------------------- */
 /* Cloning                                                                   */
@@ -345,6 +345,6 @@ void dict_foreach(const dict_t *dict,
  *
  * @return A new dictionary, or NULL on allocation failure.
  */
-dict_t *dict_clone(const dict_t *dict);
+dictionary_t *dictionary_clone(const dictionary_t *dict);
 
 #endif /* DICTIONARY_H */

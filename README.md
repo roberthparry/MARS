@@ -5,7 +5,7 @@ It provides:
 
 - high‑precision arithmetic (`qfloat`)
 - differentiable values (`dval_t`)
-- a civil & astronomical datetime (`dttm_t`)
+- a civil & astronomical datetime (`datetime_t`)
 - generic dictionary and set types
 - a UTF‑8 aware dynamic string type
 - a suite of supporting algorithms and helpers
@@ -44,23 +44,23 @@ Every module is self‑contained, header‑driven, and usable independently.
 </details>
 
 <details>
-<summary>📅 Civil & Astronomical Datetime (<code>dttm_t</code>)</summary>
+<summary>📅 Civil & Astronomical Datetime (<code>datetime_t</code>)</summary>
 <br>
 
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• <a href="#-civil--astronomical-datetime-dttm_t">Overview</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• <a href="#-civil--astronomical-datetime-datetime_t">Overview</a><br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• <a href="#-example-chinese-new-year-calculation">Example: Chinese New Year Calculation</a><br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• <a href="#-internal-architecture--dttm_t">Internal Architecture — <code>dttm_t</code></a>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• <a href="#-internal-architecture--datetime_t">Internal Architecture — <code>datetime_t</code></a>
 
 </details>
 
 <details>
-<summary>📚 Generic Dictionary (<code>dict_t</code>)</summary>
+<summary>📚 Generic Dictionary (<code>dictionary_t</code>)</summary>
 <br>
 
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• <a href="#-generic-dictionary-dict_t">Overview</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• <a href="#-generic-dictionary-dictionary_t">Overview</a><br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• <a href="#-example-deepcopied-keys-and-values">Example: Deep‑Copied Keys and Values</a><br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• <a href="#-example-integer-keys-and-deepcopied-string-values">Example: Integer Keys and Deep‑Copied String Values</a><br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• <a href="#-internal-architecture--dict_t">Internal Architecture — <code>dict_t</code></a>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• <a href="#-internal-architecture--dictionary_t">Internal Architecture — <code>dictionary_t</code></a>
 
 </details>
 
@@ -127,8 +127,8 @@ Every module is self‑contained, header‑driven, and usable independently.
 
 - [🧮 High‑Precision Arithmetic (`qfloat`)](#-highprecision-arithmetic-qfloat)
 - [🔧 Differentiable Values (`dval_t`)](#-differentiable-values-dval_t)
-- [📅 Civil & Astronomical Datetime (`dttm_t`)](#-civil--astronomical-datetime-dttm_t)
-- [📚 Generic Dictionary (`dict_t`)](#-generic-dictionary-dict_t)
+- [📅 Civil & Astronomical Datetime (`datetime_t`)](#-civil--astronomical-datetime-datetime_t)
+- [📚 Generic Dictionary (`dictionary_t`)](#-generic-dictionary-dictionary_t)
 - [🧩 Generic Hash Set (`set_t`)](#-generic-hash-set-set_t)
 - [🔤 UTF‑8 String Type (`string_t`)](#-utf8-string-type-string_t)
 
@@ -591,12 +591,12 @@ This makes it suitable for:
 
 ---
 
-# 📅 **Civil & Astronomical Datetime (`dttm_t`)**
+# 📅 **Civil & Astronomical Datetime (`datetime_t`)**
 
 ### **Sections**
-- [Overview](#-civil--astronomical-datetime-dttm_t)
+- [Overview](#-civil--astronomical-datetime-datetime_t)
 - [Example](#-example-chinese-new-year-calculation)
-- [Internal Architecture](#-internal-architecture--dttm_t)
+- [Internal Architecture](#-internal-architecture--datetime_t)
 
 
 A high‑level civil datetime type with full Gregorian calendar support, Julian Day conversions, timezone/DST helpers, sunrise/sunset algorithms, moon‑phase computation, and a rich formatting engine.
@@ -606,7 +606,7 @@ A high‑level civil datetime type with full Gregorian calendar support, Julian 
 - Holiday algorithms: Easter Sunday, Chinese New Year  
 - Astronomical utilities: sunrise/sunset (NOAA), moon phase  
 - Full arithmetic: add/subtract years, months, days, hours, minutes, seconds  
-- Duration computation with `dttm_span_t`  
+- Duration computation with `datetime_span_t`  
 - Rich formatting mini‑language (`%ddd`, `%mmmm`, `%O`, `@hh`, etc.)  
 - Comparison, hashing, weekday calculation, leap‑year logic  
 
@@ -614,8 +614,8 @@ A high‑level civil datetime type with full Gregorian calendar support, Julian 
 
 ### 📘 **Example: Chinese New Year Calculation**
 
-`dttm_t` includes helpers for culturally and astronomically significant dates.  
-The function `dttm_init_chinese_new_year()` computes the date of Chinese New Year for any supported year (1700–2400).
+`datetime_t` includes helpers for culturally and astronomically significant dates.  
+The function `datetime_init_chinese_new_year()` computes the date of Chinese New Year for any supported year (1700–2400).
 
 #### Example Code
 
@@ -639,8 +639,8 @@ int main(void) {
 
     for (int i = 0; i < 6; i++) {
         /* Compute Chinese New Year for the given year */
-        dttm_t *dt = dttm_init_chinese_new_year(
-            dttm_alloc(),
+        datetime_t *dt = datetime_init_chinese_new_year(
+            datetime_alloc(),
             cases[i].year
         );
 
@@ -650,14 +650,14 @@ int main(void) {
         }
 
         /* Extract components */
-        short y = dttm_year(dt);
-        month_t m = dttm_month(dt);
-        unsigned char d = dttm_day(dt);
+        short y = datetime_year(dt);
+        month_t m = datetime_month(dt);
+        unsigned char d = datetime_day(dt);
 
         printf("Chinese New Year %d: %d-%02d-%02d\n",
                cases[i].year, y, (int)m, d);
 
-        dttm_dealloc(dt);
+        datetime_dealloc(dt);
     }
 
     return 0;
@@ -677,9 +677,9 @@ Chinese New Year 2025: 2025-01-29
 
 ---
 
-### 🧩 **Internal Architecture — `dttm_t`**
+### 🧩 **Internal Architecture — `datetime_t`**
 
-`dttm_t` provides a unified, high‑precision system for civil timekeeping,
+`datetime_t` provides a unified, high‑precision system for civil timekeeping,
 astronomical time scales, and solar/lunar calculations.
 
 Its **time representation and time‑scale conversions are navigation‑grade**  
@@ -705,7 +705,7 @@ All civil operations use deterministic integer arithmetic.
 Conversions between civil dates and Julian Day Numbers (JDN) use the
 Fliegel–Van Flandern algorithm for correctness, speed, and portability.
 
-`dttm_t` stores time internally with **millisecond granularity**, using double
+`datetime_t` stores time internally with **millisecond granularity**, using double
 precision floating point seconds since a defined epoch. This provides:
 
 - stable, platform‑independent behaviour  
@@ -716,7 +716,7 @@ precision floating point seconds since a defined epoch. This provides:
 
 #### **2. Astronomical Time Scales (Navigation‑Grade)**
 
-`dttm_t` implements precise, deterministic conversions between the
+`datetime_t` implements precise, deterministic conversions between the
 astronomical time scales used in navigation, ephemeris computation, and
 scientific work:
 
@@ -741,7 +741,7 @@ databases.
 
 #### **3. Solar and Lunar Algorithms (Civil‑Grade)**
 
-`dttm_t` includes algorithms for:
+`datetime_t` includes algorithms for:
 
 - sunrise and sunset  
 - solar noon  
@@ -763,7 +763,7 @@ They are **civil‑grade**:
 
 #### **4. Value‑Semantic API**
 
-`dttm_t` is a pure value type:
+`datetime_t` is a pure value type:
 
 - no hidden allocations  
 - no global state  
@@ -791,12 +791,12 @@ reliable, high‑precision timekeeping.
 
 ---
 
-# 📚 **Generic Dictionary (`dict_t`)**
+# 📚 **Generic Dictionary (`dictionary_t`)**
 
 ### **Sections**
-- [Overview](#-generic-dictionary-dict_t)
+- [Overview](#-generic-dictionary-dictionary_t)
 - [Example](#-example-deepcopied-keys-and-values)
-- [Internal Architecture](#-internal-architecture--dict_t)
+- [Internal Architecture](#-internal-architecture--dictionary_t)
 
 
 A typed, generic key/value dictionary with user‑defined hash/compare/clone/destroy callbacks, stable entry handles, and lazy sorted views.
@@ -859,7 +859,7 @@ static void deep_destroy(void *elem) {
 }
 
 int main(void) {
-    dict_t *dict = dict_create(
+    dictionary_t *dict = dictionary_create(
         sizeof(struct deep), sizeof(struct deep),
         deep_hash, deep_cmp,
         deep_clone, deep_destroy,
@@ -872,24 +872,24 @@ int main(void) {
     struct deep k2 = { "k2", 2 };
     struct deep v2 = { "v2", 20 };
 
-    dict_set(dict, &k1, &v1);
-    dict_set(dict, &k2, &v2);
+    dictionary_set(dict, &k1, &v1);
+    dictionary_set(dict, &k2, &v2);
 
     struct deep out;
 
-    if (dict_get(dict, &k1, &out)) {
+    if (dictionary_get(dict, &k1, &out)) {
         printf("Value for key '%s': %s (%d)\n",
                k1.name, out.name, out.value);
         free(out.name);
     }
 
-    if (dict_get(dict, &k2, &out)) {
+    if (dictionary_get(dict, &k2, &out)) {
         printf("Value for key '%s': %s (%d)\n",
                k2.name, out.name, out.value);
         free(out.name);
     }
 
-    dict_destroy(dict);
+    dictionary_destroy(dict);
     return 0;
 }
 ```
@@ -937,7 +937,7 @@ static void str_destroy(void *elem) {
 }
 
 int main(void) {
-    dict_t *dict = dict_create(
+    dictionary_t *dict = dictionary_create(
         sizeof(int), sizeof(char *),
         int_hash, int_cmp,
         NULL, NULL,
@@ -948,22 +948,22 @@ int main(void) {
     const char *v1 = "hello";
     const char *v2 = "world";
 
-    dict_set(dict, &k1, &v1);
-    dict_set(dict, &k2, &v2);
+    dictionary_set(dict, &k1, &v1);
+    dictionary_set(dict, &k2, &v2);
 
     char *out;
 
-    if (dict_get(dict, &k1, &out)) {
+    if (dictionary_get(dict, &k1, &out)) {
         printf("Value for key %d: %s\n", k1, out);
         free(out);
     }
 
-    if (dict_get(dict, &k2, &out)) {
+    if (dictionary_get(dict, &k2, &out)) {
         printf("Value for key %d: %s\n", k2, out);
         free(out);
     }
 
-    dict_destroy(dict);
+    dictionary_destroy(dict);
     return 0;
 }
 ```
@@ -977,14 +977,14 @@ Value for key 6: world
 
 ---
 
-### 🧩 **Internal Architecture — `dict_t`**
+### 🧩 **Internal Architecture — `dictionary_t`**
 
-`dict_t` is built on a compact, arena‑based storage model designed for
+`dictionary_t` is built on a compact, arena‑based storage model designed for
 predictable performance, stable element lifetimes, and flexible ownership
 semantics.
 
 Unlike a naive hash map that stores key/value pairs directly in hash buckets,
-`dict_t` uses **three cooperating components**:
+`dictionary_t` uses **three cooperating components**:
 
 ---
 
@@ -1049,7 +1049,7 @@ Storing keys and values in separate arenas provides:
 - predictable memory layout  
 - clean value‑semantics without hidden allocations  
 
-This makes `dict_t` suitable for use in systems where memory ownership,
+This makes `dictionary_t` suitable for use in systems where memory ownership,
 determinism, and predictable behaviour matter — such as embedded systems,
 numerical computing, or long‑running services.
 
@@ -1618,12 +1618,12 @@ Planned enhancements include:
 - Multivariate support  
 - JIT‑compiled derivative evaluation  
 
-### **dttm_t**
+### **datetime_t**
 - More holiday algorithms  
 - Optional timezone database integration  
 - Ephemeris‑grade solar/lunar algorithms (configurable)  
 
-### **dict_t / set_t**
+### **dictionary_t / set_t**
 - Ordered dictionary variant  
 - Persistent/immutable variants  
 - SIMD‑accelerated hashing  

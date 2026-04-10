@@ -46,13 +46,13 @@ struct dictionary {
     size_t sorted_values_cap;
     bool sorted_values_valid;
 
-    dict_hash_fn key_hash;
-    dict_cmp_fn key_cmp;
-    dict_clone_fn key_clone;
-    dict_destroy_fn key_destroy;
+    dictionary_hash_fn key_hash;
+    dictionary_cmp_fn key_cmp;
+    dictionary_clone_fn key_clone;
+    dictionary_destroy_fn key_destroy;
 
-    dict_clone_fn value_clone;
-    dict_destroy_fn value_destroy;
+    dictionary_clone_fn value_clone;
+    dictionary_destroy_fn value_destroy;
 
     /* scratch entry for APIs that return an opaque handle */
     struct dict_entry scratch_entry;
@@ -95,14 +95,14 @@ static bool dict_build_sorted_values(struct dictionary *dict);
 
 /* Create */
 
-dict_t *dict_create(size_t key_size,
+dictionary_t *dictionary_create(size_t key_size,
                     size_t value_size,
-                    dict_hash_fn key_hash,
-                    dict_cmp_fn key_cmp,
-                    dict_clone_fn key_clone,
-                    dict_destroy_fn key_destroy,
-                    dict_clone_fn value_clone,
-                    dict_destroy_fn value_destroy)
+                    dictionary_hash_fn key_hash,
+                    dictionary_cmp_fn key_cmp,
+                    dictionary_clone_fn key_clone,
+                    dictionary_destroy_fn key_destroy,
+                    dictionary_clone_fn value_clone,
+                    dictionary_destroy_fn value_destroy)
 {
     if (key_size == 0 || value_size == 0 || key_hash == NULL || key_cmp == NULL) {
         return NULL;
@@ -148,7 +148,7 @@ dict_t *dict_create(size_t key_size,
     dict->scratch_entry.index = 0;
 
     if (!dict_rehash(dict, 0)) {
-        dict_destroy(dict);
+        dictionary_destroy(dict);
         return NULL;
     }
 
@@ -157,7 +157,7 @@ dict_t *dict_create(size_t key_size,
 
 /* Destroy */
 
-void dict_destroy(dict_t *dict)
+void dictionary_destroy(dictionary_t *dict)
 {
     if (!dict) return;
 
@@ -196,7 +196,7 @@ void dict_destroy(dict_t *dict)
 
 /* Clear */
 
-void dict_clear(dict_t *dict)
+void dictionary_clear(dictionary_t *dict)
 {
     if (!dict || dict->count == 0) return;
 
@@ -232,7 +232,7 @@ void dict_clear(dict_t *dict)
 
 /* Size */
 
-size_t dict_size(const dict_t *dict)
+size_t dictionary_size(const dictionary_t *dict)
 {
     return dict ? dict->count : 0;
 }
@@ -359,7 +359,7 @@ static bool dict_find_bucket(const struct dictionary *dict,
 
 /* Set */
 
-bool dict_set(dict_t *dict, const void *key, const void *value)
+bool dictionary_set(dictionary_t *dict, const void *key, const void *value)
 {
     if (!dict || !key || !value) return false;
 
@@ -429,7 +429,7 @@ bool dict_set(dict_t *dict, const void *key, const void *value)
 
 /* Get (copy out) */
 
-bool dict_get(const dict_t *dict, const void *key, void *out_value)
+bool dictionary_get(const dictionary_t *dict, const void *key, void *out_value)
 {
     if (!dict || !key || !out_value) return false;
 
@@ -458,7 +458,7 @@ bool dict_get(const dict_t *dict, const void *key, void *out_value)
 
 /* Remove */
 
-bool dict_remove(dict_t *dict, const void *key)
+bool dictionary_remove(dictionary_t *dict, const void *key)
 {
     if (!dict || !key || dict->count == 0 || dict->table_size == 0)
         return false;
@@ -560,13 +560,13 @@ bool dict_remove(dict_t *dict, const void *key)
 
 /* Direct arena access */
 
-const void *dict_get_key(const dict_t *dict, size_t index)
+const void *dictionary_get_key(const dictionary_t *dict, size_t index)
 {
     if (!dict || index >= dict->count) return NULL;
     return key_slot_data_ptr(dict, index);
 }
 
-const void *dict_get_value(const dict_t *dict, size_t index)
+const void *dictionary_get_value(const dictionary_t *dict, size_t index)
 {
     if (!dict || index >= dict->count) return NULL;
     return value_slot_data_ptr(dict, index);
@@ -668,7 +668,7 @@ static bool dict_build_sorted_values(struct dictionary *dict)
 
 /* Sorted key access */
 
-const void *dict_get_key_sorted(dict_t *dict, size_t index)
+const void *dictionary_get_key_sorted(dictionary_t *dict, size_t index)
 {
     if (!dict || index >= dict->count) return NULL;
 
@@ -682,7 +682,7 @@ const void *dict_get_key_sorted(dict_t *dict, size_t index)
 
 /* Sorted value access */
 
-const void *dict_get_value_sorted(dict_t *dict, size_t index)
+const void *dictionary_get_value_sorted(dictionary_t *dict, size_t index)
 {
     if (!dict || index >= dict->count) return NULL;
 
@@ -696,16 +696,16 @@ const void *dict_get_value_sorted(dict_t *dict, size_t index)
 
 /* Sorted entry access */
 
-bool dict_get_entry_sorted(dict_t *dict,
+bool dictionary_get_entry_sorted(dictionary_t *dict,
                            size_t index,
-                           dict_sort_mode mode,
-                           dict_entry_t **out_entry)
+                           dictionary_sort_mode mode,
+                           dictionary_entry_t **out_entry)
 {
     if (!dict || !out_entry || index >= dict->count) return false;
 
     size_t arena_index = 0;
 
-    if (mode == DICT_SORT_BY_KEY) {
+    if (mode == DICTIONARY_SORT_BY_KEY) {
         if (!dict->sorted_keys_valid) {
             if (!dict_build_sorted_keys(dict)) return false;
         }
@@ -725,9 +725,9 @@ bool dict_get_entry_sorted(dict_t *dict,
 
 /* Get entry by key */
 
-bool dict_get_entry(const dict_t *dict,
+bool dictionary_get_entry(const dictionary_t *dict,
                     const void *key,
-                    dict_entry_t **out_entry)
+                    dictionary_entry_t **out_entry)
 {
     if (!dict || !key || !out_entry) return false;
 
@@ -750,8 +750,8 @@ bool dict_get_entry(const dict_t *dict,
 
 /* Set value via entry */
 
-bool dict_set_entry(dict_t *dict,
-                    dict_entry_t *entry,
+bool dictionary_set_entry(dictionary_t *dict,
+                    dictionary_entry_t *entry,
                     const void *value)
 {
     if (!dict || !entry || !value) return false;
@@ -776,13 +776,13 @@ bool dict_set_entry(dict_t *dict,
 
 /* Entry accessors */
 
-const void *dict_entry_key(const dict_entry_t *entry)
+const void *dictionary_entry_key(const dictionary_entry_t *entry)
 {
     if (!entry || !entry->dict || entry->index >= entry->dict->count) return NULL;
     return key_slot_data_ptr(entry->dict, entry->index);
 }
 
-const void *dict_entry_value(const dict_entry_t *entry)
+const void *dictionary_entry_value(const dictionary_entry_t *entry)
 {
     if (!entry || !entry->dict || entry->index >= entry->dict->count) return NULL;
     return value_slot_data_ptr(entry->dict, entry->index);
@@ -790,8 +790,8 @@ const void *dict_entry_value(const dict_entry_t *entry)
 
 /* Foreach */
 
-void dict_foreach(const dict_t *dict,
-                  dict_foreach_fn fn,
+void dictionary_foreach(const dictionary_t *dict,
+                  dictionary_foreach_fn fn,
                   void *user_data)
 {
     if (!dict || !fn) return;
@@ -807,11 +807,11 @@ void dict_foreach(const dict_t *dict,
 
 /* Clone */
 
-dict_t *dict_clone(const dict_t *dict)
+dictionary_t *dictionary_clone(const dictionary_t *dict)
 {
     if (!dict) return NULL;
 
-    struct dictionary *clone = dict_create(dict->key_size,
+    struct dictionary *clone = dictionary_create(dict->key_size,
                                            dict->value_size,
                                            dict->key_hash,
                                            dict->key_cmp,
@@ -824,13 +824,13 @@ dict_t *dict_clone(const dict_t *dict)
     if (dict->count == 0) return clone;
 
     if (!dict_reserve_arenas(clone, dict->count)) {
-        dict_destroy(clone);
+        dictionary_destroy(clone);
         return NULL;
     }
 
     if (clone->prime_index < dict->prime_index) {
         if (!dict_rehash(clone, dict->prime_index)) {
-            dict_destroy(clone);
+            dictionary_destroy(clone);
             return NULL;
         }
     }
@@ -877,7 +877,7 @@ dict_t *dict_clone(const dict_t *dict)
 
         struct bucket *b = (struct bucket *)malloc(sizeof(struct bucket));
         if (!b) {
-            dict_destroy(clone);
+            dictionary_destroy(clone);
             return NULL;
         }
         b->index = i;

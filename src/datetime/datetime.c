@@ -14,7 +14,7 @@
 /// @brief the datetime type - this is the internal structure definition for the datetime type. It is not intended to be used 
 ///        directly by users of the datetime library, but it is needed for the implementation of the datetime functions and 
 ///        for testing purposes.
-typedef struct _dttm_t {
+typedef struct _datetime_t {
     short year;
     month_t month;
     uint8_t day;
@@ -23,12 +23,12 @@ typedef struct _dttm_t {
     double second;
     long JulianDayNumber;
     double JulianDay;
-} dttm_t;
+} datetime_t;
 
-/// @brief allocates enough memory for a dttm_t structure.
+/// @brief allocates enough memory for a datetime_t structure.
 /// @return the start address of the allocated memory.
-dttm_t *dttm_alloc() {
-    dttm_t *self = (dttm_t *)malloc(sizeof(dttm_t));
+datetime_t *datetime_alloc() {
+    datetime_t *self = (datetime_t *)malloc(sizeof(datetime_t));
     if (self != NULL) {
         self->year = SHRT_MAX; // Mark as uninitialised
         self->month = 0;
@@ -42,12 +42,12 @@ dttm_t *dttm_alloc() {
     return self;
 }
 
-inline void dttm_dealloc(dttm_t *self)
+inline void datetime_dealloc(datetime_t *self)
 {
     free(self);
 }
 
-dttm_t *dttm_init_ymd(dttm_t *self, short year, month_t month, uint8_t day) {
+datetime_t *datetime_init_ymd(datetime_t *self, short year, month_t month, uint8_t day) {
     self->year = year;
     self->month = month;
     self->day = day;
@@ -59,7 +59,7 @@ dttm_t *dttm_init_ymd(dttm_t *self, short year, month_t month, uint8_t day) {
     return self;
 }
 
-dttm_t *dttm_init_ymdt(dttm_t *self,
+datetime_t *datetime_init_ymdt(datetime_t *self,
     short year, month_t month, uint8_t day, uint8_t hour, uint8_t minute, double second)
 {
     self->year = year;
@@ -73,7 +73,7 @@ dttm_t *dttm_init_ymdt(dttm_t *self,
     return self;
 }
 
-dttm_t *dttm_init_copy(dttm_t *self, const dttm_t *datetime) {
+datetime_t *datetime_init_copy(datetime_t *self, const datetime_t *datetime) {
     self->year = datetime->year;
     self->month = datetime->month;
     self->day = datetime->day;
@@ -85,7 +85,7 @@ dttm_t *dttm_init_copy(dttm_t *self, const dttm_t *datetime) {
     return self;
 }
 
-dttm_t *dttm_init_jdn(dttm_t *self, long JulianDayNumber) {
+datetime_t *datetime_init_jdn(datetime_t *self, long JulianDayNumber) {
     self->JulianDayNumber = JulianDayNumber;
     self->JulianDay = DBL_MAX; // Mark as uninitialised
     self->year = SHRT_MAX; // Mark as uninitialised
@@ -98,7 +98,7 @@ dttm_t *dttm_init_jdn(dttm_t *self, long JulianDayNumber) {
     return self;
 }
 
-dttm_t *dttm_init_jd(dttm_t *self, double JulianDay) {
+datetime_t *datetime_init_jd(datetime_t *self, double JulianDay) {
     self->JulianDay = JulianDay;
     self->JulianDayNumber = LONG_MAX; // Mark as uninitialised
     self->year = SHRT_MAX; // Mark as uninitialised
@@ -111,7 +111,7 @@ dttm_t *dttm_init_jd(dttm_t *self, double JulianDay) {
     return self;
 }
 
-dttm_t *dttm_init_now(dttm_t *self) {
+datetime_t *datetime_init_now(datetime_t *self) {
     time_t now;
 	struct tm tmdate;
 
@@ -130,7 +130,7 @@ dttm_t *dttm_init_now(dttm_t *self) {
     return self;
 }
 
-dttm_t *dttm_init_easter(dttm_t *self, int year)
+datetime_t *datetime_init_easter(datetime_t *self, int year)
 {
     if (year < 1 || year > 9999) return NULL;
 
@@ -176,7 +176,7 @@ dttm_t *dttm_init_easter(dttm_t *self, int year)
 /// operations. The resulting time is returned as a Julian Ephemeris Date (JDE) in days.
 /// @param lunationIndex the lunation number for which to calculate the time of the true new moon. This should be a positive integer.
 /// @return the time of the true new moon in days as a Julian Ephemeris Date (JDE).
-static double dttm_true_new_moon_tt(int lunationIndex)
+static double datetime_true_new_moon_tt(int lunationIndex)
 {
     /* Time in Julian centuries from J2000 */
     double T  = lunationIndex / 1236.85;
@@ -253,7 +253,7 @@ static double dttm_true_new_moon_tt(int lunationIndex)
 ///        inclusive. If the input year is outside this range, the function will return an approximate value based on the nearest valid 
 ///        year.
 /// @return the difference in seconds between TT and UT for the given year.
-static double dttm_delta_t(int year)
+static double datetime_delta_t(int year)
 {
     double offsetYears;   /* Years offset from reference epoch for this segment */
     double deltaT;        /* Resulting ΔT in seconds */
@@ -310,7 +310,7 @@ static double dttm_delta_t(int year)
 }
 
 /* Compute the TT of the December solstice for a given year (Meeus polynomial). */
-static double dttm_dec_solstice_tt(int year)
+static double datetime_dec_solstice_tt(int year)
 {
     double Y = (year - 2000) / 1000.0;  /* millennia from J2000.0 */
     return (((-0.000000217 * Y - 0.00000084) * Y + 0.000461) * Y + 365242.74049) * Y + 2451900.05952;
@@ -320,34 +320,34 @@ static double dttm_dec_solstice_tt(int year)
 /// This function takes a year between 1700 and 2400 and returns the Julian day number of the Chinese New Year in that year.
 /// @param year The year for which the Julian day number of the Chinese New Year is to be computed.
 /// @return The Julian day number of the Chinese New Year in the given year.
-static long dttm_chinese_new_year_jdn(int year)
+static long datetime_chinese_new_year_jdn(int year)
 {
     if (year < 1700 || year > 2400)
         return LONG_MAX;
 
     /* 1. December solstice of the previous year (Terrestrial Time) */
-    double solsticeTerrestrialTime = dttm_dec_solstice_tt(year - 1);
+    double solsticeTerrestrialTime = datetime_dec_solstice_tt(year - 1);
 
     /* Convert solstice from Terrestrial Time to UTC */
-    double deltaTPreviousYearDays = dttm_delta_t(year - 1) / 86400.0;
+    double deltaTPreviousYearDays = datetime_delta_t(year - 1) / 86400.0;
     double solsticeUTC = solsticeTerrestrialTime - deltaTPreviousYearDays;
 
     /* 2. Estimate lunation index for new moons around the solstice */
     int lunationIndex = (int)((solsticeUTC - 2451550.09765) / 29.530588853) - 2;
 
     /* 3. First new moon after the solstice */
-    double firstNewMoonTerrestrial = dttm_true_new_moon_tt(lunationIndex);
+    double firstNewMoonTerrestrial = datetime_true_new_moon_tt(lunationIndex);
     double firstNewMoonUTC = firstNewMoonTerrestrial - deltaTPreviousYearDays;
 
     while (firstNewMoonUTC < solsticeUTC) {
         lunationIndex++;
-        firstNewMoonTerrestrial = dttm_true_new_moon_tt(lunationIndex);
+        firstNewMoonTerrestrial = datetime_true_new_moon_tt(lunationIndex);
         firstNewMoonUTC = firstNewMoonTerrestrial - deltaTPreviousYearDays;
     }
 
     /* 4. Second new moon = Chinese New Year */
-    double secondNewMoonTerrestrial = dttm_true_new_moon_tt(lunationIndex + 1);
-    double deltaTCurrentYearDays = dttm_delta_t(year) / 86400.0;
+    double secondNewMoonTerrestrial = datetime_true_new_moon_tt(lunationIndex + 1);
+    double deltaTCurrentYearDays = datetime_delta_t(year) / 86400.0;
     double secondNewMoonUTC = secondNewMoonTerrestrial - deltaTCurrentYearDays;
 
     /* Convert UTC → China Standard Time (UTC+8) */
@@ -357,23 +357,23 @@ static long dttm_chinese_new_year_jdn(int year)
     return (long)floor(secondNewMoonCST + 0.5);
 }
 
-dttm_t *dttm_init_chinese_new_year(dttm_t *self, int year)
+datetime_t *datetime_init_chinese_new_year(datetime_t *self, int year)
 {
     // algorithm not reliable for years before 1700 or after 2400
     if (year < 1700 || year > 2400) return NULL;
 
-    self->JulianDayNumber = dttm_chinese_new_year_jdn(year);
+    self->JulianDayNumber = datetime_chinese_new_year_jdn(year);
     self->hour   = 0;
     self->minute = 0;
     self->second = 0.0;
     self->JulianDay = DBL_MAX;
 
-    dttm_year(self);
+    datetime_year(self);
 
     return self;
 }
 
-double dttm_tz_offset(const dttm_t *self) {
+double datetime_tz_offset(const datetime_t *self) {
     // Get the local time and GMT time for the given datetime
     time_t t;
     struct tm local_tm, gmt_tm;
@@ -383,7 +383,7 @@ double dttm_tz_offset(const dttm_t *self) {
         if (self->JulianDayNumber == LONG_MAX && self->JulianDay == DBL_MAX) {
             return DBL_MAX; // Cannot calculate timezone offset if date is not initialised
         }
-        dttm_year(self);
+        datetime_year(self);
     }
 
     // Convert datetime to struct tm
@@ -421,7 +421,7 @@ double dttm_tz_offset(const dttm_t *self) {
     return offset_hours;
 }
 
-dttm_t *dttm_to_gmt(dttm_t *self)
+datetime_t *datetime_to_gmt(datetime_t *self)
 {
     if (self == NULL) return NULL;
 
@@ -455,11 +455,11 @@ dttm_t *dttm_to_gmt(dttm_t *self)
     
     if (self->JulianDayNumber != LONG_MAX) {
         // If Julian Day Number is initialised, we need to update it as well
-        self->JulianDayNumber = dttm_jdn(self);
+        self->JulianDayNumber = datetime_jdn(self);
     }
     if (self->JulianDay != DBL_MAX) {
         // If Julian Day is initialised, we need to update it as well
-        self->JulianDay = dttm_jd(self);
+        self->JulianDay = datetime_jd(self);
     }
 
     return self;
@@ -496,12 +496,12 @@ static void date_julianDayNumToMDY(long julianDay, int *monthOut, int *dayOut, i
     if (*yearOut <= 0) (*yearOut)--;
 }
 
-short dttm_year(const dttm_t *self) {
+short datetime_year(const datetime_t *self) {
     if (self == NULL) return SHRT_MAX;
     if (self->year != SHRT_MAX) return self->year;
     if (self->JulianDay != DBL_MAX) {
         // Convert Julian Day to calendar date and return the year.
-        dttm_t *mutable_self = (dttm_t *)self; // Cast away const to store the calculated year
+        datetime_t *mutable_self = (datetime_t *)self; // Cast away const to store the calculated year
         mutable_self->JulianDayNumber = (long)(self->JulianDay + 0.5);
         int month, day, year;
         date_julianDayNumToMDY(self->JulianDayNumber, &month, &day, &year);
@@ -520,7 +520,7 @@ short dttm_year(const dttm_t *self) {
         // Convert Julian Day Number to calendar date and return the year.
         int month, day, year;
         date_julianDayNumToMDY(self->JulianDayNumber, &month, &day, &year);
-        dttm_t *mutable_self = (dttm_t *)self; // Cast away const to store the calculated year
+        datetime_t *mutable_self = (datetime_t *)self; // Cast away const to store the calculated year
         mutable_self->year = (short)year;
         mutable_self->month = (month_t)month;
         mutable_self->day = (uint8_t)day;
@@ -532,42 +532,42 @@ short dttm_year(const dttm_t *self) {
     return SHRT_MAX; // This is an uninitialised state that cannot be calculated, so we return SHRT_MAX as a sentinel value.
 }
 
-month_t dttm_month(const dttm_t *self) {
+month_t datetime_month(const datetime_t *self) {
     if (self->year != SHRT_MAX) return self->month;
     // If we cannot calculate the year, we cannot calculate the month, so we return 0 as a sentinel value.
-    if (dttm_year(self) == SHRT_MAX) return 0;
+    if (datetime_year(self) == SHRT_MAX) return 0;
     return self->month;
 }
 
-uint8_t dttm_day(const dttm_t *self) {
+uint8_t datetime_day(const datetime_t *self) {
     if (self->year != SHRT_MAX) return self->day;
     // If we cannot calculate the year, we cannot calculate the day, so we return 0 as a sentinel value.
-    if (dttm_year(self) == SHRT_MAX) return 0;
+    if (datetime_year(self) == SHRT_MAX) return 0;
     return self->day;
 }
 
-uint8_t dttm_hour(const dttm_t *self) {
+uint8_t datetime_hour(const datetime_t *self) {
     if (self->year != SHRT_MAX) return self->hour;
     // If we cannot calculate the year, we cannot calculate the hour, so we return 0 as a sentinel value.
-    if (dttm_year(self) == SHRT_MAX) return 0;
+    if (datetime_year(self) == SHRT_MAX) return 0;
     return self->hour;
 }
 
-uint8_t dttm_minute(const dttm_t *self) {
+uint8_t datetime_minute(const datetime_t *self) {
     if (self->year != SHRT_MAX) return self->minute;
     // If we cannot calculate the year, we cannot calculate the minute, so we return 0 as a sentinel value.
-    if (dttm_year(self) == SHRT_MAX) return 0;
+    if (datetime_year(self) == SHRT_MAX) return 0;
     return self->minute;
 }
 
-double dttm_second(const dttm_t *self) {
+double datetime_second(const datetime_t *self) {
     if (self->year != SHRT_MAX) return self->second;
     // If we cannot calculate the year, we cannot calculate the second, so we return 0.0 as a sentinel value.
-    if (dttm_year(self) == SHRT_MAX) return 0.0;
+    if (datetime_year(self) == SHRT_MAX) return 0.0;
     return self->second;
 }
 
-long dttm_ymd_to_jdn(short year, month_t month, uint8_t day) {
+long datetime_ymd_to_jdn(short year, month_t month, uint8_t day) {
     bool isGregorian = (year > 1582) ||
                        (year == 1582 && month > DT_October) || 
                        (year == 1582 && month == DT_October && day >= 15);
@@ -591,7 +591,7 @@ long dttm_ymd_to_jdn(short year, month_t month, uint8_t day) {
     return JulianDayNumber;
 }
 
-long dttm_jdn(const dttm_t *self) {
+long datetime_jdn(const datetime_t *self) {
     if (self->JulianDayNumber != LONG_MAX) return self->JulianDayNumber;
 
     if (self->year == SHRT_MAX) {
@@ -599,28 +599,28 @@ long dttm_jdn(const dttm_t *self) {
         return LONG_MAX;
     }
 
-    dttm_t *mutable_self = (dttm_t *)self; // Cast away const to store the calculated Julian Day Number
-    mutable_self->JulianDayNumber = dttm_ymd_to_jdn(self->year, self->month, self->day);
+    datetime_t *mutable_self = (datetime_t *)self; // Cast away const to store the calculated Julian Day Number
+    mutable_self->JulianDayNumber = datetime_ymd_to_jdn(self->year, self->month, self->day);
     return self->JulianDayNumber;
 }
 
-double dttm_jd(const dttm_t *self) {
+double datetime_jd(const datetime_t *self) {
     if (self->JulianDay != DBL_MAX) return self->JulianDay;
 
-    long jdn = dttm_jdn(self);
+    long jdn = datetime_jdn(self);
     if (jdn == LONG_MAX) {
         // If we cannot calculate the Julian Day Number, we cannot calculate the Julian Day, so we return DBL_MAX as a sentinel value.
         return DBL_MAX;
     }
 
-    ((dttm_t *)self)->JulianDay = jdn + (self->hour - 12) / 24.0 + self->minute / 1440.0 + self->second / 86400.0;
+    ((datetime_t *)self)->JulianDay = jdn + (self->hour - 12) / 24.0 + self->minute / 1440.0 + self->second / 86400.0;
 
     return self->JulianDay;
 }
 
-weekday_t dttm_weekday(const dttm_t *self)
+weekday_t datetime_weekday(const datetime_t *self)
 {
-    long jdn = dttm_jdn(self);
+    long jdn = datetime_jdn(self);
     if (jdn == LONG_MAX) {
         // If we cannot calculate the Julian Day Number, we cannot calculate the weekday, so we return 0 as a sentinel value.
         return 0;
@@ -628,10 +628,10 @@ weekday_t dttm_weekday(const dttm_t *self)
     return (weekday_t)((jdn + 1) % 7 + 1); 
 }
 
-bool dttm_equal(const dttm_t *self, const dttm_t *datetime)
+bool datetime_equal(const datetime_t *self, const datetime_t *datetime)
 {
-    if (self->year == SHRT_MAX) dttm_year(self); // Try to calculate the year, month, day, ... if it is not initialised
-    if (datetime->year == SHRT_MAX) dttm_year(datetime); // Try to calculate the year, month, day, ... if it is not initialised
+    if (self->year == SHRT_MAX) datetime_year(self); // Try to calculate the year, month, day, ... if it is not initialised
+    if (datetime->year == SHRT_MAX) datetime_year(datetime); // Try to calculate the year, month, day, ... if it is not initialised
     
     return self->year == datetime->year &&
            self->month == datetime->month &&
@@ -641,10 +641,10 @@ bool dttm_equal(const dttm_t *self, const dttm_t *datetime)
            fabs(self->second - datetime->second) < 1e-9;
 }
 
-bool dttm_lt(const dttm_t *self, const dttm_t *datetime)
+bool datetime_lt(const datetime_t *self, const datetime_t *datetime)
 {
-    if (self->year == SHRT_MAX) dttm_year(self); // Try to calculate the year, month, day, ... if it is not initialised
-    if (datetime->year == SHRT_MAX) dttm_year(datetime); // Try to calculate the year, month, day, ... if it is not initialised
+    if (self->year == SHRT_MAX) datetime_year(self); // Try to calculate the year, month, day, ... if it is not initialised
+    if (datetime->year == SHRT_MAX) datetime_year(datetime); // Try to calculate the year, month, day, ... if it is not initialised
 
     if (self->year != datetime->year) return self->year < datetime->year;
     if (self->month != datetime->month) return self->month < datetime->month;
@@ -654,54 +654,54 @@ bool dttm_lt(const dttm_t *self, const dttm_t *datetime)
     return self->second < datetime->second;
 }
 
-bool dttm_le(const dttm_t *self, const dttm_t *datetime)
+bool datetime_le(const datetime_t *self, const datetime_t *datetime)
 {
-    return dttm_lt(self, datetime) || dttm_equal(self, datetime);
+    return datetime_lt(self, datetime) || datetime_equal(self, datetime);
 }
 
-bool dttm_gt(const dttm_t *self, const dttm_t *datetime)
+bool datetime_gt(const datetime_t *self, const datetime_t *datetime)
 {
-    return !dttm_le(self, datetime);
+    return !datetime_le(self, datetime);
 }
 
-bool dttm_ge(const dttm_t *self, const dttm_t *datetime)
+bool datetime_ge(const datetime_t *self, const datetime_t *datetime)
 {
-    return !dttm_lt(self, datetime);
+    return !datetime_lt(self, datetime);
 }
 
-int dttm_compare(const dttm_t *self, const dttm_t *datetime)
+int datetime_compare(const datetime_t *self, const datetime_t *datetime)
 {
-    if (dttm_lt(self, datetime)) return -1;
-    if (dttm_gt(self, datetime)) return 1;
+    if (datetime_lt(self, datetime)) return -1;
+    if (datetime_gt(self, datetime)) return 1;
     return 0; // They are equal
 }
 
-inline bool dttm_is_leap_year(short year)
+inline bool datetime_is_leap_year(short year)
 {
     return (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
 }
 
-unsigned short dttm_days_in_month(short year, month_t month)
+unsigned short datetime_days_in_month(short year, month_t month)
 {
     static unsigned short daysInMonth[] = {0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
     if (month < DT_January || month > DT_December) return 0;
-    if (month == DT_February) return dttm_is_leap_year(year) ? 29 : 28;
+    if (month == DT_February) return datetime_is_leap_year(year) ? 29 : 28;
     return daysInMonth[ month ];
 }
 
-unsigned short dttm_days_in_this_month(const dttm_t *self)
+unsigned short datetime_days_in_this_month(const datetime_t *self)
 {
-    short year = dttm_year(self);
+    short year = datetime_year(self);
     if (year == SHRT_MAX) return 0; // If we cannot calculate the year, we cannot calculate the number of days in the month.
 
-    month_t month = dttm_month(self);
-    return dttm_days_in_month(year, month);
+    month_t month = datetime_month(self);
+    return datetime_days_in_month(year, month);
 }
 
-bool dttm_is_dst(const dttm_t *self)
+bool datetime_is_dst(const datetime_t *self)
 {
-    if (self->year == SHRT_MAX) dttm_year(self); // Try to calculate the year, month, day, ... if it is not initialised
+    if (self->year == SHRT_MAX) datetime_year(self); // Try to calculate the year, month, day, ... if it is not initialised
 
     struct tm tmdate;
     tmdate.tm_year = self->year - 1900;
@@ -719,16 +719,16 @@ bool dttm_is_dst(const dttm_t *self)
 }   
 
 /* Invalidate Julian caches and recalculate from the current y/m/d/h/m/s fields. */
-static void dttm_refresh_julian_caches(dttm_t *self)
+static void datetime_refresh_julian_caches(datetime_t *self)
 {
     if (self->JulianDay != DBL_MAX || self->JulianDayNumber != LONG_MAX) {
         self->JulianDay = DBL_MAX;
         self->JulianDayNumber = LONG_MAX;
-        dttm_jd(self);
+        datetime_jd(self);
     }
 }
 
-dttm_t *dttm_add_days(dttm_t *self, long days)
+datetime_t *datetime_add_days(datetime_t *self, long days)
 {
     if (days == 0) return self; // No change needed
     if (self->year == SHRT_MAX) {
@@ -746,9 +746,9 @@ dttm_t *dttm_add_days(dttm_t *self, long days)
     uint8_t hour = self->hour;
     uint8_t minute = self->minute;
     double second = self->second;
-    double jdn = dttm_jd(self);
-    dttm_init_jd(self, jdn + (double)days);
-    dttm_year(self); // This will fill in the year, month, day based on the new Julian Day
+    double jdn = datetime_jd(self);
+    datetime_init_jd(self, jdn + (double)days);
+    datetime_year(self); // This will fill in the year, month, day based on the new Julian Day
     
     self->hour = hour;
     self->minute = minute;
@@ -757,19 +757,19 @@ dttm_t *dttm_add_days(dttm_t *self, long days)
     return self;
 }
 
-dttm_t *dttm_add_weeks(dttm_t *self, int weeks)
+datetime_t *datetime_add_weeks(datetime_t *self, int weeks)
 {
-    return dttm_add_days(self, (long)weeks * 7L);
+    return datetime_add_days(self, (long)weeks * 7L);
 }
 
-dttm_t *dttm_add_months(dttm_t *self, int months)
+datetime_t *datetime_add_months(datetime_t *self, int months)
 {
     if (months == 0) return self; // No change needed
     
     if (self->year == SHRT_MAX) {
         // If we get here, it means the datetime is in an uninitialised state that cannot be calculated, so we cannot add seconds to it.
         if (self->JulianDay == DBL_MAX && self->JulianDayNumber == LONG_MAX) return NULL; 
-        dttm_year(self); // Try to calculate the year, month, day, ... if it is not initialised
+        datetime_year(self); // Try to calculate the year, month, day, ... if it is not initialised
     } 
 
     int years = months / 12;
@@ -791,7 +791,7 @@ dttm_t *dttm_add_months(dttm_t *self, int months)
     if (self->day >= 29) {
         if (self->month == DT_February) {
             // Handle February separately because of leap years
-            int maxDay = dttm_is_leap_year(self->year) ? 29 : 28;
+            int maxDay = datetime_is_leap_year(self->year) ? 29 : 28;
             if (self->day > maxDay) {
                 self->day = (uint8_t)maxDay;
             }
@@ -805,39 +805,39 @@ dttm_t *dttm_add_months(dttm_t *self, int months)
         }
     }
 
-    dttm_refresh_julian_caches(self);
+    datetime_refresh_julian_caches(self);
 
     return self;
 }
 
-dttm_t *dttm_add_years(dttm_t *self, int years)
+datetime_t *datetime_add_years(datetime_t *self, int years)
 {
     if (years == 0) return self; // No change needed
     
     if (self->year == SHRT_MAX) {
         // If we get here, it means the datetime is in an uninitialised state that cannot be calculated, so we cannot add seconds to it.
         if (self->JulianDay == DBL_MAX && self->JulianDayNumber == LONG_MAX) return NULL; 
-        dttm_year(self); // Try to calculate the year, month, day, ... if it is not initialised
+        datetime_year(self); // Try to calculate the year, month, day, ... if it is not initialised
     } 
 
     self->year += years;
-    if (self->month == DT_February && self->day == 29 && !dttm_is_leap_year(self->year)) {
+    if (self->month == DT_February && self->day == 29 && !datetime_is_leap_year(self->year)) {
         // If we are on February 29 and the new year is not a leap year, we need to adjust the day to February 28
         self->day = 28;
     }
 
-    dttm_refresh_julian_caches(self);
+    datetime_refresh_julian_caches(self);
     return self;
 }
 
-dttm_t *dttm_add_hours(dttm_t *self, int hours)
+datetime_t *datetime_add_hours(datetime_t *self, int hours)
 {
     if (hours == 0) return self; // No change needed
 
     if (self->year == SHRT_MAX) {
         // If we get here, it means the datetime is in an uninitialised state that cannot be calculated, so we cannot add seconds to it.
         if (self->JulianDay == DBL_MAX && self->JulianDayNumber == LONG_MAX) return NULL; 
-        dttm_year(self); // Try to calculate the year, month, day, ... if it is not initialised
+        datetime_year(self); // Try to calculate the year, month, day, ... if it is not initialised
     } 
 
     int daysToAdd = hours / 24;
@@ -855,22 +855,22 @@ dttm_t *dttm_add_hours(dttm_t *self, int hours)
 
     self->hour = hour;
     if (daysToAdd != 0) {
-        dttm_add_days(self, daysToAdd);
+        datetime_add_days(self, daysToAdd);
     }
 
-    dttm_refresh_julian_caches(self);
+    datetime_refresh_julian_caches(self);
 
     return self;
 }
 
-dttm_t *dttm_add_minutes(dttm_t *self, int minutes)
+datetime_t *datetime_add_minutes(datetime_t *self, int minutes)
 {
     if (minutes == 0) return self; // No change needed
 
     if (self->year == SHRT_MAX) {
         // If we get here, it means the datetime is in an uninitialised state that cannot be calculated, so we cannot add seconds to it.
         if (self->JulianDay == DBL_MAX && self->JulianDayNumber == LONG_MAX) return NULL; 
-        dttm_year(self); // Try to calculate the year, month, day, ... if it is not initialised
+        datetime_year(self); // Try to calculate the year, month, day, ... if it is not initialised
     } 
 
     int hoursToAdd = minutes / 60;
@@ -888,22 +888,22 @@ dttm_t *dttm_add_minutes(dttm_t *self, int minutes)
     self->minute = minute;
 
     if (hoursToAdd != 0) {
-        dttm_add_hours(self, hoursToAdd);
+        datetime_add_hours(self, hoursToAdd);
     }
 
-    dttm_refresh_julian_caches(self);
+    datetime_refresh_julian_caches(self);
 
     return self;
 }
 
-dttm_t *dttm_add_seconds(dttm_t *self, double seconds)
+datetime_t *datetime_add_seconds(datetime_t *self, double seconds)
 {
     if (fabs(seconds) < 1e-9) return self; // No change needed
 
     if (self->year == SHRT_MAX) {
         // If we get here, it means the datetime is in an uninitialised state that cannot be calculated, so we cannot add seconds to it.
         if (self->JulianDay == DBL_MAX && self->JulianDayNumber == LONG_MAX) return NULL;
-        dttm_year(self); // Try to calculate the year, month, day, ... if it is not initialised
+        datetime_year(self); // Try to calculate the year, month, day, ... if it is not initialised
     } 
 
     int minutesToAdd = (int)(seconds / 60.0);
@@ -912,52 +912,52 @@ dttm_t *dttm_add_seconds(dttm_t *self, double seconds)
     self->second += remainingSeconds;
     if (self->second >= 60.0) {
         self->second -= 60.0;
-        dttm_add_minutes(self, 1);
+        datetime_add_minutes(self, 1);
     } else if (self->second < 0.0) {
         self->second += 60.0;
-        dttm_add_minutes(self, -1);
+        datetime_add_minutes(self, -1);
     }
 
-    dttm_refresh_julian_caches(self);
+    datetime_refresh_julian_caches(self);
 
     return self;
 }
 
-dttm_t *dttm_add_span(dttm_t *self, const dttm_span_t *span)
+datetime_t *datetime_add_span(datetime_t *self, const datetime_span_t *span)
 {
     if (span == NULL) return self;
 
     // If we get here, it means the datetime is in an uninitialised state that cannot be calculated, so we cannot add seconds to it.
     if (self->year == SHRT_MAX && self->JulianDay == DBL_MAX && self->JulianDayNumber == LONG_MAX) return NULL;
 
-    if (span->years != 0) self = dttm_add_years(self, (int)span->years);
-    if (span->months != 0) self = dttm_add_months(self, (int)span->months);
-    if (span->days != 0) self = dttm_add_days(self, (long)span->days);
-    if (span->hours != 0) self = dttm_add_hours(self, (int)span->hours);
-    if (span->minutes != 0) self = dttm_add_minutes(self, (int)span->minutes);
-    if (span->seconds != 0) self = dttm_add_seconds(self, (double)span->seconds);
+    if (span->years != 0) self = datetime_add_years(self, (int)span->years);
+    if (span->months != 0) self = datetime_add_months(self, (int)span->months);
+    if (span->days != 0) self = datetime_add_days(self, (long)span->days);
+    if (span->hours != 0) self = datetime_add_hours(self, (int)span->hours);
+    if (span->minutes != 0) self = datetime_add_minutes(self, (int)span->minutes);
+    if (span->seconds != 0) self = datetime_add_seconds(self, (double)span->seconds);
     return self;
 }
 
-dttm_t *dttm_sub_span(dttm_t *self, const dttm_span_t *span)
+datetime_t *datetime_sub_span(datetime_t *self, const datetime_span_t *span)
 {
     if (span == NULL) return self;
 
     // If we get here, it means the datetime is in an uninitialised state that cannot be calculated, so we cannot add seconds to it.
     if (self->year == SHRT_MAX && self->JulianDay == DBL_MAX && self->JulianDayNumber == LONG_MAX) return NULL;
 
-    if (span->years != 0) self = dttm_add_years(self, -(int)span->years);
-    if (span->months != 0) self = dttm_add_months(self, -(int)span->months);
-    if (span->days != 0) self = dttm_add_days(self, -(long)span->days);
-    if (span->hours != 0) self = dttm_add_hours(self, -(int)span->hours);
-    if (span->minutes != 0) self = dttm_add_minutes(self, -(int)span->minutes);
-    if (span->seconds != 0) self = dttm_add_seconds(self, -(double)span->seconds);
+    if (span->years != 0) self = datetime_add_years(self, -(int)span->years);
+    if (span->months != 0) self = datetime_add_months(self, -(int)span->months);
+    if (span->days != 0) self = datetime_add_days(self, -(long)span->days);
+    if (span->hours != 0) self = datetime_add_hours(self, -(int)span->hours);
+    if (span->minutes != 0) self = datetime_add_minutes(self, -(int)span->minutes);
+    if (span->seconds != 0) self = datetime_add_seconds(self, -(double)span->seconds);
     return self;
 }
 
-unsigned int dttm_hash(const dttm_t *self)
+unsigned int datetime_hash(const datetime_t *self)
 {
-    if (self->year == SHRT_MAX) dttm_year(self); // Try to calculate the year, month, day, ... if it is not initialised
+    if (self->year == SHRT_MAX) datetime_year(self); // Try to calculate the year, month, day, ... if it is not initialised
 
     unsigned int ms = (unsigned int)(self->hour * 3600000u +
                     self->minute * 60000u + (unsigned int)(self->second * 1000.0));
@@ -978,7 +978,7 @@ unsigned int dttm_hash(const dttm_t *self)
     return hash;
 }
 
-double dttm_duration(const dttm_t *self, const dttm_t *datetime, dttm_span_t *span)
+double datetime_duration(const datetime_t *self, const datetime_t *datetime, datetime_span_t *span)
 {
     // If we get here, it means the datetime is in an uninitialised state that cannot be calculated, so we cannot calculate the difference.
     if (self->year == SHRT_MAX && self->JulianDay == DBL_MAX && self->JulianDayNumber == LONG_MAX) return DBL_MAX;
@@ -986,17 +986,17 @@ double dttm_duration(const dttm_t *self, const dttm_t *datetime, dttm_span_t *sp
     // If we get here, it means the datetime is in an uninitialised state that cannot be calculated, so we cannot calculate the difference.
     if (datetime->year == SHRT_MAX && datetime->JulianDay == DBL_MAX && datetime->JulianDayNumber == LONG_MAX) return DBL_MAX;
 
-    double jd1 = dttm_jd(self);
-    double jd2 = dttm_jd(datetime);
+    double jd1 = datetime_jd(self);
+    double jd2 = datetime_jd(datetime);
 
     if (span != NULL) {
-        dttm_year(self); // Try to calculate the year, month, day, ... if it is not initialised
-        dttm_year(datetime); // Try to calculate the year, month, day, ... if it is not initialised
+        datetime_year(self); // Try to calculate the year, month, day, ... if it is not initialised
+        datetime_year(datetime); // Try to calculate the year, month, day, ... if it is not initialised
 
         if (jd1 < jd2) {
             // If self is earlier than datetime, we swap them to calculate the span as a positive duration, and we will negate the final 
             // difference at the end.
-            const dttm_t *temp = self;
+            const datetime_t *temp = self;
             self = datetime;
             datetime = temp;
         }
@@ -1024,7 +1024,7 @@ double dttm_duration(const dttm_t *self, const dttm_t *datetime, dttm_span_t *sp
         if (days < 0) {
             int month = datetime->month;
             int year = datetime->year;
-            unsigned short daysInPrevMonth = dttm_days_in_month(year, month == DT_January ? DT_December : month - 1);
+            unsigned short daysInPrevMonth = datetime_days_in_month(year, month == DT_January ? DT_December : month - 1);
             days += daysInPrevMonth;
             months--;
         }
@@ -1146,7 +1146,7 @@ static char *string_finalize(string_t string)
    return (char *)realloc(memmove(&string[ -sizeof(size_t) - sizeof(size_t) ], string, len + 1), len + 1);
 }
 
-char *dttm_format(const dttm_t *self, const char *format)
+char *datetime_format(const datetime_t *self, const char *format)
 {
     static char* weekdayNames[] = { NULL,
         "sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday" };
@@ -1155,7 +1155,7 @@ char *dttm_format(const dttm_t *self, const char *format)
    
     if (format == NULL) return NULL;
     if (self->year == SHRT_MAX) {
-        if (dttm_year(self) == SHRT_MAX) {
+        if (datetime_year(self) == SHRT_MAX) {
             return NULL;
         }
     }
@@ -1194,7 +1194,7 @@ char *dttm_format(const dttm_t *self, const char *format)
                      formatPtr += 2;
                      break;
                   case 3:
-                     strncpy(buffer, weekdayNames[ dttm_weekday(self) ], 3);
+                     strncpy(buffer, weekdayNames[ datetime_weekday(self) ], 3);
                      buffer[3] = '\0';
                      if (*formatPtr == 'D') {
                         if ( formatPtr[ 1 ] == 'D' )
@@ -1207,7 +1207,7 @@ char *dttm_format(const dttm_t *self, const char *format)
                      break;
                   case 4:
                   default:
-                     strcpy( buffer, weekdayNames[ dttm_weekday(self) ] );
+                     strcpy( buffer, weekdayNames[ datetime_weekday(self) ] );
                      if (*formatPtr == 'D') {
                         if (formatPtr[ 1 ] == 'D')
                            str_to_upper(buffer);
@@ -1403,7 +1403,7 @@ char *dttm_format(const dttm_t *self, const char *format)
    return string_finalize(formattedString);
 }
 
-double dttm_sun_time(long julianDayNumber, double latitude, double longitude, bool isSunrise)
+double datetime_sun_time(long julianDayNumber, double latitude, double longitude, bool isSunrise)
 {
     const double degToRad = M_PI / 180.0;
     const double radToDeg = 180.0 / M_PI;
@@ -1481,19 +1481,19 @@ double dttm_sun_time(long julianDayNumber, double latitude, double longitude, bo
 ///        saving time). For example, if the local time zone is GMT+2, the timeZoneOffset should be 2.0. If the local time zone is 
 ///        GMT-5, the timeZoneOffset should be -5.0.
 /// @param isSunrise a boolean value indicating whether to calculate the sunrise time (true) or the sunset time (false).
-static void dttm_set_sun_time(dttm_t *self, double latitude, double longitude, double timeZoneOffset, bool isSunrise)
+static void datetime_set_sun_time(datetime_t *self, double latitude, double longitude, double timeZoneOffset, bool isSunrise)
 {
-    long julianDayNumber = dttm_jdn(self);
-    dttm_year(self);
+    long julianDayNumber = datetime_jdn(self);
+    datetime_year(self);
 
-    double time = dttm_sun_time(julianDayNumber, latitude, longitude, isSunrise);
+    double time = datetime_sun_time(julianDayNumber, latitude, longitude, isSunrise);
     if (time < 0.0) {
         self->hour = 0;
         return; // Sunrise/sunset cannot be calculated for this date and location (e.g. polar night)
     }
 
     if (timeZoneOffset == DBL_MAX) {
-        timeZoneOffset = dttm_tz_offset(self);
+        timeZoneOffset = datetime_tz_offset(self);
         if (timeZoneOffset == DBL_MAX) {
             timeZoneOffset = 0.0; // Fallback to GMT if time zone offset cannot be calculated
         }
@@ -1503,11 +1503,11 @@ static void dttm_set_sun_time(dttm_t *self, double latitude, double longitude, d
 
     if (time < 0.0) {
         time += 24.0;
-        dttm_add_days(self, -1);
+        datetime_add_days(self, -1);
     }
     else if (time >= 24.0) {
         time -= 24.0;
-        dttm_add_days(self, 1);
+        datetime_add_days(self, 1);
     }
 
     // Update the time components of the datetime object
@@ -1539,35 +1539,35 @@ static void dttm_set_sun_time(dttm_t *self, double latitude, double longitude, d
 /// @return a pointer to the initialised datetime object. If the sunrise/sunset time cannot be calculated for the given date and 
 ///         location (e.g. polar night), the time components of the datetime object will be set to 0, and the function will return 
 ///         the datetime object with the date set to the given Julian Day Number.
-static dttm_t *dttm_init_sun_time(dttm_t *self, long julianDayNumber, double latitude, double longitude, 
+static datetime_t *datetime_init_sun_time(datetime_t *self, long julianDayNumber, double latitude, double longitude, 
     double timeZoneOffset, bool isSunrise)
 {
-    dttm_init_jdn(self, julianDayNumber);
-    dttm_year(self); // This will fill in the year, month, day based on the new Julian Day
+    datetime_init_jdn(self, julianDayNumber);
+    datetime_year(self); // This will fill in the year, month, day based on the new Julian Day
 
-    dttm_set_sun_time(self, latitude, longitude, timeZoneOffset, isSunrise);
+    datetime_set_sun_time(self, latitude, longitude, timeZoneOffset, isSunrise);
 
     return self;
 }
 
-inline dttm_t *dttm_init_sunrise(dttm_t *self, long julianDayNumber, double latitude, double longitude, double timeZoneOffset)
+inline datetime_t *datetime_init_sunrise(datetime_t *self, long julianDayNumber, double latitude, double longitude, double timeZoneOffset)
 {
-    return dttm_init_sun_time(self, julianDayNumber, latitude, longitude, timeZoneOffset, true);
+    return datetime_init_sun_time(self, julianDayNumber, latitude, longitude, timeZoneOffset, true);
 }
 
-inline dttm_t *dttm_init_sunset(dttm_t *self, long julianDayNumber, double latitude, double longitude, double timeZoneOffset)
+inline datetime_t *datetime_init_sunset(datetime_t *self, long julianDayNumber, double latitude, double longitude, double timeZoneOffset)
 {
-    return dttm_init_sun_time(self, julianDayNumber, latitude, longitude, timeZoneOffset, false);
+    return datetime_init_sun_time(self, julianDayNumber, latitude, longitude, timeZoneOffset, false);
 }
 
-inline void dttm_set_sunrise(dttm_t *self, double latitude, double longitude, double timeZoneOffset)
+inline void datetime_set_sunrise(datetime_t *self, double latitude, double longitude, double timeZoneOffset)
 {
-    dttm_set_sun_time(self, latitude, longitude, timeZoneOffset, true);
+    datetime_set_sun_time(self, latitude, longitude, timeZoneOffset, true);
 }
 
-inline void dttm_set_sunset(dttm_t *self, double latitude, double longitude, double timeZoneOffset)
+inline void datetime_set_sunset(datetime_t *self, double latitude, double longitude, double timeZoneOffset)
 {
-    dttm_set_sun_time(self, latitude, longitude, timeZoneOffset, false);
+    datetime_set_sun_time(self, latitude, longitude, timeZoneOffset, false);
 }
 
 // reference julian day number of a recent full moon
@@ -1588,7 +1588,7 @@ inline void dttm_set_sunset(dttm_t *self, double latitude, double longitude, dou
 ///         DT_WaningGibbous:  Waning Gibbous
 ///         DT_LastQuarter:    Last Quarter
 ///         DT_WaningCrescent: Waning Crescent
-static moon_phase_t dttm_moon_phase_on_jdn(long julianDayNumber)
+static moon_phase_t datetime_moon_phase_on_jdn(long julianDayNumber)
 {
     // The moon phase is calculated based on the difference between the given Julian Day Number and a known new moon date,
     // divided by the length of a synodic month (the average time between new moons).
@@ -1611,28 +1611,28 @@ static moon_phase_t dttm_moon_phase_on_jdn(long julianDayNumber)
     return (moon_phase_t)(int)(moonPhase * 8 + 0.5) % 8; // Round to nearest integer and wrap around using modulo
 }
 
-moon_phase_t dttm_moon_phase(const dttm_t *self)
+moon_phase_t datetime_moon_phase(const datetime_t *self)
 {
-    long julianDayNumber = dttm_jdn(self);
+    long julianDayNumber = datetime_jdn(self);
     if (julianDayNumber == LONG_MAX) {
         return DT_NewMoon; // Default value if datetime is not initialised
     }
-    return dttm_moon_phase_on_jdn(julianDayNumber);
+    return datetime_moon_phase_on_jdn(julianDayNumber);
 }
 
-dttm_t *dttm_next_moon_phase(const dttm_t *self, moon_phase_t phase)
+datetime_t *datetime_next_moon_phase(const datetime_t *self, moon_phase_t phase)
 {
     static const double phase_fraction = 0.125; // Each moon phase corresponds to 1/8 of the synodic month
 
     if (self == NULL) return NULL; // Invalid input
 
     if (self->year == SHRT_MAX) {
-        if (dttm_year(self) == SHRT_MAX) {
+        if (datetime_year(self) == SHRT_MAX) {
             return NULL; // Datetime is not initialised
         }
     }
 
-    long jdn = dttm_jdn(self);
+    long jdn = datetime_jdn(self);
 
     // Current phase fraction (0 = New Moon, 0.5 = Full Moon, etc.)
     double currentPhase = fmod((jdn - NEWMOON_JDN) / SYNODIC_MONTH_LENGTH, 1.0);
@@ -1652,29 +1652,29 @@ dttm_t *dttm_next_moon_phase(const dttm_t *self, moon_phase_t phase)
     double daysToAdd = delta * SYNODIC_MONTH_LENGTH;
 
     // Create new datetime and add fractional days
-    dttm_t *result = dttm_init_copy(dttm_alloc(), self);
-    dttm_add_days(result, daysToAdd);
+    datetime_t *result = datetime_init_copy(datetime_alloc(), self);
+    datetime_add_days(result, daysToAdd);
 
     return result;
 }
 
-dttm_t *dttm_next_weekday(const dttm_t *self, weekday_t weekday)
+datetime_t *datetime_next_weekday(const datetime_t *self, weekday_t weekday)
 {
     if (self == NULL) return NULL; // Invalid input
 
     if (self->year == SHRT_MAX) {
-        if (dttm_year(self) == SHRT_MAX) {
+        if (datetime_year(self) == SHRT_MAX) {
             return NULL; // Datetime is not initialised
         }
     }
 
-    weekday_t currentWeekday = dttm_weekday(self);
+    weekday_t currentWeekday = datetime_weekday(self);
 
     int daysToAdd = (weekday - currentWeekday + 7) % 7;
     if (daysToAdd == 0) daysToAdd = 7; // If the target weekday is the same as the current, we want the next occurrence
 
-    dttm_t *result = dttm_init_copy(dttm_alloc(), self);
-    dttm_add_days(result, daysToAdd);
+    datetime_t *result = datetime_init_copy(datetime_alloc(), self);
+    datetime_add_days(result, daysToAdd);
 
     return result;
 }
