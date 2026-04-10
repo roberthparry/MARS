@@ -12,7 +12,7 @@
 
 /* Globals */
 
-static dict_t *g_root  = NULL;
+static dict_t       *g_root  = NULL;
 static int           g_mode  = TEST_CONFIG_MODE;
 
 /* Track whether we've attempted to load JSON in this process */
@@ -50,9 +50,9 @@ static void string_key_destroy(void *elem)
 /* Value types */
 
 typedef struct _test_value {
-    bool         is_node;
-    bool         enabled;
-    dict_t *content;
+    bool     is_node;
+    bool     enabled;
+    dict_t  *content;
 } test_value_t;
 
 void test_value_clone(void *dst, const void *src)
