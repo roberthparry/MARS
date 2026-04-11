@@ -1,6 +1,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "qfloat.h"
 #include "dval_internal.h"
@@ -33,8 +34,9 @@ static void collect_mul_flat(
 {
     if (*is_zero) return;
 
-    /* absorb constants */
-    if (f->ops == &ops_const) {
+    /* absorb unnamed constants into the numeric accumulator;
+     * named constants (e.g. π) stay as symbolic terms */
+    if (f->ops == &ops_const && (!f->name || !*f->name)) {
         if (is_qf_zero(f->c)) {
             *is_zero = 1;
             return;
@@ -65,6 +67,54 @@ static void collect_mul_flat(
 
     dv_retain(f);
     (*terms)[(*nterms)++] = f;
+}
+
+/* ------------------------------------------------------------------------- */
+/* Like-term helpers for addition/subtraction                                */
+/* ------------------------------------------------------------------------- */
+
+/* Extract a scalar coefficient from a simplified additive term.
+ * Sets *base to the non-coefficient factor (the "shape" of the term).
+ * *base is NOT retained — caller must not free it independently of term.
+ * Returns 1.0 for unrecognised forms (base = term itself). */
+static qfloat term_coeff(const dval_t *term, const dval_t **base)
+{
+    /* unnamed pure constant: pure numeric, no symbolic base */
+    if (term->ops == &ops_const && (!term->name || !*term->name)) {
+        *base = NULL;
+        return term->c;
+    }
+    /* neg(x): coefficient -1 */
+    if (term->ops == &ops_neg) {
+        *base = term->a;
+        return qf_from_double(-1.0);
+    }
+    /* mul(unnamed_const, rest): coefficient is the leading const */
+    if (term->ops == &ops_mul &&
+        term->a->ops == &ops_const &&
+        (!term->a->name || !*term->a->name)) {
+        *base = term->b;
+        return term->a->c;
+    }
+    /* everything else: coefficient 1 */
+    *base = term;
+    return qf_from_double(1.0);
+}
+
+/* Build coeff * base, owning the retained base reference. */
+static dval_t *make_scaled(qfloat coeff, dval_t *base)
+{
+    if (is_qf_zero(coeff)) {
+        dv_free(base);
+        return dv_new_const_d(0.0);
+    }
+    if (is_qf_one(coeff))
+        return base;
+    dval_t *cn = dv_new_const(coeff);
+    dval_t *r  = dv_mul(cn, base);
+    dv_free(cn);
+    dv_free(base);
+    return r;
 }
 
 /* ------------------------------------------------------------------------- */
@@ -177,21 +227,24 @@ dval_t *dv_simplify(dval_t *f)
        ============================================================ */
     if (f->ops == &ops_add) {
 
-        if (a->ops == &ops_const && is_qf_zero(a->c)) {
-            dv_free(a);
-            return b;
-        }
-
-        if (b->ops == &ops_const && is_qf_zero(b->c)) {
-            dv_free(b);
-            return a;
-        }
+        if (a->ops == &ops_const && is_qf_zero(a->c)) { dv_free(a); return b; }
+        if (b->ops == &ops_const && is_qf_zero(b->c)) { dv_free(b); return a; }
 
         if (a->ops == &ops_const && b->ops == &ops_const) {
             qfloat c = qf_add(a->c, b->c);
+            dv_free(a); dv_free(b);
+            return dv_new_const(c);
+        }
+
+        /* Combine like terms: ca*X + cb*X  →  (ca+cb)*X */
+        const dval_t *base_a, *base_b;
+        qfloat ca = term_coeff(a, &base_a);
+        qfloat cb = term_coeff(b, &base_b);
+        if (base_a && base_b && dv_struct_eq(base_a, base_b)) {
+            dv_retain((dval_t *)base_a);
             dv_free(a);
             dv_free(b);
-            return dv_new_const(c);
+            return make_scaled(qf_add(ca, cb), (dval_t *)base_a);
         }
 
         return dv_add(a, b);
@@ -202,16 +255,23 @@ dval_t *dv_simplify(dval_t *f)
        ============================================================ */
     if (f->ops == &ops_sub) {
 
-        if (b->ops == &ops_const && is_qf_zero(b->c)) {
-            dv_free(b);
-            return a;
-        }
+        if (b->ops == &ops_const && is_qf_zero(b->c)) { dv_free(b); return a; }
 
         if (a->ops == &ops_const && b->ops == &ops_const) {
             qfloat c = qf_sub(a->c, b->c);
+            dv_free(a); dv_free(b);
+            return dv_new_const(c);
+        }
+
+        /* Combine like terms: ca*X - cb*X  →  (ca-cb)*X */
+        const dval_t *base_a, *base_b;
+        qfloat ca = term_coeff(a, &base_a);
+        qfloat cb = term_coeff(b, &base_b);
+        if (base_a && base_b && dv_struct_eq(base_a, base_b)) {
+            dv_retain((dval_t *)base_a);
             dv_free(a);
             dv_free(b);
-            return dv_new_const(c);
+            return make_scaled(qf_sub(ca, cb), (dval_t *)base_a);
         }
 
         return dv_sub(a, b);
@@ -299,6 +359,85 @@ dval_t *dv_simplify(dval_t *f)
                 dv_free(ti);
                 terms[i] = dv_pow_d(base, exp);
                 dv_free(base);
+            }
+        }
+
+        /* --- exp combining: exp(a) * exp(b) → exp(a+b) ---
+         * Addends are sorted: variables (alphabetical) then named
+         * constants (alphabetical), everything else last. */
+        for (size_t i = 0; i < nterms; ++i) {
+            if (!terms[i] || terms[i]->ops != &ops_exp) continue;
+
+            for (size_t j = i + 1; j < nterms; ++j) {
+                if (!terms[j] || terms[j]->ops != &ops_exp) continue;
+
+                /* Flatten both exp arguments into individual addends */
+                dval_t *addends[64];
+                int na = 0;
+
+                #define FLATTEN_ADD(root) do { \
+                    dval_t *_stk[64]; int _sp = 0; \
+                    _stk[_sp++] = (root); \
+                    while (_sp > 0 && na < 64) { \
+                        dval_t *_n = _stk[--_sp]; \
+                        if (_n->ops == &ops_add) { \
+                            if (_sp < 63) { _stk[_sp++] = _n->b; _stk[_sp++] = _n->a; } \
+                        } else { \
+                            dv_retain(_n); \
+                            addends[na++] = _n; \
+                        } \
+                    } \
+                } while (0)
+
+                FLATTEN_ADD(terms[i]->a);
+                FLATTEN_ADD(terms[j]->a);
+                #undef FLATTEN_ADD
+
+                dv_free(terms[i]);
+                dv_free(terms[j]);
+                terms[j] = NULL;
+
+                /* Sort: vars (alpha) < named consts (alpha) < other */
+                #define ADDEND_GROUP(f) \
+                    ((f)->ops == &ops_var ? 0 : \
+                     ((f)->ops == &ops_const && (f)->name && *(f)->name ? 1 : 2))
+                #define ADDEND_NAME(f) \
+                    (((f)->ops == &ops_var || (f)->ops == &ops_const) && (f)->name \
+                     ? (f)->name : "")
+
+                /* simple insertion sort (na is small) */
+                for (int s = 1; s < na; ++s) {
+                    dval_t *key = addends[s];
+                    int kg = ADDEND_GROUP(key);
+                    int t = s - 1;
+                    while (t >= 0) {
+                        int tg = ADDEND_GROUP(addends[t]);
+                        int cmp = (tg != kg) ? (tg - kg)
+                                             : strcmp(ADDEND_NAME(addends[t]),
+                                                      ADDEND_NAME(key));
+                        if (cmp <= 0) break;
+                        addends[t + 1] = addends[t];
+                        --t;
+                    }
+                    addends[t + 1] = key;
+                }
+                #undef ADDEND_GROUP
+                #undef ADDEND_NAME
+
+                /* Rebuild sum in sorted order */
+                dval_t *sum = addends[0]; /* already retained */
+                for (int k = 1; k < na; ++k) {
+                    dval_t *s = dv_add(sum, addends[k]);
+                    dv_free(sum);
+                    dv_free(addends[k]);
+                    sum = s;
+                }
+                /* sum is the combined argument; simplify it */
+                dval_t *simp = dv_simplify(sum);
+                dv_free(sum);
+
+                terms[i] = dv_exp(simp);
+                dv_free(simp);
             }
         }
 

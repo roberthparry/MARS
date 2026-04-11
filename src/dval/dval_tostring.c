@@ -307,57 +307,42 @@ static void flatten_mul(dval_t *f, dval_t **buf, int *count, int max)
     }
 }
 
-static int expr_depth(const dval_t *f)
+/* Sort group for multiplication factors:
+ *   0 = unnamed numeric constant  (e.g. 6)
+ *   1 = named constant            (e.g. π, τ) — alphabetical within group
+ *   2 = variable or var^n         (e.g. x, x³) — alphabetical by var name
+ *   3 = everything else
+ */
+static int factor_group(const dval_t *f)
 {
-    if (!f) return 0;
+    if (f->ops == &ops_neg) f = f->a;
 
-    if (f->ops == &ops_const || f->ops == &ops_var)
-        return 1;
+    if (f->ops == &ops_const)
+        return (f->name && *f->name) ? 1 : 0;
 
-    if (f->ops == &ops_neg)
-        return expr_depth(f->a);
-
-    if (f->ops->arity == DV_OP_UNARY)
-        return 1 + expr_depth(f->a);
-
-    if (f->ops->arity == DV_OP_BINARY) {
-        int da = expr_depth(f->a);
-        int db = expr_depth(f->b);
-        return 1 + (da > db ? da : db);
-    }
-
-    return 1;
-}
-
-static int expr_class(const dval_t *f)
-{
-    if (f->ops == &ops_const || f->ops == &ops_var)
-        return 0;
+    if (f->ops == &ops_var)
+        return 2;
 
     if (f->ops == &ops_pow_d && f->a->ops == &ops_var)
-        return 1;
+        return 2;
 
-    if (f->ops->arity == DV_OP_UNARY)
-        return 2 + expr_class(f->a);
-
-    if (f->ops->arity == DV_OP_BINARY)
-        return 4;
-
-    return 5;
+    return 3;
 }
 
-static int eff_depth(const dval_t *f)
+static const char *factor_sort_name(const dval_t *f)
 {
-    if (f->ops == &ops_neg)
-        return expr_depth(f->a);
-    return expr_depth(f);
-}
+    if (f->ops == &ops_neg) f = f->a;
 
-static const char *eff_name(const dval_t *f)
-{
-    if (f->ops == &ops_neg)
-        return f->a->ops->name;
-    return f->ops->name;
+    if (f->ops == &ops_const)
+        return (f->name && *f->name) ? f->name : "";
+
+    if (f->ops == &ops_var)
+        return f->name ? f->name : "";
+
+    if (f->ops == &ops_pow_d && f->a->ops == &ops_var)
+        return f->a->name ? f->a->name : "";
+
+    return f->ops->name ? f->ops->name : "";
 }
 
 static int factor_cmp(const void *pa, const void *pb)
@@ -365,18 +350,13 @@ static int factor_cmp(const void *pa, const void *pb)
     const dval_t *a = *(const dval_t * const *)pa;
     const dval_t *b = *(const dval_t * const *)pb;
 
-    int da = eff_depth(a);
-    int db = eff_depth(b);
+    int ga = factor_group(a);
+    int gb = factor_group(b);
 
-    if (da != db)
-        return (da < db) ? -1 : 1;
+    if (ga != gb)
+        return ga - gb;
 
-    int ca = expr_class(a);
-    int cb = expr_class(b);
-    if (ca != cb)
-        return (ca < cb) ? -1 : 1;
-
-    return strcmp(eff_name(a), eff_name(b));
+    return strcmp(factor_sort_name(a), factor_sort_name(b));
 }
 
 /* ------------------------------------------------------------------------- */
@@ -417,10 +397,33 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
         int need = prec_pow < parent_prec;
         if (need) sbuf_putc(b, '(');
 
-        emit_expr(f->a, b, prec_pow);
-
         double ed = qf_to_double(f->c);
         long   ei = (long)ed;
+
+        /* For unary functions raised to a power, write func²(arg) or func² x
+         * rather than func(arg)² so the exponent binds to the function name. */
+        if (f->a->ops->arity == DV_OP_UNARY) {
+            dval_t *inner = f->a;
+            sbuf_puts(b, inner->ops->name);
+
+            if (ed == (double)ei)
+                emit_superscript_int(b, ei);
+            else {
+                sbuf_putc(b, '^');
+                char buf[64];
+                qf_to_string_simple(f->c, buf, sizeof(buf));
+                sbuf_puts(b, buf);
+            }
+
+            sbuf_putc(b, '(');
+            emit_expr(inner->a, b, 0);
+            sbuf_putc(b, ')');
+
+            if (need) sbuf_putc(b, ')');
+            return;
+        }
+
+        emit_expr(f->a, b, prec_pow);
 
         if (ed == (double)ei)
             emit_superscript_int(b, ei);
@@ -468,10 +471,8 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
 
                 if (left_atomic && right_atomic) {
                     /* implicit */
-                } else if (!left_atomic && !right_atomic) {
-                    sbuf_puts(b, "·");
                 } else {
-                    sbuf_putc(b, '*');
+                    sbuf_puts(b, "·");
                 }
             }
             emit_expr(fac[i], b, prec_mul);
@@ -548,10 +549,8 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
 
                     if (left_atomic && right_atomic) {
                         /* implicit */
-                    } else if (!left_atomic && !right_atomic) {
-                        sbuf_puts(b, "·");
                     } else {
-                        sbuf_putc(b, '*');
+                        sbuf_puts(b, "·");
                     }
                 }
                 emit_expr(fac[i], b, prec_mul);
@@ -562,6 +561,17 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
         }
 
         if (need) sbuf_putc(b, ')');
+        return;
+    }
+
+    /* Named binary functions (e.g. atan2) */
+    if (f->ops->arity == DV_OP_BINARY) {
+        sbuf_puts(b, f->ops->name);
+        sbuf_putc(b, '(');
+        emit_expr(f->a, b, 0);
+        sbuf_puts(b, ", ");
+        emit_expr(f->b, b, 0);
+        sbuf_putc(b, ')');
         return;
     }
 
@@ -651,6 +661,17 @@ static void emit_func(const dval_t *f, sbuf_t *b, int parent_prec)
         return;
     }
 
+    /* Named binary functions (e.g. atan2) */
+    if (f->ops->arity == DV_OP_BINARY) {
+        sbuf_puts(b, f->ops->name);
+        sbuf_putc(b, '(');
+        emit_func(f->a, b, 0);
+        sbuf_puts(b, ", ");
+        emit_func(f->b, b, 0);
+        sbuf_putc(b, ')');
+        return;
+    }
+
     emit_atom((dval_t *)f, b);
 }
 
@@ -697,8 +718,26 @@ static void find_vars_dfs(dval_t *f, varlist_t *vl)
         return;
     }
 
+    if (f->ops == &ops_const) return;
+
     find_vars_dfs(f->a, vl);
     find_vars_dfs(f->b, vl);
+}
+
+static void find_named_consts_dfs(dval_t *f, varlist_t *cl)
+{
+    if (!f) return;
+
+    if (f->ops == &ops_const) {
+        if (f->name && *f->name)
+            varlist_add(cl, f);
+        return;
+    }
+
+    if (f->ops == &ops_var) return;
+
+    find_named_consts_dfs(f->a, cl);
+    find_named_consts_dfs(f->b, cl);
 }
 
 /* ------------------------------------------------------------------------- */
@@ -713,10 +752,14 @@ static char *dv_to_string_function(const dval_t *f)
     /* Simplify first */
     dval_t *g = dv_simplify((dval_t *)f);
 
-    /* Discover variables */
+    /* Discover variables and named constants */
     varlist_t vl;
     varlist_init(&vl);
     find_vars_dfs(g, &vl);
+
+    varlist_t cl;
+    varlist_init(&cl);
+    find_named_consts_dfs(g, &cl);
 
     /* Emit variable bindings */
     for (size_t i = 0; i < vl.count; ++i) {
@@ -732,21 +775,24 @@ static char *dv_to_string_function(const dval_t *f)
         sbuf_putc(&b, '\n');
     }
 
+    /* Emit named constant bindings */
+    for (size_t i = 0; i < cl.count; ++i) {
+        dval_t *c = cl.vars[i];
+        emit_name(&b, c->name);
+        sbuf_puts(&b, " = ");
+
+        char valbuf[64];
+        qf_to_string_simple(c->c, valbuf, sizeof(valbuf));
+        sbuf_puts(&b, valbuf);
+        sbuf_putc(&b, '\n');
+    }
+
     /* Pure variable */
     if (g->ops == &ops_var) {
         const char *vname = (g->name && *g->name) ? g->name : "x";
 
         sbuf_puts(&b, "return ");
         emit_name(&b, vname);
-
-        /* Strip trailing whitespace */
-        while (b.len > 0 &&
-               (b.data[b.len - 1] == ' ' ||
-                b.data[b.len - 1] == '\n' ||
-                b.data[b.len - 1] == '\t'))
-        {
-            b.data[--b.len] = '\0';
-        }
 
         char *out = xstrdup(b.data);
         sbuf_free(&b);
@@ -770,15 +816,6 @@ static char *dv_to_string_function(const dval_t *f)
         sbuf_puts(&b, "return ");
         emit_name(&b, cname);
 
-        /* Strip trailing whitespace */
-        while (b.len > 0 &&
-               (b.data[b.len - 1] == ' ' ||
-                b.data[b.len - 1] == '\n' ||
-                b.data[b.len - 1] == '\t'))
-        {
-            b.data[--b.len] = '\0';
-        }
-
         char *out = xstrdup(b.data);
         sbuf_free(&b);
         free(vl.vars);
@@ -789,7 +826,7 @@ static char *dv_to_string_function(const dval_t *f)
     /* General expression */
     const char *fname = (g->name && *g->name) ? g->name : "expr";
 
-    /* expr(x,y,z) = ... */
+    /* expr(x,y,z,π,...) = ... */
     sbuf_puts(&b, fname);
     sbuf_putc(&b, '(');
     for (size_t i = 0; i < vl.count; ++i) {
@@ -798,11 +835,15 @@ static char *dv_to_string_function(const dval_t *f)
                             ? vl.vars[i]->name : "x";
         emit_name(&b, vname);
     }
+    for (size_t i = 0; i < cl.count; ++i) {
+        if (vl.count > 0 || i > 0) sbuf_putc(&b, ',');
+        emit_name(&b, cl.vars[i]->name);
+    }
     sbuf_puts(&b, ") = ");
     emit_func(g, &b, PREC_LOWEST);
     sbuf_putc(&b, '\n');
 
-    /* return expr(x,y,z) */
+    /* return expr(x,y,z,π,...) */
     sbuf_puts(&b, "return ");
     sbuf_puts(&b, fname);
     sbuf_putc(&b, '(');
@@ -812,20 +853,16 @@ static char *dv_to_string_function(const dval_t *f)
                             ? vl.vars[i]->name : "x";
         emit_name(&b, vname);
     }
-    sbuf_puts(&b, ")");   /* ← NO NEWLINE */
-
-    /* Strip trailing whitespace (Option B) */
-    while (b.len > 0 &&
-           (b.data[b.len - 1] == ' ' ||
-            b.data[b.len - 1] == '\n' ||
-            b.data[b.len - 1] == '\t'))
-    {
-        b.data[--b.len] = '\0';
+    for (size_t i = 0; i < cl.count; ++i) {
+        if (vl.count > 0 || i > 0) sbuf_putc(&b, ',');
+        emit_name(&b, cl.vars[i]->name);
     }
+    sbuf_puts(&b, ")");
 
     char *out = xstrdup(b.data);
     sbuf_free(&b);
     free(vl.vars);
+    free(cl.vars);
     dv_free(g);
     return out;
 }
@@ -877,6 +914,10 @@ static char *dv_to_string_expr(const dval_t *f)
     varlist_init(&vl);
     find_vars_dfs(g, &vl);
 
+    varlist_t cl;
+    varlist_init(&cl);
+    find_named_consts_dfs(g, &cl);
+
     sbuf_putc(&b, '|');
     sbuf_putc(&b, ' ');
 
@@ -895,12 +936,29 @@ static char *dv_to_string_expr(const dval_t *f)
             sbuf_puts(&b, ", ");
     }
 
+    /* named constants after ';' (or directly if no variables) */
+    if (cl.count > 0) {
+        if (vl.count > 0)
+            sbuf_puts(&b, "; ");
+        for (size_t i = 0; i < cl.count; ++i) {
+            dval_t *c = cl.vars[i];
+            char valbuf[64];
+            qf_to_string_simple(c->c, valbuf, sizeof(valbuf));
+            emit_name(&b, c->name);
+            sbuf_puts(&b, " = ");
+            sbuf_puts(&b, valbuf);
+            if (i + 1 < cl.count)
+                sbuf_puts(&b, ", ");
+        }
+    }
+
     sbuf_putc(&b, ' ');
     sbuf_putc(&b, '}');
 
     char *out = xstrdup(b.data);
     sbuf_free(&b);
     free(vl.vars);
+    free(cl.vars);
     dv_free(g);
     return out;
 }
@@ -908,6 +966,15 @@ static char *dv_to_string_expr(const dval_t *f)
 /* ------------------------------------------------------------------------- */
 /* Public entry points                                                       */
 /* ------------------------------------------------------------------------- */
+
+static void strip_trailing_newline(char *s)
+{
+    size_t len = strlen(s);
+    while (len > 0 &&
+           (s[len - 1] == '\n' || s[len - 1] == '\r' ||
+            s[len - 1] == ' '  || s[len - 1] == '\t'))
+        s[--len] = '\0';
+}
 
 char *dv_to_string(const dval_t *f, style_t style)
 {
@@ -917,10 +984,12 @@ char *dv_to_string(const dval_t *f, style_t style)
         return s;
     }
 
-    if (style == style_FUNCTION)
-        return dv_to_string_function(f);
-    else
-        return dv_to_string_expr(f);
+    char *out = (style == style_FUNCTION)
+        ? dv_to_string_function(f)
+        : dv_to_string_expr(f);
+
+    strip_trailing_newline(out);
+    return out;
 }
 
 void dv_print(const dval_t *f)
