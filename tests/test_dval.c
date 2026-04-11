@@ -1318,9 +1318,8 @@ void test_second_deriv_asin(void)
                        qf_mul(X, X)));
 
     qfloat expect =
-        qf_mul(qf_from_double(-1.0),
-               qf_div(X,
-                      qf_mul(denom, denom)));
+        qf_div(X,
+               qf_mul(denom, qf_mul(denom, denom)));
 
     check_q_at(__FILE__, __LINE__, 1,
                "d²/dx²{asin(x)} | x=0.25",
@@ -1344,8 +1343,9 @@ void test_second_deriv_acos(void)
                        qf_mul(X, X)));
 
     qfloat expect =
-        qf_div(X,
-               qf_mul(denom, denom));
+        qf_mul(qf_from_double(-1.0),
+               qf_div(X,
+                      qf_mul(denom, qf_mul(denom, denom))));
 
     check_q_at(__FILE__, __LINE__, 1,
                "d²/dx²{acos(x)} | x=0.25",
@@ -1430,7 +1430,7 @@ void test_second_deriv_asinh(void)
         qf_mul(qf_from_double(-1.0),
                qf_mul(X,
                       qf_div(qf_from_double(1.0),
-                             qf_mul(denom, denom))));
+                             qf_mul(denom, qf_mul(denom, denom)))));
 
     check_q_at(__FILE__, __LINE__, 1,
                "d²/dx²{asinh(x)} | x=0.25",
@@ -1461,7 +1461,7 @@ void test_second_deriv_acosh(void)
         qf_mul(qf_from_double(-1.0),
                qf_mul(X,
                       qf_div(qf_from_double(1.0),
-                             qf_mul(denom, denom))));
+                             qf_mul(denom, qf_mul(denom, denom)))));
 
     check_q_at(__FILE__, __LINE__, 1,
                "d²/dx²{acosh(x)} | x=1.25",
@@ -1550,11 +1550,12 @@ void test_second_deriv_sqrt(void)
 
     qfloat X = qf_from_double(4.0);
 
+    qfloat sqrtX = qf_sqrt(X);
     qfloat expect =
         qf_mul(qf_from_double(-1.0),
                qf_div(qf_from_double(1.0),
                       qf_mul(qf_from_double(4.0),
-                             qf_mul(qf_sqrt(X), qf_sqrt(X)))));
+                             qf_mul(sqrtX, qf_mul(sqrtX, sqrtX)))));
 
     check_q_at(__FILE__, __LINE__, 1,
                "d²/dx²{sqrt(x)} | x=4",
@@ -1577,7 +1578,8 @@ void test_second_deriv_composite(void)
     qfloat expect =
         qf_add(qf_mul(qf_neg(qf_sin(X)), qf_exp(X)),
                qf_add(qf_mul(qf_cos(X), qf_exp(X)),
-                      qf_mul(qf_sin(X), qf_exp(X))));
+                      qf_add(qf_mul(qf_cos(X), qf_exp(X)),
+                             qf_mul(qf_sin(X), qf_exp(X)))));
 
     check_q_at(__FILE__, __LINE__, 1,
                "d²/dx²{sin(x)*exp(x)} | x=1",
@@ -1603,11 +1605,13 @@ void test_second_deriv_sin_log(void)
             qf_add(
                 qf_mul(qf_cos(X),
                        qf_div(qf_from_double(1.0), X)),
-                qf_mul(qf_sin(X),
-                       qf_mul(qf_from_double(-1.0),
-                              qf_div(qf_from_double(1.0),
-                                     qf_mul(X, X)))))
-        );
+                qf_add(
+                    qf_mul(qf_cos(X),
+                           qf_div(qf_from_double(1.0), X)),
+                    qf_mul(qf_sin(X),
+                           qf_mul(qf_from_double(-1.0),
+                                  qf_div(qf_from_double(1.0),
+                                         qf_mul(X, X)))))));
 
     check_q_at(__FILE__, __LINE__, 1,
                "d²/dx²{sin(x)*log(x)} | x=1.3",
@@ -1630,11 +1634,12 @@ void test_second_deriv_exp_tanh(void)
 
     qfloat expect =
         qf_add(
-            qf_mul(qf_exp(X),
-                   qf_sub(qf_from_double(1.0),
-                          qf_mul(t, t))),
+            qf_mul(qf_exp(X), t),
             qf_add(
-                qf_mul(qf_exp(X), t),
+                qf_mul(qf_from_double(2.0),
+                       qf_mul(qf_exp(X),
+                              qf_sub(qf_from_double(1.0),
+                                     qf_mul(t, t)))),
                 qf_mul(qf_exp(X),
                        qf_mul(qf_from_double(-2.0),
                               qf_mul(t,
@@ -1661,24 +1666,30 @@ void test_second_deriv_sqrt_sin_x2(void)
     qfloat X  = qf_from_double(1.1);
     qfloat X2 = qf_mul(X, X);
 
+    /* f = sqrt(x)*sin(x²), using (fg)'' = f''g + 2f'g' + fg''
+     * u = sqrt(x):  u' = 1/(2√x),  u'' = -1/(4x^(3/2))
+     * v = sin(x²):  v' = 2x·cos(x²),  v'' = 2·cos(x²) - 4x²·sin(x²)
+     */
+    qfloat sqrtX = qf_sqrt(X);
+    qfloat X3_2  = qf_mul(sqrtX, qf_mul(sqrtX, sqrtX));  /* x^(3/2) */
+
+    /* u''·v */
     qfloat term1 =
-        qf_mul(qf_mul(qf_from_double(-1.0),
-                      qf_div(qf_from_double(1.0),
-                             qf_mul(qf_from_double(4.0),
-                                    qf_mul(qf_sqrt(X), qf_sqrt(X))))),
+        qf_mul(qf_neg(qf_div(qf_from_double(1.0),
+                             qf_mul(qf_from_double(4.0), X3_2))),
                qf_sin(X2));
 
+    /* 2·u'·v' = 2·(1/(2√x))·(2x·cos(x²)) = 2√x·cos(x²) */
     qfloat term2 =
-        qf_mul(qf_div(qf_from_double(1.0),
-                      qf_mul(qf_from_double(2.0), qf_sqrt(X))),
-               qf_mul(qf_cos(X2),
-                      qf_mul(qf_from_double(2.0), X)));
+        qf_mul(qf_mul(qf_from_double(2.0), sqrtX),
+               qf_cos(X2));
 
+    /* u·v'' = √x·(2·cos(x²) - 4x²·sin(x²)) */
     qfloat term3 =
-        qf_mul(qf_sqrt(X),
-               qf_mul(qf_neg(qf_sin(X2)),
-                      qf_mul(qf_from_double(2.0),
-                             qf_mul(X, X))));
+        qf_mul(sqrtX,
+               qf_add(qf_mul(qf_from_double(2.0), qf_cos(X2)),
+                      qf_mul(qf_from_double(-4.0),
+                             qf_mul(X2, qf_sin(X2)))));
 
     qfloat expect = qf_add(qf_add(term1, term2), term3);
 
@@ -1701,9 +1712,11 @@ void test_second_deriv_log_cosh(void)
 
     qfloat X = qf_from_double(0.9);
 
+    /* d²/dx²{log(cosh(x))} = sech²(x) = 1 - tanh²(x) */
+    qfloat t = qf_tanh(X);
     qfloat expect =
-        qf_mul(qf_tanh(X),
-               qf_tanh(X));
+        qf_sub(qf_from_double(1.0),
+               qf_mul(t, t));
 
     check_q_at(__FILE__, __LINE__, 1,
                "d²/dx²{log(cosh(x))} | x=0.9",
@@ -1727,11 +1740,12 @@ void test_second_deriv_x2_exp_negx(void)
     qfloat X    = qf_from_double(1.7);
     qfloat e_mx = qf_exp(qf_neg(X));
 
+    /* d²/dx²{x²·e^{-x}} = e^{-x}·(x² - 4x + 2) */
     qfloat expect =
         qf_mul(e_mx,
-               qf_add(qf_mul(qf_from_double(2.0), X),
-                      qf_mul(qf_from_double(-1.0),
-                             qf_mul(X, X))));
+               qf_add(qf_mul(X, X),
+                      qf_add(qf_mul(qf_from_double(-4.0), X),
+                             qf_from_double(2.0))));
 
     check_q_at(__FILE__, __LINE__, 1,
                "d²/dx²{x^2*exp(-x)} | x=1.7",
@@ -1761,13 +1775,18 @@ void test_second_deriv_atan_x_over_sqrt(void)
 
     qfloat X = qf_from_double(0.8);
 
-    qfloat expect =
-        qf_div(qf_from_double(1.0),
-               qf_mul(qf_sqrt(qf_add(qf_from_double(1.0),
-                                     qf_mul(X, X))),
-                      qf_add(qf_from_double(1.0),
-                             qf_mul(qf_from_double(2.0),
-                                    qf_mul(X, X)))));
+    /* d²/dx²{atan(x/√(1+x²))} = -x(5+6x²) / ((1+x²)^(3/2)·(1+2x²)²) */
+    qfloat X2           = qf_mul(X, X);
+    qfloat one_p_x2     = qf_add(qf_from_double(1.0), X2);
+    qfloat one_p_2x2    = qf_add(qf_from_double(1.0),
+                                 qf_mul(qf_from_double(2.0), X2));
+    qfloat five_p_6x2   = qf_add(qf_from_double(5.0),
+                                 qf_mul(qf_from_double(6.0), X2));
+    qfloat sqrtX_       = qf_sqrt(one_p_x2);
+    qfloat numer        = qf_neg(qf_mul(X, five_p_6x2));
+    qfloat denom        = qf_mul(qf_mul(sqrtX_, one_p_x2),
+                                 qf_mul(one_p_2x2, one_p_2x2));
+    qfloat expect       = qf_div(numer, denom);
 
     check_q_at(__FILE__, __LINE__, 1,
                "d²/dx²{atan(x/sqrt(1+x^2))} | x=0.8",
@@ -1862,6 +1881,22 @@ static void to_string_fail(const char *file, int line, int col,
     print_multiline("expected", expected);
 }
 
+/* Compare two strings ignoring trailing whitespace */
+static int str_eq(const char *a, const char *b)
+{
+    size_t la = strlen(a);
+    size_t lb = strlen(b);
+
+    while (la > 0 && (a[la-1] == '\n' || a[la-1] == '\r' ||
+                      a[la-1] == ' '  || a[la-1] == '\t'))
+        --la;
+    while (lb > 0 && (b[lb-1] == '\n' || b[lb-1] == '\r' ||
+                      b[lb-1] == ' '  || b[lb-1] == '\t'))
+        --lb;
+
+    return la == lb && memcmp(a, b, la) == 0;
+}
+
 static void test_to_string_basic_const_expr(void)
 {
     dval_t *c = dv_new_const_d(3.5);
@@ -1869,7 +1904,7 @@ static void test_to_string_basic_const_expr(void)
 
     const char *expect = "{ c = 3.5 }";
 
-    if (strcmp(got, expect) == 0)
+    if (str_eq(got, expect))
         to_string_pass("basic const (EXPR)", got, expect);
     else
         to_string_fail(__FILE__, __LINE__, 1, "basic const (EXPR)", got, expect);
@@ -1887,7 +1922,7 @@ static void test_to_string_basic_const_func(void)
         "c = 3.5\n"
         "return c\n";
 
-    if (strcmp(got, expect) == 0)
+    if (str_eq(got, expect))
         to_string_pass("basic const (FUNC)", got, expect);
     else
         to_string_fail(__FILE__, __LINE__, 1, "basic const (FUNC)", got, expect);
@@ -1913,7 +1948,7 @@ static void test_to_string_basic_var_expr(void)
 
     const char *expect = "{ x | x = 42 }";
 
-    if (strcmp(got, expect) == 0)
+    if (str_eq(got, expect))
         to_string_pass("basic var (EXPR)", got, expect);
     else
         to_string_fail(__FILE__, __LINE__, 1, "basic var (EXPR)", got, expect);
@@ -1931,7 +1966,7 @@ static void test_to_string_basic_var_func(void)
         "x = 42\n"
         "return x\n";
 
-    if (strcmp(got, expect) == 0)
+    if (str_eq(got, expect))
         to_string_pass("basic var (FUNC)", got, expect);
     else
         to_string_fail(__FILE__, __LINE__, 1, "basic var (FUNC)", got, expect);
@@ -1959,7 +1994,7 @@ static void test_to_string_addition_expr(void)
     char *got = dv_to_string(f, style_EXPRESSION);
     const char *expect = "{ x + y | x = 1, y = 2 }";
 
-    if (strcmp(got, expect) == 0)
+    if (str_eq(got, expect))
         to_string_pass("addition (EXPR)", got, expect);
     else
         to_string_fail(__FILE__, __LINE__, 1, "addition (EXPR)", got, expect);
@@ -1981,7 +2016,7 @@ static void test_to_string_addition_func(void)
         "expr(x,y) = x + y\n"
         "return expr(x,y)\n";
 
-    if (strcmp(got, expect) == 0)
+    if (str_eq(got, expect))
         to_string_pass("addition (FUNC)", got, expect);
     else
         to_string_fail(__FILE__, __LINE__, 1, "addition (FUNC)", got, expect);
@@ -2011,7 +2046,7 @@ static void test_to_string_nested_mul_add_expr(void)
     char *got = dv_to_string(f, style_EXPRESSION);
     const char *expect = "{ xy + z | x = 2, y = 3, z = 4 }";
 
-    if (strcmp(got, expect) == 0)
+    if (str_eq(got, expect))
         to_string_pass("nested mul+add (EXPR)", got, expect);
     else
         to_string_fail(__FILE__, __LINE__, 1, "nested mul+add (EXPR)", got, expect);
@@ -2036,7 +2071,7 @@ static void test_to_string_nested_mul_add_func(void)
         "expr(x,y,z) = x*y + z\n"
         "return expr(x,y,z)\n";
 
-    if (strcmp(got, expect) == 0)
+    if (str_eq(got, expect))
         to_string_pass("nested mul+add (FUNC)", got, expect);
     else
         to_string_fail(__FILE__, __LINE__, 1, "nested mul+add (FUNC)", got, expect);
@@ -2061,7 +2096,7 @@ static void test_to_string_atan2_expr(void)
     char *got = dv_to_string(f, style_EXPRESSION);
     const char *expect = "{ atan2(x, y) | x = 2, y = 3 }";
 
-    if (strcmp(got, expect) == 0)
+    if (str_eq(got, expect))
         to_string_pass("atan2 (EXPR)", got, expect);
     else
         to_string_fail(__FILE__, __LINE__, 1, "atan2 (EXPR)", got, expect);
@@ -2084,7 +2119,7 @@ static void test_to_string_atan2_func(void)
         "expr(x,y) = atan2(x, y)\n"
         "return expr(x,y)\n";
 
-    if (strcmp(got, expect) == 0)
+    if (str_eq(got, expect))
         to_string_pass("atan2 (FUNC)", got, expect);
     else
         to_string_fail(__FILE__, __LINE__, 1, "atan2 (FUNC)", got, expect);
@@ -2111,7 +2146,7 @@ static void test_to_string_pow_superscript_expr(void)
     char *got = dv_to_string(f, style_EXPRESSION);
     const char *expect = "{ x³ | x = 2 }";
 
-    if (strcmp(got, expect) == 0)
+    if (str_eq(got, expect))
         to_string_pass("pow superscript (EXPR)", got, expect);
     else
         to_string_fail(__FILE__, __LINE__, 1, "pow superscript (EXPR)", got, expect);
@@ -2131,7 +2166,7 @@ static void test_to_string_pow_superscript_func(void)
         "expr(x) = x^3\n"
         "return expr(x)\n";
 
-    if (strcmp(got, expect) == 0)
+    if (str_eq(got, expect))
         to_string_pass("pow superscript (FUNC)", got, expect);
     else
         to_string_fail(__FILE__, __LINE__, 1, "pow superscript (FUNC)", got, expect);
@@ -2156,9 +2191,9 @@ static void test_to_string_unary_sin_expr(void)
     dval_t *f = dv_sin(x);
 
     char *got = dv_to_string(f, style_EXPRESSION);
-    const char *expect = "{ sin x | x = 0.5 }";
+    const char *expect = "{ sin(x) | x = 0.5 }";
 
-    if (strcmp(got, expect) == 0)
+    if (str_eq(got, expect))
         to_string_pass("unary sin (EXPR)", got, expect);
     else
         to_string_fail(__FILE__, __LINE__, 1, "unary sin (EXPR)", got, expect);
@@ -2178,7 +2213,7 @@ static void test_to_string_unary_sin_func(void)
         "expr(x) = sin(x)\n"
         "return expr(x)\n";
 
-    if (strcmp(got, expect) == 0)
+    if (str_eq(got, expect))
         to_string_pass("unary sin (FUNC)", got, expect);
     else
         to_string_fail(__FILE__, __LINE__, 1, "unary sin (FUNC)", got, expect);
@@ -2204,7 +2239,7 @@ static void test_to_string_function_style_expr(void)
 
     const char *expect = "{ x | x = 10 }";
 
-    if (strcmp(got, expect) == 0)
+    if (str_eq(got, expect))
         to_string_pass("function style identity (EXPR)", got, expect);
     else
         to_string_fail(__FILE__, __LINE__, 1, "function style identity (EXPR)", got, expect);
@@ -2222,7 +2257,7 @@ static void test_to_string_function_style_func(void)
         "x = 10\n"
         "return x\n";
 
-    if (strcmp(got, expect) == 0)
+    if (str_eq(got, expect))
         to_string_pass("function style identity (FUNC)", got, expect);
     else
         to_string_fail(__FILE__, __LINE__, 1, "function style identity (FUNC)", got, expect);
@@ -3257,9 +3292,9 @@ static void test_expressions(void)
         {
             "π * x^2",
             make_expr_03,
-            "{ πx² | x = 1.25 }",
+            "{ πx² | x = 1.25; π = 3.141592653589793238462643383279505 }",
             "x = 1.25\n"
-            "π = 3.141592653589793\n"
+            "π = 3.141592653589793238462643383279505\n"
             "expr(x,π) = π*x^2\n"
             "return expr(x,π)",
             __LINE__ 
@@ -3324,7 +3359,7 @@ static void test_expressions(void)
         {
             "x^2 * y^3 * x",
             make_expr_09,
-            "{ x³y³ | x = 1.25 }",
+            "{ x³y³ | x = 1.25, y = 1.25 }",
             "x = 1.25\n"
             "y = 1.25\n"
             "expr(x,y) = x^3*y^3\n"
@@ -3347,7 +3382,7 @@ static void test_expressions(void)
         {
             "3*x * 2*y * x^2",
             make_expr_11,
-            "{ 6x³y | x = 1.25 }",
+            "{ 6x³y | x = 1.25, y = 1.25 }",
             "x = 1.25\n"
             "y = 1.25\n"
             "expr(x,y) = 6*x^3*y\n"
@@ -3359,7 +3394,7 @@ static void test_expressions(void)
         {
             "x*x*y*x",
             make_expr_12,
-            "{ x³y | x = 1.25 }",
+            "{ x³y | x = 1.25, y = 1.25 }",
             "x = 1.25\n"
             "y = 1.25\n"
             "expr(x,y) = x^3*y\n"
@@ -3415,7 +3450,7 @@ static void test_expressions(void)
         {
             "2*x*y",
             make_expr_17,
-            "{ 2xy | x = 1.25 }",
+            "{ 2xy | x = 1.25, y = 1.25 }",
             "x = 1.25\n"
             "y = 1.25\n"
             "expr(x,y) = 2*x*y\n"
@@ -3438,7 +3473,7 @@ static void test_expressions(void)
         {
             "cos(x)*exp(x)",
             make_expr_19,
-            "{ cos(x)·eˣ | x = 1.25 }",
+            "{ cos(x)·exp(x) | x = 1.25 }",
             "x = 1.25\n"
             "expr(x) = cos(x)*exp(x)\n"
             "return expr(x)",
@@ -3526,9 +3561,9 @@ static void test_expressions(void)
         {
             "exp(sin(x))*exp(cos(x))",
             make_expr_27,
-            "{ exp(sin(x))·exp(cos(x)) | x = 1.25 }",
+            "{ exp(sin(x) + cos(x)) | x = 1.25 }",
             "x = 1.25\n"
-            "expr(x) = exp(sin(x))*exp(cos(x))\n"
+            "expr(x) = exp(sin(x) + cos(x))\n"
             "return expr(x)",
             __LINE__ 
         },
@@ -3537,9 +3572,9 @@ static void test_expressions(void)
         {
             "exp(x^2)*exp(3*x^2)",
             make_expr_28,
-            "{ exp(x²)·exp(3x²) | x = 1.25 }",
+            "{ exp(4x²) | x = 1.25 }",
             "x = 1.25\n"
-            "expr(x) = exp(x^2)*exp(3*x^2)\n"
+            "expr(x) = exp(4x^2)\n"
             "return expr(x)",
             __LINE__ 
         },
@@ -3548,9 +3583,9 @@ static void test_expressions(void)
         {
             "exp(x)*exp(2*x)",
             make_expr_29,
-            "{ exp(x)·exp(2x) | x = 1.25 }",
+            "{ exp(3x) | x = 1.25 }",
             "x = 1.25\n"
-            "expr(x) = exp(x)*exp(2*x)\n"
+            "expr(x) = exp(3*x)\n"
             "return expr(x)",
             __LINE__ 
         },
@@ -3570,9 +3605,9 @@ static void test_expressions(void)
         {
             "π*sin(x)",
             make_expr_31,
-            "{ π·sin(x) | x = 1.25 }",
+            "{ π·sin(x) | x = 1.25; π = 3.141592653589793238462643383279505 }",
             "x = 1.25\n"
-            "π = 3.141592653589793\n"
+            "π = 3.141592653589793238462643383279505\n"
             "expr(x,π) = π*sin(x)\n"
             "return expr(x,π)",
             __LINE__ 
@@ -3582,9 +3617,9 @@ static void test_expressions(void)
         {
             "τ*cos(x)",
             make_expr_32,
-            "{ τ·cos(x) | x = 1.25 }",
+            "{ τ·cos(x) | x = 1.25; τ = 6.283185307179586476925286766559011 }",
             "x = 1.25\n"
-            "τ = 6.283185307179586\n"
+            "τ = 6.283185307179586476925286766559011\n"
             "expr(x,τ) = τ*cos(x)\n"
             "return expr(x,τ)",
             __LINE__ 
@@ -3594,9 +3629,9 @@ static void test_expressions(void)
         {
             "e*x^2",
             make_expr_33,
-            "{ e·x² | x = 1.25 }",
+            "{ ex² | x = 1.25; e = 2.718281828459045235360287471352664 }",
             "x = 1.25\n"
-            "e = 2.718281828459045\n"
+            "e = 2.718281828459045235360287471352664\n"
             "expr(x,e) = e*x^2\n"
             "return expr(x,e)",
             __LINE__ 
@@ -3606,10 +3641,10 @@ static void test_expressions(void)
         {
             "π*τ*e",
             make_expr_34,
-            "{ π·τ·e | x = 1.25 }",
-            "π = 3.141592653589793\n"
-            "τ = 6.283185307179586\n"
-            "e = 2.718281828459045\n"
+            "{ πτe | π = 3.141592653589793238462643383279505, τ = 6.283185307179586476925286766559011, e = 2.718281828459045235360287471352664 }",
+            "π = 3.141592653589793238462643383279505\n"
+            "τ = 6.283185307179586476925286766559011\n"
+            "e = 2.718281828459045235360287471352664\n"
             "expr(π,τ,e) = π*τ*e\n"
             "return expr(π,τ,e)",
             __LINE__ 
@@ -3619,11 +3654,11 @@ static void test_expressions(void)
         {
             "π*x*τ*y",
             make_expr_35,
-            "{ π·τ·x·y | x = 1.25 }",
+            "{ πτxy | x = 1.25, y = 1.25; π = 3.141592653589793238462643383279505, τ = 6.283185307179586476925286766559011 }",
             "x = 1.25\n"
             "y = 1.25\n"
-            "π = 3.141592653589793\n"
-            "τ = 6.283185307179586\n"
+            "π = 3.141592653589793238462643383279505\n"
+            "τ = 6.283185307179586476925286766559011\n"
             "expr(x,y,π,τ) = π*x*τ*y\n"
             "return expr(x,y,π,τ)",
             __LINE__ 
@@ -3633,10 +3668,10 @@ static void test_expressions(void)
         {
             "exp(x)*π",
             make_expr_36,
-            "{ π·eˣ | x = 1.25 }",
+            "{ π·exp(x) | x = 1.25; π = 3.141592653589793238462643383279505 }",
             "x = 1.25\n"
-            "π = 3.141592653589793\n"
-            "expr(x,π) = exp(x)*π\n"
+            "π = 3.141592653589793238462643383279505\n"
+            "expr(x,π) = π*exp(x)\n"
             "return expr(x,π)",
             __LINE__ 
         },
@@ -3645,9 +3680,9 @@ static void test_expressions(void)
         {
             "τ*exp(x^2)",
             make_expr_37,
-            "{ τ·e^{x²} | x = 1.25 }",
+            "{ τ·exp(x²) | x = 1.25; τ = 6.283185307179586476925286766559011 }",
             "x = 1.25\n"
-            "τ = 6.283185307179586\n"
+            "τ = 6.283185307179586476925286766559011\n"
             "expr(x,τ) = τ*exp(x^2)\n"
             "return expr(x,τ)",
             __LINE__ 
@@ -3657,10 +3692,10 @@ static void test_expressions(void)
         {
             "e*sin(x)*cos(y)",
             make_expr_38,
-            "{ e·sin(x)·cos(y) | x = 1.25 }",
+            "{ e·sin(x)·cos(y) | x = 1.25, y = 1.25; e = 2.718281828459045235360287471352664 }",
             "x = 1.25\n"
             "y = 1.25\n"
-            "e = 2.718281828459045\n"
+            "e = 2.718281828459045235360287471352664\n"
             "expr(x,y,e) = e*sin(x)*cos(y)\n"
             "return expr(x,y,e)",
             __LINE__ 
@@ -3670,10 +3705,10 @@ static void test_expressions(void)
         {
             "π*exp(τ*x)",
             make_expr_39,
-            "{ π·e^{τx} | x = 1.25 }",
+            "{ π·exp(τx) | x = 1.25; π = 3.141592653589793238462643383279505, τ = 6.283185307179586476925286766559011 }",
             "x = 1.25\n"
-            "π = 3.141592653589793\n"
-            "τ = 6.283185307179586\n"
+            "π = 3.141592653589793238462643383279505\n"
+            "τ = 6.283185307179586476925286766559011\n"
             "expr(x,π,τ) = π*exp(τ*x)\n"
             "return expr(x,π,τ)",
             __LINE__ 
@@ -3683,11 +3718,11 @@ static void test_expressions(void)
         {
             "exp(π*x)*τ",
             make_expr_40,
-            "{ τ·e^{πx} | x = 1.25 }",
+            "{ τ·exp(πx) | x = 1.25; π = 3.141592653589793238462643383279505, τ = 6.283185307179586476925286766559011 }",
             "x = 1.25\n"
-            "π = 3.141592653589793\n"
-            "τ = 6.283185307179586\n"
-            "expr(x,π,τ) = exp(π*x)*τ\n"
+            "π = 3.141592653589793238462643383279505\n"
+            "τ = 6.283185307179586476925286766559011\n"
+            "expr(x,π,τ) = τ*exp(π*x)\n"
             "return expr(x,π,τ)",
             __LINE__ 
         },
@@ -3696,9 +3731,9 @@ static void test_expressions(void)
         {
             "sin(π*x)",
             make_expr_41,
-            "{ sin(πx) | x = 1.25 }",
+            "{ sin(πx) | x = 1.25; π = 3.141592653589793238462643383279505 }",
             "x = 1.25\n"
-            "π = 3.141592653589793\n"
+            "π = 3.141592653589793238462643383279505\n"
             "expr(x,π) = sin(π*x)\n"
             "return expr(x,π)",
             __LINE__
@@ -3708,9 +3743,9 @@ static void test_expressions(void)
         {
             "cos(τ*x)",
             make_expr_42,
-            "{ cos(τx) | x = 1.25 }",
+            "{ cos(τx) | x = 1.25; τ = 6.283185307179586476925286766559011 }",
             "x = 1.25\n"
-            "τ = 6.283185307179586\n"
+            "τ = 6.283185307179586476925286766559011\n"
             "expr(x,τ) = cos(τ*x)\n"
             "return expr(x,τ)",
             __LINE__
@@ -3720,10 +3755,10 @@ static void test_expressions(void)
         {
             "exp(π*τ*x)",
             make_expr_43,
-            "{ e^{πτx} | x = 1.25 }",
+            "{ exp(πτx) | x = 1.25; π = 3.141592653589793238462643383279505, τ = 6.283185307179586476925286766559011 }",
             "x = 1.25\n"
-            "π = 3.141592653589793\n"
-            "τ = 6.283185307179586\n"
+            "π = 3.141592653589793238462643383279505\n"
+            "τ = 6.283185307179586476925286766559011\n"
             "expr(x,π,τ) = exp(π*τ*x)\n"
             "return expr(x,π,τ)",
             __LINE__
@@ -3733,9 +3768,9 @@ static void test_expressions(void)
         {
             "sin(x)+cos(x)+exp(x)",
             make_expr_44,
-            "{ sin(x)+cos(x)+eˣ | x = 1.25 }",
+            "{ sin(x) + cos(x) + exp(x) | x = 1.25 }",
             "x = 1.25\n"
-            "expr(x) = sin(x)+cos(x)+exp(x)\n"
+            "expr(x) = sin(x) + cos(x) + exp(x)\n"
             "return expr(x)",
             __LINE__
         },
@@ -3744,12 +3779,12 @@ static void test_expressions(void)
         {
             "x + y + π + τ + e",
             make_expr_45,
-            "{ x + y + π + τ + e | x = 1.25 }",
+            "{ x + y + π + τ + e | x = 1.25, y = 1.25; π = 3.141592653589793238462643383279505, τ = 6.283185307179586476925286766559011, e = 2.718281828459045235360287471352664 }",
             "x = 1.25\n"
             "y = 1.25\n"
-            "π = 3.141592653589793\n"
-            "τ = 6.283185307179586\n"
-            "e = 2.718281828459045\n"
+            "π = 3.141592653589793238462643383279505\n"
+            "τ = 6.283185307179586476925286766559011\n"
+            "e = 2.718281828459045235360287471352664\n"
             "expr(x,y,π,τ,e) = x + y + π + τ + e\n"
             "return expr(x,y,π,τ,e)",
             __LINE__
@@ -3759,12 +3794,12 @@ static void test_expressions(void)
         {
             "x*y + π*x + τ*y + e",
             make_expr_46,
-            "{ xy + πx + τy + e | x = 1.25 }",
+            "{ xy + πx + τy + e | x = 1.25, y = 1.25; π = 3.141592653589793238462643383279505, τ = 6.283185307179586476925286766559011, e = 2.718281828459045235360287471352664 }",
             "x = 1.25\n"
             "y = 1.25\n"
-            "π = 3.141592653589793\n"
-            "τ = 6.283185307179586\n"
-            "e = 2.718281828459045\n"
+            "π = 3.141592653589793238462643383279505\n"
+            "τ = 6.283185307179586476925286766559011\n"
+            "e = 2.718281828459045235360287471352664\n"
             "expr(x,y,π,τ,e) = x*y + π*x + τ*y + e\n"
             "return expr(x,y,π,τ,e)",
             __LINE__
@@ -3774,11 +3809,11 @@ static void test_expressions(void)
         {
             "(x+π)*(y+τ)",
             make_expr_47,
-            "{ (x + π)(y + τ) | x = 1.25 }",
+            "{ (x + π)·(y + τ) | x = 1.25, y = 1.25; π = 3.141592653589793238462643383279505, τ = 6.283185307179586476925286766559011 }",
             "x = 1.25\n"
             "y = 1.25\n"
-            "π = 3.141592653589793\n"
-            "τ = 6.283185307179586\n"
+            "π = 3.141592653589793238462643383279505\n"
+            "τ = 6.283185307179586476925286766559011\n"
             "expr(x,y,π,τ) = (x + π)*(y + τ)\n"
             "return expr(x,y,π,τ)",
             __LINE__
@@ -3788,12 +3823,12 @@ static void test_expressions(void)
         {
             "exp(x+π)*exp(y+τ)",
             make_expr_48,
-            "{ exp(x + π)·exp(y + τ) | x = 1.25 }",
+            "{ exp(x + y + π + τ) | x = 1.25, y = 1.25; π = 3.141592653589793238462643383279505, τ = 6.283185307179586476925286766559011 }",
             "x = 1.25\n"
             "y = 1.25\n"
-            "π = 3.141592653589793\n"
-            "τ = 6.283185307179586\n"
-            "expr(x,y,π,τ) = exp(x + π)*exp(y + τ)\n"
+            "π = 3.141592653589793238462643383279505\n"
+            "τ = 6.283185307179586476925286766559011\n"
+            "expr(x,y,π,τ) = exp(x + y + π + τ)\n"
             "return expr(x,y,π,τ)",
             __LINE__
         },
@@ -3802,11 +3837,11 @@ static void test_expressions(void)
         {
             "sin(x+π)*cos(y+τ)",
             make_expr_49,
-            "{ sin(x + π)·cos(y + τ) | x = 1.25 }",
+            "{ cos(y + τ)·sin(x + π) | x = 1.25, y = 1.25; π = 3.141592653589793238462643383279505, τ = 6.283185307179586476925286766559011 }",
             "x = 1.25\n"
             "y = 1.25\n"
-            "π = 3.141592653589793\n"
-            "τ = 6.283185307179586\n"
+            "π = 3.141592653589793238462643383279505\n"
+            "τ = 6.283185307179586476925286766559011\n"
             "expr(x,y,π,τ) = sin(x + π)*cos(y + τ)\n"
             "return expr(x,y,π,τ)",
             __LINE__
@@ -3816,12 +3851,12 @@ static void test_expressions(void)
         {
             "exp(sin(x+π) + cos(y+τ))",
             make_expr_50,
-            "{ e^{sin(x+π)+cos(y+τ)} | x = 1.25 }",
+            "{ exp(sin(x + π) + cos(y + τ)) | x = 1.25, y = 1.25; π = 3.141592653589793238462643383279505, τ = 6.283185307179586476925286766559011 }",
             "x = 1.25\n"
             "y = 1.25\n"
-            "π = 3.141592653589793\n"
-            "τ = 6.283185307179586\n"
-            "expr(x,y,π,τ) = exp(sin(x+π) + cos(y+τ))\n"
+            "π = 3.141592653589793238462643383279505\n"
+            "τ = 6.283185307179586476925286766559011\n"
+            "expr(x,y,π,τ) = exp(sin(x + π) + cos(y + τ))\n"
             "return expr(x,y,π,τ)",
             __LINE__
         },

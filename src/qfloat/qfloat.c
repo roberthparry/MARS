@@ -1236,7 +1236,45 @@ int qf_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap)
 
             int fixed_dp = (int)strlen(intpart) + exp10; /* decimal point position in digits[] */
 
-            /* Step 3a: rounding for explicit precision */
+            /* Step 3a: suppress noise in digits 33-34.
+             * qfloat is reliable to ~32 significant digits.  Digits 33-34
+             * are real information only when the preceding digits are varied;
+             * when they follow a long run of zeros they are rounding noise.
+             * Heuristic: if the first 32 digits end in >=5 zeros AND the
+             * remaining digits are non-zero, treat them as noise and round
+             * to 32 sig figs.  Otherwise keep all 34. */
+            if (nd > 32) {
+                int trail = 0;
+                for (int i = 31; i >= 0 && digits[i] == '0'; i--)
+                    trail++;
+                int tail_nonzero = 0;
+                for (int i = 32; i < nd; i++)
+                    if (digits[i] != '0') { tail_nonzero = 1; break; }
+
+                if (trail >= 5 && tail_nonzero) {
+                    if (digits[32] >= '5') {
+                        int i = 31;
+                        while (i >= 0 && digits[i] == '9') {
+                            digits[i] = '0';
+                            i--;
+                        }
+                        if (i >= 0) {
+                            digits[i]++;
+                        } else {
+                            if (nd + 1 < (int)sizeof(digits)) {
+                                memmove(digits + 1, digits, nd + 1);
+                                digits[0] = '1';
+                                nd++;
+                                fixed_dp++;
+                            }
+                        }
+                    }
+                    nd = 32;
+                    digits[nd] = '\0';
+                }
+            }
+
+            /* Step 3b: rounding for explicit precision */
             if (precision >= 0) {
                 int K = fixed_dp + precision; /* index of rounding digit */
 
