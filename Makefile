@@ -143,13 +143,17 @@ memtest_%: $(TEST_BUILD_DIR)/test_%
 # ------------------------------------------------------------
 help:
 	@echo "Targets:"
-	@echo "  make debug          Build debug binaries and tests"
-	@echo "  make release        Build release binaries and tests"
-	@echo "  make test           Run all tests (release)"
-	@echo "  make memtest        Run all tests under valgrind"
-	@echo "  make test_<name>    Build and run a single test (e.g. make test_dval)"
-	@echo "  make memtest_<name> Build and run a single test under valgrind"
-	@echo "  make clean          Remove all build artifacts"
+	@echo "  make debug                  Build debug binaries and tests"
+	@echo "  make release                Build release binaries and tests"
+	@echo "  make test                   Run all tests (release)"
+	@echo "  make memtest                Run all tests under valgrind (release)"
+	@echo "  make test_<name>            Build and run a single test (e.g. make test_dval) (release)"
+	@echo "  make memtest_<name>         Build and run a single test under valgrind (release)"
+	@echo "  make DEBUG=1 test           Run all tests (debug)"
+	@echo "  make DEBUG=1 memtest        Run all tests under valgrind (debug)"
+	@echo "  make DEBUG=1 test_<name>    Build and run a single test (e.g. make test_dval) (debug)"
+	@echo "  make DEBUG=1 memtest_<name> Build and run a single test under valgrind (debug)"
+	@echo "  make clean                  Remove all build artifacts"
 
 # ------------------------------------------------------------
 # Clean

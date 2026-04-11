@@ -18,12 +18,15 @@
 #define BLUE    "\x1b[34m"
 #define RESET   "\x1b[0m"
 
+static int tests_failed = 0;
+
 static void pass(const char *msg) {
     printf(C_GREEN "PASS" RESET " %s\n", msg);
 }
 
 static void fail(const char *msg) {
     printf(C_RED "FAIL" RESET " %s\n", msg);
+    tests_failed++;
 }
 
 /* -------------------------------------------------------------
@@ -641,5 +644,6 @@ int main(void) {
     test_readme_examples();
 
     printf(BLUE "Done.\n" RESET);
-    return 0;
+    
+    return tests_failed;
 }

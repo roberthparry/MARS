@@ -4135,5 +4135,5 @@ int tests_main(void)
     printf(C_BOLD C_CYAN "=== README.md example ===\n" C_RESET);
     RUN_TEST(test_README_md_example, NULL);
 
-    return 0;
+    return tests_failed;
 }

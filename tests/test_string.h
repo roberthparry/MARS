@@ -10,14 +10,19 @@
 #define CLR_YELLOW  "\x1b[33m"
 #define CLR_CYAN    "\x1b[36m"
 
+static int tests_failed = 0;
+
 #define TEST(name)                                                  \
     do {                                                            \
         printf(CLR_CYAN "Running %s..." CLR_RESET "\n", #name);     \
         int _result = name();                                       \
-        if (_result == 0)                                           \
+        if (_result == 0) {                                         \
             printf(CLR_GREEN "PASS: %s" CLR_RESET "\n\n", #name);   \
-        else                                                        \
+        }                                                           \
+        else {                                                      \
             printf(CLR_RED "FAIL: %s" CLR_RESET "\n\n", #name);     \
+            tests_failed++;                                         \
+        }                                                           \
     } while (0)
 
 /* ------------------------------------------------------------------------- */
@@ -34,6 +39,7 @@
                    "    actual:     false\n"                        \
                    CLR_RESET,                                       \
                    __FILE__, __LINE__, #expr);                      \
+            tests_failed++;                                         \
             return 1;                                               \
         }                                                           \
         printf(CLR_GREEN                                            \
@@ -54,6 +60,7 @@
                    "    actual:     %ld\n"                          \
                    CLR_RESET,                                       \
                    __FILE__, __LINE__, #actual, #expected, _e, _a); \
+            tests_failed++;                                         \
             return 1;                                               \
         }                                                           \
         printf(CLR_GREEN                                            \
@@ -74,6 +81,7 @@
                    "    actual:     \"%s\"\n"                       \
                    CLR_RESET,                                       \
                    __FILE__, __LINE__, #actual, #expected, _e, _a); \
+            tests_failed++;                                         \
             return 1;                                               \
         }                                                           \
         printf(CLR_GREEN                                            \
@@ -92,6 +100,7 @@
                    "    actual:     NULL\n"                         \
                    CLR_RESET,                                       \
                    __FILE__, __LINE__, #ptr);                       \
+            tests_failed++;                                         \
             return 1;                                               \
         }                                                           \
         printf(CLR_GREEN                                            \
@@ -110,6 +119,7 @@
                    "    actual:     %p\n"                           \
                    CLR_RESET,                                       \
                    __FILE__, __LINE__, #ptr, (void *)(ptr));        \
+            tests_failed++;                                         \
             return 1;                                               \
         }                                                           \
         printf(CLR_GREEN                                            \
@@ -129,6 +139,7 @@
                    "    actual:     %d\n"                           \
                    CLR_RESET,                                       \
                    __FILE__, __LINE__, #expr, _r);                  \
+            tests_failed++;                                         \
             return 1;                                               \
         }                                                           \
         printf(CLR_GREEN                                            \
@@ -144,6 +155,7 @@
                "    message: %s\n"                                  \
                CLR_RESET,                                           \
                __FILE__, __LINE__, msg);                            \
+            tests_failed++;                                         \
         return 1;                                                   \
     } while (0)
 

@@ -4708,5 +4708,5 @@ int tests_main() {
 
     printf("\n" C_YELLOW "Done.\n" C_RESET);
 
-    return 0;
+    return tests_failed;
 }

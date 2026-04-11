@@ -14,6 +14,7 @@ static void ok(bool cond, const char *msg)
         printf(C_GREEN "  OK  " C_RESET "%s\n", msg);
     } else {
         printf(C_RED   " FAIL " C_RESET "%s\n", msg);
+        tests_failed++;
     }
 }
 

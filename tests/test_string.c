@@ -429,6 +429,6 @@ int main(void)
      printf("Running README examples...\n");
      TEST(test_readme_examples);
 
-    return 0;
+    return tests_failed;
 }
 

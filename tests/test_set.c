@@ -259,6 +259,6 @@ int tests_main(void) {
     printf(C_YELLOW "\nRunning README examples...\n" C_RESET);
     RUN_TEST(test_readme_examples, NULL);
 
-    return 0;
+    return tests_failed;
 }
 
