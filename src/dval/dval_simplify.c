@@ -137,6 +137,20 @@ static dval_t *simplify_unary_fun(dval_t *f, dval_t *a)
             if (x == 0.0) { dv_free(a); return dv_new_const_d(0.0); }
             if (x == 1.0) { dv_free(a); return dv_new_const_d(1.0); }
         }
+
+        /* Generic constant fold for all other unary functions applied to an
+         * unnamed constant: build a temporary node, evaluate numerically,
+         * and collapse to a constant. Named constants (e.g. π) are left
+         * symbolic so their names are preserved in to_string output. */
+        if (!a->name || !*a->name) {
+            if (f->ops->apply_unary) {
+                dval_t *tmp = f->ops->apply_unary(a); /* retains a */
+                qfloat   v  = tmp->ops->eval(tmp);
+                dv_free(tmp);
+                dv_free(a);
+                return dv_new_const(v);
+            }
+        }
     }
 
     /* generic unary dispatch via the vtable constructor */
@@ -577,7 +591,58 @@ dval_t *dv_simplify(dval_t *f)
     }
 
     /* ============================================================
-       FALLBACK
+       BINARY SPECIAL FUNCTIONS (hypot, beta, logbeta)
+       ============================================================ */
+    if (f->ops == &ops_hypot) {
+
+        /* hypot(0, b) → |b| */
+        if (a->ops == &ops_const && is_qf_zero(a->c)) {
+            dv_free(a);
+            dval_t *r = dv_abs(b);
+            dv_free(b);
+            return r;
+        }
+
+        /* hypot(a, 0) → |a| */
+        if (b->ops == &ops_const && is_qf_zero(b->c)) {
+            dv_free(b);
+            dval_t *r = dv_abs(a);
+            dv_free(a);
+            return r;
+        }
+
+        /* hypot(const, const) → numeric constant */
+        if (a->ops == &ops_const && (!a->name || !*a->name) &&
+            b->ops == &ops_const && (!b->name || !*b->name)) {
+            dval_t *tmp = dv_hypot(a, b);
+            qfloat   v  = tmp->ops->eval(tmp);
+            dv_free(tmp); dv_free(a); dv_free(b);
+            return dv_new_const(v);
+        }
+
+        dval_t *r = dv_hypot(a, b);
+        dv_free(a); dv_free(b);
+        return r;
+    }
+
+    if (f->ops == &ops_beta || f->ops == &ops_logbeta) {
+
+        /* both constant → numeric constant */
+        if (a->ops == &ops_const && (!a->name || !*a->name) &&
+            b->ops == &ops_const && (!b->name || !*b->name)) {
+            dval_t *tmp = (f->ops == &ops_beta) ? dv_beta(a, b) : dv_logbeta(a, b);
+            qfloat   v  = tmp->ops->eval(tmp);
+            dv_free(tmp); dv_free(a); dv_free(b);
+            return dv_new_const(v);
+        }
+
+        dval_t *r = (f->ops == &ops_beta) ? dv_beta(a, b) : dv_logbeta(a, b);
+        dv_free(a); dv_free(b);
+        return r;
+    }
+
+    /* ============================================================
+       FALLBACK (unrecognised binary ops: rebuild with simplified children)
        ============================================================ */
     if (a) dv_free(a);
     if (b) dv_free(b);

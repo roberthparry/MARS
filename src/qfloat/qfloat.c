@@ -2916,6 +2916,89 @@ qfloat qf_trigamma(qfloat x)
     return qf_trigamma_asymp(x);
 }
 
+/* tetragamma — ψ''(x), second derivative of digamma
+ *
+ * Derived by differentiating the trigamma asymptotic series term by term:
+ *   ψ'(x) ≈ 1/x + 1/(2x²) + Σ B_{2k}/x^{2k+1}
+ *   ψ''(x) = d/dx ψ'(x) = -1/x² - 1/x³ - Σ (2k+1)·B_{2k}/x^{2k+2}
+ *
+ * Same Bernoulli numbers as trigamma; the k-th coefficient gains a factor (2k+1).
+ * Reflection:  ψ''(x) = ψ''(1-x) + 2π³cos(πx)/sin³(πx)
+ * Recurrence:  ψ''(x) = ψ''(x+1) - 2/x³
+ * Asymptotic region: x > 20
+ */
+
+static qfloat qf_tetragamma_asymp(qfloat x)
+{
+    /* (2k+1) * B_{2k} for k = 1 .. 17 */
+    static const struct { double num; double den; int sign; double mult; } B[] = {
+        {         1.0,       6.0,  1,  3.0},  /* 3·B_2           */
+        {         1.0,      30.0, -1,  5.0},  /* 5·B_4           */
+        {         1.0,      42.0,  1,  7.0},  /* 7·B_6           */
+        {         1.0,      30.0, -1,  9.0},  /* 9·B_8           */
+        {         5.0,      66.0,  1, 11.0},  /* 11·B_10         */
+        {       691.0,    2730.0, -1, 13.0},  /* 13·B_12         */
+        {         7.0,       6.0,  1, 15.0},  /* 15·B_14         */
+        {      3617.0,     510.0, -1, 17.0},  /* 17·B_16         */
+        {     43867.0,     798.0,  1, 19.0},  /* 19·B_18         */
+        {    174611.0,     330.0, -1, 21.0},  /* 21·B_20         */
+        {    854513.0,     138.0,  1, 23.0},  /* 23·B_22         */
+        { 236364091.0,    2730.0, -1, 25.0},  /* 25·B_24         */
+        {   8553103.0,       6.0,  1, 27.0},  /* 27·B_26         */
+        {23749461029.0,    870.0, -1, 29.0},  /* 29·B_28         */
+        {8615841276005.0,14322.0,  1, 31.0},  /* 31·B_30         */
+        {7709321041217.0,  510.0, -1, 33.0},  /* 33·B_32         */
+        {2577687858367.0,    6.0,  1, 35.0},  /* 35·B_34         */
+    };
+    static const int N = (int)(sizeof B / sizeof B[0]);
+
+    qfloat xi   = qf_div(qf_from_double(1.0), x);
+    qfloat xi2  = qf_mul(xi, xi);
+    qfloat xip  = xi2;           /* xi^2 = 1/x^2 */
+    qfloat sum  = xip;           /* leading term: 1/x^2 */
+    xip = qf_mul(xip, xi);       /* xi^3 */
+    sum = qf_add(sum, xip);      /* + 1/x^3 */
+    xip = qf_mul(xip, xi);       /* xi^4 — start of Bernoulli terms */
+
+    for (int n = 0; n < N; n++) {
+        qfloat raw   = qf_div(qf_from_double(B[n].num), qf_from_double(B[n].den));
+        qfloat coeff = qf_mul(qf_from_double(B[n].mult), raw);
+        if (B[n].sign < 0) coeff = qf_neg(coeff);
+        sum = qf_add(sum, qf_mul(coeff, xip));
+        xip = qf_mul(xip, xi2);
+    }
+
+    return qf_neg(sum);   /* ψ''(x) = −(sum) */
+}
+
+qfloat qf_tetragamma(qfloat x)
+{
+    qfloat one = qf_from_double(1.0);
+
+    if (x.hi <= 0.0 && x.hi == floor(x.hi))
+        return QF_NAN;
+
+    /* Reflection: ψ''(x) = ψ''(1-x) + 2π³cos(πx)/sin³(πx) */
+    if (x.hi < 0.5) {
+        qfloat px  = qf_mul(QF_PI, x);
+        qfloat spx = qf_sin(px);
+        qfloat cpx = qf_cos(px);
+        qfloat pi3 = qf_mul(QF_PI, qf_mul(QF_PI, QF_PI));
+        qfloat refl = qf_div(qf_mul(qf_from_double(2.0), qf_mul(pi3, cpx)),
+                              qf_mul(spx, qf_mul(spx, spx)));
+        return qf_add(qf_tetragamma(qf_sub(one, x)), refl);
+    }
+
+    /* Recurrence: ψ''(x) = ψ''(x+1) − 2/x³ — shift x > 20 */
+    if (x.hi <= 20.0) {
+        qfloat two_over_x3 = qf_div(qf_from_double(2.0),
+                                     qf_mul(x, qf_mul(x, x)));
+        return qf_sub(qf_tetragamma(qf_add(x, one)), two_over_x3);
+    }
+
+    return qf_tetragamma_asymp(x);
+}
+
 /* gammainv */
 
 static const qfloat QF_GAMMA_MIN_VAL = { 0.885603194410888700278815900582588, 0.0 };

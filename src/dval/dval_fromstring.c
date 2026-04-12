@@ -334,6 +334,8 @@ static const struct {
     { "lambert_w0",    10, 0, dv_lambert_w0,    NULL          },
     { "normal_pdf",    10, 0, dv_normal_pdf,    NULL          },
     { "normal_cdf",    10, 0, dv_normal_cdf,    NULL          },
+    /* 8-char */
+    { "trigamma",       8, 0, dv_trigamma,      NULL          },
     /* 7-char */
     { "logbeta",        7, 1, NULL,              dv_logbeta    },
     { "erfcinv",        7, 0, dv_erfcinv,        NULL          },
@@ -809,9 +811,13 @@ static int parse_bindings(const char *s, const char *end,
         /* Detect name clashes — same name used twice, or once as a variable
          * and once as a named constant. */
         if (symtab_has(syms, key)) {
+            /* Copy key before freeing node/name — key may alias node->name or name */
+            char key_copy[210];
+            strncpy(key_copy, key, sizeof(key_copy) - 1);
+            key_copy[sizeof(key_copy) - 1] = '\0';
             dv_free(node);
             free(name);
-            snprintf(errmsg, errmsg_n, "duplicate name '%.200s' in binding section", key);
+            snprintf(errmsg, errmsg_n, "duplicate name '%.200s' in binding section", key_copy);
             return -1;
         }
 

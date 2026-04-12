@@ -779,6 +779,17 @@ qfloat qf_digamma(qfloat x);
 qfloat qf_trigamma(qfloat x);
 
 /**
+ * @brief Compute the tetragamma function ψ''(x) (second derivative of digamma).
+ *
+ * Uses the asymptotic Bernoulli series for x > 20, with recurrence and
+ * reflection to extend to all non-integer x.  Full qfloat precision.
+ *
+ * @param x Input value. Must not be a non-positive integer (pole).
+ * @return tetragamma(x) (double-double precision).
+ */
+qfloat qf_tetragamma(qfloat x);
+
+/**
  * @brief Compute the main branch of the inverse of the gamma function.
  *
  * @param y Input value.

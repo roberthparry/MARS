@@ -138,6 +138,7 @@ dval_t *dv_erfcinv(dval_t *f);
 dval_t *dv_gamma(dval_t *f);
 dval_t *dv_lgamma(dval_t *f);
 dval_t *dv_digamma(dval_t *f);
+dval_t *dv_trigamma(dval_t *f);
 dval_t *dv_lambert_w0(dval_t *f);
 dval_t *dv_lambert_wm1(dval_t *f);
 dval_t *dv_beta(dval_t *f, dval_t *g);

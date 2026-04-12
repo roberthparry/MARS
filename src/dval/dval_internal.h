@@ -133,6 +133,7 @@ extern const dval_ops_t ops_erfcinv;
 extern const dval_ops_t ops_gamma;
 extern const dval_ops_t ops_lgamma;
 extern const dval_ops_t ops_digamma;
+extern const dval_ops_t ops_trigamma;
 extern const dval_ops_t ops_lambert_w0;
 extern const dval_ops_t ops_lambert_wm1;
 extern const dval_ops_t ops_beta;

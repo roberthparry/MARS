@@ -226,7 +226,8 @@
       "test_ei": true,
       "test_e1": true,
       "test_beta": true,
-      "test_logbeta": true
+      "test_logbeta": true,
+      "test_trigamma": true
     },
     "test_first_derivatives": {
       "enabled": true,
@@ -279,7 +280,8 @@
       "test_deriv_ei": true,
       "test_deriv_e1": true,
       "test_deriv_beta": true,
-      "test_deriv_logbeta": true
+      "test_deriv_logbeta": true,
+      "test_deriv_trigamma": true
     },
     "test_second_derivatives": {
       "enabled": true,
@@ -330,7 +332,8 @@
       "test_second_deriv_lambert_w0": true,
       "test_second_deriv_lambert_wm1": true,
       "test_second_deriv_beta": true,
-      "test_second_deriv_logbeta": true
+      "test_second_deriv_logbeta": true,
+      "test_second_deriv_digamma": true
     },
     "test_dval_t_to_string": {
       "enabled": true,

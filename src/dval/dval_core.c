@@ -419,7 +419,8 @@ static qfloat eval_hypot(dval_t *n) {
 static qfloat eval_erfinv(dval_t *n)        { return qf_erfinv    (dv_eval_qf(n->a)); }
 static qfloat eval_erfcinv(dval_t *n)       { return qf_erfcinv   (dv_eval_qf(n->a)); }
 static qfloat eval_gamma(dval_t *n)         { return qf_gamma     (dv_eval_qf(n->a)); }
-static qfloat eval_digamma(dval_t *n)       { return qf_digamma   (dv_eval_qf(n->a)); }
+static qfloat eval_digamma(dval_t *n)        { return qf_digamma  (dv_eval_qf(n->a)); }
+static qfloat eval_trigamma(dval_t *n)       { return qf_trigamma (dv_eval_qf(n->a)); }
 static qfloat eval_lambert_w0(dval_t *n)    { return qf_lambert_w0 (dv_eval_qf(n->a)); }
 static qfloat eval_lambert_wm1(dval_t *n)   { return qf_lambert_wm1(dv_eval_qf(n->a)); }
 static qfloat eval_normal_pdf(dval_t *n)    { return qf_normal_pdf (dv_eval_qf(n->a)); }
@@ -962,12 +963,22 @@ static dval_t *deriv_gamma(dval_t *n)
     return out;
 }
 
-/* digamma(a) — d/dx = trigamma(a) * a'
- * trigamma is computed numerically (no dv_trigamma node yet). */
+/* digamma(a) — d/dx = trigamma(a) * a' (symbolic) */
 static dval_t *deriv_digamma(dval_t *n)
 {
+    dval_t *da  = get_dx(n->a);
+    dval_t *tg  = dv_trigamma(n->a);
+    dval_t *out = dv_mul(tg, da);
+    dv_free(da); dv_free(tg);
+    return out;
+}
+
+/* trigamma(a) — d/dx = tetragamma(a) * a' */
+static dval_t *deriv_trigamma(dval_t *n)
+{
+    qfloat t2     = qf_tetragamma(dv_eval_qf(n->a));
     dval_t *da    = get_dx(n->a);
-    dval_t *coeff = dv_new_const(qf_trigamma(dv_eval_qf(n->a)));
+    dval_t *coeff = dv_new_const(t2);
     dval_t *out   = dv_mul(coeff, da);
     dv_free(da); dv_free(coeff);
     return out;
@@ -1370,6 +1381,9 @@ const dval_ops_t ops_gamma = {
 const dval_ops_t ops_digamma = {
     eval_digamma,   deriv_digamma,   DV_OP_UNARY, "digamma",        dv_digamma
 };
+const dval_ops_t ops_trigamma = {
+    eval_trigamma,  deriv_trigamma,  DV_OP_UNARY, "trigamma",       dv_trigamma
+};
 const dval_ops_t ops_lambert_w0 = {
     eval_lambert_w0,  deriv_lambert_w0,  DV_OP_UNARY, "lambert_w0",  dv_lambert_w0
 };
@@ -1569,6 +1583,7 @@ dval_t *dv_erfinv(dval_t *a)     { if (!a) return NULL; dv_retain(a); return dv_
 dval_t *dv_erfcinv(dval_t *a)    { if (!a) return NULL; dv_retain(a); return dv_new_unary(&ops_erfcinv,       a); }
 dval_t *dv_gamma(dval_t *a)      { if (!a) return NULL; dv_retain(a); return dv_new_unary(&ops_gamma,         a); }
 dval_t *dv_digamma(dval_t *a)    { if (!a) return NULL; dv_retain(a); return dv_new_unary(&ops_digamma,       a); }
+dval_t *dv_trigamma(dval_t *a)   { if (!a) return NULL; dv_retain(a); return dv_new_unary(&ops_trigamma,      a); }
 dval_t *dv_lambert_w0(dval_t *a) { if (!a) return NULL; dv_retain(a); return dv_new_unary(&ops_lambert_w0,   a); }
 dval_t *dv_lambert_wm1(dval_t *a){ if (!a) return NULL; dv_retain(a); return dv_new_unary(&ops_lambert_wm1,  a); }
 dval_t *dv_normal_pdf(dval_t *a) { if (!a) return NULL; dv_retain(a); return dv_new_unary(&ops_normal_pdf,   a); }
