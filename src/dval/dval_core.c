@@ -137,7 +137,7 @@ static void dv_release(dval_t *f)
 /* Node allocation                                                           */
 /* ------------------------------------------------------------------------- */
 
-dval_t *dv_alloc(const dval_ops_t *ops)
+static dval_t *dv_alloc(const dval_ops_t *ops)
 {
     dval_t *f = malloc(sizeof *f);
     if (!f) abort();
@@ -184,6 +184,18 @@ static dval_t *dv_build_dx(dval_t *f)
         f->dx_valid = 1;
     }
     return f->dx; /* borrowed */
+}
+
+/* Return an owning reference to the derivative of n.
+ * Falls back to a zero constant when no derivative exists. */
+static dval_t *get_dx(const dval_t *n)
+{
+    const dval_t *d = dv_get_deriv(n);
+    if (d) {
+        dv_retain((dval_t *)d);
+        return (dval_t *)d;
+    }
+    return dv_new_const_d(0.0);
 }
 
 /* ------------------------------------------------------------------------- */
@@ -413,154 +425,101 @@ static dval_t *deriv_const(dval_t *n)
 
 static dval_t *deriv_var(dval_t *n)
 {
-    const dval_t *d = dv_get_deriv(n);
-
-    if (d) {
-        dv_retain((dval_t *)d);
-        return (dval_t *)d;
-    }
-
-    return dv_new_const_d(0.0);
+    /* Variables are constructed with dx pre-seeded to const(1).
+     * get_dx returns an owning copy of that cached derivative. */
+    return get_dx(n);
 }
 
 /* a + b */
 static dval_t *deriv_add(dval_t *n)
 {
-    const dval_t *da = dv_get_deriv(n->a);
-    const dval_t *db = dv_get_deriv(n->b);
-
-    dval_t *da_r = da ? (dv_retain((dval_t *)da), (dval_t *)da)
-                      : dv_new_const_d(0.0);
-
-    dval_t *db_r = db ? (dv_retain((dval_t *)db), (dval_t *)db)
-                      : dv_new_const_d(0.0);
-
-    dval_t *out = dv_add(da_r, db_r);
-
-    dv_free(da_r);
-    dv_free(db_r);
-
+    dval_t *da  = get_dx(n->a);
+    dval_t *db  = get_dx(n->b);
+    dval_t *out = dv_add(da, db);
+    dv_free(da);
+    dv_free(db);
     return out;
 }
 
 /* a - b */
 static dval_t *deriv_sub(dval_t *n)
 {
-    const dval_t *da = dv_get_deriv(n->a);
-    const dval_t *db = dv_get_deriv(n->b);
-
-    dval_t *da_r = da ? (dv_retain((dval_t *)da), (dval_t *)da)
-                      : dv_new_const_d(0.0);
-
-    dval_t *db_r = db ? (dv_retain((dval_t *)db), (dval_t *)db)
-                      : dv_new_const_d(0.0);
-
-    dval_t *out = dv_sub(da_r, db_r);
-
-    dv_free(da_r);
-    dv_free(db_r);
-
+    dval_t *da  = get_dx(n->a);
+    dval_t *db  = get_dx(n->b);
+    dval_t *out = dv_sub(da, db);
+    dv_free(da);
+    dv_free(db);
     return out;
 }
 
 /* a * b */
 static dval_t *deriv_mul(dval_t *n)
 {
-    const dval_t *da = dv_get_deriv(n->a);
-    const dval_t *db = dv_get_deriv(n->b);
-
-    dval_t *da_r = da ? (dv_retain((dval_t *)da), (dval_t *)da)
-                      : dv_new_const_d(0.0);
-
-    dval_t *db_r = db ? (dv_retain((dval_t *)db), (dval_t *)db)
-                      : dv_new_const_d(0.0);
-
-    dval_t *t1 = dv_mul(da_r, n->b);
-    dval_t *t2 = dv_mul(n->a, db_r);
+    dval_t *da  = get_dx(n->a);
+    dval_t *db  = get_dx(n->b);
+    dval_t *t1  = dv_mul(da, n->b);
+    dval_t *t2  = dv_mul(n->a, db);
     dval_t *out = dv_add(t1, t2);
-
-    dv_free(da_r);
-    dv_free(db_r);
+    dv_free(da);
+    dv_free(db);
     dv_free(t1);
     dv_free(t2);
-
     return out;
 }
 
 /* a / b */
 static dval_t *deriv_div(dval_t *n)
 {
-    const dval_t *da = dv_get_deriv(n->a);
-    const dval_t *db = dv_get_deriv(n->b);
-
-    dval_t *da_r = da ? (dv_retain((dval_t *)da), (dval_t *)da)
-                      : dv_new_const_d(0.0);
-
-    dval_t *db_r = db ? (dv_retain((dval_t *)db), (dval_t *)db)
-                      : dv_new_const_d(0.0);
-
-    dval_t *num1 = dv_mul(da_r, n->b);
-    dval_t *num2 = dv_mul(n->a, db_r);
+    dval_t *da   = get_dx(n->a);
+    dval_t *db   = get_dx(n->b);
+    dval_t *num1 = dv_mul(da, n->b);
+    dval_t *num2 = dv_mul(n->a, db);
     dval_t *num  = dv_sub(num1, num2);
     dval_t *den  = dv_pow_d(n->b, 2.0);
-
-    dval_t *out = dv_div(num, den);
-
-    dv_free(da_r);
-    dv_free(db_r);
+    dval_t *out  = dv_div(num, den);
+    dv_free(da);
+    dv_free(db);
     dv_free(num1);
     dv_free(num2);
     dv_free(num);
     dv_free(den);
-
     return out;
 }
 
 /* -a */
 static dval_t *deriv_neg(dval_t *n)
 {
-    const dval_t *da = dv_get_deriv(n->a);
-
-    dval_t *da_r = da ? (dv_retain((dval_t *)da), (dval_t *)da)
-                      : dv_new_const_d(0.0);
-
-    dval_t *out = dv_neg(da_r);
-
-    dv_free(da_r);
-
+    dval_t *da  = get_dx(n->a);
+    dval_t *out = dv_neg(da);
+    dv_free(da);
     return out;
 }
 
-/* a^b */
+/* a^b — d/dx = a^b * (b' * log(a) + b * a'/a) */
 static dval_t *deriv_pow(dval_t *n)
 {
-    dval_t *a = n->a;
-    dval_t *b = n->b;
+    dval_t *a  = n->a;
+    dval_t *b  = n->b;
+    dval_t *da = get_dx(a);
+    dval_t *db = get_dx(b);
 
-    const dval_t *da = dv_get_deriv(a);
-    const dval_t *db = dv_get_deriv(b);
-
-    dval_t *da_r = da ? (dv_retain((dval_t *)da), (dval_t *)da)
-                      : dv_new_const_d(0.0);
-
-    dval_t *db_r = db ? (dv_retain((dval_t *)db), (dval_t *)db)
-                      : dv_new_const_d(0.0);
-
-    /* FIX: retain a and b before using them in multiple child nodes */
+    /* a and b are each used in two child nodes, so retain once extra each */
     dv_retain(a);
     dv_retain(a);
     dv_retain(b);
 
     dval_t *loga  = dv_log(a);
-    dval_t *term1 = dv_mul(db_r, loga);
-    dval_t *term2 = dv_mul(b, dv_div(da_r, a));
+    dval_t *da_on_a = dv_div(da, a);
+    dval_t *term1 = dv_mul(db, loga);
+    dval_t *term2 = dv_mul(b, da_on_a);
     dval_t *sum   = dv_add(term1, term2);
     dval_t *powab = dv_pow(a, b);
     dval_t *out   = dv_mul(powab, sum);
 
-    dv_free(da_r);
-    dv_free(db_r);
+    dv_free(da);
+    dv_free(db);
     dv_free(loga);
+    dv_free(da_on_a);
     dv_free(term1);
     dv_free(term2);
     dv_free(sum);
@@ -569,285 +528,196 @@ static dval_t *deriv_pow(dval_t *n)
     return out;
 }
 
-/* a^c */
+/* a^c — d/dx = c * a^(c-1) * a' */
 static dval_t *deriv_pow_d(dval_t *n)
 {
-    double c = qf_to_double(n->c);
-    const dval_t *da = dv_get_deriv(n->a);
-
-    dval_t *da_r = da ? (dv_retain((dval_t *)da), (dval_t *)da)
-                      : dv_new_const_d(0.0);
-
+    double  c    = qf_to_double(n->c);
+    dval_t *da   = get_dx(n->a);
     dval_t *p    = dv_pow_d(n->a, c - 1.0);
     dval_t *coef = dv_new_const_d(c);
     dval_t *cp   = dv_mul(coef, p);
-    dval_t *out  = dv_mul(cp, da_r);
-
-    dv_free(da_r);
+    dval_t *out  = dv_mul(cp, da);
+    dv_free(da);
     dv_free(p);
     dv_free(coef);
     dv_free(cp);
-
     return out;
 }
 
-/* sin(a) */
+/* sin(a) — d/dx = cos(a) * a' */
 static dval_t *deriv_sin(dval_t *n)
 {
-    const dval_t *da = dv_get_deriv(n->a);
-
-    dval_t *da_r = da ? (dv_retain((dval_t *)da), (dval_t *)da)
-                      : dv_new_const_d(0.0);
-
-    dval_t *out = dv_mul(dv_cos(n->a), da_r);
-
-    dv_free(da_r);
-
+    dval_t *da  = get_dx(n->a);
+    dval_t *out = dv_mul(dv_cos(n->a), da);
+    dv_free(da);
     return out;
 }
 
-/* cos(a) */
+/* cos(a) — d/dx = -sin(a) * a' */
 static dval_t *deriv_cos(dval_t *n)
 {
-    const dval_t *da = dv_get_deriv(n->a);
-
-    dval_t *da_r = da ? (dv_retain((dval_t *)da), (dval_t *)da)
-                      : dv_new_const_d(0.0);
-
+    dval_t *da      = get_dx(n->a);
     dval_t *neg_sin = dv_neg(dv_sin(n->a));
-    dval_t *out = dv_mul(neg_sin, da_r);
-
-    dv_free(da_r);
+    dval_t *out     = dv_mul(neg_sin, da);
+    dv_free(da);
     dv_free(neg_sin);
-
     return out;
 }
 
-/* tan(a) = sin/cos → d/dx tan = (1 + tan^2) * a' */
+/* tan(a) — d/dx = (1 + tan²(a)) * a' */
 static dval_t *deriv_tan(dval_t *n)
 {
-    const dval_t *da = dv_get_deriv(n->a);
-
-    dval_t *da_r = da ? (dv_retain((dval_t *)da), (dval_t *)da)
-                      : dv_new_const_d(0.0);
-
+    dval_t *da  = get_dx(n->a);
     dval_t *t   = dv_tan(n->a);
     dval_t *t2  = dv_pow_d(t, 2.0);
     dval_t *one = dv_new_const_d(1.0);
     dval_t *fac = dv_add(one, t2);
-    dval_t *out = dv_mul(fac, da_r);
-
-    dv_free(da_r);
+    dval_t *out = dv_mul(fac, da);
+    dv_free(da);
     dv_free(t);
     dv_free(t2);
     dv_free(one);
     dv_free(fac);
-
     return out;
 }
 
-/* sinh(a) */
+/* sinh(a) — d/dx = cosh(a) * a' */
 static dval_t *deriv_sinh(dval_t *n)
 {
-    const dval_t *da = dv_get_deriv(n->a);
-
-    dval_t *da_r = da ? (dv_retain((dval_t *)da), (dval_t *)da)
-                      : dv_new_const_d(0.0);
-
-    dval_t *out = dv_mul(dv_cosh(n->a), da_r);
-
-    dv_free(da_r);
-
+    dval_t *da  = get_dx(n->a);
+    dval_t *out = dv_mul(dv_cosh(n->a), da);
+    dv_free(da);
     return out;
 }
 
-/* cosh(a) */
+/* cosh(a) — d/dx = sinh(a) * a' */
 static dval_t *deriv_cosh(dval_t *n)
 {
-    const dval_t *da = dv_get_deriv(n->a);
-
-    dval_t *da_r = da ? (dv_retain((dval_t *)da), (dval_t *)da)
-                      : dv_new_const_d(0.0);
-
-    dval_t *out = dv_mul(dv_sinh(n->a), da_r);
-
-    dv_free(da_r);
-
+    dval_t *da  = get_dx(n->a);
+    dval_t *out = dv_mul(dv_sinh(n->a), da);
+    dv_free(da);
     return out;
 }
 
-/* tanh(a) → d/dx tanh = (1 - tanh^2) * a' */
+/* tanh(a) — d/dx = (1 - tanh²(a)) * a' */
 static dval_t *deriv_tanh(dval_t *n)
 {
-    const dval_t *da = dv_get_deriv(n->a);
-
-    dval_t *da_r = da ? (dv_retain((dval_t *)da), (dval_t *)da)
-                      : dv_new_const_d(0.0);
-
+    dval_t *da  = get_dx(n->a);
     dval_t *t   = dv_tanh(n->a);
     dval_t *t2  = dv_pow_d(t, 2.0);
     dval_t *one = dv_new_const_d(1.0);
     dval_t *fac = dv_sub(one, t2);
-    dval_t *out = dv_mul(fac, da_r);
-
-    dv_free(da_r);
+    dval_t *out = dv_mul(fac, da);
+    dv_free(da);
     dv_free(t);
     dv_free(t2);
     dv_free(one);
     dv_free(fac);
-
     return out;
 }
 
-/* exp(a) */
+/* exp(a) — d/dx = exp(a) * a' */
 static dval_t *deriv_exp(dval_t *n)
 {
-    const dval_t *da = dv_get_deriv(n->a);
-
-    dval_t *da_r = da ? (dv_retain((dval_t *)da), (dval_t *)da)
-                      : dv_new_const_d(0.0);
-
-    dval_t *out = dv_mul(dv_exp(n->a), da_r);
-
-    dv_free(da_r);
-
+    dval_t *da  = get_dx(n->a);
+    dval_t *out = dv_mul(dv_exp(n->a), da);
+    dv_free(da);
     return out;
 }
 
-/* log(a) */
+/* log(a) — d/dx = a' / a */
 static dval_t *deriv_log(dval_t *n)
 {
-    const dval_t *da = dv_get_deriv(n->a);
-
-    dval_t *da_r = da ? (dv_retain((dval_t *)da), (dval_t *)da)
-                      : dv_new_const_d(0.0);
-
-    dval_t *out = dv_div(da_r, n->a);
-
-    dv_free(da_r);
-
+    dval_t *da  = get_dx(n->a);
+    dval_t *out = dv_div(da, n->a);
+    dv_free(da);
     return out;
 }
 
-/* sqrt(a) */
+/* sqrt(a) — d/dx = a' / (2 * sqrt(a)) */
 static dval_t *deriv_sqrt(dval_t *n)
 {
-    const dval_t *da = dv_get_deriv(n->a);
-
-    dval_t *da_r = da ? (dv_retain((dval_t *)da), (dval_t *)da)
-                      : dv_new_const_d(0.0);
-
+    dval_t *da  = get_dx(n->a);
     dval_t *two = dv_new_const_d(2.0);
     dval_t *den = dv_mul(two, dv_sqrt(n->a));
-    dval_t *out = dv_div(da_r, den);
-
-    dv_free(da_r);
+    dval_t *out = dv_div(da, den);
+    dv_free(da);
     dv_free(two);
     dv_free(den);
-
     return out;
 }
 
-/* asin(a) */
+/* asin(a) — d/dx = a' / sqrt(1 - a²) */
 static dval_t *deriv_asin(dval_t *n)
 {
-    const dval_t *da = dv_get_deriv(n->a);
-
-    dval_t *da_r = da ? (dv_retain((dval_t *)da), (dval_t *)da)
-                      : dv_new_const_d(0.0);
-
+    dval_t *da  = get_dx(n->a);
     dval_t *a2  = dv_pow_d(n->a, 2.0);
     dval_t *one = dv_new_const_d(1.0);
     dval_t *den = dv_sqrt(dv_sub(one, a2));
-    dval_t *out = dv_div(da_r, den);
-
-    dv_free(da_r);
+    dval_t *out = dv_div(da, den);
+    dv_free(da);
     dv_free(a2);
     dv_free(one);
     dv_free(den);
-
     return out;
 }
 
-/* acos(a) */
+/* acos(a) — d/dx = -a' / sqrt(1 - a²) */
 static dval_t *deriv_acos(dval_t *n)
 {
-    const dval_t *da = dv_get_deriv(n->a);
-
-    dval_t *da_r = da ? (dv_retain((dval_t *)da), (dval_t *)da)
-                      : dv_new_const_d(0.0);
-
+    dval_t *da  = get_dx(n->a);
     dval_t *a2  = dv_pow_d(n->a, 2.0);
     dval_t *one = dv_new_const_d(1.0);
     dval_t *den = dv_sqrt(dv_sub(one, a2));
-    dval_t *num = dv_neg(da_r);
+    dval_t *num = dv_neg(da);
     dval_t *out = dv_div(num, den);
-
-    dv_free(da_r);
+    dv_free(da);
     dv_free(a2);
     dv_free(one);
     dv_free(den);
     dv_free(num);
-
     return out;
 }
 
-/* atan(a) */
+/* atan(a) — d/dx = a' / (1 + a²) */
 static dval_t *deriv_atan(dval_t *n)
 {
-    const dval_t *da = dv_get_deriv(n->a);
-
-    dval_t *da_r = da ? (dv_retain((dval_t *)da), (dval_t *)da)
-                      : dv_new_const_d(0.0);
-
+    dval_t *da  = get_dx(n->a);
     dval_t *a2  = dv_pow_d(n->a, 2.0);
     dval_t *one = dv_new_const_d(1.0);
     dval_t *den = dv_add(one, a2);
-    dval_t *out = dv_div(da_r, den);
-
-    dv_free(da_r);
+    dval_t *out = dv_div(da, den);
+    dv_free(da);
     dv_free(a2);
     dv_free(one);
     dv_free(den);
-
     return out;
 }
 
+/* atan2(y, x) — d/dx = (x*y' - y*x') / (x² + y²) */
 static dval_t *deriv_atan2(dval_t *self)
 {
-    dval_t *y = self->a;   // first argument
-    dval_t *x = self->b;   // second argument
+    dval_t *y  = self->a;  /* first argument */
+    dval_t *x  = self->b;  /* second argument */
+    dval_t *dy = get_dx(y);
+    dval_t *dx = get_dx(x);
 
-    /* dy = derivative of y */
-    const dval_t *dy0 = dv_get_deriv(y);
-    dval_t *dy = dy0 ? (dv_retain((dval_t *)dy0), (dval_t *)dy0)
-                     : dv_new_const_d(0.0);
-
-    /* dx = derivative of x */
-    const dval_t *dx0 = dv_get_deriv(x);
-    dval_t *dx = dx0 ? (dv_retain((dval_t *)dx0), (dval_t *)dx0)
-                     : dv_new_const_d(0.0);
-
-    /* numerator = x*dy - y*dx */
+    /* numerator = x*dy - y*dx; x and y each appear twice so need one extra retain */
     dv_retain(x);
     dval_t *x_dy = dv_mul(x, dy);
     dv_retain(y);
     dval_t *y_dx = dv_mul(y, dx);
-    dval_t *num = dv_sub(x_dy, y_dx);
+    dval_t *num  = dv_sub(x_dy, y_dx);
 
-    /* denominator = x^2 + y^2 */
-    dv_retain(x);
-    dv_retain(x);
-    dval_t *x2 = dv_mul(x, x);
-    dv_retain(y);
-    dv_retain(y);
-    dval_t *y2 = dv_mul(y, y);
+    /* denominator = x² + y²; each used once more */
+    dv_retain(x); dv_retain(x);
+    dval_t *x2  = dv_mul(x, x);
+    dv_retain(y); dv_retain(y);
+    dval_t *y2  = dv_mul(y, y);
     dval_t *den = dv_add(x2, y2);
 
-    /* result = num / den */
     dval_t *out = dv_div(num, den);
 
-    /* cleanup */
     dv_free(dy);
     dv_free(dx);
     dv_free(x_dy);
@@ -860,75 +730,57 @@ static dval_t *deriv_atan2(dval_t *self)
     return out;
 }
 
-/* asinh(a) */
+/* asinh(a) — d/dx = a' / sqrt(1 + a²) */
 static dval_t *deriv_asinh(dval_t *n)
 {
-    const dval_t *da = dv_get_deriv(n->a);
-
-    dval_t *da_r = da ? (dv_retain((dval_t *)da), (dval_t *)da)
-                      : dv_new_const_d(0.0);
-
+    dval_t *da  = get_dx(n->a);
     dval_t *a2  = dv_pow_d(n->a, 2.0);
     dval_t *one = dv_new_const_d(1.0);
     dval_t *den = dv_sqrt(dv_add(one, a2));
-    dval_t *out = dv_div(da_r, den);
-
-    dv_free(da_r);
+    dval_t *out = dv_div(da, den);
+    dv_free(da);
     dv_free(a2);
     dv_free(one);
     dv_free(den);
-
     return out;
 }
 
-/* acosh(a) */
+/* acosh(a) — d/dx = a' / (sqrt(a-1) * sqrt(a+1)) */
 static dval_t *deriv_acosh(dval_t *n)
 {
-    const dval_t *da = dv_get_deriv(n->a);
-
-    dval_t *da_r = da ? (dv_retain((dval_t *)da), (dval_t *)da)
-                      : dv_new_const_d(0.0);
-
-    dval_t *one  = dv_new_const_d(1.0);
-    dval_t *am1  = dv_sub(n->a, one);
-    dval_t *ap1  = dv_add(n->a, one);
-    dval_t *s1   = dv_sqrt(am1);
-    dval_t *s2   = dv_sqrt(ap1);
-    dval_t *den  = dv_mul(s1, s2);
-    dval_t *out  = dv_div(da_r, den);
-
-    dv_free(da_r);
+    dval_t *da  = get_dx(n->a);
+    dval_t *one = dv_new_const_d(1.0);
+    dval_t *am1 = dv_sub(n->a, one);
+    dval_t *ap1 = dv_add(n->a, one);
+    dval_t *s1  = dv_sqrt(am1);
+    dval_t *s2  = dv_sqrt(ap1);
+    dval_t *den = dv_mul(s1, s2);
+    dval_t *out = dv_div(da, den);
+    dv_free(da);
     dv_free(one);
     dv_free(am1);
     dv_free(ap1);
     dv_free(s1);
     dv_free(s2);
     dv_free(den);
-
     return out;
 }
 
-/* atanh(a) */
+/* atanh(a) — d/dx = a' / (1 - a²) */
 static dval_t *deriv_atanh(dval_t *n)
 {
-    const dval_t *da = dv_get_deriv(n->a);
-
-    dval_t *da_r = da ? (dv_retain((dval_t *)da), (dval_t *)da)
-                      : dv_new_const_d(0.0);
-
+    dval_t *da  = get_dx(n->a);
     dval_t *a2  = dv_pow_d(n->a, 2.0);
     dval_t *one = dv_new_const_d(1.0);
     dval_t *den = dv_sub(one, a2);
-    dval_t *out = dv_div(da_r, den);
-
-    dv_free(da_r);
+    dval_t *out = dv_div(da, den);
+    dv_free(da);
     dv_free(a2);
     dv_free(one);
     dv_free(den);
-
     return out;
 }
-    
+
 /* ------------------------------------------------------------------------- */
 /* Operator vtable instances                                                 */
 /* ------------------------------------------------------------------------- */
@@ -1145,55 +997,24 @@ const dval_ops_t ops_sqrt = {
 
 static dval_t *dv_new_unary(const dval_ops_t *ops, dval_t *a)
 {
-    dval_t *n = malloc(sizeof(dval_t));
-    n->ops = ops;
+    dval_t *n = dv_alloc(ops);
     n->a = a;
-    n->b = NULL;
-    n->c = qf_from_double(0.0);
-
-    n->x_valid = 0;
-    n->dx_valid = 0;
-    n->x = qf_from_double(0.0);
-    n->dx = NULL;
-
-    n->name = NULL;
-    n->refcount = 1;
     return n;
 }
 
 static dval_t *dv_new_binary(const dval_ops_t *ops, dval_t *a, dval_t *b)
 {
-    dval_t *n = malloc(sizeof(dval_t));
-    n->ops = ops;
+    dval_t *n = dv_alloc(ops);
     n->a = a;
     n->b = b;
-    n->c = qf_from_double(0.0);
-
-    n->x_valid = 0;
-    n->dx_valid = 0;
-    n->x = qf_from_double(0.0);
-    n->dx = NULL;
-
-    n->name = NULL;
-    n->refcount = 1;
     return n;
 }
 
 static dval_t *dv_new_pow_d(dval_t *a, double d)
 {
-    dval_t *n = malloc(sizeof(dval_t));
-    n->ops = &ops_pow_d;
+    dval_t *n = dv_alloc(&ops_pow_d);
     n->a = a;
-    n->b = NULL;
     n->c = qf_from_double(d);
-
-    n->x_valid = 0;
-    n->dx_valid = 0;
-    n->x = qf_from_double(0.0);
-    n->dx = NULL;
-
-    n->name = NULL;
-    n->refcount = 1;
     return n;
 }
 

@@ -10,6 +10,7 @@
  * is done in dv_simplify.c.
  */
 
+#include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -286,15 +287,6 @@ static int is_atomic_for_mul(const dval_t *f)
    Factor classification / flattening / ordering
    ------------------------------------------------------------- */
 
-typedef enum {
-    FACT_CONST = 0,
-    FACT_SINGLE_VAR = 1,
-    FACT_MULTI_VAR = 2,
-    FACT_VAR_POWER = 3,
-    FACT_UNARY_FUNC = 4,
-    FACT_OTHER = 5
-} factor_kind_t;
-
 static void flatten_mul(dval_t *f, dval_t **buf, int *count, int max)
 {
     if (!f || *count >= max) return;
@@ -308,25 +300,55 @@ static void flatten_mul(dval_t *f, dval_t **buf, int *count, int max)
 }
 
 /* Sort group for multiplication factors:
- *   0 = unnamed numeric constant  (e.g. 6)
- *   1 = named constant            (e.g. π, τ) — alphabetical within group
- *   2 = variable or var^n         (e.g. x, x³) — alphabetical by var name
- *   3 = everything else
+ *   0 = unnamed numeric constant      (e.g. 6)
+ *   1 = Greek named constant          (e.g. π, τ) — alphabetical within group
+ *   2 = Latin/other named constant    (e.g. e)    — alphabetical within group
+ *   3 = variable or var^n             (e.g. x, x³) — alphabetical by var name
+ *   4 = everything else (unary/binary fns) — sort by primary arg var name,
+ *       stable so same-arg functions keep their original tree order
  */
 static int factor_group(const dval_t *f)
 {
     if (f->ops == &ops_neg) f = f->a;
 
-    if (f->ops == &ops_const)
-        return (f->name && *f->name) ? 1 : 0;
+    if (f->ops == &ops_const) {
+        if (!f->name || !*f->name) return 0;
+        /* Greek letters are UTF-8 multi-byte; first byte >= 0x80 */
+        return ((unsigned char)f->name[0] >= 0x80) ? 1 : 2;
+    }
 
     if (f->ops == &ops_var)
-        return 2;
+        return 3;
 
     if (f->ops == &ops_pow_d && f->a->ops == &ops_var)
-        return 2;
+        return 3;
 
-    return 3;
+    return 4;
+}
+
+/* DFS to find the name of the first variable in an expression. */
+static const char *first_var_name(const dval_t *f)
+{
+    if (!f) return "";
+    if (f->ops == &ops_var) return f->name ? f->name : "";
+    const char *a = first_var_name(f->a);
+    if (*a) return a;
+    return first_var_name(f->b);
+}
+
+/* Counts levels of function *nesting* (not tree depth).
+ * pow_d and neg are transparent — cos²(x) has the same nesting depth as cos(x).
+ * This makes cos²(x) (depth 1) sort before exp(sin(x)) (depth 2). */
+static int factor_depth(const dval_t *f)
+{
+    if (!f || f->ops == &ops_const || f->ops == &ops_var) return 0;
+    if (f->ops == &ops_neg || f->ops == &ops_pow_d) return factor_depth(f->a);
+    if (f->ops->arity == DV_OP_UNARY) return 1 + factor_depth(f->a);
+    if (f->ops->arity == DV_OP_BINARY) {
+        int da = factor_depth(f->a), db = factor_depth(f->b);
+        return 1 + (da > db ? da : db);
+    }
+    return 0;
 }
 
 static const char *factor_sort_name(const dval_t *f)
@@ -342,21 +364,41 @@ static const char *factor_sort_name(const dval_t *f)
     if (f->ops == &ops_pow_d && f->a->ops == &ops_var)
         return f->a->name ? f->a->name : "";
 
-    return f->ops->name ? f->ops->name : "";
+    /* Unary/binary functions: sort by the primary variable in the argument
+     * so e.g. sin(x) and cos(y) sort by x vs y, not by function name.
+     * Functions with the same primary variable keep their original order
+     * (handled by the stable sort below). */
+    return first_var_name(f->a);
 }
 
-static int factor_cmp(const void *pa, const void *pb)
+/* Stable insertion sort for factor arrays.
+ * Within group 4 (functions), sort shallower expressions first so that
+ * e.g. cos(x) (depth 2) appears before exp(sin(x)) (depth 3). */
+static void sort_factors(dval_t **fac, int n)
 {
-    const dval_t *a = *(const dval_t * const *)pa;
-    const dval_t *b = *(const dval_t * const *)pb;
-
-    int ga = factor_group(a);
-    int gb = factor_group(b);
-
-    if (ga != gb)
-        return ga - gb;
-
-    return strcmp(factor_sort_name(a), factor_sort_name(b));
+    for (int s = 1; s < n; s++) {
+        dval_t *key = fac[s];
+        int kg = factor_group(key);
+        const char *kn = factor_sort_name(key);
+        int kd = (kg == 4) ? factor_depth(key) : 0;
+        int t = s - 1;
+        while (t >= 0) {
+            int tg = factor_group(fac[t]);
+            int cmp;
+            if (tg != kg) {
+                cmp = tg - kg;
+            } else if (kg == 4) {
+                int td = factor_depth(fac[t]);
+                cmp = (td != kd) ? (td - kd) : strcmp(factor_sort_name(fac[t]), kn);
+            } else {
+                cmp = strcmp(factor_sort_name(fac[t]), kn);
+            }
+            if (cmp <= 0) break;
+            fac[t + 1] = fac[t];
+            t--;
+        }
+        fac[t + 1] = key;
+    }
 }
 
 /* ------------------------------------------------------------------------- */
@@ -367,11 +409,6 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
 {
     if (!f) { sbuf_puts(b, "0"); return; }
 
-    const int prec_add = 1;
-    const int prec_mul = 2;
-    const int prec_pow = 3;
-    const int prec_un  = 4;
-
     /* Atoms */
     if (f->ops == &ops_const || f->ops == &ops_var) {
         emit_atom((dval_t *)f, b);
@@ -380,7 +417,7 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
 
     /* Unary ops */
     if (f->ops->arity == DV_OP_UNARY) {
-        int need = prec_un < parent_prec;
+        int need = PREC_UNARY < parent_prec;
         if (need) sbuf_putc(b, '(');
 
         sbuf_puts(b, f->ops->name);
@@ -394,13 +431,13 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
 
     /* Power */
     if (f->ops == &ops_pow_d) {
-        int need = prec_pow < parent_prec;
+        int need = PREC_POW < parent_prec;
         if (need) sbuf_putc(b, '(');
 
         double ed = qf_to_double(f->c);
         long   ei = (long)ed;
 
-        /* For unary functions raised to a power, write func²(arg) or func² x
+        /* For unary functions raised to a power, write func²(arg)
          * rather than func(arg)² so the exponent binds to the function name. */
         if (f->a->ops->arity == DV_OP_UNARY) {
             dval_t *inner = f->a;
@@ -423,7 +460,7 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
             return;
         }
 
-        emit_expr(f->a, b, prec_pow);
+        emit_expr(f->a, b, PREC_POW);
 
         if (ed == (double)ei)
             emit_superscript_int(b, ei);
@@ -440,13 +477,13 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
 
     /* Multiplication with sign folding */
     if (f->ops == &ops_mul) {
-        int need = prec_mul < parent_prec;
+        int need = PREC_MUL < parent_prec;
         if (need) sbuf_putc(b, '(');
 
         dval_t *fac[64];
         int n = 0;
         flatten_mul((dval_t *)f, fac, &n, 64);
-        qsort(fac, n, sizeof(dval_t *), factor_cmp);
+        sort_factors(fac, n);
 
         int sign = 1;
         for (int i = 0; i < n; i++) {
@@ -475,7 +512,7 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
                     sbuf_puts(b, "·");
                 }
             }
-            emit_expr(fac[i], b, prec_mul);
+            emit_expr(fac[i], b, PREC_MUL);
         }
 
         if (need) sbuf_putc(b, ')');
@@ -484,10 +521,10 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
 
     /* Addition/subtraction with a + -b → a - b and a - -b → a + b */
     if (f->ops == &ops_add || f->ops == &ops_sub) {
-        int need = prec_add < parent_prec;
+        int need = PREC_ADD < parent_prec;
         if (need) sbuf_putc(b, '(');
 
-        emit_expr(f->a, b, prec_add);
+        emit_expr(f->a, b, PREC_ADD);
 
         /* Detect if right child is syntactically negative */
         bool neg = false;
@@ -521,14 +558,14 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
         if (neg && f->b->ops == &ops_const) {
             dval_t tmp = *f->b;
             tmp.c = qf_neg(tmp.c);
-            emit_expr(&tmp, b, prec_add);
+            emit_expr(&tmp, b, PREC_ADD);
         }
         else if (neg && f->b->ops == &ops_mul) {
             /* Re-emit product without the -1 factor and without a leading '-' */
             dval_t *fac[64];
             int n = 0;
             flatten_mul((dval_t *)f->b, fac, &n, 64);
-            qsort(fac, n, sizeof(dval_t *), factor_cmp);
+            sort_factors(fac, n);
 
             /* strip -1 factors but ignore resulting sign (we already used it) */
             for (int i = 0; i < n; i++) {
@@ -553,11 +590,11 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
                         sbuf_puts(b, "·");
                     }
                 }
-                emit_expr(fac[i], b, prec_mul);
+                emit_expr(fac[i], b, PREC_MUL);
             }
         }
         else {
-            emit_expr(f->b, b, prec_add);
+            emit_expr(f->b, b, PREC_ADD);
         }
 
         if (need) sbuf_putc(b, ')');
@@ -587,18 +624,13 @@ static void emit_func(const dval_t *f, sbuf_t *b, int parent_prec)
 {
     if (!f) { sbuf_puts(b, "0"); return; }
 
-    const int prec_add = 1;
-    const int prec_mul = 2;
-    const int prec_pow = 3;
-    const int prec_un  = 4;
-
     if (f->ops == &ops_const || f->ops == &ops_var) {
         emit_atom((dval_t *)f, b);
         return;
     }
 
     if (f->ops->arity == DV_OP_UNARY) {
-        int need = prec_un < parent_prec;
+        int need = PREC_UNARY < parent_prec;
         if (need) sbuf_putc(b, '(');
 
         sbuf_puts(b, f->ops->name);
@@ -611,10 +643,10 @@ static void emit_func(const dval_t *f, sbuf_t *b, int parent_prec)
     }
 
     if (f->ops == &ops_pow_d) {
-        int need = prec_pow < parent_prec;
+        int need = PREC_POW < parent_prec;
         if (need) sbuf_putc(b, '(');
 
-        emit_func(f->a, b, prec_pow);
+        emit_func(f->a, b, PREC_POW);
 
         sbuf_putc(b, '^');
         char buf[64];
@@ -626,18 +658,18 @@ static void emit_func(const dval_t *f, sbuf_t *b, int parent_prec)
     }
 
     if (f->ops == &ops_mul) {
-        int need = prec_mul < parent_prec;
+        int need = PREC_MUL < parent_prec;
         if (need) sbuf_putc(b, '(');
 
         dval_t *fac[64];
         int n = 0;
         flatten_mul((dval_t *)f, fac, &n, 64);
-        qsort(fac, n, sizeof(dval_t *), factor_cmp);
+        sort_factors(fac, n);
 
         for (int i = 0; i < n; i++) {
             if (i > 0)
                 sbuf_putc(b, '*');
-            emit_func(fac[i], b, prec_mul);
+            emit_func(fac[i], b, PREC_MUL);
         }
 
         if (need) sbuf_putc(b, ')');
@@ -645,17 +677,17 @@ static void emit_func(const dval_t *f, sbuf_t *b, int parent_prec)
     }
 
     if (f->ops == &ops_add || f->ops == &ops_sub) {
-        int need = prec_add < parent_prec;
+        int need = PREC_ADD < parent_prec;
         if (need) sbuf_putc(b, '(');
 
-        emit_func(f->a, b, prec_add);
+        emit_func(f->a, b, PREC_ADD);
 
         if (f->ops == &ops_add)
             sbuf_puts(b, " + ");
         else
             sbuf_puts(b, " - ");
 
-        emit_func(f->b, b, prec_add);
+        emit_func(f->b, b, PREC_ADD);
 
         if (need) sbuf_putc(b, ')');
         return;
@@ -797,6 +829,7 @@ static char *dv_to_string_function(const dval_t *f)
         char *out = xstrdup(b.data);
         sbuf_free(&b);
         free(vl.vars);
+        free(cl.vars);
         dv_free(g);
         return out;
     }
@@ -819,6 +852,7 @@ static char *dv_to_string_function(const dval_t *f)
         char *out = xstrdup(b.data);
         sbuf_free(&b);
         free(vl.vars);
+        free(cl.vars);
         dv_free(g);
         return out;
     }

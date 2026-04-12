@@ -47,7 +47,7 @@ typedef struct dval_ops {
     dval_arity_t arity;
     const char  *name;
 
-    /* NEW: constructor for unary ops */
+    /* constructor for unary ops (NULL for non-unary) */
     dval_t *(*apply_unary)(dval_t *arg);
 } dval_ops_t;
 
