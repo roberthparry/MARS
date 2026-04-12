@@ -5152,8 +5152,47 @@ void test_dval_t_to_string(void) {
     RUN_TEST(test_expressions_longname, __func__);
 }
 
+static void test_readme_from_string_example(void) {
+    /* Parse expression and variable binding from a single string.
+       The caller owns the returned handle and must call dv_free() exactly once. */
+    dval_t *f = dval_from_string("{ exp(sin(x)) + 3*x^2 - 7 | x = 1.25 }");
+    if (!f) {
+        printf(C_BOLD C_RED "FAIL" C_RESET
+               " dval_from_string returned NULL %s:%d:1\n\n", __FILE__, __LINE__);
+        TEST_FAIL();
+        return;
+    }
+
+    /* First derivative (owning handle) */
+    dval_t *df_dx = dv_create_deriv(f);
+
+    /* Second derivative (borrowed — owned by df_dx, must not be freed) */
+    const dval_t *d2f_dx = dv_get_deriv(df_dx);
+
+    /* Evaluate */
+    qfloat f_val  = dv_eval(f);
+    qfloat d1_val = dv_eval(df_dx);
+    qfloat d2_val = dv_eval(d2f_dx);
+
+    /* Print symbolic forms */
+    printf("f(x)    = "); dv_print(f);
+    printf("f'(x)   = "); dv_print(df_dx);
+    printf("f''(x)  = "); dv_print(d2f_dx);
+
+    /* Print numeric results */
+    qf_printf("\nAt x = 1.25:\n");
+    qf_printf("f(x)    = %.34q\n", f_val);
+    qf_printf("f'(x)   = %.34q\n", d1_val);
+    qf_printf("f''(x)  = %.34q\n", d2_val);
+
+    /* Free owning handles (x is internal to f — do not free separately) */
+    dv_free(df_dx);
+    dv_free(f);
+}
+
 void test_README_md_example(void) {
-    RUN_TEST(test_readme_example, __func__);
+    RUN_TEST(test_readme_example,             __func__);
+    RUN_TEST(test_readme_from_string_example, __func__);
 }
 
 /* ------------------------------------------------------------------------- */
