@@ -340,7 +340,8 @@
     },
     "test_README_md_example": {
       "enabled": true,
-      "test_readme_example": true
+      "test_readme_example": true,
+      "test_readme_from_string_example": true
     },
     "test_dval_t_from_string": {
       "enabled": true,
