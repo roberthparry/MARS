@@ -92,7 +92,7 @@ extern int tests_skipped;
     do {                                                                          \
         /* Check enable/disable state */                                          \
         if (!test_enabled(__FILE__, #func, parent)) {                             \
-            printf(C_YELLOW "SKIP: %s\n" C_RESET, #func);                         \
+            printf("\r" C_YELLOW "SKIP: %-30s" C_RESET, #func);                   \
             tests_skipped++;                                                      \
             break;                                                                \
         }                                                                         \
@@ -115,7 +115,7 @@ extern int tests_skipped;
             int skipped = skipped_after - skipped_before;                         \
             int passed  = total - failed;                                         \
                                                                                   \
-            printf(C_CYAN "GROUP: %s"                                             \
+            printf("\r" C_CYAN "GROUP: %s"                                        \
                    " " C_RESET "(" C_GREEN "%d passed" C_RESET                    \
                    "," C_RED " %d failed" C_RESET                                 \
                    "," C_YELLOW " %d skipped" C_RESET ")\n" C_RESET,              \

@@ -139,7 +139,7 @@ static dval_t *simplify_unary_fun(dval_t *f, dval_t *a)
         }
     }
 
-    /* NEW: generic unary dispatch */
+    /* generic unary dispatch via the vtable constructor */
     if (f->ops->apply_unary) {
         dval_t *out = f->ops->apply_unary(a);
         dv_free(a);
@@ -179,6 +179,55 @@ static int dv_struct_eq(const dval_t *u, const dval_t *v)
     /* binary ops */
     return dv_struct_eq(u->a, v->a) &&
            dv_struct_eq(u->b, v->b);
+}
+
+/* ------------------------------------------------------------------------- */
+/* Addend helpers for exp-combining                                          */
+/* ------------------------------------------------------------------------- */
+
+/* Flatten an addition tree into individual addends (DFS, iterative).
+ * Each collected node is retained once; na is updated in place. */
+static void flatten_add(dval_t *root, dval_t **addends, int *na, int max)
+{
+    dval_t *stk[64];
+    int sp = 0;
+    stk[sp++] = root;
+    while (sp > 0 && *na < max) {
+        dval_t *n = stk[--sp];
+        if (n->ops == &ops_add) {
+            if (sp < 63) { stk[sp++] = n->b; stk[sp++] = n->a; }
+        } else {
+            dv_retain(n);
+            addends[(*na)++] = n;
+        }
+    }
+}
+
+/* Sort group for addends inside a combined exp argument:
+ *   0 = unary function   (e.g. sin(x), cos(x))
+ *   1 = variable         (e.g. x, y)
+ *   2 = named constant   (e.g. π, e)
+ *   3 = everything else
+ */
+static int addend_group(const dval_t *f)
+{
+    if (f->ops->arity == DV_OP_UNARY) return 0;
+    if (f->ops == &ops_var)           return 1;
+    if (f->ops == &ops_const && f->name && *f->name) return 2;
+    return 3;
+}
+
+/* Primary sort name for an addend: the variable name it depends on,
+ * or its own name for vars/consts. */
+static const char *addend_sort_name(const dval_t *f)
+{
+    if (f->ops == &ops_var)
+        return f->name ? f->name : "";
+    if (f->ops == &ops_const)
+        return f->name ? f->name : "";
+    if (f->a && f->a->ops == &ops_var)
+        return f->a->name ? f->a->name : "";
+    return "";
 }
 
 /* ------------------------------------------------------------------------- */
@@ -363,76 +412,50 @@ dval_t *dv_simplify(dval_t *f)
         }
 
         /* --- exp combining: exp(a) * exp(b) → exp(a+b) ---
-         * Addends are sorted: variables (alphabetical) then named
-         * constants (alphabetical), everything else last. */
+         * Addends are sorted: unary fns (group 0) < vars (group 1) <
+         * named consts (group 2) < everything else (group 3). */
         for (size_t i = 0; i < nterms; ++i) {
             if (!terms[i] || terms[i]->ops != &ops_exp) continue;
 
             for (size_t j = i + 1; j < nterms; ++j) {
                 if (!terms[j] || terms[j]->ops != &ops_exp) continue;
 
-                /* Flatten both exp arguments into individual addends */
                 dval_t *addends[64];
                 int na = 0;
 
-                #define FLATTEN_ADD(root) do { \
-                    dval_t *_stk[64]; int _sp = 0; \
-                    _stk[_sp++] = (root); \
-                    while (_sp > 0 && na < 64) { \
-                        dval_t *_n = _stk[--_sp]; \
-                        if (_n->ops == &ops_add) { \
-                            if (_sp < 63) { _stk[_sp++] = _n->b; _stk[_sp++] = _n->a; } \
-                        } else { \
-                            dv_retain(_n); \
-                            addends[na++] = _n; \
-                        } \
-                    } \
-                } while (0)
-
-                FLATTEN_ADD(terms[i]->a);
-                FLATTEN_ADD(terms[j]->a);
-                #undef FLATTEN_ADD
+                flatten_add(terms[i]->a, addends, &na, 64);
+                flatten_add(terms[j]->a, addends, &na, 64);
 
                 dv_free(terms[i]);
                 dv_free(terms[j]);
                 terms[j] = NULL;
 
-                /* Sort: vars (alpha) < named consts (alpha) < other */
-                #define ADDEND_GROUP(f) \
-                    ((f)->ops == &ops_var ? 0 : \
-                     ((f)->ops == &ops_const && (f)->name && *(f)->name ? 1 : 2))
-                #define ADDEND_NAME(f) \
-                    (((f)->ops == &ops_var || (f)->ops == &ops_const) && (f)->name \
-                     ? (f)->name : "")
-
-                /* simple insertion sort (na is small) */
+                /* insertion sort by group then name */
                 for (int s = 1; s < na; ++s) {
                     dval_t *key = addends[s];
-                    int kg = ADDEND_GROUP(key);
-                    int t = s - 1;
+                    int kg = addend_group(key);
+                    int t  = s - 1;
                     while (t >= 0) {
-                        int tg = ADDEND_GROUP(addends[t]);
-                        int cmp = (tg != kg) ? (tg - kg)
-                                             : strcmp(ADDEND_NAME(addends[t]),
-                                                      ADDEND_NAME(key));
+                        int tg  = addend_group(addends[t]);
+                        int cmp = (tg != kg)
+                                  ? (tg - kg)
+                                  : strcmp(addend_sort_name(addends[t]),
+                                           addend_sort_name(key));
                         if (cmp <= 0) break;
                         addends[t + 1] = addends[t];
                         --t;
                     }
                     addends[t + 1] = key;
                 }
-                #undef ADDEND_GROUP
-                #undef ADDEND_NAME
 
-                /* Rebuild sum in sorted order */
-                dval_t *sum = addends[0]; /* already retained */
+                /* rebuild sum */
+                dval_t *sum = addends[0];
                 for (int k = 1; k < na; ++k) {
                     dval_t *s = dv_add(sum, addends[k]);
                     dv_free(sum);
                     dv_free(addends[k]);
                     sum = s;
                 }
-                /* sum is the combined argument; simplify it */
                 dval_t *simp = dv_simplify(sum);
                 dv_free(sum);
 

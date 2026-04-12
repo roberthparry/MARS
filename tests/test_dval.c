@@ -68,9 +68,9 @@ void test_add(void)
     check_q_at(__FILE__, __LINE__, 1, "2+3",
                dv_eval(f), qf_from_double(5));
 
-    dv_free(c2);
-    dv_free(c3);
     dv_free(f);
+    dv_free(c3);
+    dv_free(c2);
 }
 
 void test_sub(void)
@@ -165,8 +165,8 @@ void test_mul_d(void)
     check_q_at(__FILE__, __LINE__, 1, "3*4",
                dv_eval(f), qf_from_double(12));
 
-    dv_free(three);
     dv_free(f);
+    dv_free(three);
 }
 
 void test_div_d(void)
@@ -3274,7 +3274,7 @@ static void test_expressions(void)
             "x = 1.25\n"
             "expr(x) = x^2\n"
             "return expr(x)",
-            __LINE__ 
+            __LINE__
         },
 
         /* 02 */
@@ -3285,7 +3285,7 @@ static void test_expressions(void)
             "x = 1.25\n"
             "expr(x) = x^3\n"
             "return expr(x)",
-            __LINE__ 
+            __LINE__
         },
 
         /* 03 */
@@ -3297,7 +3297,7 @@ static void test_expressions(void)
             "π = 3.141592653589793238462643383279505\n"
             "expr(x,π) = π*x^2\n"
             "return expr(x,π)",
-            __LINE__ 
+            __LINE__
         },
 
         /* 04 */
@@ -3308,7 +3308,7 @@ static void test_expressions(void)
             "x = 1.25\n"
             "expr(x) = 2*x^2\n"
             "return expr(x)",
-            __LINE__ 
+            __LINE__
         },
 
         /* 05 */
@@ -3319,7 +3319,7 @@ static void test_expressions(void)
             "x = 1.25\n"
             "expr(x) = 4*x^2 + 7\n"
             "return expr(x)",
-            __LINE__ 
+            __LINE__
         },
 
         /* 06 */
@@ -3330,7 +3330,7 @@ static void test_expressions(void)
             "x = 1.25\n"
             "expr(x) = -3*x\n"
             "return expr(x)",
-            __LINE__ 
+            __LINE__
         },
 
         /* 07 */
@@ -3341,7 +3341,7 @@ static void test_expressions(void)
             "x = 1.25\n"
             "expr(x) = x^5\n"
             "return expr(x)",
-            __LINE__ 
+            __LINE__
         },
 
         /* 08 */
@@ -3352,7 +3352,7 @@ static void test_expressions(void)
             "x = 1.25\n"
             "expr(x) = x^7\n"
             "return expr(x)",
-            __LINE__ 
+            __LINE__
         },
 
         /* 09 */
@@ -3364,7 +3364,7 @@ static void test_expressions(void)
             "y = 1.25\n"
             "expr(x,y) = x^3*y^3\n"
             "return expr(x,y)",
-            __LINE__ 
+            __LINE__
         },
 
         /* 10 */
@@ -3375,7 +3375,7 @@ static void test_expressions(void)
             "x = 1.25\n"
             "expr(x) = 12*x^3\n"
             "return expr(x)",
-            __LINE__ 
+            __LINE__
         },
 
         /* 11 */
@@ -3387,7 +3387,7 @@ static void test_expressions(void)
             "y = 1.25\n"
             "expr(x,y) = 6*x^3*y\n"
             "return expr(x,y)",
-            __LINE__ 
+            __LINE__
         },
 
         /* 12 */
@@ -3399,7 +3399,7 @@ static void test_expressions(void)
             "y = 1.25\n"
             "expr(x,y) = x^3*y\n"
             "return expr(x,y)",
-            __LINE__ 
+            __LINE__
         },
 
         /* 13 */
@@ -3410,7 +3410,7 @@ static void test_expressions(void)
             "x = 1.25\n"
             "expr(x) = 3*x\n"
             "return expr(x)",
-            __LINE__ 
+            __LINE__
         },
 
         /* 14 */
@@ -3421,7 +3421,7 @@ static void test_expressions(void)
             "x = 1.25\n"
             "expr(x) = 3*x^2\n"
             "return expr(x)",
-            __LINE__ 
+            __LINE__
         },
 
         /* 15 */
@@ -3432,7 +3432,7 @@ static void test_expressions(void)
             "x = 1.25\n"
             "expr(x) = 6*x\n"
             "return expr(x)",
-            __LINE__ 
+            __LINE__
         },
 
         /* 16 */
@@ -3443,7 +3443,7 @@ static void test_expressions(void)
             "x = 1.25\n"
             "expr(x) = 7*x^2\n"
             "return expr(x)",
-            __LINE__ 
+            __LINE__
         },
 
         /* 17 */
@@ -3455,7 +3455,7 @@ static void test_expressions(void)
             "y = 1.25\n"
             "expr(x,y) = 2*x*y\n"
             "return expr(x,y)",
-            __LINE__ 
+            __LINE__
         },
 
         /* 18 */
@@ -3466,7 +3466,7 @@ static void test_expressions(void)
             "x = 1.25\n"
             "expr(x) = sin(x)*cos(x)\n"
             "return expr(x)",
-            __LINE__ 
+            __LINE__
         },
 
         /* 19 */
@@ -3477,7 +3477,7 @@ static void test_expressions(void)
             "x = 1.25\n"
             "expr(x) = cos(x)*exp(x)\n"
             "return expr(x)",
-            __LINE__ 
+            __LINE__
         },
 
         /* 20 */
@@ -3488,7 +3488,7 @@ static void test_expressions(void)
             "x = 1.25\n"
             "expr(x) = x^2*exp(x)\n"
             "return expr(x)",
-            __LINE__ 
+            __LINE__
         },
 
         /* 21 */
@@ -3499,7 +3499,7 @@ static void test_expressions(void)
             "x = 1.25\n"
             "expr(x) = 3*x^2*exp(x)\n"
             "return expr(x)",
-            __LINE__ 
+            __LINE__
         },
 
         /* 22 */
@@ -3510,7 +3510,7 @@ static void test_expressions(void)
             "x = 1.25\n"
             "expr(x) = x^2*sin(x)\n"
             "return expr(x)",
-            __LINE__ 
+            __LINE__
         },
 
         /* 23 */
@@ -3521,7 +3521,7 @@ static void test_expressions(void)
             "x = 1.25\n"
             "expr(x) = x^2*sin(x)\n"
             "return expr(x)",
-            __LINE__ 
+            __LINE__
         },
 
         /* 24 */
@@ -3532,7 +3532,7 @@ static void test_expressions(void)
             "x = 1.25\n"
             "expr(x) = exp(sin(x))\n"
             "return expr(x)",
-            __LINE__ 
+            __LINE__
         },
 
         /* 25 */
@@ -3543,7 +3543,7 @@ static void test_expressions(void)
             "x = 1.25\n"
             "expr(x) = cos(x)*exp(sin(x))\n"
             "return expr(x)",
-            __LINE__ 
+            __LINE__
         },
 
         /* 26 */
@@ -3554,7 +3554,7 @@ static void test_expressions(void)
             "x = 1.25\n"
             "expr(x) = x^2*exp(sin(x))\n"
             "return expr(x)",
-            __LINE__ 
+            __LINE__
         },
 
         /* 27 */
@@ -3565,7 +3565,7 @@ static void test_expressions(void)
             "x = 1.25\n"
             "expr(x) = exp(sin(x) + cos(x))\n"
             "return expr(x)",
-            __LINE__ 
+            __LINE__
         },
 
         /* 28 */
@@ -3574,9 +3574,9 @@ static void test_expressions(void)
             make_expr_28,
             "{ exp(4x²) | x = 1.25 }",
             "x = 1.25\n"
-            "expr(x) = exp(4x^2)\n"
+            "expr(x) = exp(4*x^2)\n"
             "return expr(x)",
-            __LINE__ 
+            __LINE__
         },
 
         /* 29 */
@@ -3587,7 +3587,7 @@ static void test_expressions(void)
             "x = 1.25\n"
             "expr(x) = exp(3*x)\n"
             "return expr(x)",
-            __LINE__ 
+            __LINE__
         },
 
         /* 30 */
@@ -3598,7 +3598,7 @@ static void test_expressions(void)
             "x = 1.25\n"
             "expr(x) = exp(sin(x) + cos(x) + x)\n"
             "return expr(x)",
-            __LINE__ 
+            __LINE__
         },
 
         /* 31 */
@@ -3610,7 +3610,7 @@ static void test_expressions(void)
             "π = 3.141592653589793238462643383279505\n"
             "expr(x,π) = π*sin(x)\n"
             "return expr(x,π)",
-            __LINE__ 
+            __LINE__
         },
 
         /* 32 */
@@ -3622,7 +3622,7 @@ static void test_expressions(void)
             "τ = 6.283185307179586476925286766559011\n"
             "expr(x,τ) = τ*cos(x)\n"
             "return expr(x,τ)",
-            __LINE__ 
+            __LINE__
         },
 
         /* 33 */
@@ -3634,7 +3634,7 @@ static void test_expressions(void)
             "e = 2.718281828459045235360287471352664\n"
             "expr(x,e) = e*x^2\n"
             "return expr(x,e)",
-            __LINE__ 
+            __LINE__
         },
 
         /* 34 */
@@ -3647,7 +3647,7 @@ static void test_expressions(void)
             "e = 2.718281828459045235360287471352664\n"
             "expr(π,τ,e) = π*τ*e\n"
             "return expr(π,τ,e)",
-            __LINE__ 
+            __LINE__
         },
 
         /* 35 */
@@ -3659,9 +3659,9 @@ static void test_expressions(void)
             "y = 1.25\n"
             "π = 3.141592653589793238462643383279505\n"
             "τ = 6.283185307179586476925286766559011\n"
-            "expr(x,y,π,τ) = π*x*τ*y\n"
+            "expr(x,y,π,τ) = π*τ*x*y\n"
             "return expr(x,y,π,τ)",
-            __LINE__ 
+            __LINE__
         },
 
         /* 36 */
@@ -3673,7 +3673,7 @@ static void test_expressions(void)
             "π = 3.141592653589793238462643383279505\n"
             "expr(x,π) = π*exp(x)\n"
             "return expr(x,π)",
-            __LINE__ 
+            __LINE__
         },
 
         /* 37 */
@@ -3685,7 +3685,7 @@ static void test_expressions(void)
             "τ = 6.283185307179586476925286766559011\n"
             "expr(x,τ) = τ*exp(x^2)\n"
             "return expr(x,τ)",
-            __LINE__ 
+            __LINE__
         },
 
         /* 38 */
@@ -3698,7 +3698,7 @@ static void test_expressions(void)
             "e = 2.718281828459045235360287471352664\n"
             "expr(x,y,e) = e*sin(x)*cos(y)\n"
             "return expr(x,y,e)",
-            __LINE__ 
+            __LINE__
         },
 
         /* 39 */
@@ -3711,7 +3711,7 @@ static void test_expressions(void)
             "τ = 6.283185307179586476925286766559011\n"
             "expr(x,π,τ) = π*exp(τ*x)\n"
             "return expr(x,π,τ)",
-            __LINE__ 
+            __LINE__
         },
 
         /* 40 */
@@ -3724,7 +3724,7 @@ static void test_expressions(void)
             "τ = 6.283185307179586476925286766559011\n"
             "expr(x,π,τ) = τ*exp(π*x)\n"
             "return expr(x,π,τ)",
-            __LINE__ 
+            __LINE__
         },
 
         /* 41 */
@@ -3837,7 +3837,7 @@ static void test_expressions(void)
         {
             "sin(x+π)*cos(y+τ)",
             make_expr_49,
-            "{ cos(y + τ)·sin(x + π) | x = 1.25, y = 1.25; π = 3.141592653589793238462643383279505, τ = 6.283185307179586476925286766559011 }",
+            "{ sin(x + π)·cos(y + τ) | x = 1.25, y = 1.25; π = 3.141592653589793238462643383279505, τ = 6.283185307179586476925286766559011 }",
             "x = 1.25\n"
             "y = 1.25\n"
             "π = 3.141592653589793238462643383279505\n"
@@ -3934,7 +3934,7 @@ static void test_expressions(void)
 }
 
 /* Build expression: f(x) = exp(sin(x)) + 3*x^2 - 7 */
-dval_t *make_f(dval_t *x) {
+static dval_t *make_f(dval_t *x) {
     dval_t *sinx   = dv_sin(x);
     dval_t *exp_sx = dv_exp(sinx);
     dval_t *x2     = dv_pow_d(x, 2.0);
@@ -3948,10 +3948,10 @@ dval_t *make_f(dval_t *x) {
     dv_free(term2);
     dv_free(f0);
 
-    return f;    
+    return f;
 }
 
-int test_readme_example(void) {
+static void test_readme_example(void) {
     /* Create a named variable x with initial value 1.25 */
     dval_t *x = dv_new_named_var_d(1.25, "x");
 
@@ -3986,8 +3986,6 @@ int test_readme_example(void) {
     dv_free(df_dx);
     dv_free(f);
     dv_free(x);
-
-    return 0;
 }
 
 void test_arithmetic(void) {
