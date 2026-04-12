@@ -268,7 +268,9 @@ dval_t *dv_simplify(dval_t *f)
             return dv_new_const(c);
         }
 
-        return dv_neg(a);
+        dval_t *r = dv_neg(a);
+        dv_free(a);
+        return r;
     }
 
     /* ============================================================
@@ -296,7 +298,10 @@ dval_t *dv_simplify(dval_t *f)
             return make_scaled(qf_add(ca, cb), (dval_t *)base_a);
         }
 
-        return dv_add(a, b);
+        dval_t *r = dv_add(a, b);
+        dv_free(a);
+        dv_free(b);
+        return r;
     }
 
     /* ============================================================
@@ -323,7 +328,10 @@ dval_t *dv_simplify(dval_t *f)
             return make_scaled(qf_sub(ca, cb), (dval_t *)base_a);
         }
 
-        return dv_sub(a, b);
+        dval_t *r = dv_sub(a, b);
+        dv_free(a);
+        dv_free(b);
+        return r;
     }
 
     /* ============================================================
@@ -514,7 +522,10 @@ dval_t *dv_simplify(dval_t *f)
             return dv_new_const(q);
         }
 
-        return dv_div(a, b);
+        dval_t *r = dv_div(a, b);
+        dv_free(a);
+        dv_free(b);
+        return r;
     }
 
     /* ============================================================
@@ -531,7 +542,9 @@ dval_t *dv_simplify(dval_t *f)
             return dv_new_const_d(1.0);
         }
 
-        return dv_pow_d(a, ed);
+        dval_t *r = dv_pow_d(a, ed);
+        dv_free(a);
+        return r;
     }
 
     /* ============================================================
@@ -550,7 +563,10 @@ dval_t *dv_simplify(dval_t *f)
             return dv_new_const_d(1.0);
         }
 
-        return dv_pow(a, b);
+        dval_t *r = dv_pow(a, b);
+        dv_free(a);
+        dv_free(b);
+        return r;
     }
 
     /* ============================================================
