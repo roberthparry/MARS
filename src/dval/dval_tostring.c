@@ -553,6 +553,22 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
         return;
     }
 
+    /* Negation: -a  — only parenthesise when the child is an add/sub */
+    if (f->ops == &ops_neg) {
+        int need = PREC_UNARY < parent_prec;
+        if (need) sbuf_putc(b, '(');
+
+        const dval_t *a = f->a;
+        int child_needs_paren = (a->ops == &ops_add || a->ops == &ops_sub);
+        sbuf_putc(b, '-');
+        if (child_needs_paren) sbuf_putc(b, '(');
+        emit_expr(a, b, 0);
+        if (child_needs_paren) sbuf_putc(b, ')');
+
+        if (need) sbuf_putc(b, ')');
+        return;
+    }
+
     /* Unary ops */
     if (f->ops->arity == DV_OP_UNARY) {
         int need = PREC_UNARY < parent_prec;
