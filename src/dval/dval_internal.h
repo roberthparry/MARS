@@ -125,6 +125,25 @@ extern const dval_ops_t ops_sqrt;
 extern const dval_ops_t ops_pow_d;
 extern const dval_ops_t ops_pow;
 
+extern const dval_ops_t ops_abs;
+extern const dval_ops_t ops_erf;
+extern const dval_ops_t ops_erfc;
+extern const dval_ops_t ops_erfinv;
+extern const dval_ops_t ops_erfcinv;
+extern const dval_ops_t ops_gamma;
+extern const dval_ops_t ops_lgamma;
+extern const dval_ops_t ops_digamma;
+extern const dval_ops_t ops_lambert_w0;
+extern const dval_ops_t ops_lambert_wm1;
+extern const dval_ops_t ops_beta;
+extern const dval_ops_t ops_logbeta;
+extern const dval_ops_t ops_normal_pdf;
+extern const dval_ops_t ops_normal_cdf;
+extern const dval_ops_t ops_normal_logpdf;
+extern const dval_ops_t ops_ei;
+extern const dval_ops_t ops_e1;
+extern const dval_ops_t ops_hypot;
+
 /* ------------------------------------------------------------------------- */
 /* Internal helpers                                                          */
 /* ------------------------------------------------------------------------- */

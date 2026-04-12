@@ -770,6 +770,15 @@ qfloat qf_lgamma(qfloat x);
 qfloat qf_digamma(qfloat x);
 
 /**
+ * @brief Compute the trigamma function (psi'(x), the first derivative of
+ *        digamma) for a qfloat argument.
+ *
+ * @param x Input value. Must not be a non-positive integer (pole).
+ * @return trigamma(x) (double-double precision).
+ */
+qfloat qf_trigamma(qfloat x);
+
+/**
  * @brief Compute the main branch of the inverse of the gamma function.
  *
  * @param y Input value.

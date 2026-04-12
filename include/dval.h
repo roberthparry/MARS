@@ -126,6 +126,29 @@ dval_t *dv_pow_d(dval_t *f, double d);
 dval_t *dv_pow(dval_t *f, dval_t *g);
 
 /* ------------------------------------------------------------------------- */
+/* Special functions (owning)                                                */
+/* ------------------------------------------------------------------------- */
+
+dval_t *dv_abs(dval_t *f);
+dval_t *dv_hypot(dval_t *f, dval_t *g);
+dval_t *dv_erf(dval_t *f);
+dval_t *dv_erfc(dval_t *f);
+dval_t *dv_erfinv(dval_t *f);
+dval_t *dv_erfcinv(dval_t *f);
+dval_t *dv_gamma(dval_t *f);
+dval_t *dv_lgamma(dval_t *f);
+dval_t *dv_digamma(dval_t *f);
+dval_t *dv_lambert_w0(dval_t *f);
+dval_t *dv_lambert_wm1(dval_t *f);
+dval_t *dv_beta(dval_t *f, dval_t *g);
+dval_t *dv_logbeta(dval_t *f, dval_t *g);
+dval_t *dv_normal_pdf(dval_t *f);
+dval_t *dv_normal_cdf(dval_t *f);
+dval_t *dv_normal_logpdf(dval_t *f);
+dval_t *dv_ei(dval_t *f);
+dval_t *dv_e1(dval_t *f);
+
+/* ------------------------------------------------------------------------- */
 /* Debug / lifetime                                                          */
 /* ------------------------------------------------------------------------- */
 

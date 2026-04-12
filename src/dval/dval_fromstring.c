@@ -326,23 +326,50 @@ static const struct {
     unary_fn    ufn;
     binary_fn   bfn;
 } s_funcs[] = {
-    { "atan2", 5, 1, NULL,     dv_atan2 },
-    { "asinh", 5, 0, dv_asinh, NULL     },
-    { "acosh", 5, 0, dv_acosh, NULL     },
-    { "atanh", 5, 0, dv_atanh, NULL     },
-    { "sinh",  4, 0, dv_sinh,  NULL     },
-    { "cosh",  4, 0, dv_cosh,  NULL     },
-    { "tanh",  4, 0, dv_tanh,  NULL     },
-    { "asin",  4, 0, dv_asin,  NULL     },
-    { "acos",  4, 0, dv_acos,  NULL     },
-    { "atan",  4, 0, dv_atan,  NULL     },
-    { "sqrt",  4, 0, dv_sqrt,  NULL     },
-    { "pow",   3, 1, NULL,     dv_pow   },
-    { "sin",   3, 0, dv_sin,   NULL     },
-    { "cos",   3, 0, dv_cos,   NULL     },
-    { "tan",   3, 0, dv_tan,   NULL     },
-    { "exp",   3, 0, dv_exp,   NULL     },
-    { "log",   3, 0, dv_log,   NULL     },
+    /* 13-char */
+    { "normal_logpdf", 13, 0, dv_normal_logpdf, NULL          },
+    /* 11-char */
+    { "lambert_wm1",   11, 0, dv_lambert_wm1,   NULL          },
+    /* 10-char */
+    { "lambert_w0",    10, 0, dv_lambert_w0,    NULL          },
+    { "normal_pdf",    10, 0, dv_normal_pdf,    NULL          },
+    { "normal_cdf",    10, 0, dv_normal_cdf,    NULL          },
+    /* 7-char */
+    { "logbeta",        7, 1, NULL,              dv_logbeta    },
+    { "erfcinv",        7, 0, dv_erfcinv,        NULL          },
+    { "digamma",        7, 0, dv_digamma,        NULL          },
+    /* 6-char */
+    { "erfinv",         6, 0, dv_erfinv,         NULL          },
+    { "lgamma",         6, 0, dv_lgamma,         NULL          },
+    /* 5-char */
+    { "atan2",          5, 1, NULL,              dv_atan2      },
+    { "asinh",          5, 0, dv_asinh,          NULL          },
+    { "acosh",          5, 0, dv_acosh,          NULL          },
+    { "atanh",          5, 0, dv_atanh,          NULL          },
+    { "hypot",          5, 1, NULL,              dv_hypot      },
+    { "gamma",          5, 0, dv_gamma,          NULL          },
+    /* 4-char */
+    { "sinh",           4, 0, dv_sinh,           NULL          },
+    { "cosh",           4, 0, dv_cosh,           NULL          },
+    { "tanh",           4, 0, dv_tanh,           NULL          },
+    { "asin",           4, 0, dv_asin,           NULL          },
+    { "acos",           4, 0, dv_acos,           NULL          },
+    { "atan",           4, 0, dv_atan,           NULL          },
+    { "sqrt",           4, 0, dv_sqrt,           NULL          },
+    { "erfc",           4, 0, dv_erfc,           NULL          },
+    { "beta",           4, 1, NULL,              dv_beta       },
+    /* 3-char */
+    { "pow",            3, 1, NULL,              dv_pow        },
+    { "sin",            3, 0, dv_sin,            NULL          },
+    { "cos",            3, 0, dv_cos,            NULL          },
+    { "tan",            3, 0, dv_tan,            NULL          },
+    { "exp",            3, 0, dv_exp,            NULL          },
+    { "log",            3, 0, dv_log,            NULL          },
+    { "erf",            3, 0, dv_erf,            NULL          },
+    { "abs",            3, 0, dv_abs,            NULL          },
+    /* 2-char */
+    { "ei",             2, 0, dv_ei,             NULL          },
+    { "e1",             2, 0, dv_e1,             NULL          },
 };
 #define N_FUNCS ((int)(sizeof(s_funcs)/sizeof(s_funcs[0])))
 
