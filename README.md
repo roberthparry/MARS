@@ -39,6 +39,7 @@ Every module is self‑contained, header‑driven, and usable independently.
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• <a href="#-differentiable-values-dval_t">Overview</a><br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• <a href="#-example-singlevariable-expression-with-first-and-second-derivatives">Example: Single‑Variable Expression</a><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• <a href="#-example-constructing-an-expression-from-a-string">Example: Constructing an Expression from a String</a><br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;• <a href="#-internal-architecture--dval_t">Internal Architecture — <code>dval_t</code></a>
 
 </details>
@@ -419,6 +420,83 @@ int main(void) {
     dv_free(df_dx);
     dv_free(f);
     dv_free(x);
+
+    return 0;
+}
+```
+
+#### Expected Symbolic Output
+
+```
+f(x)    = { exp(sin(x)) + 3x² - 7 | x = 1.25 }
+f'(x)   = { cos(x)·exp(sin(x)) + 6x | x = 1.25 }
+f''(x)  = { cos²(x)·exp(sin(x)) - sin(x)·exp(sin(x)) + 6 | x = 1.25 }
+```
+
+#### Expected Numeric Output at x = 1.25
+
+```
+At x = 1.25:
+f(x)    = 0.2705855122552273437029639300166272
+f'(x)   = 8.3145046259933109960293996152090640
+f''(x)  = 3.8055231012396292258221776404244160
+```
+
+---
+
+### 📘 **Example: Constructing an Expression from a String**
+
+The same computation can be expressed entirely as a string. `dval_from_string`
+parses the expression and its variable bindings in one call — no manual node
+construction required. The symbolic and numeric results are identical to the
+previous example.
+
+#### Expression String Format
+
+```
+{ expr | var₀ = val, var₁ = val, ... ; [named_const] = val, ... }
+```
+
+Variables (differentiated with respect to) appear before the `;`; named
+constants appear after it. For this example there is one variable and no
+named constants.
+
+Both Unicode subscripts (`x₀`) and ASCII alternatives (`x_0`) are accepted,
+as are `*` in place of `·` and `^n` in place of Unicode superscripts (`²`, `³`, …).
+
+#### Example Code
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include "dval.h"
+
+int main(void) {
+    /* Parse expression and variable binding from a single string.
+       The caller owns the returned handle and must call dv_free() exactly once. */
+    dval_t *f = dval_from_string("{ exp(sin(x)) + 3*x^2 - 7 | x = 1.25 }");
+    if (!f) return 1;   /* dval_from_string writes diagnostics to stderr on error */
+
+    /* First derivative (owning handle) */
+    dval_t *df_dx = dv_create_deriv(f);
+
+    /* Second derivative (borrowed — owned by df_dx, must not be freed) */
+    const dval_t *d2f_dx = dv_get_deriv(df_dx);
+
+    /* Print symbolic forms */
+    printf("f(x)    = "); dv_print(f);
+    printf("f'(x)   = "); dv_print(df_dx);
+    printf("f''(x)  = "); dv_print(d2f_dx);
+
+    /* Print numeric results */
+    qf_printf("\nAt x = 1.25:\n");
+    qf_printf("f(x)    = %.34q\n", dv_eval(f));
+    qf_printf("f'(x)   = %.34q\n", dv_eval(df_dx));
+    qf_printf("f''(x)  = %.34q\n", dv_eval(d2f_dx));
+
+    /* Free owning handles (x is internal to f — do not free separately) */
+    dv_free(df_dx);
+    dv_free(f);
 
     return 0;
 }

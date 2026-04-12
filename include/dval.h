@@ -156,4 +156,27 @@ char *dv_to_string(const dval_t *f, style_t style);
  */
 void dv_print(const dval_t *f);
 
+/* ------------------------------------------------------------------------- */
+/* Parsing                                                                   */
+/* ------------------------------------------------------------------------- */
+
+/**
+ * @brief Construct a dval_t from an expression-style string.
+ *
+ * Accepts strings in the format produced by dv_to_string(f, style_EXPRESSION):
+ *
+ *   { expr | x₀ = val, ...; [name] = val, ... }
+ *
+ * or for a pure named constant:
+ *
+ *   { name = val }
+ *
+ * Variables appear before the ';' in the binding section; named constants
+ * appear after it.  Returns an owning handle on success, or NULL on error
+ * (error details are written to stderr).
+ *
+ * The caller must call dv_free() on the returned pointer exactly once.
+ */
+dval_t *dval_from_string(const char *s);
+
 #endif /* DVAL_H */

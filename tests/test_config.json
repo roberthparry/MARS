@@ -284,7 +284,8 @@
       "test_to_string_all": true,
       "test_expressions": true,
       "test_expressions_unnamed": true,
-      "test_expressions_longname": true
+      "test_expressions_longname": true,
+      "test_dval_from_string": true
     },
     "test_to_string_all": {
       "enabled": true,
@@ -340,6 +341,25 @@
     "test_README_md_example": {
       "enabled": true,
       "test_readme_example": true
+    },
+    "test_dval_t_from_string": {
+      "enabled": true,
+      "test_from_string_pure_const": true,
+      "test_from_string_arithmetic": true,
+      "test_from_string_functions": true,
+      "test_from_string_named_consts": true,
+      "test_from_string_bracketed_names": true,
+      "test_from_string_errors": true,
+      "test_from_string_round_trips": true,
+      "test_from_string_ascii_alternatives": true,
+      "test_from_string_deriv": true
+    },
+    "test_from_string_ascii_alternatives": {
+      "enabled": true,
+      "test_from_string_subscripts": true,
+      "test_from_string_star_mul": true,
+      "test_from_string_func_power": true,
+      "test_from_string_composed": true
     }
   },
   "tests/test_datetime.c": {
