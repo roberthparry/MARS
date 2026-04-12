@@ -2840,6 +2840,82 @@ qfloat qf_digamma(qfloat x)
     return qf_digamma_asymp(x);
 }
 
+/* trigamma */
+
+/* Asymptotic expansion of psi'(x) for x > 20.
+ *
+ * psi'(x) ~ 1/x + 1/(2x^2) + sum_{n=1..N} B_{2n} / x^{2n+1}
+ *
+ * Bernoulli numbers B_2, B_4, ..., B_34 are given as exact rational
+ * fractions (numerators fit in 43 bits, exact as double).
+ * At x = 20, 17 terms give truncation error < 2e-34 (well within qfloat
+ * precision).  Optimal-truncation error at x > 20 is < e^{-125} ~ 10^{-55}.
+ */
+static qfloat qf_trigamma_asymp(qfloat x)
+{
+    static const struct { double num; double den; int sign; } B[] = {
+        {         1.0,       6.0,  1},  /* B_2  =  1/6             */
+        {         1.0,      30.0, -1},  /* B_4  = -1/30            */
+        {         1.0,      42.0,  1},  /* B_6  =  1/42            */
+        {         1.0,      30.0, -1},  /* B_8  = -1/30            */
+        {         5.0,      66.0,  1},  /* B_10 =  5/66            */
+        {       691.0,    2730.0, -1},  /* B_12 = -691/2730        */
+        {         7.0,       6.0,  1},  /* B_14 =  7/6             */
+        {      3617.0,     510.0, -1},  /* B_16 = -3617/510        */
+        {     43867.0,     798.0,  1},  /* B_18 =  43867/798       */
+        {    174611.0,     330.0, -1},  /* B_20 = -174611/330      */
+        {    854513.0,     138.0,  1},  /* B_22 =  854513/138      */
+        { 236364091.0,    2730.0, -1},  /* B_24 = -236364091/2730  */
+        {   8553103.0,       6.0,  1},  /* B_26 =  8553103/6       */
+        {23749461029.0,    870.0, -1},  /* B_28 = -23749461029/870 */
+        {8615841276005.0, 14322.0, 1},  /* B_30 =  8615841276005/14322 */
+        {7709321041217.0,   510.0,-1},  /* B_32 = -7709321041217/510   */
+        {2577687858367.0,     6.0, 1},  /* B_34 =  2577687858367/6     */
+    };
+    static const int N = (int)(sizeof B / sizeof B[0]);
+
+    qfloat xi  = qf_div(qf_from_double(1.0), x);
+    qfloat xi2 = qf_mul(xi, xi);
+    qfloat xip = xi;
+    qfloat sum = xip;                                    /* 1/x */
+    xip = qf_mul(xip, xi);
+    sum = qf_add(sum, qf_mul(xip, qf_from_double(0.5))); /* 1/(2x^2) */
+    xip = qf_mul(xip, xi);                              /* xi^3 */
+
+    for (int n = 0; n < N; n++) {
+        qfloat coeff = qf_div(qf_from_double(B[n].num), qf_from_double(B[n].den));
+        if (B[n].sign < 0) coeff = qf_neg(coeff);
+        sum = qf_add(sum, qf_mul(coeff, xip));
+        xip = qf_mul(xip, xi2);
+    }
+    return sum;
+}
+
+qfloat qf_trigamma(qfloat x)
+{
+    qfloat one = qf_from_double(1.0);
+
+    /* Poles at non-positive integers */
+    if (x.hi <= 0.0 && x.hi == floor(x.hi))
+        return QF_NAN;
+
+    /* Reflection: psi'(x) + psi'(1-x) = pi^2 / sin^2(pi*x) */
+    if (x.hi < 0.5) {
+        qfloat sinpx = qf_sin(qf_mul(QF_PI, x));
+        qfloat pi2   = qf_mul(QF_PI, QF_PI);
+        return qf_sub(qf_div(pi2, qf_mul(sinpx, sinpx)),
+                      qf_trigamma(qf_sub(one, x)));
+    }
+
+    /* Recurrence: psi'(x) = psi'(x+1) + 1/x^2 — shift x to > 20 */
+    if (x.hi <= 20.0) {
+        qfloat inv_x2 = qf_div(one, qf_mul(x, x));
+        return qf_add(inv_x2, qf_trigamma(qf_add(x, one)));
+    }
+
+    return qf_trigamma_asymp(x);
+}
+
 /* gammainv */
 
 static const qfloat QF_GAMMA_MIN_VAL = { 0.885603194410888700278815900582588, 0.0 };

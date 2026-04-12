@@ -208,7 +208,25 @@
       "test_log": true,
       "test_sqrt": true,
       "test_pow_d": true,
-      "test_pow": true
+      "test_pow": true,
+      "test_abs": true,
+      "test_hypot": true,
+      "test_erf": true,
+      "test_erfc": true,
+      "test_erfinv": true,
+      "test_erfcinv": true,
+      "test_gamma": true,
+      "test_lgamma": true,
+      "test_digamma": true,
+      "test_lambert_w0": true,
+      "test_lambert_wm1": true,
+      "test_normal_pdf": true,
+      "test_normal_cdf": true,
+      "test_normal_logpdf": true,
+      "test_ei": true,
+      "test_e1": true,
+      "test_beta": true,
+      "test_logbeta": true
     },
     "test_first_derivatives": {
       "enabled": true,
@@ -243,7 +261,25 @@
       "test_deriv_sqrt_sin_x2": true,
       "test_deriv_log_cosh": true,
       "test_deriv_x2_exp_negx": true,
-      "test_deriv_atan_x_over_sqrt": true
+      "test_deriv_atan_x_over_sqrt": true,
+      "test_deriv_abs": true,
+      "test_deriv_hypot": true,
+      "test_deriv_erf": true,
+      "test_deriv_erfc": true,
+      "test_deriv_erfinv": true,
+      "test_deriv_erfcinv": true,
+      "test_deriv_gamma": true,
+      "test_deriv_lgamma": true,
+      "test_deriv_digamma": true,
+      "test_deriv_lambert_w0": true,
+      "test_deriv_lambert_wm1": true,
+      "test_deriv_normal_pdf": true,
+      "test_deriv_normal_cdf": true,
+      "test_deriv_normal_logpdf": true,
+      "test_deriv_ei": true,
+      "test_deriv_e1": true,
+      "test_deriv_beta": true,
+      "test_deriv_logbeta": true
     },
     "test_second_derivatives": {
       "enabled": true,
@@ -277,7 +313,24 @@
       "test_second_deriv_sqrt_sin_x2": true,
       "test_second_deriv_log_cosh": true,
       "test_second_deriv_x2_exp_negx": true,
-      "test_second_deriv_atan_x_over_sqrt": true
+      "test_second_deriv_atan_x_over_sqrt": true,
+      "test_second_deriv_abs": true,
+      "test_second_deriv_hypot": true,
+      "test_second_deriv_erf": true,
+      "test_second_deriv_erfc": true,
+      "test_second_deriv_gamma": true,
+      "test_second_deriv_lgamma": true,
+      "test_second_deriv_normal_pdf": true,
+      "test_second_deriv_normal_cdf": true,
+      "test_second_deriv_normal_logpdf": true,
+      "test_second_deriv_ei": true,
+      "test_second_deriv_e1": true,
+      "test_second_deriv_erfinv": true,
+      "test_second_deriv_erfcinv": true,
+      "test_second_deriv_lambert_w0": true,
+      "test_second_deriv_lambert_wm1": true,
+      "test_second_deriv_beta": true,
+      "test_second_deriv_logbeta": true
     },
     "test_dval_t_to_string": {
       "enabled": true,
@@ -296,7 +349,8 @@
       "test_to_string_atan2": true,
       "test_to_string_pow_superscript": true,
       "test_to_string_unary_sin": true,
-      "test_to_string_function_style": true
+      "test_to_string_function_style": true,
+      "test_to_string_special_functions": true
     },
     "test_to_string_basic_const": {
       "enabled": true,
@@ -353,7 +407,8 @@
       "test_from_string_errors": true,
       "test_from_string_round_trips": true,
       "test_from_string_ascii_alternatives": true,
-      "test_from_string_deriv": true
+      "test_from_string_deriv": true,
+      "test_from_string_special_functions": true
     },
     "test_from_string_ascii_alternatives": {
       "enabled": true,

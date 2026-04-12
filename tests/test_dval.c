@@ -376,6 +376,212 @@ void test_pow(void)
     dv_free(base);
 }
 
+/* Special functions */
+
+void test_abs(void)
+{
+    dval_t *c = dv_new_const_d(-0.5);
+    dval_t *f = dv_abs(c);
+
+    check_q_at(__FILE__, __LINE__, 1, "abs(-0.5)", dv_eval(f), qf_abs(qf_from_double(-0.5)));
+
+    dv_free(f);
+    dv_free(c);
+}
+
+void test_hypot(void)
+{
+    dval_t *a = dv_new_const_d(3.0);
+    dval_t *b = dv_new_const_d(4.0);
+    dval_t *f = dv_hypot(a, b);
+
+    check_q_at(__FILE__, __LINE__, 1, "hypot(3,4)", dv_eval(f), qf_hypot(qf_from_double(3.0), qf_from_double(4.0)));
+
+    dv_free(f);
+    dv_free(b);
+    dv_free(a);
+}
+
+void test_erf(void)
+{
+    dval_t *c = dv_new_const_d(0.5);
+    dval_t *f = dv_erf(c);
+
+    check_q_at(__FILE__, __LINE__, 1, "erf(0.5)", dv_eval(f), qf_erf(qf_from_double(0.5)));
+
+    dv_free(f);
+    dv_free(c);
+}
+
+void test_erfc(void)
+{
+    dval_t *c = dv_new_const_d(0.5);
+    dval_t *f = dv_erfc(c);
+
+    check_q_at(__FILE__, __LINE__, 1, "erfc(0.5)", dv_eval(f), qf_erfc(qf_from_double(0.5)));
+
+    dv_free(f);
+    dv_free(c);
+}
+
+void test_erfinv(void)
+{
+    dval_t *c = dv_new_const_d(0.5);
+    dval_t *f = dv_erfinv(c);
+
+    check_q_at(__FILE__, __LINE__, 1, "erfinv(0.5)", dv_eval(f), qf_erfinv(qf_from_double(0.5)));
+
+    dv_free(f);
+    dv_free(c);
+}
+
+void test_erfcinv(void)
+{
+    dval_t *c = dv_new_const_d(0.5);
+    dval_t *f = dv_erfcinv(c);
+
+    check_q_at(__FILE__, __LINE__, 1, "erfcinv(0.5)", dv_eval(f), qf_erfcinv(qf_from_double(0.5)));
+
+    dv_free(f);
+    dv_free(c);
+}
+
+void test_gamma(void)
+{
+    dval_t *c = dv_new_const_d(2.0);
+    dval_t *f = dv_gamma(c);
+
+    check_q_at(__FILE__, __LINE__, 1, "gamma(2)", dv_eval(f), qf_gamma(qf_from_double(2.0)));
+
+    dv_free(f);
+    dv_free(c);
+}
+
+void test_lgamma(void)
+{
+    dval_t *c = dv_new_const_d(2.0);
+    dval_t *f = dv_lgamma(c);
+
+    check_q_at(__FILE__, __LINE__, 1, "lgamma(2)", dv_eval(f), qf_lgamma(qf_from_double(2.0)));
+
+    dv_free(f);
+    dv_free(c);
+}
+
+void test_digamma(void)
+{
+    dval_t *c = dv_new_const_d(2.0);
+    dval_t *f = dv_digamma(c);
+
+    check_q_at(__FILE__, __LINE__, 1, "digamma(2)", dv_eval(f), qf_digamma(qf_from_double(2.0)));
+
+    dv_free(f);
+    dv_free(c);
+}
+
+void test_lambert_w0(void)
+{
+    dval_t *c = dv_new_const_d(1.0);
+    dval_t *f = dv_lambert_w0(c);
+
+    check_q_at(__FILE__, __LINE__, 1, "lambert_w0(1)", dv_eval(f), qf_lambert_w0(qf_from_double(1.0)));
+
+    dv_free(f);
+    dv_free(c);
+}
+
+void test_lambert_wm1(void)
+{
+    dval_t *c = dv_new_const_d(-0.1);
+    dval_t *f = dv_lambert_wm1(c);
+
+    check_q_at(__FILE__, __LINE__, 1, "lambert_wm1(-0.1)", dv_eval(f), qf_lambert_wm1(qf_from_double(-0.1)));
+
+    dv_free(f);
+    dv_free(c);
+}
+
+void test_normal_pdf(void)
+{
+    dval_t *c = dv_new_const_d(0.5);
+    dval_t *f = dv_normal_pdf(c);
+
+    check_q_at(__FILE__, __LINE__, 1, "normal_pdf(0.5)", dv_eval(f), qf_normal_pdf(qf_from_double(0.5)));
+
+    dv_free(f);
+    dv_free(c);
+}
+
+void test_normal_cdf(void)
+{
+    dval_t *c = dv_new_const_d(0.5);
+    dval_t *f = dv_normal_cdf(c);
+
+    check_q_at(__FILE__, __LINE__, 1, "normal_cdf(0.5)", dv_eval(f), qf_normal_cdf(qf_from_double(0.5)));
+
+    dv_free(f);
+    dv_free(c);
+}
+
+void test_normal_logpdf(void)
+{
+    dval_t *c = dv_new_const_d(0.5);
+    dval_t *f = dv_normal_logpdf(c);
+
+    check_q_at(__FILE__, __LINE__, 1, "normal_logpdf(0.5)", dv_eval(f), qf_normal_logpdf(qf_from_double(0.5)));
+
+    dv_free(f);
+    dv_free(c);
+}
+
+void test_ei(void)
+{
+    dval_t *c = dv_new_const_d(1.0);
+    dval_t *f = dv_ei(c);
+
+    check_q_at(__FILE__, __LINE__, 1, "ei(1)", dv_eval(f), qf_ei(qf_from_double(1.0)));
+
+    dv_free(f);
+    dv_free(c);
+}
+
+void test_e1(void)
+{
+    dval_t *c = dv_new_const_d(1.0);
+    dval_t *f = dv_e1(c);
+
+    check_q_at(__FILE__, __LINE__, 1, "e1(1)", dv_eval(f), qf_e1(qf_from_double(1.0)));
+
+    dv_free(f);
+    dv_free(c);
+}
+
+void test_beta(void)
+{
+    dval_t *a = dv_new_const_d(2.0);
+    dval_t *b = dv_new_const_d(3.0);
+    dval_t *f = dv_beta(a, b);
+
+    check_q_at(__FILE__, __LINE__, 1, "beta(2,3)", dv_eval(f), qf_beta(qf_from_double(2.0), qf_from_double(3.0)));
+
+    dv_free(f);
+    dv_free(b);
+    dv_free(a);
+}
+
+void test_logbeta(void)
+{
+    dval_t *a = dv_new_const_d(2.0);
+    dval_t *b = dv_new_const_d(3.0);
+    dval_t *f = dv_logbeta(a, b);
+
+    check_q_at(__FILE__, __LINE__, 1, "logbeta(2,3)", dv_eval(f), qf_logbeta(qf_from_double(2.0), qf_from_double(3.0)));
+
+    dv_free(f);
+    dv_free(b);
+    dv_free(a);
+}
+
 /* ------------------------------------------------------------------------- */
 /* First derivative tests                                                     */
 /* ------------------------------------------------------------------------- */
@@ -884,6 +1090,310 @@ void test_deriv_atan_x_over_sqrt(void)
     dv_free(den);
     dv_free(one);
     dv_free(x2);
+    dv_free(x);
+}
+
+/* Special function first derivative tests */
+
+void test_deriv_abs(void)
+{
+    dval_t *x  = dv_new_var_d(0.8);
+    dval_t *f  = dv_abs(x);
+    const dval_t *df = dv_get_deriv(f);
+
+    /* d/dx{|x|} = sign(x) = 1 at x=0.8 */
+    check_q_at(__FILE__, __LINE__, 1, "d/dx{|x|} | x=0.8", dv_eval(df), qf_from_double(1.0));
+
+    dv_free(f);
+    dv_free(x);
+}
+
+void test_deriv_hypot(void)
+{
+    dval_t *x  = dv_new_var_d(3.0);
+    dval_t *yc = dv_new_const_d(4.0);
+    dval_t *f  = dv_hypot(x, yc);
+    const dval_t *df = dv_get_deriv(f);
+
+    /* d/dx{hypot(x,4)} = x/hypot(x,4) = 3/5 at x=3 */
+    qfloat X = qf_from_double(3.0);
+    qfloat Y = qf_from_double(4.0);
+    qfloat expect = qf_div(X, qf_hypot(X, Y));
+
+    check_q_at(__FILE__, __LINE__, 1, "d/dx{hypot(x,4)} | x=3", dv_eval(df), expect);
+
+    dv_free(f);
+    dv_free(yc);
+    dv_free(x);
+}
+
+void test_deriv_erf(void)
+{
+    dval_t *x  = dv_new_var_d(0.5);
+    dval_t *f  = dv_erf(x);
+    const dval_t *df = dv_get_deriv(f);
+
+    /* d/dx{erf(x)} = (2/sqrt(pi)) * exp(-x^2) */
+    qfloat X = qf_from_double(0.5);
+    qfloat expect = qf_mul(qf_div(qf_from_double(2.0), qf_sqrt(QF_PI)),
+                           qf_exp(qf_neg(qf_mul(X, X))));
+
+    check_q_at(__FILE__, __LINE__, 1, "d/dx{erf(x)} | x=0.5", dv_eval(df), expect);
+
+    dv_free(f);
+    dv_free(x);
+}
+
+void test_deriv_erfc(void)
+{
+    dval_t *x  = dv_new_var_d(0.5);
+    dval_t *f  = dv_erfc(x);
+    const dval_t *df = dv_get_deriv(f);
+
+    /* d/dx{erfc(x)} = -(2/sqrt(pi)) * exp(-x^2) */
+    qfloat X = qf_from_double(0.5);
+    qfloat expect = qf_neg(qf_mul(qf_div(qf_from_double(2.0), qf_sqrt(QF_PI)),
+                                  qf_exp(qf_neg(qf_mul(X, X)))));
+
+    check_q_at(__FILE__, __LINE__, 1, "d/dx{erfc(x)} | x=0.5", dv_eval(df), expect);
+
+    dv_free(f);
+    dv_free(x);
+}
+
+void test_deriv_erfinv(void)
+{
+    dval_t *x  = dv_new_var_d(0.5);
+    dval_t *f  = dv_erfinv(x);
+    const dval_t *df = dv_get_deriv(f);
+
+    /* d/dx{erfinv(x)} = sqrt(pi)/2 * exp(erfinv(x)^2) */
+    qfloat X = qf_from_double(0.5);
+    qfloat u = qf_erfinv(X);
+    qfloat expect = qf_mul(qf_mul(qf_sqrt(QF_PI), qf_from_double(0.5)),
+                           qf_exp(qf_mul(u, u)));
+
+    check_q_at(__FILE__, __LINE__, 1, "d/dx{erfinv(x)} | x=0.5", dv_eval(df), expect);
+
+    dv_free(f);
+    dv_free(x);
+}
+
+void test_deriv_erfcinv(void)
+{
+    dval_t *x  = dv_new_var_d(0.5);
+    dval_t *f  = dv_erfcinv(x);
+    const dval_t *df = dv_get_deriv(f);
+
+    /* d/dx{erfcinv(x)} = -sqrt(pi)/2 * exp(erfcinv(x)^2) */
+    qfloat X = qf_from_double(0.5);
+    qfloat v = qf_erfcinv(X);
+    qfloat expect = qf_neg(qf_mul(qf_mul(qf_sqrt(QF_PI), qf_from_double(0.5)),
+                                  qf_exp(qf_mul(v, v))));
+
+    check_q_at(__FILE__, __LINE__, 1, "d/dx{erfcinv(x)} | x=0.5", dv_eval(df), expect);
+
+    dv_free(f);
+    dv_free(x);
+}
+
+void test_deriv_gamma(void)
+{
+    dval_t *x  = dv_new_var_d(2.0);
+    dval_t *f  = dv_gamma(x);
+    const dval_t *df = dv_get_deriv(f);
+
+    /* d/dx{gamma(x)} = gamma(x) * digamma(x) */
+    qfloat X = qf_from_double(2.0);
+    qfloat expect = qf_mul(qf_gamma(X), qf_digamma(X));
+
+    check_q_at(__FILE__, __LINE__, 1, "d/dx{gamma(x)} | x=2", dv_eval(df), expect);
+
+    dv_free(f);
+    dv_free(x);
+}
+
+void test_deriv_lgamma(void)
+{
+    dval_t *x  = dv_new_var_d(2.0);
+    dval_t *f  = dv_lgamma(x);
+    const dval_t *df = dv_get_deriv(f);
+
+    /* d/dx{lgamma(x)} = digamma(x) */
+    qfloat X = qf_from_double(2.0);
+    qfloat expect = qf_digamma(X);
+
+    check_q_at(__FILE__, __LINE__, 1, "d/dx{lgamma(x)} | x=2", dv_eval(df), expect);
+
+    dv_free(f);
+    dv_free(x);
+}
+
+void test_deriv_digamma(void)
+{
+    dval_t *x  = dv_new_var_d(2.0);
+    dval_t *f  = dv_digamma(x);
+    const dval_t *df = dv_get_deriv(f);
+
+    /* d/dx{digamma(x)} = trigamma(x); trigamma(2) = pi^2/6 - 1 */
+    qfloat pi2_over_6 = qf_div(qf_mul(QF_PI, QF_PI), qf_from_double(6.0));
+    qfloat expect = qf_sub(pi2_over_6, qf_from_double(1.0));
+
+    check_q_at(__FILE__, __LINE__, 1, "d/dx{digamma(x)} | x=2", dv_eval(df), expect);
+
+    dv_free(f);
+    dv_free(x);
+}
+
+void test_deriv_lambert_w0(void)
+{
+    dval_t *x  = dv_new_var_d(1.0);
+    dval_t *f  = dv_lambert_w0(x);
+    const dval_t *df = dv_get_deriv(f);
+
+    /* d/dx{W0(x)} = W0(x) / (x * (1 + W0(x))) */
+    qfloat X = qf_from_double(1.0);
+    qfloat w = qf_lambert_w0(X);
+    qfloat expect = qf_div(w, qf_mul(X, qf_add(qf_from_double(1.0), w)));
+
+    check_q_at(__FILE__, __LINE__, 1, "d/dx{W0(x)} | x=1", dv_eval(df), expect);
+
+    dv_free(f);
+    dv_free(x);
+}
+
+void test_deriv_lambert_wm1(void)
+{
+    dval_t *x  = dv_new_var_d(-0.1);
+    dval_t *f  = dv_lambert_wm1(x);
+    const dval_t *df = dv_get_deriv(f);
+
+    /* d/dx{Wm1(x)} = Wm1(x) / (x * (1 + Wm1(x))) */
+    qfloat X = qf_from_double(-0.1);
+    qfloat w = qf_lambert_wm1(X);
+    qfloat expect = qf_div(w, qf_mul(X, qf_add(qf_from_double(1.0), w)));
+
+    check_q_at(__FILE__, __LINE__, 1, "d/dx{Wm1(x)} | x=-0.1", dv_eval(df), expect);
+
+    dv_free(f);
+    dv_free(x);
+}
+
+void test_deriv_normal_pdf(void)
+{
+    dval_t *x  = dv_new_var_d(0.5);
+    dval_t *f  = dv_normal_pdf(x);
+    const dval_t *df = dv_get_deriv(f);
+
+    /* d/dx{phi(x)} = -x * phi(x) */
+    qfloat X = qf_from_double(0.5);
+    qfloat expect = qf_neg(qf_mul(X, qf_normal_pdf(X)));
+
+    check_q_at(__FILE__, __LINE__, 1, "d/dx{phi(x)} | x=0.5", dv_eval(df), expect);
+
+    dv_free(f);
+    dv_free(x);
+}
+
+void test_deriv_normal_cdf(void)
+{
+    dval_t *x  = dv_new_var_d(0.5);
+    dval_t *f  = dv_normal_cdf(x);
+    const dval_t *df = dv_get_deriv(f);
+
+    /* d/dx{Phi(x)} = phi(x) */
+    qfloat X = qf_from_double(0.5);
+    qfloat expect = qf_normal_pdf(X);
+
+    check_q_at(__FILE__, __LINE__, 1, "d/dx{Phi(x)} | x=0.5", dv_eval(df), expect);
+
+    dv_free(f);
+    dv_free(x);
+}
+
+void test_deriv_normal_logpdf(void)
+{
+    dval_t *x  = dv_new_var_d(0.5);
+    dval_t *f  = dv_normal_logpdf(x);
+    const dval_t *df = dv_get_deriv(f);
+
+    /* d/dx{log phi(x)} = -x */
+    qfloat expect = qf_from_double(-0.5);
+
+    check_q_at(__FILE__, __LINE__, 1, "d/dx{log phi(x)} | x=0.5", dv_eval(df), expect);
+
+    dv_free(f);
+    dv_free(x);
+}
+
+void test_deriv_ei(void)
+{
+    dval_t *x  = dv_new_var_d(1.0);
+    dval_t *f  = dv_ei(x);
+    const dval_t *df = dv_get_deriv(f);
+
+    /* d/dx{Ei(x)} = exp(x)/x */
+    qfloat X = qf_from_double(1.0);
+    qfloat expect = qf_div(qf_exp(X), X);
+
+    check_q_at(__FILE__, __LINE__, 1, "d/dx{Ei(x)} | x=1", dv_eval(df), expect);
+
+    dv_free(f);
+    dv_free(x);
+}
+
+void test_deriv_e1(void)
+{
+    dval_t *x  = dv_new_var_d(1.0);
+    dval_t *f  = dv_e1(x);
+    const dval_t *df = dv_get_deriv(f);
+
+    /* d/dx{E1(x)} = -exp(-x)/x */
+    qfloat X = qf_from_double(1.0);
+    qfloat expect = qf_neg(qf_div(qf_exp(qf_neg(X)), X));
+
+    check_q_at(__FILE__, __LINE__, 1, "d/dx{E1(x)} | x=1", dv_eval(df), expect);
+
+    dv_free(f);
+    dv_free(x);
+}
+
+void test_deriv_beta(void)
+{
+    dval_t *x  = dv_new_var_d(2.0);
+    dval_t *bc = dv_new_const_d(3.0);
+    dval_t *f  = dv_beta(x, bc);
+    const dval_t *df = dv_get_deriv(f);
+
+    /* d/da{beta(a,b)} = beta(a,b) * (digamma(a) - digamma(a+b)) */
+    qfloat A = qf_from_double(2.0);
+    qfloat B = qf_from_double(3.0);
+    qfloat expect = qf_mul(qf_beta(A, B),
+                           qf_sub(qf_digamma(A), qf_digamma(qf_add(A, B))));
+
+    check_q_at(__FILE__, __LINE__, 1, "d/da{beta(a,3)} | a=2", dv_eval(df), expect);
+
+    dv_free(f);
+    dv_free(bc);
+    dv_free(x);
+}
+
+void test_deriv_logbeta(void)
+{
+    dval_t *x  = dv_new_var_d(2.0);
+    dval_t *bc = dv_new_const_d(3.0);
+    dval_t *f  = dv_logbeta(x, bc);
+    const dval_t *df = dv_get_deriv(f);
+
+    /* d/da{logbeta(a,b)} = digamma(a) - digamma(a+b) */
+    qfloat A = qf_from_double(2.0);
+    qfloat B = qf_from_double(3.0);
+    qfloat expect = qf_sub(qf_digamma(A), qf_digamma(qf_add(A, B)));
+
+    check_q_at(__FILE__, __LINE__, 1, "d/da{logbeta(a,3)} | a=2", dv_eval(df), expect);
+
+    dv_free(f);
+    dv_free(bc);
     dv_free(x);
 }
 
@@ -1541,6 +2051,349 @@ void test_second_deriv_atan_x_over_sqrt(void)
     dv_free(x);
 }
 
+/* Special function second derivative tests */
+
+void test_second_deriv_abs(void)
+{
+    dval_t *x   = dv_new_var_d(0.8);
+    dval_t *f   = dv_abs(x);
+    dval_t *df  = dv_create_deriv(f);
+    const dval_t *ddf = dv_get_deriv(df);
+
+    /* d²/dx²{|x|} = 0 for x != 0 */
+    qfloat expect = qf_from_double(0.0);
+
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{|x|} | x=0.8", dv_eval(ddf), expect);
+
+    dv_free(df);
+    dv_free(f);
+    dv_free(x);
+}
+
+void test_second_deriv_hypot(void)
+{
+    dval_t *x   = dv_new_var_d(3.0);
+    dval_t *yc  = dv_new_const_d(4.0);
+    dval_t *f   = dv_hypot(x, yc);
+    dval_t *df  = dv_create_deriv(f);
+    const dval_t *ddf = dv_get_deriv(df);
+
+    /* d²/dx²{hypot(x,y)} = y^2 / hypot(x,y)^3 at x=3, y=4: 16/125 */
+    qfloat X = qf_from_double(3.0);
+    qfloat Y = qf_from_double(4.0);
+    qfloat h = qf_hypot(X, Y);
+    qfloat expect = qf_div(qf_mul(Y, Y), qf_mul(h, qf_mul(h, h)));
+
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{hypot(x,4)} | x=3", dv_eval(ddf), expect);
+
+    dv_free(df);
+    dv_free(f);
+    dv_free(yc);
+    dv_free(x);
+}
+
+void test_second_deriv_erf(void)
+{
+    dval_t *x   = dv_new_var_d(0.5);
+    dval_t *f   = dv_erf(x);
+    dval_t *df  = dv_create_deriv(f);
+    const dval_t *ddf = dv_get_deriv(df);
+
+    /* d²/dx²{erf(x)} = -4x/sqrt(pi) * exp(-x^2) */
+    qfloat X = qf_from_double(0.5);
+    qfloat expect = qf_mul(qf_div(qf_from_double(-4.0), qf_sqrt(QF_PI)),
+                           qf_mul(X, qf_exp(qf_neg(qf_mul(X, X)))));
+
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{erf(x)} | x=0.5", dv_eval(ddf), expect);
+
+    dv_free(df);
+    dv_free(f);
+    dv_free(x);
+}
+
+void test_second_deriv_erfc(void)
+{
+    dval_t *x   = dv_new_var_d(0.5);
+    dval_t *f   = dv_erfc(x);
+    dval_t *df  = dv_create_deriv(f);
+    const dval_t *ddf = dv_get_deriv(df);
+
+    /* d²/dx²{erfc(x)} = 4x/sqrt(pi) * exp(-x^2) */
+    qfloat X = qf_from_double(0.5);
+    qfloat expect = qf_mul(qf_div(qf_from_double(4.0), qf_sqrt(QF_PI)),
+                           qf_mul(X, qf_exp(qf_neg(qf_mul(X, X)))));
+
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{erfc(x)} | x=0.5", dv_eval(ddf), expect);
+
+    dv_free(df);
+    dv_free(f);
+    dv_free(x);
+}
+
+void test_second_deriv_gamma(void)
+{
+    dval_t *x   = dv_new_var_d(2.0);
+    dval_t *f   = dv_gamma(x);
+    dval_t *df  = dv_create_deriv(f);
+    const dval_t *ddf = dv_get_deriv(df);
+
+    /* d²/dx²{gamma(x)} = gamma(x) * (digamma(x)^2 + trigamma(x))
+       at x=2: gamma(2)=1, digamma(2)=1-gamma_euler, trigamma(2)=pi^2/6-1 */
+    qfloat X   = qf_from_double(2.0);
+    qfloat g   = qf_gamma(X);
+    qfloat d   = qf_digamma(X);
+    qfloat t   = qf_sub(qf_div(qf_mul(QF_PI, QF_PI), qf_from_double(6.0)), qf_from_double(1.0));
+    qfloat expect = qf_mul(g, qf_add(qf_mul(d, d), t));
+
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{gamma(x)} | x=2", dv_eval(ddf), expect);
+
+    dv_free(df);
+    dv_free(f);
+    dv_free(x);
+}
+
+void test_second_deriv_lgamma(void)
+{
+    dval_t *x   = dv_new_var_d(2.0);
+    dval_t *f   = dv_lgamma(x);
+    dval_t *df  = dv_create_deriv(f);
+    const dval_t *ddf = dv_get_deriv(df);
+
+    /* d²/dx²{lgamma(x)} = trigamma(x); trigamma(2) = pi^2/6 - 1 */
+    qfloat expect = qf_sub(qf_div(qf_mul(QF_PI, QF_PI), qf_from_double(6.0)),
+                           qf_from_double(1.0));
+
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{lgamma(x)} | x=2", dv_eval(ddf), expect);
+
+    dv_free(df);
+    dv_free(f);
+    dv_free(x);
+}
+
+void test_second_deriv_normal_pdf(void)
+{
+    dval_t *x   = dv_new_var_d(0.5);
+    dval_t *f   = dv_normal_pdf(x);
+    dval_t *df  = dv_create_deriv(f);
+    const dval_t *ddf = dv_get_deriv(df);
+
+    /* d²/dx²{phi(x)} = (x^2 - 1) * phi(x) */
+    qfloat X = qf_from_double(0.5);
+    qfloat expect = qf_mul(qf_sub(qf_mul(X, X), qf_from_double(1.0)),
+                           qf_normal_pdf(X));
+
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{phi(x)} | x=0.5", dv_eval(ddf), expect);
+
+    dv_free(df);
+    dv_free(f);
+    dv_free(x);
+}
+
+void test_second_deriv_normal_cdf(void)
+{
+    dval_t *x   = dv_new_var_d(0.5);
+    dval_t *f   = dv_normal_cdf(x);
+    dval_t *df  = dv_create_deriv(f);
+    const dval_t *ddf = dv_get_deriv(df);
+
+    /* d²/dx²{Phi(x)} = -x * phi(x) */
+    qfloat X = qf_from_double(0.5);
+    qfloat expect = qf_neg(qf_mul(X, qf_normal_pdf(X)));
+
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{Phi(x)} | x=0.5", dv_eval(ddf), expect);
+
+    dv_free(df);
+    dv_free(f);
+    dv_free(x);
+}
+
+void test_second_deriv_normal_logpdf(void)
+{
+    dval_t *x   = dv_new_var_d(0.5);
+    dval_t *f   = dv_normal_logpdf(x);
+    dval_t *df  = dv_create_deriv(f);
+    const dval_t *ddf = dv_get_deriv(df);
+
+    /* d²/dx²{log phi(x)} = -1 */
+    qfloat expect = qf_from_double(-1.0);
+
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{log phi(x)} | x=0.5", dv_eval(ddf), expect);
+
+    dv_free(df);
+    dv_free(f);
+    dv_free(x);
+}
+
+void test_second_deriv_ei(void)
+{
+    dval_t *x   = dv_new_var_d(1.0);
+    dval_t *f   = dv_ei(x);
+    dval_t *df  = dv_create_deriv(f);
+    const dval_t *ddf = dv_get_deriv(df);
+
+    /* d²/dx²{Ei(x)} = exp(x)*(x-1)/x^2; at x=1: 0 */
+    qfloat X = qf_from_double(1.0);
+    qfloat expect = qf_div(qf_mul(qf_exp(X), qf_sub(X, qf_from_double(1.0))),
+                           qf_mul(X, X));
+
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{Ei(x)} | x=1", dv_eval(ddf), expect);
+
+    dv_free(df);
+    dv_free(f);
+    dv_free(x);
+}
+
+void test_second_deriv_e1(void)
+{
+    dval_t *x   = dv_new_var_d(1.0);
+    dval_t *f   = dv_e1(x);
+    dval_t *df  = dv_create_deriv(f);
+    const dval_t *ddf = dv_get_deriv(df);
+
+    /* d²/dx²{E1(x)} = exp(-x)*(x+1)/x^2; at x=1: 2/e */
+    qfloat X = qf_from_double(1.0);
+    qfloat expect = qf_div(qf_mul(qf_exp(qf_neg(X)), qf_add(X, qf_from_double(1.0))),
+                           qf_mul(X, X));
+
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{E1(x)} | x=1", dv_eval(ddf), expect);
+
+    dv_free(df);
+    dv_free(f);
+    dv_free(x);
+}
+
+void test_second_deriv_erfinv(void)
+{
+    dval_t *x   = dv_new_var_d(0.5);
+    dval_t *f   = dv_erfinv(x);
+    dval_t *df  = dv_create_deriv(f);
+    const dval_t *ddf = dv_get_deriv(df);
+
+    /* d²/dx²{erfinv(x)} = (π/2) * erfinv(x) * exp(2*erfinv(x)^2) */
+    qfloat X = qf_from_double(0.5);
+    qfloat u = qf_erfinv(X);
+    qfloat expect = qf_mul(qf_mul(QF_PI, qf_from_double(0.5)),
+                           qf_mul(u, qf_exp(qf_mul(qf_from_double(2.0), qf_mul(u, u)))));
+
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{erfinv(x)} | x=0.5", dv_eval(ddf), expect);
+
+    dv_free(df);
+    dv_free(f);
+    dv_free(x);
+}
+
+void test_second_deriv_erfcinv(void)
+{
+    dval_t *x   = dv_new_var_d(0.5);
+    dval_t *f   = dv_erfcinv(x);
+    dval_t *df  = dv_create_deriv(f);
+    const dval_t *ddf = dv_get_deriv(df);
+
+    /* d²/dx²{erfcinv(x)} = (π/2) * erfcinv(x) * exp(2*erfcinv(x)^2) */
+    qfloat X = qf_from_double(0.5);
+    qfloat v = qf_erfcinv(X);
+    qfloat expect = qf_mul(qf_mul(QF_PI, qf_from_double(0.5)),
+                           qf_mul(v, qf_exp(qf_mul(qf_from_double(2.0), qf_mul(v, v)))));
+
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{erfcinv(x)} | x=0.5", dv_eval(ddf), expect);
+
+    dv_free(df);
+    dv_free(f);
+    dv_free(x);
+}
+
+void test_second_deriv_lambert_w0(void)
+{
+    dval_t *x   = dv_new_var_d(1.0);
+    dval_t *f   = dv_lambert_w0(x);
+    dval_t *df  = dv_create_deriv(f);
+    const dval_t *ddf = dv_get_deriv(df);
+
+    /* d²/dx²{W0(x)} = -W0^2 * (2 + W0) / (x^2 * (1 + W0)^3) */
+    qfloat X  = qf_from_double(1.0);
+    qfloat W  = qf_lambert_w0(X);
+    qfloat W1 = qf_add(qf_from_double(1.0), W);
+    qfloat W2 = qf_add(qf_from_double(2.0), W);
+    qfloat expect = qf_neg(qf_div(qf_mul(qf_mul(W, W), W2),
+                                  qf_mul(qf_mul(X, X),
+                                         qf_mul(W1, qf_mul(W1, W1)))));
+
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{W0(x)} | x=1", dv_eval(ddf), expect);
+
+    dv_free(df);
+    dv_free(f);
+    dv_free(x);
+}
+
+void test_second_deriv_lambert_wm1(void)
+{
+    dval_t *x   = dv_new_var_d(-0.1);
+    dval_t *f   = dv_lambert_wm1(x);
+    dval_t *df  = dv_create_deriv(f);
+    const dval_t *ddf = dv_get_deriv(df);
+
+    /* d²/dx²{Wm1(x)} = -Wm1^2 * (2 + Wm1) / (x^2 * (1 + Wm1)^3) */
+    qfloat X  = qf_from_double(-0.1);
+    qfloat W  = qf_lambert_wm1(X);
+    qfloat W1 = qf_add(qf_from_double(1.0), W);
+    qfloat W2 = qf_add(qf_from_double(2.0), W);
+    qfloat expect = qf_neg(qf_div(qf_mul(qf_mul(W, W), W2),
+                                  qf_mul(qf_mul(X, X),
+                                         qf_mul(W1, qf_mul(W1, W1)))));
+
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{Wm1(x)} | x=-0.1", dv_eval(ddf), expect);
+
+    dv_free(df);
+    dv_free(f);
+    dv_free(x);
+}
+
+void test_second_deriv_beta(void)
+{
+    dval_t *x   = dv_new_var_d(2.0);
+    dval_t *bc  = dv_new_const_d(3.0);
+    dval_t *f   = dv_beta(x, bc);
+    dval_t *df  = dv_create_deriv(f);
+    const dval_t *ddf = dv_get_deriv(df);
+
+    /* d²/da²{beta(a,b)} = beta(a,b) * [(ψ(a)-ψ(a+b))² + ψ'(a) - ψ'(a+b)] */
+    qfloat A   = qf_from_double(2.0);
+    qfloat B   = qf_from_double(3.0);
+    qfloat ApB = qf_add(A, B);
+    qfloat d_a = qf_sub(qf_digamma(A),   qf_digamma(ApB));
+    qfloat t_a = qf_sub(qf_trigamma(A),  qf_trigamma(ApB));
+    qfloat expect = qf_mul(qf_beta(A, B),
+                           qf_add(qf_mul(d_a, d_a), t_a));
+
+    check_q_at(__FILE__, __LINE__, 1, "d²/da²{beta(a,3)} | a=2", dv_eval(ddf), expect);
+
+    dv_free(df);
+    dv_free(f);
+    dv_free(bc);
+    dv_free(x);
+}
+
+void test_second_deriv_logbeta(void)
+{
+    dval_t *x   = dv_new_var_d(2.0);
+    dval_t *bc  = dv_new_const_d(3.0);
+    dval_t *f   = dv_logbeta(x, bc);
+    dval_t *df  = dv_create_deriv(f);
+    const dval_t *ddf = dv_get_deriv(df);
+
+    /* d²/da²{logbeta(a,b)} = ψ'(a) - ψ'(a+b) */
+    qfloat A   = qf_from_double(2.0);
+    qfloat B   = qf_from_double(3.0);
+    qfloat expect = qf_sub(qf_trigamma(A), qf_trigamma(qf_add(A, B)));
+
+    check_q_at(__FILE__, __LINE__, 1, "d²/da²{logbeta(a,3)} | a=2", dv_eval(ddf), expect);
+
+    dv_free(df);
+    dv_free(f);
+    dv_free(bc);
+    dv_free(x);
+}
+
 /* ------------------------------------------------------------------------- */
 /* dv_to_string Tests                                                        */
 /* ------------------------------------------------------------------------- */
@@ -2020,6 +2873,52 @@ void test_to_string_function_style(void)
 }
 
 /* ============================================================
+ * SPECIAL FUNCTIONS — round-trip for all 18 new ops
+ * ============================================================ */
+
+/* check_roundtrip is defined later in the from_string section */
+static void check_roundtrip(const char *label, dval_t *f, int line);
+
+void test_to_string_special_functions(void)
+{
+    /* Unary functions */
+    { dval_t *x = dv_new_named_var_d(-3.0, "x"); check_roundtrip("to_string: abs(x)",           dv_abs(x),           __LINE__); dv_free(x); }
+    { dval_t *x = dv_new_named_var_d( 0.5, "x"); check_roundtrip("to_string: erf(x)",           dv_erf(x),           __LINE__); dv_free(x); }
+    { dval_t *x = dv_new_named_var_d( 0.5, "x"); check_roundtrip("to_string: erfc(x)",          dv_erfc(x),          __LINE__); dv_free(x); }
+    { dval_t *x = dv_new_named_var_d( 0.5, "x"); check_roundtrip("to_string: erfinv(x)",        dv_erfinv(x),        __LINE__); dv_free(x); }
+    { dval_t *x = dv_new_named_var_d( 0.5, "x"); check_roundtrip("to_string: erfcinv(x)",       dv_erfcinv(x),       __LINE__); dv_free(x); }
+    { dval_t *x = dv_new_named_var_d( 3.0, "x"); check_roundtrip("to_string: gamma(x)",         dv_gamma(x),         __LINE__); dv_free(x); }
+    { dval_t *x = dv_new_named_var_d( 3.0, "x"); check_roundtrip("to_string: lgamma(x)",        dv_lgamma(x),        __LINE__); dv_free(x); }
+    { dval_t *x = dv_new_named_var_d( 1.0, "x"); check_roundtrip("to_string: digamma(x)",       dv_digamma(x),       __LINE__); dv_free(x); }
+    { dval_t *x = dv_new_named_var_d( 1.0, "x"); check_roundtrip("to_string: lambert_w0(x)",    dv_lambert_w0(x),    __LINE__); dv_free(x); }
+    { dval_t *x = dv_new_named_var_d(-0.2, "x"); check_roundtrip("to_string: lambert_wm1(x)",   dv_lambert_wm1(x),   __LINE__); dv_free(x); }
+    { dval_t *x = dv_new_named_var_d( 0.0, "x"); check_roundtrip("to_string: normal_pdf(x)",    dv_normal_pdf(x),    __LINE__); dv_free(x); }
+    { dval_t *x = dv_new_named_var_d( 0.0, "x"); check_roundtrip("to_string: normal_cdf(x)",    dv_normal_cdf(x),    __LINE__); dv_free(x); }
+    { dval_t *x = dv_new_named_var_d( 0.0, "x"); check_roundtrip("to_string: normal_logpdf(x)", dv_normal_logpdf(x), __LINE__); dv_free(x); }
+    { dval_t *x = dv_new_named_var_d( 1.0, "x"); check_roundtrip("to_string: ei(x)",            dv_ei(x),            __LINE__); dv_free(x); }
+    { dval_t *x = dv_new_named_var_d( 1.0, "x"); check_roundtrip("to_string: e1(x)",            dv_e1(x),            __LINE__); dv_free(x); }
+    /* Binary functions */
+    {
+        dval_t *x = dv_new_named_var_d(2.0, "x");
+        dval_t *y = dv_new_named_var_d(3.0, "y");
+        dval_t *f = dv_beta(x, y);    dv_free(x); dv_free(y);
+        check_roundtrip("to_string: beta(x,y)", f, __LINE__);
+    }
+    {
+        dval_t *x = dv_new_named_var_d(2.0, "x");
+        dval_t *y = dv_new_named_var_d(3.0, "y");
+        dval_t *f = dv_logbeta(x, y); dv_free(x); dv_free(y);
+        check_roundtrip("to_string: logbeta(x,y)", f, __LINE__);
+    }
+    {
+        dval_t *x = dv_new_named_var_d(3.0, "x");
+        dval_t *y = dv_new_named_var_d(4.0, "y");
+        dval_t *f = dv_hypot(x, y);   dv_free(x); dv_free(y);
+        check_roundtrip("to_string: hypot(x,y)", f, __LINE__);
+    }
+}
+
+/* ============================================================
  * TEST SUITE RUNNER
  * ============================================================ */
 
@@ -2033,6 +2932,7 @@ void test_to_string_all(void)
     RUN_TEST(test_to_string_pow_superscript, __func__);
     RUN_TEST(test_to_string_unary_sin, __func__);
     RUN_TEST(test_to_string_function_style, __func__);
+    RUN_TEST(test_to_string_special_functions, __func__);
 }
 
 /* ============================================================
@@ -4544,6 +5444,32 @@ static void test_from_string_functions(void)
         0.0, __LINE__);
 }
 
+/* ---- Special functions (the 18 new ops) ---- */
+
+static void test_from_string_special_functions(void)
+{
+    /* Unary — clean exact values */
+    check_parse_val("abs(-3) = 3",           "{ abs(x) | x = -3 }",          3.0,                     __LINE__);
+    check_parse_val("erf(0) = 0",            "{ erf(x) | x = 0 }",           0.0,                     __LINE__);
+    check_parse_val("erfc(0) = 1",           "{ erfc(x) | x = 0 }",          1.0,                     __LINE__);
+    check_parse_val("erfinv(0) = 0",         "{ erfinv(x) | x = 0 }",        0.0,                     __LINE__);
+    check_parse_val("erfcinv(1) = 0",        "{ erfcinv(x) | x = 1 }",       0.0,                     __LINE__);
+    check_parse_val("gamma(3) = 2",          "{ gamma(x) | x = 3 }",         2.0,                     __LINE__);
+    check_parse_val("lgamma(1) = 0",         "{ lgamma(x) | x = 1 }",        0.0,                     __LINE__);
+    check_parse_val("digamma(1) = -gamma_E", "{ digamma(x) | x = 1 }",      -0.5772156649015329,       __LINE__);
+    check_parse_val("lambert_w0(0) = 0",     "{ lambert_w0(x) | x = 0 }",    0.0,                     __LINE__);
+    check_parse_val("lambert_wm1(-0.2)",     "{ lambert_wm1(x) | x = -0.2 }",  -2.5426413577735265,     __LINE__);
+    check_parse_val("normal_pdf(0)",         "{ normal_pdf(x) | x = 0 }",    1.0/sqrt(2.0*M_PI),      __LINE__);
+    check_parse_val("normal_cdf(0) = 0.5",   "{ normal_cdf(x) | x = 0 }",    0.5,                     __LINE__);
+    check_parse_val("normal_logpdf(0)",      "{ normal_logpdf(x) | x = 0 }", -0.5*log(2.0*M_PI),      __LINE__);
+    check_parse_val("ei(1)",                 "{ ei(x) | x = 1 }",            1.8951178163559367,       __LINE__);
+    check_parse_val("e1(1)",                 "{ e1(x) | x = 1 }",            0.21938393439552029,      __LINE__);
+    /* Binary functions */
+    check_parse_val("beta(1,1) = 1",         "{ beta(x, y) | x = 1, y = 1 }", 1.0,                   __LINE__);
+    check_parse_val("logbeta(1,1) = 0",      "{ logbeta(x, y) | x = 1, y = 1 }", 0.0,                __LINE__);
+    check_parse_val("hypot(3,4) = 5",        "{ hypot(x, y) | x = 3, y = 4 }", 5.0,                  __LINE__);
+}
+
 /* ---- Named constants (binding section) ---- */
 
 static void test_from_string_named_consts(void)
@@ -4843,19 +5769,27 @@ static void test_from_string_ascii_alternatives(void)
  */
 
 /* Inline comparison helper for the derivative checks below. */
-static void check_dval_d(const char *label, double got, double expect, int line)
+static void check_dval_d(const char *label, const dval_t *node,
+                          double expect, int line)
 {
-    double err = fabs(got - expect);
-    double rel = (fabs(expect) > 0.0) ? err / fabs(expect) : err;
+    qfloat qval = dv_eval(node);
+    double got   = qf_to_double(qval);
+    double err   = fabs(got - expect);
+    double rel   = (fabs(expect) > 0.0) ? err / fabs(expect) : err;
     const double TOL = 2e-14;
+    char *expr = dv_to_string(node, style_EXPRESSION);
     if (err < TOL || rel < TOL) {
-        printf(C_BOLD C_GREEN "PASS" C_RESET " %s\n\n", label);
+        printf(C_BOLD C_GREEN "PASS" C_RESET " %s\n", label);
+        printf(C_BOLD "  expr   " C_RESET "%s\n", expr ? expr : "(null)");
+        qf_printf(C_BOLD "  value  " C_RESET "%.34q\n\n", qval);
     } else {
         printf(C_BOLD C_RED "FAIL" C_RESET " %s %s:%d:1\n", label, __FILE__, line);
-        printf(C_BOLD "  got    " C_RESET "%.17g\n", got);
+        printf(C_BOLD "  expr   " C_RESET "%s\n", expr ? expr : "(null)");
+        qf_printf(C_BOLD "  got    " C_RESET "%.34q\n", qval);
         printf(C_BOLD "  expect " C_RESET "%.17g\n\n", expect);
         TEST_FAIL();
     }
+    free(expr);
 }
 
 static void test_from_string_deriv(void)
@@ -4917,15 +5851,15 @@ static void test_from_string_deriv(void)
     }
 
     check_dval_d("f(1.25) via dv_eval_d",
-                 dv_eval_d(f), esx + 3*xv*xv - 7, __LINE__);
+                 f, esx + 3*xv*xv - 7, __LINE__);
 
     dval_t *df = dv_create_deriv(f);
     check_dval_d("f'(1.25) via dv_create_deriv",
-                 dv_eval_d(df), cx*esx + 6*xv, __LINE__);
+                 df, cx*esx + 6*xv, __LINE__);
 
     dval_t *d2f = dv_create_deriv(df);
     check_dval_d("f''(1.25) via dv_create_deriv",
-                 dv_eval_d(d2f), cx*cx*esx - sx*esx + 6, __LINE__);
+                 d2f, cx*cx*esx - sx*esx + 6, __LINE__);
 
     dv_free(d2f);
     dv_free(df);
@@ -4993,10 +5927,11 @@ static void test_from_string_round_trips(void)
 
 void test_dval_t_from_string(void)
 {
-    RUN_TEST(test_from_string_pure_const,        __func__);
-    RUN_TEST(test_from_string_arithmetic,        __func__);
-    RUN_TEST(test_from_string_functions,         __func__);
-    RUN_TEST(test_from_string_named_consts,      __func__);
+    RUN_TEST(test_from_string_pure_const,           __func__);
+    RUN_TEST(test_from_string_arithmetic,           __func__);
+    RUN_TEST(test_from_string_functions,            __func__);
+    RUN_TEST(test_from_string_special_functions,    __func__);
+    RUN_TEST(test_from_string_named_consts,         __func__);
     RUN_TEST(test_from_string_bracketed_names,   __func__);
     RUN_TEST(test_from_string_ascii_alternatives,__func__);
     RUN_TEST(test_from_string_errors,            __func__);
@@ -5074,6 +6009,24 @@ void test_maths_functions(void) {
     RUN_TEST(test_sqrt, __func__);
     RUN_TEST(test_pow_d, __func__);
     RUN_TEST(test_pow, __func__);
+    RUN_TEST(test_abs, __func__);
+    RUN_TEST(test_hypot, __func__);
+    RUN_TEST(test_erf, __func__);
+    RUN_TEST(test_erfc, __func__);
+    RUN_TEST(test_erfinv, __func__);
+    RUN_TEST(test_erfcinv, __func__);
+    RUN_TEST(test_gamma, __func__);
+    RUN_TEST(test_lgamma, __func__);
+    RUN_TEST(test_digamma, __func__);
+    RUN_TEST(test_lambert_w0, __func__);
+    RUN_TEST(test_lambert_wm1, __func__);
+    RUN_TEST(test_normal_pdf, __func__);
+    RUN_TEST(test_normal_cdf, __func__);
+    RUN_TEST(test_normal_logpdf, __func__);
+    RUN_TEST(test_ei, __func__);
+    RUN_TEST(test_e1, __func__);
+    RUN_TEST(test_beta, __func__);
+    RUN_TEST(test_logbeta, __func__);
 }
 
 void test_first_derivatives(void) {
@@ -5109,6 +6062,24 @@ void test_first_derivatives(void) {
     RUN_TEST(test_deriv_log_cosh, __func__);
     RUN_TEST(test_deriv_x2_exp_negx, __func__);
     RUN_TEST(test_deriv_atan_x_over_sqrt, __func__);
+    RUN_TEST(test_deriv_abs, __func__);
+    RUN_TEST(test_deriv_hypot, __func__);
+    RUN_TEST(test_deriv_erf, __func__);
+    RUN_TEST(test_deriv_erfc, __func__);
+    RUN_TEST(test_deriv_erfinv, __func__);
+    RUN_TEST(test_deriv_erfcinv, __func__);
+    RUN_TEST(test_deriv_gamma, __func__);
+    RUN_TEST(test_deriv_lgamma, __func__);
+    RUN_TEST(test_deriv_digamma, __func__);
+    RUN_TEST(test_deriv_lambert_w0, __func__);
+    RUN_TEST(test_deriv_lambert_wm1, __func__);
+    RUN_TEST(test_deriv_normal_pdf, __func__);
+    RUN_TEST(test_deriv_normal_cdf, __func__);
+    RUN_TEST(test_deriv_normal_logpdf, __func__);
+    RUN_TEST(test_deriv_ei, __func__);
+    RUN_TEST(test_deriv_e1, __func__);
+    RUN_TEST(test_deriv_beta, __func__);
+    RUN_TEST(test_deriv_logbeta, __func__);
 }
 
 void test_second_derivatives(void) {
@@ -5143,6 +6114,23 @@ void test_second_derivatives(void) {
     RUN_TEST(test_second_deriv_log_cosh, __func__);
     RUN_TEST(test_second_deriv_x2_exp_negx, __func__);
     RUN_TEST(test_second_deriv_atan_x_over_sqrt, __func__);
+    RUN_TEST(test_second_deriv_abs, __func__);
+    RUN_TEST(test_second_deriv_hypot, __func__);
+    RUN_TEST(test_second_deriv_erf, __func__);
+    RUN_TEST(test_second_deriv_erfc, __func__);
+    RUN_TEST(test_second_deriv_gamma, __func__);
+    RUN_TEST(test_second_deriv_lgamma, __func__);
+    RUN_TEST(test_second_deriv_normal_pdf, __func__);
+    RUN_TEST(test_second_deriv_normal_cdf, __func__);
+    RUN_TEST(test_second_deriv_normal_logpdf, __func__);
+    RUN_TEST(test_second_deriv_ei, __func__);
+    RUN_TEST(test_second_deriv_e1, __func__);
+    RUN_TEST(test_second_deriv_erfinv, __func__);
+    RUN_TEST(test_second_deriv_erfcinv, __func__);
+    RUN_TEST(test_second_deriv_lambert_w0, __func__);
+    RUN_TEST(test_second_deriv_lambert_wm1, __func__);
+    RUN_TEST(test_second_deriv_beta, __func__);
+    RUN_TEST(test_second_deriv_logbeta, __func__);
 }
 
 void test_dval_t_to_string(void) {
