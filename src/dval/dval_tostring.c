@@ -161,19 +161,24 @@ static int is_simple_name(const char *name)
 
     unsigned int c;
     int len = utf8_decode(name, &c);
-    if (len <= 0)
+    if (len <= 0 || !is_unicode_letter(c))
         return 0;
 
-    if (name[len] == '\0' && is_unicode_letter(c))
-        return 1;
+    if (name[len] == '\0')
+        return 1;   /* single letter — always simple */
 
-    if (!is_unicode_letter(c))
-        return 0;
-
-    for (const unsigned char *p = (const unsigned char *)name + len; *p; ++p)
-        if (!(isalnum(*p) || *p == '_'))
+    /* Accept only Unicode subscript digit continuations (U+2080–U+2089).
+     * These are the auto-generated suffixes like x₀, x₁, c₀, c₁, etc.
+     * Any other continuation (e.g. "radius", "pi") makes the name non-simple
+     * and causes it to be rendered with square brackets: [radius], [pi]. */
+    const char *p = name + len;
+    while (*p) {
+        unsigned int sc;
+        int sl = utf8_decode(p, &sc);
+        if (sl <= 0 || sc < 0x2080 || sc > 0x2089)
             return 0;
-
+        p += sl;
+    }
     return 1;
 }
 
@@ -191,6 +196,141 @@ static void emit_name(sbuf_t *b, const char *name)
         sbuf_putc(b, ']');
     }
 }
+
+/* In function-style output, brackets are only needed when a name would be
+ * ambiguous or unparseable: names that start with a digit, contain spaces,
+ * or contain characters other than Unicode letters, ASCII digits 0-9, or
+ * Unicode subscript digits U+2080-U+2089. */
+static int is_safe_func_name(const char *name)
+{
+    if (!name || !*name) return 0;
+
+    unsigned int c;
+    int len = utf8_decode(name, &c);
+    if (len <= 0 || !is_unicode_letter(c)) return 0;
+
+    const char *p = name + len;
+    while (*p) {
+        unsigned int sc;
+        int sl = utf8_decode(p, &sc);
+        if (sl <= 0) return 0;
+        if (!is_unicode_letter(sc) &&
+            !(sc >= '0' && sc <= '9') &&
+            !(sc >= 0x2080 && sc <= 0x2089))
+            return 0;
+        p += sl;
+    }
+    return 1;
+}
+
+static void emit_name_func(sbuf_t *b, const char *name)
+{
+    if (!name || !*name) {
+        sbuf_puts(b, "x");
+        return;
+    }
+    if (is_safe_func_name(name)) {
+        sbuf_puts(b, name);
+    } else {
+        sbuf_putc(b, '[');
+        sbuf_puts(b, name);
+        sbuf_putc(b, ']');
+    }
+}
+
+/* ------------------------------------------------------------------------- */
+/* Auto-naming for unnamed nodes                                             */
+/* ------------------------------------------------------------------------- */
+
+/* The 10 subscript digit strings (U+2080–U+2089), each 3 UTF-8 bytes.
+ * Multi-digit subscripts like ₁₀ are assembled from these at call time. */
+static const char subscript_digits[10][4] = {
+    "\xE2\x82\x80", "\xE2\x82\x81", "\xE2\x82\x82", "\xE2\x82\x83",
+    "\xE2\x82\x84", "\xE2\x82\x85", "\xE2\x82\x86", "\xE2\x82\x87",
+    "\xE2\x82\x88", "\xE2\x82\x89",
+};
+
+/* Build a name of the form  prefix₀  prefix₁  prefix₁₀  …
+ * The returned buffer is heap-allocated and owned by the caller. */
+static char *make_subscript_name(char prefix, int idx)
+{
+    char digits[16];
+    int nd = 0, n = idx;
+    do { digits[nd++] = (char)(n % 10); n /= 10; } while (n > 0);
+
+    char *buf = (char *)xmalloc(1 + (size_t)nd * 3 + 1);
+    buf[0] = prefix;
+    int pos = 1;
+    for (int i = nd - 1; i >= 0; i--) {
+        memcpy(buf + pos, subscript_digits[(unsigned char)digits[i]], 3);
+        pos += 3;
+    }
+    buf[pos] = '\0';
+    return buf;
+}
+
+typedef struct {
+    dval_t *node;
+    char   *buf;   /* allocated name, also stored in node->name during use */
+} autoname_entry_t;
+
+typedef struct {
+    autoname_entry_t *entries;
+    size_t            count;
+    size_t            cap;
+} autoname_table_t;
+
+static void autoname_init(autoname_table_t *t)
+{
+    t->entries = NULL;
+    t->count   = 0;
+    t->cap     = 0;
+}
+
+/* Restore node->name fields to NULL and free all allocated name buffers. */
+static void autoname_restore(autoname_table_t *t)
+{
+    for (size_t i = 0; i < t->count; i++) {
+        t->entries[i].node->name = NULL;
+        free(t->entries[i].buf);
+    }
+    free(t->entries);
+    t->entries = NULL;
+    t->count   = 0;
+    t->cap     = 0;
+}
+
+/* DFS: find unnamed var nodes and assign x₀, x₁, … in first-visit order. */
+static void assign_unnamed_vars_dfs(dval_t *f, autoname_table_t *t)
+{
+    if (!f) return;
+
+    if (f->ops == &ops_var) {
+        if (f->name && *f->name) return;  /* already named */
+        /* Check if this node was already assigned */
+        for (size_t i = 0; i < t->count; i++)
+            if (t->entries[i].node == f) return;
+        /* Grow table if needed */
+        if (t->count == t->cap) {
+            t->cap = t->cap ? t->cap * 2 : 4;
+            t->entries = (autoname_entry_t *)realloc(
+                t->entries, t->cap * sizeof(autoname_entry_t));
+            if (!t->entries) { fprintf(stderr, "auto-name: OOM\n"); abort(); }
+        }
+        char *buf = make_subscript_name('x', (int)t->count);
+        t->entries[t->count].node = f;
+        t->entries[t->count].buf  = buf;
+        t->count++;
+        f->name = buf;   /* temporary assignment */
+        return;
+    }
+
+    if (f->ops == &ops_const) return;   /* constants have no children to recurse */
+
+    assign_unnamed_vars_dfs(f->a, t);
+    assign_unnamed_vars_dfs(f->b, t);
+}
+
 
 /* ------------------------------------------------------------------------- */
 /* Precedence and superscripts                                               */
@@ -254,14 +394,6 @@ static void emit_atom(dval_t *f, sbuf_t *b)
     }
 }
 
-static int is_single_char_name(const dval_t *f)
-{
-    if (!f || !f->name) return 0;
-    unsigned int cp;
-    int len = utf8_decode(f->name, &cp);
-    return (len > 0 && f->name[len] == '\0');
-}
-
 /* -------------------------------------------------------------
    Helper: atomic factors for implicit multiplication (EXPR mode)
    ------------------------------------------------------------- */
@@ -269,16 +401,22 @@ static int is_atomic_for_mul(const dval_t *f)
 {
     if (!f) return 0;
 
-    if (f->ops == &ops_const)
-        return 1;
+    if (f->ops == &ops_const) {
+        /* Unnamed numeric constants are always atomic (e.g. the leading "6" in 6x²).
+         * Named constants are atomic only when their name is "simple" (single letter
+         * or letter + subscript digits).  Multi-char names like "pi" or "radius"
+         * are non-atomic so that a middle-dot separator is inserted between adjacent
+         * bracketed terms: [pi]·[radius]² instead of [pi][radius]². */
+        if (!f->name || !*f->name) return 1;
+        return is_simple_name(f->name);
+    }
 
-    if (f->ops == &ops_var && is_single_char_name(f))
-        return 1;
+    if (f->ops == &ops_var)
+        return is_simple_name(f->name);
 
     if (f->ops == &ops_pow_d &&
-        f->a && f->a->ops == &ops_var &&
-        is_single_char_name(f->a))
-        return 1;
+        f->a && f->a->ops == &ops_var)
+        return is_simple_name(f->a->name);
 
     return 0;
 }
@@ -624,8 +762,19 @@ static void emit_func(const dval_t *f, sbuf_t *b, int parent_prec)
 {
     if (!f) { sbuf_puts(b, "0"); return; }
 
-    if (f->ops == &ops_const || f->ops == &ops_var) {
-        emit_atom((dval_t *)f, b);
+    if (f->ops == &ops_const) {
+        if (f->name && *f->name)
+            emit_name_func(b, f->name);
+        else {
+            char buf[64];
+            qf_to_string_simple(f->c, buf, sizeof(buf));
+            sbuf_puts(b, buf);
+        }
+        return;
+    }
+
+    if (f->ops == &ops_var) {
+        emit_name_func(b, f->name ? f->name : "x");
         return;
     }
 
@@ -704,7 +853,7 @@ static void emit_func(const dval_t *f, sbuf_t *b, int parent_prec)
         return;
     }
 
-    emit_atom((dval_t *)f, b);
+    emit_name_func(b, f->name ? f->name : "?");
 }
 
 /* ------------------------------------------------------------------------- */
@@ -781,6 +930,16 @@ static char *dv_to_string_function(const dval_t *f)
     sbuf_t b;
     sbuf_init(&b);
 
+    /* Assign auto-names (x₀, x₁, …) to unnamed vars BEFORE simplification so
+     * the names survive into the simplified tree — var leaf nodes are shared by
+     * reference, so the name set here is visible throughout the tree after
+     * dv_simplify returns.  Unnamed numeric constants (coefficients created by
+     * dv_mul_d / dv_add_d etc.) are not auto-named; they appear as plain numbers.
+     * Callers that want symbolic unnamed constants should use dv_new_named_const. */
+    autoname_table_t vnames;
+    autoname_init(&vnames);
+    assign_unnamed_vars_dfs((dval_t *)f, &vnames);
+
     /* Simplify first */
     dval_t *g = dv_simplify((dval_t *)f);
 
@@ -798,7 +957,7 @@ static char *dv_to_string_function(const dval_t *f)
         dval_t *v = vl.vars[i];
         const char *vname = (v->name && *v->name) ? v->name : "x";
 
-        emit_name(&b, vname);
+        emit_name_func(&b, vname);
         sbuf_puts(&b, " = ");
 
         char valbuf[64];
@@ -810,7 +969,7 @@ static char *dv_to_string_function(const dval_t *f)
     /* Emit named constant bindings */
     for (size_t i = 0; i < cl.count; ++i) {
         dval_t *c = cl.vars[i];
-        emit_name(&b, c->name);
+        emit_name_func(&b, c->name);
         sbuf_puts(&b, " = ");
 
         char valbuf[64];
@@ -824,12 +983,13 @@ static char *dv_to_string_function(const dval_t *f)
         const char *vname = (g->name && *g->name) ? g->name : "x";
 
         sbuf_puts(&b, "return ");
-        emit_name(&b, vname);
+        emit_name_func(&b, vname);
 
         char *out = xstrdup(b.data);
         sbuf_free(&b);
         free(vl.vars);
         free(cl.vars);
+        autoname_restore(&vnames);
         dv_free(g);
         return out;
     }
@@ -838,7 +998,7 @@ static char *dv_to_string_function(const dval_t *f)
     if (g->ops == &ops_const) {
         const char *cname = (g->name && *g->name) ? g->name : "c";
 
-        emit_name(&b, cname);
+        emit_name_func(&b, cname);
         sbuf_puts(&b, " = ");
 
         char valbuf[64];
@@ -847,12 +1007,13 @@ static char *dv_to_string_function(const dval_t *f)
         sbuf_putc(&b, '\n');
 
         sbuf_puts(&b, "return ");
-        emit_name(&b, cname);
+        emit_name_func(&b, cname);
 
         char *out = xstrdup(b.data);
         sbuf_free(&b);
         free(vl.vars);
         free(cl.vars);
+        autoname_restore(&vnames);
         dv_free(g);
         return out;
     }
@@ -867,11 +1028,11 @@ static char *dv_to_string_function(const dval_t *f)
         if (i > 0) sbuf_putc(&b, ',');
         const char *vname = (vl.vars[i]->name && *vl.vars[i]->name)
                             ? vl.vars[i]->name : "x";
-        emit_name(&b, vname);
+        emit_name_func(&b, vname);
     }
     for (size_t i = 0; i < cl.count; ++i) {
         if (vl.count > 0 || i > 0) sbuf_putc(&b, ',');
-        emit_name(&b, cl.vars[i]->name);
+        emit_name_func(&b, cl.vars[i]->name);
     }
     sbuf_puts(&b, ") = ");
     emit_func(g, &b, PREC_LOWEST);
@@ -885,11 +1046,11 @@ static char *dv_to_string_function(const dval_t *f)
         if (i > 0) sbuf_putc(&b, ',');
         const char *vname = (vl.vars[i]->name && *vl.vars[i]->name)
                             ? vl.vars[i]->name : "x";
-        emit_name(&b, vname);
+        emit_name_func(&b, vname);
     }
     for (size_t i = 0; i < cl.count; ++i) {
         if (vl.count > 0 || i > 0) sbuf_putc(&b, ',');
-        emit_name(&b, cl.vars[i]->name);
+        emit_name_func(&b, cl.vars[i]->name);
     }
     sbuf_puts(&b, ")");
 
@@ -897,6 +1058,7 @@ static char *dv_to_string_function(const dval_t *f)
     sbuf_free(&b);
     free(vl.vars);
     free(cl.vars);
+    autoname_restore(&vnames);
     dv_free(g);
     return out;
 }
@@ -910,19 +1072,17 @@ static char *dv_to_string_expr(const dval_t *f)
     sbuf_t b;
     sbuf_init(&b);
 
+    autoname_table_t vnames;
+    autoname_init(&vnames);
+    assign_unnamed_vars_dfs((dval_t *)f, &vnames);
+
     dval_t *g = dv_simplify((dval_t *)f);
 
     if (g->ops == &ops_const) {
         sbuf_putc(&b, '{');
         sbuf_putc(&b, ' ');
 
-        if (g->name && *g->name) {
-            sbuf_putc(&b, '[');
-            sbuf_puts(&b, g->name);
-            sbuf_putc(&b, ']');
-        } else {
-            sbuf_puts(&b, "c");
-        }
+        emit_name(&b, (g->name && *g->name) ? g->name : "c");
 
         sbuf_puts(&b, " = ");
 
@@ -935,6 +1095,7 @@ static char *dv_to_string_expr(const dval_t *f)
 
         char *out = xstrdup(b.data);
         sbuf_free(&b);
+        autoname_restore(&vnames);
         dv_free(g);
         return out;
     }
@@ -993,6 +1154,7 @@ static char *dv_to_string_expr(const dval_t *f)
     sbuf_free(&b);
     free(vl.vars);
     free(cl.vars);
+    autoname_restore(&vnames);
     dv_free(g);
     return out;
 }

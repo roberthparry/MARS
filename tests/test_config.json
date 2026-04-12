@@ -282,7 +282,9 @@
     "test_dval_t_to_string": {
       "enabled": true,
       "test_to_string_all": true,
-      "test_expressions": true
+      "test_expressions": true,
+      "test_expressions_unnamed": true,
+      "test_expressions_longname": true
     },
     "test_to_string_all": {
       "enabled": true,

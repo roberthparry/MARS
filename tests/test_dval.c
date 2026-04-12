@@ -3680,6 +3680,637 @@ static void test_expressions(void)
     }
 }
 
+/* ============================================================
+ *  Builders for unnamed-variable tests (U01–U06)
+ * ============================================================ */
+
+/* U01: x₀² */
+static dval_t *make_expr_u01(void)
+{
+    dval_t *x  = dv_new_var_d(1.25);
+    dval_t *f  = dv_mul(x, x);
+    dv_free(x);
+    return f;
+}
+
+/* U02: x₀³ */
+static dval_t *make_expr_u02(void)
+{
+    dval_t *x  = dv_new_var_d(1.25);
+    dval_t *t1 = dv_mul(x, x);
+    dval_t *f  = dv_mul(t1, x);
+    dv_free(x);
+    dv_free(t1);
+    return f;
+}
+
+/* U03: x₀³x₁³  (mirrors test 09, but with unnamed vars) */
+static dval_t *make_expr_u03(void)
+{
+    dval_t *x  = dv_new_var_d(1.25);
+    dval_t *y  = dv_new_var_d(1.25);
+    dval_t *t1 = dv_pow_d(x, 2.0);
+    dval_t *t2 = dv_pow_d(y, 3.0);
+    dval_t *t3 = dv_mul(t1, t2);
+    dval_t *f  = dv_mul(t3, x);
+    dv_free(x);
+    dv_free(y);
+    dv_free(t1);
+    dv_free(t2);
+    dv_free(t3);
+    return f;
+}
+
+/* U04: 2x₀²  (coefficient stays numeric after simplification) */
+static dval_t *make_expr_u04(void)
+{
+    dval_t *x  = dv_new_var_d(1.25);
+    dval_t *t1 = dv_mul(x, x);
+    dval_t *t2 = dv_mul(x, x);
+    dval_t *f  = dv_add(t1, t2);
+    dv_free(x);
+    dv_free(t1);
+    dv_free(t2);
+    return f;
+}
+
+/* U05: sin(x₀)·cos(x₀) */
+static dval_t *make_expr_u05(void)
+{
+    dval_t *x  = dv_new_var_d(1.25);
+    dval_t *sx = dv_sin(x);
+    dval_t *cx = dv_cos(x);
+    dval_t *f  = dv_mul(sx, cx);
+    dv_free(x);
+    dv_free(sx);
+    dv_free(cx);
+    return f;
+}
+
+/* U06: exp(sin(x₀) + cos(x₀))  (exp merge) */
+static dval_t *make_expr_u06(void)
+{
+    dval_t *x  = dv_new_var_d(1.25);
+    dval_t *sx = dv_sin(x);
+    dval_t *cx = dv_cos(x);
+    dval_t *t1 = dv_exp(sx);
+    dval_t *t2 = dv_exp(cx);
+    dval_t *f  = dv_mul(t1, t2);
+    dv_free(x);
+    dv_free(sx);
+    dv_free(cx);
+    dv_free(t1);
+    dv_free(t2);
+    return f;
+}
+
+/* ============================================================
+ *  Builders for manually-subscripted constant tests (C01–C04)
+ *
+ *  Callers pass "c\xE2\x82\x80" (c₀) and "c\xE2\x82\x81" (c₁)
+ *  as the name argument to dv_new_named_const so the names are
+ *  simple (letter + subscript digit) — they won't be bracketed.
+ * ============================================================ */
+
+/* C01: c₀x₀²  (named const × unnamed var²) */
+static dval_t *make_expr_c01(void)
+{
+    dval_t *x  = dv_new_var_d(1.25);
+    dval_t *c  = dv_new_named_const(QF_PI, "c\xE2\x82\x80");
+    dval_t *x2 = dv_pow_d(x, 2.0);
+    dval_t *f  = dv_mul(c, x2);
+    dv_free(x);
+    dv_free(c);
+    dv_free(x2);
+    return f;
+}
+
+/* C02: c₀·sin(x₀)  (named const × function — needs separator) */
+static dval_t *make_expr_c02(void)
+{
+    dval_t *x  = dv_new_var_d(1.25);
+    dval_t *c  = dv_new_named_const(QF_E, "c\xE2\x82\x80");
+    dval_t *sx = dv_sin(x);
+    dval_t *f  = dv_mul(c, sx);
+    dv_free(x);
+    dv_free(c);
+    dv_free(sx);
+    return f;
+}
+
+/* C03: x₀ + x₁ + c₀ */
+static dval_t *make_expr_c03(void)
+{
+    dval_t *x  = dv_new_var_d(1.25);
+    dval_t *y  = dv_new_var_d(1.25);
+    dval_t *c  = dv_new_named_const(QF_PI, "c\xE2\x82\x80");
+    dval_t *t1 = dv_add(x, y);
+    dval_t *f  = dv_add(t1, c);
+    dv_free(x);
+    dv_free(y);
+    dv_free(c);
+    dv_free(t1);
+    return f;
+}
+
+/* C04: c₀x₀ + c₁  (two named consts with unnamed var; tests multi-const bindings) */
+static dval_t *make_expr_c04(void)
+{
+    dval_t *x  = dv_new_var_d(1.25);
+    dval_t *c0 = dv_new_named_const(QF_PI, "c\xE2\x82\x80");
+    dval_t *c1 = dv_new_named_const(QF_E,  "c\xE2\x82\x81");
+    dval_t *t1 = dv_mul(c0, x);
+    dval_t *f  = dv_add(t1, c1);
+    dv_free(x);
+    dv_free(c0);
+    dv_free(c1);
+    dv_free(t1);
+    return f;
+}
+
+/* ============================================================
+ *  Builders for multi-character name tests (L01–L09)
+ * ============================================================ */
+
+/* L01: [radius]² */
+static dval_t *make_expr_l01(void)
+{
+    dval_t *r = dv_new_named_var_d(1.25, "radius");
+    dval_t *f = dv_pow_d(r, 2.0);
+    dv_free(r);
+    return f;
+}
+
+/* L02: [base]·[height]  (two multi-char vars — separator needed) */
+static dval_t *make_expr_l02(void)
+{
+    dval_t *base   = dv_new_named_var_d(1.25, "base");
+    dval_t *height = dv_new_named_var_d(1.25, "height");
+    dval_t *f      = dv_mul(base, height);
+    dv_free(base);
+    dv_free(height);
+    return f;
+}
+
+/* L03: [pi]·[radius]²  (multi-char named const × multi-char named var²) */
+static dval_t *make_expr_l03(void)
+{
+    dval_t *r  = dv_new_named_var_d(1.25, "radius");
+    dval_t *pi = dv_new_named_const(QF_PI, "pi");
+    dval_t *r2 = dv_pow_d(r, 2.0);
+    dval_t *f  = dv_mul(pi, r2);
+    dv_free(r);
+    dv_free(pi);
+    dv_free(r2);
+    return f;
+}
+
+/* L04: π·[radius]²  (@pi → π is simple; radius is not — separator needed) */
+static dval_t *make_expr_l04(void)
+{
+    dval_t *r  = dv_new_named_var_d(1.25, "radius");
+    dval_t *pi = dv_new_named_const(QF_PI, "@pi");
+    dval_t *r2 = dv_pow_d(r, 2.0);
+    dval_t *f  = dv_mul(pi, r2);
+    dv_free(r);
+    dv_free(pi);
+    dv_free(r2);
+    return f;
+}
+
+/* L05: sin([theta])·cos([theta]) */
+static dval_t *make_expr_l05(void)
+{
+    dval_t *t  = dv_new_named_var_d(1.25, "theta");
+    dval_t *st = dv_sin(t);
+    dval_t *ct = dv_cos(t);
+    dval_t *f  = dv_mul(st, ct);
+    dv_free(t);
+    dv_free(st);
+    dv_free(ct);
+    return f;
+}
+
+/* L06: [pi]·[tau]·x  (two multi-char consts + one single-char var) */
+static dval_t *make_expr_l06(void)
+{
+    dval_t *x   = dv_new_named_var_d(1.25, "x");
+    dval_t *pi  = dv_new_named_const(QF_PI,  "pi");
+    dval_t *tau = dv_new_named_const(QF_2PI, "tau");
+    dval_t *t1  = dv_mul(pi, tau);
+    dval_t *f   = dv_mul(t1, x);
+    dv_free(x);
+    dv_free(pi);
+    dv_free(tau);
+    dv_free(t1);
+    return f;
+}
+
+/* L07: [my var]²  (space in name) */
+static dval_t *make_expr_l07(void)
+{
+    dval_t *x = dv_new_named_var_d(1.25, "my var");
+    dval_t *f = dv_pow_d(x, 2.0);
+    dv_free(x);
+    return f;
+}
+
+/* L08: [2pi]·x  (name starting with a digit) */
+static dval_t *make_expr_l08(void)
+{
+    dval_t *x = dv_new_named_var_d(1.25, "x");
+    dval_t *c = dv_new_named_const(QF_PI, "2pi");
+    dval_t *f = dv_mul(c, x);
+    dv_free(x);
+    dv_free(c);
+    return f;
+}
+
+/* L09: [x']²  (non-alphanumeric character — apostrophe/prime) */
+static dval_t *make_expr_l09(void)
+{
+    dval_t *x = dv_new_named_var_d(1.25, "x'");
+    dval_t *f = dv_pow_d(x, 2.0);
+    dv_free(x);
+    return f;
+}
+
+/* ============================================================
+ *  test_expressions_unnamed
+ * ============================================================ */
+static void test_expressions_unnamed(void)
+{
+    struct {
+        const char *src;
+        dval_t *(*make)(void);
+        const char *expected_expr;
+        const char *expected_func;
+        int line;
+    } tests[] = {
+        /* U01 */
+        {
+            "x*x (unnamed)",
+            make_expr_u01,
+            "{ x₀² | x₀ = 1.25 }",
+            "x₀ = 1.25\n"
+            "expr(x₀) = x₀^2\n"
+            "return expr(x₀)",
+            __LINE__
+        },
+
+        /* U02 */
+        {
+            "x*x*x (unnamed)",
+            make_expr_u02,
+            "{ x₀³ | x₀ = 1.25 }",
+            "x₀ = 1.25\n"
+            "expr(x₀) = x₀^3\n"
+            "return expr(x₀)",
+            __LINE__
+        },
+
+        /* U03 */
+        {
+            "x^2*y^3*x (unnamed)",
+            make_expr_u03,
+            "{ x₀³x₁³ | x₀ = 1.25, x₁ = 1.25 }",
+            "x₀ = 1.25\n"
+            "x₁ = 1.25\n"
+            "expr(x₀,x₁) = x₀^3*x₁^3\n"
+            "return expr(x₀,x₁)",
+            __LINE__
+        },
+
+        /* U04 */
+        {
+            "x*x + x*x (unnamed)",
+            make_expr_u04,
+            "{ 2x₀² | x₀ = 1.25 }",
+            "x₀ = 1.25\n"
+            "expr(x₀) = 2*x₀^2\n"
+            "return expr(x₀)",
+            __LINE__
+        },
+
+        /* U05 */
+        {
+            "sin(x)*cos(x) (unnamed)",
+            make_expr_u05,
+            "{ sin(x₀)·cos(x₀) | x₀ = 1.25 }",
+            "x₀ = 1.25\n"
+            "expr(x₀) = sin(x₀)*cos(x₀)\n"
+            "return expr(x₀)",
+            __LINE__
+        },
+
+        /* U06 */
+        {
+            "exp(sin(x))*exp(cos(x)) (unnamed)",
+            make_expr_u06,
+            "{ exp(sin(x₀) + cos(x₀)) | x₀ = 1.25 }",
+            "x₀ = 1.25\n"
+            "expr(x₀) = exp(sin(x₀) + cos(x₀))\n"
+            "return expr(x₀)",
+            __LINE__
+        },
+
+        /* C01 */
+        {
+            "c₀*x₀^2 (named const, unnamed var)",
+            make_expr_c01,
+            "{ c₀x₀² | x₀ = 1.25; c₀ = 3.141592653589793238462643383279505 }",
+            "x₀ = 1.25\n"
+            "c₀ = 3.141592653589793238462643383279505\n"
+            "expr(x₀,c₀) = c₀*x₀^2\n"
+            "return expr(x₀,c₀)",
+            __LINE__
+        },
+
+        /* C02 */
+        {
+            "c₀*sin(x₀) (named const, unnamed var)",
+            make_expr_c02,
+            "{ c₀·sin(x₀) | x₀ = 1.25; c₀ = 2.718281828459045235360287471352664 }",
+            "x₀ = 1.25\n"
+            "c₀ = 2.718281828459045235360287471352664\n"
+            "expr(x₀,c₀) = c₀*sin(x₀)\n"
+            "return expr(x₀,c₀)",
+            __LINE__
+        },
+
+        /* C03 */
+        {
+            "x₀ + x₁ + c₀",
+            make_expr_c03,
+            "{ x₀ + x₁ + c₀ | x₀ = 1.25, x₁ = 1.25; c₀ = 3.141592653589793238462643383279505 }",
+            "x₀ = 1.25\n"
+            "x₁ = 1.25\n"
+            "c₀ = 3.141592653589793238462643383279505\n"
+            "expr(x₀,x₁,c₀) = x₀ + x₁ + c₀\n"
+            "return expr(x₀,x₁,c₀)",
+            __LINE__
+        },
+
+        /* C04 */
+        {
+            "c₀*x₀ + c₁ (two named consts, unnamed var)",
+            make_expr_c04,
+            "{ c₀x₀ + c₁ | x₀ = 1.25; c₀ = 3.141592653589793238462643383279505, c₁ = 2.718281828459045235360287471352664 }",
+            "x₀ = 1.25\n"
+            "c₀ = 3.141592653589793238462643383279505\n"
+            "c₁ = 2.718281828459045235360287471352664\n"
+            "expr(x₀,c₀,c₁) = c₀*x₀ + c₁\n"
+            "return expr(x₀,c₀,c₁)",
+            __LINE__
+        },
+    };
+
+    const int N = (int)(sizeof(tests) / sizeof(tests[0]));
+
+    for (int i = 0; i < N; i++) {
+        dval_t *f = tests[i].make();
+
+        char *got_expr = dv_to_string(f, style_EXPRESSION);
+        char *got_func = dv_to_string(f, style_FUNCTION);
+
+        int ok_expr = strcmp(got_expr, tests[i].expected_expr) == 0;
+        int ok_func = strcmp(got_func, tests[i].expected_func) == 0;
+
+        if (ok_expr) {
+            printf(C_BOLD C_GREEN "PASS" C_RESET " %s (EXPR)\n", tests[i].src);
+        } else {
+            printf(C_BOLD C_RED "FAIL" C_RESET " %s (EXPR): " C_RED "%s:%d:1\n" C_RESET,
+                   tests[i].src, __FILE__, tests[i].line);
+            TEST_FAIL();
+        }
+
+        printf(C_BOLD "  got      " C_RESET "%s\n", got_expr);
+        printf(C_BOLD "  expected " C_RESET "%s\n", tests[i].expected_expr);
+
+        if (ok_func) {
+            printf(C_BOLD C_GREEN "PASS" C_RESET " %s (FUNC)\n", tests[i].src);
+        } else {
+            printf(C_BOLD C_RED "FAIL" C_RESET " %s (FUNC): " C_RED "%s:%d:1\n" C_RESET,
+                   tests[i].src, __FILE__, tests[i].line);
+            TEST_FAIL();
+        }
+
+        {
+            const char *p = got_func;
+            const char *nl;
+            printf(C_BOLD "  got      " C_RESET);
+            while ((nl = strchr(p, '\n'))) {
+                fwrite(p, 1, nl - p, stdout);
+                printf("\n           ");
+                p = nl + 1;
+            }
+            printf("%s\n", p);
+        }
+
+        printf("  ───────────────────────────────\n");
+
+        {
+            const char *p = tests[i].expected_func;
+            const char *nl;
+            printf(C_BOLD "  expected " C_RESET);
+            while ((nl = strchr(p, '\n'))) {
+                fwrite(p, 1, nl - p, stdout);
+                printf("\n           ");
+                p = nl + 1;
+            }
+            printf("%s\n", p);
+        }
+
+        printf("\n");
+
+        free(got_expr);
+        free(got_func);
+        dv_free(f);
+    }
+}
+
+/* ============================================================
+ *  test_expressions_longname
+ * ============================================================ */
+static void test_expressions_longname(void)
+{
+    struct {
+        const char *src;
+        dval_t *(*make)(void);
+        const char *expected_expr;
+        const char *expected_func;
+        int line;
+    } tests[] = {
+        /* L01 */
+        {
+            "radius^2",
+            make_expr_l01,
+            "{ [radius]² | [radius] = 1.25 }",
+            "radius = 1.25\n"
+            "expr(radius) = radius^2\n"
+            "return expr(radius)",
+            __LINE__
+        },
+
+        /* L02 */
+        {
+            "base * height",
+            make_expr_l02,
+            "{ [base]·[height] | [base] = 1.25, [height] = 1.25 }",
+            "base = 1.25\n"
+            "height = 1.25\n"
+            "expr(base,height) = base*height\n"
+            "return expr(base,height)",
+            __LINE__
+        },
+
+        /* L03 */
+        {
+            "pi * radius^2",
+            make_expr_l03,
+            "{ [pi]·[radius]² | [radius] = 1.25; [pi] = 3.141592653589793238462643383279505 }",
+            "radius = 1.25\n"
+            "pi = 3.141592653589793238462643383279505\n"
+            "expr(radius,pi) = pi*radius^2\n"
+            "return expr(radius,pi)",
+            __LINE__
+        },
+
+        /* L04 */
+        {
+            "@pi * radius^2",
+            make_expr_l04,
+            "{ π·[radius]² | [radius] = 1.25; π = 3.141592653589793238462643383279505 }",
+            "radius = 1.25\n"
+            "π = 3.141592653589793238462643383279505\n"
+            "expr(radius,π) = π*radius^2\n"
+            "return expr(radius,π)",
+            __LINE__
+        },
+
+        /* L05 */
+        {
+            "sin(theta)*cos(theta)",
+            make_expr_l05,
+            "{ sin([theta])·cos([theta]) | [theta] = 1.25 }",
+            "theta = 1.25\n"
+            "expr(theta) = sin(theta)*cos(theta)\n"
+            "return expr(theta)",
+            __LINE__
+        },
+
+        /* L06 */
+        {
+            "pi * tau * x",
+            make_expr_l06,
+            "{ [pi]·[tau]·x | x = 1.25; [pi] = 3.141592653589793238462643383279505, [tau] = 6.283185307179586476925286766559011 }",
+            "x = 1.25\n"
+            "pi = 3.141592653589793238462643383279505\n"
+            "tau = 6.283185307179586476925286766559011\n"
+            "expr(x,pi,tau) = pi*tau*x\n"
+            "return expr(x,pi,tau)",
+            __LINE__
+        },
+
+        /* L07: space in name */
+        {
+            "\"my var\"^2",
+            make_expr_l07,
+            "{ [my var]² | [my var] = 1.25 }",
+            "[my var] = 1.25\n"
+            "expr([my var]) = [my var]^2\n"
+            "return expr([my var])",
+            __LINE__
+        },
+
+        /* L08: name starting with a digit */
+        {
+            "\"2pi\" * x",
+            make_expr_l08,
+            "{ [2pi]·x | x = 1.25; [2pi] = 3.141592653589793238462643383279505 }",
+            "x = 1.25\n"
+            "[2pi] = 3.141592653589793238462643383279505\n"
+            "expr(x,[2pi]) = [2pi]*x\n"
+            "return expr(x,[2pi])",
+            __LINE__
+        },
+
+        /* L09: non-alphanumeric character (apostrophe/prime) */
+        {
+            "\"x'\"^2",
+            make_expr_l09,
+            "{ [x']² | [x'] = 1.25 }",
+            "[x'] = 1.25\n"
+            "expr([x']) = [x']^2\n"
+            "return expr([x'])",
+            __LINE__
+        },
+    };
+
+    const int N = (int)(sizeof(tests) / sizeof(tests[0]));
+
+    for (int i = 0; i < N; i++) {
+        dval_t *f = tests[i].make();
+
+        char *got_expr = dv_to_string(f, style_EXPRESSION);
+        char *got_func = dv_to_string(f, style_FUNCTION);
+
+        int ok_expr = strcmp(got_expr, tests[i].expected_expr) == 0;
+        int ok_func = strcmp(got_func, tests[i].expected_func) == 0;
+
+        if (ok_expr) {
+            printf(C_BOLD C_GREEN "PASS" C_RESET " %s (EXPR)\n", tests[i].src);
+        } else {
+            printf(C_BOLD C_RED "FAIL" C_RESET " %s (EXPR): " C_RED "%s:%d:1\n" C_RESET,
+                   tests[i].src, __FILE__, tests[i].line);
+            TEST_FAIL();
+        }
+
+        printf(C_BOLD "  got      " C_RESET "%s\n", got_expr);
+        printf(C_BOLD "  expected " C_RESET "%s\n", tests[i].expected_expr);
+
+        if (ok_func) {
+            printf(C_BOLD C_GREEN "PASS" C_RESET " %s (FUNC)\n", tests[i].src);
+        } else {
+            printf(C_BOLD C_RED "FAIL" C_RESET " %s (FUNC): " C_RED "%s:%d:1\n" C_RESET,
+                   tests[i].src, __FILE__, tests[i].line);
+            TEST_FAIL();
+        }
+
+        {
+            const char *p = got_func;
+            const char *nl;
+            printf(C_BOLD "  got      " C_RESET);
+            while ((nl = strchr(p, '\n'))) {
+                fwrite(p, 1, nl - p, stdout);
+                printf("\n           ");
+                p = nl + 1;
+            }
+            printf("%s\n", p);
+        }
+
+        printf("  ───────────────────────────────\n");
+
+        {
+            const char *p = tests[i].expected_func;
+            const char *nl;
+            printf(C_BOLD "  expected " C_RESET);
+            while ((nl = strchr(p, '\n'))) {
+                fwrite(p, 1, nl - p, stdout);
+                printf("\n           ");
+                p = nl + 1;
+            }
+            printf("%s\n", p);
+        }
+
+        printf("\n");
+
+        free(got_expr);
+        free(got_func);
+        dv_free(f);
+    }
+}
+
 /* Build expression: f(x) = exp(sin(x)) + 3*x^2 - 7 */
 static dval_t *make_f(dval_t *x) {
     dval_t *sinx   = dv_sin(x);
@@ -3842,6 +4473,8 @@ void test_second_derivatives(void) {
 void test_dval_t_to_string(void) {
     RUN_TEST(test_to_string_all, __func__);
     RUN_TEST(test_expressions, __func__);
+    RUN_TEST(test_expressions_unnamed, __func__);
+    RUN_TEST(test_expressions_longname, __func__);
 }
 
 void test_README_md_example(void) {
