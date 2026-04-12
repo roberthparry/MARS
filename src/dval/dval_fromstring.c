@@ -1,6 +1,6 @@
 /* dval_fromstring.c - construct a dval_t from an expression-style string
  *
- * Parses strings in the format produced by dv_to_string(f, style_EXPRESSION):
+ * Accepts strings in the format produced by dv_to_string(f, style_EXPRESSION):
  *
  *   { expr | x₀ = val, ...; [name] = val, ... }
  *
@@ -8,12 +8,26 @@
  *
  *   { name = val }
  *
- * Variables come before the ';' in the binding section; named constants come
- * after it.  Names in the expression follow the same rules as dval_tostring:
- * simple names are a single Unicode letter optionally followed by Unicode
- * subscript digits (U+2080–U+2089); anything else is written with brackets.
+ * Variables appear before the ';' in the binding section; named constants
+ * appear after it.  The parser also accepts the following ASCII alternatives
+ * for convenience:
  *
- * Returns an owning dval_t* on success, NULL on parse error.
+ *   _N          subscript digit N (0–9), normalised to U+2080+N internally
+ *               so x_0 and x₀ are interchangeable within the same string
+ *
+ *   *           explicit multiplication in place of middle-dot (·) or
+ *               implicit juxtaposition; spaces around '*' are permitted
+ *
+ *   ^N          integer exponent on a function name (sin^2, cos^3, …) or
+ *               on a sub-expression, in place of Unicode superscripts
+ *               (², ³, …)
+ *
+ * Bracketed names ([my var], [2pi], …) are supported for identifiers that
+ * do not fit the single-letter-plus-subscript rule.
+ *
+ * Returns an owning dval_t* on success, NULL on parse error (details written
+ * to stderr).  The caller must call dv_free() on the returned pointer exactly
+ * once.
  */
 
 #include <stdlib.h>
