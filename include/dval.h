@@ -172,10 +172,24 @@ void dv_print(const dval_t *f);
  *   { name = val }
  *
  * Variables appear before the ';' in the binding section; named constants
- * appear after it.  Returns an owning handle on success, or NULL on error
- * (error details are written to stderr).
+ * appear after it.
  *
- * The caller must call dv_free() on the returned pointer exactly once.
+ * The following ASCII alternatives are accepted in addition to the canonical
+ * Unicode forms:
+ *
+ *   @p _N       subscript digit (x_0 ≡ x₀); interchangeable with U+2080–U+2089
+ *               within the same string
+ *   @p *        explicit multiplication (c * sin(x) ≡ c·sin(x)); spaces around
+ *               @p * are permitted
+ *   @p ^N       integer exponent on a function name (sin^2 ≡ sin²) or on a
+ *               sub-expression ((x+1)^2 ≡ (x+1)²)
+ *
+ * Bracketed names (@p [my var], @p [2pi], …) are supported for identifiers
+ * that do not fit the single-letter-plus-subscript rule.
+ *
+ * Returns an owning handle on success, or NULL on error (details written to
+ * stderr).  The caller must call dv_free() on the returned pointer exactly
+ * once.
  */
 dval_t *dval_from_string(const char *s);
 
