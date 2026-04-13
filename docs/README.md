@@ -38,11 +38,7 @@ W0(1) = 0.5671432904097838729999686622103575
 - [`dval_t`](docs/dval.md)
 - [`datetime_t`](docs/datetime.md)
 - [`dictionary_t`](docs/dictionary.md)
-  - [shallow ownership example](docs/dictionary.md#example-shallow-ownership)
-  - [deep ownership example](docs/dictionary.md#example-deep-ownership)
 - [`set_t`](docs/set.md)
-  - [shallow ownership example](docs/set.md#example-shallow-ownership)
-  - [deep ownership example](docs/set.md#example-deep-ownership)
 - [`string_t`](docs/string.md)
 
 A module index is also available in [`docs/README.md`](docs/README.md).
@@ -60,11 +56,20 @@ Makefile     build and test entry points
 
 ## Build
 
-See [`docs/building.md`](docs/building.md).
+```sh
+make release
+```
 
 ## Run Tests
 
-See [`docs/testing.md`](docs/testing.md).
+```sh
+make test_qfloat
+make test_dval
+make test_datetime
+make test_dictionary
+make test_set
+make test_string
+```
 
 ## Documentation
 
@@ -73,3 +78,26 @@ Detailed architecture notes and longer examples live in `docs/`.
 ## License
 
 MIT License. See `LICENSE`.
+
+# MARS Documentation
+
+This directory contains the longer module documentation for MARS.
+
+## Getting Started
+
+- [Building](building.md)
+- [Testing](testing.md)
+
+## Modules
+
+- [`qfloat`](qfloat.md) — double-double arithmetic and special functions
+- [`dval_t`](dval.md) — differentiable expression DAGs
+- [`datetime_t`](datetime.md) — civil and astronomical date/time utilities
+- [`dictionary_t`](dictionary.md) — generic key/value storage
+- [`set_t`](set.md) — generic set storage
+- [`string_t`](string.md) — UTF-8-aware dynamic strings
+
+## Notes
+
+- The repository landing page is [`../README.md`](../README.md).
+- These documents focus on API shape, examples, and implementation notes.
