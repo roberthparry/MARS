@@ -687,13 +687,16 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
             if (qf_to_double(f->b->c) < 0)
                 neg = true;
         }
+        else if (f->b->ops == &ops_neg) {
+            neg = true;
+        }
         else if (f->b->ops == &ops_mul) {
             dval_t *fac[64];
             int n = 0;
             flatten_mul((dval_t *)f->b, fac, &n, 64);
             for (int i = 0; i < n; i++) {
                 if (fac[i]->ops == &ops_const &&
-                    qf_to_double(fac[i]->c) == -1.0)
+                    qf_to_double(fac[i]->c) < 0)
                 {
                     neg = true;
                     break;
@@ -714,22 +717,35 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
             tmp.c = qf_neg(tmp.c);
             emit_expr(&tmp, b, PREC_ADD);
         }
+        else if (neg && f->b->ops == &ops_neg) {
+            emit_expr(f->b->a, b, PREC_ADD);
+        }
         else if (neg && f->b->ops == &ops_mul) {
-            /* Re-emit product without the -1 factor and without a leading '-' */
+            /* Re-emit product with the negative constant replaced by its absolute value */
             dval_t *fac[64];
             int n = 0;
             flatten_mul((dval_t *)f->b, fac, &n, 64);
             sort_factors(fac, n);
 
-            /* strip -1 factors but ignore resulting sign (we already used it) */
+            /* replace or strip the negative constant factor */
+            dval_t pos_const;
             for (int i = 0; i < n; i++) {
                 if (fac[i]->ops == &ops_const &&
-                    qf_to_double(fac[i]->c) == -1.0)
+                    qf_to_double(fac[i]->c) < 0)
                 {
-                    for (int j = i; j < n - 1; j++)
-                        fac[j] = fac[j + 1];
-                    n--;
-                    i--;
+                    if (qf_to_double(fac[i]->c) == -1.0) {
+                        /* strip -1 entirely */
+                        for (int j = i; j < n - 1; j++)
+                            fac[j] = fac[j + 1];
+                        n--;
+                    } else {
+                        /* replace with stack-local positive copy */
+                        pos_const         = *fac[i];
+                        pos_const.c       = qf_neg(fac[i]->c);
+                        pos_const.x_valid = 0;
+                        fac[i]            = &pos_const;
+                    }
+                    break;
                 }
             }
 
@@ -750,6 +766,34 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
         else {
             emit_expr(f->b, b, PREC_ADD);
         }
+
+        if (need) sbuf_putc(b, ')');
+        return;
+    }
+
+    /* Division: a/b — denominator gets PREC_POW so mul/add inside it parenthesise */
+    if (f->ops == &ops_div) {
+        int need = PREC_MUL < parent_prec;
+        if (need) sbuf_putc(b, '(');
+
+        emit_expr(f->a, b, PREC_MUL);
+        sbuf_putc(b, '/');
+        emit_expr(f->b, b, PREC_POW);
+
+        if (need) sbuf_putc(b, ')');
+        return;
+    }
+
+    /* Binary power: base^(exp) */
+    if (f->ops == &ops_pow) {
+        int need = PREC_POW < parent_prec;
+        if (need) sbuf_putc(b, '(');
+
+        emit_expr(f->a, b, PREC_POW);
+        sbuf_putc(b, '^');
+        sbuf_putc(b, '(');
+        emit_expr(f->b, b, 0);
+        sbuf_putc(b, ')');
 
         if (need) sbuf_putc(b, ')');
         return;
@@ -853,6 +897,34 @@ static void emit_func(const dval_t *f, sbuf_t *b, int parent_prec)
             sbuf_puts(b, " - ");
 
         emit_func(f->b, b, PREC_ADD);
+
+        if (need) sbuf_putc(b, ')');
+        return;
+    }
+
+    /* Division: a/b */
+    if (f->ops == &ops_div) {
+        int need = PREC_MUL < parent_prec;
+        if (need) sbuf_putc(b, '(');
+
+        emit_func(f->a, b, PREC_MUL);
+        sbuf_putc(b, '/');
+        emit_func(f->b, b, PREC_POW);
+
+        if (need) sbuf_putc(b, ')');
+        return;
+    }
+
+    /* Binary power: base^(exp) */
+    if (f->ops == &ops_pow) {
+        int need = PREC_POW < parent_prec;
+        if (need) sbuf_putc(b, '(');
+
+        emit_func(f->a, b, PREC_POW);
+        sbuf_putc(b, '^');
+        sbuf_putc(b, '(');
+        emit_func(f->b, b, 0);
+        sbuf_putc(b, ')');
 
         if (need) sbuf_putc(b, ')');
         return;

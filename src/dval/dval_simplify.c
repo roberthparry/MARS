@@ -84,8 +84,14 @@ static qfloat term_coeff(const dval_t *term, const dval_t **base)
         *base = NULL;
         return term->c;
     }
-    /* neg(x): coefficient -1 */
+    /* neg(x): coefficient -1; neg(c·rest): coefficient -c */
     if (term->ops == &ops_neg) {
+        if (term->a->ops == &ops_mul &&
+            term->a->a->ops == &ops_const &&
+            (!term->a->a->name || !*term->a->a->name)) {
+            *base = term->a->b;
+            return qf_neg(term->a->a->c);
+        }
         *base = term->a;
         return qf_from_double(-1.0);
     }
@@ -110,6 +116,11 @@ static dval_t *make_scaled(qfloat coeff, dval_t *base)
     }
     if (is_qf_one(coeff))
         return base;
+    if (qf_to_double(coeff) == -1.0) {
+        dval_t *r = dv_neg(base);
+        dv_free(base);
+        return r;
+    }
     dval_t *cn = dv_new_const(coeff);
     dval_t *r  = dv_mul(cn, base);
     dv_free(cn);
@@ -245,6 +256,67 @@ static const char *addend_sort_name(const dval_t *f)
 }
 
 /* ------------------------------------------------------------------------- */
+/* Addition/subtraction flattening with like-term combining                  */
+/* ------------------------------------------------------------------------- */
+
+typedef struct { dval_t *base; qfloat coeff; } addend_t;
+
+/* Flatten an add/sub tree into coefficient·base pairs.
+ * sign is +1 or -1 for the current branch.
+ * Pure numeric constants accumulate into *c_const. */
+static void collect_addends(
+    dval_t *f, int sign,
+    qfloat *c_const,
+    addend_t **terms, size_t *n, size_t *cap)
+{
+    if (!f) return;
+
+    if (f->ops == &ops_add) {
+        collect_addends(f->a,  sign, c_const, terms, n, cap);
+        collect_addends(f->b,  sign, c_const, terms, n, cap);
+        return;
+    }
+    if (f->ops == &ops_sub) {
+        collect_addends(f->a,  sign, c_const, terms, n, cap);
+        collect_addends(f->b, -sign, c_const, terms, n, cap);
+        return;
+    }
+    /* neg(add/sub): distribute negation into the inner sum */
+    if (f->ops == &ops_neg &&
+        (f->a->ops == &ops_add || f->a->ops == &ops_sub)) {
+        collect_addends(f->a, -sign, c_const, terms, n, cap);
+        return;
+    }
+
+    const dval_t *base;
+    qfloat coeff = term_coeff(f, &base);
+    if (sign < 0) coeff = qf_neg(coeff);
+
+    if (!base) {
+        *c_const = qf_add(*c_const, coeff);
+        return;
+    }
+
+    /* combine with any existing entry that has the same base */
+    for (size_t i = 0; i < *n; ++i) {
+        if (dv_struct_eq((*terms)[i].base, base)) {
+            (*terms)[i].coeff = qf_add((*terms)[i].coeff, coeff);
+            return;
+        }
+    }
+
+    /* new entry */
+    if (*n == *cap) {
+        *cap   = *cap ? *cap * 2 : 8;
+        *terms = realloc(*terms, *cap * sizeof(addend_t));
+    }
+    dv_retain((dval_t *)base);
+    (*terms)[*n].base  = (dval_t *)base;
+    (*terms)[*n].coeff = coeff;
+    (*n)++;
+}
+
+/* ------------------------------------------------------------------------- */
 /* Simplifier                                                                */
 /* ------------------------------------------------------------------------- */
 dval_t *dv_simplify(dval_t *f)
@@ -288,64 +360,54 @@ dval_t *dv_simplify(dval_t *f)
     }
 
     /* ============================================================
-       ADDITION
+       ADDITION / SUBTRACTION  — flatten + combine like terms
        ============================================================ */
-    if (f->ops == &ops_add) {
+    if (f->ops == &ops_add || f->ops == &ops_sub) {
 
-        if (a->ops == &ops_const && is_qf_zero(a->c)) { dv_free(a); return b; }
-        if (b->ops == &ops_const && is_qf_zero(b->c)) { dv_free(b); return a; }
+        qfloat   c_const = qf_from_double(0.0);
+        addend_t *terms  = NULL;
+        size_t    n = 0, cap = 0;
 
-        if (a->ops == &ops_const && b->ops == &ops_const) {
-            qfloat c = qf_add(a->c, b->c);
-            dv_free(a); dv_free(b);
-            return dv_new_const(c);
-        }
-
-        /* Combine like terms: ca*X + cb*X  →  (ca+cb)*X */
-        const dval_t *base_a, *base_b;
-        qfloat ca = term_coeff(a, &base_a);
-        qfloat cb = term_coeff(b, &base_b);
-        if (base_a && base_b && dv_struct_eq(base_a, base_b)) {
-            dv_retain((dval_t *)base_a);
-            dv_free(a);
-            dv_free(b);
-            return make_scaled(qf_add(ca, cb), (dval_t *)base_a);
-        }
-
-        dval_t *r = dv_add(a, b);
+        collect_addends(a, +1, &c_const, &terms, &n, &cap);
         dv_free(a);
+        collect_addends(b, (f->ops == &ops_sub) ? -1 : +1,
+                        &c_const, &terms, &n, &cap);
         dv_free(b);
-        return r;
-    }
 
-    /* ============================================================
-       SUBTRACTION
-       ============================================================ */
-    if (f->ops == &ops_sub) {
+        /* rebuild: symbolic terms first, then constant */
+        dval_t *cur = NULL;
 
-        if (b->ops == &ops_const && is_qf_zero(b->c)) { dv_free(b); return a; }
-
-        if (a->ops == &ops_const && b->ops == &ops_const) {
-            qfloat c = qf_sub(a->c, b->c);
-            dv_free(a); dv_free(b);
-            return dv_new_const(c);
+        for (size_t i = 0; i < n; ++i) {
+            if (is_qf_zero(terms[i].coeff)) {
+                dv_free(terms[i].base);
+                continue;
+            }
+            dval_t *term = make_scaled(terms[i].coeff, terms[i].base);
+            if (!cur) {
+                cur = term;
+            } else {
+                dval_t *tmp = dv_add(cur, term);
+                dv_free(cur);
+                dv_free(term);
+                cur = tmp;
+            }
         }
 
-        /* Combine like terms: ca*X - cb*X  →  (ca-cb)*X */
-        const dval_t *base_a, *base_b;
-        qfloat ca = term_coeff(a, &base_a);
-        qfloat cb = term_coeff(b, &base_b);
-        if (base_a && base_b && dv_struct_eq(base_a, base_b)) {
-            dv_retain((dval_t *)base_a);
-            dv_free(a);
-            dv_free(b);
-            return make_scaled(qf_sub(ca, cb), (dval_t *)base_a);
+        free(terms);
+
+        if (!is_qf_zero(c_const)) {
+            dval_t *cterm = dv_new_const(c_const);
+            if (!cur) {
+                cur = cterm;
+            } else {
+                dval_t *tmp = dv_add(cur, cterm);
+                dv_free(cur);
+                dv_free(cterm);
+                cur = tmp;
+            }
         }
 
-        dval_t *r = dv_sub(a, b);
-        dv_free(a);
-        dv_free(b);
-        return r;
+        return cur ? cur : dv_new_const_d(0.0);
     }
 
     /* ============================================================
@@ -386,6 +448,74 @@ dval_t *dv_simplify(dval_t *f)
                 dv_free(terms[i]);
             free(terms);
             return dv_new_const_d(0.0);
+        }
+
+        /* --- extract div factors: div(a,b) splits a into numer, b into denom --- */
+        dval_t **dterms = NULL;
+        size_t ndterms = 0, dcap = 0;
+
+        for (size_t i = 0; i < nterms; ++i) {
+            if (!terms[i] || terms[i]->ops != &ops_div) continue;
+            dval_t *dnode = terms[i];
+            dval_t *num   = dnode->a;
+            dval_t *den   = dnode->b;
+            dv_retain(num);
+            dv_retain(den);
+            dv_free(dnode);
+            terms[i] = NULL;
+
+            /* absorb numeric numerator into c_acc */
+            if (num->ops == &ops_const && (!num->name || !*num->name)) {
+                if (is_qf_zero(num->c))
+                    is_zero = 1;
+                else
+                    c_acc = qf_mul(c_acc, num->c);
+                dv_free(num);
+            } else {
+                terms[i] = num;
+            }
+
+            if (is_zero) { dv_free(den); continue; }
+
+            /* absorb numeric denominator into c_acc (divide) */
+            if (den->ops == &ops_const && (!den->name || !*den->name)) {
+                c_acc = qf_div(c_acc, den->c);
+                dv_free(den);
+            } else {
+                if (ndterms == dcap) {
+                    dcap   = dcap ? dcap * 2 : 4;
+                    dterms = realloc(dterms, dcap * sizeof(dval_t *));
+                }
+                dterms[ndterms++] = den;
+            }
+        }
+
+        if (is_zero) {
+            for (size_t i = 0; i < nterms; ++i) dv_free(terms[i]);
+            for (size_t i = 0; i < ndterms; ++i) dv_free(dterms[i]);
+            free(terms); free(dterms);
+            return dv_new_const_d(0.0);
+        }
+
+        /* --- exponent combining on denominator terms --- */
+        for (size_t i = 0; i < ndterms; ++i) {
+            if (!dterms[i]) continue;
+            dval_t *ti   = dterms[i];
+            dval_t *base = (ti->ops == &ops_pow_d) ? ti->a : ti;
+            double  exp  = (ti->ops == &ops_pow_d) ? qf_to_double(ti->c) : 1.0;
+            for (size_t j = i + 1; j < ndterms; ++j) {
+                if (!dterms[j]) continue;
+                dval_t *tj = dterms[j];
+                if (tj->ops == &ops_pow_d && dv_struct_eq(base, tj->a)) {
+                    exp += qf_to_double(tj->c); dv_free(tj); dterms[j] = NULL;
+                } else if (dv_struct_eq(base, tj)) {
+                    exp += 1.0; dv_free(tj); dterms[j] = NULL;
+                }
+            }
+            if (exp != 1.0 || ti->ops == &ops_pow_d) {
+                dv_retain(base); dv_free(ti);
+                dterms[i] = dv_pow_d(base, exp); dv_free(base);
+            }
         }
 
         /* --- exponent combining: merge x, x^2, x^3, ... --- */
@@ -486,7 +616,7 @@ dval_t *dv_simplify(dval_t *f)
             }
         }
 
-        /* --- rebuild multiplication chain --- */
+        /* --- rebuild numerator chain --- */
         dval_t *cur = NULL;
 
         if (!is_qf_one(c_acc))
@@ -508,9 +638,34 @@ dval_t *dv_simplify(dval_t *f)
         free(terms);
 
         if (!cur)
-            return dv_new_const(c_acc);
+            cur = dv_new_const(c_acc);
 
-        return cur;
+        /* --- rebuild denominator and wrap with division --- */
+        if (ndterms == 0) {
+            free(dterms);
+            return cur;
+        }
+
+        dval_t *denom = NULL;
+        for (size_t i = 0; i < ndterms; ++i) {
+            if (!dterms[i]) continue;
+            if (!denom) {
+                denom = dterms[i];
+            } else {
+                dval_t *tmp = dv_mul(denom, dterms[i]);
+                dv_free(denom);
+                dv_free(dterms[i]);
+                denom = tmp;
+            }
+        }
+        free(dterms);
+
+        dval_t *div_node = dv_div(cur, denom);
+        dv_free(cur);
+        dv_free(denom);
+        dval_t *result = dv_simplify(div_node);
+        dv_free(div_node);
+        return result;
     }
 
     /* ============================================================
@@ -536,6 +691,36 @@ dval_t *dv_simplify(dval_t *f)
             return dv_new_const(q);
         }
 
+        /* sinh(x)/cosh(x) → tanh(x) */
+        if (a->ops == &ops_sinh && b->ops == &ops_cosh &&
+            dv_struct_eq(a->a, b->a)) {
+            dv_retain(a->a);
+            dval_t *r = dv_tanh(a->a);
+            dv_free(a->a);
+            dv_free(a);
+            dv_free(b);
+            return r;
+        }
+
+        /* sin(x)/cos(x) → tan(x) */
+        if (a->ops == &ops_sin && b->ops == &ops_cos &&
+            dv_struct_eq(a->a, b->a)) {
+            dv_retain(a->a);
+            dval_t *r = dv_tan(a->a);
+            dv_free(a->a);
+            dv_free(a);
+            dv_free(b);
+            return r;
+        }
+
+        /* x/abs(x) → abs(x)/x  (canonical form for sign function) */
+        if (b->ops == &ops_abs && dv_struct_eq(a, b->a)) {
+            dval_t *r = dv_div(b, a);
+            dv_free(a);
+            dv_free(b);
+            return r;
+        }
+
         dval_t *r = dv_div(a, b);
         dv_free(a);
         dv_free(b);
@@ -554,6 +739,25 @@ dval_t *dv_simplify(dval_t *f)
         if (ed == 0.0) {
             dv_free(a);
             return dv_new_const_d(1.0);
+        }
+
+        /* constant folding: pow_d(unnamed_const, exp) → const */
+        if (a->ops == &ops_const && (!a->name || !*a->name)) {
+            qfloat v = qf_pow(a->c, f->c);
+            dv_free(a);
+            return dv_new_const(v);
+        }
+
+        /* sqrt(x)^n → x^(n/2) */
+        if (a->ops == &ops_sqrt) {
+            double half = ed / 2.0;
+            dv_retain(a->a);
+            dval_t *inner = a->a;
+            dv_free(a);
+            if (half == 1.0) return inner;
+            dval_t *r = dv_pow_d(inner, half);
+            dv_free(inner);
+            return r;
         }
 
         dval_t *r = dv_pow_d(a, ed);
