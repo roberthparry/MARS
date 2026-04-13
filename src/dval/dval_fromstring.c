@@ -317,63 +317,112 @@ static dval_t *parse_addexpr(parser_t *p);
 typedef dval_t *(*unary_fn)(dval_t *);
 typedef dval_t *(*binary_fn)(dval_t *, dval_t *);
 
-/* Sorted longest-first so "atan2" is tried before "atan", "asinh"
- * before "asin", etc.  This prevents a shorter prefix stealing the match. */
-static const struct {
+/* ------------------------------------------------------------------ */
+/* Function dispatch — open-addressing hash table, linear probing     */
+/* ------------------------------------------------------------------ */
+
+/* 67 is prime; with 36 entries the load factor is 36/67 ≈ 0.54.
+ * Slot positions were computed with: h = djb2(kw) % 67, linear probe
+ * on collision.  NULL kw marks an empty slot. */
+#define FUNC_HT_SIZE  67
+
+typedef struct {
     const char *kw;
     size_t      klen;
     int         is_binary; /* 0 = unary, 1 = two-arg */
     unary_fn    ufn;
     binary_fn   bfn;
-} s_funcs[] = {
-    /* 13-char */
-    { "normal_logpdf", 13, 0, dv_normal_logpdf, NULL          },
-    /* 11-char */
-    { "lambert_wm1",   11, 0, dv_lambert_wm1,   NULL          },
-    /* 10-char */
-    { "lambert_w0",    10, 0, dv_lambert_w0,    NULL          },
-    { "normal_pdf",    10, 0, dv_normal_pdf,    NULL          },
-    { "normal_cdf",    10, 0, dv_normal_cdf,    NULL          },
-    /* 8-char */
-    { "trigamma",       8, 0, dv_trigamma,      NULL          },
-    /* 7-char */
-    { "logbeta",        7, 1, NULL,              dv_logbeta    },
-    { "erfcinv",        7, 0, dv_erfcinv,        NULL          },
-    { "digamma",        7, 0, dv_digamma,        NULL          },
-    /* 6-char */
-    { "erfinv",         6, 0, dv_erfinv,         NULL          },
-    { "lgamma",         6, 0, dv_lgamma,         NULL          },
-    /* 5-char */
-    { "atan2",          5, 1, NULL,              dv_atan2      },
-    { "asinh",          5, 0, dv_asinh,          NULL          },
-    { "acosh",          5, 0, dv_acosh,          NULL          },
-    { "atanh",          5, 0, dv_atanh,          NULL          },
-    { "hypot",          5, 1, NULL,              dv_hypot      },
-    { "gamma",          5, 0, dv_gamma,          NULL          },
-    /* 4-char */
-    { "sinh",           4, 0, dv_sinh,           NULL          },
-    { "cosh",           4, 0, dv_cosh,           NULL          },
-    { "tanh",           4, 0, dv_tanh,           NULL          },
-    { "asin",           4, 0, dv_asin,           NULL          },
-    { "acos",           4, 0, dv_acos,           NULL          },
-    { "atan",           4, 0, dv_atan,           NULL          },
-    { "sqrt",           4, 0, dv_sqrt,           NULL          },
-    { "erfc",           4, 0, dv_erfc,           NULL          },
-    { "beta",           4, 1, NULL,              dv_beta       },
-    /* 3-char */
-    { "pow",            3, 1, NULL,              dv_pow        },
-    { "sin",            3, 0, dv_sin,            NULL          },
-    { "cos",            3, 0, dv_cos,            NULL          },
-    { "tan",            3, 0, dv_tan,            NULL          },
-    { "exp",            3, 0, dv_exp,            NULL          },
-    { "log",            3, 0, dv_log,            NULL          },
-    { "erf",            3, 0, dv_erf,            NULL          },
-    { "abs",            3, 0, dv_abs,            NULL          },
-    /* 2-char */
-    { "ei",             2, 0, dv_ei,             NULL          },
-    { "e1",             2, 0, dv_e1,             NULL          },
+} func_entry_t;
+
+static const func_entry_t s_funcs[FUNC_HT_SIZE] = {
+    /* [ 0] */ { "sinh",          4, 0, dv_sinh,          NULL        },
+    /* [ 1] */ { NULL,            0, 0, NULL,             NULL        },
+    /* [ 2] */ { NULL,            0, 0, NULL,             NULL        },
+    /* [ 3] */ { NULL,            0, 0, NULL,             NULL        },
+    /* [ 4] */ { NULL,            0, 0, NULL,             NULL        },
+    /* [ 5] */ { "normal_cdf",   10, 0, dv_normal_cdf,    NULL        },
+    /* [ 6] */ { "erfinv",        6, 0, dv_erfinv,        NULL        },
+    /* [ 7] */ { "acosh",         5, 0, dv_acosh,         NULL        },
+    /* [ 8] */ { "Ei",            2, 0, dv_ei,            NULL        },
+    /* [ 9] */ { NULL,            0, 0, NULL,             NULL        },
+    /* [10] */ { NULL,            0, 0, NULL,             NULL        },
+    /* [11] */ { "E1",            2, 0, dv_e1,            NULL        },
+    /* [12] */ { NULL,            0, 0, NULL,             NULL        },
+    /* [13] */ { NULL,            0, 0, NULL,             NULL        },
+    /* [14] */ { "digamma",       7, 0, dv_digamma,       NULL        },
+    /* [15] */ { NULL,            0, 0, NULL,             NULL        },
+    /* [16] */ { NULL,            0, 0, NULL,             NULL        },
+    /* [17] */ { "beta",          4, 1, NULL,             dv_beta     },
+    /* [18] */ { NULL,            0, 0, NULL,             NULL        },
+    /* [19] */ { "sqrt",          4, 0, dv_sqrt,          NULL        },
+    /* [20] */ { "sin",           3, 0, dv_sin,           NULL        },
+    /* [21] */ { NULL,            0, 0, NULL,             NULL        },
+    /* [22] */ { NULL,            0, 0, NULL,             NULL        },
+    /* [23] */ { NULL,            0, 0, NULL,             NULL        },
+    /* [24] */ { "trigamma",      8, 0, dv_trigamma,      NULL        },
+    /* [25] */ { "logbeta",       7, 1, NULL,             dv_logbeta  },
+    /* [26] */ { "erfcinv",       7, 0, dv_erfcinv,       NULL        },
+    /* [27] */ { "asin",          4, 0, dv_asin,          NULL        },
+    /* [28] */ { "erf",           3, 0, dv_erf,           NULL        },
+    /* [29] */ { "tanh",          4, 0, dv_tanh,          NULL        },
+    /* [30] */ { "normal_logpdf",13, 0, dv_normal_logpdf, NULL        },
+    /* [31] */ { "normal_pdf",   10, 0, dv_normal_pdf,    NULL        },
+    /* [32] */ { NULL,            0, 0, NULL,             NULL        },
+    /* [33] */ { NULL,            0, 0, NULL,             NULL        },
+    /* [34] */ { NULL,            0, 0, NULL,             NULL        },
+    /* [35] */ { "pow",           3, 1, NULL,             dv_pow      },
+    /* [36] */ { "cosh",          4, 0, dv_cosh,          NULL        },
+    /* [37] */ { NULL,            0, 0, NULL,             NULL        },
+    /* [38] */ { "atan2",         5, 1, NULL,             dv_atan2    },
+    /* [39] */ { "asinh",         5, 0, dv_asinh,         NULL        },
+    /* [40] */ { NULL,            0, 0, NULL,             NULL        },
+    /* [41] */ { "atan",          4, 0, dv_atan,          NULL        },
+    /* [42] */ { NULL,            0, 0, NULL,             NULL        },
+    /* [43] */ { NULL,            0, 0, NULL,             NULL        },
+    /* [44] */ { "lambert_wm1",  11, 0, dv_lambert_wm1,   NULL        },
+    /* [45] */ { "cos",           3, 0, dv_cos,           NULL        },
+    /* [46] */ { "log",           3, 0, dv_log,           NULL        },
+    /* [47] */ { NULL,            0, 0, NULL,             NULL        },
+    /* [48] */ { "abs",           3, 0, dv_abs,           NULL        },
+    /* [49] */ { "hypot",         5, 1, NULL,             dv_hypot    },
+    /* [50] */ { NULL,            0, 0, NULL,             NULL        },
+    /* [51] */ { "atanh",         5, 0, dv_atanh,         NULL        },
+    /* [52] */ { NULL,            0, 0, NULL,             NULL        },
+    /* [53] */ { "erfc",          4, 0, dv_erfc,          NULL        },
+    /* [54] */ { NULL,            0, 0, NULL,             NULL        },
+    /* [55] */ { "lambert_w0",   10, 0, dv_lambert_w0,    NULL        },
+    /* [56] */ { NULL,            0, 0, NULL,             NULL        },
+    /* [57] */ { NULL,            0, 0, NULL,             NULL        },
+    /* [58] */ { "tan",           3, 0, dv_tan,           NULL        },
+    /* [59] */ { "gamma",         5, 0, dv_gamma,         NULL        },
+    /* [60] */ { NULL,            0, 0, NULL,             NULL        },
+    /* [61] */ { NULL,            0, 0, NULL,             NULL        },
+    /* [62] */ { "lgamma",        6, 0, dv_lgamma,        NULL        },
+    /* [63] */ { "acos",          4, 0, dv_acos,          NULL        },
+    /* [64] */ { NULL,            0, 0, NULL,             NULL        },
+    /* [65] */ { NULL,            0, 0, NULL,             NULL        },
+    /* [66] */ { "exp",           3, 0, dv_exp,           NULL        },
 };
-#define N_FUNCS ((int)(sizeof(s_funcs)/sizeof(s_funcs[0])))
+
+static unsigned func_ht_hash(const char *s, size_t n)
+{
+    unsigned h = 5381;
+    for (size_t i = 0; i < n; i++)
+        h = ((h << 5) + h) ^ (unsigned char)s[i];
+    return h % FUNC_HT_SIZE;
+}
+
+static const func_entry_t *lookup_func(const char *kw, size_t klen)
+{
+    unsigned slot = func_ht_hash(kw, klen);
+    for (;;) {
+        if (!s_funcs[slot].kw) return NULL;
+        if (s_funcs[slot].klen == klen &&
+                memcmp(s_funcs[slot].kw, kw, klen) == 0)
+            return &s_funcs[slot];
+        slot = (slot + 1) % FUNC_HT_SIZE;
+    }
+}
 
 /* Return 1 if the byte sequence at p looks like a superscript codepoint. */
 static int is_superscript_byte(const char *p)
@@ -478,63 +527,76 @@ static dval_t *parse_atom(parser_t *p)
         return dv_new_const(qf_from_string(nbuf));
     }
 
-    /* Function keywords — checked BEFORE read_any_name because read_simple_name
-     * only reads a single letter + subscripts, so "sin" would be read as "s".
-     * In the expression-style output, function names are always multi-letter
-     * lowercase ASCII followed by '(' (optionally with a superscript in between),
-     * so a prefix-match + '(' check is unambiguous. */
-    for (int i = 0; i < N_FUNCS; i++) {
-        const char *paren = func_call_start(p->p, s_funcs[i].kw, s_funcs[i].klen);
-        if (!paren) continue;
+    /* Function keywords — O(1) hash lookup.  We read the ASCII identifier at
+     * the current position (letters, digits, underscores; stops before UTF-8
+     * superscripts and '^'), look it up in the hash table, then confirm that
+     * '(' (optionally preceded by a superscript) follows. */
+    {
+        const char *id = p->p;
+        const char *id_end = id;
+        while (id_end < p->end &&
+               (isalpha((unsigned char)*id_end) ||
+                isdigit((unsigned char)*id_end) ||
+                *id_end == '_'))
+            id_end++;
+        size_t id_len = (size_t)(id_end - id);
 
-        /* Read optional exponent between keyword and '(': Unicode superscripts
-         * (sin²) or ASCII ^N (sin^2).  after_kw ends up pointing at paren. */
-        const char *after_kw = p->p + s_funcs[i].klen;
-        int sup = read_superscript(&after_kw);
-        if (sup < 0 && after_kw[0] == '^' && isdigit((unsigned char)after_kw[1])) {
-            after_kw++; /* skip '^' */
-            sup = 0;
-            while (isdigit((unsigned char)*after_kw))
-                sup = sup * 10 + (*after_kw++ - '0');
-        }
-        (void)after_kw;
+        if (id_len > 0) {
+            const func_entry_t *fe = lookup_func(id, id_len);
+            if (fe) {
+                const char *paren = func_call_start(p->p, fe->kw, fe->klen);
+                if (paren) {
+                    /* Read optional exponent between keyword and '('. */
+                    const char *after_kw = p->p + fe->klen;
+                    int sup = read_superscript(&after_kw);
+                    if (sup < 0 && after_kw[0] == '^' &&
+                            isdigit((unsigned char)after_kw[1])) {
+                        after_kw++;
+                        sup = 0;
+                        while (isdigit((unsigned char)*after_kw))
+                            sup = sup * 10 + (*after_kw++ - '0');
+                    }
+                    (void)after_kw;
 
-        p->p = paren + 1; /* skip past '(' */
+                    p->p = paren + 1; /* skip past '(' */
 
-        if (s_funcs[i].is_binary) {
-            dval_t *a = NULL, *b = NULL;
-            if (!parse_two_args(p, &a, &b)) return NULL;
-            if (p->p >= p->end || *p->p != ')') {
-                dv_free(a); dv_free(b);
-                set_error(p, "expected ')' after binary function");
-                return NULL;
+                    if (fe->is_binary) {
+                        dval_t *a = NULL, *b = NULL;
+                        if (!parse_two_args(p, &a, &b)) return NULL;
+                        if (p->p >= p->end || *p->p != ')') {
+                            dv_free(a); dv_free(b);
+                            set_error(p, "expected ')' after binary function");
+                            return NULL;
+                        }
+                        p->p++;
+                        dval_t *result = fe->bfn(a, b);
+                        dv_free(a); dv_free(b);
+                        if (sup >= 0) {
+                            dval_t *tmp = dv_pow_d(result, (double)sup);
+                            dv_free(result);
+                            result = tmp;
+                        }
+                        return result;
+                    } else {
+                        dval_t *arg = parse_addexpr(p);
+                        if (!arg) return NULL;
+                        if (p->p >= p->end || *p->p != ')') {
+                            dv_free(arg);
+                            set_error(p, "expected ')' after function argument");
+                            return NULL;
+                        }
+                        p->p++;
+                        dval_t *result = fe->ufn(arg);
+                        dv_free(arg);
+                        if (sup >= 0) {
+                            dval_t *tmp = dv_pow_d(result, (double)sup);
+                            dv_free(result);
+                            result = tmp;
+                        }
+                        return result;
+                    }
+                }
             }
-            p->p++;
-            dval_t *result = s_funcs[i].bfn(a, b);
-            dv_free(a); dv_free(b);
-            if (sup >= 0) {
-                dval_t *tmp = dv_pow_d(result, (double)sup);
-                dv_free(result);
-                result = tmp;
-            }
-            return result;
-        } else {
-            dval_t *arg = parse_addexpr(p);
-            if (!arg) return NULL;
-            if (p->p >= p->end || *p->p != ')') {
-                dv_free(arg);
-                set_error(p, "expected ')' after function argument");
-                return NULL;
-            }
-            p->p++;
-            dval_t *result = s_funcs[i].ufn(arg);
-            dv_free(arg);
-            if (sup >= 0) {
-                dval_t *tmp = dv_pow_d(result, (double)sup);
-                dv_free(result);
-                result = tmp;
-            }
-            return result;
         }
     }
 
