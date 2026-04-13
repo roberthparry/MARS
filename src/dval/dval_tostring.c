@@ -395,6 +395,25 @@ static void emit_atom(dval_t *f, sbuf_t *b)
 }
 
 /* -------------------------------------------------------------
+   Helper: does a pow exponent need wrapping parens?
+   Atoms (var/const) and function calls (unary/binary — they have their own
+   parentheses) are self-delimiting; infix operators and neg are not.
+   ------------------------------------------------------------- */
+static int pow_exp_needs_parens(const dval_t *e)
+{
+    if (!e) return 0;
+    if (e->ops->arity == DV_OP_ATOM)  return 0;  /* var, const */
+    if (e->ops == &ops_neg)            return 1;
+    if (e->ops == &ops_pow_d)          return 1;  /* e.g. y² is ambiguous as exponent */
+    if (e->ops->arity == DV_OP_UNARY)  return 0;  /* sin(…), exp(…), etc. */
+    /* DV_OP_BINARY: arithmetic/pow need parens; named functions (atan2 …) don't */
+    if (e->ops == &ops_add || e->ops == &ops_sub ||
+        e->ops == &ops_mul || e->ops == &ops_div ||
+        e->ops == &ops_pow)            return 1;
+    return 0;
+}
+
+/* -------------------------------------------------------------
    Helper: atomic factors for implicit multiplication (EXPR mode)
    ------------------------------------------------------------- */
 static int is_atomic_for_mul(const dval_t *f)
@@ -784,16 +803,17 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
         return;
     }
 
-    /* Binary power: base^(exp) */
+    /* Binary power: base^exp  or  base^(exp) when exponent needs grouping */
     if (f->ops == &ops_pow) {
         int need = PREC_POW < parent_prec;
         if (need) sbuf_putc(b, '(');
 
         emit_expr(f->a, b, PREC_POW);
         sbuf_putc(b, '^');
-        sbuf_putc(b, '(');
+        int ep = pow_exp_needs_parens(f->b);
+        if (ep) sbuf_putc(b, '(');
         emit_expr(f->b, b, 0);
-        sbuf_putc(b, ')');
+        if (ep) sbuf_putc(b, ')');
 
         if (need) sbuf_putc(b, ')');
         return;
@@ -915,16 +935,17 @@ static void emit_func(const dval_t *f, sbuf_t *b, int parent_prec)
         return;
     }
 
-    /* Binary power: base^(exp) */
+    /* Binary power: base^exp  or  base^(exp) when exponent needs grouping */
     if (f->ops == &ops_pow) {
         int need = PREC_POW < parent_prec;
         if (need) sbuf_putc(b, '(');
 
         emit_func(f->a, b, PREC_POW);
         sbuf_putc(b, '^');
-        sbuf_putc(b, '(');
+        int ep = pow_exp_needs_parens(f->b);
+        if (ep) sbuf_putc(b, '(');
         emit_func(f->b, b, 0);
-        sbuf_putc(b, ')');
+        if (ep) sbuf_putc(b, ')');
 
         if (need) sbuf_putc(b, ')');
         return;
