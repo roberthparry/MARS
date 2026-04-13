@@ -5789,8 +5789,8 @@ static void test_from_string_special_functions(void)
     check_parse_val("normal_pdf(0)",         "{ normal_pdf(x) | x = 0 }",    1.0/sqrt(2.0*M_PI),      __LINE__);
     check_parse_val("normal_cdf(0) = 0.5",   "{ normal_cdf(x) | x = 0 }",    0.5,                     __LINE__);
     check_parse_val("normal_logpdf(0)",      "{ normal_logpdf(x) | x = 0 }", -0.5*log(2.0*M_PI),      __LINE__);
-    check_parse_val("ei(1)",                 "{ ei(x) | x = 1 }",            1.8951178163559367,       __LINE__);
-    check_parse_val("e1(1)",                 "{ e1(x) | x = 1 }",            0.21938393439552029,      __LINE__);
+    check_parse_val("Ei(1)",                 "{ Ei(x) | x = 1 }",            1.8951178163559367,       __LINE__);
+    check_parse_val("E1(1)",                 "{ E1(x) | x = 1 }",            0.21938393439552029,      __LINE__);
     /* Binary functions */
     check_parse_val("beta(1,1) = 1",         "{ beta(x, y) | x = 1, y = 1 }", 1.0,                   __LINE__);
     check_parse_val("logbeta(1,1) = 0",      "{ logbeta(x, y) | x = 1, y = 1 }", 0.0,                __LINE__);
