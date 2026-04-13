@@ -11,7 +11,9 @@ ownership rules.
 - clone, union, intersection, and difference
 - shallow or deep ownership policies
 
-## Example: Shallow Ownership
+## Ownership Models
+
+### Shallow Ownership
 
 This example stores borrowed string pointers. The set owns only its internal
 storage; it does not duplicate or free the pointed-to strings.
@@ -74,7 +76,7 @@ Duplicate 'hello' was not added
 'hello' was removed
 ```
 
-## Example: Deep Ownership
+### Deep Ownership
 
 This example deep-copies the inserted strings, so the set owns the duplicated
 elements and releases them on destruction.
@@ -215,143 +217,3 @@ changing membership behavior.
 
 The design favors compact storage and explicit ownership over stable element
 positions.
-
-## Ownership Models
-
-### Shallow Ownership
-
-This example stores borrowed string pointers. The set owns only its internal
-storage; it does not duplicate or free the pointed-to strings.
-
-```c
-#include <stdio.h>
-#include <string.h>
-#include "set.h"
-
-static size_t str_hash(const void *p) {
-    const char *s = *(const char * const *)p;
-    size_t h = 146527;
-    while (*s) h = (h * 33) ^ (unsigned char)*s++;
-    return h;
-}
-
-static int str_cmp(const void *a, const void *b) {
-    const char *sa = *(const char * const *)a;
-    const char *sb = *(const char * const *)b;
-    return strcmp(sa, sb);
-}
-
-int main(void) {
-    set_t *s = set_create(
-        sizeof(char *),
-        str_hash,
-        str_cmp,
-        NULL,
-        NULL
-    );
-
-    const char *a = "hello";
-    const char *b = "world";
-    const char *c = "hello";
-
-    set_add(s, &a);
-    set_add(s, &b);
-
-    if (set_contains(s, &a))
-        printf("'hello' is in the set\n");
-
-    if (!set_add(s, &c))
-        printf("Duplicate 'hello' was not added\n");
-
-    set_remove(s, &a);
-
-    if (!set_contains(s, &a))
-        printf("'hello' was removed\n");
-
-    set_destroy(s);
-    return 0;
-}
-```
-
-Expected output:
-
-```text
-'hello' is in the set
-Duplicate 'hello' was not added
-'hello' was removed
-```
-
-### Deep Ownership
-
-This example deep-copies the inserted strings, so the set owns the duplicated
-elements and releases them on destruction.
-
-```c
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include "set.h"
-
-static size_t str_hash(const void *p) {
-    const char *s = *(const char * const *)p;
-    size_t h = 146527;
-    while (*s) h = (h * 33) ^ (unsigned char)*s++;
-    return h;
-}
-
-static int str_cmp(const void *a, const void *b) {
-    const char *sa = *(const char * const *)a;
-    const char *sb = *(const char * const *)b;
-    return strcmp(sa, sb);
-}
-
-static void str_clone(void *dst, const void *src) {
-    const char *s = *(const char * const *)src;
-    char *copy = strdup(s);
-    memcpy(dst, &copy, sizeof(char *));
-}
-
-static void str_destroy(void *elem) {
-    char *s = *(char **)elem;
-    free(s);
-}
-
-int main(void) {
-    set_t *s = set_create(
-        sizeof(char *),
-        str_hash,
-        str_cmp,
-        str_clone,
-        str_destroy
-    );
-
-    const char *a = "hello";
-    const char *b = "world";
-    const char *c = "hello";
-
-    set_add(s, &a);
-    set_add(s, &b);
-
-    if (set_contains(s, &a))
-        printf("'hello' is in the set\n");
-
-    if (!set_add(s, &c))
-        printf("Duplicate 'hello' was not added\n");
-
-    set_remove(s, &a);
-
-    if (!set_contains(s, &a))
-        printf("'hello' was removed\n");
-
-    set_destroy(s);
-    return 0;
-}
-```
-
-Expected output:
-
-```text
-'hello' is in the set
-Duplicate 'hello' was not added
-'hello' was removed
-```

@@ -96,6 +96,15 @@ typedef enum {
     DICTIONARY_SORT_BY_VALUE  /**< Sort entries by value */
 } dictionary_sort_mode;
 
+/* TODO:
+ * DICTIONARY_SORT_BY_VALUE currently has no dedicated value comparator.
+ * dictionary_create() accepts only key_cmp, so value-sorted access is
+ * underspecified when keys and values have different types.
+ *
+ * Revisit this API: either add a value_cmp parameter or remove
+ * DICTIONARY_SORT_BY_VALUE from the public interface.
+ */
+
 /* ------------------------------------------------------------------------- */
 /* Creation / destruction                                                    */
 /* ------------------------------------------------------------------------- */

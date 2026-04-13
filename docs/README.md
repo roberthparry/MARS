@@ -97,6 +97,11 @@ This directory contains the longer module documentation for MARS.
 - [`set_t`](set.md) — generic set storage
 - [`string_t`](string.md) — UTF-8-aware dynamic strings
 
+## Guides
+
+- [`dictionary_t` ownership models](dictionary.md#ownership-models)
+- [`set_t` ownership models](set.md#ownership-models)
+
 ## Notes
 
 - The repository landing page is [`../README.md`](../README.md).
