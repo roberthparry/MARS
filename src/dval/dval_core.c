@@ -1400,10 +1400,10 @@ const dval_ops_t ops_normal_logpdf = {
     eval_normal_logpdf, deriv_normal_logpdf, DV_OP_UNARY, "normal_logpdf", dv_normal_logpdf
 };
 const dval_ops_t ops_ei = {
-    eval_ei, deriv_ei, DV_OP_UNARY, "ei", dv_ei
+    eval_ei, deriv_ei, DV_OP_UNARY, "Ei", dv_ei
 };
 const dval_ops_t ops_e1 = {
-    eval_e1, deriv_e1, DV_OP_UNARY, "e1", dv_e1
+    eval_e1, deriv_e1, DV_OP_UNARY, "E1", dv_e1
 };
 const dval_ops_t ops_beta = {
     eval_beta,    deriv_beta,    DV_OP_BINARY, "beta",    NULL
