@@ -34,18 +34,20 @@ W0(1) = 0.5671432904097838729999686622103575
 
 ## Modules
 
-- [`qfloat`](docs/qfloat.md)
-- [`dval_t`](docs/dval.md)
-- [`datetime_t`](docs/datetime.md)
-- [`dictionary_t`](docs/dictionary.md)
-  - [shallow ownership example](docs/dictionary.md#example-shallow-ownership)
-  - [deep ownership example](docs/dictionary.md#example-deep-ownership)
-- [`set_t`](docs/set.md)
-  - [shallow ownership example](docs/set.md#example-shallow-ownership)
-  - [deep ownership example](docs/set.md#example-deep-ownership)
-- [`string_t`](docs/string.md)
+- [`qfloat`](docs/qfloat.md) — double-double arithmetic and special functions
+- [`dval_t`](docs/dval.md) — differentiable expression DAGs
+- [`datetime_t`](docs/datetime.md) — civil and astronomical date/time utilities
+- [`dictionary_t`](docs/dictionary.md) — generic key/value storage
+- [`set_t`](docs/set.md) — generic set storage
+- [`string_t`](docs/string.md) — UTF-8-aware dynamic strings
 
-A module index is also available in [`docs/README.md`](docs/README.md).
+## Documentation
+
+- [Documentation index](docs/README.md)
+- [Building](docs/building.md)
+- [Testing](docs/testing.md)
+- [Dictionary ownership models](docs/dictionary.md#ownership-models)
+- [Set ownership models](docs/set.md#ownership-models)
 
 ## Directory Layout
 
@@ -65,10 +67,6 @@ See [`docs/building.md`](docs/building.md).
 ## Run Tests
 
 See [`docs/testing.md`](docs/testing.md).
-
-## Documentation
-
-Detailed architecture notes and longer examples live in `docs/`.
 
 ## License
 
