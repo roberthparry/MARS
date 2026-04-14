@@ -1668,9 +1668,6 @@ int dv_cmp(const dval_t *dv1, const dval_t *dv2) {
     return 0;
 }
 
-int dv_compare(const dval_t *dv1, const dval_t *dv2) {
-    return dv_cmp(dv1, dv2);
-}
 
 /* ------------------------------------------------------------------------- */
 /* Derivative creation (owning)                                              */
