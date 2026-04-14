@@ -1,14 +1,17 @@
 # `dval_t`
 
 `dval_t` is a reference-counted expression DAG for differentiable values.
+Expressions are built from constants, variables, and operator nodes; each node
+carries a vtable that knows how to evaluate itself and construct its derivative.
+Evaluation uses `qfloat` throughout for ~106-bit precision.
 
 ## Capabilities
 
 - expression construction from constants, variables, and operators
-- first derivatives
-- second derivatives
-- integration with `qfloat`
-- expression parsing and formatting
+- lazy evaluation with result caching
+- symbolic differentiation to arbitrary order
+- elementary and special functions mirroring the `qfloat` API
+- expression parsing from and formatting to strings
 
 ## Example: Constructing an Expression
 
@@ -91,92 +94,181 @@ int main(void) {
 
 ### Node Model
 
-Expressions are stored as DAG nodes representing:
+Expressions are stored as a directed acyclic graph. Each node is one of:
 
-- constants
-- variables
-- unary operators
-- binary operators
+- **constant** — a fixed `qfloat` value, optionally named
+- **variable** — a mutable `qfloat` value, optionally named; changing it via
+  `dv_set_val()` invalidates the cached primal and derivative values in all
+  ancestor nodes
+- **unary operator** — wraps one child (e.g. `sin`, `exp`, `sqrt`)
+- **binary operator** — wraps two children (e.g. `+`, `*`, `pow`)
 
-Shared subexpressions are represented once and reused by reference.
+Shared subexpressions are represented once and referenced from multiple places
+in the graph without duplication.
 
 ### Differentiation
 
-Each node type knows how to:
+Each node's vtable provides a `deriv` function that returns a new expression
+graph representing the derivative of that node with respect to its input.
+Calling `dv_create_deriv(f)` recursively applies the chain rule across the
+graph to produce `df/dx` as a new owning expression. Higher-order derivatives
+are obtained by differentiating derivative expressions again with
+`dv_create_nth_deriv()`.
 
-- evaluate itself
-- build its derivative
-- release its owned state
+### Ownership and Reference Counting
 
-Derivative construction produces another expression graph. Higher-order
-derivatives are obtained by differentiating derivative expressions again.
-
-### Ownership
-
-Nodes are reference-counted. This allows shared structure without forcing deep
-copies for every composed expression.
+Every owning handle has reference count ≥ 1. Arithmetic and function builders
+retain their children (increment their refcounts) but do not steal ownership.
+`dv_free()` decrements the refcount and recursively frees when it reaches zero.
+`dv_get_deriv()` returns a *borrowed* pointer — do not free it.
 
 ### Evaluation
 
-Evaluation uses `qfloat` throughout, so function values and derivative values
-follow the same numeric path.
+`dv_eval()` walks the DAG bottom-up, caching the `qfloat` result in each node.
+Subsequent calls without any `dv_set_val()` return the cached result immediately.
+Setting a variable's value with `dv_set_val()` or `dv_set_val_d()` marks the
+cache invalid in the variable node; ancestor caches are invalidated lazily on
+the next evaluation pass.
 
-## Scope
+### Simplification
 
-`dval_t` is best described as a compact differentiable expression system with
-high-precision evaluation and repeated symbolic differentiation.
+The library applies algebraic simplification rules during derivative
+construction. This keeps derivative expressions compact and fast to evaluate.
+The simplifier is exposed internally via `dv_simplify()` (see `dval_internal.h`).
+
+---
 
 ## API Reference
 
-The full public API is declared in `include/dval.h`. The functions below are
-the main entry points most users will want first.
+All public declarations are in `include/dval.h`.
 
-### Construction and Lifetime
+### Constructors — Constants
 
-- `dv_new_named_var_d(double value, const char *name)`  
-  Create a named variable node initialized from a `double`.
+- `dval_t *dv_new_const_d(double x)` — constant node from a `double`
+- `dval_t *dv_new_const(qfloat x)` — constant node from a `qfloat`
+- `dval_t *dv_new_named_const(qfloat x, const char *name)` — named constant from a `qfloat`
+- `dval_t *dv_new_named_const_d(double x, const char *name)` — named constant from a `double`
 
-- `dv_free(dval_t *v)`  
-  Release a `dval_t` handle.
+### Constructors — Variables
 
-### Expression Building
+- `dval_t *dv_new_var_d(double x)` — variable node from a `double`
+- `dval_t *dv_new_var(qfloat x)` — variable node from a `qfloat`
+- `dval_t *dv_new_named_var(qfloat x, const char *name)` — named variable from a `qfloat`
+- `dval_t *dv_new_named_var_d(double x, const char *name)` — named variable from a `double`
 
-- `dv_add(dval_t *a, dval_t *b)`  
-  Construct `a + b`.
+### Mutators
 
-- `dv_sub_d(dval_t *a, double b)`  
-  Construct `a - b` with a scalar right-hand side.
+- `void dv_set_val(dval_t *dv, qfloat value)` — set the primal value (variables only); invalidates caches
+- `void dv_set_val_d(dval_t *dv, double value)` — set the primal value from a `double`
+- `void dv_set_name(dval_t *dv, const char *name)` — set or replace the symbolic name
 
-- `dv_mul_d(dval_t *a, double b)`  
-  Construct `a * b` with a scalar right-hand side.
+### Accessors
 
-- `dv_pow_d(dval_t *a, double p)`  
-  Raise an expression to a scalar power.
+- `qfloat dv_get_val(const dval_t *dv)` — return the stored primal value without re-evaluating
+- `double dv_get_val_d(const dval_t *dv)` — return the stored primal value as a `double`
+- `const dval_t *dv_get_deriv(const dval_t *dv)` — return the cached first derivative node
+  (borrowed — do **not** free); built lazily on first call
 
-- `dv_sin(dval_t *a)`  
-  Construct `sin(a)`.
+### Evaluation
 
-- `dv_exp(dval_t *a)`  
-  Construct `exp(a)`.
+- `qfloat dv_eval(const dval_t *dv)` — evaluate the expression and return a `qfloat`; uses cached result if valid
+- `double dv_eval_d(const dval_t *dv)` — evaluate and return a `double`
 
-### Evaluation and Differentiation
+### Derivative Construction (owning)
 
-- `dv_eval(const dval_t *v)`  
-  Evaluate an expression to a `qfloat`.
+All returned handles must be freed by the caller.
 
-- `dv_create_deriv(dval_t *v)`  
-  Build the first derivative expression.
+- `dval_t *dv_create_deriv(dval_t *dv)` — build the first derivative expression
+- `dval_t *dv_create_2nd_deriv(dval_t *dv)` — build d²/dx²
+- `dval_t *dv_create_3rd_deriv(dval_t *dv)` — build d³/dx³
+- `dval_t *dv_create_nth_deriv(unsigned int n, dval_t *dv)` — build the nth derivative
 
-- `dv_get_deriv(const dval_t *v)`  
-  Access a cached derivative expression.
+### Arithmetic (graph-building, owning)
 
-### Parsing and Formatting
+All functions return owning handles.
 
-- `dval_from_string(const char *text)`  
-  Parse an expression from text.
+- `dval_t *dv_neg(dval_t *dv)` — `-dv`
+- `dval_t *dv_add(dval_t *dv1, dval_t *dv2)` — `dv1 + dv2`
+- `dval_t *dv_sub(dval_t *dv1, dval_t *dv2)` — `dv1 - dv2`
+- `dval_t *dv_mul(dval_t *dv1, dval_t *dv2)` — `dv1 * dv2`
+- `dval_t *dv_div(dval_t *dv1, dval_t *dv2)` — `dv1 / dv2`
+- `dval_t *dv_add_d(dval_t *dv, double d)` — `dv + d`
+- `dval_t *dv_sub_d(dval_t *dv, double d)` — `dv - d`
+- `dval_t *dv_d_sub(double d, dval_t *dv)` — `d - dv`
+- `dval_t *dv_mul_d(dval_t *dv, double d)` — `dv * d`
+- `dval_t *dv_div_d(dval_t *dv, double d)` — `dv / d`
+- `dval_t *dv_d_div(double d, dval_t *dv)` — `d / dv`
 
-- `dv_to_string(const dval_t *v, dv_style_t style)`  
-  Convert an expression to a string in a selected style.
+### Comparison
 
-- `dv_print(const dval_t *v)`  
-  Print an expression directly.
+- `int dv_cmp(const dval_t *dv1, const dval_t *dv2)` — compare by primal value; returns -1, 0, or 1
+- `int dv_compare(const dval_t *dv1, const dval_t *dv2)` — alias for `dv_cmp`
+
+### Elementary Functions (owning)
+
+- `dval_t *dv_sin(dval_t *dv)` — sin
+- `dval_t *dv_cos(dval_t *dv)` — cos
+- `dval_t *dv_tan(dval_t *dv)` — tan
+- `dval_t *dv_sinh(dval_t *dv)` — sinh
+- `dval_t *dv_cosh(dval_t *dv)` — cosh
+- `dval_t *dv_tanh(dval_t *dv)` — tanh
+- `dval_t *dv_asin(dval_t *dv)` — arcsin
+- `dval_t *dv_acos(dval_t *dv)` — arccos
+- `dval_t *dv_atan(dval_t *dv)` — arctan
+- `dval_t *dv_atan2(dval_t *dv1, dval_t *dv2)` — four-quadrant arctan2(dv1, dv2)
+- `dval_t *dv_asinh(dval_t *dv)` — inverse hyperbolic sine
+- `dval_t *dv_acosh(dval_t *dv)` — inverse hyperbolic cosine
+- `dval_t *dv_atanh(dval_t *dv)` — inverse hyperbolic tangent
+- `dval_t *dv_exp(dval_t *dv)` — natural exponential
+- `dval_t *dv_log(dval_t *dv)` — natural logarithm
+- `dval_t *dv_sqrt(dval_t *dv)` — square root
+- `dval_t *dv_pow_d(dval_t *dv, double d)` — `dv ^ d` (scalar exponent)
+- `dval_t *dv_pow(dval_t *dv1, dval_t *dv2)` — `dv1 ^ dv2`
+
+### Special Functions (owning)
+
+- `dval_t *dv_abs(dval_t *dv)` — absolute value
+- `dval_t *dv_hypot(dval_t *dv1, dval_t *dv2)` — sqrt(dv1² + dv2²)
+- `dval_t *dv_erf(dval_t *dv)` — error function
+- `dval_t *dv_erfc(dval_t *dv)` — complementary error function
+- `dval_t *dv_erfinv(dval_t *dv)` — inverse error function
+- `dval_t *dv_erfcinv(dval_t *dv)` — inverse complementary error function
+- `dval_t *dv_gamma(dval_t *dv)` — Γ(x)
+- `dval_t *dv_lgamma(dval_t *dv)` — ln|Γ(x)|
+- `dval_t *dv_digamma(dval_t *dv)` — ψ(x) = d/dx ln Γ(x)
+- `dval_t *dv_trigamma(dval_t *dv)` — ψ'(x)
+- `dval_t *dv_lambert_w0(dval_t *dv)` — Lambert W principal branch W₀(x)
+- `dval_t *dv_lambert_wm1(dval_t *dv)` — Lambert W branch W₋₁(x)
+- `dval_t *dv_beta(dval_t *dv1, dval_t *dv2)` — B(a, b)
+- `dval_t *dv_logbeta(dval_t *dv1, dval_t *dv2)` — ln B(a, b)
+- `dval_t *dv_normal_pdf(dval_t *dv)` — standard normal PDF φ(x)
+- `dval_t *dv_normal_cdf(dval_t *dv)` — standard normal CDF Φ(x)
+- `dval_t *dv_normal_logpdf(dval_t *dv)` — ln φ(x)
+- `dval_t *dv_ei(dval_t *dv)` — Ei(x), exponential integral
+- `dval_t *dv_e1(dval_t *dv)` — E₁(x), exponential integral
+
+### Lifetime Management
+
+- `void dv_free(dval_t *dv)` — decrement refcount; free the node and recursively its children when it reaches zero. Must be called exactly once per owning handle.
+
+### String Conversion
+
+- `char *dv_to_string(const dval_t *dv, style_t style)` — serialize the expression; `style` is `style_FUNCTION` or `style_EXPRESSION`. Returns a newly allocated C string; the caller must free it.
+- `void dv_print(const dval_t *dv)` — print the expression to stdout in `style_EXPRESSION` format
+
+### Parsing
+
+- `dval_t *dval_from_string(const char *s)` — construct a `dval_t` from a string in the format produced by `dv_to_string(..., style_EXPRESSION)`:
+
+  ```
+  { expr | x₀ = val, ...; [name] = val, ... }
+  ```
+
+  Variables appear before the `;`; named constants appear after it. Returns an owning handle on success, or NULL on error (details written to stderr).
+
+  Accepted shorthand in the string:
+  - `x_0` for subscript x₀
+  - `*` for explicit multiplication
+  - `^N` for integer exponents
+  - `[bracket names]` for identifiers that are not single-letter-plus-subscript
+
