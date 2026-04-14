@@ -41,8 +41,8 @@ typedef enum {
 } dval_arity_t;
 
 typedef struct dval_ops {
-    qfloat  (*eval)(dval_t *self);
-    dval_t *(*deriv)(dval_t *self);
+    qfloat  (*eval)(dval_t *dv);
+    dval_t *(*deriv)(dval_t *dv);
 
     dval_arity_t arity;
     const char  *name;
@@ -154,7 +154,7 @@ extern const dval_ops_t ops_hypot;
  *
  * Safe to call with NULL.
  */
-void dv_retain(dval_t *f);
+void dv_retain(dval_t *dv);
 
 /**
  * @brief Simplify a differentiable value node using algebraic identities.
@@ -162,6 +162,6 @@ void dv_retain(dval_t *f);
  * Returned node is owning (refcount = 1).
  * Input node is borrowed.
  */
-dval_t *dv_simplify(dval_t *f);
+dval_t *dv_simplify(dval_t *dv);
 
 #endif /* DVAL_INTERNAL_H */

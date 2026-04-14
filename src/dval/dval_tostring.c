@@ -1281,25 +1281,25 @@ static void strip_trailing_newline(char *s)
         s[--len] = '\0';
 }
 
-char *dv_to_string(const dval_t *f, style_t style)
+char *dv_to_string(const dval_t *dv, style_t style)
 {
-    if (!f) {
+    if (!dv) {
         char *s = (char *)xmalloc(5);
         strcpy(s, "NULL");
         return s;
     }
 
     char *out = (style == style_FUNCTION)
-        ? dv_to_string_function(f)
-        : dv_to_string_expr(f);
+        ? dv_to_string_function(dv)
+        : dv_to_string_expr(dv);
 
     strip_trailing_newline(out);
     return out;
 }
 
-void dv_print(const dval_t *f)
+void dv_print(const dval_t *dv)
 {
-    char *s = dv_to_string(f, style_EXPRESSION);
+    char *s = dv_to_string(dv, style_EXPRESSION);
     fputs(s, stdout);
     fputc('\n', stdout);
     free(s);
