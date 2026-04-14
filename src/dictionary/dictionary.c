@@ -51,6 +51,7 @@ struct dictionary {
     dictionary_clone_fn key_clone;
     dictionary_destroy_fn key_destroy;
 
+    dictionary_cmp_fn value_cmp;
     dictionary_clone_fn value_clone;
     dictionary_destroy_fn value_destroy;
 
@@ -101,6 +102,7 @@ dictionary_t *dictionary_create(size_t key_size,
                     dictionary_cmp_fn key_cmp,
                     dictionary_clone_fn key_clone,
                     dictionary_destroy_fn key_destroy,
+                    dictionary_cmp_fn value_cmp,
                     dictionary_clone_fn value_clone,
                     dictionary_destroy_fn value_destroy)
 {
@@ -141,6 +143,7 @@ dictionary_t *dictionary_create(size_t key_size,
     dict->key_clone = key_clone;
     dict->key_destroy = key_destroy;
 
+    dict->value_cmp = value_cmp;
     dict->value_clone = value_clone;
     dict->value_destroy = value_destroy;
 
@@ -593,7 +596,7 @@ static int dict_qsort_keys_cmp(const void *a, const void *b)
     return g_sort_ctx.dict->key_cmp(ka, kb);
 }
 
-/* qsort comparator for values (uses key_cmp as generic comparator) */
+/* qsort comparator for values */
 
 static int dict_qsort_values_cmp(const void *a, const void *b)
 {
@@ -603,7 +606,7 @@ static int dict_qsort_values_cmp(const void *a, const void *b)
     void *va = value_slot_data_ptr(g_sort_ctx.dict, ia);
     void *vb = value_slot_data_ptr(g_sort_ctx.dict, ib);
 
-    return g_sort_ctx.dict->key_cmp(va, vb);
+    return g_sort_ctx.dict->value_cmp(va, vb);
 }
 
 /* Build sorted keys */
@@ -641,6 +644,7 @@ static bool dict_build_sorted_keys(struct dictionary *dict)
 static bool dict_build_sorted_values(struct dictionary *dict)
 {
     if (!dict) return false;
+    if (!dict->value_cmp) return false;
 
     if (dict->count == 0) {
         dict->sorted_values_valid = true;
@@ -817,6 +821,7 @@ dictionary_t *dictionary_clone(const dictionary_t *dict)
                                            dict->key_cmp,
                                            dict->key_clone,
                                            dict->key_destroy,
+                                           dict->value_cmp,
                                            dict->value_clone,
                                            dict->value_destroy);
     if (!clone) return NULL;

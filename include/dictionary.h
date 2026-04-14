@@ -96,14 +96,6 @@ typedef enum {
     DICTIONARY_SORT_BY_VALUE  /**< Sort entries by value */
 } dictionary_sort_mode;
 
-/* TODO:
- * DICTIONARY_SORT_BY_VALUE currently has no dedicated value comparator.
- * dictionary_create() accepts only key_cmp, so value-sorted access is
- * underspecified when keys and values have different types.
- *
- * Revisit this API: either add a value_cmp parameter or remove
- * DICTIONARY_SORT_BY_VALUE from the public interface.
- */
 
 /* ------------------------------------------------------------------------- */
 /* Creation / destruction                                                    */
@@ -118,6 +110,7 @@ typedef enum {
  * @param key_cmp       Comparison function for keys (required).
  * @param key_clone     Clone function for keys (NULL for shallow copy).
  * @param key_destroy   Destroy function for keys (NULL for no-op).
+ * @param value_cmp     Comparison function for values (required for DICTIONARY_SORT_BY_VALUE).
  * @param value_clone   Clone function for values (NULL for shallow copy).
  * @param value_destroy Destroy function for values (NULL for no-op).
  *
@@ -133,6 +126,7 @@ dictionary_t *dictionary_create(size_t key_size,
                                 dictionary_cmp_fn key_cmp,
                                 dictionary_clone_fn key_clone,
                                 dictionary_destroy_fn key_destroy,
+                                dictionary_cmp_fn value_cmp,
                                 dictionary_clone_fn value_clone,
                                 dictionary_destroy_fn value_destroy);
 
@@ -245,7 +239,7 @@ const void *dictionary_get_key_sorted(dictionary_t *dict, size_t index);
 /**
  * @brief Retrieve the value at a given position in sorted order.
  *
- * Values are sorted using the comparison function supplied for keys.
+ * Values are sorted using the value comparison function supplied at creation.
  *
  * Calling this function repeatedly with indices 0 through
  * dictionary_size(dict)-1 yields all values in ascending sorted order.

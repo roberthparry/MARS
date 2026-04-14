@@ -133,7 +133,7 @@ static void test_int_int(void) {
         sizeof(int), sizeof(int),
         int_hash, int_cmp,
         NULL, NULL,
-        NULL, NULL
+        int_cmp, NULL, NULL
     );
 
     int k1 = 1, v1 = 10;
@@ -163,7 +163,7 @@ static void test_str_int(void) {
         sizeof(char *), sizeof(int),
         str_hash, str_cmp,
         str_clone, str_destroy,
-        NULL, NULL
+        int_cmp, NULL, NULL
     );
 
     const char *k1 = "alpha";
@@ -194,7 +194,7 @@ static void test_int_str(void) {
         sizeof(int), sizeof(char *),
         int_hash, int_cmp,
         NULL, NULL,
-        str_clone, str_destroy
+        str_cmp, str_clone, str_destroy
     );
 
     int k1 = 5, k2 = 6;
@@ -233,7 +233,7 @@ static void test_deep_deep(void) {
         sizeof(struct deep), sizeof(struct deep),
         deep_hash, deep_cmp,
         deep_clone, deep_destroy,
-        deep_clone, deep_destroy
+        deep_cmp, deep_clone, deep_destroy
     );
 
     /* 1. Inputs: no heap ownership here, just literals.
@@ -285,7 +285,7 @@ static void test_sorted(void) {
         sizeof(int), sizeof(int),
         int_hash, int_cmp,
         NULL, NULL,
-        NULL, NULL
+        int_cmp, NULL, NULL
     );
 
     int keys[] = { 5, 1, 4, 3, 2 };
@@ -327,7 +327,7 @@ static void test_entries(void) {
         sizeof(int), sizeof(int),
         int_hash, int_cmp,
         NULL, NULL,
-        NULL, NULL
+        int_cmp, NULL, NULL
     );
 
     int k1 = 7, v1 = 70;
@@ -373,7 +373,7 @@ static void test_foreach(void) {
         sizeof(int), sizeof(int),
         int_hash, int_cmp,
         NULL, NULL,
-        NULL, NULL
+        int_cmp, NULL, NULL
     );
 
     int k1 = 1, v1 = 10;
@@ -404,7 +404,7 @@ static void test_fuzz(void) {
         sizeof(int), sizeof(int),
         int_hash, int_cmp,
         NULL, NULL,
-        NULL, NULL
+        int_cmp, NULL, NULL
     );
 
     srand((unsigned)time(NULL));
@@ -447,7 +447,7 @@ static void test_sorted_fuzz(void) {
         sizeof(int), sizeof(int),
         int_hash, int_cmp,
         NULL, NULL,
-        NULL, NULL
+        int_cmp, NULL, NULL
     );
 
     const int MAX = 2000;
@@ -554,12 +554,9 @@ done:
 }
 
 void test_readme_example_deep(void) {
-    dictionary_t *dict = dictionary_create(
-        sizeof(struct deep), sizeof(struct deep),
-        deep_hash, deep_cmp,
-        deep_clone, deep_destroy,
-        deep_clone, deep_destroy
-    );
+    dictionary_t *dict = dictionary_create(sizeof(struct deep), sizeof(struct deep), deep_hash,
+                                           deep_cmp, deep_clone, deep_destroy,
+                                           deep_cmp, deep_clone, deep_destroy);
 
     struct deep k1 = { "k1", 1 };
     struct deep v1 = { "v1", 10 };
@@ -588,12 +585,9 @@ void test_readme_example_deep(void) {
 }
 
 void test_readme_example_shallow(void) {
-    dictionary_t *dict = dictionary_create(
-        sizeof(int), sizeof(char *),
-        int_hash, int_cmp,
-        NULL, NULL,
-        str_clone, str_destroy
-    );
+    dictionary_t *dict = dictionary_create(sizeof(int), sizeof(char *), int_hash, 
+                                           int_cmp, NULL, NULL,
+                                           str_cmp, str_clone, str_destroy);
 
     int k1 = 5, k2 = 6;
     const char *v1 = "hello";
@@ -615,6 +609,62 @@ void test_readme_example_shallow(void) {
     }
 
     dictionary_destroy(dict);
+}
+
+/* -------------------------------------------------------------
+ * Test: sort by value with mismatched key/value types
+ *
+ * Uses string keys and int values where key order and value order
+ * diverge, so the test would fail if value_cmp were ignored and
+ * key_cmp were used instead.
+ * ------------------------------------------------------------- */
+
+static void test_sort_by_value(void) {
+    printf(C_YELLOW "test_sort_by_value\n" RESET);
+
+    dictionary_t *d = dictionary_create(
+        sizeof(char *), sizeof(int),
+        str_hash, str_cmp,
+        str_clone, str_destroy,
+        int_cmp, NULL, NULL
+    );
+
+    /* Keys in alphabetical order would be: apple, banana, cherry, date, elderberry
+     * Values assigned so that value order != key order:
+     *   apple=3, banana=1, cherry=4, date=2, elderberry=5
+     * Sorted by value: 1(banana), 2(date), 3(apple), 4(cherry), 5(elderberry)
+     * Sorted by key:   apple,     banana,  cherry,   date,      elderberry    */
+    const char *keys[] = { "apple", "banana", "cherry", "date", "elderberry" };
+    int         vals[] = { 3,       1,        4,        2,      5            };
+
+    for (int i = 0; i < 5; ++i)
+        dictionary_set(d, &keys[i], &vals[i]);
+
+    /* Check dictionary_get_value_sorted returns values in ascending int order */
+    bool ok = true;
+    for (size_t i = 0; i < 5; ++i) {
+        const int *v = dictionary_get_value_sorted(d, i);
+        if (!v || *v != (int)(i + 1)) { ok = false; break; }
+    }
+    if (!ok) fail("sort-by-value: values not in int order");
+    else pass("sort-by-value: values in int order");
+
+    /* Check dictionary_get_entry_sorted(SORT_BY_VALUE) yields keys in
+     * value order, i.e. banana, date, apple, cherry, elderberry */
+    const char *expected_key_order[] = { "banana", "date", "apple", "cherry", "elderberry" };
+    ok = true;
+    for (size_t i = 0; i < 5; ++i) {
+        dictionary_entry_t *e;
+        if (!dictionary_get_entry_sorted(d, i, DICTIONARY_SORT_BY_VALUE, &e)) {
+            ok = false; break;
+        }
+        const char *k = *(const char **)dictionary_entry_key(e);
+        if (strcmp(k, expected_key_order[i]) != 0) { ok = false; break; }
+    }
+    if (!ok) fail("sort-by-value: entry key order wrong");
+    else pass("sort-by-value: entry key order correct");
+
+    dictionary_destroy(d);
 }
 
 void test_readme_examples(void) {
@@ -640,7 +690,8 @@ int main(void) {
     test_foreach();
     test_fuzz();
     test_sorted_fuzz();
-    
+    test_sort_by_value();
+
     test_readme_examples();
 
     printf(BLUE "Done.\n" RESET);

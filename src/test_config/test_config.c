@@ -132,6 +132,7 @@ static dictionary_t *create_file_dict(void)
         string_key_cmp,
         string_key_clone,
         string_key_destroy,
+        NULL,
         test_value_clone,
         test_value_destroy
     );
@@ -151,6 +152,7 @@ static void ensure_root_created(void)
             string_key_cmp,
             string_key_clone,
             string_key_destroy,
+            NULL,
             dictptr_clone,
             dictptr_destroy
         );

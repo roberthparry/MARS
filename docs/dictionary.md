@@ -38,12 +38,9 @@ static int str_cmp(const void *a, const void *b) {
 }
 
 int main(void) {
-    dictionary_t *dict = dictionary_create(
-        sizeof(char *), sizeof(char *),
-        str_hash, str_cmp,
-        NULL, NULL,
-        NULL, NULL
-    );
+    dictionary_t *dict = dictionary_create(sizeof(char *), sizeof(char *), str_hash,
+                                           str_cmp, NULL, NULL,
+                                           str_cmp, NULL, NULL);
 
     const char *k1 = "alpha";
     const char *v1 = "one";
@@ -111,12 +108,9 @@ static void deep_destroy(void *elem) {
 }
 
 int main(void) {
-    dictionary_t *dict = dictionary_create(
-        sizeof(struct deep), sizeof(struct deep),
-        deep_hash, deep_cmp,
-        deep_clone, deep_destroy,
-        deep_clone, deep_destroy
-    );
+    dictionary_t *dict = dictionary_create(sizeof(struct deep), sizeof(struct deep), deep_hash,
+                                           deep_cmp, deep_clone, deep_destroy,
+                                           deep_cmp, deep_clone, deep_destroy);
 
     struct deep k1 = { "k1", 1 };
     struct deep v1 = { "v1", 10 };
