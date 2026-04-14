@@ -202,7 +202,6 @@ All functions return owning handles.
 ### Comparison
 
 - `int dv_cmp(const dval_t *dv1, const dval_t *dv2)` — compare by primal value; returns -1, 0, or 1
-- `int dv_compare(const dval_t *dv1, const dval_t *dv2)` — alias for `dv_cmp`
 
 ### Elementary Functions (owning)
 

@@ -100,7 +100,6 @@ dval_t *dv_d_div(double d, dval_t *dv);
 /* ------------------------------------------------------------------------- */
 
 int dv_cmp(const dval_t *dv1, const dval_t *dv2);
-int dv_compare(const dval_t *dv1, const dval_t *dv2);
 
 /* ------------------------------------------------------------------------- */
 /* Elementary functions (owning)                                             */
