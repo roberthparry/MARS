@@ -1,3 +1,21 @@
+/* qfloat.c - double-double precision arithmetic (~106-bit / ~32 decimal digits)
+ *
+ * Implements the qfloat type declared in qfloat.h.  See that header for the
+ * representation, invariants, and algorithm references (Dekker, Knuth, Bailey).
+ *
+ * Organisation:
+ *   Constants      — QF_PI, QF_E, etc., stored as exact (hi, lo) pairs
+ *   Arithmetic     — add, sub, mul, div using TwoSum / TwoProd error-free
+ *                    transforms to maintain the double-double invariant
+ *   Comparisons    — qf_cmp, qf_eq, qf_lt, etc.
+ *   Conversion     — to/from double and long
+ *   Elementary     — exp, log, sqrt, pow via argument reduction + Taylor series
+ *   Trigonometric  — sin, cos, tan and inverses (range-reduced to [-π/4, π/4])
+ *   Hyperbolic     — sinh, cosh, tanh and inverses
+ *   Special        — erf, erfc, gamma, lgamma, digamma, beta, normal dist.,
+ *                    Lambert W, exponential integrals (Ei, E₁)
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>

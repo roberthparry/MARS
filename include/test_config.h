@@ -1,6 +1,25 @@
 #ifndef TEST_CONFIG_H
 #define TEST_CONFIG_H
 
+/**
+ * @file test_config.h
+ * @brief Hierarchical per-test enable/disable configuration with JSON persistence.
+ *
+ * Provides a two-level configuration system that lets individual tests or
+ * whole groups be skipped without recompilation.  State is stored in a JSON
+ * file and reloaded on the next run.
+ *
+ * Two modes are supported (see test_config_mode_t):
+ *   TEST_CONFIG_GLOBAL  — one shared JSON file for all test translation units
+ *   TEST_CONFIG_LOCAL   — one JSON file per test source file
+ *
+ * Typical call sequence (handled automatically by test_harness.h):
+ *   test_config_set_mode(mode);   // called once at startup
+ *   test_enabled(file, name, parent);  // called per test
+ *   test_config_save();           // persist any state changes
+ *   test_config_shutdown();       // free resources
+ */
+
 #include <stdbool.h>
 
 /* ------------------------------------------------------------------------- */

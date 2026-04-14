@@ -1,4 +1,19 @@
-/* dval_core.c - lazy, vtable-driven, reference-counted differentiable value DAG */
+/* dval_core.c - lazy, vtable-driven, reference-counted differentiable value DAG
+ *
+ * This file implements:
+ *   - Node allocation and the dv_new_X / dv_create_X family of constructors
+ *   - Reference counting (dv_retain / dv_free)
+ *   - Name handling, including ASCII-to-Unicode normalisation for Greek letter
+ *     names (e.g. "alpha" -> "alpha-as-unicode") so names are canonical in output
+ *   - Lazy primal evaluation (dv_eval) via vtable dispatch (ops->eval)
+ *   - Lazy derivative construction (dv_get_deriv / dv_create_deriv) via
+ *     vtable dispatch (ops->deriv), with the result cached in dval_t::dx
+ *   - All arithmetic and math operator constructors (dv_add, dv_sin, etc.)
+ *   - dv_cmp, dv_print, and other accessors
+ *
+ * The operator implementations (eval/deriv bodies) live in the same file,
+ * grouped by operator family after the core infrastructure.
+ */
 
 #include <stdlib.h>
 #include <stdio.h>

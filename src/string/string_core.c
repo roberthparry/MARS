@@ -1,3 +1,18 @@
+/* string_core.c - memory management, mutation, and formatting for string_t
+ *
+ * Implements the lifecycle and core mutation operations for the dynamic UTF-8
+ * string type defined in ustring.h:
+ *
+ *   Allocation/free  — string_new, string_new_with, string_clone, string_free
+ *   Capacity         — string_reserve (internal), the doubling growth policy
+ *   Append           — string_append_cstr, string_append_char, string_append_fmt
+ *   Insert/remove    — string_insert, string_remove
+ *   Accessors        — string_c_str, string_length, string_is_empty
+ *
+ * All functions that accept or produce C strings assume valid UTF-8.
+ * No transcoding is performed; bytes are copied as-is.
+ */
+
 #include <stdbool.h>
 
 #include "string_internal.h"

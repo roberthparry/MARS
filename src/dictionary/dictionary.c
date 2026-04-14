@@ -1,4 +1,27 @@
-/* dictionary.c - implementation of generic key/value dictionary with dense arenas */
+/* dictionary.c - generic key/value dictionary with open-addressing hash table
+ *                and dense arena storage
+ *
+ * Data layout:
+ *   Keys and values are stored in two parallel arenas (key_arena, value_arena).
+ *   Each slot in key_arena holds a size_t hash followed by the key bytes;
+ *   each slot in value_arena holds the value bytes directly.
+ *   A separate hash table (table[]) holds singly-linked bucket chains that
+ *   index into the arenas by slot number.
+ *
+ * Sorted views:
+ *   sorted_keys_idx and sorted_values_idx are lazily built index arrays
+ *   (sorted_keys_valid / sorted_values_valid track staleness).  They are
+ *   rebuilt on the next sorted-iteration request after any mutation.
+ *
+ * Rehashing:
+ *   When load factor exceeds ~0.7, the table is rebuilt at the next prime
+ *   capacity from the primes[] table.  Arenas are not moved; only the
+ *   bucket chains are reconstructed.
+ *
+ * Ownership:
+ *   If clone/destroy callbacks are provided, the dictionary owns deep copies
+ *   of keys and values.  Without them, it stores the raw bytes passed in.
+ */
 
 #include "dictionary.h"
 

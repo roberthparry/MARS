@@ -34,6 +34,13 @@
  *
  * Both functions must return *new* nodes with refcount = 1.
  */
+/**
+ * @brief Arity classification for operator vtable entries.
+ *
+ * DV_OP_ATOM   — leaf node; no child pointers (constants, variables)
+ * DV_OP_UNARY  — single child stored in dval_t::a
+ * DV_OP_BINARY — two children stored in dval_t::a and dval_t::b
+ */
 typedef enum {
     DV_OP_ATOM,
     DV_OP_UNARY,
@@ -41,13 +48,22 @@ typedef enum {
 } dval_arity_t;
 
 typedef struct dval_ops {
+    /** Compute the primal value of the node. Returns a qfloat by value. */
     qfloat  (*eval)(dval_t *dv);
+
+    /** Build a new DAG node for the symbolic derivative. Returns owning (refcount=1). */
     dval_t *(*deriv)(dval_t *dv);
 
+    /** Arity of the operator; determines which child pointers are used. */
     dval_arity_t arity;
+
+    /** Human-readable operator name used in debug output and dv_to_string(). */
     const char  *name;
 
-    /* constructor for unary ops (NULL for non-unary) */
+    /**
+     * Convenience constructor for unary ops: builds a new node wrapping @p arg.
+     * NULL for non-unary operators. Returns owning (refcount=1).
+     */
     dval_t *(*apply_unary)(dval_t *arg);
 } dval_ops_t;
 
@@ -92,58 +108,77 @@ struct _dval_t {
 /* Operator vtable instances                                                 */
 /* ------------------------------------------------------------------------- */
 
+/* Leaf nodes */
 extern const dval_ops_t ops_const;
 extern const dval_ops_t ops_var;
 
+/* Arithmetic */
 extern const dval_ops_t ops_add;
 extern const dval_ops_t ops_sub;
 extern const dval_ops_t ops_mul;
 extern const dval_ops_t ops_div;
 extern const dval_ops_t ops_neg;
 
+/* Trigonometric */
 extern const dval_ops_t ops_sin;
 extern const dval_ops_t ops_cos;
 extern const dval_ops_t ops_tan;
 
+/* Hyperbolic */
 extern const dval_ops_t ops_sinh;
 extern const dval_ops_t ops_cosh;
 extern const dval_ops_t ops_tanh;
 
+/* Inverse trigonometric */
 extern const dval_ops_t ops_asin;
 extern const dval_ops_t ops_acos;
 extern const dval_ops_t ops_atan;
 extern const dval_ops_t ops_atan2;
 
+/* Inverse hyperbolic */
 extern const dval_ops_t ops_asinh;
 extern const dval_ops_t ops_acosh;
 extern const dval_ops_t ops_atanh;
 
+/* Exponential / logarithm / power */
 extern const dval_ops_t ops_exp;
 extern const dval_ops_t ops_log;
 extern const dval_ops_t ops_sqrt;
+extern const dval_ops_t ops_pow_d;  /* dv^(constant double) */
+extern const dval_ops_t ops_pow;    /* dv^dv */
 
-extern const dval_ops_t ops_pow_d;
-extern const dval_ops_t ops_pow;
-
+/* Miscellaneous / special functions */
 extern const dval_ops_t ops_abs;
+extern const dval_ops_t ops_hypot;
+
+/* Error functions */
 extern const dval_ops_t ops_erf;
 extern const dval_ops_t ops_erfc;
 extern const dval_ops_t ops_erfinv;
 extern const dval_ops_t ops_erfcinv;
+
+/* Gamma family */
 extern const dval_ops_t ops_gamma;
 extern const dval_ops_t ops_lgamma;
 extern const dval_ops_t ops_digamma;
 extern const dval_ops_t ops_trigamma;
+
+/* Lambert W (principal and k=-1 branches) */
 extern const dval_ops_t ops_lambert_w0;
 extern const dval_ops_t ops_lambert_wm1;
+
+/* Beta */
 extern const dval_ops_t ops_beta;
 extern const dval_ops_t ops_logbeta;
+
+/* Normal distribution */
 extern const dval_ops_t ops_normal_pdf;
 extern const dval_ops_t ops_normal_cdf;
 extern const dval_ops_t ops_normal_logpdf;
+
+/* Exponential integrals */
 extern const dval_ops_t ops_ei;
 extern const dval_ops_t ops_e1;
-extern const dval_ops_t ops_hypot;
 
 /* ------------------------------------------------------------------------- */
 /* Internal helpers                                                          */

@@ -1,3 +1,24 @@
+/* string_grapheme.c - grapheme cluster boundary detection (Unicode UAX #29)
+ *
+ * Implements grapheme cluster iteration and classification as defined in
+ * Unicode Standard Annex #29 "Unicode Text Segmentation", §3.1
+ * (https://www.unicode.org/reports/tr29/).
+ *
+ * A grapheme cluster is the user-perceived character: a base codepoint plus
+ * any combining marks, emoji modifiers, ZWJ sequences, etc. that logically
+ * belong to it.  This is the correct unit for operations like string_length()
+ * (character count), string_reverse(), and cursor movement.
+ *
+ * Implementation:
+ *   • Codepoints are classified into grapheme break categories via sorted
+ *     range tables (binary search, O(log n) per codepoint).
+ *   • The break rules GB1–GB999 from UAX #29 are applied in priority order.
+ *   • Emoji modifier sequences (GB12/GB13) and ZWJ sequences (GB11) require
+ *     a one-codepoint lookahead.
+ *
+ * The range tables embed the Unicode 15.0 data.
+ */
+
 #include "string_internal.h"
 
 #define ARRAY_COUNT(a) (sizeof(a) / sizeof((a)[0]))

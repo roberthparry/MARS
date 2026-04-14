@@ -49,6 +49,21 @@ static void string_key_destroy(void *elem)
 
 /* Value types */
 
+/**
+ * @brief A node in the hierarchical test configuration tree.
+ *
+ * The config tree mirrors the nesting of test files, groups, and individual
+ * tests.  Each node is either an interior node (a group or file) or a leaf
+ * (an individual test).
+ *
+ *   is_node  — true if this entry is an interior node (has children in
+ *               content); false if it is a leaf test entry.
+ *   enabled  — whether this test/group is enabled.  For interior nodes,
+ *               this acts as a default for children that have no explicit
+ *               entry of their own.
+ *   content  — child dictionary (non-NULL only when is_node == true).
+ *               Keys are string_t*, values are test_value_t.
+ */
 typedef struct _test_value {
     bool     is_node;
     bool     enabled;
