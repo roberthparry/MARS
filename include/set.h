@@ -95,7 +95,7 @@ void set_destroy(set_t *set);
 /* Remove all elements from the set.
  *
  * After this call:
- *   - set_getSize(set) == 0
+ *   - set_get_size(set) == 0
  *   - The set remains usable for further insertions.
  *
  * If a destroy_fn was provided, it is called once for each removed element.
@@ -103,7 +103,7 @@ void set_destroy(set_t *set);
 void set_clear(set_t *set);
 
 /* Get the number of elements currently stored in the set. */
-size_t set_getSize(const set_t *set);
+size_t set_get_size(const set_t *set);
 
 /* Check whether the set contains an element equal to 'elem'.
  *
@@ -156,7 +156,7 @@ bool set_remove(set_t *set, const void *elem);
 /* Get a pointer to the element at the given index in arena order.
  *
  * Parameters:
- *   index - zero-based index in [0, set_getSize(set))
+ *   index - zero-based index in [0, set_get_size(set))
  *
  * Returns:
  *   Pointer to the element's storage inside the arena, or NULL if index
@@ -173,7 +173,7 @@ const void *set_get(const set_t *set, size_t index);
 /* Get a pointer to the element at the given index in sorted order.
  *
  * Parameters:
- *   index - zero-based index in [0, set_getSize(set))
+ *   index - zero-based index in [0, set_get_size(set))
  *
  * Returns:
  *   Pointer to the element's storage inside the arena, or NULL if index

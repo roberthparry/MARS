@@ -181,7 +181,7 @@ void set_clear(set_t *set)
 }
 
 /* Get size */
-size_t set_getSize(const set_t *set)
+size_t set_get_size(const set_t *set)
 {
     return set ? set->count : 0;
 }

@@ -113,7 +113,7 @@ int main(void) {
     set_add(s, &b);
 
     /* Iterate in sorted order */
-    for (size_t i = 0; i < set_getSize(s); i++) {
+    for (size_t i = 0; i < set_get_size(s); i++) {
         const char *elem = *(const char **)set_get_sorted(s, i);
         printf("[%zu] %s\n", i, elem);
     }
@@ -182,7 +182,7 @@ typedef void   (*set_destroy_fn)(void *elem);
 
 ### Size
 
-- `size_t set_getSize(const set_t *set)` — number of elements currently stored
+- `size_t set_get_size(const set_t *set)` — number of elements currently stored
 
 ### Membership
 
