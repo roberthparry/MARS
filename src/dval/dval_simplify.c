@@ -1,3 +1,23 @@
+/* dval_simplify.c - algebraic simplification of differentiable value nodes
+ *
+ * dv_simplify() rewrites a DAG node into a canonical form using a small set
+ * of structural rules applied bottom-up.  It is called automatically by
+ * dv_create_deriv() so that derivative expressions stay readable.
+ *
+ * Rules applied (in order):
+ *   1. Constant folding — a sub-tree with no variable leaves is replaced by
+ *      a single const node holding the evaluated value.
+ *   2. Identity removal — x+0, x*1, x^1, neg(neg(x)), etc. are collapsed.
+ *   3. Multiplication flattening — a chain of mul/neg nodes is collected into
+ *      (scalar_coefficient * term₁ * term₂ * ...) with the coefficient folded
+ *      into a single leading const node.
+ *   4. Like-term collection in additions — terms with the same symbolic
+ *      structure have their coefficients summed, e.g. 2x + 3x → 5x.
+ *
+ * dv_simplify() returns a new owning node (refcount = 1).  The input node is
+ * borrowed; its refcount is not changed.
+ */
+
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>

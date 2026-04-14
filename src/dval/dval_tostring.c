@@ -1,13 +1,23 @@
 /* dval_tostring.c - symbolic/string conversion for dval_t
  *
- * Responsibilities:
- *   - precedence and parentheses
- *   - superscripts for powers (expression style)
- *   - function vs expression style
- *   - { expr | x = value } wrapper
+ * Produces human-readable and round-trip-safe string representations of a
+ * dval_t DAG via dv_to_string(dv, style).  Two styles are supported:
+ *
+ *   style_EXPRESSION  — infix notation with variable bindings, e.g.
+ *                         { sin(x₀) * cos(x₁) | x₀ = 1.0, x₁ = 0.5 }
+ *                       This format is accepted by dval_from_string().
+ *
+ *   style_FUNCTION    — nested prefix notation, e.g.
+ *                         mul(sin(var(x₀=1.0)), cos(var(x₁=0.5)))
+ *                       Useful for debugging graph structure.
+ *
+ * Responsibilities of this file:
+ *   • Operator precedence and parenthesisation (infix only)
+ *   • Unicode superscript encoding for integer powers (², ³, …)
+ *   • The { expr | bindings } wrapper for expression style
  *
  * All algebraic simplification (flattening, factoring, ordering, etc.)
- * is done in dv_simplify.c.
+ * is done in dv_simplify.c before this file is reached.
  */
 
 #include <stdbool.h>

@@ -1,6 +1,32 @@
 #ifndef TEST_HARNESS_H
 #define TEST_HARNESS_H
 
+/**
+ * @file test_harness.h
+ * @brief Lightweight test runner with per-test enable/disable and group support.
+ *
+ * Usage:
+ *   1. Before including this header, define which config mode to use:
+ *        #define TEST_CONFIG_MODE TEST_CONFIG_GLOBAL   // shared config file
+ *        #define TEST_CONFIG_MODE TEST_CONFIG_LOCAL    // per-test-file config
+ *   2. Define the entry point expected by main():
+ *        int tests_main(void) { RUN_TEST(...); return 0; }
+ *   3. Call RUN_TEST(func, parent) for each test or test-group function:
+ *        RUN_TEST(test_addition, NULL);          // top-level test
+ *        RUN_TEST(test_group_arithmetic, NULL);  // group (calls RUN_TEST itself)
+ *
+ * RUN_TEST behaviour:
+ *   • Consults test_config to decide whether to SKIP the test.
+ *   • After calling func(), if sub-tests were skipped it prints a GROUP summary;
+ *     otherwise it prints PASS or FAIL for the individual test.
+ *   • Assertion macros (ASSERT_*) call TEST_FAIL() and continue to the next
+ *     iteration of the enclosing for/while loop — tests are conventionally
+ *     wrapped in a for(;;){ ... break; } body or use a do/while(0) pattern.
+ *
+ * The three counters (tests_run, tests_failed, tests_skipped) are defined here
+ * and owned by the harness; do not modify them directly.
+ */
+
 #ifndef TEST_CONFIG_MODE
 #error "You must #define TEST_CONFIG_MODE before including test_harness.h"
 #endif

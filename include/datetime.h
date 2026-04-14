@@ -1,6 +1,22 @@
 #ifndef _DATETIME_H
 #define _DATETIME_H
 
+/**
+ * @file datetime.h
+ * @brief Gregorian calendar datetime type with astronomical calculations.
+ *
+ * Provides an opaque datetime_t type supporting:
+ *   • Construction from year/month/day and optional time-of-day components
+ *   • Arithmetic via datetime_span_t (add/subtract durations)
+ *   • Conversion to/from Unix timestamps and Julian Day Numbers
+ *   • Calendar queries: leap year, day-of-week, day-of-year, week number
+ *   • Astronomical calculations: sunrise/sunset times, moon phase
+ *   • Formatting and parsing
+ *
+ * All datetime_t values are heap-allocated; callers must call datetime_free()
+ * exactly once for each handle returned by a constructor.
+ */
+
 #include <stdint.h>
 
 /// @brief the datetime type

@@ -1,3 +1,22 @@
+/* string_utf8.c - UTF-8 codepoint-level navigation and utilities
+ *
+ * Operations in this file work at the codepoint level (not grapheme cluster
+ * level — see string_grapheme.c for that, and ustring.h for the distinction).
+ *
+ *   Navigation  — utf8_next, string_utf8_prev (advance/retreat by one codepoint)
+ *   Length      — string_utf8_length (codepoint count, not byte count)
+ *   Reversal    — string_utf8_reverse (reverses codepoint sequence)
+ *   Case        — string_to_upper_ascii, string_to_lower_ascii
+ *                 (ASCII-only; full Unicode case folding is in string_utils.c)
+ *
+ * UTF-8 byte length is encoded in the high bits of the leading byte:
+ *   0xxxxxxx  (< 0x80)          — 1-byte sequence (ASCII)
+ *   110xxxxx  (0xC0–0xDF)       — 2-byte sequence
+ *   1110xxxx  (0xE0–0xEF)       — 3-byte sequence
+ *   11110xxx  (0xF0–0xF7)       — 4-byte sequence
+ * Continuation bytes match 10xxxxxx (0x80–0xBF).
+ */
+
 #include "string_internal.h"
 
 /* UTF‑8 codepoint utilities */

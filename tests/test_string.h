@@ -1,6 +1,31 @@
 #ifndef TEST_STRING_H
 #define TEST_STRING_H
 
+/**
+ * @file test_string.h
+ * @brief Standalone verbose test framework for string-focused tests.
+ *
+ * A simpler alternative to test_harness.h: no test_config integration, no
+ * skip/enable logic. Every assertion prints an "OK" line on success and full
+ * context (file, line, expressions, values) on failure.
+ *
+ * Usage:
+ *   • Test functions return int — 0 on pass, 1 on failure.
+ *   • Wrap each function with the TEST(name) macro in main().
+ *   • Assertion macros return 1 immediately on the first failure within a test.
+ *
+ * Example:
+ *   int test_reverse(void) {
+ *       string_t *s = string_new_with("hello");
+ *       string_reverse(s);
+ *       ASSERT_STREQ(string_c_str(s), "olleh");
+ *       string_free(s);
+ *       return 0;
+ *   }
+ *
+ *   int main(void) { TEST(test_reverse); return tests_failed ? 1 : 0; }
+ */
+
 #include <stdio.h>
 #include <string.h>
 

@@ -1,3 +1,21 @@
+/* datetime.c - implementation of the datetime type and calendar arithmetic
+ *
+ * The datetime_t struct is defined here (not in the public header) so that
+ * callers work entirely through the opaque pointer API.
+ *
+ * Uninitialised-field sentinels:
+ *   year             — SHRT_MAX  (no valid Gregorian year reaches this)
+ *   JulianDayNumber  — LONG_MAX
+ *   JulianDay        — DBL_MAX
+ * Functions that need these fields check for the sentinel before using the
+ * cached value, computing and caching on first access (lazy initialisation).
+ *
+ * Julian Day Number (JDN) is the integer day count used as the canonical
+ * internal representation for date arithmetic.  The fractional Julian Day
+ * (JD) additionally encodes the time of day and is used for astronomical
+ * calculations (sunrise/sunset, moon phase).
+ */
+
 #include <stdlib.h>
 #include <stdint.h>
 #include <limits.h>

@@ -1,3 +1,22 @@
+/* string_utils.c - views, search, split/join, replace, and normalisation
+ *
+ * Higher-level string utilities built on top of the core string_t type:
+ *
+ *   Views        — string_view, string_view_equals, string_from_view
+ *   Search       — string_find, string_find_last, string_contains
+ *   Comparison   — string_compare, string_equals, string_starts_with,
+ *                  string_ends_with
+ *   Split/join   — string_split_views (zero-copy), string_split,
+ *                  string_join, string_join_views
+ *   Replace      — string_replace_first, string_replace_all
+ *   Normalisation — string_normalize_nfc, string_normalize_nfd, etc.
+ *                   (requires libunistring; no-op stubs otherwise)
+ *
+ * When compiled with -DHAVE_UNISTRING, the Unicode normalisation functions
+ * delegate to GNU libunistring (u8_normalize).  Without it they are defined
+ * as pass-through clones so callers compile unchanged.
+ */
+
 #ifdef HAVE_UNISTRING
     #include <unistr.h>
     #include <uninorm.h>
