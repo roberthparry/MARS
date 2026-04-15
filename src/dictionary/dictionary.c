@@ -616,7 +616,7 @@ const void *dictionary_get_key_sorted(dictionary_t *dict, size_t index)
 
 const void *dictionary_get_value_sorted(dictionary_t *dict, size_t index)
 {
-    if (!dict || index >= dict->count) return NULL;
+    if (!dict || index >= dict->count || !dict->value_cmp) return NULL;
 
     if (!dict->sorted_values_valid &&
         !dict_build_sorted_idx(dict,
@@ -648,6 +648,7 @@ bool dictionary_get_entry_sorted(dictionary_t *dict,
             return false;
         arena_index = dict->sorted_keys_idx[index];
     } else {
+        if (!dict->value_cmp) return false;
         if (!dict->sorted_values_valid &&
             !dict_build_sorted_idx(dict,
                                    &dict->sorted_values_idx, &dict->sorted_values_cap,

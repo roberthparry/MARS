@@ -110,7 +110,11 @@ typedef enum {
  * @param key_cmp       Comparison function for keys (required).
  * @param key_clone     Clone function for keys (NULL for shallow copy).
  * @param key_destroy   Destroy function for keys (NULL for no-op).
- * @param value_cmp     Comparison function for values (required for DICTIONARY_SORT_BY_VALUE).
+ * @param value_cmp     Comparison function for values. May be NULL, in which case
+ *                      sorted-by-value views fall back to byte-wise comparison
+ *                      (memcmp) using @p value_size bytes. This is suitable for
+ *                      simple scalar types but may produce meaningless orderings
+ *                      for structs with padding or pointer-based types.
  * @param value_clone   Clone function for values (NULL for shallow copy).
  * @param value_destroy Destroy function for values (NULL for no-op).
  *
