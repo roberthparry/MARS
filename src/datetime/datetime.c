@@ -460,23 +460,21 @@ datetime_t *datetime_to_gmt(datetime_t *dttm)
     if (t == -1) return NULL;
 
     // Convert time_t to struct tm in GMT
-    struct tm *gmtm = gmtime(&t);
-    if (gmtm == NULL) return NULL;
+    struct tm gmt_tm;
+    if (gmtime_r(&t, &gmt_tm) == NULL) return NULL;
 
     // Update the input datetime with GMT values
-    dttm->year = (short)(gmtm->tm_year + 1900);
-    dttm->month = (month_t)(gmtm->tm_mon + 1);
-    dttm->day = (uint8_t)gmtm->tm_mday;
-    dttm->hour = (uint8_t)gmtm->tm_hour;
-    dttm->minute = (uint8_t)gmtm->tm_min;
-    dttm->second = (double)gmtm->tm_sec;
+    dttm->year = (short)(gmt_tm.tm_year + 1900);
+    dttm->month = (month_t)(gmt_tm.tm_mon + 1);
+    dttm->day = (uint8_t)gmt_tm.tm_mday;
+    dttm->hour = (uint8_t)gmt_tm.tm_hour;
+    dttm->minute = (uint8_t)gmt_tm.tm_min;
+    dttm->second = (double)gmt_tm.tm_sec;
     
     if (dttm->JulianDayNumber != LONG_MAX) {
-        // If Julian Day Number is initialised, we need to update it as well
         dttm->JulianDayNumber = datetime_jdn(dttm);
     }
     if (dttm->JulianDay != DBL_MAX) {
-        // If Julian Day is initialised, we need to update it as well
         dttm->JulianDay = datetime_jd(dttm);
     }
 
@@ -536,9 +534,9 @@ short datetime_year(const datetime_t *dttm) {
     }
     if (dttm->JulianDayNumber != LONG_MAX) {
         // Convert Julian Day Number to calendar date and return the year.
+        datetime_t *mutable_dttm = (datetime_t *)dttm; // Cast away const to store the calculated year
         int month, day, year;
         date_julianDayNumToMDY(dttm->JulianDayNumber, &month, &day, &year);
-        datetime_t *mutable_dttm = (datetime_t *)dttm; // Cast away const to store the calculated year
         mutable_dttm->year = (short)year;
         mutable_dttm->month = (month_t)month;
         mutable_dttm->day = (uint8_t)day;
@@ -1230,7 +1228,7 @@ char *datetime_format(const datetime_t *dttm, const char *format)
                         if (formatPtr[ 1 ] == 'D')
                            str_to_upper(buffer);
                         else
-                           buffer[ 0 ] = (char)toupper((int) buffer[ 0 ]);
+                           buffer[ 0 ] = (char) toupper( (int) buffer[ 0 ] );
                      }
                      formattedString = string_append(formattedString, buffer);
                      formatPtr += 4;

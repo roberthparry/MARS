@@ -1,9 +1,9 @@
 /* set.c - implementation of generic value-set container with dense arena and lazy sorting */
 
-#include "set.h"
-
 #include <stdlib.h>
 #include <string.h>
+
+#include "set.h"
 
 /* Internal structures */
 
@@ -465,23 +465,17 @@ const void *set_get(const set_t *set, size_t index)
     return slot_data_ptr(set, index);
 }
 
-/* Global/static pointer used for qsort comparator */
-struct sort_ctx {
-    struct set *set;
-};
-
-static struct sort_ctx g_sort_ctx;
-
-/* Comparator for qsort over indices */
-static int set_qsort_index_cmp(const void *a, const void *b)
+/* Comparator thunk for qsort_r */
+static int set_qsort_index_cmp(const void *a, const void *b, void *arg)
 {
+    struct set *set = (struct set *)arg;
     const size_t ia = *(const size_t *)a;
     const size_t ib = *(const size_t *)b;
 
-    void *ea = slot_data_ptr(g_sort_ctx.set, ia);
-    void *eb = slot_data_ptr(g_sort_ctx.set, ib);
+    void *ea = slot_data_ptr(set, ia);
+    void *eb = slot_data_ptr(set, ib);
 
-    return g_sort_ctx.set->cmp_fn(ea, eb);
+    return set->cmp_fn(ea, eb);
 }
 
 /* Build sorted index array */
@@ -513,8 +507,7 @@ static bool set_build_sorted(struct set *set)
         set->sorted_idx[i] = i;
     }
 
-    g_sort_ctx.set = set;
-    qsort(set->sorted_idx, set->count, sizeof(size_t), set_qsort_index_cmp);
+    qsort_r(set->sorted_idx, set->count, sizeof(size_t), set_qsort_index_cmp, set);
     set->sorted_valid = true;
     return true;
 }

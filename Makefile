@@ -13,6 +13,8 @@ else
     CFLAGS         := -Wall -Wextra -Werror -O2 -fPIC
 endif
 
+CFLAGS += -D_GNU_SOURCE
+
 CC := gcc
 AR := ar rcs
 
@@ -37,6 +39,7 @@ ifeq ($(ENABLE_UNISTRING),1)
 endif
 
 LDLIBS += -lm
+LDLIBS += -lpthread
 
 # ------------------------------------------------------------
 # Source discovery

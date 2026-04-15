@@ -20,6 +20,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <strings.h>
+#include <pthread.h>
 
 #include "qfloat.h"
 #include "dval_internal.h"
@@ -124,16 +125,34 @@ static char *dv_normalize_name(const char *name)
 /* Refcount                                                                  */
 /* ------------------------------------------------------------------------- */
 
+static pthread_mutex_t refcount_lock = PTHREAD_MUTEX_INITIALIZER;
+
+static inline void refcount_inc(int *rc)
+{
+    pthread_mutex_lock(&refcount_lock);
+    (*rc)++;
+    pthread_mutex_unlock(&refcount_lock);
+}
+
+static inline int refcount_dec(int *rc)
+{
+    pthread_mutex_lock(&refcount_lock);
+    int prev = *rc;
+    (*rc)--;
+    pthread_mutex_unlock(&refcount_lock);
+    return prev;
+}
+
 void dv_retain(dval_t *dv)
 {
-    if (dv) dv->refcount++;
+    if (dv) refcount_inc(&dv->refcount);
 }
 
 static void dv_release(dval_t *dv)
 {
     if (!dv) return;
 
-    if (--dv->refcount > 0)
+    if (refcount_dec(&dv->refcount) > 1)
         return;
 
     dval_t *a  = dv->a;

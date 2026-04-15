@@ -23,10 +23,10 @@
  *   of keys and values.  Without them, it stores the raw bytes passed in.
  */
 
-#include "dictionary.h"
-
 #include <stdlib.h>
 #include <string.h>
+
+#include "dictionary.h"
 
 /* Internal bucket structure */
 
@@ -176,7 +176,7 @@ static bool dict_ensure_table_capacity(struct dictionary *dict);
 static void dict_invalidate_sorted(struct dictionary *dict);
 static bool dict_build_sorted_idx(struct dictionary *dict,
                                   size_t **idx, size_t *cap, bool *valid,
-                                  int (*cmp)(const void *, const void *));
+                                  int (*cmp)(const struct dictionary *, size_t, size_t));
 
 /* -------------------------------------------------------------------------
  * Create
@@ -554,14 +554,39 @@ const void *dictionary_get_value(const dictionary_t *dict, size_t index)
 }
 
 /* -------------------------------------------------------------------------
- * Internal: build a sorted index array
+ * Internal: build a sorted index array (thread-safe via qsort_r)
  * ---------------------------------------------------------------------- */
 
-static struct dictionary *g_sort_dict;
+struct sort_ctx {
+    struct dictionary *dict;
+    int (*cmp)(const struct dictionary *, size_t, size_t);
+};
+
+static int sort_thunk(const void *a, const void *b, void *arg)
+{
+    struct sort_ctx *ctx = (struct sort_ctx *)arg;
+    return ctx->cmp(ctx->dict, *(const size_t *)a, *(const size_t *)b);
+}
+
+static int sort_cmp_keys_ctx(const struct dictionary *dict, size_t ia, size_t ib)
+{
+    return dict->key_cmp(key_slot_data_ptr(dict, ia),
+                         key_slot_data_ptr(dict, ib));
+}
+
+static int sort_cmp_values_ctx(const struct dictionary *dict, size_t ia, size_t ib)
+{
+    if (dict->value_cmp)
+        return dict->value_cmp(value_slot_data_ptr(dict, ia),
+                               value_slot_data_ptr(dict, ib));
+    return memcmp(value_slot_data_ptr(dict, ia),
+                  value_slot_data_ptr(dict, ib),
+                  dict->value_size);
+}
 
 static bool dict_build_sorted_idx(struct dictionary *dict,
                                   size_t **idx, size_t *cap, bool *valid,
-                                  int (*cmp)(const void *, const void *))
+                                  int (*cmp)(const struct dictionary *, size_t, size_t))
 {
     if (!dict) return false;
 
@@ -578,23 +603,11 @@ static bool dict_build_sorted_idx(struct dictionary *dict,
 
     for (size_t i = 0; i < dict->count; ++i) (*idx)[i] = i;
 
-    g_sort_dict = dict;
-    qsort(*idx, dict->count, sizeof(size_t), cmp);
-    g_sort_dict = NULL;
+    struct sort_ctx ctx = { .dict = dict, .cmp = cmp };
+    qsort_r(*idx, dict->count, sizeof(size_t), sort_thunk, &ctx);
+
     *valid = true;
     return true;
-}
-
-static int sort_cmp_keys(const void *a, const void *b)
-{
-    return g_sort_dict->key_cmp(key_slot_data_ptr(g_sort_dict, *(const size_t *)a),
-                                key_slot_data_ptr(g_sort_dict, *(const size_t *)b));
-}
-
-static int sort_cmp_values(const void *a, const void *b)
-{
-    return g_sort_dict->value_cmp(value_slot_data_ptr(g_sort_dict, *(const size_t *)a),
-                                  value_slot_data_ptr(g_sort_dict, *(const size_t *)b));
 }
 
 /* -------------------------------------------------------------------------
@@ -608,7 +621,7 @@ const void *dictionary_get_key_sorted(dictionary_t *dict, size_t index)
     if (!dict->sorted_keys_valid &&
         !dict_build_sorted_idx(dict,
                                &dict->sorted_keys_idx, &dict->sorted_keys_cap,
-                               &dict->sorted_keys_valid, sort_cmp_keys))
+                               &dict->sorted_keys_valid, sort_cmp_keys_ctx))
         return NULL;
 
     return key_slot_data_ptr(dict, dict->sorted_keys_idx[index]);
@@ -621,7 +634,7 @@ const void *dictionary_get_value_sorted(dictionary_t *dict, size_t index)
     if (!dict->sorted_values_valid &&
         !dict_build_sorted_idx(dict,
                                &dict->sorted_values_idx, &dict->sorted_values_cap,
-                               &dict->sorted_values_valid, sort_cmp_values))
+                               &dict->sorted_values_valid, sort_cmp_values_ctx))
         return NULL;
 
     return value_slot_data_ptr(dict, dict->sorted_values_idx[index]);
@@ -644,7 +657,7 @@ bool dictionary_get_entry_sorted(dictionary_t *dict,
         if (!dict->sorted_keys_valid &&
             !dict_build_sorted_idx(dict,
                                    &dict->sorted_keys_idx, &dict->sorted_keys_cap,
-                                   &dict->sorted_keys_valid, sort_cmp_keys))
+                                   &dict->sorted_keys_valid, sort_cmp_keys_ctx))
             return false;
         arena_index = dict->sorted_keys_idx[index];
     } else {
@@ -652,7 +665,7 @@ bool dictionary_get_entry_sorted(dictionary_t *dict,
         if (!dict->sorted_values_valid &&
             !dict_build_sorted_idx(dict,
                                    &dict->sorted_values_idx, &dict->sorted_values_cap,
-                                   &dict->sorted_values_valid, sort_cmp_values))
+                                   &dict->sorted_values_valid, sort_cmp_values_ctx))
             return false;
         arena_index = dict->sorted_values_idx[index];
     }
