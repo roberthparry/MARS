@@ -1,17 +1,30 @@
 # MARS
 
+![CI](https://github.com/rparry/MARS/actions/workflows/ci.yml/badge.svg)
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+![C99](https://img.shields.io/badge/C-99-blue.svg)
+
 Portable C99 library for high-precision numerics, automatic differentiation,
 datetime utilities, UTF-8 strings, and generic containers.
 
+**Tested on:** Linux (GCC, Clang), macOS (Apple Clang), Windows (MSVC 2019+)
+
 ## Highlights
 
-- **`qfloat`** — double-double arithmetic and special functions
+- **`qfloat`** — double-double arithmetic and special functions (~34 decimal digits of precision)
 - **`dval_t`** — differentiable expression DAGs with first/second derivatives
 - **`datetime_t`** — civil and astronomical date/time helpers
 - **`dictionary_t` / `set_t`** — generic containers with user-defined ownership
 - **`string_t`** — UTF-8-aware dynamic strings and grapheme operations
 
-## Quick Example
+## Requirements
+
+- C99-compliant compiler (GCC ≥ 4.8, Clang ≥ 3.5, MSVC ≥ 2019)
+- Standard C library only — no external dependencies
+
+## Quick Examples
+
+**High-precision arithmetic with `qfloat`:**
 
 ```c
 #include <stdio.h>
@@ -26,20 +39,36 @@ int main(void) {
 }
 ```
 
-Expected output:
-
 ```text
 W0(1) = 0.5671432904097838729999686622103575
 ```
 
 ## Modules
 
-- [`qfloat`](docs/qfloat.md) — double-double arithmetic and special functions
-- [`dval_t`](docs/dval.md) — differentiable expression DAGs
-- [`datetime_t`](docs/datetime.md) — civil and astronomical date/time utilities
-- [`dictionary_t`](docs/dictionary.md) — generic key/value storage
-- [`set_t`](docs/set.md) — generic set storage
-- [`string_t`](docs/string.md) — UTF-8-aware dynamic strings
+| Module | Description | Docs |
+|---|---|---|
+| `qfloat` | Double-double arithmetic and special functions | [`docs/qfloat.md`](docs/qfloat.md) |
+| `dval_t` | Differentiable expression DAGs | [`docs/dval.md`](docs/dval.md) |
+| `datetime_t` | Civil and astronomical date/time utilities | [`docs/datetime.md`](docs/datetime.md) |
+| `dictionary_t` | Generic key/value storage with ownership models | [`docs/dictionary.md`](docs/dictionary.md) |
+| `set_t` | Generic set storage with ownership models | [`docs/set.md`](docs/set.md) |
+| `string_t` | UTF-8-aware dynamic strings | [`docs/string.md`](docs/string.md) |
+
+## Build
+
+```sh
+make
+```
+
+See [`docs/building.md`](docs/building.md) for configuration options and cross-compilation notes.
+
+## Run Tests
+
+```sh
+make test
+```
+
+See [`docs/testing.md`](docs/testing.md) for details on individual test suites.
 
 ## Documentation
 
@@ -60,14 +89,6 @@ README.md    repository landing page
 Makefile     build and test entry points
 ```
 
-## Build
-
-See [`docs/building.md`](docs/building.md).
-
-## Run Tests
-
-See [`docs/testing.md`](docs/testing.md).
-
 ## License
 
-MIT License. See `LICENSE`.
+MIT License. See [`LICENSE`](LICENSE).
