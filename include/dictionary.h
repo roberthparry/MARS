@@ -72,7 +72,7 @@ typedef void (*dictionary_destroy_fn)(void *elem);
  *
  * The internal structure is hidden. Users interact only through the API.
  */
-typedef struct dictionary dictionary_t;
+typedef struct _dictionary_t dictionary_t;
 
 /**
  * @brief Opaque entry handle.

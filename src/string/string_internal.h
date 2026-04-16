@@ -28,7 +28,7 @@
  *   len  — number of content bytes, not counting the NUL terminator.
  *   cap  — number of bytes allocated (always at least len + 1).
  */
-struct string_t {
+struct _string_t {
     char  *data;
     size_t len;
     size_t cap;

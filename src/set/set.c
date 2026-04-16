@@ -12,7 +12,7 @@ struct bucket {
     struct bucket *next;   /* next in chain */
 };
 
-struct set {
+struct _set_t {
     size_t elem_size;      /* size of each element */
     size_t slot_stride;    /* bytes per slot: sizeof(size_t) + elem_size */
 
@@ -48,11 +48,11 @@ struct set {
  * We implement this via a stride and pointer arithmetic.
  */
 
-static inline size_t *slot_hash_ptr(const struct set *set, size_t index) {
+static inline size_t *slot_hash_ptr(const struct _set_t *set, size_t index) {
     return (size_t *)(set->arena + index * set->slot_stride);
 }
 
-static inline void *slot_data_ptr(const struct set *set, size_t index) {
+static inline void *slot_data_ptr(const struct _set_t *set, size_t index) {
     return (void *)(set->arena + index * set->slot_stride + sizeof(size_t));
 }
 
@@ -68,11 +68,11 @@ static const size_t primes[] = {
 static const size_t num_primes = sizeof(primes) / sizeof(primes[0]);
 
 /* Forward declarations of internal helpers */
-static bool set_reserve_arena(struct set *set, size_t min_capacity);
-static bool set_rehash(struct set *set, size_t new_prime_index);
-static bool set_ensure_table_capacity(struct set *set);
-static void set_invalidate_sorted(struct set *set);
-static bool set_build_sorted(struct set *set);
+static bool set_reserve_arena(struct _set_t *set, size_t min_capacity);
+static bool set_rehash(struct _set_t *set, size_t new_prime_index);
+static bool set_ensure_table_capacity(struct _set_t *set);
+static void set_invalidate_sorted(struct _set_t *set);
+static bool set_build_sorted(struct _set_t *set);
 
 /* Create a new set */
 set_t *set_create(size_t elem_size,
@@ -85,7 +85,7 @@ set_t *set_create(size_t elem_size,
         return NULL;
     }
 
-    struct set *set = (struct set *)calloc(1, sizeof(struct set));
+    struct _set_t *set = (struct _set_t *)calloc(1, sizeof(struct _set_t));
     if (!set) {
         return NULL;
     }
@@ -187,7 +187,7 @@ size_t set_get_size(const set_t *set)
 }
 
 /* Internal: find bucket and previous bucket for an element */
-static bool set_find_bucket(const struct set *set,
+static bool set_find_bucket(const struct _set_t *set,
                             const void *elem,
                             size_t hash,
                             size_t *out_bucket_index,
@@ -235,7 +235,7 @@ bool set_contains(const set_t *set, const void *elem)
 }
 
 /* Internal: ensure arena capacity */
-static bool set_reserve_arena(struct set *set, size_t min_capacity)
+static bool set_reserve_arena(struct _set_t *set, size_t min_capacity)
 {
     if (set->capacity >= min_capacity) {
         return true;
@@ -258,7 +258,7 @@ static bool set_reserve_arena(struct set *set, size_t min_capacity)
 }
 
 /* Internal: rehash table to new prime index */
-static bool set_rehash(struct set *set, size_t new_prime_index)
+static bool set_rehash(struct _set_t *set, size_t new_prime_index)
 {
     if (new_prime_index >= num_primes) {
         /* Cannot grow further */
@@ -301,7 +301,7 @@ static bool set_rehash(struct set *set, size_t new_prime_index)
 }
 
 /* Internal: ensure table capacity based on load factor */
-static bool set_ensure_table_capacity(struct set *set)
+static bool set_ensure_table_capacity(struct _set_t *set)
 {
     if (!set || set->table_size == 0) {
         return false;
@@ -322,7 +322,7 @@ static bool set_ensure_table_capacity(struct set *set)
 }
 
 /* Invalidate sorted view */
-static void set_invalidate_sorted(struct set *set)
+static void set_invalidate_sorted(struct _set_t *set)
 {
     if (!set) {
         return;
@@ -468,7 +468,7 @@ const void *set_get(const set_t *set, size_t index)
 /* Comparator thunk for qsort_r */
 static int set_qsort_index_cmp(const void *a, const void *b, void *arg)
 {
-    struct set *set = (struct set *)arg;
+    struct _set_t *set = (struct _set_t *)arg;
     const size_t ia = *(const size_t *)a;
     const size_t ib = *(const size_t *)b;
 
@@ -479,7 +479,7 @@ static int set_qsort_index_cmp(const void *a, const void *b, void *arg)
 }
 
 /* Build sorted index array */
-static bool set_build_sorted(struct set *set)
+static bool set_build_sorted(struct _set_t *set)
 {
     if (!set) {
         return false;
@@ -536,7 +536,7 @@ set_t *set_clone(const set_t *set)
         return NULL;
     }
 
-    struct set *clone = set_create(set->elem_size,
+    struct _set_t *clone = set_create(set->elem_size,
                                    set->hash_fn,
                                    set->cmp_fn,
                                    set->clone_fn,
@@ -616,7 +616,7 @@ set_t *set_union(const set_t *a, const set_t *b)
         return NULL;
     }
 
-    struct set *res = set_create(a->elem_size,
+    struct _set_t *res = set_create(a->elem_size,
                                  a->hash_fn,
                                  a->cmp_fn,
                                  a->clone_fn,
@@ -658,7 +658,7 @@ set_t *set_intersection(const set_t *a, const set_t *b)
         return NULL;
     }
 
-    struct set *res = set_create(a->elem_size,
+    struct _set_t *res = set_create(a->elem_size,
                                  a->hash_fn,
                                  a->cmp_fn,
                                  a->clone_fn,
@@ -668,8 +668,8 @@ set_t *set_intersection(const set_t *a, const set_t *b)
     }
 
     /* Iterate over smaller set for efficiency */
-    const struct set *small = a;
-    const struct set *large = b;
+    const struct _set_t *small = a;
+    const struct _set_t *large = b;
     if (b->count < a->count) {
         small = b;
         large = a;
@@ -699,7 +699,7 @@ set_t *set_difference(const set_t *a, const set_t *b)
         return NULL;
     }
 
-    struct set *res = set_create(a->elem_size,
+    struct _set_t *res = set_create(a->elem_size,
                                  a->hash_fn,
                                  a->cmp_fn,
                                  a->clone_fn,
