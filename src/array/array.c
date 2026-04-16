@@ -4,6 +4,7 @@
 #include "array.h"
 
 #define ARRAY_INIT_CAPACITY 8
+#define STACK_CHUNK_SIZE 32
 
 struct array {
     size_t elem_size;
@@ -468,6 +469,17 @@ bool array_rotate_right(array_t *arr) {
     return true;
 }
 
+// --- Array accessors for stack delegation ---
+
+static inline pthread_mutex_t *array_mutex(array_t *arr) { return arr ? &arr->mutex : NULL; }
+static inline void array_set_size(array_t *arr, size_t sz) { if (arr) arr->size = sz; }
+static inline size_t array_capacity(const array_t *arr) { return arr ? arr->capacity : 0; }
+static inline void array_set_capacity(array_t *arr, size_t cap) { if (arr) arr->capacity = cap; }
+static inline void *array_arena(const array_t *arr) { return arr ? arr->arena : NULL; }
+static inline void array_set_arena(array_t *arr, void *arena) { if (arr) arr->arena = arena; }
+static inline size_t array_elem_size(const array_t *arr) { return arr ? arr->elem_size : 0; }
+static inline array_clone_fn array_clone_element_fn(const array_t *arr) { return arr ? arr->clone : NULL; }
+
 /* --- Slicing --- */
 
 static size_t array_slice_real_index(const array_slice_t *slice, size_t index) {
@@ -476,36 +488,34 @@ static size_t array_slice_real_index(const array_slice_t *slice, size_t index) {
 
 void *array_slice_get(const array_slice_t *slice, size_t index) {
     if (!slice || !slice->parent) return NULL;
-    array_t *arr = slice->parent;
-    pthread_mutex_lock(&arr->mutex);
-    if (arr->destroyed || index >= slice->size || slice->start + index >= arr->size) {
-        pthread_mutex_unlock(&arr->mutex);
+    pthread_mutex_lock(array_mutex(slice->parent));
+    if (slice->parent->destroyed || index >= slice->size || slice->start + index >= array_size(slice->parent)) {
+        pthread_mutex_unlock(array_mutex(slice->parent));
         return NULL;
     }
     size_t real_index = array_slice_real_index(slice, index);
-    void *result = (char*)arr->arena + real_index * arr->elem_size;
-    pthread_mutex_unlock(&arr->mutex);
+    void *result = (char*)array_arena(slice->parent) + real_index * array_elem_size(slice->parent);
+    pthread_mutex_unlock(array_mutex(slice->parent));
     return result;
 }
 
 void array_slice_destroy(array_slice_t *slice) {
     if (!slice) return;
-    array_t *arr = slice->parent;
     free(slice->indices);
+    array_t *parent = slice->parent;
     free(slice);
-    array_release(arr);
+    array_release(parent);
 }
 
 static void array_slice_ensure_indices(array_slice_t *slice) {
     if (!slice || !slice->parent) return;
-    array_t *arr = slice->parent;
-    pthread_mutex_lock(&arr->mutex);
+    pthread_mutex_lock(array_mutex(slice->parent));
     if (!slice->indices) {
         slice->indices = malloc(sizeof(size_t) * slice->size);
         for (size_t i = 0; i < slice->size; ++i)
             slice->indices[i] = slice->start + i;
     }
-    pthread_mutex_unlock(&arr->mutex);
+    pthread_mutex_unlock(array_mutex(slice->parent));
 }
 
 struct cmp_ctx {
@@ -526,70 +536,68 @@ static int cmp_indices_static(const void *a, const void *b) {
 void array_slice_sort(array_slice_t *slice, array_cmp_fn cmp) {
     if (!slice || !cmp || slice->size < 2) return;
     array_slice_ensure_indices(slice);
-    array_t *arr = slice->parent;
-    pthread_mutex_lock(&arr->mutex);
-    g_cmp_ctx.arena = arr->arena;
-    g_cmp_ctx.elem_size = arr->elem_size;
+    pthread_mutex_lock(array_mutex(slice->parent));
+    g_cmp_ctx.arena = array_arena(slice->parent);
+    g_cmp_ctx.elem_size = array_elem_size(slice->parent);
     g_cmp_ctx.cmp = cmp;
     qsort(slice->indices, slice->size, sizeof(size_t), cmp_indices_static);
-    pthread_mutex_unlock(&arr->mutex);
+    pthread_mutex_unlock(array_mutex(slice->parent));
 }
 
 bool array_slice_swap(array_slice_t *slice, size_t i, size_t j) {
     if (!slice || !slice->parent) return false;
-    array_t *arr = slice->parent;
-    pthread_mutex_lock(&arr->mutex);
+    pthread_mutex_lock(array_mutex(slice->parent));
     if (i >= slice->size || j >= slice->size) {
-        pthread_mutex_unlock(&arr->mutex);
+        pthread_mutex_unlock(array_mutex(slice->parent));
         return false;
     }
     if (i == j) {
-        pthread_mutex_unlock(&arr->mutex);
+        pthread_mutex_unlock(array_mutex(slice->parent));
         return true;
     }
     array_slice_ensure_indices(slice);
     size_t tmp = slice->indices[i];
     slice->indices[i] = slice->indices[j];
     slice->indices[j] = tmp;
-    pthread_mutex_unlock(&arr->mutex);
+    pthread_mutex_unlock(array_mutex(slice->parent));
     return true;
 }
 
 bool array_slice_rotate_left(array_slice_t *slice) {
     if (!slice || !slice->parent) return false;
     array_t *arr = slice->parent;
-    pthread_mutex_lock(&arr->mutex);
+    pthread_mutex_lock(array_mutex(arr));
     if (slice->size < 2) {
-        pthread_mutex_unlock(&arr->mutex);
+        pthread_mutex_unlock(array_mutex(arr));
         return false;
     }
     array_slice_ensure_indices(slice);
     size_t first = slice->indices[0];
     memmove(&slice->indices[0], &slice->indices[1], (slice->size - 1) * sizeof(size_t));
     slice->indices[slice->size - 1] = first;
-    pthread_mutex_unlock(&arr->mutex);
+    pthread_mutex_unlock(array_mutex(arr));
     return true;
 }
 
 bool array_slice_rotate_right(array_slice_t *slice) {
     if (!slice || !slice->parent) return false;
     array_t *arr = slice->parent;
-    pthread_mutex_lock(&arr->mutex);
+    pthread_mutex_lock(array_mutex(arr));
     if (slice->size < 2) {
-        pthread_mutex_unlock(&arr->mutex);
+        pthread_mutex_unlock(array_mutex(arr));
         return false;
     }
     array_slice_ensure_indices(slice);
     size_t last = slice->indices[slice->size - 1];
     memmove(&slice->indices[1], &slice->indices[0], (slice->size - 1) * sizeof(size_t));
     slice->indices[0] = last;
-    pthread_mutex_unlock(&arr->mutex);
+    pthread_mutex_unlock(array_mutex(arr));
     return true;
 }
 
 array_t *array_from_slice(const array_slice_t *slice, array_clone_fn clone, array_destroy_fn destroy) {
     if (!slice || !slice->parent) return NULL;
-    array_t *arr = array_create(slice->parent->elem_size, clone, destroy);
+    array_t *arr = array_create(array_elem_size(slice->parent), clone, destroy);
     if (!arr) return NULL;
     if (slice->size == 0) return arr;
     for (size_t i = 0; i < slice->size; ++i) {
@@ -604,51 +612,49 @@ array_t *array_from_slice(const array_slice_t *slice, array_clone_fn clone, arra
 
 array_slice_t *array_slice(const array_t *arr, size_t start, size_t count) {
     if (!arr) return NULL;
-    pthread_mutex_lock((pthread_mutex_t *)&arr->mutex);
-    if (arr->destroyed || start >= arr->size) {
-        pthread_mutex_unlock((pthread_mutex_t *)&arr->mutex);
+    pthread_mutex_lock(array_mutex((array_t *)arr));
+    if (arr->destroyed || start >= array_size(arr)) {
+        pthread_mutex_unlock(array_mutex((array_t *)arr));
         return NULL;
     }
-    if (start + count > arr->size) count = arr->size - start;
+    if (start + count > array_size(arr)) count = array_size(arr) - start;
     array_ref((array_t *)arr);
     array_slice_t *slice = malloc(sizeof(array_slice_t));
     if (!slice) {
         array_release((array_t *)arr);
-        pthread_mutex_unlock((pthread_mutex_t *)&arr->mutex);
+        pthread_mutex_unlock(array_mutex((array_t *)arr));
         return NULL;
     }
     slice->parent = (array_t *)arr;
     slice->start = start;
     slice->size = count;
     slice->indices = NULL;
-    pthread_mutex_unlock((pthread_mutex_t *)&arr->mutex);
+    pthread_mutex_unlock(array_mutex((array_t *)arr));
     return slice;
 }
 
 size_t array_slice_size(const array_slice_t *slice) {
     if (!slice) return 0;
-    array_t *arr = slice->parent;
-    pthread_mutex_lock(&arr->mutex);
+    pthread_mutex_lock(array_mutex(slice->parent));
     size_t sz = slice->size;
-    pthread_mutex_unlock(&arr->mutex);
+    pthread_mutex_unlock(array_mutex(slice->parent));
     return sz;
 }
 
 size_t array_slice_elem_size(const array_slice_t *slice) {
     if (!slice) return 0;
-    array_t *arr = slice->parent;
-    pthread_mutex_lock(&arr->mutex);
-    size_t sz = arr->elem_size;
-    pthread_mutex_unlock(&arr->mutex);
+    pthread_mutex_lock(array_mutex(slice->parent));
+    size_t sz = array_elem_size(slice->parent);
+    pthread_mutex_unlock(array_mutex(slice->parent));
     return sz;
 }
 
 array_slice_t *array_slice_subslice(const array_slice_t *slice, size_t start, size_t count) {
     if (!slice || !slice->parent) return NULL;
     array_t *arr = slice->parent;
-    pthread_mutex_lock(&arr->mutex);
+    pthread_mutex_lock(array_mutex(arr));
     if (start >= slice->size) {
-        pthread_mutex_unlock(&arr->mutex);
+        pthread_mutex_unlock(array_mutex(arr));
         return NULL;
     }
     if (start + count > slice->size) count = slice->size - start;
@@ -656,7 +662,7 @@ array_slice_t *array_slice_subslice(const array_slice_t *slice, size_t start, si
     array_slice_t *sub = malloc(sizeof(array_slice_t));
     if (!sub) {
         array_release(arr);
-        pthread_mutex_unlock(&arr->mutex);
+        pthread_mutex_unlock(array_mutex(arr));
         return NULL;
     }
     sub->parent = arr;
@@ -667,7 +673,7 @@ array_slice_t *array_slice_subslice(const array_slice_t *slice, size_t start, si
         if (!sub->indices) {
             free(sub);
             array_release(arr);
-            pthread_mutex_unlock(&arr->mutex);
+            pthread_mutex_unlock(array_mutex(arr));
             return NULL;
         }
         for (size_t i = 0; i < count; ++i)
@@ -675,7 +681,7 @@ array_slice_t *array_slice_subslice(const array_slice_t *slice, size_t start, si
     } else {
         sub->indices = NULL;
     }
-    pthread_mutex_unlock(&arr->mutex);
+    pthread_mutex_unlock(array_mutex(arr));
     return sub;
 }
 
@@ -700,28 +706,65 @@ void stack_destroy(stack_t *s) {
     free(s);
 }
 
-bool stack_push(stack_t *s, const void *elem) {
-    if (!s) return false;
-    return array_add(s->array, elem);
-}
-
 void *stack_pop(stack_t *s) {
     if (!s) return NULL;
-    pthread_mutex_lock(&s->array->mutex);
-    size_t sz = s->array->size;
+    pthread_mutex_t *mutex = array_mutex(s->array);
+    pthread_mutex_lock(mutex);
+    size_t sz = array_size(s->array);
     if (sz == 0) {
-        pthread_mutex_unlock(&s->array->mutex);
+        pthread_mutex_unlock(mutex);
         return NULL;
     }
-    void *buf = malloc(s->array->elem_size);
+    size_t elem_size = array_elem_size(s->array);
+    void *buf = malloc(elem_size);
     if (!buf) {
-        pthread_mutex_unlock(&s->array->mutex);
+        pthread_mutex_unlock(mutex);
         return NULL;
     }
-    void *src = (char*)s->array->arena + (sz - 1) * s->array->elem_size;
-    memcpy(buf, src, s->array->elem_size);
-    --s->array->size;
-    pthread_mutex_unlock(&s->array->mutex);
+    void *src = (char*)array_arena(s->array) + (sz - 1) * elem_size;
+    memcpy(buf, src, elem_size);
+
+    array_set_size(s->array, sz - 1);
+
+    // Shrink arena if too many unused slots
+    size_t unused = array_capacity(s->array) - array_size(s->array);
+    if (unused > STACK_CHUNK_SIZE) {
+        size_t new_cap = array_size(s->array) + STACK_CHUNK_SIZE;
+        void *new_arena = realloc(array_arena(s->array), new_cap * elem_size);
+        if (new_arena) {
+            array_set_arena(s->array, new_arena);
+            array_set_capacity(s->array, new_cap);
+        }
+    }
+
+    pthread_mutex_unlock(mutex);
     return buf;
+}
+
+bool stack_push(stack_t *s, const void *elem) {
+    if (!s) return false;
+    pthread_mutex_t *mutex = array_mutex(s->array);
+    pthread_mutex_lock(mutex);
+
+    // Grow by STACK_CHUNK_SIZE if needed
+    if (array_size(s->array) == array_capacity(s->array)) {
+        size_t new_cap = array_capacity(s->array) ? array_capacity(s->array) + STACK_CHUNK_SIZE : ARRAY_INIT_CAPACITY;
+        void *new_arena = realloc(array_arena(s->array), new_cap * array_elem_size(s->array));
+        if (!new_arena) {
+            pthread_mutex_unlock(mutex);
+            return false;
+        }
+        array_set_arena(s->array, new_arena);
+        array_set_capacity(s->array, new_cap);
+    }
+    void *dst = (char*)array_arena(s->array) + array_size(s->array) * array_elem_size(s->array);
+    array_clone_fn clone_element = array_clone_element_fn(s->array);
+    if (clone_element)
+        clone_element(dst, elem);
+    else
+        memcpy(dst, elem, array_elem_size(s->array));
+    array_set_size(s->array, array_size(s->array) + 1);
+    pthread_mutex_unlock(mutex);
+    return true;
 }
 
