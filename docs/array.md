@@ -182,7 +182,7 @@ typedef int  (*array_cmp_fn)(const void *a, const void *b);
 
 ### Slicing
 
-- `typedef struct array_slice array_slice_t;` — opaque type representing a view into a portion of an array.
+- `array_slice_t` — opaque type representing a view into a portion of an array.
 
 - `array_slice_t *array_slice(const array_t *arr, size_t start, size_t count)`  
   Create a slice `[start, start+count)` from the array. Returns NULL if out of bounds. The returned slice must be freed with `array_slice_destroy()`.
@@ -216,5 +216,23 @@ typedef int  (*array_cmp_fn)(const void *a, const void *b);
 
 - `bool array_slice_rotate_right(array_slice_t *slice)`  
   Rotate the slice view right (last element becomes first).
+
+---
+
+### Stack
+
+- `stack_t` — opaque type representing a LIFO stack built on top of `array_t`.
+
+- `stack_t *stack_create(size_t elem_size, array_clone_fn clone, array_destroy_fn destroy)`  
+  Create a new stack for elements of the given size. Returns NULL on allocation failure.
+
+- `void stack_destroy(stack_t *s)`  
+  Destroy the stack and free all memory. Calls destroy for each element if provided. Safe to call with NULL.
+
+- `bool stack_push(stack_t *s, const void *elem)`  
+  Push an element onto the stack. Returns true on success, false on allocation failure.
+
+- `void *stack_pop(stack_t *s)`  
+  Pop the top element from the stack. Returns a pointer to a heap-allocated copy of the popped value, or NULL if the stack is empty. The caller must free the returned pointer.
 
 ---

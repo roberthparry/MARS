@@ -498,6 +498,8 @@
     "test_readme_deep_struct": true,
     "test_swap_rotate": true,
     "test_slice_and_from_slice": true,
-    "test_slice_view_ops": true
+    "test_slice_view_ops": true,
+    "test_stack_ints": true,
+    "test_stack_strings": true
   }
 }

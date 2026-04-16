@@ -529,9 +529,50 @@ void test_slice_view_ops(void) {
     array_destroy(arr);
 }
 
-/* -------------------------------------------------------------
- * tests_main() — the harness entry point
- * ------------------------------------------------------------- */
+void test_stack_ints(void) {
+    stack_t *s = stack_create(sizeof(int), NULL, NULL);
+    ASSERT_TRUE(s);
+
+    // Push values
+    int vals[] = {1, 2, 3, 4};
+    for (int i = 0; i < 4; ++i)
+        ASSERT_TRUE(stack_push(s, &vals[i]));
+
+    // Pop values (should be LIFO)
+    for (int i = 3; i >= 0; --i) {
+        int *p = stack_pop(s);
+        ASSERT_TRUE(p);
+        ASSERT_EQ_INT(*p, vals[i]);
+        free(p);
+    }
+
+    // Stack should now be empty
+    ASSERT_TRUE(stack_pop(s) == NULL);
+
+    stack_destroy(s);
+}
+
+void test_stack_strings(void) {
+    stack_t *s = stack_create(sizeof(char *), str_clone, str_destroy);
+    ASSERT_TRUE(s);
+
+    const char *words[] = {"alpha", "beta", "gamma"};
+    for (int i = 0; i < 3; ++i)
+        ASSERT_TRUE(stack_push(s, &words[i]));
+
+    // Pop values (should be LIFO)
+    for (int i = 2; i >= 0; --i) {
+        char **p = stack_pop(s);
+        ASSERT_TRUE(p);
+        ASSERT_TRUE(strcmp(*p, words[i]) == 0);
+        free(*p); // free cloned string
+        free(p);  // free pointer returned by stack_pop
+    }
+
+    ASSERT_TRUE(stack_pop(s) == NULL);
+
+    stack_destroy(s);
+}
 
 int tests_main(void) {
     printf(C_BOLD C_CYAN "=== Integer Array Tests ===\n" C_RESET);
@@ -558,6 +599,10 @@ int tests_main(void) {
     RUN_TEST(test_slice_and_from_slice, NULL);
     RUN_TEST(test_slice_view_ops, NULL);
 
+    printf(C_BOLD C_CYAN "=== Stack Tests ===\n" C_RESET);
+    RUN_TEST(test_stack_ints, NULL);
+    RUN_TEST(test_stack_strings, NULL);
+
     printf(C_YELLOW "\nRunning README examples...\n" C_RESET);
     RUN_TEST(test_readme_examples, NULL);
     RUN_TEST(test_readme_deep_struct, NULL);
@@ -565,6 +610,10 @@ int tests_main(void) {
     printf(C_BOLD C_GREEN "\n=== README Output Examples ===\n" C_RESET);
     example_array_primitive();
     example_array_deep_struct();
+
+    printf(C_BOLD C_CYAN "=== Stack Tests ===\n" C_RESET);
+    RUN_TEST(test_stack_ints, NULL);
+    RUN_TEST(test_stack_strings, NULL);
 
     return tests_failed;
 }
