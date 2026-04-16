@@ -247,6 +247,37 @@ bool array_rotate_right(array_t *arr);
 
 /**
  * @brief Opaque slice type (view into an array).
+ *
+ * An array slice (`array_slice_t`) is a lightweight, non-owning view into a contiguous
+ * subrange of an `array_t`. Slices allow you to operate on a portion of an array
+ * without copying data. They are useful for:
+ *
+ *   - Iterating over a subrange of an array efficiently.
+ *   - Creating logical windows or partitions of data for algorithms.
+ *   - Providing a "view" that can be sorted, rotated, or swapped independently
+ *     of the underlying array order (via an internal index array).
+ *   - Passing subarrays to functions without exposing the entire array.
+ *
+ * Key properties:
+ *   - Slices do not own the underlying data; they reference the parent array's arena.
+ *   - Slices are safe to use concurrently with the parent array and other slices.
+ *   - Slices can be further sub-sliced, creating views of views.
+ *   - Slices can maintain their own logical order (for sorting, swapping, rotating)
+ *     without modifying the parent array.
+ *   - The parent array is reference-counted and will not be destroyed until all
+ *     slices referencing it are destroyed.
+ *
+ * Limitations:
+ *   - Mutating the parent array (inserting/removing elements) may invalidate
+ *     slices or change their contents if the arena is reallocated or elements
+ *     are shifted. Slices are best used for read-only or view-based operations.
+ *   - Slices must be destroyed with array_slice_destroy() when no longer needed.
+ *
+ * Typical usage:
+ *   - Create a slice with array_slice().
+ *   - Access elements with array_slice_get().
+ *   - Sort, swap, or rotate the slice view as needed.
+ *   - Destroy the slice with array_slice_destroy().
  */
 typedef struct array_slice array_slice_t;
 
