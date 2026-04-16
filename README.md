@@ -14,7 +14,7 @@ datetime utilities, UTF-8 strings, and generic containers.
 - **`qfloat`** — double-double arithmetic and special functions (~34 decimal digits of precision)
 - **`dval_t`** — differentiable expression DAGs with first/second derivatives
 - **`datetime_t`** — civil and astronomical date/time helpers
-- **`dictionary_t` / `set_t`** — generic containers with user-defined ownership
+- **`dictionary_t` / `set_t` / `array_t`** — generic containers with user-defined ownership
 - **`string_t`** — UTF-8-aware dynamic strings and grapheme operations
 
 ## Requirements
@@ -52,6 +52,7 @@ W0(1) = 0.5671432904097838729999686622103575
 | `datetime_t` | Civil and astronomical date/time utilities | [`docs/datetime.md`](docs/datetime.md) |
 | `dictionary_t` | Generic key/value storage with ownership models | [`docs/dictionary.md`](docs/dictionary.md) |
 | `set_t` | Generic set storage with ownership models | [`docs/set.md`](docs/set.md) |
+| `array_t` | Generic array storage with ownership models | [`docs/array.md`](docs/array.md) |
 | `string_t` | UTF-8-aware dynamic strings | [`docs/string.md`](docs/string.md) |
 
 ## Build
@@ -77,6 +78,7 @@ See [`docs/testing.md`](docs/testing.md) for details on individual test suites.
 - [Testing](docs/testing.md)
 - [Dictionary ownership models](docs/dictionary.md#ownership-models)
 - [Set ownership models](docs/set.md#ownership-models)
+- [Array ownership models](docs/array.md#ownership-models)
 
 ## Directory Layout
 

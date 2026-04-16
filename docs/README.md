@@ -8,7 +8,7 @@ datetime utilities, UTF-8 strings, and generic containers.
 - **`qfloat`** — double-double arithmetic and special functions
 - **`dval_t`** — differentiable expression DAGs with first/second derivatives
 - **`datetime_t`** — civil and astronomical date/time helpers
-- **`dictionary_t` / `set_t`** — generic containers with user-defined ownership
+- **`dictionary_t` / `set_t` / `array_t`** — generic containers with user-defined ownership
 - **`string_t`** — UTF-8-aware dynamic strings and grapheme operations
 
 ## Quick Example
@@ -34,14 +34,13 @@ W0(1) = 0.5671432904097838729999686622103575
 
 ## Modules
 
-- [`qfloat`](docs/qfloat.md)
-- [`dval_t`](docs/dval.md)
-- [`datetime_t`](docs/datetime.md)
-- [`dictionary_t`](docs/dictionary.md)
-- [`set_t`](docs/set.md)
-- [`string_t`](docs/string.md)
-
-A module index is also available in [`docs/README.md`](docs/README.md).
+- [`qfloat`](qfloat.md)
+- [`dval_t`](dval.md)
+- [`datetime_t`](datetime.md)
+- [`dictionary_t`](dictionary.md)
+- [`set_t`](set.md)
+- [`array_t`](array.md)
+- [`string_t`](string.md)
 
 ## Directory Layout
 
@@ -68,6 +67,7 @@ make test_dval
 make test_datetime
 make test_dictionary
 make test_set
+make test_array
 make test_string
 ```
 
@@ -95,12 +95,14 @@ This directory contains the longer module documentation for MARS.
 - [`datetime_t`](datetime.md) — civil and astronomical date/time utilities
 - [`dictionary_t`](dictionary.md) — generic key/value storage
 - [`set_t`](set.md) — generic set storage
+- [`array_t`](array.md) — generic array storage
 - [`string_t`](string.md) — UTF-8-aware dynamic strings
 
 ## Guides
 
 - [`dictionary_t` ownership models](dictionary.md#ownership-models)
 - [`set_t` ownership models](set.md#ownership-models)
+- [`array_t` ownership models](array.md#ownership-models)
 
 ## Notes
 

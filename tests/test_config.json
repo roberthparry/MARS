@@ -485,5 +485,16 @@
       "enabled": true,
       "test_sub_sub_sub_sub_function": true
     }
+  },
+  "tests/test_array.c": {
+    "test_ints": true,
+    "test_strings": true,
+    "test_append_array": true,
+    "test_thread_safety_append": true,
+    "test_remove_and_remove_elements": true,
+    "test_insert_and_insert_carray": true,
+    "test_insert_array": true,
+    "test_readme_examples": true,
+    "test_readme_deep_struct": true
   }
 }
