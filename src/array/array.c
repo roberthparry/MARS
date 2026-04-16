@@ -17,7 +17,7 @@ struct array {
     int destroyed;        // set to 1 when array_destroy is called
 };
 
-struct array_slice {
+struct _array_slice_t {
     struct array *parent;
     size_t start;
     size_t size;
@@ -30,7 +30,7 @@ static void array_ref(array_t *arr) {
     pthread_mutex_unlock(&arr->mutex);
 }
 
-static void array_unref(array_t *arr) {
+static void array_release(array_t *arr) {
     int do_free = 0;
     pthread_mutex_lock(&arr->mutex);
     if (--arr->refcount == 0) do_free = 1;
@@ -80,7 +80,7 @@ void array_destroy(array_t *arr) {
     pthread_mutex_lock(&arr->mutex);
     arr->destroyed = 1;
     pthread_mutex_unlock(&arr->mutex);
-    array_unref(arr);
+    array_release(arr);
 }
 
 void array_clear(array_t *arr) {
@@ -493,7 +493,7 @@ void array_slice_destroy(array_slice_t *slice) {
     array_t *arr = slice->parent;
     free(slice->indices);
     free(slice);
-    array_unref(arr);
+    array_release(arr);
 }
 
 static void array_slice_ensure_indices(array_slice_t *slice) {
@@ -613,7 +613,7 @@ array_slice_t *array_slice(const array_t *arr, size_t start, size_t count) {
     array_ref((array_t *)arr);
     array_slice_t *slice = malloc(sizeof(array_slice_t));
     if (!slice) {
-        array_unref((array_t *)arr);
+        array_release((array_t *)arr);
         pthread_mutex_unlock((pthread_mutex_t *)&arr->mutex);
         return NULL;
     }
@@ -655,7 +655,7 @@ array_slice_t *array_slice_subslice(const array_slice_t *slice, size_t start, si
     array_ref(arr);
     array_slice_t *sub = malloc(sizeof(array_slice_t));
     if (!sub) {
-        array_unref(arr);
+        array_release(arr);
         pthread_mutex_unlock(&arr->mutex);
         return NULL;
     }
@@ -666,7 +666,7 @@ array_slice_t *array_slice_subslice(const array_slice_t *slice, size_t start, si
         sub->indices = malloc(sizeof(size_t) * count);
         if (!sub->indices) {
             free(sub);
-            array_unref(arr);
+            array_release(arr);
             pthread_mutex_unlock(&arr->mutex);
             return NULL;
         }
@@ -677,5 +677,51 @@ array_slice_t *array_slice_subslice(const array_slice_t *slice, size_t start, si
     }
     pthread_mutex_unlock(&arr->mutex);
     return sub;
+}
+
+typedef struct stack {
+    array_t *array;
+} stack_t;
+
+stack_t *stack_create(size_t elem_size, array_clone_fn clone, array_destroy_fn destroy) {
+    stack_t *s = malloc(sizeof(stack_t));
+    if (!s) return NULL;
+    s->array = array_create(elem_size, clone, destroy);
+    if (!s->array) {
+        free(s);
+        return NULL;
+    }
+    return s;
+}
+
+void stack_destroy(stack_t *s) {
+    if (!s) return;
+    array_destroy(s->array);
+    free(s);
+}
+
+bool stack_push(stack_t *s, const void *elem) {
+    if (!s) return false;
+    return array_add(s->array, elem);
+}
+
+void *stack_pop(stack_t *s) {
+    if (!s) return NULL;
+    pthread_mutex_lock(&s->array->mutex);
+    size_t sz = s->array->size;
+    if (sz == 0) {
+        pthread_mutex_unlock(&s->array->mutex);
+        return NULL;
+    }
+    void *buf = malloc(s->array->elem_size);
+    if (!buf) {
+        pthread_mutex_unlock(&s->array->mutex);
+        return NULL;
+    }
+    void *src = (char*)s->array->arena + (sz - 1) * s->array->elem_size;
+    memcpy(buf, src, s->array->elem_size);
+    --s->array->size;
+    pthread_mutex_unlock(&s->array->mutex);
+    return buf;
 }
 

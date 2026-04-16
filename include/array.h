@@ -279,7 +279,7 @@ bool array_rotate_right(array_t *arr);
  *   - Sort, swap, or rotate the slice view as needed.
  *   - Destroy the slice with array_slice_destroy().
  */
-typedef struct array_slice array_slice_t;
+typedef struct _array_slice_t array_slice_t;
 
 /**
  * @brief Create a slice [start, start+count) from the array (returns NULL if out of bounds).
@@ -364,5 +364,54 @@ bool array_slice_rotate_left(array_slice_t *slice);
  * @brief Rotate the slice view right.
  */
 bool array_slice_rotate_right(array_slice_t *slice);
+
+/* --- Stack (LIFO) interface built on array_t --- */
+
+/**
+ * @brief Opaque stack type (LIFO), built on top of array_t.
+ */
+typedef struct stack stack_t;
+
+/**
+ * @brief Create a new stack for elements of size @p elem_size.
+ *
+ * If @p clone is NULL, memcpy is used for copying elements.
+ * If @p destroy is NULL, no cleanup is performed.
+ *
+ * @param elem_size Size of each element in bytes (must be > 0).
+ * @param clone     Element clone function (NULL for memcpy).
+ * @param destroy   Element destroy function (NULL for no-op).
+ * @return Pointer to new stack, or NULL on allocation failure.
+ */
+stack_t *stack_create(size_t elem_size, array_clone_fn clone, array_destroy_fn destroy);
+
+/**
+ * @brief Destroy the stack and free all memory.
+ *
+ * Calls destroy for each element if provided. Safe to pass NULL.
+ *
+ * @param s Pointer to the stack.
+ */
+void stack_destroy(stack_t *s);
+
+/**
+ * @brief Push an element onto the stack.
+ *
+ * @param s    Pointer to the stack.
+ * @param elem Pointer to the element to push.
+ * @return true on success, false on allocation failure.
+ */
+bool stack_push(stack_t *s, const void *elem);
+
+/**
+ * @brief Pop the top element from the stack.
+ *
+ * Returns a pointer to a heap-allocated copy of the popped value,
+ * or NULL if the stack is empty. The caller must free the returned pointer.
+ *
+ * @param s Pointer to the stack.
+ * @return Pointer to popped value, or NULL if stack is empty.
+ */
+void *stack_pop(stack_t *s);
 
 #endif /* ARRAY_H */
