@@ -6,7 +6,7 @@
 #define ARRAY_INIT_CAPACITY 8
 #define STACK_CHUNK_SIZE 32
 
-struct array {
+typedef struct _array_t {
     size_t elem_size;
     size_t size;
     size_t capacity;
@@ -16,14 +16,18 @@ struct array {
     pthread_mutex_t mutex;
     size_t refcount;      // 1 for the array itself, +1 for each live slice
     int destroyed;        // set to 1 when array_destroy is called
-};
+} array_t;
 
-struct _array_slice_t {
-    struct array *parent;
+typedef struct _array_slice_t {
+    array_t *parent;
     size_t start;
     size_t size;
     size_t *indices; // NULL if identity mapping, else maps logical index to physical
-};
+} array_slice_t;
+
+typedef struct _stack_t {
+    array_t *array;
+} stack_t;
 
 static void array_ref(array_t *arr) {
     pthread_mutex_lock(&arr->mutex);
@@ -684,10 +688,6 @@ array_slice_t *array_slice_subslice(const array_slice_t *slice, size_t start, si
     pthread_mutex_unlock(array_mutex(arr));
     return sub;
 }
-
-typedef struct stack {
-    array_t *array;
-} stack_t;
 
 stack_t *stack_create(size_t elem_size, array_clone_fn clone, array_destroy_fn destroy) {
     stack_t *s = malloc(sizeof(stack_t));

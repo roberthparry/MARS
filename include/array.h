@@ -47,7 +47,7 @@ typedef int (*array_cmp_fn)(const void *a, const void *b);
 /**
  * @brief Opaque array type.
  */
-typedef struct array array_t;
+typedef struct _array_t array_t;
 
 /* --- Lifecycle --- */
 
@@ -370,7 +370,7 @@ bool array_slice_rotate_right(array_slice_t *slice);
 /**
  * @brief Opaque stack type (LIFO), built on top of array_t.
  */
-typedef struct stack stack_t;
+typedef struct _stack_t stack_t;
 
 /**
  * @brief Create a new stack for elements of size @p elem_size.
