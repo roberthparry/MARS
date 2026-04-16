@@ -248,6 +248,55 @@ void example_array_deep_struct(void) {
     array_destroy(arr);
 }
 
+void test_swap_rotate(void) {
+    array_t *arr = array_create(sizeof(int), NULL, NULL);
+    int vals[] = {1, 2, 3, 4, 5};
+    for (int i = 0; i < 5; ++i)
+        array_add(arr, &vals[i]);
+
+    // Test swap
+    ASSERT_TRUE(array_swap(arr, 1, 3)); // swap 2 and 4
+    ASSERT_EQ_INT(*(int*)array_get(arr, 0), 1);
+    ASSERT_EQ_INT(*(int*)array_get(arr, 1), 4);
+    ASSERT_EQ_INT(*(int*)array_get(arr, 2), 3);
+    ASSERT_EQ_INT(*(int*)array_get(arr, 3), 2);
+    ASSERT_EQ_INT(*(int*)array_get(arr, 4), 5);
+
+    // Test rotate left
+    ASSERT_TRUE(array_rotate_left(arr));
+    // Now: 4 3 2 5 1
+    ASSERT_EQ_INT(*(int*)array_get(arr, 0), 4);
+    ASSERT_EQ_INT(*(int*)array_get(arr, 1), 3);
+    ASSERT_EQ_INT(*(int*)array_get(arr, 2), 2);
+    ASSERT_EQ_INT(*(int*)array_get(arr, 3), 5);
+    ASSERT_EQ_INT(*(int*)array_get(arr, 4), 1);
+
+    // Test rotate right
+    ASSERT_TRUE(array_rotate_right(arr));
+    // Now: 1 4 3 2 5
+    ASSERT_EQ_INT(*(int*)array_get(arr, 0), 1);
+    ASSERT_EQ_INT(*(int*)array_get(arr, 1), 4);
+    ASSERT_EQ_INT(*(int*)array_get(arr, 2), 3);
+    ASSERT_EQ_INT(*(int*)array_get(arr, 3), 2);
+    ASSERT_EQ_INT(*(int*)array_get(arr, 4), 5);
+
+    // Edge cases
+    ASSERT_TRUE(!array_swap(arr, 0, 5)); // out of bounds
+    ASSERT_TRUE(!array_rotate_left(NULL));
+    ASSERT_TRUE(!array_rotate_right(NULL));
+
+    array_clear(arr);
+    ASSERT_TRUE(!array_rotate_left(arr)); // empty array
+    ASSERT_TRUE(!array_rotate_right(arr));
+
+    int x = 42;
+    array_add(arr, &x);
+    ASSERT_TRUE(!array_rotate_left(arr)); // single element
+    ASSERT_TRUE(!array_rotate_right(arr));
+
+    array_destroy(arr);
+}
+
 #define THREAD_COUNT 8
 #define PER_THREAD 1000
 
@@ -386,6 +435,100 @@ void test_insert_array(void) {
     array_destroy(a2);
 }
 
+void test_slice_and_from_slice(void) {
+    // Create an array of ints
+    array_t *arr = array_create(sizeof(int), NULL, NULL);
+    int vals[] = {10, 20, 30, 40, 50};
+    for (int i = 0; i < 5; ++i)
+        array_add(arr, &vals[i]);
+
+    // Create a slice [1, 4) => {20, 30, 40}
+    array_slice_t *slice = array_slice(arr, 1, 3);
+    ASSERT_TRUE(slice);
+    ASSERT_EQ_INT(array_slice_size(slice), 3);
+    ASSERT_EQ_INT(array_slice_elem_size(slice), sizeof(int));
+    ASSERT_EQ_INT(*(int*)array_slice_get(slice, 0), 20);
+    ASSERT_EQ_INT(*(int*)array_slice_get(slice, 1), 30);
+    ASSERT_EQ_INT(*(int*)array_slice_get(slice, 2), 40);
+    ASSERT_TRUE(array_slice_get(slice, 3) == NULL);
+
+    // Subslice [1, 2) => {30}
+    array_slice_t *sub = array_slice_subslice(slice, 1, 1);
+    ASSERT_TRUE(sub);
+    ASSERT_EQ_INT(array_slice_size(sub), 1);
+    ASSERT_EQ_INT(*(int*)array_slice_get(sub, 0), 30);
+
+    // Subslice out of bounds returns NULL
+    ASSERT_TRUE(array_slice_subslice(slice, 5, 1) == NULL);
+
+    // Create array from slice
+    array_t *arr2 = array_from_slice(slice, NULL, NULL);
+    ASSERT_TRUE(arr2);
+    ASSERT_EQ_INT(array_size(arr2), 3);
+    ASSERT_EQ_INT(*(int*)array_get(arr2, 0), 20);
+    ASSERT_EQ_INT(*(int*)array_get(arr2, 1), 30);
+    ASSERT_EQ_INT(*(int*)array_get(arr2, 2), 40);
+
+    array_slice_destroy(sub);
+    array_slice_destroy(slice);
+    array_destroy(arr2);
+    array_destroy(arr);
+}
+
+void test_slice_view_ops(void) {
+    array_t *arr = array_create(sizeof(int), NULL, NULL);
+    int vals[] = {5, 2, 9, 1, 7};
+    for (int i = 0; i < 5; ++i)
+        array_add(arr, &vals[i]);
+
+    // Slice: [1, 4) => {2, 9, 1}
+    array_slice_t *slice = array_slice(arr, 1, 3);
+    ASSERT_TRUE(slice);
+
+    // Sort the slice (should be {1, 2, 9} in the slice view, but underlying array unchanged)
+    array_slice_sort(slice, int_cmp);
+    ASSERT_EQ_INT(*(int*)array_slice_get(slice, 0), 1);
+    ASSERT_EQ_INT(*(int*)array_slice_get(slice, 1), 2);
+    ASSERT_EQ_INT(*(int*)array_slice_get(slice, 2), 9);
+
+    // Underlying array is unchanged
+    ASSERT_EQ_INT(*(int*)array_get(arr, 1), 2);
+    ASSERT_EQ_INT(*(int*)array_get(arr, 2), 9);
+    ASSERT_EQ_INT(*(int*)array_get(arr, 3), 1);
+
+    // Swap first and last in the slice view
+    ASSERT_TRUE(array_slice_swap(slice, 0, 2));
+    ASSERT_EQ_INT(*(int*)array_slice_get(slice, 0), 9);
+    ASSERT_EQ_INT(*(int*)array_slice_get(slice, 2), 1);
+
+    // Rotate left: {9, 2, 1} -> {2, 1, 9}
+    ASSERT_TRUE(array_slice_rotate_left(slice));
+    ASSERT_EQ_INT(*(int*)array_slice_get(slice, 0), 2);
+    ASSERT_EQ_INT(*(int*)array_slice_get(slice, 1), 1);
+    ASSERT_EQ_INT(*(int*)array_slice_get(slice, 2), 9);
+
+    // Rotate right: {2, 1, 9} -> {9, 2, 1}
+    ASSERT_TRUE(array_slice_rotate_right(slice));
+    ASSERT_EQ_INT(*(int*)array_slice_get(slice, 0), 9);
+    ASSERT_EQ_INT(*(int*)array_slice_get(slice, 1), 2);
+    ASSERT_EQ_INT(*(int*)array_slice_get(slice, 2), 1);
+
+    // Edge cases
+    ASSERT_TRUE(!array_slice_swap(slice, 0, 3)); // out of bounds
+    ASSERT_TRUE(!array_slice_rotate_left(NULL));
+    ASSERT_TRUE(!array_slice_rotate_right(NULL));
+
+    // Single-element slice: rotate is no-op
+    array_slice_t *single = array_slice_subslice(slice, 0, 1);
+    ASSERT_TRUE(single);
+    ASSERT_TRUE(!array_slice_rotate_left(single));
+    ASSERT_TRUE(!array_slice_rotate_right(single));
+    array_slice_destroy(single);
+
+    array_slice_destroy(slice);
+    array_destroy(arr);
+}
+
 /* -------------------------------------------------------------
  * tests_main() — the harness entry point
  * ------------------------------------------------------------- */
@@ -400,13 +543,20 @@ int tests_main(void) {
     printf(C_BOLD C_CYAN "=== Append Array Tests ===\n" C_RESET);
     RUN_TEST(test_append_array, NULL);
 
-    printf(C_BOLD C_CYAN "\n=== Thread Safety Tests ===\n" C_RESET);
+    printf(C_BOLD C_CYAN "=== Thread Safety Tests ===\n" C_RESET);
     RUN_TEST(test_thread_safety_append, NULL);
 
     printf(C_BOLD C_CYAN "=== Remove/Insert Tests ===\n" C_RESET);
     RUN_TEST(test_remove_and_remove_elements, NULL);
     RUN_TEST(test_insert_and_insert_carray, NULL);
     RUN_TEST(test_insert_array, NULL);
+
+    printf(C_BOLD C_CYAN "=== Swap/Rotate Tests ===\n" C_RESET);
+    RUN_TEST(test_swap_rotate, NULL);
+
+    printf(C_BOLD C_CYAN "=== Slice/From Slice Tests ===\n" C_RESET);
+    RUN_TEST(test_slice_and_from_slice, NULL);
+    RUN_TEST(test_slice_view_ops, NULL);
 
     printf(C_YELLOW "\nRunning README examples...\n" C_RESET);
     RUN_TEST(test_readme_examples, NULL);

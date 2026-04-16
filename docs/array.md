@@ -179,3 +179,42 @@ typedef int  (*array_cmp_fn)(const void *a, const void *b);
 - `void array_sort(array_t *arr, array_cmp_fn cmp)` — sort the array in-place using the provided comparison function.
 
 ---
+
+### Slicing
+
+- `typedef struct array_slice array_slice_t;` — opaque type representing a view into a portion of an array.
+
+- `array_slice_t *array_slice(const array_t *arr, size_t start, size_t count)`  
+  Create a slice `[start, start+count)` from the array. Returns NULL if out of bounds. The returned slice must be freed with `array_slice_destroy()`.
+
+- `void array_slice_destroy(array_slice_t *slice)`  
+  Destroy a slice created by `array_slice`.
+
+- `size_t array_slice_size(const array_slice_t *slice)`  
+  Get the number of elements in the slice.
+
+- `void *array_slice_get(const array_slice_t *slice, size_t index)`  
+  Get pointer to element at index in slice (returns NULL if out of bounds).
+
+- `array_slice_t *array_slice_subslice(const array_slice_t *slice, size_t start, size_t count)`  
+  Create a slice of a slice (view into a subrange). Returns NULL if out of bounds.
+
+- `size_t array_slice_elem_size(const array_slice_t *slice)`  
+  Get the element size of the slice.
+
+- `array_t *array_from_slice(const array_slice_t *slice, array_clone_fn clone, array_destroy_fn destroy)`  
+  Create a new array from a slice. The new array will contain copies of the slice's elements.
+
+- `void array_slice_sort(array_slice_t *slice, array_cmp_fn cmp)`  
+  Sort the slice view (does not affect the underlying array).
+
+- `bool array_slice_swap(array_slice_t *slice, size_t i, size_t j)`  
+  Swap two elements in the slice view.
+
+- `bool array_slice_rotate_left(array_slice_t *slice)`  
+  Rotate the slice view left (first element becomes last).
+
+- `bool array_slice_rotate_right(array_slice_t *slice)`  
+  Rotate the slice view right (last element becomes first).
+
+---

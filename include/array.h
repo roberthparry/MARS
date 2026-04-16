@@ -213,4 +213,125 @@ bool array_remove_elements(array_t *arr, size_t index, size_t count);
  */
 void array_sort(array_t *arr, array_cmp_fn cmp);
 
+/**
+ * @brief Swap two elements at indices i and j.
+ *
+ * @param arr Pointer to the array.
+ * @param i   Index of the first element.
+ * @param j   Index of the second element.
+ * @return true on success, false if out of bounds or arr is NULL.
+ */
+bool array_swap(array_t *arr, size_t i, size_t j);
+
+/**
+ * @brief Rotate the array left by one element.
+ *
+ * The first element becomes the last; all other elements shift down by one.
+ *
+ * @param arr Pointer to the array.
+ * @return true on success, false if array is empty or NULL.
+ */
+bool array_rotate_left(array_t *arr);
+
+/**
+ * @brief Rotate the array right by one element.
+ *
+ * The last element becomes the first; all other elements shift up by one.
+ *
+ * @param arr Pointer to the array.
+ * @return true on success, false if array is empty or NULL.
+ */
+bool array_rotate_right(array_t *arr);
+
+/* --- Slicing --- */
+
+/**
+ * @brief Opaque slice type (view into an array).
+ */
+typedef struct array_slice array_slice_t;
+
+/**
+ * @brief Create a slice [start, start+count) from the array (returns NULL if out of bounds).
+ *
+ * The returned slice must be freed with array_slice_destroy().
+ *
+ * @param arr   Pointer to the array.
+ * @param start Start index.
+ * @param count Number of elements in the slice.
+ * @return Pointer to a new slice, or NULL if out of bounds or allocation fails.
+ */
+array_slice_t *array_slice(const array_t *arr, size_t start, size_t count);
+
+/**
+ * @brief Destroy a slice created by array_slice.
+ *
+ * @param slice Pointer to the slice.
+ */
+void array_slice_destroy(array_slice_t *slice);
+
+/**
+ * @brief Get the number of elements in the slice.
+ *
+ * @param slice Pointer to the slice.
+ * @return Number of elements.
+ */
+size_t array_slice_size(const array_slice_t *slice);
+
+/**
+ * @brief Get pointer to element at index in slice (returns NULL if out of bounds).
+ *
+ * @param slice Pointer to the slice.
+ * @param index Index in the slice.
+ * @return Pointer to the element, or NULL if out of bounds.
+ */
+void *array_slice_get(const array_slice_t *slice, size_t index);
+
+/**
+ * @brief Create a slice from a slice (sub-slice).
+ *
+ * @param slice Pointer to the original slice.
+ * @param start Start index in the slice.
+ * @param count Number of elements in the sub-slice.
+ * @return Pointer to a new slice, or NULL if out of bounds or allocation fails.
+ */
+array_slice_t *array_slice_subslice(const array_slice_t *slice, size_t start, size_t count);
+
+/**
+ * @brief Get the element size of the slice.
+ *
+ * @param slice Pointer to the slice.
+ * @return Element size in bytes.
+ */
+size_t array_slice_elem_size(const array_slice_t *slice);
+
+/**
+ * @brief Create a new array from a slice.
+ *
+ * @param slice Pointer to the slice.
+ * @param clone Clone function for elements (may be NULL).
+ * @param destroy Destroy function for elements (may be NULL).
+ * @return Pointer to a new array, or NULL on allocation failure.
+ */
+array_t *array_from_slice(const array_slice_t *slice, array_clone_fn clone, array_destroy_fn destroy);
+
+/**
+ * @brief Sort the slice view (does not affect underlying array).
+ */
+void array_slice_sort(array_slice_t *slice, array_cmp_fn cmp);
+
+/**
+ * @brief Swap two elements in the slice view.
+ */
+bool array_slice_swap(array_slice_t *slice, size_t i, size_t j);
+
+/**
+ * @brief Rotate the slice view left.
+ */
+bool array_slice_rotate_left(array_slice_t *slice);
+
+/**
+ * @brief Rotate the slice view right.
+ */
+bool array_slice_rotate_right(array_slice_t *slice);
+
 #endif /* ARRAY_H */
