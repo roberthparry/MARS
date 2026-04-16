@@ -38,13 +38,13 @@ struct bucket {
 /* Opaque entry */
 
 struct dict_entry {
-    struct dictionary *dict;
+    struct _dictionary_t *dict;
     size_t             index;
 };
 
 /* Dictionary structure */
 
-struct dictionary {
+struct _dictionary_t {
     size_t key_size;
     size_t value_size;
     size_t key_slot_stride;    /* sizeof(size_t) + key_size */
@@ -85,17 +85,17 @@ struct dictionary {
  * Slot helpers
  * ---------------------------------------------------------------------- */
 
-static inline size_t *key_slot_hash_ptr(const struct dictionary *dict, size_t index)
+static inline size_t *key_slot_hash_ptr(const struct _dictionary_t *dict, size_t index)
 {
     return (size_t *)(dict->key_arena + index * dict->key_slot_stride);
 }
 
-static inline void *key_slot_data_ptr(const struct dictionary *dict, size_t index)
+static inline void *key_slot_data_ptr(const struct _dictionary_t *dict, size_t index)
 {
     return (void *)(dict->key_arena + index * dict->key_slot_stride + sizeof(size_t));
 }
 
-static inline void *value_slot_data_ptr(const struct dictionary *dict, size_t index)
+static inline void *value_slot_data_ptr(const struct _dictionary_t *dict, size_t index)
 {
     return (void *)(dict->value_arena + index * dict->value_slot_stride);
 }
@@ -104,32 +104,32 @@ static inline void *value_slot_data_ptr(const struct dictionary *dict, size_t in
  * Clone / destroy helpers  (eliminate the repeated clone-or-memcpy pattern)
  * ---------------------------------------------------------------------- */
 
-static inline void slot_copy_key(const struct dictionary *dict,
+static inline void slot_copy_key(const struct _dictionary_t *dict,
                                  void *dst, const void *src)
 {
     if (dict->key_clone) dict->key_clone(dst, src);
     else                 memcpy(dst, src, dict->key_size);
 }
 
-static inline void slot_copy_value(const struct dictionary *dict,
+static inline void slot_copy_value(const struct _dictionary_t *dict,
                                    void *dst, const void *src)
 {
     if (dict->value_clone) dict->value_clone(dst, src);
     else                   memcpy(dst, src, dict->value_size);
 }
 
-static inline void slot_destroy_key(const struct dictionary *dict, void *key)
+static inline void slot_destroy_key(const struct _dictionary_t *dict, void *key)
 {
     if (dict->key_destroy) dict->key_destroy(key);
 }
 
-static inline void slot_destroy_value(const struct dictionary *dict, void *val)
+static inline void slot_destroy_value(const struct _dictionary_t *dict, void *val)
 {
     if (dict->value_destroy) dict->value_destroy(val);
 }
 
 /* Destroy every live key+value in the arenas (does not free the arenas). */
-static void dict_destroy_all_slots(struct dictionary *dict)
+static void dict_destroy_all_slots(struct _dictionary_t *dict)
 {
     for (size_t i = 0; i < dict->count; ++i) {
         slot_destroy_key(dict,   key_slot_data_ptr(dict, i));
@@ -138,7 +138,7 @@ static void dict_destroy_all_slots(struct dictionary *dict)
 }
 
 /* Free every bucket node in the table (does not free the table array). */
-static void dict_free_all_buckets(struct dictionary *dict)
+static void dict_free_all_buckets(struct _dictionary_t *dict)
 {
     if (!dict->table) return;
     for (size_t i = 0; i < dict->table_size; ++i) {
@@ -170,13 +170,13 @@ static const size_t num_primes = sizeof(primes) / sizeof(primes[0]);
  * Forward declarations
  * ---------------------------------------------------------------------- */
 
-static bool dict_reserve_arenas(struct dictionary *dict, size_t min_capacity);
-static bool dict_rehash(struct dictionary *dict, size_t new_prime_index);
-static bool dict_ensure_table_capacity(struct dictionary *dict);
-static void dict_invalidate_sorted(struct dictionary *dict);
-static bool dict_build_sorted_idx(struct dictionary *dict,
+static bool dict_reserve_arenas(struct _dictionary_t *dict, size_t min_capacity);
+static bool dict_rehash(struct _dictionary_t *dict, size_t new_prime_index);
+static bool dict_ensure_table_capacity(struct _dictionary_t *dict);
+static void dict_invalidate_sorted(struct _dictionary_t *dict);
+static bool dict_build_sorted_idx(struct _dictionary_t *dict,
                                   size_t **idx, size_t *cap, bool *valid,
-                                  int (*cmp)(const struct dictionary *, size_t, size_t));
+                                  int (*cmp)(const struct _dictionary_t *, size_t, size_t));
 
 /* -------------------------------------------------------------------------
  * Create
@@ -195,7 +195,7 @@ dictionary_t *dictionary_create(size_t key_size,
     if (key_size == 0 || value_size == 0 || !key_hash || !key_cmp)
         return NULL;
 
-    struct dictionary *dict = (struct dictionary *)calloc(1, sizeof(*dict));
+    struct _dictionary_t *dict = (struct _dictionary_t *)calloc(1, sizeof(*dict));
     if (!dict) return NULL;
 
     dict->key_size          = key_size;
@@ -269,7 +269,7 @@ size_t dictionary_size(const dictionary_t *dict)
  * Internal: reserve arenas
  * ---------------------------------------------------------------------- */
 
-static bool dict_reserve_arenas(struct dictionary *dict, size_t min_capacity)
+static bool dict_reserve_arenas(struct _dictionary_t *dict, size_t min_capacity)
 {
     if (dict->capacity >= min_capacity) return true;
 
@@ -296,7 +296,7 @@ static bool dict_reserve_arenas(struct dictionary *dict, size_t min_capacity)
  * Internal: rehash
  * ---------------------------------------------------------------------- */
 
-static bool dict_rehash(struct dictionary *dict, size_t new_prime_index)
+static bool dict_rehash(struct _dictionary_t *dict, size_t new_prime_index)
 {
     if (new_prime_index >= num_primes)
         return dict->table_size != 0;
@@ -330,7 +330,7 @@ static bool dict_rehash(struct dictionary *dict, size_t new_prime_index)
  * Internal: ensure table capacity
  * ---------------------------------------------------------------------- */
 
-static bool dict_ensure_table_capacity(struct dictionary *dict)
+static bool dict_ensure_table_capacity(struct _dictionary_t *dict)
 {
     if (!dict || dict->table_size == 0) return false;
 
@@ -344,7 +344,7 @@ static bool dict_ensure_table_capacity(struct dictionary *dict)
  * Internal: invalidate sorted views
  * ---------------------------------------------------------------------- */
 
-static void dict_invalidate_sorted(struct dictionary *dict)
+static void dict_invalidate_sorted(struct _dictionary_t *dict)
 {
     if (!dict) return;
     dict->sorted_keys_valid   = false;
@@ -355,7 +355,7 @@ static void dict_invalidate_sorted(struct dictionary *dict)
  * Internal: find bucket
  * ---------------------------------------------------------------------- */
 
-static bool dict_find_bucket(const struct dictionary *dict,
+static bool dict_find_bucket(const struct _dictionary_t *dict,
                              const void *key,
                              size_t hash,
                              size_t *out_bucket_index,
@@ -558,8 +558,8 @@ const void *dictionary_get_value(const dictionary_t *dict, size_t index)
  * ---------------------------------------------------------------------- */
 
 struct sort_ctx {
-    struct dictionary *dict;
-    int (*cmp)(const struct dictionary *, size_t, size_t);
+    struct _dictionary_t *dict;
+    int (*cmp)(const struct _dictionary_t *, size_t, size_t);
 };
 
 static int sort_thunk(const void *a, const void *b, void *arg)
@@ -568,13 +568,13 @@ static int sort_thunk(const void *a, const void *b, void *arg)
     return ctx->cmp(ctx->dict, *(const size_t *)a, *(const size_t *)b);
 }
 
-static int sort_cmp_keys_ctx(const struct dictionary *dict, size_t ia, size_t ib)
+static int sort_cmp_keys_ctx(const struct _dictionary_t *dict, size_t ia, size_t ib)
 {
     return dict->key_cmp(key_slot_data_ptr(dict, ia),
                          key_slot_data_ptr(dict, ib));
 }
 
-static int sort_cmp_values_ctx(const struct dictionary *dict, size_t ia, size_t ib)
+static int sort_cmp_values_ctx(const struct _dictionary_t *dict, size_t ia, size_t ib)
 {
     if (dict->value_cmp)
         return dict->value_cmp(value_slot_data_ptr(dict, ia),
@@ -584,9 +584,9 @@ static int sort_cmp_values_ctx(const struct dictionary *dict, size_t ia, size_t 
                   dict->value_size);
 }
 
-static bool dict_build_sorted_idx(struct dictionary *dict,
+static bool dict_build_sorted_idx(struct _dictionary_t *dict,
                                   size_t **idx, size_t *cap, bool *valid,
-                                  int (*cmp)(const struct dictionary *, size_t, size_t))
+                                  int (*cmp)(const struct _dictionary_t *, size_t, size_t))
 {
     if (!dict) return false;
 
@@ -692,7 +692,7 @@ bool dictionary_get_entry(const dictionary_t *dict,
     if (!dict_find_bucket(dict, key, hash, NULL, NULL, &curr))
         return false;
 
-    struct dictionary *md     = (struct dictionary *)dict;
+    struct _dictionary_t *md     = (struct _dictionary_t *)dict;
     md->scratch_entry.dict    = md;
     md->scratch_entry.index   = curr->index;
     *out_entry = &md->scratch_entry;
@@ -744,7 +744,7 @@ void dictionary_foreach(const dictionary_t *dict,
 {
     if (!dict || !fn) return;
 
-    struct dict_entry entry = { .dict = (struct dictionary *)dict };
+    struct dict_entry entry = { .dict = (struct _dictionary_t *)dict };
 
     for (size_t i = 0; i < dict->count; ++i) {
         entry.index = i;
@@ -760,7 +760,7 @@ dictionary_t *dictionary_clone(const dictionary_t *dict)
 {
     if (!dict) return NULL;
 
-    struct dictionary *clone = dictionary_create(dict->key_size,
+    struct _dictionary_t *clone = dictionary_create(dict->key_size,
                                                  dict->value_size,
                                                  dict->key_hash,
                                                  dict->key_cmp,

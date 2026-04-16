@@ -48,7 +48,7 @@
  * released with string_free(). Do not allocate @c string_t on the stack
  * or embed it in another struct — use the pointer form exclusively.
  */
-typedef struct string_t string_t;
+typedef struct _string_t string_t;
 
 /* =========================================================================
    Creation and destruction

@@ -56,7 +56,7 @@ typedef void (*set_clone_fn)(void *dst, const void *src);
 typedef void (*set_destroy_fn)(void *elem);
 
 /* Opaque set type. */
-typedef struct set set_t;
+typedef struct _set_t set_t;
 
 /* Create a new set.
  *
