@@ -161,7 +161,7 @@ the next mutation and rebuilt on demand.
 
 ## Tradeoffs
 
-The design favors explicit ownership and generic behaviour over a minimal API
+The design favours explicit ownership and generic behaviour over a minimal API
 surface.
 
 ---

@@ -65,7 +65,7 @@ The implementation is based on standard error-free transformation routines:
 - `TwoProd` (Dekker) — exact representation of multiplication error
 
 These make the rounding error explicit so that it can be captured in `lo` and
-the result renormalized into a stable `(hi, lo)` pair.
+the result renormalised into a stable `(hi, lo)` pair.
 
 ### Function Implementation
 
@@ -133,7 +133,7 @@ All declarations are in `include/qfloat.h`.
   notation). Uses exact decimal accumulation for full precision.
 
 - `void qf_to_string(qfloat x, char *out, size_t out_size)`  
-  Write normalized scientific notation with 32 significant digits into `out`.
+  Write normalised scientific notation with 32 significant digits into `out`.
 
 ### Comparison and Classification
 

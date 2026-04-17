@@ -151,7 +151,7 @@ called after any mutation. It is invalidated by the next `set_add()`,
 
 ## Tradeoffs
 
-The design favors compact storage and explicit ownership over stable element
+The design favours compact storage and explicit ownership over stable element
 positions.
 
 ---

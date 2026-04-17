@@ -252,7 +252,7 @@ All functions return owning handles.
 
 ### String Conversion
 
-- `char *dv_to_string(const dval_t *dv, style_t style)` — serialize the expression; `style` is `style_FUNCTION` or `style_EXPRESSION`. Returns a newly allocated C string; the caller must free it.
+- `char *dv_to_string(const dval_t *dv, style_t style)` — serialise the expression; `style` is `style_FUNCTION` or `style_EXPRESSION`. Returns a newly allocated C string; the caller must free it.
 - `void dv_print(const dval_t *dv)` — print the expression to stdout in `style_EXPRESSION` format
 
 ### Parsing

@@ -75,9 +75,9 @@ make test_string
 
 Detailed architecture notes and longer examples live in `docs/`.
 
-## License
+## Licence
 
-MIT License. See `LICENSE`.
+MIT Licence. See `LICENSE`.
 
 # MARS Documentation
 

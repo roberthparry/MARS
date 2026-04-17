@@ -150,7 +150,7 @@ truncated at a valid UTF-8 codepoint boundary.
 
 ## Tradeoffs
 
-The design favors Unicode correctness over the simplicity of treating text as
+The design favours Unicode correctness over the simplicity of treating text as
 raw bytes.
 
 ---
