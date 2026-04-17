@@ -574,6 +574,98 @@ void test_stack_strings(void) {
     stack_destroy(s);
 }
 
+void example_slice_subrange(void) {
+    array_t *arr = array_create(sizeof(int), NULL, NULL);
+
+    for (int i = 0; i < 8; ++i)
+        array_add(arr, &i);
+
+    array_slice_t *slice = array_slice(arr, 2, 4);
+
+    for (size_t i = 0; i < array_slice_size(slice); ++i)
+        printf("%d ", *(int*)array_slice_get(slice, i));
+    printf("\n");
+
+    array_slice_destroy(slice);
+    array_destroy(arr);
+}
+
+void example_slice_sort(void) {
+    array_t *arr = array_create(sizeof(int), NULL, NULL);
+
+    int vals[] = {7, 3, 9, 1, 5};
+    for (int i = 0; i < 5; ++i)
+        array_add(arr, &vals[i]);
+
+    array_slice_t *slice = array_slice(arr, 0, 5);
+    array_slice_sort(slice, int_cmp);
+
+    printf("slice (sorted): ");
+    for (size_t i = 0; i < array_slice_size(slice); ++i)
+        printf("%d ", *(int*)array_slice_get(slice, i));
+    printf("\n");
+
+    printf("array (unchanged): ");
+    for (size_t i = 0; i < array_size(arr); ++i)
+        printf("%d ", *(int*)array_get(arr, i));
+    printf("\n");
+
+    array_slice_destroy(slice);
+    array_destroy(arr);
+}
+
+void example_slice_materialise(void) {
+    array_t *arr = array_create(sizeof(int), NULL, NULL);
+
+    for (int i = 0; i < 6; ++i)
+        array_add(arr, &i);
+
+    array_slice_t *slice = array_slice(arr, 1, 4);
+    array_t *copy = array_from_slice(slice, NULL, NULL);
+
+    array_slice_destroy(slice);
+    array_destroy(arr);
+
+    for (size_t i = 0; i < array_size(copy); ++i)
+        printf("%d ", *(int*)array_get(copy, i));
+    printf("\n");
+
+    array_destroy(copy);
+}
+
+void example_stack_basic(void) {
+    stack_t *s = stack_create(sizeof(int), NULL, NULL);
+
+    int vals[] = {10, 20, 30};
+    for (int i = 0; i < 3; ++i)
+        stack_push(s, &vals[i]);
+
+    int *v;
+    while ((v = stack_pop(s)) != NULL) {
+        printf("%d\n", *v);
+        free(v);
+    }
+
+    stack_destroy(s);
+}
+
+void example_stack_deep(void) {
+    stack_t *s = stack_create(sizeof(char *), str_clone, str_destroy);
+
+    const char *words[] = {"first", "second", "third"};
+    for (int i = 0; i < 3; ++i)
+        stack_push(s, &words[i]);
+
+    char **top;
+    while ((top = stack_pop(s)) != NULL) {
+        printf("%s\n", *top);
+        free(*top);
+        free(top);
+    }
+
+    stack_destroy(s);
+}
+
 int tests_main(void) {
     printf(C_BOLD C_CYAN "=== Integer Array Tests ===\n" C_RESET);
     RUN_TEST(test_ints, NULL);
@@ -610,6 +702,11 @@ int tests_main(void) {
     printf(C_BOLD C_GREEN "\n=== README Output Examples ===\n" C_RESET);
     example_array_primitive();
     example_array_deep_struct();
+    example_slice_subrange();
+    example_slice_sort();
+    example_slice_materialise();
+    example_stack_basic();
+    example_stack_deep();
 
     printf(C_BOLD C_CYAN "=== Stack Tests ===\n" C_RESET);
     RUN_TEST(test_stack_ints, NULL);

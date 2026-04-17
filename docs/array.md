@@ -180,9 +180,208 @@ typedef int  (*array_cmp_fn)(const void *a, const void *b);
 
 ---
 
-### Slicing
+## Slice Examples
 
-- `array_slice_t` — opaque type representing a view into a portion of an array.
+### Reading a subrange
+
+Slices are views into an existing array. They do not copy elements; mutations to the underlying array are visible through the slice.
+
+```c
+#include <stdio.h>
+#include "array.h"
+
+int main(void) {
+    array_t *arr = array_create(sizeof(int), NULL, NULL);
+
+    for (int i = 0; i < 8; ++i)
+        array_add(arr, &i);
+
+    // View elements [2, 6)
+    array_slice_t *slice = array_slice(arr, 2, 4);
+
+    for (size_t i = 0; i < array_slice_size(slice); ++i)
+        printf("%d ", *(int*)array_slice_get(slice, i));
+    printf("\n");
+
+    array_slice_destroy(slice);
+    array_destroy(arr);
+    return 0;
+}
+```
+
+Expected output:
+
+```text
+2 3 4 5
+```
+
+### Sorting a slice without affecting the array
+
+Slice sort reorders the slice's index mapping without moving elements in the underlying array.
+
+```c
+#include <stdio.h>
+#include "array.h"
+
+static int cmp_int(const void *a, const void *b) {
+    return *(const int*)a - *(const int*)b;
+}
+
+int main(void) {
+    array_t *arr = array_create(sizeof(int), NULL, NULL);
+
+    int vals[] = {7, 3, 9, 1, 5};
+    for (int i = 0; i < 5; ++i)
+        array_add(arr, &vals[i]);
+
+    array_slice_t *slice = array_slice(arr, 0, 5);
+    array_slice_sort(slice, cmp_int);
+
+    printf("slice (sorted): ");
+    for (size_t i = 0; i < array_slice_size(slice); ++i)
+        printf("%d ", *(int*)array_slice_get(slice, i));
+    printf("\n");
+
+    printf("array (unchanged): ");
+    for (size_t i = 0; i < array_size(arr); ++i)
+        printf("%d ", *(int*)array_get(arr, i));
+    printf("\n");
+
+    array_slice_destroy(slice);
+    array_destroy(arr);
+    return 0;
+}
+```
+
+Expected output:
+
+```text
+slice (sorted): 1 3 5 7 9
+array (unchanged): 7 3 9 1 5
+```
+
+### Materialising a slice into a new array
+
+```c
+#include <stdio.h>
+#include "array.h"
+
+int main(void) {
+    array_t *arr = array_create(sizeof(int), NULL, NULL);
+
+    for (int i = 0; i < 6; ++i)
+        array_add(arr, &i);
+
+    array_slice_t *slice = array_slice(arr, 1, 4);    // [1, 2, 3, 4]
+    array_t *copy = array_from_slice(slice, NULL, NULL);
+
+    array_slice_destroy(slice);
+    array_destroy(arr);
+
+    for (size_t i = 0; i < array_size(copy); ++i)
+        printf("%d ", *(int*)array_get(copy, i));
+    printf("\n");
+
+    array_destroy(copy);
+    return 0;
+}
+```
+
+Expected output:
+
+```text
+1 2 3 4
+```
+
+---
+
+## Stack Examples
+
+### Basic push and pop
+
+`stack_pop` returns a heap-allocated copy of the top element; the caller is responsible for freeing it.
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include "array.h"
+
+int main(void) {
+    stack_t *s = stack_create(sizeof(int), NULL, NULL);
+
+    int vals[] = {10, 20, 30};
+    for (int i = 0; i < 3; ++i)
+        stack_push(s, &vals[i]);
+
+    int *v;
+    while ((v = stack_pop(s)) != NULL) {
+        printf("%d\n", *v);
+        free(v);
+    }
+
+    stack_destroy(s);
+    return 0;
+}
+```
+
+Expected output:
+
+```text
+30
+20
+10
+```
+
+### Stack with deep ownership
+
+Supply `clone_fn` and `destroy_fn` to have the stack own its elements.
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "array.h"
+
+static void str_clone(void *dst, const void *src) {
+    const char **s = (const char**)src;
+    *(char**)dst = malloc(strlen(*s) + 1);
+    strcpy(*(char**)dst, *s);
+}
+
+static void str_destroy(void *elem) {
+    free(*(char**)elem);
+}
+
+int main(void) {
+    stack_t *s = stack_create(sizeof(char*), str_clone, str_destroy);
+
+    const char *words[] = {"first", "second", "third"};
+    for (int i = 0; i < 3; ++i)
+        stack_push(s, &words[i]);
+
+    char **top;
+    while ((top = stack_pop(s)) != NULL) {
+        printf("%s\n", *top);
+        free(*top);
+        free(top);
+    }
+
+    stack_destroy(s);
+    return 0;
+}
+```
+
+Expected output:
+
+```text
+third
+second
+first
+```
+
+---
+
+### Slicing
 
 - `array_slice_t *array_slice(const array_t *arr, size_t start, size_t count)`  
   Create a slice `[start, start+count)` from the array. Returns NULL if out of bounds. The returned slice must be freed with `array_slice_destroy()`.

@@ -14,8 +14,8 @@ typedef struct _array_t {
     array_clone_fn clone;
     array_destroy_fn destroy;
     pthread_mutex_t mutex;
-    size_t refcount;      // 1 for the array itself, +1 for each live slice
-    int destroyed;        // set to 1 when array_destroy is called
+    size_t refcount;
+    int destroyed;
 } array_t;
 
 typedef struct _array_slice_t {
@@ -28,6 +28,8 @@ typedef struct _array_slice_t {
 typedef struct _stack_t {
     array_t *array;
 } stack_t;
+
+/* --- Internal helpers (caller must hold arr->mutex where noted) --- */
 
 static void array_ref(array_t *arr) {
     pthread_mutex_lock(&arr->mutex);
@@ -48,6 +50,30 @@ static void array_release(array_t *arr) {
         free(arr->arena);
         pthread_mutex_destroy(&arr->mutex);
         free(arr);
+    }
+}
+
+// Requires arr->mutex held.
+static bool array_grow_to(array_t *arr, size_t needed) {
+    if (needed <= arr->capacity) return true;
+    size_t new_cap = arr->capacity ? arr->capacity * 2 : ARRAY_INIT_CAPACITY;
+    while (new_cap < needed) new_cap *= 2;
+    void *new_arena = realloc(arr->arena, new_cap * arr->elem_size);
+    if (!new_arena) return false;
+    arr->arena = new_arena;
+    arr->capacity = new_cap;
+    return true;
+}
+
+// Requires arr->mutex held.
+static void array_copy_elems(array_t *arr, size_t dst_idx, const void *src, size_t n) {
+    for (size_t i = 0; i < n; ++i) {
+        const void *s = (const char*)src + i * arr->elem_size;
+        void *d = (char*)arr->arena + (dst_idx + i) * arr->elem_size;
+        if (arr->clone)
+            arr->clone(d, s);
+        else
+            memcpy(d, s, arr->elem_size);
     }
 }
 
@@ -126,26 +152,12 @@ void *array_get(const array_t *arr, size_t index) {
 bool array_add(array_t *arr, const void *elem) {
     if (!arr || !elem) return false;
     pthread_mutex_lock(&arr->mutex);
-    if (arr->destroyed) {
+    if (arr->destroyed || !array_grow_to(arr, arr->size + 1)) {
         pthread_mutex_unlock(&arr->mutex);
         return false;
     }
-    if (arr->size == arr->capacity) {
-        size_t new_cap = arr->capacity ? arr->capacity * 2 : ARRAY_INIT_CAPACITY;
-        void *new_arena = realloc(arr->arena, new_cap * arr->elem_size);
-        if (!new_arena) {
-            pthread_mutex_unlock(&arr->mutex);
-            return false;
-        }
-        arr->arena = new_arena;
-        arr->capacity = new_cap;
-    }
-    void *dst = (char*)arr->arena + arr->size * arr->elem_size;
-    if (arr->clone)
-        arr->clone(dst, elem);
-    else
-        memcpy(dst, elem, arr->elem_size);
-    arr->size += 1;
+    array_copy_elems(arr, arr->size, elem, 1);
+    arr->size++;
     pthread_mutex_unlock(&arr->mutex);
     return true;
 }
@@ -153,31 +165,17 @@ bool array_add(array_t *arr, const void *elem) {
 bool array_insert(array_t *arr, size_t index, const void *elem) {
     if (!arr || !elem) return false;
     pthread_mutex_lock(&arr->mutex);
-    if (arr->destroyed || index > arr->size) {
+    if (arr->destroyed || index > arr->size || !array_grow_to(arr, arr->size + 1)) {
         pthread_mutex_unlock(&arr->mutex);
         return false;
-    }
-    if (arr->size == arr->capacity) {
-        size_t new_cap = arr->capacity ? arr->capacity * 2 : ARRAY_INIT_CAPACITY;
-        void *new_arena = realloc(arr->arena, new_cap * arr->elem_size);
-        if (!new_arena) {
-            pthread_mutex_unlock(&arr->mutex);
-            return false;
-        }
-        arr->arena = new_arena;
-        arr->capacity = new_cap;
     }
     if (index < arr->size) {
         memmove((char*)arr->arena + (index + 1) * arr->elem_size,
                 (char*)arr->arena + index * arr->elem_size,
                 (arr->size - index) * arr->elem_size);
     }
-    void *dst = (char*)arr->arena + index * arr->elem_size;
-    if (arr->clone)
-        arr->clone(dst, elem);
-    else
-        memcpy(dst, elem, arr->elem_size);
-    arr->size += 1;
+    array_copy_elems(arr, index, elem, 1);
+    arr->size++;
     pthread_mutex_unlock(&arr->mutex);
     return true;
 }
@@ -188,83 +186,37 @@ bool array_insert_array(array_t *dst, size_t index, const array_t *src) {
     if (src->size == 0) return true;
     pthread_mutex_lock(&dst->mutex);
     pthread_mutex_lock((pthread_mutex_t *)&src->mutex);
-    if (dst->destroyed) {
-        pthread_mutex_unlock((pthread_mutex_t *)&src->mutex);
-        pthread_mutex_unlock(&dst->mutex);
-        return false;
-    }
-    size_t needed = dst->size + src->size;
-    if (needed > dst->capacity) {
-        size_t new_cap = dst->capacity ? dst->capacity * 2 : ARRAY_INIT_CAPACITY;
-        while (new_cap < needed) new_cap *= 2;
-        void *new_arena = realloc(dst->arena, new_cap * dst->elem_size);
-        if (!new_arena) {
-            pthread_mutex_unlock((pthread_mutex_t *)&src->mutex);
-            pthread_mutex_unlock(&dst->mutex);
-            return false;
+    bool ok = !dst->destroyed && array_grow_to(dst, dst->size + src->size);
+    if (ok) {
+        if (index < dst->size) {
+            memmove((char*)dst->arena + (index + src->size) * dst->elem_size,
+                    (char*)dst->arena + index * dst->elem_size,
+                    (dst->size - index) * dst->elem_size);
         }
-        dst->arena = new_arena;
-        dst->capacity = new_cap;
+        array_copy_elems(dst, index, src->arena, src->size);
+        dst->size += src->size;
     }
-    // Move elements up to make space
-    if (index < dst->size) {
-        memmove((char*)dst->arena + (index + src->size) * dst->elem_size,
-                (char*)dst->arena + index * dst->elem_size,
-                (dst->size - index) * dst->elem_size);
-    }
-    // Copy/clone new elements in
-    for (size_t i = 0; i < src->size; ++i) {
-        void *src_elem = (char*)src->arena + i * src->elem_size;
-        void *dst_elem = (char*)dst->arena + (index + i) * dst->elem_size;
-        if (dst->clone)
-            dst->clone(dst_elem, src_elem);
-        else
-            memcpy(dst_elem, src_elem, dst->elem_size);
-    }
-    dst->size += src->size;
     pthread_mutex_unlock((pthread_mutex_t *)&src->mutex);
     pthread_mutex_unlock(&dst->mutex);
-    return true;
+    return ok;
 }
 
 bool array_insert_carray(array_t *dst, size_t index, const void *src, size_t n) {
     if (!dst || !src || n == 0) return false;
     if (index > dst->size) return false;
     pthread_mutex_lock(&dst->mutex);
-    if (dst->destroyed) {
-        pthread_mutex_unlock(&dst->mutex);
-        return false;
-    }
-    size_t needed = dst->size + n;
-    if (needed > dst->capacity) {
-        size_t new_cap = dst->capacity ? dst->capacity * 2 : ARRAY_INIT_CAPACITY;
-        while (new_cap < needed) new_cap *= 2;
-        void *new_arena = realloc(dst->arena, new_cap * dst->elem_size);
-        if (!new_arena) {
-            pthread_mutex_unlock(&dst->mutex);
-            return false;
+    bool ok = !dst->destroyed && array_grow_to(dst, dst->size + n);
+    if (ok) {
+        if (index < dst->size) {
+            memmove((char*)dst->arena + (index + n) * dst->elem_size,
+                    (char*)dst->arena + index * dst->elem_size,
+                    (dst->size - index) * dst->elem_size);
         }
-        dst->arena = new_arena;
-        dst->capacity = new_cap;
+        array_copy_elems(dst, index, src, n);
+        dst->size += n;
     }
-    // Move elements up to make space
-    if (index < dst->size) {
-        memmove((char*)dst->arena + (index + n) * dst->elem_size,
-                (char*)dst->arena + index * dst->elem_size,
-                (dst->size - index) * dst->elem_size);
-    }
-    // Copy/clone new elements in
-    for (size_t i = 0; i < n; ++i) {
-        const void *src_elem = (const char*)src + i * dst->elem_size;
-        void *dst_elem = (char*)dst->arena + (index + i) * dst->elem_size;
-        if (dst->clone)
-            dst->clone(dst_elem, src_elem);
-        else
-            memcpy(dst_elem, src_elem, dst->elem_size);
-    }
-    dst->size += n;
     pthread_mutex_unlock(&dst->mutex);
-    return true;
+    return ok;
 }
 
 bool array_append_array(array_t *dst, const array_t *src) {
@@ -272,68 +224,26 @@ bool array_append_array(array_t *dst, const array_t *src) {
     if (src->size == 0) return true;
     pthread_mutex_lock(&dst->mutex);
     pthread_mutex_lock((pthread_mutex_t *)&src->mutex);
-    if (dst->destroyed) {
-        pthread_mutex_unlock((pthread_mutex_t *)&src->mutex);
-        pthread_mutex_unlock(&dst->mutex);
-        return false;
+    bool ok = !dst->destroyed && array_grow_to(dst, dst->size + src->size);
+    if (ok) {
+        array_copy_elems(dst, dst->size, src->arena, src->size);
+        dst->size += src->size;
     }
-    size_t needed = dst->size + src->size;
-    if (needed > dst->capacity) {
-        size_t new_cap = dst->capacity ? dst->capacity * 2 : ARRAY_INIT_CAPACITY;
-        while (new_cap < needed) new_cap *= 2;
-        void *new_arena = realloc(dst->arena, new_cap * dst->elem_size);
-        if (!new_arena) {
-            pthread_mutex_unlock((pthread_mutex_t *)&src->mutex);
-            pthread_mutex_unlock(&dst->mutex);
-            return false;
-        }
-        dst->arena = new_arena;
-        dst->capacity = new_cap;
-    }
-    for (size_t i = 0; i < src->size; ++i) {
-        void *src_elem = (char*)src->arena + i * src->elem_size;
-        void *dst_elem = (char*)dst->arena + (dst->size + i) * dst->elem_size;
-        if (dst->clone)
-            dst->clone(dst_elem, src_elem);
-        else
-            memcpy(dst_elem, src_elem, dst->elem_size);
-    }
-    dst->size += src->size;
     pthread_mutex_unlock((pthread_mutex_t *)&src->mutex);
     pthread_mutex_unlock(&dst->mutex);
-    return true;
+    return ok;
 }
 
 bool array_append_carray(array_t *dst, const void *src, size_t n) {
     if (!dst || !src || n == 0) return false;
     pthread_mutex_lock(&dst->mutex);
-    if (dst->destroyed) {
-        pthread_mutex_unlock(&dst->mutex);
-        return false;
+    bool ok = !dst->destroyed && array_grow_to(dst, dst->size + n);
+    if (ok) {
+        array_copy_elems(dst, dst->size, src, n);
+        dst->size += n;
     }
-    size_t needed = dst->size + n;
-    if (needed > dst->capacity) {
-        size_t new_cap = dst->capacity ? dst->capacity * 2 : ARRAY_INIT_CAPACITY;
-        while (new_cap < needed) new_cap *= 2;
-        void *new_arena = realloc(dst->arena, new_cap * dst->elem_size);
-        if (!new_arena) {
-            pthread_mutex_unlock(&dst->mutex);
-            return false;
-        }
-        dst->arena = new_arena;
-        dst->capacity = new_cap;
-    }
-    for (size_t i = 0; i < n; ++i) {
-        const void *src_elem = (const char*)src + i * dst->elem_size;
-        void *dst_elem = (char*)dst->arena + (dst->size + i) * dst->elem_size;
-        if (dst->clone)
-            dst->clone(dst_elem, src_elem);
-        else
-            memcpy(dst_elem, src_elem, dst->elem_size);
-    }
-    dst->size += n;
     pthread_mutex_unlock(&dst->mutex);
-    return true;
+    return ok;
 }
 
 bool array_remove(array_t *arr, size_t index) {
@@ -351,7 +261,7 @@ bool array_remove(array_t *arr, size_t index) {
                 (char*)arr->arena + (index + 1) * arr->elem_size,
                 (arr->size - index - 1) * arr->elem_size);
     }
-    arr->size -= 1;
+    arr->size--;
     pthread_mutex_unlock(&arr->mutex);
     return true;
 }
@@ -363,12 +273,10 @@ bool array_remove_elements(array_t *arr, size_t index, size_t count) {
         pthread_mutex_unlock(&arr->mutex);
         return false;
     }
-    // Destroy elements if needed
     if (arr->destroy) {
         for (size_t i = 0; i < count; ++i)
             arr->destroy((char*)arr->arena + (index + i) * arr->elem_size);
     }
-    // Move elements down to fill the gap
     if (index + count < arr->size) {
         memmove((char*)arr->arena + index * arr->elem_size,
                 (char*)arr->arena + (index + count) * arr->elem_size,
@@ -384,11 +292,8 @@ bool array_remove_elements(array_t *arr, size_t index, size_t count) {
 void array_sort(array_t *arr, array_cmp_fn cmp) {
     if (!arr || !cmp || arr->size < 2) return;
     pthread_mutex_lock(&arr->mutex);
-    if (arr->destroyed) {
-        pthread_mutex_unlock(&arr->mutex);
-        return;
-    }
-    qsort(arr->arena, arr->size, arr->elem_size, cmp);
+    if (!arr->destroyed)
+        qsort(arr->arena, arr->size, arr->elem_size, cmp);
     pthread_mutex_unlock(&arr->mutex);
 }
 
@@ -403,13 +308,10 @@ bool array_swap(array_t *arr, size_t i, size_t j) {
     void *a = (char*)arr->arena + i * arr->elem_size;
     void *b = (char*)arr->arena + j * arr->elem_size;
     unsigned char tmp[256];
-    void *buf = tmp;
-    if (arr->elem_size > sizeof(tmp)) {
-        buf = malloc(arr->elem_size);
-        if (!buf) {
-            pthread_mutex_unlock(&arr->mutex);
-            return false;
-        }
+    void *buf = arr->elem_size <= sizeof(tmp) ? tmp : malloc(arr->elem_size);
+    if (!buf) {
+        pthread_mutex_unlock(&arr->mutex);
+        return false;
     }
     memcpy(buf, a, arr->elem_size);
     memcpy(a, b, arr->elem_size);
@@ -427,19 +329,13 @@ bool array_rotate_left(array_t *arr) {
         return false;
     }
     unsigned char tmp[256];
-    void *buf = tmp;
-    if (arr->elem_size > sizeof(tmp)) {
-        buf = malloc(arr->elem_size);
-        if (!buf) {
-            pthread_mutex_unlock(&arr->mutex);
-            return false;
-        }
+    void *buf = arr->elem_size <= sizeof(tmp) ? tmp : malloc(arr->elem_size);
+    if (!buf) {
+        pthread_mutex_unlock(&arr->mutex);
+        return false;
     }
-    // Save the first element
     memcpy(buf, arr->arena, arr->elem_size);
-    // Shift all elements down by one
     memmove(arr->arena, (char*)arr->arena + arr->elem_size, (arr->size - 1) * arr->elem_size);
-    // Move the first element to the end
     memcpy((char*)arr->arena + (arr->size - 1) * arr->elem_size, buf, arr->elem_size);
     if (buf != tmp) free(buf);
     pthread_mutex_unlock(&arr->mutex);
@@ -454,35 +350,18 @@ bool array_rotate_right(array_t *arr) {
         return false;
     }
     unsigned char tmp[256];
-    void *buf = tmp;
-    if (arr->elem_size > sizeof(tmp)) {
-        buf = malloc(arr->elem_size);
-        if (!buf) {
-            pthread_mutex_unlock(&arr->mutex);
-            return false;
-        }
+    void *buf = arr->elem_size <= sizeof(tmp) ? tmp : malloc(arr->elem_size);
+    if (!buf) {
+        pthread_mutex_unlock(&arr->mutex);
+        return false;
     }
-    // Save the last element
     memcpy(buf, (char*)arr->arena + (arr->size - 1) * arr->elem_size, arr->elem_size);
-    // Shift all elements up by one
     memmove((char*)arr->arena + arr->elem_size, arr->arena, (arr->size - 1) * arr->elem_size);
-    // Move the last element to the front
     memcpy(arr->arena, buf, arr->elem_size);
     if (buf != tmp) free(buf);
     pthread_mutex_unlock(&arr->mutex);
     return true;
 }
-
-// --- Array accessors for stack delegation ---
-
-static inline pthread_mutex_t *array_mutex(array_t *arr) { return arr ? &arr->mutex : NULL; }
-static inline void array_set_size(array_t *arr, size_t sz) { if (arr) arr->size = sz; }
-static inline size_t array_capacity(const array_t *arr) { return arr ? arr->capacity : 0; }
-static inline void array_set_capacity(array_t *arr, size_t cap) { if (arr) arr->capacity = cap; }
-static inline void *array_arena(const array_t *arr) { return arr ? arr->arena : NULL; }
-static inline void array_set_arena(array_t *arr, void *arena) { if (arr) arr->arena = arena; }
-static inline size_t array_elem_size(const array_t *arr) { return arr ? arr->elem_size : 0; }
-static inline array_clone_fn array_clone_element_fn(const array_t *arr) { return arr ? arr->clone : NULL; }
 
 /* --- Slicing --- */
 
@@ -490,16 +369,25 @@ static size_t array_slice_real_index(const array_slice_t *slice, size_t index) {
     return slice->indices ? slice->indices[index] : (slice->start + index);
 }
 
+// Requires slice->parent->mutex held.
+static void array_slice_materialize_indices(array_slice_t *slice) {
+    if (slice->indices) return;
+    slice->indices = malloc(sizeof(size_t) * slice->size);
+    if (!slice->indices) return;
+    for (size_t i = 0; i < slice->size; ++i)
+        slice->indices[i] = slice->start + i;
+}
+
 void *array_slice_get(const array_slice_t *slice, size_t index) {
     if (!slice || !slice->parent) return NULL;
-    pthread_mutex_lock(array_mutex(slice->parent));
-    if (slice->parent->destroyed || index >= slice->size || slice->start + index >= array_size(slice->parent)) {
-        pthread_mutex_unlock(array_mutex(slice->parent));
-        return NULL;
+    array_t *arr = slice->parent;
+    pthread_mutex_lock(&arr->mutex);
+    void *result = NULL;
+    if (!arr->destroyed && index < slice->size && (slice->start + index) < arr->size) {
+        size_t real_index = array_slice_real_index(slice, index);
+        result = (char*)arr->arena + real_index * arr->elem_size;
     }
-    size_t real_index = array_slice_real_index(slice, index);
-    void *result = (char*)array_arena(slice->parent) + real_index * array_elem_size(slice->parent);
-    pthread_mutex_unlock(array_mutex(slice->parent));
+    pthread_mutex_unlock(&arr->mutex);
     return result;
 }
 
@@ -511,99 +399,75 @@ void array_slice_destroy(array_slice_t *slice) {
     array_release(parent);
 }
 
-static void array_slice_ensure_indices(array_slice_t *slice) {
-    if (!slice || !slice->parent) return;
-    pthread_mutex_lock(array_mutex(slice->parent));
-    if (!slice->indices) {
-        slice->indices = malloc(sizeof(size_t) * slice->size);
-        for (size_t i = 0; i < slice->size; ++i)
-            slice->indices[i] = slice->start + i;
-    }
-    pthread_mutex_unlock(array_mutex(slice->parent));
-}
-
 struct cmp_ctx {
     const void *arena;
     size_t elem_size;
     array_cmp_fn cmp;
 };
-static struct cmp_ctx g_cmp_ctx;
 
-static int cmp_indices_static(const void *a, const void *b) {
-    struct cmp_ctx *c = &g_cmp_ctx;
+static int cmp_indices_r(const void *a, const void *b, void *ctx) {
+    struct cmp_ctx *c = ctx;
     size_t ia = *(const size_t*)a, ib = *(const size_t*)b;
-    const void *pa = (const char*)c->arena + ia * c->elem_size;
-    const void *pb = (const char*)c->arena + ib * c->elem_size;
-    return c->cmp(pa, pb);
+    return c->cmp((const char*)c->arena + ia * c->elem_size,
+                  (const char*)c->arena + ib * c->elem_size);
 }
 
 void array_slice_sort(array_slice_t *slice, array_cmp_fn cmp) {
     if (!slice || !cmp || slice->size < 2) return;
-    array_slice_ensure_indices(slice);
-    pthread_mutex_lock(array_mutex(slice->parent));
-    g_cmp_ctx.arena = array_arena(slice->parent);
-    g_cmp_ctx.elem_size = array_elem_size(slice->parent);
-    g_cmp_ctx.cmp = cmp;
-    qsort(slice->indices, slice->size, sizeof(size_t), cmp_indices_static);
-    pthread_mutex_unlock(array_mutex(slice->parent));
+    array_t *arr = slice->parent;
+    pthread_mutex_lock(&arr->mutex);
+    array_slice_materialize_indices(slice);
+    struct cmp_ctx ctx = { arr->arena, arr->elem_size, cmp };
+    qsort_r(slice->indices, slice->size, sizeof(size_t), cmp_indices_r, &ctx);
+    pthread_mutex_unlock(&arr->mutex);
 }
 
 bool array_slice_swap(array_slice_t *slice, size_t i, size_t j) {
     if (!slice || !slice->parent) return false;
-    pthread_mutex_lock(array_mutex(slice->parent));
+    array_t *arr = slice->parent;
+    pthread_mutex_lock(&arr->mutex);
     if (i >= slice->size || j >= slice->size) {
-        pthread_mutex_unlock(array_mutex(slice->parent));
+        pthread_mutex_unlock(&arr->mutex);
         return false;
     }
-    if (i == j) {
-        pthread_mutex_unlock(array_mutex(slice->parent));
-        return true;
+    if (i != j) {
+        array_slice_materialize_indices(slice);
+        size_t tmp = slice->indices[i];
+        slice->indices[i] = slice->indices[j];
+        slice->indices[j] = tmp;
     }
-    array_slice_ensure_indices(slice);
-    size_t tmp = slice->indices[i];
-    slice->indices[i] = slice->indices[j];
-    slice->indices[j] = tmp;
-    pthread_mutex_unlock(array_mutex(slice->parent));
+    pthread_mutex_unlock(&arr->mutex);
     return true;
 }
 
 bool array_slice_rotate_left(array_slice_t *slice) {
-    if (!slice || !slice->parent) return false;
+    if (!slice || !slice->parent || slice->size < 2) return false;
     array_t *arr = slice->parent;
-    pthread_mutex_lock(array_mutex(arr));
-    if (slice->size < 2) {
-        pthread_mutex_unlock(array_mutex(arr));
-        return false;
-    }
-    array_slice_ensure_indices(slice);
+    pthread_mutex_lock(&arr->mutex);
+    array_slice_materialize_indices(slice);
     size_t first = slice->indices[0];
     memmove(&slice->indices[0], &slice->indices[1], (slice->size - 1) * sizeof(size_t));
     slice->indices[slice->size - 1] = first;
-    pthread_mutex_unlock(array_mutex(arr));
+    pthread_mutex_unlock(&arr->mutex);
     return true;
 }
 
 bool array_slice_rotate_right(array_slice_t *slice) {
-    if (!slice || !slice->parent) return false;
+    if (!slice || !slice->parent || slice->size < 2) return false;
     array_t *arr = slice->parent;
-    pthread_mutex_lock(array_mutex(arr));
-    if (slice->size < 2) {
-        pthread_mutex_unlock(array_mutex(arr));
-        return false;
-    }
-    array_slice_ensure_indices(slice);
+    pthread_mutex_lock(&arr->mutex);
+    array_slice_materialize_indices(slice);
     size_t last = slice->indices[slice->size - 1];
     memmove(&slice->indices[1], &slice->indices[0], (slice->size - 1) * sizeof(size_t));
     slice->indices[0] = last;
-    pthread_mutex_unlock(array_mutex(arr));
+    pthread_mutex_unlock(&arr->mutex);
     return true;
 }
 
 array_t *array_from_slice(const array_slice_t *slice, array_clone_fn clone, array_destroy_fn destroy) {
     if (!slice || !slice->parent) return NULL;
-    array_t *arr = array_create(array_elem_size(slice->parent), clone, destroy);
+    array_t *arr = array_create(slice->parent->elem_size, clone, destroy);
     if (!arr) return NULL;
-    if (slice->size == 0) return arr;
     for (size_t i = 0; i < slice->size; ++i) {
         const void *src_elem = array_slice_get(slice, i);
         if (!array_add(arr, src_elem)) {
@@ -616,49 +480,50 @@ array_t *array_from_slice(const array_slice_t *slice, array_clone_fn clone, arra
 
 array_slice_t *array_slice(const array_t *arr, size_t start, size_t count) {
     if (!arr) return NULL;
-    pthread_mutex_lock(array_mutex((array_t *)arr));
-    if (arr->destroyed || start >= array_size(arr)) {
-        pthread_mutex_unlock(array_mutex((array_t *)arr));
+    array_t *a = (array_t *)arr;
+    pthread_mutex_lock(&a->mutex);
+    if (a->destroyed || start >= a->size) {
+        pthread_mutex_unlock(&a->mutex);
         return NULL;
     }
-    if (start + count > array_size(arr)) count = array_size(arr) - start;
-    array_ref((array_t *)arr);
+    if (start + count > a->size) count = a->size - start;
+    array_ref(a);
     array_slice_t *slice = malloc(sizeof(array_slice_t));
     if (!slice) {
-        array_release((array_t *)arr);
-        pthread_mutex_unlock(array_mutex((array_t *)arr));
+        array_release(a);
+        pthread_mutex_unlock(&a->mutex);
         return NULL;
     }
-    slice->parent = (array_t *)arr;
+    slice->parent = a;
     slice->start = start;
     slice->size = count;
     slice->indices = NULL;
-    pthread_mutex_unlock(array_mutex((array_t *)arr));
+    pthread_mutex_unlock(&a->mutex);
     return slice;
 }
 
 size_t array_slice_size(const array_slice_t *slice) {
     if (!slice) return 0;
-    pthread_mutex_lock(array_mutex(slice->parent));
+    pthread_mutex_lock(&slice->parent->mutex);
     size_t sz = slice->size;
-    pthread_mutex_unlock(array_mutex(slice->parent));
+    pthread_mutex_unlock(&slice->parent->mutex);
     return sz;
 }
 
 size_t array_slice_elem_size(const array_slice_t *slice) {
     if (!slice) return 0;
-    pthread_mutex_lock(array_mutex(slice->parent));
-    size_t sz = array_elem_size(slice->parent);
-    pthread_mutex_unlock(array_mutex(slice->parent));
+    pthread_mutex_lock(&slice->parent->mutex);
+    size_t sz = slice->parent->elem_size;
+    pthread_mutex_unlock(&slice->parent->mutex);
     return sz;
 }
 
 array_slice_t *array_slice_subslice(const array_slice_t *slice, size_t start, size_t count) {
     if (!slice || !slice->parent) return NULL;
     array_t *arr = slice->parent;
-    pthread_mutex_lock(array_mutex(arr));
+    pthread_mutex_lock(&arr->mutex);
     if (start >= slice->size) {
-        pthread_mutex_unlock(array_mutex(arr));
+        pthread_mutex_unlock(&arr->mutex);
         return NULL;
     }
     if (start + count > slice->size) count = slice->size - start;
@@ -666,7 +531,7 @@ array_slice_t *array_slice_subslice(const array_slice_t *slice, size_t start, si
     array_slice_t *sub = malloc(sizeof(array_slice_t));
     if (!sub) {
         array_release(arr);
-        pthread_mutex_unlock(array_mutex(arr));
+        pthread_mutex_unlock(&arr->mutex);
         return NULL;
     }
     sub->parent = arr;
@@ -677,7 +542,7 @@ array_slice_t *array_slice_subslice(const array_slice_t *slice, size_t start, si
         if (!sub->indices) {
             free(sub);
             array_release(arr);
-            pthread_mutex_unlock(array_mutex(arr));
+            pthread_mutex_unlock(&arr->mutex);
             return NULL;
         }
         for (size_t i = 0; i < count; ++i)
@@ -685,9 +550,11 @@ array_slice_t *array_slice_subslice(const array_slice_t *slice, size_t start, si
     } else {
         sub->indices = NULL;
     }
-    pthread_mutex_unlock(array_mutex(arr));
+    pthread_mutex_unlock(&arr->mutex);
     return sub;
 }
+
+/* --- Stack --- */
 
 stack_t *stack_create(size_t elem_size, array_clone_fn clone, array_destroy_fn destroy) {
     stack_t *s = malloc(sizeof(stack_t));
@@ -700,71 +567,61 @@ stack_t *stack_create(size_t elem_size, array_clone_fn clone, array_destroy_fn d
     return s;
 }
 
-void stack_destroy(stack_t *s) {
-    if (!s) return;
-    array_destroy(s->array);
-    free(s);
+void stack_destroy(stack_t *stack) {
+    if (!stack) return;
+    array_destroy(stack->array);
+    free(stack);
 }
 
-void *stack_pop(stack_t *s) {
-    if (!s) return NULL;
-    pthread_mutex_t *mutex = array_mutex(s->array);
-    pthread_mutex_lock(mutex);
-    size_t sz = array_size(s->array);
-    if (sz == 0) {
-        pthread_mutex_unlock(mutex);
+void *stack_pop(stack_t *stack) {
+    if (!stack) return NULL;
+    array_t *arr = stack->array;
+    pthread_mutex_lock(&arr->mutex);
+    if (arr->size == 0) {
+        pthread_mutex_unlock(&arr->mutex);
         return NULL;
     }
-    size_t elem_size = array_elem_size(s->array);
-    void *buf = malloc(elem_size);
+    void *buf = malloc(arr->elem_size);
     if (!buf) {
-        pthread_mutex_unlock(mutex);
+        pthread_mutex_unlock(&arr->mutex);
         return NULL;
     }
-    void *src = (char*)array_arena(s->array) + (sz - 1) * elem_size;
-    memcpy(buf, src, elem_size);
+    memcpy(buf, (char*)arr->arena + (arr->size - 1) * arr->elem_size, arr->elem_size);
+    arr->size--;
 
-    array_set_size(s->array, sz - 1);
-
-    // Shrink arena if too many unused slots
-    size_t unused = array_capacity(s->array) - array_size(s->array);
+    size_t unused = arr->capacity - arr->size;
     if (unused > STACK_CHUNK_SIZE) {
-        size_t new_cap = array_size(s->array) + STACK_CHUNK_SIZE;
-        void *new_arena = realloc(array_arena(s->array), new_cap * elem_size);
+        size_t new_cap = arr->size + STACK_CHUNK_SIZE;
+        void *new_arena = realloc(arr->arena, new_cap * arr->elem_size);
         if (new_arena) {
-            array_set_arena(s->array, new_arena);
-            array_set_capacity(s->array, new_cap);
+            arr->arena = new_arena;
+            arr->capacity = new_cap;
         }
     }
-
-    pthread_mutex_unlock(mutex);
+    pthread_mutex_unlock(&arr->mutex);
     return buf;
 }
 
-bool stack_push(stack_t *s, const void *elem) {
-    if (!s) return false;
-    pthread_mutex_t *mutex = array_mutex(s->array);
-    pthread_mutex_lock(mutex);
-
-    // Grow by STACK_CHUNK_SIZE if needed
-    if (array_size(s->array) == array_capacity(s->array)) {
-        size_t new_cap = array_capacity(s->array) ? array_capacity(s->array) + STACK_CHUNK_SIZE : ARRAY_INIT_CAPACITY;
-        void *new_arena = realloc(array_arena(s->array), new_cap * array_elem_size(s->array));
+bool stack_push(stack_t *stack, const void *elem) {
+    if (!stack) return false;
+    array_t *arr = stack->array;
+    pthread_mutex_lock(&arr->mutex);
+    if (arr->size == arr->capacity) {
+        size_t new_cap = arr->capacity ? arr->capacity + STACK_CHUNK_SIZE : ARRAY_INIT_CAPACITY;
+        void *new_arena = realloc(arr->arena, new_cap * arr->elem_size);
         if (!new_arena) {
-            pthread_mutex_unlock(mutex);
+            pthread_mutex_unlock(&arr->mutex);
             return false;
         }
-        array_set_arena(s->array, new_arena);
-        array_set_capacity(s->array, new_cap);
+        arr->arena = new_arena;
+        arr->capacity = new_cap;
     }
-    void *dst = (char*)array_arena(s->array) + array_size(s->array) * array_elem_size(s->array);
-    array_clone_fn clone_element = array_clone_element_fn(s->array);
-    if (clone_element)
-        clone_element(dst, elem);
+    void *dst = (char*)arr->arena + arr->size * arr->elem_size;
+    if (arr->clone)
+        arr->clone(dst, elem);
     else
-        memcpy(dst, elem, array_elem_size(s->array));
-    array_set_size(s->array, array_size(s->array) + 1);
-    pthread_mutex_unlock(mutex);
+        memcpy(dst, elem, arr->elem_size);
+    arr->size++;
+    pthread_mutex_unlock(&arr->mutex);
     return true;
 }
-
