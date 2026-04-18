@@ -14,7 +14,7 @@ total_error ≤ max(abs_tol, rel_tol × |result|)
 
 or the maximum subinterval count is reached.
 
-The G7K15 nodes and weights are initialised once (via `pthread_once`) from high-precision decimal strings so that they inherit full `qfloat` accuracy.
+The G7K15 nodes and weights are statically initialised from high-precision decimal strings so that they inherit full `qfloat` accuracy.
 
 ---
 
