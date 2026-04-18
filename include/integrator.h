@@ -1,6 +1,6 @@
 /**
  * @file integrator.h
- * @brief Adaptive Gauss-Kronrod G7K15 numerical integrator at qfloat precision.
+ * @brief Adaptive Gauss-Kronrod G7K15 numerical integrator at qfloat_t precision.
  *
  * Integrates a user-supplied function over a finite interval [a, b] using
  * an adaptive G7K15 rule.  The 15-point Kronrod estimate is used as the
@@ -27,7 +27,7 @@
  * @param ctx User context pointer (may be NULL).
  * @return    f(x).
  */
-typedef qfloat (*integrand_fn)(qfloat x, void *ctx);
+typedef qfloat_t (*integrand_fn)(qfloat_t x, void *ctx);
 
 /** Opaque integrator handle. */
 typedef struct integrator_t integrator_t;
@@ -56,7 +56,7 @@ void integrator_destroy(integrator_t *ig);
  * @param abs_tol  Absolute tolerance.
  * @param rel_tol  Relative tolerance.
  */
-void integrator_set_tol(integrator_t *ig, qfloat abs_tol, qfloat rel_tol);
+void integrator_set_tol(integrator_t *ig, qfloat_t abs_tol, qfloat_t rel_tol);
 
 /**
  * @brief Override the maximum number of subintervals.
@@ -82,7 +82,7 @@ void integrator_set_max_intervals(integrator_t *ig, size_t max_intervals);
  * @return -1  Internal allocation failure.
  */
 int integrator_eval(integrator_t *ig, integrand_fn f, void *ctx,
-                    qfloat a, qfloat b, qfloat *result, qfloat *error_est);
+                    qfloat_t a, qfloat_t b, qfloat_t *result, qfloat_t *error_est);
 
 /**
  * @brief Number of subintervals used in the most recent call to integrator_eval.

@@ -14,43 +14,43 @@
  * --------------------------------------------------------------------- */
 
 /* True if |a - b| <= tol */
-static int qf_close(qfloat a, qfloat b, qfloat tol) {
+static int qf_close(qfloat_t a, qfloat_t b, qfloat_t tol) {
     return qf_le(qf_abs(qf_sub(a, b)), tol);
 }
 
-static qfloat tol20 = {0};  /* 1e-20, initialised in tests_main */
+static qfloat_t tol20 = {0};  /* 1e-20, initialised in tests_main */
 
 /* -----------------------------------------------------------------------
  * Integrands
  * --------------------------------------------------------------------- */
 
-static qfloat fn_x2(qfloat x, void *ctx) {
+static qfloat_t fn_x2(qfloat_t x, void *ctx) {
     (void)ctx;
     return qf_sqr(x);
 }
 
-static qfloat fn_sin(qfloat x, void *ctx) {
+static qfloat_t fn_sin(qfloat_t x, void *ctx) {
     (void)ctx;
     return qf_sin(x);
 }
 
-static qfloat fn_exp(qfloat x, void *ctx) {
+static qfloat_t fn_exp(qfloat_t x, void *ctx) {
     (void)ctx;
     return qf_exp(x);
 }
 
-static qfloat fn_inv1px2(qfloat x, void *ctx) {
+static qfloat_t fn_inv1px2(qfloat_t x, void *ctx) {
     (void)ctx;
-    qfloat one = qf_from_double(1.0);
+    qfloat_t one = qf_from_double(1.0);
     return qf_div(one, qf_add(one, qf_sqr(x)));
 }
 
-static qfloat fn_log(qfloat x, void *ctx) {
+static qfloat_t fn_log(qfloat_t x, void *ctx) {
     (void)ctx;
     return qf_log(x);
 }
 
-static qfloat fn_const(qfloat x, void *ctx) {
+static qfloat_t fn_const(qfloat_t x, void *ctx) {
     (void)ctx; (void)x;
     return qf_from_double(1.0);
 }
@@ -69,12 +69,12 @@ void test_create_and_destroy(void) {
 void test_polynomial(void) {
     /* ∫₀¹ x² dx = 1/3 */
     integrator_t *ig = integrator_create();
-    qfloat result, err;
+    qfloat_t result, err;
     int s = integrator_eval(ig, fn_x2, NULL,
                             qf_from_double(0.0), qf_from_double(1.0),
                             &result, &err);
     ASSERT_TRUE(s == 0);
-    qfloat expected = qf_from_string("0.33333333333333333333333333333333333333");
+    qfloat_t expected = qf_from_string("0.33333333333333333333333333333333333333");
     ASSERT_TRUE(qf_close(result, expected, tol20));
     integrator_destroy(ig);
 }
@@ -82,12 +82,12 @@ void test_polynomial(void) {
 void test_sin(void) {
     /* ∫₀^π sin(x) dx = 2 */
     integrator_t *ig = integrator_create();
-    qfloat result, err;
+    qfloat_t result, err;
     int s = integrator_eval(ig, fn_sin, NULL,
                             qf_from_double(0.0), QF_PI,
                             &result, &err);
     ASSERT_TRUE(s == 0);
-    qfloat expected = qf_from_double(2.0);
+    qfloat_t expected = qf_from_double(2.0);
     ASSERT_TRUE(qf_close(result, expected, tol20));
     integrator_destroy(ig);
 }
@@ -95,12 +95,12 @@ void test_sin(void) {
 void test_exp(void) {
     /* ∫₀¹ exp(x) dx = e - 1 */
     integrator_t *ig = integrator_create();
-    qfloat result, err;
+    qfloat_t result, err;
     int s = integrator_eval(ig, fn_exp, NULL,
                             qf_from_double(0.0), qf_from_double(1.0),
                             &result, &err);
     ASSERT_TRUE(s == 0);
-    qfloat expected = qf_sub(QF_E, qf_from_double(1.0));
+    qfloat_t expected = qf_sub(QF_E, qf_from_double(1.0));
     ASSERT_TRUE(qf_close(result, expected, tol20));
     integrator_destroy(ig);
 }
@@ -108,7 +108,7 @@ void test_exp(void) {
 void test_arctan(void) {
     /* ∫₋₁¹ 1/(1+x²) dx = π/2 */
     integrator_t *ig = integrator_create();
-    qfloat result, err;
+    qfloat_t result, err;
     int s = integrator_eval(ig, fn_inv1px2, NULL,
                             qf_from_double(-1.0), qf_from_double(1.0),
                             &result, &err);
@@ -120,12 +120,12 @@ void test_arctan(void) {
 void test_log(void) {
     /* ∫₁^e ln(x) dx = 1 */
     integrator_t *ig = integrator_create();
-    qfloat result, err;
+    qfloat_t result, err;
     int s = integrator_eval(ig, fn_log, NULL,
                             qf_from_double(1.0), QF_E,
                             &result, &err);
     ASSERT_TRUE(s == 0);
-    qfloat expected = qf_from_double(1.0);
+    qfloat_t expected = qf_from_double(1.0);
     ASSERT_TRUE(qf_close(result, expected, tol20));
     integrator_destroy(ig);
 }
@@ -133,7 +133,7 @@ void test_log(void) {
 void test_constant(void) {
     /* ∫₀^5 1 dx = 5 */
     integrator_t *ig = integrator_create();
-    qfloat result, err;
+    qfloat_t result, err;
     int s = integrator_eval(ig, fn_const, NULL,
                             qf_from_double(0.0), qf_from_double(5.0),
                             &result, &err);
@@ -144,10 +144,10 @@ void test_constant(void) {
 
 void test_set_tol(void) {
     integrator_t *ig = integrator_create();
-    qfloat loose = qf_from_string("1e-10");
+    qfloat_t loose = qf_from_string("1e-10");
     integrator_set_tol(ig, loose, loose);
 
-    qfloat result, err;
+    qfloat_t result, err;
     integrator_eval(ig, fn_sin, NULL,
                     qf_from_double(0.0), QF_PI,
                     &result, &err);
@@ -162,7 +162,7 @@ void test_max_intervals(void) {
     integrator_t *ig = integrator_create();
     integrator_set_max_intervals(ig, 1);
 
-    qfloat result, err;
+    qfloat_t result, err;
     int s = integrator_eval(ig, fn_sin, NULL,
                             qf_from_double(0.0), QF_PI,
                             &result, &err);
@@ -177,7 +177,7 @@ void test_last_intervals(void) {
     /* A smooth integrand over a moderate range should converge in a handful
        of intervals; verify the counter is updated. */
     integrator_t *ig = integrator_create();
-    qfloat result, err;
+    qfloat_t result, err;
     integrator_eval(ig, fn_exp, NULL,
                     qf_from_double(0.0), qf_from_double(1.0),
                     &result, &err);
@@ -187,7 +187,7 @@ void test_last_intervals(void) {
 
 void test_null_safety(void) {
     integrator_t *ig = integrator_create();
-    qfloat result;
+    qfloat_t result;
     /* NULL integrand */
     int s = integrator_eval(ig, NULL, NULL,
                             qf_from_double(0.0), qf_from_double(1.0),
@@ -204,12 +204,12 @@ void test_null_safety(void) {
 void test_reversed_limits(void) {
     /* ∫₁⁰ x² dx = -1/3 (limits reversed) */
     integrator_t *ig = integrator_create();
-    qfloat result, err;
+    qfloat_t result, err;
     int s = integrator_eval(ig, fn_x2, NULL,
                             qf_from_double(1.0), qf_from_double(0.0),
                             &result, &err);
     ASSERT_TRUE(s == 0);
-    qfloat expected = qf_from_string("-0.33333333333333333333333333333333333333");
+    qfloat_t expected = qf_from_string("-0.33333333333333333333333333333333333333");
     ASSERT_TRUE(qf_close(result, expected, tol20));
     integrator_destroy(ig);
 }
@@ -218,7 +218,7 @@ void test_reversed_limits(void) {
  * README example
  * --------------------------------------------------------------------- */
 
-static qfloat fn_gaussian(qfloat x, void *ctx) {
+static qfloat_t fn_gaussian(qfloat_t x, void *ctx) {
     (void)ctx;
     return qf_exp(qf_neg(qf_sqr(x)));
 }
@@ -226,7 +226,7 @@ static qfloat fn_gaussian(qfloat x, void *ctx) {
 void example_integrator(void) {
     /* ∫₋₃³ exp(-x²) dx ≈ √π * erf(3) */
     integrator_t *ig = integrator_create();
-    qfloat result, err;
+    qfloat_t result, err;
     integrator_eval(ig, fn_gaussian, NULL,
                     qf_from_double(-3.0), qf_from_double(3.0),
                     &result, &err);
@@ -237,9 +237,9 @@ void example_integrator(void) {
     integrator_destroy(ig);
 }
 
-typedef struct { qfloat exponent; } power_ctx;
+typedef struct { qfloat_t exponent; } power_ctx;
 
-static qfloat fn_power(qfloat x, void *ctx) {
+static qfloat_t fn_power(qfloat_t x, void *ctx) {
     power_ctx *pc = ctx;
     return qf_pow(x, pc->exponent);
 }
@@ -248,7 +248,7 @@ void example_ctx(void) {
     /* ∫₀¹ x^2.5 dx = 1/3.5 */
     integrator_t *ig = integrator_create();
     power_ctx ctx = { qf_from_string("2.5") };
-    qfloat result, err;
+    qfloat_t result, err;
     integrator_eval(ig, fn_power, &ctx,
                     qf_from_double(0.0), qf_from_double(1.0),
                     &result, &err);

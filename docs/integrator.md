@@ -1,6 +1,6 @@
 # `integrator_t`
 
-`integrator_t` is an adaptive Gauss-Kronrod G7K15 numerical integrator that works at full `qfloat` (~34 decimal digits) precision. It evaluates a user-supplied callback over a finite interval `[a, b]`, automatically subdividing the interval until the estimated error is within the requested tolerance.
+`integrator_t` is an adaptive Gauss-Kronrod G7K15 numerical integrator that works at full `qfloat_t` (~34 decimal digits) precision. It evaluates a user-supplied callback over a finite interval `[a, b]`, automatically subdividing the interval until the estimated error is within the requested tolerance.
 
 ---
 
@@ -14,7 +14,7 @@ total_error ≤ max(abs_tol, rel_tol × |result|)
 
 or the maximum subinterval count is reached.
 
-The G7K15 nodes and weights are statically initialised from high-precision decimal strings so that they inherit full `qfloat` accuracy.
+The G7K15 nodes and weights are statically initialised from high-precision decimal strings so that they inherit full `qfloat_t` accuracy.
 
 ---
 
@@ -27,7 +27,7 @@ The G7K15 nodes and weights are statically initialised from high-precision decim
 #include "qfloat.h"
 #include "integrator.h"
 
-static qfloat gaussian(qfloat x, void *ctx) {
+static qfloat_t gaussian(qfloat_t x, void *ctx) {
     (void)ctx;
     return qf_exp(qf_neg(qf_sqr(x)));
 }
@@ -35,7 +35,7 @@ static qfloat gaussian(qfloat x, void *ctx) {
 int main(void) {
     integrator_t *ig = integrator_create();
 
-    qfloat result, err;
+    qfloat_t result, err;
     integrator_eval(ig, gaussian, NULL,
                     qf_from_double(-3.0), qf_from_double(3.0),
                     &result, &err);
@@ -58,9 +58,9 @@ int main(void) {
 ### Custom context
 
 ```c
-typedef struct { qfloat exponent; } power_ctx;
+typedef struct { qfloat_t exponent; } power_ctx;
 
-static qfloat power_fn(qfloat x, void *ctx) {
+static qfloat_t power_fn(qfloat_t x, void *ctx) {
     power_ctx *pc = ctx;
     return qf_pow(x, pc->exponent);
 }
@@ -70,7 +70,7 @@ int main(void) {
     integrator_t *ig = integrator_create();
     power_ctx ctx = { qf_from_string("2.5") };
 
-    qfloat result, err;
+    qfloat_t result, err;
     integrator_eval(ig, power_fn, &ctx,
                     qf_from_double(0.0), qf_from_double(1.0),
                     &result, &err);
@@ -95,7 +95,7 @@ All declarations are in `include/integrator.h`.
 
 ### Types
 
-- `integrand_fn` — `typedef qfloat (*integrand_fn)(qfloat x, void *ctx)` — integrand callback.
+- `integrand_fn` — `typedef qfloat_t (*integrand_fn)(qfloat_t x, void *ctx)` — integrand callback.
 - `integrator_t` — opaque adaptive integrator.
 
 ### Lifecycle
@@ -105,12 +105,12 @@ All declarations are in `include/integrator.h`.
 
 ### Configuration
 
-- `void integrator_set_tol(integrator_t *ig, qfloat abs_tol, qfloat rel_tol)` — override convergence tolerances. Convergence when `total_error ≤ max(abs_tol, rel_tol × |result|)`.
+- `void integrator_set_tol(integrator_t *ig, qfloat_t abs_tol, qfloat_t rel_tol)` — override convergence tolerances. Convergence when `total_error ≤ max(abs_tol, rel_tol × |result|)`.
 - `void integrator_set_max_intervals(integrator_t *ig, size_t max_intervals)` — override the maximum number of subintervals before the algorithm halts.
 
 ### Evaluation
 
-- `int integrator_eval(integrator_t *ig, integrand_fn f, void *ctx, qfloat a, qfloat b, qfloat *result, qfloat *error_est)` — integrate `f` over `[a, b]`.
+- `int integrator_eval(integrator_t *ig, integrand_fn f, void *ctx, qfloat_t a, qfloat_t b, qfloat_t *result, qfloat_t *error_est)` — integrate `f` over `[a, b]`.
   - Returns `0` on convergence.
   - Returns `1` if `max_intervals` was reached before convergence.
   - Returns `-1` on internal allocation failure or if `ig`, `f`, or `result` is NULL.
@@ -125,7 +125,7 @@ All declarations are in `include/integrator.h`.
 
 ## Design Notes
 
-**Nodes and weights** are stored as static `qfloat` arrays with double-double values pre-computed from the 37-digit reference constants, so all 106 bits of precision are available in the quadrature rule itself with no runtime initialisation cost.
+**Nodes and weights** are stored as static `qfloat_t` arrays with double-double values pre-computed from the 37-digit reference constants, so all 106 bits of precision are available in the quadrature rule itself with no runtime initialisation cost.
 
 **Subinterval storage** is a dynamically-grown heap-allocated array. Linear search for the maximum-error interval is used; this is O(n) per step but n rarely exceeds tens of intervals for well-behaved integrands.
 

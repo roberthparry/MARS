@@ -9,27 +9,27 @@
 #define TEST_CONFIG_MODE TEST_CONFIG_GLOBAL
 #include "test_harness.h"
 
-/* Helper to print qfloat */
-static void print_q(const char *label, qfloat x) {
+/* Helper to print qfloat_t */
+static void print_q(const char *label, qfloat_t x) {
     char buf[256];
     qf_to_string(x, buf, sizeof(buf));
     printf("%s = %s\n", label, buf);
 }
 
-/* Compare qfloat to double with tolerance */
-static int approx_equal(qfloat a, double b, double tol) {
+/* Compare qfloat_t to double with tolerance */
+static int approx_equal(qfloat_t a, double b, double tol) {
     double diff = fabs(qf_to_double(a) - b);
     return diff < tol;
 }
 
-static int qf_close(qfloat a, qfloat b, double rel)
+static int qf_close(qfloat_t a, qfloat_t b, double rel)
 {
     return qf_abs(qf_sub(a, b)).hi <= rel;
 }
 
-static int qf_close_rel(qfloat a, qfloat b, double rel)
+static int qf_close_rel(qfloat_t a, qfloat_t b, double rel)
 {
-    return qf_abs(qf_sub(qf_div(a,b), (qfloat){1,0})).hi <= rel;
+    return qf_abs(qf_sub(qf_div(a,b), (qfloat_t){1,0})).hi <= rel;
 }
 
 /* -----------------------------------------------------------
@@ -39,14 +39,14 @@ static int qf_close_rel(qfloat a, qfloat b, double rel)
 static void test_add() {
     printf(C_CYAN "TEST: addition\n" C_RESET);
 
-    qfloat a = qf_from_string("1.2345678901234561234567891234567");
-    qfloat b = qf_from_string("9.8765432109876541234567891234567");
-    qfloat got = qf_add(a, b);
+    qfloat_t a = qf_from_string("1.2345678901234561234567891234567");
+    qfloat_t b = qf_from_string("9.8765432109876541234567891234567");
+    qfloat_t got = qf_add(a, b);
 
     char buf[64];
     qf_to_string(got, buf, sizeof(buf));
     char buf_exp[64] = "11.1111111011111102469135782469134";
-    qfloat expected = qf_from_string(buf_exp);
+    qfloat_t expected = qf_from_string(buf_exp);
 
     if (qf_close(got, expected, 1e-30)) {
         printf("%s  OK: %s = %s%s\n", C_GREEN, "1.2345678901234561234567891234567 + 9.8765432109876541234567891234567", "11.1111111011111102469135782469134", C_RESET);
@@ -64,14 +64,14 @@ static void test_mul() {
 
     char a_buf[64] = "9.8765431209876543171934981073984";
     char b_buf[64] = "0.1256789123456789012345678901234567";
-    qfloat a = qf_from_string(a_buf);
-    qfloat b = qf_from_string(b_buf);
-    qfloat r = qf_mul(a, b);
+    qfloat_t a = qf_from_string(a_buf);
+    qfloat_t b = qf_from_string(b_buf);
+    qfloat_t r = qf_mul(a, b);
     char r_buf[64];
     qf_to_string(r, r_buf, sizeof(r_buf));
 
     char buf_exp[64] = "1.2412731971809253340758239961506";
-    qfloat expected = qf_from_string(buf_exp);
+    qfloat_t expected = qf_from_string(buf_exp);
 
     char buf_name[256];
     sprintf(buf_name, "%s * %s", a_buf, b_buf);
@@ -92,13 +92,13 @@ static void test_mul() {
 static void test_div() {
     printf(C_CYAN "TEST: division\n" C_RESET);
 
-    qfloat a = qf_from_string("1.2412731971809253340758239961506");
-    qfloat b = qf_from_string("9.8765431209876543171934981073984");
-    qfloat got = qf_div(a, b);
+    qfloat_t a = qf_from_string("1.2412731971809253340758239961506");
+    qfloat_t b = qf_from_string("9.8765431209876543171934981073984");
+    qfloat_t got = qf_div(a, b);
 
     char buf[64];
     char buf_exp[64] = "0.1256789123456789012345678901234567";
-    qfloat expected = qf_from_string(buf_exp);
+    qfloat_t expected = qf_from_string(buf_exp);
     qf_to_string(got, buf, sizeof(buf));
 
     if (qf_close(got, expected, 1e-30)) {
@@ -117,12 +117,12 @@ static void test_div() {
 static void test_sqrt() {
     printf(C_CYAN "TEST: sqrt\n" C_RESET);
 
-    qfloat x = qf_from_double(0.5);
-    qfloat got = qf_sqrt(x);
+    qfloat_t x = qf_from_double(0.5);
+    qfloat_t got = qf_sqrt(x);
 
     char buf[64];
     char buf_exp[64] = "0.707106781186547524400844362104849";
-    qfloat expected = qf_from_string(buf_exp);
+    qfloat_t expected = qf_from_string(buf_exp);
     qf_to_string(got, buf, sizeof(buf));
 
     if (qf_close(got, expected, 1e-30)) {
@@ -142,9 +142,9 @@ static void test_sqrt() {
 static void test_exp_log() {
     printf(C_CYAN "TEST: exp/log\n" C_RESET);
 
-    qfloat expected = qf_from_string("1.2345678912345678912345678912346");
-    qfloat e = qf_exp(expected);
-    qfloat got = qf_log(e);
+    qfloat_t expected = qf_from_string("1.2345678912345678912345678912346");
+    qfloat_t e = qf_exp(expected);
+    qfloat_t got = qf_log(e);
 
     char buf_exp[64];
     qf_to_string(expected, buf_exp, sizeof(buf_exp));
@@ -167,9 +167,9 @@ static void test_qf_exp(void)
     printf("\n== qf_exp ==\n");
 
     struct {
-        qfloat arg;
+        qfloat_t arg;
         const char *name;
-        qfloat expected;
+        qfloat_t expected;
     } exp_tests[] = {
 
         { {1.0,0.0}, "exp(1)",
@@ -213,7 +213,7 @@ static void test_qf_exp(void)
     char buf[64], buf_exp[64];
 
     for (int i = 0; i < N; ++i) {
-        qfloat got = qf_exp(exp_tests[i].arg);
+        qfloat_t got = qf_exp(exp_tests[i].arg);
         qf_to_string(got, buf, sizeof(buf));
         qf_to_string(exp_tests[i].expected, buf_exp, sizeof(buf_exp));
 
@@ -232,12 +232,12 @@ static void test_qf_exp(void)
     }
 
     /* exp(x)*exp(-x) ≈ 1 */
-    qfloat x = qf_from_double(10.0);
-    qfloat ex  = qf_exp(x);
-    qfloat emx = qf_exp(qf_neg(x));
-    qfloat prod = qf_mul(ex, emx);
+    qfloat_t x = qf_from_double(10.0);
+    qfloat_t ex  = qf_exp(x);
+    qfloat_t emx = qf_exp(qf_neg(x));
+    qfloat_t prod = qf_mul(ex, emx);
 
-    qfloat one = qf_from_double(1.0);
+    qfloat_t one = qf_from_double(1.0);
     qf_to_string(prod, buf, sizeof(buf));
 
     if (qf_close(prod, one, 1e-30)) {
@@ -254,9 +254,9 @@ static void test_qf_log(void)
     printf("\n== qf_log ==\n");
 
     struct {
-        qfloat arg;
+        qfloat_t arg;
         const char *name;
-        qfloat expected;
+        qfloat_t expected;
     } log_tests[] = {
 
         { {1.0,0.0}, "log(1)",
@@ -283,7 +283,7 @@ static void test_qf_log(void)
     char buf[64], buf_exp[64];
 
     for (int i = 0; i < N; ++i) {
-        qfloat got = qf_log(log_tests[i].arg);
+        qfloat_t got = qf_log(log_tests[i].arg);
         qf_to_string(got, buf, sizeof(buf));
         qf_to_string(log_tests[i].expected, buf_exp, sizeof(buf_exp));
 
@@ -302,9 +302,9 @@ static void test_qf_log(void)
     }
 
     /* Round-trip: log(exp(x)) ≈ x */
-    qfloat x = qf_from_double(5.0);
-    qfloat ex = qf_exp(x);
-    qfloat lx = qf_log(ex);
+    qfloat_t x = qf_from_double(5.0);
+    qfloat_t ex = qf_exp(x);
+    qfloat_t lx = qf_log(ex);
 
     qf_to_string(lx, buf, sizeof(buf));
     if (qf_close(lx, x, 1e-30)) {
@@ -316,9 +316,9 @@ static void test_qf_log(void)
     }
 
     /* Round-trip: exp(log(x)) ≈ x */
-    qfloat y = qf_from_double(7.0);
-    qfloat ly = qf_log(y);
-    qfloat ey = qf_exp(ly);
+    qfloat_t y = qf_from_double(7.0);
+    qfloat_t ly = qf_log(y);
+    qfloat_t ey = qf_exp(ly);
 
     qf_to_string(ey, buf, sizeof(buf));
     if (qf_close(ey, y, 1e-30)) {
@@ -336,10 +336,10 @@ static void test_stability() {
     double a = 1e16;
     double b = 1.0;
 
-    qfloat qa = qf_from_double(a);
-    qfloat qb = qf_from_double(b);
+    qfloat_t qa = qf_from_double(a);
+    qfloat_t qb = qf_from_double(b);
 
-    qfloat r = qf_sub(qa, qb);
+    qfloat_t r = qf_sub(qa, qb);
 
     double expected = a - b;
 
@@ -364,7 +364,7 @@ static void test_qf_to_string(void)
 {
     static struct {
         const char *label;
-        qfloat      x;
+        qfloat_t      x;
         const char *expected;
     } tests[] = {
 
@@ -387,7 +387,7 @@ static void test_qf_to_string(void)
         { "-pi (double only)", { -3.141592653589793, 0.0 }, "-3.141592653589793115997963468544185e+0" },
 
         /* Full quad-double π */
-        { "pi (full qfloat)", { 3.14159265358979312e+00, 1.22464679914735321e-16 }, "3.141592653589793238462643383279503e+0" },
+        { "pi (full qfloat_t)", { 3.14159265358979312e+00, 1.22464679914735321e-16 }, "3.141592653589793238462643383279503e+0" },
                               
         /* Tiny numbers */
         { "1e-29 (double only)", { 9.99999999999999943e-30, 5.67934258248957217e-46 }, "1.000000000000000000000000000000000e-29" },
@@ -402,7 +402,7 @@ static void test_qf_to_string(void)
           "1.234567890123456789012345678901200e+200" },
     };
 
-    printf("\n=== TEST: qf_to_string (raw qfloat inputs) ===\n\n");
+    printf("\n=== TEST: qf_to_string (raw qfloat_t inputs) ===\n\n");
 
     const int N = sizeof(tests) / sizeof(tests[0]);
 
@@ -410,8 +410,8 @@ static void test_qf_to_string(void)
 
         char buf[256];
         qf_to_string(tests[i].x, buf, sizeof(buf));
-        qfloat x = qf_from_string(buf);
-        qfloat err = qf_abs(qf_sub(qf_div(x, tests[i].x), (qfloat){1,0}));
+        qfloat_t x = qf_from_string(buf);
+        qfloat_t err = qf_abs(qf_sub(qf_div(x, tests[i].x), (qfloat_t){1,0}));
 
         bool ok = (strcmp(buf, tests[i].expected) == 0 || err.hi < 1e-30 || (tests[i].x.hi == x.hi && tests[i].x.lo == x.lo));
 
@@ -436,7 +436,7 @@ static void test_qf_from_string(void)
     static struct {
         const char *label;
         const char *input;
-        qfloat      expected;
+        qfloat_t      expected;
     } tests[] = {
 
         /* Zero */
@@ -449,7 +449,7 @@ static void test_qf_from_string(void)
         { "-2.5", "-2.5", { -2.5, 0.0 } },
 
         /* Full quad-double π */
-        { "pi (full qfloat)", "3.141592653589793238462643383279503", { 3.14159265358979312e+00, 1.22464679914735321e-16 } },
+        { "pi (full qfloat_t)", "3.141592653589793238462643383279503", { 3.14159265358979312e+00, 1.22464679914735321e-16 } },
 
         /* Tiny numbers */
         { "1e-29", "1e-29", { 9.99999999999999943e-30, 5.67934258248957217e-46 } },
@@ -477,8 +477,8 @@ static void test_qf_from_string(void)
     const int N = sizeof(tests) / sizeof(tests[0]);
 
     for (int i = 0; i < N; i++) {
-        qfloat x = qf_from_string(tests[i].input);
-        qfloat err = qf_abs(qf_sub(qf_div(x, tests[i].expected), (qfloat){1,0}));
+        qfloat_t x = qf_from_string(tests[i].input);
+        qfloat_t err = qf_abs(qf_sub(qf_div(x, tests[i].expected), (qfloat_t){1,0}));
         bool ok = ((err.hi < 1e-30) || (x.hi == tests[i].expected.hi && x.lo == tests[i].expected.lo));
 
         printf("  %s\n", tests[i].label);
@@ -500,7 +500,7 @@ static void test_from_string_basic() {
     printf(C_CYAN "TEST: qf_from_string (basic)\n" C_RESET);
 
     const char *s = "3.1415926535897932384626433832795";
-    qfloat x = qf_from_string(s);
+    qfloat_t x = qf_from_string(s);
 
     char buf[256];
     qf_to_string(x, buf, sizeof(buf));
@@ -521,7 +521,7 @@ static void test_from_string_scientific() {
     printf(C_CYAN "TEST: qf_from_string (scientific)\n" C_RESET);
 
     const char *s = "1.2345678901234567890123456789012e+20";
-    qfloat x = qf_from_string(s);
+    qfloat_t x = qf_from_string(s);
 
     char buf[256];
     qf_to_string(x, buf, sizeof(buf));
@@ -552,22 +552,22 @@ static void test_round_trip(void)
 
     for (size_t i = 0; i < sizeof(cases)/sizeof(cases[0]); i++) {
 
-        qfloat x = qf_from_string(cases[i].input);
+        qfloat_t x = qf_from_string(cases[i].input);
 
         char trimmed[256];
         memset(trimmed, 0, sizeof(trimmed));
         qf_to_string(x, trimmed, sizeof(trimmed));
 
-        qfloat y = qf_from_string(trimmed);
+        qfloat_t y = qf_from_string(trimmed);
 
         // ---- numeric closeness check ----
 
         // diff = |x - y|
-        qfloat diff = qf_abs(qf_sub(x, y));
+        qfloat_t diff = qf_abs(qf_sub(x, y));
 
         // tolerance: choose something smaller than your precision
-        // ~1e-33 works well for your ~36-digit qfloat
-        qfloat eps = qf_from_string("1e-31");
+        // ~1e-33 works well for your ~36-digit qfloat_t
+        qfloat_t eps = qf_from_string("1e-31");
 
         if (qf_lt(diff, eps)) {
             printf(C_GREEN "  OK: round-trip\n" C_RESET);
@@ -590,7 +590,7 @@ static void test_qd_sprintf_basic(void)
 {
     printf(C_CYAN "TEST: qf_sprintf (basic)\n" C_RESET);
 
-    qfloat x = qf_from_string("3.1415926535897932384626433832795");
+    qfloat_t x = qf_from_string("3.1415926535897932384626433832795");
 
     char buf[256];
     qf_sprintf(buf, sizeof(buf), "%Q", x);
@@ -618,8 +618,8 @@ static void test_qd_sprintf_multiple(void)
 {
     printf(C_CYAN "TEST: qf_sprintf (multiple %%Q)\n" C_RESET);
 
-    qfloat a = qf_from_string("1.2345678901234567890123456789012");
-    qfloat b = qf_from_string("9.8765432109876543210987654321098");
+    qfloat_t a = qf_from_string("1.2345678901234567890123456789012");
+    qfloat_t b = qf_from_string("9.8765432109876543210987654321098");
 
     char buf[256];
     qf_sprintf(buf, sizeof(buf), "A=%Q B=%Q", a, b);
@@ -653,7 +653,7 @@ static void test_qd_sprintf_mixed(void)
 {
     printf(C_CYAN "TEST: qf_sprintf (mixed specifiers)\n" C_RESET);
 
-    qfloat x = qf_from_string("2.5");
+    qfloat_t x = qf_from_string("2.5");
 
     char buf[256];
     qf_sprintf(buf, sizeof(buf), "x=%Q int=%d str=%s", x, 42, "hello");
@@ -677,7 +677,7 @@ static void test_qd_sprintf_buffer_limit(void)
 {
     printf(C_CYAN "TEST: qf_sprintf (buffer limit)\n" C_RESET);
 
-    qfloat x = qf_from_string("1.2345678901234567890123456789012");
+    qfloat_t x = qf_from_string("1.2345678901234567890123456789012");
 
     char buf[16];
     qf_sprintf(buf, sizeof(buf), "%Q", x);
@@ -703,13 +703,13 @@ static void test_qd_sprintf_edge_cases(void)
     };
 
     for (int i = 0; i < 4; i++) {
-        qfloat x = qf_from_string(tests[i].input);
+        qfloat_t x = qf_from_string(tests[i].input);
 
         char buf[128];
         qf_sprintf(buf, sizeof(buf), "%q", x);
 
-        /* Parse the printed value back into a qfloat */
-        qfloat y = qf_from_string(buf);
+        /* Parse the printed value back into a qfloat_t */
+        qfloat_t y = qf_from_string(buf);
 
         printf("  input     = %s\n", tests[i].input);
         printf("  got       = %s\n", buf);
@@ -718,7 +718,7 @@ static void test_qd_sprintf_edge_cases(void)
         char reparsed[128];
         qf_to_string(y, reparsed, sizeof(reparsed));
         printf("  reparsed  = %s\n", reparsed);
-        qfloat err = qf_abs(qf_sub(qf_div(x, y), (qfloat){1,0}));
+        qfloat_t err = qf_abs(qf_sub(qf_div(x, y), (qfloat_t){1,0}));
         printf("  rel error = %.17g\n", err.hi);
 
         if (qf_close_rel(x, y, tests[i].tolerance || qf_close(x, y, tests[i].tolerance)) || qf_eq(x, y)) {
@@ -734,7 +734,7 @@ static void test_qd_sprintf_q_precision(void)
 {
     printf(C_CYAN "TEST: qf_sprintf %%.Nq (explicit precision)\n" C_RESET);
 
-    qfloat x = qf_from_string("3.1415926535897932384626433832795");
+    qfloat_t x = qf_from_string("3.1415926535897932384626433832795");
 
     char buf[256];
     qf_sprintf(buf, sizeof(buf), "%.10q", x);
@@ -757,7 +757,7 @@ static void test_qd_sprintf_q_zero_precision(void)
 {
     printf(C_CYAN "TEST: qf_sprintf %%.0q (zero precision)\n" C_RESET);
 
-    qfloat x = qf_from_string("3.1415926535897932384626433832795");
+    qfloat_t x = qf_from_string("3.1415926535897932384626433832795");
 
     char buf[256];
     qf_sprintf(buf, sizeof(buf), "%.0q", x);
@@ -778,7 +778,7 @@ static void test_qd_sprintf_q_flags(void)
 {
     printf(C_CYAN "TEST: qf_sprintf %%q flags (+, space, #)\n" C_RESET);
 
-    qfloat x = qf_from_string("3");
+    qfloat_t x = qf_from_string("3");
 
     char buf[256];
 
@@ -811,7 +811,7 @@ static void test_qd_sprintf_q_width(void)
 {
     printf(C_CYAN "TEST: qf_sprintf %%q width and padding\n" C_RESET);
 
-    qfloat x = qf_from_string("3.14159");
+    qfloat_t x = qf_from_string("3.14159");
 
     char buf[256];
 
@@ -844,7 +844,7 @@ static void test_qd_sprintf_q_fallback(void)
 {
     printf(C_CYAN "TEST: qf_sprintf %%q fallback to scientific\n" C_RESET);
 
-    qfloat x = qf_from_string("1.2345678901234567890123456789012e+200");
+    qfloat_t x = qf_from_string("1.2345678901234567890123456789012e+200");
 
     char buf[256];
     qf_sprintf(buf, sizeof(buf), "%q", x);
@@ -861,7 +861,7 @@ static void test_qd_sprintf_q_fallback_width(void)
 {
     printf(C_CYAN "TEST: qf_sprintf %%q fallback preserves width\n" C_RESET);
 
-    qfloat x = qf_from_string("1.234e+200");
+    qfloat_t x = qf_from_string("1.234e+200");
 
     char buf[256];
     qf_sprintf(buf, sizeof(buf), "%40q", x);
@@ -924,13 +924,13 @@ static void test_qf_sprintf_q_concise(void)
 
     for (int i = 0; i < N; i++) {
 
-        qfloat x = qf_from_string(tests[i].input);
+        qfloat_t x = qf_from_string(tests[i].input);
 
         char buf[256];
         qf_sprintf(buf, sizeof(buf), "%q", x);
 
-        /* Parse the printed value back into a qfloat */
-        qfloat y = qf_from_string(buf);
+        /* Parse the printed value back into a qfloat_t */
+        qfloat_t y = qf_from_string(buf);
 
         printf("  input     = %s\n", tests[i].input);
         printf("  expected  = %s\n", tests[i].expected);
@@ -941,7 +941,7 @@ static void test_qf_sprintf_q_concise(void)
         qf_to_string(y, reparsed, sizeof(reparsed));
         printf("  reparsed  = %s\n", reparsed);
 
-        qfloat err = qf_abs(qf_sub(qf_div(x, y), (qfloat){1,0}));
+        qfloat_t err = qf_abs(qf_sub(qf_div(x, y), (qfloat_t){1,0}));
         printf("  rel error = %.17g\n", err.hi);
 
         if (strcmp(buf, tests[i].expected) == 0 &&
@@ -963,7 +963,7 @@ static void test_qf_sprintf_null_safe_new(void)
 {
     printf(C_CYAN "TEST: qf_sprintf (NULL‑safe sizing, new)\n" C_RESET);
 
-    qfloat x = qf_from_string("3.1415926535897932384626433832795");
+    qfloat_t x = qf_from_string("3.1415926535897932384626433832795");
 
     /* First, get the canonical %Q string via qf_to_string + 'E' */
     char core[128];
@@ -997,7 +997,7 @@ static void test_qf_sprintf_two_pass_new(void)
 {
     printf(C_CYAN "TEST: qf_sprintf (two‑pass correctness, new)\n" C_RESET);
 
-    qfloat x = qf_from_string("9.9999999999999999999999999999999");
+    qfloat_t x = qf_from_string("9.9999999999999999999999999999999");
 
     /* Canonical expected string via qf_to_string + 'E' */
     char core[128];
@@ -1031,7 +1031,7 @@ static void test_qf_printf_stdout(void)
 {
     printf(C_CYAN "TEST: qf_printf (stdout)\n" C_RESET);
 
-    qfloat x = qf_from_double(1.5);
+    qfloat_t x = qf_from_double(1.5);
 
     /* Save original stdout */
     int saved_stdout = dup(fileno(stdout));
@@ -1133,9 +1133,9 @@ static void test_qf_pow_int()
 
     for (size_t i = 0; i < sizeof(cases)/sizeof(cases[0]); i++) {
 
-        qfloat x        = qf_from_string(cases[i].x);
-        qfloat r        = qf_pow_int(x, cases[i].n);
-        qfloat expected = qf_from_string(cases[i].expected);
+        qfloat_t x        = qf_from_string(cases[i].x);
+        qfloat_t r        = qf_pow_int(x, cases[i].n);
+        qfloat_t expected = qf_from_string(cases[i].expected);
 
         /* THIS LINE WAS MISSING */
         qf_to_string(r, buf, sizeof(buf));
@@ -1160,8 +1160,8 @@ static void test_qf_pow()
 
     /* 1) 2^3 = 8 */
     {
-        qfloat r = qf_pow(qf_from_double(2.0), qf_from_double(3.0));
-        qfloat expected = qf_from_double(8.0);
+        qfloat_t r = qf_pow(qf_from_double(2.0), qf_from_double(3.0));
+        qfloat_t expected = qf_from_double(8.0);
         qf_to_string(r, buf, sizeof(buf));
 
         if (qf_close(r, expected, 1e-30)) {
@@ -1176,8 +1176,8 @@ static void test_qf_pow()
 
     /* 2) 9^0.5 = 3 */
     {
-        qfloat r = qf_pow(qf_from_double(9.0), qf_from_double(0.5));
-        qfloat expected = qf_from_double(3.0);
+        qfloat_t r = qf_pow(qf_from_double(9.0), qf_from_double(0.5));
+        qfloat_t expected = qf_from_double(3.0);
         qf_to_string(r, buf, sizeof(buf));
 
         if (qf_close(r, expected, 1e-30)) {
@@ -1192,8 +1192,8 @@ static void test_qf_pow()
 
     /* 3) 0^5 = 0 */
     {
-        qfloat r = qf_pow(qf_from_double(0.0), qf_from_double(5.0));
-        qfloat expected = qf_from_double(0.0);
+        qfloat_t r = qf_pow(qf_from_double(0.0), qf_from_double(5.0));
+        qfloat_t expected = qf_from_double(0.0);
         qf_to_string(r, buf, sizeof(buf));
 
         if (qf_close(r, expected, 1e-30)) {
@@ -1208,7 +1208,7 @@ static void test_qf_pow()
 
     /* 4) 0^-1 → NaN */
     {
-        qfloat r = qf_pow(qf_from_double(0.0), qf_from_double(-1.0));
+        qfloat_t r = qf_pow(qf_from_double(0.0), qf_from_double(-1.0));
 
         if (qf_isnan(r)) {
             printf("%s  OK: 0^-1 = NaN%s\n", C_GREEN, C_RESET);
@@ -1223,8 +1223,8 @@ static void test_qf_pow()
 
     /* 5) (-2)^3 = -8 */
     {
-        qfloat r = qf_pow(qf_from_double(-2.0), qf_from_double(3.0));
-        qfloat expected = qf_from_double(-8.0);
+        qfloat_t r = qf_pow(qf_from_double(-2.0), qf_from_double(3.0));
+        qfloat_t expected = qf_from_double(-8.0);
         qf_to_string(r, buf, sizeof(buf));
 
         if (qf_close(r, expected, 1e-30)) {
@@ -1239,7 +1239,7 @@ static void test_qf_pow()
 
     /* 6) (-2)^0.5 → NaN */
     {
-        qfloat r = qf_pow(qf_from_double(-2.0), qf_from_double(0.5));
+        qfloat_t r = qf_pow(qf_from_double(-2.0), qf_from_double(0.5));
 
         if (qf_isnan(r)) {
             printf("%s  OK: (-2)^0.5 = NaN%s\n", C_GREEN, C_RESET);
@@ -1271,8 +1271,8 @@ static void test_qf_pow10(void)
     };
 
     for (size_t i = 0; i < sizeof(cases)/sizeof(cases[0]); i++) {
-        qfloat r        = qf_pow10(cases[i].n);
-        qfloat expected = qf_from_string(cases[i].expected);
+        qfloat_t r        = qf_pow10(cases[i].n);
+        qfloat_t expected = qf_from_string(cases[i].expected);
 
         qf_to_string(r, buf, sizeof(buf));
 
@@ -1297,15 +1297,15 @@ static void test_qf_trig()
 
     /* 1) sin(0) = 0, cos(0) = 1, tan(0) = 0 */
     {
-        qfloat x = qf_from_double(0.0);
+        qfloat_t x = qf_from_double(0.0);
 
-        qfloat s = qf_sin(x);
-        qfloat c = qf_cos(x);
-        qfloat t = qf_tan(x);
+        qfloat_t s = qf_sin(x);
+        qfloat_t c = qf_cos(x);
+        qfloat_t t = qf_tan(x);
 
-        qfloat s_exp = qf_from_double(0.0);
-        qfloat c_exp = qf_from_double(1.0);
-        qfloat t_exp = qf_from_double(0.0);
+        qfloat_t s_exp = qf_from_double(0.0);
+        qfloat_t c_exp = qf_from_double(1.0);
+        qfloat_t t_exp = qf_from_double(0.0);
 
         qf_to_string(s, buf, sizeof(buf));
         if (qf_close(s, s_exp, 1e-30)) {
@@ -1346,13 +1346,13 @@ static void test_qf_trig()
 
     /* 2) sin(pi/2) = 1, cos(pi/2) = 0 */
     {
-        qfloat x = QF_PI_2;
+        qfloat_t x = QF_PI_2;
 
-        qfloat s = qf_sin(x);
-        qfloat c = qf_cos(x);
+        qfloat_t s = qf_sin(x);
+        qfloat_t c = qf_cos(x);
 
-        qfloat s_exp = qf_from_double(1.0);
-        qfloat c_exp = qf_from_double(0.0);
+        qfloat_t s_exp = qf_from_double(1.0);
+        qfloat_t c_exp = qf_from_double(0.0);
 
         qf_to_string(s, buf, sizeof(buf));
         if (qf_close(s, s_exp, 1e-30)) {
@@ -1381,13 +1381,13 @@ static void test_qf_trig()
 
     /* 3) sin(pi) = 0, cos(pi) = -1 */
     {
-        qfloat x = QF_PI;
+        qfloat_t x = QF_PI;
 
-        qfloat s = qf_sin(x);
-        qfloat c = qf_cos(x);
+        qfloat_t s = qf_sin(x);
+        qfloat_t c = qf_cos(x);
 
-        qfloat s_exp = qf_from_double(0.0);
-        qfloat c_exp = qf_from_double(-1.0);
+        qfloat_t s_exp = qf_from_double(0.0);
+        qfloat_t c_exp = qf_from_double(-1.0);
 
         qf_to_string(s, buf, sizeof(buf));
         if (qf_close(s, s_exp, 1e-30)) {
@@ -1416,10 +1416,10 @@ static void test_qf_trig()
 
     /* 4) tan(pi/4) = 1 */
     {
-        qfloat x = QF_PI_4;
+        qfloat_t x = QF_PI_4;
 
-        qfloat t = qf_tan(x);
-        qfloat t_exp = qf_from_double(1.0);
+        qfloat_t t = qf_tan(x);
+        qfloat_t t_exp = qf_from_double(1.0);
 
         qf_to_string(t, buf, sizeof(buf));
         if (qf_close(t, t_exp, 1e-30)) {
@@ -1436,8 +1436,8 @@ static void test_qf_trig()
 
     /* 5) tan(pi/2) → NaN */
     {
-        qfloat x = QF_PI_2;
-        qfloat t = qf_tan(x);
+        qfloat_t x = QF_PI_2;
+        qfloat_t t = qf_tan(x);
 
         if (qf_isnan(t)) {
             printf("%s  OK: tan(pi/2) = NaN%s\n", C_GREEN, C_RESET);
@@ -1454,15 +1454,15 @@ static void test_qf_trig()
 
     /* 6) Random spot check: sin(1.0), cos(1.0), tan(1.0) */
     {
-        qfloat x = qf_from_double(1.0);
+        qfloat_t x = qf_from_double(1.0);
 
-        qfloat s = qf_sin(x);
-        qfloat c = qf_cos(x);
-        qfloat t = qf_tan(x);
+        qfloat_t s = qf_sin(x);
+        qfloat_t c = qf_cos(x);
+        qfloat_t t = qf_tan(x);
 
-        qfloat s_exp = qf_from_string("0.8414709848078965066525023216303");
-        qfloat c_exp = qf_from_string("0.54030230586813971740093660744298");
-        qfloat t_exp = qf_from_string("1.55740772465490223050697480745836");
+        qfloat_t s_exp = qf_from_string("0.8414709848078965066525023216303");
+        qfloat_t c_exp = qf_from_string("0.54030230586813971740093660744298");
+        qfloat_t t_exp = qf_from_string("1.55740772465490223050697480745836");
 
         qf_to_string(s, buf, sizeof(buf));
         qf_to_string(s_exp, buf_exp, sizeof(buf_exp));
@@ -1512,9 +1512,9 @@ static void test_qf_trig()
 static void test_qf_atan(void)
 {
     struct {
-        qfloat arg;
+        qfloat_t arg;
         const char *name;
-        qfloat expected;
+        qfloat_t expected;
     } atan_tests[] = {
         /* exact */
         { { 0.0, 0.0 }, "atan(0)",     { 0.0, 0.0 } },
@@ -1539,9 +1539,9 @@ static void test_qf_atan(void)
     printf("\n== qf_atan ==\n");
 
     for (int i = 0; i < N_ATAN_TESTS; ++i) {
-        qfloat x = atan_tests[i].arg;
-        qfloat expected = atan_tests[i].expected;
-        qfloat got = qf_atan(x);
+        qfloat_t x = atan_tests[i].arg;
+        qfloat_t expected = atan_tests[i].expected;
+        qfloat_t got = qf_atan(x);
 
         qf_to_string(got, buf, sizeof(buf));
         qf_to_string(expected, buf_exp, sizeof(buf_exp));
@@ -1568,9 +1568,9 @@ static void test_qf_atan(void)
 static void test_qf_asin(void)
 {
     struct {
-        qfloat arg;
+        qfloat_t arg;
         const char *name;
-        qfloat expected;
+        qfloat_t expected;
     } asin_tests[] = {
         { { 0.0, 0.0 }, "asin(0)",   { 0.0, 0.0 } },
 
@@ -1591,9 +1591,9 @@ static void test_qf_asin(void)
     printf("\n== qf_asin ==\n");
 
     for (int i = 0; i < N_ASIN_TESTS; ++i) {
-        qfloat x = asin_tests[i].arg;
-        qfloat expected = asin_tests[i].expected;
-        qfloat got = qf_asin(x);
+        qfloat_t x = asin_tests[i].arg;
+        qfloat_t expected = asin_tests[i].expected;
+        qfloat_t got = qf_asin(x);
 
         qf_to_string(got, buf, sizeof(buf));
         qf_to_string(expected, buf_exp, sizeof(buf_exp));
@@ -1611,7 +1611,7 @@ static void test_qf_asin(void)
     }
 
     /* Domain error: asin(2) = NaN */
-    qfloat r = qf_asin(qf_from_double(2.0));
+    qfloat_t r = qf_asin(qf_from_double(2.0));
     if (isnan(qf_to_double(r))) {
         printf("%s  OK: asin(2) = NaN%s\n", C_GREEN, C_RESET);
     } else {
@@ -1630,9 +1630,9 @@ static void test_qf_asin(void)
 static void test_qf_acos(void)
 {
     struct {
-        qfloat arg;
+        qfloat_t arg;
         const char *name;
-        qfloat expected;
+        qfloat_t expected;
     } acos_tests[] = {
         /* exact */
         { { 1.0, 0.0 }, "acos(1)",   { 0.0, 0.0 } },
@@ -1654,9 +1654,9 @@ static void test_qf_acos(void)
     printf("\n== qf_acos ==\n");
 
     for (int i = 0; i < N_ACOS_TESTS; ++i) {
-        qfloat x = acos_tests[i].arg;
-        qfloat expected = acos_tests[i].expected;
-        qfloat got = qf_acos(x);
+        qfloat_t x = acos_tests[i].arg;
+        qfloat_t expected = acos_tests[i].expected;
+        qfloat_t got = qf_acos(x);
 
         qf_to_string(got, buf, sizeof(buf));
         qf_to_string(expected, buf_exp, sizeof(buf_exp));
@@ -1674,7 +1674,7 @@ static void test_qf_acos(void)
     }
 
     /* Domain error: acos(2) = NaN */
-    qfloat r = qf_acos(qf_from_double(2.0));
+    qfloat_t r = qf_acos(qf_from_double(2.0));
     if (isnan(qf_to_double(r))) {
         printf("%s  OK: acos(2) = NaN%s\n", C_GREEN, C_RESET);
     } else {
@@ -1693,9 +1693,9 @@ static void test_qf_acos(void)
 static void test_qf_atan2(void)
 {
     struct {
-        qfloat y, x;
+        qfloat_t y, x;
         const char *name;
-        qfloat expected;
+        qfloat_t expected;
     } atan2_tests[] = {
         /* exact */
         { {0.0,0.0}, {1.0,0.0}, "atan2(0,1)",   {0.0,0.0} },
@@ -1719,10 +1719,10 @@ static void test_qf_atan2(void)
     printf("\n== qf_atan2 ==\n");
 
     for (int i = 0; i < N_ATAN2_TESTS; ++i) {
-        qfloat y = atan2_tests[i].y;
-        qfloat x = atan2_tests[i].x;
-        qfloat expected = atan2_tests[i].expected;
-        qfloat got = qf_atan2(y, x);
+        qfloat_t y = atan2_tests[i].y;
+        qfloat_t x = atan2_tests[i].x;
+        qfloat_t expected = atan2_tests[i].expected;
+        qfloat_t got = qf_atan2(y, x);
 
         qf_to_string(got, buf, sizeof(buf));
         qf_to_string(expected, buf_exp, sizeof(buf_exp));
@@ -1743,9 +1743,9 @@ static void test_qf_atan2(void)
 static void test_qf_sinh(void)
 {
     struct {
-        qfloat arg;
+        qfloat_t arg;
         const char *name;
-        qfloat expected;
+        qfloat_t expected;
     } sinh_tests[] = {
         { { 0.0, 0.0 }, "sinh(0)",   { 0.0, 0.0 } },
 
@@ -1765,9 +1765,9 @@ static void test_qf_sinh(void)
     printf("\n== qf_sinh ==\n");
 
     for (int i = 0; i < N; ++i) {
-        qfloat x = sinh_tests[i].arg;
-        qfloat expected = sinh_tests[i].expected;
-        qfloat got = qf_sinh(x);
+        qfloat_t x = sinh_tests[i].arg;
+        qfloat_t expected = sinh_tests[i].expected;
+        qfloat_t got = qf_sinh(x);
 
         qf_to_string(got, buf, sizeof(buf));
         qf_to_string(expected, buf_exp, sizeof(buf_exp));
@@ -1789,9 +1789,9 @@ static void test_qf_sinh(void)
 static void test_qf_cosh(void)
 {
     struct {
-        qfloat arg;
+        qfloat_t arg;
         const char *name;
-        qfloat expected;
+        qfloat_t expected;
     } cosh_tests[] = {
         { { 0.0, 0.0 }, "cosh(0)",   { 1.0, 0.0 } },
 
@@ -1811,9 +1811,9 @@ static void test_qf_cosh(void)
     printf("\n== qf_cosh ==\n");
 
     for (int i = 0; i < N; ++i) {
-        qfloat x = cosh_tests[i].arg;
-        qfloat expected = cosh_tests[i].expected;
-        qfloat got = qf_cosh(x);
+        qfloat_t x = cosh_tests[i].arg;
+        qfloat_t expected = cosh_tests[i].expected;
+        qfloat_t got = qf_cosh(x);
 
         qf_to_string(got, buf, sizeof(buf));
         qf_to_string(expected, buf_exp, sizeof(buf_exp));
@@ -1834,9 +1834,9 @@ static void test_qf_cosh(void)
 static void test_qf_tanh(void)
 {
     struct {
-        qfloat arg;
+        qfloat_t arg;
         const char *name;
-        qfloat expected;
+        qfloat_t expected;
     } tanh_tests[] = {
         { { 0.0, 0.0 }, "tanh(0)",     { 0.0, 0.0 } },
 
@@ -1862,9 +1862,9 @@ static void test_qf_tanh(void)
     printf("\n== qf_tanh ==\n");
 
     for (int i = 0; i < N; ++i) {
-        qfloat x = tanh_tests[i].arg;
-        qfloat expected = tanh_tests[i].expected;
-        qfloat got = qf_tanh(x);
+        qfloat_t x = tanh_tests[i].arg;
+        qfloat_t expected = tanh_tests[i].expected;
+        qfloat_t got = qf_tanh(x);
 
         qf_to_string(got, buf, sizeof(buf));
         qf_to_string(expected, buf_exp, sizeof(buf_exp));
@@ -1885,9 +1885,9 @@ static void test_qf_tanh(void)
 static void test_qf_asinh(void)
 {
     struct {
-        qfloat arg;
+        qfloat_t arg;
         const char *name;
-        qfloat expected;
+        qfloat_t expected;
     } asinh_tests[] = {
         { { 0.0, 0.0 }, "asinh(0)",   { 0.0, 0.0 } },
 
@@ -1907,9 +1907,9 @@ static void test_qf_asinh(void)
     printf("\n== qf_asinh ==\n");
 
     for (int i = 0; i < N; ++i) {
-        qfloat x = asinh_tests[i].arg;
-        qfloat expected = asinh_tests[i].expected;
-        qfloat got = qf_asinh(x);
+        qfloat_t x = asinh_tests[i].arg;
+        qfloat_t expected = asinh_tests[i].expected;
+        qfloat_t got = qf_asinh(x);
 
         qf_to_string(got, buf, sizeof(buf));
         qf_to_string(expected, buf_exp, sizeof(buf_exp));
@@ -1930,9 +1930,9 @@ static void test_qf_asinh(void)
 static void test_qf_acosh(void)
 {
     struct {
-        qfloat arg;
+        qfloat_t arg;
         const char *name;
-        qfloat expected;
+        qfloat_t expected;
     } acosh_tests[] = {
         /* acosh(1) = 0 */
         { { 1.0, 0.0 }, "acosh(1)",   { 0.0, 0.0 } },
@@ -1950,9 +1950,9 @@ static void test_qf_acosh(void)
     printf("\n== qf_acosh ==\n");
 
     for (int i = 0; i < N; ++i) {
-        qfloat x = acosh_tests[i].arg;
-        qfloat expected = acosh_tests[i].expected;
-        qfloat got = qf_acosh(x);
+        qfloat_t x = acosh_tests[i].arg;
+        qfloat_t expected = acosh_tests[i].expected;
+        qfloat_t got = qf_acosh(x);
 
         qf_to_string(got, buf, sizeof(buf));
         qf_to_string(expected, buf_exp, sizeof(buf_exp));
@@ -1970,7 +1970,7 @@ static void test_qf_acosh(void)
     }
 
     /* Domain error: acosh(x<1) = NaN */
-    qfloat r = qf_acosh(qf_from_double(0.5));
+    qfloat_t r = qf_acosh(qf_from_double(0.5));
     if (isnan(qf_to_double(r))) {
         printf("%s  OK: acosh(0.5) = NaN%s\n", C_GREEN, C_RESET);
     } else {
@@ -1984,9 +1984,9 @@ static void test_qf_acosh(void)
 static void test_qf_atanh(void)
 {
     struct {
-        qfloat arg;
+        qfloat_t arg;
         const char *name;
-        qfloat expected;
+        qfloat_t expected;
     } atanh_tests[] = {
         { { 0.0, 0.0 }, "atanh(0)",     { 0.0, 0.0 } },
 
@@ -2006,9 +2006,9 @@ static void test_qf_atanh(void)
     printf("\n== qf_atanh ==\n");
 
     for (int i = 0; i < N; ++i) {
-        qfloat x = atanh_tests[i].arg;
-        qfloat expected = atanh_tests[i].expected;
-        qfloat got = qf_atanh(x);
+        qfloat_t x = atanh_tests[i].arg;
+        qfloat_t expected = atanh_tests[i].expected;
+        qfloat_t got = qf_atanh(x);
 
         qf_to_string(got, buf, sizeof(buf));
         qf_to_string(expected, buf_exp, sizeof(buf_exp));
@@ -2026,7 +2026,7 @@ static void test_qf_atanh(void)
     }
 
     /* Domain error: |x| >= 1 → NaN */
-    qfloat r = qf_atanh(qf_from_double(1.0));
+    qfloat_t r = qf_atanh(qf_from_double(1.0));
     if (isnan(qf_to_double(r))) {
         printf("%s  OK: atanh(1) = NaN%s\n", C_GREEN, C_RESET);
     } else {
@@ -2038,7 +2038,7 @@ static void test_qf_atanh(void)
 }
 
 /* -----------------------------------------------------------
-   qf_hypot tests (full qfloat precision)
+   qf_hypot tests (full qfloat_t precision)
    ----------------------------------------------------------- */
 static void test_qf_hypot(void)
 {
@@ -2046,7 +2046,7 @@ static void test_qf_hypot(void)
 
     char buf[128], buf_ref[128];
 
-    /* 1) Full-precision qfloat reference (safe magnitudes) */
+    /* 1) Full-precision qfloat_t reference (safe magnitudes) */
     struct {
         const char *xs, *ys, *label;
     } precise[] = {
@@ -2067,16 +2067,16 @@ static void test_qf_hypot(void)
     int Np = (int)(sizeof(precise)/sizeof(precise[0]));
 
     for (int i = 0; i < Np; i++) {
-        qfloat x = qf_from_string(precise[i].xs);
-        qfloat y = qf_from_string(precise[i].ys);
+        qfloat_t x = qf_from_string(precise[i].xs);
+        qfloat_t y = qf_from_string(precise[i].ys);
 
-        qfloat got = qf_hypot(x, y);
+        qfloat_t got = qf_hypot(x, y);
 
-        /* direct qfloat reference: sqrt(x*x + y*y) */
-        qfloat xx  = qf_mul(x, x);
-        qfloat yy  = qf_mul(y, y);
-        qfloat sum = qf_add(xx, yy);
-        qfloat ref = qf_sqrt(sum);
+        /* direct qfloat_t reference: sqrt(x*x + y*y) */
+        qfloat_t xx  = qf_mul(x, x);
+        qfloat_t yy  = qf_mul(y, y);
+        qfloat_t sum = qf_add(xx, yy);
+        qfloat_t ref = qf_sqrt(sum);
 
         qf_to_string(got, buf, sizeof(buf));
         qf_to_string(ref, buf_ref, sizeof(buf_ref));
@@ -2095,11 +2095,11 @@ static void test_qf_hypot(void)
 
     /* symmetry (full precision) */
     {
-        qfloat a = qf_from_double(1.2345);
-        qfloat b = qf_from_double(9.8765);
+        qfloat_t a = qf_from_double(1.2345);
+        qfloat_t b = qf_from_double(9.8765);
 
-        qfloat h1 = qf_hypot(a, b);
-        qfloat h2 = qf_hypot(b, a);
+        qfloat_t h1 = qf_hypot(a, b);
+        qfloat_t h2 = qf_hypot(b, a);
 
         if (qf_close(h1, h2, 1e-32)) {
             printf("%s  OK: symmetry%s\n", C_GREEN, C_RESET);
@@ -2126,10 +2126,10 @@ static void test_qf_hypot(void)
         double xd = extreme[i].x;
         double yd = extreme[i].y;
 
-        qfloat x = qf_from_double(xd);
-        qfloat y = qf_from_double(yd);
+        qfloat_t x = qf_from_double(xd);
+        qfloat_t y = qf_from_double(yd);
 
-        qfloat hq = qf_hypot(x, y);
+        qfloat_t hq = qf_hypot(x, y);
         double  hq_d = qf_to_double(hq);
         double  href = hypot(xd, yd);
         double  err  = hq_d - href;
@@ -2164,7 +2164,7 @@ static void test_qf_gamma(void)
        ------------------------------------------------------------ */
     struct {
         const char *xs;      /* input x */
-        const char *expected;/* expected gamma(x) as qfloat string */
+        const char *expected;/* expected gamma(x) as qfloat_t string */
         double tol;
     } tests[] = {
 
@@ -2206,9 +2206,9 @@ static void test_qf_gamma(void)
        ------------------------------------------------------------ */
     for (int i = 0; tests[i].xs != NULL; i++) {
 
-        qfloat x   = qf_from_string(tests[i].xs);
-        qfloat got = qf_gamma(x);
-        qfloat exp = qf_from_string(tests[i].expected);
+        qfloat_t x   = qf_from_string(tests[i].xs);
+        qfloat_t got = qf_gamma(x);
+        qfloat_t exp = qf_from_string(tests[i].expected);
 
         qf_to_string(got, buf, sizeof(buf));
         qf_to_string(exp, buf_exp, sizeof(buf_exp));
@@ -2230,8 +2230,8 @@ static void test_qf_gamma(void)
        ------------------------------------------------------------ */
     const char *poles[] = { "0", "-1", "-2", "-3", "-4" };
     for (size_t i = 0; i < sizeof(poles)/sizeof(poles[0]); i++) {
-        qfloat x = qf_from_string(poles[i]);
-        qfloat g = qf_gamma(x);
+        qfloat_t x = qf_from_string(poles[i]);
+        qfloat_t g = qf_gamma(x);
 
         if (isnan(g.hi)) {
             printf("%s  OK: gamma(%s) is NaN%s\n", C_GREEN, poles[i], C_RESET);
@@ -2248,8 +2248,8 @@ static void test_qf_gamma(void)
        ------------------------------------------------------------ */
     const char *extreme[] = { "1e300", "-1e300" };
     for (size_t i = 0; i < sizeof(extreme)/sizeof(extreme[0]); i++) {
-        qfloat x = qf_from_string(extreme[i]);
-        qfloat g = qf_gamma(x);
+        qfloat_t x = qf_from_string(extreme[i]);
+        qfloat_t g = qf_gamma(x);
 
         if (isnan(g.hi)) {
             printf("%s  OK: gamma(%s) extreme -> NaN%s\n",
@@ -2276,7 +2276,7 @@ static void test_qf_erf(void)
        ------------------------------------------------------------ */
     struct {
         const char *xs;       /* input x */
-        const char *expected; /* expected erf(x) as qfloat string */
+        const char *expected; /* expected erf(x) as qfloat_t string */
     } tests[] = {
 
         /* Basic values */
@@ -2317,9 +2317,9 @@ static void test_qf_erf(void)
 
     for (int i = 0; tests[i].xs != NULL; i++) {
 
-        qfloat x   = qf_from_string(tests[i].xs);
-        qfloat got = qf_erf(x);
-        qfloat exp = qf_from_string(tests[i].expected);
+        qfloat_t x   = qf_from_string(tests[i].xs);
+        qfloat_t got = qf_erf(x);
+        qfloat_t exp = qf_from_string(tests[i].expected);
 
         qf_to_string(got, buf, sizeof(buf));
         qf_to_string(exp, buf_exp, sizeof(buf_exp));
@@ -2347,7 +2347,7 @@ static void test_qf_erfc(void)
 
     struct {
         const char *xs;       /* input x */
-        const char *expected; /* expected erfc(x) as qfloat string */
+        const char *expected; /* expected erfc(x) as qfloat_t string */
     } tests[] = {
 
         /* Basic values */
@@ -2388,9 +2388,9 @@ static void test_qf_erfc(void)
 
     for (int i = 0; tests[i].xs != NULL; i++) {
 
-        qfloat x   = qf_from_string(tests[i].xs);
-        qfloat got = qf_erfc(x);
-        qfloat exp = qf_from_string(tests[i].expected);
+        qfloat_t x   = qf_from_string(tests[i].xs);
+        qfloat_t got = qf_erfc(x);
+        qfloat_t exp = qf_from_string(tests[i].expected);
 
         qf_to_string(got, buf, sizeof(buf));
         qf_to_string(exp, buf_exp, sizeof(buf_exp));
@@ -2418,7 +2418,7 @@ static void test_qf_erfinv(void) {
 
     struct {
         const char *xs;       /* input x */
-        const char *expected; /* expected erfc(x) as qfloat string */
+        const char *expected; /* expected erfc(x) as qfloat_t string */
         double acceptable_error;
     } tests[] = {
 
@@ -2457,8 +2457,8 @@ static void test_qf_erfinv(void) {
 
     for (int i = 0; tests[i].xs != NULL; i++) {
 
-        qfloat x   = qf_from_string(tests[i].xs);
-        qfloat got = qf_erfinv(x);
+        qfloat_t x   = qf_from_string(tests[i].xs);
+        qfloat_t got = qf_erfinv(x);
         if (strcmp(tests[i].expected, "NAN") == 0) {
             if (qf_isnan(got)) {
                 printf("%s  OK: erfinv(%s)%s\n", C_GREEN, tests[i].xs, C_RESET);
@@ -2470,7 +2470,7 @@ static void test_qf_erfinv(void) {
             continue;
         }
         else {
-            qfloat exp = qf_from_string(tests[i].expected);
+            qfloat_t exp = qf_from_string(tests[i].expected);
 
             qf_to_string(got, buf, sizeof(buf));
             qf_to_string(exp, buf_exp, sizeof(buf_exp));
@@ -2498,7 +2498,7 @@ static void test_qf_erfcinv(void) {
 
     struct {
         const char *xs;       /* input x */
-        const char *expected; /* expected erfcinv(x) as qfloat string */
+        const char *expected; /* expected erfcinv(x) as qfloat_t string */
         double acceptable_error;
     } tests[] = {
 
@@ -2537,8 +2537,8 @@ static void test_qf_erfcinv(void) {
 
     for (int i = 0; tests[i].xs != NULL; i++) {
 
-        qfloat x   = qf_from_string(tests[i].xs);
-        qfloat got = qf_erfcinv(x);
+        qfloat_t x   = qf_from_string(tests[i].xs);
+        qfloat_t got = qf_erfcinv(x);
 
         /* Handle infinities */
         if (strcmp(tests[i].expected, "POSINF") == 0) {
@@ -2564,7 +2564,7 @@ static void test_qf_erfcinv(void) {
         }
 
         /* Normal numeric case */
-        qfloat exp = qf_from_string(tests[i].expected);
+        qfloat_t exp = qf_from_string(tests[i].expected);
 
         qf_to_string(got, buf, sizeof(buf));
         qf_to_string(exp, buf_exp, sizeof(buf_exp));
@@ -2630,8 +2630,8 @@ static void test_qf_lgamma(void) {
 
     for (int i = 0; tests[i].xs != NULL; i++) {
 
-        qfloat x   = qf_from_string(tests[i].xs);
-        qfloat got = qf_lgamma(x);
+        qfloat_t x   = qf_from_string(tests[i].xs);
+        qfloat_t got = qf_lgamma(x);
 
         if (strcmp(tests[i].expected, "NAN") == 0) {
             if (qf_isnan(got)) {
@@ -2646,7 +2646,7 @@ static void test_qf_lgamma(void) {
             continue;
         }
 
-        qfloat exp = qf_from_string(tests[i].expected);
+        qfloat_t exp = qf_from_string(tests[i].expected);
 
         qf_to_string(got, buf, sizeof(buf));
         qf_to_string(exp, buf_exp, sizeof(buf_exp));
@@ -2710,8 +2710,8 @@ static void test_qf_digamma(void) {
 
     for (int i = 0; tests[i].xs != NULL; i++) {
 
-        qfloat x   = qf_from_string(tests[i].xs);
-        qfloat got = qf_digamma(x);
+        qfloat_t x   = qf_from_string(tests[i].xs);
+        qfloat_t got = qf_digamma(x);
 
         if (strcmp(tests[i].expected, "NAN") == 0) {
             if (qf_isnan(got)) {
@@ -2726,7 +2726,7 @@ static void test_qf_digamma(void) {
             continue;
         }
 
-        qfloat exp = qf_from_string(tests[i].expected);
+        qfloat_t exp = qf_from_string(tests[i].expected);
 
         qf_to_string(got, buf, sizeof(buf));
         qf_to_string(exp, buf_exp, sizeof(buf_exp));
@@ -2772,11 +2772,11 @@ static void test_qf_gammainv(void) {
 
     for (int i = 0; tests[i].xs != NULL; i++) {
 
-        qfloat x   = qf_from_string(tests[i].xs);
-        qfloat y   = qf_gamma(x);
-        qfloat got = qf_gammainv(y);
+        qfloat_t x   = qf_from_string(tests[i].xs);
+        qfloat_t y   = qf_gamma(x);
+        qfloat_t got = qf_gammainv(y);
 
-        qfloat exp = x;
+        qfloat_t exp = x;
 
         qf_to_string(got, buf, sizeof(buf));
         qf_to_string(exp, buf_exp, sizeof(buf_exp));
@@ -2802,7 +2802,7 @@ static void test_qf_lambert_w0(void) {
 
     struct {
         const char *xs;       /* input x */
-        const char *expected; /* expected W0(x) as qfloat string */
+        const char *expected; /* expected W0(x) as qfloat_t string */
         double acceptable_error;
     } tests[] = {
 
@@ -2827,9 +2827,9 @@ static void test_qf_lambert_w0(void) {
 
     for (int i = 0; tests[i].xs != NULL; i++) {
 
-        qfloat x   = qf_from_string(tests[i].xs);
-        qfloat got = qf_lambert_w0(x);
-        qfloat exp = qf_from_string(tests[i].expected);
+        qfloat_t x   = qf_from_string(tests[i].xs);
+        qfloat_t got = qf_lambert_w0(x);
+        qfloat_t exp = qf_from_string(tests[i].expected);
 
         qf_to_string(got, buf, sizeof(buf));
         qf_to_string(exp, buf_exp, sizeof(buf_exp));
@@ -2856,7 +2856,7 @@ static void test_qf_lambert_wm1(void) {
 
     struct {
         const char *xs;       /* input x */
-        const char *expected; /* expected Wm1(x) as qfloat string */
+        const char *expected; /* expected Wm1(x) as qfloat_t string */
         double acceptable_error;
     } tests[] = {
 
@@ -2875,9 +2875,9 @@ static void test_qf_lambert_wm1(void) {
 
     for (int i = 0; tests[i].xs != NULL; i++) {
 
-        qfloat x   = qf_from_string(tests[i].xs);
-        qfloat got = qf_lambert_wm1(x);
-        qfloat exp = qf_from_string(tests[i].expected);
+        qfloat_t x   = qf_from_string(tests[i].xs);
+        qfloat_t got = qf_lambert_wm1(x);
+        qfloat_t exp = qf_from_string(tests[i].expected);
 
         qf_to_string(got, buf, sizeof(buf));
         qf_to_string(exp, buf_exp, sizeof(buf_exp));
@@ -2901,7 +2901,7 @@ static void test_qf_lambert_wm1(void) {
    Colourised tests for qf_beta
    ------------------------------------------------------------------------- */
 
-static void print_qf(const char *label, qfloat x)
+static void print_qf(const char *label, qfloat_t x)
 {
     char buf[128];
     qf_sprintf(buf, sizeof(buf), "%Q", x);
@@ -2921,15 +2921,15 @@ static void test_qf_beta_definition(void)
     for (int i = 0; i < (int)(sizeof(as)/sizeof(as[0])); ++i) {
         for (int j = 0; j < (int)(sizeof(bs)/sizeof(bs[0])); ++j) {
 
-            qfloat a = qf_from_double(as[i]);
-            qfloat b = qf_from_double(bs[j]);
+            qfloat_t a = qf_from_double(as[i]);
+            qfloat_t b = qf_from_double(bs[j]);
 
-            qfloat B  = qf_beta(a, b);
-            qfloat ga = qf_gamma(a);
-            qfloat gb = qf_gamma(b);
-            qfloat gab = qf_gamma(qf_add(a, b));
+            qfloat_t B  = qf_beta(a, b);
+            qfloat_t ga = qf_gamma(a);
+            qfloat_t gb = qf_gamma(b);
+            qfloat_t gab = qf_gamma(qf_add(a, b));
 
-            qfloat rhs = qf_div(qf_mul(ga, gb), gab);
+            qfloat_t rhs = qf_div(qf_mul(ga, gb), gab);
 
             int ok = qf_close_rel(B, rhs, 1e-30);
 
@@ -2960,11 +2960,11 @@ static void test_qf_beta_symmetry(void)
     for (int i = 0; i < (int)(sizeof(as)/sizeof(as[0])); ++i) {
         for (int j = 0; j < (int)(sizeof(bs)/sizeof(bs[0])); ++j) {
 
-            qfloat a = qf_from_double(as[i]);
-            qfloat b = qf_from_double(bs[j]);
+            qfloat_t a = qf_from_double(as[i]);
+            qfloat_t b = qf_from_double(bs[j]);
 
-            qfloat Bab = qf_beta(a, b);
-            qfloat Bba = qf_beta(b, a);
+            qfloat_t Bab = qf_beta(a, b);
+            qfloat_t Bba = qf_beta(b, a);
 
             int ok = qf_close_rel(Bab, Bba, 1e-30);
 
@@ -2994,14 +2994,14 @@ static void test_qf_beta_special_cases(void)
 
     for (int i = 0; i < (int)(sizeof(vals)/sizeof(vals[0])); ++i) {
 
-        qfloat b = qf_from_double(vals[i]);
-        qfloat a = qf_from_double(vals[i]);
+        qfloat_t b = qf_from_double(vals[i]);
+        qfloat_t a = qf_from_double(vals[i]);
 
-        qfloat B1b = qf_beta(qf_from_double(1.0), b);
-        qfloat B1b_expected = qf_div(qf_from_double(1.0), b);
+        qfloat_t B1b = qf_beta(qf_from_double(1.0), b);
+        qfloat_t B1b_expected = qf_div(qf_from_double(1.0), b);
 
-        qfloat Ba1 = qf_beta(a, qf_from_double(1.0));
-        qfloat Ba1_expected = qf_div(qf_from_double(1.0), a);
+        qfloat_t Ba1 = qf_beta(a, qf_from_double(1.0));
+        qfloat_t Ba1_expected = qf_div(qf_from_double(1.0), a);
 
         int ok1 = qf_close_rel(B1b, B1b_expected, 1e-30);
         int ok2 = qf_close_rel(Ba1, Ba1_expected, 1e-30);
@@ -3045,16 +3045,16 @@ static void test_qf_logbeta_definition(void)
     for (int i = 0; i < (int)(sizeof(as)/sizeof(as[0])); ++i) {
         for (int j = 0; j < (int)(sizeof(bs)/sizeof(bs[0])); ++j) {
 
-            qfloat a = qf_from_double(as[i]);
-            qfloat b = qf_from_double(bs[j]);
+            qfloat_t a = qf_from_double(as[i]);
+            qfloat_t b = qf_from_double(bs[j]);
 
-            qfloat logB = qf_logbeta(a, b);
+            qfloat_t logB = qf_logbeta(a, b);
 
-            qfloat lg_a  = qf_lgamma(a);
-            qfloat lg_b  = qf_lgamma(b);
-            qfloat lg_ab = qf_lgamma(qf_add(a, b));
+            qfloat_t lg_a  = qf_lgamma(a);
+            qfloat_t lg_b  = qf_lgamma(b);
+            qfloat_t lg_ab = qf_lgamma(qf_add(a, b));
 
-            qfloat rhs = qf_add(lg_a, lg_b);
+            qfloat_t rhs = qf_add(lg_a, lg_b);
             rhs        = qf_sub(rhs, lg_ab);
 
             int ok = qf_close_rel(logB, rhs, 1e-30);
@@ -3087,12 +3087,12 @@ static void test_qf_logbeta_consistency(void)
     for (int i = 0; i < (int)(sizeof(as)/sizeof(as[0])); ++i) {
         for (int j = 0; j < (int)(sizeof(bs)/sizeof(bs[0])); ++j) {
 
-            qfloat a = qf_from_double(as[i]);
-            qfloat b = qf_from_double(bs[j]);
+            qfloat_t a = qf_from_double(as[i]);
+            qfloat_t b = qf_from_double(bs[j]);
 
-            qfloat logB = qf_logbeta(a, b);
-            qfloat B    = qf_beta(a, b);
-            qfloat logB_expected = qf_log(B);
+            qfloat_t logB = qf_logbeta(a, b);
+            qfloat_t B    = qf_beta(a, b);
+            qfloat_t logB_expected = qf_log(B);
 
             int ok = qf_close(logB, logB_expected, 1e-29);
 
@@ -3124,11 +3124,11 @@ static void test_qf_logbeta_symmetry(void)
     for (int i = 0; i < (int)(sizeof(as)/sizeof(as[0])); ++i) {
         for (int j = 0; j < (int)(sizeof(bs)/sizeof(bs[0])); ++j) {
 
-            qfloat a = qf_from_double(as[i]);
-            qfloat b = qf_from_double(bs[j]);
+            qfloat_t a = qf_from_double(as[i]);
+            qfloat_t b = qf_from_double(bs[j]);
 
-            qfloat lab = qf_logbeta(a, b);
-            qfloat lba = qf_logbeta(b, a);
+            qfloat_t lab = qf_logbeta(a, b);
+            qfloat_t lba = qf_logbeta(b, a);
 
             int ok = qf_close_rel(lab, lba, 1e-30);
 
@@ -3160,13 +3160,13 @@ static void test_qf_logbeta_special_cases(void)
 
     for (int i = 0; i < (int)(sizeof(vals)/sizeof(vals[0])); ++i) {
 
-        qfloat v = qf_from_double(vals[i]);
+        qfloat_t v = qf_from_double(vals[i]);
 
-        qfloat logB1v = qf_logbeta(qf_from_double(1.0), v);
-        qfloat logB1v_expected = qf_neg(qf_log(v));
+        qfloat_t logB1v = qf_logbeta(qf_from_double(1.0), v);
+        qfloat_t logB1v_expected = qf_neg(qf_log(v));
 
-        qfloat logBv1 = qf_logbeta(v, qf_from_double(1.0));
-        qfloat logBv1_expected = qf_neg(qf_log(v));
+        qfloat_t logBv1 = qf_logbeta(v, qf_from_double(1.0));
+        qfloat_t logBv1_expected = qf_neg(qf_log(v));
 
         int ok1 = qf_close(logB1v, logB1v_expected, 1e-28);
         int ok2 = qf_close(logBv1, logBv1_expected, 1e-28);
@@ -3212,16 +3212,16 @@ static void test_qf_binomial_definition(void)
     for (int i = 0; i < (int)(sizeof(as)/sizeof(as[0])); ++i) {
         for (int j = 0; j < (int)(sizeof(bs)/sizeof(bs[0])); ++j) {
 
-            qfloat a = qf_from_double(as[i]);
-            qfloat b = qf_from_double(bs[j]);
+            qfloat_t a = qf_from_double(as[i]);
+            qfloat_t b = qf_from_double(bs[j]);
 
-            qfloat C = qf_binomial(a, b);
+            qfloat_t C = qf_binomial(a, b);
 
-            qfloat ga1   = qf_gamma(qf_add(a, qf_from_double(1.0)));
-            qfloat gb1   = qf_gamma(qf_add(b, qf_from_double(1.0)));
-            qfloat gamb1 = qf_gamma(qf_add(qf_sub(a, b), qf_from_double(1.0)));
+            qfloat_t ga1   = qf_gamma(qf_add(a, qf_from_double(1.0)));
+            qfloat_t gb1   = qf_gamma(qf_add(b, qf_from_double(1.0)));
+            qfloat_t gamb1 = qf_gamma(qf_add(qf_sub(a, b), qf_from_double(1.0)));
 
-            qfloat rhs = qf_div(ga1, qf_mul(gb1, gamb1));
+            qfloat_t rhs = qf_div(ga1, qf_mul(gb1, gamb1));
 
             int ok = qf_close_rel(C, rhs, 1e-30);
 
@@ -3253,12 +3253,12 @@ static void test_qf_binomial_symmetry(void)
 
         for (int k = 0; k <= n; ++k) {
 
-            qfloat nq = qf_from_double((double)n);
-            qfloat kq = qf_from_double((double)k);
-            qfloat nkq = qf_from_double((double)(n-k));
+            qfloat_t nq = qf_from_double((double)n);
+            qfloat_t kq = qf_from_double((double)k);
+            qfloat_t nkq = qf_from_double((double)(n-k));
 
-            qfloat C1 = qf_binomial(nq, kq);
-            qfloat C2 = qf_binomial(nq, nkq);
+            qfloat_t C1 = qf_binomial(nq, kq);
+            qfloat_t C2 = qf_binomial(nq, nkq);
 
             int ok = qf_close_rel(C1, C2, 1e-30);
 
@@ -3288,10 +3288,10 @@ static void test_qf_binomial_special_cases(void)
 
     for (int i = 0; i < (int)(sizeof(ns)/sizeof(ns[0])); ++i) {
         int n = ns[i];
-        qfloat nq = qf_from_double((double)n);
+        qfloat_t nq = qf_from_double((double)n);
 
-        qfloat Cn0 = qf_binomial(nq, qf_from_double(0.0));
-        qfloat Cn1 = qf_binomial(nq, qf_from_double(1.0));
+        qfloat_t Cn0 = qf_binomial(nq, qf_from_double(0.0));
+        qfloat_t Cn1 = qf_binomial(nq, qf_from_double(1.0));
 
         int ok1 = qf_close_rel(Cn0, qf_from_double(1.0), 1e-30);
         int ok2 = qf_close_rel(Cn1, nq, 1e-30);
@@ -3335,19 +3335,19 @@ static void test_qf_beta_pdf_definition(void)
         for (int j = 0; j < (int)(sizeof(as)/sizeof(as[0])); ++j) {
             for (int k = 0; k < (int)(sizeof(bs)/sizeof(bs[0])); ++k) {
 
-                qfloat x = qf_from_double(xs[i]);
-                qfloat a = qf_from_double(as[j]);
-                qfloat b = qf_from_double(bs[k]);
+                qfloat_t x = qf_from_double(xs[i]);
+                qfloat_t a = qf_from_double(as[j]);
+                qfloat_t b = qf_from_double(bs[k]);
 
-                qfloat pdf = qf_beta_pdf(x, a, b);
+                qfloat_t pdf = qf_beta_pdf(x, a, b);
 
                 /* RHS = x^(a-1) (1-x)^(b-1) / B(a,b) */
-                qfloat xpow   = qf_exp(qf_mul(qf_sub(a, qf_from_double(1.0)), qf_log(x)));
-                qfloat omxpow = qf_exp(qf_mul(qf_sub(b, qf_from_double(1.0)),
+                qfloat_t xpow   = qf_exp(qf_mul(qf_sub(a, qf_from_double(1.0)), qf_log(x)));
+                qfloat_t omxpow = qf_exp(qf_mul(qf_sub(b, qf_from_double(1.0)),
                                               qf_log(qf_sub(qf_from_double(1.0), x))));
-                qfloat B      = qf_beta(a, b);
+                qfloat_t B      = qf_beta(a, b);
 
-                qfloat rhs = qf_div(qf_mul(xpow, omxpow), B);
+                qfloat_t rhs = qf_div(qf_mul(xpow, omxpow), B);
 
                 int ok = qf_close_rel(pdf, rhs, 1e-30);
 
@@ -3382,21 +3382,21 @@ static void test_qf_beta_pdf_logform(void)
         for (int j = 0; j < (int)(sizeof(as)/sizeof(as[0])); ++j) {
             for (int k = 0; k < (int)(sizeof(bs)/sizeof(bs[0])); ++k) {
 
-                qfloat x = qf_from_double(xs[i]);
-                qfloat a = qf_from_double(as[j]);
-                qfloat b = qf_from_double(bs[k]);
+                qfloat_t x = qf_from_double(xs[i]);
+                qfloat_t a = qf_from_double(as[j]);
+                qfloat_t b = qf_from_double(bs[k]);
 
-                qfloat pdf = qf_beta_pdf(x, a, b);
-                qfloat logpdf = qf_log(pdf);
+                qfloat_t pdf = qf_beta_pdf(x, a, b);
+                qfloat_t logpdf = qf_log(pdf);
 
-                qfloat log_x   = qf_log(x);
-                qfloat log_1mx = qf_log(qf_sub(qf_from_double(1.0), x));
+                qfloat_t log_x   = qf_log(x);
+                qfloat_t log_1mx = qf_log(qf_sub(qf_from_double(1.0), x));
 
-                qfloat term1 = qf_mul(qf_sub(a, qf_from_double(1.0)), log_x);
-                qfloat term2 = qf_mul(qf_sub(b, qf_from_double(1.0)), log_1mx);
-                qfloat logB  = qf_logbeta(a, b);
+                qfloat_t term1 = qf_mul(qf_sub(a, qf_from_double(1.0)), log_x);
+                qfloat_t term2 = qf_mul(qf_sub(b, qf_from_double(1.0)), log_1mx);
+                qfloat_t logB  = qf_logbeta(a, b);
 
-                qfloat rhs = qf_sub(qf_add(term1, term2), logB);
+                qfloat_t rhs = qf_sub(qf_add(term1, term2), logB);
 
                 int ok = qf_close_rel(logpdf, rhs, 1e-30);
 
@@ -3431,12 +3431,12 @@ static void test_qf_beta_pdf_symmetry(void)
         for (int j = 0; j < (int)(sizeof(as)/sizeof(as[0])); ++j) {
             for (int k = 0; k < (int)(sizeof(bs)/sizeof(bs[0])); ++k) {
 
-                qfloat x = qf_from_double(xs[i]);
-                qfloat a = qf_from_double(as[j]);
-                qfloat b = qf_from_double(bs[k]);
+                qfloat_t x = qf_from_double(xs[i]);
+                qfloat_t a = qf_from_double(as[j]);
+                qfloat_t b = qf_from_double(bs[k]);
 
-                qfloat f1 = qf_beta_pdf(x, a, b);
-                qfloat f2 = qf_beta_pdf(qf_sub(qf_from_double(1.0), x), b, a);
+                qfloat_t f1 = qf_beta_pdf(x, a, b);
+                qfloat_t f2 = qf_beta_pdf(qf_sub(qf_from_double(1.0), x), b, a);
 
                 int ok = qf_close_rel(f1, f2, 1e-30);
 
@@ -3482,20 +3482,20 @@ static void test_qf_logbeta_pdf_definition(void)
         for (int j = 0; j < (int)(sizeof(as)/sizeof(as[0])); ++j) {
             for (int k = 0; k < (int)(sizeof(bs)/sizeof(bs[0])); ++k) {
 
-                qfloat x = qf_from_double(xs[i]);
-                qfloat a = qf_from_double(as[j]);
-                qfloat b = qf_from_double(bs[k]);
+                qfloat_t x = qf_from_double(xs[i]);
+                qfloat_t a = qf_from_double(as[j]);
+                qfloat_t b = qf_from_double(bs[k]);
 
-                qfloat logpdf = qf_logbeta_pdf(x, a, b);
+                qfloat_t logpdf = qf_logbeta_pdf(x, a, b);
 
-                qfloat log_x   = qf_log(x);
-                qfloat log_1mx = qf_log(qf_sub(qf_from_double(1.0), x));
+                qfloat_t log_x   = qf_log(x);
+                qfloat_t log_1mx = qf_log(qf_sub(qf_from_double(1.0), x));
 
-                qfloat term1 = qf_mul(qf_sub(a, qf_from_double(1.0)), log_x);
-                qfloat term2 = qf_mul(qf_sub(b, qf_from_double(1.0)), log_1mx);
-                qfloat logB  = qf_logbeta(a, b);
+                qfloat_t term1 = qf_mul(qf_sub(a, qf_from_double(1.0)), log_x);
+                qfloat_t term2 = qf_mul(qf_sub(b, qf_from_double(1.0)), log_1mx);
+                qfloat_t logB  = qf_logbeta(a, b);
 
-                qfloat rhs = qf_sub(qf_add(term1, term2), logB);
+                qfloat_t rhs = qf_sub(qf_add(term1, term2), logB);
 
                 int ok = qf_close_rel(logpdf, rhs, 1e-30);
 
@@ -3531,13 +3531,13 @@ static void test_qf_logbeta_pdf_consistency(void)
         for (int j = 0; j < (int)(sizeof(as)/sizeof(as[0])); ++j) {
             for (int k = 0; k < (int)(sizeof(bs)/sizeof(bs[0])); ++k) {
 
-                qfloat x = qf_from_double(xs[i]);
-                qfloat a = qf_from_double(as[j]);
-                qfloat b = qf_from_double(bs[k]);
+                qfloat_t x = qf_from_double(xs[i]);
+                qfloat_t a = qf_from_double(as[j]);
+                qfloat_t b = qf_from_double(bs[k]);
 
-                qfloat pdf    = qf_beta_pdf(x, a, b);
-                qfloat logpdf = qf_logbeta_pdf(x, a, b);
-                qfloat rhs    = qf_log(pdf);
+                qfloat_t pdf    = qf_beta_pdf(x, a, b);
+                qfloat_t logpdf = qf_logbeta_pdf(x, a, b);
+                qfloat_t rhs    = qf_log(pdf);
 
                 int ok = qf_close_rel(logpdf, rhs, 1e-30);
 
@@ -3572,12 +3572,12 @@ static void test_qf_logbeta_pdf_symmetry(void)
         for (int j = 0; j < (int)(sizeof(as)/sizeof(as[0])); ++j) {
             for (int k = 0; k < (int)(sizeof(bs)/sizeof(bs[0])); ++k) {
 
-                qfloat x = qf_from_double(xs[i]);
-                qfloat a = qf_from_double(as[j]);
-                qfloat b = qf_from_double(bs[k]);
+                qfloat_t x = qf_from_double(xs[i]);
+                qfloat_t a = qf_from_double(as[j]);
+                qfloat_t b = qf_from_double(bs[k]);
 
-                qfloat f1 = qf_logbeta_pdf(x, a, b);
-                qfloat f2 = qf_logbeta_pdf(qf_sub(qf_from_double(1.0), x), b, a);
+                qfloat_t f1 = qf_logbeta_pdf(x, a, b);
+                qfloat_t f2 = qf_logbeta_pdf(qf_sub(qf_from_double(1.0), x), b, a);
 
                 int ok = qf_close_rel(f1, f2, 1e-30);
 
@@ -3619,16 +3619,16 @@ static void test_qf_normal_pdf_definition(void)
 
     for (int i = 0; i < (int)(sizeof(xs)/sizeof(xs[0])); ++i) {
 
-        qfloat x = qf_from_double(xs[i]);
-        qfloat pdf = qf_normal_pdf(x);
+        qfloat_t x = qf_from_double(xs[i]);
+        qfloat_t pdf = qf_normal_pdf(x);
 
         /* RHS = exp(-x^2/2) / sqrt(2π) */
-        qfloat x2   = qf_mul(x, x);
-        qfloat expo = qf_mul(qf_neg(x2), qf_from_double(0.5));
-        qfloat e    = qf_exp(expo);
+        qfloat_t x2   = qf_mul(x, x);
+        qfloat_t expo = qf_mul(qf_neg(x2), qf_from_double(0.5));
+        qfloat_t e    = qf_exp(expo);
 
-        qfloat inv_sqrt_2pi = qf_from_string("0.3989422804014326779399460599343819");
-        qfloat rhs = qf_mul(inv_sqrt_2pi, e);
+        qfloat_t inv_sqrt_2pi = qf_from_string("0.3989422804014326779399460599343819");
+        qfloat_t rhs = qf_mul(inv_sqrt_2pi, e);
 
         int ok = qf_close_rel(pdf, rhs, 1e-30);
 
@@ -3656,11 +3656,11 @@ static void test_qf_normal_pdf_symmetry(void)
 
     for (int i = 0; i < (int)(sizeof(xs)/sizeof(xs[0])); ++i) {
 
-        qfloat x  = qf_from_double(xs[i]);
-        qfloat nx = qf_neg(x);
+        qfloat_t x  = qf_from_double(xs[i]);
+        qfloat_t nx = qf_neg(x);
 
-        qfloat fx  = qf_normal_pdf(x);
-        qfloat fnx = qf_normal_pdf(nx);
+        qfloat_t fx  = qf_normal_pdf(x);
+        qfloat_t fnx = qf_normal_pdf(nx);
 
         int ok = qf_close_rel(fx, fnx, 1e-30);
 
@@ -3684,8 +3684,8 @@ static void test_qf_normal_pdf_at_zero(void)
 {
     printf(C_CYAN "TEST: qf_normal_pdf at x=0\n" C_RESET);
 
-    qfloat pdf0 = qf_normal_pdf(qf_from_double(0.0));
-    qfloat expected = qf_from_string("0.3989422804014326779399460599343819");
+    qfloat_t pdf0 = qf_normal_pdf(qf_from_double(0.0));
+    qfloat_t expected = qf_from_string("0.3989422804014326779399460599343819");
 
     int ok = qf_close_rel(pdf0, expected, 1e-30);
 
@@ -3711,17 +3711,17 @@ static void test_qf_normal_pdf_logform(void)
 
     double xs[] = { -2.0, -1.0, -0.5, 0.5, 1.0, 2.0 };
 
-    qfloat log_2pi = qf_log(QF_2PI);
+    qfloat_t log_2pi = qf_log(QF_2PI);
 
     for (int i = 0; i < (int)(sizeof(xs)/sizeof(xs[0])); ++i) {
 
-        qfloat x = qf_from_double(xs[i]);
+        qfloat_t x = qf_from_double(xs[i]);
 
-        qfloat pdf    = qf_normal_pdf(x);
-        qfloat logpdf = qf_log(pdf);
+        qfloat_t pdf    = qf_normal_pdf(x);
+        qfloat_t logpdf = qf_log(pdf);
 
-        qfloat x2     = qf_mul(x, x);
-        qfloat rhs    = qf_sub(qf_mul(qf_from_double(-0.5), log_2pi),
+        qfloat_t x2     = qf_mul(x, x);
+        qfloat_t rhs    = qf_sub(qf_mul(qf_from_double(-0.5), log_2pi),
                                qf_mul(qf_from_double(0.5), x2));
 
         int ok = qf_close_rel(logpdf, rhs, 1e-30);
@@ -3760,17 +3760,17 @@ static void test_qf_normal_cdf_definition(void)
 
     double xs[] = { -3.0, -1.0, -0.5, 0.0, 0.5, 1.0, 3.0 };
 
-    qfloat inv_sqrt2 = QF_SQRT_HALF;
-    qfloat half = qf_from_double(0.5);
-    qfloat one  = qf_from_double(1.0);
+    qfloat_t inv_sqrt2 = QF_SQRT_HALF;
+    qfloat_t half = qf_from_double(0.5);
+    qfloat_t one  = qf_from_double(1.0);
 
     for (int i = 0; i < (int)(sizeof(xs)/sizeof(xs[0])); ++i) {
 
-        qfloat x = qf_from_double(xs[i]);
-        qfloat cdf = qf_normal_cdf(x);
+        qfloat_t x = qf_from_double(xs[i]);
+        qfloat_t cdf = qf_normal_cdf(x);
 
-        qfloat t = qf_mul(x, inv_sqrt2);
-        qfloat rhs = qf_mul(half, qf_add(one, qf_erf(t)));
+        qfloat_t t = qf_mul(x, inv_sqrt2);
+        qfloat_t rhs = qf_mul(half, qf_add(one, qf_erf(t)));
 
         int ok = qf_close_rel(cdf, rhs, 1e-30);
 
@@ -3796,17 +3796,17 @@ static void test_qf_normal_cdf_symmetry(void)
 
     double xs[] = { 0.1, 0.5, 1.0, 2.0, 3.0 };
 
-    qfloat one = qf_from_double(1.0);
+    qfloat_t one = qf_from_double(1.0);
 
     for (int i = 0; i < (int)(sizeof(xs)/sizeof(xs[0])); ++i) {
 
-        qfloat x  = qf_from_double(xs[i]);
-        qfloat nx = qf_neg(x);
+        qfloat_t x  = qf_from_double(xs[i]);
+        qfloat_t nx = qf_neg(x);
 
-        qfloat Fx  = qf_normal_cdf(x);
-        qfloat Fnx = qf_normal_cdf(nx);
+        qfloat_t Fx  = qf_normal_cdf(x);
+        qfloat_t Fnx = qf_normal_cdf(nx);
 
-        qfloat rhs = qf_sub(one, Fx);
+        qfloat_t rhs = qf_sub(one, Fx);
 
         int ok = qf_close_rel(Fnx, rhs, 1e-30);
 
@@ -3831,8 +3831,8 @@ static void test_qf_normal_cdf_known_values(void)
 {
     printf(C_CYAN "TEST: qf_normal_cdf known values\n" C_RESET);
 
-    qfloat F0 = qf_normal_cdf(qf_from_double(0.0));
-    qfloat expected = qf_from_double(0.5);
+    qfloat_t F0 = qf_normal_cdf(qf_from_double(0.0));
+    qfloat_t expected = qf_from_double(0.5);
 
     int ok = qf_close_rel(F0, expected, 1e-30);
 
@@ -3859,35 +3859,35 @@ static void test_qf_normal_cdf_pdf_consistency(void)
     double xs[] = { -2.0, -1.0, -0.5, 0.5, 1.0, 2.0 };
 
     /* h chosen to avoid cancellation but still small */
-    qfloat h = qf_from_double(1e-9);
+    qfloat_t h = qf_from_double(1e-9);
 
-    qfloat two   = qf_from_double(2.0);
-    qfloat three = qf_from_double(3.0);
-    qfloat four  = qf_from_double(4.0);
+    qfloat_t two   = qf_from_double(2.0);
+    qfloat_t three = qf_from_double(3.0);
+    qfloat_t four  = qf_from_double(4.0);
 
-    qfloat c3    = qf_from_double(3.0);
-    qfloat c32   = qf_from_double(32.0);
-    qfloat c168  = qf_from_double(168.0);
-    qfloat c672  = qf_from_double(672.0);
-    qfloat c840  = qf_from_double(840.0);
+    qfloat_t c3    = qf_from_double(3.0);
+    qfloat_t c32   = qf_from_double(32.0);
+    qfloat_t c168  = qf_from_double(168.0);
+    qfloat_t c672  = qf_from_double(672.0);
+    qfloat_t c840  = qf_from_double(840.0);
 
     for (int i = 0; i < (int)(sizeof(xs)/sizeof(xs[0])); ++i) {
 
-        qfloat x = qf_from_double(xs[i]);
+        qfloat_t x = qf_from_double(xs[i]);
 
         /* Evaluate Φ at shifted points */
-        qfloat Fm4 = qf_normal_cdf(qf_sub(x, qf_mul(four, h)));
-        qfloat Fm3 = qf_normal_cdf(qf_sub(x, qf_mul(three, h)));
-        qfloat Fm2 = qf_normal_cdf(qf_sub(x, qf_mul(two, h)));
-        qfloat Fm1 = qf_normal_cdf(qf_sub(x, h));
+        qfloat_t Fm4 = qf_normal_cdf(qf_sub(x, qf_mul(four, h)));
+        qfloat_t Fm3 = qf_normal_cdf(qf_sub(x, qf_mul(three, h)));
+        qfloat_t Fm2 = qf_normal_cdf(qf_sub(x, qf_mul(two, h)));
+        qfloat_t Fm1 = qf_normal_cdf(qf_sub(x, h));
 
-        qfloat Fp1 = qf_normal_cdf(qf_add(x, h));
-        qfloat Fp2 = qf_normal_cdf(qf_add(x, qf_mul(two, h)));
-        qfloat Fp3 = qf_normal_cdf(qf_add(x, qf_mul(three, h)));
-        qfloat Fp4 = qf_normal_cdf(qf_add(x, qf_mul(four, h)));
+        qfloat_t Fp1 = qf_normal_cdf(qf_add(x, h));
+        qfloat_t Fp2 = qf_normal_cdf(qf_add(x, qf_mul(two, h)));
+        qfloat_t Fp3 = qf_normal_cdf(qf_add(x, qf_mul(three, h)));
+        qfloat_t Fp4 = qf_normal_cdf(qf_add(x, qf_mul(four, h)));
 
         /* 9-point stencil numerator */
-        qfloat num = {0.0, 0.0};
+        qfloat_t num = {0.0, 0.0};
 
         num = qf_add(num, qf_mul(c3,   Fm4));
         num = qf_sub(num, qf_mul(c32,  Fm3));
@@ -3900,10 +3900,10 @@ static void test_qf_normal_cdf_pdf_consistency(void)
         num = qf_sub(num, qf_mul(c3,   Fp4));
 
         /* denominator = 840 h */
-        qfloat denom = qf_mul(c840, h);
+        qfloat_t denom = qf_mul(c840, h);
 
-        qfloat dF = qf_div(num, denom);
-        qfloat pdf = qf_normal_pdf(x);
+        qfloat_t dF = qf_div(num, denom);
+        qfloat_t pdf = qf_normal_pdf(x);
 
         int ok = qf_close_rel(dF, pdf, 1e-22);
 
@@ -3941,16 +3941,16 @@ static void test_qf_normal_logpdf_definition(void)
 
     double xs[] = { -3.0, -1.0, -0.5, 0.0, 0.5, 1.0, 3.0 };
 
-    qfloat log_2pi = QF_LN_2PI;
-    qfloat half = qf_from_double(0.5);
+    qfloat_t log_2pi = QF_LN_2PI;
+    qfloat_t half = qf_from_double(0.5);
 
     for (int i = 0; i < (int)(sizeof(xs)/sizeof(xs[0])); ++i) {
 
-        qfloat x = qf_from_double(xs[i]);
-        qfloat logpdf = qf_normal_logpdf(x);
+        qfloat_t x = qf_from_double(xs[i]);
+        qfloat_t logpdf = qf_normal_logpdf(x);
 
-        qfloat x2 = qf_mul(x, x);
-        qfloat rhs = qf_neg(qf_add(qf_mul(half, log_2pi),
+        qfloat_t x2 = qf_mul(x, x);
+        qfloat_t rhs = qf_neg(qf_add(qf_mul(half, log_2pi),
                                    qf_mul(half, x2)));
 
         int ok = qf_close_rel(logpdf, rhs, 1e-30);
@@ -3980,11 +3980,11 @@ static void test_qf_normal_logpdf_consistency(void)
 
     for (int i = 0; i < (int)(sizeof(xs)/sizeof(xs[0])); ++i) {
 
-        qfloat x = qf_from_double(xs[i]);
+        qfloat_t x = qf_from_double(xs[i]);
 
-        qfloat logpdf = qf_normal_logpdf(x);
-        qfloat pdf    = qf_normal_pdf(x);
-        qfloat rhs    = qf_log(pdf);
+        qfloat_t logpdf = qf_normal_logpdf(x);
+        qfloat_t pdf    = qf_normal_pdf(x);
+        qfloat_t rhs    = qf_log(pdf);
 
         int ok = qf_close_rel(logpdf, rhs, 1e-30);
 
@@ -4012,11 +4012,11 @@ static void test_qf_normal_logpdf_symmetry(void)
 
     for (int i = 0; i < (int)(sizeof(xs)/sizeof(xs[0])); ++i) {
 
-        qfloat x  = qf_from_double(xs[i]);
-        qfloat nx = qf_neg(x);
+        qfloat_t x  = qf_from_double(xs[i]);
+        qfloat_t nx = qf_neg(x);
 
-        qfloat fx  = qf_normal_logpdf(x);
-        qfloat fnx = qf_normal_logpdf(nx);
+        qfloat_t fx  = qf_normal_logpdf(x);
+        qfloat_t fnx = qf_normal_logpdf(nx);
 
         int ok = qf_close_rel(fx, fnx, 1e-30);
 
@@ -4041,8 +4041,8 @@ static void test_qf_normal_logpdf_at_zero(void)
 {
     printf(C_CYAN "TEST: qf_normal_logpdf at x=0\n" C_RESET);
 
-    qfloat logpdf0 = qf_normal_logpdf(qf_from_double(0.0));
-    qfloat expected = qf_neg(qf_mul(qf_from_double(0.5), QF_LN_2PI));
+    qfloat_t logpdf0 = qf_normal_logpdf(qf_from_double(0.0));
+    qfloat_t expected = qf_neg(qf_mul(qf_from_double(0.5), QF_LN_2PI));
 
     int ok = qf_close_rel(logpdf0, expected, 1e-30);
 
@@ -4080,10 +4080,10 @@ static void test_qf_productlog_definition(void)
 
     for (int i = 0; i < (int)(sizeof(xs)/sizeof(xs[0])); ++i) {
 
-        qfloat x = qf_from_double(xs[i]);
-        qfloat w = qf_productlog(x);
+        qfloat_t x = qf_from_double(xs[i]);
+        qfloat_t w = qf_productlog(x);
 
-        qfloat lhs = qf_mul(w, qf_exp(w));
+        qfloat_t lhs = qf_mul(w, qf_exp(w));
 
         int ok = qf_close(lhs, x, 1e-30);
 
@@ -4112,10 +4112,10 @@ static void test_qf_productlog_consistency(void)
 
     for (int i = 0; i < (int)(sizeof(xs)/sizeof(xs[0])); ++i) {
 
-        qfloat x = qf_from_double(xs[i]);
+        qfloat_t x = qf_from_double(xs[i]);
 
-        qfloat p = qf_productlog(x);
-        qfloat w = qf_lambert_w0(x);
+        qfloat_t p = qf_productlog(x);
+        qfloat_t w = qf_lambert_w0(x);
 
         int ok = qf_close(p, w, 1e-30);
 
@@ -4139,21 +4139,21 @@ static void test_qf_productlog_special(void)
 {
     printf(C_CYAN "TEST: qf_productlog special values\n" C_RESET);
 
-    qfloat zero = qf_from_double(0.0);
-    qfloat one  = qf_from_double(1.0);
+    qfloat_t zero = qf_from_double(0.0);
+    qfloat_t one  = qf_from_double(1.0);
 
     /* W(0) = 0 */
-    qfloat w0 = qf_productlog(zero);
+    qfloat_t w0 = qf_productlog(zero);
     int ok1 = qf_close(w0, zero, 1e-30);
 
     /* W(-1/e) = -1 */
-    qfloat x = qf_neg(qf_exp(qf_neg(one))); /* -1/e */
-    qfloat w = qf_productlog(x);
+    qfloat_t x = qf_neg(qf_exp(qf_neg(one))); /* -1/e */
+    qfloat_t w = qf_productlog(x);
     int ok2 = qf_close_rel(w, qf_neg(one), 1e-30);
 
     /* W(e) = 1 */
-    qfloat xe = qf_exp(one);
-    qfloat we = qf_productlog(xe);
+    qfloat_t xe = qf_exp(one);
+    qfloat_t we = qf_productlog(xe);
     int ok3 = qf_close(we, one, 1e-30);
 
     if (ok1 && ok2 && ok3) {
@@ -4178,12 +4178,12 @@ static void test_qf_productlog_monotonicity(void)
 
     double xs[] = { -0.3, -0.1, 0.0, 0.2, 1.0, 3.0 };
 
-    qfloat prev = qf_productlog(qf_from_double(xs[0]));
+    qfloat_t prev = qf_productlog(qf_from_double(xs[0]));
 
     for (int i = 1; i < (int)(sizeof(xs)/sizeof(xs[0])); ++i) {
 
-        qfloat x = qf_from_double(xs[i]);
-        qfloat w = qf_productlog(x);
+        qfloat_t x = qf_from_double(xs[i]);
+        qfloat_t w = qf_productlog(x);
 
         if (qf_lt(w, prev)) {
             printf(C_RED "  FAIL: W(%g) < W(%g)  [%s:%d]\n" C_RESET, xs[i], xs[i-1], __FILE__, __LINE__);
@@ -4224,12 +4224,12 @@ static void test_qf_gammainc_PQ_identity(void)
     for (int i = 0; i < (int)(sizeof(ss)/sizeof(ss[0])); ++i) {
         for (int j = 0; j < (int)(sizeof(xs)/sizeof(xs[0])); ++j) {
 
-            qfloat s = qf_from_double(ss[i]);
-            qfloat x = qf_from_double(xs[j]);
+            qfloat_t s = qf_from_double(ss[i]);
+            qfloat_t x = qf_from_double(xs[j]);
 
-            qfloat P = qf_gammainc_P(s, x);
-            qfloat Q = qf_gammainc_Q(s, x);
-            qfloat sum = qf_add(P, Q);
+            qfloat_t P = qf_gammainc_P(s, x);
+            qfloat_t Q = qf_gammainc_Q(s, x);
+            qfloat_t sum = qf_add(P, Q);
 
             int ok = qf_close_rel(sum, qf_from_double(1.0), 1e-30);
 
@@ -4263,14 +4263,14 @@ static void test_qf_gammainc_lower_upper_identity(void)
     for (int i = 0; i < (int)(sizeof(ss)/sizeof(ss[0])); ++i) {
         for (int j = 0; j < (int)(sizeof(xs)/sizeof(xs[0])); ++j) {
 
-            qfloat s = qf_from_double(ss[i]);
-            qfloat x = qf_from_double(xs[j]);
+            qfloat_t s = qf_from_double(ss[i]);
+            qfloat_t x = qf_from_double(xs[j]);
 
-            qfloat gl = qf_gammainc_lower(s, x);
-            qfloat gu = qf_gammainc_upper(s, x);
-            qfloat sum = qf_add(gl, gu);
+            qfloat_t gl = qf_gammainc_lower(s, x);
+            qfloat_t gu = qf_gammainc_upper(s, x);
+            qfloat_t sum = qf_add(gl, gu);
 
-            qfloat gs = qf_gamma(s);
+            qfloat_t gs = qf_gamma(s);
 
             int ok = qf_close_rel(sum, gs, 1e-30);
 
@@ -4306,15 +4306,15 @@ static void test_qf_gammainc_special_s1(void)
 
     for (int j = 0; j < (int)(sizeof(xs)/sizeof(xs[0])); ++j) {
 
-        qfloat x = qf_from_double(xs[j]);
-        qfloat s = qf_from_double(1.0);
+        qfloat_t x = qf_from_double(xs[j]);
+        qfloat_t s = qf_from_double(1.0);
 
-        qfloat e_minus_x = qf_exp(qf_neg(x));
-        qfloat expected_lower = qf_sub(qf_from_double(1.0), e_minus_x);
-        qfloat expected_upper = e_minus_x;
+        qfloat_t e_minus_x = qf_exp(qf_neg(x));
+        qfloat_t expected_lower = qf_sub(qf_from_double(1.0), e_minus_x);
+        qfloat_t expected_upper = e_minus_x;
 
-        qfloat gl = qf_gammainc_lower(s, x);
-        qfloat gu = qf_gammainc_upper(s, x);
+        qfloat_t gl = qf_gammainc_lower(s, x);
+        qfloat_t gu = qf_gammainc_upper(s, x);
 
         int ok1 = qf_close_rel(gl, expected_lower, 1e-30);
         int ok2 = qf_close_rel(gu, expected_upper, 1e-30);
@@ -4347,38 +4347,38 @@ static void test_qf_gammainc_all(void)
 /* Approximate derivative using symmetric difference:
  *   f'(x) ≈ (f(x+h) - f(x-h)) / (2h)
  */
-static qfloat qf_deriv_sym(qfloat (*f)(qfloat), qfloat x, double h_d)
+static qfloat_t qf_deriv_sym(qfloat_t (*f)(qfloat_t), qfloat_t x, double h_d)
 {
-    qfloat h = qf_from_double(h_d);
+    qfloat_t h = qf_from_double(h_d);
 
     /* x ± k h */
-    qfloat x1p = qf_add(x, h);
-    qfloat x1m = qf_sub(x, h);
+    qfloat_t x1p = qf_add(x, h);
+    qfloat_t x1m = qf_sub(x, h);
 
-    qfloat x2p = qf_add(x, qf_mul(qf_from_double(2.0), h));
-    qfloat x2m = qf_sub(x, qf_mul(qf_from_double(2.0), h));
+    qfloat_t x2p = qf_add(x, qf_mul(qf_from_double(2.0), h));
+    qfloat_t x2m = qf_sub(x, qf_mul(qf_from_double(2.0), h));
 
-    qfloat x3p = qf_add(x, qf_mul(qf_from_double(3.0), h));
-    qfloat x3m = qf_sub(x, qf_mul(qf_from_double(3.0), h));
+    qfloat_t x3p = qf_add(x, qf_mul(qf_from_double(3.0), h));
+    qfloat_t x3m = qf_sub(x, qf_mul(qf_from_double(3.0), h));
 
-    qfloat x4p = qf_add(x, qf_mul(qf_from_double(4.0), h));
-    qfloat x4m = qf_sub(x, qf_mul(qf_from_double(4.0), h));
+    qfloat_t x4p = qf_add(x, qf_mul(qf_from_double(4.0), h));
+    qfloat_t x4m = qf_sub(x, qf_mul(qf_from_double(4.0), h));
 
     /* function evaluations */
-    qfloat f1p = f(x1p), f1m = f(x1m);
-    qfloat f2p = f(x2p), f2m = f(x2m);
-    qfloat f3p = f(x3p), f3m = f(x3m);
-    qfloat f4p = f(x4p), f4m = f(x4m);
+    qfloat_t f1p = f(x1p), f1m = f(x1m);
+    qfloat_t f2p = f(x2p), f2m = f(x2m);
+    qfloat_t f3p = f(x3p), f3m = f(x3m);
+    qfloat_t f4p = f(x4p), f4m = f(x4m);
 
     /* coefficients */
-    qfloat c1 = qf_from_double(672.0);
-    qfloat c2 = qf_from_double(-168.0);
-    qfloat c3 = qf_from_double(32.0);
-    qfloat c4 = qf_from_double(-3.0);
-    qfloat cden = qf_from_double(840.0);
+    qfloat_t c1 = qf_from_double(672.0);
+    qfloat_t c2 = qf_from_double(-168.0);
+    qfloat_t c3 = qf_from_double(32.0);
+    qfloat_t c4 = qf_from_double(-3.0);
+    qfloat_t cden = qf_from_double(840.0);
 
     /* numerator */
-    qfloat num = {0.0, 0.0};
+    qfloat_t num = {0.0, 0.0};
 
     num = qf_add(num, qf_mul(c1, qf_sub(f1p, f1m)));
     num = qf_add(num, qf_mul(c2, qf_sub(f2p, f2m)));
@@ -4386,7 +4386,7 @@ static qfloat qf_deriv_sym(qfloat (*f)(qfloat), qfloat x, double h_d)
     num = qf_add(num, qf_mul(c4, qf_sub(f4p, f4m)));
 
     /* denominator = 840 h */
-    qfloat den = qf_mul(cden, h);
+    qfloat_t den = qf_mul(cden, h);
 
     return qf_div(num, den);
 }
@@ -4400,13 +4400,13 @@ static void test_qf_ei_deriv(void)
     int n = (int)(sizeof(xs) / sizeof(xs[0]));
 
     for (int i = 0; i < n; ++i) {
-        qfloat x   = qf_from_double(xs[i]);
-        qfloat dEi = qf_deriv_sym(qf_ei, x, 1e-8);
+        qfloat_t x   = qf_from_double(xs[i]);
+        qfloat_t dEi = qf_deriv_sym(qf_ei, x, 1e-8);
 
-        qfloat ex  = qf_exp(x);
-        qfloat rhs = qf_div(ex, x); /* e^x / x */
+        qfloat_t ex  = qf_exp(x);
+        qfloat_t rhs = qf_div(ex, x); /* e^x / x */
 
-        qfloat res = qf_sub(dEi, rhs);
+        qfloat_t res = qf_sub(dEi, rhs);
 
         int ok = qf_close_rel(dEi, rhs, 1.02e-22);
 
@@ -4433,15 +4433,15 @@ static void test_qf_e1_deriv(void)
     int n = (int)(sizeof(xs) / sizeof(xs[0]));
 
     for (int i = 0; i < n; ++i) {
-        qfloat x    = qf_from_double(xs[i]);
-        qfloat dE1  = qf_deriv_sym(qf_e1, x, 1e-8);
+        qfloat_t x    = qf_from_double(xs[i]);
+        qfloat_t dE1  = qf_deriv_sym(qf_e1, x, 1e-8);
 
-        qfloat nx   = qf_neg(x);
-        qfloat emx  = qf_exp(nx);          /* e^{-x} */
-        qfloat rhs  = qf_div(emx, x);      /* e^{-x} / x */
+        qfloat_t nx   = qf_neg(x);
+        qfloat_t emx  = qf_exp(nx);          /* e^{-x} */
+        qfloat_t rhs  = qf_div(emx, x);      /* e^{-x} / x */
         rhs         = qf_neg(rhs);         /* -e^{-x} / x */
 
-        qfloat res  = qf_sub(dE1, rhs);
+        qfloat_t res  = qf_sub(dE1, rhs);
 
         int ok = qf_close_rel(dE1, rhs, 1e-20);
 
@@ -4468,13 +4468,13 @@ static void test_qf_ei_e1_identity(void)
     int n = (int)(sizeof(xs) / sizeof(xs[0]));
 
     for (int i = 0; i < n; ++i) {
-        qfloat x   = qf_from_double(xs[i]);
-        qfloat nx  = qf_neg(x);
+        qfloat_t x   = qf_from_double(xs[i]);
+        qfloat_t nx  = qf_neg(x);
 
-        qfloat e1  = qf_e1(x);
-        qfloat ei  = qf_ei(nx);
+        qfloat_t e1  = qf_e1(x);
+        qfloat_t ei  = qf_ei(nx);
 
-        qfloat sum = qf_add(e1, ei); /* should be ~0 */
+        qfloat_t sum = qf_add(e1, ei); /* should be ~0 */
 
         int ok = qf_close(sum, qf_from_double(0.0), 1e-30);
 
@@ -4532,14 +4532,14 @@ static void test_ei_values(void)
 
     for (int i = 0; i < n; ++i) {
 
-        qfloat x   = qf_from_string(cases[i].x_str);
-        qfloat ref = qf_from_string(cases[i].ref_str);
-        qfloat got = qf_ei(x);
+        qfloat_t x   = qf_from_string(cases[i].x_str);
+        qfloat_t ref = qf_from_string(cases[i].ref_str);
+        qfloat_t got = qf_ei(x);
 
-        qfloat diff = qf_sub(got, ref);
-        qfloat ad   = qf_abs(diff);
+        qfloat_t diff = qf_sub(got, ref);
+        qfloat_t ad   = qf_abs(diff);
 
-        /* qfloat-level tolerance */
+        /* qfloat_t-level tolerance */
         int pass = (ad.hi < cases[i].tolerance);
 
         if (pass) {
@@ -4670,10 +4670,10 @@ void test_readme_examples(void) {
 
     for (int i = 0; inputs[i] != NULL; i++) {
         /* Parse x from a decimal string */
-        qfloat x = qf_from_string(inputs[i]);
+        qfloat_t x = qf_from_string(inputs[i]);
 
         /* Compute the principal branch W0(x) */
-        qfloat w = qf_lambert_w0(x);
+        qfloat_t w = qf_lambert_w0(x);
 
         qf_printf("W0(%s) = %q\n", inputs[i], w);
     }    
@@ -4683,13 +4683,13 @@ void test_readme_examples(void) {
    ----------------------------------------------------------- */
 
 int tests_main() {
-    // qfloat x = qf_from_string("1.837877066409345483560659472811235");
-    // char* s = "QF_LN_2PI";
-    // printf("const qfloat %s = {\n    %.17g,\n    %.17g\n};\n", s, x.hi, x.lo);
-    // printf("extern const qfloat %s;\n", s);
+    // qfloat_t x = qf_from_string("1.7724538509055160272981674833411451827975494561223871282138");
+    // char* s = "QF_SQRT_PI";
+    // printf("const qfloat_t %s = {\n    %.17g,\n    %.17g\n};\n", s, x.hi, x.lo);
+    // printf("extern const qfloat_t %s;\n", s);
     // exit(0);
 
-    printf(C_YELLOW "Running qfloat tests...\n\n" C_RESET);
+    printf(C_YELLOW "Running qfloat_t tests...\n\n" C_RESET);
 
     RUN_TEST(test_arithmetic, NULL);
     RUN_TEST(test_strings, NULL);

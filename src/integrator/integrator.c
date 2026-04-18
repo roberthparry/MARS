@@ -9,7 +9,7 @@
 #define GK_GAUSS    4   /* Gauss nodes at t[0], t[2], t[4], t[6] */
 
 /* Kronrod abscissae (non-negative) */
-static qfloat t_node[GK_NODES] =  {
+static qfloat_t t_node[GK_NODES] =  {
     { 0.0, 0.0 },
     { 0.20778495500789848, -1.3226987786329531e-17 },
     { 0.40584515137739718, -1.7249275447547112e-17 },
@@ -21,7 +21,7 @@ static qfloat t_node[GK_NODES] =  {
 };
 
 /* Kronrod weights   */
-static qfloat wk[GK_NODES] = {
+static qfloat_t wk[GK_NODES] = {
     { 0.20948214108472782, 9.3212527821842532e-18 },
     { 0.20443294007529889, 6.7404018028659684e-18 },
     { 0.19035057806478542, -9.6165132809012221e-18 },
@@ -33,7 +33,7 @@ static qfloat wk[GK_NODES] = {
 };
 
 /* Gauss weights     */
-static qfloat wg[GK_GAUSS] = {
+static qfloat_t wg[GK_GAUSS] = {
     { 0.4179591836734694, -1.54978071192573e-17 },
     { 0.38183005050511892, 2.1862747923778412e-17 },
     { 0.27970539148927664, 2.3267180221717125e-17 },
@@ -45,30 +45,30 @@ static qfloat wg[GK_GAUSS] = {
  * ------------------------------------------------------------------- */
 
 static void gk15_eval(integrand_fn f, void *ctx,
-                      qfloat a, qfloat b,
-                      qfloat *k15_out, qfloat *g7_out) {
-    qfloat c = qf_mul_double(qf_add(a, b), 0.5);
-    qfloat h = qf_mul_double(qf_sub(b, a), 0.5);
+                      qfloat_t a, qfloat_t b,
+                      qfloat_t *k15_out, qfloat_t *g7_out) {
+    qfloat_t c = qf_mul_double(qf_add(a, b), 0.5);
+    qfloat_t h = qf_mul_double(qf_sub(b, a), 0.5);
 
     /* Evaluate f at center */
-    qfloat f0 = f(c, ctx);
+    qfloat_t f0 = f(c, ctx);
 
     /* Evaluate f at the 7 symmetric pairs and accumulate K15 */
-    qfloat fpos[7], fneg[7];
+    qfloat_t fpos[7], fneg[7];
     for (int i = 0; i < 7; i++) {
-        qfloat hi = qf_mul(h, t_node[i + 1]);
+        qfloat_t hi = qf_mul(h, t_node[i + 1]);
         fpos[i] = f(qf_add(c, hi), ctx);
         fneg[i] = f(qf_sub(c, hi), ctx);
     }
 
     /* K15: center + 7 symmetric pairs */
-    qfloat k15 = qf_mul(wk[0], f0);
+    qfloat_t k15 = qf_mul(wk[0], f0);
     for (int i = 0; i < 7; i++)
         k15 = qf_add(k15, qf_mul(wk[i + 1], qf_add(fpos[i], fneg[i])));
 
     /* G7: center (t[0]) + pairs at t[2], t[4], t[6]
        In fpos/fneg those correspond to indices 1, 3, 5 respectively  */
-    qfloat g7 = qf_mul(wg[0], f0);
+    qfloat_t g7 = qf_mul(wg[0], f0);
     g7 = qf_add(g7, qf_mul(wg[1], qf_add(fpos[1], fneg[1])));
     g7 = qf_add(g7, qf_mul(wg[2], qf_add(fpos[3], fneg[3])));
     g7 = qf_add(g7, qf_mul(wg[3], qf_add(fpos[5], fneg[5])));
@@ -82,8 +82,8 @@ static void gk15_eval(integrand_fn f, void *ctx,
  * ------------------------------------------------------------------- */
 
 struct integrator_t {
-    qfloat abs_tol;
-    qfloat rel_tol;
+    qfloat_t abs_tol;
+    qfloat_t rel_tol;
     size_t max_intervals;
     size_t last_intervals;
 };
@@ -102,7 +102,7 @@ void integrator_destroy(integrator_t *ig) {
     free(ig);
 }
 
-void integrator_set_tol(integrator_t *ig, qfloat abs_tol, qfloat rel_tol) {
+void integrator_set_tol(integrator_t *ig, qfloat_t abs_tol, qfloat_t rel_tol) {
     if (!ig) return;
     ig->abs_tol = abs_tol;
     ig->rel_tol = rel_tol;
@@ -122,13 +122,13 @@ size_t integrator_last_intervals(const integrator_t *ig) {
  * ------------------------------------------------------------------- */
 
 typedef struct {
-    qfloat a, b;
-    qfloat result;
-    qfloat error;
+    qfloat_t a, b;
+    qfloat_t result;
+    qfloat_t error;
 } subinterval_t;
 
 int integrator_eval(integrator_t *ig, integrand_fn f, void *ctx,
-                    qfloat a, qfloat b, qfloat *result, qfloat *error_est) {
+                    qfloat_t a, qfloat_t b, qfloat_t *result, qfloat_t *error_est) {
     if (!ig || !f || !result) return -1;
 
     size_t capacity = 64;
@@ -136,7 +136,7 @@ int integrator_eval(integrator_t *ig, integrand_fn f, void *ctx,
     if (!intervals) return -1;
 
     /* Evaluate the initial interval */
-    qfloat k15, g7;
+    qfloat_t k15, g7;
     gk15_eval(f, ctx, a, b, &k15, &g7);
 
     intervals[0].a      = a;
@@ -145,15 +145,15 @@ int integrator_eval(integrator_t *ig, integrand_fn f, void *ctx,
     intervals[0].error  = qf_abs(qf_sub(k15, g7));
 
     size_t count      = 1;
-    qfloat total      = k15;
-    qfloat total_err  = intervals[0].error;
+    qfloat_t total      = k15;
+    qfloat_t total_err  = intervals[0].error;
 
     int status = 0;
 
     while (1) {
         /* Convergence check */
-        qfloat thresh = ig->abs_tol;
-        qfloat rel    = qf_mul(ig->rel_tol, qf_abs(total));
+        qfloat_t thresh = ig->abs_tol;
+        qfloat_t rel    = qf_mul(ig->rel_tol, qf_abs(total));
         if (qf_gt(rel, thresh)) thresh = rel;
         if (qf_le(qf_abs(total_err), thresh)) break;
 
@@ -167,7 +167,7 @@ int integrator_eval(integrator_t *ig, integrand_fn f, void *ctx,
         }
 
         /* Bisect the worst interval */
-        qfloat mid = qf_mul_double(qf_add(intervals[worst].a,
+        qfloat_t mid = qf_mul_double(qf_add(intervals[worst].a,
                                            intervals[worst].b), 0.5);
 
         subinterval_t left, right;

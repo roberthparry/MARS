@@ -858,7 +858,7 @@ static int parse_bindings(const char *s, const char *end,
         char *vbuf = (char *)fs_xmalloc(vlen + 1);
         memcpy(vbuf, val_start, vlen);
         vbuf[vlen] = '\0';
-        qfloat val = qf_from_string(vbuf);
+        qfloat_t val = qf_from_string(vbuf);
         free(vbuf);
 
         dval_t *node = is_var
@@ -932,7 +932,7 @@ static dval_t *parse_pure_const(const char *s, const char *end,
     char *vbuf = (char *)fs_xmalloc(vlen + 1);
     memcpy(vbuf, val_start, vlen);
     vbuf[vlen] = '\0';
-    qfloat val = qf_from_string(vbuf);
+    qfloat_t val = qf_from_string(vbuf);
     free(vbuf);
 
     if (!name) {

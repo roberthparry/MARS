@@ -1,6 +1,6 @@
 /* qfloat.c - double-double precision arithmetic (~106-bit / ~32 decimal digits)
  *
- * Implements the qfloat type declared in qfloat.h.  See that header for the
+ * Implements the qfloat_t type declared in qfloat.h.  See that header for the
  * representation, invariants, and algorithm references (Dekker, Knuth, Bailey).
  *
  * Organisation:
@@ -27,116 +27,118 @@
 
 /* Constants */
 
-const qfloat QF_MAX = {
-    1.79769313486231570815e+308,
-    9.97920154767359795037e+291
-};
-
-const qfloat QF_NAN = {
+const qfloat_t QF_NAN = {
     NAN,
     NAN
 };
 
-const qfloat QF_INF  = { INFINITY, 0.0 };
+const qfloat_t QF_INF  = { INFINITY, 0.0 };
 
-const qfloat QF_NINF = { -INFINITY, 0.0 };
+const qfloat_t QF_NINF = { -INFINITY, 0.0 };
 
-const qfloat QF_PI = {
+const qfloat_t QF_MAX = {
+    1.79769313486231570815e+308,
+    9.97920154767359795037e+291
+};
+
+const qfloat_t QF_PI = {
     3.14159265358979311600e+00,
     1.2246467991473532072e-16
 };
 
-const qfloat QF_2PI = {
+const qfloat_t QF_2PI = {
     6.28318530717958623200e+00,
     2.4492935982947064144e-16
 };
 
-const qfloat QF_PI_2 = {
+const qfloat_t QF_PI_2 = {
     1.57079632679489655800e+00,
     6.123233995736766036e-17
 };
 
-const qfloat QF_PI_4 = {
+const qfloat_t QF_PI_4 = {
     7.8539816339744827900e-01,
     3.061616997868383018e-17
 };
 
-const qfloat QF_3PI_4 = {
+const qfloat_t QF_3PI_4 = {
     2.356194490192344837e+00,
     9.1848509936051484375e-17
 };
 
-const qfloat QF_PI_6 = { 
+const qfloat_t QF_PI_6 = {
     0.52359877559829893,
-    -5.3604088322554746e-17 
+    -5.3604088322554746e-17
 };
 
-const qfloat QF_PI_3 = { 
+const qfloat_t QF_PI_3 = {
     1.0471975511965979,
     -1.0720817664510948e-16
 };
 
-const qfloat QF_2_PI = {
+const qfloat_t QF_2_PI = {
     0.63661977236758134308,   /* hi */
-    -1.073741823e-17          /* lo (approx; compute with your qfloat printer) */
+    -1.073741823e-17          /* lo (approx; compute with your qfloat_t printer) */
 };
 
-const qfloat QF_LN2 = {
-    6.9314718055994530941723212145817656e-01,   // hi (double)
-    2.3190468138462995584177710792423e-17       // lo = ln2 - hi
-};
-
-const qfloat QF_INVLN2 = {
-    1.4426950408889634073599246810019e+00,      // hi (double)
-    2.0355273740931032980408127082449e-17       // lo = 1/ln2 - hi
-};
-
-const qfloat QF_SQRT_HALF = {
-    0.70710678118654757,
-    -4.8336466567264851e-17 
-};
-
-const qfloat QF_E = {
+const qfloat_t QF_E = {
     2.718281828459045091e+00,
     1.445646891729250158e-16
 };
 
-const qfloat QF_INV_E = {
+const qfloat_t QF_INV_E = {
     0.36787944117144233,
     -1.2428753672788614e-17
 };
 
-const qfloat QF_SQRT1ONPI = {
+const qfloat_t QF_LN2 = {
+    6.9314718055994530941723212145817656e-01,   // hi (double)
+    2.3190468138462995584177710792423e-17       // lo = ln2 - hi
+};
+
+const qfloat_t QF_INVLN2 = {
+    1.4426950408889634073599246810019e+00,      // hi (double)
+    2.0355273740931032980408127082449e-17       // lo = 1/ln2 - hi
+};
+
+const qfloat_t QF_SQRT_HALF = {
+    0.70710678118654757,
+    -4.8336466567264851e-17
+};
+
+const qfloat_t QF_SQRT_PI = {
+    1.7724538509055161,
+    -7.6665864998258049e-17
+};
+
+const qfloat_t QF_SQRT1ONPI = {
     0.56418958354775628,
     7.6677298065829314e-18
 };
 
-const qfloat QF_2_SQRTPI = { 
+const qfloat_t QF_2_SQRTPI = {
     1.1283791670955126,
-    1.5335459613165487e-17 
+    1.5335459613165487e-17
 };
 
-const qfloat QF_LOG_SQRT_2PI = { 
-    0.91893853320467278, 
-    -3.8782941580672716e-17
-};
-
-/// @brief Euler–Mascheroni constant γ
-const qfloat QF_EULER_MASCHERONI = { 
-    0.57721566490153287,
-    -4.9429151524310308e-18
-};
-
-/// @brief 1/sqrt(2pi)
-const qfloat QF_INV_SQRT_2PI = {
+const qfloat_t QF_INV_SQRT_2PI = {
     0.3989422804014327,
     -2.4923272022777433e-17
 };
 
-/// @brief ln(2pi)
-const qfloat QF_LN_2PI = {
+const qfloat_t QF_LOG_SQRT_2PI = {
+    0.91893853320467278,
+    -3.8782941580672716e-17
+};
+
+const qfloat_t QF_LN_2PI = {
     1.8378770664093456,
     -7.7565883161345433e-17
+};
+
+const qfloat_t QF_EULER_MASCHERONI = {
+    0.57721566490153287,
+    -4.9429151524310308e-18
 };
 
 const double QF_EPS = 4.93038065763132e-32;
@@ -167,9 +169,9 @@ static inline void quick_two_sum(double a, double b, double *s, double *e)
 
 /* Renormalization */
 
-qfloat qf_renorm(double hi, double lo)
+qfloat_t qf_renorm(double hi, double lo)
 {
-    qfloat r;
+    qfloat_t r;
     double s, e;
     quick_two_sum(hi, lo, &s, &e);
     r.hi = s;
@@ -179,37 +181,37 @@ qfloat qf_renorm(double hi, double lo)
 
 /* Constructors */
 
-inline qfloat qf_from_double(double x)
+inline qfloat_t qf_from_double(double x)
 {
-    return (qfloat) { x, 0.0 };
+    return (qfloat_t) { x, 0.0 };
 }
 
-inline double qf_to_double(qfloat x) {
+inline double qf_to_double(qfloat_t x) {
     return x.hi + x.lo;
 }
 
-static inline int qf_to_int(qfloat x)
+static inline int qf_to_int(qfloat_t x)
 {
     return (int)(x.hi + x.lo);
 }
 
 /* Basic arithmetic */
 
-qfloat qf_add(qfloat a, qfloat b) {
+qfloat_t qf_add(qfloat_t a, qfloat_t b) {
     double s, e1, e2;
     two_sum(a.hi, b.hi, &s, &e1);
     e2 = a.lo + b.lo + e1;
     return qf_renorm(s, e2);
 }
 
-qfloat qf_sub(qfloat a, qfloat b) {
+qfloat_t qf_sub(qfloat_t a, qfloat_t b) {
     double s, e1, e2;
     two_sum(a.hi, -b.hi, &s, &e1);
     e2 = a.lo - b.lo + e1;
     return qf_renorm(s, e2);
 }
 
-qfloat qf_mul(qfloat a, qfloat b) {
+qfloat_t qf_mul(qfloat_t a, qfloat_t b) {
     double hx, tx, hy, ty, C, c;
 
     // Split a.hi
@@ -236,42 +238,42 @@ qfloat qf_mul(qfloat a, qfloat b) {
     double hi, lo;
     two_sum(C, c, &hi, &lo);
 
-    return (qfloat){ hi, lo };
+    return (qfloat_t){ hi, lo };
 }
 
 /* Correct double-double division */
-qfloat qf_div(qfloat a, qfloat b)
+qfloat_t qf_div(qfloat_t a, qfloat_t b)
 {
-    qfloat zero = qf_from_double(0.0);
+    qfloat_t zero = qf_from_double(0.0);
 
     if (qf_eq(b, zero))
         return QF_NAN;
 
     double q1 = a.hi / b.hi;
-    qfloat q1q = qf_from_double(q1);
+    qfloat_t q1q = qf_from_double(q1);
 
-    qfloat qb = qf_mul(q1q, b);
-    qfloat r  = qf_sub(a, qb);
+    qfloat_t qb = qf_mul(q1q, b);
+    qfloat_t r  = qf_sub(a, qb);
 
     double q2 = r.hi / b.hi;
-    qfloat q2q = qf_from_double(q2);
+    qfloat_t q2q = qf_from_double(q2);
 
     return qf_add(q1q, q2q);
 }
 
-qfloat qf_pow_int(qfloat x, int n)
+qfloat_t qf_pow_int(qfloat_t x, int n)
 {
     if (n == 0) {
         return qf_from_double(1.0);
     }
 
     if (n < 0) {
-        qfloat r = qf_pow_int(x, -n);
+        qfloat_t r = qf_pow_int(x, -n);
         return qf_div(qf_from_double(1.0), r);
     }
 
-    qfloat result = qf_from_double(1.0);
-    qfloat base   = x;
+    qfloat_t result = qf_from_double(1.0);
+    qfloat_t base   = x;
 
     while (n > 0) {
         if (n & 1)
@@ -283,7 +285,7 @@ qfloat qf_pow_int(qfloat x, int n)
     return result;
 }
 
-qfloat qf_pow(qfloat x, qfloat y)
+qfloat_t qf_pow(qfloat_t x, qfloat_t y)
 {
     /* x == 0 handling */
     if (x.hi == 0.0) {
@@ -305,10 +307,10 @@ qfloat qf_pow(qfloat x, qfloat y)
         int n = (int)yi;
 
         /* compute |x|^n using integer power */
-        qfloat ax = x;
-        ax.hi = fabs(ax.hi);   /* assuming normalised qfloat, this is enough */
+        qfloat_t ax = x;
+        ax.hi = fabs(ax.hi);   /* assuming normalised qfloat_t, this is enough */
 
-        qfloat r = qf_pow_int(ax, n);
+        qfloat_t r = qf_pow_int(ax, n);
 
         /* if n is odd, result is negative */
         if (n & 1) {
@@ -320,25 +322,25 @@ qfloat qf_pow(qfloat x, qfloat y)
     }
 
     /* x > 0: general case x^y = exp(y * log(x)) */
-    qfloat lx = qf_log(x);
-    qfloat t  = qf_mul(y, lx);
+    qfloat_t lx = qf_log(x);
+    qfloat_t t  = qf_mul(y, lx);
     return qf_exp(t);
 }
 
-/* Optional: tiny helper for exact 2^k scaling of a qfloat */
-qfloat qf_ldexp(qfloat x, int e)
+/* Optional: tiny helper for exact 2^k scaling of a qfloat_t */
+qfloat_t qf_ldexp(qfloat_t x, int e)
 {
     double s = ldexp(1.0, e);
 
-    qfloat r;
+    qfloat_t r;
     r.hi = x.hi * s;
     r.lo = x.lo * s;
     return r;
 }
 
-qfloat qf_sqrt(qfloat x)
+qfloat_t qf_sqrt(qfloat_t x)
 {
-    qfloat zero = qf_from_double(0.0);
+    qfloat_t zero = qf_from_double(0.0);
 
     if (qf_eq(x, zero))
         return zero;
@@ -347,19 +349,19 @@ qfloat qf_sqrt(qfloat x)
         return QF_NAN;
 
     double approx = sqrt(x.hi);
-    qfloat y = qf_from_double(approx);
+    qfloat_t y = qf_from_double(approx);
 
     /* 3–4 Newton steps: y_{n+1} = 0.5 * (y_n + x / y_n) */
     for (int i = 0; i < 4; ++i) {
-        qfloat x_over_y = qf_div(x, y);
-        qfloat sum      = qf_add(y, x_over_y);
+        qfloat_t x_over_y = qf_div(x, y);
+        qfloat_t sum      = qf_add(y, x_over_y);
         y = qf_mul(qf_from_double(0.5), sum);
     }
 
     return y;
 }
 
-qfloat qf_add_double(qfloat x, double y) {
+qfloat_t qf_add_double(qfloat_t x, double y) {
     double H, h, S, s, e;
 	S = y + x.hi;
 	e = S - y;
@@ -367,7 +369,7 @@ qfloat qf_add_double(qfloat x, double y) {
 	s = (x.hi - e) + (y - s);
 	H = S + (s + x.lo);
 	h = (s + x.lo) + (S - H);
-    qfloat r = x;
+    qfloat_t r = x;
 	r.hi = H + h;
 	r.lo = h + (H - r.hi);
     return r;
@@ -381,7 +383,7 @@ static inline void split(double x, double* hi, double* lo)
     *lo = x - *hi;
 }
 
-qfloat qf_mul_double(qfloat x, double a)
+qfloat_t qf_mul_double(qfloat_t x, double a)
 {
     double xh, xl, ah, al;
     split(x.hi, &xh, &xl);
@@ -392,13 +394,13 @@ qfloat qf_mul_double(qfloat x, double a)
     double err = ((xh*ah - p) + xh*al + xl*ah) + xl*al;
     err += x.lo * a;
 
-    qfloat r;
+    qfloat_t r;
     r.hi = p + err;
     r.lo = err - (r.hi - p);
     return r;
 }
 
-qfloat qf_sqr(qfloat x) {
+qfloat_t qf_sqr(qfloat_t x) {
 	double hx, tx, C, c;
 
 	C = QF_SPLIT * x.hi;
@@ -409,14 +411,14 @@ qfloat qf_sqr(qfloat x) {
 	c = ((((hx * hx - C) + 2.0 * hx * tx)) + tx * tx) + 2.0 * x.hi * x.lo;
 	hx = C + c;
 
-    qfloat r;
+    qfloat_t r;
     r.hi = hx;
     r.lo = c + (C - hx);
 
 	return r;
 }
 
-qfloat qf_floor(qfloat x)
+qfloat_t qf_floor(qfloat_t x)
 {
     double fh = floor(x.hi);
     double fl = floor(x.lo);
@@ -427,7 +429,7 @@ qfloat qf_floor(qfloat x)
 
     int t = (int)floor(t3);
 
-    qfloat r;
+    qfloat_t r;
 
     switch (t) {
         case 0:
@@ -449,15 +451,15 @@ qfloat qf_floor(qfloat x)
     return r;
 }
 
-/* Round qfloat to nearest integer (ties to even) */
-qfloat qf_rint(qfloat x)
+/* Round qfloat_t to nearest integer (ties to even) */
+qfloat_t qf_rint(qfloat_t x)
 {
-    qfloat t = qf_from_double(0.5);
+    qfloat_t t = qf_from_double(0.5);
     t = qf_add(t, x);
     return qf_floor(t);
 }
 
-static inline int qf_round_to_int(qfloat y)
+static inline int qf_round_to_int(qfloat_t y)
 {
     double s, e;
     two_sum(y.hi, y.lo, &s, &e);   // s = hi+lo, e = tiny residual
@@ -465,9 +467,9 @@ static inline int qf_round_to_int(qfloat y)
     return (int)nearbyint(s);
 }
 
-static inline qfloat qf_exp_kernel(qfloat r)
+static inline qfloat_t qf_exp_kernel(qfloat_t r)
 {
-    static const qfloat EXP_COEF[] = {
+    static const qfloat_t EXP_COEF[] = {
         { 2.0078201327067089, 7.6989170590508717e-17 },   // 2.00782013270670897025569345450493539496719826451529e+00
         { 0.12524429962246966, -1.1636659685304788e-17 },   // 1.25244299622469650888488552059403016996167595573611e-01
         { 0.0039113387471945557, 3.6511894489906962e-19 },   // 3.91133874719455603987662155448712302851673533750791e-03
@@ -505,13 +507,13 @@ static inline qfloat qf_exp_kernel(qfloat r)
     static const int N_EXP_COEF = sizeof(EXP_COEF) / sizeof(EXP_COEF[0]);
 
     // map r ∈ [-0.125, 0.125] to x ∈ [-1,1]
-    qfloat x = qf_mul_double(r, 8.0);
+    qfloat_t x = qf_mul_double(r, 8.0);
 
-    qfloat b_kplus1 = (qfloat){0,0};
-    qfloat b_kplus2 = (qfloat){0,0};
+    qfloat_t b_kplus1 = (qfloat_t){0,0};
+    qfloat_t b_kplus2 = (qfloat_t){0,0};
 
     for (int k = N_EXP_COEF - 1; k >= 1; k--) {
-        qfloat t = qf_mul_double(x, 2.0);
+        qfloat_t t = qf_mul_double(x, 2.0);
         t = qf_mul(t, b_kplus1);
         t = qf_sub(t, b_kplus2);
         t = qf_add(t, EXP_COEF[k]);
@@ -521,9 +523,9 @@ static inline qfloat qf_exp_kernel(qfloat r)
     }
 
     // p(x) = (c0/2) + x*b1 - b2   // because c0 came from a DCT-I
-    qfloat xb1 = qf_mul(x, b_kplus1);
-    qfloat half_c0 = qf_mul_double(EXP_COEF[0], 0.5);
-    qfloat p = qf_add(half_c0, xb1);
+    qfloat_t xb1 = qf_mul(x, b_kplus1);
+    qfloat_t half_c0 = qf_mul_double(EXP_COEF[0], 0.5);
+    qfloat_t p = qf_add(half_c0, xb1);
     return qf_sub(p, b_kplus2);
 }
 
@@ -533,58 +535,58 @@ static inline qfloat qf_exp_kernel(qfloat r)
 //
 //   x = k*ln2 + r
 //
-static inline void qf_exp_reduce(qfloat x, int* k, qfloat* r)
+static inline void qf_exp_reduce(qfloat_t x, int* k, qfloat_t* r)
 {
     // High/low split of ln2 in double
     static const double LN2_HI = 6.93147180559945286227e-01;  // 0x3fe62e42fefa3800
     static const double LN2_LO = 2.31904681384629955842e-17;  // ln2 - LN2_HI
 
-    // y = x * (1/ln2) in qfloat
-    qfloat y = qf_mul(x, QF_INVLN2);
+    // y = x * (1/ln2) in qfloat_t
+    qfloat_t y = qf_mul(x, QF_INVLN2);
 
-    // k = round(y) using qfloat-accurate rounding
+    // k = round(y) using qfloat_t-accurate rounding
     int ki = qf_round_to_int(y);
     *k = ki;
 
-    // k as double and qfloat
+    // k as double and qfloat_t
     double kd = (double)ki;
-    qfloat kq = qf_from_double(kd);
+    qfloat_t kq = qf_from_double(kd);
 
-    // First subtract k * LN2_HI in qfloat
-    qfloat t_hi = qf_mul_double(kq, LN2_HI);
-    qfloat r1   = qf_sub(x, t_hi);
+    // First subtract k * LN2_HI in qfloat_t
+    qfloat_t t_hi = qf_mul_double(kq, LN2_HI);
+    qfloat_t r1   = qf_sub(x, t_hi);
 
-    // Then subtract k * LN2_LO in qfloat
-    qfloat t_lo = qf_mul_double(kq, LN2_LO);
-    qfloat r2   = qf_sub(r1, t_lo);
+    // Then subtract k * LN2_LO in qfloat_t
+    qfloat_t t_lo = qf_mul_double(kq, LN2_LO);
+    qfloat_t r2   = qf_sub(r1, t_lo);
 
     *r = r2;
 }
 
 
-qfloat qf_exp(qfloat x)
+qfloat_t qf_exp(qfloat_t x)
 {
     int k;
-    qfloat r;
+    qfloat_t r;
 
     qf_exp_reduce(x, &k, &r);
 
-    qfloat p = qf_exp_kernel(r);
+    qfloat_t p = qf_exp_kernel(r);
 
     // scale by 2^k
     return qf_ldexp(p, k);
 }
 
-qfloat qf_log(qfloat x)
+qfloat_t qf_log(qfloat_t x)
 {
-    qfloat one = qf_from_double(1.0);
+    qfloat_t one = qf_from_double(1.0);
 
     /* log(1) = 0 */
     if (qf_eq(x, one))
         return qf_from_double(0.0);
 
     /* x <= 0: return NaN (you can refine this if you like) */
-    qfloat zero = qf_from_double(0.0);
+    qfloat_t zero = qf_from_double(0.0);
     if (qf_lt(x, zero))
         return QF_NAN;
 
@@ -598,20 +600,20 @@ qfloat qf_log(qfloat x)
         e -= 1;
     }
 
-    qfloat mq = qf_from_double(m);
-    qfloat u  = qf_sub(mq, one);   /* u = m - 1, |u| <= ~0.2929 */
+    qfloat_t mq = qf_from_double(m);
+    qfloat_t u  = qf_sub(mq, one);   /* u = m - 1, |u| <= ~0.2929 */
 
     /* log(1+u) = u - u^2/2 + u^3/3 - ... (alternating series) */
-    qfloat term = u;
-    qfloat sum  = term;
+    qfloat_t term = u;
+    qfloat_t sum  = term;
 
-    qfloat u_power = u;  /* u^1 already */
+    qfloat_t u_power = u;  /* u^1 already */
     int sign = -1;
 
     for (int n = 2; n <= 40; ++n) {
-        qfloat nd = qf_from_double((double)n);
+        qfloat_t nd = qf_from_double((double)n);
         u_power = qf_mul(u_power, u);          /* u^n */
-        qfloat frac = qf_div(u_power, nd);     /* u^n / n */
+        qfloat_t frac = qf_div(u_power, nd);     /* u^n / n */
 
         if (sign > 0)
             sum = qf_add(sum, frac);
@@ -622,56 +624,56 @@ qfloat qf_log(qfloat x)
     }
 
     /* Add exponent contribution: e * ln2 */
-    qfloat ln2 = QF_LN2;
-    qfloat eq  = qf_from_double((double)e);
-    qfloat elog2 = qf_mul(eq, ln2);
+    qfloat_t ln2 = QF_LN2;
+    qfloat_t eq  = qf_from_double((double)e);
+    qfloat_t elog2 = qf_mul(eq, ln2);
 
-    qfloat y = qf_add(sum, elog2);
+    qfloat_t y = qf_add(sum, elog2);
 
     /* Optional: 1–2 Newton refinements to tighten last bits */
     for (int i = 0; i < 2; ++i) {
-        qfloat ey   = qf_exp(y);
-        qfloat diff = qf_sub(x, ey);
-        qfloat corr = qf_div(diff, ey);
+        qfloat_t ey   = qf_exp(y);
+        qfloat_t diff = qf_sub(x, ey);
+        qfloat_t corr = qf_div(diff, ey);
         y = qf_add(y, corr);
     }
 
     return y;
 }
 
-inline bool qf_isnan(qfloat x)
+inline bool qf_isnan(qfloat_t x)
 {
     return (x.hi != x.hi) || (x.lo != x.lo);
 }
 
-inline bool qf_isposinf(qfloat x)
+inline bool qf_isposinf(qfloat_t x)
 {
     return isinf(x.hi) && x.hi > 0.0;
 }
 
-inline bool qf_isneginf(qfloat x)
+inline bool qf_isneginf(qfloat_t x)
 {
     return isinf(x.hi) && x.hi < 0.0;
 }
 
-inline bool qf_isinf(qfloat x)
+inline bool qf_isinf(qfloat_t x)
 {
     return qf_eq(x, QF_INF) || qf_eq(x, QF_NINF);
 }
 
-static inline qfloat qf_scale_pow10(qfloat x, int exp10)
+static inline qfloat_t qf_scale_pow10(qfloat_t x, int exp10)
 {
-    static const qfloat P10_1   = { 1.00000000000000000e+01, 0.00000000000000000e+00 };
-    static const qfloat P10_2   = { 1.00000000000000000e+02, 0.00000000000000000e+00 };
-    static const qfloat P10_4   = { 1.00000000000000000e+04, 0.00000000000000000e+00 };
-    static const qfloat P10_8   = { 1.00000000000000000e+08, 0.00000000000000000e+00 };
-    static const qfloat P10_16  = { 1.00000000000000000e+16, 0.00000000000000000e+00 };
-    static const qfloat P10_32  = { 1.00000000000000010e+32, -5.36616220439347200e+15 };
-    static const qfloat P10_64  = { 1.00000000000000000e+64, -2.13204190094544240e+47 };
-    static const qfloat P10_128 = { 1.00000000000000010e+128, -7.51744869165182680e+111 };
-    static const qfloat P10_256 = { 1.00000000000000000e+256, -3.01276599001406900e+239 };
+    static const qfloat_t P10_1   = { 1.00000000000000000e+01, 0.00000000000000000e+00 };
+    static const qfloat_t P10_2   = { 1.00000000000000000e+02, 0.00000000000000000e+00 };
+    static const qfloat_t P10_4   = { 1.00000000000000000e+04, 0.00000000000000000e+00 };
+    static const qfloat_t P10_8   = { 1.00000000000000000e+08, 0.00000000000000000e+00 };
+    static const qfloat_t P10_16  = { 1.00000000000000000e+16, 0.00000000000000000e+00 };
+    static const qfloat_t P10_32  = { 1.00000000000000010e+32, -5.36616220439347200e+15 };
+    static const qfloat_t P10_64  = { 1.00000000000000000e+64, -2.13204190094544240e+47 };
+    static const qfloat_t P10_128 = { 1.00000000000000010e+128, -7.51744869165182680e+111 };
+    static const qfloat_t P10_256 = { 1.00000000000000000e+256, -3.01276599001406900e+239 };
 
-    qfloat r = x;
+    qfloat_t r = x;
     int n = exp10;
 
     if (n < 0) {
@@ -701,12 +703,12 @@ static inline qfloat qf_scale_pow10(qfloat x, int exp10)
     return r;
 }
 
-qfloat qf_pow10(int e)
+qfloat_t qf_pow10(int e)
 {
-    return qf_scale_pow10((qfloat){1.0, 0.0}, e);
+    return qf_scale_pow10((qfloat_t){1.0, 0.0}, e);
 }
 
-static inline int qf_iszero(qfloat x)
+static inline int qf_iszero(qfloat_t x)
 {
     /* Treat any representable zero as zero, regardless of sign.
        This matches Option A: always print "0". */
@@ -715,10 +717,10 @@ static inline int qf_iszero(qfloat x)
 }
 
 /* 32-digit decimal parser (no long double) */
-qfloat qf_from_string(const char *s)
+qfloat_t qf_from_string(const char *s)
 {
-    qfloat result = qf_from_double(0.0);
-    qfloat ten    = qf_from_double(10.0);
+    qfloat_t result = qf_from_double(0.0);
+    qfloat_t ten    = qf_from_double(10.0);
 
     int sign     = 1;
     int exp10    = 0;
@@ -769,8 +771,8 @@ qfloat qf_from_string(const char *s)
 
     /* scale by exact 10^exp10 from table */
     if (!qf_iszero(result)) {
-        if (exp10 == 308 && qf_eq(result, (qfloat){1,0})) {
-            result = (qfloat){ 1.0000000000000000e+308, -1.0979063629440455e+291 };
+        if (exp10 == 308 && qf_eq(result, (qfloat_t){1,0})) {
+            result = (qfloat_t){ 1.0000000000000000e+308, -1.0979063629440455e+291 };
         } else {
             result = qf_mul(result, qf_pow10(exp10));
         }
@@ -786,21 +788,21 @@ qfloat qf_from_string(const char *s)
 
 /* 32-digit decimal formatter (robust) */
 
-static inline int qf_is_negative(qfloat x) {
+static inline int qf_is_negative(qfloat_t x) {
     return (x.hi < 0.0) || (x.hi == 0.0 && x.lo < 0.0);
 }
 
-static inline void qf_modf_like(qfloat x, qfloat *ip, qfloat *fp) {
-    qfloat f = qf_floor(x);
+static inline void qf_modf_like(qfloat_t x, qfloat_t *ip, qfloat_t *fp) {
+    qfloat_t f = qf_floor(x);
     *ip = f;
     *fp = qf_sub(x, f);
 }
 
-static inline qfloat qf_div_double(qfloat x, double d) {
+static inline qfloat_t qf_div_double(qfloat_t x, double d) {
     return qf_div(x, qf_from_double(d));
 }
 
-int qf_decimal_exponent(qfloat x)
+int qf_decimal_exponent(qfloat_t x)
 {
     /* Work with absolute value */
     double v = x.hi;
@@ -821,26 +823,26 @@ int qf_decimal_exponent(qfloat x)
 }
 
 /* Extract ndigits decimal digits and return the (possibly adjusted) exp10 */
-int qf_to_decimal_digits(qfloat x, char *digits, int ndigits, int *out_exp10)
+int qf_to_decimal_digits(qfloat_t x, char *digits, int ndigits, int *out_exp10)
 {
     /* assume x > 0 and not zero; sign handled outside */
 
     int exp10 = qf_decimal_exponent(x);
-    qfloat y  = qf_scale_pow10(x, -exp10);   /* y ≈ [1,10) */
+    qfloat_t y  = qf_scale_pow10(x, -exp10);   /* y ≈ [1,10) */
 
-    qfloat ten = (qfloat){ 10.0, 0.0 };
+    qfloat_t ten = (qfloat_t){ 10.0, 0.0 };
 
     for (int i = 0; i < ndigits; i++) {
 
-        /* use full qfloat for the remainder, but digit from hi */
+        /* use full qfloat_t for the remainder, but digit from hi */
         int digit = qf_to_int(qf_floor(y));
         if (digit < 0) digit = 0;
         if (digit > 9) digit = 9;
 
         digits[i] = (char)('0' + digit);
 
-        /* y = (y - digit) * 10, using qfloat subtraction */
-        qfloat d = (qfloat){ (double)digit, 0.0 };
+        /* y = (y - digit) * 10, using qfloat_t subtraction */
+        qfloat_t d = (qfloat_t){ (double)digit, 0.0 };
         y = qf_sub(y, d);
         y = qf_mul(y, ten);
     }
@@ -849,7 +851,7 @@ int qf_to_decimal_digits(qfloat x, char *digits, int ndigits, int *out_exp10)
     return ndigits;
 }
 
-void qf_to_string(qfloat x, char *out, size_t out_size)
+void qf_to_string(qfloat_t x, char *out, size_t out_size)
 {
     if (out_size == 0) return;
 
@@ -900,10 +902,10 @@ void qf_to_string(qfloat x, char *out, size_t out_size)
 
 /* Local helpers */
 
-qfloat qf_abs(qfloat x)
+qfloat_t qf_abs(qfloat_t x)
 {
     if (qf_is_negative(x)) {
-        qfloat r;
+        qfloat_t r;
         r.hi = -x.hi;
         r.lo = -x.lo;
         return r;
@@ -911,56 +913,56 @@ qfloat qf_abs(qfloat x)
     return x;
 }
 
-inline qfloat qf_neg(qfloat x) {
-    qfloat r = { -x.hi, -x.lo };
+inline qfloat_t qf_neg(qfloat_t x) {
+    qfloat_t r = { -x.hi, -x.lo };
     return r;
 }
 
-bool qf_eq(qfloat a, qfloat b)
+bool qf_eq(qfloat_t a, qfloat_t b)
 {
     return a.hi == b.hi && a.lo == b.lo;
 }
 
-bool qf_lt(qfloat a, qfloat b)
+bool qf_lt(qfloat_t a, qfloat_t b)
 {
     if (a.hi < b.hi) return 1;
     if (a.hi > b.hi) return 0;
     return a.lo < b.lo;
 }
 
-bool qf_le(qfloat a, qfloat b)
+bool qf_le(qfloat_t a, qfloat_t b)
 {
     if (a.hi < b.hi) return 1;
     if (a.hi > b.hi) return 0;
     return a.lo <= b.lo;
 }
 
-bool qf_gt(qfloat a, qfloat b)
+bool qf_gt(qfloat_t a, qfloat_t b)
 {
     if (a.hi > b.hi) return 1;
     if (a.hi < b.hi) return 0;
     return a.lo > b.lo;
 }
 
-bool qf_ge(qfloat a, qfloat b)
+bool qf_ge(qfloat_t a, qfloat_t b)
 {
     if (a.hi > b.hi) return 1;
     if (a.hi < b.hi) return 0;
     return a.lo >= b.lo;
 }
 
-int qf_cmp(qfloat a, qfloat b) {
+int qf_cmp(qfloat_t a, qfloat_t b) {
     if (qf_eq(a, b)) return 0;
     if (qf_lt(a, b)) return -1;
     return 1;
 }
 
-inline int qf_signbit(qfloat x)
+inline int qf_signbit(qfloat_t x)
 {
     return signbit(x.hi);
 }
 
-qfloat qf_mul_pow10(qfloat x, int k)
+qfloat_t qf_mul_pow10(qfloat_t x, int k)
 {
     double p = pow(10.0, (double)k);
     return qf_mul(x, qf_from_double(p));
@@ -1107,7 +1109,7 @@ int qf_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap)
         if (*p == 'Q') {
             p++;
 
-            qfloat x   = va_arg(ap_local, qfloat);
+            qfloat_t x   = va_arg(ap_local, qfloat_t);
 
             char core[256];
             qf_to_string(x, core, sizeof(core));
@@ -1141,7 +1143,7 @@ int qf_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap)
         else if (*p == 'q') {
             p++;
 
-            qfloat x = va_arg(ap_local, qfloat);
+            qfloat_t x = va_arg(ap_local, qfloat_t);
 
             /* Step 1: canonical scientific form */
             char sci[128];
@@ -1255,7 +1257,7 @@ int qf_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap)
             int fixed_dp = (int)strlen(intpart) + exp10; /* decimal point position in digits[] */
 
             /* Step 3a: suppress noise in digits 33-34.
-             * qfloat is reliable to ~32 significant digits.  Digits 33-34
+             * qfloat_t is reliable to ~32 significant digits.  Digits 33-34
              * are real information only when the preceding digits are varied;
              * when they follow a long run of zeros they are rounding noise.
              * Heuristic: if the first 32 digits end in >=5 zeros AND the
@@ -1511,7 +1513,7 @@ int qf_printf(const char *fmt, ...)
  *  Strategy:
  *    1. Convert x to double.
  *    2. Compute s0 = sin(xd), c0 = cos(xd).
- *    3. Lift to qfloat.
+ *    3. Lift to qfloat_t.
  *    4. Refine (s, c) so that s^2 + c^2 = 1 using Newton iteration:
  *
  *         r  = s^2 + c^2 - 1
@@ -1533,19 +1535,19 @@ int qf_printf(const char *fmt, ...)
  *   q = k mod 4        (quadrant)
  *
  * This version uses a Payne–Hanek style reduction with
- * high‑precision constants stored as qfloat.
+ * high‑precision constants stored as qfloat_t.
  */
-static int qf_range_reduce_pi_over_2(qfloat x, qfloat *r_out)
+static int qf_range_reduce_pi_over_2(qfloat_t x, qfloat_t *r_out)
 {
     /* Step 1:  k = nearest integer to x * (2/pi) */
-    qfloat t = qf_mul(x, QF_2_PI);
+    qfloat_t t = qf_mul(x, QF_2_PI);
     double t_hi = t.hi;               /* safe: only used for rounding */
     long k = (long) llround(t_hi);    /* nearest integer */
 
     /* Step 2:  r = x - k*(pi/2) */
-    qfloat k_qf = qf_from_double((double)k);
-    qfloat prod = qf_mul(k_qf, QF_PI_2);
-    qfloat r = qf_sub(x, prod);
+    qfloat_t k_qf = qf_from_double((double)k);
+    qfloat_t prod = qf_mul(k_qf, QF_PI_2);
+    qfloat_t r = qf_sub(x, prod);
 
     /* Step 3:  final cleanup: ensure r ∈ [-pi/4, +pi/4] */
     /* If r is slightly outside due to rounding, adjust. */
@@ -1570,7 +1572,7 @@ static int qf_range_reduce_pi_over_2(qfloat x, qfloat *r_out)
  */
 
  /* sin(r) coefficients (odd powers), highest degree first */
-static const qfloat SIN_COEF[] = {
+static const qfloat_t SIN_COEF[] = {
     // { 7.2654601791530714e-44, -4.3640971493544333e-61 },
     // { -9.6775929586318907e-41, -3.2022955486455637e-57 },
     // { 1.1516335620771951e-37, -6.0995744578845386e-54 },
@@ -1594,7 +1596,7 @@ static const qfloat SIN_COEF[] = {
 static const int NSIN = sizeof(SIN_COEF) / sizeof(SIN_COEF[0]);
 
 /* cos(r) coefficients (even powers), highest degree first */
-static const qfloat COS_COEF[] = {
+static const qfloat_t COS_COEF[] = {
     // { 2.6882202662866363e-42, 5.355061165943334e-59 },
     // { -3.3871575355211618e-39, -5.0905614815108499e-56 },
     // { 3.8003907548547434e-36, 1.7457158024652518e-52 },
@@ -1617,28 +1619,28 @@ static const qfloat COS_COEF[] = {
 
 static const int NCOS = sizeof(COS_COEF) / sizeof(COS_COEF[0]);
 
-static void qf_sin_cos_kernel(qfloat x, qfloat *s_out, qfloat *c_out)
+static void qf_sin_cos_kernel(qfloat_t x, qfloat_t *s_out, qfloat_t *c_out)
 {
-    qfloat x2 = qf_mul(x, x);
+    qfloat_t x2 = qf_mul(x, x);
 
     /* sin */
-    qfloat p = SIN_COEF[0];
+    qfloat_t p = SIN_COEF[0];
     for (int i = 1; i < NSIN; ++i)
         p = qf_add(SIN_COEF[i], qf_mul(p, x2));
-    qfloat x3 = qf_mul(x, x2);
-    qfloat s = qf_add(x, qf_mul(x3, p));
+    qfloat_t x3 = qf_mul(x, x2);
+    qfloat_t s = qf_add(x, qf_mul(x3, p));
 
     /* cos */
-    qfloat q = COS_COEF[0];
+    qfloat_t q = COS_COEF[0];
     for (int i = 1; i < NCOS; ++i)
         q = qf_add(COS_COEF[i], qf_mul(q, x2));
-    qfloat c = qf_add(qf_from_double(1.0), qf_mul(x2, q));
+    qfloat_t c = qf_add(qf_from_double(1.0), qf_mul(x2, q));
 
     *s_out = s;
     *c_out = c;
 }
 
-qfloat qf_hypot(qfloat x, qfloat y)
+qfloat_t qf_hypot(qfloat_t x, qfloat_t y)
 {
     // double ax = fabs(x.hi);
     // double ay = fabs(y.hi);
@@ -1647,42 +1649,42 @@ qfloat qf_hypot(qfloat x, qfloat y)
     //if (ax > 1e200 || ay > 1e200)
     //    return QF_NAN;
 
-    /* Normal qfloat path (safe mid-range) */
+    /* Normal qfloat_t path (safe mid-range) */
 
-    qfloat axq = qf_abs(x);
-    qfloat ayq = qf_abs(y);
+    qfloat_t axq = qf_abs(x);
+    qfloat_t ayq = qf_abs(y);
 
     /* ensure axq >= ayq */
     if (qf_lt(axq, ayq)) {
-        qfloat tmp = axq;
+        qfloat_t tmp = axq;
         axq = ayq;
         ayq = tmp;
     }
 
     /* if the smaller one is zero, result is the larger */
-    if (qf_eq(ayq, (qfloat){0.0, 0.0}))
+    if (qf_eq(ayq, (qfloat_t){0.0, 0.0}))
         return axq;
 
     /* r = ayq / axq, so 0 < r <= 1 */
-    qfloat r = qf_div(ayq, axq);
+    qfloat_t r = qf_div(ayq, axq);
 
     /* s = 1 + r*r, in [1,2] */
-    qfloat one = qf_from_double(1.0);
-    qfloat s   = qf_add(one, qf_mul(r, r));
+    qfloat_t one = qf_from_double(1.0);
+    qfloat_t s   = qf_add(one, qf_mul(r, r));
 
     /* t = sqrt(s), in [1, sqrt(2)] */
-    qfloat t = qf_sqrt(s);
+    qfloat_t t = qf_sqrt(s);
 
     /* axq * t */
     return qf_mul(axq, t);
 }
 
-qfloat qf_sin(qfloat x)
+qfloat_t qf_sin(qfloat_t x)
 {
-    qfloat r;
+    qfloat_t r;
     int q = qf_range_reduce_pi_over_2(x, &r);
 
-    qfloat s, c;
+    qfloat_t s, c;
     qf_sin_cos_kernel(r, &s, &c);
 
     /* Quadrant reconstruction:
@@ -1699,12 +1701,12 @@ qfloat qf_sin(qfloat x)
     }
 }
 
-qfloat qf_cos(qfloat x)
+qfloat_t qf_cos(qfloat_t x)
 {
-    qfloat r;
+    qfloat_t r;
     int q = qf_range_reduce_pi_over_2(x, &r);
 
-    qfloat s, c;
+    qfloat_t s, c;
     qf_sin_cos_kernel(r, &s, &c);
 
     /* Quadrant reconstruction:
@@ -1721,10 +1723,10 @@ qfloat qf_cos(qfloat x)
     }
 }
 
-qfloat qf_tan(qfloat x)
+qfloat_t qf_tan(qfloat_t x)
 {
-    qfloat s = qf_sin(x);
-    qfloat c = qf_cos(x);
+    qfloat_t s = qf_sin(x);
+    qfloat_t c = qf_cos(x);
 
     double cd = qf_to_double(c);
     if (fabs(cd) < 1e-30) {
@@ -1739,7 +1741,7 @@ qfloat qf_tan(qfloat x)
    P(u) = sum_{k=0}^34 (-1)^k / (2k+3) * u^k
 */
 
-static const qfloat ATAN_COEF[] = {
+static const qfloat_t ATAN_COEF[] = {
     /* c0..c34, ascending degree */
     { 0.33333333333333331,  1.8503717077085584e-17 },   /*  1/3  */
     { -0.20000000000000001, 1.1102230246251769e-17 },   /* -1/5  */
@@ -1779,29 +1781,29 @@ static const qfloat ATAN_COEF[] = {
 };
 static const int NATAN = sizeof(ATAN_COEF) / sizeof(ATAN_COEF[0]);
 
-qfloat qf_atan_kernel(qfloat t)
+qfloat_t qf_atan_kernel(qfloat_t t)
 {
-    qfloat t2 = qf_mul(t, t);      // t^2
+    qfloat_t t2 = qf_mul(t, t);      // t^2
 
-    qfloat p = ATAN_COEF[NATAN - 1];
+    qfloat_t p = ATAN_COEF[NATAN - 1];
     for (int i = NATAN - 2; i >= 0; --i)
         p = qf_add(ATAN_COEF[i], qf_mul(p, t2));
 
-    qfloat t3 = qf_mul(t, t2);     // t^3
+    qfloat_t t3 = qf_mul(t, t2);     // t^3
     return qf_sub(t, qf_mul(t3, p));
 }
 
-qfloat qf_atan(qfloat x)
+qfloat_t qf_atan(qfloat_t x)
 {
-    static const qfloat one  = { 1.0, 0.0 };
-    static const qfloat RED  = { 0.41421356237309503, 1.4349369327986359e-17 }; /* tan(pi/8) */
-    static const qfloat TMAX = { 0.35, 0.0 };                                   /* kernel limit */
+    static const qfloat_t one  = { 1.0, 0.0 };
+    static const qfloat_t RED  = { 0.41421356237309503, 1.4349369327986359e-17 }; /* tan(pi/8) */
+    static const qfloat_t TMAX = { 0.35, 0.0 };                                   /* kernel limit */
 
     int neg = (x.hi < 0.0);
     if (neg)
         x = qf_neg(x);
 
-    qfloat r, t;
+    qfloat_t r, t;
 
     if (qf_gt(x, one)) {
         t = qf_div(one, x);  /* t = 1/x */
@@ -1812,22 +1814,22 @@ qfloat qf_atan(qfloat x)
                        = pi/2 - (atan(u) + pi/4)
                        = pi/4 - atan(u)
             */
-            qfloat num = qf_sub(t, one);
-            qfloat den = qf_add(t, one);
-            qfloat u   = qf_div(num, den);
-            qfloat k   = qf_atan_kernel(u);
+            qfloat_t num = qf_sub(t, one);
+            qfloat_t den = qf_add(t, one);
+            qfloat_t u   = qf_div(num, den);
+            qfloat_t k   = qf_atan_kernel(u);
             r = qf_sub(QF_PI_4, k);
         } else {
-            qfloat k = qf_atan_kernel(t);
+            qfloat_t k = qf_atan_kernel(t);
             r = qf_sub(QF_PI_2, k);
         }
     }
     else if (qf_gt(x, RED)) {
         /* atan(x) = atan((x-1)/(x+1)) + pi/4 */
-        qfloat num = qf_sub(x, one);
-        qfloat den = qf_add(x, one);
+        qfloat_t num = qf_sub(x, one);
+        qfloat_t den = qf_add(x, one);
         t = qf_div(num, den);          /* |t| <= 1/3 */
-        qfloat k = qf_atan_kernel(t);
+        qfloat_t k = qf_atan_kernel(t);
         r = qf_add(QF_PI_4, k);
     }
     else {
@@ -1840,9 +1842,9 @@ qfloat qf_atan(qfloat x)
     return r;
 }
 
-qfloat qf_atan2(qfloat y, qfloat x)
+qfloat_t qf_atan2(qfloat_t y, qfloat_t x)
 {
-    qfloat zero = qf_from_double(0.0);
+    qfloat_t zero = qf_from_double(0.0);
 
     /* y = 0 */
     if (qf_eq(y, zero)) {
@@ -1858,7 +1860,7 @@ qfloat qf_atan2(qfloat y, qfloat x)
     }
 
     /* General case */
-    qfloat a = qf_atan(qf_div(y, x));
+    qfloat_t a = qf_atan(qf_div(y, x));
 
     if (qf_gt(x, zero))
         return a;
@@ -1869,10 +1871,10 @@ qfloat qf_atan2(qfloat y, qfloat x)
     return qf_sub(a, QF_PI);
 }
 
-qfloat qf_asin(qfloat x)
+qfloat_t qf_asin(qfloat_t x)
 {
-    qfloat one = qf_from_double(1.0);
-    qfloat zero = qf_from_double(0.0);
+    qfloat_t one = qf_from_double(1.0);
+    qfloat_t zero = qf_from_double(0.0);
 
     /* Domain check */
     if (qf_gt(qf_abs(x), one))
@@ -1887,71 +1889,71 @@ qfloat qf_asin(qfloat x)
         return qf_neg(QF_PI_2);
 
     /* asin(x) = atan(x / sqrt(1 - x^2)) for |x| < 1 */
-    qfloat x2 = qf_mul(x, x);
-    qfloat t  = qf_sqrt(qf_sub(one, x2));
-    qfloat y  = qf_div(x, t);
+    qfloat_t x2 = qf_mul(x, x);
+    qfloat_t t  = qf_sqrt(qf_sub(one, x2));
+    qfloat_t y  = qf_div(x, t);
 
     return qf_atan(y);
 }
 
-qfloat qf_acos(qfloat x)
+qfloat_t qf_acos(qfloat_t x)
 {
-    qfloat one = qf_from_double(1.0);
+    qfloat_t one = qf_from_double(1.0);
 
     if (qf_gt(qf_abs(x), one))
         return QF_NAN;
 
-    qfloat half_pi = QF_PI_2;
+    qfloat_t half_pi = QF_PI_2;
     return qf_sub(half_pi, qf_asin(x));
 }
 
-qfloat qf_sinh(qfloat x)
+qfloat_t qf_sinh(qfloat_t x)
 {
-    qfloat ex  = qf_exp(x);
-    qfloat emx = qf_exp(qf_neg(x));
+    qfloat_t ex  = qf_exp(x);
+    qfloat_t emx = qf_exp(qf_neg(x));
 
-    qfloat num = qf_sub(ex, emx);
-    qfloat two = qf_from_double(2.0);
+    qfloat_t num = qf_sub(ex, emx);
+    qfloat_t two = qf_from_double(2.0);
 
     return qf_div(num, two);
 }
 
-qfloat qf_cosh(qfloat x)
+qfloat_t qf_cosh(qfloat_t x)
 {
-    qfloat ex  = qf_exp(x);
-    qfloat emx = qf_exp(qf_neg(x));
+    qfloat_t ex  = qf_exp(x);
+    qfloat_t emx = qf_exp(qf_neg(x));
 
-    qfloat sum = qf_add(ex, emx);
-    qfloat two = qf_from_double(2.0);
+    qfloat_t sum = qf_add(ex, emx);
+    qfloat_t two = qf_from_double(2.0);
 
     return qf_div(sum, two);
 }
 
-qfloat qf_tanh(qfloat x)
+qfloat_t qf_tanh(qfloat_t x)
 {
-    qfloat two = qf_from_double(2.0);
-    qfloat t   = qf_exp(qf_mul(two, x));   // e^(2x)
+    qfloat_t two = qf_from_double(2.0);
+    qfloat_t t   = qf_exp(qf_mul(two, x));   // e^(2x)
 
-    qfloat num = qf_sub(t, qf_from_double(1.0));
-    qfloat den = qf_add(t, qf_from_double(1.0));
+    qfloat_t num = qf_sub(t, qf_from_double(1.0));
+    qfloat_t den = qf_add(t, qf_from_double(1.0));
 
     return qf_div(num, den);
 }
 
-qfloat qf_asinh(qfloat x)
+qfloat_t qf_asinh(qfloat_t x)
 {
-    qfloat one = qf_from_double(1.0);
+    qfloat_t one = qf_from_double(1.0);
 
-    qfloat x2  = qf_mul(x, x);
-    qfloat rad = qf_sqrt(qf_add(x2, one));
-    qfloat sum = qf_add(x, rad);
+    qfloat_t x2  = qf_mul(x, x);
+    qfloat_t rad = qf_sqrt(qf_add(x2, one));
+    qfloat_t sum = qf_add(x, rad);
 
     return qf_log(sum);
 }
 
-qfloat qf_acosh(qfloat x)
+qfloat_t qf_acosh(qfloat_t x)
 {
-    qfloat one = qf_from_double(1.0);
+    qfloat_t one = qf_from_double(1.0);
 
     if (qf_eq(x, one))
         return qf_from_double(0.0);
@@ -1960,43 +1962,43 @@ qfloat qf_acosh(qfloat x)
     if (qf_lt(x, one))
         return QF_NAN;
 
-    qfloat xm1 = qf_sub(x, one);
-    qfloat xp1 = qf_add(x, one);
+    qfloat_t xm1 = qf_sub(x, one);
+    qfloat_t xp1 = qf_add(x, one);
 
-    qfloat s1 = qf_sqrt(xm1);
-    qfloat s2 = qf_sqrt(xp1);
+    qfloat_t s1 = qf_sqrt(xm1);
+    qfloat_t s2 = qf_sqrt(xp1);
 
-    qfloat prod = qf_mul(s1, s2);
-    qfloat sum  = qf_add(x, prod);
+    qfloat_t prod = qf_mul(s1, s2);
+    qfloat_t sum  = qf_add(x, prod);
 
     return qf_log(sum);
 }
 
-qfloat qf_atanh(qfloat x)
+qfloat_t qf_atanh(qfloat_t x)
 {
-    qfloat one = qf_from_double(1.0);
+    qfloat_t one = qf_from_double(1.0);
 
     /* Domain check: |x| >= 1 → NaN */
     if (qf_ge(qf_abs(x), one))
         return QF_NAN;
 
-    qfloat num = qf_add(one, x);
-    qfloat den = qf_sub(one, x);
+    qfloat_t num = qf_add(one, x);
+    qfloat_t den = qf_sub(one, x);
 
-    qfloat frac = qf_div(num, den);
-    qfloat half = qf_from_double(0.5);
+    qfloat_t frac = qf_div(num, den);
+    qfloat_t half = qf_from_double(0.5);
 
     return qf_mul(half, qf_log(frac));
 }
 
-qfloat qf_gamma(qfloat x)
+qfloat_t qf_gamma(qfloat_t x)
 {
     /* Reject extreme magnitudes for now */
     if (fabs(x.hi) > 1e+240) 
-        return (qfloat){ NAN, NAN };
+        return (qfloat_t){ NAN, NAN };
 
     /* Coefficients for 1/gamma(1+x) - x ... */
-    static const qfloat c[43] = {
+    static const qfloat_t c[43] = {
         { 0.57721566490153287, -4.9429151524306318e-18 },
         { -0.6558780715202539,  2.137185197068536e-17 },
         { -0.042002635034095237, 1.4920306285650486e-18 },
@@ -2045,10 +2047,10 @@ qfloat qf_gamma(qfloat x)
     const int n = 43;
 
     /* ss = x, f = 1, sum = 0 */
-    qfloat ss = x;
-    qfloat f  = (qfloat){1.0, 0.0};
-    qfloat sum = (qfloat){0.0, 0.0};
-    qfloat one = (qfloat){1.0, 0.0};
+    qfloat_t ss = x;
+    qfloat_t f  = (qfloat_t){1.0, 0.0};
+    qfloat_t sum = (qfloat_t){0.0, 0.0};
+    qfloat_t one = (qfloat_t){1.0, 0.0};
 
     /* Reduce x into [1,2) by shifting and accumulating f */
     while (ss.hi > 1.0) {
@@ -2070,32 +2072,32 @@ qfloat qf_gamma(qfloat x)
 
     /* Horner evaluation of polynomial */
     for (int i = n - 1; i >= 0; i--) {
-        qfloat tmp = qf_mul(ss, sum);
+        qfloat_t tmp = qf_mul(ss, sum);
         tmp = qf_add(tmp, c[i]);
         sum = tmp;
     }
 
     /* temp = 1 + ss * sum */
-    qfloat temp = qf_add(one, qf_mul(ss, sum));
+    qfloat_t temp = qf_add(one, qf_mul(ss, sum));
 
     /* result = f / temp */
     return qf_div(f, temp);
 }
 
-qfloat qf_erf(qfloat x)
+qfloat_t qf_erf(qfloat_t x)
 {
-    qfloat zero = (qfloat){0.0, 0.0};
+    qfloat_t zero = (qfloat_t){0.0, 0.0};
 
     /* erf(0) = 0 */
     if (x.hi == 0.0)
         return zero;
 
     /* |x| */
-    qfloat y = qf_abs(x);
+    qfloat_t y = qf_abs(x);
 
     /* erf saturates for |x| > 26 */
     if (y.hi > 26.0) {
-        qfloat one = (qfloat){1.0, 0.0};
+        qfloat_t one = (qfloat_t){1.0, 0.0};
         return (x.hi > 0.0) ? one : qf_neg(one);
     }
 
@@ -2108,12 +2110,12 @@ qfloat qf_erf(qfloat x)
     if (y.hi < cut) {
 
         /* ap = 0.5, s = 2.0, t = 2.0 */
-        qfloat ap = qf_from_double(0.5);
-        qfloat s  = qf_from_double(2.0);
-        qfloat t  = qf_from_double(2.0);
+        qfloat_t ap = qf_from_double(0.5);
+        qfloat_t s  = qf_from_double(2.0);
+        qfloat_t t  = qf_from_double(2.0);
 
         /* x^2 */
-        qfloat x2 = qf_mul(x, x);
+        qfloat_t x2 = qf_mul(x, x);
 
         int i;
         for (i = 0; i < 200; i++) {
@@ -2122,7 +2124,7 @@ qfloat qf_erf(qfloat x)
             ap = qf_add(ap, qf_from_double(1.0));
 
             /* t *= x2 / ap */
-            qfloat temp = qf_div(x2, ap);
+            qfloat_t temp = qf_div(x2, ap);
             t = qf_mul(t, temp);
 
             /* s += t */
@@ -2132,11 +2134,11 @@ qfloat qf_erf(qfloat x)
             if (fabs(t.hi) < 1e-35 * fabs(s.hi)) {
 
                 /* ex2 = exp(x^2) */
-                qfloat ex2 = qf_exp(x2);
+                qfloat_t ex2 = qf_exp(x2);
 
                 /* result = x * (2/sqrt(pi)) * s / exp(x^2) */
-                qfloat result = x;
-                result = qf_mul(result, QF_SQRT1ONPI); /* your qfloat constant */
+                qfloat_t result = x;
+                result = qf_mul(result, QF_SQRT1ONPI); /* your qfloat_t constant */
                 result = qf_mul(result, s);
                 result = qf_div(result, ex2);
 
@@ -2145,7 +2147,7 @@ qfloat qf_erf(qfloat x)
         }
 
         /* failed to converge */
-        qfloat nan = {NAN, NAN};
+        qfloat_t nan = {NAN, NAN};
         return nan;
     }
 
@@ -2155,19 +2157,19 @@ qfloat qf_erf(qfloat x)
 
     double small = 1e-300;
 
-    qfloat x2 = qf_mul(x, x);
+    qfloat_t x2 = qf_mul(x, x);
 
     /* b = x^2 + 0.5 */
-    qfloat b = qf_add(x2, qf_from_double(0.5));
+    qfloat_t b = qf_add(x2, qf_from_double(0.5));
 
     /* c = huge */
-    qfloat c = qf_from_double(1e300);
+    qfloat_t c = qf_from_double(1e300);
 
     /* d = 1/b */
-    qfloat d = qf_div(qf_from_double(1.0), b);
+    qfloat_t d = qf_div(qf_from_double(1.0), b);
 
     /* h = d */
-    qfloat h = d;
+    qfloat_t h = d;
 
     int i;
     for (i = 1; i < 300; i++) {
@@ -2178,14 +2180,14 @@ qfloat qf_erf(qfloat x)
         b = qf_add(b, qf_from_double(2.0));
 
         /* d = an * d + b */
-        qfloat dtemp = qf_mul(qf_from_double(an), d);
+        qfloat_t dtemp = qf_mul(qf_from_double(an), d);
         d = qf_add(dtemp, b);
 
         if (fabs(d.hi) < small)
             d = qf_from_double(small);
 
         /* c = an / c + b */
-        qfloat ctemp = qf_div(qf_from_double(an), c);
+        qfloat_t ctemp = qf_div(qf_from_double(an), c);
         c = qf_add(ctemp, b);
 
         if (fabs(c.hi) < small)
@@ -2195,7 +2197,7 @@ qfloat qf_erf(qfloat x)
         d = qf_div(qf_from_double(1.0), d);
 
         /* del = d * c */
-        qfloat del = qf_mul(d, c);
+        qfloat_t del = qf_mul(d, c);
 
         /* h *= del */
         h = qf_mul(h, del);
@@ -2205,19 +2207,19 @@ qfloat qf_erf(qfloat x)
             break;
 
         if (i == 299) {
-            qfloat nan = {NAN, NAN};
+            qfloat_t nan = {NAN, NAN};
             return nan;
         }
     }
 
     /* sx2 = sqrt(x^2) = |x| */
-    qfloat sx2 = qf_sqrt(x2);
+    qfloat_t sx2 = qf_sqrt(x2);
 
     /* ex2 = exp(x^2) */
-    qfloat ex2 = qf_exp(x2);
+    qfloat_t ex2 = qf_exp(x2);
 
     /* result = (2/sqrt(pi)) * sx2 / exp(x^2) * h - 1 */
-    qfloat result = QF_SQRT1ONPI;
+    qfloat_t result = QF_SQRT1ONPI;
     result = qf_mul(result, sx2);
     result = qf_div(result, ex2);
     result = qf_mul(result, h);
@@ -2231,25 +2233,25 @@ qfloat qf_erf(qfloat x)
     return result;
 }
 
-qfloat qf_erfc(qfloat x)
+qfloat_t qf_erfc(qfloat_t x)
 {
-    qfloat one  = (qfloat){1.0, 0.0};
+    qfloat_t one  = (qfloat_t){1.0, 0.0};
 
     /* erfc(0) = 1 */
     if (x.hi == 0.0)
         return one;
 
-    if (qf_gt(x, (qfloat){26.3,0}))
-        return (qfloat){0,0};
+    if (qf_gt(x, (qfloat_t){26.3,0}))
+        return (qfloat_t){0,0};
 
     /* For x < 0: erfc(x) = 1 - erf(x) */
     if (x.hi < 0.0) {
-        qfloat erfx = qf_erf(x);
+        qfloat_t erfx = qf_erf(x);
         return qf_sub(one, erfx);
     }
 
     /* |x| */
-    qfloat y = qf_abs(x);
+    qfloat_t y = qf_abs(x);
 
     const double cut = 1.5;
 
@@ -2259,12 +2261,12 @@ qfloat qf_erfc(qfloat x)
     if (y.hi < cut) {
 
         /* ap = 0.5, s = 2.0, t = 2.0 */
-        qfloat ap = qf_from_double(0.5);
-        qfloat s  = qf_from_double(2.0);
-        qfloat t  = qf_from_double(2.0);
+        qfloat_t ap = qf_from_double(0.5);
+        qfloat_t s  = qf_from_double(2.0);
+        qfloat_t t  = qf_from_double(2.0);
 
         /* x^2 */
-        qfloat x2 = qf_mul(x, x);
+        qfloat_t x2 = qf_mul(x, x);
 
         int i;
         for (i = 0; i < 200; i++) {
@@ -2283,10 +2285,10 @@ qfloat qf_erfc(qfloat x)
             if (fabs(t.hi) < 1e-35 * fabs(s.hi)) {
 
                 /* ex2 = exp(x^2) */
-                qfloat ex2 = qf_exp(x2);
+                qfloat_t ex2 = qf_exp(x2);
 
                 /* result = - ( x * (2/sqrt(pi)) * s / exp(x^2) - 1 ) */
-                qfloat result = x;
+                qfloat_t result = x;
                 result = qf_mul(result, QF_SQRT1ONPI);
                 result = qf_mul(result, s);
                 result = qf_div(result, ex2);
@@ -2298,7 +2300,7 @@ qfloat qf_erfc(qfloat x)
         }
 
         /* failed to converge */
-        qfloat nan = {NAN, NAN};
+        qfloat_t nan = {NAN, NAN};
         return nan;
     }
 
@@ -2309,19 +2311,19 @@ qfloat qf_erfc(qfloat x)
     double small = 1e-300;
 
     /* x^2 */
-    qfloat x2 = qf_mul(x, x);
+    qfloat_t x2 = qf_mul(x, x);
 
     /* b = x^2 + 0.5 */
-    qfloat b = qf_add(x2, qf_from_double(0.5));
+    qfloat_t b = qf_add(x2, qf_from_double(0.5));
 
     /* c = huge */
-    qfloat c = qf_from_double(1e300);
+    qfloat_t c = qf_from_double(1e300);
 
     /* d = 1/b */
-    qfloat d = qf_div(qf_from_double(1.0), b);
+    qfloat_t d = qf_div(qf_from_double(1.0), b);
 
     /* h = d */
-    qfloat h = d;
+    qfloat_t h = d;
 
     int i;
     for (i = 1; i < 300; i++) {
@@ -2332,14 +2334,14 @@ qfloat qf_erfc(qfloat x)
         b = qf_add(b, qf_from_double(2.0));
 
         /* d = an*d + b */
-        qfloat dtemp = qf_mul(qf_from_double(an), d);
+        qfloat_t dtemp = qf_mul(qf_from_double(an), d);
         d = qf_add(dtemp, b);
 
         if (fabs(d.hi) < small)
             d = qf_from_double(small);
 
         /* c = an/c + b */
-        qfloat ctemp = qf_div(qf_from_double(an), c);
+        qfloat_t ctemp = qf_div(qf_from_double(an), c);
         c = qf_add(ctemp, b);
 
         if (fabs(c.hi) < small)
@@ -2349,7 +2351,7 @@ qfloat qf_erfc(qfloat x)
         d = qf_div(qf_from_double(1.0), d);
 
         /* del = d * c */
-        qfloat del = qf_mul(d, c);
+        qfloat_t del = qf_mul(d, c);
 
         /* h *= del */
         h = qf_mul(h, del);
@@ -2359,19 +2361,19 @@ qfloat qf_erfc(qfloat x)
             break;
 
         if (i == 299) {
-            qfloat nan = {NAN, NAN};
+            qfloat_t nan = {NAN, NAN};
             return nan;
         }
     }
 
     /* sx2 = sqrt(x^2) = |x| */
-    qfloat sx2 = qf_sqrt(x2);
+    qfloat_t sx2 = qf_sqrt(x2);
 
     /* ex2 = exp(x^2) */
-    qfloat ex2 = qf_exp(x2);
+    qfloat_t ex2 = qf_exp(x2);
 
     /* result = (2/sqrt(pi)) * sx2 * h / exp(x^2) */
-    qfloat result = QF_SQRT1ONPI;
+    qfloat_t result = QF_SQRT1ONPI;
     result = qf_mul(result, sx2);
     result = qf_mul(result, h);
     result = qf_div(result, ex2);
@@ -2379,68 +2381,68 @@ qfloat qf_erfc(qfloat x)
     return result;
 }
 
-qfloat qf_erfinv_initial(qfloat x)
+qfloat_t qf_erfinv_initial(qfloat_t x)
 {
-    qfloat one = qf_from_double(1.0);
-    qfloat a   = qf_from_double(0.147);
+    qfloat_t one = qf_from_double(1.0);
+    qfloat_t a   = qf_from_double(0.147);
 
     /* t = 1 - x^2 */
-    qfloat t  = qf_mul(qf_sub(one, x), qf_add(one, x));
-    qfloat ln = qf_log(t);   /* ln(1 - x^2), negative */
+    qfloat_t t  = qf_mul(qf_sub(one, x), qf_add(one, x));
+    qfloat_t ln = qf_log(t);   /* ln(1 - x^2), negative */
 
     /* c = 2/(pi*a) + ln(1-x^2)/2 */
-    qfloat c1 = qf_div(qf_from_double(2.0),
+    qfloat_t c1 = qf_div(qf_from_double(2.0),
                        qf_mul(qf_from_double(M_PI), a));
-    qfloat c2 = qf_div(ln, qf_from_double(2.0));
-    qfloat c  = qf_add(c1, c2);
+    qfloat_t c2 = qf_div(ln, qf_from_double(2.0));
+    qfloat_t c  = qf_add(c1, c2);
 
     /* inside = c^2 - ln(1-x^2)/a */
-    qfloat c2sq   = qf_mul(c, c);
-    qfloat ln_over_a = qf_div(ln, a);
-    qfloat inside = qf_sub(c2sq, ln_over_a);
+    qfloat_t c2sq   = qf_mul(c, c);
+    qfloat_t ln_over_a = qf_div(ln, a);
+    qfloat_t inside = qf_sub(c2sq, ln_over_a);
 
-    qfloat y0 = qf_sqrt(qf_sub(qf_sqrt(inside), c));
+    qfloat_t y0 = qf_sqrt(qf_sub(qf_sqrt(inside), c));
 
     return (x.hi >= 0.0 ? y0 : qf_neg(y0));
 }
 
-qfloat qf_erfinv(qfloat x)
+qfloat_t qf_erfinv(qfloat_t x)
 {
     /* Domain check: erf(x) ∈ [-1,1] */
     if (x.hi <= -1.0 || x.hi >= 1.0)
         return QF_NAN;
 
-    qfloat one = qf_from_double(1.0);
+    qfloat_t one = qf_from_double(1.0);
 
     /* y0 = sign(x) * p */
-    qfloat y;
+    qfloat_t y;
     if (x.hi > 0.87 || x.hi < -0.87)
         y = qf_erfinv_initial(x);
     else {
         /* Initial guess using A&S 7.1.26 */
-        qfloat t   = qf_log(qf_mul(qf_sub(one, x), qf_add(one, x)));  /* log(1-x^2) */
+        qfloat_t t   = qf_log(qf_mul(qf_sub(one, x), qf_add(one, x)));  /* log(1-x^2) */
 
         /* p = sqrt(-2 * t) */
-        qfloat p = qf_sqrt(qf_mul(qf_from_double(-2.0), t));
+        qfloat_t p = qf_sqrt(qf_mul(qf_from_double(-2.0), t));
         y = (x.hi >= 0.0 ? p : qf_neg(p));
     }
 
     /* Halley iteration */
     for (int i = 0; i < 20; i++) {
 
-        qfloat erfy = qf_erf(y);
-        qfloat f    = qf_sub(erfy, x);
+        qfloat_t erfy = qf_erf(y);
+        qfloat_t f    = qf_sub(erfy, x);
 
         /* f' = 2/sqrt(pi) * exp(-y^2) */
-        qfloat y2   = qf_mul(y, y);
-        qfloat fp   = qf_mul(QF_2_SQRTPI, qf_exp(qf_neg(y2)));
+        qfloat_t y2   = qf_mul(y, y);
+        qfloat_t fp   = qf_mul(QF_2_SQRTPI, qf_exp(qf_neg(y2)));
 
         /* f'' = -2*y*f' */
-        qfloat fpp  = qf_mul(qf_mul(qf_from_double(-2.0), y), fp);
+        qfloat_t fpp  = qf_mul(qf_mul(qf_from_double(-2.0), y), fp);
 
         /* Halley correction */
-        qfloat ratio = qf_div(f, fp);
-        qfloat corr  = qf_mul(ratio,
+        qfloat_t ratio = qf_div(f, fp);
+        qfloat_t corr  = qf_mul(ratio,
                               qf_sub(one,
                                      qf_mul(qf_div(fpp, fp),
                                             qf_div(f, qf_from_double(2.0)))));
@@ -2454,10 +2456,10 @@ qfloat qf_erfinv(qfloat x)
     return y;
 }
 
-qfloat qf_erfcinv(qfloat x)
+qfloat_t qf_erfcinv(qfloat_t x)
 {
-    static const qfloat QF_POSINF = { INFINITY, 0.0 };
-    static const qfloat QF_NEGINF = { -INFINITY, 0.0 };
+    static const qfloat_t QF_POSINF = { INFINITY, 0.0 };
+    static const qfloat_t QF_NEGINF = { -INFINITY, 0.0 };
 
     /* Domain: erfc(x) ∈ [0,2] */
     if (x.hi < 0.0 || x.hi > 2.0)
@@ -2471,8 +2473,8 @@ qfloat qf_erfcinv(qfloat x)
         return QF_NEGINF;   /* erfcinv(2) = -∞ */
 
     /* erfcinv(x) = erfinv(1 - x) */
-    qfloat one = qf_from_double(1.0);
-    qfloat t   = qf_sub(one, x);
+    qfloat_t one = qf_from_double(1.0);
+    qfloat_t t   = qf_sub(one, x);
 
     return qf_erfinv(t);
 }
@@ -2481,7 +2483,7 @@ qfloat qf_erfcinv(qfloat x)
 
 // Chebyshev coefficients for lgamma on x in [1,2]
 // x = 1.5 + 0.5*y, y in [-1,1]
-static const qfloat QF_LGAMMA_C[41] = {
+static const qfloat_t QF_LGAMMA_C[41] = {
     { -6.08999038183025906e-02, -1.67161028145317951e-18 },
     { 4.68966674650670226e-03, -8.00414782984271387e-20 },
     { 6.03821964754341009e-02, 8.91374388867524059e-19 },
@@ -2530,35 +2532,35 @@ static const int QF_LGAMMA_N = sizeof(QF_LGAMMA_C) / sizeof(QF_LGAMMA_C[0]);
 // x in [1,2]
 // Chebyshev core: lgamma(x) on x in [1,2]
 // x = 1.5 + 0.5*y, y in [-1,1]
-static qfloat qf_lgamma_core_1_2(qfloat x)
+static qfloat_t qf_lgamma_core_1_2(qfloat_t x)
 {
-    qfloat one_point_five = qf_div((qfloat){ 3.0, 0.0 }, (qfloat){ 2.0, 0.0 });
-    qfloat two            = (qfloat){ 2.0, 0.0 };
+    qfloat_t one_point_five = qf_div((qfloat_t){ 3.0, 0.0 }, (qfloat_t){ 2.0, 0.0 });
+    qfloat_t two            = (qfloat_t){ 2.0, 0.0 };
 
     // y = 2*(x - 1.5)
-    qfloat t = qf_sub(x, one_point_five);
-    qfloat y = qf_mul(two, t);
+    qfloat_t t = qf_sub(x, one_point_five);
+    qfloat_t y = qf_mul(two, t);
 
-    qfloat b1 = (qfloat){ 0.0, 0.0 };
-    qfloat b2 = (qfloat){ 0.0, 0.0 };
+    qfloat_t b1 = (qfloat_t){ 0.0, 0.0 };
+    qfloat_t b2 = (qfloat_t){ 0.0, 0.0 };
 
     // k = N .. 1  (do NOT include c[0] in the loop)
     for (int k = QF_LGAMMA_N - 1; k >= 1; --k) {
-        qfloat term = qf_mul(y, b1);      // y*b1
+        qfloat_t term = qf_mul(y, b1);      // y*b1
         term        = qf_add(term, term); // 2*y*b1
-        qfloat bk   = qf_sub(term, b2);   // 2*y*b1 - b2
+        qfloat_t bk   = qf_sub(term, b2);   // 2*y*b1 - b2
         bk          = qf_add(bk, QF_LGAMMA_C[k]); // + c_k
         b2          = b1;
         b1          = bk;
     }
 
     // f(y) = c0 + y*b1 - b2
-    qfloat yb1 = qf_mul(y, b1);
-    qfloat res = qf_add(QF_LGAMMA_C[0], qf_sub(yb1, b2));
+    qfloat_t yb1 = qf_mul(y, b1);
+    qfloat_t res = qf_add(QF_LGAMMA_C[0], qf_sub(yb1, b2));
     return res;
 }
 
-static int qf_is_integer(qfloat x)
+static int qf_is_integer(qfloat_t x)
 {
     // crude but effective: check hi is integer and lo is (near) zero
     double r = nearbyint(x.hi);
@@ -2567,7 +2569,7 @@ static int qf_is_integer(qfloat x)
     return 1;
 }
 
-qfloat qf_lgamma(qfloat x)
+qfloat_t qf_lgamma(qfloat_t x)
 {
     if (x.hi <= 0.0 && qf_is_integer(x)) {
         return QF_NAN;
@@ -2575,24 +2577,24 @@ qfloat qf_lgamma(qfloat x)
 
     // Handle poles and reflection as you already do
     if (x.hi < 0.5) {
-        qfloat one_minus_x = qf_sub((qfloat){1.0,0.0}, x);
-        qfloat lg1mx       = qf_lgamma(one_minus_x);
+        qfloat_t one_minus_x = qf_sub((qfloat_t){1.0,0.0}, x);
+        qfloat_t lg1mx       = qf_lgamma(one_minus_x);
 
-        qfloat pix     = qf_mul(QF_PI, x);
-        qfloat sin_pix = qf_sin(pix);
-        qfloat sin_abs = qf_abs(sin_pix);
+        qfloat_t pix     = qf_mul(QF_PI, x);
+        qfloat_t sin_pix = qf_sin(pix);
+        qfloat_t sin_abs = qf_abs(sin_pix);
 
-        qfloat term = qf_sub(qf_log(QF_PI), qf_log(sin_abs));
+        qfloat_t term = qf_sub(qf_log(QF_PI), qf_log(sin_abs));
         return qf_sub(term, lg1mx);
     }
 
     // Shift x into [1,2] using recurrence
-    qfloat acc = (qfloat){ 0.0, 0.0 };
-    qfloat one = (qfloat){ 1.0, 0.0 };
+    qfloat_t acc = (qfloat_t){ 0.0, 0.0 };
+    qfloat_t one = (qfloat_t){ 1.0, 0.0 };
 
-    qfloat z = x;
+    qfloat_t z = x;
     while (z.hi > 2.0) {
-        qfloat zm1 = qf_sub(z, one);
+        qfloat_t zm1 = qf_sub(z, one);
         acc = qf_add(acc, qf_log(zm1));
         z   = zm1;
     }
@@ -2602,12 +2604,12 @@ qfloat qf_lgamma(qfloat x)
     }
 
     // Now z in [1,2]
-    qfloat core = qf_lgamma_core_1_2(z);
+    qfloat_t core = qf_lgamma_core_1_2(z);
     return qf_add(core, acc);
 }
 
 /* digamma */
-static const qfloat QF_DIGAMMA_C[41] = {
+static const qfloat_t QF_DIGAMMA_C[41] = {
     { -1.90285404176089613e-02, 5.77950654326901646e-19 },
     { 4.91415393029387138e-01, -1.00314059023864708e-17 },
     { -5.68157478212447317e-02, 1.47606722184751199e-18 },
@@ -2654,32 +2656,32 @@ static const qfloat QF_DIGAMMA_C[41] = {
 static const int QF_DIGAMMA_N = sizeof(QF_DIGAMMA_C) / sizeof(QF_DIGAMMA_C[0]);
 
 /* Asymptotic digamma for x >= 8 */
-static qfloat qf_digamma_core_1_2(qfloat x)
+static qfloat_t qf_digamma_core_1_2(qfloat_t x)
 {
-    qfloat one_point_five = (qfloat){ 1.5, 0.0 };
-    qfloat two            = (qfloat){ 2.0, 0.0 };
+    qfloat_t one_point_five = (qfloat_t){ 1.5, 0.0 };
+    qfloat_t two            = (qfloat_t){ 2.0, 0.0 };
 
-    qfloat t = qf_sub(x, one_point_five);
-    qfloat y = qf_mul(two, t);
+    qfloat_t t = qf_sub(x, one_point_five);
+    qfloat_t y = qf_mul(two, t);
 
-    qfloat b1 = (qfloat){ 0.0, 0.0 };
-    qfloat b2 = (qfloat){ 0.0, 0.0 };
+    qfloat_t b1 = (qfloat_t){ 0.0, 0.0 };
+    qfloat_t b2 = (qfloat_t){ 0.0, 0.0 };
 
     for (int k = QF_DIGAMMA_N - 1; k >= 1; --k) {
-        qfloat term = qf_mul(y, b1);
+        qfloat_t term = qf_mul(y, b1);
         term        = qf_add(term, term);
-        qfloat bk   = qf_sub(term, b2);
+        qfloat_t bk   = qf_sub(term, b2);
         bk          = qf_add(bk, QF_DIGAMMA_C[k]);
         b2          = b1;
         b1          = bk;
     }
 
-    qfloat yb1 = qf_mul(y, b1);
-    qfloat res = qf_add(QF_DIGAMMA_C[0], qf_sub(yb1, b2));
+    qfloat_t yb1 = qf_mul(y, b1);
+    qfloat_t res = qf_add(QF_DIGAMMA_C[0], qf_sub(yb1, b2));
     return res;
 }
 
-static const qfloat QF_DIGAMMA_C_8_20[81] = {
+static const qfloat_t QF_DIGAMMA_C_8_20[81] = {
     { 2.54950422984596603e+00, -2.09119746016275927e-16 },
     { 4.68589303047532435e-01, 7.66340925430541880e-18 },
     { -5.48629055282131919e-02, 5.94722323398451975e-19 },
@@ -2765,46 +2767,46 @@ static const qfloat QF_DIGAMMA_C_8_20[81] = {
 
 static const int QF_DIGAMMA_N_8_20 = sizeof(QF_DIGAMMA_C_8_20) / sizeof(QF_DIGAMMA_C_8_20[0]);
 
-static qfloat qf_digamma_core_8_20(qfloat x)
+static qfloat_t qf_digamma_core_8_20(qfloat_t x)
 {
-    qfloat center = (qfloat){ 14.0, 0.0 };
-    qfloat halfw  = (qfloat){  6.0, 0.0 };
+    qfloat_t center = (qfloat_t){ 14.0, 0.0 };
+    qfloat_t halfw  = (qfloat_t){  6.0, 0.0 };
 
-    qfloat t = qf_sub(x, center);
-    qfloat y = qf_div(t, halfw);   // y in [-1,1]
+    qfloat_t t = qf_sub(x, center);
+    qfloat_t y = qf_div(t, halfw);   // y in [-1,1]
 
-    qfloat b1 = (qfloat){ 0.0, 0.0 };
-    qfloat b2 = (qfloat){ 0.0, 0.0 };
+    qfloat_t b1 = (qfloat_t){ 0.0, 0.0 };
+    qfloat_t b2 = (qfloat_t){ 0.0, 0.0 };
 
     for (int k = QF_DIGAMMA_N_8_20 - 1; k >= 1; --k) {
-        qfloat term = qf_mul(y, b1);
+        qfloat_t term = qf_mul(y, b1);
         term        = qf_add(term, term);   // 2*y*b1
-        qfloat bk   = qf_sub(term, b2);
+        qfloat_t bk   = qf_sub(term, b2);
         bk          = qf_add(bk, QF_DIGAMMA_C_8_20[k]);
         b2 = b1;
         b1 = bk;
     }
 
-    qfloat yb1 = qf_mul(y, b1);
+    qfloat_t yb1 = qf_mul(y, b1);
     return qf_add(QF_DIGAMMA_C_8_20[0], qf_sub(yb1, b2));
 }
 
-static qfloat qf_digamma_asymp(qfloat x)
+static qfloat_t qf_digamma_asymp(qfloat_t x)
 {
     /* psi(x) ~ log(x) - 1/(2x) - 1/(12x^2) + 1/(120x^4) - 1/(252x^6) + ... */
-    qfloat logx = qf_log(x);
+    qfloat_t logx = qf_log(x);
 
-    qfloat x2 = qf_mul(x, x);
-    qfloat x4 = qf_mul(x2, x2);
-    qfloat x6 = qf_mul(x4, x2);
+    qfloat_t x2 = qf_mul(x, x);
+    qfloat_t x4 = qf_mul(x2, x2);
+    qfloat_t x6 = qf_mul(x4, x2);
 
-    qfloat one = qf_from_double(1.0);
-    qfloat t1 = qf_div(qf_div(one, (qfloat){2.0,0.0}),   x);
-    qfloat t2 = qf_div(qf_div(one, (qfloat){12.0,0.0}),  x2);
-    qfloat t3 = qf_div(qf_div(one, (qfloat){120.0,0.0}), x4);
-    qfloat t4 = qf_div(qf_div(one, (qfloat){252.0,0.0}), x6);
+    qfloat_t one = qf_from_double(1.0);
+    qfloat_t t1 = qf_div(qf_div(one, (qfloat_t){2.0,0.0}),   x);
+    qfloat_t t2 = qf_div(qf_div(one, (qfloat_t){12.0,0.0}),  x2);
+    qfloat_t t3 = qf_div(qf_div(one, (qfloat_t){120.0,0.0}), x4);
+    qfloat_t t4 = qf_div(qf_div(one, (qfloat_t){252.0,0.0}), x6);
 
-    qfloat s = qf_sub(logx, t1);
+    qfloat_t s = qf_sub(logx, t1);
     s = qf_sub(s, t2);
     s = qf_add(s, t3);
     s = qf_sub(s, t4);
@@ -2812,10 +2814,10 @@ static qfloat qf_digamma_asymp(qfloat x)
     return s;
 }
 
-qfloat qf_digamma(qfloat x)
+qfloat_t qf_digamma(qfloat_t x)
 {
-    qfloat one = (qfloat){ 1.0, 0.0 };
-    qfloat pi  = QF_PI;
+    qfloat_t one = (qfloat_t){ 1.0, 0.0 };
+    qfloat_t pi  = QF_PI;
 
     /* Poles */
     if (x.hi <= 0.0 && x.hi == floor(x.hi))
@@ -2823,13 +2825,13 @@ qfloat qf_digamma(qfloat x)
 
     /* Reflection */
     if (x.hi < 0.5) {
-        qfloat one_minus_x = qf_sub(one, x);
-        qfloat psi_1mx     = qf_digamma(one_minus_x);
+        qfloat_t one_minus_x = qf_sub(one, x);
+        qfloat_t psi_1mx     = qf_digamma(one_minus_x);
 
-        qfloat pix  = qf_mul(pi, x);
-        qfloat sinx = qf_sin(pix);
-        qfloat cosx = qf_cos(pix);
-        qfloat cot  = qf_div(cosx, sinx);
+        qfloat_t pix  = qf_mul(pi, x);
+        qfloat_t sinx = qf_sin(pix);
+        qfloat_t cosx = qf_cos(pix);
+        qfloat_t cot  = qf_div(cosx, sinx);
 
         return qf_sub(psi_1mx, qf_mul(pi, cot));
     }
@@ -2866,10 +2868,10 @@ qfloat qf_digamma(qfloat x)
  *
  * Bernoulli numbers B_2, B_4, ..., B_34 are given as exact rational
  * fractions (numerators fit in 43 bits, exact as double).
- * At x = 20, 17 terms give truncation error < 2e-34 (well within qfloat
+ * At x = 20, 17 terms give truncation error < 2e-34 (well within qfloat_t
  * precision).  Optimal-truncation error at x > 20 is < e^{-125} ~ 10^{-55}.
  */
-static qfloat qf_trigamma_asymp(qfloat x)
+static qfloat_t qf_trigamma_asymp(qfloat_t x)
 {
     static const struct { double num; double den; int sign; } B[] = {
         {         1.0,       6.0,  1},  /* B_2  =  1/6             */
@@ -2892,16 +2894,16 @@ static qfloat qf_trigamma_asymp(qfloat x)
     };
     static const int N = (int)(sizeof B / sizeof B[0]);
 
-    qfloat xi  = qf_div(qf_from_double(1.0), x);
-    qfloat xi2 = qf_mul(xi, xi);
-    qfloat xip = xi;
-    qfloat sum = xip;                                    /* 1/x */
+    qfloat_t xi  = qf_div(qf_from_double(1.0), x);
+    qfloat_t xi2 = qf_mul(xi, xi);
+    qfloat_t xip = xi;
+    qfloat_t sum = xip;                                    /* 1/x */
     xip = qf_mul(xip, xi);
     sum = qf_add(sum, qf_mul(xip, qf_from_double(0.5))); /* 1/(2x^2) */
     xip = qf_mul(xip, xi);                              /* xi^3 */
 
     for (int n = 0; n < N; n++) {
-        qfloat coeff = qf_div(qf_from_double(B[n].num), qf_from_double(B[n].den));
+        qfloat_t coeff = qf_div(qf_from_double(B[n].num), qf_from_double(B[n].den));
         if (B[n].sign < 0) coeff = qf_neg(coeff);
         sum = qf_add(sum, qf_mul(coeff, xip));
         xip = qf_mul(xip, xi2);
@@ -2909,9 +2911,9 @@ static qfloat qf_trigamma_asymp(qfloat x)
     return sum;
 }
 
-qfloat qf_trigamma(qfloat x)
+qfloat_t qf_trigamma(qfloat_t x)
 {
-    qfloat one = qf_from_double(1.0);
+    qfloat_t one = qf_from_double(1.0);
 
     /* Poles at non-positive integers */
     if (x.hi <= 0.0 && x.hi == floor(x.hi))
@@ -2919,15 +2921,15 @@ qfloat qf_trigamma(qfloat x)
 
     /* Reflection: psi'(x) + psi'(1-x) = pi^2 / sin^2(pi*x) */
     if (x.hi < 0.5) {
-        qfloat sinpx = qf_sin(qf_mul(QF_PI, x));
-        qfloat pi2   = qf_mul(QF_PI, QF_PI);
+        qfloat_t sinpx = qf_sin(qf_mul(QF_PI, x));
+        qfloat_t pi2   = qf_mul(QF_PI, QF_PI);
         return qf_sub(qf_div(pi2, qf_mul(sinpx, sinpx)),
                       qf_trigamma(qf_sub(one, x)));
     }
 
     /* Recurrence: psi'(x) = psi'(x+1) + 1/x^2 — shift x to > 20 */
     if (x.hi <= 20.0) {
-        qfloat inv_x2 = qf_div(one, qf_mul(x, x));
+        qfloat_t inv_x2 = qf_div(one, qf_mul(x, x));
         return qf_add(inv_x2, qf_trigamma(qf_add(x, one)));
     }
 
@@ -2946,7 +2948,7 @@ qfloat qf_trigamma(qfloat x)
  * Asymptotic region: x > 20
  */
 
-static qfloat qf_tetragamma_asymp(qfloat x)
+static qfloat_t qf_tetragamma_asymp(qfloat_t x)
 {
     /* (2k+1) * B_{2k} for k = 1 .. 17 */
     static const struct { double num; double den; int sign; double mult; } B[] = {
@@ -2970,17 +2972,17 @@ static qfloat qf_tetragamma_asymp(qfloat x)
     };
     static const int N = (int)(sizeof B / sizeof B[0]);
 
-    qfloat xi   = qf_div(qf_from_double(1.0), x);
-    qfloat xi2  = qf_mul(xi, xi);
-    qfloat xip  = xi2;           /* xi^2 = 1/x^2 */
-    qfloat sum  = xip;           /* leading term: 1/x^2 */
+    qfloat_t xi   = qf_div(qf_from_double(1.0), x);
+    qfloat_t xi2  = qf_mul(xi, xi);
+    qfloat_t xip  = xi2;           /* xi^2 = 1/x^2 */
+    qfloat_t sum  = xip;           /* leading term: 1/x^2 */
     xip = qf_mul(xip, xi);       /* xi^3 */
     sum = qf_add(sum, xip);      /* + 1/x^3 */
     xip = qf_mul(xip, xi);       /* xi^4 — start of Bernoulli terms */
 
     for (int n = 0; n < N; n++) {
-        qfloat raw   = qf_div(qf_from_double(B[n].num), qf_from_double(B[n].den));
-        qfloat coeff = qf_mul(qf_from_double(B[n].mult), raw);
+        qfloat_t raw   = qf_div(qf_from_double(B[n].num), qf_from_double(B[n].den));
+        qfloat_t coeff = qf_mul(qf_from_double(B[n].mult), raw);
         if (B[n].sign < 0) coeff = qf_neg(coeff);
         sum = qf_add(sum, qf_mul(coeff, xip));
         xip = qf_mul(xip, xi2);
@@ -2989,27 +2991,27 @@ static qfloat qf_tetragamma_asymp(qfloat x)
     return qf_neg(sum);   /* ψ''(x) = −(sum) */
 }
 
-qfloat qf_tetragamma(qfloat x)
+qfloat_t qf_tetragamma(qfloat_t x)
 {
-    qfloat one = qf_from_double(1.0);
+    qfloat_t one = qf_from_double(1.0);
 
     if (x.hi <= 0.0 && x.hi == floor(x.hi))
         return QF_NAN;
 
     /* Reflection: ψ''(x) = ψ''(1-x) + 2π³cos(πx)/sin³(πx) */
     if (x.hi < 0.5) {
-        qfloat px  = qf_mul(QF_PI, x);
-        qfloat spx = qf_sin(px);
-        qfloat cpx = qf_cos(px);
-        qfloat pi3 = qf_mul(QF_PI, qf_mul(QF_PI, QF_PI));
-        qfloat refl = qf_div(qf_mul(qf_from_double(2.0), qf_mul(pi3, cpx)),
+        qfloat_t px  = qf_mul(QF_PI, x);
+        qfloat_t spx = qf_sin(px);
+        qfloat_t cpx = qf_cos(px);
+        qfloat_t pi3 = qf_mul(QF_PI, qf_mul(QF_PI, QF_PI));
+        qfloat_t refl = qf_div(qf_mul(qf_from_double(2.0), qf_mul(pi3, cpx)),
                               qf_mul(spx, qf_mul(spx, spx)));
         return qf_add(qf_tetragamma(qf_sub(one, x)), refl);
     }
 
     /* Recurrence: ψ''(x) = ψ''(x+1) − 2/x³ — shift x > 20 */
     if (x.hi <= 20.0) {
-        qfloat two_over_x3 = qf_div(qf_from_double(2.0),
+        qfloat_t two_over_x3 = qf_div(qf_from_double(2.0),
                                      qf_mul(x, qf_mul(x, x)));
         return qf_sub(qf_tetragamma(qf_add(x, one)), two_over_x3);
     }
@@ -3019,11 +3021,11 @@ qfloat qf_tetragamma(qfloat x)
 
 /* gammainv */
 
-static const qfloat QF_GAMMA_MIN_VAL = { 0.885603194410888700278815900582588, 0.0 };
+static const qfloat_t QF_GAMMA_MIN_VAL = { 0.885603194410888700278815900582588, 0.0 };
 
-qfloat qf_gammainv(qfloat y)
+qfloat_t qf_gammainv(qfloat_t y)
 {
-    qfloat one = qf_from_double(1.0);
+    qfloat_t one = qf_from_double(1.0);
 
     /* y <= 0: no real solution */
     if (y.hi <= 0.0)
@@ -3033,7 +3035,7 @@ qfloat qf_gammainv(qfloat y)
     if (qf_lt(y, QF_GAMMA_MIN_VAL))
         return QF_NAN;
 
-    qfloat x;
+    qfloat_t x;
 
     /* ---------------------------------------------------------
        BRANCH SELECTION
@@ -3062,14 +3064,14 @@ qfloat qf_gammainv(qfloat y)
         x = qf_from_double(x0);
     }
 
-    qfloat logy = qf_log(y);
+    qfloat_t logy = qf_log(y);
 
     /* Newton on f(x) = lgamma(x) - log(y) */
     for (int i = 0; i < 40; i++) {
-        qfloat lg   = qf_lgamma(x);
-        qfloat psi  = qf_digamma(x);
-        qfloat f    = qf_sub(lg, logy);
-        qfloat step = qf_div(f, psi);
+        qfloat_t lg   = qf_lgamma(x);
+        qfloat_t psi  = qf_digamma(x);
+        qfloat_t f    = qf_sub(lg, logy);
+        qfloat_t step = qf_div(f, psi);
         x = qf_sub(x, step);
 
         if (qf_abs(step).hi < 1e-33)
@@ -3083,18 +3085,18 @@ qfloat qf_gammainv(qfloat y)
 
 /* Newton iteration (stable everywhere) */
 
-static qfloat qf_lambert_newton(qfloat x, qfloat w0)
+static qfloat_t qf_lambert_newton(qfloat_t x, qfloat_t w0)
 {
-    qfloat one = qf_from_double(1.0);
+    qfloat_t one = qf_from_double(1.0);
 
     for (int i = 0; i < 50; ++i) {
-        qfloat ew   = qf_exp(w0);
-        qfloat wew  = qf_mul(w0, ew);              /* w e^w */
-        qfloat f    = qf_sub(wew, x);              /* f(w)  */
+        qfloat_t ew   = qf_exp(w0);
+        qfloat_t wew  = qf_mul(w0, ew);              /* w e^w */
+        qfloat_t f    = qf_sub(wew, x);              /* f(w)  */
 
-        qfloat denom = qf_mul(ew, qf_add(w0, one)); /* e^w (w+1) */
+        qfloat_t denom = qf_mul(ew, qf_add(w0, one)); /* e^w (w+1) */
 
-        qfloat step = qf_div(f, denom);
+        qfloat_t step = qf_div(f, denom);
         w0 = qf_sub(w0, step);
 
         if (qf_abs(step).hi < 1e-33)
@@ -3105,28 +3107,28 @@ static qfloat qf_lambert_newton(qfloat x, qfloat w0)
 
 /* Halley iteration (fast but unstable near x≈1) */
 
-static qfloat qf_lambert_halley(qfloat x, qfloat w0)
+static qfloat_t qf_lambert_halley(qfloat_t x, qfloat_t w0)
 {
-    qfloat one = qf_from_double(1.0);
-    qfloat two = qf_from_double(2.0);
+    qfloat_t one = qf_from_double(1.0);
+    qfloat_t two = qf_from_double(2.0);
 
     for (int i = 0; i < 40; ++i) {
-        qfloat ew   = qf_exp(w0);
-        qfloat wew  = qf_mul(w0, ew);
-        qfloat f    = qf_sub(wew, x);
+        qfloat_t ew   = qf_exp(w0);
+        qfloat_t wew  = qf_mul(w0, ew);
+        qfloat_t f    = qf_sub(wew, x);
 
-        qfloat wp1  = qf_add(w0, one);
-        qfloat denom1 = qf_mul(ew, wp1);           /* f' = e^w (w+1) */
+        qfloat_t wp1  = qf_add(w0, one);
+        qfloat_t denom1 = qf_mul(ew, wp1);           /* f' = e^w (w+1) */
 
-        qfloat wplus2 = qf_add(w0, two);
-        qfloat f2     = qf_mul(ew, wplus2);        /* f'' = e^w (w+2) */
+        qfloat_t wplus2 = qf_add(w0, two);
+        qfloat_t f2     = qf_mul(ew, wplus2);        /* f'' = e^w (w+2) */
 
-        qfloat t      = qf_div(f, denom1);
-        qfloat corr2  = qf_mul(qf_from_double(0.5), qf_mul(t, f2));
+        qfloat_t t      = qf_div(f, denom1);
+        qfloat_t corr2  = qf_mul(qf_from_double(0.5), qf_mul(t, f2));
 
-        qfloat denom  = qf_sub(denom1, corr2);
+        qfloat_t denom  = qf_sub(denom1, corr2);
 
-        qfloat step   = qf_div(f, denom);
+        qfloat_t step   = qf_div(f, denom);
         w0 = qf_sub(w0, step);
 
         if (qf_abs(step).hi < 1e-33)
@@ -3138,13 +3140,13 @@ static qfloat qf_lambert_halley(qfloat x, qfloat w0)
 
 /* Principal branch W0(x) */
 
-qfloat qf_lambert_w0(qfloat x)
+qfloat_t qf_lambert_w0(qfloat_t x)
 {
-    qfloat zero = qf_from_double(0.0);
-    qfloat one  = qf_from_double(1.0);
-    qfloat e    = QF_E;
-    qfloat minus_one = qf_from_double(-1.0);
-    qfloat minus_one_over_e = qf_div(minus_one, e);
+    qfloat_t zero = qf_from_double(0.0);
+    qfloat_t one  = qf_from_double(1.0);
+    qfloat_t e    = QF_E;
+    qfloat_t minus_one = qf_from_double(-1.0);
+    qfloat_t minus_one_over_e = qf_div(minus_one, e);
 
     /* Domain check */
     if (qf_lt(x, minus_one_over_e))
@@ -3155,40 +3157,40 @@ qfloat qf_lambert_w0(qfloat x)
         return zero;
 
     /* Special-case x ≈ -1/e using absolute tolerance */
-    qfloat diff = qf_abs(qf_sub(x, minus_one_over_e));
+    qfloat_t diff = qf_abs(qf_sub(x, minus_one_over_e));
     if (diff.hi < 1e-30)   /* absolute tolerance */
         return minus_one;
 
     /* ---------- FIX #1: avoid Halley near x ≈ 1 ---------- */
     if (qf_lt(qf_abs(x), qf_from_double(3.0))) {
-        qfloat w0 = x;   /* safe initial guess */
+        qfloat_t w0 = x;   /* safe initial guess */
         return qf_lambert_newton(x, w0);
     }
 
     /* ---------- Initial guess for general x ---------- */
-    qfloat w0;
+    qfloat_t w0;
 
     /* Region A: near -1/e */
     if (qf_le(x, qf_from_double(-0.2))) {
-        qfloat ex  = qf_mul(e, x);
-        qfloat t   = qf_add(one, ex);
-        qfloat two = qf_from_double(2.0);
+        qfloat_t ex  = qf_mul(e, x);
+        qfloat_t t   = qf_add(one, ex);
+        qfloat_t two = qf_from_double(2.0);
         t = qf_mul(two, t);
-        qfloat s = qf_sqrt(t);
+        qfloat_t s = qf_sqrt(t);
         w0 = qf_add(minus_one, s);
     }
     /* Region B: small |x| */
     else if (qf_lt(qf_abs(x), qf_from_double(0.3))) {
-        qfloat x2  = qf_mul(x, x);
-        qfloat x3  = qf_mul(x2, x);
+        qfloat_t x2  = qf_mul(x, x);
+        qfloat_t x3  = qf_mul(x2, x);
         w0 = qf_sub(x, x2);
         w0 = qf_add(w0, qf_mul(qf_from_double(1.5), x3));
     }
     /* Region C: large x */
     else {
-        qfloat L1  = qf_log(x);
-        qfloat L2  = qf_log(L1);
-        qfloat L2_over_L1 = qf_div(L2, L1);
+        qfloat_t L1  = qf_log(x);
+        qfloat_t L2  = qf_log(L1);
+        qfloat_t L2_over_L1 = qf_div(L2, L1);
         w0 = qf_sub(L1, L2);
         w0 = qf_add(w0, L2_over_L1);
     }
@@ -3198,41 +3200,41 @@ qfloat qf_lambert_w0(qfloat x)
 
 /* Lower branch W_{-1}(x) */
 
-qfloat qf_lambert_wm1(qfloat x)
+qfloat_t qf_lambert_wm1(qfloat_t x)
 {
-    qfloat zero = qf_from_double(0.0);
-    qfloat one  = qf_from_double(1.0);
-    qfloat e    = QF_E;
-    qfloat minus_one = qf_from_double(-1.0);
-    qfloat minus_one_over_e = qf_div(minus_one, e);
+    qfloat_t zero = qf_from_double(0.0);
+    qfloat_t one  = qf_from_double(1.0);
+    qfloat_t e    = QF_E;
+    qfloat_t minus_one = qf_from_double(-1.0);
+    qfloat_t minus_one_over_e = qf_div(minus_one, e);
 
     /* Domain: -1/e <= x < 0 */
     if (qf_lt(x, minus_one_over_e) || qf_ge(x, zero))
         return QF_NAN;
 
     /* Special-case x ≈ -1/e */
-    qfloat diff = qf_abs(qf_sub(x, minus_one_over_e));
+    qfloat_t diff = qf_abs(qf_sub(x, minus_one_over_e));
     if (diff.hi < 1e-30)   /* absolute tolerance */
         return minus_one;
 
-    qfloat w0;
+    qfloat_t w0;
 
     /* Region A: near -1/e */
     if (qf_le(x, qf_from_double(-0.2))) {
-        qfloat ex  = qf_mul(e, x);
-        qfloat t   = qf_add(one, ex);
-        qfloat two = qf_from_double(2.0);
+        qfloat_t ex  = qf_mul(e, x);
+        qfloat_t t   = qf_add(one, ex);
+        qfloat_t two = qf_from_double(2.0);
         t = qf_mul(two, t);
-        qfloat s = qf_sqrt(t);
+        qfloat_t s = qf_sqrt(t);
         w0 = qf_sub(minus_one, s);
     }
     /* Region B: near 0− */
     else {
-        qfloat nx   = qf_neg(x);
-        qfloat L1   = qf_log(nx);
-        qfloat minus_L1 = qf_neg(L1);
-        qfloat L2   = qf_log(minus_L1);
-        qfloat L2_over_L1 = qf_div(L2, L1);
+        qfloat_t nx   = qf_neg(x);
+        qfloat_t L1   = qf_log(nx);
+        qfloat_t minus_L1 = qf_neg(L1);
+        qfloat_t L2   = qf_log(minus_L1);
+        qfloat_t L2_over_L1 = qf_div(L2, L1);
         w0 = qf_sub(L1, L2);
         w0 = qf_add(w0, L2_over_L1);
     }
@@ -3242,21 +3244,21 @@ qfloat qf_lambert_wm1(qfloat x)
 
 /* Beta function B(a,b) = Γ(a)Γ(b) / Γ(a+b) */
 
-qfloat qf_beta(qfloat a, qfloat b)
+qfloat_t qf_beta(qfloat_t a, qfloat_t b)
 {
-    qfloat zero = qf_from_double(0.0);
+    qfloat_t zero = qf_from_double(0.0);
 
     /* Domain: a>0, b>0 */
     if (qf_le(a, zero) || qf_le(b, zero))
         return QF_NAN;
 
     /* log B(a,b) = lgamma(a) + lgamma(b) - lgamma(a+b) */
-    qfloat lg_a  = qf_lgamma(a);
-    qfloat lg_b  = qf_lgamma(b);
-    qfloat a_plus_b = qf_add(a, b);
-    qfloat lg_ab = qf_lgamma(a_plus_b);
+    qfloat_t lg_a  = qf_lgamma(a);
+    qfloat_t lg_b  = qf_lgamma(b);
+    qfloat_t a_plus_b = qf_add(a, b);
+    qfloat_t lg_ab = qf_lgamma(a_plus_b);
 
-    qfloat logB = qf_add(lg_a, lg_b);
+    qfloat_t logB = qf_add(lg_a, lg_b);
     logB        = qf_sub(logB, lg_ab);
 
     return qf_exp(logB);
@@ -3264,19 +3266,19 @@ qfloat qf_beta(qfloat a, qfloat b)
 
 /* log-Beta function: log B(a,b) */
 
-qfloat qf_logbeta(qfloat a, qfloat b)
+qfloat_t qf_logbeta(qfloat_t a, qfloat_t b)
 {
-    qfloat zero = qf_from_double(0.0);
+    qfloat_t zero = qf_from_double(0.0);
 
     /* Domain: a>0, b>0 */
     if (qf_le(a, zero) || qf_le(b, zero))
         return QF_NAN;
 
-    qfloat lg_a  = qf_lgamma(a);
-    qfloat lg_b  = qf_lgamma(b);
-    qfloat lg_ab = qf_lgamma(qf_add(a, b));
+    qfloat_t lg_a  = qf_lgamma(a);
+    qfloat_t lg_b  = qf_lgamma(b);
+    qfloat_t lg_ab = qf_lgamma(qf_add(a, b));
 
-    qfloat logB = qf_add(lg_a, lg_b);
+    qfloat_t logB = qf_add(lg_a, lg_b);
     logB        = qf_sub(logB, lg_ab);
 
     return logB;
@@ -3284,20 +3286,20 @@ qfloat qf_logbeta(qfloat a, qfloat b)
 
 /* Generalized binomial coefficient C(a,b) = Γ(a+1) / (Γ(b+1) Γ(a-b+1)) */
 
-qfloat qf_binomial(qfloat a, qfloat b)
+qfloat_t qf_binomial(qfloat_t a, qfloat_t b)
 {
-    qfloat one  = qf_from_double(1.0);
+    qfloat_t one  = qf_from_double(1.0);
 
     /* Compute log C(a,b) = lgamma(a+1) - lgamma(b+1) - lgamma(a-b+1) */
-    qfloat a1   = qf_add(a, one);
-    qfloat b1   = qf_add(b, one);
-    qfloat amb1 = qf_add(qf_sub(a, b), one);
+    qfloat_t a1   = qf_add(a, one);
+    qfloat_t b1   = qf_add(b, one);
+    qfloat_t amb1 = qf_add(qf_sub(a, b), one);
 
-    qfloat lg_a1   = qf_lgamma(a1);
-    qfloat lg_b1   = qf_lgamma(b1);
-    qfloat lg_amb1 = qf_lgamma(amb1);
+    qfloat_t lg_a1   = qf_lgamma(a1);
+    qfloat_t lg_b1   = qf_lgamma(b1);
+    qfloat_t lg_amb1 = qf_lgamma(amb1);
 
-    qfloat logC = qf_sub(lg_a1, lg_b1);
+    qfloat_t logC = qf_sub(lg_a1, lg_b1);
     logC        = qf_sub(logC, lg_amb1);
 
     return qf_exp(logC);
@@ -3305,10 +3307,10 @@ qfloat qf_binomial(qfloat a, qfloat b)
 
 /* Beta PDF: f(x; a,b) = x^(a-1) (1-x)^(b-1) / B(a,b) */
 
-qfloat qf_beta_pdf(qfloat x, qfloat a, qfloat b)
+qfloat_t qf_beta_pdf(qfloat_t x, qfloat_t a, qfloat_t b)
 {
-    qfloat zero = qf_from_double(0.0);
-    qfloat one  = qf_from_double(1.0);
+    qfloat_t zero = qf_from_double(0.0);
+    qfloat_t one  = qf_from_double(1.0);
 
     /* Domain: 0 < x < 1, a>0, b>0 */
     if (qf_le(x, zero) || qf_ge(x, one))
@@ -3316,28 +3318,28 @@ qfloat qf_beta_pdf(qfloat x, qfloat a, qfloat b)
     if (qf_le(a, zero) || qf_le(b, zero))
         return QF_NAN;
 
-    qfloat log_x    = qf_log(x);
-    qfloat log_1mx  = qf_log(qf_sub(one, x));
+    qfloat_t log_x    = qf_log(x);
+    qfloat_t log_1mx  = qf_log(qf_sub(one, x));
 
-    qfloat a1 = qf_sub(a, one);
-    qfloat b1 = qf_sub(b, one);
+    qfloat_t a1 = qf_sub(a, one);
+    qfloat_t b1 = qf_sub(b, one);
 
-    qfloat term1 = qf_mul(a1, log_x);
-    qfloat term2 = qf_mul(b1, log_1mx);
+    qfloat_t term1 = qf_mul(a1, log_x);
+    qfloat_t term2 = qf_mul(b1, log_1mx);
 
-    qfloat logB  = qf_logbeta(a, b);
+    qfloat_t logB  = qf_logbeta(a, b);
 
-    qfloat logpdf = qf_sub(qf_add(term1, term2), logB);
+    qfloat_t logpdf = qf_sub(qf_add(term1, term2), logB);
 
     return qf_exp(logpdf);
 }
 
 /* log Beta PDF: log f(x; a,b) = (a-1)log x + (b-1)log(1-x) - log B(a,b) */
 
-qfloat qf_logbeta_pdf(qfloat x, qfloat a, qfloat b)
+qfloat_t qf_logbeta_pdf(qfloat_t x, qfloat_t a, qfloat_t b)
 {
-    qfloat zero = qf_from_double(0.0);
-    qfloat one  = qf_from_double(1.0);
+    qfloat_t zero = qf_from_double(0.0);
+    qfloat_t one  = qf_from_double(1.0);
 
     /* Domain: 0 < x < 1, a>0, b>0 */
     if (qf_le(x, zero) || qf_ge(x, one))
@@ -3345,65 +3347,65 @@ qfloat qf_logbeta_pdf(qfloat x, qfloat a, qfloat b)
     if (qf_le(a, zero) || qf_le(b, zero))
         return QF_NAN;
 
-    qfloat log_x   = qf_log(x);
-    qfloat log_1mx = qf_log(qf_sub(one, x));
+    qfloat_t log_x   = qf_log(x);
+    qfloat_t log_1mx = qf_log(qf_sub(one, x));
 
-    qfloat a1 = qf_sub(a, one);
-    qfloat b1 = qf_sub(b, one);
+    qfloat_t a1 = qf_sub(a, one);
+    qfloat_t b1 = qf_sub(b, one);
 
-    qfloat term1 = qf_mul(a1, log_x);
-    qfloat term2 = qf_mul(b1, log_1mx);
+    qfloat_t term1 = qf_mul(a1, log_x);
+    qfloat_t term2 = qf_mul(b1, log_1mx);
 
-    qfloat logB = qf_logbeta(a, b);
+    qfloat_t logB = qf_logbeta(a, b);
 
     return qf_sub(qf_add(term1, term2), logB);
 }
 
 /* Standard normal PDF: φ(x) = exp(-x^2/2) / sqrt(2π) */
 
-qfloat qf_normal_pdf(qfloat x)
+qfloat_t qf_normal_pdf(qfloat_t x)
 {
-    qfloat half = qf_from_double(0.5);
+    qfloat_t half = qf_from_double(0.5);
 
     /* Compute -x^2 / 2 */
-    qfloat x2   = qf_mul(x, x);
-    qfloat expo = qf_mul(qf_neg(x2), half);
+    qfloat_t x2   = qf_mul(x, x);
+    qfloat_t expo = qf_mul(qf_neg(x2), half);
 
     /* exp(-x^2/2) */
-    qfloat e = qf_exp(expo);
+    qfloat_t e = qf_exp(expo);
 
     return qf_mul(QF_INV_SQRT_2PI, e);
 }
 
 /* Standard normal CDF: Φ(x) = 0.5 * (1 + erf(x / sqrt(2))) */
 
-qfloat qf_normal_cdf(qfloat x)
+qfloat_t qf_normal_cdf(qfloat_t x)
 {
-    qfloat half = qf_from_double(0.5);
-    qfloat one  = qf_from_double(1.0);
+    qfloat_t half = qf_from_double(0.5);
+    qfloat_t one  = qf_from_double(1.0);
 
-    qfloat t = qf_mul(x, QF_SQRT_HALF);
-    qfloat erf_t = qf_erf(t);
+    qfloat_t t = qf_mul(x, QF_SQRT_HALF);
+    qfloat_t erf_t = qf_erf(t);
 
     return qf_mul(half, qf_add(one, erf_t));
 }
 
 /* Standard normal log-PDF: log φ(x) = -0.5 * log(2π) - 0.5 * x^2 */
 
-qfloat qf_normal_logpdf(qfloat x)
+qfloat_t qf_normal_logpdf(qfloat_t x)
 {
-    qfloat half = qf_from_double(0.5);
+    qfloat_t half = qf_from_double(0.5);
 
-    qfloat x2 = qf_mul(x, x);
-    qfloat term1 = qf_mul(half, QF_LN_2PI);   /* 0.5 * log(2π) */
-    qfloat term2 = qf_mul(half, x2);          /* 0.5 * x^2 */
+    qfloat_t x2 = qf_mul(x, x);
+    qfloat_t term1 = qf_mul(half, QF_LN_2PI);   /* 0.5 * log(2π) */
+    qfloat_t term2 = qf_mul(half, x2);          /* 0.5 * x^2 */
 
     return qf_neg(qf_add(term1, term2));
 }
 
 /* ProductLog(x) = LambertW_0(x) */
 
-qfloat qf_productlog(qfloat x)
+qfloat_t qf_productlog(qfloat_t x)
 {
     /* principal branch */
     return qf_lambert_w0(x);
@@ -3411,42 +3413,42 @@ qfloat qf_productlog(qfloat x)
 
 /* Incomplete gamma: lower γ(s,x), upper Γ(s,x), and P/Q */
 
-static qfloat qf_gammainc_series_P(qfloat s, qfloat x)
+static qfloat_t qf_gammainc_series_P(qfloat_t s, qfloat_t x)
 {
     /* P(s,x) via series when x < s+1
        P(s,x) = e^{-x} x^s / Γ(s) * Σ_{n=0..∞} x^n / (s+n) n!
     */
-    qfloat one  = qf_from_double(1.0);
-    qfloat zero = qf_from_double(0.0);
+    qfloat_t one  = qf_from_double(1.0);
+    qfloat_t zero = qf_from_double(0.0);
 
     if (qf_le(x, zero))
         return zero;
 
-    qfloat lgamma_s = qf_lgamma(s);
-    qfloat log_x    = qf_log(x);
+    qfloat_t lgamma_s = qf_lgamma(s);
+    qfloat_t log_x    = qf_log(x);
 
-    qfloat log_pref = qf_sub(qf_mul(s, log_x), x);      /* s*log(x) - x */
+    qfloat_t log_pref = qf_sub(qf_mul(s, log_x), x);      /* s*log(x) - x */
     log_pref        = qf_sub(log_pref, lgamma_s);       /* s*log(x) - x - log Γ(s) */
 
-    qfloat pref = qf_exp(log_pref);                     /* e^{-x} x^s / Γ(s) */
+    qfloat_t pref = qf_exp(log_pref);                     /* e^{-x} x^s / Γ(s) */
 
-    qfloat sum  = qf_div(one, s);                       /* n=0: x^0 / ((s+0) 0!) = 1/s */
-    qfloat term = sum;
+    qfloat_t sum  = qf_div(one, s);                       /* n=0: x^0 / ((s+0) 0!) = 1/s */
+    qfloat_t term = sum;
 
-    qfloat tol  = qf_from_double(1e-34);
+    qfloat_t tol  = qf_from_double(1e-34);
 
     for (int n = 1; n < 2000; ++n) {
-        qfloat n_q = qf_from_double((double)n);
+        qfloat_t n_q = qf_from_double((double)n);
 
         /* term *= x / (s + n) / n */
-        qfloat s_plus_n = qf_add(s, n_q);
+        qfloat_t s_plus_n = qf_add(s, n_q);
         term = qf_mul(term, x);
         term = qf_div(term, s_plus_n);
         term = qf_div(term, n_q);
 
         sum = qf_add(sum, term);
 
-        qfloat at = qf_abs(term);
+        qfloat_t at = qf_abs(term);
         if (qf_le(at, tol))
             break;
     }
@@ -3457,41 +3459,41 @@ static qfloat qf_gammainc_series_P(qfloat s, qfloat x)
 /* Q(s,x) via continued fraction when x >= s+1
    Based on standard Lentz algorithm for incomplete gamma.
 */
-static qfloat qf_gammainc_cf_Q(qfloat s, qfloat x)
+static qfloat_t qf_gammainc_cf_Q(qfloat_t s, qfloat_t x)
 {
-    qfloat one  = qf_from_double(1.0);
-    qfloat zero = qf_from_double(0.0);
+    qfloat_t one  = qf_from_double(1.0);
+    qfloat_t zero = qf_from_double(0.0);
 
-    qfloat lgamma_s = qf_lgamma(s);
-    qfloat log_x    = qf_log(x);
+    qfloat_t lgamma_s = qf_lgamma(s);
+    qfloat_t log_x    = qf_log(x);
 
-    qfloat log_pref = qf_sub(qf_mul(s, log_x), x);      /* s*log(x) - x */
+    qfloat_t log_pref = qf_sub(qf_mul(s, log_x), x);      /* s*log(x) - x */
     log_pref        = qf_sub(log_pref, lgamma_s);       /* s*log(x) - x - log Γ(s) */
 
-    qfloat pref = qf_exp(log_pref);                     /* e^{-x} x^s / Γ(s) */
+    qfloat_t pref = qf_exp(log_pref);                     /* e^{-x} x^s / Γ(s) */
 
     /* Lentz algorithm for continued fraction.
        We keep the same structure you had; this computes the CF factor f,
        then Q(s,x) = pref * f.
     */
 
-    qfloat tiny = qf_from_double(1e-300);
-    qfloat C    = tiny;
-    qfloat D    = zero;
+    qfloat_t tiny = qf_from_double(1e-300);
+    qfloat_t C    = tiny;
+    qfloat_t D    = zero;
 
-    qfloat f    = qf_from_double(1.0);
+    qfloat_t f    = qf_from_double(1.0);
 
-    qfloat a, b, delta;
+    qfloat_t a, b, delta;
 
     for (int n = 1; n < 2000; ++n) {
-        qfloat n_q = qf_from_double((double)n);
+        qfloat_t n_q = qf_from_double((double)n);
 
         /* a_n = n * (s - n) */
-        qfloat s_minus_n = qf_sub(s, n_q);
+        qfloat_t s_minus_n = qf_sub(s, n_q);
         a = qf_mul(n_q, s_minus_n);
 
         /* b_n = x + 2n - s */
-        qfloat two_n = qf_mul_double(n_q, 2.0);
+        qfloat_t two_n = qf_mul_double(n_q, 2.0);
         b = qf_sub(qf_add(x, two_n), s);
 
         /* D = b + a * D */
@@ -3501,7 +3503,7 @@ static qfloat qf_gammainc_cf_Q(qfloat s, qfloat x)
         D = qf_div(one, D);
 
         /* C = b + a / C */
-        qfloat a_over_C = qf_div(a, C);
+        qfloat_t a_over_C = qf_div(a, C);
         C = qf_add(b, a_over_C);
         if (qf_eq(C, zero))
             C = tiny;
@@ -3510,8 +3512,8 @@ static qfloat qf_gammainc_cf_Q(qfloat s, qfloat x)
         f     = qf_mul(f, delta);
 
         /* convergence: |delta - 1| small */
-        qfloat one_minus_delta = qf_sub(delta, one);
-        qfloat ad = qf_abs(one_minus_delta);
+        qfloat_t one_minus_delta = qf_sub(delta, one);
+        qfloat_t ad = qf_abs(one_minus_delta);
         if (qf_le(ad, qf_from_double(1e-32)))
             break;
     }
@@ -3522,10 +3524,10 @@ static qfloat qf_gammainc_cf_Q(qfloat s, qfloat x)
 
 /* Regularized P(s,x) and Q(s,x) */
 
-qfloat qf_gammainc_P(qfloat s, qfloat x)
+qfloat_t qf_gammainc_P(qfloat_t s, qfloat_t x)
 {
-    qfloat zero = qf_from_double(0.0);
-    qfloat one  = qf_from_double(1.0);
+    qfloat_t zero = qf_from_double(0.0);
+    qfloat_t one  = qf_from_double(1.0);
 
     if (qf_le(x, zero))
         return zero;
@@ -3539,31 +3541,31 @@ qfloat qf_gammainc_P(qfloat s, qfloat x)
     }
 
     /* s = 1/2: P = erf(sqrt(x)) */
-    qfloat half = qf_from_double(0.5);
+    qfloat_t half = qf_from_double(0.5);
     if (qf_eq(s, half)) {
-        qfloat r = qf_sqrt(x);
+        qfloat_t r = qf_sqrt(x);
         return qf_erf(r);
     }
 
-    qfloat s_plus_one = qf_add(s, one);
+    qfloat_t s_plus_one = qf_add(s, one);
 
     if (qf_lt(x, s_plus_one)) {
         return qf_gammainc_series_P(s, x);
     } else {
-        qfloat Q = qf_gammainc_cf_Q(s, x);
+        qfloat_t Q = qf_gammainc_cf_Q(s, x);
         if (qf_isnan(Q) || qf_isinf(Q)) {
             /* CF failed: compute P via series and complement */
-            qfloat P = qf_gammainc_series_P(s, x);
+            qfloat_t P = qf_gammainc_series_P(s, x);
             return P;
         }
         return qf_sub(one, Q);
     }
 }
 
-qfloat qf_gammainc_Q(qfloat s, qfloat x)
+qfloat_t qf_gammainc_Q(qfloat_t s, qfloat_t x)
 {
-    qfloat zero = qf_from_double(0.0);
-    qfloat one  = qf_from_double(1.0);
+    qfloat_t zero = qf_from_double(0.0);
+    qfloat_t one  = qf_from_double(1.0);
 
     if (qf_le(x, zero))
         return one;
@@ -3577,22 +3579,22 @@ qfloat qf_gammainc_Q(qfloat s, qfloat x)
     }
 
     /* s = 1/2: Q = erfc(sqrt(x)) */
-    qfloat half = qf_from_double(0.5);
+    qfloat_t half = qf_from_double(0.5);
     if (qf_eq(s, half)) {
-        qfloat r = qf_sqrt(x);
+        qfloat_t r = qf_sqrt(x);
         return qf_erfc(r);
     }
 
-    qfloat s_plus_one = qf_add(s, one);
+    qfloat_t s_plus_one = qf_add(s, one);
 
     if (qf_lt(x, s_plus_one)) {
-        qfloat P = qf_gammainc_series_P(s, x);
+        qfloat_t P = qf_gammainc_series_P(s, x);
         return qf_sub(one, P);
     } else {
         /* CF gives Q directly; if it fails, fall back to series */
-        qfloat Q = qf_gammainc_cf_Q(s, x);
+        qfloat_t Q = qf_gammainc_cf_Q(s, x);
         if (qf_isnan(Q) || qf_isinf(Q)) {
-            qfloat P = qf_gammainc_series_P(s, x);
+            qfloat_t P = qf_gammainc_series_P(s, x);
             return qf_sub(one, P);
         }
         return Q;
@@ -3601,17 +3603,17 @@ qfloat qf_gammainc_Q(qfloat s, qfloat x)
 
 /* Unregularized lower and upper incomplete gamma */
 
-qfloat qf_gammainc_lower(qfloat s, qfloat x)
+qfloat_t qf_gammainc_lower(qfloat_t s, qfloat_t x)
 {
-    qfloat P = qf_gammainc_P(s, x);
-    qfloat gamma_s = qf_gamma(s);
+    qfloat_t P = qf_gammainc_P(s, x);
+    qfloat_t gamma_s = qf_gamma(s);
     return qf_mul(P, gamma_s);
 }
 
-qfloat qf_gammainc_upper(qfloat s, qfloat x)
+qfloat_t qf_gammainc_upper(qfloat_t s, qfloat_t x)
 {
-    qfloat Q = qf_gammainc_Q(s, x);
-    qfloat gamma_s = qf_gamma(s);
+    qfloat_t Q = qf_gammainc_Q(s, x);
+    qfloat_t gamma_s = qf_gamma(s);
     return qf_mul(Q, gamma_s);
 }
 
@@ -3619,21 +3621,21 @@ qfloat qf_gammainc_upper(qfloat s, qfloat x)
    Ei(x) asymptotic for large positive x:
    Ei(x) ~ e^x / x * Σ_{k=0..∞} k! / x^k
   ===============================================================*/
-static qfloat qf_ei_asymp_pos(qfloat x)
+static qfloat_t qf_ei_asymp_pos(qfloat_t x)
 {
-    qfloat one  = qf_from_double(1.0);
-    qfloat invx = qf_div(one, x);
+    qfloat_t one  = qf_from_double(1.0);
+    qfloat_t invx = qf_div(one, x);
 
-    qfloat term = one;
-    qfloat sum  = term;
-    qfloat prev_abs = qf_abs(term);
+    qfloat_t term = one;
+    qfloat_t sum  = term;
+    qfloat_t prev_abs = qf_abs(term);
 
     for (int k = 1; k < 50; ++k) {
-        qfloat kq = qf_from_double((double)k);
+        qfloat_t kq = qf_from_double((double)k);
         term = qf_mul(term, kq);
         term = qf_mul(term, invx);
 
-        qfloat at = qf_abs(term);
+        qfloat_t at = qf_abs(term);
         if (qf_gt(at, prev_abs))
             break;
         prev_abs = at;
@@ -3647,21 +3649,21 @@ static qfloat qf_ei_asymp_pos(qfloat x)
 /*===============================================================
    E1(x) asymptotic for large positive x
   ===============================================================*/
-static qfloat qf_e1_asymp_pos(qfloat x)
+static qfloat_t qf_e1_asymp_pos(qfloat_t x)
 {
-    qfloat one  = qf_from_double(1.0);
-    qfloat invx = qf_div(one, x);
+    qfloat_t one  = qf_from_double(1.0);
+    qfloat_t invx = qf_div(one, x);
 
-    qfloat term = one;
-    qfloat sum  = term;
-    qfloat prev_abs = qf_abs(term);
+    qfloat_t term = one;
+    qfloat_t sum  = term;
+    qfloat_t prev_abs = qf_abs(term);
 
     for (int k = 1; k < 50; ++k) {
-        qfloat kq = qf_from_double((double)k);
+        qfloat_t kq = qf_from_double((double)k);
         term = qf_mul(term, qf_neg(kq));
         term = qf_mul(term, invx);
 
-        qfloat at = qf_abs(term);
+        qfloat_t at = qf_abs(term);
         if (qf_gt(at, prev_abs))
             break;
         prev_abs = at;
@@ -3676,27 +3678,27 @@ static qfloat qf_e1_asymp_pos(qfloat x)
    Ei(x) series for small/moderate |x|
    Ei(x) = γ + ln|x| + Σ_{k=1..∞} x^k / (k·k!)
   ===============================================================*/
-static qfloat qf_ei_series(qfloat x)
+static qfloat_t qf_ei_series(qfloat_t x)
 {
-    qfloat ax   = qf_abs(x);
-    qfloat zero = qf_from_double(0.0);
+    qfloat_t ax   = qf_abs(x);
+    qfloat_t zero = qf_from_double(0.0);
 
     if (qf_eq(ax, zero))
         return QF_NAN;
 
-    qfloat u   = x;   /* u_1 = x */
-    qfloat sum = u;
+    qfloat_t u   = x;   /* u_1 = x */
+    qfloat_t sum = u;
 
-    qfloat tol = qf_from_double(1e-40);  /* absolute on term */
+    qfloat_t tol = qf_from_double(1e-40);  /* absolute on term */
 
     for (int k = 2; k < 800; ++k) {
-        qfloat kq = qf_from_double((double)k);
+        qfloat_t kq = qf_from_double((double)k);
 
         /* u_k = u_{k-1} * x / k */
         u = qf_div(qf_mul(u, x), kq);
 
         /* term_k = u_k / k */
-        qfloat term = qf_div(u, kq);
+        qfloat_t term = qf_div(u, kq);
 
         sum = qf_add(sum, term);
 
@@ -3704,32 +3706,32 @@ static qfloat qf_ei_series(qfloat x)
             break;
     }
 
-    qfloat log_ax = qf_log(ax);
+    qfloat_t log_ax = qf_log(ax);
     return qf_add(qf_add(QF_EULER_MASCHERONI, log_ax), sum);
 }
 
 /*===============================================================
    Ei(x) asymptotic for large negative x
   ===============================================================*/
-static qfloat qf_ei_asymp_neg(qfloat x)
+static qfloat_t qf_ei_asymp_neg(qfloat_t x)
 {
-    qfloat t = qf_neg(x);  /* t = -x > 0 */
+    qfloat_t t = qf_neg(x);  /* t = -x > 0 */
 
-    qfloat one  = qf_from_double(1.0);
-    qfloat invt = qf_div(one, t);
+    qfloat_t one  = qf_from_double(1.0);
+    qfloat_t invt = qf_div(one, t);
 
-    qfloat term = one;
-    qfloat sum  = term;
-    qfloat prev_abs = qf_abs(term);
+    qfloat_t term = one;
+    qfloat_t sum  = term;
+    qfloat_t prev_abs = qf_abs(term);
 
     for (int k = 1; k < 100; ++k) {   /* was 50 */
-        qfloat kq = qf_from_double((double)k);
+        qfloat_t kq = qf_from_double((double)k);
 
         term = qf_mul(term, kq);
         term = qf_mul(term, invt);
         term = qf_neg(term);   /* alternating */
 
-        qfloat at = qf_abs(term);
+        qfloat_t at = qf_abs(term);
         if (qf_gt(at, prev_abs))
             break;
         prev_abs = at;
@@ -3737,8 +3739,8 @@ static qfloat qf_ei_asymp_neg(qfloat x)
         sum = qf_add(sum, term);
     }
 
-    qfloat e_minus_t = qf_exp(qf_neg(t));
-    qfloat e_over_t  = qf_mul(e_minus_t, invt);
+    qfloat_t e_minus_t = qf_exp(qf_neg(t));
+    qfloat_t e_over_t  = qf_mul(e_minus_t, invt);
 
     return qf_neg(qf_mul(e_over_t, sum));
 }
@@ -3746,12 +3748,12 @@ static qfloat qf_ei_asymp_neg(qfloat x)
 /*===============================================================
    Ei(x) — PRIMARY ENTRY POINT (NO CF)
   ===============================================================*/
-qfloat qf_ei(qfloat x)
+qfloat_t qf_ei(qfloat_t x)
 {
-    qfloat zero   = qf_from_double(0.0);
-    qfloat twelve = qf_from_double(12.0);
+    qfloat_t zero   = qf_from_double(0.0);
+    qfloat_t twelve = qf_from_double(12.0);
 
-    qfloat ax = qf_abs(x);
+    qfloat_t ax = qf_abs(x);
 
     /* |x| ≤ 12: series */
     if (qf_le(ax, twelve))
@@ -3767,10 +3769,10 @@ qfloat qf_ei(qfloat x)
    E1(x) — SECONDARY ENTRY POINT
    E1(x) = -Ei(-x) for moderate x
   ===============================================================*/
-qfloat qf_e1(qfloat x)
+qfloat_t qf_e1(qfloat_t x)
 {
-    qfloat zero   = qf_from_double(0.0);
-    qfloat twenty = qf_from_double(20.0);
+    qfloat_t zero   = qf_from_double(0.0);
+    qfloat_t twenty = qf_from_double(20.0);
 
     if (qf_le(x, zero))
         return QF_NAN;

@@ -5,7 +5,7 @@ datetime utilities, UTF-8 strings, and generic containers.
 
 ## Highlights
 
-- **`qfloat`** — double-double arithmetic and special functions
+- **`qfloat_t`** — double-double arithmetic and special functions
 - **`dval_t`** — differentiable expression DAGs with first/second derivatives
 - **`datetime_t`** — civil and astronomical date/time helpers
 - **`dictionary_t` / `set_t` / `array_t`** — generic containers with user-defined ownership
@@ -18,8 +18,8 @@ datetime utilities, UTF-8 strings, and generic containers.
 #include "qfloat.h"
 
 int main(void) {
-    qfloat x = qf_from_string("1");
-    qfloat w = qf_lambert_w0(x);
+    qfloat_t x = qf_from_string("1");
+    qfloat_t w = qf_lambert_w0(x);
 
     qf_printf("W0(1) = %.34q\n", w);
     return 0;
@@ -34,7 +34,7 @@ W0(1) = 0.5671432904097838729999686622103575
 
 ## Modules
 
-- [`qfloat`](qfloat.md)
+- [`qfloat_t`](qfloat.md)
 - [`dval_t`](dval.md)
 - [`datetime_t`](datetime.md)
 - [`dictionary_t`](dictionary.md)
@@ -91,7 +91,7 @@ This directory contains the longer module documentation for MARS.
 
 ## Modules
 
-- [`qfloat`](qfloat.md) — double-double arithmetic and special functions
+- [`qfloat_t`](qfloat.md) — double-double arithmetic and special functions
 - [`dval_t`](dval.md) — differentiable expression DAGs
 - [`datetime_t`](datetime.md) — civil and astronomical date/time utilities
 - [`dictionary_t`](dictionary.md) — generic key/value storage

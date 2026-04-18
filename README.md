@@ -11,13 +11,13 @@ datetime utilities, UTF-8 strings, and generic containers.
 
 ## Highlights
 
-- **`qfloat`** — double-double arithmetic and special functions (~34 decimal digits of precision)
+- **`qfloat_t`** — double-double arithmetic and special functions (~34 decimal digits of precision)
 - **`dval_t`** — differentiable expression DAGs with first/second derivatives
 - **`datetime_t`** — civil and astronomical date/time helpers
 - **`dictionary_t` / `set_t` / `array_t`** — generic containers with user-defined ownership
 - **`string_t`** — UTF-8-aware dynamic strings and grapheme operations
 - **`bitset_t`** — dynamic thread-safe bitset with bitwise operations
-- **`integrator_t`** — adaptive G7K15 numerical integration at qfloat precision
+- **`integrator_t`** — adaptive G7K15 numerical integration at qfloat_t precision
 
 ## Requirements
 
@@ -26,15 +26,15 @@ datetime utilities, UTF-8 strings, and generic containers.
 
 ## Quick Examples
 
-**High-precision arithmetic with `qfloat`:**
+**High-precision arithmetic with `qfloat_t`:**
 
 ```c
 #include <stdio.h>
 #include "qfloat.h"
 
 int main(void) {
-    qfloat x = qf_from_string("1");
-    qfloat w = qf_lambert_w0(x);
+    qfloat_t x = qf_from_string("1");
+    qfloat_t w = qf_lambert_w0(x);
 
     qf_printf("W0(1) = %.34q\n", w);
     return 0;
@@ -49,7 +49,7 @@ W0(1) = 0.5671432904097838729999686622103575
 
 | Module | Description | Docs |
 |---|---|---|
-| `qfloat` | Double-double arithmetic and special functions | [`docs/qfloat.md`](docs/qfloat.md) |
+| `qfloat_t` | Double-double arithmetic and special functions | [`docs/qfloat.md`](docs/qfloat.md) |
 | `dval_t` | Differentiable expression DAGs | [`docs/dval.md`](docs/dval.md) |
 | `datetime_t` | Civil and astronomical date/time utilities | [`docs/datetime.md`](docs/datetime.md) |
 | `dictionary_t` | Generic key/value storage with ownership models | [`docs/dictionary.md`](docs/dictionary.md) |

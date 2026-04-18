@@ -33,8 +33,8 @@ dval_t *dv_simplify(dval_t *dv);
 /* Scalar predicates                                                          */
 /* ========================================================================= */
 
-static int is_qf_zero(qfloat x) { return qf_to_double(x) == 0.0; }
-static int is_qf_one (qfloat x) { return qf_to_double(x) == 1.0; }
+static int is_qf_zero(qfloat_t x) { return qf_to_double(x) == 0.0; }
+static int is_qf_one (qfloat_t x) { return qf_to_double(x) == 1.0; }
 
 /* ========================================================================= */
 /* Structural equality                                                        */
@@ -62,7 +62,7 @@ static int dv_struct_eq(const dval_t *u, const dval_t *v)
 
 static void collect_mul_flat(
     dval_t *dv,
-    qfloat *c_acc, int *is_zero,
+    qfloat_t *c_acc, int *is_zero,
     dval_t ***terms, size_t *nterms, size_t *cap)
 {
     if (*is_zero) return;
@@ -94,7 +94,7 @@ static void collect_mul_flat(
 /* Like-term helpers for addition/subtraction                                */
 /* ========================================================================= */
 
-static qfloat term_coeff(const dval_t *term, const dval_t **base)
+static qfloat_t term_coeff(const dval_t *term, const dval_t **base)
 {
     /* unnamed pure constant: numeric only, no symbolic base */
     if (term->ops == &ops_const && (!term->name || !*term->name)) {
@@ -124,7 +124,7 @@ static qfloat term_coeff(const dval_t *term, const dval_t **base)
 }
 
 /* Build  coeff * base,  consuming the retained base reference. */
-static dval_t *make_scaled(qfloat coeff, dval_t *base)
+static dval_t *make_scaled(qfloat_t coeff, dval_t *base)
 {
     if (is_qf_zero(coeff)) { dv_free(base); return dv_new_const_d(0.0); }
     if (is_qf_one(coeff))  return base;
@@ -134,7 +134,7 @@ static dval_t *make_scaled(qfloat coeff, dval_t *base)
             base->a->a->ops == &ops_const &&
             (!base->a->a->name || !*base->a->a->name) &&
             qf_to_double(base->a->a->c) < 0.0) {
-            qfloat    pos_c   = qf_neg(base->a->a->c);
+            qfloat_t    pos_c   = qf_neg(base->a->a->c);
             dval_t   *rest    = base->a->b;
             dval_t   *den     = base->b;
             dv_retain(rest); dv_retain(den); dv_free(base);
@@ -156,7 +156,7 @@ static dval_t *make_scaled(qfloat coeff, dval_t *base)
     if (base->ops == &ops_mul &&
         base->a->ops == &ops_const &&
         (!base->a->name || !*base->a->name)) {
-        qfloat folded = qf_mul(coeff, base->a->c);
+        qfloat_t folded = qf_mul(coeff, base->a->c);
         dv_retain(base->b);
         dval_t *rest = base->b;
         dv_free(base);
@@ -168,7 +168,7 @@ static dval_t *make_scaled(qfloat coeff, dval_t *base)
         base->a->ops == &ops_mul &&
         base->a->a->ops == &ops_const &&
         (!base->a->a->name || !*base->a->a->name)) {
-        qfloat folded = qf_mul(coeff, base->a->a->c);
+        qfloat_t folded = qf_mul(coeff, base->a->a->c);
         dv_retain(base->a->b);
         dv_retain(base->b);
         dval_t *inner = dv_mul(base->a->b, base->b);
@@ -187,11 +187,11 @@ static dval_t *make_scaled(qfloat coeff, dval_t *base)
 /* Add/sub: collect coefficient·base pairs                                   */
 /* ========================================================================= */
 
-typedef struct { dval_t *base; qfloat coeff; } addend_t;
+typedef struct { dval_t *base; qfloat_t coeff; } addend_t;
 
 static void collect_addends(
     dval_t *dv, int sign,
-    qfloat *c_const,
+    qfloat_t *c_const,
     addend_t **terms, size_t *n, size_t *cap)
 {
     if (!dv) return;
@@ -211,7 +211,7 @@ static void collect_addends(
         return;
     }
     const dval_t *base;
-    qfloat coeff = term_coeff(dv, &base);
+    qfloat_t coeff = term_coeff(dv, &base);
     if (sign < 0) coeff = qf_neg(coeff);
     if (!base) { *c_const = qf_add(*c_const, coeff); return; }
 
@@ -315,7 +315,7 @@ static dval_t *simplify_unary_fun(dval_t *dv, dval_t *a)
         if (!a->name || !*a->name) {
             if (dv->ops->apply_unary) {
                 dval_t *tmp = dv->ops->apply_unary(a);
-                qfloat   v  = tmp->ops->eval(tmp);
+                qfloat_t   v  = tmp->ops->eval(tmp);
                 dv_free(tmp); dv_free(a);
                 return dv_new_const(v);
             }
@@ -344,14 +344,14 @@ static dval_t *simplify_neg(dval_t *a)
     }
     /* neg(c) → -c */
     if (a->ops == &ops_const) {
-        qfloat c = qf_neg(a->c); dv_free(a); return dv_new_const(c);
+        qfloat_t c = qf_neg(a->c); dv_free(a); return dv_new_const(c);
     }
     /* neg(c·x) where c < 0 → |c|·x  (eliminates spurious double-negative) */
     if (a->ops == &ops_mul &&
         a->a->ops == &ops_const &&
         (!a->a->name || !*a->a->name) &&
         qf_to_double(a->a->c) < 0.0) {
-        qfloat pos_c = qf_neg(a->a->c);
+        qfloat_t pos_c = qf_neg(a->a->c);
         dv_retain(a->b);
         dval_t *rest = a->b;
         dv_free(a);
@@ -364,7 +364,7 @@ static dval_t *simplify_neg(dval_t *a)
 
 static dval_t *simplify_add_sub(dval_t *dv, dval_t *a, dval_t *b)
 {
-    qfloat    c_const = qf_from_double(0.0);
+    qfloat_t    c_const = qf_from_double(0.0);
     addend_t *terms   = NULL;
     size_t    n = 0, cap = 0;
 
@@ -429,7 +429,7 @@ static dval_t *simplify_mul(dval_t *dv, dval_t *a, dval_t *b)
     if (b->ops == &ops_const && is_qf_one(b->c)) { dv_free(b); return a; }
 
     /* --- flatten --- */
-    qfloat   c_acc  = qf_from_double(1.0);
+    qfloat_t   c_acc  = qf_from_double(1.0);
     int      is_zero = 0;
     dval_t **terms   = NULL;
     size_t   nterms  = 0, cap = 0;
@@ -681,7 +681,7 @@ static dval_t *simplify_div(dval_t *dv, dval_t *a, dval_t *b)
         dv_free(a); dv_free(b); return dv_new_const_d(0.0);
     }
     if (a->ops == &ops_const && b->ops == &ops_const) {
-        qfloat q = qf_div(a->c, b->c); dv_free(a); dv_free(b);
+        qfloat_t q = qf_div(a->c, b->c); dv_free(a); dv_free(b);
         return dv_new_const(q);
     }
 
@@ -717,7 +717,7 @@ static dval_t *simplify_pow_d(dval_t *dv, dval_t *a)
     if (ed == 0.0) { dv_free(a); return dv_new_const_d(1.0); }
 
     if (a->ops == &ops_const && (!a->name || !*a->name)) {
-        qfloat v = qf_pow(a->c, dv->c); dv_free(a); return dv_new_const(v);
+        qfloat_t v = qf_pow(a->c, dv->c); dv_free(a); return dv_new_const(v);
     }
 
     /* sqrt(x)^n → x^(n/2) */
@@ -757,7 +757,7 @@ static dval_t *simplify_binary_special(dval_t *dv, dval_t *a, dval_t *b)
         if (a->ops == &ops_const && (!a->name || !*a->name) &&
             b->ops == &ops_const && (!b->name || !*b->name)) {
             dval_t *tmp = dv_hypot(a, b);
-            qfloat v = tmp->ops->eval(tmp);
+            qfloat_t v = tmp->ops->eval(tmp);
             dv_free(tmp); dv_free(a); dv_free(b);
             return dv_new_const(v);
         }
@@ -768,7 +768,7 @@ static dval_t *simplify_binary_special(dval_t *dv, dval_t *a, dval_t *b)
         if (a->ops == &ops_const && (!a->name || !*a->name) &&
             b->ops == &ops_const && (!b->name || !*b->name)) {
             dval_t *tmp = (dv->ops == &ops_beta) ? dv_beta(a,b) : dv_logbeta(a,b);
-            qfloat v = tmp->ops->eval(tmp);
+            qfloat_t v = tmp->ops->eval(tmp);
             dv_free(tmp); dv_free(a); dv_free(b);
             return dv_new_const(v);
         }

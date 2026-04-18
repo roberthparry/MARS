@@ -194,7 +194,7 @@ static dval_t *dv_alloc(const dval_ops_t *ops)
 /* Lazy eval / deriv                                                         */
 /* ------------------------------------------------------------------------- */
 
-static qfloat dv_eval_qf(const dval_t *dv)
+static qfloat_t dv_eval_qf(const dval_t *dv)
 {
     if (!dv)
         return qf_from_double(0.0);
@@ -236,7 +236,7 @@ static dval_t *get_dx(const dval_t *dv)
 /* Public eval                                                               */
 /* ------------------------------------------------------------------------- */
 
-qfloat dv_eval(const dval_t *dv)
+qfloat_t dv_eval(const dval_t *dv)
 {
     return dv_eval_qf(dv);
 }
@@ -274,7 +274,7 @@ const dval_t *dv_get_deriv(const dval_t *dv)
 /* Constructors                                                              */
 /* ------------------------------------------------------------------------- */
 
-static dval_t *dv_make_const_qf(qfloat x)
+static dval_t *dv_make_const_qf(qfloat_t x)
 {
     dval_t *dv = dv_alloc(&ops_const);
     dv->c = x;
@@ -284,7 +284,7 @@ static dval_t *dv_make_const_qf(qfloat x)
 }
 
 /* A variable: value x, derivative dx = 1 (as a constant node) */
-static dval_t *dv_make_var_qf(qfloat x)
+static dval_t *dv_make_var_qf(qfloat_t x)
 {
     dval_t *dv = dv_alloc(&ops_var);
     dv->c = x;
@@ -300,7 +300,7 @@ static dval_t *dv_make_var_qf(qfloat x)
 }
 
 dval_t *dv_new_const_d(double x) { return dv_make_const_qf(qf_from_double(x)); }
-dval_t *dv_new_const(qfloat x)   { return dv_make_const_qf(x); }
+dval_t *dv_new_const(qfloat_t x)   { return dv_make_const_qf(x); }
 
 /* Public variable constructors: no derivative argument */
 dval_t *dv_new_var_d(double x)
@@ -308,12 +308,12 @@ dval_t *dv_new_var_d(double x)
     return dv_make_var_qf(qf_from_double(x));
 }
 
-dval_t *dv_new_var(qfloat x)
+dval_t *dv_new_var(qfloat_t x)
 {
     return dv_make_var_qf(x);
 }
 
-dval_t *dv_new_named_const(qfloat x, const char *name)
+dval_t *dv_new_named_const(qfloat_t x, const char *name)
 {
     dval_t *dv = dv_new_const(x);
     dv->name = dv_normalize_name(name);
@@ -326,7 +326,7 @@ dval_t *dv_new_named_const_d(double x, const char *name)
 }
 
 /* Named variable: value x, derivative 1, with a name */
-dval_t *dv_new_named_var(qfloat x, const char *name)
+dval_t *dv_new_named_var(qfloat_t x, const char *name)
 {
     dval_t *dv = dv_new_var(x);
     dv->name = dv_normalize_name(name);
@@ -342,7 +342,7 @@ dval_t *dv_new_named_var_d(double x, const char *name)
 /* Setters                                                                   */
 /* ------------------------------------------------------------------------- */
 
-void dv_set_val(dval_t *dv, qfloat v)
+void dv_set_val(dval_t *dv, qfloat_t v)
 {
     if (dv->ops != &ops_var) abort();
     dv->c = v;
@@ -371,7 +371,7 @@ double dv_get_val_d(const dval_t *dv)
     return qf_to_double(dv_eval_qf((dval_t *)dv));
 }
 
-qfloat dv_get_val(const dval_t *dv)
+qfloat_t dv_get_val(const dval_t *dv)
 {
     return dv_eval_qf((dval_t *)dv);
 }
@@ -380,99 +380,99 @@ qfloat dv_get_val(const dval_t *dv)
 /* EVALUATION FUNCTIONS                                                      */
 /* ------------------------------------------------------------------------- */
 
-static qfloat eval_const(dval_t *dv) {
+static qfloat_t eval_const(dval_t *dv) {
     return dv->c;
 }
 
-static qfloat eval_var(dval_t *dv) {
+static qfloat_t eval_var(dval_t *dv) {
     return dv->c;
 }
 
-static qfloat eval_add(dval_t *dv) {
+static qfloat_t eval_add(dval_t *dv) {
     return qf_add(dv_eval_qf(dv->a), dv_eval_qf(dv->b));
 }
 
-static qfloat eval_sub(dval_t *dv) {
+static qfloat_t eval_sub(dval_t *dv) {
     return qf_sub(dv_eval_qf(dv->a), dv_eval_qf(dv->b));
 }
 
-static qfloat eval_mul(dval_t *dv) {
+static qfloat_t eval_mul(dval_t *dv) {
     return qf_mul(dv_eval_qf(dv->a), dv_eval_qf(dv->b));
 }
 
-static qfloat eval_div(dval_t *dv) {
+static qfloat_t eval_div(dval_t *dv) {
     return qf_div(dv_eval_qf(dv->a), dv_eval_qf(dv->b));
 }
 
-static qfloat eval_neg(dval_t *dv) {
+static qfloat_t eval_neg(dval_t *dv) {
     return qf_neg(dv_eval_qf(dv->a));
 }
 
-static qfloat eval_pow(dval_t *dv) {
-    qfloat base = dv_eval_qf(dv->a);
-    qfloat exp  = dv_eval_qf(dv->b);
+static qfloat_t eval_pow(dval_t *dv) {
+    qfloat_t base = dv_eval_qf(dv->a);
+    qfloat_t exp  = dv_eval_qf(dv->b);
     return qf_pow(base, exp);
 }
 
-static qfloat eval_pow_d(dval_t *dv) {
-    qfloat base = dv_eval_qf(dv->a);
+static qfloat_t eval_pow_d(dval_t *dv) {
+    qfloat_t base = dv_eval_qf(dv->a);
     return qf_pow(base, dv->c);
 }
 
 /* --- Trig / Hyperbolic / Exp / Log / Sqrt -------------------------------- */
 
-static qfloat eval_sin(dval_t *dv)   { return qf_sin (dv_eval_qf(dv->a)); }
-static qfloat eval_cos(dval_t *dv)   { return qf_cos (dv_eval_qf(dv->a)); }
-static qfloat eval_tan(dval_t *dv)   { return qf_tan (dv_eval_qf(dv->a)); }
+static qfloat_t eval_sin(dval_t *dv)   { return qf_sin (dv_eval_qf(dv->a)); }
+static qfloat_t eval_cos(dval_t *dv)   { return qf_cos (dv_eval_qf(dv->a)); }
+static qfloat_t eval_tan(dval_t *dv)   { return qf_tan (dv_eval_qf(dv->a)); }
 
-static qfloat eval_sinh(dval_t *dv)  { return qf_sinh(dv_eval_qf(dv->a)); }
-static qfloat eval_cosh(dval_t *dv)  { return qf_cosh(dv_eval_qf(dv->a)); }
-static qfloat eval_tanh(dval_t *dv)  { return qf_tanh(dv_eval_qf(dv->a)); }
+static qfloat_t eval_sinh(dval_t *dv)  { return qf_sinh(dv_eval_qf(dv->a)); }
+static qfloat_t eval_cosh(dval_t *dv)  { return qf_cosh(dv_eval_qf(dv->a)); }
+static qfloat_t eval_tanh(dval_t *dv)  { return qf_tanh(dv_eval_qf(dv->a)); }
 
-static qfloat eval_asin(dval_t *dv)  { return qf_asin(dv_eval_qf(dv->a)); }
-static qfloat eval_acos(dval_t *dv)  { return qf_acos(dv_eval_qf(dv->a)); }
-static qfloat eval_atan(dval_t *dv)  { return qf_atan(dv_eval_qf(dv->a)); }
+static qfloat_t eval_asin(dval_t *dv)  { return qf_asin(dv_eval_qf(dv->a)); }
+static qfloat_t eval_acos(dval_t *dv)  { return qf_acos(dv_eval_qf(dv->a)); }
+static qfloat_t eval_atan(dval_t *dv)  { return qf_atan(dv_eval_qf(dv->a)); }
 
-static qfloat eval_asinh(dval_t *dv) { return qf_asinh(dv_eval_qf(dv->a)); }
-static qfloat eval_acosh(dval_t *dv) { return qf_acosh(dv_eval_qf(dv->a)); }
-static qfloat eval_atanh(dval_t *dv) { return qf_atanh(dv_eval_qf(dv->a)); }
+static qfloat_t eval_asinh(dval_t *dv) { return qf_asinh(dv_eval_qf(dv->a)); }
+static qfloat_t eval_acosh(dval_t *dv) { return qf_acosh(dv_eval_qf(dv->a)); }
+static qfloat_t eval_atanh(dval_t *dv) { return qf_atanh(dv_eval_qf(dv->a)); }
 
-static qfloat eval_exp(dval_t *dv)    { return qf_exp   (dv_eval_qf(dv->a)); }
-static qfloat eval_log(dval_t *dv)    { return qf_log   (dv_eval_qf(dv->a)); }
-static qfloat eval_sqrt(dval_t *dv)   { return qf_sqrt  (dv_eval_qf(dv->a)); }
+static qfloat_t eval_exp(dval_t *dv)    { return qf_exp   (dv_eval_qf(dv->a)); }
+static qfloat_t eval_log(dval_t *dv)    { return qf_log   (dv_eval_qf(dv->a)); }
+static qfloat_t eval_sqrt(dval_t *dv)   { return qf_sqrt  (dv_eval_qf(dv->a)); }
 
-static qfloat eval_abs(dval_t *dv)    { return qf_abs   (dv_eval_qf(dv->a)); }
-static qfloat eval_erf(dval_t *dv)    { return qf_erf   (dv_eval_qf(dv->a)); }
-static qfloat eval_erfc(dval_t *dv)   { return qf_erfc  (dv_eval_qf(dv->a)); }
-static qfloat eval_lgamma(dval_t *dv) { return qf_lgamma(dv_eval_qf(dv->a)); }
+static qfloat_t eval_abs(dval_t *dv)    { return qf_abs   (dv_eval_qf(dv->a)); }
+static qfloat_t eval_erf(dval_t *dv)    { return qf_erf   (dv_eval_qf(dv->a)); }
+static qfloat_t eval_erfc(dval_t *dv)   { return qf_erfc  (dv_eval_qf(dv->a)); }
+static qfloat_t eval_lgamma(dval_t *dv) { return qf_lgamma(dv_eval_qf(dv->a)); }
 
-static qfloat eval_hypot(dval_t *dv) {
+static qfloat_t eval_hypot(dval_t *dv) {
     return qf_hypot(dv_eval_qf(dv->a), dv_eval_qf(dv->b));
 }
 
-static qfloat eval_erfinv(dval_t *dv)        { return qf_erfinv    (dv_eval_qf(dv->a)); }
-static qfloat eval_erfcinv(dval_t *dv)       { return qf_erfcinv   (dv_eval_qf(dv->a)); }
-static qfloat eval_gamma(dval_t *dv)         { return qf_gamma     (dv_eval_qf(dv->a)); }
-static qfloat eval_digamma(dval_t *dv)        { return qf_digamma  (dv_eval_qf(dv->a)); }
-static qfloat eval_trigamma(dval_t *dv)       { return qf_trigamma (dv_eval_qf(dv->a)); }
-static qfloat eval_lambert_w0(dval_t *dv)    { return qf_lambert_w0 (dv_eval_qf(dv->a)); }
-static qfloat eval_lambert_wm1(dval_t *dv)   { return qf_lambert_wm1(dv_eval_qf(dv->a)); }
-static qfloat eval_normal_pdf(dval_t *dv)    { return qf_normal_pdf (dv_eval_qf(dv->a)); }
-static qfloat eval_normal_cdf(dval_t *dv)    { return qf_normal_cdf (dv_eval_qf(dv->a)); }
-static qfloat eval_normal_logpdf(dval_t *dv) { return qf_normal_logpdf(dv_eval_qf(dv->a)); }
-static qfloat eval_ei(dval_t *dv)            { return qf_ei        (dv_eval_qf(dv->a)); }
-static qfloat eval_e1(dval_t *dv)            { return qf_e1        (dv_eval_qf(dv->a)); }
+static qfloat_t eval_erfinv(dval_t *dv)        { return qf_erfinv    (dv_eval_qf(dv->a)); }
+static qfloat_t eval_erfcinv(dval_t *dv)       { return qf_erfcinv   (dv_eval_qf(dv->a)); }
+static qfloat_t eval_gamma(dval_t *dv)         { return qf_gamma     (dv_eval_qf(dv->a)); }
+static qfloat_t eval_digamma(dval_t *dv)        { return qf_digamma  (dv_eval_qf(dv->a)); }
+static qfloat_t eval_trigamma(dval_t *dv)       { return qf_trigamma (dv_eval_qf(dv->a)); }
+static qfloat_t eval_lambert_w0(dval_t *dv)    { return qf_lambert_w0 (dv_eval_qf(dv->a)); }
+static qfloat_t eval_lambert_wm1(dval_t *dv)   { return qf_lambert_wm1(dv_eval_qf(dv->a)); }
+static qfloat_t eval_normal_pdf(dval_t *dv)    { return qf_normal_pdf (dv_eval_qf(dv->a)); }
+static qfloat_t eval_normal_cdf(dval_t *dv)    { return qf_normal_cdf (dv_eval_qf(dv->a)); }
+static qfloat_t eval_normal_logpdf(dval_t *dv) { return qf_normal_logpdf(dv_eval_qf(dv->a)); }
+static qfloat_t eval_ei(dval_t *dv)            { return qf_ei        (dv_eval_qf(dv->a)); }
+static qfloat_t eval_e1(dval_t *dv)            { return qf_e1        (dv_eval_qf(dv->a)); }
 
-static qfloat eval_beta(dval_t *dv) {
+static qfloat_t eval_beta(dval_t *dv) {
     return qf_beta(dv_eval_qf(dv->a), dv_eval_qf(dv->b));
 }
-static qfloat eval_logbeta(dval_t *dv) {
+static qfloat_t eval_logbeta(dval_t *dv) {
     return qf_logbeta(dv_eval_qf(dv->a), dv_eval_qf(dv->b));
 }
 
-static qfloat eval_atan2(dval_t *dv) {
-    qfloat fy = dv_eval_qf(dv->a);
-    qfloat gx = dv_eval_qf(dv->b);
+static qfloat_t eval_atan2(dval_t *dv) {
+    qfloat_t fy = dv_eval_qf(dv->a);
+    qfloat_t gx = dv_eval_qf(dv->b);
     return qf_atan2(fy, gx);
 }
 
@@ -869,9 +869,9 @@ static dval_t *deriv_abs(dval_t *dv)
 }
 
 /* Helper: 2/√π — used by erf and erfc derivatives */
-static qfloat two_over_sqrtpi(void)
+static qfloat_t two_over_sqrtpi(void)
 {
-    qfloat pi = qf_mul(qf_from_double(4.0), qf_atan(qf_from_double(1.0)));
+    qfloat_t pi = qf_mul(qf_from_double(4.0), qf_atan(qf_from_double(1.0)));
     return qf_div(qf_from_double(2.0), qf_sqrt(pi));
 }
 
@@ -951,9 +951,9 @@ static dval_t *deriv_hypot(dval_t *dv)
 }
 
 /* Helper: √π/2 — used by erfinv and erfcinv derivatives */
-static qfloat sqrtpi_over_2(void)
+static qfloat_t sqrtpi_over_2(void)
 {
-    qfloat pi = qf_mul(qf_from_double(4.0), qf_atan(qf_from_double(1.0)));
+    qfloat_t pi = qf_mul(qf_from_double(4.0), qf_atan(qf_from_double(1.0)));
     return qf_div(qf_sqrt(pi), qf_from_double(2.0));
 }
 
@@ -1010,7 +1010,7 @@ static dval_t *deriv_digamma(dval_t *dv)
 /* trigamma(a) — d/dx = tetragamma(a) * a' */
 static dval_t *deriv_trigamma(dval_t *dv)
 {
-    qfloat t2     = qf_tetragamma(dv_eval_qf(dv->a));
+    qfloat_t t2     = qf_tetragamma(dv_eval_qf(dv->a));
     dval_t *da    = get_dx(dv->a);
     dval_t *coeff = dv_new_const(t2);
     dval_t *out   = dv_mul(coeff, da);

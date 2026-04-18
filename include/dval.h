@@ -26,13 +26,13 @@ typedef struct _dval_t dval_t;
 /* ------------------------------------------------------------------------- */
 
 /**
- * @brief Create a constant node from a double or qfloat value.
+ * @brief Create a constant node from a double or qfloat_t value.
  *
  * Constants have no variable binding; their derivative is always zero.
  * Returns an owning handle; caller must call dv_free() exactly once.
  */
 dval_t *dv_new_const_d(double x);
-dval_t *dv_new_const(qfloat x);
+dval_t *dv_new_const(qfloat_t x);
 
 /**
  * @brief Create a named constant node.
@@ -41,7 +41,7 @@ dval_t *dv_new_const(qfloat x);
  * dv_to_string() output and debug printing. @p name is copied.
  * Returns an owning handle; caller must call dv_free() exactly once.
  */
-dval_t *dv_new_named_const(qfloat x, const char *name);
+dval_t *dv_new_named_const(qfloat_t x, const char *name);
 dval_t *dv_new_named_const_d(double x, const char *name);
 
 /* ------------------------------------------------------------------------- */
@@ -49,14 +49,14 @@ dval_t *dv_new_named_const_d(double x, const char *name);
 /* ------------------------------------------------------------------------- */
 
 /**
- * @brief Create a variable node from a double or qfloat value.
+ * @brief Create a variable node from a double or qfloat_t value.
  *
  * Variables are leaf nodes whose value can be updated via dv_set_val().
  * Derivative of a variable with respect to itself is 1.
  * Returns an owning handle; caller must call dv_free() exactly once.
  */
 dval_t *dv_new_var_d(double x);
-dval_t *dv_new_var(qfloat x);
+dval_t *dv_new_var(qfloat_t x);
 
 /**
  * @brief Create a named variable node.
@@ -65,7 +65,7 @@ dval_t *dv_new_var(qfloat x);
  * dv_to_string() output and debug printing. @p name is copied.
  * Returns an owning handle; caller must call dv_free() exactly once.
  */
-dval_t *dv_new_named_var(qfloat x, const char *name);
+dval_t *dv_new_named_var(qfloat_t x, const char *name);
 dval_t *dv_new_named_var_d(double x, const char *name);
 
 /* ------------------------------------------------------------------------- */
@@ -79,7 +79,7 @@ dval_t *dv_new_named_var_d(double x, const char *name);
  * and all ancestor nodes that depend on it.
  * @p dv must be a variable node (created with dv_new_var or dv_new_named_var).
  */
-void dv_set_val(dval_t *dv, qfloat value);
+void dv_set_val(dval_t *dv, qfloat_t value);
 void dv_set_val_d(dval_t *dv, double value);
 
 /**
@@ -101,7 +101,7 @@ void dv_set_name(dval_t *dv, const char *name);
  * cache is valid.
  */
 double dv_get_val_d(const dval_t *dv);
-qfloat dv_get_val(const dval_t *dv);
+qfloat_t dv_get_val(const dval_t *dv);
 
 /**
  * @brief Get the cached first derivative node (borrowed).
@@ -121,7 +121,7 @@ const dval_t *dv_get_deriv(const dval_t *dv);
  * Traverses the DAG recursively, recomputing any nodes whose cache is
  * stale. The result is stored in the node's cache and returned.
  */
-qfloat dv_eval(const dval_t *dv);
+qfloat_t dv_eval(const dval_t *dv);
 double dv_eval_d(const dval_t *dv);
 
 /* ------------------------------------------------------------------------- */

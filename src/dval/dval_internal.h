@@ -48,8 +48,8 @@ typedef enum {
 } dval_arity_t;
 
 typedef struct dval_ops {
-    /** Compute the primal value of the node. Returns a qfloat by value. */
-    qfloat  (*eval)(dval_t *dv);
+    /** Compute the primal value of the node. Returns a qfloat_t by value. */
+    qfloat_t  (*eval)(dval_t *dv);
 
     /** Build a new DAG node for the symbolic derivative. Returns owning (refcount=1). */
     dval_t *(*deriv)(dval_t *dv);
@@ -91,9 +91,9 @@ struct _dval_t {
     dval_t *a;
     dval_t *b;
 
-    qfloat  c;
+    qfloat_t  c;
 
-    qfloat  x;
+    qfloat_t  x;
     int     x_valid;
 
     dval_t *dx;

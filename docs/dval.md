@@ -3,14 +3,14 @@
 `dval_t` is a reference-counted expression DAG for differentiable values.
 Expressions are built from constants, variables, and operator nodes; each node
 carries a vtable that knows how to evaluate itself and construct its derivative.
-Evaluation uses `qfloat` throughout for ~106-bit precision.
+Evaluation uses `qfloat_t` throughout for ~106-bit precision.
 
 ## Capabilities
 
 - expression construction from constants, variables, and operators
 - lazy evaluation with result caching
 - symbolic differentiation to arbitrary order
-- elementary and special functions mirroring the `qfloat` API
+- elementary and special functions mirroring the `qfloat_t` API
 - expression parsing from and formatting to strings
 
 ## Example: Constructing an Expression
@@ -96,8 +96,8 @@ int main(void) {
 
 Expressions are stored as a directed acyclic graph. Each node is one of:
 
-- **constant** — a fixed `qfloat` value, optionally named
-- **variable** — a mutable `qfloat` value, optionally named; changing it via
+- **constant** — a fixed `qfloat_t` value, optionally named
+- **variable** — a mutable `qfloat_t` value, optionally named; changing it via
   `dv_set_val()` invalidates the cached primal and derivative values in all
   ancestor nodes
 - **unary operator** — wraps one child (e.g. `sin`, `exp`, `sqrt`)
@@ -124,7 +124,7 @@ retain their children (increment their refcounts) but do not steal ownership.
 
 ### Evaluation
 
-`dv_eval()` walks the DAG bottom-up, caching the `qfloat` result in each node.
+`dv_eval()` walks the DAG bottom-up, caching the `qfloat_t` result in each node.
 Subsequent calls without any `dv_set_val()` return the cached result immediately.
 Setting a variable's value with `dv_set_val()` or `dv_set_val_d()` marks the
 cache invalid in the variable node; ancestor caches are invalidated lazily on
@@ -145,33 +145,33 @@ All public declarations are in `include/dval.h`.
 ### Constructors — Constants
 
 - `dval_t *dv_new_const_d(double x)` — constant node from a `double`
-- `dval_t *dv_new_const(qfloat x)` — constant node from a `qfloat`
-- `dval_t *dv_new_named_const(qfloat x, const char *name)` — named constant from a `qfloat`
+- `dval_t *dv_new_const(qfloat_t x)` — constant node from a `qfloat_t`
+- `dval_t *dv_new_named_const(qfloat_t x, const char *name)` — named constant from a `qfloat_t`
 - `dval_t *dv_new_named_const_d(double x, const char *name)` — named constant from a `double`
 
 ### Constructors — Variables
 
 - `dval_t *dv_new_var_d(double x)` — variable node from a `double`
-- `dval_t *dv_new_var(qfloat x)` — variable node from a `qfloat`
-- `dval_t *dv_new_named_var(qfloat x, const char *name)` — named variable from a `qfloat`
+- `dval_t *dv_new_var(qfloat_t x)` — variable node from a `qfloat_t`
+- `dval_t *dv_new_named_var(qfloat_t x, const char *name)` — named variable from a `qfloat_t`
 - `dval_t *dv_new_named_var_d(double x, const char *name)` — named variable from a `double`
 
 ### Mutators
 
-- `void dv_set_val(dval_t *dv, qfloat value)` — set the primal value (variables only); invalidates caches
+- `void dv_set_val(dval_t *dv, qfloat_t value)` — set the primal value (variables only); invalidates caches
 - `void dv_set_val_d(dval_t *dv, double value)` — set the primal value from a `double`
 - `void dv_set_name(dval_t *dv, const char *name)` — set or replace the symbolic name
 
 ### Accessors
 
-- `qfloat dv_get_val(const dval_t *dv)` — return the stored primal value without re-evaluating
+- `qfloat_t dv_get_val(const dval_t *dv)` — return the stored primal value without re-evaluating
 - `double dv_get_val_d(const dval_t *dv)` — return the stored primal value as a `double`
 - `const dval_t *dv_get_deriv(const dval_t *dv)` — return the cached first derivative node
   (borrowed — do **not** free); built lazily on first call
 
 ### Evaluation
 
-- `qfloat dv_eval(const dval_t *dv)` — evaluate the expression and return a `qfloat`; uses cached result if valid
+- `qfloat_t dv_eval(const dval_t *dv)` — evaluate the expression and return a `qfloat_t`; uses cached result if valid
 - `double dv_eval_d(const dval_t *dv)` — evaluate and return a `double`
 
 ### Derivative Construction (owning)

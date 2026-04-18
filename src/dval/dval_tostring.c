@@ -137,10 +137,10 @@ static int utf8_decode(const char *s, unsigned int *out)
 }
 
 /* ------------------------------------------------------------------------- */
-/* qfloat formatting                                                         */
+/* qfloat_t formatting                                                         */
 /* ------------------------------------------------------------------------- */
 
-static void qf_to_string_simple(qfloat v, char *buf, size_t n)
+static void qf_to_string_simple(qfloat_t v, char *buf, size_t n)
 {
     qf_sprintf(buf, n, "%q", v);
 }

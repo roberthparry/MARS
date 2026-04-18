@@ -1,12 +1,12 @@
-# `qfloat`
+# `qfloat_t`
 
-`qfloat` is a double-double floating-point type built from the unevaluated sum
+`qfloat_t` is a double-double floating-point type built from the unevaluated sum
 of two IEEE-754 `double` values.
 
 ## Representation
 
 ```text
-qfloat = hi + lo
+qfloat_t = hi + lo
 ```
 
 `hi` carries the leading 53 bits of precision and `lo` carries the trailing
@@ -36,8 +36,8 @@ int main(void) {
         NULL
     };
     for (int i = 0; inputs[i] != NULL; i++) {
-        qfloat x = qf_from_string(inputs[i]);
-        qfloat w = qf_lambert_w0(x);
+        qfloat_t x = qf_from_string(inputs[i]);
+        qfloat_t w = qf_lambert_w0(x);
         qf_printf("W0(%s) = %q\n", inputs[i], w);
     }
     return 0;
@@ -76,13 +76,13 @@ Special functions build on the same arithmetic core.
 
 ### Formatting and Parsing
 
-`qfloat` supports decimal parsing and high-precision formatting, making it
+`qfloat_t` supports decimal parsing and high-precision formatting, making it
 suitable for both numeric work and regression tests. The `%q`/`%Q` specifiers
-extend `printf` for `qfloat` arguments passed by value.
+extend `printf` for `qfloat_t` arguments passed by value.
 
 ## Tradeoffs
 
-Compared with `double`, `qfloat` offers more precision at higher runtime cost.
+Compared with `double`, `qfloat_t` offers more precision at higher runtime cost.
 Compared with arbitrary-precision libraries it is lighter-weight and simpler
 to integrate into a C99 codebase.
 
@@ -99,7 +99,7 @@ All declarations are in `include/qfloat.h`.
 | `QF_NAN` | Not-a-number |
 | `QF_INF` | +∞ |
 | `QF_NINF` | -∞ |
-| `QF_MAX` | Maximum finite `qfloat` value |
+| `QF_MAX` | Maximum finite `qfloat_t` value |
 | `QF_PI` | π |
 | `QF_2PI` | 2π |
 | `QF_PI_2` | π/2 |
@@ -113,137 +113,138 @@ All declarations are in `include/qfloat.h`.
 | `QF_LN2` | ln 2 |
 | `QF_INVLN2` | 1/ln 2 |
 | `QF_SQRT_HALF` | √(1/2) |
+| `QF_SQRT_PI` | √π |
 | `QF_SQRT1ONPI` | √(1/π) |
 | `QF_2_SQRTPI` | 2√(1/π) |
-| `QF_LOG_SQRT_2PI` | ln √(2π) |
-| `QF_EULER_MASCHERONI` | Euler–Mascheroni constant γ |
 | `QF_INV_SQRT_2PI` | 1/√(2π) |
+| `QF_LOG_SQRT_2PI` | ln √(2π) |
 | `QF_LN_2PI` | ln(2π) |
+| `QF_EULER_MASCHERONI` | Euler–Mascheroni constant γ |
 
 ### Construction and Conversion
 
-- `qfloat qf_from_double(double x)`  
-  Construct a `qfloat` from a `double`. Exact: `hi = x`, `lo = 0`.
+- `qfloat_t qf_from_double(double x)`  
+  Construct a `qfloat_t` from a `double`. Exact: `hi = x`, `lo = 0`.
 
-- `double qf_to_double(qfloat x)`  
-  Convert a `qfloat` to the nearest `double`.
+- `double qf_to_double(qfloat_t x)`  
+  Convert a `qfloat_t` to the nearest `double`.
 
-- `qfloat qf_from_string(const char *s)`  
+- `qfloat_t qf_from_string(const char *s)`  
   Parse a decimal string (integer, fractional, optional sign, scientific
   notation). Uses exact decimal accumulation for full precision.
 
-- `void qf_to_string(qfloat x, char *out, size_t out_size)`  
+- `void qf_to_string(qfloat_t x, char *out, size_t out_size)`  
   Write normalised scientific notation with 32 significant digits into `out`.
 
 ### Comparison and Classification
 
-- `bool qf_eq(qfloat a, qfloat b)` — true if `a == b`
-- `bool qf_lt(qfloat a, qfloat b)` — true if `a < b`
-- `bool qf_le(qfloat a, qfloat b)` — true if `a <= b`
-- `bool qf_gt(qfloat a, qfloat b)` — true if `a > b`
-- `bool qf_ge(qfloat a, qfloat b)` — true if `a >= b`
-- `int  qf_cmp(qfloat a, qfloat b)` — returns -1, 0, or +1
-- `int  qf_signbit(qfloat x)` — sign bit of `x`
-- `bool qf_isnan(qfloat x)` — true if either component is IEEE-754 NaN
-- `bool qf_isinf(qfloat x)` — true if `x` is ±∞
-- `bool qf_isposinf(qfloat x)` — true if `x` is +∞
-- `bool qf_isneginf(qfloat x)` — true if `x` is -∞
+- `bool qf_eq(qfloat_t a, qfloat_t b)` — true if `a == b`
+- `bool qf_lt(qfloat_t a, qfloat_t b)` — true if `a < b`
+- `bool qf_le(qfloat_t a, qfloat_t b)` — true if `a <= b`
+- `bool qf_gt(qfloat_t a, qfloat_t b)` — true if `a > b`
+- `bool qf_ge(qfloat_t a, qfloat_t b)` — true if `a >= b`
+- `int  qf_cmp(qfloat_t a, qfloat_t b)` — returns -1, 0, or +1
+- `int  qf_signbit(qfloat_t x)` — sign bit of `x`
+- `bool qf_isnan(qfloat_t x)` — true if either component is IEEE-754 NaN
+- `bool qf_isinf(qfloat_t x)` — true if `x` is ±∞
+- `bool qf_isposinf(qfloat_t x)` — true if `x` is +∞
+- `bool qf_isneginf(qfloat_t x)` — true if `x` is -∞
 
 ### Arithmetic
 
-- `qfloat qf_neg(qfloat x)` — unary negation `-x`
-- `qfloat qf_abs(qfloat x)` — absolute value `|x|`
-- `qfloat qf_add(qfloat a, qfloat b)` — `a + b` using TwoSum + renormalization
-- `qfloat qf_add_double(qfloat x, double y)` — `x + y`
-- `qfloat qf_sub(qfloat a, qfloat b)` — `a - b`
-- `qfloat qf_mul(qfloat a, qfloat b)` — `a * b` using Dekker TwoProd
-- `qfloat qf_mul_double(qfloat x, double a)` — `x * a`
-- `qfloat qf_mul_pow10(qfloat x, int k)` — `x * 10^k` exactly
-- `qfloat qf_div(qfloat a, qfloat b)` — `a / b` via Newton quotient
-- `qfloat qf_sqr(qfloat x)` — `x^2` exactly
-- `qfloat qf_floor(qfloat x)` — floor of `x`
-- `qfloat qf_ldexp(qfloat x, int k)` — `x * 2^k`
-- `qfloat qf_pow_int(qfloat x, int n)` — `x^n` by exponentiation-by-squaring; negative exponents supported
-- `qfloat qf_pow(qfloat x, qfloat y)` — `x^y` via `exp(y * log(x))`; returns NaN on domain error
-- `qfloat qf_pow10(int n)` — `10^n` exactly
+- `qfloat_t qf_neg(qfloat_t x)` — unary negation `-x`
+- `qfloat_t qf_abs(qfloat_t x)` — absolute value `|x|`
+- `qfloat_t qf_add(qfloat_t a, qfloat_t b)` — `a + b` using TwoSum + renormalization
+- `qfloat_t qf_add_double(qfloat_t x, double y)` — `x + y`
+- `qfloat_t qf_sub(qfloat_t a, qfloat_t b)` — `a - b`
+- `qfloat_t qf_mul(qfloat_t a, qfloat_t b)` — `a * b` using Dekker TwoProd
+- `qfloat_t qf_mul_double(qfloat_t x, double a)` — `x * a`
+- `qfloat_t qf_mul_pow10(qfloat_t x, int k)` — `x * 10^k` exactly
+- `qfloat_t qf_div(qfloat_t a, qfloat_t b)` — `a / b` via Newton quotient
+- `qfloat_t qf_sqr(qfloat_t x)` — `x^2` exactly
+- `qfloat_t qf_floor(qfloat_t x)` — floor of `x`
+- `qfloat_t qf_ldexp(qfloat_t x, int k)` — `x * 2^k`
+- `qfloat_t qf_pow_int(qfloat_t x, int n)` — `x^n` by exponentiation-by-squaring; negative exponents supported
+- `qfloat_t qf_pow(qfloat_t x, qfloat_t y)` — `x^y` via `exp(y * log(x))`; returns NaN on domain error
+- `qfloat_t qf_pow10(int n)` — `10^n` exactly
 
 ### Elementary Functions
 
-- `qfloat qf_sqrt(qfloat x)` — square root via Newton refinement
-- `qfloat qf_exp(qfloat x)` — natural exponential
-- `qfloat qf_log(qfloat x)` — natural logarithm (`x > 0`)
-- `qfloat qf_hypot(qfloat x, qfloat y)` — `sqrt(x^2 + y^2)` without overflow
-- `qfloat qf_sin(qfloat x)` — sine (radians)
-- `qfloat qf_cos(qfloat x)` — cosine (radians)
-- `qfloat qf_tan(qfloat x)` — tangent; NaN at poles
-- `qfloat qf_asin(qfloat x)` — inverse sine
-- `qfloat qf_acos(qfloat x)` — inverse cosine
-- `qfloat qf_atan(qfloat x)` — inverse tangent
-- `qfloat qf_atan2(qfloat y, qfloat x)` — four-quadrant inverse tangent
-- `qfloat qf_sinh(qfloat x)` — hyperbolic sine
-- `qfloat qf_cosh(qfloat x)` — hyperbolic cosine
-- `qfloat qf_tanh(qfloat x)` — hyperbolic tangent
-- `qfloat qf_asinh(qfloat x)` — inverse hyperbolic sine
-- `qfloat qf_acosh(qfloat x)` — inverse hyperbolic cosine
-- `qfloat qf_atanh(qfloat x)` — inverse hyperbolic tangent
+- `qfloat_t qf_sqrt(qfloat_t x)` — square root via Newton refinement
+- `qfloat_t qf_exp(qfloat_t x)` — natural exponential
+- `qfloat_t qf_log(qfloat_t x)` — natural logarithm (`x > 0`)
+- `qfloat_t qf_hypot(qfloat_t x, qfloat_t y)` — `sqrt(x^2 + y^2)` without overflow
+- `qfloat_t qf_sin(qfloat_t x)` — sine (radians)
+- `qfloat_t qf_cos(qfloat_t x)` — cosine (radians)
+- `qfloat_t qf_tan(qfloat_t x)` — tangent; NaN at poles
+- `qfloat_t qf_asin(qfloat_t x)` — inverse sine
+- `qfloat_t qf_acos(qfloat_t x)` — inverse cosine
+- `qfloat_t qf_atan(qfloat_t x)` — inverse tangent
+- `qfloat_t qf_atan2(qfloat_t y, qfloat_t x)` — four-quadrant inverse tangent
+- `qfloat_t qf_sinh(qfloat_t x)` — hyperbolic sine
+- `qfloat_t qf_cosh(qfloat_t x)` — hyperbolic cosine
+- `qfloat_t qf_tanh(qfloat_t x)` — hyperbolic tangent
+- `qfloat_t qf_asinh(qfloat_t x)` — inverse hyperbolic sine
+- `qfloat_t qf_acosh(qfloat_t x)` — inverse hyperbolic cosine
+- `qfloat_t qf_atanh(qfloat_t x)` — inverse hyperbolic tangent
 
 ### Special Functions
 
 **Gamma family**
 
-- `qfloat qf_gamma(qfloat x)` — Γ(x)
-- `qfloat qf_lgamma(qfloat x)` — ln|Γ(x)|
-- `qfloat qf_digamma(qfloat x)` — ψ(x) = d/dx ln Γ(x)
-- `qfloat qf_trigamma(qfloat x)` — ψ'(x); pole at non-positive integers
-- `qfloat qf_tetragamma(qfloat x)` — ψ''(x); pole at non-positive integers
-- `qfloat qf_gammainv(qfloat y)` — principal branch of Γ⁻¹(y)
-- `qfloat qf_gammainc_lower(qfloat s, qfloat x)` — lower incomplete γ(s, x)
-- `qfloat qf_gammainc_upper(qfloat s, qfloat x)` — upper incomplete Γ(s, x)
-- `qfloat qf_gammainc_P(qfloat s, qfloat x)` — regularized P(s, x) = γ(s,x)/Γ(s)
-- `qfloat qf_gammainc_Q(qfloat s, qfloat x)` — regularized Q(s, x) = Γ(s,x)/Γ(s)
+- `qfloat_t qf_gamma(qfloat_t x)` — Γ(x)
+- `qfloat_t qf_lgamma(qfloat_t x)` — ln|Γ(x)|
+- `qfloat_t qf_digamma(qfloat_t x)` — ψ(x) = d/dx ln Γ(x)
+- `qfloat_t qf_trigamma(qfloat_t x)` — ψ'(x); pole at non-positive integers
+- `qfloat_t qf_tetragamma(qfloat_t x)` — ψ''(x); pole at non-positive integers
+- `qfloat_t qf_gammainv(qfloat_t y)` — principal branch of Γ⁻¹(y)
+- `qfloat_t qf_gammainc_lower(qfloat_t s, qfloat_t x)` — lower incomplete γ(s, x)
+- `qfloat_t qf_gammainc_upper(qfloat_t s, qfloat_t x)` — upper incomplete Γ(s, x)
+- `qfloat_t qf_gammainc_P(qfloat_t s, qfloat_t x)` — regularized P(s, x) = γ(s,x)/Γ(s)
+- `qfloat_t qf_gammainc_Q(qfloat_t s, qfloat_t x)` — regularized Q(s, x) = Γ(s,x)/Γ(s)
 
 **Error functions**
 
-- `qfloat qf_erf(qfloat x)` — error function
-- `qfloat qf_erfc(qfloat x)` — complementary error function
-- `qfloat qf_erfinv(qfloat x)` — inverse error function
-- `qfloat qf_erfcinv(qfloat x)` — inverse complementary error function
+- `qfloat_t qf_erf(qfloat_t x)` — error function
+- `qfloat_t qf_erfc(qfloat_t x)` — complementary error function
+- `qfloat_t qf_erfinv(qfloat_t x)` — inverse error function
+- `qfloat_t qf_erfcinv(qfloat_t x)` — inverse complementary error function
 
 **Lambert W**
 
-- `qfloat qf_lambert_w0(qfloat x)` — principal branch W₀(x)
-- `qfloat qf_lambert_wm1(qfloat x)` — branch W₋₁(x)
-- `qfloat qf_productlog(qfloat x)` — alias for `qf_lambert_w0`
+- `qfloat_t qf_lambert_w0(qfloat_t x)` — principal branch W₀(x)
+- `qfloat_t qf_lambert_wm1(qfloat_t x)` — branch W₋₁(x)
+- `qfloat_t qf_productlog(qfloat_t x)` — alias for `qf_lambert_w0`
 
 **Beta and binomial**
 
-- `qfloat qf_beta(qfloat a, qfloat b)` — B(a, b)
-- `qfloat qf_logbeta(qfloat a, qfloat b)` — ln B(a, b)
-- `qfloat qf_binomial(qfloat a, qfloat b)` — generalized binomial coefficient
-- `qfloat qf_beta_pdf(qfloat x, qfloat a, qfloat b)` — beta distribution PDF
-- `qfloat qf_logbeta_pdf(qfloat x, qfloat a, qfloat b)` — log beta distribution PDF
+- `qfloat_t qf_beta(qfloat_t a, qfloat_t b)` — B(a, b)
+- `qfloat_t qf_logbeta(qfloat_t a, qfloat_t b)` — ln B(a, b)
+- `qfloat_t qf_binomial(qfloat_t a, qfloat_t b)` — generalized binomial coefficient
+- `qfloat_t qf_beta_pdf(qfloat_t x, qfloat_t a, qfloat_t b)` — beta distribution PDF
+- `qfloat_t qf_logbeta_pdf(qfloat_t x, qfloat_t a, qfloat_t b)` — log beta distribution PDF
 
 **Normal distribution**
 
-- `qfloat qf_normal_pdf(qfloat x)` — φ(x), standard normal PDF
-- `qfloat qf_normal_cdf(qfloat x)` — Φ(x), standard normal CDF
-- `qfloat qf_normal_logpdf(qfloat x)` — ln φ(x)
+- `qfloat_t qf_normal_pdf(qfloat_t x)` — φ(x), standard normal PDF
+- `qfloat_t qf_normal_cdf(qfloat_t x)` — Φ(x), standard normal CDF
+- `qfloat_t qf_normal_logpdf(qfloat_t x)` — ln φ(x)
 
 **Exponential integrals**
 
-- `qfloat qf_ei(qfloat x)` — Ei(x) = −PV∫_{-x}^∞ (e^{-t}/t) dt, principal value; branch cut on (−∞, 0]
-- `qfloat qf_e1(qfloat x)` — E₁(x) = ∫_x^∞ (e^{-t}/t) dt, for x > 0
+- `qfloat_t qf_ei(qfloat_t x)` — Ei(x) = −PV∫_{-x}^∞ (e^{-t}/t) dt, principal value; branch cut on (−∞, 0]
+- `qfloat_t qf_e1(qfloat_t x)` — E₁(x) = ∫_x^∞ (e^{-t}/t) dt, for x > 0
 
 ### Formatted Output
 
-Pass `qfloat` values **by value** to `%q`/`%Q` specifiers.
+Pass `qfloat_t` values **by value** to `%q`/`%Q` specifiers.
 
 - `int qf_printf(const char *fmt, ...)` — like `printf`; adds `%q` (decimal) and `%Q` (scientific)
 - `int qf_sprintf(char *out, size_t n, const char *fmt, ...)` — like `snprintf`
 - `int qf_vsprintf(char *out, size_t n, const char *fmt, va_list ap)` — `va_list` variant
 
 ```c
-qfloat x = qf_from_string("1");
+qfloat_t x = qf_from_string("1");
 qf_printf("W0(1) = %.34q\n", x);   // 34 significant digits
 qf_printf("W0(1) = %Q\n",   x);    // scientific notation
 ```
