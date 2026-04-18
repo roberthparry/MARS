@@ -231,11 +231,8 @@ void example_integrator(void) {
                     qf_from_double(-3.0), qf_from_double(3.0),
                     &result, &err);
 
-    char buf[64];
-    qf_to_string(result, buf, sizeof(buf));
-    printf("∫₋₃³ exp(-x²) dx ≈ %s\n", buf);
-    qf_to_string(err, buf, sizeof(buf));
-    printf("  error estimate   ≈ %s\n", buf);
+    qf_printf("∫₋₃³ exp(-x²) dx ≈ %q\n", result);
+    qf_printf("  error estimate   ≈ %q\n", err);
     printf("  subintervals used: %zu\n", integrator_last_intervals(ig));
     integrator_destroy(ig);
 }
@@ -256,11 +253,8 @@ void example_ctx(void) {
                     qf_from_double(0.0), qf_from_double(1.0),
                     &result, &err);
 
-    char buf[64];
-    qf_to_string(result, buf, sizeof(buf));
-    printf("∫₀¹ x^2.5 dx ≈ %s\n", buf);
-    qf_to_string(err, buf, sizeof(buf));
-    printf("  error estimate   ≈ %s\n", buf);
+    qf_printf("∫₀¹ x^2.5 dx ≈ %q\n", result);
+    qf_printf("  error estimate   ≈ %q\n", err);
     integrator_destroy(ig);
 }
 
