@@ -41,6 +41,7 @@ W0(1) = 0.5671432904097838729999686622103575
 - [`set_t`](set.md)
 - [`array_t`](array.md)
 - [`string_t`](string.md)
+- [`bitset_t`](bitset.md)
 
 ## Directory Layout
 
@@ -97,6 +98,7 @@ This directory contains the longer module documentation for MARS.
 - [`set_t`](set.md) — generic set storage
 - [`array_t`](array.md) — generic array storage
 - [`string_t`](string.md) — UTF-8-aware dynamic strings
+- [`bitset_t`](bitset.md) — dynamic thread-safe bitset
 
 ## Guides
 

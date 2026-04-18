@@ -486,6 +486,25 @@
       "test_sub_sub_sub_sub_function": true
     }
   },
+  "tests/test_bitset.c": {
+    "test_create_and_destroy": true,
+    "test_set_and_test": true,
+    "test_unset": true,
+    "test_toggle": true,
+    "test_clear": true,
+    "test_set_range": true,
+    "test_unset_range": true,
+    "test_popcount": true,
+    "test_any_none": true,
+    "test_next_set": true,
+    "test_clone": true,
+    "test_bitwise_and": true,
+    "test_bitwise_or": true,
+    "test_bitwise_xor": true,
+    "test_bitwise_not": true,
+    "test_growth": true,
+    "test_thread_safety": true
+  },
   "tests/test_array.c": {
     "test_ints": true,
     "test_strings": true,
