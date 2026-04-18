@@ -517,7 +517,11 @@
     "test_reversed_limits": true,
     "test_set_tol": true,
     "test_max_intervals": true,
-    "test_last_intervals": true
+    "test_last_intervals": true,
+    "test_dv_sin": true,
+    "test_dv_exp": true,
+    "test_dv_arctan": true,
+    "test_dv_null_safety": true
   },
   "tests/test_array.c": {
     "test_ints": true,

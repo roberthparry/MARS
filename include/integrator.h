@@ -19,6 +19,7 @@
 
 #include <stddef.h>
 #include "qfloat.h"
+#include "dval.h"
 
 /**
  * @brief Integrand callback.
@@ -88,5 +89,50 @@ int integrator_eval(integrator_t *ig, integrand_fn f, void *ctx,
  * @brief Number of subintervals used in the most recent call to integrator_eval.
  */
 size_t integrator_last_intervals(const integrator_t *ig);
+
+/**
+ * @brief Integrate a dval_t expression over [a, b] using adaptive Turán T15/T4.
+ *
+ * Applies an adaptive Turán quadrature rule that uses both f(x) and f''(x) at
+ * 8 symmetric node positions on each subinterval, achieving degree-31 polynomial
+ * exactness (versus degree 29 for G7K15).  The second derivative is computed
+ * automatically via the dval_t expression graph — no user-supplied derivative is
+ * needed.
+ *
+ * The nested T4 rule (4 of the 8 positions, degree 15) provides the error
+ * estimate; the adaptive bisection strategy is identical to integrator_eval().
+ *
+ * @p x_var must be the variable node in @p expr that represents the integration
+ * variable.  Both @p expr and any derivative graph built from it are invalidated
+ * and re-evaluated at each quadrature node; the caller's graph is not modified
+ * permanently.
+ *
+ * Example:
+ * @code
+ *   integrator_t *ig = integrator_create();
+ *   dval_t *x    = dv_new_var(qf_from_double(0.0));
+ *   dval_t *expr = dv_sin(x);
+ *   qfloat_t result, err;
+ *   integrator_eval_dv(ig, expr, x, qf_from_double(0.0), QF_PI, &result, &err);
+ *   // result ≈ 2.0
+ *   dv_free(expr); dv_free(x); integrator_destroy(ig);
+ * @endcode
+ *
+ * @param ig         Integrator handle.
+ * @param expr       dval_t expression representing the integrand f(x).
+ * @param x_var      Variable node in @p expr representing x.  Must have been
+ *                   created with dv_new_var() or dv_new_named_var().
+ * @param a          Lower bound.
+ * @param b          Upper bound.
+ * @param result     Receives the integral estimate.
+ * @param error_est  If non-NULL, receives the final total error estimate.
+ *
+ * @return  0  Converged within tolerance.
+ * @return  1  Maximum subintervals reached before convergence.
+ * @return -1  Null argument or internal allocation failure.
+ */
+int integrator_eval_dv(integrator_t *ig, dval_t *expr, dval_t *x_var,
+                        qfloat_t a, qfloat_t b,
+                        qfloat_t *result, qfloat_t *error_est);
 
 #endif /* INTEGRATOR_H */

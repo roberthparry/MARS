@@ -8,6 +8,7 @@
 
 #include "qfloat.h"
 #include "integrator.h"
+#include "dval.h"
 
 /* -----------------------------------------------------------------------
  * Helpers
@@ -18,7 +19,8 @@ static int qf_close(qfloat_t a, qfloat_t b, qfloat_t tol) {
     return qf_le(qf_abs(qf_sub(a, b)), tol);
 }
 
-static qfloat_t tol20 = {0};  /* 1e-20, initialised in tests_main */
+static qfloat_t tol20 = { 9.9999999999999995e-21, 5.4846728545790429e-37 };  /* 1e-20 */
+[[maybe_unused]] static qfloat_t tol27 = { 1e-27, -3.8494869749191836e-44 }; /* 1e-27 */
 
 /* -----------------------------------------------------------------------
  * Integrands
@@ -73,8 +75,13 @@ void test_polynomial(void) {
     int s = integrator_eval(ig, fn_x2, NULL,
                             qf_from_double(0.0), qf_from_double(1.0),
                             &result, &err);
-    ASSERT_TRUE(s == 0);
     qfloat_t expected = qf_from_string("0.33333333333333333333333333333333333333");
+    printf("  ∫₀¹ x² dx\n");
+    qf_printf("  result   = %q\n", result);
+    qf_printf("  expected = %q\n", expected);
+    qf_printf("  err      = %q\n", err);
+    printf("  status = %d  intervals = %zu\n", s, integrator_last_intervals(ig));
+    ASSERT_TRUE(s == 0);
     ASSERT_TRUE(qf_close(result, expected, tol20));
     integrator_destroy(ig);
 }
@@ -86,8 +93,13 @@ void test_sin(void) {
     int s = integrator_eval(ig, fn_sin, NULL,
                             qf_from_double(0.0), QF_PI,
                             &result, &err);
-    ASSERT_TRUE(s == 0);
     qfloat_t expected = qf_from_double(2.0);
+    printf("  ∫₀^π sin(x) dx\n");
+    qf_printf("  result   = %q\n", result);
+    qf_printf("  expected = %q\n", expected);
+    qf_printf("  err      = %q\n", err);
+    printf("  status = %d  intervals = %zu\n", s, integrator_last_intervals(ig));
+    ASSERT_TRUE(s == 0);
     ASSERT_TRUE(qf_close(result, expected, tol20));
     integrator_destroy(ig);
 }
@@ -99,8 +111,13 @@ void test_exp(void) {
     int s = integrator_eval(ig, fn_exp, NULL,
                             qf_from_double(0.0), qf_from_double(1.0),
                             &result, &err);
-    ASSERT_TRUE(s == 0);
     qfloat_t expected = qf_sub(QF_E, qf_from_double(1.0));
+    printf("  ∫₀¹ exp(x) dx\n");
+    qf_printf("  result   = %q\n", result);
+    qf_printf("  expected = %q\n", expected);
+    qf_printf("  err      = %q\n", err);
+    printf("  status = %d  intervals = %zu\n", s, integrator_last_intervals(ig));
+    ASSERT_TRUE(s == 0);
     ASSERT_TRUE(qf_close(result, expected, tol20));
     integrator_destroy(ig);
 }
@@ -112,6 +129,11 @@ void test_arctan(void) {
     int s = integrator_eval(ig, fn_inv1px2, NULL,
                             qf_from_double(-1.0), qf_from_double(1.0),
                             &result, &err);
+    printf("  ∫₋₁¹ 1/(1+x²) dx\n");
+    qf_printf("  result   = %q\n", result);
+    qf_printf("  expected = %q  (π/2)\n", QF_PI_2);
+    qf_printf("  err      = %q\n", err);
+    printf("  status = %d  intervals = %zu\n", s, integrator_last_intervals(ig));
     ASSERT_TRUE(s == 0);
     ASSERT_TRUE(qf_close(result, QF_PI_2, tol20));
     integrator_destroy(ig);
@@ -124,8 +146,13 @@ void test_log(void) {
     int s = integrator_eval(ig, fn_log, NULL,
                             qf_from_double(1.0), QF_E,
                             &result, &err);
-    ASSERT_TRUE(s == 0);
     qfloat_t expected = qf_from_double(1.0);
+    printf("  ∫₁^e ln(x) dx\n");
+    qf_printf("  result   = %q\n", result);
+    qf_printf("  expected = %q\n", expected);
+    qf_printf("  err      = %q\n", err);
+    printf("  status = %d  intervals = %zu\n", s, integrator_last_intervals(ig));
+    ASSERT_TRUE(s == 0);
     ASSERT_TRUE(qf_close(result, expected, tol20));
     integrator_destroy(ig);
 }
@@ -137,8 +164,14 @@ void test_constant(void) {
     int s = integrator_eval(ig, fn_const, NULL,
                             qf_from_double(0.0), qf_from_double(5.0),
                             &result, &err);
+    qfloat_t expected = qf_from_double(5.0);
+    printf("  ∫₀^5 1 dx\n");
+    qf_printf("  result   = %q\n", result);
+    qf_printf("  expected = %q\n", expected);
+    qf_printf("  err      = %q\n", err);
+    printf("  status = %d  intervals = %zu\n", s, integrator_last_intervals(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, qf_from_double(5.0), tol20));
+    ASSERT_TRUE(qf_close(result, expected, tol20));
     integrator_destroy(ig);
 }
 
@@ -148,10 +181,13 @@ void test_set_tol(void) {
     integrator_set_tol(ig, loose, loose);
 
     qfloat_t result, err;
-    integrator_eval(ig, fn_sin, NULL,
-                    qf_from_double(0.0), QF_PI,
-                    &result, &err);
-
+    int s = integrator_eval(ig, fn_sin, NULL,
+                            qf_from_double(0.0), QF_PI,
+                            &result, &err);
+    printf("  ∫₀^π sin(x) dx  (tolerance 1e-10)\n");
+    qf_printf("  result   = %q\n", result);
+    qf_printf("  err      = %q  (limit 1e-8)\n", err);
+    printf("  status = %d  intervals = %zu\n", s, integrator_last_intervals(ig));
     /* Error estimate should be at or below the loose tolerance */
     ASSERT_TRUE(qf_le(err, qf_from_string("1e-8")));
     integrator_destroy(ig);
@@ -166,10 +202,15 @@ void test_max_intervals(void) {
     int s = integrator_eval(ig, fn_sin, NULL,
                             qf_from_double(0.0), QF_PI,
                             &result, &err);
+    size_t n = integrator_last_intervals(ig);
+    printf("  ∫₀^π sin(x) dx  (max_intervals = 1)\n");
+    qf_printf("  result   = %q\n", result);
+    qf_printf("  err      = %q\n", err);
+    printf("  status = %d  intervals = %zu\n", s, n);
     /* Should stop early — status 1 is acceptable for a highly oscillatory
        integrand restricted to a single subinterval */
     ASSERT_TRUE(s == 0 || s == 1);
-    ASSERT_TRUE(integrator_last_intervals(ig) <= 1);
+    ASSERT_TRUE(n <= 1);
     integrator_destroy(ig);
 }
 
@@ -178,10 +219,15 @@ void test_last_intervals(void) {
        of intervals; verify the counter is updated. */
     integrator_t *ig = integrator_create();
     qfloat_t result, err;
-    integrator_eval(ig, fn_exp, NULL,
-                    qf_from_double(0.0), qf_from_double(1.0),
-                    &result, &err);
-    ASSERT_TRUE(integrator_last_intervals(ig) >= 1);
+    int s = integrator_eval(ig, fn_exp, NULL,
+                            qf_from_double(0.0), qf_from_double(1.0),
+                            &result, &err);
+    size_t n = integrator_last_intervals(ig);
+    printf("  ∫₀¹ exp(x) dx  (interval counter)\n");
+    qf_printf("  result   = %q\n", result);
+    qf_printf("  err      = %q\n", err);
+    printf("  status = %d  intervals = %zu\n", s, n);
+    ASSERT_TRUE(n >= 1);
     integrator_destroy(ig);
 }
 
@@ -208,14 +254,129 @@ void test_reversed_limits(void) {
     int s = integrator_eval(ig, fn_x2, NULL,
                             qf_from_double(1.0), qf_from_double(0.0),
                             &result, &err);
-    ASSERT_TRUE(s == 0);
     qfloat_t expected = qf_from_string("-0.33333333333333333333333333333333333333");
+    printf("  ∫₁⁰ x² dx  (reversed limits)\n");
+    qf_printf("  result   = %q\n", result);
+    qf_printf("  expected = %q\n", expected);
+    qf_printf("  err      = %q\n", err);
+    printf("  status = %d  intervals = %zu\n", s, integrator_last_intervals(ig));
+    ASSERT_TRUE(s == 0);
     ASSERT_TRUE(qf_close(result, expected, tol20));
     integrator_destroy(ig);
 }
 
 /* -----------------------------------------------------------------------
- * README example
+ * integrator_eval_dv tests (Turán T15/T4 rule)
+ * --------------------------------------------------------------------- */
+
+void test_dv_sin(void) {
+    /* ∫₀^π sin(x) dx = 2 */
+    integrator_t *ig = integrator_create();
+    dval_t *x    = dv_new_var(qf_from_double(0.0));
+    dval_t *expr = dv_sin(x);
+
+    qfloat_t result, err;
+    int s = integrator_eval_dv(ig, expr, x,
+                                qf_from_double(0.0), QF_PI,
+                                &result, &err);
+    qfloat_t expected = qf_from_double(2.0);
+    printf("  ∫₀^π sin(x) dx  [Turán T15/T4]\n");
+    qf_printf("  result   = %q\n", result);
+    qf_printf("  expected = %q\n", expected);
+    qf_printf("  err      = %q\n", err);
+    printf("  status = %d  intervals = %zu\n", s, integrator_last_intervals(ig));
+    ASSERT_TRUE(s == 0);
+    ASSERT_TRUE(qf_close(result, expected, tol20));
+
+    dv_free(expr);
+    dv_free(x);
+    integrator_destroy(ig);
+}
+
+void test_dv_exp(void) {
+    /* ∫₀¹ exp(x) dx = e - 1 */
+    integrator_t *ig = integrator_create();
+    dval_t *x    = dv_new_var(qf_from_double(0.0));
+    dval_t *expr = dv_exp(x);
+
+    qfloat_t result, err;
+    int s = integrator_eval_dv(ig, expr, x,
+                                qf_from_double(0.0), qf_from_double(1.0),
+                                &result, &err);
+    qfloat_t expected = qf_sub(QF_E, qf_from_double(1.0));
+    printf("  ∫₀¹ exp(x) dx  [Turán T15/T4]\n");
+    qf_printf("  result   = %q\n", result);
+    qf_printf("  expected = %q\n", expected);
+    qf_printf("  err      = %q\n", err);
+    printf("  status = %d  intervals = %zu\n", s, integrator_last_intervals(ig));
+    ASSERT_TRUE(s == 0);
+    ASSERT_TRUE(qf_close(result, expected, tol20));
+
+    dv_free(expr);
+    dv_free(x);
+    integrator_destroy(ig);
+}
+
+void test_dv_arctan(void) {
+    /* ∫₋₁¹ 1/(1+x²) dx = π/2 */
+    integrator_t *ig = integrator_create();
+    dval_t *x    = dv_new_var(qf_from_double(0.0));
+    dval_t *one  = dv_new_const_d(1.0);
+    dval_t *x2   = dv_mul(x, x);
+    dval_t *denom = dv_add(one, x2);
+    dval_t *expr = dv_div(one, denom);
+
+    qfloat_t result, err;
+    int s = integrator_eval_dv(ig, expr, x,
+                                qf_from_double(-1.0), qf_from_double(1.0),
+                                &result, &err);
+    printf("  ∫₋₁¹ 1/(1+x²) dx  [Turán T15/T4]\n");
+    qf_printf("  result   = %q\n", result);
+    qf_printf("  expected = %q  (π/2)\n", QF_PI_2);
+    qf_printf("  err      = %q\n", err);
+    printf("  status = %d  intervals = %zu\n", s, integrator_last_intervals(ig));
+    ASSERT_TRUE(s == 0);
+    ASSERT_TRUE(qf_close(result, QF_PI_2, tol20));
+
+    dv_free(expr);
+    dv_free(denom);
+    dv_free(x2);
+    dv_free(one);
+    dv_free(x);
+    integrator_destroy(ig);
+}
+
+void test_dv_null_safety(void) {
+    integrator_t *ig = integrator_create();
+    dval_t *x    = dv_new_var(qf_from_double(0.0));
+    dval_t *expr = dv_exp(x);
+    qfloat_t result;
+
+    /* NULL integrator */
+    int s = integrator_eval_dv(NULL, expr, x,
+                                qf_from_double(0.0), qf_from_double(1.0),
+                                &result, NULL);
+    ASSERT_TRUE(s == -1);
+
+    /* NULL expr */
+    s = integrator_eval_dv(ig, NULL, x,
+                            qf_from_double(0.0), qf_from_double(1.0),
+                            &result, NULL);
+    ASSERT_TRUE(s == -1);
+
+    /* NULL result */
+    s = integrator_eval_dv(ig, expr, x,
+                            qf_from_double(0.0), qf_from_double(1.0),
+                            NULL, NULL);
+    ASSERT_TRUE(s == -1);
+
+    dv_free(expr);
+    dv_free(x);
+    integrator_destroy(ig);
+}
+
+/* -----------------------------------------------------------------------
+ * README examples
  * --------------------------------------------------------------------- */
 
 static qfloat_t fn_gaussian(qfloat_t x, void *ctx) {
@@ -258,13 +419,37 @@ void example_ctx(void) {
     integrator_destroy(ig);
 }
 
+void example_integrator_dv(void) {
+    /* ∫₋₃³ exp(-x²) dx using Turán T15/T4 with automatic differentiation.
+     * Exact value: √π · erf(3).  Compare interval count with example_integrator(). */
+    integrator_t *ig = integrator_create();
+
+    dval_t *x    = dv_new_var(qf_from_double(0.0));
+    dval_t *x2   = dv_mul(x, x);
+    dval_t *negx2 = dv_neg(x2);
+    dval_t *expr = dv_exp(negx2);
+
+    qfloat_t result, err;
+    integrator_eval_dv(ig, expr, x,
+                       qf_from_double(-3.0), qf_from_double(3.0),
+                       &result, &err);
+
+    qf_printf("∫₋₃³ exp(-x²) dx ≈ %q\n", result);
+    qf_printf("  error estimate   ≈ %q\n", err);
+    printf("  subintervals used: %zu\n", integrator_last_intervals(ig));
+
+    dv_free(expr);
+    dv_free(negx2);
+    dv_free(x2);
+    dv_free(x);
+    integrator_destroy(ig);
+}
+
 /* -----------------------------------------------------------------------
  * Entry point
  * --------------------------------------------------------------------- */
 
 int tests_main(void) {
-    tol20 = qf_from_string("1e-20");
-
     printf(C_BOLD C_CYAN "=== Lifecycle Tests ===\n" C_RESET);
     RUN_TEST(test_create_and_destroy, NULL);
     RUN_TEST(test_null_safety, NULL);
@@ -283,11 +468,19 @@ int tests_main(void) {
     RUN_TEST(test_max_intervals, NULL);
     RUN_TEST(test_last_intervals, NULL);
 
+    printf(C_BOLD C_CYAN "=== Turán T15/T4 dval_t Tests ===\n" C_RESET);
+    RUN_TEST(test_dv_sin, NULL);
+    RUN_TEST(test_dv_exp, NULL);
+    RUN_TEST(test_dv_arctan, NULL);
+    RUN_TEST(test_dv_null_safety, NULL);
+
     printf(C_BOLD C_GREEN "\n=== README Output Examples ===\n" C_RESET);
     printf(C_BOLD C_YELLOW "Example: Gaussian integral\n" C_RESET);
     example_integrator();
     printf(C_BOLD C_YELLOW "\nExample: Power function with context\n" C_RESET);
     example_ctx();
+    printf(C_BOLD C_YELLOW "\nExample: Gaussian via Turán T15/T4 + AD\n" C_RESET);
+    example_integrator_dv();
 
     return tests_failed;
 }

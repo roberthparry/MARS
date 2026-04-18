@@ -148,6 +148,17 @@ void dv_retain(dval_t *dv)
     if (dv) refcount_inc(&dv->refcount);
 }
 
+void dv_invalidate(dval_t *dv)
+{
+    if (!dv || !dv->x_valid) return;
+    dv->x_valid = 0;
+    if (dv->ops->arity != DV_OP_ATOM) {
+        dv_invalidate(dv->a);
+        if (dv->ops->arity == DV_OP_BINARY)
+            dv_invalidate(dv->b);
+    }
+}
+
 static void dv_release(dval_t *dv)
 {
     if (!dv) return;

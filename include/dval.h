@@ -257,6 +257,32 @@ dval_t *dv_e1(dval_t *dv);
  */
 void dv_free(dval_t *dv);
 
+/**
+ * @brief Invalidate the cached primal value of @p dv and all of its
+ *        descendant (input) nodes, recursively.
+ *
+ * After this call, the next dv_eval() on @p dv or any node in its
+ * sub-expression will force a full re-evaluation.
+ *
+ * This is needed when a variable node's value is changed via dv_set_val()
+ * and the same expression graph is to be re-evaluated at the new point.
+ * Because the graph stores no parent pointers, dv_set_val() cannot
+ * automatically propagate cache invalidation upward.  The correct pattern
+ * for repeated evaluation at different points is therefore:
+ *
+ * @code
+ *   dv_invalidate(expr);
+ *   dv_invalidate(d2_expr);    // if you also have derivative nodes
+ *   dv_set_val(x_var, new_x);  // marks x_var valid with new value
+ *   qfloat_t f  = dv_eval(expr);
+ *   qfloat_t d2 = dv_eval(d2_expr);
+ * @endcode
+ *
+ * Nodes that are already invalid are skipped to avoid redundant work on
+ * shared sub-expressions.
+ */
+void dv_invalidate(dval_t *dv);
+
 /* ------------------------------------------------------------------------- */
 /* String conversion                                                         */
 /* ------------------------------------------------------------------------- */
