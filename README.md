@@ -16,6 +16,7 @@ datetime utilities, UTF-8 strings, and generic containers.
 - **`datetime_t`** — civil and astronomical date/time helpers
 - **`dictionary_t` / `set_t` / `array_t`** — generic containers with user-defined ownership
 - **`string_t`** — UTF-8-aware dynamic strings and grapheme operations
+- **`bitset_t`** — dynamic thread-safe bitset with bitwise operations
 
 ## Requirements
 
@@ -54,6 +55,7 @@ W0(1) = 0.5671432904097838729999686622103575
 | `set_t` | Generic set storage with ownership models | [`docs/set.md`](docs/set.md) |
 | `array_t` | Generic array storage with ownership models | [`docs/array.md`](docs/array.md) |
 | `string_t` | UTF-8-aware dynamic strings | [`docs/string.md`](docs/string.md) |
+| `bitset_t` | Dynamic thread-safe bitset | [`docs/bitset.md`](docs/bitset.md) |
 
 ## Build
 
