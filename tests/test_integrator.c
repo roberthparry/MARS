@@ -240,6 +240,30 @@ void example_integrator(void) {
     integrator_destroy(ig);
 }
 
+typedef struct { qfloat exponent; } power_ctx;
+
+static qfloat fn_power(qfloat x, void *ctx) {
+    power_ctx *pc = ctx;
+    return qf_pow(x, pc->exponent);
+}
+
+void example_ctx(void) {
+    /* ∫₀¹ x^2.5 dx = 1/3.5 */
+    integrator_t *ig = integrator_create();
+    power_ctx ctx = { qf_from_string("2.5") };
+    qfloat result, err;
+    integrator_eval(ig, fn_power, &ctx,
+                    qf_from_double(0.0), qf_from_double(1.0),
+                    &result, &err);
+
+    char buf[64];
+    qf_to_string(result, buf, sizeof(buf));
+    printf("∫₀¹ x^2.5 dx ≈ %s\n", buf);
+    qf_to_string(err, buf, sizeof(buf));
+    printf("  error estimate   ≈ %s\n", buf);
+    integrator_destroy(ig);
+}
+
 /* -----------------------------------------------------------------------
  * Entry point
  * --------------------------------------------------------------------- */
@@ -265,8 +289,9 @@ int tests_main(void) {
     RUN_TEST(test_max_intervals, NULL);
     RUN_TEST(test_last_intervals, NULL);
 
-    printf(C_BOLD C_GREEN "\n=== README Output Example ===\n" C_RESET);
+    printf(C_BOLD C_GREEN "\n=== README Output Examples ===\n" C_RESET);
     example_integrator();
+    example_ctx();
 
     return tests_failed;
 }
