@@ -53,9 +53,9 @@ int main(void) {
 ```
 
 ```text
-∫₋₃³ exp(-x²) dx ≈ 1.7724538509055159927507927604462...
-error estimate      ≈ ...
-subintervals used: 1
+∫₋₃³ exp(-x²) dx ≈ 1.772414696519042467789405388127980e+0
+  error estimate   ≈ 2.807878575265393832671772224952451e-21
+  subintervals used: 200
 ```
 
 ### Custom context
@@ -81,9 +81,16 @@ int main(void) {
     char buf[64];
     qf_to_string(result, buf, sizeof(buf));
     printf("∫₀¹ x^2.5 dx ≈ %s\n", buf);
+    qf_to_string(err, buf, sizeof(buf));
+    printf("  error estimate   ≈ %s\n", buf);
     integrator_destroy(ig);
     return 0;
 }
+```
+
+```text
+∫₀¹ x^2.5 dx ≈ 2.857142857142857142866307551087165e-1
+  error estimate   ≈ 9.829684091587462300529671656255823e-22
 ```
 
 ---
