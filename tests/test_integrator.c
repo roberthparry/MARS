@@ -284,7 +284,9 @@ int tests_main(void) {
     RUN_TEST(test_last_intervals, NULL);
 
     printf(C_BOLD C_GREEN "\n=== README Output Examples ===\n" C_RESET);
+    printf(C_BOLD C_YELLOW "Example: Gaussian integral\n" C_RESET);
     example_integrator();
+    printf(C_BOLD C_YELLOW "\nExample: Power function with context\n" C_RESET);
     example_ctx();
 
     return tests_failed;
