@@ -41,7 +41,12 @@
         {
             "cwd": "${workspaceFolder}",
             "binaryPath": "${workspaceFolder}/tests/build/debug/test_dval",
-            "binaryArgs": []           
+            "binaryArgs": []
+        },
+        {
+            "cwd": "/home/rparry/Projects/MARS/tests/build/debug",
+            "binaryPath": "/home/rparry/Projects/MARS/tests/build/debug/test_integrator",
+            "binaryArgs": []
         }
     ],
 

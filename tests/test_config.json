@@ -505,6 +505,20 @@
     "test_growth": true,
     "test_thread_safety": true
   },
+  "tests/test_integrator.c": {
+    "test_create_and_destroy": true,
+    "test_null_safety": true,
+    "test_polynomial": true,
+    "test_sin": true,
+    "test_exp": true,
+    "test_arctan": true,
+    "test_log": true,
+    "test_constant": true,
+    "test_reversed_limits": true,
+    "test_set_tol": true,
+    "test_max_intervals": true,
+    "test_last_intervals": true
+  },
   "tests/test_array.c": {
     "test_ints": true,
     "test_strings": true,
