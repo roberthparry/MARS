@@ -99,6 +99,8 @@ This directory contains the longer module documentation for MARS.
 - [`array_t`](array.md) — generic array storage
 - [`string_t`](string.md) — UTF-8-aware dynamic strings
 - [`bitset_t`](bitset.md) — dynamic thread-safe bitset
+- [`integrator_t`](integrator.md) — adaptive G7K15 numerical integrator
+- [`integrator_t`](integrator.md) — adaptive G7K15 numerical integrator
 
 ## Guides
 
