@@ -1,6 +1,7 @@
 #ifndef DVAL_INTERNAL_H
 #define DVAL_INTERNAL_H
 
+#include <stdint.h>
 #include "qfloat.h"
 #include "dval.h"
 
@@ -94,7 +95,13 @@ struct _dval_t {
     qfloat_t  c;
 
     qfloat_t  x;
-    int     x_valid;
+    int       x_valid;
+
+    /* epoch tracks the maximum variable generation seen at last evaluation.
+     * For variable nodes, incremented by dv_set_val(). For computed nodes,
+     * set to max(child epochs) after each recomputation. dv_eval() uses
+     * this to detect stale caches automatically. */
+    uint64_t  epoch;
 
     dval_t *dx;
     int     dx_valid;

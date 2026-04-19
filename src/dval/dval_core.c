@@ -148,16 +148,6 @@ void dv_retain(dval_t *dv)
     if (dv) refcount_inc(&dv->refcount);
 }
 
-void dv_invalidate(dval_t *dv)
-{
-    if (!dv || !dv->x_valid) return;
-    dv->x_valid = 0;
-    if (dv->ops->arity != DV_OP_ATOM) {
-        dv_invalidate(dv->a);
-        if (dv->ops->arity == DV_OP_BINARY)
-            dv_invalidate(dv->b);
-    }
-}
 
 static void dv_release(dval_t *dv)
 {
@@ -193,6 +183,7 @@ static dval_t *dv_alloc(const dval_ops_t *ops)
     dv->c        = qf_from_double(0.0);
     dv->x        = qf_from_double(0.0);
     dv->x_valid  = 0;
+    dv->epoch    = 0;
     dv->dx       = NULL;
     dv->dx_valid = 0;
     dv->name     = NULL;
@@ -210,13 +201,29 @@ static qfloat_t dv_eval_qf(const dval_t *dv)
     if (!dv)
         return qf_from_double(0.0);
 
-    dval_t *mutable_dv = (dval_t *)dv;
+    dval_t *m = (dval_t *)dv;
 
-    if (!mutable_dv->x_valid) {
-        mutable_dv->x = mutable_dv->ops->eval(mutable_dv);
-        mutable_dv->x_valid = 1;
+    /* Atoms (constants and variables) are always up-to-date. */
+    if (m->ops->arity == DV_OP_ATOM)
+        return m->x;
+
+    /* Recurse into children to bring their epochs current, then check whether
+     * this node's cached value is still valid. ops->eval() will call dv_eval_qf
+     * on children a second time, but those calls return immediately (x_valid=1). */
+    dv_eval_qf(m->a);
+    if (m->ops->arity == DV_OP_BINARY)
+        dv_eval_qf(m->b);
+
+    uint64_t child_epoch = m->a ? m->a->epoch : 0;
+    if (m->b && m->b->epoch > child_epoch)
+        child_epoch = m->b->epoch;
+
+    if (!m->x_valid || child_epoch > m->epoch) {
+        m->x       = m->ops->eval(m);
+        m->x_valid = 1;
+        m->epoch   = child_epoch;
     }
-    return mutable_dv->x;
+    return m->x;
 }
 
 static dval_t *dv_build_dx(dval_t *dv)
@@ -359,6 +366,7 @@ void dv_set_val(dval_t *dv, qfloat_t v)
     dv->c = v;
     dv->x = v;
     dv->x_valid = 1;
+    dv->epoch++;
 }
 
 void dv_set_val_d(dval_t *dv, double v)

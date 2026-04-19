@@ -75,10 +75,10 @@ dval_t *dv_new_named_var_d(double x, const char *name);
 /**
  * @brief Update the value of a variable node.
  *
- * Sets the node's value and marks it valid, but does NOT propagate
- * invalidation to ancestor nodes — the graph has no parent pointers.
- * Call dv_invalidate() on the expression root(s) before calling this
- * function, then call dv_eval() to recompute. See dv_invalidate().
+ * Sets the node's value and advances the node's internal epoch counter.
+ * The next call to dv_eval() on any expression that depends on @p dv will
+ * automatically detect the change and recompute. Calling dv_invalidate()
+ * before dv_eval() is no longer required.
  *
  * @p dv must be a variable node (created with dv_new_var or dv_new_named_var).
  */
@@ -260,31 +260,6 @@ dval_t *dv_e1(dval_t *dv);
  */
 void dv_free(dval_t *dv);
 
-/**
- * @brief Invalidate the cached primal value of @p dv and all of its
- *        descendant (input) nodes, recursively.
- *
- * After this call, the next dv_eval() on @p dv or any node in its
- * sub-expression will force a full re-evaluation.
- *
- * This is needed when a variable node's value is changed via dv_set_val()
- * and the same expression graph is to be re-evaluated at the new point.
- * Because the graph stores no parent pointers, dv_set_val() cannot
- * automatically propagate cache invalidation upward.  The correct pattern
- * for repeated evaluation at different points is therefore:
- *
- * @code
- *   dv_invalidate(expr);
- *   dv_invalidate(d2_expr);    // if you also have derivative nodes
- *   dv_set_val(x_var, new_x);  // marks x_var valid with new value
- *   qfloat_t f  = dv_eval(expr);
- *   qfloat_t d2 = dv_eval(d2_expr);
- * @endcode
- *
- * Nodes that are already invalid are skipped to avoid redundant work on
- * shared sub-expressions.
- */
-void dv_invalidate(dval_t *dv);
 
 /* ------------------------------------------------------------------------- */
 /* String conversion                                                         */
