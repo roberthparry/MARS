@@ -288,8 +288,6 @@ static void gturan_eval_dv(dval_t *expr, dval_t *x_var, dval_t *d2_expr,
     qfloat_t h2 = qf_mul(h, h);
 
     /* Center node */
-    dv_invalidate(expr);
-    dv_invalidate(d2_expr);
     dv_set_val(x_var, c);
     qfloat_t f0  = dv_eval(expr);
     qfloat_t d20 = dv_eval(d2_expr);
@@ -299,14 +297,10 @@ static void gturan_eval_dv(dval_t *expr, dval_t *x_var, dval_t *d2_expr,
     for (int i = 0; i < 7; i++) {
         qfloat_t hi = qf_mul(h, tn_node[i + 1]);
 
-        dv_invalidate(expr);
-        dv_invalidate(d2_expr);
         dv_set_val(x_var, qf_add(c, hi));
         fpos[i]  = dv_eval(expr);
         d2pos[i] = dv_eval(d2_expr);
 
-        dv_invalidate(expr);
-        dv_invalidate(d2_expr);
         dv_set_val(x_var, qf_sub(c, hi));
         fneg[i]  = dv_eval(expr);
         d2neg[i] = dv_eval(d2_expr);

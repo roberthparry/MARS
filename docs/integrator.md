@@ -191,7 +191,7 @@ All declarations are in `include/integrator.h`.
 
 **Turán degree advantage** comes from incorporating f'' directly into the quadrature weights. For an 8-node symmetric rule this raises exactness from degree 15 (f only) to degree 31. The T4 nested sub-rule uses alternating node positions (not consecutive), which keeps all weights positive and the rule well-conditioned.
 
-**Cache invalidation** in `integrator_eval_dv`: between evaluation points the function calls `dv_invalidate` on the expression and its derivative graph so that `dv_eval` recomputes rather than returning a stale cached value. This is handled internally; callers do not need to call `dv_invalidate` themselves.
+**Cache coherence** in `integrator_eval_dv`: `dv_eval` detects variable changes automatically via epoch tracking — each call to `dv_set_val` advances the variable's epoch, and computed nodes recompute when they see a newer epoch from their inputs.
 
 ## Tradeoffs
 
