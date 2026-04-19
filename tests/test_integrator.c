@@ -441,7 +441,8 @@ void test_double_exp(void) {
     integrator_t *ig = ig_new();
     dval_t *x    = dv_new_var(qf_from_double(0.0));
     dval_t *y    = dv_new_var(qf_from_double(0.0));
-    dval_t *expr = dv_exp(dv_add(x, y));
+    dval_t *sum  = dv_add(x, y);           // store intermediate
+    dval_t *expr = dv_exp(sum);
 
     qfloat_t result, err;
     int s = ig_double_integral(ig, expr,
@@ -458,6 +459,7 @@ void test_double_exp(void) {
     ASSERT_TRUE(s == 0);
     ASSERT_TRUE(qf_close(result, expected, tol27));
     dv_free(expr);
+    dv_free(sum);   // free intermediate
     dv_free(y);
     dv_free(x);
     ig_free(ig);
@@ -516,7 +518,8 @@ void test_triple_polynomial(void) {
     dval_t *x    = dv_new_var(qf_from_double(0.0));
     dval_t *y    = dv_new_var(qf_from_double(0.0));
     dval_t *z    = dv_new_var(qf_from_double(0.0));
-    dval_t *expr = dv_mul(dv_mul(x, y), z);
+    dval_t *xy   = dv_mul(x, y);           // store intermediate
+    dval_t *expr = dv_mul(xy, z);
 
     qfloat_t result, err;
     int s = ig_triple_integral(ig, expr,
@@ -533,6 +536,7 @@ void test_triple_polynomial(void) {
     ASSERT_TRUE(s == 0);
     ASSERT_TRUE(qf_close(result, expected, tol27));
     dv_free(expr);
+    dv_free(xy);    // free intermediate
     dv_free(z);
     dv_free(y);
     dv_free(x);
@@ -545,7 +549,9 @@ void test_triple_exp(void) {
     dval_t *x    = dv_new_var(qf_from_double(0.0));
     dval_t *y    = dv_new_var(qf_from_double(0.0));
     dval_t *z    = dv_new_var(qf_from_double(0.0));
-    dval_t *expr = dv_exp(dv_add(dv_add(x, y), z));
+    dval_t *xy   = dv_add(x, y);           // store intermediate
+    dval_t *xyz  = dv_add(xy, z);          // store intermediate
+    dval_t *expr = dv_exp(xyz);
 
     qfloat_t result, err;
     int s = ig_triple_integral(ig, expr,
@@ -563,6 +569,8 @@ void test_triple_exp(void) {
     ASSERT_TRUE(s == 0);
     ASSERT_TRUE(qf_close(result, expected, tol27));
     dv_free(expr);
+    dv_free(xyz);   // free intermediate
+    dv_free(xy);    // free intermediate
     dv_free(z);
     dv_free(y);
     dv_free(x);
@@ -574,14 +582,17 @@ void test_triple_null_safety(void) {
     dval_t *x    = dv_new_var(qf_from_double(0.0));
     dval_t *y    = dv_new_var(qf_from_double(0.0));
     dval_t *z    = dv_new_var(qf_from_double(0.0));
-    dval_t *expr = dv_mul(dv_mul(x, y), z);
+    dval_t *xy   = dv_mul(x, y);           // store intermediate
+    dval_t *expr = dv_mul(xy, z);
     qfloat_t result;
     qfloat_t lo = qf_from_double(0.0), hi = qf_from_double(1.0);
 
     ASSERT_TRUE(ig_triple_integral(NULL, expr, x, lo, hi, y, lo, hi, z, lo, hi, &result, NULL) == -1);
     ASSERT_TRUE(ig_triple_integral(ig, NULL, x, lo, hi, y, lo, hi, z, lo, hi, &result, NULL) == -1);
     ASSERT_TRUE(ig_triple_integral(ig, expr, x, lo, hi, y, lo, hi, z, lo, hi, NULL, NULL) == -1);
+
     dv_free(expr);
+    dv_free(xy);    // free intermediate
     dv_free(z);
     dv_free(y);
     dv_free(x);
@@ -606,7 +617,7 @@ void test_multi_2d(void) {
     qfloat_t result, err;
     int s = ig_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
     qfloat_t expected = qf_from_double(1.0);
-    printf("  ∫₀¹∫₀¹ (x+y) dx dy  [multi 2D]\n");
+    printf("  ∫₀¹∫₀¹ (x+y) dx dy  [double integral]\n");
     qf_printf("  result   = %q\n", result);
     qf_printf("  expected = %q\n", expected);
     qf_printf("  err      = %q\n", err);
@@ -626,7 +637,7 @@ void test_multi_3d(void) {
     dval_t *x    = dv_new_var(qf_from_double(0.0));
     dval_t *y    = dv_new_var(qf_from_double(0.0));
     dval_t *z    = dv_new_var(qf_from_double(0.0));
-    dval_t *xy   = dv_add(x, y);
+    dval_t *xy   = dv_add(x, y);           // store intermediate
     dval_t *expr = dv_add(xy, z);
 
     dval_t *vars[3] = { x, y, z };
@@ -636,7 +647,7 @@ void test_multi_3d(void) {
     qfloat_t result, err;
     int s = ig_integral_multi(ig, expr, 3, vars, lo, hi, &result, &err);
     qfloat_t expected = qf_from_string("1.5");
-    printf("  ∫₀¹∫₀¹∫₀¹ (x+y+z) dx dy dz  [multi 3D]\n");
+    printf("  ∫₀¹∫₀¹∫₀¹ (x+y+z) dx dy dz  [triple integral]\n");
     qf_printf("  result   = %q\n", result);
     qf_printf("  expected = %q\n", expected);
     qf_printf("  err      = %q\n", err);
@@ -645,7 +656,7 @@ void test_multi_3d(void) {
     ASSERT_TRUE(qf_close(result, expected, tol27));
 
     dv_free(expr);
-    dv_free(xy);
+    dv_free(xy);    // free intermediate
     dv_free(z);
     dv_free(y);
     dv_free(x);
@@ -696,14 +707,14 @@ void test_multi_nd1(void) {
 }
 
 void test_multi_4d(void) {
-    /* ∫₀¹⁴ (x+y+z+w) = 2.0 — linear polynomial in 4D, exact */
+    /* ∫₀¹∫₀¹∫₀¹∫₀¹ (x+y+z+w) dx dy dz dw = 2.0 — linear polynomial in 4D, exact */
     integrator_t *ig = ig_new();
     dval_t *x    = dv_new_var(qf_from_double(0.0));
     dval_t *y    = dv_new_var(qf_from_double(0.0));
     dval_t *z    = dv_new_var(qf_from_double(0.0));
     dval_t *w    = dv_new_var(qf_from_double(0.0));
-    dval_t *xy   = dv_add(x, y);
-    dval_t *zw   = dv_add(z, w);
+    dval_t *xy   = dv_add(x, y);           // store intermediate
+    dval_t *zw   = dv_add(z, w);           // store intermediate
     dval_t *expr = dv_add(xy, zw);
 
     dval_t *vars[4] = { x, y, z, w };
@@ -715,7 +726,7 @@ void test_multi_4d(void) {
     qfloat_t result, err;
     int s = ig_integral_multi(ig, expr, 4, vars, lo, hi, &result, &err);
     qfloat_t expected = qf_from_double(2.0);
-    printf("  ∫₀¹⁴ (x+y+z+w) dx dy dz dw  [multi 4D]\n");
+    printf("  ∫₀¹∫₀¹∫₀¹∫₀¹ (x+y+z+w) dx dy dz dw  [quadruple integral]\n");
     qf_printf("  result   = %q\n", result);
     qf_printf("  expected = %q\n", expected);
     qf_printf("  err      = %q\n", err);
@@ -723,8 +734,8 @@ void test_multi_4d(void) {
     ASSERT_TRUE(s == 0);
     ASSERT_TRUE(qf_close(result, expected, tol27));
     dv_free(expr);
-    dv_free(zw);
-    dv_free(xy);
+    dv_free(zw);    // free intermediate
+    dv_free(xy);    // free intermediate
     dv_free(w);
     dv_free(z);
     dv_free(y);
@@ -733,15 +744,16 @@ void test_multi_4d(void) {
 }
 
 void test_multi_4d_exp(void) {
-    /* ∫₀¹⁴ exp(x+y+z+w) = (e−1)⁴ */
+    /* ∫₀¹∫₀¹∫₀¹∫₀¹ exp(x+y+z+w) dx dy dz dw = (e−1)⁴ */
     integrator_t *ig = ig_new();
     dval_t *x    = dv_new_var(qf_from_double(0.0));
     dval_t *y    = dv_new_var(qf_from_double(0.0));
     dval_t *z    = dv_new_var(qf_from_double(0.0));
     dval_t *w    = dv_new_var(qf_from_double(0.0));
-    dval_t *xy   = dv_add(x, y);
-    dval_t *zw   = dv_add(z, w);
-    dval_t *expr = dv_exp(dv_add(xy, zw));
+    dval_t *xy   = dv_add(x, y);           // store intermediate
+    dval_t *zw   = dv_add(z, w);           // store intermediate
+    dval_t *sum  = dv_add(xy, zw);         // store intermediate
+    dval_t *expr = dv_exp(sum);
 
     dval_t *vars[4] = { x, y, z, w };
     qfloat_t lo[4]  = { qf_from_double(0.0), qf_from_double(0.0),
@@ -754,7 +766,7 @@ void test_multi_4d_exp(void) {
     qfloat_t em1      = qf_sub(QF_E, qf_from_double(1.0));
     qfloat_t em1sq    = qf_mul(em1, em1);
     qfloat_t expected = qf_mul(em1sq, em1sq);
-    printf("  ∫₀¹⁴ exp(x+y+z+w) dx dy dz dw  [(e−1)⁴]\n");
+    printf("  ∫₀¹∫₀¹∫₀¹∫₀¹ exp(x+y+z+w) dx dy dz dw  [(e - 1)⁴]\n");
     qf_printf("  result   = %q\n", result);
     qf_printf("  expected = %q\n", expected);
     qf_printf("  err      = %q\n", err);
@@ -762,8 +774,9 @@ void test_multi_4d_exp(void) {
     ASSERT_TRUE(s == 0);
     ASSERT_TRUE(qf_close(result, expected, tol27));
     dv_free(expr);
-    dv_free(zw);
-    dv_free(xy);
+    dv_free(sum);   // free intermediate
+    dv_free(zw);    // free intermediate
+    dv_free(xy);    // free intermediate
     dv_free(w);
     dv_free(z);
     dv_free(y);
