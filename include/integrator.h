@@ -36,8 +36,8 @@ typedef struct integrator_t integrator_t;
 /**
  * @brief Create an integrator with default tolerances.
  *
- * Default absolute and relative tolerances are both 1e-21.
- * Default maximum subinterval count is 200.
+ * Default absolute and relative tolerances are both 1e-27.
+ * Default maximum subinterval count is 500.
  *
  * @return New integrator, or NULL on allocation failure.
  */

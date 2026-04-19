@@ -20,7 +20,7 @@ static int qf_close(qfloat_t a, qfloat_t b, qfloat_t tol) {
 }
 
 static qfloat_t tol20 = { 9.9999999999999995e-21, 5.4846728545790429e-37 };  /* 1e-20 */
-[[maybe_unused]] static qfloat_t tol27 = { 1e-27, -3.8494869749191836e-44 }; /* 1e-27 */
+static qfloat_t tol27 = { 1e-27, -3.8494869749191836e-44 }; /* 1e-27 */
 
 /* -----------------------------------------------------------------------
  * Integrands
@@ -71,6 +71,7 @@ void test_create_and_destroy(void) {
 void test_polynomial(void) {
     /* ∫₀¹ x² dx = 1/3 */
     integrator_t *ig = integrator_create();
+    integrator_set_tol(ig, qf_from_string("1e-21"), qf_from_string("1e-21"));
     qfloat_t result, err;
     int s = integrator_eval(ig, fn_x2, NULL,
                             qf_from_double(0.0), qf_from_double(1.0),
@@ -89,6 +90,7 @@ void test_polynomial(void) {
 void test_sin(void) {
     /* ∫₀^π sin(x) dx = 2 */
     integrator_t *ig = integrator_create();
+    integrator_set_tol(ig, qf_from_string("1e-21"), qf_from_string("1e-21"));
     qfloat_t result, err;
     int s = integrator_eval(ig, fn_sin, NULL,
                             qf_from_double(0.0), QF_PI,
@@ -107,6 +109,7 @@ void test_sin(void) {
 void test_exp(void) {
     /* ∫₀¹ exp(x) dx = e - 1 */
     integrator_t *ig = integrator_create();
+    integrator_set_tol(ig, qf_from_string("1e-21"), qf_from_string("1e-21"));
     qfloat_t result, err;
     int s = integrator_eval(ig, fn_exp, NULL,
                             qf_from_double(0.0), qf_from_double(1.0),
@@ -125,6 +128,7 @@ void test_exp(void) {
 void test_arctan(void) {
     /* ∫₋₁¹ 1/(1+x²) dx = π/2 */
     integrator_t *ig = integrator_create();
+    integrator_set_tol(ig, qf_from_string("1e-21"), qf_from_string("1e-21"));
     qfloat_t result, err;
     int s = integrator_eval(ig, fn_inv1px2, NULL,
                             qf_from_double(-1.0), qf_from_double(1.0),
@@ -142,6 +146,7 @@ void test_arctan(void) {
 void test_log(void) {
     /* ∫₁^e ln(x) dx = 1 */
     integrator_t *ig = integrator_create();
+    integrator_set_tol(ig, qf_from_string("1e-21"), qf_from_string("1e-21"));
     qfloat_t result, err;
     int s = integrator_eval(ig, fn_log, NULL,
                             qf_from_double(1.0), QF_E,
@@ -160,6 +165,7 @@ void test_log(void) {
 void test_constant(void) {
     /* ∫₀^5 1 dx = 5 */
     integrator_t *ig = integrator_create();
+    integrator_set_tol(ig, qf_from_string("1e-21"), qf_from_string("1e-21"));
     qfloat_t result, err;
     int s = integrator_eval(ig, fn_const, NULL,
                             qf_from_double(0.0), qf_from_double(5.0),
@@ -250,6 +256,7 @@ void test_null_safety(void) {
 void test_reversed_limits(void) {
     /* ∫₁⁰ x² dx = -1/3 (limits reversed) */
     integrator_t *ig = integrator_create();
+    integrator_set_tol(ig, qf_from_string("1e-21"), qf_from_string("1e-21"));
     qfloat_t result, err;
     int s = integrator_eval(ig, fn_x2, NULL,
                             qf_from_double(1.0), qf_from_double(0.0),
@@ -286,7 +293,7 @@ void test_dv_sin(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, integrator_last_intervals(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol20));
+    ASSERT_TRUE(qf_close(result, expected, tol27));
 
     dv_free(expr);
     dv_free(x);
@@ -310,7 +317,7 @@ void test_dv_exp(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, integrator_last_intervals(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol20));
+    ASSERT_TRUE(qf_close(result, expected, tol27));
 
     dv_free(expr);
     dv_free(x);
@@ -336,7 +343,7 @@ void test_dv_arctan(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, integrator_last_intervals(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, QF_PI_2, tol20));
+    ASSERT_TRUE(qf_close(result, QF_PI_2, tol27));
 
     dv_free(expr);
     dv_free(denom);
@@ -387,6 +394,7 @@ static qfloat_t fn_gaussian(qfloat_t x, void *ctx) {
 void example_integrator(void) {
     /* ∫₋₃³ exp(-x²) dx ≈ √π * erf(3) */
     integrator_t *ig = integrator_create();
+    integrator_set_tol(ig, qf_from_string("1e-21"), qf_from_string("1e-21"));
     qfloat_t result, err;
     integrator_eval(ig, fn_gaussian, NULL,
                     qf_from_double(-3.0), qf_from_double(3.0),
@@ -408,6 +416,7 @@ static qfloat_t fn_power(qfloat_t x, void *ctx) {
 void example_ctx(void) {
     /* ∫₀¹ x^2.5 dx = 1/3.5 */
     integrator_t *ig = integrator_create();
+    integrator_set_tol(ig, qf_from_string("1e-21"), qf_from_string("1e-21"));
     power_ctx ctx = { qf_from_string("2.5") };
     qfloat_t result, err;
     integrator_eval(ig, fn_power, &ctx,

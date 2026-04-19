@@ -155,9 +155,9 @@ struct integrator_t {
 integrator_t *integrator_create(void) {
     integrator_t *ig = malloc(sizeof(integrator_t));
     if (!ig) return NULL;
-    ig->abs_tol       = qf_from_string("1e-21");
-    ig->rel_tol       = qf_from_string("1e-21");
-    ig->max_intervals = 200;
+    ig->abs_tol       = qf_from_string("1e-27");
+    ig->rel_tol       = qf_from_string("1e-27");
+    ig->max_intervals = 500;
     ig->last_intervals = 0;
     return ig;
 }

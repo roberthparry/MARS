@@ -75,8 +75,11 @@ dval_t *dv_new_named_var_d(double x, const char *name);
 /**
  * @brief Update the value of a variable node.
  *
- * Invalidates the cached primal value and cached derivative for @p dv
- * and all ancestor nodes that depend on it.
+ * Sets the node's value and marks it valid, but does NOT propagate
+ * invalidation to ancestor nodes — the graph has no parent pointers.
+ * Call dv_invalidate() on the expression root(s) before calling this
+ * function, then call dv_eval() to recompute. See dv_invalidate().
+ *
  * @p dv must be a variable node (created with dv_new_var or dv_new_named_var).
  */
 void dv_set_val(dval_t *dv, qfloat_t value);

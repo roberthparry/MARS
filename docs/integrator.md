@@ -19,7 +19,7 @@ Each subinterval is evaluated with a 15-point Kronrod rule (K15) containing an e
 
 Uses both f(x) and f''(x) at 8 symmetric node positions per subinterval (Turán quadrature), achieving degree-31 polynomial exactness versus degree 29 for G7K15. The second derivative is computed automatically by differentiating the `dval_t` expression graph — no user-supplied derivative is needed. The nested T4 sub-rule (4 of the 8 positions) provides the error estimate.
 
-Because the rule exploits curvature information, smooth integrands typically converge in far fewer subintervals than G7K15. The same Gaussian integral `∫₋₃³ exp(-x²) dx` takes 40 subintervals with Turán T15/T4 versus 200 with G7K15.
+Because the rule exploits curvature information, smooth integrands typically converge in far fewer subintervals than G7K15. For example, `∫₀¹ exp(x) dx` takes 3 subintervals with Turán T15/T4 at the default 1e-27 tolerance versus 39 with G7K15 at 1e-21 — and the Turán result carries an extra 6 digits of accuracy.
 
 Both rules stop when:
 
@@ -47,6 +47,8 @@ static qfloat_t gaussian(qfloat_t x, void *ctx) {
 
 int main(void) {
     integrator_t *ig = integrator_create();
+    /* G7K15 tops out at ~21 digits; tighten tolerance to match */
+    integrator_set_tol(ig, qf_from_string("1e-21"), qf_from_string("1e-21"));
 
     qfloat_t result, err;
     integrator_eval(ig, gaussian, NULL,
@@ -63,9 +65,9 @@ int main(void) {
 ```
 
 ```text
-∫₋₃³ exp(-x²) dx ≈ 1.77241469651904246778940538812798
-  error estimate   ≈ 2.807878575265393832671772224952451e-21
-  subintervals used: 200
+∫₋₃³ exp(-x²) dx ≈ 1.772414696519042467789877193922336
+  error estimate   ≈ 1.765624419480535291888099331079003e-21
+  subintervals used: 259
 ```
 
 ### Turán T15/T4 with automatic differentiation
@@ -79,26 +81,22 @@ When the integrand can be expressed as a `dval_t` graph, `integrator_eval_dv` us
 #include "dval.h"
 
 int main(void) {
-    /* ∫₋₃³ exp(-x²) dx — same integral, fewer subintervals */
+    /* ∫₀¹ exp(x) dx = e - 1, at default 1e-27 tolerance */
     integrator_t *ig = integrator_create();
 
     dval_t *x    = dv_new_var(qf_from_double(0.0));
-    dval_t *x2   = dv_mul(x, x);
-    dval_t *negx2 = dv_neg(x2);
-    dval_t *expr = dv_exp(negx2);
+    dval_t *expr = dv_exp(x);
 
     qfloat_t result, err;
     integrator_eval_dv(ig, expr, x,
-                       qf_from_double(-3.0), qf_from_double(3.0),
+                       qf_from_double(0.0), qf_from_double(1.0),
                        &result, &err);
 
-    qf_printf("∫₋₃³ exp(-x²) dx ≈ %q\n", result);
+    qf_printf("∫₀¹ exp(x) dx ≈ %q\n", result);
     qf_printf("  error estimate   ≈ %q\n", err);
     printf("  subintervals used: %zu\n", integrator_last_intervals(ig));
 
     dv_free(expr);
-    dv_free(negx2);
-    dv_free(x2);
     dv_free(x);
     integrator_destroy(ig);
     return 0;
@@ -106,9 +104,9 @@ int main(void) {
 ```
 
 ```text
-∫₋₃³ exp(-x²) dx ≈ 1.772414696519042467788922676371878
-  error estimate   ≈ 1.599358478547741084647103771000033e-21
-  subintervals used: 40
+∫₀¹ exp(x) dx ≈ 1.718281828459045235360287471352664
+  error estimate   ≈ 7.623185090994446757792522996692577e-28
+  subintervals used: 3
 ```
 
 ### Custom context
@@ -139,8 +137,8 @@ int main(void) {
 ```
 
 ```text
-∫₀¹ x^2.5 dx ≈ 2.857142857142857142866307551087165e-1
-  error estimate   ≈ 9.829684091587462300529671656255823e-22
+∫₀¹ x^2.5 dx ≈ 2.857142857142857142857278677175604e-1
+  error estimate   ≈ 1.346867791475306539808536874367391e-23
 ```
 
 ---
@@ -156,7 +154,7 @@ All declarations are in `include/integrator.h`.
 
 ### Lifecycle
 
-- `integrator_t *integrator_create(void)` — create an integrator with default tolerances (1e-21 absolute and relative, 200 max subintervals). Returns NULL on allocation failure.
+- `integrator_t *integrator_create(void)` — create an integrator with default tolerances (1e-27 absolute and relative, 500 max subintervals). Returns NULL on allocation failure.
 - `void integrator_destroy(integrator_t *ig)` — free the integrator. Safe to call with NULL.
 
 ### Configuration
