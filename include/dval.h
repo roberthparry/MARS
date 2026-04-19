@@ -107,12 +107,13 @@ double dv_get_val_d(const dval_t *dv);
 qfloat_t dv_get_val(const dval_t *dv);
 
 /**
- * @brief Get the cached first derivative node (borrowed).
+ * @brief Get the derivative ∂expr/∂wrt (borrowed).
  *
- * The returned pointer is owned by @p dv and must NOT be freed by the caller.
- * If the derivative has not yet been built, it is created lazily.
+ * The returned pointer is owned by @p expr and must NOT be freed by the caller.
+ * The result is cached keyed by @p wrt, so repeated calls are cheap.
+ * @p wrt must be a variable node that appears in the DAG rooted at @p expr.
  */
-const dval_t *dv_get_deriv(const dval_t *dv);
+const dval_t *dv_get_deriv(const dval_t *expr, dval_t *wrt);
 
 /* ------------------------------------------------------------------------- */
 /* Evaluation                                                                */
@@ -132,16 +133,24 @@ double dv_eval_d(const dval_t *dv);
 /* ------------------------------------------------------------------------- */
 
 /**
- * @brief Build a new DAG node representing the n-th derivative of @p dv.
+ * @brief Build a new DAG node representing a derivative of @p expr w.r.t. @p wrt.
  *
- * Returns an owning handle; caller must call dv_free() exactly once.
- * Passing n = 0 returns a new reference to @p dv itself.
- * dv_create_deriv() is equivalent to dv_create_nth_deriv(1, dv).
+ * @p wrt must be a variable node (created with dv_new_var or dv_new_named_var)
+ * that appears in the expression DAG rooted at @p expr.  Only the nominated
+ * variable contributes a derivative of 1; all other variable nodes contribute 0.
+ *
+ * All functions return owning handles; caller must call dv_free() exactly once.
+ * dv_get_deriv() returns a *borrowed* pointer (do NOT free it); the result is
+ * cached inside @p expr keyed by @p wrt, so repeated calls are cheap.
+ *
+ * dv_create_2nd_deriv(expr, wrt1, wrt2) computes ∂²expr/(∂wrt1 ∂wrt2).
+ * dv_create_3rd_deriv(expr, wrt1, wrt2, wrt3) computes the mixed third derivative.
+ * dv_create_nth_deriv(n, expr, wrt) applies d/d(wrt) n times in succession.
  */
-dval_t *dv_create_deriv(dval_t *dv);
-dval_t *dv_create_2nd_deriv(dval_t *dv);
-dval_t *dv_create_3rd_deriv(dval_t *dv);
-dval_t *dv_create_nth_deriv(unsigned int n, dval_t *dv);
+dval_t *dv_create_deriv(dval_t *expr, dval_t *wrt);
+dval_t *dv_create_2nd_deriv(dval_t *expr, dval_t *wrt1, dval_t *wrt2);
+dval_t *dv_create_3rd_deriv(dval_t *expr, dval_t *wrt1, dval_t *wrt2, dval_t *wrt3);
+dval_t *dv_create_nth_deriv(unsigned int n, dval_t *expr, dval_t *wrt);
 
 /* ------------------------------------------------------------------------- */
 /* Arithmetic (graph-building, owning)                                       */

@@ -883,7 +883,7 @@ void test_deriv_trigamma(void)
 {
     dval_t *x  = dv_new_var_d(3.0);
     dval_t *f  = dv_trigamma(x);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     /* d/dx{ψ'(x)} = ψ''(x) (tetragamma) — verify via qf_tetragamma */
     qfloat_t expect = qf_tetragamma(qf_from_double(3.0));
@@ -905,8 +905,8 @@ void test_second_deriv_digamma(void)
      * evaluates to qf_tetragamma(x₀) via deriv_trigamma. */
     dval_t *x   = dv_new_var_d(2.0);
     dval_t *f   = dv_digamma(x);
-    dval_t *df  = dv_create_deriv(f);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     /* d²/dx²{ψ(x)} = ψ''(x) = tetragamma(x); at x=2: ψ''(2) = ψ''(1) - 2
      * ψ''(1) = -2ζ(3) so we just use qf_tetragamma to get the expected value */
@@ -930,21 +930,23 @@ void test_second_deriv_digamma(void)
 
 void test_deriv_const(void)
 {
+    dval_t *x  = dv_new_var_d(0.0);  /* dummy wrt — const ignores it */
     dval_t *c  = dv_new_const_d(5.0);
     dval_t *f  = c;
-    dval_t *df = dv_create_deriv(f);
+    dval_t *df = dv_create_deriv(f, x);
 
-    check_q_at(__FILE__, __LINE__, 1, "d/dx{5}", dv_eval(dv_get_deriv(df)), qf_from_double(0.0));
+    check_q_at(__FILE__, __LINE__, 1, "d/dx{5}", dv_eval(dv_get_deriv(df, x)), qf_from_double(0.0));
     print_expr_of(df);
 
     dv_free(df);
     dv_free(c);
+    dv_free(x);
 }
 
 void test_deriv_var(void)
 {
     dval_t *x = dv_new_var_d(2.0);
-    const dval_t *dx = dv_get_deriv(x);
+    const dval_t *dx = dv_get_deriv(x, x);
 
     check_q_at(__FILE__, __LINE__, 1, "d/dx{x} | x=2", dv_eval(dx), qf_from_double(1.0));
     print_expr_of(dx);
@@ -956,7 +958,7 @@ void test_deriv_neg(void)
 {
     dval_t *x = dv_new_var_d(3.0);
     dval_t *f = dv_neg(x);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     check_q_at(__FILE__, __LINE__, 1, "d/dx{-x} | x=3", dv_eval(df), qf_from_double(-1.0));
     print_expr_of(df);
@@ -969,7 +971,7 @@ void test_deriv_add_d(void)
 {
     dval_t *x = dv_new_var_d(2.0);
     dval_t *f = dv_add_d(x, 5.0);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     check_q_at(__FILE__, __LINE__, 1, "d/dx{x+5} | x=2", dv_eval(df), qf_from_double(1.0));
     print_expr_of(df);
@@ -982,7 +984,7 @@ void test_deriv_mul_d(void)
 {
     dval_t *x = dv_new_var_d(4.0);
     dval_t *f = dv_mul_d(x, 7.0);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     check_q_at(__FILE__, __LINE__, 1, "d/dx{7x} | x=4", dv_eval(df), qf_from_double(7.0));
     print_expr_of(df);
@@ -995,7 +997,7 @@ void test_deriv_div_d(void)
 {
     dval_t *x = dv_new_var_d(9.0);
     dval_t *f = dv_div_d(x, 3.0);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     check_q_at(__FILE__, __LINE__, 1, "d/dx{x/3} | x=9", dv_eval(df), qf_div(qf_from_double(1.0), qf_from_double(3.0)));
     print_expr_of(df);
@@ -1008,7 +1010,7 @@ void test_deriv_x2(void)
 {
     dval_t *x = dv_new_var_d(3.0);
     dval_t *f = dv_mul(x, x);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     check_q_at(__FILE__, __LINE__, 1, "d/dx{x^2} | x=3", dv_eval(df), qf_from_double(6.0));
     print_expr_of(df);
@@ -1021,7 +1023,7 @@ void test_deriv_pow3(void)
 {
     dval_t *x = dv_new_var_d(2.0);
     dval_t *f = dv_pow_d(x, 3.0);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     check_q_at(__FILE__, __LINE__, 1, "d/dx{x^3} | x=2", dv_eval(df), qf_from_double(12.0));
     print_expr_of(df);
@@ -1039,7 +1041,7 @@ void test_deriv_pow_xy(void)
     dval_t *y   = dv_add(x2, one);
 
     dval_t *f   = dv_pow(x, y);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     qfloat_t X = qf_from_double(2.0);
     qfloat_t yval = qf_add(qf_mul(X, X), qf_from_double(1.0));
@@ -1063,7 +1065,7 @@ void test_deriv_sin(void)
 {
     dval_t *x = dv_new_var_d(0.5);
     dval_t *f = dv_sin(x);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     check_q_at(__FILE__, __LINE__, 1, "d/dx{sin(x)} | x=0.5", dv_eval(df), qf_cos(qf_from_double(0.5)));
     print_expr_of(df);
@@ -1076,7 +1078,7 @@ void test_deriv_cos(void)
 {
     dval_t *x = dv_new_var_d(0.5);
     dval_t *f = dv_cos(x);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     check_q_at(__FILE__, __LINE__, 1, "d/dx{cos(x)} | x=0.5", dv_eval(df), qf_neg(qf_sin(qf_from_double(0.5))));
     print_expr_of(df);
@@ -1089,7 +1091,7 @@ void test_deriv_tan(void)
 {
     dval_t *x = dv_new_var_d(0.5);
     dval_t *f = dv_tan(x);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     qfloat_t X = qf_from_double(0.5);
     qfloat_t c = qf_cos(X);
@@ -1106,7 +1108,7 @@ void test_deriv_sinh(void)
 {
     dval_t *x = dv_new_var_d(0.5);
     dval_t *f = dv_sinh(x);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     check_q_at(__FILE__, __LINE__, 1, "d/dx{sinh(x)} | x=0.5", dv_eval(df), qf_cosh(qf_from_double(0.5)));
     print_expr_of(df);
@@ -1119,7 +1121,7 @@ void test_deriv_cosh(void)
 {
     dval_t *x = dv_new_var_d(0.5);
     dval_t *f = dv_cosh(x);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     check_q_at(__FILE__, __LINE__, 1, "d/dx{cosh(x)} | x=0.5", dv_eval(df), qf_sinh(qf_from_double(0.5)));
     print_expr_of(df);
@@ -1132,7 +1134,7 @@ void test_deriv_tanh(void)
 {
     dval_t *x = dv_new_var_d(0.5);
     dval_t *f = dv_tanh(x);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     qfloat_t X = qf_from_double(0.5);
     qfloat_t t = qf_tanh(X);
@@ -1149,7 +1151,7 @@ void test_deriv_asin(void)
 {
     dval_t *x = dv_new_var_d(0.25);
     dval_t *f = dv_asin(x);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     qfloat_t X = qf_from_double(0.25);
     qfloat_t expect = qf_div(qf_from_double(1.0), qf_sqrt(qf_sub(qf_from_double(1.0), qf_mul(X, X))));
@@ -1165,7 +1167,7 @@ void test_deriv_acos(void)
 {
     dval_t *x = dv_new_var_d(0.25);
     dval_t *f = dv_acos(x);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     qfloat_t X = qf_from_double(0.25);
     qfloat_t expect = qf_neg(qf_div(qf_from_double(1.0), qf_sqrt(qf_sub(qf_from_double(1.0), qf_mul(X, X)))));
@@ -1181,7 +1183,7 @@ void test_deriv_atan(void)
 {
     dval_t *x = dv_new_var_d(0.25);
     dval_t *f = dv_atan(x);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     qfloat_t X = qf_from_double(0.25);
     qfloat_t expect = qf_div(qf_from_double(1.0), qf_add(qf_from_double(1.0), qf_mul(X, X)));
@@ -1198,7 +1200,7 @@ void test_deriv_atan2(void)
     dval_t *x = dv_new_var_d(0.25);
     dval_t *one = dv_new_const_d(1.0);
     dval_t *f = dv_atan2(x, one);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     qfloat_t X = qf_from_double(0.25);
     qfloat_t expect = qf_div(qf_from_double(1.0), qf_add(qf_from_double(1.0), qf_mul(X, X)));
@@ -1215,7 +1217,7 @@ void test_deriv_asinh(void)
 {
     dval_t *x = dv_new_var_d(0.25);
     dval_t *f = dv_asinh(x);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     qfloat_t X = qf_from_double(0.25);
     qfloat_t expect = qf_div(qf_from_double(1.0), qf_sqrt(qf_add(qf_from_double(1.0), qf_mul(X, X))));
@@ -1231,7 +1233,7 @@ void test_deriv_acosh(void)
 {
     dval_t *x = dv_new_var_d(1.25);
     dval_t *f = dv_acosh(x);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     qfloat_t X = qf_from_double(1.25);
     qfloat_t expect = qf_div(qf_from_double(1.0), qf_mul(qf_sqrt(qf_sub(X, qf_from_double(1.0))),
@@ -1248,7 +1250,7 @@ void test_deriv_atanh(void)
 {
     dval_t *x = dv_new_var_d(0.25);
     dval_t *f = dv_atanh(x);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     qfloat_t X = qf_from_double(0.25);
     qfloat_t expect = qf_div(qf_from_double(1.0), qf_sub(qf_from_double(1.0), qf_mul(X, X)));
@@ -1264,7 +1266,7 @@ void test_deriv_exp(void)
 {
     dval_t *x = dv_new_var_d(1.5);
     dval_t *f = dv_exp(x);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     check_q_at(__FILE__, __LINE__, 1, "d/dx{exp(x)} | x=1.5", dv_eval(df), qf_exp(qf_from_double(1.5)));
     print_expr_of(df);
@@ -1277,7 +1279,7 @@ void test_deriv_log(void)
 {
     dval_t *x = dv_new_var_d(2.0);
     dval_t *f = dv_log(x);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     qfloat_t expect = qf_div(qf_from_double(1.0), qf_from_double(2.0));
 
@@ -1292,7 +1294,7 @@ void test_deriv_sqrt(void)
 {
     dval_t *x = dv_new_var_d(4.0);
     dval_t *f = dv_sqrt(x);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     qfloat_t expect = qf_div(qf_from_double(1.0), qf_mul(qf_from_double(2.0), qf_sqrt(qf_from_double(4.0))));
 
@@ -1311,7 +1313,7 @@ void test_deriv_composite(void)
     dval_t *f  = dv_mul(sx, ex);
     dv_free(sx);
     dv_free(ex);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     qfloat_t X = qf_from_double(1.0);
     qfloat_t expect = qf_add(qf_mul(qf_cos(X), qf_exp(X)), qf_mul(qf_sin(X), qf_exp(X)));
@@ -1331,7 +1333,7 @@ void test_deriv_sin_log(void)
     dval_t *f  = dv_mul(sx, lx);
     dv_free(sx);
     dv_free(lx);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     qfloat_t X = qf_from_string("1.3");
     qfloat_t expect = qf_add(qf_mul(qf_cos(X), qf_log(X)), qf_mul(qf_sin(X), qf_div(qf_from_double(1.0), X)));
@@ -1349,7 +1351,7 @@ void test_deriv_exp_tanh(void)
     dval_t *ex = dv_exp(x);
     dval_t *tx = dv_tanh(x);
     dval_t *f  = dv_mul(ex, tx);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     qfloat_t X = qf_from_string("0.7");
     qfloat_t t = qf_tanh(X);
@@ -1372,7 +1374,7 @@ void test_deriv_sqrt_sin_x2(void)
     dval_t *sqx  = dv_sqrt(x);
     dval_t *sx2  = dv_sin(x2);
     dval_t *f  = dv_mul(sqx, sx2);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     qfloat_t X  = qf_from_string("1.1");
     qfloat_t X2 = qf_mul(X, X);
@@ -1398,7 +1400,7 @@ void test_deriv_log_cosh(void)
     dval_t *x  = dv_new_var(qf_from_string("0.9"));
     dval_t *cx = dv_cosh(x);
     dval_t *f  = dv_log(cx);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     qfloat_t X = qf_from_string("0.9");
     qfloat_t expect = qf_tanh(X);
@@ -1418,7 +1420,7 @@ void test_deriv_x2_exp_negx(void)
     dval_t *ex  = dv_exp(xm);
     dval_t *x2  = dv_mul(x, x);
     dval_t *f   = dv_mul(x2, ex);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     qfloat_t X    = qf_from_string("1.7");
     qfloat_t e_mx = qf_exp(qf_neg(X));
@@ -1447,7 +1449,7 @@ void test_deriv_atan_x_over_sqrt(void)
 
     dval_t *u   = dv_mul(x, g);
     dval_t *f   = dv_atan(u);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     qfloat_t X = qf_from_string("0.8");
 
@@ -1473,7 +1475,7 @@ void test_deriv_abs(void)
 {
     dval_t *x  = dv_new_var(qf_from_string("0.8"));
     dval_t *f  = dv_abs(x);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     /* d/dx{|x|} = sign(x) = 1 at x=0.8 */
     check_q_at(__FILE__, __LINE__, 1, "d/dx{|x|} | x=0.8", dv_eval(df), qf_from_double(1.0));
@@ -1488,7 +1490,7 @@ void test_deriv_hypot(void)
     dval_t *x  = dv_new_var_d(3.0);
     dval_t *yc = dv_new_const_d(4.0);
     dval_t *f  = dv_hypot(x, yc);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     /* d/dx{hypot(x,4)} = x/hypot(x,4) = 3/5 at x=3 */
     qfloat_t X = qf_from_double(3.0);
@@ -1507,7 +1509,7 @@ void test_deriv_erf(void)
 {
     dval_t *x  = dv_new_var_d(0.5);
     dval_t *f  = dv_erf(x);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     /* d/dx{erf(x)} = (2/sqrt(pi)) * exp(-x^2) */
     qfloat_t X = qf_from_double(0.5);
@@ -1525,7 +1527,7 @@ void test_deriv_erfc(void)
 {
     dval_t *x  = dv_new_var_d(0.5);
     dval_t *f  = dv_erfc(x);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     /* d/dx{erfc(x)} = -(2/sqrt(pi)) * exp(-x^2) */
     qfloat_t X = qf_from_double(0.5);
@@ -1543,7 +1545,7 @@ void test_deriv_erfinv(void)
 {
     dval_t *x  = dv_new_var_d(0.5);
     dval_t *f  = dv_erfinv(x);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     /* d/dx{erfinv(x)} = sqrt(pi)/2 * exp(erfinv(x)^2) */
     qfloat_t X = qf_from_double(0.5);
@@ -1562,7 +1564,7 @@ void test_deriv_erfcinv(void)
 {
     dval_t *x  = dv_new_var_d(0.5);
     dval_t *f  = dv_erfcinv(x);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     /* d/dx{erfcinv(x)} = -sqrt(pi)/2 * exp(erfcinv(x)^2) */
     qfloat_t X = qf_from_double(0.5);
@@ -1581,7 +1583,7 @@ void test_deriv_gamma(void)
 {
     dval_t *x  = dv_new_var_d(2.0);
     dval_t *f  = dv_gamma(x);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     /* d/dx{gamma(x)} = gamma(x) * digamma(x) */
     qfloat_t X = qf_from_double(2.0);
@@ -1598,7 +1600,7 @@ void test_deriv_lgamma(void)
 {
     dval_t *x  = dv_new_var_d(2.0);
     dval_t *f  = dv_lgamma(x);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     /* d/dx{lgamma(x)} = digamma(x) */
     qfloat_t X = qf_from_double(2.0);
@@ -1615,7 +1617,7 @@ void test_deriv_digamma(void)
 {
     dval_t *x  = dv_new_var_d(2.0);
     dval_t *f  = dv_digamma(x);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     /* d/dx{digamma(x)} = trigamma(x); trigamma(2) = pi^2/6 - 1 */
     qfloat_t pi2_over_6 = qf_div(qf_mul(QF_PI, QF_PI), qf_from_double(6.0));
@@ -1632,7 +1634,7 @@ void test_deriv_lambert_w0(void)
 {
     dval_t *x  = dv_new_var_d(1.0);
     dval_t *f  = dv_lambert_w0(x);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     /* d/dx{W0(x)} = W0(x) / (x * (1 + W0(x))) */
     qfloat_t X = qf_from_double(1.0);
@@ -1650,7 +1652,7 @@ void test_deriv_lambert_wm1(void)
 {
     dval_t *x  = dv_new_var(qf_from_string("-0.1"));
     dval_t *f  = dv_lambert_wm1(x);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     /* d/dx{Wm1(x)} = Wm1(x) / (x * (1 + Wm1(x))) */
     qfloat_t X = qf_from_string("-0.1");
@@ -1668,7 +1670,7 @@ void test_deriv_normal_pdf(void)
 {
     dval_t *x  = dv_new_var_d(0.5);
     dval_t *f  = dv_normal_pdf(x);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     /* d/dx{phi(x)} = -x * phi(x) */
     qfloat_t X = qf_from_double(0.5);
@@ -1685,7 +1687,7 @@ void test_deriv_normal_cdf(void)
 {
     dval_t *x  = dv_new_var_d(0.5);
     dval_t *f  = dv_normal_cdf(x);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     /* d/dx{Phi(x)} = phi(x) */
     qfloat_t X = qf_from_double(0.5);
@@ -1702,7 +1704,7 @@ void test_deriv_normal_logpdf(void)
 {
     dval_t *x  = dv_new_var_d(0.5);
     dval_t *f  = dv_normal_logpdf(x);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     /* d/dx{log phi(x)} = -x */
     qfloat_t expect = qf_from_double(-0.5);
@@ -1718,7 +1720,7 @@ void test_deriv_ei(void)
 {
     dval_t *x  = dv_new_var_d(1.0);
     dval_t *f  = dv_ei(x);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     /* d/dx{Ei(x)} = exp(x)/x */
     qfloat_t X = qf_from_double(1.0);
@@ -1735,7 +1737,7 @@ void test_deriv_e1(void)
 {
     dval_t *x  = dv_new_var_d(1.0);
     dval_t *f  = dv_e1(x);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     /* d/dx{E1(x)} = -exp(-x)/x */
     qfloat_t X = qf_from_double(1.0);
@@ -1753,7 +1755,7 @@ void test_deriv_beta(void)
     dval_t *x  = dv_new_var_d(2.0);
     dval_t *bc = dv_new_const_d(3.0);
     dval_t *f  = dv_beta(x, bc);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     /* d/da{beta(a,b)} = beta(a,b) * (digamma(a) - digamma(a+b)) */
     qfloat_t A = qf_from_double(2.0);
@@ -1774,7 +1776,7 @@ void test_deriv_logbeta(void)
     dval_t *x  = dv_new_var_d(2.0);
     dval_t *bc = dv_new_const_d(3.0);
     dval_t *f  = dv_logbeta(x, bc);
-    const dval_t *df = dv_get_deriv(f);
+    const dval_t *df = dv_get_deriv(f, x);
 
     /* d/da{logbeta(a,b)} = digamma(a) - digamma(a+b) */
     qfloat_t A = qf_from_double(2.0);
@@ -1796,8 +1798,8 @@ void test_deriv_logbeta(void)
 void test_second_deriv_var(void)
 {
     dval_t *x   = dv_new_var_d(2.0);
-    dval_t *df  = dv_create_deriv(x);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(x, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     qfloat_t expect = qf_from_double(0.0);
 
@@ -1812,8 +1814,8 @@ void test_second_deriv_neg(void)
 {
     dval_t *x   = dv_new_var_d(3.0);
     dval_t *f   = dv_neg(x);
-    dval_t *df  = dv_create_deriv(f);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     qfloat_t expect = qf_from_double(0.0);
 
@@ -1829,8 +1831,8 @@ void test_second_deriv_add_d(void)
 {
     dval_t *x   = dv_new_var_d(2.0);
     dval_t *f   = dv_add_d(x, 5.0);
-    dval_t *df  = dv_create_deriv(f);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     qfloat_t expect = qf_from_double(0.0);
 
@@ -1846,8 +1848,8 @@ void test_second_deriv_mul_d(void)
 {
     dval_t *x   = dv_new_var_d(4.0);
     dval_t *f   = dv_mul_d(x, 7.0);
-    dval_t *df  = dv_create_deriv(f);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     qfloat_t expect = qf_from_double(0.0);
 
@@ -1863,8 +1865,8 @@ void test_second_deriv_div_d(void)
 {
     dval_t *x   = dv_new_var_d(9.0);
     dval_t *f   = dv_div_d(x, 3.0);
-    dval_t *df  = dv_create_deriv(f);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     qfloat_t expect = qf_from_double(0.0);
 
@@ -1880,8 +1882,8 @@ void test_second_deriv_x2(void)
 {
     dval_t *x   = dv_new_var_d(3.0);
     dval_t *f   = dv_mul(x, x);
-    dval_t *df  = dv_create_deriv(f);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     qfloat_t expect = qf_from_double(2.0);
 
@@ -1897,8 +1899,8 @@ void test_second_deriv_x3(void)
 {
     dval_t *x   = dv_new_var_d(2.0);
     dval_t *f   = dv_pow_d(x, 3.0);
-    dval_t *df  = dv_create_deriv(f);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     qfloat_t expect = qf_from_double(12.0);
 
@@ -1919,8 +1921,8 @@ void test_second_deriv_pow_xy(void)
     dval_t *y   = dv_add(x2, one);
 
     dval_t *f   = dv_pow(x, y);
-    dval_t *df  = dv_create_deriv(f);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     qfloat_t X  = qf_from_double(2.0);
     qfloat_t X2 = qf_mul(X, X);
@@ -1955,8 +1957,8 @@ void test_second_deriv_sin(void)
 {
     dval_t *x   = dv_new_var_d(0.5);
     dval_t *f   = dv_sin(x);
-    dval_t *df  = dv_create_deriv(f);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     qfloat_t expect = qf_neg(qf_sin(qf_from_double(0.5)));
 
@@ -1972,8 +1974,8 @@ void test_second_deriv_cos(void)
 {
     dval_t *x   = dv_new_var_d(0.5);
     dval_t *f   = dv_cos(x);
-    dval_t *df  = dv_create_deriv(f);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     qfloat_t expect = qf_neg(qf_cos(qf_from_double(0.5)));
 
@@ -1989,8 +1991,8 @@ void test_second_deriv_tan(void)
 {
     dval_t *x   = dv_new_var_d(0.5);
     dval_t *f   = dv_tan(x);
-    dval_t *df  = dv_create_deriv(f);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     qfloat_t X = qf_from_double(0.5);
     qfloat_t sec2 = qf_div(qf_from_double(1.0), qf_mul(qf_cos(X), qf_cos(X)));
@@ -2008,8 +2010,8 @@ void test_second_deriv_sinh(void)
 {
     dval_t *x   = dv_new_var_d(0.5);
     dval_t *f   = dv_sinh(x);
-    dval_t *df  = dv_create_deriv(f);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     qfloat_t expect = qf_sinh(qf_from_double(0.5));
 
@@ -2025,8 +2027,8 @@ void test_second_deriv_cosh(void)
 {
     dval_t *x   = dv_new_var_d(0.5);
     dval_t *f   = dv_cosh(x);
-    dval_t *df  = dv_create_deriv(f);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     qfloat_t expect = qf_cosh(qf_from_double(0.5));
 
@@ -2042,8 +2044,8 @@ void test_second_deriv_tanh(void)
 {
     dval_t *x   = dv_new_var_d(0.5);
     dval_t *f   = dv_tanh(x);
-    dval_t *df  = dv_create_deriv(f);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     qfloat_t X = qf_from_double(0.5);
     qfloat_t t = qf_tanh(X);
@@ -2062,8 +2064,8 @@ void test_second_deriv_asin(void)
 {
     dval_t *x   = dv_new_var_d(0.25);
     dval_t *f   = dv_asin(x);
-    dval_t *df  = dv_create_deriv(f);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     qfloat_t X = qf_from_double(0.25);
     qfloat_t denom = qf_sqrt(qf_sub(qf_from_double(1.0), qf_mul(X, X)));
@@ -2082,8 +2084,8 @@ void test_second_deriv_acos(void)
 {
     dval_t *x   = dv_new_var_d(0.25);
     dval_t *f   = dv_acos(x);
-    dval_t *df  = dv_create_deriv(f);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     qfloat_t X = qf_from_double(0.25);
     qfloat_t denom = qf_sqrt(qf_sub(qf_from_double(1.0), qf_mul(X, X)));
@@ -2102,8 +2104,8 @@ void test_second_deriv_atan(void)
 {
     dval_t *x   = dv_new_var_d(0.25);
     dval_t *f   = dv_atan(x);
-    dval_t *df  = dv_create_deriv(f);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     qfloat_t X = qf_from_double(0.25);
     qfloat_t denom = qf_add(qf_from_double(1.0), qf_mul(X, X));
@@ -2123,8 +2125,8 @@ void test_second_deriv_atan2(void)
     dval_t *x   = dv_new_var_d(0.25);
     dval_t *one = dv_new_const_d(1.0);
     dval_t *f   = dv_atan2(x, one);
-    dval_t *df  = dv_create_deriv(f);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     qfloat_t X = qf_from_double(0.25);
 
@@ -2145,8 +2147,8 @@ void test_second_deriv_asinh(void)
 {
     dval_t *x   = dv_new_var_d(0.25);
     dval_t *f   = dv_asinh(x);
-    dval_t *df  = dv_create_deriv(f);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     qfloat_t X = qf_from_double(0.25);
 
@@ -2166,8 +2168,8 @@ void test_second_deriv_acosh(void)
 {
     dval_t *x   = dv_new_var_d(1.25);
     dval_t *f   = dv_acosh(x);
-    dval_t *df  = dv_create_deriv(f);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     qfloat_t X = qf_from_double(1.25);
 
@@ -2190,8 +2192,8 @@ void test_second_deriv_atanh(void)
 {
     dval_t *x   = dv_new_var_d(0.25);
     dval_t *f   = dv_atanh(x);
-    dval_t *df  = dv_create_deriv(f);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     qfloat_t X = qf_from_double(0.25);
 
@@ -2211,8 +2213,8 @@ void test_second_deriv_exp(void)
 {
     dval_t *x   = dv_new_var_d(1.5);
     dval_t *f   = dv_exp(x);
-    dval_t *df  = dv_create_deriv(f);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     qfloat_t X = qf_from_double(1.5);
     qfloat_t expect = qf_exp(X);
@@ -2229,8 +2231,8 @@ void test_second_deriv_log(void)
 {
     dval_t *x   = dv_new_var_d(2.0);
     dval_t *f   = dv_log(x);
-    dval_t *df  = dv_create_deriv(f);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     qfloat_t expect = qf_mul(qf_from_double(-1.0), qf_div(qf_from_double(1.0), qf_mul(qf_from_double(2.0), qf_from_double(2.0))));
 
@@ -2246,8 +2248,8 @@ void test_second_deriv_sqrt(void)
 {
     dval_t *x   = dv_new_var_d(4.0);
     dval_t *f   = dv_sqrt(x);
-    dval_t *df  = dv_create_deriv(f);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     qfloat_t X = qf_from_double(4.0);
 
@@ -2269,8 +2271,8 @@ void test_second_deriv_composite(void)
     dval_t *sx  = dv_sin(x);
     dval_t *ex  = dv_exp(x);
     dval_t *f   = dv_mul(sx, ex);
-    dval_t *df  = dv_create_deriv(f);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     qfloat_t X = qf_from_double(1.0);
 
@@ -2293,8 +2295,8 @@ void test_second_deriv_sin_log(void)
     dval_t *sx  = dv_sin(x);
     dval_t *lx  = dv_log(x);
     dval_t *f   = dv_mul(sx, lx);
-    dval_t *df  = dv_create_deriv(f);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     qfloat_t X = qf_from_string("1.3");
 
@@ -2320,8 +2322,8 @@ void test_second_deriv_exp_tanh(void)
     dval_t *ex  = dv_exp(x);
     dval_t *tx  = dv_tanh(x);
     dval_t *f   = dv_mul(ex, tx);
-    dval_t *df  = dv_create_deriv(f);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     qfloat_t X = qf_from_string("0.7");
     qfloat_t t = qf_tanh(X);
@@ -2347,8 +2349,8 @@ void test_second_deriv_sqrt_sin_x2(void)
     dval_t *sqx = dv_sqrt(x);
     dval_t *sx2 = dv_sin(x2);
     dval_t *f   = dv_mul(sqx, sx2);
-    dval_t *df  = dv_create_deriv(f);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     qfloat_t X  = qf_from_string("1.1");
     qfloat_t X2 = qf_mul(X, X);
@@ -2388,8 +2390,8 @@ void test_second_deriv_log_cosh(void)
     dval_t *x   = dv_new_var(qf_from_string("0.9"));
     dval_t *cx  = dv_cosh(x);
     dval_t *f   = dv_log(cx);
-    dval_t *df  = dv_create_deriv(f);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     qfloat_t X = qf_from_string("0.9");
 
@@ -2413,8 +2415,8 @@ void test_second_deriv_x2_exp_negx(void)
     dval_t *ex  = dv_exp(xm);
     dval_t *x2  = dv_mul(x, x);
     dval_t *f   = dv_mul(x2, ex);
-    dval_t *df  = dv_create_deriv(f);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     qfloat_t X    = qf_from_string("1.7");
     qfloat_t e_mx = qf_exp(qf_neg(X));
@@ -2445,8 +2447,8 @@ void test_second_deriv_atan_x_over_sqrt(void)
 
     dval_t *u   = dv_mul(x, g);
     dval_t *f   = dv_atan(u);
-    dval_t *df  = dv_create_deriv(f);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     qfloat_t X = qf_from_string("0.8");
 
@@ -2480,8 +2482,8 @@ void test_second_deriv_abs(void)
 {
     dval_t *x   = dv_new_var(qf_from_string("0.8"));
     dval_t *f   = dv_abs(x);
-    dval_t *df  = dv_create_deriv(f);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     /* d²/dx²{|x|} = 0 for x != 0 */
     qfloat_t expect = qf_from_double(0.0);
@@ -2499,8 +2501,8 @@ void test_second_deriv_hypot(void)
     dval_t *x   = dv_new_var_d(3.0);
     dval_t *yc  = dv_new_const_d(4.0);
     dval_t *f   = dv_hypot(x, yc);
-    dval_t *df  = dv_create_deriv(f);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     /* d²/dx²{hypot(x,y)} = y^2 / hypot(x,y)^3 at x=3, y=4: 16/125 */
     qfloat_t X = qf_from_double(3.0);
@@ -2521,8 +2523,8 @@ void test_second_deriv_erf(void)
 {
     dval_t *x   = dv_new_var_d(0.5);
     dval_t *f   = dv_erf(x);
-    dval_t *df  = dv_create_deriv(f);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     /* d²/dx²{erf(x)} = -4x/sqrt(pi) * exp(-x^2) */
     qfloat_t X = qf_from_double(0.5);
@@ -2541,8 +2543,8 @@ void test_second_deriv_erfc(void)
 {
     dval_t *x   = dv_new_var_d(0.5);
     dval_t *f   = dv_erfc(x);
-    dval_t *df  = dv_create_deriv(f);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     /* d²/dx²{erfc(x)} = 4x/sqrt(pi) * exp(-x^2) */
     qfloat_t X = qf_from_double(0.5);
@@ -2561,8 +2563,8 @@ void test_second_deriv_gamma(void)
 {
     dval_t *x   = dv_new_var_d(2.0);
     dval_t *f   = dv_gamma(x);
-    dval_t *df  = dv_create_deriv(f);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     /* d²/dx²{gamma(x)} = gamma(x) * (digamma(x)^2 + trigamma(x))
        at x=2: gamma(2)=1, digamma(2)=1-gamma_euler, trigamma(2)=pi^2/6-1 */
@@ -2584,8 +2586,8 @@ void test_second_deriv_lgamma(void)
 {
     dval_t *x   = dv_new_var_d(2.0);
     dval_t *f   = dv_lgamma(x);
-    dval_t *df  = dv_create_deriv(f);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     /* d²/dx²{lgamma(x)} = trigamma(x); trigamma(2) = pi^2/6 - 1 */
     qfloat_t expect = qf_sub(qf_div(qf_mul(QF_PI, QF_PI), qf_from_double(6.0)),
@@ -2603,8 +2605,8 @@ void test_second_deriv_normal_pdf(void)
 {
     dval_t *x   = dv_new_var_d(0.5);
     dval_t *f   = dv_normal_pdf(x);
-    dval_t *df  = dv_create_deriv(f);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     /* d²/dx²{phi(x)} = (x^2 - 1) * phi(x) */
     qfloat_t X = qf_from_double(0.5);
@@ -2623,8 +2625,8 @@ void test_second_deriv_normal_cdf(void)
 {
     dval_t *x   = dv_new_var_d(0.5);
     dval_t *f   = dv_normal_cdf(x);
-    dval_t *df  = dv_create_deriv(f);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     /* d²/dx²{Phi(x)} = -x * phi(x) */
     qfloat_t X = qf_from_double(0.5);
@@ -2642,8 +2644,8 @@ void test_second_deriv_normal_logpdf(void)
 {
     dval_t *x   = dv_new_var_d(0.5);
     dval_t *f   = dv_normal_logpdf(x);
-    dval_t *df  = dv_create_deriv(f);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     /* d²/dx²{log phi(x)} = -1 */
     qfloat_t expect = qf_from_double(-1.0);
@@ -2660,8 +2662,8 @@ void test_second_deriv_ei(void)
 {
     dval_t *x   = dv_new_var_d(1.0);
     dval_t *f   = dv_ei(x);
-    dval_t *df  = dv_create_deriv(f);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     /* d²/dx²{Ei(x)} = exp(x)*(x-1)/x^2; at x=1: 0 */
     qfloat_t X = qf_from_double(1.0);
@@ -2680,8 +2682,8 @@ void test_second_deriv_e1(void)
 {
     dval_t *x   = dv_new_var_d(1.0);
     dval_t *f   = dv_e1(x);
-    dval_t *df  = dv_create_deriv(f);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     /* d²/dx²{E1(x)} = exp(-x)*(x+1)/x^2; at x=1: 2/e */
     qfloat_t X = qf_from_double(1.0);
@@ -2700,8 +2702,8 @@ void test_second_deriv_erfinv(void)
 {
     dval_t *x   = dv_new_var_d(0.5);
     dval_t *f   = dv_erfinv(x);
-    dval_t *df  = dv_create_deriv(f);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     /* d²/dx²{erfinv(x)} = (π/2) * erfinv(x) * exp(2*erfinv(x)^2) */
     qfloat_t X = qf_from_double(0.5);
@@ -2721,8 +2723,8 @@ void test_second_deriv_erfcinv(void)
 {
     dval_t *x   = dv_new_var_d(0.5);
     dval_t *f   = dv_erfcinv(x);
-    dval_t *df  = dv_create_deriv(f);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     /* d²/dx²{erfcinv(x)} = (π/2) * erfcinv(x) * exp(2*erfcinv(x)^2) */
     qfloat_t X = qf_from_double(0.5);
@@ -2742,8 +2744,8 @@ void test_second_deriv_lambert_w0(void)
 {
     dval_t *x   = dv_new_var_d(1.0);
     dval_t *f   = dv_lambert_w0(x);
-    dval_t *df  = dv_create_deriv(f);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     /* d²/dx²{W0(x)} = -W0^2 * (2 + W0) / (x^2 * (1 + W0)^3) */
     qfloat_t X  = qf_from_double(1.0);
@@ -2766,8 +2768,8 @@ void test_second_deriv_lambert_wm1(void)
 {
     dval_t *x   = dv_new_var(qf_from_string("-0.1"));
     dval_t *f   = dv_lambert_wm1(x);
-    dval_t *df  = dv_create_deriv(f);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     /* d²/dx²{Wm1(x)} = -Wm1^2 * (2 + Wm1) / (x^2 * (1 + Wm1)^3) */
     qfloat_t X  = qf_from_string("-0.1");
@@ -2791,8 +2793,8 @@ void test_second_deriv_beta(void)
     dval_t *x   = dv_new_var_d(2.0);
     dval_t *bc  = dv_new_const_d(3.0);
     dval_t *f   = dv_beta(x, bc);
-    dval_t *df  = dv_create_deriv(f);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     /* d²/da²{beta(a,b)} = beta(a,b) * [(ψ(a)-ψ(a+b))² + ψ'(a) - ψ'(a+b)] */
     qfloat_t A   = qf_from_double(2.0);
@@ -2817,8 +2819,8 @@ void test_second_deriv_logbeta(void)
     dval_t *x   = dv_new_var_d(2.0);
     dval_t *bc  = dv_new_const_d(3.0);
     dval_t *f   = dv_logbeta(x, bc);
-    dval_t *df  = dv_create_deriv(f);
-    const dval_t *ddf = dv_get_deriv(df);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
 
     /* d²/da²{logbeta(a,b)} = ψ'(a) - ψ'(a+b) */
     qfloat_t A   = qf_from_double(2.0);
@@ -6280,30 +6282,29 @@ static void test_from_string_deriv(void)
         "{ (x^2 + 1)^2 | x = 2 }",
         25.0, __LINE__);
 
-    /* ---- Programmatic differentiation of a parsed dval_t ---- */
+    /* ---- Programmatic differentiation ---- */
+    /* Build f(x) = exp(sin(x)) + 3*x^2 - 7 explicitly so we hold the wrt pointer. */
+    {
+        dval_t *xvar  = dv_new_named_var_d(xv, "x");
+        dval_t *sinx  = dv_sin(xvar);
+        dval_t *esinx = dv_exp(sinx);
+        dval_t *x2    = dv_pow_d(xvar, 2.0);
+        dval_t *t     = dv_mul_d(x2, 3.0);
+        dval_t *t2    = dv_sub_d(t, 7.0);
+        dval_t *f     = dv_add(esinx, t2);
 
-    dval_t *f = dval_from_string("{ exp(sin(x)) + 3*x^2 - 7 | x = 1.25 }");
-    if (!f) {
-        printf(C_BOLD C_RED "FAIL" C_RESET
-               " dval_from_string returned NULL for f %s:%d:1\n\n", __FILE__, __LINE__);
-        TEST_FAIL();
-        return;
+        check_dval_d("f(1.25) via dv_eval_d",   f,   esx + 3*xv*xv - 7, __LINE__);
+
+        dval_t *df  = dv_create_deriv(f,  xvar);
+        check_dval_d("f'(1.25) via dv_create_deriv",  df,  cx*esx + 6*xv, __LINE__);
+
+        dval_t *d2f = dv_create_deriv(df, xvar);
+        check_dval_d("f''(1.25) via dv_create_deriv", d2f, cx*cx*esx - sx*esx + 6, __LINE__);
+
+        dv_free(d2f); dv_free(df); dv_free(f);
+        dv_free(t2); dv_free(t); dv_free(x2); dv_free(esinx); dv_free(sinx);
+        dv_free(xvar);
     }
-
-    check_dval_d("f(1.25) via dv_eval_d",
-                 f, esx + 3*xv*xv - 7, __LINE__);
-
-    dval_t *df = dv_create_deriv(f);
-    check_dval_d("f'(1.25) via dv_create_deriv",
-                 df, cx*esx + 6*xv, __LINE__);
-
-    dval_t *d2f = dv_create_deriv(df);
-    check_dval_d("f''(1.25) via dv_create_deriv",
-                 d2f, cx*cx*esx - sx*esx + 6, __LINE__);
-
-    dv_free(d2f);
-    dv_free(df);
-    dv_free(f);
 }
 
 /* ---- Error paths — all must return NULL ----
@@ -6389,10 +6390,10 @@ static void test_readme_example(void) {
     dval_t *f = make_f(x);
 
     /* First derivative (owning) */
-    dval_t *df_dx = dv_create_deriv(f);   /* df/dx */
+    dval_t *df_dx = dv_create_deriv(f, x);   /* df/dx */
 
     /* Second derivative (borrowed) */
-    const dval_t *d2f_dx = dv_get_deriv(df_dx);  /* d²f/dx² */
+    const dval_t *d2f_dx = dv_get_deriv(df_dx, x);  /* d²f/dx² */
 
     /* Evaluate */
     qfloat_t f_val    = dv_eval(f);
@@ -6584,21 +6585,21 @@ void test_dval_t_to_string(void) {
 }
 
 static void test_readme_from_string_example(void) {
-    /* Parse expression and variable binding from a single string.
-       The caller owns the returned handle and must call dv_free() exactly once. */
-    dval_t *f = dval_from_string("{ exp(sin(x)) + 3*x^2 - 7 | x = 1.25 }");
-    if (!f) {
-        printf(C_BOLD C_RED "FAIL" C_RESET
-               " dval_from_string returned NULL %s:%d:1\n\n", __FILE__, __LINE__);
-        TEST_FAIL();
-        return;
-    }
+    /* Build f(x) = exp(sin(x)) + 3*x^2 - 7 programmatically so we hold the
+     * wrt pointer needed by the derivative API. */
+    dval_t *x     = dv_new_named_var_d(1.25, "x");
+    dval_t *sinx  = dv_sin(x);
+    dval_t *esinx = dv_exp(sinx);
+    dval_t *x2    = dv_pow_d(x, 2.0);
+    dval_t *t     = dv_mul_d(x2, 3.0);
+    dval_t *t2    = dv_sub_d(t, 7.0);
+    dval_t *f     = dv_add(esinx, t2);
 
     /* First derivative (owning handle) */
-    dval_t *df_dx = dv_create_deriv(f);
+    dval_t *df_dx = dv_create_deriv(f, x);
 
     /* Second derivative (borrowed — owned by df_dx, must not be freed) */
-    const dval_t *d2f_dx = dv_get_deriv(df_dx);
+    const dval_t *d2f_dx = dv_get_deriv(df_dx, x);
 
     /* Evaluate */
     qfloat_t f_val  = dv_eval(f);
@@ -6616,14 +6617,460 @@ static void test_readme_from_string_example(void) {
     qf_printf("f'(x)   = %.34q\n", d1_val);
     qf_printf("f''(x)  = %.34q\n", d2_val);
 
-    /* Free owning handles (x is internal to f — do not free separately) */
     dv_free(df_dx);
     dv_free(f);
+    dv_free(t2); dv_free(t); dv_free(x2); dv_free(esinx); dv_free(sinx);
+    dv_free(x);
+}
+
+static void test_readme_partial_example(void) {
+    /* f(x, y) = x² + x·y + y²  — mirrors the "Partial Derivatives" example in dval.md */
+    dval_t *x  = dv_new_named_var_d(1.0, "x");
+    dval_t *y  = dv_new_named_var_d(2.0, "y");
+
+    dval_t *x2 = dv_pow_d(x, 2.0);
+    dval_t *xy = dv_mul(x, y);
+    dval_t *y2 = dv_pow_d(y, 2.0);
+    dval_t *t0 = dv_add(x2, xy);
+    dval_t *f  = dv_add(t0, y2);
+
+    dval_t *df_dx    = dv_create_deriv(f, x);
+    dval_t *df_dy    = dv_create_deriv(f, y);
+    dval_t *d2f_dxdy = dv_create_2nd_deriv(f, x, y);
+
+    check_q_at(__FILE__, __LINE__, 1, "f(1,2)        = 7", dv_eval(f),        qf_from_double(7.0));
+    check_q_at(__FILE__, __LINE__, 1, "∂f/∂x(1,2)   = 4", dv_eval(df_dx),    qf_from_double(4.0));
+    check_q_at(__FILE__, __LINE__, 1, "∂f/∂y(1,2)   = 5", dv_eval(df_dy),    qf_from_double(5.0));
+    check_q_at(__FILE__, __LINE__, 1, "∂²f/∂x∂y     = 1", dv_eval(d2f_dxdy), qf_from_double(1.0));
+
+    /* borrowed pointer — same result, no extra free */
+    const dval_t *p = dv_get_deriv(f, x);
+    check_q_at(__FILE__, __LINE__, 1, "dv_get_deriv == dv_create_deriv", dv_eval(p), qf_from_double(4.0));
+
+    /* update x=3; cached partial graphs recompute automatically */
+    dv_set_val_d(x, 3.0);
+    check_q_at(__FILE__, __LINE__, 1, "∂f/∂x(3,2)   = 8", dv_eval(df_dx), qf_from_double(8.0));
+    check_q_at(__FILE__, __LINE__, 1, "∂f/∂y(3,2)   = 7", dv_eval(df_dy), qf_from_double(7.0));
+
+    dv_free(d2f_dxdy);
+    dv_free(df_dy);
+    dv_free(df_dx);
+    dv_free(f); dv_free(t0); dv_free(y2); dv_free(xy); dv_free(x2);
+    dv_free(y); dv_free(x);
 }
 
 void test_README_md_example(void) {
     RUN_TEST(test_readme_example,             __func__);
     RUN_TEST(test_readme_from_string_example, __func__);
+    RUN_TEST(test_readme_partial_example,     __func__);
+}
+
+/* ------------------------------------------------------------------------- */
+/* Partial derivative tests                                                  */
+/* ------------------------------------------------------------------------- */
+
+/* f(x,y) = x*y  →  ∂f/∂x = y,  ∂f/∂y = x,  ∂²f/∂x∂y = 1 */
+static void test_partial_xy_product(void)
+{
+    dval_t *x = dv_new_var_d(2.0);
+    dval_t *y = dv_new_var_d(3.0);
+    dval_t *f = dv_mul(x, y);
+
+    dval_t *df_dx = dv_create_deriv(f, x);
+    dval_t *df_dy = dv_create_deriv(f, y);
+    dval_t *d2f   = dv_create_2nd_deriv(f, x, y);
+
+    check_q_at(__FILE__, __LINE__, 1, "∂(x*y)/∂x at x=2,y=3", dv_eval(df_dx), qf_from_double(3.0));
+    check_q_at(__FILE__, __LINE__, 1, "∂(x*y)/∂y at x=2,y=3", dv_eval(df_dy), qf_from_double(2.0));
+    check_q_at(__FILE__, __LINE__, 1, "∂²(x*y)/∂x∂y",         dv_eval(d2f),   qf_from_double(1.0));
+
+    dv_free(d2f);
+    dv_free(df_dy);
+    dv_free(df_dx);
+    dv_free(f);
+    dv_free(y);
+    dv_free(x);
+}
+
+/* f(x,y) = x² + y³  →  ∂f/∂x = 2x,  ∂f/∂y = 3y²,  ∂²f/∂x² = 2,  ∂²f/∂y² = 6y */
+static void test_partial_poly(void)
+{
+    dval_t *x  = dv_new_var_d(2.0);
+    dval_t *y  = dv_new_var_d(3.0);
+    dval_t *x2 = dv_pow_d(x, 2.0);
+    dval_t *y3 = dv_pow_d(y, 3.0);
+    dval_t *f  = dv_add(x2, y3);
+
+    dval_t *df_dx   = dv_create_deriv(f, x);
+    dval_t *df_dy   = dv_create_deriv(f, y);
+    dval_t *d2f_dx2 = dv_create_2nd_deriv(f, x, x);
+    dval_t *d2f_dy2 = dv_create_2nd_deriv(f, y, y);
+
+    /* at x=2: ∂f/∂x = 2*2 = 4 */
+    check_q_at(__FILE__, __LINE__, 1, "∂(x²+y³)/∂x at x=2",   dv_eval(df_dx),   qf_from_double(4.0));
+    /* at y=3: ∂f/∂y = 3*9 = 27 */
+    check_q_at(__FILE__, __LINE__, 1, "∂(x²+y³)/∂y at y=3",   dv_eval(df_dy),   qf_from_double(27.0));
+    /* ∂²f/∂x² = 2 */
+    check_q_at(__FILE__, __LINE__, 1, "∂²(x²+y³)/∂x² = 2",    dv_eval(d2f_dx2), qf_from_double(2.0));
+    /* at y=3: ∂²f/∂y² = 6y = 18 */
+    check_q_at(__FILE__, __LINE__, 1, "∂²(x²+y³)/∂y² at y=3", dv_eval(d2f_dy2), qf_from_double(18.0));
+
+    dv_free(d2f_dy2);
+    dv_free(d2f_dx2);
+    dv_free(df_dy);
+    dv_free(df_dx);
+    dv_free(f);
+    dv_free(y3);
+    dv_free(x2);
+    dv_free(y);
+    dv_free(x);
+}
+
+/* f(x,y) = sin(x) * exp(y)  →  ∂f/∂x = cos(x)*exp(y),  ∂f/∂y = sin(x)*exp(y),
+   ∂²f/∂x∂y = cos(x)*exp(y) */
+static void test_partial_sin_exp(void)
+{
+    dval_t *x    = dv_new_var_d(1.0);
+    dval_t *y    = dv_new_var_d(2.0);
+    dval_t *sinx = dv_sin(x);
+    dval_t *expy = dv_exp(y);
+    dval_t *f    = dv_mul(sinx, expy);
+
+    dval_t *df_dx = dv_create_deriv(f, x);
+    dval_t *df_dy = dv_create_deriv(f, y);
+    dval_t *d2f   = dv_create_2nd_deriv(f, x, y);
+
+    qfloat_t qcos1   = qf_cos(qf_from_double(1.0));
+    qfloat_t qsin1   = qf_sin(qf_from_double(1.0));
+    qfloat_t qexp2   = qf_exp(qf_from_double(2.0));
+    qfloat_t cos_exp = qf_mul(qcos1, qexp2);
+    qfloat_t sin_exp = qf_mul(qsin1, qexp2);
+
+    check_q_at(__FILE__, __LINE__, 1, "∂(sin(x)exp(y))/∂x",    dv_eval(df_dx), cos_exp);
+    check_q_at(__FILE__, __LINE__, 1, "∂(sin(x)exp(y))/∂y",    dv_eval(df_dy), sin_exp);
+    check_q_at(__FILE__, __LINE__, 1, "∂²(sin(x)exp(y))/∂x∂y", dv_eval(d2f),   cos_exp);
+
+    dv_free(d2f);
+    dv_free(df_dy);
+    dv_free(df_dx);
+    dv_free(f);
+    dv_free(expy);
+    dv_free(sinx);
+    dv_free(y);
+    dv_free(x);
+}
+
+/* Cross-partial symmetry: ∂²f/∂x∂y == ∂²f/∂y∂x for f = x*y + x²*y */
+static void test_partial_symmetry(void)
+{
+    dval_t *x   = dv_new_var_d(2.0);
+    dval_t *y   = dv_new_var_d(3.0);
+    dval_t *xy  = dv_mul(x, y);
+    dval_t *x2  = dv_pow_d(x, 2.0);
+    dval_t *x2y = dv_mul(x2, y);
+    dval_t *f   = dv_add(xy, x2y);  /* f = xy + x²y */
+
+    dval_t *dxy  = dv_create_2nd_deriv(f, x, y);
+    dval_t *dyx  = dv_create_2nd_deriv(f, y, x);
+
+    /* ∂²f/∂x∂y = x + 2x*1 ... actually ∂f/∂x = y + 2xy, ∂²f/∂x∂y = 1 + 2x = 5 at x=2 */
+    check_q_at(__FILE__, __LINE__, 1, "∂²f/∂x∂y at x=2,y=3", dv_eval(dxy), qf_from_double(5.0));
+    check_q_at(__FILE__, __LINE__, 1, "∂²f/∂y∂x at x=2,y=3", dv_eval(dyx), qf_from_double(5.0));
+
+    dv_free(dyx);
+    dv_free(dxy);
+    dv_free(f);
+    dv_free(x2y);
+    dv_free(x2);
+    dv_free(xy);
+    dv_free(y);
+    dv_free(x);
+}
+
+/* dv_get_deriv returns a borrowed pointer; verify it evaluates correctly
+   and that repeated calls return the cached result (same pointer) */
+static void test_partial_get_borrowed(void)
+{
+    dval_t *x = dv_new_var_d(4.0);
+    dval_t *y = dv_new_var_d(5.0);
+    dval_t *f = dv_mul(x, y);  /* f = x*y */
+
+    const dval_t *p1 = dv_get_deriv(f, x);
+    const dval_t *p2 = dv_get_deriv(f, x);  /* should be cached */
+
+    if (p1 != p2) {
+        printf(C_BOLD C_RED "FAIL" C_RESET
+               " dv_get_deriv not cached %s:%d:1\n", __FILE__, __LINE__);
+        TEST_FAIL();
+    } else {
+        printf(C_BOLD C_GREEN "PASS" C_RESET " dv_get_deriv returns cached pointer\n");
+    }
+
+    check_q_at(__FILE__, __LINE__, 1, "dv_get_deriv(x*y, x) = y = 5", dv_eval(p1), qf_from_double(5.0));
+
+    dv_free(f);
+    dv_free(y);
+    dv_free(x);
+}
+
+/* Symbolic expression-style string output for partial derivative nodes */
+static void test_partial_to_string(void)
+{
+    fprintf(stderr, "\n  [%s]\n", __func__);
+    dval_t *x = dv_new_named_var_d(2.0, "x");
+    dval_t *y = dv_new_named_var_d(3.0, "y");
+
+    /* f = xy */
+    dval_t *f        = dv_mul(x, y);
+    dval_t *df_dx    = dv_create_deriv(f, x);   /* simplifies to y */
+    dval_t *df_dy    = dv_create_deriv(f, y);   /* simplifies to x */
+    dval_t *d2f_dxdy = dv_create_2nd_deriv(f, x, y); /* simplifies to 1 */
+
+    char *s;
+
+    s = dv_to_string(f, style_EXPRESSION);
+    to_string_pass("f = xy (EXPR)", s, "{ xy | x = 2, y = 3 }");
+    if (!str_eq(s, "{ xy | x = 2, y = 3 }"))
+        to_string_fail(__FILE__, __LINE__, 1, "f = xy (EXPR)", s, "{ xy | x = 2, y = 3 }");
+    free(s);
+
+    s = dv_to_string(df_dx, style_EXPRESSION);
+    if (str_eq(s, "{ y | y = 3 }"))
+        to_string_pass("∂(xy)/∂x (EXPR)", s, "{ y | y = 3 }");
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "∂(xy)/∂x (EXPR)", s, "{ y | y = 3 }");
+    free(s);
+
+    s = dv_to_string(df_dy, style_EXPRESSION);
+    if (str_eq(s, "{ x | x = 2 }"))
+        to_string_pass("∂(xy)/∂y (EXPR)", s, "{ x | x = 2 }");
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "∂(xy)/∂y (EXPR)", s, "{ x | x = 2 }");
+    free(s);
+
+    s = dv_to_string(d2f_dxdy, style_EXPRESSION);
+    if (str_eq(s, "{ c = 1 }"))
+        to_string_pass("∂²(xy)/∂x∂y (EXPR)", s, "{ c = 1 }");
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "∂²(xy)/∂x∂y (EXPR)", s, "{ c = 1 }");
+    free(s);
+
+    /* g = x² + xy + y² */
+    dval_t *x2 = dv_pow_d(x, 2.0);
+    dval_t *xy = dv_mul(x, y);
+    dval_t *y2 = dv_pow_d(y, 2.0);
+    dval_t *t0 = dv_add(x2, xy);
+    dval_t *g  = dv_add(t0, y2);
+
+    dval_t *dg_dx = dv_create_deriv(g, x);  /* 2x + y */
+    dval_t *dg_dy = dv_create_deriv(g, y);  /* x + 2y */
+
+    s = dv_to_string(dg_dx, style_EXPRESSION);
+    if (str_eq(s, "{ 2x + y | x = 2, y = 3 }"))
+        to_string_pass("∂(x²+xy+y²)/∂x (EXPR)", s, "{ 2x + y | x = 2, y = 3 }");
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "∂(x²+xy+y²)/∂x (EXPR)", s, "{ 2x + y | x = 2, y = 3 }");
+    free(s);
+
+    s = dv_to_string(dg_dy, style_EXPRESSION);
+    if (str_eq(s, "{ x + 2y | x = 2, y = 3 }"))
+        to_string_pass("∂(x²+xy+y²)/∂y (EXPR)", s, "{ x + 2y | x = 2, y = 3 }");
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "∂(x²+xy+y²)/∂y (EXPR)", s, "{ x + 2y | x = 2, y = 3 }");
+    free(s);
+
+    dv_free(dg_dy); dv_free(dg_dx);
+    dv_free(g); dv_free(t0); dv_free(y2); dv_free(xy); dv_free(x2);
+    dv_free(d2f_dxdy); dv_free(df_dy); dv_free(df_dx); dv_free(f);
+    dv_free(y); dv_free(x);
+}
+
+/* f(x,y) = sin(x)·exp(y) — symbolic output checks with elementary functions */
+static void test_partial_to_string_functions(void)
+{
+    fprintf(stderr, "\n  [%s]\n", __func__);
+    dval_t *x    = dv_new_named_var_d(1.0, "x");
+    dval_t *y    = dv_new_named_var_d(2.0, "y");
+    dval_t *sinx = dv_sin(x);
+    dval_t *expy = dv_exp(y);
+    dval_t *f    = dv_mul(sinx, expy);
+
+    dval_t *df_dx    = dv_create_deriv(f, x);   /* cos(x)·exp(y)  */
+    dval_t *df_dy    = dv_create_deriv(f, y);   /* sin(x)·exp(y) = f */
+    dval_t *d2f_dx2  = dv_create_2nd_deriv(f, x, x); /* -sin(x)·exp(y) */
+    dval_t *d2f_dxdy = dv_create_2nd_deriv(f, x, y); /* cos(x)·exp(y)  */
+
+    char *s;
+
+    s = dv_to_string(f, style_EXPRESSION);
+    if (str_eq(s, "{ sin(x)·exp(y) | x = 1, y = 2 }"))
+        to_string_pass("sin(x)·exp(y) (EXPR)", s, "{ sin(x)·exp(y) | x = 1, y = 2 }");
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "sin(x)·exp(y) (EXPR)", s, "{ sin(x)·exp(y) | x = 1, y = 2 }");
+    free(s);
+
+    s = dv_to_string(df_dx, style_EXPRESSION);
+    if (str_eq(s, "{ cos(x)·exp(y) | x = 1, y = 2 }"))
+        to_string_pass("∂(sin(x)·exp(y))/∂x (EXPR)", s, "{ cos(x)·exp(y) | x = 1, y = 2 }");
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "∂(sin(x)·exp(y))/∂x (EXPR)", s, "{ cos(x)·exp(y) | x = 1, y = 2 }");
+    free(s);
+
+    s = dv_to_string(df_dy, style_EXPRESSION);
+    if (str_eq(s, "{ sin(x)·exp(y) | x = 1, y = 2 }"))
+        to_string_pass("∂(sin(x)·exp(y))/∂y (EXPR)", s, "{ sin(x)·exp(y) | x = 1, y = 2 }");
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "∂(sin(x)·exp(y))/∂y (EXPR)", s, "{ sin(x)·exp(y) | x = 1, y = 2 }");
+    free(s);
+
+    s = dv_to_string(d2f_dx2, style_EXPRESSION);
+    if (str_eq(s, "{ -sin(x)·exp(y) | x = 1, y = 2 }"))
+        to_string_pass("∂²(sin(x)·exp(y))/∂x² (EXPR)", s, "{ -sin(x)·exp(y) | x = 1, y = 2 }");
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "∂²(sin(x)·exp(y))/∂x² (EXPR)", s, "{ -sin(x)·exp(y) | x = 1, y = 2 }");
+    free(s);
+
+    s = dv_to_string(d2f_dxdy, style_EXPRESSION);
+    if (str_eq(s, "{ cos(x)·exp(y) | x = 1, y = 2 }"))
+        to_string_pass("∂²(sin(x)·exp(y))/∂x∂y (EXPR)", s, "{ cos(x)·exp(y) | x = 1, y = 2 }");
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "∂²(sin(x)·exp(y))/∂x∂y (EXPR)", s, "{ cos(x)·exp(y) | x = 1, y = 2 }");
+    free(s);
+
+    dv_free(d2f_dxdy); dv_free(d2f_dx2); dv_free(df_dy); dv_free(df_dx);
+    dv_free(f); dv_free(expy); dv_free(sinx); dv_free(y); dv_free(x);
+}
+
+/* f(x,y) = log(x² + y²)  — harmonic function; all partials involve the
+   denominator (x² + y²) and its powers, exercising quotient-rule simplification */
+static void test_partial_to_string_log_r2(void)
+{
+    fprintf(stderr, "\n  [%s]\n", __func__);
+    dval_t *x   = dv_new_named_var_d(1.0, "x");
+    dval_t *y   = dv_new_named_var_d(2.0, "y");
+    dval_t *x2  = dv_pow_d(x, 2.0);
+    dval_t *y2  = dv_pow_d(y, 2.0);
+    dval_t *sum = dv_add(x2, y2);
+    dval_t *f   = dv_log(sum);
+
+    dval_t *df_dx    = dv_create_deriv(f, x);
+    dval_t *df_dy    = dv_create_deriv(f, y);
+    dval_t *d2f_dx2  = dv_create_2nd_deriv(f, x, x);
+    dval_t *d2f_dxdy = dv_create_2nd_deriv(f, x, y);
+
+    char *s;
+
+    s = dv_to_string(f, style_EXPRESSION);
+    if (str_eq(s, "{ log(x² + y²) | x = 1, y = 2 }"))
+        to_string_pass("log(x²+y²) (EXPR)", s, "{ log(x² + y²) | x = 1, y = 2 }");
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "log(x²+y²) (EXPR)", s, "{ log(x² + y²) | x = 1, y = 2 }");
+    free(s);
+
+    s = dv_to_string(df_dx, style_EXPRESSION);
+    if (str_eq(s, "{ 2x/(x² + y²) | x = 1, y = 2 }"))
+        to_string_pass("∂log(x²+y²)/∂x (EXPR)", s, "{ 2x/(x² + y²) | x = 1, y = 2 }");
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "∂log(x²+y²)/∂x (EXPR)", s, "{ 2x/(x² + y²) | x = 1, y = 2 }");
+    free(s);
+
+    s = dv_to_string(df_dy, style_EXPRESSION);
+    if (str_eq(s, "{ 2y/(x² + y²) | y = 2, x = 1 }"))
+        to_string_pass("∂log(x²+y²)/∂y (EXPR)", s, "{ 2y/(x² + y²) | y = 2, x = 1 }");
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "∂log(x²+y²)/∂y (EXPR)", s, "{ 2y/(x² + y²) | y = 2, x = 1 }");
+    free(s);
+
+    s = dv_to_string(d2f_dx2, style_EXPRESSION);
+    if (str_eq(s, "{ (-2x² + 2y²)/(x² + y²)² | x = 1, y = 2 }"))
+        to_string_pass("∂²log(x²+y²)/∂x² (EXPR)", s, "{ (-2x² + 2y²)/(x² + y²)² | x = 1, y = 2 }");
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "∂²log(x²+y²)/∂x² (EXPR)", s, "{ (-2x² + 2y²)/(x² + y²)² | x = 1, y = 2 }");
+    free(s);
+
+    s = dv_to_string(d2f_dxdy, style_EXPRESSION);
+    if (str_eq(s, "{ -4xy/(x² + y²)² | x = 1, y = 2 }"))
+        to_string_pass("∂²log(x²+y²)/∂x∂y (EXPR)", s, "{ -4xy/(x² + y²)² | x = 1, y = 2 }");
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "∂²log(x²+y²)/∂x∂y (EXPR)", s, "{ -4xy/(x² + y²)² | x = 1, y = 2 }");
+    free(s);
+
+    dv_free(d2f_dxdy); dv_free(d2f_dx2); dv_free(df_dy); dv_free(df_dx);
+    dv_free(f); dv_free(sum); dv_free(y2); dv_free(x2); dv_free(y); dv_free(x);
+}
+
+/* f(x,y) = sin(xy) + x·log(y)  — chain rule through a product argument plus
+   a cross term; the mixed second partial -xy·sin(xy) + cos(xy) + 1/y exercises
+   several simplification paths simultaneously */
+static void test_partial_to_string_sin_xy(void)
+{
+    fprintf(stderr, "\n  [%s]\n", __func__);
+    dval_t *x     = dv_new_named_var_d(1.0, "x");
+    dval_t *y     = dv_new_named_var_d(2.0, "y");
+    dval_t *xy    = dv_mul(x, y);
+    dval_t *sinxy = dv_sin(xy);
+    dval_t *logy  = dv_log(y);
+    dval_t *xlogy = dv_mul(x, logy);
+    dval_t *f     = dv_add(sinxy, xlogy);
+
+    dval_t *df_dx    = dv_create_deriv(f, x);
+    dval_t *df_dy    = dv_create_deriv(f, y);
+    dval_t *d2f_dx2  = dv_create_2nd_deriv(f, x, x);
+    dval_t *d2f_dxdy = dv_create_2nd_deriv(f, x, y);
+
+    char *s;
+
+    s = dv_to_string(f, style_EXPRESSION);
+    if (str_eq(s, "{ sin(xy) + x·log(y) | x = 1, y = 2 }"))
+        to_string_pass("sin(xy)+x·log(y) (EXPR)", s, "{ sin(xy) + x·log(y) | x = 1, y = 2 }");
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "sin(xy)+x·log(y) (EXPR)", s, "{ sin(xy) + x·log(y) | x = 1, y = 2 }");
+    free(s);
+
+    s = dv_to_string(df_dx, style_EXPRESSION);
+    if (str_eq(s, "{ y·cos(xy) + log(y) | x = 1, y = 2 }"))
+        to_string_pass("∂(sin(xy)+x·log(y))/∂x (EXPR)", s, "{ y·cos(xy) + log(y) | x = 1, y = 2 }");
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "∂(sin(xy)+x·log(y))/∂x (EXPR)", s, "{ y·cos(xy) + log(y) | x = 1, y = 2 }");
+    free(s);
+
+    s = dv_to_string(df_dy, style_EXPRESSION);
+    if (str_eq(s, "{ x·cos(xy) + x/y | x = 1, y = 2 }"))
+        to_string_pass("∂(sin(xy)+x·log(y))/∂y (EXPR)", s, "{ x·cos(xy) + x/y | x = 1, y = 2 }");
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "∂(sin(xy)+x·log(y))/∂y (EXPR)", s, "{ x·cos(xy) + x/y | x = 1, y = 2 }");
+    free(s);
+
+    s = dv_to_string(d2f_dx2, style_EXPRESSION);
+    if (str_eq(s, "{ -y²·sin(xy) | x = 1, y = 2 }"))
+        to_string_pass("∂²(sin(xy)+x·log(y))/∂x² (EXPR)", s, "{ -y²·sin(xy) | x = 1, y = 2 }");
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "∂²(sin(xy)+x·log(y))/∂x² (EXPR)", s, "{ -y²·sin(xy) | x = 1, y = 2 }");
+    free(s);
+
+    s = dv_to_string(d2f_dxdy, style_EXPRESSION);
+    if (str_eq(s, "{ -xy·sin(xy) + cos(xy) + 1/y | x = 1, y = 2 }"))
+        to_string_pass("∂²(sin(xy)+x·log(y))/∂x∂y (EXPR)", s, "{ -xy·sin(xy) + cos(xy) + 1/y | x = 1, y = 2 }");
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "∂²(sin(xy)+x·log(y))/∂x∂y (EXPR)", s, "{ -xy·sin(xy) + cos(xy) + 1/y | x = 1, y = 2 }");
+    free(s);
+
+    dv_free(d2f_dxdy); dv_free(d2f_dx2); dv_free(df_dy); dv_free(df_dx);
+    dv_free(f); dv_free(xlogy); dv_free(logy); dv_free(sinxy); dv_free(xy);
+    dv_free(y); dv_free(x);
+}
+
+void test_partial_derivatives(void)
+{
+    RUN_TEST(test_partial_xy_product,   __func__);
+    RUN_TEST(test_partial_poly,         __func__);
+    RUN_TEST(test_partial_sin_exp,      __func__);
+    RUN_TEST(test_partial_symmetry,     __func__);
+    RUN_TEST(test_partial_get_borrowed, __func__);
+    RUN_TEST(test_partial_to_string,            __func__);
+    RUN_TEST(test_partial_to_string_functions,  __func__);
+    RUN_TEST(test_partial_to_string_log_r2,     __func__);
+    RUN_TEST(test_partial_to_string_sin_xy,     __func__);
 }
 
 /* ------------------------------------------------------------------------- */
@@ -6660,6 +7107,9 @@ int tests_main(void)
 
     printf(C_BOLD C_CYAN "=== README.md example ===\n" C_RESET);
     RUN_TEST(test_README_md_example, NULL);
+
+    printf(C_BOLD C_CYAN "=== Partial derivatives ===\n" C_RESET);
+    RUN_TEST(test_partial_derivatives, NULL);
 
     return tests_failed;
 }

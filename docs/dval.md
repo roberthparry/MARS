@@ -41,8 +41,8 @@ int main(void) {
     dval_t *x = dv_new_named_var_d(1.25, "x");
     dval_t *f = make_f(x);
 
-    dval_t *df_dx = dv_create_deriv(f);
-    const dval_t *d2f_dx = dv_get_deriv(df_dx);
+    dval_t *df_dx = dv_create_deriv(f, x);
+    const dval_t *d2f_dx = dv_get_deriv(df_dx, x);
 
     printf("f(x)    = "); dv_print(f);
     printf("f'(x)   = "); dv_print(df_dx);
@@ -63,16 +63,32 @@ int main(void) {
 
 ## Example: Parsing from a String
 
+`dval_from_string` parses an expression and its variable bindings from a single
+string. Use it when you need to evaluate the expression; for differentiation,
+hold an explicit variable pointer so you can pass it to the derivative API.
+
 ```c
 #include <stdio.h>
 #include "dval.h"
 
 int main(void) {
-    dval_t *f = dval_from_string("{ exp(sin(x)) + 3*x^2 - 7 | x = 1.25 }");
-    if (!f) return 1;
+    /* Evaluation only — variable is internal to the parsed DAG. */
+    dval_t *fparse = dval_from_string("{ exp(sin(x)) + 3*x^2 - 7 | x = 1.25 }");
+    if (!fparse) return 1;
+    qf_printf("f(1.25) = %.34q\n", dv_eval(fparse));
+    dv_free(fparse);
 
-    dval_t *df_dx = dv_create_deriv(f);
-    const dval_t *d2f_dx = dv_get_deriv(df_dx);
+    /* Differentiation — build explicitly so x is accessible as wrt. */
+    dval_t *x     = dv_new_named_var_d(1.25, "x");
+    dval_t *sinx  = dv_sin(x);
+    dval_t *esinx = dv_exp(sinx);
+    dval_t *x2    = dv_pow_d(x, 2.0);
+    dval_t *t     = dv_mul_d(x2, 3.0);
+    dval_t *t2    = dv_sub_d(t, 7.0);
+    dval_t *f     = dv_add(esinx, t2);
+
+    dval_t *df_dx       = dv_create_deriv(f, x);
+    const dval_t *d2f_dx = dv_get_deriv(df_dx, x);
 
     printf("f(x)    = "); dv_print(f);
     printf("f'(x)   = "); dv_print(df_dx);
@@ -85,10 +101,90 @@ int main(void) {
 
     dv_free(df_dx);
     dv_free(f);
+    dv_free(t2); dv_free(t); dv_free(x2); dv_free(esinx); dv_free(sinx);
+    dv_free(x);
 
     return 0;
 }
 ```
+
+## Example: Derivatives
+
+The derivative API always requires an explicit `wrt` variable so the library
+knows which variable to differentiate with respect to. Pass the same node
+pointer that was used to build the expression.
+
+```c
+#include <stdio.h>
+#include "dval.h"
+
+/* f(x, y) = x² + x·y + y² */
+int main(void) {
+    dval_t *x  = dv_new_named_var_d(1.0, "x");
+    dval_t *y  = dv_new_named_var_d(2.0, "y");
+
+    dval_t *x2 = dv_pow_d(x, 2.0);
+    dval_t *xy = dv_mul(x, y);
+    dval_t *y2 = dv_pow_d(y, 2.0);
+    dval_t *t0 = dv_add(x2, xy);
+    dval_t *f  = dv_add(t0, y2);
+
+    /* First derivatives (owning) */
+    dval_t *df_dx = dv_create_deriv(f, x);   /* 2x + y */
+    dval_t *df_dy = dv_create_deriv(f, y);   /* x + 2y */
+
+    /* Mixed second derivative ∂²f/∂x∂y (owning) */
+    dval_t *d2f_dxdy = dv_create_2nd_deriv(f, x, y);   /* 1 */
+
+    qf_printf("At x=1, y=2:\n");
+    qf_printf("f          = %.34q\n", dv_eval(f));          /* 7 */
+    qf_printf("∂f/∂x      = %.34q\n", dv_eval(df_dx));     /* 4 */
+    qf_printf("∂f/∂y      = %.34q\n", dv_eval(df_dy));     /* 5 */
+    qf_printf("∂²f/∂x∂y   = %.34q\n", dv_eval(d2f_dxdy)); /* 1 */
+
+    /* Update x=3 — cached partials recompute automatically */
+    dv_set_val_d(x, 3.0);
+    qf_printf("\nAfter x=3:\n");
+    qf_printf("∂f/∂x      = %.34q\n", dv_eval(df_dx));     /* 8 */
+    qf_printf("∂f/∂y      = %.34q\n", dv_eval(df_dy));     /* 7 */
+
+    dv_free(d2f_dxdy);
+    dv_free(df_dy);
+    dv_free(df_dx);
+    dv_free(f);
+    dv_free(t0);
+    dv_free(y2);
+    dv_free(xy);
+    dv_free(x2);
+    dv_free(y);
+    dv_free(x);
+
+    return 0;
+}
+```
+
+```text
+At x=1, y=2:
+f          = 7.0000000000000000000000000000000000
+∂f/∂x      = 4.0000000000000000000000000000000000
+∂f/∂y      = 5.0000000000000000000000000000000000
+∂²f/∂x∂y   = 1.0000000000000000000000000000000000
+
+After x=3:
+∂f/∂x      = 8.0000000000000000000000000000000000
+∂f/∂y      = 7.0000000000000000000000000000000000
+```
+
+`dv_get_deriv` returns a *borrowed* pointer to the cached derivative — useful when
+you only need to evaluate it and don't want to manage another owning handle:
+
+```c
+const dval_t *p = dv_get_deriv(f, x);   /* borrowed — do NOT free */
+qf_printf("∂f/∂x = %.34q\n", dv_eval(p));
+```
+
+The result is cached: repeated calls to `dv_get_deriv` with the same `wrt` variable
+return the same node without rebuilding the expression graph.
 
 ## Design Notes
 
@@ -110,17 +206,19 @@ in the graph without duplication.
 
 Each node's vtable provides a `deriv` function that returns a new expression
 graph representing the derivative of that node with respect to its input.
-Calling `dv_create_deriv(f)` recursively applies the chain rule across the
+Calling `dv_create_deriv(f, x)` recursively applies the chain rule across the
 graph to produce `df/dx` as a new owning expression. Higher-order derivatives
 are obtained by differentiating derivative expressions again with
-`dv_create_nth_deriv()`.
+`dv_create_nth_deriv()`. All derivative functions require an explicit `wrt`
+variable pointer so the library knows which variable to differentiate with
+respect to; all other variable nodes in the graph are treated as constants.
 
 ### Ownership and Reference Counting
 
 Every owning handle has reference count ≥ 1. Arithmetic and function builders
 retain their children (increment their refcounts) but do not steal ownership.
 `dv_free()` decrements the refcount and recursively frees when it reaches zero.
-`dv_get_deriv()` returns a *borrowed* pointer — do not free it.
+`dv_get_deriv(expr, wrt)` returns a *borrowed* pointer — do not free it.
 
 ### Evaluation
 
@@ -166,8 +264,9 @@ All public declarations are in `include/dval.h`.
 
 - `qfloat_t dv_get_val(const dval_t *dv)` — return the stored primal value without re-evaluating
 - `double dv_get_val_d(const dval_t *dv)` — return the stored primal value as a `double`
-- `const dval_t *dv_get_deriv(const dval_t *dv)` — return the cached first derivative node
-  (borrowed — do **not** free); built lazily on first call
+- `const dval_t *dv_get_deriv(const dval_t *expr, dval_t *wrt)` — return the
+  cached ∂expr/∂wrt node as a **borrowed** pointer; do **not** free it. Built
+  lazily on first call; subsequent calls with the same `wrt` return the cached node.
 
 ### Evaluation
 
@@ -176,12 +275,14 @@ All public declarations are in `include/dval.h`.
 
 ### Derivative Construction (owning)
 
-All returned handles must be freed by the caller.
+All returned handles must be freed by the caller. `wrt` must be a variable node
+(created with `dv_new_var` or `dv_new_named_var`) that appears in the expression
+DAG. All other variable nodes in the graph are treated as constants.
 
-- `dval_t *dv_create_deriv(dval_t *dv)` — build the first derivative expression
-- `dval_t *dv_create_2nd_deriv(dval_t *dv)` — build d²/dx²
-- `dval_t *dv_create_3rd_deriv(dval_t *dv)` — build d³/dx³
-- `dval_t *dv_create_nth_deriv(unsigned int n, dval_t *dv)` — build the nth derivative
+- `dval_t *dv_create_deriv(dval_t *expr, dval_t *wrt)` — build ∂expr/∂wrt
+- `dval_t *dv_create_2nd_deriv(dval_t *expr, dval_t *wrt1, dval_t *wrt2)` — build ∂²expr/(∂wrt1 ∂wrt2)
+- `dval_t *dv_create_3rd_deriv(dval_t *expr, dval_t *wrt1, dval_t *wrt2, dval_t *wrt3)` — build the mixed third derivative
+- `dval_t *dv_create_nth_deriv(unsigned int n, dval_t *expr, dval_t *wrt)` — apply d/d(wrt) n times
 
 ### Arithmetic (graph-building, owning)
 

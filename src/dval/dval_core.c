@@ -7,12 +7,19 @@
  *     names (e.g. "alpha" -> "alpha-as-unicode") so names are canonical in output
  *   - Lazy primal evaluation (dv_eval) via vtable dispatch (ops->eval)
  *   - Lazy derivative construction (dv_get_deriv / dv_create_deriv) via
- *     vtable dispatch (ops->deriv), with the result cached in dval_t::dx
+ *     vtable dispatch (ops->deriv), with the result cached in dval_t::dx_cache
  *   - All arithmetic and math operator constructors (dv_add, dv_sin, etc.)
  *   - dv_cmp, dv_print, and other accessors
  *
  * The operator implementations (eval/deriv bodies) live in the same file,
  * grouped by operator family after the core infrastructure.
+ *
+ * Partial derivatives: tl_wrt is a thread-local pointer to the variable being
+ * differentiated with respect to.  NULL means "single-variable / differentiate
+ * w.r.t. every variable" (the original behaviour of dv_get_deriv /
+ * dv_create_deriv).  dv_create_partial() sets it, runs the derivative
+ * machinery, then clears it.  All deriv_X functions remain unchanged; only
+ * deriv_var consults tl_wrt to return 1 or 0.
  */
 
 #include <stdlib.h>
@@ -25,6 +32,12 @@
 #include "qfloat.h"
 #include "dval_internal.h"
 #include "dval.h"
+
+/* Thread-local pointer to the variable being differentiated with respect to.
+ * NULL = single-variable / "all variables" mode (original behaviour of
+ * dv_get_deriv / dv_create_deriv).  Set by dv_create_partial / dv_get_partial
+ * and cleared before returning. */
+static __thread dval_t *tl_wrt = NULL;
 
 /* ------------------------------------------------------------------------- */
 /* Name handling                                                             */
@@ -156,16 +169,23 @@ static void dv_release(dval_t *dv)
     if (refcount_dec(&dv->refcount) > 1)
         return;
 
-    dval_t *a  = dv->a;
-    dval_t *b  = dv->b;
-    dval_t *dx = dv->dx;
+    dval_t *a = dv->a;
+    dval_t *b = dv->b;
+
+    /* Free the derivative cache linked list */
+    dv_deriv_cache_t *ce = dv->dx_cache;
+    while (ce) {
+        dv_deriv_cache_t *next = ce->next;
+        dv_release(ce->dx);
+        free(ce);
+        ce = next;
+    }
 
     if (dv->name) free(dv->name);
     free(dv);
 
     dv_release(a);
     dv_release(b);
-    dv_release(dx);
 }
 
 /* ------------------------------------------------------------------------- */
@@ -184,8 +204,7 @@ static dval_t *dv_alloc(const dval_ops_t *ops)
     dv->x        = qf_from_double(0.0);
     dv->x_valid  = 0;
     dv->epoch    = 0;
-    dv->dx       = NULL;
-    dv->dx_valid = 0;
+    dv->dx_cache = NULL;
     dv->name     = NULL;
     dv->refcount = 1;
 
@@ -226,23 +245,37 @@ static qfloat_t dv_eval_qf(const dval_t *dv)
     return m->x;
 }
 
+/* Look up (or compute and cache) the derivative of dv w.r.t. tl_wrt.
+ * Returns a borrowed pointer owned by the cache entry. */
 static dval_t *dv_build_dx(dval_t *dv)
 {
     if (!dv)
         return NULL;
 
-    if (!dv->dx_valid) {
-        dv->dx = dv->ops->deriv(dv); /* refcount = 1 */
-        dv->dx_valid = 1;
+    /* Search the cache for a matching wrt entry. */
+    for (dv_deriv_cache_t *ce = dv->dx_cache; ce; ce = ce->next) {
+        if (ce->wrt == tl_wrt)
+            return ce->dx; /* borrowed */
     }
-    return dv->dx; /* borrowed */
+
+    /* Not cached: compute and insert at head. */
+    dval_t *dx = dv->ops->deriv(dv); /* refcount = 1, tl_wrt still set */
+    dv_deriv_cache_t *ce = malloc(sizeof *ce);
+    if (!ce) abort();
+    ce->wrt  = tl_wrt;
+    ce->dx   = dx;
+    ce->next = dv->dx_cache;
+    dv->dx_cache = ce;
+    return dx; /* borrowed */
 }
 
-/* Return an owning reference to the derivative of n.
+/* Return an owning reference to the derivative of dv w.r.t. tl_wrt.
  * Falls back to a zero constant when no derivative exists. */
 static dval_t *get_dx(const dval_t *dv)
 {
-    const dval_t *d = dv_get_deriv(dv);
+    /* tl_wrt is already set by the caller; call dv_build_dx directly so we
+     * don't go through the public dv_get_deriv signature which also sets it. */
+    const dval_t *d = dv_build_dx((dval_t *)dv);
     if (d) {
         dv_retain((dval_t *)d);
         return (dval_t *)d;
@@ -268,24 +301,13 @@ double dv_eval_d(const dval_t *dv)
 /* Public derivative (borrowed)                                              */
 /* ------------------------------------------------------------------------- */
 
-const dval_t *dv_get_deriv(const dval_t *dv)
+const dval_t *dv_get_deriv(const dval_t *expr, dval_t *wrt)
 {
-    if (!dv) return NULL;
-
-    /* If already computed, return cached derivative */
-    if (dv->dx_valid)
-        return dv->dx;
-
-    /* Cast away const to mutate internal cache */
-    dval_t *mutable_dv = (dval_t *)dv;
-
-    /* Compute derivative lazily */
-    dval_t *d = mutable_dv->ops->deriv(mutable_dv);
-
-    mutable_dv->dx = d;
-    mutable_dv->dx_valid = 1;
-
-    return d;
+    if (!expr || !wrt) return NULL;
+    tl_wrt = wrt;
+    const dval_t *result = dv_build_dx((dval_t *)expr);
+    tl_wrt = NULL;
+    return result; /* borrowed */
 }
 
 /* ------------------------------------------------------------------------- */
@@ -301,19 +323,14 @@ static dval_t *dv_make_const_qf(qfloat_t x)
     return dv;
 }
 
-/* A variable: value x, derivative dx = 1 (as a constant node) */
+/* A variable: value x. The derivative is computed lazily by deriv_var,
+ * keyed by tl_wrt at the time of the first request. */
 static dval_t *dv_make_var_qf(qfloat_t x)
 {
     dval_t *dv = dv_alloc(&ops_var);
     dv->c = x;
     dv->x = x;
     dv->x_valid = 1;
-
-    /* dx is a dval_t*; for a variable, derivative is 1 */
-    dval_t *df = dv_make_const_qf(qf_from_double(1.0));
-    dv->dx = df;
-    dv->dx_valid = 1;
-
     return dv;
 }
 
@@ -507,9 +524,9 @@ static dval_t *deriv_const(dval_t *dv)
 
 static dval_t *deriv_var(dval_t *dv)
 {
-    /* Variables are constructed with dx pre-seeded to const(1).
-     * get_dx returns an owning copy of that cached derivative. */
-    return get_dx(dv);
+    /* tl_wrt == NULL: single-variable mode — this variable IS the variable,
+     * so return 1.  Otherwise return 1 iff this node is the target variable. */
+    return dv_new_const_d(tl_wrt == NULL || dv == tl_wrt ? 1.0 : 0.0);
 }
 
 /* a + b */
@@ -1726,47 +1743,46 @@ int dv_cmp(const dval_t *dv1, const dval_t *dv2) {
 /* Derivative creation (owning)                                              */
 /* ------------------------------------------------------------------------- */
 
-dval_t *dv_create_deriv(dval_t *dv)
+dval_t *dv_create_deriv(dval_t *expr, dval_t *wrt)
 {
-    if (!dv) return NULL;
-
-    dval_t *raw = dv_build_dx(dv); /* borrowed */
-    if (!raw) return NULL;
-
-    dv_retain(raw);                /* now owning */
+    if (!expr || !wrt) return NULL;
+    tl_wrt = wrt;
+    dval_t *raw = dv_build_dx(expr); /* borrowed */
+    if (!raw) { tl_wrt = NULL; return NULL; }
+    dv_retain(raw);                  /* now owning */
     dval_t *simp = dv_simplify(raw);
     dv_free(raw);
-
+    tl_wrt = NULL;
     return simp;
 }
 
-dval_t *dv_create_2nd_deriv(dval_t *dv)
+dval_t *dv_create_2nd_deriv(dval_t *expr, dval_t *wrt1, dval_t *wrt2)
 {
-    dval_t *g = dv_create_deriv(dv);
+    dval_t *g = dv_create_deriv(expr, wrt1);
     if (!g) return NULL;
-    dval_t *h = dv_create_deriv(g);
+    dval_t *h = dv_create_deriv(g, wrt2);
     dv_free(g);
     return h;
 }
 
-dval_t *dv_create_3rd_deriv(dval_t *dv)
+dval_t *dv_create_3rd_deriv(dval_t *expr, dval_t *wrt1, dval_t *wrt2, dval_t *wrt3)
 {
-    dval_t *g = dv_create_deriv(dv);
+    dval_t *g = dv_create_deriv(expr, wrt1);
     if (!g) return NULL;
-    dval_t *h = dv_create_deriv(g);
+    dval_t *h = dv_create_deriv(g, wrt2);
     dv_free(g);
     if (!h) return NULL;
-    dval_t *k = dv_create_deriv(h);
+    dval_t *k = dv_create_deriv(h, wrt3);
     dv_free(h);
     return k;
 }
 
-dval_t *dv_create_nth_deriv(unsigned int n, dval_t *dv)
+dval_t *dv_create_nth_deriv(unsigned int n, dval_t *expr, dval_t *wrt)
 {
-    dval_t *cur = dv;
+    dval_t *cur = expr;
     while (n--) {
-        dval_t *next = dv_create_deriv(cur);
-        if (cur != dv) dv_free(cur);
+        dval_t *next = dv_create_deriv(cur, wrt);
+        if (cur != expr) dv_free(cur);
         cur = next;
         if (!cur) break;
     }

@@ -278,7 +278,20 @@
     "test_README_md_example": {
       "enabled": true,
       "test_readme_example": true,
-      "test_readme_from_string_example": true
+      "test_readme_from_string_example": true,
+      "test_readme_partial_example": true
+    },
+    "test_partial_derivatives": {
+      "enabled": true,
+      "test_partial_xy_product": true,
+      "test_partial_poly": true,
+      "test_partial_sin_exp": true,
+      "test_partial_symmetry": true,
+      "test_partial_get_borrowed": true,
+      "test_partial_to_string": true,
+      "test_partial_to_string_functions": true,
+      "test_partial_to_string_log_r2": true,
+      "test_partial_to_string_sin_xy": true
     }
   },
   "tests/test_qfloat.c": {

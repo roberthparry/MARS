@@ -190,29 +190,46 @@ static dval_t *make_scaled(qfloat_t coeff, dval_t *base)
 typedef struct { dval_t *base; qfloat_t coeff; } addend_t;
 
 static void collect_addends(
-    dval_t *dv, int sign,
+    dval_t *dv, qfloat_t scale,
     qfloat_t *c_const,
     addend_t **terms, size_t *n, size_t *cap)
 {
     if (!dv) return;
     if (dv->ops == &ops_add) {
-        collect_addends(dv->a,  sign, c_const, terms, n, cap);
-        collect_addends(dv->b,  sign, c_const, terms, n, cap);
+        collect_addends(dv->a, scale,           c_const, terms, n, cap);
+        collect_addends(dv->b, scale,           c_const, terms, n, cap);
         return;
     }
     if (dv->ops == &ops_sub) {
-        collect_addends(dv->a,  sign, c_const, terms, n, cap);
-        collect_addends(dv->b, -sign, c_const, terms, n, cap);
+        collect_addends(dv->a, scale,           c_const, terms, n, cap);
+        collect_addends(dv->b, qf_neg(scale),   c_const, terms, n, cap);
         return;
     }
-    if (dv->ops == &ops_neg &&
-        (dv->a->ops == &ops_add || dv->a->ops == &ops_sub)) {
-        collect_addends(dv->a, -sign, c_const, terms, n, cap);
+    if (dv->ops == &ops_neg) {
+        if (dv->a->ops == &ops_add || dv->a->ops == &ops_sub) {
+            collect_addends(dv->a, qf_neg(scale), c_const, terms, n, cap);
+            return;
+        }
+        /* neg(c·(a ± b)) — strip neg and distribute */
+        if (dv->a->ops == &ops_mul &&
+            dv->a->a->ops == &ops_const && (!dv->a->a->name || !*dv->a->a->name) &&
+            (dv->a->b->ops == &ops_add || dv->a->b->ops == &ops_sub)) {
+            qfloat_t ns = qf_mul(qf_neg(scale), dv->a->a->c);
+            collect_addends(dv->a->b, ns, c_const, terms, n, cap);
+            return;
+        }
+    }
+    /* distribute: c · (a ± b) → c·a ± c·b */
+    if (dv->ops == &ops_mul &&
+        dv->a->ops == &ops_const && (!dv->a->name || !*dv->a->name) &&
+        (dv->b->ops == &ops_add || dv->b->ops == &ops_sub)) {
+        qfloat_t ns = qf_mul(scale, dv->a->c);
+        collect_addends(dv->b, ns, c_const, terms, n, cap);
         return;
     }
     const dval_t *base;
     qfloat_t coeff = term_coeff(dv, &base);
-    if (sign < 0) coeff = qf_neg(coeff);
+    coeff = qf_mul(coeff, scale);
     if (!base) { *c_const = qf_add(*c_const, coeff); return; }
 
     for (size_t i = 0; i < *n; ++i) {
@@ -368,9 +385,9 @@ static dval_t *simplify_add_sub(dval_t *dv, dval_t *a, dval_t *b)
     addend_t *terms   = NULL;
     size_t    n = 0, cap = 0;
 
-    collect_addends(a, +1, &c_const, &terms, &n, &cap);
+    collect_addends(a, qf_from_double(1.0), &c_const, &terms, &n, &cap);
     dv_free(a);
-    collect_addends(b, (dv->ops == &ops_sub) ? -1 : +1, &c_const, &terms, &n, &cap);
+    collect_addends(b, (dv->ops == &ops_sub) ? qf_from_double(-1.0) : qf_from_double(1.0), &c_const, &terms, &n, &cap);
     dv_free(b);
 
     /* find the leading non-cancelled symbolic term */

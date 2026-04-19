@@ -73,6 +73,24 @@ typedef struct dval_ops {
 /* ------------------------------------------------------------------------- */
 
 /**
+ * @brief Per-variable derivative cache entry.
+ *
+ * The derivative of a node can vary depending on which variable it is
+ * differentiated with respect to. Each computed node holds a singly-linked
+ * list of (wrt, dx) pairs so that partial derivatives w.r.t. different
+ * variables can all be cached simultaneously.
+ *
+ * wrt == NULL is the sentinel for the single-variable / "differentiate
+ * w.r.t. the unique variable" case used by dv_get_deriv() and
+ * dv_create_deriv().
+ */
+typedef struct dv_deriv_cache {
+    dval_t              *wrt; /* the variable node (NULL = single-var sentinel) */
+    dval_t              *dx;  /* the derivative expression (owned) */
+    struct dv_deriv_cache *next;
+} dv_deriv_cache_t;
+
+/**
  * @brief Full internal definition of a differentiable value node.
  *
  * Fields:
@@ -81,8 +99,7 @@ typedef struct dval_ops {
  *   c        — constant field (used by const and pow_d)
  *   x        — cached primal value
  *   x_valid  — whether x is valid
- *   dx       — cached derivative node (owned)
- *   dx_valid — whether dx is valid
+ *   dx_cache — singly-linked list of (wrt, dx) cache entries (owned)
  *   name     — optional symbolic name (owned)
  *   refcount — reference count for DAG lifetime management
  */
@@ -103,8 +120,7 @@ struct _dval_t {
      * this to detect stale caches automatically. */
     uint64_t  epoch;
 
-    dval_t *dx;
-    int     dx_valid;
+    dv_deriv_cache_t *dx_cache;
 
     char   *name;
 
