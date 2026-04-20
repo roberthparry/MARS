@@ -1,32 +1,41 @@
 {
     "version": "0.2.0",
     "configurations": [
-
         {
-            "name": "Debug test_string",
+            "name": "Debug test_array",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/tests/build/debug/test_string",
+            "program": "${workspaceFolder}/tests/build/debug/test_array",
             "cwd": "${workspaceFolder}",
             "args": [],
             "MIMode": "gdb",
             "stopAtEntry": false
         },
         {
-            "name": "Debug test_set",
+            "name": "Release test_array",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/tests/build/debug/test_set",
+            "program": "${workspaceFolder}/tests/build/release/test_array",
             "cwd": "${workspaceFolder}",
             "args": [],
             "MIMode": "gdb",
             "stopAtEntry": false
         },
         {
-            "name": "Debug test_dictionary",
+            "name": "Debug test_bitset",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/tests/build/debug/test_dictionary",
+            "program": "${workspaceFolder}/tests/build/debug/test_bitset",
+            "cwd": "${workspaceFolder}",
+            "args": [],
+            "MIMode": "gdb",
+            "stopAtEntry": false
+        },
+        {
+            "name": "Release test_bitset",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/tests/build/release/test_bitset",
             "cwd": "${workspaceFolder}",
             "args": [],
             "MIMode": "gdb",
@@ -37,37 +46,6 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/tests/build/debug/test_datetime",
-            "cwd": "${workspaceFolder}",
-            "args": [],
-            "MIMode": "gdb",
-            "stopAtEntry": false
-        },
-
-        {
-            "name": "Release test_string",
-            "type": "cppdbg",
-            "request": "launch",
-            "program": "${workspaceFolder}/tests/build/release/test_string",
-            "cwd": "${workspaceFolder}",
-            "args": [],
-            "MIMode": "gdb",
-            "stopAtEntry": false
-        },
-        {
-            "name": "Release test_set",
-            "type": "cppdbg",
-            "request": "launch",
-            "program": "${workspaceFolder}/tests/build/release/test_set",
-            "cwd": "${workspaceFolder}",
-            "args": [],
-            "MIMode": "gdb",
-            "stopAtEntry": false
-        },
-        {
-            "name": "Release test_dictionary",
-            "type": "cppdbg",
-            "request": "launch",
-            "program": "${workspaceFolder}/tests/build/release/test_dictionary",
             "cwd": "${workspaceFolder}",
             "args": [],
             "MIMode": "gdb",
@@ -84,10 +62,30 @@
             "stopAtEntry": false
         },
         {
-            "name": "Release test_qfloat",
+            "name": "Debug test_dictionary",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/tests/build/release/test_qfloat",
+            "program": "${workspaceFolder}/tests/build/debug/test_dictionary",
+            "cwd": "${workspaceFolder}",
+            "args": [],
+            "MIMode": "gdb",
+            "stopAtEntry": false
+        },
+        {
+            "name": "Release test_dictionary",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/tests/build/release/test_dictionary",
+            "cwd": "${workspaceFolder}",
+            "args": [],
+            "MIMode": "gdb",
+            "stopAtEntry": false
+        },
+        {
+            "name": "Debug test_dval",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/tests/build/debug/test_dval",
             "cwd": "${workspaceFolder}",
             "args": [],
             "MIMode": "gdb",
@@ -98,6 +96,126 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/tests/build/release/test_dval",
+            "cwd": "${workspaceFolder}",
+            "args": [],
+            "MIMode": "gdb",
+            "stopAtEntry": false
+        },
+        {
+            "name": "Debug test_integrator",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/tests/build/debug/test_integrator",
+            "cwd": "${workspaceFolder}",
+            "args": [],
+            "MIMode": "gdb",
+            "stopAtEntry": false
+        },
+        {
+            "name": "Release test_integrator",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/tests/build/release/test_integrator",
+            "cwd": "${workspaceFolder}",
+            "args": [],
+            "MIMode": "gdb",
+            "stopAtEntry": false
+        },
+        {
+            "name": "Debug test_qcomplex",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/tests/build/debug/test_qcomplex",
+            "cwd": "${workspaceFolder}",
+            "args": [],
+            "MIMode": "gdb",
+            "stopAtEntry": false
+        },
+        {
+            "name": "Release test_qcomplex",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/tests/build/release/test_qcomplex",
+            "cwd": "${workspaceFolder}",
+            "args": [],
+            "MIMode": "gdb",
+            "stopAtEntry": false
+        },
+        {
+            "name": "Debug test_qfloat",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/tests/build/debug/test_qfloat",
+            "cwd": "${workspaceFolder}",
+            "args": [],
+            "MIMode": "gdb",
+            "stopAtEntry": false
+        },
+        {
+            "name": "Release test_qfloat",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/tests/build/release/test_qfloat",
+            "cwd": "${workspaceFolder}",
+            "args": [],
+            "MIMode": "gdb",
+            "stopAtEntry": false
+        },
+        {
+            "name": "Debug test_set",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/tests/build/debug/test_set",
+            "cwd": "${workspaceFolder}",
+            "args": [],
+            "MIMode": "gdb",
+            "stopAtEntry": false
+        },
+        {
+            "name": "Release test_set",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/tests/build/release/test_set",
+            "cwd": "${workspaceFolder}",
+            "args": [],
+            "MIMode": "gdb",
+            "stopAtEntry": false
+        },
+        {
+            "name": "Debug test_string",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/tests/build/debug/test_string",
+            "cwd": "${workspaceFolder}",
+            "args": [],
+            "MIMode": "gdb",
+            "stopAtEntry": false
+        },
+        {
+            "name": "Release test_string",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/tests/build/release/test_string",
+            "cwd": "${workspaceFolder}",
+            "args": [],
+            "MIMode": "gdb",
+            "stopAtEntry": false
+        },
+        {
+            "name": "Debug test_test_config",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/tests/build/debug/test_test_config",
+            "cwd": "${workspaceFolder}",
+            "args": [],
+            "MIMode": "gdb",
+            "stopAtEntry": false
+        },
+        {
+            "name": "Release test_test_config",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/tests/build/release/test_test_config",
             "cwd": "${workspaceFolder}",
             "args": [],
             "MIMode": "gdb",

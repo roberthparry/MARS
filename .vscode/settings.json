@@ -12,6 +12,114 @@
 
     "makefile.launchConfigurations": [
         {
+            "name": "Debug test_array",
+            "cwd": "${workspaceFolder}",
+            "binaryPath": "${workspaceFolder}/tests/build/debug/test_array",
+            "binaryArgs": []
+        },
+        {
+            "name": "Release test_array",
+            "cwd": "${workspaceFolder}",
+            "binaryPath": "${workspaceFolder}/tests/build/release/test_array",
+            "binaryArgs": []
+        },
+        {
+            "name": "Debug test_bitset",
+            "cwd": "${workspaceFolder}",
+            "binaryPath": "${workspaceFolder}/tests/build/debug/test_bitset",
+            "binaryArgs": []
+        },
+        {
+            "name": "Release test_bitset",
+            "cwd": "${workspaceFolder}",
+            "binaryPath": "${workspaceFolder}/tests/build/release/test_bitset",
+            "binaryArgs": []
+        },
+        {
+            "name": "Debug test_datetime",
+            "cwd": "${workspaceFolder}",
+            "binaryPath": "${workspaceFolder}/tests/build/debug/test_datetime",
+            "binaryArgs": []
+        },
+        {
+            "name": "Release test_datetime",
+            "cwd": "${workspaceFolder}",
+            "binaryPath": "${workspaceFolder}/tests/build/release/test_datetime",
+            "binaryArgs": []
+        },
+        {
+            "name": "Debug test_dictionary",
+            "cwd": "${workspaceFolder}",
+            "binaryPath": "${workspaceFolder}/tests/build/debug/test_dictionary",
+            "binaryArgs": []
+        },
+        {
+            "name": "Release test_dictionary",
+            "cwd": "${workspaceFolder}",
+            "binaryPath": "${workspaceFolder}/tests/build/release/test_dictionary",
+            "binaryArgs": []
+        },
+        {
+            "name": "Debug test_dval",
+            "cwd": "${workspaceFolder}",
+            "binaryPath": "${workspaceFolder}/tests/build/debug/test_dval",
+            "binaryArgs": []
+        },
+        {
+            "name": "Release test_dval",
+            "cwd": "${workspaceFolder}",
+            "binaryPath": "${workspaceFolder}/tests/build/release/test_dval",
+            "binaryArgs": []
+        },
+        {
+            "name": "Debug test_integrator",
+            "cwd": "${workspaceFolder}",
+            "binaryPath": "${workspaceFolder}/tests/build/debug/test_integrator",
+            "binaryArgs": []
+        },
+        {
+            "name": "Release test_integrator",
+            "cwd": "${workspaceFolder}",
+            "binaryPath": "${workspaceFolder}/tests/build/release/test_integrator",
+            "binaryArgs": []
+        },
+        {
+            "name": "Debug test_qcomplex",
+            "cwd": "${workspaceFolder}",
+            "binaryPath": "${workspaceFolder}/tests/build/debug/test_qcomplex",
+            "binaryArgs": []
+        },
+        {
+            "name": "Release test_qcomplex",
+            "cwd": "${workspaceFolder}",
+            "binaryPath": "${workspaceFolder}/tests/build/release/test_qcomplex",
+            "binaryArgs": []
+        },
+        {
+            "name": "Debug test_qfloat",
+            "cwd": "${workspaceFolder}",
+            "binaryPath": "${workspaceFolder}/tests/build/debug/test_qfloat",
+            "binaryArgs": []
+        },
+        {
+            "name": "Release test_qfloat",
+            "cwd": "${workspaceFolder}",
+            "binaryPath": "${workspaceFolder}/tests/build/release/test_qfloat",
+            "binaryArgs": []
+        },
+        {
+            "name": "Debug test_set",
+            "cwd": "${workspaceFolder}",
+            "binaryPath": "${workspaceFolder}/tests/build/debug/test_set",
+            "binaryArgs": []
+        },
+        {
+            "name": "Release test_set",
+            "cwd": "${workspaceFolder}",
+            "binaryPath": "${workspaceFolder}/tests/build/release/test_set",
+            "binaryArgs": []
+        },
+        {
             "name": "Debug test_string",
             "cwd": "${workspaceFolder}",
             "binaryPath": "${workspaceFolder}/tests/build/debug/test_string",
@@ -24,28 +132,15 @@
             "binaryArgs": []
         },
         {
+            "name": "Debug test_test_config",
             "cwd": "${workspaceFolder}",
-            "binaryPath": "${workspaceFolder}/tests/build/debug/test_set",
+            "binaryPath": "${workspaceFolder}/tests/build/debug/test_test_config",
             "binaryArgs": []
         },
         {
+            "name": "Release test_test_config",
             "cwd": "${workspaceFolder}",
-            "binaryPath": "${workspaceFolder}/tests/build/debug/test_dictionary",
-            "binaryArgs": []
-        },
-        {
-            "cwd": "${workspaceFolder}",
-            "binaryPath": "${workspaceFolder}/tests/build/debug/test_qfloat",
-            "binaryArgs": []
-        },
-        {
-            "cwd": "${workspaceFolder}",
-            "binaryPath": "${workspaceFolder}/tests/build/debug/test_dval",
-            "binaryArgs": []
-        },
-        {
-            "cwd": "/home/rparry/Projects/MARS/tests/build/debug",
-            "binaryPath": "/home/rparry/Projects/MARS/tests/build/debug/test_integrator",
+            "binaryPath": "${workspaceFolder}/tests/build/release/test_test_config",
             "binaryArgs": []
         }
     ],
