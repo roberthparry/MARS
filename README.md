@@ -50,6 +50,7 @@ W0(1) = 0.5671432904097838729999686622103575
 | Module | Description | Docs |
 |---|---|---|
 | `qfloat_t` | Double-double arithmetic and special functions | [`docs/qfloat.md`](docs/qfloat.md) |
+| `qcomplex_t` | Double-double complex arithmetic and special functions | [`docs/qcomplex.md`](docs/qcomplex.md) |
 | `dval_t` | Differentiable expression DAGs | [`docs/dval.md`](docs/dval.md) |
 | `datetime_t` | Civil and astronomical date/time utilities | [`docs/datetime.md`](docs/datetime.md) |
 | `dictionary_t` | Generic key/value storage with ownership models | [`docs/dictionary.md`](docs/dictionary.md) |
