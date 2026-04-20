@@ -146,6 +146,13 @@ bool qc_isneginf(qcomplex_t z);                  /**< isneginf(z) */
 void qc_to_string(qcomplex_t z, char *out, size_t out_size);
 
 /**
+ * @brief Parse qcomplex_t from string.
+ * @param s Input string (e.g. "3 + 4i", "2e-5 - 1.2e3i", "5i", "7", etc.)
+ * @return Parsed qcomplex_t (NaN if parsing fails)
+ */
+qcomplex_t qc_from_string(const char *s);
+
+/**
  * @brief Internal printf-style formatter with full qcomplex_t and qfloat_t support.
  *
  * qc_vsprintf handles all standard printf specifiers plus:

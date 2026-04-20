@@ -982,6 +982,209 @@ static void test_util_group(void)
 }
 
 /* ====================================================================
+   qc_from_string — full coverage tests with file/line reporting
+   ==================================================================== */
+static void test_from_string(void)
+{
+    printf(C_CYAN "TEST: qc_from_string\n" C_RESET);
+
+    struct {
+        const char *file;
+        int         line;
+        const char *desc;
+        const char *input;
+        const char *re_exp;   /* NULL => special handling (polar) */
+        const char *im_exp;
+        double      tol;
+        int         expect_nan;
+    } cases[] = {
+
+        /* PURE REAL */
+        { __FILE__, __LINE__, "pure real: integer",
+          "3", "3", "0", 1e-60, 0 },
+
+        { __FILE__, __LINE__, "pure real: negative",
+          "-2.5", "-2.5", "0", 1e-60, 0 },
+
+        { __FILE__, __LINE__, "pure real: scientific",
+          "1e-30", "1e-30", "0", 1e-60, 0 },
+
+        { __FILE__, __LINE__, "pure real: high precision",
+          "3.14159265358979323846264338327950288419716939937510",
+          "3.14159265358979323846264338327950288419716939937510",
+          "0", 1e-60, 0 },
+
+        /* PURE IMAGINARY */
+        { __FILE__, __LINE__, "pure imaginary: i",
+          "i", "0", "1", 1e-60, 0 },
+
+        { __FILE__, __LINE__, "pure imaginary: -i",
+          "-i", "0", "-1", 1e-60, 0 },
+
+        { __FILE__, __LINE__, "pure imaginary: +i",
+          "+i", "0", "1", 1e-60, 0 },
+
+        { __FILE__, __LINE__, "pure imaginary: 5i",
+          "5i", "0", "5", 1e-60, 0 },
+
+        { __FILE__, __LINE__, "pure imaginary: scientific",
+          "1e2j", "0", "100", 1e-60, 0 },
+
+        { __FILE__, __LINE__, "pure imaginary: high precision",
+          "2.71828182845904523536028747135266249775724709369996i",
+          "0",
+          "2.71828182845904523536028747135266249775724709369996",
+          1e-60, 0 },
+
+        /* a ± bi */
+        { __FILE__, __LINE__, "a + i",
+          "1 + i", "1", "1", 1e-60, 0 },
+
+        { __FILE__, __LINE__, "a - i",
+          "1 - i", "1", "-1", 1e-60, 0 },
+
+        { __FILE__, __LINE__, "a + 1i",
+          "1 + 1i", "1", "1", 1e-60, 0 },
+
+        { __FILE__, __LINE__, "a - 1j",
+          "1 - 1j", "1", "-1", 1e-60, 0 },
+
+        { __FILE__, __LINE__, "a + bi (high precision)",
+          "1.23456789012345678901234567890123456789012345678901 + "
+          "9.87654321098765432109876543210987654321098765432109i",
+          "1.23456789012345678901234567890123456789012345678901",
+          "9.87654321098765432109876543210987654321098765432109",
+          1e-60, 0 },
+
+        /* (a,b) tuple */
+        { __FILE__, __LINE__, "(a,b) tuple",
+          "(1,2)", "1", "2", 1e-60, 0 },
+
+        { __FILE__, __LINE__, "(a,b) high precision",
+          "(3.14159265358979323846264338327950288419716939937510,"
+           "2.71828182845904523536028747135266249775724709369996)",
+          "3.14159265358979323846264338327950288419716939937510",
+          "2.71828182845904523536028747135266249775724709369996",
+          1e-60, 0 },
+
+        /* Scientific a + bj */
+        { __FILE__, __LINE__, "scientific a + bj",
+          "-1.0e-3 + 1.0e2j", "-1.0e-3", "1.0e2", 1e-60, 0 },
+
+        /* Polar r*exp(theta i) — expected computed dynamically */
+        { __FILE__, __LINE__, "polar: r*exp(theta i)",
+          "1.732*exp(2.2i)", NULL, NULL, 1e-30, 0 },
+
+        /* Full complex exponent r*exp(a+bi) — expected computed dynamically */
+        { __FILE__, __LINE__, "polar: r*exp(a+bi)",
+          "1.732*exp(1.1+2.2i)", NULL, NULL, 1e-30, 0 },
+
+        /* Whitespace */
+        { __FILE__, __LINE__, "whitespace: a + i",
+          "   1   +   i   ", "1", "1", 1e-60, 0 },
+
+        { __FILE__, __LINE__, "whitespace: (a,b)",
+          " ( 1 , 2 ) ", "1", "2", 1e-60, 0 },
+
+        /* FAILURE CASES — only those that actually yield NaN */
+        { __FILE__, __LINE__, "fail: empty",
+          "", NULL, NULL, 0, 1 },
+
+        { __FILE__, __LINE__, "fail: (1 2)",
+          "(1 2)", NULL, NULL, 0, 1 },
+
+        { __FILE__, __LINE__, "fail: exp(2i) (missing r*)",
+          "exp(2i)", NULL, NULL, 0, 1 },
+
+        { __FILE__, __LINE__, "fail: 1*exp()",
+          "1*exp()", NULL, NULL, 0, 1 },
+
+        { __FILE__, __LINE__, "fail: 1*exp(1+)",
+          "1*exp(1+)", NULL, NULL, 0, 1 },
+
+        { __FILE__, __LINE__, "fail: 1*exp(i)",
+          "1*exp(i)", NULL, NULL, 0, 1 },
+
+        { __FILE__, __LINE__, "fail: 1*exp(1+i (missing ')')",
+          "1*exp(1+i", NULL, NULL, 0, 1 },
+    };
+
+    const size_t N = sizeof(cases) / sizeof(cases[0]);
+
+    for (size_t i = 0; i < N; i++) {
+
+        const char *desc  = cases[i].desc;
+        const char *input = cases[i].input;
+        const char *file  = cases[i].file;
+        int         line  = cases[i].line;
+        double      tol   = cases[i].tol;
+        int         expect_nan = cases[i].expect_nan;
+
+        qcomplex_t z = qc_from_string(input);
+
+        printf(C_YELLOW "TEST: %s (%s:%d)\n" C_RESET, desc, file, line);
+        printf("    input    = \"%s\"\n", input);
+
+        /* Failure cases: expect NaN */
+        if (expect_nan) {
+            tests_run++;
+            int ok = qc_isnan(z);
+            if (!ok) tests_failed++;
+
+            printf(ok ? C_GREEN "  OK\n" C_RESET
+                      : C_RED   "  FAIL\n" C_RESET);
+
+            print_qc("    got     ", z);
+            print_qc("    expected", qc_make(QF_NAN, QF_NAN));
+            print_qc("    error   ", qc_make(QF_NAN, QF_NAN));
+            //printf("\n");
+            continue;
+        }
+
+        /* Success cases */
+
+        qcomplex_t expected;
+
+        /* Polar cases: compute expected dynamically */
+        if (cases[i].re_exp == NULL && cases[i].im_exp == NULL &&
+            strstr(desc, "polar: r*exp(theta i)") == desc) {
+
+            qfloat_t r = qf_from_string("1.732");
+            qfloat_t t = qf_from_string("2.2");
+            expected = qc_make(qf_mul(r, qf_cos(t)),
+                               qf_mul(r, qf_sin(t)));
+
+        } else if (cases[i].re_exp == NULL && cases[i].im_exp == NULL &&
+                   strstr(desc, "polar: r*exp(a+bi)") == desc) {
+
+            qfloat_t r = qf_from_string("1.732");
+            qcomplex_t e = qc_exp(qc_make(qf_from_string("1.1"),
+                                          qf_from_string("2.2")));
+            expected = qc_mul(qc_make(r, qf_from_double(0.0)), e);
+
+        } else {
+            qfloat_t re_exp = qf_from_string(cases[i].re_exp);
+            qfloat_t im_exp = qf_from_string(cases[i].im_exp);
+            expected = qc_make(re_exp, im_exp);
+        }
+
+        qcomplex_t diff = qc_sub(z, expected);
+        double err = qf_to_double(qc_abs(diff));
+
+        tests_run++;
+        int ok = err < tol;
+        if (!ok) tests_failed++;
+
+        printf(ok ? C_GREEN "  OK\n" C_RESET
+                  : C_RED   "  FAIL\n" C_RESET);
+
+        print_qc("    got     ", z);
+        print_qc("    expected", expected);
+        print_qc("    error   ", diff);
+    }
+}
+
+/* ====================================================================
    Entry point
    ==================================================================== */
 
@@ -992,6 +1195,7 @@ int tests_main(void)
     RUN_TEST(test_trig_group,       NULL);
     RUN_TEST(test_special_group,    NULL);
     RUN_TEST(test_util_group,       NULL);
+    RUN_TEST(test_from_string,      NULL);
     RUN_TEST(test_euler_identity,   NULL);
 
     return tests_failed;

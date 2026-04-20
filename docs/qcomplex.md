@@ -19,6 +19,9 @@ typedef struct {
 - elementary functions: exp, log, pow, sqrt
 - trigonometric and hyperbolic functions (and their inverses)
 - special functions: erf, gamma, digamma, beta, Lambert W, incomplete gamma, exponential integrals, normal distribution
+- polar form conversion
+- parsing from string
+- printf-style formatting and printing
 
 ## Example
 
@@ -70,6 +73,13 @@ All declarations are in `include/qcomplex.h`.
 |---|---|
 | `qc_abs(z)` → `qfloat_t` | `|z|` — modulus |
 | `qc_arg(z)` → `qfloat_t` | `arg(z)` — principal argument in `(-π, π]` |
+
+### Polar Form
+
+| Function | Description |
+|---|---|
+| `qc_from_polar(r, theta)` | construct from polar coordinates |
+| `qc_to_polar(z, &r, &theta)` | extract polar coordinates |
 
 ### Elementary Functions
 
@@ -141,6 +151,14 @@ All declarations are in `include/qcomplex.h`.
 | `qc_floor(z)` | component-wise floor |
 | `qc_hypot(x, y)` | `sqrt(|x|² + |y|²)` |
 
+### Extractors and Additional Utilities
+
+| Function | Description |
+|---|---|
+| `qc_real(z)` → `qfloat_t` | real part |
+| `qc_imag(z)` → `qfloat_t` | imaginary part |
+| `qc_inv(z)` | multiplicative inverse `1/z` |
+
 ### Comparison and Predicates
 
 | Function | Description |
@@ -151,24 +169,30 @@ All declarations are in `include/qcomplex.h`.
 | `qc_isposinf(z)` → `bool` | true if real part is +∞ and imaginary part is 0 |
 | `qc_isneginf(z)` → `bool` | true if real part is −∞ and imaginary part is 0 |
 
-### Formatting
+### Formatting and Parsing
 
-```c
-void qc_to_string(qcomplex_t z, char *out, size_t out_size);
-```
+| Function | Description |
+|---|---|
+| `void qc_to_string(qcomplex_t z, char *out, size_t out_size);` | Writes a human-readable representation of `z` into `out`. |
+| `qcomplex_t qc_from_string(const char *s);` | Parses a complex number from a string (e.g. `"3+4i"`, `"2e-5-1.2e3i"`, `"5i"`, `"7"`). |
 
-Writes a human-readable representation of `z` into `out`.
+### Printf-style Formatting
+
+| Function | Description |
+|---|---|
+| `int qc_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap);` | Internal printf-style formatter with full `qcomplex_t` and `qfloat_t` support. |
+| `int qc_sprintf(char *out, size_t out_size, const char *fmt, ...);` | Printf-style formatter with full `qcomplex_t` and `qfloat_t` support. |
+| `int qc_printf(const char *fmt, ...);` | Printf to stdout with full `qcomplex_t` and `qfloat_t` support. |
 
 ---
 
 ## Implementation Notes
 
-**Real fast paths** — `qc_erf` and `qc_erfc` detect `im == 0` and delegate to `qf_erf` / `qf_erfc`, which give full 30-digit accuracy. The complex path uses a Faddeeva / Weideman rational approximation that tops out near 15 significant digits.
+- **Precision:** All arithmetic and elementary functions operate at full `qfloat_t` precision (~31–32 decimal digits, ~106 bits), both for real and complex arguments, unless otherwise noted.
+- **Special functions:** For real arguments (`im == 0`), all special functions use the corresponding `qf_` implementation, preserving full precision. For complex arguments, algorithms are chosen to maximize accuracy and stability, but some special functions may have slightly reduced precision due to the complexity of analytic continuation or series evaluation in the complex plane.
+- **Gamma and polygamma:** Implemented using high-precision algorithms (e.g., Lanczos, asymptotic expansions) to maintain as much precision as possible for both real and complex arguments.
+- **Lambert W, incomplete gamma, exponential integrals:** Use iterative or series/continued-fraction methods adapted for complex arguments, with careful attention to branch cuts and principal values.
+- **Parsing and formatting:** Parsing from string and printf-style formatting are supported for all complex numbers, with full control over decimal/scientific notation and alignment.
+- **Fast paths:** For all functions, if the imaginary part is zero, the real-valued `qf_` implementation is used for maximum speed and accuracy.
 
-**Gamma** — implemented via Lanczos g=7, which provides ~15 significant digits for complex arguments. Real arguments with `im == 0` use the `qf_gamma` fast path at full qfloat_t precision.
-
-**Digamma and polygamma** — use the asymptotic Stirling–Bernoulli series after argument shifting via the recurrence relation ψ(z+1) = ψ(z) + 1/z.  The tetragamma `qc_tetragamma` returns −ψ^(2)(z), a positive quantity satisfying ψ₂(z+1) = ψ₂(z) − 2/z³.
-
-**Lambert W** — uses Halley's method initialised from a log approximation; converges in a few iterations for |z| > 1, switches to a series near z = 0.
-
-**Incomplete gamma / exponential integrals** — use continued-fraction or power-series representations selected by region, with the same techniques as the real `qf_` counterparts.
+If you need details about the implementation of a specific function or want to know about accuracy in a particular region of the complex plane, see the source code or contact the maintainers.
