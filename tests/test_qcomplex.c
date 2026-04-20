@@ -888,7 +888,7 @@ static void test_printf(void)
 
     /* Width and alignment */
     qc_sprintf(buf, sizeof(buf), "%20.2z", z35);
-    check_str("%20.2z right-align", buf, "      3.00 + 5.00i");
+    check_str("%20.2z right-align", buf, "        3.00 + 5.00i");
 
     qc_sprintf(buf, sizeof(buf), "%-20.2z|", z35);
     check_str("%-20.2z left-align", buf, "3.00 + 5.00i        |");

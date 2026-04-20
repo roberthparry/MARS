@@ -6,6 +6,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include "qcomplex.h"
 
 /* Helpers: construct purely real qcomplex_t from a double literal or qfloat_t. */
@@ -188,28 +189,18 @@ void qc_to_string(qcomplex_t z, char *out, size_t out_size) {
 /*  qc_vsprintf / qc_sprintf / qc_printf                               */
 /* ------------------------------------------------------------------ */
 
-#define QC_PUT_CHAR(c) do {                                  \
-    (count)++;                                               \
-    if (dst && remaining > 1) { *dst++ = (c); remaining--; }\
-} while (0)
-
-#define QC_PUT_STR(s) do {                                   \
-    const char *_s = (s);                                    \
-    while (*_s) QC_PUT_CHAR(*_s++);                          \
-} while (0)
-
-static inline void qc_put_char(char **buf, size_t *left, int *count, char c) {
-    if (*left > 1 && *buf) {
-        **buf = c;
-        (*buf)++;
-        (*left)--;
+static inline void qc_put_char(char **dst, size_t *remaining, size_t *count, char c) {
+    if (*remaining > 1 && *dst) {
+        **dst = c;
+        (*dst)++;
+        (*remaining)--;
     }
     (*count)++;
 }
 
-static inline void qc_put_str(char **buf, size_t *left, int *count, const char *s) {
+static inline void qc_put_str(char **dst, size_t *remaining, size_t *count, const char *s) {
     while (*s) {
-        qc_put_char(buf, left, count, *s++);
+        qc_put_char(dst, remaining, count, *s++);
     }
 }
 
@@ -233,6 +224,52 @@ static void qc_pad_string(char *out, size_t out_size,
     out[pos] = '\0';
 }
 
+/* Ensure a qfloat string has exactly <precision> digits after the decimal.
+   Works for both fixed (%q) and scientific (%Q) formats. */
+static void qc_fix_precision(char *s, int precision)
+{
+    if (precision < 0) return;
+
+    char *exp = strchr(s, 'e');
+    if (!exp) exp = strchr(s, 'E');
+
+    char saved_exp[64] = {0};
+    if (exp) {
+        strcpy(saved_exp, exp);
+        *exp = '\0';
+    }
+
+    char *dot = strchr(s, '.');
+    if (!dot) {
+        /* No decimal point → add one */
+        size_t len = strlen(s);
+        s[len] = '.';
+        s[len+1] = '\0';
+        dot = s + len;
+    }
+
+    char *p = dot + 1;
+    int count = 0;
+
+    while (*p && count < precision) {
+        p++;
+        count++;
+    }
+
+    /* Truncate or pad */
+    *p = '\0';
+
+    while (count < precision) {
+        strcat(s, "0");
+        count++;
+    }
+
+    /* Restore exponent */
+    if (saved_exp[0]) {
+        strcat(s, saved_exp);
+    }
+}
+
 int qc_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap)
 {
     const char *p = fmt;
@@ -243,10 +280,16 @@ int qc_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap)
     size_t remaining = out_size;
     size_t count = 0;
 
-    if (!out || out_size == 0) { dst = NULL; remaining = 0; }
+    if (!out || out_size == 0) {
+        dst = NULL;
+        remaining = 0;
+    }
 
     while (*p) {
-        if (*p != '%') { QC_PUT_CHAR(*p++); continue; }
+        if (*p != '%') {
+            qc_put_char(&dst, &remaining, &count, *p++);
+            continue;
+        }
 
         p++; /* skip '%' */
 
@@ -277,23 +320,35 @@ int qc_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap)
                 precision = precision * 10 + (*p++ - '0');
         }
 
-        /* ---- %z / %Z : complex number (fixed / scientific) ---- */
+        /* ============================================================
+           %z / %Z  (complex number formatting)
+           ============================================================ */
         if (*p == 'z' || *p == 'Z') {
             char spec = *p++;
             qcomplex_t z = va_arg(ap_local, qcomplex_t);
 
-            char cfmt[32];
-            if (precision >= 0)
-                snprintf(cfmt, sizeof(cfmt), "%%.%d%c", precision,
-                         (spec == 'Z') ? 'Q' : 'q');
-            else
-                snprintf(cfmt, sizeof(cfmt), "%%%c", (spec == 'Z') ? 'Q' : 'q');
-
             char re_buf[256], im_buf[256];
-            qf_sprintf(re_buf, sizeof(re_buf), cfmt, z.re);
-
             qfloat_t im_abs = qf_signbit(z.im) ? qf_neg(z.im) : z.im;
+
+            /* Build qfloat format: %q or %Q */
+            char cfmt[16];
+            snprintf(cfmt, sizeof(cfmt), "%%%c", (spec == 'Z') ? 'Q' : 'q');
+
+            /* Format real and imaginary parts */
+            qf_sprintf(re_buf, sizeof(re_buf), cfmt, z.re);
             qf_sprintf(im_buf, sizeof(im_buf), cfmt, im_abs);
+
+            /* Enforce precision manually */
+            if (precision >= 0) {
+                qc_fix_precision(re_buf, precision);
+                qc_fix_precision(im_buf, precision);
+            }
+
+            /* Lowercase exponent for %Z */
+            if (spec == 'Z') {
+                for (char *s = re_buf; *s; s++) if (*s == 'E') *s = 'e';
+                for (char *s = im_buf; *s; s++) if (*s == 'E') *s = 'e';
+            }
 
             const char *sep = qf_signbit(z.im) ? " - " : " + ";
 
@@ -301,13 +356,16 @@ int qc_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap)
             snprintf(assembled, sizeof(assembled), "%s%s%si", re_buf, sep, im_buf);
 
             char padded[600];
-            qc_pad_string(padded, sizeof(padded), assembled, width, flag_minus, flag_zero);
+            qc_pad_string(padded, sizeof(padded),
+                          assembled, width, flag_minus, flag_zero);
 
-            QC_PUT_STR(padded);
+            qc_put_str(&dst, &remaining, &count, padded);
             continue;
         }
 
-        /* ---- %q / %Q : qfloat_t (fixed / scientific) ---- */
+        /* ============================================================
+           %q / %Q (qfloat formatting)
+           ============================================================ */
         else if (*p == 'q' || *p == 'Q') {
             char spec = *p++;
             qfloat_t x = va_arg(ap_local, qfloat_t);
@@ -327,11 +385,13 @@ int qc_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap)
 
             char tmp[512];
             qf_sprintf(tmp, sizeof(tmp), cfmt, x);
-            QC_PUT_STR(tmp);
+            qc_put_str(&dst, &remaining, &count, tmp);
             continue;
         }
 
-        /* ---- Standard specifiers: delegate to snprintf ---- */
+        /* ============================================================
+           Standard C specifiers
+           ============================================================ */
         else {
             char fmtbuf[32];
             char tmp[256];
@@ -380,19 +440,17 @@ int qc_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap)
                     break;
             }
             p++;
-            QC_PUT_STR(tmp);
+            qc_put_str(&dst, &remaining, &count, tmp);
             continue;
         }
     }
 
-    if (dst && remaining > 0) *dst = '\0';
+    if (dst && remaining > 0)
+        *dst = '\0';
 
     va_end(ap_local);
     return (int)count;
 }
-
-#undef QC_PUT_CHAR
-#undef QC_PUT_STR
 
 int qc_sprintf(char *out, size_t out_size, const char *fmt, ...)
 {
