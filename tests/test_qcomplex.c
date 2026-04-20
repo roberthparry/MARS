@@ -321,6 +321,18 @@ static void test_trig(void)
         qcomplex_t z5 = qcz(0.4, 0.3);
         check_qc("acos(cos(z)) = z", qc_acos(qc_cos(z5)), z5, 1e-27);
     }
+
+    check_qc("atan2(0,1) = 0",   qc_atan2(qcr(0.0), qcr( 1.0)), qcr(0.0),          1e-30);
+    check_qc("atan2(1,0) = π/2", qc_atan2(qcr(1.0), qcr( 0.0)), qcrs("1.57079632679489661923132169163975144209858469968755"), 1e-30);
+    check_qc("atan2(0,-1) = π",  qc_atan2(qcr(0.0), qcr(-1.0)), qcrs("3.14159265358979323846264338327950288419716939937510"), 1e-30);
+    check_qc("atan2(-1,0) = -π/2", qc_atan2(qcr(-1.0), qcr(0.0)), qcrs("-1.57079632679489661923132169163975144209858469968755"), 1e-30);
+
+    {
+        qcomplex_t y6 = qcz(0.7, 0.0);
+        qcomplex_t x6 = qcz(0.5, 0.0);
+        check_qc_rel("atan2(y,x) = atan(y/x) for Re(x)>0",
+                     qc_atan2(y6, x6), qc_atan(qc_div(y6, x6)), 1e-29);
+    }
 }
 
 /* ====================================================================
@@ -394,6 +406,15 @@ static void test_erf(void)
     }
 
     check_qc("erfc(0) = 1", qc_erfc(qcr(0.0)), qcr(1.0), 1e-30);
+
+    {
+        /* complex path (Faddeeva approximation — ~15 sig digits) */
+        qcomplex_t zc = qcz(0.5, 0.3);
+        check_qc("erf(-z) = -erf(z) for complex z",
+                 qc_erf(qc_neg(zc)), qc_neg(qc_erf(zc)), 1e-14);
+        check_qc("erf(z)+erfc(z) = 1 for complex z",
+                 qc_add(qc_erf(zc), qc_erfc(zc)), qcr(1.0), 1e-14);
+    }
 }
 
 static void test_erfinv(void)
@@ -545,6 +566,72 @@ static void test_beta(void)
     }
 
     check_qc("C(5,2) = 10", qc_binomial(qcr(5.0), qcr(2.0)), qcr(10.0), 1e-28);
+
+    /* beta_pdf(x,a,b) = x^(a-1)*(1-x)^(b-1)/B(a,b) */
+    check_qc("beta_pdf(0.5,1,1) = 1",
+             qc_beta_pdf(qcr(0.5), qcr(1.0), qcr(1.0)), qcr(1.0), 1e-29);
+    check_qc("beta_pdf(0.5,2,2) = 1.5",
+             qc_beta_pdf(qcr(0.5), qcr(2.0), qcr(2.0)), qcr(1.5), 1e-29);
+
+    {
+        qcomplex_t x2 = qcr(0.3);
+        qcomplex_t a2 = qcr(2.5);
+        qcomplex_t b2 = qcr(1.5);
+        check_qc_rel("beta_pdf = exp(logbeta_pdf)",
+                     qc_beta_pdf(x2, a2, b2), qc_exp(qc_logbeta_pdf(x2, a2, b2)), 1e-28);
+    }
+}
+
+/* ====================================================================
+   Normal distribution
+   ==================================================================== */
+
+static void test_normal(void)
+{
+    printf(C_CYAN "TEST: normal (pdf/cdf/logpdf)\n" C_RESET);
+
+    /* φ(0) = 1/√(2π) */
+    check_qc_rel("normal_pdf(0) = 1/√(2π)",
+                 qc_normal_pdf(qcr(0.0)),
+                 qcrs("0.39894228040143267793994605993438186847585863116494"), 1e-28);
+
+    /* symmetry */
+    {
+        qcomplex_t z = qcr(1.5);
+        check_qc("normal_pdf(-z) = normal_pdf(z)",
+                 qc_normal_pdf(qc_neg(z)), qc_normal_pdf(z), 1e-29);
+    }
+
+    /* logpdf consistency */
+    {
+        qcomplex_t z = qcr(0.8);
+        check_qc_rel("exp(normal_logpdf(z)) = normal_pdf(z)",
+                     qc_exp(qc_normal_logpdf(z)), qc_normal_pdf(z), 1e-28);
+    }
+
+    /* ln φ(0) = -½ ln(2π) */
+    check_qc_rel("normal_logpdf(0) = -½ln(2π)",
+                 qc_normal_logpdf(qcr(0.0)),
+                 qcrs("-0.91893853320467274178032973640561763986139747363778"), 1e-28);
+
+    /* Φ(0) = 0.5 */
+    check_qc("normal_cdf(0) = 0.5", qc_normal_cdf(qcr(0.0)), qcr(0.5), 1e-29);
+
+    /* Φ(-z) + Φ(z) = 1 */
+    {
+        qcomplex_t z = qcr(1.2);
+        check_qc("normal_cdf(-z) + normal_cdf(z) = 1",
+                 qc_add(qc_normal_cdf(qc_neg(z)), qc_normal_cdf(z)), qcr(1.0), 1e-29);
+    }
+
+    /* Φ(z) = (1 + erf(z/√2)) / 2 */
+    {
+        qcomplex_t z    = qcr(0.7);
+        qcomplex_t sqrt2 = qcrs("1.41421356237309504880168872420969807856967187537694");
+        qcomplex_t rhs  = qc_ldexp(qc_add(qcr(1.0), qc_erf(qc_div(z, sqrt2))), -1);
+        check_qc_rel("normal_cdf(z) = (1+erf(z/√2))/2",
+                     qc_normal_cdf(z), rhs, 1e-28);
+    }
 }
 
 /* ====================================================================
@@ -728,6 +815,7 @@ static void test_special_group(void)
     RUN_TEST(test_digamma,    __func__);
     RUN_TEST(test_gammainv,   __func__);
     RUN_TEST(test_beta,       __func__);
+    RUN_TEST(test_normal,     __func__);
     RUN_TEST(test_productlog, __func__);
     RUN_TEST(test_gammainc,   __func__);
     RUN_TEST(test_ei_e1,      __func__);

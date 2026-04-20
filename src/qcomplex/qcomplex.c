@@ -101,7 +101,8 @@ qcomplex_t qc_atan(qcomplex_t z) {
                    qf_mul_double(diff.re, 0.5));
 }
 qcomplex_t qc_atan2(qcomplex_t y, qcomplex_t x) {
-    // Not standard for complex; defined as atan(y/x)
+    if (qf_eq(y.im, qf_from_double(0.0)) && qf_eq(x.im, qf_from_double(0.0)))
+        return qcrf(qf_atan2(y.re, x.re));
     return qc_atan(qc_div(y, x));
 }
 
@@ -206,6 +207,9 @@ static qcomplex_t qc_faddeeva(qcomplex_t z)
 qcomplex_t qc_erf(qcomplex_t z) {
     if (qf_eq(z.im, qf_from_double(0.0)))
         return qcrf(qf_erf(z.re));
+    /* Faddeeva requires Im(iz) = Re(z) >= 0; use antisymmetry erf(-z) = -erf(z) otherwise */
+    if (qf_lt(z.re, qf_from_double(0.0)))
+        return qc_neg(qc_erf(qc_neg(z)));
     qcomplex_t iz = qc_make(qf_neg(z.im), z.re);
     qcomplex_t w  = qc_faddeeva(iz);
     qcomplex_t e  = qc_exp(qc_neg(qc_mul(z, z)));
@@ -216,6 +220,9 @@ qcomplex_t qc_erfc(qcomplex_t z)
 {
     if (qf_eq(z.im, qf_from_double(0.0)))
         return qcrf(qf_erfc(z.re));
+    /* Use erfc(-z) = 2 - erfc(z) to keep Re(z) >= 0 for Faddeeva */
+    if (qf_lt(z.re, qf_from_double(0.0)))
+        return qc_sub(qcr(2.0), qc_erfc(qc_neg(z)));
     qcomplex_t iz = qc_make(qf_neg(z.im), z.re);
     qcomplex_t w  = qc_faddeeva(iz);
     qcomplex_t e  = qc_exp(qc_neg(qc_mul(z, z)));

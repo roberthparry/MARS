@@ -596,7 +596,8 @@
       "test_beta": true,
       "test_productlog": true,
       "test_gammainc": true,
-      "test_ei_e1": true
+      "test_ei_e1": true,
+      "test_normal": true
     },
     "test_util_group": {
       "enabled": true,
