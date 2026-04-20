@@ -35,6 +35,7 @@ W0(1) = 0.5671432904097838729999686622103575
 ## Modules
 
 - [`qfloat_t`](qfloat.md)
+- [`qcomplex_t`](qcomplex.md)
 - [`dval_t`](dval.md)
 - [`datetime_t`](datetime.md)
 - [`dictionary_t`](dictionary.md)
@@ -92,6 +93,7 @@ This directory contains the longer module documentation for MARS.
 ## Modules
 
 - [`qfloat_t`](qfloat.md) — double-double arithmetic and special functions
+- [`qcomplex_t`](qcomplex.md) — double-double complex arithmetic and special functions
 - [`dval_t`](dval.md) — differentiable expression DAGs
 - [`datetime_t`](datetime.md) — civil and astronomical date/time utilities
 - [`dictionary_t`](dictionary.md) — generic key/value storage
@@ -99,8 +101,7 @@ This directory contains the longer module documentation for MARS.
 - [`array_t`](array.md) — generic array storage
 - [`string_t`](string.md) — UTF-8-aware dynamic strings
 - [`bitset_t`](bitset.md) — dynamic thread-safe bitset
-- [`integrator_t`](integrator.md) — adaptive G7K15 numerical integrator
-- [`integrator_t`](integrator.md) — adaptive G7K15 numerical integrator
+- [`integrator_t`](integrator.md) — adaptive G7K15 / Turán T15 numerical integrator
 
 ## Guides
 

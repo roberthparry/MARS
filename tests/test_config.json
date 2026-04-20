@@ -565,5 +565,43 @@
     "test_slice_view_ops": true,
     "test_stack_ints": true,
     "test_stack_strings": true
+  },
+  "tests/test_qcomplex.c": {
+    "test_arithmetic_group": {
+      "enabled": true,
+      "test_add_sub": true,
+      "test_mul_div": true,
+      "test_conj": true,
+      "test_abs_arg": true
+    },
+    "test_elementary_group": {
+      "enabled": true,
+      "test_exp": true,
+      "test_log": true,
+      "test_pow_sqrt": true,
+      "test_euler_identity": true
+    },
+    "test_trig_group": {
+      "enabled": true,
+      "test_trig": true,
+      "test_hyperbolic": true
+    },
+    "test_special_group": {
+      "enabled": true,
+      "test_erf": true,
+      "test_erfinv": true,
+      "test_gamma": true,
+      "test_digamma": true,
+      "test_gammainv": true,
+      "test_beta": true,
+      "test_productlog": true,
+      "test_gammainc": true,
+      "test_ei_e1": true
+    },
+    "test_util_group": {
+      "enabled": true,
+      "test_utility": true,
+      "test_comparison": true
+    }
   }
 }
