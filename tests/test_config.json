@@ -304,7 +304,16 @@
       "test_exp_log": true,
       "test_qf_exp": true,
       "test_qf_log": true,
-      "test_stability": true
+      "test_stability": true,
+      "test_qf_add_double": true,
+      "test_qf_mul_double": true,
+      "test_qf_sqr": true,
+      "test_qf_ldexp": true,
+      "test_qf_mul_pow10": true,
+      "test_qf_floor": true,
+      "test_qf_cmp": true,
+      "test_qf_signbit": true,
+      "test_qf_isinf": true
     },
     "test_strings": {
       "enabled": true,
@@ -316,7 +325,8 @@
     },
     "test_printf": {
       "enabled": true,
-      "test_qf_sprintf_and_printf": true
+      "test_qf_sprintf_and_printf": true,
+      "test_qf_vsprintf": true
     },
     "test_qf_sprintf_and_printf": {
       "enabled": true,
@@ -372,7 +382,9 @@
       "test_qf_erfcinv": true,
       "test_qf_lgamma": true,
       "test_qf_digamma": true,
-      "test_qf_gammainv": true
+      "test_qf_gammainv": true,
+      "test_qf_trigamma": true,
+      "test_qf_tetragamma": true
     },
     "test_lambert_w": {
       "enabled": true,
@@ -572,7 +584,8 @@
       "test_add_sub": true,
       "test_mul_div": true,
       "test_conj": true,
-      "test_abs_arg": true
+      "test_abs_arg": true,
+      "test_polar": true
     },
     "test_elementary_group": {
       "enabled": true,
@@ -602,7 +615,8 @@
     "test_util_group": {
       "enabled": true,
       "test_utility": true,
-      "test_comparison": true
+      "test_comparison": true,
+      "test_printf": true
     }
   }
 }

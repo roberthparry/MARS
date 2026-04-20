@@ -15,6 +15,7 @@ static void print_qc(const char *label, qcomplex_t z)
     char buf[256];
     qc_to_string(z, buf, sizeof(buf));
     printf("    %s = %s\n", label, buf);
+    fflush(stdout);
 }
 
 static void check_qc(const char *label, qcomplex_t got, qcomplex_t expected, double tol)
@@ -783,6 +784,157 @@ static void test_comparison(void)
 }
 
 /* ====================================================================
+   Polar form
+   ==================================================================== */
+
+static void test_polar(void)
+{
+    printf(C_CYAN "TEST: qc_from_polar / qc_to_polar\n" C_RESET);
+
+    /* from_polar then to_polar round-trips */
+    {
+        qfloat_t r     = qf_from_double(5.0);
+        qfloat_t theta = QF_PI_2;
+        qcomplex_t z   = qc_from_polar(r, theta);
+        check_qc("from_polar(5, π/2) = 5i", z, qcz(0.0, 5.0), 1e-28);
+    }
+    {
+        qfloat_t r     = qf_from_double(1.0);
+        qfloat_t theta = QF_PI;
+        qcomplex_t z   = qc_from_polar(r, theta);
+        check_qc("from_polar(1, π) = -1", z, qcr(-1.0), 1e-28);
+    }
+    {
+        qfloat_t r     = qf_from_double(2.0);
+        qfloat_t theta = qf_from_double(0.0);
+        qcomplex_t z   = qc_from_polar(r, theta);
+        check_qc("from_polar(2, 0) = 2", z, qcr(2.0), 1e-30);
+    }
+    {
+        /* Euler: e^(iπ/4) = (1+i)/√2 */
+        qfloat_t r     = qf_from_double(1.0);
+        qfloat_t theta = qf_ldexp(QF_PI, -2);   /* π/4 */
+        qcomplex_t z   = qc_from_polar(r, theta);
+        qfloat_t inv_sqrt2 = qf_div(qf_from_double(1.0), qf_sqrt(qf_from_double(2.0)));
+        check_qc("from_polar(1, π/4) = (1+i)/√2", z, qc_make(inv_sqrt2, inv_sqrt2), 1e-28);
+    }
+
+    /* to_polar recovers r and theta */
+    {
+        qcomplex_t z = qcz(3.0, 4.0);
+        qfloat_t r, theta;
+        qc_to_polar(z, &r, &theta);
+        check_qf("to_polar(3+4i): r = 5",   r,     qf_from_double(5.0),  1e-30);
+        check_qf("to_polar(3+4i): theta = atan2(4,3)", theta, qf_atan2(qf_from_double(4.0), qf_from_double(3.0)), 1e-30);
+    }
+    {
+        qcomplex_t z = qcr(-2.0);
+        qfloat_t r, theta;
+        qc_to_polar(z, &r, &theta);
+        check_qf("to_polar(-2): r = 2",   r,     qf_from_double(2.0), 1e-30);
+        check_qf("to_polar(-2): theta = π", theta, QF_PI,              1e-30);
+    }
+
+    /* from_polar(to_polar(z)) == z */
+    {
+        qcomplex_t z = qcz(1.5, -2.5);
+        qfloat_t r, theta;
+        qc_to_polar(z, &r, &theta);
+        check_qc("round-trip: from_polar(to_polar(1.5-2.5i))", qc_from_polar(r, theta), z, 1e-28);
+    }
+}
+
+/* ====================================================================
+   printf (qc_sprintf / qc_vsprintf)
+   ==================================================================== */
+
+static void check_str(const char *label, const char *got, const char *expected)
+{
+    tests_run++;
+    int ok = (strcmp(got, expected) == 0);
+    if (!ok) tests_failed++;
+    if (ok)
+        printf(C_GREEN "  OK: %s\n" C_RESET, label);
+    else
+        printf(C_RED "  FAIL: %s\n    got      = \"%s\"\n    expected = \"%s\"\n" C_RESET,
+               label, got, expected);
+}
+
+static void test_printf(void)
+{
+    char buf[512];
+    qcomplex_t z35   = qcz(3.0,  5.0);
+    qcomplex_t zneg  = qcz(3.0, -5.0);
+    qcomplex_t pure_im = qci(2.5);
+    qcomplex_t pure_re = qcr(-1.0);
+
+    /* Basic fixed %z */
+    qc_sprintf(buf, sizeof(buf), "%z", z35);
+    check_str("%z basic positive im", buf, "3 + 5i");
+
+    qc_sprintf(buf, sizeof(buf), "%z", zneg);
+    check_str("%z negative im", buf, "3 - 5i");
+
+    /* Precision */
+    qc_sprintf(buf, sizeof(buf), "%.2z", z35);
+    check_str("%.2z precision 2", buf, "3.00 + 5.00i");
+
+    qc_sprintf(buf, sizeof(buf), "%.4z", qcz(1.5, -2.25));
+    check_str("%.4z negative im precision 4", buf, "1.5000 - 2.2500i");
+
+    /* Scientific %Z */
+    qc_sprintf(buf, sizeof(buf), "%.2Z", z35);
+    check_str("%.2Z scientific", buf, "3.00e+0 + 5.00e+0i");
+
+    /* Width and alignment */
+    qc_sprintf(buf, sizeof(buf), "%20.2z", z35);
+    check_str("%20.2z right-align", buf, "      3.00 + 5.00i");
+
+    qc_sprintf(buf, sizeof(buf), "%-20.2z|", z35);
+    check_str("%-20.2z left-align", buf, "3.00 + 5.00i        |");
+
+    /* Pure imaginary / pure real */
+    qc_sprintf(buf, sizeof(buf), "%.1z", pure_im);
+    check_str("%.1z pure imaginary", buf, "0.0 + 2.5i");
+
+    qc_sprintf(buf, sizeof(buf), "%.1z", pure_re);
+    check_str("%.1z pure real", buf, "-1.0 + 0.0i");
+
+    /* %q / %Q passthrough */
+    qfloat_t pi = QF_PI;
+    qc_sprintf(buf, sizeof(buf), "%.5q", pi);
+    char ref[64];
+    qf_sprintf(ref, sizeof(ref), "%.5q", pi);
+    check_str("%q delegates to qf_sprintf", buf, ref);
+
+    qc_sprintf(buf, sizeof(buf), "%.3Q", pi);
+    qf_sprintf(ref, sizeof(ref), "%.3Q", pi);
+    check_str("%Q delegates to qf_sprintf", buf, ref);
+
+    /* Standard specifiers */
+    qc_sprintf(buf, sizeof(buf), "%d + %s", 42, "hello");
+    check_str("%d and %s", buf, "42 + hello");
+
+    qc_sprintf(buf, sizeof(buf), "%.2f", 3.14159);
+    check_str("%.2f", buf, "3.14");
+
+    qc_sprintf(buf, sizeof(buf), "%%");
+    check_str("%%%%", buf, "%");
+
+    /* Mixed complex and standard in one format */
+    qc_sprintf(buf, sizeof(buf), "z=%.2z n=%d", z35, 7);
+    check_str("mixed %%z and %%d", buf, "z=3.00 + 5.00i n=7");
+
+    /* Return value: count of characters */
+    int n = qc_sprintf(buf, sizeof(buf), "%.1z", z35);
+    check_bool("qc_sprintf return value matches strlen", n == (int)strlen(buf));
+
+    /* Dry-run (NULL buffer): count only */
+     int n2 = qc_sprintf(NULL, 0, "%.1z", z35);
+     check_bool("qc_sprintf dry-run count matches", n == n2);
+}
+
+/* ====================================================================
    Test groups
    ==================================================================== */
 
@@ -792,6 +944,7 @@ static void test_arithmetic_group(void)
     RUN_TEST(test_mul_div,  __func__);
     RUN_TEST(test_conj,     __func__);
     RUN_TEST(test_abs_arg,  __func__);
+    RUN_TEST(test_polar,    __func__);
 }
 
 static void test_elementary_group(void)
@@ -825,6 +978,7 @@ static void test_util_group(void)
 {
     RUN_TEST(test_utility,   __func__);
     RUN_TEST(test_comparison, __func__);
+    RUN_TEST(test_printf,    __func__);
 }
 
 /* ====================================================================

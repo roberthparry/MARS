@@ -4572,6 +4572,404 @@ static void test_qf_ei_e1_all(void)
     RUN_TEST(test_ei_values, __func__);
 }
 
+static void test_qf_add_double(void) {
+    printf(C_CYAN "TEST: qf_add_double\n" C_RESET);
+    char buf[256], buf_exp[256];
+
+    struct { const char *xs; double y; const char *expected; } tests[] = {
+        { "1",                   0.5,   "1.5"                              },
+        { "0",                   1.0,   "1"                                },
+        { "-3",                  3.0,   "0"                                },
+        { "1.23456789012345678", 1e-15, "1.23456789012345778"              },
+        { "0",                   0.0,   "0"                                },
+        { NULL, 0.0, NULL }
+    };
+
+    for (int i = 0; tests[i].xs != NULL; i++) {
+        qfloat_t x   = qf_from_string(tests[i].xs);
+        qfloat_t got = qf_add_double(x, tests[i].y);
+        qfloat_t exp = qf_from_string(tests[i].expected);
+        qf_to_string(got, buf, sizeof(buf));
+        qf_to_string(exp, buf_exp, sizeof(buf_exp));
+        if (qf_close(got, exp, 1e-28)) {
+            printf("%s  OK: add_double(%s, %.17g)%s\n", C_GREEN, tests[i].xs, tests[i].y, C_RESET);
+        } else {
+            printf("%s  FAIL: add_double(%s, %.17g)%s  [%s:%d]\n", C_RED, tests[i].xs, tests[i].y, C_RESET, __FILE__, __LINE__);
+            printf("    got      = %s\n", buf);
+            printf("    expected = %s\n", buf_exp);
+            TEST_FAIL();
+        }
+    }
+    printf("\n");
+}
+
+static void test_qf_mul_double(void) {
+    printf(C_CYAN "TEST: qf_mul_double\n" C_RESET);
+    char buf[256], buf_exp[256];
+
+    struct { const char *xs; double y; const char *expected; } tests[] = {
+        { "2",   3.0,   "6"   },
+        { "0",   5.0,   "0"   },
+        { "-1",  4.0,  "-4"   },
+        { "1",   0.5,   "0.5" },
+        { "3",  -2.0,  "-6"   },
+        { NULL, 0.0, NULL }
+    };
+
+    for (int i = 0; tests[i].xs != NULL; i++) {
+        qfloat_t x   = qf_from_string(tests[i].xs);
+        qfloat_t got = qf_mul_double(x, tests[i].y);
+        qfloat_t exp = qf_from_string(tests[i].expected);
+        qf_to_string(got, buf, sizeof(buf));
+        qf_to_string(exp, buf_exp, sizeof(buf_exp));
+        if (qf_close(got, exp, 1e-28)) {
+            printf("%s  OK: mul_double(%s, %.17g)%s\n", C_GREEN, tests[i].xs, tests[i].y, C_RESET);
+        } else {
+            printf("%s  FAIL: mul_double(%s, %.17g)%s  [%s:%d]\n", C_RED, tests[i].xs, tests[i].y, C_RESET, __FILE__, __LINE__);
+            printf("    got      = %s\n", buf);
+            printf("    expected = %s\n", buf_exp);
+            TEST_FAIL();
+        }
+    }
+    printf("\n");
+}
+
+static void test_qf_cmp(void) {
+    printf(C_CYAN "TEST: qf_cmp / qf_lt / qf_le / qf_gt / qf_ge\n" C_RESET);
+
+    struct { const char *as; const char *bs; int want_cmp; } tests[] = {
+        { "1",  "2",  -1 },
+        { "2",  "1",   1 },
+        { "3",  "3",   0 },
+        { "-1", "0",  -1 },
+        { "0",  "-1",  1 },
+        { NULL, NULL,  0 }
+    };
+
+    for (int i = 0; tests[i].as != NULL; i++) {
+        qfloat_t a = qf_from_string(tests[i].as);
+        qfloat_t b = qf_from_string(tests[i].bs);
+        int c = qf_cmp(a, b);
+
+        int ok = (c == tests[i].want_cmp)
+              && (qf_lt(a, b) == (tests[i].want_cmp < 0))
+              && (qf_le(a, b) == (tests[i].want_cmp <= 0))
+              && (qf_gt(a, b) == (tests[i].want_cmp > 0))
+              && (qf_ge(a, b) == (tests[i].want_cmp >= 0));
+
+        if (ok) {
+            printf("%s  OK: cmp(%s, %s) = %d%s\n", C_GREEN, tests[i].as, tests[i].bs, c, C_RESET);
+        } else {
+            printf("%s  FAIL: cmp(%s, %s): got %d want %d%s  [%s:%d]\n",
+                   C_RED, tests[i].as, tests[i].bs, c, tests[i].want_cmp, C_RESET, __FILE__, __LINE__);
+            TEST_FAIL();
+        }
+    }
+    printf("\n");
+}
+
+static void test_qf_floor(void) {
+    printf(C_CYAN "TEST: qf_floor\n" C_RESET);
+    char buf[256], buf_exp[256];
+
+    struct { const char *xs; const char *expected; } tests[] = {
+        { "2.9",  "2"  },
+        { "2.0",  "2"  },
+        { "-2.1", "-3" },
+        { "-2.0", "-2" },
+        { "0.5",  "0"  },
+        { "-0.5", "-1" },
+        { NULL, NULL }
+    };
+
+    for (int i = 0; tests[i].xs != NULL; i++) {
+        qfloat_t x   = qf_from_string(tests[i].xs);
+        qfloat_t got = qf_floor(x);
+        qfloat_t exp = qf_from_string(tests[i].expected);
+        qf_to_string(got, buf, sizeof(buf));
+        qf_to_string(exp, buf_exp, sizeof(buf_exp));
+        if (qf_close(got, exp, 1e-30)) {
+            printf("%s  OK: floor(%s) = %s%s\n", C_GREEN, tests[i].xs, buf, C_RESET);
+        } else {
+            printf("%s  FAIL: floor(%s)%s  [%s:%d]\n", C_RED, tests[i].xs, C_RESET, __FILE__, __LINE__);
+            printf("    got      = %s\n", buf);
+            printf("    expected = %s\n", buf_exp);
+            TEST_FAIL();
+        }
+    }
+    printf("\n");
+}
+
+static void test_qf_ldexp(void) {
+    printf(C_CYAN "TEST: qf_ldexp\n" C_RESET);
+    char buf[256], buf_exp[256];
+
+    struct { const char *xs; int k; const char *expected; } tests[] = {
+        { "1",   3,   "8"    },
+        { "1",  -1,   "0.5"  },
+        { "3",   2,   "12"   },
+        { "1",   0,   "1"    },
+        { "-5",  1,  "-10"   },
+        { NULL,  0,   NULL   }
+    };
+
+    for (int i = 0; tests[i].xs != NULL; i++) {
+        qfloat_t x   = qf_from_string(tests[i].xs);
+        qfloat_t got = qf_ldexp(x, tests[i].k);
+        qfloat_t exp = qf_from_string(tests[i].expected);
+        qf_to_string(got, buf, sizeof(buf));
+        qf_to_string(exp, buf_exp, sizeof(buf_exp));
+        if (qf_close(got, exp, 1e-30)) {
+            printf("%s  OK: ldexp(%s, %d) = %s%s\n", C_GREEN, tests[i].xs, tests[i].k, buf, C_RESET);
+        } else {
+            printf("%s  FAIL: ldexp(%s, %d)%s  [%s:%d]\n", C_RED, tests[i].xs, tests[i].k, C_RESET, __FILE__, __LINE__);
+            printf("    got      = %s\n", buf);
+            printf("    expected = %s\n", buf_exp);
+            TEST_FAIL();
+        }
+    }
+    printf("\n");
+}
+
+static void test_qf_sqr(void) {
+    printf(C_CYAN "TEST: qf_sqr\n" C_RESET);
+    char buf[256], buf_exp[256];
+
+    struct { const char *xs; const char *expected; } tests[] = {
+        { "3",    "9"   },
+        { "-4",   "16"  },
+        { "0.5",  "0.25" },
+        { "0",    "0"   },
+        { "1",    "1"   },
+        { NULL, NULL }
+    };
+
+    for (int i = 0; tests[i].xs != NULL; i++) {
+        qfloat_t x   = qf_from_string(tests[i].xs);
+        qfloat_t got = qf_sqr(x);
+        qfloat_t exp = qf_from_string(tests[i].expected);
+        qfloat_t ref = qf_mul(x, x);
+        qf_to_string(got, buf, sizeof(buf));
+        qf_to_string(exp, buf_exp, sizeof(buf_exp));
+        if (qf_close(got, exp, 1e-30) && qf_close(got, ref, 1e-30)) {
+            printf("%s  OK: sqr(%s) = %s%s\n", C_GREEN, tests[i].xs, buf, C_RESET);
+        } else {
+            printf("%s  FAIL: sqr(%s)%s  [%s:%d]\n", C_RED, tests[i].xs, C_RESET, __FILE__, __LINE__);
+            printf("    got      = %s\n", buf);
+            printf("    expected = %s\n", buf_exp);
+            TEST_FAIL();
+        }
+    }
+    printf("\n");
+}
+
+static void test_qf_mul_pow10(void) {
+    printf(C_CYAN "TEST: qf_mul_pow10\n" C_RESET);
+    char buf[256], buf_exp[256];
+
+    struct { const char *xs; int k; const char *expected; double tol; } tests[] = {
+        { "1",    3,  "1000",  1e-28 },
+        { "1",   -3,  "0.001", 1e-15 },  /* non-exact binary fraction */
+        { "2.5",  2,  "250",   1e-28 },
+        { "3",    0,  "3",     1e-28 },
+        { "-7",   1,  "-70",   1e-28 },
+        { NULL,   0,  NULL,    0.0   }
+    };
+
+    for (int i = 0; tests[i].xs != NULL; i++) {
+        qfloat_t x   = qf_from_string(tests[i].xs);
+        qfloat_t got = qf_mul_pow10(x, tests[i].k);
+        qfloat_t exp = qf_from_string(tests[i].expected);
+        qf_to_string(got, buf, sizeof(buf));
+        qf_to_string(exp, buf_exp, sizeof(buf_exp));
+        if (qf_close(got, exp, tests[i].tol)) {
+            printf("%s  OK: mul_pow10(%s, %d) = %s%s\n", C_GREEN, tests[i].xs, tests[i].k, buf, C_RESET);
+        } else {
+            printf("%s  FAIL: mul_pow10(%s, %d)%s  [%s:%d]\n", C_RED, tests[i].xs, tests[i].k, C_RESET, __FILE__, __LINE__);
+            printf("    got      = %s\n", buf);
+            printf("    expected = %s\n", buf_exp);
+            TEST_FAIL();
+        }
+    }
+    printf("\n");
+}
+
+static void test_qf_signbit(void) {
+    printf(C_CYAN "TEST: qf_signbit\n" C_RESET);
+
+    struct { const char *xs; int expected; } tests[] = {
+        { "1",    0 },
+        { "-1",   1 },
+        { "0",    0 },
+        { "1e30", 0 },
+        { "-1e30",1 },
+        { NULL,   0 }
+    };
+
+    for (int i = 0; tests[i].xs != NULL; i++) {
+        qfloat_t x = qf_from_string(tests[i].xs);
+        int got    = qf_signbit(x);
+        if (got == tests[i].expected) {
+            printf("%s  OK: signbit(%s) = %d%s\n", C_GREEN, tests[i].xs, got, C_RESET);
+        } else {
+            printf("%s  FAIL: signbit(%s): got %d want %d%s  [%s:%d]\n",
+                   C_RED, tests[i].xs, got, tests[i].expected, C_RESET, __FILE__, __LINE__);
+            TEST_FAIL();
+        }
+    }
+    printf("\n");
+}
+
+static void test_qf_isinf(void) {
+    printf(C_CYAN "TEST: qf_isinf\n" C_RESET);
+
+    qfloat_t pos_inf = qf_from_double(1.0 / 0.0);
+    qfloat_t neg_inf = qf_from_double(-1.0 / 0.0);
+    qfloat_t normal  = qf_from_string("1");
+    qfloat_t nan_val = qf_from_double(0.0 / 0.0);
+
+    struct { const char *label; qfloat_t x; bool expected; } tests[] = {
+        { "+INF",   pos_inf, true  },
+        { "-INF",   neg_inf, true  },
+        { "1",      normal,  false },
+        { "NaN",    nan_val, false },
+    };
+
+    int n = (int)(sizeof(tests) / sizeof(tests[0]));
+    for (int i = 0; i < n; i++) {
+        bool got = qf_isinf(tests[i].x);
+        if (got == tests[i].expected) {
+            printf("%s  OK: isinf(%s) = %s%s\n", C_GREEN, tests[i].label, got ? "true" : "false", C_RESET);
+        } else {
+            printf("%s  FAIL: isinf(%s): got %s want %s%s  [%s:%d]\n",
+                   C_RED, tests[i].label, got ? "true" : "false",
+                   tests[i].expected ? "true" : "false", C_RESET, __FILE__, __LINE__);
+            TEST_FAIL();
+        }
+    }
+    printf("\n");
+}
+
+static void test_qf_vsprintf(void) {
+    printf(C_CYAN "TEST: qf_vsprintf\n" C_RESET);
+
+    /* qf_sprintf is the public wrapper around qf_vsprintf; test via it */
+    char buf[256];
+    qfloat_t x = qf_from_string("3.14159265358979323846264338327950288");
+    qfloat_t y = qf_from_string("-2.71828182845904523536028747135266249");
+
+    /* %q should round-trip: qf_from_string(qf_sprintf(...)) == x */
+    qf_sprintf(buf, sizeof(buf), "%q", x);
+    qfloat_t rt = qf_from_string(buf);
+    if (qf_close(rt, x, 1e-28)) {
+        printf("%s  OK: vsprintf %%q round-trips correctly%s\n", C_GREEN, C_RESET);
+    } else {
+        printf("%s  FAIL: vsprintf %%q round-trip%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
+        printf("    formatted = %s\n", buf);
+        TEST_FAIL();
+    }
+
+    /* negative value round-trip */
+    qf_sprintf(buf, sizeof(buf), "%q", y);
+    rt = qf_from_string(buf);
+    if (qf_close(rt, y, 1e-28)) {
+        printf("%s  OK: vsprintf %%q negative round-trips%s\n", C_GREEN, C_RESET);
+    } else {
+        printf("%s  FAIL: vsprintf %%q negative round-trip%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
+        printf("    formatted = %s\n", buf);
+        TEST_FAIL();
+    }
+
+    /* mixing %q with surrounding text: prefix and suffix must appear */
+    qf_sprintf(buf, sizeof(buf), "val=%q!", x);
+    char inner[256];
+    qf_sprintf(inner, sizeof(inner), "%q", x);
+    char expected[512];
+    snprintf(expected, sizeof(expected), "val=%s!", inner);
+    if (strcmp(buf, expected) == 0) {
+        printf("%s  OK: vsprintf surrounding text%s\n", C_GREEN, C_RESET);
+    } else {
+        printf("%s  FAIL: vsprintf surrounding text%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
+        printf("    got      = %s\n", buf);
+        printf("    expected = %s\n", expected);
+        TEST_FAIL();
+    }
+    printf("\n");
+}
+
+static void test_qf_trigamma(void) {
+    printf(C_CYAN "TEST: qf_trigamma\n" C_RESET);
+    char buf[256], buf_exp[256];
+
+    /* ψ₁(n) = π²/6 - sum_{k=1}^{n-1} 1/k²; ψ₁(1/2) = π²/2 */
+    struct { const char *xs; const char *expected; double tol; } tests[] = {
+        /* ψ₁(1) = π²/6 */
+        { "1",   "1.6449340668482264364724151666460251892189499012068", 1e-28 },
+        /* ψ₁(2) = ψ₁(1) - 1 */
+        { "2",   "0.6449340668482264364724151666460251892189499012068", 1e-28 },
+        /* ψ₁(1/2) = π²/2 = 4.9348022005446793094172454999380755676568... */
+        { "0.5", "4.9348022005446793094172454999380755676568497036204", 1e-25 },
+        /* ψ₁(3) = ψ₁(1) - 1 - 1/4 */
+        { "3",   "0.3949340668482264364724151666460251892189499012068", 1e-28 },
+        { NULL, NULL, 0.0 }
+    };
+
+    for (int i = 0; tests[i].xs != NULL; i++) {
+        qfloat_t x   = qf_from_string(tests[i].xs);
+        qfloat_t got = qf_trigamma(x);
+        qfloat_t exp = qf_from_string(tests[i].expected);
+        qf_to_string(got, buf, sizeof(buf));
+        qf_to_string(exp, buf_exp, sizeof(buf_exp));
+        if (qf_close(got, exp, tests[i].tol)) {
+            printf("%s  OK: trigamma(%s)%s\n", C_GREEN, tests[i].xs, C_RESET);
+            printf("    got      = %s\n", buf);
+            printf("    expected = %s\n", buf_exp);
+        } else {
+            printf("%s  FAIL: trigamma(%s)%s  [%s:%d]\n", C_RED, tests[i].xs, C_RESET, __FILE__, __LINE__);
+            printf("    got      = %s\n", buf);
+            printf("    expected = %s\n", buf_exp);
+            TEST_FAIL();
+        }
+    }
+    printf("\n");
+}
+
+static void test_qf_tetragamma(void) {
+    printf(C_CYAN "TEST: qf_tetragamma\n" C_RESET);
+    char buf[256], buf_exp[256];
+
+    /* ψ''(x); recurrence ψ''(x+1) = ψ''(x) + 2/x³
+       ψ''(1) = -2ζ(3) = -2 * 1.2020569031595942853997... = -2.4041138063191885707994... */
+    struct { const char *xs; const char *expected; double tol; } tests[] = {
+        /* ψ''(1) = -2ζ(3) */
+        { "1",  "-2.4041138063191885707994763230228999815299725846810", 1e-25 },
+        /* ψ''(2) = ψ''(1) + 2 */
+        { "2",  "-0.4041138063191885707994763230228999815299725846810", 1e-25 },
+        /* ψ''(3) = ψ''(2) + 2/8 */
+        { "3",  "-0.1541138063191885707994763230228999815299725846810", 1e-25 },
+        { NULL, NULL, 0.0 }
+    };
+
+    for (int i = 0; tests[i].xs != NULL; i++) {
+        qfloat_t x   = qf_from_string(tests[i].xs);
+        qfloat_t got = qf_tetragamma(x);
+        qfloat_t exp = qf_from_string(tests[i].expected);
+        qf_to_string(got, buf, sizeof(buf));
+        qf_to_string(exp, buf_exp, sizeof(buf_exp));
+        if (qf_close(got, exp, tests[i].tol)) {
+            printf("%s  OK: tetragamma(%s)%s\n", C_GREEN, tests[i].xs, C_RESET);
+            printf("    got      = %s\n", buf);
+            printf("    expected = %s\n", buf_exp);
+        } else {
+            printf("%s  FAIL: tetragamma(%s)%s  [%s:%d]\n", C_RED, tests[i].xs, C_RESET, __FILE__, __LINE__);
+            printf("    got      = %s\n", buf);
+            printf("    expected = %s\n", buf_exp);
+            TEST_FAIL();
+        }
+    }
+    printf("\n");
+}
+
 static void test_arithmetic(void) {
     RUN_TEST(test_add, __func__);
     RUN_TEST(test_mul, __func__);
@@ -4581,6 +4979,15 @@ static void test_arithmetic(void) {
     RUN_TEST(test_qf_exp, __func__);
     RUN_TEST(test_qf_log, __func__);
     RUN_TEST(test_stability, __func__);
+    RUN_TEST(test_qf_add_double, __func__);
+    RUN_TEST(test_qf_mul_double, __func__);
+    RUN_TEST(test_qf_sqr, __func__);
+    RUN_TEST(test_qf_ldexp, __func__);
+    RUN_TEST(test_qf_mul_pow10, __func__);
+    RUN_TEST(test_qf_floor, __func__);
+    RUN_TEST(test_qf_cmp, __func__);
+    RUN_TEST(test_qf_signbit, __func__);
+    RUN_TEST(test_qf_isinf, __func__);
 }
 
 void test_strings(void) {
@@ -4593,6 +5000,7 @@ void test_strings(void) {
 
 void test_printf(void) {
     RUN_TEST(test_qf_sprintf_and_printf, __func__);
+    RUN_TEST(test_qf_vsprintf, __func__);
 }
 
 void test_power(void) {
@@ -4632,6 +5040,8 @@ void test_gamma_erf_erfc_erfinv_erfcinv_digamma(void) {
     RUN_TEST(test_qf_lgamma, __func__);
     RUN_TEST(test_qf_digamma, __func__);
     RUN_TEST(test_qf_gammainv, __func__);
+    RUN_TEST(test_qf_trigamma, __func__);
+    RUN_TEST(test_qf_tetragamma, __func__);
 }
 
 void test_lambert_w(void) {

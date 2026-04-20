@@ -42,6 +42,16 @@ qfloat_t   qc_arg(qcomplex_t z);                 /**< arg(z) */
 /** @} */
 
 /**
+ * @name Polar form
+ * @{
+ */
+/** Construct z = r * exp(i*theta) from polar coordinates. */
+qcomplex_t qc_from_polar(qfloat_t r, qfloat_t theta);
+/** Decompose z into (r, theta) where r = |z| and theta = arg(z) in (-pi, pi]. */
+void       qc_to_polar(qcomplex_t z, qfloat_t *r, qfloat_t *theta);
+/** @} */
+
+/**
  * @name Elementary functions
  * @{
  */
@@ -134,5 +144,60 @@ bool qc_isneginf(qcomplex_t z);                  /**< isneginf(z) */
  * @param out_size Size of output buffer
  */
 void qc_to_string(qcomplex_t z, char *out, size_t out_size);
+
+/**
+ * @brief Internal printf-style formatter with full qcomplex_t and qfloat_t support.
+ *
+ * qc_vsprintf handles all standard printf specifiers plus:
+ *
+ *   - %z : fixed-decimal complex  — formats as "a + bi" or "a - bi" using %q per part
+ *   - %Z : scientific complex     — formats as "a + bi" or "a - bi" using %Q per part
+ *   - %q : fixed-decimal qfloat_t  (same as qf_vsprintf)
+ *   - %Q : scientific qfloat_t    (same as qf_vsprintf)
+ *
+ * Flags (+, space, -, 0, #), width, and precision are fully supported.
+ * For %z/%Z, precision controls decimal places on each component; width
+ * and alignment flags apply to the assembled "a ± bi" string.
+ *
+ * IMPORTANT: qcomplex_t and qfloat_t arguments are passed BY VALUE.
+ *
+ *     qcomplex_t z = qc_make(qf_from_double(3.0), qf_from_double(4.0));
+ *     qc_printf("%z\n", z);          // "3 + 4i"
+ *     qc_printf("%.4z\n", z);        // "3.0000 + 4.0000i"
+ *     qc_printf("%Z\n", z);          // "3e+0 + 4e+0i"
+ *
+ * @param out      Output buffer (NULL for dry-run count).
+ * @param out_size Size of output buffer.
+ * @param fmt      Format string.
+ * @param ap       Variadic argument list.
+ * @return Number of characters written (excluding null terminator).
+ */
+int qc_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap);
+
+/**
+ * @brief printf-style formatter with full qcomplex_t and qfloat_t support.
+ *
+ * Extends snprintf() with %z, %Z (qcomplex_t) and %q, %Q (qfloat_t).
+ * All other specifiers behave exactly like snprintf().
+ *
+ * @param out      Output buffer.
+ * @param out_size Size of output buffer.
+ * @param fmt      Format string.
+ * @param ...      Additional arguments.
+ * @return Number of characters written (excluding null terminator).
+ */
+int qc_sprintf(char *out, size_t out_size, const char *fmt, ...);
+
+/**
+ * @brief printf to stdout with full qcomplex_t and qfloat_t support.
+ *
+ * Extends printf() with %z, %Z (qcomplex_t) and %q, %Q (qfloat_t).
+ * All other specifiers behave exactly like printf().
+ *
+ * @param fmt Format string.
+ * @param ... Additional arguments.
+ * @return Number of characters written.
+ */
+int qc_printf(const char *fmt, ...);
 
 #endif // QCOMPLEX_H
