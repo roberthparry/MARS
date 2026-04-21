@@ -618,5 +618,19 @@
       "test_comparison": true,
       "test_printf": true
     }
+  },
+  "tests/test_matrix.c": {
+    "test_creation": true,
+    "test_reading": true,
+    "test_writing": true,
+    "test_add_sub": true,
+    "test_multiply": true,
+    "test_transpose_conjugate": true,
+    "test_identity_get": true,
+    "test_identity_set": true,
+    "test_add_sub_qf": true,
+    "test_add_sub_qc": true,
+    "test_multiply_qf": true,
+    "test_multiply_qc": true
   }
 }
