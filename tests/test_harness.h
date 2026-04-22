@@ -46,6 +46,10 @@
 #define C_CYAN    "\x1b[36m"
 #define C_RESET   "\x1b[0m"
 #define C_BOLD    "\x1b[1m"
+#define C_DIM     "\x1b[2m"
+#define C_WHITE   "\x1b[97m"
+#define C_GREY    "\x1b[90m"
+#define C_MAGENTA "\x1b[95m"
 
 /* Global test state */
 

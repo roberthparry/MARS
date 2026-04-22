@@ -10,15 +10,6 @@
 #define TEST_CONFIG_MODE TEST_CONFIG_GLOBAL
 #include "test_harness.h"
 
-/* ------------------------------------------------------------------ ANSI colours */
-
-#define C_RESET   "\x1b[0m"
-#define C_DIM     "\x1b[2m"
-#define C_CYAN    "\x1b[36m"
-#define C_WHITE   "\x1b[97m"
-#define C_GREY    "\x1b[90m"
-#define C_MAGENTA "\x1b[95m"
-
 /* ------------------------------------------------------------------ coloured scalar printers */
 
 static void d_to_coloured_string(double x, char *out, size_t out_size)
