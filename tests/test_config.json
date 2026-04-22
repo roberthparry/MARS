@@ -640,6 +640,26 @@
     "test_sub_mixed_qf_qc": true,
     "test_multiply_mixed_d_qf": true,
     "test_multiply_mixed_d_qc": true,
-    "test_multiply_mixed_qf_qc": true
+    "test_multiply_mixed_qf_qc": true,
+    "test_scalar_mul_d_d": true,
+    "test_scalar_mul_d_qf": true,
+    "test_scalar_mul_d_qc": true,
+    "test_scalar_mul_qf_d": true,
+    "test_scalar_mul_qc_qc": true,
+    "test_identity_arith_d": true,
+    "test_identity_arith_qf": true,
+    "test_identity_arith_qc": true,
+    "test_scalar_div_d_d": true,
+    "test_scalar_div_qf_qf": true,
+    "test_scalar_div_qc_qc": true,
+    "test_scalar_div_d_qf": true,
+    "test_scalar_div_qf_d": true,
+    "test_det_double": true,
+    "test_det_qfloat": true,
+    "test_det_qcomplex": true,
+    "test_inverse_double": true,
+    "test_inverse_qfloat": true,
+    "test_inverse_qcomplex": true,
+    "test_hermitian_op": true
   }
 }

@@ -3,6 +3,9 @@
 
 #include <stddef.h>
 
+#include "qfloat.h"
+#include "qcomplex.h"
+
 /**
  * @file matrix.h
  * @brief Generic high‑precision matrix type with pluggable element types
@@ -106,6 +109,38 @@ size_t mat_get_col_count(const matrix_t *A);
    Basic operations
    ------------------------------------------------------------------------- */
 
+/* Scalar multiplication */
+
+/**
+ * @brief Multiply a matrix by a double scalar.
+ */
+matrix_t *mat_scalar_mul_d(double s, matrix_t *A);
+
+/**
+ * @brief Multiply a matrix by a qfloat_t scalar.
+ */
+matrix_t *mat_scalar_mul_qf(qfloat_t s, matrix_t *A);
+
+/**
+ * @brief Multiply a matrix by a qcomplex_t scalar.
+ */
+matrix_t *mat_scalar_mul_qc(qcomplex_t s, matrix_t *A);
+
+/**
+ * @brief Divide a matrix by a double scalar.
+ */
+matrix_t *mat_scalar_div_d(double s, matrix_t *A);
+
+/**
+ * @brief Divide a matrix by a qfloat_t scalar.
+ */
+matrix_t *mat_scalar_div_qf(qfloat_t s, matrix_t *A);
+
+/**
+ * @brief Divide a matrix by a qcomplex_t scalar.
+ */
+matrix_t *mat_scalar_div_qc(qcomplex_t s, matrix_t *A);
+
 /**
  * @brief Add two matrices.
  */
@@ -130,6 +165,86 @@ matrix_t *mat_transpose(const matrix_t *A);
  * @brief Conjugate a matrix.
  */
 matrix_t *mat_conj(const matrix_t *A);
+
+/**
+ * @brief Compute the Hermitian (conjugate transpose) of a matrix.
+ * @param A The input matrix.
+ * @return A new matrix representing the Hermitian of A, or NULL on error.
+ */
+matrix_t *mat_hermitian(const matrix_t *A);
+
+/**
+ * @brief Compute the determinant of a square matrix.
+ * @param A The input square matrix.
+ * @param determinant Pointer to a buffer where the determinant will be stored.
+ * @return 0 on success, negative on error:
+ *         -1 : A is NULL
+ *         -2 : A is not square
+ *         -3 : allocation failure
+ */
+int mat_det(const matrix_t *A, void *determinant);
+
+/**
+ * @brief Compute the inverse of a square matrix.
+ * @param A The input square matrix.
+ * @return A new matrix representing the inverse of A, or NULL on error.
+ */
+matrix_t *mat_inverse(const matrix_t *A);
+
+/**
+ * @brief Compute all eigenvalues of a square matrix.
+ *
+ * Computes the complete set of eigenvalues of @p A. The matrix must
+ * be square. The eigenvalues are written into the user-provided buffer
+ * @p eigenvalues, which must have room for @c n values of the matrix's
+ * element type (double, qfloat_t, or qcomplex_t depending on @p A).
+ *
+ * @param[in]  A            The input matrix (must be square).
+ * @param[out] eigenvalues  Buffer of size @c n * elem_size to receive
+ *                          the eigenvalues.
+ *
+ * @return 0 on success, negative on error.
+ */
+int mat_eigenvalues(const matrix_t *A, void *eigenvalues);
+
+/**
+ * @brief Compute eigenvalues and eigenvectors of a square matrix.
+ *
+ * Computes both the eigenvalues and the corresponding eigenvectors of
+ * @p A. The matrix must be square. The eigenvalues are written into the
+ * user-provided buffer @p eigenvalues, which must have room for @c n
+ * values of the matrix's element type.
+ *
+ * The eigenvectors are returned as a newly allocated @c n×n matrix of
+ * the same element type as @p A. Each column of the returned matrix is
+ * an eigenvector. For Hermitian matrices, the eigenvectors are returned
+ * orthonormal.
+ *
+ * @param[in]  A             The input matrix (must be square).
+ * @param[out] eigenvalues   Buffer of size @c n * elem_size to receive
+ *                           the eigenvalues (may be NULL if only
+ *                           eigenvectors are desired).
+ * @param[out] eigenvectors  On success, set to a newly allocated matrix
+ *                           containing the eigenvectors.
+ *
+ * @return 0 on success, negative on error.
+ */
+int mat_eigendecompose(const matrix_t *A,
+                       void *eigenvalues,
+                       matrix_t **eigenvectors);
+
+/**
+ * @brief Compute only the eigenvectors of a square matrix.
+ *
+ * Convenience wrapper around mat_eigendecompose(). The eigenvalues are
+ * discarded. The returned matrix contains the eigenvectors as its columns.
+ * For Hermitian matrices, the eigenvectors are orthonormal.
+ *
+ * @param[in] A   The input matrix (must be square).
+ *
+ * @return A newly allocated matrix of eigenvectors, or NULL on error.
+ */
+matrix_t *mat_eigenvectors(const matrix_t *A);
 
 /* -------------------------------------------------------------------------
    Debugging / I/O

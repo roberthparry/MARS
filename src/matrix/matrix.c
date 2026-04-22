@@ -640,6 +640,120 @@ static inline const struct elem_vtable *elem_of(const struct matrix_t *A) {
     return A->elem;
 }
 
+matrix_t *mat_scalar_mul_d(double s, matrix_t *A)
+{
+    if (!A) return NULL;
+
+    elem_kind ak = elem_of(A)->kind;
+
+    /* scalar is double => left kind is ELEM_DOUBLE */
+    const binop_vtable *op = &binops[ELEM_DOUBLE][ak];
+    if (!op->mul || !op->result_elem)
+        return NULL;
+
+    const struct elem_vtable *re = op->result_elem;
+    matrix_t *R = re->create_matrix(A->rows, A->cols);
+    if (!R) return NULL;
+
+    unsigned char scalar_raw[64];
+    unsigned char a_raw[64];
+    unsigned char out_raw[64];
+
+    /* encode scalar as a double (left operand type) */
+    memcpy(scalar_raw, &s, sizeof(double));
+
+    for (size_t i = 0; i < A->rows; i++)
+        for (size_t j = 0; j < A->cols; j++) {
+            mat_get(A, i, j, a_raw);
+            op->mul(out_raw, scalar_raw, a_raw);
+            mat_set(R, i, j, out_raw);
+        }
+
+    return R;
+}
+
+matrix_t *mat_scalar_mul_qf(qfloat_t s, matrix_t *A)
+{
+    if (!A) return NULL;
+
+    elem_kind ak = elem_of(A)->kind;
+
+    /* scalar is qfloat => left kind is ELEM_QFLOAT */
+    const binop_vtable *op = &binops[ELEM_QFLOAT][ak];
+    if (!op->mul || !op->result_elem)
+        return NULL;
+
+    const struct elem_vtable *re = op->result_elem;
+    matrix_t *R = re->create_matrix(A->rows, A->cols);
+    if (!R) return NULL;
+
+    unsigned char scalar_raw[64];
+    unsigned char a_raw[64];
+    unsigned char out_raw[64];
+
+    /* encode scalar as a qfloat_t (left operand type) */
+    memcpy(scalar_raw, &s, sizeof(qfloat_t));
+
+    for (size_t i = 0; i < A->rows; i++)
+        for (size_t j = 0; j < A->cols; j++) {
+            mat_get(A, i, j, a_raw);
+            op->mul(out_raw, scalar_raw, a_raw);
+            mat_set(R, i, j, out_raw);
+        }
+
+    return R;
+}
+
+matrix_t *mat_scalar_mul_qc(qcomplex_t s, matrix_t *A)
+{
+    if (!A) return NULL;
+
+    elem_kind ak = elem_of(A)->kind;
+
+    /* scalar is qcomplex => left kind is ELEM_QCOMPLEX */
+    const binop_vtable *op = &binops[ELEM_QCOMPLEX][ak];
+    if (!op->mul || !op->result_elem)
+        return NULL;
+
+    const struct elem_vtable *re = op->result_elem;
+    matrix_t *R = re->create_matrix(A->rows, A->cols);
+    if (!R) return NULL;
+
+    unsigned char scalar_raw[64];
+    unsigned char a_raw[64];
+    unsigned char out_raw[64];
+
+    /* encode scalar as a qcomplex_t (left operand type) */
+    memcpy(scalar_raw, &s, sizeof(qcomplex_t));
+
+    for (size_t i = 0; i < A->rows; i++)
+        for (size_t j = 0; j < A->cols; j++) {
+            mat_get(A, i, j, a_raw);
+            op->mul(out_raw, scalar_raw, a_raw);
+            mat_set(R, i, j, out_raw);
+        }
+
+    return R;
+}
+
+matrix_t *mat_scalar_div_d(double s, matrix_t *A)
+{
+    double inv = 1.0 / s;
+    return mat_scalar_mul_d(inv, A);
+}
+
+matrix_t *mat_scalar_div_qf(qfloat_t s, matrix_t *A)
+{
+    qfloat_t inv = qf_div(QF_ONE, s);
+    return mat_scalar_mul_qf(inv, A);
+}
+
+matrix_t *mat_scalar_div_qc(qcomplex_t s, matrix_t *A)
+{
+    qcomplex_t inv = qc_inv(s);
+    return mat_scalar_mul_qc(inv, A);
+}
+
 /* ============================================================
    Mixed-type matrix operations (2D vtable driven)
    ============================================================ */
@@ -783,11 +897,239 @@ struct matrix_t *mat_conj(const struct matrix_t *A) {
     return C;
 }
 
+matrix_t *mat_hermitian(const matrix_t *A)
+{
+    if (!A)
+        return NULL;
+
+    /* Hermitian = conjugate transpose */
+    matrix_t *T = mat_transpose(A);
+    if (!T)
+        return NULL;
+
+    matrix_t *H = mat_conj(T);
+    mat_free(T);
+
+    return H;
+}
+
+int mat_det(const matrix_t *A, void *determinant)
+{
+    if (!A || !determinant)
+        return -1;
+
+    if (A->rows != A->cols)
+        return -2;
+
+    size_t n = A->rows;
+    const struct elem_vtable *e = A->elem;
+
+    /* 1×1 case */
+    if (n == 1) {
+        mat_get(A, 0, 0, determinant);
+        return 0;
+    }
+
+    /* Make a working dense copy of A in the same element type */
+    matrix_t *M = e->create_matrix(A->rows, A->cols);
+    if (!M)
+        return -3;
+
+    unsigned char val[64];
+    for (size_t i = 0; i < A->rows; i++)
+        for (size_t j = 0; j < A->cols; j++) {
+            mat_get(A, i, j, val);
+            mat_set(M, i, j, val);
+        }
+
+    /* Buffers for element arithmetic */
+    unsigned char pivot[64];
+    unsigned char inv_pivot[64];
+    unsigned char factor[64];
+    unsigned char a[64];
+    unsigned char b[64];
+    unsigned char prod[64];
+    unsigned char tmp[64];
+
+    /* Gaussian elimination without pivoting */
+    for (size_t k = 0; k < n; k++) {
+
+        /* pivot = M[k][k] */
+        mat_get(M, k, k, pivot);
+
+        /* If pivot == 0 → determinant is 0 */
+        if (memcmp(pivot, e->zero, e->size) == 0) {
+            memcpy(determinant, e->zero, e->size);
+            mat_free(M);
+            return 0;
+        }
+
+        /* inv_pivot = 1 / pivot */
+        e->inv(inv_pivot, pivot);
+
+        for (size_t i = k + 1; i < n; i++) {
+
+            /* factor = M[i][k] / pivot = M[i][k] * inv_pivot */
+            mat_get(M, i, k, factor);
+            e->mul(factor, inv_pivot, factor);
+
+            for (size_t j = k; j < n; j++) {
+
+                /* a = M[i][j], b = M[k][j] */
+                mat_get(M, i, j, a);
+                mat_get(M, k, j, b);
+
+                /* prod = factor * b */
+                e->mul(prod, factor, b);
+
+                /* tmp = a - prod */
+                e->sub(tmp, a, prod);
+
+                mat_set(M, i, j, tmp);
+            }
+        }
+    }
+
+    /* determinant = product of diagonal entries */
+    unsigned char det[64];
+    memcpy(det, e->one, e->size);
+
+    for (size_t i = 0; i < n; i++) {
+        mat_get(M, i, i, a);
+        e->mul(det, det, a);
+    }
+
+    memcpy(determinant, det, e->size);
+    mat_free(M);
+    return 0;
+}
+
+matrix_t *mat_inverse(const matrix_t *A)
+{
+    if (!A)
+        return NULL;
+
+    if (A->rows != A->cols)
+        return NULL;
+
+    size_t n = A->rows;
+    const struct elem_vtable *e = A->elem;
+
+    /* Make working copies: M = A, I = identity */
+    matrix_t *M = e->create_matrix(n, n);
+    matrix_t *I = e->create_identity(n);
+    if (!M || !I) {
+        if (M) mat_free(M);
+        if (I) mat_free(I);
+        return NULL;
+    }
+
+    unsigned char v[64];
+
+    /* Copy A into M */
+    for (size_t i = 0; i < n; i++)
+        for (size_t j = 0; j < n; j++) {
+            mat_get(A, i, j, v);
+            mat_set(M, i, j, v);
+        }
+
+    /* Temporary buffers */
+    unsigned char pivot[64];
+    unsigned char inv_pivot[64];
+    unsigned char factor[64];
+    unsigned char a[64];
+    unsigned char b[64];
+    unsigned char prod[64];
+    unsigned char tmp[64];
+
+    /* Gauss–Jordan elimination */
+    for (size_t k = 0; k < n; k++) {
+
+        /* pivot = M[k][k] */
+        mat_get(M, k, k, pivot);
+
+        /* If pivot == 0 → singular */
+        if (memcmp(pivot, e->zero, e->size) == 0) {
+            mat_free(M);
+            mat_free(I);
+            return NULL;
+        }
+
+        /* inv_pivot = 1 / pivot */
+        e->inv(inv_pivot, pivot);
+
+        /* Normalize row k: divide entire row by pivot */
+        for (size_t j = 0; j < n; j++) {
+            mat_get(M, k, j, a);
+            e->mul(a, inv_pivot, a);
+            mat_set(M, k, j, a);
+
+            mat_get(I, k, j, b);
+            e->mul(b, inv_pivot, b);
+            mat_set(I, k, j, b);
+        }
+
+        /* Eliminate all other rows */
+        for (size_t i = 0; i < n; i++) {
+            if (i == k) continue;
+
+            /* factor = M[i][k] */
+            mat_get(M, i, k, factor);
+
+            /* If factor == 0, skip */
+            if (memcmp(factor, e->zero, e->size) == 0)
+                continue;
+
+            for (size_t j = 0; j < n; j++) {
+
+                /* M[i][j] -= factor * M[k][j] */
+                mat_get(M, i, j, a);
+                mat_get(M, k, j, b);
+                e->mul(prod, factor, b);
+                e->sub(tmp, a, prod);
+                mat_set(M, i, j, tmp);
+
+                /* I[i][j] -= factor * I[k][j] */
+                mat_get(I, i, j, a);
+                mat_get(I, k, j, b);
+                e->mul(prod, factor, b);
+                e->sub(tmp, a, prod);
+                mat_set(I, i, j, tmp);
+            }
+        }
+    }
+
+    /* M is now identity; I is A^{-1} */
+    mat_free(M);
+    return I;
+}
+
+/* ============================================================
+   Eigenvalues / eigenvectors (double-only Jacobi implementation)
+   ============================================================ */
+
+
+int mat_eigenvalues(const matrix_t *A, void *eigenvalues)
+{
+    return 0;
+}
+
+int mat_eigendecompose(const matrix_t *A, void *eigenvalues, matrix_t **eigenvectors)
+{
+    return 0;
+}
+
+matrix_t *mat_eigenvectors(const matrix_t *A)
+{
+    return NULL;
+}
+
 /* ============================================================
    Debug printing
    ============================================================ */
 
-void mat_print(const struct matrix_t *A) {
+void mat_print(const struct matrix_t *A)
+{
     if (!A) {
         printf("(null)\n");
         return;
