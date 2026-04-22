@@ -11,6 +11,20 @@
 
 #include "qcomplex.h"
 
+/* ============================================================
+   Constants
+   ============================================================ */
+   
+const qcomplex_t QC_ZERO = {
+    .re = { .hi = 0.0, .lo = 0.0 },
+    .im = { .hi = 0.0, .lo = 0.0 }
+};
+
+const qcomplex_t QC_ONE = {
+    .re = { .hi = 1.0, .lo = 0.0 },
+    .im = { .hi = 0.0, .lo = 0.0 }
+};
+
 /* Helpers: construct purely real qcomplex_t from a double literal or qfloat_t. */
 static inline qcomplex_t qcr(double x)    { return qc_make(qf_from_double(x),  qf_from_double(0.0)); }
 static inline qcomplex_t qcrf(qfloat_t x) { return qc_make(x, qf_from_double(0.0)); }

@@ -27,10 +27,11 @@
 
 /* Constants */
 
-const qfloat_t QF_NAN = {
-    NAN,
-    NAN
-};
+const qfloat_t QF_ZERO = { 0.0, 0.0 };
+
+const qfloat_t QF_ONE  = { 1.0, 0.0 };
+
+const qfloat_t QF_NAN = { NAN, NAN };
 
 const qfloat_t QF_INF  = { INFINITY, 0.0 };
 

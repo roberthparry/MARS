@@ -52,6 +52,12 @@ typedef struct {
    Constants
    ------------------------------------------------------------------------- */
 
+/// @brief Zero
+extern const qfloat_t QF_ZERO;
+
+/// @brief One
+extern const qfloat_t QF_ONE;
+
 /// @brief NaN
 extern const qfloat_t QF_NAN;
 

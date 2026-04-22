@@ -734,10 +734,433 @@ static void test_multiply_qc(void)
     mat_free(A); mat_free(B); mat_free(C);
 }
 
+/* ------------------------------------------------------------------ mixed-type add: double + qfloat */
+
+static void test_add_mixed_d_qf(void)
+{
+    printf(C_CYAN "TEST: mixed-type addition (double + qfloat)\n" C_RESET);
+
+    matrix_t *A = mat_create_d(2,2);
+    matrix_t *B = mat_create_qf(2,2);
+
+    double a_vals[4] = { 1.0, 2.0, 3.0, 4.0 };
+    qfloat_t b_vals[4] = {
+        qf_from_double(10), qf_from_double(20),
+        qf_from_double(30), qf_from_double(40)
+    };
+
+    size_t idx = 0;
+    for (size_t i = 0; i < 2; i++)
+        for (size_t j = 0; j < 2; j++) {
+            mat_set(A, i, j, &a_vals[idx]);
+            mat_set(B, i, j, &b_vals[idx]);
+            idx++;
+        }
+
+    print_md("A (double)", A);
+    print_mqf("B (qfloat)", B);
+
+    matrix_t *C = mat_add(A, B);
+    print_mqf("A + B (qfloat result)", C);
+
+    idx = 0;
+    for (size_t i = 0; i < 2; i++)
+        for (size_t j = 0; j < 2; j++) {
+            qfloat_t got;
+            qfloat_t expected = qf_add(qf_from_double(a_vals[idx]), b_vals[idx]);
+            mat_get(C, i, j, &got);
+
+            char label[64];
+            snprintf(label, sizeof(label), "mixed add d+qf [%zu,%zu]", i, j);
+            check_qf_val(label, got, expected, 1e-28);
+
+            idx++;
+        }
+
+    mat_free(A); mat_free(B); mat_free(C);
+}
+
+/* ------------------------------------------------------------------ mixed-type add: double + qcomplex */
+
+static void test_add_mixed_d_qc(void)
+{
+    printf(C_CYAN "TEST: mixed-type addition (double + qcomplex)\n" C_RESET);
+
+    matrix_t *A = mat_create_d(1,3);
+    matrix_t *B = mat_create_qc(1,3);
+
+    double a_vals[3] = { 1.0, -2.0, 5.0 };
+    qcomplex_t b_vals[3] = {
+        qc_make(qf_from_double(3), qf_from_double(4)),
+        qc_make(qf_from_double(0), qf_from_double(-1)),
+        qc_make(qf_from_double(2), qf_from_double(2))
+    };
+
+    for (size_t j = 0; j < 3; j++) {
+        mat_set(A, 0, j, &a_vals[j]);
+        mat_set(B, 0, j, &b_vals[j]);
+    }
+
+    print_md("A (double)", A);
+    print_mqc("B (qcomplex)", B);
+
+    matrix_t *C = mat_add(A, B);
+    print_mqc("A + B (qcomplex result)", C);
+
+    for (size_t j = 0; j < 3; j++) {
+        qcomplex_t got;
+        qcomplex_t expected = qc_add(qc_make(qf_from_double(a_vals[j]), QF_ZERO), b_vals[j]);
+        mat_get(C, 0, j, &got);
+
+        char label[64];
+        snprintf(label, sizeof(label), "mixed add d+qc [0,%zu]", j);
+        check_qc_val(label, got, expected, 1e-28);
+    }
+
+    mat_free(A); mat_free(B); mat_free(C);
+}
+
+/* ------------------------------------------------------------------ mixed-type add: qfloat + qcomplex */
+
+static void test_add_mixed_qf_qc(void)
+{
+    printf(C_CYAN "TEST: mixed-type addition (qfloat + qcomplex)\n" C_RESET);
+
+    matrix_t *A = mat_create_qf(2,1);
+    matrix_t *B = mat_create_qc(2,1);
+
+    qfloat_t a_vals[2] = { qf_from_double(1.5), qf_from_double(-3.25) };
+    qcomplex_t b_vals[2] = {
+        qc_make(qf_from_double(2), qf_from_double(1)),
+        qc_make(qf_from_double(-1), qf_from_double(4))
+    };
+
+    for (size_t i = 0; i < 2; i++) {
+        mat_set(A, i, 0, &a_vals[i]);
+        mat_set(B, i, 0, &b_vals[i]);
+    }
+
+    print_mqf("A (qfloat)", A);
+    print_mqc("B (qcomplex)", B);
+
+    matrix_t *C = mat_add(A, B);
+    print_mqc("A + B (qcomplex result)", C);
+
+    for (size_t i = 0; i < 2; i++) {
+        qcomplex_t got;
+        qcomplex_t expected = qc_add(qc_make(a_vals[i], QF_ZERO), b_vals[i]);
+        mat_get(C, i, 0, &got);
+
+        char label[64];
+        snprintf(label, sizeof(label), "mixed add qf+qc [%zu,0]", i);
+        check_qc_val(label, got, expected, 1e-28);
+    }
+
+    mat_free(A); mat_free(B); mat_free(C);
+}
+
+/* ------------------------------------------------------------------ mixed-type sub: double - qfloat */
+
+static void test_sub_mixed_d_qf(void)
+{
+    printf(C_CYAN "TEST: mixed-type subtraction (double - qfloat)\n" C_RESET);
+
+    matrix_t *A = mat_create_d(2,2);
+    matrix_t *B = mat_create_qf(2,2);
+
+    double a_vals[4] = { 5.0,  7.0, -3.0,  2.0 };
+    qfloat_t b_vals[4] = {
+        qf_from_double(1.0), qf_from_double(2.5),
+        qf_from_double(-4.0), qf_from_double(10.0)
+    };
+
+    size_t idx = 0;
+    for (size_t i = 0; i < 2; i++)
+        for (size_t j = 0; j < 2; j++) {
+            mat_set(A, i, j, &a_vals[idx]);
+            mat_set(B, i, j, &b_vals[idx]);
+            idx++;
+        }
+
+    print_md("A (double)", A);
+    print_mqf("B (qfloat)", B);
+
+    matrix_t *C = mat_sub(A, B);
+    print_mqf("A - B (qfloat result)", C);
+
+    idx = 0;
+    for (size_t i = 0; i < 2; i++)
+        for (size_t j = 0; j < 2; j++) {
+            qfloat_t got;
+            qfloat_t expected = qf_sub(qf_from_double(a_vals[idx]), b_vals[idx]);
+            mat_get(C, i, j, &got);
+
+            char label[64];
+            snprintf(label, sizeof(label), "mixed sub d-qf [%zu,%zu]", i, j);
+            check_qf_val(label, got, expected, 1e-28);
+
+            idx++;
+        }
+
+    mat_free(A); mat_free(B); mat_free(C);
+}
+
+/* ------------------------------------------------------------------ mixed-type sub: double - qcomplex */
+
+static void test_sub_mixed_d_qc(void)
+{
+    printf(C_CYAN "TEST: mixed-type subtraction (double - qcomplex)\n" C_RESET);
+
+    matrix_t *A = mat_create_d(1,3);
+    matrix_t *B = mat_create_qc(1,3);
+
+    double a_vals[3] = { 10.0, -5.0, 3.0 };
+    qcomplex_t b_vals[3] = {
+        qc_make(qf_from_double(2), qf_from_double(1)),
+        qc_make(qf_from_double(-3), qf_from_double(4)),
+        qc_make(qf_from_double(0.5), qf_from_double(-2))
+    };
+
+    for (size_t j = 0; j < 3; j++) {
+        mat_set(A, 0, j, &a_vals[j]);
+        mat_set(B, 0, j, &b_vals[j]);
+    }
+
+    print_md("A (double)", A);
+    print_mqc("B (qcomplex)", B);
+
+    matrix_t *C = mat_sub(A, B);
+    print_mqc("A - B (qcomplex result)", C);
+
+    for (size_t j = 0; j < 3; j++) {
+        qcomplex_t got;
+        qcomplex_t expected = qc_sub(
+            qc_make(qf_from_double(a_vals[j]), QF_ZERO),
+            b_vals[j]
+        );
+        mat_get(C, 0, j, &got);
+
+        char label[64];
+        snprintf(label, sizeof(label), "mixed sub d-qc [0,%zu]", j);
+        check_qc_val(label, got, expected, 1e-28);
+    }
+
+    mat_free(A); mat_free(B); mat_free(C);
+}
+
+/* ------------------------------------------------------------------ mixed-type sub: qfloat - qcomplex */
+
+static void test_sub_mixed_qf_qc(void)
+{
+    printf(C_CYAN "TEST: mixed-type subtraction (qfloat - qcomplex)\n" C_RESET);
+
+    matrix_t *A = mat_create_qf(2,1);
+    matrix_t *B = mat_create_qc(2,1);
+
+    qfloat_t a_vals[2] = {
+        qf_from_double(4.5),
+        qf_from_double(-1.25)
+    };
+
+    qcomplex_t b_vals[2] = {
+        qc_make(qf_from_double(1), qf_from_double(3)),
+        qc_make(qf_from_double(-2), qf_from_double(1))
+    };
+
+    for (size_t i = 0; i < 2; i++) {
+        mat_set(A, i, 0, &a_vals[i]);
+        mat_set(B, i, 0, &b_vals[i]);
+    }
+
+    print_mqf("A (qfloat)", A);
+    print_mqc("B (qcomplex)", B);
+
+    matrix_t *C = mat_sub(A, B);
+    print_mqc("A - B (qcomplex result)", C);
+
+    for (size_t i = 0; i < 2; i++) {
+        qcomplex_t got;
+        qcomplex_t expected = qc_sub(
+            qc_make(a_vals[i], QF_ZERO),
+            b_vals[i]
+        );
+        mat_get(C, i, 0, &got);
+
+        char label[64];
+        snprintf(label, sizeof(label), "mixed sub qf-qc [%zu,0]", i);
+        check_qc_val(label, got, expected, 1e-28);
+    }
+
+    mat_free(A); mat_free(B); mat_free(C);
+}
+
+/* ------------------------------------------------------------------ mixed-type mul: double * qfloat */
+
+static void test_multiply_mixed_d_qf(void)
+{
+    printf(C_CYAN "TEST: mixed-type multiplication (double * qfloat)\n" C_RESET);
+
+    matrix_t *A = mat_create_d(2,3);
+    matrix_t *B = mat_create_qf(3,2);
+
+    double a_vals[6] = { 1, 2, 3, 4, 5, 6 };
+    qfloat_t b_vals[6] = {
+        qf_from_double(7),  qf_from_double(8),
+        qf_from_double(9),  qf_from_double(10),
+        qf_from_double(11), qf_from_double(12)
+    };
+
+    size_t idx = 0;
+    for (size_t i = 0; i < 2; i++)
+        for (size_t j = 0; j < 3; j++) {
+            mat_set(A, i, j, &a_vals[idx]);
+            idx++;
+        }
+
+    idx = 0;
+    for (size_t i = 0; i < 3; i++)
+        for (size_t j = 0; j < 2; j++) {
+            mat_set(B, i, j, &b_vals[idx]);
+            idx++;
+        }
+
+    print_md("A (double)", A);
+    print_mqf("B (qfloat)", B);
+
+    matrix_t *C = mat_mul(A, B);
+    print_mqf("A * B (qfloat result)", C);
+
+    /* expected result in double, then converted to qfloat */
+    double expected_raw[4] = { 58, 64, 139, 154 };
+
+    idx = 0;
+    for (size_t i = 0; i < 2; i++)
+        for (size_t j = 0; j < 2; j++) {
+            qfloat_t got;
+            qfloat_t expected = qf_from_double(expected_raw[idx]);
+            mat_get(C, i, j, &got);
+
+            char label[64];
+            snprintf(label, sizeof(label), "mixed mul d*qf [%zu,%zu]", i, j);
+            check_qf_val(label, got, expected, 1e-28);
+
+            idx++;
+        }
+
+    mat_free(A); mat_free(B); mat_free(C);
+}
+
+/* ------------------------------------------------------------------ mixed-type mul: double * qcomplex */
+
+static void test_multiply_mixed_d_qc(void)
+{
+    printf(C_CYAN "TEST: mixed-type multiplication (double * qcomplex)\n" C_RESET);
+
+    matrix_t *A = mat_create_d(1,3);
+    matrix_t *B = mat_create_qc(3,2);
+
+    double a_vals[3] = { 2.0, -1.0, 3.0 };
+    qcomplex_t b_vals[6] = {
+        qc_make(qf_from_double(1), qf_from_double(2)),
+        qc_make(qf_from_double(0), qf_from_double(-1)),
+        qc_make(qf_from_double(4), qf_from_double(0)),
+        qc_make(qf_from_double(-2), qf_from_double(3)),
+        qc_make(qf_from_double(1), qf_from_double(1)),
+        qc_make(qf_from_double(0), qf_from_double(5))
+    };
+
+    for (size_t j = 0; j < 3; j++)
+        mat_set(A, 0, j, &a_vals[j]);
+
+    size_t idx = 0;
+    for (size_t i = 0; i < 3; i++)
+        for (size_t j = 0; j < 2; j++) {
+            mat_set(B, i, j, &b_vals[idx]);
+            idx++;
+        }
+
+    print_md("A (double)", A);
+    print_mqc("B (qcomplex)", B);
+
+    matrix_t *C = mat_mul(A, B);
+    print_mqc("A * B (qcomplex result)", C);
+
+    /* compute expected manually */
+    qcomplex_t expected_vals[2] = { QC_ZERO, QC_ZERO };
+
+    for (size_t k = 0; k < 3; k++) {
+        qcomplex_t term0 = qc_mul(qc_make(qf_from_double(a_vals[k]), QF_ZERO), b_vals[k*2 + 0]);
+        qcomplex_t term1 = qc_mul(qc_make(qf_from_double(a_vals[k]), QF_ZERO), b_vals[k*2 + 1]);
+        expected_vals[0] = qc_add(expected_vals[0], term0);
+        expected_vals[1] = qc_add(expected_vals[1], term1);
+    }
+
+    for (size_t j = 0; j < 2; j++) {
+        qcomplex_t got;
+        mat_get(C, 0, j, &got);
+
+        char label[64];
+        snprintf(label, sizeof(label), "mixed mul d*qc [0,%zu]", j);
+        check_qc_val(label, got, expected_vals[j], 1e-28);
+    }
+
+    mat_free(A); mat_free(B); mat_free(C);
+}
+
+/* ------------------------------------------------------------------ mixed-type mul: qfloat * qcomplex */
+
+static void test_multiply_mixed_qf_qc(void)
+{
+    printf(C_CYAN "TEST: mixed-type multiplication (qfloat * qcomplex)\n" C_RESET);
+
+    matrix_t *A = mat_create_qf(2,1);
+    matrix_t *B = mat_create_qc(1,3);
+
+    qfloat_t a_vals[2] = {
+        qf_from_double(2.5),
+        qf_from_double(-1.0)
+    };
+
+    qcomplex_t b_vals[3] = {
+        qc_make(qf_from_double(3), qf_from_double(1)),
+        qc_make(qf_from_double(-2), qf_from_double(4)),
+        qc_make(qf_from_double(0), qf_from_double(-3))
+    };
+
+    for (size_t i = 0; i < 2; i++)
+        mat_set(A, i, 0, &a_vals[i]);
+
+    for (size_t j = 0; j < 3; j++)
+        mat_set(B, 0, j, &b_vals[j]);
+
+    print_mqf("A (qfloat)", A);
+    print_mqc("B (qcomplex)", B);
+
+    matrix_t *C = mat_mul(A, B);
+    print_mqc("A * B (qcomplex result)", C);
+
+    for (size_t i = 0; i < 2; i++)
+        for (size_t j = 0; j < 3; j++) {
+            qcomplex_t got;
+            qcomplex_t expected = qc_mul(
+                qc_make(a_vals[i], QF_ZERO),
+                b_vals[j]
+            );
+            mat_get(C, i, j, &got);
+
+            char label[64];
+            snprintf(label, sizeof(label), "mixed mul qf*qc [%zu,%zu]", i, j);
+            check_qc_val(label, got, expected, 1e-28);
+        }
+
+    mat_free(A); mat_free(B); mat_free(C);
+}
+
 /* ------------------------------------------------------------------ tests_main */
 
 int tests_main(void)
 {
+    /* core matrix tests */
     RUN_TEST(test_creation, NULL);
     RUN_TEST(test_reading, NULL);
     RUN_TEST(test_writing, NULL);
@@ -747,10 +1170,27 @@ int tests_main(void)
     RUN_TEST(test_identity_get, NULL);
     RUN_TEST(test_identity_set, NULL);
 
+    /* same-type qfloat/qcomplex tests */
     RUN_TEST(test_add_sub_qf, NULL);
     RUN_TEST(test_add_sub_qc, NULL);
     RUN_TEST(test_multiply_qf, NULL);
     RUN_TEST(test_multiply_qc, NULL);
 
+    /* mixed-type ADD tests */
+    RUN_TEST(test_add_mixed_d_qf, NULL);
+    RUN_TEST(test_add_mixed_d_qc, NULL);
+    RUN_TEST(test_add_mixed_qf_qc, NULL);
+
+    /* mixed-type SUB tests */
+    RUN_TEST(test_sub_mixed_d_qf, NULL);
+    RUN_TEST(test_sub_mixed_d_qc, NULL);
+    RUN_TEST(test_sub_mixed_qf_qc, NULL);
+
+    /* mixed-type MUL tests */
+    RUN_TEST(test_multiply_mixed_d_qf, NULL);
+    RUN_TEST(test_multiply_mixed_d_qc, NULL);
+    RUN_TEST(test_multiply_mixed_qf_qc, NULL);
+
     return tests_failed;
 }
+

@@ -13,6 +13,9 @@ typedef struct {
     qfloat_t im; /**< Imaginary part */
 } qcomplex_t;
 
+extern const qcomplex_t QC_ZERO;
+extern const qcomplex_t QC_ONE;
+
 /**
  * @brief Construct a qcomplex_t from real and imaginary parts.
  */

@@ -631,6 +631,15 @@
     "test_add_sub_qf": true,
     "test_add_sub_qc": true,
     "test_multiply_qf": true,
-    "test_multiply_qc": true
+    "test_multiply_qc": true,
+    "test_add_mixed_d_qf": true,
+    "test_add_mixed_d_qc": true,
+    "test_add_mixed_qf_qc": true,
+    "test_sub_mixed_d_qf": true,
+    "test_sub_mixed_d_qc": true,
+    "test_sub_mixed_qf_qc": true,
+    "test_multiply_mixed_d_qf": true,
+    "test_multiply_mixed_d_qc": true,
+    "test_multiply_mixed_qf_qc": true
   }
 }
