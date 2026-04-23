@@ -560,7 +560,7 @@
     "test_multi_null_safety": true,
     "test_multi_nd1": true,
     "test_multi_4d": true,
-    "test_multi_4d_exp": false
+    "test_multi_4d_exp": true
   },
   "tests/test_array.c": {
     "test_ints": true,
