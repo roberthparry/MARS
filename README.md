@@ -12,6 +12,7 @@ datetime utilities, UTF-8 strings, and generic containers.
 ## Highlights
 
 - **`qfloat_t`** — double-double arithmetic and special functions (~34 decimal digits of precision)
+- **`matrix_t`** — generic high-precision matrix with pluggable element types (`double`, `qfloat_t`, `qcomplex_t`) and eigendecomposition at full `qfloat_t` precision
 - **`dval_t`** — differentiable expression DAGs with first/second derivatives
 - **`datetime_t`** — civil and astronomical date/time helpers
 - **`dictionary_t` / `set_t` / `array_t`** — generic containers with user-defined ownership
@@ -51,6 +52,7 @@ W0(1) = 0.5671432904097838729999686622103575
 |---|---|---|
 | `qfloat_t` | Double-double arithmetic and special functions | [`docs/qfloat.md`](docs/qfloat.md) |
 | `qcomplex_t` | Double-double complex arithmetic and special functions | [`docs/qcomplex.md`](docs/qcomplex.md) |
+| `matrix_t` | Generic high-precision matrix with eigendecomposition | [`docs/matrix.md`](docs/matrix.md) |
 | `dval_t` | Differentiable expression DAGs | [`docs/dval.md`](docs/dval.md) |
 | `datetime_t` | Civil and astronomical date/time utilities | [`docs/datetime.md`](docs/datetime.md) |
 | `dictionary_t` | Generic key/value storage with ownership models | [`docs/dictionary.md`](docs/dictionary.md) |

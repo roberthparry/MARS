@@ -94,6 +94,7 @@ This directory contains the longer module documentation for MARS.
 
 - [`qfloat_t`](qfloat.md) — double-double arithmetic and special functions
 - [`qcomplex_t`](qcomplex.md) — double-double complex arithmetic and special functions
+- [`matrix_t`](matrix.md) — generic high-precision matrix with pluggable element types and storage kinds
 - [`dval_t`](dval.md) — differentiable expression DAGs
 - [`datetime_t`](datetime.md) — civil and astronomical date/time utilities
 - [`dictionary_t`](dictionary.md) — generic key/value storage
