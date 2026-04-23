@@ -660,6 +660,10 @@
     "test_inverse_double": true,
     "test_inverse_qfloat": true,
     "test_inverse_qcomplex": true,
-    "test_hermitian_op": true
+    "test_hermitian_op": true,
+    "test_eigen_d": true,
+    "test_eigen_qf": true,
+    "test_eigen_qc": true,
+    "test_readme_example": true
   }
 }

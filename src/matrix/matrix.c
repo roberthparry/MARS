@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <math.h>
 #include "matrix.h"
 #include "qfloat.h"
 #include "qcomplex.h"
@@ -48,6 +49,17 @@ struct elem_vtable {
     void (*sub)(void *out, const void *a, const void *b);
     void (*mul)(void *out, const void *a, const void *b);
     void (*inv)(void *out, const void *a);
+
+    /* scalar queries — return/accept double for generic algorithm use */
+    double (*abs2)(const void *a);          /* |a|² as double          */
+    double (*to_real)(const void *a);       /* Re(a) as double          */
+    void   (*from_real)(void *out, double x); /* construct from real     */
+    void   (*conj_elem)(void *out, const void *a); /* complex conjugate  */
+
+    /* qfloat-precision scalar queries for high-precision algorithms */
+    void (*to_qf)(qfloat_t *out, const void *a);    /* Re(a) as qfloat  */
+    void (*abs_qf)(qfloat_t *out, const void *a);   /* |a| as qfloat    */
+    void (*from_qf)(void *out, const qfloat_t *x);  /* construct pure-real from qfloat */
 
     /* constants */
     const void *zero;
@@ -261,16 +273,32 @@ static void d_print(const void *v, char *buf, size_t n) {
     snprintf(buf, n, "%.16g", *(const double*)v);
 }
 
+static double d_abs2(const void *a)              { double x = *(const double*)a; return x * x; }
+static double d_to_real(const void *a)            { return *(const double*)a; }
+static void   d_from_real(void *o, double x)      { *(double*)o = x; }
+static void   d_conj_elem(void *o, const void *a) { *(double*)o = *(const double*)a; }
+
+static void d_to_qf(qfloat_t *o, const void *a)  { *o = qf_from_double(*(const double*)a); }
+static void d_abs_qf(qfloat_t *o, const void *a) { *o = qf_from_double(fabs(*(const double*)a)); }
+static void d_from_qf(void *o, const qfloat_t *x){ *(double*)o = qf_to_double(*x); }
+
 const struct elem_vtable double_elem = {
-    .size  = sizeof(double),
-    .kind  = ELEM_DOUBLE,
-    .add   = d_add,
-    .sub   = d_sub,
-    .mul   = d_mul,
-    .inv   = d_inv,
-    .zero  = &D_ZERO,
-    .one   = &D_ONE,
-    .print = d_print,
+    .size      = sizeof(double),
+    .kind      = ELEM_DOUBLE,
+    .add       = d_add,
+    .sub       = d_sub,
+    .mul       = d_mul,
+    .inv       = d_inv,
+    .abs2      = d_abs2,
+    .to_real   = d_to_real,
+    .from_real = d_from_real,
+    .conj_elem = d_conj_elem,
+    .to_qf     = d_to_qf,
+    .abs_qf    = d_abs_qf,
+    .from_qf   = d_from_qf,
+    .zero      = &D_ZERO,
+    .one       = &D_ONE,
+    .print     = d_print,
     .create_matrix   = create_matrix_double,
     .create_identity = create_identity_double
 };
@@ -297,16 +325,35 @@ static void qf_print_wrap(const void *v, char *buf, size_t n) {
     qf_to_string(*(const qfloat_t*)v, buf, n);
 }
 
+static double qf_abs2_wrap(const void *a) {
+    qfloat_t x = *(const qfloat_t*)a;
+    return qf_to_double(qf_mul(x, x));
+}
+static double qf_to_real_wrap(const void *a)            { return qf_to_double(*(const qfloat_t*)a); }
+static void   qf_from_real_wrap(void *o, double x)      { *(qfloat_t*)o = qf_from_double(x); }
+static void   qf_conj_elem(void *o, const void *a)      { *(qfloat_t*)o = *(const qfloat_t*)a; }
+
+static void qf_to_qf(qfloat_t *o, const void *a)  { *o = *(const qfloat_t*)a; }
+static void qf_abs_qf(qfloat_t *o, const void *a) { *o = qf_abs(*(const qfloat_t*)a); }
+static void qf_from_qf(void *o, const qfloat_t *x){ *(qfloat_t*)o = *x; }
+
 const struct elem_vtable qfloat_elem = {
-    .size  = sizeof(qfloat_t),
-    .kind  = ELEM_QFLOAT,
-    .add   = qf_add_wrap,
-    .sub   = qf_sub_wrap,
-    .mul   = qf_mul_wrap,
-    .inv   = qf_inv_wrap,
-    .zero  = &QF_ZERO,
-    .one   = &QF_ONE,
-    .print = qf_print_wrap,
+    .size      = sizeof(qfloat_t),
+    .kind      = ELEM_QFLOAT,
+    .add       = qf_add_wrap,
+    .sub       = qf_sub_wrap,
+    .mul       = qf_mul_wrap,
+    .inv       = qf_inv_wrap,
+    .abs2      = qf_abs2_wrap,
+    .to_real   = qf_to_real_wrap,
+    .from_real = qf_from_real_wrap,
+    .conj_elem = qf_conj_elem,
+    .to_qf     = qf_to_qf,
+    .abs_qf    = qf_abs_qf,
+    .from_qf   = qf_from_qf,
+    .zero      = &QF_ZERO,
+    .one       = &QF_ONE,
+    .print     = qf_print_wrap,
     .create_matrix   = create_matrix_qfloat,
     .create_identity = create_identity_qfloat
 };
@@ -341,16 +388,41 @@ static void qc_print_wrap(const void *v, char *buf, size_t n) {
     qc_to_string(*(const qcomplex_t*)v, buf, n);
 }
 
+static double qc_abs2_wrap(const void *a) {
+    qcomplex_t z = *(const qcomplex_t*)a;
+    return qf_to_double(qf_add(qf_mul(z.re, z.re), qf_mul(z.im, z.im)));
+}
+static double qc_to_real_wrap(const void *a) {
+    return qf_to_double(((const qcomplex_t*)a)->re);
+}
+static void qc_from_real_wrap(void *o, double x) {
+    *(qcomplex_t*)o = qc_make(qf_from_double(x), QF_ZERO);
+}
+static void qc_conj_elem(void *o, const void *a) {
+    *(qcomplex_t*)o = qc_conj(*(const qcomplex_t*)a);
+}
+
+static void qc_to_qf(qfloat_t *o, const void *a)  { *o = ((const qcomplex_t*)a)->re; }
+static void qc_abs_qf(qfloat_t *o, const void *a) { *o = qc_abs(*(const qcomplex_t*)a); }
+static void qc_from_qf(void *o, const qfloat_t *x){ *(qcomplex_t*)o = qc_make(*x, QF_ZERO); }
+
 const struct elem_vtable qcomplex_elem = {
-    .size  = sizeof(qcomplex_t),
-    .kind  = ELEM_QCOMPLEX,
-    .add   = qc_add_wrap,
-    .sub   = qc_sub_wrap,
-    .mul   = qc_mul_wrap,
-    .inv   = qc_inv_wrap,
-    .zero  = &QC_ZERO,
-    .one   = &QC_ONE,
-    .print = qc_print_wrap,
+    .size      = sizeof(qcomplex_t),
+    .kind      = ELEM_QCOMPLEX,
+    .add       = qc_add_wrap,
+    .sub       = qc_sub_wrap,
+    .mul       = qc_mul_wrap,
+    .inv       = qc_inv_wrap,
+    .abs2      = qc_abs2_wrap,
+    .to_real   = qc_to_real_wrap,
+    .from_real = qc_from_real_wrap,
+    .conj_elem = qc_conj_elem,
+    .to_qf     = qc_to_qf,
+    .abs_qf    = qc_abs_qf,
+    .from_qf   = qc_from_qf,
+    .zero      = &QC_ZERO,
+    .one       = &QC_ONE,
+    .print     = qc_print_wrap,
     .create_matrix   = create_matrix_qcomplex,
     .create_identity = create_identity_qcomplex
 };
@@ -359,7 +431,7 @@ const struct elem_vtable qcomplex_elem = {
    Conversion helpers for mixed-type arithmetic
    ============================================================ */
 
-static inline void d_to_qf(qfloat_t *out, const double *a) {
+static inline void d_as_qf(qfloat_t *out, const double *a) {
     *out = qf_from_double(*a);
 }
 
@@ -389,7 +461,7 @@ static inline void id_qc(qcomplex_t *out, const qcomplex_t *a) {
 static void add_d_qf(void *out, const void *a, const void *b)
 {
     qfloat_t A, B;
-    d_to_qf(&A, (const double*)a);
+    d_as_qf(&A, (const double*)a);
     id_qf(&B, (const qfloat_t*)b);
     *(qfloat_t*)out = qf_add(A, B);
 }
@@ -398,14 +470,14 @@ static void add_qf_d(void *out, const void *a, const void *b)
 {
     qfloat_t A, B;
     id_qf(&A, (const qfloat_t*)a);
-    d_to_qf(&B, (const double*)b);
+    d_as_qf(&B, (const double*)b);
     *(qfloat_t*)out = qf_add(A, B);
 }
 
 static void sub_d_qf(void *out, const void *a, const void *b)
 {
     qfloat_t A, B;
-    d_to_qf(&A, (const double*)a);
+    d_as_qf(&A, (const double*)a);
     id_qf(&B, (const qfloat_t*)b);
     *(qfloat_t*)out = qf_sub(A, B);
 }
@@ -414,14 +486,14 @@ static void sub_qf_d(void *out, const void *a, const void *b)
 {
     qfloat_t A, B;
     id_qf(&A, (const qfloat_t*)a);
-    d_to_qf(&B, (const double*)b);
+    d_as_qf(&B, (const double*)b);
     *(qfloat_t*)out = qf_sub(A, B);
 }
 
 static void mul_d_qf(void *out, const void *a, const void *b)
 {
     qfloat_t A, B;
-    d_to_qf(&A, (const double*)a);
+    d_as_qf(&A, (const double*)a);
     id_qf(&B, (const qfloat_t*)b);
     *(qfloat_t*)out = qf_mul(A, B);
 }
@@ -430,7 +502,7 @@ static void mul_qf_d(void *out, const void *a, const void *b)
 {
     qfloat_t A, B;
     id_qf(&A, (const qfloat_t*)a);
-    d_to_qf(&B, (const double*)b);
+    d_as_qf(&B, (const double*)b);
     *(qfloat_t*)out = qf_mul(A, B);
 }
 
@@ -929,19 +1001,13 @@ struct matrix_t *mat_conj(const struct matrix_t *A) {
     struct matrix_t *C = e->create_matrix(A->rows, A->cols);
     if (!C) return NULL;
 
-    unsigned char v[64];
+    unsigned char v[64], cv[64];
 
     for (size_t i = 0; i < A->rows; i++)
         for (size_t j = 0; j < A->cols; j++) {
             mat_get(A, i, j, v);
-
-            if (e->kind == ELEM_QCOMPLEX) {
-                qcomplex_t z = *(qcomplex_t*)v;
-                z = qc_conj(z);
-                mat_set(C, i, j, &z);
-            } else {
-                mat_set(C, i, j, v);
-            }
+            e->conj_elem(cv, v);
+            mat_set(C, i, j, cv);
         }
 
     return C;
@@ -1155,32 +1221,201 @@ matrix_t *mat_inverse(const matrix_t *A)
 }
 
 /* ============================================================
-   Eigenvalues / eigenvectors (Jacobi implementation)
+   Eigenvalues / eigenvectors (Hermitian Jacobi implementation)
    ============================================================ */
 
-
-int mat_eigenvalues(const matrix_t *A, void *eigenvalues)
+static matrix_t *mat_copy_dense(const matrix_t *A)
 {
-    (void)A;
-    (void)eigenvalues;
+    const struct elem_vtable *e = A->elem;
+    matrix_t *C = e->create_matrix(A->rows, A->cols);
+    if (!C) return NULL;
+    unsigned char v[64];
+    for (size_t i = 0; i < A->rows; i++)
+        for (size_t j = 0; j < A->cols; j++) {
+            mat_get(A, i, j, v);
+            mat_set(C, i, j, v);
+        }
+    return C;
+}
 
-    return 0;
+/* Squared Frobenius norm of all off-diagonal elements (convergence probe). */
+static double offdiag_norm2(const matrix_t *A)
+{
+    const struct elem_vtable *e = A->elem;
+    unsigned char v[64];
+    double s = 0.0;
+    for (size_t i = 0; i < A->rows; i++)
+        for (size_t j = 0; j < A->cols; j++) {
+            if (i == j) continue;
+            mat_get(A, i, j, v);
+            s += e->abs2(v);
+        }
+    return s;
+}
+
+/* Zero A[p][q] with a complex Givens rotation; accumulate into V.
+ *
+ * Handles the Hermitian case: the rotation has a real magnitude (c, s)
+ * and a complex phase derived from A[p][q] itself, so the algorithm
+ * never inspects the element kind directly.
+ *
+ * After this call: (J† A J)[p][q] == 0,  V_new = V J.
+ */
+static void jacobi_apply(matrix_t *A, matrix_t *V, size_t p, size_t q)
+{
+    const struct elem_vtable *e = A->elem;
+    size_t n = A->rows;
+
+    unsigned char a_pq[64];
+    mat_get(A, p, q, a_pq);
+
+    /* |A[p,q]| in qfloat precision */
+    qfloat_t B_qf;
+    e->abs_qf(&B_qf, a_pq);
+    if (qf_to_double(B_qf) < 1e-150) return;
+
+    unsigned char a_pp[64], a_qq[64];
+    mat_get(A, p, p, a_pp);
+    mat_get(A, q, q, a_qq);
+
+    /* Real Jacobi parameters computed entirely in qfloat precision */
+    qfloat_t app_qf, aqq_qf;
+    e->to_qf(&app_qf, a_pp);
+    e->to_qf(&aqq_qf, a_qq);
+    qfloat_t two   = qf_from_double(2.0);
+    qfloat_t tau   = qf_div(qf_sub(aqq_qf, app_qf), qf_mul(two, B_qf));
+    qfloat_t sign  = (qf_to_double(tau) >= 0.0) ? QF_ONE : qf_neg(QF_ONE);
+    qfloat_t t_qf  = qf_div(sign, qf_add(qf_abs(tau), qf_sqrt(qf_add(QF_ONE, qf_mul(tau, tau)))));
+    qfloat_t c_qf  = qf_div(QF_ONE, qf_sqrt(qf_add(QF_ONE, qf_mul(t_qf, t_qf))));
+    qfloat_t s_qf  = qf_mul(t_qf, c_qf);
+    qfloat_t ns_qf = qf_neg(s_qf);
+    qfloat_t ib_qf = qf_div(QF_ONE, B_qf);
+
+    /* phase = A[p,q] / |A[p,q]|  —  a unit element in the matrix's type */
+    unsigned char inv_B[64], ph[64], ph_c[64];
+    e->from_qf(inv_B, &ib_qf);
+    e->mul(ph,  a_pq, inv_B);
+    e->conj_elem(ph_c, ph);
+
+    /* Pre-compute the four rotation scalars as typed elements */
+    unsigned char ce[64], nse[64], cph[64], cph_c[64], sph[64], sph_c[64];
+    unsigned char se[64];
+    e->from_qf(ce,  &c_qf);
+    e->from_qf(se,  &s_qf);
+    e->from_qf(nse, &ns_qf);
+    e->mul(cph,   ce, ph);      /* c · phase   */
+    e->mul(cph_c, ce, ph_c);    /* c · phase*  */
+    e->mul(sph,   se, ph);      /* s · phase   */
+    e->mul(sph_c, se, ph_c);    /* s · phase*  */
+
+    unsigned char ai_p[64], ai_q[64], t1[64], t2[64], np[64], nq[64];
+
+    /* Column update: A ← A J
+     *   A[:,p] = (c·ph)·A[:,p]  +  (-s)·A[:,q]
+     *   A[:,q] = (s·ph)·A[:,p]  +    c ·A[:,q]
+     */
+    for (size_t i = 0; i < n; i++) {
+        mat_get(A, i, p, ai_p);
+        mat_get(A, i, q, ai_q);
+        e->mul(t1, cph,  ai_p);  e->mul(t2, nse, ai_q);  e->add(np, t1, t2);
+        e->mul(t1, sph,  ai_p);  e->mul(t2, ce,  ai_q);  e->add(nq, t1, t2);
+        mat_set(A, i, p, np);
+        mat_set(A, i, q, nq);
+    }
+
+    /* Row update: A ← J† A
+     *   A[p,:] = (c·ph*)·A[p,:]  +  (-s)·A[q,:]
+     *   A[q,:] = (s·ph*)·A[p,:]  +    c ·A[q,:]
+     */
+    unsigned char ap_k[64], aq_k[64];
+    for (size_t k = 0; k < n; k++) {
+        mat_get(A, p, k, ap_k);
+        mat_get(A, q, k, aq_k);
+        e->mul(t1, cph_c, ap_k);  e->mul(t2, nse, aq_k);  e->add(np, t1, t2);
+        e->mul(t1, sph_c, ap_k);  e->mul(t2, ce,  aq_k);  e->add(nq, t1, t2);
+        mat_set(A, p, k, np);
+        mat_set(A, q, k, nq);
+    }
+
+    /* Eigenvector accumulation: V ← V J  (same column transform as above) */
+    unsigned char vi_p[64], vi_q[64];
+    for (size_t i = 0; i < n; i++) {
+        mat_get(V, i, p, vi_p);
+        mat_get(V, i, q, vi_q);
+        e->mul(t1, cph,  vi_p);  e->mul(t2, nse, vi_q);  e->add(np, t1, t2);
+        e->mul(t1, sph,  vi_p);  e->mul(t2, ce,  vi_q);  e->add(nq, t1, t2);
+        mat_set(V, i, p, np);
+        mat_set(V, i, q, nq);
+    }
 }
 
 int mat_eigendecompose(const matrix_t *A, void *eigenvalues, matrix_t **eigenvectors)
 {
-    (void)A;
-    (void)eigenvalues;
-    (void)eigenvectors;
+    if (!A) return -1;
+    if (A->rows != A->cols) return -2;
 
+    size_t n = A->rows;
+    const struct elem_vtable *e = A->elem;
+
+    matrix_t *W = mat_copy_dense(A);
+    if (!W) return -3;
+
+    matrix_t *V = e->create_identity(n);
+    if (!V) { mat_free(W); return -3; }
+
+    /* Frobenius norm² of W (invariant under orthogonal similarity) */
+    double fro2 = 0.0;
+    {
+        unsigned char fv[64];
+        for (size_t i = 0; i < n; i++)
+            for (size_t j = 0; j < n; j++) {
+                mat_get(W, i, j, fv);
+                fro2 += e->abs2(fv);
+            }
+    }
+    /* Converge when off-diagonal norm < 1e-29 * ||A||_F (safely below qfloat eps) */
+    double tol = fro2 * 1e-29;
+
+    for (int sweep = 0; sweep < 50; sweep++) {
+        for (size_t p = 0; p < n - 1; p++)
+            for (size_t q = p + 1; q < n; q++)
+                jacobi_apply(W, V, p, q);
+        if (offdiag_norm2(W) < tol) break;
+    }
+
+    if (eigenvalues) {
+        /* Diagonal of W holds eigenvalues; extract real part via qfloat to
+           preserve full precision and strip any imaginary rounding noise. */
+        char *ev = (char *)eigenvalues;
+        unsigned char dv[64];
+        for (size_t i = 0; i < n; i++) {
+            mat_get(W, i, i, dv);
+            qfloat_t re_qf;
+            e->to_qf(&re_qf, dv);
+            e->from_qf(ev + i * e->size, &re_qf);
+        }
+    }
+
+    if (eigenvectors)
+        *eigenvectors = V;
+    else
+        mat_free(V);
+
+    mat_free(W);
     return 0;
+}
+
+int mat_eigenvalues(const matrix_t *A, void *eigenvalues)
+{
+    return mat_eigendecompose(A, eigenvalues, NULL);
 }
 
 matrix_t *mat_eigenvectors(const matrix_t *A)
 {
-    (void)A;
-    
-    return NULL;
+    matrix_t *V = NULL;
+    if (mat_eigendecompose(A, NULL, &V) != 0)
+        return NULL;
+    return V;
 }
 
 /* ============================================================
