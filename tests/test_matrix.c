@@ -20,95 +20,27 @@ static void d_to_coloured_string(double x, char *out, size_t out_size)
         snprintf(out, out_size, C_WHITE "%.16g" C_RESET, x);
 }
 
-/* test-local compact qfloat formatter */
-static void qf_to_string_short(qfloat_t x, char *buf, size_t n)
-{
-    /* If the qfloat is exactly representable as a double, print short */
-    if (x.lo == 0.0 && isfinite(x.hi)) {
-        snprintf(buf, n, "%.16g", x.hi);
-        return;
-    }
-
-    /* Otherwise fall back to full precision */
-    qf_to_string(x, buf, n);
-}
-
-/* ------------------------------------------------------------------ updated qfloat coloured printer */
-
 static void qf_to_coloured_string(qfloat_t x, char *out, size_t out_size)
 {
-    char shortbuf[256];
-    char fullbuf[256];
-
-    /* compact form */
-    qf_to_string_short(x, shortbuf, sizeof(shortbuf));
-
-    /* full precision */
-    qf_to_string(x, fullbuf, sizeof(fullbuf));
-
-    /* choose compact if it's short and has no exponent */
-    const char *chosen =
-        (strchr(shortbuf, 'e') == NULL && strlen(shortbuf) <= 12)
-            ? shortbuf
-            : fullbuf;
-
-    if (strcmp(chosen, "0") == 0)
+    char buf[256];
+    qf_sprintf(buf, sizeof(buf), "%q", x);
+    if (strcmp(buf, "0") == 0)
         snprintf(out, out_size, C_GREY "0" C_RESET);
     else
-        snprintf(out, out_size, C_YELLOW "%s" C_RESET, chosen);
+        snprintf(out, out_size, C_YELLOW "%s" C_RESET, buf);
 }
-
-/* test-local compact qcomplex formatter */
-static void qc_to_string_short(qcomplex_t z, char *buf, size_t n)
-{
-    char re[128], im[128];
-
-    qf_to_string_short(z.re, re, sizeof(re));
-    qf_to_string_short(z.im, im, sizeof(im));
-
-    /* If both parts are short, use compact form */
-    if (strlen(re) <= 12 && strlen(im) <= 12) {
-        snprintf(buf, n, "%s %s %si",
-                 re,
-                 (z.im.hi >= 0 ? "+" : "-"),
-                 (z.im.hi >= 0 ? im : im + 1));
-        return;
-    }
-
-    /* Otherwise full precision */
-    qc_to_string(z, buf, n);
-}
-
-/* ------------------------------------------------------------------ updated qcomplex coloured printer */
 
 static void qc_to_coloured_string(qcomplex_t z, char *out, size_t out_size)
 {
-    char shortbuf[256];
-    char fullbuf[256];
-
-    qc_to_string_short(z, shortbuf, sizeof(shortbuf));
-    qc_to_string(z, fullbuf, sizeof(fullbuf));
-
-    /* parse short form */
-    char r_short[128], s_short[8], i_short[128];
-    sscanf(shortbuf, "%127s %7s %127s", r_short, s_short, i_short);
-
-    /* choose compact only if both parts are short */
-    const char *chosen =
-        (strlen(r_short) <= 12 && strlen(i_short) <= 12)
-            ? shortbuf
-            : fullbuf;
-
-    /* parse chosen */
-    char real[128], sign[8], imag[128];
-    sscanf(chosen, "%127s %7s %127s", real, sign, imag);
-
+    char re[128], im[128];
+    qf_sprintf(re, sizeof(re), "%q", z.re);
+    qf_sprintf(im, sizeof(im), "%q", qf_abs(z.im));
+    const char *sign = (z.im.hi >= 0.0) ? "+" : "-";
     snprintf(out, out_size,
         C_GREEN "%s" C_RESET " "
         C_WHITE "%s" C_RESET " "
-        C_MAGENTA "%s" C_RESET,
-        real, sign, imag
-    );
+        C_MAGENTA "%si" C_RESET,
+        re, sign, im);
 }
 
 /* ------------------------------------------------------------------ coloured qc/qf debug printers */
@@ -2253,6 +2185,276 @@ static void test_hermitian_op(void)
     }
 }
 
+/* ------------------------------------------------------------------ eigendecomposition: double */
+
+static void test_eigen_d(void)
+{
+    printf(C_CYAN "TEST: eigendecomposition (double)\n" C_RESET);
+
+    /* A = [[5, 2], [2, 8]] — eigenvalues 4 and 9 */
+    matrix_t *A = mat_create_d(2, 2);
+    double a00=5, a01=2, a10=2, a11=8;
+    mat_set(A, 0, 0, &a00);
+    mat_set(A, 0, 1, &a01);
+    mat_set(A, 1, 0, &a10);
+    mat_set(A, 1, 1, &a11);
+
+    print_md("A", A);
+
+    /* eigenvalues only */
+    double ev[2];
+    mat_eigenvalues(A, ev);
+    printf("    eigenvalues (mat_eigenvalues): [%.15g, %.15g]\n", ev[0], ev[1]);
+
+    double lmin = fmin(ev[0], ev[1]);
+    double lmax = fmax(ev[0], ev[1]);
+    check_d("eigenvalue min = 4", lmin, 4.0, 1e-10);
+    check_d("eigenvalue max = 9", lmax, 9.0, 1e-10);
+
+    /* full decomposition */
+    double ev2[2];
+    matrix_t *V = NULL;
+    mat_eigendecompose(A, ev2, &V);
+
+    print_md("eigenvectors V (columns)", V);
+    printf("    eigenvalues (mat_eigendecompose): [%.15g, %.15g]\n", ev2[0], ev2[1]);
+
+    /* verify A*v[k] = lambda[k]*v[k] for each column k */
+    for (size_t k = 0; k < 2; k++) {
+        for (size_t i = 0; i < 2; i++) {
+            double Av_ik = 0.0;
+            for (size_t j = 0; j < 2; j++) {
+                double aij, vjk;
+                mat_get(A, i, j, &aij);
+                mat_get(V, j, k, &vjk);
+                Av_ik += aij * vjk;
+            }
+            double vik;
+            mat_get(V, i, k, &vik);
+            double lv_ik = ev2[k] * vik;
+
+            char label[64];
+            snprintf(label, sizeof(label), "d: (Av)[%zu,%zu] = lv[%zu,%zu]", i, k, i, k);
+            check_d(label, Av_ik, lv_ik, 1e-10);
+        }
+    }
+
+    /* eigenvectors only */
+    matrix_t *V2 = mat_eigenvectors(A);
+    print_md("eigenvectors (mat_eigenvectors)", V2);
+
+    mat_free(A);
+    mat_free(V);
+    mat_free(V2);
+}
+
+/* ------------------------------------------------------------------ eigendecomposition: qfloat */
+
+static void test_eigen_qf(void)
+{
+    printf(C_CYAN "TEST: eigendecomposition (qfloat)\n" C_RESET);
+
+    /* A = [[5, 2], [2, 8]] — eigenvalues 4 and 9 */
+    matrix_t *A = mat_create_qf(2, 2);
+    qfloat_t a00 = qf_from_double(5);
+    qfloat_t a01 = qf_from_double(2);
+    qfloat_t a10 = qf_from_double(2);
+    qfloat_t a11 = qf_from_double(8);
+    mat_set(A, 0, 0, &a00);
+    mat_set(A, 0, 1, &a01);
+    mat_set(A, 1, 0, &a10);
+    mat_set(A, 1, 1, &a11);
+
+    print_mqf("A", A);
+
+    /* eigenvalues only */
+    qfloat_t ev[2];
+    mat_eigenvalues(A, ev);
+    print_qf("eigenvalue[0]", ev[0]);
+    print_qf("eigenvalue[1]", ev[1]);
+
+    int e0_smaller = qf_to_double(ev[0]) < qf_to_double(ev[1]);
+    qfloat_t ev_min = e0_smaller ? ev[0] : ev[1];
+    qfloat_t ev_max = e0_smaller ? ev[1] : ev[0];
+    check_qf_val("eigenvalue min = 4", ev_min, qf_from_double(4.0), 1e-25);
+    check_qf_val("eigenvalue max = 9", ev_max, qf_from_double(9.0), 1e-25);
+
+    /* full decomposition */
+    qfloat_t ev2[2];
+    matrix_t *V = NULL;
+    mat_eigendecompose(A, ev2, &V);
+
+    print_mqf("eigenvectors V (columns)", V);
+    print_qf("eigenvalue2[0]", ev2[0]);
+    print_qf("eigenvalue2[1]", ev2[1]);
+
+    /* verify A*v[k] = lambda[k]*v[k] */
+    for (size_t k = 0; k < 2; k++) {
+        for (size_t i = 0; i < 2; i++) {
+            qfloat_t Av_ik = QF_ZERO;
+            for (size_t j = 0; j < 2; j++) {
+                qfloat_t aij, vjk;
+                mat_get(A, i, j, &aij);
+                mat_get(V, j, k, &vjk);
+                Av_ik = qf_add(Av_ik, qf_mul(aij, vjk));
+            }
+            qfloat_t vik;
+            mat_get(V, i, k, &vik);
+            qfloat_t lv_ik = qf_mul(ev2[k], vik);
+
+            char label[64];
+            snprintf(label, sizeof(label), "qf: (Av)[%zu,%zu] = lv[%zu,%zu]", i, k, i, k);
+            check_qf_val(label, Av_ik, lv_ik, 1e-25);
+        }
+    }
+
+    /* eigenvectors only */
+    matrix_t *V2 = mat_eigenvectors(A);
+    print_mqf("eigenvectors (mat_eigenvectors)", V2);
+
+    mat_free(A);
+    mat_free(V);
+    mat_free(V2);
+}
+
+/* ------------------------------------------------------------------ eigendecomposition: qcomplex */
+
+static void test_eigen_qc(void)
+{
+    printf(C_CYAN "TEST: eigendecomposition (qcomplex Hermitian)\n" C_RESET);
+
+    /* A = [[2, 1+i], [1-i, 3]] — eigenvalues 1 and 4 */
+    matrix_t *A = mat_create_qc(2, 2);
+    qcomplex_t z00 = qc_make(qf_from_double(2),  QF_ZERO);
+    qcomplex_t z01 = qc_make(qf_from_double(1),  qf_from_double(1));
+    qcomplex_t z10 = qc_make(qf_from_double(1),  qf_from_double(-1));
+    qcomplex_t z11 = qc_make(qf_from_double(3),  QF_ZERO);
+    mat_set(A, 0, 0, &z00);
+    mat_set(A, 0, 1, &z01);
+    mat_set(A, 1, 0, &z10);
+    mat_set(A, 1, 1, &z11);
+
+    print_mqc("A", A);
+
+    /* eigenvalues only */
+    qcomplex_t ev[2];
+    mat_eigenvalues(A, ev);
+    print_qc("eigenvalue[0]", ev[0]);
+    print_qc("eigenvalue[1]", ev[1]);
+
+    int e0_smaller = qf_to_double(ev[0].re) < qf_to_double(ev[1].re);
+    qcomplex_t ev_min = e0_smaller ? ev[0] : ev[1];
+    qcomplex_t ev_max = e0_smaller ? ev[1] : ev[0];
+    qcomplex_t exp_min = qc_make(qf_from_double(1), QF_ZERO);
+    qcomplex_t exp_max = qc_make(qf_from_double(4), QF_ZERO);
+    check_qc_val("eigenvalue min = 1+0i", ev_min, exp_min, 1e-25);
+    check_qc_val("eigenvalue max = 4+0i", ev_max, exp_max, 1e-25);
+
+    /* full decomposition */
+    qcomplex_t ev2[2];
+    matrix_t *V = NULL;
+    mat_eigendecompose(A, ev2, &V);
+
+    print_mqc("eigenvectors V (columns)", V);
+    print_qc("eigenvalue2[0]", ev2[0]);
+    print_qc("eigenvalue2[1]", ev2[1]);
+
+    /* verify A*v[k] = lambda[k]*v[k] */
+    for (size_t k = 0; k < 2; k++) {
+        for (size_t i = 0; i < 2; i++) {
+            qcomplex_t Av_ik = QC_ZERO;
+            for (size_t j = 0; j < 2; j++) {
+                qcomplex_t aij, vjk;
+                mat_get(A, i, j, &aij);
+                mat_get(V, j, k, &vjk);
+                Av_ik = qc_add(Av_ik, qc_mul(aij, vjk));
+            }
+            qcomplex_t vik;
+            mat_get(V, i, k, &vik);
+            qcomplex_t lv_ik = qc_mul(ev2[k], vik);
+
+            char label[64];
+            snprintf(label, sizeof(label), "qc: (Av)[%zu,%zu] = lv[%zu,%zu]", i, k, i, k);
+            check_qc_val(label, Av_ik, lv_ik, 1e-25);
+        }
+    }
+
+    /* eigenvectors only */
+    matrix_t *V2 = mat_eigenvectors(A);
+    print_mqc("eigenvectors (mat_eigenvectors)", V2);
+
+    mat_free(A);
+    mat_free(V);
+    mat_free(V2);
+}
+
+/* ------------------------------------------------------------------ README example */
+
+static void test_readme_example(void)
+{
+    printf(C_CYAN "TEST: README example — Hermitian eigendecomposition\n" C_RESET);
+
+    /* Matrix from docs/matrix.md:
+     *   [ 2    1+i ]
+     *   [ 1-i  3   ]
+     * Eigenvalues: 1 and 4
+     */
+    matrix_t *A = matsq_create_qc(2);
+
+    qcomplex_t a00 = qc_make(qf_from_double(2.0), QF_ZERO);
+    qcomplex_t a01 = qc_make(qf_from_double(1.0), qf_from_double( 1.0));
+    qcomplex_t a10 = qc_make(qf_from_double(1.0), qf_from_double(-1.0));
+    qcomplex_t a11 = qc_make(qf_from_double(3.0), QF_ZERO);
+
+    mat_set(A, 0, 0, &a00);
+    mat_set(A, 0, 1, &a01);
+    mat_set(A, 1, 0, &a10);
+    mat_set(A, 1, 1, &a11);
+
+    print_mqc("A", A);
+
+    qcomplex_t ev[2];
+    matrix_t  *V = NULL;
+    mat_eigendecompose(A, ev, &V);
+
+    print_qc("eigenvalue[0]", ev[0]);
+    print_qc("eigenvalue[1]", ev[1]);
+    print_mqc("eigenvectors V (columns)", V);
+
+    /* sort so ev[min] <= ev[max] */
+    int e0_smaller = qf_to_double(ev[0].re) < qf_to_double(ev[1].re);
+    qcomplex_t ev_min = e0_smaller ? ev[0] : ev[1];
+    qcomplex_t ev_max = e0_smaller ? ev[1] : ev[0];
+    size_t     k_min  = e0_smaller ? 0 : 1;
+    size_t     k_max  = e0_smaller ? 1 : 0;
+
+    check_qc_val("eigenvalue min = 1", ev_min, qc_make(qf_from_double(1.0), QF_ZERO), 1e-25);
+    check_qc_val("eigenvalue max = 4", ev_max, qc_make(qf_from_double(4.0), QF_ZERO), 1e-25);
+
+    /* verify A*v[k] = lambda[k]*v[k] for each eigenvector */
+    for (size_t k = 0; k < 2; k++) {
+        for (size_t i = 0; i < 2; i++) {
+            qcomplex_t Av_ik = QC_ZERO;
+            for (size_t j = 0; j < 2; j++) {
+                qcomplex_t aij, vjk;
+                mat_get(A, i, j, &aij);
+                mat_get(V, j, k, &vjk);
+                Av_ik = qc_add(Av_ik, qc_mul(aij, vjk));
+            }
+            qcomplex_t vik;
+            mat_get(V, i, k, &vik);
+            qcomplex_t lv_ik = qc_mul(ev[k], vik);
+            char label[64];
+            snprintf(label, sizeof(label), "(Av)[%zu,%zu] = lambda*v[%zu,%zu]", i, k, i, k);
+            check_qc_val(label, Av_ik, lv_ik, 1e-25);
+        }
+    }
+    (void)k_min; (void)k_max;
+
+    mat_free(A);
+    mat_free(V);
+}
+
 /* ------------------------------------------------------------------ tests_main */
 
 int tests_main(void)
@@ -2313,6 +2515,12 @@ int tests_main(void)
     RUN_TEST(test_inverse_qcomplex, NULL);
 
     RUN_TEST(test_hermitian_op, NULL);
+
+    RUN_TEST(test_eigen_d,  NULL);
+    RUN_TEST(test_eigen_qf, NULL);
+    RUN_TEST(test_eigen_qc, NULL);
+
+    RUN_TEST(test_readme_example, NULL);
 
     return tests_failed;
 }
