@@ -241,11 +241,25 @@ static struct matrix_t *create_identity_qcomplex(size_t n) {
 static const double D_ZERO = 0.0;
 static const double D_ONE  = 1.0;
 
-static void d_add(void *o, const void *a, const void *b) { *(double*)o = *(const double*)a + *(const double*)b; }
-static void d_sub(void *o, const void *a, const void *b) { *(double*)o = *(const double*)a - *(const double*)b; }
-static void d_mul(void *o, const void *a, const void *b) { *(double*)o = *(const double*)a * *(const double*)b; }
-static void d_inv(void *o, const void *a) { *(double*)o = 1.0 / *(const double*)a; }
-static void d_print(const void *v, char *buf, size_t n) { snprintf(buf, n, "%.16g", *(const double*)v); }
+static void d_add(void *o, const void *a, const void *b) { 
+    *(double*)o = *(const double*)a + *(const double*)b;
+}
+
+static void d_sub(void *o, const void *a, const void *b) { 
+    *(double*)o = *(const double*)a - *(const double*)b;
+}
+
+static void d_mul(void *o, const void *a, const void *b) {
+    *(double*)o = *(const double*)a * *(const double*)b;
+}
+
+static void d_inv(void *o, const void *a) {
+    *(double*)o = 1.0 / *(const double*)a;
+}
+
+static void d_print(const void *v, char *buf, size_t n) {
+    snprintf(buf, n, "%.16g", *(const double*)v);
+}
 
 const struct elem_vtable double_elem = {
     .size  = sizeof(double),
@@ -263,11 +277,25 @@ const struct elem_vtable double_elem = {
 
 /* ---------- qfloat ---------- */
 
-static void qf_add_wrap(void *o, const void *a, const void *b) { *(qfloat_t*)o = qf_add(*(const qfloat_t*)a, *(const qfloat_t*)b); }
-static void qf_sub_wrap(void *o, const void *a, const void *b) { *(qfloat_t*)o = qf_sub(*(const qfloat_t*)a, *(const qfloat_t*)b); }
-static void qf_mul_wrap(void *o, const void *a, const void *b) { *(qfloat_t*)o = qf_mul(*(const qfloat_t*)a, *(const qfloat_t*)b); }
-static void qf_inv_wrap(void *o, const void *a) { *(qfloat_t*)o = qf_div(QF_ONE, *(const qfloat_t*)a); }
-static void qf_print_wrap(const void *v, char *buf, size_t n) { qf_to_string(*(const qfloat_t*)v, buf, n); }
+static void qf_add_wrap(void *o, const void *a, const void *b) {
+    *(qfloat_t*)o = qf_add(*(const qfloat_t*)a, *(const qfloat_t*)b);
+}
+
+static void qf_sub_wrap(void *o, const void *a, const void *b) {
+    *(qfloat_t*)o = qf_sub(*(const qfloat_t*)a, *(const qfloat_t*)b);
+}
+
+static void qf_mul_wrap(void *o, const void *a, const void *b) {
+    *(qfloat_t*)o = qf_mul(*(const qfloat_t*)a, *(const qfloat_t*)b);
+}
+
+static void qf_inv_wrap(void *o, const void *a) {
+    *(qfloat_t*)o = qf_div(QF_ONE, *(const qfloat_t*)a);
+}
+
+static void qf_print_wrap(const void *v, char *buf, size_t n) {
+    qf_to_string(*(const qfloat_t*)v, buf, n);
+}
 
 const struct elem_vtable qfloat_elem = {
     .size  = sizeof(qfloat_t),
@@ -293,11 +321,25 @@ static qcomplex_t qc_inv(qcomplex_t z)
     return qc_make(re, im);
 }
 
-static void qc_add_wrap(void *o, const void *a, const void *b) { *(qcomplex_t*)o = qc_add(*(const qcomplex_t*)a, *(const qcomplex_t*)b); }
-static void qc_sub_wrap(void *o, const void *a, const void *b) { *(qcomplex_t*)o = qc_sub(*(const qcomplex_t*)a, *(const qcomplex_t*)b); }
-static void qc_mul_wrap(void *o, const void *a, const void *b) { *(qcomplex_t*)o = qc_mul(*(const qcomplex_t*)a, *(const qcomplex_t*)b); }
-static void qc_inv_wrap(void *o, const void *a) { *(qcomplex_t*)o = qc_inv(*(const qcomplex_t*)a); }
-static void qc_print_wrap(const void *v, char *buf, size_t n) { qc_to_string(*(const qcomplex_t*)v, buf, n); }
+static void qc_add_wrap(void *o, const void *a, const void *b) {
+    *(qcomplex_t*)o = qc_add(*(const qcomplex_t*)a, *(const qcomplex_t*)b);
+}
+
+static void qc_sub_wrap(void *o, const void *a, const void *b) {
+    *(qcomplex_t*)o = qc_sub(*(const qcomplex_t*)a, *(const qcomplex_t*)b);
+}
+
+static void qc_mul_wrap(void *o, const void *a, const void *b) {
+    *(qcomplex_t*)o = qc_mul(*(const qcomplex_t*)a, *(const qcomplex_t*)b);
+}
+
+static void qc_inv_wrap(void *o, const void *a) {
+    *(qcomplex_t*)o = qc_inv(*(const qcomplex_t*)a);
+}
+
+static void qc_print_wrap(const void *v, char *buf, size_t n) {
+    qc_to_string(*(const qcomplex_t*)v, buf, n);
+}
 
 const struct elem_vtable qcomplex_elem = {
     .size  = sizeof(qcomplex_t),
@@ -594,9 +636,17 @@ struct matrix_t *mat_create_qc(size_t rows, size_t cols) {
     return qcomplex_elem.create_matrix(rows, cols);
 }
 
-struct matrix_t *matsq_create_d(size_t n)  { return mat_create_d(n, n); }
-struct matrix_t *matsq_create_qf(size_t n) { return mat_create_qf(n, n); }
-struct matrix_t *matsq_create_qc(size_t n) { return mat_create_qc(n, n); }
+struct matrix_t *matsq_create_d(size_t n)  { 
+    return mat_create_d(n, n);
+}
+
+struct matrix_t *matsq_create_qf(size_t n) { 
+    return mat_create_qf(n, n);
+}
+
+struct matrix_t *matsq_create_qc(size_t n) { 
+    return mat_create_qc(n, n);
+}
 
 struct matrix_t *matsq_ident_d(size_t n) {
     return double_elem.create_identity(n);
@@ -1105,22 +1155,31 @@ matrix_t *mat_inverse(const matrix_t *A)
 }
 
 /* ============================================================
-   Eigenvalues / eigenvectors (double-only Jacobi implementation)
+   Eigenvalues / eigenvectors (Jacobi implementation)
    ============================================================ */
 
 
 int mat_eigenvalues(const matrix_t *A, void *eigenvalues)
 {
+    (void)A;
+    (void)eigenvalues;
+
     return 0;
 }
 
 int mat_eigendecompose(const matrix_t *A, void *eigenvalues, matrix_t **eigenvectors)
 {
+    (void)A;
+    (void)eigenvalues;
+    (void)eigenvectors;
+
     return 0;
 }
 
 matrix_t *mat_eigenvectors(const matrix_t *A)
 {
+    (void)A;
+    
     return NULL;
 }
 
