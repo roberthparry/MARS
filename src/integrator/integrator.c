@@ -283,6 +283,10 @@ static void gturan_eval_dv(dval_t *expr, dval_t *x_var, dval_t *d2_expr,
                             qfloat_t a, qfloat_t b,
                             qfloat_t *t15_out, qfloat_t *t4_out)
 {
+    /* When expr and d2_expr are the same object (d²f/dx² == f), skip the
+     * second evaluation at each quadrature point. */
+    int same = (expr == d2_expr);
+
     qfloat_t c  = qf_mul_double(qf_add(a, b), 0.5);
     qfloat_t h  = qf_mul_double(qf_sub(b, a), 0.5);
     qfloat_t h2 = qf_mul(h, h);
@@ -290,7 +294,7 @@ static void gturan_eval_dv(dval_t *expr, dval_t *x_var, dval_t *d2_expr,
     /* Center node */
     dv_set_val(x_var, c);
     qfloat_t f0  = dv_eval(expr);
-    qfloat_t d20 = dv_eval(d2_expr);
+    qfloat_t d20 = same ? f0 : dv_eval(d2_expr);
 
     /* Seven symmetric pairs */
     qfloat_t fpos[7], fneg[7], d2pos[7], d2neg[7];
@@ -299,11 +303,11 @@ static void gturan_eval_dv(dval_t *expr, dval_t *x_var, dval_t *d2_expr,
 
         dv_set_val(x_var, qf_add(c, hi));
         fpos[i]  = dv_eval(expr);
-        d2pos[i] = dv_eval(d2_expr);
+        d2pos[i] = same ? fpos[i] : dv_eval(d2_expr);
 
         dv_set_val(x_var, qf_sub(c, hi));
         fneg[i]  = dv_eval(expr);
-        d2neg[i] = dv_eval(d2_expr);
+        d2neg[i] = same ? fneg[i] : dv_eval(d2_expr);
     }
 
     /* T15 accumulation (all 8 positions) */
@@ -486,12 +490,23 @@ int ig_single_integral(integrator_t *ig, dval_t *expr, dval_t *x_var,
     dval_t *d2_expr = dv_create_2nd_deriv(expr, x_var, x_var);
     if (!d2_expr) return -1;
 
+    /* If d²f/dx² == f (e.g. exp(x)), pass expr for both args so gturan_eval_dv
+     * can skip the redundant second evaluation at each quadrature point. */
+    static const double tp[2] = { 0.31415, 0.71828 };
+    int d2_same = 1;
+    for (int t = 0; t < 2 && d2_same; t++) {
+        dv_set_val(x_var, qf_from_double(tp[t]));
+        if (!qf_eq(dv_eval(expr), dv_eval(d2_expr)))
+            d2_same = 0;
+    }
+    dval_t *d2_use = d2_same ? expr : d2_expr;
+
     size_t capacity = 64;
     subinterval_t *intervals = malloc(capacity * sizeof(subinterval_t));
     if (!intervals) { dv_free(d2_expr); return -1; }
 
     qfloat_t t15, t4;
-    gturan_eval_dv(expr, x_var, d2_expr, a, b, &t15, &t4);
+    gturan_eval_dv(expr, x_var, d2_use, a, b, &t15, &t4);
 
     intervals[0].a      = a;
     intervals[0].b      = b;
@@ -523,11 +538,11 @@ int ig_single_integral(integrator_t *ig, dval_t *expr, dval_t *x_var,
 
         subinterval_t left, right;
 
-        gturan_eval_dv(expr, x_var, d2_expr, intervals[worst].a, mid, &t15, &t4);
+        gturan_eval_dv(expr, x_var, d2_use, intervals[worst].a, mid, &t15, &t4);
         left.a = intervals[worst].a;  left.b = mid;
         left.result = t15;  left.error = qf_abs(qf_sub(t15, t4));
 
-        gturan_eval_dv(expr, x_var, d2_expr, mid, intervals[worst].b, &t15, &t4);
+        gturan_eval_dv(expr, x_var, d2_use, mid, intervals[worst].b, &t15, &t4);
         right.a = mid;  right.b = intervals[worst].b;
         right.result = t15;  right.error = qf_abs(qf_sub(t15, t4));
 
@@ -786,6 +801,7 @@ typedef struct {
     dval_t    **vars;        /* vars[0] = innermost variable                  */
     const qfloat_t *lo;
     const qfloat_t *hi;
+    int        all_same;    /* all deriv_exprs[mask] are the same function   */
 } multi_ctx_t;
 
 static qfloat_t eval_nd_t15(const multi_ctx_t *ctx, int dim, size_t dmask,
@@ -793,8 +809,10 @@ static qfloat_t eval_nd_t15(const multi_ctx_t *ctx, int dim, size_t dmask,
 {
     if (dim == 0) {
         qfloat_t t15, t4;
-        gturan_eval_dv(ctx->deriv_exprs[dmask], ctx->vars[0],
-                       ctx->deriv_exprs[dmask | 1], a, b, &t15, &t4);
+        dval_t *e = ctx->deriv_exprs[dmask];
+        gturan_eval_dv(e, ctx->vars[0],
+                       ctx->all_same ? e : ctx->deriv_exprs[dmask | 1],
+                       a, b, &t15, &t4);
         return t15;
     }
     qfloat_t c   = qf_mul_double(qf_add(a, b), 0.5);
@@ -804,17 +822,20 @@ static qfloat_t eval_nd_t15(const multi_ctx_t *ctx, int dim, size_t dmask,
 
     dv_set_val(ctx->vars[dim], c);
     qfloat_t F0   = eval_nd_t15(ctx, dim-1, dmask,       ctx->lo[dim-1], ctx->hi[dim-1]);
-    qfloat_t Fpp0 = eval_nd_t15(ctx, dim-1, dmask | bit, ctx->lo[dim-1], ctx->hi[dim-1]);
+    qfloat_t Fpp0 = ctx->all_same ? F0
+                  : eval_nd_t15(ctx, dim-1, dmask | bit, ctx->lo[dim-1], ctx->hi[dim-1]);
 
     qfloat_t Fpos[7], Fneg[7], Fpppos[7], Fppneg[7];
     for (int i = 0; i < 7; i++) {
         qfloat_t ht = qf_mul(h, tn_node[i + 1]);
         dv_set_val(ctx->vars[dim], qf_add(c, ht));
         Fpos[i]   = eval_nd_t15(ctx, dim-1, dmask,       ctx->lo[dim-1], ctx->hi[dim-1]);
-        Fpppos[i] = eval_nd_t15(ctx, dim-1, dmask | bit, ctx->lo[dim-1], ctx->hi[dim-1]);
+        Fpppos[i] = ctx->all_same ? Fpos[i]
+                  : eval_nd_t15(ctx, dim-1, dmask | bit, ctx->lo[dim-1], ctx->hi[dim-1]);
         dv_set_val(ctx->vars[dim], qf_sub(c, ht));
         Fneg[i]   = eval_nd_t15(ctx, dim-1, dmask,       ctx->lo[dim-1], ctx->hi[dim-1]);
-        Fppneg[i] = eval_nd_t15(ctx, dim-1, dmask | bit, ctx->lo[dim-1], ctx->hi[dim-1]);
+        Fppneg[i] = ctx->all_same ? Fneg[i]
+                  : eval_nd_t15(ctx, dim-1, dmask | bit, ctx->lo[dim-1], ctx->hi[dim-1]);
     }
 
     qfloat_t t15 = qf_add(qf_mul(tn_wa[0], F0), qf_mul(tn_wd[0], qf_mul(h2, Fpp0)));
@@ -830,8 +851,10 @@ static void eval_nd_turan(const multi_ctx_t *ctx, int dim, size_t dmask,
                             qfloat_t *t15_out, qfloat_t *t4_out)
 {
     if (dim == 0) {
-        gturan_eval_dv(ctx->deriv_exprs[dmask], ctx->vars[0],
-                       ctx->deriv_exprs[dmask | 1], a, b, t15_out, t4_out);
+        dval_t *e = ctx->deriv_exprs[dmask];
+        gturan_eval_dv(e, ctx->vars[0],
+                       ctx->all_same ? e : ctx->deriv_exprs[dmask | 1],
+                       a, b, t15_out, t4_out);
         return;
     }
     qfloat_t c   = qf_mul_double(qf_add(a, b), 0.5);
@@ -841,17 +864,20 @@ static void eval_nd_turan(const multi_ctx_t *ctx, int dim, size_t dmask,
 
     dv_set_val(ctx->vars[dim], c);
     qfloat_t F0   = eval_nd_t15(ctx, dim-1, dmask,       ctx->lo[dim-1], ctx->hi[dim-1]);
-    qfloat_t Fpp0 = eval_nd_t15(ctx, dim-1, dmask | bit, ctx->lo[dim-1], ctx->hi[dim-1]);
+    qfloat_t Fpp0 = ctx->all_same ? F0
+                  : eval_nd_t15(ctx, dim-1, dmask | bit, ctx->lo[dim-1], ctx->hi[dim-1]);
 
     qfloat_t Fpos[7], Fneg[7], Fpppos[7], Fppneg[7];
     for (int i = 0; i < 7; i++) {
         qfloat_t ht = qf_mul(h, tn_node[i + 1]);
         dv_set_val(ctx->vars[dim], qf_add(c, ht));
         Fpos[i]   = eval_nd_t15(ctx, dim-1, dmask,       ctx->lo[dim-1], ctx->hi[dim-1]);
-        Fpppos[i] = eval_nd_t15(ctx, dim-1, dmask | bit, ctx->lo[dim-1], ctx->hi[dim-1]);
+        Fpppos[i] = ctx->all_same ? Fpos[i]
+                  : eval_nd_t15(ctx, dim-1, dmask | bit, ctx->lo[dim-1], ctx->hi[dim-1]);
         dv_set_val(ctx->vars[dim], qf_sub(c, ht));
         Fneg[i]   = eval_nd_t15(ctx, dim-1, dmask,       ctx->lo[dim-1], ctx->hi[dim-1]);
-        Fppneg[i] = eval_nd_t15(ctx, dim-1, dmask | bit, ctx->lo[dim-1], ctx->hi[dim-1]);
+        Fppneg[i] = ctx->all_same ? Fneg[i]
+                  : eval_nd_t15(ctx, dim-1, dmask | bit, ctx->lo[dim-1], ctx->hi[dim-1]);
     }
 
     qfloat_t t15 = qf_add(qf_mul(tn_wa[0], F0), qf_mul(tn_wd[0], qf_mul(h2, Fpp0)));
@@ -894,7 +920,24 @@ int ig_integral_multi(integrator_t *ig, dval_t *expr,
         }
     }
 
-    multi_ctx_t ctx = { deriv_exprs, (dval_t **)vars, lo, hi };
+    /* Detect if all deriv_exprs evaluate to the same function.
+     * If so, eval_nd_t15/turan skip redundant recursive calls, and gturan_eval_dv
+     * skips redundant evaluations. Uses two test points to distinguish functions. */
+    int all_same = (nexprs > 1);
+    if (all_same) {
+        static const double tp[2] = { 0.31415, 0.71828 };
+        for (int t = 0; t < 2 && all_same; t++) {
+            for (size_t v = 0; v < ndim; v++)
+                dv_set_val(vars[v], qf_from_double(tp[t]));
+            qfloat_t ref = dv_eval(deriv_exprs[0]);
+            for (size_t mask = 1; mask < nexprs && all_same; mask++) {
+                if (!qf_eq(ref, dv_eval(deriv_exprs[mask])))
+                    all_same = 0;
+            }
+        }
+    }
+
+    multi_ctx_t ctx = { deriv_exprs, (dval_t **)vars, lo, hi, all_same };
 
     size_t capacity = 64;
     subinterval_t *intervals = malloc(capacity * sizeof(subinterval_t));

@@ -11,6 +11,7 @@ make test_datetime
 make test_dictionary
 make test_set
 make test_string
+make test_matrix
 ```
 
 ## Typical Workflow
@@ -32,6 +33,7 @@ make test_datetime
 make test_dictionary
 make test_set
 make test_string
+make test_matrix
 ```
 
 ## Notes

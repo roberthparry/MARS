@@ -35,6 +35,7 @@
 #include <math.h>
 #include <float.h>
 #include <string.h>
+#include <time.h>
 
 #include "test_config.h"
 
@@ -53,9 +54,33 @@
 
 /* Global test state */
 
-extern int tests_run;
-extern int tests_failed;
-extern int tests_skipped;
+extern int    tests_run;
+extern int    tests_failed;
+extern int    tests_skipped;
+extern double tests_total_ms;
+
+/* Timing helpers */
+
+static inline double th_elapsed_ms(struct timespec t0, struct timespec t1) {
+    return (t1.tv_sec - t0.tv_sec) * 1000.0
+         + (t1.tv_nsec - t0.tv_nsec) / 1e6;
+}
+
+static inline void th_print_time(double ms) {
+    printf(C_GREY "  [");
+    if (ms < 0.001) {
+        long ns = (long)(ms * 1000000.0 + 0.5);
+        if (ns < 1) printf("< 1 ns");
+        else        printf("%ld ns", ns);
+    }
+    else if (ms < 1.0)
+        printf("%.1f µs", ms * 1000.0);
+    else if (ms < 1000.0)
+        printf("%.1f ms", ms);
+    else
+        printf("%.2f s", ms / 1000.0);
+    printf("]" C_RESET);
+}
 
 /* Assertion helpers */
 
@@ -133,7 +158,19 @@ extern int tests_skipped;
         int failed_before  = tests_failed;                                        \
         int skipped_before = tests_skipped;                                       \
                                                                                   \
+        double __total_ms_before = tests_total_ms;                                \
+        struct timespec __th_t0, __th_t1;                                         \
+        clock_gettime(CLOCK_MONOTONIC, &__th_t0);                                 \
         func();                                                                   \
+        clock_gettime(CLOCK_MONOTONIC, &__th_t1);                                 \
+        double __th_ms = th_elapsed_ms(__th_t0, __th_t1);                        \
+                                                                                  \
+        int __is_group = (tests_run > run_before);                                \
+        double __disp_ms = __is_group                                             \
+                         ? (tests_total_ms - __total_ms_before)                   \
+                         : __th_ms;                                               \
+        if (!__is_group)                                                          \
+            tests_total_ms += __th_ms;                                            \
                                                                                   \
         if (tests_skipped > skipped_before) {                                     \
             int run_after     = tests_run;                                        \
@@ -148,14 +185,16 @@ extern int tests_skipped;
             printf("\r" C_CYAN "GROUP: %s"                                        \
                    " " C_RESET "(" C_GREEN "%d passed" C_RESET                    \
                    "," C_RED " %d failed" C_RESET                                 \
-                   "," C_YELLOW " %d skipped" C_RESET ")\n" C_RESET,              \
+                   "," C_YELLOW " %d skipped" C_RESET ")",                        \
                    #func, passed, failed, skipped);                               \
         } else if (tests_failed == failed_before) {                               \
-            printf(C_BOLD C_GREEN "PASS: " C_RESET "%s\n", #func);                \
+            printf(C_BOLD C_GREEN "PASS: " C_RESET "%s", #func);                  \
         } else {                                                                  \
-            printf(C_BOLD C_RED "FAIL: " C_RESET "%s " C_RED "(%s:%d)\n" C_RESET, \
+            printf(C_BOLD C_RED "FAIL: " C_RESET "%s " C_RED "(%s:%d)" C_RESET,   \
                    #func, __FILE__, __LINE__);                                    \
         }                                                                         \
+        th_print_time(__disp_ms);                                                 \
+        putchar('\n');                                                            \
     } while (0)
 
 
@@ -166,13 +205,16 @@ int tests_main(void);
 
 /* Harness-owned — do not modify */
 
-int tests_run = 0;
-int tests_failed = 0;
-int tests_skipped = 0;
+int    tests_run      = 0;
+int    tests_failed   = 0;
+int    tests_skipped  = 0;
+double tests_total_ms = 0.0;
 
 int main(void) {
     test_config_set_mode(TEST_CONFIG_MODE);
+
     int rc = tests_main();
+
     test_config_save();
     test_config_shutdown();
 
@@ -181,8 +223,10 @@ int main(void) {
     printf("\n" C_CYAN "SUMMARY: " C_RESET
            "%d run, " C_GREEN "%d passed" C_RESET ", "
            C_RED "%d failed" C_RESET ", "
-           C_YELLOW "%d skipped" C_RESET "\n",
+           C_YELLOW "%d skipped" C_RESET,
            tests_run, passed, tests_failed, tests_skipped);
+    th_print_time(tests_total_ms);
+    putchar('\n');
 
     return rc;
 }
