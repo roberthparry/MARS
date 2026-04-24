@@ -47,7 +47,7 @@ static void qc_to_coloured_string(qcomplex_t z, char *out, size_t out_size)
 
 static void print_qc(const char *label, qcomplex_t z)
 {
-    char buf[256];
+    char buf[512];
     qc_to_coloured_string(z, buf, sizeof(buf));
     printf("    %s = %s\n", label, buf);
     fflush(stdout);
@@ -55,7 +55,7 @@ static void print_qc(const char *label, qcomplex_t z)
 
 static void print_qf(const char *label, qfloat_t x)
 {
-    char buf[256];
+    char buf[512];
     qf_to_coloured_string(x, buf, sizeof(buf));
     printf("    %s = %s\n", label, buf);
     fflush(stdout);
@@ -112,7 +112,7 @@ static void print_mqf(const char *label, matrix_t *A)
     for (size_t i = 0; i < rows; i++)
         for (size_t j = 0; j < cols; j++) {
             qfloat_t v;
-            char buf[256];
+            char buf[512];
             mat_get(A, i, j, &v);
             qf_to_coloured_string(v, buf, sizeof(buf));
             size_t len = strlen(buf);
@@ -123,7 +123,7 @@ static void print_mqf(const char *label, matrix_t *A)
         printf("      ");
         for (size_t j = 0; j < cols; j++) {
             qfloat_t v;
-            char buf[256];
+            char buf[512];
             mat_get(A, i, j, &v);
             qf_to_coloured_string(v, buf, sizeof(buf));
             printf(" %*s", (int)w[j], buf);
@@ -147,7 +147,7 @@ static void print_mqc(const char *label, matrix_t *A)
     for (size_t i = 0; i < rows; i++)
         for (size_t j = 0; j < cols; j++) {
             qcomplex_t v;
-            char buf[256];
+            char buf[512];
             mat_get(A, i, j, &v);
             qc_to_coloured_string(v, buf, sizeof(buf));
             size_t len = strlen(buf);
@@ -158,7 +158,7 @@ static void print_mqc(const char *label, matrix_t *A)
         printf("      ");
         for (size_t j = 0; j < cols; j++) {
             qcomplex_t v;
-            char buf[256];
+            char buf[512];
             mat_get(A, i, j, &v);
             qc_to_coloured_string(v, buf, sizeof(buf));
             printf(" (%*s)", (int)w[j], buf);
@@ -2388,6 +2388,824 @@ static void test_eigen_qc(void)
     mat_free(V2);
 }
 
+/* ------------------------------------------------------------------ mat_exp */
+
+static void test_mat_exp_d(void)
+{
+    printf(C_CYAN "TEST: mat_exp (double)\n" C_RESET);
+
+    /* 1×1: exp([[x]]) = [[exp(x)]] */
+    {
+        matrix_t *A = mat_create_d(1, 1);
+        double v = 2.0;
+        mat_set(A, 0, 0, &v);
+        print_md("A", A);
+        matrix_t *E = mat_exp(A);
+        check_bool("mat_exp(1x1) not NULL", E != NULL);
+        if (E) {
+            print_md("exp(A)", E);
+            double got;
+            mat_get(E, 0, 0, &got);
+            check_d("exp([[2]]) = e²", got, exp(2.0), 1e-12);
+        }
+        mat_free(A); mat_free(E);
+    }
+
+    /* 2×2 diagonal: exp(diag(a,b)) = diag(exp(a),exp(b)) */
+    {
+        matrix_t *A = mat_create_d(2, 2);
+        double a=1.0, b=2.0, z=0.0;
+        mat_set(A, 0, 0, &a); mat_set(A, 0, 1, &z);
+        mat_set(A, 1, 0, &z); mat_set(A, 1, 1, &b);
+        print_md("A", A);
+        matrix_t *E = mat_exp(A);
+        check_bool("mat_exp(diag) not NULL", E != NULL);
+        if (E) {
+            print_md("exp(A)", E);
+            double e00, e01, e10, e11;
+            mat_get(E, 0, 0, &e00); mat_get(E, 0, 1, &e01);
+            mat_get(E, 1, 0, &e10); mat_get(E, 1, 1, &e11);
+            check_d("exp(diag)[0,0] = e",   e00, exp(1.0), 1e-12);
+            check_d("exp(diag)[1,1] = e²",  e11, exp(2.0), 1e-12);
+            check_d("exp(diag)[0,1] = 0",   e01, 0.0,      1e-12);
+            check_d("exp(diag)[1,0] = 0",   e10, 0.0,      1e-12);
+        }
+        mat_free(A); mat_free(E);
+    }
+
+    /* 2×2 symmetric: A = [[0,1],[1,0]]
+     * eigenvalues ±1 → exp(A) = cosh(1)·I + sinh(1)·A */
+    {
+        matrix_t *A = mat_create_d(2, 2);
+        double z=0.0, o=1.0;
+        mat_set(A, 0, 0, &z); mat_set(A, 0, 1, &o);
+        mat_set(A, 1, 0, &o); mat_set(A, 1, 1, &z);
+        print_md("A", A);
+        matrix_t *E = mat_exp(A);
+        check_bool("mat_exp(sym) not NULL", E != NULL);
+        if (E) {
+            print_md("exp(A)", E);
+            double e00, e01, e10, e11;
+            mat_get(E, 0, 0, &e00); mat_get(E, 0, 1, &e01);
+            mat_get(E, 1, 0, &e10); mat_get(E, 1, 1, &e11);
+            double ch = cosh(1.0), sh = sinh(1.0);
+            check_d("exp([[0,1],[1,0]])[0,0] = cosh(1)", e00, ch, 1e-12);
+            check_d("exp([[0,1],[1,0]])[1,1] = cosh(1)", e11, ch, 1e-12);
+            check_d("exp([[0,1],[1,0]])[0,1] = sinh(1)", e01, sh, 1e-12);
+            check_d("exp([[0,1],[1,0]])[1,0] = sinh(1)", e10, sh, 1e-12);
+        }
+        mat_free(A); mat_free(E);
+    }
+
+    /* zero matrix: exp(0) = I */
+    {
+        matrix_t *A = mat_create_d(2, 2);
+        double z = 0.0;
+        mat_set(A, 0, 0, &z); mat_set(A, 0, 1, &z);
+        mat_set(A, 1, 0, &z); mat_set(A, 1, 1, &z);
+        print_md("A", A);
+        matrix_t *E = mat_exp(A);
+        check_bool("mat_exp(zero) not NULL", E != NULL);
+        if (E) {
+            print_md("exp(A)", E);
+            double e00, e01, e10, e11;
+            mat_get(E, 0, 0, &e00); mat_get(E, 0, 1, &e01);
+            mat_get(E, 1, 0, &e10); mat_get(E, 1, 1, &e11);
+            check_d("exp(0)[0,0] = 1", e00, 1.0, 1e-12);
+            check_d("exp(0)[1,1] = 1", e11, 1.0, 1e-12);
+            check_d("exp(0)[0,1] = 0", e01, 0.0, 1e-12);
+            check_d("exp(0)[1,0] = 0", e10, 0.0, 1e-12);
+        }
+        mat_free(A); mat_free(E);
+    }
+}
+
+static void test_mat_exp_qf(void)
+{
+    printf(C_CYAN "TEST: mat_exp (qfloat)\n" C_RESET);
+
+    /* 1×1: exp([[x]]) = [[exp(x)]] */
+    {
+        matrix_t *A = mat_create_qf(1, 1);
+        qfloat_t v = qf_from_double(2.0);
+        mat_set(A, 0, 0, &v);
+        print_mqf("A", A);
+        matrix_t *E = mat_exp(A);
+        check_bool("mat_exp qf(1x1) not NULL", E != NULL);
+        if (E) {
+            print_mqf("exp(A)", E);
+            qfloat_t got;
+            mat_get(E, 0, 0, &got);
+            check_qf_val("qf exp([[2]]) = e²", got, qf_exp(qf_from_double(2.0)), 1e-25);
+        }
+        mat_free(A); mat_free(E);
+    }
+
+    /* 2×2 symmetric: A = [[0,1],[1,0]] → exp(A) = cosh(1)·I + sinh(1)·A */
+    {
+        matrix_t *A = mat_create_qf(2, 2);
+        qfloat_t z = QF_ZERO, o = QF_ONE;
+        mat_set(A, 0, 0, &z); mat_set(A, 0, 1, &o);
+        mat_set(A, 1, 0, &o); mat_set(A, 1, 1, &z);
+        print_mqf("A", A);
+        matrix_t *E = mat_exp(A);
+        check_bool("mat_exp qf(sym) not NULL", E != NULL);
+        if (E) {
+            print_mqf("exp(A)", E);
+            qfloat_t e00, e01, e10, e11;
+            mat_get(E, 0, 0, &e00); mat_get(E, 0, 1, &e01);
+            mat_get(E, 1, 0, &e10); mat_get(E, 1, 1, &e11);
+            /* cosh(1) = (e + 1/e) / 2, sinh(1) = (e - 1/e) / 2 */
+            qfloat_t e1   = qf_exp(QF_ONE);
+            qfloat_t inv1 = qf_div(QF_ONE, e1);
+            qfloat_t two  = qf_from_double(2.0);
+            qfloat_t ch   = qf_div(qf_add(e1, inv1), two);
+            qfloat_t sh   = qf_div(qf_sub(e1, inv1), two);
+            check_qf_val("qf exp(sym)[0,0] = cosh(1)", e00, ch, 1e-25);
+            check_qf_val("qf exp(sym)[1,1] = cosh(1)", e11, ch, 1e-25);
+            check_qf_val("qf exp(sym)[0,1] = sinh(1)", e01, sh, 1e-25);
+            check_qf_val("qf exp(sym)[1,0] = sinh(1)", e10, sh, 1e-25);
+        }
+        mat_free(A); mat_free(E);
+    }
+}
+
+static void test_mat_exp_qc(void)
+{
+    printf(C_CYAN "TEST: mat_exp (qcomplex)\n" C_RESET);
+
+    /* Hermitian 2×2: A = [[0, i], [-i, 0]]
+     * eigenvalues ±1 → exp(A) = cosh(1)·I + sinh(1)·A */
+    {
+        matrix_t *A = mat_create_qc(2, 2);
+        qcomplex_t z   = QC_ZERO;
+        qcomplex_t pi  = qc_make(QF_ZERO,  QF_ONE);   /*  i */
+        qcomplex_t ni  = qc_make(QF_ZERO,  qf_neg(QF_ONE)); /* -i */
+        mat_set(A, 0, 0, &z);  mat_set(A, 0, 1, &pi);
+        mat_set(A, 1, 0, &ni); mat_set(A, 1, 1, &z);
+        print_mqc("A", A);
+        matrix_t *E = mat_exp(A);
+        check_bool("mat_exp qc(herm) not NULL", E != NULL);
+        if (E) {
+            print_mqc("exp(A)", E);
+            qcomplex_t e00, e01, e10, e11;
+            mat_get(E, 0, 0, &e00); mat_get(E, 0, 1, &e01);
+            mat_get(E, 1, 0, &e10); mat_get(E, 1, 1, &e11);
+            qfloat_t e1   = qf_exp(QF_ONE);
+            qfloat_t inv1 = qf_div(QF_ONE, e1);
+            qfloat_t two  = qf_from_double(2.0);
+            qfloat_t ch   = qf_div(qf_add(e1, inv1), two);
+            qfloat_t sh   = qf_div(qf_sub(e1, inv1), two);
+            qcomplex_t ch_c = qc_make(ch, QF_ZERO);
+            qcomplex_t ish  = qc_make(QF_ZERO, sh);   /* i·sinh(1) */
+            qcomplex_t nish = qc_make(QF_ZERO, qf_neg(sh)); /* -i·sinh(1) */
+            check_qc_val("qc exp(herm)[0,0] = cosh(1)",   e00, ch_c, 1e-25);
+            check_qc_val("qc exp(herm)[1,1] = cosh(1)",   e11, ch_c, 1e-25);
+            check_qc_val("qc exp(herm)[0,1] = i·sinh(1)", e01, ish,  1e-25);
+            check_qc_val("qc exp(herm)[1,0] = -i·sinh(1)",e10, nish, 1e-25);
+        }
+        mat_free(A); mat_free(E);
+    }
+}
+
+static void test_mat_exp_null_safety(void)
+{
+    printf(C_CYAN "TEST: mat_exp null safety\n" C_RESET);
+    check_bool("mat_exp(NULL) = NULL", mat_exp(NULL) == NULL);
+
+    matrix_t *A = mat_create_d(2, 3);
+    check_bool("mat_exp(non-square) = NULL", mat_exp(A) == NULL);
+    mat_free(A);
+}
+
+/* ------------------------------------------------------------------ mat_sin */
+
+static void test_mat_sin_d(void)
+{
+    printf(C_CYAN "TEST: mat_sin (double)\n" C_RESET);
+
+    /* 1×1: sin([[π/6]]) = [[0.5]] */
+    {
+        matrix_t *A = mat_create_d(1, 1);
+        double v = M_PI / 6.0;
+        mat_set(A, 0, 0, &v);
+        print_md("A", A);
+        matrix_t *S = mat_sin(A);
+        check_bool("mat_sin(1x1) not NULL", S != NULL);
+        if (S) {
+            print_md("sin(A)", S);
+            double got;
+            mat_get(S, 0, 0, &got);
+            check_d("sin([[π/6]]) = 0.5", got, 0.5, 1e-12);
+        }
+        mat_free(A); mat_free(S);
+    }
+
+    /* 2×2 diagonal: sin(diag(0, π/2)) = diag(0, 1) */
+    {
+        matrix_t *A = mat_create_d(2, 2);
+        double z=0.0, h=M_PI/2.0;
+        mat_set(A, 0, 0, &z); mat_set(A, 0, 1, &z);
+        mat_set(A, 1, 0, &z); mat_set(A, 1, 1, &h);
+        print_md("A", A);
+        matrix_t *S = mat_sin(A);
+        check_bool("mat_sin(diag) not NULL", S != NULL);
+        if (S) {
+            print_md("sin(A)", S);
+            double s00, s01, s10, s11;
+            mat_get(S, 0, 0, &s00); mat_get(S, 0, 1, &s01);
+            mat_get(S, 1, 0, &s10); mat_get(S, 1, 1, &s11);
+            check_d("sin(diag)[0,0] = 0", s00, 0.0, 1e-12);
+            check_d("sin(diag)[1,1] = 1", s11, 1.0, 1e-12);
+            check_d("sin(diag)[0,1] = 0", s01, 0.0, 1e-12);
+            check_d("sin(diag)[1,0] = 0", s10, 0.0, 1e-12);
+        }
+        mat_free(A); mat_free(S);
+    }
+
+    /* 2×2 symmetric: A = [[0,1],[1,0]], eigenvalues ±1.
+     * A² = I, so sin(A) = sin(1)·A */
+    {
+        matrix_t *A = mat_create_d(2, 2);
+        double z=0.0, o=1.0;
+        mat_set(A, 0, 0, &z); mat_set(A, 0, 1, &o);
+        mat_set(A, 1, 0, &o); mat_set(A, 1, 1, &z);
+        print_md("A", A);
+        matrix_t *S = mat_sin(A);
+        check_bool("mat_sin(sym) not NULL", S != NULL);
+        if (S) {
+            print_md("sin(A)", S);
+            double s00, s01, s10, s11;
+            mat_get(S, 0, 0, &s00); mat_get(S, 0, 1, &s01);
+            mat_get(S, 1, 0, &s10); mat_get(S, 1, 1, &s11);
+            double s1 = sin(1.0);
+            check_d("sin([[0,1],[1,0]])[0,0] = 0",      s00, 0.0, 1e-12);
+            check_d("sin([[0,1],[1,0]])[1,1] = 0",      s11, 0.0, 1e-12);
+            check_d("sin([[0,1],[1,0]])[0,1] = sin(1)", s01, s1,  1e-12);
+            check_d("sin([[0,1],[1,0]])[1,0] = sin(1)", s10, s1,  1e-12);
+        }
+        mat_free(A); mat_free(S);
+    }
+
+    /* zero matrix: sin(0) = 0 */
+    {
+        matrix_t *A = mat_create_d(2, 2);
+        double z = 0.0;
+        mat_set(A, 0, 0, &z); mat_set(A, 0, 1, &z);
+        mat_set(A, 1, 0, &z); mat_set(A, 1, 1, &z);
+        print_md("A", A);
+        matrix_t *S = mat_sin(A);
+        check_bool("mat_sin(zero) not NULL", S != NULL);
+        if (S) {
+            print_md("sin(A)", S);
+            double s00, s01, s10, s11;
+            mat_get(S, 0, 0, &s00); mat_get(S, 0, 1, &s01);
+            mat_get(S, 1, 0, &s10); mat_get(S, 1, 1, &s11);
+            check_d("sin(0)[0,0] = 0", s00, 0.0, 1e-12);
+            check_d("sin(0)[1,1] = 0", s11, 0.0, 1e-12);
+            check_d("sin(0)[0,1] = 0", s01, 0.0, 1e-12);
+            check_d("sin(0)[1,0] = 0", s10, 0.0, 1e-12);
+        }
+        mat_free(A); mat_free(S);
+    }
+}
+
+static void test_mat_sin_qf(void)
+{
+    printf(C_CYAN "TEST: mat_sin (qfloat)\n" C_RESET);
+
+    /* 1×1: sin([[π/6]]) = [[0.5]] */
+    {
+        matrix_t *A = mat_create_qf(1, 1);
+        qfloat_t v = qf_div(QF_PI, qf_from_double(6.0));
+        mat_set(A, 0, 0, &v);
+        print_mqf("A", A);
+        matrix_t *S = mat_sin(A);
+        check_bool("mat_sin qf(1x1) not NULL", S != NULL);
+        if (S) {
+            print_mqf("sin(A)", S);
+            qfloat_t got;
+            mat_get(S, 0, 0, &got);
+            check_qf_val("qf sin([[π/6]]) = 0.5", got, qf_from_double(0.5), 1e-25);
+        }
+        mat_free(A); mat_free(S);
+    }
+
+    /* 2×2 symmetric: A = [[0,1],[1,0]] → sin(A) = sin(1)·A */
+    {
+        matrix_t *A = mat_create_qf(2, 2);
+        qfloat_t z = QF_ZERO, o = QF_ONE;
+        mat_set(A, 0, 0, &z); mat_set(A, 0, 1, &o);
+        mat_set(A, 1, 0, &o); mat_set(A, 1, 1, &z);
+        print_mqf("A", A);
+        matrix_t *S = mat_sin(A);
+        check_bool("mat_sin qf(sym) not NULL", S != NULL);
+        if (S) {
+            print_mqf("sin(A)", S);
+            qfloat_t s00, s01, s10, s11;
+            mat_get(S, 0, 0, &s00); mat_get(S, 0, 1, &s01);
+            mat_get(S, 1, 0, &s10); mat_get(S, 1, 1, &s11);
+            qfloat_t s1 = qf_sin(QF_ONE);
+            check_qf_val("qf sin(sym)[0,0] = 0",      s00, QF_ZERO, 1e-25);
+            check_qf_val("qf sin(sym)[1,1] = 0",      s11, QF_ZERO, 1e-25);
+            check_qf_val("qf sin(sym)[0,1] = sin(1)", s01, s1,      1e-25);
+            check_qf_val("qf sin(sym)[1,0] = sin(1)", s10, s1,      1e-25);
+        }
+        mat_free(A); mat_free(S);
+    }
+}
+
+static void test_mat_sin_qc(void)
+{
+    printf(C_CYAN "TEST: mat_sin (qcomplex)\n" C_RESET);
+
+    /* Hermitian 2×2: A = [[0, i], [-i, 0]], eigenvalues ±1.
+     * A² = I, so sin(A) = sin(1)·A = [[0, i·sin(1)], [-i·sin(1), 0]] */
+    {
+        matrix_t *A = mat_create_qc(2, 2);
+        qcomplex_t z  = QC_ZERO;
+        qcomplex_t pi = qc_make(QF_ZERO,  QF_ONE);
+        qcomplex_t ni = qc_make(QF_ZERO,  qf_neg(QF_ONE));
+        mat_set(A, 0, 0, &z);  mat_set(A, 0, 1, &pi);
+        mat_set(A, 1, 0, &ni); mat_set(A, 1, 1, &z);
+        print_mqc("A", A);
+        matrix_t *S = mat_sin(A);
+        check_bool("mat_sin qc(herm) not NULL", S != NULL);
+        if (S) {
+            print_mqc("sin(A)", S);
+            qcomplex_t s00, s01, s10, s11;
+            mat_get(S, 0, 0, &s00); mat_get(S, 0, 1, &s01);
+            mat_get(S, 1, 0, &s10); mat_get(S, 1, 1, &s11);
+            qfloat_t s1 = qf_sin(QF_ONE);
+            qcomplex_t zero_c = QC_ZERO;
+            qcomplex_t ish    = qc_make(QF_ZERO, s1);
+            qcomplex_t nish   = qc_make(QF_ZERO, qf_neg(s1));
+            check_qc_val("qc sin(herm)[0,0] = 0",         s00, zero_c, 1e-25);
+            check_qc_val("qc sin(herm)[1,1] = 0",         s11, zero_c, 1e-25);
+            check_qc_val("qc sin(herm)[0,1] = i·sin(1)",  s01, ish,    1e-25);
+            check_qc_val("qc sin(herm)[1,0] = -i·sin(1)", s10, nish,   1e-25);
+        }
+        mat_free(A); mat_free(S);
+    }
+}
+
+static void test_mat_sin_null_safety(void)
+{
+    printf(C_CYAN "TEST: mat_sin null safety\n" C_RESET);
+    check_bool("mat_sin(NULL) = NULL", mat_sin(NULL) == NULL);
+
+    matrix_t *A = mat_create_d(2, 3);
+    check_bool("mat_sin(non-square) = NULL", mat_sin(A) == NULL);
+    mat_free(A);
+}
+
+/* ------------------------------------------------------------------ mat_cos */
+
+static void test_mat_cos_d(void)
+{
+    printf(C_CYAN "TEST: mat_cos (double)\n" C_RESET);
+
+    /* 1×1: cos([[π/3]]) = 0.5 */
+    {
+        matrix_t *A = mat_create_d(1, 1);
+        double v = M_PI / 3.0;
+        mat_set(A, 0, 0, &v);
+        print_md("A", A);
+        matrix_t *C = mat_cos(A);
+        check_bool("mat_cos(1x1) not NULL", C != NULL);
+        if (C) {
+            print_md("cos(A)", C);
+            double got;
+            mat_get(C, 0, 0, &got);
+            check_d("cos([[π/3]]) = 0.5", got, 0.5, 1e-12);
+        }
+        mat_free(A); mat_free(C);
+    }
+
+    /* 2×2 diagonal: cos(diag(0, π)) = diag(1, -1) */
+    {
+        matrix_t *A = mat_create_d(2, 2);
+        double z=0.0, p=M_PI;
+        mat_set(A, 0, 0, &z); mat_set(A, 0, 1, &z);
+        mat_set(A, 1, 0, &z); mat_set(A, 1, 1, &p);
+        print_md("A", A);
+        matrix_t *C = mat_cos(A);
+        check_bool("mat_cos(diag) not NULL", C != NULL);
+        if (C) {
+            print_md("cos(A)", C);
+            double c00, c01, c10, c11;
+            mat_get(C, 0, 0, &c00); mat_get(C, 0, 1, &c01);
+            mat_get(C, 1, 0, &c10); mat_get(C, 1, 1, &c11);
+            check_d("cos(diag)[0,0] =  1", c00,  1.0, 1e-12);
+            check_d("cos(diag)[1,1] = -1", c11, -1.0, 1e-12);
+            check_d("cos(diag)[0,1] =  0", c01,  0.0, 1e-12);
+            check_d("cos(diag)[1,0] =  0", c10,  0.0, 1e-12);
+        }
+        mat_free(A); mat_free(C);
+    }
+
+    /* 2×2 symmetric: A = [[0,1],[1,0]], eigenvalues ±1.
+     * cos is even → cos(A) = cos(1)·I */
+    {
+        matrix_t *A = mat_create_d(2, 2);
+        double z=0.0, o=1.0;
+        mat_set(A, 0, 0, &z); mat_set(A, 0, 1, &o);
+        mat_set(A, 1, 0, &o); mat_set(A, 1, 1, &z);
+        print_md("A", A);
+        matrix_t *C = mat_cos(A);
+        check_bool("mat_cos(sym) not NULL", C != NULL);
+        if (C) {
+            print_md("cos(A)", C);
+            double c00, c01, c10, c11;
+            mat_get(C, 0, 0, &c00); mat_get(C, 0, 1, &c01);
+            mat_get(C, 1, 0, &c10); mat_get(C, 1, 1, &c11);
+            double c1 = cos(1.0);
+            check_d("cos([[0,1],[1,0]])[0,0] = cos(1)", c00, c1,  1e-12);
+            check_d("cos([[0,1],[1,0]])[1,1] = cos(1)", c11, c1,  1e-12);
+            check_d("cos([[0,1],[1,0]])[0,1] = 0",      c01, 0.0, 1e-12);
+            check_d("cos([[0,1],[1,0]])[1,0] = 0",      c10, 0.0, 1e-12);
+        }
+        mat_free(A); mat_free(C);
+    }
+}
+
+static void test_mat_cos_qf(void)
+{
+    printf(C_CYAN "TEST: mat_cos (qfloat)\n" C_RESET);
+
+    /* 1×1: cos([[π/3]]) = 0.5 */
+    {
+        matrix_t *A = mat_create_qf(1, 1);
+        qfloat_t v = qf_div(QF_PI, qf_from_double(3.0));
+        mat_set(A, 0, 0, &v);
+        print_mqf("A", A);
+        matrix_t *C = mat_cos(A);
+        check_bool("mat_cos qf(1x1) not NULL", C != NULL);
+        if (C) {
+            print_mqf("cos(A)", C);
+            qfloat_t got;
+            mat_get(C, 0, 0, &got);
+            check_qf_val("qf cos([[π/3]]) = 0.5", got, qf_from_double(0.5), 1e-25);
+        }
+        mat_free(A); mat_free(C);
+    }
+
+    /* 2×2 symmetric: A = [[0,1],[1,0]] → cos(A) = cos(1)·I */
+    {
+        matrix_t *A = mat_create_qf(2, 2);
+        qfloat_t z = QF_ZERO, o = QF_ONE;
+        mat_set(A, 0, 0, &z); mat_set(A, 0, 1, &o);
+        mat_set(A, 1, 0, &o); mat_set(A, 1, 1, &z);
+        print_mqf("A", A);
+        matrix_t *C = mat_cos(A);
+        check_bool("mat_cos qf(sym) not NULL", C != NULL);
+        if (C) {
+            print_mqf("cos(A)", C);
+            qfloat_t c00, c01, c10, c11;
+            mat_get(C, 0, 0, &c00); mat_get(C, 0, 1, &c01);
+            mat_get(C, 1, 0, &c10); mat_get(C, 1, 1, &c11);
+            qfloat_t c1 = qf_cos(QF_ONE);
+            check_qf_val("qf cos(sym)[0,0] = cos(1)", c00, c1,     1e-25);
+            check_qf_val("qf cos(sym)[1,1] = cos(1)", c11, c1,     1e-25);
+            check_qf_val("qf cos(sym)[0,1] = 0",      c01, QF_ZERO, 1e-25);
+            check_qf_val("qf cos(sym)[1,0] = 0",      c10, QF_ZERO, 1e-25);
+        }
+        mat_free(A); mat_free(C);
+    }
+}
+
+static void test_mat_cos_qc(void)
+{
+    printf(C_CYAN "TEST: mat_cos (qcomplex)\n" C_RESET);
+
+    /* Hermitian 2×2: A = [[0, i], [-i, 0]], eigenvalues ±1.
+     * cos is even → cos(A) = cos(1)·I */
+    {
+        matrix_t *A = mat_create_qc(2, 2);
+        qcomplex_t z  = QC_ZERO;
+        qcomplex_t pi = qc_make(QF_ZERO,  QF_ONE);
+        qcomplex_t ni = qc_make(QF_ZERO,  qf_neg(QF_ONE));
+        mat_set(A, 0, 0, &z);  mat_set(A, 0, 1, &pi);
+        mat_set(A, 1, 0, &ni); mat_set(A, 1, 1, &z);
+        print_mqc("A", A);
+        matrix_t *C = mat_cos(A);
+        check_bool("mat_cos qc(herm) not NULL", C != NULL);
+        if (C) {
+            print_mqc("cos(A)", C);
+            qcomplex_t c00, c01, c10, c11;
+            mat_get(C, 0, 0, &c00); mat_get(C, 0, 1, &c01);
+            mat_get(C, 1, 0, &c10); mat_get(C, 1, 1, &c11);
+            qfloat_t c1 = qf_cos(QF_ONE);
+            qcomplex_t c1_c    = qc_make(c1, QF_ZERO);
+            qcomplex_t zero_c  = QC_ZERO;
+            check_qc_val("qc cos(herm)[0,0] = cos(1)", c00, c1_c,   1e-25);
+            check_qc_val("qc cos(herm)[1,1] = cos(1)", c11, c1_c,   1e-25);
+            check_qc_val("qc cos(herm)[0,1] = 0",      c01, zero_c, 1e-25);
+            check_qc_val("qc cos(herm)[1,0] = 0",      c10, zero_c, 1e-25);
+        }
+        mat_free(A); mat_free(C);
+    }
+}
+
+/* ------------------------------------------------------------------ mat_tan */
+
+static void test_mat_tan_d(void)
+{
+    printf(C_CYAN "TEST: mat_tan (double)\n" C_RESET);
+
+    /* 1×1: tan([[π/4]]) = 1 */
+    {
+        matrix_t *A = mat_create_d(1, 1);
+        double v = M_PI / 4.0;
+        mat_set(A, 0, 0, &v);
+        print_md("A", A);
+        matrix_t *T = mat_tan(A);
+        check_bool("mat_tan(1x1) not NULL", T != NULL);
+        if (T) {
+            print_md("tan(A)", T);
+            double got;
+            mat_get(T, 0, 0, &got);
+            check_d("tan([[π/4]]) = 1", got, 1.0, 1e-12);
+        }
+        mat_free(A); mat_free(T);
+    }
+
+    /* 2×2 diagonal: tan(diag(0, π/4)) = diag(0, 1) */
+    {
+        matrix_t *A = mat_create_d(2, 2);
+        double z=0.0, h=M_PI/4.0;
+        mat_set(A, 0, 0, &z); mat_set(A, 0, 1, &z);
+        mat_set(A, 1, 0, &z); mat_set(A, 1, 1, &h);
+        print_md("A", A);
+        matrix_t *T = mat_tan(A);
+        check_bool("mat_tan(diag) not NULL", T != NULL);
+        if (T) {
+            print_md("tan(A)", T);
+            double t00, t01, t10, t11;
+            mat_get(T, 0, 0, &t00); mat_get(T, 0, 1, &t01);
+            mat_get(T, 1, 0, &t10); mat_get(T, 1, 1, &t11);
+            check_d("tan(diag)[0,0] = 0", t00, 0.0, 1e-12);
+            check_d("tan(diag)[1,1] = 1", t11, 1.0, 1e-12);
+            check_d("tan(diag)[0,1] = 0", t01, 0.0, 1e-12);
+            check_d("tan(diag)[1,0] = 0", t10, 0.0, 1e-12);
+        }
+        mat_free(A); mat_free(T);
+    }
+
+    /* 2×2 symmetric: A = [[0,1],[1,0]], eigenvalues ±1.
+     * tan is odd → tan(A) = tan(1)·A */
+    {
+        matrix_t *A = mat_create_d(2, 2);
+        double z=0.0, o=1.0;
+        mat_set(A, 0, 0, &z); mat_set(A, 0, 1, &o);
+        mat_set(A, 1, 0, &o); mat_set(A, 1, 1, &z);
+        print_md("A", A);
+        matrix_t *T = mat_tan(A);
+        check_bool("mat_tan(sym) not NULL", T != NULL);
+        if (T) {
+            print_md("tan(A)", T);
+            double t00, t01, t10, t11;
+            mat_get(T, 0, 0, &t00); mat_get(T, 0, 1, &t01);
+            mat_get(T, 1, 0, &t10); mat_get(T, 1, 1, &t11);
+            double t1 = tan(1.0);
+            check_d("tan([[0,1],[1,0]])[0,0] = 0",      t00, 0.0, 1e-12);
+            check_d("tan([[0,1],[1,0]])[1,1] = 0",      t11, 0.0, 1e-12);
+            check_d("tan([[0,1],[1,0]])[0,1] = tan(1)", t01, t1,  1e-12);
+            check_d("tan([[0,1],[1,0]])[1,0] = tan(1)", t10, t1,  1e-12);
+        }
+        mat_free(A); mat_free(T);
+    }
+}
+
+/* ------------------------------------------------------------------ mat_sinh */
+
+static void test_mat_sinh_d(void)
+{
+    printf(C_CYAN "TEST: mat_sinh (double)\n" C_RESET);
+
+    /* 1×1: sinh([[0]]) = 0 */
+    {
+        matrix_t *A = mat_create_d(1, 1);
+        double v = 0.0;
+        mat_set(A, 0, 0, &v);
+        print_md("A", A);
+        matrix_t *S = mat_sinh(A);
+        check_bool("mat_sinh(1x1) not NULL", S != NULL);
+        if (S) {
+            print_md("sinh(A)", S);
+            double got;
+            mat_get(S, 0, 0, &got);
+            check_d("sinh([[0]]) = 0", got, 0.0, 1e-12);
+        }
+        mat_free(A); mat_free(S);
+    }
+
+    /* 2×2 diagonal: sinh(diag(0, 1)) = diag(0, sinh(1)) */
+    {
+        matrix_t *A = mat_create_d(2, 2);
+        double z=0.0, o=1.0;
+        mat_set(A, 0, 0, &z); mat_set(A, 0, 1, &z);
+        mat_set(A, 1, 0, &z); mat_set(A, 1, 1, &o);
+        print_md("A", A);
+        matrix_t *S = mat_sinh(A);
+        check_bool("mat_sinh(diag) not NULL", S != NULL);
+        if (S) {
+            print_md("sinh(A)", S);
+            double s00, s01, s10, s11;
+            mat_get(S, 0, 0, &s00); mat_get(S, 0, 1, &s01);
+            mat_get(S, 1, 0, &s10); mat_get(S, 1, 1, &s11);
+            check_d("sinh(diag)[0,0] = 0",       s00, 0.0,     1e-12);
+            check_d("sinh(diag)[1,1] = sinh(1)",  s11, sinh(1.0), 1e-12);
+            check_d("sinh(diag)[0,1] = 0",        s01, 0.0,     1e-12);
+            check_d("sinh(diag)[1,0] = 0",        s10, 0.0,     1e-12);
+        }
+        mat_free(A); mat_free(S);
+    }
+
+    /* 2×2 symmetric: A = [[0,1],[1,0]], eigenvalues ±1.
+     * sinh is odd → sinh(A) = sinh(1)·A */
+    {
+        matrix_t *A = mat_create_d(2, 2);
+        double z=0.0, o=1.0;
+        mat_set(A, 0, 0, &z); mat_set(A, 0, 1, &o);
+        mat_set(A, 1, 0, &o); mat_set(A, 1, 1, &z);
+        print_md("A", A);
+        matrix_t *S = mat_sinh(A);
+        check_bool("mat_sinh(sym) not NULL", S != NULL);
+        if (S) {
+            print_md("sinh(A)", S);
+            double s00, s01, s10, s11;
+            mat_get(S, 0, 0, &s00); mat_get(S, 0, 1, &s01);
+            mat_get(S, 1, 0, &s10); mat_get(S, 1, 1, &s11);
+            double sh = sinh(1.0);
+            check_d("sinh([[0,1],[1,0]])[0,0] = 0",       s00, 0.0, 1e-12);
+            check_d("sinh([[0,1],[1,0]])[1,1] = 0",       s11, 0.0, 1e-12);
+            check_d("sinh([[0,1],[1,0]])[0,1] = sinh(1)", s01, sh,  1e-12);
+            check_d("sinh([[0,1],[1,0]])[1,0] = sinh(1)", s10, sh,  1e-12);
+        }
+        mat_free(A); mat_free(S);
+    }
+}
+
+/* ------------------------------------------------------------------ mat_cosh */
+
+static void test_mat_cosh_d(void)
+{
+    printf(C_CYAN "TEST: mat_cosh (double)\n" C_RESET);
+
+    /* 1×1: cosh([[0]]) = 1 */
+    {
+        matrix_t *A = mat_create_d(1, 1);
+        double v = 0.0;
+        mat_set(A, 0, 0, &v);
+        print_md("A", A);
+        matrix_t *C = mat_cosh(A);
+        check_bool("mat_cosh(1x1) not NULL", C != NULL);
+        if (C) {
+            print_md("cosh(A)", C);
+            double got;
+            mat_get(C, 0, 0, &got);
+            check_d("cosh([[0]]) = 1", got, 1.0, 1e-12);
+        }
+        mat_free(A); mat_free(C);
+    }
+
+    /* 2×2 diagonal: cosh(diag(0, 1)) = diag(1, cosh(1)) */
+    {
+        matrix_t *A = mat_create_d(2, 2);
+        double z=0.0, o=1.0;
+        mat_set(A, 0, 0, &z); mat_set(A, 0, 1, &z);
+        mat_set(A, 1, 0, &z); mat_set(A, 1, 1, &o);
+        print_md("A", A);
+        matrix_t *C = mat_cosh(A);
+        check_bool("mat_cosh(diag) not NULL", C != NULL);
+        if (C) {
+            print_md("cosh(A)", C);
+            double c00, c01, c10, c11;
+            mat_get(C, 0, 0, &c00); mat_get(C, 0, 1, &c01);
+            mat_get(C, 1, 0, &c10); mat_get(C, 1, 1, &c11);
+            check_d("cosh(diag)[0,0] = 1",       c00, 1.0,      1e-12);
+            check_d("cosh(diag)[1,1] = cosh(1)", c11, cosh(1.0), 1e-12);
+            check_d("cosh(diag)[0,1] = 0",       c01, 0.0,      1e-12);
+            check_d("cosh(diag)[1,0] = 0",       c10, 0.0,      1e-12);
+        }
+        mat_free(A); mat_free(C);
+    }
+
+    /* 2×2 symmetric: A = [[0,1],[1,0]], eigenvalues ±1.
+     * cosh is even → cosh(A) = cosh(1)·I */
+    {
+        matrix_t *A = mat_create_d(2, 2);
+        double z=0.0, o=1.0;
+        mat_set(A, 0, 0, &z); mat_set(A, 0, 1, &o);
+        mat_set(A, 1, 0, &o); mat_set(A, 1, 1, &z);
+        print_md("A", A);
+        matrix_t *C = mat_cosh(A);
+        check_bool("mat_cosh(sym) not NULL", C != NULL);
+        if (C) {
+            print_md("cosh(A)", C);
+            double c00, c01, c10, c11;
+            mat_get(C, 0, 0, &c00); mat_get(C, 0, 1, &c01);
+            mat_get(C, 1, 0, &c10); mat_get(C, 1, 1, &c11);
+            double ch = cosh(1.0);
+            check_d("cosh([[0,1],[1,0]])[0,0] = cosh(1)", c00, ch,  1e-12);
+            check_d("cosh([[0,1],[1,0]])[1,1] = cosh(1)", c11, ch,  1e-12);
+            check_d("cosh([[0,1],[1,0]])[0,1] = 0",       c01, 0.0, 1e-12);
+            check_d("cosh([[0,1],[1,0]])[1,0] = 0",       c10, 0.0, 1e-12);
+        }
+        mat_free(A); mat_free(C);
+    }
+}
+
+/* ------------------------------------------------------------------ mat_tanh */
+
+static void test_mat_tanh_d(void)
+{
+    printf(C_CYAN "TEST: mat_tanh (double)\n" C_RESET);
+
+    /* 1×1: tanh([[0]]) = 0 */
+    {
+        matrix_t *A = mat_create_d(1, 1);
+        double v = 0.0;
+        mat_set(A, 0, 0, &v);
+        print_md("A", A);
+        matrix_t *T = mat_tanh(A);
+        check_bool("mat_tanh(1x1) not NULL", T != NULL);
+        if (T) {
+            print_md("tanh(A)", T);
+            double got;
+            mat_get(T, 0, 0, &got);
+            check_d("tanh([[0]]) = 0", got, 0.0, 1e-12);
+        }
+        mat_free(A); mat_free(T);
+    }
+
+    /* 2×2 diagonal: tanh(diag(0, 1)) = diag(0, tanh(1)) */
+    {
+        matrix_t *A = mat_create_d(2, 2);
+        double z=0.0, o=1.0;
+        mat_set(A, 0, 0, &z); mat_set(A, 0, 1, &z);
+        mat_set(A, 1, 0, &z); mat_set(A, 1, 1, &o);
+        print_md("A", A);
+        matrix_t *T = mat_tanh(A);
+        check_bool("mat_tanh(diag) not NULL", T != NULL);
+        if (T) {
+            print_md("tanh(A)", T);
+            double t00, t01, t10, t11;
+            mat_get(T, 0, 0, &t00); mat_get(T, 0, 1, &t01);
+            mat_get(T, 1, 0, &t10); mat_get(T, 1, 1, &t11);
+            check_d("tanh(diag)[0,0] = 0",       t00, 0.0,      1e-12);
+            check_d("tanh(diag)[1,1] = tanh(1)", t11, tanh(1.0), 1e-12);
+            check_d("tanh(diag)[0,1] = 0",       t01, 0.0,      1e-12);
+            check_d("tanh(diag)[1,0] = 0",       t10, 0.0,      1e-12);
+        }
+        mat_free(A); mat_free(T);
+    }
+
+    /* 2×2 symmetric: A = [[0,1],[1,0]], eigenvalues ±1.
+     * tanh is odd → tanh(A) = tanh(1)·A */
+    {
+        matrix_t *A = mat_create_d(2, 2);
+        double z=0.0, o=1.0;
+        mat_set(A, 0, 0, &z); mat_set(A, 0, 1, &o);
+        mat_set(A, 1, 0, &o); mat_set(A, 1, 1, &z);
+        print_md("A", A);
+        matrix_t *T = mat_tanh(A);
+        check_bool("mat_tanh(sym) not NULL", T != NULL);
+        if (T) {
+            print_md("tanh(A)", T);
+            double t00, t01, t10, t11;
+            mat_get(T, 0, 0, &t00); mat_get(T, 0, 1, &t01);
+            mat_get(T, 1, 0, &t10); mat_get(T, 1, 1, &t11);
+            double th = tanh(1.0);
+            check_d("tanh([[0,1],[1,0]])[0,0] = 0",       t00, 0.0, 1e-12);
+            check_d("tanh([[0,1],[1,0]])[1,1] = 0",       t11, 0.0, 1e-12);
+            check_d("tanh([[0,1],[1,0]])[0,1] = tanh(1)", t01, th,  1e-12);
+            check_d("tanh([[0,1],[1,0]])[1,0] = tanh(1)", t10, th,  1e-12);
+        }
+        mat_free(A); mat_free(T);
+    }
+}
+
+static void test_mat_trig_null_safety(void)
+{
+    printf(C_CYAN "TEST: mat_cos/tan/sinh/cosh/tanh null safety\n" C_RESET);
+
+    check_bool("mat_cos(NULL) = NULL",  mat_cos(NULL)  == NULL);
+    check_bool("mat_tan(NULL) = NULL",  mat_tan(NULL)  == NULL);
+    check_bool("mat_sinh(NULL) = NULL", mat_sinh(NULL) == NULL);
+    check_bool("mat_cosh(NULL) = NULL", mat_cosh(NULL) == NULL);
+    check_bool("mat_tanh(NULL) = NULL", mat_tanh(NULL) == NULL);
+
+    matrix_t *A = mat_create_d(2, 3);
+    check_bool("mat_cos(non-square) = NULL",  mat_cos(A)  == NULL);
+    check_bool("mat_tan(non-square) = NULL",  mat_tan(A)  == NULL);
+    check_bool("mat_sinh(non-square) = NULL", mat_sinh(A) == NULL);
+    check_bool("mat_cosh(non-square) = NULL", mat_cosh(A) == NULL);
+    check_bool("mat_tanh(non-square) = NULL", mat_tanh(A) == NULL);
+    mat_free(A);
+}
+
 /* ------------------------------------------------------------------ README example */
 
 static void test_readme_example(void)
@@ -2519,6 +3337,28 @@ int tests_main(void)
     RUN_TEST(test_eigen_d,  NULL);
     RUN_TEST(test_eigen_qf, NULL);
     RUN_TEST(test_eigen_qc, NULL);
+
+    RUN_TEST(test_mat_exp_d,           NULL);
+    RUN_TEST(test_mat_exp_qf,          NULL);
+    RUN_TEST(test_mat_exp_qc,          NULL);
+    RUN_TEST(test_mat_exp_null_safety, NULL);
+
+    RUN_TEST(test_mat_sin_d,           NULL);
+    RUN_TEST(test_mat_sin_qf,          NULL);
+    RUN_TEST(test_mat_sin_qc,          NULL);
+    RUN_TEST(test_mat_sin_null_safety, NULL);
+
+    RUN_TEST(test_mat_cos_d,           NULL);
+    RUN_TEST(test_mat_cos_qf,          NULL);
+    RUN_TEST(test_mat_cos_qc,          NULL);
+
+    RUN_TEST(test_mat_tan_d,           NULL);
+
+    RUN_TEST(test_mat_sinh_d,          NULL);
+    RUN_TEST(test_mat_cosh_d,          NULL);
+    RUN_TEST(test_mat_tanh_d,          NULL);
+
+    RUN_TEST(test_mat_trig_null_safety, NULL);
 
     RUN_TEST(test_readme_example, NULL);
 

@@ -58,6 +58,7 @@ extern int    tests_run;
 extern int    tests_failed;
 extern int    tests_skipped;
 extern double tests_total_ms;
+extern int    tests_rts;      /* RUN_TEST starts — harness-internal, for group detection */
 
 /* Timing helpers */
 
@@ -145,6 +146,7 @@ static inline void th_print_time(double ms) {
 
 #define RUN_TEST(func, parent)                                                    \
     do {                                                                          \
+        tests_rts++;                                                              \
         /* Check enable/disable state */                                          \
         if (!test_enabled(__FILE__, #func, parent)) {                             \
             printf("\r" C_YELLOW "SKIP: %-30s" C_RESET, #func);                   \
@@ -157,15 +159,16 @@ static inline void th_print_time(double ms) {
         int run_before     = tests_run;                                           \
         int failed_before  = tests_failed;                                        \
         int skipped_before = tests_skipped;                                       \
+        int rts_before     = tests_rts;                                           \
                                                                                   \
         double __total_ms_before = tests_total_ms;                                \
         struct timespec __th_t0, __th_t1;                                         \
         clock_gettime(CLOCK_MONOTONIC, &__th_t0);                                 \
         func();                                                                   \
         clock_gettime(CLOCK_MONOTONIC, &__th_t1);                                 \
-        double __th_ms = th_elapsed_ms(__th_t0, __th_t1);                        \
+        double __th_ms = th_elapsed_ms(__th_t0, __th_t1);                         \
                                                                                   \
-        int __is_group = (tests_run > run_before);                                \
+        int __is_group = (tests_rts > rts_before);                                \
         double __disp_ms = __is_group                                             \
                          ? (tests_total_ms - __total_ms_before)                   \
                          : __th_ms;                                               \
@@ -209,6 +212,7 @@ int    tests_run      = 0;
 int    tests_failed   = 0;
 int    tests_skipped  = 0;
 double tests_total_ms = 0.0;
+int    tests_rts      = 0;
 
 int main(void) {
     test_config_set_mode(TEST_CONFIG_MODE);
