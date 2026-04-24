@@ -2,92 +2,24 @@
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
-#include "matrix.h"
+#include "matrix_internal.h"
 #include "qfloat.h"
 #include "qcomplex.h"
 
 /* ============================================================
-   Element kinds
+   Element-type-specific matrix constructors (forward declarations)
    ============================================================ */
 
-typedef enum {
-    ELEM_DOUBLE = 0,
-    ELEM_QFLOAT = 1,
-    ELEM_QCOMPLEX = 2,
-    ELEM_MAX
-} elem_kind;
-
-/* Forward declarations */
-struct elem_vtable;
-struct store_vtable;
-struct matrix_t;
+static struct matrix_t *create_matrix_double(size_t rows, size_t cols);
+static struct matrix_t *create_identity_double(size_t n);
+static struct matrix_t *create_matrix_qfloat(size_t rows, size_t cols);
+static struct matrix_t *create_identity_qfloat(size_t n);
+static struct matrix_t *create_matrix_qcomplex(size_t rows, size_t cols);
+static struct matrix_t *create_identity_qcomplex(size_t n);
 
 /* ============================================================
-   Matrix object (opaque in matrix.h)
+   Storage vtables (dense, identity)
    ============================================================ */
-
-struct matrix_t {
-    size_t rows;
-    size_t cols;
-
-    const struct elem_vtable  *elem;
-    const struct store_vtable *store;
-
-    void **data;   /* row pointers for dense; NULL for identity */
-};
-
-/* ============================================================
-   Element vtable (extended)
-   ============================================================ */
-
-struct elem_vtable {
-    size_t size;
-    elem_kind kind;
-
-    /* arithmetic */
-    void (*add)(void *out, const void *a, const void *b);
-    void (*sub)(void *out, const void *a, const void *b);
-    void (*mul)(void *out, const void *a, const void *b);
-    void (*inv)(void *out, const void *a);
-
-    /* scalar queries — return/accept double for generic algorithm use */
-    double (*abs2)(const void *a);          /* |a|² as double          */
-    double (*to_real)(const void *a);       /* Re(a) as double          */
-    void   (*from_real)(void *out, double x); /* construct from real     */
-    void   (*conj_elem)(void *out, const void *a); /* complex conjugate  */
-
-    /* qfloat-precision scalar queries for high-precision algorithms */
-    void (*to_qf)(qfloat_t *out, const void *a);    /* Re(a) as qfloat  */
-    void (*abs_qf)(qfloat_t *out, const void *a);   /* |a| as qfloat    */
-    void (*from_qf)(void *out, const qfloat_t *x);  /* construct pure-real from qfloat */
-
-    /* constants */
-    const void *zero;
-    const void *one;
-
-    /* printing */
-    void (*print)(const void *val, char *buf, size_t buflen);
-
-    /* matrix constructors */
-    struct matrix_t *(*create_matrix)(size_t rows, size_t cols);
-    struct matrix_t *(*create_identity)(size_t n);
-};
-
-/* ============================================================
-   Storage vtable (dense, identity)
-   ============================================================ */
-
-struct store_vtable {
-    void (*alloc)(struct matrix_t *A);
-    void (*free)(struct matrix_t *A);
-
-    void (*get)(const struct matrix_t *A, size_t i, size_t j, void *out);
-    void (*set)(struct matrix_t *A, size_t i, size_t j, const void *val);
-
-    void (*materialise)(struct matrix_t *A);
-};
-
-/* ---------- dense storage (row-pointer) ---------- */
 
 static void dense_alloc(struct matrix_t *A) {
     size_t n = A->rows, m = A->cols, es = A->elem->size;
@@ -207,40 +139,27 @@ static struct matrix_t *mat_create_internal(size_t rows, size_t cols,
    Element-type-specific matrix constructors
    ============================================================ */
 
-static struct matrix_t *create_matrix_double(size_t r, size_t c);
-static struct matrix_t *create_identity_double(size_t n);
-static struct matrix_t *create_matrix_qfloat(size_t r, size_t c);
-static struct matrix_t *create_identity_qfloat(size_t n);
-static struct matrix_t *create_matrix_qcomplex(size_t r, size_t c);
-static struct matrix_t *create_identity_qcomplex(size_t n);
-
 static struct matrix_t *create_matrix_double(size_t r, size_t c) {
-    extern const struct elem_vtable double_elem;
     return mat_create_internal(r, c, &double_elem, &dense_store);
 }
 
 static struct matrix_t *create_identity_double(size_t n) {
-    extern const struct elem_vtable double_elem;
     return mat_create_internal(n, n, &double_elem, &identity_store);
 }
 
 static struct matrix_t *create_matrix_qfloat(size_t r, size_t c) {
-    extern const struct elem_vtable qfloat_elem;
     return mat_create_internal(r, c, &qfloat_elem, &dense_store);
 }
 
 static struct matrix_t *create_identity_qfloat(size_t n) {
-    extern const struct elem_vtable qfloat_elem;
     return mat_create_internal(n, n, &qfloat_elem, &identity_store);
 }
 
 static struct matrix_t *create_matrix_qcomplex(size_t r, size_t c) {
-    extern const struct elem_vtable qcomplex_elem;
     return mat_create_internal(r, c, &qcomplex_elem, &dense_store);
 }
 
 static struct matrix_t *create_identity_qcomplex(size_t n) {
-    extern const struct elem_vtable qcomplex_elem;
     return mat_create_internal(n, n, &qcomplex_elem, &identity_store);
 }
 
@@ -253,11 +172,11 @@ static struct matrix_t *create_identity_qcomplex(size_t n) {
 static const double D_ZERO = 0.0;
 static const double D_ONE  = 1.0;
 
-static void d_add(void *o, const void *a, const void *b) { 
+static void d_add(void *o, const void *a, const void *b) {
     *(double*)o = *(const double*)a + *(const double*)b;
 }
 
-static void d_sub(void *o, const void *a, const void *b) { 
+static void d_sub(void *o, const void *a, const void *b) {
     *(double*)o = *(const double*)a - *(const double*)b;
 }
 
@@ -708,15 +627,15 @@ struct matrix_t *mat_create_qc(size_t rows, size_t cols) {
     return qcomplex_elem.create_matrix(rows, cols);
 }
 
-struct matrix_t *matsq_create_d(size_t n)  { 
+struct matrix_t *matsq_create_d(size_t n)  {
     return mat_create_d(n, n);
 }
 
-struct matrix_t *matsq_create_qf(size_t n) { 
+struct matrix_t *matsq_create_qf(size_t n) {
     return mat_create_qf(n, n);
 }
 
-struct matrix_t *matsq_create_qc(size_t n) { 
+struct matrix_t *matsq_create_qc(size_t n) {
     return mat_create_qc(n, n);
 }
 
@@ -756,10 +675,6 @@ size_t mat_get_row_count(const struct matrix_t *A) {
 
 size_t mat_get_col_count(const struct matrix_t *A) {
     return A->cols;
-}
-
-static inline const struct elem_vtable *elem_of(const struct matrix_t *A) {
-    return A->elem;
 }
 
 matrix_t *mat_scalar_mul_d(double s, matrix_t *A)

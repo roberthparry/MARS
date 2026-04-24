@@ -229,9 +229,7 @@ int mat_eigenvalues(const matrix_t *A, void *eigenvalues);
  *
  * @return 0 on success, negative on error.
  */
-int mat_eigendecompose(const matrix_t *A,
-                       void *eigenvalues,
-                       matrix_t **eigenvectors);
+int mat_eigendecompose(const matrix_t *A, void *eigenvalues, matrix_t **eigenvectors);
 
 /**
  * @brief Compute only the eigenvectors of a square matrix.
@@ -245,6 +243,55 @@ int mat_eigendecompose(const matrix_t *A,
  * @return A newly allocated matrix of eigenvectors, or NULL on error.
  */
 matrix_t *mat_eigenvectors(const matrix_t *A);
+
+/* -------------------------------------------------------------------------
+   Matrix functions (Hermitian matrices via eigendecomposition)
+   ------------------------------------------------------------------------- */
+
+/**
+ * @brief Compute the matrix exponential exp(A) of a square Hermitian matrix.
+ *
+ * Uses eigendecomposition: A = V D V†, then exp(A) = V · diag(exp(λᵢ)) · V†.
+ *
+ * @param A  Square Hermitian matrix (double, qfloat_t, or qcomplex_t elements).
+ * @return   Newly allocated matrix exp(A), or NULL on error.
+ */
+matrix_t *mat_exp(const matrix_t *A);
+
+/**
+ * @brief Compute the matrix sine sin(A) of a square Hermitian matrix.
+ *
+ * Uses eigendecomposition: A = V D V†, then sin(A) = V · diag(sin(λᵢ)) · V†.
+ *
+ * @param A  Square Hermitian matrix (double, qfloat_t, or qcomplex_t elements).
+ * @return   Newly allocated matrix sin(A), or NULL on error.
+ */
+matrix_t *mat_sin(const matrix_t *A);
+
+/**
+ * @brief Compute the matrix cosine cos(A) of a square Hermitian matrix.
+ */
+matrix_t *mat_cos(const matrix_t *A);
+
+/**
+ * @brief Compute the matrix tangent tan(A) of a square Hermitian matrix.
+ */
+matrix_t *mat_tan(const matrix_t *A);
+
+/**
+ * @brief Compute the matrix hyperbolic sine sinh(A) of a square Hermitian matrix.
+ */
+matrix_t *mat_sinh(const matrix_t *A);
+
+/**
+ * @brief Compute the matrix hyperbolic cosine cosh(A) of a square Hermitian matrix.
+ */
+matrix_t *mat_cosh(const matrix_t *A);
+
+/**
+ * @brief Compute the matrix hyperbolic tangent tanh(A) of a square Hermitian matrix.
+ */
+matrix_t *mat_tanh(const matrix_t *A);
 
 /* -------------------------------------------------------------------------
    Debugging / I/O

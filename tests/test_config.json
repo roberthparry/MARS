@@ -664,6 +664,22 @@
     "test_eigen_d": true,
     "test_eigen_qf": true,
     "test_eigen_qc": true,
-    "test_readme_example": true
+    "test_readme_example": true,
+    "test_mat_exp_d": true,
+    "test_mat_exp_qf": true,
+    "test_mat_exp_qc": true,
+    "test_mat_exp_null_safety": true,
+    "test_mat_sin_d": true,
+    "test_mat_sin_qf": true,
+    "test_mat_sin_qc": true,
+    "test_mat_sin_null_safety": true,
+    "test_mat_cos_d": true,
+    "test_mat_cos_qf": true,
+    "test_mat_cos_qc": true,
+    "test_mat_tan_d": true,
+    "test_mat_sinh_d": true,
+    "test_mat_cosh_d": true,
+    "test_mat_tanh_d": true,
+    "test_mat_trig_null_safety": true
   }
 }
