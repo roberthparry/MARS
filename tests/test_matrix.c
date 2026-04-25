@@ -179,7 +179,7 @@ static void check_d(const char *label, double got, double expected, double tol)
     if (!ok) tests_failed++;
 
     printf(ok ? C_GREEN "  OK: %s\n" C_RESET
-              : C_MAGENTA "  FAIL: %s\n" C_RESET, label);
+              : C_RED "  FAIL: %s\n" C_RESET, label);
 
     char gbuf[256], ebuf[256];
     d_to_coloured_string(got, gbuf, sizeof(gbuf));
@@ -200,7 +200,7 @@ static void check_qf_val(const char *label, qfloat_t got, qfloat_t expected, dou
     if (!ok) tests_failed++;
 
     printf(ok ? C_GREEN "  OK: %s\n" C_RESET
-              : C_MAGENTA "  FAIL: %s\n" C_RESET, label);
+              : C_RED "  FAIL: %s\n" C_RESET, label);
 
     print_qf("got      ", got);
     print_qf("expected ", expected);
@@ -216,7 +216,7 @@ static void check_qc_val(const char *label, qcomplex_t got, qcomplex_t expected,
     if (!ok) tests_failed++;
 
     printf(ok ? C_GREEN "  OK: %s\n" C_RESET
-              : C_MAGENTA "  FAIL: %s\n" C_RESET, label);
+              : C_RED "  FAIL: %s\n" C_RESET, label);
 
     print_qc("got      ", got);
     print_qc("expected ", expected);
@@ -229,7 +229,7 @@ static void check_bool(const char *label, int cond)
     if (!cond) tests_failed++;
 
     printf(cond ? C_GREEN "  OK: %s\n" C_RESET
-                : C_MAGENTA "  FAIL: %s\n" C_RESET, label);
+                : C_RED "  FAIL: %s\n" C_RESET, label);
 }
 
 /* ------------------------------------------------------------------ 1. creation */
@@ -238,13 +238,13 @@ static void test_creation(void)
 {
     printf(C_CYAN "TEST: creation of all matrix types\n" C_RESET);
 
-    matrix_t *Ad  = mat_create_d(2,3);
-    matrix_t *Aqf = mat_create_qf(3,4);
-    matrix_t *Aqc = mat_create_qc(4,5);
+    matrix_t *Ad  = mat_new_d(2,3);
+    matrix_t *Aqf = mat_new_qf(3,4);
+    matrix_t *Aqc = mat_new_qc(4,5);
 
-    check_bool("mat_create_d non-null",  Ad  != NULL);
-    check_bool("mat_create_qf non-null", Aqf != NULL);
-    check_bool("mat_create_qc non-null", Aqc != NULL);
+    check_bool("mat_new_d non-null",  Ad  != NULL);
+    check_bool("mat_new_qf non-null", Aqf != NULL);
+    check_bool("mat_new_qc non-null", Aqc != NULL);
 
     print_md("Ad", Ad);
     print_mqf("Aqf", Aqf);
@@ -262,54 +262,62 @@ static void test_reading(void)
     printf(C_CYAN "TEST: reading from all matrix types\n" C_RESET);
 
     /* double */
-    matrix_t *A = mat_create_d(2,2);
-    double x = 3.0, y = 4.0;
-    mat_set(A,0,0,&x);
-    mat_set(A,1,1,&y);
+    {
+        const double vals[4] = {
+            3.0, 0.0,
+            0.0, 4.0
+        };
+        matrix_t *A = mat_create_d(2, 2, vals);
+        print_md("A", A);
 
-    print_md("A", A);
+        double out[4];
+        mat_get_data(A, out);
 
-    double v;
-    mat_get(A,0,0,&v);
-    check_d("read double A[0,0] = 3", v, 3.0, 1e-30);
-    mat_get(A,1,1,&v);
-    check_d("read double A[1,1] = 4", v, 4.0, 1e-30);
+        check_d("read double A[0,0] = 3", out[0], 3.0, 1e-30);
+        check_d("read double A[1,1] = 4", out[3], 4.0, 1e-30);
 
-    mat_free(A);
+        mat_free(A);
+    }
 
     /* qfloat */
-    matrix_t *B = mat_create_qf(2,2);
-    qfloat_t qx = qf_from_double(1.25);
-    qfloat_t qy = qf_from_double(-2.5);
-    mat_set(B,0,1,&qx);
-    mat_set(B,1,0,&qy);
+    {
+        qfloat_t vals[4] = {
+            QF_ZERO,              qf_from_double(1.25),
+            qf_from_double(-2.5), QF_ZERO
+        };
+        matrix_t *B = mat_create_qf(2, 2, vals);
+        print_mqf("B", B);
 
-    print_mqf("B", B);
+        qfloat_t out[4];
+        mat_get_data(B, out);
 
-    qfloat_t qv;
-    mat_get(B,0,1,&qv);
-    check_qf_val("read qfloat B[0,1] = 1.25", qv, qx, 1e-30);
-    mat_get(B,1,0,&qv);
-    check_qf_val("read qfloat B[1,0] = -2.5", qv, qy, 1e-30);
+        check_qf_val("read qfloat B[0,1] = 1.25", out[1], vals[1], 1e-30);
+        check_qf_val("read qfloat B[1,0] = -2.5", out[2], vals[2], 1e-30);
 
-    mat_free(B);
+        mat_free(B);
+    }
 
     /* qcomplex */
-    matrix_t *C = mat_create_qc(2,2);
-    qcomplex_t z1 = qc_make(qf_from_double(2.0), qf_from_double(3.0));
-    qcomplex_t z2 = qc_make(qf_from_double(-1.0), qf_from_double(0.5));
-    mat_set(C,0,0,&z1);
-    mat_set(C,1,1,&z2);
+    {
+        qcomplex_t z1 = qc_make(qf_from_double(2.0),  qf_from_double(3.0));
+        qcomplex_t z2 = qc_make(qf_from_double(-1.0), qf_from_double(0.5));
 
-    print_mqc("C", C);
+        qcomplex_t vals[4] = {
+            z1,        QC_ZERO,
+            QC_ZERO,   z2
+        };
 
-    qcomplex_t zv;
-    mat_get(C,0,0,&zv);
-    check_qc_val("read qcomplex C[0,0]", zv, z1, 1e-30);
-    mat_get(C,1,1,&zv);
-    check_qc_val("read qcomplex C[1,1]", zv, z2, 1e-30);
+        matrix_t *C = mat_create_qc(2, 2, vals);
+        print_mqc("C", C);
 
-    mat_free(C);
+        qcomplex_t out[4];
+        mat_get_data(C, out);
+
+        check_qc_val("read qcomplex C[0,0]", out[0], z1, 1e-30);
+        check_qc_val("read qcomplex C[1,1]", out[3], z2, 1e-30);
+
+        mat_free(C);
+    }
 }
 
 /* ------------------------------------------------------------------ 3. writing */
@@ -319,40 +327,49 @@ static void test_writing(void)
     printf(C_CYAN "TEST: writing to all matrix types\n" C_RESET);
 
     /* double */
-    matrix_t *A = mat_create_d(2,2);
-    double x = 9.0;
-    mat_set(A,1,0,&x);
+    {
+        matrix_t *A = mat_new_d(2, 2);
+        double x = 9.0;
+        mat_set(A, 1, 0, &x);
 
-    print_md("A after write", A);
+        print_md("A after write", A);
 
-    double v;
-    mat_get(A,1,0,&v);
-    check_d("write double A[1,0] = 9", v, 9.0, 1e-30);
-    mat_free(A);
+        double vals[4];
+        mat_get_data(A, vals);
+        check_d("write double A[1,0] = 9", vals[2], 9.0, 1e-30);
+
+        mat_free(A);
+    }
 
     /* qfloat */
-    matrix_t *B = mat_create_qf(2,2);
-    qfloat_t qx = qf_from_double(7.75);
-    mat_set(B,0,1,&qx);
+    {
+        matrix_t *B = mat_new_qf(2, 2);
+        qfloat_t qx = qf_from_double(7.75);
+        mat_set(B, 0, 1, &qx);
 
-    print_mqf("B after write", B);
+        print_mqf("B after write", B);
 
-    qfloat_t qv;
-    mat_get(B,0,1,&qv);
-    check_qf_val("write qfloat B[0,1] = 7.75", qv, qx, 1e-30);
-    mat_free(B);
+        qfloat_t vals[4];
+        mat_get_data(B, vals);
+        check_qf_val("write qfloat B[0,1] = 7.75", vals[1], qx, 1e-30);
+
+        mat_free(B);
+    }
 
     /* qcomplex */
-    matrix_t *C = mat_create_qc(2,2);
-    qcomplex_t z = qc_make(qf_from_double(1.0), qf_from_double(-3.0));
-    mat_set(C,1,1,&z);
+    {
+        matrix_t *C = mat_new_qc(2, 2);
+        qcomplex_t z = qc_make(qf_from_double(1.0), qf_from_double(-3.0));
+        mat_set(C, 1, 1, &z);
 
-    print_mqc("C after write", C);
+        print_mqc("C after write", C);
 
-    qcomplex_t zv;
-    mat_get(C,1,1,&zv);
-    check_qc_val("write qcomplex C[1,1]", zv, z, 1e-30);
-    mat_free(C);
+        qcomplex_t vals[4];
+        mat_get_data(C, vals);
+        check_qc_val("write qcomplex C[1,1]", vals[3], z, 1e-30);
+
+        mat_free(C);
+    }
 }
 
 /* ------------------------------------------------------------------ 4. add/sub (double only) */
@@ -361,17 +378,11 @@ static void test_add_sub(void)
 {
     printf(C_CYAN "TEST: addition/subtraction\n" C_RESET);
 
-    matrix_t *A = mat_create_d(2,2);
-    matrix_t *B = mat_create_d(2,2);
+    const double A_vals[4] = { 1, 2, 3, 4 };
+    const double B_vals[4] = { 5, 6, 7, 8 };
 
-    double a11=1, a12=2, a21=3, a22=4;
-    double b11=5, b12=6, b21=7, b22=8;
-
-    mat_set(A,0,0,&a11); mat_set(A,0,1,&a12);
-    mat_set(A,1,0,&a21); mat_set(A,1,1,&a22);
-
-    mat_set(B,0,0,&b11); mat_set(B,0,1,&b12);
-    mat_set(B,1,0,&b21); mat_set(B,1,1,&b22);
+    matrix_t *A = mat_create_d(2, 2, A_vals);
+    matrix_t *B = mat_create_d(2, 2, B_vals);
 
     print_md("A", A);
     print_md("B", B);
@@ -379,15 +390,18 @@ static void test_add_sub(void)
     matrix_t *C = mat_add(A,B);
     print_md("A+B", C);
 
-    double v;
-    mat_get(C,0,0,&v); check_d("add[0,0] = 6", v, 6, 1e-30);
-    mat_get(C,1,1,&v); check_d("add[1,1] = 12", v, 12, 1e-30);
+    double c_vals[4];
+    mat_get_data(C, c_vals);
+    check_d("add[0,0] = 6",  c_vals[0], 6,  1e-30);
+    check_d("add[1,1] = 12", c_vals[3], 12, 1e-30);
 
     matrix_t *D = mat_sub(A,B);
     print_md("A-B", D);
 
-    mat_get(D,0,0,&v); check_d("sub[0,0] = -4", v, -4, 1e-30);
-    mat_get(D,1,1,&v); check_d("sub[1,1] = -4", v, -4, 1e-30);
+    double d_vals[4];
+    mat_get_data(D, d_vals);
+    check_d("sub[0,0] = -4", d_vals[0], -4, 1e-30);
+    check_d("sub[1,1] = -4", d_vals[3], -4, 1e-30);
 
     mat_free(A); mat_free(B); mat_free(C); mat_free(D);
 }
@@ -398,17 +412,10 @@ static void test_multiply(void)
 {
     printf(C_CYAN "TEST: multiplication\n" C_RESET);
 
-    matrix_t *A = mat_create_d(2,2);
-    matrix_t *B = mat_create_d(2,2);
-
-    double a11=1, a12=2, a21=3, a22=4;
-    double b11=5, b12=6, b21=7, b22=8;
-
-    mat_set(A,0,0,&a11); mat_set(A,0,1,&a12);
-    mat_set(A,1,0,&a21); mat_set(A,1,1,&a22);
-
-    mat_set(B,0,0,&b11); mat_set(B,0,1,&b12);
-    mat_set(B,1,0,&b21); mat_set(B,1,1,&b22);
+    double A_vals[4] = { 1, 2, 3, 4 };
+    double B_vals[4] = { 5, 6, 7, 8 };
+    matrix_t *A = mat_create_d(2, 2, A_vals);
+    matrix_t *B = mat_create_d(2, 2, B_vals);
 
     print_md("A", A);
     print_md("B", B);
@@ -429,7 +436,7 @@ static void test_transpose_conjugate(void)
 {
     printf(C_CYAN "TEST: transpose/conjugate\n" C_RESET);
 
-    matrix_t *A = mat_create_d(2,3);
+    matrix_t *A = mat_new_d(2,3);
     double x = 1, y = 2, z = 3;
     mat_set(A,0,1,&x);
     mat_set(A,1,2,&y);
@@ -448,7 +455,7 @@ static void test_transpose_conjugate(void)
     mat_free(A);
     mat_free(T);
 
-    matrix_t *C = mat_create_qc(2,2);
+    matrix_t *C = mat_new_qc(2,2);
     qcomplex_t z1 = qc_make(qf_from_double(2.0), qf_from_double(3.0));
     qcomplex_t z2 = qc_make(qf_from_double(-1.0), qf_from_double(4.0));
     mat_set(C,0,0,&z1);
@@ -476,17 +483,18 @@ static void test_identity_get(void)
 {
     printf(C_CYAN "TEST: identity matrix get\n" C_RESET);
 
-    matrix_t *I = matsq_ident_d(3);
-
+    matrix_t *I = mat_create_identity_d(3);
     print_md("I", I);
 
-    double v;
-    mat_get(I,0,0,&v); check_d("I[0,0] = 1", v, 1, 1e-30);
-    mat_get(I,1,1,&v); check_d("I[1,1] = 1", v, 1, 1e-30);
-    mat_get(I,2,2,&v); check_d("I[2,2] = 1", v, 1, 1e-30);
+    double vals[9];
+    mat_get_data(I, vals);
 
-    mat_get(I,0,1,&v); check_d("I[0,1] = 0", v, 0, 1e-30);
-    mat_get(I,1,2,&v); check_d("I[1,2] = 0", v, 0, 1e-30);
+    check_d("I[0,0] = 1", vals[0], 1, 1e-30);
+    check_d("I[1,1] = 1", vals[4], 1, 1e-30);
+    check_d("I[2,2] = 1", vals[8], 1, 1e-30);
+
+    check_d("I[0,1] = 0", vals[1], 0, 1e-30);
+    check_d("I[1,2] = 0", vals[5], 0, 1e-30);
 
     mat_free(I);
 }
@@ -497,18 +505,20 @@ static void test_identity_set(void)
 {
     printf(C_CYAN "TEST: identity matrix set (materialisation)\n" C_RESET);
 
-    matrix_t *I = matsq_ident_d(3);
+    matrix_t *I = mat_create_identity_d(3);
 
     print_md("I before write", I);
 
     double x = 7.0;
-    mat_set(I,0,2,&x);
+    mat_set(I, 0, 2, &x);
 
     print_md("I after write", I);
 
-    double v;
-    mat_get(I,0,2,&v); check_d("after write, I[0,2] = 7", v, 7.0, 1e-30);
-    mat_get(I,1,1,&v); check_d("diagonal preserved", v, 1.0, 1e-30);
+    double vals[9];
+    mat_get_data(I, vals);
+
+    check_d("after write, I[0,2] = 7", vals[2], 7.0, 1e-30);
+    check_d("diagonal preserved",      vals[4], 1.0, 1e-30);
 
     mat_free(I);
 }
@@ -519,9 +529,6 @@ static void test_add_sub_qf(void)
 {
     printf(C_CYAN "TEST: qfloat addition/subtraction (mixed sizes)\n" C_RESET);
 
-    matrix_t *A = mat_create_qf(2,3);
-    matrix_t *B = mat_create_qf(2,3);
-
     qfloat_t a_vals[6] = {
         qf_from_double(1), qf_from_double(2), qf_from_double(3),
         qf_from_double(4), qf_from_double(5), qf_from_double(6)
@@ -531,15 +538,8 @@ static void test_add_sub_qf(void)
         qf_from_double(40), qf_from_double(50), qf_from_double(60)
     };
 
-    size_t idx = 0;
-    for (size_t i = 0; i < 2; i++)
-        for (size_t j = 0; j < 3; j++) {
-            qfloat_t tmpA = a_vals[idx];
-            qfloat_t tmpB = b_vals[idx];
-            mat_set(A, i, j, &tmpA);
-            mat_set(B, i, j, &tmpB);
-            idx++;
-        }
+    matrix_t *A = mat_create_qf(2, 3, a_vals);
+    matrix_t *B = mat_create_qf(2, 3, b_vals);
 
     print_mqf("A", A);
     print_mqf("B", B);
@@ -547,32 +547,28 @@ static void test_add_sub_qf(void)
     matrix_t *C = mat_add(A, B);
     print_mqf("A+B", C);
 
-    idx = 0;
-    for (size_t i = 0; i < 2; i++)
-        for (size_t j = 0; j < 3; j++) {
-            qfloat_t got;
-            qfloat_t expected = qf_add(a_vals[idx], b_vals[idx]);
-            mat_get(C, i, j, &got);
-            char label[64];
-            snprintf(label, sizeof(label), "qfloat add[%zu,%zu]", i, j);
-            check_qf_val(label, got, expected, 1e-28);
-            idx++;
-        }
+    qfloat_t c_vals[6];
+    mat_get_data(C, c_vals);
+
+    for (size_t k = 0; k < 6; k++) {
+        qfloat_t expected = qf_add(a_vals[k], b_vals[k]);
+        char label[64];
+        snprintf(label, sizeof(label), "qfloat add[%zu,%zu]", k / 3, k % 3);
+        check_qf_val(label, c_vals[k], expected, 1e-28);
+    }
 
     matrix_t *D = mat_sub(A, B);
     print_mqf("A-B", D);
 
-    idx = 0;
-    for (size_t i = 0; i < 2; i++)
-        for (size_t j = 0; j < 3; j++) {
-            qfloat_t got;
-            qfloat_t expected = qf_sub(a_vals[idx], b_vals[idx]);
-            mat_get(D, i, j, &got);
-            char label[64];
-            snprintf(label, sizeof(label), "qfloat sub[%zu,%zu]", i, j);
-            check_qf_val(label, got, expected, 1e-28);
-            idx++;
-        }
+    qfloat_t d_vals[6];
+    mat_get_data(D, d_vals);
+
+    for (size_t k = 0; k < 6; k++) {
+        qfloat_t expected = qf_sub(a_vals[k], b_vals[k]);
+        char label[64];
+        snprintf(label, sizeof(label), "qfloat sub[%zu,%zu]", k / 3, k % 3);
+        check_qf_val(label, d_vals[k], expected, 1e-28);
+    }
 
     mat_free(A); mat_free(B); mat_free(C); mat_free(D);
 }
@@ -582,9 +578,6 @@ static void test_add_sub_qf(void)
 static void test_add_sub_qc(void)
 {
     printf(C_CYAN "TEST: qcomplex addition/subtraction (mixed sizes)\n" C_RESET);
-
-    matrix_t *A = mat_create_qc(1,3);
-    matrix_t *B = mat_create_qc(1,3);
 
     qcomplex_t a_vals[3] = {
         qc_make(qf_from_double(1), qf_from_double(2)),
@@ -596,11 +589,8 @@ static void test_add_sub_qc(void)
         qc_make(qf_from_double(0),  qf_from_double(7)),
         qc_make(qf_from_double(2),  qf_from_double(3))
     };
-
-    for (size_t j = 0; j < 3; j++) {
-        mat_set(A, 0, j, &a_vals[j]);
-        mat_set(B, 0, j, &b_vals[j]);
-    }
+    matrix_t *A = mat_create_qc(1, 3, a_vals);
+    matrix_t *B = mat_create_qc(1, 3, b_vals);
 
     print_mqc("A", A);
     print_mqc("B", B);
@@ -608,25 +598,25 @@ static void test_add_sub_qc(void)
     matrix_t *C = mat_add(A, B);
     print_mqc("A+B", C);
 
+    qcomplex_t C_vals[3];
+    mat_get_data(C, C_vals);
     for (size_t j = 0; j < 3; j++) {
-        qcomplex_t got;
         qcomplex_t expected = qc_add(a_vals[j], b_vals[j]);
-        mat_get(C, 0, j, &got);
         char label[64];
         snprintf(label, sizeof(label), "qcomplex add[0,%zu]", j);
-        check_qc_val(label, got, expected, 1e-28);
+        check_qc_val(label, C_vals[j], expected, 1e-28);
     }
 
     matrix_t *D = mat_sub(A, B);
     print_mqc("A-B", D);
 
+    qcomplex_t D_vals[3];
+    mat_get_data(D, D_vals);
     for (size_t j = 0; j < 3; j++) {
-        qcomplex_t got;
         qcomplex_t expected = qc_sub(a_vals[j], b_vals[j]);
-        mat_get(D, 0, j, &got);
         char label[64];
         snprintf(label, sizeof(label), "qcomplex sub[0,%zu]", j);
-        check_qc_val(label, got, expected, 1e-28);
+        check_qc_val(label, D_vals[j], expected, 1e-28);
     }
 
     mat_free(A); mat_free(B); mat_free(C); mat_free(D);
@@ -638,25 +628,19 @@ static void test_multiply_qf(void)
 {
     printf(C_CYAN "TEST: qfloat multiplication (mixed sizes)\n" C_RESET);
 
-    matrix_t *A = mat_create_qf(2,3);
-    matrix_t *B = mat_create_qf(3,2);
+    double a_raw[6] = { 1, 2, 3, 4, 5, 6 };
+    double b_raw[6] = { 7, 8, 9, 10, 11, 12 };
 
-    double a_raw[6] = { 1,2,3, 4,5,6 };
-    double b_raw[6] = { 7,8, 9,10, 11,12 };
+    qfloat_t A_vals[6];
+    qfloat_t B_vals[6];
 
-    size_t idx = 0;
-    for (size_t i = 0; i < 2; i++)
-        for (size_t j = 0; j < 3; j++) {
-            qfloat_t tmp = qf_from_double(a_raw[idx++]);
-            mat_set(A, i, j, &tmp);
-        }
+    for (size_t k = 0; k < 6; k++) {
+        A_vals[k] = qf_from_double(a_raw[k]);
+        B_vals[k] = qf_from_double(b_raw[k]);
+    }
 
-    idx = 0;
-    for (size_t i = 0; i < 3; i++)
-        for (size_t j = 0; j < 2; j++) {
-            qfloat_t tmp = qf_from_double(b_raw[idx++]);
-            mat_set(B, i, j, &tmp);
-        }
+    matrix_t *A = mat_create_qf(2, 3, A_vals);
+    matrix_t *B = mat_create_qf(3, 2, B_vals);
 
     print_mqf("A", A);
     print_mqf("B", B);
@@ -666,16 +650,15 @@ static void test_multiply_qf(void)
 
     double expected_raw[4] = { 58, 64, 139, 154 };
 
-    idx = 0;
-    for (size_t i = 0; i < 2; i++)
-        for (size_t j = 0; j < 2; j++) {
-            qfloat_t got;
-            qfloat_t expected = qf_from_double(expected_raw[idx++]);
-            mat_get(C, i, j, &got);
-            char label[64];
-            snprintf(label, sizeof(label), "qfloat mul[%zu,%zu]", i, j);
-            check_qf_val(label, got, expected, 1e-28);
-        }
+    qfloat_t C_vals[4];
+    mat_get_data(C, C_vals);
+
+    for (size_t k = 0; k < 4; k++) {
+        qfloat_t expected = qf_from_double(expected_raw[k]);
+        char label[64];
+        snprintf(label, sizeof(label), "qfloat mul[%zu,%zu]", k / 2, k % 2);
+        check_qf_val(label, C_vals[k], expected, 1e-28);
+    }
 
     mat_free(A); mat_free(B); mat_free(C);
 }
@@ -685,9 +668,6 @@ static void test_multiply_qf(void)
 static void test_multiply_qc(void)
 {
     printf(C_CYAN "TEST: qcomplex multiplication (mixed sizes)\n" C_RESET);
-
-    matrix_t *A = mat_create_qc(3,1);
-    matrix_t *B = mat_create_qc(1,4);
 
     qcomplex_t a_vals[3] = {
         qc_make(qf_from_double(1), qf_from_double(1)),
@@ -702,11 +682,8 @@ static void test_multiply_qc(void)
         qc_make(qf_from_double(0), qf_from_double(-2))
     };
 
-    for (size_t i = 0; i < 3; i++)
-        mat_set(A, i, 0, &a_vals[i]);
-
-    for (size_t j = 0; j < 4; j++)
-        mat_set(B, 0, j, &b_vals[j]);
+    matrix_t *A = mat_create_qc(3, 1, a_vals);
+    matrix_t *B = mat_create_qc(1, 4, b_vals);
 
     print_mqc("A", A);
     print_mqc("B", B);
@@ -714,14 +691,16 @@ static void test_multiply_qc(void)
     matrix_t *C = mat_mul(A, B);
     print_mqc("A*B", C);
 
+    qcomplex_t C_vals[12];
+    mat_get_data(C, C_vals);
+
     for (size_t i = 0; i < 3; i++)
         for (size_t j = 0; j < 4; j++) {
-            qcomplex_t got;
+            size_t k = i * 4 + j;
             qcomplex_t expected = qc_mul(a_vals[i], b_vals[j]);
-            mat_get(C, i, j, &got);
             char label[64];
             snprintf(label, sizeof(label), "qcomplex mul[%zu,%zu]", i, j);
-            check_qc_val(label, got, expected, 1e-28);
+            check_qc_val(label, C_vals[k], expected, 1e-28);
         }
 
     mat_free(A); mat_free(B); mat_free(C);
@@ -733,42 +712,30 @@ static void test_add_mixed_d_qf(void)
 {
     printf(C_CYAN "TEST: mixed-type addition (double + qfloat)\n" C_RESET);
 
-    matrix_t *A = mat_create_d(2,2);
-    matrix_t *B = mat_create_qf(2,2);
-
-    double a_vals[4] = { 1.0, 2.0, 3.0, 4.0 };
+    double   a_vals[4] = { 1.0, 2.0, 3.0, 4.0 };
     qfloat_t b_vals[4] = {
         qf_from_double(10), qf_from_double(20),
         qf_from_double(30), qf_from_double(40)
     };
 
-    size_t idx = 0;
-    for (size_t i = 0; i < 2; i++)
-        for (size_t j = 0; j < 2; j++) {
-            mat_set(A, i, j, &a_vals[idx]);
-            mat_set(B, i, j, &b_vals[idx]);
-            idx++;
-        }
+    matrix_t *A = mat_create_d (2, 2, a_vals);
+    matrix_t *B = mat_create_qf(2, 2, b_vals);
 
-    print_md("A (double)", A);
+    print_md ("A (double)", A);
     print_mqf("B (qfloat)", B);
 
     matrix_t *C = mat_add(A, B);
     print_mqf("A + B (qfloat result)", C);
 
-    idx = 0;
-    for (size_t i = 0; i < 2; i++)
-        for (size_t j = 0; j < 2; j++) {
-            qfloat_t got;
-            qfloat_t expected = qf_add(qf_from_double(a_vals[idx]), b_vals[idx]);
-            mat_get(C, i, j, &got);
+    qfloat_t C_vals[4];
+    mat_get_data(C, C_vals);
 
-            char label[64];
-            snprintf(label, sizeof(label), "mixed add d+qf [%zu,%zu]", i, j);
-            check_qf_val(label, got, expected, 1e-28);
-
-            idx++;
-        }
+    for (size_t k = 0; k < 4; k++) {
+        qfloat_t expected = qf_add(qf_from_double(a_vals[k]), b_vals[k]);
+        char label[64];
+        snprintf(label, sizeof(label), "mixed add d+qf [%zu,%zu]", k / 2, k % 2);
+        check_qf_val(label, C_vals[k], expected, 1e-28);
+    }
 
     mat_free(A); mat_free(B); mat_free(C);
 }
@@ -779,9 +746,6 @@ static void test_add_mixed_d_qc(void)
 {
     printf(C_CYAN "TEST: mixed-type addition (double + qcomplex)\n" C_RESET);
 
-    matrix_t *A = mat_create_d(1,3);
-    matrix_t *B = mat_create_qc(1,3);
-
     double a_vals[3] = { 1.0, -2.0, 5.0 };
     qcomplex_t b_vals[3] = {
         qc_make(qf_from_double(3), qf_from_double(4)),
@@ -789,25 +753,26 @@ static void test_add_mixed_d_qc(void)
         qc_make(qf_from_double(2), qf_from_double(2))
     };
 
-    for (size_t j = 0; j < 3; j++) {
-        mat_set(A, 0, j, &a_vals[j]);
-        mat_set(B, 0, j, &b_vals[j]);
-    }
+    matrix_t *A = mat_create_d (1, 3, a_vals);
+    matrix_t *B = mat_create_qc(1, 3, b_vals);
 
-    print_md("A (double)", A);
+    print_md ("A (double)", A);
     print_mqc("B (qcomplex)", B);
 
     matrix_t *C = mat_add(A, B);
     print_mqc("A + B (qcomplex result)", C);
 
-    for (size_t j = 0; j < 3; j++) {
-        qcomplex_t got;
-        qcomplex_t expected = qc_add(qc_make(qf_from_double(a_vals[j]), QF_ZERO), b_vals[j]);
-        mat_get(C, 0, j, &got);
+    qcomplex_t C_vals[3];
+    mat_get_data(C, C_vals);
 
+    for (size_t j = 0; j < 3; j++) {
+        qcomplex_t expected = qc_add(
+            qc_make(qf_from_double(a_vals[j]), QF_ZERO),
+            b_vals[j]
+        );
         char label[64];
         snprintf(label, sizeof(label), "mixed add d+qc [0,%zu]", j);
-        check_qc_val(label, got, expected, 1e-28);
+        check_qc_val(label, C_vals[j], expected, 1e-28);
     }
 
     mat_free(A); mat_free(B); mat_free(C);
@@ -819,19 +784,14 @@ static void test_add_mixed_qf_qc(void)
 {
     printf(C_CYAN "TEST: mixed-type addition (qfloat + qcomplex)\n" C_RESET);
 
-    matrix_t *A = mat_create_qf(2,1);
-    matrix_t *B = mat_create_qc(2,1);
-
-    qfloat_t a_vals[2] = { qf_from_double(1.5), qf_from_double(-3.25) };
+    qfloat_t   a_vals[2] = { qf_from_double(1.5),  qf_from_double(-3.25) };
     qcomplex_t b_vals[2] = {
-        qc_make(qf_from_double(2), qf_from_double(1)),
+        qc_make(qf_from_double(2),  qf_from_double(1)),
         qc_make(qf_from_double(-1), qf_from_double(4))
     };
 
-    for (size_t i = 0; i < 2; i++) {
-        mat_set(A, i, 0, &a_vals[i]);
-        mat_set(B, i, 0, &b_vals[i]);
-    }
+    matrix_t *A = mat_create_qf(2, 1, a_vals);
+    matrix_t *B = mat_create_qc(2, 1, b_vals);
 
     print_mqf("A (qfloat)", A);
     print_mqc("B (qcomplex)", B);
@@ -839,14 +799,17 @@ static void test_add_mixed_qf_qc(void)
     matrix_t *C = mat_add(A, B);
     print_mqc("A + B (qcomplex result)", C);
 
-    for (size_t i = 0; i < 2; i++) {
-        qcomplex_t got;
-        qcomplex_t expected = qc_add(qc_make(a_vals[i], QF_ZERO), b_vals[i]);
-        mat_get(C, i, 0, &got);
+    qcomplex_t C_vals[2];
+    mat_get_data(C, C_vals);
 
+    for (size_t i = 0; i < 2; i++) {
+        qcomplex_t expected = qc_add(
+            qc_make(a_vals[i], QF_ZERO),
+            b_vals[i]
+        );
         char label[64];
         snprintf(label, sizeof(label), "mixed add qf+qc [%zu,0]", i);
-        check_qc_val(label, got, expected, 1e-28);
+        check_qc_val(label, C_vals[i], expected, 1e-28);
     }
 
     mat_free(A); mat_free(B); mat_free(C);
@@ -858,42 +821,30 @@ static void test_sub_mixed_d_qf(void)
 {
     printf(C_CYAN "TEST: mixed-type subtraction (double - qfloat)\n" C_RESET);
 
-    matrix_t *A = mat_create_d(2,2);
-    matrix_t *B = mat_create_qf(2,2);
-
-    double a_vals[4] = { 5.0,  7.0, -3.0,  2.0 };
+    double   a_vals[4] = { 5.0,  7.0, -3.0,  2.0 };
     qfloat_t b_vals[4] = {
-        qf_from_double(1.0), qf_from_double(2.5),
+        qf_from_double(1.0),  qf_from_double(2.5),
         qf_from_double(-4.0), qf_from_double(10.0)
     };
 
-    size_t idx = 0;
-    for (size_t i = 0; i < 2; i++)
-        for (size_t j = 0; j < 2; j++) {
-            mat_set(A, i, j, &a_vals[idx]);
-            mat_set(B, i, j, &b_vals[idx]);
-            idx++;
-        }
+    matrix_t *A = mat_create_d (2, 2, a_vals);
+    matrix_t *B = mat_create_qf(2, 2, b_vals);
 
-    print_md("A (double)", A);
+    print_md ("A (double)", A);
     print_mqf("B (qfloat)", B);
 
     matrix_t *C = mat_sub(A, B);
     print_mqf("A - B (qfloat result)", C);
 
-    idx = 0;
-    for (size_t i = 0; i < 2; i++)
-        for (size_t j = 0; j < 2; j++) {
-            qfloat_t got;
-            qfloat_t expected = qf_sub(qf_from_double(a_vals[idx]), b_vals[idx]);
-            mat_get(C, i, j, &got);
+    qfloat_t C_vals[4];
+    mat_get_data(C, C_vals);
 
-            char label[64];
-            snprintf(label, sizeof(label), "mixed sub d-qf [%zu,%zu]", i, j);
-            check_qf_val(label, got, expected, 1e-28);
-
-            idx++;
-        }
+    for (size_t k = 0; k < 4; k++) {
+        qfloat_t expected = qf_sub(qf_from_double(a_vals[k]), b_vals[k]);
+        char label[64];
+        snprintf(label, sizeof(label), "mixed sub d-qf [%zu,%zu]", k / 2, k % 2);
+        check_qf_val(label, C_vals[k], expected, 1e-28);
+    }
 
     mat_free(A); mat_free(B); mat_free(C);
 }
@@ -904,38 +855,33 @@ static void test_sub_mixed_d_qc(void)
 {
     printf(C_CYAN "TEST: mixed-type subtraction (double - qcomplex)\n" C_RESET);
 
-    matrix_t *A = mat_create_d(1,3);
-    matrix_t *B = mat_create_qc(1,3);
-
     double a_vals[3] = { 10.0, -5.0, 3.0 };
     qcomplex_t b_vals[3] = {
-        qc_make(qf_from_double(2), qf_from_double(1)),
-        qc_make(qf_from_double(-3), qf_from_double(4)),
+        qc_make(qf_from_double(2),   qf_from_double(1)),
+        qc_make(qf_from_double(-3),  qf_from_double(4)),
         qc_make(qf_from_double(0.5), qf_from_double(-2))
     };
 
-    for (size_t j = 0; j < 3; j++) {
-        mat_set(A, 0, j, &a_vals[j]);
-        mat_set(B, 0, j, &b_vals[j]);
-    }
+    matrix_t *A = mat_create_d (1, 3, a_vals);
+    matrix_t *B = mat_create_qc(1, 3, b_vals);
 
-    print_md("A (double)", A);
+    print_md ("A (double)", A);
     print_mqc("B (qcomplex)", B);
 
     matrix_t *C = mat_sub(A, B);
     print_mqc("A - B (qcomplex result)", C);
 
+    qcomplex_t C_vals[3];
+    mat_get_data(C, C_vals);
+
     for (size_t j = 0; j < 3; j++) {
-        qcomplex_t got;
         qcomplex_t expected = qc_sub(
             qc_make(qf_from_double(a_vals[j]), QF_ZERO),
             b_vals[j]
         );
-        mat_get(C, 0, j, &got);
-
         char label[64];
         snprintf(label, sizeof(label), "mixed sub d-qc [0,%zu]", j);
-        check_qc_val(label, got, expected, 1e-28);
+        check_qc_val(label, C_vals[j], expected, 1e-28);
     }
 
     mat_free(A); mat_free(B); mat_free(C);
@@ -947,23 +893,18 @@ static void test_sub_mixed_qf_qc(void)
 {
     printf(C_CYAN "TEST: mixed-type subtraction (qfloat - qcomplex)\n" C_RESET);
 
-    matrix_t *A = mat_create_qf(2,1);
-    matrix_t *B = mat_create_qc(2,1);
-
     qfloat_t a_vals[2] = {
         qf_from_double(4.5),
         qf_from_double(-1.25)
     };
 
     qcomplex_t b_vals[2] = {
-        qc_make(qf_from_double(1), qf_from_double(3)),
+        qc_make(qf_from_double(1),  qf_from_double(3)),
         qc_make(qf_from_double(-2), qf_from_double(1))
     };
 
-    for (size_t i = 0; i < 2; i++) {
-        mat_set(A, i, 0, &a_vals[i]);
-        mat_set(B, i, 0, &b_vals[i]);
-    }
+    matrix_t *A = mat_create_qf(2, 1, a_vals);
+    matrix_t *B = mat_create_qc(2,  1, b_vals);
 
     print_mqf("A (qfloat)", A);
     print_mqc("B (qcomplex)", B);
@@ -971,17 +912,17 @@ static void test_sub_mixed_qf_qc(void)
     matrix_t *C = mat_sub(A, B);
     print_mqc("A - B (qcomplex result)", C);
 
+    qcomplex_t C_vals[2];
+    mat_get_data(C, C_vals);
+
     for (size_t i = 0; i < 2; i++) {
-        qcomplex_t got;
         qcomplex_t expected = qc_sub(
             qc_make(a_vals[i], QF_ZERO),
             b_vals[i]
         );
-        mat_get(C, i, 0, &got);
-
         char label[64];
         snprintf(label, sizeof(label), "mixed sub qf-qc [%zu,0]", i);
-        check_qc_val(label, got, expected, 1e-28);
+        check_qc_val(label, C_vals[i], expected, 1e-28);
     }
 
     mat_free(A); mat_free(B); mat_free(C);
@@ -993,31 +934,17 @@ static void test_multiply_mixed_d_qf(void)
 {
     printf(C_CYAN "TEST: mixed-type multiplication (double * qfloat)\n" C_RESET);
 
-    matrix_t *A = mat_create_d(2,3);
-    matrix_t *B = mat_create_qf(3,2);
-
-    double a_vals[6] = { 1, 2, 3, 4, 5, 6 };
+    double   a_vals[6] = { 1, 2, 3, 4, 5, 6 };
     qfloat_t b_vals[6] = {
         qf_from_double(7),  qf_from_double(8),
         qf_from_double(9),  qf_from_double(10),
         qf_from_double(11), qf_from_double(12)
     };
 
-    size_t idx = 0;
-    for (size_t i = 0; i < 2; i++)
-        for (size_t j = 0; j < 3; j++) {
-            mat_set(A, i, j, &a_vals[idx]);
-            idx++;
-        }
+    matrix_t *A = mat_create_d (2, 3, a_vals);
+    matrix_t *B = mat_create_qf(3, 2, b_vals);
 
-    idx = 0;
-    for (size_t i = 0; i < 3; i++)
-        for (size_t j = 0; j < 2; j++) {
-            mat_set(B, i, j, &b_vals[idx]);
-            idx++;
-        }
-
-    print_md("A (double)", A);
+    print_md ("A (double)", A);
     print_mqf("B (qfloat)", B);
 
     matrix_t *C = mat_mul(A, B);
@@ -1025,19 +952,15 @@ static void test_multiply_mixed_d_qf(void)
 
     double expected_raw[4] = { 58, 64, 139, 154 };
 
-    idx = 0;
-    for (size_t i = 0; i < 2; i++)
-        for (size_t j = 0; j < 2; j++) {
-            qfloat_t got;
-            qfloat_t expected = qf_from_double(expected_raw[idx]);
-            mat_get(C, i, j, &got);
+    qfloat_t C_vals[4];
+    mat_get_data(C, C_vals);
 
-            char label[64];
-            snprintf(label, sizeof(label), "mixed mul d*qf [%zu,%zu]", i, j);
-            check_qf_val(label, got, expected, 1e-28);
-
-            idx++;
-        }
+    for (size_t k = 0; k < 4; k++) {
+        qfloat_t expected = qf_from_double(expected_raw[k]);
+        char label[64];
+        snprintf(label, sizeof(label), "mixed mul d*qf [%zu,%zu]", k / 2, k % 2);
+        check_qf_val(label, C_vals[k], expected, 1e-28);
+    }
 
     mat_free(A); mat_free(B); mat_free(C);
 }
@@ -1048,51 +971,43 @@ static void test_multiply_mixed_d_qc(void)
 {
     printf(C_CYAN "TEST: mixed-type multiplication (double * qcomplex)\n" C_RESET);
 
-    matrix_t *A = mat_create_d(1,3);
-    matrix_t *B = mat_create_qc(3,2);
-
     double a_vals[3] = { 2.0, -1.0, 3.0 };
     qcomplex_t b_vals[6] = {
-        qc_make(qf_from_double(1), qf_from_double(2)),
-        qc_make(qf_from_double(0), qf_from_double(-1)),
-        qc_make(qf_from_double(4), qf_from_double(0)),
+        qc_make(qf_from_double(1),  qf_from_double(2)),
+        qc_make(qf_from_double(0),  qf_from_double(-1)),
+        qc_make(qf_from_double(4),  qf_from_double(0)),
         qc_make(qf_from_double(-2), qf_from_double(3)),
-        qc_make(qf_from_double(1), qf_from_double(1)),
-        qc_make(qf_from_double(0), qf_from_double(5))
+        qc_make(qf_from_double(1),  qf_from_double(1)),
+        qc_make(qf_from_double(0),  qf_from_double(5))
     };
 
-    for (size_t j = 0; j < 3; j++)
-        mat_set(A, 0, j, &a_vals[j]);
+    matrix_t *A = mat_create_d (1, 3, a_vals);
+    matrix_t *B = mat_create_qc(3, 2, b_vals);
 
-    size_t idx = 0;
-    for (size_t i = 0; i < 3; i++)
-        for (size_t j = 0; j < 2; j++) {
-            mat_set(B, i, j, &b_vals[idx]);
-            idx++;
-        }
-
-    print_md("A (double)", A);
+    print_md ("A (double)", A);
     print_mqc("B (qcomplex)", B);
 
     matrix_t *C = mat_mul(A, B);
     print_mqc("A * B (qcomplex result)", C);
 
-    qcomplex_t expected_vals[2] = { QC_ZERO, QC_ZERO };
+    qcomplex_t C_vals[6];
+    mat_get_data(C, C_vals);
 
-    for (size_t k = 0; k < 3; k++) {
-        qcomplex_t scalar = qc_make(qf_from_double(a_vals[k]), QF_ZERO);
-        expected_vals[0] = qc_add(expected_vals[0], qc_mul(scalar, b_vals[k*2 + 0]));
-        expected_vals[1] = qc_add(expected_vals[1], qc_mul(scalar, b_vals[k*2 + 1]));
-    }
-
-    for (size_t j = 0; j < 2; j++) {
-        qcomplex_t got;
-        mat_get(C, 0, j, &got);
-
-        char label[64];
-        snprintf(label, sizeof(label), "mixed mul d*qc [0,%zu]", j);
-        check_qc_val(label, got, expected_vals[j], 1e-28);
-    }
+    for (size_t i = 0; i < 1; i++)
+        for (size_t j = 0; j < 2; j++) {
+            size_t k = i * 2 + j;
+            qcomplex_t expected = QC_ZERO;
+            for (size_t t = 0; t < 3; t++) {
+                qcomplex_t term = qc_mul(
+                    qc_make(qf_from_double(a_vals[t]), QF_ZERO),
+                    b_vals[t * 2 + j]
+                );
+                expected = qc_add(expected, term);
+            }
+            char label[64];
+            snprintf(label, sizeof(label), "mixed mul d*qc [%zu,%zu]", i, j);
+            check_qc_val(label, C_vals[k], expected, 1e-28);
+        }
 
     mat_free(A); mat_free(B); mat_free(C);
 }
@@ -1102,9 +1017,6 @@ static void test_multiply_mixed_d_qc(void)
 static void test_multiply_mixed_qf_qc(void)
 {
     printf(C_CYAN "TEST: mixed-type multiplication (qfloat * qcomplex)\n" C_RESET);
-
-    matrix_t *A = mat_create_qf(2,1);
-    matrix_t *B = mat_create_qc(1,3);
 
     qfloat_t a_vals[2] = {
         qf_from_double(2.5),
@@ -1117,11 +1029,8 @@ static void test_multiply_mixed_qf_qc(void)
         qc_make(qf_from_double(0), qf_from_double(-3))
     };
 
-    for (size_t i = 0; i < 2; i++)
-        mat_set(A, i, 0, &a_vals[i]);
-
-    for (size_t j = 0; j < 3; j++)
-        mat_set(B, 0, j, &b_vals[j]);
+    matrix_t *A = mat_create_qf(2, 1, a_vals);
+    matrix_t *B = mat_create_qc(1, 3, b_vals);
 
     print_mqf("A (qfloat)", A);
     print_mqc("B (qcomplex)", B);
@@ -1152,36 +1061,30 @@ static void test_scalar_mul_d_d(void)
 {
     printf(C_CYAN "TEST: scalar multiply (double * double matrix)\n" C_RESET);
 
-    matrix_t *A = mat_create_d(2,3);
-    double vals[6] = { 1,2,3, 4,5,6 };
+    const double A_vals[4] = {
+        1.0, 2.0,
+        3.0, 4.0
+    };
+    const double alpha = 2.5;
 
-    size_t idx = 0;
-    for (size_t i = 0; i < 2; i++)
-        for (size_t j = 0; j < 3; j++)
-            mat_set(A, i, j, &vals[idx++]);
-
+    matrix_t *A = mat_create_d(2, 2, A_vals);
     print_md("A", A);
 
-    double s = 2.0;
-    matrix_t *C = mat_scalar_mul_d(s, A);
-    print_md("2*A", C);
+    matrix_t *B = mat_scalar_mul_d(A, alpha);
+    print_md("alpha * A", B);
 
-    idx = 0;
-    for (size_t i = 0; i < 2; i++)
-        for (size_t j = 0; j < 3; j++) {
-            double got;
-            double expected = s * vals[idx];
-            mat_get(C, i, j, &got);
+    double B_vals[4];
+    mat_get_data(B, B_vals);
 
-            char label[64];
-            snprintf(label, sizeof(label), "scalar d*d [%zu,%zu]", i, j);
-            check_d(label, got, expected, 1e-12);
-
-            idx++;
-        }
+    for (size_t k = 0; k < 4; k++) {
+        double expected = alpha * A_vals[k];
+        char label[64];
+        snprintf(label, sizeof(label), "scalar mul d*d [%zu,%zu]", k / 2, k % 2);
+        check_d(label, B_vals[k], expected, 1e-30);
+    }
 
     mat_free(A);
-    mat_free(C);
+    mat_free(B);
 }
 
 /* ------------------------------------------------------------------ scalar multiply: double scalar × qfloat matrix */
@@ -1190,41 +1093,30 @@ static void test_scalar_mul_d_qf(void)
 {
     printf(C_CYAN "TEST: scalar multiply (double * qfloat matrix)\n" C_RESET);
 
-    matrix_t *A = mat_create_qf(2,2);
-    qfloat_t vals[4] = {
-        qf_from_double(1.5),
-        qf_from_double(-2.0),
-        qf_from_double(3.25),
-        qf_from_double(4.0)
+    qfloat_t A_vals[4] = {
+        qf_from_double(1.0), qf_from_double(-2.0),
+        qf_from_double(3.5), qf_from_double(0.5)
     };
+    const double alpha = -1.25;
 
-    size_t idx = 0;
-    for (size_t i = 0; i < 2; i++)
-        for (size_t j = 0; j < 2; j++)
-            mat_set(A, i, j, &vals[idx++]);
+    matrix_t *A = mat_create_qf(2, 2, A_vals);
+    print_mqf("A (qfloat)", A);
 
-    print_mqf("A", A);
+    matrix_t *B = mat_scalar_mul_d(A, alpha);
+    print_mqf("alpha * A (qfloat)", B);
 
-    double s = -3.0;
-    matrix_t *C = mat_scalar_mul_d(s, A);
-    print_mqf("-3*A", C);
+    qfloat_t B_vals[4];
+    mat_get_data(B, B_vals);
 
-    idx = 0;
-    for (size_t i = 0; i < 2; i++)
-        for (size_t j = 0; j < 2; j++) {
-            qfloat_t got;
-            qfloat_t expected = qf_mul(qf_from_double(s), vals[idx]);
-            mat_get(C, i, j, &got);
-
-            char label[64];
-            snprintf(label, sizeof(label), "scalar d*qf [%zu,%zu]", i, j);
-            check_qf_val(label, got, expected, 1e-28);
-
-            idx++;
-        }
+    for (size_t k = 0; k < 4; k++) {
+        qfloat_t expected = qf_mul(qf_from_double(alpha), A_vals[k]);
+        char label[64];
+        snprintf(label, sizeof(label), "scalar mul d*qf [%zu,%zu]", k / 2, k % 2);
+        check_qf_val(label, B_vals[k], expected, 1e-28);
+    }
 
     mat_free(A);
-    mat_free(C);
+    mat_free(B);
 }
 
 /* ------------------------------------------------------------------ scalar multiply: double scalar × qcomplex matrix */
@@ -1233,37 +1125,34 @@ static void test_scalar_mul_d_qc(void)
 {
     printf(C_CYAN "TEST: scalar multiply (double * qcomplex matrix)\n" C_RESET);
 
-    matrix_t *A = mat_create_qc(1,3);
-    qcomplex_t vals[3] = {
-        qc_make(qf_from_double(1), qf_from_double(2)),
-        qc_make(qf_from_double(-3), qf_from_double(1)),
-        qc_make(qf_from_double(0.5), qf_from_double(-4))
+    qcomplex_t A_vals[3] = {
+        qc_make(qf_from_double(1.0),  qf_from_double(2.0)),
+        qc_make(qf_from_double(-3.0), qf_from_double(0.5)),
+        qc_make(qf_from_double(0.0),  qf_from_double(-1.0))
     };
+    const double alpha = 0.75;
 
-    for (size_t j = 0; j < 3; j++)
-        mat_set(A, 0, j, &vals[j]);
+    matrix_t *A = mat_create_qc(1, 3, A_vals);
+    print_mqc("A (qcomplex)", A);
 
-    print_mqc("A", A);
+    matrix_t *B = mat_scalar_mul_d(A, alpha);
+    print_mqc("alpha * A (qcomplex)", B);
 
-    double s = 2.0;
-    matrix_t *C = mat_scalar_mul_d(s, A);
-    print_mqc("2*A", C);
+    qcomplex_t B_vals[3];
+    mat_get_data(B, B_vals);
 
     for (size_t j = 0; j < 3; j++) {
-        qcomplex_t got;
         qcomplex_t expected = qc_mul(
-            qc_make(qf_from_double(s), QF_ZERO),
-            vals[j]
+            qc_make(qf_from_double(alpha), QF_ZERO),
+            A_vals[j]
         );
-        mat_get(C, 0, j, &got);
-
         char label[64];
-        snprintf(label, sizeof(label), "scalar d*qc [0,%zu]", j);
-        check_qc_val(label, got, expected, 1e-28);
+        snprintf(label, sizeof(label), "scalar mul d*qc [0,%zu]", j);
+        check_qc_val(label, B_vals[j], expected, 1e-28);
     }
 
     mat_free(A);
-    mat_free(C);
+    mat_free(B);
 }
 
 /* ------------------------------------------------------------------ scalar multiply: qfloat scalar × double matrix */
@@ -1272,36 +1161,30 @@ static void test_scalar_mul_qf_d(void)
 {
     printf(C_CYAN "TEST: scalar multiply (qfloat * double matrix)\n" C_RESET);
 
-    matrix_t *A = mat_create_d(2,2);
-    double vals[4] = { 2.0, -1.0, 4.0, 3.0 };
+    const double A_vals[6] = {
+        1.0, -2.0, 3.0,
+        0.5, 4.0, -1.0
+    };
+    qfloat_t alpha = qf_from_double(1.75);
 
-    size_t idx = 0;
-    for (size_t i = 0; i < 2; i++)
-        for (size_t j = 0; j < 2; j++)
-            mat_set(A, i, j, &vals[idx++]);
+    matrix_t *A = mat_create_d(2, 3, A_vals);
+    print_md("A (double)", A);
 
-    print_md("A", A);
+    matrix_t *B = mat_scalar_mul_qf(A, alpha);
+    print_mqf("alpha * A (qfloat)", B);
 
-    qfloat_t s = qf_from_double(0.5);
-    matrix_t *C = mat_scalar_mul_qf(s, A);
-    print_mqf("0.5*A", C);
+    qfloat_t B_vals[6];
+    mat_get_data(B, B_vals);
 
-    idx = 0;
-    for (size_t i = 0; i < 2; i++)
-        for (size_t j = 0; j < 2; j++) {
-            qfloat_t got;
-            qfloat_t expected = qf_mul(s, qf_from_double(vals[idx]));
-            mat_get(C, i, j, &got);
-
-            char label[64];
-            snprintf(label, sizeof(label), "scalar qf*d [%zu,%zu]", i, j);
-            check_qf_val(label, got, expected, 1e-28);
-
-            idx++;
-        }
+    for (size_t k = 0; k < 6; k++) {
+        qfloat_t expected = qf_mul(alpha, qf_from_double(A_vals[k]));
+        char label[64];
+        snprintf(label, sizeof(label), "scalar mul qf*d [%zu,%zu]", k / 3, k % 3);
+        check_qf_val(label, B_vals[k], expected, 1e-28);
+    }
 
     mat_free(A);
-    mat_free(C);
+    mat_free(B);
 }
 
 /* ------------------------------------------------------------------ scalar multiply: qcomplex scalar × qcomplex matrix */
@@ -1310,33 +1193,33 @@ static void test_scalar_mul_qc_qc(void)
 {
     printf(C_CYAN "TEST: scalar multiply (qcomplex * qcomplex matrix)\n" C_RESET);
 
-    matrix_t *A = mat_create_qc(2,1);
-    qcomplex_t vals[2] = {
-        qc_make(qf_from_double(1), qf_from_double(1)),
-        qc_make(qf_from_double(2), qf_from_double(-3))
+    qcomplex_t A_vals[4] = {
+        QC_ONE,
+        qc_make(qf_from_double(2.0),  qf_from_double(-1.0)),
+        qc_make(qf_from_double(0.0),  qf_from_double(3.0)),
+        qc_make(qf_from_double(-1.5), qf_from_double(0.5))
     };
 
-    for (size_t i = 0; i < 2; i++)
-        mat_set(A, i, 0, &vals[i]);
+    qcomplex_t alpha = qc_make(qf_from_double(0.5), qf_from_double(2.0));
 
-    print_mqc("A", A);
+    matrix_t *A = mat_create_qc(2, 2, A_vals);
+    print_mqc("A (qcomplex)", A);
 
-    qcomplex_t s = qc_make(qf_from_double(2), qf_from_double(3));
-    matrix_t *C = mat_scalar_mul_qc(s, A);
-    print_mqc("(2+3i)*A", C);
+    matrix_t *B = mat_scalar_mul_qc(A, alpha);
+    print_mqc("alpha * A (qcomplex)", B);
 
-    for (size_t i = 0; i < 2; i++) {
-        qcomplex_t got;
-        qcomplex_t expected = qc_mul(s, vals[i]);
-        mat_get(C, i, 0, &got);
+    qcomplex_t B_vals[4];
+    mat_get_data(B, B_vals);
 
+    for (size_t k = 0; k < 4; k++) {
+        qcomplex_t expected = qc_mul(alpha, A_vals[k]);
         char label[64];
-        snprintf(label, sizeof(label), "scalar qc*qc [%zu,0]", i);
-        check_qc_val(label, got, expected, 1e-28);
+        snprintf(label, sizeof(label), "scalar mul qc*qc [%zu,%zu]", k / 2, k % 2);
+        check_qc_val(label, B_vals[k], expected, 1e-28);
     }
 
     mat_free(A);
-    mat_free(C);
+    mat_free(B);
 }
 
 /* ------------------------------------------------------------------ identity add/sub/mul: double */
@@ -1345,15 +1228,9 @@ static void test_identity_arith_d(void)
 {
     printf(C_CYAN "TEST: identity arithmetic (double)\n" C_RESET);
 
-    matrix_t *A = mat_create_d(2,2);
     double vals[4] = { 1, 2, 3, 4 };
-
-    size_t idx = 0;
-    for (size_t i = 0; i < 2; i++)
-        for (size_t j = 0; j < 2; j++)
-            mat_set(A, i, j, &vals[idx++]);
-
-    matrix_t *I = matsq_ident_d(2);
+    matrix_t *A = mat_create_d(2, 2, vals);
+    matrix_t *I = mat_create_identity_d(2);
 
     print_md("A", A);
     print_md("I", I);
@@ -1363,58 +1240,50 @@ static void test_identity_arith_d(void)
     print_md("A + I", ApI);
 
     double expected_add[4] = { 2, 2, 3, 5 };
-    idx = 0;
-    for (size_t i = 0; i < 2; i++)
-        for (size_t j = 0; j < 2; j++) {
-            double got;
-            mat_get(ApI, i, j, &got);
-            char label[64];
-            snprintf(label, sizeof(label), "d: A+I [%zu,%zu]", i, j);
-            check_d(label, got, expected_add[idx++], 1e-12);
-        }
+    double got_add[4];
+    mat_get_data(ApI, got_add);
+    for (size_t k = 0; k < 4; k++) {
+        char label[64];
+        snprintf(label, sizeof(label), "d: A+I [%zu,%zu]", k/2, k%2);
+        check_d(label, got_add[k], expected_add[k], 1e-12);
+    }
 
     /* A - I */
     matrix_t *AmI = mat_sub(A, I);
     print_md("A - I", AmI);
 
     double expected_sub[4] = { 0, 2, 3, 3 };
-    idx = 0;
-    for (size_t i = 0; i < 2; i++)
-        for (size_t j = 0; j < 2; j++) {
-            double got;
-            mat_get(AmI, i, j, &got);
-            char label[64];
-            snprintf(label, sizeof(label), "d: A-I [%zu,%zu]", i, j);
-            check_d(label, got, expected_sub[idx++], 1e-12);
-        }
+    double got_sub[4];
+    mat_get_data(AmI, got_sub);
+    for (size_t k = 0; k < 4; k++) {
+        char label[64];
+        snprintf(label, sizeof(label), "d: A-I [%zu,%zu]", k/2, k%2);
+        check_d(label, got_sub[k], expected_sub[k], 1e-12);
+    }
 
     /* A * I */
     matrix_t *A_times_I = mat_mul(A, I);
     print_md("A * I", A_times_I);
 
-    idx = 0;
-    for (size_t i = 0; i < 2; i++)
-        for (size_t j = 0; j < 2; j++) {
-            double got;
-            mat_get(A_times_I, i, j, &got);
-            char label[64];
-            snprintf(label, sizeof(label), "d: A*I [%zu,%zu]", i, j);
-            check_d(label, got, vals[idx++], 1e-12);
-        }
+    double got_ai[4];
+    mat_get_data(A_times_I, got_ai);
+    for (size_t k = 0; k < 4; k++) {
+        char label[64];
+        snprintf(label, sizeof(label), "d: A*I [%zu,%zu]", k/2, k%2);
+        check_d(label, got_ai[k], vals[k], 1e-12);
+    }
 
     /* I * A */
     matrix_t *I_times_A = mat_mul(I, A);
     print_md("I * A", I_times_A);
 
-    idx = 0;
-    for (size_t i = 0; i < 2; i++)
-        for (size_t j = 0; j < 2; j++) {
-            double got;
-            mat_get(I_times_A, i, j, &got);
-            char label[64];
-            snprintf(label, sizeof(label), "d: I*A [%zu,%zu]", i, j);
-            check_d(label, got, vals[idx++], 1e-12);
-        }
+    double got_ia[4];
+    mat_get_data(I_times_A, got_ia);
+    for (size_t k = 0; k < 4; k++) {
+        char label[64];
+        snprintf(label, sizeof(label), "d: I*A [%zu,%zu]", k/2, k%2);
+        check_d(label, got_ia[k], vals[k], 1e-12);
+    }
 
     mat_free(A);
     mat_free(I);
@@ -1430,20 +1299,14 @@ static void test_identity_arith_qf(void)
 {
     printf(C_CYAN "TEST: identity arithmetic (qfloat)\n" C_RESET);
 
-    matrix_t *A = mat_create_qf(2,2);
     qfloat_t vals[4] = {
         qf_from_double(1.5),
         qf_from_double(2.0),
         qf_from_double(-1.0),
         qf_from_double(4.0)
     };
-
-    size_t idx = 0;
-    for (size_t i = 0; i < 2; i++)
-        for (size_t j = 0; j < 2; j++)
-            mat_set(A, i, j, &vals[idx++]);
-
-    matrix_t *I = matsq_ident_qf(2);
+    matrix_t *A = mat_create_qf(2, 2, vals);
+    matrix_t *I = mat_create_identity_qf(2);
 
     print_mqf("A", A);
     print_mqf("I", I);
@@ -1452,71 +1315,57 @@ static void test_identity_arith_qf(void)
     matrix_t *ApI = mat_add(A, I);
     print_mqf("A + I", ApI);
 
-    idx = 0;
-    for (size_t i = 0; i < 2; i++)
-        for (size_t j = 0; j < 2; j++) {
-            qfloat_t got;
-            qfloat_t expected = (i == j)
-                ? qf_add(vals[idx], QF_ONE)
-                : vals[idx];
-            mat_get(ApI, i, j, &got);
-
-            char label[64];
-            snprintf(label, sizeof(label), "qf: A+I [%zu,%zu]", i, j);
-            check_qf_val(label, got, expected, 1e-28);
-
-            idx++;
-        }
+    qfloat_t expected_add[4] = {
+        qf_add(vals[0], QF_ONE), vals[1],
+        vals[2], qf_add(vals[3], QF_ONE)
+    };
+    qfloat_t got_add[4];
+    mat_get_data(ApI, got_add);
+    for (size_t k = 0; k < 4; k++) {
+        char label[64];
+        snprintf(label, sizeof(label), "qf: A+I [%zu,%zu]", k/2, k%2);
+        check_qf_val(label, got_add[k], expected_add[k], 1e-28);
+    }
 
     /* A - I */
     matrix_t *AmI = mat_sub(A, I);
     print_mqf("A - I", AmI);
 
-    idx = 0;
-    for (size_t i = 0; i < 2; i++)
-        for (size_t j = 0; j < 2; j++) {
-            qfloat_t got;
-            qfloat_t expected = (i == j)
-                ? qf_sub(vals[idx], QF_ONE)
-                : vals[idx];
-            mat_get(AmI, i, j, &got);
-
-            char label[64];
-            snprintf(label, sizeof(label), "qf: A-I [%zu,%zu]", i, j);
-            check_qf_val(label, got, expected, 1e-28);
-
-            idx++;
-        }
+    qfloat_t expected_sub[4] = {
+        qf_sub(vals[0], QF_ONE), vals[1],
+        vals[2], qf_sub(vals[3], QF_ONE)
+    };
+    qfloat_t got_sub[4];
+    mat_get_data(AmI, got_sub);
+    for (size_t k = 0; k < 4; k++) {
+        char label[64];
+        snprintf(label, sizeof(label), "qf: A-I [%zu,%zu]", k/2, k%2);
+        check_qf_val(label, got_sub[k], expected_sub[k], 1e-28);
+    }
 
     /* A * I */
     matrix_t *A_times_I = mat_mul(A, I);
     print_mqf("A * I", A_times_I);
 
-    idx = 0;
-    for (size_t i = 0; i < 2; i++)
-        for (size_t j = 0; j < 2; j++) {
-            qfloat_t got;
-            mat_get(A_times_I, i, j, &got);
-
-            char label[64];
-            snprintf(label, sizeof(label), "qf: A*I [%zu,%zu]", i, j);
-            check_qf_val(label, got, vals[idx++], 1e-28);
-        }
+    qfloat_t got_ai[4];
+    mat_get_data(A_times_I, got_ai);
+    for (size_t k = 0; k < 4; k++) {
+        char label[64];
+        snprintf(label, sizeof(label), "qf: A*I [%zu,%zu]", k/2, k%2);
+        check_qf_val(label, got_ai[k], vals[k], 1e-28);
+    }
 
     /* I * A */
     matrix_t *I_times_A = mat_mul(I, A);
     print_mqf("I * A", I_times_A);
 
-    idx = 0;
-    for (size_t i = 0; i < 2; i++)
-        for (size_t j = 0; j < 2; j++) {
-            qfloat_t got;
-            mat_get(I_times_A, i, j, &got);
-
-            char label[64];
-            snprintf(label, sizeof(label), "qf: I*A [%zu,%zu]", i, j);
-            check_qf_val(label, got, vals[idx++], 1e-28);
-        }
+    qfloat_t got_ia[4];
+    mat_get_data(I_times_A, got_ia);
+    for (size_t k = 0; k < 4; k++) {
+        char label[64];
+        snprintf(label, sizeof(label), "qf: I*A [%zu,%zu]", k/2, k%2);
+        check_qf_val(label, got_ia[k], vals[k], 1e-28);
+    }
 
     mat_free(A);
     mat_free(I);
@@ -1532,20 +1381,14 @@ static void test_identity_arith_qc(void)
 {
     printf(C_CYAN "TEST: identity arithmetic (qcomplex)\n" C_RESET);
 
-    matrix_t *A = mat_create_qc(2,2);
     qcomplex_t vals[4] = {
         qc_make(qf_from_double(1), qf_from_double(2)),
         qc_make(qf_from_double(3), qf_from_double(-1)),
         qc_make(qf_from_double(0), qf_from_double(4)),
         qc_make(qf_from_double(-2), qf_from_double(3))
     };
-
-    size_t idx = 0;
-    for (size_t i = 0; i < 2; i++)
-        for (size_t j = 0; j < 2; j++)
-            mat_set(A, i, j, &vals[idx++]);
-
-    matrix_t *I = matsq_ident_qc(2);
+    matrix_t *A = mat_create_qc(2, 2, vals);
+    matrix_t *I = mat_create_identity_qc(2);
 
     print_mqc("A", A);
     print_mqc("I", I);
@@ -1554,71 +1397,57 @@ static void test_identity_arith_qc(void)
     matrix_t *ApI = mat_add(A, I);
     print_mqc("A + I", ApI);
 
-    idx = 0;
-    for (size_t i = 0; i < 2; i++)
-        for (size_t j = 0; j < 2; j++) {
-            qcomplex_t got;
-            qcomplex_t expected = (i == j)
-                ? qc_add(vals[idx], QC_ONE)
-                : vals[idx];
-            mat_get(ApI, i, j, &got);
-
-            char label[64];
-            snprintf(label, sizeof(label), "qc: A+I [%zu,%zu]", i, j);
-            check_qc_val(label, got, expected, 1e-28);
-
-            idx++;
-        }
+    qcomplex_t expected_add[4] = {
+        qc_add(vals[0], QC_ONE), vals[1],
+        vals[2], qc_add(vals[3], QC_ONE)
+    };
+    qcomplex_t got_add[4];
+    mat_get_data(ApI, got_add);
+    for (size_t k = 0; k < 4; k++) {
+        char label[64];
+        snprintf(label, sizeof(label), "qc: A+I [%zu,%zu]", k/2, k%2);
+        check_qc_val(label, got_add[k], expected_add[k], 1e-28);
+    }
 
     /* A - I */
     matrix_t *AmI = mat_sub(A, I);
     print_mqc("A - I", AmI);
 
-    idx = 0;
-    for (size_t i = 0; i < 2; i++)
-        for (size_t j = 0; j < 2; j++) {
-            qcomplex_t got;
-            qcomplex_t expected = (i == j)
-                ? qc_sub(vals[idx], QC_ONE)
-                : vals[idx];
-            mat_get(AmI, i, j, &got);
-
-            char label[64];
-            snprintf(label, sizeof(label), "qc: A-I [%zu,%zu]", i, j);
-            check_qc_val(label, got, expected, 1e-28);
-
-            idx++;
-        }
+    qcomplex_t expected_sub[4] = {
+        qc_sub(vals[0], QC_ONE), vals[1],
+        vals[2], qc_sub(vals[3], QC_ONE)
+    };
+    qcomplex_t got_sub[4];
+    mat_get_data(AmI, got_sub);
+    for (size_t k = 0; k < 4; k++) {
+        char label[64];
+        snprintf(label, sizeof(label), "qc: A-I [%zu,%zu]", k/2, k%2);
+        check_qc_val(label, got_sub[k], expected_sub[k], 1e-28);
+    }
 
     /* A * I */
     matrix_t *A_times_I = mat_mul(A, I);
     print_mqc("A * I", A_times_I);
 
-    idx = 0;
-    for (size_t i = 0; i < 2; i++)
-        for (size_t j = 0; j < 2; j++) {
-            qcomplex_t got;
-            mat_get(A_times_I, i, j, &got);
-
-            char label[64];
-            snprintf(label, sizeof(label), "qc: A*I [%zu,%zu]", i, j);
-            check_qc_val(label, got, vals[idx++], 1e-28);
-        }
+    qcomplex_t got_ai[4];
+    mat_get_data(A_times_I, got_ai);
+    for (size_t k = 0; k < 4; k++) {
+        char label[64];
+        snprintf(label, sizeof(label), "qc: A*I [%zu,%zu]", k/2, k%2);
+        check_qc_val(label, got_ai[k], vals[k], 1e-28);
+    }
 
     /* I * A */
     matrix_t *I_times_A = mat_mul(I, A);
     print_mqc("I * A", I_times_A);
 
-    idx = 0;
-    for (size_t i = 0; i < 2; i++)
-        for (size_t j = 0; j < 2; j++) {
-            qcomplex_t got;
-            mat_get(I_times_A, i, j, &got);
-
-            char label[64];
-            snprintf(label, sizeof(label), "qc: I*A [%zu,%zu]", i, j);
-            check_qc_val(label, got, vals[idx++], 1e-28);
-        }
+    qcomplex_t got_ia[4];
+    mat_get_data(I_times_A, got_ia);
+    for (size_t k = 0; k < 4; k++) {
+        char label[64];
+        snprintf(label, sizeof(label), "qc: I*A [%zu,%zu]", k/2, k%2);
+        check_qc_val(label, got_ia[k], vals[k], 1e-28);
+    }
 
     mat_free(A);
     mat_free(I);
@@ -1632,193 +1461,165 @@ static void test_identity_arith_qc(void)
 
 static void test_scalar_div_d_d(void)
 {
-    printf(C_CYAN "TEST: scalar division (double / double)\n" C_RESET);
+    printf(C_CYAN "TEST: scalar division (double / double matrix)\n" C_RESET);
 
-    matrix_t *A = mat_create_d(2,2);
-    double vals[4] = { 4.0, -2.0, 9.0, 3.0 };
+    const double A_vals[4] = {
+        2.0,  -4.0,
+        5.0,  10.0
+    };
+    const double alpha = 2.0;
 
-    size_t idx = 0;
-    for (size_t i = 0; i < 2; i++)
-        for (size_t j = 0; j < 2; j++)
-            mat_set(A, i, j, &vals[idx++]);
-
+    matrix_t *A = mat_create_d(2, 2, A_vals);
     print_md("A", A);
 
-    double s = 2.0;
-    matrix_t *C = mat_scalar_div_d(s, A);
-    print_md("A / 2", C);
+    matrix_t *B = mat_scalar_div_d(A, alpha);
+    print_md("A / alpha", B);
 
-    idx = 0;
-    for (size_t i = 0; i < 2; i++)
-        for (size_t j = 0; j < 2; j++) {
-            double got;
-            double expected = vals[idx] / s;
-            mat_get(C, i, j, &got);
+    double B_vals[4];
+    mat_get_data(B, B_vals);
 
-            char label[64];
-            snprintf(label, sizeof(label), "d: A/2 [%zu,%zu]", i, j);
-            check_d(label, got, expected, 1e-12);
-
-            idx++;
-        }
+    for (size_t k = 0; k < 4; k++) {
+        double expected = A_vals[k] / alpha;
+        char label[64];
+        snprintf(label, sizeof(label), "scalar div d/d [%zu,%zu]", k / 2, k % 2);
+        check_d(label, B_vals[k], expected, 1e-30);
+    }
 
     mat_free(A);
-    mat_free(C);
+    mat_free(B);
 }
 
 /* ------------------------------------------------------------------ scalar division: qfloat scalar */
 
 static void test_scalar_div_qf_qf(void)
 {
-    printf(C_CYAN "TEST: scalar division (qfloat / qfloat)\n" C_RESET);
+    printf(C_CYAN "TEST: scalar division (qfloat / qfloat matrix)\n" C_RESET);
 
-    matrix_t *A = mat_create_qf(2,2);
-    qfloat_t vals[4] = {
-        qf_from_double(1.0),
-        qf_from_double(2.0),
-        qf_from_double(-3.0),
-        qf_from_double(4.0)
+    qfloat_t A_vals[4] = {
+        qf_from_double(3.0),  qf_from_double(-6.0),
+        qf_from_double(1.5),  qf_from_double(0.75)
     };
+    qfloat_t alpha = qf_from_double(1.5);
 
-    size_t idx = 0;
-    for (size_t i = 0; i < 2; i++)
-        for (size_t j = 0; j < 2; j++)
-            mat_set(A, i, j, &vals[idx++]);
+    matrix_t *A = mat_create_qf(2, 2, A_vals);
+    print_mqf("A (qfloat)", A);
 
-    print_mqf("A", A);
+    matrix_t *B = mat_scalar_div_qf(A, alpha);
+    print_mqf("A / alpha (qfloat)", B);
 
-    qfloat_t s = qf_from_double(0.5);
-    matrix_t *C = mat_scalar_div_qf(s, A);
-    print_mqf("A / 0.5", C);
+    qfloat_t B_vals[4];
+    mat_get_data(B, B_vals);
 
-    idx = 0;
-    for (size_t i = 0; i < 2; i++)
-        for (size_t j = 0; j < 2; j++) {
-            qfloat_t got;
-            qfloat_t expected = qf_div(vals[idx], s);
-            mat_get(C, i, j, &got);
-
-            char label[64];
-            snprintf(label, sizeof(label), "qf: A/0.5 [%zu,%zu]", i, j);
-            check_qf_val(label, got, expected, 1e-28);
-
-            idx++;
-        }
+    for (size_t k = 0; k < 4; k++) {
+        qfloat_t expected = qf_div(A_vals[k], alpha);
+        char label[64];
+        snprintf(label, sizeof(label), "scalar div qf/qf [%zu,%zu]", k / 2, k % 2);
+        check_qf_val(label, B_vals[k], expected, 1e-28);
+    }
 
     mat_free(A);
-    mat_free(C);
+    mat_free(B);
 }
 
 /* ------------------------------------------------------------------ scalar division: qcomplex scalar */
 
 static void test_scalar_div_qc_qc(void)
 {
-    printf(C_CYAN "TEST: scalar division (qcomplex / qcomplex)\n" C_RESET);
+    printf(C_CYAN "TEST: scalar division (qcomplex / qcomplex matrix)\n" C_RESET);
 
-    matrix_t *A = mat_create_qc(1,3);
-    qcomplex_t vals[3] = {
-        qc_make(qf_from_double(2), qf_from_double(1)),
-        qc_make(qf_from_double(-3), qf_from_double(4)),
-        qc_make(qf_from_double(1), qf_from_double(-2))
+    qcomplex_t A_vals[3] = {
+        QC_ONE,
+        qc_make(qf_from_double(2.0),  qf_from_double(3.0)),
+        qc_make(qf_from_double(-1.0), qf_from_double(0.5))
     };
 
-    for (size_t j = 0; j < 3; j++)
-        mat_set(A, 0, j, &vals[j]);
+    qcomplex_t alpha = qc_make(qf_from_double(0.5), qf_from_double(1.0));
 
-    print_mqc("A", A);
+    matrix_t *A = mat_create_qc(1, 3, A_vals);
+    print_mqc("A (qcomplex)", A);
 
-    qcomplex_t s = qc_make(qf_from_double(1), qf_from_double(1)); /* 1 + i */
-    matrix_t *C = mat_scalar_div_qc(s, A);
-    print_mqc("A / (1+i)", C);
+    matrix_t *B = mat_scalar_div_qc(A, alpha);
+    print_mqc("A / alpha (qcomplex)", B);
+
+    qcomplex_t B_vals[3];
+    mat_get_data(B, B_vals);
 
     for (size_t j = 0; j < 3; j++) {
-        qcomplex_t got;
-        qcomplex_t expected = qc_div(vals[j], s);
-        mat_get(C, 0, j, &got);
-
+        qcomplex_t expected = qc_div(A_vals[j], alpha);
         char label[64];
-        snprintf(label, sizeof(label), "qc: A/(1+i) [0,%zu]", j);
-        check_qc_val(label, got, expected, 1e-28);
+        snprintf(label, sizeof(label), "scalar div qc/qc [0,%zu]", j);
+        check_qc_val(label, B_vals[j], expected, 1e-28);
     }
 
     mat_free(A);
-    mat_free(C);
+    mat_free(B);
 }
 
 /* ------------------------------------------------------------------ scalar division: double scalar / qfloat matrix */
 
 static void test_scalar_div_d_qf(void)
 {
-    printf(C_CYAN "TEST: scalar division (double / qfloat)\n" C_RESET);
+    printf(C_CYAN "TEST: scalar division (double / qfloat matrix)\n" C_RESET);
 
-    matrix_t *A = mat_create_qf(2,1);
-    qfloat_t vals[2] = {
-        qf_from_double(4.0),
-        qf_from_double(-2.0)
+    qfloat_t A_vals[4] = {
+        qf_from_double(2.0),
+        qf_from_double(-4.0),
+        qf_from_double(5.0),
+        qf_from_double(10.0)
     };
+    const double alpha = 2.0;
 
-    for (size_t i = 0; i < 2; i++)
-        mat_set(A, i, 0, &vals[i]);
+    matrix_t *A = mat_create_qf(2, 2, A_vals);
+    print_mqf("A (qfloat)", A);
 
-    print_mqf("A", A);
+    matrix_t *B = mat_scalar_div_d(A, alpha);
+    print_mqf("A / alpha (qfloat)", B);
 
-    double s = -2.0;
-    matrix_t *C = mat_scalar_div_d(s, A);
-    print_mqf("A / -2", C);
+    qfloat_t B_vals[4];
+    mat_get_data(B, B_vals);
 
-    for (size_t i = 0; i < 2; i++) {
-        qfloat_t got;
-        qfloat_t expected = qf_div(vals[i], qf_from_double(s));
-        mat_get(C, i, 0, &got);
-
+    for (size_t k = 0; k < 4; k++) {
+        qfloat_t expected = qf_div(A_vals[k], qf_from_double(alpha));
         char label[64];
-        snprintf(label, sizeof(label), "d: A/-2 [%zu,0]", i);
-        check_qf_val(label, got, expected, 1e-28);
+        snprintf(label, sizeof(label), "scalar div d/qf [%zu,%zu]", k / 2, k % 2);
+        check_qf_val(label, B_vals[k], expected, 1e-28);
     }
 
     mat_free(A);
-    mat_free(C);
+    mat_free(B);
 }
 
 /* ------------------------------------------------------------------ scalar division: qfloat scalar / double matrix */
 
 static void test_scalar_div_qf_d(void)
 {
-    printf(C_CYAN "TEST: scalar division (qfloat / double)\n" C_RESET);
+    printf(C_CYAN "TEST: scalar division (qfloat / double matrix)\n" C_RESET);
 
-    matrix_t *A = mat_create_d(2,2);
-    double vals[4] = { 1.0, -2.0, 4.0, 8.0 };
+    const double A_vals[6] = {
+        1.0,  -2.0,  4.0,
+        0.5,  3.0,  -1.0
+    };
+    qfloat_t alpha = qf_from_double(2.0);
 
-    size_t idx = 0;
-    for (size_t i = 0; i < 2; i++)
-        for (size_t j = 0; j < 2; j++)
-            mat_set(A, i, j, &vals[idx++]);
+    matrix_t *A = mat_create_d(2, 3, A_vals);
+    print_md("A (double)", A);
 
-    print_md("A", A);
+    matrix_t *B = mat_scalar_div_qf(A, alpha);
+    print_mqf("A / alpha (qfloat)", B);
 
-    qfloat_t s = qf_from_double(4.0);
-    matrix_t *C = mat_scalar_div_qf(s, A);
-    print_mqf("A / 4", C);
+    qfloat_t B_vals[6];
+    mat_get_data(B, B_vals);
 
-    idx = 0;
-    for (size_t i = 0; i < 2; i++)
-        for (size_t j = 0; j < 2; j++) {
-            qfloat_t got;
-            qfloat_t expected = qf_div(qf_from_double(vals[idx]), s);
-            mat_get(C, i, j, &got);
-
-            char label[64];
-            snprintf(label, sizeof(label), "qf: A/4 [%zu,%zu]", i, j);
-            check_qf_val(label, got, expected, 1e-28);
-
-            idx++;
-        }
+    for (size_t k = 0; k < 6; k++) {
+        qfloat_t expected = qf_div(qf_from_double(A_vals[k]), alpha);
+        char label[64];
+        snprintf(label, sizeof(label), "scalar div qf/d [%zu,%zu]", k / 3, k % 3);
+        check_qf_val(label, B_vals[k], expected, 1e-28);
+    }
 
     mat_free(A);
-    mat_free(C);
+    mat_free(B);
 }
-
-/* ------------------------------------------------------------------ determinant: double */
 
 /* ------------------------------------------------------------------ determinant: double */
 
@@ -1826,11 +1627,10 @@ static void test_det_double(void)
 {
     printf(C_CYAN "TEST: determinant (double)\n" C_RESET);
 
-    /* 1×1 */
+    /* -------------------------------------------------------------- 1×1 */
     {
-        matrix_t *A = mat_create_d(1,1);
-        double x = 7.0;
-        mat_set(A,0,0,&x);
+        const double vals[1] = { 7.0 };
+        matrix_t *A = mat_create_d(1, 1, vals);
 
         print_md("A (1x1)", A);
 
@@ -1841,12 +1641,13 @@ static void test_det_double(void)
         mat_free(A);
     }
 
-    /* 2×2 */
+    /* -------------------------------------------------------------- 2×2 */
     {
-        matrix_t *A = mat_create_d(2,2);
-        double a11=1, a12=2, a21=3, a22=4;
-        mat_set(A,0,0,&a11); mat_set(A,0,1,&a12);
-        mat_set(A,1,0,&a21); mat_set(A,1,1,&a22);
+        const double vals[4] = {
+            1, 2,
+            3, 4
+        };
+        matrix_t *A = mat_create_d(2, 2, vals);
 
         print_md("A (2x2)", A);
 
@@ -1857,19 +1658,14 @@ static void test_det_double(void)
         mat_free(A);
     }
 
-    /* 3×3 */
+    /* -------------------------------------------------------------- 3×3 */
     {
-        matrix_t *A = mat_create_d(3,3);
-        double vals[9] = {
-            6, 1, 1,
+        const double vals[9] = {
+            6,  1, 1,
             4, -2, 5,
-            2, 8, 7
+            2,  8, 7
         };
-
-        size_t k = 0;
-        for (size_t i=0;i<3;i++)
-            for (size_t j=0;j<3;j++)
-                mat_set(A,i,j,&vals[k++]);
+        matrix_t *A = mat_create_d(3, 3, vals);
 
         print_md("A (3x3)", A);
 
@@ -1880,12 +1676,13 @@ static void test_det_double(void)
         mat_free(A);
     }
 
-    /* singular */
+    /* -------------------------------------------------------------- singular */
     {
-        matrix_t *A = mat_create_d(2,2);
-        double a11=1, a12=2, a21=2, a22=4;
-        mat_set(A,0,0,&a11); mat_set(A,0,1,&a12);
-        mat_set(A,1,0,&a21); mat_set(A,1,1,&a22);
+        const double vals[4] = {
+            1, 2,
+            2, 4
+        };
+        matrix_t *A = mat_create_d(2, 2, vals);
 
         print_md("A (singular)", A);
 
@@ -1896,9 +1693,9 @@ static void test_det_double(void)
         mat_free(A);
     }
 
-    /* identity */
+    /* -------------------------------------------------------------- identity */
     {
-        matrix_t *I = matsq_ident_d(4);
+        matrix_t *I = mat_create_identity_d(4);
 
         print_md("I (identity)", I);
 
@@ -1916,22 +1713,22 @@ static void test_det_qfloat(void)
 {
     printf(C_CYAN "TEST: determinant (qfloat)\n" C_RESET);
 
-    matrix_t *A = mat_create_qf(2,2);
+    /* original values preserved */
+    qfloat_t vals[4] = {
+        qf_from_double(1.5),  qf_from_double(2.0),
+        qf_from_double(-3.0), qf_from_double(4.25)
+    };
 
-    qfloat_t a11 = qf_from_double(1.5);
-    qfloat_t a12 = qf_from_double(2.0);
-    qfloat_t a21 = qf_from_double(-3.0);
-    qfloat_t a22 = qf_from_double(4.25);
-
-    mat_set(A,0,0,&a11); mat_set(A,0,1,&a12);
-    mat_set(A,1,0,&a21); mat_set(A,1,1,&a22);
-
+    matrix_t *A = mat_create_qf(2, 2, vals);
     print_mqf("A (qfloat 2x2)", A);
 
     qfloat_t det;
     mat_det(A, &det);
 
-    qfloat_t expected = qf_sub(qf_mul(a11,a22), qf_mul(a12,a21));
+    qfloat_t expected =
+        qf_sub(qf_mul(vals[0], vals[3]),
+               qf_mul(vals[1], vals[2]));
+
     check_qf_val("det qfloat 2x2", det, expected, 1e-28);
 
     mat_free(A);
@@ -1943,23 +1740,23 @@ static void test_det_qcomplex(void)
 {
     printf(C_CYAN "TEST: determinant (qcomplex)\n" C_RESET);
 
-    matrix_t *A = mat_create_qc(2,2);
+    /* original values preserved */
+    qcomplex_t vals[4] = {
+        qc_make(qf_from_double(1),  qf_from_double(2)),
+        qc_make(qf_from_double(3),  qf_from_double(-1)),
+        qc_make(qf_from_double(0),  qf_from_double(4)),
+        qc_make(qf_from_double(-2), qf_from_double(1))
+    };
 
-    qcomplex_t z11 = qc_make(qf_from_double(1), qf_from_double(2));
-    qcomplex_t z12 = qc_make(qf_from_double(3), qf_from_double(-1));
-    qcomplex_t z21 = qc_make(qf_from_double(0), qf_from_double(4));
-    qcomplex_t z22 = qc_make(qf_from_double(-2), qf_from_double(1));
-
-    mat_set(A,0,0,&z11); mat_set(A,0,1,&z12);
-    mat_set(A,1,0,&z21); mat_set(A,1,1,&z22);
-
+    matrix_t *A = mat_create_qc(2, 2, vals);
     print_mqc("A (qcomplex 2x2)", A);
 
     qcomplex_t det;
     mat_det(A, &det);
 
     qcomplex_t expected =
-        qc_sub(qc_mul(z11,z22), qc_mul(z12,z21));
+        qc_sub(qc_mul(vals[0], vals[3]),
+               qc_mul(vals[1], vals[2]));
 
     check_qc_val("det qcomplex 2x2", det, expected, 1e-28);
 
@@ -1974,10 +1771,8 @@ static void test_inverse_double(void)
 
     /* 2×2 invertible */
     {
-        matrix_t *A = mat_create_d(2,2);
-        double a11=4, a12=7, a21=2, a22=6;
-        mat_set(A,0,0,&a11); mat_set(A,0,1,&a12);
-        mat_set(A,1,0,&a21); mat_set(A,1,1,&a22);
+        double A_vals[4] = { 4, 7, 2, 6 };
+        matrix_t *A = mat_create_d(2, 2, A_vals);
 
         print_md("A", A);
 
@@ -2003,7 +1798,7 @@ static void test_inverse_double(void)
 
     /* identity inverse */
     {
-        matrix_t *I = matsq_ident_d(3);
+        matrix_t *I = mat_create_identity_d(3);
         print_md("I", I);
 
         matrix_t *Ii = mat_inverse(I);
@@ -2022,10 +1817,8 @@ static void test_inverse_double(void)
 
     /* singular matrix */
     {
-        matrix_t *A = mat_create_d(2,2);
-        double a11=1, a12=2, a21=2, a22=4;
-        mat_set(A,0,0,&a11); mat_set(A,0,1,&a12);
-        mat_set(A,1,0,&a21); mat_set(A,1,1,&a22);
+        double A_vals[4] = { 1, 2, 2, 4 };
+        matrix_t *A = mat_create_d(2, 2, A_vals);
 
         print_md("A (singular)", A);
 
@@ -2042,15 +1835,11 @@ static void test_inverse_qfloat(void)
 {
     printf(C_CYAN "TEST: matrix inverse (qfloat)\n" C_RESET);
 
-    matrix_t *A = mat_create_qf(2,2);
-
-    qfloat_t a11 = qf_from_double(3.0);
-    qfloat_t a12 = qf_from_double(1.0);
-    qfloat_t a21 = qf_from_double(2.0);
-    qfloat_t a22 = qf_from_double(1.0);
-
-    mat_set(A,0,0,&a11); mat_set(A,0,1,&a12);
-    mat_set(A,1,0,&a21); mat_set(A,1,1,&a22);
+    qfloat_t A_vals[4] = {
+        qf_from_double(3.0), qf_from_double(1.0),
+        qf_from_double(2.0), qf_from_double(1.0)
+    };
+    matrix_t *A = mat_create_qf(2, 2, A_vals);
 
     print_mqf("A", A);
 
@@ -2082,15 +1871,13 @@ static void test_inverse_qcomplex(void)
 {
     printf(C_CYAN "TEST: matrix inverse (qcomplex)\n" C_RESET);
 
-    matrix_t *A = mat_create_qc(2,2);
-
-    qcomplex_t z11 = qc_make(qf_from_double(1), qf_from_double(1));
-    qcomplex_t z12 = qc_make(qf_from_double(2), qf_from_double(-1));
-    qcomplex_t z21 = qc_make(qf_from_double(0), qf_from_double(3));
-    qcomplex_t z22 = qc_make(qf_from_double(4), qf_from_double(0));
-
-    mat_set(A,0,0,&z11); mat_set(A,0,1,&z12);
-    mat_set(A,1,0,&z21); mat_set(A,1,1,&z22);
+    qcomplex_t A_vals[4] = {
+        qc_make(qf_from_double(1), qf_from_double(1)),
+        qc_make(qf_from_double(2), qf_from_double(-1)),
+        qc_make(qf_from_double(0), qf_from_double(3)),
+        qc_make(qf_from_double(4), qf_from_double(0))
+    };
+    matrix_t *A = mat_create_qc(2, 2, A_vals);
 
     print_mqc("A", A);
 
@@ -2132,7 +1919,7 @@ static void test_hermitian_op(void)
 
     /* double: Hermitian = transpose */
     {
-        matrix_t *A = mat_create_d(2,3);
+        matrix_t *A = mat_new_d(2,3);
         double x = 1, y = 2, z = 3;
         mat_set(A,0,1,&x);
         mat_set(A,1,2,&y);
@@ -2154,17 +1941,12 @@ static void test_hermitian_op(void)
 
     /* qcomplex: Hermitian = conjugate transpose */
     {
-        matrix_t *A = mat_create_qc(2,2);
-
         qcomplex_t z11 = qc_make(qf_from_double(1), qf_from_double(2));
         qcomplex_t z12 = qc_make(qf_from_double(3), qf_from_double(-1));
         qcomplex_t z21 = qc_make(qf_from_double(4), qf_from_double(5));
         qcomplex_t z22 = qc_make(qf_from_double(-2), qf_from_double(0));
-
-        mat_set(A,0,0,&z11);
-        mat_set(A,0,1,&z12);
-        mat_set(A,1,0,&z21);
-        mat_set(A,1,1,&z22);
+        qcomplex_t A_vals[4] = { z11, z12, z21, z22 };
+        matrix_t *A = mat_create_qc(2, 2, A_vals);
 
         print_mqc("A (qcomplex)", A);
 
@@ -2190,12 +1972,8 @@ static void test_eigen_d(void)
     printf(C_CYAN "TEST: eigendecomposition (double)\n" C_RESET);
 
     /* A = [[5, 2], [2, 8]] — eigenvalues 4 and 9 */
-    matrix_t *A = mat_create_d(2, 2);
-    double a00=5, a01=2, a10=2, a11=8;
-    mat_set(A, 0, 0, &a00);
-    mat_set(A, 0, 1, &a01);
-    mat_set(A, 1, 0, &a10);
-    mat_set(A, 1, 1, &a11);
+    double A_vals[4] = { 5, 2, 2, 8 };
+    matrix_t *A = mat_create_d(2, 2, A_vals);
 
     print_md("A", A);
 
@@ -2253,15 +2031,11 @@ static void test_eigen_qf(void)
     printf(C_CYAN "TEST: eigendecomposition (qfloat)\n" C_RESET);
 
     /* A = [[5, 2], [2, 8]] — eigenvalues 4 and 9 */
-    matrix_t *A = mat_create_qf(2, 2);
-    qfloat_t a00 = qf_from_double(5);
-    qfloat_t a01 = qf_from_double(2);
-    qfloat_t a10 = qf_from_double(2);
-    qfloat_t a11 = qf_from_double(8);
-    mat_set(A, 0, 0, &a00);
-    mat_set(A, 0, 1, &a01);
-    mat_set(A, 1, 0, &a10);
-    mat_set(A, 1, 1, &a11);
+    qfloat_t A_vals[4] = {
+        qf_from_double(5), qf_from_double(2),
+        qf_from_double(2), qf_from_double(8)
+    };
+    matrix_t *A = mat_create_qf(2, 2, A_vals);
 
     print_mqf("A", A);
 
@@ -2322,15 +2096,13 @@ static void test_eigen_qc(void)
     printf(C_CYAN "TEST: eigendecomposition (qcomplex Hermitian)\n" C_RESET);
 
     /* A = [[2, 1+i], [1-i, 3]] — eigenvalues 1 and 4 */
-    matrix_t *A = mat_create_qc(2, 2);
-    qcomplex_t z00 = qc_make(qf_from_double(2),  QF_ZERO);
-    qcomplex_t z01 = qc_make(qf_from_double(1),  qf_from_double(1));
-    qcomplex_t z10 = qc_make(qf_from_double(1),  qf_from_double(-1));
-    qcomplex_t z11 = qc_make(qf_from_double(3),  QF_ZERO);
-    mat_set(A, 0, 0, &z00);
-    mat_set(A, 0, 1, &z01);
-    mat_set(A, 1, 0, &z10);
-    mat_set(A, 1, 1, &z11);
+    qcomplex_t A_vals[4] = {
+        qc_make(qf_from_double(2),  QF_ZERO),
+        qc_make(qf_from_double(1),  qf_from_double(1)),
+        qc_make(qf_from_double(1),  qf_from_double(-1)),
+        qc_make(qf_from_double(3),  QF_ZERO)
+    };
+    matrix_t *A = mat_create_qc(2, 2, A_vals);
 
     print_mqc("A", A);
 
@@ -2394,9 +2166,8 @@ static void test_mat_exp_d(void)
 
     /* 1×1: exp([[x]]) = [[exp(x)]] */
     {
-        matrix_t *A = mat_create_d(1, 1);
         double v = 2.0;
-        mat_set(A, 0, 0, &v);
+        matrix_t *A = mat_create_d(1, 1, &v);
         print_md("A", A);
         matrix_t *E = mat_exp(A);
         check_bool("mat_exp(1x1) not NULL", E != NULL);
@@ -2411,22 +2182,19 @@ static void test_mat_exp_d(void)
 
     /* 2×2 diagonal: exp(diag(a,b)) = diag(exp(a),exp(b)) */
     {
-        matrix_t *A = mat_create_d(2, 2);
-        double a=1.0, b=2.0, z=0.0;
-        mat_set(A, 0, 0, &a); mat_set(A, 0, 1, &z);
-        mat_set(A, 1, 0, &z); mat_set(A, 1, 1, &b);
+        double A_vals[4] = { 1.0, 0.0, 0.0, 2.0 };
+        matrix_t *A = mat_create_d(2, 2, A_vals);
         print_md("A", A);
         matrix_t *E = mat_exp(A);
         check_bool("mat_exp(diag) not NULL", E != NULL);
         if (E) {
             print_md("exp(A)", E);
-            double e00, e01, e10, e11;
-            mat_get(E, 0, 0, &e00); mat_get(E, 0, 1, &e01);
-            mat_get(E, 1, 0, &e10); mat_get(E, 1, 1, &e11);
-            check_d("exp(diag)[0,0] = e",   e00, exp(1.0), 1e-12);
-            check_d("exp(diag)[1,1] = e²",  e11, exp(2.0), 1e-12);
-            check_d("exp(diag)[0,1] = 0",   e01, 0.0,      1e-12);
-            check_d("exp(diag)[1,0] = 0",   e10, 0.0,      1e-12);
+            double e[4];
+            mat_get_data(E, e);
+            check_d("exp(diag)[0,0] = e",   e[0], exp(1.0), 1e-12);
+            check_d("exp(diag)[1,1] = e²",  e[3], exp(2.0), 1e-12);
+            check_d("exp(diag)[0,1] = 0",   e[1], 0.0,      1e-12);
+            check_d("exp(diag)[1,0] = 0",   e[2], 0.0,      1e-12);
         }
         mat_free(A); mat_free(E);
     }
@@ -2434,45 +2202,39 @@ static void test_mat_exp_d(void)
     /* 2×2 symmetric: A = [[0,1],[1,0]]
      * eigenvalues ±1 → exp(A) = cosh(1)·I + sinh(1)·A */
     {
-        matrix_t *A = mat_create_d(2, 2);
-        double z=0.0, o=1.0;
-        mat_set(A, 0, 0, &z); mat_set(A, 0, 1, &o);
-        mat_set(A, 1, 0, &o); mat_set(A, 1, 1, &z);
+        double A_vals[4] = { 0.0, 1.0, 1.0, 0.0 };
+        matrix_t *A = mat_create_d(2, 2, A_vals);
         print_md("A", A);
         matrix_t *E = mat_exp(A);
         check_bool("mat_exp(sym) not NULL", E != NULL);
         if (E) {
             print_md("exp(A)", E);
-            double e00, e01, e10, e11;
-            mat_get(E, 0, 0, &e00); mat_get(E, 0, 1, &e01);
-            mat_get(E, 1, 0, &e10); mat_get(E, 1, 1, &e11);
+            double e[4];
+            mat_get_data(E, e);
             double ch = cosh(1.0), sh = sinh(1.0);
-            check_d("exp([[0,1],[1,0]])[0,0] = cosh(1)", e00, ch, 1e-12);
-            check_d("exp([[0,1],[1,0]])[1,1] = cosh(1)", e11, ch, 1e-12);
-            check_d("exp([[0,1],[1,0]])[0,1] = sinh(1)", e01, sh, 1e-12);
-            check_d("exp([[0,1],[1,0]])[1,0] = sinh(1)", e10, sh, 1e-12);
+            check_d("exp([[0,1],[1,0]])[0,0] = cosh(1)", e[0], ch, 1e-12);
+            check_d("exp([[0,1],[1,0]])[1,1] = cosh(1)", e[3], ch, 1e-12);
+            check_d("exp([[0,1],[1,0]])[0,1] = sinh(1)", e[1], sh, 1e-12);
+            check_d("exp([[0,1],[1,0]])[1,0] = sinh(1)", e[2], sh, 1e-12);
         }
         mat_free(A); mat_free(E);
     }
 
     /* zero matrix: exp(0) = I */
     {
-        matrix_t *A = mat_create_d(2, 2);
-        double z = 0.0;
-        mat_set(A, 0, 0, &z); mat_set(A, 0, 1, &z);
-        mat_set(A, 1, 0, &z); mat_set(A, 1, 1, &z);
+        double A_vals[4] = { 0.0, 0.0, 0.0, 0.0 };
+        matrix_t *A = mat_create_d(2, 2, A_vals);
         print_md("A", A);
         matrix_t *E = mat_exp(A);
         check_bool("mat_exp(zero) not NULL", E != NULL);
         if (E) {
             print_md("exp(A)", E);
-            double e00, e01, e10, e11;
-            mat_get(E, 0, 0, &e00); mat_get(E, 0, 1, &e01);
-            mat_get(E, 1, 0, &e10); mat_get(E, 1, 1, &e11);
-            check_d("exp(0)[0,0] = 1", e00, 1.0, 1e-12);
-            check_d("exp(0)[1,1] = 1", e11, 1.0, 1e-12);
-            check_d("exp(0)[0,1] = 0", e01, 0.0, 1e-12);
-            check_d("exp(0)[1,0] = 0", e10, 0.0, 1e-12);
+            double e[4];
+            mat_get_data(E, e);
+            check_d("exp(0)[0,0] = 1", e[0], 1.0, 1e-12);
+            check_d("exp(0)[1,1] = 1", e[3], 1.0, 1e-12);
+            check_d("exp(0)[0,1] = 0", e[1], 0.0, 1e-12);
+            check_d("exp(0)[1,0] = 0", e[2], 0.0, 1e-12);
         }
         mat_free(A); mat_free(E);
     }
@@ -2484,9 +2246,8 @@ static void test_mat_exp_qf(void)
 
     /* 1×1: exp([[x]]) = [[exp(x)]] */
     {
-        matrix_t *A = mat_create_qf(1, 1);
         qfloat_t v = qf_from_double(2.0);
-        mat_set(A, 0, 0, &v);
+        matrix_t *A = mat_create_qf(1, 1, &v);
         print_mqf("A", A);
         matrix_t *E = mat_exp(A);
         check_bool("mat_exp qf(1x1) not NULL", E != NULL);
@@ -2501,28 +2262,25 @@ static void test_mat_exp_qf(void)
 
     /* 2×2 symmetric: A = [[0,1],[1,0]] → exp(A) = cosh(1)·I + sinh(1)·A */
     {
-        matrix_t *A = mat_create_qf(2, 2);
-        qfloat_t z = QF_ZERO, o = QF_ONE;
-        mat_set(A, 0, 0, &z); mat_set(A, 0, 1, &o);
-        mat_set(A, 1, 0, &o); mat_set(A, 1, 1, &z);
+        qfloat_t A_vals[4] = { QF_ZERO, QF_ONE, QF_ONE, QF_ZERO };
+        matrix_t *A = mat_create_qf(2, 2, A_vals);
         print_mqf("A", A);
         matrix_t *E = mat_exp(A);
         check_bool("mat_exp qf(sym) not NULL", E != NULL);
         if (E) {
             print_mqf("exp(A)", E);
-            qfloat_t e00, e01, e10, e11;
-            mat_get(E, 0, 0, &e00); mat_get(E, 0, 1, &e01);
-            mat_get(E, 1, 0, &e10); mat_get(E, 1, 1, &e11);
+            qfloat_t e[4];
+            mat_get_data(E, e);
             /* cosh(1) = (e + 1/e) / 2, sinh(1) = (e - 1/e) / 2 */
             qfloat_t e1   = qf_exp(QF_ONE);
             qfloat_t inv1 = qf_div(QF_ONE, e1);
             qfloat_t two  = qf_from_double(2.0);
             qfloat_t ch   = qf_div(qf_add(e1, inv1), two);
             qfloat_t sh   = qf_div(qf_sub(e1, inv1), two);
-            check_qf_val("qf exp(sym)[0,0] = cosh(1)", e00, ch, 1e-25);
-            check_qf_val("qf exp(sym)[1,1] = cosh(1)", e11, ch, 1e-25);
-            check_qf_val("qf exp(sym)[0,1] = sinh(1)", e01, sh, 1e-25);
-            check_qf_val("qf exp(sym)[1,0] = sinh(1)", e10, sh, 1e-25);
+            check_qf_val("qf exp(sym)[0,0] = cosh(1)", e[0], ch, 1e-25);
+            check_qf_val("qf exp(sym)[1,1] = cosh(1)", e[3], ch, 1e-25);
+            check_qf_val("qf exp(sym)[0,1] = sinh(1)", e[1], sh, 1e-25);
+            check_qf_val("qf exp(sym)[1,0] = sinh(1)", e[2], sh, 1e-25);
         }
         mat_free(A); mat_free(E);
     }
@@ -2535,32 +2293,32 @@ static void test_mat_exp_qc(void)
     /* Hermitian 2×2: A = [[0, i], [-i, 0]]
      * eigenvalues ±1 → exp(A) = cosh(1)·I + sinh(1)·A */
     {
-        matrix_t *A = mat_create_qc(2, 2);
-        qcomplex_t z   = QC_ZERO;
-        qcomplex_t pi  = qc_make(QF_ZERO,  QF_ONE);   /*  i */
-        qcomplex_t ni  = qc_make(QF_ZERO,  qf_neg(QF_ONE)); /* -i */
-        mat_set(A, 0, 0, &z);  mat_set(A, 0, 1, &pi);
-        mat_set(A, 1, 0, &ni); mat_set(A, 1, 1, &z);
+        qcomplex_t A_vals[4] = {
+            QC_ZERO,
+            qc_make(QF_ZERO,  QF_ONE),
+            qc_make(QF_ZERO,  qf_neg(QF_ONE)),
+            QC_ZERO
+        };
+        matrix_t *A = mat_create_qc(2, 2, A_vals);
         print_mqc("A", A);
         matrix_t *E = mat_exp(A);
         check_bool("mat_exp qc(herm) not NULL", E != NULL);
         if (E) {
             print_mqc("exp(A)", E);
-            qcomplex_t e00, e01, e10, e11;
-            mat_get(E, 0, 0, &e00); mat_get(E, 0, 1, &e01);
-            mat_get(E, 1, 0, &e10); mat_get(E, 1, 1, &e11);
+            qcomplex_t e[4];
+            mat_get_data(E, e);
             qfloat_t e1   = qf_exp(QF_ONE);
             qfloat_t inv1 = qf_div(QF_ONE, e1);
             qfloat_t two  = qf_from_double(2.0);
             qfloat_t ch   = qf_div(qf_add(e1, inv1), two);
             qfloat_t sh   = qf_div(qf_sub(e1, inv1), two);
             qcomplex_t ch_c = qc_make(ch, QF_ZERO);
-            qcomplex_t ish  = qc_make(QF_ZERO, sh);   /* i·sinh(1) */
-            qcomplex_t nish = qc_make(QF_ZERO, qf_neg(sh)); /* -i·sinh(1) */
-            check_qc_val("qc exp(herm)[0,0] = cosh(1)",   e00, ch_c, 1e-25);
-            check_qc_val("qc exp(herm)[1,1] = cosh(1)",   e11, ch_c, 1e-25);
-            check_qc_val("qc exp(herm)[0,1] = i·sinh(1)", e01, ish,  1e-25);
-            check_qc_val("qc exp(herm)[1,0] = -i·sinh(1)",e10, nish, 1e-25);
+            qcomplex_t ish  = qc_make(QF_ZERO, sh);
+            qcomplex_t nish = qc_make(QF_ZERO, qf_neg(sh));
+            check_qc_val("qc exp(herm)[0,0] = cosh(1)",    e[0], ch_c, 1e-25);
+            check_qc_val("qc exp(herm)[1,1] = cosh(1)",    e[3], ch_c, 1e-25);
+            check_qc_val("qc exp(herm)[0,1] = i·sinh(1)",  e[1], ish,  1e-25);
+            check_qc_val("qc exp(herm)[1,0] = -i·sinh(1)", e[2], nish, 1e-25);
         }
         mat_free(A); mat_free(E);
     }
@@ -2571,7 +2329,7 @@ static void test_mat_exp_null_safety(void)
     printf(C_CYAN "TEST: mat_exp null safety\n" C_RESET);
     check_bool("mat_exp(NULL) = NULL", mat_exp(NULL) == NULL);
 
-    matrix_t *A = mat_create_d(2, 3);
+    matrix_t *A = mat_new_d(2, 3);
     check_bool("mat_exp(non-square) = NULL", mat_exp(A) == NULL);
     mat_free(A);
 }
@@ -2584,9 +2342,8 @@ static void test_mat_sin_d(void)
 
     /* 1×1: sin([[π/6]]) = [[0.5]] */
     {
-        matrix_t *A = mat_create_d(1, 1);
         double v = M_PI / 6.0;
-        mat_set(A, 0, 0, &v);
+        matrix_t *A = mat_create_d(1, 1, &v);
         print_md("A", A);
         matrix_t *S = mat_sin(A);
         check_bool("mat_sin(1x1) not NULL", S != NULL);
@@ -2601,22 +2358,19 @@ static void test_mat_sin_d(void)
 
     /* 2×2 diagonal: sin(diag(0, π/2)) = diag(0, 1) */
     {
-        matrix_t *A = mat_create_d(2, 2);
-        double z=0.0, h=M_PI/2.0;
-        mat_set(A, 0, 0, &z); mat_set(A, 0, 1, &z);
-        mat_set(A, 1, 0, &z); mat_set(A, 1, 1, &h);
+        double A_vals[4] = { 0.0, 0.0, 0.0, M_PI/2.0 };
+        matrix_t *A = mat_create_d(2, 2, A_vals);
         print_md("A", A);
         matrix_t *S = mat_sin(A);
         check_bool("mat_sin(diag) not NULL", S != NULL);
         if (S) {
             print_md("sin(A)", S);
-            double s00, s01, s10, s11;
-            mat_get(S, 0, 0, &s00); mat_get(S, 0, 1, &s01);
-            mat_get(S, 1, 0, &s10); mat_get(S, 1, 1, &s11);
-            check_d("sin(diag)[0,0] = 0", s00, 0.0, 1e-12);
-            check_d("sin(diag)[1,1] = 1", s11, 1.0, 1e-12);
-            check_d("sin(diag)[0,1] = 0", s01, 0.0, 1e-12);
-            check_d("sin(diag)[1,0] = 0", s10, 0.0, 1e-12);
+            double s[4];
+            mat_get_data(S, s);
+            check_d("sin(diag)[0,0] = 0", s[0], 0.0, 1e-12);
+            check_d("sin(diag)[1,1] = 1", s[3], 1.0, 1e-12);
+            check_d("sin(diag)[0,1] = 0", s[1], 0.0, 1e-12);
+            check_d("sin(diag)[1,0] = 0", s[2], 0.0, 1e-12);
         }
         mat_free(A); mat_free(S);
     }
@@ -2624,45 +2378,39 @@ static void test_mat_sin_d(void)
     /* 2×2 symmetric: A = [[0,1],[1,0]], eigenvalues ±1.
      * A² = I, so sin(A) = sin(1)·A */
     {
-        matrix_t *A = mat_create_d(2, 2);
-        double z=0.0, o=1.0;
-        mat_set(A, 0, 0, &z); mat_set(A, 0, 1, &o);
-        mat_set(A, 1, 0, &o); mat_set(A, 1, 1, &z);
+        double A_vals[4] = { 0.0, 1.0, 1.0, 0.0 };
+        matrix_t *A = mat_create_d(2, 2, A_vals);
         print_md("A", A);
         matrix_t *S = mat_sin(A);
         check_bool("mat_sin(sym) not NULL", S != NULL);
         if (S) {
             print_md("sin(A)", S);
-            double s00, s01, s10, s11;
-            mat_get(S, 0, 0, &s00); mat_get(S, 0, 1, &s01);
-            mat_get(S, 1, 0, &s10); mat_get(S, 1, 1, &s11);
+            double s[4];
+            mat_get_data(S, s);
             double s1 = sin(1.0);
-            check_d("sin([[0,1],[1,0]])[0,0] = 0",      s00, 0.0, 1e-12);
-            check_d("sin([[0,1],[1,0]])[1,1] = 0",      s11, 0.0, 1e-12);
-            check_d("sin([[0,1],[1,0]])[0,1] = sin(1)", s01, s1,  1e-12);
-            check_d("sin([[0,1],[1,0]])[1,0] = sin(1)", s10, s1,  1e-12);
+            check_d("sin([[0,1],[1,0]])[0,0] = 0",      s[0], 0.0, 1e-12);
+            check_d("sin([[0,1],[1,0]])[1,1] = 0",      s[3], 0.0, 1e-12);
+            check_d("sin([[0,1],[1,0]])[0,1] = sin(1)", s[1], s1,  1e-12);
+            check_d("sin([[0,1],[1,0]])[1,0] = sin(1)", s[2], s1,  1e-12);
         }
         mat_free(A); mat_free(S);
     }
 
     /* zero matrix: sin(0) = 0 */
     {
-        matrix_t *A = mat_create_d(2, 2);
-        double z = 0.0;
-        mat_set(A, 0, 0, &z); mat_set(A, 0, 1, &z);
-        mat_set(A, 1, 0, &z); mat_set(A, 1, 1, &z);
+        double A_vals[4] = { 0.0, 0.0, 0.0, 0.0 };
+        matrix_t *A = mat_create_d(2, 2, A_vals);
         print_md("A", A);
         matrix_t *S = mat_sin(A);
         check_bool("mat_sin(zero) not NULL", S != NULL);
         if (S) {
             print_md("sin(A)", S);
-            double s00, s01, s10, s11;
-            mat_get(S, 0, 0, &s00); mat_get(S, 0, 1, &s01);
-            mat_get(S, 1, 0, &s10); mat_get(S, 1, 1, &s11);
-            check_d("sin(0)[0,0] = 0", s00, 0.0, 1e-12);
-            check_d("sin(0)[1,1] = 0", s11, 0.0, 1e-12);
-            check_d("sin(0)[0,1] = 0", s01, 0.0, 1e-12);
-            check_d("sin(0)[1,0] = 0", s10, 0.0, 1e-12);
+            double s[4];
+            mat_get_data(S, s);
+            check_d("sin(0)[0,0] = 0", s[0], 0.0, 1e-12);
+            check_d("sin(0)[1,1] = 0", s[3], 0.0, 1e-12);
+            check_d("sin(0)[0,1] = 0", s[1], 0.0, 1e-12);
+            check_d("sin(0)[1,0] = 0", s[2], 0.0, 1e-12);
         }
         mat_free(A); mat_free(S);
     }
@@ -2674,9 +2422,8 @@ static void test_mat_sin_qf(void)
 
     /* 1×1: sin([[π/6]]) = [[0.5]] */
     {
-        matrix_t *A = mat_create_qf(1, 1);
         qfloat_t v = qf_div(QF_PI, qf_from_double(6.0));
-        mat_set(A, 0, 0, &v);
+        matrix_t *A = mat_create_qf(1, 1, &v);
         print_mqf("A", A);
         matrix_t *S = mat_sin(A);
         check_bool("mat_sin qf(1x1) not NULL", S != NULL);
@@ -2691,23 +2438,20 @@ static void test_mat_sin_qf(void)
 
     /* 2×2 symmetric: A = [[0,1],[1,0]] → sin(A) = sin(1)·A */
     {
-        matrix_t *A = mat_create_qf(2, 2);
-        qfloat_t z = QF_ZERO, o = QF_ONE;
-        mat_set(A, 0, 0, &z); mat_set(A, 0, 1, &o);
-        mat_set(A, 1, 0, &o); mat_set(A, 1, 1, &z);
+        qfloat_t A_vals[4] = { QF_ZERO, QF_ONE, QF_ONE, QF_ZERO };
+        matrix_t *A = mat_create_qf(2, 2, A_vals);
         print_mqf("A", A);
         matrix_t *S = mat_sin(A);
         check_bool("mat_sin qf(sym) not NULL", S != NULL);
         if (S) {
             print_mqf("sin(A)", S);
-            qfloat_t s00, s01, s10, s11;
-            mat_get(S, 0, 0, &s00); mat_get(S, 0, 1, &s01);
-            mat_get(S, 1, 0, &s10); mat_get(S, 1, 1, &s11);
+            qfloat_t s[4];
+            mat_get_data(S, s);
             qfloat_t s1 = qf_sin(QF_ONE);
-            check_qf_val("qf sin(sym)[0,0] = 0",      s00, QF_ZERO, 1e-25);
-            check_qf_val("qf sin(sym)[1,1] = 0",      s11, QF_ZERO, 1e-25);
-            check_qf_val("qf sin(sym)[0,1] = sin(1)", s01, s1,      1e-25);
-            check_qf_val("qf sin(sym)[1,0] = sin(1)", s10, s1,      1e-25);
+            check_qf_val("qf sin(sym)[0,0] = 0",      s[0], QF_ZERO, 1e-25);
+            check_qf_val("qf sin(sym)[1,1] = 0",      s[3], QF_ZERO, 1e-25);
+            check_qf_val("qf sin(sym)[0,1] = sin(1)", s[1], s1,      1e-25);
+            check_qf_val("qf sin(sym)[1,0] = sin(1)", s[2], s1,      1e-25);
         }
         mat_free(A); mat_free(S);
     }
@@ -2720,28 +2464,28 @@ static void test_mat_sin_qc(void)
     /* Hermitian 2×2: A = [[0, i], [-i, 0]], eigenvalues ±1.
      * A² = I, so sin(A) = sin(1)·A = [[0, i·sin(1)], [-i·sin(1), 0]] */
     {
-        matrix_t *A = mat_create_qc(2, 2);
-        qcomplex_t z  = QC_ZERO;
-        qcomplex_t pi = qc_make(QF_ZERO,  QF_ONE);
-        qcomplex_t ni = qc_make(QF_ZERO,  qf_neg(QF_ONE));
-        mat_set(A, 0, 0, &z);  mat_set(A, 0, 1, &pi);
-        mat_set(A, 1, 0, &ni); mat_set(A, 1, 1, &z);
+        qcomplex_t A_vals[4] = {
+            QC_ZERO,
+            qc_make(QF_ZERO,  QF_ONE),
+            qc_make(QF_ZERO,  qf_neg(QF_ONE)),
+            QC_ZERO
+        };
+        matrix_t *A = mat_create_qc(2, 2, A_vals);
         print_mqc("A", A);
         matrix_t *S = mat_sin(A);
         check_bool("mat_sin qc(herm) not NULL", S != NULL);
         if (S) {
             print_mqc("sin(A)", S);
-            qcomplex_t s00, s01, s10, s11;
-            mat_get(S, 0, 0, &s00); mat_get(S, 0, 1, &s01);
-            mat_get(S, 1, 0, &s10); mat_get(S, 1, 1, &s11);
+            qcomplex_t s[4];
+            mat_get_data(S, s);
             qfloat_t s1 = qf_sin(QF_ONE);
             qcomplex_t zero_c = QC_ZERO;
             qcomplex_t ish    = qc_make(QF_ZERO, s1);
             qcomplex_t nish   = qc_make(QF_ZERO, qf_neg(s1));
-            check_qc_val("qc sin(herm)[0,0] = 0",         s00, zero_c, 1e-25);
-            check_qc_val("qc sin(herm)[1,1] = 0",         s11, zero_c, 1e-25);
-            check_qc_val("qc sin(herm)[0,1] = i·sin(1)",  s01, ish,    1e-25);
-            check_qc_val("qc sin(herm)[1,0] = -i·sin(1)", s10, nish,   1e-25);
+            check_qc_val("qc sin(herm)[0,0] = 0",         s[0], zero_c, 1e-25);
+            check_qc_val("qc sin(herm)[1,1] = 0",         s[3], zero_c, 1e-25);
+            check_qc_val("qc sin(herm)[0,1] = i·sin(1)",  s[1], ish,    1e-25);
+            check_qc_val("qc sin(herm)[1,0] = -i·sin(1)", s[2], nish,   1e-25);
         }
         mat_free(A); mat_free(S);
     }
@@ -2752,7 +2496,7 @@ static void test_mat_sin_null_safety(void)
     printf(C_CYAN "TEST: mat_sin null safety\n" C_RESET);
     check_bool("mat_sin(NULL) = NULL", mat_sin(NULL) == NULL);
 
-    matrix_t *A = mat_create_d(2, 3);
+    matrix_t *A = mat_new_d(2, 3);
     check_bool("mat_sin(non-square) = NULL", mat_sin(A) == NULL);
     mat_free(A);
 }
@@ -2765,9 +2509,8 @@ static void test_mat_cos_d(void)
 
     /* 1×1: cos([[π/3]]) = 0.5 */
     {
-        matrix_t *A = mat_create_d(1, 1);
         double v = M_PI / 3.0;
-        mat_set(A, 0, 0, &v);
+        matrix_t *A = mat_create_d(1, 1, &v);
         print_md("A", A);
         matrix_t *C = mat_cos(A);
         check_bool("mat_cos(1x1) not NULL", C != NULL);
@@ -2782,22 +2525,19 @@ static void test_mat_cos_d(void)
 
     /* 2×2 diagonal: cos(diag(0, π)) = diag(1, -1) */
     {
-        matrix_t *A = mat_create_d(2, 2);
-        double z=0.0, p=M_PI;
-        mat_set(A, 0, 0, &z); mat_set(A, 0, 1, &z);
-        mat_set(A, 1, 0, &z); mat_set(A, 1, 1, &p);
+        double A_vals[4] = { 0.0, 0.0, 0.0, M_PI };
+        matrix_t *A = mat_create_d(2, 2, A_vals);
         print_md("A", A);
         matrix_t *C = mat_cos(A);
         check_bool("mat_cos(diag) not NULL", C != NULL);
         if (C) {
             print_md("cos(A)", C);
-            double c00, c01, c10, c11;
-            mat_get(C, 0, 0, &c00); mat_get(C, 0, 1, &c01);
-            mat_get(C, 1, 0, &c10); mat_get(C, 1, 1, &c11);
-            check_d("cos(diag)[0,0] =  1", c00,  1.0, 1e-12);
-            check_d("cos(diag)[1,1] = -1", c11, -1.0, 1e-12);
-            check_d("cos(diag)[0,1] =  0", c01,  0.0, 1e-12);
-            check_d("cos(diag)[1,0] =  0", c10,  0.0, 1e-12);
+            double c[4];
+            mat_get_data(C, c);
+            check_d("cos(diag)[0,0] =  1", c[0],  1.0, 1e-12);
+            check_d("cos(diag)[1,1] = -1", c[3], -1.0, 1e-12);
+            check_d("cos(diag)[0,1] =  0", c[1],  0.0, 1e-12);
+            check_d("cos(diag)[1,0] =  0", c[2],  0.0, 1e-12);
         }
         mat_free(A); mat_free(C);
     }
@@ -2805,23 +2545,20 @@ static void test_mat_cos_d(void)
     /* 2×2 symmetric: A = [[0,1],[1,0]], eigenvalues ±1.
      * cos is even → cos(A) = cos(1)·I */
     {
-        matrix_t *A = mat_create_d(2, 2);
-        double z=0.0, o=1.0;
-        mat_set(A, 0, 0, &z); mat_set(A, 0, 1, &o);
-        mat_set(A, 1, 0, &o); mat_set(A, 1, 1, &z);
+        double A_vals[4] = { 0.0, 1.0, 1.0, 0.0 };
+        matrix_t *A = mat_create_d(2, 2, A_vals);
         print_md("A", A);
         matrix_t *C = mat_cos(A);
         check_bool("mat_cos(sym) not NULL", C != NULL);
         if (C) {
             print_md("cos(A)", C);
-            double c00, c01, c10, c11;
-            mat_get(C, 0, 0, &c00); mat_get(C, 0, 1, &c01);
-            mat_get(C, 1, 0, &c10); mat_get(C, 1, 1, &c11);
+            double c[4];
+            mat_get_data(C, c);
             double c1 = cos(1.0);
-            check_d("cos([[0,1],[1,0]])[0,0] = cos(1)", c00, c1,  1e-12);
-            check_d("cos([[0,1],[1,0]])[1,1] = cos(1)", c11, c1,  1e-12);
-            check_d("cos([[0,1],[1,0]])[0,1] = 0",      c01, 0.0, 1e-12);
-            check_d("cos([[0,1],[1,0]])[1,0] = 0",      c10, 0.0, 1e-12);
+            check_d("cos([[0,1],[1,0]])[0,0] = cos(1)", c[0], c1,  1e-12);
+            check_d("cos([[0,1],[1,0]])[1,1] = cos(1)", c[3], c1,  1e-12);
+            check_d("cos([[0,1],[1,0]])[0,1] = 0",      c[1], 0.0, 1e-12);
+            check_d("cos([[0,1],[1,0]])[1,0] = 0",      c[2], 0.0, 1e-12);
         }
         mat_free(A); mat_free(C);
     }
@@ -2833,7 +2570,7 @@ static void test_mat_cos_qf(void)
 
     /* 1×1: cos([[π/3]]) = 0.5 */
     {
-        matrix_t *A = mat_create_qf(1, 1);
+        matrix_t *A = mat_new_qf(1, 1);
         qfloat_t v = qf_div(QF_PI, qf_from_double(3.0));
         mat_set(A, 0, 0, &v);
         print_mqf("A", A);
@@ -2850,7 +2587,7 @@ static void test_mat_cos_qf(void)
 
     /* 2×2 symmetric: A = [[0,1],[1,0]] → cos(A) = cos(1)·I */
     {
-        matrix_t *A = mat_create_qf(2, 2);
+        matrix_t *A = mat_new_qf(2, 2);
         qfloat_t z = QF_ZERO, o = QF_ONE;
         mat_set(A, 0, 0, &z); mat_set(A, 0, 1, &o);
         mat_set(A, 1, 0, &o); mat_set(A, 1, 1, &z);
@@ -2879,7 +2616,7 @@ static void test_mat_cos_qc(void)
     /* Hermitian 2×2: A = [[0, i], [-i, 0]], eigenvalues ±1.
      * cos is even → cos(A) = cos(1)·I */
     {
-        matrix_t *A = mat_create_qc(2, 2);
+        matrix_t *A = mat_new_qc(2, 2);
         qcomplex_t z  = QC_ZERO;
         qcomplex_t pi = qc_make(QF_ZERO,  QF_ONE);
         qcomplex_t ni = qc_make(QF_ZERO,  qf_neg(QF_ONE));
@@ -2913,7 +2650,7 @@ static void test_mat_tan_d(void)
 
     /* 1×1: tan([[π/4]]) = 1 */
     {
-        matrix_t *A = mat_create_d(1, 1);
+        matrix_t *A = mat_new_d(1, 1);
         double v = M_PI / 4.0;
         mat_set(A, 0, 0, &v);
         print_md("A", A);
@@ -2930,7 +2667,7 @@ static void test_mat_tan_d(void)
 
     /* 2×2 diagonal: tan(diag(0, π/4)) = diag(0, 1) */
     {
-        matrix_t *A = mat_create_d(2, 2);
+        matrix_t *A = mat_new_d(2, 2);
         double z=0.0, h=M_PI/4.0;
         mat_set(A, 0, 0, &z); mat_set(A, 0, 1, &z);
         mat_set(A, 1, 0, &z); mat_set(A, 1, 1, &h);
@@ -2953,7 +2690,7 @@ static void test_mat_tan_d(void)
     /* 2×2 symmetric: A = [[0,1],[1,0]], eigenvalues ±1.
      * tan is odd → tan(A) = tan(1)·A */
     {
-        matrix_t *A = mat_create_d(2, 2);
+        matrix_t *A = mat_new_d(2, 2);
         double z=0.0, o=1.0;
         mat_set(A, 0, 0, &z); mat_set(A, 0, 1, &o);
         mat_set(A, 1, 0, &o); mat_set(A, 1, 1, &z);
@@ -2983,7 +2720,7 @@ static void test_mat_sinh_d(void)
 
     /* 1×1: sinh([[0]]) = 0 */
     {
-        matrix_t *A = mat_create_d(1, 1);
+        matrix_t *A = mat_new_d(1, 1);
         double v = 0.0;
         mat_set(A, 0, 0, &v);
         print_md("A", A);
@@ -3000,7 +2737,7 @@ static void test_mat_sinh_d(void)
 
     /* 2×2 diagonal: sinh(diag(0, 1)) = diag(0, sinh(1)) */
     {
-        matrix_t *A = mat_create_d(2, 2);
+        matrix_t *A = mat_new_d(2, 2);
         double z=0.0, o=1.0;
         mat_set(A, 0, 0, &z); mat_set(A, 0, 1, &z);
         mat_set(A, 1, 0, &z); mat_set(A, 1, 1, &o);
@@ -3023,7 +2760,7 @@ static void test_mat_sinh_d(void)
     /* 2×2 symmetric: A = [[0,1],[1,0]], eigenvalues ±1.
      * sinh is odd → sinh(A) = sinh(1)·A */
     {
-        matrix_t *A = mat_create_d(2, 2);
+        matrix_t *A = mat_new_d(2, 2);
         double z=0.0, o=1.0;
         mat_set(A, 0, 0, &z); mat_set(A, 0, 1, &o);
         mat_set(A, 1, 0, &o); mat_set(A, 1, 1, &z);
@@ -3053,7 +2790,7 @@ static void test_mat_cosh_d(void)
 
     /* 1×1: cosh([[0]]) = 1 */
     {
-        matrix_t *A = mat_create_d(1, 1);
+        matrix_t *A = mat_new_d(1, 1);
         double v = 0.0;
         mat_set(A, 0, 0, &v);
         print_md("A", A);
@@ -3070,7 +2807,7 @@ static void test_mat_cosh_d(void)
 
     /* 2×2 diagonal: cosh(diag(0, 1)) = diag(1, cosh(1)) */
     {
-        matrix_t *A = mat_create_d(2, 2);
+        matrix_t *A = mat_new_d(2, 2);
         double z=0.0, o=1.0;
         mat_set(A, 0, 0, &z); mat_set(A, 0, 1, &z);
         mat_set(A, 1, 0, &z); mat_set(A, 1, 1, &o);
@@ -3093,7 +2830,7 @@ static void test_mat_cosh_d(void)
     /* 2×2 symmetric: A = [[0,1],[1,0]], eigenvalues ±1.
      * cosh is even → cosh(A) = cosh(1)·I */
     {
-        matrix_t *A = mat_create_d(2, 2);
+        matrix_t *A = mat_new_d(2, 2);
         double z=0.0, o=1.0;
         mat_set(A, 0, 0, &z); mat_set(A, 0, 1, &o);
         mat_set(A, 1, 0, &o); mat_set(A, 1, 1, &z);
@@ -3123,7 +2860,7 @@ static void test_mat_tanh_d(void)
 
     /* 1×1: tanh([[0]]) = 0 */
     {
-        matrix_t *A = mat_create_d(1, 1);
+        matrix_t *A = mat_new_d(1, 1);
         double v = 0.0;
         mat_set(A, 0, 0, &v);
         print_md("A", A);
@@ -3140,7 +2877,7 @@ static void test_mat_tanh_d(void)
 
     /* 2×2 diagonal: tanh(diag(0, 1)) = diag(0, tanh(1)) */
     {
-        matrix_t *A = mat_create_d(2, 2);
+        matrix_t *A = mat_new_d(2, 2);
         double z=0.0, o=1.0;
         mat_set(A, 0, 0, &z); mat_set(A, 0, 1, &z);
         mat_set(A, 1, 0, &z); mat_set(A, 1, 1, &o);
@@ -3163,7 +2900,7 @@ static void test_mat_tanh_d(void)
     /* 2×2 symmetric: A = [[0,1],[1,0]], eigenvalues ±1.
      * tanh is odd → tanh(A) = tanh(1)·A */
     {
-        matrix_t *A = mat_create_d(2, 2);
+        matrix_t *A = mat_new_d(2, 2);
         double z=0.0, o=1.0;
         mat_set(A, 0, 0, &z); mat_set(A, 0, 1, &o);
         mat_set(A, 1, 0, &o); mat_set(A, 1, 1, &z);
@@ -3195,7 +2932,7 @@ static void test_mat_trig_null_safety(void)
     check_bool("mat_cosh(NULL) = NULL", mat_cosh(NULL) == NULL);
     check_bool("mat_tanh(NULL) = NULL", mat_tanh(NULL) == NULL);
 
-    matrix_t *A = mat_create_d(2, 3);
+    matrix_t *A = mat_new_d(2, 3);
     check_bool("mat_cos(non-square) = NULL",  mat_cos(A)  == NULL);
     check_bool("mat_tan(non-square) = NULL",  mat_tan(A)  == NULL);
     check_bool("mat_sinh(non-square) = NULL", mat_sinh(A) == NULL);
@@ -3212,7 +2949,7 @@ static void test_mat_sqrt_d(void)
 
     /* 1×1: sqrt([[4]]) = [[2]] */
     {
-        matrix_t *A = mat_create_d(1, 1);
+        matrix_t *A = mat_new_d(1, 1);
         double v = 4.0;
         mat_set(A, 0, 0, &v);
         print_md("A", A);
@@ -3228,7 +2965,7 @@ static void test_mat_sqrt_d(void)
 
     /* 2×2 diagonal: sqrt(diag(1,4)) = diag(1,2) */
     {
-        matrix_t *A = mat_create_d(2, 2);
+        matrix_t *A = mat_new_d(2, 2);
         double z=0.0, o=1.0, f=4.0;
         mat_set(A, 0, 0, &o); mat_set(A, 0, 1, &z);
         mat_set(A, 1, 0, &z); mat_set(A, 1, 1, &f);
@@ -3250,7 +2987,7 @@ static void test_mat_sqrt_d(void)
 
     /* Verify: sqrt(A)^2 = A for [[2,1],[1,2]] (eigenvalues 1 and 3) */
     {
-        matrix_t *A = mat_create_d(2, 2);
+        matrix_t *A = mat_new_d(2, 2);
         double o=1.0, t=2.0;
         mat_set(A, 0, 0, &t); mat_set(A, 0, 1, &o);
         mat_set(A, 1, 0, &o); mat_set(A, 1, 1, &t);
@@ -3283,7 +3020,7 @@ static void test_mat_sqrt_qf(void)
     printf(C_CYAN "TEST: mat_sqrt (qfloat)\n" C_RESET);
 
     /* 1×1: sqrt([[9]]) = [[3]] */
-    matrix_t *A = mat_create_qf(1, 1);
+    matrix_t *A = mat_new_qf(1, 1);
     qfloat_t v = qf_from_double(9.0);
     mat_set(A, 0, 0, &v);
     print_mqf("A", A);
@@ -3305,7 +3042,7 @@ static void test_mat_log_d(void)
 
     /* 1×1: log([[1]]) = [[0]] */
     {
-        matrix_t *A = mat_create_d(1, 1);
+        matrix_t *A = mat_new_d(1, 1);
         double v = 1.0;
         mat_set(A, 0, 0, &v);
         print_md("A", A);
@@ -3321,7 +3058,7 @@ static void test_mat_log_d(void)
 
     /* 1×1: log([[e]]) = [[1]] */
     {
-        matrix_t *A = mat_create_d(1, 1);
+        matrix_t *A = mat_new_d(1, 1);
         double v = M_E;
         mat_set(A, 0, 0, &v);
         print_md("A", A);
@@ -3337,7 +3074,7 @@ static void test_mat_log_d(void)
 
     /* exp(log(A)) = A for diagonal [[2,0],[0,3]] */
     {
-        matrix_t *A = mat_create_d(2, 2);
+        matrix_t *A = mat_new_d(2, 2);
         double z=0.0, t=2.0, th=3.0;
         mat_set(A, 0, 0, &t);  mat_set(A, 0, 1, &z);
         mat_set(A, 1, 0, &z);  mat_set(A, 1, 1, &th);
@@ -3373,7 +3110,7 @@ static void test_mat_asin_d(void)
 
     /* 1×1: asin([[0]]) = [[0]] */
     {
-        matrix_t *A = mat_create_d(1, 1);
+        matrix_t *A = mat_new_d(1, 1);
         double v = 0.0;
         mat_set(A, 0, 0, &v);
         matrix_t *R = mat_asin(A);
@@ -3388,7 +3125,7 @@ static void test_mat_asin_d(void)
 
     /* 1×1: asin([[0.5]]) = [[π/6]] */
     {
-        matrix_t *A = mat_create_d(1, 1);
+        matrix_t *A = mat_new_d(1, 1);
         double v = 0.5;
         mat_set(A, 0, 0, &v);
         print_md("A", A);
@@ -3404,7 +3141,7 @@ static void test_mat_asin_d(void)
 
     /* sin(asin(A)) = A for 2×2 symmetric with small eigenvalues */
     {
-        matrix_t *A = mat_create_d(2, 2);
+        matrix_t *A = mat_new_d(2, 2);
         double v00=0.3, v01=0.1, v10=0.1, v11=0.2;
         mat_set(A, 0, 0, &v00); mat_set(A, 0, 1, &v01);
         mat_set(A, 1, 0, &v10); mat_set(A, 1, 1, &v11);
@@ -3438,7 +3175,7 @@ static void test_mat_acos_d(void)
 
     /* 1×1: acos([[0.5]]) = [[π/3]] */
     {
-        matrix_t *A = mat_create_d(1, 1);
+        matrix_t *A = mat_new_d(1, 1);
         double v = 0.5;
         mat_set(A, 0, 0, &v);
         print_md("A", A);
@@ -3454,7 +3191,7 @@ static void test_mat_acos_d(void)
 
     /* asin(A) + acos(A) = (π/2)·I for diagonal [[0.3, 0], [0, 0.4]] */
     {
-        matrix_t *A = mat_create_d(2, 2);
+        matrix_t *A = mat_new_d(2, 2);
         double z=0.0, v0=0.3, v1=0.4;
         mat_set(A, 0, 0, &v0); mat_set(A, 0, 1, &z);
         mat_set(A, 1, 0, &z);  mat_set(A, 1, 1, &v1);
@@ -3489,7 +3226,7 @@ static void test_mat_atan_d(void)
 
     /* 1×1: atan([[0]]) = [[0]] */
     {
-        matrix_t *A = mat_create_d(1, 1);
+        matrix_t *A = mat_new_d(1, 1);
         double v = 0.0;
         mat_set(A, 0, 0, &v);
         matrix_t *R = mat_atan(A);
@@ -3504,7 +3241,7 @@ static void test_mat_atan_d(void)
 
     /* 1×1: atan([[0.5]]) — use 0.5 (well within convergence radius) */
     {
-        matrix_t *A = mat_create_d(1, 1);
+        matrix_t *A = mat_new_d(1, 1);
         double v = 0.5;
         mat_set(A, 0, 0, &v);
         print_md("A", A);
@@ -3520,7 +3257,7 @@ static void test_mat_atan_d(void)
 
     /* tan(atan(A)) = A for small diagonal [[0.5, 0],[0, 0.3]] */
     {
-        matrix_t *A = mat_create_d(2, 2);
+        matrix_t *A = mat_new_d(2, 2);
         double z=0.0, a=0.5, b=0.3;
         mat_set(A, 0, 0, &a); mat_set(A, 0, 1, &z);
         mat_set(A, 1, 0, &z); mat_set(A, 1, 1, &b);
@@ -3553,7 +3290,7 @@ static void test_mat_asinh_d(void)
 
     /* 1×1: asinh([[0]]) = [[0]] */
     {
-        matrix_t *A = mat_create_d(1, 1);
+        matrix_t *A = mat_new_d(1, 1);
         double v = 0.0;
         mat_set(A, 0, 0, &v);
         matrix_t *R = mat_asinh(A);
@@ -3568,7 +3305,7 @@ static void test_mat_asinh_d(void)
 
     /* sinh(asinh(A)) = A for diagonal [[0.5, 0],[0, 0.3]] */
     {
-        matrix_t *A = mat_create_d(2, 2);
+        matrix_t *A = mat_new_d(2, 2);
         double z=0.0, a=0.5, b=0.3;
         mat_set(A, 0, 0, &a); mat_set(A, 0, 1, &z);
         mat_set(A, 1, 0, &z); mat_set(A, 1, 1, &b);
@@ -3599,7 +3336,7 @@ static void test_mat_acosh_d(void)
 
     /* 1×1: acosh([[1]]) = [[0]] */
     {
-        matrix_t *A = mat_create_d(1, 1);
+        matrix_t *A = mat_new_d(1, 1);
         double v = 1.0;
         mat_set(A, 0, 0, &v);
         matrix_t *R = mat_acosh(A);
@@ -3614,7 +3351,7 @@ static void test_mat_acosh_d(void)
 
     /* cosh(acosh(A)) = A for diagonal [[2, 0],[0, 3]] */
     {
-        matrix_t *A = mat_create_d(2, 2);
+        matrix_t *A = mat_new_d(2, 2);
         double z=0.0, a=2.0, b=3.0;
         mat_set(A, 0, 0, &a); mat_set(A, 0, 1, &z);
         mat_set(A, 1, 0, &z); mat_set(A, 1, 1, &b);
@@ -3645,7 +3382,7 @@ static void test_mat_atanh_d(void)
 
     /* 1×1: atanh([[0]]) = [[0]] */
     {
-        matrix_t *A = mat_create_d(1, 1);
+        matrix_t *A = mat_new_d(1, 1);
         double v = 0.0;
         mat_set(A, 0, 0, &v);
         matrix_t *R = mat_atanh(A);
@@ -3660,7 +3397,7 @@ static void test_mat_atanh_d(void)
 
     /* tanh(atanh(A)) = A for diagonal [[0.4, 0],[0, 0.2]] */
     {
-        matrix_t *A = mat_create_d(2, 2);
+        matrix_t *A = mat_new_d(2, 2);
         double z=0.0, a=0.4, b=0.2;
         mat_set(A, 0, 0, &a); mat_set(A, 0, 1, &z);
         mat_set(A, 1, 0, &z); mat_set(A, 1, 1, &b);
@@ -3697,7 +3434,7 @@ static void test_mat_inv_trig_null_safety(void)
     check_bool("mat_acosh(NULL) = NULL", mat_acosh(NULL) == NULL);
     check_bool("mat_atanh(NULL) = NULL", mat_atanh(NULL) == NULL);
 
-    matrix_t *A = mat_create_d(2, 3);
+    matrix_t *A = mat_new_d(2, 3);
     check_bool("mat_sqrt(non-sq)  = NULL", mat_sqrt(A)  == NULL);
     check_bool("mat_log(non-sq)   = NULL", mat_log(A)   == NULL);
     check_bool("mat_asin(non-sq)  = NULL", mat_asin(A)  == NULL);
@@ -3718,7 +3455,7 @@ static void test_eigen_general_d(void)
     /* A = [[3, 1], [0, 2]] — upper triangular, eigenvalues 2 and 3.
      * eigenvector for λ=3: [1, 0]
      * eigenvector for λ=2: [-1, 1] (normalised) */
-    matrix_t *A = mat_create_d(2, 2);
+    matrix_t *A = mat_new_d(2, 2);
     double a00=3.0, a01=1.0, a10=0.0, a11=2.0;
     mat_set(A, 0, 0, &a00); mat_set(A, 0, 1, &a01);
     mat_set(A, 1, 0, &a10); mat_set(A, 1, 1, &a11);
@@ -3757,7 +3494,7 @@ static void test_eigen_general_qf(void)
     printf(C_CYAN "TEST: eigendecompose general (non-Hermitian, qfloat)\n" C_RESET);
 
     /* A = [[4, 1], [0, 1]] — eigenvalues 1 and 4 */
-    matrix_t *A = mat_create_qf(2, 2);
+    matrix_t *A = mat_new_qf(2, 2);
     qfloat_t a00 = qf_from_double(4.0), a01 = qf_from_double(1.0);
     qfloat_t a10 = QF_ZERO,             a11 = QF_ONE;
     mat_set(A, 0, 0, &a00); mat_set(A, 0, 1, &a01);
@@ -3803,7 +3540,7 @@ static void test_readme_example(void)
      *   [ 1-i  3   ]
      * Eigenvalues: 1 and 4
      */
-    matrix_t *A = matsq_create_qc(2);
+    matrix_t *A = matsq_new_qc(2);
 
     qcomplex_t a00 = qc_make(qf_from_double(2.0), QF_ZERO);
     qcomplex_t a01 = qc_make(qf_from_double(1.0), qf_from_double( 1.0));
@@ -3857,6 +3594,1087 @@ static void test_readme_example(void)
 
     mat_free(A);
     mat_free(V);
+}
+
+/* ------------------------------------------------------------------ matrix comparison helper */
+
+static void check_mat2x2_d(const char *label,
+                            matrix_t *R,
+                            double e00, double e01,
+                            double e10, double e11,
+                            double tol)
+{
+    check_bool(label, R != NULL);
+    if (!R) return;
+    double r[4];
+    mat_get_data(R, r);
+
+    char buf[256];
+    snprintf(buf, sizeof(buf), "%s [0,0]", label);
+    check_d(buf, r[0], e00, tol);
+    snprintf(buf, sizeof(buf), "%s [0,1]", label);
+    check_d(buf, r[1], e01, tol);
+    snprintf(buf, sizeof(buf), "%s [1,0]", label);
+    check_d(buf, r[2], e10, tol);
+    snprintf(buf, sizeof(buf), "%s [1,1]", label);
+    check_d(buf, r[3], e11, tol);
+}
+
+/* ------------------------------------------------------------------ matrix identity helper (n×n double) */
+
+static void check_mat_identity_d(const char *label, matrix_t *R, size_t n, double tol)
+{
+    check_bool(label, R != NULL);
+    if (!R) return;
+    for (size_t i = 0; i < n; i++) {
+        for (size_t j = 0; j < n; j++) {
+            double v;
+            mat_get(R, i, j, &v);
+            double expected = (i == j) ? 1.0 : 0.0;
+            char buf[128];
+            snprintf(buf, sizeof(buf), "%s [%zu,%zu]", label, i, j);
+            check_d(buf, v, expected, tol);
+        }
+    }
+}
+
+/* ------------------------------------------------------------------ nilpotent matrix tests */
+
+/*
+ * N = [[0,1],[0,0]] is nilpotent: N² = 0.  Every Taylor series truncates
+ * after the linear term, giving exact closed-form results for all functions.
+ */
+static void test_mat_nilpotent_d(void)
+{
+    printf(C_CYAN "TEST: nilpotent matrix N=[[0,1],[0,0]] exact values\n" C_RESET);
+
+    double nvals[4] = {0.0, 1.0, 0.0, 0.0};
+    matrix_t *N = mat_create_d(2, 2, nvals);
+    check_bool("N allocated", N != NULL);
+    if (!N) return;
+
+    /* exp(N) = I + N = [[1,1],[0,1]] */
+    {
+        matrix_t *R = mat_exp(N);
+        print_md("exp(N)", R);
+        check_mat2x2_d("exp(N)", R, 1.0,1.0, 0.0,1.0, 1e-12);
+        mat_free(R);
+    }
+
+    /* sin(N) = N = [[0,1],[0,0]] */
+    {
+        matrix_t *R = mat_sin(N);
+        print_md("sin(N)", R);
+        check_mat2x2_d("sin(N)", R, 0.0,1.0, 0.0,0.0, 1e-12);
+        mat_free(R);
+    }
+
+    /* cos(N) = I = [[1,0],[0,1]] */
+    {
+        matrix_t *R = mat_cos(N);
+        print_md("cos(N)", R);
+        check_mat2x2_d("cos(N)", R, 1.0,0.0, 0.0,1.0, 1e-12);
+        mat_free(R);
+    }
+
+    /* tan(N) = N = [[0,1],[0,0]] */
+    {
+        matrix_t *R = mat_tan(N);
+        print_md("tan(N)", R);
+        check_mat2x2_d("tan(N)", R, 0.0,1.0, 0.0,0.0, 1e-12);
+        mat_free(R);
+    }
+
+    /* sinh(N) = N = [[0,1],[0,0]] */
+    {
+        matrix_t *R = mat_sinh(N);
+        print_md("sinh(N)", R);
+        check_mat2x2_d("sinh(N)", R, 0.0,1.0, 0.0,0.0, 1e-12);
+        mat_free(R);
+    }
+
+    /* cosh(N) = I = [[1,0],[0,1]] */
+    {
+        matrix_t *R = mat_cosh(N);
+        print_md("cosh(N)", R);
+        check_mat2x2_d("cosh(N)", R, 1.0,0.0, 0.0,1.0, 1e-12);
+        mat_free(R);
+    }
+
+    /* tanh(N) = N = [[0,1],[0,0]] */
+    {
+        matrix_t *R = mat_tanh(N);
+        print_md("tanh(N)", R);
+        check_mat2x2_d("tanh(N)", R, 0.0,1.0, 0.0,0.0, 1e-12);
+        mat_free(R);
+    }
+
+    /* asin(N) = N = [[0,1],[0,0]] */
+    {
+        matrix_t *R = mat_asin(N);
+        print_md("asin(N)", R);
+        check_mat2x2_d("asin(N)", R, 0.0,1.0, 0.0,0.0, 1e-12);
+        mat_free(R);
+    }
+
+    /* acos(N) = π/2·I - N = [[π/2,-1],[0,π/2]] */
+    {
+        matrix_t *R = mat_acos(N);
+        print_md("acos(N)", R);
+        check_mat2x2_d("acos(N)", R, M_PI/2.0,-1.0, 0.0,M_PI/2.0, 1e-12);
+        mat_free(R);
+    }
+
+    /* atan(N) = N = [[0,1],[0,0]] */
+    {
+        matrix_t *R = mat_atan(N);
+        print_md("atan(N)", R);
+        check_mat2x2_d("atan(N)", R, 0.0,1.0, 0.0,0.0, 1e-12);
+        mat_free(R);
+    }
+
+    /* asinh(N) = N = [[0,1],[0,0]] */
+    {
+        matrix_t *R = mat_asinh(N);
+        print_md("asinh(N)", R);
+        check_mat2x2_d("asinh(N)", R, 0.0,1.0, 0.0,0.0, 1e-12);
+        mat_free(R);
+    }
+
+    /* atanh(N) = N = [[0,1],[0,0]] */
+    {
+        matrix_t *R = mat_atanh(N);
+        print_md("atanh(N)", R);
+        check_mat2x2_d("atanh(N)", R, 0.0,1.0, 0.0,0.0, 1e-12);
+        mat_free(R);
+    }
+
+    /* erf(N) = (2/√π)·N = [[0, 2/√π],[0,0]] */
+    {
+        double two_over_sqrtpi = 2.0 / sqrt(M_PI);
+        matrix_t *R = mat_erf(N);
+        print_md("erf(N)", R);
+        check_mat2x2_d("erf(N)", R, 0.0, two_over_sqrtpi, 0.0, 0.0, 1e-12);
+        mat_free(R);
+    }
+
+    /* erfc(N) = I - (2/√π)·N = [[1, -2/√π],[0,1]] */
+    {
+        double two_over_sqrtpi = 2.0 / sqrt(M_PI);
+        matrix_t *R = mat_erfc(N);
+        print_md("erfc(N)", R);
+        check_mat2x2_d("erfc(N)", R, 1.0, -two_over_sqrtpi, 0.0, 1.0, 1e-12);
+        mat_free(R);
+    }
+
+    mat_free(N);
+
+    /* sqrt(I+N) = I + N/2 = [[1,0.5],[0,1]] */
+    {
+        double invals[4] = {1.0, 1.0, 0.0, 1.0};
+        matrix_t *IN = mat_create_d(2, 2, invals);
+        matrix_t *R = mat_sqrt(IN);
+        print_md("sqrt(I+N)", R);
+        check_mat2x2_d("sqrt(I+N)", R, 1.0,0.5, 0.0,1.0, 1e-12);
+        mat_free(IN); mat_free(R);
+    }
+
+    /* log(I+N) = N = [[0,1],[0,0]] */
+    {
+        double invals[4] = {1.0, 1.0, 0.0, 1.0};
+        matrix_t *IN = mat_create_d(2, 2, invals);
+        matrix_t *R = mat_log(IN);
+        print_md("log(I+N)", R);
+        check_mat2x2_d("log(I+N)", R, 0.0,1.0, 0.0,0.0, 1e-12);
+        mat_free(IN); mat_free(R);
+    }
+}
+
+/* ------------------------------------------------------------------ algebraic identity tests */
+
+/*
+ * For any square matrix A:
+ *   sin²(A) + cos²(A) = I
+ *   cosh²(A) - sinh²(A) = I
+ *   exp(A) · exp(-A) = I
+ * These hold exactly (up to floating-point rounding) because the doubling
+ * formulas used internally preserve Pythagorean relations.
+ */
+static void test_mat_algebraic_ids_d(void)
+{
+    printf(C_CYAN "TEST: algebraic identities for non-diagonal matrices\n" C_RESET);
+
+    /* A = [[0.3, 0.1],[0.1, 0.4]] — symmetric, non-diagonal */
+    double avals[4] = {0.3, 0.1, 0.1, 0.4};
+    matrix_t *A = mat_create_d(2, 2, avals);
+    check_bool("A allocated", A != NULL);
+    if (!A) return;
+    print_md("A", A);
+
+    /* sin²(A) + cos²(A) = I */
+    {
+        matrix_t *S = mat_sin(A);
+        matrix_t *C = mat_cos(A);
+        check_bool("sin(A) not NULL", S != NULL);
+        check_bool("cos(A) not NULL", C != NULL);
+        if (S && C) {
+            matrix_t *S2 = mat_mul(S, S);
+            matrix_t *C2 = mat_mul(C, C);
+            check_bool("sin²(A) not NULL", S2 != NULL);
+            check_bool("cos²(A) not NULL", C2 != NULL);
+            if (S2 && C2) {
+                matrix_t *I = mat_add(S2, C2);
+                print_md("sin²(A)+cos²(A)", I);
+                check_mat2x2_d("sin²+cos²=I", I, 1.0,0.0, 0.0,1.0, 1e-10);
+                mat_free(I);
+            }
+            mat_free(S2); mat_free(C2);
+        }
+        mat_free(S); mat_free(C);
+    }
+
+    /* cosh²(A) - sinh²(A) = I */
+    {
+        matrix_t *CH = mat_cosh(A);
+        matrix_t *SH = mat_sinh(A);
+        check_bool("cosh(A) not NULL", CH != NULL);
+        check_bool("sinh(A) not NULL", SH != NULL);
+        if (CH && SH) {
+            matrix_t *CH2 = mat_mul(CH, CH);
+            matrix_t *SH2 = mat_mul(SH, SH);
+            check_bool("cosh²(A) not NULL", CH2 != NULL);
+            check_bool("sinh²(A) not NULL", SH2 != NULL);
+            if (CH2 && SH2) {
+                matrix_t *I = mat_sub(CH2, SH2);
+                print_md("cosh²(A)-sinh²(A)", I);
+                check_mat2x2_d("cosh²-sinh²=I", I, 1.0,0.0, 0.0,1.0, 1e-10);
+                mat_free(I);
+            }
+            mat_free(CH2); mat_free(SH2);
+        }
+        mat_free(CH); mat_free(SH);
+    }
+
+    /* exp(A) · exp(-A) = I */
+    {
+        matrix_t *E = mat_exp(A);
+        double negvals[4] = {-0.3, -0.1, -0.1, -0.4};
+        matrix_t *negA = mat_create_d(2, 2, negvals);
+        matrix_t *EnA = mat_exp(negA);
+        check_bool("exp(A) not NULL", E != NULL);
+        check_bool("exp(-A) not NULL", EnA != NULL);
+        if (E && EnA) {
+            matrix_t *I = mat_mul(E, EnA);
+            print_md("exp(A)·exp(-A)", I);
+            check_mat2x2_d("exp(A)·exp(-A)=I", I, 1.0,0.0, 0.0,1.0, 1e-10);
+            mat_free(I);
+        }
+        mat_free(E); mat_free(negA); mat_free(EnA);
+    }
+
+    mat_free(A);
+}
+
+/* ------------------------------------------------------------------ round-trip tests */
+
+static void test_mat_roundtrips_d(void)
+{
+    printf(C_CYAN "TEST: round-trip identities for non-diagonal matrices\n" C_RESET);
+
+    /* exp(log(A)) = A for positive-definite A = [[2,0.5],[0.5,2]] */
+    {
+        double avals[4] = {2.0, 0.5, 0.5, 2.0};
+        matrix_t *A = mat_create_d(2, 2, avals);
+        print_md("A (pos-def)", A);
+        matrix_t *L = mat_log(A);
+        check_bool("log(A) not NULL", L != NULL);
+        if (L) {
+            print_md("log(A)", L);
+            matrix_t *R = mat_exp(L);
+            check_bool("exp(log(A)) not NULL", R != NULL);
+            if (R) {
+                print_md("exp(log(A))", R);
+                check_mat2x2_d("exp(log(A))=A", R, 2.0,0.5, 0.5,2.0, 1e-10);
+                mat_free(R);
+            }
+            mat_free(L);
+        }
+        mat_free(A);
+    }
+
+    /* sinh(asinh(A)) = A for symmetric A = [[0.3,0.1],[0.1,0.4]] */
+    {
+        double avals[4] = {0.3, 0.1, 0.1, 0.4};
+        matrix_t *A = mat_create_d(2, 2, avals);
+        print_md("A", A);
+        matrix_t *S = mat_asinh(A);
+        check_bool("asinh(A) not NULL", S != NULL);
+        if (S) {
+            print_md("asinh(A)", S);
+            matrix_t *R = mat_sinh(S);
+            check_bool("sinh(asinh(A)) not NULL", R != NULL);
+            if (R) {
+                print_md("sinh(asinh(A))", R);
+                check_mat2x2_d("sinh(asinh(A))=A", R, 0.3,0.1, 0.1,0.4, 1e-10);
+                mat_free(R);
+            }
+            mat_free(S);
+        }
+        mat_free(A);
+    }
+
+    /* sqrt(A)·sqrt(A) = A for positive-definite A = [[2,0.5],[0.5,2]] */
+    {
+        double avals[4] = {2.0, 0.5, 0.5, 2.0};
+        matrix_t *A = mat_create_d(2, 2, avals);
+        print_md("A (pos-def)", A);
+        matrix_t *S = mat_sqrt(A);
+        check_bool("sqrt(A) not NULL", S != NULL);
+        if (S) {
+            print_md("sqrt(A)", S);
+            matrix_t *R = mat_mul(S, S);
+            check_bool("sqrt(A)·sqrt(A) not NULL", R != NULL);
+            if (R) {
+                print_md("sqrt(A)²", R);
+                check_mat2x2_d("sqrt(A)²=A", R, 2.0,0.5, 0.5,2.0, 1e-10);
+                mat_free(R);
+            }
+            mat_free(S);
+        }
+        mat_free(A);
+    }
+
+    /* atan(tan(A)) = A for small symmetric A = [[0.3,0.1],[0.1,0.2]] */
+    {
+        double avals[4] = {0.3, 0.1, 0.1, 0.2};
+        matrix_t *A = mat_create_d(2, 2, avals);
+        print_md("A", A);
+        matrix_t *T = mat_tan(A);
+        check_bool("tan(A) not NULL", T != NULL);
+        if (T) {
+            print_md("tan(A)", T);
+            matrix_t *R = mat_atan(T);
+            check_bool("atan(tan(A)) not NULL", R != NULL);
+            if (R) {
+                print_md("atan(tan(A))", R);
+                check_mat2x2_d("atan(tan(A))=A", R, 0.3,0.1, 0.1,0.2, 1e-10);
+                mat_free(R);
+            }
+            mat_free(T);
+        }
+        mat_free(A);
+    }
+}
+
+/* ------------------------------------------------------------------ mat_pow_int tests */
+
+static void test_mat_pow_int_d(void)
+{
+    printf(C_CYAN "TEST: mat_pow_int (double)\n" C_RESET);
+
+    /* null safety */
+    check_bool("mat_pow_int(NULL,0) = NULL", mat_pow_int(NULL, 0) == NULL);
+
+    double nvals[4] = {0.0, 1.0, 0.0, 0.0};
+    matrix_t *N = mat_create_d(2, 2, nvals);
+    check_bool("N allocated", N != NULL);
+    if (!N) return;
+
+    /* N^0 = I */
+    {
+        matrix_t *R = mat_pow_int(N, 0);
+        print_md("N^0", R);
+        check_mat2x2_d("N^0=I", R, 1.0,0.0, 0.0,1.0, 1e-12);
+        mat_free(R);
+    }
+
+    /* N^1 = N */
+    {
+        matrix_t *R = mat_pow_int(N, 1);
+        print_md("N^1", R);
+        check_mat2x2_d("N^1=N", R, 0.0,1.0, 0.0,0.0, 1e-12);
+        mat_free(R);
+    }
+
+    /* N^2 = 0 */
+    {
+        matrix_t *R = mat_pow_int(N, 2);
+        print_md("N^2", R);
+        check_mat2x2_d("N^2=0", R, 0.0,0.0, 0.0,0.0, 1e-12);
+        mat_free(R);
+    }
+
+    mat_free(N);
+
+    /* (I+N)^n = I + n·N  for upper-triangular Jordan blocks */
+    double invals[4] = {1.0, 1.0, 0.0, 1.0};
+    matrix_t *IN = mat_create_d(2, 2, invals);
+    check_bool("I+N allocated", IN != NULL);
+    if (!IN) return;
+
+    /* (I+N)^0 = I */
+    {
+        matrix_t *R = mat_pow_int(IN, 0);
+        print_md("(I+N)^0", R);
+        check_mat2x2_d("(I+N)^0=I", R, 1.0,0.0, 0.0,1.0, 1e-12);
+        mat_free(R);
+    }
+
+    /* (I+N)^2 = I + 2N = [[1,2],[0,1]] */
+    {
+        matrix_t *R = mat_pow_int(IN, 2);
+        print_md("(I+N)^2", R);
+        check_mat2x2_d("(I+N)^2", R, 1.0,2.0, 0.0,1.0, 1e-12);
+        mat_free(R);
+    }
+
+    /* (I+N)^3 = I + 3N = [[1,3],[0,1]] */
+    {
+        matrix_t *R = mat_pow_int(IN, 3);
+        print_md("(I+N)^3", R);
+        check_mat2x2_d("(I+N)^3", R, 1.0,3.0, 0.0,1.0, 1e-12);
+        mat_free(R);
+    }
+
+    /* (I+N)^-1 = I - N = [[1,-1],[0,1]] */
+    {
+        matrix_t *R = mat_pow_int(IN, -1);
+        print_md("(I+N)^-1", R);
+        check_mat2x2_d("(I+N)^-1", R, 1.0,-1.0, 0.0,1.0, 1e-12);
+        mat_free(R);
+    }
+
+    /* (I+N)^-2 = I - 2N = [[1,-2],[0,1]] */
+    {
+        matrix_t *R = mat_pow_int(IN, -2);
+        print_md("(I+N)^-2", R);
+        check_mat2x2_d("(I+N)^-2", R, 1.0,-2.0, 0.0,1.0, 1e-12);
+        mat_free(R);
+    }
+
+    mat_free(IN);
+
+    /* diagonal matrix: diag(2,3)^4 = diag(16,81) */
+    {
+        double dvals[4] = {2.0, 0.0, 0.0, 3.0};
+        matrix_t *D = mat_create_d(2, 2, dvals);
+        matrix_t *R = mat_pow_int(D, 4);
+        print_md("diag(2,3)^4", R);
+        check_mat2x2_d("diag(2,3)^4=diag(16,81)", R, 16.0,0.0, 0.0,81.0, 1e-12);
+        mat_free(D); mat_free(R);
+    }
+}
+
+/* ------------------------------------------------------------------ mat_pow tests */
+
+static void test_mat_pow_d(void)
+{
+    printf(C_CYAN "TEST: mat_pow (double)\n" C_RESET);
+
+    /* null safety */
+    check_bool("mat_pow(NULL,1.0) = NULL", mat_pow(NULL, 1.0) == NULL);
+
+    /* (I+N)^0.5 = I + 0.5·N = [[1,0.5],[0,1]] */
+    {
+        double invals[4] = {1.0, 1.0, 0.0, 1.0};
+        matrix_t *IN = mat_create_d(2, 2, invals);
+        matrix_t *R = mat_pow(IN, 0.5);
+        print_md("(I+N)^0.5", R);
+        check_mat2x2_d("(I+N)^0.5", R, 1.0,0.5, 0.0,1.0, 1e-10);
+        mat_free(IN); mat_free(R);
+    }
+
+    /* (I+N)^2.0 = I + 2N = [[1,2],[0,1]] */
+    {
+        double invals[4] = {1.0, 1.0, 0.0, 1.0};
+        matrix_t *IN = mat_create_d(2, 2, invals);
+        matrix_t *R = mat_pow(IN, 2.0);
+        print_md("(I+N)^2.0", R);
+        check_mat2x2_d("(I+N)^2.0", R, 1.0,2.0, 0.0,1.0, 1e-10);
+        mat_free(IN); mat_free(R);
+    }
+
+    /* A^1.0 = A for positive-definite A = [[2,0.5],[0.5,2]] */
+    {
+        double avals[4] = {2.0, 0.5, 0.5, 2.0};
+        matrix_t *A = mat_create_d(2, 2, avals);
+        matrix_t *R = mat_pow(A, 1.0);
+        print_md("A^1.0", R);
+        check_mat2x2_d("A^1.0=A", R, 2.0,0.5, 0.5,2.0, 1e-10);
+        mat_free(A); mat_free(R);
+    }
+
+    /* pow(pow_int): (A^2.0)[i,j] ≈ (A²)[i,j] for positive-definite A */
+    {
+        double avals[4] = {2.0, 0.5, 0.5, 2.0};
+        matrix_t *A = mat_create_d(2, 2, avals);
+        matrix_t *Rp = mat_pow(A, 2.0);
+        matrix_t *Ri = mat_pow_int(A, 2);
+        check_bool("A^2.0 not NULL", Rp != NULL);
+        check_bool("A^2   not NULL", Ri != NULL);
+        if (Rp && Ri) {
+            double p00, p01, i00, i01;
+            mat_get(Rp, 0, 0, &p00); mat_get(Rp, 0, 1, &p01);
+            mat_get(Ri, 0, 0, &i00); mat_get(Ri, 0, 1, &i01);
+            check_d("A^2.0[0,0] = A²[0,0]", p00, i00, 1e-10);
+            check_d("A^2.0[0,1] = A²[0,1]", p01, i01, 1e-10);
+        }
+        mat_free(A); mat_free(Rp); mat_free(Ri);
+    }
+}
+
+/* ------------------------------------------------------------------ mat_erf tests */
+
+static void test_mat_erf_d(void)
+{
+    printf(C_CYAN "TEST: mat_erf (double)\n" C_RESET);
+
+    /* null safety */
+    check_bool("mat_erf(NULL) = NULL", mat_erf(NULL) == NULL);
+
+    /* 1×1: erf([[0.5]]) = [[erf(0.5)]] */
+    {
+        matrix_t *A = mat_new_d(1, 1);
+        double v = 0.5;
+        mat_set(A, 0, 0, &v);
+        matrix_t *R = mat_erf(A);
+        check_bool("mat_erf([[0.5]]) not NULL", R != NULL);
+        if (R) {
+            double got; mat_get(R, 0, 0, &got);
+            check_d("erf([[0.5]])", got, erf(0.5), 1e-12);
+            mat_free(R);
+        }
+        mat_free(A);
+    }
+
+    /* 1×1: erf([[0]]) = [[0]] */
+    {
+        matrix_t *A = mat_new_d(1, 1);
+        double v = 0.0;
+        mat_set(A, 0, 0, &v);
+        matrix_t *R = mat_erf(A);
+        check_bool("mat_erf([[0]]) not NULL", R != NULL);
+        if (R) {
+            double got; mat_get(R, 0, 0, &got);
+            check_d("erf([[0]]) = 0", got, 0.0, 1e-12);
+            mat_free(R);
+        }
+        mat_free(A);
+    }
+
+    /* nilpotent: erf(N) = (2/√π)·N = [[0, 2/√π],[0,0]] */
+    {
+        double nvals[4] = {0.0, 1.0, 0.0, 0.0};
+        matrix_t *N = mat_create_d(2, 2, nvals);
+        double two_over_sqrtpi = 2.0 / sqrt(M_PI);
+        matrix_t *R = mat_erf(N);
+        print_md("erf(N)", R);
+        check_mat2x2_d("erf(N)=(2/√π)N", R, 0.0, two_over_sqrtpi, 0.0, 0.0, 1e-12);
+        mat_free(N); mat_free(R);
+    }
+
+    /* odd symmetry: erf(-A) = -erf(A) for symmetric A = [[0.3,0.1],[0.1,0.4]] */
+    {
+        double avals[4]  = { 0.3,  0.1,  0.1,  0.4};
+        double navals[4] = {-0.3, -0.1, -0.1, -0.4};
+        matrix_t *A  = mat_create_d(2, 2, avals);
+        matrix_t *nA = mat_create_d(2, 2, navals);
+        matrix_t *E  = mat_erf(A);
+        matrix_t *En = mat_erf(nA);
+        check_bool("erf(A) not NULL", E != NULL);
+        check_bool("erf(-A) not NULL", En != NULL);
+        if (E && En) {
+            double e00, en00, e01, en01;
+            mat_get(E,  0, 0, &e00);  mat_get(E,  0, 1, &e01);
+            mat_get(En, 0, 0, &en00); mat_get(En, 0, 1, &en01);
+            check_d("erf(-A)[0,0] = -erf(A)[0,0]", en00, -e00, 1e-12);
+            check_d("erf(-A)[0,1] = -erf(A)[0,1]", en01, -e01, 1e-12);
+        }
+        mat_free(A); mat_free(nA); mat_free(E); mat_free(En);
+    }
+}
+
+/* ------------------------------------------------------------------ mat_erfc tests */
+
+static void test_mat_erfc_d(void)
+{
+    printf(C_CYAN "TEST: mat_erfc (double)\n" C_RESET);
+
+    /* null safety */
+    check_bool("mat_erfc(NULL) = NULL", mat_erfc(NULL) == NULL);
+
+    /* 1×1: erfc([[0.5]]) = [[erfc(0.5)]] */
+    {
+        matrix_t *A = mat_new_d(1, 1);
+        double v = 0.5;
+        mat_set(A, 0, 0, &v);
+        matrix_t *R = mat_erfc(A);
+        check_bool("mat_erfc([[0.5]]) not NULL", R != NULL);
+        if (R) {
+            double got; mat_get(R, 0, 0, &got);
+            check_d("erfc([[0.5]])", got, erfc(0.5), 1e-12);
+            mat_free(R);
+        }
+        mat_free(A);
+    }
+
+    /* nilpotent: erfc(N) = I - (2/√π)·N = [[1,-2/√π],[0,1]] */
+    {
+        double nvals[4] = {0.0, 1.0, 0.0, 0.0};
+        matrix_t *N = mat_create_d(2, 2, nvals);
+        double two_over_sqrtpi = 2.0 / sqrt(M_PI);
+        matrix_t *R = mat_erfc(N);
+        print_md("erfc(N)", R);
+        check_mat2x2_d("erfc(N)=I-(2/√π)N", R, 1.0, -two_over_sqrtpi, 0.0, 1.0, 1e-12);
+        mat_free(N); mat_free(R);
+    }
+
+    /* erf(A) + erfc(A) = I for symmetric A = [[0.3,0.1],[0.1,0.4]] */
+    {
+        double avals[4] = {0.3, 0.1, 0.1, 0.4};
+        matrix_t *A  = mat_create_d(2, 2, avals);
+        matrix_t *E  = mat_erf(A);
+        matrix_t *EC = mat_erfc(A);
+        check_bool("erf(A) not NULL", E != NULL);
+        check_bool("erfc(A) not NULL", EC != NULL);
+        if (E && EC) {
+            matrix_t *Sum = mat_add(E, EC);
+            print_md("erf(A)+erfc(A)", Sum);
+            check_mat2x2_d("erf+erfc=I", Sum, 1.0,0.0, 0.0,1.0, 1e-12);
+            mat_free(Sum);
+        }
+        mat_free(A); mat_free(E); mat_free(EC);
+    }
+}
+
+/* ------------------------------------------------------------------ mat_typeof tests */
+
+static void test_mat_typeof(void)
+{
+    printf(C_CYAN "TEST: mat_typeof\n" C_RESET);
+
+    matrix_t *Ad  = matsq_new_d(2);
+    matrix_t *Aqf = matsq_new_qf(2);
+    matrix_t *Aqc = matsq_new_qc(2);
+
+    check_bool("mat_typeof(double)   = MAT_TYPE_DOUBLE",   mat_typeof(Ad)  == MAT_TYPE_DOUBLE);
+    check_bool("mat_typeof(qfloat)   = MAT_TYPE_QFLOAT",   mat_typeof(Aqf) == MAT_TYPE_QFLOAT);
+    check_bool("mat_typeof(qcomplex) = MAT_TYPE_QCOMPLEX",  mat_typeof(Aqc) == MAT_TYPE_QCOMPLEX);
+
+    matrix_t *Id  = mat_create_identity_d(2);
+    matrix_t *Iqf = mat_create_identity_qf(2);
+    matrix_t *Iqc = mat_create_identity_qc(2);
+
+    check_bool("mat_typeof(identity double)   = MAT_TYPE_DOUBLE",   mat_typeof(Id)  == MAT_TYPE_DOUBLE);
+    check_bool("mat_typeof(identity qfloat)   = MAT_TYPE_QFLOAT",   mat_typeof(Iqf) == MAT_TYPE_QFLOAT);
+    check_bool("mat_typeof(identity qcomplex) = MAT_TYPE_QCOMPLEX",  mat_typeof(Iqc) == MAT_TYPE_QCOMPLEX);
+
+    /* matrix functions preserve element type */
+    double dvals[4] = {0.5, 0.1, 0.1, 0.6};
+    matrix_t *A_d = mat_create_d(2, 2, dvals);
+
+    qfloat_t qfvals[4] = {
+        qf_from_double(0.5), qf_from_double(0.1),
+        qf_from_double(0.1), qf_from_double(0.6)
+    };
+    matrix_t *A_qf = mat_create_qf(2, 2, qfvals);
+
+    matrix_t *E_d  = mat_exp(A_d);
+    matrix_t *E_qf = mat_exp(A_qf);
+
+    check_bool("mat_exp(double) → double",  E_d  != NULL && mat_typeof(E_d)  == MAT_TYPE_DOUBLE);
+    check_bool("mat_exp(qfloat) → qfloat",  E_qf != NULL && mat_typeof(E_qf) == MAT_TYPE_QFLOAT);
+
+    mat_free(Ad);  mat_free(Aqf); mat_free(Aqc);
+    mat_free(Id);  mat_free(Iqf); mat_free(Iqc);
+    mat_free(A_d); mat_free(A_qf);
+    mat_free(E_d); mat_free(E_qf);
+}
+
+/* ------------------------------------------------------------------ 3×3 matrix function tests */
+
+/*
+ * Asymmetric upper-triangular A is not Hermitian, so it takes the general
+ * QR Schur path.  The Schur factor T equals A itself (Q=I), giving a
+ * non-diagonal 3×3 T.  For indices (i=0, j=2) the Parlett recurrence uses
+ * the cross-term Σ_{k=1}^{1}(T[0,k]*F[k,2] - F[0,k]*T[k,2]) — the only
+ * path that is never exercised by 2×2 tests.
+ */
+static void test_mat_fun_3x3(void)
+{
+    printf(C_CYAN "TEST: 3×3 matrix functions — Parlett cross-term\n" C_RESET);
+
+    double avals[9] = {
+        1.0, 0.5, 0.2,
+        0.0, 2.0, 0.7,
+        0.0, 0.0, 3.0
+    };
+    double negavals[9] = {
+        -1.0, -0.5, -0.2,
+         0.0, -2.0, -0.7,
+         0.0,  0.0, -3.0
+    };
+
+    matrix_t *A    = mat_create_d(3, 3, avals);
+    matrix_t *negA = mat_create_d(3, 3, negavals);
+
+    check_bool("A 3×3 allocated",    A    != NULL);
+    check_bool("negA 3×3 allocated", negA != NULL);
+    if (!A || !negA) { mat_free(A); mat_free(negA); return; }
+
+    /* exp(A) · exp(-A) = I */
+    {
+        matrix_t *E  = mat_exp(A);
+        matrix_t *En = mat_exp(negA);
+        check_bool("exp(A) not NULL",  E  != NULL);
+        check_bool("exp(-A) not NULL", En != NULL);
+        if (E && En) {
+            matrix_t *I = mat_mul(E, En);
+            check_mat_identity_d("3×3 exp(A)·exp(-A)=I", I, 3, 1e-10);
+            mat_free(I);
+        }
+        mat_free(E); mat_free(En);
+    }
+
+    /* sin²(A) + cos²(A) = I */
+    {
+        matrix_t *S = mat_sin(A);
+        matrix_t *C = mat_cos(A);
+        check_bool("sin(A) 3×3 not NULL", S != NULL);
+        check_bool("cos(A) 3×3 not NULL", C != NULL);
+        if (S && C) {
+            matrix_t *S2 = mat_mul(S, S);
+            matrix_t *C2 = mat_mul(C, C);
+            if (S2 && C2) {
+                matrix_t *I = mat_add(S2, C2);
+                check_mat_identity_d("3×3 sin²(A)+cos²(A)=I", I, 3, 1e-10);
+                mat_free(I);
+            }
+            mat_free(S2); mat_free(C2);
+        }
+        mat_free(S); mat_free(C);
+    }
+
+    /* cosh²(A) - sinh²(A) = I */
+    {
+        matrix_t *CH = mat_cosh(A);
+        matrix_t *SH = mat_sinh(A);
+        check_bool("cosh(A) 3×3 not NULL", CH != NULL);
+        check_bool("sinh(A) 3×3 not NULL", SH != NULL);
+        if (CH && SH) {
+            matrix_t *CH2 = mat_mul(CH, CH);
+            matrix_t *SH2 = mat_mul(SH, SH);
+            if (CH2 && SH2) {
+                matrix_t *I = mat_sub(CH2, SH2);
+                check_mat_identity_d("3×3 cosh²(A)-sinh²(A)=I", I, 3, 1e-10);
+                mat_free(I);
+            }
+            mat_free(CH2); mat_free(SH2);
+        }
+        mat_free(CH); mat_free(SH);
+    }
+
+    /* exp(log(A)) = A (A has positive diagonal → positive eigenvalues) */
+    {
+        matrix_t *L = mat_log(A);
+        check_bool("log(A) 3×3 not NULL", L != NULL);
+        if (L) {
+            matrix_t *R = mat_exp(L);
+            check_bool("exp(log(A)) 3×3 not NULL", R != NULL);
+            if (R) {
+                for (size_t i = 0; i < 3; i++) {
+                    for (size_t j = 0; j < 3; j++) {
+                        double got, expected;
+                        mat_get(R, i, j, &got);
+                        mat_get(A, i, j, &expected);
+                        char buf[64];
+                        snprintf(buf, sizeof(buf),
+                                 "3×3 exp(log(A))[%zu,%zu]=A[%zu,%zu]", i, j, i, j);
+                        check_d(buf, got, expected, 1e-10);
+                    }
+                }
+                mat_free(R);
+            }
+            mat_free(L);
+        }
+    }
+
+    mat_free(A);
+    mat_free(negA);
+}
+
+/* ------------------------------------------------------------------ error-handling tests */
+
+static void test_mat_error_handling(void)
+{
+    printf(C_CYAN "TEST: error handling — NULL and non-square inputs\n" C_RESET);
+
+    /* mat_det */
+    {
+        double out = 0.0;
+        check_bool("mat_det(NULL) = -1",  mat_det(NULL, &out) == -1);
+        matrix_t *rect = mat_new_d(2, 3);
+        check_bool("mat_det(2×3) = -2",   mat_det(rect, &out) == -2);
+        mat_free(rect);
+    }
+
+    /* mat_inverse */
+    {
+        check_bool("mat_inverse(NULL) = NULL", mat_inverse(NULL) == NULL);
+        matrix_t *rect = mat_new_d(3, 2);
+        check_bool("mat_inverse(3×2) = NULL",  mat_inverse(rect) == NULL);
+        mat_free(rect);
+    }
+
+    /* mat_eigenvalues */
+    {
+        double ev[4];
+        check_bool("mat_eigenvalues(NULL) < 0",  mat_eigenvalues(NULL, ev) < 0);
+        matrix_t *rect = mat_new_d(2, 3);
+        check_bool("mat_eigenvalues(2×3) < 0",   mat_eigenvalues(rect, ev) < 0);
+        mat_free(rect);
+    }
+
+    /* mat_eigendecompose */
+    {
+        double ev[4];
+        matrix_t *evecs = NULL;
+        check_bool("mat_eigendecompose(NULL) < 0",
+                   mat_eigendecompose(NULL, ev, &evecs) < 0);
+        matrix_t *rect = mat_new_d(2, 3);
+        check_bool("mat_eigendecompose(2×3) < 0",
+                   mat_eigendecompose(rect, ev, &evecs) < 0);
+        mat_free(rect);
+    }
+
+    /* dimension mismatch in arithmetic */
+    {
+        matrix_t *A = mat_new_d(2, 3);
+        matrix_t *B = mat_new_d(3, 2);
+        matrix_t *C = mat_new_d(4, 4);
+
+        check_bool("mat_add(2×3, 3×2) = NULL",  mat_add(A, B) == NULL);
+        check_bool("mat_sub(2×3, 3×2) = NULL",  mat_sub(A, B) == NULL);
+        check_bool("mat_mul(2×3, 4×4) = NULL",  mat_mul(A, C) == NULL);
+
+        mat_free(A); mat_free(B); mat_free(C);
+    }
+
+    /* mat_pow_int on non-square */
+    {
+        matrix_t *rect = mat_new_d(2, 3);
+        check_bool("mat_pow_int(2×3, 2) = NULL", mat_pow_int(rect, 2) == NULL);
+        mat_free(rect);
+    }
+}
+
+/* ------------------------------------------------------------------ qf/qc variants of under-tested functions */
+
+static void test_mat_fun_qf_qc(void)
+{
+    printf(C_CYAN "TEST: qf/qc variants of tan, hyperbolic, log, erf, erfc, pow_int\n" C_RESET);
+
+    qfloat_t qfvals[4] = {
+        qf_from_double(0.3), qf_from_double(0.1),
+        qf_from_double(0.1), qf_from_double(0.4)
+    };
+    matrix_t *A_qf = mat_create_qf(2, 2, qfvals);
+    check_bool("A_qf allocated", A_qf != NULL);
+    if (!A_qf) return;
+
+    /* tan: cos(A)·tan(A) = sin(A) */
+    {
+        matrix_t *T  = mat_tan(A_qf);
+        matrix_t *S  = mat_sin(A_qf);
+        matrix_t *C  = mat_cos(A_qf);
+        check_bool("qf tan(A) not NULL", T != NULL);
+        if (T && S && C) {
+            matrix_t *CT = mat_mul(C, T);
+            if (CT) {
+                for (size_t i = 0; i < 2; i++) {
+                    for (size_t j = 0; j < 2; j++) {
+                        qfloat_t ct, s;
+                        mat_get(CT, i, j, &ct);
+                        mat_get(S,  i, j, &s);
+                        char buf[64];
+                        snprintf(buf, sizeof(buf),
+                                 "qf cos·tan[%zu,%zu]=sin", i, j);
+                        check_qf_val(buf, ct, s, 1e-25);
+                    }
+                }
+                mat_free(CT);
+            }
+        }
+        mat_free(T); mat_free(S); mat_free(C);
+    }
+
+    /* cosh²(A) - sinh²(A) = I */
+    {
+        matrix_t *CH = mat_cosh(A_qf);
+        matrix_t *SH = mat_sinh(A_qf);
+        check_bool("qf cosh(A) not NULL", CH != NULL);
+        check_bool("qf sinh(A) not NULL", SH != NULL);
+        if (CH && SH) {
+            matrix_t *CH2 = mat_mul(CH, CH);
+            matrix_t *SH2 = mat_mul(SH, SH);
+            if (CH2 && SH2) {
+                matrix_t *I = mat_sub(CH2, SH2);
+                if (I) {
+                    qfloat_t i00, i11, i01, i10;
+                    mat_get(I, 0, 0, &i00); mat_get(I, 1, 1, &i11);
+                    mat_get(I, 0, 1, &i01); mat_get(I, 1, 0, &i10);
+                    check_qf_val("qf cosh²-sinh²=I [0,0]", i00, qf_from_double(1.0), 1e-25);
+                    check_qf_val("qf cosh²-sinh²=I [1,1]", i11, qf_from_double(1.0), 1e-25);
+                    check_qf_val("qf cosh²-sinh²=I [0,1]", i01, QF_ZERO, 1e-25);
+                    check_qf_val("qf cosh²-sinh²=I [1,0]", i10, QF_ZERO, 1e-25);
+                    mat_free(I);
+                }
+            }
+            mat_free(CH2); mat_free(SH2);
+        }
+        mat_free(CH); mat_free(SH);
+    }
+
+    /* tanh: cosh(A)·tanh(A) = sinh(A) */
+    {
+        matrix_t *TH = mat_tanh(A_qf);
+        matrix_t *CH = mat_cosh(A_qf);
+        matrix_t *SH = mat_sinh(A_qf);
+        check_bool("qf tanh(A) not NULL", TH != NULL);
+        if (TH && CH && SH) {
+            matrix_t *CT = mat_mul(CH, TH);
+            if (CT) {
+                for (size_t i = 0; i < 2; i++) {
+                    for (size_t j = 0; j < 2; j++) {
+                        qfloat_t ct, s;
+                        mat_get(CT, i, j, &ct);
+                        mat_get(SH, i, j, &s);
+                        char buf[64];
+                        snprintf(buf, sizeof(buf),
+                                 "qf cosh·tanh[%zu,%zu]=sinh", i, j);
+                        check_qf_val(buf, ct, s, 1e-25);
+                    }
+                }
+                mat_free(CT);
+            }
+        }
+        mat_free(TH); mat_free(CH); mat_free(SH);
+    }
+
+    /* log: exp(log(A)) = A for positive-definite A */
+    {
+        qfloat_t pdvals[4] = {
+            qf_from_double(2.0), qf_from_double(0.5),
+            qf_from_double(0.5), qf_from_double(2.0)
+        };
+        matrix_t *PD = mat_create_qf(2, 2, pdvals);
+        matrix_t *L  = mat_log(PD);
+        check_bool("qf log(PD) not NULL", L != NULL);
+        if (L) {
+            matrix_t *R = mat_exp(L);
+            check_bool("qf exp(log(PD)) not NULL", R != NULL);
+            if (R) {
+                for (size_t i = 0; i < 2; i++) {
+                    for (size_t j = 0; j < 2; j++) {
+                        qfloat_t got, expected;
+                        mat_get(R,  i, j, &got);
+                        mat_get(PD, i, j, &expected);
+                        char buf[64];
+                        snprintf(buf, sizeof(buf),
+                                 "qf exp(log(A))[%zu,%zu]=A", i, j);
+                        check_qf_val(buf, got, expected, 1e-25);
+                    }
+                }
+                mat_free(R);
+            }
+            mat_free(L);
+        }
+        mat_free(PD);
+    }
+
+    /* erf + erfc = I */
+    {
+        matrix_t *E  = mat_erf(A_qf);
+        matrix_t *EC = mat_erfc(A_qf);
+        check_bool("qf erf(A) not NULL",  E  != NULL);
+        check_bool("qf erfc(A) not NULL", EC != NULL);
+        if (E && EC) {
+            matrix_t *I = mat_add(E, EC);
+            if (I) {
+                qfloat_t i00, i11, i01, i10;
+                mat_get(I, 0, 0, &i00); mat_get(I, 1, 1, &i11);
+                mat_get(I, 0, 1, &i01); mat_get(I, 1, 0, &i10);
+                check_qf_val("qf erf+erfc=I [0,0]", i00, qf_from_double(1.0), 1e-25);
+                check_qf_val("qf erf+erfc=I [1,1]", i11, qf_from_double(1.0), 1e-25);
+                check_qf_val("qf erf+erfc=I [0,1]", i01, QF_ZERO, 1e-25);
+                check_qf_val("qf erf+erfc=I [1,0]", i10, QF_ZERO, 1e-25);
+                mat_free(I);
+            }
+        }
+        mat_free(E); mat_free(EC);
+    }
+
+    /* pow_int for qf: diag(2,3)^3 = diag(8,27) */
+    {
+        qfloat_t dvals[4] = {
+            qf_from_double(2.0), QF_ZERO,
+            QF_ZERO,             qf_from_double(3.0)
+        };
+        matrix_t *D = mat_create_qf(2, 2, dvals);
+        matrix_t *R = mat_pow_int(D, 3);
+        check_bool("qf pow_int(diag(2,3),3) not NULL", R != NULL);
+        if (R) {
+            qfloat_t r00, r11, r01, r10;
+            mat_get(R, 0, 0, &r00); mat_get(R, 1, 1, &r11);
+            mat_get(R, 0, 1, &r01); mat_get(R, 1, 0, &r10);
+            check_qf_val("qf diag(2,3)^3 [0,0]=8",  r00, qf_from_double(8.0),  1e-25);
+            check_qf_val("qf diag(2,3)^3 [1,1]=27", r11, qf_from_double(27.0), 1e-25);
+            check_qf_val("qf diag(2,3)^3 [0,1]=0",  r01, QF_ZERO, 1e-25);
+            check_qf_val("qf diag(2,3)^3 [1,0]=0",  r10, QF_ZERO, 1e-25);
+            mat_free(R);
+        }
+        mat_free(D);
+    }
+
+    /* qcomplex: exp(A_qc)·exp(-A_qc) = I */
+    {
+        qcomplex_t qcvals[4] = {
+            qc_make(qf_from_double(0.3), QF_ZERO),
+            qc_make(qf_from_double(0.1), QF_ZERO),
+            qc_make(qf_from_double(0.1), QF_ZERO),
+            qc_make(qf_from_double(0.4), QF_ZERO)
+        };
+        qcomplex_t neg_qcvals[4] = {
+            qc_make(qf_from_double(-0.3), QF_ZERO),
+            qc_make(qf_from_double(-0.1), QF_ZERO),
+            qc_make(qf_from_double(-0.1), QF_ZERO),
+            qc_make(qf_from_double(-0.4), QF_ZERO)
+        };
+        matrix_t *A_qc    = mat_create_qc(2, 2, qcvals);
+        matrix_t *negA_qc = mat_create_qc(2, 2, neg_qcvals);
+        matrix_t *E       = mat_exp(A_qc);
+        matrix_t *En      = mat_exp(negA_qc);
+        check_bool("qc exp(A) not NULL",   E  != NULL);
+        check_bool("qc exp(-A) not NULL",  En != NULL);
+        if (E && En) {
+            matrix_t *I = mat_mul(E, En);
+            if (I) {
+                qcomplex_t i00, i11, i01, i10;
+                mat_get(I, 0, 0, &i00); mat_get(I, 1, 1, &i11);
+                mat_get(I, 0, 1, &i01); mat_get(I, 1, 0, &i10);
+                check_qc_val("qc exp(A)·exp(-A) [0,0]=1",
+                             i00, qc_make(qf_from_double(1.0), QF_ZERO), 1e-25);
+                check_qc_val("qc exp(A)·exp(-A) [1,1]=1",
+                             i11, qc_make(qf_from_double(1.0), QF_ZERO), 1e-25);
+                check_qc_val("qc exp(A)·exp(-A) [0,1]=0", i01, QC_ZERO, 1e-25);
+                check_qc_val("qc exp(A)·exp(-A) [1,0]=0", i10, QC_ZERO, 1e-25);
+                mat_free(I);
+            }
+        }
+        mat_free(A_qc); mat_free(negA_qc); mat_free(E); mat_free(En);
+    }
+
+    mat_free(A_qf);
 }
 
 /* ------------------------------------------------------------------ tests_main */
@@ -3963,6 +4781,21 @@ int tests_main(void)
 
     RUN_TEST(test_eigen_general_d,     NULL);
     RUN_TEST(test_eigen_general_qf,    NULL);
+
+    RUN_TEST(test_mat_nilpotent_d,     NULL);
+    RUN_TEST(test_mat_algebraic_ids_d, NULL);
+    RUN_TEST(test_mat_roundtrips_d,    NULL);
+
+    RUN_TEST(test_mat_pow_int_d,       NULL);
+    RUN_TEST(test_mat_pow_d,           NULL);
+
+    RUN_TEST(test_mat_erf_d,           NULL);
+    RUN_TEST(test_mat_erfc_d,          NULL);
+
+    RUN_TEST(test_mat_fun_qf_qc,       NULL);
+    RUN_TEST(test_mat_error_handling,  NULL);
+    RUN_TEST(test_mat_fun_3x3,         NULL);
+    RUN_TEST(test_mat_typeof,          NULL);
 
     RUN_TEST(test_readme_example, NULL);
 

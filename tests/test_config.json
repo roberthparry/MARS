@@ -692,6 +692,17 @@
     "test_mat_atanh_d": true,
     "test_mat_inv_trig_null_safety": true,
     "test_eigen_general_d": true,
-    "test_eigen_general_qf": true
+    "test_eigen_general_qf": true,
+    "test_mat_nilpotent_d": true,
+    "test_mat_algebraic_ids_d": true,
+    "test_mat_roundtrips_d": true,
+    "test_mat_pow_int_d": true,
+    "test_mat_pow_d": true,
+    "test_mat_erf_d": true,
+    "test_mat_erfc_d": true,
+    "test_mat_fun_qf_qc": true,
+    "test_mat_error_handling": true,
+    "test_mat_fun_3x3": true,
+    "test_mat_typeof": true
   }
 }

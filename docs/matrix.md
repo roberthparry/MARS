@@ -23,8 +23,9 @@ the API. Internally each matrix carries:
 - arithmetic: scalar multiply/divide, matrix add, subtract, multiply
 - structural: transpose, conjugate, Hermitian (conjugate transpose)
 - linear algebra: determinant, inverse, eigenvalues, eigendecomposition, eigenvectors
-- matrix functions: exp, sin, cos, tan, sinh, cosh, tanh, sqrt, log, asin, acos, atan, asinh, acosh, atanh
-- all linear algebra computed at full `qfloat_t` precision regardless of element type
+- matrix functions: exp, sin, cos, tan, sinh, cosh, tanh, sqrt, log, asin, acos, atan, asinh, acosh, atanh, erf, erfc
+- power functions: integer power (binary exponentiation), real power via exp/log
+- all eigendecomposition computed at full `qfloat_t`/`qcomplex_t` precision regardless of element type; all matrix functions computed at full `qcomplex_t` precision
 
 ## Example
 
@@ -39,7 +40,7 @@ int main(void) {
      *   [ 2    1+i ]
      *   [ 1-i  3   ]
      */
-    matrix_t *A = matsq_create_qc(2);
+    matrix_t *A = matsq_new_qc(2);
 
     qcomplex_t a00 = qc_make(qf_from_double(2.0), QF_ZERO);
     qcomplex_t a01 = qc_make(qf_from_double(1.0), qf_from_double( 1.0));
@@ -79,32 +80,38 @@ All declarations are in `include/matrix.h`.
 
 ### Construction
 
-#### Rectangular dense matrices
+#### Allocate without filling
+
+Use these when you need to fill elements sparsely (e.g. a single diagonal or one
+off-diagonal element). For bulk initialisation prefer the `mat_create_*` forms below.
 
 | Function | Element type | Description |
 |---|---|---|
-| `mat_create_d(rows, cols)` | `double` | Allocate a `rows × cols` dense matrix of doubles |
-| `mat_create_qf(rows, cols)` | `qfloat_t` | Allocate a `rows × cols` dense matrix of `qfloat_t` |
-| `mat_create_qc(rows, cols)` | `qcomplex_t` | Allocate a `rows × cols` dense matrix of `qcomplex_t` |
+| `mat_new_d(rows, cols)` | `double` | Allocate an uninitialised `rows × cols` matrix of doubles |
+| `mat_new_qf(rows, cols)` | `qfloat_t` | Allocate an uninitialised `rows × cols` matrix of `qfloat_t` |
+| `mat_new_qc(rows, cols)` | `qcomplex_t` | Allocate an uninitialised `rows × cols` matrix of `qcomplex_t` |
+| `matsq_new_d(n)` | `double` | Allocate an uninitialised `n × n` matrix of doubles |
+| `matsq_new_qf(n)` | `qfloat_t` | Allocate an uninitialised `n × n` matrix of `qfloat_t` |
+| `matsq_new_qc(n)` | `qcomplex_t` | Allocate an uninitialised `n × n` matrix of `qcomplex_t` |
 
-#### Square dense matrices
+#### Allocate and fill from a flat array
 
 | Function | Element type | Description |
 |---|---|---|
-| `matsq_create_d(n)` | `double` | Allocate an `n × n` dense matrix of doubles |
-| `matsq_create_qf(n)` | `qfloat_t` | Allocate an `n × n` dense matrix of `qfloat_t` |
-| `matsq_create_qc(n)` | `qcomplex_t` | Allocate an `n × n` dense matrix of `qcomplex_t` |
+| `mat_create_d(rows, cols, data)` | `double` | Allocate and fill from a row-major `double[]` |
+| `mat_create_qf(rows, cols, data)` | `qfloat_t` | Allocate and fill from a row-major `qfloat_t[]` |
+| `mat_create_qc(rows, cols, data)` | `qcomplex_t` | Allocate and fill from a row-major `qcomplex_t[]` |
 
 #### Identity matrices
 
-Identity matrices carry no element storage. The first write to an off-diagonal
-element materialises the matrix as dense.
+Identity matrices carry no element storage. The first write to any element
+materialises the matrix as dense.
 
 | Function | Element type | Description |
 |---|---|---|
-| `matsq_ident_d(n)` | `double` | `n × n` identity matrix of doubles |
-| `matsq_ident_qf(n)` | `qfloat_t` | `n × n` identity matrix of `qfloat_t` |
-| `matsq_ident_qc(n)` | `qcomplex_t` | `n × n` identity matrix of `qcomplex_t` |
+| `mat_create_identity_d(n)` | `double` | `n × n` identity matrix of doubles |
+| `mat_create_identity_qf(n)` | `qfloat_t` | `n × n` identity matrix of `qfloat_t` |
+| `mat_create_identity_qc(n)` | `qcomplex_t` | `n × n` identity matrix of `qcomplex_t` |
 
 ### Destruction
 
@@ -117,6 +124,11 @@ element materialises the matrix as dense.
 - `size_t mat_get_row_count(const matrix_t *A)` — number of rows.
 - `size_t mat_get_col_count(const matrix_t *A)` — number of columns.
 
+### Bulk Element Access
+
+- `void mat_set_data(matrix_t *A, const void *data)` — copy all elements from a flat row-major buffer into `A`. The buffer must contain `rows × cols` elements of `A`'s element type.
+- `void mat_get_data(const matrix_t *A, void *data)` — copy all elements of `A` into a flat row-major buffer. The buffer must have space for `rows × cols` elements of `A`'s element type.
+
 ### Scalar Operations
 
 Scalar functions return a new matrix. The scalar is broadcast to every element.
@@ -125,12 +137,12 @@ the two.
 
 | Function | Scalar type | Description |
 |---|---|---|
-| `mat_scalar_mul_d(s, A)` | `double` | `s * A` |
-| `mat_scalar_mul_qf(s, A)` | `qfloat_t` | `s * A` |
-| `mat_scalar_mul_qc(s, A)` | `qcomplex_t` | `s * A` |
-| `mat_scalar_div_d(s, A)` | `double` | `A / s` |
-| `mat_scalar_div_qf(s, A)` | `qfloat_t` | `A / s` |
-| `mat_scalar_div_qc(s, A)` | `qcomplex_t` | `A / s` |
+| `mat_scalar_mul_d(A, s)` | `double` | `s * A` |
+| `mat_scalar_mul_qf(A, s)` | `qfloat_t` | `s * A` |
+| `mat_scalar_mul_qc(A, s)` | `qcomplex_t` | `s * A` |
+| `mat_scalar_div_d(A, s)` | `double` | `A / s` |
+| `mat_scalar_div_qf(A, s)` | `qfloat_t` | `A / s` |
+| `mat_scalar_div_qc(A, s)` | `qcomplex_t` | `A / s` |
 
 ### Matrix Operations
 
@@ -206,8 +218,9 @@ if only eigenvectors are needed. On success `*eigenvectors` is set to a newly
 allocated `n × n` matrix whose columns are the eigenvectors.
 
 - **Hermitian matrices** — Jacobi path; eigenvectors are orthonormal.
-- **General matrices** — Schur decomposition path; eigenvectors are the columns of
-  the Schur factor matrix transformed back to the original basis.
+- **General matrices** — Schur decomposition path; eigenvectors are computed by
+  back-substitution from the upper triangular Schur factor, then multiplied by
+  the unitary Schur factor Q to transform back to the original basis.
 
 Return values: `0` on success, negative on error.
 
@@ -225,61 +238,59 @@ Returns a newly allocated eigenvector matrix, or NULL on error.
 All matrix functions accept a square matrix and return a newly allocated result,
 or NULL on error (NULL input, non-square input, or internal allocation failure).
 
-#### Via eigendecomposition (Hermitian matrices)
+Every matrix function uses the same algorithm: Schur decomposition followed by
+the Parlett recurrence on the triangular Schur factor.
 
-For Hermitian matrices these functions use the eigendecomposition
-`A = V D V†`, apply the scalar function to each eigenvalue, then reconstruct:
-`f(A) = V · diag(f(λᵢ)) · V†`.
+1. Compute `A = Q T Q*` (Schur decomposition; T is upper triangular, Q is unitary).
+2. Apply the scalar function element-wise to the diagonal of T and propagate off-diagonal
+   entries via the Parlett recurrence: `f(T)_{ij} = T_{ij}(f(T_{ii}) − f(T_{jj})) / (T_{ii} − T_{jj})`.
+   When `T_{ii} = T_{jj}` the recurrence uses a numerical derivative of the scalar function.
+3. Reconstruct `f(A) = Q · f(T) · Q*`.
+
+All internal arithmetic uses `qcomplex_t`. If the input matrix has a narrower element
+type the result is converted back to that type before returning.
 
 | Function | Description |
 |---|---|
-| `mat_exp(A)` | Matrix exponential `exp(A)` |
-| `mat_sin(A)` | Matrix sine `sin(A)` |
-| `mat_cos(A)` | Matrix cosine `cos(A)` |
-| `mat_tan(A)` | Matrix tangent `tan(A)` |
-| `mat_sinh(A)` | Matrix hyperbolic sine `sinh(A)` |
-| `mat_cosh(A)` | Matrix hyperbolic cosine `cosh(A)` |
-| `mat_tanh(A)` | Matrix hyperbolic tangent `tanh(A)` |
+| `mat_exp(A)` | Matrix exponential `eˢ` |
+| `mat_log(A)` | Matrix (principal) logarithm |
+| `mat_sqrt(A)` | Matrix (principal) square root |
+| `mat_sin(A)` | Matrix sine |
+| `mat_cos(A)` | Matrix cosine |
+| `mat_tan(A)` | Matrix tangent |
+| `mat_sinh(A)` | Matrix hyperbolic sine |
+| `mat_cosh(A)` | Matrix hyperbolic cosine |
+| `mat_tanh(A)` | Matrix hyperbolic tangent |
+| `mat_asin(A)` | Matrix arc sine |
+| `mat_acos(A)` | Matrix arc cosine |
+| `mat_atan(A)` | Matrix arc tangent |
+| `mat_asinh(A)` | Matrix inverse hyperbolic sine |
+| `mat_acosh(A)` | Matrix inverse hyperbolic cosine |
+| `mat_atanh(A)` | Matrix inverse hyperbolic tangent |
+| `mat_erf(A)` | Matrix error function |
+| `mat_erfc(A)` | Matrix complementary error function |
 
-#### Via Denman–Beavers iteration
+### Power Functions
+
+#### Integer power
 
 ```c
-matrix_t *mat_sqrt(const matrix_t *A);
+matrix_t *mat_pow_int(const matrix_t *A, int n);
 ```
 
-Computes the principal square root of `A` using the Denman–Beavers coupled
-iteration `X_{k+1} = (X_k + Y_k⁻¹)/2`, `Y_{k+1} = (Y_k + X_k⁻¹)/2`, which
-converges quadratically. The zero matrix is handled as a special case
-(returns a zero matrix immediately). Returns NULL for singular inputs where no
-square root exists.
+Computes `Aⁿ` via binary exponentiation. `n` may be zero (returns the
+identity), positive, or negative (uses `mat_inverse` internally). Returns NULL
+if `A` is NULL, not square, or inversion fails when `n < 0`.
 
-#### Via repeated square root and Taylor series
+#### Real power
 
 ```c
-matrix_t *mat_log(const matrix_t *A);
+matrix_t *mat_pow(const matrix_t *A, double s);
 ```
 
-Computes the principal matrix logarithm. Reduces `A` by repeated square-rooting
-until `‖B − I‖_F ≤ 0.5`, computes `log(I + C) = C − C²/2 + C³/3 − …` via
-Taylor series (convergence guaranteed in that neighbourhood), then multiplies
-the result by `2^m` where `m` is the number of halvings.
-
-#### Via Taylor series
-
-The inverse trigonometric and inverse hyperbolic functions are computed by
-power-series expansion. The series use `A²` as the step matrix, so each term
-costs one additional matrix multiply. Convergence requires `‖A‖ < 1` for
-`asin`, `atan`, `atanh`; `‖A‖ > 1` for `acosh` (which uses a different
-formula); and `asinh` converges for all `A`.
-
-| Function | Formula / series | Domain |
-|---|---|---|
-| `mat_asin(A)` | `A + (1/6)A³ + (3/40)A⁵ + …` | `‖A‖ ≤ 1` |
-| `mat_acos(A)` | `(π/2)I − mat_asin(A)` | `‖A‖ ≤ 1` |
-| `mat_atan(A)` | `A − (1/3)A³ + (1/5)A⁵ − …` | `‖A‖ < 1` |
-| `mat_asinh(A)` | `A − (1/6)A³ + (3/40)A⁵ − …` | all `A` |
-| `mat_acosh(A)` | `mat_log(A + mat_sqrt(A² − I))` | `‖A‖ ≥ 1` |
-| `mat_atanh(A)` | `A + (1/3)A³ + (1/5)A⁵ + …` | `‖A‖ < 1` |
+Computes `Aˢ = exp(s · log(A))`. Requires `A` to have a well-defined matrix
+logarithm — positive definite real matrices always satisfy this. Returns NULL
+on any error (NULL input, non-square, `mat_log` failure).
 
 ### Debugging / I/O
 
@@ -304,21 +315,24 @@ kind directly.
 
 ### Precision of Linear Algebra
 
-**Hermitian path** — cyclic Jacobi sweep. Rotation parameters (τ, t, c, s) are
-always real; they are computed through `qfloat_t` arithmetic, giving ~31 decimal
-digits of precision regardless of the matrix's element type. Eigenvalues are real
-and eigenvectors are orthonormal.
+**Eigendecomposition, Hermitian path** — cyclic Jacobi sweep. Rotation parameters
+(τ, t, c, s) are always real; they are computed through `qfloat_t` arithmetic,
+giving ~31 decimal digits of precision regardless of the matrix's element type.
+Eigenvalues are real and eigenvectors are orthonormal.
 
-**General path** — Hessenberg reduction (Householder reflectors) followed by
-implicit single-shift QR (Francis/Wilkinson). All internal arithmetic uses
-`qcomplex_t` flat arrays, so the algorithm handles real, qfloat, and complex
-matrices uniformly. Hermitian detection compares `A[i,j]` against `conj(A[j,i])`
-within a tolerance relative to the Frobenius norm; matrices that pass this test
-take the faster Jacobi path automatically.
+**Eigendecomposition, general path** — Hessenberg reduction (Householder
+reflectors) followed by implicit single-shift QR (Francis/Wilkinson). All
+internal arithmetic uses `qcomplex_t` flat arrays, so the algorithm handles real,
+qfloat, and complex matrices uniformly. Hermitian detection compares `A[i,j]`
+against `conj(A[j,i])` within a tolerance relative to the Frobenius norm; matrices
+that pass this test take the faster Jacobi path automatically.
+
+**Matrix functions** — all use the Schur + Parlett path regardless of whether the
+matrix is Hermitian. Internal arithmetic is always `qcomplex_t`; the result is
+cast back to the input element type before returning.
 
 ### Identity Storage
 
 Identity matrices store no element data. Reading `(i, i)` returns one; reading
 `(i, j)` for `i ≠ j` returns zero. The first write to any element transparently
-materialises the matrix as dense, after which it behaves identically to a dense
-matrix created with `matsq_create_*`.
+materialises the matrix as dense.

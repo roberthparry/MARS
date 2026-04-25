@@ -8,14 +8,13 @@
 
 /**
  * @file matrix.h
- * @brief Generic high‑precision matrix type with pluggable element types
- *        and storage kinds (dense, identity, diagonal, etc.).
+ * @brief Generic high‑precision matrix type with pluggable element types.
  *
  * This API exposes a uniform matrix abstraction while hiding all internal
  * details such as element type, storage representation, and vtables.
  *
  * Matrices may be:
- *   - dense (fully materialised)
+ *   - fully materialised (standard matrix)
  *   - identity (zero storage; materialises on write)
  *   - diagonal (future extension)
  *
@@ -25,54 +24,85 @@
 
 typedef struct matrix_t matrix_t;
 
+/**
+ * @brief Matrix element type.
+ */
+typedef enum {
+    MAT_TYPE_DOUBLE,
+    MAT_TYPE_QFLOAT,
+    MAT_TYPE_QCOMPLEX
+} mat_type_t;
+
 /* -------------------------------------------------------------------------
    Construction
    ------------------------------------------------------------------------- */
 
 /**
- * @brief Create a dense matrix of doubles.
+ * @brief Allocate a new (incomplete) matrix of doubles.
+ *
+ * The returned matrix is allocated but contains unspecified values.
+ * The caller must fill it using mat_set().
  */
-matrix_t *mat_create_d(size_t rows, size_t cols);
+matrix_t *mat_new_d(size_t rows, size_t cols);
 
 /**
- * @brief Create a dense matrix of qfloat_t.
+ * @brief Allocate a new (incomplete) matrix of qfloat_t.
  */
-matrix_t *mat_create_qf(size_t rows, size_t cols);
+matrix_t *mat_new_qf(size_t rows, size_t cols);
 
 /**
- * @brief Create a dense matrix of qcomplex_t.
+ * @brief Allocate a new (incomplete) matrix of qcomplex_t.
  */
-matrix_t *mat_create_qc(size_t rows, size_t cols);
+matrix_t *mat_new_qc(size_t rows, size_t cols);
 
 /**
- * @brief Create a square dense matrix of doubles.
+ * @brief Allocate a new (incomplete) square matrix of doubles.
  */
-matrix_t *matsq_create_d(size_t n);
+matrix_t *matsq_new_d(size_t n);
 
 /**
- * @brief Create a square dense matrix of qfloat_t.
+ * @brief Allocate a new (incomplete) square matrix of qfloat_t.
  */
-matrix_t *matsq_create_qf(size_t n);
+matrix_t *matsq_new_qf(size_t n);
 
 /**
- * @brief Create a square dense matrix of qcomplex_t.
+ * @brief Allocate a new (incomplete) square matrix of qcomplex_t.
  */
-matrix_t *matsq_create_qc(size_t n);
+matrix_t *matsq_new_qc(size_t n);
 
 /**
- * @brief Create an identity matrix of doubles.
+ * @brief Create a complete identity matrix of doubles.
  */
-matrix_t *matsq_ident_d(size_t n);
+matrix_t *mat_create_identity_d(size_t n);
 
 /**
- * @brief Create an identity matrix of qfloat_t.
+ * @brief Create a complete identity matrix of qfloat_t.
  */
-matrix_t *matsq_ident_qf(size_t n);
+matrix_t *mat_create_identity_qf(size_t n);
 
 /**
- * @brief Create an identity matrix of qcomplex_t.
+ * @brief Create a complete identity matrix of qcomplex_t.
  */
-matrix_t *matsq_ident_qc(size_t n);
+matrix_t *mat_create_identity_qc(size_t n);
+
+/**
+ * @brief Create a complete matrix of doubles from a flat array.
+ *
+ * @param rows       Number of rows.
+ * @param cols       Number of columns.
+ * @param data       Pointer to rows*cols values.
+ */
+matrix_t *mat_create_d(size_t rows, size_t cols, const double *data);
+
+/**
+ * @brief Create a complete matrix of qfloat_t from a flat array.
+ */
+matrix_t *mat_create_qf(size_t rows, size_t cols, const qfloat_t *data);
+
+/**
+ * @brief Create a complete matrix of qcomplex_t from a flat array.
+ */
+matrix_t *mat_create_qc(size_t rows, size_t cols, const qcomplex_t *data);
 
 /* -------------------------------------------------------------------------
    Destruction
@@ -84,262 +114,145 @@ void mat_free(matrix_t *A);
    Element access
    ------------------------------------------------------------------------- */
 
-/**
- * @brief Get the value of an element in the matrix.
- */
 void mat_get(const matrix_t *A, size_t i, size_t j, void *out);
-
-/**
- * @brief Set the value of an element in the matrix.
- */
 void mat_set(matrix_t *A, size_t i, size_t j, const void *val);
 
-/**
- * @brief Get the number of rows in the matrix.
- */
 size_t mat_get_row_count(const matrix_t *A);
-
-/**
- * @brief Get the number of columns in the matrix.
- */
 size_t mat_get_col_count(const matrix_t *A);
 
+/**
+ * @brief Query the element type of a matrix.
+ *
+ * This function returns the public element type associated with a matrix.
+ * It allows callers to detect when an operation has promoted the matrix to
+ * a wider numerical type.  For example, functions such as mat_log(),
+ * mat_sqrt(), or mat_pow() may legitimately produce complex-valued results
+ * even when the input matrix is real.  In such cases the returned matrix
+ * will have a different element type from the input.
+ *
+ * This mechanism is important when performing bulk data extraction into
+ * user-provided buffers: callers must ensure that the buffer element type
+ * matches the actual matrix element type.  By checking mat_typeof() before
+ * a bulk get, the caller can avoid accidental overwrites or misinterpretation
+ * of the underlying data.
+ *
+ * The returned type is a stable, public-facing enumeration and does not
+ * expose any internal representation details.
+ *
+ * @param A  The matrix whose element type is to be queried.
+ * @return   The public element type of the matrix.
+ */
+mat_type_t mat_typeof(const matrix_t *A);
+
+/* -------------------------------------------------------------------------
+   Bulk settors/gettors
+   ------------------------------------------------------------------------- */
+
+/**
+ * @brief Set all matrix elements from a flat row‑major buffer.
+ *
+ * The buffer must contain rows*cols elements of the matrix's element type
+ * (double, qfloat_t, or qcomplex_t depending on A).
+ *
+ * @param A     The matrix to modify.
+ * @param data  Pointer to a flat row‑major array of elements.
+ */
+void mat_set_data(matrix_t *A, const void *data);
+
+/**
+ * @brief Get all matrix elements into a flat row‑major buffer.
+ *
+ * The buffer must have space for rows*cols elements of the matrix's
+ * element type (double, qfloat_t, or qcomplex_t depending on A).
+ *
+ * @param A     The matrix to read from.
+ * @param data  Pointer to a flat row‑major array to receive the elements.
+ */
+void mat_get_data(const matrix_t *A, void *data);
 
 /* -------------------------------------------------------------------------
    Basic operations
    ------------------------------------------------------------------------- */
 
-/* Scalar multiplication */
+matrix_t *mat_scalar_mul_d(matrix_t *A, double s);
+matrix_t *mat_scalar_mul_qf(matrix_t *A, qfloat_t s);
+matrix_t *mat_scalar_mul_qc(matrix_t *A, qcomplex_t s);
 
-/**
- * @brief Multiply a matrix by a double scalar.
- */
-matrix_t *mat_scalar_mul_d(double s, matrix_t *A);
+matrix_t *mat_scalar_div_d(matrix_t *A, double s);
+matrix_t *mat_scalar_div_qf(matrix_t *A, qfloat_t s);
+matrix_t *mat_scalar_div_qc(matrix_t *A, qcomplex_t s);
 
-/**
- * @brief Multiply a matrix by a qfloat_t scalar.
- */
-matrix_t *mat_scalar_mul_qf(qfloat_t s, matrix_t *A);
-
-/**
- * @brief Multiply a matrix by a qcomplex_t scalar.
- */
-matrix_t *mat_scalar_mul_qc(qcomplex_t s, matrix_t *A);
-
-/**
- * @brief Divide a matrix by a double scalar.
- */
-matrix_t *mat_scalar_div_d(double s, matrix_t *A);
-
-/**
- * @brief Divide a matrix by a qfloat_t scalar.
- */
-matrix_t *mat_scalar_div_qf(qfloat_t s, matrix_t *A);
-
-/**
- * @brief Divide a matrix by a qcomplex_t scalar.
- */
-matrix_t *mat_scalar_div_qc(qcomplex_t s, matrix_t *A);
-
-/**
- * @brief Add two matrices.
- */
 matrix_t *mat_add(const matrix_t *A, const matrix_t *B);
-
-/**
- * @brief Subtract matrix B from matrix A.
- */
 matrix_t *mat_sub(const matrix_t *A, const matrix_t *B);
-
-/**
- * @brief Multiply two matrices.
- */
 matrix_t *mat_mul(const matrix_t *A, const matrix_t *B);
 
-/**
- * @brief Transpose a matrix.
- */
 matrix_t *mat_transpose(const matrix_t *A);
-
-/**
- * @brief Conjugate a matrix.
- */
 matrix_t *mat_conj(const matrix_t *A);
-
-/**
- * @brief Compute the Hermitian (conjugate transpose) of a matrix.
- * @param A The input matrix.
- * @return A new matrix representing the Hermitian of A, or NULL on error.
- */
 matrix_t *mat_hermitian(const matrix_t *A);
 
-/**
- * @brief Compute the determinant of a square matrix.
- * @param A The input square matrix.
- * @param determinant Pointer to a buffer where the determinant will be stored.
- * @return 0 on success, negative on error:
- *         -1 : A is NULL
- *         -2 : A is not square
- *         -3 : allocation failure
- */
-int mat_det(const matrix_t *A, void *determinant);
-
-/**
- * @brief Compute the inverse of a square matrix.
- * @param A The input square matrix.
- * @return A new matrix representing the inverse of A, or NULL on error.
- */
+int       mat_det(const matrix_t *A, void *determinant);
 matrix_t *mat_inverse(const matrix_t *A);
 
-/**
- * @brief Compute all eigenvalues of a square matrix.
- *
- * Computes the complete set of eigenvalues of @p A. The matrix must
- * be square. The eigenvalues are written into the user-provided buffer
- * @p eigenvalues, which must have room for @c n values of the matrix's
- * element type (double, qfloat_t, or qcomplex_t depending on @p A).
- *
- * @param[in]  A            The input matrix (must be square).
- * @param[out] eigenvalues  Buffer of size @c n * elem_size to receive
- *                          the eigenvalues.
- *
- * @return 0 on success, negative on error.
- */
-int mat_eigenvalues(const matrix_t *A, void *eigenvalues);
+/* -------------------------------------------------------------------------
+   Eigenvalues / Eigenvectors
+   ------------------------------------------------------------------------- */
 
-/**
- * @brief Compute eigenvalues and eigenvectors of a square matrix.
- *
- * Computes both the eigenvalues and the corresponding eigenvectors of
- * @p A. The matrix must be square. The eigenvalues are written into the
- * user-provided buffer @p eigenvalues, which must have room for @c n
- * values of the matrix's element type.
- *
- * The eigenvectors are returned as a newly allocated @c n×n matrix of
- * the same element type as @p A. Each column of the returned matrix is
- * an eigenvector. For Hermitian matrices, the eigenvectors are returned
- * orthonormal.
- *
- * @param[in]  A             The input matrix (must be square).
- * @param[out] eigenvalues   Buffer of size @c n * elem_size to receive
- *                           the eigenvalues (may be NULL if only
- *                           eigenvectors are desired).
- * @param[out] eigenvectors  On success, set to a newly allocated matrix
- *                           containing the eigenvectors.
- *
- * @return 0 on success, negative on error.
- */
-int mat_eigendecompose(const matrix_t *A, void *eigenvalues, matrix_t **eigenvectors);
-
-/**
- * @brief Compute only the eigenvectors of a square matrix.
- *
- * Convenience wrapper around mat_eigendecompose(). The eigenvalues are
- * discarded. The returned matrix contains the eigenvectors as its columns.
- * For Hermitian matrices, the eigenvectors are orthonormal.
- *
- * @param[in] A   The input matrix (must be square).
- *
- * @return A newly allocated matrix of eigenvectors, or NULL on error.
- */
+int       mat_eigenvalues(const matrix_t *A, void *eigenvalues);
+int       mat_eigendecompose(const matrix_t *A, void *eigenvalues,
+                             matrix_t **eigenvectors);
 matrix_t *mat_eigenvectors(const matrix_t *A);
 
 /* -------------------------------------------------------------------------
    Matrix functions (Hermitian matrices via eigendecomposition)
    ------------------------------------------------------------------------- */
 
-/**
- * @brief Compute the matrix exponential exp(A) of a square Hermitian matrix.
- *
- * Uses eigendecomposition: A = V D V†, then exp(A) = V · diag(exp(λᵢ)) · V†.
- *
- * @param A  Square Hermitian matrix (double, qfloat_t, or qcomplex_t elements).
- * @return   Newly allocated matrix exp(A), or NULL on error.
- */
 matrix_t *mat_exp(const matrix_t *A);
-
-/**
- * @brief Compute the matrix sine sin(A) of a square Hermitian matrix.
- *
- * Uses eigendecomposition: A = V D V†, then sin(A) = V · diag(sin(λᵢ)) · V†.
- *
- * @param A  Square Hermitian matrix (double, qfloat_t, or qcomplex_t elements).
- * @return   Newly allocated matrix sin(A), or NULL on error.
- */
 matrix_t *mat_sin(const matrix_t *A);
-
-/**
- * @brief Compute the matrix cosine cos(A) of a square Hermitian matrix.
- */
 matrix_t *mat_cos(const matrix_t *A);
-
-/**
- * @brief Compute the matrix tangent tan(A) of a square Hermitian matrix.
- */
 matrix_t *mat_tan(const matrix_t *A);
 
-/**
- * @brief Compute the matrix hyperbolic sine sinh(A) of a square Hermitian matrix.
- */
 matrix_t *mat_sinh(const matrix_t *A);
-
-/**
- * @brief Compute the matrix hyperbolic cosine cosh(A) of a square Hermitian matrix.
- */
 matrix_t *mat_cosh(const matrix_t *A);
-
-/**
- * @brief Compute the matrix hyperbolic tangent tanh(A) of a square Hermitian matrix.
- */
 matrix_t *mat_tanh(const matrix_t *A);
 
-/**
- * @brief Compute the matrix square root sqrt(A) of a square matrix.
- */
 matrix_t *mat_sqrt(const matrix_t *A);
-
-/**
- * @brief Compute the principal matrix logarithm log(A) of a square matrix.
- */
 matrix_t *mat_log(const matrix_t *A);
 
-/**
- * @brief Compute the matrix arcsine asin(A) of a square matrix.
- */
 matrix_t *mat_asin(const matrix_t *A);
-
-/**
- * @brief Compute the matrix arccosine acos(A) of a square matrix.
- */
 matrix_t *mat_acos(const matrix_t *A);
-
-/**
- * @brief Compute the matrix arctangent atan(A) of a square matrix.
- */
 matrix_t *mat_atan(const matrix_t *A);
 
-/**
- * @brief Compute the matrix hyperbolic arcsine asinh(A) of a square matrix.
- */
 matrix_t *mat_asinh(const matrix_t *A);
-
-/**
- * @brief Compute the matrix hyperbolic arccosine acosh(A) of a square matrix.
- */
 matrix_t *mat_acosh(const matrix_t *A);
+matrix_t *mat_atanh(const matrix_t *A);
+
+matrix_t *mat_erf(const matrix_t *A);
+matrix_t *mat_erfc(const matrix_t *A);
+
+/* -------------------------------------------------------------------------
+   Power functions
+   ------------------------------------------------------------------------- */
 
 /**
- * @brief Compute the matrix hyperbolic arctangent atanh(A) of a square matrix.
+ * @brief Integer power: A^n via binary exponentiation.
+ *
+ * n may be negative (uses mat_inverse internally).
+ * Returns NULL if A is NULL, not square, or inversion fails for n < 0.
  */
-matrix_t *mat_atanh(const matrix_t *A);
+matrix_t *mat_pow_int(const matrix_t *A, int n);
+
+/**
+ * @brief Real power: A^s = exp(s * log(A)).
+ *
+ * Requires A to have a well-defined matrix logarithm (positive definite
+ * for real matrices).  Returns NULL on error.
+ */
+matrix_t *mat_pow(const matrix_t *A, double s);
 
 /* -------------------------------------------------------------------------
    Debugging / I/O
    ------------------------------------------------------------------------- */
 
-/**
- * @brief Print the matrix to standard output.
- */
 void mat_print(const matrix_t *A);
 
 #endif /* MATRIX_H */

@@ -13,7 +13,14 @@ typedef struct {
     qfloat_t im; /**< Imaginary part */
 } qcomplex_t;
 
+/**
+ * @brief 0 + 0i constant
+ */
 extern const qcomplex_t QC_ZERO;
+
+/**
+ * @brief 1 + 0i constant
+ */
 extern const qcomplex_t QC_ONE;
 
 /**
