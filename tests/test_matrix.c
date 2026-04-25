@@ -178,8 +178,8 @@ static void check_d(const char *label, double got, double expected, double tol)
     tests_run++;
     if (!ok) tests_failed++;
 
-    printf(ok ? C_GREEN "  OK: %s\n" C_RESET
-              : C_RED "  FAIL: %s\n" C_RESET, label);
+    printf(ok ? C_BOLD C_GREEN "  OK: %s\n" C_RESET
+              : C_BOLD C_RED "  FAIL: %s\n" C_RESET, label);
 
     char gbuf[256], ebuf[256];
     d_to_coloured_string(got, gbuf, sizeof(gbuf));
@@ -199,8 +199,8 @@ static void check_qf_val(const char *label, qfloat_t got, qfloat_t expected, dou
     tests_run++;
     if (!ok) tests_failed++;
 
-    printf(ok ? C_GREEN "  OK: %s\n" C_RESET
-              : C_RED "  FAIL: %s\n" C_RESET, label);
+    printf(ok ? C_BOLD C_GREEN "  OK: %s\n" C_RESET
+              : C_BOLD C_RED "  FAIL: %s\n" C_RESET, label);
 
     print_qf("got      ", got);
     print_qf("expected ", expected);
@@ -215,8 +215,8 @@ static void check_qc_val(const char *label, qcomplex_t got, qcomplex_t expected,
     tests_run++;
     if (!ok) tests_failed++;
 
-    printf(ok ? C_GREEN "  OK: %s\n" C_RESET
-              : C_RED "  FAIL: %s\n" C_RESET, label);
+    printf(ok ? C_BOLD C_GREEN "  OK: %s\n" C_RESET
+              : C_BOLD C_RED "  FAIL: %s\n" C_RESET, label);
 
     print_qc("got      ", got);
     print_qc("expected ", expected);
@@ -228,8 +228,8 @@ static void check_bool(const char *label, int cond)
     tests_run++;
     if (!cond) tests_failed++;
 
-    printf(cond ? C_GREEN "  OK: %s\n" C_RESET
-                : C_RED "  FAIL: %s\n" C_RESET, label);
+    printf(cond ? C_BOLD C_GREEN "  OK: %s\n" C_RESET
+                : C_BOLD C_RED "  FAIL: %s\n" C_RESET, label);
 }
 
 /* ------------------------------------------------------------------ 1. creation */
