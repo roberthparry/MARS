@@ -293,6 +293,46 @@ matrix_t *mat_cosh(const matrix_t *A);
  */
 matrix_t *mat_tanh(const matrix_t *A);
 
+/**
+ * @brief Compute the matrix square root sqrt(A) of a square matrix.
+ */
+matrix_t *mat_sqrt(const matrix_t *A);
+
+/**
+ * @brief Compute the principal matrix logarithm log(A) of a square matrix.
+ */
+matrix_t *mat_log(const matrix_t *A);
+
+/**
+ * @brief Compute the matrix arcsine asin(A) of a square matrix.
+ */
+matrix_t *mat_asin(const matrix_t *A);
+
+/**
+ * @brief Compute the matrix arccosine acos(A) of a square matrix.
+ */
+matrix_t *mat_acos(const matrix_t *A);
+
+/**
+ * @brief Compute the matrix arctangent atan(A) of a square matrix.
+ */
+matrix_t *mat_atan(const matrix_t *A);
+
+/**
+ * @brief Compute the matrix hyperbolic arcsine asinh(A) of a square matrix.
+ */
+matrix_t *mat_asinh(const matrix_t *A);
+
+/**
+ * @brief Compute the matrix hyperbolic arccosine acosh(A) of a square matrix.
+ */
+matrix_t *mat_acosh(const matrix_t *A);
+
+/**
+ * @brief Compute the matrix hyperbolic arctangent atanh(A) of a square matrix.
+ */
+matrix_t *mat_atanh(const matrix_t *A);
+
 /* -------------------------------------------------------------------------
    Debugging / I/O
    ------------------------------------------------------------------------- */

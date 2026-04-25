@@ -23,6 +23,7 @@ the API. Internally each matrix carries:
 - arithmetic: scalar multiply/divide, matrix add, subtract, multiply
 - structural: transpose, conjugate, Hermitian (conjugate transpose)
 - linear algebra: determinant, inverse, eigenvalues, eigendecomposition, eigenvectors
+- matrix functions: exp, sin, cos, tan, sinh, cosh, tanh, sqrt, log, asin, acos, atan, asinh, acosh, atanh
 - all linear algebra computed at full `qfloat_t` precision regardless of element type
 
 ## Example
@@ -182,8 +183,13 @@ int mat_eigenvalues(const matrix_t *A, void *eigenvalues);
 
 Computes all eigenvalues of square matrix `A` and writes them into the
 caller-allocated buffer `eigenvalues`, which must hold `n` values of the matrix's
-element type. For Hermitian matrices the algorithm is a cyclic Jacobi sweep
-computed entirely in `qfloat_t` precision (~31 decimal digits).
+element type.
+
+- **Hermitian matrices** — cyclic Jacobi sweep computed entirely in `qfloat_t`
+  precision (~31 decimal digits); eigenvalues are real.
+- **General matrices** — Hessenberg reduction followed by implicit single-shift QR
+  (Francis algorithm); all internal arithmetic uses `qcomplex_t`. Eigenvalues may
+  be complex even when `A` has real elements.
 
 Return values: `0` on success, negative on error.
 
@@ -197,8 +203,11 @@ int mat_eigendecompose(const matrix_t *A,
 
 Computes eigenvalues and eigenvectors simultaneously. `eigenvalues` may be NULL
 if only eigenvectors are needed. On success `*eigenvectors` is set to a newly
-allocated `n × n` matrix whose columns are the eigenvectors. For Hermitian
-matrices the columns are orthonormal.
+allocated `n × n` matrix whose columns are the eigenvectors.
+
+- **Hermitian matrices** — Jacobi path; eigenvectors are orthonormal.
+- **General matrices** — Schur decomposition path; eigenvectors are the columns of
+  the Schur factor matrix transformed back to the original basis.
 
 Return values: `0` on success, negative on error.
 
@@ -210,6 +219,67 @@ matrix_t *mat_eigenvectors(const matrix_t *A);
 
 Convenience wrapper around `mat_eigendecompose` that discards the eigenvalues.
 Returns a newly allocated eigenvector matrix, or NULL on error.
+
+### Matrix Functions
+
+All matrix functions accept a square matrix and return a newly allocated result,
+or NULL on error (NULL input, non-square input, or internal allocation failure).
+
+#### Via eigendecomposition (Hermitian matrices)
+
+For Hermitian matrices these functions use the eigendecomposition
+`A = V D V†`, apply the scalar function to each eigenvalue, then reconstruct:
+`f(A) = V · diag(f(λᵢ)) · V†`.
+
+| Function | Description |
+|---|---|
+| `mat_exp(A)` | Matrix exponential `exp(A)` |
+| `mat_sin(A)` | Matrix sine `sin(A)` |
+| `mat_cos(A)` | Matrix cosine `cos(A)` |
+| `mat_tan(A)` | Matrix tangent `tan(A)` |
+| `mat_sinh(A)` | Matrix hyperbolic sine `sinh(A)` |
+| `mat_cosh(A)` | Matrix hyperbolic cosine `cosh(A)` |
+| `mat_tanh(A)` | Matrix hyperbolic tangent `tanh(A)` |
+
+#### Via Denman–Beavers iteration
+
+```c
+matrix_t *mat_sqrt(const matrix_t *A);
+```
+
+Computes the principal square root of `A` using the Denman–Beavers coupled
+iteration `X_{k+1} = (X_k + Y_k⁻¹)/2`, `Y_{k+1} = (Y_k + X_k⁻¹)/2`, which
+converges quadratically. The zero matrix is handled as a special case
+(returns a zero matrix immediately). Returns NULL for singular inputs where no
+square root exists.
+
+#### Via repeated square root and Taylor series
+
+```c
+matrix_t *mat_log(const matrix_t *A);
+```
+
+Computes the principal matrix logarithm. Reduces `A` by repeated square-rooting
+until `‖B − I‖_F ≤ 0.5`, computes `log(I + C) = C − C²/2 + C³/3 − …` via
+Taylor series (convergence guaranteed in that neighbourhood), then multiplies
+the result by `2^m` where `m` is the number of halvings.
+
+#### Via Taylor series
+
+The inverse trigonometric and inverse hyperbolic functions are computed by
+power-series expansion. The series use `A²` as the step matrix, so each term
+costs one additional matrix multiply. Convergence requires `‖A‖ < 1` for
+`asin`, `atan`, `atanh`; `‖A‖ > 1` for `acosh` (which uses a different
+formula); and `asinh` converges for all `A`.
+
+| Function | Formula / series | Domain |
+|---|---|---|
+| `mat_asin(A)` | `A + (1/6)A³ + (3/40)A⁵ + …` | `‖A‖ ≤ 1` |
+| `mat_acos(A)` | `(π/2)I − mat_asin(A)` | `‖A‖ ≤ 1` |
+| `mat_atan(A)` | `A − (1/3)A³ + (1/5)A⁵ − …` | `‖A‖ < 1` |
+| `mat_asinh(A)` | `A − (1/6)A³ + (3/40)A⁵ − …` | all `A` |
+| `mat_acosh(A)` | `mat_log(A + mat_sqrt(A² − I))` | `‖A‖ ≥ 1` |
+| `mat_atanh(A)` | `A + (1/3)A³ + (1/5)A⁵ + …` | `‖A‖ < 1` |
 
 ### Debugging / I/O
 
@@ -234,10 +304,17 @@ kind directly.
 
 ### Precision of Linear Algebra
 
-Eigendecomposition uses a cyclic Jacobi sweep. Rotation parameters (τ, t, c, s)
-are always real even for complex Hermitian matrices; they are computed through
-`qfloat_t` arithmetic rather than `double`, giving ~31 decimal digits of precision
-regardless of whether the matrix elements are `double` or `qfloat_t`.
+**Hermitian path** — cyclic Jacobi sweep. Rotation parameters (τ, t, c, s) are
+always real; they are computed through `qfloat_t` arithmetic, giving ~31 decimal
+digits of precision regardless of the matrix's element type. Eigenvalues are real
+and eigenvectors are orthonormal.
+
+**General path** — Hessenberg reduction (Householder reflectors) followed by
+implicit single-shift QR (Francis/Wilkinson). All internal arithmetic uses
+`qcomplex_t` flat arrays, so the algorithm handles real, qfloat, and complex
+matrices uniformly. Hermitian detection compares `A[i,j]` against `conj(A[j,i])`
+within a tolerance relative to the Frobenius norm; matrices that pass this test
+take the faster Jacobi path automatically.
 
 ### Identity Storage
 

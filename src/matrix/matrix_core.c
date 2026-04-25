@@ -201,6 +201,9 @@ static void d_to_qf(qfloat_t *o, const void *a)  { *o = qf_from_double(*(const d
 static void d_abs_qf(qfloat_t *o, const void *a) { *o = qf_from_double(fabs(*(const double*)a)); }
 static void d_from_qf(void *o, const qfloat_t *x){ *(double*)o = qf_to_double(*x); }
 
+static void d_to_qc_fn(qcomplex_t *o, const void *a)  { *o = qc_make(qf_from_double(*(const double*)a), QF_ZERO); }
+static void d_from_qc_fn(void *o, const qcomplex_t *z) { *(double*)o = qf_to_double(z->re); }
+
 const struct elem_vtable double_elem = {
     .size      = sizeof(double),
     .kind      = ELEM_DOUBLE,
@@ -215,6 +218,8 @@ const struct elem_vtable double_elem = {
     .to_qf     = d_to_qf,
     .abs_qf    = d_abs_qf,
     .from_qf   = d_from_qf,
+    .to_qc     = d_to_qc_fn,
+    .from_qc   = d_from_qc_fn,
     .zero      = &D_ZERO,
     .one       = &D_ONE,
     .print     = d_print,
@@ -256,6 +261,9 @@ static void qf_to_qf(qfloat_t *o, const void *a)  { *o = *(const qfloat_t*)a; }
 static void qf_abs_qf(qfloat_t *o, const void *a) { *o = qf_abs(*(const qfloat_t*)a); }
 static void qf_from_qf(void *o, const qfloat_t *x){ *(qfloat_t*)o = *x; }
 
+static void qf_to_qc_fn(qcomplex_t *o, const void *a)  { *o = qc_make(*(const qfloat_t*)a, QF_ZERO); }
+static void qf_from_qc_fn(void *o, const qcomplex_t *z) { *(qfloat_t*)o = z->re; }
+
 const struct elem_vtable qfloat_elem = {
     .size      = sizeof(qfloat_t),
     .kind      = ELEM_QFLOAT,
@@ -270,6 +278,8 @@ const struct elem_vtable qfloat_elem = {
     .to_qf     = qf_to_qf,
     .abs_qf    = qf_abs_qf,
     .from_qf   = qf_from_qf,
+    .to_qc     = qf_to_qc_fn,
+    .from_qc   = qf_from_qc_fn,
     .zero      = &QF_ZERO,
     .one       = &QF_ONE,
     .print     = qf_print_wrap,
@@ -325,6 +335,9 @@ static void qc_to_qf(qfloat_t *o, const void *a)  { *o = ((const qcomplex_t*)a)-
 static void qc_abs_qf(qfloat_t *o, const void *a) { *o = qc_abs(*(const qcomplex_t*)a); }
 static void qc_from_qf(void *o, const qfloat_t *x){ *(qcomplex_t*)o = qc_make(*x, QF_ZERO); }
 
+static void qc_to_qc_fn(qcomplex_t *o, const void *a)  { *o = *(const qcomplex_t*)a; }
+static void qc_from_qc_fn(void *o, const qcomplex_t *z) { *(qcomplex_t*)o = *z; }
+
 const struct elem_vtable qcomplex_elem = {
     .size      = sizeof(qcomplex_t),
     .kind      = ELEM_QCOMPLEX,
@@ -339,6 +352,8 @@ const struct elem_vtable qcomplex_elem = {
     .to_qf     = qc_to_qf,
     .abs_qf    = qc_abs_qf,
     .from_qf   = qc_from_qf,
+    .to_qc     = qc_to_qc_fn,
+    .from_qc   = qc_from_qc_fn,
     .zero      = &QC_ZERO,
     .one       = &QC_ONE,
     .print     = qc_print_wrap,
@@ -1264,11 +1279,12 @@ static void jacobi_apply(matrix_t *A, matrix_t *V, size_t p, size_t q)
     }
 }
 
-int mat_eigendecompose(const matrix_t *A, void *eigenvalues, matrix_t **eigenvectors)
-{
-    if (!A) return -1;
-    if (A->rows != A->cols) return -2;
+/* ============================================================
+   Hermitian fast path (Jacobi)
+   ============================================================ */
 
+static int mat_eigendecompose_hermitian(const matrix_t *A, void *eigenvalues, matrix_t **eigenvectors)
+{
     size_t n = A->rows;
     const struct elem_vtable *e = A->elem;
 
@@ -1278,7 +1294,6 @@ int mat_eigendecompose(const matrix_t *A, void *eigenvalues, matrix_t **eigenvec
     matrix_t *V = e->create_identity(n);
     if (!V) { mat_free(W); return -3; }
 
-    /* Frobenius norm² of W (invariant under orthogonal similarity) */
     double fro2 = 0.0;
     {
         unsigned char fv[64];
@@ -1288,7 +1303,6 @@ int mat_eigendecompose(const matrix_t *A, void *eigenvalues, matrix_t **eigenvec
                 fro2 += e->abs2(fv);
             }
     }
-    /* Converge when off-diagonal norm < 1e-29 * ||A||_F (safely below qfloat eps) */
     double tol = fro2 * 1e-29;
 
     for (int sweep = 0; sweep < 50; sweep++) {
@@ -1299,8 +1313,6 @@ int mat_eigendecompose(const matrix_t *A, void *eigenvalues, matrix_t **eigenvec
     }
 
     if (eigenvalues) {
-        /* Diagonal of W holds eigenvalues; extract real part via qfloat to
-           preserve full precision and strip any imaginary rounding noise. */
         char *ev = (char *)eigenvalues;
         unsigned char dv[64];
         for (size_t i = 0; i < n; i++) {
@@ -1318,6 +1330,375 @@ int mat_eigendecompose(const matrix_t *A, void *eigenvalues, matrix_t **eigenvec
 
     mat_free(W);
     return 0;
+}
+
+/* ============================================================
+   General QR eigensolver — Francis implicit single-shift
+   All internal arithmetic is in qcomplex_t (quad precision).
+   ============================================================ */
+
+/* Index into flat n×n qcomplex array */
+#define QCM(a,i,j,n) ((a)[(size_t)(i)*(n)+(size_t)(j)])
+
+static inline qfloat_t qc_abs2_qf(qcomplex_t z)
+{
+    return qf_add(qf_mul(z.re, z.re), qf_mul(z.im, z.im));
+}
+
+static inline qcomplex_t qcs(qfloat_t s, qcomplex_t z)
+{
+    return qc_make(qf_mul(s, z.re), qf_mul(s, z.im));
+}
+
+/* Detect whether A is Hermitian: A[i,j] == conj(A[j,i]) within tolerance */
+static int mat_is_hermitian(const matrix_t *A)
+{
+    size_t n = A->rows;
+    const struct elem_vtable *e = A->elem;
+    unsigned char aij[64], aji[64], cji[64], diff[64];
+    double tol2 = 0.0;
+    /* build tolerance from Frobenius norm */
+    for (size_t i = 0; i < n; i++)
+        for (size_t j = 0; j < n; j++) {
+            mat_get(A, i, j, aij);
+            tol2 += e->abs2(aij);
+        }
+    tol2 *= 1e-28;
+    for (size_t i = 0; i < n; i++)
+        for (size_t j = i + 1; j < n; j++) {
+            mat_get(A, i, j, aij);
+            mat_get(A, j, i, aji);
+            e->conj_elem(cji, aji);
+            e->sub(diff, aij, cji);
+            if (e->abs2(diff) > tol2) return 0;
+        }
+    return 1;
+}
+
+/* Householder reduction to upper Hessenberg form in-place.
+ * H is n×n qcomplex array. Q accumulates transformations (Q·H·Q†). */
+static void eigen_hess_reduce(qcomplex_t *H, qcomplex_t *Q, size_t n)
+{
+    qfloat_t two = qf_from_double(2.0);
+
+    for (size_t k = 0; k + 2 <= n; k++) {
+        /* Build Householder vector v from H[k+1..n-1, k] */
+        size_t len = n - k - 1;
+        qcomplex_t *col = (qcomplex_t *)malloc(len * sizeof(qcomplex_t));
+        if (!col) return;
+        for (size_t i = 0; i < len; i++)
+            col[i] = QCM(H, k+1+i, k, n);
+
+        /* norm of column */
+        qfloat_t norm2 = QF_ZERO;
+        for (size_t i = 0; i < len; i++)
+            norm2 = qf_add(norm2, qc_abs2_qf(col[i]));
+        qfloat_t norm = qf_sqrt(norm2);
+
+        if (qf_to_double(norm) < 1e-150) { free(col); continue; }
+
+        /* phase of first element: alpha = -norm * (col[0] / |col[0]|) */
+        qfloat_t abs0 = qc_abs(col[0]);
+        qcomplex_t alpha;
+        if (qf_to_double(abs0) < 1e-150) {
+            alpha = qc_make(qf_neg(norm), QF_ZERO);
+        } else {
+            /* alpha = -norm * col[0]/|col[0]| */
+            qfloat_t inv0 = qf_div(QF_ONE, abs0);
+            qcomplex_t phase = qcs(inv0, col[0]);
+            alpha = qcs(qf_neg(norm), phase);
+        }
+
+        /* v = col; v[0] -= alpha */
+        col[0] = qc_sub(col[0], alpha);
+
+        /* beta = 2 / (v† v) */
+        qfloat_t vdotv = QF_ZERO;
+        for (size_t i = 0; i < len; i++)
+            vdotv = qf_add(vdotv, qc_abs2_qf(col[i]));
+        qfloat_t beta = qf_div(two, vdotv);
+
+        /* Apply P = I - beta v v† from left: H ← P H */
+        /* w = beta * v† H[k+1:, :] */
+        for (size_t j = 0; j < n; j++) {
+            qcomplex_t s = QC_ZERO;
+            for (size_t i = 0; i < len; i++)
+                s = qc_add(s, qc_mul(qc_conj(col[i]), QCM(H, k+1+i, j, n)));
+            s = qcs(beta, s);
+            for (size_t i = 0; i < len; i++)
+                QCM(H, k+1+i, j, n) = qc_sub(QCM(H, k+1+i, j, n), qc_mul(col[i], s));
+        }
+
+        /* Apply P from right: H ← H P */
+        for (size_t i = 0; i < n; i++) {
+            qcomplex_t s = QC_ZERO;
+            for (size_t j = 0; j < len; j++)
+                s = qc_add(s, qc_mul(QCM(H, i, k+1+j, n), col[j]));
+            s = qcs(beta, s);
+            for (size_t j = 0; j < len; j++)
+                QCM(H, i, k+1+j, n) = qc_sub(QCM(H, i, k+1+j, n), qc_mul(qc_conj(col[j]), s));
+        }
+
+        /* Accumulate into Q: Q ← Q P */
+        for (size_t i = 0; i < n; i++) {
+            qcomplex_t s = QC_ZERO;
+            for (size_t j = 0; j < len; j++)
+                s = qc_add(s, qc_mul(QCM(Q, i, k+1+j, n), col[j]));
+            s = qcs(beta, s);
+            for (size_t j = 0; j < len; j++)
+                QCM(Q, i, k+1+j, n) = qc_sub(QCM(Q, i, k+1+j, n), qc_mul(qc_conj(col[j]), s));
+        }
+
+        free(col);
+    }
+}
+
+/* Givens rotation: find c (real), s (complex) such that
+ *   [ c    conj(s) ] [a]   [r]
+ *   [-s      c    ] [b] = [0]
+ * where r = hypot(|a|,|b|). */
+static void givens_cs(qcomplex_t a, qcomplex_t b,
+                      qfloat_t *c_out, qcomplex_t *s_out)
+{
+    qfloat_t abs_a = qc_abs(a);
+    qfloat_t abs_b = qc_abs(b);
+    qfloat_t r = qf_sqrt(qf_add(qf_mul(abs_a, abs_a), qf_mul(abs_b, abs_b)));
+    if (qf_to_double(r) < 1e-150) {
+        *c_out = QF_ONE;
+        *s_out = QC_ZERO;
+        return;
+    }
+    qfloat_t c = qf_div(abs_a, r);
+    /* s = c * b / a  (complex division; if a≈0 fall back) */
+    qcomplex_t s;
+    if (qf_to_double(abs_a) < 1e-150) {
+        s = qc_make(QF_ZERO, QF_ZERO);
+    } else {
+        qfloat_t inv_a_abs = qf_div(QF_ONE, abs_a);
+        qcomplex_t a_unit = qcs(inv_a_abs, a); /* a/|a| */
+        /* s = c * conj(a_unit) * b */
+        s = qcs(c, qc_mul(qc_conj(a_unit), b));
+    }
+    *c_out = c;
+    *s_out = s;
+}
+
+/* Apply one Givens rotation to columns k and k+1 of H (rows j0..n-1)
+ * and rows k and k+1 of H (cols 0..n-1), and Q cols k and k+1. */
+static void givens_apply(qcomplex_t *H, qcomplex_t *Q, size_t n,
+                         size_t k, size_t row_start,
+                         qfloat_t c, qcomplex_t s)
+{
+    qcomplex_t cs = qc_conj(s);
+
+    /* left multiply rows k, k+1 of H */
+    for (size_t j = row_start; j < n; j++) {
+        qcomplex_t x = QCM(H, k,   j, n);
+        qcomplex_t y = QCM(H, k+1, j, n);
+        QCM(H, k,   j, n) = qc_add(qcs(c, x), qc_mul(cs, y));
+        QCM(H, k+1, j, n) = qc_add(qc_neg(qc_mul(s, x)), qcs(c, y));
+    }
+
+    /* right multiply cols k, k+1 of H */
+    for (size_t i = 0; i < n; i++) {
+        qcomplex_t x = QCM(H, i, k,   n);
+        qcomplex_t y = QCM(H, i, k+1, n);
+        QCM(H, i, k,   n) = qc_add(qcs(c, x), qc_mul(s, y));
+        QCM(H, i, k+1, n) = qc_add(qc_mul(qc_neg(cs), x), qcs(c, y));
+    }
+
+    /* accumulate into Q (eigenvector columns) */
+    for (size_t i = 0; i < n; i++) {
+        qcomplex_t x = QCM(Q, i, k,   n);
+        qcomplex_t y = QCM(Q, i, k+1, n);
+        QCM(Q, i, k,   n) = qc_add(qcs(c, x), qc_mul(s, y));
+        QCM(Q, i, k+1, n) = qc_add(qc_mul(qc_neg(cs), x), qcs(c, y));
+    }
+}
+
+/* Wilkinson shift: eigenvalue of bottom 2×2 submatrix of T[0..sz-1, 0..sz-1]
+ * that is closest to T[sz-1, sz-1]. */
+static qcomplex_t wilkinson_shift(const qcomplex_t *T, size_t sz, size_t n)
+{
+    if (sz < 2) return QCM(T, sz-1, sz-1, n);
+    qcomplex_t a = QCM(T, sz-2, sz-2, n);
+    qcomplex_t b = QCM(T, sz-2, sz-1, n);
+    qcomplex_t c = QCM(T, sz-1, sz-2, n);
+    qcomplex_t d = QCM(T, sz-1, sz-1, n);
+    /* eigenvalues of [[a,b],[c,d]]:
+     * mu = (a+d)/2 ± sqrt(((a-d)/2)^2 + bc) */
+    qfloat_t half = qf_from_double(0.5);
+    qcomplex_t tr_half = qcs(half, qc_add(a, d));
+    qcomplex_t disc = qc_add(
+        qc_mul(qcs(half, qc_sub(a, d)), qcs(half, qc_sub(a, d))),
+        qc_mul(b, c));
+    qcomplex_t sq = qc_sqrt(disc);
+    qcomplex_t e1 = qc_add(tr_half, sq);
+    qcomplex_t e2 = qc_sub(tr_half, sq);
+    /* pick eigenvalue closer to d */
+    qfloat_t d1 = qc_abs(qc_sub(e1, d));
+    qfloat_t d2 = qc_abs(qc_sub(e2, d));
+    return (qf_to_double(d1) <= qf_to_double(d2)) ? e1 : e2;
+}
+
+/* Single QR step with shift mu on active submatrix [0..sz-1].
+ * H and Q are n×n flat arrays. */
+static void qr_step(qcomplex_t *H, qcomplex_t *Q, size_t sz, size_t n,
+                    qcomplex_t mu)
+{
+    /* Shift: H ← H - mu I */
+    for (size_t i = 0; i < sz; i++)
+        QCM(H, i, i, n) = qc_sub(QCM(H, i, i, n), mu);
+
+    /* QR via Givens on Hessenberg structure */
+    qfloat_t c[256];
+    qcomplex_t s[256];
+    for (size_t k = 0; k + 1 < sz; k++) {
+        givens_cs(QCM(H, k, k, n), QCM(H, k+1, k, n), &c[k], &s[k]);
+        givens_apply(H, Q, n, k, k, c[k], s[k]);
+    }
+
+    /* Unshift */
+    for (size_t i = 0; i < sz; i++)
+        QCM(H, i, i, n) = qc_add(QCM(H, i, i, n), mu);
+}
+
+/* Implicit single-shift QR: drive H to quasi-upper-triangular (Schur form). */
+static void qr_schur(qcomplex_t *H, qcomplex_t *Q, size_t n)
+{
+    size_t sz = n;
+    for (int iter = 0; iter < (int)(30 * n) && sz > 1; iter++) {
+        /* deflate trailing near-zero subdiagonals */
+        while (sz > 1) {
+            qfloat_t sub = qc_abs(QCM(H, sz-1, sz-2, n));
+            qfloat_t d1  = qc_abs(QCM(H, sz-2, sz-2, n));
+            qfloat_t d2  = qc_abs(QCM(H, sz-1, sz-1, n));
+            qfloat_t tol = qf_mul(qf_from_double(1e-29),
+                                   qf_add(d1, d2));
+            if (qf_to_double(sub) <= qf_to_double(tol)) {
+                QCM(H, sz-1, sz-2, n) = QC_ZERO;
+                sz--;
+            } else {
+                break;
+            }
+        }
+        if (sz <= 1) break;
+        qcomplex_t mu = wilkinson_shift(H, sz, n);
+        qr_step(H, Q, sz, n, mu);
+    }
+}
+
+/* Back-substitution: given upper-triangular T and eigenvalue T[k,k],
+ * compute the k-th eigenvector by back-solving (T - lambda I) x = -e_k
+ * for x[0..k-1] (x[k]=1 by convention). */
+static void backsub_eigenvec(const qcomplex_t *T, qcomplex_t *Y, size_t n, size_t k)
+{
+    qcomplex_t lambda = QCM(T, k, k, n);
+    /* Y[:,k] will be the eigenvector; zero it first */
+    for (size_t i = 0; i < n; i++)
+        QCM(Y, i, k, n) = QC_ZERO;
+    QCM(Y, k, k, n) = QC_ONE;
+
+    /* Back-substitute rows k-1 down to 0 */
+    for (size_t i = k; i-- > 0; ) {
+        /* (T[i,i] - lambda) y[i] = -sum_{j=i+1}^{k} T[i,j] y[j] */
+        qcomplex_t rhs = QC_ZERO;
+        for (size_t j = i + 1; j <= k; j++)
+            rhs = qc_sub(rhs, qc_mul(QCM(T, i, j, n), QCM(Y, j, k, n)));
+        qcomplex_t diag = qc_sub(QCM(T, i, i, n), lambda);
+        double dabs = qf_to_double(qc_abs(diag));
+        if (dabs < 1e-150)
+            QCM(Y, i, k, n) = QC_ZERO;
+        else
+            QCM(Y, i, k, n) = qc_div(rhs, diag);
+    }
+
+    /* Normalize */
+    qfloat_t nrm = QF_ZERO;
+    for (size_t i = 0; i <= k; i++)
+        nrm = qf_add(nrm, qc_abs2_qf(QCM(Y, i, k, n)));
+    nrm = qf_sqrt(nrm);
+    if (qf_to_double(nrm) > 1e-150) {
+        qfloat_t inv = qf_div(QF_ONE, nrm);
+        for (size_t i = 0; i <= k; i++)
+            QCM(Y, i, k, n) = qcs(inv, QCM(Y, i, k, n));
+    }
+}
+
+static int mat_eigendecompose_general(const matrix_t *A, void *eigenvalues,
+                                      matrix_t **eigenvectors)
+{
+    size_t n = A->rows;
+    const struct elem_vtable *e = A->elem;
+
+    /* Load A into flat qcomplex array H */
+    qcomplex_t *H = (qcomplex_t *)malloc(n * n * sizeof(qcomplex_t));
+    if (!H) return -3;
+    {
+        unsigned char raw[64];
+        for (size_t i = 0; i < n; i++)
+            for (size_t j = 0; j < n; j++) {
+                mat_get(A, i, j, raw);
+                e->to_qc(&QCM(H, i, j, n), raw);
+            }
+    }
+
+    /* Q = identity (accumulates similarity transforms) */
+    qcomplex_t *Qm = (qcomplex_t *)calloc(n * n, sizeof(qcomplex_t));
+    if (!Qm) { free(H); return -3; }
+    for (size_t i = 0; i < n; i++) QCM(Qm, i, i, n) = QC_ONE;
+
+    /* Hessenberg reduction then Schur form */
+    eigen_hess_reduce(H, Qm, n);
+    qr_schur(H, Qm, n);
+
+    /* Extract eigenvalues from diagonal of Schur matrix */
+    if (eigenvalues) {
+        char *ev = (char *)eigenvalues;
+        for (size_t i = 0; i < n; i++)
+            e->from_qc(ev + i * e->size, &QCM(H, i, i, n));
+    }
+
+    /* Compute eigenvectors if requested */
+    if (eigenvectors) {
+        /* Back-substitution: eigenvectors of T in Schur basis */
+        qcomplex_t *Y = (qcomplex_t *)calloc(n * n, sizeof(qcomplex_t));
+        if (!Y) { free(H); free(Qm); return -3; }
+
+        for (size_t k = 0; k < n; k++)
+            backsub_eigenvec(H, Y, n, k);
+
+        /* Transform back: eigvec_A = Q * Y */
+        matrix_t *V = e->create_matrix(n, n);
+        if (!V) { free(H); free(Qm); free(Y); return -3; }
+
+        unsigned char raw[64];
+        for (size_t i = 0; i < n; i++) {
+            for (size_t j = 0; j < n; j++) {
+                qcomplex_t sum = QC_ZERO;
+                for (size_t k = 0; k < n; k++)
+                    sum = qc_add(sum, qc_mul(QCM(Qm, i, k, n), QCM(Y, k, j, n)));
+                e->from_qc(raw, &sum);
+                mat_set(V, i, j, raw);
+            }
+        }
+        free(Y);
+        *eigenvectors = V;
+    }
+
+    free(H);
+    free(Qm);
+    return 0;
+}
+
+int mat_eigendecompose(const matrix_t *A, void *eigenvalues, matrix_t **eigenvectors)
+{
+    if (!A) return -1;
+    if (A->rows != A->cols) return -2;
+
+    if (mat_is_hermitian(A))
+        return mat_eigendecompose_hermitian(A, eigenvalues, eigenvectors);
+    return mat_eigendecompose_general(A, eigenvalues, eigenvectors);
 }
 
 int mat_eigenvalues(const matrix_t *A, void *eigenvalues)

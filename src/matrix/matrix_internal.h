@@ -43,6 +43,10 @@ struct elem_vtable {
     void (*abs_qf)(qfloat_t *out, const void *a);   /* |a| as qfloat    */
     void (*from_qf)(void *out, const qfloat_t *x);  /* construct pure-real from qfloat */
 
+    /* qcomplex cast — used by the general QR eigensolver */
+    void (*to_qc)(qcomplex_t *out, const void *a);   /* cast element to qcomplex */
+    void (*from_qc)(void *out, const qcomplex_t *z); /* cast qcomplex back (drops im for real types) */
+
     /* constants */
     const void *zero;
     const void *one;

@@ -5,11 +5,14 @@ datetime utilities, UTF-8 strings, and generic containers.
 
 ## Highlights
 
-- **`qfloat_t`** — double-double arithmetic and special functions
+- **`qfloat_t`** — double-double arithmetic and special functions (~34 decimal digits)
+- **`qcomplex_t`** — double-double complex arithmetic and special functions
+- **`matrix_t`** — generic high-precision matrix: eigendecomposition, matrix functions (exp, log, sqrt, trig, …), pluggable element types
 - **`dval_t`** — differentiable expression DAGs with first/second derivatives
 - **`datetime_t`** — civil and astronomical date/time helpers
 - **`dictionary_t` / `set_t` / `array_t`** — generic containers with user-defined ownership
 - **`string_t`** — UTF-8-aware dynamic strings and grapheme operations
+- **`integrator_t`** — adaptive G7K15 numerical integration at `qfloat_t` precision
 
 ## Quick Example
 
@@ -64,13 +67,23 @@ make release
 ## Run Tests
 
 ```sh
+make test
+```
+
+Or run individual suites:
+
+```sh
 make test_qfloat
+make test_qcomplex
+make test_matrix
 make test_dval
 make test_datetime
 make test_dictionary
 make test_set
 make test_array
 make test_string
+make test_bitset
+make test_integrator
 ```
 
 ## Documentation

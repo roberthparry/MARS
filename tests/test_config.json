@@ -680,6 +680,18 @@
     "test_mat_sinh_d": true,
     "test_mat_cosh_d": true,
     "test_mat_tanh_d": true,
-    "test_mat_trig_null_safety": true
+    "test_mat_trig_null_safety": true,
+    "test_mat_sqrt_d": true,
+    "test_mat_sqrt_qf": true,
+    "test_mat_log_d": true,
+    "test_mat_asin_d": true,
+    "test_mat_acos_d": true,
+    "test_mat_atan_d": true,
+    "test_mat_asinh_d": true,
+    "test_mat_acosh_d": true,
+    "test_mat_atanh_d": true,
+    "test_mat_inv_trig_null_safety": true,
+    "test_eigen_general_d": true,
+    "test_eigen_general_qf": true
   }
 }
