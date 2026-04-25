@@ -617,3 +617,120 @@ matrix_t *mat_atanh(const matrix_t *A)
     mat_free(A2); mat_free(Ac);
     return result;
 }
+
+/* ============================================================
+   mat_erf  —  Taylor series scaled by 2/√π
+
+   erf(A) = (2/√π) Σ_{k=0}^∞ (-1)^k A^{2k+1} / (k! (2k+1))
+   ratio_erf(k) = -(2k-1) / (k (2k+1))
+   ============================================================ */
+
+static qfloat_t ratio_erf(int k) {
+    return qf_neg(qf_div(qf_from_double(2.0*k - 1),
+                         qf_mul(qf_from_double(k), qf_from_double(2.0*k + 1))));
+}
+
+matrix_t *mat_erf(const matrix_t *A)
+{
+    if (!A || A->rows != A->cols) return NULL;
+
+    matrix_t *A2 = mat_mul(A, A);
+    if (!A2) return NULL;
+
+    matrix_t *Ac = mat_copy_dense(A);
+    if (!Ac) { mat_free(A2); return NULL; }
+
+    matrix_t *S = mat_series_sum(A2, Ac, ratio_erf);
+    mat_free(A2); mat_free(Ac);
+    if (!S) return NULL;
+
+    qfloat_t two_over_sqrt_pi = qf_div(qf_from_double(2.0), qf_sqrt(QF_PI));
+    mat_scale_qf(S, two_over_sqrt_pi);
+    return S;
+}
+
+/* ============================================================
+   mat_erfc  —  erfc(A) = I - erf(A)
+   ============================================================ */
+
+matrix_t *mat_erfc(const matrix_t *A)
+{
+    if (!A || A->rows != A->cols) return NULL;
+    size_t n = A->rows;
+    const struct elem_vtable *e = A->elem;
+
+    matrix_t *E = mat_erf(A);
+    if (!E) return NULL;
+
+    matrix_t *I = e->create_identity(n);
+    if (!I) { mat_free(E); return NULL; }
+
+    matrix_t *result = mat_sub(I, E);
+    mat_free(I); mat_free(E);
+    return result;
+}
+
+/* ============================================================
+   mat_pow_int  —  binary exponentiation
+   Negative exponents invert A first.
+   ============================================================ */
+
+matrix_t *mat_pow_int(const matrix_t *A, int n)
+{
+    if (!A || A->rows != A->cols) return NULL;
+    size_t sz = A->rows;
+    const struct elem_vtable *e = A->elem;
+
+    matrix_t *base;
+    unsigned int p;
+    if (n < 0) {
+        base = mat_inverse(A);
+        if (!base) return NULL;
+        p = (unsigned int)(-(long long)n);
+    } else {
+        base = mat_copy_dense(A);
+        if (!base) return NULL;
+        p = (unsigned int)n;
+    }
+
+    matrix_t *result = e->create_identity(sz);
+    if (!result) { mat_free(base); return NULL; }
+
+    while (p > 0u) {
+        if (p & 1u) {
+            matrix_t *tmp = mat_mul(result, base);
+            mat_free(result);
+            if (!tmp) { mat_free(base); return NULL; }
+            result = tmp;
+        }
+        p >>= 1u;
+        if (p > 0u) {
+            matrix_t *tmp = mat_mul(base, base);
+            mat_free(base);
+            if (!tmp) { mat_free(result); return NULL; }
+            base = tmp;
+        }
+    }
+
+    mat_free(base);
+    return result;
+}
+
+/* ============================================================
+   mat_pow  —  A^s = exp(s · log(A))
+   Requires A to admit a principal logarithm (positive definite).
+   ============================================================ */
+
+matrix_t *mat_pow(const matrix_t *A, double s)
+{
+    if (!A || A->rows != A->cols) return NULL;
+
+    matrix_t *L = mat_log(A);
+    if (!L) return NULL;
+
+    mat_scale_qf(L, qf_from_double(s));
+
+    matrix_t *result = mat_exp(L);
+    mat_free(L);
+    return result;
+}

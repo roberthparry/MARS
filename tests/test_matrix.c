@@ -4,8 +4,6 @@
 #include <math.h>
 
 #include "matrix.h"
-#include "qfloat.h"
-#include "qcomplex.h"
 
 #define TEST_CONFIG_MODE TEST_CONFIG_GLOBAL
 #include "test_harness.h"

@@ -4,8 +4,6 @@
 #include <stddef.h>
 
 #include "matrix.h"
-#include "qfloat.h"
-#include "qcomplex.h"
 
 /* ============================================================
    Element kinds
