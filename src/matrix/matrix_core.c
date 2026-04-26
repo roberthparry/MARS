@@ -2325,47 +2325,68 @@ static int schur_qr_qc(matrix_t *H, matrix_t *Q)
             /* Wilkinson shift */
             qcomplex_t mu = wilkinson_shift_qc(H, m);
 
-            /* perform one implicit QR step with shift mu */
-            qcomplex_t h00, h10;
-            mat_get(H, 0, 0, &h00);
-            mat_get(H, 1, 0, &h10);
-
-            qcomplex_t x = qc_sub(h00, mu);
-            qcomplex_t y = h10;
-
-            /* Householder on [x; y] */
+            /* Single-shift implicit QR step (bulge-chase Householder) */
             for (size_t k = 0; k < m; ++k) {
-                /* form vector [x; y] from H[k,k]-mu, H[k+1,k] */
-                mat_get(H, k,   k, &h00);
-                mat_get(H, k+1, k, &h10);
-                x = qc_sub(h00, mu);
-                y = h10;
 
-                qfloat_t nrm2 = qf_add(qf_mul(qc_abs(x), qc_abs(x)),
-                                       qf_mul(qc_abs(y), qc_abs(y)));
+                /* k=0: initial shifted vector [H[0,0]-mu, H[1,0]]
+                 * k>0: chase the bulge using [H[k,k-1], H[k+1,k-1]] (no shift) */
+                qcomplex_t a, b;
+                if (k == 0) {
+                    qcomplex_t h00, h10;
+                    mat_get(H, 0, 0, &h00);
+                    mat_get(H, 1, 0, &h10);
+                    a = qc_sub(h00, mu);
+                    b = h10;
+                } else {
+                    mat_get(H, k,   k-1, &a);
+                    mat_get(H, k+1, k-1, &b);
+                }
+
+                qfloat_t a_abs = qc_abs(a);
+                qfloat_t b_abs = qc_abs(b);
+                qfloat_t nrm2  = qf_add(qf_mul(a_abs, a_abs),
+                                        qf_mul(b_abs, b_abs));
                 if (qf_lt(nrm2, eps)) continue;
 
                 qfloat_t nrm = qf_sqrt(nrm2);
-                qcomplex_t u0 = qc_scale(x, qf_div(QF_ONE, nrm));
-                qcomplex_t u1 = qc_scale(y, qf_div(QF_ONE, nrm));
 
-                /* apply from left to H rows k,k+1 */
-                for (size_t j = k; j < n; ++j) {
+                /* Householder vector: v = [a + (a/|a|)*nrm, b], then normalize */
+                qcomplex_t v0;
+                if (qf_lt(a_abs, eps)) {
+                    v0 = qc_make(nrm, QF_ZERO);
+                } else {
+                    qcomplex_t a_phase = qc_scale(a, qf_div(QF_ONE, a_abs));
+                    v0 = qc_add(a, qc_scale(a_phase, nrm));
+                }
+                qcomplex_t v1 = b;
+
+                qfloat_t v0_abs = qc_abs(v0);
+                qfloat_t vnrm2  = qf_add(qf_mul(v0_abs, v0_abs),
+                                         qf_mul(b_abs,  b_abs));
+                if (qf_lt(vnrm2, eps)) continue;
+                qfloat_t inv = qf_div(QF_ONE, qf_sqrt(vnrm2));
+                qcomplex_t u0 = qc_scale(v0, inv);
+                qcomplex_t u1 = qc_scale(v1, inv);
+
+                /* apply from left: H := (I - 2 u u*) H, rows k, k+1
+                 * include column k-1 for k>0 to zero the bulge H[k+1,k-1] */
+                size_t jstart = (k > 0) ? k - 1 : (size_t)0;
+                for (size_t j = jstart; j < n; ++j) {
                     qcomplex_t hk0, hk1;
                     mat_get(H, k,   j, &hk0);
                     mat_get(H, k+1, j, &hk1);
 
                     qcomplex_t dot = qc_add(qc_mul(qc_conj(u0), hk0),
                                             qc_mul(qc_conj(u1), hk1));
+                    dot = qc_add(dot, dot);
 
                     qcomplex_t t0 = qc_sub(hk0, qc_mul(u0, dot));
                     qcomplex_t t1 = qc_sub(hk1, qc_mul(u1, dot));
-
                     mat_set(H, k,   j, &t0);
                     mat_set(H, k+1, j, &t1);
                 }
 
-                /* apply from right to H columns k,k+1 */
+                /* apply from right: H := H (I - 2 u u*), cols k, k+1 */
                 for (size_t i = 0; i < n; ++i) {
                     qcomplex_t hik0, hik1;
                     mat_get(H, i, k,   &hik0);
@@ -2373,15 +2394,15 @@ static int schur_qr_qc(matrix_t *H, matrix_t *Q)
 
                     qcomplex_t dot = qc_add(qc_mul(hik0, u0),
                                             qc_mul(hik1, u1));
+                    dot = qc_add(dot, dot);
 
                     qcomplex_t t0 = qc_sub(hik0, qc_mul(dot, qc_conj(u0)));
                     qcomplex_t t1 = qc_sub(hik1, qc_mul(dot, qc_conj(u1)));
-
                     mat_set(H, i, k,   &t0);
                     mat_set(H, i, k+1, &t1);
                 }
 
-                /* accumulate into Q */
+                /* accumulate into Q: Q := Q (I - 2 u u*), cols k, k+1 */
                 for (size_t i = 0; i < n; ++i) {
                     qcomplex_t qik0, qik1;
                     mat_get(Q, i, k,   &qik0);
@@ -2389,18 +2410,12 @@ static int schur_qr_qc(matrix_t *H, matrix_t *Q)
 
                     qcomplex_t dot = qc_add(qc_mul(qik0, u0),
                                             qc_mul(qik1, u1));
+                    dot = qc_add(dot, dot);
 
                     qcomplex_t t0 = qc_sub(qik0, qc_mul(dot, qc_conj(u0)));
                     qcomplex_t t1 = qc_sub(qik1, qc_mul(dot, qc_conj(u1)));
-
                     mat_set(Q, i, k,   &t0);
                     mat_set(Q, i, k+1, &t1);
-                }
-
-                /* prepare x,y for next bulge if it exists */
-                if (k + 2 < n) {
-                    mat_get(H, k+2, k,   &x);
-                    mat_get(H, k+2, k+1, &y);
                 }
             }
 
@@ -2413,7 +2428,6 @@ static int schur_qr_qc(matrix_t *H, matrix_t *Q)
         }
 
         if (iter >= max_iter) {
-            /* failed to converge */
             return -1;
         }
 
@@ -2508,7 +2522,7 @@ matrix_t *mat_fun_triangular(const matrix_t *T,
             mat_get(T, j, j, t_jj);
             e->sub(denom, t_ii, t_jj);
 
-            /* sum = Σ_{k=i+1}^{j-1} (T_ik F_kj - F_ik T_kj) */
+            /* sum = Σ_{k=i+1}^{j-1} (F_ik T_kj - T_ik F_kj) */
             memcpy(sum, e->zero, e->size);
             for (size_t k = i + 1; k < j; ++k) {
                 mat_get(T, i, k, t_ik);
@@ -2516,12 +2530,12 @@ matrix_t *mat_fun_triangular(const matrix_t *T,
                 mat_get(F, k, j, f_kj);
                 mat_get(F, i, k, f_ik);
 
-                /* tmp = T_ik * F_kj */
-                e->mul(tmp, t_ik, f_kj);
-                e->add(sum, sum, tmp);
-
                 /* tmp = F_ik * T_kj */
                 e->mul(tmp, f_ik, t_kj);
+                e->add(sum, sum, tmp);
+
+                /* tmp = T_ik * F_kj */
+                e->mul(tmp, t_ik, f_kj);
                 e->sub(sum, sum, tmp);
             }
 

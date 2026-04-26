@@ -703,6 +703,9 @@
     "test_mat_fun_qf_qc": true,
     "test_mat_error_handling": true,
     "test_mat_fun_3x3": true,
-    "test_mat_typeof": true
+    "test_mat_typeof": true,
+    "test_mat_fun_4x4": true,
+    "test_mat_fun_3x3_qf": true,
+    "test_mat_fun_3x3_qc": true
   }
 }

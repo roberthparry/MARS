@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
@@ -52,8 +53,12 @@ matrix_t *mat_fun_schur(const matrix_t *A,
     size_t n = A->rows;
 
     mat_schur_t S;
-    if (mat_schur(A, &S) != 0)
+    int schur_rc = mat_schur(A, &S);
+    if (schur_rc != 0) {
+        fprintf(stderr, "[mat_fun_schur] mat_schur returned %d for %zu×%zu matrix\n",
+                schur_rc, A->rows, A->cols);
         return NULL;
+    }
 
     /* S.T is always qcomplex; scalar_f must already be the qcomplex
      * version of the desired function (callers are responsible for this). */
