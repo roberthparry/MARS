@@ -3688,7 +3688,7 @@ static void test_eigen_general_d(void)
 {
     printf(C_CYAN "TEST: eigendecompose general (non-Hermitian, double)\n" C_RESET);
 
-    /* A = [[3, 1], [0, 2]] — upper triangular, eigenvalues 2 and 3.
+    /* A = [[3, 1], [0, 2]] — upper triangular, eigenvalues 3 and 2.
      * eigenvector for λ=3: [1, 0]
      * eigenvector for λ=2: [-1, 1] (normalised) */
     matrix_t *A = mat_new_d(2, 2);
