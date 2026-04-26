@@ -1093,12 +1093,89 @@ qcomplex_t qc_normal_logpdf(qcomplex_t z)
                   qcrf(qf_mul_double(log_2pi, 0.5)));
 }
 
+static qcomplex_t qc_lambert_w_series_guess(qcomplex_t z, int branch)
+{
+    qcomplex_t ez = qc_mul(qcrf(QF_E), z);
+    qcomplex_t p = qc_sqrt(qc_mul(qcr(2.0), qc_add(qcr(1.0), ez)));
+    qcomplex_t p2 = qc_mul(p, p);
+    qcomplex_t p3 = qc_mul(p2, p);
+    qcomplex_t sign_p = (branch == -1) ? qc_neg(p) : p;
+    qcomplex_t sign_p3 = (branch == -1) ? qc_neg(p3) : p3;
+    qcomplex_t w = qcr(-1.0);
+
+    w = qc_add(w, sign_p);
+    w = qc_sub(w, qc_mul(qcr(1.0 / 3.0), p2));
+    w = qc_add(w, qc_mul(qcr(11.0 / 72.0), sign_p3));
+    return w;
+}
+
+static qcomplex_t qc_lambert_w_asymptotic_guess(qcomplex_t z, int branch)
+{
+    qfloat_t two_pi = qf_mul_double(QF_PI, 2.0);
+    qcomplex_t L1 = qc_log(z);
+    L1.im = qf_add(L1.im, qf_mul_double(two_pi, (double)branch));
+
+    if (qc_abs(L1).hi == 0.0)
+        return L1;
+
+    qcomplex_t L2 = qc_log(L1);
+    return qc_add(qc_sub(L1, L2), qc_div(L2, L1));
+}
+
+static qcomplex_t qc_lambert_wm1_complex(qcomplex_t z)
+{
+    qfloat_t zero_tol = qf_from_double(1e-30);
+
+    if (qc_isnan(z))
+        return qc_make(QF_NAN, QF_NAN);
+
+    if (qf_eq(z.im, qf_from_double(0.0)))
+        return qcrf(qf_lambert_wm1(z.re));
+
+    if (qf_eq(z.re, QF_ZERO) && qf_eq(z.im, QF_ZERO))
+        return qc_make(QF_NINF, QF_NAN);
+
+    qcomplex_t branch_probe = qc_add(qc_mul(qcrf(QF_E), z), qcr(1.0));
+    qcomplex_t w = qf_lt(qc_abs(branch_probe), qf_from_double(0.25))
+        ? qc_lambert_w_series_guess(z, -1)
+        : qc_lambert_w_asymptotic_guess(z, -1);
+
+    for (int i = 0; i < 60; i++) {
+        qcomplex_t ew = qc_exp(w);
+        qcomplex_t wew = qc_mul(w, ew);
+        qcomplex_t f = qc_sub(wew, z);
+        qcomplex_t wp1 = qc_add(w, qcr(1.0));
+        qcomplex_t denom;
+
+        if (qf_lt(qc_abs(wp1), zero_tol)) {
+            denom = qc_mul(ew, qcr(1.0));
+        } else {
+            qcomplex_t halley_corr = qc_div(qc_mul(qc_add(w, qcr(2.0)), f),
+                                            qc_mul(qcr(2.0), wp1));
+            denom = qc_sub(qc_mul(ew, wp1), halley_corr);
+        }
+
+        qcomplex_t delta = qc_div(f, denom);
+        w = qc_sub(w, delta);
+
+        if (qf_lt(qc_abs(delta), zero_tol))
+            break;
+    }
+
+    return w;
+}
+
+qcomplex_t qc_lambert_wm1(qcomplex_t z)
+{
+    return qc_lambert_wm1_complex(z);
+}
+
 qcomplex_t qc_productlog(qcomplex_t z)
 {
     if (qf_eq(z.im, qf_from_double(0.0)))
         return qcrf(qf_productlog(z.re));
 
-    // Newton iteration: w e^w = z
+    /* Newton iteration on the principal branch: w e^w = z */
     qcomplex_t w = qc_log(z);
     for (int i = 0; i < 40; i++) {
         qcomplex_t ew    = qc_exp(w);

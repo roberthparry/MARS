@@ -47,6 +47,22 @@ struct elem_fun_vtable {
     /* special functions */
     void (*erf)(void *out, const void *a);
     void (*erfc)(void *out, const void *a);
+    void (*erfinv)(void *out, const void *a);
+    void (*erfcinv)(void *out, const void *a);
+    void (*gamma)(void *out, const void *a);
+    void (*lgamma)(void *out, const void *a);
+    void (*digamma)(void *out, const void *a);
+    void (*trigamma)(void *out, const void *a);
+    void (*tetragamma)(void *out, const void *a);
+    void (*gammainv)(void *out, const void *a);
+    void (*normal_pdf)(void *out, const void *a);
+    void (*normal_cdf)(void *out, const void *a);
+    void (*normal_logpdf)(void *out, const void *a);
+    void (*lambert_w0)(void *out, const void *a);
+    void (*lambert_wm1)(void *out, const void *a);
+    void (*productlog)(void *out, const void *a);
+    void (*ei)(void *out, const void *a);
+    void (*e1)(void *out, const void *a);
 };
 
 /* ============================================================
@@ -173,6 +189,12 @@ matrix_t *mat_fun_triangular(const matrix_t *T,
 /* High-level Schur-based matrix function engine. */
 matrix_t *mat_fun_schur(const matrix_t *A,
                         void (*scalar_f)(void *out, const void *in));
+
+/* Internal Hermitian detector used to select stable fast paths. */
+int mat_is_hermitian(const matrix_t *A);
+
+/* Drop any internal matrix-function cache associated with A. */
+void mat_fun_cache_forget(const matrix_t *A);
 
 
 #endif /* MATRIX_INTERNAL_H */

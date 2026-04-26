@@ -666,6 +666,28 @@ static void test_productlog(void)
     }
 }
 
+static void test_lambert_wm1(void)
+{
+    printf(C_CYAN "TEST: lambert_wm1 (complex branch)\n" C_RESET);
+
+    check_qc("W_-1(-0.2) matches real branch",
+             qc_lambert_wm1(qcr(-0.2)),
+             qcrf(qf_lambert_wm1(qf_from_double(-0.2))), 1e-28);
+
+    {
+        qcomplex_t z = qcz(-0.2, -0.1);
+        qcomplex_t w = qc_lambert_wm1(z);
+        qcomplex_t w0 = qc_productlog(z);
+
+        check_qc_rel("W_-1(-0.2-0.1i) * exp(W_-1(-0.2-0.1i)) = -0.2-0.1i",
+                     qc_mul(w, qc_exp(w)), z, 1e-24);
+        check_bool("W_-1(-0.2-0.1i) is distinct from W0",
+                   qf_gt(qc_abs(qc_sub(w, w0)), qf_from_double(1e-8)));
+        check_bool("W_-1(-0.2-0.1i) has negative imaginary part",
+                   qf_lt(w.im, qf_from_double(0.0)));
+    }
+}
+
 /* ====================================================================
    Incomplete gamma
    ==================================================================== */
@@ -970,6 +992,7 @@ static void test_special_group(void)
     RUN_TEST(test_beta,       __func__);
     RUN_TEST(test_normal,     __func__);
     RUN_TEST(test_productlog, __func__);
+    RUN_TEST(test_lambert_wm1, __func__);
     RUN_TEST(test_gammainc,   __func__);
     RUN_TEST(test_ei_e1,      __func__);
 }

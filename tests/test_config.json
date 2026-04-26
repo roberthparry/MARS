@@ -610,7 +610,8 @@
       "test_productlog": true,
       "test_gammainc": true,
       "test_ei_e1": true,
-      "test_normal": true
+      "test_normal": true,
+      "test_lambert_wm1": true
     },
     "test_util_group": {
       "enabled": true,
@@ -706,6 +707,10 @@
     "test_mat_typeof": true,
     "test_mat_fun_4x4": true,
     "test_mat_fun_3x3_qf": true,
-    "test_mat_fun_3x3_qc": true
+    "test_mat_fun_3x3_qc": true,
+    "test_mat_exp_singular": true,
+    "test_mat_fun_singular_entire_d": true,
+    "test_mat_special_unary_extensions": true,
+    "test_mat_neg_convenience": true
   }
 }

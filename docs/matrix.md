@@ -40,17 +40,13 @@ int main(void) {
      *   [ 2    1+i ]
      *   [ 1-i  3   ]
      */
-    matrix_t *A = matsq_new_qc(2);
-
-    qcomplex_t a00 = qc_make(qf_from_double(2.0), QF_ZERO);
-    qcomplex_t a01 = qc_make(qf_from_double(1.0), qf_from_double( 1.0));
-    qcomplex_t a10 = qc_make(qf_from_double(1.0), qf_from_double(-1.0));
-    qcomplex_t a11 = qc_make(qf_from_double(3.0), QF_ZERO);
-
-    mat_set(A, 0, 0, &a00);
-    mat_set(A, 0, 1, &a01);
-    mat_set(A, 1, 0, &a10);
-    mat_set(A, 1, 1, &a11);
+    qcomplex_t A_vals[4] = {
+        qc_make(qf_from_double(2.0), qf_from_double(0.0)),
+        qc_make(qf_from_double(1.0), qf_from_double(1.0)),
+        qc_make(qf_from_double(1.0), qf_from_double(-1.0)),
+        qc_make(qf_from_double(3.0), qf_from_double(0.0))
+    };
+    matrix_t *A = mat_create_qc(2, 2, A_vals);
 
     qcomplex_t eigenvalues[2];
     matrix_t  *evecs = NULL;
@@ -269,6 +265,22 @@ type the result is converted back to that type before returning.
 | `mat_atanh(A)` | Matrix inverse hyperbolic tangent |
 | `mat_erf(A)` | Matrix error function |
 | `mat_erfc(A)` | Matrix complementary error function |
+| `mat_erfinv(A)` | Matrix inverse error function |
+| `mat_erfcinv(A)` | Matrix inverse complementary error function |
+| `mat_gamma(A)` | Matrix gamma function |
+| `mat_lgamma(A)` | Matrix log gamma function |
+| `mat_digamma(A)` | Matrix digamma function (psi) |
+| `mat_trigamma(A)` | Matrix trigamma function |
+| `mat_tetragamma(A)` | Matrix tetragamma function |
+| `mat_gammainv(A)` | Matrix inverse gamma function |
+| `mat_normal_pdf(A)` | Matrix normal probability density function |
+| `mat_normal_cdf(A)` | Matrix normal cumulative distribution function |
+| `mat_normal_logpdf(A)` | Matrix normal log probability density function |
+| `mat_lambert_w0(A)` | Matrix Lambert W function (principal branch) |
+| `mat_lambert_wm1(A)` | Matrix Lambert W function (-1 branch) |
+| `mat_productlog(A)` | Matrix product logarithm (Lambert W) |
+| `mat_ei(A)` | Matrix exponential integral Ei |
+| `mat_e1(A)` | Matrix exponential integral E1 |
 
 ### Power Functions
 

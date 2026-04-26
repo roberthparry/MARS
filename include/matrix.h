@@ -185,6 +185,7 @@ matrix_t *mat_scalar_div_qc(matrix_t *A, qcomplex_t s);
 matrix_t *mat_add(const matrix_t *A, const matrix_t *B);
 matrix_t *mat_sub(const matrix_t *A, const matrix_t *B);
 matrix_t *mat_mul(const matrix_t *A, const matrix_t *B);
+matrix_t *mat_neg(const matrix_t *A);
 
 matrix_t *mat_transpose(const matrix_t *A);
 matrix_t *mat_conj(const matrix_t *A);
@@ -228,6 +229,22 @@ matrix_t *mat_atanh(const matrix_t *A);
 
 matrix_t *mat_erf(const matrix_t *A);
 matrix_t *mat_erfc(const matrix_t *A);
+matrix_t *mat_erfinv(const matrix_t *A);
+matrix_t *mat_erfcinv(const matrix_t *A);
+matrix_t *mat_gamma(const matrix_t *A);
+matrix_t *mat_lgamma(const matrix_t *A);
+matrix_t *mat_digamma(const matrix_t *A);
+matrix_t *mat_trigamma(const matrix_t *A);
+matrix_t *mat_tetragamma(const matrix_t *A);
+matrix_t *mat_gammainv(const matrix_t *A);
+matrix_t *mat_normal_pdf(const matrix_t *A);
+matrix_t *mat_normal_cdf(const matrix_t *A);
+matrix_t *mat_normal_logpdf(const matrix_t *A);
+matrix_t *mat_lambert_w0(const matrix_t *A);
+matrix_t *mat_lambert_wm1(const matrix_t *A);
+matrix_t *mat_productlog(const matrix_t *A);
+matrix_t *mat_ei(const matrix_t *A);
+matrix_t *mat_e1(const matrix_t *A);
 
 /* -------------------------------------------------------------------------
    Power functions

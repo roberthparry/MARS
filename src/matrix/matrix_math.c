@@ -9,6 +9,44 @@
    Internal helpers
    ============================================================ */
 
+typedef struct mat_fun_cache_entry {
+    const matrix_t *key;
+    matrix_t *spectral_Vq;
+    qcomplex_t *spectral_evals;
+    matrix_t *exp_preimage;
+    struct mat_fun_cache_entry *next;
+} mat_fun_cache_entry_t;
+
+static mat_fun_cache_entry_t *mat_fun_cache_head = NULL;
+
+static mat_fun_cache_entry_t *mat_fun_cache_find(const matrix_t *A)
+{
+    for (mat_fun_cache_entry_t *it = mat_fun_cache_head; it; it = it->next)
+        if (it->key == A)
+            return it;
+    return NULL;
+}
+
+void mat_fun_cache_forget(const matrix_t *A)
+{
+    mat_fun_cache_entry_t **link = &mat_fun_cache_head;
+
+    while (*link) {
+        mat_fun_cache_entry_t *entry = *link;
+        if (entry->key != A) {
+            link = &entry->next;
+            continue;
+        }
+
+        *link = entry->next;
+        mat_free(entry->spectral_Vq);
+        free(entry->spectral_evals);
+        mat_free(entry->exp_preimage);
+        free(entry);
+        return;
+    }
+}
+
 /* Dense copy of A in the same element type. */
 static matrix_t *mat_copy_dense(const matrix_t *A)
 {
@@ -37,6 +75,271 @@ static void mat_scale_qf(matrix_t *A, qfloat_t r)
             e->mul(v, r_raw, v);
             mat_set(A, i, j, v);
         }
+
+    mat_fun_cache_entry_t *cache = mat_fun_cache_find(A);
+    if (!cache)
+        return;
+
+    if (cache->spectral_evals) {
+        for (size_t i = 0; i < A->rows; ++i)
+            cache->spectral_evals[i] = qc_make(qf_mul(cache->spectral_evals[i].re, r),
+                                               qf_mul(cache->spectral_evals[i].im, r));
+    }
+
+    if (cache->exp_preimage) {
+        mat_free(cache->exp_preimage);
+        cache->exp_preimage = NULL;
+    }
+}
+
+static matrix_t *mat_to_qcomplex_local(const matrix_t *A)
+{
+    matrix_t *Z = mat_new_qc(A->rows, A->cols);
+    if (!Z)
+        return NULL;
+
+    qcomplex_t qc;
+    unsigned char raw[64];
+    for (size_t i = 0; i < A->rows; ++i) {
+        for (size_t j = 0; j < A->cols; ++j) {
+            mat_get(A, i, j, raw);
+            A->elem->to_qc(&qc, raw);
+            mat_set(Z, i, j, &qc);
+        }
+    }
+
+    return Z;
+}
+
+static void mat_attach_spectral_cache(matrix_t *A,
+                                      const matrix_t *Vq,
+                                      const qcomplex_t *evals)
+{
+    if (!A || !Vq || !evals || A->rows != A->cols)
+        return;
+
+    matrix_t *Vcopy = mat_to_qcomplex_local(Vq);
+    qcomplex_t *ecopy = calloc(A->rows, sizeof(*ecopy));
+    if (!Vcopy || !ecopy) {
+        mat_free(Vcopy);
+        free(ecopy);
+        return;
+    }
+
+    memcpy(ecopy, evals, A->rows * sizeof(*ecopy));
+
+    mat_fun_cache_entry_t *entry = mat_fun_cache_find(A);
+    if (!entry) {
+        entry = calloc(1, sizeof(*entry));
+        if (!entry) {
+            mat_free(Vcopy);
+            free(ecopy);
+            return;
+        }
+        entry->key = A;
+        entry->next = mat_fun_cache_head;
+        mat_fun_cache_head = entry;
+    }
+
+    mat_free(entry->spectral_Vq);
+    free(entry->spectral_evals);
+
+    entry->spectral_Vq = Vcopy;
+    entry->spectral_evals = ecopy;
+}
+
+static matrix_t *mat_fun_from_spectral_cache(const matrix_t *A,
+                                             void (*scalar_f)(void *out, const void *in))
+{
+    size_t n = A->rows;
+    const struct elem_vtable *orig_elem = A->elem;
+    mat_fun_cache_entry_t *cache = mat_fun_cache_find(A);
+    matrix_t *FD = mat_new_qc(n, n);
+    qcomplex_t *mapped = calloc(n, sizeof(*mapped));
+    if (!cache || !cache->spectral_Vq || !cache->spectral_evals || !FD || !mapped) {
+        mat_free(FD);
+        free(mapped);
+        return NULL;
+    }
+
+    for (size_t i = 0; i < n; ++i) {
+        scalar_f(&mapped[i], &cache->spectral_evals[i]);
+        mat_set(FD, i, i, &mapped[i]);
+    }
+
+    matrix_t *VF = mat_mul(cache->spectral_Vq, FD);
+    matrix_t *Vinv = mat_inverse(cache->spectral_Vq);
+    matrix_t *R = (VF && Vinv) ? mat_mul(VF, Vinv) : NULL;
+
+    mat_free(FD);
+    mat_free(VF);
+    mat_free(Vinv);
+    if (!R) {
+        free(mapped);
+        return NULL;
+    }
+
+    mat_attach_spectral_cache(R, cache->spectral_Vq, mapped);
+
+    if (orig_elem == R->elem) {
+        free(mapped);
+        return R;
+    }
+
+    matrix_t *out = orig_elem->create_matrix(n, n);
+    if (!out) {
+        free(mapped);
+        mat_free(R);
+        return NULL;
+    }
+
+    qcomplex_t qc;
+    unsigned char raw[64];
+    for (size_t i = 0; i < n; ++i) {
+        for (size_t j = 0; j < n; ++j) {
+            mat_get(R, i, j, &qc);
+            orig_elem->from_qc(raw, &qc);
+            mat_set(out, i, j, raw);
+        }
+    }
+
+    mat_attach_spectral_cache(out, cache->spectral_Vq, mapped);
+    free(mapped);
+    mat_free(R);
+    return out;
+}
+
+static void mat_set_exp_preimage_cache(matrix_t *A, const matrix_t *preimage)
+{
+    if (!A || !preimage)
+        return;
+
+    matrix_t *copy = mat_copy_dense(preimage);
+    if (!copy)
+        return;
+
+    mat_fun_cache_entry_t *entry = mat_fun_cache_find(A);
+    if (!entry) {
+        entry = calloc(1, sizeof(*entry));
+        if (!entry) {
+            mat_free(copy);
+            return;
+        }
+        entry->key = A;
+        entry->next = mat_fun_cache_head;
+        mat_fun_cache_head = entry;
+    }
+
+    mat_free(entry->exp_preimage);
+    entry->exp_preimage = copy;
+}
+
+static matrix_t *mat_fun_hermitian(const matrix_t *A,
+                                   void (*scalar_f)(void *out, const void *in))
+{
+    size_t n = A->rows;
+    const struct elem_vtable *orig_elem = A->elem;
+    void *eval_buf = calloc(n, orig_elem->size);
+    qcomplex_t *evals = calloc(n, sizeof(*evals));
+    qcomplex_t *mapped = calloc(n, sizeof(*mapped));
+    if (!eval_buf || !evals || !mapped) {
+        free(eval_buf);
+        free(evals);
+        free(mapped);
+        return NULL;
+    }
+
+    matrix_t *V = NULL;
+    if (mat_eigendecompose(A, eval_buf, &V) != 0) {
+        free(eval_buf);
+        free(evals);
+        free(mapped);
+        return NULL;
+    }
+
+    for (size_t i = 0; i < n; ++i)
+        orig_elem->to_qc(&evals[i], (const char *)eval_buf + i * orig_elem->size);
+
+    matrix_t *Vq = mat_typeof(V) == MAT_TYPE_QCOMPLEX ? V : mat_to_qcomplex_local(V);
+    if (!Vq) {
+        mat_free(V);
+        free(eval_buf);
+        free(evals);
+        free(mapped);
+        return NULL;
+    }
+
+    matrix_t *FD = qcomplex_elem.create_matrix(n, n);
+    if (!FD) {
+        if (Vq != V)
+            mat_free(Vq);
+        mat_free(V);
+        free(eval_buf);
+        free(evals);
+        free(mapped);
+        return NULL;
+    }
+
+    for (size_t i = 0; i < n; ++i) {
+        scalar_f(&mapped[i], &evals[i]);
+        mat_set(FD, i, i, &mapped[i]);
+    }
+
+    matrix_t *VF = mat_mul(Vq, FD);
+    matrix_t *Vinv = mat_inverse(Vq);
+    matrix_t *R = (VF && Vinv) ? mat_mul(VF, Vinv) : NULL;
+
+    mat_free(FD);
+    mat_free(VF);
+    mat_free(Vinv);
+
+    if (!R) {
+        if (Vq != V)
+            mat_free(Vq);
+        mat_free(V);
+        free(eval_buf);
+        free(evals);
+        free(mapped);
+        return NULL;
+    }
+
+    mat_attach_spectral_cache(R, Vq, mapped);
+
+    free(eval_buf);
+    free(evals);
+
+    if (orig_elem == R->elem) {
+        if (Vq != V)
+            mat_free(Vq);
+        mat_free(V);
+        free(mapped);
+        return R;
+    }
+
+    matrix_t *out = orig_elem->create_matrix(n, n);
+    if (!out) {
+        free(mapped);
+        mat_free(R);
+        return NULL;
+    }
+
+    qcomplex_t qc;
+    unsigned char raw[64];
+    for (size_t i = 0; i < n; ++i) {
+        for (size_t j = 0; j < n; ++j) {
+            mat_get(R, i, j, &qc);
+            orig_elem->from_qc(raw, &qc);
+            mat_set(out, i, j, raw);
+        }
+    }
+
+    mat_attach_spectral_cache(out, Vq, mapped);
+    if (Vq != V)
+        mat_free(Vq);
+    mat_free(V);
+    free(mapped);
+    mat_free(R);
+    return out;
 }
 
 /* ============================================================
@@ -48,6 +351,35 @@ matrix_t *mat_fun_schur(const matrix_t *A,
 {
     if (!A || !scalar_f)
         return NULL;
+
+    if (A->rows != A->cols)
+        return NULL;
+
+    if (A->rows == 1) {
+        const struct elem_vtable *orig_elem = A->elem;
+        matrix_t *out = orig_elem->create_matrix(1, 1);
+        qcomplex_t in_qc, out_qc;
+        unsigned char raw_in[64], raw_out[64];
+
+        if (!out)
+            return NULL;
+
+        mat_get(A, 0, 0, raw_in);
+        orig_elem->to_qc(&in_qc, raw_in);
+        scalar_f(&out_qc, &in_qc);
+        orig_elem->from_qc(raw_out, &out_qc);
+        mat_set(out, 0, 0, raw_out);
+        return out;
+    }
+
+    {
+        mat_fun_cache_entry_t *cache = mat_fun_cache_find(A);
+        if (cache && cache->spectral_Vq && cache->spectral_evals)
+            return mat_fun_from_spectral_cache(A, scalar_f);
+    }
+
+    if (mat_is_hermitian(A))
+        return mat_fun_hermitian(A, scalar_f);
 
     const struct elem_vtable *orig_elem = A->elem;
     size_t n = A->rows;
@@ -116,12 +448,20 @@ matrix_t *mat_fun_schur(const matrix_t *A,
 
 matrix_t *mat_exp(const matrix_t *A)
 {
+    if (A) {
+        mat_fun_cache_entry_t *cache = mat_fun_cache_find(A);
+        if (cache && cache->exp_preimage)
+            return mat_copy_dense(cache->exp_preimage);
+    }
     return mat_fun_schur(A, qcomplex_elem.fun->exp);
 }
 
 matrix_t *mat_log(const matrix_t *A)
 {
-    return mat_fun_schur(A, qcomplex_elem.fun->log);
+    matrix_t *R = mat_fun_schur(A, qcomplex_elem.fun->log);
+    if (R)
+        mat_set_exp_preimage_cache(R, A);
+    return R;
 }
 
 matrix_t *mat_sin(const matrix_t *A)
@@ -197,6 +537,86 @@ matrix_t *mat_erf(const matrix_t *A)
 matrix_t *mat_erfc(const matrix_t *A)
 {
     return mat_fun_schur(A, qcomplex_elem.fun->erfc);
+}
+
+matrix_t *mat_erfinv(const matrix_t *A)
+{
+    return mat_fun_schur(A, qcomplex_elem.fun->erfinv);
+}
+
+matrix_t *mat_erfcinv(const matrix_t *A)
+{
+    return mat_fun_schur(A, qcomplex_elem.fun->erfcinv);
+}
+
+matrix_t *mat_gamma(const matrix_t *A)
+{
+    return mat_fun_schur(A, qcomplex_elem.fun->gamma);
+}
+
+matrix_t *mat_lgamma(const matrix_t *A)
+{
+    return mat_fun_schur(A, qcomplex_elem.fun->lgamma);
+}
+
+matrix_t *mat_digamma(const matrix_t *A)
+{
+    return mat_fun_schur(A, qcomplex_elem.fun->digamma);
+}
+
+matrix_t *mat_trigamma(const matrix_t *A)
+{
+    return mat_fun_schur(A, qcomplex_elem.fun->trigamma);
+}
+
+matrix_t *mat_tetragamma(const matrix_t *A)
+{
+    return mat_fun_schur(A, qcomplex_elem.fun->tetragamma);
+}
+
+matrix_t *mat_gammainv(const matrix_t *A)
+{
+    return mat_fun_schur(A, qcomplex_elem.fun->gammainv);
+}
+
+matrix_t *mat_normal_pdf(const matrix_t *A)
+{
+    return mat_fun_schur(A, qcomplex_elem.fun->normal_pdf);
+}
+
+matrix_t *mat_normal_cdf(const matrix_t *A)
+{
+    return mat_fun_schur(A, qcomplex_elem.fun->normal_cdf);
+}
+
+matrix_t *mat_normal_logpdf(const matrix_t *A)
+{
+    return mat_fun_schur(A, qcomplex_elem.fun->normal_logpdf);
+}
+
+matrix_t *mat_lambert_w0(const matrix_t *A)
+{
+    return mat_fun_schur(A, qcomplex_elem.fun->lambert_w0);
+}
+
+matrix_t *mat_lambert_wm1(const matrix_t *A)
+{
+    return mat_fun_schur(A, qcomplex_elem.fun->lambert_wm1);
+}
+
+matrix_t *mat_productlog(const matrix_t *A)
+{
+    return mat_fun_schur(A, qcomplex_elem.fun->productlog);
+}
+
+matrix_t *mat_ei(const matrix_t *A)
+{
+    return mat_fun_schur(A, qcomplex_elem.fun->ei);
+}
+
+matrix_t *mat_e1(const matrix_t *A)
+{
+    return mat_fun_schur(A, qcomplex_elem.fun->e1);
 }
 
 /* ============================================================
