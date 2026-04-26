@@ -1956,6 +1956,57 @@ static qcomplex_t wilkinson_shift(const qcomplex_t *T, size_t sz, size_t n)
     return (qf_to_double(d1) <= qf_to_double(d2)) ? e1 : e2;
 }
 
+static void qr_schur_2x2(qcomplex_t *H, qcomplex_t *Q, size_t n)
+{
+    qfloat_t eps = qf_from_double(1e-30);
+    qcomplex_t a = QCM(H, 0, 0, n);
+    qcomplex_t b = QCM(H, 0, 1, n);
+    qcomplex_t c = QCM(H, 1, 0, n);
+    qcomplex_t d = QCM(H, 1, 1, n);
+
+    if (qf_lt(qc_abs(c), eps)) {
+        QCM(H, 1, 0, n) = QC_ZERO;
+        return;
+    }
+
+    qcomplex_t half_tr = qcs(qf_div(QF_ONE, qf_from_double(2.0)),
+                             qc_add(a, d));
+    qcomplex_t det = qc_sub(qc_mul(a, d), qc_mul(b, c));
+    qcomplex_t disc = qc_sub(qc_mul(half_tr, half_tr), det);
+    qcomplex_t root = qc_sqrt(disc);
+    qcomplex_t lam1 = qc_add(half_tr, root);
+    qcomplex_t lam2 = qc_sub(half_tr, root);
+
+    qcomplex_t v0 = qc_sub(lam1, d);
+    qcomplex_t v1 = c;
+    qfloat_t vnrm = qf_sqrt(qf_add(qc_abs2_qf(v0), qc_abs2_qf(v1)));
+    if (qf_eq(vnrm, QF_ZERO))
+        return;
+
+    qfloat_t inv = qf_div(QF_ONE, vnrm);
+    qcomplex_t q0 = qcs(inv, v0);
+    qcomplex_t q1 = qcs(inv, v1);
+    qcomplex_t cq0 = qc_conj(q0);
+    qcomplex_t cq1 = qc_conj(q1);
+    qcomplex_t neg_cq1 = qc_sub(QC_ZERO, cq1);
+
+    qcomplex_t hq01 = qc_add(qc_mul(a, neg_cq1), qc_mul(b, cq0));
+    qcomplex_t hq11 = qc_add(qc_mul(c, neg_cq1), qc_mul(d, cq0));
+    qcomplex_t t01 = qc_add(qc_mul(cq0, hq01), qc_mul(cq1, hq11));
+
+    QCM(H, 0, 0, n) = lam1;
+    QCM(H, 0, 1, n) = t01;
+    QCM(H, 1, 0, n) = QC_ZERO;
+    QCM(H, 1, 1, n) = lam2;
+
+    for (size_t i = 0; i < n; ++i) {
+        qcomplex_t qi0 = QCM(Q, i, 0, n);
+        qcomplex_t qi1 = QCM(Q, i, 1, n);
+        QCM(Q, i, 0, n) = qc_add(qc_mul(qi0, q0), qc_mul(qi1, q1));
+        QCM(Q, i, 1, n) = qc_add(qc_mul(qi0, neg_cq1), qc_mul(qi1, cq0));
+    }
+}
+
 /* Single QR step with shift mu on active submatrix [0..sz-1].
  * H and Q are n×n flat arrays. */
 static void qr_step(qcomplex_t *H, qcomplex_t *Q, size_t sz, size_t n,
@@ -1998,6 +2049,10 @@ static void qr_schur(qcomplex_t *H, qcomplex_t *Q, size_t n)
             }
         }
         if (sz <= 1) break;
+        if (sz == 2) {
+            qr_schur_2x2(H, Q, n);
+            break;
+        }
         qcomplex_t mu = wilkinson_shift(H, sz, n);
         qr_step(H, Q, sz, n, mu);
     }
@@ -2644,6 +2699,214 @@ void mat_schur_free(mat_schur_t *S)
    Parlett recurrence on upper triangular T
    ============================================================ */
 
+static void qc_fun_coeffs_up_to_second(qcomplex_t *c0,
+                                       qcomplex_t *c1,
+                                       qcomplex_t *c2,
+                                       void (*scalar_f)(void *out, const void *in),
+                                       qcomplex_t lambda)
+{
+    qcomplex_t f0;
+
+    scalar_f(&f0, &lambda);
+    if (c0)
+        *c0 = f0;
+
+    if (scalar_f == qcomplex_elem.fun->gamma) {
+        qcomplex_t psi = qc_digamma(lambda);
+        qcomplex_t tri = qc_trigamma(lambda);
+        if (c1)
+            *c1 = qc_mul(f0, psi);
+        if (c2) {
+            qcomplex_t second = qc_mul(f0, qc_add(tri, qc_mul(psi, psi)));
+            *c2 = qc_mul(qc_make(qf_from_double(0.5), QF_ZERO), second);
+        }
+        return;
+    }
+
+    if (scalar_f == qcomplex_elem.fun->digamma) {
+        if (c1)
+            *c1 = qc_trigamma(lambda);
+        if (c2)
+            *c2 = qc_mul(qc_make(qf_from_double(0.5), QF_ZERO),
+                         qc_tetragamma(lambda));
+        return;
+    }
+
+    if (scalar_f == qcomplex_elem.fun->lambert_w0 ||
+        scalar_f == qcomplex_elem.fun->lambert_wm1) {
+        qcomplex_t one = qc_make(QF_ONE, QF_ZERO);
+        qcomplex_t two = qc_make(qf_from_double(2.0), QF_ZERO);
+        qcomplex_t wp1 = qc_add(one, f0);
+        qcomplex_t lam2 = qc_mul(lambda, lambda);
+        qcomplex_t denom1 = qc_mul(lambda, wp1);
+        if (c1)
+            *c1 = qc_div(f0, denom1);
+        if (c2) {
+            qcomplex_t numer = qc_neg(qc_mul(qc_mul(f0, f0), qc_add(f0, two)));
+            qcomplex_t denom = qc_mul(lam2, qc_mul(wp1, qc_mul(wp1, wp1)));
+            *c2 = qc_mul(qc_make(qf_from_double(0.5), QF_ZERO), qc_div(numer, denom));
+        }
+        return;
+    }
+
+    if (scalar_f == qcomplex_elem.fun->ei) {
+        qcomplex_t exp_lambda = qc_exp(lambda);
+        qcomplex_t one = qc_make(QF_ONE, QF_ZERO);
+        qcomplex_t lam2 = qc_mul(lambda, lambda);
+        if (c1)
+            *c1 = qc_div(exp_lambda, lambda);
+        if (c2) {
+            qcomplex_t second = qc_div(qc_mul(exp_lambda, qc_sub(lambda, one)), lam2);
+            *c2 = qc_mul(qc_make(qf_from_double(0.5), QF_ZERO), second);
+        }
+        return;
+    }
+
+    if (scalar_f == qcomplex_elem.fun->e1) {
+        qcomplex_t one = qc_make(QF_ONE, QF_ZERO);
+        qcomplex_t emlambda = qc_exp(qc_neg(lambda));
+        qcomplex_t lam2 = qc_mul(lambda, lambda);
+        if (c1)
+            *c1 = qc_div(qc_neg(emlambda), lambda);
+        if (c2) {
+            qcomplex_t second = qc_div(qc_mul(emlambda, qc_add(lambda, one)), lam2);
+            *c2 = qc_mul(qc_make(qf_from_double(0.5), QF_ZERO), second);
+        }
+        return;
+    }
+
+    if (scalar_f == qcomplex_elem.fun->erf) {
+        qcomplex_t scale = qc_make(qf_div(qf_from_double(2.0), QF_SQRT_PI), QF_ZERO);
+        qcomplex_t fp = qc_mul(scale, qc_exp(qc_neg(qc_mul(lambda, lambda))));
+        if (c1)
+            *c1 = fp;
+        if (c2)
+            *c2 = qc_neg(qc_mul(lambda, fp));
+        return;
+    }
+
+    if (scalar_f == qcomplex_elem.fun->erfc) {
+        qcomplex_t scale = qc_make(qf_div(qf_neg(qf_from_double(2.0)), QF_SQRT_PI), QF_ZERO);
+        qcomplex_t fp = qc_mul(scale, qc_exp(qc_neg(qc_mul(lambda, lambda))));
+        if (c1)
+            *c1 = fp;
+        if (c2)
+            *c2 = qc_neg(qc_mul(lambda, fp));
+        return;
+    }
+
+    if (scalar_f == qcomplex_elem.fun->normal_pdf) {
+        qcomplex_t fp = qc_neg(qc_mul(lambda, f0));
+        if (c1)
+            *c1 = fp;
+        if (c2) {
+            qcomplex_t lambda2 = qc_mul(lambda, lambda);
+            *c2 = qc_mul(qc_make(qf_from_double(0.5), QF_ZERO),
+                         qc_mul(qc_sub(lambda2, qc_make(QF_ONE, QF_ZERO)), f0));
+        }
+        return;
+    }
+
+    if (scalar_f == qcomplex_elem.fun->normal_cdf) {
+        qcomplex_t pdf = qc_normal_pdf(lambda);
+        if (c1)
+            *c1 = pdf;
+        if (c2)
+            *c2 = qc_mul(qc_make(qf_from_double(-0.5), QF_ZERO), qc_mul(lambda, pdf));
+        return;
+    }
+
+    if (scalar_f == qcomplex_elem.fun->normal_logpdf) {
+        if (c1)
+            *c1 = qc_neg(lambda);
+        if (c2)
+            *c2 = qc_make(qf_from_double(-0.5), QF_ZERO);
+        return;
+    }
+
+    {
+        qfloat_t h = qf_from_double(1e-6);
+        qcomplex_t ih = qc_make(QF_ZERO, h);
+        qcomplex_t fp, fm, lambda_p, lambda_m;
+        qcomplex_t denom1 = qc_make(QF_ZERO, qf_mul_double(h, 2.0));
+        qcomplex_t denom2 = qc_make(qf_mul_double(qf_mul(h, h), -2.0), QF_ZERO);
+        qcomplex_t two_f0 = qc_mul(qc_make(qf_from_double(2.0), QF_ZERO), f0);
+
+        lambda_p = qc_add(lambda, ih);
+        lambda_m = qc_sub(lambda, ih);
+        scalar_f(&fp, &lambda_p);
+        scalar_f(&fm, &lambda_m);
+
+        if (c1)
+            *c1 = qc_div(qc_sub(fp, fm), denom1);
+        if (c2)
+            *c2 = qc_div(qc_add(qc_sub(fp, two_f0), fm), denom2);
+    }
+}
+
+static matrix_t *mat_fun_triangular_equal_diag(const matrix_t *T,
+                                               void (*scalar_f)(void *out, const void *in))
+{
+    size_t n = T->rows;
+    matrix_t *F = mat_new_qc(n, n);
+    matrix_t *N = mat_new_qc(n, n);
+    if (!F || !N) {
+        mat_free(F);
+        mat_free(N);
+        return NULL;
+    }
+
+    qcomplex_t lambda, c0, c1 = QC_ZERO, c2 = QC_ZERO;
+    mat_get(T, 0, 0, &lambda);
+    qc_fun_coeffs_up_to_second(&c0, &c1, &c2, scalar_f, lambda);
+
+    for (size_t i = 0; i < n; ++i) {
+        mat_set(F, i, i, &c0);
+        for (size_t j = i; j < n; ++j) {
+            qcomplex_t tij;
+            mat_get(T, i, j, &tij);
+            if (i == j)
+                tij = QC_ZERO;
+            mat_set(N, i, j, &tij);
+        }
+    }
+
+    if (n >= 2) {
+        for (size_t i = 0; i < n; ++i) {
+            for (size_t j = i + 1; j < n; ++j) {
+                qcomplex_t nij, term;
+                mat_get(N, i, j, &nij);
+                term = qc_mul(c1, nij);
+                mat_set(F, i, j, &term);
+            }
+        }
+    }
+
+    if (n >= 3) {
+        matrix_t *N2 = mat_mul(N, N);
+        if (!N2) {
+            mat_free(F);
+            mat_free(N);
+            return NULL;
+        }
+
+        for (size_t i = 0; i < n; ++i) {
+            for (size_t j = i + 2; j < n; ++j) {
+                qcomplex_t fij, n2ij;
+                mat_get(F, i, j, &fij);
+                mat_get(N2, i, j, &n2ij);
+                fij = qc_add(fij, qc_mul(c2, n2ij));
+                mat_set(F, i, j, &fij);
+            }
+        }
+
+        mat_free(N2);
+    }
+
+    mat_free(N);
+    return F;
+}
+
 matrix_t *mat_fun_triangular(const matrix_t *T,
                              void (*scalar_f)(void *out, const void *in))
 {
@@ -2656,15 +2919,31 @@ matrix_t *mat_fun_triangular(const matrix_t *T,
     size_t n = T->rows;
     const struct elem_vtable *e = T->elem;
 
-    matrix_t *F = e->create_matrix(n, n);
-    if (!F)
-        return NULL;
-
     unsigned char t_ii[64], t_jj[64], t_ij[64];
     unsigned char f_ii[64], f_jj[64], f_ij[64];
     unsigned char num[64], tmp[64], sum[64];
     unsigned char t_ik[64], t_kj[64], f_ik[64], f_kj[64];
     unsigned char denom[64], inv_denom[64];
+
+    {
+        int all_diag_equal = 1;
+        qcomplex_t lam0, lami;
+        qfloat_t tol = qf_from_double(1e-24);
+        mat_get(T, 0, 0, &lam0);
+        for (size_t i = 1; i < n; ++i) {
+            mat_get(T, i, i, &lami);
+            if (qf_lt(tol, qc_abs(qc_sub(lami, lam0)))) {
+                all_diag_equal = 0;
+                break;
+            }
+        }
+        if (all_diag_equal)
+            return mat_fun_triangular_equal_diag(T, scalar_f);
+    }
+
+    matrix_t *F = e->create_matrix(n, n);
+    if (!F)
+        return NULL;
 
     /* 1. Diagonal: f(T_ii) */
     for (size_t i = 0; i < n; ++i) {

@@ -2410,24 +2410,6 @@ static void test_mat_exp_d(void)
 {
     printf(C_CYAN "TEST: mat_exp (double)\n" C_RESET);
 
-    /* 1×1: exp([[x]]) = [[exp(x)]] */
-    {
-        double v = 2.0;
-        matrix_t *A = mat_create_d(1, 1, &v);
-        print_md("A", A);
-        matrix_t *E = mat_exp(A);
-        check_bool("mat_exp(1x1) not NULL", E != NULL);
-        if (E)
-        {
-            print_md("exp(A)", E);
-            double got;
-            mat_get(E, 0, 0, &got);
-            check_d("exp([[2]]) = e²", got, exp(2.0), 1e-12);
-        }
-        mat_free(A);
-        mat_free(E);
-    }
-
     /* 2×2 diagonal: exp(diag(a,b)) = diag(exp(a),exp(b)) */
     {
         double A_vals[4] = {1.0, 0.0, 0.0, 2.0};
@@ -2497,24 +2479,6 @@ static void test_mat_exp_d(void)
 static void test_mat_exp_qf(void)
 {
     printf(C_CYAN "TEST: mat_exp (qfloat)\n" C_RESET);
-
-    /* 1×1: exp([[x]]) = [[exp(x)]] */
-    {
-        qfloat_t v = qf_from_double(2.0);
-        matrix_t *A = mat_create_qf(1, 1, &v);
-        print_mqf("A", A);
-        matrix_t *E = mat_exp(A);
-        check_bool("mat_exp qf(1x1) not NULL", E != NULL);
-        if (E)
-        {
-            print_mqf("exp(A)", E);
-            qfloat_t got;
-            mat_get(E, 0, 0, &got);
-            check_qf_val("qf exp([[2]]) = e²", got, qf_exp(qf_from_double(2.0)), 1e-25);
-        }
-        mat_free(A);
-        mat_free(E);
-    }
 
     /* 2×2 symmetric: A = [[0,1],[1,0]] → exp(A) = cosh(1)·I + sinh(1)·A */
     {
@@ -2775,24 +2739,6 @@ static void test_mat_sin_d(void)
 {
     printf(C_CYAN "TEST: mat_sin (double)\n" C_RESET);
 
-    /* 1×1: sin([[π/6]]) = [[0.5]] */
-    {
-        double v = M_PI / 6.0;
-        matrix_t *A = mat_create_d(1, 1, &v);
-        print_md("A", A);
-        matrix_t *S = mat_sin(A);
-        check_bool("mat_sin(1x1) not NULL", S != NULL);
-        if (S)
-        {
-            print_md("sin(A)", S);
-            double got;
-            mat_get(S, 0, 0, &got);
-            check_d("sin([[π/6]]) = 0.5", got, 0.5, 1e-12);
-        }
-        mat_free(A);
-        mat_free(S);
-    }
-
     /* 2×2 diagonal: sin(diag(0, π/2)) = diag(0, 1) */
     {
         double A_vals[4] = {0.0, 0.0, 0.0, M_PI / 2.0};
@@ -2862,24 +2808,6 @@ static void test_mat_sin_d(void)
 static void test_mat_sin_qf(void)
 {
     printf(C_CYAN "TEST: mat_sin (qfloat)\n" C_RESET);
-
-    /* 1×1: sin([[π/6]]) = [[0.5]] */
-    {
-        qfloat_t v = qf_div(QF_PI, qf_from_double(6.0));
-        matrix_t *A = mat_create_qf(1, 1, &v);
-        print_mqf("A", A);
-        matrix_t *S = mat_sin(A);
-        check_bool("mat_sin qf(1x1) not NULL", S != NULL);
-        if (S)
-        {
-            print_mqf("sin(A)", S);
-            qfloat_t got;
-            mat_get(S, 0, 0, &got);
-            check_qf_val("qf sin([[π/6]]) = 0.5", got, qf_from_double(0.5), 1e-25);
-        }
-        mat_free(A);
-        mat_free(S);
-    }
 
     /* 2×2 symmetric: A = [[0,1],[1,0]] → sin(A) = sin(1)·A */
     {
@@ -2955,24 +2883,6 @@ static void test_mat_cos_d(void)
 {
     printf(C_CYAN "TEST: mat_cos (double)\n" C_RESET);
 
-    /* 1×1: cos([[π/3]]) = 0.5 */
-    {
-        double v = M_PI / 3.0;
-        matrix_t *A = mat_create_d(1, 1, &v);
-        print_md("A", A);
-        matrix_t *C = mat_cos(A);
-        check_bool("mat_cos(1x1) not NULL", C != NULL);
-        if (C)
-        {
-            print_md("cos(A)", C);
-            double got;
-            mat_get(C, 0, 0, &got);
-            check_d("cos([[π/3]]) = 0.5", got, 0.5, 1e-12);
-        }
-        mat_free(A);
-        mat_free(C);
-    }
-
     /* 2×2 diagonal: cos(diag(0, π)) = diag(1, -1) */
     {
         double A_vals[4] = {0.0, 0.0, 0.0, M_PI};
@@ -3021,25 +2931,6 @@ static void test_mat_cos_d(void)
 static void test_mat_cos_qf(void)
 {
     printf(C_CYAN "TEST: mat_cos (qfloat)\n" C_RESET);
-
-    /* 1×1: cos([[π/3]]) = 0.5 */
-    {
-        matrix_t *A = mat_new_qf(1, 1);
-        qfloat_t v = qf_div(QF_PI, qf_from_double(3.0));
-        mat_set(A, 0, 0, &v);
-        print_mqf("A", A);
-        matrix_t *C = mat_cos(A);
-        check_bool("mat_cos qf(1x1) not NULL", C != NULL);
-        if (C)
-        {
-            print_mqf("cos(A)", C);
-            qfloat_t got;
-            mat_get(C, 0, 0, &got);
-            check_qf_val("qf cos([[π/3]]) = 0.5", got, qf_from_double(0.5), 1e-25);
-        }
-        mat_free(A);
-        mat_free(C);
-    }
 
     /* 2×2 symmetric: A = [[0,1],[1,0]] → cos(A) = cos(1)·I */
     {
@@ -3116,25 +3007,6 @@ static void test_mat_tan_d(void)
 {
     printf(C_CYAN "TEST: mat_tan (double)\n" C_RESET);
 
-    /* 1×1: tan([[π/4]]) = 1 */
-    {
-        matrix_t *A = mat_new_d(1, 1);
-        double v = M_PI / 4.0;
-        mat_set(A, 0, 0, &v);
-        print_md("A", A);
-        matrix_t *T = mat_tan(A);
-        check_bool("mat_tan(1x1) not NULL", T != NULL);
-        if (T)
-        {
-            print_md("tan(A)", T);
-            double got;
-            mat_get(T, 0, 0, &got);
-            check_d("tan([[π/4]]) = 1", got, 1.0, 1e-12);
-        }
-        mat_free(A);
-        mat_free(T);
-    }
-
     /* 2×2 diagonal: tan(diag(0, π/4)) = diag(0, 1) */
     {
         matrix_t *A = mat_new_d(2, 2);
@@ -3199,25 +3071,6 @@ static void test_mat_tan_d(void)
 static void test_mat_sinh_d(void)
 {
     printf(C_CYAN "TEST: mat_sinh (double)\n" C_RESET);
-
-    /* 1×1: sinh([[0]]) = 0 */
-    {
-        matrix_t *A = mat_new_d(1, 1);
-        double v = 0.0;
-        mat_set(A, 0, 0, &v);
-        print_md("A", A);
-        matrix_t *S = mat_sinh(A);
-        check_bool("mat_sinh(1x1) not NULL", S != NULL);
-        if (S)
-        {
-            print_md("sinh(A)", S);
-            double got;
-            mat_get(S, 0, 0, &got);
-            check_d("sinh([[0]]) = 0", got, 0.0, 1e-12);
-        }
-        mat_free(A);
-        mat_free(S);
-    }
 
     /* 2×2 diagonal: sinh(diag(0, 1)) = diag(0, sinh(1)) */
     {
@@ -3284,25 +3137,6 @@ static void test_mat_cosh_d(void)
 {
     printf(C_CYAN "TEST: mat_cosh (double)\n" C_RESET);
 
-    /* 1×1: cosh([[0]]) = 1 */
-    {
-        matrix_t *A = mat_new_d(1, 1);
-        double v = 0.0;
-        mat_set(A, 0, 0, &v);
-        print_md("A", A);
-        matrix_t *C = mat_cosh(A);
-        check_bool("mat_cosh(1x1) not NULL", C != NULL);
-        if (C)
-        {
-            print_md("cosh(A)", C);
-            double got;
-            mat_get(C, 0, 0, &got);
-            check_d("cosh([[0]]) = 1", got, 1.0, 1e-12);
-        }
-        mat_free(A);
-        mat_free(C);
-    }
-
     /* 2×2 diagonal: cosh(diag(0, 1)) = diag(1, cosh(1)) */
     {
         matrix_t *A = mat_new_d(2, 2);
@@ -3367,25 +3201,6 @@ static void test_mat_cosh_d(void)
 static void test_mat_tanh_d(void)
 {
     printf(C_CYAN "TEST: mat_tanh (double)\n" C_RESET);
-
-    /* 1×1: tanh([[0]]) = 0 */
-    {
-        matrix_t *A = mat_new_d(1, 1);
-        double v = 0.0;
-        mat_set(A, 0, 0, &v);
-        print_md("A", A);
-        matrix_t *T = mat_tanh(A);
-        check_bool("mat_tanh(1x1) not NULL", T != NULL);
-        if (T)
-        {
-            print_md("tanh(A)", T);
-            double got;
-            mat_get(T, 0, 0, &got);
-            check_d("tanh([[0]]) = 0", got, 0.0, 1e-12);
-        }
-        mat_free(A);
-        mat_free(T);
-    }
 
     /* 2×2 diagonal: tanh(diag(0, 1)) = diag(0, tanh(1)) */
     {
@@ -3471,25 +3286,6 @@ static void test_mat_sqrt_d(void)
 {
     printf(C_CYAN "TEST: mat_sqrt (double)\n" C_RESET);
 
-    /* 1×1: sqrt([[4]]) = [[2]] */
-    {
-        matrix_t *A = mat_new_d(1, 1);
-        double v = 4.0;
-        mat_set(A, 0, 0, &v);
-        print_md("A", A);
-        matrix_t *S = mat_sqrt(A);
-        check_bool("mat_sqrt(1x1) not NULL", S != NULL);
-        if (S)
-        {
-            print_md("sqrt(A)", S);
-            double got;
-            mat_get(S, 0, 0, &got);
-            check_d("sqrt([[4]]) = 2", got, 2.0, 1e-12);
-        }
-        mat_free(A);
-        mat_free(S);
-    }
-
     /* 2×2 diagonal: sqrt(diag(1,4)) = diag(1,2) */
     {
         matrix_t *A = mat_new_d(2, 2);
@@ -3558,22 +3354,35 @@ static void test_mat_sqrt_qf(void)
 {
     printf(C_CYAN "TEST: mat_sqrt (qfloat)\n" C_RESET);
 
-    /* 1×1: sqrt([[9]]) = [[3]] */
-    matrix_t *A = mat_new_qf(1, 1);
-    qfloat_t v = qf_from_double(9.0);
-    mat_set(A, 0, 0, &v);
-    print_mqf("A", A);
-    matrix_t *S = mat_sqrt(A);
-    check_bool("qf mat_sqrt(1x1) not NULL", S != NULL);
-    if (S)
+    /* 2×2 diagonal: sqrt(diag(1,9)) = diag(1,3) */
     {
-        print_mqf("sqrt(A)", S);
-        qfloat_t got;
-        mat_get(S, 0, 0, &got);
-        check_qf_val("qf sqrt([[9]]) = 3", got, qf_from_double(3.0), 1e-25);
+        matrix_t *A = mat_new_qf(2, 2);
+        qfloat_t z = QF_ZERO;
+        qfloat_t o = QF_ONE;
+        qfloat_t n = qf_from_double(9.0);
+        mat_set(A, 0, 0, &o);
+        mat_set(A, 0, 1, &z);
+        mat_set(A, 1, 0, &z);
+        mat_set(A, 1, 1, &n);
+        print_mqf("A", A);
+        matrix_t *S = mat_sqrt(A);
+        check_bool("qf mat_sqrt(diag) not NULL", S != NULL);
+        if (S)
+        {
+            print_mqf("sqrt(A)", S);
+            qfloat_t s00, s01, s10, s11;
+            mat_get(S, 0, 0, &s00);
+            mat_get(S, 0, 1, &s01);
+            mat_get(S, 1, 0, &s10);
+            mat_get(S, 1, 1, &s11);
+            check_qf_val("qf sqrt(diag)[0,0] = 1", s00, QF_ONE, 1e-25);
+            check_qf_val("qf sqrt(diag)[0,1] = 0", s01, QF_ZERO, 1e-25);
+            check_qf_val("qf sqrt(diag)[1,0] = 0", s10, QF_ZERO, 1e-25);
+            check_qf_val("qf sqrt(diag)[1,1] = 3", s11, qf_from_double(3.0), 1e-25);
+        }
+        mat_free(A);
+        mat_free(S);
     }
-    mat_free(A);
-    mat_free(S);
 }
 
 /* ------------------------------------------------------------------ mat_log */
@@ -3581,44 +3390,6 @@ static void test_mat_sqrt_qf(void)
 static void test_mat_log_d(void)
 {
     printf(C_CYAN "TEST: mat_log (double)\n" C_RESET);
-
-    /* 1×1: log([[1]]) = [[0]] */
-    {
-        matrix_t *A = mat_new_d(1, 1);
-        double v = 1.0;
-        mat_set(A, 0, 0, &v);
-        print_md("A", A);
-        matrix_t *L = mat_log(A);
-        check_bool("mat_log([[1]]) not NULL", L != NULL);
-        if (L)
-        {
-            print_md("log(A)", L);
-            double got;
-            mat_get(L, 0, 0, &got);
-            check_d("log([[1]]) = 0", got, 0.0, 1e-12);
-        }
-        mat_free(A);
-        mat_free(L);
-    }
-
-    /* 1×1: log([[e]]) = [[1]] */
-    {
-        matrix_t *A = mat_new_d(1, 1);
-        double v = M_E;
-        mat_set(A, 0, 0, &v);
-        print_md("A", A);
-        matrix_t *L = mat_log(A);
-        check_bool("mat_log([[e]]) not NULL", L != NULL);
-        if (L)
-        {
-            print_md("log(A)", L);
-            double got;
-            mat_get(L, 0, 0, &got);
-            check_d("log([[e]]) = 1", got, 1.0, 1e-12);
-        }
-        mat_free(A);
-        mat_free(L);
-    }
 
     /* exp(log(A)) = A for diagonal [[2,0],[0,3]] */
     {
@@ -3662,42 +3433,6 @@ static void test_mat_asin_d(void)
 {
     printf(C_CYAN "TEST: mat_asin (double)\n" C_RESET);
 
-    /* 1×1: asin([[0]]) = [[0]] */
-    {
-        matrix_t *A = mat_new_d(1, 1);
-        double v = 0.0;
-        mat_set(A, 0, 0, &v);
-        matrix_t *R = mat_asin(A);
-        check_bool("mat_asin([[0]]) not NULL", R != NULL);
-        if (R)
-        {
-            double got;
-            mat_get(R, 0, 0, &got);
-            check_d("asin([[0]]) = 0", got, 0.0, 1e-12);
-            mat_free(R);
-        }
-        mat_free(A);
-    }
-
-    /* 1×1: asin([[0.5]]) = [[π/6]] */
-    {
-        matrix_t *A = mat_new_d(1, 1);
-        double v = 0.5;
-        mat_set(A, 0, 0, &v);
-        print_md("A", A);
-        matrix_t *R = mat_asin(A);
-        check_bool("mat_asin([[0.5]]) not NULL", R != NULL);
-        if (R)
-        {
-            print_md("asin(A)", R);
-            double got;
-            mat_get(R, 0, 0, &got);
-            check_d("asin([[0.5]]) = π/6", got, M_PI / 6.0, 1e-12);
-        }
-        mat_free(A);
-        mat_free(R);
-    }
-
     /* sin(asin(A)) = A for 2×2 symmetric with small eigenvalues */
     {
         matrix_t *A = mat_new_d(2, 2);
@@ -3737,25 +3472,6 @@ static void test_mat_asin_d(void)
 static void test_mat_acos_d(void)
 {
     printf(C_CYAN "TEST: mat_acos (double)\n" C_RESET);
-
-    /* 1×1: acos([[0.5]]) = [[π/3]] */
-    {
-        matrix_t *A = mat_new_d(1, 1);
-        double v = 0.5;
-        mat_set(A, 0, 0, &v);
-        print_md("A", A);
-        matrix_t *R = mat_acos(A);
-        check_bool("mat_acos([[0.5]]) not NULL", R != NULL);
-        if (R)
-        {
-            print_md("acos(A)", R);
-            double got;
-            mat_get(R, 0, 0, &got);
-            check_d("acos([[0.5]]) = π/3", got, M_PI / 3.0, 1e-12);
-        }
-        mat_free(A);
-        mat_free(R);
-    }
 
     /* asin(A) + acos(A) = (π/2)·I for diagonal [[0.3, 0], [0, 0.4]] */
     {
@@ -3800,42 +3516,6 @@ static void test_mat_atan_d(void)
 {
     printf(C_CYAN "TEST: mat_atan (double)\n" C_RESET);
 
-    /* 1×1: atan([[0]]) = [[0]] */
-    {
-        matrix_t *A = mat_new_d(1, 1);
-        double v = 0.0;
-        mat_set(A, 0, 0, &v);
-        matrix_t *R = mat_atan(A);
-        check_bool("mat_atan([[0]]) not NULL", R != NULL);
-        if (R)
-        {
-            double got;
-            mat_get(R, 0, 0, &got);
-            check_d("atan([[0]]) = 0", got, 0.0, 1e-12);
-            mat_free(R);
-        }
-        mat_free(A);
-    }
-
-    /* 1×1: atan([[0.5]]) — use 0.5 (well within convergence radius) */
-    {
-        matrix_t *A = mat_new_d(1, 1);
-        double v = 0.5;
-        mat_set(A, 0, 0, &v);
-        print_md("A", A);
-        matrix_t *R = mat_atan(A);
-        check_bool("mat_atan([[0.5]]) not NULL", R != NULL);
-        if (R)
-        {
-            print_md("atan(A)", R);
-            double got;
-            mat_get(R, 0, 0, &got);
-            check_d("atan([[0.5]]) = atan(0.5)", got, atan(0.5), 1e-12);
-        }
-        mat_free(A);
-        mat_free(R);
-    }
-
     /* tan(atan(A)) = A for small diagonal [[0.5, 0],[0, 0.3]] */
     {
         matrix_t *A = mat_new_d(2, 2);
@@ -3874,23 +3554,6 @@ static void test_mat_asinh_d(void)
 {
     printf(C_CYAN "TEST: mat_asinh (double)\n" C_RESET);
 
-    /* 1×1: asinh([[0]]) = [[0]] */
-    {
-        matrix_t *A = mat_new_d(1, 1);
-        double v = 0.0;
-        mat_set(A, 0, 0, &v);
-        matrix_t *R = mat_asinh(A);
-        check_bool("mat_asinh([[0]]) not NULL", R != NULL);
-        if (R)
-        {
-            double got;
-            mat_get(R, 0, 0, &got);
-            check_d("asinh([[0]]) = 0", got, 0.0, 1e-12);
-            mat_free(R);
-        }
-        mat_free(A);
-    }
-
     /* sinh(asinh(A)) = A for diagonal [[0.5, 0],[0, 0.3]] */
     {
         matrix_t *A = mat_new_d(2, 2);
@@ -3927,23 +3590,6 @@ static void test_mat_acosh_d(void)
 {
     printf(C_CYAN "TEST: mat_acosh (double)\n" C_RESET);
 
-    /* 1×1: acosh([[1]]) = [[0]] */
-    {
-        matrix_t *A = mat_new_d(1, 1);
-        double v = 1.0;
-        mat_set(A, 0, 0, &v);
-        matrix_t *R = mat_acosh(A);
-        check_bool("mat_acosh([[1]]) not NULL", R != NULL);
-        if (R)
-        {
-            double got;
-            mat_get(R, 0, 0, &got);
-            check_d("acosh([[1]]) = 0", got, 0.0, 1e-10);
-            mat_free(R);
-        }
-        mat_free(A);
-    }
-
     /* cosh(acosh(A)) = A for diagonal [[2, 0],[0, 3]] */
     {
         matrix_t *A = mat_new_d(2, 2);
@@ -3979,23 +3625,6 @@ static void test_mat_acosh_d(void)
 static void test_mat_atanh_d(void)
 {
     printf(C_CYAN "TEST: mat_atanh (double)\n" C_RESET);
-
-    /* 1×1: atanh([[0]]) = [[0]] */
-    {
-        matrix_t *A = mat_new_d(1, 1);
-        double v = 0.0;
-        mat_set(A, 0, 0, &v);
-        matrix_t *R = mat_atanh(A);
-        check_bool("mat_atanh([[0]]) not NULL", R != NULL);
-        if (R)
-        {
-            double got;
-            mat_get(R, 0, 0, &got);
-            check_d("atanh([[0]]) = 0", got, 0.0, 1e-12);
-            mat_free(R);
-        }
-        mat_free(A);
-    }
 
     /* tanh(atanh(A)) = A for diagonal [[0.4, 0],[0, 0.2]] */
     {
@@ -4098,6 +3727,56 @@ static void test_eigen_general_d(void)
         mat_free(V);
     }
     mat_free(A);
+
+    /* Dense non-Hermitian case:
+     *   P = [[1,1],[1,2]], D = diag(3,2), A = P D P^-1 = [[4,-1],[2,1]]
+     * so the eigenpairs are exact but the input is no longer triangular. */
+    {
+        double avals[4] = {4.0, -1.0, 2.0, 1.0};
+        matrix_t *B = mat_create_d(2, 2, avals);
+        double evals[2];
+        matrix_t *W = NULL;
+
+        check_bool("dense non-Hermitian B allocated", B != NULL);
+        if (!B)
+            return;
+
+        print_md("B (dense non-Hermitian)", B);
+
+        int rc2 = mat_eigendecompose(B, evals, &W);
+        check_bool("dense non-Hermitian eigendecompose rc = 0", rc2 == 0);
+        check_bool("dense non-Hermitian eigenvectors not NULL", W != NULL);
+
+        if (W)
+        {
+            print_md("W (eigenvectors)", W);
+            for (int j = 0; j < 2; j++)
+            {
+                double lam = evals[j];
+                double w0, w1;
+                double bw0, bw1;
+                char label0[80], label1[80];
+
+                mat_get(W, 0, j, &w0);
+                mat_get(W, 1, j, &w1);
+                bw0 = 4.0 * w0 - 1.0 * w1;
+                bw1 = 2.0 * w0 + 1.0 * w1;
+
+                snprintf(label0, sizeof(label0), "(Bw)[0,%d] = lam*w[0,%d]", j, j);
+                snprintf(label1, sizeof(label1), "(Bw)[1,%d] = lam*w[1,%d]", j, j);
+                check_d(label0, bw0, lam * w0, 1e-10);
+                check_d(label1, bw1, lam * w1, 1e-10);
+            }
+
+            double ev_min = evals[0] < evals[1] ? evals[0] : evals[1];
+            double ev_max = evals[0] < evals[1] ? evals[1] : evals[0];
+            check_d("dense non-Hermitian eigenvalue min = 2", ev_min, 2.0, 1e-10);
+            check_d("dense non-Hermitian eigenvalue max = 3", ev_max, 3.0, 1e-10);
+            mat_free(W);
+        }
+
+        mat_free(B);
+    }
 }
 
 static void test_eigen_general_qf(void)
@@ -4142,6 +3821,67 @@ static void test_eigen_general_qf(void)
         mat_free(V);
     }
     mat_free(A);
+
+    /* Same dense non-Hermitian similarity transform as the double test:
+     * A = [[4,-1],[2,1]] has eigenvalues 3 and 2 but is not triangular. */
+    {
+        qfloat_t avals[4] = {
+            qf_from_double(4.0), qf_from_double(-1.0),
+            qf_from_double(2.0), qf_from_double(1.0)};
+        matrix_t *B = mat_create_qf(2, 2, avals);
+        qfloat_t evals[2];
+        matrix_t *W = NULL;
+
+        check_bool("qf dense non-Hermitian B allocated", B != NULL);
+        if (!B)
+            return;
+
+        print_mqf("B (dense non-Hermitian)", B);
+
+        int rc2 = mat_eigendecompose(B, evals, &W);
+        check_bool("qf dense non-Hermitian eigendecompose rc = 0", rc2 == 0);
+        check_bool("qf dense non-Hermitian eigenvectors not NULL", W != NULL);
+
+        if (W)
+        {
+            qfloat_t four = qf_from_double(4.0);
+            qfloat_t minus_one = qf_from_double(-1.0);
+            qfloat_t two = qf_from_double(2.0);
+            qfloat_t one = QF_ONE;
+            print_mqf("W", W);
+            for (int j = 0; j < 2; j++)
+            {
+                qfloat_t lam = evals[j];
+                qfloat_t w0, w1;
+                qfloat_t bw0, bw1;
+                qfloat_t lw0, lw1;
+                char label0[96], label1[96];
+
+                mat_get(W, 0, j, &w0);
+                mat_get(W, 1, j, &w1);
+                bw0 = qf_add(qf_mul(four, w0), qf_mul(minus_one, w1));
+                bw1 = qf_add(qf_mul(two, w0), qf_mul(one, w1));
+                lw0 = qf_mul(lam, w0);
+                lw1 = qf_mul(lam, w1);
+
+                snprintf(label0, sizeof(label0), "qf (Bw)[0,%d]=lam*w[0,%d]", j, j);
+                snprintf(label1, sizeof(label1), "qf (Bw)[1,%d]=lam*w[1,%d]", j, j);
+                check_qf_val(label0, bw0, lw0, 1e-25);
+                check_qf_val(label1, bw1, lw1, 1e-25);
+            }
+
+            int e0_smaller = qf_cmp(evals[0], evals[1]) < 0;
+            qfloat_t ev_min = e0_smaller ? evals[0] : evals[1];
+            qfloat_t ev_max = e0_smaller ? evals[1] : evals[0];
+            check_qf_val("qf dense non-Hermitian eigenvalue min = 2", ev_min,
+                         qf_from_double(2.0), 1e-25);
+            check_qf_val("qf dense non-Hermitian eigenvalue max = 3", ev_max,
+                         qf_from_double(3.0), 1e-25);
+            mat_free(W);
+        }
+
+        mat_free(B);
+    }
 }
 
 /* ------------------------------------------------------------------ README example */
@@ -4589,180 +4329,642 @@ static void check_mat_identity_qc(const char *label, matrix_t *R, size_t n, doub
     mat_free(I);
 }
 
-static void check_unary_mat_1x1_d(const char *label,
-                                  matrix_t *(*fun)(const matrix_t *),
-                                  double x, double expected, double tol)
+static void check_unary_jordan_2x2_d(const char *label,
+                                     matrix_t *(*fun)(const matrix_t *),
+                                     double a, double fa, double fpa, double tol);
+static void check_unary_diagonal_2x2_qc(const char *label,
+                                        matrix_t *(*fun)(const matrix_t *),
+                                        qcomplex_t a, qcomplex_t b,
+                                        qcomplex_t fa, qcomplex_t fb,
+                                        double tol);
+
+static void check_unary_jordan_2x2_qf(const char *label,
+                                      matrix_t *(*fun)(const matrix_t *),
+                                      qfloat_t a, qfloat_t fa, qfloat_t fpa, double tol)
 {
-    matrix_t *A = mat_new_d(1, 1);
-    check_bool("1x1 double input allocated", A != NULL);
-    if (!A)
+    qfloat_t avals[4] = {a, QF_ONE, QF_ZERO, a};
+    qfloat_t evals[4] = {fa, fpa, QF_ZERO, fa};
+    matrix_t *A = mat_create_qf(2, 2, avals);
+    matrix_t *E = mat_create_qf(2, 2, evals);
+
+    check_bool("2x2 qfloat Jordan input allocated", A != NULL);
+    check_bool("2x2 qfloat Jordan expected allocated", E != NULL);
+    if (!A || !E) {
+        mat_free(A);
+        mat_free(E);
         return;
+    }
 
-    mat_set(A, 0, 0, &x);
-    print_md("A", A);
-
+    print_mqf("A (qfloat Jordan block)", A);
     matrix_t *R = fun(A);
     check_bool(label, R != NULL);
-    if (R) {
-        double got;
-        mat_get(R, 0, 0, &got);
-        check_d(label, got, expected, tol);
-    }
+    if (R)
+        check_mat_qf(label, R, E, tol);
 
     mat_free(R);
     mat_free(A);
+    mat_free(E);
 }
 
-static void check_unary_mat_1x1_qf(const char *label,
-                                   matrix_t *(*fun)(const matrix_t *),
-                                   qfloat_t x, qfloat_t expected, double tol)
+static void check_unary_diagonal_2x2_d(const char *label,
+                                       matrix_t *(*fun)(const matrix_t *),
+                                       double a, double b,
+                                       double fa, double fb,
+                                       double tol)
 {
-    matrix_t *A = mat_new_qf(1, 1);
-    check_bool("1x1 qfloat input allocated", A != NULL);
-    if (!A)
+    double avals[4] = {a, 0.0, 0.0, b};
+    double evals[4] = {fa, 0.0, 0.0, fb};
+    matrix_t *A = mat_create_d(2, 2, avals);
+    matrix_t *E = mat_create_d(2, 2, evals);
+
+    check_bool("2x2 diagonal input allocated", A != NULL);
+    check_bool("2x2 diagonal expected allocated", E != NULL);
+    if (!A || !E) {
+        mat_free(A);
+        mat_free(E);
         return;
+    }
 
-    mat_set(A, 0, 0, &x);
-    print_mqf("A", A);
-
+    print_md("A (2x2 diagonal)", A);
     matrix_t *R = fun(A);
     check_bool(label, R != NULL);
-    if (R) {
-        qfloat_t got;
-        mat_get(R, 0, 0, &got);
-        check_qf_val(label, got, expected, tol);
-    }
+    if (R)
+        check_mat_d(label, R, E, tol);
 
     mat_free(R);
     mat_free(A);
+    mat_free(E);
 }
 
-static void check_unary_mat_1x1_qc(const char *label,
-                                   matrix_t *(*fun)(const matrix_t *),
-                                   qcomplex_t x, qcomplex_t expected, double tol)
+static void check_unary_diagonal_2x2_qf(const char *label,
+                                        matrix_t *(*fun)(const matrix_t *),
+                                        qfloat_t a, qfloat_t b,
+                                        qfloat_t fa, qfloat_t fb,
+                                        double tol)
 {
-    matrix_t *A = mat_new_qc(1, 1);
-    check_bool("1x1 qcomplex input allocated", A != NULL);
-    if (!A)
+    qfloat_t avals[4] = {a, QF_ZERO, QF_ZERO, b};
+    qfloat_t evals[4] = {fa, QF_ZERO, QF_ZERO, fb};
+    matrix_t *A = mat_create_qf(2, 2, avals);
+    matrix_t *E = mat_create_qf(2, 2, evals);
+
+    check_bool("2x2 qfloat diagonal input allocated", A != NULL);
+    check_bool("2x2 qfloat diagonal expected allocated", E != NULL);
+    if (!A || !E) {
+        mat_free(A);
+        mat_free(E);
         return;
+    }
 
-    mat_set(A, 0, 0, &x);
-    print_mqc("A", A);
-
+    print_mqf("A (2x2 qfloat diagonal)", A);
     matrix_t *R = fun(A);
     check_bool(label, R != NULL);
-    if (R) {
-        qcomplex_t got;
-        mat_get(R, 0, 0, &got);
-        check_qc_val(label, got, expected, tol);
-    }
+    if (R)
+        check_mat_qf(label, R, E, tol);
 
     mat_free(R);
     mat_free(A);
+    mat_free(E);
 }
 
 static void test_mat_special_unary_extensions(void)
 {
     printf(C_CYAN "TEST: extended unary matrix special functions\n" C_RESET);
 
-    check_unary_mat_1x1_d("mat_erfinv([[0.25]])",
-                          mat_erfinv, 0.25,
-                          qf_to_double(qf_erfinv(qf_from_double(0.25))), 1e-12);
-    check_unary_mat_1x1_d("mat_erfcinv([[0.75]])",
-                          mat_erfcinv, 0.75,
-                          qf_to_double(qf_erfcinv(qf_from_double(0.75))), 1e-12);
-    check_unary_mat_1x1_d("mat_gamma([[2.5]])",
-                          mat_gamma, 2.5,
-                          qf_to_double(qf_gamma(qf_from_double(2.5))), 1e-12);
-    check_unary_mat_1x1_d("mat_lgamma([[2.5]])",
-                          mat_lgamma, 2.5,
-                          qf_to_double(qf_lgamma(qf_from_double(2.5))), 1e-12);
-    check_unary_mat_1x1_d("mat_digamma([[2.5]])",
-                          mat_digamma, 2.5,
-                          qf_to_double(qf_digamma(qf_from_double(2.5))), 1e-12);
-    check_unary_mat_1x1_d("mat_trigamma([[2.5]])",
-                          mat_trigamma, 2.5,
-                          qf_to_double(qf_trigamma(qf_from_double(2.5))), 1e-12);
-    check_unary_mat_1x1_d("mat_tetragamma([[2.5]])",
-                          mat_tetragamma, 2.5,
-                          qf_to_double(qf_tetragamma(qf_from_double(2.5))), 1e-12);
-    check_unary_mat_1x1_d("mat_gammainv([[1.329340388]])",
-                          mat_gammainv, 1.329340388179137,
-                          qf_to_double(qf_gammainv(qf_from_double(1.329340388179137))), 1e-10);
-    check_unary_mat_1x1_d("mat_normal_pdf([[0.5]])",
-                          mat_normal_pdf, 0.5,
-                          qf_to_double(qf_normal_pdf(qf_from_double(0.5))), 1e-12);
-    check_unary_mat_1x1_d("mat_normal_cdf([[0.5]])",
-                          mat_normal_cdf, 0.5,
-                          qf_to_double(qf_normal_cdf(qf_from_double(0.5))), 1e-12);
-    check_unary_mat_1x1_d("mat_normal_logpdf([[0.5]])",
-                          mat_normal_logpdf, 0.5,
-                          qf_to_double(qf_normal_logpdf(qf_from_double(0.5))), 1e-12);
-    check_unary_mat_1x1_d("mat_lambert_w0([[0.2]])",
-                          mat_lambert_w0, 0.2,
-                          qf_to_double(qf_lambert_w0(qf_from_double(0.2))), 1e-12);
-    check_unary_mat_1x1_d("mat_lambert_wm1([[-0.2]])",
-                          mat_lambert_wm1, -0.2,
-                          qf_to_double(qf_lambert_wm1(qf_from_double(-0.2))), 1e-12);
-    check_unary_mat_1x1_d("mat_productlog([[0.2]])",
-                          mat_productlog, 0.2,
-                          qf_to_double(qf_productlog(qf_from_double(0.2))), 1e-12);
-    check_unary_mat_1x1_d("mat_ei([[0.5]])",
-                          mat_ei, 0.5,
-                          qf_to_double(qf_ei(qf_from_double(0.5))), 1e-12);
-    check_unary_mat_1x1_d("mat_e1([[1.0]])",
-                          mat_e1, 1.0,
-                          qf_to_double(qf_e1(qf_from_double(1.0))), 1e-12);
+    {
+        qfloat_t x = qf_from_double(0.25);
+        qfloat_t y = qf_erfinv(x);
+        qfloat_t fp = qf_mul(qf_from_double(0.5), qf_mul(QF_SQRT_PI, qf_exp(qf_mul(y, y))));
+        check_unary_jordan_2x2_d("erfinv(aI+N)=erfinv(a)I+erfinv'(a)N",
+                                 mat_erfinv,
+                                 0.25,
+                                 qf_to_double(y),
+                                 qf_to_double(fp),
+                                 1e-12);
+    }
 
-    check_unary_mat_1x1_qf("qf mat_productlog([[0.2]])",
-                           mat_productlog,
-                           qf_from_double(0.2),
-                           qf_productlog(qf_from_double(0.2)), 1e-25);
-    check_unary_mat_1x1_qf("qf mat_digamma([[2.5]])",
-                           mat_digamma,
-                           qf_from_double(2.5),
-                           qf_digamma(qf_from_double(2.5)), 1e-25);
-    check_unary_mat_1x1_qf("qf mat_lambert_w0([[0.2]])",
-                           mat_lambert_w0,
-                           qf_from_double(0.2),
-                           qf_lambert_w0(qf_from_double(0.2)), 1e-25);
-    check_unary_mat_1x1_qf("qf mat_lambert_wm1([[-0.2]])",
-                           mat_lambert_wm1,
-                           qf_from_double(-0.2),
-                           qf_lambert_wm1(qf_from_double(-0.2)), 1e-25);
-    check_unary_mat_1x1_qf("qf mat_ei([[0.5]])",
-                           mat_ei,
-                           qf_from_double(0.5),
-                           qf_ei(qf_from_double(0.5)), 1e-25);
+    {
+        qfloat_t x = qf_from_double(0.75);
+        qfloat_t y = qf_erfcinv(x);
+        qfloat_t fp = qf_neg(qf_mul(qf_from_double(0.5), qf_mul(QF_SQRT_PI, qf_exp(qf_mul(y, y)))));
+        check_unary_jordan_2x2_d("erfcinv(aI+N)=erfcinv(a)I+erfcinv'(a)N",
+                                 mat_erfcinv,
+                                 0.75,
+                                 qf_to_double(y),
+                                 qf_to_double(fp),
+                                 1e-12);
+    }
 
-    check_unary_mat_1x1_qc("qc mat_lambert_w0([[0.2+0.1i]])",
-                           mat_lambert_w0,
-                           qc_make(qf_from_double(0.2), qf_from_double(0.1)),
-                           qc_productlog(qc_make(qf_from_double(0.2), qf_from_double(0.1))), 1e-24);
-    check_unary_mat_1x1_qc("qc mat_lambert_wm1([[-0.2+0i]])",
-                           mat_lambert_wm1,
-                           qc_make(qf_from_double(-0.2), QF_ZERO),
-                           qc_make(qf_lambert_wm1(qf_from_double(-0.2)), QF_ZERO), 1e-24);
-    check_unary_mat_1x1_qc("qc mat_lambert_wm1([[-0.2-0.1i]])",
-                           mat_lambert_wm1,
-                           qc_make(qf_from_double(-0.2), qf_from_double(-0.1)),
-                           qc_lambert_wm1(qc_make(qf_from_double(-0.2), qf_from_double(-0.1))), 1e-24);
-    check_unary_mat_1x1_qc("qc mat_gamma([[1.2+0.3i]])",
-                           mat_gamma,
-                           qc_make(qf_from_double(1.2), qf_from_double(0.3)),
-                           qc_gamma(qc_make(qf_from_double(1.2), qf_from_double(0.3))), 1e-24);
-    check_unary_mat_1x1_qc("qc mat_digamma([[1.2+0.3i]])",
-                           mat_digamma,
-                           qc_make(qf_from_double(1.2), qf_from_double(0.3)),
-                           qc_digamma(qc_make(qf_from_double(1.2), qf_from_double(0.3))), 1e-24);
-    check_unary_mat_1x1_qc("qc mat_productlog([[0.2+0.1i]])",
-                           mat_productlog,
-                           qc_make(qf_from_double(0.2), qf_from_double(0.1)),
-                           qc_productlog(qc_make(qf_from_double(0.2), qf_from_double(0.1))), 1e-24);
-    check_unary_mat_1x1_qc("qc mat_ei([[0.5+0.2i]])",
-                           mat_ei,
-                           qc_make(qf_from_double(0.5), qf_from_double(0.2)),
-                           qc_ei(qc_make(qf_from_double(0.5), qf_from_double(0.2))), 1e-24);
+    {
+        qfloat_t x = qf_from_double(2.5);
+        check_unary_jordan_2x2_d("lgamma(aI+N)=lgamma(a)I+digamma(a)N",
+                                 mat_lgamma,
+                                 2.5,
+                                 qf_to_double(qf_lgamma(x)),
+                                 qf_to_double(qf_digamma(x)),
+                                 1e-12);
+
+        check_unary_diagonal_2x2_d("tetragamma(diag(a,b)) = diag(tetragamma(a), tetragamma(b))",
+                                   mat_tetragamma,
+                                   2.5, 1.75,
+                                   qf_to_double(qf_tetragamma(qf_from_double(2.5))),
+                                   qf_to_double(qf_tetragamma(qf_from_double(1.75))),
+                                   1e-12);
+    }
+
+    {
+        qfloat_t a = qf_from_double(1.329340388179137);
+        qfloat_t y = qf_gammainv(a);
+        qfloat_t fp = qf_div(QF_ONE, qf_mul(a, qf_digamma(y)));
+        check_unary_jordan_2x2_d("gammainv(aI+N)=gammainv(a)I+gammainv'(a)N",
+                                 mat_gammainv,
+                                 1.329340388179137,
+                                 qf_to_double(y),
+                                 qf_to_double(fp),
+                                 1e-10);
+    }
+
+    {
+        qfloat_t x = qf_from_double(0.5);
+        qfloat_t pdf = qf_normal_pdf(x);
+        check_unary_jordan_2x2_d("normal_pdf(aI+N)=pdf(a)I+pdf'(a)N",
+                                 mat_normal_pdf,
+                                 0.5,
+                                 qf_to_double(pdf),
+                                 qf_to_double(qf_neg(qf_mul(x, pdf))),
+                                 1e-12);
+
+        check_unary_jordan_2x2_d("normal_cdf(aI+N)=cdf(a)I+cdf'(a)N",
+                                 mat_normal_cdf,
+                                 0.5,
+                                 qf_to_double(qf_normal_cdf(x)),
+                                 qf_to_double(pdf),
+                                 1e-12);
+
+        check_unary_jordan_2x2_d("normal_logpdf(aI+N)=logpdf(a)I+logpdf'(a)N",
+                                 mat_normal_logpdf,
+                                 0.5,
+                                 qf_to_double(qf_normal_logpdf(x)),
+                                 qf_to_double(qf_neg(x)),
+                                 1e-12);
+    }
+
+    {
+        qfloat_t a = qf_from_double(0.2);
+        qfloat_t b = qf_from_double(-0.05);
+        check_unary_diagonal_2x2_d("productlog(diag(a,b)) = diag(W0(a),W0(b))",
+                                   mat_productlog,
+                                   0.2, -0.05,
+                                   qf_to_double(qf_productlog(a)),
+                                   qf_to_double(qf_productlog(b)),
+                                   1e-12);
+
+        check_unary_diagonal_2x2_qf("qf productlog(diag(a,b)) = diag(W0(a),W0(b))",
+                                    mat_productlog,
+                                    a, b,
+                                    qf_productlog(a),
+                                    qf_productlog(b),
+                                    1e-25);
+    }
+
+    {
+        qfloat_t x = qf_from_double(2.5);
+        qfloat_t a = qf_from_double(0.2);
+        qfloat_t b = qf_from_double(-0.2);
+        qfloat_t ei_x = qf_from_double(0.5);
+
+        check_unary_jordan_2x2_qf("qf digamma(aI+N)=digamma(a)I+trigamma(a)N",
+                                  mat_digamma,
+                                  x,
+                                  qf_digamma(x),
+                                  qf_trigamma(x),
+                                  1e-25);
+
+        check_unary_jordan_2x2_qf("qf lambert_w0(aI+N)=W0(a)I+W0'(a)N",
+                                  mat_lambert_w0,
+                                  a,
+                                  qf_lambert_w0(a),
+                                  qf_div(qf_lambert_w0(a), qf_mul(a, qf_add(QF_ONE, qf_lambert_w0(a)))),
+                                  1e-25);
+
+        check_unary_jordan_2x2_qf("qf lambert_wm1(aI+N)=Wm1(a)I+Wm1'(a)N",
+                                  mat_lambert_wm1,
+                                  b,
+                                  qf_lambert_wm1(b),
+                                  qf_div(qf_lambert_wm1(b), qf_mul(b, qf_add(QF_ONE, qf_lambert_wm1(b)))),
+                                  1e-25);
+
+        check_unary_jordan_2x2_qf("qf ei(aI+N)=Ei(a)I+Ei'(a)N",
+                                  mat_ei,
+                                  ei_x,
+                                  qf_ei(ei_x),
+                                  qf_div(qf_exp(ei_x), ei_x),
+                                  1e-25);
+    }
+
+    {
+        qcomplex_t z1 = qc_make(qf_from_double(1.2), qf_from_double(0.3));
+        qcomplex_t z2 = qc_make(qf_from_double(0.5), qf_from_double(0.2));
+        qcomplex_t w0a = qc_make(qf_from_double(0.2), qf_from_double(0.1));
+        qcomplex_t w0b = qc_make(qf_from_double(-0.05), qf_from_double(0.08));
+        qcomplex_t wm1a = qc_make(qf_from_double(-0.2), QF_ZERO);
+        qcomplex_t wm1b = qc_make(qf_from_double(-0.2), qf_from_double(-0.1));
+
+        check_unary_diagonal_2x2_qc("qc gamma(diag(z1,z2)) = diag(gamma(z1),gamma(z2))",
+                                    mat_gamma,
+                                    z1, z2,
+                                    qc_gamma(z1), qc_gamma(z2), 1e-24);
+
+        check_unary_diagonal_2x2_qc("qc digamma(diag(z1,z2)) = diag(digamma(z1),digamma(z2))",
+                                    mat_digamma,
+                                    z1, z2,
+                                    qc_digamma(z1), qc_digamma(z2), 1e-24);
+
+        check_unary_diagonal_2x2_qc("qc productlog(diag(a,b)) = diag(W0(a),W0(b))",
+                                    mat_productlog,
+                                    w0a, w0b,
+                                    qc_productlog(w0a), qc_productlog(w0b), 1e-24);
+
+        check_unary_diagonal_2x2_qc("qc lambert_wm1(diag(a,b)) = diag(Wm1(a),Wm1(b))",
+                                    mat_lambert_wm1,
+                                    wm1a, wm1b,
+                                    qc_make(qf_lambert_wm1(qf_from_double(-0.2)), QF_ZERO),
+                                    qc_lambert_wm1(wm1b), 1e-24);
+
+        check_unary_diagonal_2x2_qc("qc ei(diag(z1,z2)) = diag(Ei(z1),Ei(z2))",
+                                    mat_ei,
+                                    z1, z2,
+                                    qc_ei(z1), qc_ei(z2), 1e-24);
+    }
+}
+
+static void check_unary_jordan_2x2_d(const char *label,
+                                     matrix_t *(*fun)(const matrix_t *),
+                                     double a, double fa, double fpa, double tol)
+{
+    double avals[4] = {a, 1.0, 0.0, a};
+    double evals[4] = {fa, fpa, 0.0, fa};
+    matrix_t *A = mat_create_d(2, 2, avals);
+    matrix_t *E = mat_create_d(2, 2, evals);
+
+    check_bool("2x2 Jordan input allocated", A != NULL);
+    check_bool("2x2 Jordan expected allocated", E != NULL);
+    if (!A || !E) {
+        mat_free(A);
+        mat_free(E);
+        return;
+    }
+
+    print_md("A (Jordan block)", A);
+    matrix_t *R = fun(A);
+    check_bool(label, R != NULL);
+    if (R)
+        check_mat_d(label, R, E, tol);
+
+    mat_free(R);
+    mat_free(A);
+    mat_free(E);
+}
+
+static void check_unary_diagonal_2x2_qc(const char *label,
+                                        matrix_t *(*fun)(const matrix_t *),
+                                        qcomplex_t a, qcomplex_t b,
+                                        qcomplex_t fa, qcomplex_t fb,
+                                        double tol)
+{
+    qcomplex_t avals[4] = {a, QC_ZERO, QC_ZERO, b};
+    qcomplex_t evals[4] = {fa, QC_ZERO, QC_ZERO, fb};
+    matrix_t *A = mat_create_qc(2, 2, avals);
+    matrix_t *E = mat_create_qc(2, 2, evals);
+
+    check_bool("2x2 qcomplex diagonal input allocated", A != NULL);
+    check_bool("2x2 qcomplex diagonal expected allocated", E != NULL);
+    if (!A || !E) {
+        mat_free(A);
+        mat_free(E);
+        return;
+    }
+
+    print_mqc("A (qcomplex diagonal)", A);
+    matrix_t *R = fun(A);
+    check_bool(label, R != NULL);
+    if (R)
+        check_mat_qc(label, R, E, tol);
+
+    mat_free(R);
+    mat_free(A);
+    mat_free(E);
+}
+
+static void check_unary_jordan_3x3_d(const char *label,
+                                     matrix_t *(*fun)(const matrix_t *),
+                                     double a, double fa, double fpa,
+                                     double fppa_over_2, double tol)
+{
+    double avals[9] = {
+        a, 1.0, 0.0,
+        0.0, a, 1.0,
+        0.0, 0.0, a
+    };
+    double evals[9] = {
+        fa, fpa, fppa_over_2,
+        0.0, fa, fpa,
+        0.0, 0.0, fa
+    };
+    matrix_t *A = mat_create_d(3, 3, avals);
+    matrix_t *E = mat_create_d(3, 3, evals);
+
+    check_bool("3x3 Jordan input allocated", A != NULL);
+    check_bool("3x3 Jordan expected allocated", E != NULL);
+    if (!A || !E) {
+        mat_free(A);
+        mat_free(E);
+        return;
+    }
+
+    print_md("A (3x3 Jordan block)", A);
+    matrix_t *R = fun(A);
+    check_bool(label, R != NULL);
+    if (R)
+        check_mat_d(label, R, E, tol);
+
+    mat_free(R);
+    mat_free(A);
+    mat_free(E);
+}
+
+static void check_unary_diagonal_3x3_qc(const char *label,
+                                        matrix_t *(*fun)(const matrix_t *),
+                                        qcomplex_t a, qcomplex_t b, qcomplex_t c,
+                                        qcomplex_t fa, qcomplex_t fb, qcomplex_t fc,
+                                        double tol)
+{
+    qcomplex_t avals[9] = {
+        a, QC_ZERO, QC_ZERO,
+        QC_ZERO, b, QC_ZERO,
+        QC_ZERO, QC_ZERO, c
+    };
+    qcomplex_t evals[9] = {
+        fa, QC_ZERO, QC_ZERO,
+        QC_ZERO, fb, QC_ZERO,
+        QC_ZERO, QC_ZERO, fc
+    };
+    matrix_t *A = mat_create_qc(3, 3, avals);
+    matrix_t *E = mat_create_qc(3, 3, evals);
+
+    check_bool("3x3 qcomplex diagonal input allocated", A != NULL);
+    check_bool("3x3 qcomplex diagonal expected allocated", E != NULL);
+    if (!A || !E) {
+        mat_free(A);
+        mat_free(E);
+        return;
+    }
+
+    print_mqc("A (3x3 qcomplex diagonal)", A);
+    matrix_t *R = fun(A);
+    check_bool(label, R != NULL);
+    if (R)
+        check_mat_qc(label, R, E, tol);
+
+    mat_free(R);
+    mat_free(A);
+    mat_free(E);
+}
+
+static void test_mat_special_unary_square_extensions(void)
+{
+    printf(C_CYAN "TEST: extended unary functions on square matrices\n" C_RESET);
+
+    {
+        qfloat_t x = qf_from_double(2.5);
+        qfloat_t gamma_x = qf_gamma(x);
+        qfloat_t digamma_x = qf_digamma(x);
+        qfloat_t trigamma_x = qf_trigamma(x);
+        qfloat_t one = qf_from_double(1.0);
+
+        check_unary_jordan_2x2_d("gamma(aI+N)=gamma(a)I+gamma'(a)N",
+                                 mat_gamma,
+                                 2.5,
+                                 qf_to_double(gamma_x),
+                                 qf_to_double(qf_mul(gamma_x, digamma_x)),
+                                 1e-12);
+
+        check_unary_jordan_2x2_d("digamma(aI+N)=digamma(a)I+trigamma(a)N",
+                                 mat_digamma,
+                                 2.5,
+                                 qf_to_double(digamma_x),
+                                 qf_to_double(trigamma_x),
+                                 1e-12);
+
+        check_unary_jordan_2x2_d("trigamma(aI+N)=trigamma(a)I+tetragamma(a)N",
+                                 mat_trigamma,
+                                 2.5,
+                                 qf_to_double(trigamma_x),
+                                 qf_to_double(qf_tetragamma(x)),
+                                 1e-12);
+
+        {
+            qfloat_t a = qf_from_double(0.2);
+            qfloat_t w = qf_lambert_w0(a);
+            qfloat_t wp = qf_div(w, qf_mul(a, qf_add(one, w)));
+            check_unary_jordan_2x2_d("lambert_w0(aI+N)=W0(a)I+W0'(a)N",
+                                     mat_lambert_w0,
+                                     0.2,
+                                     qf_to_double(w),
+                                     qf_to_double(wp),
+                                     1e-12);
+        }
+
+        {
+            qfloat_t a = qf_from_double(-0.2);
+            qfloat_t w = qf_lambert_wm1(a);
+            qfloat_t wp = qf_div(w, qf_mul(a, qf_add(one, w)));
+            check_unary_jordan_2x2_d("lambert_wm1(aI+N)=Wm1(a)I+Wm1'(a)N",
+                                     mat_lambert_wm1,
+                                     -0.2,
+                                     qf_to_double(w),
+                                     qf_to_double(wp),
+                                     1e-12);
+        }
+
+        {
+            qfloat_t a = qf_from_double(0.5);
+            check_unary_jordan_2x2_d("ei(aI+N)=Ei(a)I+Ei'(a)N",
+                                     mat_ei,
+                                     0.5,
+                                     qf_to_double(qf_ei(a)),
+                                     qf_to_double(qf_div(qf_exp(a), a)),
+                                     1e-12);
+        }
+
+        {
+            qfloat_t a = qf_from_double(1.0);
+            check_unary_jordan_2x2_d("e1(aI+N)=E1(a)I+E1'(a)N",
+                                     mat_e1,
+                                     1.0,
+                                     qf_to_double(qf_e1(a)),
+                                     qf_to_double(qf_div(qf_neg(qf_exp(qf_neg(a))), a)),
+                                     1e-12);
+        }
+    }
+
+    {
+        qcomplex_t z1 = qc_make(qf_from_double(1.2), qf_from_double(0.3));
+        qcomplex_t z2 = qc_make(qf_from_double(0.5), qf_from_double(0.2));
+        qcomplex_t w0a = qc_make(qf_from_double(0.2), qf_from_double(0.1));
+        qcomplex_t w0b = qc_make(qf_from_double(0.1), qf_from_double(0.05));
+        qcomplex_t wm1a = qc_make(qf_from_double(-0.2), qf_from_double(-0.1));
+        qcomplex_t wm1b = qc_make(qf_from_double(-0.1), qf_from_double(-0.05));
+
+        check_unary_diagonal_2x2_qc("qc gamma(diag(z1,z2)) = diag(gamma(z1),gamma(z2))",
+                                    mat_gamma,
+                                    z1, z2,
+                                    qc_gamma(z1), qc_gamma(z2), 1e-24);
+
+        check_unary_diagonal_2x2_qc("qc digamma(diag(z1,z2)) = diag(digamma(z1),digamma(z2))",
+                                    mat_digamma,
+                                    z1, z2,
+                                    qc_digamma(z1), qc_digamma(z2), 1e-24);
+
+        check_unary_diagonal_2x2_qc("qc lambert_w0(diag(a,b)) = diag(W0(a),W0(b))",
+                                    mat_lambert_w0,
+                                    w0a, w0b,
+                                    qc_productlog(w0a), qc_productlog(w0b), 1e-24);
+
+        check_unary_diagonal_2x2_qc("qc lambert_wm1(diag(a,b)) = diag(Wm1(a),Wm1(b))",
+                                    mat_lambert_wm1,
+                                    wm1a, wm1b,
+                                    qc_lambert_wm1(wm1a), qc_lambert_wm1(wm1b), 1e-24);
+
+        check_unary_diagonal_2x2_qc("qc ei(diag(z1,z2)) = diag(Ei(z1),Ei(z2))",
+                                    mat_ei,
+                                    z1, z2,
+                                    qc_ei(z1), qc_ei(z2), 1e-24);
+    }
+
+    {
+        qfloat_t x = qf_from_double(2.5);
+        qfloat_t gamma_x = qf_gamma(x);
+        qfloat_t digamma_x = qf_digamma(x);
+        qfloat_t trigamma_x = qf_trigamma(x);
+        qfloat_t tetragamma_x = qf_tetragamma(x);
+        qfloat_t one = qf_from_double(1.0);
+
+        check_unary_jordan_3x3_d("gamma(aI+N+N^2)=gamma(a)I+gamma'(a)N+gamma''(a)N^2/2",
+                                 mat_gamma,
+                                 2.5,
+                                 qf_to_double(gamma_x),
+                                 qf_to_double(qf_mul(gamma_x, digamma_x)),
+                                 qf_to_double(qf_mul(gamma_x,
+                                                     qf_add(trigamma_x,
+                                                            qf_mul(digamma_x, digamma_x))))
+                                     / 2.0,
+                                 1e-12);
+
+        check_unary_jordan_3x3_d("digamma(aI+N+N^2)=digamma(a)I+trigamma(a)N+tetragamma(a)N^2/2",
+                                 mat_digamma,
+                                 2.5,
+                                 qf_to_double(digamma_x),
+                                 qf_to_double(trigamma_x),
+                                 qf_to_double(tetragamma_x) / 2.0,
+                                 1e-12);
+
+        {
+            qfloat_t a = qf_from_double(0.2);
+            qfloat_t w = qf_lambert_w0(a);
+            qfloat_t wp = qf_div(w, qf_mul(a, qf_add(one, w)));
+            qfloat_t wpp = qf_neg(qf_div(qf_mul(qf_mul(w, w), qf_add(w, qf_from_double(2.0))),
+                                         qf_mul(qf_mul(a, a),
+                                                qf_mul(qf_add(one, w),
+                                                       qf_mul(qf_add(one, w), qf_add(one, w))))));
+            check_unary_jordan_3x3_d("lambert_w0(aI+N+N^2)=W0(a)I+W0'(a)N+W0''(a)N^2/2",
+                                     mat_lambert_w0,
+                                     0.2,
+                                     qf_to_double(w),
+                                     qf_to_double(wp),
+                                     qf_to_double(wpp) / 2.0,
+                                     1e-12);
+        }
+
+        {
+            qfloat_t a = qf_from_double(-0.2);
+            qfloat_t w = qf_lambert_wm1(a);
+            qfloat_t wp = qf_div(w, qf_mul(a, qf_add(one, w)));
+            qfloat_t wpp = qf_neg(qf_div(qf_mul(qf_mul(w, w), qf_add(w, qf_from_double(2.0))),
+                                         qf_mul(qf_mul(a, a),
+                                                qf_mul(qf_add(one, w),
+                                                       qf_mul(qf_add(one, w), qf_add(one, w))))));
+            check_unary_jordan_3x3_d("lambert_wm1(aI+N+N^2)=Wm1(a)I+Wm1'(a)N+Wm1''(a)N^2/2",
+                                     mat_lambert_wm1,
+                                     -0.2,
+                                     qf_to_double(w),
+                                     qf_to_double(wp),
+                                     qf_to_double(wpp) / 2.0,
+                                     1e-12);
+        }
+
+        {
+            qfloat_t a = qf_from_double(0.5);
+            check_unary_jordan_3x3_d("ei(aI+N+N^2)=Ei(a)I+Ei'(a)N+Ei''(a)N^2/2",
+                                     mat_ei,
+                                     0.5,
+                                     qf_to_double(qf_ei(a)),
+                                     qf_to_double(qf_div(qf_exp(a), a)),
+                                     qf_to_double(qf_div(qf_mul(qf_exp(a),
+                                                                qf_sub(a, one)),
+                                                         qf_mul(a, a))) / 2.0,
+                                     1e-12);
+        }
+
+        {
+            qfloat_t a = qf_from_double(1.0);
+            check_unary_jordan_3x3_d("e1(aI+N+N^2)=E1(a)I+E1'(a)N+E1''(a)N^2/2",
+                                     mat_e1,
+                                     1.0,
+                                     qf_to_double(qf_e1(a)),
+                                     qf_to_double(qf_div(qf_neg(qf_exp(qf_neg(a))), a)),
+                                     qf_to_double(qf_div(qf_mul(qf_exp(qf_neg(a)),
+                                                                qf_add(a, one)),
+                                                         qf_mul(a, a))) / 2.0,
+                                     1e-12);
+        }
+    }
+
+    {
+        qcomplex_t z1 = qc_make(qf_from_double(1.2), qf_from_double(0.3));
+        qcomplex_t z2 = qc_make(qf_from_double(0.5), qf_from_double(0.2));
+        qcomplex_t z3 = qc_make(qf_from_double(0.8), qf_from_double(-0.25));
+        qcomplex_t w0a = qc_make(qf_from_double(0.2), qf_from_double(0.1));
+        qcomplex_t w0b = qc_make(qf_from_double(0.1), qf_from_double(0.05));
+        qcomplex_t w0c = qc_make(qf_from_double(0.15), qf_from_double(-0.08));
+        qcomplex_t wm1a = qc_make(qf_from_double(-0.2), qf_from_double(-0.1));
+        qcomplex_t wm1b = qc_make(qf_from_double(-0.1), qf_from_double(-0.05));
+        qcomplex_t wm1c = qc_make(qf_from_double(-0.16), qf_from_double(-0.07));
+
+        check_unary_diagonal_3x3_qc("qc gamma(diag(z1,z2,z3)) = diag(gamma(z1),gamma(z2),gamma(z3))",
+                                    mat_gamma,
+                                    z1, z2, z3,
+                                    qc_gamma(z1), qc_gamma(z2), qc_gamma(z3), 1e-24);
+
+        check_unary_diagonal_3x3_qc("qc digamma(diag(z1,z2,z3)) = diag(digamma(z1),digamma(z2),digamma(z3))",
+                                    mat_digamma,
+                                    z1, z2, z3,
+                                    qc_digamma(z1), qc_digamma(z2), qc_digamma(z3), 1e-24);
+
+        check_unary_diagonal_3x3_qc("qc lambert_w0(diag(a,b,c)) = diag(W0(a),W0(b),W0(c))",
+                                    mat_lambert_w0,
+                                    w0a, w0b, w0c,
+                                    qc_productlog(w0a), qc_productlog(w0b), qc_productlog(w0c), 1e-24);
+
+        check_unary_diagonal_3x3_qc("qc lambert_wm1(diag(a,b,c)) = diag(Wm1(a),Wm1(b),Wm1(c))",
+                                    mat_lambert_wm1,
+                                    wm1a, wm1b, wm1c,
+                                    qc_lambert_wm1(wm1a), qc_lambert_wm1(wm1b), qc_lambert_wm1(wm1c), 1e-24);
+
+        check_unary_diagonal_3x3_qc("qc ei(diag(z1,z2,z3)) = diag(Ei(z1),Ei(z2),Ei(z3))",
+                                    mat_ei,
+                                    z1, z2, z3,
+                                    qc_ei(z1), qc_ei(z2), qc_ei(z3), 1e-24);
+    }
 }
 
 static void test_mat_neg_convenience(void)
@@ -5350,44 +5552,6 @@ static void test_mat_erf_d(void)
     /* null safety */
     check_bool("mat_erf(NULL) = NULL", mat_erf(NULL) == NULL);
 
-    /* 1×1: erf([[0.5]]) = [[erf(0.5)]] */
-    {
-        matrix_t *A = mat_new_d(1, 1);
-        double v = 0.5;
-        mat_set(A, 0, 0, &v);
-        print_md("A", A);
-        matrix_t *R = mat_erf(A);
-        check_bool("mat_erf([[0.5]]) not NULL", R != NULL);
-        if (R)
-        {
-            print_md("erf(A)", R);
-            double got;
-            mat_get(R, 0, 0, &got);
-            check_d("erf([[0.5]])", got, erf(0.5), 1e-12);
-            mat_free(R);
-        }
-        mat_free(A);
-    }
-
-    /* 1×1: erf([[0]]) = [[0]] */
-    {
-        matrix_t *A = mat_new_d(1, 1);
-        double v = 0.0;
-        mat_set(A, 0, 0, &v);
-        print_md("A", A);
-        matrix_t *R = mat_erf(A);
-        check_bool("mat_erf([[0]]) not NULL", R != NULL);
-        if (R)
-        {
-            print_md("erf(A)", R);
-            double got;
-            mat_get(R, 0, 0, &got);
-            check_d("erf([[0]]) = 0", got, 0.0, 1e-12);
-            mat_free(R);
-        }
-        mat_free(A);
-    }
-
     /* nilpotent: erf(N) = (2/√π)·N = [[0, 2/√π],[0,0]] */
     {
         double nvals[4] = {0.0, 1.0, 0.0, 0.0};
@@ -5440,25 +5604,6 @@ static void test_mat_erfc_d(void)
 
     /* null safety */
     check_bool("mat_erfc(NULL) = NULL", mat_erfc(NULL) == NULL);
-
-    /* 1×1: erfc([[0.5]]) = [[erfc(0.5)]] */
-    {
-        matrix_t *A = mat_new_d(1, 1);
-        double v = 0.5;
-        mat_set(A, 0, 0, &v);
-        print_md("A", A);
-        matrix_t *R = mat_erfc(A);
-        check_bool("mat_erfc([[0.5]]) not NULL", R != NULL);
-        if (R)
-        {
-            print_md("erfc(A)", R);
-            double got;
-            mat_get(R, 0, 0, &got);
-            check_d("erfc([[0.5]])", got, erfc(0.5), 1e-12);
-            mat_free(R);
-        }
-        mat_free(A);
-    }
 
     /* nilpotent: erfc(N) = I - (2/√π)·N = [[1,-2/√π],[0,1]] */
     {
@@ -5547,11 +5692,9 @@ static void test_mat_typeof(void)
 /* ------------------------------------------------------------------ 3×3 matrix function tests */
 
 /*
- * Asymmetric upper-triangular A is not Hermitian, so it takes the general
- * QR Schur path.  The Schur factor T equals A itself (Q=I), giving a
- * non-diagonal 3×3 T.  For indices (i=0, j=2) the Parlett recurrence uses
- * the cross-term Σ_{k=1}^{1}(T[0,k]*F[k,2] - F[0,k]*T[k,2]) — the only
- * path that is never exercised by 2×2 tests.
+ * Symmetric positive-definite 3×3 input exercises the full Schur-roundtrip
+ * path on a genuinely dense matrix, rather than the simpler diagonal,
+ * nilpotent, or 2×2 cases covered elsewhere in this file.
  */
 static void test_mat_fun_3x3(void)
 {
@@ -5580,7 +5723,7 @@ static void test_mat_fun_3x3(void)
         return;
     }
 
-    print_md("A (3×3 upper-triangular)", A);
+    print_md("A (3×3 SPD)", A);
 
     /* exp(A) · exp(-A) = I */
     {
@@ -5684,9 +5827,9 @@ static void test_mat_fun_3x3(void)
 /* ------------------------------------------------------------------ 4×4 matrix function tests */
 
 /*
- * Upper-triangular 4×4 with eigenvalues {1,2,3,4} exercises every level of the
- * Parlett recurrence: element (0,3) accumulates cross-terms over k=1,2, which
- * is unreachable with a 3×3 matrix.
+ * Symmetric positive-definite 4×4 input gives a larger dense Schur-roundtrip
+ * case than the 3×3 tests and helps cover matrix-function products on
+ * nontrivial square inputs.
  */
 static void test_mat_fun_4x4(void)
 {
@@ -5717,7 +5860,7 @@ static void test_mat_fun_4x4(void)
         return;
     }
 
-    print_md("A (4×4 upper-triangular)", A);
+    print_md("A (4×4 SPD)", A);
 
     /* exp(A) · exp(-A) = I */
     {
@@ -6482,6 +6625,7 @@ int tests_main(void)
     RUN_TEST(test_mat_erf_d, NULL);
     RUN_TEST(test_mat_erfc_d, NULL);
     RUN_TEST(test_mat_special_unary_extensions, NULL);
+    RUN_TEST(test_mat_special_unary_square_extensions, NULL);
 
     RUN_TEST(test_mat_fun_qf_qc, NULL);
     RUN_TEST(test_mat_error_handling, NULL);

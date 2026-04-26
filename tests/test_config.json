@@ -711,6 +711,7 @@
     "test_mat_exp_singular": true,
     "test_mat_fun_singular_entire_d": true,
     "test_mat_special_unary_extensions": true,
-    "test_mat_neg_convenience": true
+    "test_mat_neg_convenience": true,
+    "test_mat_special_unary_square_extensions": true
   }
 }

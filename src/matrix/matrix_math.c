@@ -342,6 +342,72 @@ static matrix_t *mat_fun_hermitian(const matrix_t *A,
     return out;
 }
 
+static int mat_is_upper_triangular_local(const matrix_t *A)
+{
+    qfloat_t tol = qf_from_double(1e-30);
+    qcomplex_t z;
+
+    if (!A || A->rows != A->cols)
+        return 0;
+
+    for (size_t i = 1; i < A->rows; ++i) {
+        for (size_t j = 0; j < i; ++j) {
+            unsigned char raw[64];
+            mat_get(A, i, j, raw);
+            A->elem->to_qc(&z, raw);
+            if (qf_lt(tol, qc_abs(z)))
+                return 0;
+        }
+    }
+
+    return 1;
+}
+
+static matrix_t *mat_fun_upper_triangular(const matrix_t *A,
+                                          void (*scalar_f)(void *out, const void *in))
+{
+    const struct elem_vtable *orig_elem = A->elem;
+    size_t n = A->rows;
+    matrix_t *T = mat_to_qcomplex_local(A);
+    matrix_t *FT = NULL;
+    matrix_t *out = NULL;
+
+    if (!T)
+        return NULL;
+
+    FT = mat_fun_triangular(T, scalar_f);
+    if (!FT) {
+        mat_free(T);
+        return NULL;
+    }
+
+    if (orig_elem == FT->elem) {
+        mat_free(T);
+        return FT;
+    }
+
+    out = orig_elem->create_matrix(n, n);
+    if (!out) {
+        mat_free(T);
+        mat_free(FT);
+        return NULL;
+    }
+
+    for (size_t i = 0; i < n; ++i) {
+        for (size_t j = 0; j < n; ++j) {
+            qcomplex_t qc;
+            unsigned char raw[64];
+            mat_get(FT, i, j, &qc);
+            orig_elem->from_qc(raw, &qc);
+            mat_set(out, i, j, raw);
+        }
+    }
+
+    mat_free(T);
+    mat_free(FT);
+    return out;
+}
+
 /* ============================================================
    Schur-based matrix function engine
    ============================================================ */
@@ -380,6 +446,9 @@ matrix_t *mat_fun_schur(const matrix_t *A,
 
     if (mat_is_hermitian(A))
         return mat_fun_hermitian(A, scalar_f);
+
+    if (mat_is_upper_triangular_local(A))
+        return mat_fun_upper_triangular(A, scalar_f);
 
     const struct elem_vtable *orig_elem = A->elem;
     size_t n = A->rows;
