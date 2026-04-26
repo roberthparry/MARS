@@ -240,6 +240,64 @@ static void d_scalar_atanh(void *out, const void *a) { *(double*)out = atanh(*(c
 
 static void d_scalar_erf (void *out, const void *a) { *(double*)out = erf (*(const double*)a); }
 static void d_scalar_erfc(void *out, const void *a) { *(double*)out = erfc(*(const double*)a); }
+static void d_scalar_erfinv(void *out, const void *a)
+{
+    *(double *)out = qf_to_double(qf_erfinv(qf_from_double(*(const double *)a)));
+}
+static void d_scalar_erfcinv(void *out, const void *a)
+{
+    *(double *)out = qf_to_double(qf_erfcinv(qf_from_double(*(const double *)a)));
+}
+static void d_scalar_gamma(void *out, const void *a) { *(double*)out = tgamma(*(const double*)a); }
+static void d_scalar_lgamma(void *out, const void *a) { *(double*)out = lgamma(*(const double*)a); }
+static void d_scalar_digamma(void *out, const void *a)
+{
+    *(double *)out = qf_to_double(qf_digamma(qf_from_double(*(const double *)a)));
+}
+static void d_scalar_trigamma(void *out, const void *a)
+{
+    *(double *)out = qf_to_double(qf_trigamma(qf_from_double(*(const double *)a)));
+}
+static void d_scalar_tetragamma(void *out, const void *a)
+{
+    *(double *)out = qf_to_double(qf_tetragamma(qf_from_double(*(const double *)a)));
+}
+static void d_scalar_gammainv(void *out, const void *a)
+{
+    *(double *)out = qf_to_double(qf_gammainv(qf_from_double(*(const double *)a)));
+}
+static void d_scalar_normal_pdf(void *out, const void *a)
+{
+    *(double *)out = qf_to_double(qf_normal_pdf(qf_from_double(*(const double *)a)));
+}
+static void d_scalar_normal_cdf(void *out, const void *a)
+{
+    *(double *)out = qf_to_double(qf_normal_cdf(qf_from_double(*(const double *)a)));
+}
+static void d_scalar_normal_logpdf(void *out, const void *a)
+{
+    *(double *)out = qf_to_double(qf_normal_logpdf(qf_from_double(*(const double *)a)));
+}
+static void d_scalar_lambert_w0(void *out, const void *a)
+{
+    *(double *)out = qf_to_double(qf_lambert_w0(qf_from_double(*(const double *)a)));
+}
+static void d_scalar_lambert_wm1(void *out, const void *a)
+{
+    *(double *)out = qf_to_double(qf_lambert_wm1(qf_from_double(*(const double *)a)));
+}
+static void d_scalar_productlog(void *out, const void *a)
+{
+    *(double *)out = qf_to_double(qf_productlog(qf_from_double(*(const double *)a)));
+}
+static void d_scalar_ei(void *out, const void *a)
+{
+    *(double *)out = qf_to_double(qf_ei(qf_from_double(*(const double *)a)));
+}
+static void d_scalar_e1(void *out, const void *a)
+{
+    *(double *)out = qf_to_double(qf_e1(qf_from_double(*(const double *)a)));
+}
 
 static const struct elem_fun_vtable double_fun = {
     .exp  = d_scalar_exp,
@@ -263,7 +321,23 @@ static const struct elem_fun_vtable double_fun = {
     .atanh = d_scalar_atanh,
 
     .erf  = d_scalar_erf,
-    .erfc = d_scalar_erfc
+    .erfc = d_scalar_erfc,
+    .erfinv = d_scalar_erfinv,
+    .erfcinv = d_scalar_erfcinv,
+    .gamma = d_scalar_gamma,
+    .lgamma = d_scalar_lgamma,
+    .digamma = d_scalar_digamma,
+    .trigamma = d_scalar_trigamma,
+    .tetragamma = d_scalar_tetragamma,
+    .gammainv = d_scalar_gammainv,
+    .normal_pdf = d_scalar_normal_pdf,
+    .normal_cdf = d_scalar_normal_cdf,
+    .normal_logpdf = d_scalar_normal_logpdf,
+    .lambert_w0 = d_scalar_lambert_w0,
+    .lambert_wm1 = d_scalar_lambert_wm1,
+    .productlog = d_scalar_productlog,
+    .ei = d_scalar_ei,
+    .e1 = d_scalar_e1
 };
 
 const struct elem_vtable double_elem = {
@@ -361,6 +435,22 @@ static void qf_scalar_atanh(void *out, const void *a) { *(qfloat_t*)out = qf_ata
 
 static void qf_scalar_erf (void *out, const void *a) { *(qfloat_t*)out = qf_erf (*(const qfloat_t*)a); }
 static void qf_scalar_erfc(void *out, const void *a) { *(qfloat_t*)out = qf_erfc(*(const qfloat_t*)a); }
+static void qf_scalar_erfinv(void *out, const void *a) { *(qfloat_t*)out = qf_erfinv(*(const qfloat_t*)a); }
+static void qf_scalar_erfcinv(void *out, const void *a) { *(qfloat_t*)out = qf_erfcinv(*(const qfloat_t*)a); }
+static void qf_scalar_gamma(void *out, const void *a) { *(qfloat_t*)out = qf_gamma(*(const qfloat_t*)a); }
+static void qf_scalar_lgamma(void *out, const void *a) { *(qfloat_t*)out = qf_lgamma(*(const qfloat_t*)a); }
+static void qf_scalar_digamma(void *out, const void *a) { *(qfloat_t*)out = qf_digamma(*(const qfloat_t*)a); }
+static void qf_scalar_trigamma(void *out, const void *a) { *(qfloat_t*)out = qf_trigamma(*(const qfloat_t*)a); }
+static void qf_scalar_tetragamma(void *out, const void *a) { *(qfloat_t*)out = qf_tetragamma(*(const qfloat_t*)a); }
+static void qf_scalar_gammainv(void *out, const void *a) { *(qfloat_t*)out = qf_gammainv(*(const qfloat_t*)a); }
+static void qf_scalar_normal_pdf(void *out, const void *a) { *(qfloat_t*)out = qf_normal_pdf(*(const qfloat_t*)a); }
+static void qf_scalar_normal_cdf(void *out, const void *a) { *(qfloat_t*)out = qf_normal_cdf(*(const qfloat_t*)a); }
+static void qf_scalar_normal_logpdf(void *out, const void *a) { *(qfloat_t*)out = qf_normal_logpdf(*(const qfloat_t*)a); }
+static void qf_scalar_lambert_w0(void *out, const void *a) { *(qfloat_t*)out = qf_lambert_w0(*(const qfloat_t*)a); }
+static void qf_scalar_lambert_wm1(void *out, const void *a) { *(qfloat_t*)out = qf_lambert_wm1(*(const qfloat_t*)a); }
+static void qf_scalar_productlog(void *out, const void *a) { *(qfloat_t*)out = qf_productlog(*(const qfloat_t*)a); }
+static void qf_scalar_ei(void *out, const void *a) { *(qfloat_t*)out = qf_ei(*(const qfloat_t*)a); }
+static void qf_scalar_e1(void *out, const void *a) { *(qfloat_t*)out = qf_e1(*(const qfloat_t*)a); }
 
 static const struct elem_fun_vtable qfloat_fun = {
     .exp  = qf_scalar_exp,
@@ -384,7 +474,23 @@ static const struct elem_fun_vtable qfloat_fun = {
     .atanh = qf_scalar_atanh,
 
     .erf  = qf_scalar_erf,
-    .erfc = qf_scalar_erfc
+    .erfc = qf_scalar_erfc,
+    .erfinv = qf_scalar_erfinv,
+    .erfcinv = qf_scalar_erfcinv,
+    .gamma = qf_scalar_gamma,
+    .lgamma = qf_scalar_lgamma,
+    .digamma = qf_scalar_digamma,
+    .trigamma = qf_scalar_trigamma,
+    .tetragamma = qf_scalar_tetragamma,
+    .gammainv = qf_scalar_gammainv,
+    .normal_pdf = qf_scalar_normal_pdf,
+    .normal_cdf = qf_scalar_normal_cdf,
+    .normal_logpdf = qf_scalar_normal_logpdf,
+    .lambert_w0 = qf_scalar_lambert_w0,
+    .lambert_wm1 = qf_scalar_lambert_wm1,
+    .productlog = qf_scalar_productlog,
+    .ei = qf_scalar_ei,
+    .e1 = qf_scalar_e1
 };
 
 const struct elem_vtable qfloat_elem = {
@@ -506,6 +612,22 @@ static void qc_scalar_atanh(void *out, const void *a) { *(qcomplex_t*)out = qc_a
 
 static void qc_scalar_erf (void *out, const void *a) { *(qcomplex_t*)out = qc_erf (*(const qcomplex_t*)a); }
 static void qc_scalar_erfc(void *out, const void *a) { *(qcomplex_t*)out = qc_erfc(*(const qcomplex_t*)a); }
+static void qc_scalar_erfinv(void *out, const void *a) { *(qcomplex_t*)out = qc_erfinv(*(const qcomplex_t*)a); }
+static void qc_scalar_erfcinv(void *out, const void *a) { *(qcomplex_t*)out = qc_erfcinv(*(const qcomplex_t*)a); }
+static void qc_scalar_gamma(void *out, const void *a) { *(qcomplex_t*)out = qc_gamma(*(const qcomplex_t*)a); }
+static void qc_scalar_lgamma(void *out, const void *a) { *(qcomplex_t*)out = qc_lgamma(*(const qcomplex_t*)a); }
+static void qc_scalar_digamma(void *out, const void *a) { *(qcomplex_t*)out = qc_digamma(*(const qcomplex_t*)a); }
+static void qc_scalar_trigamma(void *out, const void *a) { *(qcomplex_t*)out = qc_trigamma(*(const qcomplex_t*)a); }
+static void qc_scalar_tetragamma(void *out, const void *a) { *(qcomplex_t*)out = qc_tetragamma(*(const qcomplex_t*)a); }
+static void qc_scalar_gammainv(void *out, const void *a) { *(qcomplex_t*)out = qc_gammainv(*(const qcomplex_t*)a); }
+static void qc_scalar_normal_pdf(void *out, const void *a) { *(qcomplex_t*)out = qc_normal_pdf(*(const qcomplex_t*)a); }
+static void qc_scalar_normal_cdf(void *out, const void *a) { *(qcomplex_t*)out = qc_normal_cdf(*(const qcomplex_t*)a); }
+static void qc_scalar_normal_logpdf(void *out, const void *a) { *(qcomplex_t*)out = qc_normal_logpdf(*(const qcomplex_t*)a); }
+static void qc_scalar_lambert_w0(void *out, const void *a) { *(qcomplex_t*)out = qc_productlog(*(const qcomplex_t*)a); }
+static void qc_scalar_lambert_wm1(void *out, const void *a) { *(qcomplex_t*)out = qc_lambert_wm1(*(const qcomplex_t*)a); }
+static void qc_scalar_productlog(void *out, const void *a) { *(qcomplex_t*)out = qc_productlog(*(const qcomplex_t*)a); }
+static void qc_scalar_ei(void *out, const void *a) { *(qcomplex_t*)out = qc_ei(*(const qcomplex_t*)a); }
+static void qc_scalar_e1(void *out, const void *a) { *(qcomplex_t*)out = qc_e1(*(const qcomplex_t*)a); }
 
 static const struct elem_fun_vtable qcomplex_fun = {
     .exp  = qc_scalar_exp,
@@ -529,7 +651,23 @@ static const struct elem_fun_vtable qcomplex_fun = {
     .atanh = qc_scalar_atanh,
 
     .erf  = qc_scalar_erf,
-    .erfc = qc_scalar_erfc
+    .erfc = qc_scalar_erfc,
+    .erfinv = qc_scalar_erfinv,
+    .erfcinv = qc_scalar_erfcinv,
+    .gamma = qc_scalar_gamma,
+    .lgamma = qc_scalar_lgamma,
+    .digamma = qc_scalar_digamma,
+    .trigamma = qc_scalar_trigamma,
+    .tetragamma = qc_scalar_tetragamma,
+    .gammainv = qc_scalar_gammainv,
+    .normal_pdf = qc_scalar_normal_pdf,
+    .normal_cdf = qc_scalar_normal_cdf,
+    .normal_logpdf = qc_scalar_normal_logpdf,
+    .lambert_w0 = qc_scalar_lambert_w0,
+    .lambert_wm1 = qc_scalar_lambert_wm1,
+    .productlog = qc_scalar_productlog,
+    .ei = qc_scalar_ei,
+    .e1 = qc_scalar_e1
 };
 
 const struct elem_vtable qcomplex_elem = {
@@ -891,6 +1029,7 @@ matrix_t *mat_create_qc(size_t rows, size_t cols, const qcomplex_t *data)
 
 void mat_free(struct matrix_t *A) {
     if (!A) return;
+    mat_fun_cache_forget(A);
     A->store->free(A);
     free(A);
 }
@@ -1153,6 +1292,23 @@ struct matrix_t *mat_mul(const struct matrix_t *A, const struct matrix_t *B) {
     }
 
     return C;
+}
+
+matrix_t *mat_neg(const matrix_t *A)
+{
+    if (!A)
+        return NULL;
+
+    switch (mat_typeof(A)) {
+    case MAT_TYPE_DOUBLE:
+        return mat_scalar_mul_d((matrix_t *)A, -1.0);
+    case MAT_TYPE_QFLOAT:
+        return mat_scalar_mul_qf((matrix_t *)A, qf_from_double(-1.0));
+    case MAT_TYPE_QCOMPLEX:
+        return mat_scalar_mul_qc((matrix_t *)A, qc_make(qf_from_double(-1.0), QF_ZERO));
+    default:
+        return NULL;
+    }
 }
 
 /* ============================================================
@@ -1604,11 +1760,11 @@ static inline qcomplex_t qcs(qfloat_t s, qcomplex_t z)
 }
 
 /* Detect whether A is Hermitian: A[i,j] == conj(A[j,i]) within tolerance */
-static int mat_is_hermitian(const matrix_t *A)
+int mat_is_hermitian(const matrix_t *A)
 {
     size_t n = A->rows;
     const struct elem_vtable *e = A->elem;
-    unsigned char aij[64], aji[64], cji[64], diff[64];
+    unsigned char aij[64], aji[64], cji[64], diff[64], diag[64];
     double tol2 = 0.0;
     /* build tolerance from Frobenius norm */
     for (size_t i = 0; i < n; i++)
@@ -1617,6 +1773,12 @@ static int mat_is_hermitian(const matrix_t *A)
             tol2 += e->abs2(aij);
         }
     tol2 *= 1e-28;
+    for (size_t i = 0; i < n; i++) {
+        mat_get(A, i, i, diag);
+        e->conj_elem(cji, diag);
+        e->sub(diff, diag, cji);
+        if (e->abs2(diff) > tol2) return 0;
+    }
     for (size_t i = 0; i < n; i++)
         for (size_t j = i + 1; j < n; j++) {
             mat_get(A, i, j, aij);
@@ -2522,7 +2684,7 @@ matrix_t *mat_fun_triangular(const matrix_t *T,
             mat_get(T, j, j, t_jj);
             e->sub(denom, t_ii, t_jj);
 
-            /* sum = Σ_{k=i+1}^{j-1} (F_ik T_kj - T_ik F_kj) */
+            /* sum = Σ_{k=i+1}^{j-1} (T_ik F_kj - F_ik T_kj) */
             memcpy(sum, e->zero, e->size);
             for (size_t k = i + 1; k < j; ++k) {
                 mat_get(T, i, k, t_ik);
@@ -2530,22 +2692,22 @@ matrix_t *mat_fun_triangular(const matrix_t *T,
                 mat_get(F, k, j, f_kj);
                 mat_get(F, i, k, f_ik);
 
-                /* tmp = F_ik * T_kj */
-                e->mul(tmp, f_ik, t_kj);
-                e->add(sum, sum, tmp);
-
                 /* tmp = T_ik * F_kj */
                 e->mul(tmp, t_ik, f_kj);
+                e->add(sum, sum, tmp);
+
+                /* tmp = F_ik * T_kj */
+                e->mul(tmp, f_ik, t_kj);
                 e->sub(sum, sum, tmp);
             }
 
-            /* num = T_ij * (F_ii - F_jj) + sum */
+            /* num = T_ij * (F_jj - F_ii) + sum */
             mat_get(T, i, j, t_ij);
             mat_get(F, i, i, f_ii);
             mat_get(F, j, j, f_jj);
 
-            e->sub(tmp, f_ii, f_jj);      /* tmp = F_ii - F_jj */
-            e->mul(num, t_ij, tmp);       /* num = T_ij * (F_ii - F_jj) */
+            e->sub(tmp, f_jj, f_ii);      /* tmp = F_jj - F_ii */
+            e->mul(num, t_ij, tmp);       /* num = T_ij * (F_jj - F_ii) */
             e->add(num, num, sum);        /* num += sum */
 
             /* Handle T_ii == T_jj: avoid 0/0 */

@@ -8,6 +8,125 @@
 #define TEST_CONFIG_MODE TEST_CONFIG_GLOBAL
 #include "test_harness.h"
 
+static void check_mat_d(const char *label, matrix_t *got, matrix_t *expected_mat, double tol);
+static char current_matrix_input_label[128];
+static matrix_t *current_matrix_input = NULL;
+
+static matrix_t *clone_matrix_snapshot(const matrix_t *A)
+{
+    if (!A)
+        return NULL;
+
+    size_t rows = mat_get_row_count(A);
+    size_t cols = mat_get_col_count(A);
+
+    switch (mat_typeof(A))
+    {
+    case MAT_TYPE_DOUBLE:
+    {
+        double *data = malloc(rows * cols * sizeof(double));
+        matrix_t *copy;
+        if (!data)
+            return NULL;
+        mat_get_data(A, data);
+        copy = mat_create_d(rows, cols, data);
+        free(data);
+        return copy;
+    }
+    case MAT_TYPE_QFLOAT:
+    {
+        qfloat_t *data = malloc(rows * cols * sizeof(qfloat_t));
+        matrix_t *copy;
+        if (!data)
+            return NULL;
+        mat_get_data(A, data);
+        copy = mat_create_qf(rows, cols, data);
+        free(data);
+        return copy;
+    }
+    case MAT_TYPE_QCOMPLEX:
+    {
+        qcomplex_t *data = malloc(rows * cols * sizeof(qcomplex_t));
+        matrix_t *copy;
+        if (!data)
+            return NULL;
+        mat_get_data(A, data);
+        copy = mat_create_qc(rows, cols, data);
+        free(data);
+        return copy;
+    }
+    }
+
+    return NULL;
+}
+
+static int is_primary_matrix_label(const char *label)
+{
+    static const char *derived_prefixes[] = {
+        "exp(", "sin(", "cos(", "tan(", "sinh(", "cosh(", "tanh(",
+        "sqrt(", "log(", "asin(", "acos(", "atan(", "asinh(",
+        "acosh(", "atanh(", "erf(", "erfc(", "transpose(", "conj(",
+        "eigenvectors", "V ", NULL};
+
+    if (!label || !label[0])
+        return 0;
+    if (label[0] < 'A' || label[0] > 'Z')
+        return 0;
+
+    for (size_t i = 0; derived_prefixes[i]; i++)
+        if (strncmp(label, derived_prefixes[i], strlen(derived_prefixes[i])) == 0)
+            return 0;
+
+    size_t token_len = 0;
+    while ((label[token_len] >= 'A' && label[token_len] <= 'Z') ||
+           (label[token_len] >= 'a' && label[token_len] <= 'z') ||
+           (label[token_len] >= '0' && label[token_len] <= '9'))
+        token_len++;
+
+    if (token_len == 0)
+        return 0;
+
+    while (label[token_len] == ' ')
+        token_len++;
+
+    if (label[token_len] == '\0' || label[token_len] == '(')
+        return 1;
+
+    if ((label[token_len] >= 'A' && label[token_len] <= 'Z') ||
+        (label[token_len] >= 'a' && label[token_len] <= 'z'))
+        return 1;
+
+    if (label[0] == 'I' && label[token_len] == '+' && label[token_len + 1] != '\0')
+        return 1;
+
+    return 0;
+}
+
+static void remember_matrix_input(const char *label, matrix_t *A)
+{
+    if (!is_primary_matrix_label(label))
+        return;
+
+    snprintf(current_matrix_input_label, sizeof(current_matrix_input_label), "%s", label);
+    mat_free(current_matrix_input);
+    current_matrix_input = clone_matrix_snapshot(A);
+}
+
+static void clear_matrix_input_context(void)
+{
+    current_matrix_input_label[0] = '\0';
+    mat_free(current_matrix_input);
+    current_matrix_input = NULL;
+}
+
+static void format_matrix_label(const char *label, char *out, size_t out_size)
+{
+    if (is_primary_matrix_label(label))
+        snprintf(out, out_size, "input %s", label);
+    else
+        snprintf(out, out_size, "%s", label);
+}
+
 /* ------------------------------------------------------------------ coloured scalar printers */
 
 static void d_to_coloured_string(double x, char *out, size_t out_size)
@@ -69,11 +188,10 @@ static void print_qf(const char *label, qfloat_t x)
 
 /* ------------------------------------------------------------------ pretty, coloured matrix printers */
 
-static void print_md(const char *label, matrix_t *A)
+static void print_md_raw(const char *label, matrix_t *A)
 {
     size_t rows = mat_get_row_count(A);
     size_t cols = mat_get_col_count(A);
-
     printf("    %s = " C_CYAN "[" C_RESET "\n", label);
 
     size_t *w = calloc(cols, sizeof(size_t));
@@ -110,11 +228,18 @@ static void print_md(const char *label, matrix_t *A)
     free(w);
 }
 
-static void print_mqf(const char *label, matrix_t *A)
+static void print_md(const char *label, matrix_t *A)
+{
+    char display_label[160];
+    remember_matrix_input(label, A);
+    format_matrix_label(label, display_label, sizeof(display_label));
+    print_md_raw(display_label, A);
+}
+
+static void print_mqf_raw(const char *label, matrix_t *A)
 {
     size_t rows = mat_get_row_count(A);
     size_t cols = mat_get_col_count(A);
-
     printf("    %s = " C_CYAN "[" C_RESET "\n", label);
 
     size_t *w = calloc(cols, sizeof(size_t));
@@ -149,11 +274,18 @@ static void print_mqf(const char *label, matrix_t *A)
     free(w);
 }
 
-static void print_mqc(const char *label, matrix_t *A)
+static void print_mqf(const char *label, matrix_t *A)
+{
+    char display_label[160];
+    remember_matrix_input(label, A);
+    format_matrix_label(label, display_label, sizeof(display_label));
+    print_mqf_raw(display_label, A);
+}
+
+static void print_mqc_raw(const char *label, matrix_t *A)
 {
     size_t rows = mat_get_row_count(A);
     size_t cols = mat_get_col_count(A);
-
     printf("    %s = " C_CYAN "[" C_RESET "\n", label);
 
     size_t *w = calloc(cols, sizeof(size_t));
@@ -186,6 +318,35 @@ static void print_mqc(const char *label, matrix_t *A)
 
     printf("    " C_CYAN "]" C_RESET "\n");
     free(w);
+}
+
+static void print_mqc(const char *label, matrix_t *A)
+{
+    char display_label[160];
+    remember_matrix_input(label, A);
+    format_matrix_label(label, display_label, sizeof(display_label));
+    print_mqc_raw(display_label, A);
+}
+
+static void print_current_input_matrix(void)
+{
+    if (!current_matrix_input || current_matrix_input_label[0] == '\0')
+        return;
+
+    switch (mat_typeof(current_matrix_input))
+    {
+    case MAT_TYPE_DOUBLE:
+        print_md_raw("input matrix", current_matrix_input);
+        break;
+    case MAT_TYPE_QFLOAT:
+        print_mqf_raw("input matrix", current_matrix_input);
+        break;
+    case MAT_TYPE_QCOMPLEX:
+        print_mqc_raw("input matrix", current_matrix_input);
+        break;
+    default:
+        break;
+    }
 }
 
 /* ------------------------------------------------------------------ checkers */
@@ -233,8 +394,13 @@ static void check_qf_val(const char *label, qfloat_t got, qfloat_t expected, dou
 
 static void check_qc_val(const char *label, qcomplex_t got, qcomplex_t expected, double tol)
 {
-    double err = qf_to_double(qc_abs(qc_sub(got, expected)));
-    int ok = err < tol;
+    double got_re = qf_to_double(got.re);
+    double got_im = qf_to_double(got.im);
+    double exp_re = qf_to_double(expected.re);
+    double exp_im = qf_to_double(expected.im);
+    int both_nan = isnan(got_re) && isnan(got_im) && isnan(exp_re) && isnan(exp_im);
+    double err = both_nan ? 0.0 : qf_to_double(qc_abs(qc_sub(got, expected)));
+    int ok = both_nan || err < tol;
 
     tests_run++;
     if (!ok)
@@ -2417,6 +2583,182 @@ static void test_mat_exp_qc(void)
     }
 }
 
+static void test_mat_exp_singular(void)
+{
+    printf(C_CYAN "TEST: mat_exp on singular square matrices\n" C_RESET);
+
+    /* singular diagonal: exp(diag(0,2)) = diag(1,e^2) */
+    {
+        double A_vals[4] = {0.0, 0.0, 0.0, 2.0};
+        double expected_vals[4] = {1.0, 0.0, 0.0, exp(2.0)};
+        matrix_t *A = mat_create_d(2, 2, A_vals);
+        matrix_t *E_expected = mat_create_d(2, 2, expected_vals);
+        check_bool("singular diagonal allocated", A != NULL);
+        check_bool("singular diagonal expected allocated", E_expected != NULL);
+        if (!A || !E_expected) {
+            mat_free(A);
+            mat_free(E_expected);
+            return;
+        }
+
+        print_md("A (singular diagonal)", A);
+        matrix_t *E = mat_exp(A);
+        check_bool("mat_exp(singular diagonal) not NULL", E != NULL);
+        if (E)
+        {
+            check_mat_d("exp(diag(0,2)) = diag(1,e^2)", E, E_expected, 1e-12);
+        }
+
+        mat_free(A);
+        mat_free(E);
+        mat_free(E_expected);
+    }
+
+    /* singular nilpotent Jordan block: exp(N) = I + N */
+    {
+        double N_vals[4] = {0.0, 1.0, 0.0, 0.0};
+        double expected_vals[4] = {1.0, 1.0, 0.0, 1.0};
+        matrix_t *N = mat_create_d(2, 2, N_vals);
+        matrix_t *E_expected = mat_create_d(2, 2, expected_vals);
+        check_bool("singular nilpotent allocated", N != NULL);
+        check_bool("singular nilpotent expected allocated", E_expected != NULL);
+        if (!N || !E_expected) {
+            mat_free(N);
+            mat_free(E_expected);
+            return;
+        }
+
+        print_md("N (singular nilpotent)", N);
+        matrix_t *E = mat_exp(N);
+        check_bool("mat_exp(singular nilpotent) not NULL", E != NULL);
+        if (E)
+        {
+            check_mat_d("exp(N) = I + N", E, E_expected, 1e-12);
+        }
+
+        mat_free(N);
+        mat_free(E);
+        mat_free(E_expected);
+    }
+}
+
+static void test_mat_fun_singular_entire_d(void)
+{
+    printf(C_CYAN "TEST: entire matrix functions on singular square matrices\n" C_RESET);
+
+    /* For the nilpotent Jordan block N with N^2 = 0, any entire function
+     * satisfies f(N) = f(0) I + f'(0) N. */
+    {
+        double N_vals[4] = {0.0, 1.0, 0.0, 0.0};
+        matrix_t *N = mat_create_d(2, 2, N_vals);
+        check_bool("nilpotent singular test matrix allocated", N != NULL);
+        if (!N)
+            return;
+
+        print_md("N (nilpotent singular)", N);
+
+        {
+            matrix_t *R = mat_sin(N);
+            check_bool("mat_sin(N) not NULL", R != NULL);
+            if (R) {
+                double expected_vals[4] = {0.0, 1.0, 0.0, 0.0};
+                matrix_t *E = mat_create_d(2, 2, expected_vals);
+                check_mat_d("sin(N)=N", R, E, 1e-12);
+                mat_free(E);
+            }
+            mat_free(R);
+        }
+
+        {
+            matrix_t *R = mat_cos(N);
+            check_bool("mat_cos(N) not NULL", R != NULL);
+            if (R) {
+                double expected_vals[4] = {1.0, 0.0, 0.0, 1.0};
+                matrix_t *E = mat_create_d(2, 2, expected_vals);
+                check_mat_d("cos(N)=I", R, E, 1e-12);
+                mat_free(E);
+            }
+            mat_free(R);
+        }
+
+        {
+            matrix_t *R = mat_sinh(N);
+            check_bool("mat_sinh(N) not NULL", R != NULL);
+            if (R) {
+                double expected_vals[4] = {0.0, 1.0, 0.0, 0.0};
+                matrix_t *E = mat_create_d(2, 2, expected_vals);
+                check_mat_d("sinh(N)=N", R, E, 1e-12);
+                mat_free(E);
+            }
+            mat_free(R);
+        }
+
+        {
+            matrix_t *R = mat_cosh(N);
+            check_bool("mat_cosh(N) not NULL", R != NULL);
+            if (R) {
+                double expected_vals[4] = {1.0, 0.0, 0.0, 1.0};
+                matrix_t *E = mat_create_d(2, 2, expected_vals);
+                check_mat_d("cosh(N)=I", R, E, 1e-12);
+                mat_free(E);
+            }
+            mat_free(R);
+        }
+
+        {
+            matrix_t *R = mat_tan(N);
+            check_bool("mat_tan(N) not NULL", R != NULL);
+            if (R) {
+                double expected_vals[4] = {0.0, 1.0, 0.0, 0.0};
+                matrix_t *E = mat_create_d(2, 2, expected_vals);
+                check_mat_d("tan(N)=N", R, E, 1e-12);
+                mat_free(E);
+            }
+            mat_free(R);
+        }
+
+        {
+            matrix_t *R = mat_tanh(N);
+            check_bool("mat_tanh(N) not NULL", R != NULL);
+            if (R) {
+                double expected_vals[4] = {0.0, 1.0, 0.0, 0.0};
+                matrix_t *E = mat_create_d(2, 2, expected_vals);
+                check_mat_d("tanh(N)=N", R, E, 1e-12);
+                mat_free(E);
+            }
+            mat_free(R);
+        }
+
+        {
+            matrix_t *R = mat_erf(N);
+            double c = 2.0 / sqrt(M_PI);
+            check_bool("mat_erf(N) not NULL", R != NULL);
+            if (R) {
+                double expected_vals[4] = {0.0, c, 0.0, 0.0};
+                matrix_t *E = mat_create_d(2, 2, expected_vals);
+                check_mat_d("erf(N)=(2/sqrt(pi))N", R, E, 1e-12);
+                mat_free(E);
+            }
+            mat_free(R);
+        }
+
+        {
+            matrix_t *R = mat_erfc(N);
+            double c = 2.0 / sqrt(M_PI);
+            check_bool("mat_erfc(N) not NULL", R != NULL);
+            if (R) {
+                double expected_vals[4] = {1.0, -c, 0.0, 1.0};
+                matrix_t *E = mat_create_d(2, 2, expected_vals);
+                check_mat_d("erfc(N)=I-(2/sqrt(pi))N", R, E, 1e-12);
+                mat_free(E);
+            }
+            mat_free(R);
+        }
+
+        mat_free(N);
+    }
+}
+
 static void test_mat_exp_null_safety(void)
 {
     printf(C_CYAN "TEST: mat_exp null safety\n" C_RESET);
@@ -3813,17 +4155,13 @@ static void test_readme_example(void)
      *   [ 1-i  3   ]
      * Eigenvalues: 1 and 4
      */
-    matrix_t *A = matsq_new_qc(2);
-
-    qcomplex_t a00 = qc_make(qf_from_double(2.0), QF_ZERO);
-    qcomplex_t a01 = qc_make(qf_from_double(1.0), qf_from_double(1.0));
-    qcomplex_t a10 = qc_make(qf_from_double(1.0), qf_from_double(-1.0));
-    qcomplex_t a11 = qc_make(qf_from_double(3.0), QF_ZERO);
-
-    mat_set(A, 0, 0, &a00);
-    mat_set(A, 0, 1, &a01);
-    mat_set(A, 1, 0, &a10);
-    mat_set(A, 1, 1, &a11);
+    qcomplex_t A_vals[4] = {
+        qc_make(qf_from_double(2.0), qf_from_double(0.0)),
+        qc_make(qf_from_double(1.0), qf_from_double(1.0)),
+        qc_make(qf_from_double(1.0), qf_from_double(-1.0)),
+        qc_make(qf_from_double(3.0), qf_from_double(0.0))
+    };
+    matrix_t *A = mat_create_qc(2, 2, A_vals);
 
     print_mqc("A", A);
 
@@ -3923,6 +4261,12 @@ static void check_mat_d(const char *label, matrix_t *got, matrix_t *expected_mat
 
     printf(ok ? C_BOLD C_GREEN "  OK: %s\n" C_RESET
               : C_BOLD C_RED "  FAIL: %s\n" C_RESET, label);
+
+    if (current_matrix_input_label[0] != '\0')
+    {
+        printf("    input context = %s\n", current_matrix_input_label);
+        print_current_input_matrix();
+    }
 
     char buf[256];
     for (size_t i = 0; i < rows; i++)
@@ -4054,6 +4398,12 @@ static void check_mat_qf(const char *label, matrix_t *got, matrix_t *expected_ma
     printf(ok ? C_BOLD C_GREEN "  OK: %s\n" C_RESET
               : C_BOLD C_RED "  FAIL: %s\n" C_RESET, label);
 
+    if (current_matrix_input_label[0] != '\0')
+    {
+        printf("    input context = %s\n", current_matrix_input_label);
+        print_current_input_matrix();
+    }
+
     char buf[512];
     for (size_t i = 0; i < rows; i++)
         for (size_t j = 0; j < cols; j++)
@@ -4161,6 +4511,12 @@ static void check_mat_qc(const char *label, matrix_t *got, matrix_t *expected_ma
     printf(ok ? C_BOLD C_GREEN "  OK: %s\n" C_RESET
               : C_BOLD C_RED "  FAIL: %s\n" C_RESET, label);
 
+    if (current_matrix_input_label[0] != '\0')
+    {
+        printf("    input context = %s\n", current_matrix_input_label);
+        print_current_input_matrix();
+    }
+
     char buf[512];
     for (size_t i = 0; i < rows; i++)
         for (size_t j = 0; j < cols; j++)
@@ -4233,6 +4589,229 @@ static void check_mat_identity_qc(const char *label, matrix_t *R, size_t n, doub
     mat_free(I);
 }
 
+static void check_unary_mat_1x1_d(const char *label,
+                                  matrix_t *(*fun)(const matrix_t *),
+                                  double x, double expected, double tol)
+{
+    matrix_t *A = mat_new_d(1, 1);
+    check_bool("1x1 double input allocated", A != NULL);
+    if (!A)
+        return;
+
+    mat_set(A, 0, 0, &x);
+    print_md("A", A);
+
+    matrix_t *R = fun(A);
+    check_bool(label, R != NULL);
+    if (R) {
+        double got;
+        mat_get(R, 0, 0, &got);
+        check_d(label, got, expected, tol);
+    }
+
+    mat_free(R);
+    mat_free(A);
+}
+
+static void check_unary_mat_1x1_qf(const char *label,
+                                   matrix_t *(*fun)(const matrix_t *),
+                                   qfloat_t x, qfloat_t expected, double tol)
+{
+    matrix_t *A = mat_new_qf(1, 1);
+    check_bool("1x1 qfloat input allocated", A != NULL);
+    if (!A)
+        return;
+
+    mat_set(A, 0, 0, &x);
+    print_mqf("A", A);
+
+    matrix_t *R = fun(A);
+    check_bool(label, R != NULL);
+    if (R) {
+        qfloat_t got;
+        mat_get(R, 0, 0, &got);
+        check_qf_val(label, got, expected, tol);
+    }
+
+    mat_free(R);
+    mat_free(A);
+}
+
+static void check_unary_mat_1x1_qc(const char *label,
+                                   matrix_t *(*fun)(const matrix_t *),
+                                   qcomplex_t x, qcomplex_t expected, double tol)
+{
+    matrix_t *A = mat_new_qc(1, 1);
+    check_bool("1x1 qcomplex input allocated", A != NULL);
+    if (!A)
+        return;
+
+    mat_set(A, 0, 0, &x);
+    print_mqc("A", A);
+
+    matrix_t *R = fun(A);
+    check_bool(label, R != NULL);
+    if (R) {
+        qcomplex_t got;
+        mat_get(R, 0, 0, &got);
+        check_qc_val(label, got, expected, tol);
+    }
+
+    mat_free(R);
+    mat_free(A);
+}
+
+static void test_mat_special_unary_extensions(void)
+{
+    printf(C_CYAN "TEST: extended unary matrix special functions\n" C_RESET);
+
+    check_unary_mat_1x1_d("mat_erfinv([[0.25]])",
+                          mat_erfinv, 0.25,
+                          qf_to_double(qf_erfinv(qf_from_double(0.25))), 1e-12);
+    check_unary_mat_1x1_d("mat_erfcinv([[0.75]])",
+                          mat_erfcinv, 0.75,
+                          qf_to_double(qf_erfcinv(qf_from_double(0.75))), 1e-12);
+    check_unary_mat_1x1_d("mat_gamma([[2.5]])",
+                          mat_gamma, 2.5,
+                          qf_to_double(qf_gamma(qf_from_double(2.5))), 1e-12);
+    check_unary_mat_1x1_d("mat_lgamma([[2.5]])",
+                          mat_lgamma, 2.5,
+                          qf_to_double(qf_lgamma(qf_from_double(2.5))), 1e-12);
+    check_unary_mat_1x1_d("mat_digamma([[2.5]])",
+                          mat_digamma, 2.5,
+                          qf_to_double(qf_digamma(qf_from_double(2.5))), 1e-12);
+    check_unary_mat_1x1_d("mat_trigamma([[2.5]])",
+                          mat_trigamma, 2.5,
+                          qf_to_double(qf_trigamma(qf_from_double(2.5))), 1e-12);
+    check_unary_mat_1x1_d("mat_tetragamma([[2.5]])",
+                          mat_tetragamma, 2.5,
+                          qf_to_double(qf_tetragamma(qf_from_double(2.5))), 1e-12);
+    check_unary_mat_1x1_d("mat_gammainv([[1.329340388]])",
+                          mat_gammainv, 1.329340388179137,
+                          qf_to_double(qf_gammainv(qf_from_double(1.329340388179137))), 1e-10);
+    check_unary_mat_1x1_d("mat_normal_pdf([[0.5]])",
+                          mat_normal_pdf, 0.5,
+                          qf_to_double(qf_normal_pdf(qf_from_double(0.5))), 1e-12);
+    check_unary_mat_1x1_d("mat_normal_cdf([[0.5]])",
+                          mat_normal_cdf, 0.5,
+                          qf_to_double(qf_normal_cdf(qf_from_double(0.5))), 1e-12);
+    check_unary_mat_1x1_d("mat_normal_logpdf([[0.5]])",
+                          mat_normal_logpdf, 0.5,
+                          qf_to_double(qf_normal_logpdf(qf_from_double(0.5))), 1e-12);
+    check_unary_mat_1x1_d("mat_lambert_w0([[0.2]])",
+                          mat_lambert_w0, 0.2,
+                          qf_to_double(qf_lambert_w0(qf_from_double(0.2))), 1e-12);
+    check_unary_mat_1x1_d("mat_lambert_wm1([[-0.2]])",
+                          mat_lambert_wm1, -0.2,
+                          qf_to_double(qf_lambert_wm1(qf_from_double(-0.2))), 1e-12);
+    check_unary_mat_1x1_d("mat_productlog([[0.2]])",
+                          mat_productlog, 0.2,
+                          qf_to_double(qf_productlog(qf_from_double(0.2))), 1e-12);
+    check_unary_mat_1x1_d("mat_ei([[0.5]])",
+                          mat_ei, 0.5,
+                          qf_to_double(qf_ei(qf_from_double(0.5))), 1e-12);
+    check_unary_mat_1x1_d("mat_e1([[1.0]])",
+                          mat_e1, 1.0,
+                          qf_to_double(qf_e1(qf_from_double(1.0))), 1e-12);
+
+    check_unary_mat_1x1_qf("qf mat_productlog([[0.2]])",
+                           mat_productlog,
+                           qf_from_double(0.2),
+                           qf_productlog(qf_from_double(0.2)), 1e-25);
+    check_unary_mat_1x1_qf("qf mat_digamma([[2.5]])",
+                           mat_digamma,
+                           qf_from_double(2.5),
+                           qf_digamma(qf_from_double(2.5)), 1e-25);
+    check_unary_mat_1x1_qf("qf mat_lambert_w0([[0.2]])",
+                           mat_lambert_w0,
+                           qf_from_double(0.2),
+                           qf_lambert_w0(qf_from_double(0.2)), 1e-25);
+    check_unary_mat_1x1_qf("qf mat_lambert_wm1([[-0.2]])",
+                           mat_lambert_wm1,
+                           qf_from_double(-0.2),
+                           qf_lambert_wm1(qf_from_double(-0.2)), 1e-25);
+    check_unary_mat_1x1_qf("qf mat_ei([[0.5]])",
+                           mat_ei,
+                           qf_from_double(0.5),
+                           qf_ei(qf_from_double(0.5)), 1e-25);
+
+    check_unary_mat_1x1_qc("qc mat_lambert_w0([[0.2+0.1i]])",
+                           mat_lambert_w0,
+                           qc_make(qf_from_double(0.2), qf_from_double(0.1)),
+                           qc_productlog(qc_make(qf_from_double(0.2), qf_from_double(0.1))), 1e-24);
+    check_unary_mat_1x1_qc("qc mat_lambert_wm1([[-0.2+0i]])",
+                           mat_lambert_wm1,
+                           qc_make(qf_from_double(-0.2), QF_ZERO),
+                           qc_make(qf_lambert_wm1(qf_from_double(-0.2)), QF_ZERO), 1e-24);
+    check_unary_mat_1x1_qc("qc mat_lambert_wm1([[-0.2-0.1i]])",
+                           mat_lambert_wm1,
+                           qc_make(qf_from_double(-0.2), qf_from_double(-0.1)),
+                           qc_lambert_wm1(qc_make(qf_from_double(-0.2), qf_from_double(-0.1))), 1e-24);
+    check_unary_mat_1x1_qc("qc mat_gamma([[1.2+0.3i]])",
+                           mat_gamma,
+                           qc_make(qf_from_double(1.2), qf_from_double(0.3)),
+                           qc_gamma(qc_make(qf_from_double(1.2), qf_from_double(0.3))), 1e-24);
+    check_unary_mat_1x1_qc("qc mat_digamma([[1.2+0.3i]])",
+                           mat_digamma,
+                           qc_make(qf_from_double(1.2), qf_from_double(0.3)),
+                           qc_digamma(qc_make(qf_from_double(1.2), qf_from_double(0.3))), 1e-24);
+    check_unary_mat_1x1_qc("qc mat_productlog([[0.2+0.1i]])",
+                           mat_productlog,
+                           qc_make(qf_from_double(0.2), qf_from_double(0.1)),
+                           qc_productlog(qc_make(qf_from_double(0.2), qf_from_double(0.1))), 1e-24);
+    check_unary_mat_1x1_qc("qc mat_ei([[0.5+0.2i]])",
+                           mat_ei,
+                           qc_make(qf_from_double(0.5), qf_from_double(0.2)),
+                           qc_ei(qc_make(qf_from_double(0.5), qf_from_double(0.2))), 1e-24);
+}
+
+static void test_mat_neg_convenience(void)
+{
+    printf(C_CYAN "TEST: mat_neg convenience wrapper\n" C_RESET);
+
+    double dvals[4] = {1.0, -2.0, 3.5, 0.0};
+    double dexp[4] = {-1.0, 2.0, -3.5, 0.0};
+    matrix_t *A = mat_create_d(2, 2, dvals);
+    matrix_t *E = mat_create_d(2, 2, dexp);
+    check_bool("double neg input allocated", A != NULL);
+    check_bool("double neg expected allocated", E != NULL);
+    if (A && E) {
+        print_md("A", A);
+        matrix_t *N = mat_neg(A);
+        check_bool("mat_neg(double) not NULL", N != NULL);
+        if (N) {
+            check_mat_d("mat_neg(double) = -A", N, E, 1e-30);
+            mat_free(N);
+        }
+    }
+    mat_free(A);
+    mat_free(E);
+
+    qcomplex_t qvals[2] = {
+        qc_make(qf_from_double(1.0), qf_from_double(-2.0)),
+        qc_make(qf_from_double(-0.5), qf_from_double(0.25))
+    };
+    qcomplex_t qexp[2] = {
+        qc_make(qf_from_double(-1.0), qf_from_double(2.0)),
+        qc_make(qf_from_double(0.5), qf_from_double(-0.25))
+    };
+    matrix_t *Q = mat_create_qc(1, 2, qvals);
+    matrix_t *QE = mat_create_qc(1, 2, qexp);
+    check_bool("qcomplex neg input allocated", Q != NULL);
+    check_bool("qcomplex neg expected allocated", QE != NULL);
+    if (Q && QE) {
+        print_mqc("Q", Q);
+        matrix_t *QN = mat_neg(Q);
+        check_bool("mat_neg(qcomplex) not NULL", QN != NULL);
+        if (QN) {
+            check_mat_qc("mat_neg(qcomplex) = -Q", QN, QE, 1e-28);
+            mat_free(QN);
+        }
+    }
+    mat_free(Q);
+    mat_free(QE);
+}
+
 /* ------------------------------------------------------------------ nilpotent matrix tests */
 
 /*
@@ -4248,6 +4827,7 @@ static void test_mat_nilpotent_d(void)
     check_bool("N allocated", N != NULL);
     if (!N)
         return;
+    print_md("N", N);
 
     /* exp(N) = I + N = [[1,1],[0,1]] */
     {
@@ -4369,6 +4949,7 @@ static void test_mat_nilpotent_d(void)
     {
         double invals[4] = {1.0, 1.0, 0.0, 1.0};
         matrix_t *IN = mat_create_d(2, 2, invals);
+        print_md("I+N", IN);
         matrix_t *R = mat_sqrt(IN);
         print_md("sqrt(I+N)", R);
         check_mat2x2_d("sqrt(I+N)", R, 1.0, 0.5, 0.0, 1.0, 1e-12);
@@ -4380,6 +4961,7 @@ static void test_mat_nilpotent_d(void)
     {
         double invals[4] = {1.0, 1.0, 0.0, 1.0};
         matrix_t *IN = mat_create_d(2, 2, invals);
+        print_md("I+N", IN);
         matrix_t *R = mat_log(IN);
         print_md("log(I+N)", R);
         check_mat2x2_d("log(I+N)", R, 0.0, 1.0, 0.0, 0.0, 1e-12);
@@ -4598,6 +5180,7 @@ static void test_mat_pow_int_d(void)
     check_bool("N allocated", N != NULL);
     if (!N)
         return;
+    print_md("N", N);
 
     /* N^0 = I */
     {
@@ -4631,6 +5214,7 @@ static void test_mat_pow_int_d(void)
     check_bool("I+N allocated", IN != NULL);
     if (!IN)
         return;
+    print_md("I+N", IN);
 
     /* (I+N)^0 = I */
     {
@@ -4678,6 +5262,7 @@ static void test_mat_pow_int_d(void)
     {
         double dvals[4] = {2.0, 0.0, 0.0, 3.0};
         matrix_t *D = mat_create_d(2, 2, dvals);
+        print_md("D", D);
         matrix_t *R = mat_pow_int(D, 4);
         print_md("diag(2,3)^4", R);
         check_mat2x2_d("diag(2,3)^4=diag(16,81)", R, 16.0, 0.0, 0.0, 81.0, 1e-12);
@@ -4699,6 +5284,7 @@ static void test_mat_pow_d(void)
     {
         double invals[4] = {1.0, 1.0, 0.0, 1.0};
         matrix_t *IN = mat_create_d(2, 2, invals);
+        print_md("I+N", IN);
         matrix_t *R = mat_pow(IN, 0.5);
         print_md("(I+N)^0.5", R);
         check_mat2x2_d("(I+N)^0.5", R, 1.0, 0.5, 0.0, 1.0, 1e-10);
@@ -4710,6 +5296,7 @@ static void test_mat_pow_d(void)
     {
         double invals[4] = {1.0, 1.0, 0.0, 1.0};
         matrix_t *IN = mat_create_d(2, 2, invals);
+        print_md("I+N", IN);
         matrix_t *R = mat_pow(IN, 2.0);
         print_md("(I+N)^2.0", R);
         check_mat2x2_d("(I+N)^2.0", R, 1.0, 2.0, 0.0, 1.0, 1e-10);
@@ -4721,6 +5308,7 @@ static void test_mat_pow_d(void)
     {
         double avals[4] = {2.0, 0.5, 0.5, 2.0};
         matrix_t *A = mat_create_d(2, 2, avals);
+        print_md("A (positive-definite)", A);
         matrix_t *R = mat_pow(A, 1.0);
         print_md("A^1.0", R);
         check_mat2x2_d("A^1.0=A", R, 2.0, 0.5, 0.5, 2.0, 1e-10);
@@ -4732,6 +5320,7 @@ static void test_mat_pow_d(void)
     {
         double avals[4] = {2.0, 0.5, 0.5, 2.0};
         matrix_t *A = mat_create_d(2, 2, avals);
+        print_md("A (positive-definite)", A);
         matrix_t *Rp = mat_pow(A, 2.0);
         matrix_t *Ri = mat_pow_int(A, 2);
         check_bool("A^2.0 not NULL", Rp != NULL);
@@ -5825,6 +6414,7 @@ int tests_main(void)
     RUN_TEST(test_scalar_div_qc_qc, NULL);
     RUN_TEST(test_scalar_div_d_qf, NULL);
     RUN_TEST(test_scalar_div_qf_d, NULL);
+    RUN_TEST(test_mat_neg_convenience, NULL);
 
     RUN_TEST(test_det_double, NULL);
     RUN_TEST(test_det_qfloat, NULL);
@@ -5843,6 +6433,8 @@ int tests_main(void)
     RUN_TEST(test_mat_exp_d, NULL);
     RUN_TEST(test_mat_exp_qf, NULL);
     RUN_TEST(test_mat_exp_qc, NULL);
+    RUN_TEST(test_mat_exp_singular, NULL);
+    RUN_TEST(test_mat_fun_singular_entire_d, NULL);
     RUN_TEST(test_mat_exp_null_safety, NULL);
 
     RUN_TEST(test_mat_sin_d, NULL);
@@ -5889,6 +6481,7 @@ int tests_main(void)
 
     RUN_TEST(test_mat_erf_d, NULL);
     RUN_TEST(test_mat_erfc_d, NULL);
+    RUN_TEST(test_mat_special_unary_extensions, NULL);
 
     RUN_TEST(test_mat_fun_qf_qc, NULL);
     RUN_TEST(test_mat_error_handling, NULL);
@@ -5900,5 +6493,6 @@ int tests_main(void)
 
     RUN_TEST(test_readme_example, NULL);
 
+    clear_matrix_input_context();
     return tests_failed;
 }
