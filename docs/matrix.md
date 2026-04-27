@@ -286,8 +286,10 @@ right-hand sides.
 
 When `A` is diagonal, upper triangular, or lower triangular, the library uses
 direct substitution rather than first treating the problem as a dense general
-system. Diagonal solves also preserve compatible right-hand-side layouts, so a
-sparse `B` stays sparse when the solution has the same zero pattern.
+system. General sparse systems go through LU factorisation followed by
+triangular substitution on sparse-like working matrices. Diagonal solves also preserve compatible
+right-hand-side layouts, so a sparse `B` stays sparse when the solution has
+the same zero pattern.
 
 #### Eigenvalues
 
@@ -456,8 +458,12 @@ void mat_lu_factor_free(mat_lu_factor_t *out);
 
 Computes `P * A = L * U` where `P` is a permutation matrix, `L` is lower triangular
 with unit diagonal, and `U` is upper triangular. The result is stored in the
-`mat_lu_factor_t` struct containing `P`, `L`, and `U`. Returns 0 on success, negative on error.
-Use `mat_lu_factor_free` to release the factorisation.
+`mat_lu_factor_t` struct containing `P`, `L`, and `U`. For sparse-like inputs,
+the permutation and triangular factors keep sparse storage where possible, and
+the factorisation uses sparse row operations for elimination rather than first
+materialising the working matrices densely.
+Returns 0 on success, negative on error. Use
+`mat_lu_factor_free` to release the factorisation.
 
 ##### QR Factorisation
 
@@ -480,8 +486,9 @@ void mat_cholesky_free(mat_cholesky_t *out);
 
 Computes the Cholesky factorisation `A = L * L^H` for Hermitian positive-definite
 matrices. The result is stored in the `mat_cholesky_t` struct containing `L`.
-Returns 0 on success, negative on error (including when `A` is not positive-definite).
-Use `mat_cholesky_free` to release the factorisation.
+For sparse-like inputs, the returned factor keeps sparse storage. Returns 0 on
+success, negative on error (including when `A` is not positive-definite). Use
+`mat_cholesky_free` to release the factorisation.
 
 ##### Singular Value Factorisation
 

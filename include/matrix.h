@@ -351,8 +351,10 @@ matrix_t *mat_inverse(const matrix_t *A);
  * The input matrix A must be square and nonsingular. The matrix B may
  * contain one or more right-hand sides. When A is diagonal or triangular,
  * the solve is performed directly by substitution rather than first reducing
- * the system to a dense general form. Compatible sparse right-hand sides keep
- * their layout through diagonal solves.
+ * the system to a dense general form. General sparse systems are solved
+ * through an LU factorisation followed by triangular substitution while
+ * keeping sparse-like working storage. Compatible sparse right-hand sides
+ * keep their layout through diagonal solves.
  *
  * @param A  Coefficient matrix.
  * @param B  Right-hand-side matrix.
@@ -474,6 +476,10 @@ int       mat_condition_number(const matrix_t *A, mat_norm_type_t type, qfloat_t
  *
  * On success, @p out receives matrices P, L, and U such that P A = L U.
  * The caller becomes responsible for releasing them with mat_lu_factor_free().
+ * When the input already uses a sparse-like layout, the permutation and
+ * triangular factors keep sparse storage where possible, and the factorisation
+ * uses sparse row operations for elimination rather than first materialising
+ * the working matrices densely.
  *
  * @param A    Input matrix.
  * @param out  Output factorisation structure.
@@ -511,7 +517,8 @@ void mat_qr_factor_free(mat_qr_factor_t *out);
  * @brief Compute a Cholesky factorisation.
  *
  * On success, @p out receives a lower-triangular matrix L such that
- * A = L L^H. The input must be Hermitian positive-definite.
+ * A = L L^H. The input must be Hermitian positive-definite. When the input
+ * uses a sparse-like layout, the returned factor keeps sparse storage.
  *
  * @param A    Input matrix.
  * @param out  Output factorisation structure.

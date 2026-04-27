@@ -2720,6 +2720,77 @@ static void test_solve_and_lstsq(void)
         mat_free(X);
     }
 
+    /* General sparse solve goes through LU plus substitution. */
+    {
+        matrix_t *A = mat_new_sparse_d(3, 3);
+        matrix_t *B = mat_create_d(3, 1, (double[]){7.0, 8.0, 3.0});
+        matrix_t *X_expected = mat_create_d(3, 1, (double[]){7.0 / 3.0, 2.0 / 3.0, 3.0});
+        double v;
+
+        check_bool("general sparse solve inputs allocated", A != NULL && B != NULL && X_expected != NULL);
+        if (!A || !B || !X_expected) {
+            mat_free(A);
+            mat_free(B);
+            mat_free(X_expected);
+            return;
+        }
+
+        v = 4.0;  mat_set(A, 0, 0, &v);
+        v = 1.0;  mat_set(A, 0, 1, &v);
+        v = -1.0; mat_set(A, 0, 2, &v);
+        v = 2.0;  mat_set(A, 1, 0, &v);
+        v = 5.0;  mat_set(A, 1, 1, &v);
+        v = 1.0;  mat_set(A, 2, 2, &v);
+
+        print_md("A (general sparse)", A);
+        print_md("B", B);
+
+        matrix_t *X = mat_solve(A, B);
+        check_bool("mat_solve(general sparse) not NULL", X != NULL);
+        if (X)
+            check_mat_d("solve(sparse A,B)=X", X, X_expected, 1e-12);
+
+        mat_free(A);
+        mat_free(B);
+        mat_free(X_expected);
+        mat_free(X);
+    }
+
+    /* General sparse solve with pivoting exercises sparse row swaps too. */
+    {
+        matrix_t *A = mat_new_sparse_d(3, 3);
+        matrix_t *B = mat_create_d(3, 1, (double[]){4.0, 11.0, 2.0});
+        matrix_t *X_expected = mat_create_d(3, 1, (double[]){1.0, 2.0, 2.0});
+        double v;
+
+        check_bool("general sparse pivoting solve inputs allocated", A != NULL && B != NULL && X_expected != NULL);
+        if (!A || !B || !X_expected) {
+            mat_free(A);
+            mat_free(B);
+            mat_free(X_expected);
+            return;
+        }
+
+        v = 2.0; mat_set(A, 0, 1, &v);
+        v = 1.0; mat_set(A, 1, 0, &v);
+        v = 1.0; mat_set(A, 1, 1, &v);
+        v = 1.0; mat_set(A, 2, 2, &v);
+        v = 4.0; mat_set(A, 1, 2, &v);
+
+        print_md("A (general sparse with pivoting)", A);
+        print_md("B", B);
+
+        matrix_t *X = mat_solve(A, B);
+        check_bool("mat_solve(general sparse with pivoting) not NULL", X != NULL);
+        if (X)
+            check_mat_d("solve(sparse pivoting A,B)=X", X, X_expected, 1e-12);
+
+        mat_free(A);
+        mat_free(B);
+        mat_free(X_expected);
+        mat_free(X);
+    }
+
     /* Rank-deficient overdetermined system falls back to pseudoinverse. */
     {
         double A_vals[6] = {1.0, 0.0,
@@ -2857,6 +2928,48 @@ static void test_factorisations(void)
     }
 
     {
+        matrix_t *A = mat_new_sparse_d(3, 3);
+        mat_lu_factor_t lu = {0};
+        double v;
+
+        check_bool("sparse LU input allocated", A != NULL);
+        if (!A) {
+            return;
+        }
+
+        v = 4.0;  mat_set(A, 0, 0, &v);
+        v = 1.0;  mat_set(A, 0, 1, &v);
+        v = -1.0; mat_set(A, 0, 2, &v);
+        v = 2.0;  mat_set(A, 1, 0, &v);
+        v = 5.0;  mat_set(A, 1, 1, &v);
+        v = 1.0;  mat_set(A, 2, 2, &v);
+
+        print_md("A (sparse)", A);
+        check_bool("mat_lu_factor(sparse) rc=0", mat_lu_factor(A, &lu) == 0);
+        check_bool("sparse LU factors non-null", lu.P && lu.L && lu.U);
+        check_bool("sparse LU P uses sparse storage", lu.P && mat_is_sparse(lu.P));
+        check_bool("sparse LU permutation nonzero count = n",
+                   lu.P && mat_nonzero_count(lu.P) == 3);
+        check_bool("sparse LU L uses sparse storage", lu.L && mat_is_sparse(lu.L));
+        check_bool("sparse LU U uses sparse storage", lu.U && mat_is_sparse(lu.U));
+        check_bool("sparse LU L is lower triangular", lu.L && mat_is_lower_triangular(lu.L));
+        check_bool("sparse LU U is upper triangular", lu.U && mat_is_upper_triangular(lu.U));
+        if (lu.P && lu.L && lu.U) {
+            matrix_t *PA = mat_mul(lu.P, A);
+            matrix_t *LU = mat_mul(lu.L, lu.U);
+            check_bool("sparse P*A not NULL", PA != NULL);
+            check_bool("sparse L*U not NULL", LU != NULL);
+            if (PA && LU)
+                check_mat_d("sparse P*A = L*U", PA, LU, 1e-12);
+            mat_free(PA);
+            mat_free(LU);
+        }
+
+        mat_lu_factor_free(&lu);
+        mat_free(A);
+    }
+
+    {
         double A_vals[6] = {1.0, 1.0,
                             1.0, 0.0,
                             0.0, 1.0};
@@ -2910,6 +3023,81 @@ static void test_factorisations(void)
         mat_free(LH);
         mat_free(LLH);
         mat_cholesky_free(&chol);
+        mat_free(A);
+    }
+
+    {
+        matrix_t *A = mat_new_sparse_d(3, 3);
+        mat_cholesky_t chol = {0};
+        matrix_t *LH = NULL, *LLH = NULL;
+        double v;
+
+        check_bool("sparse Cholesky input allocated", A != NULL);
+        if (!A) {
+            return;
+        }
+
+        v = 4.0; mat_set(A, 0, 0, &v);
+        v = 1.0; mat_set(A, 0, 1, &v);
+        v = 1.0; mat_set(A, 1, 0, &v);
+        v = 3.0; mat_set(A, 1, 1, &v);
+        v = 0.5; mat_set(A, 1, 2, &v);
+        v = 0.5; mat_set(A, 2, 1, &v);
+        v = 2.0; mat_set(A, 2, 2, &v);
+
+        print_md("A (sparse SPD)", A);
+        check_bool("mat_cholesky(sparse) rc=0", mat_cholesky(A, &chol) == 0);
+        check_bool("sparse Cholesky factor non-null", chol.L != NULL);
+        check_bool("sparse Cholesky factor uses sparse storage", chol.L && mat_is_sparse(chol.L));
+        check_bool("sparse Cholesky factor is lower triangular", chol.L && mat_is_lower_triangular(chol.L));
+        if (chol.L) {
+            LH = mat_hermitian(chol.L);
+            LLH = LH ? mat_mul(chol.L, LH) : NULL;
+            check_bool("sparse L*L^T not NULL", LLH != NULL);
+            if (LLH)
+                check_mat_d("sparse L*L^T = A", LLH, A, 1e-12);
+        }
+
+        mat_free(LH);
+        mat_free(LLH);
+        mat_cholesky_free(&chol);
+        mat_free(A);
+    }
+
+    {
+        matrix_t *A = mat_new_sparse_d(3, 3);
+        mat_lu_factor_t lu = {0};
+        double v;
+
+        check_bool("sparse pivoting LU input allocated", A != NULL);
+        if (!A) {
+            return;
+        }
+
+        v = 2.0; mat_set(A, 0, 1, &v);
+        v = 1.0; mat_set(A, 1, 0, &v);
+        v = 1.0; mat_set(A, 1, 1, &v);
+        v = 4.0; mat_set(A, 1, 2, &v);
+        v = 1.0; mat_set(A, 2, 2, &v);
+
+        print_md("A (sparse pivoting LU)", A);
+        check_bool("mat_lu_factor(sparse pivoting) rc=0", mat_lu_factor(A, &lu) == 0);
+        check_bool("sparse pivoting LU factors non-null", lu.P && lu.L && lu.U);
+        check_bool("sparse pivoting LU P uses sparse storage", lu.P && mat_is_sparse(lu.P));
+        check_bool("sparse pivoting permutation nonzero count = n",
+                   lu.P && mat_nonzero_count(lu.P) == 3);
+        if (lu.P && lu.L && lu.U) {
+            matrix_t *PA = mat_mul(lu.P, A);
+            matrix_t *LU = mat_mul(lu.L, lu.U);
+            check_bool("sparse pivoting P*A not NULL", PA != NULL);
+            check_bool("sparse pivoting L*U not NULL", LU != NULL);
+            if (PA && LU)
+                check_mat_d("sparse pivoting P*A = L*U", PA, LU, 1e-12);
+            mat_free(PA);
+            mat_free(LU);
+        }
+
+        mat_lu_factor_free(&lu);
         mat_free(A);
     }
 
