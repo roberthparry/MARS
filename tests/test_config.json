@@ -720,6 +720,7 @@
     "test_sparse_support": true,
     "test_layout_policy_regressions": true,
     "test_structural_queries_and_diagonal_construction": true,
-    "test_factorisations": true
+    "test_factorisations": true,
+    "test_matrix_function_structure_preservation": true
   }
 }

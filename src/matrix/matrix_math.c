@@ -47,21 +47,6 @@ void mat_fun_cache_forget(const matrix_t *A)
     }
 }
 
-/* Dense copy of A in the same element type. */
-static matrix_t *mat_copy_dense(const matrix_t *A)
-{
-    const struct elem_vtable *e = A->elem;
-    matrix_t *C = mat_create_dense_with_elem(A->rows, A->cols, e);
-    if (!C) return NULL;
-    unsigned char v[64];
-    for (size_t i = 0; i < A->rows; i++)
-        for (size_t j = 0; j < A->cols; j++) {
-            mat_get(A, i, j, v);
-            mat_set(C, i, j, v);
-        }
-    return C;
-}
-
 /* Scale every element of A in-place by the qfloat scalar r.
  * Using from_qf preserves full precision for qfloat/qcomplex elements. */
 static void mat_scale_qf(matrix_t *A, qfloat_t r)
@@ -94,21 +79,7 @@ static void mat_scale_qf(matrix_t *A, qfloat_t r)
 
 static matrix_t *mat_to_qcomplex_local(const matrix_t *A)
 {
-    matrix_t *Z = mat_new_qc(A->rows, A->cols);
-    if (!Z)
-        return NULL;
-
-    qcomplex_t qc;
-    unsigned char raw[64];
-    for (size_t i = 0; i < A->rows; ++i) {
-        for (size_t j = 0; j < A->cols; ++j) {
-            mat_get(A, i, j, raw);
-            A->elem->to_qc(&qc, raw);
-            mat_set(Z, i, j, &qc);
-        }
-    }
-
-    return Z;
+    return mat_convert_with_store(A, &qcomplex_elem, A ? A->store : NULL);
 }
 
 static void mat_attach_spectral_cache(matrix_t *A,
@@ -154,7 +125,7 @@ static matrix_t *mat_fun_from_spectral_cache(const matrix_t *A,
     size_t n = A->rows;
     const struct elem_vtable *orig_elem = A->elem;
     mat_fun_cache_entry_t *cache = mat_fun_cache_find(A);
-    matrix_t *FD = mat_new_qc(n, n);
+    matrix_t *FD = mat_create_diagonal_with_elem(n, &qcomplex_elem);
     qcomplex_t *mapped = calloc(n, sizeof(*mapped));
     if (!cache || !cache->spectral_Vq || !cache->spectral_evals || !FD || !mapped) {
         mat_free(FD);
@@ -186,21 +157,11 @@ static matrix_t *mat_fun_from_spectral_cache(const matrix_t *A,
         return R;
     }
 
-    matrix_t *out = mat_create_dense_with_elem(n, n, orig_elem);
+    matrix_t *out = mat_convert_with_store(R, orig_elem, R->store);
     if (!out) {
         free(mapped);
         mat_free(R);
         return NULL;
-    }
-
-    qcomplex_t qc;
-    unsigned char raw[64];
-    for (size_t i = 0; i < n; ++i) {
-        for (size_t j = 0; j < n; ++j) {
-            mat_get(R, i, j, &qc);
-            orig_elem->from_qc(raw, &qc);
-            mat_set(out, i, j, raw);
-        }
     }
 
     mat_attach_spectral_cache(out, cache->spectral_Vq, mapped);
@@ -214,7 +175,7 @@ static void mat_set_exp_preimage_cache(matrix_t *A, const matrix_t *preimage)
     if (!A || !preimage)
         return;
 
-    matrix_t *copy = mat_copy_dense(preimage);
+    matrix_t *copy = mat_copy_preserving_store(preimage);
     if (!copy)
         return;
 
@@ -250,6 +211,7 @@ static matrix_t *mat_fun_hermitian(const matrix_t *A,
     }
 
     matrix_t *V = NULL;
+    matrix_t *Vq = NULL;
     if (mat_eigendecompose(A, eval_buf, &V) != 0) {
         free(eval_buf);
         free(evals);
@@ -260,7 +222,7 @@ static matrix_t *mat_fun_hermitian(const matrix_t *A,
     for (size_t i = 0; i < n; ++i)
         orig_elem->to_qc(&evals[i], (const char *)eval_buf + i * orig_elem->size);
 
-    matrix_t *Vq = mat_typeof(V) == MAT_TYPE_QCOMPLEX ? V : mat_to_qcomplex_local(V);
+    Vq = mat_to_qcomplex_local(V);
     if (!Vq) {
         mat_free(V);
         free(eval_buf);
@@ -269,10 +231,9 @@ static matrix_t *mat_fun_hermitian(const matrix_t *A,
         return NULL;
     }
 
-    matrix_t *FD = mat_create_dense_with_elem(n, n, &qcomplex_elem);
+    matrix_t *FD = mat_create_diagonal_with_elem(n, &qcomplex_elem);
     if (!FD) {
-        if (Vq != V)
-            mat_free(Vq);
+        mat_free(Vq);
         mat_free(V);
         free(eval_buf);
         free(evals);
@@ -294,8 +255,7 @@ static matrix_t *mat_fun_hermitian(const matrix_t *A,
     mat_free(Vinv);
 
     if (!R) {
-        if (Vq != V)
-            mat_free(Vq);
+        mat_free(Vq);
         mat_free(V);
         free(eval_buf);
         free(evals);
@@ -308,34 +268,17 @@ static matrix_t *mat_fun_hermitian(const matrix_t *A,
     free(eval_buf);
     free(evals);
 
-    if (orig_elem == R->elem) {
-        if (Vq != V)
-            mat_free(Vq);
-        mat_free(V);
-        free(mapped);
-        return R;
-    }
-
-    matrix_t *out = mat_create_dense_with_elem(n, n, orig_elem);
+    matrix_t *out = mat_convert_with_store(R, orig_elem, R->store);
     if (!out) {
         free(mapped);
+        mat_free(Vq);
+        mat_free(V);
         mat_free(R);
         return NULL;
     }
 
-    qcomplex_t qc;
-    unsigned char raw[64];
-    for (size_t i = 0; i < n; ++i) {
-        for (size_t j = 0; j < n; ++j) {
-            mat_get(R, i, j, &qc);
-            orig_elem->from_qc(raw, &qc);
-            mat_set(out, i, j, raw);
-        }
-    }
-
     mat_attach_spectral_cache(out, Vq, mapped);
-    if (Vq != V)
-        mat_free(Vq);
+    mat_free(Vq);
     mat_free(V);
     free(mapped);
     mat_free(R);
@@ -367,7 +310,6 @@ static matrix_t *mat_fun_upper_triangular(const matrix_t *A,
                                           void (*scalar_f)(void *out, const void *in))
 {
     const struct elem_vtable *orig_elem = A->elem;
-    size_t n = A->rows;
     matrix_t *T = mat_to_qcomplex_local(A);
     matrix_t *FT = NULL;
     matrix_t *out = NULL;
@@ -381,26 +323,11 @@ static matrix_t *mat_fun_upper_triangular(const matrix_t *A,
         return NULL;
     }
 
-    if (orig_elem == FT->elem) {
-        mat_free(T);
-        return FT;
-    }
-
-    out = mat_create_dense_with_elem(n, n, orig_elem);
+    out = mat_convert_with_store(FT, orig_elem, FT->store);
     if (!out) {
         mat_free(T);
         mat_free(FT);
         return NULL;
-    }
-
-    for (size_t i = 0; i < n; ++i) {
-        for (size_t j = 0; j < n; ++j) {
-            qcomplex_t qc;
-            unsigned char raw[64];
-            mat_get(FT, i, j, &qc);
-            orig_elem->from_qc(raw, &qc);
-            mat_set(out, i, j, raw);
-        }
     }
 
     mat_free(T);
@@ -423,7 +350,7 @@ matrix_t *mat_fun_schur(const matrix_t *A,
 
     if (A->rows == 1) {
         const struct elem_vtable *orig_elem = A->elem;
-        matrix_t *out = mat_create_dense_with_elem(1, 1, orig_elem);
+        matrix_t *out = mat_create_diagonal_with_elem(1, orig_elem);
         qcomplex_t in_qc, out_qc;
         unsigned char raw_in[64], raw_out[64];
 
@@ -451,8 +378,6 @@ matrix_t *mat_fun_schur(const matrix_t *A,
         return mat_fun_upper_triangular(A, scalar_f);
 
     const struct elem_vtable *orig_elem = A->elem;
-    size_t n = A->rows;
-
     mat_schur_factor_t S;
     int schur_rc = mat_schur_factor(A, &S);
     if (schur_rc != 0) {
@@ -494,22 +419,8 @@ matrix_t *mat_fun_schur(const matrix_t *A,
 
     if (!R) return NULL;
 
-    /* Convert R back to the original element type. */
-    if (orig_elem == R->elem)
-        return R;   /* already correct type (qcomplex input) */
-
-    matrix_t *out = mat_create_dense_with_elem(n, n, orig_elem);
+    matrix_t *out = mat_convert_with_store(R, orig_elem, R->store);
     if (!out) { mat_free(R); return NULL; }
-
-    qcomplex_t qc;
-    unsigned char raw[64];
-    for (size_t i = 0; i < n; i++) {
-        for (size_t j = 0; j < n; j++) {
-            mat_get(R, i, j, &qc);
-            orig_elem->from_qc(raw, &qc);
-            mat_set(out, i, j, raw);
-        }
-    }
 
     mat_free(R);
     return out;
@@ -520,7 +431,7 @@ matrix_t *mat_exp(const matrix_t *A)
     if (A) {
         mat_fun_cache_entry_t *cache = mat_fun_cache_find(A);
         if (cache && cache->exp_preimage)
-            return mat_copy_dense(cache->exp_preimage);
+            return mat_copy_preserving_store(cache->exp_preimage);
     }
     return mat_fun_schur(A, qcomplex_elem.fun->exp);
 }
@@ -706,7 +617,7 @@ matrix_t *mat_pow_int(const matrix_t *A, int n)
         if (!base) return NULL;
         p = (unsigned int)(-(long long)n);
     } else {
-        base = mat_copy_dense(A);
+        base = mat_copy_preserving_store(A);
         if (!base) return NULL;
         p = (unsigned int)n;
     }

@@ -176,6 +176,13 @@ struct matrix_t *mat_create_upper_triangular_with_elem(size_t rows, size_t cols,
                                                        const struct elem_vtable *elem);
 struct matrix_t *mat_create_lower_triangular_with_elem(size_t rows, size_t cols,
                                                        const struct elem_vtable *elem);
+struct matrix_t *mat_copy_with_store(const struct matrix_t *A,
+                                     const struct store_vtable *store);
+struct matrix_t *mat_copy_preserving_store(const struct matrix_t *A);
+struct matrix_t *mat_copy_as_dense(const struct matrix_t *A);
+struct matrix_t *mat_convert_with_store(const struct matrix_t *A,
+                                        const struct elem_vtable *target,
+                                        const struct store_vtable *store);
 
 /* ============================================================
    Convenience accessor

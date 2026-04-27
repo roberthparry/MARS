@@ -349,7 +349,10 @@ matrix_t *mat_inverse(const matrix_t *A);
  * @brief Solve the linear matrix equation A X = B.
  *
  * The input matrix A must be square and nonsingular. The matrix B may
- * contain one or more right-hand sides.
+ * contain one or more right-hand sides. When A is diagonal or triangular,
+ * the solve is performed directly by substitution rather than first reducing
+ * the system to a dense general form. Compatible sparse right-hand sides keep
+ * their layout through diagonal solves.
  *
  * @param A  Coefficient matrix.
  * @param B  Right-hand-side matrix.

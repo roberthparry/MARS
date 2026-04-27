@@ -204,6 +204,13 @@ applicable.
 - `bool mat_is_upper_triangular(const matrix_t *A)` — returns true when all entries below the diagonal are zero.
 - `bool mat_is_lower_triangular(const matrix_t *A)` — returns true when all entries above the diagonal are zero.
 
+When an operation has an obviously structured result, the library tries to keep
+that structure instead of immediately falling back to a fully materialised dense
+matrix. In particular, factorisation outputs and compatible diagonal or
+triangular matrix-function results preserve their natural layout. This also
+applies to compatible `exp(log(A))` round-trips, so diagonal or triangular
+inputs are not flattened merely because an internal cache is involved.
+
 ### Bulk Element Access
 
 - `void mat_set_data(matrix_t *A, const void *data)` — copy all elements from a flat row-major buffer into `A`. The buffer must contain `rows × cols` elements of `A`'s element type.
@@ -266,6 +273,21 @@ matrix_t *mat_inverse(const matrix_t *A);
 
 Returns a newly allocated matrix containing the inverse of `A`, or NULL if `A`
 is NULL, not square, or singular.
+
+#### Solve
+
+```c
+matrix_t *mat_solve(const matrix_t *A, const matrix_t *B);
+```
+
+Solves the linear matrix equation `A X = B` for `X`. The coefficient matrix
+`A` must be square and nonsingular, while `B` may contain one or more
+right-hand sides.
+
+When `A` is diagonal, upper triangular, or lower triangular, the library uses
+direct substitution rather than first treating the problem as a dense general
+system. Diagonal solves also preserve compatible right-hand-side layouts, so a
+sparse `B` stays sparse when the solution has the same zero pattern.
 
 #### Eigenvalues
 

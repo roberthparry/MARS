@@ -2445,9 +2445,44 @@ matrix_t *mat_neg(const matrix_t *A)
     return R;
 }
 
-static matrix_t *mat_convert_with_store(const matrix_t *A,
-                                        const struct elem_vtable *target,
-                                        const struct store_vtable *store)
+matrix_t *mat_copy_with_store(const matrix_t *A,
+                              const struct store_vtable *store)
+{
+    matrix_t *C;
+    unsigned char raw[64];
+
+    if (!A || !A->elem || !store)
+        return NULL;
+
+    C = mat_create_with_store(A->rows, A->cols, A->elem, store);
+    if (!C)
+        return NULL;
+
+    for (size_t i = 0; i < A->rows; i++)
+        for (size_t j = 0; j < A->cols; j++) {
+            mat_get(A, i, j, raw);
+            mat_set(C, i, j, raw);
+        }
+
+    return C;
+}
+
+matrix_t *mat_copy_preserving_store(const matrix_t *A)
+{
+    if (!A)
+        return NULL;
+
+    return mat_copy_with_store(A, A->store);
+}
+
+matrix_t *mat_copy_as_dense(const matrix_t *A)
+{
+    return mat_copy_with_store(A, &dense_store);
+}
+
+matrix_t *mat_convert_with_store(const matrix_t *A,
+                                 const struct elem_vtable *target,
+                                 const struct store_vtable *store)
 {
     matrix_t *C;
     unsigned char src[64], dst[64];
@@ -2508,6 +2543,145 @@ static size_t mat_find_pivot_row(const matrix_t *A, size_t col, size_t start)
     }
 
     return best;
+}
+
+static const struct elem_vtable *mat_binary_result_elem(const matrix_t *A,
+                                                        const matrix_t *B)
+{
+    elem_kind ak, bk;
+    const binop_vtable *op;
+
+    if (!A || !B)
+        return NULL;
+
+    ak = elem_of(A)->kind;
+    bk = elem_of(B)->kind;
+    op = &binops[ak][bk];
+    return op->result_elem;
+}
+
+static matrix_t *mat_convert_preserving_store(const matrix_t *A,
+                                              const struct elem_vtable *target)
+{
+    if (!A || !target)
+        return NULL;
+
+    return mat_convert_with_store(A, target, A->store);
+}
+
+static matrix_t *mat_create_direct_solve_result(const matrix_t *A,
+                                                const matrix_t *B,
+                                                const struct elem_vtable *elem)
+{
+    const struct store_vtable *store = &dense_store;
+
+    if (!A || !B || !elem)
+        return NULL;
+
+    if (mat_has_diagonal_structure(A) &&
+        B->store && B->store->elementwise_unary_store)
+        store = B->store->elementwise_unary_store(B);
+
+    return mat_create_with_store(A->cols, B->cols, elem, store);
+}
+
+static matrix_t *mat_solve_diagonal(const matrix_t *A,
+                                    const matrix_t *B,
+                                    const struct elem_vtable *elem)
+{
+    matrix_t *X;
+    unsigned char diag[64], inv_diag[64], rhs[64], out[64];
+
+    X = mat_create_direct_solve_result(A, B, elem);
+    if (!X)
+        return NULL;
+
+    for (size_t i = 0; i < A->rows; i++) {
+        mat_get(A, i, i, diag);
+        if (elem->abs2(diag) < 1e-300) {
+            mat_free(X);
+            return NULL;
+        }
+
+        elem->inv(inv_diag, diag);
+        for (size_t j = 0; j < B->cols; j++) {
+            mat_get(B, i, j, rhs);
+            elem->mul(out, inv_diag, rhs);
+            mat_set(X, i, j, out);
+        }
+    }
+
+    return X;
+}
+
+static matrix_t *mat_forward_substitute(const matrix_t *L,
+                                        const matrix_t *B,
+                                        const struct elem_vtable *elem)
+{
+    matrix_t *X;
+    unsigned char diag[64], inv_diag[64], sum[64], a[64], b[64], prod[64], out[64];
+
+    X = mat_create_dense_with_elem(L->cols, B->cols, elem);
+    if (!X)
+        return NULL;
+
+    for (size_t i = 0; i < L->rows; i++) {
+        mat_get(L, i, i, diag);
+        if (elem->abs2(diag) < 1e-300) {
+            mat_free(X);
+            return NULL;
+        }
+
+        elem->inv(inv_diag, diag);
+        for (size_t j = 0; j < B->cols; j++) {
+            mat_get(B, i, j, sum);
+            for (size_t k = 0; k < i; k++) {
+                mat_get(L, i, k, a);
+                mat_get(X, k, j, b);
+                elem->mul(prod, a, b);
+                elem->sub(sum, sum, prod);
+            }
+            elem->mul(out, inv_diag, sum);
+            mat_set(X, i, j, out);
+        }
+    }
+
+    return X;
+}
+
+static matrix_t *mat_backward_substitute(const matrix_t *U,
+                                         const matrix_t *B,
+                                         const struct elem_vtable *elem)
+{
+    matrix_t *X;
+    unsigned char diag[64], inv_diag[64], sum[64], a[64], b[64], prod[64], out[64];
+
+    X = mat_create_dense_with_elem(U->cols, B->cols, elem);
+    if (!X)
+        return NULL;
+
+    for (size_t ii = U->rows; ii-- > 0;) {
+        mat_get(U, ii, ii, diag);
+        if (elem->abs2(diag) < 1e-300) {
+            mat_free(X);
+            return NULL;
+        }
+
+        elem->inv(inv_diag, diag);
+        for (size_t j = 0; j < B->cols; j++) {
+            mat_get(B, ii, j, sum);
+            for (size_t k = ii + 1; k < U->cols; k++) {
+                mat_get(U, ii, k, a);
+                mat_get(X, k, j, b);
+                elem->mul(prod, a, b);
+                elem->sub(sum, sum, prod);
+            }
+            elem->mul(out, inv_diag, sum);
+            mat_set(X, ii, j, out);
+        }
+    }
+
+    return X;
 }
 
 /* ============================================================
@@ -2760,9 +2934,8 @@ matrix_t *mat_inverse(const matrix_t *A)
 
 matrix_t *mat_solve(const matrix_t *A, const matrix_t *B)
 {
-    elem_kind ak, bk;
-    const binop_vtable *op;
     const struct elem_vtable *e;
+    matrix_t *Ac = NULL, *Bc = NULL;
     matrix_t *M = NULL, *RHS = NULL, *X = NULL;
     unsigned char pivot[64], inv_pivot[64], factor[64];
     unsigned char a[64], b[64], prod[64], tmp[64], sum[64];
@@ -2770,15 +2943,38 @@ matrix_t *mat_solve(const matrix_t *A, const matrix_t *B)
     if (!A || !B || A->rows != A->cols || A->rows != B->rows)
         return NULL;
 
-    ak = elem_of(A)->kind;
-    bk = elem_of(B)->kind;
-    op = &binops[ak][bk];
-    if (!op->result_elem)
+    e = mat_binary_result_elem(A, B);
+    if (!e)
         return NULL;
 
-    e = op->result_elem;
-    M = mat_convert_dense(A, e);
-    RHS = mat_convert_dense(B, e);
+    Ac = mat_convert_preserving_store(A, e);
+    Bc = mat_convert_preserving_store(B, e);
+    if (!Ac || !Bc)
+        goto fail;
+
+    if (mat_has_diagonal_structure(Ac)) {
+        X = mat_solve_diagonal(Ac, Bc, e);
+        mat_free(Ac);
+        mat_free(Bc);
+        return X;
+    }
+
+    if (mat_has_lower_triangular_structure(Ac)) {
+        X = mat_forward_substitute(Ac, Bc, e);
+        mat_free(Ac);
+        mat_free(Bc);
+        return X;
+    }
+
+    if (mat_has_upper_triangular_structure(Ac)) {
+        X = mat_backward_substitute(Ac, Bc, e);
+        mat_free(Ac);
+        mat_free(Bc);
+        return X;
+    }
+
+    M = mat_copy_as_dense(Ac);
+    RHS = mat_copy_as_dense(Bc);
     if (!M || !RHS)
         goto fail;
 
@@ -2848,9 +3044,13 @@ matrix_t *mat_solve(const matrix_t *A, const matrix_t *B)
 
     mat_free(M);
     mat_free(RHS);
+    mat_free(Ac);
+    mat_free(Bc);
     return X;
 
 fail:
+    mat_free(Ac);
+    mat_free(Bc);
     mat_free(M);
     mat_free(RHS);
     mat_free(X);
@@ -3401,71 +3601,99 @@ fail:
     return rc;
 }
 
-int mat_norm(const matrix_t *A, mat_norm_type_t type, qfloat_t *out)
+typedef int (*mat_norm_function_t)(const matrix_t *A, qfloat_t *out);
+
+static int mat_norm_one(const matrix_t *A, qfloat_t *out)
 {
     const struct elem_vtable *e;
+
+    e = A->elem;
+
+    qfloat_t best = QF_ZERO;
+    for (size_t j = 0; j < A->cols; j++) {
+        qfloat_t sum = QF_ZERO;
+        for (size_t i = 0; i < A->rows; i++) {
+            unsigned char raw[64];
+            qfloat_t mag;
+            mat_get(A, i, j, raw);
+            e->abs_qf(&mag, raw);
+            sum = qf_add(sum, mag);
+        }
+        if (qf_gt(sum, best))
+            best = sum;
+    }
+    *out = best;
+    return 0;
+}
+
+static int mat_norm_infinity(const matrix_t *A, qfloat_t *out)
+{
+    const struct elem_vtable *e = A->elem;
+    qfloat_t best = QF_ZERO;
+
+    for (size_t i = 0; i < A->rows; i++) {
+        qfloat_t sum = QF_ZERO;
+        for (size_t j = 0; j < A->cols; j++) {
+            unsigned char raw[64];
+            qfloat_t mag;
+            mat_get(A, i, j, raw);
+            e->abs_qf(&mag, raw);
+            sum = qf_add(sum, mag);
+        }
+        if (qf_gt(sum, best))
+            best = sum;
+    }
+    *out = best;
+    return 0;
+}
+
+static int mat_norm_frobenius(const matrix_t *A, qfloat_t *out)
+{
+    const struct elem_vtable *e = A->elem;
+    qfloat_t sumsq = QF_ZERO;
+
+    for (size_t i = 0; i < A->rows; i++) {
+        for (size_t j = 0; j < A->cols; j++) {
+            unsigned char raw[64];
+            qfloat_t mag;
+            mat_get(A, i, j, raw);
+            e->abs_qf(&mag, raw);
+            sumsq = qf_add(sumsq, qf_mul(mag, mag));
+        }
+    }
+    *out = qf_sqrt(sumsq);
+    return 0;
+}
+
+static const mat_norm_function_t mat_norm_functions[] = {
+    [MAT_NORM_1] = mat_norm_one,
+    [MAT_NORM_INF] = mat_norm_infinity,
+    [MAT_NORM_FRO] = mat_norm_frobenius,
+    [MAT_NORM_2] = mat_norm_via_svd
+};
+
+static mat_norm_function_t mat_norm_function_for(mat_norm_type_t type)
+{
+    size_t index = (size_t)type;
+
+    if (index >= sizeof(mat_norm_functions) / sizeof(mat_norm_functions[0]))
+        return NULL;
+
+    return mat_norm_functions[index];
+}
+
+int mat_norm(const matrix_t *A, mat_norm_type_t type, qfloat_t *out)
+{
+    mat_norm_function_t fun;
 
     if (!A || !out)
         return -1;
 
-    e = A->elem;
-    switch (type) {
-    case MAT_NORM_1:
-    {
-        qfloat_t best = QF_ZERO;
-        for (size_t j = 0; j < A->cols; j++) {
-            qfloat_t sum = QF_ZERO;
-            for (size_t i = 0; i < A->rows; i++) {
-                unsigned char raw[64];
-                qfloat_t mag;
-                mat_get(A, i, j, raw);
-                e->abs_qf(&mag, raw);
-                sum = qf_add(sum, mag);
-            }
-            if (qf_gt(sum, best))
-                best = sum;
-        }
-        *out = best;
-        return 0;
-    }
-    case MAT_NORM_INF:
-    {
-        qfloat_t best = QF_ZERO;
-        for (size_t i = 0; i < A->rows; i++) {
-            qfloat_t sum = QF_ZERO;
-            for (size_t j = 0; j < A->cols; j++) {
-                unsigned char raw[64];
-                qfloat_t mag;
-                mat_get(A, i, j, raw);
-                e->abs_qf(&mag, raw);
-                sum = qf_add(sum, mag);
-            }
-            if (qf_gt(sum, best))
-                best = sum;
-        }
-        *out = best;
-        return 0;
-    }
-    case MAT_NORM_FRO:
-    {
-        qfloat_t sumsq = QF_ZERO;
-        for (size_t i = 0; i < A->rows; i++) {
-            for (size_t j = 0; j < A->cols; j++) {
-                unsigned char raw[64];
-                qfloat_t mag;
-                mat_get(A, i, j, raw);
-                e->abs_qf(&mag, raw);
-                sumsq = qf_add(sumsq, qf_mul(mag, mag));
-            }
-        }
-        *out = qf_sqrt(sumsq);
-        return 0;
-    }
-    case MAT_NORM_2:
-        return mat_norm_via_svd(A, out);
-    default:
+    fun = mat_norm_function_for(type);
+    if (!fun)
         return -2;
-    }
+
+    return fun(A, out);
 }
 
 int mat_condition_number(const matrix_t *A, mat_norm_type_t type, qfloat_t *out)
@@ -3486,7 +3714,7 @@ int mat_condition_number(const matrix_t *A, mat_norm_type_t type, qfloat_t *out)
         return 0;
     }
 
-    if (type == MAT_NORM_2) {
+    if (mat_norm_function_for(type) == mat_norm_via_svd) {
         mat_svd_factor_t svd = {0};
         qfloat_t sigma_max = QF_ZERO;
         qfloat_t sigma_min = QF_INF;
@@ -3728,20 +3956,6 @@ fail:
    Eigenvalues / eigenvectors (Hermitian Jacobi implementation)
    ============================================================ */
 
-static matrix_t *mat_copy_dense(const matrix_t *A)
-{
-    const struct elem_vtable *e = A->elem;
-    matrix_t *C = mat_create_dense_with_elem(A->rows, A->cols, e);
-    if (!C) return NULL;
-    unsigned char v[64];
-    for (size_t i = 0; i < A->rows; i++)
-        for (size_t j = 0; j < A->cols; j++) {
-            mat_get(A, i, j, v);
-            mat_set(C, i, j, v);
-        }
-    return C;
-}
-
 /* Squared Frobenius norm of all off-diagonal elements (convergence probe). */
 static double offdiag_norm2(const matrix_t *A)
 {
@@ -3862,7 +4076,7 @@ static int mat_eigendecompose_hermitian(const matrix_t *A, void *eigenvalues, ma
     size_t n = A->rows;
     const struct elem_vtable *e = A->elem;
 
-    matrix_t *W = mat_copy_dense(A);
+    matrix_t *W = mat_copy_as_dense(A);
     if (!W) return -3;
 
     matrix_t *V = mat_create_identity_with_elem(n, e);
@@ -5018,8 +5232,8 @@ static matrix_t *mat_fun_triangular_equal_diag(const matrix_t *T,
                                                void (*scalar_f)(void *out, const void *in))
 {
     size_t n = T->rows;
-    matrix_t *F = mat_new_qc(n, n);
-    matrix_t *N = mat_new_qc(n, n);
+    matrix_t *F = mat_create_upper_triangular_with_elem(n, n, &qcomplex_elem);
+    matrix_t *N = mat_create_upper_triangular_with_elem(n, n, &qcomplex_elem);
     if (!F || !N) {
         mat_free(F);
         mat_free(N);
@@ -5111,7 +5325,7 @@ matrix_t *mat_fun_triangular(const matrix_t *T,
             return mat_fun_triangular_equal_diag(T, scalar_f);
     }
 
-    matrix_t *F = mat_create_dense_with_elem(n, n, e);
+    matrix_t *F = mat_create_upper_triangular_with_elem(n, n, e);
     if (!F)
         return NULL;
 

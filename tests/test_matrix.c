@@ -2594,6 +2594,132 @@ static void test_solve_and_lstsq(void)
         mat_free(X);
     }
 
+    /* Lower-triangular direct solve. */
+    {
+        double L_vals[9] = {2.0, 0.0, 0.0,
+                            3.0, 1.0, 0.0,
+                            1.0, -2.0, 4.0};
+        double X_expected_vals[3] = {1.0, 2.0, -1.0};
+        double B_vals[3] = {2.0, 5.0, -7.0};
+        matrix_t *L = mat_create_d(3, 3, L_vals);
+        matrix_t *B = mat_create_d(3, 1, B_vals);
+        matrix_t *X_expected = mat_create_d(3, 1, X_expected_vals);
+
+        print_md("L (lower triangular)", L);
+        print_md("B", B);
+
+        matrix_t *X = mat_solve(L, B);
+        check_bool("mat_solve(lower triangular) not NULL", X != NULL);
+        if (X)
+            check_mat_d("solve(L,B)=X", X, X_expected, 1e-12);
+
+        mat_free(L);
+        mat_free(B);
+        mat_free(X_expected);
+        mat_free(X);
+    }
+
+    /* Upper-triangular direct solve. */
+    {
+        double U_vals[9] = {2.0, 1.0, -1.0,
+                            0.0, 3.0, 2.0,
+                            0.0, 0.0, 4.0};
+        double X_expected_vals[3] = {1.0, -2.0, 0.5};
+        double B_vals[3] = {-0.5, -5.0, 2.0};
+        matrix_t *U = mat_create_d(3, 3, U_vals);
+        matrix_t *B = mat_create_d(3, 1, B_vals);
+        matrix_t *X_expected = mat_create_d(3, 1, X_expected_vals);
+
+        print_md("U (upper triangular)", U);
+        print_md("B", B);
+
+        matrix_t *X = mat_solve(U, B);
+        check_bool("mat_solve(upper triangular) not NULL", X != NULL);
+        if (X)
+            check_mat_d("solve(U,B)=X", X, X_expected, 1e-12);
+
+        mat_free(U);
+        mat_free(B);
+        mat_free(X_expected);
+        mat_free(X);
+    }
+
+    /* Sparse lower-triangular solve exercises sparse-aware direct substitution. */
+    {
+        matrix_t *L = mat_new_sparse_d(3, 3);
+        matrix_t *B = mat_create_d(3, 1, (double[]){4.0, 5.0, 7.0});
+        matrix_t *X_expected = mat_create_d(3, 1, (double[]){2.0, 0.75, 1.125});
+        double v;
+
+        check_bool("sparse lower-triangular input allocated", L != NULL && B != NULL && X_expected != NULL);
+        if (!L || !B || !X_expected) {
+            mat_free(L);
+            mat_free(B);
+            mat_free(X_expected);
+            return;
+        }
+
+        v = 2.0; mat_set(L, 0, 0, &v);
+        v = 1.0; mat_set(L, 1, 0, &v);
+        v = 4.0; mat_set(L, 1, 1, &v);
+        v = -1.0; mat_set(L, 2, 0, &v);
+        v = 3.0; mat_set(L, 2, 1, &v);
+        v = 6.0; mat_set(L, 2, 2, &v);
+
+        check_bool("sparse matrix recognised as lower triangular", mat_is_lower_triangular(L));
+        print_md("L (sparse lower triangular)", L);
+        print_md("B", B);
+
+        matrix_t *X = mat_solve(L, B);
+        check_bool("mat_solve(sparse lower triangular) not NULL", X != NULL);
+        if (X)
+            check_mat_d("solve(sparse L,B)=X", X, X_expected, 1e-12);
+
+        mat_free(L);
+        mat_free(B);
+        mat_free(X_expected);
+        mat_free(X);
+    }
+
+    /* Diagonal solve preserves the right-hand-side layout. */
+    {
+        matrix_t *D = mat_create_diagonal_d(3, (double[]){2.0, 4.0, 8.0});
+        matrix_t *B = mat_new_sparse_d(3, 3);
+        matrix_t *X_expected = mat_new_sparse_d(3, 3);
+        double v;
+
+        check_bool("diagonal solve inputs allocated", D != NULL && B != NULL && X_expected != NULL);
+        if (!D || !B || !X_expected) {
+            mat_free(D);
+            mat_free(B);
+            mat_free(X_expected);
+            return;
+        }
+
+        v = 4.0; mat_set(B, 0, 0, &v);
+        v = 12.0; mat_set(B, 1, 2, &v);
+        v = 16.0; mat_set(B, 2, 1, &v);
+
+        v = 2.0; mat_set(X_expected, 0, 0, &v);
+        v = 3.0; mat_set(X_expected, 1, 2, &v);
+        v = 2.0; mat_set(X_expected, 2, 1, &v);
+
+        print_md("D (diagonal)", D);
+        print_md("B (sparse right-hand side)", B);
+
+        matrix_t *X = mat_solve(D, B);
+        check_bool("mat_solve(diagonal,sparse RHS) not NULL", X != NULL);
+        if (X) {
+            check_bool("diagonal solve preserves sparse layout of RHS", mat_is_sparse(X));
+            check_mat_d("solve(D,B)=X with sparse RHS", X, X_expected, 1e-12);
+        }
+
+        mat_free(D);
+        mat_free(B);
+        mat_free(X_expected);
+        mat_free(X);
+    }
+
     /* Rank-deficient overdetermined system falls back to pseudoinverse. */
     {
         double A_vals[6] = {1.0, 0.0,
@@ -3528,6 +3654,7 @@ static void test_mat_exp_singular(void)
         check_bool("mat_exp(singular diagonal) not NULL", E != NULL);
         if (E)
         {
+            check_bool("exp(diag(0,2)) preserves diagonal structure", mat_is_diagonal(E));
             check_mat_d("exp(diag(0,2)) = diag(1,e^2)", E, E_expected, 1e-12);
         }
 
@@ -3555,12 +3682,74 @@ static void test_mat_exp_singular(void)
         check_bool("mat_exp(singular nilpotent) not NULL", E != NULL);
         if (E)
         {
+            check_bool("exp(N) preserves upper-triangular structure", mat_is_upper_triangular(E));
             check_mat_d("exp(N) = I + N", E, E_expected, 1e-12);
         }
 
         mat_free(N);
         mat_free(E);
         mat_free(E_expected);
+    }
+}
+
+static void test_matrix_function_structure_preservation(void)
+{
+    printf(C_CYAN "TEST: matrix functions preserve structured layouts when possible\n" C_RESET);
+
+    {
+        double A_vals[4] = {2.0, 0.0, 0.0, 3.0};
+        matrix_t *A = mat_create_d(2, 2, A_vals);
+        matrix_t *L = mat_log(A);
+        matrix_t *E = NULL;
+
+        check_bool("positive diagonal input allocated", A != NULL);
+        check_bool("mat_log(positive diagonal) not NULL", L != NULL);
+        if (L) {
+            check_bool("mat_log(positive diagonal) preserves diagonal structure", mat_is_diagonal(L));
+            E = mat_exp(L);
+            check_bool("mat_exp(mat_log(positive diagonal)) not NULL", E != NULL);
+            if (E) {
+                check_bool("mat_exp(mat_log(positive diagonal)) preserves diagonal structure",
+                           mat_is_diagonal(E));
+                check_mat_d("exp(log(diag(2,3))) = diag(2,3)", E, A, 1e-12);
+            }
+        }
+
+        mat_free(E);
+        mat_free(L);
+        mat_free(A);
+    }
+
+    {
+        double A_vals[4] = {1.0, 1.0, 0.0, 1.0};
+        matrix_t *A = mat_create_d(2, 2, A_vals);
+        matrix_t *L = mat_log(A);
+        matrix_t *S = mat_sqrt(A);
+        matrix_t *E = NULL;
+
+        check_bool("upper-triangular Jordan input allocated", A != NULL);
+        check_bool("mat_log(upper-triangular Jordan) not NULL", L != NULL);
+        check_bool("mat_sqrt(upper-triangular Jordan) not NULL", S != NULL);
+        if (L) {
+            check_bool("mat_log(upper-triangular Jordan) preserves upper-triangular structure",
+                       mat_is_upper_triangular(L));
+            E = mat_exp(L);
+            check_bool("mat_exp(mat_log(upper-triangular Jordan)) not NULL", E != NULL);
+            if (E) {
+                check_bool("mat_exp(mat_log(upper-triangular Jordan)) preserves upper-triangular structure",
+                           mat_is_upper_triangular(E));
+                check_mat_d("exp(log(I+N)) = I+N", E, A, 1e-12);
+            }
+        }
+        if (S) {
+            check_bool("mat_sqrt(upper-triangular Jordan) preserves upper-triangular structure",
+                       mat_is_upper_triangular(S));
+        }
+
+        mat_free(E);
+        mat_free(L);
+        mat_free(S);
+        mat_free(A);
     }
 }
 
@@ -7602,6 +7791,7 @@ int tests_main(void)
     RUN_TEST(test_mat_exp_qf, NULL);
     RUN_TEST(test_mat_exp_qc, NULL);
     RUN_TEST(test_mat_exp_singular, NULL);
+    RUN_TEST(test_matrix_function_structure_preservation, NULL);
     RUN_TEST(test_mat_fun_singular_entire_d, NULL);
     RUN_TEST(test_mat_exp_null_safety, NULL);
 
