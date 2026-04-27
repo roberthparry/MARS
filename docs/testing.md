@@ -52,11 +52,12 @@ A missing key always means **enabled**. Set a value to `false` to skip it.
 
 ### Flat tests
 
-Most test files list their tests as simple booleans at the top level of their entry:
+Most test files list their tests as simple booleans at the top level of their entry.
+Entries are keyed by the test source's path under `tests/`:
 
 ```json
 {
-  "tests/test_array.c": {
+  "tests/array/test_array.c": {
     "test_ints": true,
     "test_strings": false,
     "test_swap_rotate": true
@@ -72,7 +73,7 @@ Some tests are organised into groups. A group object has an `"enabled"` key for 
 
 ```json
 {
-  "tests/test_dval.c": {
+  "tests/dval/test_dval.c": {
     "test_arithmetic": {
       "enabled": true,
       "test_add": true,
@@ -94,6 +95,8 @@ Test files declare one of two modes before including `test_harness.h`:
 | Mode | File consulted |
 |---|---|
 | `TEST_CONFIG_GLOBAL` | `tests/test_config.json` (shared by all test binaries) |
-| `TEST_CONFIG_LOCAL` | `tests/<basename>.json` (one file per test binary) |
+| `TEST_CONFIG_LOCAL` | `<normalized test source path>.json` (one file per test binary) |
+
+For example, `tests/test_config/test_test_config.c` uses `tests/test_config/test_test_config.json` in local mode.
 
 All current test files use `TEST_CONFIG_GLOBAL`, so `tests/test_config.json` is the single place to control everything.

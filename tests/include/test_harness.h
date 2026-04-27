@@ -6,12 +6,16 @@
  * @brief Lightweight test runner with per-test enable/disable and group support.
  *
  * Usage:
- *   1. Before including this header, define which config mode to use:
+ *   1. In exactly one test translation unit, define:
  *        #define TEST_CONFIG_MODE TEST_CONFIG_GLOBAL   // shared config file
  *        #define TEST_CONFIG_MODE TEST_CONFIG_LOCAL    // per-test-file config
+ *        #define TEST_HARNESS_IMPLEMENTATION
+ *      before including this header.
  *   2. Define the entry point expected by main():
  *        int tests_main(void) { RUN_TEST(...); return 0; }
- *   3. Call RUN_TEST(func, parent) for each test or test-group function:
+ *   3. Any additional helper translation units may include this header
+ *      without defining TEST_HARNESS_IMPLEMENTATION.
+ *   4. Call RUN_TEST(func, parent) for each test or test-group function:
  *        RUN_TEST(test_addition, NULL);          // top-level test
  *        RUN_TEST(test_group_arithmetic, NULL);  // group (calls RUN_TEST itself)
  *
@@ -26,10 +30,6 @@
  * The three counters (tests_run, tests_failed, tests_skipped) are defined here
  * and owned by the harness; do not modify them directly.
  */
-
-#ifndef TEST_CONFIG_MODE
-#error "You must #define TEST_CONFIG_MODE before including test_harness.h"
-#endif
 
 #include <stdio.h>
 #include <math.h>
@@ -206,6 +206,12 @@ static inline void th_print_time(double ms) {
 /* Define this in your test file. Call RUN_TEST() for each test. */
 int tests_main(void);
 
+#ifdef TEST_HARNESS_IMPLEMENTATION
+
+#ifndef TEST_CONFIG_MODE
+#error "You must #define TEST_CONFIG_MODE before defining TEST_HARNESS_IMPLEMENTATION"
+#endif
+
 /* Harness-owned — do not modify */
 
 int    tests_run      = 0;
@@ -234,5 +240,7 @@ int main(void) {
 
     return rc;
 }
+
+#endif
 
 #endif /* TEST_HARNESS_H */

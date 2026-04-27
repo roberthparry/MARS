@@ -18,7 +18,7 @@ CFLAGS += -D_GNU_SOURCE
 CC := gcc
 AR := ar rcs
 
-INCLUDES := -I. -Iinclude -Itests
+INCLUDES := -I. -Iinclude -Itests -Itests/include
 
 # ------------------------------------------------------------
 # Optional libunistring
@@ -47,17 +47,20 @@ LDLIBS += -lpthread
 SRCS    := $(shell find src -name '*.c' | sort)
 OBJS    := $(SRCS:src/%.c=$(BUILD_DIR)/%.o)
 
-TEST_SRCS  := $(sort $(wildcard tests/test_*.c))
-TEST_OBJS  := $(TEST_SRCS:tests/%.c=$(TEST_BUILD_DIR)/%.o)
+TEST_ALL_SRCS     := $(shell find tests -name 'test_*.c' | sort)
+TEST_SRCS         := $(shell find tests -name 'test_*.c' | while read -r f; do d=$$(basename "$$(dirname "$$f")"); b=$$(basename "$$f"); if [ "$$b" = "test_$$d.c" ]; then printf '%s\n' "$$f"; fi; done | sort)
+TEST_HELPER_SRCS  := $(filter-out $(TEST_SRCS),$(TEST_ALL_SRCS))
+TEST_OBJS         := $(TEST_SRCS:tests/%.c=$(TEST_BUILD_DIR)/%.o)
+TEST_HELPER_OBJS  := $(TEST_HELPER_SRCS:tests/%.c=$(TEST_BUILD_DIR)/%.o)
 
 HEADERS      := $(wildcard include/*.h)
-TEST_HEADERS := $(wildcard tests/*.h)
 
 STATIC_LIB := $(BUILD_DIR)/libmars.a
 SHARED_LIB := $(BUILD_DIR)/libmars.so
 
-TEST_NAMES := $(patsubst tests/test_%.c,%,$(TEST_SRCS))
-TEST_BINS  := $(TEST_NAMES:%=$(TEST_BUILD_DIR)/test_%)
+TEST_BINS  := $(patsubst tests/%.c,$(TEST_BUILD_DIR)/%,$(TEST_SRCS))
+
+.SECONDARY: $(TEST_OBJS) $(TEST_HELPER_OBJS)
 
 # ------------------------------------------------------------
 # Default target
@@ -75,7 +78,7 @@ release:
 # ------------------------------------------------------------
 # Dependency tracking
 # ------------------------------------------------------------
-DEPFLAGS = -MT $@ -MMD -MP -MF $(dir $@).deps/$(notdir $*).d
+DEPFLAGS = -MT $@ -MMD -MP -MF $(dir $@).deps/$(subst /,_,$*).d
 DEPS     := $(shell find build tests/build -name '*.d' 2>/dev/null)
 -include $(DEPS)
 
@@ -104,12 +107,9 @@ $(SHARED_LIB): $(OBJS)
 # ------------------------------------------------------------
 # Test binaries
 # ------------------------------------------------------------
-$(TEST_BUILD_DIR)/test_%: $(TEST_BUILD_DIR)/test_%.o $(STATIC_LIB)
+$(TEST_BUILD_DIR)/%: $(TEST_BUILD_DIR)/%.o $(STATIC_LIB) $(TEST_HELPER_OBJS)
 	@mkdir -p $(dir $@)
-	$(CC) -o $@ $< \
-		-L$(BUILD_DIR) -lmars \
-		-Wl,-rpath,'$$ORIGIN:$$ORIGIN/../../../$(BUILD_DIR)' \
-		$(LDLIBS)
+	$(CC) -o $@ $< $(filter $(TEST_BUILD_DIR)/$(dir $*)%.o,$(TEST_HELPER_OBJS)) $(STATIC_LIB) $(LDLIBS)
 
 # ------------------------------------------------------------
 # Test targets
@@ -135,11 +135,16 @@ memtest: $(TEST_BINS)
 	    $(VALGRIND) $$t; \
 	done
 
-test_%: $(TEST_BUILD_DIR)/test_%
-	@$(TEST_BUILD_DIR)/test_$*
+define TEST_ALIAS_RULES
+.PHONY: $(1) mem$(1)
+$(1): $(2)
+	@$(2)
 
-memtest_%: $(TEST_BUILD_DIR)/test_%
-	$(VALGRIND) $(TEST_BUILD_DIR)/test_$*
+mem$(1): $(2)
+	$(VALGRIND) $(2)
+endef
+
+$(foreach bin,$(TEST_BINS),$(eval $(call TEST_ALIAS_RULES,$(notdir $(bin)),$(bin))))
 
 # ------------------------------------------------------------
 # Help

@@ -21,6 +21,9 @@ static bool          g_loaded = false;
 /* LOCAL mode: store the real test filename (basename only) */
 static string_t     *g_local_filename = NULL;
 
+/* Forward declarations for path helpers used before their definitions. */
+static string_t *normalize_test_file_path(const char *file);
+
 /* string_t* key helpers */
 
 static size_t string_key_hash(const void *key)
@@ -123,16 +126,44 @@ static string_t *compute_global_path(void)
 
 static string_t *compute_local_path(const char *file)
 {
-    const char *slash = strrchr(file, '/');
-    const char *base  = slash ? slash + 1 : file;
-
-    const char *dot = strrchr(base, '.');
-    size_t len = dot ? (size_t)(dot - base) : strlen(base);
+    string_t *normalized = normalize_test_file_path(file);
+    const char *full = string_c_str(normalized);
+    const char *dot = strrchr(full, '.');
+    size_t len = dot ? (size_t)(dot - full) : strlen(full);
 
     string_t *path = string_new();
-    string_append_cstr(path, "tests/");
-    string_append_format(path, "%.*s.json", (int)len, base);
+    string_append_format(path, "%.*s.json", (int)len, full);
 
+    string_free(normalized);
+    return path;
+}
+
+static string_t *normalize_test_file_path(const char *file)
+{
+    const char *tests = strstr(file, "tests/");
+    string_t *path = string_new();
+
+    if (tests) {
+        string_append_cstr(path, tests);
+        return path;
+    }
+
+    const char *slash = strrchr(file, '/');
+    const char *base = slash ? slash + 1 : file;
+
+    string_append_cstr(path, "tests/");
+    string_append_cstr(path, base);
+    return path;
+}
+
+static string_t *flattened_test_file_path(const char *file)
+{
+    const char *slash = strrchr(file, '/');
+    const char *base = slash ? slash + 1 : file;
+    string_t *path = string_new();
+
+    string_append_cstr(path, "tests/");
+    string_append_cstr(path, base);
     return path;
 }
 
@@ -184,33 +215,44 @@ static dictionary_t *ensure_file_dict(const char *file)
 
     if (g_mode == TEST_CONFIG_GLOBAL) {
         /* g_root: key = string_t*, value = dictionary_t* */
-
-        string_t *file_key = string_new_with(file);
-        if (!file_key)
-            return NULL;
-
+        string_t *normalized_key = normalize_test_file_path(file);
+        string_t *flattened_key = flattened_test_file_path(file);
         dictionary_t *file_dict = NULL;
 
-        /* Look up existing file dictionary */
-        if (dictionary_get(g_root, &file_key, &file_dict) && file_dict) {
-            string_free(file_key);
+        if (!normalized_key || !flattened_key) {
+            if (normalized_key) string_free(normalized_key);
+            if (flattened_key) string_free(flattened_key);
+            return NULL;
+        }
+
+        /* Prefer the canonical tests/... path for nested sources. */
+        if (dictionary_get(g_root, &normalized_key, &file_dict) && file_dict) {
+            string_free(flattened_key);
+            string_free(normalized_key);
+            return file_dict;
+        }
+
+        /* Accept legacy flattened entries such as tests/test_dval.c. */
+        if (string_compare(normalized_key, flattened_key) != 0 &&
+            dictionary_get(g_root, &flattened_key, &file_dict) && file_dict) {
+            string_free(flattened_key);
+            string_free(normalized_key);
             return file_dict;
         }
 
         /* Create new file dictionary */
         file_dict = create_file_dict();
         if (!file_dict) {
-            string_free(file_key);
+            string_free(flattened_key);
+            string_free(normalized_key);
             return NULL;
         }
 
-        /* Store pointer to file_dict in g_root.
-           dictptr_clone/dictptr_destroy handle cloning/destroying the pointed-to dictionary.
-        */
-        dictionary_set(g_root, &file_key, &file_dict);
+        /* Store under the canonical key; g_root clones both key and value. */
+        dictionary_set(g_root, &normalized_key, &file_dict);
 
-        /* We own this key instance; g_root has its own clone. */
-        string_free(file_key);
+        string_free(flattened_key);
+        string_free(normalized_key);
 
         return file_dict;
     }

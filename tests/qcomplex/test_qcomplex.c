@@ -6,6 +6,7 @@
 #include "qfloat.h"
 
 #define TEST_CONFIG_MODE TEST_CONFIG_GLOBAL
+#define TEST_HARNESS_IMPLEMENTATION
 #include "test_harness.h"
 
 /* ------------------------------------------------------------------ helpers */
