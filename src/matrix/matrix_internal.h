@@ -1,6 +1,7 @@
 #ifndef MATRIX_INTERNAL_H
 #define MATRIX_INTERNAL_H
 
+#include <stdbool.h>
 #include <stddef.h>
 
 #include "matrix.h"
@@ -105,9 +106,8 @@ struct elem_vtable {
     /* printing */
     void (*print)(const void *val, char *buf, size_t buflen);
 
-    /* matrix constructors */
-    struct matrix_t *(*create_matrix)(size_t rows, size_t cols);
-    struct matrix_t *(*create_identity)(size_t n);
+    /* numerical tolerance scale for rank/conditioning decisions */
+    qfloat_t relative_epsilon;
 
     const struct elem_fun_vtable *fun;
 };
@@ -117,13 +117,24 @@ struct elem_vtable {
    ============================================================ */
 
 struct store_vtable {
-    void (*alloc)(struct matrix_t *A);
+    struct matrix_t *(*create)(size_t rows, size_t cols,
+                               const struct elem_vtable *elem);
+
+    bool (*alloc)(struct matrix_t *A);
     void (*free)(struct matrix_t *A);
 
     void (*get)(const struct matrix_t *A, size_t i, size_t j, void *out);
     void (*set)(struct matrix_t *A, size_t i, size_t j, const void *val);
 
     void (*materialise)(struct matrix_t *A);
+    bool (*is_sparse_storage)(const struct matrix_t *A);
+    bool (*is_sparse_like)(const struct matrix_t *A);
+    bool (*is_diagonal)(const struct matrix_t *A);
+    bool (*is_upper_triangular)(const struct matrix_t *A);
+    bool (*is_lower_triangular)(const struct matrix_t *A);
+    size_t (*nonzero_count)(const struct matrix_t *A);
+    const struct store_vtable *(*elementwise_unary_store)(const struct matrix_t *A);
+    const struct store_vtable *(*transpose_store)(const struct matrix_t *A);
 };
 
 /* ============================================================
@@ -133,11 +144,12 @@ struct store_vtable {
 struct matrix_t {
     size_t rows;
     size_t cols;
+    size_t nnz;
 
     const struct elem_vtable  *elem;
     const struct store_vtable *store;
 
-    void **data;   /* row pointers for dense; NULL for identity */
+    void **data;   /* row pointers for dense/sparse; NULL for identity */
 };
 
 /* ============================================================
@@ -147,6 +159,23 @@ struct matrix_t {
 extern const struct elem_vtable double_elem;
 extern const struct elem_vtable qfloat_elem;
 extern const struct elem_vtable qcomplex_elem;
+
+/* ============================================================
+   Matrix construction helpers (internal)
+   ============================================================ */
+
+struct matrix_t *mat_create_dense_with_elem(size_t rows, size_t cols,
+                                            const struct elem_vtable *elem);
+struct matrix_t *mat_create_sparse_with_elem(size_t rows, size_t cols,
+                                             const struct elem_vtable *elem);
+struct matrix_t *mat_create_identity_with_elem(size_t n,
+                                               const struct elem_vtable *elem);
+struct matrix_t *mat_create_diagonal_with_elem(size_t n,
+                                               const struct elem_vtable *elem);
+struct matrix_t *mat_create_upper_triangular_with_elem(size_t rows, size_t cols,
+                                                       const struct elem_vtable *elem);
+struct matrix_t *mat_create_lower_triangular_with_elem(size_t rows, size_t cols,
+                                                       const struct elem_vtable *elem);
 
 /* ============================================================
    Convenience accessor
@@ -160,23 +189,18 @@ static inline const struct elem_vtable *elem_of(const struct matrix_t *A) {
    Schur decomposition API (internal use by matrix_math.c)
    ============================================================ */
 
-typedef struct {
-    matrix_t *Q;   /* unitary */
-    matrix_t *T;   /* upper triangular (Schur form) */
-} mat_schur_t;
-
 /**
  * Compute the Schur decomposition A = Q T Q*.
  *
  * A must be square. Q and T are allocated on success.
  * Returns 0 on success, nonzero on failure.
  */
-int mat_schur(const matrix_t *A, mat_schur_t *out);
+int mat_schur_factor(const matrix_t *A, mat_schur_factor_t *out);
 
 /**
- * Free the Q and T matrices inside a mat_schur_t.
+ * Free the Q and T matrices inside a mat_schur_factor_t.
  */
-void mat_schur_free(mat_schur_t *S);
+void mat_schur_factor_free(mat_schur_factor_t *S);
 
 /* ============================================================
    Matrix functions via Schur + Parlett (internal)

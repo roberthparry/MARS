@@ -8,34 +8,104 @@
 #include "matrix.h"
 
 /* ============================================================
-   Element-type-specific matrix constructors (forward declarations)
+   Internal matrix construction helpers (forward declarations)
    ============================================================ */
 
-static struct matrix_t *create_matrix_double(size_t rows, size_t cols);
-static struct matrix_t *create_identity_double(size_t n);
-static struct matrix_t *create_matrix_qfloat(size_t rows, size_t cols);
-static struct matrix_t *create_identity_qfloat(size_t n);
-static struct matrix_t *create_matrix_qcomplex(size_t rows, size_t cols);
-static struct matrix_t *create_identity_qcomplex(size_t n);
+static struct matrix_t *store_create_dense(size_t rows, size_t cols,
+                                           const struct elem_vtable *elem);
+static struct matrix_t *store_create_sparse(size_t rows, size_t cols,
+                                            const struct elem_vtable *elem);
+static struct matrix_t *store_create_identity(size_t rows, size_t cols,
+                                              const struct elem_vtable *elem);
+static struct matrix_t *store_create_diagonal(size_t rows, size_t cols,
+                                              const struct elem_vtable *elem);
+static struct matrix_t *store_create_upper_triangular(size_t rows, size_t cols,
+                                                      const struct elem_vtable *elem);
+static struct matrix_t *store_create_lower_triangular(size_t rows, size_t cols,
+                                                      const struct elem_vtable *elem);
+static bool dense_is_sparse_storage(const struct matrix_t *A);
+static bool sparse_is_sparse_storage(const struct matrix_t *A);
+static bool identity_is_sparse_storage(const struct matrix_t *A);
+static bool diagonal_is_sparse_storage(const struct matrix_t *A);
+static bool upper_triangular_is_sparse_storage(const struct matrix_t *A);
+static bool lower_triangular_is_sparse_storage(const struct matrix_t *A);
+static bool dense_is_sparse_like(const struct matrix_t *A);
+static bool sparse_is_sparse_like(const struct matrix_t *A);
+static bool identity_is_sparse_like(const struct matrix_t *A);
+static bool diagonal_is_sparse_like(const struct matrix_t *A);
+static bool upper_triangular_is_sparse_like(const struct matrix_t *A);
+static bool lower_triangular_is_sparse_like(const struct matrix_t *A);
+static bool store_true(const struct matrix_t *A);
+static bool store_false(const struct matrix_t *A);
+static bool dense_is_diagonal(const struct matrix_t *A);
+static bool sparse_is_diagonal(const struct matrix_t *A);
+static bool upper_triangular_is_diagonal(const struct matrix_t *A);
+static bool lower_triangular_is_diagonal(const struct matrix_t *A);
+static bool generic_is_upper_triangular(const struct matrix_t *A);
+static bool generic_is_lower_triangular(const struct matrix_t *A);
+static size_t dense_nonzero_count(const struct matrix_t *A);
+static size_t sparse_nonzero_count(const struct matrix_t *A);
+static size_t identity_nonzero_count(const struct matrix_t *A);
+static size_t diagonal_nonzero_count(const struct matrix_t *A);
+static size_t upper_triangular_nonzero_count(const struct matrix_t *A);
+static size_t lower_triangular_nonzero_count(const struct matrix_t *A);
+static const struct store_vtable *store_self_unary(const struct matrix_t *A);
+static const struct store_vtable *identity_unary_store(const struct matrix_t *A);
+static const struct store_vtable *store_self_transpose(const struct matrix_t *A);
+static const struct store_vtable *upper_triangular_transpose_store(const struct matrix_t *A);
+static const struct store_vtable *lower_triangular_transpose_store(const struct matrix_t *A);
+static struct matrix_t *mat_create_with_store(size_t rows, size_t cols,
+                                              const struct elem_vtable *elem,
+                                              const struct store_vtable *store);
+static struct matrix_t *mat_create_elementwise_unary_result(size_t rows, size_t cols,
+                                                            const struct elem_vtable *elem,
+                                                            const struct matrix_t *layout_src);
+static struct matrix_t *mat_create_transpose_result(size_t rows, size_t cols,
+                                                    const struct elem_vtable *elem,
+                                                    const struct matrix_t *layout_src);
+static struct matrix_t *mat_create_binary_result(size_t rows, size_t cols,
+                                                 const struct elem_vtable *elem,
+                                                 const struct matrix_t *A,
+                                                 const struct matrix_t *B);
+static bool mat_uses_sparse_storage(const struct matrix_t *A);
+static bool mat_is_sparse_like(const struct matrix_t *A);
+static bool mat_has_diagonal_structure(const struct matrix_t *A);
+static bool mat_has_upper_triangular_structure(const struct matrix_t *A);
+static bool mat_has_lower_triangular_structure(const struct matrix_t *A);
+static matrix_t *mat_convert_dense(const matrix_t *A, const struct elem_vtable *target);
 
 /* ============================================================
    Storage vtables (dense, identity)
    ============================================================ */
 
-static void dense_alloc(struct matrix_t *A) {
+typedef struct sparse_entry_t {
+    size_t col;
+    struct sparse_entry_t *next;
+    unsigned char value[];
+} sparse_entry_t;
+
+static const struct store_vtable sparse_store;
+static const struct store_vtable diagonal_store;
+static const struct store_vtable upper_triangular_store;
+static const struct store_vtable lower_triangular_store;
+
+static bool dense_alloc(struct matrix_t *A) {
     size_t n = A->rows, m = A->cols, es = A->elem->size;
 
     A->data = malloc(n * sizeof(void*));
-    if (!A->data) return;
+    if (!A->data)
+        return false;
     for (size_t i = 0; i < n; i++) {
         A->data[i] = calloc(m, es);
         if (!A->data[i]) {
             for (size_t k = 0; k < i; k++) free(A->data[k]);
             free(A->data);
             A->data = NULL;
-            return;
+            return false;
         }
     }
+    A->nnz = 0;
+    return true;
 }
 
 static void dense_free(struct matrix_t *A) {
@@ -59,19 +129,184 @@ static void dense_set(struct matrix_t *A, size_t i, size_t j, const void *val) {
 }
 
 static const struct store_vtable dense_store = {
-    .alloc        = dense_alloc,
-    .free         = dense_free,
-    .get          = dense_get,
-    .set          = dense_set,
-    .materialise  = NULL
+    .create                   = store_create_dense,
+    .alloc                    = dense_alloc,
+    .free                     = dense_free,
+    .get                      = dense_get,
+    .set                      = dense_set,
+    .materialise              = NULL,
+    .is_sparse_storage        = dense_is_sparse_storage,
+    .is_sparse_like           = dense_is_sparse_like,
+    .is_diagonal              = dense_is_diagonal,
+    .is_upper_triangular      = generic_is_upper_triangular,
+    .is_lower_triangular      = generic_is_lower_triangular,
+    .nonzero_count            = dense_nonzero_count,
+    .elementwise_unary_store  = store_self_unary,
+    .transpose_store          = store_self_transpose
+};
+
+/* ---------- sparse storage ---------- */
+
+static sparse_entry_t *sparse_find_prev(const struct matrix_t *A, size_t row, size_t col)
+{
+    sparse_entry_t *prev = NULL;
+    sparse_entry_t *cur = A->data ? (sparse_entry_t *)A->data[row] : NULL;
+
+    while (cur && cur->col < col) {
+        prev = cur;
+        cur = cur->next;
+    }
+
+    return prev;
+}
+
+static bool sparse_alloc(struct matrix_t *A)
+{
+    A->data = calloc(A->rows, sizeof(void *));
+    if (!A->data)
+        return false;
+    A->nnz = 0;
+    return true;
+}
+
+static void sparse_free(struct matrix_t *A)
+{
+    if (!A->data)
+        return;
+
+    for (size_t i = 0; i < A->rows; i++) {
+        sparse_entry_t *cur = (sparse_entry_t *)A->data[i];
+        while (cur) {
+            sparse_entry_t *next = cur->next;
+            free(cur);
+            cur = next;
+        }
+    }
+
+    free(A->data);
+    A->data = NULL;
+    A->nnz = 0;
+}
+
+static void sparse_get(const struct matrix_t *A, size_t i, size_t j, void *out)
+{
+    sparse_entry_t *prev = sparse_find_prev(A, i, j);
+    sparse_entry_t *cur = prev ? prev->next : (A->data ? (sparse_entry_t *)A->data[i] : NULL);
+
+    if (cur && cur->col == j) {
+        memcpy(out, cur->value, A->elem->size);
+        return;
+    }
+
+    memcpy(out, A->elem->zero, A->elem->size);
+}
+
+static void sparse_set(struct matrix_t *A, size_t i, size_t j, const void *val)
+{
+    sparse_entry_t *prev;
+    sparse_entry_t *cur;
+    int is_zero;
+
+    prev = sparse_find_prev(A, i, j);
+    cur = prev ? prev->next : (A->data ? (sparse_entry_t *)A->data[i] : NULL);
+    is_zero = (A->elem->cmp(val, A->elem->zero) == 0);
+
+    if (cur && cur->col == j) {
+        if (is_zero) {
+            if (prev)
+                prev->next = cur->next;
+            else
+                A->data[i] = cur->next;
+            free(cur);
+            if (A->nnz > 0)
+                A->nnz--;
+        } else {
+            memcpy(cur->value, val, A->elem->size);
+        }
+        return;
+    }
+
+    if (is_zero)
+        return;
+
+    cur = malloc(sizeof(*cur) + A->elem->size);
+    if (!cur)
+        return;
+
+    cur->col = j;
+    memcpy(cur->value, val, A->elem->size);
+    if (prev) {
+        cur->next = prev->next;
+        prev->next = cur;
+    } else {
+        cur->next = (sparse_entry_t *)A->data[i];
+        A->data[i] = cur;
+    }
+    A->nnz++;
+}
+
+static void sparse_materialise(struct matrix_t *A)
+{
+    void **old_rows;
+    size_t old_nnz;
+
+    old_rows = A->data;
+    old_nnz = A->nnz;
+    A->store = &dense_store;
+    A->data = NULL;
+    A->nnz = 0;
+    if (!dense_alloc(A)) {
+        A->store = &sparse_store;
+        A->data = old_rows;
+        A->nnz = old_nnz;
+        return;
+    }
+
+    for (size_t i = 0; i < A->rows; i++) {
+        sparse_entry_t *cur = (sparse_entry_t *)old_rows[i];
+        while (cur) {
+            dense_set(A, i, cur->col, cur->value);
+            A->nnz++;
+            cur = cur->next;
+        }
+    }
+
+    for (size_t i = 0; i < A->rows; i++) {
+        sparse_entry_t *cur = (sparse_entry_t *)old_rows[i];
+        while (cur) {
+            sparse_entry_t *next = cur->next;
+            free(cur);
+            cur = next;
+        }
+    }
+    free(old_rows);
+}
+
+static const struct store_vtable sparse_store = {
+    .create                   = store_create_sparse,
+    .alloc                    = sparse_alloc,
+    .free                     = sparse_free,
+    .get                      = sparse_get,
+    .set                      = sparse_set,
+    .materialise              = sparse_materialise,
+    .is_sparse_storage        = sparse_is_sparse_storage,
+    .is_sparse_like           = sparse_is_sparse_like,
+    .is_diagonal              = sparse_is_diagonal,
+    .is_upper_triangular      = generic_is_upper_triangular,
+    .is_lower_triangular      = generic_is_lower_triangular,
+    .nonzero_count            = sparse_nonzero_count,
+    .elementwise_unary_store  = store_self_unary,
+    .transpose_store          = store_self_transpose
 };
 
 /* ---------- identity storage ---------- */
 
 static void ident_materialise(struct matrix_t *A);
 
-static void ident_alloc(struct matrix_t *A) {
+static bool ident_alloc(struct matrix_t *A) {
     A->data = NULL;
+    A->nnz = A->rows;
+    return true;
 }
 
 static void ident_free(struct matrix_t *A) {
@@ -90,26 +325,359 @@ static void ident_set(struct matrix_t *A, size_t i, size_t j, const void *val) {
 }
 
 static const struct store_vtable identity_store = {
-    .alloc        = ident_alloc,
-    .free         = ident_free,
-    .get          = ident_get,
-    .set          = ident_set,
-    .materialise  = ident_materialise
+    .create                   = store_create_identity,
+    .alloc                    = ident_alloc,
+    .free                     = ident_free,
+    .get                      = ident_get,
+    .set                      = ident_set,
+    .materialise              = ident_materialise,
+    .is_sparse_storage        = identity_is_sparse_storage,
+    .is_sparse_like           = identity_is_sparse_like,
+    .is_diagonal              = store_true,
+    .is_upper_triangular      = store_true,
+    .is_lower_triangular      = store_true,
+    .nonzero_count            = identity_nonzero_count,
+    .elementwise_unary_store  = identity_unary_store,
+    .transpose_store          = store_self_transpose
 };
 
 static void ident_materialise(struct matrix_t *A) {
-    if (A->store == &dense_store)
-        return;
-
     A->store = &dense_store;
-    dense_alloc(A);
-    if (!A->data) return;
+    if (!dense_alloc(A))
+        return;
 
     for (size_t i = 0; i < A->rows; i++)
         for (size_t j = 0; j < A->cols; j++)
             dense_set(A, i, j,
                       (i == j) ? A->elem->one : A->elem->zero);
 }
+
+/* ---------- diagonal storage ---------- */
+
+static bool diagonal_alloc(struct matrix_t *A)
+{
+    size_t i;
+
+    A->data = malloc(A->rows * sizeof(void *));
+    if (!A->data)
+        return false;
+
+    for (i = 0; i < A->rows; i++) {
+        A->data[i] = calloc(1, A->elem->size);
+        if (!A->data[i]) {
+            while (i > 0) {
+                i--;
+                free(A->data[i]);
+            }
+            free(A->data);
+            A->data = NULL;
+            return false;
+        }
+    }
+
+    A->nnz = 0;
+    return true;
+}
+
+static void diagonal_free(struct matrix_t *A)
+{
+    if (!A->data)
+        return;
+
+    for (size_t i = 0; i < A->rows; i++)
+        free(A->data[i]);
+    free(A->data);
+    A->data = NULL;
+    A->nnz = 0;
+}
+
+static void diagonal_get(const struct matrix_t *A, size_t i, size_t j, void *out)
+{
+    memcpy(out, (i == j) ? A->data[i] : A->elem->zero, A->elem->size);
+}
+
+static void diagonal_materialise(struct matrix_t *A)
+{
+    void **old_diagonal = A->data;
+    size_t old_nnz = A->nnz;
+
+    A->store = &dense_store;
+    A->data = NULL;
+    A->nnz = 0;
+    if (!dense_alloc(A)) {
+        A->store = &diagonal_store;
+        A->data = old_diagonal;
+        A->nnz = old_nnz;
+        return;
+    }
+
+    for (size_t i = 0; i < A->rows; i++) {
+        dense_set(A, i, i, old_diagonal[i]);
+        if (A->elem->cmp(old_diagonal[i], A->elem->zero) != 0)
+            A->nnz++;
+        free(old_diagonal[i]);
+    }
+    free(old_diagonal);
+}
+
+static void diagonal_set(struct matrix_t *A, size_t i, size_t j, const void *val)
+{
+    if (i == j) {
+        int was_zero = (A->elem->cmp(A->data[i], A->elem->zero) == 0);
+        int is_zero = (A->elem->cmp(val, A->elem->zero) == 0);
+
+        memcpy(A->data[i], val, A->elem->size);
+        if (was_zero && !is_zero)
+            A->nnz++;
+        else if (!was_zero && is_zero)
+            A->nnz--;
+        return;
+    }
+
+    if (A->elem->cmp(val, A->elem->zero) == 0)
+        return;
+
+    diagonal_materialise(A);
+    dense_set(A, i, j, val);
+    A->nnz++;
+}
+
+static const struct store_vtable diagonal_store = {
+    .create                   = store_create_diagonal,
+    .alloc                    = diagonal_alloc,
+    .free                     = diagonal_free,
+    .get                      = diagonal_get,
+    .set                      = diagonal_set,
+    .materialise              = diagonal_materialise,
+    .is_sparse_storage        = diagonal_is_sparse_storage,
+    .is_sparse_like           = diagonal_is_sparse_like,
+    .is_diagonal              = store_true,
+    .is_upper_triangular      = store_true,
+    .is_lower_triangular      = store_true,
+    .nonzero_count            = diagonal_nonzero_count,
+    .elementwise_unary_store  = store_self_unary,
+    .transpose_store          = store_self_transpose
+};
+
+/* ---------- triangular storage ---------- */
+
+static size_t upper_triangular_row_width(const struct matrix_t *A, size_t row)
+{
+    return (row < A->cols) ? (A->cols - row) : 0;
+}
+
+static size_t lower_triangular_row_width(const struct matrix_t *A, size_t row)
+{
+    return (row < A->cols) ? (row + 1) : A->cols;
+}
+
+static bool triangular_alloc(struct matrix_t *A, size_t (*row_width)(const struct matrix_t *, size_t))
+{
+    size_t i;
+
+    A->data = malloc(A->rows * sizeof(void *));
+    if (!A->data)
+        return false;
+
+    for (i = 0; i < A->rows; i++) {
+        size_t width = row_width(A, i);
+        A->data[i] = width ? calloc(width, A->elem->size) : NULL;
+        if (width && !A->data[i]) {
+            while (i > 0) {
+                i--;
+                free(A->data[i]);
+            }
+            free(A->data);
+            A->data = NULL;
+            return false;
+        }
+    }
+
+    A->nnz = 0;
+    return true;
+}
+
+static void triangular_free(struct matrix_t *A)
+{
+    if (!A->data)
+        return;
+
+    for (size_t i = 0; i < A->rows; i++)
+        free(A->data[i]);
+    free(A->data);
+    A->data = NULL;
+    A->nnz = 0;
+}
+
+static bool upper_triangular_alloc(struct matrix_t *A)
+{
+    return triangular_alloc(A, upper_triangular_row_width);
+}
+
+static bool lower_triangular_alloc(struct matrix_t *A)
+{
+    return triangular_alloc(A, lower_triangular_row_width);
+}
+
+static void upper_triangular_get(const struct matrix_t *A, size_t i, size_t j, void *out)
+{
+    if (i <= j && i < A->cols) {
+        memcpy(out,
+               (char *)A->data[i] + (j - i) * A->elem->size,
+               A->elem->size);
+        return;
+    }
+
+    memcpy(out, A->elem->zero, A->elem->size);
+}
+
+static void lower_triangular_get(const struct matrix_t *A, size_t i, size_t j, void *out)
+{
+    if (j <= i && j < A->cols) {
+        memcpy(out,
+               (char *)A->data[i] + j * A->elem->size,
+               A->elem->size);
+        return;
+    }
+
+    memcpy(out, A->elem->zero, A->elem->size);
+}
+
+static void upper_triangular_materialise(struct matrix_t *A)
+{
+    void **old_rows = A->data;
+    size_t old_nnz = A->nnz;
+
+    A->store = &dense_store;
+    A->data = NULL;
+    A->nnz = 0;
+    if (!dense_alloc(A)) {
+        A->store = &upper_triangular_store;
+        A->data = old_rows;
+        A->nnz = old_nnz;
+        return;
+    }
+
+    for (size_t i = 0; i < A->rows; i++) {
+        size_t width = upper_triangular_row_width(A, i);
+        for (size_t offset = 0; offset < width; offset++) {
+            void *src = (char *)old_rows[i] + offset * A->elem->size;
+            dense_set(A, i, i + offset, src);
+            if (A->elem->cmp(src, A->elem->zero) != 0)
+                A->nnz++;
+        }
+        free(old_rows[i]);
+    }
+    free(old_rows);
+}
+
+static void lower_triangular_materialise(struct matrix_t *A)
+{
+    void **old_rows = A->data;
+    size_t old_nnz = A->nnz;
+
+    A->store = &dense_store;
+    A->data = NULL;
+    A->nnz = 0;
+    if (!dense_alloc(A)) {
+        A->store = &lower_triangular_store;
+        A->data = old_rows;
+        A->nnz = old_nnz;
+        return;
+    }
+
+    for (size_t i = 0; i < A->rows; i++) {
+        size_t width = lower_triangular_row_width(A, i);
+        for (size_t j = 0; j < width; j++) {
+            void *src = (char *)old_rows[i] + j * A->elem->size;
+            dense_set(A, i, j, src);
+            if (A->elem->cmp(src, A->elem->zero) != 0)
+                A->nnz++;
+        }
+        free(old_rows[i]);
+    }
+    free(old_rows);
+}
+
+static void upper_triangular_set(struct matrix_t *A, size_t i, size_t j, const void *val)
+{
+    if (i <= j && i < A->cols) {
+        void *slot = (char *)A->data[i] + (j - i) * A->elem->size;
+        int was_zero = (A->elem->cmp(slot, A->elem->zero) == 0);
+        int is_zero = (A->elem->cmp(val, A->elem->zero) == 0);
+
+        memcpy(slot, val, A->elem->size);
+        if (was_zero && !is_zero)
+            A->nnz++;
+        else if (!was_zero && is_zero)
+            A->nnz--;
+        return;
+    }
+
+    if (A->elem->cmp(val, A->elem->zero) == 0)
+        return;
+
+    upper_triangular_materialise(A);
+    dense_set(A, i, j, val);
+    A->nnz++;
+}
+
+static void lower_triangular_set(struct matrix_t *A, size_t i, size_t j, const void *val)
+{
+    if (j <= i && j < A->cols) {
+        void *slot = (char *)A->data[i] + j * A->elem->size;
+        int was_zero = (A->elem->cmp(slot, A->elem->zero) == 0);
+        int is_zero = (A->elem->cmp(val, A->elem->zero) == 0);
+
+        memcpy(slot, val, A->elem->size);
+        if (was_zero && !is_zero)
+            A->nnz++;
+        else if (!was_zero && is_zero)
+            A->nnz--;
+        return;
+    }
+
+    if (A->elem->cmp(val, A->elem->zero) == 0)
+        return;
+
+    lower_triangular_materialise(A);
+    dense_set(A, i, j, val);
+    A->nnz++;
+}
+
+static const struct store_vtable upper_triangular_store = {
+    .create                   = store_create_upper_triangular,
+    .alloc                    = upper_triangular_alloc,
+    .free                     = triangular_free,
+    .get                      = upper_triangular_get,
+    .set                      = upper_triangular_set,
+    .materialise              = upper_triangular_materialise,
+    .is_sparse_storage        = upper_triangular_is_sparse_storage,
+    .is_sparse_like           = upper_triangular_is_sparse_like,
+    .is_diagonal              = upper_triangular_is_diagonal,
+    .is_upper_triangular      = store_true,
+    .is_lower_triangular      = generic_is_lower_triangular,
+    .nonzero_count            = upper_triangular_nonzero_count,
+    .elementwise_unary_store  = store_self_unary,
+    .transpose_store          = upper_triangular_transpose_store
+};
+
+static const struct store_vtable lower_triangular_store = {
+    .create                   = store_create_lower_triangular,
+    .alloc                    = lower_triangular_alloc,
+    .free                     = triangular_free,
+    .get                      = lower_triangular_get,
+    .set                      = lower_triangular_set,
+    .materialise              = lower_triangular_materialise,
+    .is_sparse_storage        = lower_triangular_is_sparse_storage,
+    .is_sparse_like           = lower_triangular_is_sparse_like,
+    .is_diagonal              = lower_triangular_is_diagonal,
+    .is_upper_triangular      = generic_is_upper_triangular,
+    .is_lower_triangular      = store_true,
+    .nonzero_count            = lower_triangular_nonzero_count,
+    .elementwise_unary_store  = store_self_unary,
+    .transpose_store          = lower_triangular_transpose_store
+};
 
 /* ============================================================
    Internal constructor helper
@@ -127,9 +695,9 @@ static struct matrix_t *mat_create_internal(size_t rows, size_t cols,
     A->elem  = elem;
     A->store = store;
     A->data  = NULL;
+    A->nnz   = 0;
 
-    A->store->alloc(A);
-    if (store == &dense_store && !A->data) {
+    if (!A->store->alloc(A)) {
         free(A);
         return NULL;
     }
@@ -137,31 +705,394 @@ static struct matrix_t *mat_create_internal(size_t rows, size_t cols,
 }
 
 /* ============================================================
-   Element-type-specific matrix constructors
+   Matrix construction policy helpers
    ============================================================ */
 
-static struct matrix_t *create_matrix_double(size_t r, size_t c) {
-    return mat_create_internal(r, c, &double_elem, &dense_store);
+static struct matrix_t *store_create_dense(size_t rows, size_t cols,
+                                           const struct elem_vtable *elem)
+{
+    return mat_create_internal(rows, cols, elem, &dense_store);
 }
 
-static struct matrix_t *create_identity_double(size_t n) {
-    return mat_create_internal(n, n, &double_elem, &identity_store);
+static struct matrix_t *store_create_sparse(size_t rows, size_t cols,
+                                            const struct elem_vtable *elem)
+{
+    return mat_create_internal(rows, cols, elem, &sparse_store);
 }
 
-static struct matrix_t *create_matrix_qfloat(size_t r, size_t c) {
-    return mat_create_internal(r, c, &qfloat_elem, &dense_store);
+static struct matrix_t *store_create_identity(size_t rows, size_t cols,
+                                              const struct elem_vtable *elem)
+{
+    if (rows != cols)
+        return NULL;
+    return mat_create_internal(rows, cols, elem, &identity_store);
 }
 
-static struct matrix_t *create_identity_qfloat(size_t n) {
-    return mat_create_internal(n, n, &qfloat_elem, &identity_store);
+static struct matrix_t *store_create_diagonal(size_t rows, size_t cols,
+                                              const struct elem_vtable *elem)
+{
+    if (rows != cols)
+        return NULL;
+    return mat_create_internal(rows, cols, elem, &diagonal_store);
 }
 
-static struct matrix_t *create_matrix_qcomplex(size_t r, size_t c) {
-    return mat_create_internal(r, c, &qcomplex_elem, &dense_store);
+static struct matrix_t *store_create_upper_triangular(size_t rows, size_t cols,
+                                                      const struct elem_vtable *elem)
+{
+    return mat_create_internal(rows, cols, elem, &upper_triangular_store);
 }
 
-static struct matrix_t *create_identity_qcomplex(size_t n) {
-    return mat_create_internal(n, n, &qcomplex_elem, &identity_store);
+static struct matrix_t *store_create_lower_triangular(size_t rows, size_t cols,
+                                                      const struct elem_vtable *elem)
+{
+    return mat_create_internal(rows, cols, elem, &lower_triangular_store);
+}
+
+static bool store_false(const struct matrix_t *A)
+{
+    (void)A;
+    return false;
+}
+
+static bool store_true(const struct matrix_t *A)
+{
+    return A != NULL;
+}
+
+static bool dense_is_sparse_storage(const struct matrix_t *A)
+{
+    return store_false(A);
+}
+
+static bool sparse_is_sparse_storage(const struct matrix_t *A)
+{
+    return store_true(A);
+}
+
+static bool identity_is_sparse_storage(const struct matrix_t *A)
+{
+    return store_false(A);
+}
+
+static bool diagonal_is_sparse_storage(const struct matrix_t *A)
+{
+    return store_false(A);
+}
+
+static bool upper_triangular_is_sparse_storage(const struct matrix_t *A)
+{
+    return store_false(A);
+}
+
+static bool lower_triangular_is_sparse_storage(const struct matrix_t *A)
+{
+    return store_false(A);
+}
+
+static bool dense_is_sparse_like(const struct matrix_t *A)
+{
+    return store_false(A);
+}
+
+static bool sparse_is_sparse_like(const struct matrix_t *A)
+{
+    return store_true(A);
+}
+
+static bool identity_is_sparse_like(const struct matrix_t *A)
+{
+    return store_true(A);
+}
+
+static bool diagonal_is_sparse_like(const struct matrix_t *A)
+{
+    return store_true(A);
+}
+
+static bool upper_triangular_is_sparse_like(const struct matrix_t *A)
+{
+    return store_false(A);
+}
+
+static bool lower_triangular_is_sparse_like(const struct matrix_t *A)
+{
+    return store_false(A);
+}
+
+static bool dense_is_diagonal(const struct matrix_t *A)
+{
+    unsigned char raw[64];
+
+    for (size_t i = 0; i < A->rows; i++)
+        for (size_t j = 0; j < A->cols; j++) {
+            if (i == j)
+                continue;
+            dense_get(A, i, j, raw);
+            if (A->elem->cmp(raw, A->elem->zero) != 0)
+                return false;
+        }
+
+    return true;
+}
+
+static bool sparse_is_diagonal(const struct matrix_t *A)
+{
+    for (size_t i = 0; i < A->rows; i++) {
+        sparse_entry_t *cur = A->data ? (sparse_entry_t *)A->data[i] : NULL;
+        while (cur) {
+            if (cur->col != i)
+                return false;
+            cur = cur->next;
+        }
+    }
+    return true;
+}
+
+static bool upper_triangular_is_diagonal(const struct matrix_t *A)
+{
+    for (size_t i = 0; i < A->rows; i++) {
+        size_t width = upper_triangular_row_width(A, i);
+        for (size_t offset = 1; offset < width; offset++) {
+            void *slot = (char *)A->data[i] + offset * A->elem->size;
+            if (A->elem->cmp(slot, A->elem->zero) != 0)
+                return false;
+        }
+    }
+    return true;
+}
+
+static bool lower_triangular_is_diagonal(const struct matrix_t *A)
+{
+    for (size_t i = 0; i < A->rows; i++) {
+        size_t width = lower_triangular_row_width(A, i);
+        for (size_t j = 0; j + 1 < width; j++) {
+            void *slot = (char *)A->data[i] + j * A->elem->size;
+            if (A->elem->cmp(slot, A->elem->zero) != 0)
+                return false;
+        }
+    }
+    return true;
+}
+
+static bool generic_is_upper_triangular(const struct matrix_t *A)
+{
+    unsigned char raw[64];
+
+    for (size_t i = 0; i < A->rows; i++)
+        for (size_t j = 0; j < A->cols && j < i; j++) {
+            mat_get(A, i, j, raw);
+            if (A->elem->cmp(raw, A->elem->zero) != 0)
+                return false;
+        }
+
+    return true;
+}
+
+static bool generic_is_lower_triangular(const struct matrix_t *A)
+{
+    unsigned char raw[64];
+
+    for (size_t i = 0; i < A->rows; i++)
+        for (size_t j = i + 1; j < A->cols; j++) {
+            mat_get(A, i, j, raw);
+            if (A->elem->cmp(raw, A->elem->zero) != 0)
+                return false;
+        }
+
+    return true;
+}
+
+static size_t dense_nonzero_count(const struct matrix_t *A)
+{
+    size_t count = 0;
+    unsigned char raw[64];
+
+    for (size_t i = 0; i < A->rows; i++)
+        for (size_t j = 0; j < A->cols; j++) {
+            dense_get(A, i, j, raw);
+            if (A->elem->cmp(raw, A->elem->zero) != 0)
+                count++;
+        }
+
+    return count;
+}
+
+static size_t sparse_nonzero_count(const struct matrix_t *A)
+{
+    return A->nnz;
+}
+
+static size_t identity_nonzero_count(const struct matrix_t *A)
+{
+    return A->rows;
+}
+
+static size_t diagonal_nonzero_count(const struct matrix_t *A)
+{
+    return A->nnz;
+}
+
+static size_t upper_triangular_nonzero_count(const struct matrix_t *A)
+{
+    return A->nnz;
+}
+
+static size_t lower_triangular_nonzero_count(const struct matrix_t *A)
+{
+    return A->nnz;
+}
+
+static const struct store_vtable *store_self_unary(const struct matrix_t *A)
+{
+    return A ? A->store : NULL;
+}
+
+static const struct store_vtable *identity_unary_store(const struct matrix_t *A)
+{
+    (void)A;
+    return &diagonal_store;
+}
+
+static const struct store_vtable *store_self_transpose(const struct matrix_t *A)
+{
+    return A ? A->store : NULL;
+}
+
+static const struct store_vtable *upper_triangular_transpose_store(const struct matrix_t *A)
+{
+    (void)A;
+    return &lower_triangular_store;
+}
+
+static const struct store_vtable *lower_triangular_transpose_store(const struct matrix_t *A)
+{
+    (void)A;
+    return &upper_triangular_store;
+}
+
+static struct matrix_t *mat_create_with_store(size_t rows, size_t cols,
+                                              const struct elem_vtable *elem,
+                                              const struct store_vtable *store)
+{
+    if (!elem || !store || !store->create)
+        return NULL;
+    return store->create(rows, cols, elem);
+}
+
+struct matrix_t *mat_create_dense_with_elem(size_t rows, size_t cols,
+                                            const struct elem_vtable *elem)
+{
+    return mat_create_with_store(rows, cols, elem, &dense_store);
+}
+
+struct matrix_t *mat_create_sparse_with_elem(size_t rows, size_t cols,
+                                             const struct elem_vtable *elem)
+{
+    return mat_create_with_store(rows, cols, elem, &sparse_store);
+}
+
+struct matrix_t *mat_create_identity_with_elem(size_t n,
+                                               const struct elem_vtable *elem)
+{
+    return mat_create_with_store(n, n, elem, &identity_store);
+}
+
+struct matrix_t *mat_create_diagonal_with_elem(size_t n,
+                                               const struct elem_vtable *elem)
+{
+    return mat_create_with_store(n, n, elem, &diagonal_store);
+}
+
+struct matrix_t *mat_create_upper_triangular_with_elem(size_t rows, size_t cols,
+                                                       const struct elem_vtable *elem)
+{
+    return mat_create_with_store(rows, cols, elem, &upper_triangular_store);
+}
+
+struct matrix_t *mat_create_lower_triangular_with_elem(size_t rows, size_t cols,
+                                                       const struct elem_vtable *elem)
+{
+    return mat_create_with_store(rows, cols, elem, &lower_triangular_store);
+}
+
+static struct matrix_t *mat_create_elementwise_unary_result(size_t rows, size_t cols,
+                                                            const struct elem_vtable *elem,
+                                                            const struct matrix_t *layout_src)
+{
+    const struct store_vtable *store;
+
+    if (!layout_src || !layout_src->store || !layout_src->store->elementwise_unary_store)
+        return mat_create_dense_with_elem(rows, cols, elem);
+
+    store = layout_src->store->elementwise_unary_store(layout_src);
+    return mat_create_with_store(rows, cols, elem, store);
+}
+
+static struct matrix_t *mat_create_transpose_result(size_t rows, size_t cols,
+                                                    const struct elem_vtable *elem,
+                                                    const struct matrix_t *layout_src)
+{
+    const struct store_vtable *store;
+
+    if (!layout_src || !layout_src->store || !layout_src->store->transpose_store)
+        return mat_create_dense_with_elem(rows, cols, elem);
+
+    store = layout_src->store->transpose_store(layout_src);
+    return mat_create_with_store(rows, cols, elem, store);
+}
+
+static struct matrix_t *mat_create_binary_result(size_t rows, size_t cols,
+                                                 const struct elem_vtable *elem,
+                                                 const struct matrix_t *A,
+                                                 const struct matrix_t *B)
+{
+    const struct store_vtable *store = &dense_store;
+
+    if (rows == cols &&
+        mat_has_diagonal_structure(A) && mat_has_diagonal_structure(B))
+        store = &diagonal_store;
+    else if ((mat_has_upper_triangular_structure(A) && mat_has_upper_triangular_structure(B)) ||
+             (mat_has_diagonal_structure(A) && mat_has_upper_triangular_structure(B)) ||
+             (mat_has_upper_triangular_structure(A) && mat_has_diagonal_structure(B)))
+        store = &upper_triangular_store;
+    else if ((mat_has_lower_triangular_structure(A) && mat_has_lower_triangular_structure(B)) ||
+             (mat_has_diagonal_structure(A) && mat_has_lower_triangular_structure(B)) ||
+             (mat_has_lower_triangular_structure(A) && mat_has_diagonal_structure(B)))
+        store = &lower_triangular_store;
+    else if (mat_is_sparse_like(A) && mat_is_sparse_like(B))
+        store = &sparse_store;
+
+    return mat_create_with_store(rows, cols, elem, store);
+}
+
+static bool mat_uses_sparse_storage(const struct matrix_t *A)
+{
+    return A && A->store && A->store->is_sparse_storage &&
+           A->store->is_sparse_storage(A);
+}
+
+static bool mat_is_sparse_like(const struct matrix_t *A)
+{
+    return A && A->store && A->store->is_sparse_like &&
+           A->store->is_sparse_like(A);
+}
+
+static bool mat_has_diagonal_structure(const struct matrix_t *A)
+{
+    return A && A->store && A->store->is_diagonal &&
+           A->store->is_diagonal(A);
+}
+
+static bool mat_has_upper_triangular_structure(const struct matrix_t *A)
+{
+    return A && A->store && A->store->is_upper_triangular &&
+           A->store->is_upper_triangular(A);
+}
+
+static bool mat_has_lower_triangular_structure(const struct matrix_t *A)
+{
+    return A && A->store && A->store->is_lower_triangular &&
+           A->store->is_lower_triangular(A);
 }
 
 /* ============================================================
@@ -172,6 +1103,8 @@ static struct matrix_t *create_identity_qcomplex(size_t n) {
 
 static const double D_ZERO = 0.0;
 static const double D_ONE  = 1.0;
+static const qfloat_t D_REL_EPS = { 2.2204460492503131e-16, 0.0 };
+static const qfloat_t Q_REL_EPS = { 1.0e-30, 0.0 };
 
 static void d_add(void *o, const void *a, const void *b) {
     *(double*)o = *(const double*)a + *(const double*)b;
@@ -361,9 +1294,7 @@ const struct elem_vtable double_elem = {
     .one             = &D_ONE,
     .cmp             = d_cmp,
     .print           = d_print,
-    .create_matrix   = create_matrix_double,
-    .create_identity = create_identity_double,
-
+    .relative_epsilon = D_REL_EPS,
     .fun             = &double_fun
 };
 
@@ -514,9 +1445,7 @@ const struct elem_vtable qfloat_elem = {
     .one             = &QF_ONE,
     .cmp             = qfloat_cmp,
     .print           = qf_print_wrap,
-    .create_matrix   = create_matrix_qfloat,
-    .create_identity = create_identity_qfloat,
-
+    .relative_epsilon = Q_REL_EPS,
     .fun             = &qfloat_fun
 };
 
@@ -691,9 +1620,7 @@ const struct elem_vtable qcomplex_elem = {
     .one             = &QC_ONE,
     .cmp             = qcomplex_cmp,
     .print           = qc_print_wrap,
-    .create_matrix   = create_matrix_qcomplex,
-    .create_identity = create_identity_qcomplex,
-
+    .relative_epsilon = Q_REL_EPS,
     .fun             = &qcomplex_fun
 };
 
@@ -967,15 +1894,27 @@ static const binop_vtable binops[ELEM_MAX][ELEM_MAX] = {
    ============================================================ */
 
 struct matrix_t *mat_new_d(size_t rows, size_t cols) {
-    return double_elem.create_matrix(rows, cols);
+    return mat_create_dense_with_elem(rows, cols, &double_elem);
+}
+
+struct matrix_t *mat_new_sparse_d(size_t rows, size_t cols) {
+    return mat_create_sparse_with_elem(rows, cols, &double_elem);
 }
 
 struct matrix_t *mat_new_qf(size_t rows, size_t cols) {
-    return qfloat_elem.create_matrix(rows, cols);
+    return mat_create_dense_with_elem(rows, cols, &qfloat_elem);
+}
+
+struct matrix_t *mat_new_sparse_qf(size_t rows, size_t cols) {
+    return mat_create_sparse_with_elem(rows, cols, &qfloat_elem);
 }
 
 struct matrix_t *mat_new_qc(size_t rows, size_t cols) {
-    return qcomplex_elem.create_matrix(rows, cols);
+    return mat_create_dense_with_elem(rows, cols, &qcomplex_elem);
+}
+
+struct matrix_t *mat_new_sparse_qc(size_t rows, size_t cols) {
+    return mat_create_sparse_with_elem(rows, cols, &qcomplex_elem);
 }
 
 struct matrix_t *matsq_new_d(size_t n)  {
@@ -991,15 +1930,52 @@ struct matrix_t *matsq_new_qc(size_t n) {
 }
 
 struct matrix_t *mat_create_identity_d(size_t n) {
-    return double_elem.create_identity(n);
+    return mat_create_identity_with_elem(n, &double_elem);
 }
 
 struct matrix_t *mat_create_identity_qf(size_t n) {
-    return qfloat_elem.create_identity(n);
+    return mat_create_identity_with_elem(n, &qfloat_elem);
 }
 
 struct matrix_t *mat_create_identity_qc(size_t n) {
-    return qcomplex_elem.create_identity(n);
+    return mat_create_identity_with_elem(n, &qcomplex_elem);
+}
+
+static matrix_t *mat_create_diagonal_from_array(size_t n,
+                                                const void *diagonal,
+                                                const struct elem_vtable *elem)
+{
+    matrix_t *A;
+    const unsigned char *cursor = diagonal;
+
+    if (!diagonal)
+        return NULL;
+
+    A = mat_create_diagonal_with_elem(n, elem);
+    if (!A)
+        return NULL;
+
+    for (size_t i = 0; i < n; i++) {
+        mat_set(A, i, i, cursor);
+        cursor += elem->size;
+    }
+
+    return A;
+}
+
+matrix_t *mat_create_diagonal_d(size_t n, const double *diagonal)
+{
+    return mat_create_diagonal_from_array(n, diagonal, &double_elem);
+}
+
+matrix_t *mat_create_diagonal_qf(size_t n, const qfloat_t *diagonal)
+{
+    return mat_create_diagonal_from_array(n, diagonal, &qfloat_elem);
+}
+
+matrix_t *mat_create_diagonal_qc(size_t n, const qcomplex_t *diagonal)
+{
+    return mat_create_diagonal_from_array(n, diagonal, &qcomplex_elem);
 }
 
 matrix_t *mat_create_d(size_t rows, size_t cols, const double *data)
@@ -1050,6 +2026,33 @@ size_t mat_get_col_count(const struct matrix_t *A) {
     return A->cols;
 }
 
+bool mat_is_sparse(const matrix_t *A)
+{
+    return mat_uses_sparse_storage(A);
+}
+
+bool mat_is_diagonal(const matrix_t *A)
+{
+    return mat_has_diagonal_structure(A);
+}
+
+bool mat_is_upper_triangular(const matrix_t *A)
+{
+    return mat_has_upper_triangular_structure(A);
+}
+
+bool mat_is_lower_triangular(const matrix_t *A)
+{
+    return mat_has_lower_triangular_structure(A);
+}
+
+size_t mat_nonzero_count(const matrix_t *A)
+{
+    if (!A)
+        return 0;
+    return A->store->nonzero_count ? A->store->nonzero_count(A) : 0;
+}
+
 mat_type_t mat_typeof(const matrix_t *A)
 {
     return A->elem->public_type;
@@ -1084,6 +2087,34 @@ void mat_get_data(const matrix_t *A, void *data)
     mat_copy_flat((matrix_t *)A, data, (void (*)(matrix_t*,size_t,size_t,void*))mat_get);
 }
 
+matrix_t *mat_to_dense(const matrix_t *A)
+{
+    return mat_convert_dense(A, A ? A->elem : NULL);
+}
+
+matrix_t *mat_to_sparse(const matrix_t *A)
+{
+    matrix_t *S;
+    unsigned char raw[64];
+
+    if (!A)
+        return NULL;
+
+    S = mat_create_sparse_with_elem(A->rows, A->cols, A->elem);
+
+    if (!S)
+        return NULL;
+
+    for (size_t i = 0; i < A->rows; i++)
+        for (size_t j = 0; j < A->cols; j++) {
+            mat_get(A, i, j, raw);
+            if (A->elem->cmp(raw, A->elem->zero) != 0)
+                mat_set(S, i, j, raw);
+        }
+
+    return S;
+}
+
 matrix_t *mat_scalar_mul_d(matrix_t *A, double s)
 {
     if (!A) return NULL;
@@ -1096,7 +2127,7 @@ matrix_t *mat_scalar_mul_d(matrix_t *A, double s)
         return NULL;
 
     const struct elem_vtable *re = op->result_elem;
-    matrix_t *R = re->create_matrix(A->rows, A->cols);
+    matrix_t *R = mat_create_elementwise_unary_result(A->rows, A->cols, re, A);
     if (!R) return NULL;
 
     unsigned char scalar_raw[64];
@@ -1128,7 +2159,7 @@ matrix_t *mat_scalar_mul_qf(matrix_t *A, qfloat_t s)
         return NULL;
 
     const struct elem_vtable *re = op->result_elem;
-    matrix_t *R = re->create_matrix(A->rows, A->cols);
+    matrix_t *R = mat_create_elementwise_unary_result(A->rows, A->cols, re, A);
     if (!R) return NULL;
 
     unsigned char scalar_raw[64];
@@ -1160,7 +2191,7 @@ matrix_t *mat_scalar_mul_qc(matrix_t *A, qcomplex_t s)
         return NULL;
 
     const struct elem_vtable *re = op->result_elem;
-    matrix_t *R = re->create_matrix(A->rows, A->cols);
+    matrix_t *R = mat_create_elementwise_unary_result(A->rows, A->cols, re, A);
     if (!R) return NULL;
 
     unsigned char scalar_raw[64];
@@ -1202,6 +2233,90 @@ matrix_t *mat_scalar_div_qc(matrix_t *A, qcomplex_t s)
    Mixed-type matrix operations (2D vtable driven)
    ============================================================ */
 
+static struct matrix_t *mat_add_or_sub_sparse(const struct matrix_t *A,
+                                              const struct matrix_t *B,
+                                              const binop_vtable *op,
+                                              int is_sub)
+{
+    const struct elem_vtable *re = op->result_elem;
+    struct matrix_t *C = mat_create_sparse_with_elem(A->rows, A->cols, re);
+    unsigned char a_raw[64], b_raw[64], out[64];
+
+    if (!C)
+        return NULL;
+
+    for (size_t i = 0; i < A->rows; i++)
+        for (size_t j = 0; j < A->cols; j++) {
+            mat_get(A, i, j, a_raw);
+            mat_get(B, i, j, b_raw);
+            if (is_sub)
+                op->sub(out, a_raw, b_raw);
+            else
+                op->add(out, a_raw, b_raw);
+            mat_set(C, i, j, out);
+        }
+
+    return C;
+}
+
+static struct matrix_t *mat_mul_sparse(const struct matrix_t *A,
+                                       const struct matrix_t *B,
+                                       const binop_vtable *op)
+{
+    const struct elem_vtable *re = op->result_elem;
+    struct matrix_t *As = NULL, *Bs = NULL, *C = NULL;
+    unsigned char x_raw[64], y_raw[64], prod[64], sum[64];
+
+    if (!re)
+        return NULL;
+
+    As = mat_uses_sparse_storage(A) ? (struct matrix_t *)A : mat_to_sparse(A);
+    Bs = mat_uses_sparse_storage(B) ? (struct matrix_t *)B : mat_to_sparse(B);
+    if (!As || !Bs) {
+        if (As != A)
+            mat_free(As);
+        if (Bs != B)
+            mat_free(Bs);
+        return NULL;
+    }
+
+    C = mat_create_sparse_with_elem(A->rows, B->cols, re);
+    if (!C) {
+        if (As != A)
+            mat_free(As);
+        if (Bs != B)
+            mat_free(Bs);
+        return NULL;
+    }
+
+    for (size_t i = 0; i < As->rows; i++) {
+        sparse_entry_t *a_cur = As->data ? (sparse_entry_t *)As->data[i] : NULL;
+
+        while (a_cur) {
+            size_t k = a_cur->col;
+            sparse_entry_t *b_cur = Bs->data ? (sparse_entry_t *)Bs->data[k] : NULL;
+
+            memcpy(x_raw, a_cur->value, As->elem->size);
+            while (b_cur) {
+                mat_get(C, i, b_cur->col, sum);
+                memcpy(y_raw, b_cur->value, Bs->elem->size);
+                op->mul(prod, x_raw, y_raw);
+                re->add(sum, sum, prod);
+                mat_set(C, i, b_cur->col, sum);
+                b_cur = b_cur->next;
+            }
+
+            a_cur = a_cur->next;
+        }
+    }
+
+    if (As != A)
+        mat_free(As);
+    if (Bs != B)
+        mat_free(Bs);
+    return C;
+}
+
 struct matrix_t *mat_add(const struct matrix_t *A, const struct matrix_t *B) {
     if (!A || !B || A->rows != B->rows || A->cols != B->cols)
         return NULL;
@@ -1213,8 +2328,11 @@ struct matrix_t *mat_add(const struct matrix_t *A, const struct matrix_t *B) {
     if (!op->add || !op->result_elem)
         return NULL;
 
+    if (mat_is_sparse_like(A) && mat_is_sparse_like(B))
+        return mat_add_or_sub_sparse(A, B, op, 0);
+
     const struct elem_vtable *re = op->result_elem;
-    struct matrix_t *C = re->create_matrix(A->rows, A->cols);
+    struct matrix_t *C = mat_create_binary_result(A->rows, A->cols, re, A, B);
     if (!C) return NULL;
 
     unsigned char a_raw[64], b_raw[64], out[64];
@@ -1241,8 +2359,11 @@ struct matrix_t *mat_sub(const struct matrix_t *A, const struct matrix_t *B) {
     if (!op->sub || !op->result_elem)
         return NULL;
 
+    if (mat_is_sparse_like(A) && mat_is_sparse_like(B))
+        return mat_add_or_sub_sparse(A, B, op, 1);
+
     const struct elem_vtable *re = op->result_elem;
-    struct matrix_t *C = re->create_matrix(A->rows, A->cols);
+    struct matrix_t *C = mat_create_binary_result(A->rows, A->cols, re, A, B);
     if (!C) return NULL;
 
     unsigned char a_raw[64], b_raw[64], out[64];
@@ -1269,8 +2390,11 @@ struct matrix_t *mat_mul(const struct matrix_t *A, const struct matrix_t *B) {
     if (!op->mul || !op->result_elem)
         return NULL;
 
+    if (mat_is_sparse_like(A) && mat_is_sparse_like(B))
+        return mat_mul_sparse(A, B, op);
+
     const struct elem_vtable *re = op->result_elem;
-    struct matrix_t *C = re->create_matrix(A->rows, B->cols);
+    struct matrix_t *C = mat_create_binary_result(A->rows, B->cols, re, A, B);
     if (!C) return NULL;
 
     unsigned char x_raw[64], y_raw[64], prod[64], sum[64];
@@ -1296,19 +2420,94 @@ struct matrix_t *mat_mul(const struct matrix_t *A, const struct matrix_t *B) {
 
 matrix_t *mat_neg(const matrix_t *A)
 {
+    const struct elem_vtable *e;
+    matrix_t *R;
+    unsigned char a_raw[64], out_raw[64];
+
     if (!A)
         return NULL;
 
-    switch (mat_typeof(A)) {
-    case MAT_TYPE_DOUBLE:
-        return mat_scalar_mul_d((matrix_t *)A, -1.0);
-    case MAT_TYPE_QFLOAT:
-        return mat_scalar_mul_qf((matrix_t *)A, qf_from_double(-1.0));
-    case MAT_TYPE_QCOMPLEX:
-        return mat_scalar_mul_qc((matrix_t *)A, qc_make(qf_from_double(-1.0), QF_ZERO));
-    default:
+    e = A->elem;
+    if (!e || !e->sub)
         return NULL;
+
+    R = mat_create_elementwise_unary_result(A->rows, A->cols, e, A);
+    if (!R)
+        return NULL;
+
+    for (size_t i = 0; i < A->rows; i++)
+        for (size_t j = 0; j < A->cols; j++) {
+            mat_get(A, i, j, a_raw);
+            e->sub(out_raw, e->zero, a_raw);
+            mat_set(R, i, j, out_raw);
+        }
+
+    return R;
+}
+
+static matrix_t *mat_convert_with_store(const matrix_t *A,
+                                        const struct elem_vtable *target,
+                                        const struct store_vtable *store)
+{
+    matrix_t *C;
+    unsigned char src[64], dst[64];
+
+    if (!A || !target || !store)
+        return NULL;
+
+    C = mat_create_with_store(A->rows, A->cols, target, store);
+    if (!C)
+        return NULL;
+
+    for (size_t i = 0; i < A->rows; i++)
+        for (size_t j = 0; j < A->cols; j++) {
+            qcomplex_t z;
+            mat_get(A, i, j, src);
+            A->elem->to_qc(&z, src);
+            target->from_qc(dst, &z);
+            mat_set(C, i, j, dst);
+        }
+
+    return C;
+}
+
+static matrix_t *mat_convert_dense(const matrix_t *A, const struct elem_vtable *target)
+{
+    return mat_convert_with_store(A, target, &dense_store);
+}
+
+static void mat_swap_rows(matrix_t *A, size_t r1, size_t r2)
+{
+    unsigned char a[64], b[64];
+
+    if (!A || r1 == r2)
+        return;
+
+    for (size_t j = 0; j < A->cols; j++) {
+        mat_get(A, r1, j, a);
+        mat_get(A, r2, j, b);
+        mat_set(A, r1, j, b);
+        mat_set(A, r2, j, a);
     }
+}
+
+static size_t mat_find_pivot_row(const matrix_t *A, size_t col, size_t start)
+{
+    const struct elem_vtable *e = A->elem;
+    unsigned char v[64];
+    size_t best = start;
+    double best_abs2 = -1.0;
+
+    for (size_t i = start; i < A->rows; i++) {
+        mat_get(A, i, col, v);
+        double abs2 = e->abs2(v);
+        if (abs2 > best_abs2) {
+            best_abs2 = abs2;
+            best = i;
+        }
+    }
+
+    return best;
 }
 
 /* ============================================================
@@ -1319,7 +2518,7 @@ struct matrix_t *mat_transpose(const struct matrix_t *A) {
     if (!A) return NULL;
 
     const struct elem_vtable *e = elem_of(A);
-    struct matrix_t *T = e->create_matrix(A->cols, A->rows);
+    struct matrix_t *T = mat_create_transpose_result(A->cols, A->rows, e, A);
     if (!T) return NULL;
 
     unsigned char v[64];
@@ -1337,7 +2536,7 @@ struct matrix_t *mat_conj(const struct matrix_t *A) {
     if (!A) return NULL;
 
     const struct elem_vtable *e = elem_of(A);
-    struct matrix_t *C = e->create_matrix(A->rows, A->cols);
+    struct matrix_t *C = mat_create_elementwise_unary_result(A->rows, A->cols, e, A);
     if (!C) return NULL;
 
     unsigned char v[64], cv[64];
@@ -1386,7 +2585,7 @@ int mat_det(const matrix_t *A, void *determinant)
     }
 
     /* Make a working dense copy of A in the same element type */
-    matrix_t *M = e->create_matrix(A->rows, A->cols);
+    matrix_t *M = mat_create_dense_with_elem(A->rows, A->cols, e);
     if (!M)
         return -3;
 
@@ -1471,8 +2670,8 @@ matrix_t *mat_inverse(const matrix_t *A)
     const struct elem_vtable *e = A->elem;
 
     /* Make working copies: M = A, I = identity */
-    matrix_t *M = e->create_matrix(n, n);
-    matrix_t *I = e->create_identity(n);
+    matrix_t *M = mat_create_dense_with_elem(n, n, e);
+    matrix_t *I = mat_create_identity_with_elem(n, e);
     if (!M || !I) {
         if (M) mat_free(M);
         if (I) mat_free(I);
@@ -1559,6 +2758,972 @@ matrix_t *mat_inverse(const matrix_t *A)
     return I;
 }
 
+matrix_t *mat_solve(const matrix_t *A, const matrix_t *B)
+{
+    elem_kind ak, bk;
+    const binop_vtable *op;
+    const struct elem_vtable *e;
+    matrix_t *M = NULL, *RHS = NULL, *X = NULL;
+    unsigned char pivot[64], inv_pivot[64], factor[64];
+    unsigned char a[64], b[64], prod[64], tmp[64], sum[64];
+
+    if (!A || !B || A->rows != A->cols || A->rows != B->rows)
+        return NULL;
+
+    ak = elem_of(A)->kind;
+    bk = elem_of(B)->kind;
+    op = &binops[ak][bk];
+    if (!op->result_elem)
+        return NULL;
+
+    e = op->result_elem;
+    M = mat_convert_dense(A, e);
+    RHS = mat_convert_dense(B, e);
+    if (!M || !RHS)
+        goto fail;
+
+    for (size_t k = 0; k < M->rows; k++) {
+        size_t pivot_row = mat_find_pivot_row(M, k, k);
+        mat_get(M, pivot_row, k, pivot);
+        if (e->abs2(pivot) < 1e-300)
+            goto fail;
+
+        mat_swap_rows(M, k, pivot_row);
+        mat_swap_rows(RHS, k, pivot_row);
+
+        mat_get(M, k, k, pivot);
+        e->inv(inv_pivot, pivot);
+
+        for (size_t i = k + 1; i < M->rows; i++) {
+            mat_get(M, i, k, factor);
+            if (e->abs2(factor) < 1e-300)
+                continue;
+
+            e->mul(factor, factor, inv_pivot);
+            mat_set(M, i, k, e->zero);
+
+            for (size_t j = k + 1; j < M->cols; j++) {
+                mat_get(M, i, j, a);
+                mat_get(M, k, j, b);
+                e->mul(prod, factor, b);
+                e->sub(tmp, a, prod);
+                mat_set(M, i, j, tmp);
+            }
+
+            for (size_t j = 0; j < RHS->cols; j++) {
+                mat_get(RHS, i, j, a);
+                mat_get(RHS, k, j, b);
+                e->mul(prod, factor, b);
+                e->sub(tmp, a, prod);
+                mat_set(RHS, i, j, tmp);
+            }
+        }
+    }
+
+    X = mat_create_dense_with_elem(A->cols, B->cols, e);
+    if (!X)
+        goto fail;
+
+    for (size_t ii = M->rows; ii-- > 0;) {
+        mat_get(M, ii, ii, pivot);
+        if (e->abs2(pivot) < 1e-300)
+            goto fail;
+
+        e->inv(inv_pivot, pivot);
+
+        for (size_t j = 0; j < RHS->cols; j++) {
+            mat_get(RHS, ii, j, sum);
+
+            for (size_t k = ii + 1; k < M->cols; k++) {
+                mat_get(M, ii, k, a);
+                mat_get(X, k, j, b);
+                e->mul(prod, a, b);
+                e->sub(sum, sum, prod);
+            }
+
+            e->mul(tmp, sum, inv_pivot);
+            mat_set(X, ii, j, tmp);
+        }
+    }
+
+    mat_free(M);
+    mat_free(RHS);
+    return X;
+
+fail:
+    mat_free(M);
+    mat_free(RHS);
+    mat_free(X);
+    return NULL;
+}
+
+matrix_t *mat_least_squares(const matrix_t *A, const matrix_t *B)
+{
+    mat_qr_factor_t qr = {0};
+    matrix_t *QH = NULL, *QHB = NULL, *A_pinv = NULL, *X = NULL;
+    int rank;
+
+    if (!A || !B || A->rows != B->rows)
+        return NULL;
+
+    if (A->rows == A->cols)
+        return mat_solve(A, B);
+
+    if (A->rows >= A->cols) {
+        rank = mat_rank(A);
+        if (rank < 0)
+            return NULL;
+
+        if ((size_t)rank == A->cols) {
+            if (mat_qr_factor(A, &qr) != 0)
+                goto fail;
+
+            QH = mat_hermitian(qr.Q);
+            QHB = QH ? mat_mul(QH, B) : NULL;
+            if (!QH || !QHB)
+                goto fail;
+
+            X = mat_solve(qr.R, QHB);
+            goto fail;
+        }
+    }
+
+    A_pinv = mat_pseudoinverse(A);
+    X = A_pinv ? mat_mul(A_pinv, B) : NULL;
+
+fail:
+    mat_qr_factor_free(&qr);
+    mat_free(QH);
+    mat_free(QHB);
+    mat_free(A_pinv);
+    return X;
+}
+
+void mat_lu_factor_free(mat_lu_factor_t *out)
+{
+    if (!out)
+        return;
+    mat_free(out->P);
+    mat_free(out->L);
+    mat_free(out->U);
+    out->P = out->L = out->U = NULL;
+}
+
+int mat_lu_factor(const matrix_t *A, mat_lu_factor_t *out)
+{
+    const struct elem_vtable *e;
+    matrix_t *P = NULL, *L = NULL, *U = NULL;
+    unsigned char pivot[64], inv_pivot[64], factor[64];
+    unsigned char a[64], b[64], prod[64], tmp[64];
+
+    if (!A || !out)
+        return -1;
+    if (A->rows != A->cols)
+        return -2;
+
+    e = A->elem;
+    P = mat_create_identity_with_elem(A->rows, e);
+    L = mat_create_lower_triangular_with_elem(A->rows, A->rows, e);
+    U = mat_convert_dense(A, e);
+    if (!P || !L || !U) {
+        mat_free(P);
+        mat_free(L);
+        mat_free(U);
+        return -3;
+    }
+
+    for (size_t i = 0; i < A->rows; i++)
+        mat_set(L, i, i, e->one);
+
+    for (size_t k = 0; k < A->rows; k++) {
+        size_t pivot_row = mat_find_pivot_row(U, k, k);
+        mat_get(U, pivot_row, k, pivot);
+        if (e->abs2(pivot) < 1e-300) {
+            mat_free(P);
+            mat_free(L);
+            mat_free(U);
+            return -4;
+        }
+
+        if (pivot_row != k) {
+            mat_swap_rows(U, k, pivot_row);
+            mat_swap_rows(P, k, pivot_row);
+            for (size_t j = 0; j < k; j++) {
+                mat_get(L, k, j, a);
+                mat_get(L, pivot_row, j, b);
+                mat_set(L, k, j, b);
+                mat_set(L, pivot_row, j, a);
+            }
+        }
+
+        mat_get(U, k, k, pivot);
+        e->inv(inv_pivot, pivot);
+
+        for (size_t i = k + 1; i < A->rows; i++) {
+            mat_get(U, i, k, factor);
+            if (e->abs2(factor) < 1e-300) {
+                mat_set(L, i, k, e->zero);
+                continue;
+            }
+
+            e->mul(factor, factor, inv_pivot);
+            mat_set(L, i, k, factor);
+            mat_set(U, i, k, e->zero);
+
+            for (size_t j = k + 1; j < A->cols; j++) {
+                mat_get(U, i, j, a);
+                mat_get(U, k, j, b);
+                e->mul(prod, factor, b);
+                e->sub(tmp, a, prod);
+                mat_set(U, i, j, tmp);
+            }
+        }
+    }
+
+    out->P = P;
+    out->L = L;
+    out->U = mat_convert_with_store(U, e, &upper_triangular_store);
+    mat_free(U);
+    if (!out->U) {
+        mat_free(P);
+        mat_free(L);
+        return -3;
+    }
+    return 0;
+}
+
+void mat_qr_factor_free(mat_qr_factor_t *out)
+{
+    if (!out)
+        return;
+    mat_free(out->Q);
+    mat_free(out->R);
+    out->Q = out->R = NULL;
+}
+
+int mat_qr_factor(const matrix_t *A, mat_qr_factor_t *out)
+{
+    size_t m, n, kdim;
+    matrix_t *Z = NULL, *Qq = NULL, *Rq = NULL;
+    const struct elem_vtable *target;
+
+    if (!A || !out)
+        return -1;
+
+    m = A->rows;
+    n = A->cols;
+    kdim = (m < n) ? m : n;
+    target = A->elem;
+
+    Z = mat_convert_dense(A, &qcomplex_elem);
+    Qq = mat_create_dense_with_elem(m, kdim, &qcomplex_elem);
+    Rq = mat_create_upper_triangular_with_elem(kdim, n, &qcomplex_elem);
+    if (!Z || !Qq || !Rq) {
+        mat_free(Z);
+        mat_free(Qq);
+        mat_free(Rq);
+        return -3;
+    }
+
+    for (size_t j = 0; j < n; j++) {
+        qcomplex_t *v = malloc(m * sizeof(qcomplex_t));
+        size_t imax = (j < kdim) ? j : kdim;
+        if (!v) {
+            mat_free(Z); mat_free(Qq); mat_free(Rq);
+            return -3;
+        }
+
+        for (size_t r = 0; r < m; r++)
+            mat_get(Z, r, j, &v[r]);
+
+        for (size_t i = 0; i < imax; i++) {
+            qcomplex_t rij = QC_ZERO;
+            for (size_t r = 0; r < m; r++) {
+                qcomplex_t qri;
+                mat_get(Qq, r, i, &qri);
+                rij = qc_add(rij, qc_mul(qc_conj(qri), v[r]));
+            }
+            mat_set(Rq, i, j, &rij);
+            for (size_t r = 0; r < m; r++) {
+                qcomplex_t qri;
+                mat_get(Qq, r, i, &qri);
+                v[r] = qc_sub(v[r], qc_mul(qri, rij));
+            }
+        }
+
+        if (j < kdim) {
+            qfloat_t norm2 = QF_ZERO;
+            qcomplex_t rjj;
+            for (size_t r = 0; r < m; r++)
+                norm2 = qf_add(norm2, qf_add(qf_mul(v[r].re, v[r].re),
+                                             qf_mul(v[r].im, v[r].im)));
+
+            if (qf_to_double(norm2) < 1e-300) {
+                rjj = QC_ZERO;
+                mat_set(Rq, j, j, &rjj);
+                for (size_t r = 0; r < m; r++) {
+                    qcomplex_t zero = QC_ZERO;
+                    mat_set(Qq, r, j, &zero);
+                }
+            } else {
+                qfloat_t norm = qf_sqrt(norm2);
+                qfloat_t inv = qf_div(QF_ONE, norm);
+                rjj = qc_make(norm, QF_ZERO);
+                mat_set(Rq, j, j, &rjj);
+                for (size_t r = 0; r < m; r++) {
+                    qcomplex_t qcol = qc_make(qf_mul(inv, v[r].re),
+                                              qf_mul(inv, v[r].im));
+                    mat_set(Qq, r, j, &qcol);
+                }
+            }
+        }
+
+        free(v);
+    }
+
+    out->Q = mat_convert_dense(Qq, target);
+    out->R = mat_convert_with_store(Rq, target, &upper_triangular_store);
+    mat_free(Z);
+    mat_free(Qq);
+    mat_free(Rq);
+
+    if (!out->Q || !out->R) {
+        mat_qr_factor_free(out);
+        return -3;
+    }
+
+    return 0;
+}
+
+void mat_cholesky_free(mat_cholesky_t *out)
+{
+    if (!out)
+        return;
+    mat_free(out->L);
+    out->L = NULL;
+}
+
+int mat_cholesky(const matrix_t *A, mat_cholesky_t *out)
+{
+    matrix_t *Z = NULL, *Lq = NULL;
+
+    if (!A || !out)
+        return -1;
+    if (A->rows != A->cols)
+        return -2;
+
+    Z = mat_convert_dense(A, &qcomplex_elem);
+    Lq = mat_create_lower_triangular_with_elem(A->rows, A->cols, &qcomplex_elem);
+    if (!Z || !Lq) {
+        mat_free(Z);
+        mat_free(Lq);
+        return -3;
+    }
+
+    for (size_t i = 0; i < A->rows; i++) {
+        for (size_t j = 0; j <= i; j++) {
+            qcomplex_t sum, aij;
+            mat_get(Z, i, j, &aij);
+            sum = aij;
+
+            for (size_t k = 0; k < j; k++) {
+                qcomplex_t lik, ljk;
+                mat_get(Lq, i, k, &lik);
+                mat_get(Lq, j, k, &ljk);
+                sum = qc_sub(sum, qc_mul(lik, qc_conj(ljk)));
+            }
+
+            if (i == j) {
+                double imag_abs = fabs(qf_to_double(sum.im));
+                double real_val = qf_to_double(sum.re);
+                if (imag_abs > 1e-12 || real_val <= 0.0) {
+                    mat_free(Z);
+                    mat_free(Lq);
+                    return -4;
+                }
+                qcomplex_t diag = qc_make(qf_sqrt(sum.re), QF_ZERO);
+                mat_set(Lq, i, j, &diag);
+            } else {
+                qcomplex_t ljj;
+                mat_get(Lq, j, j, &ljj);
+                if (qf_to_double(qc_abs(ljj)) < 1e-300) {
+                    mat_free(Z);
+                    mat_free(Lq);
+                    return -4;
+                }
+                qcomplex_t lij = qc_div(sum, qc_conj(ljj));
+                mat_set(Lq, i, j, &lij);
+            }
+        }
+
+    }
+
+    out->L = mat_convert_with_store(Lq, A->elem, &lower_triangular_store);
+    mat_free(Z);
+    mat_free(Lq);
+
+    if (!out->L)
+        return -3;
+
+    return 0;
+}
+
+void mat_svd_factor_free(mat_svd_factor_t *out)
+{
+    if (!out)
+        return;
+    mat_free(out->U);
+    mat_free(out->S);
+    mat_free(out->V);
+    out->U = out->S = out->V = NULL;
+}
+
+static double mat_singular_tolerance(const matrix_t *A, double sigma_max)
+{
+    qfloat_t sigma_qf = qf_from_double(sigma_max);
+    qfloat_t dim_qf = qf_from_double((double)((A->rows > A->cols) ? A->rows : A->cols));
+    qfloat_t tol_qf = qf_mul(qf_mul(sigma_qf, dim_qf), A->elem->relative_epsilon);
+
+    if (qf_lt(tol_qf, A->elem->relative_epsilon))
+        tol_qf = A->elem->relative_epsilon;
+
+    return qf_to_double(tol_qf);
+}
+
+static int mat_norm_via_svd(const matrix_t *A, qfloat_t *out)
+{
+    mat_svd_factor_t svd = {0};
+    size_t kdim;
+    qfloat_t best = QF_ZERO;
+
+    if (!A || !out)
+        return -1;
+
+    if (mat_svd_factor(A, &svd) != 0)
+        return -2;
+
+    kdim = (A->rows < A->cols) ? A->rows : A->cols;
+    for (size_t i = 0; i < kdim; i++) {
+        unsigned char raw[64];
+        qfloat_t sig;
+        mat_get(svd.S, i, i, raw);
+        svd.S->elem->to_qf(&sig, raw);
+        sig = qf_abs(sig);
+        if (qf_gt(sig, best))
+            best = sig;
+    }
+
+    *out = best;
+    mat_svd_factor_free(&svd);
+    return 0;
+}
+
+int mat_svd_factor(const matrix_t *A, mat_svd_factor_t *out)
+{
+    size_t m, n, kdim;
+    matrix_t *Z = NULL, *ZH = NULL, *Gram = NULL;
+    matrix_t *EigVecs = NULL, *LeftQ = NULL, *RightQ = NULL, *Sq = NULL;
+    qcomplex_t *evals = NULL;
+    qfloat_t *sigma = NULL;
+    size_t *order = NULL;
+    int rc;
+
+    if (!A || !out)
+        return -1;
+
+    m = A->rows;
+    n = A->cols;
+    kdim = (m < n) ? m : n;
+
+    Z = mat_convert_dense(A, &qcomplex_elem);
+    if (!Z)
+        return -3;
+
+    evals = calloc(kdim ? kdim : 1, sizeof(qcomplex_t));
+    sigma = calloc(kdim ? kdim : 1, sizeof(qfloat_t));
+    order = calloc(kdim ? kdim : 1, sizeof(size_t));
+    if (!evals || !sigma || !order) {
+        rc = -3;
+        goto fail;
+    }
+
+    if (m >= n) {
+        ZH = mat_hermitian(Z);
+        Gram = mat_mul(ZH, Z);
+        if (!ZH || !Gram) {
+            rc = -3;
+            goto fail;
+        }
+        rc = mat_eigendecompose(Gram, evals, &EigVecs);
+        if (rc != 0)
+            goto fail;
+
+        for (size_t i = 0; i < n; i++) {
+            double re = qf_to_double(evals[i].re);
+            order[i] = i;
+            sigma[i] = (re > 0.0) ? qf_sqrt(evals[i].re) : QF_ZERO;
+        }
+
+        for (size_t i = 0; i < n; i++)
+            for (size_t j = i + 1; j < n; j++)
+                if (qf_to_double(sigma[order[j]]) > qf_to_double(sigma[order[i]])) {
+                    size_t tmp = order[i];
+                    order[i] = order[j];
+                    order[j] = tmp;
+                }
+
+        RightQ = mat_create_dense_with_elem(n, kdim, &qcomplex_elem);
+        LeftQ = mat_create_dense_with_elem(m, kdim, &qcomplex_elem);
+        Sq = mat_create_diagonal_with_elem(kdim, &qcomplex_elem);
+        if (!RightQ || !LeftQ || !Sq) {
+            rc = -3;
+            goto fail;
+        }
+
+        for (size_t j = 0; j < kdim; j++) {
+            size_t idx = order[j];
+            qcomplex_t sigqc = qc_make(sigma[idx], QF_ZERO);
+            qcomplex_t invsig = qf_to_double(sigma[idx]) > 1e-300
+                              ? qc_make(qf_div(QF_ONE, sigma[idx]), QF_ZERO)
+                              : QC_ZERO;
+
+            for (size_t r = 0; r < n; r++) {
+                qcomplex_t v;
+                mat_get(EigVecs, r, idx, &v);
+                mat_set(RightQ, r, j, &v);
+            }
+
+            mat_set(Sq, j, j, &sigqc);
+
+            for (size_t r = 0; r < m; r++) {
+                qcomplex_t sum = QC_ZERO;
+                for (size_t c = 0; c < n; c++) {
+                    qcomplex_t a_rc, v_c;
+                    mat_get(Z, r, c, &a_rc);
+                    mat_get(RightQ, c, j, &v_c);
+                    sum = qc_add(sum, qc_mul(a_rc, v_c));
+                }
+                if (qf_to_double(sigma[idx]) > 1e-300)
+                    sum = qc_mul(sum, invsig);
+                else
+                    sum = QC_ZERO;
+                mat_set(LeftQ, r, j, &sum);
+            }
+        }
+    } else {
+        ZH = mat_hermitian(Z);
+        Gram = mat_mul(Z, ZH);
+        if (!ZH || !Gram) {
+            rc = -3;
+            goto fail;
+        }
+        rc = mat_eigendecompose(Gram, evals, &EigVecs);
+        if (rc != 0)
+            goto fail;
+
+        for (size_t i = 0; i < m; i++) {
+            double re = qf_to_double(evals[i].re);
+            order[i] = i;
+            sigma[i] = (re > 0.0) ? qf_sqrt(evals[i].re) : QF_ZERO;
+        }
+
+        for (size_t i = 0; i < m; i++)
+            for (size_t j = i + 1; j < m; j++)
+                if (qf_to_double(sigma[order[j]]) > qf_to_double(sigma[order[i]])) {
+                    size_t tmp = order[i];
+                    order[i] = order[j];
+                    order[j] = tmp;
+                }
+
+        LeftQ = mat_create_dense_with_elem(m, kdim, &qcomplex_elem);
+        RightQ = mat_create_dense_with_elem(n, kdim, &qcomplex_elem);
+        Sq = mat_create_diagonal_with_elem(kdim, &qcomplex_elem);
+        if (!RightQ || !LeftQ || !Sq) {
+            rc = -3;
+            goto fail;
+        }
+
+        for (size_t j = 0; j < kdim; j++) {
+            size_t idx = order[j];
+            qcomplex_t sigqc = qc_make(sigma[idx], QF_ZERO);
+            qcomplex_t invsig = qf_to_double(sigma[idx]) > 1e-300
+                              ? qc_make(qf_div(QF_ONE, sigma[idx]), QF_ZERO)
+                              : QC_ZERO;
+
+            for (size_t r = 0; r < m; r++) {
+                qcomplex_t u;
+                mat_get(EigVecs, r, idx, &u);
+                mat_set(LeftQ, r, j, &u);
+            }
+
+            mat_set(Sq, j, j, &sigqc);
+
+            for (size_t r = 0; r < n; r++) {
+                qcomplex_t sum = QC_ZERO;
+                for (size_t c = 0; c < m; c++) {
+                    qcomplex_t ah_rc, u_c;
+                    mat_get(ZH, r, c, &ah_rc);
+                    mat_get(LeftQ, c, j, &u_c);
+                    sum = qc_add(sum, qc_mul(ah_rc, u_c));
+                }
+                if (qf_to_double(sigma[idx]) > 1e-300)
+                    sum = qc_mul(sum, invsig);
+                else
+                    sum = QC_ZERO;
+                mat_set(RightQ, r, j, &sum);
+            }
+        }
+    }
+
+    out->U = mat_convert_dense(LeftQ, A->elem);
+    out->S = mat_convert_with_store(Sq, A->elem, &diagonal_store);
+    out->V = mat_convert_dense(RightQ, A->elem);
+    if (!out->U || !out->S || !out->V) {
+        rc = -3;
+        goto fail;
+    }
+
+    rc = 0;
+
+fail:
+    mat_free(Z);
+    mat_free(ZH);
+    mat_free(Gram);
+    mat_free(EigVecs);
+    mat_free(LeftQ);
+    mat_free(RightQ);
+    mat_free(Sq);
+    free(evals);
+    free(sigma);
+    free(order);
+    if (rc != 0)
+        mat_svd_factor_free(out);
+    return rc;
+}
+
+int mat_norm(const matrix_t *A, mat_norm_type_t type, qfloat_t *out)
+{
+    const struct elem_vtable *e;
+
+    if (!A || !out)
+        return -1;
+
+    e = A->elem;
+    switch (type) {
+    case MAT_NORM_1:
+    {
+        qfloat_t best = QF_ZERO;
+        for (size_t j = 0; j < A->cols; j++) {
+            qfloat_t sum = QF_ZERO;
+            for (size_t i = 0; i < A->rows; i++) {
+                unsigned char raw[64];
+                qfloat_t mag;
+                mat_get(A, i, j, raw);
+                e->abs_qf(&mag, raw);
+                sum = qf_add(sum, mag);
+            }
+            if (qf_gt(sum, best))
+                best = sum;
+        }
+        *out = best;
+        return 0;
+    }
+    case MAT_NORM_INF:
+    {
+        qfloat_t best = QF_ZERO;
+        for (size_t i = 0; i < A->rows; i++) {
+            qfloat_t sum = QF_ZERO;
+            for (size_t j = 0; j < A->cols; j++) {
+                unsigned char raw[64];
+                qfloat_t mag;
+                mat_get(A, i, j, raw);
+                e->abs_qf(&mag, raw);
+                sum = qf_add(sum, mag);
+            }
+            if (qf_gt(sum, best))
+                best = sum;
+        }
+        *out = best;
+        return 0;
+    }
+    case MAT_NORM_FRO:
+    {
+        qfloat_t sumsq = QF_ZERO;
+        for (size_t i = 0; i < A->rows; i++) {
+            for (size_t j = 0; j < A->cols; j++) {
+                unsigned char raw[64];
+                qfloat_t mag;
+                mat_get(A, i, j, raw);
+                e->abs_qf(&mag, raw);
+                sumsq = qf_add(sumsq, qf_mul(mag, mag));
+            }
+        }
+        *out = qf_sqrt(sumsq);
+        return 0;
+    }
+    case MAT_NORM_2:
+        return mat_norm_via_svd(A, out);
+    default:
+        return -2;
+    }
+}
+
+int mat_condition_number(const matrix_t *A, mat_norm_type_t type, qfloat_t *out)
+{
+    int rank;
+    size_t kdim;
+
+    if (!A || !out)
+        return -1;
+
+    rank = mat_rank(A);
+    if (rank < 0)
+        return -2;
+
+    kdim = (A->rows < A->cols) ? A->rows : A->cols;
+    if ((size_t)rank < kdim) {
+        *out = QF_INF;
+        return 0;
+    }
+
+    if (type == MAT_NORM_2) {
+        mat_svd_factor_t svd = {0};
+        qfloat_t sigma_max = QF_ZERO;
+        qfloat_t sigma_min = QF_INF;
+        if (mat_svd_factor(A, &svd) != 0)
+            return -2;
+        for (size_t i = 0; i < kdim; i++) {
+            unsigned char raw[64];
+            qfloat_t sig;
+            mat_get(svd.S, i, i, raw);
+            svd.S->elem->to_qf(&sig, raw);
+            sig = qf_abs(sig);
+            if (qf_gt(sig, sigma_max))
+                sigma_max = sig;
+            if (qf_lt(sig, sigma_min))
+                sigma_min = sig;
+        }
+        *out = qf_div(sigma_max, sigma_min);
+        mat_svd_factor_free(&svd);
+        return 0;
+    }
+
+    {
+        qfloat_t na, ni;
+        matrix_t *Aw = NULL;
+        matrix_t *Ai = NULL;
+        int rc_a, rc_i;
+
+        Aw = mat_convert_dense(A, &qcomplex_elem);
+        if (!Aw)
+            return -2;
+
+        if (Aw->rows == Aw->cols) {
+            matrix_t *I = mat_create_identity_with_elem(Aw->rows, Aw->elem);
+            if (!I)
+                goto fail_non2;
+            Ai = mat_solve(Aw, I);
+            mat_free(I);
+        } else {
+            Ai = mat_pseudoinverse(Aw);
+        }
+
+        if (!Ai)
+            goto fail_non2;
+
+        rc_a = mat_norm(Aw, type, &na);
+        rc_i = mat_norm(Ai, type, &ni);
+        mat_free(Ai);
+        mat_free(Aw);
+        if (rc_a != 0 || rc_i != 0)
+            return -2;
+        *out = qf_mul(na, ni);
+        return 0;
+
+fail_non2:
+        mat_free(Aw);
+        mat_free(Ai);
+        return -2;
+    }
+}
+
+int mat_rank(const matrix_t *A)
+{
+    mat_svd_factor_t svd = {0};
+    size_t kdim;
+    double sigma_max = 0.0, tol;
+    int rank = 0;
+
+    if (!A)
+        return -1;
+
+    if (mat_svd_factor(A, &svd) != 0)
+        return -2;
+
+    kdim = (A->rows < A->cols) ? A->rows : A->cols;
+    for (size_t i = 0; i < kdim; i++) {
+        unsigned char raw[64];
+        qfloat_t sig;
+        double d;
+        mat_get(svd.S, i, i, raw);
+        svd.S->elem->to_qf(&sig, raw);
+        d = qf_to_double(qf_abs(sig));
+        if (d > sigma_max)
+            sigma_max = d;
+    }
+
+    tol = mat_singular_tolerance(A, sigma_max);
+    for (size_t i = 0; i < kdim; i++) {
+        unsigned char raw[64];
+        qfloat_t sig;
+        double d;
+        mat_get(svd.S, i, i, raw);
+        svd.S->elem->to_qf(&sig, raw);
+        d = qf_to_double(qf_abs(sig));
+        if (d > tol)
+            rank++;
+    }
+
+    mat_svd_factor_free(&svd);
+    return rank;
+}
+
+matrix_t *mat_pseudoinverse(const matrix_t *A)
+{
+    mat_svd_factor_t svd = {0};
+    matrix_t *Uq = NULL, *Vq = NULL, *UH = NULL, *Sp = NULL;
+    matrix_t *VSp = NULL, *Pinvq = NULL, *Pinv = NULL;
+    size_t kdim;
+    double sigma_max = 0.0, tol;
+
+    if (!A)
+        return NULL;
+
+    if (mat_svd_factor(A, &svd) != 0)
+        return NULL;
+
+    kdim = (A->rows < A->cols) ? A->rows : A->cols;
+    for (size_t i = 0; i < kdim; i++) {
+        unsigned char raw[64];
+        qfloat_t sig;
+        double d;
+        mat_get(svd.S, i, i, raw);
+        svd.S->elem->to_qf(&sig, raw);
+        d = qf_to_double(qf_abs(sig));
+        if (d > sigma_max)
+            sigma_max = d;
+    }
+    tol = mat_singular_tolerance(A, sigma_max);
+
+    Uq = mat_convert_dense(svd.U, &qcomplex_elem);
+    Vq = mat_convert_dense(svd.V, &qcomplex_elem);
+    Sp = mat_create_diagonal_with_elem(kdim, &qcomplex_elem);
+    if (!Uq || !Vq || !Sp)
+        goto fail;
+
+    for (size_t i = 0; i < kdim; i++) {
+        unsigned char raw[64];
+        qfloat_t sig;
+        double d;
+        qcomplex_t val;
+        mat_get(svd.S, i, i, raw);
+        svd.S->elem->to_qf(&sig, raw);
+        d = qf_to_double(qf_abs(sig));
+        if (d > tol)
+            val = qc_make(qf_div(QF_ONE, sig), QF_ZERO);
+        else
+            val = QC_ZERO;
+        mat_set(Sp, i, i, &val);
+    }
+
+    UH = mat_hermitian(Uq);
+    VSp = (Vq && Sp) ? mat_mul(Vq, Sp) : NULL;
+    Pinvq = (VSp && UH) ? mat_mul(VSp, UH) : NULL;
+    if (!UH || !VSp || !Pinvq)
+        goto fail;
+
+    Pinv = mat_convert_dense(Pinvq, A->elem);
+
+fail:
+    mat_svd_factor_free(&svd);
+    mat_free(Uq);
+    mat_free(Vq);
+    mat_free(UH);
+    mat_free(Sp);
+    mat_free(VSp);
+    mat_free(Pinvq);
+    return Pinv;
+}
+
+matrix_t *mat_nullspace(const matrix_t *A)
+{
+    matrix_t *AH = NULL, *Gram = NULL, *Gramq = NULL, *V = NULL, *Nq = NULL, *N = NULL;
+    qcomplex_t *evals = NULL;
+    size_t nullity = 0, col = 0;
+    double sigma_max = 0.0, tol;
+    int rc;
+
+    if (!A)
+        return NULL;
+
+    AH = mat_hermitian(A);
+    Gram = AH ? mat_mul(AH, A) : NULL;
+    Gramq = Gram ? mat_convert_dense(Gram, &qcomplex_elem) : NULL;
+    if (!AH || !Gram || !Gramq)
+        goto fail;
+
+    evals = calloc(A->cols ? A->cols : 1, sizeof(qcomplex_t));
+    if (!evals)
+        goto fail;
+
+    rc = mat_eigendecompose(Gramq, evals, &V);
+    if (rc != 0 || !V)
+        goto fail;
+
+    for (size_t i = 0; i < A->cols; i++) {
+        double d = qf_to_double(qf_abs(evals[i].re));
+        if (d > sigma_max)
+            sigma_max = d;
+    }
+    tol = mat_singular_tolerance(A, sqrt(sigma_max));
+    tol *= tol;
+
+    for (size_t i = 0; i < A->cols; i++) {
+        double d = qf_to_double(qf_abs(evals[i].re));
+        if (d <= tol)
+            nullity++;
+    }
+
+    Nq = mat_create_dense_with_elem(A->cols, nullity, &qcomplex_elem);
+    if (!Nq)
+        goto fail;
+
+    for (size_t i = 0; i < A->cols; i++) {
+        double d = qf_to_double(qf_abs(evals[i].re));
+        if (d > tol)
+            continue;
+        for (size_t r = 0; r < A->cols; r++) {
+            unsigned char raw[64];
+            qcomplex_t z;
+            mat_get(V, r, i, raw);
+            V->elem->to_qc(&z, raw);
+            mat_set(Nq, r, col, &z);
+        }
+        col++;
+    }
+
+    N = mat_convert_dense(Nq, A->elem);
+
+fail:
+    mat_free(AH);
+    mat_free(Gram);
+    mat_free(Gramq);
+    mat_free(V);
+    mat_free(Nq);
+    free(evals);
+    return N;
+}
+
 /* ============================================================
    Eigenvalues / eigenvectors (Hermitian Jacobi implementation)
    ============================================================ */
@@ -1566,7 +3731,7 @@ matrix_t *mat_inverse(const matrix_t *A)
 static matrix_t *mat_copy_dense(const matrix_t *A)
 {
     const struct elem_vtable *e = A->elem;
-    matrix_t *C = e->create_matrix(A->rows, A->cols);
+    matrix_t *C = mat_create_dense_with_elem(A->rows, A->cols, e);
     if (!C) return NULL;
     unsigned char v[64];
     for (size_t i = 0; i < A->rows; i++)
@@ -1700,7 +3865,7 @@ static int mat_eigendecompose_hermitian(const matrix_t *A, void *eigenvalues, ma
     matrix_t *W = mat_copy_dense(A);
     if (!W) return -3;
 
-    matrix_t *V = e->create_identity(n);
+    matrix_t *V = mat_create_identity_with_elem(n, e);
     if (!V) { mat_free(W); return -3; }
 
     double fro2 = 0.0;
@@ -2139,7 +4304,7 @@ static int mat_eigendecompose_general(const matrix_t *A, void *eigenvalues,
             backsub_eigenvec(H, Y, n, k);
 
         /* Transform back: eigvec_A = Q * Y */
-        matrix_t *V = e->create_matrix(n, n);
+        matrix_t *V = mat_create_dense_with_elem(n, n, e);
         if (!V) { free(H); free(Qm); free(Y); return -3; }
 
         unsigned char raw[64];
@@ -2256,7 +4421,7 @@ static matrix_t *mat_to_qcomplex(const matrix_t *A)
 {
     if (!A) return NULL;
 
-    matrix_t *Z = qcomplex_elem.create_matrix(A->rows, A->cols);
+    matrix_t *Z = mat_create_dense_with_elem(A->rows, A->cols, &qcomplex_elem);
     if (!Z) return NULL;
 
     unsigned char v_raw[64];
@@ -2286,7 +4451,7 @@ static int hessenberg_reduce_qc(matrix_t *H, matrix_t **Qptr)
     /* Ensure Q exists and is n×n qcomplex */
     matrix_t *Q = *Qptr;
     if (!Q) {
-        Q = qcomplex_elem.create_identity(n);
+        Q = mat_create_identity_with_elem(n, &qcomplex_elem);
         if (!Q) return -1;
         *Qptr = Q;
     } else {
@@ -2658,7 +4823,7 @@ static int schur_qr_qc(matrix_t *H, matrix_t *Q)
    Public Schur API
    ============================================================ */
 
-int mat_schur(const matrix_t *A, mat_schur_t *out)
+int mat_schur_factor(const matrix_t *A, mat_schur_factor_t *out)
 {
     if (!A || !out) return -1;
     if (A->rows != A->cols) return -2;
@@ -2683,11 +4848,16 @@ int mat_schur(const matrix_t *A, mat_schur_t *out)
 
     /* Z is now T (Schur form), Q0 is Q */
     out->Q = Q0;
-    out->T = Z;
+    out->T = mat_convert_with_store(Z, &qcomplex_elem, &upper_triangular_store);
+    mat_free(Z);
+    if (!out->T) {
+        mat_free(Q0);
+        return -3;
+    }
     return 0;
 }
 
-void mat_schur_free(mat_schur_t *S)
+void mat_schur_factor_free(mat_schur_factor_t *S)
 {
     if (!S) return;
     if (S->Q) mat_free(S->Q);
@@ -2941,7 +5111,7 @@ matrix_t *mat_fun_triangular(const matrix_t *T,
             return mat_fun_triangular_equal_diag(T, scalar_f);
     }
 
-    matrix_t *F = e->create_matrix(n, n);
+    matrix_t *F = mat_create_dense_with_elem(n, n, e);
     if (!F)
         return NULL;
 

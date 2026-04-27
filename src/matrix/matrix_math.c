@@ -51,7 +51,7 @@ void mat_fun_cache_forget(const matrix_t *A)
 static matrix_t *mat_copy_dense(const matrix_t *A)
 {
     const struct elem_vtable *e = A->elem;
-    matrix_t *C = e->create_matrix(A->rows, A->cols);
+    matrix_t *C = mat_create_dense_with_elem(A->rows, A->cols, e);
     if (!C) return NULL;
     unsigned char v[64];
     for (size_t i = 0; i < A->rows; i++)
@@ -186,7 +186,7 @@ static matrix_t *mat_fun_from_spectral_cache(const matrix_t *A,
         return R;
     }
 
-    matrix_t *out = orig_elem->create_matrix(n, n);
+    matrix_t *out = mat_create_dense_with_elem(n, n, orig_elem);
     if (!out) {
         free(mapped);
         mat_free(R);
@@ -269,7 +269,7 @@ static matrix_t *mat_fun_hermitian(const matrix_t *A,
         return NULL;
     }
 
-    matrix_t *FD = qcomplex_elem.create_matrix(n, n);
+    matrix_t *FD = mat_create_dense_with_elem(n, n, &qcomplex_elem);
     if (!FD) {
         if (Vq != V)
             mat_free(Vq);
@@ -316,7 +316,7 @@ static matrix_t *mat_fun_hermitian(const matrix_t *A,
         return R;
     }
 
-    matrix_t *out = orig_elem->create_matrix(n, n);
+    matrix_t *out = mat_create_dense_with_elem(n, n, orig_elem);
     if (!out) {
         free(mapped);
         mat_free(R);
@@ -386,7 +386,7 @@ static matrix_t *mat_fun_upper_triangular(const matrix_t *A,
         return FT;
     }
 
-    out = orig_elem->create_matrix(n, n);
+    out = mat_create_dense_with_elem(n, n, orig_elem);
     if (!out) {
         mat_free(T);
         mat_free(FT);
@@ -423,7 +423,7 @@ matrix_t *mat_fun_schur(const matrix_t *A,
 
     if (A->rows == 1) {
         const struct elem_vtable *orig_elem = A->elem;
-        matrix_t *out = orig_elem->create_matrix(1, 1);
+        matrix_t *out = mat_create_dense_with_elem(1, 1, orig_elem);
         qcomplex_t in_qc, out_qc;
         unsigned char raw_in[64], raw_out[64];
 
@@ -453,10 +453,10 @@ matrix_t *mat_fun_schur(const matrix_t *A,
     const struct elem_vtable *orig_elem = A->elem;
     size_t n = A->rows;
 
-    mat_schur_t S;
-    int schur_rc = mat_schur(A, &S);
+    mat_schur_factor_t S;
+    int schur_rc = mat_schur_factor(A, &S);
     if (schur_rc != 0) {
-        fprintf(stderr, "[mat_fun_schur] mat_schur returned %d for %zu×%zu matrix\n",
+        fprintf(stderr, "[mat_fun_schur] mat_schur_factor returned %d for %zu×%zu matrix\n",
                 schur_rc, A->rows, A->cols);
         return NULL;
     }
@@ -465,7 +465,7 @@ matrix_t *mat_fun_schur(const matrix_t *A,
      * version of the desired function (callers are responsible for this). */
     matrix_t *FT = mat_fun_triangular(S.T, scalar_f);
     if (!FT) {
-        mat_schur_free(&S);
+        mat_schur_factor_free(&S);
         return NULL;
     }
 
@@ -473,7 +473,7 @@ matrix_t *mat_fun_schur(const matrix_t *A,
     matrix_t *QFT = mat_mul(S.Q, FT);
     if (!QFT) {
         mat_free(FT);
-        mat_schur_free(&S);
+        mat_schur_factor_free(&S);
         return NULL;
     }
 
@@ -481,7 +481,7 @@ matrix_t *mat_fun_schur(const matrix_t *A,
     if (!QH) {
         mat_free(FT);
         mat_free(QFT);
-        mat_schur_free(&S);
+        mat_schur_factor_free(&S);
         return NULL;
     }
 
@@ -490,7 +490,7 @@ matrix_t *mat_fun_schur(const matrix_t *A,
     mat_free(FT);
     mat_free(QFT);
     mat_free(QH);
-    mat_schur_free(&S);
+    mat_schur_factor_free(&S);
 
     if (!R) return NULL;
 
@@ -498,7 +498,7 @@ matrix_t *mat_fun_schur(const matrix_t *A,
     if (orig_elem == R->elem)
         return R;   /* already correct type (qcomplex input) */
 
-    matrix_t *out = orig_elem->create_matrix(n, n);
+    matrix_t *out = mat_create_dense_with_elem(n, n, orig_elem);
     if (!out) { mat_free(R); return NULL; }
 
     qcomplex_t qc;
@@ -711,7 +711,7 @@ matrix_t *mat_pow_int(const matrix_t *A, int n)
         p = (unsigned int)n;
     }
 
-    matrix_t *result = e->create_identity(sz);
+    matrix_t *result = mat_create_identity_with_elem(sz, e);
     if (!result) { mat_free(base); return NULL; }
 
     while (p > 0u) {

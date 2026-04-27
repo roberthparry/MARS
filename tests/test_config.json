@@ -712,6 +712,14 @@
     "test_mat_fun_singular_entire_d": true,
     "test_mat_special_unary_extensions": true,
     "test_mat_neg_convenience": true,
-    "test_mat_special_unary_square_extensions": true
+    "test_mat_special_unary_square_extensions": true,
+    "test_solve_and_lstsq": true,
+    "test_factorizations": true,
+    "test_rank_pinv_nullspace": true,
+    "test_norms_and_condition": true,
+    "test_sparse_support": true,
+    "test_layout_policy_regressions": true,
+    "test_structural_queries_and_diagonal_construction": true,
+    "test_factorisations": true
   }
 }
