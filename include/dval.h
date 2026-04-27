@@ -1,6 +1,7 @@
 #ifndef DVAL_H
 #define DVAL_H
 
+#include <stddef.h>
 #include "qfloat.h"
 
 /**
@@ -17,6 +18,11 @@
  *   • dv_get_deriv() returns a *borrowed* view. The caller must NOT free it.
  *
  * Internally, each dval_t is a node in a reference-counted DAG.
+ *
+ * Threading:
+ *   • dval_t is currently a single-threaded type.
+ *   • Do not read, evaluate, differentiate, or mutate the same DAG from
+ *     multiple threads concurrently without external synchronisation.
  */
 
 typedef struct _dval_t dval_t;
@@ -97,11 +103,11 @@ void dv_set_name(dval_t *dv, const char *name);
 /* ------------------------------------------------------------------------- */
 
 /**
- * @brief Return the cached primal value without forcing evaluation.
+ * @brief Return the current primal value of a node.
  *
- * Returns the last computed value. If the node has never been evaluated
- * the result is undefined. Prefer dv_eval() unless you are certain the
- * cache is valid.
+ * This function evaluates the node if required and returns the current
+ * primal value. Use dv_eval() when you want that intent to be explicit;
+ * these accessors are convenient value-returning wrappers.
  */
 double dv_get_val_d(const dval_t *dv);
 qfloat_t dv_get_val(const dval_t *dv);
@@ -127,6 +133,33 @@ const dval_t *dv_get_deriv(const dval_t *expr, dval_t *wrt);
  */
 qfloat_t dv_eval(const dval_t *dv);
 double dv_eval_d(const dval_t *dv);
+
+/**
+ * @brief Evaluate a scalar expression and compute derivatives with respect to
+ *        several variables.
+ *
+ * This routine evaluates @p expr once and computes derivatives with respect to
+ * the variable nodes listed in @p vars. It is useful when one scalar output
+ * depends on many input variables, because all requested derivatives can be obtained
+ * in a single pass over the expression DAG.
+ *
+ * @p expr must be a scalar expression DAG. @p vars points to an array of
+ * variable nodes whose derivatives are desired; entries not present in the DAG
+ * receive a derivative of zero. The order of @p derivs_out matches the order of
+ * @p vars.
+ *
+ * @param expr       Expression whose value and derivatives are required.
+ * @param nvars      Number of entries in @p vars and @p derivs_out.
+ * @param vars       Variable nodes with respect to which derivatives are taken.
+ * @param value_out  Optional destination for the primal value of @p expr.
+ * @param derivs_out Output array of length @p nvars for derivative values.
+ * @return           0 on success, non-zero on invalid input.
+ */
+int dv_eval_derivatives(const dval_t *expr,
+                        size_t nvars,
+                        dval_t *const *vars,
+                        qfloat_t *value_out,
+                        qfloat_t *derivs_out);
 
 /* ------------------------------------------------------------------------- */
 /* Derivative creation (owning)                                              */

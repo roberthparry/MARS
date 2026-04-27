@@ -5,11 +5,20 @@ Expressions are built from constants, variables, and operator nodes; each node
 carries a vtable that knows how to evaluate itself and construct its derivative.
 Evaluation uses `qfloat_t` throughout for ~106-bit precision.
 
+## Threading
+
+`dval_t` is currently a single-threaded type. The expression DAG, cached primal
+values, derivative cache, and variable updates are not synchronised internally.
+If you need to use a `dval_t` graph from multiple threads, protect it with
+external locking and treat concurrent evaluation or mutation as unsupported for
+now.
+
 ## Capabilities
 
 - expression construction from constants, variables, and operators
 - lazy evaluation with result caching
 - symbolic differentiation to arbitrary order
+- evaluation of derivatives for scalar outputs
 - elementary and special functions mirroring the `qfloat_t` API
 - expression parsing from and formatting to strings
 
@@ -186,6 +195,49 @@ qf_printf("∂f/∂x = %.34q\n", dv_eval(p));
 The result is cached: repeated calls to `dv_get_deriv` with the same `wrt` variable
 return the same node without rebuilding the expression graph.
 
+## Example: Evaluating Derivatives
+
+When one scalar output depends on many input variables, it is often more
+efficient to evaluate the expression once and compute all requested derivatives
+in a single pass than to build one symbolic derivative expression per variable.
+
+```c
+#include <stdio.h>
+#include "dval.h"
+
+int main(void) {
+    dval_t *x = dv_new_named_var_d(1.0, "x");
+    dval_t *y = dv_new_named_var_d(2.0, "y");
+    dval_t *xy = dv_mul(x, y);
+    dval_t *sin_xy = dv_sin(xy);
+    dval_t *exp_xy = dv_exp(sin_xy);
+    dval_t *log_y = dv_log(y);
+    dval_t *x_log_y = dv_mul(x, log_y);
+    dval_t *f = dv_add(exp_xy, x_log_y);
+
+    dval_t *vars[2] = { x, y };
+    qfloat_t value;
+    qfloat_t grads[2];
+
+    if (dv_eval_derivatives(f, 2, vars, &value, grads) != 0)
+        return 1;
+
+    qf_printf("f      = %.34q\n", value);
+    qf_printf("df/dx  = %.34q\n", grads[0]);
+    qf_printf("df/dy  = %.34q\n", grads[1]);
+
+    dv_free(f);
+    dv_free(x_log_y);
+    dv_free(log_y);
+    dv_free(exp_xy);
+    dv_free(sin_xy);
+    dv_free(xy);
+    dv_free(y);
+    dv_free(x);
+    return 0;
+}
+```
+
 ## Design Notes
 
 ### Node Model
@@ -256,14 +308,14 @@ All public declarations are in `include/dval.h`.
 
 ### Mutators
 
-- `void dv_set_val(dval_t *dv, qfloat_t value)` — set the primal value (variables only); invalidates caches
+- `void dv_set_val(dval_t *dv, qfloat_t value)` — set the primal value (variables only); dependent expressions will recompute lazily on the next evaluation
 - `void dv_set_val_d(dval_t *dv, double value)` — set the primal value from a `double`
 - `void dv_set_name(dval_t *dv, const char *name)` — set or replace the symbolic name
 
 ### Accessors
 
-- `qfloat_t dv_get_val(const dval_t *dv)` — return the stored primal value without re-evaluating
-- `double dv_get_val_d(const dval_t *dv)` — return the stored primal value as a `double`
+- `qfloat_t dv_get_val(const dval_t *dv)` — return the current primal value, evaluating the node first if required
+- `double dv_get_val_d(const dval_t *dv)` — return the current primal value as a `double`
 - `const dval_t *dv_get_deriv(const dval_t *expr, dval_t *wrt)` — return the
   cached ∂expr/∂wrt node as a **borrowed** pointer; do **not** free it. Built
   lazily on first call; subsequent calls with the same `wrt` return the cached node.
@@ -272,6 +324,7 @@ All public declarations are in `include/dval.h`.
 
 - `qfloat_t dv_eval(const dval_t *dv)` — evaluate the expression and return a `qfloat_t`; uses cached result if valid
 - `double dv_eval_d(const dval_t *dv)` — evaluate and return a `double`
+- `int dv_eval_derivatives(const dval_t *expr, size_t nvars, dval_t *const *vars, qfloat_t *value_out, qfloat_t *derivs_out)` — evaluate a scalar expression and compute derivatives with respect to the listed variables
 
 ### Derivative Construction (owning)
 
@@ -302,7 +355,7 @@ All functions return owning handles.
 
 ### Comparison
 
-- `int dv_cmp(const dval_t *dv1, const dval_t *dv2)` — compare by primal value; returns -1, 0, or 1
+- `int dv_cmp(const dval_t *dv1, const dval_t *dv2)` — compare by primal `qfloat_t` value; returns -1, 0, or 1
 
 ### Elementary Functions (owning)
 
@@ -371,4 +424,3 @@ All functions return owning handles.
   - `*` for explicit multiplication
   - `^N` for integer exponents
   - `[bracket names]` for identifiers that are not single-letter-plus-subscript
-

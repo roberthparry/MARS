@@ -7074,6 +7074,190 @@ void test_partial_derivatives(void)
 }
 
 /* ------------------------------------------------------------------------- */
+/* Precision / cache regressions                                             */
+/* ------------------------------------------------------------------------- */
+
+static void test_cmp_qfloat_precision(void)
+{
+    dval_t *a = dv_new_const(qf_from_string("1.00000000000000000001"));
+    dval_t *b = dv_new_const(qf_from_string("1.00000000000000000002"));
+    int cmp = dv_cmp(a, b);
+
+    if (cmp < 0) {
+        printf(C_BOLD C_GREEN "PASS" C_RESET " dv_cmp respects qfloat precision\n");
+    } else {
+        printf(C_BOLD C_RED "FAIL" C_RESET
+               " dv_cmp lost qfloat precision %s:%d:1 (got %d, expected < 0)\n",
+               __FILE__, __LINE__, cmp);
+        TEST_FAIL();
+    }
+
+    dv_free(b);
+    dv_free(a);
+}
+
+static void test_get_val_updates_after_set(void)
+{
+    dval_t *x = dv_new_var_d(1.0);
+    dval_t *f = dv_add_d(x, 2.0);
+
+    check_q_at(__FILE__, __LINE__, 1, "dv_get_val initial", dv_get_val(f), qf_from_double(3.0));
+    dv_set_val_d(x, 5.0);
+    check_q_at(__FILE__, __LINE__, 1, "dv_get_val after set", dv_get_val(f), qf_from_double(7.0));
+
+    dv_free(f);
+    dv_free(x);
+}
+
+static void test_simplify_inverse_unary_pairs(void)
+{
+    dval_t *x = dv_new_named_var_d(3.0, "x");
+    dval_t *log_x = dv_log(x);
+    dval_t *exp_log_x = dv_exp(log_x);
+    dval_t *exp_x = dv_exp(x);
+    dval_t *log_exp_x = dv_log(exp_x);
+    char *exp_log_s = dv_to_string(exp_log_x, style_EXPRESSION);
+    char *log_exp_s = dv_to_string(log_exp_x, style_EXPRESSION);
+    const char *expect = "{ x | x = 3 }";
+
+    check_q_at(__FILE__, __LINE__, 1, "exp(log(x)) eval", dv_eval(exp_log_x), qf_from_double(3.0));
+    check_q_at(__FILE__, __LINE__, 1, "log(exp(x)) eval", dv_eval(log_exp_x), qf_from_double(3.0));
+
+    if (str_eq(exp_log_s, expect))
+        to_string_pass("exp(log(x)) simplification (EXPR)", exp_log_s, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "exp(log(x)) simplification (EXPR)", exp_log_s, expect);
+
+    if (str_eq(log_exp_s, expect))
+        to_string_pass("log(exp(x)) simplification (EXPR)", log_exp_s, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "log(exp(x)) simplification (EXPR)", log_exp_s, expect);
+
+    free(log_exp_s);
+    free(exp_log_s);
+    dv_free(log_exp_x);
+    dv_free(exp_x);
+    dv_free(exp_log_x);
+    dv_free(log_x);
+    dv_free(x);
+}
+
+void test_runtime_regressions(void)
+{
+    RUN_TEST(test_cmp_qfloat_precision, __func__);
+    RUN_TEST(test_get_val_updates_after_set, __func__);
+    RUN_TEST(test_simplify_inverse_unary_pairs, __func__);
+}
+
+/* ------------------------------------------------------------------------- */
+/* Reverse mode                                                              */
+/* ------------------------------------------------------------------------- */
+
+static void test_reverse_gradient_polynomial(void)
+{
+    dval_t *x  = dv_new_named_var_d(1.0, "x");
+    dval_t *y  = dv_new_named_var_d(2.0, "y");
+    dval_t *x2 = dv_pow_d(x, 2.0);
+    dval_t *xy = dv_mul(x, y);
+    dval_t *y2 = dv_pow_d(y, 2.0);
+    dval_t *t0 = dv_add(x2, xy);
+    dval_t *f  = dv_add(t0, y2);
+    dval_t *vars[2] = { x, y };
+    qfloat_t value;
+    qfloat_t grads[2];
+
+    if (dv_eval_derivatives(f, 2, vars, &value, grads) != 0) {
+        printf(C_BOLD C_RED "FAIL" C_RESET " reverse polynomial gradient returned error\n");
+        TEST_FAIL();
+    }
+
+    check_q_at(__FILE__, __LINE__, 1, "reverse value polynomial", value, qf_from_double(7.0));
+    check_q_at(__FILE__, __LINE__, 1, "reverse df/dx polynomial", grads[0], qf_from_double(4.0));
+    check_q_at(__FILE__, __LINE__, 1, "reverse df/dy polynomial", grads[1], qf_from_double(5.0));
+
+    dv_free(f); dv_free(t0); dv_free(y2); dv_free(xy); dv_free(x2); dv_free(y); dv_free(x);
+}
+
+static void test_reverse_gradient_shared_subexpression(void)
+{
+    dval_t *x = dv_new_named_var_d(1.5, "x");
+    dval_t *y = dv_new_named_var_d(-0.5, "y");
+    dval_t *s = dv_add(x, y);
+    dval_t *f = dv_mul(s, s);
+    dval_t *vars[2] = { x, y };
+    qfloat_t value;
+    qfloat_t grads[2];
+
+    if (dv_eval_derivatives(f, 2, vars, &value, grads) != 0) {
+        printf(C_BOLD C_RED "FAIL" C_RESET " reverse shared-subexpression gradient returned error\n");
+        TEST_FAIL();
+    }
+
+    check_q_at(__FILE__, __LINE__, 1, "reverse value shared", value, qf_from_double(1.0));
+    check_q_at(__FILE__, __LINE__, 1, "reverse df/dx shared", grads[0], qf_from_double(2.0));
+    check_q_at(__FILE__, __LINE__, 1, "reverse df/dy shared", grads[1], qf_from_double(2.0));
+
+    dv_free(f); dv_free(s); dv_free(y); dv_free(x);
+}
+
+static void test_reverse_matches_forward_composite(void)
+{
+    dval_t *x = dv_new_named_var_d(1.0, "x");
+    dval_t *y = dv_new_named_var_d(2.0, "y");
+    dval_t *xy = dv_mul(x, y);
+    dval_t *sin_xy = dv_sin(xy);
+    dval_t *exp_term = dv_exp(sin_xy);
+    dval_t *log_y = dv_log(y);
+    dval_t *x_log_y = dv_mul(x, log_y);
+    dval_t *f = dv_add(exp_term, x_log_y);
+    dval_t *vars[2] = { x, y };
+    qfloat_t grads[2];
+    qfloat_t value;
+    dval_t *df_dx = dv_create_deriv(f, x);
+    dval_t *df_dy = dv_create_deriv(f, y);
+
+    if (dv_eval_derivatives(f, 2, vars, &value, grads) != 0) {
+        printf(C_BOLD C_RED "FAIL" C_RESET " reverse composite gradient returned error\n");
+        TEST_FAIL();
+    }
+
+    check_q_at(__FILE__, __LINE__, 1, "reverse value composite", value, dv_eval(f));
+    check_q_at(__FILE__, __LINE__, 1, "reverse matches forward df/dx", grads[0], dv_eval(df_dx));
+    check_q_at(__FILE__, __LINE__, 1, "reverse matches forward df/dy", grads[1], dv_eval(df_dy));
+
+    dv_free(df_dy); dv_free(df_dx);
+    dv_free(f); dv_free(x_log_y); dv_free(log_y); dv_free(exp_term); dv_free(sin_xy); dv_free(xy);
+    dv_free(y); dv_free(x);
+}
+
+static void test_reverse_gradient_missing_variable(void)
+{
+    dval_t *x = dv_new_named_var_d(3.0, "x");
+    dval_t *z = dv_new_named_var_d(9.0, "z");
+    dval_t *f = dv_mul_d(x, 4.0);
+    dval_t *vars[2] = { x, z };
+    qfloat_t grads[2];
+
+    if (dv_eval_derivatives(f, 2, vars, NULL, grads) != 0) {
+        printf(C_BOLD C_RED "FAIL" C_RESET " reverse missing-variable gradient returned error\n");
+        TEST_FAIL();
+    }
+
+    check_q_at(__FILE__, __LINE__, 1, "reverse df/dx present", grads[0], qf_from_double(4.0));
+    check_q_at(__FILE__, __LINE__, 1, "reverse df/dz missing", grads[1], QF_ZERO);
+
+    dv_free(f); dv_free(z); dv_free(x);
+}
+
+void test_reverse_mode(void)
+{
+    RUN_TEST(test_reverse_gradient_polynomial, __func__);
+    RUN_TEST(test_reverse_gradient_shared_subexpression, __func__);
+    RUN_TEST(test_reverse_matches_forward_composite, __func__);
+    RUN_TEST(test_reverse_gradient_missing_variable, __func__);
+}
+
+/* ------------------------------------------------------------------------- */
 /* Test driver                                                                */
 /* ------------------------------------------------------------------------- */
 
@@ -7105,11 +7289,17 @@ int tests_main(void)
     printf(C_BOLD C_CYAN "=== dval_t from_string Tests ===\n" C_RESET);
     RUN_TEST(test_dval_t_from_string, NULL);
 
-    printf(C_BOLD C_CYAN "=== README.md example ===\n" C_RESET);
-    RUN_TEST(test_README_md_example, NULL);
-
     printf(C_BOLD C_CYAN "=== Partial derivatives ===\n" C_RESET);
     RUN_TEST(test_partial_derivatives, NULL);
+
+    printf(C_BOLD C_CYAN "=== Runtime regressions ===\n" C_RESET);
+    RUN_TEST(test_runtime_regressions, NULL);
+
+    printf(C_BOLD C_CYAN "=== Reverse mode ===\n" C_RESET);
+    RUN_TEST(test_reverse_mode, NULL);
+
+    printf(C_BOLD C_CYAN "=== README.md example ===\n" C_RESET);
+    RUN_TEST(test_README_md_example, NULL);
 
     return tests_failed;
 }

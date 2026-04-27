@@ -61,5 +61,4 @@ build/
 # Generated files
 test_output.txt
 
-.claude/
 .codex

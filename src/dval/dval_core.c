@@ -15,11 +15,11 @@
  * grouped by operator family after the core infrastructure.
  *
  * Partial derivatives: tl_wrt is a thread-local pointer to the variable being
- * differentiated with respect to.  NULL means "single-variable / differentiate
+ * differentiated with respect to. NULL means "single-variable / differentiate
  * w.r.t. every variable" (the original behaviour of dv_get_deriv /
- * dv_create_deriv).  dv_create_partial() sets it, runs the derivative
- * machinery, then clears it.  All deriv_X functions remain unchanged; only
- * deriv_var consults tl_wrt to return 1 or 0.
+ * dv_create_deriv). This isolates the active differentiation target per
+ * thread, but the DAG itself remains unsynchronised and is not safe for
+ * concurrent mutation or evaluation.
  */
 
 #include <stdlib.h>
@@ -27,16 +27,14 @@
 #include <string.h>
 #include <ctype.h>
 #include <strings.h>
-#include <pthread.h>
-
 #include "qfloat.h"
 #include "dval_internal.h"
 #include "dval.h"
 
 /* Thread-local pointer to the variable being differentiated with respect to.
  * NULL = single-variable / "all variables" mode (original behaviour of
- * dv_get_deriv / dv_create_deriv).  Set by dv_create_partial / dv_get_partial
- * and cleared before returning. */
+ * dv_get_deriv / dv_create_deriv). This is differentiation context only,
+ * not a general thread-safety mechanism for the DAG. */
 static __thread dval_t *tl_wrt = NULL;
 
 /* ------------------------------------------------------------------------- */
@@ -138,22 +136,23 @@ static char *dv_normalize_name(const char *name)
 /* Refcount                                                                  */
 /* ------------------------------------------------------------------------- */
 
-static pthread_mutex_t refcount_lock = PTHREAD_MUTEX_INITIALIZER;
+static uint64_t next_var_id = 1;
 
 static inline void refcount_inc(int *rc)
 {
-    pthread_mutex_lock(&refcount_lock);
     (*rc)++;
-    pthread_mutex_unlock(&refcount_lock);
 }
 
 static inline int refcount_dec(int *rc)
 {
-    pthread_mutex_lock(&refcount_lock);
     int prev = *rc;
     (*rc)--;
-    pthread_mutex_unlock(&refcount_lock);
     return prev;
+}
+
+static uint64_t alloc_var_id(void)
+{
+    return next_var_id++;
 }
 
 void dv_retain(dval_t *dv)
@@ -207,6 +206,7 @@ static dval_t *dv_alloc(const dval_ops_t *ops)
     dv->dx_cache = NULL;
     dv->name     = NULL;
     dv->refcount = 1;
+    dv->var_id   = 0;
 
     return dv;
 }
@@ -245,6 +245,11 @@ static qfloat_t dv_eval_qf(const dval_t *dv)
     return m->x;
 }
 
+static uint64_t current_wrt_id(void)
+{
+    return tl_wrt ? tl_wrt->var_id : 0;
+}
+
 /* Look up (or compute and cache) the derivative of dv w.r.t. tl_wrt.
  * Returns a borrowed pointer owned by the cache entry. */
 static dval_t *dv_build_dx(dval_t *dv)
@@ -252,9 +257,11 @@ static dval_t *dv_build_dx(dval_t *dv)
     if (!dv)
         return NULL;
 
+    uint64_t wrt_id = current_wrt_id();
+
     /* Search the cache for a matching wrt entry. */
     for (dv_deriv_cache_t *ce = dv->dx_cache; ce; ce = ce->next) {
-        if (ce->wrt == tl_wrt)
+        if (ce->wrt_id == wrt_id)
             return ce->dx; /* borrowed */
     }
 
@@ -262,7 +269,7 @@ static dval_t *dv_build_dx(dval_t *dv)
     dval_t *dx = dv->ops->deriv(dv); /* refcount = 1, tl_wrt still set */
     dv_deriv_cache_t *ce = malloc(sizeof *ce);
     if (!ce) abort();
-    ce->wrt  = tl_wrt;
+    ce->wrt_id = wrt_id;
     ce->dx   = dx;
     ce->next = dv->dx_cache;
     dv->dx_cache = ce;
@@ -298,15 +305,135 @@ double dv_eval_d(const dval_t *dv)
 }
 
 /* ------------------------------------------------------------------------- */
+/* Reverse-mode evaluation                                                   */
+/* ------------------------------------------------------------------------- */
+
+typedef struct {
+    const dval_t *node;
+    qfloat_t adjoint;
+} dv_reverse_slot_t;
+
+static int reverse_find_slot(const dv_reverse_slot_t *slots, size_t nslots,
+                             const dval_t *node)
+{
+    for (size_t i = 0; i < nslots; ++i)
+        if (slots[i].node == node)
+            return (int)i;
+    return -1;
+}
+
+static int reverse_collect_nodes(const dval_t *node,
+                                 dv_reverse_slot_t **slots,
+                                 size_t *nslots,
+                                 size_t *capslots)
+{
+    if (!node)
+        return 0;
+    if (reverse_find_slot(*slots, *nslots, node) >= 0)
+        return 0;
+    if (reverse_collect_nodes(node->a, slots, nslots, capslots) != 0)
+        return -1;
+    if (reverse_collect_nodes(node->b, slots, nslots, capslots) != 0)
+        return -1;
+    if (*nslots == *capslots) {
+        size_t new_cap = *capslots ? (*capslots * 2) : 32;
+        dv_reverse_slot_t *grown = realloc(*slots, new_cap * sizeof(**slots));
+        if (!grown)
+            return -1;
+        *slots = grown;
+        *capslots = new_cap;
+    }
+    (*slots)[*nslots].node = node;
+    (*slots)[*nslots].adjoint = QF_ZERO;
+    (*nslots)++;
+    return 0;
+}
+
+int dv_eval_derivatives(const dval_t *expr,
+                        size_t nvars,
+                        dval_t *const *vars,
+                        qfloat_t *value_out,
+                        qfloat_t *derivs_out)
+{
+    dv_reverse_slot_t *slots = NULL;
+    size_t nslots = 0;
+    size_t capslots = 0;
+    qfloat_t value;
+
+    if (!expr || (nvars > 0 && (!vars || !derivs_out)))
+        return -1;
+
+    value = dv_eval(expr);
+    if (value_out)
+        *value_out = value;
+
+    if (reverse_collect_nodes(expr, &slots, &nslots, &capslots) != 0) {
+        free(slots);
+        return -1;
+    }
+
+    if (nslots == 0) {
+        free(slots);
+        return -1;
+    }
+
+    slots[nslots - 1].adjoint = QF_ONE;
+
+    for (size_t i = nslots; i-- > 0;) {
+        const dval_t *node = slots[i].node;
+        qfloat_t out_bar = slots[i].adjoint;
+        qfloat_t a_bar = QF_ZERO;
+        qfloat_t b_bar = QF_ZERO;
+        int child_index;
+
+        if (qf_eq(out_bar, QF_ZERO))
+            continue;
+
+        if (!node->ops || !node->ops->reverse) {
+            free(slots);
+            return -1;
+        }
+
+        node->ops->reverse(node, out_bar, &a_bar, &b_bar);
+
+        if (node->a && !qf_eq(a_bar, QF_ZERO)) {
+            child_index = reverse_find_slot(slots, nslots, node->a);
+            if (child_index < 0) {
+                free(slots);
+                return -1;
+            }
+            slots[child_index].adjoint = qf_add(slots[child_index].adjoint, a_bar);
+        }
+        if (node->b && !qf_eq(b_bar, QF_ZERO)) {
+            child_index = reverse_find_slot(slots, nslots, node->b);
+            if (child_index < 0) {
+                free(slots);
+                return -1;
+            }
+            slots[child_index].adjoint = qf_add(slots[child_index].adjoint, b_bar);
+        }
+    }
+
+    for (size_t i = 0; i < nvars; ++i) {
+        int slot_index = reverse_find_slot(slots, nslots, vars[i]);
+        derivs_out[i] = (slot_index >= 0) ? slots[slot_index].adjoint : QF_ZERO;
+    }
+
+    free(slots);
+    return 0;
+}
+
+/* ------------------------------------------------------------------------- */
 /* Public derivative (borrowed)                                              */
 /* ------------------------------------------------------------------------- */
 
 const dval_t *dv_get_deriv(const dval_t *expr, dval_t *wrt)
 {
     if (!expr || !wrt) return NULL;
+    dval_t *saved_wrt = tl_wrt;
     tl_wrt = wrt;
     const dval_t *result = dv_build_dx((dval_t *)expr);
-    tl_wrt = NULL;
+    tl_wrt = saved_wrt;
     return result; /* borrowed */
 }
 
@@ -331,6 +458,7 @@ static dval_t *dv_make_var_qf(qfloat_t x)
     dv->c = x;
     dv->x = x;
     dv->x_valid = 1;
+    dv->var_id = alloc_var_id();
     return dv;
 }
 
@@ -1190,296 +1318,755 @@ static dval_t *deriv_logbeta(dval_t *dv)
 }
 
 /* ------------------------------------------------------------------------- */
+/* Reverse-mode local adjoint propagation                                    */
+/* ------------------------------------------------------------------------- */
+
+static qfloat_t qf_from_int_local(int x)
+{
+    return qf_from_double((double)x);
+}
+
+static qfloat_t qf_sq_local(qfloat_t x)
+{
+    return qf_mul(x, x);
+}
+
+void dv_reverse_atom(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+{
+    (void)dv;
+    (void)out_bar;
+    *a_bar = QF_ZERO;
+    *b_bar = QF_ZERO;
+}
+
+void dv_reverse_add(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+{
+    (void)dv;
+    *a_bar = out_bar;
+    *b_bar = out_bar;
+}
+
+void dv_reverse_sub(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+{
+    (void)dv;
+    *a_bar = out_bar;
+    *b_bar = qf_neg(out_bar);
+}
+
+void dv_reverse_mul(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+{
+    *a_bar = qf_mul(out_bar, dv->b->x);
+    *b_bar = qf_mul(out_bar, dv->a->x);
+}
+
+void dv_reverse_div(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+{
+    qfloat_t denom_sq = qf_mul(dv->b->x, dv->b->x);
+    *a_bar = qf_div(out_bar, dv->b->x);
+    *b_bar = qf_neg(qf_div(qf_mul(out_bar, dv->a->x), denom_sq));
+}
+
+void dv_reverse_pow(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+{
+    qfloat_t z = dv->x;
+    *a_bar = qf_mul(out_bar, qf_div(qf_mul(z, dv->b->x), dv->a->x));
+    *b_bar = qf_mul(out_bar, qf_mul(z, qf_log(dv->a->x)));
+}
+
+void dv_reverse_pow_d(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+{
+    qfloat_t exponent = dv->c;
+    qfloat_t one_less = qf_sub(exponent, QF_ONE);
+    *a_bar = qf_mul(out_bar, qf_mul(exponent, qf_pow(dv->a->x, one_less)));
+    *b_bar = QF_ZERO;
+}
+
+void dv_reverse_atan2(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+{
+    qfloat_t denom = qf_add(qf_sq_local(dv->a->x), qf_sq_local(dv->b->x));
+    *a_bar = qf_mul(out_bar, qf_div(dv->b->x, denom));
+    *b_bar = qf_neg(qf_mul(out_bar, qf_div(dv->a->x, denom)));
+}
+
+void dv_reverse_neg(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+{
+    (void)dv;
+    *a_bar = qf_neg(out_bar);
+    *b_bar = QF_ZERO;
+}
+
+void dv_reverse_sin(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+{
+    *a_bar = qf_mul(out_bar, qf_cos(dv->a->x));
+    *b_bar = QF_ZERO;
+}
+
+void dv_reverse_cos(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+{
+    *a_bar = qf_neg(qf_mul(out_bar, qf_sin(dv->a->x)));
+    *b_bar = QF_ZERO;
+}
+
+void dv_reverse_tan(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+{
+    qfloat_t cos_x = qf_cos(dv->a->x);
+    *a_bar = qf_mul(out_bar, qf_div(QF_ONE, qf_sq_local(cos_x)));
+    *b_bar = QF_ZERO;
+}
+
+void dv_reverse_sinh(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+{
+    *a_bar = qf_mul(out_bar, qf_cosh(dv->a->x));
+    *b_bar = QF_ZERO;
+}
+
+void dv_reverse_cosh(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+{
+    *a_bar = qf_mul(out_bar, qf_sinh(dv->a->x));
+    *b_bar = QF_ZERO;
+}
+
+void dv_reverse_tanh(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+{
+    *a_bar = qf_mul(out_bar, qf_sub(QF_ONE, qf_sq_local(dv->x)));
+    *b_bar = QF_ZERO;
+}
+
+void dv_reverse_asin(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+{
+    qfloat_t denom = qf_sqrt(qf_sub(QF_ONE, qf_sq_local(dv->a->x)));
+    *a_bar = qf_div(out_bar, denom);
+    *b_bar = QF_ZERO;
+}
+
+void dv_reverse_acos(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+{
+    qfloat_t denom = qf_sqrt(qf_sub(QF_ONE, qf_sq_local(dv->a->x)));
+    *a_bar = qf_neg(qf_div(out_bar, denom));
+    *b_bar = QF_ZERO;
+}
+
+void dv_reverse_atan(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+{
+    *a_bar = qf_div(out_bar, qf_add(QF_ONE, qf_sq_local(dv->a->x)));
+    *b_bar = QF_ZERO;
+}
+
+void dv_reverse_asinh(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+{
+    qfloat_t denom = qf_sqrt(qf_add(qf_sq_local(dv->a->x), QF_ONE));
+    *a_bar = qf_div(out_bar, denom);
+    *b_bar = QF_ZERO;
+}
+
+void dv_reverse_acosh(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+{
+    qfloat_t denom = qf_mul(qf_sqrt(qf_sub(dv->a->x, QF_ONE)),
+                            qf_sqrt(qf_add(dv->a->x, QF_ONE)));
+    *a_bar = qf_div(out_bar, denom);
+    *b_bar = QF_ZERO;
+}
+
+void dv_reverse_atanh(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+{
+    *a_bar = qf_div(out_bar, qf_sub(QF_ONE, qf_sq_local(dv->a->x)));
+    *b_bar = QF_ZERO;
+}
+
+void dv_reverse_exp(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+{
+    *a_bar = qf_mul(out_bar, dv->x);
+    *b_bar = QF_ZERO;
+}
+
+void dv_reverse_log(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+{
+    *a_bar = qf_div(out_bar, dv->a->x);
+    *b_bar = QF_ZERO;
+}
+
+void dv_reverse_sqrt(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+{
+    *a_bar = qf_div(out_bar, qf_mul(qf_from_int_local(2), dv->x));
+    *b_bar = QF_ZERO;
+}
+
+void dv_reverse_abs(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+{
+    int cmp = qf_cmp(dv->a->x, QF_ZERO);
+    if (cmp > 0)
+        *a_bar = out_bar;
+    else if (cmp < 0)
+        *a_bar = qf_neg(out_bar);
+    else
+        *a_bar = QF_ZERO;
+    *b_bar = QF_ZERO;
+}
+
+void dv_reverse_hypot(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+{
+    *a_bar = qf_mul(out_bar, qf_div(dv->a->x, dv->x));
+    *b_bar = qf_mul(out_bar, qf_div(dv->b->x, dv->x));
+}
+
+void dv_reverse_erf(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+{
+    qfloat_t scale = qf_div(qf_from_int_local(2), qf_sqrt(QF_PI));
+    *a_bar = qf_mul(out_bar, qf_mul(scale, qf_exp(qf_neg(qf_sq_local(dv->a->x)))));
+    *b_bar = QF_ZERO;
+}
+
+void dv_reverse_erfc(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+{
+    qfloat_t scale = qf_div(qf_from_int_local(2), qf_sqrt(QF_PI));
+    *a_bar = qf_neg(qf_mul(out_bar, qf_mul(scale, qf_exp(qf_neg(qf_sq_local(dv->a->x))))));
+    *b_bar = QF_ZERO;
+}
+
+void dv_reverse_erfinv(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+{
+    qfloat_t scale = qf_div(qf_sqrt(QF_PI), qf_from_int_local(2));
+    *a_bar = qf_mul(out_bar, qf_mul(scale, qf_exp(qf_sq_local(dv->x))));
+    *b_bar = QF_ZERO;
+}
+
+void dv_reverse_erfcinv(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+{
+    qfloat_t scale = qf_div(qf_sqrt(QF_PI), qf_from_int_local(2));
+    *a_bar = qf_neg(qf_mul(out_bar, qf_mul(scale, qf_exp(qf_sq_local(dv->x)))));
+    *b_bar = QF_ZERO;
+}
+
+void dv_reverse_gamma(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+{
+    *a_bar = qf_mul(out_bar, qf_mul(dv->x, qf_digamma(dv->a->x)));
+    *b_bar = QF_ZERO;
+}
+
+void dv_reverse_lgamma(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+{
+    (void)dv;
+    *a_bar = qf_mul(out_bar, qf_digamma(dv->a->x));
+    *b_bar = QF_ZERO;
+}
+
+void dv_reverse_digamma(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+{
+    (void)dv;
+    *a_bar = qf_mul(out_bar, qf_trigamma(dv->a->x));
+    *b_bar = QF_ZERO;
+}
+
+void dv_reverse_trigamma(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+{
+    (void)dv;
+    *a_bar = qf_mul(out_bar, qf_tetragamma(dv->a->x));
+    *b_bar = QF_ZERO;
+}
+
+static qfloat_t qf_lambert_reverse_factor(qfloat_t z, qfloat_t w)
+{
+    if (qf_eq(z, QF_ZERO))
+        return QF_ONE;
+    return qf_div(w, qf_mul(z, qf_add(QF_ONE, w)));
+}
+
+void dv_reverse_lambert_w0(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+{
+    *a_bar = qf_mul(out_bar, qf_lambert_reverse_factor(dv->a->x, dv->x));
+    *b_bar = QF_ZERO;
+}
+
+void dv_reverse_lambert_wm1(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+{
+    *a_bar = qf_mul(out_bar, qf_lambert_reverse_factor(dv->a->x, dv->x));
+    *b_bar = QF_ZERO;
+}
+
+void dv_reverse_normal_pdf(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+{
+    *a_bar = qf_neg(qf_mul(out_bar, qf_mul(dv->a->x, dv->x)));
+    *b_bar = QF_ZERO;
+}
+
+void dv_reverse_normal_cdf(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+{
+    *a_bar = qf_mul(out_bar, qf_normal_pdf(dv->a->x));
+    *b_bar = QF_ZERO;
+}
+
+void dv_reverse_normal_logpdf(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+{
+    *a_bar = qf_neg(qf_mul(out_bar, dv->a->x));
+    *b_bar = QF_ZERO;
+}
+
+void dv_reverse_ei(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+{
+    *a_bar = qf_mul(out_bar, qf_div(qf_exp(dv->a->x), dv->a->x));
+    *b_bar = QF_ZERO;
+}
+
+void dv_reverse_e1(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+{
+    *a_bar = qf_neg(qf_mul(out_bar, qf_div(qf_exp(qf_neg(dv->a->x)), dv->a->x)));
+    *b_bar = QF_ZERO;
+}
+
+void dv_reverse_beta(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+{
+    qfloat_t psi_ab = qf_digamma(qf_add(dv->a->x, dv->b->x));
+    *a_bar = qf_mul(out_bar, qf_mul(dv->x, qf_sub(qf_digamma(dv->a->x), psi_ab)));
+    *b_bar = qf_mul(out_bar, qf_mul(dv->x, qf_sub(qf_digamma(dv->b->x), psi_ab)));
+}
+
+void dv_reverse_logbeta(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+{
+    qfloat_t psi_ab = qf_digamma(qf_add(dv->a->x, dv->b->x));
+    (void)dv;
+    *a_bar = qf_mul(out_bar, qf_sub(qf_digamma(dv->a->x), psi_ab));
+    *b_bar = qf_mul(out_bar, qf_sub(qf_digamma(dv->b->x), psi_ab));
+}
+
+/* ------------------------------------------------------------------------- */
 /* Operator vtable instances                                                 */
 /* ------------------------------------------------------------------------- */
 
 /* -------------------- ATOMS -------------------- */
 
 const dval_ops_t ops_const = {
-    eval_const,
-    deriv_const,
-    DV_OP_ATOM,
-    "const",
-    NULL
+    .eval = eval_const,
+    .deriv = deriv_const,
+    .reverse = dv_reverse_atom,
+    .arity = DV_OP_ATOM,
+    .name = "const",
+    .apply_unary = NULL,
+    .apply_binary = NULL,
+    .simplify = dv_simplify_passthrough,
+    .fold_const_unary = NULL
 };
 
 const dval_ops_t ops_var = {
-    eval_var,
-    deriv_var,
-    DV_OP_ATOM,
-    "var",
-    NULL
+    .eval = eval_var,
+    .deriv = deriv_var,
+    .reverse = dv_reverse_atom,
+    .arity = DV_OP_ATOM,
+    .name = "var",
+    .apply_unary = NULL,
+    .apply_binary = NULL,
+    .simplify = dv_simplify_passthrough,
+    .fold_const_unary = NULL
 };
 
 /* -------------------- BINARY OPS -------------------- */
 
 const dval_ops_t ops_add = {
-    eval_add,
-    deriv_add,
-    DV_OP_BINARY,
-    "+",
-    NULL
+    .eval = eval_add,
+    .deriv = deriv_add,
+    .reverse = dv_reverse_add,
+    .arity = DV_OP_BINARY,
+    .name = "+",
+    .apply_unary = NULL,
+    .apply_binary = dv_add,
+    .simplify = dv_simplify_add_sub_operator,
+    .fold_const_unary = NULL
 };
 
 const dval_ops_t ops_sub = {
-    eval_sub,
-    deriv_sub,
-    DV_OP_BINARY,
-    "-",
-    NULL
+    .eval = eval_sub,
+    .deriv = deriv_sub,
+    .reverse = dv_reverse_sub,
+    .arity = DV_OP_BINARY,
+    .name = "-",
+    .apply_unary = NULL,
+    .apply_binary = dv_sub,
+    .simplify = dv_simplify_add_sub_operator,
+    .fold_const_unary = NULL
 };
 
 const dval_ops_t ops_mul = {
-    eval_mul,
-    deriv_mul,
-    DV_OP_BINARY,
-    "*",
-    NULL
+    .eval = eval_mul,
+    .deriv = deriv_mul,
+    .reverse = dv_reverse_mul,
+    .arity = DV_OP_BINARY,
+    .name = "*",
+    .apply_unary = NULL,
+    .apply_binary = dv_mul,
+    .simplify = dv_simplify_mul_operator,
+    .fold_const_unary = NULL
 };
 
 const dval_ops_t ops_div = {
-    eval_div,
-    deriv_div,
-    DV_OP_BINARY,
-    "/",
-    NULL
+    .eval = eval_div,
+    .deriv = deriv_div,
+    .reverse = dv_reverse_div,
+    .arity = DV_OP_BINARY,
+    .name = "/",
+    .apply_unary = NULL,
+    .apply_binary = dv_div,
+    .simplify = dv_simplify_div_operator,
+    .fold_const_unary = NULL
 };
 
 const dval_ops_t ops_pow = {
-    eval_pow,
-    deriv_pow,
-    DV_OP_BINARY,
-    "^",
-    NULL
+    .eval = eval_pow,
+    .deriv = deriv_pow,
+    .reverse = dv_reverse_pow,
+    .arity = DV_OP_BINARY,
+    .name = "^",
+    .apply_unary = NULL,
+    .apply_binary = dv_pow,
+    .simplify = dv_simplify_pow_operator,
+    .fold_const_unary = NULL
 };
 
 const dval_ops_t ops_pow_d = {
-    eval_pow_d,
-    deriv_pow_d,
-    DV_OP_BINARY,
-    "^",
-    NULL
+    .eval = eval_pow_d,
+    .deriv = deriv_pow_d,
+    .reverse = dv_reverse_pow_d,
+    .arity = DV_OP_BINARY,
+    .name = "^",
+    .apply_unary = NULL,
+    .apply_binary = NULL,
+    .simplify = dv_simplify_pow_d_operator,
+    .fold_const_unary = NULL
 };
 
 const dval_ops_t ops_atan2 = {
-    eval_atan2,
-    deriv_atan2,
-    DV_OP_BINARY,
-    "atan2",
-    NULL
+    .eval = eval_atan2,
+    .deriv = deriv_atan2,
+    .reverse = dv_reverse_atan2,
+    .arity = DV_OP_BINARY,
+    .name = "atan2",
+    .apply_unary = NULL,
+    .apply_binary = dv_atan2,
+    .simplify = dv_simplify_binary_operator,
+    .fold_const_unary = NULL
 };
 
 /* -------------------- UNARY OPS -------------------- */
 
 const dval_ops_t ops_neg = {
-    eval_neg,
-    deriv_neg,
-    DV_OP_UNARY,
-    "-",
-    dv_neg
+    .eval = eval_neg,
+    .deriv = deriv_neg,
+    .reverse = dv_reverse_neg,
+    .arity = DV_OP_UNARY,
+    .name = "-",
+    .apply_unary = dv_neg,
+    .apply_binary = NULL,
+    .simplify = dv_simplify_neg_operator,
+    .fold_const_unary = NULL
 };
 
 const dval_ops_t ops_sin = {
-    eval_sin,
-    deriv_sin,
-    DV_OP_UNARY,
-    "sin",
-    dv_sin
+    .eval = eval_sin,
+    .deriv = deriv_sin,
+    .reverse = dv_reverse_sin,
+    .arity = DV_OP_UNARY,
+    .name = "sin",
+    .apply_unary = dv_sin,
+    .apply_binary = NULL,
+    .simplify = dv_simplify_unary_operator,
+    .fold_const_unary = dv_fold_zero_to_zero
 };
 
 const dval_ops_t ops_cos = {
-    eval_cos,
-    deriv_cos,
-    DV_OP_UNARY,
-    "cos",
-    dv_cos
+    .eval = eval_cos,
+    .deriv = deriv_cos,
+    .reverse = dv_reverse_cos,
+    .arity = DV_OP_UNARY,
+    .name = "cos",
+    .apply_unary = dv_cos,
+    .apply_binary = NULL,
+    .simplify = dv_simplify_unary_operator,
+    .fold_const_unary = dv_fold_cos_const
 };
 
 const dval_ops_t ops_tan = {
-    eval_tan,
-    deriv_tan,
-    DV_OP_UNARY,
-    "tan",
-    dv_tan
+    .eval = eval_tan,
+    .deriv = deriv_tan,
+    .reverse = dv_reverse_tan,
+    .arity = DV_OP_UNARY,
+    .name = "tan",
+    .apply_unary = dv_tan,
+    .apply_binary = NULL,
+    .simplify = dv_simplify_unary_operator,
+    .fold_const_unary = dv_fold_zero_to_zero
 };
 
 const dval_ops_t ops_sinh = {
-    eval_sinh,
-    deriv_sinh,
-    DV_OP_UNARY,
-    "sinh",
-    dv_sinh
+    .eval = eval_sinh,
+    .deriv = deriv_sinh,
+    .reverse = dv_reverse_sinh,
+    .arity = DV_OP_UNARY,
+    .name = "sinh",
+    .apply_unary = dv_sinh,
+    .apply_binary = NULL,
+    .simplify = dv_simplify_unary_operator,
+    .fold_const_unary = NULL
 };
 
 const dval_ops_t ops_cosh = {
-    eval_cosh,
-    deriv_cosh,
-    DV_OP_UNARY,
-    "cosh",
-    dv_cosh
+    .eval = eval_cosh,
+    .deriv = deriv_cosh,
+    .reverse = dv_reverse_cosh,
+    .arity = DV_OP_UNARY,
+    .name = "cosh",
+    .apply_unary = dv_cosh,
+    .apply_binary = NULL,
+    .simplify = dv_simplify_unary_operator,
+    .fold_const_unary = NULL
 };
 
 const dval_ops_t ops_tanh = {
-    eval_tanh,
-    deriv_tanh,
-    DV_OP_UNARY,
-    "tanh",
-    dv_tanh
+    .eval = eval_tanh,
+    .deriv = deriv_tanh,
+    .reverse = dv_reverse_tanh,
+    .arity = DV_OP_UNARY,
+    .name = "tanh",
+    .apply_unary = dv_tanh,
+    .apply_binary = NULL,
+    .simplify = dv_simplify_unary_operator,
+    .fold_const_unary = NULL
 };
 
 const dval_ops_t ops_asin = {
-    eval_asin,
-    deriv_asin,
-    DV_OP_UNARY,
-    "asin",
-    dv_asin
+    .eval = eval_asin,
+    .deriv = deriv_asin,
+    .reverse = dv_reverse_asin,
+    .arity = DV_OP_UNARY,
+    .name = "asin",
+    .apply_unary = dv_asin,
+    .apply_binary = NULL,
+    .simplify = dv_simplify_unary_operator,
+    .fold_const_unary = NULL
 };
 
 const dval_ops_t ops_acos = {
-    eval_acos,
-    deriv_acos,
-    DV_OP_UNARY,
-    "acos",
-    dv_acos
+    .eval = eval_acos,
+    .deriv = deriv_acos,
+    .reverse = dv_reverse_acos,
+    .arity = DV_OP_UNARY,
+    .name = "acos",
+    .apply_unary = dv_acos,
+    .apply_binary = NULL,
+    .simplify = dv_simplify_unary_operator,
+    .fold_const_unary = NULL
 };
 
 const dval_ops_t ops_atan = {
-    eval_atan,
-    deriv_atan,
-    DV_OP_UNARY,
-    "atan",
-    dv_atan
+    .eval = eval_atan,
+    .deriv = deriv_atan,
+    .reverse = dv_reverse_atan,
+    .arity = DV_OP_UNARY,
+    .name = "atan",
+    .apply_unary = dv_atan,
+    .apply_binary = NULL,
+    .simplify = dv_simplify_unary_operator,
+    .fold_const_unary = NULL
 };
 
 const dval_ops_t ops_asinh = {
-    eval_asinh,
-    deriv_asinh,
-    DV_OP_UNARY,
-    "asinh",
-    dv_asinh
+    .eval = eval_asinh,
+    .deriv = deriv_asinh,
+    .reverse = dv_reverse_asinh,
+    .arity = DV_OP_UNARY,
+    .name = "asinh",
+    .apply_unary = dv_asinh,
+    .apply_binary = NULL,
+    .simplify = dv_simplify_unary_operator,
+    .fold_const_unary = NULL
 };
 
 const dval_ops_t ops_acosh = {
-    eval_acosh,
-    deriv_acosh,
-    DV_OP_UNARY,
-    "acosh",
-    dv_acosh
+    .eval = eval_acosh,
+    .deriv = deriv_acosh,
+    .reverse = dv_reverse_acosh,
+    .arity = DV_OP_UNARY,
+    .name = "acosh",
+    .apply_unary = dv_acosh,
+    .apply_binary = NULL,
+    .simplify = dv_simplify_unary_operator,
+    .fold_const_unary = NULL
 };
 
 const dval_ops_t ops_atanh = {
-    eval_atanh,
-    deriv_atanh,
-    DV_OP_UNARY,
-    "atanh",
-    dv_atanh
+    .eval = eval_atanh,
+    .deriv = deriv_atanh,
+    .reverse = dv_reverse_atanh,
+    .arity = DV_OP_UNARY,
+    .name = "atanh",
+    .apply_unary = dv_atanh,
+    .apply_binary = NULL,
+    .simplify = dv_simplify_unary_operator,
+    .fold_const_unary = NULL
 };
 
 const dval_ops_t ops_exp = {
-    eval_exp,
-    deriv_exp,
-    DV_OP_UNARY,
-    "exp",
-    dv_exp
+    .eval = eval_exp,
+    .deriv = deriv_exp,
+    .reverse = dv_reverse_exp,
+    .arity = DV_OP_UNARY,
+    .name = "exp",
+    .apply_unary = dv_exp,
+    .apply_binary = NULL,
+    .simplify = dv_simplify_unary_operator,
+    .fold_const_unary = dv_fold_exp_const
 };
 
 const dval_ops_t ops_log = {
-    eval_log,
-    deriv_log,
-    DV_OP_UNARY,
-    "log",
-    dv_log
+    .eval = eval_log,
+    .deriv = deriv_log,
+    .reverse = dv_reverse_log,
+    .arity = DV_OP_UNARY,
+    .name = "log",
+    .apply_unary = dv_log,
+    .apply_binary = NULL,
+    .simplify = dv_simplify_unary_operator,
+    .fold_const_unary = dv_fold_log_const
 };
 
 const dval_ops_t ops_sqrt = {
-    eval_sqrt,
-    deriv_sqrt,
-    DV_OP_UNARY,
-    "sqrt",
-    dv_sqrt
+    .eval = eval_sqrt,
+    .deriv = deriv_sqrt,
+    .reverse = dv_reverse_sqrt,
+    .arity = DV_OP_UNARY,
+    .name = "sqrt",
+    .apply_unary = dv_sqrt,
+    .apply_binary = NULL,
+    .simplify = dv_simplify_unary_operator,
+    .fold_const_unary = dv_fold_sqrt_const
 };
 
 const dval_ops_t ops_abs = {
-    eval_abs,
-    deriv_abs,
-    DV_OP_UNARY,
-    "abs",
-    dv_abs
+    .eval = eval_abs,
+    .deriv = deriv_abs,
+    .reverse = dv_reverse_abs,
+    .arity = DV_OP_UNARY,
+    .name = "abs",
+    .apply_unary = dv_abs,
+    .apply_binary = NULL,
+    .simplify = dv_simplify_unary_operator,
+    .fold_const_unary = NULL
 };
 
 const dval_ops_t ops_erf = {
-    eval_erf,
-    deriv_erf,
-    DV_OP_UNARY,
-    "erf",
-    dv_erf
+    .eval = eval_erf,
+    .deriv = deriv_erf,
+    .reverse = dv_reverse_erf,
+    .arity = DV_OP_UNARY,
+    .name = "erf",
+    .apply_unary = dv_erf,
+    .apply_binary = NULL,
+    .simplify = dv_simplify_unary_operator,
+    .fold_const_unary = NULL
 };
 
 const dval_ops_t ops_erfc = {
-    eval_erfc,
-    deriv_erfc,
-    DV_OP_UNARY,
-    "erfc",
-    dv_erfc
+    .eval = eval_erfc,
+    .deriv = deriv_erfc,
+    .reverse = dv_reverse_erfc,
+    .arity = DV_OP_UNARY,
+    .name = "erfc",
+    .apply_unary = dv_erfc,
+    .apply_binary = NULL,
+    .simplify = dv_simplify_unary_operator,
+    .fold_const_unary = NULL
 };
 
 const dval_ops_t ops_lgamma = {
-    eval_lgamma,
-    deriv_lgamma,
-    DV_OP_UNARY,
-    "lgamma",
-    dv_lgamma
+    .eval = eval_lgamma,
+    .deriv = deriv_lgamma,
+    .reverse = dv_reverse_lgamma,
+    .arity = DV_OP_UNARY,
+    .name = "lgamma",
+    .apply_unary = dv_lgamma,
+    .apply_binary = NULL,
+    .simplify = dv_simplify_unary_operator,
+    .fold_const_unary = NULL
 };
 
 const dval_ops_t ops_hypot = {
-    eval_hypot,
-    deriv_hypot,
-    DV_OP_BINARY,
-    "hypot",
-    NULL
+    .eval = eval_hypot,
+    .deriv = deriv_hypot,
+    .reverse = dv_reverse_hypot,
+    .arity = DV_OP_BINARY,
+    .name = "hypot",
+    .apply_unary = NULL,
+    .apply_binary = dv_hypot,
+    .simplify = dv_simplify_hypot_operator,
+    .fold_const_unary = NULL
 };
 
 const dval_ops_t ops_erfinv = {
-    eval_erfinv,    deriv_erfinv,    DV_OP_UNARY, "erfinv",         dv_erfinv
+    .eval = eval_erfinv, .deriv = deriv_erfinv, .reverse = dv_reverse_erfinv, .arity = DV_OP_UNARY, .name = "erfinv",
+    .apply_unary = dv_erfinv, .apply_binary = NULL,
+    .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
 };
 const dval_ops_t ops_erfcinv = {
-    eval_erfcinv,   deriv_erfcinv,   DV_OP_UNARY, "erfcinv",        dv_erfcinv
+    .eval = eval_erfcinv, .deriv = deriv_erfcinv, .reverse = dv_reverse_erfcinv, .arity = DV_OP_UNARY, .name = "erfcinv",
+    .apply_unary = dv_erfcinv, .apply_binary = NULL,
+    .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
 };
 const dval_ops_t ops_gamma = {
-    eval_gamma,     deriv_gamma,     DV_OP_UNARY, "gamma",          dv_gamma
+    .eval = eval_gamma, .deriv = deriv_gamma, .reverse = dv_reverse_gamma, .arity = DV_OP_UNARY, .name = "gamma",
+    .apply_unary = dv_gamma, .apply_binary = NULL,
+    .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
 };
 const dval_ops_t ops_digamma = {
-    eval_digamma,   deriv_digamma,   DV_OP_UNARY, "digamma",        dv_digamma
+    .eval = eval_digamma, .deriv = deriv_digamma, .reverse = dv_reverse_digamma, .arity = DV_OP_UNARY, .name = "digamma",
+    .apply_unary = dv_digamma, .apply_binary = NULL,
+    .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
 };
 const dval_ops_t ops_trigamma = {
-    eval_trigamma,  deriv_trigamma,  DV_OP_UNARY, "trigamma",       dv_trigamma
+    .eval = eval_trigamma, .deriv = deriv_trigamma, .reverse = dv_reverse_trigamma, .arity = DV_OP_UNARY, .name = "trigamma",
+    .apply_unary = dv_trigamma, .apply_binary = NULL,
+    .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
 };
 const dval_ops_t ops_lambert_w0 = {
-    eval_lambert_w0,  deriv_lambert_w0,  DV_OP_UNARY, "lambert_w0",  dv_lambert_w0
+    .eval = eval_lambert_w0, .deriv = deriv_lambert_w0, .reverse = dv_reverse_lambert_w0, .arity = DV_OP_UNARY, .name = "lambert_w0",
+    .apply_unary = dv_lambert_w0, .apply_binary = NULL,
+    .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
 };
 const dval_ops_t ops_lambert_wm1 = {
-    eval_lambert_wm1, deriv_lambert_wm1, DV_OP_UNARY, "lambert_wm1", dv_lambert_wm1
+    .eval = eval_lambert_wm1, .deriv = deriv_lambert_wm1, .reverse = dv_reverse_lambert_wm1, .arity = DV_OP_UNARY, .name = "lambert_wm1",
+    .apply_unary = dv_lambert_wm1, .apply_binary = NULL,
+    .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
 };
 const dval_ops_t ops_normal_pdf = {
-    eval_normal_pdf,    deriv_normal_pdf,    DV_OP_UNARY, "normal_pdf",    dv_normal_pdf
+    .eval = eval_normal_pdf, .deriv = deriv_normal_pdf, .reverse = dv_reverse_normal_pdf, .arity = DV_OP_UNARY, .name = "normal_pdf",
+    .apply_unary = dv_normal_pdf, .apply_binary = NULL,
+    .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
 };
 const dval_ops_t ops_normal_cdf = {
-    eval_normal_cdf,    deriv_normal_cdf,    DV_OP_UNARY, "normal_cdf",    dv_normal_cdf
+    .eval = eval_normal_cdf, .deriv = deriv_normal_cdf, .reverse = dv_reverse_normal_cdf, .arity = DV_OP_UNARY, .name = "normal_cdf",
+    .apply_unary = dv_normal_cdf, .apply_binary = NULL,
+    .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
 };
 const dval_ops_t ops_normal_logpdf = {
-    eval_normal_logpdf, deriv_normal_logpdf, DV_OP_UNARY, "normal_logpdf", dv_normal_logpdf
+    .eval = eval_normal_logpdf, .deriv = deriv_normal_logpdf, .reverse = dv_reverse_normal_logpdf, .arity = DV_OP_UNARY, .name = "normal_logpdf",
+    .apply_unary = dv_normal_logpdf, .apply_binary = NULL,
+    .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
 };
 const dval_ops_t ops_ei = {
-    eval_ei, deriv_ei, DV_OP_UNARY, "Ei", dv_ei
+    .eval = eval_ei, .deriv = deriv_ei, .reverse = dv_reverse_ei, .arity = DV_OP_UNARY, .name = "Ei",
+    .apply_unary = dv_ei, .apply_binary = NULL,
+    .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
 };
 const dval_ops_t ops_e1 = {
-    eval_e1, deriv_e1, DV_OP_UNARY, "E1", dv_e1
+    .eval = eval_e1, .deriv = deriv_e1, .reverse = dv_reverse_e1, .arity = DV_OP_UNARY, .name = "E1",
+    .apply_unary = dv_e1, .apply_binary = NULL,
+    .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
 };
 const dval_ops_t ops_beta = {
-    eval_beta,    deriv_beta,    DV_OP_BINARY, "beta",    NULL
+    .eval = eval_beta, .deriv = deriv_beta, .reverse = dv_reverse_beta, .arity = DV_OP_BINARY, .name = "beta",
+    .apply_unary = NULL, .apply_binary = dv_beta,
+    .simplify = dv_simplify_binary_operator, .fold_const_unary = NULL
 };
 const dval_ops_t ops_logbeta = {
-    eval_logbeta, deriv_logbeta, DV_OP_BINARY, "logbeta", NULL
+    .eval = eval_logbeta, .deriv = deriv_logbeta, .reverse = dv_reverse_logbeta, .arity = DV_OP_BINARY, .name = "logbeta",
+    .apply_unary = NULL, .apply_binary = dv_logbeta,
+    .simplify = dv_simplify_binary_operator, .fold_const_unary = NULL
 };
 
 /* ------------------------------------------------------------------------- */
@@ -1506,6 +2093,14 @@ static dval_t *dv_new_pow_d(dval_t *a, double d)
     dval_t *dv = dv_alloc(&ops_pow_d);
     dv->a = a;
     dv->c = qf_from_double(d);
+    return dv;
+}
+
+static dval_t *dv_new_pow_qf(dval_t *a, qfloat_t exponent)
+{
+    dval_t *dv = dv_alloc(&ops_pow_d);
+    dv->a = a;
+    dv->c = exponent;
     return dv;
 }
 
@@ -1569,6 +2164,14 @@ dval_t *dv_pow_d(dval_t *a, double d)
     if (!a) return NULL;
     dv_retain(a);
     return dv_new_pow_d(a, d);
+}
+
+dval_t *dv_pow_qf(dval_t *a, qfloat_t exponent)
+{
+    if (!a)
+        return NULL;
+    dv_retain(a);
+    return dv_new_pow_qf(a, exponent);
 }
 
 dval_t *dv_sqrt(dval_t *a)
@@ -1731,11 +2334,7 @@ dval_t *dv_d_div(double d, dval_t *dv)
 }
 
 int dv_cmp(const dval_t *dv1, const dval_t *dv2) {
-    double a = dv_eval_d(dv1);
-    double b = dv_eval_d(dv2);
-    if (a < b) return -1;
-    if (a > b) return +1;
-    return 0;
+    return qf_cmp(dv_eval(dv1), dv_eval(dv2));
 }
 
 
@@ -1746,13 +2345,14 @@ int dv_cmp(const dval_t *dv1, const dval_t *dv2) {
 dval_t *dv_create_deriv(dval_t *expr, dval_t *wrt)
 {
     if (!expr || !wrt) return NULL;
+    dval_t *saved_wrt = tl_wrt;
     tl_wrt = wrt;
     dval_t *raw = dv_build_dx(expr); /* borrowed */
-    if (!raw) { tl_wrt = NULL; return NULL; }
+    if (!raw) { tl_wrt = saved_wrt; return NULL; }
     dv_retain(raw);                  /* now owning */
     dval_t *simp = dv_simplify(raw);
     dv_free(raw);
-    tl_wrt = NULL;
+    tl_wrt = saved_wrt;
     return simp;
 }
 

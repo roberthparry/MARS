@@ -213,7 +213,9 @@
       "test_to_string_pow_superscript": true,
       "test_to_string_unary_sin": true,
       "test_to_string_function_style": true,
-      "test_to_string_special_functions": true
+      "test_to_string_special_functions": true,
+      "test_to_string_simplification_identities_expr": true,
+      "test_to_string_common_denominator_expr": true
     },
     "test_to_string_basic_const": {
       "enabled": true,
@@ -292,6 +294,21 @@
       "test_partial_to_string_functions": true,
       "test_partial_to_string_log_r2": true,
       "test_partial_to_string_sin_xy": true
+    },
+    "test_runtime_regressions": {
+      "enabled": true,
+      "test_cmp_qfloat_precision": true,
+      "test_get_val_updates_after_set": true,
+      "test_simplify_nested_pow_d": true,
+      "test_simplify_negated_unary_args": true,
+      "test_simplify_inverse_unary_pairs": true
+    },
+    "test_reverse_mode": {
+      "enabled": true,
+      "test_reverse_gradient_polynomial": true,
+      "test_reverse_gradient_shared_subexpression": true,
+      "test_reverse_matches_forward_composite": true,
+      "test_reverse_gradient_missing_variable": true
     }
   },
   "tests/test_qfloat.c": {
