@@ -128,12 +128,43 @@ static void dense_set(struct matrix_t *A, size_t i, size_t j, const void *val) {
            A->elem->size);
 }
 
+static void dense_swap_rows(struct matrix_t *A, size_t r1, size_t r2)
+{
+    void *tmp;
+
+    if (!A || r1 == r2)
+        return;
+
+    tmp = A->data[r1];
+    A->data[r1] = A->data[r2];
+    A->data[r2] = tmp;
+}
+
+static void dense_row_eliminate_from(struct matrix_t *A, size_t dst_row, size_t src_row,
+                                     size_t col_start, const void *factor)
+{
+    unsigned char src[64], dst[64], prod[64], out[64];
+
+    if (!A || !factor || dst_row == src_row)
+        return;
+
+    for (size_t j = col_start; j < A->cols; j++) {
+        dense_get(A, dst_row, j, dst);
+        dense_get(A, src_row, j, src);
+        A->elem->mul(prod, factor, src);
+        A->elem->sub(out, dst, prod);
+        dense_set(A, dst_row, j, out);
+    }
+}
+
 static const struct store_vtable dense_store = {
     .create                   = store_create_dense,
     .alloc                    = dense_alloc,
     .free                     = dense_free,
     .get                      = dense_get,
     .set                      = dense_set,
+    .swap_rows                = dense_swap_rows,
+    .row_eliminate_from       = dense_row_eliminate_from,
     .materialise              = NULL,
     .is_sparse_storage        = dense_is_sparse_storage,
     .is_sparse_like           = dense_is_sparse_like,
@@ -245,6 +276,40 @@ static void sparse_set(struct matrix_t *A, size_t i, size_t j, const void *val)
     A->nnz++;
 }
 
+static void sparse_swap_rows(struct matrix_t *A, size_t r1, size_t r2)
+{
+    void *tmp;
+
+    if (!A || r1 == r2)
+        return;
+
+    tmp = A->data[r1];
+    A->data[r1] = A->data[r2];
+    A->data[r2] = tmp;
+}
+
+static void sparse_row_eliminate_from(struct matrix_t *A, size_t dst_row, size_t src_row,
+                                      size_t col_start, const void *factor)
+{
+    sparse_entry_t *cur;
+    unsigned char dst[64], prod[64], out[64];
+
+    if (!A || !factor || dst_row == src_row || !A->data)
+        return;
+
+    cur = (sparse_entry_t *)A->data[src_row];
+    while (cur && cur->col < col_start)
+        cur = cur->next;
+
+    while (cur) {
+        sparse_get(A, dst_row, cur->col, dst);
+        A->elem->mul(prod, factor, cur->value);
+        A->elem->sub(out, dst, prod);
+        sparse_set(A, dst_row, cur->col, out);
+        cur = cur->next;
+    }
+}
+
 static void sparse_materialise(struct matrix_t *A)
 {
     void **old_rows;
@@ -288,6 +353,8 @@ static const struct store_vtable sparse_store = {
     .free                     = sparse_free,
     .get                      = sparse_get,
     .set                      = sparse_set,
+    .swap_rows                = sparse_swap_rows,
+    .row_eliminate_from       = sparse_row_eliminate_from,
     .materialise              = sparse_materialise,
     .is_sparse_storage        = sparse_is_sparse_storage,
     .is_sparse_like           = sparse_is_sparse_like,
@@ -324,12 +391,27 @@ static void ident_set(struct matrix_t *A, size_t i, size_t j, const void *val) {
     dense_set(A, i, j, val);
 }
 
+static void ident_swap_rows(struct matrix_t *A, size_t r1, size_t r2)
+{
+    ident_materialise(A);
+    dense_swap_rows(A, r1, r2);
+}
+
+static void ident_row_eliminate_from(struct matrix_t *A, size_t dst_row, size_t src_row,
+                                     size_t col_start, const void *factor)
+{
+    ident_materialise(A);
+    dense_row_eliminate_from(A, dst_row, src_row, col_start, factor);
+}
+
 static const struct store_vtable identity_store = {
     .create                   = store_create_identity,
     .alloc                    = ident_alloc,
     .free                     = ident_free,
     .get                      = ident_get,
     .set                      = ident_set,
+    .swap_rows                = ident_swap_rows,
+    .row_eliminate_from       = ident_row_eliminate_from,
     .materialise              = ident_materialise,
     .is_sparse_storage        = identity_is_sparse_storage,
     .is_sparse_like           = identity_is_sparse_like,
@@ -442,12 +524,27 @@ static void diagonal_set(struct matrix_t *A, size_t i, size_t j, const void *val
     A->nnz++;
 }
 
+static void diagonal_swap_rows(struct matrix_t *A, size_t r1, size_t r2)
+{
+    diagonal_materialise(A);
+    dense_swap_rows(A, r1, r2);
+}
+
+static void diagonal_row_eliminate_from(struct matrix_t *A, size_t dst_row, size_t src_row,
+                                        size_t col_start, const void *factor)
+{
+    diagonal_materialise(A);
+    dense_row_eliminate_from(A, dst_row, src_row, col_start, factor);
+}
+
 static const struct store_vtable diagonal_store = {
     .create                   = store_create_diagonal,
     .alloc                    = diagonal_alloc,
     .free                     = diagonal_free,
     .get                      = diagonal_get,
     .set                      = diagonal_set,
+    .swap_rows                = diagonal_swap_rows,
+    .row_eliminate_from       = diagonal_row_eliminate_from,
     .materialise              = diagonal_materialise,
     .is_sparse_storage        = diagonal_is_sparse_storage,
     .is_sparse_like           = diagonal_is_sparse_like,
@@ -645,12 +742,50 @@ static void lower_triangular_set(struct matrix_t *A, size_t i, size_t j, const v
     A->nnz++;
 }
 
+static void upper_triangular_swap_rows(struct matrix_t *A, size_t r1, size_t r2)
+{
+    upper_triangular_materialise(A);
+    dense_swap_rows(A, r1, r2);
+}
+
+static void lower_triangular_swap_rows(struct matrix_t *A, size_t r1, size_t r2)
+{
+    lower_triangular_materialise(A);
+    dense_swap_rows(A, r1, r2);
+}
+
+static void upper_triangular_row_eliminate_from(struct matrix_t *A, size_t dst_row, size_t src_row,
+                                                size_t col_start, const void *factor)
+{
+    unsigned char src[64], dst[64], prod[64], out[64];
+
+    if (!A || !factor || dst_row == src_row)
+        return;
+
+    for (size_t j = col_start; j < A->cols; j++) {
+        upper_triangular_get(A, dst_row, j, dst);
+        upper_triangular_get(A, src_row, j, src);
+        A->elem->mul(prod, factor, src);
+        A->elem->sub(out, dst, prod);
+        upper_triangular_set(A, dst_row, j, out);
+    }
+}
+
+static void lower_triangular_row_eliminate_from(struct matrix_t *A, size_t dst_row, size_t src_row,
+                                                size_t col_start, const void *factor)
+{
+    lower_triangular_materialise(A);
+    dense_row_eliminate_from(A, dst_row, src_row, col_start, factor);
+}
+
 static const struct store_vtable upper_triangular_store = {
     .create                   = store_create_upper_triangular,
     .alloc                    = upper_triangular_alloc,
     .free                     = triangular_free,
     .get                      = upper_triangular_get,
     .set                      = upper_triangular_set,
+    .swap_rows                = upper_triangular_swap_rows,
+    .row_eliminate_from       = upper_triangular_row_eliminate_from,
     .materialise              = upper_triangular_materialise,
     .is_sparse_storage        = upper_triangular_is_sparse_storage,
     .is_sparse_like           = upper_triangular_is_sparse_like,
@@ -668,6 +803,8 @@ static const struct store_vtable lower_triangular_store = {
     .free                     = triangular_free,
     .get                      = lower_triangular_get,
     .set                      = lower_triangular_set,
+    .swap_rows                = lower_triangular_swap_rows,
+    .row_eliminate_from       = lower_triangular_row_eliminate_from,
     .materialise              = lower_triangular_materialise,
     .is_sparse_storage        = lower_triangular_is_sparse_storage,
     .is_sparse_like           = lower_triangular_is_sparse_like,
@@ -2513,17 +2650,19 @@ static matrix_t *mat_convert_dense(const matrix_t *A, const struct elem_vtable *
 
 static void mat_swap_rows(matrix_t *A, size_t r1, size_t r2)
 {
-    unsigned char a[64], b[64];
-
-    if (!A || r1 == r2)
+    if (!A || !A->store || !A->store->swap_rows)
         return;
 
-    for (size_t j = 0; j < A->cols; j++) {
-        mat_get(A, r1, j, a);
-        mat_get(A, r2, j, b);
-        mat_set(A, r1, j, b);
-        mat_set(A, r2, j, a);
-    }
+    A->store->swap_rows(A, r1, r2);
+}
+
+static void mat_row_eliminate_from(matrix_t *A, size_t dst_row, size_t src_row,
+                                   size_t col_start, const void *factor)
+{
+    if (!A || !A->store || !A->store->row_eliminate_from)
+        return;
+
+    A->store->row_eliminate_from(A, dst_row, src_row, col_start, factor);
 }
 
 static size_t mat_find_pivot_row(const matrix_t *A, size_t col, size_t start)
@@ -2567,6 +2706,54 @@ static matrix_t *mat_convert_preserving_store(const matrix_t *A,
         return NULL;
 
     return mat_convert_with_store(A, target, A->store);
+}
+
+static const struct store_vtable *mat_sparse_factor_store(const matrix_t *A,
+                                                          const struct store_vtable *structured_store)
+{
+    if (!structured_store)
+        return NULL;
+
+    return mat_is_sparse_like(A) ? &sparse_store : structured_store;
+}
+
+static matrix_t *mat_apply_row_permutation(const matrix_t *P,
+                                           const matrix_t *B,
+                                           const struct elem_vtable *elem)
+{
+    matrix_t *PB;
+    unsigned char pivot[64], value[64];
+
+    if (!P || !B || !elem || P->rows != B->rows)
+        return NULL;
+
+    PB = mat_create_elementwise_unary_result(B->rows, B->cols, elem, B);
+    if (!PB)
+        return NULL;
+
+    for (size_t i = 0; i < P->rows; i++) {
+        size_t src_row = P->cols;
+
+        for (size_t j = 0; j < P->cols; j++) {
+            mat_get(P, i, j, pivot);
+            if (elem->cmp(pivot, elem->zero) != 0) {
+                src_row = j;
+                break;
+            }
+        }
+
+        if (src_row >= P->cols) {
+            mat_free(PB);
+            return NULL;
+        }
+
+        for (size_t j = 0; j < B->cols; j++) {
+            mat_get(B, src_row, j, value);
+            mat_set(PB, i, j, value);
+        }
+    }
+
+    return PB;
 }
 
 static matrix_t *mat_create_direct_solve_result(const matrix_t *A,
@@ -2934,11 +3121,9 @@ matrix_t *mat_inverse(const matrix_t *A)
 
 matrix_t *mat_solve(const matrix_t *A, const matrix_t *B)
 {
+    mat_lu_factor_t lu = {0};
     const struct elem_vtable *e;
-    matrix_t *Ac = NULL, *Bc = NULL;
-    matrix_t *M = NULL, *RHS = NULL, *X = NULL;
-    unsigned char pivot[64], inv_pivot[64], factor[64];
-    unsigned char a[64], b[64], prod[64], tmp[64], sum[64];
+    matrix_t *Ac = NULL, *Bc = NULL, *PB = NULL, *Y = NULL, *X = NULL;
 
     if (!A || !B || A->rows != A->cols || A->rows != B->rows)
         return NULL;
@@ -2973,87 +3158,35 @@ matrix_t *mat_solve(const matrix_t *A, const matrix_t *B)
         return X;
     }
 
-    M = mat_copy_as_dense(Ac);
-    RHS = mat_copy_as_dense(Bc);
-    if (!M || !RHS)
+    if (mat_lu_factor(Ac, &lu) != 0)
         goto fail;
 
-    for (size_t k = 0; k < M->rows; k++) {
-        size_t pivot_row = mat_find_pivot_row(M, k, k);
-        mat_get(M, pivot_row, k, pivot);
-        if (e->abs2(pivot) < 1e-300)
-            goto fail;
+    PB = mat_apply_row_permutation(lu.P, Bc, e);
+    if (!PB)
+        goto fail;
 
-        mat_swap_rows(M, k, pivot_row);
-        mat_swap_rows(RHS, k, pivot_row);
+    Y = mat_forward_substitute(lu.L, PB, e);
+    if (!Y)
+        goto fail;
 
-        mat_get(M, k, k, pivot);
-        e->inv(inv_pivot, pivot);
-
-        for (size_t i = k + 1; i < M->rows; i++) {
-            mat_get(M, i, k, factor);
-            if (e->abs2(factor) < 1e-300)
-                continue;
-
-            e->mul(factor, factor, inv_pivot);
-            mat_set(M, i, k, e->zero);
-
-            for (size_t j = k + 1; j < M->cols; j++) {
-                mat_get(M, i, j, a);
-                mat_get(M, k, j, b);
-                e->mul(prod, factor, b);
-                e->sub(tmp, a, prod);
-                mat_set(M, i, j, tmp);
-            }
-
-            for (size_t j = 0; j < RHS->cols; j++) {
-                mat_get(RHS, i, j, a);
-                mat_get(RHS, k, j, b);
-                e->mul(prod, factor, b);
-                e->sub(tmp, a, prod);
-                mat_set(RHS, i, j, tmp);
-            }
-        }
-    }
-
-    X = mat_create_dense_with_elem(A->cols, B->cols, e);
+    X = mat_backward_substitute(lu.U, Y, e);
     if (!X)
         goto fail;
 
-    for (size_t ii = M->rows; ii-- > 0;) {
-        mat_get(M, ii, ii, pivot);
-        if (e->abs2(pivot) < 1e-300)
-            goto fail;
-
-        e->inv(inv_pivot, pivot);
-
-        for (size_t j = 0; j < RHS->cols; j++) {
-            mat_get(RHS, ii, j, sum);
-
-            for (size_t k = ii + 1; k < M->cols; k++) {
-                mat_get(M, ii, k, a);
-                mat_get(X, k, j, b);
-                e->mul(prod, a, b);
-                e->sub(sum, sum, prod);
-            }
-
-            e->mul(tmp, sum, inv_pivot);
-            mat_set(X, ii, j, tmp);
-        }
-    }
-
-    mat_free(M);
-    mat_free(RHS);
     mat_free(Ac);
     mat_free(Bc);
+    mat_free(PB);
+    mat_free(Y);
+    mat_lu_factor_free(&lu);
     return X;
 
 fail:
     mat_free(Ac);
     mat_free(Bc);
-    mat_free(M);
-    mat_free(RHS);
+    mat_free(PB);
+    mat_free(Y);
     mat_free(X);
+    mat_lu_factor_free(&lu);
     return NULL;
 }
 
@@ -3112,9 +3245,14 @@ void mat_lu_factor_free(mat_lu_factor_t *out)
 int mat_lu_factor(const matrix_t *A, mat_lu_factor_t *out)
 {
     const struct elem_vtable *e;
-    matrix_t *P = NULL, *L = NULL, *U = NULL;
+    const struct store_vtable *permutation_store;
+    const struct store_vtable *lower_store;
+    const struct store_vtable *upper_store;
+    const struct store_vtable *working_lower_store;
+    matrix_t *P_seed = NULL, *P = NULL, *L = NULL, *U = NULL;
+    matrix_t *L_out = NULL, *U_out = NULL;
     unsigned char pivot[64], inv_pivot[64], factor[64];
-    unsigned char a[64], b[64], prod[64], tmp[64];
+    unsigned char a[64], b[64];
 
     if (!A || !out)
         return -1;
@@ -3122,9 +3260,15 @@ int mat_lu_factor(const matrix_t *A, mat_lu_factor_t *out)
         return -2;
 
     e = A->elem;
-    P = mat_create_identity_with_elem(A->rows, e);
-    L = mat_create_lower_triangular_with_elem(A->rows, A->rows, e);
-    U = mat_convert_dense(A, e);
+    permutation_store = mat_sparse_factor_store(A, &identity_store);
+    lower_store = mat_sparse_factor_store(A, &lower_triangular_store);
+    upper_store = mat_sparse_factor_store(A, &upper_triangular_store);
+    working_lower_store = mat_sparse_factor_store(A, &lower_triangular_store);
+    P_seed = mat_create_identity_with_elem(A->rows, e);
+    P = mat_convert_with_store(P_seed, e, permutation_store);
+    L = mat_create_with_store(A->rows, A->rows, e, working_lower_store);
+    U = mat_convert_preserving_store(A, e);
+    mat_free(P_seed);
     if (!P || !L || !U) {
         mat_free(P);
         mat_free(L);
@@ -3169,26 +3313,24 @@ int mat_lu_factor(const matrix_t *A, mat_lu_factor_t *out)
             e->mul(factor, factor, inv_pivot);
             mat_set(L, i, k, factor);
             mat_set(U, i, k, e->zero);
-
-            for (size_t j = k + 1; j < A->cols; j++) {
-                mat_get(U, i, j, a);
-                mat_get(U, k, j, b);
-                e->mul(prod, factor, b);
-                e->sub(tmp, a, prod);
-                mat_set(U, i, j, tmp);
-            }
+            mat_row_eliminate_from(U, i, k, k + 1, factor);
         }
     }
 
-    out->P = P;
-    out->L = L;
-    out->U = mat_convert_with_store(U, e, &upper_triangular_store);
+    L_out = mat_convert_with_store(L, e, lower_store);
+    U_out = mat_convert_with_store(U, e, upper_store);
     mat_free(U);
-    if (!out->U) {
+    mat_free(L);
+    if (!L_out || !U_out) {
         mat_free(P);
-        mat_free(L);
+        mat_free(L_out);
+        mat_free(U_out);
         return -3;
     }
+
+    out->P = P;
+    out->L = L_out;
+    out->U = U_out;
     return 0;
 }
 
@@ -3305,12 +3447,15 @@ void mat_cholesky_free(mat_cholesky_t *out)
 
 int mat_cholesky(const matrix_t *A, mat_cholesky_t *out)
 {
+    const struct store_vtable *lower_store;
     matrix_t *Z = NULL, *Lq = NULL;
 
     if (!A || !out)
         return -1;
     if (A->rows != A->cols)
         return -2;
+
+    lower_store = mat_sparse_factor_store(A, &lower_triangular_store);
 
     Z = mat_convert_dense(A, &qcomplex_elem);
     Lq = mat_create_lower_triangular_with_elem(A->rows, A->cols, &qcomplex_elem);
@@ -3358,7 +3503,7 @@ int mat_cholesky(const matrix_t *A, mat_cholesky_t *out)
 
     }
 
-    out->L = mat_convert_with_store(Lq, A->elem, &lower_triangular_store);
+    out->L = mat_convert_with_store(Lq, A->elem, lower_store);
     mat_free(Z);
     mat_free(Lq);
 

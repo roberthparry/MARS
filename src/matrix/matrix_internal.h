@@ -125,6 +125,9 @@ struct store_vtable {
 
     void (*get)(const struct matrix_t *A, size_t i, size_t j, void *out);
     void (*set)(struct matrix_t *A, size_t i, size_t j, const void *val);
+    void (*swap_rows)(struct matrix_t *A, size_t r1, size_t r2);
+    void (*row_eliminate_from)(struct matrix_t *A, size_t dst_row, size_t src_row,
+                               size_t col_start, const void *factor);
 
     void (*materialise)(struct matrix_t *A);
     bool (*is_sparse_storage)(const struct matrix_t *A);
