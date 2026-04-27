@@ -1,6 +1,7 @@
 #ifndef MATRIX_H
 #define MATRIX_H
 
+#include <stdbool.h>
 #include <stddef.h>
 
 #include "qfloat.h"
@@ -15,8 +16,11 @@
  *
  * Matrices may be:
  *   - fully materialised (standard matrix)
+ *   - sparse
  *   - identity (zero storage; materialises on write)
- *   - diagonal (future extension)
+ *   - diagonal
+ *   - upper triangular
+ *   - lower triangular
  *
  * All operations dispatch through internal vtables. No type switches or
  * storage switches appear in user code.
@@ -33,6 +37,86 @@ typedef enum {
     MAT_TYPE_QCOMPLEX
 } mat_type_t;
 
+/**
+ * @brief Matrix norm selector.
+ *
+ * This enumeration identifies the matrix norm to be computed by functions
+ * such as mat_norm() and mat_condition_number().
+ */
+typedef enum {
+    /** Maximum absolute column sum. */
+    MAT_NORM_1,
+    /** Maximum absolute row sum. */
+    MAT_NORM_INF,
+    /** Frobenius norm. */
+    MAT_NORM_FRO,
+    /** Spectral norm (largest singular value). */
+    MAT_NORM_2
+} mat_norm_type_t;
+
+/**
+ * @brief Result of an LU factorisation.
+ *
+ * On success, these matrices satisfy P A = L U.
+ */
+typedef struct {
+    /** Permutation matrix. */
+    matrix_t *P;
+    /** Unit lower-triangular factor. */
+    matrix_t *L;
+    /** Upper-triangular factor. */
+    matrix_t *U;
+} mat_lu_factor_t;
+
+/**
+ * @brief Result of a QR factorisation.
+ *
+ * On success, these matrices satisfy A = Q R.
+ */
+typedef struct {
+    /** Orthogonal or unitary factor. */
+    matrix_t *Q;
+    /** Upper-triangular factor. */
+    matrix_t *R;
+} mat_qr_factor_t;
+
+/**
+ * @brief Result of a Cholesky factorisation.
+ *
+ * On success, L satisfies A = L L^H.
+ */
+typedef struct {
+    /** Lower-triangular Cholesky factor. */
+    matrix_t *L;
+} mat_cholesky_t;
+
+/**
+ * @brief Result of a singular value decomposition.
+ *
+ * On success, these matrices describe the factorisation A = U S V^H.
+ */
+typedef struct {
+    /** Left singular vectors. */
+    matrix_t *U;
+    /** Diagonal matrix of singular values. */
+    matrix_t *S;
+    /** Right singular vectors. */
+    matrix_t *V;
+} mat_svd_factor_t;
+
+/**
+ * @brief Result of a Schur factorisation.
+ *
+ * On success, these matrices satisfy A = Q T Q^H, where Q is unitary and
+ * T is upper triangular.
+ */
+typedef struct {
+    /** Unitary Schur vectors. */
+    matrix_t *Q;
+    /** Upper-triangular Schur form. */
+    matrix_t *T;
+} mat_schur_factor_t;
+
 /* -------------------------------------------------------------------------
    Construction
    ------------------------------------------------------------------------- */
@@ -44,16 +128,19 @@ typedef enum {
  * The caller must fill it using mat_set().
  */
 matrix_t *mat_new_d(size_t rows, size_t cols);
+matrix_t *mat_new_sparse_d(size_t rows, size_t cols);
 
 /**
  * @brief Allocate a new (incomplete) matrix of qfloat_t.
  */
 matrix_t *mat_new_qf(size_t rows, size_t cols);
+matrix_t *mat_new_sparse_qf(size_t rows, size_t cols);
 
 /**
  * @brief Allocate a new (incomplete) matrix of qcomplex_t.
  */
 matrix_t *mat_new_qc(size_t rows, size_t cols);
+matrix_t *mat_new_sparse_qc(size_t rows, size_t cols);
 
 /**
  * @brief Allocate a new (incomplete) square matrix of doubles.
@@ -84,6 +171,28 @@ matrix_t *mat_create_identity_qf(size_t n);
  * @brief Create a complete identity matrix of qcomplex_t.
  */
 matrix_t *mat_create_identity_qc(size_t n);
+
+/**
+ * @brief Create a diagonal matrix of doubles from its diagonal entries.
+ *
+ * Only the main diagonal is stored explicitly. All off-diagonal entries are
+ * zero.
+ *
+ * @param n         Matrix order.
+ * @param diagonal  Pointer to n diagonal entries in row order.
+ * @return          Newly allocated diagonal matrix on success, or NULL on error.
+ */
+matrix_t *mat_create_diagonal_d(size_t n, const double *diagonal);
+
+/**
+ * @brief Create a diagonal matrix of qfloat_t values from its diagonal entries.
+ */
+matrix_t *mat_create_diagonal_qf(size_t n, const qfloat_t *diagonal);
+
+/**
+ * @brief Create a diagonal matrix of qcomplex_t values from its diagonal entries.
+ */
+matrix_t *mat_create_diagonal_qc(size_t n, const qcomplex_t *diagonal);
 
 /**
  * @brief Create a complete matrix of doubles from a flat array.
@@ -119,6 +228,48 @@ void mat_set(matrix_t *A, size_t i, size_t j, const void *val);
 
 size_t mat_get_row_count(const matrix_t *A);
 size_t mat_get_col_count(const matrix_t *A);
+
+/**
+ * @brief Sparse storage helpers.
+ *
+ * Sparse matrices are useful when most entries are zero and only a small
+ * number of values need to be stored explicitly. Typical examples include
+ * diagonal matrices, banded matrices, graph adjacency matrices, and large
+ * linear systems where only a few coefficients appear in each row.
+ *
+ * Use these helpers when you want to:
+ * - check whether a matrix is currently using sparse storage,
+ * - inspect how many nonzero entries it contains,
+ * - convert a dense matrix into sparse form to save space, or
+ * - materialise a sparse matrix as dense form for inspection or algorithms
+ *   that expect all entries to be stored explicitly.
+ *
+ * Sparse storage is worth using when the matrix contains many zeros, because
+ * it can reduce memory use and help sparse-aware operations avoid unnecessary
+ * work. Dense storage is often simpler for very small matrices or for
+ * algorithms that naturally touch nearly every entry.
+ */
+bool   mat_is_sparse(const matrix_t *A);
+size_t mat_nonzero_count(const matrix_t *A);
+matrix_t *mat_to_sparse(const matrix_t *A);
+matrix_t *mat_to_dense(const matrix_t *A);
+
+/**
+ * @brief Structural queries.
+ *
+ * These predicates report whether a matrix has diagonal, upper-triangular, or
+ * lower-triangular structure. They answer the mathematical question about the
+ * entries of the matrix, not merely which internal storage backend is in use.
+ *
+ * Use them when you want to:
+ * - verify the output of a factorisation,
+ * - check whether a specialised algorithm is applicable, or
+ * - confirm that a matrix built from a structured constructor has kept its
+ *   shape after further operations.
+ */
+bool mat_is_diagonal(const matrix_t *A);
+bool mat_is_upper_triangular(const matrix_t *A);
+bool mat_is_lower_triangular(const matrix_t *A);
 
 /**
  * @brief Query the element type of a matrix.
@@ -193,6 +344,240 @@ matrix_t *mat_hermitian(const matrix_t *A);
 
 int       mat_det(const matrix_t *A, void *determinant);
 matrix_t *mat_inverse(const matrix_t *A);
+
+/**
+ * @brief Solve the linear matrix equation A X = B.
+ *
+ * The input matrix A must be square and nonsingular. The matrix B may
+ * contain one or more right-hand sides.
+ *
+ * @param A  Coefficient matrix.
+ * @param B  Right-hand-side matrix.
+ * @return   Newly allocated solution matrix on success, or NULL on error.
+ */
+matrix_t *mat_solve(const matrix_t *A, const matrix_t *B);
+
+/**
+ * @brief Compute a best-fit solution to A X = B.
+ *
+ * When an exact solution may not exist, this routine returns a matrix X that
+ * minimises the residual norm ||A X - B||. For full-column-rank overdetermined
+ * systems it uses a QR-based solve. Rank-deficient or underdetermined systems
+ * fall back to the Moore-Penrose pseudoinverse so the returned solution remains
+ * well defined.
+ *
+ * Example:
+ * @code
+ * double A_data[] = {
+ *     0.0, 1.0,
+ *     1.0, 1.0,
+ *     2.0, 1.0
+ * };
+ * double B_data[] = {
+ *     1.0,
+ *     3.0,
+ *     5.1
+ * };
+ *
+ * matrix_t *A = mat_create_d(3, 2, A_data);
+ * matrix_t *B = mat_create_d(3, 1, B_data);
+ * matrix_t *X = mat_least_squares(A, B);
+ *
+ * mat_print(X);
+ *
+ * mat_free(X);
+ * mat_free(B);
+ * mat_free(A);
+ * @endcode
+ *
+ * @param A  Coefficient matrix.
+ * @param B  Right-hand-side matrix.
+ * @return   Newly allocated least-squares solution matrix on success, or
+ *           NULL on error.
+ */
+matrix_t *mat_least_squares(const matrix_t *A, const matrix_t *B);
+
+/**
+ * @brief Compute the numerical rank of a matrix.
+ *
+ * The rank is determined from the singular values of A using the library's
+ * internal tolerance policy.
+ *
+ * @param A  Input matrix.
+ * @return   The computed rank, or a negative value on error.
+ */
+int       mat_rank(const matrix_t *A);
+
+/**
+ * @brief Compute the Moore-Penrose pseudoinverse of a matrix.
+ *
+ * The pseudoinverse generalises the ordinary matrix inverse to rectangular
+ * or singular matrices. It is useful for least-squares problems, minimum-
+ * norm solutions, projection operators, and for working with matrices that
+ * do not admit a true inverse.
+ *
+ * In particular, the pseudoinverse is useful when solving systems that are
+ * overdetermined, underdetermined, or rank-deficient. In those settings it
+ * provides the standard inverse-like object used to compute best-fit or
+ * minimum-norm solutions.
+ *
+ * When A is square and nonsingular, the pseudoinverse coincides with the
+ * ordinary inverse.
+ *
+ * @param A  Input matrix.
+ * @return   Newly allocated pseudoinverse on success, or NULL on error.
+ */
+matrix_t *mat_pseudoinverse(const matrix_t *A);
+
+/**
+ * @brief Compute a basis for the right nullspace of a matrix.
+ *
+ * The returned matrix stores basis vectors as its columns. If the nullspace
+ * is trivial, the result may have zero columns.
+ *
+ * @param A  Input matrix.
+ * @return   Newly allocated nullspace basis matrix on success, or NULL on
+ *           error.
+ */
+matrix_t *mat_nullspace(const matrix_t *A);
+
+/**
+ * @brief Compute a matrix norm.
+ *
+ * The selected norm is written to @p out as a qfloat_t regardless of the
+ * element type of the input matrix.
+ *
+ * @param A     Input matrix.
+ * @param type  Norm to compute.
+ * @param out   Output location for the norm value.
+ * @return      0 on success, nonzero on error.
+ */
+int       mat_norm(const matrix_t *A, mat_norm_type_t type, qfloat_t *out);
+
+/**
+ * @brief Compute a matrix condition number in a chosen norm.
+ *
+ * The condition number is written to @p out as a qfloat_t.
+ *
+ * @param A     Input matrix.
+ * @param type  Norm in which to compute the condition number.
+ * @param out   Output location for the condition number.
+ * @return      0 on success, nonzero on error.
+ */
+int       mat_condition_number(const matrix_t *A, mat_norm_type_t type, qfloat_t *out);
+
+/**
+ * @brief Compute an LU factorisation with pivoting.
+ *
+ * On success, @p out receives matrices P, L, and U such that P A = L U.
+ * The caller becomes responsible for releasing them with mat_lu_factor_free().
+ *
+ * @param A    Input matrix.
+ * @param out  Output factorisation structure.
+ * @return     0 on success, nonzero on error.
+ */
+int mat_lu_factor(const matrix_t *A, mat_lu_factor_t *out);
+
+/**
+ * @brief Release storage owned by an LU factorisation result.
+ *
+ * @param out  Factorisation structure previously filled by mat_lu_factor().
+ */
+void mat_lu_factor_free(mat_lu_factor_t *out);
+
+/**
+ * @brief Compute a QR factorisation.
+ *
+ * On success, @p out receives matrices Q and R such that A = Q R. The caller
+ * becomes responsible for releasing them with mat_qr_factor_free().
+ *
+ * @param A    Input matrix.
+ * @param out  Output factorisation structure.
+ * @return     0 on success, nonzero on error.
+ */
+int mat_qr_factor(const matrix_t *A, mat_qr_factor_t *out);
+
+/**
+ * @brief Release storage owned by a QR factorisation result.
+ *
+ * @param out  Factorisation structure previously filled by mat_qr_factor().
+ */
+void mat_qr_factor_free(mat_qr_factor_t *out);
+
+/**
+ * @brief Compute a Cholesky factorisation.
+ *
+ * On success, @p out receives a lower-triangular matrix L such that
+ * A = L L^H. The input must be Hermitian positive-definite.
+ *
+ * @param A    Input matrix.
+ * @param out  Output factorisation structure.
+ * @return     0 on success, nonzero on error.
+ */
+int mat_cholesky(const matrix_t *A, mat_cholesky_t *out);
+
+/**
+ * @brief Release storage owned by a Cholesky factorisation result.
+ *
+ * @param out  Factorisation structure previously filled by mat_cholesky().
+ */
+void mat_cholesky_free(mat_cholesky_t *out);
+
+/**
+ * @brief Compute a singular value decomposition.
+ *
+ * This routine factorises A as
+ *
+ *   A = U S V^H
+ *
+ * where U and V contain left and right singular vectors, and S contains the
+ * singular values on its diagonal.
+ *
+ * The singular value decomposition is useful for rank analysis, numerical
+ * conditioning, pseudoinverses, least-squares problems, and for working
+ * robustly with rectangular or rank-deficient matrices.
+ *
+ * On success, @p out receives matrices U, S, and V describing this
+ * factorisation. The caller becomes responsible for releasing them with
+ * mat_svd_factor_free().
+ *
+ * @param A    Input matrix.
+ * @param out  Output factorisation structure.
+ * @return     0 on success, nonzero on error.
+ */
+int mat_svd_factor(const matrix_t *A, mat_svd_factor_t *out);
+
+/**
+ * @brief Release storage owned by an SVD result.
+ *
+ * @param out  Factorisation structure previously filled by mat_svd_factor().
+ */
+void mat_svd_factor_free(mat_svd_factor_t *out);
+
+/**
+ * @brief Compute the Schur factorisation A = Q T Q^H.
+ *
+ * The Schur factorisation is a numerically stable way to represent a square
+ * matrix using a unitary change of basis Q and an upper-triangular matrix T.
+ * It is especially useful for non-Hermitian eigenvalue problems and for matrix
+ * functions such as exp(A), log(A), and sqrt(A).
+ *
+ * The returned factors are stored as qcomplex matrices even when the input is
+ * real-valued, since a general real matrix may have complex Schur data.
+ *
+ * @param A    Input square matrix.
+ * @param out  Output factorisation structure.
+ * @return     0 on success, nonzero on error.
+ */
+int mat_schur_factor(const matrix_t *A, mat_schur_factor_t *out);
+
+/**
+ * @brief Release the matrices owned by a Schur factorisation.
+ *
+ * @param out  Factorisation structure previously filled by
+ *             mat_schur_factor().
+ */
+void mat_schur_factor_free(mat_schur_factor_t *out);
 
 /* -------------------------------------------------------------------------
    Eigenvalues / Eigenvectors

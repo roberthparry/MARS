@@ -1,9 +1,9 @@
 # `matrix_t`
 
 `matrix_t` is a generic high-precision matrix type with pluggable element types
-(`double`, `qfloat_t`, `qcomplex_t`) and pluggable storage kinds (dense, identity,
-diagonal). All operations dispatch through internal vtables; no type switches or
-storage switches appear in user code.
+(`double`, `qfloat_t`, `qcomplex_t`) and pluggable storage kinds (dense, sparse,
+identity, diagonal, upper triangular, lower triangular). All operations dispatch
+through internal vtables; no type switches or storage switches appear in user code.
 
 ## Representation
 
@@ -11,18 +11,26 @@ storage switches appear in user code.
 the API. Internally each matrix carries:
 
 - a pointer to an element vtable (arithmetic, conversion, formatting)
-- a pointer to a storage vtable (get/set, iteration)
+- a pointer to a storage vtable (construction, get/set, layout queries)
 - a `rows × cols` size pair
-- a storage payload (a flat `double[]`, `qfloat_t[]`, or `qcomplex_t[]` for dense
-  matrices; nothing for identity matrices)
+- a storage payload whose layout depends on the chosen storage kind
 
 ## Capabilities
 
 - element types: `double`, `qfloat_t` (~31–32 decimal digits), `qcomplex_t` (~31–32 decimal digits)
-- storage kinds: dense (fully materialised), identity (zero storage, materialises on write)
+- storage kinds:
+  - dense (fully materialised)
+  - sparse (stores only non-zero elements explicitly)
+  - identity (zero storage, materialises on write)
+  - diagonal (stores only the main diagonal)
+  - upper triangular (stores entries on and above the diagonal)
+  - lower triangular (stores entries on and below the diagonal)
 - arithmetic: scalar multiply/divide, matrix add, subtract, multiply
 - structural: transpose, conjugate, Hermitian (conjugate transpose)
-- linear algebra: determinant, inverse, eigenvalues, eigendecomposition, eigenvectors
+- linear algebra: determinant, inverse, eigenvalues, eigendecomposition, eigenvectors, solve, least-squares, rank, pseudoinverse, nullspace
+- matrix norms: 1-norm, infinity-norm, Frobenius norm, 2-norm
+- matrix factorisations: LU, QR, Cholesky, SVD, Schur
+- condition number computation
 - matrix functions: exp, sin, cos, tan, sinh, cosh, tanh, sqrt, log, asin, acos, atan, asinh, acosh, atanh, erf, erfc
 - power functions: integer power (binary exponentiation), real power via exp/log
 - all eigendecomposition computed at full `qfloat_t`/`qcomplex_t` precision regardless of element type; all matrix functions computed at full `qcomplex_t` precision
@@ -74,6 +82,43 @@ eigenvalue[1] = 4 + 0i
 
 All declarations are in `include/matrix.h`.
 
+### Types
+
+```c
+typedef enum {
+    MAT_NORM_1,      /* 1-norm (max column sum) */
+    MAT_NORM_INF,    /* Infinity-norm (max row sum) */
+    MAT_NORM_FRO,    /* Frobenius norm */
+    MAT_NORM_2       /* 2-norm (largest singular value) */
+} mat_norm_type_t;
+
+typedef struct {
+    matrix_t *P;  /* Permutation matrix */
+    matrix_t *L;  /* Lower triangular */
+    matrix_t *U;  /* Upper triangular */
+} mat_lu_factor_t;
+
+typedef struct {
+    matrix_t *Q;  /* Unitary/orthogonal factor */
+    matrix_t *R;  /* Upper triangular factor */
+} mat_qr_factor_t;
+
+typedef struct {
+    matrix_t *L;  /* Lower triangular factor */
+} mat_cholesky_t;
+
+typedef struct {
+    matrix_t *U;  /* Left singular vectors */
+    matrix_t *S;  /* Diagonal singular values */
+    matrix_t *V;  /* Right singular vectors */
+} mat_svd_factor_t;
+
+typedef struct {
+    matrix_t *Q;  /* Unitary Schur vectors */
+    matrix_t *T;  /* Upper-triangular Schur form */
+} mat_schur_factor_t;
+```
+
 ### Construction
 
 #### Allocate without filling
@@ -86,6 +131,9 @@ off-diagonal element). For bulk initialisation prefer the `mat_create_*` forms b
 | `mat_new_d(rows, cols)` | `double` | Allocate an uninitialised `rows × cols` matrix of doubles |
 | `mat_new_qf(rows, cols)` | `qfloat_t` | Allocate an uninitialised `rows × cols` matrix of `qfloat_t` |
 | `mat_new_qc(rows, cols)` | `qcomplex_t` | Allocate an uninitialised `rows × cols` matrix of `qcomplex_t` |
+| `mat_new_sparse_d(rows, cols)` | `double` | Allocate an uninitialised sparse `rows × cols` matrix of doubles |
+| `mat_new_sparse_qf(rows, cols)` | `qfloat_t` | Allocate an uninitialised sparse `rows × cols` matrix of `qfloat_t` |
+| `mat_new_sparse_qc(rows, cols)` | `qcomplex_t` | Allocate an uninitialised sparse `rows × cols` matrix of `qcomplex_t` |
 | `matsq_new_d(n)` | `double` | Allocate an uninitialised `n × n` matrix of doubles |
 | `matsq_new_qf(n)` | `qfloat_t` | Allocate an uninitialised `n × n` matrix of `qfloat_t` |
 | `matsq_new_qc(n)` | `qcomplex_t` | Allocate an uninitialised `n × n` matrix of `qcomplex_t` |
@@ -109,6 +157,18 @@ materialises the matrix as dense.
 | `mat_create_identity_qf(n)` | `qfloat_t` | `n × n` identity matrix of `qfloat_t` |
 | `mat_create_identity_qc(n)` | `qcomplex_t` | `n × n` identity matrix of `qcomplex_t` |
 
+#### Diagonal matrices
+
+Diagonal matrices store only their main diagonal explicitly. They are useful
+when every off-diagonal entry is known to be zero and you want that structure
+to survive through compatible operations.
+
+| Function | Element type | Description |
+|---|---|---|
+| `mat_create_diagonal_d(n, diagonal)` | `double` | `n × n` diagonal matrix of doubles |
+| `mat_create_diagonal_qf(n, diagonal)` | `qfloat_t` | `n × n` diagonal matrix of `qfloat_t` |
+| `mat_create_diagonal_qc(n, diagonal)` | `qcomplex_t` | `n × n` diagonal matrix of `qcomplex_t` |
+
 ### Destruction
 
 - `void mat_free(matrix_t *A)` — free all memory owned by `A`, including element storage.
@@ -119,6 +179,30 @@ materialises the matrix as dense.
 - `void mat_set(matrix_t *A, size_t i, size_t j, const void *val)` — copy `val` into position `(i, j)`.
 - `size_t mat_get_row_count(const matrix_t *A)` — number of rows.
 - `size_t mat_get_col_count(const matrix_t *A)` — number of columns.
+
+Sparse matrices are useful when most entries are zero and only a relatively
+small number of values need to be stored explicitly. Typical examples include
+diagonal matrices, banded matrices, graph adjacency matrices, and large linear
+systems where each row contains only a few nonzero coefficients.
+
+Use the sparse helpers when you want to inspect whether a matrix is currently
+stored sparsely, count its nonzero entries, convert a dense matrix to sparse
+form to save space, or materialise a sparse matrix as dense form for printing
+or for algorithms that expect all entries to be stored explicitly.
+
+- `bool mat_is_sparse(const matrix_t *A)` — returns true if matrix uses sparse storage.
+- `size_t mat_nonzero_count(const matrix_t *A)` — number of non-zero elements.
+- `matrix_t *mat_to_sparse(const matrix_t *A)` — convert to sparse storage.
+- `matrix_t *mat_to_dense(const matrix_t *A)` — convert to dense storage.
+
+Structural queries answer a mathematical question about the entries of a matrix
+rather than merely describing its internal storage. They are useful when
+checking factorisation results or deciding whether a specialised algorithm is
+applicable.
+
+- `bool mat_is_diagonal(const matrix_t *A)` — returns true when all off-diagonal entries are zero.
+- `bool mat_is_upper_triangular(const matrix_t *A)` — returns true when all entries below the diagonal are zero.
+- `bool mat_is_lower_triangular(const matrix_t *A)` — returns true when all entries above the diagonal are zero.
 
 ### Bulk Element Access
 
@@ -228,6 +312,194 @@ matrix_t *mat_eigenvectors(const matrix_t *A);
 
 Convenience wrapper around `mat_eigendecompose` that discards the eigenvalues.
 Returns a newly allocated eigenvector matrix, or NULL on error.
+
+#### Linear Systems
+
+```c
+matrix_t *mat_solve(const matrix_t *A, const matrix_t *B);
+```
+
+Solves `A * X = B` for `X` using Gaussian elimination with partial pivoting.
+`A` must be square and `B` must have the same number of rows as `A`. Returns a
+newly allocated matrix `X`, or NULL on error.
+
+```c
+matrix_t *mat_least_squares(const matrix_t *A, const matrix_t *B);
+```
+
+Computes a best-fit solution to `A * X = B`. When the system does not admit a
+clean exact solve, this returns the `X` that minimises the residual norm
+`||A*X - B||`. Full-column-rank overdetermined systems use a QR-based solve.
+Rank-deficient or underdetermined systems fall back to the Moore-Penrose
+pseudoinverse so the result remains well defined.
+
+Example:
+
+```c
+double A_data[] = {
+    0.0, 1.0,
+    1.0, 1.0,
+    2.0, 1.0
+};
+double B_data[] = {
+    1.0,
+    3.0,
+    5.1
+};
+
+matrix_t *A = mat_create_d(3, 2, A_data);
+matrix_t *B = mat_create_d(3, 1, B_data);
+matrix_t *X = mat_least_squares(A, B);
+
+mat_print(X);
+
+mat_free(X);
+mat_free(B);
+mat_free(A);
+```
+
+Returns a newly allocated matrix, or NULL on error.
+
+#### Rank and Pseudoinverse
+
+```c
+int mat_rank(const matrix_t *A);
+```
+
+Computes the rank of matrix `A` via SVD. Returns the rank (non-negative integer),
+or negative on error. The cutoff between zero and nonzero singular values is
+chosen from the matrix size, the largest singular value, and the element type's
+numerical precision.
+
+```c
+matrix_t *mat_pseudoinverse(const matrix_t *A);
+```
+
+Computes the Moore-Penrose pseudoinverse `A⁺` via SVD. The pseudoinverse
+generalises the ordinary matrix inverse to rectangular or singular matrices.
+It is useful for least-squares problems, minimum-norm solutions, projection
+operators, and for working with matrices that do not admit a true inverse.
+
+In particular, the pseudoinverse is useful when solving systems that are
+overdetermined, underdetermined, or rank-deficient. In those settings it
+provides the standard inverse-like object used to compute best-fit or
+minimum-norm solutions.
+
+When `A` is square and nonsingular, the pseudoinverse coincides with the
+ordinary inverse. Returns a newly allocated matrix, or NULL on error.
+
+```c
+matrix_t *mat_nullspace(const matrix_t *A);
+```
+
+Computes a basis for the nullspace of `A` (all `x` such that `A*x = 0`) via the
+eigendecomposition of `Aᵀ*A`. Returns a matrix whose columns span the nullspace,
+or NULL on error.
+
+#### Matrix Norms
+
+```c
+int mat_norm(const matrix_t *A, mat_norm_type_t type, qfloat_t *out);
+```
+
+Computes a matrix norm. The norm type is specified by `type`:
+
+| Type | Norm |
+|---|---|
+| `MAT_NORM_1` | 1-norm (max column sum) |
+| `MAT_NORM_INF` | Infinity-norm (max row sum) |
+| `MAT_NORM_FRO` | Frobenius norm |
+| `MAT_NORM_2` | 2-norm (largest singular value) |
+
+Returns 0 on success, negative on error. The result is written to `*out`.
+
+```c
+int mat_condition_number(const matrix_t *A, mat_norm_type_t type, qfloat_t *out);
+```
+
+Computes the condition number of `A` in the specified norm and writes it to
+`*out`. The condition number measures how sensitive a linear system involving
+`A` is to perturbations: small values indicate a well-conditioned problem,
+while large values indicate numerical sensitivity. For singular matrices the
+result is infinity. Returns 0 on success, negative on error.
+
+#### Matrix Factorisations
+
+##### LU Factorisation
+
+```c
+int mat_lu_factor(const matrix_t *A, mat_lu_factor_t *out);
+void mat_lu_factor_free(mat_lu_factor_t *out);
+```
+
+Computes `P * A = L * U` where `P` is a permutation matrix, `L` is lower triangular
+with unit diagonal, and `U` is upper triangular. The result is stored in the
+`mat_lu_factor_t` struct containing `P`, `L`, and `U`. Returns 0 on success, negative on error.
+Use `mat_lu_factor_free` to release the factorisation.
+
+##### QR Factorisation
+
+```c
+int mat_qr_factor(const matrix_t *A, mat_qr_factor_t *out);
+void mat_qr_factor_free(mat_qr_factor_t *out);
+```
+
+Computes `A = Q * R` where `Q` is unitary (orthogonal for real matrices) and `R`
+is upper triangular. The result is stored in the `mat_qr_factor_t` struct containing
+`Q` and `R`. Returns 0 on success, negative on error. Use `mat_qr_factor_free` to
+release the factorisation.
+
+##### Cholesky Factorisation
+
+```c
+int mat_cholesky(const matrix_t *A, mat_cholesky_t *out);
+void mat_cholesky_free(mat_cholesky_t *out);
+```
+
+Computes the Cholesky factorisation `A = L * L^H` for Hermitian positive-definite
+matrices. The result is stored in the `mat_cholesky_t` struct containing `L`.
+Returns 0 on success, negative on error (including when `A` is not positive-definite).
+Use `mat_cholesky_free` to release the factorisation.
+
+##### Singular Value Factorisation
+
+```c
+int mat_svd_factor(const matrix_t *A, mat_svd_factor_t *out);
+void mat_svd_factor_free(mat_svd_factor_t *out);
+```
+
+Computes the singular value factorisation
+
+`A = U * S * V^H`
+
+where `U` and `V` contain left and right singular vectors, and `S` contains the
+singular values on its diagonal. The SVD is useful for rank analysis, numerical
+conditioning, pseudoinverses, least-squares problems, and for working robustly
+with rectangular or rank-deficient matrices.
+
+The result is stored in the `mat_svd_factor_t` struct containing `U`, `S`, and
+`V`. Returns 0 on success, negative on error. Use `mat_svd_factor_free` to
+release the factorisation.
+
+##### Schur Factorisation
+
+```c
+int mat_schur_factor(const matrix_t *A, mat_schur_factor_t *out);
+void mat_schur_factor_free(mat_schur_factor_t *out);
+```
+
+Computes the Schur factorisation
+
+`A = Q * T * Q^H`
+
+where `Q` is unitary and `T` is upper triangular. This is the standard stable
+representation used for non-Hermitian eigenvalue problems and for matrix
+functions such as `exp(A)`, `log(A)`, and `sqrt(A)`.
+
+The result is stored in the `mat_schur_factor_t` struct containing `Q` and `T`.
+These factors are returned as `qcomplex` matrices even when `A` is real-valued,
+since a general real matrix may have complex Schur data. Returns 0 on success,
+negative on error. Use `mat_schur_factor_free` to release the decomposition.
 
 ### Matrix Functions
 
@@ -348,3 +620,18 @@ cast back to the input element type before returning.
 Identity matrices store no element data. Reading `(i, i)` returns one; reading
 `(i, j)` for `i ≠ j` returns zero. The first write to any element transparently
 materialises the matrix as dense.
+
+### Sparse Storage
+
+Sparse matrices use a hash-based storage scheme that stores only non-zero elements.
+Reading a non-existent element returns zero; setting an element to zero removes it
+from storage. The `mat_nonzero_count` function returns the number of stored non-zero elements.
+
+Sparse matrices support efficient arithmetic operations:
+- Addition and subtraction of two sparse matrices produce sparse results
+- Multiplication of two sparse matrices uses the sparse-sparse algorithm
+- Mixed operations (sparse × dense, dense × sparse) automatically convert as needed
+
+Use `mat_to_sparse` to convert a dense matrix to sparse form, and `mat_to_dense`
+to convert a sparse matrix to dense form. The `mat_is_sparse` function queries
+whether a matrix uses sparse storage.
