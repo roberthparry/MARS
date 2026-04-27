@@ -14,133 +14,133 @@
         {
             "name": "Debug test_array",
             "cwd": "${workspaceFolder}",
-            "binaryPath": "${workspaceFolder}/tests/build/debug/test_array",
+            "binaryPath": "${workspaceFolder}/tests/build/debug/array/test_array",
             "binaryArgs": []
         },
         {
             "name": "Release test_array",
             "cwd": "${workspaceFolder}",
-            "binaryPath": "${workspaceFolder}/tests/build/release/test_array",
+            "binaryPath": "${workspaceFolder}/tests/build/release/array/test_array",
             "binaryArgs": []
         },
         {
             "name": "Debug test_bitset",
             "cwd": "${workspaceFolder}",
-            "binaryPath": "${workspaceFolder}/tests/build/debug/test_bitset",
+            "binaryPath": "${workspaceFolder}/tests/build/debug/bitset/test_bitset",
             "binaryArgs": []
         },
         {
             "name": "Release test_bitset",
             "cwd": "${workspaceFolder}",
-            "binaryPath": "${workspaceFolder}/tests/build/release/test_bitset",
+            "binaryPath": "${workspaceFolder}/tests/build/release/bitset/test_bitset",
             "binaryArgs": []
         },
         {
             "name": "Debug test_datetime",
             "cwd": "${workspaceFolder}",
-            "binaryPath": "${workspaceFolder}/tests/build/debug/test_datetime",
+            "binaryPath": "${workspaceFolder}/tests/build/debug/datetime/test_datetime",
             "binaryArgs": []
         },
         {
             "name": "Release test_datetime",
             "cwd": "${workspaceFolder}",
-            "binaryPath": "${workspaceFolder}/tests/build/release/test_datetime",
+            "binaryPath": "${workspaceFolder}/tests/build/release/datetime/test_datetime",
             "binaryArgs": []
         },
         {
             "name": "Debug test_dictionary",
             "cwd": "${workspaceFolder}",
-            "binaryPath": "${workspaceFolder}/tests/build/debug/test_dictionary",
+            "binaryPath": "${workspaceFolder}/tests/build/debug/dictionary/test_dictionary",
             "binaryArgs": []
         },
         {
             "name": "Release test_dictionary",
             "cwd": "${workspaceFolder}",
-            "binaryPath": "${workspaceFolder}/tests/build/release/test_dictionary",
+            "binaryPath": "${workspaceFolder}/tests/build/release/dictionary/test_dictionary",
             "binaryArgs": []
         },
         {
             "name": "Debug test_dval",
             "cwd": "${workspaceFolder}",
-            "binaryPath": "${workspaceFolder}/tests/build/debug/test_dval",
+            "binaryPath": "${workspaceFolder}/tests/build/debug/dval/test_dval",
             "binaryArgs": []
         },
         {
             "name": "Release test_dval",
             "cwd": "${workspaceFolder}",
-            "binaryPath": "${workspaceFolder}/tests/build/release/test_dval",
+            "binaryPath": "${workspaceFolder}/tests/build/release/dval/test_dval",
             "binaryArgs": []
         },
         {
             "name": "Debug test_integrator",
             "cwd": "${workspaceFolder}",
-            "binaryPath": "${workspaceFolder}/tests/build/debug/test_integrator",
+            "binaryPath": "${workspaceFolder}/tests/build/debug/integrator/test_integrator",
             "binaryArgs": []
         },
         {
             "name": "Release test_integrator",
             "cwd": "${workspaceFolder}",
-            "binaryPath": "${workspaceFolder}/tests/build/release/test_integrator",
+            "binaryPath": "${workspaceFolder}/tests/build/release/integrator/test_integrator",
             "binaryArgs": []
         },
         {
             "name": "Debug test_qcomplex",
             "cwd": "${workspaceFolder}",
-            "binaryPath": "${workspaceFolder}/tests/build/debug/test_qcomplex",
+            "binaryPath": "${workspaceFolder}/tests/build/debug/qcomplex/test_qcomplex",
             "binaryArgs": []
         },
         {
             "name": "Release test_qcomplex",
             "cwd": "${workspaceFolder}",
-            "binaryPath": "${workspaceFolder}/tests/build/release/test_qcomplex",
+            "binaryPath": "${workspaceFolder}/tests/build/release/qcomplex/test_qcomplex",
             "binaryArgs": []
         },
         {
             "name": "Debug test_qfloat",
             "cwd": "${workspaceFolder}",
-            "binaryPath": "${workspaceFolder}/tests/build/debug/test_qfloat",
+            "binaryPath": "${workspaceFolder}/tests/build/debug/qfloat/test_qfloat",
             "binaryArgs": []
         },
         {
             "name": "Release test_qfloat",
             "cwd": "${workspaceFolder}",
-            "binaryPath": "${workspaceFolder}/tests/build/release/test_qfloat",
+            "binaryPath": "${workspaceFolder}/tests/build/release/qfloat/test_qfloat",
             "binaryArgs": []
         },
         {
             "name": "Debug test_set",
             "cwd": "${workspaceFolder}",
-            "binaryPath": "${workspaceFolder}/tests/build/debug/test_set",
+            "binaryPath": "${workspaceFolder}/tests/build/debug/set/test_set",
             "binaryArgs": []
         },
         {
             "name": "Release test_set",
             "cwd": "${workspaceFolder}",
-            "binaryPath": "${workspaceFolder}/tests/build/release/test_set",
+            "binaryPath": "${workspaceFolder}/tests/build/release/set/test_set",
             "binaryArgs": []
         },
         {
             "name": "Debug test_string",
             "cwd": "${workspaceFolder}",
-            "binaryPath": "${workspaceFolder}/tests/build/debug/test_string",
+            "binaryPath": "${workspaceFolder}/tests/build/debug/string/test_string",
             "binaryArgs": []
         },
         {
             "name": "Release test_string",
             "cwd": "${workspaceFolder}",
-            "binaryPath": "${workspaceFolder}/tests/build/release/test_string",
+            "binaryPath": "${workspaceFolder}/tests/build/release/string/test_string",
             "binaryArgs": []
         },
         {
             "name": "Debug test_test_config",
             "cwd": "${workspaceFolder}",
-            "binaryPath": "${workspaceFolder}/tests/build/debug/test_test_config",
+            "binaryPath": "${workspaceFolder}/tests/build/debug/test_config/test_test_config",
             "binaryArgs": []
         },
         {
             "name": "Release test_test_config",
             "cwd": "${workspaceFolder}",
-            "binaryPath": "${workspaceFolder}/tests/build/release/test_test_config",
+            "binaryPath": "${workspaceFolder}/tests/build/release/test_config/test_test_config",
             "binaryArgs": []
         }
     ],
@@ -151,7 +151,10 @@
     ],
 
     "C_Cpp.default.includePath": [
-        "${workspaceFolder}/include"
+        "${workspaceFolder}/include",
+        "${workspaceFolder}/tests",
+        "${workspaceFolder}/tests/include",
+        "${workspaceFolder}/tests/*"
     ],
 
     "[makefile]": {

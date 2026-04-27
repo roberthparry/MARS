@@ -1,5 +1,62 @@
 {
-  "tests/test_datetime.c": {
+  "tests/test_config/test_test_config.c": {
+    "test_top_level_default_true": {
+      "enabled": true,
+      "test_subtest_default_true": true
+    },
+    "parent_group": {
+      "enabled": true,
+      "test_subtest_grouping": true
+    },
+    "test_subtest_grouping": {
+      "enabled": true,
+      "test_sub_sub_function": true
+    },
+    "test_sub_sub_function": {
+      "enabled": true,
+      "test_sub_sub_sub_function": true
+    },
+    "test_sub_sub_sub_function": {
+      "enabled": true,
+      "test_sub_sub_sub_sub_function": true
+    }
+  },
+  "tests/array/test_array.c": {
+    "test_ints": true,
+    "test_strings": true,
+    "test_append_array": true,
+    "test_thread_safety_append": true,
+    "test_remove_and_remove_elements": true,
+    "test_insert_and_insert_carray": true,
+    "test_insert_array": true,
+    "test_swap_rotate": true,
+    "test_slice_and_from_slice": true,
+    "test_slice_view_ops": true,
+    "test_stack_ints": true,
+    "test_stack_strings": true,
+    "test_readme_examples": true,
+    "test_readme_deep_struct": true
+  },
+  "tests/bitset/test_bitset.c": {
+    "test_create_and_destroy": true,
+    "test_set_and_test": true,
+    "test_unset": true,
+    "test_toggle": true,
+    "test_clear": true,
+    "test_set_range": true,
+    "test_unset_range": true,
+    "test_popcount": true,
+    "test_any_none": true,
+    "test_next_set": true,
+    "test_clone": true,
+    "test_bitwise_and": true,
+    "test_bitwise_or": true,
+    "test_bitwise_xor": true,
+    "test_bitwise_not": true,
+    "test_growth": true,
+    "test_thread_safety": true
+  },
+  "tests/datetime/test_datetime.c": {
     "test_datetime_init_jd": true,
     "test_datetime_jdn_and_getJulianDay": true,
     "test_datetime_year_initialized": true,
@@ -35,7 +92,7 @@
     "test_datetime_days_in_month": true,
     "test_readme_examples": true
   },
-  "tests/test_dval.c": {
+  "tests/dval/test_dval.c": {
     "test_arithmetic": {
       "enabled": true,
       "test_add": true,
@@ -213,9 +270,7 @@
       "test_to_string_pow_superscript": true,
       "test_to_string_unary_sin": true,
       "test_to_string_function_style": true,
-      "test_to_string_special_functions": true,
-      "test_to_string_simplification_identities_expr": true,
-      "test_to_string_common_denominator_expr": true
+      "test_to_string_special_functions": true
     },
     "test_to_string_basic_const": {
       "enabled": true,
@@ -277,12 +332,6 @@
       "test_from_string_func_power": true,
       "test_from_string_composed": true
     },
-    "test_README_md_example": {
-      "enabled": true,
-      "test_readme_example": true,
-      "test_readme_from_string_example": true,
-      "test_readme_partial_example": true
-    },
     "test_partial_derivatives": {
       "enabled": true,
       "test_partial_xy_product": true,
@@ -299,8 +348,6 @@
       "enabled": true,
       "test_cmp_qfloat_precision": true,
       "test_get_val_updates_after_set": true,
-      "test_simplify_nested_pow_d": true,
-      "test_simplify_negated_unary_args": true,
       "test_simplify_inverse_unary_pairs": true
     },
     "test_reverse_mode": {
@@ -309,9 +356,190 @@
       "test_reverse_gradient_shared_subexpression": true,
       "test_reverse_matches_forward_composite": true,
       "test_reverse_gradient_missing_variable": true
+    },
+    "test_README_md_example": {
+      "enabled": true,
+      "test_readme_example": true,
+      "test_readme_from_string_example": true,
+      "test_readme_partial_example": true
     }
   },
-  "tests/test_qfloat.c": {
+  "tests/integrator/test_integrator.c": {
+    "test_create_and_destroy": true,
+    "test_null_safety": true,
+    "test_polynomial": true,
+    "test_sin": true,
+    "test_exp": true,
+    "test_arctan": true,
+    "test_log": true,
+    "test_constant": true,
+    "test_linear": true,
+    "test_reversed_limits": true,
+    "test_set_tol": true,
+    "test_max_intervals": true,
+    "test_last_intervals": true,
+    "test_dv_sin": true,
+    "test_dv_exp": true,
+    "test_dv_arctan": true,
+    "test_dv_null_safety": true,
+    "test_double_polynomial": true,
+    "test_double_exp": true,
+    "test_double_nonunit_bounds": true,
+    "test_double_null_safety": true,
+    "test_triple_polynomial": true,
+    "test_triple_exp": true,
+    "test_triple_null_safety": true,
+    "test_multi_2d": true,
+    "test_multi_3d": true,
+    "test_multi_null_safety": true,
+    "test_multi_nd1": true,
+    "test_multi_4d": true,
+    "test_multi_4d_exp": true
+  },
+  "tests/matrix/test_matrix.c": {
+    "test_creation": true,
+    "test_reading": true,
+    "test_writing": true,
+    "test_add_sub": true,
+    "test_multiply": true,
+    "test_transpose_conjugate": true,
+    "test_identity_get": true,
+    "test_identity_set": true,
+    "test_sparse_support": true,
+    "test_structural_queries_and_diagonal_construction": true,
+    "test_layout_policy_regressions": true,
+    "test_add_sub_qf": true,
+    "test_add_sub_qc": true,
+    "test_multiply_qf": true,
+    "test_multiply_qc": true,
+    "test_add_mixed_d_qf": true,
+    "test_add_mixed_d_qc": true,
+    "test_add_mixed_qf_qc": true,
+    "test_sub_mixed_d_qf": true,
+    "test_sub_mixed_d_qc": true,
+    "test_sub_mixed_qf_qc": true,
+    "test_multiply_mixed_d_qf": true,
+    "test_multiply_mixed_d_qc": true,
+    "test_multiply_mixed_qf_qc": true,
+    "test_scalar_mul_d_d": true,
+    "test_scalar_mul_d_qf": true,
+    "test_scalar_mul_d_qc": true,
+    "test_scalar_mul_qf_d": true,
+    "test_scalar_mul_qc_qc": true,
+    "test_identity_arith_d": true,
+    "test_identity_arith_qf": true,
+    "test_identity_arith_qc": true,
+    "test_scalar_div_d_d": true,
+    "test_scalar_div_qf_qf": true,
+    "test_scalar_div_qc_qc": true,
+    "test_scalar_div_d_qf": true,
+    "test_scalar_div_qf_d": true,
+    "test_mat_neg_convenience": true,
+    "test_det_double": true,
+    "test_det_qfloat": true,
+    "test_det_qcomplex": true,
+    "test_inverse_double": true,
+    "test_inverse_qfloat": true,
+    "test_inverse_qcomplex": true,
+    "test_solve_and_lstsq": true,
+    "test_factorisations": true,
+    "test_rank_pinv_nullspace": true,
+    "test_norms_and_condition": true,
+    "test_hermitian_op": true,
+    "test_eigen_d": true,
+    "test_eigen_qf": true,
+    "test_eigen_qc": true,
+    "test_mat_exp_d": true,
+    "test_mat_exp_qf": true,
+    "test_mat_exp_qc": true,
+    "test_mat_exp_singular": true,
+    "test_matrix_function_structure_preservation": true,
+    "test_mat_fun_singular_entire_d": true,
+    "test_mat_exp_null_safety": true,
+    "test_mat_sin_d": true,
+    "test_mat_sin_qf": true,
+    "test_mat_sin_qc": true,
+    "test_mat_sin_null_safety": true,
+    "test_mat_cos_d": true,
+    "test_mat_cos_qf": true,
+    "test_mat_cos_qc": true,
+    "test_mat_tan_d": true,
+    "test_mat_sinh_d": true,
+    "test_mat_cosh_d": true,
+    "test_mat_tanh_d": true,
+    "test_mat_trig_null_safety": true,
+    "test_mat_sqrt_d": true,
+    "test_mat_sqrt_qf": true,
+    "test_mat_log_d": true,
+    "test_mat_asin_d": true,
+    "test_mat_acos_d": true,
+    "test_mat_atan_d": true,
+    "test_mat_asinh_d": true,
+    "test_mat_acosh_d": true,
+    "test_mat_atanh_d": true,
+    "test_mat_inv_trig_null_safety": true,
+    "test_eigen_general_d": true,
+    "test_eigen_general_qf": true,
+    "test_mat_nilpotent_d": true,
+    "test_mat_algebraic_ids_d": true,
+    "test_mat_roundtrips_d": true,
+    "test_mat_pow_int_d": true,
+    "test_mat_pow_d": true,
+    "test_mat_erf_d": true,
+    "test_mat_erfc_d": true,
+    "test_mat_special_unary_extensions": true,
+    "test_mat_special_unary_square_extensions": true,
+    "test_mat_fun_qf_qc": true,
+    "test_mat_error_handling": true,
+    "test_mat_fun_3x3": true,
+    "test_mat_fun_4x4": true,
+    "test_mat_fun_3x3_qf": true,
+    "test_mat_fun_3x3_qc": true,
+    "test_mat_typeof": true,
+    "test_readme_example": true
+  },
+  "tests/qcomplex/test_qcomplex.c": {
+    "test_arithmetic_group": {
+      "enabled": true,
+      "test_add_sub": true,
+      "test_mul_div": true,
+      "test_conj": true,
+      "test_abs_arg": true,
+      "test_polar": true
+    },
+    "test_elementary_group": {
+      "enabled": true,
+      "test_exp": true,
+      "test_log": true,
+      "test_pow_sqrt": true
+    },
+    "test_trig_group": {
+      "enabled": true,
+      "test_trig": true,
+      "test_hyperbolic": true
+    },
+    "test_special_group": {
+      "enabled": true,
+      "test_erf": true,
+      "test_erfinv": true,
+      "test_gamma": true,
+      "test_digamma": true,
+      "test_gammainv": true,
+      "test_beta": true,
+      "test_normal": true,
+      "test_productlog": true,
+      "test_lambert_wm1": true,
+      "test_gammainc": true,
+      "test_ei_e1": true
+    },
+    "test_util_group": {
+      "enabled": true,
+      "test_utility": true,
+      "test_comparison": true,
+      "test_printf": true
+    }
+  },
+  "tests/qfloat/test_qfloat.c": {
     "test_arithmetic": {
       "enabled": true,
       "test_add": true,
@@ -498,7 +726,7 @@
       "test_ei_values": true
     }
   },
-  "tests/test_set.c": {
+  "tests/set/test_set.c": {
     "test_ints": true,
     "test_strings": true,
     "test_deep": true,
@@ -506,138 +734,1170 @@
     "test_fuzz": true,
     "test_readme_examples": true
   },
-  "tests/test_test_config.c": {
-    "test_top_level_default_true": {
+  "tests/dval/test_dval_groups.inc": {
+    "test_arithmetic": {
       "enabled": true,
-      "test_subtest_default_true": true
+      "test_add": true,
+      "test_sub": true,
+      "test_mul": true,
+      "test_div": true,
+      "test_mixed": true
     },
-    "parent_group": {
+    "test_d_variants": {
       "enabled": true,
-      "test_subtest_grouping": true
+      "test_add_d": true,
+      "test_mul_d": true,
+      "test_div_d": true
     },
-    "test_subtest_grouping": {
+    "test_maths_functions": {
       "enabled": true,
-      "test_sub_sub_function": true
-    },
-    "test_sub_sub_function": {
-      "enabled": true,
-      "test_sub_sub_sub_function": true
-    },
-    "test_sub_sub_sub_function": {
-      "enabled": true,
-      "test_sub_sub_sub_sub_function": true
-    }
-  },
-  "tests/test_bitset.c": {
-    "test_create_and_destroy": true,
-    "test_set_and_test": true,
-    "test_unset": true,
-    "test_toggle": true,
-    "test_clear": true,
-    "test_set_range": true,
-    "test_unset_range": true,
-    "test_popcount": true,
-    "test_any_none": true,
-    "test_next_set": true,
-    "test_clone": true,
-    "test_bitwise_and": true,
-    "test_bitwise_or": true,
-    "test_bitwise_xor": true,
-    "test_bitwise_not": true,
-    "test_growth": true,
-    "test_thread_safety": true
-  },
-  "tests/test_integrator.c": {
-    "test_create_and_destroy": true,
-    "test_null_safety": true,
-    "test_polynomial": true,
-    "test_sin": true,
-    "test_exp": true,
-    "test_arctan": true,
-    "test_log": true,
-    "test_constant": true,
-    "test_linear": true,
-    "test_reversed_limits": true,
-    "test_set_tol": true,
-    "test_max_intervals": true,
-    "test_last_intervals": true,
-    "test_dv_sin": true,
-    "test_dv_exp": true,
-    "test_dv_arctan": true,
-    "test_dv_null_safety": true,
-    "test_double_polynomial": true,
-    "test_double_exp": true,
-    "test_double_nonunit_bounds": true,
-    "test_double_null_safety": true,
-    "test_triple_polynomial": true,
-    "test_triple_exp": true,
-    "test_triple_null_safety": true,
-    "test_multi_2d": true,
-    "test_multi_3d": true,
-    "test_multi_null_safety": true,
-    "test_multi_nd1": true,
-    "test_multi_4d": true,
-    "test_multi_4d_exp": true
-  },
-  "tests/test_array.c": {
-    "test_ints": true,
-    "test_strings": true,
-    "test_append_array": true,
-    "test_thread_safety_append": true,
-    "test_remove_and_remove_elements": true,
-    "test_insert_and_insert_carray": true,
-    "test_insert_array": true,
-    "test_readme_examples": true,
-    "test_readme_deep_struct": true,
-    "test_swap_rotate": true,
-    "test_slice_and_from_slice": true,
-    "test_slice_view_ops": true,
-    "test_stack_ints": true,
-    "test_stack_strings": true
-  },
-  "tests/test_qcomplex.c": {
-    "test_arithmetic_group": {
-      "enabled": true,
-      "test_add_sub": true,
-      "test_mul_div": true,
-      "test_conj": true,
-      "test_abs_arg": true,
-      "test_polar": true
-    },
-    "test_elementary_group": {
-      "enabled": true,
+      "test_sin": true,
+      "test_cos": true,
+      "test_tan": true,
+      "test_sinh": true,
+      "test_cosh": true,
+      "test_tanh": true,
+      "test_asin": true,
+      "test_acos": true,
+      "test_atan": true,
+      "test_atan2": true,
+      "test_asinh": true,
+      "test_acosh": true,
+      "test_atanh": true,
       "test_exp": true,
       "test_log": true,
-      "test_pow_sqrt": true,
-      "test_euler_identity": true
-    },
-    "test_trig_group": {
-      "enabled": true,
-      "test_trig": true,
-      "test_hyperbolic": true
-    },
-    "test_special_group": {
-      "enabled": true,
+      "test_sqrt": true,
+      "test_pow_d": true,
+      "test_pow": true,
+      "test_abs": true,
+      "test_hypot": true,
       "test_erf": true,
+      "test_erfc": true,
       "test_erfinv": true,
+      "test_erfcinv": true,
       "test_gamma": true,
+      "test_lgamma": true,
       "test_digamma": true,
-      "test_gammainv": true,
+      "test_trigamma": true,
+      "test_lambert_w0": true,
+      "test_lambert_wm1": true,
+      "test_normal_pdf": true,
+      "test_normal_cdf": true,
+      "test_normal_logpdf": true,
+      "test_ei": true,
+      "test_e1": true,
       "test_beta": true,
-      "test_productlog": true,
-      "test_gammainc": true,
-      "test_ei_e1": true,
-      "test_normal": true,
-      "test_lambert_wm1": true
+      "test_logbeta": true
     },
-    "test_util_group": {
+    "test_first_derivatives": {
       "enabled": true,
-      "test_utility": true,
-      "test_comparison": true,
-      "test_printf": true
+      "test_deriv_const": true,
+      "test_deriv_var": true,
+      "test_deriv_neg": true,
+      "test_deriv_add_d": true,
+      "test_deriv_mul_d": true,
+      "test_deriv_div_d": true,
+      "test_deriv_x2": true,
+      "test_deriv_pow3": true,
+      "test_deriv_pow_xy": true,
+      "test_deriv_sin": true,
+      "test_deriv_cos": true,
+      "test_deriv_tan": true,
+      "test_deriv_sinh": true,
+      "test_deriv_cosh": true,
+      "test_deriv_tanh": true,
+      "test_deriv_asin": true,
+      "test_deriv_acos": true,
+      "test_deriv_atan": true,
+      "test_deriv_atan2": true,
+      "test_deriv_asinh": true,
+      "test_deriv_acosh": true,
+      "test_deriv_atanh": true,
+      "test_deriv_exp": true,
+      "test_deriv_log": true,
+      "test_deriv_sqrt": true,
+      "test_deriv_composite": true,
+      "test_deriv_sin_log": true,
+      "test_deriv_exp_tanh": true,
+      "test_deriv_sqrt_sin_x2": true,
+      "test_deriv_log_cosh": true,
+      "test_deriv_x2_exp_negx": true,
+      "test_deriv_atan_x_over_sqrt": true,
+      "test_deriv_abs": true,
+      "test_deriv_hypot": true,
+      "test_deriv_erf": true,
+      "test_deriv_erfc": true,
+      "test_deriv_erfinv": true,
+      "test_deriv_erfcinv": true,
+      "test_deriv_gamma": true,
+      "test_deriv_lgamma": true,
+      "test_deriv_digamma": true,
+      "test_deriv_trigamma": true,
+      "test_deriv_lambert_w0": true,
+      "test_deriv_lambert_wm1": true,
+      "test_deriv_normal_pdf": true,
+      "test_deriv_normal_cdf": true,
+      "test_deriv_normal_logpdf": true,
+      "test_deriv_ei": true,
+      "test_deriv_e1": true,
+      "test_deriv_beta": true,
+      "test_deriv_logbeta": true
+    },
+    "test_second_derivatives": {
+      "enabled": true,
+      "test_second_deriv_var": true,
+      "test_second_deriv_neg": true,
+      "test_second_deriv_add_d": true,
+      "test_second_deriv_mul_d": true,
+      "test_second_deriv_div_d": true,
+      "test_second_deriv_x2": true,
+      "test_second_deriv_x3": true,
+      "test_second_deriv_pow_xy": true,
+      "test_second_deriv_sin": true,
+      "test_second_deriv_cos": true,
+      "test_second_deriv_tan": true,
+      "test_second_deriv_sinh": true,
+      "test_second_deriv_cosh": true,
+      "test_second_deriv_tanh": true,
+      "test_second_deriv_asin": true,
+      "test_second_deriv_acos": true,
+      "test_second_deriv_atan": true,
+      "test_second_deriv_atan2": true,
+      "test_second_deriv_asinh": true,
+      "test_second_deriv_acosh": true,
+      "test_second_deriv_atanh": true,
+      "test_second_deriv_exp": true,
+      "test_second_deriv_log": true,
+      "test_second_deriv_sqrt": true,
+      "test_second_deriv_composite": true,
+      "test_second_deriv_sin_log": true,
+      "test_second_deriv_exp_tanh": true,
+      "test_second_deriv_sqrt_sin_x2": true,
+      "test_second_deriv_log_cosh": true,
+      "test_second_deriv_x2_exp_negx": true,
+      "test_second_deriv_atan_x_over_sqrt": true,
+      "test_second_deriv_abs": true,
+      "test_second_deriv_hypot": true,
+      "test_second_deriv_erf": true,
+      "test_second_deriv_erfc": true,
+      "test_second_deriv_gamma": true,
+      "test_second_deriv_lgamma": true,
+      "test_second_deriv_normal_pdf": true,
+      "test_second_deriv_normal_cdf": true,
+      "test_second_deriv_normal_logpdf": true,
+      "test_second_deriv_ei": true,
+      "test_second_deriv_e1": true,
+      "test_second_deriv_erfinv": true,
+      "test_second_deriv_erfcinv": true,
+      "test_second_deriv_lambert_w0": true,
+      "test_second_deriv_lambert_wm1": true,
+      "test_second_deriv_beta": true,
+      "test_second_deriv_logbeta": true,
+      "test_second_deriv_digamma": true
+    },
+    "test_dval_t_to_string": {
+      "enabled": true,
+      "test_to_string_all": true,
+      "test_expressions": true,
+      "test_expressions_unnamed": true,
+      "test_expressions_longname": true
     }
   },
-  "tests/test_matrix.c": {
+  "tests/dval/test_dval_to_string.inc": {
+    "test_to_string_all": {
+      "enabled": true,
+      "test_to_string_basic_const": true,
+      "test_to_string_basic_var": true,
+      "test_to_string_addition": true,
+      "test_to_string_nested_mul_add": true,
+      "test_to_string_atan2": true,
+      "test_to_string_pow_superscript": true,
+      "test_to_string_unary_sin": true,
+      "test_to_string_function_style": true,
+      "test_to_string_special_functions": true
+    },
+    "test_to_string_basic_const": {
+      "enabled": true,
+      "test_to_string_basic_const_expr": true,
+      "test_to_string_basic_const_func": true
+    },
+    "test_to_string_basic_var": {
+      "enabled": true,
+      "test_to_string_basic_var_expr": true,
+      "test_to_string_basic_var_func": true
+    },
+    "test_to_string_addition": {
+      "enabled": true,
+      "test_to_string_addition_expr": true,
+      "test_to_string_addition_func": true
+    },
+    "test_to_string_nested_mul_add": {
+      "enabled": true,
+      "test_to_string_nested_mul_add_expr": true,
+      "test_to_string_nested_mul_add_func": true
+    },
+    "test_to_string_atan2": {
+      "enabled": true,
+      "test_to_string_atan2_expr": true,
+      "test_to_string_atan2_func": true
+    },
+    "test_to_string_pow_superscript": {
+      "enabled": true,
+      "test_to_string_pow_superscript_expr": true,
+      "test_to_string_pow_superscript_func": true
+    },
+    "test_to_string_unary_sin": {
+      "enabled": true,
+      "test_to_string_unary_sin_expr": true,
+      "test_to_string_unary_sin_func": true
+    },
+    "test_to_string_function_style": {
+      "enabled": true,
+      "test_to_string_function_style_expr": true,
+      "test_to_string_function_style_func": true
+    }
+  },
+  "tests/dval/test_dval_from_string.inc": {
+    "test_dval_t_from_string": {
+      "enabled": true,
+      "test_from_string_pure_const": true,
+      "test_from_string_arithmetic": true,
+      "test_from_string_functions": true,
+      "test_from_string_special_functions": true,
+      "test_from_string_named_consts": true,
+      "test_from_string_bracketed_names": true,
+      "test_from_string_ascii_alternatives": true,
+      "test_from_string_errors": true,
+      "test_from_string_round_trips": true,
+      "test_from_string_deriv": true
+    },
+    "test_from_string_ascii_alternatives": {
+      "enabled": true,
+      "test_from_string_subscripts": true,
+      "test_from_string_star_mul": true,
+      "test_from_string_func_power": true,
+      "test_from_string_composed": true
+    }
+  },
+  "tests/dval/test_dval_partials.inc": {
+    "test_partial_derivatives": {
+      "enabled": true,
+      "test_partial_xy_product": true,
+      "test_partial_poly": true,
+      "test_partial_sin_exp": true,
+      "test_partial_symmetry": true,
+      "test_partial_get_borrowed": true,
+      "test_partial_to_string": true,
+      "test_partial_to_string_functions": true,
+      "test_partial_to_string_log_r2": true,
+      "test_partial_to_string_sin_xy": true
+    }
+  },
+  "tests/dval/test_dval_regressions.inc": {
+    "test_runtime_regressions": {
+      "enabled": true,
+      "test_cmp_qfloat_precision": true,
+      "test_get_val_updates_after_set": true,
+      "test_simplify_inverse_unary_pairs": true
+    }
+  },
+  "tests/dval/test_dval_reverse_mode.inc": {
+    "test_reverse_mode": {
+      "enabled": true,
+      "test_reverse_gradient_polynomial": true,
+      "test_reverse_gradient_shared_subexpression": true,
+      "test_reverse_matches_forward_composite": true,
+      "test_reverse_gradient_missing_variable": true
+    }
+  },
+  "tests/dval/test_dval_readme.inc": {
+    "test_README_md_example": {
+      "enabled": true,
+      "test_readme_example": true,
+      "test_readme_from_string_example": true,
+      "test_readme_partial_example": true
+    }
+  },
+  "tests/qfloat/test_qfloat_groups.inc": {
+    "test_arithmetic": {
+      "enabled": true,
+      "test_add": true,
+      "test_mul": true,
+      "test_div": true,
+      "test_sqrt": true,
+      "test_exp_log": true,
+      "test_qf_exp": true,
+      "test_qf_log": true,
+      "test_stability": true,
+      "test_qf_add_double": true,
+      "test_qf_mul_double": true,
+      "test_qf_sqr": true,
+      "test_qf_ldexp": true,
+      "test_qf_mul_pow10": true,
+      "test_qf_floor": true,
+      "test_qf_cmp": true,
+      "test_qf_signbit": true,
+      "test_qf_isinf": true
+    },
+    "test_strings": {
+      "enabled": true,
+      "test_qf_to_string": true,
+      "test_qf_from_string": true,
+      "test_from_string_basic": true,
+      "test_from_string_scientific": true,
+      "test_round_trip": true
+    },
+    "test_printf": {
+      "enabled": true,
+      "test_qf_sprintf_and_printf": true,
+      "test_qf_vsprintf": true
+    },
+    "test_power": {
+      "enabled": true,
+      "test_qf_pow_int": true,
+      "test_qf_pow": true,
+      "test_qf_pow10": true
+    },
+    "test_trigonometric": {
+      "enabled": true,
+      "test_qf_trig": true,
+      "test_qf_atan": true,
+      "test_qf_atan2": true,
+      "test_qf_asin": true,
+      "test_qf_acos": true
+    },
+    "test_hyperbolic": {
+      "enabled": true,
+      "test_qf_cosh": true,
+      "test_qf_sinh": true,
+      "test_qf_tanh": true,
+      "test_qf_asinh": true,
+      "test_qf_acosh": true,
+      "test_qf_atanh": true
+    },
+    "test_hypotenus": {
+      "enabled": true,
+      "test_qf_hypot": true
+    },
+    "test_gamma_erf_erfc_erfinv_erfcinv_digamma": {
+      "enabled": true,
+      "test_qf_gamma": true,
+      "test_qf_erf": true,
+      "test_qf_erfc": true,
+      "test_qf_erfinv": true,
+      "test_qf_erfcinv": true,
+      "test_qf_lgamma": true,
+      "test_qf_digamma": true,
+      "test_qf_gammainv": true,
+      "test_qf_trigamma": true,
+      "test_qf_tetragamma": true
+    },
+    "test_lambert_w": {
+      "enabled": true,
+      "test_qf_lambert_w0": true,
+      "test_qf_lambert_wm1": true,
+      "test_qf_productlog_all": true
+    },
+    "test_beta_logbeta_binomial_beta_pdf_logbeta_pdf_normal_pdf_cdf_logpdf": {
+      "enabled": true,
+      "test_qf_beta_all": true,
+      "test_qf_logbeta_all": true,
+      "test_qf_binomial_all": true,
+      "test_qf_beta_pdf_all": true,
+      "test_qf_logbeta_pdf_all": true,
+      "test_qf_normal_pdf_all": true,
+      "test_qf_normal_cdf_all": true,
+      "test_qf_normal_logpdf_all": true
+    },
+    "test_gammainc_ei_e1": {
+      "enabled": true,
+      "test_qf_gammainc_all": true,
+      "test_qf_ei_e1_all": true
+    }
+  },
+  "tests/qfloat/test_qfloat_printf.inc": {
+    "test_qf_sprintf_and_printf": {
+      "enabled": true,
+      "test_qd_sprintf_basic": true,
+      "test_qd_sprintf_multiple": true,
+      "test_qd_sprintf_mixed": true,
+      "test_qd_sprintf_buffer_limit": true,
+      "test_qd_sprintf_edge_cases": true,
+      "test_qd_sprintf_q_precision": true,
+      "test_qd_sprintf_q_zero_precision": true,
+      "test_qd_sprintf_q_flags": true,
+      "test_qd_sprintf_q_width": true,
+      "test_qd_sprintf_q_fallback": true,
+      "test_qd_sprintf_q_fallback_width": true,
+      "test_qf_sprintf_q_concise": true,
+      "test_qf_sprintf_null_safe_new": true,
+      "test_qf_sprintf_two_pass_new": true,
+      "test_qf_printf_stdout": true
+    }
+  },
+  "tests/qfloat/test_qfloat_special_functions.inc": {
+    "test_qf_productlog_all": {
+      "enabled": true,
+      "test_qf_productlog_definition": true,
+      "test_qf_productlog_consistency": true,
+      "test_qf_productlog_special": true,
+      "test_qf_productlog_monotonicity": true
+    },
+    "test_qf_gammainc_all": {
+      "enabled": true,
+      "test_qf_gammainc_PQ_identity": true,
+      "test_qf_gammainc_lower_upper_identity": true,
+      "test_qf_gammainc_special_s1": true
+    },
+    "test_qf_ei_e1_all": {
+      "enabled": true,
+      "test_qf_ei_deriv": true,
+      "test_qf_e1_deriv": true,
+      "test_qf_ei_e1_identity": true,
+      "test_ei_values": true
+    }
+  },
+  "tests/qfloat/test_qfloat_probability.inc": {
+    "test_qf_beta_all": {
+      "enabled": true,
+      "test_qf_beta_definition": true,
+      "test_qf_beta_symmetry": true,
+      "test_qf_beta_special_cases": true
+    },
+    "test_qf_logbeta_all": {
+      "enabled": true,
+      "test_qf_logbeta_definition": true,
+      "test_qf_logbeta_consistency": true,
+      "test_qf_logbeta_symmetry": true,
+      "test_qf_logbeta_special_cases": true
+    },
+    "test_qf_binomial_all": {
+      "enabled": true,
+      "test_qf_binomial_definition": true,
+      "test_qf_binomial_symmetry": true,
+      "test_qf_binomial_special_cases": true
+    },
+    "test_qf_beta_pdf_all": {
+      "enabled": true,
+      "test_qf_beta_pdf_definition": true,
+      "test_qf_beta_pdf_logform": true,
+      "test_qf_beta_pdf_symmetry": true
+    },
+    "test_qf_logbeta_pdf_all": {
+      "enabled": true,
+      "test_qf_logbeta_pdf_definition": true,
+      "test_qf_logbeta_pdf_consistency": true,
+      "test_qf_logbeta_pdf_symmetry": true
+    },
+    "test_qf_normal_pdf_all": {
+      "enabled": true,
+      "test_qf_normal_pdf_definition": true,
+      "test_qf_normal_pdf_symmetry": true,
+      "test_qf_normal_pdf_at_zero": true,
+      "test_qf_normal_pdf_logform": true
+    },
+    "test_qf_normal_cdf_all": {
+      "enabled": true,
+      "test_qf_normal_cdf_definition": true,
+      "test_qf_normal_cdf_symmetry": true,
+      "test_qf_normal_cdf_known_values": true,
+      "test_qf_normal_cdf_pdf_consistency": true
+    },
+    "test_qf_normal_logpdf_all": {
+      "enabled": true,
+      "test_qf_normal_logpdf_definition": true,
+      "test_qf_normal_logpdf_consistency": true,
+      "test_qf_normal_logpdf_symmetry": true,
+      "test_qf_normal_logpdf_at_zero": true
+    }
+  },
+  "tests/qfloat/qfloat_groups.c": {
+    "test_arithmetic": {
+      "enabled": true,
+      "test_add": true,
+      "test_mul": true,
+      "test_div": true,
+      "test_sqrt": true,
+      "test_exp_log": true,
+      "test_qf_exp": true,
+      "test_qf_log": true,
+      "test_stability": true,
+      "test_qf_add_double": true,
+      "test_qf_mul_double": true,
+      "test_qf_sqr": true,
+      "test_qf_ldexp": true,
+      "test_qf_mul_pow10": true,
+      "test_qf_floor": true,
+      "test_qf_cmp": true,
+      "test_qf_signbit": true,
+      "test_qf_isinf": true
+    },
+    "test_strings": {
+      "enabled": true,
+      "test_qf_to_string": true,
+      "test_qf_from_string": true,
+      "test_from_string_basic": true,
+      "test_from_string_scientific": true,
+      "test_round_trip": true
+    },
+    "test_printf": {
+      "enabled": true,
+      "test_qf_sprintf_and_printf": true,
+      "test_qf_vsprintf": true
+    },
+    "test_power": {
+      "enabled": true,
+      "test_qf_pow_int": true,
+      "test_qf_pow": true,
+      "test_qf_pow10": true
+    },
+    "test_trigonometric": {
+      "enabled": true,
+      "test_qf_trig": true,
+      "test_qf_atan": true,
+      "test_qf_atan2": true,
+      "test_qf_asin": true,
+      "test_qf_acos": true
+    },
+    "test_hyperbolic": {
+      "enabled": true,
+      "test_qf_cosh": true,
+      "test_qf_sinh": true,
+      "test_qf_tanh": true,
+      "test_qf_asinh": true,
+      "test_qf_acosh": true,
+      "test_qf_atanh": true
+    },
+    "test_hypotenus": {
+      "enabled": true,
+      "test_qf_hypot": true
+    },
+    "test_gamma_erf_erfc_erfinv_erfcinv_digamma": {
+      "enabled": true,
+      "test_qf_gamma": true,
+      "test_qf_erf": true,
+      "test_qf_erfc": true,
+      "test_qf_erfinv": true,
+      "test_qf_erfcinv": true,
+      "test_qf_lgamma": true,
+      "test_qf_digamma": true,
+      "test_qf_gammainv": true,
+      "test_qf_trigamma": true,
+      "test_qf_tetragamma": true
+    },
+    "test_lambert_w": {
+      "enabled": true,
+      "test_qf_lambert_w0": true,
+      "test_qf_lambert_wm1": true,
+      "test_qf_productlog_all": true
+    },
+    "test_beta_logbeta_binomial_beta_pdf_logbeta_pdf_normal_pdf_cdf_logpdf": {
+      "enabled": true,
+      "test_qf_beta_all": true,
+      "test_qf_logbeta_all": true,
+      "test_qf_binomial_all": true,
+      "test_qf_beta_pdf_all": true,
+      "test_qf_logbeta_pdf_all": true,
+      "test_qf_normal_pdf_all": true,
+      "test_qf_normal_cdf_all": true,
+      "test_qf_normal_logpdf_all": true
+    },
+    "test_gammainc_ei_e1": {
+      "enabled": true,
+      "test_qf_gammainc_all": true,
+      "test_qf_ei_e1_all": true
+    }
+  },
+  "tests/qfloat/qfloat_printf.c": {
+    "test_qf_sprintf_and_printf": {
+      "enabled": true,
+      "test_qd_sprintf_basic": true,
+      "test_qd_sprintf_multiple": true,
+      "test_qd_sprintf_mixed": true,
+      "test_qd_sprintf_buffer_limit": true,
+      "test_qd_sprintf_edge_cases": true,
+      "test_qd_sprintf_q_precision": true,
+      "test_qd_sprintf_q_zero_precision": true,
+      "test_qd_sprintf_q_flags": true,
+      "test_qd_sprintf_q_width": true,
+      "test_qd_sprintf_q_fallback": true,
+      "test_qd_sprintf_q_fallback_width": true,
+      "test_qf_sprintf_q_concise": true,
+      "test_qf_sprintf_null_safe_new": true,
+      "test_qf_sprintf_two_pass_new": true,
+      "test_qf_printf_stdout": true
+    }
+  },
+  "tests/qfloat/qfloat_special_functions.c": {
+    "test_qf_productlog_all": {
+      "enabled": true,
+      "test_qf_productlog_definition": true,
+      "test_qf_productlog_consistency": true,
+      "test_qf_productlog_special": true,
+      "test_qf_productlog_monotonicity": true
+    },
+    "test_qf_gammainc_all": {
+      "enabled": true,
+      "test_qf_gammainc_PQ_identity": true,
+      "test_qf_gammainc_lower_upper_identity": true,
+      "test_qf_gammainc_special_s1": true
+    },
+    "test_qf_ei_e1_all": {
+      "enabled": true,
+      "test_qf_ei_deriv": true,
+      "test_qf_e1_deriv": true,
+      "test_qf_ei_e1_identity": true,
+      "test_ei_values": true
+    }
+  },
+  "tests/qfloat/qfloat_probability.c": {
+    "test_qf_beta_all": {
+      "enabled": true,
+      "test_qf_beta_definition": true,
+      "test_qf_beta_symmetry": true,
+      "test_qf_beta_special_cases": true
+    },
+    "test_qf_logbeta_all": {
+      "enabled": true,
+      "test_qf_logbeta_definition": true,
+      "test_qf_logbeta_consistency": true,
+      "test_qf_logbeta_symmetry": true,
+      "test_qf_logbeta_special_cases": true
+    },
+    "test_qf_binomial_all": {
+      "enabled": true,
+      "test_qf_binomial_definition": true,
+      "test_qf_binomial_symmetry": true,
+      "test_qf_binomial_special_cases": true
+    },
+    "test_qf_beta_pdf_all": {
+      "enabled": true,
+      "test_qf_beta_pdf_definition": true,
+      "test_qf_beta_pdf_logform": true,
+      "test_qf_beta_pdf_symmetry": true
+    },
+    "test_qf_logbeta_pdf_all": {
+      "enabled": true,
+      "test_qf_logbeta_pdf_definition": true,
+      "test_qf_logbeta_pdf_consistency": true,
+      "test_qf_logbeta_pdf_symmetry": true
+    },
+    "test_qf_normal_pdf_all": {
+      "enabled": true,
+      "test_qf_normal_pdf_definition": true,
+      "test_qf_normal_pdf_symmetry": true,
+      "test_qf_normal_pdf_at_zero": true,
+      "test_qf_normal_pdf_logform": true
+    },
+    "test_qf_normal_cdf_all": {
+      "enabled": true,
+      "test_qf_normal_cdf_definition": true,
+      "test_qf_normal_cdf_symmetry": true,
+      "test_qf_normal_cdf_known_values": true,
+      "test_qf_normal_cdf_pdf_consistency": true
+    },
+    "test_qf_normal_logpdf_all": {
+      "enabled": true,
+      "test_qf_normal_logpdf_definition": true,
+      "test_qf_normal_logpdf_consistency": true,
+      "test_qf_normal_logpdf_symmetry": true,
+      "test_qf_normal_logpdf_at_zero": true
+    }
+  },
+  "tests/dval/dval_groups.c": {
+    "test_arithmetic": {
+      "enabled": true,
+      "test_add": true,
+      "test_sub": true,
+      "test_mul": true,
+      "test_div": true,
+      "test_mixed": true
+    },
+    "test_d_variants": {
+      "enabled": true,
+      "test_add_d": true,
+      "test_mul_d": true,
+      "test_div_d": true
+    },
+    "test_maths_functions": {
+      "enabled": true,
+      "test_sin": true,
+      "test_cos": true,
+      "test_tan": true,
+      "test_sinh": true,
+      "test_cosh": true,
+      "test_tanh": true,
+      "test_asin": true,
+      "test_acos": true,
+      "test_atan": true,
+      "test_atan2": true,
+      "test_asinh": true,
+      "test_acosh": true,
+      "test_atanh": true,
+      "test_exp": true,
+      "test_log": true,
+      "test_sqrt": true,
+      "test_pow_d": true,
+      "test_pow": true,
+      "test_abs": true,
+      "test_hypot": true,
+      "test_erf": true,
+      "test_erfc": true,
+      "test_erfinv": true,
+      "test_erfcinv": true,
+      "test_gamma": true,
+      "test_lgamma": true,
+      "test_digamma": true,
+      "test_trigamma": true,
+      "test_lambert_w0": true,
+      "test_lambert_wm1": true,
+      "test_normal_pdf": true,
+      "test_normal_cdf": true,
+      "test_normal_logpdf": true,
+      "test_ei": true,
+      "test_e1": true,
+      "test_beta": true,
+      "test_logbeta": true
+    },
+    "test_first_derivatives": {
+      "enabled": true,
+      "test_deriv_const": true,
+      "test_deriv_var": true,
+      "test_deriv_neg": true,
+      "test_deriv_add_d": true,
+      "test_deriv_mul_d": true,
+      "test_deriv_div_d": true,
+      "test_deriv_x2": true,
+      "test_deriv_pow3": true,
+      "test_deriv_pow_xy": true,
+      "test_deriv_sin": true,
+      "test_deriv_cos": true,
+      "test_deriv_tan": true,
+      "test_deriv_sinh": true,
+      "test_deriv_cosh": true,
+      "test_deriv_tanh": true,
+      "test_deriv_asin": true,
+      "test_deriv_acos": true,
+      "test_deriv_atan": true,
+      "test_deriv_atan2": true,
+      "test_deriv_asinh": true,
+      "test_deriv_acosh": true,
+      "test_deriv_atanh": true,
+      "test_deriv_exp": true,
+      "test_deriv_log": true,
+      "test_deriv_sqrt": true,
+      "test_deriv_composite": true,
+      "test_deriv_sin_log": true,
+      "test_deriv_exp_tanh": true,
+      "test_deriv_sqrt_sin_x2": true,
+      "test_deriv_log_cosh": true,
+      "test_deriv_x2_exp_negx": true,
+      "test_deriv_atan_x_over_sqrt": true,
+      "test_deriv_abs": true,
+      "test_deriv_hypot": true,
+      "test_deriv_erf": true,
+      "test_deriv_erfc": true,
+      "test_deriv_erfinv": true,
+      "test_deriv_erfcinv": true,
+      "test_deriv_gamma": true,
+      "test_deriv_lgamma": true,
+      "test_deriv_digamma": true,
+      "test_deriv_trigamma": true,
+      "test_deriv_lambert_w0": true,
+      "test_deriv_lambert_wm1": true,
+      "test_deriv_normal_pdf": true,
+      "test_deriv_normal_cdf": true,
+      "test_deriv_normal_logpdf": true,
+      "test_deriv_ei": true,
+      "test_deriv_e1": true,
+      "test_deriv_beta": true,
+      "test_deriv_logbeta": true
+    },
+    "test_second_derivatives": {
+      "enabled": true,
+      "test_second_deriv_var": true,
+      "test_second_deriv_neg": true,
+      "test_second_deriv_add_d": true,
+      "test_second_deriv_mul_d": true,
+      "test_second_deriv_div_d": true,
+      "test_second_deriv_x2": true,
+      "test_second_deriv_x3": true,
+      "test_second_deriv_pow_xy": true,
+      "test_second_deriv_sin": true,
+      "test_second_deriv_cos": true,
+      "test_second_deriv_tan": true,
+      "test_second_deriv_sinh": true,
+      "test_second_deriv_cosh": true,
+      "test_second_deriv_tanh": true,
+      "test_second_deriv_asin": true,
+      "test_second_deriv_acos": true,
+      "test_second_deriv_atan": true,
+      "test_second_deriv_atan2": true,
+      "test_second_deriv_asinh": true,
+      "test_second_deriv_acosh": true,
+      "test_second_deriv_atanh": true,
+      "test_second_deriv_exp": true,
+      "test_second_deriv_log": true,
+      "test_second_deriv_sqrt": true,
+      "test_second_deriv_composite": true,
+      "test_second_deriv_sin_log": true,
+      "test_second_deriv_exp_tanh": true,
+      "test_second_deriv_sqrt_sin_x2": true,
+      "test_second_deriv_log_cosh": true,
+      "test_second_deriv_x2_exp_negx": true,
+      "test_second_deriv_atan_x_over_sqrt": true,
+      "test_second_deriv_abs": true,
+      "test_second_deriv_hypot": true,
+      "test_second_deriv_erf": true,
+      "test_second_deriv_erfc": true,
+      "test_second_deriv_gamma": true,
+      "test_second_deriv_lgamma": true,
+      "test_second_deriv_normal_pdf": true,
+      "test_second_deriv_normal_cdf": true,
+      "test_second_deriv_normal_logpdf": true,
+      "test_second_deriv_ei": true,
+      "test_second_deriv_e1": true,
+      "test_second_deriv_erfinv": true,
+      "test_second_deriv_erfcinv": true,
+      "test_second_deriv_lambert_w0": true,
+      "test_second_deriv_lambert_wm1": true,
+      "test_second_deriv_beta": true,
+      "test_second_deriv_logbeta": true,
+      "test_second_deriv_digamma": true
+    },
+    "test_dval_t_to_string": {
+      "enabled": true,
+      "test_to_string_all": true,
+      "test_expressions": true,
+      "test_expressions_unnamed": true,
+      "test_expressions_longname": true
+    }
+  },
+  "tests/dval/dval_to_string.c": {
+    "test_to_string_all": {
+      "enabled": true,
+      "test_to_string_basic_const": true,
+      "test_to_string_basic_var": true,
+      "test_to_string_addition": true,
+      "test_to_string_nested_mul_add": true,
+      "test_to_string_atan2": true,
+      "test_to_string_pow_superscript": true,
+      "test_to_string_unary_sin": true,
+      "test_to_string_function_style": true,
+      "test_to_string_special_functions": true
+    },
+    "test_to_string_basic_const": {
+      "enabled": true,
+      "test_to_string_basic_const_expr": true,
+      "test_to_string_basic_const_func": true
+    },
+    "test_to_string_basic_var": {
+      "enabled": true,
+      "test_to_string_basic_var_expr": true,
+      "test_to_string_basic_var_func": true
+    },
+    "test_to_string_addition": {
+      "enabled": true,
+      "test_to_string_addition_expr": true,
+      "test_to_string_addition_func": true
+    },
+    "test_to_string_nested_mul_add": {
+      "enabled": true,
+      "test_to_string_nested_mul_add_expr": true,
+      "test_to_string_nested_mul_add_func": true
+    },
+    "test_to_string_atan2": {
+      "enabled": true,
+      "test_to_string_atan2_expr": true,
+      "test_to_string_atan2_func": true
+    },
+    "test_to_string_pow_superscript": {
+      "enabled": true,
+      "test_to_string_pow_superscript_expr": true,
+      "test_to_string_pow_superscript_func": true
+    },
+    "test_to_string_unary_sin": {
+      "enabled": true,
+      "test_to_string_unary_sin_expr": true,
+      "test_to_string_unary_sin_func": true
+    },
+    "test_to_string_function_style": {
+      "enabled": true,
+      "test_to_string_function_style_expr": true,
+      "test_to_string_function_style_func": true
+    }
+  },
+  "tests/dval/dval_from_string.c": {
+    "test_dval_t_from_string": {
+      "enabled": true,
+      "test_from_string_pure_const": true,
+      "test_from_string_arithmetic": true,
+      "test_from_string_functions": true,
+      "test_from_string_special_functions": true,
+      "test_from_string_named_consts": true,
+      "test_from_string_bracketed_names": true,
+      "test_from_string_ascii_alternatives": true,
+      "test_from_string_errors": true,
+      "test_from_string_round_trips": true,
+      "test_from_string_deriv": true
+    },
+    "test_from_string_ascii_alternatives": {
+      "enabled": true,
+      "test_from_string_subscripts": true,
+      "test_from_string_star_mul": true,
+      "test_from_string_func_power": true,
+      "test_from_string_composed": true
+    }
+  },
+  "tests/dval/dval_partials.c": {
+    "test_partial_derivatives": {
+      "enabled": true,
+      "test_partial_xy_product": true,
+      "test_partial_poly": true,
+      "test_partial_sin_exp": true,
+      "test_partial_symmetry": true,
+      "test_partial_get_borrowed": true,
+      "test_partial_to_string": true,
+      "test_partial_to_string_functions": true,
+      "test_partial_to_string_log_r2": true,
+      "test_partial_to_string_sin_xy": true
+    }
+  },
+  "tests/dval/dval_regressions.c": {
+    "test_runtime_regressions": {
+      "enabled": true,
+      "test_cmp_qfloat_precision": true,
+      "test_get_val_updates_after_set": true,
+      "test_simplify_inverse_unary_pairs": true
+    }
+  },
+  "tests/dval/dval_reverse_mode.c": {
+    "test_reverse_mode": {
+      "enabled": true,
+      "test_reverse_gradient_polynomial": true,
+      "test_reverse_gradient_shared_subexpression": true,
+      "test_reverse_matches_forward_composite": true,
+      "test_reverse_gradient_missing_variable": true
+    }
+  },
+  "tests/dval/dval_readme.c": {
+    "test_README_md_example": {
+      "enabled": true,
+      "test_readme_example": true,
+      "test_readme_from_string_example": true,
+      "test_readme_partial_example": true
+    }
+  },
+  "tests/qfloat/test_qfloat_arithmetic.c": {
+    "test_arithmetic": {
+      "enabled": true,
+      "test_add": true,
+      "test_mul": true,
+      "test_div": true,
+      "test_sqrt": true,
+      "test_exp_log": true,
+      "test_qf_exp": true,
+      "test_qf_log": true,
+      "test_stability": true
+    }
+  },
+  "tests/qfloat/test_qfloat_special_functions.c": {
+    "test_arithmetic_extensions": {
+      "enabled": true,
+      "test_qf_add_double": true,
+      "test_qf_mul_double": true,
+      "test_qf_sqr": true,
+      "test_qf_ldexp": true,
+      "test_qf_mul_pow10": true,
+      "test_qf_floor": true,
+      "test_qf_cmp": true,
+      "test_qf_signbit": true,
+      "test_qf_isinf": true
+    },
+    "test_vsprintf": {
+      "enabled": true,
+      "test_qf_vsprintf": true
+    },
+    "test_qf_productlog_all": {
+      "enabled": true,
+      "test_qf_productlog_definition": true,
+      "test_qf_productlog_consistency": true,
+      "test_qf_productlog_special": true,
+      "test_qf_productlog_monotonicity": true
+    },
+    "test_gammainc_ei_e1": {
+      "enabled": true,
+      "test_qf_gammainc_all": true,
+      "test_qf_ei_e1_all": true
+    },
+    "test_qf_gammainc_all": {
+      "enabled": true,
+      "test_qf_gammainc_PQ_identity": true,
+      "test_qf_gammainc_lower_upper_identity": true,
+      "test_qf_gammainc_special_s1": true
+    },
+    "test_qf_ei_e1_all": {
+      "enabled": true,
+      "test_qf_ei_deriv": true,
+      "test_qf_e1_deriv": true,
+      "test_qf_ei_e1_identity": true,
+      "test_ei_values": true
+    }
+  },
+  "tests/qfloat/test_qfloat_strings.c": {
+    "test_strings": {
+      "enabled": true,
+      "test_qf_to_string": true,
+      "test_qf_from_string": true,
+      "test_from_string_basic": true,
+      "test_from_string_scientific": true,
+      "test_round_trip": true
+    }
+  },
+  "tests/qfloat/test_qfloat_printf.c": {
+    "test_printf": {
+      "enabled": true,
+      "test_qf_sprintf_and_printf": true
+    },
+    "test_qf_sprintf_and_printf": {
+      "enabled": true,
+      "test_qd_sprintf_basic": true,
+      "test_qd_sprintf_multiple": true,
+      "test_qd_sprintf_mixed": true,
+      "test_qd_sprintf_buffer_limit": true,
+      "test_qd_sprintf_edge_cases": true,
+      "test_qd_sprintf_q_precision": true,
+      "test_qd_sprintf_q_zero_precision": true,
+      "test_qd_sprintf_q_flags": true,
+      "test_qd_sprintf_q_width": true,
+      "test_qd_sprintf_q_fallback": true,
+      "test_qd_sprintf_q_fallback_width": true,
+      "test_qf_sprintf_q_concise": true,
+      "test_qf_sprintf_null_safe_new": true,
+      "test_qf_sprintf_two_pass_new": true,
+      "test_qf_printf_stdout": true
+    }
+  },
+  "tests/qfloat/test_qfloat_power.c": {
+    "test_power": {
+      "enabled": true,
+      "test_qf_pow_int": true,
+      "test_qf_pow": true,
+      "test_qf_pow10": true
+    }
+  },
+  "tests/qfloat/test_qfloat_trig.c": {
+    "test_trigonometric": {
+      "enabled": true,
+      "test_qf_trig": true,
+      "test_qf_atan": true,
+      "test_qf_atan2": true,
+      "test_qf_asin": true,
+      "test_qf_acos": true
+    }
+  },
+  "tests/qfloat/test_qfloat_hyperbolic.c": {
+    "test_hyperbolic": {
+      "enabled": true,
+      "test_qf_cosh": true,
+      "test_qf_sinh": true,
+      "test_qf_tanh": true,
+      "test_qf_asinh": true,
+      "test_qf_acosh": true,
+      "test_qf_atanh": true
+    }
+  },
+  "tests/qfloat/test_qfloat_gamma_family.c": {
+    "test_hypotenus": {
+      "enabled": true,
+      "test_qf_hypot": true
+    },
+    "test_gamma_erf_erfc_erfinv_erfcinv_digamma": {
+      "enabled": true,
+      "test_qf_gamma": true,
+      "test_qf_erf": true,
+      "test_qf_erfc": true,
+      "test_qf_erfinv": true,
+      "test_qf_erfcinv": true,
+      "test_qf_lgamma": true,
+      "test_qf_digamma": true,
+      "test_qf_gammainv": true,
+      "test_qf_trigamma": true,
+      "test_qf_tetragamma": true
+    }
+  },
+  "tests/qfloat/test_qfloat_probability.c": {
+    "test_lambert_w": {
+      "enabled": true,
+      "test_qf_lambert_w0": true,
+      "test_qf_lambert_wm1": true,
+      "test_qf_productlog_all": true
+    },
+    "test_beta_logbeta_binomial_beta_pdf_logbeta_pdf_normal_pdf_cdf_logpdf": {
+      "enabled": true,
+      "test_qf_beta_all": true,
+      "test_qf_logbeta_all": true,
+      "test_qf_binomial_all": true,
+      "test_qf_beta_pdf_all": true,
+      "test_qf_logbeta_pdf_all": true,
+      "test_qf_normal_pdf_all": true,
+      "test_qf_normal_cdf_all": true,
+      "test_qf_normal_logpdf_all": true
+    },
+    "test_qf_beta_all": {
+      "enabled": true,
+      "test_qf_beta_definition": true,
+      "test_qf_beta_symmetry": true,
+      "test_qf_beta_special_cases": true
+    },
+    "test_qf_logbeta_all": {
+      "enabled": true,
+      "test_qf_logbeta_definition": true,
+      "test_qf_logbeta_consistency": true,
+      "test_qf_logbeta_symmetry": true,
+      "test_qf_logbeta_special_cases": true
+    },
+    "test_qf_binomial_all": {
+      "enabled": true,
+      "test_qf_binomial_definition": true,
+      "test_qf_binomial_symmetry": true,
+      "test_qf_binomial_special_cases": true
+    },
+    "test_qf_beta_pdf_all": {
+      "enabled": true,
+      "test_qf_beta_pdf_definition": true,
+      "test_qf_beta_pdf_logform": true,
+      "test_qf_beta_pdf_symmetry": true
+    },
+    "test_qf_logbeta_pdf_all": {
+      "enabled": true,
+      "test_qf_logbeta_pdf_definition": true,
+      "test_qf_logbeta_pdf_consistency": true,
+      "test_qf_logbeta_pdf_symmetry": true
+    },
+    "test_qf_normal_pdf_all": {
+      "enabled": true,
+      "test_qf_normal_pdf_definition": true,
+      "test_qf_normal_pdf_symmetry": true,
+      "test_qf_normal_pdf_at_zero": true,
+      "test_qf_normal_pdf_logform": true
+    },
+    "test_qf_normal_cdf_all": {
+      "enabled": true,
+      "test_qf_normal_cdf_definition": true,
+      "test_qf_normal_cdf_symmetry": true,
+      "test_qf_normal_cdf_known_values": true,
+      "test_qf_normal_cdf_pdf_consistency": true
+    },
+    "test_qf_normal_logpdf_all": {
+      "enabled": true,
+      "test_qf_normal_logpdf_definition": true,
+      "test_qf_normal_logpdf_consistency": true,
+      "test_qf_normal_logpdf_symmetry": true,
+      "test_qf_normal_logpdf_at_zero": true
+    }
+  },
+  "tests/matrix/test_matrix_core.c": {
     "test_creation": true,
     "test_reading": true,
     "test_writing": true,
@@ -646,6 +1906,9 @@
     "test_transpose_conjugate": true,
     "test_identity_get": true,
     "test_identity_set": true,
+    "test_sparse_support": true,
+    "test_structural_queries_and_diagonal_construction": true,
+    "test_layout_policy_regressions": true,
     "test_add_sub_qf": true,
     "test_add_sub_qc": true,
     "test_multiply_qf": true,
@@ -678,14 +1941,23 @@
     "test_inverse_double": true,
     "test_inverse_qfloat": true,
     "test_inverse_qcomplex": true,
-    "test_hermitian_op": true,
+    "test_solve_and_lstsq": true,
+    "test_factorisations": true,
+    "test_rank_pinv_nullspace": true,
+    "test_norms_and_condition": true,
+    "test_hermitian_op": true
+  },
+  "tests/matrix/test_matrix_functions.c": {
+    "test_mat_neg_convenience": true,
     "test_eigen_d": true,
     "test_eigen_qf": true,
     "test_eigen_qc": true,
-    "test_readme_example": true,
     "test_mat_exp_d": true,
     "test_mat_exp_qf": true,
     "test_mat_exp_qc": true,
+    "test_mat_exp_singular": true,
+    "test_matrix_function_structure_preservation": true,
+    "test_mat_fun_singular_entire_d": true,
     "test_mat_exp_null_safety": true,
     "test_mat_sin_d": true,
     "test_mat_sin_qf": true,
@@ -718,26 +1990,309 @@
     "test_mat_pow_d": true,
     "test_mat_erf_d": true,
     "test_mat_erfc_d": true,
+    "test_mat_special_unary_extensions": true,
+    "test_mat_special_unary_square_extensions": true,
+    "test_mat_typeof": true,
+    "test_readme_example": true
+  },
+  "tests/matrix/test_matrix_function_regressions.c": {
     "test_mat_fun_qf_qc": true,
     "test_mat_error_handling": true,
     "test_mat_fun_3x3": true,
-    "test_mat_typeof": true,
     "test_mat_fun_4x4": true,
     "test_mat_fun_3x3_qf": true,
-    "test_mat_fun_3x3_qc": true,
-    "test_mat_exp_singular": true,
-    "test_mat_fun_singular_entire_d": true,
-    "test_mat_special_unary_extensions": true,
-    "test_mat_neg_convenience": true,
-    "test_mat_special_unary_square_extensions": true,
-    "test_solve_and_lstsq": true,
-    "test_factorizations": true,
-    "test_rank_pinv_nullspace": true,
-    "test_norms_and_condition": true,
-    "test_sparse_support": true,
-    "test_layout_policy_regressions": true,
-    "test_structural_queries_and_diagonal_construction": true,
-    "test_factorisations": true,
-    "test_matrix_function_structure_preservation": true
+    "test_mat_fun_3x3_qc": true
+  },
+  "tests/dval/test_dval_arithmetic.c": {
+    "test_arithmetic": {
+      "enabled": true,
+      "test_add": true,
+      "test_sub": true,
+      "test_mul": true,
+      "test_div": true,
+      "test_mixed": true
+    },
+    "test_d_variants": {
+      "enabled": true,
+      "test_add_d": true,
+      "test_mul_d": true,
+      "test_div_d": true
+    }
+  },
+  "tests/dval/test_dval_unary_math.c": {
+    "test_maths_functions": {
+      "enabled": true,
+      "test_sin": true,
+      "test_cos": true,
+      "test_tan": true,
+      "test_sinh": true,
+      "test_cosh": true,
+      "test_tanh": true,
+      "test_asin": true,
+      "test_acos": true,
+      "test_atan": true,
+      "test_atan2": true,
+      "test_asinh": true,
+      "test_acosh": true,
+      "test_atanh": true,
+      "test_exp": true,
+      "test_log": true,
+      "test_sqrt": true,
+      "test_pow_d": true,
+      "test_pow": true,
+      "test_abs": true,
+      "test_hypot": true,
+      "test_erf": true,
+      "test_erfc": true,
+      "test_erfinv": true,
+      "test_erfcinv": true,
+      "test_gamma": true,
+      "test_lgamma": true,
+      "test_digamma": true,
+      "test_trigamma": true,
+      "test_lambert_w0": true,
+      "test_lambert_wm1": true,
+      "test_normal_pdf": true,
+      "test_normal_cdf": true,
+      "test_normal_logpdf": true,
+      "test_ei": true,
+      "test_e1": true,
+      "test_beta": true,
+      "test_logbeta": true
+    }
+  },
+  "tests/dval/test_dval_first_derivatives.c": {
+    "test_first_derivatives": {
+      "enabled": true,
+      "test_deriv_const": true,
+      "test_deriv_var": true,
+      "test_deriv_neg": true,
+      "test_deriv_add_d": true,
+      "test_deriv_mul_d": true,
+      "test_deriv_div_d": true,
+      "test_deriv_x2": true,
+      "test_deriv_pow3": true,
+      "test_deriv_pow_xy": true,
+      "test_deriv_sin": true,
+      "test_deriv_cos": true,
+      "test_deriv_tan": true,
+      "test_deriv_sinh": true,
+      "test_deriv_cosh": true,
+      "test_deriv_tanh": true,
+      "test_deriv_asin": true,
+      "test_deriv_acos": true,
+      "test_deriv_atan": true,
+      "test_deriv_atan2": true,
+      "test_deriv_asinh": true,
+      "test_deriv_acosh": true,
+      "test_deriv_atanh": true,
+      "test_deriv_exp": true,
+      "test_deriv_log": true,
+      "test_deriv_sqrt": true,
+      "test_deriv_composite": true,
+      "test_deriv_sin_log": true,
+      "test_deriv_exp_tanh": true,
+      "test_deriv_sqrt_sin_x2": true,
+      "test_deriv_log_cosh": true,
+      "test_deriv_x2_exp_negx": true,
+      "test_deriv_atan_x_over_sqrt": true,
+      "test_deriv_abs": true,
+      "test_deriv_hypot": true,
+      "test_deriv_erf": true,
+      "test_deriv_erfc": true,
+      "test_deriv_erfinv": true,
+      "test_deriv_erfcinv": true,
+      "test_deriv_gamma": true,
+      "test_deriv_lgamma": true,
+      "test_deriv_digamma": true,
+      "test_deriv_trigamma": true,
+      "test_deriv_lambert_w0": true,
+      "test_deriv_lambert_wm1": true,
+      "test_deriv_normal_pdf": true,
+      "test_deriv_normal_cdf": true,
+      "test_deriv_normal_logpdf": true,
+      "test_deriv_ei": true,
+      "test_deriv_e1": true,
+      "test_deriv_beta": true,
+      "test_deriv_logbeta": true
+    }
+  },
+  "tests/dval/test_dval_second_derivatives.c": {
+    "test_second_derivatives": {
+      "enabled": true,
+      "test_second_deriv_var": true,
+      "test_second_deriv_neg": true,
+      "test_second_deriv_add_d": true,
+      "test_second_deriv_mul_d": true,
+      "test_second_deriv_div_d": true,
+      "test_second_deriv_x2": true,
+      "test_second_deriv_x3": true,
+      "test_second_deriv_pow_xy": true,
+      "test_second_deriv_sin": true,
+      "test_second_deriv_cos": true,
+      "test_second_deriv_tan": true,
+      "test_second_deriv_sinh": true,
+      "test_second_deriv_cosh": true,
+      "test_second_deriv_tanh": true,
+      "test_second_deriv_asin": true,
+      "test_second_deriv_acos": true,
+      "test_second_deriv_atan": true,
+      "test_second_deriv_atan2": true,
+      "test_second_deriv_asinh": true,
+      "test_second_deriv_acosh": true,
+      "test_second_deriv_atanh": true,
+      "test_second_deriv_exp": true,
+      "test_second_deriv_log": true,
+      "test_second_deriv_sqrt": true,
+      "test_second_deriv_composite": true,
+      "test_second_deriv_sin_log": true,
+      "test_second_deriv_exp_tanh": true,
+      "test_second_deriv_sqrt_sin_x2": true,
+      "test_second_deriv_log_cosh": true,
+      "test_second_deriv_x2_exp_negx": true,
+      "test_second_deriv_atan_x_over_sqrt": true,
+      "test_second_deriv_abs": true,
+      "test_second_deriv_hypot": true,
+      "test_second_deriv_erf": true,
+      "test_second_deriv_erfc": true,
+      "test_second_deriv_gamma": true,
+      "test_second_deriv_lgamma": true,
+      "test_second_deriv_normal_pdf": true,
+      "test_second_deriv_normal_cdf": true,
+      "test_second_deriv_normal_logpdf": true,
+      "test_second_deriv_ei": true,
+      "test_second_deriv_e1": true,
+      "test_second_deriv_erfinv": true,
+      "test_second_deriv_erfcinv": true,
+      "test_second_deriv_lambert_w0": true,
+      "test_second_deriv_lambert_wm1": true,
+      "test_second_deriv_beta": true,
+      "test_second_deriv_logbeta": true,
+      "test_second_deriv_digamma": true
+    }
+  },
+  "tests/dval/test_dval_string_groups.c": {
+    "test_dval_t_to_string": {
+      "enabled": true,
+      "test_to_string_all": true,
+      "test_expressions": true,
+      "test_expressions_unnamed": true,
+      "test_expressions_longname": true
+    }
+  },
+  "tests/dval/test_dval_to_string.c": {
+    "test_to_string_all": {
+      "enabled": true,
+      "test_to_string_basic_const": true,
+      "test_to_string_basic_var": true,
+      "test_to_string_addition": true,
+      "test_to_string_nested_mul_add": true,
+      "test_to_string_atan2": true,
+      "test_to_string_pow_superscript": true,
+      "test_to_string_unary_sin": true,
+      "test_to_string_function_style": true,
+      "test_to_string_special_functions": true
+    },
+    "test_to_string_basic_const": {
+      "enabled": true,
+      "test_to_string_basic_const_expr": true,
+      "test_to_string_basic_const_func": true
+    },
+    "test_to_string_basic_var": {
+      "enabled": true,
+      "test_to_string_basic_var_expr": true,
+      "test_to_string_basic_var_func": true
+    },
+    "test_to_string_addition": {
+      "enabled": true,
+      "test_to_string_addition_expr": true,
+      "test_to_string_addition_func": true
+    },
+    "test_to_string_nested_mul_add": {
+      "enabled": true,
+      "test_to_string_nested_mul_add_expr": true,
+      "test_to_string_nested_mul_add_func": true
+    },
+    "test_to_string_atan2": {
+      "enabled": true,
+      "test_to_string_atan2_expr": true,
+      "test_to_string_atan2_func": true
+    },
+    "test_to_string_pow_superscript": {
+      "enabled": true,
+      "test_to_string_pow_superscript_expr": true,
+      "test_to_string_pow_superscript_func": true
+    },
+    "test_to_string_unary_sin": {
+      "enabled": true,
+      "test_to_string_unary_sin_expr": true,
+      "test_to_string_unary_sin_func": true
+    },
+    "test_to_string_function_style": {
+      "enabled": true,
+      "test_to_string_function_style_expr": true,
+      "test_to_string_function_style_func": true
+    }
+  },
+  "tests/dval/test_dval_from_string.c": {
+    "test_dval_t_from_string": {
+      "enabled": true,
+      "test_from_string_pure_const": true,
+      "test_from_string_arithmetic": true,
+      "test_from_string_functions": true,
+      "test_from_string_special_functions": true,
+      "test_from_string_named_consts": true,
+      "test_from_string_bracketed_names": true,
+      "test_from_string_ascii_alternatives": true,
+      "test_from_string_errors": true,
+      "test_from_string_round_trips": true,
+      "test_from_string_deriv": true
+    },
+    "test_from_string_ascii_alternatives": {
+      "enabled": true,
+      "test_from_string_subscripts": true,
+      "test_from_string_star_mul": true,
+      "test_from_string_func_power": true,
+      "test_from_string_composed": true
+    }
+  },
+  "tests/dval/test_dval_partials.c": {
+    "test_partial_derivatives": {
+      "enabled": true,
+      "test_partial_xy_product": true,
+      "test_partial_poly": true,
+      "test_partial_sin_exp": true,
+      "test_partial_symmetry": true,
+      "test_partial_get_borrowed": true,
+      "test_partial_to_string": true,
+      "test_partial_to_string_functions": true,
+      "test_partial_to_string_log_r2": true,
+      "test_partial_to_string_sin_xy": true
+    }
+  },
+  "tests/dval/test_dval_regressions.c": {
+    "test_runtime_regressions": {
+      "enabled": true,
+      "test_cmp_qfloat_precision": true,
+      "test_get_val_updates_after_set": true,
+      "test_simplify_inverse_unary_pairs": true
+    }
+  },
+  "tests/dval/test_dval_reverse_mode.c": {
+    "test_reverse_mode": {
+      "enabled": true,
+      "test_reverse_gradient_polynomial": true,
+      "test_reverse_gradient_shared_subexpression": true,
+      "test_reverse_matches_forward_composite": true,
+      "test_reverse_gradient_missing_variable": true
+    }
+  },
+  "tests/dval/test_dval_readme.c": {
+    "test_README_md_example": {
+      "enabled": true,
+      "test_readme_example": true,
+      "test_readme_from_string_example": true,
+      "test_readme_partial_example": true
+    }
   }
 }
