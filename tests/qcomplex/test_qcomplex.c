@@ -6,7 +6,7 @@
 #include "qfloat.h"
 
 #define TEST_CONFIG_MODE TEST_CONFIG_GLOBAL
-#define TEST_HARNESS_IMPLEMENTATION
+#define TEST_CONFIG_MAIN
 #include "test_harness.h"
 
 /* ------------------------------------------------------------------ helpers */
@@ -1079,6 +1079,12 @@ static void test_from_string(void)
           "1.23456789012345678901234567890123456789012345678901",
           "9.87654321098765432109876543210987654321098765432109",
           1e-60, 0 },
+
+        { __FILE__, __LINE__, "bi + a",
+          "2j+4", "4", "2", 1e-60, 0 },
+
+        { __FILE__, __LINE__, "bi - a",
+          "2j-4", "-4", "2", 1e-60, 0 },
 
         /* (a,b) tuple */
         { __FILE__, __LINE__, "(a,b) tuple",

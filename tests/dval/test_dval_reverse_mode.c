@@ -68,9 +68,9 @@ static void test_reverse_matches_forward_composite(void)
         TEST_FAIL();
     }
 
-    check_q_at(__FILE__, __LINE__, 1, "reverse value composite", value, dv_eval(f));
-    check_q_at(__FILE__, __LINE__, 1, "reverse matches forward df/dx", grads[0], dv_eval(df_dx));
-    check_q_at(__FILE__, __LINE__, 1, "reverse matches forward df/dy", grads[1], dv_eval(df_dy));
+    check_q_at(__FILE__, __LINE__, 1, "reverse value composite", value, dv_eval_qf(f));
+    check_q_at(__FILE__, __LINE__, 1, "reverse matches forward df/dx", grads[0], dv_eval_qf(df_dx));
+    check_q_at(__FILE__, __LINE__, 1, "reverse matches forward df/dy", grads[1], dv_eval_qf(df_dy));
 
     dv_free(df_dy); dv_free(df_dx);
     dv_free(f); dv_free(x_log_y); dv_free(log_y); dv_free(exp_term); dv_free(sin_xy); dv_free(xy);

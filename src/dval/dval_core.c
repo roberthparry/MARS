@@ -28,7 +28,7 @@
 #include <ctype.h>
 #include <strings.h>
 #include <limits.h>
-#include "qfloat.h"
+#include "qcomplex.h"
 #include "dval_internal.h"
 #include "dval.h"
 
@@ -38,12 +38,32 @@
  * not a general thread-safety mechanism for the DAG. */
 static __thread dval_t *tl_wrt = NULL;
 
+static inline qcomplex_t qc_real_qf(qfloat_t x)
+{
+    return qc_make(x, QF_ZERO);
+}
+
+static inline qcomplex_t qc_real_d(double x)
+{
+    return qc_make(qf_from_double(x), QF_ZERO);
+}
+
+static inline int qc_is_zero(qcomplex_t z)
+{
+    return qc_eq(z, QC_ZERO);
+}
+
+static inline int qc_is_one(qcomplex_t z)
+{
+    return qc_eq(z, QC_ONE);
+}
+
 static struct _dval_t _DV_ZERO_NODE = {
     .ops = &ops_const,
     .a = NULL,
     .b = NULL,
-    .c = { 0.0, 0.0 },
-    .x = { 0.0, 0.0 },
+    .c = { { 0.0, 0.0 }, { 0.0, 0.0 } },
+    .x = { { 0.0, 0.0 }, { 0.0, 0.0 } },
     .x_valid = 1,
     .epoch = 0,
     .dx_cache = NULL,
@@ -56,8 +76,8 @@ static struct _dval_t _DV_ONE_NODE = {
     .ops = &ops_const,
     .a = NULL,
     .b = NULL,
-    .c = { 1.0, 0.0 },
-    .x = { 1.0, 0.0 },
+    .c = { { 1.0, 0.0 }, { 0.0, 0.0 } },
+    .x = { { 1.0, 0.0 }, { 0.0, 0.0 } },
     .x_valid = 1,
     .epoch = 0,
     .dx_cache = NULL,
@@ -234,8 +254,8 @@ static dval_t *dv_alloc(const dval_ops_t *ops)
     dv->ops      = ops;
     dv->a        = NULL;
     dv->b        = NULL;
-    dv->c        = qf_from_double(0.0);
-    dv->x        = qf_from_double(0.0);
+    dv->c        = QC_ZERO;
+    dv->x        = QC_ZERO;
     dv->x_valid  = 0;
     dv->epoch    = 0;
     dv->dx_cache = NULL;
@@ -250,10 +270,10 @@ static dval_t *dv_alloc(const dval_ops_t *ops)
 /* Lazy eval / deriv                                                         */
 /* ------------------------------------------------------------------------- */
 
-static qfloat_t dv_eval_qf(const dval_t *dv)
+static qcomplex_t dv_eval_qc(const dval_t *dv)
 {
     if (!dv)
-        return qf_from_double(0.0);
+        return QC_ZERO;
 
     dval_t *m = (dval_t *)dv;
 
@@ -262,11 +282,11 @@ static qfloat_t dv_eval_qf(const dval_t *dv)
         return m->x;
 
     /* Recurse into children to bring their epochs current, then check whether
-     * this node's cached value is still valid. ops->eval() will call dv_eval_qf
+     * this node's cached value is still valid. ops->eval() will call dv_eval_qc
      * on children a second time, but those calls return immediately (x_valid=1). */
-    dv_eval_qf(m->a);
+    dv_eval_qc(m->a);
     if (m->ops->arity == DV_OP_BINARY)
-        dv_eval_qf(m->b);
+        dv_eval_qc(m->b);
 
     uint64_t child_epoch = m->a ? m->a->epoch : 0;
     if (m->b && m->b->epoch > child_epoch)
@@ -329,14 +349,19 @@ static dval_t *get_dx(const dval_t *dv)
 /* Public eval                                                               */
 /* ------------------------------------------------------------------------- */
 
-qfloat_t dv_eval(const dval_t *dv)
+qcomplex_t dv_eval(const dval_t *dv)
 {
-    return dv_eval_qf(dv);
+    return dv_eval_qc(dv);
+}
+
+qfloat_t dv_eval_qf(const dval_t *dv)
+{
+    return dv_eval_qc(dv).re;
 }
 
 double dv_eval_d(const dval_t *dv)
 {
-    return qf_to_double(dv_eval(dv));
+    return qf_to_double(dv_eval_qf(dv));
 }
 
 /* ------------------------------------------------------------------------- */
@@ -398,7 +423,7 @@ int dv_eval_derivatives(const dval_t *expr,
     if (!expr || (nvars > 0 && (!vars || !derivs_out)))
         return -1;
 
-    value = dv_eval(expr);
+    value = dv_eval_qf(expr);
     if (value_out)
         *value_out = value;
 
@@ -476,7 +501,7 @@ const dval_t *dv_get_deriv(const dval_t *expr, dval_t *wrt)
 /* Constructors                                                              */
 /* ------------------------------------------------------------------------- */
 
-static dval_t *dv_make_const_qf(qfloat_t x)
+static dval_t *dv_make_const_qc(qcomplex_t x)
 {
     dval_t *dv = dv_alloc(&ops_const);
     dv->c = x;
@@ -487,7 +512,7 @@ static dval_t *dv_make_const_qf(qfloat_t x)
 
 /* A variable: value x. The derivative is computed lazily by deriv_var,
  * keyed by tl_wrt at the time of the first request. */
-static dval_t *dv_make_var_qf(qfloat_t x)
+static dval_t *dv_make_var_qc(qcomplex_t x)
 {
     dval_t *dv = dv_alloc(&ops_var);
     dv->c = x;
@@ -497,23 +522,36 @@ static dval_t *dv_make_var_qf(qfloat_t x)
     return dv;
 }
 
-dval_t *dv_new_const_d(double x) { return dv_make_const_qf(qf_from_double(x)); }
-dval_t *dv_new_const(qfloat_t x)   { return dv_make_const_qf(x); }
+dval_t *dv_new_const_d(double x) { return dv_make_const_qc(qc_real_d(x)); }
+dval_t *dv_new_const(qfloat_t x) { return dv_make_const_qc(qc_real_qf(x)); }
+dval_t *dv_new_const_qc(qcomplex_t x) { return dv_make_const_qc(x); }
 
 /* Public variable constructors: no derivative argument */
 dval_t *dv_new_var_d(double x)
 {
-    return dv_make_var_qf(qf_from_double(x));
+    return dv_make_var_qc(qc_real_d(x));
 }
 
 dval_t *dv_new_var(qfloat_t x)
 {
-    return dv_make_var_qf(x);
+    return dv_make_var_qc(qc_real_qf(x));
+}
+
+dval_t *dv_new_var_qc(qcomplex_t x)
+{
+    return dv_make_var_qc(x);
 }
 
 dval_t *dv_new_named_const(qfloat_t x, const char *name)
 {
     dval_t *dv = dv_new_const(x);
+    dv->name = dv_normalize_name(name);
+    return dv;
+}
+
+dval_t *dv_new_named_const_qc(qcomplex_t x, const char *name)
+{
+    dval_t *dv = dv_new_const_qc(x);
     dv->name = dv_normalize_name(name);
     return dv;
 }
@@ -531,6 +569,13 @@ dval_t *dv_new_named_var(qfloat_t x, const char *name)
     return dv;
 }
 
+dval_t *dv_new_named_var_qc(qcomplex_t x, const char *name)
+{
+    dval_t *dv = dv_new_var_qc(x);
+    dv->name = dv_normalize_name(name);
+    return dv;
+}
+
 dval_t *dv_new_named_var_d(double x, const char *name)
 {
     return dv_new_named_var(qf_from_double(x), name);
@@ -540,18 +585,27 @@ dval_t *dv_new_named_var_d(double x, const char *name)
 /* Setters                                                                   */
 /* ------------------------------------------------------------------------- */
 
-void dv_set_val(dval_t *dv, qfloat_t v)
+void dv_set_val(dval_t *dv, qcomplex_t v)
 {
-    if (dv->ops != &ops_var) abort();
+    if (!dv)
+        abort();
+    if (dv->ops != &ops_var &&
+        !(dv->ops == &ops_const && dv->name && *dv->name))
+        abort();
     dv->c = v;
     dv->x = v;
     dv->x_valid = 1;
     dv->epoch++;
 }
 
+void dv_set_val_qf(dval_t *dv, qfloat_t v)
+{
+    dv_set_val(dv, qc_real_qf(v));
+}
+
 void dv_set_val_d(dval_t *dv, double v)
 {
-    dv_set_val(dv, qf_from_double(v));
+    dv_set_val(dv, qc_real_d(v));
 }
 
 void dv_set_name(dval_t *dv, const char *name)
@@ -567,112 +621,117 @@ void dv_set_name(dval_t *dv, const char *name)
 
 double dv_get_val_d(const dval_t *dv)
 {
-    return qf_to_double(dv_eval_qf((dval_t *)dv));
+    return qf_to_double(dv_eval_qc((dval_t *)dv).re);
 }
 
-qfloat_t dv_get_val(const dval_t *dv)
+qfloat_t dv_get_val_qf(const dval_t *dv)
 {
-    return dv_eval_qf((dval_t *)dv);
+    return dv_eval_qc((dval_t *)dv).re;
+}
+
+qcomplex_t dv_get_val(const dval_t *dv)
+{
+    return dv_eval_qc((dval_t *)dv);
 }
 
 /* ------------------------------------------------------------------------- */
 /* EVALUATION FUNCTIONS                                                      */
 /* ------------------------------------------------------------------------- */
 
-static qfloat_t eval_const(dval_t *dv) {
+static qcomplex_t eval_const(dval_t *dv) {
     return dv->c;
 }
 
-static qfloat_t eval_var(dval_t *dv) {
+static qcomplex_t eval_var(dval_t *dv) {
     return dv->c;
 }
 
-static qfloat_t eval_add(dval_t *dv) {
-    return qf_add(dv_eval_qf(dv->a), dv_eval_qf(dv->b));
+static qcomplex_t eval_add(dval_t *dv) {
+    return qc_add(dv_eval_qc(dv->a), dv_eval_qc(dv->b));
 }
 
-static qfloat_t eval_sub(dval_t *dv) {
-    return qf_sub(dv_eval_qf(dv->a), dv_eval_qf(dv->b));
+static qcomplex_t eval_sub(dval_t *dv) {
+    return qc_sub(dv_eval_qc(dv->a), dv_eval_qc(dv->b));
 }
 
-static qfloat_t eval_mul(dval_t *dv) {
-    return qf_mul(dv_eval_qf(dv->a), dv_eval_qf(dv->b));
+static qcomplex_t eval_mul(dval_t *dv) {
+    return qc_mul(dv_eval_qc(dv->a), dv_eval_qc(dv->b));
 }
 
-static qfloat_t eval_div(dval_t *dv) {
-    return qf_div(dv_eval_qf(dv->a), dv_eval_qf(dv->b));
+static qcomplex_t eval_div(dval_t *dv) {
+    return qc_div(dv_eval_qc(dv->a), dv_eval_qc(dv->b));
 }
 
-static qfloat_t eval_neg(dval_t *dv) {
-    return qf_neg(dv_eval_qf(dv->a));
+static qcomplex_t eval_neg(dval_t *dv) {
+    return qc_neg(dv_eval_qc(dv->a));
 }
 
-static qfloat_t eval_pow(dval_t *dv) {
-    qfloat_t base = dv_eval_qf(dv->a);
-    qfloat_t exp  = dv_eval_qf(dv->b);
-    return qf_pow(base, exp);
+static qcomplex_t eval_pow(dval_t *dv) {
+    qcomplex_t base = dv_eval_qc(dv->a);
+    qcomplex_t exp  = dv_eval_qc(dv->b);
+    return qc_pow(base, exp);
 }
 
-static qfloat_t eval_pow_d(dval_t *dv) {
-    qfloat_t base = dv_eval_qf(dv->a);
-    return qf_pow(base, dv->c);
+static qcomplex_t eval_pow_d(dval_t *dv) {
+    qcomplex_t base = dv_eval_qc(dv->a);
+    return qc_pow(base, dv->c);
 }
 
 /* --- Trig / Hyperbolic / Exp / Log / Sqrt -------------------------------- */
 
-static qfloat_t eval_sin(dval_t *dv)   { return qf_sin (dv_eval_qf(dv->a)); }
-static qfloat_t eval_cos(dval_t *dv)   { return qf_cos (dv_eval_qf(dv->a)); }
-static qfloat_t eval_tan(dval_t *dv)   { return qf_tan (dv_eval_qf(dv->a)); }
+static qcomplex_t eval_sin(dval_t *dv)   { return qc_sin (dv_eval_qc(dv->a)); }
+static qcomplex_t eval_cos(dval_t *dv)   { return qc_cos (dv_eval_qc(dv->a)); }
+static qcomplex_t eval_tan(dval_t *dv)   { return qc_tan (dv_eval_qc(dv->a)); }
 
-static qfloat_t eval_sinh(dval_t *dv)  { return qf_sinh(dv_eval_qf(dv->a)); }
-static qfloat_t eval_cosh(dval_t *dv)  { return qf_cosh(dv_eval_qf(dv->a)); }
-static qfloat_t eval_tanh(dval_t *dv)  { return qf_tanh(dv_eval_qf(dv->a)); }
+static qcomplex_t eval_sinh(dval_t *dv)  { return qc_sinh(dv_eval_qc(dv->a)); }
+static qcomplex_t eval_cosh(dval_t *dv)  { return qc_cosh(dv_eval_qc(dv->a)); }
+static qcomplex_t eval_tanh(dval_t *dv)  { return qc_tanh(dv_eval_qc(dv->a)); }
 
-static qfloat_t eval_asin(dval_t *dv)  { return qf_asin(dv_eval_qf(dv->a)); }
-static qfloat_t eval_acos(dval_t *dv)  { return qf_acos(dv_eval_qf(dv->a)); }
-static qfloat_t eval_atan(dval_t *dv)  { return qf_atan(dv_eval_qf(dv->a)); }
+static qcomplex_t eval_asin(dval_t *dv)  { return qc_asin(dv_eval_qc(dv->a)); }
+static qcomplex_t eval_acos(dval_t *dv)  { return qc_acos(dv_eval_qc(dv->a)); }
+static qcomplex_t eval_atan(dval_t *dv)  { return qc_atan(dv_eval_qc(dv->a)); }
 
-static qfloat_t eval_asinh(dval_t *dv) { return qf_asinh(dv_eval_qf(dv->a)); }
-static qfloat_t eval_acosh(dval_t *dv) { return qf_acosh(dv_eval_qf(dv->a)); }
-static qfloat_t eval_atanh(dval_t *dv) { return qf_atanh(dv_eval_qf(dv->a)); }
+static qcomplex_t eval_asinh(dval_t *dv) { return qc_asinh(dv_eval_qc(dv->a)); }
+static qcomplex_t eval_acosh(dval_t *dv) { return qc_acosh(dv_eval_qc(dv->a)); }
+static qcomplex_t eval_atanh(dval_t *dv) { return qc_atanh(dv_eval_qc(dv->a)); }
 
-static qfloat_t eval_exp(dval_t *dv)    { return qf_exp   (dv_eval_qf(dv->a)); }
-static qfloat_t eval_log(dval_t *dv)    { return qf_log   (dv_eval_qf(dv->a)); }
-static qfloat_t eval_sqrt(dval_t *dv)   { return qf_sqrt  (dv_eval_qf(dv->a)); }
+static qcomplex_t eval_exp(dval_t *dv)    { return qc_exp   (dv_eval_qc(dv->a)); }
+static qcomplex_t eval_log(dval_t *dv)    { return qc_log   (dv_eval_qc(dv->a)); }
+static qcomplex_t eval_sqrt(dval_t *dv)   { return qc_sqrt  (dv_eval_qc(dv->a)); }
 
-static qfloat_t eval_abs(dval_t *dv)    { return qf_abs   (dv_eval_qf(dv->a)); }
-static qfloat_t eval_erf(dval_t *dv)    { return qf_erf   (dv_eval_qf(dv->a)); }
-static qfloat_t eval_erfc(dval_t *dv)   { return qf_erfc  (dv_eval_qf(dv->a)); }
-static qfloat_t eval_lgamma(dval_t *dv) { return qf_lgamma(dv_eval_qf(dv->a)); }
+static qcomplex_t eval_abs(dval_t *dv)    { return qc_real_qf(qc_abs(dv_eval_qc(dv->a))); }
+static qcomplex_t eval_erf(dval_t *dv)    { return qc_erf   (dv_eval_qc(dv->a)); }
+static qcomplex_t eval_erfc(dval_t *dv)   { return qc_erfc  (dv_eval_qc(dv->a)); }
+static qcomplex_t eval_lgamma(dval_t *dv) { return qc_lgamma(dv_eval_qc(dv->a)); }
 
-static qfloat_t eval_hypot(dval_t *dv) {
-    return qf_hypot(dv_eval_qf(dv->a), dv_eval_qf(dv->b));
+static qcomplex_t eval_hypot(dval_t *dv) {
+    return qc_hypot(dv_eval_qc(dv->a), dv_eval_qc(dv->b));
 }
 
-static qfloat_t eval_erfinv(dval_t *dv)        { return qf_erfinv    (dv_eval_qf(dv->a)); }
-static qfloat_t eval_erfcinv(dval_t *dv)       { return qf_erfcinv   (dv_eval_qf(dv->a)); }
-static qfloat_t eval_gamma(dval_t *dv)         { return qf_gamma     (dv_eval_qf(dv->a)); }
-static qfloat_t eval_digamma(dval_t *dv)        { return qf_digamma  (dv_eval_qf(dv->a)); }
-static qfloat_t eval_trigamma(dval_t *dv)       { return qf_trigamma (dv_eval_qf(dv->a)); }
-static qfloat_t eval_lambert_w0(dval_t *dv)    { return qf_lambert_w0 (dv_eval_qf(dv->a)); }
-static qfloat_t eval_lambert_wm1(dval_t *dv)   { return qf_lambert_wm1(dv_eval_qf(dv->a)); }
-static qfloat_t eval_normal_pdf(dval_t *dv)    { return qf_normal_pdf (dv_eval_qf(dv->a)); }
-static qfloat_t eval_normal_cdf(dval_t *dv)    { return qf_normal_cdf (dv_eval_qf(dv->a)); }
-static qfloat_t eval_normal_logpdf(dval_t *dv) { return qf_normal_logpdf(dv_eval_qf(dv->a)); }
-static qfloat_t eval_ei(dval_t *dv)            { return qf_ei        (dv_eval_qf(dv->a)); }
-static qfloat_t eval_e1(dval_t *dv)            { return qf_e1        (dv_eval_qf(dv->a)); }
+static qcomplex_t eval_erfinv(dval_t *dv)        { return qc_erfinv       (dv_eval_qc(dv->a)); }
+static qcomplex_t eval_erfcinv(dval_t *dv)       { return qc_erfcinv      (dv_eval_qc(dv->a)); }
+static qcomplex_t eval_gamma(dval_t *dv)         { return qc_gamma        (dv_eval_qc(dv->a)); }
+static qcomplex_t eval_digamma(dval_t *dv)       { return qc_digamma      (dv_eval_qc(dv->a)); }
+static qcomplex_t eval_trigamma(dval_t *dv)      { return qc_trigamma     (dv_eval_qc(dv->a)); }
+static qcomplex_t eval_lambert_w0(dval_t *dv)    { return qc_productlog   (dv_eval_qc(dv->a)); }
+static qcomplex_t eval_lambert_wm1(dval_t *dv)   { return qc_lambert_wm1  (dv_eval_qc(dv->a)); }
+static qcomplex_t eval_normal_pdf(dval_t *dv)    { return qc_normal_pdf   (dv_eval_qc(dv->a)); }
+static qcomplex_t eval_normal_cdf(dval_t *dv)    { return qc_normal_cdf   (dv_eval_qc(dv->a)); }
+static qcomplex_t eval_normal_logpdf(dval_t *dv) { return qc_normal_logpdf(dv_eval_qc(dv->a)); }
+static qcomplex_t eval_ei(dval_t *dv)            { return qc_ei           (dv_eval_qc(dv->a)); }
+static qcomplex_t eval_e1(dval_t *dv)            { return qc_e1           (dv_eval_qc(dv->a)); }
 
-static qfloat_t eval_beta(dval_t *dv) {
-    return qf_beta(dv_eval_qf(dv->a), dv_eval_qf(dv->b));
+static qcomplex_t eval_beta(dval_t *dv) {
+    return qc_beta(dv_eval_qc(dv->a), dv_eval_qc(dv->b));
 }
-static qfloat_t eval_logbeta(dval_t *dv) {
-    return qf_logbeta(dv_eval_qf(dv->a), dv_eval_qf(dv->b));
+static qcomplex_t eval_logbeta(dval_t *dv) {
+    return qc_logbeta(dv_eval_qc(dv->a), dv_eval_qc(dv->b));
 }
 
-static qfloat_t eval_atan2(dval_t *dv) {
-    qfloat_t fy = dv_eval_qf(dv->a);
-    qfloat_t gx = dv_eval_qf(dv->b);
-    return qf_atan2(fy, gx);
+static qcomplex_t eval_atan2(dval_t *dv) {
+    qcomplex_t fy = dv_eval_qc(dv->a);
+    qcomplex_t gx = dv_eval_qc(dv->b);
+    return qc_atan2(fy, gx);
 }
 
 /* ------------------------------------------------------------------------- */
@@ -788,7 +847,7 @@ static dval_t *deriv_pow(dval_t *dv)
 /* a^c — d/dx = c * a^(c-1) * a' */
 static dval_t *deriv_pow_d(dval_t *dv)
 {
-    double  c    = qf_to_double(dv->c);
+    double  c    = qf_to_double(dv->c.re);
     dval_t *da   = get_dx(dv->a);
     dval_t *p    = dv_pow_d(dv->a, c - 1.0);
     dval_t *coef = dv_new_const_d(c);
@@ -1390,37 +1449,37 @@ void dv_reverse_sub(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_
 
 void dv_reverse_mul(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
 {
-    *a_bar = qf_mul(out_bar, dv->b->x);
-    *b_bar = qf_mul(out_bar, dv->a->x);
+    *a_bar = qf_mul(out_bar, dv->b->x.re);
+    *b_bar = qf_mul(out_bar, dv->a->x.re);
 }
 
 void dv_reverse_div(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
 {
-    qfloat_t denom_sq = qf_mul(dv->b->x, dv->b->x);
-    *a_bar = qf_div(out_bar, dv->b->x);
-    *b_bar = qf_neg(qf_div(qf_mul(out_bar, dv->a->x), denom_sq));
+    qfloat_t denom_sq = qf_mul(dv->b->x.re, dv->b->x.re);
+    *a_bar = qf_div(out_bar, dv->b->x.re);
+    *b_bar = qf_neg(qf_div(qf_mul(out_bar, dv->a->x.re), denom_sq));
 }
 
 void dv_reverse_pow(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
 {
-    qfloat_t z = dv->x;
-    *a_bar = qf_mul(out_bar, qf_div(qf_mul(z, dv->b->x), dv->a->x));
-    *b_bar = qf_mul(out_bar, qf_mul(z, qf_log(dv->a->x)));
+    qfloat_t z = dv->x.re;
+    *a_bar = qf_mul(out_bar, qf_div(qf_mul(z, dv->b->x.re), dv->a->x.re));
+    *b_bar = qf_mul(out_bar, qf_mul(z, qf_log(dv->a->x.re)));
 }
 
 void dv_reverse_pow_d(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
 {
-    qfloat_t exponent = dv->c;
+    qfloat_t exponent = dv->c.re;
     qfloat_t one_less = qf_sub(exponent, QF_ONE);
-    *a_bar = qf_mul(out_bar, qf_mul(exponent, qf_pow(dv->a->x, one_less)));
+    *a_bar = qf_mul(out_bar, qf_mul(exponent, qf_pow(dv->a->x.re, one_less)));
     *b_bar = QF_ZERO;
 }
 
 void dv_reverse_atan2(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
 {
-    qfloat_t denom = qf_add(qf_sq_local(dv->a->x), qf_sq_local(dv->b->x));
-    *a_bar = qf_mul(out_bar, qf_div(dv->b->x, denom));
-    *b_bar = qf_neg(qf_mul(out_bar, qf_div(dv->a->x, denom)));
+    qfloat_t denom = qf_add(qf_sq_local(dv->a->x.re), qf_sq_local(dv->b->x.re));
+    *a_bar = qf_mul(out_bar, qf_div(dv->b->x.re, denom));
+    *b_bar = qf_neg(qf_mul(out_bar, qf_div(dv->a->x.re, denom)));
 }
 
 void dv_reverse_neg(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
@@ -1432,103 +1491,103 @@ void dv_reverse_neg(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_
 
 void dv_reverse_sin(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
 {
-    *a_bar = qf_mul(out_bar, qf_cos(dv->a->x));
+    *a_bar = qf_mul(out_bar, qf_cos(dv->a->x.re));
     *b_bar = QF_ZERO;
 }
 
 void dv_reverse_cos(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
 {
-    *a_bar = qf_neg(qf_mul(out_bar, qf_sin(dv->a->x)));
+    *a_bar = qf_neg(qf_mul(out_bar, qf_sin(dv->a->x.re)));
     *b_bar = QF_ZERO;
 }
 
 void dv_reverse_tan(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
 {
-    qfloat_t cos_x = qf_cos(dv->a->x);
+    qfloat_t cos_x = qf_cos(dv->a->x.re);
     *a_bar = qf_mul(out_bar, qf_div(QF_ONE, qf_sq_local(cos_x)));
     *b_bar = QF_ZERO;
 }
 
 void dv_reverse_sinh(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
 {
-    *a_bar = qf_mul(out_bar, qf_cosh(dv->a->x));
+    *a_bar = qf_mul(out_bar, qf_cosh(dv->a->x.re));
     *b_bar = QF_ZERO;
 }
 
 void dv_reverse_cosh(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
 {
-    *a_bar = qf_mul(out_bar, qf_sinh(dv->a->x));
+    *a_bar = qf_mul(out_bar, qf_sinh(dv->a->x.re));
     *b_bar = QF_ZERO;
 }
 
 void dv_reverse_tanh(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
 {
-    *a_bar = qf_mul(out_bar, qf_sub(QF_ONE, qf_sq_local(dv->x)));
+    *a_bar = qf_mul(out_bar, qf_sub(QF_ONE, qf_sq_local(dv->x.re)));
     *b_bar = QF_ZERO;
 }
 
 void dv_reverse_asin(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
 {
-    qfloat_t denom = qf_sqrt(qf_sub(QF_ONE, qf_sq_local(dv->a->x)));
+    qfloat_t denom = qf_sqrt(qf_sub(QF_ONE, qf_sq_local(dv->a->x.re)));
     *a_bar = qf_div(out_bar, denom);
     *b_bar = QF_ZERO;
 }
 
 void dv_reverse_acos(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
 {
-    qfloat_t denom = qf_sqrt(qf_sub(QF_ONE, qf_sq_local(dv->a->x)));
+    qfloat_t denom = qf_sqrt(qf_sub(QF_ONE, qf_sq_local(dv->a->x.re)));
     *a_bar = qf_neg(qf_div(out_bar, denom));
     *b_bar = QF_ZERO;
 }
 
 void dv_reverse_atan(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
 {
-    *a_bar = qf_div(out_bar, qf_add(QF_ONE, qf_sq_local(dv->a->x)));
+    *a_bar = qf_div(out_bar, qf_add(QF_ONE, qf_sq_local(dv->a->x.re)));
     *b_bar = QF_ZERO;
 }
 
 void dv_reverse_asinh(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
 {
-    qfloat_t denom = qf_sqrt(qf_add(qf_sq_local(dv->a->x), QF_ONE));
+    qfloat_t denom = qf_sqrt(qf_add(qf_sq_local(dv->a->x.re), QF_ONE));
     *a_bar = qf_div(out_bar, denom);
     *b_bar = QF_ZERO;
 }
 
 void dv_reverse_acosh(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
 {
-    qfloat_t denom = qf_mul(qf_sqrt(qf_sub(dv->a->x, QF_ONE)),
-                            qf_sqrt(qf_add(dv->a->x, QF_ONE)));
+    qfloat_t denom = qf_mul(qf_sqrt(qf_sub(dv->a->x.re, QF_ONE)),
+                            qf_sqrt(qf_add(dv->a->x.re, QF_ONE)));
     *a_bar = qf_div(out_bar, denom);
     *b_bar = QF_ZERO;
 }
 
 void dv_reverse_atanh(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
 {
-    *a_bar = qf_div(out_bar, qf_sub(QF_ONE, qf_sq_local(dv->a->x)));
+    *a_bar = qf_div(out_bar, qf_sub(QF_ONE, qf_sq_local(dv->a->x.re)));
     *b_bar = QF_ZERO;
 }
 
 void dv_reverse_exp(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
 {
-    *a_bar = qf_mul(out_bar, dv->x);
+    *a_bar = qf_mul(out_bar, dv->x.re);
     *b_bar = QF_ZERO;
 }
 
 void dv_reverse_log(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
 {
-    *a_bar = qf_div(out_bar, dv->a->x);
+    *a_bar = qf_div(out_bar, dv->a->x.re);
     *b_bar = QF_ZERO;
 }
 
 void dv_reverse_sqrt(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
 {
-    *a_bar = qf_div(out_bar, qf_mul(qf_from_int_local(2), dv->x));
+    *a_bar = qf_div(out_bar, qf_mul(qf_from_int_local(2), dv->x.re));
     *b_bar = QF_ZERO;
 }
 
 void dv_reverse_abs(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
 {
-    int cmp = qf_cmp(dv->a->x, QF_ZERO);
+    int cmp = qf_cmp(dv->a->x.re, QF_ZERO);
     if (cmp > 0)
         *a_bar = out_bar;
     else if (cmp < 0)
@@ -1540,62 +1599,62 @@ void dv_reverse_abs(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_
 
 void dv_reverse_hypot(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
 {
-    *a_bar = qf_mul(out_bar, qf_div(dv->a->x, dv->x));
-    *b_bar = qf_mul(out_bar, qf_div(dv->b->x, dv->x));
+    *a_bar = qf_mul(out_bar, qf_div(dv->a->x.re, dv->x.re));
+    *b_bar = qf_mul(out_bar, qf_div(dv->b->x.re, dv->x.re));
 }
 
 void dv_reverse_erf(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
 {
     qfloat_t scale = qf_div(qf_from_int_local(2), qf_sqrt(QF_PI));
-    *a_bar = qf_mul(out_bar, qf_mul(scale, qf_exp(qf_neg(qf_sq_local(dv->a->x)))));
+    *a_bar = qf_mul(out_bar, qf_mul(scale, qf_exp(qf_neg(qf_sq_local(dv->a->x.re)))));
     *b_bar = QF_ZERO;
 }
 
 void dv_reverse_erfc(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
 {
     qfloat_t scale = qf_div(qf_from_int_local(2), qf_sqrt(QF_PI));
-    *a_bar = qf_neg(qf_mul(out_bar, qf_mul(scale, qf_exp(qf_neg(qf_sq_local(dv->a->x))))));
+    *a_bar = qf_neg(qf_mul(out_bar, qf_mul(scale, qf_exp(qf_neg(qf_sq_local(dv->a->x.re))))));
     *b_bar = QF_ZERO;
 }
 
 void dv_reverse_erfinv(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
 {
     qfloat_t scale = qf_div(qf_sqrt(QF_PI), qf_from_int_local(2));
-    *a_bar = qf_mul(out_bar, qf_mul(scale, qf_exp(qf_sq_local(dv->x))));
+    *a_bar = qf_mul(out_bar, qf_mul(scale, qf_exp(qf_sq_local(dv->x.re))));
     *b_bar = QF_ZERO;
 }
 
 void dv_reverse_erfcinv(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
 {
     qfloat_t scale = qf_div(qf_sqrt(QF_PI), qf_from_int_local(2));
-    *a_bar = qf_neg(qf_mul(out_bar, qf_mul(scale, qf_exp(qf_sq_local(dv->x)))));
+    *a_bar = qf_neg(qf_mul(out_bar, qf_mul(scale, qf_exp(qf_sq_local(dv->x.re)))));
     *b_bar = QF_ZERO;
 }
 
 void dv_reverse_gamma(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
 {
-    *a_bar = qf_mul(out_bar, qf_mul(dv->x, qf_digamma(dv->a->x)));
+    *a_bar = qf_mul(out_bar, qf_mul(dv->x.re, qf_digamma(dv->a->x.re)));
     *b_bar = QF_ZERO;
 }
 
 void dv_reverse_lgamma(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
 {
     (void)dv;
-    *a_bar = qf_mul(out_bar, qf_digamma(dv->a->x));
+    *a_bar = qf_mul(out_bar, qf_digamma(dv->a->x.re));
     *b_bar = QF_ZERO;
 }
 
 void dv_reverse_digamma(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
 {
     (void)dv;
-    *a_bar = qf_mul(out_bar, qf_trigamma(dv->a->x));
+    *a_bar = qf_mul(out_bar, qf_trigamma(dv->a->x.re));
     *b_bar = QF_ZERO;
 }
 
 void dv_reverse_trigamma(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
 {
     (void)dv;
-    *a_bar = qf_mul(out_bar, qf_tetragamma(dv->a->x));
+    *a_bar = qf_mul(out_bar, qf_tetragamma(dv->a->x.re));
     *b_bar = QF_ZERO;
 }
 
@@ -1608,59 +1667,59 @@ static qfloat_t qf_lambert_reverse_factor(qfloat_t z, qfloat_t w)
 
 void dv_reverse_lambert_w0(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
 {
-    *a_bar = qf_mul(out_bar, qf_lambert_reverse_factor(dv->a->x, dv->x));
+    *a_bar = qf_mul(out_bar, qf_lambert_reverse_factor(dv->a->x.re, dv->x.re));
     *b_bar = QF_ZERO;
 }
 
 void dv_reverse_lambert_wm1(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
 {
-    *a_bar = qf_mul(out_bar, qf_lambert_reverse_factor(dv->a->x, dv->x));
+    *a_bar = qf_mul(out_bar, qf_lambert_reverse_factor(dv->a->x.re, dv->x.re));
     *b_bar = QF_ZERO;
 }
 
 void dv_reverse_normal_pdf(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
 {
-    *a_bar = qf_neg(qf_mul(out_bar, qf_mul(dv->a->x, dv->x)));
+    *a_bar = qf_neg(qf_mul(out_bar, qf_mul(dv->a->x.re, dv->x.re)));
     *b_bar = QF_ZERO;
 }
 
 void dv_reverse_normal_cdf(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
 {
-    *a_bar = qf_mul(out_bar, qf_normal_pdf(dv->a->x));
+    *a_bar = qf_mul(out_bar, qf_normal_pdf(dv->a->x.re));
     *b_bar = QF_ZERO;
 }
 
 void dv_reverse_normal_logpdf(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
 {
-    *a_bar = qf_neg(qf_mul(out_bar, dv->a->x));
+    *a_bar = qf_neg(qf_mul(out_bar, dv->a->x.re));
     *b_bar = QF_ZERO;
 }
 
 void dv_reverse_ei(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
 {
-    *a_bar = qf_mul(out_bar, qf_div(qf_exp(dv->a->x), dv->a->x));
+    *a_bar = qf_mul(out_bar, qf_div(qf_exp(dv->a->x.re), dv->a->x.re));
     *b_bar = QF_ZERO;
 }
 
 void dv_reverse_e1(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
 {
-    *a_bar = qf_neg(qf_mul(out_bar, qf_div(qf_exp(qf_neg(dv->a->x)), dv->a->x)));
+    *a_bar = qf_neg(qf_mul(out_bar, qf_div(qf_exp(qf_neg(dv->a->x.re)), dv->a->x.re)));
     *b_bar = QF_ZERO;
 }
 
 void dv_reverse_beta(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
 {
-    qfloat_t psi_ab = qf_digamma(qf_add(dv->a->x, dv->b->x));
-    *a_bar = qf_mul(out_bar, qf_mul(dv->x, qf_sub(qf_digamma(dv->a->x), psi_ab)));
-    *b_bar = qf_mul(out_bar, qf_mul(dv->x, qf_sub(qf_digamma(dv->b->x), psi_ab)));
+    qfloat_t psi_ab = qf_digamma(qf_add(dv->a->x.re, dv->b->x.re));
+    *a_bar = qf_mul(out_bar, qf_mul(dv->x.re, qf_sub(qf_digamma(dv->a->x.re), psi_ab)));
+    *b_bar = qf_mul(out_bar, qf_mul(dv->x.re, qf_sub(qf_digamma(dv->b->x.re), psi_ab)));
 }
 
 void dv_reverse_logbeta(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
 {
-    qfloat_t psi_ab = qf_digamma(qf_add(dv->a->x, dv->b->x));
+    qfloat_t psi_ab = qf_digamma(qf_add(dv->a->x.re, dv->b->x.re));
     (void)dv;
-    *a_bar = qf_mul(out_bar, qf_sub(qf_digamma(dv->a->x), psi_ab));
-    *b_bar = qf_mul(out_bar, qf_sub(qf_digamma(dv->b->x), psi_ab));
+    *a_bar = qf_mul(out_bar, qf_sub(qf_digamma(dv->a->x.re), psi_ab));
+    *b_bar = qf_mul(out_bar, qf_sub(qf_digamma(dv->b->x.re), psi_ab));
 }
 
 /* ------------------------------------------------------------------------- */
@@ -2157,11 +2216,19 @@ static dval_t *dv_new_pow_d(dval_t *a, double d)
 {
     dval_t *dv = dv_alloc(&ops_pow_d);
     dv->a = a;
-    dv->c = qf_from_double(d);
+    dv->c = qc_real_d(d);
     return dv;
 }
 
 static dval_t *dv_new_pow_qf(dval_t *a, qfloat_t exponent)
+{
+    dval_t *dv = dv_alloc(&ops_pow_d);
+    dv->a = a;
+    dv->c = qc_real_qf(exponent);
+    return dv;
+}
+
+static dval_t *dv_new_pow_qc_internal(dval_t *a, qcomplex_t exponent)
 {
     dval_t *dv = dv_alloc(&ops_pow_d);
     dv->a = a;
@@ -2237,6 +2304,14 @@ dval_t *dv_pow_qf(dval_t *a, qfloat_t exponent)
         return NULL;
     dv_retain(a);
     return dv_new_pow_qf(a, exponent);
+}
+
+dval_t *dv_pow_qc(dval_t *a, qcomplex_t exponent)
+{
+    if (!a)
+        return NULL;
+    dv_retain(a);
+    return dv_new_pow_qc_internal(a, exponent);
 }
 
 dval_t *dv_sqrt(dval_t *a)
@@ -2399,7 +2474,12 @@ dval_t *dv_d_div(double d, dval_t *dv)
 }
 
 int dv_cmp(const dval_t *dv1, const dval_t *dv2) {
-    return qf_cmp(dv_eval(dv1), dv_eval(dv2));
+    qcomplex_t a = dv_eval(dv1);
+    qcomplex_t b = dv_eval(dv2);
+
+    if (!qf_eq(a.re, b.re))
+        return qf_cmp(a.re, b.re);
+    return qf_cmp(a.im, b.im);
 }
 
 

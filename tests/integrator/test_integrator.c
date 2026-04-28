@@ -4,7 +4,7 @@
 #include <math.h>
 
 #define TEST_CONFIG_MODE TEST_CONFIG_GLOBAL
-#define TEST_HARNESS_IMPLEMENTATION
+#define TEST_CONFIG_MAIN
 #include "test_harness.h"
 
 #include "qfloat.h"

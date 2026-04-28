@@ -5,7 +5,7 @@ void test_erf(void)
     /* erf(0) = 0 exactly */
     dval_t *c = dv_new_var_d(0.0);
     dval_t *f = dv_erf(c);
-    check_q_at(__FILE__, __LINE__, 1, "erf(0) = 0", dv_eval(f), qf_from_double(0.0));
+    check_q_at(__FILE__, __LINE__, 1, "erf(0) = 0", dv_eval_qf(f), qf_from_double(0.0));
     print_expr_of(f);
     dv_free(f); dv_free(c);
 
@@ -15,7 +15,7 @@ void test_erf(void)
     dval_t *fp = dv_erf(cp);
     dval_t *fn = dv_erf(cn);
     check_q_at(__FILE__, __LINE__, 1, "erf(-0.8) = -erf(0.8)",
-               dv_eval(fn), qf_neg(dv_eval(fp)));
+               dv_eval_qf(fn), qf_neg(dv_eval_qf(fp)));
     dv_free(fp); dv_free(fn); dv_free(cp); dv_free(cn);
 
     /* erf(x) + erfc(x) = 1 identity at x=0.6 */
@@ -29,7 +29,7 @@ void test_erfc(void)
     /* erfc(0) = 1 exactly */
     dval_t *c = dv_new_var_d(0.0);
     dval_t *f = dv_erfc(c);
-    check_q_at(__FILE__, __LINE__, 1, "erfc(0) = 1", dv_eval(f), qf_from_double(1.0));
+    check_q_at(__FILE__, __LINE__, 1, "erfc(0) = 1", dv_eval_qf(f), qf_from_double(1.0));
     print_expr_of(f);
     dv_free(f); dv_free(c);
 
@@ -51,7 +51,7 @@ void test_erfinv(void)
     /* erfinv(0) = 0 exactly */
     dval_t *c = dv_new_var_d(0.0);
     dval_t *f = dv_erfinv(c);
-    check_q_at(__FILE__, __LINE__, 1, "erfinv(0) = 0", dv_eval(f), qf_from_double(0.0));
+    check_q_at(__FILE__, __LINE__, 1, "erfinv(0) = 0", dv_eval_qf(f), qf_from_double(0.0));
     print_expr_of(f);
     dv_free(f); dv_free(c);
 
@@ -72,7 +72,7 @@ void test_erfcinv(void)
     /* erfcinv(1) = 0 exactly (erfc(0) = 1) */
     dval_t *c = dv_new_var_d(1.0);
     dval_t *f = dv_erfcinv(c);
-    check_q_at(__FILE__, __LINE__, 1, "erfcinv(1) = 0", dv_eval(f), qf_from_double(0.0));
+    check_q_at(__FILE__, __LINE__, 1, "erfcinv(1) = 0", dv_eval_qf(f), qf_from_double(0.0));
     print_expr_of(f);
     dv_free(f); dv_free(c);
 
@@ -93,21 +93,21 @@ void test_gamma(void)
     /* Γ(1) = 0! = 1 exactly */
     dval_t *c = dv_new_var_d(1.0);
     dval_t *f = dv_gamma(c);
-    check_q_at(__FILE__, __LINE__, 1, "gamma(1) = 1", dv_eval(f), qf_from_double(1.0));
+    check_q_at(__FILE__, __LINE__, 1, "gamma(1) = 1", dv_eval_qf(f), qf_from_double(1.0));
     print_expr_of(f);
     dv_free(f); dv_free(c);
 
     /* Γ(3) = 2! = 2 exactly */
     c = dv_new_var_d(3.0);
     f = dv_gamma(c);
-    check_q_at(__FILE__, __LINE__, 1, "gamma(3) = 2", dv_eval(f), qf_from_double(2.0));
+    check_q_at(__FILE__, __LINE__, 1, "gamma(3) = 2", dv_eval_qf(f), qf_from_double(2.0));
     print_expr_of(f);
     dv_free(f); dv_free(c);
 
     /* Γ(0.5) = sqrt(π) */
     c = dv_new_var_d(0.5);
     f = dv_gamma(c);
-    check_q_at(__FILE__, __LINE__, 1, "gamma(0.5) = sqrt(pi)", dv_eval(f), qf_sqrt(QF_PI));
+    check_q_at(__FILE__, __LINE__, 1, "gamma(0.5) = sqrt(pi)", dv_eval_qf(f), qf_sqrt(QF_PI));
     print_expr_of(f);
     dv_free(f); dv_free(c);
 
@@ -123,7 +123,7 @@ void test_lgamma(void)
     /* lgamma(1) = log(1) = 0 exactly */
     dval_t *c = dv_new_var_d(1.0);
     dval_t *f = dv_lgamma(c);
-    check_q_at(__FILE__, __LINE__, 1, "lgamma(1) = 0", dv_eval(f), qf_from_double(0.0));
+    check_q_at(__FILE__, __LINE__, 1, "lgamma(1) = 0", dv_eval_qf(f), qf_from_double(0.0));
     print_expr_of(f);
     dv_free(f); dv_free(c);
 
@@ -131,7 +131,7 @@ void test_lgamma(void)
     c = dv_new_const_d(3.0);
     f = dv_lgamma(c);
     check_q_at(__FILE__, __LINE__, 1, "lgamma(3) = log(2)",
-               dv_eval(f), qf_log(qf_from_double(2.0)));
+               dv_eval_qf(f), qf_log(qf_from_double(2.0)));
     print_expr_of(f);
     dv_free(f); dv_free(c);
 
@@ -168,14 +168,14 @@ void test_lambert_w0(void)
     /* W₀(0) = 0 exactly */
     dval_t *c = dv_new_var_d(0.0);
     dval_t *f = dv_lambert_w0(c);
-    check_q_at(__FILE__, __LINE__, 1, "lambert_w0(0) = 0", dv_eval(f), qf_from_double(0.0));
+    check_q_at(__FILE__, __LINE__, 1, "lambert_w0(0) = 0", dv_eval_qf(f), qf_from_double(0.0));
     print_expr_of(f);
     dv_free(f); dv_free(c);
 
     /* W₀(e) = 1 — use qfloat_t e so the input is accurate to ~33 digits */
     c = dv_new_var(qf_exp(qf_from_double(1.0)));
     f = dv_lambert_w0(c);
-    check_q_at(__FILE__, __LINE__, 1, "lambert_w0(e) = 1", dv_eval(f), qf_from_double(1.0));
+    check_q_at(__FILE__, __LINE__, 1, "lambert_w0(e) = 1", dv_eval_qf(f), qf_from_double(1.0));
     print_expr_of(f);
     dv_free(f); dv_free(c);
 
@@ -208,7 +208,7 @@ void test_normal_pdf(void)
     dval_t *f = dv_normal_pdf(c);
     qfloat_t expect = qf_div(qf_from_double(1.0),
                            qf_sqrt(qf_mul(qf_from_double(2.0), QF_PI)));
-    check_q_at(__FILE__, __LINE__, 1, "normal_pdf(0) = 1/sqrt(2pi)", dv_eval(f), expect);
+    check_q_at(__FILE__, __LINE__, 1, "normal_pdf(0) = 1/sqrt(2pi)", dv_eval_qf(f), expect);
     print_expr_of(f);
     dv_free(f); dv_free(c);
 
@@ -230,7 +230,7 @@ void test_normal_cdf(void)
     /* Φ(0) = 0.5 exactly by symmetry */
     dval_t *c = dv_new_var_d(0.0);
     dval_t *f = dv_normal_cdf(c);
-    check_q_at(__FILE__, __LINE__, 1, "normal_cdf(0) = 0.5", dv_eval(f), qf_from_double(0.5));
+    check_q_at(__FILE__, __LINE__, 1, "normal_cdf(0) = 0.5", dv_eval_qf(f), qf_from_double(0.5));
     print_expr_of(f);
     dv_free(f); dv_free(c);
 
@@ -255,7 +255,7 @@ void test_normal_logpdf(void)
                                   qf_log(qf_mul(qf_from_double(2.0), QF_PI))));
     dval_t *c = dv_new_var_d(0.0);
     dval_t *f = dv_normal_logpdf(c);
-    check_q_at(__FILE__, __LINE__, 1, "normal_logpdf(0) = -log(2pi)/2", dv_eval(f), expect);
+    check_q_at(__FILE__, __LINE__, 1, "normal_logpdf(0) = -log(2pi)/2", dv_eval_qf(f), expect);
     print_expr_of(f);
     dv_free(f); dv_free(c);
 
@@ -280,8 +280,8 @@ void test_ei(void)
     qfloat_t X2 = qf_from_double(2.0);
     dval_t *c1 = dv_new_var_d(1.0); dval_t *f1 = dv_ei(c1);
     dval_t *c2 = dv_new_var_d(2.0); dval_t *f2 = dv_ei(c2);
-    check_q_at(__FILE__, __LINE__, 1, "ei(1) via qfloat_t", dv_eval(f1), qf_ei(X1));
-    check_q_at(__FILE__, __LINE__, 1, "ei(2) via qfloat_t", dv_eval(f2), qf_ei(X2));
+    check_q_at(__FILE__, __LINE__, 1, "ei(1) via qfloat_t", dv_eval_qf(f1), qf_ei(X1));
+    check_q_at(__FILE__, __LINE__, 1, "ei(2) via qfloat_t", dv_eval_qf(f2), qf_ei(X2));
     print_expr_of(f1);
     print_expr_of(f2);
     dv_free(f1); dv_free(c1); dv_free(f2); dv_free(c2);
@@ -297,7 +297,7 @@ void test_e1(void)
     /* E₁(x) at x=1 */
     dval_t *c = dv_new_var_d(1.0);
     dval_t *f = dv_e1(c);
-    check_q_at(__FILE__, __LINE__, 1, "e1(1) via qfloat_t", dv_eval(f), qf_e1(qf_from_double(1.0)));
+    check_q_at(__FILE__, __LINE__, 1, "e1(1) via qfloat_t", dv_eval_qf(f), qf_e1(qf_from_double(1.0)));
     print_expr_of(f);
     dv_free(f); dv_free(c);
 
@@ -305,7 +305,7 @@ void test_e1(void)
     c = dv_new_var_d(0.5);
     f = dv_e1(c);
     check_q_at(__FILE__, __LINE__, 1, "e1(0.5) via qfloat_t",
-               dv_eval(f), qf_e1(qf_from_double(0.5)));
+               dv_eval_qf(f), qf_e1(qf_from_double(0.5)));
     print_expr_of(f);
     dv_free(f); dv_free(c);
 
@@ -322,7 +322,7 @@ void test_beta(void)
     dval_t *a = dv_new_var_d(1.0);
     dval_t *b = dv_new_const_d(1.0);
     dval_t *f = dv_beta(a, b);
-    check_q_at(__FILE__, __LINE__, 1, "beta(1,1) = 1", dv_eval(f), qf_from_double(1.0));
+    check_q_at(__FILE__, __LINE__, 1, "beta(1,1) = 1", dv_eval_qf(f), qf_from_double(1.0));
     print_expr_of(f);
     dv_free(f); dv_free(b); dv_free(a);
 
@@ -331,7 +331,7 @@ void test_beta(void)
     b = dv_new_const_d(3.0);
     f = dv_beta(a, b);
     check_q_at(__FILE__, __LINE__, 1, "beta(2,3) = 1/12",
-               dv_eval(f), qf_div(qf_from_double(1.0), qf_from_double(12.0)));
+               dv_eval_qf(f), qf_div(qf_from_double(1.0), qf_from_double(12.0)));
     dv_free(f); dv_free(b); dv_free(a);
 
     /* B(a,b) = B(b,a) symmetry at (2,5) */
@@ -354,7 +354,7 @@ void test_logbeta(void)
     dval_t *a = dv_new_var_d(1.0);
     dval_t *b = dv_new_const_d(1.0);
     dval_t *f = dv_logbeta(a, b);
-    check_q_at(__FILE__, __LINE__, 1, "logbeta(1,1) = 0", dv_eval(f), qf_from_double(0.0));
+    check_q_at(__FILE__, __LINE__, 1, "logbeta(1,1) = 0", dv_eval_qf(f), qf_from_double(0.0));
     print_expr_of(f);
     dv_free(f); dv_free(b); dv_free(a);
 
@@ -363,7 +363,7 @@ void test_logbeta(void)
     b = dv_new_const_d(3.0);
     f = dv_logbeta(a, b);
     check_q_at(__FILE__, __LINE__, 1, "logbeta(2,3) = -log(12)",
-               dv_eval(f), qf_neg(qf_log(qf_from_double(12.0))));
+               dv_eval_qf(f), qf_neg(qf_log(qf_from_double(12.0))));
     print_expr_of(f);
     dv_free(f); dv_free(b); dv_free(a);
 
@@ -388,7 +388,7 @@ void test_trigamma(void)
     dval_t *c = dv_new_var_d(1.0);
     dval_t *f = dv_trigamma(c);
     qfloat_t expect = qf_div(qf_mul(QF_PI, QF_PI), qf_from_double(6.0));
-    check_q_at(__FILE__, __LINE__, 1, "trigamma(1) = pi^2/6", dv_eval(f), expect);
+    check_q_at(__FILE__, __LINE__, 1, "trigamma(1) = pi^2/6", dv_eval_qf(f), expect);
     print_expr_of(f);
     dv_free(f); dv_free(c);
 
@@ -397,7 +397,7 @@ void test_trigamma(void)
     f = dv_trigamma(c);
     expect = qf_sub(qf_div(qf_mul(QF_PI, QF_PI), qf_from_double(6.0)),
                     qf_from_double(1.0));
-    check_q_at(__FILE__, __LINE__, 1, "trigamma(2) = pi^2/6 - 1", dv_eval(f), expect);
+    check_q_at(__FILE__, __LINE__, 1, "trigamma(2) = pi^2/6 - 1", dv_eval_qf(f), expect);
     print_expr_of(f);
     dv_free(f); dv_free(c);
 
@@ -405,7 +405,7 @@ void test_trigamma(void)
     c = dv_new_const_d(0.5);
     f = dv_trigamma(c);
     expect = qf_div(qf_mul(QF_PI, QF_PI), qf_from_double(2.0));
-    check_q_at(__FILE__, __LINE__, 1, "trigamma(1/2) = pi^2/2", dv_eval(f), expect);
+    check_q_at(__FILE__, __LINE__, 1, "trigamma(1/2) = pi^2/2", dv_eval_qf(f), expect);
     print_expr_of(f);
     dv_free(f); dv_free(c);
 
@@ -424,7 +424,7 @@ void test_deriv_trigamma(void)
 
     /* d/dx{ψ'(x)} = ψ''(x) (tetragamma) — verify via qf_tetragamma */
     qfloat_t expect = qf_tetragamma(qf_from_double(3.0));
-    check_q_at(__FILE__, __LINE__, 1, "d/dx{trigamma(x)} | x=3", dv_eval(df), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d/dx{trigamma(x)} | x=3", dv_eval_qf(df), expect);
     print_expr_of(df);
 
     /* Cross-check against recurrence: ψ''(3) = ψ''(4) - 2/27 */
@@ -448,7 +448,7 @@ void test_second_deriv_digamma(void)
     /* d²/dx²{ψ(x)} = ψ''(x) = tetragamma(x); at x=2: ψ''(2) = ψ''(1) - 2
      * ψ''(1) = -2ζ(3) so we just use qf_tetragamma to get the expected value */
     qfloat_t expect = qf_tetragamma(qf_from_double(2.0));
-    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{digamma(x)} | x=2", dv_eval(ddf), expect);
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{digamma(x)} | x=2", dv_eval_qf(ddf), expect);
     print_expr_of(ddf);
 
     /* Cross-check via recurrence: ψ''(2) = ψ''(3) - 2/8 */

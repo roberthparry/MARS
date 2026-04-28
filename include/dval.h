@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include "qfloat.h"
+#include "qcomplex.h"
 
 /**
  * @file dval.h
@@ -41,13 +42,14 @@ extern dval_t *DV_ONE;
 /* ------------------------------------------------------------------------- */
 
 /**
- * @brief Create a constant node from a double or qfloat_t value.
+ * @brief Create a constant node from a double, qfloat_t, or qcomplex_t value.
  *
  * Constants have no variable binding; their derivative is always zero.
  * Returns an owning handle; caller must call dv_free() exactly once.
  */
 dval_t *dv_new_const_d(double x);
 dval_t *dv_new_const(qfloat_t x);
+dval_t *dv_new_const_qc(qcomplex_t x);
 
 /**
  * @brief Create a named constant node.
@@ -57,6 +59,7 @@ dval_t *dv_new_const(qfloat_t x);
  * Returns an owning handle; caller must call dv_free() exactly once.
  */
 dval_t *dv_new_named_const(qfloat_t x, const char *name);
+dval_t *dv_new_named_const_qc(qcomplex_t x, const char *name);
 dval_t *dv_new_named_const_d(double x, const char *name);
 
 /* ------------------------------------------------------------------------- */
@@ -64,7 +67,7 @@ dval_t *dv_new_named_const_d(double x, const char *name);
 /* ------------------------------------------------------------------------- */
 
 /**
- * @brief Create a variable node from a double or qfloat_t value.
+ * @brief Create a variable node from a double, qfloat_t, or qcomplex_t value.
  *
  * Variables are leaf nodes whose value can be updated via dv_set_val().
  * Derivative of a variable with respect to itself is 1.
@@ -72,6 +75,7 @@ dval_t *dv_new_named_const_d(double x, const char *name);
  */
 dval_t *dv_new_var_d(double x);
 dval_t *dv_new_var(qfloat_t x);
+dval_t *dv_new_var_qc(qcomplex_t x);
 
 /**
  * @brief Create a named variable node.
@@ -81,6 +85,7 @@ dval_t *dv_new_var(qfloat_t x);
  * Returns an owning handle; caller must call dv_free() exactly once.
  */
 dval_t *dv_new_named_var(qfloat_t x, const char *name);
+dval_t *dv_new_named_var_qc(qcomplex_t x, const char *name);
 dval_t *dv_new_named_var_d(double x, const char *name);
 
 /* ------------------------------------------------------------------------- */
@@ -97,7 +102,8 @@ dval_t *dv_new_named_var_d(double x, const char *name);
  *
  * @p dv must be a variable node (created with dv_new_var or dv_new_named_var).
  */
-void dv_set_val(dval_t *dv, qfloat_t value);
+void dv_set_val(dval_t *dv, qcomplex_t value);
+void dv_set_val_qf(dval_t *dv, qfloat_t value);
 void dv_set_val_d(dval_t *dv, double value);
 
 /**
@@ -119,7 +125,8 @@ void dv_set_name(dval_t *dv, const char *name);
  * these accessors are convenient value-returning wrappers.
  */
 double dv_get_val_d(const dval_t *dv);
-qfloat_t dv_get_val(const dval_t *dv);
+qfloat_t dv_get_val_qf(const dval_t *dv);
+qcomplex_t dv_get_val(const dval_t *dv);
 
 /**
  * @brief Get the derivative ∂expr/∂wrt (borrowed).
@@ -140,7 +147,8 @@ const dval_t *dv_get_deriv(const dval_t *expr, dval_t *wrt);
  * Traverses the DAG recursively, recomputing any nodes whose cache is
  * stale. The result is stored in the node's cache and returned.
  */
-qfloat_t dv_eval(const dval_t *dv);
+qcomplex_t dv_eval(const dval_t *dv);
+qfloat_t dv_eval_qf(const dval_t *dv);
 double dv_eval_d(const dval_t *dv);
 
 /**
@@ -240,6 +248,7 @@ int dv_cmp(const dval_t *dv1, const dval_t *dv2);
  * Arguments are retained (not consumed).
  *
  * dv_pow_d(dv, d) computes dv^d for a constant double exponent.
+ * dv_pow_qc(dv, z) computes dv^z for a constant complex exponent.
  * dv_pow(dv1, dv2) computes dv1^dv2 where both operands are differentiable.
  */
 dval_t *dv_sin(dval_t *dv);
@@ -259,6 +268,7 @@ dval_t *dv_exp(dval_t *dv);
 dval_t *dv_log(dval_t *dv);
 dval_t *dv_sqrt(dval_t *dv);
 dval_t *dv_pow_d(dval_t *dv, double d);
+dval_t *dv_pow_qc(dval_t *dv, qcomplex_t z);
 dval_t *dv_pow(dval_t *dv1, dval_t *dv2);
 
 /* ------------------------------------------------------------------------- */
@@ -399,5 +409,24 @@ void dv_print(const dval_t *dv);
  * once.
  */
 dval_t *dval_from_string(const char *s);
+
+/**
+ * @brief Construct a dval_t from a bare expression string using supplied symbols.
+ *
+ * This parser accepts the same expression grammar as dval_from_string(), but
+ * without the outer braces or binding section. Symbol resolution is performed
+ * against the supplied @p names / @p symbols table.
+ *
+ * Each entry in @p names is matched to the corresponding entry in @p symbols.
+ * The parser borrows those symbols during parsing and returns a new owning
+ * handle for the parsed expression.
+ *
+ * Returns an owning handle on success, or NULL on error (details written to
+ * stderr). The caller must call dv_free() on the returned pointer exactly once.
+ */
+dval_t *dval_from_expression_string(const char *expr,
+                                    const char *const *names,
+                                    dval_t *const *symbols,
+                                    size_t nsymbols);
 
 #endif /* DVAL_H */

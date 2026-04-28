@@ -446,7 +446,7 @@ static void test_from_string_ascii_alternatives(void)
 static void check_dval_d(const char *label, const dval_t *node,
                           double expect, int line)
 {
-    qfloat_t qval = dv_eval(node);
+    qfloat_t qval = dv_eval_qf(node);
     double got   = qf_to_double(qval);
     double err   = fabs(got - expect);
     double rel   = (fabs(expect) > 0.0) ? err / fabs(expect) : err;

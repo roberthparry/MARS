@@ -9,12 +9,12 @@
  *   1. In exactly one test translation unit, define:
  *        #define TEST_CONFIG_MODE TEST_CONFIG_GLOBAL   // shared config file
  *        #define TEST_CONFIG_MODE TEST_CONFIG_LOCAL    // per-test-file config
- *        #define TEST_HARNESS_IMPLEMENTATION
+ *        #define TEST_CONFIG_MAIN
  *      before including this header.
  *   2. Define the entry point expected by main():
  *        int tests_main(void) { RUN_TEST(...); return 0; }
  *   3. Any additional helper translation units may include this header
- *      without defining TEST_HARNESS_IMPLEMENTATION.
+ *      without defining TEST_CONFIG_MAIN.
  *   4. Call RUN_TEST(func, parent) for each test or test-group function:
  *        RUN_TEST(test_addition, NULL);          // top-level test
  *        RUN_TEST(test_group_arithmetic, NULL);  // group (calls RUN_TEST itself)
@@ -206,10 +206,10 @@ static inline void th_print_time(double ms) {
 /* Define this in your test file. Call RUN_TEST() for each test. */
 int tests_main(void);
 
-#ifdef TEST_HARNESS_IMPLEMENTATION
+#ifdef TEST_CONFIG_MAIN
 
 #ifndef TEST_CONFIG_MODE
-#error "You must #define TEST_CONFIG_MODE before defining TEST_HARNESS_IMPLEMENTATION"
+#error "You must #define TEST_CONFIG_MODE before defining TEST_CONFIG_MAIN"
 #endif
 
 /* Harness-owned — do not modify */

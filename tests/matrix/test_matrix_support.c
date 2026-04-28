@@ -1,4 +1,5 @@
 #include "test_matrix.h"
+#include "dval_pattern.h"
 
 char current_matrix_input_label[128];
 static matrix_t *current_matrix_input = NULL;

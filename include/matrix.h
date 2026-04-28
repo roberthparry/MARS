@@ -30,6 +30,29 @@
 typedef struct matrix_t matrix_t;
 
 /**
+ * @brief Borrowed symbolic binding returned by mat_from_string().
+ *
+ * The @p name pointer and @p symbol handle remain valid for as long as the
+ * matrix returned by mat_from_string() remains alive. Releasing the bindings
+ * array itself only requires a plain free(bindings).
+ */
+typedef struct {
+    const char *name;
+    dval_t *symbol;
+    bool is_constant;
+} binding_t;
+
+/**
+ * @brief Matrix string rendering style.
+ */
+typedef enum {
+    MAT_STRING_INLINE_SCIENTIFIC,
+    MAT_STRING_INLINE_PRETTY,
+    MAT_STRING_LAYOUT_SCIENTIFIC,
+    MAT_STRING_LAYOUT_PRETTY
+} mat_string_style_t;
+
+/**
  * @brief Matrix element type.
  */
 typedef enum {
@@ -246,6 +269,23 @@ matrix_t *mat_create_qc(size_t rows, size_t cols, const qcomplex_t *data);
  */
 matrix_t *mat_create_dv(size_t rows, size_t cols, dval_t *const *data);
 
+/**
+ * @brief Parse a matrix from a string.
+ *
+ * Supported forms are:
+ *
+ *   [[a b c][d e f]]
+ *   { [[a b][c d]] | x = 1, y = 2; c1 = 3 }
+ *
+ * Purely numeric matrices become qfloat or qcomplex matrices depending on
+ * whether any entry is genuinely complex. Symbolic matrices become dval
+ * matrices. When @p bindings_out is non-NULL for a symbolic matrix, it
+ * receives a heap-allocated array of borrowed bindings that remains valid
+ * while the returned matrix remains alive; releasing that array only requires
+ * free(*bindings_out).
+ */
+matrix_t *mat_from_string(const char *s, binding_t **bindings_out, size_t *number_out);
+
 /* -------------------------------------------------------------------------
    Destruction
    ------------------------------------------------------------------------- */
@@ -300,6 +340,36 @@ bool   mat_is_sparse(const matrix_t *A);
 size_t mat_nonzero_count(const matrix_t *A);
 matrix_t *mat_to_sparse(const matrix_t *A);
 matrix_t *mat_to_dense(const matrix_t *A);
+
+/**
+ * @brief Evaluate a matrix into qfloat_t form.
+ *
+ * For dval matrices, each symbolic entry is evaluated at the current variable
+ * values and copied into a newly allocated qfloat matrix. The result is a
+ * numeric snapshot and does not continue to track later variable changes.
+ *
+ * For non-dval matrices, this returns a qfloat-valued copy in the same shape.
+ *
+ * @param A  Input matrix.
+ * @return   Newly allocated qfloat matrix on success, or NULL on error.
+ */
+matrix_t *mat_evaluate_qf(const matrix_t *A);
+
+/**
+ * @brief Evaluate a matrix into qcomplex_t form.
+ *
+ * For dval matrices, each symbolic entry is evaluated at the current variable
+ * values and copied into a newly allocated qcomplex matrix with zero imaginary
+ * part. The result is a numeric snapshot and does not continue to track later
+ * variable changes.
+ *
+ * For non-dval matrices, this returns a qcomplex-valued copy in the same
+ * shape.
+ *
+ * @param A  Input matrix.
+ * @return   Newly allocated qcomplex matrix on success, or NULL on error.
+ */
+matrix_t *mat_evaluate_qc(const matrix_t *A);
 
 /**
  * @brief Structural queries.
@@ -389,9 +459,25 @@ matrix_t *mat_neg(const matrix_t *A);
 matrix_t *mat_transpose(const matrix_t *A);
 matrix_t *mat_conj(const matrix_t *A);
 matrix_t *mat_hermitian(const matrix_t *A);
+/* For non-dval matrices, derivative helpers treat the matrix as constant. */
+matrix_t *mat_deriv(const matrix_t *A, dval_t *wrt);
+dval_t   *mat_deriv_trace(const matrix_t *A, dval_t *wrt);
+dval_t   *mat_deriv_det(const matrix_t *A, dval_t *wrt);
+matrix_t *mat_deriv_inverse(const matrix_t *A, dval_t *wrt);
+matrix_t *mat_deriv_block_inverse(const matrix_t *A, size_t split, dval_t *wrt);
+matrix_t *mat_jacobian(const matrix_t *A, dval_t *const *vars, size_t nvars);
 
+int       mat_trace(const matrix_t *A, void *trace);
 int       mat_det(const matrix_t *A, void *determinant);
+matrix_t *mat_charpoly(const matrix_t *A);
+matrix_t *mat_minpoly(const matrix_t *A);
+matrix_t *mat_apply_poly(const matrix_t *A, const matrix_t *coeffs);
+matrix_t *mat_adjugate(const matrix_t *A);
+matrix_t *mat_schur_complement(const matrix_t *A, size_t split);
+matrix_t *mat_block_inverse(const matrix_t *A, size_t split);
+matrix_t *mat_deriv_block_solve(const matrix_t *A, const matrix_t *B, size_t split, dval_t *wrt);
 matrix_t *mat_inverse(const matrix_t *A);
+matrix_t *mat_deriv_solve(const matrix_t *A, const matrix_t *B, dval_t *wrt);
 
 /**
  * @brief Solve the linear matrix equation A X = B.
@@ -409,6 +495,7 @@ matrix_t *mat_inverse(const matrix_t *A);
  * @return   Newly allocated solution matrix on success, or NULL on error.
  */
 matrix_t *mat_solve(const matrix_t *A, const matrix_t *B);
+matrix_t *mat_block_solve(const matrix_t *A, const matrix_t *B, size_t split);
 
 /**
  * @brief Compute a best-fit solution to A X = B.
@@ -645,9 +732,15 @@ int       mat_eigenvalues(const matrix_t *A, void *eigenvalues);
 int       mat_eigendecompose(const matrix_t *A, void *eigenvalues,
                              matrix_t **eigenvectors);
 matrix_t *mat_eigenvectors(const matrix_t *A);
+matrix_t *mat_eigenspace(const matrix_t *A, const void *eigenvalue);
+matrix_t *mat_generalized_eigenspace(const matrix_t *A, const void *eigenvalue,
+                                     size_t order);
+matrix_t *mat_jordan_chain(const matrix_t *A, const void *eigenvalue,
+                           size_t order);
+matrix_t *mat_jordan_profile(const matrix_t *A, const void *eigenvalue);
 
 /* -------------------------------------------------------------------------
-   Matrix functions (Hermitian matrices via eigendecomposition)
+   Matrix-function helpers
    ------------------------------------------------------------------------- */
 
 matrix_t *mat_exp(const matrix_t *A);
@@ -713,6 +806,9 @@ matrix_t *mat_pow(const matrix_t *A, double s);
    Debugging / I/O
    ------------------------------------------------------------------------- */
 
+char *mat_to_string(const matrix_t *A, mat_string_style_t style);
+int mat_sprintf(char *out, size_t out_size, const char *fmt, ...);
+int mat_printf(const char *fmt, ...);
 void mat_print(const matrix_t *A);
 
 #endif /* MATRIX_H */

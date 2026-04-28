@@ -10,9 +10,9 @@ static void test_partial_xy_product(void)
     dval_t *df_dy = dv_create_deriv(f, y);
     dval_t *d2f   = dv_create_2nd_deriv(f, x, y);
 
-    check_q_at(__FILE__, __LINE__, 1, "∂(x*y)/∂x at x=2,y=3", dv_eval(df_dx), qf_from_double(3.0));
-    check_q_at(__FILE__, __LINE__, 1, "∂(x*y)/∂y at x=2,y=3", dv_eval(df_dy), qf_from_double(2.0));
-    check_q_at(__FILE__, __LINE__, 1, "∂²(x*y)/∂x∂y",         dv_eval(d2f),   qf_from_double(1.0));
+    check_q_at(__FILE__, __LINE__, 1, "∂(x*y)/∂x at x=2,y=3", dv_eval_qf(df_dx), qf_from_double(3.0));
+    check_q_at(__FILE__, __LINE__, 1, "∂(x*y)/∂y at x=2,y=3", dv_eval_qf(df_dy), qf_from_double(2.0));
+    check_q_at(__FILE__, __LINE__, 1, "∂²(x*y)/∂x∂y",         dv_eval_qf(d2f),   qf_from_double(1.0));
 
     dv_free(d2f);
     dv_free(df_dy);
@@ -37,13 +37,13 @@ static void test_partial_poly(void)
     dval_t *d2f_dy2 = dv_create_2nd_deriv(f, y, y);
 
     /* at x=2: ∂f/∂x = 2*2 = 4 */
-    check_q_at(__FILE__, __LINE__, 1, "∂(x²+y³)/∂x at x=2",   dv_eval(df_dx),   qf_from_double(4.0));
+    check_q_at(__FILE__, __LINE__, 1, "∂(x²+y³)/∂x at x=2",   dv_eval_qf(df_dx),   qf_from_double(4.0));
     /* at y=3: ∂f/∂y = 3*9 = 27 */
-    check_q_at(__FILE__, __LINE__, 1, "∂(x²+y³)/∂y at y=3",   dv_eval(df_dy),   qf_from_double(27.0));
+    check_q_at(__FILE__, __LINE__, 1, "∂(x²+y³)/∂y at y=3",   dv_eval_qf(df_dy),   qf_from_double(27.0));
     /* ∂²f/∂x² = 2 */
-    check_q_at(__FILE__, __LINE__, 1, "∂²(x²+y³)/∂x² = 2",    dv_eval(d2f_dx2), qf_from_double(2.0));
+    check_q_at(__FILE__, __LINE__, 1, "∂²(x²+y³)/∂x² = 2",    dv_eval_qf(d2f_dx2), qf_from_double(2.0));
     /* at y=3: ∂²f/∂y² = 6y = 18 */
-    check_q_at(__FILE__, __LINE__, 1, "∂²(x²+y³)/∂y² at y=3", dv_eval(d2f_dy2), qf_from_double(18.0));
+    check_q_at(__FILE__, __LINE__, 1, "∂²(x²+y³)/∂y² at y=3", dv_eval_qf(d2f_dy2), qf_from_double(18.0));
 
     dv_free(d2f_dy2);
     dv_free(d2f_dx2);
@@ -76,9 +76,9 @@ static void test_partial_sin_exp(void)
     qfloat_t cos_exp = qf_mul(qcos1, qexp2);
     qfloat_t sin_exp = qf_mul(qsin1, qexp2);
 
-    check_q_at(__FILE__, __LINE__, 1, "∂(sin(x)exp(y))/∂x",    dv_eval(df_dx), cos_exp);
-    check_q_at(__FILE__, __LINE__, 1, "∂(sin(x)exp(y))/∂y",    dv_eval(df_dy), sin_exp);
-    check_q_at(__FILE__, __LINE__, 1, "∂²(sin(x)exp(y))/∂x∂y", dv_eval(d2f),   cos_exp);
+    check_q_at(__FILE__, __LINE__, 1, "∂(sin(x)exp(y))/∂x",    dv_eval_qf(df_dx), cos_exp);
+    check_q_at(__FILE__, __LINE__, 1, "∂(sin(x)exp(y))/∂y",    dv_eval_qf(df_dy), sin_exp);
+    check_q_at(__FILE__, __LINE__, 1, "∂²(sin(x)exp(y))/∂x∂y", dv_eval_qf(d2f),   cos_exp);
 
     dv_free(d2f);
     dv_free(df_dy);
@@ -104,8 +104,8 @@ static void test_partial_symmetry(void)
     dval_t *dyx  = dv_create_2nd_deriv(f, y, x);
 
     /* ∂²f/∂x∂y = x + 2x*1 ... actually ∂f/∂x = y + 2xy, ∂²f/∂x∂y = 1 + 2x = 5 at x=2 */
-    check_q_at(__FILE__, __LINE__, 1, "∂²f/∂x∂y at x=2,y=3", dv_eval(dxy), qf_from_double(5.0));
-    check_q_at(__FILE__, __LINE__, 1, "∂²f/∂y∂x at x=2,y=3", dv_eval(dyx), qf_from_double(5.0));
+    check_q_at(__FILE__, __LINE__, 1, "∂²f/∂x∂y at x=2,y=3", dv_eval_qf(dxy), qf_from_double(5.0));
+    check_q_at(__FILE__, __LINE__, 1, "∂²f/∂y∂x at x=2,y=3", dv_eval_qf(dyx), qf_from_double(5.0));
 
     dv_free(dyx);
     dv_free(dxy);
@@ -136,7 +136,7 @@ static void test_partial_get_borrowed(void)
         printf(C_BOLD C_GREEN "PASS" C_RESET " dv_get_deriv returns cached pointer\n");
     }
 
-    check_q_at(__FILE__, __LINE__, 1, "dv_get_deriv(x*y, x) = y = 5", dv_eval(p1), qf_from_double(5.0));
+    check_q_at(__FILE__, __LINE__, 1, "dv_get_deriv(x*y, x) = y = 5", dv_eval_qf(p1), qf_from_double(5.0));
 
     dv_free(f);
     dv_free(y);

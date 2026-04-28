@@ -224,6 +224,89 @@ void test_to_string_addition(void)
     RUN_TEST(test_to_string_addition_func, __func__);
 }
 
+static void test_to_string_negative_rhs_expr(void)
+{
+    dval_t *x = dv_new_named_var_d(2, "x");
+    dval_t *y = dv_new_named_var_d(3, "y");
+    dval_t *z = dv_new_named_var_d(4, "z");
+    dval_t *neg_y = dv_neg(y);
+    dval_t *frac = dv_div(neg_y, z);
+    dval_t *f = dv_sub(x, frac);
+    char *got = dv_to_string(f, style_EXPRESSION);
+    const char *expect = "{ x + y/z | x = 2, y = 3, z = 4 }";
+
+    if (str_eq(got, expect))
+        to_string_pass("negative rhs quotient (EXPR)", got, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "negative rhs quotient (EXPR)", got, expect);
+
+    free(got);
+    dv_free(neg_y);
+    dv_free(frac);
+    dv_free(f);
+    dv_free(x);
+    dv_free(y);
+    dv_free(z);
+}
+
+static void test_to_string_double_negative_expr(void)
+{
+    dval_t *x = dv_new_named_var_d(2, "x");
+    dval_t *y = dv_new_named_var_d(3, "y");
+    dval_t *neg_y = dv_neg(y);
+    dval_t *f = dv_sub(x, neg_y);
+    char *got = dv_to_string(f, style_EXPRESSION);
+    const char *expect = "{ x + y | x = 2, y = 3 }";
+
+    if (str_eq(got, expect))
+        to_string_pass("double negative rhs (EXPR)", got, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "double negative rhs (EXPR)", got, expect);
+
+    free(got);
+    dv_free(neg_y);
+    dv_free(f);
+    dv_free(x);
+    dv_free(y);
+}
+
+static void test_to_string_nested_negative_rhs_expr(void)
+{
+    dval_t *a = dv_new_named_var_d(5, "a");
+    dval_t *b = dv_new_named_var_d(6, "b");
+    dval_t *one = dv_new_const_d(1);
+    dval_t *two = dv_new_const_d(2);
+    dval_t *two_over_a = dv_div(two, a);
+    dval_t *inner = dv_sub(one, two_over_a);
+    dval_t *neg_inner = dv_neg(inner);
+    dval_t *neg_inner_over_a = dv_div(neg_inner, a);
+    dval_t *minus_two = dv_new_const_d(-2);
+    dval_t *rhs = dv_div(neg_inner_over_a, b);
+    dval_t *lhs = dv_div(minus_two, a);
+    dval_t *f = dv_sub(lhs, rhs);
+    char *got = dv_to_string(f, style_EXPRESSION);
+    const char *expect = "{ -2/a + (1 - 2/a)/a/b | a = 5, b = 6 }";
+
+    if (str_eq(got, expect))
+        to_string_pass("nested negative rhs quotient (EXPR)", got, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "nested negative rhs quotient (EXPR)", got, expect);
+
+    free(got);
+    dv_free(f);
+    dv_free(lhs);
+    dv_free(rhs);
+    dv_free(minus_two);
+    dv_free(neg_inner_over_a);
+    dv_free(neg_inner);
+    dv_free(inner);
+    dv_free(two_over_a);
+    dv_free(two);
+    dv_free(one);
+    dv_free(a);
+    dv_free(b);
+}
+
 /* ============================================================
  * NESTED MUL + ADD
  * ============================================================ */
@@ -533,6 +616,9 @@ void test_to_string_all(void)
     RUN_TEST(test_to_string_basic_const, __func__);
     RUN_TEST(test_to_string_basic_var, __func__);
     RUN_TEST(test_to_string_addition, __func__);
+    RUN_TEST(test_to_string_negative_rhs_expr, __func__);
+    RUN_TEST(test_to_string_double_negative_expr, __func__);
+    RUN_TEST(test_to_string_nested_negative_rhs_expr, __func__);
     RUN_TEST(test_to_string_nested_mul_add, __func__);
     RUN_TEST(test_to_string_atan2, __func__);
     RUN_TEST(test_to_string_pow_superscript, __func__);
@@ -2838,8 +2924,8 @@ void check_roundtrip(const char *label, dval_t *f, int line)
         return;
     }
 
-    qfloat_t expect = dv_eval(f);
-    qfloat_t got    = dv_eval(g);
+    qfloat_t expect = dv_eval_qf(f);
+    qfloat_t got    = dv_eval_qf(g);
     qfloat_t diff   = qf_sub(got, expect);
     double abs_err = fabs(qf_to_double(diff));
     double exp_d   = fabs(qf_to_double(expect));

@@ -27,7 +27,9 @@ the API. Internally each matrix carries:
   - lower triangular (stores entries on and below the diagonal)
 - arithmetic: scalar multiply/divide, matrix add, subtract, multiply
 - structural: transpose, conjugate, Hermitian (conjugate transpose)
-- linear algebra: determinant, inverse, eigenvalues, eigendecomposition, eigenvectors, solve, least-squares, rank, pseudoinverse, nullspace
+- string I/O: parse matrices from strings, render them back to strings, and print them with matrix-aware format specifiers
+- linear algebra: determinant, trace, characteristic polynomial, minimal polynomial, polynomial application, adjugate, inverse, block inverse, Schur complements, solve, block solve, eigenvalues, eigendecomposition, eigenvectors, eigenspaces, generalized eigenspaces, Jordan-chain helpers, rank, pseudoinverse, nullspace
+- symbolic matrix calculus: entrywise derivatives via `mat_deriv(...)`, Jacobian helpers, plus derivative helpers for trace, determinant, inverse, block inverse, solve, and block solve
 - matrix norms: 1-norm, infinity-norm, Frobenius norm, 2-norm
 - matrix factorisations: LU, QR, Cholesky, SVD, Schur
 - condition number computation
@@ -44,15 +46,24 @@ materialisation, and destruction are reference-count safe.
 What currently works for `dval` matrices:
 
 - construction in dense, sparse, identity, diagonal, and compatible structured layouts
+- string-based construction through `mat_from_string(...)` for real, complex, and symbolic matrices
 - element access, copy, transpose, conjugate
 - add, subtract, multiply
 - scalar multiply/divide through the normal promotion rules
-- exact `1×1` and `2×2` inverse
+- exact determinant, trace, characteristic polynomial, minimal polynomial, polynomial application, adjugate
+- exact inverse and solve, including larger dense symbolic cases
+- exact Schur complements, block inverses, and block solves, including symbolic `dval` block expressions when the leading block is invertible
+- eigenspaces, generalized eigenspaces, Jordan chains, and Jordan block-size profiles for disciplined symbolic cases
+- entrywise symbolic matrix derivatives with respect to a chosen `dval` variable
+- row-major Jacobian extraction for matrix-valued symbolic outputs
+- symbolic derivative helpers for `trace(A)`, `det(A)`, and `A^{-1}`
+- symbolic derivative helper for `solve(A, B)`
 - symbolic matrix functions for exact structured square inputs
   - diagonal matrices
   - upper- and lower-triangular matrices
   - repeated-diagonal triangular cases such as Jordan blocks
 - symbolic pretty-printing with one shared binding footer for the whole matrix
+- `mat_to_string(...)`, `mat_printf(...)`, and `mat_sprintf(...)` for matrix-aware symbolic and numeric output
 
 What is still intentionally unsupported for `dval` matrices:
 
@@ -60,6 +71,7 @@ What is still intentionally unsupported for `dval` matrices:
 - LU / QR / Cholesky / SVD / Schur
 - numerical eigensolvers and pseudoinverse
 - general dense Schur-based matrix functions on arbitrary `dval` inputs
+- full general symbolic Jordan normal form / arbitrary dense symbolic spectral decomposition
 
 The current design is to use `matrix<dval_t *>` for symbolic construction,
 differentiation, and exact structured operations, then evaluate to a numeric
@@ -106,6 +118,150 @@ eigenvalue[0] = 1 + 0i
 eigenvalue[1] = 4 + 0i
 ```
 
+### String-based symbolic example
+
+The string parser is especially handy when you want to build a symbolic matrix
+directly from a compact mathematical expression. Here is a small spin-½
+Hamiltonian with detuning `Δ` and coupling `Ω`:
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "dval.h"
+#include "matrix.h"
+
+static binding_t *find_binding(binding_t *bindings, size_t n, const char *name)
+{
+    for (size_t i = 0; i < n; ++i) {
+        if (strcmp(bindings[i].name, name) == 0)
+            return &bindings[i];
+    }
+    return NULL;
+}
+
+int main(void)
+{
+    binding_t *bindings = NULL;
+    size_t nbindings = 0;
+    matrix_t *H = mat_from_string(
+        "{ [[Δ Ω][Ω -Δ]] | Δ = 1.5; Ω = 0.25 }",
+        &bindings, &nbindings);
+    binding_t *delta = find_binding(bindings, nbindings, "Δ");
+    matrix_t *charpoly = mat_charpoly(H);
+    dval_t *detH = NULL;
+    dval_t *ddet_dDelta = mat_deriv_det(H, delta->symbol);
+    char *H_text;
+    char *p_text;
+    char *det_text;
+    char *ddet_text;
+
+    mat_get(charpoly, 2, 0, &detH);
+
+    H_text = mat_to_string(H, MAT_STRING_LAYOUT_PRETTY);
+    p_text = mat_to_string(charpoly, MAT_STRING_INLINE_PRETTY);
+    det_text = dv_to_string(detH, style_EXPRESSION);
+    ddet_text = dv_to_string(ddet_dDelta, style_EXPRESSION);
+
+    puts(H_text);
+    printf("characteristic polynomial coefficients = %s\n", p_text);
+    printf("det(H) = %s\n", det_text);
+    printf("d/dΔ det(H) = %s\n", ddet_text);
+
+    free(H_text);
+    free(p_text);
+    free(det_text);
+    free(ddet_text);
+    free(bindings);
+    dv_free(ddet_dDelta);
+    mat_free(charpoly);
+    mat_free(H);
+    return 0;
+}
+```
+
+Illustrative output:
+
+```text
+{ [
+  Δ    Ω
+  Ω   -Δ
+] | Δ = 1.5; Ω = 0.25 }
+characteristic polynomial coefficients = [[1][0][-(Δ² + Ω²)]]
+det(H) = { -Δ² - Ω² | Δ = 1.5; Ω = 0.25 }
+d/dΔ det(H) = { -2Δ | Δ = 1.5 }
+```
+
+### Symbolic quantum-mechanics example
+
+Here is a symbolic two-level Hamiltonian for a driven spin-½ system,
+
+`H = Δσ_z + Ωσ_x`,
+
+written in matrix form as
+
+`[[Δ, Ω], [Ω, -Δ]]`.
+
+This is a pleasing example because the algebra stays exact:
+
+- `tr(H) = 0`
+- `H² = (Δ² + Ω²) I`
+- the characteristic polynomial is `λ² - (Δ² + Ω²)`
+- the eigenvalues are `±sqrt(Δ² + Ω²)`
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "dval.h"
+#include "matrix.h"
+
+int main(void)
+{
+    binding_t *bindings = NULL;
+    size_t nbindings = 0;
+    matrix_t *H = mat_from_string(
+        "{ [[Δ Ω][Ω -Δ]] | Δ = 1.5; Ω = 0.25 }",
+        &bindings, &nbindings);
+    matrix_t *H2 = mat_pow_int(H, 2);
+    matrix_t *P = mat_charpoly(H);
+    dval_t *evals[2] = {NULL, NULL};
+    dval_t *trace = NULL;
+    dval_t *c2 = NULL;
+
+    mat_eigenvalues(H, evals);
+    mat_trace(H, &trace);
+    mat_get(P, 2, 0, &c2);
+
+    mat_printf("H = %ml\n", H);
+    mat_printf("H² = %m\n", H2);
+    printf("tr(H) = %s\n", dv_to_string(trace, style_EXPRESSION));
+    printf("charpoly constant term = %s\n", dv_to_string(c2, style_EXPRESSION));
+    printf("eigenvalues = %s, %s\n",
+           dv_to_string(evals[0], style_EXPRESSION),
+           dv_to_string(evals[1], style_EXPRESSION));
+
+    free(bindings);
+    mat_free(P);
+    mat_free(H2);
+    mat_free(H);
+    return 0;
+}
+```
+
+Illustrative output:
+
+```text
+H = { [
+  Δ  Ω
+  Ω -Δ
+] | Δ = 1.5; Ω = 0.25 }
+H² = { [[Ω² + Δ² -ΩΔ + ΩΔ][ΩΔ - ΩΔ Ω² + Δ²]] | Δ = 1.5; Ω = 0.25 }
+tr(H) = { 0 }
+charpoly constant term = { -(2·Ω² + 2Δ²)/2 | Δ = 1.5; Ω = 0.25 }
+eigenvalues = { 0.5·sqrt(4·Ω² + 4Δ²) | Δ = 1.5; Ω = 0.25 }, { -0.5·sqrt(4·Ω² + 4Δ²) | Δ = 1.5; Ω = 0.25 }
+```
+
 ---
 
 ## API Reference
@@ -147,6 +303,19 @@ typedef struct {
     matrix_t *Q;  /* Unitary Schur vectors */
     matrix_t *T;  /* Upper-triangular Schur form */
 } mat_schur_factor_t;
+
+typedef struct {
+    const char *name;
+    dval_t *symbol;
+    bool is_constant;
+} binding_t;
+
+typedef enum {
+    MAT_STRING_INLINE_SCIENTIFIC,
+    MAT_STRING_INLINE_PRETTY,
+    MAT_STRING_LAYOUT_SCIENTIFIC,
+    MAT_STRING_LAYOUT_PRETTY
+} mat_string_style_t;
 ```
 
 ### Construction
@@ -281,6 +450,64 @@ compatible shapes for mul). They return a newly allocated matrix.
 | `mat_conj(A)` | Element-wise complex conjugate |
 | `mat_hermitian(A)` | Conjugate transpose: `A^† = conj(A)^T` |
 
+#### Matrix Derivative
+
+```c
+matrix_t *mat_deriv(const matrix_t *A, dval_t *wrt);
+```
+
+Returns the entrywise derivative of `A` with respect to `wrt`, so the output
+has the same shape as `A` and each entry is
+
+```text
+∂A[i,j] / ∂wrt
+```
+
+For symbolic `MAT_TYPE_DVAL` matrices, the returned matrix is newly allocated
+and continues to track later changes to any variables referenced by the
+differentiated expressions.
+
+For non-`dval` matrices, `A` is treated as a constant matrix and the result is a
+newly allocated zero matrix with the same shape and element type as `A`.
+
+#### Matrix Calculus Helpers
+
+```c
+dval_t   *mat_deriv_trace(const matrix_t *A, dval_t *wrt);
+dval_t   *mat_deriv_det(const matrix_t *A, dval_t *wrt);
+matrix_t *mat_deriv_inverse(const matrix_t *A, dval_t *wrt);
+matrix_t *mat_deriv_block_inverse(const matrix_t *A, size_t split, dval_t *wrt);
+matrix_t *mat_deriv_solve(const matrix_t *A, const matrix_t *B, dval_t *wrt);
+matrix_t *mat_deriv_block_solve(const matrix_t *A, const matrix_t *B, size_t split, dval_t *wrt);
+matrix_t *mat_jacobian(const matrix_t *A, dval_t *const *vars, size_t nvars);
+```
+
+These helpers build on the symbolic `dval` matrix layer:
+
+- `mat_deriv_trace(A, wrt)` returns the derivative of `trace(A)` as a symbolic scalar
+- `mat_deriv_det(A, wrt)` returns the derivative of `det(A)` as a symbolic scalar
+- `mat_deriv_inverse(A, wrt)` returns the derivative of `A^{-1}` as a symbolic matrix
+- `mat_deriv_block_inverse(A, split, wrt)` returns the derivative of the symbolic block inverse of `A`
+- `mat_deriv_solve(A, B, wrt)` returns the derivative of the symbolic solution of `A X = B`
+- `mat_deriv_block_solve(A, B, split, wrt)` returns the derivative of the symbolic block solution of `A X = B`
+- `mat_jacobian(A, vars, nvars)` returns a row-major Jacobian matrix with
+  `rows(A) * cols(A)` rows and `nvars` columns
+
+For symbolic `MAT_TYPE_DVAL` matrices, these helpers return newly allocated
+symbolic results that continue to track later variable updates.
+
+For non-`dval` matrices, they treat the matrix inputs as constants:
+
+- `mat_deriv_trace(...)` and `mat_deriv_det(...)` return symbolic zero
+- `mat_deriv_inverse(...)`, `mat_deriv_block_inverse(...)`, `mat_deriv_solve(...)`, and `mat_deriv_block_solve(...)`
+  return zero matrices with the corresponding numeric shape and element type
+- `mat_jacobian(...)` returns a zero symbolic Jacobian matrix of the same
+  row-major shape it would use for a symbolic matrix
+
+For `mat_jacobian(...)`, row `i * cols(A) + j` corresponds to the entry
+`A[i,j]`, and column `k` corresponds to differentiation with respect to
+`vars[k]`.
+
 ### Linear Algebra
 
 #### Determinant
@@ -310,8 +537,52 @@ matrix_t *mat_inverse(const matrix_t *A);
 Returns a newly allocated matrix containing the inverse of `A`, or NULL if `A`
 is NULL, not square, or singular.
 
-For `MAT_TYPE_DVAL`, the current exact inverse support is limited to `1×1` and
-`2×2` matrices.
+For `MAT_TYPE_DVAL`, inverse support now includes diagonal and triangular cases,
+exact dense `2×2` / `3×3`, and the larger dense symbolic elimination path used
+by the matrix tests.
+
+#### Schur Complement
+
+```c
+matrix_t *mat_schur_complement(const matrix_t *A, size_t split);
+```
+
+Partitions a square matrix as
+
+```text
+A = [ A11  A12 ]
+    [ A21  A22 ]
+```
+
+with `A11` of size `split × split`, and returns the Schur complement
+
+```text
+A22 - A21 A11^{-1} A12
+```
+
+as a newly allocated matrix. This is exact for supported symbolic `dval`
+inputs as long as the leading block `A11` is invertible.
+
+#### Block Inverse
+
+```c
+matrix_t *mat_block_inverse(const matrix_t *A, size_t split);
+```
+
+Uses the same top-left partition and Schur-complement algebra to build the full
+inverse of `A` from block formulas. This is particularly useful for symbolic
+workflows because it exposes block structure instead of forcing a single dense
+elimination path from the outset.
+
+#### Block Solve
+
+```c
+matrix_t *mat_block_solve(const matrix_t *A, const matrix_t *B, size_t split);
+```
+
+Solves `A X = B` using the same block partition and Schur-complement reduction.
+It returns a newly allocated `X`, and is exact for supported symbolic `dval`
+inputs when the leading block and the resulting Schur complement are invertible.
 
 #### Solve
 
@@ -658,6 +929,53 @@ on any error (NULL input, non-square, `mat_log` failure).
 For `MAT_TYPE_DVAL`, `mat_print` renders symbolic entries and prints one shared
 binding footer for the whole matrix rather than repeating a binding block for
 every cell.
+
+### String Construction and Output
+
+```c
+matrix_t *mat_from_string(const char *s, binding_t **bindings_out, size_t *number_out);
+char *mat_to_string(const matrix_t *A, mat_string_style_t style);
+int mat_sprintf(char *out, size_t out_size, const char *fmt, ...);
+int mat_printf(const char *fmt, ...);
+```
+
+`mat_from_string(...)` accepts three main forms:
+
+- purely numeric matrices such as `[[1 2][3 4]]`
+- wrapped symbolic matrices such as `{ [[x 1][1 c1]] | x = 2; c1 = 3 }`
+- bare symbolic matrices such as `[[c1 c2*y][x y]]`
+
+Numeric input produces either a `qfloat_t` matrix or a `qcomplex_t` matrix,
+depending on whether any entry has a non-zero imaginary part. Symbolic input
+produces a `dval_t *` matrix.
+
+For bare symbolic input, names are treated as variables by default except for
+the conventional constant names `c1`, `c2`, `c3`, `c_1`, `c_2`, `c_3` and their
+subscript-normalised forms such as `c₁` and `c₂`. These are created as named
+constants with initial value `NaN`, so you can fill them in later through the
+returned bindings.
+
+If `bindings_out` is non-NULL, `mat_from_string(...)` returns a flat array of
+borrowed symbolic bindings:
+
+- `binding_t.name` is the normalised symbol name
+- `binding_t.symbol` is the underlying symbolic leaf
+- `binding_t.is_constant` tells you whether the symbol is a constant placeholder
+
+The returned bindings array itself should be released with a plain `free(...)`.
+The `binding_t.symbol` handles remain valid only while the matrix returned by
+`mat_from_string(...)` remains alive.
+
+`mat_to_string(...)` allocates a freshly formatted string which the caller owns
+and must release with `free(...)`.
+
+`mat_sprintf(...)` and `mat_printf(...)` understand matrix-specific format
+specifiers:
+
+- `%M`  — inline scientific matrix
+- `%m`  — inline pretty matrix
+- `%ML` — layout scientific matrix
+- `%ml` — layout pretty matrix
 
 ---
 

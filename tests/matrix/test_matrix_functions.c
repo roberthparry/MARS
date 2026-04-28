@@ -140,7 +140,6 @@ static void test_eigen_qc(void)
         qc_make(qf_from_double(1), qf_from_double(-1)),
         qc_make(qf_from_double(3), QF_ZERO)};
     matrix_t *A = mat_create_qc(2, 2, A_vals);
-
     print_mqc("A", A);
 
     /* eigenvalues only */
@@ -161,7 +160,6 @@ static void test_eigen_qc(void)
     qcomplex_t ev2[2];
     matrix_t *V = NULL;
     mat_eigendecompose(A, ev2, &V);
-
     print_mqc("eigenvectors V (columns)", V);
     print_qc("eigenvalue2[0]", ev2[0]);
     print_qc("eigenvalue2[1]", ev2[1]);
@@ -196,6 +194,743 @@ static void test_eigen_qc(void)
     mat_free(A);
     mat_free(V);
     mat_free(V2);
+}
+
+/* ------------------------------------------------------------------ eigenvalues: dval */
+
+static void check_dval_eigen_relation(const char *label_prefix,
+                                      const matrix_t *A,
+                                      dval_t **ev,
+                                      const matrix_t *V,
+                                      double tol)
+{
+    size_t rows = mat_get_row_count(A);
+    size_t cols = mat_get_col_count(A);
+    matrix_t *D = mat_create_diagonal_dv(rows, ev);
+    matrix_t *AV = mat_mul(A, V);
+    matrix_t *VD = mat_mul(V, D);
+    matrix_t *AVq = mat_evaluate_qf(AV);
+    matrix_t *VDq = mat_evaluate_qf(VD);
+
+    check_bool("dval eig relation D not NULL", D != NULL);
+    check_bool("dval eig relation AV not NULL", AV != NULL);
+    check_bool("dval eig relation VD not NULL", VD != NULL);
+    check_bool("dval eig relation AVq not NULL", AVq != NULL);
+    check_bool("dval eig relation VDq not NULL", VDq != NULL);
+
+    if (AVq && VDq) {
+        for (size_t i = 0; i < rows; ++i) {
+            for (size_t j = 0; j < cols; ++j) {
+                qfloat_t lhs;
+                qfloat_t rhs;
+                char label[128];
+
+                mat_get(AVq, i, j, &lhs);
+                mat_get(VDq, i, j, &rhs);
+                snprintf(label, sizeof(label), "%s: AV[%zu,%zu]=VD[%zu,%zu]",
+                         label_prefix, i, j, i, j);
+                check_qf_val(label, lhs, rhs, tol);
+            }
+        }
+    }
+
+    mat_free(D);
+    mat_free(AV);
+    mat_free(VD);
+    mat_free(AVq);
+    mat_free(VDq);
+}
+
+static void check_dval_eigenspace_relation(const char *label_prefix,
+                                           const matrix_t *A,
+                                           dval_t *lambda,
+                                           const matrix_t *E,
+                                           double tol)
+{
+    size_t rows = mat_get_row_count(A);
+    size_t cols = mat_get_col_count(E);
+    dval_t **diag_vals = NULL;
+    matrix_t *D = NULL;
+    matrix_t *AE = mat_mul(A, E);
+    matrix_t *ED = NULL;
+    matrix_t *AEq = NULL;
+    matrix_t *EDq = NULL;
+
+    diag_vals = cols ? malloc(cols * sizeof(*diag_vals)) : NULL;
+    check_bool("dval eigenspace diag alloc ok", cols == 0 || diag_vals != NULL);
+    if (cols && !diag_vals)
+        goto cleanup;
+
+    for (size_t j = 0; j < cols; ++j)
+        diag_vals[j] = lambda;
+
+    D = mat_create_diagonal_dv(cols, diag_vals);
+    ED = mat_mul(E, D);
+    AEq = mat_evaluate_qf(AE);
+    EDq = mat_evaluate_qf(ED);
+
+    check_bool("dval eigenspace D not NULL", D != NULL);
+    check_bool("dval eigenspace AE not NULL", AE != NULL);
+    check_bool("dval eigenspace ED not NULL", ED != NULL);
+    check_bool("dval eigenspace AEq not NULL", AEq != NULL);
+    check_bool("dval eigenspace EDq not NULL", EDq != NULL);
+
+    if (AEq && EDq) {
+        for (size_t i = 0; i < rows; ++i) {
+            for (size_t j = 0; j < cols; ++j) {
+                qfloat_t lhs;
+                qfloat_t rhs;
+                char label[128];
+
+                mat_get(AEq, i, j, &lhs);
+                mat_get(EDq, i, j, &rhs);
+                snprintf(label, sizeof(label), "%s: AE[%zu,%zu]=LE[%zu,%zu]",
+                         label_prefix, i, j, i, j);
+                check_qf_val(label, lhs, rhs, tol);
+            }
+        }
+    }
+
+cleanup:
+    free(diag_vals);
+    mat_free(D);
+    mat_free(AE);
+    mat_free(ED);
+    mat_free(AEq);
+    mat_free(EDq);
+}
+
+static void check_dval_generalized_eigenspace_relation(const char *label_prefix,
+                                                       const matrix_t *A,
+                                                       dval_t *lambda,
+                                                       size_t order,
+                                                       const matrix_t *E,
+                                                       double tol)
+{
+    dval_t **diag_vals = NULL;
+    matrix_t *D = NULL;
+    matrix_t *Shifted = NULL;
+    matrix_t *Power = NULL;
+    matrix_t *Residual = NULL;
+    matrix_t *Residual_qf = NULL;
+
+    check_bool("dval generalized eigenspace input not NULL",
+               A != NULL && lambda != NULL && E != NULL);
+    if (!A || !lambda || !E)
+        return;
+
+    diag_vals = malloc(mat_get_row_count(A) * sizeof(*diag_vals));
+    check_bool("dval generalized eigenspace diag alloc ok", diag_vals != NULL);
+    if (!diag_vals)
+        goto cleanup;
+
+    for (size_t i = 0; i < mat_get_row_count(A); ++i)
+        diag_vals[i] = lambda;
+
+    D = mat_create_diagonal_dv(mat_get_row_count(A), diag_vals);
+    Shifted = mat_sub(A, D);
+    check_bool("dval generalized eigenspace diag matrix ok", D != NULL);
+    check_bool("dval generalized eigenspace shifted ok", Shifted != NULL);
+    if (!D || !Shifted)
+        goto cleanup;
+
+    Power = mat_pow_int(Shifted, (int)order);
+    Residual = mat_mul(Power, E);
+    Residual_qf = mat_evaluate_qf(Residual);
+
+    check_bool("dval generalized eigenspace power not NULL", Power != NULL);
+    check_bool("dval generalized eigenspace residual not NULL", Residual != NULL);
+    check_bool("dval generalized eigenspace residual_qf not NULL", Residual_qf != NULL);
+
+    if (Residual_qf) {
+        for (size_t i = 0; i < mat_get_row_count(Residual_qf); ++i) {
+            for (size_t j = 0; j < mat_get_col_count(Residual_qf); ++j) {
+                qfloat_t got;
+                char label[128];
+
+                mat_get(Residual_qf, i, j, &got);
+                snprintf(label, sizeof(label), "%s: ((A-LI)^k E)[%zu,%zu]",
+                         label_prefix, i, j);
+                check_qf_val(label, got, QF_ZERO, tol);
+            }
+        }
+    }
+
+cleanup:
+    free(diag_vals);
+    mat_free(D);
+    mat_free(Shifted);
+    mat_free(Power);
+    mat_free(Residual);
+    mat_free(Residual_qf);
+}
+
+static matrix_t *copy_dval_column(const matrix_t *A, size_t col)
+{
+    matrix_t *C;
+
+    if (!A || col >= mat_get_col_count(A))
+        return NULL;
+
+    C = mat_new_dv(mat_get_row_count(A), 1);
+    if (!C)
+        return NULL;
+
+    for (size_t i = 0; i < mat_get_row_count(A); ++i) {
+        dval_t *v = NULL;
+        mat_get(A, i, col, &v);
+        mat_set(C, i, 0, &v);
+    }
+
+    return C;
+}
+
+static void check_dval_jordan_chain_relation(const char *label_prefix,
+                                             const matrix_t *A,
+                                             dval_t *lambda,
+                                             const matrix_t *Chain,
+                                             double tol)
+{
+    size_t rows = mat_get_row_count(A);
+    size_t cols = mat_get_col_count(Chain);
+    dval_t **diag_vals = NULL;
+    matrix_t *D = NULL;
+    matrix_t *Shifted = NULL;
+    matrix_t *Prev = NULL;
+    matrix_t *SC = NULL;
+    matrix_t *SCq = NULL;
+    matrix_t *Prevq = NULL;
+
+    check_bool("dval jordan chain input not NULL",
+               A != NULL && lambda != NULL && Chain != NULL);
+    if (!A || !lambda || !Chain)
+        return;
+
+    diag_vals = malloc(rows * sizeof(*diag_vals));
+    check_bool("dval jordan chain diag alloc ok", diag_vals != NULL);
+    if (!diag_vals)
+        goto cleanup;
+
+    for (size_t i = 0; i < rows; ++i)
+        diag_vals[i] = lambda;
+
+    D = mat_create_diagonal_dv(rows, diag_vals);
+    Shifted = mat_sub(A, D);
+    check_bool("dval jordan chain D not NULL", D != NULL);
+    check_bool("dval jordan chain shifted not NULL", Shifted != NULL);
+    if (!D || !Shifted)
+        goto cleanup;
+
+    for (size_t j = 0; j < cols; ++j) {
+        matrix_t *Col = copy_dval_column(Chain, j);
+        check_bool("dval jordan chain column copy ok", Col != NULL);
+        if (!Col)
+            goto cleanup;
+
+        mat_free(SC);
+        mat_free(SCq);
+        SC = mat_mul(Shifted, Col);
+        SCq = mat_evaluate_qf(SC);
+        check_bool("dval jordan chain shifted col not NULL", SC != NULL);
+        check_bool("dval jordan chain shifted col qf not NULL", SCq != NULL);
+        if (!SC || !SCq) {
+            mat_free(Col);
+            goto cleanup;
+        }
+
+        if (j == 0) {
+            for (size_t i = 0; i < rows; ++i) {
+                qfloat_t got;
+                char label[128];
+
+                mat_get(SCq, i, 0, &got);
+                snprintf(label, sizeof(label), "%s: (A-LI)v1[%zu]", label_prefix, i);
+                check_qf_val(label, got, QF_ZERO, tol);
+            }
+        } else {
+            mat_free(Prev);
+            mat_free(Prevq);
+            Prev = copy_dval_column(Chain, j - 1);
+            Prevq = mat_evaluate_qf(Prev);
+            check_bool("dval jordan chain prev col not NULL", Prev != NULL);
+            check_bool("dval jordan chain prev col qf not NULL", Prevq != NULL);
+            if (!Prev || !Prevq) {
+                mat_free(Col);
+                goto cleanup;
+            }
+
+            for (size_t i = 0; i < rows; ++i) {
+                qfloat_t got;
+                qfloat_t expected;
+                char label[128];
+
+                mat_get(SCq, i, 0, &got);
+                mat_get(Prevq, i, 0, &expected);
+                snprintf(label, sizeof(label), "%s: (A-LI)v%zu[%zu]=v%zu[%zu]",
+                         label_prefix, j + 1, i, j, i);
+                check_qf_val(label, got, expected, tol);
+            }
+        }
+
+        mat_free(Col);
+    }
+
+cleanup:
+    free(diag_vals);
+    mat_free(D);
+    mat_free(Shifted);
+    mat_free(Prev);
+    mat_free(SC);
+    mat_free(SCq);
+    mat_free(Prevq);
+}
+
+static void test_eigen_dval(void)
+{
+    printf(C_CYAN "TEST: eigendecomposition (dval)\n" C_RESET);
+
+    {
+        dval_t *x = dv_new_named_var_d(2.0, "x");
+        dval_t *y = dv_new_named_var_d(3.0, "y");
+        dval_t *one = dv_new_const_d(1.0);
+        dval_t *two = dv_new_const_d(2.0);
+        dval_t *five = dv_new_const_d(5.0);
+        dval_t *seven = dv_new_const_d(7.0);
+        dval_t *vals[16] = {
+            x,   one, two, DV_ZERO,
+            DV_ZERO, y, one, DV_ZERO,
+            DV_ZERO, DV_ZERO, five, one,
+            DV_ZERO, DV_ZERO, DV_ZERO, seven};
+        dval_t *ev[4] = {NULL, NULL, NULL, NULL};
+        dval_t *ev2[4] = {NULL, NULL, NULL, NULL};
+        matrix_t *A = mat_create_dv(4, 4, vals);
+        matrix_t *V = NULL;
+
+        print_mdv("A", A);
+        check_bool("mat_eigenvalues(dval triangular) rc = 0",
+                   mat_eigenvalues(A, ev) == 0);
+        check_bool("dval triangular eigenvalue[0] non-null", ev[0] != NULL);
+        check_bool("dval triangular eigenvalue[1] non-null", ev[1] != NULL);
+        check_bool("dval triangular eigenvalue[2] non-null", ev[2] != NULL);
+        check_bool("dval triangular eigenvalue[3] non-null", ev[3] != NULL);
+        if (ev[0] && ev[1] && ev[2] && ev[3]) {
+            check_d("dval triangular eigenvalue[0] = x", dv_eval_d(ev[0]), 2.0, 1e-12);
+            check_d("dval triangular eigenvalue[1] = y", dv_eval_d(ev[1]), 3.0, 1e-12);
+            check_d("dval triangular eigenvalue[2] = 5", dv_eval_d(ev[2]), 5.0, 1e-12);
+            check_d("dval triangular eigenvalue[3] = 7", dv_eval_d(ev[3]), 7.0, 1e-12);
+            dv_set_val_d(x, 11.0);
+            dv_set_val_d(y, 13.0);
+            check_d("dval triangular eigenvalue[0] tracks x", dv_eval_d(ev[0]), 11.0, 1e-12);
+            check_d("dval triangular eigenvalue[1] tracks y", dv_eval_d(ev[1]), 13.0, 1e-12);
+        }
+
+        check_bool("mat_eigendecompose(dval triangular distinct) rc = 0",
+                   mat_eigendecompose(A, ev2, &V) == 0);
+        check_bool("dval triangular eigenvectors not NULL", V != NULL);
+        if (V)
+            check_dval_eigen_relation("dval triangular", A, ev2, V, 1e-20);
+
+        for (size_t i = 0; i < 4; ++i)
+            dv_free(ev[i]);
+        for (size_t i = 0; i < 4; ++i)
+            dv_free(ev2[i]);
+        mat_free(A);
+        mat_free(V);
+        dv_free(x);
+        dv_free(y);
+        dv_free(one);
+        dv_free(two);
+        dv_free(five);
+        dv_free(seven);
+    }
+
+    {
+        dval_t *x = dv_new_named_var_d(2.0, "x");
+        dval_t *y = dv_new_named_var_d(5.0, "y");
+        dval_t *one = dv_new_const_d(1.0);
+        dval_t *vals[9] = {
+            x, one, DV_ZERO,
+            DV_ZERO, y, DV_ZERO,
+            DV_ZERO, DV_ZERO, x};
+        dval_t *ev[3] = {NULL, NULL, NULL};
+        dval_t *ev2[3] = {NULL, NULL, NULL};
+        matrix_t *A = mat_create_dv(3, 3, vals);
+        matrix_t *V = NULL;
+
+        print_mdv("A (triangular repeated dval)", A);
+        check_bool("mat_eigenvalues(dval triangular repeated) rc = 0",
+                   mat_eigenvalues(A, ev) == 0);
+        check_bool("mat_eigendecompose(dval triangular repeated diagonalizable) rc = 0",
+                   mat_eigendecompose(A, ev2, &V) == 0);
+        check_bool("dval triangular repeated eigenvectors not NULL", V != NULL);
+        if (V)
+            check_dval_eigen_relation("dval triangular repeated", A, ev2, V, 1e-20);
+
+        for (size_t i = 0; i < 3; ++i)
+            dv_free(ev[i]);
+        for (size_t i = 0; i < 3; ++i)
+            dv_free(ev2[i]);
+        mat_free(A);
+        mat_free(V);
+        dv_free(x);
+        dv_free(y);
+        dv_free(one);
+    }
+
+    {
+        dval_t *x = dv_new_named_var_d(3.0, "x");
+        dval_t *one = dv_new_const_d(1.0);
+        dval_t *vals[4] = {x, one, one, x};
+        dval_t *ev[2] = {NULL, NULL};
+        dval_t *ev2[2] = {NULL, NULL};
+        matrix_t *A = mat_create_dv(2, 2, vals);
+        double ev0, ev1;
+        double lo, hi;
+        matrix_t *V = NULL;
+        matrix_t *V2 = NULL;
+
+        print_mdv("A (dense 2x2 dval)", A);
+        check_bool("mat_eigenvalues(dval dense 2x2) rc = 0",
+                   mat_eigenvalues(A, ev) == 0);
+        check_bool("dval dense eigenvalue[0] non-null", ev[0] != NULL);
+        check_bool("dval dense eigenvalue[1] non-null", ev[1] != NULL);
+        if (ev[0] && ev[1]) {
+            ev0 = dv_eval_d(ev[0]);
+            ev1 = dv_eval_d(ev[1]);
+            lo = fmin(ev0, ev1);
+            hi = fmax(ev0, ev1);
+            check_d("dval dense 2x2 eigenvalue min = x-1", lo, 2.0, 1e-12);
+            check_d("dval dense 2x2 eigenvalue max = x+1", hi, 4.0, 1e-12);
+
+            dv_set_val_d(x, 10.0);
+            ev0 = dv_eval_d(ev[0]);
+            ev1 = dv_eval_d(ev[1]);
+            lo = fmin(ev0, ev1);
+            hi = fmax(ev0, ev1);
+            check_d("dval dense 2x2 eigenvalue min tracks x", lo, 9.0, 1e-12);
+            check_d("dval dense 2x2 eigenvalue max tracks x", hi, 11.0, 1e-12);
+        }
+
+        check_bool("mat_eigendecompose(dval dense 2x2) rc = 0",
+                   mat_eigendecompose(A, ev2, &V) == 0);
+        check_bool("dval dense 2x2 eigenvectors not NULL", V != NULL);
+        if (V)
+            check_dval_eigen_relation("dval dense 2x2", A, ev2, V, 1e-20);
+
+        V2 = mat_eigenvectors(A);
+        check_bool("mat_eigenvectors(dval dense 2x2) not NULL", V2 != NULL);
+
+        dv_free(ev[0]);
+        dv_free(ev[1]);
+        dv_free(ev2[0]);
+        dv_free(ev2[1]);
+        mat_free(A);
+        mat_free(V);
+        mat_free(V2);
+        dv_free(x);
+        dv_free(one);
+    }
+
+    {
+        dval_t *x = dv_new_named_var_d(2.0, "x");
+        dval_t *one = dv_new_const_d(1.0);
+        dval_t *vals[4] = {x, one, DV_ZERO, x};
+        dval_t *ev[2] = {NULL, NULL};
+        dval_t *ev2[2] = {NULL, NULL};
+        matrix_t *A = mat_create_dv(2, 2, vals);
+        matrix_t *V = NULL;
+
+        check_bool("mat_eigenvalues(dval Jordan 2x2) rc = 0",
+                   mat_eigenvalues(A, ev) == 0);
+        check_bool("mat_eigendecompose(dval Jordan 2x2) remains unsupported",
+                   mat_eigendecompose(A, ev2, &V) < 0 && V == NULL);
+
+        dv_free(ev[0]);
+        dv_free(ev[1]);
+        dv_free(ev2[0]);
+        dv_free(ev2[1]);
+        mat_free(A);
+        dv_free(x);
+        dv_free(one);
+    }
+}
+
+static void test_eigenspace_dval(void)
+{
+    printf(C_CYAN "TEST: eigenspace (dval)\n" C_RESET);
+
+    {
+        dval_t *x = dv_new_named_var_d(2.0, "x");
+        dval_t *y = dv_new_named_var_d(5.0, "y");
+        dval_t *one = dv_new_const_d(1.0);
+        dval_t *vals[9] = {
+            x, one, DV_ZERO,
+            DV_ZERO, y, DV_ZERO,
+            DV_ZERO, DV_ZERO, x};
+        matrix_t *A = mat_create_dv(3, 3, vals);
+        matrix_t *E = mat_eigenspace(A, &x);
+
+        print_mdv("A (eigenspace repeated dval)", A);
+        check_bool("mat_eigenspace(dval repeated triangular) not NULL", E != NULL);
+        if (E) {
+            print_mdv("eigenspace_x(A)", E);
+            check_bool("eigenspace rows = 3", mat_get_row_count(E) == 3);
+            check_bool("eigenspace cols = 2", mat_get_col_count(E) == 2);
+            check_dval_eigenspace_relation("dval repeated eigenspace", A, x, E, 1e-20);
+            dv_set_val_d(x, 11.0);
+            dv_set_val_d(y, 13.0);
+            check_dval_eigenspace_relation("dval repeated eigenspace tracks", A, x, E, 1e-20);
+        }
+
+        mat_free(A);
+        mat_free(E);
+        dv_free(x);
+        dv_free(y);
+        dv_free(one);
+    }
+
+    {
+        dval_t *x = dv_new_named_var_d(3.0, "x");
+        dval_t *one = dv_new_const_d(1.0);
+        dval_t *vals[4] = {x, one, DV_ZERO, x};
+        matrix_t *A = mat_create_dv(2, 2, vals);
+        matrix_t *E = mat_eigenspace(A, &x);
+
+        print_mdv("A (Jordan eigenspace dval)", A);
+        check_bool("mat_eigenspace(dval Jordan 2x2) not NULL", E != NULL);
+        if (E) {
+            print_mdv("eigenspace_x(Jordan A)", E);
+            check_bool("Jordan eigenspace rows = 2", mat_get_row_count(E) == 2);
+            check_bool("Jordan eigenspace cols = 1", mat_get_col_count(E) == 1);
+            check_dval_eigenspace_relation("dval Jordan eigenspace", A, x, E, 1e-20);
+            dv_set_val_d(x, 9.0);
+            check_dval_eigenspace_relation("dval Jordan eigenspace tracks", A, x, E, 1e-20);
+        }
+
+        mat_free(A);
+        mat_free(E);
+        dv_free(x);
+        dv_free(one);
+    }
+}
+
+static void test_generalized_eigenspace_dval(void)
+{
+    printf(C_CYAN "TEST: generalized eigenspace (dval)\n" C_RESET);
+
+    {
+        dval_t *x = dv_new_named_var_d(3.0, "x");
+        dval_t *one = dv_new_const_d(1.0);
+        dval_t *vals[4] = {x, one, DV_ZERO, x};
+        matrix_t *A = mat_create_dv(2, 2, vals);
+        matrix_t *G = mat_generalized_eigenspace(A, &x, 2);
+
+        print_mdv("A (Jordan generalized eigenspace dval)", A);
+        check_bool("mat_generalized_eigenspace(dval Jordan 2x2,2) not NULL", G != NULL);
+        if (G) {
+            print_mdv("gen_eigenspace_x^2(A)", G);
+            check_bool("Jordan generalized eigenspace rows = 2", mat_get_row_count(G) == 2);
+            check_bool("Jordan generalized eigenspace cols = 2", mat_get_col_count(G) == 2);
+            check_dval_generalized_eigenspace_relation("dval Jordan generalized eigenspace",
+                                                       A, x, 2, G, 1e-20);
+            dv_set_val_d(x, 9.0);
+            check_dval_generalized_eigenspace_relation("dval Jordan generalized eigenspace tracks",
+                                                       A, x, 2, G, 1e-20);
+        }
+
+        mat_free(A);
+        mat_free(G);
+        dv_free(x);
+        dv_free(one);
+    }
+
+    {
+        dval_t *x = dv_new_named_var_d(2.0, "x");
+        dval_t *one = dv_new_const_d(1.0);
+        dval_t *vals[9] = {
+            x, one, DV_ZERO,
+            DV_ZERO, x, one,
+            DV_ZERO, DV_ZERO, x};
+        matrix_t *A = mat_create_dv(3, 3, vals);
+        matrix_t *G2 = mat_generalized_eigenspace(A, &x, 2);
+        matrix_t *G3 = mat_generalized_eigenspace(A, &x, 3);
+
+        print_mdv("A (3x3 Jordan generalized eigenspace dval)", A);
+        check_bool("mat_generalized_eigenspace(dval Jordan 3x3,2) not NULL", G2 != NULL);
+        check_bool("mat_generalized_eigenspace(dval Jordan 3x3,3) not NULL", G3 != NULL);
+        if (G2) {
+            print_mdv("gen_eigenspace_x^2(A)", G2);
+            check_bool("3x3 Jordan generalized eigenspace order-2 rows = 3",
+                       mat_get_row_count(G2) == 3);
+            check_bool("3x3 Jordan generalized eigenspace order-2 cols = 2",
+                       mat_get_col_count(G2) == 2);
+            check_dval_generalized_eigenspace_relation("dval 3x3 Jordan generalized eigenspace order-2",
+                                                       A, x, 2, G2, 1e-20);
+        }
+        if (G3) {
+            print_mdv("gen_eigenspace_x^3(A)", G3);
+            check_bool("3x3 Jordan generalized eigenspace order-3 rows = 3",
+                       mat_get_row_count(G3) == 3);
+            check_bool("3x3 Jordan generalized eigenspace order-3 cols = 3",
+                       mat_get_col_count(G3) == 3);
+            check_dval_generalized_eigenspace_relation("dval 3x3 Jordan generalized eigenspace order-3",
+                                                       A, x, 3, G3, 1e-20);
+            dv_set_val_d(x, 5.0);
+            check_dval_generalized_eigenspace_relation("dval 3x3 Jordan generalized eigenspace order-3 tracks",
+                                                       A, x, 3, G3, 1e-20);
+        }
+
+        mat_free(A);
+        mat_free(G2);
+        mat_free(G3);
+        dv_free(x);
+        dv_free(one);
+    }
+}
+
+static void test_jordan_chain_dval(void)
+{
+    printf(C_CYAN "TEST: Jordan chain (dval)\n" C_RESET);
+
+    {
+        dval_t *x = dv_new_named_var_d(3.0, "x");
+        dval_t *one = dv_new_const_d(1.0);
+        dval_t *vals[4] = {x, one, DV_ZERO, x};
+        matrix_t *A = mat_create_dv(2, 2, vals);
+        matrix_t *J = mat_jordan_chain(A, &x, 2);
+
+        print_mdv("A (Jordan chain 2x2 dval)", A);
+        check_bool("mat_jordan_chain(dval Jordan 2x2,2) not NULL", J != NULL);
+        if (J) {
+            print_mdv("jordan_chain_x^2(A)", J);
+            check_bool("Jordan chain 2x2 rows = 2", mat_get_row_count(J) == 2);
+            check_bool("Jordan chain 2x2 cols = 2", mat_get_col_count(J) == 2);
+            check_dval_jordan_chain_relation("dval Jordan chain 2x2", A, x, J, 1e-20);
+            dv_set_val_d(x, 9.0);
+            check_dval_jordan_chain_relation("dval Jordan chain 2x2 tracks", A, x, J, 1e-20);
+        }
+
+        mat_free(A);
+        mat_free(J);
+        dv_free(x);
+        dv_free(one);
+    }
+
+    {
+        dval_t *x = dv_new_named_var_d(2.0, "x");
+        dval_t *one = dv_new_const_d(1.0);
+        dval_t *vals[9] = {
+            x, one, DV_ZERO,
+            DV_ZERO, x, one,
+            DV_ZERO, DV_ZERO, x};
+        matrix_t *A = mat_create_dv(3, 3, vals);
+        matrix_t *J = mat_jordan_chain(A, &x, 3);
+
+        print_mdv("A (Jordan chain 3x3 dval)", A);
+        check_bool("mat_jordan_chain(dval Jordan 3x3,3) not NULL", J != NULL);
+        if (J) {
+            print_mdv("jordan_chain_x^3(A)", J);
+            check_bool("Jordan chain 3x3 rows = 3", mat_get_row_count(J) == 3);
+            check_bool("Jordan chain 3x3 cols = 3", mat_get_col_count(J) == 3);
+            check_dval_jordan_chain_relation("dval Jordan chain 3x3", A, x, J, 1e-20);
+            dv_set_val_d(x, 5.0);
+            check_dval_jordan_chain_relation("dval Jordan chain 3x3 tracks", A, x, J, 1e-20);
+        }
+
+        mat_free(A);
+        mat_free(J);
+        dv_free(x);
+        dv_free(one);
+    }
+}
+
+static void test_jordan_profile_dval(void)
+{
+    printf(C_CYAN "TEST: Jordan profile (dval)\n" C_RESET);
+
+    {
+        dval_t *x = dv_new_named_var_d(3.0, "x");
+        dval_t *one = dv_new_const_d(1.0);
+        dval_t *vals[4] = {x, one, DV_ZERO, x};
+        matrix_t *A = mat_create_dv(2, 2, vals);
+        matrix_t *P = mat_jordan_profile(A, &x);
+
+        print_mdv("A (Jordan profile 2x2 dval)", A);
+        check_bool("mat_jordan_profile(dval Jordan 2x2) not NULL", P != NULL);
+        if (P) {
+            double p0 = 0.0;
+            print_md("jordan_profile_x(A)", P);
+            check_bool("Jordan profile 2x2 rows = 1", mat_get_row_count(P) == 1);
+            check_bool("Jordan profile 2x2 cols = 1", mat_get_col_count(P) == 1);
+            mat_get(P, 0, 0, &p0);
+            check_d("Jordan profile 2x2[0] = 2", p0, 2.0, 1e-12);
+        }
+
+        mat_free(A);
+        mat_free(P);
+        dv_free(x);
+        dv_free(one);
+    }
+
+    {
+        dval_t *x = dv_new_named_var_d(2.0, "x");
+        dval_t *y = dv_new_named_var_d(5.0, "y");
+        dval_t *vals[9] = {
+            x, DV_ZERO, DV_ZERO,
+            DV_ZERO, x, DV_ZERO,
+            DV_ZERO, DV_ZERO, y};
+        matrix_t *A = mat_create_dv(3, 3, vals);
+        matrix_t *P = mat_jordan_profile(A, &x);
+
+        print_mdv("A (Jordan profile repeated diagonal dval)", A);
+        check_bool("mat_jordan_profile(repeated diagonal dval) not NULL", P != NULL);
+        if (P) {
+            double p0 = 0.0;
+            double p1 = 0.0;
+            print_md("jordan_profile_x(A)", P);
+            check_bool("Jordan profile repeated diagonal rows = 2", mat_get_row_count(P) == 2);
+            check_bool("Jordan profile repeated diagonal cols = 1", mat_get_col_count(P) == 1);
+            mat_get(P, 0, 0, &p0);
+            mat_get(P, 1, 0, &p1);
+            check_d("Jordan profile repeated diagonal[0] = 1", p0, 1.0, 1e-12);
+            check_d("Jordan profile repeated diagonal[1] = 1", p1, 1.0, 1e-12);
+        }
+
+        mat_free(A);
+        mat_free(P);
+        dv_free(x);
+        dv_free(y);
+    }
+
+    {
+        dval_t *x = dv_new_named_var_d(2.0, "x");
+        dval_t *one = dv_new_const_d(1.0);
+        dval_t *vals[9] = {
+            x, one, DV_ZERO,
+            DV_ZERO, x, DV_ZERO,
+            DV_ZERO, DV_ZERO, x};
+        matrix_t *A = mat_create_dv(3, 3, vals);
+        matrix_t *P = mat_jordan_profile(A, &x);
+
+        print_mdv("A (Jordan profile mixed 3x3 dval)", A);
+        check_bool("mat_jordan_profile(mixed 3x3 dval) not NULL", P != NULL);
+        if (P) {
+            double p0 = 0.0;
+            double p1 = 0.0;
+            print_md("jordan_profile_x(A)", P);
+            check_bool("Jordan profile mixed 3x3 rows = 2", mat_get_row_count(P) == 2);
+            check_bool("Jordan profile mixed 3x3 cols = 1", mat_get_col_count(P) == 1);
+            mat_get(P, 0, 0, &p0);
+            mat_get(P, 1, 0, &p1);
+            check_d("Jordan profile mixed 3x3[0] = 2", p0, 2.0, 1e-12);
+            check_d("Jordan profile mixed 3x3[1] = 1", p1, 1.0, 1e-12);
+        }
+
+        mat_free(A);
+        mat_free(P);
+        dv_free(x);
+        dv_free(one);
+    }
 }
 
 /* ------------------------------------------------------------------ mat_exp */
@@ -1789,6 +2524,105 @@ static void test_readme_example(void)
 
     mat_free(A);
     mat_free(V);
+}
+
+static void test_readme_string_quantum_example(void)
+{
+    printf(C_CYAN "TEST: README example — symbolic two-level Hamiltonian\n" C_RESET);
+
+    binding_t *bindings = NULL;
+    size_t nbindings = 0;
+    matrix_t *H = mat_from_string(
+        "{ [[Δ Ω][Ω -Δ]] | Δ = 1.5; Ω = 0.25 }",
+        &bindings, &nbindings);
+    matrix_t *H2 = NULL;
+    matrix_t *P = NULL;
+    dval_t *ev[2] = {NULL, NULL};
+    dval_t *trace = NULL;
+    dval_t *c2 = NULL;
+    dval_t *v = NULL;
+    tests_run++;
+
+    if (!H) {
+        tests_failed++;
+        printf(C_BOLD C_RED "  FAIL: README string example input allocation\n" C_RESET);
+        return;
+    }
+
+    H2 = mat_pow_int(H, 2);
+    P = mat_charpoly(H);
+    if (mat_eigenvalues(H, ev) != 0 || !H2 || !P) {
+        tests_failed++;
+        printf(C_BOLD C_RED "  FAIL: README string example matrix functions\n" C_RESET);
+        for (size_t i = 0; i < 2; ++i)
+            dv_free(ev[i]);
+        mat_free(P);
+        mat_free(H2);
+        free(bindings);
+        mat_free(H);
+        return;
+    }
+
+    check_bool("README string example mat_trace rc = 0", mat_trace(H, &trace) == 0);
+    mat_get(P, 2, 0, &c2);
+
+    check_bool("README string example trace non-null", trace != NULL);
+    check_bool("README string example charpoly constant non-null", c2 != NULL);
+    check_bool("README string example eigenvalue[0] non-null", ev[0] != NULL);
+    check_bool("README string example eigenvalue[1] non-null", ev[1] != NULL);
+
+    if (trace)
+        check_d("README string example trace = 0", dv_eval_d(trace), 0.0, 1e-12);
+    if (c2)
+        check_d("README string example charpoly constant = -(Δ²+Ω²)",
+                dv_eval_d(c2), -(1.5 * 1.5 + 0.25 * 0.25), 1e-12);
+
+    if (H2) {
+        mat_get(H2, 0, 0, &v);
+        check_d("README string example H²[0,0] = Δ²+Ω²",
+                dv_eval_d(v), 1.5 * 1.5 + 0.25 * 0.25, 1e-12);
+        mat_get(H2, 0, 1, &v);
+        check_d("README string example H²[0,1] = 0",
+                dv_eval_d(v), 0.0, 1e-12);
+        mat_get(H2, 1, 0, &v);
+        check_d("README string example H²[1,0] = 0",
+                dv_eval_d(v), 0.0, 1e-12);
+        mat_get(H2, 1, 1, &v);
+        check_d("README string example H²[1,1] = Δ²+Ω²",
+                dv_eval_d(v), 1.5 * 1.5 + 0.25 * 0.25, 1e-12);
+    }
+
+    printf("    example output from matrix.md:\n");
+    mat_printf("    H = %ml\n", H);
+    mat_printf("    H² = %m\n", H2);
+    if (trace) {
+        char *trace_text = dv_to_string(trace, style_EXPRESSION);
+        printf("    tr(H) = %s\n", trace_text ? trace_text : "(null)");
+        free(trace_text);
+    }
+    if (c2) {
+        char *c2_text = dv_to_string(c2, style_EXPRESSION);
+        printf("    charpoly constant term = %s\n", c2_text ? c2_text : "(null)");
+        free(c2_text);
+    }
+    if (ev[0] && ev[1]) {
+        char *ev0_text = dv_to_string(ev[0], style_EXPRESSION);
+        char *ev1_text = dv_to_string(ev[1], style_EXPRESSION);
+        printf("    eigenvalues = %s, %s\n",
+               ev0_text ? ev0_text : "(null)",
+               ev1_text ? ev1_text : "(null)");
+        free(ev0_text);
+        free(ev1_text);
+    }
+    printf("\n");
+
+    dv_free(trace);
+    for (size_t i = 0; i < 2; ++i)
+        dv_free(ev[i]);
+    free(bindings);
+    mat_free(P);
+    mat_free(H2);
+    mat_free(H);
 }
 
 /* ------------------------------------------------------------------ generic matrix check (double) */
@@ -3791,6 +4625,11 @@ void run_matrix_function_tests(void)
     RUN_TEST(test_eigen_d, NULL);
     RUN_TEST(test_eigen_qf, NULL);
     RUN_TEST(test_eigen_qc, NULL);
+    RUN_TEST(test_eigen_dval, NULL);
+    RUN_TEST(test_eigenspace_dval, NULL);
+    RUN_TEST(test_generalized_eigenspace_dval, NULL);
+    RUN_TEST(test_jordan_chain_dval, NULL);
+    RUN_TEST(test_jordan_profile_dval, NULL);
     RUN_TEST(test_mat_exp_d, NULL);
     RUN_TEST(test_mat_exp_qf, NULL);
     RUN_TEST(test_mat_exp_qc, NULL);
@@ -3834,5 +4673,10 @@ void run_matrix_function_tests(void)
     RUN_TEST(test_mat_typeof, NULL);
     RUN_TEST(test_dval_matrix_functions, NULL);
     RUN_TEST(test_dval_matrix_functions_extended, NULL);
+}
+
+void run_matrix_readme_example(void)
+{
     RUN_TEST(test_readme_example, NULL);
+    RUN_TEST(test_readme_string_quantum_example, NULL);
 }

@@ -1,7 +1,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "qfloat.h"
+#include "qcomplex.h"
 #include "dval_internal.h"
 #include "dval.h"
 #include "dval_pattern.h"
@@ -13,7 +13,9 @@ static bool is_kind(const dval_t *expr, dval_op_kind_t kind)
 
 bool dv_is_exact_zero(const dval_t *dv)
 {
-    return is_kind(dv, DV_KIND_CONST) && !dv->name && qf_eq(dv->c, QF_ZERO);
+    return is_kind(dv, DV_KIND_CONST) &&
+           !dv->name &&
+           qc_eq(dv->c, QC_ZERO);
 }
 
 bool dv_is_named_const(const dval_t *dv)
@@ -26,7 +28,7 @@ static bool dv_match_const_leaf(const dval_t *expr, qfloat_t *value_out, const c
     if (!is_kind(expr, DV_KIND_CONST))
         return false;
     if (value_out)
-        *value_out = expr->c;
+        *value_out = expr->c.re;
     if (name_out)
         *name_out = (expr->name && *expr->name) ? expr->name : NULL;
     return true;
@@ -37,7 +39,7 @@ static bool dv_match_var_leaf(const dval_t *expr, qfloat_t *value_out, const cha
     if (!is_kind(expr, DV_KIND_VAR))
         return false;
     if (value_out)
-        *value_out = expr->c;
+        *value_out = expr->c.re;
     if (name_out)
         *name_out = (expr->name && *expr->name) ? expr->name : NULL;
     return true;
@@ -361,7 +363,7 @@ dval_t *dv_substitute(const dval_t *expr,
         left = dv_substitute(arg, needle, replacement);
         if (!left)
             return NULL;
-        out = dv_pow_qf(left, expr->c);
+        out = dv_pow_qc(left, expr->c);
         dv_free(left);
         return out;
     }

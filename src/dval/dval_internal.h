@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include "qfloat.h"
+#include "qcomplex.h"
 #include "dval.h"
 
 /**
@@ -103,8 +104,8 @@ typedef void (*dval_reverse_fn)(const dval_t *dv, qfloat_t out_bar,
                                 qfloat_t *a_bar, qfloat_t *b_bar);
 
 typedef struct dval_ops {
-    /** Compute the primal value of the node. Returns a qfloat_t by value. */
-    qfloat_t  (*eval)(dval_t *dv);
+    /** Compute the primal value of the node. Returns a qcomplex_t by value. */
+    qcomplex_t  (*eval)(dval_t *dv);
 
     /** Build a new DAG node for the symbolic derivative. Returns owning (refcount=1). */
     dval_t *(*deriv)(dval_t *dv);
@@ -199,9 +200,9 @@ struct _dval_t {
     dval_t *a;
     dval_t *b;
 
-    qfloat_t  c;
+    qcomplex_t  c;
 
-    qfloat_t  x;
+    qcomplex_t  x;
     int       x_valid;
 
     /* epoch tracks the maximum variable generation seen at last evaluation.

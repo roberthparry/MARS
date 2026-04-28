@@ -24,9 +24,9 @@ static void test_get_val_updates_after_set(void)
     dval_t *x = dv_new_var_d(1.0);
     dval_t *f = dv_add_d(x, 2.0);
 
-    check_q_at(__FILE__, __LINE__, 1, "dv_get_val initial", dv_get_val(f), qf_from_double(3.0));
+    check_q_at(__FILE__, __LINE__, 1, "dv_get_val initial", dv_get_val_qf(f), qf_from_double(3.0));
     dv_set_val_d(x, 5.0);
-    check_q_at(__FILE__, __LINE__, 1, "dv_get_val after set", dv_get_val(f), qf_from_double(7.0));
+    check_q_at(__FILE__, __LINE__, 1, "dv_get_val after set", dv_get_val_qf(f), qf_from_double(7.0));
 
     dv_free(f);
     dv_free(x);
@@ -43,8 +43,8 @@ static void test_simplify_inverse_unary_pairs(void)
     char *log_exp_s = dv_to_string(log_exp_x, style_EXPRESSION);
     const char *expect = "{ x | x = 3 }";
 
-    check_q_at(__FILE__, __LINE__, 1, "exp(log(x)) eval", dv_eval(exp_log_x), qf_from_double(3.0));
-    check_q_at(__FILE__, __LINE__, 1, "log(exp(x)) eval", dv_eval(log_exp_x), qf_from_double(3.0));
+    check_q_at(__FILE__, __LINE__, 1, "exp(log(x)) eval", dv_eval_qf(exp_log_x), qf_from_double(3.0));
+    check_q_at(__FILE__, __LINE__, 1, "log(exp(x)) eval", dv_eval_qf(log_exp_x), qf_from_double(3.0));
 
     if (str_eq(exp_log_s, expect))
         to_string_pass("exp(log(x)) simplification (EXPR)", exp_log_s, expect);

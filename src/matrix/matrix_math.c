@@ -4,6 +4,7 @@
 #include <math.h>
 
 #include "matrix_internal.h"
+#include "dval_pattern.h"
 
 /* ============================================================
    Internal helpers
@@ -243,7 +244,7 @@ static matrix_t *mat_fun_dval_structured(const matrix_t *A,
             dval_t *diag_i = NULL;
             qfloat_t diff;
             mat_get(A, i, i, &diag_i);
-            diff = qf_abs(qf_sub(dv_get_val(diag_i), dv_get_val(diag0)));
+            diff = qc_abs(qc_sub(dv_get_val(diag_i), dv_get_val(diag0)));
             if (qf_lt(tol, diff))
                 return mat_fun_triangular(A, scalar_f);
         }

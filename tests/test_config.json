@@ -394,7 +394,16 @@
     "test_multi_null_safety": true,
     "test_multi_nd1": true,
     "test_multi_4d": true,
-    "test_multi_4d_exp": true
+    "test_multi_4d_exp": true,
+    "test_multi_4d_exp_affine": true,
+    "test_multi_3d_sinh_affine": true,
+    "test_multi_3d_cosh_affine": true,
+    "test_multi_3d_sin_affine": true,
+    "test_multi_3d_cos_affine": true,
+    "test_multi_3d_scaled_sum_specials": true,
+    "test_multi_2d_sum_of_specials": true,
+    "test_multi_3d_separable_product": true,
+    "test_multi_2d_sum_of_separable_products": true
   },
   "tests/matrix/test_matrix.c": {
     "test_creation": true,
@@ -1948,7 +1957,18 @@
     "test_hermitian_op": true,
     "test_dval_multiply": true,
     "test_dval_symbolic_printing": true,
-    "test_inverse_dval": true
+    "test_inverse_dval": true,
+    "test_det_dval": true,
+    "test_trace": true,
+    "test_evaluate_bridge": true,
+    "test_symbolic_linear_algebra_extensions": true,
+    "test_schur_complement": true,
+    "test_block_linear_algebra": true,
+    "test_deriv": true,
+    "test_matrix_calculus": true,
+    "test_jacobian": true,
+    "test_deriv_solve": true,
+    "test_deriv_block_solve": true
   },
   "tests/matrix/test_matrix_functions.c": {
     "test_mat_neg_convenience": true,
@@ -1999,7 +2019,13 @@
     "test_readme_example": true,
     "test_dval_numerical_functions_unsupported": true,
     "test_dval_matrix_functions": true,
-    "test_dval_matrix_functions_extended": true
+    "test_dval_matrix_functions_extended": true,
+    "test_eigen_dval": true,
+    "test_eigenspace_dval": true,
+    "test_generalized_eigenspace_dval": true,
+    "test_jordan_chain_dval": true,
+    "test_jordan_profile_dval": true,
+    "test_readme_string_quantum_example": true
   },
   "tests/matrix/test_matrix_function_regressions.c": {
     "test_mat_fun_qf_qc": true,
@@ -2197,7 +2223,10 @@
       "test_to_string_pow_superscript": true,
       "test_to_string_unary_sin": true,
       "test_to_string_function_style": true,
-      "test_to_string_special_functions": true
+      "test_to_string_special_functions": true,
+      "test_to_string_negative_rhs_expr": true,
+      "test_to_string_double_negative_expr": true,
+      "test_to_string_nested_negative_rhs_expr": true
     },
     "test_to_string_basic_const": {
       "enabled": true,

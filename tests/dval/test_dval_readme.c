@@ -34,9 +34,9 @@ static void test_readme_example(void) {
     const dval_t *d2f_dx = dv_get_deriv(df_dx, x);  /* d²f/dx² */
 
     /* Evaluate */
-    qfloat_t f_val    = dv_eval(f);
-    qfloat_t d1_val   = dv_eval(df_dx);
-    qfloat_t d2_val   = dv_eval(d2f_dx);
+    qfloat_t f_val    = dv_eval_qf(f);
+    qfloat_t d1_val   = dv_eval_qf(df_dx);
+    qfloat_t d2_val   = dv_eval_qf(d2f_dx);
 
     /* Print symbolic forms */
     printf("f(x)    = "); dv_print(f);
@@ -73,9 +73,9 @@ static void test_readme_from_string_example(void) {
     const dval_t *d2f_dx = dv_get_deriv(df_dx, x);
 
     /* Evaluate */
-    qfloat_t f_val  = dv_eval(f);
-    qfloat_t d1_val = dv_eval(df_dx);
-    qfloat_t d2_val = dv_eval(d2f_dx);
+    qfloat_t f_val  = dv_eval_qf(f);
+    qfloat_t d1_val = dv_eval_qf(df_dx);
+    qfloat_t d2_val = dv_eval_qf(d2f_dx);
 
     /* Print symbolic forms */
     printf("f(x)    = "); dv_print(f);
@@ -109,19 +109,19 @@ static void test_readme_partial_example(void) {
     dval_t *df_dy    = dv_create_deriv(f, y);
     dval_t *d2f_dxdy = dv_create_2nd_deriv(f, x, y);
 
-    check_q_at(__FILE__, __LINE__, 1, "f(1,2)        = 7", dv_eval(f),        qf_from_double(7.0));
-    check_q_at(__FILE__, __LINE__, 1, "∂f/∂x(1,2)   = 4", dv_eval(df_dx),    qf_from_double(4.0));
-    check_q_at(__FILE__, __LINE__, 1, "∂f/∂y(1,2)   = 5", dv_eval(df_dy),    qf_from_double(5.0));
-    check_q_at(__FILE__, __LINE__, 1, "∂²f/∂x∂y     = 1", dv_eval(d2f_dxdy), qf_from_double(1.0));
+    check_q_at(__FILE__, __LINE__, 1, "f(1,2)        = 7", dv_eval_qf(f),        qf_from_double(7.0));
+    check_q_at(__FILE__, __LINE__, 1, "∂f/∂x(1,2)   = 4", dv_eval_qf(df_dx),    qf_from_double(4.0));
+    check_q_at(__FILE__, __LINE__, 1, "∂f/∂y(1,2)   = 5", dv_eval_qf(df_dy),    qf_from_double(5.0));
+    check_q_at(__FILE__, __LINE__, 1, "∂²f/∂x∂y     = 1", dv_eval_qf(d2f_dxdy), qf_from_double(1.0));
 
     /* borrowed pointer — same result, no extra free */
     const dval_t *p = dv_get_deriv(f, x);
-    check_q_at(__FILE__, __LINE__, 1, "dv_get_deriv == dv_create_deriv", dv_eval(p), qf_from_double(4.0));
+    check_q_at(__FILE__, __LINE__, 1, "dv_get_deriv == dv_create_deriv", dv_eval_qf(p), qf_from_double(4.0));
 
     /* update x=3; cached partial graphs recompute automatically */
     dv_set_val_d(x, 3.0);
-    check_q_at(__FILE__, __LINE__, 1, "∂f/∂x(3,2)   = 8", dv_eval(df_dx), qf_from_double(8.0));
-    check_q_at(__FILE__, __LINE__, 1, "∂f/∂y(3,2)   = 7", dv_eval(df_dy), qf_from_double(7.0));
+    check_q_at(__FILE__, __LINE__, 1, "∂f/∂x(3,2)   = 8", dv_eval_qf(df_dx), qf_from_double(8.0));
+    check_q_at(__FILE__, __LINE__, 1, "∂f/∂y(3,2)   = 7", dv_eval_qf(df_dy), qf_from_double(7.0));
 
     dv_free(d2f_dxdy);
     dv_free(df_dy);

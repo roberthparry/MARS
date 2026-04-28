@@ -12,7 +12,7 @@ datetime utilities, UTF-8 strings, and generic containers.
 ## Highlights
 
 - **`qfloat_t`** — double-double arithmetic and special functions (~34 decimal digits of precision)
-- **`matrix_t`** — generic high-precision matrix with pluggable element types (`double`, `qfloat_t`, `qcomplex_t`, `dval_t *`), symbolic matrix support, and eigendecomposition at full `qfloat_t` precision
+- **`matrix_t`** — generic high-precision matrix with pluggable element types (`double`, `qfloat_t`, `qcomplex_t`, `dval_t *`), string-based matrix parsing and formatting, symbolic linear algebra support including Schur complements, block inverse/solve, Jordan helpers, entrywise matrix derivatives, Jacobian helpers, and first matrix-calculus helpers for trace, determinant, inverse, block inverse, solve, and block solve, and eigendecomposition at full `qfloat_t` precision
 - **`dval_t`** — differentiable expression DAGs with first/second derivatives and symbolic matrix integration
 - **`datetime_t`** — civil and astronomical date/time helpers
 - **`dictionary_t` / `set_t` / `array_t`** — generic containers with user-defined ownership
@@ -44,6 +44,31 @@ int main(void) {
 
 ```text
 W0(1) = 0.5671432904097838729999686622103575
+```
+
+**Symbolic matrix from a string:**
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include "matrix.h"
+
+int main(void) {
+    matrix_t *H = mat_from_string(
+        "{ [[Δ Ω][Ω -Δ]] | Δ = 1.5; Ω = 0.25 }",
+        NULL, NULL);
+
+    mat_printf("%ml\n", H);
+    mat_free(H);
+    return 0;
+}
+```
+
+```text
+{ [
+  Δ    Ω
+  Ω   -Δ
+] | Δ = 1.5; Ω = 0.25 }
 ```
 
 ## Modules

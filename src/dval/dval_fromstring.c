@@ -35,8 +35,10 @@
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
+#include <limits.h>
 
 #include "qfloat.h"
+#include "qcomplex.h"
 #include "dval_internal.h"
 #include "dval.h"
 
@@ -284,6 +286,16 @@ static void symtab_free(symtab_t *t)
     }
     free(t->entries);
     symtab_init(t);
+}
+
+static int symtab_add_borrowed(symtab_t *t, const char *name, dval_t *node)
+{
+    if (!t || !name || !node)
+        return -1;
+
+    dv_retain(node);
+    symtab_add(t, name, node);
+    return 0;
 }
 
 /* ------------------------------------------------------------------ */
@@ -937,6 +949,47 @@ static dval_t *parse_pure_const(const char *s, const char *end,
     return result;
 }
 
+static dval_t *parse_expression_region(const char *start,
+                                       const char *end,
+                                       symtab_t *syms,
+                                       const char *context_label)
+{
+    parser_t ps;
+    dval_t *result;
+
+    if (!start || !end || end < start)
+        return NULL;
+
+    while (start < end && isspace((unsigned char)*start))
+        start++;
+    while (end > start && isspace((unsigned char)end[-1]))
+        end--;
+
+    ps.p = start;
+    ps.end = end;
+    ps.syms = syms;
+    ps.error = 0;
+    ps.errmsg[0] = '\0';
+
+    result = parse_addexpr(&ps);
+    if (result && !ps.error) {
+        while (ps.p < end && isspace((unsigned char)*ps.p))
+            ps.p++;
+        if (ps.p == end)
+            return result;
+        dv_free(result);
+        result = NULL;
+        set_error(&ps, "trailing input");
+    } else if (result) {
+        dv_free(result);
+        result = NULL;
+    }
+
+    if (ps.error)
+        fprintf(stderr, "%s: parse error: %s\n", context_label, ps.errmsg);
+    return NULL;
+}
+
 /* ------------------------------------------------------------------ */
 /* Public entry point                                                   */
 /* ------------------------------------------------------------------ */
@@ -984,25 +1037,11 @@ dval_t *dval_from_string(const char *s)
         while (content_end > s && isspace((unsigned char)content_end[-1]))
             content_end--;
 
-        parser_t ps;
-        ps.p       = s;
-        ps.end     = content_end;
-        ps.syms    = NULL;
-        ps.error   = 0;
-        ps.errmsg[0] = '\0';
+        dval_t *result = parse_expression_region(s, content_end, NULL,
+                                                 "dval_from_string");
 
-        dval_t *result = parse_addexpr(&ps);
-        if (result && !ps.error) {
-            while (ps.p < content_end && isspace((unsigned char)*ps.p))
-                ps.p++;
-            if (ps.p == content_end)
-                return result;
-            dv_free(result);
-            result = NULL;
-        } else if (result) {
-            dv_free(result);
-            result = NULL;
-        }
+        if (result)
+            return result;
 
         errmsg[0] = '\0';
         result = parse_pure_const(s, content_end, errmsg, sizeof(errmsg));
@@ -1045,21 +1084,58 @@ dval_t *dval_from_string(const char *s)
         }
     }
 
-    parser_t ps;
-    ps.p       = s;
-    ps.end     = expr_end;
-    ps.syms    = &syms;
-    ps.error   = 0;
-    ps.errmsg[0] = '\0';
+    dval_t *result = parse_expression_region(s, expr_end, &syms,
+                                             "dval_from_string");
 
-    dval_t *result = parse_addexpr(&ps);
+    symtab_free(&syms);
+    return result;
+}
 
-    if (ps.error) {
-        if (result) dv_free(result);
-        result = NULL;
-        fprintf(stderr, "dval_from_string: parse error: %s\n", ps.errmsg);
+dval_t *dval_from_expression_string(const char *expr,
+                                    const char *const *names,
+                                    dval_t *const *symbols,
+                                    size_t nsymbols)
+{
+    symtab_t syms;
+    dval_t *result;
+
+    if (!expr)
+        return NULL;
+    if (nsymbols > 0 && (!names || !symbols)) {
+        fprintf(stderr,
+                "dval_from_expression_string: symbol table is incomplete\n");
+        return NULL;
+    }
+    if (nsymbols > (size_t)INT_MAX) {
+        fprintf(stderr,
+                "dval_from_expression_string: too many symbols\n");
+        return NULL;
     }
 
+    symtab_init(&syms);
+    for (size_t i = 0; i < nsymbols; ++i) {
+        if (!names[i] || !symbols[i]) {
+            fprintf(stderr,
+                    "dval_from_expression_string: null symbol entry\n");
+            symtab_free(&syms);
+            return NULL;
+        }
+        if (symtab_has(&syms, names[i])) {
+            fprintf(stderr,
+                    "dval_from_expression_string: duplicate symbol '%s'\n",
+                    names[i]);
+            symtab_free(&syms);
+            return NULL;
+        }
+        if (symtab_add_borrowed(&syms, names[i], symbols[i]) != 0) {
+            symtab_free(&syms);
+            return NULL;
+        }
+    }
+
+    result = parse_expression_region(expr, expr + strlen(expr),
+                                     nsymbols ? &syms : NULL,
+                                     "dval_from_expression_string");
     symtab_free(&syms);
     return result;
 }

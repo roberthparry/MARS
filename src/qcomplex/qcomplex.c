@@ -8,6 +8,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <math.h>
 
 #include "qcomplex.h"
 
@@ -28,6 +29,27 @@ const qcomplex_t QC_ONE = {
 /* Helpers: construct purely real qcomplex_t from a double literal or qfloat_t. */
 static inline qcomplex_t qcr(double x)    { return qc_make(qf_from_double(x),  qf_from_double(0.0)); }
 static inline qcomplex_t qcrf(qfloat_t x) { return qc_make(x, qf_from_double(0.0)); }
+
+static qcomplex_t qc_pow_int(qcomplex_t z, int n)
+{
+    qcomplex_t result = QC_ONE;
+    qcomplex_t base = z;
+
+    if (n == 0)
+        return QC_ONE;
+
+    if (n < 0)
+        return qc_div(QC_ONE, qc_pow_int(z, -n));
+
+    while (n > 0) {
+        if (n & 1)
+            result = qc_mul(result, base);
+        base = qc_mul(base, base);
+        n >>= 1;
+    }
+
+    return result;
+}
 
 // Basic arithmetic
 qcomplex_t qc_add(qcomplex_t a, qcomplex_t b) {
@@ -79,6 +101,26 @@ qcomplex_t qc_log(qcomplex_t z) {
     return qc_make(qf_log(qc_abs(z)), qc_arg(z));
 }
 qcomplex_t qc_pow(qcomplex_t a, qcomplex_t b) {
+    if (qc_eq(b, QC_ZERO))
+        return QC_ONE;
+
+    if (qc_eq(a, QC_ONE))
+        return QC_ONE;
+
+    if (qc_eq(b, QC_ONE))
+        return a;
+
+    if (qf_eq(a.im, QF_ZERO) && qf_eq(b.im, QF_ZERO))
+        return qcrf(qf_pow(a.re, b.re));
+
+    if (qf_eq(b.im, QF_ZERO)) {
+        double yd = qf_to_double(b.re);
+        double yi = nearbyint(yd);
+
+        if (fabs(yd - yi) <= 1e-30)
+            return qc_pow_int(a, (int)yi);
+    }
+
     return qc_exp(qc_mul(b, qc_log(a)));
 }
 qcomplex_t qc_sqrt(qcomplex_t z) {
@@ -356,6 +398,21 @@ qcomplex_t qc_from_string(const char *s)
             qfloat_t im = qf_from_string(right);
             if (qf_isnan(re) || qf_isnan(im))
                 return qc_parse_fail("invalid numbers in a±bi", s_original);
+
+            return qc_make(re, im);
+        }
+
+        if (split > 0 && (left[split - 1] == 'i' || left[split - 1] == 'j')) {
+            left[split - 1] = '\0';
+
+            if (strcmp(left, "") == 0)  strcpy(left, "1");
+            if (strcmp(left, "+") == 0) strcpy(left, "1");
+            if (strcmp(left, "-") == 0) strcpy(left, "-1");
+
+            qfloat_t im = qf_from_string(left);
+            qfloat_t re = qf_from_string(right);
+            if (qf_isnan(re) || qf_isnan(im))
+                return qc_parse_fail("invalid numbers in bi±a", s_original);
 
             return qc_make(re, im);
         }

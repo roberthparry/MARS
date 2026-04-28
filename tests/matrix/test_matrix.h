@@ -40,6 +40,10 @@ void check_mat_identity_qc(const char *label, matrix_t *R, size_t n, double tol)
 
 void run_matrix_core_tests(void);
 void run_matrix_function_tests(void);
+void run_matrix_readme_example(void);
 void run_matrix_function_regression_tests(void);
+void run_matrix_fromstring_tests(void);
+void run_matrix_tostring_tests(void);
+void run_matrix_output_tests(void);
 
 #endif
