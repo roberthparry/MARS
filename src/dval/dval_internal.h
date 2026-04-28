@@ -48,6 +48,53 @@ typedef enum {
     DV_OP_BINARY
 } dval_arity_t;
 
+typedef enum {
+    DV_KIND_CONST,
+    DV_KIND_VAR,
+    DV_KIND_ADD,
+    DV_KIND_SUB,
+    DV_KIND_MUL,
+    DV_KIND_DIV,
+    DV_KIND_POW,
+    DV_KIND_POW_D,
+    DV_KIND_ATAN2,
+    DV_KIND_NEG,
+    DV_KIND_SIN,
+    DV_KIND_COS,
+    DV_KIND_TAN,
+    DV_KIND_SINH,
+    DV_KIND_COSH,
+    DV_KIND_TANH,
+    DV_KIND_ASIN,
+    DV_KIND_ACOS,
+    DV_KIND_ATAN,
+    DV_KIND_ASINH,
+    DV_KIND_ACOSH,
+    DV_KIND_ATANH,
+    DV_KIND_EXP,
+    DV_KIND_LOG,
+    DV_KIND_SQRT,
+    DV_KIND_ABS,
+    DV_KIND_HYPOT,
+    DV_KIND_ERF,
+    DV_KIND_ERFC,
+    DV_KIND_LGAMMA,
+    DV_KIND_ERFINV,
+    DV_KIND_ERFCINV,
+    DV_KIND_GAMMA,
+    DV_KIND_DIGAMMA,
+    DV_KIND_TRIGAMMA,
+    DV_KIND_LAMBERT_W0,
+    DV_KIND_LAMBERT_WM1,
+    DV_KIND_NORMAL_PDF,
+    DV_KIND_NORMAL_CDF,
+    DV_KIND_NORMAL_LOGPDF,
+    DV_KIND_EI,
+    DV_KIND_E1,
+    DV_KIND_BETA,
+    DV_KIND_LOGBETA
+} dval_op_kind_t;
+
 typedef dval_t *(*dval_apply_unary_fn)(dval_t *arg);
 typedef dval_t *(*dval_apply_binary_fn)(dval_t *left, dval_t *right);
 typedef dval_t *(*dval_simplify_fn)(const dval_t *tmpl, dval_t *a, dval_t *b);
@@ -70,6 +117,9 @@ typedef struct dval_ops {
      * Unused child outputs must be written as zero.
      */
     dval_reverse_fn reverse;
+
+    /** Stable operator kind tag for structural matching/introspection. */
+    dval_op_kind_t kind;
 
     /** Arity of the operator; determines which child pointers are used. */
     dval_arity_t arity;

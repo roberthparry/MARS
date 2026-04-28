@@ -189,79 +189,6 @@ static uint64_t alloc_var_id(void)
     return next_var_id++;
 }
 
-bool dv_is_exact_zero(const dval_t *dv)
-{
-    return dv && dv->ops == &ops_const && !dv->name && qf_eq(dv->c, QF_ZERO);
-}
-
-bool dv_is_named_const(const dval_t *dv)
-{
-    return dv && dv->ops == &ops_const && dv->name && *dv->name;
-}
-
-dval_t *dv_substitute(const dval_t *expr,
-                      const dval_t *needle,
-                      dval_t *replacement)
-{
-    dval_t *left;
-    dval_t *right;
-    dval_t *out;
-
-    if (!expr)
-        return NULL;
-
-    if (expr == needle) {
-        dv_retain(replacement);
-        return replacement;
-    }
-
-    if (expr->ops == &ops_const) {
-        if (expr->name && *expr->name)
-            return dv_new_named_const(expr->c, expr->name);
-        return dv_new_const(expr->c);
-    }
-
-    if (expr->ops == &ops_var) {
-        if (expr->name && *expr->name)
-            return dv_new_named_var(expr->c, expr->name);
-        return dv_new_var(expr->c);
-    }
-
-    if (expr->ops == &ops_pow_d) {
-        left = dv_substitute(expr->a, needle, replacement);
-        if (!left)
-            return NULL;
-        out = dv_pow_qf(left, expr->c);
-        dv_free(left);
-        return out;
-    }
-
-    if (expr->ops->arity == DV_OP_UNARY && expr->ops->apply_unary) {
-        left = dv_substitute(expr->a, needle, replacement);
-        if (!left)
-            return NULL;
-        out = expr->ops->apply_unary(left);
-        dv_free(left);
-        return out;
-    }
-
-    if (expr->ops->arity == DV_OP_BINARY && expr->ops->apply_binary) {
-        left = dv_substitute(expr->a, needle, replacement);
-        right = dv_substitute(expr->b, needle, replacement);
-        if (!left || !right) {
-            dv_free(left);
-            dv_free(right);
-            return NULL;
-        }
-        out = expr->ops->apply_binary(left, right);
-        dv_free(left);
-        dv_free(right);
-        return out;
-    }
-
-    return NULL;
-}
-
 void dv_retain(dval_t *dv)
 {
     if (dv)
@@ -1746,6 +1673,7 @@ const dval_ops_t ops_const = {
     .eval = eval_const,
     .deriv = deriv_const,
     .reverse = dv_reverse_atom,
+    .kind = DV_KIND_CONST,
     .arity = DV_OP_ATOM,
     .name = "const",
     .apply_unary = NULL,
@@ -1758,6 +1686,7 @@ const dval_ops_t ops_var = {
     .eval = eval_var,
     .deriv = deriv_var,
     .reverse = dv_reverse_atom,
+    .kind = DV_KIND_VAR,
     .arity = DV_OP_ATOM,
     .name = "var",
     .apply_unary = NULL,
@@ -1772,6 +1701,7 @@ const dval_ops_t ops_add = {
     .eval = eval_add,
     .deriv = deriv_add,
     .reverse = dv_reverse_add,
+    .kind = DV_KIND_ADD,
     .arity = DV_OP_BINARY,
     .name = "+",
     .apply_unary = NULL,
@@ -1784,6 +1714,7 @@ const dval_ops_t ops_sub = {
     .eval = eval_sub,
     .deriv = deriv_sub,
     .reverse = dv_reverse_sub,
+    .kind = DV_KIND_SUB,
     .arity = DV_OP_BINARY,
     .name = "-",
     .apply_unary = NULL,
@@ -1796,6 +1727,7 @@ const dval_ops_t ops_mul = {
     .eval = eval_mul,
     .deriv = deriv_mul,
     .reverse = dv_reverse_mul,
+    .kind = DV_KIND_MUL,
     .arity = DV_OP_BINARY,
     .name = "*",
     .apply_unary = NULL,
@@ -1808,6 +1740,7 @@ const dval_ops_t ops_div = {
     .eval = eval_div,
     .deriv = deriv_div,
     .reverse = dv_reverse_div,
+    .kind = DV_KIND_DIV,
     .arity = DV_OP_BINARY,
     .name = "/",
     .apply_unary = NULL,
@@ -1820,6 +1753,7 @@ const dval_ops_t ops_pow = {
     .eval = eval_pow,
     .deriv = deriv_pow,
     .reverse = dv_reverse_pow,
+    .kind = DV_KIND_POW,
     .arity = DV_OP_BINARY,
     .name = "^",
     .apply_unary = NULL,
@@ -1832,6 +1766,7 @@ const dval_ops_t ops_pow_d = {
     .eval = eval_pow_d,
     .deriv = deriv_pow_d,
     .reverse = dv_reverse_pow_d,
+    .kind = DV_KIND_POW_D,
     .arity = DV_OP_BINARY,
     .name = "^",
     .apply_unary = NULL,
@@ -1844,6 +1779,7 @@ const dval_ops_t ops_atan2 = {
     .eval = eval_atan2,
     .deriv = deriv_atan2,
     .reverse = dv_reverse_atan2,
+    .kind = DV_KIND_ATAN2,
     .arity = DV_OP_BINARY,
     .name = "atan2",
     .apply_unary = NULL,
@@ -1858,6 +1794,7 @@ const dval_ops_t ops_neg = {
     .eval = eval_neg,
     .deriv = deriv_neg,
     .reverse = dv_reverse_neg,
+    .kind = DV_KIND_NEG,
     .arity = DV_OP_UNARY,
     .name = "-",
     .apply_unary = dv_neg,
@@ -1870,6 +1807,7 @@ const dval_ops_t ops_sin = {
     .eval = eval_sin,
     .deriv = deriv_sin,
     .reverse = dv_reverse_sin,
+    .kind = DV_KIND_SIN,
     .arity = DV_OP_UNARY,
     .name = "sin",
     .apply_unary = dv_sin,
@@ -1882,6 +1820,7 @@ const dval_ops_t ops_cos = {
     .eval = eval_cos,
     .deriv = deriv_cos,
     .reverse = dv_reverse_cos,
+    .kind = DV_KIND_COS,
     .arity = DV_OP_UNARY,
     .name = "cos",
     .apply_unary = dv_cos,
@@ -1894,6 +1833,7 @@ const dval_ops_t ops_tan = {
     .eval = eval_tan,
     .deriv = deriv_tan,
     .reverse = dv_reverse_tan,
+    .kind = DV_KIND_TAN,
     .arity = DV_OP_UNARY,
     .name = "tan",
     .apply_unary = dv_tan,
@@ -1906,6 +1846,7 @@ const dval_ops_t ops_sinh = {
     .eval = eval_sinh,
     .deriv = deriv_sinh,
     .reverse = dv_reverse_sinh,
+    .kind = DV_KIND_SINH,
     .arity = DV_OP_UNARY,
     .name = "sinh",
     .apply_unary = dv_sinh,
@@ -1918,6 +1859,7 @@ const dval_ops_t ops_cosh = {
     .eval = eval_cosh,
     .deriv = deriv_cosh,
     .reverse = dv_reverse_cosh,
+    .kind = DV_KIND_COSH,
     .arity = DV_OP_UNARY,
     .name = "cosh",
     .apply_unary = dv_cosh,
@@ -1930,6 +1872,7 @@ const dval_ops_t ops_tanh = {
     .eval = eval_tanh,
     .deriv = deriv_tanh,
     .reverse = dv_reverse_tanh,
+    .kind = DV_KIND_TANH,
     .arity = DV_OP_UNARY,
     .name = "tanh",
     .apply_unary = dv_tanh,
@@ -1942,6 +1885,7 @@ const dval_ops_t ops_asin = {
     .eval = eval_asin,
     .deriv = deriv_asin,
     .reverse = dv_reverse_asin,
+    .kind = DV_KIND_ASIN,
     .arity = DV_OP_UNARY,
     .name = "asin",
     .apply_unary = dv_asin,
@@ -1954,6 +1898,7 @@ const dval_ops_t ops_acos = {
     .eval = eval_acos,
     .deriv = deriv_acos,
     .reverse = dv_reverse_acos,
+    .kind = DV_KIND_ACOS,
     .arity = DV_OP_UNARY,
     .name = "acos",
     .apply_unary = dv_acos,
@@ -1966,6 +1911,7 @@ const dval_ops_t ops_atan = {
     .eval = eval_atan,
     .deriv = deriv_atan,
     .reverse = dv_reverse_atan,
+    .kind = DV_KIND_ATAN,
     .arity = DV_OP_UNARY,
     .name = "atan",
     .apply_unary = dv_atan,
@@ -1978,6 +1924,7 @@ const dval_ops_t ops_asinh = {
     .eval = eval_asinh,
     .deriv = deriv_asinh,
     .reverse = dv_reverse_asinh,
+    .kind = DV_KIND_ASINH,
     .arity = DV_OP_UNARY,
     .name = "asinh",
     .apply_unary = dv_asinh,
@@ -1990,6 +1937,7 @@ const dval_ops_t ops_acosh = {
     .eval = eval_acosh,
     .deriv = deriv_acosh,
     .reverse = dv_reverse_acosh,
+    .kind = DV_KIND_ACOSH,
     .arity = DV_OP_UNARY,
     .name = "acosh",
     .apply_unary = dv_acosh,
@@ -2002,6 +1950,7 @@ const dval_ops_t ops_atanh = {
     .eval = eval_atanh,
     .deriv = deriv_atanh,
     .reverse = dv_reverse_atanh,
+    .kind = DV_KIND_ATANH,
     .arity = DV_OP_UNARY,
     .name = "atanh",
     .apply_unary = dv_atanh,
@@ -2014,6 +1963,7 @@ const dval_ops_t ops_exp = {
     .eval = eval_exp,
     .deriv = deriv_exp,
     .reverse = dv_reverse_exp,
+    .kind = DV_KIND_EXP,
     .arity = DV_OP_UNARY,
     .name = "exp",
     .apply_unary = dv_exp,
@@ -2026,6 +1976,7 @@ const dval_ops_t ops_log = {
     .eval = eval_log,
     .deriv = deriv_log,
     .reverse = dv_reverse_log,
+    .kind = DV_KIND_LOG,
     .arity = DV_OP_UNARY,
     .name = "log",
     .apply_unary = dv_log,
@@ -2038,6 +1989,7 @@ const dval_ops_t ops_sqrt = {
     .eval = eval_sqrt,
     .deriv = deriv_sqrt,
     .reverse = dv_reverse_sqrt,
+    .kind = DV_KIND_SQRT,
     .arity = DV_OP_UNARY,
     .name = "sqrt",
     .apply_unary = dv_sqrt,
@@ -2050,6 +2002,7 @@ const dval_ops_t ops_abs = {
     .eval = eval_abs,
     .deriv = deriv_abs,
     .reverse = dv_reverse_abs,
+    .kind = DV_KIND_ABS,
     .arity = DV_OP_UNARY,
     .name = "abs",
     .apply_unary = dv_abs,
@@ -2062,6 +2015,7 @@ const dval_ops_t ops_erf = {
     .eval = eval_erf,
     .deriv = deriv_erf,
     .reverse = dv_reverse_erf,
+    .kind = DV_KIND_ERF,
     .arity = DV_OP_UNARY,
     .name = "erf",
     .apply_unary = dv_erf,
@@ -2074,6 +2028,7 @@ const dval_ops_t ops_erfc = {
     .eval = eval_erfc,
     .deriv = deriv_erfc,
     .reverse = dv_reverse_erfc,
+    .kind = DV_KIND_ERFC,
     .arity = DV_OP_UNARY,
     .name = "erfc",
     .apply_unary = dv_erfc,
@@ -2086,6 +2041,7 @@ const dval_ops_t ops_lgamma = {
     .eval = eval_lgamma,
     .deriv = deriv_lgamma,
     .reverse = dv_reverse_lgamma,
+    .kind = DV_KIND_LGAMMA,
     .arity = DV_OP_UNARY,
     .name = "lgamma",
     .apply_unary = dv_lgamma,
@@ -2098,6 +2054,7 @@ const dval_ops_t ops_hypot = {
     .eval = eval_hypot,
     .deriv = deriv_hypot,
     .reverse = dv_reverse_hypot,
+    .kind = DV_KIND_HYPOT,
     .arity = DV_OP_BINARY,
     .name = "hypot",
     .apply_unary = NULL,
@@ -2107,72 +2064,72 @@ const dval_ops_t ops_hypot = {
 };
 
 const dval_ops_t ops_erfinv = {
-    .eval = eval_erfinv, .deriv = deriv_erfinv, .reverse = dv_reverse_erfinv, .arity = DV_OP_UNARY, .name = "erfinv",
+    .eval = eval_erfinv, .deriv = deriv_erfinv, .reverse = dv_reverse_erfinv, .kind = DV_KIND_ERFINV, .arity = DV_OP_UNARY, .name = "erfinv",
     .apply_unary = dv_erfinv, .apply_binary = NULL,
     .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
 };
 const dval_ops_t ops_erfcinv = {
-    .eval = eval_erfcinv, .deriv = deriv_erfcinv, .reverse = dv_reverse_erfcinv, .arity = DV_OP_UNARY, .name = "erfcinv",
+    .eval = eval_erfcinv, .deriv = deriv_erfcinv, .reverse = dv_reverse_erfcinv, .kind = DV_KIND_ERFCINV, .arity = DV_OP_UNARY, .name = "erfcinv",
     .apply_unary = dv_erfcinv, .apply_binary = NULL,
     .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
 };
 const dval_ops_t ops_gamma = {
-    .eval = eval_gamma, .deriv = deriv_gamma, .reverse = dv_reverse_gamma, .arity = DV_OP_UNARY, .name = "gamma",
+    .eval = eval_gamma, .deriv = deriv_gamma, .reverse = dv_reverse_gamma, .kind = DV_KIND_GAMMA, .arity = DV_OP_UNARY, .name = "gamma",
     .apply_unary = dv_gamma, .apply_binary = NULL,
     .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
 };
 const dval_ops_t ops_digamma = {
-    .eval = eval_digamma, .deriv = deriv_digamma, .reverse = dv_reverse_digamma, .arity = DV_OP_UNARY, .name = "digamma",
+    .eval = eval_digamma, .deriv = deriv_digamma, .reverse = dv_reverse_digamma, .kind = DV_KIND_DIGAMMA, .arity = DV_OP_UNARY, .name = "digamma",
     .apply_unary = dv_digamma, .apply_binary = NULL,
     .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
 };
 const dval_ops_t ops_trigamma = {
-    .eval = eval_trigamma, .deriv = deriv_trigamma, .reverse = dv_reverse_trigamma, .arity = DV_OP_UNARY, .name = "trigamma",
+    .eval = eval_trigamma, .deriv = deriv_trigamma, .reverse = dv_reverse_trigamma, .kind = DV_KIND_TRIGAMMA, .arity = DV_OP_UNARY, .name = "trigamma",
     .apply_unary = dv_trigamma, .apply_binary = NULL,
     .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
 };
 const dval_ops_t ops_lambert_w0 = {
-    .eval = eval_lambert_w0, .deriv = deriv_lambert_w0, .reverse = dv_reverse_lambert_w0, .arity = DV_OP_UNARY, .name = "lambert_w0",
+    .eval = eval_lambert_w0, .deriv = deriv_lambert_w0, .reverse = dv_reverse_lambert_w0, .kind = DV_KIND_LAMBERT_W0, .arity = DV_OP_UNARY, .name = "lambert_w0",
     .apply_unary = dv_lambert_w0, .apply_binary = NULL,
     .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
 };
 const dval_ops_t ops_lambert_wm1 = {
-    .eval = eval_lambert_wm1, .deriv = deriv_lambert_wm1, .reverse = dv_reverse_lambert_wm1, .arity = DV_OP_UNARY, .name = "lambert_wm1",
+    .eval = eval_lambert_wm1, .deriv = deriv_lambert_wm1, .reverse = dv_reverse_lambert_wm1, .kind = DV_KIND_LAMBERT_WM1, .arity = DV_OP_UNARY, .name = "lambert_wm1",
     .apply_unary = dv_lambert_wm1, .apply_binary = NULL,
     .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
 };
 const dval_ops_t ops_normal_pdf = {
-    .eval = eval_normal_pdf, .deriv = deriv_normal_pdf, .reverse = dv_reverse_normal_pdf, .arity = DV_OP_UNARY, .name = "normal_pdf",
+    .eval = eval_normal_pdf, .deriv = deriv_normal_pdf, .reverse = dv_reverse_normal_pdf, .kind = DV_KIND_NORMAL_PDF, .arity = DV_OP_UNARY, .name = "normal_pdf",
     .apply_unary = dv_normal_pdf, .apply_binary = NULL,
     .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
 };
 const dval_ops_t ops_normal_cdf = {
-    .eval = eval_normal_cdf, .deriv = deriv_normal_cdf, .reverse = dv_reverse_normal_cdf, .arity = DV_OP_UNARY, .name = "normal_cdf",
+    .eval = eval_normal_cdf, .deriv = deriv_normal_cdf, .reverse = dv_reverse_normal_cdf, .kind = DV_KIND_NORMAL_CDF, .arity = DV_OP_UNARY, .name = "normal_cdf",
     .apply_unary = dv_normal_cdf, .apply_binary = NULL,
     .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
 };
 const dval_ops_t ops_normal_logpdf = {
-    .eval = eval_normal_logpdf, .deriv = deriv_normal_logpdf, .reverse = dv_reverse_normal_logpdf, .arity = DV_OP_UNARY, .name = "normal_logpdf",
+    .eval = eval_normal_logpdf, .deriv = deriv_normal_logpdf, .reverse = dv_reverse_normal_logpdf, .kind = DV_KIND_NORMAL_LOGPDF, .arity = DV_OP_UNARY, .name = "normal_logpdf",
     .apply_unary = dv_normal_logpdf, .apply_binary = NULL,
     .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
 };
 const dval_ops_t ops_ei = {
-    .eval = eval_ei, .deriv = deriv_ei, .reverse = dv_reverse_ei, .arity = DV_OP_UNARY, .name = "Ei",
+    .eval = eval_ei, .deriv = deriv_ei, .reverse = dv_reverse_ei, .kind = DV_KIND_EI, .arity = DV_OP_UNARY, .name = "Ei",
     .apply_unary = dv_ei, .apply_binary = NULL,
     .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
 };
 const dval_ops_t ops_e1 = {
-    .eval = eval_e1, .deriv = deriv_e1, .reverse = dv_reverse_e1, .arity = DV_OP_UNARY, .name = "E1",
+    .eval = eval_e1, .deriv = deriv_e1, .reverse = dv_reverse_e1, .kind = DV_KIND_E1, .arity = DV_OP_UNARY, .name = "E1",
     .apply_unary = dv_e1, .apply_binary = NULL,
     .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
 };
 const dval_ops_t ops_beta = {
-    .eval = eval_beta, .deriv = deriv_beta, .reverse = dv_reverse_beta, .arity = DV_OP_BINARY, .name = "beta",
+    .eval = eval_beta, .deriv = deriv_beta, .reverse = dv_reverse_beta, .kind = DV_KIND_BETA, .arity = DV_OP_BINARY, .name = "beta",
     .apply_unary = NULL, .apply_binary = dv_beta,
     .simplify = dv_simplify_binary_operator, .fold_const_unary = NULL
 };
 const dval_ops_t ops_logbeta = {
-    .eval = eval_logbeta, .deriv = deriv_logbeta, .reverse = dv_reverse_logbeta, .arity = DV_OP_BINARY, .name = "logbeta",
+    .eval = eval_logbeta, .deriv = deriv_logbeta, .reverse = dv_reverse_logbeta, .kind = DV_KIND_LOGBETA, .arity = DV_OP_BINARY, .name = "logbeta",
     .apply_unary = NULL, .apply_binary = dv_logbeta,
     .simplify = dv_simplify_binary_operator, .fold_const_unary = NULL
 };
