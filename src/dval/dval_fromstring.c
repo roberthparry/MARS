@@ -74,6 +74,30 @@ static int fs_is_letter(unsigned int c)
     return 0;
 }
 
+static void skip_spaces(const char **pp, const char *end)
+{
+    while (*pp < end && isspace((unsigned char)**pp))
+        (*pp)++;
+}
+
+static size_t scan_decimal_len(const char *s, const char *end)
+{
+    const char *p = s;
+
+    if (p < end && (*p == '-' || *p == '+')) p++;
+    while (p < end && isdigit((unsigned char)*p)) p++;
+    if (p < end && *p == '.') {
+        p++;
+        while (p < end && isdigit((unsigned char)*p)) p++;
+    }
+    if (p < end && (*p == 'e' || *p == 'E')) {
+        p++;
+        if (p < end && (*p == '+' || *p == '-')) p++;
+        while (p < end && isdigit((unsigned char)*p)) p++;
+    }
+    return (size_t)(p - s);
+}
+
 /* ------------------------------------------------------------------ */
 /* Superscript digit reading                                            */
 /* ------------------------------------------------------------------ */
@@ -474,7 +498,7 @@ static int parse_two_args(parser_t *p, dval_t **a_out, dval_t **b_out)
         return 0;
     }
     p->p++;
-    if (p->p < p->end && *p->p == ' ') p->p++;
+    skip_spaces(&p->p, p->end);
 
     dval_t *b = parse_addexpr(p);
     if (!b) { dv_free(a); return 0; }
@@ -512,17 +536,8 @@ static dval_t *parse_atom(parser_t *p)
     /* Decimal number (starts with digit or '.') */
     if (isdigit((unsigned char)*p->p) || *p->p == '.') {
         const char *start = p->p;
-        while (p->p < p->end && isdigit((unsigned char)*p->p)) p->p++;
-        if (p->p < p->end && *p->p == '.') {
-            p->p++;
-            while (p->p < p->end && isdigit((unsigned char)*p->p)) p->p++;
-        }
-        if (p->p < p->end && (*p->p == 'e' || *p->p == 'E')) {
-            p->p++;
-            if (p->p < p->end && (*p->p == '+' || *p->p == '-')) p->p++;
-            while (p->p < p->end && isdigit((unsigned char)*p->p)) p->p++;
-        }
-        size_t n = (size_t)(p->p - start);
+        size_t n = scan_decimal_len(start, p->end);
+        p->p = start + n;
         char nbuf[64];
         if (n >= sizeof(nbuf)) n = sizeof(nbuf) - 1;
         memcpy(nbuf, start, n);
@@ -667,12 +682,8 @@ static dval_t *parse_power(parser_t *p)
         /* Numeric exponent: ^3.5 */
         const char *num_start = p->p;
         if (p->p < p->end && (*p->p == '-' || *p->p == '+')) p->p++;
-        while (p->p < p->end && isdigit((unsigned char)*p->p)) p->p++;
-        if (p->p < p->end && *p->p == '.') {
-            p->p++;
-            while (p->p < p->end && isdigit((unsigned char)*p->p)) p->p++;
-        }
-        size_t n = (size_t)(p->p - num_start);
+        size_t n = scan_decimal_len(num_start, p->end);
+        p->p = num_start + n;
         if (n == 0) {
             dv_free(base);
             set_error(p, "expected exponent after '^'");
@@ -742,7 +753,7 @@ static dval_t *parse_mulexpr(parser_t *p)
             while (peek < p->end && *peek == ' ') peek++;
             if (peek < p->end && *peek == '*') {
                 p->p = peek + 1; /* consume optional leading spaces and '*' */
-                while (p->p < p->end && *p->p == ' ') p->p++; /* trailing spaces */
+                skip_spaces(&p->p, p->end); /* trailing spaces */
                 dval_t *rhs = parse_signed_power(p);
                 if (!rhs) { dv_free(lhs); return NULL; }
                 dval_t *tmp = dv_mul(lhs, rhs);
@@ -828,30 +839,19 @@ static int parse_bindings(const char *s, const char *end,
             return -1;
         }
 
-        while (p < end && isspace((unsigned char)*p)) p++;
+        skip_spaces(&p, end);
         if (p >= end || *p != '=') {
             free(name);
             snprintf(errmsg, errmsg_n, "expected '=' after name in binding");
             return -1;
         }
         p++; /* skip '=' */
-        while (p < end && isspace((unsigned char)*p)) p++;
+        skip_spaces(&p, end);
 
         /* Parse decimal value (may be negative) */
         const char *val_start = p;
-        if (p < end && (*p == '-' || *p == '+')) p++;
-        while (p < end && isdigit((unsigned char)*p)) p++;
-        if (p < end && *p == '.') {
-            p++;
-            while (p < end && isdigit((unsigned char)*p)) p++;
-        }
-        if (p < end && (*p == 'e' || *p == 'E')) {
-            p++;
-            if (p < end && (*p == '+' || *p == '-')) p++;
-            while (p < end && isdigit((unsigned char)*p)) p++;
-        }
-
-        size_t vlen = (size_t)(p - val_start);
+        size_t vlen = scan_decimal_len(val_start, end);
+        p = val_start + vlen;
         if (vlen == 0) {
             free(name);
             snprintf(errmsg, errmsg_n, "expected numeric value in binding");
@@ -900,32 +900,22 @@ static dval_t *parse_pure_const(const char *s, const char *end,
                                  char *errmsg, size_t errmsg_n)
 {
     const char *p = s;
-    while (p < end && isspace((unsigned char)*p)) p++;
+    skip_spaces(&p, end);
 
     char *name = read_any_name(&p);
 
-    while (p < end && isspace((unsigned char)*p)) p++;
+    skip_spaces(&p, end);
     if (p >= end || *p != '=') {
         free(name);
         snprintf(errmsg, errmsg_n, "expected '=' in constant format");
         return NULL;
     }
     p++;
-    while (p < end && isspace((unsigned char)*p)) p++;
+    skip_spaces(&p, end);
 
     const char *val_start = p;
-    if (p < end && (*p == '-' || *p == '+')) p++;
-    while (p < end && isdigit((unsigned char)*p)) p++;
-    if (p < end && *p == '.') {
-        p++;
-        while (p < end && isdigit((unsigned char)*p)) p++;
-    }
-    if (p < end && (*p == 'e' || *p == 'E')) {
-        p++;
-        if (p < end && (*p == '+' || *p == '-')) p++;
-        while (p < end && isdigit((unsigned char)*p)) p++;
-    }
-    size_t vlen = (size_t)(p - val_start);
+    size_t vlen = scan_decimal_len(val_start, end);
+    p = val_start + vlen;
     if (vlen == 0) {
         free(name);
         snprintf(errmsg, errmsg_n, "expected value in constant format");

@@ -55,6 +55,46 @@ static char *xstrdup(const char *s)
     return p;
 }
 
+static int is_op(const dval_t *f, const dval_ops_t *ops)
+{
+    return f && f->ops == ops;
+}
+
+static int is_const(const dval_t *f)
+{
+    return is_op(f, &ops_const);
+}
+
+static int is_var(const dval_t *f)
+{
+    return is_op(f, &ops_var);
+}
+
+static int is_neg(const dval_t *f)
+{
+    return is_op(f, &ops_neg);
+}
+
+static int is_mul(const dval_t *f)
+{
+    return is_op(f, &ops_mul);
+}
+
+static int is_addsub(const dval_t *f)
+{
+    return is_op(f, &ops_add) || is_op(f, &ops_sub);
+}
+
+static int is_pow_d_expr(const dval_t *f)
+{
+    return is_op(f, &ops_pow_d);
+}
+
+static int is_var_pow_d(const dval_t *f)
+{
+    return is_pow_d_expr(f) && is_var(f->a);
+}
+
 /* ------------------------------------------------------------------------- */
 /* Growable string buffer                                                    */
 /* ------------------------------------------------------------------------- */
@@ -317,7 +357,7 @@ static void assign_unnamed_vars_dfs(dval_t *f, autoname_table_t *t)
 {
     if (!f) return;
 
-    if (f->ops == &ops_var) {
+    if (is_var(f)) {
         if (f->name && *f->name) return;  /* already named */
         /* Check if this node was already assigned */
         for (size_t i = 0; i < t->count; i++)
@@ -337,7 +377,7 @@ static void assign_unnamed_vars_dfs(dval_t *f, autoname_table_t *t)
         return;
     }
 
-    if (f->ops == &ops_const) return;   /* constants have no children to recurse */
+    if (is_const(f)) return;   /* constants have no children to recurse */
 
     assign_unnamed_vars_dfs(f->a, t);
     assign_unnamed_vars_dfs(f->b, t);
@@ -389,7 +429,7 @@ static void emit_superscript_int(sbuf_t *b, long n)
 
 static void emit_atom(dval_t *f, sbuf_t *b)
 {
-    if (f->ops == &ops_const) {
+    if (is_const(f)) {
         if (f->name && *f->name) {
             emit_name(b, f->name);
         } else {
@@ -397,7 +437,7 @@ static void emit_atom(dval_t *f, sbuf_t *b)
             qf_to_string_simple(f->c, buf, sizeof(buf));
             sbuf_puts(b, buf);
         }
-    } else if (f->ops == &ops_var) {
+    } else if (is_var(f)) {
         emit_name(b, f->name ? f->name : "x");
     } else {
         char buf[64];
@@ -415,13 +455,12 @@ static int pow_exp_needs_parens(const dval_t *e)
 {
     if (!e) return 0;
     if (e->ops->arity == DV_OP_ATOM)  return 0;  /* var, const */
-    if (e->ops == &ops_neg)            return 1;
-    if (e->ops == &ops_pow_d)          return 1;  /* e.g. y² is ambiguous as exponent */
+    if (is_neg(e))                     return 1;
+    if (is_pow_d_expr(e))              return 1;  /* e.g. y² is ambiguous as exponent */
     if (e->ops->arity == DV_OP_UNARY)  return 0;  /* sin(…), exp(…), etc. */
     /* DV_OP_BINARY: arithmetic/pow need parens; named functions (atan2 …) don't */
-    if (e->ops == &ops_add || e->ops == &ops_sub ||
-        e->ops == &ops_mul || e->ops == &ops_div ||
-        e->ops == &ops_pow)            return 1;
+    if (is_addsub(e) || is_mul(e) ||
+        is_op(e, &ops_div) || is_op(e, &ops_pow)) return 1;
     return 0;
 }
 
@@ -432,7 +471,7 @@ static int is_atomic_for_mul(const dval_t *f)
 {
     if (!f) return 0;
 
-    if (f->ops == &ops_const) {
+    if (is_const(f)) {
         /* Unnamed numeric constants are always atomic (e.g. the leading "6" in 6x²).
          * Named constants are atomic only when their name is "simple" (single letter
          * or letter + subscript digits).  Multi-char names like "pi" or "radius"
@@ -442,11 +481,10 @@ static int is_atomic_for_mul(const dval_t *f)
         return is_simple_name(f->name);
     }
 
-    if (f->ops == &ops_var)
+    if (is_var(f))
         return is_simple_name(f->name);
 
-    if (f->ops == &ops_pow_d &&
-        f->a && f->a->ops == &ops_var)
+    if (is_var_pow_d(f))
         return is_simple_name(f->a->name);
 
     return 0;
@@ -460,7 +498,7 @@ static void flatten_mul(dval_t *f, dval_t **buf, int *count, int max)
 {
     if (!f || *count >= max) return;
 
-    if (f->ops == &ops_mul) {
+    if (is_mul(f)) {
         flatten_mul(f->a, buf, count, max);
         flatten_mul(f->b, buf, count, max);
     } else {
@@ -478,18 +516,18 @@ static void flatten_mul(dval_t *f, dval_t **buf, int *count, int max)
  */
 static int factor_group(const dval_t *f)
 {
-    if (f->ops == &ops_neg) f = f->a;
+    if (is_neg(f)) f = f->a;
 
-    if (f->ops == &ops_const) {
+    if (is_const(f)) {
         if (!f->name || !*f->name) return 0;
         /* Greek letters are UTF-8 multi-byte; first byte >= 0x80 */
         return ((unsigned char)f->name[0] >= 0x80) ? 1 : 2;
     }
 
-    if (f->ops == &ops_var)
+    if (is_var(f))
         return 3;
 
-    if (f->ops == &ops_pow_d && f->a->ops == &ops_var)
+    if (is_var_pow_d(f))
         return 3;
 
     return 4;
@@ -499,7 +537,7 @@ static int factor_group(const dval_t *f)
 static const char *first_var_name(const dval_t *f)
 {
     if (!f) return "";
-    if (f->ops == &ops_var) return f->name ? f->name : "";
+    if (is_var(f)) return f->name ? f->name : "";
     const char *a = first_var_name(f->a);
     if (*a) return a;
     return first_var_name(f->b);
@@ -510,8 +548,8 @@ static const char *first_var_name(const dval_t *f)
  * This makes cos²(x) (depth 1) sort before exp(sin(x)) (depth 2). */
 static int factor_depth(const dval_t *f)
 {
-    if (!f || f->ops == &ops_const || f->ops == &ops_var) return 0;
-    if (f->ops == &ops_neg || f->ops == &ops_pow_d) return factor_depth(f->a);
+    if (!f || is_const(f) || is_var(f)) return 0;
+    if (is_neg(f) || is_pow_d_expr(f)) return factor_depth(f->a);
     if (f->ops->arity == DV_OP_UNARY) return 1 + factor_depth(f->a);
     if (f->ops->arity == DV_OP_BINARY) {
         int da = factor_depth(f->a), db = factor_depth(f->b);
@@ -522,15 +560,15 @@ static int factor_depth(const dval_t *f)
 
 static const char *factor_sort_name(const dval_t *f)
 {
-    if (f->ops == &ops_neg) f = f->a;
+    if (is_neg(f)) f = f->a;
 
-    if (f->ops == &ops_const)
+    if (is_const(f))
         return (f->name && *f->name) ? f->name : "";
 
-    if (f->ops == &ops_var)
+    if (is_var(f))
         return f->name ? f->name : "";
 
-    if (f->ops == &ops_pow_d && f->a->ops == &ops_var)
+    if (is_var_pow_d(f))
         return f->a->name ? f->a->name : "";
 
     /* Unary/binary functions: sort by the primary variable in the argument
@@ -579,18 +617,18 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
     if (!f) { sbuf_puts(b, "0"); return; }
 
     /* Atoms */
-    if (f->ops == &ops_const || f->ops == &ops_var) {
+    if (is_const(f) || is_var(f)) {
         emit_atom((dval_t *)f, b);
         return;
     }
 
     /* Negation: -a  — only parenthesise when the child is an add/sub */
-    if (f->ops == &ops_neg) {
+    if (is_neg(f)) {
         int need = PREC_UNARY < parent_prec;
         if (need) sbuf_putc(b, '(');
 
         const dval_t *a = f->a;
-        int child_needs_paren = (a->ops == &ops_add || a->ops == &ops_sub);
+        int child_needs_paren = is_addsub(a);
         sbuf_putc(b, '-');
         if (child_needs_paren) sbuf_putc(b, '(');
         emit_expr(a, b, 0);
@@ -615,7 +653,7 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
     }
 
     /* Power */
-    if (f->ops == &ops_pow_d) {
+    if (is_pow_d_expr(f)) {
         int need = PREC_POW < parent_prec;
         if (need) sbuf_putc(b, '(');
 
@@ -661,7 +699,7 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
     }
 
     /* Multiplication with sign folding */
-    if (f->ops == &ops_mul) {
+    if (is_mul(f)) {
         int need = PREC_MUL < parent_prec;
         if (need) sbuf_putc(b, '(');
 
@@ -672,7 +710,7 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
 
         int sign = 1;
         for (int i = 0; i < n; i++) {
-            if (fac[i]->ops == &ops_const &&
+            if (is_const(fac[i]) &&
                 qf_to_double(fac[i]->c) == -1.0)
             {
                 sign = -sign;
@@ -705,7 +743,7 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
     }
 
     /* Addition/subtraction with a + -b → a - b and a - -b → a + b */
-    if (f->ops == &ops_add || f->ops == &ops_sub) {
+    if (is_addsub(f)) {
         int need = PREC_ADD < parent_prec;
         if (need) sbuf_putc(b, '(');
 
@@ -714,19 +752,19 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
         /* Detect if right child is syntactically negative */
         bool neg = false;
 
-        if (f->b->ops == &ops_const) {
+        if (is_const(f->b)) {
             if (qf_to_double(f->b->c) < 0)
                 neg = true;
         }
-        else if (f->b->ops == &ops_neg) {
+        else if (is_neg(f->b)) {
             neg = true;
         }
-        else if (f->b->ops == &ops_mul) {
+        else if (is_mul(f->b)) {
             dval_t *fac[64];
             int n = 0;
             flatten_mul((dval_t *)f->b, fac, &n, 64);
             for (int i = 0; i < n; i++) {
-                if (fac[i]->ops == &ops_const &&
+                if (is_const(fac[i]) &&
                     qf_to_double(fac[i]->c) < 0)
                 {
                     neg = true;
@@ -736,22 +774,22 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
         }
 
         /* Emit flipped operator if needed */
-        if (f->ops == &ops_add) {
+        if (is_op(f, &ops_add)) {
             sbuf_puts(b, neg ? " - " : " + ");
         } else { /* subtraction */
             sbuf_puts(b, neg ? " + " : " - ");
         }
 
         /* Emit |b| (absolute value of right operand) */
-        if (neg && f->b->ops == &ops_const) {
+        if (neg && is_const(f->b)) {
             dval_t tmp = *f->b;
             tmp.c = qf_neg(tmp.c);
             emit_expr(&tmp, b, PREC_ADD);
         }
-        else if (neg && f->b->ops == &ops_neg) {
+        else if (neg && is_neg(f->b)) {
             emit_expr(f->b->a, b, PREC_ADD);
         }
-        else if (neg && f->b->ops == &ops_mul) {
+        else if (neg && is_mul(f->b)) {
             /* Re-emit product with the negative constant replaced by its absolute value */
             dval_t *fac[64];
             int n = 0;
@@ -761,7 +799,7 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
             /* replace or strip the negative constant factor */
             dval_t pos_const;
             for (int i = 0; i < n; i++) {
-                if (fac[i]->ops == &ops_const &&
+                if (is_const(fac[i]) &&
                     qf_to_double(fac[i]->c) < 0)
                 {
                     if (qf_to_double(fac[i]->c) == -1.0) {
@@ -803,7 +841,7 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
     }
 
     /* Division: a/b — denominator gets PREC_POW so mul/add inside it parenthesise */
-    if (f->ops == &ops_div) {
+    if (is_op(f, &ops_div)) {
         int need = PREC_MUL < parent_prec;
         if (need) sbuf_putc(b, '(');
 
@@ -816,7 +854,7 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
     }
 
     /* Binary power: base^exp  or  base^(exp) when exponent needs grouping */
-    if (f->ops == &ops_pow) {
+    if (is_op(f, &ops_pow)) {
         int need = PREC_POW < parent_prec;
         if (need) sbuf_putc(b, '(');
 
@@ -854,7 +892,7 @@ static void emit_func(const dval_t *f, sbuf_t *b, int parent_prec)
 {
     if (!f) { sbuf_puts(b, "0"); return; }
 
-    if (f->ops == &ops_const) {
+    if (is_const(f)) {
         if (f->name && *f->name)
             emit_name_func(b, f->name);
         else {
@@ -865,7 +903,7 @@ static void emit_func(const dval_t *f, sbuf_t *b, int parent_prec)
         return;
     }
 
-    if (f->ops == &ops_var) {
+    if (is_var(f)) {
         emit_name_func(b, f->name ? f->name : "x");
         return;
     }
@@ -883,7 +921,7 @@ static void emit_func(const dval_t *f, sbuf_t *b, int parent_prec)
         return;
     }
 
-    if (f->ops == &ops_pow_d) {
+    if (is_pow_d_expr(f)) {
         int need = PREC_POW < parent_prec;
         if (need) sbuf_putc(b, '(');
 
@@ -898,7 +936,7 @@ static void emit_func(const dval_t *f, sbuf_t *b, int parent_prec)
         return;
     }
 
-    if (f->ops == &ops_mul) {
+    if (is_mul(f)) {
         int need = PREC_MUL < parent_prec;
         if (need) sbuf_putc(b, '(');
 
@@ -917,13 +955,13 @@ static void emit_func(const dval_t *f, sbuf_t *b, int parent_prec)
         return;
     }
 
-    if (f->ops == &ops_add || f->ops == &ops_sub) {
+    if (is_addsub(f)) {
         int need = PREC_ADD < parent_prec;
         if (need) sbuf_putc(b, '(');
 
         emit_func(f->a, b, PREC_ADD);
 
-        if (f->ops == &ops_add)
+        if (is_op(f, &ops_add))
             sbuf_puts(b, " + ");
         else
             sbuf_puts(b, " - ");
@@ -935,7 +973,7 @@ static void emit_func(const dval_t *f, sbuf_t *b, int parent_prec)
     }
 
     /* Division: a/b */
-    if (f->ops == &ops_div) {
+    if (is_op(f, &ops_div)) {
         int need = PREC_MUL < parent_prec;
         if (need) sbuf_putc(b, '(');
 
@@ -948,7 +986,7 @@ static void emit_func(const dval_t *f, sbuf_t *b, int parent_prec)
     }
 
     /* Binary power: base^exp  or  base^(exp) when exponent needs grouping */
-    if (f->ops == &ops_pow) {
+    if (is_op(f, &ops_pow)) {
         int need = PREC_POW < parent_prec;
         if (need) sbuf_putc(b, '(');
 
@@ -1015,12 +1053,12 @@ static void find_vars_dfs(dval_t *f, varlist_t *vl)
 {
     if (!f) return;
 
-    if (f->ops == &ops_var) {
+    if (is_var(f)) {
         varlist_add(vl, f);
         return;
     }
 
-    if (f->ops == &ops_const) return;
+    if (is_const(f)) return;
 
     find_vars_dfs(f->a, vl);
     find_vars_dfs(f->b, vl);
@@ -1030,13 +1068,13 @@ static void find_named_consts_dfs(dval_t *f, varlist_t *cl)
 {
     if (!f) return;
 
-    if (f->ops == &ops_const) {
+    if (is_const(f)) {
         if (f->name && *f->name)
             varlist_add(cl, f);
         return;
     }
 
-    if (f->ops == &ops_var) return;
+    if (is_var(f)) return;
 
     find_named_consts_dfs(f->a, cl);
     find_named_consts_dfs(f->b, cl);
@@ -1100,7 +1138,7 @@ static char *dv_to_string_function(const dval_t *f)
     }
 
     /* Pure variable */
-    if (g->ops == &ops_var) {
+    if (is_var(g)) {
         const char *vname = (g->name && *g->name) ? g->name : "x";
 
         sbuf_puts(&b, "return ");
@@ -1116,7 +1154,7 @@ static char *dv_to_string_function(const dval_t *f)
     }
 
     /* Pure constant */
-    if (g->ops == &ops_const) {
+    if (is_const(g)) {
         const char *cname = (g->name && *g->name) ? g->name : "c";
 
         emit_name_func(&b, cname);

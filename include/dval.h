@@ -320,33 +320,12 @@ void dv_retain(dval_t *dv);
 void dv_free(dval_t *dv);
 
 /**
- * @brief Return true when @p dv is exactly the unnamed constant zero.
- */
-bool dv_is_exact_zero(const dval_t *dv);
-
-/**
- * @brief Return true when @p dv is a named constant node.
- */
-bool dv_is_named_const(const dval_t *dv);
-
-/**
  * @brief Return a simplified owning handle for @p dv.
  *
  * The input handle is not consumed. The caller owns the returned handle and
  * must call dv_free() on it.
  */
 dval_t *dv_simplify(dval_t *dv);
-
-/**
- * @brief Deep-copy @p expr while replacing every occurrence of @p needle
- * with @p replacement.
- *
- * The returned expression is newly allocated and owned by the caller.
- * Returns NULL on allocation or reconstruction failure.
- */
-dval_t *dv_substitute(const dval_t *expr,
-                      const dval_t *needle,
-                      dval_t *replacement);
 
 
 /* ------------------------------------------------------------------------- */
