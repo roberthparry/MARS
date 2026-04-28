@@ -3514,10 +3514,12 @@ static void test_mat_typeof(void)
     matrix_t *Ad = matsq_new_d(2);
     matrix_t *Aqf = matsq_new_qf(2);
     matrix_t *Aqc = matsq_new_qc(2);
+    matrix_t *Adv = matsq_new_dv(2);
 
     check_bool("mat_typeof(double)   = MAT_TYPE_DOUBLE", mat_typeof(Ad) == MAT_TYPE_DOUBLE);
     check_bool("mat_typeof(qfloat)   = MAT_TYPE_QFLOAT", mat_typeof(Aqf) == MAT_TYPE_QFLOAT);
     check_bool("mat_typeof(qcomplex) = MAT_TYPE_QCOMPLEX", mat_typeof(Aqc) == MAT_TYPE_QCOMPLEX);
+    check_bool("mat_typeof(dval)     = MAT_TYPE_DVAL", Adv != NULL && mat_typeof(Adv) == MAT_TYPE_DVAL);
 
     matrix_t *Id = mat_create_identity_d(2);
     matrix_t *Iqf = mat_create_identity_qf(2);
@@ -3545,6 +3547,7 @@ static void test_mat_typeof(void)
     mat_free(Ad);
     mat_free(Aqf);
     mat_free(Aqc);
+    mat_free(Adv);
     mat_free(Id);
     mat_free(Iqf);
     mat_free(Iqc);
@@ -3552,6 +3555,226 @@ static void test_mat_typeof(void)
     mat_free(A_qf);
     mat_free(E_d);
     mat_free(E_qf);
+}
+
+static void check_dval_expr_contains(const char *label,
+                                     dval_t *dv,
+                                     const char *needle)
+{
+    char *s = dv_to_string(dv, style_EXPRESSION);
+    check_bool(label, s != NULL && strstr(s, needle) != NULL);
+    free(s);
+}
+
+static void test_dval_matrix_functions(void)
+{
+    printf(C_CYAN "TEST: dval matrix functions\n" C_RESET);
+
+    dval_t *x = dv_new_named_var_d(2.0, "x");
+    dval_t *one = dv_new_const_d(1.0);
+
+    {
+        dval_t *diag_vals[4] = {x, DV_ZERO, DV_ZERO, one};
+        matrix_t *A = mat_create_dv(2, 2, diag_vals);
+        matrix_t *E = mat_exp(A);
+        dval_t *e00 = NULL;
+        dval_t *e11 = NULL;
+
+        check_bool("mat_exp(dval diagonal) not NULL", E != NULL);
+        print_mdv("A", A);
+        if (E) {
+            print_mdv("exp(A)", E);
+            mat_get(E, 0, 0, &e00);
+            mat_get(E, 1, 1, &e11);
+            check_d("exp(dval diag)[0,0] = exp(2)", dv_eval_d(e00), exp(2.0), 1e-12);
+            check_d("exp(dval diag)[1,1] = exp(1)", dv_eval_d(e11), exp(1.0), 1e-12);
+            dv_set_val_d(x, 3.0);
+            check_d("exp(dval diag)[0,0] tracks x", dv_eval_d(e00), exp(3.0), 1e-12);
+        }
+
+        mat_free(A);
+        mat_free(E);
+    }
+
+    dv_set_val_d(x, 2.0);
+
+    {
+        dval_t *tri_vals[4] = {x, one, DV_ZERO, x};
+        matrix_t *T = mat_create_dv(2, 2, tri_vals);
+        matrix_t *E = mat_exp(T);
+        dval_t *e00 = NULL;
+        dval_t *e01 = NULL;
+        dval_t *e11 = NULL;
+
+        check_bool("mat_exp(dval Jordan block) not NULL", E != NULL);
+        print_mdv("T", T);
+        if (E) {
+            print_mdv("exp(T)", E);
+            mat_get(E, 0, 0, &e00);
+            mat_get(E, 0, 1, &e01);
+            mat_get(E, 1, 1, &e11);
+            check_d("exp([[x,1],[0,x]])[0,0] = exp(2)", dv_eval_d(e00), exp(2.0), 1e-12);
+            check_d("exp([[x,1],[0,x]])[0,1] = exp(2)", dv_eval_d(e01), exp(2.0), 1e-12);
+            check_d("exp([[x,1],[0,x]])[1,1] = exp(2)", dv_eval_d(e11), exp(2.0), 1e-12);
+            dv_set_val_d(x, 3.0);
+            check_d("Jordan exp tracks x on diagonal", dv_eval_d(e00), exp(3.0), 1e-12);
+            check_d("Jordan exp tracks x on superdiag", dv_eval_d(e01), exp(3.0), 1e-12);
+        }
+
+        mat_free(T);
+        mat_free(E);
+    }
+
+    {
+        dval_t *dense_vals[4] = {x, one, one, x};
+        matrix_t *A = mat_create_dv(2, 2, dense_vals);
+        matrix_t *E = mat_exp(A);
+        matrix_t *Ai = mat_inverse(A);
+
+        print_mdv("A", A);
+        check_bool("mat_exp(general dval) currently unsupported", E == NULL);
+        check_bool("mat_inverse(dval 2x2) now supported", Ai != NULL);
+        if (Ai)
+            print_mdv("A^{-1}", Ai);
+        check_bool("mat_rank(dval) unsupported", mat_rank(A) < 0);
+
+        mat_free(Ai);
+        mat_free(A);
+        mat_free(E);
+    }
+
+    dv_free(one);
+    dv_free(x);
+}
+
+static void test_dval_matrix_functions_extended(void)
+{
+    printf(C_CYAN "TEST: dval matrix functions (extended symbolic coverage)\n" C_RESET);
+
+    {
+        dval_t *x = dv_new_named_var_d(0.2, "x");
+        dval_t *one = dv_new_const_d(1.0);
+        dval_t *vals[9] = {
+            x, DV_ZERO, DV_ZERO,
+            one, x, DV_ZERO,
+            DV_ZERO, one, x};
+        matrix_t *T = mat_create_dv(3, 3, vals);
+        matrix_t *R = NULL;
+        matrix_t *G = NULL;
+        matrix_t *W = NULL;
+        dval_t *v = NULL;
+
+        R = mat_erf(T);
+        G = mat_gamma(T);
+        W = mat_lambert_w0(T);
+
+        check_bool("mat_erf(dval 3x3 lower Jordan) not NULL", R != NULL);
+        check_bool("mat_gamma(dval 3x3 lower Jordan) not NULL", G != NULL);
+        check_bool("mat_lambert_w0(dval 3x3 lower Jordan) not NULL", W != NULL);
+
+        if (T)
+            print_mdv("T", T);
+        if (R)
+            print_mdv("erf(T)", R);
+        if (G)
+            print_mdv("gamma(T)", G);
+        if (W)
+            print_mdv("lambert_w0(T)", W);
+
+        if (R) {
+            check_bool("erf(T) preserves lower-triangular structure",
+                       mat_is_lower_triangular(R));
+            mat_get(R, 0, 0, &v);
+            check_dval_expr_contains("erf(T)[0,0] stays symbolic in x", v, "erf(x)");
+            dv_set_val_d(x, 0.3);
+            check_d("erf(T)[0,0] tracks x", dv_eval_d(v), erf(0.3), 1e-12);
+        }
+
+        if (G) {
+            check_bool("gamma(T) preserves lower-triangular structure",
+                       mat_is_lower_triangular(G));
+            mat_get(G, 0, 0, &v);
+            dv_set_val_d(x, 3.0);
+            check_d("gamma(T)[0,0] tracks x", dv_eval_d(v), tgamma(3.0), 1e-12);
+        }
+
+        if (W) {
+            check_bool("lambert_w0(T) preserves lower-triangular structure",
+                       mat_is_lower_triangular(W));
+            mat_get(W, 0, 0, &v);
+            check_dval_expr_contains("lambert_w0(T)[0,0] stays symbolic in x", v, "lambert_w0");
+            dv_set_val_d(x, 0.1);
+            check_bool("lambert_w0(T)[0,0] numerically finite", isfinite(dv_eval_d(v)));
+        }
+
+        mat_free(T);
+        mat_free(R);
+        mat_free(G);
+        mat_free(W);
+        dv_free(x);
+        dv_free(one);
+    }
+
+    {
+        dval_t *x = dv_new_named_var_d(1.5, "x");
+        dval_t *one = dv_new_const_d(1.0);
+        dval_t *vals[9] = {
+            x, DV_ZERO, DV_ZERO,
+            one, x, DV_ZERO,
+            DV_ZERO, one, x};
+        matrix_t *T = mat_create_dv(3, 3, vals);
+        matrix_t *E = mat_exp(T);
+        dval_t *v = NULL;
+
+        check_bool("mat_exp(dval 3x3 lower Jordan) not NULL", E != NULL);
+        if (T)
+            print_mdv("T", T);
+        if (E)
+            print_mdv("exp(T)", E);
+
+        if (E) {
+            check_bool("exp(lower Jordan) preserves lower-triangular structure",
+                       mat_is_lower_triangular(E));
+            mat_get(E, 0, 0, &v);
+            check_d("exp(lower Jordan)[0,0] = exp(1.5)", dv_eval_d(v), exp(1.5), 1e-12);
+            mat_get(E, 1, 0, &v);
+            check_d("exp(lower Jordan)[1,0] = exp(1.5)", dv_eval_d(v), exp(1.5), 1e-12);
+            mat_get(E, 2, 0, &v);
+            check_d("exp(lower Jordan)[2,0] = exp(1.5)/2", dv_eval_d(v), 0.5 * exp(1.5), 1e-12);
+            mat_get(E, 2, 0, &v);
+            check_dval_expr_contains("exp(lower Jordan)[2,0] stays symbolic in x", v, "exp(x)");
+            dv_set_val_d(x, 2.0);
+            mat_get(E, 2, 0, &v);
+            check_d("exp(lower Jordan)[2,0] tracks x", dv_eval_d(v), 0.5 * exp(2.0), 1e-12);
+        }
+
+        mat_free(T);
+        mat_free(E);
+        dv_free(x);
+        dv_free(one);
+    }
+
+    {
+        dval_t *x = dv_new_named_var_d(1.0, "x");
+        dval_t *one = dv_new_const_d(1.0);
+        dval_t *two = dv_new_const_d(2.0);
+        dval_t *vals[9] = {
+            x, one, DV_ZERO,
+            one, two, one,
+            DV_ZERO, one, x};
+        matrix_t *A = mat_create_dv(3, 3, vals);
+
+        print_mdv("A", A);
+        check_bool("mat_exp(dval dense 3x3) currently unsupported", mat_exp(A) == NULL);
+        check_bool("mat_log(dval dense 3x3) currently unsupported", mat_log(A) == NULL);
+        check_bool("mat_sin(dval dense 3x3) currently unsupported", mat_sin(A) == NULL);
+        check_bool("mat_gamma(dval dense 3x3) currently unsupported", mat_gamma(A) == NULL);
+
+        mat_free(A);
+        dv_free(x);
+        dv_free(one);
+        dv_free(two);
+    }
 }
 
 /* ------------------------------------------------------------------ 3×3 matrix function tests */
@@ -3609,5 +3832,7 @@ void run_matrix_function_tests(void)
     RUN_TEST(test_mat_special_unary_extensions, NULL);
     RUN_TEST(test_mat_special_unary_square_extensions, NULL);
     RUN_TEST(test_mat_typeof, NULL);
+    RUN_TEST(test_dval_matrix_functions, NULL);
+    RUN_TEST(test_dval_matrix_functions_extended, NULL);
     RUN_TEST(test_readme_example, NULL);
 }

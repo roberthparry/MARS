@@ -46,6 +46,8 @@ static matrix_t *clone_matrix_snapshot(const matrix_t *A)
         free(data);
         return copy;
     }
+    case MAT_TYPE_DVAL:
+        return mat_to_dense(A);
     }
 
     return NULL;
@@ -173,6 +175,330 @@ void print_qf(const char *label, qfloat_t x)
     fflush(stdout);
 }
 
+static size_t visible_string_width(const char *s)
+{
+    size_t width = 0;
+
+    while (s && *s) {
+        if (s[0] == '\033' && s[1] == '[') {
+            s += 2;
+            while (*s && *s != 'm')
+                s++;
+            if (*s == 'm')
+                s++;
+            continue;
+        }
+        width++;
+        s++;
+    }
+
+    return width;
+}
+
+static char *dup_trimmed_token(const char *start, size_t len)
+{
+    while (len > 0 && (*start == ' ' || *start == '\t')) {
+        start++;
+        len--;
+    }
+    while (len > 0 && (start[len - 1] == ' ' || start[len - 1] == '\t'))
+        len--;
+
+    char *out = malloc(len + 1);
+    if (!out)
+        return NULL;
+    memcpy(out, start, len);
+    out[len] = '\0';
+    return out;
+}
+
+static int binding_contains(char **bindings, size_t nb, const char *token)
+{
+    for (size_t i = 0; i < nb; ++i)
+        if (strcmp(bindings[i], token) == 0)
+            return 1;
+    return 0;
+}
+
+static void append_binding(char ***bindings,
+                           size_t *nbindings,
+                           size_t *capbindings,
+                           char *token)
+{
+    if (!token || !*token) {
+        free(token);
+        return;
+    }
+
+    if (binding_contains(*bindings, *nbindings, token)) {
+        free(token);
+        return;
+    }
+
+    if (*nbindings == *capbindings) {
+        size_t new_cap = *capbindings ? (*capbindings * 2) : 8;
+        char **grown = realloc(*bindings, new_cap * sizeof(**bindings));
+        if (!grown) {
+            free(token);
+            return;
+        }
+        *bindings = grown;
+        *capbindings = new_cap;
+    }
+
+    (*bindings)[(*nbindings)++] = token;
+}
+
+static void collect_bindings(char ***var_bindings,
+                             size_t *nvar_bindings,
+                             size_t *capvar_bindings,
+                             char ***const_bindings,
+                             size_t *nconst_bindings,
+                             size_t *capconst_bindings,
+                             const char *binding_text)
+{
+    const char *p = binding_text;
+    int in_constants = 0;
+
+    while (p && *p) {
+        while (*p == ' ' || *p == '\t' || *p == ',')
+            p++;
+        if (*p == ';') {
+            in_constants = 1;
+            p++;
+            continue;
+        }
+        if (!*p)
+            break;
+
+        const char *start = p;
+        while (*p && *p != ',' && *p != ';')
+            p++;
+
+        char *token = dup_trimmed_token(start, (size_t)(p - start));
+        if (in_constants)
+            append_binding(const_bindings, nconst_bindings, capconst_bindings, token);
+        else
+            append_binding(var_bindings, nvar_bindings, capvar_bindings, token);
+    }
+}
+
+static void collect_dval_bindings(const dval_t *dv,
+                                  char ***var_bindings,
+                                  size_t *nvar_bindings,
+                                  size_t *capvar_bindings,
+                                  char ***const_bindings,
+                                  size_t *nconst_bindings,
+                                  size_t *capconst_bindings,
+                                  const char *binding_text)
+{
+    if (dv && dv_is_named_const(dv) &&
+        binding_text && *binding_text && !strchr(binding_text, ';')) {
+        append_binding(const_bindings, nconst_bindings, capconst_bindings,
+                       strdup(binding_text));
+        return;
+    }
+
+    collect_bindings(var_bindings, nvar_bindings, capvar_bindings,
+                     const_bindings, nconst_bindings, capconst_bindings,
+                     binding_text);
+}
+
+static char *join_binding_list(char **bindings, size_t nbindings)
+{
+    size_t total = 1;
+
+    for (size_t i = 0; i < nbindings; ++i)
+        total += strlen(bindings[i]) + (i ? 2 : 0);
+
+    char *out = malloc(total);
+    if (!out)
+        return NULL;
+    out[0] = '\0';
+
+    for (size_t i = 0; i < nbindings; ++i) {
+        if (i)
+            strcat(out, ", ");
+        strcat(out, bindings[i]);
+    }
+
+    return out;
+}
+
+static int split_binding_token(const char *binding, char **name_out, char **value_out)
+{
+    const char *eq;
+    char *name;
+    char *value;
+
+    *name_out = NULL;
+    *value_out = NULL;
+    if (!binding)
+        return -1;
+
+    eq = strstr(binding, "=");
+    if (!eq)
+        return -1;
+
+    name = strndup(binding, (size_t)(eq - binding));
+    value = strdup(eq + 1);
+    if (!name || !value) {
+        free(name);
+        free(value);
+        return -1;
+    }
+
+    while (*name == ' ' || *name == '\t')
+        memmove(name, name + 1, strlen(name));
+    while (*value == ' ' || *value == '\t')
+        memmove(value, value + 1, strlen(value));
+
+    for (size_t len = strlen(name); len > 0; --len) {
+        if (name[len - 1] == ' ' || name[len - 1] == '\t')
+            name[len - 1] = '\0';
+        else
+            break;
+    }
+    for (size_t len = strlen(value); len > 0; --len) {
+        if (value[len - 1] == ' ' || value[len - 1] == '\t')
+            value[len - 1] = '\0';
+        else
+            break;
+    }
+
+    *name_out = name;
+    *value_out = value;
+    return 0;
+}
+
+static int has_long_binding(char **bindings, size_t nbindings, size_t threshold)
+{
+    for (size_t i = 0; i < nbindings; ++i) {
+        if (strlen(bindings[i]) > threshold)
+            return 1;
+    }
+    return 0;
+}
+
+static char *join_bindings(char **var_bindings,
+                           size_t nvar_bindings,
+                           char **const_bindings,
+                           size_t nconst_bindings)
+{
+    if (nvar_bindings == 0) {
+        if (!has_long_binding(const_bindings, nconst_bindings, 16))
+            return strdup("");
+        return join_binding_list(const_bindings, nconst_bindings);
+    }
+
+    char *vars = join_binding_list(var_bindings, nvar_bindings);
+    char *consts = join_binding_list(const_bindings, nconst_bindings);
+    char *out;
+    size_t total;
+
+    if (!vars || !consts) {
+        free(vars);
+        free(consts);
+        return NULL;
+    }
+
+    total = strlen(vars) + strlen(consts) + 4;
+    out = malloc(total);
+    if (!out) {
+        free(vars);
+        free(consts);
+        return NULL;
+    }
+
+    out[0] = '\0';
+    if (*vars)
+        strcat(out, vars);
+    if (*consts) {
+        if (*vars)
+            strcat(out, "; ");
+        strcat(out, consts);
+    }
+
+    free(vars);
+    free(consts);
+    return out;
+}
+
+static int split_dval_repr(const dval_t *dv, char **expr_out, char **bindings_out)
+{
+    char *tmp;
+    char *body;
+    char *sep;
+    size_t len;
+
+    *expr_out = NULL;
+    *bindings_out = NULL;
+
+    if (!dv) {
+        *expr_out = strdup("NULL");
+        *bindings_out = strdup("");
+        return *expr_out && *bindings_out ? 0 : -1;
+    }
+
+    tmp = dv_to_string(dv, style_EXPRESSION);
+    if (!tmp)
+        return -1;
+
+    body = tmp;
+    len = strlen(tmp);
+    if (len >= 4 && tmp[0] == '{' && tmp[1] == ' ' &&
+        tmp[len - 2] == ' ' && tmp[len - 1] == '}') {
+        body = tmp + 2;
+        tmp[len - 2] = '\0';
+    }
+
+    sep = strstr(body, " | ");
+    if (sep) {
+        *sep = '\0';
+        *expr_out = strdup(body);
+        *bindings_out = strdup(sep + 3);
+    } else {
+        *expr_out = strdup(body);
+        *bindings_out = strdup("");
+    }
+
+    free(tmp);
+    return *expr_out && *bindings_out ? 0 : -1;
+}
+
+static void pretty_dval_expr(char **expr_io,
+                             char **const_bindings,
+                             size_t nconst_bindings)
+{
+    char *expr;
+
+    if (!expr_io || !*expr_io)
+        return;
+
+    expr = *expr_io;
+    for (size_t i = 0; i < nconst_bindings; ++i) {
+        char *name = NULL;
+        char *value = NULL;
+
+        if (split_binding_token(const_bindings[i], &name, &value) != 0)
+            continue;
+
+        if (strlen(const_bindings[i]) > 16 && strcmp(expr, value) == 0) {
+            char *replacement = strdup(name);
+            if (replacement) {
+                free(*expr_io);
+                *expr_io = replacement;
+            }
+            free(name);
+            free(value);
+            return;
+        }
+
+        free(name);
+        free(value);
+    }
+}
+
 static void print_md_raw(const char *label, matrix_t *A)
 {
     size_t rows = mat_get_row_count(A);
@@ -188,7 +514,7 @@ static void print_md_raw(const char *label, matrix_t *A)
             char buf[256];
             mat_get(A, i, j, &v);
             d_to_coloured_string(v, buf, sizeof(buf));
-            size_t len = strlen(buf);
+            size_t len = visible_string_width(buf);
             if (len > w[j])
                 w[j] = len;
         }
@@ -234,7 +560,7 @@ static void print_mqf_raw(const char *label, matrix_t *A)
             char buf[512];
             mat_get(A, i, j, &v);
             qf_to_coloured_string(v, buf, sizeof(buf));
-            size_t len = strlen(buf);
+            size_t len = visible_string_width(buf);
             if (len > w[j])
                 w[j] = len;
         }
@@ -280,7 +606,7 @@ static void print_mqc_raw(const char *label, matrix_t *A)
             char buf[512];
             mat_get(A, i, j, &v);
             qc_to_coloured_string(v, buf, sizeof(buf));
-            size_t len = strlen(buf);
+            size_t len = visible_string_width(buf);
             if (len > w[j])
                 w[j] = len;
         }
@@ -311,6 +637,95 @@ void print_mqc(const char *label, matrix_t *A)
     print_mqc_raw(display_label, A);
 }
 
+static void print_mdv_raw(const char *label, matrix_t *A)
+{
+    size_t rows = mat_get_row_count(A);
+    size_t cols = mat_get_col_count(A);
+    printf("    %s = " C_CYAN "{ [" C_RESET "\n", label);
+
+    char **exprs = calloc(rows * cols, sizeof(*exprs));
+    char **var_bindings = NULL;
+    char **const_bindings = NULL;
+    size_t *w = calloc(cols ? cols : 1, sizeof(size_t));
+    size_t nvar_bindings = 0, capvar_bindings = 0;
+    size_t nconst_bindings = 0, capconst_bindings = 0;
+    int ok = exprs && w;
+
+    for (size_t i = 0; ok && i < rows; i++)
+        for (size_t j = 0; j < cols; j++)
+        {
+            dval_t *v;
+            char *expr = NULL;
+            char *binding_text = NULL;
+            char buf[2048];
+            size_t idx = i * cols + j;
+
+            mat_get(A, i, j, &v);
+            if (split_dval_repr(v, &expr, &binding_text) != 0) {
+                free(expr);
+                free(binding_text);
+                ok = 0;
+                break;
+            }
+
+            exprs[idx] = expr;
+            collect_dval_bindings(v,
+                                  &var_bindings, &nvar_bindings, &capvar_bindings,
+                                  &const_bindings, &nconst_bindings, &capconst_bindings,
+                                  binding_text);
+            pretty_dval_expr(&exprs[idx], const_bindings, nconst_bindings);
+            snprintf(buf, sizeof(buf), C_WHITE "%s" C_RESET, exprs[idx]);
+            if (visible_string_width(buf) > w[j])
+                w[j] = visible_string_width(buf);
+            free(binding_text);
+        }
+
+    if (!ok) {
+        printf("      " C_WHITE "<dval matrix>" C_RESET "\n");
+        printf("    " C_CYAN "] }" C_RESET "\n");
+    } else {
+        char *joined = join_bindings(var_bindings, nvar_bindings,
+                                     const_bindings, nconst_bindings);
+        for (size_t i = 0; i < rows; i++)
+        {
+            printf("      ");
+            for (size_t j = 0; j < cols; j++)
+            {
+                char buf[2048];
+                size_t idx = i * cols + j;
+                snprintf(buf, sizeof(buf), C_WHITE "%s" C_RESET, exprs[idx] ? exprs[idx] : "");
+                printf(" %*s", (int)w[j], buf);
+            }
+            printf("\n");
+        }
+
+        if (joined && *joined)
+            printf("    " C_CYAN "]" C_RESET " | %s " C_CYAN "}" C_RESET "\n", joined);
+        else
+            printf("    " C_CYAN "] }" C_RESET "\n");
+        free(joined);
+    }
+
+    for (size_t i = 0; i < rows * cols; ++i)
+        free(exprs[i]);
+    for (size_t i = 0; i < nvar_bindings; ++i)
+        free(var_bindings[i]);
+    for (size_t i = 0; i < nconst_bindings; ++i)
+        free(const_bindings[i]);
+    free(var_bindings);
+    free(const_bindings);
+    free(exprs);
+    free(w);
+}
+
+void print_mdv(const char *label, matrix_t *A)
+{
+    char display_label[160];
+    remember_matrix_input(label, A);
+    format_matrix_label(label, display_label, sizeof(display_label));
+    print_mdv_raw(display_label, A);
+}
+
 void print_current_input_matrix(void)
 {
     if (!current_matrix_input || current_matrix_input_label[0] == '\0')
@@ -326,6 +741,9 @@ void print_current_input_matrix(void)
         break;
     case MAT_TYPE_QCOMPLEX:
         print_mqc_raw("input matrix", current_matrix_input);
+        break;
+    case MAT_TYPE_DVAL:
+        print_mdv_raw("input matrix", current_matrix_input);
         break;
     default:
         break;

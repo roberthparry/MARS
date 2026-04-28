@@ -1,7 +1,7 @@
 # `matrix_t`
 
 `matrix_t` is a generic high-precision matrix type with pluggable element types
-(`double`, `qfloat_t`, `qcomplex_t`) and pluggable storage kinds (dense, sparse,
+(`double`, `qfloat_t`, `qcomplex_t`, `dval_t *`) and pluggable storage kinds (dense, sparse,
 identity, diagonal, upper triangular, lower triangular). All operations dispatch
 through internal vtables; no type switches or storage switches appear in user code.
 
@@ -17,7 +17,7 @@ the API. Internally each matrix carries:
 
 ## Capabilities
 
-- element types: `double`, `qfloat_t` (~31–32 decimal digits), `qcomplex_t` (~31–32 decimal digits)
+- element types: `double`, `qfloat_t` (~31–32 decimal digits), `qcomplex_t` (~31–32 decimal digits), `dval_t *` (symbolic differentiable values)
 - storage kinds:
   - dense (fully materialised)
   - sparse (stores only non-zero elements explicitly)
@@ -34,6 +34,36 @@ the API. Internally each matrix carries:
 - matrix functions: exp, sin, cos, tan, sinh, cosh, tanh, sqrt, log, asin, acos, atan, asinh, acosh, atanh, erf, erfc
 - power functions: integer power (binary exponentiation), real power via exp/log
 - all eigendecomposition computed at full `qfloat_t`/`qcomplex_t` precision regardless of element type; all matrix functions computed at full `qcomplex_t` precision
+
+## `dval_t *` Matrices
+
+`matrix_t` also supports symbolic `dval_t *` elements through `MAT_TYPE_DVAL`.
+These matrices retain every stored `dval_t *` handle, so overwrites, copies,
+materialisation, and destruction are reference-count safe.
+
+What currently works for `dval` matrices:
+
+- construction in dense, sparse, identity, diagonal, and compatible structured layouts
+- element access, copy, transpose, conjugate
+- add, subtract, multiply
+- scalar multiply/divide through the normal promotion rules
+- exact `1×1` and `2×2` inverse
+- symbolic matrix functions for exact structured square inputs
+  - diagonal matrices
+  - upper- and lower-triangular matrices
+  - repeated-diagonal triangular cases such as Jordan blocks
+- symbolic pretty-printing with one shared binding footer for the whole matrix
+
+What is still intentionally unsupported for `dval` matrices:
+
+- general numerical inverse / solve / least-squares
+- LU / QR / Cholesky / SVD / Schur
+- numerical eigensolvers and pseudoinverse
+- general dense Schur-based matrix functions on arbitrary `dval` inputs
+
+The current design is to use `matrix<dval_t *>` for symbolic construction,
+differentiation, and exact structured operations, then evaluate to a numeric
+matrix type when you want the full numerical linear-algebra toolbox.
 
 ## Example
 
@@ -131,12 +161,15 @@ off-diagonal element). For bulk initialisation prefer the `mat_create_*` forms b
 | `mat_new_d(rows, cols)` | `double` | Allocate an uninitialised `rows × cols` matrix of doubles |
 | `mat_new_qf(rows, cols)` | `qfloat_t` | Allocate an uninitialised `rows × cols` matrix of `qfloat_t` |
 | `mat_new_qc(rows, cols)` | `qcomplex_t` | Allocate an uninitialised `rows × cols` matrix of `qcomplex_t` |
+| `mat_new_dv(rows, cols)` | `dval_t *` | Allocate an uninitialised `rows × cols` matrix of retained `dval_t *` handles |
 | `mat_new_sparse_d(rows, cols)` | `double` | Allocate an uninitialised sparse `rows × cols` matrix of doubles |
 | `mat_new_sparse_qf(rows, cols)` | `qfloat_t` | Allocate an uninitialised sparse `rows × cols` matrix of `qfloat_t` |
 | `mat_new_sparse_qc(rows, cols)` | `qcomplex_t` | Allocate an uninitialised sparse `rows × cols` matrix of `qcomplex_t` |
+| `mat_new_sparse_dv(rows, cols)` | `dval_t *` | Allocate an uninitialised sparse `rows × cols` matrix of retained `dval_t *` handles |
 | `matsq_new_d(n)` | `double` | Allocate an uninitialised `n × n` matrix of doubles |
 | `matsq_new_qf(n)` | `qfloat_t` | Allocate an uninitialised `n × n` matrix of `qfloat_t` |
 | `matsq_new_qc(n)` | `qcomplex_t` | Allocate an uninitialised `n × n` matrix of `qcomplex_t` |
+| `matsq_new_dv(n)` | `dval_t *` | Allocate an uninitialised `n × n` matrix of retained `dval_t *` handles |
 
 #### Allocate and fill from a flat array
 
@@ -145,6 +178,7 @@ off-diagonal element). For bulk initialisation prefer the `mat_create_*` forms b
 | `mat_create_d(rows, cols, data)` | `double` | Allocate and fill from a row-major `double[]` |
 | `mat_create_qf(rows, cols, data)` | `qfloat_t` | Allocate and fill from a row-major `qfloat_t[]` |
 | `mat_create_qc(rows, cols, data)` | `qcomplex_t` | Allocate and fill from a row-major `qcomplex_t[]` |
+| `mat_create_dv(rows, cols, data)` | `dval_t *` | Allocate and fill from a row-major `dval_t * []`; each handle is retained by the matrix |
 
 #### Identity matrices
 
@@ -156,6 +190,7 @@ materialises the matrix as dense.
 | `mat_create_identity_d(n)` | `double` | `n × n` identity matrix of doubles |
 | `mat_create_identity_qf(n)` | `qfloat_t` | `n × n` identity matrix of `qfloat_t` |
 | `mat_create_identity_qc(n)` | `qcomplex_t` | `n × n` identity matrix of `qcomplex_t` |
+| `mat_create_identity_dv(n)` | `dval_t *` | `n × n` identity matrix of symbolic ones and zeros |
 
 #### Diagonal matrices
 
@@ -168,6 +203,7 @@ to survive through compatible operations.
 | `mat_create_diagonal_d(n, diagonal)` | `double` | `n × n` diagonal matrix of doubles |
 | `mat_create_diagonal_qf(n, diagonal)` | `qfloat_t` | `n × n` diagonal matrix of `qfloat_t` |
 | `mat_create_diagonal_qc(n, diagonal)` | `qcomplex_t` | `n × n` diagonal matrix of `qcomplex_t` |
+| `mat_create_diagonal_dv(n, diagonal)` | `dval_t *` | `n × n` diagonal matrix of retained `dval_t *` handles |
 
 ### Destruction
 
@@ -175,8 +211,8 @@ to survive through compatible operations.
 
 ### Element Access
 
-- `void mat_get(const matrix_t *A, size_t i, size_t j, void *out)` — write the element at row `i`, column `j` into the buffer `out`. `out` must be large enough for the element type (8, 16, or 32 bytes).
-- `void mat_set(matrix_t *A, size_t i, size_t j, const void *val)` — copy `val` into position `(i, j)`.
+- `void mat_get(const matrix_t *A, size_t i, size_t j, void *out)` — write the element at row `i`, column `j` into the buffer `out`. `out` must be large enough for the element type. For `MAT_TYPE_DVAL`, the written value is a borrowed `dval_t *`.
+- `void mat_set(matrix_t *A, size_t i, size_t j, const void *val)` — copy `val` into position `(i, j)`. For `MAT_TYPE_DVAL`, the matrix retains the incoming handle.
 - `size_t mat_get_row_count(const matrix_t *A)` — number of rows.
 - `size_t mat_get_col_count(const matrix_t *A)` — number of columns.
 
@@ -213,8 +249,8 @@ inputs are not flattened merely because an internal cache is involved.
 
 ### Bulk Element Access
 
-- `void mat_set_data(matrix_t *A, const void *data)` — copy all elements from a flat row-major buffer into `A`. The buffer must contain `rows × cols` elements of `A`'s element type.
-- `void mat_get_data(const matrix_t *A, void *data)` — copy all elements of `A` into a flat row-major buffer. The buffer must have space for `rows × cols` elements of `A`'s element type.
+- `void mat_set_data(matrix_t *A, const void *data)` — copy all elements from a flat row-major buffer into `A`. The buffer must contain `rows × cols` elements of `A`'s element type. For `MAT_TYPE_DVAL`, each incoming handle is retained.
+- `void mat_get_data(const matrix_t *A, void *data)` — copy all elements of `A` into a flat row-major buffer. The buffer must have space for `rows × cols` elements of `A`'s element type. For `MAT_TYPE_DVAL`, the copied handles are borrowed.
 
 ### Scalar Operations
 
@@ -273,6 +309,9 @@ matrix_t *mat_inverse(const matrix_t *A);
 
 Returns a newly allocated matrix containing the inverse of `A`, or NULL if `A`
 is NULL, not square, or singular.
+
+For `MAT_TYPE_DVAL`, the current exact inverse support is limited to `1×1` and
+`2×2` matrices.
 
 #### Solve
 
@@ -533,7 +572,8 @@ negative on error. Use `mat_schur_factor_free` to release the decomposition.
 ### Matrix Functions
 
 All matrix functions accept a square matrix and return a newly allocated result,
-or NULL on error (NULL input, non-square input, or internal allocation failure).
+or NULL on error (NULL input, non-square input, unsupported element type, or
+internal allocation failure).
 
 Every matrix function uses the same algorithm: Schur decomposition followed by
 the Parlett recurrence on the triangular Schur factor.
@@ -546,6 +586,12 @@ the Parlett recurrence on the triangular Schur factor.
 
 All internal arithmetic uses `qcomplex_t`. If the input matrix has a narrower element
 type the result is converted back to that type before returning.
+
+For `MAT_TYPE_DVAL`, the story is different:
+
+- general dense Schur-based matrix functions remain unsupported
+- exact symbolic matrix functions are implemented for structured inputs where the
+  result can be expressed entrywise without numerical approximation
 
 | Function | Description |
 |---|---|
@@ -608,6 +654,10 @@ on any error (NULL input, non-square, `mat_log` failure).
 ### Debugging / I/O
 
 - `void mat_print(const matrix_t *A)` — print the matrix to standard output.
+
+For `MAT_TYPE_DVAL`, `mat_print` renders symbolic entries and prints one shared
+binding footer for the whole matrix rather than repeating a binding block for
+every cell.
 
 ---
 

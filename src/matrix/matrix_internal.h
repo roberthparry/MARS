@@ -14,6 +14,7 @@ typedef enum {
     ELEM_DOUBLE = 0,
     ELEM_QFLOAT = 1,
     ELEM_QCOMPLEX = 2,
+    ELEM_DVAL = 3,
     ELEM_MAX
 } elem_kind;
 
@@ -162,6 +163,7 @@ struct matrix_t {
 extern const struct elem_vtable double_elem;
 extern const struct elem_vtable qfloat_elem;
 extern const struct elem_vtable qcomplex_elem;
+extern const struct elem_vtable dval_elem;
 
 /* ============================================================
    Matrix construction helpers (internal)

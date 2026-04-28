@@ -179,10 +179,10 @@ static void test_partial_to_string(void)
     free(s);
 
     s = dv_to_string(d2f_dxdy, style_EXPRESSION);
-    if (str_eq(s, "{ c = 1 }"))
-        to_string_pass("∂²(xy)/∂x∂y (EXPR)", s, "{ c = 1 }");
+    if (str_eq(s, "{ 1 }"))
+        to_string_pass("∂²(xy)/∂x∂y (EXPR)", s, "{ 1 }");
     else
-        to_string_fail(__FILE__, __LINE__, 1, "∂²(xy)/∂x∂y (EXPR)", s, "{ c = 1 }");
+        to_string_fail(__FILE__, __LINE__, 1, "∂²(xy)/∂x∂y (EXPR)", s, "{ 1 }");
     free(s);
 
     /* g = x² + xy + y² */
@@ -358,10 +358,10 @@ static void test_partial_to_string_sin_xy(void)
     free(s);
 
     s = dv_to_string(df_dx, style_EXPRESSION);
-    if (str_eq(s, "{ y·cos(xy) + log(y) | x = 1, y = 2 }"))
-        to_string_pass("∂(sin(xy)+x·log(y))/∂x (EXPR)", s, "{ y·cos(xy) + log(y) | x = 1, y = 2 }");
+    if (str_eq(s, "{ log(y) + y·cos(xy) | y = 2, x = 1 }"))
+        to_string_pass("∂(sin(xy)+x·log(y))/∂x (EXPR)", s, "{ log(y) + y·cos(xy) | y = 2, x = 1 }");
     else
-        to_string_fail(__FILE__, __LINE__, 1, "∂(sin(xy)+x·log(y))/∂x (EXPR)", s, "{ y·cos(xy) + log(y) | x = 1, y = 2 }");
+        to_string_fail(__FILE__, __LINE__, 1, "∂(sin(xy)+x·log(y))/∂x (EXPR)", s, "{ log(y) + y·cos(xy) | y = 2, x = 1 }");
     free(s);
 
     s = dv_to_string(df_dy, style_EXPRESSION);
@@ -379,10 +379,10 @@ static void test_partial_to_string_sin_xy(void)
     free(s);
 
     s = dv_to_string(d2f_dxdy, style_EXPRESSION);
-    if (str_eq(s, "{ -xy·sin(xy) + cos(xy) + 1/y | x = 1, y = 2 }"))
-        to_string_pass("∂²(sin(xy)+x·log(y))/∂x∂y (EXPR)", s, "{ -xy·sin(xy) + cos(xy) + 1/y | x = 1, y = 2 }");
+    if (str_eq(s, "{ cos(xy) + 1/y - xy·sin(xy) | x = 1, y = 2 }"))
+        to_string_pass("∂²(sin(xy)+x·log(y))/∂x∂y (EXPR)", s, "{ cos(xy) + 1/y - xy·sin(xy) | x = 1, y = 2 }");
     else
-        to_string_fail(__FILE__, __LINE__, 1, "∂²(sin(xy)+x·log(y))/∂x∂y (EXPR)", s, "{ -xy·sin(xy) + cos(xy) + 1/y | x = 1, y = 2 }");
+        to_string_fail(__FILE__, __LINE__, 1, "∂²(sin(xy)+x·log(y))/∂x∂y (EXPR)", s, "{ cos(xy) + 1/y - xy·sin(xy) | x = 1, y = 2 }");
     free(s);
 
     dv_free(d2f_dxdy); dv_free(d2f_dx2); dv_free(df_dy); dv_free(df_dx);

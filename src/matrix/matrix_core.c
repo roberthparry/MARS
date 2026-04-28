@@ -89,6 +89,198 @@ static const struct store_vtable diagonal_store;
 static const struct store_vtable upper_triangular_store;
 static const struct store_vtable lower_triangular_store;
 
+static bool elem_is_dval(const struct elem_vtable *elem)
+{
+    return elem && elem->kind == ELEM_DVAL;
+}
+
+static bool dval_is_exact_zero(const dval_t *dv)
+{
+    return !dv || dv_is_exact_zero(dv);
+}
+
+static dval_t *dval_clone_for_storage(dval_t *dv)
+{
+    if (!dv)
+        return NULL;
+    if (dv == DV_ZERO || dv == DV_ONE)
+        return dv_new_const(dv_get_val(dv));
+    dv_retain(dv);
+    return dv;
+}
+
+static void elem_copy_value(const struct elem_vtable *elem, void *dst, const void *src)
+{
+    if (!elem_is_dval(elem)) {
+        memcpy(dst, src, elem->size);
+        return;
+    }
+
+    dval_t *dv = src ? *(dval_t *const *)src : NULL;
+    *(dval_t **)dst = dval_clone_for_storage(dv);
+}
+
+static void elem_destroy_value(const struct elem_vtable *elem, void *slot)
+{
+    dval_t *dv;
+
+    if (!elem_is_dval(elem) || !slot)
+        return;
+
+    dv = *(dval_t **)slot;
+    if (dv)
+        dv_free(dv);
+    *(dval_t **)slot = NULL;
+}
+
+static void elem_simplify_value(const struct elem_vtable *elem, void *slot)
+{
+    dval_t *dv;
+    dval_t *simp;
+
+    if (!elem_is_dval(elem) || !slot)
+        return;
+
+    dv = *(dval_t **)slot;
+    if (!dv)
+        return;
+
+    simp = dv_simplify(dv);
+    dv_free(dv);
+    *(dval_t **)slot = simp;
+}
+
+static bool elem_is_structural_zero(const struct elem_vtable *elem, const void *val)
+{
+    if (!elem)
+        return true;
+
+    if (!elem_is_dval(elem))
+        return elem->cmp(val, elem->zero) == 0;
+
+    return dval_is_exact_zero(*(dval_t *const *)val);
+}
+
+static bool elem_supports_numeric_algorithms(const struct elem_vtable *elem)
+{
+    return elem && elem->kind != ELEM_DVAL;
+}
+
+static dval_t *dval_simplify_owned(dval_t *dv)
+{
+    dval_t *simp;
+
+    if (!dv)
+        return NULL;
+
+    simp = dv_simplify(dv);
+    dv_free(dv);
+    return simp;
+}
+
+static matrix_t *mat_inverse_dval_exact(const matrix_t *A)
+{
+    matrix_t *I = NULL;
+    dval_t *a = NULL, *b = NULL, *c = NULL, *d = NULL;
+    dval_t *det_left = NULL, *det_right = NULL, *det_raw = NULL, *det = NULL;
+    dval_t *neg_b = NULL, *neg_c = NULL;
+    dval_t *e00_raw = NULL, *e01_raw = NULL, *e10_raw = NULL, *e11_raw = NULL;
+    dval_t *e00 = NULL, *e01 = NULL, *e10 = NULL, *e11 = NULL;
+
+    if (!A || A->rows != A->cols)
+        return NULL;
+
+    if (A->rows == 1) {
+        dval_t *v = NULL;
+        dval_t *inv_raw = NULL;
+        dval_t *inv = NULL;
+
+        mat_get(A, 0, 0, &v);
+        if (!v)
+            return NULL;
+        if (dv_is_exact_zero(v))
+            return NULL;
+
+        inv_raw = dv_div(DV_ONE, v);
+        inv = dval_simplify_owned(inv_raw);
+        if (!inv)
+            return NULL;
+
+        I = mat_new_dv(1, 1);
+        if (!I) {
+            dv_free(inv);
+            return NULL;
+        }
+
+        mat_set(I, 0, 0, &inv);
+        dv_free(inv);
+        return I;
+    }
+
+    if (A->rows != 2)
+        return NULL;
+
+    mat_get(A, 0, 0, &a);
+    mat_get(A, 0, 1, &b);
+    mat_get(A, 1, 0, &c);
+    mat_get(A, 1, 1, &d);
+
+    det_left = dv_mul(a, d);
+    det_right = dv_mul(b, c);
+    det_raw = dv_sub(det_left, det_right);
+    det = dval_simplify_owned(det_raw);
+    if (!det)
+        return NULL;
+
+    if (dv_is_exact_zero(det)) {
+        dv_free(det);
+        return NULL;
+    }
+
+    neg_b = dv_neg(b);
+    neg_c = dv_neg(c);
+
+    e00_raw = dv_div(d, det);
+    e01_raw = dv_div(neg_b, det);
+    e10_raw = dv_div(neg_c, det);
+    e11_raw = dv_div(a, det);
+
+    e00 = dval_simplify_owned(e00_raw);
+    e01 = dval_simplify_owned(e01_raw);
+    e10 = dval_simplify_owned(e10_raw);
+    e11 = dval_simplify_owned(e11_raw);
+
+    dv_free(neg_b);
+    dv_free(neg_c);
+    dv_free(det);
+
+    if (!e00 || !e01 || !e10 || !e11)
+        goto fail;
+
+    I = mat_new_dv(2, 2);
+    if (!I)
+        goto fail;
+
+    mat_set(I, 0, 0, &e00);
+    mat_set(I, 0, 1, &e01);
+    mat_set(I, 1, 0, &e10);
+    mat_set(I, 1, 1, &e11);
+
+    dv_free(e00);
+    dv_free(e01);
+    dv_free(e10);
+    dv_free(e11);
+    return I;
+
+fail:
+    dv_free(e00);
+    dv_free(e01);
+    dv_free(e10);
+    dv_free(e11);
+    mat_free(I);
+    return NULL;
+}
+
 static bool dense_alloc(struct matrix_t *A) {
     size_t n = A->rows, m = A->cols, es = A->elem->size;
 
@@ -110,8 +302,15 @@ static bool dense_alloc(struct matrix_t *A) {
 
 static void dense_free(struct matrix_t *A) {
     if (!A->data) return;
-    for (size_t i = 0; i < A->rows; i++)
+    for (size_t i = 0; i < A->rows; i++) {
+        if (elem_is_dval(A->elem)) {
+            for (size_t j = 0; j < A->cols; j++) {
+                void *slot = (char *)A->data[i] + j * A->elem->size;
+                elem_destroy_value(A->elem, slot);
+            }
+        }
         free(A->data[i]);
+    }
     free(A->data);
     A->data = NULL;
 }
@@ -123,9 +322,10 @@ static void dense_get(const struct matrix_t *A, size_t i, size_t j, void *out) {
 }
 
 static void dense_set(struct matrix_t *A, size_t i, size_t j, const void *val) {
-    memcpy((char*)A->data[i] + j * A->elem->size,
-           val,
-           A->elem->size);
+    void *slot = (char *)A->data[i] + j * A->elem->size;
+
+    elem_destroy_value(A->elem, slot);
+    elem_copy_value(A->elem, slot, val);
 }
 
 static void dense_swap_rows(struct matrix_t *A, size_t r1, size_t r2)
@@ -209,6 +409,7 @@ static void sparse_free(struct matrix_t *A)
         sparse_entry_t *cur = (sparse_entry_t *)A->data[i];
         while (cur) {
             sparse_entry_t *next = cur->next;
+            elem_destroy_value(A->elem, cur->value);
             free(cur);
             cur = next;
         }
@@ -240,7 +441,7 @@ static void sparse_set(struct matrix_t *A, size_t i, size_t j, const void *val)
 
     prev = sparse_find_prev(A, i, j);
     cur = prev ? prev->next : (A->data ? (sparse_entry_t *)A->data[i] : NULL);
-    is_zero = (A->elem->cmp(val, A->elem->zero) == 0);
+    is_zero = elem_is_structural_zero(A->elem, val);
 
     if (cur && cur->col == j) {
         if (is_zero) {
@@ -248,11 +449,13 @@ static void sparse_set(struct matrix_t *A, size_t i, size_t j, const void *val)
                 prev->next = cur->next;
             else
                 A->data[i] = cur->next;
+            elem_destroy_value(A->elem, cur->value);
             free(cur);
             if (A->nnz > 0)
                 A->nnz--;
         } else {
-            memcpy(cur->value, val, A->elem->size);
+            elem_destroy_value(A->elem, cur->value);
+            elem_copy_value(A->elem, cur->value, val);
         }
         return;
     }
@@ -265,7 +468,8 @@ static void sparse_set(struct matrix_t *A, size_t i, size_t j, const void *val)
         return;
 
     cur->col = j;
-    memcpy(cur->value, val, A->elem->size);
+    memset(cur->value, 0, A->elem->size);
+    elem_copy_value(A->elem, cur->value, val);
     if (prev) {
         cur->next = prev->next;
         prev->next = cur;
@@ -332,6 +536,7 @@ static void sparse_materialise(struct matrix_t *A)
         while (cur) {
             dense_set(A, i, cur->col, cur->value);
             A->nnz++;
+            elem_destroy_value(A->elem, cur->value);
             cur = cur->next;
         }
     }
@@ -430,8 +635,7 @@ static void ident_materialise(struct matrix_t *A) {
 
     for (size_t i = 0; i < A->rows; i++)
         for (size_t j = 0; j < A->cols; j++)
-            dense_set(A, i, j,
-                      (i == j) ? A->elem->one : A->elem->zero);
+            dense_set(A, i, j, (i == j) ? A->elem->one : A->elem->zero);
 }
 
 /* ---------- diagonal storage ---------- */
@@ -466,8 +670,10 @@ static void diagonal_free(struct matrix_t *A)
     if (!A->data)
         return;
 
-    for (size_t i = 0; i < A->rows; i++)
+    for (size_t i = 0; i < A->rows; i++) {
+        elem_destroy_value(A->elem, A->data[i]);
         free(A->data[i]);
+    }
     free(A->data);
     A->data = NULL;
     A->nnz = 0;
@@ -495,8 +701,9 @@ static void diagonal_materialise(struct matrix_t *A)
 
     for (size_t i = 0; i < A->rows; i++) {
         dense_set(A, i, i, old_diagonal[i]);
-        if (A->elem->cmp(old_diagonal[i], A->elem->zero) != 0)
+        if (!elem_is_structural_zero(A->elem, old_diagonal[i]))
             A->nnz++;
+        elem_destroy_value(A->elem, old_diagonal[i]);
         free(old_diagonal[i]);
     }
     free(old_diagonal);
@@ -505,10 +712,11 @@ static void diagonal_materialise(struct matrix_t *A)
 static void diagonal_set(struct matrix_t *A, size_t i, size_t j, const void *val)
 {
     if (i == j) {
-        int was_zero = (A->elem->cmp(A->data[i], A->elem->zero) == 0);
-        int is_zero = (A->elem->cmp(val, A->elem->zero) == 0);
+        int was_zero = elem_is_structural_zero(A->elem, A->data[i]);
+        int is_zero = elem_is_structural_zero(A->elem, val);
 
-        memcpy(A->data[i], val, A->elem->size);
+        elem_destroy_value(A->elem, A->data[i]);
+        elem_copy_value(A->elem, A->data[i], val);
         if (was_zero && !is_zero)
             A->nnz++;
         else if (!was_zero && is_zero)
@@ -516,7 +724,7 @@ static void diagonal_set(struct matrix_t *A, size_t i, size_t j, const void *val
         return;
     }
 
-    if (A->elem->cmp(val, A->elem->zero) == 0)
+    if (elem_is_structural_zero(A->elem, val))
         return;
 
     diagonal_materialise(A);
@@ -582,6 +790,13 @@ static bool triangular_alloc(struct matrix_t *A, size_t (*row_width)(const struc
         if (width && !A->data[i]) {
             while (i > 0) {
                 i--;
+                if (elem_is_dval(A->elem) && A->data[i]) {
+                    size_t old_width = row_width(A, i);
+                    for (size_t j = 0; j < old_width; j++) {
+                        void *slot = (char *)A->data[i] + j * A->elem->size;
+                        elem_destroy_value(A->elem, slot);
+                    }
+                }
                 free(A->data[i]);
             }
             free(A->data);
@@ -599,8 +814,18 @@ static void triangular_free(struct matrix_t *A)
     if (!A->data)
         return;
 
-    for (size_t i = 0; i < A->rows; i++)
+    for (size_t i = 0; i < A->rows; i++) {
+        if (elem_is_dval(A->elem)) {
+            size_t width = (A->store == &upper_triangular_store)
+                         ? upper_triangular_row_width(A, i)
+                         : lower_triangular_row_width(A, i);
+            for (size_t j = 0; j < width; j++) {
+                void *slot = (char *)A->data[i] + j * A->elem->size;
+                elem_destroy_value(A->elem, slot);
+            }
+        }
         free(A->data[i]);
+    }
     free(A->data);
     A->data = NULL;
     A->nnz = 0;
@@ -660,8 +885,9 @@ static void upper_triangular_materialise(struct matrix_t *A)
         for (size_t offset = 0; offset < width; offset++) {
             void *src = (char *)old_rows[i] + offset * A->elem->size;
             dense_set(A, i, i + offset, src);
-            if (A->elem->cmp(src, A->elem->zero) != 0)
+            if (!elem_is_structural_zero(A->elem, src))
                 A->nnz++;
+            elem_destroy_value(A->elem, src);
         }
         free(old_rows[i]);
     }
@@ -688,8 +914,9 @@ static void lower_triangular_materialise(struct matrix_t *A)
         for (size_t j = 0; j < width; j++) {
             void *src = (char *)old_rows[i] + j * A->elem->size;
             dense_set(A, i, j, src);
-            if (A->elem->cmp(src, A->elem->zero) != 0)
+            if (!elem_is_structural_zero(A->elem, src))
                 A->nnz++;
+            elem_destroy_value(A->elem, src);
         }
         free(old_rows[i]);
     }
@@ -700,10 +927,11 @@ static void upper_triangular_set(struct matrix_t *A, size_t i, size_t j, const v
 {
     if (i <= j && i < A->cols) {
         void *slot = (char *)A->data[i] + (j - i) * A->elem->size;
-        int was_zero = (A->elem->cmp(slot, A->elem->zero) == 0);
-        int is_zero = (A->elem->cmp(val, A->elem->zero) == 0);
+        int was_zero = elem_is_structural_zero(A->elem, slot);
+        int is_zero = elem_is_structural_zero(A->elem, val);
 
-        memcpy(slot, val, A->elem->size);
+        elem_destroy_value(A->elem, slot);
+        elem_copy_value(A->elem, slot, val);
         if (was_zero && !is_zero)
             A->nnz++;
         else if (!was_zero && is_zero)
@@ -711,7 +939,7 @@ static void upper_triangular_set(struct matrix_t *A, size_t i, size_t j, const v
         return;
     }
 
-    if (A->elem->cmp(val, A->elem->zero) == 0)
+    if (elem_is_structural_zero(A->elem, val))
         return;
 
     upper_triangular_materialise(A);
@@ -723,10 +951,11 @@ static void lower_triangular_set(struct matrix_t *A, size_t i, size_t j, const v
 {
     if (j <= i && j < A->cols) {
         void *slot = (char *)A->data[i] + j * A->elem->size;
-        int was_zero = (A->elem->cmp(slot, A->elem->zero) == 0);
-        int is_zero = (A->elem->cmp(val, A->elem->zero) == 0);
+        int was_zero = elem_is_structural_zero(A->elem, slot);
+        int is_zero = elem_is_structural_zero(A->elem, val);
 
-        memcpy(slot, val, A->elem->size);
+        elem_destroy_value(A->elem, slot);
+        elem_copy_value(A->elem, slot, val);
         if (was_zero && !is_zero)
             A->nnz++;
         else if (!was_zero && is_zero)
@@ -734,7 +963,7 @@ static void lower_triangular_set(struct matrix_t *A, size_t i, size_t j, const v
         return;
     }
 
-    if (A->elem->cmp(val, A->elem->zero) == 0)
+    if (elem_is_structural_zero(A->elem, val))
         return;
 
     lower_triangular_materialise(A);
@@ -965,7 +1194,7 @@ static bool dense_is_diagonal(const struct matrix_t *A)
             if (i == j)
                 continue;
             dense_get(A, i, j, raw);
-            if (A->elem->cmp(raw, A->elem->zero) != 0)
+            if (!elem_is_structural_zero(A->elem, raw))
                 return false;
         }
 
@@ -977,7 +1206,7 @@ static bool sparse_is_diagonal(const struct matrix_t *A)
     for (size_t i = 0; i < A->rows; i++) {
         sparse_entry_t *cur = A->data ? (sparse_entry_t *)A->data[i] : NULL;
         while (cur) {
-            if (cur->col != i)
+            if (cur->col != i && !elem_is_structural_zero(A->elem, cur->value))
                 return false;
             cur = cur->next;
         }
@@ -991,7 +1220,7 @@ static bool upper_triangular_is_diagonal(const struct matrix_t *A)
         size_t width = upper_triangular_row_width(A, i);
         for (size_t offset = 1; offset < width; offset++) {
             void *slot = (char *)A->data[i] + offset * A->elem->size;
-            if (A->elem->cmp(slot, A->elem->zero) != 0)
+            if (!elem_is_structural_zero(A->elem, slot))
                 return false;
         }
     }
@@ -1004,7 +1233,7 @@ static bool lower_triangular_is_diagonal(const struct matrix_t *A)
         size_t width = lower_triangular_row_width(A, i);
         for (size_t j = 0; j + 1 < width; j++) {
             void *slot = (char *)A->data[i] + j * A->elem->size;
-            if (A->elem->cmp(slot, A->elem->zero) != 0)
+            if (!elem_is_structural_zero(A->elem, slot))
                 return false;
         }
     }
@@ -1018,7 +1247,7 @@ static bool generic_is_upper_triangular(const struct matrix_t *A)
     for (size_t i = 0; i < A->rows; i++)
         for (size_t j = 0; j < A->cols && j < i; j++) {
             mat_get(A, i, j, raw);
-            if (A->elem->cmp(raw, A->elem->zero) != 0)
+            if (!elem_is_structural_zero(A->elem, raw))
                 return false;
         }
 
@@ -1032,7 +1261,7 @@ static bool generic_is_lower_triangular(const struct matrix_t *A)
     for (size_t i = 0; i < A->rows; i++)
         for (size_t j = i + 1; j < A->cols; j++) {
             mat_get(A, i, j, raw);
-            if (A->elem->cmp(raw, A->elem->zero) != 0)
+            if (!elem_is_structural_zero(A->elem, raw))
                 return false;
         }
 
@@ -1047,7 +1276,7 @@ static size_t dense_nonzero_count(const struct matrix_t *A)
     for (size_t i = 0; i < A->rows; i++)
         for (size_t j = 0; j < A->cols; j++) {
             dense_get(A, i, j, raw);
-            if (A->elem->cmp(raw, A->elem->zero) != 0)
+            if (!elem_is_structural_zero(A->elem, raw))
                 count++;
         }
 
@@ -1761,6 +1990,568 @@ const struct elem_vtable qcomplex_elem = {
     .fun             = &qcomplex_fun
 };
 
+/* ---------- dval_t* ---------- */
+
+static void dv_add_wrap(void *o, const void *a, const void *b)
+{
+    dval_t *lhs = *(dval_t *const *)a;
+    dval_t *rhs = *(dval_t *const *)b;
+    dval_t *prev = *(dval_t **)o;
+    dval_t *res = dv_add(lhs, rhs);
+
+    if (prev)
+        dv_free(prev);
+    *(dval_t **)o = res;
+}
+
+static void dv_sub_wrap(void *o, const void *a, const void *b)
+{
+    dval_t *lhs = *(dval_t *const *)a;
+    dval_t *rhs = *(dval_t *const *)b;
+    dval_t *prev = *(dval_t **)o;
+    dval_t *res = dv_sub(lhs, rhs);
+
+    if (prev)
+        dv_free(prev);
+    *(dval_t **)o = res;
+}
+
+static void dv_mul_wrap(void *o, const void *a, const void *b)
+{
+    dval_t *lhs = *(dval_t *const *)a;
+    dval_t *rhs = *(dval_t *const *)b;
+    dval_t *prev = *(dval_t **)o;
+    dval_t *res = dv_mul(lhs, rhs);
+
+    if (prev)
+        dv_free(prev);
+    *(dval_t **)o = res;
+}
+
+static void dv_inv_wrap(void *o, const void *a)
+{
+    dval_t *arg = *(dval_t *const *)a;
+    dval_t *prev = *(dval_t **)o;
+    dval_t *res = dv_d_div(1.0, arg);
+
+    if (prev)
+        dv_free(prev);
+    *(dval_t **)o = res;
+}
+
+static int dval_cmp_wrap(const void *a, const void *b)
+{
+    dval_t *lhs = *(dval_t *const *)a;
+    dval_t *rhs = *(dval_t *const *)b;
+
+    if (!lhs && !rhs)
+        return 0;
+    if (!lhs)
+        return -1;
+    if (!rhs)
+        return 1;
+    return dv_cmp(lhs, rhs);
+}
+
+static void dv_print_wrap(const void *v, char *buf, size_t n)
+{
+    dval_t *dv = *(dval_t *const *)v;
+    char *tmp;
+    char *inner;
+    char *sep;
+    size_t len;
+
+    if (!dv) {
+        snprintf(buf, n, "NULL");
+        return;
+    }
+
+    tmp = dv_to_string(dv, style_EXPRESSION);
+    if (!tmp) {
+        snprintf(buf, n, "<dval>");
+        return;
+    }
+
+    /* Matrix entries read better without repeating the full binding block for
+     * every cell, so prefer the compact expression body when available. */
+    inner = tmp;
+    len = strlen(tmp);
+    if (len >= 4 && tmp[0] == '{' && tmp[1] == ' ' && tmp[len - 2] == ' ' && tmp[len - 1] == '}') {
+        inner = tmp + 2;
+        tmp[len - 2] = '\0';
+        sep = strstr(inner, " | ");
+        if (sep)
+            *sep = '\0';
+    }
+
+    snprintf(buf, n, "%s", inner);
+    free(tmp);
+}
+
+static double dv_abs2_wrap(const void *a)
+{
+    dval_t *dv = *(dval_t *const *)a;
+    double x = dv ? dv_eval_d(dv) : 0.0;
+    return x * x;
+}
+
+static double dv_to_real_wrap(const void *a)
+{
+    dval_t *dv = *(dval_t *const *)a;
+    return dv ? dv_eval_d(dv) : 0.0;
+}
+
+static void dv_from_real_wrap(void *o, double x)
+{
+    dval_t *prev = *(dval_t **)o;
+    dval_t *res = dv_new_const_d(x);
+
+    if (prev)
+        dv_free(prev);
+    *(dval_t **)o = res;
+}
+
+static void dv_conj_elem(void *o, const void *a)
+{
+    dval_t *arg = *(dval_t *const *)a;
+    dval_t *prev = *(dval_t **)o;
+
+    if (prev)
+        dv_free(prev);
+    if (arg)
+        dv_retain(arg);
+    *(dval_t **)o = arg;
+}
+
+static void dv_to_qf(qfloat_t *o, const void *a)
+{
+    dval_t *dv = *(dval_t *const *)a;
+    *o = dv ? dv_get_val(dv) : QF_ZERO;
+}
+
+static void dv_abs_qf(qfloat_t *o, const void *a)
+{
+    dval_t *dv = *(dval_t *const *)a;
+    *o = dv ? qf_abs(dv_get_val(dv)) : QF_ZERO;
+}
+
+static void dv_from_qf(void *o, const qfloat_t *x)
+{
+    dval_t *prev = *(dval_t **)o;
+    dval_t *res = dv_new_const(*x);
+
+    if (prev)
+        dv_free(prev);
+    *(dval_t **)o = res;
+}
+
+static void dv_to_qc_fn(qcomplex_t *o, const void *a)
+{
+    dval_t *dv = *(dval_t *const *)a;
+    *o = qc_make(dv ? dv_get_val(dv) : QF_ZERO, QF_ZERO);
+}
+
+static void dv_from_qc_fn(void *o, const qcomplex_t *z)
+{
+    dval_t *prev = *(dval_t **)o;
+    dval_t *res = dv_new_const(z->re);
+
+    if (prev)
+        dv_free(prev);
+    *(dval_t **)o = res;
+}
+
+static void dv_scalar_exp(void *out, const void *a)
+{
+    dval_t *arg = *(dval_t *const *)a;
+    dval_t *prev = *(dval_t **)out;
+    dval_t *res = dv_exp(arg);
+
+    if (prev)
+        dv_free(prev);
+    *(dval_t **)out = res;
+}
+
+static void dv_scalar_log(void *out, const void *a)
+{
+    dval_t *arg = *(dval_t *const *)a;
+    dval_t *prev = *(dval_t **)out;
+    dval_t *res = dv_log(arg);
+
+    if (prev)
+        dv_free(prev);
+    *(dval_t **)out = res;
+}
+
+static void dv_scalar_sin(void *out, const void *a)
+{
+    dval_t *arg = *(dval_t *const *)a;
+    dval_t *prev = *(dval_t **)out;
+    dval_t *res = dv_sin(arg);
+
+    if (prev)
+        dv_free(prev);
+    *(dval_t **)out = res;
+}
+
+static void dv_scalar_cos(void *out, const void *a)
+{
+    dval_t *arg = *(dval_t *const *)a;
+    dval_t *prev = *(dval_t **)out;
+    dval_t *res = dv_cos(arg);
+
+    if (prev)
+        dv_free(prev);
+    *(dval_t **)out = res;
+}
+
+static void dv_scalar_tan(void *out, const void *a)
+{
+    dval_t *arg = *(dval_t *const *)a;
+    dval_t *prev = *(dval_t **)out;
+    dval_t *res = dv_tan(arg);
+
+    if (prev)
+        dv_free(prev);
+    *(dval_t **)out = res;
+}
+
+static void dv_scalar_sinh(void *out, const void *a)
+{
+    dval_t *arg = *(dval_t *const *)a;
+    dval_t *prev = *(dval_t **)out;
+    dval_t *res = dv_sinh(arg);
+
+    if (prev)
+        dv_free(prev);
+    *(dval_t **)out = res;
+}
+
+static void dv_scalar_cosh(void *out, const void *a)
+{
+    dval_t *arg = *(dval_t *const *)a;
+    dval_t *prev = *(dval_t **)out;
+    dval_t *res = dv_cosh(arg);
+
+    if (prev)
+        dv_free(prev);
+    *(dval_t **)out = res;
+}
+
+static void dv_scalar_tanh(void *out, const void *a)
+{
+    dval_t *arg = *(dval_t *const *)a;
+    dval_t *prev = *(dval_t **)out;
+    dval_t *res = dv_tanh(arg);
+
+    if (prev)
+        dv_free(prev);
+    *(dval_t **)out = res;
+}
+
+static void dv_scalar_sqrt(void *out, const void *a)
+{
+    dval_t *arg = *(dval_t *const *)a;
+    dval_t *prev = *(dval_t **)out;
+    dval_t *res = dv_sqrt(arg);
+
+    if (prev)
+        dv_free(prev);
+    *(dval_t **)out = res;
+}
+
+static void dv_scalar_asin(void *out, const void *a)
+{
+    dval_t *arg = *(dval_t *const *)a;
+    dval_t *prev = *(dval_t **)out;
+    dval_t *res = dv_asin(arg);
+
+    if (prev)
+        dv_free(prev);
+    *(dval_t **)out = res;
+}
+
+static void dv_scalar_acos(void *out, const void *a)
+{
+    dval_t *arg = *(dval_t *const *)a;
+    dval_t *prev = *(dval_t **)out;
+    dval_t *res = dv_acos(arg);
+
+    if (prev)
+        dv_free(prev);
+    *(dval_t **)out = res;
+}
+
+static void dv_scalar_atan(void *out, const void *a)
+{
+    dval_t *arg = *(dval_t *const *)a;
+    dval_t *prev = *(dval_t **)out;
+    dval_t *res = dv_atan(arg);
+
+    if (prev)
+        dv_free(prev);
+    *(dval_t **)out = res;
+}
+
+static void dv_scalar_asinh(void *out, const void *a)
+{
+    dval_t *arg = *(dval_t *const *)a;
+    dval_t *prev = *(dval_t **)out;
+    dval_t *res = dv_asinh(arg);
+
+    if (prev)
+        dv_free(prev);
+    *(dval_t **)out = res;
+}
+
+static void dv_scalar_acosh(void *out, const void *a)
+{
+    dval_t *arg = *(dval_t *const *)a;
+    dval_t *prev = *(dval_t **)out;
+    dval_t *res = dv_acosh(arg);
+
+    if (prev)
+        dv_free(prev);
+    *(dval_t **)out = res;
+}
+
+static void dv_scalar_atanh(void *out, const void *a)
+{
+    dval_t *arg = *(dval_t *const *)a;
+    dval_t *prev = *(dval_t **)out;
+    dval_t *res = dv_atanh(arg);
+
+    if (prev)
+        dv_free(prev);
+    *(dval_t **)out = res;
+}
+
+static void dv_scalar_erf(void *out, const void *a)
+{
+    dval_t *arg = *(dval_t *const *)a;
+    dval_t *prev = *(dval_t **)out;
+    dval_t *res = dv_erf(arg);
+
+    if (prev)
+        dv_free(prev);
+    *(dval_t **)out = res;
+}
+
+static void dv_scalar_erfc(void *out, const void *a)
+{
+    dval_t *arg = *(dval_t *const *)a;
+    dval_t *prev = *(dval_t **)out;
+    dval_t *res = dv_erfc(arg);
+
+    if (prev)
+        dv_free(prev);
+    *(dval_t **)out = res;
+}
+
+static void dv_scalar_erfinv(void *out, const void *a)
+{
+    dval_t *arg = *(dval_t *const *)a;
+    dval_t *prev = *(dval_t **)out;
+    dval_t *res = dv_erfinv(arg);
+
+    if (prev)
+        dv_free(prev);
+    *(dval_t **)out = res;
+}
+
+static void dv_scalar_erfcinv(void *out, const void *a)
+{
+    dval_t *arg = *(dval_t *const *)a;
+    dval_t *prev = *(dval_t **)out;
+    dval_t *res = dv_erfcinv(arg);
+
+    if (prev)
+        dv_free(prev);
+    *(dval_t **)out = res;
+}
+
+static void dv_scalar_gamma(void *out, const void *a)
+{
+    dval_t *arg = *(dval_t *const *)a;
+    dval_t *prev = *(dval_t **)out;
+    dval_t *res = dv_gamma(arg);
+
+    if (prev)
+        dv_free(prev);
+    *(dval_t **)out = res;
+}
+
+static void dv_scalar_lgamma(void *out, const void *a)
+{
+    dval_t *arg = *(dval_t *const *)a;
+    dval_t *prev = *(dval_t **)out;
+    dval_t *res = dv_lgamma(arg);
+
+    if (prev)
+        dv_free(prev);
+    *(dval_t **)out = res;
+}
+
+static void dv_scalar_digamma(void *out, const void *a)
+{
+    dval_t *arg = *(dval_t *const *)a;
+    dval_t *prev = *(dval_t **)out;
+    dval_t *res = dv_digamma(arg);
+
+    if (prev)
+        dv_free(prev);
+    *(dval_t **)out = res;
+}
+
+static void dv_scalar_trigamma(void *out, const void *a)
+{
+    dval_t *arg = *(dval_t *const *)a;
+    dval_t *prev = *(dval_t **)out;
+    dval_t *res = dv_trigamma(arg);
+
+    if (prev)
+        dv_free(prev);
+    *(dval_t **)out = res;
+}
+
+static void dv_scalar_normal_pdf(void *out, const void *a)
+{
+    dval_t *arg = *(dval_t *const *)a;
+    dval_t *prev = *(dval_t **)out;
+    dval_t *res = dv_normal_pdf(arg);
+
+    if (prev)
+        dv_free(prev);
+    *(dval_t **)out = res;
+}
+
+static void dv_scalar_normal_cdf(void *out, const void *a)
+{
+    dval_t *arg = *(dval_t *const *)a;
+    dval_t *prev = *(dval_t **)out;
+    dval_t *res = dv_normal_cdf(arg);
+
+    if (prev)
+        dv_free(prev);
+    *(dval_t **)out = res;
+}
+
+static void dv_scalar_normal_logpdf(void *out, const void *a)
+{
+    dval_t *arg = *(dval_t *const *)a;
+    dval_t *prev = *(dval_t **)out;
+    dval_t *res = dv_normal_logpdf(arg);
+
+    if (prev)
+        dv_free(prev);
+    *(dval_t **)out = res;
+}
+
+static void dv_scalar_lambert_w0(void *out, const void *a)
+{
+    dval_t *arg = *(dval_t *const *)a;
+    dval_t *prev = *(dval_t **)out;
+    dval_t *res = dv_lambert_w0(arg);
+
+    if (prev)
+        dv_free(prev);
+    *(dval_t **)out = res;
+}
+
+static void dv_scalar_lambert_wm1(void *out, const void *a)
+{
+    dval_t *arg = *(dval_t *const *)a;
+    dval_t *prev = *(dval_t **)out;
+    dval_t *res = dv_lambert_wm1(arg);
+
+    if (prev)
+        dv_free(prev);
+    *(dval_t **)out = res;
+}
+
+static void dv_scalar_ei(void *out, const void *a)
+{
+    dval_t *arg = *(dval_t *const *)a;
+    dval_t *prev = *(dval_t **)out;
+    dval_t *res = dv_ei(arg);
+
+    if (prev)
+        dv_free(prev);
+    *(dval_t **)out = res;
+}
+
+static void dv_scalar_e1(void *out, const void *a)
+{
+    dval_t *arg = *(dval_t *const *)a;
+    dval_t *prev = *(dval_t **)out;
+    dval_t *res = dv_e1(arg);
+
+    if (prev)
+        dv_free(prev);
+    *(dval_t **)out = res;
+}
+
+static const struct elem_fun_vtable dval_fun = {
+    .exp = dv_scalar_exp,
+    .sin = dv_scalar_sin,
+    .cos = dv_scalar_cos,
+    .tan = dv_scalar_tan,
+    .sinh = dv_scalar_sinh,
+    .cosh = dv_scalar_cosh,
+    .tanh = dv_scalar_tanh,
+    .sqrt = dv_scalar_sqrt,
+    .log = dv_scalar_log,
+    .asin = dv_scalar_asin,
+    .acos = dv_scalar_acos,
+    .atan = dv_scalar_atan,
+    .asinh = dv_scalar_asinh,
+    .acosh = dv_scalar_acosh,
+    .atanh = dv_scalar_atanh,
+    .erf = dv_scalar_erf,
+    .erfc = dv_scalar_erfc,
+    .erfinv = dv_scalar_erfinv,
+    .erfcinv = dv_scalar_erfcinv,
+    .gamma = dv_scalar_gamma,
+    .lgamma = dv_scalar_lgamma,
+    .digamma = dv_scalar_digamma,
+    .trigamma = dv_scalar_trigamma,
+    .tetragamma = NULL,
+    .gammainv = NULL,
+    .normal_pdf = dv_scalar_normal_pdf,
+    .normal_cdf = dv_scalar_normal_cdf,
+    .normal_logpdf = dv_scalar_normal_logpdf,
+    .lambert_w0 = dv_scalar_lambert_w0,
+    .lambert_wm1 = dv_scalar_lambert_wm1,
+    .productlog = NULL,
+    .ei = dv_scalar_ei,
+    .e1 = dv_scalar_e1
+};
+
+const struct elem_vtable dval_elem = {
+    .size            = sizeof(dval_t *),
+    .kind            = ELEM_DVAL,
+    .public_type     = MAT_TYPE_DVAL,
+    .add             = dv_add_wrap,
+    .sub             = dv_sub_wrap,
+    .mul             = dv_mul_wrap,
+    .inv             = dv_inv_wrap,
+    .abs2            = dv_abs2_wrap,
+    .to_real         = dv_to_real_wrap,
+    .from_real       = dv_from_real_wrap,
+    .conj_elem       = dv_conj_elem,
+    .to_qf           = dv_to_qf,
+    .abs_qf          = dv_abs_qf,
+    .from_qf         = dv_from_qf,
+    .to_qc           = dv_to_qc_fn,
+    .from_qc         = dv_from_qc_fn,
+    .zero            = &DV_ZERO,
+    .one             = &DV_ONE,
+    .cmp             = dval_cmp_wrap,
+    .print           = dv_print_wrap,
+    .relative_epsilon = Q_REL_EPS,
+    .fun             = &dval_fun
+};
+
 /* ============================================================
    Conversion helpers for mixed-type arithmetic
    ============================================================ */
@@ -1783,6 +2574,18 @@ static inline void id_qf(qfloat_t *out, const qfloat_t *a) {
 }
 
 static inline void id_qc(qcomplex_t *out, const qcomplex_t *a) {
+    *out = *a;
+}
+
+static inline void d_as_dv(dval_t **out, const double *a) {
+    *out = dv_new_const_d(*a);
+}
+
+static inline void qf_as_dv(dval_t **out, const qfloat_t *a) {
+    *out = dv_new_const(*a);
+}
+
+static inline void id_dv(dval_t **out, dval_t *const *a) {
     *out = *a;
 }
 
@@ -1940,6 +2743,135 @@ static void mul_qc_qf(void *out, const void *a, const void *b)
     *(qcomplex_t*)out = qc_mul(A, B);
 }
 
+/* ---- double <-> dval ---- */
+
+static void add_d_dv(void *out, const void *a, const void *b)
+{
+    dval_t *A, *B;
+    d_as_dv(&A, (const double *)a);
+    id_dv(&B, (dval_t *const *)b);
+    *(dval_t **)out = dv_add(A, B);
+    dv_free(A);
+}
+
+static void add_dv_d(void *out, const void *a, const void *b)
+{
+    dval_t *A, *B;
+    id_dv(&A, (dval_t *const *)a);
+    d_as_dv(&B, (const double *)b);
+    *(dval_t **)out = dv_add(A, B);
+    dv_free(B);
+}
+
+static void sub_d_dv(void *out, const void *a, const void *b)
+{
+    dval_t *A, *B;
+    d_as_dv(&A, (const double *)a);
+    id_dv(&B, (dval_t *const *)b);
+    *(dval_t **)out = dv_sub(A, B);
+    dv_free(A);
+}
+
+static void sub_dv_d(void *out, const void *a, const void *b)
+{
+    dval_t *A, *B;
+    id_dv(&A, (dval_t *const *)a);
+    d_as_dv(&B, (const double *)b);
+    *(dval_t **)out = dv_sub(A, B);
+    dv_free(B);
+}
+
+static void mul_d_dv(void *out, const void *a, const void *b)
+{
+    dval_t *A, *B;
+    d_as_dv(&A, (const double *)a);
+    id_dv(&B, (dval_t *const *)b);
+    *(dval_t **)out = dv_mul(A, B);
+    dv_free(A);
+}
+
+static void mul_dv_d(void *out, const void *a, const void *b)
+{
+    dval_t *A, *B;
+    id_dv(&A, (dval_t *const *)a);
+    d_as_dv(&B, (const double *)b);
+    *(dval_t **)out = dv_mul(A, B);
+    dv_free(B);
+}
+
+/* ---- qfloat <-> dval ---- */
+
+static void add_qf_dv(void *out, const void *a, const void *b)
+{
+    dval_t *A, *B;
+    qf_as_dv(&A, (const qfloat_t *)a);
+    id_dv(&B, (dval_t *const *)b);
+    *(dval_t **)out = dv_add(A, B);
+    dv_free(A);
+}
+
+static void add_dv_qf(void *out, const void *a, const void *b)
+{
+    dval_t *A, *B;
+    id_dv(&A, (dval_t *const *)a);
+    qf_as_dv(&B, (const qfloat_t *)b);
+    *(dval_t **)out = dv_add(A, B);
+    dv_free(B);
+}
+
+static void sub_qf_dv(void *out, const void *a, const void *b)
+{
+    dval_t *A, *B;
+    qf_as_dv(&A, (const qfloat_t *)a);
+    id_dv(&B, (dval_t *const *)b);
+    *(dval_t **)out = dv_sub(A, B);
+    dv_free(A);
+}
+
+static void sub_dv_qf(void *out, const void *a, const void *b)
+{
+    dval_t *A, *B;
+    id_dv(&A, (dval_t *const *)a);
+    qf_as_dv(&B, (const qfloat_t *)b);
+    *(dval_t **)out = dv_sub(A, B);
+    dv_free(B);
+}
+
+static void mul_qf_dv(void *out, const void *a, const void *b)
+{
+    dval_t *A, *B;
+    qf_as_dv(&A, (const qfloat_t *)a);
+    id_dv(&B, (dval_t *const *)b);
+    *(dval_t **)out = dv_mul(A, B);
+    dv_free(A);
+}
+
+static void mul_dv_qf(void *out, const void *a, const void *b)
+{
+    dval_t *A, *B;
+    id_dv(&A, (dval_t *const *)a);
+    qf_as_dv(&B, (const qfloat_t *)b);
+    *(dval_t **)out = dv_mul(A, B);
+    dv_free(B);
+}
+
+/* ---- dval <-> dval ---- */
+
+static void add_dv_dv(void *out, const void *a, const void *b)
+{
+    *(dval_t **)out = dv_add(*(dval_t *const *)a, *(dval_t *const *)b);
+}
+
+static void sub_dv_dv(void *out, const void *a, const void *b)
+{
+    *(dval_t **)out = dv_sub(*(dval_t *const *)a, *(dval_t *const *)b);
+}
+
+static void mul_dv_dv(void *out, const void *a, const void *b)
+{
+    *(dval_t **)out = dv_mul(*(dval_t *const *)a, *(dval_t *const *)b);
+}
+
 /* ============================================================
    Binary-operation 2D vtable (static)
    ============================================================ */
@@ -1974,6 +2906,13 @@ static const binop_vtable binops[ELEM_MAX][ELEM_MAX] = {
             .add = add_d_qc,
             .sub = sub_d_qc,
             .mul = mul_d_qc
+        },
+        /* double op dval -> dval */
+        [ELEM_DVAL] = {
+            .result_elem = &dval_elem,
+            .add = add_d_dv,
+            .sub = sub_d_dv,
+            .mul = mul_d_dv
         }
     },
 
@@ -1998,6 +2937,13 @@ static const binop_vtable binops[ELEM_MAX][ELEM_MAX] = {
             .add = add_qf_qc,
             .sub = sub_qf_qc,
             .mul = mul_qf_qc
+        },
+        /* qfloat op dval -> dval */
+        [ELEM_DVAL] = {
+            .result_elem = &dval_elem,
+            .add = add_qf_dv,
+            .sub = sub_qf_dv,
+            .mul = mul_qf_dv
         }
     },
 
@@ -2022,6 +2968,30 @@ static const binop_vtable binops[ELEM_MAX][ELEM_MAX] = {
             .add = qc_add_wrap,
             .sub = qc_sub_wrap,
             .mul = qc_mul_wrap
+        }
+    },
+
+    [ELEM_DVAL] = {
+        /* dval op double -> dval */
+        [ELEM_DOUBLE] = {
+            .result_elem = &dval_elem,
+            .add = add_dv_d,
+            .sub = sub_dv_d,
+            .mul = mul_dv_d
+        },
+        /* dval op qfloat -> dval */
+        [ELEM_QFLOAT] = {
+            .result_elem = &dval_elem,
+            .add = add_dv_qf,
+            .sub = sub_dv_qf,
+            .mul = mul_dv_qf
+        },
+        /* dval op dval -> dval */
+        [ELEM_DVAL] = {
+            .result_elem = &dval_elem,
+            .add = add_dv_dv,
+            .sub = sub_dv_dv,
+            .mul = mul_dv_dv
         }
     }
 };
@@ -2054,6 +3024,14 @@ struct matrix_t *mat_new_sparse_qc(size_t rows, size_t cols) {
     return mat_create_sparse_with_elem(rows, cols, &qcomplex_elem);
 }
 
+struct matrix_t *mat_new_dv(size_t rows, size_t cols) {
+    return mat_create_dense_with_elem(rows, cols, &dval_elem);
+}
+
+struct matrix_t *mat_new_sparse_dv(size_t rows, size_t cols) {
+    return mat_create_sparse_with_elem(rows, cols, &dval_elem);
+}
+
 struct matrix_t *matsq_new_d(size_t n)  {
     return mat_new_d(n, n);
 }
@@ -2066,6 +3044,10 @@ struct matrix_t *matsq_new_qc(size_t n) {
     return mat_new_qc(n, n);
 }
 
+struct matrix_t *matsq_new_dv(size_t n) {
+    return mat_new_dv(n, n);
+}
+
 struct matrix_t *mat_create_identity_d(size_t n) {
     return mat_create_identity_with_elem(n, &double_elem);
 }
@@ -2076,6 +3058,10 @@ struct matrix_t *mat_create_identity_qf(size_t n) {
 
 struct matrix_t *mat_create_identity_qc(size_t n) {
     return mat_create_identity_with_elem(n, &qcomplex_elem);
+}
+
+struct matrix_t *mat_create_identity_dv(size_t n) {
+    return mat_create_identity_with_elem(n, &dval_elem);
 }
 
 static matrix_t *mat_create_diagonal_from_array(size_t n,
@@ -2115,6 +3101,11 @@ matrix_t *mat_create_diagonal_qc(size_t n, const qcomplex_t *diagonal)
     return mat_create_diagonal_from_array(n, diagonal, &qcomplex_elem);
 }
 
+matrix_t *mat_create_diagonal_dv(size_t n, dval_t *const *diagonal)
+{
+    return mat_create_diagonal_from_array(n, diagonal, &dval_elem);
+}
+
 matrix_t *mat_create_d(size_t rows, size_t cols, const double *data)
 {
     matrix_t *A = mat_new_d(rows, cols);
@@ -2132,6 +3123,13 @@ matrix_t *mat_create_qf(size_t rows, size_t cols, const qfloat_t *data)
 matrix_t *mat_create_qc(size_t rows, size_t cols, const qcomplex_t *data)
 {
     matrix_t *A = mat_new_qc(rows, cols);
+    mat_set_data(A, data);
+    return A;
+}
+
+matrix_t *mat_create_dv(size_t rows, size_t cols, dval_t *const *data)
+{
+    matrix_t *A = mat_new_dv(rows, cols);
     mat_set_data(A, data);
     return A;
 }
@@ -2232,7 +3230,7 @@ matrix_t *mat_to_dense(const matrix_t *A)
 matrix_t *mat_to_sparse(const matrix_t *A)
 {
     matrix_t *S;
-    unsigned char raw[64];
+    unsigned char raw[64] = {0};
 
     if (!A)
         return NULL;
@@ -2245,7 +3243,7 @@ matrix_t *mat_to_sparse(const matrix_t *A)
     for (size_t i = 0; i < A->rows; i++)
         for (size_t j = 0; j < A->cols; j++) {
             mat_get(A, i, j, raw);
-            if (A->elem->cmp(raw, A->elem->zero) != 0)
+            if (!elem_is_structural_zero(A->elem, raw))
                 mat_set(S, i, j, raw);
         }
 
@@ -2267,9 +3265,9 @@ matrix_t *mat_scalar_mul_d(matrix_t *A, double s)
     matrix_t *R = mat_create_elementwise_unary_result(A->rows, A->cols, re, A);
     if (!R) return NULL;
 
-    unsigned char scalar_raw[64];
-    unsigned char a_raw[64];
-    unsigned char out_raw[64];
+    unsigned char scalar_raw[64] = {0};
+    unsigned char a_raw[64] = {0};
+    unsigned char out_raw[64] = {0};
 
     /* encode scalar as a double (left operand type) */
     memcpy(scalar_raw, &s, sizeof(double));
@@ -2279,6 +3277,7 @@ matrix_t *mat_scalar_mul_d(matrix_t *A, double s)
             mat_get(A, i, j, a_raw);
             op->mul(out_raw, scalar_raw, a_raw);
             mat_set(R, i, j, out_raw);
+            elem_destroy_value(re, out_raw);
         }
 
     return R;
@@ -2299,9 +3298,9 @@ matrix_t *mat_scalar_mul_qf(matrix_t *A, qfloat_t s)
     matrix_t *R = mat_create_elementwise_unary_result(A->rows, A->cols, re, A);
     if (!R) return NULL;
 
-    unsigned char scalar_raw[64];
-    unsigned char a_raw[64];
-    unsigned char out_raw[64];
+    unsigned char scalar_raw[64] = {0};
+    unsigned char a_raw[64] = {0};
+    unsigned char out_raw[64] = {0};
 
     /* encode scalar as a qfloat_t (left operand type) */
     memcpy(scalar_raw, &s, sizeof(qfloat_t));
@@ -2311,6 +3310,7 @@ matrix_t *mat_scalar_mul_qf(matrix_t *A, qfloat_t s)
             mat_get(A, i, j, a_raw);
             op->mul(out_raw, scalar_raw, a_raw);
             mat_set(R, i, j, out_raw);
+            elem_destroy_value(re, out_raw);
         }
 
     return R;
@@ -2331,9 +3331,9 @@ matrix_t *mat_scalar_mul_qc(matrix_t *A, qcomplex_t s)
     matrix_t *R = mat_create_elementwise_unary_result(A->rows, A->cols, re, A);
     if (!R) return NULL;
 
-    unsigned char scalar_raw[64];
-    unsigned char a_raw[64];
-    unsigned char out_raw[64];
+    unsigned char scalar_raw[64] = {0};
+    unsigned char a_raw[64] = {0};
+    unsigned char out_raw[64] = {0};
 
     /* encode scalar as a qcomplex_t (left operand type) */
     memcpy(scalar_raw, &s, sizeof(qcomplex_t));
@@ -2343,6 +3343,7 @@ matrix_t *mat_scalar_mul_qc(matrix_t *A, qcomplex_t s)
             mat_get(A, i, j, a_raw);
             op->mul(out_raw, scalar_raw, a_raw);
             mat_set(R, i, j, out_raw);
+            elem_destroy_value(re, out_raw);
         }
 
     return R;
@@ -2377,7 +3378,7 @@ static struct matrix_t *mat_add_or_sub_sparse(const struct matrix_t *A,
 {
     const struct elem_vtable *re = op->result_elem;
     struct matrix_t *C = mat_create_sparse_with_elem(A->rows, A->cols, re);
-    unsigned char a_raw[64], b_raw[64], out[64];
+    unsigned char a_raw[64] = {0}, b_raw[64] = {0}, out[64] = {0};
 
     if (!C)
         return NULL;
@@ -2390,7 +3391,9 @@ static struct matrix_t *mat_add_or_sub_sparse(const struct matrix_t *A,
                 op->sub(out, a_raw, b_raw);
             else
                 op->add(out, a_raw, b_raw);
+            elem_simplify_value(re, out);
             mat_set(C, i, j, out);
+            elem_destroy_value(re, out);
         }
 
     return C;
@@ -2402,7 +3405,8 @@ static struct matrix_t *mat_mul_sparse(const struct matrix_t *A,
 {
     const struct elem_vtable *re = op->result_elem;
     struct matrix_t *As = NULL, *Bs = NULL, *C = NULL;
-    unsigned char x_raw[64], y_raw[64], prod[64], sum[64];
+    unsigned char x_raw[64] = {0}, y_raw[64] = {0}, prod[64] = {0};
+    unsigned char sum[64] = {0}, sum_acc[64] = {0};
 
     if (!re)
         return NULL;
@@ -2436,10 +3440,14 @@ static struct matrix_t *mat_mul_sparse(const struct matrix_t *A,
             memcpy(x_raw, a_cur->value, As->elem->size);
             while (b_cur) {
                 mat_get(C, i, b_cur->col, sum);
+                elem_copy_value(re, sum_acc, sum);
                 memcpy(y_raw, b_cur->value, Bs->elem->size);
                 op->mul(prod, x_raw, y_raw);
-                re->add(sum, sum, prod);
-                mat_set(C, i, b_cur->col, sum);
+                re->add(sum_acc, sum_acc, prod);
+                elem_simplify_value(re, sum_acc);
+                mat_set(C, i, b_cur->col, sum_acc);
+                elem_destroy_value(re, sum_acc);
+                elem_destroy_value(re, prod);
                 b_cur = b_cur->next;
             }
 
@@ -2472,14 +3480,16 @@ struct matrix_t *mat_add(const struct matrix_t *A, const struct matrix_t *B) {
     struct matrix_t *C = mat_create_binary_result(A->rows, A->cols, re, A, B);
     if (!C) return NULL;
 
-    unsigned char a_raw[64], b_raw[64], out[64];
+    unsigned char a_raw[64] = {0}, b_raw[64] = {0}, out[64] = {0};
 
     for (size_t i = 0; i < A->rows; i++)
         for (size_t j = 0; j < A->cols; j++) {
             mat_get(A, i, j, a_raw);
             mat_get(B, i, j, b_raw);
             op->add(out, a_raw, b_raw);
+            elem_simplify_value(re, out);
             mat_set(C, i, j, out);
+            elem_destroy_value(re, out);
         }
 
     return C;
@@ -2503,14 +3513,16 @@ struct matrix_t *mat_sub(const struct matrix_t *A, const struct matrix_t *B) {
     struct matrix_t *C = mat_create_binary_result(A->rows, A->cols, re, A, B);
     if (!C) return NULL;
 
-    unsigned char a_raw[64], b_raw[64], out[64];
+    unsigned char a_raw[64] = {0}, b_raw[64] = {0}, out[64] = {0};
 
     for (size_t i = 0; i < A->rows; i++)
         for (size_t j = 0; j < A->cols; j++) {
             mat_get(A, i, j, a_raw);
             mat_get(B, i, j, b_raw);
             op->sub(out, a_raw, b_raw);
+            elem_simplify_value(re, out);
             mat_set(C, i, j, out);
+            elem_destroy_value(re, out);
         }
 
     return C;
@@ -2534,21 +3546,24 @@ struct matrix_t *mat_mul(const struct matrix_t *A, const struct matrix_t *B) {
     struct matrix_t *C = mat_create_binary_result(A->rows, B->cols, re, A, B);
     if (!C) return NULL;
 
-    unsigned char x_raw[64], y_raw[64], prod[64], sum[64];
+    unsigned char x_raw[64] = {0}, y_raw[64] = {0}, prod[64] = {0}, sum[64] = {0};
 
     for (size_t i = 0; i < A->rows; i++) {
         for (size_t j = 0; j < B->cols; j++) {
 
-            memcpy(sum, re->zero, re->size);
+            elem_copy_value(re, sum, re->zero);
 
             for (size_t k = 0; k < A->cols; k++) {
                 mat_get(A, i, k, x_raw);
                 mat_get(B, k, j, y_raw);
                 op->mul(prod, x_raw, y_raw);
                 re->add(sum, sum, prod);
+                elem_simplify_value(re, sum);
+                elem_destroy_value(re, prod);
             }
 
             mat_set(C, i, j, sum);
+            elem_destroy_value(re, sum);
         }
     }
 
@@ -2559,7 +3574,7 @@ matrix_t *mat_neg(const matrix_t *A)
 {
     const struct elem_vtable *e;
     matrix_t *R;
-    unsigned char a_raw[64], out_raw[64];
+    unsigned char a_raw[64] = {0}, out_raw[64] = {0};
 
     if (!A)
         return NULL;
@@ -2577,6 +3592,7 @@ matrix_t *mat_neg(const matrix_t *A)
             mat_get(A, i, j, a_raw);
             e->sub(out_raw, e->zero, a_raw);
             mat_set(R, i, j, out_raw);
+            elem_destroy_value(e, out_raw);
         }
 
     return R;
@@ -2586,7 +3602,7 @@ matrix_t *mat_copy_with_store(const matrix_t *A,
                               const struct store_vtable *store)
 {
     matrix_t *C;
-    unsigned char raw[64];
+    unsigned char raw[64] = {0};
 
     if (!A || !A->elem || !store)
         return NULL;
@@ -2622,7 +3638,7 @@ matrix_t *mat_convert_with_store(const matrix_t *A,
                                  const struct store_vtable *store)
 {
     matrix_t *C;
-    unsigned char src[64], dst[64];
+    unsigned char src[64] = {0}, dst[64] = {0};
 
     if (!A || !target || !store)
         return NULL;
@@ -2638,6 +3654,7 @@ matrix_t *mat_convert_with_store(const matrix_t *A,
             A->elem->to_qc(&z, src);
             target->from_qc(dst, &z);
             mat_set(C, i, j, dst);
+            elem_destroy_value(target, dst);
         }
 
     return C;
@@ -2900,13 +3917,14 @@ struct matrix_t *mat_conj(const struct matrix_t *A) {
     struct matrix_t *C = mat_create_elementwise_unary_result(A->rows, A->cols, e, A);
     if (!C) return NULL;
 
-    unsigned char v[64], cv[64];
+    unsigned char v[64] = {0}, cv[64] = {0};
 
     for (size_t i = 0; i < A->rows; i++)
         for (size_t j = 0; j < A->cols; j++) {
             mat_get(A, i, j, v);
             e->conj_elem(cv, v);
             mat_set(C, i, j, cv);
+            elem_destroy_value(e, cv);
         }
 
     return C;
@@ -2932,6 +3950,8 @@ int mat_det(const matrix_t *A, void *determinant)
 {
     if (!A || !determinant)
         return -1;
+    if (!elem_supports_numeric_algorithms(A->elem))
+        return -3;
 
     if (A->rows != A->cols)
         return -2;
@@ -3025,6 +4045,12 @@ matrix_t *mat_inverse(const matrix_t *A)
         return NULL;
 
     if (A->rows != A->cols)
+        return NULL;
+
+    if (A->elem && A->elem->kind == ELEM_DVAL)
+        return mat_inverse_dval_exact(A);
+
+    if (!elem_supports_numeric_algorithms(A->elem))
         return NULL;
 
     size_t n = A->rows;
@@ -3127,6 +4153,9 @@ matrix_t *mat_solve(const matrix_t *A, const matrix_t *B)
 
     if (!A || !B || A->rows != A->cols || A->rows != B->rows)
         return NULL;
+    if (!elem_supports_numeric_algorithms(A->elem) ||
+        !elem_supports_numeric_algorithms(B->elem))
+        return NULL;
 
     e = mat_binary_result_elem(A, B);
     if (!e)
@@ -3198,6 +4227,9 @@ matrix_t *mat_least_squares(const matrix_t *A, const matrix_t *B)
 
     if (!A || !B || A->rows != B->rows)
         return NULL;
+    if (!elem_supports_numeric_algorithms(A->elem) ||
+        !elem_supports_numeric_algorithms(B->elem))
+        return NULL;
 
     if (A->rows == A->cols)
         return mat_solve(A, B);
@@ -3256,6 +4288,8 @@ int mat_lu_factor(const matrix_t *A, mat_lu_factor_t *out)
 
     if (!A || !out)
         return -1;
+    if (!elem_supports_numeric_algorithms(A->elem))
+        return -3;
     if (A->rows != A->cols)
         return -2;
 
@@ -3351,6 +4385,8 @@ int mat_qr_factor(const matrix_t *A, mat_qr_factor_t *out)
 
     if (!A || !out)
         return -1;
+    if (!elem_supports_numeric_algorithms(A->elem))
+        return -3;
 
     m = A->rows;
     n = A->cols;
@@ -3452,6 +4488,8 @@ int mat_cholesky(const matrix_t *A, mat_cholesky_t *out)
 
     if (!A || !out)
         return -1;
+    if (!elem_supports_numeric_algorithms(A->elem))
+        return -3;
     if (A->rows != A->cols)
         return -2;
 
@@ -3575,6 +4613,8 @@ int mat_svd_factor(const matrix_t *A, mat_svd_factor_t *out)
 
     if (!A || !out)
         return -1;
+    if (!elem_supports_numeric_algorithms(A->elem))
+        return -3;
 
     m = A->rows;
     n = A->cols;
@@ -3833,6 +4873,8 @@ int mat_norm(const matrix_t *A, mat_norm_type_t type, qfloat_t *out)
 
     if (!A || !out)
         return -1;
+    if (!elem_supports_numeric_algorithms(A->elem))
+        return -2;
 
     fun = mat_norm_function_for(type);
     if (!fun)
@@ -3848,6 +4890,8 @@ int mat_condition_number(const matrix_t *A, mat_norm_type_t type, qfloat_t *out)
 
     if (!A || !out)
         return -1;
+    if (!elem_supports_numeric_algorithms(A->elem))
+        return -2;
 
     rank = mat_rank(A);
     if (rank < 0)
@@ -3929,6 +4973,8 @@ int mat_rank(const matrix_t *A)
 
     if (!A)
         return -1;
+    if (!elem_supports_numeric_algorithms(A->elem))
+        return -2;
 
     if (mat_svd_factor(A, &svd) != 0)
         return -2;
@@ -3970,6 +5016,8 @@ matrix_t *mat_pseudoinverse(const matrix_t *A)
     double sigma_max = 0.0, tol;
 
     if (!A)
+        return NULL;
+    if (!elem_supports_numeric_algorithms(A->elem))
         return NULL;
 
     if (mat_svd_factor(A, &svd) != 0)
@@ -4037,6 +5085,8 @@ matrix_t *mat_nullspace(const matrix_t *A)
     int rc;
 
     if (!A)
+        return NULL;
+    if (!elem_supports_numeric_algorithms(A->elem))
         return NULL;
 
     AH = mat_hermitian(A);
@@ -4688,6 +5738,7 @@ static int mat_eigendecompose_general(const matrix_t *A, void *eigenvalues,
 int mat_eigendecompose(const matrix_t *A, void *eigenvalues, matrix_t **eigenvectors)
 {
     if (!A) return -1;
+    if (!elem_supports_numeric_algorithms(A->elem)) return -3;
     if (A->rows != A->cols) return -2;
 
     if (mat_is_hermitian(A))
@@ -4708,6 +5759,310 @@ matrix_t *mat_eigenvectors(const matrix_t *A)
     return V;
 }
 
+static char *mat_dup_trimmed_token(const char *start, size_t len)
+{
+    while (len > 0 && (*start == ' ' || *start == '\t')) {
+        start++;
+        len--;
+    }
+    while (len > 0 && (start[len - 1] == ' ' || start[len - 1] == '\t'))
+        len--;
+
+    char *out = malloc(len + 1);
+    if (!out)
+        return NULL;
+    memcpy(out, start, len);
+    out[len] = '\0';
+    return out;
+}
+
+static int mat_binding_contains(char **bindings, size_t nb, const char *token)
+{
+    for (size_t i = 0; i < nb; ++i)
+        if (strcmp(bindings[i], token) == 0)
+            return 1;
+    return 0;
+}
+
+static void mat_append_binding(char ***bindings,
+                               size_t *nbindings,
+                               size_t *capbindings,
+                               char *token)
+{
+    if (!token || !*token) {
+        free(token);
+        return;
+    }
+
+    if (mat_binding_contains(*bindings, *nbindings, token)) {
+        free(token);
+        return;
+    }
+
+    if (*nbindings == *capbindings) {
+        size_t new_cap = *capbindings ? (*capbindings * 2) : 8;
+        char **grown = realloc(*bindings, new_cap * sizeof(**bindings));
+        if (!grown) {
+            free(token);
+            return;
+        }
+        *bindings = grown;
+        *capbindings = new_cap;
+    }
+
+    (*bindings)[(*nbindings)++] = token;
+}
+
+static void mat_collect_bindings(char ***var_bindings,
+                                 size_t *nvar_bindings,
+                                 size_t *capvar_bindings,
+                                 char ***const_bindings,
+                                 size_t *nconst_bindings,
+                                 size_t *capconst_bindings,
+                                 const char *binding_text)
+{
+    const char *p = binding_text;
+    int in_constants = 0;
+
+    while (p && *p) {
+        while (*p == ' ' || *p == '\t' || *p == ',')
+            p++;
+        if (*p == ';') {
+            in_constants = 1;
+            p++;
+            continue;
+        }
+        if (!*p)
+            break;
+
+        const char *start = p;
+        while (*p && *p != ',' && *p != ';')
+            p++;
+
+        char *token = mat_dup_trimmed_token(start, (size_t)(p - start));
+        if (in_constants)
+            mat_append_binding(const_bindings, nconst_bindings, capconst_bindings, token);
+        else
+            mat_append_binding(var_bindings, nvar_bindings, capvar_bindings, token);
+    }
+}
+
+static void mat_collect_dval_bindings(const dval_t *dv,
+                                      char ***var_bindings,
+                                      size_t *nvar_bindings,
+                                      size_t *capvar_bindings,
+                                      char ***const_bindings,
+                                      size_t *nconst_bindings,
+                                      size_t *capconst_bindings,
+                                      const char *binding_text)
+{
+    if (dv && dv_is_named_const(dv) &&
+        binding_text && *binding_text && !strchr(binding_text, ';')) {
+        mat_append_binding(const_bindings, nconst_bindings, capconst_bindings,
+                           strdup(binding_text));
+        return;
+    }
+
+    mat_collect_bindings(var_bindings, nvar_bindings, capvar_bindings,
+                         const_bindings, nconst_bindings, capconst_bindings,
+                         binding_text);
+}
+
+static char *mat_join_binding_list(char **bindings, size_t nbindings)
+{
+    size_t total = 1;
+
+    for (size_t i = 0; i < nbindings; ++i)
+        total += strlen(bindings[i]) + (i ? 2 : 0);
+
+    char *out = malloc(total);
+    if (!out)
+        return NULL;
+    out[0] = '\0';
+
+    for (size_t i = 0; i < nbindings; ++i) {
+        if (i)
+            strcat(out, ", ");
+        strcat(out, bindings[i]);
+    }
+
+    return out;
+}
+
+static int mat_split_binding_token(const char *binding, char **name_out, char **value_out)
+{
+    const char *eq;
+    char *name;
+    char *value;
+
+    *name_out = NULL;
+    *value_out = NULL;
+    if (!binding)
+        return -1;
+
+    eq = strstr(binding, "=");
+    if (!eq)
+        return -1;
+
+    name = strndup(binding, (size_t)(eq - binding));
+    value = strdup(eq + 1);
+    if (!name || !value) {
+        free(name);
+        free(value);
+        return -1;
+    }
+
+    while (*name == ' ' || *name == '\t')
+        memmove(name, name + 1, strlen(name));
+    while (*value == ' ' || *value == '\t')
+        memmove(value, value + 1, strlen(value));
+
+    for (size_t len = strlen(name); len > 0; --len) {
+        if (name[len - 1] == ' ' || name[len - 1] == '\t')
+            name[len - 1] = '\0';
+        else
+            break;
+    }
+    for (size_t len = strlen(value); len > 0; --len) {
+        if (value[len - 1] == ' ' || value[len - 1] == '\t')
+            value[len - 1] = '\0';
+        else
+            break;
+    }
+
+    *name_out = name;
+    *value_out = value;
+    return 0;
+}
+
+static int mat_has_long_binding(char **bindings, size_t nbindings, size_t threshold)
+{
+    for (size_t i = 0; i < nbindings; ++i) {
+        if (strlen(bindings[i]) > threshold)
+            return 1;
+    }
+    return 0;
+}
+
+static char *mat_join_bindings(char **var_bindings,
+                               size_t nvar_bindings,
+                               char **const_bindings,
+                               size_t nconst_bindings)
+{
+    if (nvar_bindings == 0) {
+        if (!mat_has_long_binding(const_bindings, nconst_bindings, 16))
+            return strdup("");
+        return mat_join_binding_list(const_bindings, nconst_bindings);
+    }
+
+    char *vars = mat_join_binding_list(var_bindings, nvar_bindings);
+    char *consts = mat_join_binding_list(const_bindings, nconst_bindings);
+    char *out;
+    size_t total;
+
+    if (!vars || !consts) {
+        free(vars);
+        free(consts);
+        return NULL;
+    }
+
+    total = strlen(vars) + strlen(consts) + 4;
+    out = malloc(total);
+    if (!out) {
+        free(vars);
+        free(consts);
+        return NULL;
+    }
+
+    out[0] = '\0';
+    if (*vars)
+        strcat(out, vars);
+    if (*consts) {
+        if (*vars)
+            strcat(out, "; ");
+        strcat(out, consts);
+    }
+
+    free(vars);
+    free(consts);
+    return out;
+}
+
+static int mat_split_dval_repr(const dval_t *dv, char **expr_out, char **bindings_out)
+{
+    char *tmp;
+    char *body;
+    char *sep;
+    size_t len;
+
+    *expr_out = NULL;
+    *bindings_out = NULL;
+
+    if (!dv) {
+        *expr_out = strdup("NULL");
+        *bindings_out = strdup("");
+        return *expr_out && *bindings_out ? 0 : -1;
+    }
+
+    tmp = dv_to_string(dv, style_EXPRESSION);
+    if (!tmp)
+        return -1;
+
+    body = tmp;
+    len = strlen(tmp);
+    if (len >= 4 && tmp[0] == '{' && tmp[1] == ' ' &&
+        tmp[len - 2] == ' ' && tmp[len - 1] == '}') {
+        body = tmp + 2;
+        tmp[len - 2] = '\0';
+    }
+
+    sep = strstr(body, " | ");
+    if (sep) {
+        *sep = '\0';
+        *expr_out = strdup(body);
+        *bindings_out = strdup(sep + 3);
+    } else {
+        *expr_out = strdup(body);
+        *bindings_out = strdup("");
+    }
+
+    free(tmp);
+    return *expr_out && *bindings_out ? 0 : -1;
+}
+
+static void mat_pretty_dval_expr(char **expr_io,
+                                 char **const_bindings,
+                                 size_t nconst_bindings)
+{
+    char *expr;
+
+    if (!expr_io || !*expr_io)
+        return;
+
+    expr = *expr_io;
+    for (size_t i = 0; i < nconst_bindings; ++i) {
+        char *name = NULL;
+        char *value = NULL;
+
+        if (mat_split_binding_token(const_bindings[i], &name, &value) != 0)
+            continue;
+
+        if (strlen(const_bindings[i]) > 16 && strcmp(expr, value) == 0) {
+            char *replacement = strdup(name);
+            if (replacement) {
+                free(*expr_io);
+                *expr_io = replacement;
+            }
+            free(name);
+            free(value);
+            return;
+        }
+
+        free(name);
+        free(value);
+    }
+}
+
 /* ============================================================
    Debug printing
    ============================================================ */
@@ -4719,8 +6074,79 @@ void mat_print(const struct matrix_t *A)
         return;
     }
 
-    char buf[128];
-    unsigned char v[64];
+    if (A->elem && A->elem->kind == ELEM_DVAL) {
+        size_t n = A->rows * A->cols;
+        char **exprs = calloc(n, sizeof(*exprs));
+        char **var_bindings = NULL;
+        char **const_bindings = NULL;
+        size_t *widths = calloc(A->cols ? A->cols : 1, sizeof(*widths));
+        size_t nvar_bindings = 0, capvar_bindings = 0;
+        size_t nconst_bindings = 0, capconst_bindings = 0;
+        int ok = exprs && widths;
+
+        for (size_t i = 0; ok && i < A->rows; ++i) {
+            for (size_t j = 0; j < A->cols; ++j) {
+                char *expr = NULL;
+                char *binding_text = NULL;
+                dval_t *dv = NULL;
+                size_t idx = i * A->cols + j;
+
+                mat_get(A, i, j, &dv);
+                if (mat_split_dval_repr(dv, &expr, &binding_text) != 0) {
+                    free(expr);
+                    free(binding_text);
+                    ok = 0;
+                    break;
+                }
+
+                exprs[idx] = expr;
+                mat_collect_dval_bindings(dv,
+                                          &var_bindings, &nvar_bindings, &capvar_bindings,
+                                          &const_bindings, &nconst_bindings, &capconst_bindings,
+                                          binding_text);
+                mat_pretty_dval_expr(&exprs[idx], const_bindings, nconst_bindings);
+                if (strlen(exprs[idx]) > widths[j])
+                    widths[j] = strlen(exprs[idx]);
+                free(binding_text);
+            }
+        }
+
+        if (!ok) {
+            printf("(dval matrix)\n");
+        } else {
+            char *joined = mat_join_bindings(var_bindings, nvar_bindings,
+                                             const_bindings, nconst_bindings);
+            printf("{ [\n");
+            for (size_t i = 0; i < A->rows; ++i) {
+                printf("    ");
+                for (size_t j = 0; j < A->cols; ++j) {
+                    size_t idx = i * A->cols + j;
+                    printf(" %*s", (int)widths[j], exprs[idx] ? exprs[idx] : "");
+                }
+                printf("\n");
+            }
+            if (joined && *joined)
+                printf("  ] | %s }\n", joined);
+            else
+                printf("  ] }\n");
+            free(joined);
+        }
+
+        for (size_t i = 0; i < n; ++i)
+            free(exprs[i]);
+        for (size_t i = 0; i < nvar_bindings; ++i)
+            free(var_bindings[i]);
+        for (size_t i = 0; i < nconst_bindings; ++i)
+            free(const_bindings[i]);
+        free(var_bindings);
+        free(const_bindings);
+        free(exprs);
+        free(widths);
+        return;
+    }
+
+    char buf[1024];
+    unsigned char v[64] = {0};
 
     for (size_t i = 0; i < A->rows; i++) {
         printf("[");
@@ -5448,11 +6874,11 @@ matrix_t *mat_fun_triangular(const matrix_t *T,
     size_t n = T->rows;
     const struct elem_vtable *e = T->elem;
 
-    unsigned char t_ii[64], t_jj[64], t_ij[64];
-    unsigned char f_ii[64], f_jj[64], f_ij[64];
-    unsigned char num[64], tmp[64], sum[64];
-    unsigned char t_ik[64], t_kj[64], f_ik[64], f_kj[64];
-    unsigned char denom[64], inv_denom[64];
+    unsigned char t_ii[64] = {0}, t_jj[64] = {0}, t_ij[64] = {0};
+    unsigned char f_ii[64] = {0}, f_jj[64] = {0}, f_ij[64] = {0};
+    unsigned char num[64] = {0}, tmp[64] = {0}, sum[64] = {0};
+    unsigned char t_ik[64] = {0}, t_kj[64] = {0}, f_ik[64] = {0}, f_kj[64] = {0};
+    unsigned char denom[64] = {0}, inv_denom[64] = {0};
 
     {
         int all_diag_equal = 1;

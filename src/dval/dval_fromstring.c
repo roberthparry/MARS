@@ -2,9 +2,10 @@
  *
  * Accepts strings in the format produced by dv_to_string(f, style_EXPRESSION):
  *
+ *   { expr }
  *   { expr | x₀ = val, ...; [name] = val, ... }
  *
- * or for a pure named constant:
+ * The parser also accepts a legacy pure named constant form:
  *
  *   { name = val }
  *
@@ -219,6 +220,7 @@ static void symtab_init(symtab_t *t)
 /* Returns 1 if name is already in the table, 0 otherwise. */
 static int symtab_has(const symtab_t *t, const char *name)
 {
+    if (!t) return 0;
     for (int i = 0; i < t->count; i++)
         if (strcmp(t->entries[i].name, name) == 0)
             return 1;
@@ -243,6 +245,7 @@ static void symtab_add(symtab_t *t, const char *name, dval_t *node)
 /* Returns a borrowed pointer (do not free). */
 static dval_t *symtab_lookup(const symtab_t *t, const char *name)
 {
+    if (!t) return NULL;
     for (int i = 0; i < t->count; i++)
         if (strcmp(t->entries[i].name, name) == 0)
             return t->entries[i].node;
@@ -985,12 +988,34 @@ dval_t *dval_from_string(const char *s)
 
     char errmsg[256] = { 0 };
 
-    /* ---- Pure constant: { name = val } ---- */
+    /* ---- No bindings: either { expr } or legacy { name = val } ---- */
     if (!pipe_pos) {
         const char *content_end = close_pos;
         while (content_end > s && isspace((unsigned char)content_end[-1]))
             content_end--;
-        dval_t *result = parse_pure_const(s, content_end, errmsg, sizeof(errmsg));
+
+        parser_t ps;
+        ps.p       = s;
+        ps.end     = content_end;
+        ps.syms    = NULL;
+        ps.error   = 0;
+        ps.errmsg[0] = '\0';
+
+        dval_t *result = parse_addexpr(&ps);
+        if (result && !ps.error) {
+            while (ps.p < content_end && isspace((unsigned char)*ps.p))
+                ps.p++;
+            if (ps.p == content_end)
+                return result;
+            dv_free(result);
+            result = NULL;
+        } else if (result) {
+            dv_free(result);
+            result = NULL;
+        }
+
+        errmsg[0] = '\0';
+        result = parse_pure_const(s, content_end, errmsg, sizeof(errmsg));
         if (!result)
             fprintf(stderr, "dval_from_string: %s\n", errmsg);
         return result;

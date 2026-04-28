@@ -94,7 +94,7 @@ static void test_to_string_basic_const_expr(void)
     dval_t *c = dv_new_const_d(3.5);
     char *got = dv_to_string(c, style_EXPRESSION);
 
-    const char *expect = "{ c = 3.5 }";
+    const char *expect = "{ 3.5 }";
 
     if (str_eq(got, expect))
         to_string_pass("basic const (EXPR)", got, expect);
@@ -238,7 +238,7 @@ static void test_to_string_nested_mul_add_expr(void)
     dval_t *f  = dv_add(xy, z);
 
     char *got = dv_to_string(f, style_EXPRESSION);
-    const char *expect = "{ xy + z | x = 2, y = 3, z = 4 }";
+    const char *expect = "{ z + xy | z = 4, x = 2, y = 3 }";
 
     if (str_eq(got, expect))
         to_string_pass("nested mul+add (EXPR)", got, expect);
@@ -263,11 +263,11 @@ static void test_to_string_nested_mul_add_func(void)
     dval_t *f  = dv_add(xy, z);
 
     char *got = dv_to_string(f, style_FUNCTION);
-    const char *expect = "x = 2\n"
+    const char *expect = "z = 4\n"
+                         "x = 2\n"
                          "y = 3\n"
-                         "z = 4\n"
-                         "expr(x,y,z) = x*y + z\n"
-                         "return expr(x,y,z)\n";
+                         "expr(z,x,y) = z + x*y\n"
+                         "return expr(z,x,y)\n";
 
     if (str_eq(got, expect))
         to_string_pass("nested mul+add (FUNC)", got, expect);
@@ -2032,14 +2032,14 @@ void test_expressions(void)
         {
             "x + y + π + τ + e",
             make_expr_45,
-            "{ x + y + π + τ + e | x = 1.25, y = 1.25; π = 3.141592653589793238462643383279505, τ = 6.283185307179586476925286766559011, e = 2.718281828459045235360287471352664 }",
+            "{ x + y + e + π + τ | x = 1.25, y = 1.25; e = 2.718281828459045235360287471352664, π = 3.141592653589793238462643383279505, τ = 6.283185307179586476925286766559011 }",
             "x = 1.25\n"
             "y = 1.25\n"
+            "e = 2.718281828459045235360287471352664\n"
             "π = 3.141592653589793238462643383279505\n"
             "τ = 6.283185307179586476925286766559011\n"
-            "e = 2.718281828459045235360287471352664\n"
-            "expr(x,y,π,τ,e) = x + y + π + τ + e\n"
-            "return expr(x,y,π,τ,e)",
+            "expr(x,y,e,π,τ) = x + y + e + π + τ\n"
+            "return expr(x,y,e,π,τ)",
             __LINE__
         },
 
@@ -2047,14 +2047,14 @@ void test_expressions(void)
         {
             "x*y + π*x + τ*y + e",
             make_expr_46,
-            "{ xy + πx + τy + e | x = 1.25, y = 1.25; π = 3.141592653589793238462643383279505, τ = 6.283185307179586476925286766559011, e = 2.718281828459045235360287471352664 }",
+            "{ e + πx + τy + xy | x = 1.25, y = 1.25; e = 2.718281828459045235360287471352664, π = 3.141592653589793238462643383279505, τ = 6.283185307179586476925286766559011 }",
             "x = 1.25\n"
             "y = 1.25\n"
+            "e = 2.718281828459045235360287471352664\n"
             "π = 3.141592653589793238462643383279505\n"
             "τ = 6.283185307179586476925286766559011\n"
-            "e = 2.718281828459045235360287471352664\n"
-            "expr(x,y,π,τ,e) = x*y + π*x + τ*y + e\n"
-            "return expr(x,y,π,τ,e)",
+            "expr(x,y,e,π,τ) = e + π*x + τ*y + x*y\n"
+            "return expr(x,y,e,π,τ)",
             __LINE__
         },
 
@@ -2561,12 +2561,12 @@ void test_expressions_unnamed(void)
         {
             "c₀*x₀ + c₁ (two named consts, unnamed var)",
             make_expr_c04,
-            "{ c₀x₀ + c₁ | x₀ = 1.25; c₀ = 3.141592653589793238462643383279505, c₁ = 2.718281828459045235360287471352664 }",
+            "{ c₁ + c₀x₀ | x₀ = 1.25; c₁ = 2.718281828459045235360287471352664, c₀ = 3.141592653589793238462643383279505 }",
             "x₀ = 1.25\n"
-            "c₀ = 3.141592653589793238462643383279505\n"
             "c₁ = 2.718281828459045235360287471352664\n"
-            "expr(x₀,c₀,c₁) = c₀*x₀ + c₁\n"
-            "return expr(x₀,c₀,c₁)",
+            "c₀ = 3.141592653589793238462643383279505\n"
+            "expr(x₀,c₁,c₀) = c₁ + c₀*x₀\n"
+            "return expr(x₀,c₁,c₀)",
             __LINE__
         },
     };
@@ -2912,4 +2912,4 @@ void check_parse_null(const char *label, const char *s, int line)
     }
 }
 
-/* ---- Pure-constant format: { name = val } ---- */
+/* ---- Legacy pure-constant parse format: { name = val } ---- */

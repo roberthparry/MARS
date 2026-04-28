@@ -21,6 +21,27 @@ now.
 - evaluation of derivatives for scalar outputs
 - elementary and special functions mirroring the `qfloat_t` API
 - expression parsing from and formatting to strings
+- integration as a symbolic matrix element type through `matrix_t`
+
+## Matrix Integration
+
+`dval_t *` can be used as a `matrix_t` element type via `MAT_TYPE_DVAL`. This
+lets you build symbolic matrices whose entries remain differentiable expression
+DAGs.
+
+Current matrix integration is strongest for:
+
+- symbolic matrix construction and pretty-printing
+- entrywise symbolic algebra through matrix add, subtract, and multiply
+- exact structured matrix functions
+- exact `1×1` and `2×2` symbolic inverse
+
+After a matrix operation, each output entry is still a `dval_t` expression, so
+you can differentiate individual matrix entries with the normal `dval` API.
+
+The full numerical matrix toolbox is still separate. General eigensolvers,
+factorisations, and Schur-based matrix functions remain numeric-only unless the
+`dval` input first falls into a supported exact structured case.
 
 ## Example: Constructing an Expression
 
@@ -414,6 +435,7 @@ All functions return owning handles.
 - `dval_t *dval_from_string(const char *s)` — construct a `dval_t` from a string in the format produced by `dv_to_string(..., style_EXPRESSION)`:
 
   ```
+  { expr }
   { expr | x₀ = val, ...; [name] = val, ... }
   ```
 

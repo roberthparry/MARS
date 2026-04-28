@@ -135,6 +135,105 @@ static void test_writing(void)
     }
 }
 
+static void test_dval_multiply(void)
+{
+    printf(C_CYAN "TEST: dval matrix multiply\n" C_RESET);
+
+    dval_t *x = dv_new_named_var_d(2.0, "x");
+    dval_t *y = dv_new_named_var_d(4.0, "y");
+    dval_t *one = dv_new_const_d(1.0);
+    dval_t *three = dv_new_const_d(3.0);
+
+    dval_t *avals[2] = {x, one};
+    dval_t *bvals[2] = {three, y};
+
+    matrix_t *A = mat_create_dv(1, 2, avals);
+    matrix_t *B = mat_create_dv(2, 1, bvals);
+    matrix_t *C = mat_mul(A, B);
+    dval_t *out = NULL;
+
+    check_bool("mat_create_dv(A) non-null", A != NULL);
+    check_bool("mat_create_dv(B) non-null", B != NULL);
+    check_bool("mat_mul(dval,dval) non-null", C != NULL);
+    check_bool("mat_mul(dval,dval) -> MAT_TYPE_DVAL",
+               C != NULL && mat_typeof(C) == MAT_TYPE_DVAL);
+
+    if (A)
+        print_mdv("A", A);
+    if (B)
+        print_mdv("B", B);
+    if (C)
+        print_mdv("A*B", C);
+
+    if (C) {
+        mat_get(C, 0, 0, &out);
+        check_d("C[0,0] = 3*x + y at x=2,y=4", dv_eval_d(out), 10.0, 1e-12);
+
+        dv_set_val_d(x, 5.0);
+        dv_set_val_d(y, 7.0);
+        check_d("C[0,0] tracks updated variables", dv_eval_d(out), 22.0, 1e-12);
+    }
+
+    mat_free(A);
+    mat_free(B);
+    mat_free(C);
+    dv_free(x);
+    dv_free(y);
+    dv_free(one);
+    dv_free(three);
+}
+
+static void test_dval_symbolic_printing(void)
+{
+    printf(C_CYAN "TEST: dval symbolic matrix printing\n" C_RESET);
+
+    dval_t *x = dv_new_named_var_d(0.0, "x");
+    dval_t *y = dv_new_named_var_d(1.0, "y");
+    dval_t *z = dv_new_named_var_d(2.0, "z");
+    dval_t *pi = dv_new_named_const(QF_PI, "@pi");
+    dval_t *tau = dv_new_named_const(QF_2PI, "@tau");
+    dval_t *alpha = dv_new_named_const_d(3.1415926535897932384626433, "@alpha");
+
+    dval_t *a00 = dv_mul(pi, dv_cos(y));
+    dval_t *a01 = DV_ONE;
+    dval_t *a10 = dv_tan(z);
+    dval_t *a11 = dv_exp(y);
+
+    dval_t *b00 = alpha;
+    dval_t *b01 = tau;
+    dval_t *b10 = x;
+    dval_t *b11 = dv_add(alpha, x);
+
+    dval_t *avals[4] = {a00, a01, a10, a11};
+    dval_t *bvals[4] = {b00, b01, b10, b11};
+
+    matrix_t *A = mat_create_dv(2, 2, avals);
+    matrix_t *B = mat_create_dv(2, 2, bvals);
+
+    check_bool("mat_create_dv(symbolic A) non-null", A != NULL);
+    check_bool("mat_create_dv(symbolic B) non-null", B != NULL);
+
+    if (A)
+        print_mdv("A", A);
+    if (B)
+        print_mdv("B", B);
+
+    mat_free(A);
+    mat_free(B);
+
+    dv_free(a00);
+    dv_free(a10);
+    dv_free(a11);
+    dv_free(a01);
+    dv_free(b11);
+    dv_free(x);
+    dv_free(y);
+    dv_free(z);
+    dv_free(pi);
+    dv_free(tau);
+    dv_free(alpha);
+}
+
 /* ------------------------------------------------------------------ 4. add/sub (double only) */
 
 static void test_add_sub(void)
@@ -2132,6 +2231,75 @@ static void test_inverse_qcomplex(void)
     mat_free(P);
 }
 
+static void test_inverse_dval(void)
+{
+    printf(C_CYAN "TEST: matrix inverse (dval)\n" C_RESET);
+
+    dval_t *x = dv_new_named_var_d(3.0, "x");
+    dval_t *y = dv_new_named_var_d(4.0, "y");
+    dval_t *one = dv_new_const_d(1.0);
+    dval_t *two = dv_new_const_d(2.0);
+    dval_t *vals[4] = {x, one, y, two};
+    matrix_t *A = mat_create_dv(2, 2, vals);
+    matrix_t *Ai = mat_inverse(A);
+    matrix_t *P = NULL;
+    dval_t *v = NULL;
+
+    print_mdv("A", A);
+    check_bool("inverse(dval 2x2) returned non-null", Ai != NULL);
+
+    if (Ai) {
+        print_mdv("A^{-1}", Ai);
+        P = mat_mul(A, Ai);
+        check_bool("A * A^{-1} (dval) non-null", P != NULL);
+        if (P) {
+            print_mdv("A * A^{-1}", P);
+
+            mat_get(P, 0, 0, &v);
+            check_d("dval prod[0,0] = 1", dv_eval_d(v), 1.0, 1e-12);
+            mat_get(P, 0, 1, &v);
+            check_d("dval prod[0,1] = 0", dv_eval_d(v), 0.0, 1e-12);
+            mat_get(P, 1, 0, &v);
+            check_d("dval prod[1,0] = 0", dv_eval_d(v), 0.0, 1e-12);
+            mat_get(P, 1, 1, &v);
+            check_d("dval prod[1,1] = 1", dv_eval_d(v), 1.0, 1e-12);
+
+            dv_set_val_d(x, 5.0);
+            dv_set_val_d(y, 6.0);
+            mat_get(P, 0, 0, &v);
+            check_d("dval inverse product tracks x,y on [0,0]", dv_eval_d(v), 1.0, 1e-12);
+            mat_get(P, 1, 1, &v);
+            check_d("dval inverse product tracks x,y on [1,1]", dv_eval_d(v), 1.0, 1e-12);
+        }
+    }
+
+    mat_free(P);
+    mat_free(Ai);
+    mat_free(A);
+    dv_free(x);
+    dv_free(y);
+    dv_free(one);
+    dv_free(two);
+
+    {
+        dval_t *one_s = dv_new_const_d(1.0);
+        dval_t *two_s = dv_new_const_d(2.0);
+        dval_t *four_s = dv_new_const_d(4.0);
+        dval_t *sing_vals[4] = {one_s, two_s, two_s, four_s};
+        matrix_t *S = mat_create_dv(2, 2, sing_vals);
+        matrix_t *Si = mat_inverse(S);
+
+        print_mdv("A (singular dval)", S);
+        check_bool("inverse(singular dval) = NULL", Si == NULL);
+
+        mat_free(Si);
+        mat_free(S);
+        dv_free(one_s);
+        dv_free(two_s);
+        dv_free(four_s);
+    }
+}
+
 /* ------------------------------------------------------------------ solve / least-squares */
 
 static void test_solve_and_lstsq(void)
@@ -3053,6 +3221,8 @@ void run_matrix_core_tests(void)
     RUN_TEST(test_creation, NULL);
     RUN_TEST(test_reading, NULL);
     RUN_TEST(test_writing, NULL);
+    RUN_TEST(test_dval_multiply, NULL);
+    RUN_TEST(test_dval_symbolic_printing, NULL);
     RUN_TEST(test_add_sub, NULL);
     RUN_TEST(test_multiply, NULL);
     RUN_TEST(test_transpose_conjugate, NULL);
@@ -3093,6 +3263,7 @@ void run_matrix_core_tests(void)
     RUN_TEST(test_inverse_double, NULL);
     RUN_TEST(test_inverse_qfloat, NULL);
     RUN_TEST(test_inverse_qcomplex, NULL);
+    RUN_TEST(test_inverse_dval, NULL);
     RUN_TEST(test_solve_and_lstsq, NULL);
     RUN_TEST(test_factorisations, NULL);
     RUN_TEST(test_rank_pinv_nullspace, NULL);

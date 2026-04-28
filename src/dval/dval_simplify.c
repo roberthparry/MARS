@@ -246,6 +246,102 @@ static dval_t *make_scaled(qfloat_t coeff, dval_t *base)
 
 typedef struct { dval_t *base; qfloat_t coeff; } addend_t;
 
+static int addend_group(const dval_t *dv);
+static const char *addend_sort_name(const dval_t *dv);
+
+static void combine_common_denominator_addends(addend_t *terms, size_t n)
+{
+    for (size_t i = 0; i < n; ++i) {
+        dval_t *ibase = terms[i].base;
+        dval_t *sum_num = NULL;
+        dval_t *simp_num = NULL;
+        dval_t *combined = NULL;
+        int merged_any = 0;
+
+        if (!ibase || ibase->ops != &ops_div)
+            continue;
+
+        for (size_t j = i + 1; j < n; ++j) {
+            dval_t *jbase = terms[j].base;
+            dval_t *i_num_term;
+            dval_t *j_num_term;
+            dval_t *tmp;
+
+            if (!jbase || jbase->ops != &ops_div)
+                continue;
+            if (!dv_struct_eq(ibase->b, jbase->b))
+                continue;
+
+            if (!merged_any) {
+                dv_retain(ibase->a);
+                sum_num = make_scaled(terms[i].coeff, ibase->a);
+                terms[i].coeff = QF_ONE;
+                merged_any = 1;
+            }
+
+            dv_retain(jbase->a);
+            j_num_term = make_scaled(terms[j].coeff, jbase->a);
+            i_num_term = sum_num;
+            tmp = dv_add(i_num_term, j_num_term);
+            dv_free(i_num_term);
+            dv_free(j_num_term);
+            sum_num = dv_simplify(tmp);
+            dv_free(tmp);
+
+            dv_free(jbase);
+            terms[j].base = NULL;
+            terms[j].coeff = QF_ZERO;
+        }
+
+        if (!merged_any)
+            continue;
+
+        dv_retain(ibase->b);
+        simp_num = dv_simplify(sum_num);
+        dv_free(sum_num);
+        combined = dv_div(simp_num, ibase->b);
+        dv_free(simp_num);
+        dv_free(ibase->b);
+        combined = dv_simplify(combined);
+        dv_free(ibase);
+        terms[i].base = combined;
+        terms[i].coeff = QF_ONE;
+    }
+}
+
+static int compare_addends(const addend_t *lhs, const addend_t *rhs)
+{
+    int lg, rg;
+
+    if (!lhs->base && !rhs->base)
+        return 0;
+    if (!lhs->base)
+        return 1;
+    if (!rhs->base)
+        return -1;
+
+    lg = addend_group(lhs->base);
+    rg = addend_group(rhs->base);
+    if (lg != rg)
+        return lg - rg;
+
+    return strcmp(addend_sort_name(lhs->base), addend_sort_name(rhs->base));
+}
+
+static void sort_addends(addend_t *terms, size_t n)
+{
+    for (size_t i = 1; i < n; ++i) {
+        addend_t key = terms[i];
+        size_t j = i;
+
+        while (j > 0 && compare_addends(&terms[j - 1], &key) > 0) {
+            terms[j] = terms[j - 1];
+            --j;
+        }
+        terms[j] = key;
+    }
+}
+
 static void collect_addends(
     dval_t *dv, qfloat_t scale,
     qfloat_t *c_const,
@@ -838,6 +934,9 @@ dval_t *dv_simplify_add_sub_operator(const dval_t *dv, dval_t *a, dval_t *b)
     collect_addends(b, (dv->ops == &ops_sub) ? qf_from_double(-1.0) : qf_from_double(1.0), &c_const, &terms, &n, &cap);
     dv_free(b);
 
+    combine_common_denominator_addends(terms, n);
+    sort_addends(terms, n);
+
     /* find the leading non-cancelled symbolic term */
     int leading_neg = 0;
     for (size_t i = 0; i < n; ++i) {
@@ -963,6 +1062,11 @@ dval_t *dv_simplify_div_operator(const dval_t *dv, dval_t *a, dval_t *b)
     (void)dv;
 
     if (b->ops == &ops_const && is_qf_one(b->c)) { dv_free(b); return a; }
+    if (dv_struct_eq(a, b)) {
+        dv_free(a);
+        dv_free(b);
+        return dv_new_const_d(1.0);
+    }
     if (a->ops == &ops_const && is_qf_zero(a->c)) {
         dv_free(a); dv_free(b); return dv_new_const_d(0.0);
     }

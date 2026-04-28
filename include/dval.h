@@ -1,6 +1,7 @@
 #ifndef DVAL_H
 #define DVAL_H
 
+#include <stdbool.h>
 #include <stddef.h>
 #include "qfloat.h"
 
@@ -26,6 +27,14 @@
  */
 
 typedef struct _dval_t dval_t;
+
+/**
+ * @brief Canonical differentiable constants for zero and one.
+ *
+ * These are process-lifetime singleton constant nodes.
+ */
+extern dval_t *DV_ZERO;
+extern dval_t *DV_ONE;
 
 /* ------------------------------------------------------------------------- */
 /* Constructors — constants                                                  */
@@ -293,6 +302,14 @@ dval_t *dv_e1(dval_t *dv);
 /* ------------------------------------------------------------------------- */
 
 /**
+ * @brief Increment the reference count of an existing handle.
+ *
+ * This is mainly useful for container or cache layers that need to keep an
+ * additional owning reference to a node returned elsewhere.
+ */
+void dv_retain(dval_t *dv);
+
+/**
  * @brief Decrement the reference count and free if it reaches zero.
  *
  * Must be called exactly once for every owning handle returned by:
@@ -301,6 +318,35 @@ dval_t *dv_e1(dval_t *dv);
  *   - dv_add, dv_mul, dv_sin, etc.
  */
 void dv_free(dval_t *dv);
+
+/**
+ * @brief Return true when @p dv is exactly the unnamed constant zero.
+ */
+bool dv_is_exact_zero(const dval_t *dv);
+
+/**
+ * @brief Return true when @p dv is a named constant node.
+ */
+bool dv_is_named_const(const dval_t *dv);
+
+/**
+ * @brief Return a simplified owning handle for @p dv.
+ *
+ * The input handle is not consumed. The caller owns the returned handle and
+ * must call dv_free() on it.
+ */
+dval_t *dv_simplify(dval_t *dv);
+
+/**
+ * @brief Deep-copy @p expr while replacing every occurrence of @p needle
+ * with @p replacement.
+ *
+ * The returned expression is newly allocated and owned by the caller.
+ * Returns NULL on allocation or reconstruction failure.
+ */
+dval_t *dv_substitute(const dval_t *expr,
+                      const dval_t *needle,
+                      dval_t *replacement);
 
 
 /* ------------------------------------------------------------------------- */
@@ -311,6 +357,7 @@ void dv_free(dval_t *dv);
  * @brief Output style for dv_to_string().
  *
  * style_EXPRESSION  — infix notation, e.g. "{ sin(x₀) | x₀ = 1.0 }"
+ *                     or "{ 1 }" when no bindings are needed
  * style_FUNCTION    — prefix/function notation, e.g. "sin(var(x₀=1.0))"
  */
 typedef enum {
@@ -345,9 +392,10 @@ void dv_print(const dval_t *dv);
  *
  * Accepts strings in the format produced by dv_to_string(f, style_EXPRESSION):
  *
+ *   { expr }
  *   { expr | x₀ = val, ...; [name] = val, ... }
  *
- * or for a pure named constant:
+ * The parser also accepts a legacy pure named constant form:
  *
  *   { name = val }
  *

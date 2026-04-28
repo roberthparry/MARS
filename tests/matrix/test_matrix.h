@@ -24,6 +24,7 @@ void print_qf(const char *label, qfloat_t x);
 void print_md(const char *label, matrix_t *A);
 void print_mqf(const char *label, matrix_t *A);
 void print_mqc(const char *label, matrix_t *A);
+void print_mdv(const char *label, matrix_t *A);
 
 void check_d(const char *label, double got, double expected, double tol);
 void check_qf_val(const char *label, qfloat_t got, qfloat_t expected, double tol);

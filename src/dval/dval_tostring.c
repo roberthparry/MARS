@@ -3,8 +3,10 @@
  * Produces human-readable and round-trip-safe string representations of a
  * dval_t DAG via dv_to_string(dv, style).  Two styles are supported:
  *
- *   style_EXPRESSION  — infix notation with variable bindings, e.g.
+ *   style_EXPRESSION  — infix notation, e.g.
  *                         { sin(x₀) * cos(x₁) | x₀ = 1.0, x₁ = 0.5 }
+ *                       or, when no bindings are needed:
+ *                         { 1 }
  *                       This format is accepted by dval_from_string().
  *
  *   style_FUNCTION    — nested prefix notation, e.g.
@@ -14,7 +16,7 @@
  * Responsibilities of this file:
  *   • Operator precedence and parenthesisation (infix only)
  *   • Unicode superscript encoding for integer powers (², ³, …)
- *   • The { expr | bindings } wrapper for expression style
+ *   • The { expr } / { expr | bindings } wrapper for expression style
  *
  * All algebraic simplification (flattening, factoring, ordering, etc.)
  * is done in dv_simplify.c before this file is reached.
@@ -1197,28 +1199,6 @@ static char *dv_to_string_expr(const dval_t *f)
 
     dval_t *g = dv_simplify((dval_t *)f);
 
-    if (g->ops == &ops_const) {
-        sbuf_putc(&b, '{');
-        sbuf_putc(&b, ' ');
-
-        emit_name(&b, (g->name && *g->name) ? g->name : "c");
-
-        sbuf_puts(&b, " = ");
-
-        char valbuf[64];
-        qf_to_string_simple(g->c, valbuf, sizeof(valbuf));
-        sbuf_puts(&b, valbuf);
-
-        sbuf_putc(&b, ' ');
-        sbuf_putc(&b, '}');
-
-        char *out = xstrdup(b.data);
-        sbuf_free(&b);
-        autoname_restore(&vnames);
-        dv_free(g);
-        return out;
-    }
-
     sbuf_putc(&b, '{');
     sbuf_putc(&b, ' ');
     emit_expr(g, &b, PREC_LOWEST);
@@ -1232,41 +1212,43 @@ static char *dv_to_string_expr(const dval_t *f)
     varlist_init(&cl);
     find_named_consts_dfs(g, &cl);
 
-    sbuf_putc(&b, '|');
-    sbuf_putc(&b, ' ');
+    if (vl.count > 0 || cl.count > 0) {
+        sbuf_putc(&b, '|');
+        sbuf_putc(&b, ' ');
 
-    for (size_t i = 0; i < vl.count; ++i) {
-        dval_t *v = vl.vars[i];
-        const char *vname = (v->name && *v->name) ? v->name : "x";
+        for (size_t i = 0; i < vl.count; ++i) {
+            dval_t *v = vl.vars[i];
+            const char *vname = (v->name && *v->name) ? v->name : "x";
 
-        char valbuf[64];
-        qf_to_string_simple(v->c, valbuf, sizeof(valbuf));
-
-        emit_name(&b, vname);
-        sbuf_puts(&b, " = ");
-        sbuf_puts(&b, valbuf);
-
-        if (i + 1 < vl.count)
-            sbuf_puts(&b, ", ");
-    }
-
-    /* named constants after ';' (or directly if no variables) */
-    if (cl.count > 0) {
-        if (vl.count > 0)
-            sbuf_puts(&b, "; ");
-        for (size_t i = 0; i < cl.count; ++i) {
-            dval_t *c = cl.vars[i];
             char valbuf[64];
-            qf_to_string_simple(c->c, valbuf, sizeof(valbuf));
-            emit_name(&b, c->name);
+            qf_to_string_simple(v->c, valbuf, sizeof(valbuf));
+
+            emit_name(&b, vname);
             sbuf_puts(&b, " = ");
             sbuf_puts(&b, valbuf);
-            if (i + 1 < cl.count)
+
+            if (i + 1 < vl.count)
                 sbuf_puts(&b, ", ");
         }
-    }
 
-    sbuf_putc(&b, ' ');
+        /* named constants after ';' (or directly if no variables) */
+        if (cl.count > 0) {
+            if (vl.count > 0)
+                sbuf_puts(&b, "; ");
+            for (size_t i = 0; i < cl.count; ++i) {
+                dval_t *c = cl.vars[i];
+                char valbuf[64];
+                qf_to_string_simple(c->c, valbuf, sizeof(valbuf));
+                emit_name(&b, c->name);
+                sbuf_puts(&b, " = ");
+                sbuf_puts(&b, valbuf);
+                if (i + 1 < cl.count)
+                    sbuf_puts(&b, ", ");
+            }
+        }
+
+        sbuf_putc(&b, ' ');
+    }
     sbuf_putc(&b, '}');
 
     char *out = xstrdup(b.data);

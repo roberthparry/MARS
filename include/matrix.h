@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include "dval.h"
 #include "qfloat.h"
 #include "qcomplex.h"
 
@@ -34,7 +35,8 @@ typedef struct matrix_t matrix_t;
 typedef enum {
     MAT_TYPE_DOUBLE,
     MAT_TYPE_QFLOAT,
-    MAT_TYPE_QCOMPLEX
+    MAT_TYPE_QCOMPLEX,
+    MAT_TYPE_DVAL
 } mat_type_t;
 
 /**
@@ -143,6 +145,15 @@ matrix_t *mat_new_qc(size_t rows, size_t cols);
 matrix_t *mat_new_sparse_qc(size_t rows, size_t cols);
 
 /**
+ * @brief Allocate a new (incomplete) matrix of dval_t* handles.
+ *
+ * Each stored handle is retained by the matrix. Callers remain responsible
+ * for their own references after passing a value to mat_set() or mat_create_dv().
+ */
+matrix_t *mat_new_dv(size_t rows, size_t cols);
+matrix_t *mat_new_sparse_dv(size_t rows, size_t cols);
+
+/**
  * @brief Allocate a new (incomplete) square matrix of doubles.
  */
 matrix_t *matsq_new_d(size_t n);
@@ -158,6 +169,11 @@ matrix_t *matsq_new_qf(size_t n);
 matrix_t *matsq_new_qc(size_t n);
 
 /**
+ * @brief Allocate a new (incomplete) square matrix of dval_t* handles.
+ */
+matrix_t *matsq_new_dv(size_t n);
+
+/**
  * @brief Create a complete identity matrix of doubles.
  */
 matrix_t *mat_create_identity_d(size_t n);
@@ -171,6 +187,11 @@ matrix_t *mat_create_identity_qf(size_t n);
  * @brief Create a complete identity matrix of qcomplex_t.
  */
 matrix_t *mat_create_identity_qc(size_t n);
+
+/**
+ * @brief Create a complete identity matrix of dval_t* handles.
+ */
+matrix_t *mat_create_identity_dv(size_t n);
 
 /**
  * @brief Create a diagonal matrix of doubles from its diagonal entries.
@@ -195,6 +216,11 @@ matrix_t *mat_create_diagonal_qf(size_t n, const qfloat_t *diagonal);
 matrix_t *mat_create_diagonal_qc(size_t n, const qcomplex_t *diagonal);
 
 /**
+ * @brief Create a diagonal matrix of dval_t* handles from its diagonal entries.
+ */
+matrix_t *mat_create_diagonal_dv(size_t n, dval_t *const *diagonal);
+
+/**
  * @brief Create a complete matrix of doubles from a flat array.
  *
  * @param rows       Number of rows.
@@ -213,6 +239,13 @@ matrix_t *mat_create_qf(size_t rows, size_t cols, const qfloat_t *data);
  */
 matrix_t *mat_create_qc(size_t rows, size_t cols, const qcomplex_t *data);
 
+/**
+ * @brief Create a complete matrix of dval_t* handles from a flat array.
+ *
+ * Each handle is retained by the created matrix.
+ */
+matrix_t *mat_create_dv(size_t rows, size_t cols, dval_t *const *data);
+
 /* -------------------------------------------------------------------------
    Destruction
    ------------------------------------------------------------------------- */
@@ -223,7 +256,21 @@ void mat_free(matrix_t *A);
    Element access
    ------------------------------------------------------------------------- */
 
+/**
+ * @brief Read one matrix element into @p out.
+ *
+ * For dval matrices, the returned dval_t* handle is borrowed from the matrix.
+ * Do not call dv_free() on it unless you first create or retain your own
+ * owning reference by other means.
+ */
 void mat_get(const matrix_t *A, size_t i, size_t j, void *out);
+
+/**
+ * @brief Store one matrix element from @p val.
+ *
+ * For dval matrices, the matrix retains the incoming dval_t* handle. The caller
+ * still owns any reference it already held.
+ */
 void mat_set(matrix_t *A, size_t i, size_t j, const void *val);
 
 size_t mat_get_row_count(const matrix_t *A);
@@ -303,7 +350,7 @@ mat_type_t mat_typeof(const matrix_t *A);
  * @brief Set all matrix elements from a flat row‑major buffer.
  *
  * The buffer must contain rows*cols elements of the matrix's element type
- * (double, qfloat_t, or qcomplex_t depending on A).
+ * (double, qfloat_t, qcomplex_t, or dval_t* depending on A).
  *
  * @param A     The matrix to modify.
  * @param data  Pointer to a flat row‑major array of elements.
@@ -314,7 +361,8 @@ void mat_set_data(matrix_t *A, const void *data);
  * @brief Get all matrix elements into a flat row‑major buffer.
  *
  * The buffer must have space for rows*cols elements of the matrix's
- * element type (double, qfloat_t, or qcomplex_t depending on A).
+ * element type (double, qfloat_t, qcomplex_t, or dval_t* depending on A).
+ * For dval matrices, the copied handles are borrowed from the matrix.
  *
  * @param A     The matrix to read from.
  * @param data  Pointer to a flat row‑major array to receive the elements.

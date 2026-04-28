@@ -27,6 +27,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <strings.h>
+#include <limits.h>
 #include "qfloat.h"
 #include "dval_internal.h"
 #include "dval.h"
@@ -36,6 +37,37 @@
  * dv_get_deriv / dv_create_deriv). This is differentiation context only,
  * not a general thread-safety mechanism for the DAG. */
 static __thread dval_t *tl_wrt = NULL;
+
+static struct _dval_t _DV_ZERO_NODE = {
+    .ops = &ops_const,
+    .a = NULL,
+    .b = NULL,
+    .c = { 0.0, 0.0 },
+    .x = { 0.0, 0.0 },
+    .x_valid = 1,
+    .epoch = 0,
+    .dx_cache = NULL,
+    .name = NULL,
+    .refcount = INT_MAX,
+    .var_id = 0
+};
+
+static struct _dval_t _DV_ONE_NODE = {
+    .ops = &ops_const,
+    .a = NULL,
+    .b = NULL,
+    .c = { 1.0, 0.0 },
+    .x = { 1.0, 0.0 },
+    .x_valid = 1,
+    .epoch = 0,
+    .dx_cache = NULL,
+    .name = NULL,
+    .refcount = INT_MAX,
+    .var_id = 0
+};
+
+dval_t *DV_ZERO = &_DV_ZERO_NODE;
+dval_t *DV_ONE = &_DV_ONE_NODE;
 
 /* ------------------------------------------------------------------------- */
 /* Name handling                                                             */
@@ -140,13 +172,15 @@ static uint64_t next_var_id = 1;
 
 static inline void refcount_inc(int *rc)
 {
-    (*rc)++;
+    if (*rc < INT_MAX)
+        (*rc)++;
 }
 
 static inline int refcount_dec(int *rc)
 {
     int prev = *rc;
-    (*rc)--;
+    if (*rc < INT_MAX)
+        (*rc)--;
     return prev;
 }
 
@@ -155,9 +189,83 @@ static uint64_t alloc_var_id(void)
     return next_var_id++;
 }
 
+bool dv_is_exact_zero(const dval_t *dv)
+{
+    return dv && dv->ops == &ops_const && !dv->name && qf_eq(dv->c, QF_ZERO);
+}
+
+bool dv_is_named_const(const dval_t *dv)
+{
+    return dv && dv->ops == &ops_const && dv->name && *dv->name;
+}
+
+dval_t *dv_substitute(const dval_t *expr,
+                      const dval_t *needle,
+                      dval_t *replacement)
+{
+    dval_t *left;
+    dval_t *right;
+    dval_t *out;
+
+    if (!expr)
+        return NULL;
+
+    if (expr == needle) {
+        dv_retain(replacement);
+        return replacement;
+    }
+
+    if (expr->ops == &ops_const) {
+        if (expr->name && *expr->name)
+            return dv_new_named_const(expr->c, expr->name);
+        return dv_new_const(expr->c);
+    }
+
+    if (expr->ops == &ops_var) {
+        if (expr->name && *expr->name)
+            return dv_new_named_var(expr->c, expr->name);
+        return dv_new_var(expr->c);
+    }
+
+    if (expr->ops == &ops_pow_d) {
+        left = dv_substitute(expr->a, needle, replacement);
+        if (!left)
+            return NULL;
+        out = dv_pow_qf(left, expr->c);
+        dv_free(left);
+        return out;
+    }
+
+    if (expr->ops->arity == DV_OP_UNARY && expr->ops->apply_unary) {
+        left = dv_substitute(expr->a, needle, replacement);
+        if (!left)
+            return NULL;
+        out = expr->ops->apply_unary(left);
+        dv_free(left);
+        return out;
+    }
+
+    if (expr->ops->arity == DV_OP_BINARY && expr->ops->apply_binary) {
+        left = dv_substitute(expr->a, needle, replacement);
+        right = dv_substitute(expr->b, needle, replacement);
+        if (!left || !right) {
+            dv_free(left);
+            dv_free(right);
+            return NULL;
+        }
+        out = expr->ops->apply_binary(left, right);
+        dv_free(left);
+        dv_free(right);
+        return out;
+    }
+
+    return NULL;
+}
+
 void dv_retain(dval_t *dv)
 {
-    if (dv) refcount_inc(&dv->refcount);
+    if (dv)
+        refcount_inc(&dv->refcount);
 }
 
 

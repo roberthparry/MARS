@@ -1945,7 +1945,10 @@
     "test_factorisations": true,
     "test_rank_pinv_nullspace": true,
     "test_norms_and_condition": true,
-    "test_hermitian_op": true
+    "test_hermitian_op": true,
+    "test_dval_multiply": true,
+    "test_dval_symbolic_printing": true,
+    "test_inverse_dval": true
   },
   "tests/matrix/test_matrix_functions.c": {
     "test_mat_neg_convenience": true,
@@ -1993,7 +1996,10 @@
     "test_mat_special_unary_extensions": true,
     "test_mat_special_unary_square_extensions": true,
     "test_mat_typeof": true,
-    "test_readme_example": true
+    "test_readme_example": true,
+    "test_dval_numerical_functions_unsupported": true,
+    "test_dval_matrix_functions": true,
+    "test_dval_matrix_functions_extended": true
   },
   "tests/matrix/test_matrix_function_regressions.c": {
     "test_mat_fun_qf_qc": true,
