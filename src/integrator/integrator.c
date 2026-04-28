@@ -1,6 +1,8 @@
 #include <stdlib.h>
 #include "integrator.h"
 #include "dval.h"
+#include "dval_pattern.h"
+#include "qcomplex.h"
 
 /* -------------------------------------------------------------------
  * G7K15 nodes and weights — initialised once from decimal strings
@@ -897,12 +899,359 @@ static void eval_nd_turan(const multi_ctx_t *ctx, int dim, size_t dmask,
     *t4_out  = qf_mul(h, t4);
 }
 
+static qfloat_t integral_exp_affine_box(size_t ndim, const qfloat_t *coeffs,
+                                        qfloat_t constant,
+                                        const qfloat_t *lo, const qfloat_t *hi,
+                                        const bool *active)
+{
+    qfloat_t total = qf_exp(constant);
+
+    for (size_t i = 0; i < ndim; ++i) {
+        qfloat_t factor;
+
+        if (active && !active[i]) {
+            if (!qf_eq(coeffs[i], QF_ZERO))
+                return QF_NAN;
+            continue;
+        }
+
+        if (qf_eq(coeffs[i], QF_ZERO)) {
+            factor = qf_sub(hi[i], lo[i]);
+        } else {
+            qfloat_t ahi = qf_mul(coeffs[i], hi[i]);
+            qfloat_t alo = qf_mul(coeffs[i], lo[i]);
+            factor = qf_div(qf_sub(qf_exp(ahi), qf_exp(alo)), coeffs[i]);
+        }
+        total = qf_mul(total, factor);
+    }
+    return total;
+}
+
+static qcomplex_t integral_exp_i_affine_box(size_t ndim, const qfloat_t *coeffs,
+                                            qfloat_t constant,
+                                            const qfloat_t *lo, const qfloat_t *hi,
+                                            const bool *active)
+{
+    qcomplex_t total = qc_exp(qc_make(QF_ZERO, constant));
+
+    for (size_t i = 0; i < ndim; ++i) {
+        qcomplex_t factor;
+
+        if (active && !active[i]) {
+            if (!qf_eq(coeffs[i], QF_ZERO))
+                return qc_make(QF_NAN, QF_NAN);
+            continue;
+        }
+
+        if (qf_eq(coeffs[i], QF_ZERO)) {
+            factor = qc_make(qf_sub(hi[i], lo[i]), QF_ZERO);
+        } else {
+            qcomplex_t num = qc_sub(qc_exp(qc_make(QF_ZERO, qf_mul(coeffs[i], hi[i]))),
+                                    qc_exp(qc_make(QF_ZERO, qf_mul(coeffs[i], lo[i]))));
+            factor = qc_div(num, qc_make(QF_ZERO, coeffs[i]));
+        }
+        total = qc_mul(total, factor);
+    }
+    return total;
+}
+
+static bool find_single_active_dim(size_t ndim, const bool *active, size_t *dim_out)
+{
+    size_t found = ndim;
+
+    if (!dim_out)
+        return false;
+
+    for (size_t i = 0; i < ndim; ++i) {
+        if (active && !active[i])
+            continue;
+        if (found != ndim)
+            return false;
+        found = i;
+    }
+
+    if (found == ndim)
+        return false;
+
+    *dim_out = found;
+    return true;
+}
+
+typedef bool (*affine_match_fn)(const dval_t *expr,
+                                size_t nvars,
+                                dval_t *const *vars,
+                                qfloat_t *constant_out,
+                                qfloat_t *coeffs_out);
+
+typedef qfloat_t (*affine_eval_box_fn)(size_t ndim,
+                                       const qfloat_t *coeffs,
+                                       qfloat_t constant,
+                                       const qfloat_t *lo,
+                                       const qfloat_t *hi,
+                                       const bool *active);
+
+typedef struct {
+    affine_match_fn match;
+    affine_eval_box_fn eval_box;
+} affine_family_ops_t;
+
+static qfloat_t eval_box_exp(size_t ndim, const qfloat_t *coeffs,
+                             qfloat_t constant,
+                             const qfloat_t *lo, const qfloat_t *hi,
+                             const bool *active)
+{
+    return integral_exp_affine_box(ndim, coeffs, constant, lo, hi, active);
+}
+
+static qfloat_t eval_box_sinh(size_t ndim, const qfloat_t *coeffs,
+                              qfloat_t constant,
+                              const qfloat_t *lo, const qfloat_t *hi,
+                              const bool *active)
+{
+    size_t dim;
+
+    if (find_single_active_dim(ndim, active, &dim)) {
+        if (qf_eq(coeffs[dim], QF_ZERO))
+            return qf_mul(qf_sinh(constant), qf_sub(hi[dim], lo[dim]));
+        return qf_div(qf_sub(qf_cosh(qf_add(qf_mul(coeffs[dim], hi[dim]), constant)),
+                             qf_cosh(qf_add(qf_mul(coeffs[dim], lo[dim]), constant))),
+                      coeffs[dim]);
+    }
+
+    qfloat_t *neg_coeffs = malloc(ndim * sizeof(*neg_coeffs));
+    qfloat_t total;
+
+    if (!neg_coeffs)
+        return QF_NAN;
+
+    for (size_t i = 0; i < ndim; ++i)
+        neg_coeffs[i] = qf_neg(coeffs[i]);
+
+    total = qf_mul_double(qf_sub(integral_exp_affine_box(ndim, coeffs, constant, lo, hi, active),
+                                 integral_exp_affine_box(ndim, neg_coeffs, qf_neg(constant), lo, hi, active)),
+                          0.5);
+    free(neg_coeffs);
+    return total;
+}
+
+static qfloat_t eval_box_cosh(size_t ndim, const qfloat_t *coeffs,
+                              qfloat_t constant,
+                              const qfloat_t *lo, const qfloat_t *hi,
+                              const bool *active)
+{
+    size_t dim;
+
+    if (find_single_active_dim(ndim, active, &dim)) {
+        if (qf_eq(coeffs[dim], QF_ZERO))
+            return qf_mul(qf_cosh(constant), qf_sub(hi[dim], lo[dim]));
+        return qf_div(qf_sub(qf_sinh(qf_add(qf_mul(coeffs[dim], hi[dim]), constant)),
+                             qf_sinh(qf_add(qf_mul(coeffs[dim], lo[dim]), constant))),
+                      coeffs[dim]);
+    }
+
+    qfloat_t *neg_coeffs = malloc(ndim * sizeof(*neg_coeffs));
+    qfloat_t total;
+
+    if (!neg_coeffs)
+        return QF_NAN;
+
+    for (size_t i = 0; i < ndim; ++i)
+        neg_coeffs[i] = qf_neg(coeffs[i]);
+
+    total = qf_mul_double(qf_add(integral_exp_affine_box(ndim, coeffs, constant, lo, hi, active),
+                                 integral_exp_affine_box(ndim, neg_coeffs, qf_neg(constant), lo, hi, active)),
+                          0.5);
+    free(neg_coeffs);
+    return total;
+}
+
+static qfloat_t eval_box_sin(size_t ndim, const qfloat_t *coeffs,
+                             qfloat_t constant,
+                             const qfloat_t *lo, const qfloat_t *hi,
+                             const bool *active)
+{
+    size_t dim;
+
+    if (find_single_active_dim(ndim, active, &dim)) {
+        if (qf_eq(coeffs[dim], QF_ZERO))
+            return qf_mul(qf_sin(constant), qf_sub(hi[dim], lo[dim]));
+        return qf_div(qf_sub(qf_cos(qf_add(qf_mul(coeffs[dim], lo[dim]), constant)),
+                             qf_cos(qf_add(qf_mul(coeffs[dim], hi[dim]), constant))),
+                      coeffs[dim]);
+    }
+
+    return integral_exp_i_affine_box(ndim, coeffs, constant, lo, hi, active).im;
+}
+
+static qfloat_t eval_box_cos(size_t ndim, const qfloat_t *coeffs,
+                             qfloat_t constant,
+                             const qfloat_t *lo, const qfloat_t *hi,
+                             const bool *active)
+{
+    size_t dim;
+
+    if (find_single_active_dim(ndim, active, &dim)) {
+        if (qf_eq(coeffs[dim], QF_ZERO))
+            return qf_mul(qf_cos(constant), qf_sub(hi[dim], lo[dim]));
+        return qf_div(qf_sub(qf_sin(qf_add(qf_mul(coeffs[dim], hi[dim]), constant)),
+                             qf_sin(qf_add(qf_mul(coeffs[dim], lo[dim]), constant))),
+                      coeffs[dim]);
+    }
+
+    return integral_exp_i_affine_box(ndim, coeffs, constant, lo, hi, active).re;
+}
+
+static const affine_family_ops_t affine_family_table[] = {
+    { dv_match_exp_affine,  eval_box_exp  },
+    { dv_match_sinh_affine, eval_box_sinh },
+    { dv_match_cosh_affine, eval_box_cosh },
+    { dv_match_sin_affine,  eval_box_sin  },
+    { dv_match_cos_affine,  eval_box_cos  }
+};
+
+static qfloat_t box_volume(size_t ndim, const qfloat_t *lo, const qfloat_t *hi,
+                           const bool *active)
+{
+    qfloat_t v = QF_ONE;
+    for (size_t i = 0; i < ndim; ++i)
+        if (!active || active[i])
+            v = qf_mul(v, qf_sub(hi[i], lo[i]));
+    return v;
+}
+
+static bool try_eval_special_combination(const dval_t *expr,
+                                         size_t ndim,
+                                         dval_t *const *vars,
+                                         const qfloat_t *lo,
+                                         const qfloat_t *hi,
+                                         const bool *active,
+                                         int depth,
+                                         qfloat_t *out)
+{
+    qfloat_t constant;
+    qfloat_t *coeffs;
+    qfloat_t scale;
+    qfloat_t left_v;
+    qfloat_t right_v;
+    const dval_t *base;
+    const dval_t *left;
+    const dval_t *right;
+    const dval_t *mul_left;
+    const dval_t *mul_right;
+    bool is_sub;
+    bool *used_left;
+    bool *used_right;
+    bool disjoint = true;
+
+    if (!expr || !out || depth > 32)
+        return false;
+
+    if (dv_match_const_value(expr, &constant)) {
+        *out = qf_mul(constant, box_volume(ndim, lo, hi, active));
+        return true;
+    }
+
+    coeffs = malloc(ndim * sizeof(*coeffs));
+    if (!coeffs)
+        return false;
+
+    for (size_t i = 0; i < sizeof(affine_family_table) / sizeof(affine_family_table[0]); ++i) {
+        const affine_family_ops_t *ops = &affine_family_table[i];
+        if (!ops->match(expr, ndim, vars, &constant, coeffs))
+            continue;
+        *out = ops->eval_box(ndim, coeffs, constant, lo, hi, active);
+        free(coeffs);
+        return !qf_isnan(*out);
+    }
+    free(coeffs);
+
+    if (dv_match_scaled_expr(expr, &scale, &base) &&
+        try_eval_special_combination(base, ndim, vars, lo, hi, active, depth + 1, &left_v)) {
+        *out = qf_mul(scale, left_v);
+        return true;
+    }
+
+    if (dv_match_add_sub_expr(expr, &left, &right, &is_sub) &&
+        try_eval_special_combination(left, ndim, vars, lo, hi, active, depth + 1, &left_v) &&
+        try_eval_special_combination(right, ndim, vars, lo, hi, active, depth + 1, &right_v)) {
+        *out = is_sub ? qf_sub(left_v, right_v) : qf_add(left_v, right_v);
+        return true;
+    }
+
+    if (!dv_match_mul_expr(expr, &mul_left, &mul_right))
+        return false;
+
+    used_left = malloc(ndim * sizeof(*used_left));
+    used_right = malloc(ndim * sizeof(*used_right));
+    if (!used_left || !used_right) {
+        free(used_left);
+        free(used_right);
+        return false;
+    }
+    if (!dv_collect_var_usage(mul_left, ndim, vars, used_left) ||
+        !dv_collect_var_usage(mul_right, ndim, vars, used_right)) {
+        free(used_left);
+        free(used_right);
+        return false;
+    }
+    for (size_t i = 0; i < ndim; ++i) {
+        if (active && !active[i]) {
+            used_left[i] = false;
+            used_right[i] = false;
+        }
+        if (used_left[i] && used_right[i]) {
+            disjoint = false;
+            break;
+        }
+    }
+    if (!disjoint) {
+        free(used_left);
+        free(used_right);
+        return false;
+    }
+    if (!try_eval_special_combination(mul_left, ndim, vars, lo, hi, used_left, depth + 1, &left_v) ||
+        !try_eval_special_combination(mul_right, ndim, vars, lo, hi, used_right, depth + 1, &right_v)) {
+        free(used_left);
+        free(used_right);
+        return false;
+    }
+    free(used_left);
+    free(used_right);
+    *out = qf_mul(left_v, right_v);
+    return true;
+}
+
+static int try_integral_multi_special_affine(integrator_t *ig, dval_t *expr,
+                                             size_t ndim, dval_t *const *vars,
+                                             const qfloat_t *lo, const qfloat_t *hi,
+                                             qfloat_t *result, qfloat_t *error_est)
+{
+    qfloat_t total;
+
+    if (!try_eval_special_combination(expr, ndim, vars, lo, hi, NULL, 0, &total))
+        return 0;
+    if (qf_isnan(total))
+        return -1;
+    ig->last_intervals = 1;
+    *result = total;
+    if (error_est)
+        *error_est = QF_ZERO;
+    return 1;
+}
+
 int ig_integral_multi(integrator_t *ig, dval_t *expr,
                       size_t ndim, dval_t * const *vars,
                       const qfloat_t *lo, const qfloat_t *hi,
                       qfloat_t *result, qfloat_t *error_est)
 {
+    int fast_status;
+
     if (!ig || !expr || ndim == 0 || !vars || !lo || !hi || !result) return -1;
+
+    fast_status = try_integral_multi_special_affine(ig, expr, ndim, vars, lo, hi,
+                                                    result, error_est);
+    if (fast_status != 0)
+        return fast_status > 0 ? 0 : -1;
 
     size_t nexprs = (size_t)1 << ndim;
     dval_t **deriv_exprs = malloc(nexprs * sizeof(dval_t *));
