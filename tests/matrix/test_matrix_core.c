@@ -3244,7 +3244,12 @@ static void test_inverse_dval(void)
     check_bool("inverse(dval 2x2) returned non-null", Ai != NULL);
 
     if (Ai) {
+        char *ai_text = mat_to_string(Ai, MAT_STRING_INLINE_PRETTY);
+
         print_mdv("A^{-1}", Ai);
+        check_bool("inverse(dval 2x2) exact text simplified",
+                   ai_text && strcmp(ai_text,
+                                     "{ (2/(2x - y), -1/(2x - y); -y/(2x - y), x/(2x - y)) | x = 3, y = 4 }") == 0);
         P = mat_mul(A, Ai);
         check_bool("A * A^{-1} (dval) non-null", P != NULL);
         if (P) {
@@ -3266,6 +3271,8 @@ static void test_inverse_dval(void)
             mat_get(P, 1, 1, &v);
             check_d("dval inverse product tracks x,y on [1,1]", dv_eval_d(v), 1.0, 1e-12);
         }
+
+        free(ai_text);
     }
 
     mat_free(P);
@@ -3275,6 +3282,25 @@ static void test_inverse_dval(void)
     dv_free(y);
     dv_free(one);
     dv_free(two);
+
+    {
+        binding_t *bindings = NULL;
+        size_t nbindings = 0;
+        matrix_t *R = mat_from_string("(cos(@theta), -sin(@theta); sin(@theta), cos(@theta))",
+                                      &bindings, &nbindings);
+        matrix_t *Ri = mat_inverse(R);
+        char *ri_text = Ri ? mat_to_string(Ri, MAT_STRING_INLINE_PRETTY) : NULL;
+
+        check_bool("inverse(rotation matrix) returned non-null", Ri != NULL);
+        check_bool("inverse(rotation matrix) exact text simplifies to transpose",
+                   ri_text && strcmp(ri_text,
+                                     "(cos(θ), sin(θ); -sin(θ), cos(θ))") == 0);
+
+        free(ri_text);
+        mat_free(Ri);
+        mat_free(R);
+        free(bindings);
+    }
 
     {
         dval_t *a = dv_new_named_var_d(2.0, "a");
@@ -4350,9 +4376,12 @@ static void test_solve_and_lstsq(void)
         check_bool("mat_solve(lower triangular dval) -> MAT_TYPE_DVAL",
                    X != NULL && mat_typeof(X) == MAT_TYPE_DVAL);
         if (X) {
+            char *x_text = mat_to_string(X, MAT_STRING_INLINE_PRETTY);
             dval_t *x00 = NULL, *x10 = NULL, *x20 = NULL;
 
             print_mdv("X solve result", X);
+            check_bool("solve(L,B) exact text simplified",
+                       x_text && strcmp(x_text, "{ (s; 2; 1) | s = 5 }") == 0);
             mat_get(X, 0, 0, &x00);
             mat_get(X, 1, 0, &x10);
             mat_get(X, 2, 0, &x20);
@@ -4378,6 +4407,8 @@ static void test_solve_and_lstsq(void)
                     check_d("lower triangular dval residual row", dv_eval_d(got), dv_eval_d(expect), 1e-10);
                 }
             }
+
+            free(x_text);
         }
 
         mat_free(L);

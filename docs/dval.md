@@ -431,7 +431,7 @@ All functions return owning handles.
 
 ### String Conversion
 
-- `char *dv_to_string(const dval_t *dv, style_t style)` — serialise the expression; `style` is `style_FUNCTION` or `style_EXPRESSION`. Returns a newly allocated C string; the caller must free it.
+- `char *dv_to_string(const dval_t *dv, style_t style)` — serialise the expression; `style` is `style_FUNCTION` or `style_EXPRESSION`. In expression style, `sqrt(...)` is printed as `√(...)` and `abs(...)` as `|...|`. Returns a newly allocated C string; the caller must free it.
 - `void dv_print(const dval_t *dv)` — print the expression to stdout in `style_EXPRESSION` format
 
 ### Parsing
@@ -461,6 +461,7 @@ All functions return owning handles.
   - `*` for explicit multiplication
   - `^N` or `^1.5` for ASCII exponents after a variable, constant, or parenthesised sub-expression
   - `sin^2(x)` style ASCII exponents on function names
+  - `sqrt(x)` or `√(x)` for square roots
   - `[bracket names]` for identifiers that are not single-letter-plus-subscript
 
   In the no-binding form, the default inference rule is:

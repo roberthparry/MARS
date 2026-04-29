@@ -10,6 +10,8 @@ typedef struct {
     char *name;
     bool is_constant;
     bool has_value;
+    bool used_in_expr;
+    bool owns_symbol;
     qcomplex_t value;
     dval_t *symbol;
 } matrix_symbol_t;
@@ -395,6 +397,8 @@ static int symbol_vec_add(symbol_vec_t *v,
     v->items[v->count].name = name;
     v->items[v->count].is_constant = is_constant;
     v->items[v->count].has_value = has_value;
+    v->items[v->count].used_in_expr = false;
+    v->items[v->count].owns_symbol = false;
     v->items[v->count].value = value;
     v->items[v->count].symbol = NULL;
     v->count++;
@@ -405,7 +409,7 @@ static void symbol_vec_free(symbol_vec_t *v)
 {
     for (size_t i = 0; i < v->count; ++i) {
         free(v->items[i].name);
-        if (v->items[i].symbol)
+        if (v->items[i].owns_symbol && v->items[i].symbol)
             dv_free(v->items[i].symbol);
     }
     free(v->items);
@@ -569,14 +573,22 @@ static int mf_collect_expression_names(const char *expr, symbol_vec_t *symbols)
             continue;
         }
 
-        if (!mf_is_function_name(p) && symbol_vec_find(symbols, name) < 0) {
-            if (symbol_vec_add(symbols,
-                               name,
-                               mf_is_default_constant_name(name),
-                               false,
-                               qc_make(QF_NAN, QF_NAN)) != 0) {
+        if (!mf_is_function_name(p)) {
+            ssize_t found = symbol_vec_find(symbols, name);
+
+            if (found < 0) {
+                if (symbol_vec_add(symbols,
+                                   name,
+                                   mf_is_default_constant_name(name),
+                                   false,
+                                   qc_make(QF_NAN, QF_NAN)) != 0) {
+                    free(name);
+                    return -1;
+                }
+                symbols->items[symbols->count - 1].used_in_expr = true;
+            } else {
+                symbols->items[found].used_in_expr = true;
                 free(name);
-                return -1;
             }
         } else {
             free(name);
@@ -888,9 +900,15 @@ static int mf_parse_binding_section(const char *text, symbol_vec_t *symbols)
                 free(name);
                 return -1;
             }
+            if (symbols->items[found].is_constant != in_constants) {
+                free(name);
+                return -1;
+            }
             symbols->items[found].is_constant = in_constants;
             symbols->items[found].has_value = true;
             symbols->items[found].value = value;
+            if (symbols->items[found].symbol)
+                dv_set_val(symbols->items[found].symbol, value);
             free(name);
         } else {
             if (symbol_vec_add(symbols, name, in_constants, true, value) != 0) {
@@ -942,6 +960,38 @@ static int mf_try_parse_numeric_matrix(char **entries,
     return A ? 0 : -1;
 }
 
+static int mf_seed_shared_symbols(symbol_vec_t *symbols,
+                                  binding_t *shared_bindings,
+                                  size_t shared_number)
+{
+    if (!shared_bindings)
+        return 0;
+
+    for (size_t i = 0; i < shared_number; ++i) {
+        char *name;
+
+        if (!shared_bindings[i].name || !shared_bindings[i].symbol)
+            return -1;
+
+        name = mf_strdup(shared_bindings[i].name);
+        if (!name)
+            return -1;
+
+        if (symbol_vec_add(symbols,
+                           name,
+                           shared_bindings[i].is_constant,
+                           false,
+                           qc_make(QF_NAN, QF_NAN)) != 0) {
+            free(name);
+            return -1;
+        }
+
+        symbols->items[symbols->count - 1].symbol = shared_bindings[i].symbol;
+    }
+
+    return 0;
+}
+
 static int mf_build_symbolic_matrix(char **entries,
                                     size_t rows,
                                     size_t cols,
@@ -951,25 +1001,45 @@ static int mf_build_symbolic_matrix(char **entries,
                                     matrix_t **A_out)
 {
     size_t n = rows * cols;
+    size_t active_count = 0;
     dval_t **nodes = calloc(n, sizeof(*nodes));
-    const char **names = calloc(symbols->count ? symbols->count : 1, sizeof(*names));
-    dval_t **refs = calloc(symbols->count ? symbols->count : 1, sizeof(*refs));
+    const char **names = NULL;
+    dval_t **refs = NULL;
     matrix_t *A = NULL;
     binding_t *bindings = NULL;
-    int ok = nodes && names && refs;
+    int ok = nodes != NULL;
 
-    for (size_t i = 0; ok && i < symbols->count; ++i) {
+    for (size_t i = 0; i < symbols->count; ++i) {
+        if (symbols->items[i].used_in_expr)
+            active_count++;
+    }
+
+    names = calloc(active_count ? active_count : 1, sizeof(*names));
+    refs = calloc(active_count ? active_count : 1, sizeof(*refs));
+    ok = ok && names && refs;
+
+    for (size_t i = 0, active = 0; ok && i < symbols->count; ++i) {
         qcomplex_t init = symbols->items[i].has_value
                         ? symbols->items[i].value
                         : qc_make(QF_NAN, QF_NAN);
 
-        symbols->items[i].symbol = symbols->items[i].is_constant
-                                 ? dv_new_named_const_qc(init, symbols->items[i].name)
-                                 : dv_new_named_var_qc(init, symbols->items[i].name);
+        if (!symbols->items[i].used_in_expr)
+            continue;
+
+        if (!symbols->items[i].symbol) {
+            symbols->items[i].symbol = symbols->items[i].is_constant
+                                     ? dv_new_named_const_qc(init, symbols->items[i].name)
+                                     : dv_new_named_var_qc(init, symbols->items[i].name);
+            symbols->items[i].owns_symbol = true;
+        } else if (symbols->items[i].has_value) {
+            dv_set_val(symbols->items[i].symbol, init);
+        }
+
         if (!symbols->items[i].symbol)
             ok = 0;
-        names[i] = symbols->items[i].name;
-        refs[i] = symbols->items[i].symbol;
+        names[active] = symbols->items[i].name;
+        refs[active] = symbols->items[i].symbol;
+        active++;
     }
 
     for (size_t i = 0; ok && i < n; ++i) {
@@ -979,7 +1049,7 @@ static int mf_build_symbolic_matrix(char **entries,
             ok = 0;
             continue;
         }
-        nodes[i] = dval_from_expression_string(normalised, names, refs, symbols->count);
+        nodes[i] = dval_from_expression_string(normalised, names, refs, active_count);
         free(normalised);
         if (!nodes[i])
             ok = 0;
@@ -991,25 +1061,33 @@ static int mf_build_symbolic_matrix(char **entries,
 
     if (ok && bindings_out) {
         size_t total_names = 0;
+        size_t active = 0;
 
-        for (size_t i = 0; i < symbols->count; ++i)
+        for (size_t i = 0; i < symbols->count; ++i) {
+            if (!symbols->items[i].used_in_expr)
+                continue;
             total_names += strlen(symbols->items[i].name) + 1;
+            active++;
+        }
 
-        bindings = calloc(1, sizeof(*bindings) * (symbols->count ? symbols->count : 1)
+        bindings = calloc(1, sizeof(*bindings) * (active ? active : 1)
                              + total_names);
         if (!bindings)
             ok = 0;
         if (ok) {
-            char *name_store = (char *)(bindings + symbols->count);
+            char *name_store = (char *)(bindings + active);
 
-            for (size_t i = 0; i < symbols->count; ++i) {
+            for (size_t i = 0, j = 0; i < symbols->count; ++i) {
                 size_t name_len = strlen(symbols->items[i].name) + 1;
 
+                if (!symbols->items[i].used_in_expr)
+                    continue;
                 memcpy(name_store, symbols->items[i].name, name_len);
-                bindings[i].name = name_store;
-                bindings[i].symbol = symbols->items[i].symbol;
-                bindings[i].is_constant = symbols->items[i].is_constant;
+                bindings[j].name = name_store;
+                bindings[j].symbol = symbols->items[i].symbol;
+                bindings[j].is_constant = symbols->items[i].is_constant;
                 name_store += name_len;
+                j++;
             }
         }
     }
@@ -1034,12 +1112,16 @@ static int mf_build_symbolic_matrix(char **entries,
     if (bindings_out)
         *bindings_out = bindings;
     if (number_out)
-        *number_out = symbols->count;
+        *number_out = active_count;
     *A_out = A;
     return 0;
 }
 
-matrix_t *mat_from_string(const char *s, binding_t **bindings_out, size_t *number_out)
+static matrix_t *mf_parse_matrix_string(const char *s,
+                                        binding_t *shared_bindings,
+                                        size_t shared_number,
+                                        binding_t **bindings_out,
+                                        size_t *number_out)
 {
     const char *body_start;
     const char *body_end;
@@ -1112,13 +1194,19 @@ matrix_t *mat_from_string(const char *s, binding_t **bindings_out, size_t *numbe
             goto cleanup;
     }
 
+    if (mf_seed_shared_symbols(&symbols, shared_bindings, shared_number) != 0) {
+        error_msg = "invalid shared bindings";
+        goto cleanup;
+    }
+
     if (mf_parse_matrix_body(body, &entries, &rows, &cols) != 0) {
         error_msg = "invalid matrix body syntax";
         goto cleanup;
     }
     nentries = rows * cols;
 
-    if (!wrapped && mf_try_parse_numeric_matrix(entries, rows, cols, &A) == 0)
+    if (!wrapped && shared_number == 0 &&
+        mf_try_parse_numeric_matrix(entries, rows, cols, &A) == 0)
         goto cleanup_success;
 
     if (bindings && *bindings) {
@@ -1161,6 +1249,21 @@ cleanup:
     mat_free(A);
     A = NULL;
     goto cleanup_success;
+}
+
+matrix_t *mat_from_string_with_bindings(const char *s,
+                                        binding_t *shared_bindings,
+                                        size_t shared_number,
+                                        binding_t **bindings_out,
+                                        size_t *number_out)
+{
+    return mf_parse_matrix_string(s, shared_bindings, shared_number,
+                                  bindings_out, number_out);
+}
+
+matrix_t *mat_from_string(const char *s, binding_t **bindings_out, size_t *number_out)
+{
+    return mat_from_string_with_bindings(s, NULL, 0, bindings_out, number_out);
 }
 
 binding_t *mat_binding_get(binding_t *bindings, size_t number, const char *name)

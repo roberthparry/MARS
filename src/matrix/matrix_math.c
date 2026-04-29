@@ -862,6 +862,8 @@ matrix_t *mat_e1(const matrix_t *A)
 
 matrix_t *mat_pow_int(const matrix_t *A, int n)
 {
+    matrix_t *simplified = NULL;
+
     if (!A || A->rows != A->cols) return NULL;
     if (!mat_elem_supports_numeric_algorithms(A) && n < 0) return NULL;
     size_t sz = A->rows;
@@ -899,7 +901,13 @@ matrix_t *mat_pow_int(const matrix_t *A, int n)
     }
 
     mat_free(base);
-    return result;
+
+    if (result->elem != &dval_elem)
+        return result;
+
+    simplified = mat_simplify_symbolic(result);
+    mat_free(result);
+    return simplified;
 }
 
 /* ============================================================

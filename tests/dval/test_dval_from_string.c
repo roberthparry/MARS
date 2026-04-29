@@ -94,6 +94,7 @@ static void test_from_string_functions(void)
     check_parse_val("exp(x) at 0",       "{ exp(x) | x = 0 }",           1.0,          __LINE__);
     check_parse_val("log(x) at 1",       "{ log(x) | x = 1 }",           0.0,          __LINE__);
     check_parse_val("sqrt(x) at 4",      "{ sqrt(x) | x = 4 }",          2.0,          __LINE__);
+    check_parse_val("√(x) at 4",         "{ √(x) | x = 4 }",             2.0,          __LINE__);
     /* Binary functions */
     check_parse_val("atan2(1, 1) = π/4",
         "{ atan2(x\xe2\x82\x80, x\xe2\x82\x81) | x\xe2\x82\x80 = 1, x\xe2\x82\x81 = 1 }",
@@ -124,6 +125,7 @@ static void test_from_string_special_functions(void)
 {
     /* Unary — clean exact values */
     check_parse_val("abs(-3) = 3",           "{ abs(x) | x = -3 }",          3.0,                     __LINE__);
+    check_parse_val("|-3| = 3",              "{ |x| | x = -3 }",            3.0,                     __LINE__);
     check_parse_val("erf(0) = 0",            "{ erf(x) | x = 0 }",           0.0,                     __LINE__);
     check_parse_val("erfc(0) = 1",           "{ erfc(x) | x = 0 }",          1.0,                     __LINE__);
     check_parse_val("erfinv(0) = 0",         "{ erfinv(x) | x = 0 }",        0.0,                     __LINE__);
@@ -487,6 +489,25 @@ static void test_from_string_composed(void)
         0.0 + 2.0 + 3.0 + 4.0, __LINE__);
 }
 
+static void test_from_string_simplified_identity_text(void)
+{
+    dval_t *expr = dval_from_string("{ sin^2(x) + cos^2(x) | x = 1.234 }");
+    char *text = expr ? dv_to_string(expr, style_EXPRESSION) : NULL;
+
+    if (!(text && strcmp(text, "{ 1 }") == 0)) {
+        printf(C_BOLD C_RED "FAIL" C_RESET " sin^2(x) + cos^2(x) exact text simplifies to 1 %s:%d:1\n",
+               __FILE__, __LINE__);
+        printf("  got:      %s\n", text ? text : "<null>");
+        printf("  expected: { 1 }\n\n");
+        TEST_FAIL();
+    } else {
+        printf(C_BOLD C_GREEN "PASS" C_RESET " sin^2(x) + cos^2(x) exact text simplifies to 1\n\n");
+    }
+
+    free(text);
+    dv_free(expr);
+}
+
 /* ---- Group runner for all ASCII-alternative tests ---- */
 
 static void test_from_string_ascii_alternatives(void)
@@ -495,6 +516,7 @@ static void test_from_string_ascii_alternatives(void)
     RUN_TEST(test_from_string_star_mul,   __func__);
     RUN_TEST(test_from_string_func_power, __func__);
     RUN_TEST(test_from_string_composed,   __func__);
+    RUN_TEST(test_from_string_simplified_identity_text, __func__);
 }
 
 /* ---- f, f', f'' of exp(sin(x)) + 3*x^2 - 7: parse, evaluate, differentiate ----

@@ -112,6 +112,18 @@ static dval_t *dval_clone_for_storage(dval_t *dv)
     return dv;
 }
 
+static matrix_t *mat_finalize_symbolic_result(matrix_t *A)
+{
+    matrix_t *simplified;
+
+    if (!A || A->elem != &dval_elem)
+        return A;
+
+    simplified = mat_simplify_symbolic(A);
+    mat_free(A);
+    return simplified;
+}
+
 static void elem_copy_value(const struct elem_vtable *elem, void *dst, const void *src)
 {
     if (!elem_is_dval(elem)) {
@@ -216,6 +228,34 @@ static dval_t *dval_neg_simplify(dval_t *dv)
         return NULL;
 
     return dval_simplify_owned(raw);
+}
+
+static int mat_simplify_symbolic_inplace(matrix_t *A)
+{
+    dval_t *dv = NULL;
+    dval_t *simp = NULL;
+
+    if (!A)
+        return -1;
+    if (A->elem != &dval_elem)
+        return 0;
+
+    for (size_t i = 0; i < A->rows; ++i) {
+        for (size_t j = 0; j < A->cols; ++j) {
+            dv = NULL;
+            simp = NULL;
+            mat_get(A, i, j, &dv);
+            if (!dv)
+                continue;
+            simp = dv_simplify(dv);
+            if (!simp)
+                return -1;
+            mat_set(A, i, j, &simp);
+            dv_free(simp);
+        }
+    }
+
+    return 0;
 }
 
 static dval_t *dval_mul_simplify(dval_t *a, dval_t *b)
@@ -1099,19 +1139,21 @@ fail:
 
 static matrix_t *mat_solve_dval_exact(const matrix_t *A, const matrix_t *B)
 {
+    matrix_t *X = NULL;
+
     if (!A || !B || A->rows != A->cols || A->rows != B->rows)
         return NULL;
 
     if (mat_has_diagonal_structure(A))
-        return mat_solve_dval_diagonal_exact(A, B);
+        X = mat_solve_dval_diagonal_exact(A, B);
+    else if (mat_has_lower_triangular_structure(A))
+        X = mat_forward_substitute_dval_exact(A, B);
+    else if (mat_has_upper_triangular_structure(A))
+        X = mat_backward_substitute_dval_exact(A, B);
+    else
+        X = mat_solve_dval_dense_exact(A, B);
 
-    if (mat_has_lower_triangular_structure(A))
-        return mat_forward_substitute_dval_exact(A, B);
-
-    if (mat_has_upper_triangular_structure(A))
-        return mat_backward_substitute_dval_exact(A, B);
-
-    return mat_solve_dval_dense_exact(A, B);
+    return mat_finalize_symbolic_result(X);
 }
 
 static matrix_t *mat_inverse_dval_upper_exact(const matrix_t *A)
@@ -1185,7 +1227,7 @@ static matrix_t *mat_inverse_dval_upper_exact(const matrix_t *A)
         }
     }
 
-    return I;
+    return mat_finalize_symbolic_result(I);
 
 fail:
     mat_free(I);
@@ -1211,7 +1253,7 @@ static matrix_t *mat_inverse_dval_lower_exact(const matrix_t *A)
     I = mat_transpose(ATi);
     mat_free(AT);
     mat_free(ATi);
-    return I;
+    return mat_finalize_symbolic_result(I);
 }
 
 static matrix_t *mat_inverse_dval_dense3_exact(const matrix_t *A)
@@ -1270,7 +1312,7 @@ static matrix_t *mat_inverse_dval_dense3_exact(const matrix_t *A)
     for (size_t i = 0; i < 3; ++i)
         for (size_t j = 0; j < 3; ++j)
             dv_free(cof[i][j]);
-    return I;
+    return mat_finalize_symbolic_result(I);
 
 fail:
     dv_free(det);
@@ -1424,7 +1466,7 @@ static matrix_t *mat_inverse_dval_dense_exact(const matrix_t *A)
     }
 
     mat_free(M);
-    return I;
+    return mat_finalize_symbolic_result(I);
 
 fail:
     mat_free(M);
@@ -1602,7 +1644,7 @@ static matrix_t *mat_inverse_dval_exact(const matrix_t *A)
 
         mat_set(I, 0, 0, &inv);
         dv_free(inv);
-        return I;
+        return mat_finalize_symbolic_result(I);
     }
 
     if (mat_is_upper_triangular(A))
@@ -1679,7 +1721,7 @@ static matrix_t *mat_inverse_dval_exact(const matrix_t *A)
     dv_free(e01);
     dv_free(e10);
     dv_free(e11);
-    return I;
+    return mat_finalize_symbolic_result(I);
 
 fail:
     dv_free(det_left);
@@ -5846,6 +5888,11 @@ struct matrix_t *mat_mul(const struct matrix_t *A, const struct matrix_t *B) {
         }
     }
 
+    if (re == &dval_elem && mat_simplify_symbolic_inplace(C) != 0) {
+        mat_free(C);
+        return NULL;
+    }
+
     return C;
 }
 
@@ -5910,6 +5957,25 @@ matrix_t *mat_copy_preserving_store(const matrix_t *A)
 matrix_t *mat_copy_as_dense(const matrix_t *A)
 {
     return mat_copy_with_store(A, &dense_store);
+}
+
+matrix_t *mat_simplify_symbolic(const matrix_t *A)
+{
+    matrix_t *C;
+
+    if (!A)
+        return NULL;
+
+    C = mat_copy_preserving_store(A);
+    if (!C)
+        return NULL;
+
+    if (mat_simplify_symbolic_inplace(C) != 0) {
+        mat_free(C);
+        return NULL;
+    }
+
+    return C;
 }
 
 matrix_t *mat_convert_with_store(const matrix_t *A,
@@ -6264,6 +6330,36 @@ matrix_t *mat_deriv(const matrix_t *A, dval_t *wrt)
     return D;
 }
 
+dval_t *mat_deriv_trace_by_name(const matrix_t *A, binding_t *bindings, size_t number,
+                                const char *name)
+{
+    binding_t *binding;
+
+    if (!A || !bindings || !name)
+        return NULL;
+
+    binding = mat_binding_find(bindings, number, name);
+    if (!binding)
+        return NULL;
+
+    return mat_deriv_trace(A, binding->symbol);
+}
+
+matrix_t *mat_deriv_by_name(const matrix_t *A, binding_t *bindings, size_t number,
+                            const char *name)
+{
+    binding_t *binding;
+
+    if (!A || !bindings || !name)
+        return NULL;
+
+    binding = mat_binding_find(bindings, number, name);
+    if (!binding)
+        return NULL;
+
+    return mat_deriv(A, binding->symbol);
+}
+
 dval_t *mat_deriv_trace(const matrix_t *A, dval_t *wrt)
 {
     dval_t *trace = NULL;
@@ -6302,6 +6398,21 @@ dval_t *mat_deriv_det(const matrix_t *A, dval_t *wrt)
     deriv = dv_create_deriv(det, wrt);
     dv_free(det);
     return deriv;
+}
+
+dval_t *mat_deriv_det_by_name(const matrix_t *A, binding_t *bindings, size_t number,
+                              const char *name)
+{
+    binding_t *binding;
+
+    if (!A || !bindings || !name)
+        return NULL;
+
+    binding = mat_binding_find(bindings, number, name);
+    if (!binding)
+        return NULL;
+
+    return mat_deriv_det(A, binding->symbol);
 }
 
 matrix_t *mat_deriv_inverse(const matrix_t *A, dval_t *wrt)
@@ -6346,6 +6457,21 @@ cleanup:
     mat_free(dA);
     mat_free(Ai);
     return out;
+}
+
+matrix_t *mat_deriv_inverse_by_name(const matrix_t *A, binding_t *bindings, size_t number,
+                                    const char *name)
+{
+    binding_t *binding;
+
+    if (!A || !bindings || !name)
+        return NULL;
+
+    binding = mat_binding_find(bindings, number, name);
+    if (!binding)
+        return NULL;
+
+    return mat_deriv_inverse(A, binding->symbol);
 }
 
 matrix_t *mat_deriv_block_inverse(const matrix_t *A, size_t split, dval_t *wrt)
@@ -6394,6 +6520,22 @@ cleanup:
     return out;
 }
 
+matrix_t *mat_deriv_block_inverse_by_name(const matrix_t *A, size_t split,
+                                          binding_t *bindings, size_t number,
+                                          const char *name)
+{
+    binding_t *binding;
+
+    if (!A || !bindings || !name)
+        return NULL;
+
+    binding = mat_binding_find(bindings, number, name);
+    if (!binding)
+        return NULL;
+
+    return mat_deriv_block_inverse(A, split, binding->symbol);
+}
+
 matrix_t *mat_jacobian(const matrix_t *A, dval_t *const *vars, size_t nvars)
 {
     matrix_t *J = NULL;
@@ -6438,6 +6580,41 @@ matrix_t *mat_jacobian(const matrix_t *A, dval_t *const *vars, size_t nvars)
         }
     }
 
+    return J;
+}
+
+matrix_t *mat_jacobian_by_names(const matrix_t *A, binding_t *bindings, size_t number,
+                                const char *const *names, size_t nnames)
+{
+    dval_t **vars = NULL;
+    matrix_t *J = NULL;
+
+    if (!A || !bindings || !names || nnames == 0)
+        return NULL;
+
+    vars = malloc(nnames * sizeof(*vars));
+    if (!vars)
+        return NULL;
+
+    for (size_t i = 0; i < nnames; ++i) {
+        binding_t *binding;
+
+        if (!names[i]) {
+            free(vars);
+            return NULL;
+        }
+
+        binding = mat_binding_find(bindings, number, names[i]);
+        if (!binding) {
+            free(vars);
+            return NULL;
+        }
+
+        vars[i] = binding->symbol;
+    }
+
+    J = mat_jacobian(A, vars, nnames);
+    free(vars);
     return J;
 }
 
@@ -6693,7 +6870,7 @@ fail:
     mat_free(TR);
     mat_free(BL);
     mat_free(BR);
-    return Out;
+    return mat_finalize_symbolic_result(Out);
 }
 
 matrix_t *mat_block_solve(const matrix_t *A, const matrix_t *B, size_t split)
@@ -6779,7 +6956,7 @@ fail:
     mat_free(Tmp2);
     mat_free(X1);
     mat_free(X2);
-    return X;
+    return mat_finalize_symbolic_result(X);
 }
 
 matrix_t *mat_deriv_block_solve(const matrix_t *A, const matrix_t *B, size_t split, dval_t *wrt)
@@ -6833,6 +7010,22 @@ cleanup:
     return dX;
 }
 
+matrix_t *mat_deriv_block_solve_by_name(const matrix_t *A, const matrix_t *B, size_t split,
+                                        binding_t *bindings, size_t number,
+                                        const char *name)
+{
+    binding_t *binding;
+
+    if (!A || !B || !bindings || !name)
+        return NULL;
+
+    binding = mat_binding_find(bindings, number, name);
+    if (!binding)
+        return NULL;
+
+    return mat_deriv_block_solve(A, B, split, binding->symbol);
+}
+
 matrix_t *mat_deriv_solve(const matrix_t *A, const matrix_t *B, dval_t *wrt)
 {
     matrix_t *X = NULL;
@@ -6880,6 +7073,22 @@ cleanup:
     mat_free(dA);
     mat_free(X);
     return dX;
+}
+
+matrix_t *mat_deriv_solve_by_name(const matrix_t *A, const matrix_t *B,
+                                  binding_t *bindings, size_t number,
+                                  const char *name)
+{
+    binding_t *binding;
+
+    if (!A || !B || !bindings || !name)
+        return NULL;
+
+    binding = mat_binding_find(bindings, number, name);
+    if (!binding)
+        return NULL;
+
+    return mat_deriv_solve(A, B, binding->symbol);
 }
 
 int mat_det(const matrix_t *A, void *determinant)

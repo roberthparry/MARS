@@ -2025,7 +2025,8 @@
     "test_generalized_eigenspace_dval": true,
     "test_jordan_chain_dval": true,
     "test_jordan_profile_dval": true,
-    "test_readme_string_quantum_example": true
+    "test_readme_string_quantum_example": true,
+    "test_mat_simplify_symbolic_helper": true
   },
   "tests/matrix/test_matrix_function_regressions.c": {
     "test_mat_fun_qf_qc": true,
@@ -2227,7 +2228,8 @@
       "test_to_string_special_functions": true,
       "test_to_string_negative_rhs_expr": true,
       "test_to_string_double_negative_expr": true,
-      "test_to_string_nested_negative_rhs_expr": true
+      "test_to_string_nested_negative_rhs_expr": true,
+      "test_to_string_unary_sqrt": true
     },
     "test_to_string_basic_const": {
       "enabled": true,
@@ -2268,6 +2270,11 @@
       "enabled": true,
       "test_to_string_function_style_expr": true,
       "test_to_string_function_style_func": true
+    },
+    "test_to_string_unary_sqrt": {
+      "enabled": true,
+      "test_to_string_unary_sqrt_expr": true,
+      "test_to_string_unary_sqrt_func": true
     }
   },
   "tests/dval/test_dval_from_string.c": {
@@ -2292,7 +2299,8 @@
       "test_from_string_subscripts": true,
       "test_from_string_star_mul": true,
       "test_from_string_func_power": true,
-      "test_from_string_composed": true
+      "test_from_string_composed": true,
+      "test_from_string_simplified_identity_text": true
     }
   },
   "tests/dval/test_dval_partials.c": {

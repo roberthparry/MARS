@@ -181,6 +181,11 @@ typedef struct dv_deriv_cache {
     struct dv_deriv_cache *next;
 } dv_deriv_cache_t;
 
+typedef struct {
+    dval_t *base;
+    qfloat_t coeff;
+} addend_t;
+
 /**
  * @brief Full internal definition of a differentiable value node.
  *
@@ -306,6 +311,46 @@ extern const dval_ops_t ops_e1;
  */
 void dv_retain(dval_t *dv);
 dval_t *dv_pow_qf(dval_t *a, qfloat_t exponent);
+char *dv_normalize_name(const char *name);
+dval_t *dv_alloc(const dval_ops_t *ops);
+dval_t *dv_make_const_qc(qcomplex_t x);
+dval_t *dv_make_var_qc(qcomplex_t x);
+qcomplex_t dv_qc_real_qf(qfloat_t x);
+qcomplex_t dv_qc_real_d(double x);
+qcomplex_t dv_eval_qc_internal(const dval_t *dv);
+dval_t *dv_get_dx_internal(const dval_t *dv);
+dval_t *dv_current_wrt_internal(void);
+dval_t *dv_new_unary_internal(const dval_ops_t *ops, dval_t *a);
+dval_t *dv_new_binary_internal(const dval_ops_t *ops, dval_t *a, dval_t *b);
+dval_t *dv_new_pow_d_internal(dval_t *a, double d);
+dval_t *dv_new_pow_qf_internal(dval_t *a, qfloat_t exponent);
+dval_t *dv_new_pow_qc_internal(dval_t *a, qcomplex_t exponent);
+
+static inline int dv_qf_is_zero(qfloat_t x) { return qf_eq(x, QF_ZERO); }
+static inline int dv_qf_is_one(qfloat_t x) { return qf_eq(x, QF_ONE); }
+static inline int dv_qf_is_minus_one(qfloat_t x) { return qf_eq(x, qf_neg(QF_ONE)); }
+
+static inline int dv_is_op(const dval_t *dv, const dval_ops_t *ops)
+{
+    return dv && dv->ops == ops;
+}
+
+static inline int dv_is_const(const dval_t *dv) { return dv_is_op(dv, &ops_const); }
+static inline int dv_is_var(const dval_t *dv) { return dv_is_op(dv, &ops_var); }
+static inline int dv_is_neg(const dval_t *dv) { return dv_is_op(dv, &ops_neg); }
+static inline int dv_is_mul(const dval_t *dv) { return dv_is_op(dv, &ops_mul); }
+static inline int dv_is_div(const dval_t *dv) { return dv_is_op(dv, &ops_div); }
+static inline int dv_is_addsub(const dval_t *dv)
+{
+    return dv_is_op(dv, &ops_add) || dv_is_op(dv, &ops_sub);
+}
+static inline int dv_is_exp_expr(const dval_t *dv) { return dv_is_op(dv, &ops_exp); }
+static inline int dv_is_sqrt_expr(const dval_t *dv) { return dv_is_op(dv, &ops_sqrt); }
+static inline int dv_is_pow_d_expr(const dval_t *dv) { return dv_is_op(dv, &ops_pow_d); }
+static inline int dv_is_unnamed_const(const dval_t *dv)
+{
+    return dv_is_const(dv) && (!dv->name || !*dv->name);
+}
 
 dval_t *dv_simplify_passthrough(const dval_t *dv, dval_t *a, dval_t *b);
 dval_t *dv_simplify_unary_operator(const dval_t *dv, dval_t *a, dval_t *b);
@@ -317,6 +362,32 @@ dval_t *dv_simplify_div_operator(const dval_t *dv, dval_t *a, dval_t *b);
 dval_t *dv_simplify_pow_d_operator(const dval_t *dv, dval_t *a, dval_t *b);
 dval_t *dv_simplify_pow_operator(const dval_t *dv, dval_t *a, dval_t *b);
 dval_t *dv_simplify_hypot_operator(const dval_t *dv, dval_t *a, dval_t *b);
+
+int dv_struct_eq(const dval_t *u, const dval_t *v);
+dval_t *dv_make_scaled(qfloat_t coeff, dval_t *base);
+dval_t *dv_make_pow_like(dval_t *base, qfloat_t exponent);
+void dv_collect_addends(dval_t *dv, qfloat_t scale, qfloat_t *c_const,
+                        addend_t **terms, size_t *n, size_t *cap);
+void dv_combine_common_denominator_addends(addend_t *terms, size_t n);
+void dv_sort_addends(addend_t *terms, size_t n);
+int dv_extract_common_addend_coeff(const addend_t *terms, size_t n,
+                                   qfloat_t c_const, qfloat_t *common_out);
+dval_t *dv_try_trig_pythagorean_identity(const addend_t *terms, size_t n,
+                                         qfloat_t c_const, qfloat_t common_coeff);
+void dv_free_node_array(dval_t **nodes, size_t count);
+void dv_append_node(dval_t ***nodes, size_t *count, size_t *cap, dval_t *node);
+void dv_split_division_terms(qfloat_t *c_acc, int *is_zero,
+                             dval_t **terms, size_t nterms,
+                             dval_t ***den_terms, size_t *nden_terms,
+                             size_t *den_cap);
+void dv_combine_like_powers(dval_t **terms, size_t nterms);
+void dv_combine_exp_terms(dval_t **terms, size_t nterms);
+void dv_merge_sqrt_terms(dval_t **terms, size_t nterms);
+dval_t *dv_try_expand_shallow_product(qfloat_t c_acc,
+                                      dval_t **terms, size_t nterms,
+                                      dval_t **den_terms, size_t nden_terms);
+dval_t *dv_rebuild_product_chain(qfloat_t c_acc, dval_t **terms, size_t nterms);
+dval_t *dv_rebuild_division_chain(dval_t **den_terms, size_t nden_terms);
 
 int dv_fold_zero_to_zero(qfloat_t in, qfloat_t *out);
 int dv_fold_cos_const(qfloat_t in, qfloat_t *out);

@@ -295,6 +295,248 @@ static void test_mat_from_string_bracketed_names(void)
     mat_free(A);
 }
 
+static void test_mat_from_string_with_bindings_shared_symbols(void)
+{
+    binding_t *lhs_bindings = NULL;
+    binding_t *rhs_bindings = NULL;
+    size_t nlhs = 0;
+    size_t nrhs = 0;
+    matrix_t *A = mat_from_string("(x, y)", &lhs_bindings, &nlhs);
+    matrix_t *B = mat_from_string_with_bindings("(x, z)", lhs_bindings, nlhs,
+                                                &rhs_bindings, &nrhs);
+    binding_t *lhs_x = NULL;
+    binding_t *rhs_x = NULL;
+    binding_t *rhs_z = NULL;
+    dval_t *dv = NULL;
+
+    check_bool("mat_from_string_with_bindings source matrix non-null", A != NULL);
+    check_bool("mat_from_string_with_bindings shared matrix non-null", B != NULL);
+
+    lhs_x = mat_binding_find(lhs_bindings, nlhs, "x");
+    rhs_x = mat_binding_find(rhs_bindings, nrhs, "x");
+    rhs_z = mat_binding_find(rhs_bindings, nrhs, "z");
+
+    check_bool("mat_from_string_with_bindings shared x present", lhs_x && rhs_x);
+    check_bool("mat_from_string_with_bindings new z present", rhs_z != NULL);
+    check_bool("mat_from_string_with_bindings reuses x symbol",
+               lhs_x && rhs_x && lhs_x->symbol == rhs_x->symbol);
+    check_bool("mat_from_string_with_bindings returns only referenced bindings",
+               nrhs == 2);
+
+    check_bool("mat_from_string_with_bindings set shared x via rhs bindings",
+               mat_binding_set_d(rhs_bindings, nrhs, "x", 4.0) == 0);
+    check_bool("mat_from_string_with_bindings set new z via rhs bindings",
+               mat_binding_set_d(rhs_bindings, nrhs, "z", 9.0) == 0);
+
+    if (A) {
+        mat_get(A, 0, 0, &dv);
+        check_qf_val("mat_from_string_with_bindings shared x updates source matrix",
+                     dv_eval_qf(dv), qf_from_double(4.0), 1e-18);
+    }
+    if (B) {
+        mat_get(B, 0, 0, &dv);
+        check_qf_val("mat_from_string_with_bindings shared x updates target matrix",
+                     dv_eval_qf(dv), qf_from_double(4.0), 1e-18);
+        mat_get(B, 0, 1, &dv);
+        check_qf_val("mat_from_string_with_bindings new z evaluates",
+                     dv_eval_qf(dv), qf_from_double(9.0), 1e-18);
+    }
+
+    free(rhs_bindings);
+    mat_free(B);
+    free(lhs_bindings);
+    mat_free(A);
+}
+
+static void test_mat_symbolic_derivative_helpers_by_name(void)
+{
+    binding_t *bindings = NULL;
+    size_t nbindings = 0;
+    matrix_t *A = mat_from_string("([radius], x*y; y, c1)", &bindings, &nbindings);
+    matrix_t *Dr = NULL;
+    dval_t *dtr = NULL;
+    dval_t *ddet = NULL;
+    dval_t *dv = NULL;
+
+    check_bool("mat symbolic helpers source non-null", A != NULL);
+    check_bool("mat symbolic helpers set x",
+               mat_binding_set_d(bindings, nbindings, "x", 2.0) == 0);
+    check_bool("mat symbolic helpers set y",
+               mat_binding_set_d(bindings, nbindings, "y", 3.0) == 0);
+    check_bool("mat symbolic helpers set [radius]",
+               mat_binding_set_d(bindings, nbindings, "[radius]", 5.0) == 0);
+    check_bool("mat symbolic helpers set c₁",
+               mat_binding_set_d(bindings, nbindings, "c₁", 7.0) == 0);
+
+    Dr = mat_deriv_by_name(A, bindings, nbindings, "[radius]");
+    dtr = mat_deriv_trace_by_name(A, bindings, nbindings, "[radius]");
+    ddet = mat_deriv_det_by_name(A, bindings, nbindings, "[radius]");
+
+    check_bool("mat_deriv_by_name([radius]) not NULL", Dr != NULL);
+    check_bool("mat_deriv_trace_by_name([radius]) not NULL", dtr != NULL);
+    check_bool("mat_deriv_det_by_name([radius]) not NULL", ddet != NULL);
+    check_bool("mat_deriv_by_name missing symbol returns NULL",
+               mat_deriv_by_name(A, bindings, nbindings, "missing") == NULL);
+
+    if (Dr) {
+        mat_get(Dr, 0, 0, &dv);
+        check_qf_val("mat_deriv_by_name [0,0] = 1",
+                     dv_eval_qf(dv), qf_from_double(1.0), 1e-18);
+        mat_get(Dr, 0, 1, &dv);
+        check_qf_val("mat_deriv_by_name [0,1] = 0",
+                     dv_eval_qf(dv), qf_from_double(0.0), 1e-18);
+        mat_get(Dr, 1, 0, &dv);
+        check_qf_val("mat_deriv_by_name [1,0] = 0",
+                     dv_eval_qf(dv), qf_from_double(0.0), 1e-18);
+        mat_get(Dr, 1, 1, &dv);
+        check_qf_val("mat_deriv_by_name [1,1] = 0",
+                     dv_eval_qf(dv), qf_from_double(0.0), 1e-18);
+    }
+
+    if (dtr)
+        check_qf_val("mat_deriv_trace_by_name([radius]) = 1",
+                     dv_eval_qf(dtr), qf_from_double(1.0), 1e-18);
+    if (ddet)
+        check_qf_val("mat_deriv_det_by_name([radius]) = c₁",
+                     dv_eval_qf(ddet), qf_from_double(7.0), 1e-18);
+
+    dv_free(ddet);
+    dv_free(dtr);
+    mat_free(Dr);
+    free(bindings);
+    mat_free(A);
+}
+
+static void test_mat_symbolic_jacobian_helper_by_names(void)
+{
+    binding_t *bindings = NULL;
+    size_t nbindings = 0;
+    matrix_t *A = mat_from_string("(x, x*y)", &bindings, &nbindings);
+    const char *names[2] = {"x", "y"};
+    matrix_t *J = NULL;
+    dval_t *dv = NULL;
+
+    check_bool("mat symbolic Jacobian helper source non-null", A != NULL);
+    check_bool("mat symbolic Jacobian helper set x",
+               mat_binding_set_d(bindings, nbindings, "x", 2.0) == 0);
+    check_bool("mat symbolic Jacobian helper set y",
+               mat_binding_set_d(bindings, nbindings, "y", 3.0) == 0);
+
+    J = mat_jacobian_by_names(A, bindings, nbindings, names, 2);
+    check_bool("mat_jacobian_by_names not NULL", J != NULL);
+    check_bool("mat_jacobian_by_names rows", J && mat_get_row_count(J) == 2);
+    check_bool("mat_jacobian_by_names cols", J && mat_get_col_count(J) == 2);
+    check_bool("mat_jacobian_by_names missing symbol returns NULL",
+               mat_jacobian_by_names(A, bindings, nbindings,
+                                     (const char *const[]){"x", "missing"}, 2) == NULL);
+
+    if (J) {
+        mat_get(J, 0, 0, &dv);
+        check_qf_val("mat_jacobian_by_names [0,0] = 1",
+                     dv_eval_qf(dv), qf_from_double(1.0), 1e-18);
+        mat_get(J, 0, 1, &dv);
+        check_qf_val("mat_jacobian_by_names [0,1] = 0",
+                     dv_eval_qf(dv), qf_from_double(0.0), 1e-18);
+        mat_get(J, 1, 0, &dv);
+        check_qf_val("mat_jacobian_by_names [1,0] = y",
+                     dv_eval_qf(dv), qf_from_double(3.0), 1e-18);
+        mat_get(J, 1, 1, &dv);
+        check_qf_val("mat_jacobian_by_names [1,1] = x",
+                     dv_eval_qf(dv), qf_from_double(2.0), 1e-18);
+    }
+
+    mat_free(J);
+    free(bindings);
+    mat_free(A);
+}
+
+static void test_mat_symbolic_matrix_calculus_helpers_by_name(void)
+{
+    binding_t *bindings = NULL;
+    binding_t *rhs_bindings = NULL;
+    size_t nbindings = 0;
+    size_t nrhs = 0;
+    matrix_t *A = mat_from_string("(x, 1; y, 2)", &bindings, &nbindings);
+    binding_t *x_binding = NULL;
+    matrix_t *B = mat_from_string_with_bindings("(x; y)", bindings, nbindings,
+                                                &rhs_bindings, &nrhs);
+    matrix_t *dAi = NULL;
+    matrix_t *dAbi = NULL;
+    matrix_t *dX = NULL;
+    matrix_t *dXb = NULL;
+    dval_t *dv = NULL;
+
+    check_bool("mat symbolic calculus by-name source A non-null", A != NULL);
+    x_binding = mat_binding_find(bindings, nbindings, "x");
+    check_bool("mat symbolic calculus by-name shared x binding present", x_binding != NULL);
+    check_bool("mat symbolic calculus by-name source B non-null", B != NULL);
+    check_bool("mat symbolic calculus by-name B reuses x symbol",
+               x_binding && mat_binding_find(rhs_bindings, nrhs, "x")
+               && x_binding->symbol == mat_binding_find(rhs_bindings, nrhs, "x")->symbol);
+
+    check_bool("mat symbolic calculus by-name set A x",
+               mat_binding_set_d(bindings, nbindings, "x", 2.0) == 0);
+    check_bool("mat symbolic calculus by-name set A y",
+               mat_binding_set_d(bindings, nbindings, "y", 3.0) == 0);
+
+    dAi = mat_deriv_inverse_by_name(A, bindings, nbindings, "x");
+    dAbi = mat_deriv_block_inverse_by_name(A, 1, bindings, nbindings, "x");
+    dX = mat_deriv_solve_by_name(A, B, bindings, nbindings, "x");
+    dXb = mat_deriv_block_solve_by_name(A, B, 1, bindings, nbindings, "x");
+
+    check_bool("mat_deriv_inverse_by_name(x) not NULL", dAi != NULL);
+    check_bool("mat_deriv_block_inverse_by_name(x) not NULL", dAbi != NULL);
+    check_bool("mat_deriv_solve_by_name(x) not NULL", dX != NULL);
+    check_bool("mat_deriv_block_solve_by_name(x) not NULL", dXb != NULL);
+    check_bool("mat_deriv_inverse_by_name missing symbol returns NULL",
+               mat_deriv_inverse_by_name(A, bindings, nbindings, "missing") == NULL);
+
+    if (dAi) {
+        mat_get(dAi, 0, 0, &dv);
+        check_qf_val("mat_deriv_inverse_by_name [0,0]",
+                     dv_eval_qf(dv), qf_from_double(-4.0), 1e-18);
+        mat_get(dAi, 1, 0, &dv);
+        check_qf_val("mat_deriv_inverse_by_name [1,0]",
+                     dv_eval_qf(dv), qf_from_double(6.0), 1e-18);
+    }
+
+    if (dAbi) {
+        mat_get(dAbi, 0, 1, &dv);
+        check_qf_val("mat_deriv_block_inverse_by_name [0,1]",
+                     dv_eval_qf(dv), qf_from_double(2.0), 1e-18);
+        mat_get(dAbi, 1, 1, &dv);
+        check_qf_val("mat_deriv_block_inverse_by_name [1,1]",
+                     dv_eval_qf(dv), qf_from_double(-3.0), 1e-18);
+    }
+
+    if (dX) {
+        mat_get(dX, 0, 0, &dv);
+        check_qf_val("mat_deriv_solve_by_name [0,0]",
+                     dv_eval_qf(dv), qf_from_double(0.0), 1e-18);
+        mat_get(dX, 1, 0, &dv);
+        check_qf_val("mat_deriv_solve_by_name [1,0]",
+                     dv_eval_qf(dv), qf_from_double(0.0), 1e-18);
+    }
+
+    if (dXb) {
+        mat_get(dXb, 0, 0, &dv);
+        check_qf_val("mat_deriv_block_solve_by_name [0,0]",
+                     dv_eval_qf(dv), qf_from_double(0.0), 1e-18);
+        mat_get(dXb, 1, 0, &dv);
+        check_qf_val("mat_deriv_block_solve_by_name [1,0]",
+                     dv_eval_qf(dv), qf_from_double(0.0), 1e-18);
+    }
+
+    mat_free(dXb);
+    mat_free(dX);
+    mat_free(dAbi);
+    mat_free(dAi);
+    free(rhs_bindings);
+    mat_free(B);
+    free(bindings);
+    mat_free(A);
+}
+
 void run_matrix_fromstring_tests(void)
 {
     test_mat_from_string_numeric_qf();
@@ -304,5 +546,9 @@ void run_matrix_fromstring_tests(void)
     test_mat_from_string_symbolic_at_aliases();
     test_mat_from_string_symbolic_math_conventions();
     test_mat_from_string_bracketed_names();
+    test_mat_from_string_with_bindings_shared_symbols();
+    test_mat_symbolic_derivative_helpers_by_name();
+    test_mat_symbolic_jacobian_helper_by_names();
+    test_mat_symbolic_matrix_calculus_helpers_by_name();
     test_mat_from_string_invalid_syntax();
 }

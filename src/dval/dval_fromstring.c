@@ -44,410 +44,8 @@
 #include "qfloat.h"
 #include "qcomplex.h"
 #include "dval_internal.h"
+#include "dval_fromstring_internal.h"
 #include "dval.h"
-
-/* ------------------------------------------------------------------ */
-/* Utilities                                                            */
-/* ------------------------------------------------------------------ */
-
-static void *fs_xmalloc(size_t n)
-{
-    void *p = malloc(n);
-    if (!p) { fprintf(stderr, "dval_from_string: out of memory\n"); abort(); }
-    return p;
-}
-
-static int fs_utf8_decode(const char *s, unsigned int *out)
-{
-    const unsigned char *p = (const unsigned char *)s;
-    if (p[0] < 0x80) { *out = p[0]; return 1; }
-    if ((p[0] & 0xE0) == 0xC0) {
-        *out = ((p[0] & 0x1F) << 6) | (p[1] & 0x3F);
-        return 2;
-    }
-    if ((p[0] & 0xF0) == 0xE0) {
-        *out = ((p[0] & 0x0F) << 12) | ((p[1] & 0x3F) << 6) | (p[2] & 0x3F);
-        return 3;
-    }
-    return -1;
-}
-
-static int fs_is_letter(unsigned int c)
-{
-    if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')) return 1;
-    if (c >= 0x0391 && c <= 0x03A9) return 1;  /* Greek uppercase */
-    if (c >= 0x03B1 && c <= 0x03C9) return 1;  /* Greek lowercase */
-    return 0;
-}
-
-static void skip_spaces(const char **pp, const char *end)
-{
-    while (*pp < end && isspace((unsigned char)**pp))
-        (*pp)++;
-}
-
-static size_t scan_decimal_len(const char *s, const char *end)
-{
-    const char *p = s;
-    int ndigits = 0;
-    int frac_digits = 0;
-
-    if (p < end && (*p == '-' || *p == '+')) p++;
-    while (p < end && isdigit((unsigned char)*p)) {
-        p++;
-        ndigits++;
-    }
-    if (p < end && *p == '.') {
-        p++;
-        while (p < end && isdigit((unsigned char)*p)) {
-            p++;
-            frac_digits++;
-        }
-    }
-    if (ndigits == 0 && frac_digits == 0) {
-        return 0;
-    }
-    if (p < end && (*p == 'e' || *p == 'E')) {
-        const char *exp_start = p;
-        int exp_digits = 0;
-
-        p++;
-        if (p < end && (*p == '+' || *p == '-')) p++;
-        while (p < end && isdigit((unsigned char)*p)) {
-            p++;
-            exp_digits++;
-        }
-        if (exp_digits == 0) {
-            return (size_t)(exp_start - s);
-        }
-    }
-    return (size_t)(p - s);
-}
-
-/* ------------------------------------------------------------------ */
-/* Superscript digit reading                                            */
-/* ------------------------------------------------------------------ */
-
-/* Reads one or more consecutive superscript digits from *pp and advances *pp.
- * Supported: ¹ ² ³ ⁰ ⁴–⁹  (U+00B9, U+00B2, U+00B3, U+2070, U+2074–U+2079).
- * Returns the accumulated integer value, or -1 if no superscript is found. */
-static int read_superscript(const char **pp)
-{
-    const char *p = *pp;
-    unsigned int c;
-    int len = fs_utf8_decode(p, &c);
-    if (len <= 0) return -1;
-
-    int digit;
-    if      (c == 0x00B2) digit = 2;
-    else if (c == 0x00B3) digit = 3;
-    else if (c == 0x00B9) digit = 1;
-    else if (c == 0x2070) digit = 0;
-    else if (c >= 0x2074 && c <= 0x2079) digit = (int)(c - 0x2074 + 4);
-    else return -1;
-
-    p += len;
-    int val = digit;
-    for (;;) {
-        len = fs_utf8_decode(p, &c);
-        if (len <= 0) break;
-        if      (c == 0x00B2) digit = 2;
-        else if (c == 0x00B3) digit = 3;
-        else if (c == 0x00B9) digit = 1;
-        else if (c == 0x2070) digit = 0;
-        else if (c >= 0x2074 && c <= 0x2079) digit = (int)(c - 0x2074 + 4);
-        else break;
-        val = val * 10 + digit;
-        p += len;
-    }
-    *pp = p;
-    return val;
-}
-
-/* ------------------------------------------------------------------ */
-/* Name reading                                                         */
-/* ------------------------------------------------------------------ */
-
-/* Read a simple name (Unicode letter + optional subscript digits).
- * Subscripts may be Unicode U+2080–U+2089 or ASCII _0–_9 (normalised to
- * U+2080–U+2089 in the returned string so both forms produce the same key).
- * Returns a newly allocated string, or NULL if not a valid name start. */
-static char *read_simple_name(const char **pp)
-{
-    const char *p = *pp;
-    unsigned int c;
-    int len = fs_utf8_decode(p, &c);
-    if (len <= 0 || !fs_is_letter(c)) return NULL;
-
-    /* Build the normalised name into a local buffer.
-     * Initial letter: ≤4 bytes.  Each subscript: ≤3 bytes.  256 is ample. */
-    char buf[256];
-    int blen = 0;
-
-    memcpy(buf, p, (size_t)len);
-    blen = len;
-    p += len;
-
-    for (;;) {
-        /* Unicode subscript digit U+2080–U+2089: copy verbatim */
-        unsigned int sc;
-        int sl = fs_utf8_decode(p, &sc);
-        if (sl > 0 && sc >= 0x2080 && sc <= 0x2089) {
-            if (blen + sl >= (int)sizeof(buf) - 1) break;
-            memcpy(buf + blen, p, (size_t)sl);
-            blen += sl;
-            p += sl;
-            continue;
-        }
-        /* ASCII _N (N = 0–9): normalise to Unicode subscript U+2080+N */
-        if (*p == '_' && (unsigned char)p[1] >= '0' && (unsigned char)p[1] <= '9') {
-            if (blen + 3 >= (int)sizeof(buf) - 1) break;
-            int d = p[1] - '0';
-            buf[blen++] = (char)0xE2;
-            buf[blen++] = (char)0x82;
-            buf[blen++] = (char)(0x80 + d);
-            p += 2;
-            continue;
-        }
-        break;
-    }
-    buf[blen] = '\0';
-
-    char *result = (char *)fs_xmalloc((size_t)blen + 1);
-    memcpy(result, buf, (size_t)blen + 1);
-    *pp = p;
-    return result;
-}
-
-/* Read a bracketed name [content].
- * Returns the content (without brackets) as a newly allocated string,
- * or NULL if the current position isn't '['. */
-static char *read_bracketed_name(const char **pp)
-{
-    const char *p = *pp;
-    if (*p != '[') return NULL;
-    p++;
-    const char *start = p;
-    while (*p && *p != ']') p++;
-    if (*p != ']') return NULL;
-    size_t n = (size_t)(p - start);
-    char *buf = (char *)fs_xmalloc(n + 1);
-    memcpy(buf, start, n);
-    buf[n] = '\0';
-    *pp = p + 1;
-    return buf;
-}
-
-/* Read a simple or bracketed name from *pp. */
-static char *read_any_name(const char **pp)
-{
-    if (**pp == '[') return read_bracketed_name(pp);
-    return read_simple_name(pp);
-}
-
-static int fs_is_default_constant_name(const char *name)
-{
-    const char *p = name;
-    unsigned int c;
-    int len;
-
-    if (!name || !*name)
-        return 0;
-
-    if (*name != 'a' &&
-        *name != 'b' &&
-        *name != 'c' &&
-        *name != 'd') {
-        return 0;
-    }
-    p++;
-
-    len = fs_utf8_decode(p, &c);
-    if (*p == '\0')
-        return 1;
-    if (len > 0 && c >= 0x2080 && c <= 0x2089)
-        return 1;
-    if (*p == '_' && p[1] >= '0' && p[1] <= '9')
-        return 1;
-    return 0;
-}
-
-static char *fs_normalise_binding_name(const char *name)
-{
-    const char *s;
-    const char *e;
-    char *out;
-    size_t out_len = 0;
-
-    if (!name)
-        return NULL;
-
-    s = name;
-    while (*s && isspace((unsigned char)*s))
-        s++;
-    e = name + strlen(name);
-    while (e > s && isspace((unsigned char)e[-1]))
-        e--;
-    if (e == s)
-        return NULL;
-
-    if ((size_t)(e - s) >= 2 && s[0] == '[' && e[-1] == ']') {
-        out = (char *)fs_xmalloc((size_t)(e - s - 1));
-        memcpy(out, s + 1, (size_t)(e - s - 2));
-        out[e - s - 2] = '\0';
-        return out;
-    }
-
-    out = (char *)fs_xmalloc((size_t)(e - s) * 3 + 1);
-    while (s < e) {
-        if (*s == '_' && s + 1 < e && s[1] >= '0' && s[1] <= '9') {
-            int d = s[1] - '0';
-            out[out_len++] = (char)0xE2;
-            out[out_len++] = (char)0x82;
-            out[out_len++] = (char)(0x80 + d);
-            s += 2;
-            continue;
-        }
-        out[out_len++] = *s++;
-    }
-    out[out_len] = '\0';
-    return out;
-}
-
-/* ------------------------------------------------------------------ */
-/* Symbol table                                                         */
-/* ------------------------------------------------------------------ */
-
-typedef struct {
-    char   *name;   /* owned copy of the (possibly normalised) name */
-    dval_t *node;   /* owned dval_t* */
-} sym_t;
-
-typedef struct {
-    sym_t *entries;
-    int    count;
-    int    cap;
-} symtab_t;
-
-static void symtab_init(symtab_t *t)
-{
-    t->entries = NULL;
-    t->count   = 0;
-    t->cap     = 0;
-}
-
-/* Returns 1 if name is already in the table, 0 otherwise. */
-static int symtab_has(const symtab_t *t, const char *name)
-{
-    if (!t) return 0;
-    for (int i = 0; i < t->count; i++)
-        if (strcmp(t->entries[i].name, name) == 0)
-            return 1;
-    return 0;
-}
-
-/* Takes ownership of node; copies name. */
-static void symtab_add(symtab_t *t, const char *name, dval_t *node)
-{
-    if (t->count == t->cap) {
-        t->cap = t->cap ? t->cap * 2 : 8;
-        t->entries = (sym_t *)realloc(t->entries, (size_t)t->cap * sizeof(sym_t));
-        if (!t->entries) { fprintf(stderr, "dval_from_string: OOM\n"); abort(); }
-    }
-    size_t nl = strlen(name) + 1;
-    t->entries[t->count].name = (char *)fs_xmalloc(nl);
-    memcpy(t->entries[t->count].name, name, nl);
-    t->entries[t->count].node = node;
-    t->count++;
-}
-
-/* Returns a borrowed pointer (do not free). */
-static dval_t *symtab_lookup(const symtab_t *t, const char *name)
-{
-    if (!t) return NULL;
-    for (int i = 0; i < t->count; i++)
-        if (strcmp(t->entries[i].name, name) == 0)
-            return t->entries[i].node;
-    return NULL;
-}
-
-static void symtab_free(symtab_t *t)
-{
-    for (int i = 0; i < t->count; i++) {
-        free(t->entries[i].name);
-        dv_free(t->entries[i].node);
-    }
-    free(t->entries);
-    symtab_init(t);
-}
-
-static int symtab_add_borrowed(symtab_t *t, const char *name, dval_t *node)
-{
-    if (!t || !name || !node)
-        return -1;
-
-    dv_retain(node);
-    symtab_add(t, name, node);
-    return 0;
-}
-
-static dval_binding_t *symtab_build_bindings(const symtab_t *t, size_t *number_out)
-{
-    dval_binding_t *bindings;
-    char *name_store;
-    size_t total_name_bytes = 0;
-
-    if (number_out)
-        *number_out = 0;
-    if (!t || t->count <= 0)
-        return NULL;
-
-    for (int i = 0; i < t->count; ++i)
-        total_name_bytes += strlen(t->entries[i].name) + 1;
-
-    bindings = calloc(1, sizeof(*bindings) * (size_t)t->count + total_name_bytes);
-    if (!bindings)
-        return NULL;
-
-    name_store = (char *)(bindings + t->count);
-    for (int i = 0; i < t->count; ++i) {
-        size_t n = strlen(t->entries[i].name) + 1;
-        memcpy(name_store, t->entries[i].name, n);
-        bindings[i].name = name_store;
-        bindings[i].symbol = t->entries[i].node;
-        bindings[i].is_constant = (t->entries[i].node &&
-                                   t->entries[i].node->ops == &ops_const);
-        name_store += n;
-    }
-
-    if (number_out)
-        *number_out = (size_t)t->count;
-    return bindings;
-}
-
-static dval_binding_t *single_binding_from_node(dval_t *node, size_t *number_out)
-{
-    dval_binding_t *bindings;
-    size_t n;
-
-    if (number_out)
-        *number_out = 0;
-    if (!node || !node->name || !*node->name)
-        return NULL;
-
-    n = strlen(node->name) + 1;
-    bindings = calloc(1, sizeof(*bindings) + n);
-    if (!bindings)
-        return NULL;
-
-    bindings[0].name = (char *)(bindings + 1);
-    memcpy((char *)bindings[0].name, node->name, n);
-    bindings[0].symbol = node;
-    bindings[0].is_constant = (node->ops == &ops_const);
-    if (number_out)
-        *number_out = 1;
-    return bindings;
-}
 
 /* ------------------------------------------------------------------ */
 /* Parser state                                                         */
@@ -654,6 +252,9 @@ static int parse_two_args(parser_t *p, dval_t **a_out, dval_t **b_out)
 
 static dval_t *parse_atom(parser_t *p)
 {
+    unsigned int cp = 0;
+    int cp_len = fs_utf8_decode(p->p, &cp);
+
     if (p->error || p->p >= p->end) {
         set_error(p, "unexpected end of expression");
         return NULL;
@@ -673,6 +274,26 @@ static dval_t *parse_atom(parser_t *p)
         return inner;
     }
 
+    /* Absolute-value bars: |expr| */
+    if (*p->p == '|') {
+        dval_t *inner;
+        dval_t *result;
+
+        p->p++;
+        inner = parse_addexpr(p);
+        if (!inner)
+            return NULL;
+        if (p->p >= p->end || *p->p != '|') {
+            dv_free(inner);
+            set_error(p, "expected '|'");
+            return NULL;
+        }
+        p->p++;
+        result = dv_abs(inner);
+        dv_free(inner);
+        return result;
+    }
+
     /* Decimal number (starts with digit or '.') */
     if (isdigit((unsigned char)*p->p) || *p->p == '.') {
         const char *start = p->p;
@@ -683,6 +304,47 @@ static dval_t *parse_atom(parser_t *p)
         memcpy(nbuf, start, n);
         nbuf[n] = '\0';
         return dv_new_const(qf_from_string(nbuf));
+    }
+
+    if (cp_len > 0 && cp == 0x221A) {
+        int sup = -1;
+
+        p->p += cp_len;
+        sup = read_superscript(&p->p);
+        if (sup < 0 && p->p[0] == '^' && isdigit((unsigned char)p->p[1])) {
+            p->p++;
+            sup = 0;
+            while (isdigit((unsigned char)*p->p))
+                sup = sup * 10 + (*p->p++ - '0');
+        }
+
+        if (p->p >= p->end || *p->p != '(') {
+            set_error(p, "expected '(' after √");
+            return NULL;
+        }
+        p->p++;
+
+        {
+            dval_t *arg = parse_addexpr(p);
+            dval_t *result;
+
+            if (!arg)
+                return NULL;
+            if (p->p >= p->end || *p->p != ')') {
+                dv_free(arg);
+                set_error(p, "expected ')' after √ argument");
+                return NULL;
+            }
+            p->p++;
+            result = dv_sqrt(arg);
+            dv_free(arg);
+            if (sup >= 0) {
+                dval_t *tmp = dv_pow_d(result, (double)sup);
+                dv_free(result);
+                result = tmp;
+            }
+            return result;
+        }
     }
 
     /* Function keywords — O(1) hash lookup.  We read the ASCII identifier at
@@ -1216,7 +878,7 @@ static dval_t *dval_from_string_impl(const char *s,
         if (*scan == '(' || *scan == '[') { depth++; scan++; continue; }
         if (*scan == ')' || *scan == ']') { depth--; scan++; continue; }
         if (depth == 0) {
-            if (*scan == '|' && !pipe_pos) { pipe_pos = scan; scan++; continue; }
+            if (*scan == '|') { pipe_pos = scan; scan++; continue; }
             if (*scan == '}') { close_pos = scan; break; }
         }
         unsigned int uc;
@@ -1230,6 +892,9 @@ static dval_t *dval_from_string_impl(const char *s,
     }
 
     char errmsg[256] = { 0 };
+
+    if (pipe_pos && !has_top_level_equals(pipe_pos + 1, close_pos))
+        pipe_pos = NULL;
 
     /* ---- No bindings: either { expr } or legacy { name = val } ---- */
     if (!pipe_pos) {

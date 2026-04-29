@@ -30,302 +30,32 @@
 
 #include "qcomplex.h"
 #include "dval_internal.h"
+#include "dval_tostring_internal.h"
 #include "dval.h"
 
 /* ------------------------------------------------------------------------- */
 /* Small helpers                                                             */
 /* ------------------------------------------------------------------------- */
 
-static void *xmalloc(size_t n)
-{
-    void *p = malloc(n);
-    if (!p) {
-        fprintf(stderr, "dv_to_string: out of memory\n");
-        abort();
-    }
-    return p;
-}
+#define is_op dv_is_op
+#define is_const dv_is_const
+#define is_var dv_is_var
+#define is_neg dv_is_neg
+#define is_mul dv_is_mul
+#define is_addsub dv_is_addsub
+#define is_pow_d_expr dv_is_pow_d_expr
+#define is_sqrt_expr dv_is_sqrt_expr
 
-static char *xstrdup(const char *s)
-{
-    if (!s) return NULL;
-    size_t n = strlen(s) + 1;
-    char *p = (char *)xmalloc(n);
-    memcpy(p, s, n);
-    return p;
-}
-
-static int is_op(const dval_t *f, const dval_ops_t *ops)
-{
-    return f && f->ops == ops;
-}
-
-static int is_const(const dval_t *f)
-{
-    return is_op(f, &ops_const);
-}
-
-static int is_var(const dval_t *f)
-{
-    return is_op(f, &ops_var);
-}
-
-static int is_neg(const dval_t *f)
-{
-    return is_op(f, &ops_neg);
-}
-
-static int is_mul(const dval_t *f)
-{
-    return is_op(f, &ops_mul);
-}
-
-static int is_addsub(const dval_t *f)
-{
-    return is_op(f, &ops_add) || is_op(f, &ops_sub);
-}
-
-static int is_pow_d_expr(const dval_t *f)
-{
-    return is_op(f, &ops_pow_d);
-}
-
-static int is_negative_const(const dval_t *f)
-{
-    return is_const(f) &&
-           qf_eq(f->c.im, QF_ZERO) &&
-           qf_to_double(f->c.re) < 0.0;
-}
-
-static int is_var_pow_d(const dval_t *f)
-{
-    return is_pow_d_expr(f) && is_var(f->a);
-}
+#define is_negative_const dv_tostring_is_negative_const
+#define is_var_pow_d dv_tostring_is_var_pow_d
 
 /* ------------------------------------------------------------------------- */
 /* Growable string buffer                                                    */
 /* ------------------------------------------------------------------------- */
 
-typedef struct {
-    char  *data;
-    size_t len;
-    size_t cap;
-} sbuf_t;
-
-static void sbuf_init(sbuf_t *b)
-{
-    b->cap  = 128;
-    b->len  = 0;
-    b->data = (char *)xmalloc(b->cap);
-    b->data[0] = '\0';
-}
-
-static void sbuf_free(sbuf_t *b)
-{
-    free(b->data);
-    b->data = NULL;
-    b->len  = 0;
-    b->cap  = 0;
-}
-
-static void sbuf_reserve(sbuf_t *b, size_t extra)
-{
-    if (b->len + extra + 1 <= b->cap)
-        return;
-    size_t ncap = b->cap * 2;
-    while (ncap < b->len + extra + 1)
-        ncap *= 2;
-    char *ndata = (char *)xmalloc(ncap);
-    memcpy(ndata, b->data, b->len + 1);
-    free(b->data);
-    b->data = ndata;
-    b->cap  = ncap;
-}
-
-static void sbuf_putc(sbuf_t *b, char c)
-{
-    sbuf_reserve(b, 1);
-    b->data[b->len++] = c;
-    b->data[b->len]   = '\0';
-}
-
-static void sbuf_puts(sbuf_t *b, const char *s)
-{
-    if (!s) return;
-    size_t n = strlen(s);
-    sbuf_reserve(b, n);
-    memcpy(b->data + b->len, s, n);
-    b->len += n;
-    b->data[b->len] = '\0';
-}
-
-/* ------------------------------------------------------------------------- */
-/* UTF‑8 decoding (minimal)                                                  */
-/* ------------------------------------------------------------------------- */
-
-static int utf8_decode(const char *s, unsigned int *out)
-{
-    const unsigned char *p = (const unsigned char *)s;
-
-    if (p[0] < 0x80) {
-        *out = p[0];
-        return 1;
-    }
-    if ((p[0] & 0xE0) == 0xC0) {
-        *out = ((p[0] & 0x1F) << 6) |
-               (p[1] & 0x3F);
-        return 2;
-    }
-    if ((p[0] & 0xF0) == 0xE0) {
-        *out = ((p[0] & 0x0F) << 12) |
-               ((p[1] & 0x3F) << 6) |
-               (p[2] & 0x3F);
-        return 3;
-    }
-    return -1;
-}
-
-/* ------------------------------------------------------------------------- */
-/* qfloat_t formatting                                                         */
-/* ------------------------------------------------------------------------- */
-
-static void qf_to_string_simple(qcomplex_t v, char *buf, size_t n)
-{
-    if (n == 0)
-        return;
-
-    if (qc_eq(v, QC_ZERO)) {
-        snprintf(buf, n, "0");
-        return;
-    }
-
-    if (qf_eq(v.im, QF_ZERO)) {
-        qf_sprintf(buf, n, "%q", v.re);
-        return;
-    }
-
-    if (qf_eq(v.re, QF_ZERO)) {
-        char imag[128];
-        size_t len;
-
-        qf_sprintf(imag, sizeof(imag), "%q", v.im);
-        len = strlen(imag);
-        if (len + 2 > n) {
-            if (n > 0)
-                buf[0] = '\0';
-            return;
-        }
-        memcpy(buf, imag, len);
-        buf[len] = 'i';
-        buf[len + 1] = '\0';
-        return;
-    }
-
-    qc_sprintf(buf, n, "%z", v);
-}
-
-/* ------------------------------------------------------------------------- */
-/* Name classification                                                       */
-/* ------------------------------------------------------------------------- */
-
-static int is_unicode_letter(unsigned int c)
-{
-    if ((c >= 'A' && c <= 'Z') ||
-        (c >= 'a' && c <= 'z'))
-        return 1;
-
-    if (c >= 0x0391 && c <= 0x03A9)
-        return 1;
-
-    if (c >= 0x03B1 && c <= 0x03C9)
-        return 1;
-
-    return 0;
-}
-
-static int is_simple_name(const char *name)
-{
-    if (!name || !*name)
-        return 0;
-
-    unsigned int c;
-    int len = utf8_decode(name, &c);
-    if (len <= 0 || !is_unicode_letter(c))
-        return 0;
-
-    if (name[len] == '\0')
-        return 1;   /* single letter — always simple */
-
-    /* Accept only Unicode subscript digit continuations (U+2080–U+2089).
-     * These are the auto-generated suffixes like x₀, x₁, c₀, c₁, etc.
-     * Any other continuation (e.g. "radius", "pi") makes the name non-simple
-     * and causes it to be rendered with square brackets: [radius], [pi]. */
-    const char *p = name + len;
-    while (*p) {
-        unsigned int sc;
-        int sl = utf8_decode(p, &sc);
-        if (sl <= 0 || sc < 0x2080 || sc > 0x2089)
-            return 0;
-        p += sl;
-    }
-    return 1;
-}
-
-static void emit_name(sbuf_t *b, const char *name)
-{
-    if (!name || !*name) {
-        sbuf_puts(b, "x");
-        return;
-    }
-    if (is_simple_name(name)) {
-        sbuf_puts(b, name);
-    } else {
-        sbuf_putc(b, '[');
-        sbuf_puts(b, name);
-        sbuf_putc(b, ']');
-    }
-}
-
-/* In function-style output, brackets are only needed when a name would be
- * ambiguous or unparseable: names that start with a digit, contain spaces,
- * or contain characters other than Unicode letters, ASCII digits 0-9, or
- * Unicode subscript digits U+2080-U+2089. */
-static int is_safe_func_name(const char *name)
-{
-    if (!name || !*name) return 0;
-
-    unsigned int c;
-    int len = utf8_decode(name, &c);
-    if (len <= 0 || !is_unicode_letter(c)) return 0;
-
-    const char *p = name + len;
-    while (*p) {
-        unsigned int sc;
-        int sl = utf8_decode(p, &sc);
-        if (sl <= 0) return 0;
-        if (!is_unicode_letter(sc) &&
-            !(sc >= '0' && sc <= '9') &&
-            !(sc >= 0x2080 && sc <= 0x2089))
-            return 0;
-        p += sl;
-    }
-    return 1;
-}
-
-static void emit_name_func(sbuf_t *b, const char *name)
-{
-    if (!name || !*name) {
-        sbuf_puts(b, "x");
-        return;
-    }
-    if (is_safe_func_name(name)) {
-        sbuf_puts(b, name);
-    } else {
-        sbuf_putc(b, '[');
-        sbuf_puts(b, name);
-        sbuf_putc(b, ']');
-    }
-}
+#define xmalloc dv_tostring_xmalloc
+#define xstrdup dv_tostring_xstrdup
+#define utf8_decode dv_tostring_utf8_decode
 
 /* ------------------------------------------------------------------------- */
 /* Auto-naming for unnamed nodes                                             */
@@ -515,14 +245,14 @@ static int is_atomic_for_mul(const dval_t *f)
          * are non-atomic so that a middle-dot separator is inserted between adjacent
          * bracketed terms: [pi]·[radius]² instead of [pi][radius]². */
         if (!f->name || !*f->name) return 1;
-        return is_simple_name(f->name);
+        return dv_tostring_is_simple_name(f->name);
     }
 
     if (is_var(f))
-        return is_simple_name(f->name);
+        return dv_tostring_is_simple_name(f->name);
 
     if (is_var_pow_d(f))
-        return is_simple_name(f->a->name);
+        return dv_tostring_is_simple_name(f->a->name);
 
     return 0;
 }
@@ -651,6 +381,7 @@ static void sort_factors(dval_t **fac, int n)
 
 static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec);
 static void emit_expr_abs(const dval_t *f, sbuf_t *b, int parent_prec);
+static void emit_expr_abs_bars(const dval_t *f, sbuf_t *b);
 
 static int expr_is_negative(const dval_t *f)
 {
@@ -762,6 +493,13 @@ static void emit_expr_abs(const dval_t *f, sbuf_t *b, int parent_prec)
     emit_expr(f, b, parent_prec);
 }
 
+static void emit_expr_abs_bars(const dval_t *f, sbuf_t *b)
+{
+    sbuf_putc(b, '|');
+    emit_expr_abs(f, b, 0);
+    sbuf_putc(b, '|');
+}
+
 static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
 {
     if (!f) { sbuf_puts(b, "0"); return; }
@@ -803,7 +541,15 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
         int need = PREC_UNARY < parent_prec;
         if (need) sbuf_putc(b, '(');
 
-        sbuf_puts(b, f->ops->name);
+        if (is_op(f, &ops_abs)) {
+            emit_expr_abs_bars(f->a, b);
+            if (need) sbuf_putc(b, ')');
+            return;
+        }
+        if (is_sqrt_expr(f))
+            sbuf_puts(b, "√");
+        else
+            sbuf_puts(b, f->ops->name);
         sbuf_putc(b, '(');
         emit_expr(f->a, b, 0);
         sbuf_putc(b, ')');
@@ -824,7 +570,10 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
          * rather than func(arg)² so the exponent binds to the function name. */
         if (f->a->ops->arity == DV_OP_UNARY) {
             dval_t *inner = f->a;
-            sbuf_puts(b, inner->ops->name);
+            if (is_sqrt_expr(inner))
+                sbuf_puts(b, "√");
+            else
+                sbuf_puts(b, inner->ops->name);
 
             if (ed == (double)ei)
                 emit_superscript_int(b, ei);

@@ -518,6 +518,48 @@ void test_to_string_unary_sin(void)
     RUN_TEST(test_to_string_unary_sin_func, __func__);
 }
 
+static void test_to_string_unary_sqrt_expr(void)
+{
+    dval_t *x = dv_new_named_var_d(4.0, "x");
+    dval_t *f = dv_sqrt(x);
+    char *got = dv_to_string(f, style_EXPRESSION);
+    const char *expect = "{ √(x) | x = 4 }";
+
+    if (str_eq(got, expect))
+        to_string_pass("unary sqrt (EXPR)", got, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "unary sqrt (EXPR)", got, expect);
+
+    free(got);
+    dv_free(x);
+    dv_free(f);
+}
+
+static void test_to_string_unary_sqrt_func(void)
+{
+    dval_t *x = dv_new_named_var_d(4.0, "x");
+    dval_t *f = dv_sqrt(x);
+    char *got = dv_to_string(f, style_FUNCTION);
+    const char *expect = "x = 4\n"
+                         "expr(x) = sqrt(x)\n"
+                         "return expr(x)\n";
+
+    if (str_eq(got, expect))
+        to_string_pass("unary sqrt (FUNC)", got, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "unary sqrt (FUNC)", got, expect);
+
+    free(got);
+    dv_free(x);
+    dv_free(f);
+}
+
+void test_to_string_unary_sqrt(void)
+{
+    RUN_TEST(test_to_string_unary_sqrt_expr, __func__);
+    RUN_TEST(test_to_string_unary_sqrt_func, __func__);
+}
+
 /* ============================================================
  * FUNCTION STYLE (identity)
  * ============================================================ */
@@ -623,6 +665,7 @@ void test_to_string_all(void)
     RUN_TEST(test_to_string_atan2, __func__);
     RUN_TEST(test_to_string_pow_superscript, __func__);
     RUN_TEST(test_to_string_unary_sin, __func__);
+    RUN_TEST(test_to_string_unary_sqrt, __func__);
     RUN_TEST(test_to_string_function_style, __func__);
     RUN_TEST(test_to_string_special_functions, __func__);
 }

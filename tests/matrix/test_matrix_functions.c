@@ -2604,6 +2604,13 @@ static void test_readme_string_quantum_example(void)
     printf("    example output from matrix.md:\n");
     mat_printf("    H = %ml\n", H);
     mat_printf("    H² = %m\n", H2);
+    if (H2) {
+        char *h2_text = mat_to_string(H2, MAT_STRING_INLINE_PRETTY);
+        check_bool("README string example H² text simplified",
+                   h2_text && strcmp(h2_text,
+                   "{ (Δ² + Ω², 0; 0, Δ² + Ω²) | Δ = 1.5, Ω = 0.25 }") == 0);
+        free(h2_text);
+    }
     if (trace) {
         char *trace_text = dv_to_string(trace, style_EXPRESSION);
         printf("    tr(H) = %s\n", trace_text ? trace_text : "(null)");
@@ -2611,12 +2618,18 @@ static void test_readme_string_quantum_example(void)
     }
     if (c2) {
         char *c2_text = dv_to_string(c2, style_EXPRESSION);
+        check_bool("README string example charpoly constant text simplified",
+                   c2_text && strcmp(c2_text, "{ -(Δ² + Ω²) | Δ = 1.5, Ω = 0.25 }") == 0);
         printf("    charpoly constant term = %s\n", c2_text ? c2_text : "(null)");
         free(c2_text);
     }
     if (ev[0] && ev[1]) {
         char *ev0_text = dv_to_string(ev[0], style_EXPRESSION);
         char *ev1_text = dv_to_string(ev[1], style_EXPRESSION);
+        check_bool("README string example eigenvalue[0] text simplified",
+                   ev0_text && strcmp(ev0_text, "{ √(Δ² + Ω²) | Δ = 1.5, Ω = 0.25 }") == 0);
+        check_bool("README string example eigenvalue[1] text simplified",
+                   ev1_text && strcmp(ev1_text, "{ -√(Δ² + Ω²) | Δ = 1.5, Ω = 0.25 }") == 0);
         printf("    eigenvalues = %s, %s\n",
                ev0_text ? ev0_text : "(null)",
                ev1_text ? ev1_text : "(null)");
@@ -2632,6 +2645,63 @@ static void test_readme_string_quantum_example(void)
     mat_free(P);
     mat_free(H2);
     mat_free(H);
+}
+
+static void test_mat_simplify_symbolic_helper(void)
+{
+    dval_t *delta = dv_new_named_var_d(1.5, "Δ");
+    dval_t *omega = dv_new_named_var_d(0.25, "Ω");
+    dval_t *prod1 = NULL;
+    dval_t *prod2 = NULL;
+    dval_t *neg_prod1 = NULL;
+    dval_t *entry = NULL;
+    dval_t *vals[4] = {NULL, NULL, NULL, NULL};
+    matrix_t *A = NULL;
+    matrix_t *S = NULL;
+    char *text = NULL;
+
+    check_bool("mat_simplify_symbolic helper Δ allocated", delta != NULL);
+    check_bool("mat_simplify_symbolic helper Ω allocated", omega != NULL);
+    if (!delta || !omega)
+        goto cleanup;
+
+    dv_retain(delta);
+    dv_retain(omega);
+    prod1 = dv_mul(delta, omega);
+
+    dv_retain(delta);
+    dv_retain(omega);
+    prod2 = dv_mul(delta, omega);
+
+    neg_prod1 = dv_neg(prod1);
+    entry = dv_add(neg_prod1, prod2);
+
+    vals[0] = entry;
+    dv_retain(entry);
+    vals[1] = entry;
+    dv_retain(entry);
+    vals[2] = entry;
+    dv_retain(entry);
+    vals[3] = entry;
+    A = mat_create_dv(2, 2, vals);
+    check_bool("mat_simplify_symbolic helper source matrix non-null", A != NULL);
+
+    S = mat_simplify_symbolic(A);
+    check_bool("mat_simplify_symbolic helper simplified matrix non-null", S != NULL);
+    text = S ? mat_to_string(S, MAT_STRING_INLINE_PRETTY) : NULL;
+    check_bool("mat_simplify_symbolic helper collapses symbolic zero",
+               text && strcmp(text, "{ (0, 0; 0, 0) }") == 0);
+
+cleanup:
+    free(text);
+    mat_free(S);
+    mat_free(A);
+    dv_free(entry);
+    dv_free(neg_prod1);
+    dv_free(prod2);
+    dv_free(prod1);
+    dv_free(omega);
+    dv_free(delta);
 }
 
 /* ------------------------------------------------------------------ generic matrix check (double) */
@@ -4179,6 +4249,42 @@ static void test_mat_pow_int_d(void)
         mat_free(D);
         mat_free(R);
     }
+
+    /* symbolic Jordan block: [[x,1],[0,x]]^n */
+    {
+        binding_t *bindings = NULL;
+        size_t number = 0;
+        matrix_t *J = mat_from_string("(x, 1; 0, x)", &bindings, &number);
+        matrix_t *J2 = NULL;
+        matrix_t *J3 = NULL;
+        char *j2_text = NULL;
+        char *j3_text = NULL;
+
+        check_bool("symbolic Jordan block allocated", J != NULL);
+        check_bool("symbolic Jordan block bindings returned", bindings != NULL);
+        check_bool("symbolic Jordan block x binding present",
+                   bindings && mat_binding_find(bindings, number, "x") != NULL);
+
+        J2 = mat_pow_int(J, 2);
+        J3 = mat_pow_int(J, 3);
+        check_bool("symbolic Jordan block squared", J2 != NULL);
+        check_bool("symbolic Jordan block cubed", J3 != NULL);
+
+        j2_text = J2 ? mat_to_string(J2, MAT_STRING_INLINE_PRETTY) : NULL;
+        j3_text = J3 ? mat_to_string(J3, MAT_STRING_INLINE_PRETTY) : NULL;
+
+        check_bool("symbolic Jordan block J^2 exact text",
+                   j2_text && strcmp(j2_text, "(x², 2x; 0, x²)") == 0);
+        check_bool("symbolic Jordan block J^3 exact text",
+                   j3_text && strcmp(j3_text, "(x³, 3x²; 0, x³)") == 0);
+
+        free(j3_text);
+        free(j2_text);
+        mat_free(J3);
+        mat_free(J2);
+        free(bindings);
+        mat_free(J);
+    }
 }
 
 /* ------------------------------------------------------------------ mat_pow tests */
@@ -4682,6 +4788,7 @@ void run_matrix_function_tests(void)
     RUN_TEST(test_mat_typeof, NULL);
     RUN_TEST(test_dval_matrix_functions, NULL);
     RUN_TEST(test_dval_matrix_functions_extended, NULL);
+    RUN_TEST(test_mat_simplify_symbolic_helper, NULL);
 }
 
 void run_matrix_readme_example(void)
