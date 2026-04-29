@@ -144,6 +144,9 @@ The derivative API always requires an explicit `wrt` variable so the library
 knows which variable to differentiate with respect to. Pass the same node
 pointer that was used to build the expression.
 
+If `wrt` is a named constant leaf instead, the derivative is treated as
+undefined and the derivative routines return a symbolic `NaN` node.
+
 ```c
 #include <stdio.h>
 #include "dval.h"
@@ -351,7 +354,8 @@ All public declarations are in `include/dval.h`.
 
 All returned handles must be freed by the caller. `wrt` must be a variable node
 (created with `dv_new_var` or `dv_new_named_var`) that appears in the expression
-DAG. All other variable nodes in the graph are treated as constants.
+DAG. All other variable nodes in the graph are treated as constants. If `wrt`
+is a named constant node, the result is symbolic `NaN`.
 
 - `dval_t *dv_create_deriv(dval_t *expr, dval_t *wrt)` — build ∂expr/∂wrt
 - `dval_t *dv_create_2nd_deriv(dval_t *expr, dval_t *wrt1, dval_t *wrt2)` — build ∂²expr/(∂wrt1 ∂wrt2)
@@ -433,16 +437,46 @@ All functions return owning handles.
 ### Parsing
 
 - `dval_t *dval_from_string(const char *s)` — construct a `dval_t` from a string in the format produced by `dv_to_string(..., style_EXPRESSION)`:
+- `dval_t *dval_from_string_with_bindings(const char *s, dval_binding_t **bindings_out, size_t *number_out)` — same parse, but also returns a heap-allocated array of borrowed symbolic bindings when the parsed expression is symbolic
+- `dval_binding_t *dval_binding_find(dval_binding_t *bindings, size_t number, const char *name)` — find a returned symbolic binding by name
+- `int dval_binding_set_qf(dval_binding_t *bindings, size_t number, const char *name, qfloat_t value)` — update a returned binding
+- `int dval_binding_set_qc(dval_binding_t *bindings, size_t number, const char *name, qcomplex_t value)` — update a returned binding
+- `int dval_binding_set_d(dval_binding_t *bindings, size_t number, const char *name, double value)` — update a returned binding
 
   ```
   { expr }
   { expr | x₀ = val, ...; [name] = val, ... }
   ```
 
-  Variables appear before the `;`; named constants appear after it. Returns an owning handle on success, or NULL on error (details written to stderr).
+  Variables appear before the `;`; named constants appear after it.
+  If there is no `;`, all bindings are treated as variables.
+  If the binding section begins with `;`, all bindings are treated as named constants.
+  If there is no binding section and the expression still contains symbolic
+  names, `dval_from_string(...)` infers them from mathematical conventions and
+  initialises every discovered symbol to `NaN`.
+  Returns an owning handle on success, or NULL on error (details written to stderr).
 
   Accepted shorthand in the string:
   - `x_0` for subscript x₀
   - `*` for explicit multiplication
-  - `^N` for integer exponents
+  - `^N` or `^1.5` for ASCII exponents after a variable, constant, or parenthesised sub-expression
+  - `sin^2(x)` style ASCII exponents on function names
   - `[bracket names]` for identifiers that are not single-letter-plus-subscript
+
+  In the no-binding form, the default inference rule is:
+  - constants: `a`, `b`, `c`, `d`, and their indexed forms such as `a₀`, `b_1`, `c₂`, and `d_3`
+  - variables: everything else that is a valid symbolic `dval` name, including `x`, `τ`, `e`, `π`, and bracketed names like `[radius]`
+
+  Repeated occurrences of the same normalised symbol name within one parsed
+  expression resolve to the same underlying leaf node. Reusing the same name as
+  both a variable and a constant in one parse is rejected.
+
+  When `bindings_out` is non-NULL, `dval_from_string_with_bindings(...)`
+  returns a flat array of borrowed symbolic bindings:
+  - `dval_binding_t.name` is the normalised symbol name
+  - `dval_binding_t.symbol` is the underlying symbolic leaf
+  - `dval_binding_t.is_constant` tells you whether the symbol is a constant placeholder
+
+  This is the public way to differentiate a parsed bare symbolic expression:
+  parse with bindings, find the inferred variable handle, then pass that
+  `dval_t *` to `dv_create_deriv(...)`.

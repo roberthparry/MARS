@@ -2146,7 +2146,8 @@
       "test_deriv_ei": true,
       "test_deriv_e1": true,
       "test_deriv_beta": true,
-      "test_deriv_logbeta": true
+      "test_deriv_logbeta": true,
+      "test_deriv_wrt_const_is_nan": true
     }
   },
   "tests/dval/test_dval_second_derivatives.c": {
@@ -2281,7 +2282,10 @@
       "test_from_string_ascii_alternatives": true,
       "test_from_string_errors": true,
       "test_from_string_round_trips": true,
-      "test_from_string_deriv": true
+      "test_from_string_deriv": true,
+      "test_from_expression_string_api": true,
+      "test_from_string_implicit_symbolic_bindings": true,
+      "test_from_string_bindings_api": true
     },
     "test_from_string_ascii_alternatives": {
       "enabled": true,

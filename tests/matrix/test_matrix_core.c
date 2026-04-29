@@ -2153,6 +2153,7 @@ static void test_deriv(void)
     {
         dval_t *x = dv_new_named_var_d(2.0, "x");
         dval_t *y = dv_new_named_var_d(3.0, "y");
+        dval_t *c = dv_new_named_const_d(11.0, "c");
         dval_t *one = dv_new_const_d(1.0);
         dval_t *xy = dv_mul(x, y);
         dval_t *x2 = dv_mul(x, x);
@@ -2163,11 +2164,13 @@ static void test_deriv(void)
         matrix_t *A = mat_create_dv(2, 2, vals);
         matrix_t *Dx = mat_deriv(A, x);
         matrix_t *Dy = mat_deriv(A, y);
+        matrix_t *Dc = mat_deriv(A, c);
         dval_t *v = NULL;
 
         print_mdv("A (dval deriv)", A);
         check_bool("mat_deriv(A, x) not NULL", Dx != NULL);
         check_bool("mat_deriv(A, y) not NULL", Dy != NULL);
+        check_bool("mat_deriv(A, c) not NULL", Dc != NULL);
 
         if (Dx) {
             print_mdv("dA/dx", Dx);
@@ -2197,6 +2200,18 @@ static void test_deriv(void)
             check_d("dA/dy[1,1] = 1", dv_eval_d(v), 1.0, 1e-12);
         }
 
+        if (Dc) {
+            print_mdv("dA/dc", Dc);
+            mat_get(Dc, 0, 0, &v);
+            check_bool("dA/dc[0,0] = NaN", v && qf_isnan(dv_eval_qf(v)));
+            mat_get(Dc, 0, 1, &v);
+            check_bool("dA/dc[0,1] = NaN", v && qf_isnan(dv_eval_qf(v)));
+            mat_get(Dc, 1, 0, &v);
+            check_bool("dA/dc[1,0] = NaN", v && qf_isnan(dv_eval_qf(v)));
+            mat_get(Dc, 1, 1, &v);
+            check_bool("dA/dc[1,1] = NaN", v && qf_isnan(dv_eval_qf(v)));
+        }
+
         dv_set_val_d(x, 5.0);
         dv_set_val_d(y, 7.0);
         if (Dx) {
@@ -2212,7 +2227,9 @@ static void test_deriv(void)
 
         mat_free(Dx);
         mat_free(Dy);
+        mat_free(Dc);
         mat_free(A);
+        dv_free(c);
         dv_free(x);
         dv_free(y);
         dv_free(one);

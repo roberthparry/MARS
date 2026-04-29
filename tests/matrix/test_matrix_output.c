@@ -13,8 +13,8 @@ static void test_mat_sprintf_formats(void)
     int n_inline = mat_sprintf(buf, sizeof(buf), "%m", A);
 
     check_bool("mat_sprintf %m returns non-negative", n_inline >= 0);
-    check_bool("mat_sprintf %m inline brackets",
-               strstr(buf, "[[") != NULL && strstr(buf, "]]") != NULL);
+    check_bool("mat_sprintf %m inline delimiters",
+               strstr(buf, "(") != NULL && strstr(buf, ";") != NULL);
 
     memset(buf, 0, sizeof(buf));
     check_bool("mat_sprintf %ML returns non-negative",

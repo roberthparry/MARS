@@ -26,6 +26,32 @@ void test_deriv_var(void)
     dv_free(x);
 }
 
+void test_deriv_wrt_const_is_nan(void)
+{
+    dval_t *x = dv_new_named_var_d(2.0, "x");
+    dval_t *c = dv_new_named_const_d(3.0, "c");
+    dval_t *df = dv_create_deriv(x, c);
+    const dval_t *borrowed = dv_get_deriv(x, c);
+
+    if (!(df && qf_isnan(dv_eval_qf(df)))) {
+        printf(C_RED "  FAIL: d/dc{x} via dv_create_deriv should be NaN" C_RESET "\n");
+        TEST_FAIL();
+    } else {
+        printf(C_GREEN "  OK: d/dc{x} via dv_create_deriv is NaN" C_RESET "\n");
+    }
+
+    if (!(borrowed && qf_isnan(dv_eval_qf(borrowed)))) {
+        printf(C_RED "  FAIL: d/dc{x} via dv_get_deriv should be NaN" C_RESET "\n");
+        TEST_FAIL();
+    } else {
+        printf(C_GREEN "  OK: d/dc{x} via dv_get_deriv is NaN" C_RESET "\n");
+    }
+
+    dv_free(df);
+    dv_free(c);
+    dv_free(x);
+}
+
 void test_deriv_neg(void)
 {
     dval_t *x = dv_new_var_d(3.0);
@@ -871,6 +897,7 @@ void test_first_derivatives(void)
 {
     RUN_TEST(test_deriv_const, __func__);
     RUN_TEST(test_deriv_var, __func__);
+    RUN_TEST(test_deriv_wrt_const_is_nan, __func__);
     RUN_TEST(test_deriv_neg, __func__);
     RUN_TEST(test_deriv_add_d, __func__);
     RUN_TEST(test_deriv_mul_d, __func__);

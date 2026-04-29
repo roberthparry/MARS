@@ -122,32 +122,24 @@ eigenvalue[1] = 4 + 0i
 
 The string parser is especially handy when you want to build a symbolic matrix
 directly from a compact mathematical expression. Here is a small spin-½
-Hamiltonian with detuning `Δ` and coupling `Ω`:
+Hamiltonian with detuning `Δ` and coupling `Ω`. The input uses the ASCII alias
+forms `@DELTA` and `@OMEGA`, so you do not need to type Greek letters at the
+keyboard:
 
 ```c
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include "dval.h"
 #include "matrix.h"
-
-static binding_t *find_binding(binding_t *bindings, size_t n, const char *name)
-{
-    for (size_t i = 0; i < n; ++i) {
-        if (strcmp(bindings[i].name, name) == 0)
-            return &bindings[i];
-    }
-    return NULL;
-}
 
 int main(void)
 {
     binding_t *bindings = NULL;
     size_t nbindings = 0;
     matrix_t *H = mat_from_string(
-        "{ [[Δ Ω][Ω -Δ]] | Δ = 1.5; Ω = 0.25 }",
+        "{ (@DELTA, @OMEGA; @OMEGA, -@DELTA) | @DELTA = 1.5; @OMEGA = 0.25 }",
         &bindings, &nbindings);
-    binding_t *delta = find_binding(bindings, nbindings, "Δ");
+    binding_t *delta = mat_binding_find(bindings, nbindings, "@DELTA");
     matrix_t *charpoly = mat_charpoly(H);
     dval_t *detH = NULL;
     dval_t *ddet_dDelta = mat_deriv_det(H, delta->symbol);
@@ -183,11 +175,11 @@ int main(void)
 Illustrative output:
 
 ```text
-{ [
+{ (
   Δ    Ω
   Ω   -Δ
-] | Δ = 1.5; Ω = 0.25 }
-characteristic polynomial coefficients = [[1][0][-(Δ² + Ω²)]]
+) | Δ = 1.5, Ω = 0.25 }
+characteristic polynomial coefficients = (1; 0; -(Δ² + Ω²))
 det(H) = { -Δ² - Ω² | Δ = 1.5; Ω = 0.25 }
 d/dΔ det(H) = { -2Δ | Δ = 1.5 }
 ```
@@ -200,7 +192,11 @@ Here is a symbolic two-level Hamiltonian for a driven spin-½ system,
 
 written in matrix form as
 
-`[[Δ, Ω], [Ω, -Δ]]`.
+`(Δ, Ω; Ω, -Δ)`.
+
+In code below, the matrix is entered with the keyboard-friendly aliases
+`@DELTA` and `@OMEGA`, while the formatter still prints the normalised Greek
+symbols in the output.
 
 This is a pleasing example because the algebra stays exact:
 
@@ -220,10 +216,8 @@ int main(void)
 {
     binding_t *bindings = NULL;
     size_t nbindings = 0;
-    binding_t *delta = NULL;
-    binding_t *omega = NULL;
     matrix_t *H = mat_from_string(
-        "[[Δ Ω][Ω -Δ]]",
+        "(@DELTA, @OMEGA; @OMEGA, -@DELTA)",
         &bindings, &nbindings);
     matrix_t *H2 = mat_pow_int(H, 2);
     matrix_t *P = mat_charpoly(H);
@@ -231,14 +225,8 @@ int main(void)
     dval_t *trace = NULL;
     dval_t *c2 = NULL;
 
-    for (size_t i = 0; i < nbindings; ++i) {
-        if (strcmp(bindings[i].name, "Δ") == 0)
-            delta = &bindings[i];
-        else if (strcmp(bindings[i].name, "Ω") == 0)
-            omega = &bindings[i];
-    }
-    dv_set_val_d(delta->symbol, 1.5);
-    dv_set_val_d(omega->symbol, 0.25);
+    mat_binding_set_d(bindings, nbindings, "@DELTA", 1.5);
+    mat_binding_set_d(bindings, nbindings, "@OMEGA", 0.25);
 
     mat_eigenvalues(H, evals);
     mat_trace(H, &trace);
@@ -263,11 +251,11 @@ int main(void)
 Illustrative output:
 
 ```text
-H = { [
+H = { (
   Δ  Ω
   Ω -Δ
-] | Δ = 1.5, Ω = 0.25 }
-H² = { [[Δ² + Ω² -ΔΩ + ΔΩ][-ΔΩ + ΔΩ Δ² + Ω²]] | Δ = 1.5, Ω = 0.25 }
+) | Δ = 1.5, Ω = 0.25 }
+H² = { (Δ² + Ω², -ΔΩ + ΔΩ; -ΔΩ + ΔΩ, Δ² + Ω²) | Δ = 1.5, Ω = 0.25 }
 tr(H) = { 0 }
 charpoly constant term = { -(2Δ² + 2Ω²)/2 | Δ = 1.5, Ω = 0.25 }
 eigenvalues = { 0.5·sqrt(4Δ² + 4Ω²) | Δ = 1.5, Ω = 0.25 }, { -0.5·sqrt(4Δ² + 4Ω²) | Δ = 1.5, Ω = 0.25 }
@@ -945,6 +933,10 @@ every cell.
 
 ```c
 matrix_t *mat_from_string(const char *s, binding_t **bindings_out, size_t *number_out);
+binding_t *mat_binding_find(binding_t *bindings, size_t number, const char *name);
+int mat_binding_set_qf(binding_t *bindings, size_t number, const char *name, qfloat_t value);
+int mat_binding_set_qc(binding_t *bindings, size_t number, const char *name, qcomplex_t value);
+int mat_binding_set_d(binding_t *bindings, size_t number, const char *name, double value);
 char *mat_to_string(const matrix_t *A, mat_string_style_t style);
 int mat_sprintf(char *out, size_t out_size, const char *fmt, ...);
 int mat_printf(const char *fmt, ...);
@@ -952,19 +944,64 @@ int mat_printf(const char *fmt, ...);
 
 `mat_from_string(...)` accepts three main forms:
 
-- purely numeric matrices such as `[[1 2][3 4]]`
-- wrapped symbolic matrices such as `{ [[x 1][1 c1]] | x = 2; c1 = 3 }`
-- bare symbolic matrices such as `[[c1 c2*y][x y]]`
+- purely numeric matrices such as `(1, 2; 3, 4)`
+- wrapped symbolic matrices such as `{ (x, 1; 1, c1) | x = 2; c1 = 3 }`
+- bare symbolic matrices such as `(c1, c2*y; x, y)`
 
 Numeric input produces either a `qfloat_t` matrix or a `qcomplex_t` matrix,
 depending on whether any entry has a non-zero imaginary part. Symbolic input
 produces a `dval_t *` matrix.
 
-For bare symbolic input, names are treated as variables by default except for
-the conventional constant names `c1`, `c2`, `c3`, `c_1`, `c_2`, `c_3` and their
-subscript-normalised forms such as `c₁` and `c₂`. These are created as named
-constants with initial value `NaN`, so you can fill them in later through the
-returned bindings.
+Rows are separated by semicolons and columns by commas. The outer `{ ... | ... }`
+wrapper, when present, still carries one binding section for the entire matrix.
+Bindings are not attached per element.
+
+For symbolic entries, the matrix parser delegates each cell expression to
+`dval_from_expression_string(...)` after a small amount of matrix-specific
+normalisation. In practice this means each entry accepts the same expression
+operators as `dval`, including:
+
+- implicit multiplication such as `xy` and explicit `*`
+- Unicode or ASCII subscripts such as `x₀` and `x_0`
+- powers such as `x²`, `x^2`, `x^1.5`, and `sin^2(x)`
+- the usual unary and binary `dval` functions supported by `dval_from_string(...)`
+
+For bare symbolic input, the whole matrix is treated as if it had an implicit
+matrix-wide binding block with no assigned values yet. In other words, a bare
+symbolic matrix behaves like the wrapped form with every discovered symbol
+initialised to `NaN`, ready to be filled in later through the returned
+bindings.
+
+In that bare form, names are treated as variables by default, but the parser
+also recognises a small set of conventional constant-style names
+automatically:
+
+- `a`, `b`, `c`, `d`
+- indexed forms such as `a1`, `b2`, `c_7`, and `d₃`
+
+Everything else, including ordinary Latin names such as `x`, `y`, `radius`,
+Greek parameter names such as `Δ`, `Ω`, and `τ`, symbolic names such as `e`
+and `π`, and bracketed identifiers like `[radius]`, is inferred as a variable
+unless the explicit matrix-wide binding section says otherwise.
+
+Repeated occurrences of the same normalised symbol name anywhere in one parsed
+matrix resolve to the same underlying symbolic leaf. Reusing the same name as
+both a variable and a constant in one parse is rejected.
+
+Symbolic names may be written either directly, such as `Δ` and `Ω`, or through
+the `@name` aliases already used by `dval`, such as `@DELTA`, `@OMEGA`, `@pi`,
+and `@tau`.
+
+Bracketed `dval` identifiers such as `[radius]` are available inside matrix
+entries and in the matrix-wide binding section, for example
+`{ ([radius], [scale]*x; y, [offset]) | x = 2; [radius] = 3, [scale] = 4, [offset] = 7 }`.
+Returned binding names are normalised to the bracket contents, so
+`mat_binding_find(bindings, n, "[radius]")` and `mat_binding_find(bindings, n, "radius")`
+both resolve the same symbol.
+
+For compatibility, the older bracket-row forms such as `[[1 2][3 4]]` are still
+accepted on input, but the separator-based parenthesised form above is now the
+canonical matrix syntax and the format emitted by `mat_to_string(...)`.
 
 If `bindings_out` is non-NULL, `mat_from_string(...)` returns a flat array of
 borrowed symbolic bindings:
@@ -977,8 +1014,17 @@ The returned bindings array itself should be released with a plain `free(...)`.
 The `binding_t.symbol` handles remain valid only while the matrix returned by
 `mat_from_string(...)` remains alive.
 
+Use `mat_binding_find(...)` to look up a binding by name, or
+`mat_binding_set_qf(...)`, `mat_binding_set_qc(...)`, or `mat_binding_set_d(...)`
+to assign values directly without hand-writing the lookup loop. These helpers
+accept either the normalised name (`Δ`) or an alias form such as `@DELTA`.
+
 `mat_to_string(...)` allocates a freshly formatted string which the caller owns
 and must release with `free(...)`.
+
+For symbolic matrices, `mat_to_string(...)` omits the outer `{ ... | ... }`
+wrapper when every discovered binding is still `NaN`. Once any binding has a
+concrete value, the shared matrix-wide binding footer is printed again.
 
 `mat_sprintf(...)` and `mat_printf(...)` understand matrix-specific format
 specifiers:

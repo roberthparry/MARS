@@ -294,6 +294,42 @@ static int mt_has_long_binding(char **bindings, size_t nbindings, size_t thresho
     return 0;
 }
 
+static int mt_all_bindings_are_nan(char **var_bindings,
+                                   size_t nvar_bindings,
+                                   char **const_bindings,
+                                   size_t nconst_bindings)
+{
+    for (size_t i = 0; i < nvar_bindings; ++i) {
+        char *name = NULL;
+        char *value = NULL;
+
+        if (mt_split_binding_token(var_bindings[i], &name, &value) != 0)
+            return 0;
+        free(name);
+        if (!strstr(value, "NAN") && !strstr(value, "nan")) {
+            free(value);
+            return 0;
+        }
+        free(value);
+    }
+
+    for (size_t i = 0; i < nconst_bindings; ++i) {
+        char *name = NULL;
+        char *value = NULL;
+
+        if (mt_split_binding_token(const_bindings[i], &name, &value) != 0)
+            return 0;
+        free(name);
+        if (!strstr(value, "NAN") && !strstr(value, "nan")) {
+            free(value);
+            return 0;
+        }
+        free(value);
+    }
+
+    return (nvar_bindings + nconst_bindings) > 0;
+}
+
 static char *mt_join_bindings(char **var_bindings,
                               size_t nvar_bindings,
                               char **const_bindings,
@@ -531,22 +567,20 @@ static char *mat_to_string_numeric(const matrix_t *A, mat_string_style_t style)
     }
 
     if (!layout)
-        mb_puts(&out, "[");
+        mb_puts(&out, "(");
 
     for (size_t i = 0; i < A->rows; ++i) {
         if (layout) {
             if (i == 0)
-                mb_puts(&out, "[ ");
+                mb_puts(&out, "(\n  ");
             else
                 mb_puts(&out, "\n  ");
-        } else {
-            mb_putc(&out, '[');
         }
 
         for (size_t j = 0; j < A->cols; ++j) {
             size_t idx = i * A->cols + j;
             if (j > 0)
-                mb_putc(&out, ' ');
+                mb_puts(&out, layout ? " " : ", ");
             if (layout) {
                 for (size_t pad = strlen(cells[idx]); pad < widths[j]; ++pad)
                     mb_putc(&out, ' ');
@@ -556,14 +590,15 @@ static char *mat_to_string_numeric(const matrix_t *A, mat_string_style_t style)
 
         if (layout) {
             if (i + 1 == A->rows)
-                mb_puts(&out, " ]");
+                mb_puts(&out, "\n)");
         } else {
-            mb_putc(&out, ']');
+            if (i + 1 < A->rows)
+                mb_puts(&out, "; ");
         }
     }
 
     if (!layout)
-        mb_putc(&out, ']');
+        mb_putc(&out, ')');
 
 cleanup:
     if (cells) {
@@ -590,6 +625,7 @@ static char *mat_to_string_dval(const matrix_t *A, mat_string_style_t style)
                   style == MAT_STRING_LAYOUT_PRETTY);
     int scientific = (style == MAT_STRING_INLINE_SCIENTIFIC ||
                       style == MAT_STRING_LAYOUT_SCIENTIFIC);
+    int omit_wrapper = 0;
 
     for (size_t i = 0; ok && i < A->rows; ++i) {
         for (size_t j = 0; j < A->cols; ++j) {
@@ -621,32 +657,41 @@ static char *mat_to_string_dval(const matrix_t *A, mat_string_style_t style)
         free(out.data);
         out.data = strdup("<dval matrix>");
     } else if (!layout) {
+        omit_wrapper = mt_all_bindings_are_nan(var_bindings, nvar_bindings,
+                                               const_bindings, nconst_bindings);
         char *joined = mt_join_bindings(var_bindings, nvar_bindings,
                                         const_bindings, nconst_bindings,
                                         scientific);
-        mb_puts(&out, "{ [");
+        if (!omit_wrapper)
+            mb_puts(&out, "{ ");
+        mb_puts(&out, "(");
         for (size_t i = 0; i < A->rows; ++i) {
-            mb_putc(&out, '[');
             for (size_t j = 0; j < A->cols; ++j) {
                 size_t idx = i * A->cols + j;
                 if (j > 0)
-                    mb_putc(&out, ' ');
+                    mb_puts(&out, ", ");
                 mb_puts(&out, exprs[idx] ? exprs[idx] : "");
             }
-            mb_putc(&out, ']');
+            if (i + 1 < A->rows)
+                mb_puts(&out, "; ");
         }
-        mb_puts(&out, "]"); 
-        if (joined && *joined) {
+        mb_puts(&out, ")");
+        if (!omit_wrapper && joined && *joined) {
             mb_puts(&out, " | ");
             mb_puts(&out, joined);
         }
-        mb_puts(&out, " }");
+        if (!omit_wrapper)
+            mb_puts(&out, " }");
         free(joined);
     } else {
+        omit_wrapper = mt_all_bindings_are_nan(var_bindings, nvar_bindings,
+                                               const_bindings, nconst_bindings);
         char *joined = mt_join_bindings(var_bindings, nvar_bindings,
                                         const_bindings, nconst_bindings,
                                         scientific);
-        mb_puts(&out, "{ [\n");
+        if (!omit_wrapper)
+            mb_puts(&out, "{ ");
+        mb_puts(&out, "(\n");
         for (size_t i = 0; i < A->rows; ++i) {
             mb_puts(&out, "  ");
             for (size_t j = 0; j < A->cols; ++j) {
@@ -659,12 +704,13 @@ static char *mat_to_string_dval(const matrix_t *A, mat_string_style_t style)
             }
             mb_putc(&out, '\n');
         }
-        mb_puts(&out, "]");
-        if (joined && *joined) {
+        mb_puts(&out, ")");
+        if (!omit_wrapper && joined && *joined) {
             mb_puts(&out, " | ");
             mb_puts(&out, joined);
         }
-        mb_puts(&out, " }");
+        if (!omit_wrapper)
+            mb_puts(&out, " }");
         free(joined);
     }
 

@@ -30,6 +30,19 @@
 typedef struct _dval_t dval_t;
 
 /**
+ * @brief Borrowed symbolic binding returned by dval_from_string_with_bindings().
+ *
+ * The @p name pointer and @p symbol handle remain valid for as long as the
+ * dval returned by dval_from_string_with_bindings() remains alive. Releasing
+ * the bindings array itself only requires a plain free(bindings).
+ */
+typedef struct {
+    const char *name;
+    dval_t *symbol;
+    bool is_constant;
+} dval_binding_t;
+
+/**
  * @brief Canonical differentiable constants for zero and one.
  *
  * These are process-lifetime singleton constant nodes.
@@ -409,6 +422,62 @@ void dv_print(const dval_t *dv);
  * once.
  */
 dval_t *dval_from_string(const char *s);
+
+/**
+ * @brief Construct a dval_t from an expression-style string and return bindings.
+ *
+ * Behaves like dval_from_string(), but when the parsed expression is symbolic
+ * it can also return a heap-allocated array of borrowed symbol bindings.
+ * The array itself should be released with free(*bindings_out).
+ *
+ * If the parsed expression is purely numeric, @p *bindings_out is set to NULL
+ * and @p *number_out is set to 0.
+ */
+dval_t *dval_from_string_with_bindings(const char *s,
+                                       dval_binding_t **bindings_out,
+                                       size_t *number_out);
+
+/**
+ * @brief Find a returned symbolic binding by name.
+ *
+ * The lookup accepts the normalised binding names returned by
+ * dval_from_string_with_bindings(). Bracketed names may be queried either as
+ * @p [radius] or @p radius.
+ */
+dval_binding_t *dval_binding_get(dval_binding_t *bindings,
+                                 size_t number,
+                                 const char *name);
+
+/**
+ * @brief Synonym for dval_binding_get().
+ */
+dval_binding_t *dval_binding_find(dval_binding_t *bindings,
+                                  size_t number,
+                                  const char *name);
+
+/**
+ * @brief Set a returned symbolic binding from a qfloat_t value.
+ */
+int dval_binding_set_qf(dval_binding_t *bindings,
+                        size_t number,
+                        const char *name,
+                        qfloat_t value);
+
+/**
+ * @brief Set a returned symbolic binding from a qcomplex_t value.
+ */
+int dval_binding_set_qc(dval_binding_t *bindings,
+                        size_t number,
+                        const char *name,
+                        qcomplex_t value);
+
+/**
+ * @brief Set a returned symbolic binding from a double value.
+ */
+int dval_binding_set_d(dval_binding_t *bindings,
+                       size_t number,
+                       const char *name,
+                       double value);
 
 /**
  * @brief Construct a dval_t from a bare expression string using supplied symbols.

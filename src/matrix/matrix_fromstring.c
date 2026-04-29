@@ -49,6 +49,165 @@ static char *mf_strdup(const char *s)
     return mf_strndup(s, strlen(s));
 }
 
+static char *mf_read_bracketed_name(const char **pp)
+{
+    const char *p = *pp;
+    const char *start;
+
+    if (*p != '[')
+        return NULL;
+    p++;
+    start = p;
+    while (*p && *p != ']')
+        p++;
+    if (*p != ']')
+        return NULL;
+
+    *pp = p + 1;
+    return mf_strndup(start, (size_t)(p - start));
+}
+
+typedef struct {
+    const char *ascii;
+    size_t klen;
+    const char *lower;
+    const char *upper;
+} matrix_greek_entry_t;
+
+enum { MATRIX_GREEK_HT_SIZE = 30 };
+
+/* Collision-free direct hash table for ASCII Greek aliases, hashed
+ * case-insensitively. */
+static const matrix_greek_entry_t s_matrix_greek_names[MATRIX_GREEK_HT_SIZE] = {
+    [0]  = { "theta",   5, "θ", "Θ" },
+    [1]  = { "psi",     3, "ψ", "Ψ" },
+    [2]  = { "chi",     3, "χ", "Χ" },
+    [4]  = { "lambda",  6, "λ", "Λ" },
+    [5]  = { "delta",   5, "δ", "Δ" },
+    [6]  = { "omicron", 8, "ο", "Ο" },
+    [8]  = { "iota",    4, "ι", "Ι" },
+    [10] = { "mu",      2, "μ", "Μ" },
+    [11] = { "pi",      2, "π", "Π" },
+    [12] = { "phi",     3, "φ", "Φ" },
+    [13] = { "alpha",   5, "α", "Α" },
+    [14] = { "zeta",    4, "ζ", "Ζ" },
+    [15] = { "tau",     3, "τ", "Τ" },
+    [16] = { "rho",     3, "ρ", "Ρ" },
+    [17] = { "beta",    4, "β", "Β" },
+    [19] = { "nu",      2, "ν", "Ν" },
+    [20] = { "kappa",   5, "κ", "Κ" },
+    [22] = { "sigma",   5, "σ", "Σ" },
+    [23] = { "xi",      2, "ξ", "Ξ" },
+    [24] = { "eta",     3, "η", "Η" },
+    [25] = { "epsilon", 7, "ε", "Ε" },
+    [26] = { "gamma",   5, "γ", "Γ" },
+    [27] = { "upsilon", 7, "υ", "Υ" },
+    [29] = { "omega",   5, "ω", "Ω" }
+};
+
+static unsigned mf_greek_ht_hash(const char *s, size_t n)
+{
+    unsigned x = 113u;
+
+    for (size_t i = 0; i < n; ++i) {
+        x *= 65599u;
+        x ^= (unsigned char)(s[i] | 32);
+    }
+
+    x ^= (x >> 15);
+    x *= 2654435761u;
+
+    return x % MATRIX_GREEK_HT_SIZE;
+}
+
+static const matrix_greek_entry_t *mf_lookup_greek_name(const char *kw, size_t klen)
+{
+    unsigned slot = mf_greek_ht_hash(kw, klen);
+    const matrix_greek_entry_t *entry = &s_matrix_greek_names[slot];
+
+    if (!entry->ascii)
+        return NULL;
+    if (entry->klen == klen && strncasecmp(entry->ascii, kw, klen) == 0)
+        return entry;
+    return NULL;
+}
+
+static char *mf_normalise_binding_name(const char *name)
+{
+    const char *s;
+    const char *e;
+    char *t;
+
+    if (!name)
+        return NULL;
+
+    s = name;
+    while (*s && isspace((unsigned char)*s))
+        s++;
+    e = name + strlen(name);
+    while (e > s && isspace((unsigned char)e[-1]))
+        e--;
+    if (e == s)
+        return NULL;
+
+    if ((size_t)(e - s) >= 2 && s[0] == '[' && e[-1] == ']')
+        return mf_strndup(s + 1, (size_t)(e - s - 2));
+
+    t = mf_strndup(s, (size_t)(e - s));
+    if (t[0] != '@')
+        return t;
+
+    {
+        const char *p = t + 1;
+        size_t alias_len = 0;
+        const matrix_greek_entry_t *entry;
+
+        while (p[alias_len] && isalpha((unsigned char)p[alias_len]))
+            alias_len++;
+
+        entry = alias_len ? mf_lookup_greek_name(p, alias_len) : NULL;
+        if (entry) {
+            int upper = 1;
+            const char *rest = p + alias_len;
+            const char *g;
+            char *out;
+            size_t gl;
+            size_t rl;
+
+            for (size_t k = 0; k < alias_len; ++k) {
+                if (!isupper((unsigned char)p[k]))
+                    upper = 0;
+            }
+
+            g = upper ? entry->upper : entry->lower;
+            gl = strlen(g);
+            rl = strlen(rest);
+            out = mf_xmalloc(gl + rl + 1);
+            memcpy(out, g, gl);
+            memcpy(out + gl, rest, rl);
+            out[gl + rl] = '\0';
+            free(t);
+            t = out;
+        }
+    }
+
+    {
+        size_t n = strlen(t);
+        char *clean = mf_xmalloc(n + 1);
+        size_t w = 0;
+
+        for (size_t r = 0; r < n; ++r) {
+            if (t[r] != '@')
+                clean[w++] = t[r];
+        }
+        clean[w] = '\0';
+        free(t);
+        t = clean;
+    }
+
+    return t;
+}
+
 static void mf_report_error(const char *msg)
 {
     fprintf(stderr, "mat_from_string: %s\n", msg);
@@ -99,16 +258,37 @@ static char *mf_read_simple_name(const char **pp)
 {
     const char *p = *pp;
     unsigned int c;
-    int len = mf_utf8_decode(p, &c);
+    int had_at = 0;
+    int len;
     char buf[256];
     int blen = 0;
 
+    if (*p == '@') {
+        had_at = 1;
+        buf[blen++] = *p++;
+    }
+
+    len = mf_utf8_decode(p, &c);
     if (len <= 0 || !mf_is_letter(c))
         return NULL;
 
-    memcpy(buf, p, (size_t)len);
-    blen = len;
+    memcpy(buf + blen, p, (size_t)len);
+    blen += len;
     p += len;
+
+    if (had_at) {
+        for (;;) {
+            int sl = mf_utf8_decode(p, &c);
+
+            if (sl <= 0 || !mf_is_letter(c))
+                break;
+            if (blen + sl >= (int)sizeof(buf) - 1)
+                break;
+            memcpy(buf + blen, p, (size_t)sl);
+            blen += sl;
+            p += sl;
+        }
+    }
 
     for (;;) {
         unsigned int sc;
@@ -145,7 +325,16 @@ static char *mf_read_simple_name(const char **pp)
 
     buf[blen] = '\0';
     *pp = p;
-    return mf_strdup(buf);
+    if (!had_at)
+        return mf_strdup(buf);
+    return mf_normalise_binding_name(buf);
+}
+
+static char *mf_read_any_name(const char **pp)
+{
+    if (**pp == '[')
+        return mf_read_bracketed_name(pp);
+    return mf_read_simple_name(pp);
 }
 
 static int string_vec_push(string_vec_t *v, char *item)
@@ -231,16 +420,23 @@ static bool mf_is_default_constant_name(const char *name)
     unsigned int c;
     int len;
 
-    if (!name || *name != 'c')
+    if (!name || !*name)
         return false;
+
+    if (*name != 'a' &&
+        *name != 'b' &&
+        *name != 'c' &&
+        *name != 'd') {
+        return false;
+    }
     p++;
 
     len = mf_utf8_decode(p, &c);
+    if (*p == '\0')
+        return true;
     if (len > 0 && c >= 0x2080 && c <= 0x2089)
         return true;
     if (*p == '_' && p[1] >= '0' && p[1] <= '9')
-        return true;
-    if (*p >= '0' && *p <= '9')
         return true;
     return false;
 }
@@ -269,6 +465,21 @@ static char *mf_normalise_expression_subscripts(const char *expr)
         return NULL;
 
     while (*p) {
+        if (*p == '@') {
+            const char *q = p;
+            char *name = mf_read_simple_name(&q);
+
+            if (name) {
+                size_t n = strlen(name);
+
+                memcpy(out + out_len, name, n);
+                out_len += n;
+                free(name);
+                p = q;
+                continue;
+            }
+        }
+
         unsigned int c;
         int len = mf_utf8_decode(p, &c);
 
@@ -318,7 +529,7 @@ static int mf_entry_requires_symbolic(const char *entry)
     const char *p = entry;
 
     while (*p) {
-        char *name = mf_read_simple_name(&p);
+        char *name = mf_read_any_name(&p);
 
         if (!name) {
             p++;
@@ -352,15 +563,7 @@ static int mf_collect_expression_names(const char *expr, symbol_vec_t *symbols)
     while (*p) {
         char *name;
 
-        if (*p == '[') {
-            while (*p && *p != ']')
-                p++;
-            if (*p == ']')
-                p++;
-            continue;
-        }
-
-        name = mf_read_simple_name(&p);
+        name = mf_read_any_name(&p);
         if (!name) {
             p++;
             continue;
@@ -392,6 +595,19 @@ static int mf_push_token_from_range(string_vec_t *row, const char *start, const 
         return 0;
     }
     return string_vec_push(row, token);
+}
+
+static int mf_push_required_token_from_range(string_vec_t *cells,
+                                             const char *start,
+                                             const char *end)
+{
+    char *token = mf_trim_copy(start, (size_t)(end - start));
+
+    if (!token || !*token) {
+        free(token);
+        return -1;
+    }
+    return string_vec_push(cells, token);
 }
 
 static int mf_parse_row(const char **pp, string_vec_t *cells)
@@ -445,6 +661,95 @@ static int mf_parse_matrix_body(const char *body,
                                 size_t *rows_out,
                                 size_t *cols_out)
 {
+    if (body[0] == '(') {
+        const char *p = body + 1;
+        const char *token_start = p;
+        int paren_depth = 0;
+        int bracket_depth = 0;
+        size_t rows = 0;
+        size_t cols = 0;
+        size_t current_cols = 0;
+        string_vec_t entries = {0};
+
+        while (*p) {
+            if (*p == '[') {
+                bracket_depth++;
+                p++;
+                continue;
+            }
+            if (*p == ']' && bracket_depth > 0) {
+                bracket_depth--;
+                p++;
+                continue;
+            }
+
+            if (bracket_depth == 0) {
+                if (*p == '(') {
+                    paren_depth++;
+                    p++;
+                    continue;
+                }
+                if (*p == ')') {
+                    if (paren_depth > 0) {
+                        paren_depth--;
+                        p++;
+                        continue;
+                    }
+                    if (mf_push_required_token_from_range(&entries, token_start, p) != 0)
+                        goto fail_paren;
+                    current_cols++;
+                    if (rows == 0)
+                        cols = current_cols;
+                    else if (current_cols != cols)
+                        goto fail_paren;
+                    rows++;
+                    p++;
+                    while (*p && isspace((unsigned char)*p))
+                        p++;
+                    if (*p != '\0' || rows == 0 || cols == 0)
+                        goto fail_paren;
+
+                    *entries_out = entries.items;
+                    *rows_out = rows;
+                    *cols_out = cols;
+                    return 0;
+                }
+                if (paren_depth == 0 && *p == ',') {
+                    if (mf_push_required_token_from_range(&entries, token_start, p) != 0)
+                        goto fail_paren;
+                    current_cols++;
+                    p++;
+                    while (*p && isspace((unsigned char)*p))
+                        p++;
+                    token_start = p;
+                    continue;
+                }
+                if (paren_depth == 0 && *p == ';') {
+                    if (mf_push_required_token_from_range(&entries, token_start, p) != 0)
+                        goto fail_paren;
+                    current_cols++;
+                    if (rows == 0)
+                        cols = current_cols;
+                    else if (current_cols != cols)
+                        goto fail_paren;
+                    rows++;
+                    current_cols = 0;
+                    p++;
+                    while (*p && isspace((unsigned char)*p))
+                        p++;
+                    token_start = p;
+                    continue;
+                }
+            }
+
+            p++;
+        }
+
+fail_paren:
+        string_vec_free(&entries);
+        return -1;
+    }
+
     const char *p = body;
     size_t rows = 0;
     size_t cols = 0;
@@ -538,7 +843,7 @@ static int mf_parse_binding_section(const char *text, symbol_vec_t *symbols)
             continue;
         }
 
-        name = mf_read_simple_name(&p);
+        name = mf_read_any_name(&p);
         if (!name)
             return -1;
 
@@ -856,4 +1161,60 @@ cleanup:
     mat_free(A);
     A = NULL;
     goto cleanup_success;
+}
+
+binding_t *mat_binding_get(binding_t *bindings, size_t number, const char *name)
+{
+    char *norm;
+
+    if (!bindings || !name)
+        return NULL;
+
+    norm = mf_normalise_binding_name(name);
+    if (!norm)
+        return NULL;
+
+    for (size_t i = 0; i < number; ++i) {
+        if (strcmp(bindings[i].name, norm) == 0) {
+            free(norm);
+            return &bindings[i];
+        }
+    }
+    free(norm);
+    return NULL;
+}
+
+binding_t *mat_binding_find(binding_t *bindings, size_t number, const char *name)
+{
+    return mat_binding_get(bindings, number, name);
+}
+
+int mat_binding_set_qf(binding_t *bindings, size_t number, const char *name, qfloat_t value)
+{
+    binding_t *binding = mat_binding_get(bindings, number, name);
+
+    if (!binding)
+        return -1;
+    dv_set_val_qf(binding->symbol, value);
+    return 0;
+}
+
+int mat_binding_set_qc(binding_t *bindings, size_t number, const char *name, qcomplex_t value)
+{
+    binding_t *binding = mat_binding_get(bindings, number, name);
+
+    if (!binding)
+        return -1;
+    dv_set_val(binding->symbol, value);
+    return 0;
+}
+
+int mat_binding_set_d(binding_t *bindings, size_t number, const char *name, double value)
+{
+    binding_t *binding = mat_binding_get(bindings, number, name);
+
+    if (!binding)
+        return -1;
+    dv_set_val_d(binding->symbol, value);
+    return 0;
 }

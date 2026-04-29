@@ -148,12 +148,16 @@ static void test_from_string_special_functions(void)
 
 static void test_from_string_named_consts(void)
 {
+    /* No ';' means all bindings are variables */
+    check_parse_val("x + y (implicit all vars) = 5",
+        "{ x + y | x = 2, y = 3 }",
+        5.0, __LINE__);
     /* Named constant after ';' combined with a variable */
     check_parse_val("c\xe2\x82\x80x\xe2\x82\x80\xc2\xb2 = 12",
         "{ c\xe2\x82\x80x\xe2\x82\x80\xc2\xb2 | x\xe2\x82\x80 = 2; c\xe2\x82\x80 = 3 }",
         12.0, __LINE__);
-    /* Two named constants, no variables */
-    check_parse_val("c\xe2\x82\x80 + c\xe2\x82\x81 (no vars) = 3",
+    /* Leading ';' means all bindings are named constants */
+    check_parse_val("c\xe2\x82\x80 + c\xe2\x82\x81 (implicit all consts) = 3",
         "{ c\xe2\x82\x80 + c\xe2\x82\x81 | ; c\xe2\x82\x80 = 1, c\xe2\x82\x81 = 2 }",
         3.0, __LINE__);
     /* Named constant and variable */
@@ -193,6 +197,70 @@ static void test_from_string_bracketed_names(void)
     check_parse_val("[my const] pure const = 99",
         "{ [my const] = 99 }",
         99.0, __LINE__);
+}
+
+static void test_from_string_implicit_symbolic_bindings(void)
+{
+    dval_t *x = dval_from_string("{ x }");
+    dval_t *tau = dval_from_string("{ τ }");
+    dval_t *f = dval_from_string("{ [radius]^2 + c_1 + π }");
+    char *xs = x ? dv_to_string(x, style_EXPRESSION) : NULL;
+    char *taus = tau ? dv_to_string(tau, style_EXPRESSION) : NULL;
+    char *fs = f ? dv_to_string(f, style_EXPRESSION) : NULL;
+
+    if (x && xs && str_eq(xs, "{ x | x = NAN }")) {
+        to_string_pass("implicit symbolic var inference", xs, "{ x | x = NAN }");
+    } else {
+        to_string_fail(__FILE__, __LINE__, 1, "implicit symbolic var inference",
+                       xs ? xs : "(null)", "{ x | x = NAN }");
+    }
+
+    if (tau && taus && str_eq(taus, "{ τ | τ = NAN }")) {
+        to_string_pass("implicit tau variable inference", taus, "{ τ | τ = NAN }");
+    } else {
+        to_string_fail(__FILE__, __LINE__, 1, "implicit tau variable inference",
+                       taus ? taus : "(null)", "{ τ | τ = NAN }");
+    }
+
+    if (f && fs && str_eq(fs, "{ π + c₁ + [radius]² | π = NAN, [radius] = NAN; c₁ = NAN }")) {
+        to_string_pass("implicit mixed symbolic inference", fs,
+                       "{ π + c₁ + [radius]² | π = NAN, [radius] = NAN; c₁ = NAN }");
+    } else {
+        to_string_fail(__FILE__, __LINE__, 1, "implicit mixed symbolic inference",
+                       fs ? fs : "(null)",
+                       "{ π + c₁ + [radius]² | π = NAN, [radius] = NAN; c₁ = NAN }");
+    }
+
+    if (x && qf_isnan(dv_eval_qf(x))) {
+        printf(C_BOLD C_GREEN "PASS" C_RESET " implicit x evaluates to NaN\n\n");
+    } else {
+        printf(C_BOLD C_RED "FAIL" C_RESET " implicit x evaluates to NaN %s:%d:1\n\n",
+               __FILE__, __LINE__);
+        TEST_FAIL();
+    }
+
+    if (tau && qf_isnan(dv_eval_qf(tau))) {
+        printf(C_BOLD C_GREEN "PASS" C_RESET " implicit tau evaluates to NaN\n\n");
+    } else {
+        printf(C_BOLD C_RED "FAIL" C_RESET " implicit tau evaluates to NaN %s:%d:1\n\n",
+               __FILE__, __LINE__);
+        TEST_FAIL();
+    }
+
+    if (f && qf_isnan(dv_eval_qf(f))) {
+        printf(C_BOLD C_GREEN "PASS" C_RESET " implicit mixed expression evaluates to NaN\n\n");
+    } else {
+        printf(C_BOLD C_RED "FAIL" C_RESET " implicit mixed expression evaluates to NaN %s:%d:1\n\n",
+               __FILE__, __LINE__);
+        TEST_FAIL();
+    }
+
+    free(fs);
+    free(taus);
+    free(xs);
+    dv_free(f);
+    dv_free(tau);
+    dv_free(x);
 }
 
 /* ---- ASCII alternative syntax — subscripts (_N) ---- */
@@ -568,6 +636,157 @@ static void test_from_string_errors(void)
     /* Missing numeric value after '=' in binding */
     check_parse_null("missing value in binding",
         "{ x | x = }", __LINE__);
+    /* Missing exponent after '^' */
+    check_parse_null("missing exponent after '^'",
+        "{ x^ | x = 2 }", __LINE__);
+    /* Missing exponent digits after function-name '^' */
+    check_parse_null("missing function exponent digits",
+        "{ sin^(x) | x = 0 }", __LINE__);
+    /* Malformed decimal exponent */
+    check_parse_null("malformed decimal exponent",
+        "{ x^2e | x = 2 }", __LINE__);
+    /* Binary function with too few arguments */
+    check_parse_null("binary function missing arg",
+        "{ atan2(x) | x = 1 }", __LINE__);
+    /* Unary function with too many arguments */
+    check_parse_null("unary function extra arg",
+        "{ sin(x, y) | x = 1, y = 2 }", __LINE__);
+    /* Missing closing ')' in grouped expression */
+    check_parse_null("missing closing paren",
+        "{ (x + 1 | x = 2 }", __LINE__);
+    /* Missing closing ']' in bracketed name */
+    check_parse_null("missing closing bracket",
+        "{ [radius | [radius] = 5 }", __LINE__);
+    /* Trailing expression input */
+    check_parse_null("trailing input after expression",
+        "{ x y z | x = 1, y = 2, z = 3 }", __LINE__);
+    /* Extra comma in binary function */
+    check_parse_null("binary function extra comma",
+        "{ atan2(x, y, z) | x = 1, y = 2, z = 3 }", __LINE__);
+}
+
+static void test_from_expression_string_api(void)
+{
+    dval_t *x = dv_new_named_var_d(3.0, "x");
+    dval_t *y = dv_new_named_var_d(4.0, "y");
+    dval_t *c = dv_new_named_const_d(2.0, "c");
+
+    const char *names[] = { "x", "y", "c" };
+    dval_t *symbols[] = { x, y, c };
+
+    dval_t *ok = dval_from_expression_string("c*(x + y)", names, symbols, 3);
+    if (!ok) {
+        printf(C_BOLD C_RED "FAIL" C_RESET " bare expression parse returned NULL %s:%d:1\n\n",
+               __FILE__, __LINE__);
+        TEST_FAIL();
+    } else {
+        double got = dv_eval_d(ok);
+        double expect = 14.0;
+        double err = fabs(got - expect);
+        if (err < 2e-14) {
+            printf(C_BOLD C_GREEN "PASS" C_RESET " bare expression parse API\n\n");
+        } else {
+            printf(C_BOLD C_RED "FAIL" C_RESET " bare expression parse API %s:%d:1\n",
+                   __FILE__, __LINE__);
+            printf(C_BOLD "  got     " C_RESET "%.17g\n", got);
+            printf(C_BOLD "  expect  " C_RESET "%.17g\n\n", expect);
+            TEST_FAIL();
+        }
+        dv_free(ok);
+    }
+
+    if (dval_from_expression_string("x + y", names, NULL, 2) != NULL) {
+        printf(C_BOLD C_RED "FAIL" C_RESET " incomplete symbol table should fail %s:%d:1\n\n",
+               __FILE__, __LINE__);
+        TEST_FAIL();
+    } else {
+        printf(C_BOLD C_GREEN "PASS" C_RESET " incomplete symbol table rejected\n\n");
+    }
+
+    {
+        const char *dup_names[] = { "x", "x" };
+        dval_t *dup_symbols[] = { x, y };
+        if (dval_from_expression_string("x + 1", dup_names, dup_symbols, 2) != NULL) {
+            printf(C_BOLD C_RED "FAIL" C_RESET " duplicate external symbols should fail %s:%d:1\n\n",
+                   __FILE__, __LINE__);
+            TEST_FAIL();
+        } else {
+            printf(C_BOLD C_GREEN "PASS" C_RESET " duplicate external symbols rejected\n\n");
+        }
+    }
+
+    if (dval_from_expression_string("x + z", names, symbols, 3) != NULL) {
+        printf(C_BOLD C_RED "FAIL" C_RESET " unknown external symbol should fail %s:%d:1\n\n",
+               __FILE__, __LINE__);
+        TEST_FAIL();
+    } else {
+        printf(C_BOLD C_GREEN "PASS" C_RESET " unknown external symbol rejected\n\n");
+    }
+
+    dv_free(c);
+    dv_free(y);
+    dv_free(x);
+}
+
+static void test_from_string_bindings_api(void)
+{
+    dval_binding_t *bindings = NULL;
+    size_t nbindings = 0;
+    dval_t *expr = dval_from_string_with_bindings("{ x^2 + c_1 }", &bindings, &nbindings);
+    dval_binding_t *x_binding;
+    dval_binding_t *c_binding;
+    dval_t *deriv;
+
+    if (!expr) {
+        printf(C_BOLD C_RED "FAIL" C_RESET " parse with bindings returned NULL %s:%d:1\n\n",
+               __FILE__, __LINE__);
+        TEST_FAIL();
+        return;
+    }
+
+    x_binding = dval_binding_find(bindings, nbindings, "x");
+    c_binding = dval_binding_find(bindings, nbindings, "c₁");
+
+    if (!x_binding || x_binding->is_constant) {
+        printf(C_BOLD C_RED "FAIL" C_RESET " inferred x binding missing or wrong kind %s:%d:1\n\n",
+               __FILE__, __LINE__);
+        TEST_FAIL();
+    } else {
+        printf(C_BOLD C_GREEN "PASS" C_RESET " inferred x binding returned for differentiation\n\n");
+    }
+
+    if (!c_binding || !c_binding->is_constant) {
+        printf(C_BOLD C_RED "FAIL" C_RESET " inferred c₁ binding missing or wrong kind %s:%d:1\n\n",
+               __FILE__, __LINE__);
+        TEST_FAIL();
+    } else {
+        printf(C_BOLD C_GREEN "PASS" C_RESET " inferred c₁ constant binding returned\n\n");
+    }
+
+    if (dval_binding_set_d(bindings, nbindings, "x", 3.0) != 0 ||
+        dval_binding_set_d(bindings, nbindings, "c_1", 5.0) != 0) {
+        printf(C_BOLD C_RED "FAIL" C_RESET " binding setters failed %s:%d:1\n\n",
+               __FILE__, __LINE__);
+        TEST_FAIL();
+        free(bindings);
+        dv_free(expr);
+        return;
+    }
+
+    check_dval_d("parsed expr after binding update", expr, 14.0, __LINE__);
+
+    deriv = dv_create_deriv(expr, x_binding->symbol);
+    if (!deriv) {
+        printf(C_BOLD C_RED "FAIL" C_RESET " derivative from inferred binding returned NULL %s:%d:1\n\n",
+               __FILE__, __LINE__);
+        TEST_FAIL();
+    } else {
+        check_dval_d("derivative from inferred x binding", deriv, 6.0, __LINE__);
+        dv_free(deriv);
+    }
+
+    free(bindings);
+    dv_free(expr);
 }
 
 /* ---- Round-trips: build → string → parse → compare value ---- */
@@ -606,8 +825,11 @@ void test_dval_t_from_string(void)
     RUN_TEST(test_from_string_special_functions,    __func__);
     RUN_TEST(test_from_string_named_consts,         __func__);
     RUN_TEST(test_from_string_bracketed_names,   __func__);
+    RUN_TEST(test_from_string_implicit_symbolic_bindings, __func__);
     RUN_TEST(test_from_string_ascii_alternatives,__func__);
     RUN_TEST(test_from_string_errors,            __func__);
+    RUN_TEST(test_from_expression_string_api,    __func__);
+    RUN_TEST(test_from_string_bindings_api,      __func__);
     RUN_TEST(test_from_string_round_trips,       __func__);
     RUN_TEST(test_from_string_deriv,             __func__);
 }

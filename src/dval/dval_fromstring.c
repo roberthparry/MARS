@@ -10,8 +10,12 @@
  *   { name = val }
  *
  * Variables appear before the ';' in the binding section; named constants
- * appear after it.  The parser also accepts the following ASCII alternatives
- * for convenience:
+ * appear after it. If there is no ';', all bindings are treated as variables.
+ * If the binding section begins with ';', all bindings are treated as named
+ * constants. If there is no binding section and the expression still contains
+ * symbolic names, the parser infers variables and named constants from common
+ * mathematical conventions and initialises every discovered symbol to NaN.
+ * The parser also accepts the following ASCII alternatives for convenience:
  *
  *   _N          subscript digit N (0–9), normalised to U+2080+N internally
  *               so x_0 and x₀ are interchangeable within the same string
@@ -85,17 +89,37 @@ static void skip_spaces(const char **pp, const char *end)
 static size_t scan_decimal_len(const char *s, const char *end)
 {
     const char *p = s;
+    int ndigits = 0;
+    int frac_digits = 0;
 
     if (p < end && (*p == '-' || *p == '+')) p++;
-    while (p < end && isdigit((unsigned char)*p)) p++;
+    while (p < end && isdigit((unsigned char)*p)) {
+        p++;
+        ndigits++;
+    }
     if (p < end && *p == '.') {
         p++;
-        while (p < end && isdigit((unsigned char)*p)) p++;
+        while (p < end && isdigit((unsigned char)*p)) {
+            p++;
+            frac_digits++;
+        }
+    }
+    if (ndigits == 0 && frac_digits == 0) {
+        return 0;
     }
     if (p < end && (*p == 'e' || *p == 'E')) {
+        const char *exp_start = p;
+        int exp_digits = 0;
+
         p++;
         if (p < end && (*p == '+' || *p == '-')) p++;
-        while (p < end && isdigit((unsigned char)*p)) p++;
+        while (p < end && isdigit((unsigned char)*p)) {
+            p++;
+            exp_digits++;
+        }
+        if (exp_digits == 0) {
+            return (size_t)(exp_start - s);
+        }
     }
     return (size_t)(p - s);
 }
@@ -221,6 +245,75 @@ static char *read_any_name(const char **pp)
     return read_simple_name(pp);
 }
 
+static int fs_is_default_constant_name(const char *name)
+{
+    const char *p = name;
+    unsigned int c;
+    int len;
+
+    if (!name || !*name)
+        return 0;
+
+    if (*name != 'a' &&
+        *name != 'b' &&
+        *name != 'c' &&
+        *name != 'd') {
+        return 0;
+    }
+    p++;
+
+    len = fs_utf8_decode(p, &c);
+    if (*p == '\0')
+        return 1;
+    if (len > 0 && c >= 0x2080 && c <= 0x2089)
+        return 1;
+    if (*p == '_' && p[1] >= '0' && p[1] <= '9')
+        return 1;
+    return 0;
+}
+
+static char *fs_normalise_binding_name(const char *name)
+{
+    const char *s;
+    const char *e;
+    char *out;
+    size_t out_len = 0;
+
+    if (!name)
+        return NULL;
+
+    s = name;
+    while (*s && isspace((unsigned char)*s))
+        s++;
+    e = name + strlen(name);
+    while (e > s && isspace((unsigned char)e[-1]))
+        e--;
+    if (e == s)
+        return NULL;
+
+    if ((size_t)(e - s) >= 2 && s[0] == '[' && e[-1] == ']') {
+        out = (char *)fs_xmalloc((size_t)(e - s - 1));
+        memcpy(out, s + 1, (size_t)(e - s - 2));
+        out[e - s - 2] = '\0';
+        return out;
+    }
+
+    out = (char *)fs_xmalloc((size_t)(e - s) * 3 + 1);
+    while (s < e) {
+        if (*s == '_' && s + 1 < e && s[1] >= '0' && s[1] <= '9') {
+            int d = s[1] - '0';
+            out[out_len++] = (char)0xE2;
+            out[out_len++] = (char)0x82;
+            out[out_len++] = (char)(0x80 + d);
+            s += 2;
+            continue;
+        }
+        out[out_len++] = *s++;
+    }
+    out[out_len] = '\0';
+    return out;
+}
+
 /* ------------------------------------------------------------------ */
 /* Symbol table                                                         */
 /* ------------------------------------------------------------------ */
@@ -298,6 +391,64 @@ static int symtab_add_borrowed(symtab_t *t, const char *name, dval_t *node)
     return 0;
 }
 
+static dval_binding_t *symtab_build_bindings(const symtab_t *t, size_t *number_out)
+{
+    dval_binding_t *bindings;
+    char *name_store;
+    size_t total_name_bytes = 0;
+
+    if (number_out)
+        *number_out = 0;
+    if (!t || t->count <= 0)
+        return NULL;
+
+    for (int i = 0; i < t->count; ++i)
+        total_name_bytes += strlen(t->entries[i].name) + 1;
+
+    bindings = calloc(1, sizeof(*bindings) * (size_t)t->count + total_name_bytes);
+    if (!bindings)
+        return NULL;
+
+    name_store = (char *)(bindings + t->count);
+    for (int i = 0; i < t->count; ++i) {
+        size_t n = strlen(t->entries[i].name) + 1;
+        memcpy(name_store, t->entries[i].name, n);
+        bindings[i].name = name_store;
+        bindings[i].symbol = t->entries[i].node;
+        bindings[i].is_constant = (t->entries[i].node &&
+                                   t->entries[i].node->ops == &ops_const);
+        name_store += n;
+    }
+
+    if (number_out)
+        *number_out = (size_t)t->count;
+    return bindings;
+}
+
+static dval_binding_t *single_binding_from_node(dval_t *node, size_t *number_out)
+{
+    dval_binding_t *bindings;
+    size_t n;
+
+    if (number_out)
+        *number_out = 0;
+    if (!node || !node->name || !*node->name)
+        return NULL;
+
+    n = strlen(node->name) + 1;
+    bindings = calloc(1, sizeof(*bindings) + n);
+    if (!bindings)
+        return NULL;
+
+    bindings[0].name = (char *)(bindings + 1);
+    memcpy((char *)bindings[0].name, node->name, n);
+    bindings[0].symbol = node;
+    bindings[0].is_constant = (node->ops == &ops_const);
+    if (number_out)
+        *number_out = 1;
+    return bindings;
+}
+
 /* ------------------------------------------------------------------ */
 /* Parser state                                                         */
 /* ------------------------------------------------------------------ */
@@ -357,110 +508,87 @@ typedef dval_t *(*unary_fn)(dval_t *);
 typedef dval_t *(*binary_fn)(dval_t *, dval_t *);
 
 /* ------------------------------------------------------------------ */
-/* Function dispatch — open-addressing hash table, linear probing     */
+/* Function dispatch                                                   */
 /* ------------------------------------------------------------------ */
 
-/* 67 is prime; with 36 entries the load factor is 36/67 ≈ 0.54.
- * Slot positions were computed with: h = djb2(kw) % 67, linear probe
- * on collision.  NULL kw marks an empty slot. */
-#define FUNC_HT_SIZE  67
+/* Collision-free direct hash table for the current 36 function keywords.
+ * The salted hash uses modulus 54, and the highest occupied slot is 51, so
+ * the backing table itself only needs 52 entries. */
+#define FUNC_HT_MODULUS  54
+#define FUNC_HT_SIZE     52
 
 typedef struct {
     const char *kw;
     size_t      klen;
-    int         is_binary; /* 0 = unary, 1 = two-arg */
+    bool        is_binary;
     unary_fn    ufn;
     binary_fn   bfn;
 } func_entry_t;
 
 static const func_entry_t s_funcs[FUNC_HT_SIZE] = {
-    /* [ 0] */ { "sinh",          4, 0, dv_sinh,          NULL        },
-    /* [ 1] */ { NULL,            0, 0, NULL,             NULL        },
-    /* [ 2] */ { NULL,            0, 0, NULL,             NULL        },
-    /* [ 3] */ { NULL,            0, 0, NULL,             NULL        },
-    /* [ 4] */ { NULL,            0, 0, NULL,             NULL        },
-    /* [ 5] */ { "normal_cdf",   10, 0, dv_normal_cdf,    NULL        },
-    /* [ 6] */ { "erfinv",        6, 0, dv_erfinv,        NULL        },
-    /* [ 7] */ { "acosh",         5, 0, dv_acosh,         NULL        },
-    /* [ 8] */ { "Ei",            2, 0, dv_ei,            NULL        },
-    /* [ 9] */ { NULL,            0, 0, NULL,             NULL        },
-    /* [10] */ { NULL,            0, 0, NULL,             NULL        },
-    /* [11] */ { "E1",            2, 0, dv_e1,            NULL        },
-    /* [12] */ { NULL,            0, 0, NULL,             NULL        },
-    /* [13] */ { NULL,            0, 0, NULL,             NULL        },
-    /* [14] */ { "digamma",       7, 0, dv_digamma,       NULL        },
-    /* [15] */ { NULL,            0, 0, NULL,             NULL        },
-    /* [16] */ { NULL,            0, 0, NULL,             NULL        },
-    /* [17] */ { "beta",          4, 1, NULL,             dv_beta     },
-    /* [18] */ { NULL,            0, 0, NULL,             NULL        },
-    /* [19] */ { "sqrt",          4, 0, dv_sqrt,          NULL        },
-    /* [20] */ { "sin",           3, 0, dv_sin,           NULL        },
-    /* [21] */ { NULL,            0, 0, NULL,             NULL        },
-    /* [22] */ { NULL,            0, 0, NULL,             NULL        },
-    /* [23] */ { NULL,            0, 0, NULL,             NULL        },
-    /* [24] */ { "trigamma",      8, 0, dv_trigamma,      NULL        },
-    /* [25] */ { "logbeta",       7, 1, NULL,             dv_logbeta  },
-    /* [26] */ { "erfcinv",       7, 0, dv_erfcinv,       NULL        },
-    /* [27] */ { "asin",          4, 0, dv_asin,          NULL        },
-    /* [28] */ { "erf",           3, 0, dv_erf,           NULL        },
-    /* [29] */ { "tanh",          4, 0, dv_tanh,          NULL        },
-    /* [30] */ { "normal_logpdf",13, 0, dv_normal_logpdf, NULL        },
-    /* [31] */ { "normal_pdf",   10, 0, dv_normal_pdf,    NULL        },
-    /* [32] */ { NULL,            0, 0, NULL,             NULL        },
-    /* [33] */ { NULL,            0, 0, NULL,             NULL        },
-    /* [34] */ { NULL,            0, 0, NULL,             NULL        },
-    /* [35] */ { "pow",           3, 1, NULL,             dv_pow      },
-    /* [36] */ { "cosh",          4, 0, dv_cosh,          NULL        },
-    /* [37] */ { NULL,            0, 0, NULL,             NULL        },
-    /* [38] */ { "atan2",         5, 1, NULL,             dv_atan2    },
-    /* [39] */ { "asinh",         5, 0, dv_asinh,         NULL        },
-    /* [40] */ { NULL,            0, 0, NULL,             NULL        },
-    /* [41] */ { "atan",          4, 0, dv_atan,          NULL        },
-    /* [42] */ { NULL,            0, 0, NULL,             NULL        },
-    /* [43] */ { NULL,            0, 0, NULL,             NULL        },
-    /* [44] */ { "lambert_wm1",  11, 0, dv_lambert_wm1,   NULL        },
-    /* [45] */ { "cos",           3, 0, dv_cos,           NULL        },
-    /* [46] */ { "log",           3, 0, dv_log,           NULL        },
-    /* [47] */ { NULL,            0, 0, NULL,             NULL        },
-    /* [48] */ { "abs",           3, 0, dv_abs,           NULL        },
-    /* [49] */ { "hypot",         5, 1, NULL,             dv_hypot    },
-    /* [50] */ { NULL,            0, 0, NULL,             NULL        },
-    /* [51] */ { "atanh",         5, 0, dv_atanh,         NULL        },
-    /* [52] */ { NULL,            0, 0, NULL,             NULL        },
-    /* [53] */ { "erfc",          4, 0, dv_erfc,          NULL        },
-    /* [54] */ { NULL,            0, 0, NULL,             NULL        },
-    /* [55] */ { "lambert_w0",   10, 0, dv_lambert_w0,    NULL        },
-    /* [56] */ { NULL,            0, 0, NULL,             NULL        },
-    /* [57] */ { NULL,            0, 0, NULL,             NULL        },
-    /* [58] */ { "tan",           3, 0, dv_tan,           NULL        },
-    /* [59] */ { "gamma",         5, 0, dv_gamma,         NULL        },
-    /* [60] */ { NULL,            0, 0, NULL,             NULL        },
-    /* [61] */ { NULL,            0, 0, NULL,             NULL        },
-    /* [62] */ { "lgamma",        6, 0, dv_lgamma,        NULL        },
-    /* [63] */ { "acos",          4, 0, dv_acos,          NULL        },
-    /* [64] */ { NULL,            0, 0, NULL,             NULL        },
-    /* [65] */ { NULL,            0, 0, NULL,             NULL        },
-    /* [66] */ { "exp",           3, 0, dv_exp,           NULL        },
+    [0]  = { "atanh",          5, false, dv_atanh,         NULL        },
+    [1]  = { "E1",             2, false, dv_e1,            NULL        },
+    [2]  = { "acosh",          5, false, dv_acosh,         NULL        },
+    [6]  = { "erf",            3, false, dv_erf,           NULL        },
+    [8]  = { "atan2",          5, true,  NULL,             dv_atan2    },
+    [9]  = { "lambert_w0",    10, false, dv_lambert_w0,    NULL        },
+    [10] = { "log",            3, false, dv_log,           NULL        },
+    [12] = { "erfc",           4, false, dv_erfc,          NULL        },
+    [13] = { "erfinv",         6, false, dv_erfinv,        NULL        },
+    [14] = { "cosh",           4, false, dv_cosh,          NULL        },
+    [15] = { "Ei",             2, false, dv_ei,            NULL        },
+    [16] = { "trigamma",       8, false, dv_trigamma,      NULL        },
+    [17] = { "cos",            3, false, dv_cos,           NULL        },
+    [18] = { "logbeta",        7, true,  NULL,             dv_logbeta  },
+    [21] = { "tan",            3, false, dv_tan,           NULL        },
+    [22] = { "exp",            3, false, dv_exp,           NULL        },
+    [23] = { "sinh",           4, false, dv_sinh,          NULL        },
+    [24] = { "digamma",        7, false, dv_digamma,       NULL        },
+    [25] = { "normal_logpdf", 13, false, dv_normal_logpdf, NULL        },
+    [26] = { "pow",            3, true,  NULL,             dv_pow      },
+    [27] = { "lambert_wm1",   11, false, dv_lambert_wm1,   NULL        },
+    [29] = { "lgamma",         6, false, dv_lgamma,        NULL        },
+    [30] = { "sin",            3, false, dv_sin,           NULL        },
+    [31] = { "abs",            3, false, dv_abs,           NULL        },
+    [32] = { "hypot",          5, true,  NULL,             dv_hypot    },
+    [34] = { "asinh",          5, false, dv_asinh,         NULL        },
+    [35] = { "tanh",           4, false, dv_tanh,          NULL        },
+    [37] = { "erfcinv",        7, false, dv_erfcinv,       NULL        },
+    [41] = { "normal_cdf",    10, false, dv_normal_cdf,    NULL        },
+    [43] = { "sqrt",           4, false, dv_sqrt,          NULL        },
+    [44] = { "asin",           4, false, dv_asin,          NULL        },
+    [45] = { "beta",           4, true,  NULL,             dv_beta     },
+    [46] = { "atan",           4, false, dv_atan,          NULL        },
+    [48] = { "gamma",          5, false, dv_gamma,         NULL        },
+    [49] = { "acos",           4, false, dv_acos,          NULL        },
+    [51] = { "normal_pdf",    10, false, dv_normal_pdf,    NULL        },
 };
 
 static unsigned func_ht_hash(const char *s, size_t n)
 {
-    unsigned h = 5381;
-    for (size_t i = 0; i < n; i++)
-        h = ((h << 5) + h) ^ (unsigned char)s[i];
-    return h % FUNC_HT_SIZE;
+    unsigned h = 230u;
+
+    h += (unsigned)n;
+    for (size_t i = 0; i < n; i++) {
+        h *= 521u;
+        h ^= (unsigned char)s[i];
+    }
+
+    h ^= (h >> 13);
+    h *= 2654435761u;
+
+    return h % FUNC_HT_MODULUS;
 }
 
 static const func_entry_t *lookup_func(const char *kw, size_t klen)
 {
     unsigned slot = func_ht_hash(kw, klen);
-    for (;;) {
-        if (!s_funcs[slot].kw) return NULL;
-        if (s_funcs[slot].klen == klen &&
-                memcmp(s_funcs[slot].kw, kw, klen) == 0)
-            return &s_funcs[slot];
-        slot = (slot + 1) % FUNC_HT_SIZE;
-    }
+    if (slot >= FUNC_HT_SIZE) return NULL;
+    if (!s_funcs[slot].kw) return NULL;
+    if (s_funcs[slot].klen == klen &&
+            memcmp(s_funcs[slot].kw, kw, klen) == 0)
+        return &s_funcs[slot];
+    return NULL;
 }
 
 /* Return 1 if the byte sequence at p looks like a superscript codepoint. */
@@ -949,10 +1077,73 @@ static dval_t *parse_pure_const(const char *s, const char *end,
     return result;
 }
 
+static int has_top_level_equals(const char *start, const char *end)
+{
+    int depth = 0;
+    const char *p = start;
+
+    while (p < end) {
+        if (*p == '(' || *p == '[') {
+            depth++;
+            p++;
+            continue;
+        }
+        if (*p == ')' || *p == ']') {
+            depth--;
+            p++;
+            continue;
+        }
+        if (depth == 0 && *p == '=')
+            return 1;
+
+        {
+            unsigned int c;
+            int len = fs_utf8_decode(p, &c);
+            p += (len > 0) ? len : 1;
+        }
+    }
+
+    return 0;
+}
+
+static int collect_implicit_symbols(const char *start, const char *end,
+                                    symtab_t *syms)
+{
+    const char *p = start;
+
+    while (p < end) {
+        char *name = read_any_name(&p);
+        dval_t *node;
+        int is_const;
+
+        if (!name) {
+            unsigned int c;
+            int len = fs_utf8_decode(p, &c);
+            p += (len > 0) ? len : 1;
+            continue;
+        }
+
+        if (symtab_has(syms, name)) {
+            free(name);
+            continue;
+        }
+
+        is_const = fs_is_default_constant_name(name);
+        node = is_const
+            ? dv_new_named_const(QF_NAN, name)
+            : dv_new_named_var(QF_NAN, name);
+        symtab_add(syms, node->name ? node->name : name, node);
+        free(name);
+    }
+
+    return 0;
+}
+
 static dval_t *parse_expression_region(const char *start,
                                        const char *end,
                                        symtab_t *syms,
-                                       const char *context_label)
+                                       const char *context_label,
+                                       int report_errors)
 {
     parser_t ps;
     dval_t *result;
@@ -985,7 +1176,7 @@ static dval_t *parse_expression_region(const char *start,
         result = NULL;
     }
 
-    if (ps.error)
+    if (ps.error && report_errors)
         fprintf(stderr, "%s: parse error: %s\n", context_label, ps.errmsg);
     return NULL;
 }
@@ -994,8 +1185,17 @@ static dval_t *parse_expression_region(const char *start,
 /* Public entry point                                                   */
 /* ------------------------------------------------------------------ */
 
-dval_t *dval_from_string(const char *s)
+static dval_t *dval_from_string_impl(const char *s,
+                                     dval_binding_t **bindings_out,
+                                     size_t *number_out)
 {
+    dval_binding_t *bindings = NULL;
+    size_t nbindings = 0;
+
+    if (bindings_out)
+        *bindings_out = NULL;
+    if (number_out)
+        *number_out = 0;
     if (!s) return NULL;
 
     while (isspace((unsigned char)*s)) s++;
@@ -1034,19 +1234,52 @@ dval_t *dval_from_string(const char *s)
     /* ---- No bindings: either { expr } or legacy { name = val } ---- */
     if (!pipe_pos) {
         const char *content_end = close_pos;
+        symtab_t syms;
         while (content_end > s && isspace((unsigned char)content_end[-1]))
             content_end--;
 
         dval_t *result = parse_expression_region(s, content_end, NULL,
-                                                 "dval_from_string");
+                                                 "dval_from_string", 0);
 
-        if (result)
+        if (result) {
+            if (bindings_out) {
+                bindings = single_binding_from_node(result, &nbindings);
+                *bindings_out = bindings;
+            }
+            if (number_out)
+                *number_out = nbindings;
             return result;
+        }
+
+        if (!has_top_level_equals(s, content_end)) {
+            symtab_init(&syms);
+            if (collect_implicit_symbols(s, content_end, &syms) == 0 &&
+                syms.count > 0) {
+                result = parse_expression_region(s, content_end, &syms,
+                                                 "dval_from_string", 1);
+            }
+            if (result && bindings_out)
+                bindings = symtab_build_bindings(&syms, &nbindings);
+            symtab_free(&syms);
+            if (result) {
+                if (bindings_out)
+                    *bindings_out = bindings;
+                if (number_out)
+                    *number_out = nbindings;
+                return result;
+            }
+        }
 
         errmsg[0] = '\0';
         result = parse_pure_const(s, content_end, errmsg, sizeof(errmsg));
         if (!result)
             fprintf(stderr, "dval_from_string: %s\n", errmsg);
+        else if (bindings_out) {
+            bindings = single_binding_from_node(result, &nbindings);
+            *bindings_out = bindings;
+        }
+        if (number_out)
+            *number_out = nbindings;
         return result;
     }
 
@@ -1085,10 +1318,28 @@ dval_t *dval_from_string(const char *s)
     }
 
     dval_t *result = parse_expression_region(s, expr_end, &syms,
-                                             "dval_from_string");
+                                             "dval_from_string", 1);
+    if (result && bindings_out)
+        bindings = symtab_build_bindings(&syms, &nbindings);
 
     symtab_free(&syms);
+    if (result && bindings_out)
+        *bindings_out = bindings;
+    if (result && number_out)
+        *number_out = nbindings;
     return result;
+}
+
+dval_t *dval_from_string(const char *s)
+{
+    return dval_from_string_impl(s, NULL, NULL);
+}
+
+dval_t *dval_from_string_with_bindings(const char *s,
+                                       dval_binding_t **bindings_out,
+                                       size_t *number_out)
+{
+    return dval_from_string_impl(s, bindings_out, number_out);
 }
 
 dval_t *dval_from_expression_string(const char *expr,
@@ -1135,7 +1386,77 @@ dval_t *dval_from_expression_string(const char *expr,
 
     result = parse_expression_region(expr, expr + strlen(expr),
                                      nsymbols ? &syms : NULL,
-                                     "dval_from_expression_string");
+                                     "dval_from_expression_string", 1);
     symtab_free(&syms);
     return result;
+}
+
+dval_binding_t *dval_binding_get(dval_binding_t *bindings,
+                                 size_t number,
+                                 const char *name)
+{
+    char *norm;
+
+    if (!bindings || !name)
+        return NULL;
+
+    norm = fs_normalise_binding_name(name);
+    if (!norm)
+        return NULL;
+
+    for (size_t i = 0; i < number; ++i) {
+        if (strcmp(bindings[i].name, norm) == 0) {
+            free(norm);
+            return &bindings[i];
+        }
+    }
+
+    free(norm);
+    return NULL;
+}
+
+dval_binding_t *dval_binding_find(dval_binding_t *bindings,
+                                  size_t number,
+                                  const char *name)
+{
+    return dval_binding_get(bindings, number, name);
+}
+
+int dval_binding_set_qf(dval_binding_t *bindings,
+                        size_t number,
+                        const char *name,
+                        qfloat_t value)
+{
+    dval_binding_t *binding = dval_binding_get(bindings, number, name);
+
+    if (!binding)
+        return -1;
+    dv_set_val_qf(binding->symbol, value);
+    return 0;
+}
+
+int dval_binding_set_qc(dval_binding_t *bindings,
+                        size_t number,
+                        const char *name,
+                        qcomplex_t value)
+{
+    dval_binding_t *binding = dval_binding_get(bindings, number, name);
+
+    if (!binding)
+        return -1;
+    dv_set_val(binding->symbol, value);
+    return 0;
+}
+
+int dval_binding_set_d(dval_binding_t *bindings,
+                       size_t number,
+                       const char *name,
+                       double value)
+{
+    dval_binding_t *binding = dval_binding_get(bindings, number, name);
+
+    if (!binding)
+        return -1;
+    dv_set_val_d(binding->symbol, value);
+    return 0;
 }

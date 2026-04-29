@@ -28,6 +28,7 @@
 #include <ctype.h>
 #include <strings.h>
 #include <limits.h>
+#include <math.h>
 #include "qcomplex.h"
 #include "dval_internal.h"
 #include "dval.h"
@@ -89,43 +90,96 @@ static struct _dval_t _DV_ONE_NODE = {
 dval_t *DV_ZERO = &_DV_ZERO_NODE;
 dval_t *DV_ONE = &_DV_ONE_NODE;
 
+static struct _dval_t _DV_NAN_NODE = {
+    .ops = &ops_const,
+    .a = NULL,
+    .b = NULL,
+    .c = { { NAN, 0.0 }, { NAN, 0.0 } },
+    .x = { { NAN, 0.0 }, { NAN, 0.0 } },
+    .x_valid = 1,
+    .epoch = 0,
+    .dx_cache = NULL,
+    .name = NULL,
+    .refcount = INT_MAX,
+    .var_id = 0
+};
+
+static dval_t *dv_nan_const_shared(void)
+{
+    return &_DV_NAN_NODE;
+}
+
 /* ------------------------------------------------------------------------- */
 /* Name handling                                                             */
 /* ------------------------------------------------------------------------- */
 
+typedef struct {
+    const char *ascii;
+    size_t klen;
+    const char *lower;
+    const char *upper;
+} greek_entry_t;
+
+enum { GREEK_HT_SIZE = 30 };
+
+/* Collision-free direct hash table for ASCII Greek aliases, hashed
+ * case-insensitively. */
+static const greek_entry_t s_greek_names[GREEK_HT_SIZE] = {
+    [0]  = { "theta",   5, "θ", "Θ" },
+    [1]  = { "psi",     3, "ψ", "Ψ" },
+    [2]  = { "chi",     3, "χ", "Χ" },
+    [4]  = { "lambda",  6, "λ", "Λ" },
+    [5]  = { "delta",   5, "δ", "Δ" },
+    [6]  = { "omicron", 8, "ο", "Ο" },
+    [8]  = { "iota",    4, "ι", "Ι" },
+    [10] = { "mu",      2, "μ", "Μ" },
+    [11] = { "pi",      2, "π", "Π" },
+    [12] = { "phi",     3, "φ", "Φ" },
+    [13] = { "alpha",   5, "α", "Α" },
+    [14] = { "zeta",    4, "ζ", "Ζ" },
+    [15] = { "tau",     3, "τ", "Τ" },
+    [16] = { "rho",     3, "ρ", "Ρ" },
+    [17] = { "beta",    4, "β", "Β" },
+    [19] = { "nu",      2, "ν", "Ν" },
+    [20] = { "kappa",   5, "κ", "Κ" },
+    [22] = { "sigma",   5, "σ", "Σ" },
+    [23] = { "xi",      2, "ξ", "Ξ" },
+    [24] = { "eta",     3, "η", "Η" },
+    [25] = { "epsilon", 7, "ε", "Ε" },
+    [26] = { "gamma",   5, "γ", "Γ" },
+    [27] = { "upsilon", 7, "υ", "Υ" },
+    [29] = { "omega",   5, "ω", "Ω" }
+};
+
+static unsigned greek_ht_hash(const char *s, size_t n)
+{
+    unsigned x = 113u;
+
+    for (size_t i = 0; i < n; ++i) {
+        x *= 65599u;
+        x ^= (unsigned char)(s[i] | 32);
+    }
+
+    x ^= (x >> 15);
+    x *= 2654435761u;
+
+    return x % GREEK_HT_SIZE;
+}
+
+static const greek_entry_t *lookup_greek_name(const char *kw, size_t klen)
+{
+    unsigned slot = greek_ht_hash(kw, klen);
+    const greek_entry_t *entry = &s_greek_names[slot];
+
+    if (!entry->ascii)
+        return NULL;
+    if (entry->klen == klen && strncasecmp(entry->ascii, kw, klen) == 0)
+        return entry;
+    return NULL;
+}
+
 static char *dv_normalize_name(const char *name)
 {
-    static const struct {
-        const char *ascii;
-        const char *lower;
-        const char *upper;
-    } greek[] = {
-        { "alpha",   "α", "Α" },
-        { "beta",    "β", "Β" },
-        { "gamma",   "γ", "Γ" },
-        { "delta",   "δ", "Δ" },
-        { "epsilon", "ε", "Ε" },
-        { "zeta",    "ζ", "Ζ" },
-        { "eta",     "η", "Η" },
-        { "theta",   "θ", "Θ" },
-        { "iota",    "ι", "Ι" },
-        { "kappa",   "κ", "Κ" },
-        { "lambda",  "λ", "Λ" },
-        { "mu",      "μ", "Μ" },
-        { "nu",      "ν", "Ν" },
-        { "xi",      "ξ", "Ξ" },
-        { "omicron", "ο", "Ο" },
-        { "pi",      "π", "Π" },
-        { "rho",     "ρ", "Ρ" },
-        { "sigma",   "σ", "Σ" },
-        { "tau",     "τ", "Τ" },
-        { "upsilon", "υ", "Υ" },
-        { "phi",     "φ", "Φ" },
-        { "chi",     "χ", "Χ" },
-        { "psi",     "ψ", "Ψ" },
-        { "omega",   "ω", "Ω" }
-    };
-
     if (!name)
         return NULL;
 
@@ -147,29 +201,36 @@ static char *dv_normalize_name(const char *name)
         return t;
 
     const char *p = t + 1;
+    size_t alias_len = 0;
+    const greek_entry_t *entry;
 
-    for (size_t i = 0; i < sizeof(greek)/sizeof(greek[0]); ++i) {
-        size_t alen = strlen(greek[i].ascii);
-        if (strncasecmp(p, greek[i].ascii, alen) == 0) {
-            int upper = 1;
-            for (size_t k = 0; k < alen; ++k)
-                if (!isupper((unsigned char)p[k])) upper = 0;
+    while (p[alias_len] && isalpha((unsigned char)p[alias_len]))
+        alias_len++;
 
-            const char *g = upper ? greek[i].upper : greek[i].lower;
-            const char *rest = p + alen;
+    entry = alias_len ? lookup_greek_name(p, alias_len) : NULL;
+    if (entry) {
+        int upper = 1;
+        const char *g;
+        const char *rest = p + alias_len;
+        size_t gl;
+        size_t rl;
+        char *out;
 
-            size_t gl = strlen(g);
-            size_t rl = strlen(rest);
-
-            char *out = malloc(gl + rl + 1);
-            memcpy(out, g, gl);
-            memcpy(out + gl, rest, rl);
-            out[gl + rl] = '\0';
-
-            free(t);
-            t = out;
-            break;
+        for (size_t k = 0; k < alias_len; ++k) {
+            if (!isupper((unsigned char)p[k]))
+                upper = 0;
         }
+
+        g = upper ? entry->upper : entry->lower;
+        gl = strlen(g);
+        rl = strlen(rest);
+        out = malloc(gl + rl + 1);
+        memcpy(out, g, gl);
+        memcpy(out + gl, rest, rl);
+        out[gl + rl] = '\0';
+
+        free(t);
+        t = out;
     }
 
     /* remove remaining '@' */
@@ -490,6 +551,7 @@ int dv_eval_derivatives(const dval_t *expr,
 const dval_t *dv_get_deriv(const dval_t *expr, dval_t *wrt)
 {
     if (!expr || !wrt) return NULL;
+    if (wrt->ops == &ops_const) return dv_nan_const_shared();
     dval_t *saved_wrt = tl_wrt;
     tl_wrt = wrt;
     const dval_t *result = dv_build_dx((dval_t *)expr);
@@ -2490,6 +2552,7 @@ int dv_cmp(const dval_t *dv1, const dval_t *dv2) {
 dval_t *dv_create_deriv(dval_t *expr, dval_t *wrt)
 {
     if (!expr || !wrt) return NULL;
+    if (wrt->ops == &ops_const) return dv_nan_const_shared();
     dval_t *saved_wrt = tl_wrt;
     tl_wrt = wrt;
     dval_t *raw = dv_build_dx(expr); /* borrowed */

@@ -274,17 +274,64 @@ matrix_t *mat_create_dv(size_t rows, size_t cols, dval_t *const *data);
  *
  * Supported forms are:
  *
- *   [[a b c][d e f]]
- *   { [[a b][c d]] | x = 1, y = 2; c1 = 3 }
+ *   (a, b, c; d, e, f)
+ *   { (a, b; c, d) | x = 1, y = 2; c1 = 3 }
  *
  * Purely numeric matrices become qfloat or qcomplex matrices depending on
  * whether any entry is genuinely complex. Symbolic matrices become dval
- * matrices. When @p bindings_out is non-NULL for a symbolic matrix, it
- * receives a heap-allocated array of borrowed bindings that remains valid
- * while the returned matrix remains alive; releasing that array only requires
- * free(*bindings_out).
+ * matrices. For bare symbolic input without outer braces, all discovered
+ * bindings start as NaN and symbol kind is inferred from the name. Standard
+ * mathematical constants such as `e`, `π`, `τ`, along with `c1` / `c_2` /
+ * `c₃` style placeholders, are treated as constants by default; ordinary
+ * Latin names such as `x` or `radius`, and symbolic parameter names such as
+ * `Δ` or `Ω`, are treated as variables unless an explicit matrix-wide
+ * binding section says otherwise. When @p bindings_out is non-NULL for a
+ * symbolic matrix, it receives a heap-allocated array of borrowed bindings
+ * that remains valid while the returned matrix remains alive; releasing that
+ * array only requires free(*bindings_out).
  */
 matrix_t *mat_from_string(const char *s, binding_t **bindings_out, size_t *number_out);
+
+/**
+ * @brief Find a returned symbolic binding by name.
+ *
+ * The lookup uses the normalised binding names returned by mat_from_string(),
+ * such as `c₁` for `c1`. Convenience aliases such as `@DELTA`, `@OMEGA`,
+ * `@pi`, and `@tau` are also accepted.
+ *
+ * @return Pointer to the matching borrowed binding, or NULL if not found.
+ */
+binding_t *mat_binding_get(binding_t *bindings, size_t number, const char *name);
+
+/**
+ * @brief Find a returned symbolic binding by name.
+ *
+ * Synonym for mat_binding_get().
+ *
+ * @return Pointer to the matching borrowed binding, or NULL if not found.
+ */
+binding_t *mat_binding_find(binding_t *bindings, size_t number, const char *name);
+
+/**
+ * @brief Set a returned symbolic binding from a qfloat_t value.
+ *
+ * @return 0 on success, or -1 if the named binding is not present.
+ */
+int mat_binding_set_qf(binding_t *bindings, size_t number, const char *name, qfloat_t value);
+
+/**
+ * @brief Set a returned symbolic binding from a qcomplex_t value.
+ *
+ * @return 0 on success, or -1 if the named binding is not present.
+ */
+int mat_binding_set_qc(binding_t *bindings, size_t number, const char *name, qcomplex_t value);
+
+/**
+ * @brief Set a returned symbolic binding from a double value.
+ *
+ * @return 0 on success, or -1 if the named binding is not present.
+ */
+int mat_binding_set_d(binding_t *bindings, size_t number, const char *name, double value);
 
 /* -------------------------------------------------------------------------
    Destruction
