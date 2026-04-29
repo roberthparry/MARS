@@ -456,27 +456,260 @@ matrix_t *mat_sub(const matrix_t *A, const matrix_t *B);
 matrix_t *mat_mul(const matrix_t *A, const matrix_t *B);
 matrix_t *mat_neg(const matrix_t *A);
 
+/**
+ * @brief Return the transpose of a matrix.
+ *
+ * The result has dimensions `cols(A) × rows(A)` and preserves the element
+ * type of `A`.
+ *
+ * @param A  Matrix to transpose.
+ * @return   Newly allocated transpose on success, or NULL on error.
+ */
 matrix_t *mat_transpose(const matrix_t *A);
+
+/**
+ * @brief Return the entrywise complex conjugate of a matrix.
+ *
+ * For real-valued element types this leaves the numeric values unchanged. For
+ * symbolic `dval_t *` matrices, the operation applies the elementwise
+ * conjugation rule provided by the symbolic element layer.
+ *
+ * @param A  Matrix to conjugate.
+ * @return   Newly allocated conjugated matrix on success, or NULL on error.
+ */
 matrix_t *mat_conj(const matrix_t *A);
+
+/**
+ * @brief Return the Hermitian transpose of a matrix.
+ *
+ * This is the conjugate transpose `A^H = conj(transpose(A))`.
+ *
+ * @param A  Matrix to transform.
+ * @return   Newly allocated Hermitian transpose on success, or NULL on error.
+ */
 matrix_t *mat_hermitian(const matrix_t *A);
-/* For non-dval matrices, derivative helpers treat the matrix as constant. */
+
+/**
+ * @brief Differentiate a matrix entrywise with respect to a symbolic variable.
+ *
+ * Each output entry is the derivative of the corresponding input entry with
+ * respect to `wrt`. For non-`dval` matrices the input is treated as constant,
+ * so the result is a zero matrix of matching shape.
+ *
+ * @param A    Matrix to differentiate.
+ * @param wrt  Symbolic differentiation variable.
+ * @return     Newly allocated derivative matrix on success, or NULL on error.
+ */
 matrix_t *mat_deriv(const matrix_t *A, dval_t *wrt);
+
+/**
+ * @brief Differentiate the trace of a matrix with respect to a symbolic variable.
+ *
+ * For symbolic matrices this returns the exact derivative of `tr(A)`. For
+ * non-`dval` matrices the matrix is treated as constant and symbolic zero is
+ * returned.
+ *
+ * @param A    Matrix whose trace is to be differentiated.
+ * @param wrt  Symbolic differentiation variable.
+ * @return     Newly allocated symbolic derivative, or NULL on error.
+ */
 dval_t   *mat_deriv_trace(const matrix_t *A, dval_t *wrt);
+
+/**
+ * @brief Differentiate the determinant of a matrix with respect to a symbolic variable.
+ *
+ * For symbolic matrices this returns the exact derivative of `det(A)`. For
+ * non-`dval` matrices the matrix is treated as constant and symbolic zero is
+ * returned.
+ *
+ * @param A    Matrix whose determinant is to be differentiated.
+ * @param wrt  Symbolic differentiation variable.
+ * @return     Newly allocated symbolic derivative, or NULL on error.
+ */
 dval_t   *mat_deriv_det(const matrix_t *A, dval_t *wrt);
+
+/**
+ * @brief Differentiate the inverse of a matrix with respect to a symbolic variable.
+ *
+ * Symbolic matrices use the exact matrix-calculus identity
+ * `d(A^{-1}) = -A^{-1}(dA)A^{-1}`. Non-`dval` matrices are treated as
+ * constant, so a zero matrix of the appropriate shape is returned.
+ *
+ * @param A    Matrix whose inverse derivative is requested.
+ * @param wrt  Symbolic differentiation variable.
+ * @return     Newly allocated derivative matrix on success, or NULL on error.
+ */
 matrix_t *mat_deriv_inverse(const matrix_t *A, dval_t *wrt);
+
+/**
+ * @brief Differentiate the block inverse of a matrix with respect to a symbolic variable.
+ *
+ * The matrix is partitioned using the same top-left `split × split` block as
+ * `mat_block_inverse(...)`. Symbolic matrices use the block inverse path and
+ * exact matrix-calculus rules; non-`dval` matrices are treated as constant and
+ * yield a zero matrix.
+ *
+ * @param A     Matrix whose block inverse derivative is requested.
+ * @param split Size of the leading square block.
+ * @param wrt   Symbolic differentiation variable.
+ * @return      Newly allocated derivative matrix on success, or NULL on error.
+ */
 matrix_t *mat_deriv_block_inverse(const matrix_t *A, size_t split, dval_t *wrt);
+
+/**
+ * @brief Build a Jacobian for a matrix-valued symbolic output.
+ *
+ * The input matrix is flattened in row-major order. The resulting Jacobian has
+ * `rows(A) * cols(A)` rows and `nvars` columns, where row
+ * `i * cols(A) + j` corresponds to entry `A[i,j]`.
+ *
+ * For non-`dval` matrices the input is treated as constant, so the returned
+ * Jacobian is symbolic zero throughout.
+ *
+ * @param A      Matrix-valued symbolic output.
+ * @param vars   Array of symbolic differentiation variables.
+ * @param nvars  Number of variables in `vars`.
+ * @return       Newly allocated Jacobian matrix on success, or NULL on error.
+ */
 matrix_t *mat_jacobian(const matrix_t *A, dval_t *const *vars, size_t nvars);
 
+/**
+ * @brief Compute the trace of a square matrix.
+ *
+ * The output buffer must match the matrix element type: `double`, `qfloat_t`,
+ * `qcomplex_t`, or `dval_t *`. For symbolic matrices, a newly built symbolic
+ * value is written through `trace`.
+ *
+ * @param A      Matrix whose trace is requested.
+ * @param trace  Output buffer for the trace value.
+ * @return       0 on success, or a negative value on error.
+ */
 int       mat_trace(const matrix_t *A, void *trace);
+
+/**
+ * @brief Compute the determinant of a square matrix.
+ *
+ * The output buffer must match the matrix element type: `double`, `qfloat_t`,
+ * `qcomplex_t`, or `dval_t *`. Symbolic `dval` matrices use the exact
+ * symbolic determinant path.
+ *
+ * @param A            Matrix whose determinant is requested.
+ * @param determinant  Output buffer for the determinant value.
+ * @return             0 on success, or a negative value on error.
+ */
 int       mat_det(const matrix_t *A, void *determinant);
+
+/**
+ * @brief Compute the characteristic polynomial of a square matrix.
+ *
+ * The polynomial is returned as a column vector of coefficients in descending
+ * order, so for an `n × n` matrix the result has shape `(n + 1) × 1`.
+ *
+ * @param A  Matrix whose characteristic polynomial is requested.
+ * @return   Newly allocated coefficient vector on success, or NULL on error.
+ */
 matrix_t *mat_charpoly(const matrix_t *A);
+
+/**
+ * @brief Compute the minimal polynomial of a square matrix.
+ *
+ * The result is returned as a column vector of coefficients in descending
+ * order.
+ *
+ * @param A  Matrix whose minimal polynomial is requested.
+ * @return   Newly allocated coefficient vector on success, or NULL on error.
+ */
 matrix_t *mat_minpoly(const matrix_t *A);
+
+/**
+ * @brief Apply a scalar polynomial to a matrix.
+ *
+ * The coefficient vector must be supplied in descending order, matching the
+ * layout returned by `mat_charpoly(...)` and `mat_minpoly(...)`.
+ *
+ * @param A       Matrix argument.
+ * @param coeffs  Column vector of polynomial coefficients.
+ * @return        Newly allocated matrix value `p(A)` on success, or NULL on error.
+ */
 matrix_t *mat_apply_poly(const matrix_t *A, const matrix_t *coeffs);
+
+/**
+ * @brief Compute the adjugate of a square matrix.
+ *
+ * The adjugate is the transpose of the cofactor matrix and satisfies
+ * `A · adj(A) = det(A) I` whenever the product is defined.
+ *
+ * @param A  Matrix whose adjugate is requested.
+ * @return   Newly allocated adjugate on success, or NULL on error.
+ */
 matrix_t *mat_adjugate(const matrix_t *A);
+
+/**
+ * @brief Compute the Schur complement of the leading block of a matrix.
+ *
+ * With the block partition
+ *
+ * `A = [A11 A12; A21 A22]`
+ *
+ * where `A11` is `split × split`, this returns
+ *
+ * `A22 - A21 A11^{-1} A12`.
+ *
+ * @param A      Matrix to partition.
+ * @param split  Size of the leading square block.
+ * @return       Newly allocated Schur complement on success, or NULL on error.
+ */
 matrix_t *mat_schur_complement(const matrix_t *A, size_t split);
+
+/**
+ * @brief Compute the inverse of a matrix from a top-left block partition.
+ *
+ * Uses the same `split × split` leading block convention as
+ * `mat_schur_complement(...)`.
+ *
+ * @param A      Matrix to invert.
+ * @param split  Size of the leading square block.
+ * @return       Newly allocated inverse on success, or NULL on error.
+ */
 matrix_t *mat_block_inverse(const matrix_t *A, size_t split);
+
+/**
+ * @brief Differentiate the block solution of `A X = B` with respect to a symbolic variable.
+ *
+ * Uses the same top-left block partition as `mat_block_solve(...)`. For
+ * non-`dval` inputs the matrices are treated as constant and a zero matrix of
+ * the solution shape is returned.
+ *
+ * @param A      Coefficient matrix.
+ * @param B      Right-hand-side matrix.
+ * @param split  Size of the leading square block.
+ * @param wrt    Symbolic differentiation variable.
+ * @return       Newly allocated derivative matrix on success, or NULL on error.
+ */
 matrix_t *mat_deriv_block_solve(const matrix_t *A, const matrix_t *B, size_t split, dval_t *wrt);
+
+/**
+ * @brief Compute the inverse of a square matrix.
+ *
+ * For symbolic `dval` matrices this uses the exact symbolic inverse path.
+ *
+ * @param A  Matrix to invert.
+ * @return   Newly allocated inverse on success, or NULL on error.
+ */
 matrix_t *mat_inverse(const matrix_t *A);
+
+/**
+ * @brief Differentiate the solution of `A X = B` with respect to a symbolic variable.
+ *
+ * For symbolic matrices this uses the exact matrix-calculus solve derivative.
+ * For non-`dval` matrices both inputs are treated as constant and a zero matrix
+ * of the solution shape is returned.
+ *
+ * @param A    Coefficient matrix.
+ * @param B    Right-hand-side matrix.
+ * @param wrt  Symbolic differentiation variable.
+ * @return     Newly allocated derivative matrix on success, or NULL on error.
+ */
 matrix_t *mat_deriv_solve(const matrix_t *A, const matrix_t *B, dval_t *wrt);
 
 /**
