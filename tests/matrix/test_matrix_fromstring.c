@@ -1,3 +1,5 @@
+#include <stdint.h>
+
 #include "test_matrix.h"
 
 static binding_t *find_binding(binding_t *bindings, size_t n, const char *name)
@@ -126,10 +128,44 @@ static void test_mat_from_string_symbolic_bare(void)
     mat_free(A);
 }
 
+static void test_mat_from_string_invalid_syntax(void)
+{
+    binding_t *bindings = (binding_t *)(uintptr_t)1;
+    size_t nbindings = 123;
+    matrix_t *A;
+
+    A = mat_from_string("[[1 2][3]]", &bindings, &nbindings);
+    check_bool("mat_from_string rejects ragged matrix", A == NULL);
+    check_bool("mat_from_string ragged clears bindings", bindings == NULL);
+    check_bool("mat_from_string ragged clears count", nbindings == 0);
+
+    bindings = (binding_t *)(uintptr_t)1;
+    nbindings = 123;
+    A = mat_from_string("[[1 2][3 4]", &bindings, &nbindings);
+    check_bool("mat_from_string rejects missing closing bracket", A == NULL);
+    check_bool("mat_from_string missing bracket clears bindings", bindings == NULL);
+    check_bool("mat_from_string missing bracket clears count", nbindings == 0);
+
+    bindings = (binding_t *)(uintptr_t)1;
+    nbindings = 123;
+    A = mat_from_string("{ [[x 1][1 y]] | x = }", &bindings, &nbindings);
+    check_bool("mat_from_string rejects invalid binding syntax", A == NULL);
+    check_bool("mat_from_string invalid binding clears bindings", bindings == NULL);
+    check_bool("mat_from_string invalid binding clears count", nbindings == 0);
+
+    bindings = (binding_t *)(uintptr_t)1;
+    nbindings = 123;
+    A = mat_from_string("[[Δ Ω][Ω -]]", &bindings, &nbindings);
+    check_bool("mat_from_string rejects invalid symbolic expression", A == NULL);
+    check_bool("mat_from_string invalid symbolic clears bindings", bindings == NULL);
+    check_bool("mat_from_string invalid symbolic clears count", nbindings == 0);
+}
+
 void run_matrix_fromstring_tests(void)
 {
     test_mat_from_string_numeric_qf();
     test_mat_from_string_numeric_qc();
     test_mat_from_string_symbolic_wrapped();
     test_mat_from_string_symbolic_bare();
+    test_mat_from_string_invalid_syntax();
 }

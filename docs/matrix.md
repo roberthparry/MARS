@@ -220,14 +220,25 @@ int main(void)
 {
     binding_t *bindings = NULL;
     size_t nbindings = 0;
+    binding_t *delta = NULL;
+    binding_t *omega = NULL;
     matrix_t *H = mat_from_string(
-        "{ [[Δ Ω][Ω -Δ]] | Δ = 1.5; Ω = 0.25 }",
+        "[[Δ Ω][Ω -Δ]]",
         &bindings, &nbindings);
     matrix_t *H2 = mat_pow_int(H, 2);
     matrix_t *P = mat_charpoly(H);
     dval_t *evals[2] = {NULL, NULL};
     dval_t *trace = NULL;
     dval_t *c2 = NULL;
+
+    for (size_t i = 0; i < nbindings; ++i) {
+        if (strcmp(bindings[i].name, "Δ") == 0)
+            delta = &bindings[i];
+        else if (strcmp(bindings[i].name, "Ω") == 0)
+            omega = &bindings[i];
+    }
+    dv_set_val_d(delta->symbol, 1.5);
+    dv_set_val_d(omega->symbol, 0.25);
 
     mat_eigenvalues(H, evals);
     mat_trace(H, &trace);
@@ -255,11 +266,11 @@ Illustrative output:
 H = { [
   Δ  Ω
   Ω -Δ
-] | Δ = 1.5; Ω = 0.25 }
-H² = { [[Ω² + Δ² -ΩΔ + ΩΔ][ΩΔ - ΩΔ Ω² + Δ²]] | Δ = 1.5; Ω = 0.25 }
+] | Δ = 1.5, Ω = 0.25 }
+H² = { [[Δ² + Ω² -ΔΩ + ΔΩ][-ΔΩ + ΔΩ Δ² + Ω²]] | Δ = 1.5, Ω = 0.25 }
 tr(H) = { 0 }
-charpoly constant term = { -(2·Ω² + 2Δ²)/2 | Δ = 1.5; Ω = 0.25 }
-eigenvalues = { 0.5·sqrt(4·Ω² + 4Δ²) | Δ = 1.5; Ω = 0.25 }, { -0.5·sqrt(4·Ω² + 4Δ²) | Δ = 1.5; Ω = 0.25 }
+charpoly constant term = { -(2Δ² + 2Ω²)/2 | Δ = 1.5, Ω = 0.25 }
+eigenvalues = { 0.5·sqrt(4Δ² + 4Ω²) | Δ = 1.5, Ω = 0.25 }, { -0.5·sqrt(4Δ² + 4Ω²) | Δ = 1.5, Ω = 0.25 }
 ```
 
 ---

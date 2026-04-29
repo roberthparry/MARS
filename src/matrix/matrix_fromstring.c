@@ -49,6 +49,11 @@ static char *mf_strdup(const char *s)
     return mf_strndup(s, strlen(s));
 }
 
+static void mf_report_error(const char *msg)
+{
+    fprintf(stderr, "mat_from_string: %s\n", msg);
+}
+
 static char *mf_trim_copy(const char *s, size_t n)
 {
     while (n > 0 && isspace((unsigned char)*s)) {
@@ -306,14 +311,30 @@ static char *mf_normalise_expression_subscripts(const char *expr)
     return out;
 }
 
+static int mf_is_function_name(const char *p);
+
 static int mf_entry_requires_symbolic(const char *entry)
 {
-    while (*entry && isspace((unsigned char)*entry))
-        entry++;
-    if (!*entry)
-        return 0;
-    if (mf_is_letter((unsigned char)*entry) && *entry != 'i' && *entry != 'j')
-        return 1;
+    const char *p = entry;
+
+    while (*p) {
+        char *name = mf_read_simple_name(&p);
+
+        if (!name) {
+            p++;
+            continue;
+        }
+
+        if (!mf_is_function_name(p) &&
+            strcmp(name, "i") != 0 &&
+            strcmp(name, "j") != 0) {
+            free(name);
+            return 1;
+        }
+
+        free(name);
+    }
+
     return 0;
 }
 
@@ -728,13 +749,16 @@ matrix_t *mat_from_string(const char *s, binding_t **bindings_out, size_t *numbe
     symbol_vec_t symbols = {0};
     matrix_t *A = NULL;
     bool wrapped = false;
+    const char *error_msg = "invalid matrix string";
 
     if (bindings_out)
         *bindings_out = NULL;
     if (number_out)
         *number_out = 0;
-    if (!s)
+    if (!s) {
+        mf_report_error("NULL input");
         return NULL;
+    }
 
     while (*s && isspace((unsigned char)*s))
         s++;
@@ -746,7 +770,10 @@ matrix_t *mat_from_string(const char *s, binding_t **bindings_out, size_t *numbe
         const char *p = s + 1;
 
         if (!close)
+        {
+            mf_report_error("missing closing '}'");
             return NULL;
+        }
         wrapped = true;
         while (p < close) {
             if (*p == '(')
@@ -780,26 +807,34 @@ matrix_t *mat_from_string(const char *s, binding_t **bindings_out, size_t *numbe
             goto cleanup;
     }
 
-    if (mf_parse_matrix_body(body, &entries, &rows, &cols) != 0)
+    if (mf_parse_matrix_body(body, &entries, &rows, &cols) != 0) {
+        error_msg = "invalid matrix body syntax";
         goto cleanup;
+    }
     nentries = rows * cols;
 
     if (!wrapped && mf_try_parse_numeric_matrix(entries, rows, cols, &A) == 0)
         goto cleanup_success;
 
     if (bindings && *bindings) {
-        if (mf_parse_binding_section(bindings, &symbols) != 0)
+        if (mf_parse_binding_section(bindings, &symbols) != 0) {
+            error_msg = "invalid binding syntax";
             goto cleanup;
+        }
     }
 
     for (size_t i = 0; i < nentries; ++i) {
-        if (mf_collect_expression_names(entries[i], &symbols) != 0)
+        if (mf_collect_expression_names(entries[i], &symbols) != 0) {
+            error_msg = "invalid symbolic name usage";
             goto cleanup;
+        }
     }
 
     if (mf_build_symbolic_matrix(entries, rows, cols, &symbols,
-                                 bindings_out, number_out, &A) != 0)
+                                 bindings_out, number_out, &A) != 0) {
+        error_msg = "invalid symbolic expression";
         goto cleanup;
+    }
 
 cleanup_success:
     free(body);
@@ -813,6 +848,7 @@ cleanup_success:
     return A;
 
 cleanup:
+    mf_report_error(error_msg);
     if (bindings_out)
         *bindings_out = NULL;
     if (number_out)

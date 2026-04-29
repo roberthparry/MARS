@@ -2532,8 +2532,10 @@ static void test_readme_string_quantum_example(void)
 
     binding_t *bindings = NULL;
     size_t nbindings = 0;
+    binding_t *delta_binding = NULL;
+    binding_t *omega_binding = NULL;
     matrix_t *H = mat_from_string(
-        "{ [[Δ Ω][Ω -Δ]] | Δ = 1.5; Ω = 0.25 }",
+        "[[Δ Ω][Ω -Δ]]",
         &bindings, &nbindings);
     matrix_t *H2 = NULL;
     matrix_t *P = NULL;
@@ -2548,6 +2550,20 @@ static void test_readme_string_quantum_example(void)
         printf(C_BOLD C_RED "  FAIL: README string example input allocation\n" C_RESET);
         return;
     }
+
+    for (size_t i = 0; i < nbindings; ++i) {
+        if (strcmp(bindings[i].name, "Δ") == 0)
+            delta_binding = &bindings[i];
+        else if (strcmp(bindings[i].name, "Ω") == 0)
+            omega_binding = &bindings[i];
+    }
+
+    check_bool("README string example Δ binding present", delta_binding != NULL);
+    check_bool("README string example Ω binding present", omega_binding != NULL);
+    if (delta_binding)
+        dv_set_val_d(delta_binding->symbol, 1.5);
+    if (omega_binding)
+        dv_set_val_d(omega_binding->symbol, 0.25);
 
     H2 = mat_pow_int(H, 2);
     P = mat_charpoly(H);
