@@ -311,18 +311,20 @@ dval_t *dv_new_var_qc(qcomplex_t x)
     return dv_make_var_qc(x);
 }
 
-dval_t *dv_new_named_const(qfloat_t x, const char *name)
+static dval_t *dv_attach_name(dval_t *dv, const char *name)
 {
-    dval_t *dv = dv_new_const(x);
     dv->name = dv_normalize_name(name);
     return dv;
 }
 
+dval_t *dv_new_named_const(qfloat_t x, const char *name)
+{
+    return dv_attach_name(dv_new_const(x), name);
+}
+
 dval_t *dv_new_named_const_qc(qcomplex_t x, const char *name)
 {
-    dval_t *dv = dv_new_const_qc(x);
-    dv->name = dv_normalize_name(name);
-    return dv;
+    return dv_attach_name(dv_new_const_qc(x), name);
 }
 
 dval_t *dv_new_named_const_d(double x, const char *name)
@@ -332,16 +334,12 @@ dval_t *dv_new_named_const_d(double x, const char *name)
 
 dval_t *dv_new_named_var(qfloat_t x, const char *name)
 {
-    dval_t *dv = dv_new_var(x);
-    dv->name = dv_normalize_name(name);
-    return dv;
+    return dv_attach_name(dv_new_var(x), name);
 }
 
 dval_t *dv_new_named_var_qc(qcomplex_t x, const char *name)
 {
-    dval_t *dv = dv_new_var_qc(x);
-    dv->name = dv_normalize_name(name);
-    return dv;
+    return dv_attach_name(dv_new_var_qc(x), name);
 }
 
 dval_t *dv_new_named_var_d(double x, const char *name)

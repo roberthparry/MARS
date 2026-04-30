@@ -246,6 +246,73 @@ static int parse_two_args(parser_t *p, dval_t **a_out, dval_t **b_out)
     return 1;
 }
 
+static int parse_qfloat_literal(const char **p_in, const char *end, qfloat_t *out)
+{
+    const char *start = *p_in;
+    size_t len = scan_decimal_len(start, end);
+
+    if (len == 0)
+        return 0;
+
+    *p_in = start + len;
+
+    char *buf = (char *)fs_xmalloc(len + 1);
+    memcpy(buf, start, len);
+    buf[len] = '\0';
+    *out = qf_from_string(buf);
+    free(buf);
+    return 1;
+}
+
+static int read_optional_display_exponent(const char **p_in)
+{
+    const char *p = *p_in;
+    int exponent = read_superscript(&p);
+
+    if (exponent < 0 && p[0] == '^' && isdigit((unsigned char)p[1])) {
+        p++;
+        exponent = 0;
+        while (isdigit((unsigned char)*p))
+            exponent = exponent * 10 + (*p++ - '0');
+    }
+
+    *p_in = p;
+    return exponent;
+}
+
+static int parse_required_char(parser_t *p, char expected, const char *errmsg)
+{
+    if (p->p >= p->end || *p->p != expected) {
+        set_error(p, errmsg);
+        return 0;
+    }
+    p->p++;
+    return 1;
+}
+
+static dval_t *apply_integer_power_if_present(dval_t *value, int exponent)
+{
+    if (exponent < 0)
+        return value;
+
+    dval_t *powered = dv_pow_d(value, (double)exponent);
+    dv_free(value);
+    return powered;
+}
+
+static dval_t *parse_enclosed_addexpr(parser_t *p, char closing, const char *errmsg)
+{
+    dval_t *inner = parse_addexpr(p);
+
+    if (!inner)
+        return NULL;
+    if (!parse_required_char(p, closing, errmsg)) {
+        dv_free(inner);
+        return NULL;
+    }
+    return inner;
+}
+
 /* ------------------------------------------------------------------ */
 /* Atom parser                                                          */
 /* ------------------------------------------------------------------ */
@@ -263,88 +330,44 @@ static dval_t *parse_atom(parser_t *p)
     /* Parenthesised sub-expression */
     if (*p->p == '(') {
         p->p++;
-        dval_t *inner = parse_addexpr(p);
-        if (!inner) return NULL;
-        if (p->p >= p->end || *p->p != ')') {
-            dv_free(inner);
-            set_error(p, "expected ')'");
-            return NULL;
-        }
-        p->p++;
-        return inner;
+        return parse_enclosed_addexpr(p, ')', "expected ')'");
     }
 
     /* Absolute-value bars: |expr| */
     if (*p->p == '|') {
-        dval_t *inner;
-        dval_t *result;
-
         p->p++;
-        inner = parse_addexpr(p);
+        dval_t *inner = parse_enclosed_addexpr(p, '|', "expected '|'");
         if (!inner)
             return NULL;
-        if (p->p >= p->end || *p->p != '|') {
-            dv_free(inner);
-            set_error(p, "expected '|'");
-            return NULL;
-        }
-        p->p++;
-        result = dv_abs(inner);
+        dval_t *result = dv_abs(inner);
         dv_free(inner);
         return result;
     }
 
     /* Decimal number (starts with digit or '.') */
     if (isdigit((unsigned char)*p->p) || *p->p == '.') {
-        const char *start = p->p;
-        size_t n = scan_decimal_len(start, p->end);
-        p->p = start + n;
-        char nbuf[64];
-        if (n >= sizeof(nbuf)) n = sizeof(nbuf) - 1;
-        memcpy(nbuf, start, n);
-        nbuf[n] = '\0';
-        return dv_new_const(qf_from_string(nbuf));
+        qfloat_t value;
+        if (!parse_qfloat_literal(&p->p, p->end, &value)) {
+            set_error(p, "expected numeric literal");
+            return NULL;
+        }
+        return dv_new_const(value);
     }
 
     if (cp_len > 0 && cp == 0x221A) {
-        int sup = -1;
-
         p->p += cp_len;
-        sup = read_superscript(&p->p);
-        if (sup < 0 && p->p[0] == '^' && isdigit((unsigned char)p->p[1])) {
-            p->p++;
-            sup = 0;
-            while (isdigit((unsigned char)*p->p))
-                sup = sup * 10 + (*p->p++ - '0');
-        }
+        int sup = read_optional_display_exponent(&p->p);
 
-        if (p->p >= p->end || *p->p != '(') {
-            set_error(p, "expected '(' after √");
+        if (!parse_required_char(p, '(', "expected '(' after √"))
             return NULL;
-        }
-        p->p++;
 
-        {
-            dval_t *arg = parse_addexpr(p);
-            dval_t *result;
-
-            if (!arg)
-                return NULL;
-            if (p->p >= p->end || *p->p != ')') {
-                dv_free(arg);
-                set_error(p, "expected ')' after √ argument");
-                return NULL;
-            }
-            p->p++;
-            result = dv_sqrt(arg);
-            dv_free(arg);
-            if (sup >= 0) {
-                dval_t *tmp = dv_pow_d(result, (double)sup);
-                dv_free(result);
-                result = tmp;
-            }
-            return result;
-        }
+        dval_t *arg = parse_enclosed_addexpr(p, ')', "expected ')' after √ argument");
+        dval_t *result;
+        if (!arg)
+            return NULL;
+        result = dv_sqrt(arg);
+        dv_free(arg);
+        return apply_integer_power_if_present(result, sup);
     }
 
     /* Function keywords — O(1) hash lookup.  We read the ASCII identifier at
@@ -366,16 +389,8 @@ static dval_t *parse_atom(parser_t *p)
             if (fe) {
                 const char *paren = func_call_start(p->p, fe->kw, fe->klen);
                 if (paren) {
-                    /* Read optional exponent between keyword and '('. */
                     const char *after_kw = p->p + fe->klen;
-                    int sup = read_superscript(&after_kw);
-                    if (sup < 0 && after_kw[0] == '^' &&
-                            isdigit((unsigned char)after_kw[1])) {
-                        after_kw++;
-                        sup = 0;
-                        while (isdigit((unsigned char)*after_kw))
-                            sup = sup * 10 + (*after_kw++ - '0');
-                    }
+                    int sup = read_optional_display_exponent(&after_kw);
                     (void)after_kw;
 
                     p->p = paren + 1; /* skip past '(' */
@@ -383,37 +398,24 @@ static dval_t *parse_atom(parser_t *p)
                     if (fe->is_binary) {
                         dval_t *a = NULL, *b = NULL;
                         if (!parse_two_args(p, &a, &b)) return NULL;
-                        if (p->p >= p->end || *p->p != ')') {
-                            dv_free(a); dv_free(b);
-                            set_error(p, "expected ')' after binary function");
+                        if (!parse_required_char(p, ')', "expected ')' after binary function")) {
+                            dv_free(a);
+                            dv_free(b);
                             return NULL;
                         }
-                        p->p++;
                         dval_t *result = fe->bfn(a, b);
-                        dv_free(a); dv_free(b);
-                        if (sup >= 0) {
-                            dval_t *tmp = dv_pow_d(result, (double)sup);
-                            dv_free(result);
-                            result = tmp;
-                        }
-                        return result;
+                        dv_free(a);
+                        dv_free(b);
+                        return apply_integer_power_if_present(result, sup);
                     } else {
-                        dval_t *arg = parse_addexpr(p);
-                        if (!arg) return NULL;
-                        if (p->p >= p->end || *p->p != ')') {
-                            dv_free(arg);
-                            set_error(p, "expected ')' after function argument");
+                        dval_t *arg = parse_enclosed_addexpr(
+                            p, ')', "expected ')' after function argument");
+                        dval_t *result;
+                        if (!arg)
                             return NULL;
-                        }
-                        p->p++;
-                        dval_t *result = fe->ufn(arg);
+                        result = fe->ufn(arg);
                         dv_free(arg);
-                        if (sup >= 0) {
-                            dval_t *tmp = dv_pow_d(result, (double)sup);
-                            dv_free(result);
-                            result = tmp;
-                        }
-                        return result;
+                        return apply_integer_power_if_present(result, sup);
                     }
                 }
             }
@@ -453,11 +455,8 @@ static dval_t *parse_power(parser_t *p)
 
     /* Unicode superscript exponent: x² */
     int sup = read_superscript(&p->p);
-    if (sup >= 0) {
-        dval_t *tmp = dv_pow_d(base, (double)sup);
-        dv_free(base);
-        return tmp;
-    }
+    if (sup >= 0)
+        return apply_integer_power_if_present(base, sup);
 
     /* Caret exponent: x^n or x^(a,b) */
     if (p->p < p->end && *p->p == '^') {
@@ -468,12 +467,12 @@ static dval_t *parse_power(parser_t *p)
             p->p++;
             dval_t *a = NULL, *b = NULL;
             if (!parse_two_args(p, &a, &b)) { dv_free(base); return NULL; }
-            if (p->p >= p->end || *p->p != ')') {
-                dv_free(base); dv_free(a); dv_free(b);
-                set_error(p, "expected ')' after '^' arguments");
+            if (!parse_required_char(p, ')', "expected ')' after '^' arguments")) {
+                dv_free(base);
+                dv_free(a);
+                dv_free(b);
                 return NULL;
             }
-            p->p++;
             /* base is unused here — ^(a, b) is its own expression */
             dv_free(base);
             dval_t *result = dv_pow(a, b);
@@ -482,21 +481,13 @@ static dval_t *parse_power(parser_t *p)
         }
 
         /* Numeric exponent: ^3.5 */
-        const char *num_start = p->p;
-        if (p->p < p->end && (*p->p == '-' || *p->p == '+')) p->p++;
-        size_t n = scan_decimal_len(num_start, p->end);
-        p->p = num_start + n;
-        if (n == 0) {
+        qfloat_t exponent;
+        if (!parse_qfloat_literal(&p->p, p->end, &exponent)) {
             dv_free(base);
             set_error(p, "expected exponent after '^'");
             return NULL;
         }
-        char nbuf[64];
-        if (n >= sizeof(nbuf)) n = sizeof(nbuf) - 1;
-        memcpy(nbuf, num_start, n);
-        nbuf[n] = '\0';
-        double exp_val = atof(nbuf);
-        dval_t *tmp = dv_pow_d(base, exp_val);
+        dval_t *tmp = dv_pow_d(base, qf_to_double(exponent));
         dv_free(base);
         return tmp;
     }
@@ -650,21 +641,12 @@ static int parse_bindings(const char *s, const char *end,
         p++; /* skip '=' */
         skip_spaces(&p, end);
 
-        /* Parse decimal value (may be negative) */
-        const char *val_start = p;
-        size_t vlen = scan_decimal_len(val_start, end);
-        p = val_start + vlen;
-        if (vlen == 0) {
+        qfloat_t val;
+        if (!parse_qfloat_literal(&p, end, &val)) {
             free(name);
             snprintf(errmsg, errmsg_n, "expected numeric value in binding");
             return -1;
         }
-
-        char *vbuf = (char *)fs_xmalloc(vlen + 1);
-        memcpy(vbuf, val_start, vlen);
-        vbuf[vlen] = '\0';
-        qfloat_t val = qf_from_string(vbuf);
-        free(vbuf);
 
         dval_t *node = is_var
             ? dv_new_named_var(val, name)
@@ -715,20 +697,12 @@ static dval_t *parse_pure_const(const char *s, const char *end,
     p++;
     skip_spaces(&p, end);
 
-    const char *val_start = p;
-    size_t vlen = scan_decimal_len(val_start, end);
-    p = val_start + vlen;
-    if (vlen == 0) {
+    qfloat_t val;
+    if (!parse_qfloat_literal(&p, end, &val)) {
         free(name);
         snprintf(errmsg, errmsg_n, "expected value in constant format");
         return NULL;
     }
-
-    char *vbuf = (char *)fs_xmalloc(vlen + 1);
-    memcpy(vbuf, val_start, vlen);
-    vbuf[vlen] = '\0';
-    qfloat_t val = qf_from_string(vbuf);
-    free(vbuf);
 
     if (!name) {
         snprintf(errmsg, errmsg_n, "constant name is required in pure-constant format");

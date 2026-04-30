@@ -40,21 +40,6 @@ static void *dv_xrealloc(void *ptr, size_t size)
     abort();
 }
 
-/* ========================================================================= */
-/* Scalar predicates                                                          */
-/* ========================================================================= */
-
-static int is_qf_zero(qfloat_t x) { return qf_eq(x, QF_ZERO); }
-static int is_qf_one (qfloat_t x) { return qf_eq(x, QF_ONE); }
-static int is_op(const dval_t *dv, const dval_ops_t *ops) { return dv && dv->ops == ops; }
-static int is_addsub(const dval_t *dv) { return is_op(dv, &ops_add) || is_op(dv, &ops_sub); }
-static int is_exp_expr(const dval_t *dv) { return is_op(dv, &ops_exp); }
-static int is_sqrt_expr(const dval_t *dv) { return is_op(dv, &ops_sqrt); }
-static int is_unnamed_const(const dval_t *dv)
-{
-    return is_op(dv, &ops_const) && (!dv->name || !*dv->name);
-}
-
 int dv_fold_zero_to_zero(qfloat_t in, qfloat_t *out)
 {
     if (!qf_eq(in, QF_ZERO))
@@ -111,17 +96,17 @@ static void collect_mul_flat(
 {
     if (*is_zero) return;
 
-    if (is_unnamed_const(dv)) {
-        if (is_qf_zero(dv->c.re)) { *is_zero = 1; return; }
+    if (dv_is_unnamed_const(dv)) {
+        if (dv_qf_is_zero(dv->c.re)) { *is_zero = 1; return; }
         *c_acc = qf_mul(*c_acc, dv->c.re);
         return;
     }
-    if (is_op(dv, &ops_neg)) {
+    if (dv_is_op(dv, &ops_neg)) {
         *c_acc = qf_neg(*c_acc);
         collect_mul_flat(dv->a, c_acc, is_zero, terms, nterms, cap);
         return;
     }
-    if (is_op(dv, &ops_mul)) {
+    if (dv_is_op(dv, &ops_mul)) {
         collect_mul_flat(dv->a, c_acc, is_zero, terms, nterms, cap);
         collect_mul_flat(dv->b, c_acc, is_zero, terms, nterms, cap);
         return;
@@ -153,15 +138,15 @@ dval_t *dv_simplify_unary_operator(const dval_t *dv, dval_t *a, dval_t *b)
     (void)b;
 
     /* exp(log(x)) -> x, log(exp(x)) -> x */
-    if ((is_exp_expr(dv) && is_op(a, &ops_log)) ||
-        (is_op(dv, &ops_log) && is_exp_expr(a))) {
+    if ((dv_is_exp_expr(dv) && dv_is_op(a, &ops_log)) ||
+        (dv_is_op(dv, &ops_log) && dv_is_exp_expr(a))) {
         dval_t *inner = a->a;
         dv_retain(inner);
         dv_free(a);
         return inner;
     }
 
-    if (is_op(a, &ops_const)) {
+    if (dv_is_op(a, &ops_const)) {
         qfloat_t folded;
 
         if (dv->ops->fold_const_unary && dv->ops->fold_const_unary(a->c.re, &folded)) {
@@ -178,9 +163,9 @@ dval_t *dv_simplify_unary_operator(const dval_t *dv, dval_t *a, dval_t *b)
         }
     }
 
-    if (is_op(dv, &ops_sqrt) &&
-        is_op(a, &ops_mul) &&
-        is_unnamed_const(a->a) &&
+    if (dv_is_op(dv, &ops_sqrt) &&
+        dv_is_op(a, &ops_mul) &&
+        dv_is_unnamed_const(a->a) &&
         qf_cmp(a->a->c.re, QF_ZERO) > 0) {
         qfloat_t coeff_root = qf_sqrt(a->a->c.re);
 
@@ -214,7 +199,7 @@ dval_t *dv_simplify_binary_operator(const dval_t *dv, dval_t *a, dval_t *b)
     if ((!a || !b) || !dv->ops->apply_binary)
         return dv_simplify_passthrough(dv, a, b);
 
-    if (is_unnamed_const(a) && is_unnamed_const(b)) {
+    if (dv_is_unnamed_const(a) && dv_is_unnamed_const(b)) {
         dval_t *tmp = dv->ops->apply_binary(a, b);
         qfloat_t v = tmp->ops->eval(tmp).re;
         dv_free(tmp);
@@ -238,16 +223,16 @@ dval_t *dv_simplify_neg_operator(const dval_t *dv, dval_t *a, dval_t *b)
     (void)dv;
     (void)b;
     /* --x → x */
-    if (is_op(a, &ops_neg)) {
+    if (dv_is_op(a, &ops_neg)) {
         dval_t *inner = a->a; dv_retain(inner); dv_free(a); return inner;
     }
     /* neg(c) → -c */
-    if (is_op(a, &ops_const)) {
+    if (dv_is_op(a, &ops_const)) {
         qfloat_t c = qf_neg(a->c.re); dv_free(a); return dv_new_const(c);
     }
     /* neg(c·x) where c < 0 → |c|·x  (eliminates spurious double-negative) */
-    if (is_op(a, &ops_mul) &&
-        is_op(a->a, &ops_const) &&
+    if (dv_is_op(a, &ops_mul) &&
+        dv_is_op(a->a, &ops_const) &&
         (!a->a->name || !*a->a->name) &&
         qf_cmp(a->a->c.re, QF_ZERO) < 0) {
         qfloat_t pos_c = qf_neg(a->a->c.re);
@@ -270,7 +255,7 @@ dval_t *dv_simplify_add_sub_operator(const dval_t *dv, dval_t *a, dval_t *b)
 
     dv_collect_addends(a, qf_from_double(1.0), &c_const, &terms, &n, &cap);
     dv_free(a);
-    dv_collect_addends(b, is_op(dv, &ops_sub) ? qf_from_double(-1.0) : qf_from_double(1.0), &c_const, &terms, &n, &cap);
+    dv_collect_addends(b, dv_is_op(dv, &ops_sub) ? qf_from_double(-1.0) : qf_from_double(1.0), &c_const, &terms, &n, &cap);
     dv_free(b);
 
     dv_combine_common_denominator_addends(terms, n);
@@ -291,7 +276,7 @@ dval_t *dv_simplify_add_sub_operator(const dval_t *dv, dval_t *a, dval_t *b)
     /* find the leading non-cancelled symbolic term */
     int leading_neg = 0;
     for (size_t i = 0; i < n; ++i) {
-        if (!is_qf_zero(terms[i].coeff)) {
+        if (!dv_qf_is_zero(terms[i].coeff)) {
             leading_neg = qf_cmp(terms[i].coeff, QF_ZERO) < 0;
             break;
         }
@@ -302,13 +287,13 @@ dval_t *dv_simplify_add_sub_operator(const dval_t *dv, dval_t *a, dval_t *b)
     /* emit a positive constant before any leading negative symbolic term so
      * the expression reads "1 - tanh²(x)" rather than "-tanh²(x) + 1" */
     int const_emitted = 0;
-    if (!is_qf_zero(c_const) && qf_cmp(c_const, QF_ZERO) > 0 && leading_neg) {
+    if (!dv_qf_is_zero(c_const) && qf_cmp(c_const, QF_ZERO) > 0 && leading_neg) {
         cur = dv_new_const(c_const);
         const_emitted = 1;
     }
 
     for (size_t i = 0; i < n; ++i) {
-        if (is_qf_zero(terms[i].coeff)) { dv_free(terms[i].base); continue; }
+        if (dv_qf_is_zero(terms[i].coeff)) { dv_free(terms[i].base); continue; }
         dval_t *term = dv_make_scaled(qf_div(terms[i].coeff, common_coeff), terms[i].base);
         if (!cur) cur = term;
         else {
@@ -318,7 +303,7 @@ dval_t *dv_simplify_add_sub_operator(const dval_t *dv, dval_t *a, dval_t *b)
     }
     free(terms);
 
-    if (!const_emitted && !is_qf_zero(c_const)) {
+    if (!const_emitted && !dv_qf_is_zero(c_const)) {
         dval_t *cterm = dv_new_const(c_const);
         if (!cur) cur = cterm;
         else {
@@ -330,7 +315,7 @@ dval_t *dv_simplify_add_sub_operator(const dval_t *dv, dval_t *a, dval_t *b)
     if (!cur)
         return dv_new_const_d(0.0);
 
-    if (!is_qf_one(common_coeff))
+    if (!dv_qf_is_one(common_coeff))
         return dv_make_scaled(common_coeff, cur);
 
     return cur;
@@ -353,17 +338,17 @@ dval_t *dv_simplify_mul_operator(const dval_t *dv, dval_t *a, dval_t *b)
 
     (void)dv;
 
-    if ((is_op(a, &ops_const) && is_qf_zero(a->c.re)) ||
-        (is_op(b, &ops_const) && is_qf_zero(b->c.re))) {
+    if ((dv_is_op(a, &ops_const) && dv_qf_is_zero(a->c.re)) ||
+        (dv_is_op(b, &ops_const) && dv_qf_is_zero(b->c.re))) {
         dv_free(a);
         dv_free(b);
         return dv_new_const_d(0.0);
     }
-    if (is_op(a, &ops_const) && is_qf_one(a->c.re)) {
+    if (dv_is_op(a, &ops_const) && dv_qf_is_one(a->c.re)) {
         dv_free(a);
         return b;
     }
-    if (is_op(b, &ops_const) && is_qf_one(b->c.re)) {
+    if (dv_is_op(b, &ops_const) && dv_qf_is_one(b->c.re)) {
         dv_free(b);
         return a;
     }
@@ -418,10 +403,10 @@ dval_t *dv_simplify_div_operator(const dval_t *dv, dval_t *a, dval_t *b)
 {
     (void)dv;
 
-    if (is_op(b, &ops_const) && is_qf_one(b->c.re)) { dv_free(b); return a; }
-    if (is_unnamed_const(b) &&
-        is_op(a, &ops_mul) &&
-        is_unnamed_const(a->a)) {
+    if (dv_is_op(b, &ops_const) && dv_qf_is_one(b->c.re)) { dv_free(b); return a; }
+    if (dv_is_unnamed_const(b) &&
+        dv_is_op(a, &ops_mul) &&
+        dv_is_unnamed_const(a->a)) {
         qfloat_t folded = qf_div(a->a->c.re, b->c.re);
         dval_t *rest;
 
@@ -431,7 +416,7 @@ dval_t *dv_simplify_div_operator(const dval_t *dv, dval_t *a, dval_t *b)
         dv_free(b);
         return dv_make_scaled(folded, rest);
     }
-    if (is_unnamed_const(b) && is_op(a, &ops_neg)) {
+    if (dv_is_unnamed_const(b) && dv_is_op(a, &ops_neg)) {
         dval_t *inner;
         dval_t *quot;
         dval_t *simp;
@@ -447,7 +432,7 @@ dval_t *dv_simplify_div_operator(const dval_t *dv, dval_t *a, dval_t *b)
         dv_free(a);
         return dv_simplify_neg_operator(dv, simp, NULL);
     }
-    if (is_unnamed_const(b) && is_addsub(a)) {
+    if (dv_is_unnamed_const(b) && dv_is_addsub(a)) {
         qfloat_t c_const = QF_ZERO;
         addend_t *terms = NULL;
         size_t n = 0, cap = 0;
@@ -461,7 +446,7 @@ dval_t *dv_simplify_div_operator(const dval_t *dv, dval_t *a, dval_t *b)
         for (size_t i = 0; i < n; ++i) {
             dval_t *term;
 
-            if (!terms[i].base || is_qf_zero(terms[i].coeff)) {
+            if (!terms[i].base || dv_qf_is_zero(terms[i].coeff)) {
                 if (terms[i].base)
                     dv_free(terms[i].base);
                 continue;
@@ -478,7 +463,7 @@ dval_t *dv_simplify_div_operator(const dval_t *dv, dval_t *a, dval_t *b)
         }
         free(terms);
 
-        if (!is_qf_zero(c_const)) {
+        if (!dv_qf_is_zero(c_const)) {
             dval_t *cterm = dv_new_const(qf_div(c_const, denom));
 
             if (!cur)
@@ -493,7 +478,7 @@ dval_t *dv_simplify_div_operator(const dval_t *dv, dval_t *a, dval_t *b)
 
         return cur ? cur : dv_new_const_d(0.0);
     }
-    if (is_op(a, &ops_mul) && dv_struct_eq(a->a, b)) {
+    if (dv_is_op(a, &ops_mul) && dv_struct_eq(a->a, b)) {
         dval_t *rest;
 
         dv_retain(a->b);
@@ -502,7 +487,7 @@ dval_t *dv_simplify_div_operator(const dval_t *dv, dval_t *a, dval_t *b)
         dv_free(b);
         return rest;
     }
-    if (is_op(a, &ops_mul) && dv_struct_eq(a->b, b)) {
+    if (dv_is_op(a, &ops_mul) && dv_struct_eq(a->b, b)) {
         dval_t *rest;
 
         dv_retain(a->a);
@@ -516,30 +501,30 @@ dval_t *dv_simplify_div_operator(const dval_t *dv, dval_t *a, dval_t *b)
         dv_free(b);
         return dv_new_const_d(1.0);
     }
-    if (is_op(a, &ops_const) && is_qf_zero(a->c.re)) {
+    if (dv_is_op(a, &ops_const) && dv_qf_is_zero(a->c.re)) {
         dv_free(a); dv_free(b); return dv_new_const_d(0.0);
     }
-    if (is_op(a, &ops_const) && is_op(b, &ops_const)) {
+    if (dv_is_op(a, &ops_const) && dv_is_op(b, &ops_const)) {
         qfloat_t q = qf_div(a->c.re, b->c.re); dv_free(a); dv_free(b);
         return dv_new_const(q);
     }
 
     /* sinh(x)/cosh(x) → tanh(x) */
-    if (is_op(a, &ops_sinh) && is_op(b, &ops_cosh) &&
+    if (dv_is_op(a, &ops_sinh) && dv_is_op(b, &ops_cosh) &&
         dv_struct_eq(a->a, b->a)) {
         dv_retain(a->a);
         dval_t *r = dv_tanh(a->a); dv_free(a->a); dv_free(a); dv_free(b);
         return r;
     }
     /* sin(x)/cos(x) → tan(x) */
-    if (is_op(a, &ops_sin) && is_op(b, &ops_cos) &&
+    if (dv_is_op(a, &ops_sin) && dv_is_op(b, &ops_cos) &&
         dv_struct_eq(a->a, b->a)) {
         dv_retain(a->a);
         dval_t *r = dv_tan(a->a); dv_free(a->a); dv_free(a); dv_free(b);
         return r;
     }
     /* x/abs(x) → abs(x)/x  (canonical sign-function form) */
-    if (is_op(b, &ops_abs) && dv_struct_eq(a, b->a)) {
+    if (dv_is_op(b, &ops_abs) && dv_struct_eq(a, b->a)) {
         dval_t *r = dv_div(b, a); dv_free(a); dv_free(b); return r;
     }
 
@@ -560,14 +545,14 @@ dval_t *dv_simplify_pow_d_operator(const dval_t *dv, dval_t *a, dval_t *b)
         return dv_new_const_d(1.0);
     }
 
-    if (is_unnamed_const(a)) {
+    if (dv_is_unnamed_const(a)) {
         qfloat_t v = qf_pow(a->c.re, exponent);
         dv_free(a);
         return dv_new_const(v);
     }
 
     /* sqrt(x)^n → x^(n/2) */
-    if (is_sqrt_expr(a)) {
+    if (dv_is_sqrt_expr(a)) {
         qfloat_t half = qf_div(exponent, qf_from_double(2.0));
         dv_retain(a->a);
         dval_t *inner = a->a;
@@ -583,8 +568,8 @@ dval_t *dv_simplify_pow_d_operator(const dval_t *dv, dval_t *a, dval_t *b)
 dval_t *dv_simplify_pow_operator(const dval_t *dv, dval_t *a, dval_t *b)
 {
     (void)dv;
-    if (is_op(b, &ops_const) && is_qf_one(b->c.re)) { dv_free(b); return a; }
-    if (is_op(b, &ops_const) && is_qf_zero(b->c.re)) {
+    if (dv_is_op(b, &ops_const) && dv_qf_is_one(b->c.re)) { dv_free(b); return a; }
+    if (dv_is_op(b, &ops_const) && dv_qf_is_zero(b->c.re)) {
         dv_free(a); dv_free(b); return dv_new_const_d(1.0);
     }
     dval_t *r = dv_pow(a, b); dv_free(a); dv_free(b); return r;
@@ -596,13 +581,13 @@ dval_t *dv_simplify_hypot_operator(const dval_t *dv, dval_t *a, dval_t *b)
 {
     (void)dv;
 
-    if (is_op(a, &ops_const) && is_qf_zero(a->c.re)) {
+    if (dv_is_op(a, &ops_const) && dv_qf_is_zero(a->c.re)) {
         dv_free(a);
         dval_t *r = dv_abs(b);
         dv_free(b);
         return r;
     }
-    if (is_op(b, &ops_const) && is_qf_zero(b->c.re)) {
+    if (dv_is_op(b, &ops_const) && dv_qf_is_zero(b->c.re)) {
         dv_free(b);
         dval_t *r = dv_abs(a);
         dv_free(a);

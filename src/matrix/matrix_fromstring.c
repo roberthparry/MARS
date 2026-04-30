@@ -226,6 +226,12 @@ static char *mf_trim_copy(const char *s, size_t n)
     return mf_strndup(s, n);
 }
 
+static void mf_skip_spaces(const char **pp)
+{
+    while (**pp && isspace((unsigned char)**pp))
+        (*pp)++;
+}
+
 static int mf_utf8_decode(const char *s, unsigned int *out)
 {
     const unsigned char *p = (const unsigned char *)s;
@@ -598,28 +604,44 @@ static int mf_collect_expression_names(const char *expr, symbol_vec_t *symbols)
     return 0;
 }
 
-static int mf_push_token_from_range(string_vec_t *row, const char *start, const char *end)
+static int mf_push_trimmed_token(string_vec_t *cells,
+                                 const char *start,
+                                 const char *end,
+                                 bool required)
 {
     char *token = mf_trim_copy(start, (size_t)(end - start));
 
     if (!token || !*token) {
         free(token);
-        return 0;
-    }
-    return string_vec_push(row, token);
-}
-
-static int mf_push_required_token_from_range(string_vec_t *cells,
-                                             const char *start,
-                                             const char *end)
-{
-    char *token = mf_trim_copy(start, (size_t)(end - start));
-
-    if (!token || !*token) {
-        free(token);
-        return -1;
+        return required ? -1 : 0;
     }
     return string_vec_push(cells, token);
+}
+
+static int mf_commit_paren_row(size_t *rows, size_t *cols, size_t current_cols)
+{
+    if (*rows == 0)
+        *cols = current_cols;
+    else if (current_cols != *cols)
+        return -1;
+
+    (*rows)++;
+    return 0;
+}
+
+static int mf_finish_paren_field(string_vec_t *entries,
+                                 const char **token_start,
+                                 const char **pp,
+                                 size_t *current_cols)
+{
+    if (mf_push_trimmed_token(entries, *token_start, *pp, true) != 0)
+        return -1;
+
+    (*current_cols)++;
+    (*pp)++;
+    mf_skip_spaces(pp);
+    *token_start = *pp;
+    return 0;
 }
 
 static int mf_parse_row(const char **pp, string_vec_t *cells)
@@ -647,14 +669,14 @@ static int mf_parse_row(const char **pp, string_vec_t *cells)
         }
 
         if (paren_depth == 0 && *p == ']') {
-            if (mf_push_token_from_range(cells, token_start, p) != 0)
+            if (mf_push_trimmed_token(cells, token_start, p, false) != 0)
                 return -1;
             *pp = p + 1;
             return 0;
         }
 
         if (paren_depth == 0 && isspace((unsigned char)*p)) {
-            if (mf_push_token_from_range(cells, token_start, p) != 0)
+            if (mf_push_trimmed_token(cells, token_start, p, false) != 0)
                 return -1;
             while (*p && isspace((unsigned char)*p))
                 p++;
@@ -707,17 +729,10 @@ static int mf_parse_matrix_body(const char *body,
                         p++;
                         continue;
                     }
-                    if (mf_push_required_token_from_range(&entries, token_start, p) != 0)
+                    if (mf_finish_paren_field(&entries, &token_start, &p, &current_cols) != 0)
                         goto fail_paren;
-                    current_cols++;
-                    if (rows == 0)
-                        cols = current_cols;
-                    else if (current_cols != cols)
+                    if (mf_commit_paren_row(&rows, &cols, current_cols) != 0)
                         goto fail_paren;
-                    rows++;
-                    p++;
-                    while (*p && isspace((unsigned char)*p))
-                        p++;
                     if (*p != '\0' || rows == 0 || cols == 0)
                         goto fail_paren;
 
@@ -727,29 +742,16 @@ static int mf_parse_matrix_body(const char *body,
                     return 0;
                 }
                 if (paren_depth == 0 && *p == ',') {
-                    if (mf_push_required_token_from_range(&entries, token_start, p) != 0)
+                    if (mf_finish_paren_field(&entries, &token_start, &p, &current_cols) != 0)
                         goto fail_paren;
-                    current_cols++;
-                    p++;
-                    while (*p && isspace((unsigned char)*p))
-                        p++;
-                    token_start = p;
                     continue;
                 }
                 if (paren_depth == 0 && *p == ';') {
-                    if (mf_push_required_token_from_range(&entries, token_start, p) != 0)
+                    if (mf_finish_paren_field(&entries, &token_start, &p, &current_cols) != 0)
                         goto fail_paren;
-                    current_cols++;
-                    if (rows == 0)
-                        cols = current_cols;
-                    else if (current_cols != cols)
+                    if (mf_commit_paren_row(&rows, &cols, current_cols) != 0)
                         goto fail_paren;
-                    rows++;
                     current_cols = 0;
-                    p++;
-                    while (*p && isspace((unsigned char)*p))
-                        p++;
-                    token_start = p;
                     continue;
                 }
             }
@@ -768,8 +770,7 @@ fail_paren:
     string_vec_t entries = {0};
     string_vec_t row = {0};
 
-    while (*p && isspace((unsigned char)*p))
-        p++;
+    mf_skip_spaces(&p);
     if (*p != '[' || p[1] != '[')
         goto fail;
     p++;
@@ -779,8 +780,7 @@ fail_paren:
         row.count = 0;
         row.cap = 0;
 
-        while (*p && isspace((unsigned char)*p))
-            p++;
+        mf_skip_spaces(&p);
         if (*p != '[')
             goto fail_row;
         if (mf_parse_row(&p, &row) != 0)
@@ -804,8 +804,7 @@ fail_paren:
         free(row.items);
         rows++;
 
-        while (*p && isspace((unsigned char)*p))
-            p++;
+        mf_skip_spaces(&p);
         if (*p == ']') {
             p++;
             break;
@@ -814,8 +813,7 @@ fail_paren:
             goto fail;
     }
 
-    while (*p && isspace((unsigned char)*p))
-        p++;
+    mf_skip_spaces(&p);
     if (*p != '\0')
         goto fail;
 
@@ -859,15 +857,13 @@ static int mf_parse_binding_section(const char *text, symbol_vec_t *symbols)
         if (!name)
             return -1;
 
-        while (*p && isspace((unsigned char)*p))
-            p++;
+        mf_skip_spaces(&p);
         if (*p != '=') {
             free(name);
             return -1;
         }
         p++;
-        while (*p && isspace((unsigned char)*p))
-            p++;
+        mf_skip_spaces(&p);
 
         value_start = p;
         while (*p) {
@@ -1147,8 +1143,7 @@ static matrix_t *mf_parse_matrix_string(const char *s,
         return NULL;
     }
 
-    while (*s && isspace((unsigned char)*s))
-        s++;
+    mf_skip_spaces(&s);
 
     if (*s == '{') {
         const char *close = strrchr(s, '}');
