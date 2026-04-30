@@ -273,6 +273,137 @@ char *dv_normalize_name(const char *name)
     return canon;
 }
 
+char *dv_normalize_binding_name(const char *name)
+{
+    const char *s;
+    const char *e;
+    char *inner;
+    char *out;
+
+    if (!name)
+        return NULL;
+
+    s = name;
+    while (*s && isspace((unsigned char)*s))
+        s++;
+    e = name + strlen(name);
+    while (e > s && isspace((unsigned char)e[-1]))
+        e--;
+    if (e == s)
+        return NULL;
+
+    if ((size_t)(e - s) >= 2 && s[0] == '[' && e[-1] == ']') {
+        inner = malloc((size_t)(e - s - 1));
+        if (!inner)
+            abort();
+        memcpy(inner, s + 1, (size_t)(e - s - 2));
+        inner[e - s - 2] = '\0';
+        return inner;
+    }
+
+    {
+        size_t n = (size_t)(e - s);
+        char *trimmed = malloc(n + 1);
+
+        if (!trimmed)
+            abort();
+        memcpy(trimmed, s, n);
+        trimmed[n] = '\0';
+        out = dv_normalize_name(dv_default_constant_canonical_name(trimmed));
+        free(trimmed);
+    }
+
+    return out;
+}
+
+int dv_is_default_constant_name(const char *name)
+{
+    const char *p = name;
+    size_t len;
+
+    if (!name || !*name)
+        return 0;
+    if (*name != 'a' && *name != 'b' && *name != 'c' && *name != 'd')
+        return 0;
+
+    p++;
+    len = strlen(p);
+    if (*p == '\0')
+        return 1;
+    if ((unsigned char)*p == 0xE2 && len >= 3) {
+        while (*p) {
+            int d;
+
+            d = (unsigned char)p[0] == 0xE2 &&
+                (unsigned char)p[1] == 0x82 &&
+                (unsigned char)p[2] >= 0x80 &&
+                (unsigned char)p[2] <= 0x89;
+            if (!d)
+                return 0;
+            p += 3;
+        }
+        return 1;
+    }
+    if (*p == '_' && p[1] >= '0' && p[1] <= '9') {
+        p += 2;
+        while (*p >= '0' && *p <= '9')
+            p++;
+        return *p == '\0';
+    }
+    return 0;
+}
+
+int dv_get_default_constant_value(const char *name, qcomplex_t *value_out)
+{
+    if (!name || !value_out)
+        return 0;
+
+    if (strcmp(name, "e") == 0) {
+        *value_out = qc_make(QF_E, QF_ZERO);
+        return 1;
+    }
+
+    if (strcmp(name, "pi") == 0 || strcmp(name, "@pi") == 0 ||
+        strcmp(name, "\xcf\x80") == 0) {
+        *value_out = qc_make(QF_PI, QF_ZERO);
+        return 1;
+    }
+
+    if (strcmp(name, "@phi") == 0 || strcmp(name, "\xcf\x86") == 0) {
+        qfloat_t phi = qf_div(qf_add(qf_from_double(1.0), qf_sqrt(qf_from_double(5.0))),
+                              qf_from_double(2.0));
+
+        *value_out = qc_make(phi, QF_ZERO);
+        return 1;
+    }
+
+    if (strcmp(name, "@gamma") == 0 || strcmp(name, "\xce\xb3") == 0) {
+        *value_out = qc_make(QF_EULER_MASCHERONI, QF_ZERO);
+        return 1;
+    }
+
+    return 0;
+}
+
+const char *dv_default_constant_canonical_name(const char *name)
+{
+    if (!name)
+        return NULL;
+
+    if (strcmp(name, "pi") == 0 || strcmp(name, "@pi") == 0 ||
+        strcmp(name, "\xcf\x80") == 0) {
+        return "@pi";
+    }
+
+    if (strcmp(name, "@phi") == 0 || strcmp(name, "\xcf\x86") == 0)
+        return "@phi";
+
+    if (strcmp(name, "@gamma") == 0 || strcmp(name, "\xce\xb3") == 0)
+        return "@gamma";
+
+    return name;
+}
+
 void dv_retain(dval_t *dv)
 {
     if (dv)

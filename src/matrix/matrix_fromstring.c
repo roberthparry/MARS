@@ -5,6 +5,7 @@
 #include <sys/types.h>
 
 #include "matrix_internal.h"
+#include "internal/dval_symbol_rules.h"
 
 typedef struct {
     char *name;
@@ -67,153 +68,6 @@ static char *mf_read_bracketed_name(const char **pp)
 
     *pp = p + 1;
     return mf_strndup(start, (size_t)(p - start));
-}
-
-typedef struct {
-    const char *ascii;
-    size_t klen;
-    const char *lower;
-    const char *upper;
-} matrix_greek_entry_t;
-
-enum { MATRIX_GREEK_HT_SIZE = 30 };
-
-/* Collision-free direct hash table for ASCII Greek aliases, hashed
- * case-insensitively. */
-static const matrix_greek_entry_t s_matrix_greek_names[MATRIX_GREEK_HT_SIZE] = {
-    [0]  = { "theta",   5, "θ", "Θ" },
-    [1]  = { "psi",     3, "ψ", "Ψ" },
-    [2]  = { "chi",     3, "χ", "Χ" },
-    [4]  = { "lambda",  6, "λ", "Λ" },
-    [5]  = { "delta",   5, "δ", "Δ" },
-    [6]  = { "omicron", 8, "ο", "Ο" },
-    [8]  = { "iota",    4, "ι", "Ι" },
-    [10] = { "mu",      2, "μ", "Μ" },
-    [11] = { "pi",      2, "π", "Π" },
-    [12] = { "phi",     3, "φ", "Φ" },
-    [13] = { "alpha",   5, "α", "Α" },
-    [14] = { "zeta",    4, "ζ", "Ζ" },
-    [15] = { "tau",     3, "τ", "Τ" },
-    [16] = { "rho",     3, "ρ", "Ρ" },
-    [17] = { "beta",    4, "β", "Β" },
-    [19] = { "nu",      2, "ν", "Ν" },
-    [20] = { "kappa",   5, "κ", "Κ" },
-    [22] = { "sigma",   5, "σ", "Σ" },
-    [23] = { "xi",      2, "ξ", "Ξ" },
-    [24] = { "eta",     3, "η", "Η" },
-    [25] = { "epsilon", 7, "ε", "Ε" },
-    [26] = { "gamma",   5, "γ", "Γ" },
-    [27] = { "upsilon", 7, "υ", "Υ" },
-    [29] = { "omega",   5, "ω", "Ω" }
-};
-
-static unsigned mf_greek_ht_hash(const char *s, size_t n)
-{
-    unsigned x = 113u;
-
-    for (size_t i = 0; i < n; ++i) {
-        x *= 65599u;
-        x ^= (unsigned char)(s[i] | 32);
-    }
-
-    x ^= (x >> 15);
-    x *= 2654435761u;
-
-    return x % MATRIX_GREEK_HT_SIZE;
-}
-
-static const matrix_greek_entry_t *mf_lookup_greek_name(const char *kw, size_t klen)
-{
-    unsigned slot = mf_greek_ht_hash(kw, klen);
-    const matrix_greek_entry_t *entry = &s_matrix_greek_names[slot];
-
-    if (!entry->ascii)
-        return NULL;
-    if (entry->klen == klen && strncasecmp(entry->ascii, kw, klen) == 0)
-        return entry;
-    return NULL;
-}
-
-static char *mf_normalise_binding_name(const char *name)
-{
-    const char *s;
-    const char *e;
-    char *t;
-
-    if (!name)
-        return NULL;
-
-    s = name;
-    while (*s && isspace((unsigned char)*s))
-        s++;
-    e = name + strlen(name);
-    while (e > s && isspace((unsigned char)e[-1]))
-        e--;
-    if (e == s)
-        return NULL;
-
-    if ((size_t)(e - s) >= 2 && s[0] == '[' && e[-1] == ']')
-        return mf_strndup(s + 1, (size_t)(e - s - 2));
-
-    t = mf_strndup(s, (size_t)(e - s));
-
-    if (strcmp(t, "pi") == 0) {
-        free(t);
-        return mf_strndup("\xcf\x80", 2);
-    }
-
-    if (t[0] != '@')
-        return t;
-
-    {
-        const char *p = t + 1;
-        size_t alias_len = 0;
-        const matrix_greek_entry_t *entry;
-
-        while (p[alias_len] && isalpha((unsigned char)p[alias_len]))
-            alias_len++;
-
-        entry = alias_len ? mf_lookup_greek_name(p, alias_len) : NULL;
-        if (entry) {
-            int upper = 1;
-            const char *rest = p + alias_len;
-            const char *g;
-            char *out;
-            size_t gl;
-            size_t rl;
-
-            for (size_t k = 0; k < alias_len; ++k) {
-                if (!isupper((unsigned char)p[k]))
-                    upper = 0;
-            }
-
-            g = upper ? entry->upper : entry->lower;
-            gl = strlen(g);
-            rl = strlen(rest);
-            out = mf_xmalloc(gl + rl + 1);
-            memcpy(out, g, gl);
-            memcpy(out + gl, rest, rl);
-            out[gl + rl] = '\0';
-            free(t);
-            t = out;
-        }
-    }
-
-    {
-        size_t n = strlen(t);
-        char *clean = mf_xmalloc(n + 1);
-        size_t w = 0;
-
-        for (size_t r = 0; r < n; ++r) {
-            if (t[r] != '@')
-                clean[w++] = t[r];
-        }
-        clean[w] = '\0';
-        free(t);
-        t = clean;
-    }
-
-    return t;
 }
 
 static void mf_report_error(const char *msg)
@@ -347,7 +201,7 @@ static char *mf_read_simple_name(const char **pp)
     *pp = p;
     if (!had_at)
         return mf_strdup(buf);
-    return mf_normalise_binding_name(buf);
+    return dv_normalize_name(buf);
 }
 
 static char *mf_read_any_name(const char **pp)
@@ -434,63 +288,6 @@ static void symbol_vec_free(symbol_vec_t *v)
     v->items = NULL;
     v->count = 0;
     v->cap = 0;
-}
-
-static bool mf_is_default_constant_name(const char *name)
-{
-    const char *p = name;
-    unsigned int c;
-    int len;
-
-    if (!name || !*name)
-        return false;
-
-    if (*name != 'a' &&
-        *name != 'b' &&
-        *name != 'c' &&
-        *name != 'd') {
-        return false;
-    }
-    p++;
-
-    len = mf_utf8_decode(p, &c);
-    if (*p == '\0')
-        return true;
-    if (len > 0 && c >= 0x2080 && c <= 0x2089)
-        return true;
-    if (*p == '_' && p[1] >= '0' && p[1] <= '9')
-        return true;
-    return false;
-}
-
-static bool mf_get_default_constant_value(const char *name, qcomplex_t *value_out)
-{
-    if (!name || !value_out)
-        return false;
-
-    if (strcmp(name, "e") == 0) {
-        *value_out = qc_make(QF_E, QF_ZERO);
-        return true;
-    }
-
-    if (strcmp(name, "\xcf\x80") == 0) {
-        *value_out = qc_make(QF_PI, QF_ZERO);
-        return true;
-    }
-
-    if (strcmp(name, "\xcf\x86") == 0) {
-        qfloat_t phi = qf_div(qf_add(qf_from_double(1.0), qf_sqrt(qf_from_double(5.0))),
-                              qf_from_double(2.0));
-        *value_out = qc_make(phi, QF_ZERO);
-        return true;
-    }
-
-    if (strcmp(name, "\xce\xb3") == 0) {
-        *value_out = qc_make(QF_EULER_MASCHERONI, QF_ZERO);
-        return true;
-    }
-
-    return false;
 }
 
 static int mf_is_subscript_utf8(const char *p, int *len_out)
@@ -636,12 +433,12 @@ static int mf_collect_expression_names(const char *expr, symbol_vec_t *symbols)
         if (!mf_is_function_name(p)) {
             ssize_t found = symbol_vec_find(symbols, name);
             qcomplex_t default_value = QC_ZERO;
-            bool has_default_value = mf_get_default_constant_value(name, &default_value);
+            bool has_default_value = dv_get_default_constant_value(name, &default_value);
 
             if (found < 0) {
                 if (symbol_vec_add(symbols,
                                    name,
-                                   has_default_value || mf_is_default_constant_name(name),
+                                   has_default_value || dv_is_default_constant_name(name),
                                    has_default_value,
                                    has_default_value ? default_value
                                                      : qc_make(QF_NAN, QF_NAN)) != 0) {
@@ -1325,7 +1122,7 @@ binding_t *mat_binding_get(binding_t *bindings, size_t number, const char *name)
     if (!bindings || !name)
         return NULL;
 
-    norm = mf_normalise_binding_name(name);
+    norm = dv_normalize_binding_name(name);
     if (!norm)
         return NULL;
 

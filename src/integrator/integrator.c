@@ -2,7 +2,7 @@
 #include <stdint.h>
 #include "integrator.h"
 #include "dval.h"
-#include "dval_pattern.h"
+#include "internal/dval_pattern.h"
 #include "qcomplex.h"
 
 /* -------------------------------------------------------------------

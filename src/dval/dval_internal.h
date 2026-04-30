@@ -5,6 +5,7 @@
 #include "qfloat.h"
 #include "qcomplex.h"
 #include "dval.h"
+#include "internal/dval_symbol_rules.h"
 
 /**
  * @file dval_internal.h
@@ -311,7 +312,6 @@ extern const dval_ops_t ops_e1;
  */
 void dv_retain(dval_t *dv);
 dval_t *dv_pow_qf(dval_t *a, qfloat_t exponent);
-char *dv_normalize_name(const char *name);
 dval_t *dv_alloc(const dval_ops_t *ops);
 dval_t *dv_make_const_qc(qcomplex_t x);
 dval_t *dv_make_var_qc(qcomplex_t x);

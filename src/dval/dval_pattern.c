@@ -5,7 +5,7 @@
 #include "qcomplex.h"
 #include "dval_internal.h"
 #include "dval.h"
-#include "dval_pattern.h"
+#include "internal/dval_pattern.h"
 
 static bool is_kind(const dval_t *expr, dval_op_kind_t kind)
 {

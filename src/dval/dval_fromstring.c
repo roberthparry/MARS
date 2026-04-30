@@ -431,7 +431,7 @@ static dval_t *parse_atom(parser_t *p)
 
     dval_t *sym = symtab_lookup(p->syms, name);
     if (!sym) {
-        char *normalized = dv_normalize_name(name);
+        char *normalized = dv_normalize_name(dv_default_constant_canonical_name(name));
 
         if (normalized) {
             sym = symtab_lookup(p->syms, normalized);
@@ -759,8 +759,9 @@ static int collect_implicit_symbols(const char *start, const char *end,
         char *name = read_any_name(&p);
         dval_t *node;
         int is_const;
-        qfloat_t value;
+        qcomplex_t value;
         const char *canonical_name = name;
+        char *key = NULL;
 
         if (!name) {
             unsigned int c;
@@ -769,29 +770,34 @@ static int collect_implicit_symbols(const char *start, const char *end,
             continue;
         }
 
-        if (symtab_has(syms, name)) {
-            free(name);
-            continue;
-        }
-
-        is_const = fs_is_default_constant_name(name);
-        if (fs_get_default_constant_value(name, &value)) {
-            if (strcmp(name, "pi") == 0 || strcmp(name, "@pi") == 0 ||
-                strcmp(name, "\xcf\x80") == 0) {
-                canonical_name = "@pi";
-            } else if (strcmp(name, "@phi") == 0 || strcmp(name, "\xcf\x86") == 0) {
-                canonical_name = "@phi";
-            } else if (strcmp(name, "@gamma") == 0 || strcmp(name, "\xce\xb3") == 0) {
-                canonical_name = "@gamma";
-            }
-
-            node = dv_new_named_const(value, canonical_name);
+        is_const = dv_is_default_constant_name(name);
+        if (dv_get_default_constant_value(name, &value)) {
+            canonical_name = dv_default_constant_canonical_name(name);
+            node = dv_new_named_const_qc(value, canonical_name);
         } else {
             node = is_const
                 ? dv_new_named_const(QF_NAN, name)
                 : dv_new_named_var(QF_NAN, name);
         }
-        symtab_add(syms, name, node);
+
+        key = dv_normalize_name(canonical_name);
+        if (!key)
+            key = strdup(canonical_name);
+        if (!key) {
+            dv_free(node);
+            free(name);
+            return -1;
+        }
+
+        if (symtab_has(syms, key)) {
+            free(key);
+            dv_free(node);
+            free(name);
+            continue;
+        }
+
+        symtab_add(syms, key, node);
+        free(key);
         free(name);
     }
 
@@ -1062,7 +1068,7 @@ dval_binding_t *dval_binding_get(dval_binding_t *bindings,
     if (!bindings || !name)
         return NULL;
 
-    norm = fs_normalise_binding_name(name);
+    norm = dv_normalize_binding_name(name);
     if (!norm)
         return NULL;
 

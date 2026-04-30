@@ -25,7 +25,7 @@ of these graphs.
 - integration as a symbolic matrix element type through `matrix_t`
 - public structural helper layers for sibling modules:
   - `dval_helpers.h` for lightweight public DAG helpers
-  - `dval_pattern.h` for affine/polynomial matcher APIs used by the symbolic integrator fast path
+  - `internal/dval_pattern.h` for affine/polynomial matcher APIs used by the symbolic integrator fast path
 
 ## Matrix Integration
 
@@ -54,7 +54,7 @@ higher-level symbolic code:
 
 - `dval_helpers.h` contains lightweight public DAG utilities such as exact-zero
   checks, named-constant checks, variable-usage collection, and substitution.
-- `dval_pattern.h` contains the heavier affine-family recognisers used by the
+- `internal/dval_pattern.h` contains the heavier affine-family recognisers used by the
   integrator, including:
   - unary-affine matching like `exp(a)` and `sin(a)`
   - degree-4 affine polynomial matching `P(a)`
