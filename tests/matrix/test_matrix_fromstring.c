@@ -175,16 +175,24 @@ static void test_mat_from_string_symbolic_math_conventions(void)
 {
     binding_t *bindings = NULL;
     size_t nbindings = 0;
-    matrix_t *A = mat_from_string("(x, e; π, τ; [radius], c1; a, d_2)",
+    matrix_t *A = mat_from_string("(x, e; pi, τ; @phi, @gamma; [radius], c1; a, d_2)",
                                   &bindings, &nbindings);
     binding_t *x_binding;
     binding_t *e_binding;
     binding_t *pi_binding;
+    binding_t *phi_binding;
+    binding_t *gamma_binding;
     binding_t *tau_binding;
     binding_t *radius_binding;
     binding_t *c1_binding;
     binding_t *a_binding;
     binding_t *d2_binding;
+    dval_t *dv = NULL;
+    qfloat_t e_initial = QF_ZERO;
+    qfloat_t pi_initial = QF_ZERO;
+    qfloat_t phi_initial = QF_ZERO;
+    qfloat_t gamma_initial = QF_ZERO;
+    qfloat_t tau_initial = QF_ZERO;
 
     check_bool("mat_from_string math-convention symbolic matrix non-null", A != NULL);
     check_bool("mat_from_string math-convention symbolic matrix type",
@@ -193,6 +201,8 @@ static void test_mat_from_string_symbolic_math_conventions(void)
     x_binding = mat_binding_find(bindings, nbindings, "x");
     e_binding = mat_binding_find(bindings, nbindings, "e");
     pi_binding = mat_binding_find(bindings, nbindings, "π");
+    phi_binding = mat_binding_find(bindings, nbindings, "φ");
+    gamma_binding = mat_binding_find(bindings, nbindings, "γ");
     tau_binding = mat_binding_find(bindings, nbindings, "τ");
     radius_binding = mat_binding_find(bindings, nbindings, "radius");
     c1_binding = mat_binding_find(bindings, nbindings, "c₁");
@@ -202,6 +212,8 @@ static void test_mat_from_string_symbolic_math_conventions(void)
     check_bool("math-convention x binding present", x_binding != NULL);
     check_bool("math-convention e binding present", e_binding != NULL);
     check_bool("math-convention π binding present", pi_binding != NULL);
+    check_bool("math-convention φ binding present", phi_binding != NULL);
+    check_bool("math-convention γ binding present", gamma_binding != NULL);
     check_bool("math-convention τ binding present", tau_binding != NULL);
     check_bool("math-convention radius binding present", radius_binding != NULL);
     check_bool("math-convention c₁ binding present", c1_binding != NULL);
@@ -210,10 +222,14 @@ static void test_mat_from_string_symbolic_math_conventions(void)
 
     check_bool("math-convention x inferred variable",
                x_binding && !x_binding->is_constant);
-    check_bool("math-convention e inferred variable",
-               e_binding && !e_binding->is_constant);
-    check_bool("math-convention π inferred variable",
-               pi_binding && !pi_binding->is_constant);
+    check_bool("math-convention e inferred built-in constant",
+               e_binding && e_binding->is_constant);
+    check_bool("math-convention π inferred built-in constant",
+               pi_binding && pi_binding->is_constant);
+    check_bool("math-convention φ inferred built-in constant",
+               phi_binding && phi_binding->is_constant);
+    check_bool("math-convention γ inferred built-in constant",
+               gamma_binding && gamma_binding->is_constant);
     check_bool("math-convention τ inferred variable",
                tau_binding && !tau_binding->is_constant);
     check_bool("math-convention radius inferred variable",
@@ -224,6 +240,49 @@ static void test_mat_from_string_symbolic_math_conventions(void)
                a_binding && a_binding->is_constant);
     check_bool("math-convention d₂ inferred constant",
                d2_binding && d2_binding->is_constant);
+
+    if (e_binding)
+        e_initial = dv_eval_qf(e_binding->symbol);
+    if (pi_binding)
+        pi_initial = dv_eval_qf(pi_binding->symbol);
+    if (phi_binding)
+        phi_initial = dv_eval_qf(phi_binding->symbol);
+    if (gamma_binding)
+        gamma_initial = dv_eval_qf(gamma_binding->symbol);
+    if (tau_binding)
+        tau_initial = dv_eval_qf(tau_binding->symbol);
+
+    check_qf_val("math-convention e built-in value",
+                 e_initial, QF_E, 1e-30);
+    check_qf_val("math-convention π built-in value",
+                 pi_initial, QF_PI, 1e-30);
+    check_qf_val("math-convention φ built-in value",
+                 phi_initial,
+                 qf_div(qf_add(qf_from_double(1.0), qf_sqrt(qf_from_double(5.0))),
+                        qf_from_double(2.0)),
+                 1e-30);
+    check_qf_val("math-convention γ built-in value",
+                 gamma_initial, QF_EULER_MASCHERONI, 1e-30);
+    check_bool("math-convention τ still starts as variable NaN",
+               tau_binding && qf_isnan(tau_initial));
+
+    if (A) {
+        mat_get(A, 0, 1, &dv);
+        check_qf_val("math-convention matrix e entry",
+                     dv_eval_qf(dv), QF_E, 1e-30);
+        mat_get(A, 1, 0, &dv);
+        check_qf_val("math-convention matrix π entry",
+                     dv_eval_qf(dv), QF_PI, 1e-30);
+        mat_get(A, 2, 0, &dv);
+        check_qf_val("math-convention matrix φ entry",
+                     dv_eval_qf(dv),
+                     qf_div(qf_add(qf_from_double(1.0), qf_sqrt(qf_from_double(5.0))),
+                            qf_from_double(2.0)),
+                     1e-30);
+        mat_get(A, 2, 1, &dv);
+        check_qf_val("math-convention matrix γ entry",
+                     dv_eval_qf(dv), QF_EULER_MASCHERONI, 1e-30);
+    }
 
     free(bindings);
     mat_free(A);

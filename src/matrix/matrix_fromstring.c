@@ -156,6 +156,12 @@ static char *mf_normalise_binding_name(const char *name)
         return mf_strndup(s + 1, (size_t)(e - s - 2));
 
     t = mf_strndup(s, (size_t)(e - s));
+
+    if (strcmp(t, "pi") == 0) {
+        free(t);
+        return mf_strndup("\xcf\x80", 2);
+    }
+
     if (t[0] != '@')
         return t;
 
@@ -270,6 +276,12 @@ static char *mf_read_simple_name(const char **pp)
     int len;
     char buf[256];
     int blen = 0;
+
+    if (strncmp(p, "pi", 2) == 0 &&
+        !isalnum((unsigned char)p[2]) && p[2] != '_') {
+        *pp = p + 2;
+        return mf_strndup("\xcf\x80", 2);
+    }
 
     if (*p == '@') {
         had_at = 1;
@@ -451,6 +463,36 @@ static bool mf_is_default_constant_name(const char *name)
     return false;
 }
 
+static bool mf_get_default_constant_value(const char *name, qcomplex_t *value_out)
+{
+    if (!name || !value_out)
+        return false;
+
+    if (strcmp(name, "e") == 0) {
+        *value_out = qc_make(QF_E, QF_ZERO);
+        return true;
+    }
+
+    if (strcmp(name, "\xcf\x80") == 0) {
+        *value_out = qc_make(QF_PI, QF_ZERO);
+        return true;
+    }
+
+    if (strcmp(name, "\xcf\x86") == 0) {
+        qfloat_t phi = qf_div(qf_add(qf_from_double(1.0), qf_sqrt(qf_from_double(5.0))),
+                              qf_from_double(2.0));
+        *value_out = qc_make(phi, QF_ZERO);
+        return true;
+    }
+
+    if (strcmp(name, "\xce\xb3") == 0) {
+        *value_out = qc_make(QF_EULER_MASCHERONI, QF_ZERO);
+        return true;
+    }
+
+    return false;
+}
+
 static int mf_is_subscript_utf8(const char *p, int *len_out)
 {
     unsigned int c;
@@ -475,6 +517,18 @@ static char *mf_normalise_expression_subscripts(const char *expr)
         return NULL;
 
     while (*p) {
+        if (strncmp(p, "pi", 2) == 0 &&
+            (p == expr || (!isalnum((unsigned char)p[-1]) &&
+                           p[-1] != '_' &&
+                           p[-1] != '[')) &&
+            !isalnum((unsigned char)p[2]) &&
+            p[2] != '_') {
+            memcpy(out + out_len, "\xcf\x80", 2);
+            out_len += 2;
+            p += 2;
+            continue;
+        }
+
         if (*p == '@') {
             const char *q = p;
             char *name = mf_read_simple_name(&q);
@@ -581,13 +635,16 @@ static int mf_collect_expression_names(const char *expr, symbol_vec_t *symbols)
 
         if (!mf_is_function_name(p)) {
             ssize_t found = symbol_vec_find(symbols, name);
+            qcomplex_t default_value = QC_ZERO;
+            bool has_default_value = mf_get_default_constant_value(name, &default_value);
 
             if (found < 0) {
                 if (symbol_vec_add(symbols,
                                    name,
-                                   mf_is_default_constant_name(name),
-                                   false,
-                                   qc_make(QF_NAN, QF_NAN)) != 0) {
+                                   has_default_value || mf_is_default_constant_name(name),
+                                   has_default_value,
+                                   has_default_value ? default_value
+                                                     : qc_make(QF_NAN, QF_NAN)) != 0) {
                     free(name);
                     return -1;
                 }

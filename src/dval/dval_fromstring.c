@@ -83,7 +83,7 @@ static int can_start_factor(const parser_t *p)
     unsigned char c = (unsigned char)*p->p;
     if (c == ')' || c == '}' || c == ',' || c == ';' || c == '|') return 0;
     if (c == ' ') return 0;
-    if (c == '[' || c == '(' || c == '-') return 1;
+    if (c == '[' || c == '(' || c == '-' || c == '@') return 1;
     if (at_middle_dot(p)) return 1;
     unsigned int uc;
     int len = fs_utf8_decode(p->p, &uc);
@@ -431,6 +431,14 @@ static dval_t *parse_atom(parser_t *p)
 
     dval_t *sym = symtab_lookup(p->syms, name);
     if (!sym) {
+        char *normalized = dv_normalize_name(name);
+
+        if (normalized) {
+            sym = symtab_lookup(p->syms, normalized);
+            free(normalized);
+        }
+    }
+    if (!sym) {
         char msg[256];
         snprintf(msg, sizeof(msg), "unknown symbol '%.200s'", name);
         set_error(p, msg);
@@ -751,6 +759,8 @@ static int collect_implicit_symbols(const char *start, const char *end,
         char *name = read_any_name(&p);
         dval_t *node;
         int is_const;
+        qfloat_t value;
+        const char *canonical_name = name;
 
         if (!name) {
             unsigned int c;
@@ -765,10 +775,23 @@ static int collect_implicit_symbols(const char *start, const char *end,
         }
 
         is_const = fs_is_default_constant_name(name);
-        node = is_const
-            ? dv_new_named_const(QF_NAN, name)
-            : dv_new_named_var(QF_NAN, name);
-        symtab_add(syms, node->name ? node->name : name, node);
+        if (fs_get_default_constant_value(name, &value)) {
+            if (strcmp(name, "pi") == 0 || strcmp(name, "@pi") == 0 ||
+                strcmp(name, "\xcf\x80") == 0) {
+                canonical_name = "@pi";
+            } else if (strcmp(name, "@phi") == 0 || strcmp(name, "\xcf\x86") == 0) {
+                canonical_name = "@phi";
+            } else if (strcmp(name, "@gamma") == 0 || strcmp(name, "\xce\xb3") == 0) {
+                canonical_name = "@gamma";
+            }
+
+            node = dv_new_named_const(value, canonical_name);
+        } else {
+            node = is_const
+                ? dv_new_named_const(QF_NAN, name)
+                : dv_new_named_var(QF_NAN, name);
+        }
+        symtab_add(syms, name, node);
         free(name);
     }
 

@@ -997,17 +997,17 @@ symbolic matrix behaves like the wrapped form with every discovered symbol
 initialised to `NaN`, ready to be filled in later through the returned
 bindings.
 
-In that bare form, names are treated as variables by default, but the parser
-also recognises a small set of conventional constant-style names
-automatically:
+In that bare form, the unbound-symbol inference rule matches `dval` parsing:
 
-- `a`, `b`, `c`, `d`
-- indexed forms such as `a1`, `b2`, `c_7`, and `d₃`
+- built-in valued constants: `e`, `pi`, `π`, `@pi`, `@phi`, and `@gamma`
+- constant placeholders: `a`, `b`, `c`, `d`
+- indexed constant placeholders such as `a1`, `b2`, `c_7`, and `d₃`
+- variables: everything else, including `x`, `y`, `radius`, `Δ`, `Ω`, `τ`,
+  `@tau`, and bracketed identifiers like `[radius]`
 
-Everything else, including ordinary Latin names such as `x`, `y`, `radius`,
-Greek parameter names such as `Δ`, `Ω`, and `τ`, symbolic names such as `e`
-and `π`, and bracketed identifiers like `[radius]`, is inferred as a variable
-unless the explicit matrix-wide binding section says otherwise.
+The built-in-value inference is exact-name only. For example, `@pi` becomes
+the built-in constant `π`, but `@pi1`, `@pi2`, and `@pi_3` normalise to
+`π₁`, `π₂`, and `π₃` and remain ordinary symbolic variables.
 
 Repeated occurrences of the same normalised symbol name anywhere in one parsed
 matrix resolve to the same underlying symbolic leaf. Reusing the same name as

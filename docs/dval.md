@@ -400,7 +400,7 @@ All functions return owning handles.
 
 ### Comparison
 
-- `int dv_cmp(const dval_t *dv1, const dval_t *dv2)` — compare by primal `qfloat_t` value; returns -1, 0, or 1
+- `int dv_cmp(const dval_t *dv1, const dval_t *dv2)` — compare by primal `qcomplex_t` value using lexicographic order (real part first, then imaginary part); returns -1, 0, or 1
 
 ### Elementary Functions (owning)
 
@@ -478,6 +478,8 @@ All functions return owning handles.
 
   Accepted shorthand in the string:
   - `x_0` for subscript x₀
+  - trailing ASCII digits are canonicalised to Unicode subscripts, so
+    `a1`, `a12`, and `@pi2` normalise to `a₁`, `a₁₂`, and `π₂`
   - `*` for explicit multiplication
   - `^N` or `^1.5` for ASCII exponents after a variable, constant, or parenthesised sub-expression
   - `sin^2(x)` style ASCII exponents on function names
@@ -485,8 +487,13 @@ All functions return owning handles.
   - `[bracket names]` for identifiers that are not single-letter-plus-subscript
 
   In the no-binding form, the default inference rule is:
-  - constants: `a`, `b`, `c`, `d`, and their indexed forms such as `a₀`, `b_1`, `c₂`, and `d_3`
-  - variables: everything else that is a valid symbolic `dval` name, including `x`, `τ`, `e`, `π`, and bracketed names like `[radius]`
+  - constants with built-in values: `e`, `pi`, `π`, `@pi`, `@phi`, and `@gamma`
+  - constant placeholders: `a`, `b`, `c`, `d`, and their indexed forms such as `a₀`, `b_1`, `c₂`, and `d_3`
+  - variables: everything else that is a valid symbolic `dval` name, including `x`, `τ`, `@tau`, and bracketed names like `[radius]`
+
+  The built-in-value inference is exact-name only. For example, `@pi` becomes
+  the built-in constant `π`, but `@pi1`, `@pi2`, and `@pi_3` normalise to
+  `π₁`, `π₂`, and `π₃` and remain ordinary symbolic variables.
 
   Repeated occurrences of the same normalised symbol name within one parsed
   expression resolve to the same underlying leaf node. Reusing the same name as

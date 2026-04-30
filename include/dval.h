@@ -247,7 +247,8 @@ dval_t *dv_d_div(double d, dval_t *dv);
 /**
  * @brief Compare the primal values of two nodes.
  *
- * Forces evaluation of both nodes, then compares their values.
+ * Forces evaluation of both nodes, then compares their `qcomplex_t` primal
+ * values lexicographically: real part first, then imaginary part.
  * Returns -1 if dv1 < dv2, 0 if equal, +1 if dv1 > dv2.
  */
 int dv_cmp(const dval_t *dv1, const dval_t *dv2);
@@ -416,6 +417,15 @@ void dv_print(const dval_t *dv);
  *
  * Bracketed names (@p [my var], @p [2pi], …) are supported for identifiers
  * that do not fit the single-letter-plus-subscript rule.
+ *
+ * If there is no binding section and the expression still contains symbolic
+ * names, bare inference uses these defaults:
+ *   @p e, @p pi, @p π, @p @pi, @p @phi, and @p @gamma become named constants
+ *   with built-in values
+ *   @p a, @p b, @p c, @p d and their indexed forms become named constant
+ *   placeholders initialised to NaN
+ *   everything else, including @p τ and @p @tau, becomes a named variable
+ *   initialised to NaN
  *
  * Returns an owning handle on success, or NULL on error (details written to
  * stderr).  The caller must call dv_free() on the returned pointer exactly

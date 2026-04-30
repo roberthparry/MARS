@@ -138,13 +138,62 @@ char *read_simple_name(const char **pp)
     int len = fs_utf8_decode(p, &c);
     char buf[256];
     int blen = 0;
+    int allow_alias = 0;
+
+    if (strncmp(p, "pi", 2) == 0 &&
+        !isalnum((unsigned char)p[2]) && p[2] != '_') {
+        char *result = (char *)fs_xmalloc(3);
+        memcpy(result, "pi", 3);
+        *pp = p + 2;
+        return result;
+    }
+
+    if (*p == '@') {
+        const char *alias = p + 1;
+        const char *accepted[] = { "pi", "phi", "gamma", "tau" };
+        size_t i;
+
+        for (i = 0; i < sizeof(accepted) / sizeof(accepted[0]); ++i) {
+            size_t n = strlen(accepted[i]);
+
+            unsigned int suffix_cp = 0;
+            int suffix_len = fs_utf8_decode(alias + n, &suffix_cp);
+            int suffix_is_subscript = suffix_len > 0 &&
+                                      suffix_cp >= 0x2080 &&
+                                      suffix_cp <= 0x2089;
+
+            if (strncmp(alias, accepted[i], n) == 0 &&
+                (!alias[n] ||
+                 alias[n] == '_' ||
+                 isdigit((unsigned char)alias[n]) ||
+                 suffix_is_subscript ||
+                 (!isalnum((unsigned char)alias[n]) && alias[n] != '_'))) {
+                allow_alias = 1;
+                break;
+            }
+        }
+
+        if (!allow_alias)
+            return NULL;
+
+        buf[blen++] = *p++;
+        len = fs_utf8_decode(p, &c);
+    }
 
     if (len <= 0 || !fs_is_letter(c))
         return NULL;
 
-    memcpy(buf, p, (size_t)len);
-    blen = len;
-    p += len;
+    if (allow_alias) {
+        while (*p && isalpha((unsigned char)*p)) {
+            if (blen + 1 >= (int)sizeof(buf) - 1)
+                break;
+            buf[blen++] = *p++;
+        }
+    } else {
+        memcpy(buf + blen, p, (size_t)len);
+        blen += len;
+        p += len;
+    }
 
     for (;;) {
         unsigned int sc;
@@ -156,6 +205,23 @@ char *read_simple_name(const char **pp)
             memcpy(buf + blen, p, (size_t)sl);
             blen += sl;
             p += sl;
+            continue;
+        }
+        if (allow_alias && isdigit((unsigned char)*p)) {
+            if (blen + 1 >= (int)sizeof(buf) - 1)
+                break;
+            buf[blen++] = *p++;
+            continue;
+        }
+        if (allow_alias && *p == '_' && isdigit((unsigned char)p[1])) {
+            if (blen + 1 >= (int)sizeof(buf) - 1)
+                break;
+            buf[blen++] = *p++;
+            while (isdigit((unsigned char)*p)) {
+                if (blen + 1 >= (int)sizeof(buf) - 1)
+                    break;
+                buf[blen++] = *p++;
+            }
             continue;
         }
         if (*p == '_' && (unsigned char)p[1] >= '0' && (unsigned char)p[1] <= '9') {
@@ -207,8 +273,26 @@ char *read_bracketed_name(const char **pp)
 
 char *read_any_name(const char **pp)
 {
+    static const char *special_names[] = {
+        "@pi", "@phi", "@gamma", "@tau", "pi"
+    };
+    size_t i;
+
     if (**pp == '[')
         return read_bracketed_name(pp);
+
+    for (i = 0; i < sizeof(special_names) / sizeof(special_names[0]); ++i) {
+        size_t n = strlen(special_names[i]);
+
+        if (strncmp(*pp, special_names[i], n) == 0 &&
+            !isalnum((unsigned char)(*pp)[n]) && (*pp)[n] != '_') {
+            char *result = (char *)fs_xmalloc(n + 1);
+            memcpy(result, special_names[i], n + 1);
+            *pp += n;
+            return result;
+        }
+    }
+
     return read_simple_name(pp);
 }
 
@@ -231,6 +315,36 @@ int fs_is_default_constant_name(const char *name)
         return 1;
     if (*p == '_' && p[1] >= '0' && p[1] <= '9')
         return 1;
+    return 0;
+}
+
+int fs_get_default_constant_value(const char *name, qfloat_t *value_out)
+{
+    if (!name || !value_out)
+        return 0;
+
+    if (strcmp(name, "e") == 0) {
+        *value_out = QF_E;
+        return 1;
+    }
+
+    if (strcmp(name, "pi") == 0 || strcmp(name, "@pi") == 0 ||
+        strcmp(name, "\xcf\x80") == 0) {
+        *value_out = QF_PI;
+        return 1;
+    }
+
+    if (strcmp(name, "@phi") == 0) {
+        *value_out = qf_div(qf_add(qf_from_double(1.0), qf_sqrt(qf_from_double(5.0))),
+                            qf_from_double(2.0));
+        return 1;
+    }
+
+    if (strcmp(name, "@gamma") == 0) {
+        *value_out = QF_EULER_MASCHERONI;
+        return 1;
+    }
+
     return 0;
 }
 

@@ -201,13 +201,106 @@ static void test_from_string_bracketed_names(void)
         99.0, __LINE__);
 }
 
+static void test_from_string_name_normalization(void)
+{
+    dval_t *a1 = dv_new_named_var_d(1.0, "a1");
+    dval_t *a12 = dv_new_named_var_d(1.0, "a12");
+    dval_t *a123 = dv_new_named_var_d(1.0, "a123");
+    dval_t *pi1 = dv_new_named_var_d(1.0, "@pi1");
+    dval_t *pi2 = dv_new_named_var_d(1.0, "@pi_2");
+    dval_t *parsed_pi1 = dval_from_string("{ @pi1 }");
+    char *a1s = a1 ? dv_to_string(a1, style_EXPRESSION) : NULL;
+    char *a12s = a12 ? dv_to_string(a12, style_EXPRESSION) : NULL;
+    char *a123s = a123 ? dv_to_string(a123, style_EXPRESSION) : NULL;
+    char *pi1s = pi1 ? dv_to_string(pi1, style_EXPRESSION) : NULL;
+    char *pi2s = pi2 ? dv_to_string(pi2, style_EXPRESSION) : NULL;
+    char *parsed_pi1s = parsed_pi1 ? dv_to_string(parsed_pi1, style_EXPRESSION) : NULL;
+
+    if (a1s && str_eq(a1s, "{ a₁ | a₁ = 1 }")) {
+        to_string_pass("normalize a1", a1s, "{ a₁ | a₁ = 1 }");
+    } else {
+        to_string_fail(__FILE__, __LINE__, 1, "normalize a1",
+                       a1s ? a1s : "(null)", "{ a₁ | a₁ = 1 }");
+    }
+
+    if (a12s && str_eq(a12s, "{ a₁₂ | a₁₂ = 1 }")) {
+        to_string_pass("normalize a12", a12s, "{ a₁₂ | a₁₂ = 1 }");
+    } else {
+        to_string_fail(__FILE__, __LINE__, 1, "normalize a12",
+                       a12s ? a12s : "(null)", "{ a₁₂ | a₁₂ = 1 }");
+    }
+
+    if (a123s && str_eq(a123s, "{ a₁₂₃ | a₁₂₃ = 1 }")) {
+        to_string_pass("normalize a123", a123s, "{ a₁₂₃ | a₁₂₃ = 1 }");
+    } else {
+        to_string_fail(__FILE__, __LINE__, 1, "normalize a123",
+                       a123s ? a123s : "(null)", "{ a₁₂₃ | a₁₂₃ = 1 }");
+    }
+
+    if (pi1s && str_eq(pi1s, "{ π₁ | π₁ = 1 }")) {
+        to_string_pass("normalize @pi1", pi1s, "{ π₁ | π₁ = 1 }");
+    } else {
+        to_string_fail(__FILE__, __LINE__, 1, "normalize @pi1",
+                       pi1s ? pi1s : "(null)", "{ π₁ | π₁ = 1 }");
+    }
+
+    if (pi2s && str_eq(pi2s, "{ π₂ | π₂ = 1 }")) {
+        to_string_pass("normalize @pi_2", pi2s, "{ π₂ | π₂ = 1 }");
+    } else {
+        to_string_fail(__FILE__, __LINE__, 1, "normalize @pi_2",
+                       pi2s ? pi2s : "(null)", "{ π₂ | π₂ = 1 }");
+    }
+
+    if (parsed_pi1s && str_eq(parsed_pi1s, "{ π₁ | π₁ = NAN }")) {
+        to_string_pass("implicit @pi1 stays variable", parsed_pi1s,
+                       "{ π₁ | π₁ = NAN }");
+    } else {
+        to_string_fail(__FILE__, __LINE__, 1, "implicit @pi1 stays variable",
+                       parsed_pi1s ? parsed_pi1s : "(null)",
+                       "{ π₁ | π₁ = NAN }");
+    }
+
+    if (parsed_pi1 && qf_isnan(dv_eval_qf(parsed_pi1))) {
+        printf(C_BOLD C_GREEN "PASS" C_RESET " implicit @pi1 evaluates to NaN\n\n");
+    } else {
+        printf(C_BOLD C_RED "FAIL" C_RESET " implicit @pi1 evaluates to NaN %s:%d:1\n\n",
+               __FILE__, __LINE__);
+        TEST_FAIL();
+    }
+
+    free(parsed_pi1s);
+    free(pi2s);
+    free(pi1s);
+    free(a123s);
+    free(a12s);
+    free(a1s);
+    dv_free(parsed_pi1);
+    dv_free(pi2);
+    dv_free(pi1);
+    dv_free(a123);
+    dv_free(a12);
+    dv_free(a1);
+}
+
 static void test_from_string_implicit_symbolic_bindings(void)
 {
     dval_t *x = dval_from_string("{ x }");
+    dval_t *e = dval_from_string("{ e }");
+    dval_t *pi_ascii = dval_from_string("{ pi }");
+    dval_t *pi_alias = dval_from_string("{ @pi }");
     dval_t *tau = dval_from_string("{ τ }");
-    dval_t *f = dval_from_string("{ [radius]^2 + c_1 + π }");
+    dval_t *phi_alias = dval_from_string("{ @phi }");
+    dval_t *gamma_alias = dval_from_string("{ @gamma }");
+    dval_t *tau_alias = dval_from_string("{ @tau }");
+    dval_t *f = dval_from_string("{ [radius]^2 + c_1 + π + e }");
     char *xs = x ? dv_to_string(x, style_EXPRESSION) : NULL;
+    char *es = e ? dv_to_string(e, style_EXPRESSION) : NULL;
+    char *pi_as = pi_ascii ? dv_to_string(pi_ascii, style_EXPRESSION) : NULL;
+    char *pi_ats = pi_alias ? dv_to_string(pi_alias, style_EXPRESSION) : NULL;
     char *taus = tau ? dv_to_string(tau, style_EXPRESSION) : NULL;
+    char *phi_as = phi_alias ? dv_to_string(phi_alias, style_EXPRESSION) : NULL;
+    char *gamma_as = gamma_alias ? dv_to_string(gamma_alias, style_EXPRESSION) : NULL;
+    char *tau_as = tau_alias ? dv_to_string(tau_alias, style_EXPRESSION) : NULL;
     char *fs = f ? dv_to_string(f, style_EXPRESSION) : NULL;
 
     if (x && xs && str_eq(xs, "{ x | x = NAN }")) {
@@ -217,6 +310,35 @@ static void test_from_string_implicit_symbolic_bindings(void)
                        xs ? xs : "(null)", "{ x | x = NAN }");
     }
 
+    if (e && es && str_eq(es, "{ e | e = 2.718281828459045235360287471352664 }")) {
+        to_string_pass("implicit e constant inference", es,
+                       "{ e | e = 2.718281828459045235360287471352664 }");
+    } else {
+        to_string_fail(__FILE__, __LINE__, 1, "implicit e constant inference",
+                       es ? es : "(null)",
+                       "{ e | e = 2.718281828459045235360287471352664 }");
+    }
+
+    if (pi_ascii && pi_as &&
+        str_eq(pi_as, "{ π | π = 3.141592653589793238462643383279505 }")) {
+        to_string_pass("implicit pi constant inference", pi_as,
+                       "{ π | π = 3.141592653589793238462643383279505 }");
+    } else {
+        to_string_fail(__FILE__, __LINE__, 1, "implicit pi constant inference",
+                       pi_as ? pi_as : "(null)",
+                       "{ π | π = 3.141592653589793238462643383279505 }");
+    }
+
+    if (pi_alias && pi_ats &&
+        str_eq(pi_ats, "{ π | π = 3.141592653589793238462643383279505 }")) {
+        to_string_pass("implicit @pi constant inference", pi_ats,
+                       "{ π | π = 3.141592653589793238462643383279505 }");
+    } else {
+        to_string_fail(__FILE__, __LINE__, 1, "implicit @pi constant inference",
+                       pi_ats ? pi_ats : "(null)",
+                       "{ π | π = 3.141592653589793238462643383279505 }");
+    }
+
     if (tau && taus && str_eq(taus, "{ τ | τ = NAN }")) {
         to_string_pass("implicit tau variable inference", taus, "{ τ | τ = NAN }");
     } else {
@@ -224,13 +346,40 @@ static void test_from_string_implicit_symbolic_bindings(void)
                        taus ? taus : "(null)", "{ τ | τ = NAN }");
     }
 
-    if (f && fs && str_eq(fs, "{ π + c₁ + [radius]² | π = NAN, [radius] = NAN; c₁ = NAN }")) {
+    if (phi_alias && phi_as &&
+        str_eq(phi_as, "{ φ | φ = 1.618033988749894848204586834365641 }")) {
+        to_string_pass("implicit @phi constant inference", phi_as,
+                       "{ φ | φ = 1.618033988749894848204586834365641 }");
+    } else {
+        to_string_fail(__FILE__, __LINE__, 1, "implicit @phi constant inference",
+                       phi_as ? phi_as : "(null)",
+                       "{ φ | φ = 1.618033988749894848204586834365641 }");
+    }
+
+    if (gamma_alias && gamma_as &&
+        str_eq(gamma_as, "{ γ | γ = 0.5772156649015328606065120900820167 }")) {
+        to_string_pass("implicit @gamma constant inference", gamma_as,
+                       "{ γ | γ = 0.5772156649015328606065120900820167 }");
+    } else {
+        to_string_fail(__FILE__, __LINE__, 1, "implicit @gamma constant inference",
+                       gamma_as ? gamma_as : "(null)",
+                       "{ γ | γ = 0.5772156649015328606065120900820167 }");
+    }
+
+    if (tau_alias && tau_as && str_eq(tau_as, "{ τ | τ = NAN }")) {
+        to_string_pass("implicit @tau variable inference", tau_as, "{ τ | τ = NAN }");
+    } else {
+        to_string_fail(__FILE__, __LINE__, 1, "implicit @tau variable inference",
+                       tau_as ? tau_as : "(null)", "{ τ | τ = NAN }");
+    }
+
+    if (f && fs && str_eq(fs, "{ c₁ + e + π + [radius]² | [radius] = NAN; c₁ = NAN, e = 2.718281828459045235360287471352664, π = 3.141592653589793238462643383279505 }")) {
         to_string_pass("implicit mixed symbolic inference", fs,
-                       "{ π + c₁ + [radius]² | π = NAN, [radius] = NAN; c₁ = NAN }");
+                       "{ c₁ + e + π + [radius]² | [radius] = NAN; c₁ = NAN, e = 2.718281828459045235360287471352664, π = 3.141592653589793238462643383279505 }");
     } else {
         to_string_fail(__FILE__, __LINE__, 1, "implicit mixed symbolic inference",
                        fs ? fs : "(null)",
-                       "{ π + c₁ + [radius]² | π = NAN, [radius] = NAN; c₁ = NAN }");
+                       "{ c₁ + e + π + [radius]² | [radius] = NAN; c₁ = NAN, e = 2.718281828459045235360287471352664, π = 3.141592653589793238462643383279505 }");
     }
 
     if (x && qf_isnan(dv_eval_qf(x))) {
@@ -249,6 +398,49 @@ static void test_from_string_implicit_symbolic_bindings(void)
         TEST_FAIL();
     }
 
+    if (e && qf_eq(dv_eval_qf(e), QF_E)) {
+        printf(C_BOLD C_GREEN "PASS" C_RESET " implicit e evaluates to built-in constant\n\n");
+    } else {
+        printf(C_BOLD C_RED "FAIL" C_RESET " implicit e evaluates to built-in constant %s:%d:1\n\n",
+               __FILE__, __LINE__);
+        TEST_FAIL();
+    }
+
+    if (pi_ascii && qf_eq(dv_eval_qf(pi_ascii), QF_PI) &&
+        pi_alias && qf_eq(dv_eval_qf(pi_alias), QF_PI)) {
+        printf(C_BOLD C_GREEN "PASS" C_RESET " implicit pi aliases evaluate to built-in constant\n\n");
+    } else {
+        printf(C_BOLD C_RED "FAIL" C_RESET " implicit pi aliases evaluate to built-in constant %s:%d:1\n\n",
+               __FILE__, __LINE__);
+        TEST_FAIL();
+    }
+
+    if (phi_alias && qf_eq(dv_eval_qf(phi_alias),
+                           qf_div(qf_add(qf_from_double(1.0), qf_sqrt(qf_from_double(5.0))),
+                                  qf_from_double(2.0)))) {
+        printf(C_BOLD C_GREEN "PASS" C_RESET " implicit @phi evaluates to built-in constant\n\n");
+    } else {
+        printf(C_BOLD C_RED "FAIL" C_RESET " implicit @phi evaluates to built-in constant %s:%d:1\n\n",
+               __FILE__, __LINE__);
+        TEST_FAIL();
+    }
+
+    if (gamma_alias && qf_eq(dv_eval_qf(gamma_alias), QF_EULER_MASCHERONI)) {
+        printf(C_BOLD C_GREEN "PASS" C_RESET " implicit @gamma evaluates to built-in constant\n\n");
+    } else {
+        printf(C_BOLD C_RED "FAIL" C_RESET " implicit @gamma evaluates to built-in constant %s:%d:1\n\n",
+               __FILE__, __LINE__);
+        TEST_FAIL();
+    }
+
+    if (tau_alias && qf_isnan(dv_eval_qf(tau_alias))) {
+        printf(C_BOLD C_GREEN "PASS" C_RESET " implicit @tau evaluates to NaN\n\n");
+    } else {
+        printf(C_BOLD C_RED "FAIL" C_RESET " implicit @tau evaluates to NaN %s:%d:1\n\n",
+               __FILE__, __LINE__);
+        TEST_FAIL();
+    }
+
     if (f && qf_isnan(dv_eval_qf(f))) {
         printf(C_BOLD C_GREEN "PASS" C_RESET " implicit mixed expression evaluates to NaN\n\n");
     } else {
@@ -258,10 +450,22 @@ static void test_from_string_implicit_symbolic_bindings(void)
     }
 
     free(fs);
+    free(tau_as);
+    free(gamma_as);
+    free(phi_as);
     free(taus);
+    free(pi_ats);
+    free(pi_as);
+    free(es);
     free(xs);
     dv_free(f);
+    dv_free(tau_alias);
+    dv_free(gamma_alias);
+    dv_free(phi_alias);
     dv_free(tau);
+    dv_free(pi_alias);
+    dv_free(pi_ascii);
+    dv_free(e);
     dv_free(x);
 }
 
@@ -847,6 +1051,7 @@ void test_dval_t_from_string(void)
     RUN_TEST(test_from_string_special_functions,    __func__);
     RUN_TEST(test_from_string_named_consts,         __func__);
     RUN_TEST(test_from_string_bracketed_names,   __func__);
+    RUN_TEST(test_from_string_name_normalization, __func__);
     RUN_TEST(test_from_string_implicit_symbolic_bindings, __func__);
     RUN_TEST(test_from_string_ascii_alternatives,__func__);
     RUN_TEST(test_from_string_errors,            __func__);
