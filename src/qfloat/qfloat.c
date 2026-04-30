@@ -1051,6 +1051,42 @@ static inline void qf_uppercase_E(char *s) {
     char *e = strchr(s, 'e');
     if (e) *e = 'E';
 }
+
+static void qf_apply_sign_prefix(char *text, int flag_plus, int flag_space)
+{
+    if (text[0] == '-')
+        return;
+
+    if (flag_plus) {
+        memmove(text + 1, text, strlen(text) + 1);
+        text[0] = '+';
+    } else if (flag_space) {
+        memmove(text + 1, text, strlen(text) + 1);
+        text[0] = ' ';
+    }
+}
+
+static void qf_round_digits_carry(char *digits,
+                                  int *nd,
+                                  size_t digits_cap,
+                                  int *fixed_dp,
+                                  int round_index)
+{
+    int i = round_index - 1;
+
+    while (i >= 0 && digits[i] == '9') {
+        digits[i] = '0';
+        i--;
+    }
+    if (i >= 0) {
+        digits[i]++;
+    } else if (*nd + 1 < (int)digits_cap) {
+        memmove(digits + 1, digits, (size_t)*nd + 1);
+        digits[0] = '1';
+        (*nd)++;
+        (*fixed_dp)++;
+    }
+}
     
 int qf_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap)
 {
@@ -1119,15 +1155,7 @@ int qf_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap)
             char tmp[256];
             strcpy(tmp, core);
 
-            if (tmp[0] != '-') {
-                if (flag_plus) {
-                    memmove(tmp + 1, tmp, strlen(tmp) + 1);
-                    tmp[0] = '+';
-                } else if (flag_space) {
-                    memmove(tmp + 1, tmp, strlen(tmp) + 1);
-                    tmp[0] = ' ';
-                }
-            }
+            qf_apply_sign_prefix(tmp, flag_plus, flag_space);
 
             char padded[256];
             pad_string(padded, sizeof(padded),
@@ -1207,15 +1235,7 @@ int qf_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap)
                     }
                 }
 
-                if (tmp[0] != '-') {
-                    if (flag_plus) {
-                        memmove(tmp + 1, tmp, strlen(tmp) + 1);
-                        tmp[0] = '+';
-                    } else if (flag_space) {
-                        memmove(tmp + 1, tmp, strlen(tmp) + 1);
-                        tmp[0] = ' ';
-                    }
-                }
+                qf_apply_sign_prefix(tmp, flag_plus, flag_space);
 
                 char padded[256];
                 pad_string(padded, sizeof(padded),
@@ -1273,23 +1293,8 @@ int qf_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap)
                     if (digits[i] != '0') { tail_nonzero = 1; break; }
 
                 if (trail >= 5 && tail_nonzero) {
-                    if (digits[32] >= '5') {
-                        int i = 31;
-                        while (i >= 0 && digits[i] == '9') {
-                            digits[i] = '0';
-                            i--;
-                        }
-                        if (i >= 0) {
-                            digits[i]++;
-                        } else {
-                            if (nd + 1 < (int)sizeof(digits)) {
-                                memmove(digits + 1, digits, nd + 1);
-                                digits[0] = '1';
-                                nd++;
-                                fixed_dp++;
-                            }
-                        }
-                    }
+                    if (digits[32] >= '5')
+                        qf_round_digits_carry(digits, &nd, sizeof(digits), &fixed_dp, 32);
                     nd = 32;
                     digits[nd] = '\0';
                 }
@@ -1310,21 +1315,7 @@ int qf_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap)
                 }
 
                 if (K >= 0 && K < nd && digits[K] >= '5') {
-                    int i = K - 1;
-                    while (i >= 0 && digits[i] == '9') {
-                        digits[i] = '0';
-                        i--;
-                    }
-                    if (i >= 0) {
-                        digits[i]++;
-                    } else {
-                        if (nd + 1 < (int)sizeof(digits)) {
-                            memmove(digits + 1, digits, nd + 1);
-                            digits[0] = '1';
-                            nd++;
-                            fixed_dp++;
-                        }
-                    }
+                    qf_round_digits_carry(digits, &nd, sizeof(digits), &fixed_dp, K);
                 }
 
                 if (K < nd)

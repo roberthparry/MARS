@@ -249,6 +249,42 @@ static qcomplex_t qc_parse_fail(const char *msg, const char *input)
     return qc_make(QF_NAN, QF_NAN);
 }
 
+static int qc_has_imag_suffix(char c)
+{
+    return c == 'i' || c == 'j';
+}
+
+static void qc_normalize_unit_imag(char *text)
+{
+    if (strcmp(text, "") == 0 || strcmp(text, "+") == 0)
+        strcpy(text, "1");
+    else if (strcmp(text, "-") == 0)
+        strcpy(text, "-1");
+}
+
+static int qc_parse_real_imag_parts(const char *re_text,
+                                    const char *im_text,
+                                    qcomplex_t *out)
+{
+    qfloat_t re = qf_from_string(re_text);
+    qfloat_t im = qf_from_string(im_text);
+
+    if (qf_isnan(re) || qf_isnan(im))
+        return -1;
+
+    *out = qc_make(re, im);
+    return 0;
+}
+
+static int qc_find_signed_split(const char *text)
+{
+    for (int i = (int)strlen(text) - 1; i > 0; --i) {
+        if (text[i] == '+' || text[i] == '-')
+            return i;
+    }
+    return -1;
+}
+
 qcomplex_t qc_from_string(const char *s)
 {
     const char *s_original = s;
@@ -278,12 +314,11 @@ qcomplex_t qc_from_string(const char *s)
         *comma = '\0';
         *end   = '\0';
 
-        qfloat_t re = qf_from_string(buf+1);
-        qfloat_t im = qf_from_string(comma+1);
-        if (qf_isnan(re) || qf_isnan(im))
+        qcomplex_t z;
+        if (qc_parse_real_imag_parts(buf + 1, comma + 1, &z) != 0)
             return qc_parse_fail("invalid numbers in (a,b)", s_original);
 
-        return qc_make(re, im);
+        return z;
     }
 
     /* ------------------------------------------------------------
@@ -323,30 +358,21 @@ qcomplex_t qc_from_string(const char *s)
 
             if (signpos > 0) {
                 char left[128], right[128];
+                qcomplex_t e;
+
                 memcpy(left, inside, signpos);
                 left[signpos] = '\0';
                 strcpy(right, inside + signpos);
 
                 size_t RL = strlen(right);
-                if (RL < 2 || right[RL-1] != 'i')
+                if (RL < 2 || !qc_has_imag_suffix(right[RL - 1]))
                     return qc_parse_fail("invalid imaginary part in exp(a+bi)", s_original);
 
-                right[RL-1] = '\0';
-
-                qfloat_t a = qf_from_string(left);
-                qfloat_t b = qf_from_string(right);
-                if (qf_isnan(a) || qf_isnan(b))
+                right[RL - 1] = '\0';
+                if (qc_parse_real_imag_parts(left, right, &e) != 0)
                     return qc_parse_fail("invalid numbers in exp(a+bi)", s_original);
 
-                /* Correct exp(a+bi) */
-                qfloat_t ea = qf_exp(a);
-                qfloat_t cb = qf_cos(b);
-                qfloat_t sb = qf_sin(b);
-
-                qcomplex_t e = qc_make(qf_mul(ea, cb),
-                                       qf_mul(ea, sb));
-
-                return qc_mul(qc_make(r, qf_from_double(0.0)), e);
+                return qc_mul(qcrf(r), qc_exp(e));
             }
         }
 
@@ -373,48 +399,35 @@ qcomplex_t qc_from_string(const char *s)
     /* ------------------------------------------------------------
        a ± bi
        ------------------------------------------------------------ */
-    int split = -1;
-    for (int i = (int)n - 1; i > 0; i--) {
-        if (buf[i] == '+' || buf[i] == '-') {
-            split = i;
-            break;
-        }
-    }
+    int split = qc_find_signed_split(buf);
 
     if (split > 0) {
         char left[256], right[256];
+        qcomplex_t z;
+
         memcpy(left, buf, split);
         left[split] = '\0';
         strcpy(right, buf + split);
 
         size_t RL = strlen(right);
-        if (RL > 0 && (right[RL-1] == 'i' || right[RL-1] == 'j')) {
-            right[RL-1] = '\0';
+        if (RL > 0 && qc_has_imag_suffix(right[RL - 1])) {
+            right[RL - 1] = '\0';
+            qc_normalize_unit_imag(right);
 
-            if (strcmp(right, "+") == 0) strcpy(right, "+1");
-            if (strcmp(right, "-") == 0) strcpy(right, "-1");
-
-            qfloat_t re = qf_from_string(left);
-            qfloat_t im = qf_from_string(right);
-            if (qf_isnan(re) || qf_isnan(im))
+            if (qc_parse_real_imag_parts(left, right, &z) != 0)
                 return qc_parse_fail("invalid numbers in a±bi", s_original);
 
-            return qc_make(re, im);
+            return z;
         }
 
-        if (split > 0 && (left[split - 1] == 'i' || left[split - 1] == 'j')) {
+        if (split > 0 && qc_has_imag_suffix(left[split - 1])) {
             left[split - 1] = '\0';
+            qc_normalize_unit_imag(left);
 
-            if (strcmp(left, "") == 0)  strcpy(left, "1");
-            if (strcmp(left, "+") == 0) strcpy(left, "1");
-            if (strcmp(left, "-") == 0) strcpy(left, "-1");
-
-            qfloat_t im = qf_from_string(left);
-            qfloat_t re = qf_from_string(right);
-            if (qf_isnan(re) || qf_isnan(im))
+            if (qc_parse_real_imag_parts(right, left, &z) != 0)
                 return qc_parse_fail("invalid numbers in bi±a", s_original);
 
-            return qc_make(re, im);
+            return z;
         }
     }
 
@@ -422,20 +435,17 @@ qcomplex_t qc_from_string(const char *s)
        Pure imaginary
        ------------------------------------------------------------ */
     size_t L2 = strlen(buf);
-    if (L2 > 0 && (buf[L2-1] == 'i' || buf[L2-1] == 'j')) {
+    if (L2 > 0 && qc_has_imag_suffix(buf[L2 - 1])) {
         char tmp[256];
-        memcpy(tmp, buf, L2-1);
-        tmp[L2-1] = '\0';
+        qcomplex_t z;
 
-        if (strcmp(tmp, "") == 0)  strcpy(tmp, "1");
-        if (strcmp(tmp, "+") == 0) strcpy(tmp, "1");
-        if (strcmp(tmp, "-") == 0) strcpy(tmp, "-1");
-
-        qfloat_t im = qf_from_string(tmp);
-        if (qf_isnan(im))
+        memcpy(tmp, buf, L2 - 1);
+        tmp[L2 - 1] = '\0';
+        qc_normalize_unit_imag(tmp);
+        if (qc_parse_real_imag_parts("0", tmp, &z) != 0)
             return qc_parse_fail("invalid imaginary number", s_original);
 
-        return qc_make(qf_from_double(0.0), im);
+        return z;
     }
 
     /* ------------------------------------------------------------

@@ -12,6 +12,21 @@ static inline qcomplex_t dv_eval_unary_real(dval_t *dv, qfloat_t (*fn)(qcomplex_
     return dv_qc_real_qf(fn(dv_eval_qc_internal(dv->a)));
 }
 
+static inline qcomplex_t dv_eval_binary_qc(
+    dval_t *dv, qcomplex_t (*fn)(qcomplex_t, qcomplex_t))
+{
+    return fn(dv_eval_qc_internal(dv->a), dv_eval_qc_internal(dv->b));
+}
+
+static dval_t *dv_chain_rule_with_factor(const dval_t *dv, dval_t *factor)
+{
+    dval_t *da = dv_get_dx_internal(dv->a);
+    dval_t *out = dv_mul(factor, da);
+    dv_free(factor);
+    dv_free(da);
+    return out;
+}
+
 qcomplex_t eval_sin(dval_t *dv) { return dv_eval_unary_qc(dv, qc_sin); }
 qcomplex_t eval_cos(dval_t *dv) { return dv_eval_unary_qc(dv, qc_cos); }
 qcomplex_t eval_tan(dval_t *dv) { return dv_eval_unary_qc(dv, qc_tan); }
@@ -50,17 +65,17 @@ qcomplex_t eval_e1(dval_t *dv) { return dv_eval_unary_qc(dv, qc_e1); }
 
 qcomplex_t eval_hypot(dval_t *dv)
 {
-    return qc_hypot(dv_eval_qc_internal(dv->a), dv_eval_qc_internal(dv->b));
+    return dv_eval_binary_qc(dv, qc_hypot);
 }
 
 qcomplex_t eval_beta(dval_t *dv)
 {
-    return qc_beta(dv_eval_qc_internal(dv->a), dv_eval_qc_internal(dv->b));
+    return dv_eval_binary_qc(dv, qc_beta);
 }
 
 qcomplex_t eval_logbeta(dval_t *dv)
 {
-    return qc_logbeta(dv_eval_qc_internal(dv->a), dv_eval_qc_internal(dv->b));
+    return dv_eval_binary_qc(dv, qc_logbeta);
 }
 
 qcomplex_t eval_atan2(dval_t *dv)
@@ -72,12 +87,7 @@ qcomplex_t eval_atan2(dval_t *dv)
 
 dval_t *deriv_sin(dval_t *dv)
 {
-    dval_t *da  = dv_get_dx_internal(dv->a);
-    dval_t *ca  = dv_cos(dv->a);
-    dval_t *out = dv_mul(ca, da);
-    dv_free(ca);
-    dv_free(da);
-    return out;
+    return dv_chain_rule_with_factor(dv, dv_cos(dv->a));
 }
 
 dval_t *deriv_cos(dval_t *dv)
@@ -110,22 +120,12 @@ dval_t *deriv_tan(dval_t *dv)
 
 dval_t *deriv_sinh(dval_t *dv)
 {
-    dval_t *da   = dv_get_dx_internal(dv->a);
-    dval_t *ca   = dv_cosh(dv->a);
-    dval_t *out  = dv_mul(ca, da);
-    dv_free(ca);
-    dv_free(da);
-    return out;
+    return dv_chain_rule_with_factor(dv, dv_cosh(dv->a));
 }
 
 dval_t *deriv_cosh(dval_t *dv)
 {
-    dval_t *da   = dv_get_dx_internal(dv->a);
-    dval_t *sa   = dv_sinh(dv->a);
-    dval_t *out  = dv_mul(sa, da);
-    dv_free(sa);
-    dv_free(da);
-    return out;
+    return dv_chain_rule_with_factor(dv, dv_sinh(dv->a));
 }
 
 dval_t *deriv_tanh(dval_t *dv)
@@ -146,12 +146,7 @@ dval_t *deriv_tanh(dval_t *dv)
 
 dval_t *deriv_exp(dval_t *dv)
 {
-    dval_t *da   = dv_get_dx_internal(dv->a);
-    dval_t *ea   = dv_exp(dv->a);
-    dval_t *out  = dv_mul(ea, da);
-    dv_free(ea);
-    dv_free(da);
-    return out;
+    return dv_chain_rule_with_factor(dv, dv_exp(dv->a));
 }
 
 dval_t *deriv_log(dval_t *dv)
@@ -354,12 +349,7 @@ dval_t *deriv_erfc(dval_t *dv)
 
 dval_t *deriv_lgamma(dval_t *dv)
 {
-    dval_t *da  = dv_get_dx_internal(dv->a);
-    dval_t *dg  = dv_digamma(dv->a);
-    dval_t *out = dv_mul(dg, da);
-    dv_free(da);
-    dv_free(dg);
-    return out;
+    return dv_chain_rule_with_factor(dv, dv_digamma(dv->a));
 }
 
 dval_t *deriv_hypot(dval_t *dv)
@@ -427,11 +417,7 @@ dval_t *deriv_gamma(dval_t *dv)
 
 dval_t *deriv_digamma(dval_t *dv)
 {
-    dval_t *da  = dv_get_dx_internal(dv->a);
-    dval_t *tg  = dv_trigamma(dv->a);
-    dval_t *out = dv_mul(tg, da);
-    dv_free(da); dv_free(tg);
-    return out;
+    return dv_chain_rule_with_factor(dv, dv_trigamma(dv->a));
 }
 
 dval_t *deriv_trigamma(dval_t *dv)
@@ -481,20 +467,12 @@ dval_t *deriv_normal_pdf(dval_t *dv)
 
 dval_t *deriv_normal_cdf(dval_t *dv)
 {
-    dval_t *da  = dv_get_dx_internal(dv->a);
-    dval_t *phi = dv_normal_pdf(dv->a);
-    dval_t *out = dv_mul(phi, da);
-    dv_free(da); dv_free(phi);
-    return out;
+    return dv_chain_rule_with_factor(dv, dv_normal_pdf(dv->a));
 }
 
 dval_t *deriv_normal_logpdf(dval_t *dv)
 {
-    dval_t *da    = dv_get_dx_internal(dv->a);
-    dval_t *neg_a = dv_neg(dv->a);
-    dval_t *out   = dv_mul(neg_a, da);
-    dv_free(da); dv_free(neg_a);
-    return out;
+    return dv_chain_rule_with_factor(dv, dv_neg(dv->a));
 }
 
 dval_t *deriv_ei(dval_t *dv)

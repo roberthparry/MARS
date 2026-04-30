@@ -195,23 +195,41 @@ bool dv_match_exp_affine(const dval_t *expr,
     return dv_match_unary_affine(expr, DV_KIND_EXP, nvars, vars, constant_out, coeffs_out);
 }
 
-#define DV_DEFINE_MATCH_UNARY_AFFINE(fn_name, op_sym)                         \
-bool fn_name(const dval_t *expr,                                             \
-             size_t nvars,                                                   \
-             dval_t *const *vars,                                            \
-             qfloat_t *constant_out,                                         \
-             qfloat_t *coeffs_out)                                           \
-{                                                                            \
-    return dv_match_unary_affine(expr, DV_KIND_##op_sym, nvars, vars,       \
-                                 constant_out, coeffs_out);                 \
+bool dv_match_sinh_affine(const dval_t *expr,
+                          size_t nvars,
+                          dval_t *const *vars,
+                          qfloat_t *constant_out,
+                          qfloat_t *coeffs_out)
+{
+    return dv_match_unary_affine(expr, DV_KIND_SINH, nvars, vars, constant_out, coeffs_out);
 }
 
-DV_DEFINE_MATCH_UNARY_AFFINE(dv_match_sinh_affine, SINH)
-DV_DEFINE_MATCH_UNARY_AFFINE(dv_match_cosh_affine, COSH)
-DV_DEFINE_MATCH_UNARY_AFFINE(dv_match_sin_affine, SIN)
-DV_DEFINE_MATCH_UNARY_AFFINE(dv_match_cos_affine, COS)
+bool dv_match_cosh_affine(const dval_t *expr,
+                          size_t nvars,
+                          dval_t *const *vars,
+                          qfloat_t *constant_out,
+                          qfloat_t *coeffs_out)
+{
+    return dv_match_unary_affine(expr, DV_KIND_COSH, nvars, vars, constant_out, coeffs_out);
+}
 
-#undef DV_DEFINE_MATCH_UNARY_AFFINE
+bool dv_match_sin_affine(const dval_t *expr,
+                         size_t nvars,
+                         dval_t *const *vars,
+                         qfloat_t *constant_out,
+                         qfloat_t *coeffs_out)
+{
+    return dv_match_unary_affine(expr, DV_KIND_SIN, nvars, vars, constant_out, coeffs_out);
+}
+
+bool dv_match_cos_affine(const dval_t *expr,
+                         size_t nvars,
+                         dval_t *const *vars,
+                         qfloat_t *constant_out,
+                         qfloat_t *coeffs_out)
+{
+    return dv_match_unary_affine(expr, DV_KIND_COS, nvars, vars, constant_out, coeffs_out);
+}
 
 bool dv_match_const_value(const dval_t *expr, qfloat_t *value_out)
 {

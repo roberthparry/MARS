@@ -20,6 +20,17 @@ typedef struct mat_fun_cache_entry {
 
 static mat_fun_cache_entry_t *mat_fun_cache_head = NULL;
 
+static matrix_t *mat_fun_apply(const matrix_t *A,
+                               void (*qcomplex_f)(void *out, const void *a),
+                               void (*dval_f)(void *out, const void *a));
+
+static matrix_t *mat_apply_unary(const matrix_t *A,
+                                 void (*qcomplex_f)(void *out, const void *a),
+                                 void (*dval_f)(void *out, const void *a))
+{
+    return mat_fun_apply(A, qcomplex_f, dval_elem.fun ? dval_f : NULL);
+}
+
 static int mat_elem_supports_numeric_algorithms(const matrix_t *A)
 {
     return A && A->elem && A->elem->kind != ELEM_DVAL;
@@ -689,12 +700,12 @@ matrix_t *mat_exp(const matrix_t *A)
         if (cache && cache->exp_preimage)
             return mat_copy_preserving_store(cache->exp_preimage);
     }
-    return mat_fun_apply(A, qcomplex_elem.fun->exp, dval_elem.fun ? dval_elem.fun->exp : NULL);
+    return mat_apply_unary(A, qcomplex_elem.fun->exp, dval_elem.fun->exp);
 }
 
 matrix_t *mat_log(const matrix_t *A)
 {
-    matrix_t *R = mat_fun_apply(A, qcomplex_elem.fun->log, dval_elem.fun ? dval_elem.fun->log : NULL);
+    matrix_t *R = mat_apply_unary(A, qcomplex_elem.fun->log, dval_elem.fun->log);
     if (R)
         mat_set_exp_preimage_cache(R, A);
     return R;
@@ -702,157 +713,157 @@ matrix_t *mat_log(const matrix_t *A)
 
 matrix_t *mat_sin(const matrix_t *A)
 {
-    return mat_fun_apply(A, qcomplex_elem.fun->sin, dval_elem.fun ? dval_elem.fun->sin : NULL);
+    return mat_apply_unary(A, qcomplex_elem.fun->sin, dval_elem.fun->sin);
 }
 
 matrix_t *mat_cos(const matrix_t *A)
 {
-    return mat_fun_apply(A, qcomplex_elem.fun->cos, dval_elem.fun ? dval_elem.fun->cos : NULL);
+    return mat_apply_unary(A, qcomplex_elem.fun->cos, dval_elem.fun->cos);
 }
 
 matrix_t *mat_tan(const matrix_t *A)
 {
-    return mat_fun_apply(A, qcomplex_elem.fun->tan, dval_elem.fun ? dval_elem.fun->tan : NULL);
+    return mat_apply_unary(A, qcomplex_elem.fun->tan, dval_elem.fun->tan);
 }
 
 matrix_t *mat_sinh(const matrix_t *A)
 {
-    return mat_fun_apply(A, qcomplex_elem.fun->sinh, dval_elem.fun ? dval_elem.fun->sinh : NULL);
+    return mat_apply_unary(A, qcomplex_elem.fun->sinh, dval_elem.fun->sinh);
 }
 
 matrix_t *mat_cosh(const matrix_t *A)
 {
-    return mat_fun_apply(A, qcomplex_elem.fun->cosh, dval_elem.fun ? dval_elem.fun->cosh : NULL);
+    return mat_apply_unary(A, qcomplex_elem.fun->cosh, dval_elem.fun->cosh);
 }
 
 matrix_t *mat_tanh(const matrix_t *A)
 {
-    return mat_fun_apply(A, qcomplex_elem.fun->tanh, dval_elem.fun ? dval_elem.fun->tanh : NULL);
+    return mat_apply_unary(A, qcomplex_elem.fun->tanh, dval_elem.fun->tanh);
 }
 
 matrix_t *mat_sqrt(const matrix_t *A)
 {
-    return mat_fun_apply(A, qcomplex_elem.fun->sqrt, dval_elem.fun ? dval_elem.fun->sqrt : NULL);
+    return mat_apply_unary(A, qcomplex_elem.fun->sqrt, dval_elem.fun->sqrt);
 }
 
 matrix_t *mat_asin(const matrix_t *A)
 {
-    return mat_fun_apply(A, qcomplex_elem.fun->asin, dval_elem.fun ? dval_elem.fun->asin : NULL);
+    return mat_apply_unary(A, qcomplex_elem.fun->asin, dval_elem.fun->asin);
 }
 
 matrix_t *mat_acos(const matrix_t *A)
 {
-    return mat_fun_apply(A, qcomplex_elem.fun->acos, dval_elem.fun ? dval_elem.fun->acos : NULL);
+    return mat_apply_unary(A, qcomplex_elem.fun->acos, dval_elem.fun->acos);
 }
 
 matrix_t *mat_atan(const matrix_t *A)
 {
-    return mat_fun_apply(A, qcomplex_elem.fun->atan, dval_elem.fun ? dval_elem.fun->atan : NULL);
+    return mat_apply_unary(A, qcomplex_elem.fun->atan, dval_elem.fun->atan);
 }
 
 matrix_t *mat_asinh(const matrix_t *A)
 {
-    return mat_fun_apply(A, qcomplex_elem.fun->asinh, dval_elem.fun ? dval_elem.fun->asinh : NULL);
+    return mat_apply_unary(A, qcomplex_elem.fun->asinh, dval_elem.fun->asinh);
 }
 
 matrix_t *mat_acosh(const matrix_t *A)
 {
-    return mat_fun_apply(A, qcomplex_elem.fun->acosh, dval_elem.fun ? dval_elem.fun->acosh : NULL);
+    return mat_apply_unary(A, qcomplex_elem.fun->acosh, dval_elem.fun->acosh);
 }
 
 matrix_t *mat_atanh(const matrix_t *A)
 {
-    return mat_fun_apply(A, qcomplex_elem.fun->atanh, dval_elem.fun ? dval_elem.fun->atanh : NULL);
+    return mat_apply_unary(A, qcomplex_elem.fun->atanh, dval_elem.fun->atanh);
 }
 
 matrix_t *mat_erf(const matrix_t *A)
 {
-    return mat_fun_apply(A, qcomplex_elem.fun->erf, dval_elem.fun ? dval_elem.fun->erf : NULL);
+    return mat_apply_unary(A, qcomplex_elem.fun->erf, dval_elem.fun->erf);
 }
 
 matrix_t *mat_erfc(const matrix_t *A)
 {
-    return mat_fun_apply(A, qcomplex_elem.fun->erfc, dval_elem.fun ? dval_elem.fun->erfc : NULL);
+    return mat_apply_unary(A, qcomplex_elem.fun->erfc, dval_elem.fun->erfc);
 }
 
 matrix_t *mat_erfinv(const matrix_t *A)
 {
-    return mat_fun_apply(A, qcomplex_elem.fun->erfinv, dval_elem.fun ? dval_elem.fun->erfinv : NULL);
+    return mat_apply_unary(A, qcomplex_elem.fun->erfinv, dval_elem.fun->erfinv);
 }
 
 matrix_t *mat_erfcinv(const matrix_t *A)
 {
-    return mat_fun_apply(A, qcomplex_elem.fun->erfcinv, dval_elem.fun ? dval_elem.fun->erfcinv : NULL);
+    return mat_apply_unary(A, qcomplex_elem.fun->erfcinv, dval_elem.fun->erfcinv);
 }
 
 matrix_t *mat_gamma(const matrix_t *A)
 {
-    return mat_fun_apply(A, qcomplex_elem.fun->gamma, dval_elem.fun ? dval_elem.fun->gamma : NULL);
+    return mat_apply_unary(A, qcomplex_elem.fun->gamma, dval_elem.fun->gamma);
 }
 
 matrix_t *mat_lgamma(const matrix_t *A)
 {
-    return mat_fun_apply(A, qcomplex_elem.fun->lgamma, dval_elem.fun ? dval_elem.fun->lgamma : NULL);
+    return mat_apply_unary(A, qcomplex_elem.fun->lgamma, dval_elem.fun->lgamma);
 }
 
 matrix_t *mat_digamma(const matrix_t *A)
 {
-    return mat_fun_apply(A, qcomplex_elem.fun->digamma, dval_elem.fun ? dval_elem.fun->digamma : NULL);
+    return mat_apply_unary(A, qcomplex_elem.fun->digamma, dval_elem.fun->digamma);
 }
 
 matrix_t *mat_trigamma(const matrix_t *A)
 {
-    return mat_fun_apply(A, qcomplex_elem.fun->trigamma, dval_elem.fun ? dval_elem.fun->trigamma : NULL);
+    return mat_apply_unary(A, qcomplex_elem.fun->trigamma, dval_elem.fun->trigamma);
 }
 
 matrix_t *mat_tetragamma(const matrix_t *A)
 {
-    return mat_fun_apply(A, qcomplex_elem.fun->tetragamma, dval_elem.fun ? dval_elem.fun->tetragamma : NULL);
+    return mat_apply_unary(A, qcomplex_elem.fun->tetragamma, dval_elem.fun->tetragamma);
 }
 
 matrix_t *mat_gammainv(const matrix_t *A)
 {
-    return mat_fun_apply(A, qcomplex_elem.fun->gammainv, dval_elem.fun ? dval_elem.fun->gammainv : NULL);
+    return mat_apply_unary(A, qcomplex_elem.fun->gammainv, dval_elem.fun->gammainv);
 }
 
 matrix_t *mat_normal_pdf(const matrix_t *A)
 {
-    return mat_fun_apply(A, qcomplex_elem.fun->normal_pdf, dval_elem.fun ? dval_elem.fun->normal_pdf : NULL);
+    return mat_apply_unary(A, qcomplex_elem.fun->normal_pdf, dval_elem.fun->normal_pdf);
 }
 
 matrix_t *mat_normal_cdf(const matrix_t *A)
 {
-    return mat_fun_apply(A, qcomplex_elem.fun->normal_cdf, dval_elem.fun ? dval_elem.fun->normal_cdf : NULL);
+    return mat_apply_unary(A, qcomplex_elem.fun->normal_cdf, dval_elem.fun->normal_cdf);
 }
 
 matrix_t *mat_normal_logpdf(const matrix_t *A)
 {
-    return mat_fun_apply(A, qcomplex_elem.fun->normal_logpdf, dval_elem.fun ? dval_elem.fun->normal_logpdf : NULL);
+    return mat_apply_unary(A, qcomplex_elem.fun->normal_logpdf, dval_elem.fun->normal_logpdf);
 }
 
 matrix_t *mat_lambert_w0(const matrix_t *A)
 {
-    return mat_fun_apply(A, qcomplex_elem.fun->lambert_w0, dval_elem.fun ? dval_elem.fun->lambert_w0 : NULL);
+    return mat_apply_unary(A, qcomplex_elem.fun->lambert_w0, dval_elem.fun->lambert_w0);
 }
 
 matrix_t *mat_lambert_wm1(const matrix_t *A)
 {
-    return mat_fun_apply(A, qcomplex_elem.fun->lambert_wm1, dval_elem.fun ? dval_elem.fun->lambert_wm1 : NULL);
+    return mat_apply_unary(A, qcomplex_elem.fun->lambert_wm1, dval_elem.fun->lambert_wm1);
 }
 
 matrix_t *mat_productlog(const matrix_t *A)
 {
-    return mat_fun_apply(A, qcomplex_elem.fun->productlog, dval_elem.fun ? dval_elem.fun->productlog : NULL);
+    return mat_apply_unary(A, qcomplex_elem.fun->productlog, dval_elem.fun->productlog);
 }
 
 matrix_t *mat_ei(const matrix_t *A)
 {
-    return mat_fun_apply(A, qcomplex_elem.fun->ei, dval_elem.fun ? dval_elem.fun->ei : NULL);
+    return mat_apply_unary(A, qcomplex_elem.fun->ei, dval_elem.fun->ei);
 }
 
 matrix_t *mat_e1(const matrix_t *A)
 {
-    return mat_fun_apply(A, qcomplex_elem.fun->e1, dval_elem.fun ? dval_elem.fun->e1 : NULL);
+    return mat_apply_unary(A, qcomplex_elem.fun->e1, dval_elem.fun->e1);
 }
 
 /* ============================================================

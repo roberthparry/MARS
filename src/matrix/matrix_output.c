@@ -24,6 +24,72 @@ static int mo_put_str(char **dst, size_t *remaining, size_t *count, const char *
     return 0;
 }
 
+static mat_string_style_t mo_matrix_style(int scientific, int layout)
+{
+    if (scientific)
+        return layout ? MAT_STRING_LAYOUT_SCIENTIFIC : MAT_STRING_INLINE_SCIENTIFIC;
+    return layout ? MAT_STRING_LAYOUT_PRETTY : MAT_STRING_INLINE_PRETTY;
+}
+
+static int mo_emit_matrix(char **dst,
+                          size_t *remaining,
+                          size_t *count,
+                          va_list *ap,
+                          const char **fmtp)
+{
+    int scientific = (**fmtp == 'M');
+    int layout = 0;
+    const matrix_t *A;
+    char *s;
+
+    (*fmtp)++;
+    if (**fmtp == 'L' || **fmtp == 'l') {
+        layout = 1;
+        (*fmtp)++;
+    }
+
+    A = va_arg(*ap, const matrix_t *);
+    s = mat_to_string(A, mo_matrix_style(scientific, layout));
+    if (!s)
+        return -1;
+
+    mo_put_str(dst, remaining, count, s);
+    free(s);
+    return 0;
+}
+
+static int mo_format_scalar(char *tmp, size_t tmp_size, char spec, va_list *ap)
+{
+    char fmtbuf[8];
+
+    snprintf(fmtbuf, sizeof(fmtbuf), "%%%c", spec);
+
+    switch (spec) {
+    case 'd':
+        return snprintf(tmp, tmp_size, fmtbuf, va_arg(*ap, int));
+    case 'u':
+        return snprintf(tmp, tmp_size, fmtbuf, va_arg(*ap, unsigned));
+    case 'g':
+    case 'f':
+    case 'e':
+    case 'E':
+        return snprintf(tmp, tmp_size, fmtbuf, va_arg(*ap, double));
+    case 'c':
+        return snprintf(tmp, tmp_size, fmtbuf, va_arg(*ap, int));
+    case 's': {
+        const char *v = va_arg(*ap, const char *);
+        return snprintf(tmp, tmp_size, fmtbuf, v ? v : "(null)");
+    }
+    case 'p':
+        return snprintf(tmp, tmp_size, fmtbuf, va_arg(*ap, void *));
+    default:
+        tmp[0] = '%';
+        tmp[1] = spec;
+        tmp[2] = '\0';
+        return 2;
+    }
+}
+
 static int mo_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap)
 {
     const char *p = fmt;
@@ -49,81 +115,17 @@ static int mo_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap)
         }
 
         if (*p == 'M' || *p == 'm') {
-            int scientific = (*p == 'M');
-            int layout = 0;
-            const matrix_t *A;
-            char *s;
-
-            p++;
-            if (*p == 'L' || *p == 'l') {
-                layout = 1;
-                p++;
-            }
-
-            A = va_arg(ap_local, const matrix_t *);
-            s = mat_to_string(A, scientific
-                                 ? (layout ? MAT_STRING_LAYOUT_SCIENTIFIC
-                                           : MAT_STRING_INLINE_SCIENTIFIC)
-                                 : (layout ? MAT_STRING_LAYOUT_PRETTY
-                                           : MAT_STRING_INLINE_PRETTY));
-            if (!s) {
+            if (mo_emit_matrix(&dst, &remaining, &count, &ap_local, &p) != 0) {
                 va_end(ap_local);
                 return -1;
             }
-            mo_put_str(&dst, &remaining, &count, s);
-            free(s);
             continue;
         }
 
         {
             char spec = *p++;
-            char fmtbuf[8];
             char tmp[512];
-            int wrote;
-
-            snprintf(fmtbuf, sizeof(fmtbuf), "%%%c", spec);
-
-            switch (spec) {
-            case 'd': {
-                int v = va_arg(ap_local, int);
-                wrote = snprintf(tmp, sizeof(tmp), fmtbuf, v);
-                break;
-            }
-            case 'u': {
-                unsigned v = va_arg(ap_local, unsigned);
-                wrote = snprintf(tmp, sizeof(tmp), fmtbuf, v);
-                break;
-            }
-            case 'g':
-            case 'f':
-            case 'e':
-            case 'E': {
-                double v = va_arg(ap_local, double);
-                wrote = snprintf(tmp, sizeof(tmp), fmtbuf, v);
-                break;
-            }
-            case 'c': {
-                int v = va_arg(ap_local, int);
-                wrote = snprintf(tmp, sizeof(tmp), fmtbuf, v);
-                break;
-            }
-            case 's': {
-                const char *v = va_arg(ap_local, const char *);
-                wrote = snprintf(tmp, sizeof(tmp), fmtbuf, v ? v : "(null)");
-                break;
-            }
-            case 'p': {
-                void *v = va_arg(ap_local, void *);
-                wrote = snprintf(tmp, sizeof(tmp), fmtbuf, v);
-                break;
-            }
-            default:
-                tmp[0] = '%';
-                tmp[1] = spec;
-                tmp[2] = '\0';
-                wrote = 2;
-                break;
-            }
+            int wrote = mo_format_scalar(tmp, sizeof(tmp), spec, &ap_local);
 
             if (wrote < 0) {
                 va_end(ap_local);

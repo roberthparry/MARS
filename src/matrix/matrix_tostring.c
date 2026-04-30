@@ -11,6 +11,11 @@ typedef struct {
     size_t cap;
 } mat_buf_t;
 
+typedef struct {
+    char *name;
+    char *value;
+} mt_binding_token_t;
+
 static int mb_reserve(mat_buf_t *b, size_t extra)
 {
     if (b->len + extra + 1 <= b->cap)
@@ -128,6 +133,16 @@ static char *mt_dup_trimmed_token(const char *start, size_t len)
     return out;
 }
 
+static void mt_free_binding_token(mt_binding_token_t *token)
+{
+    if (!token)
+        return;
+    free(token->name);
+    free(token->value);
+    token->name = NULL;
+    token->value = NULL;
+}
+
 static int mt_binding_contains(char **bindings, size_t nb, const char *token)
 {
     for (size_t i = 0; i < nb; ++i) {
@@ -243,45 +258,22 @@ static char *mt_join_binding_list(char **bindings, size_t nbindings)
     return out;
 }
 
-static int mt_split_binding_token(const char *binding, char **name_out, char **value_out)
+static int mt_parse_binding_token(const char *binding, mt_binding_token_t *out)
 {
     const char *eq = strstr(binding, "=");
-    char *name;
-    char *value;
 
-    *name_out = NULL;
-    *value_out = NULL;
+    out->name = NULL;
+    out->value = NULL;
     if (!eq)
         return -1;
 
-    name = strndup(binding, (size_t)(eq - binding));
-    value = strdup(eq + 1);
-    if (!name || !value) {
-        free(name);
-        free(value);
+    out->name = mt_dup_trimmed_token(binding, (size_t)(eq - binding));
+    out->value = mt_dup_trimmed_token(eq + 1, strlen(eq + 1));
+    if (!out->name || !out->value) {
+        mt_free_binding_token(out);
         return -1;
     }
 
-    while (*name == ' ' || *name == '\t')
-        memmove(name, name + 1, strlen(name));
-    while (*value == ' ' || *value == '\t')
-        memmove(value, value + 1, strlen(value));
-
-    for (size_t len = strlen(name); len > 0; --len) {
-        if (name[len - 1] == ' ' || name[len - 1] == '\t')
-            name[len - 1] = '\0';
-        else
-            break;
-    }
-    for (size_t len = strlen(value); len > 0; --len) {
-        if (value[len - 1] == ' ' || value[len - 1] == '\t')
-            value[len - 1] = '\0';
-        else
-            break;
-    }
-
-    *name_out = name;
-    *value_out = value;
     return 0;
 }
 
@@ -300,31 +292,27 @@ static int mt_all_bindings_are_nan(char **var_bindings,
                                    size_t nconst_bindings)
 {
     for (size_t i = 0; i < nvar_bindings; ++i) {
-        char *name = NULL;
-        char *value = NULL;
+        mt_binding_token_t token = {0};
 
-        if (mt_split_binding_token(var_bindings[i], &name, &value) != 0)
+        if (mt_parse_binding_token(var_bindings[i], &token) != 0)
             return 0;
-        free(name);
-        if (!strstr(value, "NAN") && !strstr(value, "nan")) {
-            free(value);
+        if (!strstr(token.value, "NAN") && !strstr(token.value, "nan")) {
+            mt_free_binding_token(&token);
             return 0;
         }
-        free(value);
+        mt_free_binding_token(&token);
     }
 
     for (size_t i = 0; i < nconst_bindings; ++i) {
-        char *name = NULL;
-        char *value = NULL;
+        mt_binding_token_t token = {0};
 
-        if (mt_split_binding_token(const_bindings[i], &name, &value) != 0)
+        if (mt_parse_binding_token(const_bindings[i], &token) != 0)
             return 0;
-        free(name);
-        if (!strstr(value, "NAN") && !strstr(value, "nan")) {
-            free(value);
+        if (!strstr(token.value, "NAN") && !strstr(token.value, "nan")) {
+            mt_free_binding_token(&token);
             return 0;
         }
-        free(value);
+        mt_free_binding_token(&token);
     }
 
     return (nvar_bindings + nconst_bindings) > 0;
@@ -347,25 +335,23 @@ static char *mt_join_bindings(char **var_bindings,
     if (nconst_bindings > 0) {
         if (scientific) {
             for (size_t i = 0; i < nconst_bindings; ++i) {
-                char *name = NULL;
-                char *value = NULL;
+                mt_binding_token_t token = {0};
                 char value_buf[256];
                 qcomplex_t z;
 
-                if (mt_split_binding_token(const_bindings[i], &name, &value) != 0)
+                if (mt_parse_binding_token(const_bindings[i], &token) != 0)
                     continue;
-                z = qc_from_string(value);
+                z = qc_from_string(token.value);
                 if (qc_isnan(z))
-                    snprintf(value_buf, sizeof(value_buf), "%s", value);
+                    snprintf(value_buf, sizeof(value_buf), "%s", token.value);
                 else
                     qc_sprintf(value_buf, sizeof(value_buf), "%Z", z);
                 if (i > 0)
                     mb_puts(&b, ", ");
-                mb_puts(&b, name);
+                mb_puts(&b, token.name);
                 mb_puts(&b, " = ");
                 mb_puts(&b, value_buf);
-                free(name);
-                free(value);
+                mt_free_binding_token(&token);
             }
             consts = mb_take(&b);
         } else if (!mt_has_long_binding(const_bindings, nconst_bindings, 16) && nvar_bindings == 0) {
@@ -410,6 +396,44 @@ static char *mt_join_bindings(char **var_bindings,
     free(vars);
     free(consts);
     return out;
+}
+
+static void mt_emit_cells(mat_buf_t *out,
+                          char **cells,
+                          size_t rows,
+                          size_t cols,
+                          const size_t *widths,
+                          int layout)
+{
+    if (!layout)
+        mb_putc(out, '(');
+
+    for (size_t i = 0; i < rows; ++i) {
+        if (layout)
+            mb_puts(out, (i == 0) ? "(\n  " : "\n  ");
+
+        for (size_t j = 0; j < cols; ++j) {
+            size_t idx = i * cols + j;
+
+            if (j > 0)
+                mb_puts(out, layout ? " " : ", ");
+            if (layout) {
+                for (size_t pad = strlen(cells[idx]); pad < widths[j]; ++pad)
+                    mb_putc(out, ' ');
+            }
+            mb_puts(out, cells[idx] ? cells[idx] : "");
+        }
+
+        if (layout) {
+            if (i + 1 == rows)
+                mb_puts(out, "\n)");
+        } else if (i + 1 < rows) {
+            mb_puts(out, "; ");
+        }
+    }
+
+    if (!layout)
+        mb_putc(out, ')');
 }
 
 static int mt_split_dval_repr(const dval_t *dv, char **expr_out, char **bindings_out)
@@ -465,25 +489,22 @@ static void mt_pretty_dval_expr(char **expr_io,
 
     expr = *expr_io;
     for (size_t i = 0; i < nconst_bindings; ++i) {
-        char *name = NULL;
-        char *value = NULL;
+        mt_binding_token_t token = {0};
 
-        if (mt_split_binding_token(const_bindings[i], &name, &value) != 0)
+        if (mt_parse_binding_token(const_bindings[i], &token) != 0)
             continue;
 
-        if (strlen(const_bindings[i]) > 16 && strcmp(expr, value) == 0) {
-            char *replacement = strdup(name);
+        if (strlen(const_bindings[i]) > 16 && strcmp(expr, token.value) == 0) {
+            char *replacement = strdup(token.name);
             if (replacement) {
                 free(*expr_io);
                 *expr_io = replacement;
             }
-            free(name);
-            free(value);
+            mt_free_binding_token(&token);
             return;
         }
 
-        free(name);
-        free(value);
+        mt_free_binding_token(&token);
     }
 }
 
@@ -566,39 +587,7 @@ static char *mat_to_string_numeric(const matrix_t *A, mat_string_style_t style)
         goto cleanup;
     }
 
-    if (!layout)
-        mb_puts(&out, "(");
-
-    for (size_t i = 0; i < A->rows; ++i) {
-        if (layout) {
-            if (i == 0)
-                mb_puts(&out, "(\n  ");
-            else
-                mb_puts(&out, "\n  ");
-        }
-
-        for (size_t j = 0; j < A->cols; ++j) {
-            size_t idx = i * A->cols + j;
-            if (j > 0)
-                mb_puts(&out, layout ? " " : ", ");
-            if (layout) {
-                for (size_t pad = strlen(cells[idx]); pad < widths[j]; ++pad)
-                    mb_putc(&out, ' ');
-            }
-            mb_puts(&out, cells[idx]);
-        }
-
-        if (layout) {
-            if (i + 1 == A->rows)
-                mb_puts(&out, "\n)");
-        } else {
-            if (i + 1 < A->rows)
-                mb_puts(&out, "; ");
-        }
-    }
-
-    if (!layout)
-        mb_putc(&out, ')');
+    mt_emit_cells(&out, cells, A->rows, A->cols, widths, layout);
 
 cleanup:
     if (cells) {
@@ -664,18 +653,7 @@ static char *mat_to_string_dval(const matrix_t *A, mat_string_style_t style)
                                         scientific);
         if (!omit_wrapper)
             mb_puts(&out, "{ ");
-        mb_puts(&out, "(");
-        for (size_t i = 0; i < A->rows; ++i) {
-            for (size_t j = 0; j < A->cols; ++j) {
-                size_t idx = i * A->cols + j;
-                if (j > 0)
-                    mb_puts(&out, ", ");
-                mb_puts(&out, exprs[idx] ? exprs[idx] : "");
-            }
-            if (i + 1 < A->rows)
-                mb_puts(&out, "; ");
-        }
-        mb_puts(&out, ")");
+        mt_emit_cells(&out, exprs, A->rows, A->cols, widths, 0);
         if (!omit_wrapper && joined && *joined) {
             mb_puts(&out, " | ");
             mb_puts(&out, joined);
@@ -691,20 +669,7 @@ static char *mat_to_string_dval(const matrix_t *A, mat_string_style_t style)
                                         scientific);
         if (!omit_wrapper)
             mb_puts(&out, "{ ");
-        mb_puts(&out, "(\n");
-        for (size_t i = 0; i < A->rows; ++i) {
-            mb_puts(&out, "  ");
-            for (size_t j = 0; j < A->cols; ++j) {
-                size_t idx = i * A->cols + j;
-                if (j > 0)
-                    mb_putc(&out, ' ');
-                for (size_t pad = strlen(exprs[idx]); pad < widths[j]; ++pad)
-                    mb_putc(&out, ' ');
-                mb_puts(&out, exprs[idx] ? exprs[idx] : "");
-            }
-            mb_putc(&out, '\n');
-        }
-        mb_puts(&out, ")");
+        mt_emit_cells(&out, exprs, A->rows, A->cols, widths, 1);
         if (!omit_wrapper && joined && *joined) {
             mb_puts(&out, " | ");
             mb_puts(&out, joined);
