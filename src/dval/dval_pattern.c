@@ -1,5 +1,6 @@
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdlib.h>
 
 #include "qcomplex.h"
 #include "dval_internal.h"
@@ -161,19 +162,46 @@ static bool dv_match_affine_term(const dval_t *dv,
     return false;
 }
 
-static bool dv_match_unary_affine(const dval_t *expr,
-                                  dval_op_kind_t kind,
-                                  size_t nvars,
-                                  dval_t *const *vars,
-                                  qfloat_t *constant_out,
-                                  qfloat_t *coeffs_out)
+static bool dv_pattern_unary_kind_to_op(dv_pattern_unary_affine_kind_t kind,
+                                        dval_op_kind_t *op_kind_out)
+{
+    if (!op_kind_out)
+        return false;
+
+    switch (kind) {
+    case DV_PATTERN_UNARY_EXP:
+        *op_kind_out = DV_KIND_EXP;
+        return true;
+    case DV_PATTERN_UNARY_SIN:
+        *op_kind_out = DV_KIND_SIN;
+        return true;
+    case DV_PATTERN_UNARY_COS:
+        *op_kind_out = DV_KIND_COS;
+        return true;
+    case DV_PATTERN_UNARY_SINH:
+        *op_kind_out = DV_KIND_SINH;
+        return true;
+    case DV_PATTERN_UNARY_COSH:
+        *op_kind_out = DV_KIND_COSH;
+        return true;
+    default:
+        return false;
+    }
+}
+
+static bool dv_match_unary_affine_op(const dval_t *expr,
+                                     dval_op_kind_t op_kind,
+                                     size_t nvars,
+                                     dval_t *const *vars,
+                                     qfloat_t *constant_out,
+                                     qfloat_t *coeffs_out)
 {
     qfloat_t constant = QF_ZERO;
 
     if (!expr || !constant_out || !coeffs_out || (nvars > 0 && !vars))
         return false;
 
-    if (!is_kind(expr, kind) || !expr->a)
+    if (!is_kind(expr, op_kind) || !expr->a)
         return false;
 
     for (size_t i = 0; i < nvars; ++i)
@@ -186,49 +214,443 @@ static bool dv_match_unary_affine(const dval_t *expr,
     return true;
 }
 
-bool dv_match_exp_affine(const dval_t *expr,
-                         size_t nvars,
-                         dval_t *const *vars,
-                         qfloat_t *constant_out,
-                         qfloat_t *coeffs_out)
+bool dv_match_unary_affine_kind(const dval_t *expr,
+                                dv_pattern_unary_affine_kind_t kind,
+                                size_t nvars,
+                                dval_t *const *vars,
+                                qfloat_t *constant_out,
+                                qfloat_t *coeffs_out)
 {
-    return dv_match_unary_affine(expr, DV_KIND_EXP, nvars, vars, constant_out, coeffs_out);
+    dval_op_kind_t op_kind;
+
+    if (!dv_pattern_unary_kind_to_op(kind, &op_kind))
+        return false;
+
+    return dv_match_unary_affine_op(expr, op_kind, nvars, vars, constant_out, coeffs_out);
 }
 
-bool dv_match_sinh_affine(const dval_t *expr,
-                          size_t nvars,
-                          dval_t *const *vars,
-                          qfloat_t *constant_out,
-                          qfloat_t *coeffs_out)
+static bool dv_match_affine_power_exact(const dval_t *expr,
+                                        size_t nvars,
+                                        dval_t *const *vars,
+                                        size_t degree,
+                                        qfloat_t *constant_out,
+                                        qfloat_t *coeffs_out)
 {
-    return dv_match_unary_affine(expr, DV_KIND_SINH, nvars, vars, constant_out, coeffs_out);
+    const dval_t *arg = NULL;
+    const dval_t *left = NULL;
+    const dval_t *right = NULL;
+    const dval_t *inner_left = NULL;
+    const dval_t *inner_right = NULL;
+    const dval_t *ll = NULL;
+    const dval_t *lr = NULL;
+    const dval_t *rl = NULL;
+    const dval_t *rr = NULL;
+    qfloat_t constant = QF_ZERO;
+
+    if (!expr || !constant_out || !coeffs_out || (nvars > 0 && !vars))
+        return false;
+
+    if (dv_match_unary_kind(expr, DV_KIND_POW_D, &arg) &&
+        qf_eq(expr->c.re, qf_from_double((double) degree))) {
+        for (size_t i = 0; i < nvars; ++i)
+            coeffs_out[i] = QF_ZERO;
+        if (!dv_match_affine_term(arg, nvars, vars, QF_ONE, &constant, coeffs_out))
+            return false;
+        *constant_out = constant;
+        return true;
+    }
+
+    switch (degree) {
+    case 2:
+        if (dv_match_binary_kind(expr, DV_KIND_MUL, &left, &right) &&
+            dv_struct_eq(left, right)) {
+            for (size_t i = 0; i < nvars; ++i)
+                coeffs_out[i] = QF_ZERO;
+            if (!dv_match_affine_term(left, nvars, vars, QF_ONE, &constant, coeffs_out))
+                return false;
+            *constant_out = constant;
+            return true;
+        }
+        break;
+    case 3:
+        if (dv_match_binary_kind(expr, DV_KIND_MUL, &left, &right) &&
+            dv_match_binary_kind(left, DV_KIND_MUL, &inner_left, &inner_right) &&
+            dv_struct_eq(inner_left, inner_right) &&
+            dv_struct_eq(inner_left, right)) {
+            for (size_t i = 0; i < nvars; ++i)
+                coeffs_out[i] = QF_ZERO;
+            if (!dv_match_affine_term(inner_left, nvars, vars, QF_ONE, &constant, coeffs_out))
+                return false;
+            *constant_out = constant;
+            return true;
+        }
+
+        if (dv_match_binary_kind(expr, DV_KIND_MUL, &left, &right) &&
+            dv_match_binary_kind(right, DV_KIND_MUL, &inner_left, &inner_right) &&
+            dv_struct_eq(left, inner_left) &&
+            dv_struct_eq(left, inner_right)) {
+            for (size_t i = 0; i < nvars; ++i)
+                coeffs_out[i] = QF_ZERO;
+            if (!dv_match_affine_term(left, nvars, vars, QF_ONE, &constant, coeffs_out))
+                return false;
+            *constant_out = constant;
+            return true;
+        }
+        break;
+    case 4:
+        if (dv_match_binary_kind(expr, DV_KIND_MUL, &left, &right) &&
+            dv_match_binary_kind(left, DV_KIND_MUL, &ll, &lr) &&
+            dv_match_binary_kind(right, DV_KIND_MUL, &rl, &rr) &&
+            dv_struct_eq(ll, lr) &&
+            dv_struct_eq(ll, rl) &&
+            dv_struct_eq(ll, rr)) {
+            for (size_t i = 0; i < nvars; ++i)
+                coeffs_out[i] = QF_ZERO;
+            if (!dv_match_affine_term(ll, nvars, vars, QF_ONE, &constant, coeffs_out))
+                return false;
+            *constant_out = constant;
+            return true;
+        }
+        break;
+    default:
+        break;
+    }
+
+    return false;
 }
 
-bool dv_match_cosh_affine(const dval_t *expr,
-                          size_t nvars,
-                          dval_t *const *vars,
-                          qfloat_t *constant_out,
-                          qfloat_t *coeffs_out)
+static bool dv_affine_equal(size_t nvars,
+                            qfloat_t constant_a,
+                            const qfloat_t *coeffs_a,
+                            qfloat_t constant_b,
+                            const qfloat_t *coeffs_b)
 {
-    return dv_match_unary_affine(expr, DV_KIND_COSH, nvars, vars, constant_out, coeffs_out);
+    if (!qf_eq(constant_a, constant_b))
+        return false;
+    for (size_t i = 0; i < nvars; ++i)
+        if (!qf_eq(coeffs_a[i], coeffs_b[i]))
+            return false;
+    return true;
 }
 
-bool dv_match_sin_affine(const dval_t *expr,
-                         size_t nvars,
-                         dval_t *const *vars,
-                         qfloat_t *constant_out,
-                         qfloat_t *coeffs_out)
+static bool dv_match_affine_power_deg4(const dval_t *expr,
+                                       size_t nvars,
+                                       dval_t *const *vars,
+                                       size_t *degree_out,
+                                       qfloat_t *constant_out,
+                                       qfloat_t *coeffs_out)
 {
-    return dv_match_unary_affine(expr, DV_KIND_SIN, nvars, vars, constant_out, coeffs_out);
+    qfloat_t constant = QF_ZERO;
+
+    if (!expr || !degree_out || !constant_out || !coeffs_out || (nvars > 0 && !vars))
+        return false;
+
+    if (dv_match_const_value(expr, &constant)) {
+        *degree_out = 0;
+        *constant_out = QF_ZERO;
+        for (size_t i = 0; i < nvars; ++i)
+            coeffs_out[i] = QF_ZERO;
+        return true;
+    }
+
+    for (size_t i = 0; i < nvars; ++i)
+        coeffs_out[i] = QF_ZERO;
+
+    if (dv_match_affine_term(expr, nvars, vars, QF_ONE, &constant, coeffs_out)) {
+        *degree_out = 1;
+        *constant_out = constant;
+        return true;
+    }
+
+    if (dv_match_affine_power_exact(expr, nvars, vars, 2, constant_out, coeffs_out)) {
+        *degree_out = 2;
+        return true;
+    }
+
+    if (dv_match_affine_power_exact(expr, nvars, vars, 3, constant_out, coeffs_out)) {
+        *degree_out = 3;
+        return true;
+    }
+
+    if (dv_match_affine_power_exact(expr, nvars, vars, 4, constant_out, coeffs_out)) {
+        *degree_out = 4;
+        return true;
+    }
+
+    return false;
 }
 
-bool dv_match_cos_affine(const dval_t *expr,
-                         size_t nvars,
-                         dval_t *const *vars,
-                         qfloat_t *constant_out,
-                         qfloat_t *coeffs_out)
+static bool dv_match_scaled_affine_power_deg4(const dval_t *expr,
+                                              size_t nvars,
+                                              dval_t *const *vars,
+                                              qfloat_t *scale_out,
+                                              size_t *degree_out,
+                                              qfloat_t *constant_out,
+                                              qfloat_t *coeffs_out)
 {
-    return dv_match_unary_affine(expr, DV_KIND_COS, nvars, vars, constant_out, coeffs_out);
+    qfloat_t inner_scale;
+    qfloat_t const_value;
+    const dval_t *base;
+
+    if (!expr || !scale_out || !degree_out || !constant_out || !coeffs_out)
+        return false;
+
+    if (dv_match_const_value(expr, &const_value)) {
+        *scale_out = const_value;
+        *degree_out = 0;
+        *constant_out = QF_ZERO;
+        for (size_t i = 0; i < nvars; ++i)
+            coeffs_out[i] = QF_ZERO;
+        return true;
+    }
+
+    if (dv_match_affine_power_deg4(expr, nvars, vars, degree_out, constant_out, coeffs_out)) {
+        *scale_out = QF_ONE;
+        return true;
+    }
+
+    if (dv_match_scaled_expr(expr, &inner_scale, &base) &&
+        dv_match_affine_power_deg4(base, nvars, vars, degree_out, constant_out, coeffs_out)) {
+        *scale_out = inner_scale;
+        return true;
+    }
+
+    return false;
+}
+
+static bool dv_affine_is_zero(size_t nvars, qfloat_t constant, const qfloat_t *coeffs)
+{
+    if (!qf_eq(constant, QF_ZERO))
+        return false;
+    for (size_t i = 0; i < nvars; ++i)
+        if (!qf_eq(coeffs[i], QF_ZERO))
+            return false;
+    return true;
+}
+
+static bool dv_match_affine_poly_deg4_rec(const dval_t *expr,
+                                          size_t nvars,
+                                          dval_t *const *vars,
+                                          qfloat_t *poly_coeffs_out,
+                                          qfloat_t *constant_io,
+                                          qfloat_t *coeffs_io,
+                                          bool *have_basis_io)
+{
+    qfloat_t subtree_scale;
+    const dval_t *scaled_base = NULL;
+    const dval_t *left = NULL;
+    const dval_t *right = NULL;
+    bool is_sub = false;
+    qfloat_t scale;
+    size_t degree;
+    qfloat_t term_constant = QF_ZERO;
+    qfloat_t *term_coeffs = NULL;
+    qfloat_t poly_left[5] = { QF_ZERO, QF_ZERO, QF_ZERO, QF_ZERO, QF_ZERO };
+    qfloat_t poly_right[5] = { QF_ZERO, QF_ZERO, QF_ZERO, QF_ZERO, QF_ZERO };
+    qfloat_t left_constant = *constant_io;
+    qfloat_t right_constant = *constant_io;
+    qfloat_t *left_coeffs = NULL;
+    qfloat_t *right_coeffs = NULL;
+    bool have_left = *have_basis_io;
+    bool have_right = *have_basis_io;
+    bool ok = false;
+
+    term_coeffs = malloc(nvars * sizeof(*term_coeffs));
+    if ((nvars > 0) && !term_coeffs)
+        return false;
+
+    ok = dv_match_scaled_affine_power_deg4(expr, nvars, vars, &scale, &degree,
+                                           &term_constant, term_coeffs);
+    if (ok) {
+        for (size_t i = 0; i < 5; ++i)
+            poly_coeffs_out[i] = QF_ZERO;
+        poly_coeffs_out[degree] = scale;
+
+        if (degree > 0) {
+            if (*have_basis_io &&
+                !dv_affine_equal(nvars, *constant_io, coeffs_io, term_constant, term_coeffs)) {
+                free(term_coeffs);
+                return false;
+            }
+            *constant_io = term_constant;
+            for (size_t i = 0; i < nvars; ++i)
+                coeffs_io[i] = term_coeffs[i];
+            *have_basis_io = true;
+        }
+
+        free(term_coeffs);
+        return true;
+    }
+
+    free(term_coeffs);
+
+    if (dv_match_scaled_expr(expr, &subtree_scale, &scaled_base) &&
+        dv_match_affine_poly_deg4_rec(scaled_base, nvars, vars, poly_left,
+                                      constant_io, coeffs_io, have_basis_io)) {
+        for (size_t i = 0; i < 5; ++i)
+            poly_coeffs_out[i] = qf_mul(subtree_scale, poly_left[i]);
+        return true;
+    }
+
+    if (dv_match_add_sub_expr(expr, &left, &right, &is_sub)) {
+        left_coeffs = malloc(nvars * sizeof(*left_coeffs));
+        right_coeffs = malloc(nvars * sizeof(*right_coeffs));
+        if ((nvars > 0) && (!left_coeffs || !right_coeffs)) {
+            free(left_coeffs);
+            free(right_coeffs);
+            return false;
+        }
+
+        for (size_t i = 0; i < nvars; ++i) {
+            left_coeffs[i] = coeffs_io[i];
+            right_coeffs[i] = coeffs_io[i];
+        }
+
+        if (!dv_match_affine_poly_deg4_rec(left, nvars, vars, poly_left,
+                                           &left_constant, left_coeffs, &have_left) ||
+            !dv_match_affine_poly_deg4_rec(right, nvars, vars, poly_right,
+                                           &right_constant, right_coeffs, &have_right)) {
+            free(left_coeffs);
+            free(right_coeffs);
+            return false;
+        }
+
+        if (have_left && have_right &&
+            !dv_affine_equal(nvars, left_constant, left_coeffs, right_constant, right_coeffs)) {
+            free(left_coeffs);
+            free(right_coeffs);
+            return false;
+        }
+
+        for (size_t i = 0; i < 5; ++i)
+            poly_coeffs_out[i] = is_sub ? qf_sub(poly_left[i], poly_right[i])
+                                        : qf_add(poly_left[i], poly_right[i]);
+
+        if (have_left) {
+            *constant_io = left_constant;
+            for (size_t i = 0; i < nvars; ++i)
+                coeffs_io[i] = left_coeffs[i];
+            *have_basis_io = true;
+        } else if (have_right) {
+            *constant_io = right_constant;
+            for (size_t i = 0; i < nvars; ++i)
+                coeffs_io[i] = right_coeffs[i];
+            *have_basis_io = true;
+        } else {
+            *constant_io = QF_ZERO;
+            for (size_t i = 0; i < nvars; ++i)
+                coeffs_io[i] = QF_ZERO;
+            *have_basis_io = false;
+        }
+
+        free(left_coeffs);
+        free(right_coeffs);
+        return true;
+    }
+
+    return false;
+}
+
+bool dv_match_affine_poly_deg4(const dval_t *expr,
+                               size_t nvars,
+                               dval_t *const *vars,
+                               qfloat_t *poly_coeffs_out,
+                               qfloat_t *constant_out,
+                               qfloat_t *coeffs_out)
+{
+    bool have_basis = false;
+    qfloat_t constant = QF_ZERO;
+
+    if (!expr || !poly_coeffs_out || !constant_out || !coeffs_out || (nvars > 0 && !vars))
+        return false;
+
+    for (size_t i = 0; i < nvars; ++i)
+        coeffs_out[i] = QF_ZERO;
+    for (size_t i = 0; i < 5; ++i)
+        poly_coeffs_out[i] = QF_ZERO;
+
+    if (!dv_match_affine_poly_deg4_rec(expr, nvars, vars, poly_coeffs_out,
+                                       &constant, coeffs_out, &have_basis))
+        return false;
+
+    *constant_out = have_basis ? constant : QF_ZERO;
+    return true;
+}
+
+static bool dv_match_affine_poly_deg4_times_unary_affine_op(const dval_t *expr,
+                                                            dval_op_kind_t kind,
+                                                            size_t nvars,
+                                                            dval_t *const *vars,
+                                                            qfloat_t *poly_coeffs_out,
+                                                            qfloat_t *constant_out,
+                                                            qfloat_t *coeffs_out)
+{
+    const dval_t *left = NULL;
+    const dval_t *right = NULL;
+    qfloat_t unary_constant = QF_ZERO;
+    qfloat_t poly_constant = QF_ZERO;
+    qfloat_t *unary_coeffs = NULL;
+    qfloat_t *poly_coeffs = NULL;
+    qfloat_t poly_terms[5];
+    bool matched = false;
+
+    if (!expr || !poly_coeffs_out || !constant_out || !coeffs_out || (nvars > 0 && !vars))
+        return false;
+    if (!dv_match_binary_kind(expr, DV_KIND_MUL, &left, &right))
+        return false;
+
+    unary_coeffs = malloc(nvars * sizeof(*unary_coeffs));
+    poly_coeffs = malloc(nvars * sizeof(*poly_coeffs));
+    if ((nvars > 0) && (!unary_coeffs || !poly_coeffs)) {
+        free(unary_coeffs);
+        free(poly_coeffs);
+        return false;
+    }
+
+    if (dv_match_unary_affine_op(right, kind, nvars, vars, &unary_constant, unary_coeffs) &&
+        dv_match_affine_poly_deg4(left, nvars, vars, poly_terms, &poly_constant, poly_coeffs) &&
+        (dv_affine_is_zero(nvars, poly_constant, poly_coeffs) ||
+         dv_affine_equal(nvars, poly_constant, poly_coeffs, unary_constant, unary_coeffs))) {
+        matched = true;
+    }
+
+    if (!matched &&
+        dv_match_unary_affine_op(left, kind, nvars, vars, &unary_constant, unary_coeffs) &&
+        dv_match_affine_poly_deg4(right, nvars, vars, poly_terms, &poly_constant, poly_coeffs) &&
+        (dv_affine_is_zero(nvars, poly_constant, poly_coeffs) ||
+         dv_affine_equal(nvars, poly_constant, poly_coeffs, unary_constant, unary_coeffs))) {
+        matched = true;
+    }
+
+    if (matched) {
+        *constant_out = unary_constant;
+        for (size_t i = 0; i < nvars; ++i)
+            coeffs_out[i] = unary_coeffs[i];
+        for (size_t i = 0; i < 5; ++i)
+            poly_coeffs_out[i] = poly_terms[i];
+    }
+
+    free(unary_coeffs);
+    free(poly_coeffs);
+    return matched;
+}
+
+bool dv_match_affine_poly_deg4_times_unary_affine_kind(const dval_t *expr,
+                                                       dv_pattern_unary_affine_kind_t kind,
+                                                       size_t nvars,
+                                                       dval_t *const *vars,
+                                                       qfloat_t *poly_coeffs_out,
+                                                       qfloat_t *constant_out,
+                                                       qfloat_t *coeffs_out)
+{
+    dval_op_kind_t op_kind;
+
+    if (!dv_pattern_unary_kind_to_op(kind, &op_kind))
+        return false;
+
+    return dv_match_affine_poly_deg4_times_unary_affine_op(expr, op_kind, nvars, vars,
+                                                           poly_coeffs_out, constant_out,
+                                                           coeffs_out);
 }
 
 bool dv_match_const_value(const dval_t *expr, qfloat_t *value_out)

@@ -3,7 +3,7 @@
 #include <string.h>
 
 #include "matrix_internal.h"
-#include "dval_pattern.h"
+#include "dval_helpers.h"
 
 typedef struct {
     char *data;

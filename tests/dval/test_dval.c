@@ -86,6 +86,9 @@ int tests_main(void)
     printf(C_BOLD C_CYAN "=== Partial derivatives ===\n" C_RESET);
     RUN_TEST(test_partial_derivatives, NULL);
 
+    printf(C_BOLD C_CYAN "=== dval_pattern helpers ===\n" C_RESET);
+    RUN_TEST(test_dval_pattern_helpers, NULL);
+
     printf(C_BOLD C_CYAN "=== Runtime regressions ===\n" C_RESET);
     RUN_TEST(test_runtime_regressions, NULL);
 

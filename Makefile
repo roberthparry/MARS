@@ -52,6 +52,9 @@ TEST_SRCS         := $(shell find tests -name 'test_*.c' | while read -r f; do d
 TEST_HELPER_SRCS  := $(filter-out $(TEST_SRCS),$(TEST_ALL_SRCS))
 TEST_OBJS         := $(TEST_SRCS:tests/%.c=$(TEST_BUILD_DIR)/%.o)
 TEST_HELPER_OBJS  := $(TEST_HELPER_SRCS:tests/%.c=$(TEST_BUILD_DIR)/%.o)
+BENCH_SRCS        := $(shell find bench -name 'bench_*.c' 2>/dev/null | sort)
+BENCH_OBJS        := $(BENCH_SRCS:bench/%.c=$(BUILD_DIR)/bench/%.o)
+BENCH_BINS        := $(patsubst bench/%.c,$(BUILD_DIR)/bench/%,$(BENCH_SRCS))
 
 HEADERS      := $(wildcard include/*.h)
 
@@ -67,7 +70,7 @@ TEST_BINS  := $(patsubst tests/%.c,$(TEST_BUILD_DIR)/%,$(TEST_SRCS))
 # ------------------------------------------------------------
 .PHONY: all clean test memtest debug release help
 
-all: $(STATIC_LIB) $(SHARED_LIB) $(TEST_BINS)
+all: $(STATIC_LIB) $(SHARED_LIB) $(TEST_BINS) $(BENCH_BINS)
 
 debug:
 	$(MAKE) DEBUG=1 all
@@ -93,6 +96,10 @@ $(TEST_BUILD_DIR)/%.o: tests/%.c
 	@mkdir -p $(dir $@) $(dir $@).deps
 	$(CC) $(CFLAGS) $(DEPFLAGS) $(INCLUDES) -c $< -o $@
 
+$(BUILD_DIR)/bench/%.o: bench/%.c
+	@mkdir -p $(dir $@) $(dir $@).deps
+	$(CC) $(CFLAGS) $(DEPFLAGS) $(INCLUDES) -c $< -o $@
+
 # ------------------------------------------------------------
 # Libraries
 # ------------------------------------------------------------
@@ -110,6 +117,10 @@ $(SHARED_LIB): $(OBJS)
 $(TEST_BUILD_DIR)/%: $(TEST_BUILD_DIR)/%.o $(STATIC_LIB) $(TEST_HELPER_OBJS)
 	@mkdir -p $(dir $@)
 	$(CC) -o $@ $< $(filter $(TEST_BUILD_DIR)/$(dir $*)%.o,$(TEST_HELPER_OBJS)) $(STATIC_LIB) $(LDLIBS)
+
+$(BUILD_DIR)/bench/%: $(BUILD_DIR)/bench/%.o $(STATIC_LIB)
+	@mkdir -p $(dir $@)
+	$(CC) -o $@ $< $(STATIC_LIB) $(LDLIBS)
 
 # ------------------------------------------------------------
 # Test targets
@@ -146,6 +157,14 @@ endef
 
 $(foreach bin,$(TEST_BINS),$(eval $(call TEST_ALIAS_RULES,$(notdir $(bin)),$(bin))))
 
+define BENCH_ALIAS_RULES
+.PHONY: $(1)
+$(1): $(2)
+	@$(2)
+endef
+
+$(foreach bin,$(BENCH_BINS),$(eval $(call BENCH_ALIAS_RULES,$(notdir $(bin)),$(bin))))
+
 # ------------------------------------------------------------
 # Help
 # ------------------------------------------------------------
@@ -161,6 +180,7 @@ help:
 	@echo "  make DEBUG=1 memtest        Run all tests under valgrind (debug)"
 	@echo "  make DEBUG=1 test_<name>    Build and run a single test (e.g. make test_dval) (debug)"
 	@echo "  make DEBUG=1 memtest_<name> Build and run a single test under valgrind (debug)"
+	@echo "  make bench_<name>           Build and run a benchmark (e.g. make bench_integrator)"
 	@echo "  make clean                  Remove all build artifacts"
 
 # ------------------------------------------------------------

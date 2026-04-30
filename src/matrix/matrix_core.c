@@ -6,7 +6,7 @@
 #include "qfloat.h"
 #include "qcomplex.h"
 #include "matrix.h"
-#include "dval_pattern.h"
+#include "dval_helpers.h"
 
 /* ============================================================
    Internal matrix construction helpers (forward declarations)

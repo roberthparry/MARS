@@ -8,7 +8,7 @@
 | `ig_single_integral` | Turán T15/T4 | 31 | 1-D, `dval_t` expression, full qfloat_t precision |
 | `ig_double_integral` | Turán T15/T4 | 31 | 2-D rectangular domain |
 | `ig_triple_integral` | Turán T15/T4 | 31 | 3-D rectangular domain |
-| `ig_integral_multi` | Turán T15/T4 | 31 | N-D rectangular domain, adaptive in outermost variable |
+| `ig_integral_multi` | Turán T15/T4 | 31 | N-D rectangular domain, adaptive in outermost variable, with symbolic fast paths for recognised `dval_t` structure |
 
 ---
 
@@ -33,6 +33,21 @@ total_error ≤ max(abs_tol, rel_tol × |result|)
 ```
 
 or the maximum subinterval count is reached.
+
+### Symbolic Fast Path (`ig_integral_multi`)
+
+Before falling back to general adaptive Turán evaluation, `ig_integral_multi`
+tries a symbolic plan for several important `dval_t` expression families:
+
+- constants and scaled sums/differences of recognised symbolic forms
+- affine unary families such as `exp(a)`, `sin(a)`, `cos(a)`, `sinh(a)`, and `cosh(a)`
+- degree-4 affine polynomials `P(a)`
+- degree-4 affine-polynomial times unary-affine families `P(a) * special(a)`
+- separable products, including regrouped products that become separable after flattening the full multiplication tree
+
+For matching inputs, these cases evaluate exactly over rectangular boxes in a
+single interval, which can reduce work by orders of magnitude compared with the
+generic adaptive path.
 
 ---
 
@@ -112,6 +127,55 @@ int main(void) {
 ∫₀¹ exp(x) dx ≈ 1.718281828459045235360287471352664
   error estimate   ≈ 7.623185090994446757792522996692577e-28
   subintervals used: 3
+```
+
+### Symbolic fast path example
+
+Recognised affine-family integrands can collapse to one interval even in
+multiple dimensions:
+
+```c
+#include <stdio.h>
+#include "qfloat.h"
+#include "integrator.h"
+#include "dval.h"
+
+int main(void) {
+    integrator_t *ig = ig_new();
+    dval_t *x = dv_new_var(qf_from_double(0.0));
+    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *two_y = dv_mul_d(y, 2.0);
+    dval_t *sum = dv_add(x, two_y);
+    dval_t *affine = dv_add_d(sum, 3.0);
+    dval_t *exp_affine = dv_exp(affine);
+    dval_t *expr = dv_mul(affine, exp_affine);
+    dval_t *vars[2] = { x, y };
+    qfloat_t lo[2] = { qf_from_double(0.0), qf_from_double(0.0) };
+    qfloat_t hi[2] = { qf_from_double(1.0), qf_from_double(1.0) };
+    qfloat_t result, err;
+
+    ig_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
+
+    qf_printf("result = %q\n", result);
+    printf("intervals = %zu\n", ig_get_interval_count_used(ig));
+
+    dv_free(expr);
+    dv_free(exp_affine);
+    dv_free(affine);
+    dv_free(sum);
+    dv_free(two_y);
+    dv_free(y);
+    dv_free(x);
+    ig_free(ig);
+    return 0;
+}
+```
+
+Typical result:
+
+```text
+result = 539.6824667600549348774549946503721
+intervals = 1
 ```
 
 ### Custom context
@@ -207,6 +271,11 @@ All declarations are in `include/integrator.h`.
 **Turán degree advantage** comes from incorporating f'' directly into the quadrature weights. For an 8-node symmetric rule this raises exactness from degree 15 (f only) to degree 31. The T4 nested sub-rule uses alternating node positions (not consecutive), which keeps all weights positive and the rule well-conditioned.
 
 **Cache coherence** in `ig_single_integral`: `dv_eval` detects variable changes automatically via epoch tracking — each call to `dv_set_val` advances the variable's epoch, and computed nodes recompute when they see a newer epoch from their inputs.
+
+**Threading:** the current `dval_t` and symbolic-integrator path are not yet
+internally synchronised. Prefer sequential test and benchmark runs, and do not
+share mutable integrator / `dval_t` state across threads without external
+locking.
 
 ## Tradeoffs
 

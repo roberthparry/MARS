@@ -1,0 +1,964 @@
+src/dval/dval_arith.c:/* ------------------------------------------------------------------------- */
+src/dval/dval_arith.c:/* ------------------------------------------------------------------------- */
+src/dval/dval_arith.c:    return dv->c;
+src/dval/dval_arith.c:    return dv->c;
+src/dval/dval_arith.c:    return qc_add(dv_eval_qc_internal(dv->a), dv_eval_qc_internal(dv->b));
+src/dval/dval_arith.c:    return qc_sub(dv_eval_qc_internal(dv->a), dv_eval_qc_internal(dv->b));
+src/dval/dval_arith.c:    return qc_mul(dv_eval_qc_internal(dv->a), dv_eval_qc_internal(dv->b));
+src/dval/dval_arith.c:    return qc_div(dv_eval_qc_internal(dv->a), dv_eval_qc_internal(dv->b));
+src/dval/dval_arith.c:    return qc_neg(dv_eval_qc_internal(dv->a));
+src/dval/dval_arith.c:    qcomplex_t base = dv_eval_qc_internal(dv->a);
+src/dval/dval_arith.c:    qcomplex_t exp  = dv_eval_qc_internal(dv->b);
+src/dval/dval_arith.c:    qcomplex_t base = dv_eval_qc_internal(dv->a);
+src/dval/dval_arith.c:    return qc_pow(base, dv->c);
+src/dval/dval_arith.c:/* ------------------------------------------------------------------------- */
+src/dval/dval_arith.c:/* ------------------------------------------------------------------------- */
+src/dval/dval_arith.c:    dval_t *da  = dv_get_dx_internal(dv->a);
+src/dval/dval_arith.c:    dval_t *db  = dv_get_dx_internal(dv->b);
+src/dval/dval_arith.c:    dval_t *da  = dv_get_dx_internal(dv->a);
+src/dval/dval_arith.c:    dval_t *db  = dv_get_dx_internal(dv->b);
+src/dval/dval_arith.c:    dval_t *da  = dv_get_dx_internal(dv->a);
+src/dval/dval_arith.c:    dval_t *db  = dv_get_dx_internal(dv->b);
+src/dval/dval_arith.c:    dval_t *t1  = dv_mul(da, dv->b);
+src/dval/dval_arith.c:    dval_t *t2  = dv_mul(dv->a, db);
+src/dval/dval_arith.c:    dval_t *da   = dv_get_dx_internal(dv->a);
+src/dval/dval_arith.c:    dval_t *db   = dv_get_dx_internal(dv->b);
+src/dval/dval_arith.c:    dval_t *num1 = dv_mul(da, dv->b);
+src/dval/dval_arith.c:    dval_t *num2 = dv_mul(dv->a, db);
+src/dval/dval_arith.c:    dval_t *den  = dv_pow_d(dv->b, 2.0);
+src/dval/dval_arith.c:    dval_t *da  = dv_get_dx_internal(dv->a);
+src/dval/dval_arith.c:    dval_t *a  = dv->a;
+src/dval/dval_arith.c:    dval_t *b  = dv->b;
+src/dval/dval_arith.c:    double  c    = qf_to_double(dv->c.re);
+src/dval/dval_arith.c:    dval_t *da   = dv_get_dx_internal(dv->a);
+src/dval/dval_arith.c:    dval_t *p    = dv_pow_d(dv->a, c - 1.0);
+src/dval/dval_arith.c:/* ------------------------------------------------------------------------- */
+src/dval/dval_arith.c:/* ------------------------------------------------------------------------- */
+src/dval/dval_arith.c:    .name = "-",
+src/dval/dval_arith.c:    .name = "-",
+src/dval/dval_arith.c:/* ------------------------------------------------------------------------- */
+src/dval/dval_arith.c:/* ------------------------------------------------------------------------- */
+src/dval/dval_core.c:/* dval_core.c - lazy, vtable-driven, reference-counted differentiable value DAG
+src/dval/dval_core.c: *   - Node allocation and the dv_new_X / dv_create_X family of constructors
+src/dval/dval_core.c: *   - Reference counting (dv_retain / dv_free)
+src/dval/dval_core.c: *   - Name handling, including ASCII-to-Unicode normalisation for Greek letter
+src/dval/dval_core.c: *     names (e.g. "alpha" -> "alpha-as-unicode") so names are canonical in output
+src/dval/dval_core.c: *   - Lazy primal evaluation (dv_eval) via vtable dispatch (ops->eval)
+src/dval/dval_core.c: *   - Lazy derivative construction (dv_get_deriv / dv_create_deriv) via
+src/dval/dval_core.c: *     vtable dispatch (ops->deriv), with the result cached in dval_t::dx_cache
+src/dval/dval_core.c: *   - All arithmetic and math operator constructors (dv_add, dv_sin, etc.)
+src/dval/dval_core.c: *   - dv_cmp, dv_print, and other accessors
+src/dval/dval_core.c: * Partial derivatives: tl_wrt is a thread-local pointer to the variable being
+src/dval/dval_core.c: * differentiated with respect to. NULL means "single-variable / differentiate
+src/dval/dval_core.c:/* Thread-local pointer to the variable being differentiated with respect to.
+src/dval/dval_core.c: * NULL = single-variable / "all variables" mode (original behaviour of
+src/dval/dval_core.c: * not a general thread-safety mechanism for the DAG. */
+src/dval/dval_core.c:/* ------------------------------------------------------------------------- */
+src/dval/dval_core.c:/* ------------------------------------------------------------------------- */
+src/dval/dval_core.c:    /* Atoms (constants and variables) are always up-to-date. */
+src/dval/dval_core.c:    if (m->ops->arity == DV_OP_ATOM)
+src/dval/dval_core.c:        return m->x;
+src/dval/dval_core.c:     * this node's cached value is still valid. ops->eval() will call dv_eval_qc
+src/dval/dval_core.c:    dv_eval_qc(m->a);
+src/dval/dval_core.c:    if (m->ops->arity == DV_OP_BINARY)
+src/dval/dval_core.c:        dv_eval_qc(m->b);
+src/dval/dval_core.c:    uint64_t child_epoch = m->a ? m->a->epoch : 0;
+src/dval/dval_core.c:    if (m->b && m->b->epoch > child_epoch)
+src/dval/dval_core.c:        child_epoch = m->b->epoch;
+src/dval/dval_core.c:    if (!m->x_valid || child_epoch > m->epoch) {
+src/dval/dval_core.c:        m->x       = m->ops->eval(m);
+src/dval/dval_core.c:        m->x_valid = 1;
+src/dval/dval_core.c:        m->epoch   = child_epoch;
+src/dval/dval_core.c:    return m->x;
+src/dval/dval_core.c:    return tl_wrt ? tl_wrt->var_id : 0;
+src/dval/dval_core.c:    for (dv_deriv_cache_t *ce = dv->dx_cache; ce; ce = ce->next) {
+src/dval/dval_core.c:        if (ce->wrt_id == wrt_id)
+src/dval/dval_core.c:            return ce->dx; /* borrowed */
+src/dval/dval_core.c:    dval_t *dx = dv->ops->deriv(dv); /* refcount = 1, tl_wrt still set */
+src/dval/dval_core.c:    ce->wrt_id = wrt_id;
+src/dval/dval_core.c:    ce->dx   = dx;
+src/dval/dval_core.c:    ce->next = dv->dx_cache;
+src/dval/dval_core.c:    dv->dx_cache = ce;
+src/dval/dval_core.c:/* ------------------------------------------------------------------------- */
+src/dval/dval_core.c:/* ------------------------------------------------------------------------- */
+src/dval/dval_core.c:/* ------------------------------------------------------------------------- */
+src/dval/dval_core.c:/* ------------------------------------------------------------------------- */
+src/dval/dval_core.c:    if (wrt->ops == &ops_const) return dv_nan_const_shared();
+src/dval/dval_core.c:/* ------------------------------------------------------------------------- */
+src/dval/dval_core.c:/* ------------------------------------------------------------------------- */
+src/dval/dval_core.c:    if (dv->ops != &ops_var &&
+src/dval/dval_core.c:        !(dv->ops == &ops_const && dv->name && *dv->name))
+src/dval/dval_core.c:    dv->c = v;
+src/dval/dval_core.c:    dv->x = v;
+src/dval/dval_core.c:    dv->x_valid = 1;
+src/dval/dval_core.c:    dv->epoch++;
+src/dval/dval_core.c:    if (dv->name) free(dv->name);
+src/dval/dval_core.c:    dv->name = dv_normalize_name(name);
+src/dval/dval_core.c:/* ------------------------------------------------------------------------- */
+src/dval/dval_core.c:/* ------------------------------------------------------------------------- */
+src/dval/dval_core.c:/* ------------------------------------------------------------------------- */
+src/dval/dval_core.c:/* ------------------------------------------------------------------------- */
+src/dval/dval_core.c:    dv->a = a;
+src/dval/dval_core.c:    dv->a = a;
+src/dval/dval_core.c:    dv->b = b;
+src/dval/dval_core.c:    dv->a = a;
+src/dval/dval_core.c:    dv->c = dv_qc_real_d(d);
+src/dval/dval_core.c:    dv->a = a;
+src/dval/dval_core.c:    dv->c = dv_qc_real_qf(exponent);
+src/dval/dval_core.c:    dv->a = a;
+src/dval/dval_core.c:    dv->c = exponent;
+src/dval/dval_core.c:/* ------------------------------------------------------------------------- */
+src/dval/dval_core.c:/* ------------------------------------------------------------------------- */
+src/dval/dval_core.c:    if (wrt->ops == &ops_const) return dv_nan_const_shared();
+src/dval/dval_core.c:    while (n--) {
+src/dval/dval_core_support.c:        (*rc)--;
+src/dval/dval_core_support.c:    if (!entry->ascii)
+src/dval/dval_core_support.c:    if (entry->klen == klen && strncasecmp(entry->ascii, kw, klen) == 0)
+src/dval/dval_core_support.c:    while (e > s && isspace((unsigned char)e[-1]))
+src/dval/dval_core_support.c:        e--;
+src/dval/dval_core_support.c:    len = (size_t)(e - s);
+src/dval/dval_core_support.c:            g = upper ? entry->upper : entry->lower;
+src/dval/dval_core_support.c:        refcount_inc(&dv->refcount);
+src/dval/dval_core_support.c:    if (refcount_dec(&dv->refcount) > 1)
+src/dval/dval_core_support.c:    a = dv->a;
+src/dval/dval_core_support.c:    b = dv->b;
+src/dval/dval_core_support.c:    ce = dv->dx_cache;
+src/dval/dval_core_support.c:        dv_deriv_cache_t *next = ce->next;
+src/dval/dval_core_support.c:        dv_release(ce->dx);
+src/dval/dval_core_support.c:    if (dv->name)
+src/dval/dval_core_support.c:        free(dv->name);
+src/dval/dval_core_support.c:    dv->ops = ops;
+src/dval/dval_core_support.c:    dv->a = NULL;
+src/dval/dval_core_support.c:    dv->b = NULL;
+src/dval/dval_core_support.c:    dv->c = QC_ZERO;
+src/dval/dval_core_support.c:    dv->x = QC_ZERO;
+src/dval/dval_core_support.c:    dv->x_valid = 0;
+src/dval/dval_core_support.c:    dv->epoch = 0;
+src/dval/dval_core_support.c:    dv->dx_cache = NULL;
+src/dval/dval_core_support.c:    dv->name = NULL;
+src/dval/dval_core_support.c:    dv->refcount = 1;
+src/dval/dval_core_support.c:    dv->var_id = 0;
+src/dval/dval_core_support.c:    dv->c = x;
+src/dval/dval_core_support.c:    dv->x = x;
+src/dval/dval_core_support.c:    dv->x_valid = 1;
+src/dval/dval_core_support.c:    dv->c = x;
+src/dval/dval_core_support.c:    dv->x = x;
+src/dval/dval_core_support.c:    dv->x_valid = 1;
+src/dval/dval_core_support.c:    dv->var_id = alloc_var_id();
+src/dval/dval_core_support.c:    dv->name = dv_normalize_name(name);
+src/dval/dval_fromstring.c:/* dval_fromstring.c - construct a dval_t from an expression-style string
+src/dval/dval_fromstring.c: *   *           explicit multiplication in place of middle-dot (·) or
+src/dval/dval_fromstring.c: *               on a sub-expression, in place of Unicode superscripts
+src/dval/dval_fromstring.c: * do not fit the single-letter-plus-subscript rule.
+src/dval/dval_fromstring.c:/* ------------------------------------------------------------------ */
+src/dval/dval_fromstring.c:/* ------------------------------------------------------------------ */
+src/dval/dval_fromstring.c:    if (!p->error) {
+src/dval/dval_fromstring.c:        p->error = 1;
+src/dval/dval_fromstring.c:        snprintf(p->errmsg, sizeof(p->errmsg), "%s", msg);
+src/dval/dval_fromstring.c:/* True if we're at the middle dot · (U+00B7, UTF-8: 0xC2 0xB7). */
+src/dval/dval_fromstring.c:    return p->p + 1 < p->end &&
+src/dval/dval_fromstring.c:           (unsigned char)p->p[0] == 0xC2 &&
+src/dval/dval_fromstring.c:           (unsigned char)p->p[1] == 0xB7;
+src/dval/dval_fromstring.c: * Spaces are NOT skipped — they only appear before binary '+'/'-'. */
+src/dval/dval_fromstring.c:    if (p->p >= p->end) return 0;
+src/dval/dval_fromstring.c:    unsigned char c = (unsigned char)*p->p;
+src/dval/dval_fromstring.c:    if (c == '[' || c == '(' || c == '-') return 1;
+src/dval/dval_fromstring.c:    int len = fs_utf8_decode(p->p, &uc);
+src/dval/dval_fromstring.c:/* ------------------------------------------------------------------ */
+src/dval/dval_fromstring.c:/* ------------------------------------------------------------------ */
+src/dval/dval_fromstring.c:/* ------------------------------------------------------------------ */
+src/dval/dval_fromstring.c:/* ------------------------------------------------------------------ */
+src/dval/dval_fromstring.c:/* ------------------------------------------------------------------ */
+src/dval/dval_fromstring.c:/* ------------------------------------------------------------------ */
+src/dval/dval_fromstring.c:/* Collision-free direct hash table for the current 36 function keywords.
+src/dval/dval_fromstring.c:/* ------------------------------------------------------------------ */
+src/dval/dval_fromstring.c:/* ------------------------------------------------------------------ */
+src/dval/dval_fromstring.c:    if (p->p >= p->end || *p->p != ',') {
+src/dval/dval_fromstring.c:    p->p++;
+src/dval/dval_fromstring.c:    skip_spaces(&p->p, p->end);
+src/dval/dval_fromstring.c:            exponent = exponent * 10 + (*p++ - '0');
+src/dval/dval_fromstring.c:    if (p->p >= p->end || *p->p != expected) {
+src/dval/dval_fromstring.c:    p->p++;
+src/dval/dval_fromstring.c:/* ------------------------------------------------------------------ */
+src/dval/dval_fromstring.c:/* ------------------------------------------------------------------ */
+src/dval/dval_fromstring.c:    int cp_len = fs_utf8_decode(p->p, &cp);
+src/dval/dval_fromstring.c:    if (p->error || p->p >= p->end) {
+src/dval/dval_fromstring.c:    /* Parenthesised sub-expression */
+src/dval/dval_fromstring.c:    if (*p->p == '(') {
+src/dval/dval_fromstring.c:        p->p++;
+src/dval/dval_fromstring.c:    /* Absolute-value bars: |expr| */
+src/dval/dval_fromstring.c:    if (*p->p == '|') {
+src/dval/dval_fromstring.c:        p->p++;
+src/dval/dval_fromstring.c:    if (isdigit((unsigned char)*p->p) || *p->p == '.') {
+src/dval/dval_fromstring.c:        if (!parse_qfloat_literal(&p->p, p->end, &value)) {
+src/dval/dval_fromstring.c:        p->p += cp_len;
+src/dval/dval_fromstring.c:        int sup = read_optional_display_exponent(&p->p);
+src/dval/dval_fromstring.c:     * the current position (letters, digits, underscores; stops before UTF-8
+src/dval/dval_fromstring.c:        const char *id = p->p;
+src/dval/dval_fromstring.c:        while (id_end < p->end &&
+src/dval/dval_fromstring.c:        size_t id_len = (size_t)(id_end - id);
+src/dval/dval_fromstring.c:                const char *paren = func_call_start(p->p, fe->kw, fe->klen);
+src/dval/dval_fromstring.c:                    const char *after_kw = p->p + fe->klen;
+src/dval/dval_fromstring.c:                    p->p = paren + 1; /* skip past '(' */
+src/dval/dval_fromstring.c:                    if (fe->is_binary) {
+src/dval/dval_fromstring.c:                        dval_t *result = fe->bfn(a, b);
+src/dval/dval_fromstring.c:                        result = fe->ufn(arg);
+src/dval/dval_fromstring.c:    char *name = read_any_name(&p->p);
+src/dval/dval_fromstring.c:    dval_t *sym = symtab_lookup(p->syms, name);
+src/dval/dval_fromstring.c:/* ------------------------------------------------------------------ */
+src/dval/dval_fromstring.c:/* ------------------------------------------------------------------ */
+src/dval/dval_fromstring.c:    if (p->error) return NULL;
+src/dval/dval_fromstring.c:    int sup = read_superscript(&p->p);
+src/dval/dval_fromstring.c:    if (p->p < p->end && *p->p == '^') {
+src/dval/dval_fromstring.c:        p->p++;
+src/dval/dval_fromstring.c:        if (p->p < p->end && *p->p == '(') {
+src/dval/dval_fromstring.c:            p->p++;
+src/dval/dval_fromstring.c:        if (!parse_qfloat_literal(&p->p, p->end, &exponent)) {
+src/dval/dval_fromstring.c:/* ------------------------------------------------------------------ */
+src/dval/dval_fromstring.c:/* ------------------------------------------------------------------ */
+src/dval/dval_fromstring.c:    if (p->error) return NULL;
+src/dval/dval_fromstring.c:    if (p->p < p->end && *p->p == '-') {
+src/dval/dval_fromstring.c:        p->p++;
+src/dval/dval_fromstring.c:/* ------------------------------------------------------------------ */
+src/dval/dval_fromstring.c:/* ------------------------------------------------------------------ */
+src/dval/dval_fromstring.c:    if (p->error) return NULL;
+src/dval/dval_fromstring.c:        if (p->p >= p->end) break;
+src/dval/dval_fromstring.c:            p->p += 2;
+src/dval/dval_fromstring.c:         * through without advancing p->p. */
+src/dval/dval_fromstring.c:            const char *peek = p->p;
+src/dval/dval_fromstring.c:            while (peek < p->end && *peek == ' ') peek++;
+src/dval/dval_fromstring.c:            if (peek < p->end && *peek == '*') {
+src/dval/dval_fromstring.c:                p->p = peek + 1; /* consume optional leading spaces and '*' */
+src/dval/dval_fromstring.c:                skip_spaces(&p->p, p->end); /* trailing spaces */
+src/dval/dval_fromstring.c:/* ------------------------------------------------------------------ */
+src/dval/dval_fromstring.c:/* ------------------------------------------------------------------ */
+src/dval/dval_fromstring.c:    if (p->error) return NULL;
+src/dval/dval_fromstring.c:        if (p->p + 2 >= p->end) break;
+src/dval/dval_fromstring.c:        if (p->p[0] == ' ' && p->p[1] == '+' && p->p[2] == ' ') {
+src/dval/dval_fromstring.c:            p->p += 3;
+src/dval/dval_fromstring.c:        if (p->p[0] == ' ' && p->p[1] == '-' && p->p[2] == ' ') {
+src/dval/dval_fromstring.c:            p->p += 3;
+src/dval/dval_fromstring.c:/* ------------------------------------------------------------------ */
+src/dval/dval_fromstring.c:/* ------------------------------------------------------------------ */
+src/dval/dval_fromstring.c:/* Parse comma-separated "name = value" pairs from [s, end).
+src/dval/dval_fromstring.c: * On success returns 0; on failure writes to errmsg and returns -1. */
+src/dval/dval_fromstring.c:            return -1;
+src/dval/dval_fromstring.c:            return -1;
+src/dval/dval_fromstring.c:            return -1;
+src/dval/dval_fromstring.c:        const char *key = (node->name && *node->name) ? node->name : name;
+src/dval/dval_fromstring.c:            /* Copy key before freeing node/name — key may alias node->name or name */
+src/dval/dval_fromstring.c:            strncpy(key_copy, key, sizeof(key_copy) - 1);
+src/dval/dval_fromstring.c:            key_copy[sizeof(key_copy) - 1] = '\0';
+src/dval/dval_fromstring.c:            return -1;
+src/dval/dval_fromstring.c:/* ------------------------------------------------------------------ */
+src/dval/dval_fromstring.c:/* Pure-constant format: { name = val }                                 */
+src/dval/dval_fromstring.c:/* ------------------------------------------------------------------ */
+src/dval/dval_fromstring.c:        snprintf(errmsg, errmsg_n, "constant name is required in pure-constant format");
+src/dval/dval_fromstring.c:            depth--;
+src/dval/dval_fromstring.c:        symtab_add(syms, node->name ? node->name : name, node);
+src/dval/dval_fromstring.c:    while (end > start && isspace((unsigned char)end[-1]))
+src/dval/dval_fromstring.c:        end--;
+src/dval/dval_fromstring.c:/* ------------------------------------------------------------------ */
+src/dval/dval_fromstring.c:/* ------------------------------------------------------------------ */
+src/dval/dval_fromstring.c:        if (*scan == ')' || *scan == ']') { depth--; scan++; continue; }
+src/dval/dval_fromstring.c:    /* ---- No bindings: either { expr } or legacy { name = val } ---- */
+src/dval/dval_fromstring.c:        while (content_end > s && isspace((unsigned char)content_end[-1]))
+src/dval/dval_fromstring.c:            content_end--;
+src/dval/dval_fromstring.c:    /* ---- Expression with bindings: { expr | vars; consts } ---- */
+src/dval/dval_fromstring.c:    while (expr_end > s && isspace((unsigned char)expr_end[-1]))
+src/dval/dval_fromstring.c:        expr_end--;
+src/dval/dval_fromstring.c:        return -1;
+src/dval/dval_fromstring.c:    dv_set_val_qf(binding->symbol, value);
+src/dval/dval_fromstring.c:        return -1;
+src/dval/dval_fromstring.c:    dv_set_val(binding->symbol, value);
+src/dval/dval_fromstring.c:        return -1;
+src/dval/dval_fromstring.c:    dv_set_val_d(binding->symbol, value);
+src/dval/dval_fromstring_support.c:    return -1;
+src/dval/dval_fromstring_support.c:    if (p < end && (*p == '-' || *p == '+'))
+src/dval/dval_fromstring_support.c:        if (p < end && (*p == '+' || *p == '-'))
+src/dval/dval_fromstring_support.c:            return (size_t)(exp_start - s);
+src/dval/dval_fromstring_support.c:    return (size_t)(p - s);
+src/dval/dval_fromstring_support.c:        return -1;
+src/dval/dval_fromstring_support.c:    else if (c >= 0x2074 && c <= 0x2079) digit = (int)(c - 0x2074 + 4);
+src/dval/dval_fromstring_support.c:    else return -1;
+src/dval/dval_fromstring_support.c:        else if (c >= 0x2074 && c <= 0x2079) digit = (int)(c - 0x2074 + 4);
+src/dval/dval_fromstring_support.c:            if (blen + sl >= (int)sizeof(buf) - 1)
+src/dval/dval_fromstring_support.c:            if (blen + 3 >= (int)sizeof(buf) - 1)
+src/dval/dval_fromstring_support.c:            d = p[1] - '0';
+src/dval/dval_fromstring_support.c:    n = (size_t)(p - start);
+src/dval/dval_fromstring_support.c:    while (e > s && isspace((unsigned char)e[-1]))
+src/dval/dval_fromstring_support.c:        e--;
+src/dval/dval_fromstring_support.c:    if ((size_t)(e - s) >= 2 && s[0] == '[' && e[-1] == ']') {
+src/dval/dval_fromstring_support.c:        out = (char *)fs_xmalloc((size_t)(e - s - 1));
+src/dval/dval_fromstring_support.c:        memcpy(out, s + 1, (size_t)(e - s - 2));
+src/dval/dval_fromstring_support.c:        out[e - s - 2] = '\0';
+src/dval/dval_fromstring_support.c:    out = (char *)fs_xmalloc((size_t)(e - s) * 3 + 1);
+src/dval/dval_fromstring_support.c:            int d = s[1] - '0';
+src/dval/dval_fromstring_support.c:    t->entries = NULL;
+src/dval/dval_fromstring_support.c:    t->count = 0;
+src/dval/dval_fromstring_support.c:    t->cap = 0;
+src/dval/dval_fromstring_support.c:    for (int i = 0; i < t->count; i++)
+src/dval/dval_fromstring_support.c:        if (strcmp(t->entries[i].name, name) == 0)
+src/dval/dval_fromstring_support.c:    if (t->count == t->cap) {
+src/dval/dval_fromstring_support.c:        t->cap = t->cap ? t->cap * 2 : 8;
+src/dval/dval_fromstring_support.c:        t->entries = (sym_t *)realloc(t->entries, (size_t)t->cap * sizeof(sym_t));
+src/dval/dval_fromstring_support.c:        if (!t->entries) {
+src/dval/dval_fromstring_support.c:    t->entries[t->count].name = (char *)fs_xmalloc(nl);
+src/dval/dval_fromstring_support.c:    memcpy(t->entries[t->count].name, name, nl);
+src/dval/dval_fromstring_support.c:    t->entries[t->count].node = node;
+src/dval/dval_fromstring_support.c:    t->count++;
+src/dval/dval_fromstring_support.c:    for (int i = 0; i < t->count; i++)
+src/dval/dval_fromstring_support.c:        if (strcmp(t->entries[i].name, name) == 0)
+src/dval/dval_fromstring_support.c:            return t->entries[i].node;
+src/dval/dval_fromstring_support.c:    for (int i = 0; i < t->count; i++) {
+src/dval/dval_fromstring_support.c:        free(t->entries[i].name);
+src/dval/dval_fromstring_support.c:        dv_free(t->entries[i].node);
+src/dval/dval_fromstring_support.c:    free(t->entries);
+src/dval/dval_fromstring_support.c:        return -1;
+src/dval/dval_fromstring_support.c:    if (!t || t->count <= 0)
+src/dval/dval_fromstring_support.c:    for (int i = 0; i < t->count; ++i)
+src/dval/dval_fromstring_support.c:        total_name_bytes += strlen(t->entries[i].name) + 1;
+src/dval/dval_fromstring_support.c:    bindings = calloc(1, sizeof(*bindings) * (size_t)t->count + total_name_bytes);
+src/dval/dval_fromstring_support.c:    name_store = (char *)(bindings + t->count);
+src/dval/dval_fromstring_support.c:    for (int i = 0; i < t->count; ++i) {
+src/dval/dval_fromstring_support.c:        size_t n = strlen(t->entries[i].name) + 1;
+src/dval/dval_fromstring_support.c:        memcpy(name_store, t->entries[i].name, n);
+src/dval/dval_fromstring_support.c:        bindings[i].symbol = t->entries[i].node;
+src/dval/dval_fromstring_support.c:        bindings[i].is_constant = (t->entries[i].node &&
+src/dval/dval_fromstring_support.c:                                   t->entries[i].node->ops == &ops_const);
+src/dval/dval_fromstring_support.c:        *number_out = (size_t)t->count;
+src/dval/dval_fromstring_support.c:    if (!node || !node->name || !*node->name)
+src/dval/dval_fromstring_support.c:    n = strlen(node->name) + 1;
+src/dval/dval_fromstring_support.c:    memcpy((char *)bindings[0].name, node->name, n);
+src/dval/dval_fromstring_support.c:    bindings[0].is_constant = (node->ops == &ops_const);
+src/dval/dval_math.c:    return fn(dv_eval_qc_internal(dv->a));
+src/dval/dval_math.c:    return dv_qc_real_qf(fn(dv_eval_qc_internal(dv->a)));
+src/dval/dval_math.c:    return fn(dv_eval_qc_internal(dv->a), dv_eval_qc_internal(dv->b));
+src/dval/dval_math.c:    dval_t *da = dv_get_dx_internal(dv->a);
+src/dval/dval_math.c:    qcomplex_t fy = dv_eval_qc_internal(dv->a);
+src/dval/dval_math.c:    qcomplex_t gx = dv_eval_qc_internal(dv->b);
+src/dval/dval_math.c:    return dv_chain_rule_with_factor(dv, dv_cos(dv->a));
+src/dval/dval_math.c:    dval_t *da      = dv_get_dx_internal(dv->a);
+src/dval/dval_math.c:    dval_t *sin_a   = dv_sin(dv->a);
+src/dval/dval_math.c:    dval_t *da  = dv_get_dx_internal(dv->a);
+src/dval/dval_math.c:    dval_t *t   = dv_tan(dv->a);
+src/dval/dval_math.c:    return dv_chain_rule_with_factor(dv, dv_cosh(dv->a));
+src/dval/dval_math.c:    return dv_chain_rule_with_factor(dv, dv_sinh(dv->a));
+src/dval/dval_math.c:    dval_t *da  = dv_get_dx_internal(dv->a);
+src/dval/dval_math.c:    dval_t *t   = dv_tanh(dv->a);
+src/dval/dval_math.c:    return dv_chain_rule_with_factor(dv, dv_exp(dv->a));
+src/dval/dval_math.c:    dval_t *da  = dv_get_dx_internal(dv->a);
+src/dval/dval_math.c:    dval_t *out = dv_div(da, dv->a);
+src/dval/dval_math.c:    dval_t *da   = dv_get_dx_internal(dv->a);
+src/dval/dval_math.c:    dval_t *sqra = dv_sqrt(dv->a);
+src/dval/dval_math.c:    dval_t *da   = dv_get_dx_internal(dv->a);
+src/dval/dval_math.c:    dval_t *a2   = dv_pow_d(dv->a, 2.0);
+src/dval/dval_math.c:    dval_t *da   = dv_get_dx_internal(dv->a);
+src/dval/dval_math.c:    dval_t *a2   = dv_pow_d(dv->a, 2.0);
+src/dval/dval_math.c:    dval_t *da  = dv_get_dx_internal(dv->a);
+src/dval/dval_math.c:    dval_t *a2  = dv_pow_d(dv->a, 2.0);
+src/dval/dval_math.c:    dval_t *y  = dv->a;
+src/dval/dval_math.c:    dval_t *x  = dv->b;
+src/dval/dval_math.c:    dval_t *da   = dv_get_dx_internal(dv->a);
+src/dval/dval_math.c:    dval_t *a2   = dv_pow_d(dv->a, 2.0);
+src/dval/dval_math.c:    dval_t *da  = dv_get_dx_internal(dv->a);
+src/dval/dval_math.c:    dval_t *am1 = dv_sub(dv->a, one);
+src/dval/dval_math.c:    dval_t *ap1 = dv_add(dv->a, one);
+src/dval/dval_math.c:    dval_t *da  = dv_get_dx_internal(dv->a);
+src/dval/dval_math.c:    dval_t *a2  = dv_pow_d(dv->a, 2.0);
+src/dval/dval_math.c:    dval_t *da   = dv_get_dx_internal(dv->a);
+src/dval/dval_math.c:    dval_t *absa = dv_abs(dv->a);
+src/dval/dval_math.c:    dval_t *sign = dv_div(dv->a, absa);
+src/dval/dval_math.c:    dval_t *da     = dv_get_dx_internal(dv->a);
+src/dval/dval_math.c:    dval_t *a2     = dv_pow_d(dv->a, 2.0);
+src/dval/dval_math.c:    dval_t *da     = dv_get_dx_internal(dv->a);
+src/dval/dval_math.c:    dval_t *a2     = dv_pow_d(dv->a, 2.0);
+src/dval/dval_math.c:    return dv_chain_rule_with_factor(dv, dv_digamma(dv->a));
+src/dval/dval_math.c:    dval_t *a    = dv->a;
+src/dval/dval_math.c:    dval_t *b    = dv->b;
+src/dval/dval_math.c:    dval_t *da  = dv_get_dx_internal(dv->a);
+src/dval/dval_math.c:    dval_t *w   = dv_erfinv(dv->a);
+src/dval/dval_math.c:    dval_t *da  = dv_get_dx_internal(dv->a);
+src/dval/dval_math.c:    dval_t *w   = dv_erfcinv(dv->a);
+src/dval/dval_math.c:    dval_t *da  = dv_get_dx_internal(dv->a);
+src/dval/dval_math.c:    dval_t *g   = dv_gamma(dv->a);
+src/dval/dval_math.c:    dval_t *dg  = dv_digamma(dv->a);
+src/dval/dval_math.c:    return dv_chain_rule_with_factor(dv, dv_trigamma(dv->a));
+src/dval/dval_math.c:    qfloat_t t2     = qf_tetragamma(dv_eval_qf(dv->a));
+src/dval/dval_math.c:    dval_t *da    = dv_get_dx_internal(dv->a);
+src/dval/dval_math.c:    dval_t *da  = dv_get_dx_internal(dv->a);
+src/dval/dval_math.c:    dval_t *w   = dv_lambert_w0(dv->a);
+src/dval/dval_math.c:    dval_t *den = dv_mul(dv->a, wp1);
+src/dval/dval_math.c:    dval_t *da  = dv_get_dx_internal(dv->a);
+src/dval/dval_math.c:    dval_t *w   = dv_lambert_wm1(dv->a);
+src/dval/dval_math.c:    dval_t *den = dv_mul(dv->a, wp1);
+src/dval/dval_math.c:    dval_t *da   = dv_get_dx_internal(dv->a);
+src/dval/dval_math.c:    dval_t *neg_a = dv_neg(dv->a);
+src/dval/dval_math.c:    dval_t *phi  = dv_normal_pdf(dv->a);
+src/dval/dval_math.c:    return dv_chain_rule_with_factor(dv, dv_normal_pdf(dv->a));
+src/dval/dval_math.c:    return dv_chain_rule_with_factor(dv, dv_neg(dv->a));
+src/dval/dval_math.c:    dval_t *da  = dv_get_dx_internal(dv->a);
+src/dval/dval_math.c:    dval_t *ea  = dv_exp(dv->a);
+src/dval/dval_math.c:    dval_t *fac = dv_div(ea, dv->a);
+src/dval/dval_math.c:    dval_t *da    = dv_get_dx_internal(dv->a);
+src/dval/dval_math.c:    dval_t *neg_a = dv_neg(dv->a);
+src/dval/dval_math.c:    dval_t *fac   = dv_div(neg_en, dv->a);
+src/dval/dval_math.c:    dval_t *da    = dv_get_dx_internal(dv->a);
+src/dval/dval_math.c:    dval_t *db    = dv_get_dx_internal(dv->b);
+src/dval/dval_math.c:    dval_t *apb   = dv_add(dv->a, dv->b);
+src/dval/dval_math.c:    dval_t *dg_a  = dv_digamma(dv->a);
+src/dval/dval_math.c:    dval_t *dg_b  = dv_digamma(dv->b);
+src/dval/dval_math.c:    dval_t *beta_n = dv_beta(dv->a, dv->b);
+src/dval/dval_math.c:    dval_t *da    = dv_get_dx_internal(dv->a);
+src/dval/dval_math.c:    dval_t *db    = dv_get_dx_internal(dv->b);
+src/dval/dval_math.c:    dval_t *apb   = dv_add(dv->a, dv->b);
+src/dval/dval_math.c:    dval_t *dg_a  = dv_digamma(dv->a);
+src/dval/dval_math.c:    dval_t *dg_b  = dv_digamma(dv->b);
+src/dval/dval_math_reverse.c:    qfloat_t denom = qf_add(qf_sq_local(dv->a->x.re), qf_sq_local(dv->b->x.re));
+src/dval/dval_math_reverse.c:    *a_bar = qf_mul(out_bar, qf_div(dv->b->x.re, denom));
+src/dval/dval_math_reverse.c:    *b_bar = qf_neg(qf_mul(out_bar, qf_div(dv->a->x.re, denom)));
+src/dval/dval_math_reverse.c:    dv_reverse_unary(qf_mul(out_bar, qf_cos(dv->a->x.re)), a_bar, b_bar);
+src/dval/dval_math_reverse.c:    dv_reverse_unary(qf_neg(qf_mul(out_bar, qf_sin(dv->a->x.re))), a_bar, b_bar);
+src/dval/dval_math_reverse.c:    qfloat_t cos_x = qf_cos(dv->a->x.re);
+src/dval/dval_math_reverse.c:    dv_reverse_unary(qf_mul(out_bar, qf_cosh(dv->a->x.re)), a_bar, b_bar);
+src/dval/dval_math_reverse.c:    dv_reverse_unary(qf_mul(out_bar, qf_sinh(dv->a->x.re)), a_bar, b_bar);
+src/dval/dval_math_reverse.c:    dv_reverse_unary(qf_mul(out_bar, qf_sub(QF_ONE, qf_sq_local(dv->x.re))), a_bar, b_bar);
+src/dval/dval_math_reverse.c:    dv_reverse_unary(qf_div(out_bar, qf_sqrt(qf_sub(QF_ONE, qf_sq_local(dv->a->x.re)))), a_bar, b_bar);
+src/dval/dval_math_reverse.c:    dv_reverse_unary(qf_neg(qf_div(out_bar, qf_sqrt(qf_sub(QF_ONE, qf_sq_local(dv->a->x.re))))), a_bar, b_bar);
+src/dval/dval_math_reverse.c:    dv_reverse_unary(qf_div(out_bar, qf_add(QF_ONE, qf_sq_local(dv->a->x.re))), a_bar, b_bar);
+src/dval/dval_math_reverse.c:    dv_reverse_unary(qf_div(out_bar, qf_sqrt(qf_add(qf_sq_local(dv->a->x.re), QF_ONE))), a_bar, b_bar);
+src/dval/dval_math_reverse.c:    qfloat_t denom = qf_mul(qf_sqrt(qf_sub(dv->a->x.re, QF_ONE)),
+src/dval/dval_math_reverse.c:                            qf_sqrt(qf_add(dv->a->x.re, QF_ONE)));
+src/dval/dval_math_reverse.c:    dv_reverse_unary(qf_div(out_bar, qf_sub(QF_ONE, qf_sq_local(dv->a->x.re))), a_bar, b_bar);
+src/dval/dval_math_reverse.c:    dv_reverse_unary(qf_mul(out_bar, dv->x.re), a_bar, b_bar);
+src/dval/dval_math_reverse.c:    dv_reverse_unary(qf_div(out_bar, dv->a->x.re), a_bar, b_bar);
+src/dval/dval_math_reverse.c:    dv_reverse_unary(qf_div(out_bar, qf_mul(qf_from_int_local(2), dv->x.re)), a_bar, b_bar);
+src/dval/dval_math_reverse.c:    int cmp = qf_cmp(dv->a->x.re, QF_ZERO);
+src/dval/dval_math_reverse.c:    *a_bar = qf_mul(out_bar, qf_div(dv->a->x.re, dv->x.re));
+src/dval/dval_math_reverse.c:    *b_bar = qf_mul(out_bar, qf_div(dv->b->x.re, dv->x.re));
+src/dval/dval_math_reverse.c:    *a_bar = qf_mul(out_bar, qf_mul(scale, qf_exp(qf_neg(qf_sq_local(dv->a->x.re)))));
+src/dval/dval_math_reverse.c:    *a_bar = qf_neg(qf_mul(out_bar, qf_mul(scale, qf_exp(qf_neg(qf_sq_local(dv->a->x.re))))));
+src/dval/dval_math_reverse.c:    *a_bar = qf_mul(out_bar, qf_mul(scale, qf_exp(qf_sq_local(dv->x.re))));
+src/dval/dval_math_reverse.c:    *a_bar = qf_neg(qf_mul(out_bar, qf_mul(scale, qf_exp(qf_sq_local(dv->x.re)))));
+src/dval/dval_math_reverse.c:    dv_reverse_unary(qf_mul(out_bar, qf_mul(dv->x.re, qf_digamma(dv->a->x.re))), a_bar, b_bar);
+src/dval/dval_math_reverse.c:    dv_reverse_unary(qf_mul(out_bar, qf_digamma(dv->a->x.re)), a_bar, b_bar);
+src/dval/dval_math_reverse.c:    dv_reverse_unary(qf_mul(out_bar, qf_trigamma(dv->a->x.re)), a_bar, b_bar);
+src/dval/dval_math_reverse.c:    dv_reverse_unary(qf_mul(out_bar, qf_tetragamma(dv->a->x.re)), a_bar, b_bar);
+src/dval/dval_math_reverse.c:    dv_reverse_unary(qf_mul(out_bar, qf_lambert_reverse_factor(dv->a->x.re, dv->x.re)), a_bar, b_bar);
+src/dval/dval_math_reverse.c:    dv_reverse_unary(qf_mul(out_bar, qf_lambert_reverse_factor(dv->a->x.re, dv->x.re)), a_bar, b_bar);
+src/dval/dval_math_reverse.c:    dv_reverse_unary(qf_neg(qf_mul(out_bar, qf_mul(dv->a->x.re, dv->x.re))), a_bar, b_bar);
+src/dval/dval_math_reverse.c:    dv_reverse_unary(qf_mul(out_bar, qf_normal_pdf(dv->a->x.re)), a_bar, b_bar);
+src/dval/dval_math_reverse.c:    dv_reverse_unary(qf_neg(qf_mul(out_bar, dv->a->x.re)), a_bar, b_bar);
+src/dval/dval_math_reverse.c:    dv_reverse_unary(qf_mul(out_bar, qf_div(qf_exp(dv->a->x.re), dv->a->x.re)), a_bar, b_bar);
+src/dval/dval_math_reverse.c:    dv_reverse_unary(qf_neg(qf_mul(out_bar, qf_div(qf_exp(qf_neg(dv->a->x.re)), dv->a->x.re))), a_bar, b_bar);
+src/dval/dval_math_reverse.c:    qfloat_t psi_ab = qf_digamma(qf_add(dv->a->x.re, dv->b->x.re));
+src/dval/dval_math_reverse.c:    *a_bar = qf_mul(out_bar, qf_mul(dv->x.re, qf_sub(qf_digamma(dv->a->x.re), psi_ab)));
+src/dval/dval_math_reverse.c:    *b_bar = qf_mul(out_bar, qf_mul(dv->x.re, qf_sub(qf_digamma(dv->b->x.re), psi_ab)));
+src/dval/dval_math_reverse.c:    qfloat_t psi_ab = qf_digamma(qf_add(dv->a->x.re, dv->b->x.re));
+src/dval/dval_math_reverse.c:    *a_bar = qf_mul(out_bar, qf_sub(qf_digamma(dv->a->x.re), psi_ab));
+src/dval/dval_math_reverse.c:    *b_bar = qf_mul(out_bar, qf_sub(qf_digamma(dv->b->x.re), psi_ab));
+src/dval/dval_pattern.c:    return expr && expr->ops && expr->ops->kind == kind;
+src/dval/dval_pattern.c:           !dv->name &&
+src/dval/dval_pattern.c:           qc_eq(dv->c, QC_ZERO);
+src/dval/dval_pattern.c:    return is_kind(dv, DV_KIND_CONST) && dv->name && *dv->name;
+src/dval/dval_pattern.c:        *value_out = expr->c.re;
+src/dval/dval_pattern.c:        *name_out = (expr->name && *expr->name) ? expr->name : NULL;
+src/dval/dval_pattern.c:        *value_out = expr->c.re;
+src/dval/dval_pattern.c:        *name_out = (expr->name && *expr->name) ? expr->name : NULL;
+src/dval/dval_pattern.c:    if (!is_kind(expr, kind) || !expr->a)
+src/dval/dval_pattern.c:        *arg_out = expr->a;
+src/dval/dval_pattern.c:    if (!is_kind(expr, kind) || !expr->a || !expr->b)
+src/dval/dval_pattern.c:        *left_out = expr->a;
+src/dval/dval_pattern.c:        *right_out = expr->b;
+src/dval/dval_pattern.c:    return -1;
+src/dval/dval_pattern.c:    if (!is_kind(expr, kind) || !expr->a)
+src/dval/dval_pattern.c:    if (!dv_match_affine_term(expr->a, nvars, vars, QF_ONE, &constant, coeffs_out))
+src/dval/dval_pattern.c:        *scale_out = qf_from_double(-1.0);
+src/dval/dval_pattern.c:    if (expr->a && !dv_collect_var_usage_impl(expr->a, nvars, vars, used_out))
+src/dval/dval_pattern.c:    if (expr->b && !dv_collect_var_usage_impl(expr->b, nvars, vars, used_out))
+src/dval/dval_pattern.c:        out = dv_pow_qc(left, expr->c);
+src/dval/dval_pattern.c:    if (expr->ops->arity == DV_OP_UNARY && expr->ops->apply_unary) {
+src/dval/dval_pattern.c:        left = dv_substitute(expr->a, needle, replacement);
+src/dval/dval_pattern.c:        out = expr->ops->apply_unary(left);
+src/dval/dval_pattern.c:    if (expr->ops->arity == DV_OP_BINARY && expr->ops->apply_binary) {
+src/dval/dval_pattern.c:        left = dv_substitute(expr->a, needle, replacement);
+src/dval/dval_pattern.c:        right = dv_substitute(expr->b, needle, replacement);
+src/dval/dval_pattern.c:        out = expr->ops->apply_binary(left, right);
+src/dval/dval_reverse.c:    return -1;
+src/dval/dval_reverse.c:    if (reverse_collect_nodes(node->a, slots, nslots, capslots) != 0)
+src/dval/dval_reverse.c:        return -1;
+src/dval/dval_reverse.c:    if (reverse_collect_nodes(node->b, slots, nslots, capslots) != 0)
+src/dval/dval_reverse.c:        return -1;
+src/dval/dval_reverse.c:            return -1;
+src/dval/dval_reverse.c:        return -1;
+src/dval/dval_reverse.c:        return -1;
+src/dval/dval_reverse.c:        return -1;
+src/dval/dval_reverse.c:    slots[nslots - 1].adjoint = QF_ONE;
+src/dval/dval_reverse.c:    for (size_t i = nslots; i-- > 0;) {
+src/dval/dval_reverse.c:        if (!node->ops || !node->ops->reverse) {
+src/dval/dval_reverse.c:            return -1;
+src/dval/dval_reverse.c:        node->ops->reverse(node, out_bar, &a_bar, &b_bar);
+src/dval/dval_reverse.c:        if (node->a && !qf_eq(a_bar, QF_ZERO)) {
+src/dval/dval_reverse.c:            child_index = reverse_find_slot(slots, nslots, node->a);
+src/dval/dval_reverse.c:                return -1;
+src/dval/dval_reverse.c:        if (node->b && !qf_eq(b_bar, QF_ZERO)) {
+src/dval/dval_reverse.c:            child_index = reverse_find_slot(slots, nslots, node->b);
+src/dval/dval_reverse.c:                return -1;
+src/dval/dval_reverse.c:    *a_bar = qf_mul(out_bar, dv->b->x.re);
+src/dval/dval_reverse.c:    *b_bar = qf_mul(out_bar, dv->a->x.re);
+src/dval/dval_reverse.c:    qfloat_t denom_sq = qf_mul(dv->b->x.re, dv->b->x.re);
+src/dval/dval_reverse.c:    *a_bar = qf_div(out_bar, dv->b->x.re);
+src/dval/dval_reverse.c:    *b_bar = qf_neg(qf_div(qf_mul(out_bar, dv->a->x.re), denom_sq));
+src/dval/dval_reverse.c:    qfloat_t z = dv->x.re;
+src/dval/dval_reverse.c:    *a_bar = qf_mul(out_bar, qf_div(qf_mul(z, dv->b->x.re), dv->a->x.re));
+src/dval/dval_reverse.c:    *b_bar = qf_mul(out_bar, qf_mul(z, qf_log(dv->a->x.re)));
+src/dval/dval_reverse.c:    qfloat_t exponent = dv->c.re;
+src/dval/dval_reverse.c:    *a_bar = qf_mul(out_bar, qf_mul(exponent, qf_pow(dv->a->x.re, one_less)));
+src/dval/dval_simplify.c:/* dval_simplify.c - algebraic simplification of differentiable value nodes
+src/dval/dval_simplify.c: * of structural rules applied bottom-up.  It is called automatically by
+src/dval/dval_simplify.c: *   1. Constant folding — a sub-tree with no variable leaves is replaced by
+src/dval/dval_simplify.c: *   4. Like-term collection in additions — terms with the same symbolic
+src/dval/dval_simplify.c:        if (dv_qf_is_zero(dv->c.re)) { *is_zero = 1; return; }
+src/dval/dval_simplify.c:        *c_acc = qf_mul(*c_acc, dv->c.re);
+src/dval/dval_simplify.c:        collect_mul_flat(dv->a, c_acc, is_zero, terms, nterms, cap);
+src/dval/dval_simplify.c:        collect_mul_flat(dv->a, c_acc, is_zero, terms, nterms, cap);
+src/dval/dval_simplify.c:        collect_mul_flat(dv->b, c_acc, is_zero, terms, nterms, cap);
+src/dval/dval_simplify.c:    /* exp(log(x)) -> x, log(exp(x)) -> x */
+src/dval/dval_simplify.c:        dval_t *inner = a->a;
+src/dval/dval_simplify.c:        if (dv->ops->fold_const_unary && dv->ops->fold_const_unary(a->c.re, &folded)) {
+src/dval/dval_simplify.c:        if ((!a->name || !*a->name) && dv->ops->apply_unary) {
+src/dval/dval_simplify.c:            dval_t *tmp = dv->ops->apply_unary(a);
+src/dval/dval_simplify.c:            qfloat_t v = tmp->ops->eval(tmp).re;
+src/dval/dval_simplify.c:        dv_is_unnamed_const(a->a) &&
+src/dval/dval_simplify.c:        qf_cmp(a->a->c.re, QF_ZERO) > 0) {
+src/dval/dval_simplify.c:        qfloat_t coeff_root = qf_sqrt(a->a->c.re);
+src/dval/dval_simplify.c:        if (qf_eq(qf_mul(coeff_root, coeff_root), a->a->c.re)) {
+src/dval/dval_simplify.c:            dv_retain(a->b);
+src/dval/dval_simplify.c:            raw = dv_sqrt(a->b);
+src/dval/dval_simplify.c:            dv_free(a->b);
+src/dval/dval_simplify.c:    if (dv->ops->apply_unary) {
+src/dval/dval_simplify.c:        dval_t *out = dv->ops->apply_unary(a);
+src/dval/dval_simplify.c:    if ((!a || !b) || !dv->ops->apply_binary)
+src/dval/dval_simplify.c:        dval_t *tmp = dv->ops->apply_binary(a, b);
+src/dval/dval_simplify.c:        qfloat_t v = tmp->ops->eval(tmp).re;
+src/dval/dval_simplify.c:    dval_t *out = dv->ops->apply_binary(a, b);
+src/dval/dval_simplify.c:/* Per-operation simplifiers                                                 */
+src/dval/dval_simplify.c:    /* --x → x */
+src/dval/dval_simplify.c:        dval_t *inner = a->a; dv_retain(inner); dv_free(a); return inner;
+src/dval/dval_simplify.c:    /* neg(c) → -c */
+src/dval/dval_simplify.c:        qfloat_t c = qf_neg(a->c.re); dv_free(a); return dv_new_const(c);
+src/dval/dval_simplify.c:    /* neg(c·x) where c < 0 → |c|·x  (eliminates spurious double-negative) */
+src/dval/dval_simplify.c:        dv_is_op(a->a, &ops_const) &&
+src/dval/dval_simplify.c:        (!a->a->name || !*a->a->name) &&
+src/dval/dval_simplify.c:        qf_cmp(a->a->c.re, QF_ZERO) < 0) {
+src/dval/dval_simplify.c:        qfloat_t pos_c = qf_neg(a->a->c.re);
+src/dval/dval_simplify.c:        dv_retain(a->b);
+src/dval/dval_simplify.c:        dval_t *rest = a->b;
+src/dval/dval_simplify.c:/* --- */
+src/dval/dval_simplify.c:    dv_collect_addends(b, dv_is_op(dv, &ops_sub) ? qf_from_double(-1.0) : qf_from_double(1.0), &c_const, &terms, &n, &cap);
+src/dval/dval_simplify.c:    /* find the leading non-cancelled symbolic term */
+src/dval/dval_simplify.c:     * the expression reads "1 - tanh²(x)" rather than "-tanh²(x) + 1" */
+src/dval/dval_simplify.c:/* --- */
+src/dval/dval_simplify.c:    if ((dv_is_op(a, &ops_const) && dv_qf_is_zero(a->c.re)) ||
+src/dval/dval_simplify.c:        (dv_is_op(b, &ops_const) && dv_qf_is_zero(b->c.re))) {
+src/dval/dval_simplify.c:    if (dv_is_op(a, &ops_const) && dv_qf_is_one(a->c.re)) {
+src/dval/dval_simplify.c:    if (dv_is_op(b, &ops_const) && dv_qf_is_one(b->c.re)) {
+src/dval/dval_simplify.c:/* --- */
+src/dval/dval_simplify.c:    if (dv_is_op(b, &ops_const) && dv_qf_is_one(b->c.re)) { dv_free(b); return a; }
+src/dval/dval_simplify.c:        dv_is_unnamed_const(a->a)) {
+src/dval/dval_simplify.c:        qfloat_t folded = qf_div(a->a->c.re, b->c.re);
+src/dval/dval_simplify.c:        dv_retain(a->b);
+src/dval/dval_simplify.c:        rest = a->b;
+src/dval/dval_simplify.c:        dv_retain(a->a);
+src/dval/dval_simplify.c:        inner = a->a;
+src/dval/dval_simplify.c:        qfloat_t denom = b->c.re;
+src/dval/dval_simplify.c:    if (dv_is_op(a, &ops_mul) && dv_struct_eq(a->a, b)) {
+src/dval/dval_simplify.c:        dv_retain(a->b);
+src/dval/dval_simplify.c:        rest = a->b;
+src/dval/dval_simplify.c:    if (dv_is_op(a, &ops_mul) && dv_struct_eq(a->b, b)) {
+src/dval/dval_simplify.c:        dv_retain(a->a);
+src/dval/dval_simplify.c:        rest = a->a;
+src/dval/dval_simplify.c:    if (dv_is_op(a, &ops_const) && dv_qf_is_zero(a->c.re)) {
+src/dval/dval_simplify.c:        qfloat_t q = qf_div(a->c.re, b->c.re); dv_free(a); dv_free(b);
+src/dval/dval_simplify.c:        dv_struct_eq(a->a, b->a)) {
+src/dval/dval_simplify.c:        dv_retain(a->a);
+src/dval/dval_simplify.c:        dval_t *r = dv_tanh(a->a); dv_free(a->a); dv_free(a); dv_free(b);
+src/dval/dval_simplify.c:        dv_struct_eq(a->a, b->a)) {
+src/dval/dval_simplify.c:        dv_retain(a->a);
+src/dval/dval_simplify.c:        dval_t *r = dv_tan(a->a); dv_free(a->a); dv_free(a); dv_free(b);
+src/dval/dval_simplify.c:    /* x/abs(x) → abs(x)/x  (canonical sign-function form) */
+src/dval/dval_simplify.c:    if (dv_is_op(b, &ops_abs) && dv_struct_eq(a, b->a)) {
+src/dval/dval_simplify.c:/* --- */
+src/dval/dval_simplify.c:    qfloat_t exponent = dv->c.re;
+src/dval/dval_simplify.c:        qfloat_t v = qf_pow(a->c.re, exponent);
+src/dval/dval_simplify.c:        dv_retain(a->a);
+src/dval/dval_simplify.c:        dval_t *inner = a->a;
+src/dval/dval_simplify.c:/* --- */
+src/dval/dval_simplify.c:    if (dv_is_op(b, &ops_const) && dv_qf_is_one(b->c.re)) { dv_free(b); return a; }
+src/dval/dval_simplify.c:    if (dv_is_op(b, &ops_const) && dv_qf_is_zero(b->c.re)) {
+src/dval/dval_simplify.c:/* --- */
+src/dval/dval_simplify.c:    if (dv_is_op(a, &ops_const) && dv_qf_is_zero(a->c.re)) {
+src/dval/dval_simplify.c:    if (dv_is_op(b, &ops_const) && dv_qf_is_zero(b->c.re)) {
+src/dval/dval_simplify.c:    if (dv->ops->arity == DV_OP_ATOM) { dv_retain(dv); return dv; }
+src/dval/dval_simplify.c:    dval_t *a = dv->a ? dv_simplify(dv->a) : NULL;
+src/dval/dval_simplify.c:    dval_t *b = dv->b ? dv_simplify(dv->b) : NULL;
+src/dval/dval_simplify.c:    if (dv->ops->simplify)
+src/dval/dval_simplify.c:        return dv->ops->simplify(dv, a, b);
+src/dval/dval_simplify_match.c:        *c_acc = qf_mul(*c_acc, dv->c.re);
+src/dval/dval_simplify_match.c:        collect_mul_factors_borrowed(dv->a, c_acc, terms, nterms, cap);
+src/dval/dval_simplify_match.c:        collect_mul_factors_borrowed(dv->a, c_acc, terms, nterms, cap);
+src/dval/dval_simplify_match.c:        collect_mul_factors_borrowed(dv->b, c_acc, terms, nterms, cap);
+src/dval/dval_simplify_match.c:    if (u->ops != v->ops)
+src/dval/dval_simplify_match.c:        return qf_eq(u->c.re, v->c.re);
+src/dval/dval_simplify_match.c:        return dv_struct_eq(u->a, v->a);
+src/dval/dval_simplify_match.c:        return dv_struct_eq(u->a, v->a) && qf_eq(u->c.re, v->c.re);
+src/dval/dval_simplify_match.c:    return dv_struct_eq(u->a, v->a) && dv_struct_eq(u->b, v->b);
+src/dval/dval_simplify_terms.c:        return term->c.re;
+src/dval/dval_simplify_terms.c:        if (dv_is_op(term->a, &ops_mul) && dv_is_unnamed_const(term->a->a)) {
+src/dval/dval_simplify_terms.c:            *base = term->a->b;
+src/dval/dval_simplify_terms.c:            return qf_neg(term->a->a->c.re);
+src/dval/dval_simplify_terms.c:        *base = term->a;
+src/dval/dval_simplify_terms.c:        return qf_from_double(-1.0);
+src/dval/dval_simplify_terms.c:    if (dv_is_op(term, &ops_mul) && dv_is_unnamed_const(term->a)) {
+src/dval/dval_simplify_terms.c:        *base = term->b;
+src/dval/dval_simplify_terms.c:        return term->a->c.re;
+src/dval/dval_simplify_terms.c:        if (dv_is_op(base, &ops_div) && dv_is_op(base->a, &ops_mul) &&
+src/dval/dval_simplify_terms.c:            dv_is_unnamed_const(base->a->a) &&
+src/dval/dval_simplify_terms.c:            qf_cmp(base->a->a->c.re, QF_ZERO) < 0) {
+src/dval/dval_simplify_terms.c:            qfloat_t pos_c = qf_neg(base->a->a->c.re);
+src/dval/dval_simplify_terms.c:            dval_t *rest = base->a->b;
+src/dval/dval_simplify_terms.c:            dval_t *den = base->b;
+src/dval/dval_simplify_terms.c:        if (dv_is_op(base, &ops_div) && dv_is_op(base->a, &ops_neg)) {
+src/dval/dval_simplify_terms.c:            dval_t *inner = base->a->a;
+src/dval/dval_simplify_terms.c:            dval_t *den = base->b;
+src/dval/dval_simplify_terms.c:    if (dv_is_op(base, &ops_mul) && dv_is_unnamed_const(base->a)) {
+src/dval/dval_simplify_terms.c:        qfloat_t folded = qf_mul(coeff, base->a->c.re);
+src/dval/dval_simplify_terms.c:        dv_retain(base->b);
+src/dval/dval_simplify_terms.c:        dval_t *rest = base->b;
+src/dval/dval_simplify_terms.c:        dv_is_op(base->a, &ops_mul) &&
+src/dval/dval_simplify_terms.c:        dv_is_unnamed_const(base->a->a)) {
+src/dval/dval_simplify_terms.c:        qfloat_t folded = qf_mul(coeff, base->a->a->c.re);
+src/dval/dval_simplify_terms.c:        dv_retain(base->a->b);
+src/dval/dval_simplify_terms.c:        dv_retain(base->b);
+src/dval/dval_simplify_terms.c:        dval_t *inner = dv_mul(base->a->b, base->b);
+src/dval/dval_simplify_terms.c:        dv_free(base->a->b);
+src/dval/dval_simplify_terms.c:        dv_free(base->b);
+src/dval/dval_simplify_terms.c:    if (dv->ops->arity == DV_OP_UNARY)                  return 0;
+src/dval/dval_simplify_terms.c:    if (dv_is_op(dv, &ops_const) && dv->name && *dv->name) return 2;
+src/dval/dval_simplify_terms.c:        return dv->name ? dv->name : "";
+src/dval/dval_simplify_terms.c:    if (dv->a && dv_is_op(dv->a, &ops_var))
+src/dval/dval_simplify_terms.c:        return dv->a->name ? dv->a->name : "";
+src/dval/dval_simplify_terms.c:            if (!dv_struct_eq(ibase->b, jbase->b))
+src/dval/dval_simplify_terms.c:                dv_retain(ibase->a);
+src/dval/dval_simplify_terms.c:                sum_num = dv_make_scaled(terms[i].coeff, ibase->a);
+src/dval/dval_simplify_terms.c:            dv_retain(jbase->a);
+src/dval/dval_simplify_terms.c:            j_num_term = dv_make_scaled(terms[j].coeff, jbase->a);
+src/dval/dval_simplify_terms.c:        dv_retain(ibase->b);
+src/dval/dval_simplify_terms.c:        combined = dv_div(simp_num, ibase->b);
+src/dval/dval_simplify_terms.c:        dv_free(ibase->b);
+src/dval/dval_simplify_terms.c:    if (!lhs->base && !rhs->base)
+src/dval/dval_simplify_terms.c:    if (!lhs->base)
+src/dval/dval_simplify_terms.c:    if (!rhs->base)
+src/dval/dval_simplify_terms.c:        return -1;
+src/dval/dval_simplify_terms.c:    lg = addend_group(lhs->base);
+src/dval/dval_simplify_terms.c:    rg = addend_group(rhs->base);
+src/dval/dval_simplify_terms.c:        return lg - rg;
+src/dval/dval_simplify_terms.c:    return strcmp(addend_sort_name(lhs->base), addend_sort_name(rhs->base));
+src/dval/dval_simplify_terms.c:        while (j > 0 && compare_addends(&terms[j - 1], &key) > 0) {
+src/dval/dval_simplify_terms.c:            terms[j] = terms[j - 1];
+src/dval/dval_simplify_terms.c:            --j;
+src/dval/dval_simplify_terms.c:        dv_collect_addends(dv->a, scale, c_const, terms, n, cap);
+src/dval/dval_simplify_terms.c:        dv_collect_addends(dv->b, scale, c_const, terms, n, cap);
+src/dval/dval_simplify_terms.c:        dv_collect_addends(dv->a, scale, c_const, terms, n, cap);
+src/dval/dval_simplify_terms.c:        dv_collect_addends(dv->b, qf_neg(scale), c_const, terms, n, cap);
+src/dval/dval_simplify_terms.c:        if (dv_is_addsub(dv->a)) {
+src/dval/dval_simplify_terms.c:            dv_collect_addends(dv->a, qf_neg(scale), c_const, terms, n, cap);
+src/dval/dval_simplify_terms.c:        if (dv_is_op(dv->a, &ops_mul) &&
+src/dval/dval_simplify_terms.c:            dv_is_unnamed_const(dv->a->a) &&
+src/dval/dval_simplify_terms.c:            dv_is_addsub(dv->a->b)) {
+src/dval/dval_simplify_terms.c:            qfloat_t ns = qf_mul(qf_neg(scale), dv->a->a->c.re);
+src/dval/dval_simplify_terms.c:            dv_collect_addends(dv->a->b, ns, c_const, terms, n, cap);
+src/dval/dval_simplify_terms.c:        dv_is_unnamed_const(dv->a) &&
+src/dval/dval_simplify_terms.c:        dv_is_addsub(dv->b)) {
+src/dval/dval_simplify_terms.c:        qfloat_t ns = qf_mul(scale, dv->a->c.re);
+src/dval/dval_simplify_terms.c:        dv_collect_addends(dv->b, ns, c_const, terms, n, cap);
+src/dval/dval_simplify_terms.c:        dv_is_op(dv->a, &ops_mul) &&
+src/dval/dval_simplify_terms.c:        dv_is_unnamed_const(dv->a->a)) {
+src/dval/dval_simplify_terms.c:        qfloat_t ns = qf_mul(scale, dv->a->a->c.re);
+src/dval/dval_simplify_terms.c:        dv_retain(dv->a->b);
+src/dval/dval_simplify_terms.c:        dv_retain(dv->b);
+src/dval/dval_simplify_terms.c:        raw = dv_mul(dv->a->b, dv->b);
+src/dval/dval_simplify_terms.c:        dv_free(dv->a->b);
+src/dval/dval_simplify_terms.c:        dv_free(dv->b);
+src/dval/dval_simplify_terms.c:    if (!dv_is_pow_d_expr(dv) || !qf_eq(dv->c.re, qf_from_double(2.0)))
+src/dval/dval_simplify_terms.c:    if (!dv_is_op(dv->a, op))
+src/dval/dval_simplify_terms.c:    *arg_out = dv->a->a;
+src/dval/dval_simplify_terms.c:        dval_t *dv = stk[--sp];
+src/dval/dval_simplify_terms.c:                stk[sp++] = dv->b;
+src/dval/dval_simplify_terms.c:                stk[sp++] = dv->a;
+src/dval/dval_simplify_terms.c:        dval_t *l = expand_product(u->a, v);
+src/dval/dval_simplify_terms.c:        dval_t *r = expand_product(u->b, v);
+src/dval/dval_simplify_terms.c:        dval_t *l = expand_product(u->a, v);
+src/dval/dval_simplify_terms.c:        dval_t *r = expand_product(u->b, v);
+src/dval/dval_simplify_terms.c:    return dv_is_op(dv, &ops_pow_d) ? dv->c.re : QF_ONE;
+src/dval/dval_simplify_terms.c:    return dv_is_op(dv, &ops_pow_d) ? dv->a : (dval_t *)dv;
+src/dval/dval_simplify_terms.c:        num = term->a;
+src/dval/dval_simplify_terms.c:        den = term->b;
+src/dval/dval_simplify_terms.c:            if (dv_qf_is_zero(num->c.re))
+src/dval/dval_simplify_terms.c:                *c_acc = qf_mul(*c_acc, num->c.re);
+src/dval/dval_simplify_terms.c:            *c_acc = qf_div(*c_acc, den->c.re);
+src/dval/dval_simplify_terms.c:            flatten_add(terms[i]->a, addends, &na, 64);
+src/dval/dval_simplify_terms.c:            flatten_add(terms[j]->a, addends, &na, 64);
+src/dval/dval_simplify_terms.c:                int t = s - 1;
+src/dval/dval_simplify_terms.c:                    int cmp = (tg != kg) ? (tg - kg)
+src/dval/dval_simplify_terms.c:                    --t;
+src/dval/dval_simplify_terms.c:            dv_retain(terms[i]->a);
+src/dval/dval_simplify_terms.c:            dv_retain(terms[j]->a);
+src/dval/dval_simplify_terms.c:            prod = dv_mul(terms[i]->a, terms[j]->a);
+src/dval/dval_simplify_terms.c:            dv_free(terms[i]->a);
+src/dval/dval_simplify_terms.c:            dv_free(terms[j]->a);
+src/dval/dval_simplify_terms.c:    const dval_t *t0c[2] = { t0->a, t0->b };
+src/dval/dval_simplify_terms.c:    const dval_t *t1c[2] = { t1->a, t1->b };
+src/dval/dval_simplify_terms.c:        dv_is_addsub(t0->a) || dv_is_addsub(t0->b) ||
+src/dval/dval_simplify_terms.c:        dv_is_addsub(t1->a) || dv_is_addsub(t1->b))
+src/dval/dval_tostring.c:/* dval_tostring.c - symbolic/string conversion for dval_t
+src/dval/dval_tostring.c: * Produces human-readable and round-trip-safe string representations of a
+src/dval/dval_tostring.c:/* ------------------------------------------------------------------------- */
+src/dval/dval_tostring.c:/* ------------------------------------------------------------------------- */
+src/dval/dval_tostring.c:/* ------------------------------------------------------------------------- */
+src/dval/dval_tostring.c:/* ------------------------------------------------------------------------- */
+src/dval/dval_tostring.c:/* ------------------------------------------------------------------------- */
+src/dval/dval_tostring.c:/* Auto-naming for unnamed nodes                                             */
+src/dval/dval_tostring.c:/* ------------------------------------------------------------------------- */
+src/dval/dval_tostring.c:/* The 10 subscript digit strings (U+2080–U+2089), each 3 UTF-8 bytes.
+src/dval/dval_tostring.c: * Multi-digit subscripts like ₁₀ are assembled from these at call time. */
+src/dval/dval_tostring.c: * The returned buffer is heap-allocated and owned by the caller. */
+src/dval/dval_tostring.c:    for (int i = nd - 1; i >= 0; i--) {
+src/dval/dval_tostring.c:    char   *buf;   /* allocated name, also stored in node->name during use */
+src/dval/dval_tostring.c:    t->entries = NULL;
+src/dval/dval_tostring.c:    t->count   = 0;
+src/dval/dval_tostring.c:    t->cap     = 0;
+src/dval/dval_tostring.c:/* Restore node->name fields to NULL and free all allocated name buffers. */
+src/dval/dval_tostring.c:    for (size_t i = 0; i < t->count; i++) {
+src/dval/dval_tostring.c:        t->entries[i].node->name = NULL;
+src/dval/dval_tostring.c:        free(t->entries[i].buf);
+src/dval/dval_tostring.c:    free(t->entries);
+src/dval/dval_tostring.c:    t->entries = NULL;
+src/dval/dval_tostring.c:    t->count   = 0;
+src/dval/dval_tostring.c:    t->cap     = 0;
+src/dval/dval_tostring.c:/* DFS: find unnamed var nodes and assign x₀, x₁, … in first-visit order. */
+src/dval/dval_tostring.c:        if (f->name && *f->name) return;  /* already named */
+src/dval/dval_tostring.c:        for (size_t i = 0; i < t->count; i++)
+src/dval/dval_tostring.c:            if (t->entries[i].node == f) return;
+src/dval/dval_tostring.c:        if (t->count == t->cap) {
+src/dval/dval_tostring.c:            t->cap = t->cap ? t->cap * 2 : 4;
+src/dval/dval_tostring.c:            t->entries = (autoname_entry_t *)realloc(
+src/dval/dval_tostring.c:                t->entries, t->cap * sizeof(autoname_entry_t));
+src/dval/dval_tostring.c:            if (!t->entries) { fprintf(stderr, "auto-name: OOM\n"); abort(); }
+src/dval/dval_tostring.c:        char *buf = make_subscript_name('x', (int)t->count);
+src/dval/dval_tostring.c:        t->entries[t->count].node = f;
+src/dval/dval_tostring.c:        t->entries[t->count].buf  = buf;
+src/dval/dval_tostring.c:        t->count++;
+src/dval/dval_tostring.c:        f->name = buf;   /* temporary assignment */
+src/dval/dval_tostring.c:    assign_unnamed_vars_dfs(f->a, t);
+src/dval/dval_tostring.c:    assign_unnamed_vars_dfs(f->b, t);
+src/dval/dval_tostring.c:/* ------------------------------------------------------------------------- */
+src/dval/dval_tostring.c:/* ------------------------------------------------------------------------- */
+src/dval/dval_tostring.c:        n = -n;
+src/dval/dval_tostring.c:    for (int i = len - 1; i >= 0; --i) {
+src/dval/dval_tostring.c:        int d = tmp[i] - '0';
+src/dval/dval_tostring.c:/* ------------------------------------------------------------------------- */
+src/dval/dval_tostring.c:/* ------------------------------------------------------------------------- */
+src/dval/dval_tostring.c:        if (f->name && *f->name) {
+src/dval/dval_tostring.c:            emit_name(b, f->name);
+src/dval/dval_tostring.c:            qf_to_string_simple(f->c, buf, sizeof(buf));
+src/dval/dval_tostring.c:        emit_name(b, f->name ? f->name : "x");
+src/dval/dval_tostring.c:/* -------------------------------------------------------------
+src/dval/dval_tostring.c:   parentheses) are self-delimiting; infix operators and neg are not.
+src/dval/dval_tostring.c:   ------------------------------------------------------------- */
+src/dval/dval_tostring.c:    if (e->ops->arity == DV_OP_ATOM)  return 0;  /* var, const */
+src/dval/dval_tostring.c:    if (e->ops->arity == DV_OP_UNARY)  return 0;  /* sin(…), exp(…), etc. */
+src/dval/dval_tostring.c:/* -------------------------------------------------------------
+src/dval/dval_tostring.c:   ------------------------------------------------------------- */
+src/dval/dval_tostring.c:         * or letter + subscript digits).  Multi-char names like "pi" or "radius"
+src/dval/dval_tostring.c:         * are non-atomic so that a middle-dot separator is inserted between adjacent
+src/dval/dval_tostring.c:        if (!f->name || !*f->name) return 1;
+src/dval/dval_tostring.c:        return dv_tostring_is_simple_name(f->name);
+src/dval/dval_tostring.c:        return dv_tostring_is_simple_name(f->name);
+src/dval/dval_tostring.c:        return dv_tostring_is_simple_name(f->a->name);
+src/dval/dval_tostring.c:/* -------------------------------------------------------------
+src/dval/dval_tostring.c:   ------------------------------------------------------------- */
+src/dval/dval_tostring.c:        flatten_mul(f->a, buf, count, max);
+src/dval/dval_tostring.c:        flatten_mul(f->b, buf, count, max);
+src/dval/dval_tostring.c: *       stable so same-arg functions keep their original tree order
+src/dval/dval_tostring.c:    if (dv_is_neg(f)) f = f->a;
+src/dval/dval_tostring.c:        if (!f->name || !*f->name) return 0;
+src/dval/dval_tostring.c:        /* Greek letters are UTF-8 multi-byte; first byte >= 0x80 */
+src/dval/dval_tostring.c:        return ((unsigned char)f->name[0] >= 0x80) ? 1 : 2;
+src/dval/dval_tostring.c:    if (dv_is_var(f)) return f->name ? f->name : "";
+src/dval/dval_tostring.c:    const char *a = first_var_name(f->a);
+src/dval/dval_tostring.c:    return first_var_name(f->b);
+src/dval/dval_tostring.c:    if (dv_is_neg(f) || dv_is_pow_d_expr(f)) return factor_depth(f->a);
+src/dval/dval_tostring.c:    if (f->ops->arity == DV_OP_UNARY) return 1 + factor_depth(f->a);
+src/dval/dval_tostring.c:    if (f->ops->arity == DV_OP_BINARY) {
+src/dval/dval_tostring.c:        int da = factor_depth(f->a), db = factor_depth(f->b);
+src/dval/dval_tostring.c:    if (dv_is_neg(f)) f = f->a;
+src/dval/dval_tostring.c:        return (f->name && *f->name) ? f->name : "";
+src/dval/dval_tostring.c:        return f->name ? f->name : "";
+src/dval/dval_tostring.c:        return f->a->name ? f->a->name : "";
+src/dval/dval_tostring.c:    return first_var_name(f->a);
+src/dval/dval_tostring.c:        int t = s - 1;
+src/dval/dval_tostring.c:                cmp = tg - kg;
+src/dval/dval_tostring.c:                cmp = (td != kd) ? (td - kd) : strcmp(factor_sort_name(fac[t]), kn);
+src/dval/dval_tostring.c:            t--;
+src/dval/dval_tostring.c:/* ------------------------------------------------------------------------- */
+src/dval/dval_tostring.c:/* ------------------------------------------------------------------------- */
+src/dval/dval_tostring.c:        return expr_is_negative(f->a) ^ expr_is_negative(f->b);
+src/dval/dval_tostring.c:    neg = (b.len > 0 && b.data[0] == '-');
+src/dval/dval_tostring.c:        emit_expr(f->a, b, parent_prec);
+src/dval/dval_tostring.c:                if (qf_to_double(fac[i]->c.re) == -1.0) {
+src/dval/dval_tostring.c:                    for (int j = i; j < n - 1; ++j)
+src/dval/dval_tostring.c:                    --n;
+src/dval/dval_tostring.c:                    pos_const.c = qc_neg(fac[i]->c);
+src/dval/dval_tostring.c:                int left_atomic = is_atomic_for_mul(fac[i - 1]);
+src/dval/dval_tostring.c:    if (dv_is_op(f, &ops_div) && expr_is_negative(f->a)) {
+src/dval/dval_tostring.c:        emit_expr_abs(f->a, b, PREC_MUL);
+src/dval/dval_tostring.c:        emit_expr(f->b, b, PREC_POW);
+src/dval/dval_tostring.c:    /* Negation: -a  — only parenthesise when the child is an add/sub */
+src/dval/dval_tostring.c:        const dval_t *a = f->a;
+src/dval/dval_tostring.c:            emit_expr(a->a, b, 0);
+src/dval/dval_tostring.c:        sbuf_putc(b, '-');
+src/dval/dval_tostring.c:    if (f->ops->arity == DV_OP_UNARY) {
+src/dval/dval_tostring.c:            emit_expr_abs_bars(f->a, b);
+src/dval/dval_tostring.c:            sbuf_puts(b, f->ops->name);
+src/dval/dval_tostring.c:        emit_expr(f->a, b, 0);
+src/dval/dval_tostring.c:        double ed = qf_to_double(f->c.re);
+src/dval/dval_tostring.c:        if (f->a->ops->arity == DV_OP_UNARY) {
+src/dval/dval_tostring.c:            dval_t *inner = f->a;
+src/dval/dval_tostring.c:                sbuf_puts(b, inner->ops->name);
+src/dval/dval_tostring.c:                qf_to_string_simple(f->c, buf, sizeof(buf));
+src/dval/dval_tostring.c:            emit_expr(inner->a, b, 0);
+src/dval/dval_tostring.c:        emit_expr(f->a, b, PREC_POW);
+src/dval/dval_tostring.c:            qf_to_string_simple(f->c, buf, sizeof(buf));
+src/dval/dval_tostring.c:            sign = -sign;
+src/dval/dval_tostring.c:                if (qf_to_double(fac[i]->c.re) == -1.0) {
+src/dval/dval_tostring.c:                    for (int j = i; j < n - 1; j++)
+src/dval/dval_tostring.c:                    n--;
+src/dval/dval_tostring.c:                    i--;
+src/dval/dval_tostring.c:                pos_const.c = qc_neg(fac[i]->c);
+src/dval/dval_tostring.c:                fac[i] = fac[i]->a;
+src/dval/dval_tostring.c:            sbuf_putc(b, '-');
+src/dval/dval_tostring.c:                int left_atomic  = is_atomic_for_mul(fac[i-1]);
+src/dval/dval_tostring.c:    /* Addition/subtraction with a + -b → a - b and a - -b → a + b */
+src/dval/dval_tostring.c:        emit_expr(f->a, b, PREC_ADD);
+src/dval/dval_tostring.c:        bool neg = expr_renders_negative(f->b);
+src/dval/dval_tostring.c:            sbuf_puts(b, neg ? " - " : " + ");
+src/dval/dval_tostring.c:            sbuf_puts(b, neg ? " + " : " - ");
+src/dval/dval_tostring.c:            emit_expr_abs(f->b, b, PREC_ADD);
+src/dval/dval_tostring.c:            emit_expr(f->b, b, PREC_ADD);
+src/dval/dval_tostring.c:        bool neg_num = expr_is_negative(f->a);
+src/dval/dval_tostring.c:        bool neg_den = expr_is_negative(f->b);
+src/dval/dval_tostring.c:        if (neg) sbuf_putc(b, '-');
+src/dval/dval_tostring.c:        if (neg_num) emit_expr_abs(f->a, b, PREC_MUL);
+src/dval/dval_tostring.c:        else         emit_expr(f->a, b, PREC_MUL);
+src/dval/dval_tostring.c:        if (neg_den) emit_expr_abs(f->b, b, PREC_POW);
+src/dval/dval_tostring.c:        else         emit_expr(f->b, b, PREC_POW);
+src/dval/dval_tostring.c:        emit_expr(f->a, b, PREC_POW);
+src/dval/dval_tostring.c:        int ep = pow_exp_needs_parens(f->b);
+src/dval/dval_tostring.c:        emit_expr(f->b, b, 0);
+src/dval/dval_tostring.c:    if (f->ops->arity == DV_OP_BINARY) {
+src/dval/dval_tostring.c:        sbuf_puts(b, f->ops->name);
+src/dval/dval_tostring.c:        emit_expr(f->a, b, 0);
+src/dval/dval_tostring.c:        emit_expr(f->b, b, 0);
+src/dval/dval_tostring.c:/* ------------------------------------------------------------------------- */
+src/dval/dval_tostring.c:/* FUNCTION MODE (calculator-style)                                          */
+src/dval/dval_tostring.c:/* ------------------------------------------------------------------------- */
+src/dval/dval_tostring.c:        if (f->name && *f->name)
+src/dval/dval_tostring.c:            emit_name_func(b, f->name);
+src/dval/dval_tostring.c:            qf_to_string_simple(f->c, buf, sizeof(buf));
+src/dval/dval_tostring.c:        emit_name_func(b, f->name ? f->name : "x");
+src/dval/dval_tostring.c:    if (f->ops->arity == DV_OP_UNARY) {
+src/dval/dval_tostring.c:        sbuf_puts(b, f->ops->name);
+src/dval/dval_tostring.c:        emit_func(f->a, b, 0);
+src/dval/dval_tostring.c:        emit_func(f->a, b, PREC_POW);
+src/dval/dval_tostring.c:        qf_to_string_simple(f->c, buf, sizeof(buf));
+src/dval/dval_tostring.c:        emit_func(f->a, b, PREC_ADD);
+src/dval/dval_tostring.c:            sbuf_puts(b, " - ");
+src/dval/dval_tostring.c:        emit_func(f->b, b, PREC_ADD);
+src/dval/dval_tostring.c:        emit_func(f->a, b, PREC_MUL);
+src/dval/dval_tostring.c:        emit_func(f->b, b, PREC_POW);
+src/dval/dval_tostring.c:        emit_func(f->a, b, PREC_POW);
+src/dval/dval_tostring.c:        int ep = pow_exp_needs_parens(f->b);
+src/dval/dval_tostring.c:        emit_func(f->b, b, 0);
+src/dval/dval_tostring.c:    if (f->ops->arity == DV_OP_BINARY) {
+src/dval/dval_tostring.c:        sbuf_puts(b, f->ops->name);
+src/dval/dval_tostring.c:        emit_func(f->a, b, 0);
+src/dval/dval_tostring.c:        emit_func(f->b, b, 0);
+src/dval/dval_tostring.c:    emit_name_func(b, f->name ? f->name : "?");
+src/dval/dval_tostring.c:/* ------------------------------------------------------------------------- */
+src/dval/dval_tostring.c:/* ------------------------------------------------------------------------- */
+src/dval/dval_tostring.c:    vl->vars  = NULL;
+src/dval/dval_tostring.c:    vl->count = 0;
+src/dval/dval_tostring.c:    vl->cap   = 0;
+src/dval/dval_tostring.c:    for (size_t i = 0; i < vl->count; ++i)
+src/dval/dval_tostring.c:        if (vl->vars[i] == v)
+src/dval/dval_tostring.c:    if (vl->count == vl->cap) {
+src/dval/dval_tostring.c:        vl->cap = vl->cap ? vl->cap * 2 : 4;
+src/dval/dval_tostring.c:        vl->vars = (dval_t **)realloc(vl->vars, vl->cap * sizeof(dval_t *));
+src/dval/dval_tostring.c:        if (!vl->vars) {
+src/dval/dval_tostring.c:    vl->vars[vl->count++] = v;
+src/dval/dval_tostring.c:    find_vars_dfs(f->a, vl);
+src/dval/dval_tostring.c:    find_vars_dfs(f->b, vl);
+src/dval/dval_tostring.c:        if (f->name && *f->name)
+src/dval/dval_tostring.c:    find_named_consts_dfs(f->a, cl);
+src/dval/dval_tostring.c:    find_named_consts_dfs(f->b, cl);
+src/dval/dval_tostring.c:    return (dv->name && *dv->name) ? dv->name : fallback;
+src/dval/dval_tostring.c:    for (size_t i = 0; i < vl->count; ++i) {
+src/dval/dval_tostring.c:        emit_name_func(b, dv_name_or_default(vl->vars[i], "x"));
+src/dval/dval_tostring.c:    for (size_t i = 0; i < cl->count; ++i) {
+src/dval/dval_tostring.c:        if (vl->count > 0 || i > 0)
+src/dval/dval_tostring.c:        emit_name_func(b, cl->vars[i]->name);
+src/dval/dval_tostring.c:/* ------------------------------------------------------------------------- */
+src/dval/dval_tostring.c:/* FUNCTION-style printing                                                   */
+src/dval/dval_tostring.c:/* ------------------------------------------------------------------------- */
+src/dval/dval_tostring.c:    /* Assign auto-names (x₀, x₁, …) to unnamed vars BEFORE simplification so
+src/dval/dval_tostring.c:     * dv_mul_d / dv_add_d etc.) are not auto-named; they appear as plain numbers.
+src/dval/dval_tostring.c:        emit_binding_line(&b, dv_name_or_default(v, "x"), v->c, emit_name_func);
+src/dval/dval_tostring.c:        emit_binding_line(&b, c->name, c->c, emit_name_func);
+src/dval/dval_tostring.c:        emit_binding_line(&b, cname, g->c, emit_name_func);
+src/dval/dval_tostring.c:    const char *fname = (g->name && *g->name) ? g->name : "expr";
+src/dval/dval_tostring.c:/* ------------------------------------------------------------------------- */
+src/dval/dval_tostring.c:/* EXPRESSION-style printing                                                 */
+src/dval/dval_tostring.c:/* ------------------------------------------------------------------------- */
+src/dval/dval_tostring.c:            qf_to_string_simple(v->c, valbuf, sizeof(valbuf));
+src/dval/dval_tostring.c:                qf_to_string_simple(c->c, valbuf, sizeof(valbuf));
+src/dval/dval_tostring.c:                emit_name(&b, c->name);
+src/dval/dval_tostring.c:/* ------------------------------------------------------------------------- */
+src/dval/dval_tostring.c:/* ------------------------------------------------------------------------- */
+src/dval/dval_tostring.c:           (s[len - 1] == '\n' || s[len - 1] == '\r' ||
+src/dval/dval_tostring.c:            s[len - 1] == ' '  || s[len - 1] == '\t'))
+src/dval/dval_tostring.c:        s[--len] = '\0';
+src/dval/dval_tostring_support.c:    b->cap = 128;
+src/dval/dval_tostring_support.c:    b->len = 0;
+src/dval/dval_tostring_support.c:    b->data = (char *)dv_tostring_xmalloc(b->cap);
+src/dval/dval_tostring_support.c:    b->data[0] = '\0';
+src/dval/dval_tostring_support.c:    free(b->data);
+src/dval/dval_tostring_support.c:    b->data = NULL;
+src/dval/dval_tostring_support.c:    b->len = 0;
+src/dval/dval_tostring_support.c:    b->cap = 0;
+src/dval/dval_tostring_support.c:    if (b->len + extra + 1 <= b->cap)
+src/dval/dval_tostring_support.c:    ncap = b->cap * 2;
+src/dval/dval_tostring_support.c:    while (ncap < b->len + extra + 1)
+src/dval/dval_tostring_support.c:    memcpy(ndata, b->data, b->len + 1);
+src/dval/dval_tostring_support.c:    free(b->data);
+src/dval/dval_tostring_support.c:    b->data = ndata;
+src/dval/dval_tostring_support.c:    b->cap = ncap;
+src/dval/dval_tostring_support.c:    b->data[b->len++] = c;
+src/dval/dval_tostring_support.c:    b->data[b->len] = '\0';
+src/dval/dval_tostring_support.c:    memcpy(b->data + b->len, s, n);
+src/dval/dval_tostring_support.c:    b->len += n;
+src/dval/dval_tostring_support.c:    b->data[b->len] = '\0';
+src/dval/dval_tostring_support.c:    return -1;
+src/dval/dval_tostring_support.c:           qf_eq(f->c.im, QF_ZERO) &&
+src/dval/dval_tostring_support.c:           qf_to_double(f->c.re) < 0.0;
+src/dval/dval_tostring_support.c:    return dv_is_pow_d_expr(f) && dv_is_var(f->a);

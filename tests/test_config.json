@@ -403,7 +403,34 @@
     "test_multi_3d_scaled_sum_specials": true,
     "test_multi_2d_sum_of_specials": true,
     "test_multi_3d_separable_product": true,
-    "test_multi_2d_sum_of_separable_products": true
+    "test_multi_2d_sum_of_separable_products": true,
+    "test_multi_2d_affine_square": true,
+    "test_multi_2d_affine_cube": true,
+    "test_multi_2d_affine_quartic": true,
+    "test_multi_2d_affine_times_exp_affine": true,
+    "test_multi_2d_affine_times_sin_affine": true,
+    "test_multi_2d_affine_times_cos_affine": true,
+    "test_multi_2d_affine_times_sinh_affine": true,
+    "test_multi_2d_affine_times_cosh_affine": true,
+    "test_multi_2d_square_affine_times_exp_affine": true,
+    "test_multi_2d_square_affine_times_sin_affine": true,
+    "test_multi_2d_square_affine_times_cos_affine": true,
+    "test_multi_2d_square_affine_times_sinh_affine": true,
+    "test_multi_2d_square_affine_times_cosh_affine": true,
+    "test_multi_2d_cube_affine_times_exp_affine": true,
+    "test_multi_2d_cube_affine_times_sin_affine": true,
+    "test_multi_2d_cube_affine_times_cos_affine": true,
+    "test_multi_2d_cube_affine_times_sinh_affine": true,
+    "test_multi_2d_cube_affine_times_cosh_affine": true,
+    "test_multi_2d_quartic_affine_times_exp_affine": true,
+    "test_multi_2d_quartic_affine_times_sin_affine": true,
+    "test_multi_2d_quartic_affine_times_cos_affine": true,
+    "test_multi_2d_quartic_affine_times_sinh_affine": true,
+    "test_multi_2d_quartic_affine_times_cosh_affine": true,
+    "test_multi_2d_affine_poly_times_exp_affine_combination": true,
+    "test_multi_2d_affine_poly_times_sin_affine_combination": true,
+    "test_multi_2d_affine_poly_deg4": true,
+    "test_multi_3d_regrouped_separable_product": true
   },
   "tests/matrix/test_matrix.c": {
     "test_creation": true,
@@ -2340,6 +2367,29 @@
       "test_readme_example": true,
       "test_readme_from_string_example": true,
       "test_readme_partial_example": true
+    }
+  },
+  "tests/dval/test_dval_pattern.c": {
+    "test_dval_pattern_helpers": {
+      "enabled": true,
+      "test_match_affine_families": true,
+      "test_pattern_rejections": true,
+      "test_scaled_expr_and_var_usage": true,
+      "test_substitute_and_powd": true,
+      "test_square_affine_matchers": true,
+      "test_cube_affine_matchers": true,
+      "test_quartic_affine_matchers": true,
+      "test_affine_times_exp_affine_matcher": true,
+      "test_affine_times_trig_affine_matchers": true,
+      "test_affine_times_hyperbolic_affine_matchers": true,
+      "test_square_affine_times_exp_affine_matcher": true,
+      "test_square_affine_times_trig_affine_matchers": true,
+      "test_square_affine_times_hyperbolic_affine_matchers": true,
+      "test_cube_affine_times_unary_affine_matchers": true,
+      "test_quartic_affine_times_unary_affine_matchers": true,
+      "test_affine_poly_deg4_times_unary_affine_matchers": true,
+      "test_generic_unary_affine_matchers": true,
+      "test_generic_affine_poly_deg4_times_unary_matcher": true
     }
   }
 }

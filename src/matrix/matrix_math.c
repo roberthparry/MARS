@@ -4,7 +4,7 @@
 #include <math.h>
 
 #include "matrix_internal.h"
-#include "dval_pattern.h"
+#include "dval_helpers.h"
 
 /* ============================================================
    Internal helpers

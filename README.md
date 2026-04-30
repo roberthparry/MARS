@@ -13,17 +13,18 @@ datetime utilities, UTF-8 strings, and generic containers.
 
 - **`qfloat_t`** — double-double arithmetic and special functions (~34 decimal digits of precision)
 - **`matrix_t`** — generic high-precision matrix with pluggable element types (`double`, `qfloat_t`, `qcomplex_t`, `dval_t *`), string-based matrix parsing and formatting, symbolic linear algebra support including Schur complements, block inverse/solve, Jordan helpers, entrywise matrix derivatives, Jacobian helpers, and first matrix-calculus helpers for trace, determinant, inverse, block inverse, solve, and block solve, and eigendecomposition at full `qfloat_t` precision
-- **`dval_t`** — differentiable expression DAGs with first/second derivatives and symbolic matrix integration
+- **`dval_t`** — differentiable expression DAGs with first/second derivatives, symbolic matrix integration, and structural matcher helpers for higher-level symbolic code
 - **`datetime_t`** — civil and astronomical date/time helpers
 - **`dictionary_t` / `set_t` / `array_t`** — generic containers with user-defined ownership
 - **`string_t`** — UTF-8-aware dynamic strings and grapheme operations
 - **`bitset_t`** — dynamic thread-safe bitset with bitwise operations
-- **`integrator_t`** — adaptive G7K15 numerical integration at qfloat_t precision
+- **`integrator_t`** — adaptive G7K15 / Turan T15/T4 integration with symbolic fast paths for affine-family `dval_t` integrands
 
 ## Requirements
 
 - C99-compliant compiler (GCC ≥ 4.8, Clang ≥ 3.5, MSVC ≥ 2019)
-- Standard C library only — no external dependencies
+- Standard C library plus `libm`
+- Optional `libunistring` support for the UTF-8/string layer (`ENABLE_UNISTRING=1` by default in the Makefile)
 
 ## Quick Examples
 
@@ -102,6 +103,14 @@ make test
 ```
 
 See [`docs/testing.md`](docs/testing.md) for details on individual test suites.
+
+## Run Benchmarks
+
+```sh
+make bench_integrator
+```
+
+See [`docs/building.md`](docs/building.md) for benchmark and build details.
 
 ## Documentation
 

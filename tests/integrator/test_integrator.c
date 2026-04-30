@@ -1206,6 +1206,49 @@ void test_multi_3d_separable_product(void) {
     ig_free(ig);
 }
 
+void test_multi_3d_regrouped_separable_product(void) {
+    /* (x*cos(y)) * (x*exp(z)) -> x^2 * cos(y) * exp(z) */
+    integrator_t *ig = ig_new();
+    dval_t *x = dv_new_var(qf_from_double(0.0));
+    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *z = dv_new_var(qf_from_double(0.0));
+    dval_t *cos_y = dv_cos(y);
+    dval_t *exp_z = dv_exp(z);
+    dval_t *left = dv_mul(x, cos_y);
+    dval_t *right = dv_mul(x, exp_z);
+    dval_t *expr = dv_mul(left, right);
+
+    dval_t *vars[3] = { x, y, z };
+    qfloat_t lo[3] = { qf_from_double(0.0), qf_from_double(0.0), qf_from_double(0.0) };
+    qfloat_t hi[3] = { qf_from_double(1.0), qf_from_double(1.0), qf_from_double(1.0) };
+
+    qfloat_t result, err;
+    int s = ig_integral_multi(ig, expr, 3, vars, lo, hi, &result, &err);
+
+    qfloat_t expected = qf_mul(qf_div(qf_from_double(1.0), qf_from_double(3.0)),
+                               qf_mul(qf_sin(qf_from_double(1.0)),
+                                      qf_sub(qf_exp(qf_from_double(1.0)), QF_ONE)));
+
+    printf("  ∫ (x*cos(y))*(x*exp(z)) dV  [regrouped separable product]\n");
+    qf_printf("  result   = %q\n", result);
+    qf_printf("  expected = %q\n", expected);
+    qf_printf("  err      = %q\n", err);
+    printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
+    ASSERT_TRUE(s == 0);
+    ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
+    ASSERT_TRUE(qf_close(result, expected, tol15));
+
+    dv_free(expr);
+    dv_free(right);
+    dv_free(left);
+    dv_free(exp_z);
+    dv_free(cos_y);
+    dv_free(z);
+    dv_free(y);
+    dv_free(x);
+    ig_free(ig);
+}
+
 void test_multi_2d_sum_of_separable_products(void) {
     /* exp(x)cos(y) + sinh(x+0.1)exp(y) */
     integrator_t *ig = ig_new();
@@ -1248,6 +1291,1234 @@ void test_multi_2d_sum_of_separable_products(void) {
     dv_free(term1);
     dv_free(cos_y);
     dv_free(exp_x);
+    dv_free(y);
+    dv_free(x);
+    ig_free(ig);
+}
+
+void test_multi_2d_affine_square(void) {
+    /* (x + 2y + 3)^2 */
+    integrator_t *ig = ig_new();
+    dval_t *x = dv_new_var(qf_from_double(0.0));
+    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *two_y = dv_mul_d(y, 2.0);
+    dval_t *sum_xy = dv_add(x, two_y);
+    dval_t *affine = dv_add_d(sum_xy, 3.0);
+    dval_t *expr = dv_mul(affine, affine);
+
+    dval_t *vars[2] = { x, y };
+    qfloat_t lo[2] = { qf_from_double(0.0), qf_from_double(0.0) };
+    qfloat_t hi[2] = { qf_from_double(1.0), qf_from_double(1.0) };
+    qfloat_t result, err;
+    qfloat_t expected = qf_div(qf_from_double(62.0), qf_from_double(3.0));
+    int s = ig_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
+
+    printf("  ∫∫ (x+2y+3)^2 dA  [affine square]\n");
+    qf_printf("  result   = %q\n", result);
+    qf_printf("  expected = %q\n", expected);
+    qf_printf("  err      = %q\n", err);
+    printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
+    ASSERT_TRUE(s == 0);
+    ASSERT_TRUE(qf_close(result, expected, tol27));
+    ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
+
+    dv_free(expr);
+    dv_free(affine);
+    dv_free(sum_xy);
+    dv_free(two_y);
+    dv_free(y);
+    dv_free(x);
+    ig_free(ig);
+}
+
+void test_multi_2d_affine_cube(void) {
+    /* (x + 2y + 3)^3 */
+    integrator_t *ig = ig_new();
+    dval_t *x = dv_new_var(qf_from_double(0.0));
+    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *two_y = dv_mul_d(y, 2.0);
+    dval_t *sum_xy = dv_add(x, two_y);
+    dval_t *affine = dv_add_d(sum_xy, 3.0);
+    dval_t *expr = dv_mul(dv_mul(affine, affine), affine);
+
+    dval_t *vars[2] = { x, y };
+    qfloat_t lo[2] = { qf_from_double(0.0), qf_from_double(0.0) };
+    qfloat_t hi[2] = { qf_from_double(1.0), qf_from_double(1.0) };
+    qfloat_t result, err;
+    qfloat_t expected = qf_div(qf_from_double(387.0), qf_from_double(4.0));
+    int s = ig_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
+
+    printf("  ∫∫ (x+2y+3)^3 dA  [affine cube]\n");
+    qf_printf("  result   = %q\n", result);
+    qf_printf("  expected = %q\n", expected);
+    qf_printf("  err      = %q\n", err);
+    printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
+    ASSERT_TRUE(s == 0);
+    ASSERT_TRUE(qf_close(result, expected, tol27));
+    ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
+
+    dv_free(expr);
+    dv_free(affine);
+    dv_free(sum_xy);
+    dv_free(two_y);
+    dv_free(y);
+    dv_free(x);
+    ig_free(ig);
+}
+
+void test_multi_2d_affine_quartic(void) {
+    /* (x + 2y + 3)^4 */
+    integrator_t *ig = ig_new();
+    dval_t *x = dv_new_var(qf_from_double(0.0));
+    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *two_y = dv_mul_d(y, 2.0);
+    dval_t *sum_xy = dv_add(x, two_y);
+    dval_t *affine = dv_add_d(sum_xy, 3.0);
+    dval_t *expr = dv_mul(dv_mul(affine, affine), dv_mul(affine, affine));
+
+    dval_t *vars[2] = { x, y };
+    qfloat_t lo[2] = { qf_from_double(0.0), qf_from_double(0.0) };
+    qfloat_t hi[2] = { qf_from_double(1.0), qf_from_double(1.0) };
+    qfloat_t result, err;
+    qfloat_t expected = qf_div(qf_from_double(6916.0), qf_from_double(15.0));
+    int s = ig_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
+
+    printf("  ∫∫ (x+2y+3)^4 dA  [affine quartic]\n");
+    qf_printf("  result   = %q\n", result);
+    qf_printf("  expected = %q\n", expected);
+    qf_printf("  err      = %q\n", err);
+    printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
+    ASSERT_TRUE(s == 0);
+    ASSERT_TRUE(qf_close(result, expected, tol27));
+    ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
+
+    dv_free(expr);
+    dv_free(affine);
+    dv_free(sum_xy);
+    dv_free(two_y);
+    dv_free(y);
+    dv_free(x);
+    ig_free(ig);
+}
+
+void test_multi_2d_affine_poly_deg4(void) {
+    /* 3(x + 2y + 3)^4 - 2(x + 2y + 3)^2 + (x + 2y + 3) + 7 */
+    integrator_t *ig = ig_new();
+    dval_t *x = dv_new_var(qf_from_double(0.0));
+    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *two_y = dv_mul_d(y, 2.0);
+    dval_t *sum_xy = dv_add(x, two_y);
+    dval_t *affine = dv_add_d(sum_xy, 3.0);
+    dval_t *quartic = dv_pow_d(affine, 4.0);
+    dval_t *square = dv_pow_d(affine, 2.0);
+    dval_t *poly = dv_add(dv_sub(dv_mul_d(quartic, 3.0),
+                                 dv_mul_d(square, 2.0)),
+                          dv_add(affine, dv_new_const_d(7.0)));
+
+    dval_t *vars[2] = { x, y };
+    qfloat_t lo[2] = { qf_from_double(0.0), qf_from_double(0.0) };
+    qfloat_t hi[2] = { qf_from_double(1.0), qf_from_double(1.0) };
+    qfloat_t result, err;
+    qfloat_t expected = qf_div(qf_from_double(40601.0), qf_from_double(30.0));
+    int s = ig_integral_multi(ig, poly, 2, vars, lo, hi, &result, &err);
+
+    printf("  ∫∫ [3a^4-2a^2+a+7] dA  [affine poly]\n");
+    qf_printf("  result   = %q\n", result);
+    qf_printf("  expected = %q\n", expected);
+    qf_printf("  err      = %q\n", err);
+    printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
+    ASSERT_TRUE(s == 0);
+    ASSERT_TRUE(qf_close(result, expected, tol27));
+    ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
+
+    dv_free(poly);
+    dv_free(square);
+    dv_free(quartic);
+    dv_free(affine);
+    dv_free(sum_xy);
+    dv_free(two_y);
+    dv_free(y);
+    dv_free(x);
+    ig_free(ig);
+}
+
+void test_multi_2d_affine_times_exp_affine(void) {
+    /* (x + 2y + 3) * exp(x + 2y + 3) */
+    integrator_t *ig = ig_new();
+    dval_t *x = dv_new_var(qf_from_double(0.0));
+    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *two_y = dv_mul_d(y, 2.0);
+    dval_t *sum_xy = dv_add(x, two_y);
+    dval_t *affine = dv_add_d(sum_xy, 3.0);
+    dval_t *exp_affine = dv_exp(affine);
+    dval_t *expr = dv_mul(affine, exp_affine);
+
+    dval_t *vars[2] = { x, y };
+    qfloat_t lo[2] = { qf_from_double(0.0), qf_from_double(0.0) };
+    qfloat_t hi[2] = { qf_from_double(1.0), qf_from_double(1.0) };
+    qfloat_t result, err;
+    qfloat_t e3 = qf_exp(qf_from_double(3.0));
+    qfloat_t e4 = qf_exp(qf_from_double(4.0));
+    qfloat_t e5 = qf_exp(qf_from_double(5.0));
+    qfloat_t e6 = qf_exp(qf_from_double(6.0));
+    qfloat_t expected = qf_add(qf_sub(qf_mul_double(e6, 2.0), e4),
+                               qf_sub(qf_mul_double(e3, 0.5), qf_mul_double(e5, 1.5)));
+    int s = ig_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
+
+    printf("  ∫∫ (x+2y+3)exp(x+2y+3) dA  [affine*exp(affine)]\n");
+    qf_printf("  result   = %q\n", result);
+    qf_printf("  expected = %q\n", expected);
+    qf_printf("  err      = %q\n", err);
+    printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
+    ASSERT_TRUE(s == 0);
+    ASSERT_TRUE(qf_close(result, expected, tol27));
+    ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
+
+    dv_free(expr);
+    dv_free(exp_affine);
+    dv_free(affine);
+    dv_free(sum_xy);
+    dv_free(two_y);
+    dv_free(y);
+    dv_free(x);
+    ig_free(ig);
+}
+
+void test_multi_2d_square_affine_times_exp_affine(void) {
+    /* (x + 2y + 3)^2 * exp(x + 2y + 3) */
+    integrator_t *ig = ig_new();
+    dval_t *x = dv_new_var(qf_from_double(0.0));
+    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *two_y = dv_mul_d(y, 2.0);
+    dval_t *sum_xy = dv_add(x, two_y);
+    dval_t *affine = dv_add_d(sum_xy, 3.0);
+    dval_t *square = dv_mul(affine, affine);
+    dval_t *exp_affine = dv_exp(affine);
+    dval_t *expr = dv_mul(square, exp_affine);
+
+    dval_t *vars[2] = { x, y };
+    qfloat_t lo[2] = { qf_from_double(0.0), qf_from_double(0.0) };
+    qfloat_t hi[2] = { qf_from_double(1.0), qf_from_double(1.0) };
+    qfloat_t result, err;
+    qfloat_t e3 = qf_exp(qf_from_double(3.0));
+    qfloat_t e4 = qf_exp(qf_from_double(4.0));
+    qfloat_t e5 = qf_exp(qf_from_double(5.0));
+    qfloat_t e6 = qf_exp(qf_from_double(6.0));
+    qfloat_t expected = qf_mul_double(
+        qf_add(qf_sub(qf_mul_double(e6, 18.0), qf_mul_double(e5, 11.0)),
+               qf_sub(qf_mul_double(e3, 3.0), qf_mul_double(e4, 6.0))),
+        0.5);
+    int s = ig_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
+
+    printf("  ∫∫ (x+2y+3)^2exp(x+2y+3) dA  [affine^2*exp(affine)]\n");
+    qf_printf("  result   = %q\n", result);
+    qf_printf("  expected = %q\n", expected);
+    qf_printf("  err      = %q\n", err);
+    printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
+    ASSERT_TRUE(s == 0);
+    ASSERT_TRUE(qf_close(result, expected, tol27));
+    ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
+
+    dv_free(expr);
+    dv_free(exp_affine);
+    dv_free(square);
+    dv_free(affine);
+    dv_free(sum_xy);
+    dv_free(two_y);
+    dv_free(y);
+    dv_free(x);
+    ig_free(ig);
+}
+
+void test_multi_2d_affine_times_sin_affine(void) {
+    /* (x + 2y + 3) * sin(x + 2y + 3) */
+    integrator_t *ig = ig_new();
+    dval_t *x = dv_new_var(qf_from_double(0.0));
+    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *two_y = dv_mul_d(y, 2.0);
+    dval_t *sum_xy = dv_add(x, two_y);
+    dval_t *affine = dv_add_d(sum_xy, 3.0);
+    dval_t *sin_affine = dv_sin(affine);
+    dval_t *expr = dv_mul(affine, sin_affine);
+
+    dval_t *vars[2] = { x, y };
+    qfloat_t lo[2] = { qf_from_double(0.0), qf_from_double(0.0) };
+    qfloat_t hi[2] = { qf_from_double(1.0), qf_from_double(1.0) };
+    qfloat_t result, err;
+    qfloat_t u3 = qf_from_double(3.0);
+    qfloat_t u4 = qf_from_double(4.0);
+    qfloat_t u5 = qf_from_double(5.0);
+    qfloat_t u6 = qf_from_double(6.0);
+    qfloat_t f3 = qf_sub(qf_neg(qf_mul(u3, qf_sin(u3))), qf_mul_double(qf_cos(u3), 2.0));
+    qfloat_t f4 = qf_sub(qf_neg(qf_mul(u4, qf_sin(u4))), qf_mul_double(qf_cos(u4), 2.0));
+    qfloat_t f5 = qf_sub(qf_neg(qf_mul(u5, qf_sin(u5))), qf_mul_double(qf_cos(u5), 2.0));
+    qfloat_t f6 = qf_sub(qf_neg(qf_mul(u6, qf_sin(u6))), qf_mul_double(qf_cos(u6), 2.0));
+    qfloat_t expected = qf_mul_double(qf_sub(qf_sub(f6, f4), qf_sub(f5, f3)), 0.5);
+    int s = ig_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
+
+    printf("  ∫∫ (x+2y+3)sin(x+2y+3) dA  [affine*sin(affine)]\n");
+    qf_printf("  result   = %q\n", result);
+    qf_printf("  expected = %q\n", expected);
+    qf_printf("  err      = %q\n", err);
+    printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
+    ASSERT_TRUE(s == 0);
+    ASSERT_TRUE(qf_close(result, expected, tol27));
+    ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
+
+    dv_free(expr);
+    dv_free(sin_affine);
+    dv_free(affine);
+    dv_free(sum_xy);
+    dv_free(two_y);
+    dv_free(y);
+    dv_free(x);
+    ig_free(ig);
+}
+
+void test_multi_2d_square_affine_times_sin_affine(void) {
+    /* (x + 2y + 3)^2 * sin(x + 2y + 3) */
+    integrator_t *ig = ig_new();
+    dval_t *x = dv_new_var(qf_from_double(0.0));
+    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *two_y = dv_mul_d(y, 2.0);
+    dval_t *sum_xy = dv_add(x, two_y);
+    dval_t *affine = dv_add_d(sum_xy, 3.0);
+    dval_t *square = dv_pow_d(affine, 2.0);
+    dval_t *sin_affine = dv_sin(affine);
+    dval_t *expr = dv_mul(square, sin_affine);
+
+    dval_t *vars[2] = { x, y };
+    qfloat_t lo[2] = { qf_from_double(0.0), qf_from_double(0.0) };
+    qfloat_t hi[2] = { qf_from_double(1.0), qf_from_double(1.0) };
+    qfloat_t result, err;
+    qfloat_t u3 = qf_from_double(3.0);
+    qfloat_t u4 = qf_from_double(4.0);
+    qfloat_t u5 = qf_from_double(5.0);
+    qfloat_t u6 = qf_from_double(6.0);
+    qfloat_t f3 = qf_add(qf_neg(qf_mul(qf_mul(u3, u3), qf_sin(u3))),
+                         qf_add(qf_mul_double(qf_mul(u3, qf_cos(u3)), -4.0),
+                                qf_mul_double(qf_sin(u3), 6.0)));
+    qfloat_t f4 = qf_add(qf_neg(qf_mul(qf_mul(u4, u4), qf_sin(u4))),
+                         qf_add(qf_mul_double(qf_mul(u4, qf_cos(u4)), -4.0),
+                                qf_mul_double(qf_sin(u4), 6.0)));
+    qfloat_t f5 = qf_add(qf_neg(qf_mul(qf_mul(u5, u5), qf_sin(u5))),
+                         qf_add(qf_mul_double(qf_mul(u5, qf_cos(u5)), -4.0),
+                                qf_mul_double(qf_sin(u5), 6.0)));
+    qfloat_t f6 = qf_add(qf_neg(qf_mul(qf_mul(u6, u6), qf_sin(u6))),
+                         qf_add(qf_mul_double(qf_mul(u6, qf_cos(u6)), -4.0),
+                                qf_mul_double(qf_sin(u6), 6.0)));
+    qfloat_t expected = qf_mul_double(qf_sub(qf_sub(f6, f4), qf_sub(f5, f3)), 0.5);
+    int s = ig_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
+
+    printf("  ∫∫ (x+2y+3)^2sin(x+2y+3) dA  [affine^2*sin(affine)]\n");
+    qf_printf("  result   = %q\n", result);
+    qf_printf("  expected = %q\n", expected);
+    qf_printf("  err      = %q\n", err);
+    printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
+    ASSERT_TRUE(s == 0);
+    ASSERT_TRUE(qf_close(result, expected, tol27));
+    ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
+
+    dv_free(expr);
+    dv_free(sin_affine);
+    dv_free(square);
+    dv_free(affine);
+    dv_free(sum_xy);
+    dv_free(two_y);
+    dv_free(y);
+    dv_free(x);
+    ig_free(ig);
+}
+
+void test_multi_2d_affine_times_cos_affine(void) {
+    /* (x + 2y + 3) * cos(x + 2y + 3) */
+    integrator_t *ig = ig_new();
+    dval_t *x = dv_new_var(qf_from_double(0.0));
+    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *two_y = dv_mul_d(y, 2.0);
+    dval_t *sum_xy = dv_add(x, two_y);
+    dval_t *affine = dv_add_d(sum_xy, 3.0);
+    dval_t *cos_affine = dv_cos(affine);
+    dval_t *expr = dv_mul(cos_affine, affine);
+
+    dval_t *vars[2] = { x, y };
+    qfloat_t lo[2] = { qf_from_double(0.0), qf_from_double(0.0) };
+    qfloat_t hi[2] = { qf_from_double(1.0), qf_from_double(1.0) };
+    qfloat_t result, err;
+    qfloat_t u3 = qf_from_double(3.0);
+    qfloat_t u4 = qf_from_double(4.0);
+    qfloat_t u5 = qf_from_double(5.0);
+    qfloat_t u6 = qf_from_double(6.0);
+    qfloat_t g3 = qf_add(qf_neg(qf_mul(u3, qf_cos(u3))), qf_mul_double(qf_sin(u3), 2.0));
+    qfloat_t g4 = qf_add(qf_neg(qf_mul(u4, qf_cos(u4))), qf_mul_double(qf_sin(u4), 2.0));
+    qfloat_t g5 = qf_add(qf_neg(qf_mul(u5, qf_cos(u5))), qf_mul_double(qf_sin(u5), 2.0));
+    qfloat_t g6 = qf_add(qf_neg(qf_mul(u6, qf_cos(u6))), qf_mul_double(qf_sin(u6), 2.0));
+    qfloat_t expected = qf_mul_double(qf_sub(qf_sub(g6, g4), qf_sub(g5, g3)), 0.5);
+    int s = ig_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
+
+    printf("  ∫∫ (x+2y+3)cos(x+2y+3) dA  [affine*cos(affine)]\n");
+    qf_printf("  result   = %q\n", result);
+    qf_printf("  expected = %q\n", expected);
+    qf_printf("  err      = %q\n", err);
+    printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
+    ASSERT_TRUE(s == 0);
+    ASSERT_TRUE(qf_close(result, expected, tol27));
+    ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
+
+    dv_free(expr);
+    dv_free(cos_affine);
+    dv_free(affine);
+    dv_free(sum_xy);
+    dv_free(two_y);
+    dv_free(y);
+    dv_free(x);
+    ig_free(ig);
+}
+
+void test_multi_2d_square_affine_times_cos_affine(void) {
+    /* (x + 2y + 3)^2 * cos(x + 2y + 3) */
+    integrator_t *ig = ig_new();
+    dval_t *x = dv_new_var(qf_from_double(0.0));
+    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *two_y = dv_mul_d(y, 2.0);
+    dval_t *sum_xy = dv_add(x, two_y);
+    dval_t *affine = dv_add_d(sum_xy, 3.0);
+    dval_t *square = dv_mul(affine, affine);
+    dval_t *cos_affine = dv_cos(affine);
+    dval_t *expr = dv_mul(cos_affine, square);
+
+    dval_t *vars[2] = { x, y };
+    qfloat_t lo[2] = { qf_from_double(0.0), qf_from_double(0.0) };
+    qfloat_t hi[2] = { qf_from_double(1.0), qf_from_double(1.0) };
+    qfloat_t result, err;
+    qfloat_t u3 = qf_from_double(3.0);
+    qfloat_t u4 = qf_from_double(4.0);
+    qfloat_t u5 = qf_from_double(5.0);
+    qfloat_t u6 = qf_from_double(6.0);
+    qfloat_t g3 = qf_add(qf_neg(qf_mul(qf_mul(u3, u3), qf_cos(u3))),
+                         qf_add(qf_mul_double(qf_mul(u3, qf_sin(u3)), 4.0),
+                                qf_mul_double(qf_cos(u3), 6.0)));
+    qfloat_t g4 = qf_add(qf_neg(qf_mul(qf_mul(u4, u4), qf_cos(u4))),
+                         qf_add(qf_mul_double(qf_mul(u4, qf_sin(u4)), 4.0),
+                                qf_mul_double(qf_cos(u4), 6.0)));
+    qfloat_t g5 = qf_add(qf_neg(qf_mul(qf_mul(u5, u5), qf_cos(u5))),
+                         qf_add(qf_mul_double(qf_mul(u5, qf_sin(u5)), 4.0),
+                                qf_mul_double(qf_cos(u5), 6.0)));
+    qfloat_t g6 = qf_add(qf_neg(qf_mul(qf_mul(u6, u6), qf_cos(u6))),
+                         qf_add(qf_mul_double(qf_mul(u6, qf_sin(u6)), 4.0),
+                                qf_mul_double(qf_cos(u6), 6.0)));
+    qfloat_t expected = qf_mul_double(qf_sub(qf_sub(g6, g4), qf_sub(g5, g3)), 0.5);
+    int s = ig_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
+
+    printf("  ∫∫ (x+2y+3)^2cos(x+2y+3) dA  [affine^2*cos(affine)]\n");
+    qf_printf("  result   = %q\n", result);
+    qf_printf("  expected = %q\n", expected);
+    qf_printf("  err      = %q\n", err);
+    printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
+    ASSERT_TRUE(s == 0);
+    ASSERT_TRUE(qf_close(result, expected, tol27));
+    ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
+
+    dv_free(expr);
+    dv_free(cos_affine);
+    dv_free(square);
+    dv_free(affine);
+    dv_free(sum_xy);
+    dv_free(two_y);
+    dv_free(y);
+    dv_free(x);
+    ig_free(ig);
+}
+
+void test_multi_2d_affine_times_sinh_affine(void) {
+    /* (x + 2y + 3) * sinh(x + 2y + 3) */
+    integrator_t *ig = ig_new();
+    dval_t *x = dv_new_var(qf_from_double(0.0));
+    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *two_y = dv_mul_d(y, 2.0);
+    dval_t *sum_xy = dv_add(x, two_y);
+    dval_t *affine = dv_add_d(sum_xy, 3.0);
+    dval_t *sinh_affine = dv_sinh(affine);
+    dval_t *expr = dv_mul(affine, sinh_affine);
+
+    dval_t *vars[2] = { x, y };
+    qfloat_t lo[2] = { qf_from_double(0.0), qf_from_double(0.0) };
+    qfloat_t hi[2] = { qf_from_double(1.0), qf_from_double(1.0) };
+    qfloat_t result, err;
+    qfloat_t e3 = qf_exp(qf_from_double(3.0));
+    qfloat_t e4 = qf_exp(qf_from_double(4.0));
+    qfloat_t e5 = qf_exp(qf_from_double(5.0));
+    qfloat_t e6 = qf_exp(qf_from_double(6.0));
+    qfloat_t em3 = qf_exp(qf_from_double(-3.0));
+    qfloat_t em4 = qf_exp(qf_from_double(-4.0));
+    qfloat_t em5 = qf_exp(qf_from_double(-5.0));
+    qfloat_t em6 = qf_exp(qf_from_double(-6.0));
+    qfloat_t pos = qf_add(qf_sub(qf_mul_double(e6, 2.0), e4),
+                          qf_sub(qf_mul_double(e3, 0.5), qf_mul_double(e5, 1.5)));
+    qfloat_t minus = qf_add(qf_sub(qf_mul_double(em6, 4.0), qf_mul_double(em4, 3.0)),
+                            qf_sub(qf_mul_double(em3, 2.5), qf_mul_double(em5, 3.5)));
+    qfloat_t expected = qf_mul_double(qf_sub(pos, minus), 0.5);
+    int s = ig_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
+
+    printf("  ∫∫ (x+2y+3)sinh(x+2y+3) dA  [affine*sinh(affine)]\n");
+    qf_printf("  result   = %q\n", result);
+    qf_printf("  expected = %q\n", expected);
+    qf_printf("  err      = %q\n", err);
+    printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
+    ASSERT_TRUE(s == 0);
+    ASSERT_TRUE(qf_close(result, expected, tol27));
+    ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
+
+    dv_free(expr);
+    dv_free(sinh_affine);
+    dv_free(affine);
+    dv_free(sum_xy);
+    dv_free(two_y);
+    dv_free(y);
+    dv_free(x);
+    ig_free(ig);
+}
+
+void test_multi_2d_square_affine_times_sinh_affine(void) {
+    /* (x + 2y + 3)^2 * sinh(x + 2y + 3) */
+    integrator_t *ig = ig_new();
+    dval_t *x = dv_new_var(qf_from_double(0.0));
+    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *two_y = dv_mul_d(y, 2.0);
+    dval_t *sum_xy = dv_add(x, two_y);
+    dval_t *affine = dv_add_d(sum_xy, 3.0);
+    dval_t *square = dv_pow_d(affine, 2.0);
+    dval_t *sinh_affine = dv_sinh(affine);
+    dval_t *expr = dv_mul(square, sinh_affine);
+
+    dval_t *vars[2] = { x, y };
+    qfloat_t lo[2] = { qf_from_double(0.0), qf_from_double(0.0) };
+    qfloat_t hi[2] = { qf_from_double(1.0), qf_from_double(1.0) };
+    qfloat_t result, err;
+    qfloat_t e3 = qf_exp(qf_from_double(3.0));
+    qfloat_t e4 = qf_exp(qf_from_double(4.0));
+    qfloat_t e5 = qf_exp(qf_from_double(5.0));
+    qfloat_t e6 = qf_exp(qf_from_double(6.0));
+    qfloat_t em3 = qf_exp(qf_from_double(-3.0));
+    qfloat_t em4 = qf_exp(qf_from_double(-4.0));
+    qfloat_t em5 = qf_exp(qf_from_double(-5.0));
+    qfloat_t em6 = qf_exp(qf_from_double(-6.0));
+    qfloat_t pos = qf_mul_double(
+        qf_add(qf_sub(qf_mul_double(e6, 18.0), qf_mul_double(e5, 11.0)),
+               qf_sub(qf_mul_double(e3, 3.0), qf_mul_double(e4, 6.0))),
+        0.5);
+    qfloat_t neg = qf_mul_double(
+        qf_add(qf_sub(qf_mul_double(em6, 66.0), qf_mul_double(em5, 51.0)),
+               qf_sub(qf_mul_double(em3, 27.0), qf_mul_double(em4, 38.0))),
+        0.5);
+    qfloat_t expected = qf_mul_double(qf_sub(pos, neg), 0.5);
+    int s = ig_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
+
+    printf("  ∫∫ (x+2y+3)^2sinh(x+2y+3) dA  [affine^2*sinh(affine)]\n");
+    qf_printf("  result   = %q\n", result);
+    qf_printf("  expected = %q\n", expected);
+    qf_printf("  err      = %q\n", err);
+    printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
+    ASSERT_TRUE(s == 0);
+    ASSERT_TRUE(qf_close(result, expected, tol27));
+    ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
+
+    dv_free(expr);
+    dv_free(sinh_affine);
+    dv_free(square);
+    dv_free(affine);
+    dv_free(sum_xy);
+    dv_free(two_y);
+    dv_free(y);
+    dv_free(x);
+    ig_free(ig);
+}
+
+void test_multi_2d_affine_times_cosh_affine(void) {
+    /* (x + 2y + 3) * cosh(x + 2y + 3) */
+    integrator_t *ig = ig_new();
+    dval_t *x = dv_new_var(qf_from_double(0.0));
+    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *two_y = dv_mul_d(y, 2.0);
+    dval_t *sum_xy = dv_add(x, two_y);
+    dval_t *affine = dv_add_d(sum_xy, 3.0);
+    dval_t *cosh_affine = dv_cosh(affine);
+    dval_t *expr = dv_mul(cosh_affine, affine);
+
+    dval_t *vars[2] = { x, y };
+    qfloat_t lo[2] = { qf_from_double(0.0), qf_from_double(0.0) };
+    qfloat_t hi[2] = { qf_from_double(1.0), qf_from_double(1.0) };
+    qfloat_t result, err;
+    qfloat_t e3 = qf_exp(qf_from_double(3.0));
+    qfloat_t e4 = qf_exp(qf_from_double(4.0));
+    qfloat_t e5 = qf_exp(qf_from_double(5.0));
+    qfloat_t e6 = qf_exp(qf_from_double(6.0));
+    qfloat_t em3 = qf_exp(qf_from_double(-3.0));
+    qfloat_t em4 = qf_exp(qf_from_double(-4.0));
+    qfloat_t em5 = qf_exp(qf_from_double(-5.0));
+    qfloat_t em6 = qf_exp(qf_from_double(-6.0));
+    qfloat_t pos = qf_add(qf_sub(qf_mul_double(e6, 2.0), e4),
+                          qf_sub(qf_mul_double(e3, 0.5), qf_mul_double(e5, 1.5)));
+    qfloat_t minus = qf_add(qf_sub(qf_mul_double(em6, 4.0), qf_mul_double(em4, 3.0)),
+                            qf_sub(qf_mul_double(em3, 2.5), qf_mul_double(em5, 3.5)));
+    qfloat_t expected = qf_mul_double(qf_add(pos, minus), 0.5);
+    int s = ig_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
+
+    printf("  ∫∫ (x+2y+3)cosh(x+2y+3) dA  [affine*cosh(affine)]\n");
+    qf_printf("  result   = %q\n", result);
+    qf_printf("  expected = %q\n", expected);
+    qf_printf("  err      = %q\n", err);
+    printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
+    ASSERT_TRUE(s == 0);
+    ASSERT_TRUE(qf_close(result, expected, tol27));
+    ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
+
+    dv_free(expr);
+    dv_free(cosh_affine);
+    dv_free(affine);
+    dv_free(sum_xy);
+    dv_free(two_y);
+    dv_free(y);
+    dv_free(x);
+    ig_free(ig);
+}
+
+void test_multi_2d_square_affine_times_cosh_affine(void) {
+    /* (x + 2y + 3)^2 * cosh(x + 2y + 3) */
+    integrator_t *ig = ig_new();
+    dval_t *x = dv_new_var(qf_from_double(0.0));
+    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *two_y = dv_mul_d(y, 2.0);
+    dval_t *sum_xy = dv_add(x, two_y);
+    dval_t *affine = dv_add_d(sum_xy, 3.0);
+    dval_t *square = dv_mul(affine, affine);
+    dval_t *cosh_affine = dv_cosh(affine);
+    dval_t *expr = dv_mul(cosh_affine, square);
+
+    dval_t *vars[2] = { x, y };
+    qfloat_t lo[2] = { qf_from_double(0.0), qf_from_double(0.0) };
+    qfloat_t hi[2] = { qf_from_double(1.0), qf_from_double(1.0) };
+    qfloat_t result, err;
+    qfloat_t e3 = qf_exp(qf_from_double(3.0));
+    qfloat_t e4 = qf_exp(qf_from_double(4.0));
+    qfloat_t e5 = qf_exp(qf_from_double(5.0));
+    qfloat_t e6 = qf_exp(qf_from_double(6.0));
+    qfloat_t em3 = qf_exp(qf_from_double(-3.0));
+    qfloat_t em4 = qf_exp(qf_from_double(-4.0));
+    qfloat_t em5 = qf_exp(qf_from_double(-5.0));
+    qfloat_t em6 = qf_exp(qf_from_double(-6.0));
+    qfloat_t pos = qf_mul_double(
+        qf_add(qf_sub(qf_mul_double(e6, 18.0), qf_mul_double(e5, 11.0)),
+               qf_sub(qf_mul_double(e3, 3.0), qf_mul_double(e4, 6.0))),
+        0.5);
+    qfloat_t neg = qf_mul_double(
+        qf_add(qf_sub(qf_mul_double(em6, 66.0), qf_mul_double(em5, 51.0)),
+               qf_sub(qf_mul_double(em3, 27.0), qf_mul_double(em4, 38.0))),
+        0.5);
+    qfloat_t expected = qf_mul_double(qf_add(pos, neg), 0.5);
+    int s = ig_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
+
+    printf("  ∫∫ (x+2y+3)^2cosh(x+2y+3) dA  [affine^2*cosh(affine)]\n");
+    qf_printf("  result   = %q\n", result);
+    qf_printf("  expected = %q\n", expected);
+    qf_printf("  err      = %q\n", err);
+    printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
+    ASSERT_TRUE(s == 0);
+    ASSERT_TRUE(qf_close(result, expected, tol27));
+    ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
+
+    dv_free(expr);
+    dv_free(cosh_affine);
+    dv_free(square);
+    dv_free(affine);
+    dv_free(sum_xy);
+    dv_free(two_y);
+    dv_free(y);
+    dv_free(x);
+    ig_free(ig);
+}
+
+void test_multi_2d_cube_affine_times_exp_affine(void) {
+    /* (x + 2y + 3)^3 * exp(x + 2y + 3) */
+    integrator_t *ig = ig_new();
+    dval_t *x = dv_new_var(qf_from_double(0.0));
+    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *two_y = dv_mul_d(y, 2.0);
+    dval_t *sum_xy = dv_add(x, two_y);
+    dval_t *affine = dv_add_d(sum_xy, 3.0);
+    dval_t *cube = dv_pow_d(affine, 3.0);
+    dval_t *exp_affine = dv_exp(affine);
+    dval_t *expr = dv_mul(cube, exp_affine);
+
+    dval_t *vars[2] = { x, y };
+    qfloat_t lo[2] = { qf_from_double(0.0), qf_from_double(0.0) };
+    qfloat_t hi[2] = { qf_from_double(1.0), qf_from_double(1.0) };
+    qfloat_t result, err;
+    qfloat_t e3 = qf_exp(qf_from_double(3.0));
+    qfloat_t e4 = qf_exp(qf_from_double(4.0));
+    qfloat_t e5 = qf_exp(qf_from_double(5.0));
+    qfloat_t e6 = qf_exp(qf_from_double(6.0));
+    qfloat_t expected = qf_mul_double(
+        qf_add(qf_sub(qf_mul_double(e6, 84.0), qf_mul_double(e5, 41.0)),
+               qf_sub(qf_mul_double(e3, 3.0), qf_mul_double(e4, 16.0))),
+        0.5);
+    int s = ig_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
+
+    printf("  ∫∫ (x+2y+3)^3exp(x+2y+3) dA  [affine^3*exp(affine)]\n");
+    qf_printf("  result   = %q\n", result);
+    qf_printf("  expected = %q\n", expected);
+    qf_printf("  err      = %q\n", err);
+    printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
+    ASSERT_TRUE(s == 0);
+    ASSERT_TRUE(qf_close(result, expected, tol27));
+    ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
+
+    dv_free(expr);
+    dv_free(exp_affine);
+    dv_free(cube);
+    dv_free(affine);
+    dv_free(sum_xy);
+    dv_free(two_y);
+    dv_free(y);
+    dv_free(x);
+    ig_free(ig);
+}
+
+void test_multi_2d_cube_affine_times_sin_affine(void) {
+    /* (x + 2y + 3)^3 * sin(x + 2y + 3) */
+    integrator_t *ig = ig_new();
+    dval_t *x = dv_new_var(qf_from_double(0.0));
+    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *two_y = dv_mul_d(y, 2.0);
+    dval_t *sum_xy = dv_add(x, two_y);
+    dval_t *affine = dv_add_d(sum_xy, 3.0);
+    dval_t *cube = dv_mul(dv_mul(affine, affine), affine);
+    dval_t *sin_affine = dv_sin(affine);
+    dval_t *expr = dv_mul(cube, sin_affine);
+
+    dval_t *vars[2] = { x, y };
+    qfloat_t lo[2] = { qf_from_double(0.0), qf_from_double(0.0) };
+    qfloat_t hi[2] = { qf_from_double(1.0), qf_from_double(1.0) };
+    qfloat_t result, err;
+    qfloat_t u3 = qf_from_double(3.0);
+    qfloat_t u4 = qf_from_double(4.0);
+    qfloat_t u5 = qf_from_double(5.0);
+    qfloat_t u6 = qf_from_double(6.0);
+    qfloat_t f3 = qf_add(qf_mul(qf_add(qf_neg(qf_mul(u3, qf_mul(u3, u3))),
+                                       qf_mul_double(u3, 18.0)), qf_sin(u3)),
+                         qf_mul(qf_add(qf_mul_double(qf_mul(u3, u3), -6.0),
+                                       qf_from_double(24.0)), qf_cos(u3)));
+    qfloat_t f4 = qf_add(qf_mul(qf_add(qf_neg(qf_mul(u4, qf_mul(u4, u4))),
+                                       qf_mul_double(u4, 18.0)), qf_sin(u4)),
+                         qf_mul(qf_add(qf_mul_double(qf_mul(u4, u4), -6.0),
+                                       qf_from_double(24.0)), qf_cos(u4)));
+    qfloat_t f5 = qf_add(qf_mul(qf_add(qf_neg(qf_mul(u5, qf_mul(u5, u5))),
+                                       qf_mul_double(u5, 18.0)), qf_sin(u5)),
+                         qf_mul(qf_add(qf_mul_double(qf_mul(u5, u5), -6.0),
+                                       qf_from_double(24.0)), qf_cos(u5)));
+    qfloat_t f6 = qf_add(qf_mul(qf_add(qf_neg(qf_mul(u6, qf_mul(u6, u6))),
+                                       qf_mul_double(u6, 18.0)), qf_sin(u6)),
+                         qf_mul(qf_add(qf_mul_double(qf_mul(u6, u6), -6.0),
+                                       qf_from_double(24.0)), qf_cos(u6)));
+    qfloat_t expected = qf_mul_double(qf_sub(qf_sub(f6, f4), qf_sub(f5, f3)), 0.5);
+    int s = ig_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
+
+    printf("  ∫∫ (x+2y+3)^3sin(x+2y+3) dA  [affine^3*sin(affine)]\n");
+    qf_printf("  result   = %q\n", result);
+    qf_printf("  expected = %q\n", expected);
+    qf_printf("  err      = %q\n", err);
+    printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
+    ASSERT_TRUE(s == 0);
+    ASSERT_TRUE(qf_close(result, expected, tol27));
+    ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
+
+    dv_free(expr);
+    dv_free(sin_affine);
+    dv_free(cube);
+    dv_free(affine);
+    dv_free(sum_xy);
+    dv_free(two_y);
+    dv_free(y);
+    dv_free(x);
+    ig_free(ig);
+}
+
+void test_multi_2d_cube_affine_times_cos_affine(void) {
+    /* (x + 2y + 3)^3 * cos(x + 2y + 3) */
+    integrator_t *ig = ig_new();
+    dval_t *x = dv_new_var(qf_from_double(0.0));
+    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *two_y = dv_mul_d(y, 2.0);
+    dval_t *sum_xy = dv_add(x, two_y);
+    dval_t *affine = dv_add_d(sum_xy, 3.0);
+    dval_t *cube = dv_pow_d(affine, 3.0);
+    dval_t *cos_affine = dv_cos(affine);
+    dval_t *expr = dv_mul(cos_affine, cube);
+
+    dval_t *vars[2] = { x, y };
+    qfloat_t lo[2] = { qf_from_double(0.0), qf_from_double(0.0) };
+    qfloat_t hi[2] = { qf_from_double(1.0), qf_from_double(1.0) };
+    qfloat_t result, err;
+    qfloat_t u3 = qf_from_double(3.0);
+    qfloat_t u4 = qf_from_double(4.0);
+    qfloat_t u5 = qf_from_double(5.0);
+    qfloat_t u6 = qf_from_double(6.0);
+    qfloat_t g3 = qf_add(qf_mul(qf_add(qf_neg(qf_mul(u3, qf_mul(u3, u3))),
+                                       qf_mul_double(u3, 18.0)), qf_cos(u3)),
+                         qf_mul(qf_add(qf_mul_double(qf_mul(u3, u3), 6.0),
+                                       qf_from_double(-24.0)), qf_sin(u3)));
+    qfloat_t g4 = qf_add(qf_mul(qf_add(qf_neg(qf_mul(u4, qf_mul(u4, u4))),
+                                       qf_mul_double(u4, 18.0)), qf_cos(u4)),
+                         qf_mul(qf_add(qf_mul_double(qf_mul(u4, u4), 6.0),
+                                       qf_from_double(-24.0)), qf_sin(u4)));
+    qfloat_t g5 = qf_add(qf_mul(qf_add(qf_neg(qf_mul(u5, qf_mul(u5, u5))),
+                                       qf_mul_double(u5, 18.0)), qf_cos(u5)),
+                         qf_mul(qf_add(qf_mul_double(qf_mul(u5, u5), 6.0),
+                                       qf_from_double(-24.0)), qf_sin(u5)));
+    qfloat_t g6 = qf_add(qf_mul(qf_add(qf_neg(qf_mul(u6, qf_mul(u6, u6))),
+                                       qf_mul_double(u6, 18.0)), qf_cos(u6)),
+                         qf_mul(qf_add(qf_mul_double(qf_mul(u6, u6), 6.0),
+                                       qf_from_double(-24.0)), qf_sin(u6)));
+    qfloat_t expected = qf_mul_double(qf_sub(qf_sub(g6, g4), qf_sub(g5, g3)), 0.5);
+    int s = ig_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
+
+    printf("  ∫∫ (x+2y+3)^3cos(x+2y+3) dA  [affine^3*cos(affine)]\n");
+    qf_printf("  result   = %q\n", result);
+    qf_printf("  expected = %q\n", expected);
+    qf_printf("  err      = %q\n", err);
+    printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
+    ASSERT_TRUE(s == 0);
+    ASSERT_TRUE(qf_close(result, expected, tol27));
+    ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
+
+    dv_free(expr);
+    dv_free(cos_affine);
+    dv_free(cube);
+    dv_free(affine);
+    dv_free(sum_xy);
+    dv_free(two_y);
+    dv_free(y);
+    dv_free(x);
+    ig_free(ig);
+}
+
+void test_multi_2d_cube_affine_times_sinh_affine(void) {
+    /* (x + 2y + 3)^3 * sinh(x + 2y + 3) */
+    integrator_t *ig = ig_new();
+    dval_t *x = dv_new_var(qf_from_double(0.0));
+    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *two_y = dv_mul_d(y, 2.0);
+    dval_t *sum_xy = dv_add(x, two_y);
+    dval_t *affine = dv_add_d(sum_xy, 3.0);
+    dval_t *cube = dv_pow_d(affine, 3.0);
+    dval_t *sinh_affine = dv_sinh(affine);
+    dval_t *expr = dv_mul(cube, sinh_affine);
+
+    dval_t *vars[2] = { x, y };
+    qfloat_t lo[2] = { qf_from_double(0.0), qf_from_double(0.0) };
+    qfloat_t hi[2] = { qf_from_double(1.0), qf_from_double(1.0) };
+    qfloat_t result, err;
+    qfloat_t e3 = qf_exp(qf_from_double(3.0));
+    qfloat_t e4 = qf_exp(qf_from_double(4.0));
+    qfloat_t e5 = qf_exp(qf_from_double(5.0));
+    qfloat_t e6 = qf_exp(qf_from_double(6.0));
+    qfloat_t em3 = qf_exp(qf_from_double(-3.0));
+    qfloat_t em4 = qf_exp(qf_from_double(-4.0));
+    qfloat_t em5 = qf_exp(qf_from_double(-5.0));
+    qfloat_t em6 = qf_exp(qf_from_double(-6.0));
+    qfloat_t pos = qf_mul_double(
+        qf_add(qf_sub(qf_mul_double(e6, 84.0), qf_mul_double(e5, 41.0)),
+               qf_sub(qf_mul_double(e3, 3.0), qf_mul_double(e4, 16.0))),
+        0.5);
+    qfloat_t neg = qf_mul_double(
+        qf_add(qf_sub(qf_mul_double(em6, 564.0), qf_mul_double(em5, 389.0)),
+               qf_sub(qf_mul_double(em3, 159.0), qf_mul_double(em4, 256.0))),
+        0.5);
+    qfloat_t expected = qf_mul_double(qf_sub(pos, neg), 0.5);
+    int s = ig_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
+
+    printf("  ∫∫ (x+2y+3)^3sinh(x+2y+3) dA  [affine^3*sinh(affine)]\n");
+    qf_printf("  result   = %q\n", result);
+    qf_printf("  expected = %q\n", expected);
+    qf_printf("  err      = %q\n", err);
+    printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
+    ASSERT_TRUE(s == 0);
+    ASSERT_TRUE(qf_close(result, expected, tol27));
+    ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
+
+    dv_free(expr);
+    dv_free(sinh_affine);
+    dv_free(cube);
+    dv_free(affine);
+    dv_free(sum_xy);
+    dv_free(two_y);
+    dv_free(y);
+    dv_free(x);
+    ig_free(ig);
+}
+
+void test_multi_2d_cube_affine_times_cosh_affine(void) {
+    /* (x + 2y + 3)^3 * cosh(x + 2y + 3) */
+    integrator_t *ig = ig_new();
+    dval_t *x = dv_new_var(qf_from_double(0.0));
+    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *two_y = dv_mul_d(y, 2.0);
+    dval_t *sum_xy = dv_add(x, two_y);
+    dval_t *affine = dv_add_d(sum_xy, 3.0);
+    dval_t *cube = dv_mul(dv_mul(affine, affine), affine);
+    dval_t *cosh_affine = dv_cosh(affine);
+    dval_t *expr = dv_mul(cosh_affine, cube);
+
+    dval_t *vars[2] = { x, y };
+    qfloat_t lo[2] = { qf_from_double(0.0), qf_from_double(0.0) };
+    qfloat_t hi[2] = { qf_from_double(1.0), qf_from_double(1.0) };
+    qfloat_t result, err;
+    qfloat_t e3 = qf_exp(qf_from_double(3.0));
+    qfloat_t e4 = qf_exp(qf_from_double(4.0));
+    qfloat_t e5 = qf_exp(qf_from_double(5.0));
+    qfloat_t e6 = qf_exp(qf_from_double(6.0));
+    qfloat_t em3 = qf_exp(qf_from_double(-3.0));
+    qfloat_t em4 = qf_exp(qf_from_double(-4.0));
+    qfloat_t em5 = qf_exp(qf_from_double(-5.0));
+    qfloat_t em6 = qf_exp(qf_from_double(-6.0));
+    qfloat_t pos = qf_mul_double(
+        qf_add(qf_sub(qf_mul_double(e6, 84.0), qf_mul_double(e5, 41.0)),
+               qf_sub(qf_mul_double(e3, 3.0), qf_mul_double(e4, 16.0))),
+        0.5);
+    qfloat_t neg = qf_mul_double(
+        qf_add(qf_sub(qf_mul_double(em6, 564.0), qf_mul_double(em5, 389.0)),
+               qf_sub(qf_mul_double(em3, 159.0), qf_mul_double(em4, 256.0))),
+        0.5);
+    qfloat_t expected = qf_mul_double(qf_add(pos, neg), 0.5);
+    int s = ig_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
+
+    printf("  ∫∫ (x+2y+3)^3cosh(x+2y+3) dA  [affine^3*cosh(affine)]\n");
+    qf_printf("  result   = %q\n", result);
+    qf_printf("  expected = %q\n", expected);
+    qf_printf("  err      = %q\n", err);
+    printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
+    ASSERT_TRUE(s == 0);
+    ASSERT_TRUE(qf_close(result, expected, tol27));
+    ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
+
+    dv_free(expr);
+    dv_free(cosh_affine);
+    dv_free(cube);
+    dv_free(affine);
+    dv_free(sum_xy);
+    dv_free(two_y);
+    dv_free(y);
+    dv_free(x);
+    ig_free(ig);
+}
+
+void test_multi_2d_quartic_affine_times_exp_affine(void) {
+    /* (x + 2y + 3)^4 * exp(x + 2y + 3) */
+    integrator_t *ig = ig_new();
+    dval_t *x = dv_new_var(qf_from_double(0.0));
+    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *two_y = dv_mul_d(y, 2.0);
+    dval_t *sum_xy = dv_add(x, two_y);
+    dval_t *affine = dv_add_d(sum_xy, 3.0);
+    dval_t *quartic = dv_pow_d(affine, 4.0);
+    dval_t *exp_affine = dv_exp(affine);
+    dval_t *expr = dv_mul(quartic, exp_affine);
+
+    dval_t *vars[2] = { x, y };
+    qfloat_t lo[2] = { qf_from_double(0.0), qf_from_double(0.0) };
+    qfloat_t hi[2] = { qf_from_double(1.0), qf_from_double(1.0) };
+    qfloat_t result, err;
+    qfloat_t expected =
+        qf_from_string("68737.53818332082704696161172519695");
+    int s = ig_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
+
+    printf("  ∫∫ (x+2y+3)^4exp(x+2y+3) dA  [affine^4*exp(affine)]\n");
+    qf_printf("  result   = %q\n", result);
+    qf_printf("  expected = %q\n", expected);
+    qf_printf("  err      = %q\n", err);
+    printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
+    ASSERT_TRUE(s == 0);
+    ASSERT_TRUE(qf_close(result, expected, tol27));
+    ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
+
+    dv_free(expr);
+    dv_free(exp_affine);
+    dv_free(quartic);
+    dv_free(affine);
+    dv_free(sum_xy);
+    dv_free(two_y);
+    dv_free(y);
+    dv_free(x);
+    ig_free(ig);
+}
+
+void test_multi_2d_quartic_affine_times_sin_affine(void) {
+    /* (x + 2y + 3)^4 * sin(x + 2y + 3) */
+    integrator_t *ig = ig_new();
+    dval_t *x = dv_new_var(qf_from_double(0.0));
+    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *two_y = dv_mul_d(y, 2.0);
+    dval_t *sum_xy = dv_add(x, two_y);
+    dval_t *affine = dv_add_d(sum_xy, 3.0);
+    dval_t *quartic = dv_mul(dv_mul(affine, affine), dv_mul(affine, affine));
+    dval_t *sin_affine = dv_sin(affine);
+    dval_t *expr = dv_mul(quartic, sin_affine);
+
+    dval_t *vars[2] = { x, y };
+    qfloat_t lo[2] = { qf_from_double(0.0), qf_from_double(0.0) };
+    qfloat_t hi[2] = { qf_from_double(1.0), qf_from_double(1.0) };
+    qfloat_t result, err;
+    qfloat_t expected =
+        qf_from_string("-381.33814729825575506728041524097607853401008090198");
+    int s = ig_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
+
+    printf("  ∫∫ (x+2y+3)^4sin(x+2y+3) dA  [affine^4*sin(affine)]\n");
+    qf_printf("  result   = %q\n", result);
+    qf_printf("  expected = %q\n", expected);
+    qf_printf("  err      = %q\n", err);
+    printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
+    ASSERT_TRUE(s == 0);
+    ASSERT_TRUE(qf_close(result, expected, tol27));
+    ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
+
+    dv_free(expr);
+    dv_free(sin_affine);
+    dv_free(quartic);
+    dv_free(affine);
+    dv_free(sum_xy);
+    dv_free(two_y);
+    dv_free(y);
+    dv_free(x);
+    ig_free(ig);
+}
+
+void test_multi_2d_quartic_affine_times_cos_affine(void) {
+    /* (x + 2y + 3)^4 * cos(x + 2y + 3) */
+    integrator_t *ig = ig_new();
+    dval_t *x = dv_new_var(qf_from_double(0.0));
+    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *two_y = dv_mul_d(y, 2.0);
+    dval_t *sum_xy = dv_add(x, two_y);
+    dval_t *affine = dv_add_d(sum_xy, 3.0);
+    dval_t *quartic = dv_pow_d(affine, 4.0);
+    dval_t *cos_affine = dv_cos(affine);
+    dval_t *expr = dv_mul(cos_affine, quartic);
+
+    dval_t *vars[2] = { x, y };
+    qfloat_t lo[2] = { qf_from_double(0.0), qf_from_double(0.0) };
+    qfloat_t hi[2] = { qf_from_double(1.0), qf_from_double(1.0) };
+    qfloat_t result, err;
+    qfloat_t expected =
+        qf_from_string("56.617810832398686377797715265898455798291870430519");
+    int s = ig_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
+
+    printf("  ∫∫ (x+2y+3)^4cos(x+2y+3) dA  [affine^4*cos(affine)]\n");
+    qf_printf("  result   = %q\n", result);
+    qf_printf("  expected = %q\n", expected);
+    qf_printf("  err      = %q\n", err);
+    printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
+    ASSERT_TRUE(s == 0);
+    ASSERT_TRUE(qf_close(result, expected, tol27));
+    ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
+
+    dv_free(expr);
+    dv_free(cos_affine);
+    dv_free(quartic);
+    dv_free(affine);
+    dv_free(sum_xy);
+    dv_free(two_y);
+    dv_free(y);
+    dv_free(x);
+    ig_free(ig);
+}
+
+void test_multi_2d_quartic_affine_times_sinh_affine(void) {
+    /* (x + 2y + 3)^4 * sinh(x + 2y + 3) */
+    integrator_t *ig = ig_new();
+    dval_t *x = dv_new_var(qf_from_double(0.0));
+    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *two_y = dv_mul_d(y, 2.0);
+    dval_t *sum_xy = dv_add(x, two_y);
+    dval_t *affine = dv_add_d(sum_xy, 3.0);
+    dval_t *quartic = dv_pow_d(affine, 4.0);
+    dval_t *sinh_affine = dv_sinh(affine);
+    dval_t *expr = dv_mul(quartic, sinh_affine);
+
+    dval_t *vars[2] = { x, y };
+    qfloat_t lo[2] = { qf_from_double(0.0), qf_from_double(0.0) };
+    qfloat_t hi[2] = { qf_from_double(1.0), qf_from_double(1.0) };
+    qfloat_t result, err;
+    qfloat_t expected =
+        qf_from_string("34366.578859352871623151816024873924373424902707813");
+    int s = ig_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
+
+    printf("  ∫∫ (x+2y+3)^4sinh(x+2y+3) dA  [affine^4*sinh(affine)]\n");
+    qf_printf("  result   = %q\n", result);
+    qf_printf("  expected = %q\n", expected);
+    qf_printf("  err      = %q\n", err);
+    printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
+    ASSERT_TRUE(s == 0);
+    ASSERT_TRUE(qf_close(result, expected, tol27));
+    ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
+
+    dv_free(expr);
+    dv_free(sinh_affine);
+    dv_free(quartic);
+    dv_free(affine);
+    dv_free(sum_xy);
+    dv_free(two_y);
+    dv_free(y);
+    dv_free(x);
+    ig_free(ig);
+}
+
+void test_multi_2d_quartic_affine_times_cosh_affine(void) {
+    /* (x + 2y + 3)^4 * cosh(x + 2y + 3) */
+    integrator_t *ig = ig_new();
+    dval_t *x = dv_new_var(qf_from_double(0.0));
+    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *two_y = dv_mul_d(y, 2.0);
+    dval_t *sum_xy = dv_add(x, two_y);
+    dval_t *affine = dv_add_d(sum_xy, 3.0);
+    dval_t *quartic = dv_mul(dv_mul(affine, affine), dv_mul(affine, affine));
+    dval_t *cosh_affine = dv_cosh(affine);
+    dval_t *expr = dv_mul(cosh_affine, quartic);
+
+    dval_t *vars[2] = { x, y };
+    qfloat_t lo[2] = { qf_from_double(0.0), qf_from_double(0.0) };
+    qfloat_t hi[2] = { qf_from_double(1.0), qf_from_double(1.0) };
+    qfloat_t result, err;
+    qfloat_t expected =
+        qf_from_string("34370.95932396795542380979570032394");
+    int s = ig_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
+
+    printf("  ∫∫ (x+2y+3)^4cosh(x+2y+3) dA  [affine^4*cosh(affine)]\n");
+    qf_printf("  result   = %q\n", result);
+    qf_printf("  expected = %q\n", expected);
+    qf_printf("  err      = %q\n", err);
+    printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
+    ASSERT_TRUE(s == 0);
+    ASSERT_TRUE(qf_close(result, expected, tol27));
+    ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
+
+    dv_free(expr);
+    dv_free(cosh_affine);
+    dv_free(quartic);
+    dv_free(affine);
+    dv_free(sum_xy);
+    dv_free(two_y);
+    dv_free(y);
+    dv_free(x);
+    ig_free(ig);
+}
+
+void test_multi_2d_affine_poly_times_exp_affine_combination(void) {
+    /* (3a^4 - 2a^2 + a) * exp(a), a = x + 2y + 3 */
+    integrator_t *ig = ig_new();
+    dval_t *x = dv_new_var(qf_from_double(0.0));
+    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *two_y = dv_mul_d(y, 2.0);
+    dval_t *sum_xy = dv_add(x, two_y);
+    dval_t *affine = dv_add_d(sum_xy, 3.0);
+    dval_t *square = dv_pow_d(affine, 2.0);
+    dval_t *quartic = dv_pow_d(affine, 4.0);
+    dval_t *exp_affine = dv_exp(affine);
+    dval_t *affine_term = dv_mul(affine, exp_affine);
+    dval_t *square_term = dv_mul(square, exp_affine);
+    dval_t *quartic_term = dv_mul(quartic, exp_affine);
+    dval_t *scaled_quartic = dv_mul_d(quartic_term, 3.0);
+    dval_t *scaled_square = dv_mul_d(square_term, -2.0);
+    dval_t *sum = dv_add(scaled_quartic, scaled_square);
+    dval_t *expr = dv_add(sum, affine_term);
+
+    dval_t *vars[2] = { x, y };
+    qfloat_t lo[2] = { qf_from_double(0.0), qf_from_double(0.0) };
+    qfloat_t hi[2] = { qf_from_double(1.0), qf_from_double(1.0) };
+    qfloat_t result, err;
+    qfloat_t expected = qf_add(
+        qf_add(qf_mul_double(qf_from_string("68737.53818332082704696161172519695"), 3.0),
+               qf_mul_double(qf_from_string("2680.920621655793569036410945540741"), -2.0)),
+        qf_from_string("539.6824667600549348774549946503721"));
+    int s = ig_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
+
+    printf("  ∫∫ (3a^4-2a^2+a)exp(a) dA  [affine poly * exp(affine)]\n");
+    qf_printf("  result   = %q\n", result);
+    qf_printf("  expected = %q\n", expected);
+    qf_printf("  err      = %q\n", err);
+    printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
+    ASSERT_TRUE(s == 0);
+    ASSERT_TRUE(qf_close(result, expected, tol27));
+    ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
+
+    dv_free(expr);
+    dv_free(sum);
+    dv_free(scaled_square);
+    dv_free(scaled_quartic);
+    dv_free(quartic_term);
+    dv_free(square_term);
+    dv_free(affine_term);
+    dv_free(exp_affine);
+    dv_free(quartic);
+    dv_free(square);
+    dv_free(affine);
+    dv_free(sum_xy);
+    dv_free(two_y);
+    dv_free(y);
+    dv_free(x);
+    ig_free(ig);
+}
+
+void test_multi_2d_affine_poly_times_sin_affine_combination(void) {
+    /* (2a^4 + a^2 - 3a) * sin(a), a = x + 2y + 3 */
+    integrator_t *ig = ig_new();
+    dval_t *x = dv_new_var(qf_from_double(0.0));
+    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *two_y = dv_mul_d(y, 2.0);
+    dval_t *sum_xy = dv_add(x, two_y);
+    dval_t *affine = dv_add_d(sum_xy, 3.0);
+    dval_t *square = dv_pow_d(affine, 2.0);
+    dval_t *quartic = dv_pow_d(affine, 4.0);
+    dval_t *sin_affine = dv_sin(affine);
+    dval_t *affine_term = dv_mul(affine, sin_affine);
+    dval_t *square_term = dv_mul(square, sin_affine);
+    dval_t *quartic_term = dv_mul(quartic, sin_affine);
+    dval_t *scaled_quartic = dv_mul_d(quartic_term, 2.0);
+    dval_t *scaled_affine = dv_mul_d(affine_term, -3.0);
+    dval_t *sum = dv_add(scaled_quartic, square_term);
+    dval_t *expr = dv_add(sum, scaled_affine);
+
+    dval_t *vars[2] = { x, y };
+    qfloat_t lo[2] = { qf_from_double(0.0), qf_from_double(0.0) };
+    qfloat_t hi[2] = { qf_from_double(1.0), qf_from_double(1.0) };
+    qfloat_t result, err;
+    qfloat_t expected = qf_add(
+        qf_add(qf_mul_double(qf_from_string("-381.3381472982557550672804152409705"), 2.0),
+               qf_from_string("-16.88885619742372162769129239240872")),
+        qf_mul_double(qf_from_string("-3.624508420217032103141223583565993"), -3.0));
+    int s = ig_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
+
+    printf("  ∫∫ (2a^4+a^2-3a)sin(a) dA  [affine poly * sin(affine)]\n");
+    qf_printf("  result   = %q\n", result);
+    qf_printf("  expected = %q\n", expected);
+    qf_printf("  err      = %q\n", err);
+    printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
+    ASSERT_TRUE(s == 0);
+    ASSERT_TRUE(qf_close(result, expected, tol27));
+    ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
+
+    dv_free(expr);
+    dv_free(sum);
+    dv_free(scaled_affine);
+    dv_free(scaled_quartic);
+    dv_free(quartic_term);
+    dv_free(square_term);
+    dv_free(affine_term);
+    dv_free(sin_affine);
+    dv_free(quartic);
+    dv_free(square);
+    dv_free(affine);
+    dv_free(sum_xy);
+    dv_free(two_y);
     dv_free(y);
     dv_free(x);
     ig_free(ig);
@@ -1381,7 +2652,34 @@ int tests_main(void) {
     RUN_TEST(test_multi_3d_scaled_sum_specials, NULL);
     RUN_TEST(test_multi_2d_sum_of_specials, NULL);
     RUN_TEST(test_multi_3d_separable_product, NULL);
+    RUN_TEST(test_multi_3d_regrouped_separable_product, NULL);
     RUN_TEST(test_multi_2d_sum_of_separable_products, NULL);
+    RUN_TEST(test_multi_2d_affine_square, NULL);
+    RUN_TEST(test_multi_2d_affine_cube, NULL);
+    RUN_TEST(test_multi_2d_affine_quartic, NULL);
+    RUN_TEST(test_multi_2d_affine_poly_deg4, NULL);
+    RUN_TEST(test_multi_2d_affine_times_exp_affine, NULL);
+    RUN_TEST(test_multi_2d_square_affine_times_exp_affine, NULL);
+    RUN_TEST(test_multi_2d_cube_affine_times_exp_affine, NULL);
+    RUN_TEST(test_multi_2d_quartic_affine_times_exp_affine, NULL);
+    RUN_TEST(test_multi_2d_affine_poly_times_exp_affine_combination, NULL);
+    RUN_TEST(test_multi_2d_affine_times_sin_affine, NULL);
+    RUN_TEST(test_multi_2d_square_affine_times_sin_affine, NULL);
+    RUN_TEST(test_multi_2d_cube_affine_times_sin_affine, NULL);
+    RUN_TEST(test_multi_2d_quartic_affine_times_sin_affine, NULL);
+    RUN_TEST(test_multi_2d_affine_poly_times_sin_affine_combination, NULL);
+    RUN_TEST(test_multi_2d_affine_times_cos_affine, NULL);
+    RUN_TEST(test_multi_2d_square_affine_times_cos_affine, NULL);
+    RUN_TEST(test_multi_2d_cube_affine_times_cos_affine, NULL);
+    RUN_TEST(test_multi_2d_quartic_affine_times_cos_affine, NULL);
+    RUN_TEST(test_multi_2d_affine_times_sinh_affine, NULL);
+    RUN_TEST(test_multi_2d_square_affine_times_sinh_affine, NULL);
+    RUN_TEST(test_multi_2d_cube_affine_times_sinh_affine, NULL);
+    RUN_TEST(test_multi_2d_quartic_affine_times_sinh_affine, NULL);
+    RUN_TEST(test_multi_2d_affine_times_cosh_affine, NULL);
+    RUN_TEST(test_multi_2d_square_affine_times_cosh_affine, NULL);
+    RUN_TEST(test_multi_2d_cube_affine_times_cosh_affine, NULL);
+    RUN_TEST(test_multi_2d_quartic_affine_times_cosh_affine, NULL);
 
     printf(C_BOLD C_GREEN "\n=== README Output Examples ===\n" C_RESET);
     printf(C_BOLD C_YELLOW "Example: Gaussian integral\n" C_RESET);

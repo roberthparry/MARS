@@ -6,12 +6,16 @@ The project provides per-module test targets.
 
 ```sh
 make test_qfloat
+make test_qcomplex
 make test_dval
 make test_datetime
 make test_dictionary
 make test_set
+make test_array
 make test_string
+make test_bitset
 make test_matrix
+make test_integrator
 ```
 
 ## Typical Workflow
@@ -28,19 +32,36 @@ Before committing:
 ```sh
 make release
 make test_qfloat
+make test_qcomplex
 make test_dval
 make test_datetime
 make test_dictionary
 make test_set
+make test_array
 make test_string
+make test_bitset
 make test_matrix
+make test_integrator
 ```
 
 ## Notes
 
 - Run commands from the repository root.
+- For now, prefer running test targets sequentially rather than overlapping them. The current codebase and build products are not yet fully thread-safe for concurrent test runs.
 - The test output is intended to read cleanly in a normal terminal or in the
   Visual Studio Code integrated terminal.
+
+## Benchmarks
+
+The repository also includes focused benchmark targets. For the current symbolic
+integrator work:
+
+```sh
+make bench_integrator
+```
+
+This benchmark reports both matched symbolic fast paths and nearby fallback
+cases so performance changes are easy to spot.
 
 ---
 

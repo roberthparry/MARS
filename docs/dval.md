@@ -11,7 +11,8 @@ Evaluation uses `qfloat_t` throughout for ~106-bit precision.
 values, derivative cache, and variable updates are not synchronised internally.
 If you need to use a `dval_t` graph from multiple threads, protect it with
 external locking and treat concurrent evaluation or mutation as unsupported for
-now.
+now. That caveat also applies to the symbolic integrator fast path built on top
+of these graphs.
 
 ## Capabilities
 
@@ -22,6 +23,9 @@ now.
 - elementary and special functions mirroring the `qfloat_t` API
 - expression parsing from and formatting to strings
 - integration as a symbolic matrix element type through `matrix_t`
+- public structural helper layers for sibling modules:
+  - `dval_helpers.h` for lightweight public DAG helpers
+  - `dval_pattern.h` for affine/polynomial matcher APIs used by the symbolic integrator fast path
 
 ## Matrix Integration
 
@@ -42,6 +46,22 @@ you can differentiate individual matrix entries with the normal `dval` API.
 The full numerical matrix toolbox is still separate. General eigensolvers,
 factorisations, and Schur-based matrix functions remain numeric-only unless the
 `dval` input first falls into a supported exact structured case.
+
+## Symbolic Integrator Helpers
+
+The `dval` subsystem also exposes a small public helper surface for
+higher-level symbolic code:
+
+- `dval_helpers.h` contains lightweight public DAG utilities such as exact-zero
+  checks, named-constant checks, variable-usage collection, and substitution.
+- `dval_pattern.h` contains the heavier affine-family recognisers used by the
+  integrator, including:
+  - unary-affine matching like `exp(a)` and `sin(a)`
+  - degree-4 affine polynomial matching `P(a)`
+  - degree-4 affine-polynomial times unary-affine matching `P(a) * special(a)`
+
+These APIs are intended for sibling library modules rather than ordinary
+end-user arithmetic code.
 
 ## Example: Constructing an Expression
 
