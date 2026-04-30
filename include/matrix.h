@@ -281,15 +281,19 @@ matrix_t *mat_create_dv(size_t rows, size_t cols, dval_t *const *data);
  * whether any entry is genuinely complex. Symbolic matrices become dval
  * matrices. For bare symbolic input without outer braces, all discovered
  * bindings start as NaN and symbol kind is inferred from the name. The bare
- * inference rule treats `a`, `b`, `c`, `d`, and indexed forms such as `c1`,
- * `c_2`, and `d₃` as constants by default; ordinary Latin names such as `x`
- * or `radius`, symbolic parameter names such as `Δ` or `Ω`, and names such
- * as `e`, `π`, and `τ` are treated as variables unless an explicit
- * matrix-wide binding section says otherwise. When @p bindings_out is
- * non-NULL for a symbolic matrix, it receives a heap-allocated array of
- * borrowed bindings for the symbols actually referenced by the matrix body
- * that remain valid while the returned matrix remains alive; releasing that
- * array only requires free(*bindings_out).
+ * inference rule matches dval parsing:
+ *   - built-in valued constants: `e`, `pi`, `π`, `@pi`, `@phi`, `@gamma`
+ *   - constant placeholders: `a`, `b`, `c`, `d`, and indexed forms such as
+ *     `c1`, `c_2`, and `d₃`
+ *   - variables: everything else, including `x`, `τ`, `@tau`, and bracketed
+ *     names such as `[radius]`
+ *
+ * Suffixed names such as `@pi1` normalise to Greek-with-subscript names such
+ * as `π₁`, but remain ordinary symbolic variables rather than built-in
+ * constants. When @p bindings_out is non-NULL for a symbolic matrix, it
+ * receives a heap-allocated array of borrowed bindings for the symbols
+ * actually referenced by the matrix body that remain valid while the returned
+ * matrix remains alive; releasing that array only requires free(*bindings_out).
  */
 matrix_t *mat_from_string(const char *s, binding_t **bindings_out, size_t *number_out);
 

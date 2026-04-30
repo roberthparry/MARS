@@ -109,6 +109,15 @@ static const greek_entry_t s_greek_names[GREEK_HT_SIZE] = {
     [29] = { "omega",   5, "ω", "Ω" }
 };
 
+static void append_subscript_digit(char *out, size_t *out_len, char digit)
+{
+    int d = digit - '0';
+
+    out[(*out_len)++] = (char)0xE2;
+    out[(*out_len)++] = (char)0x82;
+    out[(*out_len)++] = (char)(0x80 + d);
+}
+
 static unsigned greek_ht_hash(const char *s, size_t n)
 {
     unsigned x = 113u;
@@ -142,6 +151,8 @@ char *dv_normalize_name(const char *name)
     const char *e;
     size_t len;
     char *t;
+    char *canon;
+    size_t out_len = 0;
 
     if (!name)
         return NULL;
@@ -207,7 +218,59 @@ char *dv_normalize_name(const char *name)
         t = clean;
     }
 
-    return t;
+    len = strlen(t);
+    canon = malloc(len * 3 + 1);
+    if (!canon) {
+        free(t);
+        abort();
+    }
+
+    for (size_t r = 0; r < len; ) {
+        if (t[r] == '_' && r + 1 < len &&
+            isdigit((unsigned char)t[r + 1])) {
+            r++;
+            while (r < len && isdigit((unsigned char)t[r])) {
+                append_subscript_digit(canon, &out_len, t[r]);
+                r++;
+            }
+            continue;
+        }
+
+        canon[out_len++] = t[r++];
+    }
+    canon[out_len] = '\0';
+
+    {
+        size_t run_start = out_len;
+
+        while (run_start > 0 &&
+               isdigit((unsigned char)canon[run_start - 1])) {
+            run_start--;
+        }
+
+        if (run_start < out_len && run_start > 0) {
+            char *final = malloc(out_len * 3 + 1);
+            size_t final_len = 0;
+
+            if (!final) {
+                free(canon);
+                free(t);
+                abort();
+            }
+
+            for (size_t i = 0; i < run_start; ++i)
+                final[final_len++] = canon[i];
+            for (size_t i = run_start; i < out_len; ++i)
+                append_subscript_digit(final, &final_len, canon[i]);
+            final[final_len] = '\0';
+
+            free(canon);
+            canon = final;
+        }
+    }
+
+    free(t);
+    return canon;
 }
 
 void dv_retain(dval_t *dv)

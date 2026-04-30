@@ -2319,7 +2319,8 @@
       "test_from_string_deriv": true,
       "test_from_expression_string_api": true,
       "test_from_string_implicit_symbolic_bindings": true,
-      "test_from_string_bindings_api": true
+      "test_from_string_bindings_api": true,
+      "test_from_string_name_normalization": true
     },
     "test_from_string_ascii_alternatives": {
       "enabled": true,
