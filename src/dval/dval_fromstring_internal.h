@@ -26,9 +26,6 @@ int read_superscript(const char **pp);
 char *read_simple_name(const char **pp);
 char *read_bracketed_name(const char **pp);
 char *read_any_name(const char **pp);
-int fs_is_default_constant_name(const char *name);
-int fs_get_default_constant_value(const char *name, qfloat_t *value_out);
-char *fs_normalise_binding_name(const char *name);
 
 void symtab_init(symtab_t *t);
 int symtab_has(const symtab_t *t, const char *name);

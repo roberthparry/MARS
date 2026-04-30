@@ -1,5 +1,5 @@
 #include "test_dval.h"
-#include "dval_pattern.h"
+#include "internal/dval_pattern.h"
 
 static void test_match_affine_families(void)
 {

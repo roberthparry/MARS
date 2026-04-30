@@ -18,7 +18,7 @@ CFLAGS += -D_GNU_SOURCE
 CC := gcc
 AR := ar rcs
 
-INCLUDES := -I. -Iinclude -Itests -Itests/include
+INCLUDES := -I. -Iinclude -Iinclude/internal -Itests -Itests/include
 
 # ------------------------------------------------------------
 # Optional libunistring
