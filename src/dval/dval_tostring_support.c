@@ -242,7 +242,7 @@ void emit_name_func(sbuf_t *b, const char *name)
         return;
     }
 
-    if (dv_tostring_is_safe_func_name(name)) {
+    if (dv_tostring_is_simple_name(name)) {
         sbuf_puts(b, name);
     } else {
         sbuf_putc(b, '[');

@@ -58,10 +58,13 @@ integrator work:
 
 ```sh
 make bench_integrator
+make bench_matrix_dval
 ```
 
 This benchmark reports both matched symbolic fast paths and nearby fallback
-cases so performance changes are easy to spot.
+cases so performance changes are easy to spot. See
+[`benchmarks.md`](benchmarks.md) for benchmark-specific notes and sample
+results.
 
 ---
 

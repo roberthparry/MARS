@@ -6,6 +6,7 @@ This directory contains the longer module documentation for MARS.
 
 - [Building](building.md)
 - [Testing](testing.md)
+- [Benchmarks](benchmarks.md)
 
 ## Modules
 
@@ -31,3 +32,6 @@ This directory contains the longer module documentation for MARS.
 
 - The repository landing page is [`../README.md`](../README.md).
 - These documents focus on API shape, examples, and implementation notes.
+- Headers in `../include/` are the public surface. Headers in
+  `../include/internal/` are shared implementation headers for MARS itself and
+  are not intended as stable external API.

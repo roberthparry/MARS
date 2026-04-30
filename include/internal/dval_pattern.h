@@ -2,6 +2,7 @@
 #define DVAL_PATTERN_H
 
 #include "dval_helpers.h"
+#include "internal/dval_expr_match.h"
 
 /**
  * @file dval_pattern.h

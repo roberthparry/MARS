@@ -2256,7 +2256,8 @@
       "test_to_string_negative_rhs_expr": true,
       "test_to_string_double_negative_expr": true,
       "test_to_string_nested_negative_rhs_expr": true,
-      "test_to_string_unary_sqrt": true
+      "test_to_string_unary_sqrt": true,
+      "test_to_string_non_simple_var_bracketed": true
     },
     "test_to_string_basic_const": {
       "enabled": true,
@@ -2302,6 +2303,11 @@
       "enabled": true,
       "test_to_string_unary_sqrt_expr": true,
       "test_to_string_unary_sqrt_func": true
+    },
+    "test_to_string_non_simple_var_bracketed": {
+      "enabled": true,
+      "test_to_string_non_simple_var_bracketed_expr": true,
+      "test_to_string_non_simple_var_bracketed_func": true
     }
   },
   "tests/dval/test_dval_from_string.c": {

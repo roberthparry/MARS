@@ -326,14 +326,6 @@ dval_t *dv_e1(dval_t *dv);
 /* ------------------------------------------------------------------------- */
 
 /**
- * @brief Increment the reference count of an existing handle.
- *
- * This is mainly useful for container or cache layers that need to keep an
- * additional owning reference to a node returned elsewhere.
- */
-void dv_retain(dval_t *dv);
-
-/**
  * @brief Decrement the reference count and free if it reaches zero.
  *
  * Must be called exactly once for every owning handle returned by:

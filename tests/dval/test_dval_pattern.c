@@ -1,4 +1,5 @@
 #include "test_dval.h"
+#include "internal/dval_expr_match.h"
 #include "internal/dval_pattern.h"
 
 static void test_match_affine_families(void)
@@ -14,8 +15,10 @@ static void test_match_affine_families(void)
     dval_t *linear = dv_sub(two_x, y_over_four);
     dval_t *affine = dv_add_d(linear, 3.0);
     dval_t *exp_affine = dv_exp(affine);
-    dval_t *neg_two_x = dv_neg(dv_mul_d(x, 2.0));
-    dval_t *sin_affine = dv_sin(dv_add_d(neg_two_x, 3.0));
+    dval_t *neg_two_x_inner = dv_mul_d(x, 2.0);
+    dval_t *neg_two_x = dv_neg(neg_two_x_inner);
+    dval_t *sin_arg = dv_add_d(neg_two_x, 3.0);
+    dval_t *sin_affine = dv_sin(sin_arg);
 
     ASSERT_TRUE(dv_match_unary_affine_kind(exp_affine, DV_PATTERN_UNARY_EXP,
                                            2, vars, &constant, coeffs));
@@ -30,7 +33,9 @@ static void test_match_affine_families(void)
     check_q_at(__FILE__, __LINE__, 1, "sin affine coeff y", coeffs[1], QF_ZERO);
 
     dv_free(sin_affine);
+    dv_free(sin_arg);
     dv_free(neg_two_x);
+    dv_free(neg_two_x_inner);
     dv_free(exp_affine);
     dv_free(affine);
     dv_free(linear);
@@ -47,7 +52,9 @@ static void test_generic_unary_affine_matchers(void)
     dval_t *vars[] = { x, y };
     qfloat_t constant;
     qfloat_t coeffs[2];
-    dval_t *affine = dv_add_d(dv_add(x, dv_mul_d(y, 2.0)), 3.0);
+    dval_t *two_y = dv_mul_d(y, 2.0);
+    dval_t *sum_xy = dv_add(x, two_y);
+    dval_t *affine = dv_add_d(sum_xy, 3.0);
     dval_t *sin_affine = dv_sin(affine);
 
     ASSERT_TRUE(dv_match_unary_affine_kind(sin_affine, DV_PATTERN_UNARY_SIN,
@@ -60,6 +67,8 @@ static void test_generic_unary_affine_matchers(void)
 
     dv_free(sin_affine);
     dv_free(affine);
+    dv_free(sum_xy);
+    dv_free(two_y);
     dv_free(y);
     dv_free(x);
 }
@@ -103,8 +112,12 @@ static void test_scaled_expr_and_var_usage(void)
     const dval_t *base = NULL;
     bool used[3];
 
-    dval_t *scaled = dv_div_d(dv_neg(dv_mul_d(x, 6.0)), 3.0);
-    dval_t *usage_expr = dv_add(dv_mul_d(x, 2.0), dv_exp(y));
+    dval_t *scaled_inner = dv_mul_d(x, 6.0);
+    dval_t *scaled_neg = dv_neg(scaled_inner);
+    dval_t *scaled = dv_div_d(scaled_neg, 3.0);
+    dval_t *usage_scaled = dv_mul_d(x, 2.0);
+    dval_t *usage_exp = dv_exp(y);
+    dval_t *usage_expr = dv_add(usage_scaled, usage_exp);
 
     ASSERT_TRUE(dv_match_scaled_expr(scaled, &scale, &base));
     check_q_at(__FILE__, __LINE__, 1, "scaled expr factor", scale, qf_from_double(-2.0));
@@ -116,7 +129,11 @@ static void test_scaled_expr_and_var_usage(void)
     ASSERT_TRUE(!used[2]);
 
     dv_free(usage_expr);
+    dv_free(usage_exp);
+    dv_free(usage_scaled);
     dv_free(scaled);
+    dv_free(scaled_neg);
+    dv_free(scaled_inner);
     dv_free(z);
     dv_free(y);
     dv_free(x);
@@ -165,7 +182,10 @@ static void test_square_affine_matchers(void)
     qfloat_t poly[5];
     qfloat_t constant;
     qfloat_t coeffs[2];
-    dval_t *affine = dv_add_d(dv_sub(dv_mul_d(x, 2.0), dv_div_d(y, 4.0)), 3.0);
+    dval_t *two_x = dv_mul_d(x, 2.0);
+    dval_t *y_over_four = dv_div_d(y, 4.0);
+    dval_t *linear = dv_sub(two_x, y_over_four);
+    dval_t *affine = dv_add_d(linear, 3.0);
     dval_t *pow_square = dv_pow_d(affine, 2.0);
     dval_t *mul_square = dv_mul(affine, affine);
 
@@ -183,6 +203,9 @@ static void test_square_affine_matchers(void)
     dv_free(mul_square);
     dv_free(pow_square);
     dv_free(affine);
+    dv_free(linear);
+    dv_free(y_over_four);
+    dv_free(two_x);
     dv_free(y);
     dv_free(x);
 }
@@ -195,9 +218,13 @@ static void test_cube_affine_matchers(void)
     qfloat_t poly[5];
     qfloat_t constant;
     qfloat_t coeffs[2];
-    dval_t *affine = dv_add_d(dv_sub(dv_mul_d(x, 2.0), dv_div_d(y, 4.0)), 3.0);
+    dval_t *two_x = dv_mul_d(x, 2.0);
+    dval_t *y_over_four = dv_div_d(y, 4.0);
+    dval_t *linear = dv_sub(two_x, y_over_four);
+    dval_t *affine = dv_add_d(linear, 3.0);
     dval_t *pow_cube = dv_pow_d(affine, 3.0);
-    dval_t *mul_cube = dv_mul(dv_mul(affine, affine), affine);
+    dval_t *mul_cube_square = dv_mul(affine, affine);
+    dval_t *mul_cube = dv_mul(mul_cube_square, affine);
 
     ASSERT_TRUE(dv_match_affine_poly_deg4(pow_cube, 2, vars, poly, &constant, coeffs));
     check_q_at(__FILE__, __LINE__, 1, "cube affine pow constant", constant, qf_from_double(3.0));
@@ -211,8 +238,12 @@ static void test_cube_affine_matchers(void)
     check_q_at(__FILE__, __LINE__, 1, "cube affine mul coeff y", coeffs[1], qf_from_double(-0.25));
 
     dv_free(mul_cube);
+    dv_free(mul_cube_square);
     dv_free(pow_cube);
     dv_free(affine);
+    dv_free(linear);
+    dv_free(y_over_four);
+    dv_free(two_x);
     dv_free(y);
     dv_free(x);
 }
@@ -225,9 +256,14 @@ static void test_quartic_affine_matchers(void)
     qfloat_t poly[5];
     qfloat_t constant;
     qfloat_t coeffs[2];
-    dval_t *affine = dv_add_d(dv_sub(dv_mul_d(x, 2.0), dv_div_d(y, 4.0)), 3.0);
+    dval_t *two_x = dv_mul_d(x, 2.0);
+    dval_t *y_over_four = dv_div_d(y, 4.0);
+    dval_t *linear = dv_sub(two_x, y_over_four);
+    dval_t *affine = dv_add_d(linear, 3.0);
     dval_t *pow_quartic = dv_pow_d(affine, 4.0);
-    dval_t *mul_quartic = dv_mul(dv_mul(affine, affine), dv_mul(affine, affine));
+    dval_t *mul_quartic_lhs = dv_mul(affine, affine);
+    dval_t *mul_quartic_rhs = dv_mul(affine, affine);
+    dval_t *mul_quartic = dv_mul(mul_quartic_lhs, mul_quartic_rhs);
 
     ASSERT_TRUE(dv_match_affine_poly_deg4(pow_quartic, 2, vars, poly, &constant, coeffs));
     check_q_at(__FILE__, __LINE__, 1, "quartic affine pow constant", constant, qf_from_double(3.0));
@@ -241,8 +277,13 @@ static void test_quartic_affine_matchers(void)
     check_q_at(__FILE__, __LINE__, 1, "quartic affine mul coeff y", coeffs[1], qf_from_double(-0.25));
 
     dv_free(mul_quartic);
+    dv_free(mul_quartic_rhs);
+    dv_free(mul_quartic_lhs);
     dv_free(pow_quartic);
     dv_free(affine);
+    dv_free(linear);
+    dv_free(y_over_four);
+    dv_free(two_x);
     dv_free(y);
     dv_free(x);
 }
@@ -254,10 +295,13 @@ static void test_affine_times_exp_affine_matcher(void)
     dval_t *vars[] = { x, y };
     qfloat_t constant;
     qfloat_t coeffs[2];
-    dval_t *affine = dv_add_d(dv_add(x, dv_mul_d(y, 2.0)), 3.0);
+    dval_t *two_y = dv_mul_d(y, 2.0);
+    dval_t *sum_xy = dv_add(x, two_y);
+    dval_t *affine = dv_add_d(sum_xy, 3.0);
     dval_t *exp_affine = dv_exp(affine);
     dval_t *expr = dv_mul(affine, exp_affine);
-    dval_t *mismatch = dv_mul(dv_add_d(x, 1.0), exp_affine);
+    dval_t *mismatch_affine = dv_add_d(x, 1.0);
+    dval_t *mismatch = dv_mul(mismatch_affine, exp_affine);
 
     ASSERT_TRUE(dv_match_affine_poly_deg4_times_unary_affine_kind(expr, DV_PATTERN_UNARY_EXP,
                                                                   2, vars, (qfloat_t[5]){0},
@@ -270,9 +314,12 @@ static void test_affine_times_exp_affine_matcher(void)
                                                                    &constant, coeffs));
 
     dv_free(mismatch);
+    dv_free(mismatch_affine);
     dv_free(expr);
     dv_free(exp_affine);
     dv_free(affine);
+    dv_free(sum_xy);
+    dv_free(two_y);
     dv_free(y);
     dv_free(x);
 }
@@ -285,13 +332,18 @@ static void test_square_affine_times_exp_affine_matcher(void)
     qfloat_t constant;
     qfloat_t coeffs[2];
     qfloat_t poly[5];
-    dval_t *affine = dv_add_d(dv_add(x, dv_mul_d(y, 2.0)), 3.0);
+    dval_t *two_y = dv_mul_d(y, 2.0);
+    dval_t *sum_xy = dv_add(x, two_y);
+    dval_t *affine = dv_add_d(sum_xy, 3.0);
     dval_t *square = dv_mul(affine, affine);
     dval_t *pow_square = dv_pow_d(affine, 2.0);
     dval_t *exp_affine = dv_exp(affine);
     dval_t *expr = dv_mul(square, exp_affine);
     dval_t *expr_pow = dv_mul(exp_affine, pow_square);
-    dval_t *mismatch = dv_mul(dv_mul(dv_add_d(x, 1.0), dv_add_d(x, 1.0)), exp_affine);
+    dval_t *mismatch_lhs = dv_add_d(x, 1.0);
+    dval_t *mismatch_rhs = dv_add_d(x, 1.0);
+    dval_t *mismatch_square = dv_mul(mismatch_lhs, mismatch_rhs);
+    dval_t *mismatch = dv_mul(mismatch_square, exp_affine);
 
     ASSERT_TRUE(dv_match_affine_poly_deg4_times_unary_affine_kind(expr, DV_PATTERN_UNARY_EXP,
                                                                   2, vars, poly, &constant, coeffs));
@@ -306,12 +358,17 @@ static void test_square_affine_times_exp_affine_matcher(void)
                                                                    2, vars, poly, &constant, coeffs));
 
     dv_free(mismatch);
+    dv_free(mismatch_square);
+    dv_free(mismatch_rhs);
+    dv_free(mismatch_lhs);
     dv_free(expr_pow);
     dv_free(expr);
     dv_free(exp_affine);
     dv_free(pow_square);
     dv_free(square);
     dv_free(affine);
+    dv_free(sum_xy);
+    dv_free(two_y);
     dv_free(y);
     dv_free(x);
 }
@@ -324,14 +381,19 @@ static void test_square_affine_times_trig_affine_matchers(void)
     qfloat_t constant;
     qfloat_t coeffs[2];
     qfloat_t poly[5];
-    dval_t *affine = dv_add_d(dv_add(x, dv_mul_d(y, 2.0)), 3.0);
+    dval_t *two_y = dv_mul_d(y, 2.0);
+    dval_t *sum_xy = dv_add(x, two_y);
+    dval_t *affine = dv_add_d(sum_xy, 3.0);
     dval_t *square = dv_mul(affine, affine);
     dval_t *pow_square = dv_pow_d(affine, 2.0);
     dval_t *sin_affine = dv_sin(affine);
     dval_t *cos_affine = dv_cos(affine);
     dval_t *sin_expr = dv_mul(square, sin_affine);
     dval_t *cos_expr = dv_mul(cos_affine, pow_square);
-    dval_t *mismatch = dv_mul(dv_mul(dv_add_d(x, 1.0), dv_add_d(x, 1.0)), sin_affine);
+    dval_t *mismatch_lhs = dv_add_d(x, 1.0);
+    dval_t *mismatch_rhs = dv_add_d(x, 1.0);
+    dval_t *mismatch_square = dv_mul(mismatch_lhs, mismatch_rhs);
+    dval_t *mismatch = dv_mul(mismatch_square, sin_affine);
 
     ASSERT_TRUE(dv_match_affine_poly_deg4_times_unary_affine_kind(sin_expr, DV_PATTERN_UNARY_SIN,
                                                                   2, vars, poly, &constant, coeffs));
@@ -351,6 +413,9 @@ static void test_square_affine_times_trig_affine_matchers(void)
                                                                    2, vars, poly, &constant, coeffs));
 
     dv_free(mismatch);
+    dv_free(mismatch_square);
+    dv_free(mismatch_rhs);
+    dv_free(mismatch_lhs);
     dv_free(cos_expr);
     dv_free(sin_expr);
     dv_free(cos_affine);
@@ -358,6 +423,8 @@ static void test_square_affine_times_trig_affine_matchers(void)
     dv_free(pow_square);
     dv_free(square);
     dv_free(affine);
+    dv_free(sum_xy);
+    dv_free(two_y);
     dv_free(y);
     dv_free(x);
 }
@@ -370,12 +437,15 @@ static void test_affine_times_trig_affine_matchers(void)
     qfloat_t constant;
     qfloat_t coeffs[2];
     qfloat_t poly[5];
-    dval_t *affine = dv_add_d(dv_add(x, dv_mul_d(y, 2.0)), 3.0);
+    dval_t *two_y = dv_mul_d(y, 2.0);
+    dval_t *sum_xy = dv_add(x, two_y);
+    dval_t *affine = dv_add_d(sum_xy, 3.0);
     dval_t *sin_affine = dv_sin(affine);
     dval_t *cos_affine = dv_cos(affine);
     dval_t *sin_expr = dv_mul(affine, sin_affine);
     dval_t *cos_expr = dv_mul(cos_affine, affine);
-    dval_t *mismatch = dv_mul(dv_add_d(x, 1.0), sin_affine);
+    dval_t *mismatch_affine = dv_add_d(x, 1.0);
+    dval_t *mismatch = dv_mul(mismatch_affine, sin_affine);
 
     ASSERT_TRUE(dv_match_affine_poly_deg4_times_unary_affine_kind(sin_expr, DV_PATTERN_UNARY_SIN,
                                                                   2, vars, poly, &constant, coeffs));
@@ -395,11 +465,14 @@ static void test_affine_times_trig_affine_matchers(void)
                                                                    2, vars, poly, &constant, coeffs));
 
     dv_free(mismatch);
+    dv_free(mismatch_affine);
     dv_free(cos_expr);
     dv_free(sin_expr);
     dv_free(cos_affine);
     dv_free(sin_affine);
     dv_free(affine);
+    dv_free(sum_xy);
+    dv_free(two_y);
     dv_free(y);
     dv_free(x);
 }
@@ -412,12 +485,15 @@ static void test_affine_times_hyperbolic_affine_matchers(void)
     qfloat_t constant;
     qfloat_t coeffs[2];
     qfloat_t poly[5];
-    dval_t *affine = dv_add_d(dv_add(x, dv_mul_d(y, 2.0)), 3.0);
+    dval_t *two_y = dv_mul_d(y, 2.0);
+    dval_t *sum_xy = dv_add(x, two_y);
+    dval_t *affine = dv_add_d(sum_xy, 3.0);
     dval_t *sinh_affine = dv_sinh(affine);
     dval_t *cosh_affine = dv_cosh(affine);
     dval_t *sinh_expr = dv_mul(affine, sinh_affine);
     dval_t *cosh_expr = dv_mul(cosh_affine, affine);
-    dval_t *mismatch = dv_mul(dv_add_d(x, 1.0), sinh_affine);
+    dval_t *mismatch_affine = dv_add_d(x, 1.0);
+    dval_t *mismatch = dv_mul(mismatch_affine, sinh_affine);
 
     ASSERT_TRUE(dv_match_affine_poly_deg4_times_unary_affine_kind(sinh_expr, DV_PATTERN_UNARY_SINH,
                                                                   2, vars, poly, &constant, coeffs));
@@ -437,11 +513,14 @@ static void test_affine_times_hyperbolic_affine_matchers(void)
                                                                    2, vars, poly, &constant, coeffs));
 
     dv_free(mismatch);
+    dv_free(mismatch_affine);
     dv_free(cosh_expr);
     dv_free(sinh_expr);
     dv_free(cosh_affine);
     dv_free(sinh_affine);
     dv_free(affine);
+    dv_free(sum_xy);
+    dv_free(two_y);
     dv_free(y);
     dv_free(x);
 }
@@ -454,14 +533,19 @@ static void test_square_affine_times_hyperbolic_affine_matchers(void)
     qfloat_t constant;
     qfloat_t coeffs[2];
     qfloat_t poly[5];
-    dval_t *affine = dv_add_d(dv_add(x, dv_mul_d(y, 2.0)), 3.0);
+    dval_t *two_y = dv_mul_d(y, 2.0);
+    dval_t *sum_xy = dv_add(x, two_y);
+    dval_t *affine = dv_add_d(sum_xy, 3.0);
     dval_t *square = dv_mul(affine, affine);
     dval_t *pow_square = dv_pow_d(affine, 2.0);
     dval_t *sinh_affine = dv_sinh(affine);
     dval_t *cosh_affine = dv_cosh(affine);
     dval_t *sinh_expr = dv_mul(square, sinh_affine);
     dval_t *cosh_expr = dv_mul(cosh_affine, pow_square);
-    dval_t *mismatch = dv_mul(dv_mul(dv_add_d(x, 1.0), dv_add_d(x, 1.0)), sinh_affine);
+    dval_t *mismatch_lhs = dv_add_d(x, 1.0);
+    dval_t *mismatch_rhs = dv_add_d(x, 1.0);
+    dval_t *mismatch_square = dv_mul(mismatch_lhs, mismatch_rhs);
+    dval_t *mismatch = dv_mul(mismatch_square, sinh_affine);
 
     ASSERT_TRUE(dv_match_affine_poly_deg4_times_unary_affine_kind(sinh_expr, DV_PATTERN_UNARY_SINH,
                                                                   2, vars, poly, &constant, coeffs));
@@ -481,6 +565,9 @@ static void test_square_affine_times_hyperbolic_affine_matchers(void)
                                                                    2, vars, poly, &constant, coeffs));
 
     dv_free(mismatch);
+    dv_free(mismatch_square);
+    dv_free(mismatch_rhs);
+    dv_free(mismatch_lhs);
     dv_free(cosh_expr);
     dv_free(sinh_expr);
     dv_free(cosh_affine);
@@ -488,6 +575,8 @@ static void test_square_affine_times_hyperbolic_affine_matchers(void)
     dv_free(pow_square);
     dv_free(square);
     dv_free(affine);
+    dv_free(sum_xy);
+    dv_free(two_y);
     dv_free(y);
     dv_free(x);
 }
@@ -500,8 +589,11 @@ static void test_cube_affine_times_unary_affine_matchers(void)
     qfloat_t constant;
     qfloat_t coeffs[2];
     qfloat_t poly[5];
-    dval_t *affine = dv_add_d(dv_add(x, dv_mul_d(y, 2.0)), 3.0);
-    dval_t *cube = dv_mul(dv_mul(affine, affine), affine);
+    dval_t *two_y = dv_mul_d(y, 2.0);
+    dval_t *sum_xy = dv_add(x, two_y);
+    dval_t *affine = dv_add_d(sum_xy, 3.0);
+    dval_t *cube_square = dv_mul(affine, affine);
+    dval_t *cube = dv_mul(cube_square, affine);
     dval_t *pow_cube = dv_pow_d(affine, 3.0);
     dval_t *exp_affine = dv_exp(affine);
     dval_t *sin_affine = dv_sin(affine);
@@ -513,9 +605,12 @@ static void test_cube_affine_times_unary_affine_matchers(void)
     dval_t *cos_expr = dv_mul(cos_affine, cube);
     dval_t *sinh_expr = dv_mul(pow_cube, sinh_affine);
     dval_t *cosh_expr = dv_mul(cosh_affine, cube);
-    dval_t *mismatch = dv_mul(dv_mul(dv_mul(dv_add_d(x, 1.0), dv_add_d(x, 1.0)),
-                                     dv_add_d(x, 1.0)),
-                              exp_affine);
+    dval_t *mismatch_a = dv_add_d(x, 1.0);
+    dval_t *mismatch_b = dv_add_d(x, 1.0);
+    dval_t *mismatch_c = dv_add_d(x, 1.0);
+    dval_t *mismatch_square = dv_mul(mismatch_a, mismatch_b);
+    dval_t *mismatch_cube = dv_mul(mismatch_square, mismatch_c);
+    dval_t *mismatch = dv_mul(mismatch_cube, exp_affine);
 
     ASSERT_TRUE(dv_match_affine_poly_deg4_times_unary_affine_kind(exp_expr, DV_PATTERN_UNARY_EXP,
                                                                   2, vars, poly, &constant, coeffs));
@@ -544,6 +639,11 @@ static void test_cube_affine_times_unary_affine_matchers(void)
                                                                    2, vars, poly, &constant, coeffs));
 
     dv_free(mismatch);
+    dv_free(mismatch_cube);
+    dv_free(mismatch_square);
+    dv_free(mismatch_c);
+    dv_free(mismatch_b);
+    dv_free(mismatch_a);
     dv_free(cosh_expr);
     dv_free(sinh_expr);
     dv_free(cos_expr);
@@ -555,8 +655,11 @@ static void test_cube_affine_times_unary_affine_matchers(void)
     dv_free(sin_affine);
     dv_free(exp_affine);
     dv_free(pow_cube);
+    dv_free(cube_square);
     dv_free(cube);
     dv_free(affine);
+    dv_free(sum_xy);
+    dv_free(two_y);
     dv_free(y);
     dv_free(x);
 }
@@ -569,8 +672,12 @@ static void test_quartic_affine_times_unary_affine_matchers(void)
     qfloat_t constant;
     qfloat_t coeffs[2];
     qfloat_t poly[5];
-    dval_t *affine = dv_add_d(dv_add(x, dv_mul_d(y, 2.0)), 3.0);
-    dval_t *quartic = dv_mul(dv_mul(affine, affine), dv_mul(affine, affine));
+    dval_t *two_y = dv_mul_d(y, 2.0);
+    dval_t *sum_xy = dv_add(x, two_y);
+    dval_t *affine = dv_add_d(sum_xy, 3.0);
+    dval_t *quartic_lhs = dv_mul(affine, affine);
+    dval_t *quartic_rhs = dv_mul(affine, affine);
+    dval_t *quartic = dv_mul(quartic_lhs, quartic_rhs);
     dval_t *pow_quartic = dv_pow_d(affine, 4.0);
     dval_t *exp_affine = dv_exp(affine);
     dval_t *sin_affine = dv_sin(affine);
@@ -582,9 +689,14 @@ static void test_quartic_affine_times_unary_affine_matchers(void)
     dval_t *cos_expr = dv_mul(cos_affine, quartic);
     dval_t *sinh_expr = dv_mul(pow_quartic, sinh_affine);
     dval_t *cosh_expr = dv_mul(cosh_affine, quartic);
-    dval_t *mismatch = dv_mul(dv_mul(dv_mul(dv_add_d(x, 1.0), dv_add_d(x, 1.0)),
-                                     dv_mul(dv_add_d(x, 1.0), dv_add_d(x, 2.0))),
-                              exp_affine);
+    dval_t *mismatch_a = dv_add_d(x, 1.0);
+    dval_t *mismatch_b = dv_add_d(x, 1.0);
+    dval_t *mismatch_c = dv_add_d(x, 1.0);
+    dval_t *mismatch_d = dv_add_d(x, 2.0);
+    dval_t *mismatch_lhs = dv_mul(mismatch_a, mismatch_b);
+    dval_t *mismatch_rhs = dv_mul(mismatch_c, mismatch_d);
+    dval_t *mismatch_quartic = dv_mul(mismatch_lhs, mismatch_rhs);
+    dval_t *mismatch = dv_mul(mismatch_quartic, exp_affine);
 
     ASSERT_TRUE(dv_match_affine_poly_deg4_times_unary_affine_kind(exp_expr, DV_PATTERN_UNARY_EXP,
                                                                   2, vars, poly, &constant, coeffs));
@@ -613,6 +725,13 @@ static void test_quartic_affine_times_unary_affine_matchers(void)
                                                                    2, vars, poly, &constant, coeffs));
 
     dv_free(mismatch);
+    dv_free(mismatch_quartic);
+    dv_free(mismatch_rhs);
+    dv_free(mismatch_lhs);
+    dv_free(mismatch_d);
+    dv_free(mismatch_c);
+    dv_free(mismatch_b);
+    dv_free(mismatch_a);
     dv_free(cosh_expr);
     dv_free(sinh_expr);
     dv_free(cos_expr);
@@ -624,8 +743,12 @@ static void test_quartic_affine_times_unary_affine_matchers(void)
     dv_free(sin_affine);
     dv_free(exp_affine);
     dv_free(pow_quartic);
+    dv_free(quartic_rhs);
+    dv_free(quartic_lhs);
     dv_free(quartic);
     dv_free(affine);
+    dv_free(sum_xy);
+    dv_free(two_y);
     dv_free(y);
     dv_free(x);
 }
@@ -638,14 +761,19 @@ static void test_affine_poly_deg4_times_unary_affine_matchers(void)
     qfloat_t poly[5];
     qfloat_t constant;
     qfloat_t coeffs[2];
-    dval_t *affine = dv_add_d(dv_add(x, dv_mul_d(y, 2.0)), 3.0);
+    dval_t *two_y = dv_mul_d(y, 2.0);
+    dval_t *sum_xy = dv_add(x, two_y);
+    dval_t *affine = dv_add_d(sum_xy, 3.0);
     dval_t *square = dv_pow_d(affine, 2.0);
     dval_t *quartic = dv_pow_d(affine, 4.0);
     dval_t *exp_affine = dv_exp(affine);
     dval_t *sin_affine = dv_sin(affine);
     dval_t *cosh_affine = dv_cosh(affine);
-    dval_t *poly_expr = dv_add(dv_add_d(dv_mul_d(quartic, 3.0), 5.0),
-                               dv_add(dv_mul_d(square, -2.0), affine));
+    dval_t *quartic_scaled = dv_mul_d(quartic, 3.0);
+    dval_t *quartic_plus_five = dv_add_d(quartic_scaled, 5.0);
+    dval_t *square_scaled = dv_mul_d(square, -2.0);
+    dval_t *square_plus_affine = dv_add(square_scaled, affine);
+    dval_t *poly_expr = dv_add(quartic_plus_five, square_plus_affine);
     dval_t *exp_expr = dv_mul(poly_expr, exp_affine);
     dval_t *sin_expr = dv_mul(sin_affine, poly_expr);
     dval_t *cosh_expr = dv_mul(poly_expr, cosh_affine);
@@ -679,12 +807,18 @@ static void test_affine_poly_deg4_times_unary_affine_matchers(void)
     dv_free(sin_expr);
     dv_free(exp_expr);
     dv_free(poly_expr);
+    dv_free(square_plus_affine);
+    dv_free(square_scaled);
+    dv_free(quartic_plus_five);
+    dv_free(quartic_scaled);
     dv_free(cosh_affine);
     dv_free(sin_affine);
     dv_free(exp_affine);
     dv_free(quartic);
     dv_free(square);
     dv_free(affine);
+    dv_free(sum_xy);
+    dv_free(two_y);
     dv_free(y);
     dv_free(x);
 }
@@ -697,11 +831,16 @@ static void test_generic_affine_poly_deg4_times_unary_matcher(void)
     qfloat_t poly[5];
     qfloat_t constant;
     qfloat_t coeffs[2];
-    dval_t *affine = dv_add_d(dv_add(x, dv_mul_d(y, 2.0)), 3.0);
+    dval_t *two_y = dv_mul_d(y, 2.0);
+    dval_t *sum_xy = dv_add(x, two_y);
+    dval_t *affine = dv_add_d(sum_xy, 3.0);
     dval_t *square = dv_pow_d(affine, 2.0);
     dval_t *quartic = dv_pow_d(affine, 4.0);
-    dval_t *poly_expr = dv_add(dv_add_d(dv_mul_d(quartic, 3.0), 5.0),
-                               dv_add(dv_mul_d(square, -2.0), affine));
+    dval_t *quartic_scaled = dv_mul_d(quartic, 3.0);
+    dval_t *quartic_plus_five = dv_add_d(quartic_scaled, 5.0);
+    dval_t *square_scaled = dv_mul_d(square, -2.0);
+    dval_t *square_plus_affine = dv_add(square_scaled, affine);
+    dval_t *poly_expr = dv_add(quartic_plus_five, square_plus_affine);
     dval_t *cosh_affine = dv_cosh(affine);
     dval_t *expr = dv_mul(poly_expr, cosh_affine);
 
@@ -721,9 +860,15 @@ static void test_generic_affine_poly_deg4_times_unary_matcher(void)
     dv_free(expr);
     dv_free(cosh_affine);
     dv_free(poly_expr);
+    dv_free(square_plus_affine);
+    dv_free(square_scaled);
+    dv_free(quartic_plus_five);
+    dv_free(quartic_scaled);
     dv_free(quartic);
     dv_free(square);
     dv_free(affine);
+    dv_free(sum_xy);
+    dv_free(two_y);
     dv_free(y);
     dv_free(x);
 }

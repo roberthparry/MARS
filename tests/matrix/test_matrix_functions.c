@@ -2665,23 +2665,16 @@ static void test_mat_simplify_symbolic_helper(void)
     if (!delta || !omega)
         goto cleanup;
 
-    dv_retain(delta);
-    dv_retain(omega);
     prod1 = dv_mul(delta, omega);
 
-    dv_retain(delta);
-    dv_retain(omega);
     prod2 = dv_mul(delta, omega);
 
     neg_prod1 = dv_neg(prod1);
     entry = dv_add(neg_prod1, prod2);
 
     vals[0] = entry;
-    dv_retain(entry);
     vals[1] = entry;
-    dv_retain(entry);
     vals[2] = entry;
-    dv_retain(entry);
     vals[3] = entry;
     A = mat_create_dv(2, 2, vals);
     check_bool("mat_simplify_symbolic helper source matrix non-null", A != NULL);
@@ -4578,18 +4571,68 @@ static void test_dval_matrix_functions(void)
         dval_t *dense_vals[4] = {x, one, one, x};
         matrix_t *A = mat_create_dv(2, 2, dense_vals);
         matrix_t *E = mat_exp(A);
+        matrix_t *L = mat_log(A);
+        matrix_t *S = mat_sin(A);
         matrix_t *Ai = mat_inverse(A);
+        int rank = mat_rank(A);
+        dval_t *v = NULL;
 
+        dv_set_val_d(x, 2.0);
         print_mdv("A", A);
-        check_bool("mat_exp(general dval) currently unsupported", E == NULL);
+        check_bool("mat_exp(dval dense 2x2 diagonalizable) not NULL", E != NULL);
+        check_bool("mat_log(dval dense 2x2 diagonalizable) not NULL", L != NULL);
+        check_bool("mat_sin(dval dense 2x2 diagonalizable) not NULL", S != NULL);
         check_bool("mat_inverse(dval 2x2) now supported", Ai != NULL);
         if (Ai)
             print_mdv("A^{-1}", Ai);
-        check_bool("mat_rank(dval) unsupported", mat_rank(A) < 0);
+        check_bool("mat_rank(dval 2x2) = 2", rank == 2);
+        if (E) {
+            print_mdv("exp(A)", E);
+            mat_get(E, 0, 0, &v);
+            check_d("exp(dval dense 2x2)[0,0]", dv_eval_d(v), exp(2.0) * cosh(1.0), 1e-12);
+            check_dval_expr_contains("exp(dval dense 2x2)[0,0] stays symbolic", v, "exp");
+            mat_get(E, 0, 1, &v);
+            check_d("exp(dval dense 2x2)[0,1]", dv_eval_d(v), exp(2.0) * sinh(1.0), 1e-12);
+        }
+        if (L) {
+            print_mdv("log(A)", L);
+            mat_get(L, 0, 0, &v);
+            check_d("log(dval dense 2x2)[0,0]", dv_eval_d(v),
+                    0.5 * (log(3.0) + log(1.0)), 1e-12);
+            check_dval_expr_contains("log(dval dense 2x2)[0,0] stays symbolic", v, "log");
+            mat_get(L, 0, 1, &v);
+            check_d("log(dval dense 2x2)[0,1]", dv_eval_d(v),
+                    0.5 * (log(3.0) - log(1.0)), 1e-12);
+        }
+        if (S) {
+            print_mdv("sin(A)", S);
+            mat_get(S, 0, 0, &v);
+            check_d("sin(dval dense 2x2)[0,0]", dv_eval_d(v), sin(2.0) * cos(1.0), 1e-12);
+            check_dval_expr_contains("sin(dval dense 2x2)[0,0] stays symbolic", v, "sin");
+            mat_get(S, 0, 1, &v);
+            check_d("sin(dval dense 2x2)[0,1]", dv_eval_d(v), cos(2.0) * sin(1.0), 1e-12);
+        }
+
+        dv_set_val_d(x, 3.0);
+        if (E) {
+            mat_get(E, 0, 0, &v);
+            check_d("exp(dval dense 2x2)[0,0] tracks x", dv_eval_d(v), exp(3.0) * cosh(1.0), 1e-12);
+        }
+        if (L) {
+            mat_get(L, 0, 1, &v);
+            check_d("log(dval dense 2x2)[0,1] tracks x", dv_eval_d(v),
+                    0.5 * (log(4.0) - log(2.0)), 1e-12);
+        }
+        if (S) {
+            mat_get(S, 0, 1, &v);
+            check_d("sin(dval dense 2x2)[0,1] tracks x", dv_eval_d(v), cos(3.0) * sin(1.0), 1e-12);
+        }
 
         mat_free(Ai);
         mat_free(A);
         mat_free(E);
+        mat_free(L);
+        mat_free(S);
     }
 
     dv_free(one);
@@ -4712,6 +4755,11 @@ static void test_dval_matrix_functions_extended(void)
             one, two, one,
             DV_ZERO, one, x};
         matrix_t *A = mat_create_dv(3, 3, vals);
+        matrix_t *Aqc = NULL;
+        matrix_t *Eqc = NULL;
+        matrix_t *Lqc = NULL;
+        matrix_t *Sqc = NULL;
+        matrix_t *Gqc = NULL;
 
         print_mdv("A", A);
         check_bool("mat_exp(dval dense 3x3) currently unsupported", mat_exp(A) == NULL);
@@ -4719,11 +4767,593 @@ static void test_dval_matrix_functions_extended(void)
         check_bool("mat_sin(dval dense 3x3) currently unsupported", mat_sin(A) == NULL);
         check_bool("mat_gamma(dval dense 3x3) currently unsupported", mat_gamma(A) == NULL);
 
+        Aqc = mat_evaluate_qc(A);
+        check_bool("mat_evaluate_qc(dval dense 3x3) not NULL", Aqc != NULL);
+
+        if (Aqc) {
+            Eqc = mat_exp(Aqc);
+            Lqc = mat_log(Aqc);
+            Sqc = mat_sin(Aqc);
+            Gqc = mat_gamma(Aqc);
+        }
+
+        check_bool("manual qc exp(dval dense 3x3) not NULL", Eqc != NULL);
+        check_bool("manual qc log(dval dense 3x3) not NULL", Lqc != NULL);
+        check_bool("manual qc sin(dval dense 3x3) not NULL", Sqc != NULL);
+        check_bool("manual qc gamma(dval dense 3x3) not NULL", Gqc != NULL);
+
+        check_bool("manual qc exp(dval dense 3x3) -> MAT_TYPE_QCOMPLEX",
+                   Eqc != NULL && mat_typeof(Eqc) == MAT_TYPE_QCOMPLEX);
+        check_bool("manual qc log(dval dense 3x3) -> MAT_TYPE_QCOMPLEX",
+                   Lqc != NULL && mat_typeof(Lqc) == MAT_TYPE_QCOMPLEX);
+        check_bool("manual qc sin(dval dense 3x3) -> MAT_TYPE_QCOMPLEX",
+                   Sqc != NULL && mat_typeof(Sqc) == MAT_TYPE_QCOMPLEX);
+        check_bool("manual qc gamma(dval dense 3x3) -> MAT_TYPE_QCOMPLEX",
+                   Gqc != NULL && mat_typeof(Gqc) == MAT_TYPE_QCOMPLEX);
+
+        mat_free(Aqc);
+        mat_free(Eqc);
+        mat_free(Lqc);
+        mat_free(Sqc);
+        mat_free(Gqc);
         mat_free(A);
         dv_free(x);
         dv_free(one);
         dv_free(two);
     }
+
+    {
+        binding_t *bindings = NULL;
+        size_t nbindings = 0;
+        matrix_t *A = mat_from_string(
+            "[[0 x 0][x 0 x][0 x 0]]",
+            &bindings, &nbindings);
+        matrix_t *E = NULL;
+        matrix_t *S = NULL;
+        dval_t *v = NULL;
+        double r;
+
+        check_bool("dense dval cubic-linear 3x3 input not NULL", A != NULL);
+        if (bindings) {
+            check_bool("dense dval cubic-linear 3x3 set x",
+                       mat_binding_set_d(bindings, nbindings, "x", 2.0) == 0);
+        }
+
+        E = mat_exp(A);
+        S = mat_sin(A);
+        check_bool("dense dval cubic-linear 3x3 exp not NULL", E != NULL);
+        check_bool("dense dval cubic-linear 3x3 sin not NULL", S != NULL);
+
+        r = sqrt(8.0);
+        if (E) {
+            mat_get(E, 0, 0, &v);
+            check_d("exp(dense cubic-linear 3x3)[0,0]",
+                    dv_eval_d(v), 0.5 * (cosh(r) + 1.0), 1e-12);
+            check_dval_expr_contains("exp(dense cubic-linear 3x3)[0,0] stays symbolic", v, "exp");
+            mat_get(E, 0, 1, &v);
+            check_d("exp(dense cubic-linear 3x3)[0,1]",
+                    dv_eval_d(v), sinh(r) / r * 2.0, 1e-12);
+            mat_get(E, 0, 2, &v);
+            check_d("exp(dense cubic-linear 3x3)[0,2]",
+                    dv_eval_d(v), 0.5 * (cosh(r) - 1.0), 1e-12);
+        }
+
+        if (S) {
+            mat_get(S, 0, 0, &v);
+            check_d("sin(dense cubic-linear 3x3)[0,0]",
+                    dv_eval_d(v), 0.0, 1e-12);
+            mat_get(S, 0, 1, &v);
+            check_d("sin(dense cubic-linear 3x3)[0,1]",
+                    dv_eval_d(v), sin(r) / r * 2.0, 1e-12);
+            check_dval_expr_contains("sin(dense cubic-linear 3x3)[0,1] stays symbolic", v, "sin");
+            mat_get(S, 0, 2, &v);
+            check_d("sin(dense cubic-linear 3x3)[0,2]",
+                    dv_eval_d(v), 0.0, 1e-12);
+        }
+
+        if (bindings) {
+            check_bool("dense dval cubic-linear 3x3 update x",
+                       mat_binding_set_d(bindings, nbindings, "x", 3.0) == 0);
+        }
+
+        r = sqrt(18.0);
+        if (E) {
+            mat_get(E, 0, 1, &v);
+            check_d("exp(dense cubic-linear 3x3)[0,1] tracks x",
+                    dv_eval_d(v), sinh(r) / r * 3.0, 1e-12);
+        }
+        if (S) {
+            mat_get(S, 1, 0, &v);
+            check_d("sin(dense cubic-linear 3x3)[1,0] tracks x",
+                    dv_eval_d(v), sin(r) / r * 3.0, 1e-12);
+        }
+
+        mat_free(A);
+        mat_free(E);
+        mat_free(S);
+        free(bindings);
+    }
+
+    {
+        binding_t *bindings = NULL;
+        size_t nbindings = 0;
+        matrix_t *A = mat_from_string(
+            "[[0 x x][x 0 x][x x 0]]",
+            &bindings, &nbindings);
+        matrix_t *E = NULL;
+        matrix_t *S = NULL;
+        dval_t *v = NULL;
+
+        check_bool("dense dval quadratic 3x3 input not NULL", A != NULL);
+        if (bindings) {
+            check_bool("dense dval quadratic 3x3 set x",
+                       mat_binding_set_d(bindings, nbindings, "x", 2.0) == 0);
+        }
+
+        E = mat_exp(A);
+        S = mat_sin(A);
+        check_bool("dense dval quadratic 3x3 exp not NULL", E != NULL);
+        check_bool("dense dval quadratic 3x3 sin not NULL", S != NULL);
+
+        if (A)
+            print_mdv("A (dense quadratic 3x3)", A);
+        if (E)
+            print_mdv("exp(A)", E);
+        if (S)
+            print_mdv("sin(A)", S);
+
+        if (E) {
+            mat_get(E, 0, 0, &v);
+            check_d("exp(dense quadratic 3x3)[0,0]",
+                    dv_eval_d(v), (exp(4.0) + 2.0 * exp(-2.0)) / 3.0, 1e-12);
+            check_dval_expr_contains("exp(dense quadratic 3x3)[0,0] stays symbolic", v, "exp");
+            mat_get(E, 0, 1, &v);
+            check_d("exp(dense quadratic 3x3)[0,1]",
+                    dv_eval_d(v), (exp(4.0) - exp(-2.0)) / 3.0, 1e-12);
+        }
+
+        if (S) {
+            mat_get(S, 0, 0, &v);
+            check_d("sin(dense quadratic 3x3)[0,0]",
+                    dv_eval_d(v), (sin(4.0) - 2.0 * sin(2.0)) / 3.0, 1e-12);
+            check_dval_expr_contains("sin(dense quadratic 3x3)[0,0] stays symbolic", v, "sin");
+            mat_get(S, 0, 1, &v);
+            check_d("sin(dense quadratic 3x3)[0,1]",
+                    dv_eval_d(v), (sin(4.0) + sin(2.0)) / 3.0, 1e-12);
+        }
+
+        if (bindings) {
+            check_bool("dense dval quadratic 3x3 update x",
+                       mat_binding_set_d(bindings, nbindings, "x", 3.0) == 0);
+        }
+
+        if (E) {
+            mat_get(E, 0, 0, &v);
+            check_d("exp(dense quadratic 3x3)[0,0] tracks x",
+                    dv_eval_d(v), (exp(6.0) + 2.0 * exp(-3.0)) / 3.0, 1e-12);
+        }
+        if (S) {
+            mat_get(S, 0, 1, &v);
+            check_d("sin(dense quadratic 3x3)[0,1] tracks x",
+                    dv_eval_d(v), (sin(6.0) + sin(3.0)) / 3.0, 1e-12);
+        }
+
+        mat_free(A);
+        mat_free(E);
+        mat_free(S);
+        free(bindings);
+    }
+
+    {
+        binding_t *bindings = NULL;
+        size_t nbindings = 0;
+        matrix_t *A = mat_from_string(
+            "[[x 1 1 1 1]"
+             "[1 x 1 1 1]"
+             "[1 1 x 1 1]"
+             "[1 1 1 x 1]"
+             "[1 1 1 1 x]]",
+            &bindings, &nbindings);
+        matrix_t *E = NULL;
+        matrix_t *S = NULL;
+        dval_t *v = NULL;
+
+        check_bool("uniform dense dval 5x5 input not NULL", A != NULL);
+        if (bindings) {
+            check_bool("uniform dense dval 5x5 set x",
+                       mat_binding_set_d(bindings, nbindings, "x", 2.0) == 0);
+        }
+
+        E = mat_exp(A);
+        S = mat_sin(A);
+        check_bool("uniform dense dval 5x5 exp not NULL", E != NULL);
+        check_bool("uniform dense dval 5x5 sin not NULL", S != NULL);
+
+        if (E) {
+            mat_get(E, 0, 0, &v);
+            check_d("exp(uniform dense 5x5)[0,0]",
+                    dv_eval_d(v), (4.0 * exp(1.0) + exp(6.0)) / 5.0, 1e-12);
+            check_dval_expr_contains("exp(uniform dense 5x5)[0,0] stays symbolic", v, "exp");
+            mat_get(E, 0, 1, &v);
+            check_d("exp(uniform dense 5x5)[0,1]",
+                    dv_eval_d(v), (exp(6.0) - exp(1.0)) / 5.0, 1e-12);
+            mat_get(E, 3, 4, &v);
+            check_d("exp(uniform dense 5x5)[3,4]",
+                    dv_eval_d(v), (exp(6.0) - exp(1.0)) / 5.0, 1e-12);
+        }
+
+        if (S) {
+            mat_get(S, 0, 0, &v);
+            check_d("sin(uniform dense 5x5)[0,0]",
+                    dv_eval_d(v), (4.0 * sin(1.0) + sin(6.0)) / 5.0, 1e-12);
+            check_dval_expr_contains("sin(uniform dense 5x5)[0,0] stays symbolic", v, "sin");
+            mat_get(S, 0, 2, &v);
+            check_d("sin(uniform dense 5x5)[0,2]",
+                    dv_eval_d(v), (sin(6.0) - sin(1.0)) / 5.0, 1e-12);
+        }
+
+        if (bindings) {
+            check_bool("uniform dense dval 5x5 update x",
+                       mat_binding_set_d(bindings, nbindings, "x", 3.0) == 0);
+        }
+
+        if (E) {
+            mat_get(E, 0, 1, &v);
+            check_d("exp(uniform dense 5x5)[0,1] tracks x",
+                    dv_eval_d(v), (exp(7.0) - exp(2.0)) / 5.0, 1e-12);
+        }
+        if (S) {
+            mat_get(S, 0, 0, &v);
+            check_d("sin(uniform dense 5x5)[0,0] tracks x",
+                    dv_eval_d(v), (4.0 * sin(2.0) + sin(7.0)) / 5.0, 1e-12);
+        }
+
+        mat_free(A);
+        mat_free(E);
+        mat_free(S);
+        free(bindings);
+    }
+
+    {
+        binding_t *bindings = NULL;
+        size_t nbindings = 0;
+        matrix_t *A = mat_from_string(
+            "(7, x, 2, 1;"
+             " 10, 2*x + 2, 4, 2;"
+             " 15, 3*x, 8, 3;"
+             " 20, 4*x, 8, 6)",
+            &bindings, &nbindings);
+        matrix_t *E = NULL;
+        matrix_t *S = NULL;
+        dval_t *v = NULL;
+        double cexp;
+        double csin;
+
+        check_bool("rank-one perturbation dense dval 4x4 input not NULL", A != NULL);
+        if (bindings) {
+            check_bool("rank-one perturbation dense dval 4x4 set x",
+                       mat_binding_set_d(bindings, nbindings, "x", 3.0) == 0);
+        }
+
+        E = mat_exp(A);
+        S = mat_sin(A);
+        check_bool("rank-one perturbation dense dval 4x4 exp not NULL", E != NULL);
+        check_bool("rank-one perturbation dense dval 4x4 sin not NULL", S != NULL);
+
+        cexp = (exp(23.0) - exp(2.0)) / 21.0;
+        csin = (sin(23.0) - sin(2.0)) / 21.0;
+
+        if (E) {
+            mat_get(E, 0, 0, &v);
+            check_d("exp(rank-one perturbation 4x4)[0,0]",
+                    dv_eval_d(v), exp(2.0) + 5.0 * cexp, 1e-5);
+            check_dval_expr_contains("exp(rank-one perturbation 4x4)[0,0] stays symbolic", v, "exp");
+            mat_get(E, 0, 1, &v);
+            check_d("exp(rank-one perturbation 4x4)[0,1]",
+                    dv_eval_d(v), 3.0 * cexp, 1e-12);
+            mat_get(E, 3, 2, &v);
+            check_d("exp(rank-one perturbation 4x4)[3,2]",
+                    dv_eval_d(v), 8.0 * cexp, 1e-5);
+        }
+
+        if (S) {
+            mat_get(S, 1, 1, &v);
+            check_d("sin(rank-one perturbation 4x4)[1,1]",
+                    dv_eval_d(v), sin(2.0) + 6.0 * csin, 1e-12);
+            check_dval_expr_contains("sin(rank-one perturbation 4x4)[1,1] stays symbolic", v, "sin");
+            mat_get(S, 2, 0, &v);
+            check_d("sin(rank-one perturbation 4x4)[2,0]",
+                    dv_eval_d(v), 15.0 * csin, 1e-12);
+            mat_get(S, 0, 3, &v);
+            check_d("sin(rank-one perturbation 4x4)[0,3]",
+                    dv_eval_d(v), csin, 1e-12);
+        }
+
+        if (bindings) {
+            check_bool("rank-one perturbation dense dval 4x4 update x",
+                       mat_binding_set_d(bindings, nbindings, "x", 4.0) == 0);
+        }
+
+        cexp = (exp(25.0) - exp(2.0)) / 23.0;
+        csin = (sin(25.0) - sin(2.0)) / 23.0;
+
+        if (E) {
+            mat_get(E, 0, 1, &v);
+            check_d("exp(rank-one perturbation 4x4)[0,1] tracks x",
+                    dv_eval_d(v), 4.0 * cexp, 1e-5);
+        }
+        if (S) {
+            mat_get(S, 1, 1, &v);
+            check_d("sin(rank-one perturbation 4x4)[1,1] tracks x",
+                    dv_eval_d(v), sin(2.0) + 8.0 * csin, 1e-12);
+        }
+
+        mat_free(A);
+        mat_free(E);
+        mat_free(S);
+        free(bindings);
+    }
+
+    {
+        binding_t *bindings = NULL;
+        size_t nbindings = 0;
+        matrix_t *A = mat_from_string(
+            "[[0 x 0 0]"
+             "[x 0 x 0]"
+             "[0 x 0 x]"
+             "[0 0 x 0]]",
+            &bindings, &nbindings);
+        matrix_t *E = NULL;
+        matrix_t *S = NULL;
+        matrix_t *Aqc = NULL;
+        matrix_t *Eqc = NULL;
+        matrix_t *Eqc_expected = NULL;
+        matrix_t *Sqc = NULL;
+        matrix_t *Sqc_expected = NULL;
+        dval_t *v = NULL;
+
+        check_bool("dense dval biquadratic quartic 4x4 input not NULL", A != NULL);
+        if (bindings) {
+            check_bool("dense dval biquadratic quartic 4x4 set x",
+                       mat_binding_set_d(bindings, nbindings, "x", 2.0) == 0);
+        }
+
+        E = mat_exp(A);
+        S = mat_sin(A);
+        check_bool("dense dval biquadratic quartic 4x4 exp not NULL", E != NULL);
+        check_bool("dense dval biquadratic quartic 4x4 sin not NULL", S != NULL);
+
+        if (E && S) {
+            Aqc = mat_evaluate_qc(A);
+            Eqc = mat_evaluate_qc(E);
+            Sqc = mat_evaluate_qc(S);
+            Eqc_expected = Aqc ? mat_exp(Aqc) : NULL;
+            Sqc_expected = Aqc ? mat_sin(Aqc) : NULL;
+
+            check_bool("dense dval biquadratic quartic 4x4 evaluated exp not NULL", Eqc != NULL);
+            check_bool("dense dval biquadratic quartic 4x4 evaluated sin not NULL", Sqc != NULL);
+            check_bool("dense dval biquadratic quartic 4x4 numeric exp baseline not NULL",
+                       Eqc_expected != NULL);
+            check_bool("dense dval biquadratic quartic 4x4 numeric sin baseline not NULL",
+                       Sqc_expected != NULL);
+            if (Eqc && Eqc_expected)
+                check_mat_qc("exp(biquadratic quartic 4x4) matches numeric snapshot",
+                             Eqc, Eqc_expected, 1e-17);
+            if (Sqc && Sqc_expected)
+                check_mat_qc("sin(biquadratic quartic 4x4) matches numeric snapshot",
+                             Sqc, Sqc_expected, 1e-20);
+        }
+
+        if (E) {
+            mat_get(E, 0, 0, &v);
+            check_dval_expr_contains("exp(biquadratic quartic 4x4)[0,0] stays symbolic", v, "exp");
+        }
+        if (S) {
+            mat_get(S, 0, 1, &v);
+            check_dval_expr_contains("sin(biquadratic quartic 4x4)[0,1] stays symbolic", v, "sin");
+        }
+
+        mat_free(Aqc);
+        mat_free(Eqc);
+        mat_free(Eqc_expected);
+        mat_free(Sqc);
+        mat_free(Sqc_expected);
+        Aqc = NULL;
+        Eqc = NULL;
+        Eqc_expected = NULL;
+        Sqc = NULL;
+        Sqc_expected = NULL;
+
+        if (bindings) {
+            check_bool("dense dval biquadratic quartic 4x4 update x",
+                       mat_binding_set_d(bindings, nbindings, "x", 3.0) == 0);
+        }
+
+        if (E && S) {
+            Aqc = mat_evaluate_qc(A);
+            Eqc = mat_evaluate_qc(E);
+            Sqc = mat_evaluate_qc(S);
+            Eqc_expected = Aqc ? mat_exp(Aqc) : NULL;
+            Sqc_expected = Aqc ? mat_sin(Aqc) : NULL;
+
+            if (Eqc && Eqc_expected)
+                check_mat_qc("exp(biquadratic quartic 4x4) tracks x",
+                             Eqc, Eqc_expected, 1e-17);
+            if (Sqc && Sqc_expected)
+                check_mat_qc("sin(biquadratic quartic 4x4) tracks x",
+                             Sqc, Sqc_expected, 1e-19);
+        }
+
+        mat_free(Aqc);
+        mat_free(Eqc);
+        mat_free(Eqc_expected);
+        mat_free(Sqc);
+        mat_free(Sqc_expected);
+        mat_free(A);
+        mat_free(E);
+        mat_free(S);
+        free(bindings);
+    }
+
+    {
+        binding_t *bindings = NULL;
+        size_t nbindings = 0;
+        matrix_t *A = mat_from_string(
+            "[[x 1 0 0][1 x 0 0][0 0 y 1][0 0 1 y]]",
+            &bindings, &nbindings);
+        matrix_t *E = NULL;
+        matrix_t *S = NULL;
+        dval_t *v = NULL;
+
+        check_bool("block-diagonal dense dval 4x4 input not NULL", A != NULL);
+        if (bindings) {
+            check_bool("block-diagonal dense dval 4x4 set x",
+                       mat_binding_set_d(bindings, nbindings, "x", 2.0) == 0);
+            check_bool("block-diagonal dense dval 4x4 set y",
+                       mat_binding_set_d(bindings, nbindings, "y", 3.0) == 0);
+        }
+
+        E = mat_exp(A);
+        S = mat_sin(A);
+        check_bool("block-diagonal dense dval 4x4 exp not NULL", E != NULL);
+        check_bool("block-diagonal dense dval 4x4 sin not NULL", S != NULL);
+
+        if (A)
+            print_mdv("A (block-diagonal dense 4x4)", A);
+        if (E)
+            print_mdv("exp(A)", E);
+        if (S)
+            print_mdv("sin(A)", S);
+
+        if (E) {
+            mat_get(E, 0, 0, &v);
+            check_d("exp(block-diagonal 4x4)[0,0]",
+                    dv_eval_d(v), 0.5 * (exp(3.0) + exp(1.0)), 1e-12);
+            check_dval_expr_contains("exp(block-diagonal 4x4)[0,0] stays symbolic", v, "exp");
+            mat_get(E, 0, 1, &v);
+            check_d("exp(block-diagonal 4x4)[0,1]",
+                    dv_eval_d(v), 0.5 * (exp(3.0) - exp(1.0)), 1e-12);
+            mat_get(E, 0, 2, &v);
+            check_d("exp(block-diagonal 4x4)[0,2] stays zero",
+                    dv_eval_d(v), 0.0, 1e-12);
+            mat_get(E, 2, 2, &v);
+            check_d("exp(block-diagonal 4x4)[2,2]",
+                    dv_eval_d(v), 0.5 * (exp(4.0) + exp(2.0)), 1e-12);
+        }
+
+        if (S) {
+            mat_get(S, 2, 2, &v);
+            check_d("sin(block-diagonal 4x4)[2,2]",
+                    dv_eval_d(v), 0.5 * (sin(4.0) + sin(2.0)), 1e-12);
+            check_dval_expr_contains("sin(block-diagonal 4x4)[2,2] stays symbolic", v, "sin");
+            mat_get(S, 2, 3, &v);
+            check_d("sin(block-diagonal 4x4)[2,3]",
+                    dv_eval_d(v), 0.5 * (sin(4.0) - sin(2.0)), 1e-12);
+            mat_get(S, 1, 3, &v);
+            check_d("sin(block-diagonal 4x4)[1,3] stays zero",
+                    dv_eval_d(v), 0.0, 1e-12);
+        }
+
+        if (bindings) {
+            check_bool("block-diagonal dense dval 4x4 update x",
+                       mat_binding_set_d(bindings, nbindings, "x", 4.0) == 0);
+            check_bool("block-diagonal dense dval 4x4 update y",
+                       mat_binding_set_d(bindings, nbindings, "y", 5.0) == 0);
+        }
+
+        if (E) {
+            mat_get(E, 0, 0, &v);
+            check_d("exp(block-diagonal 4x4)[0,0] tracks x",
+                    dv_eval_d(v), 0.5 * (exp(5.0) + exp(3.0)), 1e-12);
+        }
+        if (S) {
+            mat_get(S, 2, 3, &v);
+            check_d("sin(block-diagonal 4x4)[2,3] tracks y",
+                    dv_eval_d(v), 0.5 * (sin(6.0) - sin(4.0)), 1e-12);
+        }
+
+        mat_free(A);
+        mat_free(E);
+        mat_free(S);
+        free(bindings);
+    }
+
+    {
+        binding_t *bindings = NULL;
+        size_t nbindings = 0;
+        matrix_t *A = mat_from_string(
+            "[[x 0 1 0][0 y 0 1][1 0 x 0][0 1 0 y]]",
+            &bindings, &nbindings);
+        matrix_t *E = NULL;
+        matrix_t *S = NULL;
+        dval_t *v = NULL;
+
+        check_bool("permuted block-diagonal dense dval 4x4 input not NULL", A != NULL);
+        if (bindings) {
+            check_bool("permuted block-diagonal dense dval 4x4 set x",
+                       mat_binding_set_d(bindings, nbindings, "x", 2.0) == 0);
+            check_bool("permuted block-diagonal dense dval 4x4 set y",
+                       mat_binding_set_d(bindings, nbindings, "y", 3.0) == 0);
+        }
+
+        E = mat_exp(A);
+        S = mat_sin(A);
+        check_bool("permuted block-diagonal dense dval 4x4 exp not NULL", E != NULL);
+        check_bool("permuted block-diagonal dense dval 4x4 sin not NULL", S != NULL);
+
+        if (E) {
+            mat_get(E, 0, 0, &v);
+            check_d("exp(permuted block-diagonal 4x4)[0,0]",
+                    dv_eval_d(v), 0.5 * (exp(3.0) + exp(1.0)), 1e-12);
+            check_dval_expr_contains("exp(permuted block-diagonal 4x4)[0,0] stays symbolic", v, "exp");
+            mat_get(E, 0, 2, &v);
+            check_d("exp(permuted block-diagonal 4x4)[0,2]",
+                    dv_eval_d(v), 0.5 * (exp(3.0) - exp(1.0)), 1e-12);
+            mat_get(E, 0, 1, &v);
+            check_d("exp(permuted block-diagonal 4x4)[0,1] stays zero",
+                    dv_eval_d(v), 0.0, 1e-12);
+            mat_get(E, 1, 3, &v);
+            check_d("exp(permuted block-diagonal 4x4)[1,3]",
+                    dv_eval_d(v), 0.5 * (exp(4.0) - exp(2.0)), 1e-12);
+        }
+
+        if (S) {
+            mat_get(S, 1, 1, &v);
+            check_d("sin(permuted block-diagonal 4x4)[1,1]",
+                    dv_eval_d(v), 0.5 * (sin(4.0) + sin(2.0)), 1e-12);
+            check_dval_expr_contains("sin(permuted block-diagonal 4x4)[1,1] stays symbolic", v, "sin");
+            mat_get(S, 1, 3, &v);
+            check_d("sin(permuted block-diagonal 4x4)[1,3]",
+                    dv_eval_d(v), 0.5 * (sin(4.0) - sin(2.0)), 1e-12);
+            mat_get(S, 2, 3, &v);
+            check_d("sin(permuted block-diagonal 4x4)[2,3] stays zero",
+                    dv_eval_d(v), 0.0, 1e-12);
+        }
+
+        if (bindings) {
+            check_bool("permuted block-diagonal dense dval 4x4 update x",
+                       mat_binding_set_d(bindings, nbindings, "x", 4.0) == 0);
+            check_bool("permuted block-diagonal dense dval 4x4 update y",
+                       mat_binding_set_d(bindings, nbindings, "y", 5.0) == 0);
+        }
+
+        if (E) {
+            mat_get(E, 0, 2, &v);
+            check_d("exp(permuted block-diagonal 4x4)[0,2] tracks x",
+                    dv_eval_d(v), 0.5 * (exp(5.0) - exp(3.0)), 1e-12);
+        }
+        if (S) {
+            mat_get(S, 1, 3, &v);
+            check_d("sin(permuted block-diagonal 4x4)[1,3] tracks y",
+                    dv_eval_d(v), 0.5 * (sin(6.0) - sin(4.0)), 1e-12);
+        }
+
+        mat_free(A);
+        mat_free(E);
+        mat_free(S);
+        free(bindings);
+    }
+
 }
 
 /* ------------------------------------------------------------------ 3×3 matrix function tests */

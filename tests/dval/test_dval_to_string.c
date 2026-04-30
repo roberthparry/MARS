@@ -171,6 +171,45 @@ void test_to_string_basic_var(void)
     RUN_TEST(test_to_string_basic_var_func, __func__);
 }
 
+static void test_to_string_non_simple_var_bracketed_expr(void)
+{
+    dval_t *v = dv_new_named_var_d(42.0, "a0b0");
+    char *got = dv_to_string(v, style_EXPRESSION);
+
+    const char *expect = "{ [a0b₀] | [a0b₀] = 42 }";
+
+    if (str_eq(got, expect))
+        to_string_pass("non-simple var bracketed (EXPR)", got, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "non-simple var bracketed (EXPR)", got, expect);
+
+    free(got);
+    dv_free(v);
+}
+
+static void test_to_string_non_simple_var_bracketed_func(void)
+{
+    dval_t *v = dv_new_named_var_d(42.0, "a0b0");
+    char *got = dv_to_string(v, style_FUNCTION);
+
+    const char *expect = "[a0b₀] = 42\n"
+                         "return [a0b₀]\n";
+
+    if (str_eq(got, expect))
+        to_string_pass("non-simple var bracketed (FUNC)", got, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "non-simple var bracketed (FUNC)", got, expect);
+
+    free(got);
+    dv_free(v);
+}
+
+void test_to_string_non_simple_var_bracketed(void)
+{
+    RUN_TEST(test_to_string_non_simple_var_bracketed_expr, __func__);
+    RUN_TEST(test_to_string_non_simple_var_bracketed_func, __func__);
+}
+
 /* ============================================================
  * ADDITION
  * ============================================================ */
@@ -657,6 +696,7 @@ void test_to_string_all(void)
 {
     RUN_TEST(test_to_string_basic_const, __func__);
     RUN_TEST(test_to_string_basic_var, __func__);
+    RUN_TEST(test_to_string_non_simple_var_bracketed, __func__);
     RUN_TEST(test_to_string_addition, __func__);
     RUN_TEST(test_to_string_negative_rhs_expr, __func__);
     RUN_TEST(test_to_string_double_negative_expr, __func__);
@@ -2781,9 +2821,9 @@ void test_expressions_longname(void)
             "radius^2",
             make_expr_l01,
             "{ [radius]² | [radius] = 1.25 }",
-            "radius = 1.25\n"
-            "expr(radius) = radius^2\n"
-            "return expr(radius)",
+            "[radius] = 1.25\n"
+            "expr([radius]) = [radius]^2\n"
+            "return expr([radius])",
             __LINE__
         },
 
@@ -2792,10 +2832,10 @@ void test_expressions_longname(void)
             "base * height",
             make_expr_l02,
             "{ [base]·[height] | [base] = 1.25, [height] = 1.25 }",
-            "base = 1.25\n"
-            "height = 1.25\n"
-            "expr(base,height) = base*height\n"
-            "return expr(base,height)",
+            "[base] = 1.25\n"
+            "[height] = 1.25\n"
+            "expr([base],[height]) = [base]*[height]\n"
+            "return expr([base],[height])",
             __LINE__
         },
 
@@ -2804,10 +2844,10 @@ void test_expressions_longname(void)
             "pi * radius^2",
             make_expr_l03,
             "{ [pi]·[radius]² | [radius] = 1.25; [pi] = 3.141592653589793238462643383279505 }",
-            "radius = 1.25\n"
-            "pi = 3.141592653589793238462643383279505\n"
-            "expr(radius,pi) = pi*radius^2\n"
-            "return expr(radius,pi)",
+            "[radius] = 1.25\n"
+            "[pi] = 3.141592653589793238462643383279505\n"
+            "expr([radius],[pi]) = [pi]*[radius]^2\n"
+            "return expr([radius],[pi])",
             __LINE__
         },
 
@@ -2816,10 +2856,10 @@ void test_expressions_longname(void)
             "@pi * radius^2",
             make_expr_l04,
             "{ π·[radius]² | [radius] = 1.25; π = 3.141592653589793238462643383279505 }",
-            "radius = 1.25\n"
+            "[radius] = 1.25\n"
             "π = 3.141592653589793238462643383279505\n"
-            "expr(radius,π) = π*radius^2\n"
-            "return expr(radius,π)",
+            "expr([radius],π) = π*[radius]^2\n"
+            "return expr([radius],π)",
             __LINE__
         },
 
@@ -2828,9 +2868,9 @@ void test_expressions_longname(void)
             "sin(theta)*cos(theta)",
             make_expr_l05,
             "{ sin([theta])·cos([theta]) | [theta] = 1.25 }",
-            "theta = 1.25\n"
-            "expr(theta) = sin(theta)*cos(theta)\n"
-            "return expr(theta)",
+            "[theta] = 1.25\n"
+            "expr([theta]) = sin([theta])*cos([theta])\n"
+            "return expr([theta])",
             __LINE__
         },
 
@@ -2840,10 +2880,10 @@ void test_expressions_longname(void)
             make_expr_l06,
             "{ [pi]·[tau]·x | x = 1.25; [pi] = 3.141592653589793238462643383279505, [tau] = 6.283185307179586476925286766559011 }",
             "x = 1.25\n"
-            "pi = 3.141592653589793238462643383279505\n"
-            "tau = 6.283185307179586476925286766559011\n"
-            "expr(x,pi,tau) = pi*tau*x\n"
-            "return expr(x,pi,tau)",
+            "[pi] = 3.141592653589793238462643383279505\n"
+            "[tau] = 6.283185307179586476925286766559011\n"
+            "expr(x,[pi],[tau]) = [pi]*[tau]*x\n"
+            "return expr(x,[pi],[tau])",
             __LINE__
         },
 

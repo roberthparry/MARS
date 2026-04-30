@@ -5,6 +5,7 @@
 #include "qfloat.h"
 #include "qcomplex.h"
 #include "dval.h"
+#include "internal/dval_refcount.h"
 #include "internal/dval_symbol_rules.h"
 
 /**
@@ -305,12 +306,6 @@ extern const dval_ops_t ops_e1;
 /* Internal helpers                                                          */
 /* ------------------------------------------------------------------------- */
 
-/**
- * @brief Increment the reference count of a node.
- *
- * Safe to call with NULL.
- */
-void dv_retain(dval_t *dv);
 dval_t *dv_pow_qf(dval_t *a, qfloat_t exponent);
 dval_t *dv_alloc(const dval_ops_t *ops);
 dval_t *dv_make_const_qc(qcomplex_t x);

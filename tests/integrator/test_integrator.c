@@ -1257,7 +1257,8 @@ void test_multi_2d_sum_of_separable_products(void) {
     dval_t *exp_x = dv_exp(x);
     dval_t *cos_y = dv_cos(y);
     dval_t *term1 = dv_mul(exp_x, cos_y);
-    dval_t *sinh_x = dv_sinh(dv_add_d(x, 0.1));
+    dval_t *x_shift = dv_add_d(x, 0.1);
+    dval_t *sinh_x = dv_sinh(x_shift);
     dval_t *exp_y = dv_exp(y);
     dval_t *term2 = dv_mul(sinh_x, exp_y);
     dval_t *expr = dv_add(term1, term2);
@@ -1288,6 +1289,7 @@ void test_multi_2d_sum_of_separable_products(void) {
     dv_free(term2);
     dv_free(exp_y);
     dv_free(sinh_x);
+    dv_free(x_shift);
     dv_free(term1);
     dv_free(cos_y);
     dv_free(exp_x);
@@ -1339,7 +1341,8 @@ void test_multi_2d_affine_cube(void) {
     dval_t *two_y = dv_mul_d(y, 2.0);
     dval_t *sum_xy = dv_add(x, two_y);
     dval_t *affine = dv_add_d(sum_xy, 3.0);
-    dval_t *expr = dv_mul(dv_mul(affine, affine), affine);
+    dval_t *square = dv_mul(affine, affine);
+    dval_t *expr = dv_mul(square, affine);
 
     dval_t *vars[2] = { x, y };
     qfloat_t lo[2] = { qf_from_double(0.0), qf_from_double(0.0) };
@@ -1358,6 +1361,7 @@ void test_multi_2d_affine_cube(void) {
     ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
 
     dv_free(expr);
+    dv_free(square);
     dv_free(affine);
     dv_free(sum_xy);
     dv_free(two_y);
@@ -1374,7 +1378,9 @@ void test_multi_2d_affine_quartic(void) {
     dval_t *two_y = dv_mul_d(y, 2.0);
     dval_t *sum_xy = dv_add(x, two_y);
     dval_t *affine = dv_add_d(sum_xy, 3.0);
-    dval_t *expr = dv_mul(dv_mul(affine, affine), dv_mul(affine, affine));
+    dval_t *lhs = dv_mul(affine, affine);
+    dval_t *rhs = dv_mul(affine, affine);
+    dval_t *expr = dv_mul(lhs, rhs);
 
     dval_t *vars[2] = { x, y };
     qfloat_t lo[2] = { qf_from_double(0.0), qf_from_double(0.0) };
@@ -1393,6 +1399,8 @@ void test_multi_2d_affine_quartic(void) {
     ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
 
     dv_free(expr);
+    dv_free(rhs);
+    dv_free(lhs);
     dv_free(affine);
     dv_free(sum_xy);
     dv_free(two_y);
@@ -1411,9 +1419,12 @@ void test_multi_2d_affine_poly_deg4(void) {
     dval_t *affine = dv_add_d(sum_xy, 3.0);
     dval_t *quartic = dv_pow_d(affine, 4.0);
     dval_t *square = dv_pow_d(affine, 2.0);
-    dval_t *poly = dv_add(dv_sub(dv_mul_d(quartic, 3.0),
-                                 dv_mul_d(square, 2.0)),
-                          dv_add(affine, dv_new_const_d(7.0)));
+    dval_t *scaled_quartic = dv_mul_d(quartic, 3.0);
+    dval_t *scaled_square = dv_mul_d(square, 2.0);
+    dval_t *poly_core = dv_sub(scaled_quartic, scaled_square);
+    dval_t *seven = dv_new_const_d(7.0);
+    dval_t *affine_plus_seven = dv_add(affine, seven);
+    dval_t *poly = dv_add(poly_core, affine_plus_seven);
 
     dval_t *vars[2] = { x, y };
     qfloat_t lo[2] = { qf_from_double(0.0), qf_from_double(0.0) };
@@ -1432,6 +1443,11 @@ void test_multi_2d_affine_poly_deg4(void) {
     ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
 
     dv_free(poly);
+    dv_free(affine_plus_seven);
+    dv_free(seven);
+    dv_free(poly_core);
+    dv_free(scaled_square);
+    dv_free(scaled_quartic);
     dv_free(square);
     dv_free(quartic);
     dv_free(affine);
@@ -1992,7 +2008,8 @@ void test_multi_2d_cube_affine_times_sin_affine(void) {
     dval_t *two_y = dv_mul_d(y, 2.0);
     dval_t *sum_xy = dv_add(x, two_y);
     dval_t *affine = dv_add_d(sum_xy, 3.0);
-    dval_t *cube = dv_mul(dv_mul(affine, affine), affine);
+    dval_t *cube_square = dv_mul(affine, affine);
+    dval_t *cube = dv_mul(cube_square, affine);
     dval_t *sin_affine = dv_sin(affine);
     dval_t *expr = dv_mul(cube, sin_affine);
 
@@ -2034,6 +2051,7 @@ void test_multi_2d_cube_affine_times_sin_affine(void) {
 
     dv_free(expr);
     dv_free(sin_affine);
+    dv_free(cube_square);
     dv_free(cube);
     dv_free(affine);
     dv_free(sum_xy);
@@ -2165,7 +2183,8 @@ void test_multi_2d_cube_affine_times_cosh_affine(void) {
     dval_t *two_y = dv_mul_d(y, 2.0);
     dval_t *sum_xy = dv_add(x, two_y);
     dval_t *affine = dv_add_d(sum_xy, 3.0);
-    dval_t *cube = dv_mul(dv_mul(affine, affine), affine);
+    dval_t *cube_square = dv_mul(affine, affine);
+    dval_t *cube = dv_mul(cube_square, affine);
     dval_t *cosh_affine = dv_cosh(affine);
     dval_t *expr = dv_mul(cosh_affine, cube);
 
@@ -2203,6 +2222,7 @@ void test_multi_2d_cube_affine_times_cosh_affine(void) {
 
     dv_free(expr);
     dv_free(cosh_affine);
+    dv_free(cube_square);
     dv_free(cube);
     dv_free(affine);
     dv_free(sum_xy);
@@ -2260,7 +2280,9 @@ void test_multi_2d_quartic_affine_times_sin_affine(void) {
     dval_t *two_y = dv_mul_d(y, 2.0);
     dval_t *sum_xy = dv_add(x, two_y);
     dval_t *affine = dv_add_d(sum_xy, 3.0);
-    dval_t *quartic = dv_mul(dv_mul(affine, affine), dv_mul(affine, affine));
+    dval_t *quartic_lhs = dv_mul(affine, affine);
+    dval_t *quartic_rhs = dv_mul(affine, affine);
+    dval_t *quartic = dv_mul(quartic_lhs, quartic_rhs);
     dval_t *sin_affine = dv_sin(affine);
     dval_t *expr = dv_mul(quartic, sin_affine);
 
@@ -2283,6 +2305,8 @@ void test_multi_2d_quartic_affine_times_sin_affine(void) {
 
     dv_free(expr);
     dv_free(sin_affine);
+    dv_free(quartic_rhs);
+    dv_free(quartic_lhs);
     dv_free(quartic);
     dv_free(affine);
     dv_free(sum_xy);
@@ -2380,7 +2404,9 @@ void test_multi_2d_quartic_affine_times_cosh_affine(void) {
     dval_t *two_y = dv_mul_d(y, 2.0);
     dval_t *sum_xy = dv_add(x, two_y);
     dval_t *affine = dv_add_d(sum_xy, 3.0);
-    dval_t *quartic = dv_mul(dv_mul(affine, affine), dv_mul(affine, affine));
+    dval_t *quartic_lhs = dv_mul(affine, affine);
+    dval_t *quartic_rhs = dv_mul(affine, affine);
+    dval_t *quartic = dv_mul(quartic_lhs, quartic_rhs);
     dval_t *cosh_affine = dv_cosh(affine);
     dval_t *expr = dv_mul(cosh_affine, quartic);
 
@@ -2403,6 +2429,8 @@ void test_multi_2d_quartic_affine_times_cosh_affine(void) {
 
     dv_free(expr);
     dv_free(cosh_affine);
+    dv_free(quartic_rhs);
+    dv_free(quartic_lhs);
     dv_free(quartic);
     dv_free(affine);
     dv_free(sum_xy);

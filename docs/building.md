@@ -48,6 +48,15 @@ Run the integrator benchmark:
 make bench_integrator
 ```
 
+Run the symbolic `dval` matrix benchmark:
+
+```sh
+make bench_matrix_dval
+```
+
+See [`benchmarks.md`](benchmarks.md) for notes on output units and current
+sample results.
+
 Show the target summary:
 
 ```sh
@@ -62,3 +71,8 @@ make help
 - `libm` is required.
 - `libunistring` is optional but enabled by default through `ENABLE_UNISTRING=1`.
 - Benchmarks are discovered automatically from `bench/bench_*.c`.
+- Current benchmark targets include `bench_integrator` and
+  `bench_matrix_dval`.
+- The build currently adds both `include/` and `include/internal/` to the
+  compiler search path so project modules and tests can share internal headers.
+  External consumers should treat only `include/` as public API.

@@ -26,6 +26,24 @@ datetime utilities, UTF-8 strings, and generic containers.
 - Standard C library plus `libm`
 - Optional `libunistring` support for the UTF-8/string layer (`ENABLE_UNISTRING=1` by default in the Makefile)
 
+## Benchmark Highlights
+
+Recent sample benchmarks on this tree show:
+
+- symbolic integrator shortcuts reducing affine-family cases from fallback-style
+  tens of milliseconds to single-digit or low-double-digit microseconds
+- `affine_square` at about `1.238 µs` versus `near_miss_square` at about
+  `179.185 µs`
+- `affine_times_exp` at about `19.045 µs` versus `near_miss_exp` at about
+  `15188.762 µs`
+- symbolic `dval` matrix solve for a dense `3x3` / `2`-RHS case at about
+  `561.060 µs`
+- symbolic `dval` matrix inverse for a dense `4x4` case at about
+  `2525.437 µs`
+
+See [`docs/benchmarks.md`](docs/benchmarks.md) for commands, units, and fuller
+sample output.
+
 ## Quick Examples
 
 **High-precision arithmetic with `qfloat_t`:**
@@ -108,6 +126,7 @@ See [`docs/testing.md`](docs/testing.md) for details on individual test suites.
 
 ```sh
 make bench_integrator
+make bench_matrix_dval
 ```
 
 See [`docs/building.md`](docs/building.md) for benchmark and build details.
@@ -117,6 +136,7 @@ See [`docs/building.md`](docs/building.md) for benchmark and build details.
 - [Documentation index](docs/README.md)
 - [Building](docs/building.md)
 - [Testing](docs/testing.md)
+- [Benchmarks](docs/benchmarks.md)
 - [Dictionary ownership models](docs/dictionary.md#ownership-models)
 - [Set ownership models](docs/set.md#ownership-models)
 - [Array ownership models](docs/array.md#ownership-models)
@@ -125,12 +145,17 @@ See [`docs/building.md`](docs/building.md) for benchmark and build details.
 
 ```text
 include/     public headers
+include/internal/  project-internal cross-module headers
 src/         implementations
 tests/       unit tests
 docs/        detailed module documentation
 README.md    repository landing page
 Makefile     build and test entry points
 ```
+
+Public consumers should include headers from `include/`. Headers under
+`include/internal/` support communication between MARS subsystems and tests,
+and are not intended as stable external API.
 
 ## License
 

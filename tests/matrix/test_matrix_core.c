@@ -4011,6 +4011,49 @@ static void test_symbolic_linear_algebra_extensions(void)
         dv_free(y);
         dv_free(one);
     }
+
+    {
+        dval_t *x = dv_new_named_var_d(2.0, "x");
+        dval_t *y = dv_new_named_var_d(3.0, "y");
+        dval_t *one = dv_new_const_d(1.0);
+        dval_t *vals[6] = {
+            one, one, x,
+            one, one, y
+        };
+        matrix_t *A = mat_create_dv(2, 3, vals);
+
+        print_mdv("A (rank dval)", A);
+        check_bool("mat_rank(dval rectangular dependent) = 2", mat_rank(A) == 2);
+
+        dv_set_val_d(x, 5.0);
+        dv_set_val_d(y, 5.0);
+        check_bool("mat_rank(dval rectangular remains exact-symbolic 2)", mat_rank(A) == 2);
+
+        mat_free(A);
+        dv_free(x);
+        dv_free(y);
+        dv_free(one);
+    }
+
+    {
+        dval_t *x = dv_new_named_var_d(2.0, "x");
+        dval_t *one = dv_new_const_d(1.0);
+        dval_t *vals[6] = {
+            one, one, x,
+            one, one, x
+        };
+        matrix_t *A = mat_create_dv(2, 3, vals);
+
+        print_mdv("A (rank dval dependent)", A);
+        check_bool("mat_rank(dval structurally dependent) = 1", mat_rank(A) == 1);
+
+        dv_set_val_d(x, 5.0);
+        check_bool("mat_rank(dval structurally dependent stays 1)", mat_rank(A) == 1);
+
+        mat_free(A);
+        dv_free(x);
+        dv_free(one);
+    }
 }
 
 /* ------------------------------------------------------------------ solve / least-squares */
@@ -4315,6 +4358,127 @@ static void test_solve_and_lstsq(void)
         mat_free(X_expected);
         mat_free(X);
     }
+
+    /* Exact symbolic least-squares recovery for a full-column-rank system. */
+    {
+        dval_t *p = dv_new_named_var_d(3.0, "p");
+        dval_t *q = dv_new_named_var_d(4.0, "q");
+        dval_t *u = dv_new_named_var_d(5.0, "u");
+        dval_t *two = dv_new_const_d(2.0);
+        dval_t *A_vals[6] = {
+            p,       DV_ZERO,
+            DV_ZERO, q,
+            DV_ONE,  DV_ONE
+        };
+        dval_t *X_vals[2] = {u, two};
+        matrix_t *A = mat_create_dv(3, 2, A_vals);
+        matrix_t *X_expected = mat_create_dv(2, 1, X_vals);
+        matrix_t *B = mat_mul(A, X_expected);
+        matrix_t *X = NULL;
+        matrix_t *AX = NULL;
+
+        print_mdv("A (least-squares dval)", A);
+        print_mdv("B = A*X", B);
+
+        X = mat_least_squares(A, B);
+        check_bool("mat_least_squares(dval full-column-rank) not NULL", X != NULL);
+        check_bool("mat_least_squares(dval full-column-rank) -> MAT_TYPE_DVAL",
+                   X != NULL && mat_typeof(X) == MAT_TYPE_DVAL);
+        if (X) {
+            dval_t *x00 = NULL, *x10 = NULL;
+
+            print_mdv("X least-squares result (dval)", X);
+            mat_get(X, 0, 0, &x00);
+            mat_get(X, 1, 0, &x10);
+            check_d("lstsq(A,B)[0,0] = u", dv_eval_d(x00), 5.0, 1e-12);
+            check_d("lstsq(A,B)[1,0] = 2", dv_eval_d(x10), 2.0, 1e-12);
+
+            dv_set_val_d(p, 7.0);
+            dv_set_val_d(q, 11.0);
+            dv_set_val_d(u, 13.0);
+            check_d("lstsq(A,B)[0,0] tracks u", dv_eval_d(x00), 13.0, 1e-12);
+            check_d("lstsq(A,B)[1,0] remains 2", dv_eval_d(x10), 2.0, 1e-12);
+
+            AX = mat_mul(A, X);
+            check_bool("A*lstsq(A,B) not NULL", AX != NULL);
+            if (AX) {
+                dval_t *got = NULL, *expect = NULL;
+                for (size_t i = 0; i < 3; ++i) {
+                    mat_get(AX, i, 0, &got);
+                    mat_get(B, i, 0, &expect);
+                    check_d("dval least-squares residual entry",
+                            dv_eval_d(got), dv_eval_d(expect), 1e-10);
+                }
+            }
+        }
+
+        mat_free(A);
+        mat_free(X_expected);
+        mat_free(B);
+        mat_free(X);
+        mat_free(AX);
+        dv_free(p);
+        dv_free(q);
+        dv_free(u);
+        dv_free(two);
+    }
+
+    /* Exact symbolic least-squares for a rank-deficient rectangular system. */
+    {
+        dval_t *p = dv_new_named_var_d(3.0, "p");
+        dval_t *A_vals[6] = {
+            p,      p,
+            DV_ZERO, DV_ZERO,
+            DV_ZERO, DV_ZERO
+        };
+        dval_t *X_expected_vals[2] = {DV_ONE, DV_ONE};
+        matrix_t *A = mat_create_dv(3, 2, A_vals);
+        matrix_t *X_expected = mat_create_dv(2, 1, X_expected_vals);
+        matrix_t *B = mat_mul(A, X_expected);
+        matrix_t *X = NULL;
+        matrix_t *AX = NULL;
+
+        print_mdv("A (rank-deficient least-squares dval)", A);
+        print_mdv("B = A*X", B);
+
+        X = mat_least_squares(A, B);
+        check_bool("mat_least_squares(dval rank-deficient) not NULL", X != NULL);
+        check_bool("mat_least_squares(dval rank-deficient) -> MAT_TYPE_DVAL",
+                   X != NULL && mat_typeof(X) == MAT_TYPE_DVAL);
+        if (X) {
+            dval_t *x00 = NULL, *x10 = NULL;
+
+            print_mdv("X least-squares result (rank-deficient dval)", X);
+            mat_get(X, 0, 0, &x00);
+            mat_get(X, 1, 0, &x10);
+            check_d("rank-deficient lstsq(A,B)[0,0] = 1", dv_eval_d(x00), 1.0, 1e-12);
+            check_d("rank-deficient lstsq(A,B)[1,0] = 1", dv_eval_d(x10), 1.0, 1e-12);
+
+            dv_set_val_d(p, 7.0);
+            check_d("rank-deficient lstsq(A,B)[0,0] stays 1", dv_eval_d(x00), 1.0, 1e-12);
+            check_d("rank-deficient lstsq(A,B)[1,0] stays 1", dv_eval_d(x10), 1.0, 1e-12);
+
+            AX = mat_mul(A, X);
+            check_bool("A*lstsq(A,B) for rank-deficient dval not NULL", AX != NULL);
+            if (AX) {
+                dval_t *got = NULL, *expect = NULL;
+                for (size_t i = 0; i < 3; ++i) {
+                    mat_get(AX, i, 0, &got);
+                    mat_get(B, i, 0, &expect);
+                    check_d("rank-deficient dval least-squares residual entry",
+                            dv_eval_d(got), dv_eval_d(expect), 1e-10);
+                }
+            }
+        }
+
+        mat_free(A);
+        mat_free(X_expected);
+        mat_free(B);
+        mat_free(X);
+        mat_free(AX);
+        dv_free(p);
+    }
+
 
     /* Complex solve exercises promotion and Hermitian-free elimination. */
     {
@@ -5051,6 +5215,172 @@ static void test_rank_pinv_nullspace(void)
         mat_free(A_pinv_expected);
         mat_free(A);
     }
+
+    {
+        dval_t *p = dv_new_named_var_d(2.0, "p");
+        dval_t *q = dv_new_named_var_d(3.0, "q");
+        dval_t *A_vals[6] = {
+            p,       DV_ZERO, DV_ONE,
+            DV_ZERO, q,       DV_ONE
+        };
+        matrix_t *A = mat_create_dv(2, 3, A_vals);
+        matrix_t *A_pinv = NULL;
+        matrix_t *AAp = NULL, *AApA = NULL;
+        matrix_t *ApA = NULL, *ApAAp = NULL;
+
+        print_mdv("A (wide dval)", A);
+        check_bool("mat_rank(wide dval)=2", mat_rank(A) == 2);
+
+        A_pinv = mat_pseudoinverse(A);
+        check_bool("mat_pseudoinverse(wide dval) not NULL", A_pinv != NULL);
+        check_bool("mat_pseudoinverse(wide dval) -> MAT_TYPE_DVAL",
+                   A_pinv != NULL && mat_typeof(A_pinv) == MAT_TYPE_DVAL);
+        if (A_pinv) {
+            dval_t *entry = NULL;
+
+            print_mdv("pinv(A dval)", A_pinv);
+            mat_get(A_pinv, 0, 0, &entry);
+            check_d("pinv(dval)[0,0] initial", dv_eval_d(entry), 20.0 / 49.0, 1e-12);
+
+            AAp = mat_mul(A, A_pinv);
+            AApA = AAp ? mat_mul(AAp, A) : NULL;
+            ApA = mat_mul(A_pinv, A);
+            ApAAp = ApA ? mat_mul(ApA, A_pinv) : NULL;
+            check_bool("A*A+ for wide dval not NULL", AAp != NULL);
+            check_bool("A*A+*A for wide dval not NULL", AApA != NULL);
+            check_bool("A+*A*A+ for wide dval not NULL", ApAAp != NULL);
+            if (AAp) {
+                dval_t *got = NULL;
+                for (size_t i = 0; i < 2; ++i) {
+                    for (size_t j = 0; j < 2; ++j) {
+                        double expect = (i == j) ? 1.0 : 0.0;
+                        mat_get(AAp, i, j, &got);
+                        check_d("wide dval A*A+ identity entry",
+                                dv_eval_d(got), expect, 1e-10);
+                    }
+                }
+            }
+            if (AApA) {
+                dval_t *got = NULL, *expect = NULL;
+                for (size_t i = 0; i < 2; ++i) {
+                    for (size_t j = 0; j < 3; ++j) {
+                        mat_get(AApA, i, j, &got);
+                        mat_get(A, i, j, &expect);
+                        check_d("wide dval A*A+*A = A entry",
+                                dv_eval_d(got), dv_eval_d(expect), 1e-10);
+                    }
+                }
+            }
+            if (ApAAp) {
+                dval_t *got = NULL, *expect = NULL;
+                for (size_t i = 0; i < 3; ++i) {
+                    for (size_t j = 0; j < 2; ++j) {
+                        mat_get(ApAAp, i, j, &got);
+                        mat_get(A_pinv, i, j, &expect);
+                        check_d("wide dval A+*A*A+ = A+ entry",
+                                dv_eval_d(got), dv_eval_d(expect), 1e-10);
+                    }
+                }
+            }
+
+            dv_set_val_d(p, 5.0);
+            dv_set_val_d(q, 7.0);
+            check_d("pinv(dval)[0,0] tracks p,q", dv_eval_d(entry), 250.0 / 1299.0, 1e-12);
+            if (AAp) {
+                dval_t *got = NULL;
+                for (size_t i = 0; i < 2; ++i) {
+                    for (size_t j = 0; j < 2; ++j) {
+                        double expect = (i == j) ? 1.0 : 0.0;
+                        mat_get(AAp, i, j, &got);
+                        check_d("wide dval A*A+ identity entry tracks updates",
+                                dv_eval_d(got), expect, 1e-10);
+                    }
+                }
+            }
+        }
+
+        mat_free(AAp);
+        mat_free(AApA);
+        mat_free(ApA);
+        mat_free(ApAAp);
+        mat_free(A_pinv);
+        mat_free(A);
+        dv_free(p);
+        dv_free(q);
+    }
+
+    {
+        dval_t *p = dv_new_named_var_d(2.0, "p");
+        dval_t *A_vals[6] = {
+            p,       DV_ZERO, p,
+            DV_ZERO, DV_ZERO, DV_ZERO
+        };
+        matrix_t *A = mat_create_dv(2, 3, A_vals);
+        matrix_t *A_pinv = NULL;
+        matrix_t *AAp = NULL;
+        matrix_t *AApA = NULL;
+        matrix_t *ApA = NULL;
+        matrix_t *ApAAp = NULL;
+
+        print_mdv("A (rank-deficient wide dval)", A);
+        check_bool("mat_rank(rank-deficient wide dval)=1", mat_rank(A) == 1);
+
+        A_pinv = mat_pseudoinverse(A);
+        check_bool("mat_pseudoinverse(rank-deficient wide dval) not NULL", A_pinv != NULL);
+        check_bool("mat_pseudoinverse(rank-deficient wide dval) -> MAT_TYPE_DVAL",
+                   A_pinv != NULL && mat_typeof(A_pinv) == MAT_TYPE_DVAL);
+        if (A_pinv) {
+            dval_t *entry = NULL;
+            dval_t *zero_entry = NULL;
+
+            print_mdv("pinv(rank-deficient wide dval)", A_pinv);
+            mat_get(A_pinv, 0, 0, &entry);
+            mat_get(A_pinv, 1, 0, &zero_entry);
+            check_d("rank-deficient pinv(dval)[0,0] initial", dv_eval_d(entry), 0.25, 1e-12);
+            check_d("rank-deficient pinv(dval)[1,0] initial", dv_eval_d(zero_entry), 0.0, 1e-12);
+
+            AAp = mat_mul(A, A_pinv);
+            AApA = AAp ? mat_mul(AAp, A) : NULL;
+            ApA = mat_mul(A_pinv, A);
+            ApAAp = ApA ? mat_mul(ApA, A_pinv) : NULL;
+            check_bool("rank-deficient dval A*A+*A not NULL", AApA != NULL);
+            check_bool("rank-deficient dval A+*A*A+ not NULL", ApAAp != NULL);
+            if (AApA) {
+                dval_t *got = NULL, *expect = NULL;
+                for (size_t i = 0; i < 2; ++i) {
+                    for (size_t j = 0; j < 3; ++j) {
+                        mat_get(AApA, i, j, &got);
+                        mat_get(A, i, j, &expect);
+                        check_d("rank-deficient wide dval A*A+*A = A entry",
+                                dv_eval_d(got), dv_eval_d(expect), 1e-10);
+                    }
+                }
+            }
+            if (ApAAp) {
+                dval_t *got = NULL, *expect = NULL;
+                for (size_t i = 0; i < 3; ++i) {
+                    for (size_t j = 0; j < 2; ++j) {
+                        mat_get(ApAAp, i, j, &got);
+                        mat_get(A_pinv, i, j, &expect);
+                        check_d("rank-deficient wide dval A+*A*A+ = A+ entry",
+                                dv_eval_d(got), dv_eval_d(expect), 1e-10);
+                    }
+                }
+            }
+
+            dv_set_val_d(p, 5.0);
+            check_d("rank-deficient pinv(dval)[0,0] tracks p", dv_eval_d(entry), 0.1, 1e-12);
+        }
+
+        mat_free(AAp);
+        mat_free(AApA);
+        mat_free(ApA);
+        mat_free(ApAAp);
+        mat_free(A_pinv);
+        mat_free(A);
+        dv_free(p);
+    }
+
 }
 
 static void test_norms_and_condition(void)

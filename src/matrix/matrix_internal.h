@@ -5,6 +5,7 @@
 #include <stddef.h>
 
 #include "matrix.h"
+#include "internal/matrix_eval_qc.h"
 
 /* ============================================================
    Element kinds

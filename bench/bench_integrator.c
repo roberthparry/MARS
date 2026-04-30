@@ -312,6 +312,7 @@ static void run_case(const char *label, build_fn builder, int iters)
     size_t first_intervals;
     uint64_t start;
     uint64_t end;
+    double avg_us;
 
     ig_set_tolerance(ig, qf_from_string("1e-21"), qf_from_string("1e-21"));
     if (ig_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err) != 0) {
@@ -332,11 +333,13 @@ static void run_case(const char *label, build_fn builder, int iters)
         }
     }
     end = now_ns();
+    avg_us = ((double)(end - start) / (double)iters) / 1000.0;
 
-    printf("%-22s intervals=%-4zu avg_us=%10.3f\n",
+    printf("%-22s intervals=%-4zu avg_µs=%10.3f avg_ms=%10.3f\n",
            label,
            first_intervals,
-           ((double)(end - start) / (double)iters) / 1000.0);
+           avg_us,
+           avg_us / 1000.0);
 
     dv_free(expr);
     dv_free(y);

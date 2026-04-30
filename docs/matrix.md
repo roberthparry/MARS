@@ -52,6 +52,7 @@ What currently works for `dval` matrices:
 - scalar multiply/divide through the normal promotion rules
 - exact determinant, trace, characteristic polynomial, minimal polynomial, polynomial application, adjugate
 - exact inverse and solve, including larger dense symbolic cases
+- exact symbolic pseudoinverse, least-squares, rank, and nullspace, including rank-deficient rectangular cases
 - exact Schur complements, block inverses, and block solves, including symbolic `dval` block expressions when the leading block is invertible
 - eigenspaces, generalized eigenspaces, Jordan chains, and Jordan block-size profiles for disciplined symbolic cases
 - entrywise symbolic matrix derivatives with respect to a chosen `dval` variable
@@ -69,7 +70,7 @@ What is still intentionally unsupported for `dval` matrices:
 
 - general numerical inverse / solve / least-squares
 - LU / QR / Cholesky / SVD / Schur
-- numerical eigensolvers and pseudoinverse
+- numerical eigensolvers
 - general dense Schur-based matrix functions on arbitrary `dval` inputs
 - full general symbolic Jordan normal form / arbitrary dense symbolic spectral decomposition
 
@@ -677,9 +678,13 @@ matrix_t *mat_least_squares(const matrix_t *A, const matrix_t *B);
 
 Computes a best-fit solution to `A * X = B`. When the system does not admit a
 clean exact solve, this returns the `X` that minimises the residual norm
-`||A*X - B||`. Full-column-rank overdetermined systems use a QR-based solve.
-Rank-deficient or underdetermined systems fall back to the Moore-Penrose
-pseudoinverse so the result remains well defined.
+`||A*X - B||`.
+
+- Numeric matrix types use a QR-based solve for full-column-rank overdetermined
+  systems and fall back to the Moore-Penrose pseudoinverse for rank-deficient
+  or underdetermined cases.
+- `MAT_TYPE_DVAL` supports exact symbolic least-squares through exact symbolic
+  pseudoinverses, including rank-deficient rectangular systems.
 
 Example:
 
@@ -714,19 +719,24 @@ Returns a newly allocated matrix, or NULL on error.
 int mat_rank(const matrix_t *A);
 ```
 
-Computes the rank of matrix `A` via SVD. Returns the rank (non-negative integer),
-or negative on error. The cutoff between zero and nonzero singular values is
-chosen from the matrix size, the largest singular value, and the element type's
-numerical precision.
+Computes the rank of matrix `A`.
+
+- For numeric element types, rank is computed via SVD. The cutoff between zero
+  and nonzero singular values is chosen from the matrix size, the largest
+  singular value, and the element type's numerical precision.
+- For `MAT_TYPE_DVAL`, rank is computed exactly by symbolic elimination using
+  exact-zero checks on the reduced expression entries.
+
+Returns the rank (non-negative integer), or a negative value on error.
 
 ```c
 matrix_t *mat_pseudoinverse(const matrix_t *A);
 ```
 
-Computes the Moore-Penrose pseudoinverse `A⁺` via SVD. The pseudoinverse
-generalises the ordinary matrix inverse to rectangular or singular matrices.
-It is useful for least-squares problems, minimum-norm solutions, projection
-operators, and for working with matrices that do not admit a true inverse.
+Computes the Moore-Penrose pseudoinverse `A⁺`. The pseudoinverse generalises
+the ordinary matrix inverse to rectangular or singular matrices. It is useful
+for least-squares problems, minimum-norm solutions, projection operators, and
+for working with matrices that do not admit a true inverse.
 
 In particular, the pseudoinverse is useful when solving systems that are
 overdetermined, underdetermined, or rank-deficient. In those settings it
@@ -734,15 +744,24 @@ provides the standard inverse-like object used to compute best-fit or
 minimum-norm solutions.
 
 When `A` is square and nonsingular, the pseudoinverse coincides with the
-ordinary inverse. Returns a newly allocated matrix, or NULL on error.
+ordinary inverse.
+
+- Numeric matrix types compute the pseudoinverse via SVD.
+- `MAT_TYPE_DVAL` supports exact symbolic pseudoinverses for rectangular and
+  rank-deficient inputs through exact full-rank factorisation.
+
+Returns a newly allocated matrix, or NULL on error.
 
 ```c
 matrix_t *mat_nullspace(const matrix_t *A);
 ```
 
-Computes a basis for the nullspace of `A` (all `x` such that `A*x = 0`) via the
-eigendecomposition of `Aᵀ*A`. Returns a matrix whose columns span the nullspace,
-or NULL on error.
+Computes a basis for the nullspace of `A` (all `x` such that `A*x = 0`).
+
+- Numeric element types build the basis from the eigendecomposition of `Aᵀ*A`.
+- `MAT_TYPE_DVAL` computes the nullspace basis exactly by symbolic reduction.
+
+Returns a matrix whose columns span the nullspace, or NULL on error.
 
 #### Matrix Norms
 
@@ -877,6 +896,33 @@ For `MAT_TYPE_DVAL`, the story is different:
 - general dense Schur-based matrix functions remain unsupported
 - exact symbolic matrix functions are implemented for structured inputs where the
   result can be expressed entrywise without numerical approximation
+- when you want to continue numerically beyond that exact symbolic boundary,
+  first evaluate the current symbolic matrix into a `qcomplex_t` snapshot with
+  `mat_evaluate_qc(...)`, then apply the usual numeric matrix function.
+- that exact path also includes:
+  - dense symbolic matrices with one common diagonal value and one common
+    off-diagonal value, handled exactly for any matrix size through the
+    rank-one projector formula
+  - dense symbolic matrices of the form `A = αI + uvᵀ`, handled exactly for
+    `n×n` inputs with `n ≥ 3` through the rank-one update formula
+  - diagonalizable dense `2×2` symbolic matrices, evaluated via symbolic
+    eigendecomposition rather than numerical Schur reduction
+  - denser symbolic families satisfying an exact quadratic relation
+    `A² = pA + qI`, which covers some dense `3×3` cases without falling back to
+    numerical evaluation
+  - denser symbolic families satisfying an exact cubic-linear relation
+    `A³ = sA`, which covers another disciplined subset of dense `3×3` cases
+    through an exact quadratic polynomial in `A`
+  - the dense symbolic `4×4` path-style family with zero diagonal and one
+    common nearest-neighbour coupling, recognised as an exact biquadratic
+    quartic case `A⁴ = sA² + tI` without attempting a full general quartic
+    solver
+  - block-diagonal symbolic matrices whose diagonal blocks already belong to an
+    exact symbolic family, which gives a disciplined exact route for useful
+    `4×4` cases without attempting a full general quartic solver
+  - permutation-similar block-diagonal symbolic matrices, where an exact
+    principal reordering exposes independent symbolic blocks before the matrix
+    function is applied blockwise and permuted back
 
 | Function | Description |
 |---|---|

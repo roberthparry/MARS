@@ -913,10 +913,11 @@ matrix_t *mat_block_solve(const matrix_t *A, const matrix_t *B, size_t split);
  * @brief Compute a best-fit solution to A X = B.
  *
  * When an exact solution may not exist, this routine returns a matrix X that
- * minimises the residual norm ||A X - B||. For full-column-rank overdetermined
- * systems it uses a QR-based solve. Rank-deficient or underdetermined systems
- * fall back to the Moore-Penrose pseudoinverse so the returned solution remains
- * well defined.
+ * minimises the residual norm ||A X - B||. Numeric matrix types use a QR-based
+ * solve for full-column-rank overdetermined systems and fall back to the
+ * Moore-Penrose pseudoinverse for underdetermined or rank-deficient cases.
+ * MAT_TYPE_DVAL supports exact symbolic least-squares through exact symbolic
+ * pseudoinverses, including rank-deficient rectangular systems.
  *
  * Example:
  * @code
@@ -950,10 +951,11 @@ matrix_t *mat_block_solve(const matrix_t *A, const matrix_t *B, size_t split);
 matrix_t *mat_least_squares(const matrix_t *A, const matrix_t *B);
 
 /**
- * @brief Compute the numerical rank of a matrix.
+ * @brief Compute the rank of a matrix.
  *
- * The rank is determined from the singular values of A using the library's
- * internal tolerance policy.
+ * Numeric matrix types determine rank from the singular values of A using the
+ * library's internal tolerance policy. MAT_TYPE_DVAL uses exact symbolic
+ * elimination with exact-zero checks on reduced entries.
  *
  * @param A  Input matrix.
  * @return   The computed rank, or a negative value on error.
@@ -976,6 +978,10 @@ int       mat_rank(const matrix_t *A);
  * When A is square and nonsingular, the pseudoinverse coincides with the
  * ordinary inverse.
  *
+ * Numeric matrix types compute the pseudoinverse via SVD. MAT_TYPE_DVAL
+ * supports exact symbolic pseudoinverses for rectangular and rank-deficient
+ * inputs through exact full-rank factorisation.
+ *
  * @param A  Input matrix.
  * @return   Newly allocated pseudoinverse on success, or NULL on error.
  */
@@ -985,7 +991,8 @@ matrix_t *mat_pseudoinverse(const matrix_t *A);
  * @brief Compute a basis for the right nullspace of a matrix.
  *
  * The returned matrix stores basis vectors as its columns. If the nullspace
- * is trivial, the result may have zero columns.
+ * is trivial, the result may have zero columns. MAT_TYPE_DVAL computes this
+ * basis exactly by symbolic reduction.
  *
  * @param A  Input matrix.
  * @return   Newly allocated nullspace basis matrix on success, or NULL on
