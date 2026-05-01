@@ -65,6 +65,63 @@ int main(void) {
 W0(1) = 0.5671432904097838729999686622103575
 ```
 
+**Automatic differentiation with `dval_t`:**
+
+```c
+#include <stdio.h>
+#include "dval.h"
+
+/* f(x) = exp(sin(x)) + 3*x^2 - 7 */
+static dval_t *make_f(dval_t *x) {
+    dval_t *sinx   = dv_sin(x);
+    dval_t *exp_sx = dv_exp(sinx);
+    dval_t *x2     = dv_pow_d(x, 2.0);
+    dval_t *term2  = dv_mul_d(x2, 3.0);
+    dval_t *f0     = dv_add(exp_sx, term2);
+    dval_t *f      = dv_sub_d(f0, 7.0);
+
+    dv_free(sinx);
+    dv_free(exp_sx);
+    dv_free(x2);
+    dv_free(term2);
+    dv_free(f0);
+
+    return f;
+}
+
+int main(void) {
+    dval_t *x = dv_new_named_var_d(1.25, "x");
+    dval_t *f = make_f(x);
+    dval_t *df_dx = dv_create_deriv(f, x);
+    const dval_t *d2f_dx = dv_get_deriv(df_dx, x);
+
+    printf("f(x)    = "); dv_print(f);
+    printf("f'(x)   = "); dv_print(df_dx);
+    printf("f''(x)  = "); dv_print(d2f_dx);
+
+    qf_printf("\nAt x = 1.25:\n");
+    qf_printf("f(x)    = %.34q\n", dv_eval(f));
+    qf_printf("f'(x)   = %.34q\n", dv_eval(df_dx));
+    qf_printf("f''(x)  = %.34q\n", dv_eval(d2f_dx));
+
+    dv_free(df_dx);
+    dv_free(f);
+    dv_free(x);
+    return 0;
+}
+```
+
+```text
+f(x)    = { exp(sin(x)) + 3x² - 7 | x = 1.25 }
+f'(x)   = { 6x + cos(x)·exp(sin(x)) | x = 1.25 }
+f''(x)  = { cos²(x)·exp(sin(x)) - sin(x)·exp(sin(x)) + 6 | x = 1.25 }
+
+At x = 1.25:
+f(x)    = 7.2705855122552272007396823028102510
+f'(x)   = 7.5000000000000000000000000000000000
+f''(x)  = 6.0000000000000000000000000000000000
+```
+
 **Symbolic matrix from a string:**
 
 ```c
@@ -88,6 +145,70 @@ int main(void) {
   Δ    Ω
   Ω   -Δ
 ) | Δ = 1.5, Ω = 0.25 }
+```
+
+**Searching for Mersenne primes with `mint_t` up to `p = 4423`:**
+
+```c
+#include <stdio.h>
+#include "mint.h"
+
+int main(void) {
+    unsigned found = 0;
+    unsigned p;
+
+    for (p = 2; p <= 4423; ++p) {
+        mint_t *exp = mint_create_long((long)p);
+        mint_t *mersenne = NULL;
+        mint_t *minus_one = mint_create_long(-1);
+
+        if (!exp || !minus_one) {
+            mint_free(exp);
+            mint_free(mersenne);
+            mint_free(minus_one);
+            return 1;
+        }
+
+        if (mint_isprime(exp)) {
+            mersenne = mint_create_2pow(p);
+            if (!mersenne) {
+                mint_free(exp);
+                mint_free(minus_one);
+                return 1;
+            }
+
+            if (mint_add(mersenne, minus_one) != 0) {
+                mint_free(exp);
+                mint_free(mersenne);
+                mint_free(minus_one);
+                return 1;
+            }
+
+            if (mint_isprime(mersenne)) {
+                if ((found % 4) == 3)
+                    printf("M_%-4u is prime\n", p);
+                else
+                    printf("M_%-4u is prime    ", p);
+                found++;
+            }
+
+            mint_free(mersenne);
+        }
+
+        mint_free(exp);
+        mint_free(minus_one);
+    }
+
+    return 0;
+}
+```
+
+```text
+M_2    is prime    M_3    is prime    M_5    is prime    M_7    is prime
+M_13   is prime    M_17   is prime    M_19   is prime    M_31   is prime
+M_61   is prime    M_89   is prime    M_107  is prime    M_127  is prime
+M_521  is prime    M_607  is prime    M_1279 is prime    M_2203 is prime
+M_2281 is prime    M_3217 is prime    M_4253 is prime    M_4423 is prime
 ```
 
 ## Modules
