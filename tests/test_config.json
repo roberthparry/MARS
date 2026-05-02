@@ -2398,5 +2398,28 @@
       "test_generic_unary_affine_matchers": true,
       "test_generic_affine_poly_deg4_times_unary_matcher": true
     }
+  },
+  "tests/mint/test_mint.c": {
+    "test_create_and_to_string": true,
+    "test_setters_and_clear": true,
+    "test_clone_aliases_value": true,
+    "test_addition": true,
+    "test_multiplication": true,
+    "test_division_and_modulo": true,
+    "test_pow_and_pow10": true,
+    "test_compare_and_negate": true,
+    "test_shifts": true,
+    "test_integer_sqrt": true,
+    "test_bitwise": true,
+    "test_powmod_isprime_and_factors": true,
+    "test_readme_mersenne_prime_search": true,
+    "test_readme_mersenne_prime_output": true,
+    "test_clone_copy_on_write": true,
+    "test_clone_copies_value": true,
+    "test_sub_abs_predicates_conversions_gcd_lcm": true,
+    "test_divmod_square_gcdext_modinv": true,
+    "test_inc_dec_and_bits": true,
+    "test_long_hex_bits_and_nextprime": true,
+    "test_ulong_and_hex_constructors": true
   }
 }
