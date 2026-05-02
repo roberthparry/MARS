@@ -114,11 +114,11 @@ $(SHARED_LIB): $(OBJS)
 # ------------------------------------------------------------
 # Test binaries
 # ------------------------------------------------------------
-$(TEST_BUILD_DIR)/%: $(TEST_BUILD_DIR)/%.o $(STATIC_LIB) $(TEST_HELPER_OBJS)
+$(TEST_BUILD_DIR)/%: $(TEST_BUILD_DIR)/%.o $(STATIC_LIB) $(SHARED_LIB) $(TEST_HELPER_OBJS)
 	@mkdir -p $(dir $@)
 	$(CC) -o $@ $< $(filter $(TEST_BUILD_DIR)/$(dir $*)%.o,$(TEST_HELPER_OBJS)) $(STATIC_LIB) $(LDLIBS)
 
-$(BUILD_DIR)/bench/%: $(BUILD_DIR)/bench/%.o $(STATIC_LIB)
+$(BUILD_DIR)/bench/%: $(BUILD_DIR)/bench/%.o $(STATIC_LIB) $(SHARED_LIB)
 	@mkdir -p $(dir $@)
 	$(CC) -o $@ $< $(STATIC_LIB) $(LDLIBS)
 

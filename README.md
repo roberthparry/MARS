@@ -11,6 +11,8 @@ datetime utilities, UTF-8 strings, and generic containers.
 
 ## Highlights
 
+- **`mint_t`** — arbitrary-precision signed integers with number theory, combinatorics, and sequence helpers
+- **`mfloat_t`** — opaque multiprecision floating-point values with exact conversion, pretty/scientific formatting, and a growing native math layer
 - **`qfloat_t`** — double-double arithmetic and special functions (~34 decimal digits of precision)
 - **`matrix_t`** — generic high-precision matrix with pluggable element types (`double`, `qfloat_t`, `qcomplex_t`, `dval_t *`), string-based matrix parsing and formatting, symbolic linear algebra support including Schur complements, block inverse/solve, Jordan helpers, entrywise matrix derivatives, Jacobian helpers, and first matrix-calculus helpers for trace, determinant, inverse, block inverse, solve, and block solve, and eigendecomposition at full `qfloat_t` precision
 - **`dval_t`** — differentiable expression DAGs with first/second derivatives, symbolic matrix integration, and structural matcher helpers for higher-level symbolic code
@@ -147,7 +149,7 @@ int main(void) {
 ) | Δ = 1.5, Ω = 0.25 }
 ```
 
-**Searching for Mersenne primes with `mint_t` up to `p = 19937`:**
+**Searching for Mersenne primes with `mint_t` up to `p = 4423`:**
 
 ```c
 #include <stdio.h>
@@ -157,34 +159,34 @@ int main(void) {
     unsigned found = 0;
     unsigned p;
 
-    for (p = 2; p <= 19937; ++p) {
-        mint_t *exp = mint_create_long((long)p);
+    for (p = 2; p <= 4423; ++p) {
+        mint_t *exp = mi_create_long((long)p);
         mint_t *mersenne = NULL;
-        mint_t *minus_one = mint_create_long(-1);
+        mint_t *minus_one = mi_create_long(-1);
 
         if (!exp || !minus_one) {
-            mint_free(exp);
-            mint_free(mersenne);
-            mint_free(minus_one);
+            mi_free(exp);
+            mi_free(mersenne);
+            mi_free(minus_one);
             return 1;
         }
 
-        if (mint_isprime(exp)) {
-            mersenne = mint_create_2pow(p);
+        if (mi_isprime(exp)) {
+            mersenne = mi_create_2pow(p);
             if (!mersenne) {
-                mint_free(exp);
-                mint_free(minus_one);
+                mi_free(exp);
+                mi_free(minus_one);
                 return 1;
             }
 
-            if (mint_add(mersenne, minus_one) != 0) {
-                mint_free(exp);
-                mint_free(mersenne);
-                mint_free(minus_one);
+            if (mi_add(mersenne, minus_one) != 0) {
+                mi_free(exp);
+                mi_free(mersenne);
+                mi_free(minus_one);
                 return 1;
             }
 
-            if (mint_isprime(mersenne)) {
+            if (mi_isprime(mersenne)) {
                 if ((found % 4) == 3)
                     printf("M_%-4u is prime\n", p);
                 else
@@ -192,11 +194,11 @@ int main(void) {
                 found++;
             }
 
-            mint_free(mersenne);
+            mi_free(mersenne);
         }
 
-        mint_free(exp);
-        mint_free(minus_one);
+        mi_free(exp);
+        mi_free(minus_one);
     }
 
     return 0;
@@ -209,13 +211,14 @@ M_13   is prime    M_17   is prime    M_19   is prime    M_31   is prime
 M_61   is prime    M_89   is prime    M_107  is prime    M_127  is prime
 M_521  is prime    M_607  is prime    M_1279 is prime    M_2203 is prime
 M_2281 is prime    M_3217 is prime    M_4253 is prime    M_4423 is prime
-M_9689 is prime    M_9941 is prime    M_11213 is prime   M_19937 is prime
 ```
 
 ## Modules
 
 | Module | Description | Docs |
 |---|---|---|
+| `mint_t` | Arbitrary-precision signed integers and number-theory helpers | [`docs/mint.md`](docs/mint.md) |
+| `mfloat_t` | Opaque multiprecision floating-point arithmetic | [`docs/mfloat.md`](docs/mfloat.md) |
 | `qfloat_t` | Double-double arithmetic and special functions | [`docs/qfloat.md`](docs/qfloat.md) |
 | `qcomplex_t` | Double-double complex arithmetic and special functions | [`docs/qcomplex.md`](docs/qcomplex.md) |
 | `matrix_t` | Generic high-precision matrix with numeric and symbolic element types | [`docs/matrix.md`](docs/matrix.md) |
@@ -249,6 +252,9 @@ See [`docs/testing.md`](docs/testing.md) for details on individual test suites.
 ```sh
 make bench_integrator
 make bench_matrix_dval
+make bench_mint_mul
+make bench_mint_div
+make bench_mfloat_math
 ```
 
 See [`docs/building.md`](docs/building.md) for benchmark and build details.
