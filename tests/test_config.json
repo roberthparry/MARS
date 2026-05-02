@@ -2434,6 +2434,7 @@
     "test_constants_and_named_values": true,
     "test_conversion_to_double_and_qfloat": true,
     "test_conversion_from_double_and_qfloat": true,
-    "test_extended_math_wrappers": true
+    "test_extended_math_wrappers": true,
+    "test_remaining_special_mfloat_functions": true
   }
 }

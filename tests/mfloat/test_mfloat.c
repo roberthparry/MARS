@@ -6,6 +6,11 @@
 
 #include "mfloat.h"
 
+#ifndef TEST_MFLOAT_MATHS_PRECISION
+/* Keep maths-only precision configurable without affecting core object tests. */
+#define TEST_MFLOAT_MATHS_PRECISION 256u
+#endif
+
 #define TEST_CONFIG_MODE TEST_CONFIG_GLOBAL
 #define TEST_CONFIG_MAIN
 #include "test_harness.h"
@@ -667,17 +672,34 @@ void test_conversion_from_double_and_qfloat(void)
 
 void test_extended_math_wrappers(void)
 {
-    mfloat_t *a = mf_create_long(1);
-    mfloat_t *b = mf_create_long(4);
-    mfloat_t *c = mf_create_string("0.5");
-    mfloat_t *d = mf_create_long(2);
-    mfloat_t *e = mf_create_long(3);
-    mfloat_t *f = mf_create_long(1);
-    mfloat_t *h = mf_create_long(2);
-    mfloat_t *p = mf_create_long(10);
+    size_t saved_default = mf_get_default_precision();
+    mfloat_t *a = NULL;
+    mfloat_t *b = NULL;
+    mfloat_t *c = NULL;
+    mfloat_t *d = NULL;
+    mfloat_t *e = NULL;
+    mfloat_t *f = NULL;
+    mfloat_t *i = NULL;
+    mfloat_t *j = NULL;
+    mfloat_t *k = NULL;
+    mfloat_t *h = NULL;
+    mfloat_t *p = NULL;
     mfloat_t *expected_e = NULL;
     mfloat_t *g = NULL;
     char *sa = NULL;
+
+    ASSERT_EQ_INT(mf_set_default_precision(TEST_MFLOAT_MATHS_PRECISION), 0);
+    a = mf_create_long(1);
+    b = mf_create_long(4);
+    c = mf_create_string("0.5");
+    d = mf_create_long(2);
+    e = mf_create_long(3);
+    f = mf_create_long(1);
+    i = mf_create_long(5);
+    j = mf_create_long(1);
+    k = mf_create_long(-1);
+    h = mf_create_long(2);
+    p = mf_create_long(10);
 
     ASSERT_NOT_NULL(a);
     ASSERT_NOT_NULL(b);
@@ -685,6 +707,9 @@ void test_extended_math_wrappers(void)
     ASSERT_NOT_NULL(d);
     ASSERT_NOT_NULL(e);
     ASSERT_NOT_NULL(f);
+    ASSERT_NOT_NULL(i);
+    ASSERT_NOT_NULL(j);
+    ASSERT_NOT_NULL(k);
     ASSERT_NOT_NULL(h);
     ASSERT_NOT_NULL(p);
     print_mfloat_value("a initial", a);
@@ -693,6 +718,9 @@ void test_extended_math_wrappers(void)
     print_mfloat_value("d initial", d);
     print_mfloat_value("e initial", e);
     print_mfloat_value("f initial", f);
+    print_mfloat_value("i initial", i);
+    print_mfloat_value("j initial", j);
+    print_mfloat_value("k initial", k);
     print_mfloat_value("h initial", h);
     print_mfloat_value("p initial", p);
 
@@ -904,6 +932,96 @@ void test_extended_math_wrappers(void)
     ASSERT_TRUE(mfloat_meets_precision(g, "1000", 0));
     ASSERT_TRUE(strcmp(sa, "1000") == 0);
 
+    ASSERT_EQ_INT(mf_set_string(c, "1"), 0);
+    ASSERT_EQ_INT(mf_atan2(c, k), 0);
+    print_mfloat_value("atan2(1, -1)", c);
+    print_mfloat_error_check("atan2(1, -1) mfloat error", c,
+                             "2.356194490192344928846982537459627163147877049531329365731208444230862304714656749");
+    ASSERT_TRUE(mfloat_meets_precision(
+        c,
+        "2.356194490192344928846982537459627163147877049531329365731208444230862304714656749",
+        1));
+
+    ASSERT_EQ_INT(mf_gamma(i), 0);
+    print_mfloat_value("gamma(5)", i);
+    print_mfloat_error_check("gamma(5) mfloat error", i, "24");
+    ASSERT_TRUE(mfloat_meets_precision(i, "24", 0));
+
+    ASSERT_EQ_INT(mf_set_long(i, 5), 0);
+    ASSERT_EQ_INT(mf_lgamma(i), 0);
+    print_mfloat_value("lgamma(5)", i);
+    print_mfloat_error_check("lgamma(5) mfloat error", i,
+                             "3.178053830347945619646941601297055408873990960903515214096734362117675159127693114");
+    ASSERT_TRUE(mfloat_meets_precision(
+        i,
+        "3.178053830347945619646941601297055408873990960903515214096734362117675159127693114",
+        1));
+
+    ASSERT_EQ_INT(mf_digamma(j), 0);
+    print_mfloat_value("digamma(1)", j);
+    print_mfloat_error_check("digamma(1) mfloat error", j,
+                             "-0.577215664901532860606512090082402431042159335939923598805767234884867726777665");
+    ASSERT_TRUE(mfloat_meets_precision(
+        j,
+        "-0.577215664901532860606512090082402431042159335939923598805767234884867726777665",
+        1));
+
+    ASSERT_EQ_INT(mf_set_long(j, 1), 0);
+    ASSERT_EQ_INT(mf_trigamma(j), 0);
+    print_mfloat_value("trigamma(1)", j);
+    print_mfloat_error_check("trigamma(1) mfloat error", j,
+                             "1.644934066848226436472415166646025189218949901206798437735558229370007470403200874");
+    ASSERT_TRUE(mfloat_meets_precision(
+        j,
+        "1.644934066848226436472415166646025189218949901206798437735558229370007470403200874",
+        1));
+
+    ASSERT_EQ_INT(mf_set_string(c, "0.5"), 0);
+    ASSERT_EQ_INT(mf_erf(c), 0);
+    print_mfloat_value("erf(0.5)", c);
+    print_mfloat_error_check("erf(0.5) mfloat error", c,
+                             "0.520499877813046537682746653891964528736451575757963700058805725647193521716853571");
+    ASSERT_TRUE(mfloat_meets_precision(
+        c,
+        "0.520499877813046537682746653891964528736451575757963700058805725647193521716853571",
+        1));
+
+    ASSERT_EQ_INT(mf_set_string(c, "0.5"), 0);
+    ASSERT_EQ_INT(mf_erfc(c), 0);
+    print_mfloat_value("erfc(0.5)", c);
+    print_mfloat_error_check("erfc(0.5) mfloat error", c,
+                             "0.479500122186953462317253346108035471263548424242036299941194274352806478283146429");
+    ASSERT_TRUE(mfloat_meets_precision(
+        c,
+        "0.479500122186953462317253346108035471263548424242036299941194274352806478283146429",
+        1));
+
+    ASSERT_EQ_INT(mf_set_string(c, "1"), 0);
+    ASSERT_EQ_INT(mf_lambert_w0(c), 0);
+    print_mfloat_value("lambert_w0(1)", c);
+    print_mfloat_error_check("lambert_w0(1) mfloat error", c,
+                             "0.567143290409783872999968662210355549753815787186512508135131079223045793086684567");
+    ASSERT_TRUE(mfloat_meets_precision(
+        c,
+        "0.567143290409783872999968662210355549753815787186512508135131079223045793086684567",
+        1));
+
+    ASSERT_EQ_INT(mf_set_string(c, "0"), 0);
+    ASSERT_EQ_INT(mf_normal_cdf(c), 0);
+    print_mfloat_value("normal_cdf(0)", c);
+    print_mfloat_error_check("normal_cdf(0) mfloat error", c, "0.5");
+    ASSERT_TRUE(mfloat_meets_precision(c, "0.5", 0));
+
+    ASSERT_EQ_INT(mf_set_long(f, 1), 0);
+    ASSERT_EQ_INT(mf_gammainc_Q(f, MF_ONE), 0);
+    print_mfloat_value("gammainc_Q(1,1)", f);
+    print_mfloat_error_check("gammainc_Q(1,1) mfloat error", f,
+                             "0.367879441171442321595523770161460867445811131031767834507836801697461495744900");
+    ASSERT_TRUE(mfloat_meets_precision(
+        f,
+        "0.367879441171442321595523770161460867445811131031767834507836801697461495744900",
+        1));
+
     free(sa);
     mf_free(a);
     mf_free(b);
@@ -911,10 +1029,193 @@ void test_extended_math_wrappers(void)
     mf_free(d);
     mf_free(e);
     mf_free(f);
+    mf_free(i);
+    mf_free(j);
+    mf_free(k);
     mf_free(h);
     mf_free(p);
     mf_free(expected_e);
     mf_free(g);
+    ASSERT_EQ_INT(mf_set_default_precision(saved_default), 0);
+}
+
+void test_remaining_special_mfloat_functions(void)
+{
+    size_t saved_default = mf_get_default_precision();
+    mfloat_t *x = NULL;
+    mfloat_t *a = NULL;
+    mfloat_t *b = NULL;
+    mfloat_t *y = NULL;
+    mfloat_t *neg = NULL;
+    mfloat_t *one = NULL;
+
+    ASSERT_EQ_INT(mf_set_default_precision(TEST_MFLOAT_MATHS_PRECISION), 0);
+    x = mf_create_string("0.5");
+    a = mf_create_string("2.5");
+    b = mf_create_string("3.5");
+    y = mf_create_string("3");
+    neg = mf_create_string("-0.1");
+    one = mf_create_long(1);
+
+    ASSERT_NOT_NULL(x);
+    ASSERT_NOT_NULL(a);
+    ASSERT_NOT_NULL(b);
+    ASSERT_NOT_NULL(y);
+    ASSERT_NOT_NULL(neg);
+    ASSERT_NOT_NULL(one);
+
+    ASSERT_EQ_INT(mf_erfinv(x), 0);
+    print_mfloat_value("erfinv(0.5)", x);
+    print_mfloat_error_check("erfinv(0.5) mfloat error", x,
+                             "0.476936276204469873381418353643130559808969749059470644703882695919383447774646733488695916");
+    ASSERT_TRUE(mfloat_meets_precision(
+        x,
+        "0.476936276204469873381418353643130559808969749059470644703882695919383447774646733488695916",
+        1));
+
+    ASSERT_EQ_INT(mf_set_string(x, "0.5"), 0);
+    ASSERT_EQ_INT(mf_erfcinv(x), 0);
+    print_mfloat_value("erfcinv(0.5)", x);
+    print_mfloat_error_check("erfcinv(0.5) mfloat error", x,
+                             "0.476936276204469873381418353643130559808969749059470644703882695919383447774646733488695916");
+    ASSERT_TRUE(mfloat_meets_precision(
+        x,
+        "0.476936276204469873381418353643130559808969749059470644703882695919383447774646733488695916",
+        1));
+
+    ASSERT_EQ_INT(mf_tetragamma(one), 0);
+    print_mfloat_value("tetragamma(1)", one);
+    print_mfloat_error_check("tetragamma(1) mfloat error", one,
+                             "-2.404113806319188570799476323022899981529972584680997763584543110683676411572626180372911747");
+    ASSERT_TRUE(mfloat_meets_precision(
+        one,
+        "-2.404113806319188570799476323022899981529972584680997763584543110683676411572626180372911747",
+        1));
+
+    ASSERT_EQ_INT(mf_gammainv(y), 0);
+    print_mfloat_value("gammainv(3)", y);
+    print_mfloat_error_check("gammainv(3) mfloat error", y,
+                             "3.405869986309566924699929218375558009595395799328981394312941626277148046924954397103935285");
+    ASSERT_TRUE(mfloat_meets_precision(
+        y,
+        "3.405869986309566924699929218375558009595395799328981394312941626277148046924954397103935285",
+        1));
+
+    ASSERT_EQ_INT(mf_lambert_wm1(neg), 0);
+    print_mfloat_value("lambert_wm1(-0.1)", neg);
+    print_mfloat_error_check("lambert_wm1(-0.1) mfloat error", neg,
+                             "-3.577152063957297218409391963511994880401796257793075923683527755791687236350575462861463656");
+    ASSERT_TRUE(mfloat_meets_precision(
+        neg,
+        "-3.577152063957297218409391963511994880401796257793075923683527755791687236350575462861463656",
+        1));
+
+    ASSERT_EQ_INT(mf_logbeta(a, b), 0);
+    print_mfloat_value("logbeta(2.5,3.5)", a);
+    print_mfloat_error_check("logbeta(2.5,3.5) mfloat error", a,
+                             "-3.301835269962052609799184383389828128309215704143981009717122670837516912654122678189667591");
+    ASSERT_TRUE(mfloat_meets_precision(
+        a,
+        "-3.301835269962052609799184383389828128309215704143981009717122670837516912654122678189667591",
+        1));
+
+    ASSERT_EQ_INT(mf_set_string(a, "5.5"), 0);
+    ASSERT_EQ_INT(mf_set_string(b, "2.5"), 0);
+    ASSERT_EQ_INT(mf_binomial(a, b), 0);
+    print_mfloat_value("binomial(5.5,2.5)", a);
+    print_mfloat_error_check("binomial(5.5,2.5) mfloat error", a,
+                             "14.4375");
+    ASSERT_TRUE(mfloat_meets_precision(a, "14.4375", 1));
+
+    ASSERT_EQ_INT(mf_set_string(x, "0.5"), 0);
+    ASSERT_EQ_INT(mf_set_string(a, "2.5"), 0);
+    ASSERT_EQ_INT(mf_set_string(b, "3.5"), 0);
+    ASSERT_EQ_INT(mf_beta_pdf(x, a, b), 0);
+    print_mfloat_value("beta_pdf(0.5,2.5,3.5)", x);
+    print_mfloat_error_check("beta_pdf(0.5,2.5,3.5) mfloat error", x,
+                             "1.697652726313550248201426809306819861700902887898202119975118336628232508098416374294547230");
+    ASSERT_TRUE(mfloat_meets_precision(
+        x,
+        "1.697652726313550248201426809306819861700902887898202119975118336628232508098416374294547230",
+        1));
+
+    ASSERT_EQ_INT(mf_set_string(x, "0.5"), 0);
+    ASSERT_EQ_INT(mf_logbeta_pdf(x, a, b), 0);
+    print_mfloat_value("logbeta_pdf(0.5,2.5,3.5)", x);
+    print_mfloat_error_check("logbeta_pdf(0.5,2.5,3.5) mfloat error", x,
+                             "0.529246547722271372130255897557121856007215166702959993234402632863942424775343815766214283");
+    ASSERT_TRUE(mfloat_meets_precision(
+        x,
+        "0.529246547722271372130255897557121856007215166702959993234402632863942424775343815766214283",
+        1));
+
+    ASSERT_EQ_INT(mf_set_string(x, "0.5"), 0);
+    ASSERT_EQ_INT(mf_normal_pdf(x), 0);
+    print_mfloat_value("normal_pdf(0.5)", x);
+    print_mfloat_error_check("normal_pdf(0.5) mfloat error", x,
+                             "0.352065326764299477774680441596517653110315180375711949655469017988223197836716607487669583");
+    ASSERT_TRUE(mfloat_meets_precision(
+        x,
+        "0.352065326764299477774680441596517653110315180375711949655469017988223197836716607487669583",
+        1));
+
+    ASSERT_EQ_INT(mf_set_string(x, "0.5"), 0);
+    ASSERT_EQ_INT(mf_normal_logpdf(x), 0);
+    print_mfloat_value("normal_logpdf(0.5)", x);
+    print_mfloat_error_check("normal_logpdf(0.5) mfloat error", x,
+                             "-1.043938533204672741780329736405617639861397473637783412817151540482765695927260397694743299");
+    ASSERT_TRUE(mfloat_meets_precision(
+        x,
+        "-1.043938533204672741780329736405617639861397473637783412817151540482765695927260397694743299",
+        1));
+
+    ASSERT_EQ_INT(mf_set_long(one, 1), 0);
+    ASSERT_EQ_INT(mf_gammainc_lower(one, MF_ONE), 0);
+    print_mfloat_value("gammainc_lower(1,1)", one);
+    print_mfloat_error_check("gammainc_lower(1,1) mfloat error", one,
+                             "0.632120558828557678404476229838539132554188868968232165492163198302538504255100196642852726");
+    ASSERT_TRUE(mfloat_meets_precision(
+        one,
+        "0.632120558828557678404476229838539132554188868968232165492163198302538504255100196642852726",
+        1));
+
+    ASSERT_EQ_INT(mf_set_long(one, 1), 0);
+    ASSERT_EQ_INT(mf_gammainc_upper(one, MF_ONE), 0);
+    print_mfloat_value("gammainc_upper(1,1)", one);
+    print_mfloat_error_check("gammainc_upper(1,1) mfloat error", one,
+                             "0.367879441171442321595523770161460867445811131031767834507836801697461495744899803357147274");
+    ASSERT_TRUE(mfloat_meets_precision(
+        one,
+        "0.367879441171442321595523770161460867445811131031767834507836801697461495744899803357147274",
+        1));
+
+    ASSERT_EQ_INT(mf_set_long(one, 1), 0);
+    ASSERT_EQ_INT(mf_ei(one), 0);
+    print_mfloat_value("ei(1)", one);
+    print_mfloat_error_check("ei(1) mfloat error", one,
+                             "1.895117816355936755466520934331634269017060581732707591646228431882513834533804153548900710");
+    ASSERT_TRUE(mfloat_meets_precision(
+        one,
+        "1.895117816355936755466520934331634269017060581732707591646228431882513834533804153548900710",
+        1));
+
+    ASSERT_EQ_INT(mf_set_long(one, 1), 0);
+    ASSERT_EQ_INT(mf_e1(one), 0);
+    print_mfloat_value("e1(1)", one);
+    print_mfloat_error_check("e1(1) mfloat error", one,
+                             "0.219383934395520273677163775460121649031047293406908207577978613073568698559141544722210251");
+    ASSERT_TRUE(mfloat_meets_precision(
+        one,
+        "0.219383934395520273677163775460121649031047293406908207577978613073568698559141544722210251",
+        1));
+
+    mf_free(x);
+    mf_free(a);
+    mf_free(b);
+    mf_free(y);
+    mf_free(neg);
+    mf_free(one);
+    ASSERT_EQ_INT(mf_set_default_precision(saved_default), 0);
 }
 
 int tests_main(void)
@@ -930,5 +1231,6 @@ int tests_main(void)
     RUN_TEST(test_conversion_to_double_and_qfloat, NULL);
     RUN_TEST(test_conversion_from_double_and_qfloat, NULL);
     RUN_TEST(test_extended_math_wrappers, NULL);
+    RUN_TEST(test_remaining_special_mfloat_functions, NULL);
     return 0;
 }

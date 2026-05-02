@@ -103,11 +103,13 @@ $(BUILD_DIR)/bench/%.o: bench/%.c
 # ------------------------------------------------------------
 # Libraries
 # ------------------------------------------------------------
-$(STATIC_LIB): $(OBJS)
+$(STATIC_LIB): Makefile $(OBJS)
 	@mkdir -p $(dir $@)
+	# Rebuild the archive from scratch so renamed object files cannot linger.
+	rm -f $@
 	$(AR) $@ $(OBJS)
 
-$(SHARED_LIB): $(OBJS)
+$(SHARED_LIB): Makefile $(OBJS)
 	@mkdir -p $(dir $@)
 	$(CC) -shared -o $@ $(OBJS) $(LDLIBS)
 
