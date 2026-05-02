@@ -10,6 +10,6 @@
  * matrix and dval internals only; it is not part of the public API and should
  * not be used by tests or external callers. Safe to call with NULL.
  */
-void dv_retain(dval_t *dv);
+void dv_retain(const dval_t *dv);
 
 #endif

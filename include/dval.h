@@ -47,8 +47,8 @@ typedef struct {
  *
  * These are process-lifetime singleton constant nodes.
  */
-extern dval_t *DV_ZERO;
-extern dval_t *DV_ONE;
+extern const dval_t * const DV_ZERO;
+extern const dval_t * const DV_ONE;
 
 /* ------------------------------------------------------------------------- */
 /* Constructors — constants                                                  */
@@ -148,7 +148,7 @@ qcomplex_t dv_get_val(const dval_t *dv);
  * The result is cached keyed by @p wrt, so repeated calls are cheap.
  * @p wrt must be a variable node that appears in the DAG rooted at @p expr.
  */
-const dval_t *dv_get_deriv(const dval_t *expr, dval_t *wrt);
+const dval_t *dv_get_deriv(const dval_t *expr, const dval_t *wrt);
 
 /* ------------------------------------------------------------------------- */
 /* Evaluation                                                                */
@@ -187,7 +187,7 @@ double dv_eval_d(const dval_t *dv);
  */
 int dv_eval_derivatives(const dval_t *expr,
                         size_t nvars,
-                        dval_t *const *vars,
+                        const dval_t *const *vars,
                         qfloat_t *value_out,
                         qfloat_t *derivs_out);
 
@@ -210,10 +210,10 @@ int dv_eval_derivatives(const dval_t *expr,
  * dv_create_3rd_deriv(expr, wrt1, wrt2, wrt3) computes the mixed third derivative.
  * dv_create_nth_deriv(n, expr, wrt) applies d/d(wrt) n times in succession.
  */
-dval_t *dv_create_deriv(dval_t *expr, dval_t *wrt);
-dval_t *dv_create_2nd_deriv(dval_t *expr, dval_t *wrt1, dval_t *wrt2);
-dval_t *dv_create_3rd_deriv(dval_t *expr, dval_t *wrt1, dval_t *wrt2, dval_t *wrt3);
-dval_t *dv_create_nth_deriv(unsigned int n, dval_t *expr, dval_t *wrt);
+dval_t *dv_create_deriv(const dval_t *expr, const dval_t *wrt);
+dval_t *dv_create_2nd_deriv(const dval_t *expr, const dval_t *wrt1, const dval_t *wrt2);
+dval_t *dv_create_3rd_deriv(const dval_t *expr, const dval_t *wrt1, const dval_t *wrt2, const dval_t *wrt3);
+dval_t *dv_create_nth_deriv(unsigned int n, const dval_t *expr, const dval_t *wrt);
 
 /* ------------------------------------------------------------------------- */
 /* Arithmetic (graph-building, owning)                                       */
@@ -227,18 +227,18 @@ dval_t *dv_create_nth_deriv(unsigned int n, dval_t *expr, dval_t *wrt);
  * _d variants accept a plain double for the scalar operand; d_sub and d_div
  * treat the double as the left-hand operand (d - dv and d / dv).
  */
-dval_t *dv_neg(dval_t *dv);
-dval_t *dv_add(dval_t *dv1, dval_t *dv2);
-dval_t *dv_sub(dval_t *dv1, dval_t *dv2);
-dval_t *dv_mul(dval_t *dv1, dval_t *dv2);
-dval_t *dv_div(dval_t *dv1, dval_t *dv2);
+dval_t *dv_neg(const dval_t *dv);
+dval_t *dv_add(const dval_t *dv1, const dval_t *dv2);
+dval_t *dv_sub(const dval_t *dv1, const dval_t *dv2);
+dval_t *dv_mul(const dval_t *dv1, const dval_t *dv2);
+dval_t *dv_div(const dval_t *dv1, const dval_t *dv2);
 
-dval_t *dv_add_d(dval_t *dv, double d);
-dval_t *dv_sub_d(dval_t *dv, double d);
-dval_t *dv_d_sub(double d, dval_t *dv);
-dval_t *dv_mul_d(dval_t *dv, double d);
-dval_t *dv_div_d(dval_t *dv, double d);
-dval_t *dv_d_div(double d, dval_t *dv);
+dval_t *dv_add_d(const dval_t *dv, double d);
+dval_t *dv_sub_d(const dval_t *dv, double d);
+dval_t *dv_d_sub(double d, const dval_t *dv);
+dval_t *dv_mul_d(const dval_t *dv, double d);
+dval_t *dv_div_d(const dval_t *dv, double d);
+dval_t *dv_d_div(double d, const dval_t *dv);
 
 /* ------------------------------------------------------------------------- */
 /* Comparison                                                                */
@@ -265,25 +265,25 @@ int dv_cmp(const dval_t *dv1, const dval_t *dv2);
  * dv_pow_qc(dv, z) computes dv^z for a constant complex exponent.
  * dv_pow(dv1, dv2) computes dv1^dv2 where both operands are differentiable.
  */
-dval_t *dv_sin(dval_t *dv);
-dval_t *dv_cos(dval_t *dv);
-dval_t *dv_tan(dval_t *dv);
-dval_t *dv_sinh(dval_t *dv);
-dval_t *dv_cosh(dval_t *dv);
-dval_t *dv_tanh(dval_t *dv);
-dval_t *dv_asin(dval_t *dv);
-dval_t *dv_acos(dval_t *dv);
-dval_t *dv_atan(dval_t *dv);
-dval_t *dv_atan2(dval_t *dv1, dval_t *dv2);
-dval_t *dv_asinh(dval_t *dv);
-dval_t *dv_acosh(dval_t *dv);
-dval_t *dv_atanh(dval_t *dv);
-dval_t *dv_exp(dval_t *dv);
-dval_t *dv_log(dval_t *dv);
-dval_t *dv_sqrt(dval_t *dv);
-dval_t *dv_pow_d(dval_t *dv, double d);
-dval_t *dv_pow_qc(dval_t *dv, qcomplex_t z);
-dval_t *dv_pow(dval_t *dv1, dval_t *dv2);
+dval_t *dv_sin(const dval_t *dv);
+dval_t *dv_cos(const dval_t *dv);
+dval_t *dv_tan(const dval_t *dv);
+dval_t *dv_sinh(const dval_t *dv);
+dval_t *dv_cosh(const dval_t *dv);
+dval_t *dv_tanh(const dval_t *dv);
+dval_t *dv_asin(const dval_t *dv);
+dval_t *dv_acos(const dval_t *dv);
+dval_t *dv_atan(const dval_t *dv);
+dval_t *dv_atan2(const dval_t *dv1, const dval_t *dv2);
+dval_t *dv_asinh(const dval_t *dv);
+dval_t *dv_acosh(const dval_t *dv);
+dval_t *dv_atanh(const dval_t *dv);
+dval_t *dv_exp(const dval_t *dv);
+dval_t *dv_log(const dval_t *dv);
+dval_t *dv_sqrt(const dval_t *dv);
+dval_t *dv_pow_d(const dval_t *dv, double d);
+dval_t *dv_pow_qc(const dval_t *dv, qcomplex_t z);
+dval_t *dv_pow(const dval_t *dv1, const dval_t *dv2);
 
 /* ------------------------------------------------------------------------- */
 /* Special functions (owning)                                                */
@@ -301,25 +301,25 @@ dval_t *dv_pow(dval_t *dv1, dval_t *dv2);
  * Normal dist.:      dv_normal_pdf, dv_normal_cdf, dv_normal_logpdf
  * Exponential int.:  dv_ei (Ei), dv_e1 (E₁)
  */
-dval_t *dv_abs(dval_t *dv);
-dval_t *dv_hypot(dval_t *dv1, dval_t *dv2);
-dval_t *dv_erf(dval_t *dv);
-dval_t *dv_erfc(dval_t *dv);
-dval_t *dv_erfinv(dval_t *dv);
-dval_t *dv_erfcinv(dval_t *dv);
-dval_t *dv_gamma(dval_t *dv);
-dval_t *dv_lgamma(dval_t *dv);
-dval_t *dv_digamma(dval_t *dv);
-dval_t *dv_trigamma(dval_t *dv);
-dval_t *dv_lambert_w0(dval_t *dv);
-dval_t *dv_lambert_wm1(dval_t *dv);
-dval_t *dv_beta(dval_t *dv1, dval_t *dv2);
-dval_t *dv_logbeta(dval_t *dv1, dval_t *dv2);
-dval_t *dv_normal_pdf(dval_t *dv);
-dval_t *dv_normal_cdf(dval_t *dv);
-dval_t *dv_normal_logpdf(dval_t *dv);
-dval_t *dv_ei(dval_t *dv);
-dval_t *dv_e1(dval_t *dv);
+dval_t *dv_abs(const dval_t *dv);
+dval_t *dv_hypot(const dval_t *dv1, const dval_t *dv2);
+dval_t *dv_erf(const dval_t *dv);
+dval_t *dv_erfc(const dval_t *dv);
+dval_t *dv_erfinv(const dval_t *dv);
+dval_t *dv_erfcinv(const dval_t *dv);
+dval_t *dv_gamma(const dval_t *dv);
+dval_t *dv_lgamma(const dval_t *dv);
+dval_t *dv_digamma(const dval_t *dv);
+dval_t *dv_trigamma(const dval_t *dv);
+dval_t *dv_lambert_w0(const dval_t *dv);
+dval_t *dv_lambert_wm1(const dval_t *dv);
+dval_t *dv_beta(const dval_t *dv1, const dval_t *dv2);
+dval_t *dv_logbeta(const dval_t *dv1, const dval_t *dv2);
+dval_t *dv_normal_pdf(const dval_t *dv);
+dval_t *dv_normal_cdf(const dval_t *dv);
+dval_t *dv_normal_logpdf(const dval_t *dv);
+dval_t *dv_ei(const dval_t *dv);
+dval_t *dv_e1(const dval_t *dv);
 
 /* ------------------------------------------------------------------------- */
 /* Debug / lifetime                                                          */
@@ -341,7 +341,7 @@ void dv_free(dval_t *dv);
  * The input handle is not consumed. The caller owns the returned handle and
  * must call dv_free() on it.
  */
-dval_t *dv_simplify(dval_t *dv);
+dval_t *dv_simplify(const dval_t *dv);
 
 
 /* ------------------------------------------------------------------------- */

@@ -6,7 +6,7 @@
 #include "qfloat.h"
 #include "dval_internal.h"
 
-extern dval_t *dv_simplify(dval_t *dv);
+extern dval_t *dv_simplify(const dval_t *dv);
 
 static void *dv_terms_xrealloc(void *ptr, size_t size)
 {

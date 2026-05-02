@@ -65,7 +65,7 @@ static dval_t *deriv_const(dval_t *dv)
 
 static dval_t *deriv_var(dval_t *dv)
 {
-    dval_t *wrt = dv_current_wrt_internal();
+    const dval_t *wrt = dv_current_wrt_internal();
     return dv_new_const_d(wrt == NULL || dv == wrt ? 1.0 : 0.0);
 }
 
@@ -296,7 +296,7 @@ const dval_ops_t ops_neg = {
 /* Arithmetic constructors (retain children)                                 */
 /* ------------------------------------------------------------------------- */
 
-dval_t *dv_neg(dval_t *dv)
+dval_t *dv_neg(const dval_t *dv)
 {
     if (!dv)
         return NULL;
@@ -304,7 +304,7 @@ dval_t *dv_neg(dval_t *dv)
     return dv_new_unary_internal(&ops_neg, dv);
 }
 
-dval_t *dv_add(dval_t *dv1, dval_t *dv2)
+dval_t *dv_add(const dval_t *dv1, const dval_t *dv2)
 {
     if (!dv1 || !dv2)
         return NULL;
@@ -313,7 +313,7 @@ dval_t *dv_add(dval_t *dv1, dval_t *dv2)
     return dv_new_binary_internal(&ops_add, dv1, dv2);
 }
 
-dval_t *dv_sub(dval_t *dv1, dval_t *dv2)
+dval_t *dv_sub(const dval_t *dv1, const dval_t *dv2)
 {
     if (!dv1 || !dv2)
         return NULL;
@@ -322,7 +322,7 @@ dval_t *dv_sub(dval_t *dv1, dval_t *dv2)
     return dv_new_binary_internal(&ops_sub, dv1, dv2);
 }
 
-dval_t *dv_mul(dval_t *dv1, dval_t *dv2)
+dval_t *dv_mul(const dval_t *dv1, const dval_t *dv2)
 {
     if (!dv1 || !dv2)
         return NULL;
@@ -331,7 +331,7 @@ dval_t *dv_mul(dval_t *dv1, dval_t *dv2)
     return dv_new_binary_internal(&ops_mul, dv1, dv2);
 }
 
-dval_t *dv_div(dval_t *dv1, dval_t *dv2)
+dval_t *dv_div(const dval_t *dv1, const dval_t *dv2)
 {
     if (!dv1 || !dv2)
         return NULL;
@@ -340,7 +340,7 @@ dval_t *dv_div(dval_t *dv1, dval_t *dv2)
     return dv_new_binary_internal(&ops_div, dv1, dv2);
 }
 
-dval_t *dv_pow(dval_t *a, dval_t *b)
+dval_t *dv_pow(const dval_t *a, const dval_t *b)
 {
     if (!a || !b)
         return NULL;
@@ -349,7 +349,7 @@ dval_t *dv_pow(dval_t *a, dval_t *b)
     return dv_new_binary_internal(&ops_pow, a, b);
 }
 
-dval_t *dv_pow_d(dval_t *a, double d)
+dval_t *dv_pow_d(const dval_t *a, double d)
 {
     if (!a)
         return NULL;
@@ -357,7 +357,7 @@ dval_t *dv_pow_d(dval_t *a, double d)
     return dv_new_pow_d_internal(a, d);
 }
 
-dval_t *dv_pow_qf(dval_t *a, qfloat_t exponent)
+dval_t *dv_pow_qf(const dval_t *a, qfloat_t exponent)
 {
     if (!a)
         return NULL;
@@ -365,7 +365,7 @@ dval_t *dv_pow_qf(dval_t *a, qfloat_t exponent)
     return dv_new_pow_qf_internal(a, exponent);
 }
 
-dval_t *dv_pow_qc(dval_t *a, qcomplex_t exponent)
+dval_t *dv_pow_qc(const dval_t *a, qcomplex_t exponent)
 {
     if (!a)
         return NULL;
@@ -373,7 +373,7 @@ dval_t *dv_pow_qc(dval_t *a, qcomplex_t exponent)
     return dv_new_pow_qc_internal(a, exponent);
 }
 
-dval_t *dv_add_d(dval_t *dv, double d)
+dval_t *dv_add_d(const dval_t *dv, double d)
 {
     dval_t *c = dv_new_const_d(d);
     dval_t *r = dv_add(dv, c);
@@ -381,7 +381,7 @@ dval_t *dv_add_d(dval_t *dv, double d)
     return r;
 }
 
-dval_t *dv_sub_d(dval_t *dv, double d)
+dval_t *dv_sub_d(const dval_t *dv, double d)
 {
     dval_t *c = dv_new_const_d(d);
     dval_t *r = dv_sub(dv, c);
@@ -389,7 +389,7 @@ dval_t *dv_sub_d(dval_t *dv, double d)
     return r;
 }
 
-dval_t *dv_d_sub(double d, dval_t *dv)
+dval_t *dv_d_sub(double d, const dval_t *dv)
 {
     dval_t *c = dv_new_const_d(d);
     dval_t *r = dv_sub(c, dv);
@@ -397,7 +397,7 @@ dval_t *dv_d_sub(double d, dval_t *dv)
     return r;
 }
 
-dval_t *dv_mul_d(dval_t *dv, double d)
+dval_t *dv_mul_d(const dval_t *dv, double d)
 {
     dval_t *c = dv_new_const_d(d);
     dval_t *r = dv_mul(dv, c);
@@ -405,7 +405,7 @@ dval_t *dv_mul_d(dval_t *dv, double d)
     return r;
 }
 
-dval_t *dv_div_d(dval_t *dv, double d)
+dval_t *dv_div_d(const dval_t *dv, double d)
 {
     dval_t *c = dv_new_const_d(d);
     dval_t *r = dv_div(dv, c);
@@ -413,7 +413,7 @@ dval_t *dv_div_d(dval_t *dv, double d)
     return r;
 }
 
-dval_t *dv_d_div(double d, dval_t *dv)
+dval_t *dv_d_div(double d, const dval_t *dv)
 {
     dval_t *c = dv_new_const_d(d);
     dval_t *r = dv_div(c, dv);

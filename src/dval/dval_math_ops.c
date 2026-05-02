@@ -2,7 +2,7 @@
 
 #include "dval_math_internal.h"
 
-static inline dval_t *dv_math_wrap_unary(const dval_ops_t *ops, dval_t *a)
+static inline dval_t *dv_math_wrap_unary(const dval_ops_t *ops, const dval_t *a)
 {
     if (!a)
         return NULL;
@@ -10,7 +10,7 @@ static inline dval_t *dv_math_wrap_unary(const dval_ops_t *ops, dval_t *a)
     return dv_new_unary_internal(ops, a);
 }
 
-static inline dval_t *dv_math_wrap_binary(const dval_ops_t *ops, dval_t *a, dval_t *b)
+static inline dval_t *dv_math_wrap_binary(const dval_ops_t *ops, const dval_t *a, const dval_t *b)
 {
     if (!a || !b)
         return NULL;
@@ -231,38 +231,38 @@ const dval_ops_t ops_logbeta = {
     .simplify = dv_simplify_binary_operator, .fold_const_unary = NULL
 };
 
-dval_t *dv_sqrt(dval_t *a) { return dv_math_wrap_unary(&ops_sqrt, a); }
-dval_t *dv_exp(dval_t *a) { return dv_math_wrap_unary(&ops_exp, a); }
-dval_t *dv_log(dval_t *a) { return dv_math_wrap_unary(&ops_log, a); }
-dval_t *dv_sin(dval_t *a) { return dv_math_wrap_unary(&ops_sin, a); }
-dval_t *dv_cos(dval_t *a) { return dv_math_wrap_unary(&ops_cos, a); }
-dval_t *dv_tan(dval_t *a) { return dv_math_wrap_unary(&ops_tan, a); }
-dval_t *dv_sinh(dval_t *a) { return dv_math_wrap_unary(&ops_sinh, a); }
-dval_t *dv_cosh(dval_t *a) { return dv_math_wrap_unary(&ops_cosh, a); }
-dval_t *dv_tanh(dval_t *a) { return dv_math_wrap_unary(&ops_tanh, a); }
-dval_t *dv_asin(dval_t *a) { return dv_math_wrap_unary(&ops_asin, a); }
-dval_t *dv_acos(dval_t *a) { return dv_math_wrap_unary(&ops_acos, a); }
-dval_t *dv_atan(dval_t *a) { return dv_math_wrap_unary(&ops_atan, a); }
-dval_t *dv_atan2(dval_t *a, dval_t *b) { return dv_math_wrap_binary(&ops_atan2, a, b); }
-dval_t *dv_asinh(dval_t *a) { return dv_math_wrap_unary(&ops_asinh, a); }
-dval_t *dv_acosh(dval_t *a) { return dv_math_wrap_unary(&ops_acosh, a); }
-dval_t *dv_atanh(dval_t *a) { return dv_math_wrap_unary(&ops_atanh, a); }
-dval_t *dv_abs(dval_t *a) { return dv_math_wrap_unary(&ops_abs, a); }
-dval_t *dv_erf(dval_t *a) { return dv_math_wrap_unary(&ops_erf, a); }
-dval_t *dv_erfc(dval_t *a) { return dv_math_wrap_unary(&ops_erfc, a); }
-dval_t *dv_lgamma(dval_t *a) { return dv_math_wrap_unary(&ops_lgamma, a); }
-dval_t *dv_hypot(dval_t *a, dval_t *b) { return dv_math_wrap_binary(&ops_hypot, a, b); }
-dval_t *dv_erfinv(dval_t *a) { return dv_math_wrap_unary(&ops_erfinv, a); }
-dval_t *dv_erfcinv(dval_t *a) { return dv_math_wrap_unary(&ops_erfcinv, a); }
-dval_t *dv_gamma(dval_t *a) { return dv_math_wrap_unary(&ops_gamma, a); }
-dval_t *dv_digamma(dval_t *a) { return dv_math_wrap_unary(&ops_digamma, a); }
-dval_t *dv_trigamma(dval_t *a) { return dv_math_wrap_unary(&ops_trigamma, a); }
-dval_t *dv_lambert_w0(dval_t *a) { return dv_math_wrap_unary(&ops_lambert_w0, a); }
-dval_t *dv_lambert_wm1(dval_t *a) { return dv_math_wrap_unary(&ops_lambert_wm1, a); }
-dval_t *dv_normal_pdf(dval_t *a) { return dv_math_wrap_unary(&ops_normal_pdf, a); }
-dval_t *dv_normal_cdf(dval_t *a) { return dv_math_wrap_unary(&ops_normal_cdf, a); }
-dval_t *dv_normal_logpdf(dval_t *a) { return dv_math_wrap_unary(&ops_normal_logpdf, a); }
-dval_t *dv_ei(dval_t *a) { return dv_math_wrap_unary(&ops_ei, a); }
-dval_t *dv_e1(dval_t *a) { return dv_math_wrap_unary(&ops_e1, a); }
-dval_t *dv_beta(dval_t *a, dval_t *b) { return dv_math_wrap_binary(&ops_beta, a, b); }
-dval_t *dv_logbeta(dval_t *a, dval_t *b) { return dv_math_wrap_binary(&ops_logbeta, a, b); }
+dval_t *dv_sqrt(const dval_t *a) { return dv_math_wrap_unary(&ops_sqrt, a); }
+dval_t *dv_exp(const dval_t *a) { return dv_math_wrap_unary(&ops_exp, a); }
+dval_t *dv_log(const dval_t *a) { return dv_math_wrap_unary(&ops_log, a); }
+dval_t *dv_sin(const dval_t *a) { return dv_math_wrap_unary(&ops_sin, a); }
+dval_t *dv_cos(const dval_t *a) { return dv_math_wrap_unary(&ops_cos, a); }
+dval_t *dv_tan(const dval_t *a) { return dv_math_wrap_unary(&ops_tan, a); }
+dval_t *dv_sinh(const dval_t *a) { return dv_math_wrap_unary(&ops_sinh, a); }
+dval_t *dv_cosh(const dval_t *a) { return dv_math_wrap_unary(&ops_cosh, a); }
+dval_t *dv_tanh(const dval_t *a) { return dv_math_wrap_unary(&ops_tanh, a); }
+dval_t *dv_asin(const dval_t *a) { return dv_math_wrap_unary(&ops_asin, a); }
+dval_t *dv_acos(const dval_t *a) { return dv_math_wrap_unary(&ops_acos, a); }
+dval_t *dv_atan(const dval_t *a) { return dv_math_wrap_unary(&ops_atan, a); }
+dval_t *dv_atan2(const dval_t *a, const dval_t *b) { return dv_math_wrap_binary(&ops_atan2, a, b); }
+dval_t *dv_asinh(const dval_t *a) { return dv_math_wrap_unary(&ops_asinh, a); }
+dval_t *dv_acosh(const dval_t *a) { return dv_math_wrap_unary(&ops_acosh, a); }
+dval_t *dv_atanh(const dval_t *a) { return dv_math_wrap_unary(&ops_atanh, a); }
+dval_t *dv_abs(const dval_t *a) { return dv_math_wrap_unary(&ops_abs, a); }
+dval_t *dv_erf(const dval_t *a) { return dv_math_wrap_unary(&ops_erf, a); }
+dval_t *dv_erfc(const dval_t *a) { return dv_math_wrap_unary(&ops_erfc, a); }
+dval_t *dv_lgamma(const dval_t *a) { return dv_math_wrap_unary(&ops_lgamma, a); }
+dval_t *dv_hypot(const dval_t *a, const dval_t *b) { return dv_math_wrap_binary(&ops_hypot, a, b); }
+dval_t *dv_erfinv(const dval_t *a) { return dv_math_wrap_unary(&ops_erfinv, a); }
+dval_t *dv_erfcinv(const dval_t *a) { return dv_math_wrap_unary(&ops_erfcinv, a); }
+dval_t *dv_gamma(const dval_t *a) { return dv_math_wrap_unary(&ops_gamma, a); }
+dval_t *dv_digamma(const dval_t *a) { return dv_math_wrap_unary(&ops_digamma, a); }
+dval_t *dv_trigamma(const dval_t *a) { return dv_math_wrap_unary(&ops_trigamma, a); }
+dval_t *dv_lambert_w0(const dval_t *a) { return dv_math_wrap_unary(&ops_lambert_w0, a); }
+dval_t *dv_lambert_wm1(const dval_t *a) { return dv_math_wrap_unary(&ops_lambert_wm1, a); }
+dval_t *dv_normal_pdf(const dval_t *a) { return dv_math_wrap_unary(&ops_normal_pdf, a); }
+dval_t *dv_normal_cdf(const dval_t *a) { return dv_math_wrap_unary(&ops_normal_cdf, a); }
+dval_t *dv_normal_logpdf(const dval_t *a) { return dv_math_wrap_unary(&ops_normal_logpdf, a); }
+dval_t *dv_ei(const dval_t *a) { return dv_math_wrap_unary(&ops_ei, a); }
+dval_t *dv_e1(const dval_t *a) { return dv_math_wrap_unary(&ops_e1, a); }
+dval_t *dv_beta(const dval_t *a, const dval_t *b) { return dv_math_wrap_binary(&ops_beta, a, b); }
+dval_t *dv_logbeta(const dval_t *a, const dval_t *b) { return dv_math_wrap_binary(&ops_logbeta, a, b); }

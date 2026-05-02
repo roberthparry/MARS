@@ -45,7 +45,7 @@ static int reverse_collect_nodes(const dval_t *node,
 
 int dv_eval_derivatives(const dval_t *expr,
                         size_t nvars,
-                        dval_t *const *vars,
+                        const dval_t *const *vars,
                         qfloat_t *value_out,
                         qfloat_t *derivs_out)
 {

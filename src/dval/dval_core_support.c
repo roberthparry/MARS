@@ -48,8 +48,8 @@ static struct _dval_t _DV_ONE_NODE = {
     .var_id = 0
 };
 
-dval_t *DV_ZERO = &_DV_ZERO_NODE;
-dval_t *DV_ONE = &_DV_ONE_NODE;
+const dval_t * const DV_ZERO = &_DV_ZERO_NODE;
+const dval_t * const DV_ONE = &_DV_ONE_NODE;
 
 static uint64_t next_var_id = 1;
 
@@ -404,10 +404,10 @@ const char *dv_default_constant_canonical_name(const char *name)
     return name;
 }
 
-void dv_retain(dval_t *dv)
+void dv_retain(const dval_t *dv)
 {
     if (dv)
-        refcount_inc(&dv->refcount);
+        refcount_inc(&((dval_t *)dv)->refcount);
 }
 
 static void dv_release(dval_t *dv)
