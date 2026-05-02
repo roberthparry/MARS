@@ -102,8 +102,8 @@ static dval_t *parse_addexpr(parser_t *p);
 /* Function dispatch                                                    */
 /* ------------------------------------------------------------------ */
 
-typedef dval_t *(*unary_fn)(dval_t *);
-typedef dval_t *(*binary_fn)(dval_t *, dval_t *);
+typedef dval_t *(*unary_fn)(const dval_t *);
+typedef dval_t *(*binary_fn)(const dval_t *, const dval_t *);
 
 /* ------------------------------------------------------------------ */
 /* Function dispatch                                                   */

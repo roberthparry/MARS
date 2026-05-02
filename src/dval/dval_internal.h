@@ -98,8 +98,8 @@ typedef enum {
     DV_KIND_LOGBETA
 } dval_op_kind_t;
 
-typedef dval_t *(*dval_apply_unary_fn)(dval_t *arg);
-typedef dval_t *(*dval_apply_binary_fn)(dval_t *left, dval_t *right);
+typedef dval_t *(*dval_apply_unary_fn)(const dval_t *arg);
+typedef dval_t *(*dval_apply_binary_fn)(const dval_t *left, const dval_t *right);
 typedef dval_t *(*dval_simplify_fn)(const dval_t *tmpl, dval_t *a, dval_t *b);
 typedef int (*dval_fold_const_unary_fn)(qfloat_t in, qfloat_t *out);
 typedef void (*dval_reverse_fn)(const dval_t *dv, qfloat_t out_bar,
@@ -306,7 +306,7 @@ extern const dval_ops_t ops_e1;
 /* Internal helpers                                                          */
 /* ------------------------------------------------------------------------- */
 
-dval_t *dv_pow_qf(dval_t *a, qfloat_t exponent);
+dval_t *dv_pow_qf(const dval_t *a, qfloat_t exponent);
 dval_t *dv_alloc(const dval_ops_t *ops);
 dval_t *dv_make_const_qc(qcomplex_t x);
 dval_t *dv_make_var_qc(qcomplex_t x);
@@ -314,12 +314,12 @@ qcomplex_t dv_qc_real_qf(qfloat_t x);
 qcomplex_t dv_qc_real_d(double x);
 qcomplex_t dv_eval_qc_internal(const dval_t *dv);
 dval_t *dv_get_dx_internal(const dval_t *dv);
-dval_t *dv_current_wrt_internal(void);
-dval_t *dv_new_unary_internal(const dval_ops_t *ops, dval_t *a);
-dval_t *dv_new_binary_internal(const dval_ops_t *ops, dval_t *a, dval_t *b);
-dval_t *dv_new_pow_d_internal(dval_t *a, double d);
-dval_t *dv_new_pow_qf_internal(dval_t *a, qfloat_t exponent);
-dval_t *dv_new_pow_qc_internal(dval_t *a, qcomplex_t exponent);
+const dval_t *dv_current_wrt_internal(void);
+dval_t *dv_new_unary_internal(const dval_ops_t *ops, const dval_t *a);
+dval_t *dv_new_binary_internal(const dval_ops_t *ops, const dval_t *a, const dval_t *b);
+dval_t *dv_new_pow_d_internal(const dval_t *a, double d);
+dval_t *dv_new_pow_qf_internal(const dval_t *a, qfloat_t exponent);
+dval_t *dv_new_pow_qc_internal(const dval_t *a, qcomplex_t exponent);
 
 static inline int dv_qf_is_zero(qfloat_t x) { return qf_eq(x, QF_ZERO); }
 static inline int dv_qf_is_one(qfloat_t x) { return qf_eq(x, QF_ONE); }
@@ -440,6 +440,6 @@ void dv_reverse_logbeta(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfl
  * Returned node is owning (refcount = 1).
  * Input node is borrowed.
  */
-dval_t *dv_simplify(dval_t *dv);
+dval_t *dv_simplify(const dval_t *dv);
 
 #endif /* DVAL_INTERNAL_H */

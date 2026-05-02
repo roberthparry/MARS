@@ -37,7 +37,7 @@
  * NULL = single-variable / "all variables" mode (original behaviour of
  * dv_get_deriv / dv_create_deriv). This is differentiation context only,
  * not a general thread-safety mechanism for the DAG. */
-static __thread dval_t *tl_wrt = NULL;
+static __thread const dval_t *tl_wrt = NULL;
 
 static inline int qc_is_zero(qcomplex_t z)
 {
@@ -157,7 +157,7 @@ dval_t *dv_get_dx_internal(const dval_t *dv)
     return get_dx(dv);
 }
 
-dval_t *dv_current_wrt_internal(void)
+const dval_t *dv_current_wrt_internal(void)
 {
     return tl_wrt;
 }
@@ -185,11 +185,11 @@ double dv_eval_d(const dval_t *dv)
 /* Public derivative (borrowed)                                              */
 /* ------------------------------------------------------------------------- */
 
-const dval_t *dv_get_deriv(const dval_t *expr, dval_t *wrt)
+const dval_t *dv_get_deriv(const dval_t *expr, const dval_t *wrt)
 {
     if (!expr || !wrt) return NULL;
     if (wrt->ops == &ops_const) return dv_nan_const_shared();
-    dval_t *saved_wrt = tl_wrt;
+    const dval_t *saved_wrt = tl_wrt;
     tl_wrt = wrt;
     const dval_t *result = dv_build_dx((dval_t *)expr);
     tl_wrt = saved_wrt;
@@ -253,41 +253,41 @@ qcomplex_t dv_get_val(const dval_t *dv)
 /* Core node constructors (no retaining here)                                */
 /* ------------------------------------------------------------------------- */
 
-dval_t *dv_new_unary_internal(const dval_ops_t *ops, dval_t *a)
+dval_t *dv_new_unary_internal(const dval_ops_t *ops, const dval_t *a)
 {
     dval_t *dv = dv_alloc(ops);
-    dv->a = a;
+    dv->a = (dval_t *)a;
     return dv;
 }
 
-dval_t *dv_new_binary_internal(const dval_ops_t *ops, dval_t *a, dval_t *b)
+dval_t *dv_new_binary_internal(const dval_ops_t *ops, const dval_t *a, const dval_t *b)
 {
     dval_t *dv = dv_alloc(ops);
-    dv->a = a;
-    dv->b = b;
+    dv->a = (dval_t *)a;
+    dv->b = (dval_t *)b;
     return dv;
 }
 
-dval_t *dv_new_pow_d_internal(dval_t *a, double d)
+dval_t *dv_new_pow_d_internal(const dval_t *a, double d)
 {
     dval_t *dv = dv_alloc(&ops_pow_d);
-    dv->a = a;
+    dv->a = (dval_t *)a;
     dv->c = dv_qc_real_d(d);
     return dv;
 }
 
-dval_t *dv_new_pow_qf_internal(dval_t *a, qfloat_t exponent)
+dval_t *dv_new_pow_qf_internal(const dval_t *a, qfloat_t exponent)
 {
     dval_t *dv = dv_alloc(&ops_pow_d);
-    dv->a = a;
+    dv->a = (dval_t *)a;
     dv->c = dv_qc_real_qf(exponent);
     return dv;
 }
 
-dval_t *dv_new_pow_qc_internal(dval_t *a, qcomplex_t exponent)
+dval_t *dv_new_pow_qc_internal(const dval_t *a, qcomplex_t exponent)
 {
     dval_t *dv = dv_alloc(&ops_pow_d);
-    dv->a = a;
+    dv->a = (dval_t *)a;
     dv->c = exponent;
     return dv;
 }
@@ -306,13 +306,13 @@ int dv_cmp(const dval_t *dv1, const dval_t *dv2) {
 /* Derivative creation (owning)                                              */
 /* ------------------------------------------------------------------------- */
 
-dval_t *dv_create_deriv(dval_t *expr, dval_t *wrt)
+dval_t *dv_create_deriv(const dval_t *expr, const dval_t *wrt)
 {
     if (!expr || !wrt) return NULL;
     if (wrt->ops == &ops_const) return dv_nan_const_shared();
-    dval_t *saved_wrt = tl_wrt;
+    const dval_t *saved_wrt = tl_wrt;
     tl_wrt = wrt;
-    dval_t *raw = dv_build_dx(expr); /* borrowed */
+    dval_t *raw = dv_build_dx((dval_t *)expr); /* borrowed */
     if (!raw) { tl_wrt = saved_wrt; return NULL; }
     dv_retain(raw);                  /* now owning */
     dval_t *simp = dv_simplify(raw);
@@ -321,7 +321,7 @@ dval_t *dv_create_deriv(dval_t *expr, dval_t *wrt)
     return simp;
 }
 
-dval_t *dv_create_2nd_deriv(dval_t *expr, dval_t *wrt1, dval_t *wrt2)
+dval_t *dv_create_2nd_deriv(const dval_t *expr, const dval_t *wrt1, const dval_t *wrt2)
 {
     dval_t *g = dv_create_deriv(expr, wrt1);
     if (!g) return NULL;
@@ -330,7 +330,7 @@ dval_t *dv_create_2nd_deriv(dval_t *expr, dval_t *wrt1, dval_t *wrt2)
     return h;
 }
 
-dval_t *dv_create_3rd_deriv(dval_t *expr, dval_t *wrt1, dval_t *wrt2, dval_t *wrt3)
+dval_t *dv_create_3rd_deriv(const dval_t *expr, const dval_t *wrt1, const dval_t *wrt2, const dval_t *wrt3)
 {
     dval_t *g = dv_create_deriv(expr, wrt1);
     if (!g) return NULL;
@@ -342,14 +342,14 @@ dval_t *dv_create_3rd_deriv(dval_t *expr, dval_t *wrt1, dval_t *wrt2, dval_t *wr
     return k;
 }
 
-dval_t *dv_create_nth_deriv(unsigned int n, dval_t *expr, dval_t *wrt)
+dval_t *dv_create_nth_deriv(unsigned int n, const dval_t *expr, const dval_t *wrt)
 {
-    dval_t *cur = expr;
+    const dval_t *cur = expr;
     while (n--) {
         dval_t *next = dv_create_deriv(cur, wrt);
-        if (cur != expr) dv_free(cur);
+        if (cur != expr) dv_free((dval_t *)cur);
         cur = next;
         if (!cur) break;
     }
-    return cur;
+    return (dval_t *)cur;
 }

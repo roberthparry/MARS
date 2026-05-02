@@ -27,7 +27,7 @@
 #include "dval_internal.h"
 
 /* forward declaration — helpers below call dv_simplify recursively */
-dval_t *dv_simplify(dval_t *dv);
+dval_t *dv_simplify(const dval_t *dv);
 
 static void *dv_xrealloc(void *ptr, size_t size)
 {
@@ -601,11 +601,11 @@ dval_t *dv_simplify_hypot_operator(const dval_t *dv, dval_t *a, dval_t *b)
 /* Main dispatcher                                                            */
 /* ========================================================================= */
 
-dval_t *dv_simplify(dval_t *dv)
+dval_t *dv_simplify(const dval_t *dv)
 {
     if (!dv) return NULL;
 
-    if (dv->ops->arity == DV_OP_ATOM) { dv_retain(dv); return dv; }
+    if (dv->ops->arity == DV_OP_ATOM) { dv_retain(dv); return (dval_t *)dv; }
 
     dval_t *a = dv->a ? dv_simplify(dv->a) : NULL;
     dval_t *b = dv->b ? dv_simplify(dv->b) : NULL;
