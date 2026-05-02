@@ -1,7 +1,7 @@
 # Benchmarks
 
-MARS includes a small set of focused benchmark binaries for symbolic and
-integrator-heavy paths.
+MARS includes a small set of focused benchmark binaries for symbolic,
+integrator-heavy, and arithmetic-core paths.
 
 The sample results in this document were collected on an
 `Intel(R) Core(TM) i7-4510U CPU @ 2.00GHz` laptop, with `4` logical CPUs
@@ -15,6 +15,9 @@ From the repository root:
 ```sh
 make bench_integrator
 make bench_matrix_dval
+make bench_mint_mul
+make bench_mint_div
+make bench_mfloat_math
 ```
 
 As with the test suites, prefer running benchmarks sequentially for now. The
@@ -91,3 +94,50 @@ inverse_dense6x6         avg_µs= 66841.376 avg_ms=    66.841
 These numbers are intended as a rough baseline for the current
 fraction-free symbolic elimination path rather than as a strict performance
 contract.
+
+## Integer and Multiprecision Benchmarks
+
+The repository also includes focused arithmetic benchmarks for the newer
+numeric cores.
+
+### `mint`
+
+Available benchmark targets include:
+
+```sh
+make bench_mint_add
+make bench_mint_mul
+make bench_mint_div
+make bench_mint_gcd
+make bench_mint_combinatorics
+```
+
+These cover the main optimisation areas in the arbitrary-precision integer
+subsystem: small/native-word fast paths, wider multiply/divide behaviour,
+`gcd`/`lcm`/`modinv`, and combinatorics helpers.
+
+### `mfloat`
+
+The native multiprecision floating-point layer now has:
+
+```sh
+make bench_mfloat_math
+```
+
+This benchmark reports direct timings for native `mfloat` math paths such as:
+
+- `exp`
+- `log`
+- `sin`
+- `cos`
+- `atan`
+- `pow`
+- `pi`, `e`, and Euler–Mascheroni construction at higher precision
+
+There is also a compare helper:
+
+```sh
+bench/mfloat/compare_mfloat_math.sh <git-ref>
+```
+
+Use a reference that already contains the `mfloat` subsystem.

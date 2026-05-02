@@ -5,6 +5,9 @@ The project provides per-module test targets.
 ## Run Tests
 
 ```sh
+make test_mint
+make tests/build/release/mfloat/test_mfloat
+tests/build/release/mfloat/test_mfloat
 make test_qfloat
 make test_qcomplex
 make test_dval
@@ -31,6 +34,9 @@ Before committing:
 
 ```sh
 make release
+make test_mint
+make tests/build/release/mfloat/test_mfloat
+tests/build/release/mfloat/test_mfloat
 make test_qfloat
 make test_qcomplex
 make test_dval
@@ -59,6 +65,9 @@ integrator work:
 ```sh
 make bench_integrator
 make bench_matrix_dval
+make bench_mint_mul
+make bench_mint_div
+make bench_mfloat_math
 ```
 
 This benchmark reports both matched symbolic fast paths and nearby fallback

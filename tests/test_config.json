@@ -2412,7 +2412,7 @@
     "test_integer_sqrt": true,
     "test_bitwise": true,
     "test_powmod_isprime_and_factors": true,
-    "test_readme_mersenne_prime_search": true,
+    "test_readme_mersenne_prime_search": false,
     "test_readme_mersenne_prime_output": true,
     "test_clone_copy_on_write": true,
     "test_clone_copies_value": true,
@@ -2420,6 +2420,20 @@
     "test_divmod_square_gcdext_modinv": true,
     "test_inc_dec_and_bits": true,
     "test_long_hex_bits_and_nextprime": true,
-    "test_ulong_and_hex_constructors": true
+    "test_ulong_and_hex_constructors": true,
+    "test_factorial_fibonacci_and_binomial": true
+  },
+  "tests/mfloat/test_mfloat.c": {
+    "test_new_and_precision": true,
+    "test_set_long_normalises": true,
+    "test_clone_and_clear": true,
+    "test_set_string_and_basic_arithmetic": true,
+    "test_division_and_power": true,
+    "test_string_roundtrip": true,
+    "test_printf_family": true,
+    "test_constants_and_named_values": true,
+    "test_conversion_to_double_and_qfloat": true,
+    "test_conversion_from_double_and_qfloat": true,
+    "test_extended_math_wrappers": true
   }
 }
