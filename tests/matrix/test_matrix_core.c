@@ -1,5 +1,14 @@
 #include "test_matrix.h"
 
+/*
+ * The public API now exposes DV_ZERO / DV_ONE as read-only immortal nodes.
+ * Matrix fixture builders in this file still pass borrowed symbolic constants
+ * through mutable dval_t * slots, so cast locally in tests rather than
+ * weakening the API constness.
+ */
+#define DV_ZERO ((dval_t *)DV_ZERO)
+#define DV_ONE  ((dval_t *)DV_ONE)
+
 static void test_creation(void)
 {
     printf(C_CYAN "TEST: creation of all matrix types\n" C_RESET);

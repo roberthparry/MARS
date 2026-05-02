@@ -1,5 +1,13 @@
 #include "test_matrix.h"
 
+/*
+ * DV_ZERO / DV_ONE are read-only immortal nodes in the public API now.
+ * These matrix test fixtures still pass them through mutable dval_t * arrays,
+ * so cast locally here instead of weakening library constness.
+ */
+#define DV_ZERO ((dval_t *)DV_ZERO)
+#define DV_ONE  ((dval_t *)DV_ONE)
+
 static void test_eigen_d(void)
 {
     printf(C_CYAN "TEST: eigendecomposition (double)\n" C_RESET);
