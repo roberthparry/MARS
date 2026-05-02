@@ -29,6 +29,7 @@
 #define QFLOAT_H
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdarg.h>
 
 /**
@@ -933,4 +934,3 @@ qfloat_t qf_e1(qfloat_t x);
 
 
 #endif /* QFLOAT_H */
-
