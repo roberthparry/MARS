@@ -147,7 +147,7 @@ int main(void) {
 ) | Δ = 1.5, Ω = 0.25 }
 ```
 
-**Searching for Mersenne primes with `mint_t` up to `p = 4423`:**
+**Searching for Mersenne primes with `mint_t` up to `p = 19937`:**
 
 ```c
 #include <stdio.h>
@@ -157,7 +157,7 @@ int main(void) {
     unsigned found = 0;
     unsigned p;
 
-    for (p = 2; p <= 4423; ++p) {
+    for (p = 2; p <= 19937; ++p) {
         mint_t *exp = mint_create_long((long)p);
         mint_t *mersenne = NULL;
         mint_t *minus_one = mint_create_long(-1);
@@ -209,6 +209,7 @@ M_13   is prime    M_17   is prime    M_19   is prime    M_31   is prime
 M_61   is prime    M_89   is prime    M_107  is prime    M_127  is prime
 M_521  is prime    M_607  is prime    M_1279 is prime    M_2203 is prime
 M_2281 is prime    M_3217 is prime    M_4253 is prime    M_4423 is prime
+M_9689 is prime    M_9941 is prime    M_11213 is prime   M_19937 is prime
 ```
 
 ## Modules
