@@ -195,7 +195,7 @@ static int mf_parse_fixed_components(const char *text,
     return 0;
 }
 
-static char *mf_build_scientific(const char *fixed, int uppercase)
+static char *mf_build_scientific(const char *fixed, int uppercase, int precision)
 {
     int negative;
     char *digits = NULL;
@@ -215,8 +215,11 @@ static char *mf_build_scientific(const char *fixed, int uppercase)
     digits_len = strlen(digits);
     {
         int nd = (int)digits_len;
+        int sig_digits = precision >= 0 ? (precision + 1) : MF_PRINT_SIG_DIGITS;
 
-        mf_limit_significant_digits(digits, &nd, &fixed_dp, MF_PRINT_SIG_DIGITS);
+        if (sig_digits < 1)
+            sig_digits = 1;
+        mf_limit_significant_digits(digits, &nd, &fixed_dp, sig_digits);
         digits_len = strlen(digits);
     }
     while (digits_len > 1u && digits[digits_len - 1u] == '0') {
@@ -470,7 +473,7 @@ int mf_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap)
                     char *fixed = mf_to_string(x);
 
                     if (fixed) {
-                        core = mf_build_scientific(fixed, 1);
+                        core = mf_build_scientific(fixed, 1, precision);
                         free(fixed);
                     }
                 } else {

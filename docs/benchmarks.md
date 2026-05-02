@@ -17,7 +17,7 @@ make bench_integrator
 make bench_matrix_dval
 make bench_mint_mul
 make bench_mint_div
-make bench_mfloat_math
+make bench_mfloat_maths
 ```
 
 As with the test suites, prefer running benchmarks sequentially for now. The
@@ -121,7 +121,7 @@ subsystem: small/native-word fast paths, wider multiply/divide behaviour,
 The native multiprecision floating-point layer now has:
 
 ```sh
-make bench_mfloat_math
+make bench_mfloat_maths
 ```
 
 This benchmark reports direct timings for native `mfloat` math paths such as:
@@ -137,7 +137,7 @@ This benchmark reports direct timings for native `mfloat` math paths such as:
 There is also a compare helper:
 
 ```sh
-bench/mfloat/compare_mfloat_math.sh <git-ref>
+bench/mfloat/compare_mfloat_maths.sh <git-ref>
 ```
 
 Use a reference that already contains the `mfloat` subsystem.

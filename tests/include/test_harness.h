@@ -88,7 +88,8 @@ static inline void th_print_time(double ms) {
 #define ASSERT_TRUE(expr)                                               \
     do {                                                                \
         if (!(expr)) {                                                  \
-            printf(C_RED "    Assertion failed: %s\n" C_RESET, #expr);  \
+            printf(C_RED "    Assertion failed at %s:%d: %s\n" C_RESET, \
+                   __FILE__, __LINE__, #expr);                          \
             TEST_FAIL();                                                \
             continue;                                                   \
         }                                                               \

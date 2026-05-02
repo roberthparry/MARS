@@ -94,21 +94,22 @@ static void bench_solve_3x3(int iters)
     dval_t *c = dv_new_named_var_d(6.0, "c");
     dval_t *u = dv_new_named_var_d(2.0, "u");
     dval_t *v = dv_new_named_var_d(3.0, "v");
+    dval_t *zero = dv_new_const_d(0.0);
     dval_t *one = dv_new_const_d(1.0);
     dval_t *two = dv_new_const_d(2.0);
     dval_t *three = dv_new_const_d(3.0);
     dval_t *four = dv_new_const_d(4.0);
     dval_t *A_vals[9] = {
-        a,    one,  DV_ZERO,
+        a,    one,  zero,
         one,  b,    one,
-        DV_ZERO, one, c
+        zero, one, c
     };
     dval_t *X_vals[6] = {
         u,    one,
         two,  v,
         three, four
     };
-    dval_t *owned[] = { a, b, c, u, v, one, two, three, four };
+    dval_t *owned[] = { a, b, c, u, v, zero, one, two, three, four };
     matrix_t *A = mat_create_dv(3, 3, A_vals);
     matrix_t *X_expected = mat_create_dv(3, 2, X_vals);
     matrix_t *B = mat_mul(A, X_expected);
@@ -131,6 +132,7 @@ static void bench_solve_6x6(int iters)
     dval_t *f = dv_new_named_var_d(10.0, "f");
     dval_t *u = dv_new_named_var_d(11.0, "u");
     dval_t *v = dv_new_named_var_d(13.0, "v");
+    dval_t *zero = dv_new_const_d(0.0);
     dval_t *one = dv_new_const_d(1.0);
     dval_t *two = dv_new_const_d(2.0);
     dval_t *three = dv_new_const_d(3.0);
@@ -139,12 +141,12 @@ static void bench_solve_6x6(int iters)
     dval_t *six = dv_new_const_d(6.0);
     dval_t *seven = dv_new_const_d(7.0);
     dval_t *A_vals[36] = {
-        a,    one,  two,  DV_ZERO, DV_ZERO, DV_ZERO,
-        one,  b,    one,  DV_ZERO, DV_ZERO, DV_ZERO,
-        two,  one,  c,    one,     DV_ZERO, DV_ZERO,
-        DV_ZERO, DV_ZERO, one,  d,    one,  two,
-        DV_ZERO, DV_ZERO, DV_ZERO, one,  e,    one,
-        DV_ZERO, DV_ZERO, DV_ZERO, two,  one,  f
+        a,    one,  two,  zero, zero, zero,
+        one,  b,    one,  zero, zero, zero,
+        two,  one,  c,    one,  zero, zero,
+        zero, zero, one,  d,    one,  two,
+        zero, zero, zero, one,  e,    one,
+        zero, zero, zero, two,  one,  f
     };
     dval_t *X_vals[12] = {
         u,     one,
@@ -155,7 +157,7 @@ static void bench_solve_6x6(int iters)
         six,   seven
     };
     dval_t *owned[] = {
-        a, b, c, d, e, f, u, v, one, two, three, four, five, six, seven
+        a, b, c, d, e, f, u, v, zero, one, two, three, four, five, six, seven
     };
     matrix_t *A = mat_create_dv(6, 6, A_vals);
     matrix_t *X_expected = mat_create_dv(6, 2, X_vals);
@@ -175,14 +177,15 @@ static void bench_inverse_4x4(int iters)
     dval_t *v = dv_new_named_var_d(6.0, "v");
     dval_t *w = dv_new_named_var_d(7.0, "w");
     dval_t *t = dv_new_named_var_d(8.0, "t");
+    dval_t *zero = dv_new_const_d(0.0);
     dval_t *one = dv_new_const_d(1.0);
     dval_t *two = dv_new_const_d(2.0);
-    dval_t *owned[] = { u, v, w, t, one, two };
+    dval_t *owned[] = { u, v, w, t, zero, one, two };
     dval_t *vals[16] = {
-        u,    one, DV_ZERO, two,
-        one,  v,   one,     DV_ZERO,
-        DV_ZERO, one, w,    one,
-        two,  DV_ZERO, one, t
+        u,    one, zero, two,
+        one,  v,   one,  zero,
+        zero, one, w,    one,
+        two,  zero, one, t
     };
     matrix_t *A = mat_create_dv(4, 4, vals);
 
@@ -200,16 +203,17 @@ static void bench_inverse_6x6(int iters)
     dval_t *d = dv_new_named_var_d(8.0, "d");
     dval_t *e = dv_new_named_var_d(9.0, "e");
     dval_t *f = dv_new_named_var_d(10.0, "f");
+    dval_t *zero = dv_new_const_d(0.0);
     dval_t *one = dv_new_const_d(1.0);
     dval_t *two = dv_new_const_d(2.0);
-    dval_t *owned[] = { a, b, c, d, e, f, one, two };
+    dval_t *owned[] = { a, b, c, d, e, f, zero, one, two };
     dval_t *vals[36] = {
-        a,    one,  two,  DV_ZERO, DV_ZERO, DV_ZERO,
-        one,  b,    one,  DV_ZERO, DV_ZERO, DV_ZERO,
-        two,  one,  c,    one,     DV_ZERO, DV_ZERO,
-        DV_ZERO, DV_ZERO, one,  d,    one,  two,
-        DV_ZERO, DV_ZERO, DV_ZERO, one,  e,    one,
-        DV_ZERO, DV_ZERO, DV_ZERO, two,  one,  f
+        a,    one,  two,  zero, zero, zero,
+        one,  b,    one,  zero, zero, zero,
+        two,  one,  c,    one,  zero, zero,
+        zero, zero, one,  d,    one,  two,
+        zero, zero, zero, one,  e,    one,
+        zero, zero, zero, two,  one,  f
     };
     matrix_t *A = mat_create_dv(6, 6, vals);
 

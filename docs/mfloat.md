@@ -151,13 +151,13 @@ Recent work has improved both speed and precision in the native math layer:
 There is now a dedicated `mfloat` benchmark binary:
 
 ```sh
-make bench_mfloat_math
+make bench_mfloat_maths
 ```
 
 and a compare helper:
 
 ```sh
-bench/mfloat/compare_mfloat_math.sh <git-ref>
+bench/mfloat/compare_mfloat_maths.sh <git-ref>
 ```
 
 The compare helper expects a reference that already contains the `mfloat`
@@ -178,7 +178,7 @@ tests/build/release/mfloat/test_mfloat
 
 - `mfloat_core.c`
 - `mfloat_arith.c`
-- `mfloat_math.c`
+- `mfloat_maths.c`
 - `mfloat_string.c`
 - `mfloat_print.c`
 

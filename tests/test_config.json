@@ -2079,7 +2079,7 @@
       "test_div_d": true
     }
   },
-  "tests/dval/test_dval_unary_math.c": {
+  "tests/dval/test_dval_unary_maths.c": {
     "test_maths_functions": {
       "enabled": true,
       "test_sin": true,

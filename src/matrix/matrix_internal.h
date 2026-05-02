@@ -199,7 +199,7 @@ static inline const struct elem_vtable *elem_of(const struct matrix_t *A) {
 }
 
 /* ============================================================
-   Schur decomposition API (internal use by matrix_math.c)
+   Schur decomposition API (internal use by matrix_maths.c)
    ============================================================ */
 
 /**

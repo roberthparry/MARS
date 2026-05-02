@@ -254,7 +254,7 @@ make bench_integrator
 make bench_matrix_dval
 make bench_mint_mul
 make bench_mint_div
-make bench_mfloat_math
+make bench_mfloat_maths
 ```
 
 See [`docs/building.md`](docs/building.md) for benchmark and build details.
