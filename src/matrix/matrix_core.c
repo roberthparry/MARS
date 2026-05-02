@@ -103,14 +103,14 @@ static bool dval_is_exact_zero(const dval_t *dv)
     return !dv || dv_is_exact_zero(dv);
 }
 
-static dval_t *dval_clone_for_storage(dval_t *dv)
+static dval_t *dval_clone_for_storage(const dval_t *dv)
 {
     if (!dv)
         return NULL;
     if (dv == DV_ZERO || dv == DV_ONE)
         return dv_new_const_qc(dv_get_val(dv));
     dv_retain(dv);
-    return dv;
+    return (dval_t *)dv;
 }
 
 static matrix_t *mat_finalize_symbolic_result(matrix_t *A)
@@ -206,19 +206,19 @@ static dval_t *dval_simplify_owned(dval_t *dv)
     return simp;
 }
 
-static dval_t *dval_div_simplify(dval_t *num, dval_t *den)
+static dval_t *dval_div_simplify(const dval_t *num, const dval_t *den)
 {
     dval_t *raw;
 
     if (!num || !den) {
-        dv_free(num);
-        dv_free(den);
+        dv_free((dval_t *)num);
+        dv_free((dval_t *)den);
         return NULL;
     }
 
     raw = dv_div(num, den);
-    dv_free(num);
-    dv_free(den);
+    dv_free((dval_t *)num);
+    dv_free((dval_t *)den);
     if (!raw)
         return NULL;
 
@@ -268,57 +268,57 @@ static int mat_simplify_symbolic_inplace(matrix_t *A)
     return 0;
 }
 
-static dval_t *dval_mul_simplify(dval_t *a, dval_t *b)
+static dval_t *dval_mul_simplify(const dval_t *a, const dval_t *b)
 {
     dval_t *raw;
 
     if (!a || !b) {
-        dv_free(a);
-        dv_free(b);
+        dv_free((dval_t *)a);
+        dv_free((dval_t *)b);
         return NULL;
     }
 
     raw = dv_mul(a, b);
-    dv_free(a);
-    dv_free(b);
+    dv_free((dval_t *)a);
+    dv_free((dval_t *)b);
     if (!raw)
         return NULL;
 
     return dval_simplify_owned(raw);
 }
 
-static dval_t *dval_add_simplify(dval_t *a, dval_t *b)
+static dval_t *dval_add_simplify(const dval_t *a, const dval_t *b)
 {
     dval_t *raw;
 
     if (!a || !b) {
-        dv_free(a);
-        dv_free(b);
+        dv_free((dval_t *)a);
+        dv_free((dval_t *)b);
         return NULL;
     }
 
     raw = dv_add(a, b);
-    dv_free(a);
-    dv_free(b);
+    dv_free((dval_t *)a);
+    dv_free((dval_t *)b);
     if (!raw)
         return NULL;
 
     return dval_simplify_owned(raw);
 }
 
-static dval_t *dval_sub_simplify(dval_t *a, dval_t *b)
+static dval_t *dval_sub_simplify(const dval_t *a, const dval_t *b)
 {
     dval_t *raw;
 
     if (!a || !b) {
-        dv_free(a);
-        dv_free(b);
+        dv_free((dval_t *)a);
+        dv_free((dval_t *)b);
         return NULL;
     }
 
     raw = dv_sub(a, b);
-    dv_free(a);
-    dv_free(b);
+    dv_free((dval_t *)a);
+    dv_free((dval_t *)b);
     if (!raw)
         return NULL;
 
@@ -349,7 +349,7 @@ static matrix_t *mat_create_direct_solve_result(const matrix_t *A,
                                                 const matrix_t *B,
                                                 const struct elem_vtable *elem);
 
-static dval_t *mat_get_dval_or_zero(const matrix_t *A, size_t i, size_t j)
+static const dval_t *mat_get_dval_or_zero(const matrix_t *A, size_t i, size_t j)
 {
     dval_t *v = NULL;
 
@@ -398,10 +398,10 @@ static int mat_eigenvalues_dval(const matrix_t *A, dval_t **eigenvalues)
     }
 
     if (A->rows == 2) {
-        dval_t *a = mat_get_dval_or_zero(A, 0, 0);
-        dval_t *b = mat_get_dval_or_zero(A, 0, 1);
-        dval_t *c = mat_get_dval_or_zero(A, 1, 0);
-        dval_t *d = mat_get_dval_or_zero(A, 1, 1);
+        const dval_t *a = mat_get_dval_or_zero(A, 0, 0);
+        const dval_t *b = mat_get_dval_or_zero(A, 0, 1);
+        const dval_t *c = mat_get_dval_or_zero(A, 1, 0);
+        const dval_t *d = mat_get_dval_or_zero(A, 1, 1);
         dval_t *sum = NULL, *diff = NULL, *diff2 = NULL;
         dval_t *bc = NULL, *scaled_bc = NULL, *disc = NULL, *root = NULL;
         dval_t *plus = NULL, *minus = NULL, *half = NULL;
@@ -494,10 +494,10 @@ static int mat_eigenvalues_dval(const matrix_t *A, dval_t **eigenvalues)
         return 0;
 
 fail_2x2:
-        dv_free(a);
-        dv_free(b);
-        dv_free(c);
-        dv_free(d);
+        dv_free((dval_t *)a);
+        dv_free((dval_t *)b);
+        dv_free((dval_t *)c);
+        dv_free((dval_t *)d);
         dv_free(sum);
         dv_free(diff);
         dv_free(diff2);
@@ -546,7 +546,7 @@ static matrix_t *mat_eigenvectors_dval_triangular(const matrix_t *A)
 
     if (upper) {
         for (size_t k = 0; k < A->rows; ++k) {
-            dval_t *lambda = mat_get_dval_or_zero(A, k, k);
+            const dval_t *lambda = mat_get_dval_or_zero(A, k, k);
 
             for (size_t ii = k; ii-- > 0;) {
                 dval_t *sum = dv_new_const(QF_ZERO);
@@ -557,8 +557,8 @@ static matrix_t *mat_eigenvectors_dval_triangular(const matrix_t *A)
                     goto fail;
 
                 for (size_t j = ii + 1; j <= k; ++j) {
-                    dval_t *aij = mat_get_dval_or_zero(A, ii, j);
-                    dval_t *xjk = mat_get_dval_or_zero(V, j, k);
+                    const dval_t *aij = mat_get_dval_or_zero(A, ii, j);
+                    const dval_t *xjk = mat_get_dval_or_zero(V, j, k);
                     dval_t *term;
 
                     dv_retain(aij);
@@ -570,14 +570,14 @@ static matrix_t *mat_eigenvectors_dval_triangular(const matrix_t *A)
                 }
 
                 {
-                    dval_t *diag = mat_get_dval_or_zero(A, ii, ii);
+                    const dval_t *diag = mat_get_dval_or_zero(A, ii, ii);
 
                     dv_retain(diag);
                     dv_retain(lambda);
                     denom = dval_sub_simplify(diag, lambda);
                 }
                 if (!denom) {
-                    dv_free(sum);
+                    dv_free((dval_t *)sum);
                     goto fail;
                 }
 
@@ -587,7 +587,7 @@ static matrix_t *mat_eigenvectors_dval_triangular(const matrix_t *A)
                         dv_free(sum);
                         continue;
                     }
-                    dv_free(sum);
+                    dv_free((dval_t *)sum);
                     goto fail;
                 }
 
@@ -608,7 +608,7 @@ static matrix_t *mat_eigenvectors_dval_triangular(const matrix_t *A)
         }
     } else {
         for (size_t k = 0; k < A->rows; ++k) {
-            dval_t *lambda = mat_get_dval_or_zero(A, k, k);
+            const dval_t *lambda = mat_get_dval_or_zero(A, k, k);
 
             for (size_t i = k + 1; i < A->rows; ++i) {
                 dval_t *sum = dv_new_const(QF_ZERO);
@@ -619,8 +619,8 @@ static matrix_t *mat_eigenvectors_dval_triangular(const matrix_t *A)
                     goto fail;
 
                 for (size_t j = k; j < i; ++j) {
-                    dval_t *aij = mat_get_dval_or_zero(A, i, j);
-                    dval_t *xjk = mat_get_dval_or_zero(V, j, k);
+                    const dval_t *aij = mat_get_dval_or_zero(A, i, j);
+                    const dval_t *xjk = mat_get_dval_or_zero(V, j, k);
                     dval_t *term;
 
                     dv_retain(aij);
@@ -632,14 +632,14 @@ static matrix_t *mat_eigenvectors_dval_triangular(const matrix_t *A)
                 }
 
                 {
-                    dval_t *diag = mat_get_dval_or_zero(A, i, i);
+                    const dval_t *diag = mat_get_dval_or_zero(A, i, i);
 
                     dv_retain(diag);
                     dv_retain(lambda);
                     denom = dval_sub_simplify(diag, lambda);
                 }
                 if (!denom) {
-                    dv_free(sum);
+                    dv_free((dval_t *)sum);
                     goto fail;
                 }
 
@@ -649,7 +649,7 @@ static matrix_t *mat_eigenvectors_dval_triangular(const matrix_t *A)
                         dv_free(sum);
                         continue;
                     }
-                    dv_free(sum);
+                    dv_free((dval_t *)sum);
                     goto fail;
                 }
 
@@ -682,10 +682,10 @@ static matrix_t *mat_eigenvectors_dval_2x2(const matrix_t *A, dval_t **eigenvalu
     matrix_t *V;
     dval_t *local_ev[2] = {NULL, NULL};
     dval_t **ev = eigenvalues ? eigenvalues : local_ev;
-    dval_t *a;
-    dval_t *b;
-    dval_t *c;
-    dval_t *d;
+    const dval_t *a;
+    const dval_t *b;
+    const dval_t *c;
+    const dval_t *d;
 
     if (!A || A->rows != 2 || A->cols != 2)
         return NULL;
@@ -725,9 +725,9 @@ static matrix_t *mat_eigenvectors_dval_2x2(const matrix_t *A, dval_t **eigenvalu
         dv_retain(lambda);
         p = dval_sub_simplify(a, lambda);
         dv_retain(b);
-        q = dval_simplify_owned(b);
+        q = dval_clone_for_storage(b);
         dv_retain(c);
-        r = dval_simplify_owned(c);
+        r = dval_clone_for_storage(c);
         dv_retain(d);
         dv_retain(lambda);
         s = dval_sub_simplify(d, lambda);
@@ -859,13 +859,13 @@ static matrix_t *mat_solve_dval_diagonal_exact(const matrix_t *A, const matrix_t
         return NULL;
 
     for (size_t i = 0; i < A->rows; ++i) {
-        dval_t *diag = mat_get_dval_or_zero(A, i, i);
+        const dval_t *diag = mat_get_dval_or_zero(A, i, i);
 
         if (!diag || dv_is_exact_zero(diag))
             goto fail;
 
         for (size_t j = 0; j < B->cols; ++j) {
-            dval_t *rhs = mat_get_dval_or_zero(B, i, j);
+            const dval_t *rhs = mat_get_dval_or_zero(B, i, j);
             dval_t *out = NULL;
 
             dv_retain(rhs);
@@ -947,10 +947,10 @@ static int mat_fraction_free_eliminate_dval(matrix_t *M,
 
     for (size_t k = 0; k + 1 < n; ++k) {
         size_t pivot_row = n;
-        dval_t *pivot = NULL;
+        const dval_t *pivot = NULL;
 
         for (size_t i = k; i < n; ++i) {
-            dval_t *candidate = mat_get_dval_or_zero(M, i, k);
+            const dval_t *candidate = mat_get_dval_or_zero(M, i, k);
             if (!dval_is_exact_zero(candidate)) {
                 pivot_row = i;
                 break;
@@ -972,17 +972,17 @@ static int mat_fraction_free_eliminate_dval(matrix_t *M,
             return 1;
 
         for (size_t i = k + 1; i < n; ++i) {
-            dval_t *aik = mat_get_dval_or_zero(M, i, k);
+            const dval_t *aik = mat_get_dval_or_zero(M, i, k);
 
             if (!aik || dval_is_exact_zero(aik)) {
-                dval_t *zero = DV_ZERO;
+                const dval_t *zero = DV_ZERO;
                 mat_set(M, i, k, &zero);
                 continue;
             }
 
             for (size_t j = k + 1; j < n; ++j) {
-                dval_t *aij = mat_get_dval_or_zero(M, i, j);
-                dval_t *akj = mat_get_dval_or_zero(M, k, j);
+                const dval_t *aij = mat_get_dval_or_zero(M, i, j);
+                const dval_t *akj = mat_get_dval_or_zero(M, k, j);
                 dval_t *next = dval_bareiss_update_simplify(aij, pivot,
                                                             aik, akj,
                                                             prev_pivot,
@@ -996,8 +996,8 @@ static int mat_fraction_free_eliminate_dval(matrix_t *M,
 
             if (RHS) {
                 for (size_t j = 0; j < RHS->cols; ++j) {
-                    dval_t *bij = mat_get_dval_or_zero(RHS, i, j);
-                    dval_t *bkj = mat_get_dval_or_zero(RHS, k, j);
+                    const dval_t *bij = mat_get_dval_or_zero(RHS, i, j);
+                    const dval_t *bkj = mat_get_dval_or_zero(RHS, k, j);
                     dval_t *next = dval_bareiss_update_simplify(bij, pivot,
                                                                 aik, bkj,
                                                                 prev_pivot,
@@ -1011,7 +1011,7 @@ static int mat_fraction_free_eliminate_dval(matrix_t *M,
             }
 
             {
-                dval_t *zero = DV_ZERO;
+                const dval_t *zero = DV_ZERO;
                 mat_set(M, i, k, &zero);
             }
         }
@@ -1037,20 +1037,20 @@ static matrix_t *mat_forward_substitute_dval_exact(const matrix_t *L,
         return NULL;
 
     for (size_t i = 0; i < L->rows; ++i) {
-        dval_t *diag = mat_get_dval_or_zero(L, i, i);
+        const dval_t *diag = mat_get_dval_or_zero(L, i, i);
 
         if (!diag || dv_is_exact_zero(diag))
             goto fail;
 
         for (size_t j = 0; j < B->cols; ++j) {
-            dval_t *sum = mat_get_dval_or_zero(B, i, j);
+            const dval_t *sum = mat_get_dval_or_zero(B, i, j);
             dval_t *out = NULL;
 
             dv_retain(sum);
 
             for (size_t k = 0; k < i; ++k) {
-                dval_t *a = mat_get_dval_or_zero(L, i, k);
-                dval_t *x = mat_get_dval_or_zero(X, k, j);
+                const dval_t *a = mat_get_dval_or_zero(L, i, k);
+                const dval_t *x = mat_get_dval_or_zero(X, k, j);
                 dval_t *prod = NULL;
                 dval_t *new_sum = NULL;
 
@@ -1058,7 +1058,7 @@ static matrix_t *mat_forward_substitute_dval_exact(const matrix_t *L,
                 dv_retain(x);
                 prod = dval_mul_simplify(a, x);
                 if (!prod) {
-                    dv_free(sum);
+                    dv_free((dval_t *)sum);
                     goto fail;
                 }
 
@@ -1097,20 +1097,20 @@ static matrix_t *mat_backward_substitute_dval_exact(const matrix_t *U,
         return NULL;
 
     for (size_t ii = U->rows; ii-- > 0;) {
-        dval_t *diag = mat_get_dval_or_zero(U, ii, ii);
+        const dval_t *diag = mat_get_dval_or_zero(U, ii, ii);
 
         if (!diag || dv_is_exact_zero(diag))
             goto fail;
 
         for (size_t j = 0; j < B->cols; ++j) {
-            dval_t *sum = mat_get_dval_or_zero(B, ii, j);
+            const dval_t *sum = mat_get_dval_or_zero(B, ii, j);
             dval_t *out = NULL;
 
             dv_retain(sum);
 
             for (size_t k = ii + 1; k < U->cols; ++k) {
-                dval_t *a = mat_get_dval_or_zero(U, ii, k);
-                dval_t *x = mat_get_dval_or_zero(X, k, j);
+                const dval_t *a = mat_get_dval_or_zero(U, ii, k);
+                const dval_t *x = mat_get_dval_or_zero(X, k, j);
                 dval_t *prod = NULL;
                 dval_t *new_sum = NULL;
 
@@ -1118,7 +1118,7 @@ static matrix_t *mat_backward_substitute_dval_exact(const matrix_t *U,
                 dv_retain(x);
                 prod = dval_mul_simplify(a, x);
                 if (!prod) {
-                    dv_free(sum);
+                    dv_free((dval_t *)sum);
                     goto fail;
                 }
 
@@ -1161,11 +1161,11 @@ static matrix_t *mat_solve_dval_dense_exact(const matrix_t *A, const matrix_t *B
 
     for (size_t i = 0; i < n; ++i) {
         for (size_t j = 0; j < n; ++j) {
-            dval_t *v = mat_get_dval_or_zero(A, i, j);
+            const dval_t *v = mat_get_dval_or_zero(A, i, j);
             mat_set(M, i, j, &v);
         }
         for (size_t j = 0; j < B->cols; ++j) {
-            dval_t *v = mat_get_dval_or_zero(B, i, j);
+            const dval_t *v = mat_get_dval_or_zero(B, i, j);
             mat_set(X, i, j, &v);
         }
     }
@@ -1174,20 +1174,20 @@ static matrix_t *mat_solve_dval_dense_exact(const matrix_t *A, const matrix_t *B
         goto fail;
 
     for (size_t ii = n; ii-- > 0;) {
-        dval_t *diag = mat_get_dval_or_zero(M, ii, ii);
+        const dval_t *diag = mat_get_dval_or_zero(M, ii, ii);
 
         if (!diag || dval_is_exact_zero(diag))
             goto fail;
 
         for (size_t j = 0; j < X->cols; ++j) {
-            dval_t *sum = mat_get_dval_or_zero(X, ii, j);
+            const dval_t *sum = mat_get_dval_or_zero(X, ii, j);
             dval_t *out = NULL;
 
             dv_retain(sum);
 
             for (size_t k = ii + 1; k < n; ++k) {
-                dval_t *uik = mat_get_dval_or_zero(M, ii, k);
-                dval_t *xkj = mat_get_dval_or_zero(X, k, j);
+                const dval_t *uik = mat_get_dval_or_zero(M, ii, k);
+                const dval_t *xkj = mat_get_dval_or_zero(X, k, j);
                 dval_t *prod = NULL;
                 dval_t *new_sum = NULL;
 
@@ -1195,7 +1195,7 @@ static matrix_t *mat_solve_dval_dense_exact(const matrix_t *A, const matrix_t *B
                 dv_retain(xkj);
                 prod = dval_mul_simplify(uik, xkj);
                 if (!prod) {
-                    dv_free(sum);
+                    dv_free((dval_t *)sum);
                     goto fail;
                 }
 
@@ -1432,7 +1432,7 @@ static int mat_det_dval_exact(const matrix_t *A, dval_t **determinant)
 {
     matrix_t *M = NULL;
     dval_t *det = NULL;
-    dval_t *prev_pivot = DV_ONE;
+    const dval_t *prev_pivot = DV_ONE;
     bool negate = false;
     size_t n;
 
@@ -1450,7 +1450,7 @@ static int mat_det_dval_exact(const matrix_t *A, dval_t **determinant)
     if (n == 1) {
         mat_get(A, 0, 0, &det);
         if (!det)
-            det = DV_ZERO;
+            det = (dval_t *)DV_ZERO;
         dv_retain(det);
         *determinant = dval_simplify_owned(det);
         return *determinant ? 0 : -3;
@@ -1539,7 +1539,7 @@ static int mat_det_dval_exact(const matrix_t *A, dval_t **determinant)
             }
 
             {
-                dval_t *zero = DV_ZERO;
+                const dval_t *zero = DV_ZERO;
                 mat_set(M, i, k, &zero);
             }
         }
@@ -1549,7 +1549,7 @@ static int mat_det_dval_exact(const matrix_t *A, dval_t **determinant)
 
     mat_get(M, n - 1, n - 1, &det);
     if (!det)
-        det = DV_ZERO;
+        det = (dval_t *)DV_ZERO;
 
     if (negate) {
         dval_t *raw = dv_neg(det);
@@ -1710,7 +1710,7 @@ static matrix_t *mat_create_zero_with_elem(size_t rows, size_t cols,
     for (size_t i = 0; i < rows; ++i) {
         for (size_t j = 0; j < cols; ++j) {
             if (elem->kind == ELEM_DVAL) {
-                dval_t *zero = DV_ZERO;
+                const dval_t *zero = DV_ZERO;
                 mat_set(M, i, j, &zero);
             } else {
                 mat_set(M, i, j, elem->zero);
@@ -1908,7 +1908,7 @@ static matrix_t *mat_charpoly_dval(const matrix_t *A)
         goto fail;
 
     {
-        dval_t *one = DV_ONE;
+        const dval_t *one = DV_ONE;
         mat_set(coeffs, 0, 0, &one);
     }
 
@@ -1924,7 +1924,7 @@ static matrix_t *mat_charpoly_dval(const matrix_t *A)
             goto fail;
 
         for (size_t i = 0; i < A->rows; ++i) {
-            dval_t *diag = mat_get_dval_or_zero(T, i, i);
+            const dval_t *diag = mat_get_dval_or_zero(T, i, i);
             dval_t *new_diag;
 
             dv_retain(diag);
@@ -2075,7 +2075,7 @@ static matrix_t *mat_const_identity_with_elem(size_t n,
     return I;
 }
 
-static matrix_t *mat_shift_dval_exact(const matrix_t *A, dval_t *lambda)
+static matrix_t *mat_shift_dval_exact(const matrix_t *A, const dval_t *lambda)
 {
     matrix_t *Shifted = NULL;
 
@@ -2092,7 +2092,7 @@ static matrix_t *mat_shift_dval_exact(const matrix_t *A, dval_t *lambda)
 
         mat_get(Shifted, i, i, &diag);
         if (!diag)
-            diag = DV_ZERO;
+            diag = (dval_t *)DV_ZERO;
 
         dv_retain(diag);
         dv_retain(lambda);
@@ -2126,7 +2126,7 @@ static int mat_dval_nullity_exact(const matrix_t *A)
 }
 
 static size_t mat_dval_triangular_root_exponent(const matrix_t *A,
-                                                dval_t *lambda,
+                                                const dval_t *lambda,
                                                 size_t multiplicity)
 {
     matrix_t *Shifted = NULL;
@@ -2339,7 +2339,7 @@ static matrix_t *mat_dval_build_pivot_factor(const matrix_t *A,
         return NULL;
 
     for (size_t k = 0; k < info->rank; ++k) {
-        dval_t *one = DV_ONE;
+        const dval_t *one = DV_ONE;
         mat_set(F, k, info->pivot_cols[k], &one);
     }
 
@@ -2392,7 +2392,7 @@ static matrix_t *mat_minpoly_dval(const matrix_t *A)
             goto fail;
 
         for (size_t i = 0; i < A->rows; ++i) {
-            dval_t *diag = mat_get_dval_or_zero(A, i, i);
+            const dval_t *diag = mat_get_dval_or_zero(A, i, i);
             size_t idx = 0;
 
             while (idx < root_count && !dval_exprs_equal_exact(roots[idx], diag))
@@ -2403,7 +2403,7 @@ static matrix_t *mat_minpoly_dval(const matrix_t *A)
                 size_t exponent = 0;
 
                 for (size_t j = 0; j < A->rows; ++j) {
-                    dval_t *other = mat_get_dval_or_zero(A, j, j);
+                    const dval_t *other = mat_get_dval_or_zero(A, j, j);
                     if (dval_exprs_equal_exact(diag, other))
                         ++multiplicity;
                 }
@@ -2432,10 +2432,10 @@ static matrix_t *mat_minpoly_dval(const matrix_t *A)
         exponents[0] = 1;
         root_count = 1;
     } else if (A->rows == 2) {
-        dval_t *a = mat_get_dval_or_zero(A, 0, 0);
-        dval_t *b = mat_get_dval_or_zero(A, 0, 1);
-        dval_t *c = mat_get_dval_or_zero(A, 1, 0);
-        dval_t *d = mat_get_dval_or_zero(A, 1, 1);
+        const dval_t *a = mat_get_dval_or_zero(A, 0, 0);
+        const dval_t *b = mat_get_dval_or_zero(A, 0, 1);
+        const dval_t *c = mat_get_dval_or_zero(A, 1, 0);
+        const dval_t *d = mat_get_dval_or_zero(A, 1, 1);
         dval_t *ev[2] = {NULL, NULL};
 
         roots = calloc(2, sizeof(*roots));
@@ -2524,7 +2524,7 @@ static matrix_t *mat_adjugate_exact(const matrix_t *A)
 
     if (A->rows == 1) {
         if (e->kind == ELEM_DVAL) {
-            dval_t *one = DV_ONE;
+            const dval_t *one = DV_ONE;
             mat_set(Adj, 0, 0, &one);
         } else {
             mat_set(Adj, 0, 0, e->one);
@@ -2606,7 +2606,7 @@ static matrix_t *mat_nullspace_dval_exact(const matrix_t *A)
             continue;
 
         {
-            dval_t *one = DV_ONE;
+            const dval_t *one = DV_ONE;
             mat_set(N, free_col, basis_col, &one);
         }
 
@@ -4368,8 +4368,8 @@ const struct elem_vtable qcomplex_elem = {
 
 static void dv_add_wrap(void *o, const void *a, const void *b)
 {
-    dval_t *lhs = (*(dval_t *const *)a) ? *(dval_t *const *)a : DV_ZERO;
-    dval_t *rhs = (*(dval_t *const *)b) ? *(dval_t *const *)b : DV_ZERO;
+    const dval_t *lhs = (*(dval_t *const *)a) ? *(dval_t *const *)a : DV_ZERO;
+    const dval_t *rhs = (*(dval_t *const *)b) ? *(dval_t *const *)b : DV_ZERO;
     dval_t *prev = *(dval_t **)o;
     dval_t *res = dv_add(lhs, rhs);
 
@@ -4380,8 +4380,8 @@ static void dv_add_wrap(void *o, const void *a, const void *b)
 
 static void dv_sub_wrap(void *o, const void *a, const void *b)
 {
-    dval_t *lhs = (*(dval_t *const *)a) ? *(dval_t *const *)a : DV_ZERO;
-    dval_t *rhs = (*(dval_t *const *)b) ? *(dval_t *const *)b : DV_ZERO;
+    const dval_t *lhs = (*(dval_t *const *)a) ? *(dval_t *const *)a : DV_ZERO;
+    const dval_t *rhs = (*(dval_t *const *)b) ? *(dval_t *const *)b : DV_ZERO;
     dval_t *prev = *(dval_t **)o;
     dval_t *res = dv_sub(lhs, rhs);
 
@@ -4392,8 +4392,8 @@ static void dv_sub_wrap(void *o, const void *a, const void *b)
 
 static void dv_mul_wrap(void *o, const void *a, const void *b)
 {
-    dval_t *lhs = (*(dval_t *const *)a) ? *(dval_t *const *)a : DV_ZERO;
-    dval_t *rhs = (*(dval_t *const *)b) ? *(dval_t *const *)b : DV_ZERO;
+    const dval_t *lhs = (*(dval_t *const *)a) ? *(dval_t *const *)a : DV_ZERO;
+    const dval_t *rhs = (*(dval_t *const *)b) ? *(dval_t *const *)b : DV_ZERO;
     dval_t *prev = *(dval_t **)o;
     dval_t *res = dv_mul(lhs, rhs);
 
@@ -4960,7 +4960,7 @@ static inline void qf_as_dv(dval_t **out, const qfloat_t *a) {
 }
 
 static inline void id_dv(dval_t **out, dval_t *const *a) {
-    *out = (a && *a) ? *a : DV_ZERO;
+    *out = (dval_t *)((a && *a) ? *a : DV_ZERO);
 }
 
 /* ============================================================
@@ -5233,22 +5233,22 @@ static void mul_dv_qf(void *out, const void *a, const void *b)
 
 static void add_dv_dv(void *out, const void *a, const void *b)
 {
-    dval_t *lhs = (*(dval_t *const *)a) ? *(dval_t *const *)a : DV_ZERO;
-    dval_t *rhs = (*(dval_t *const *)b) ? *(dval_t *const *)b : DV_ZERO;
+    const dval_t *lhs = (*(dval_t *const *)a) ? *(dval_t *const *)a : DV_ZERO;
+    const dval_t *rhs = (*(dval_t *const *)b) ? *(dval_t *const *)b : DV_ZERO;
     *(dval_t **)out = dv_add(lhs, rhs);
 }
 
 static void sub_dv_dv(void *out, const void *a, const void *b)
 {
-    dval_t *lhs = (*(dval_t *const *)a) ? *(dval_t *const *)a : DV_ZERO;
-    dval_t *rhs = (*(dval_t *const *)b) ? *(dval_t *const *)b : DV_ZERO;
+    const dval_t *lhs = (*(dval_t *const *)a) ? *(dval_t *const *)a : DV_ZERO;
+    const dval_t *rhs = (*(dval_t *const *)b) ? *(dval_t *const *)b : DV_ZERO;
     *(dval_t **)out = dv_sub(lhs, rhs);
 }
 
 static void mul_dv_dv(void *out, const void *a, const void *b)
 {
-    dval_t *lhs = (*(dval_t *const *)a) ? *(dval_t *const *)a : DV_ZERO;
-    dval_t *rhs = (*(dval_t *const *)b) ? *(dval_t *const *)b : DV_ZERO;
+    const dval_t *lhs = (*(dval_t *const *)a) ? *(dval_t *const *)a : DV_ZERO;
+    const dval_t *rhs = (*(dval_t *const *)b) ? *(dval_t *const *)b : DV_ZERO;
     *(dval_t **)out = dv_mul(lhs, rhs);
 }
 
@@ -6386,7 +6386,7 @@ matrix_t *mat_deriv(const matrix_t *A, dval_t *wrt)
 
             mat_get(A, i, j, &entry);
             if (!entry)
-                entry = DV_ZERO;
+                entry = (dval_t *)DV_ZERO;
 
             deriv = dv_create_deriv(entry, wrt);
             if (!deriv) {
@@ -6630,7 +6630,7 @@ matrix_t *mat_jacobian(const matrix_t *A, dval_t *const *vars, size_t nvars)
 
             mat_get(A, i, j, &entry);
             if (!entry)
-                entry = DV_ZERO;
+                entry = (dval_t *)DV_ZERO;
 
             for (size_t k = 0; k < nvars; ++k) {
                 dval_t *deriv = NULL;
@@ -6715,7 +6715,7 @@ int mat_trace(const matrix_t *A, void *trace)
 
             mat_get(A, i, i, &term);
             if (!term)
-                term = DV_ZERO;
+                term = (dval_t *)DV_ZERO;
 
             tmp = dv_add(sum, term);
             dv_free(sum);
@@ -8472,7 +8472,7 @@ static matrix_t *mat_shift_subtract_eigenvalue(const matrix_t *A, const void *ei
 
             mat_get(Shifted, i, i, &diag);
             if (!diag)
-                diag = DV_ZERO;
+                diag = (dval_t *)DV_ZERO;
 
             dv_retain(diag);
             dv_retain(lambda);

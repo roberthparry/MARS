@@ -82,76 +82,76 @@ static dval_t *dval_simplify_owned_local(dval_t *dv)
     return simp;
 }
 
-static dval_t *dval_div_simplify_local(dval_t *num, dval_t *den)
+static dval_t *dval_div_simplify_local(const dval_t *num, const dval_t *den)
 {
     dval_t *raw;
 
     if (!num || !den) {
-        dv_free(num);
-        dv_free(den);
+        dv_free((dval_t *)num);
+        dv_free((dval_t *)den);
         return NULL;
     }
 
     raw = dv_div(num, den);
-    dv_free(num);
-    dv_free(den);
+    dv_free((dval_t *)num);
+    dv_free((dval_t *)den);
     if (!raw)
         return NULL;
 
     return dval_simplify_owned_local(raw);
 }
 
-static dval_t *dval_mul_simplify_local(dval_t *a, dval_t *b)
+static dval_t *dval_mul_simplify_local(const dval_t *a, const dval_t *b)
 {
     dval_t *raw;
 
     if (!a || !b) {
-        dv_free(a);
-        dv_free(b);
+        dv_free((dval_t *)a);
+        dv_free((dval_t *)b);
         return NULL;
     }
 
     raw = dv_mul(a, b);
-    dv_free(a);
-    dv_free(b);
+    dv_free((dval_t *)a);
+    dv_free((dval_t *)b);
     if (!raw)
         return NULL;
 
     return dval_simplify_owned_local(raw);
 }
 
-static dval_t *dval_add_simplify_local(dval_t *a, dval_t *b)
+static dval_t *dval_add_simplify_local(const dval_t *a, const dval_t *b)
 {
     dval_t *raw;
 
     if (!a || !b) {
-        dv_free(a);
-        dv_free(b);
+        dv_free((dval_t *)a);
+        dv_free((dval_t *)b);
         return NULL;
     }
 
     raw = dv_add(a, b);
-    dv_free(a);
-    dv_free(b);
+    dv_free((dval_t *)a);
+    dv_free((dval_t *)b);
     if (!raw)
         return NULL;
 
     return dval_simplify_owned_local(raw);
 }
 
-static dval_t *dval_sub_simplify_local(dval_t *a, dval_t *b)
+static dval_t *dval_sub_simplify_local(const dval_t *a, const dval_t *b)
 {
     dval_t *raw;
 
     if (!a || !b) {
-        dv_free(a);
-        dv_free(b);
+        dv_free((dval_t *)a);
+        dv_free((dval_t *)b);
         return NULL;
     }
 
     raw = dv_sub(a, b);
-    dv_free(a);
-    dv_free(b);
+    dv_free((dval_t *)a);
+    dv_free((dval_t *)b);
     if (!raw)
         return NULL;
 
@@ -339,7 +339,7 @@ static matrix_t *mat_fun_triangular_equal_diag_dval(const matrix_t *T,
         mat_set(F, i, i, &c0);
         for (size_t j = i; j < n; ++j) {
             dval_t *tij = NULL;
-            dval_t *zero = DV_ZERO;
+            const dval_t *zero = DV_ZERO;
             mat_get(T, i, j, &tij);
             if (i == j)
                 mat_set(N, i, j, &zero);
