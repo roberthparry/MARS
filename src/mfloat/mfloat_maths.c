@@ -55,6 +55,7 @@ static mfloat_t *mfloat_cached_half_ln_pi = NULL;
 static size_t mfloat_cached_half_ln_pi_prec = 0u;
 static mfloat_t *mfloat_cached_lgamma_asymptotic_terms[MFLOAT_LGAMMA_ASYMPTOTIC_TERM_COUNT] = {0};
 static size_t mfloat_cached_lgamma_asymptotic_terms_prec = 0u;
+
 static int mfloat_copy_cached_constant(mfloat_t *dst,
                                        mfloat_t **cache,
                                        size_t *cache_prec,
@@ -2068,7 +2069,7 @@ int mf_log(mfloat_t *mfloat)
     long exp2;
     mint_t *mant = NULL;
     mfloat_t *m = NULL, *u = NULL, *u2 = NULL, *y = NULL, *term = NULL;
-    mfloat_t *piece = NULL, *ln2 = NULL;
+    mfloat_t *piece = NULL, *ln2 = NULL, *denom_m = NULL;
     double md;
     int rc = -1;
 
@@ -2117,7 +2118,9 @@ int mf_log(mfloat_t *mfloat)
     y = mf_clone(u);
     term = mf_clone(u);
     u2 = mf_clone(u);
-    if (!y || !term || !u2)
+    piece = mf_new_prec(work_prec);
+    denom_m = mf_new_prec(work_prec);
+    if (!y || !term || !u2 || !piece || !denom_m)
         goto cleanup;
     if (mf_mul(u2, u) != 0)
         goto cleanup;
@@ -2127,20 +2130,15 @@ int mf_log(mfloat_t *mfloat)
 
         if (mf_mul(term, u2) != 0)
             goto cleanup;
-        piece = mf_clone(term);
-        if (!piece)
+        if (mfloat_copy_value(piece, term) != 0 || mf_set_long(denom_m, denom) != 0)
             goto cleanup;
-        if (mfloat_div_long_inplace(piece, denom) != 0)
+        if (mf_div(piece, denom_m) != 0)
             goto cleanup;
         if (mf_add(y, piece) != 0)
             goto cleanup;
         if (mfloat_is_below_neg_bits(piece, (long)work_prec + 8l))
             break;
-        mf_free(piece);
-        piece = NULL;
     }
-    mf_free(piece);
-    piece = NULL;
 
     if (mf_mul_long(y, 2) != 0)
         goto cleanup;
@@ -2176,6 +2174,7 @@ cleanup:
     mf_free(term);
     mf_free(piece);
     mf_free(ln2);
+    mf_free(denom_m);
     return rc;
 }
 
@@ -3442,7 +3441,6 @@ int mf_lgamma(mfloat_t *mfloat)
         goto cleanup;
     }
     work_prec = mfloat_transcendental_work_prec(precision);
-
     x = mfloat_clone_prec(mfloat, work_prec);
     if (!x)
         goto cleanup;
@@ -3473,17 +3471,17 @@ int mf_lgamma(mfloat_t *mfloat)
         goto cleanup;
     }
 
-    z = mfloat_clone_prec(x, work_prec);
+    z = x;
+    x = NULL;
     acc = mfloat_clone_prec(MF_ZERO, work_prec);
     threshold = mfloat_new_from_long_prec(100, work_prec);
-    if (!z || !acc || !threshold)
+    tmp = mf_new_prec(work_prec);
+    if (!z || !acc || !threshold || !tmp)
         goto cleanup;
     while (mf_lt(z, threshold)) {
-        tmp = mf_clone(z);
-        if (!tmp || mf_log(tmp) != 0 || mf_add(acc, tmp) != 0 || mf_add_long(z, 1) != 0)
+        if (mfloat_copy_value(tmp, z) != 0 || mf_log(tmp) != 0 ||
+            mf_add(acc, tmp) != 0 || mf_add_long(z, 1) != 0)
             goto cleanup;
-        mf_free(tmp);
-        tmp = NULL;
     }
     if (mfloat_lgamma_asymptotic(z, z, work_prec) != 0 || mf_sub(z, acc) != 0)
         goto cleanup;
