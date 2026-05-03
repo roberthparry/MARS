@@ -1,4 +1,5 @@
 #include "mfloat_internal.h"
+#include "../mint/mint_internal.h"
 
 #include <limits.h>
 #include <math.h>
@@ -31,6 +32,12 @@ typedef struct mfloat_seed_rational_term_t {
     const char *den;
 } mfloat_seed_rational_term_t;
 
+/* Stack-backed scratch slots avoid hot-path mfloat container allocation. */
+typedef struct mfloat_scratch_slot_t {
+    mfloat_t value;
+    mint_t mantissa;
+} mfloat_scratch_slot_t;
+
 static mfloat_t *mfloat_clone_prec(const mfloat_t *src, size_t precision);
 static int mfloat_compute_pi(mfloat_t *dst, size_t precision);
 static int mfloat_compute_ln2(mfloat_t *dst, size_t precision);
@@ -38,6 +45,11 @@ static int mfloat_compute_e(mfloat_t *dst, size_t precision);
 static int mfloat_compute_euler_gamma(mfloat_t *dst, size_t precision);
 static int mfloat_compute_sqrt_pi(mfloat_t *dst, size_t precision);
 static int mfloat_compute_half_ln_pi(mfloat_t *dst, size_t precision);
+static void mfloat_scratch_init_slot(mfloat_scratch_slot_t *slot, size_t precision);
+static void mfloat_scratch_reset_slot(mfloat_scratch_slot_t *slot, size_t precision);
+static void mfloat_scratch_release_slot(mfloat_scratch_slot_t *slot);
+static int mfloat_scratch_copy(mfloat_t *dst, const mfloat_t *src);
+static int mfloat_scratch_set_long(mfloat_t *dst, long value);
 static int mfloat_set_from_seed(mfloat_t *dst, const char *text, size_t precision);
 static int mfloat_is_below_neg_bits(const mfloat_t *mfloat, long bits);
 
@@ -55,6 +67,76 @@ static mfloat_t *mfloat_cached_half_ln_pi = NULL;
 static size_t mfloat_cached_half_ln_pi_prec = 0u;
 static mfloat_t *mfloat_cached_lgamma_asymptotic_terms[MFLOAT_LGAMMA_ASYMPTOTIC_TERM_COUNT] = {0};
 static size_t mfloat_cached_lgamma_asymptotic_terms_prec = 0u;
+
+static void mfloat_scratch_init_slot(mfloat_scratch_slot_t *slot, size_t precision)
+{
+    memset(slot, 0, sizeof(*slot));
+    slot->value.kind = MFLOAT_KIND_FINITE;
+    slot->value.precision = precision;
+    slot->value.mantissa = &slot->mantissa;
+}
+
+static void mfloat_scratch_reset_slot(mfloat_scratch_slot_t *slot, size_t precision)
+{
+    slot->value.kind = MFLOAT_KIND_FINITE;
+    slot->value.sign = 0;
+    slot->value.exponent2 = 0;
+    slot->value.precision = precision;
+    slot->value.mantissa = &slot->mantissa;
+    slot->mantissa.sign = 0;
+    slot->mantissa.length = 0;
+}
+
+static void mfloat_scratch_release_slot(mfloat_scratch_slot_t *slot)
+{
+    free(slot->mantissa.storage);
+    slot->mantissa.storage = NULL;
+    slot->mantissa.sign = 0;
+    slot->mantissa.length = 0;
+    slot->mantissa.capacity = 0;
+}
+
+static int mfloat_scratch_copy(mfloat_t *dst, const mfloat_t *src)
+{
+    if (!dst || !src || !dst->mantissa || !src->mantissa)
+        return -1;
+    if (mint_copy_value(dst->mantissa, src->mantissa) != 0)
+        return -1;
+    dst->kind = src->kind;
+    dst->sign = src->sign;
+    dst->exponent2 = src->exponent2;
+    return 0;
+}
+
+static int mfloat_scratch_set_long(mfloat_t *dst, long value)
+{
+    uint64_t magnitude;
+    short sign;
+
+    if (!dst || !dst->mantissa)
+        return -1;
+    if (value == 0) {
+        dst->kind = MFLOAT_KIND_FINITE;
+        dst->sign = 0;
+        dst->exponent2 = 0;
+        dst->mantissa->sign = 0;
+        dst->mantissa->length = 0;
+        return 0;
+    }
+    if (value < 0) {
+        magnitude = (uint64_t)(-(value + 1l)) + 1u;
+        sign = -1;
+    } else {
+        magnitude = (uint64_t)value;
+        sign = 1;
+    }
+    if (mint_set_magnitude_u64(dst->mantissa, magnitude, sign) != 0)
+        return -1;
+    dst->kind = MFLOAT_KIND_FINITE;
+    dst->sign = sign;
+    dst->exponent2 = 0;
+    return 0;
+}
 
 static int mfloat_copy_cached_constant(mfloat_t *dst,
                                        mfloat_t **cache,
@@ -2076,10 +2158,11 @@ int mf_log(mfloat_t *mfloat)
     size_t mant_bits;
     long exp2;
     mint_t *mant = NULL;
-    mfloat_t *m = NULL, *u = NULL, *u2 = NULL, *y = NULL, *term = NULL;
-    mfloat_t *piece = NULL, *ln2 = NULL, *denom_m = NULL;
+    mfloat_scratch_slot_t slots[8];
+    mfloat_t *m, *u, *u2, *y, *term, *piece, *ln2, *denom_m;
     double md;
     int rc = -1;
+    size_t i;
 
     if (!mfloat)
         return -1;
@@ -2098,11 +2181,20 @@ int mf_log(mfloat_t *mfloat)
     work_prec = precision + (precision / 2u);
     if (work_prec < precision + 96u)
         work_prec = precision + 96u;
+    for (i = 0; i < 8u; ++i)
+        mfloat_scratch_init_slot(&slots[i], work_prec);
+    m = &slots[0].value;
+    u = &slots[1].value;
+    u2 = &slots[2].value;
+    y = &slots[3].value;
+    term = &slots[4].value;
+    piece = &slots[5].value;
+    ln2 = &slots[6].value;
+    denom_m = &slots[7].value;
     mant_bits = mi_bit_length(mfloat->mantissa);
     exp2 = mfloat->exponent2 + (long)mant_bits - 1l;
     mant = mi_clone(mfloat->mantissa);
-    m = mf_new_prec(work_prec);
-    if (!mant || !m)
+    if (!mant)
         goto cleanup;
     if (mfloat_set_from_signed_mint(m, mant, -((long)mant_bits - 1l)) != 0)
         goto cleanup;
@@ -2110,9 +2202,7 @@ int mf_log(mfloat_t *mfloat)
     md = mf_to_double(m);
     if (!(md > 0.0))
         goto cleanup;
-    u = mf_clone(m);
-    term = mf_clone(m);
-    if (!u || !term)
+    if (mfloat_scratch_copy(u, m) != 0 || mfloat_scratch_copy(term, m) != 0)
         goto cleanup;
     if (mf_add_long(u, -1) != 0)
         goto cleanup;
@@ -2120,15 +2210,10 @@ int mf_log(mfloat_t *mfloat)
         goto cleanup;
     if (mf_div(u, term) != 0)
         goto cleanup;
-    mf_free(term);
-    term = NULL;
+    mfloat_scratch_reset_slot(&slots[4], work_prec);
 
-    y = mf_clone(u);
-    term = mf_clone(u);
-    u2 = mf_clone(u);
-    piece = mf_new_prec(work_prec);
-    denom_m = mf_new_prec(work_prec);
-    if (!y || !term || !u2 || !piece || !denom_m)
+    if (mfloat_scratch_copy(y, u) != 0 || mfloat_scratch_copy(term, u) != 0 ||
+        mfloat_scratch_copy(u2, u) != 0)
         goto cleanup;
     if (mf_mul(u2, u) != 0)
         goto cleanup;
@@ -2138,7 +2223,7 @@ int mf_log(mfloat_t *mfloat)
 
         if (mf_mul(term, u2) != 0)
             goto cleanup;
-        if (mfloat_copy_value(piece, term) != 0 || mf_set_long(denom_m, denom) != 0)
+        if (mfloat_scratch_copy(piece, term) != 0 || mfloat_scratch_set_long(denom_m, denom) != 0)
             goto cleanup;
         if (mf_div(piece, denom_m) != 0)
             goto cleanup;
@@ -2151,13 +2236,9 @@ int mf_log(mfloat_t *mfloat)
     if (mf_mul_long(y, 2) != 0)
         goto cleanup;
 
-    mf_free(m);
-    m = NULL;
+    mfloat_scratch_reset_slot(&slots[0], work_prec);
 
     if (exp2 != 0) {
-        ln2 = mf_new_prec(work_prec);
-        if (!ln2)
-            goto cleanup;
         if (mfloat_copy_cached_constant(ln2,
                                         &mfloat_cached_ln2,
                                         &mfloat_cached_ln2_prec,
@@ -2178,14 +2259,8 @@ int mf_log(mfloat_t *mfloat)
 
 cleanup:
     mi_free(mant);
-    mf_free(m);
-    mf_free(u);
-    mf_free(u2);
-    mf_free(y);
-    mf_free(term);
-    mf_free(piece);
-    mf_free(denom_m);
-    mf_free(ln2);
+    for (i = 0; i < 8u; ++i)
+        mfloat_scratch_release_slot(&slots[i]);
     return rc;
 }
 
