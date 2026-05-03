@@ -86,6 +86,31 @@ Compared with `double`, `qfloat_t` offers more precision at higher runtime cost.
 Compared with arbitrary-precision libraries it is lighter-weight and simpler
 to integrate into a C99 codebase.
 
+## Platform Notes
+
+`qfloat_t` is built on IEEE-754 `double` arithmetic and relies on the usual
+double-double assumptions: predictable round-to-nearest behaviour, stable
+error-free transforms, and the ordinary floating-point semantics expected on
+modern x86_64-class CPUs.
+
+That makes `qfloat_t` fast and practical, but it also means release-build
+optimisation settings are not entirely architecture-neutral. On the current
+project machine, plain release flags such as `-O2` and `-O2 -flto` preserve the
+expected behaviour, while adding native CPU tuning flags
+`-march=native -mtune=native` caused `Ei`/`E1` regressions in the `qfloat`
+release tests.
+
+Because of that, the project treats `qfloat` release targets a little more
+conservatively than some other subsystems:
+
+- `make test_qfloat`
+- `make memtest_qfloat`
+- `make bench_qfloat_gamma_maths`
+
+These targets rebuild the `qfloat` path with the safer release profile instead
+of the more aggressive project-wide native-tuned flags. This quirk is currently
+specific to `qfloat`; other subsystems still use the broader release defaults.
+
 ---
 
 ## API Reference
@@ -248,3 +273,38 @@ qfloat_t x = qf_from_string("1");
 qf_printf("W0(1) = %.34q\n", x);   // 34 significant digits
 qf_printf("W0(1) = %Q\n",   x);    // scientific notation
 ```
+
+---
+
+## Benchmark Coverage
+
+`qfloat_t` has a focused gamma-family benchmark here:
+
+- [bench/qfloat/bench_qfloat_gamma_maths.c](/home/rparry/Projects/MARS/bench/qfloat/bench_qfloat_gamma_maths.c)
+
+Run it with:
+
+```sh
+make bench_qfloat_gamma_maths
+```
+
+Sample results below were measured on:
+
+- `Linux x86_64`
+- kernel `6.8.0-110-generic`
+- `Intel(R) Core(TM) i7-4510U CPU @ 2.00GHz`
+- `4` logical CPUs
+
+Current sample results with `MARS_BENCH_SCALE=5`:
+
+| Case | Time |
+|---|---:|
+| `qf_gamma(2.3)` | `1.518 us` |
+| `qf_lgamma(2.3)` | `4.063 us` |
+| `qf_gamma(2.5)` | `1.172 us` |
+| `qf_lgamma(2.5)` | `3.975 us` |
+| `qf_gamma(3.5)` | `1.156 us` |
+| `qf_lgamma(3.5)` | `6.061 us` |
+
+For a broader benchmark overview, see
+[docs/benchmarks.md](/home/rparry/Projects/MARS/docs/benchmarks.md).

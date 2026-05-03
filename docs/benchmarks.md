@@ -141,3 +141,26 @@ bench/mfloat/compare_mfloat_maths.sh <git-ref>
 ```
 
 Use a reference that already contains the `mfloat` subsystem.
+
+### `qfloat`
+
+Available benchmark target:
+
+```sh
+make bench_qfloat_gamma_maths
+```
+
+This benchmark currently focuses on the `qfloat` gamma-family paths:
+
+- `qf_gamma(2.3)`
+- `qf_lgamma(2.3)`
+- `qf_gamma(2.5)`
+- `qf_lgamma(2.5)`
+- `qf_gamma(3.5)`
+- `qf_lgamma(3.5)`
+
+One implementation note matters here: on the current x86_64 machine, `qfloat`
+release tests stay correct under `-O2` and `-O2 -flto`, but `-march=native
+-mtune=native` caused `Ei`/`E1` regressions. Because of that, the user-facing
+`qfloat` release targets are built with a safer release profile than the
+project-wide native-tuned default.
