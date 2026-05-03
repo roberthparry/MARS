@@ -173,8 +173,8 @@ qfloat_t qf_log(qfloat_t x)
 
     qfloat_t y = qf_add(sum, elog2);
 
-    /* Optional: 1–2 Newton refinements to tighten last bits */
-    for (int i = 0; i < 2; ++i) {
+    /* Optional Newton refinement to tighten the last bits */
+    for (int i = 0; i < 1; ++i) {
         qfloat_t ey   = qf_exp(y);
         qfloat_t diff = qf_sub(x, ey);
         qfloat_t corr = qf_div(diff, ey);
