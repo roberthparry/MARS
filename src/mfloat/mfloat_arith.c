@@ -2,6 +2,8 @@
 
 #include <stddef.h>
 
+#define MFLOAT_ARITH_SLACK_BITS 64u
+
 static int mfloat_set_special(mfloat_t *mfloat, mfloat_kind_t kind)
 {
     if (!mfloat || !mfloat->mantissa || mfloat_is_immortal(mfloat))
@@ -18,8 +20,38 @@ static int mfloat_set_special(mfloat_t *mfloat, mfloat_kind_t kind)
     return 0;
 }
 
+static int mfloat_trim_oversized_inplace(mfloat_t *mfloat)
+{
+    size_t bitlen, target_precision;
+
+    if (!mfloat || !mfloat->mantissa || !mfloat_is_finite(mfloat) || mf_is_zero(mfloat))
+        return 0;
+    bitlen = mi_bit_length(mfloat->mantissa);
+    target_precision = mfloat->precision + MFLOAT_ARITH_SLACK_BITS;
+    if (bitlen <= target_precision)
+        return 0;
+    return mfloat_round_to_precision_internal(mfloat, target_precision);
+}
+
+static mfloat_t *mfloat_clone_trimmed_operand(const mfloat_t *src)
+{
+    mfloat_t *tmp;
+
+    if (!src)
+        return NULL;
+    tmp = mf_clone(src);
+    if (!tmp)
+        return NULL;
+    if (mfloat_trim_oversized_inplace(tmp) != 0) {
+        mf_free(tmp);
+        return NULL;
+    }
+    return tmp;
+}
+
 int mf_cmp(const mfloat_t *a, const mfloat_t *b)
 {
+    mfloat_t *ta = NULL, *tb = NULL;
     mint_t *lhs = NULL, *rhs = NULL;
     long common_exp;
     int cmp = 0;
@@ -48,6 +80,13 @@ int mf_cmp(const mfloat_t *a, const mfloat_t *b)
     if (a->sign == 0)
         return 0;
 
+    ta = mfloat_clone_trimmed_operand(a);
+    tb = mfloat_clone_trimmed_operand(b);
+    if (!ta || !tb)
+        goto cleanup;
+    a = ta;
+    b = tb;
+
     common_exp = a->exponent2 < b->exponent2 ? a->exponent2 : b->exponent2;
     lhs = mfloat_to_scaled_mint(a, common_exp);
     rhs = mfloat_to_scaled_mint(b, common_exp);
@@ -57,6 +96,8 @@ int mf_cmp(const mfloat_t *a, const mfloat_t *b)
     cmp = mi_cmp(lhs, rhs);
 
 cleanup:
+    mf_free(ta);
+    mf_free(tb);
     mi_free(lhs);
     mi_free(rhs);
     return cmp;
@@ -123,6 +164,7 @@ int mf_neg(mfloat_t *mfloat)
 
 int mf_add(mfloat_t *mfloat, const mfloat_t *other)
 {
+    mfloat_t *other_trimmed = NULL;
     mint_t *lhs = NULL, *rhs = NULL;
     long common_exp;
     int rc = -1;
@@ -143,6 +185,12 @@ int mf_add(mfloat_t *mfloat, const mfloat_t *other)
         return 0;
     if (mf_is_zero(mfloat))
         return mfloat_copy_value(mfloat, other);
+    if (mfloat_trim_oversized_inplace(mfloat) != 0)
+        return -1;
+    other_trimmed = mfloat_clone_trimmed_operand(other);
+    if (!other_trimmed)
+        return -1;
+    other = other_trimmed;
 
     common_exp = mfloat->exponent2 < other->exponent2
                ? mfloat->exponent2 : other->exponent2;
@@ -157,6 +205,7 @@ int mf_add(mfloat_t *mfloat, const mfloat_t *other)
     rc = mfloat_set_from_signed_mint(mfloat, lhs, common_exp);
 
 cleanup:
+    mf_free(other_trimmed);
     mi_free(lhs);
     mi_free(rhs);
     return rc;
@@ -197,6 +246,8 @@ int mf_sub(mfloat_t *mfloat, const mfloat_t *other)
 
 int mf_mul(mfloat_t *mfloat, const mfloat_t *other)
 {
+    mfloat_t *other_trimmed = NULL;
+
     if (!mfloat || !other || !mfloat->mantissa || !other->mantissa)
         return -1;
     if (!mfloat_is_finite(mfloat) || !mfloat_is_finite(other)) {
@@ -215,11 +266,20 @@ int mf_mul(mfloat_t *mfloat, const mfloat_t *other)
         mf_clear(mfloat);
         return 0;
     }
-
-    if (mi_mul(mfloat->mantissa, other->mantissa) != 0)
+    if (mfloat_trim_oversized_inplace(mfloat) != 0)
         return -1;
+    other_trimmed = mfloat_clone_trimmed_operand(other);
+    if (!other_trimmed)
+        return -1;
+    other = other_trimmed;
+
+    if (mi_mul(mfloat->mantissa, other->mantissa) != 0) {
+        mf_free(other_trimmed);
+        return -1;
+    }
     mfloat->sign = (mfloat->sign == other->sign) ? 1 : -1;
     mfloat->exponent2 += other->exponent2;
+    mf_free(other_trimmed);
     return mfloat_normalise(mfloat);
 }
 
@@ -239,6 +299,7 @@ int mf_mul_long(mfloat_t *mfloat, long value)
 
 int mf_div(mfloat_t *mfloat, const mfloat_t *other)
 {
+    mfloat_t *other_trimmed = NULL;
     mint_t *num = NULL, *den = NULL, *q = NULL, *r = NULL, *twor = NULL;
     size_t shift_bits;
     long exponent2;
@@ -269,6 +330,12 @@ int mf_div(mfloat_t *mfloat, const mfloat_t *other)
     }
     if (mf_is_zero(mfloat))
         return 0;
+    if (mfloat_trim_oversized_inplace(mfloat) != 0)
+        return -1;
+    other_trimmed = mfloat_clone_trimmed_operand(other);
+    if (!other_trimmed)
+        return -1;
+    other = other_trimmed;
 
     num = mi_clone(mfloat->mantissa);
     den = mi_clone(other->mantissa);
@@ -301,6 +368,7 @@ int mf_div(mfloat_t *mfloat, const mfloat_t *other)
     rc = mfloat_normalise(mfloat);
 
 cleanup:
+    mf_free(other_trimmed);
     mi_free(num);
     mi_free(den);
     mi_free(q);
