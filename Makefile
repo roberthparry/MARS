@@ -3,18 +3,22 @@
 # ------------------------------------------------------------
 DEBUG ?= 0
 RELEASE_OPT_FLAGS ?= -O2 -flto -march=native -mtune=native
+QFLOAT_RELEASE_OPT_FLAGS ?= -O2 -flto
 
 ifeq ($(DEBUG),1)
     BUILD_DIR      := build/debug
     TEST_BUILD_DIR := tests/build/debug
     CFLAGS         := -Wall -Wextra -Werror -g -O0 -fPIC -DDEBUG
+    RELEASE_BUILD  := 0
 else
     BUILD_DIR      := build/release
     TEST_BUILD_DIR := tests/build/release
     CFLAGS         := -Wall -Wextra -Werror $(RELEASE_OPT_FLAGS) -fPIC
+    RELEASE_BUILD  := 1
 endif
 
 CFLAGS += -D_GNU_SOURCE
+QFLOAT_RELEASE_CFLAGS := -Wall -Wextra -Werror $(QFLOAT_RELEASE_OPT_FLAGS) -fPIC -D_GNU_SOURCE
 
 CC := gcc
 AR := ar rcs
@@ -89,6 +93,14 @@ DEPS     := $(shell find build tests/build -name '*.d' 2>/dev/null)
 # ------------------------------------------------------------
 # Object build rules
 # ------------------------------------------------------------
+ifeq ($(DEBUG),0)
+QFLOAT_RELEASE_CFLAGS += $(UNISTRING_CFLAGS)
+
+ifeq ($(ENABLE_UNISTRING),1)
+QFLOAT_RELEASE_CFLAGS += -DHAVE_UNISTRING
+endif
+endif
+
 $(BUILD_DIR)/%.o: src/%.c
 	@mkdir -p $(dir $@) $(dir $@).deps
 	$(CC) $(CFLAGS) $(DEPFLAGS) $(INCLUDES) -c $< -o $@
@@ -158,7 +170,23 @@ mem$(1): $(2)
 	$(VALGRIND) $(2)
 endef
 
-$(foreach bin,$(TEST_BINS),$(eval $(call TEST_ALIAS_RULES,$(notdir $(bin)),$(bin))))
+QFLOAT_TEST_BIN := $(TEST_BUILD_DIR)/qfloat/test_qfloat
+TEST_ALIAS_BINS := $(filter-out $(QFLOAT_TEST_BIN),$(TEST_BINS))
+
+ifeq ($(RELEASE_BUILD),1)
+.PHONY: test_qfloat memtest_qfloat
+test_qfloat:
+	@$(MAKE) DEBUG=0 RELEASE_OPT_FLAGS="$(QFLOAT_RELEASE_OPT_FLAGS)" $(QFLOAT_TEST_BIN)
+	@$(QFLOAT_TEST_BIN)
+
+memtest_qfloat:
+	@$(MAKE) DEBUG=0 RELEASE_OPT_FLAGS="$(QFLOAT_RELEASE_OPT_FLAGS)" $(QFLOAT_TEST_BIN)
+	$(VALGRIND) $(QFLOAT_TEST_BIN)
+else
+$(eval $(call TEST_ALIAS_RULES,test_qfloat,$(QFLOAT_TEST_BIN)))
+endif
+
+$(foreach bin,$(TEST_ALIAS_BINS),$(eval $(call TEST_ALIAS_RULES,$(notdir $(bin)),$(bin))))
 
 define BENCH_ALIAS_RULES
 .PHONY: $(1)
@@ -166,7 +194,19 @@ $(1): $(2)
 	@$(2)
 endef
 
-$(foreach bin,$(BENCH_BINS),$(eval $(call BENCH_ALIAS_RULES,$(notdir $(bin)),$(bin))))
+QFLOAT_GAMMA_BENCH_BIN := $(BUILD_DIR)/bench/qfloat/bench_qfloat_gamma_maths
+BENCH_ALIAS_BINS := $(filter-out $(QFLOAT_GAMMA_BENCH_BIN),$(BENCH_BINS))
+
+ifeq ($(RELEASE_BUILD),1)
+.PHONY: bench_qfloat_gamma_maths
+bench_qfloat_gamma_maths:
+	@$(MAKE) DEBUG=0 RELEASE_OPT_FLAGS="$(QFLOAT_RELEASE_OPT_FLAGS)" $(QFLOAT_GAMMA_BENCH_BIN)
+	@$(QFLOAT_GAMMA_BENCH_BIN)
+else
+$(eval $(call BENCH_ALIAS_RULES,bench_qfloat_gamma_maths,$(QFLOAT_GAMMA_BENCH_BIN)))
+endif
+
+$(foreach bin,$(BENCH_ALIAS_BINS),$(eval $(call BENCH_ALIAS_RULES,$(notdir $(bin)),$(bin))))
 
 # ------------------------------------------------------------
 # Help
