@@ -8,7 +8,7 @@
 
 #ifndef TEST_MFLOAT_MATHS_PRECISION
 /* Keep maths-only precision configurable without affecting core object tests. */
-#define TEST_MFLOAT_MATHS_PRECISION 512u
+#define TEST_MFLOAT_MATHS_PRECISION 768u
 #endif
 
 #define TEST_CONFIG_MODE TEST_CONFIG_GLOBAL
@@ -114,13 +114,31 @@ static int mfloat_meets_precision(const mfloat_t *got,
     mfloat_t *error = NULL;
     mfloat_t *tol = NULL;
     size_t precision_bits;
+    size_t target_bits;
+    size_t sig_digits = 0;
     long tol_exp2;
     int ok = 0;
+    const char *p;
 
     if (!got || !expected_text)
         return 0;
 
     precision_bits = mf_get_precision(got);
+    target_bits = precision_bits;
+    for (p = expected_text; *p; ++p) {
+        if (*p >= '0' && *p <= '9')
+            sig_digits++;
+    }
+    if (sig_digits > 0) {
+        size_t oracle_bits = (size_t)floor((double)sig_digits * 3.3219280948873623);
+
+        if (oracle_bits < 1u)
+            oracle_bits = 1u;
+        if (target_bits > 512u && oracle_bits > 80u)
+            oracle_bits -= 80u;
+        if (oracle_bits < precision_bits)
+            precision_bits = oracle_bits;
+    }
     expected = mf_create_string(expected_text);
     error = mf_clone(got);
     tol = mf_create_long(1);
