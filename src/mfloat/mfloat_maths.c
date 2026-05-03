@@ -1,4 +1,5 @@
 #include "mfloat_internal.h"
+#include "mfloat_coeff_tables.h"
 #include "internal/mint_support.h"
 
 #include <limits.h>
@@ -28,6 +29,565 @@ typedef struct mfloat_scratch_slot_t {
     mint_t mantissa;
 } mfloat_scratch_slot_t;
 
+static uint64_t mfloat_half_ln_pi1024_storage[] = {
+    0x0104443541acf8fdu, 0x8acceacf3466b23fu, 0xb13d5fd4522f4415u, 0xc2bd83bb87a32c13u,
+    0x6e134b0233c534f9u, 0x68779816e22f6412u, 0x2a6759cb50729287u, 0x4f0695a10423f48cu,
+    0x7773a09a45ed9931u, 0x3d84836a42009d15u, 0xab35e0f741fe6861u, 0xc8b3fb0864b9b2b6u,
+    0x5244b33ecc757d13u, 0x2bee63bc9752142bu, 0xad0e65de19f3167bu, 0x6c15e911db12f473u,
+    0x9e5aca6d3a8b3235u, 0xadac4e8cc84ea4d0u, 0xdb9e33b006c6473au, 0xbe4e8881c0aa15b4u,
+    0x7f12928d63403528u, 0x3976495c0ef97ea8u, 0xb2d8251426f00b93u, 0xbe95cd57e0d39c6fu,
+    0xc4d128c5e65b6740u, 0xb477fcc702f86507u, 0x326e6eeed3d33b9du, 0x170cce71550f0eacu,
+    0x2c1cda480584adb6u, 0x2611cb54d89bea46u, 0x4c0dc67005d95df5u, 0xe9330bcdbb7e767eu,
+    0x7a17abf2ad8d5087u, 0x000024a1a091cf43u
+};
+static uint64_t mfloat_half_ln_2pi1024_storage[] = {
+    0xdc4e73e87fc1eb55u, 0xbf9dee51cea2bfa8u, 0xf9142d0ad1efe862u, 0xa4ab4673adcf059eu,
+    0x010fb7b85f75bea1u, 0xa7a001e5731f5e38u, 0xaf99faeceddbbf4au, 0xd72a1f85077464b2u,
+    0xc0ca1c6012efd723u, 0x92519308be8162e8u, 0xb97df6a00074f2b6u, 0xb5de6f4e7b3f8973u,
+    0xc1e9ca44b4ab4b6cu, 0x65e335a6245eb8a1u, 0x601531a6693b6cf7u, 0x6110e4bf390d8f5fu,
+    0x1dccd68ee0aa4435u, 0xa8650f8b6190e43cu, 0xf8128ef5b9bee922u, 0xc497952db4dafb98u,
+    0x282bf1495817dc2eu, 0x385fb7b5dfefb255u, 0x7edf89c21b0d9a5eu, 0x45a5a495344c1296u,
+    0x21e9cc1f619d8d70u, 0xeb7ca499dc3b2951u, 0x3696f3d9bb385dcau, 0x5a6eec172ad5c6d3u,
+    0xa1afe4faafe41715u, 0x8557484be75ff803u, 0x62d377b1a8c4cf6au, 0x4808f3ec23e344d1u,
+    0x694d252f24005106u, 0x00003acfe390c97du
+};
+
+static struct _mint_t mfloat_half_ln_pi1024_mint = { .sign = 1, .length = 34, .capacity = 34, .storage = mfloat_half_ln_pi1024_storage };
+static struct _mint_t mfloat_half_ln_2pi1024_mint = { .sign = 1, .length = 34, .capacity = 34, .storage = mfloat_half_ln_2pi1024_storage };
+
+static struct _mfloat_t mfloat_half_ln_pi1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -2158, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_half_ln_pi1024_mint };
+static struct _mfloat_t mfloat_half_ln_2pi1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -2158, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_half_ln_2pi1024_mint };
+
+static uint64_t mfloat_erf_half1024_storage[] = {
+    0x87161b412a55c3abu, 0x4c1ff8ea000648f4u, 0x741f953df347a052u, 0x5deb1ae019d33f11u,
+    0xc17cad0c73d514aeu, 0x95f0b20f67e7d79au, 0x8b28a77b510204f3u, 0xfcbc17670e70397cu,
+    0xfaff42807dd93532u, 0xd212ac5ddb50e8b9u, 0x8a3f383f53eabb74u, 0x3b401ac295b83ee6u,
+    0x583ffd36bba9677du, 0x874615a4ef6ae62bu, 0x62e9007e0f5ea0aau, 0x61fbbb8dc502286au,
+    0x9590c834259b7af2u, 0x2d6c0d1bddca92b2u, 0x3ad8ac028f6c517au, 0x7eecdc46b98c1784u,
+    0xec8c9ccde476f052u, 0x80785f4a543809edu, 0xc37d35784c6d9ae1u, 0x20856dec4ee57393u,
+    0xe809f1a31a27a94cu, 0x0853f7ae0c76e915u
+};
+static uint64_t mfloat_erfinv_half1024_storage[] = {
+    0x10a390918d219ee9u, 0x7d62ce2513aa37dbu, 0xe0e56c47b22c17dcu, 0x95afaa512dec8f46u,
+    0x83263f151663a152u, 0x7d9653744c5753c4u, 0xf8fd88430d760ac6u, 0x5ff19067db19c420u,
+    0xda4951d5dacfa186u, 0x448e861d096cfeebu, 0xf0122a299f0af25au, 0xc2b3941566634b6du,
+    0x3ea3d760675e6f6cu, 0xefeb120a8dd03a01u, 0x43c3194aac49da8fu, 0xb9094edbacb78e49u,
+    0x375fdfc4ce25b46cu, 0xa27225bde6c89b78u, 0x9a87fb6914feddf7u, 0x4df387458b103b43u,
+    0x998dd1b84cb13fcfu, 0x60182ab4cd4b10b8u, 0xb18aa9bc649686d8u, 0x7c5015058d557398u,
+    0x73533cdca0fbc883u, 0x03d0c3f76498013du
+};
+static uint64_t mfloat_tetragamma1_1024_storage[] = {
+    0xa59d40f261b7ed43u, 0x84a75658bf7e670bu, 0x4c098f7f23622517u, 0x4109e69c7409b0c0u,
+    0x277deb12e46c1c6eu, 0x34a905be8cdbaa94u, 0xe164e7aad59875deu, 0x0a0f425428ea020fu,
+    0x1f6856683cb71fecu, 0xae88bec82adb6f12u, 0x2374fb5c9f4ab6d7u, 0x1c934c0422ebd0d4u,
+    0x0b808f4742ef109du, 0x9ee513807d9a92a1u, 0x9faf8019782b7d7cu, 0x39fef9a48c857bb0u,
+    0x176806b615b25533u, 0x9fbae3c1f863d45eu, 0x0c8baab51a95328cu, 0x0f4a50361804cc41u,
+    0x5c6827329d7d9673u, 0x2ee8a4e3d5896bfbu, 0x8d8c05bed8ba49a0u, 0xc1b8b8ae2cf3483fu,
+    0x0099dd0027803109u
+};
+static uint64_t mfloat_gammainv_min1024_storage[] = {
+    0xe32521bb908f498bu, 0xa687bb4aad126e2cu, 0xa28c65e51cb4223bu, 0xb81bc96c183c6a0fu,
+    0x153a9ba3d00c712au, 0x2500e296633b79cbu, 0x316025e3b026785du, 0x930746ce8ba2ad6eu,
+    0x80b940314970ae35u, 0x94b46eec1ca45d98u, 0x0fefb390b041d79au, 0x065d07e93cee01b5u,
+    0x55f192dfff9f81cbu, 0x7cda497be88691d4u, 0x5f9ccac8086e8a63u, 0x769406f4af041520u,
+    0x0f32c76cc342ba13u, 0x74aee8d8851566d4u, 0x00000001c56dc82au
+};
+static uint64_t mfloat_gammainv_argmin1024_storage[] = {
+    0x4f8e942609d8744du, 0x8358f2e344781b01u, 0x684d1904aa33eab9u, 0x73d49af79d24eda7u,
+    0xd8f6805ed506a337u, 0x7840b99380f6e926u, 0xe4fe63c014a6f4b2u, 0x47f492ebce4f1f1au,
+    0x056ce2893b81c8c6u, 0x73362780ac30294eu, 0xe3364fed43e66490u, 0xc82f1ed2b8609a07u,
+    0x5f15787d05f9748au, 0xb982976989379da6u, 0x73ff25892935271fu, 0x1e15ff9c12474612u,
+    0x83c220ffee24d4bbu, 0x5f48637884c0e9f1u, 0xc8865e0a4f06b153u, 0x2d86356be3f6e1a9u,
+    0x0000000000000176u
+};
+static uint64_t mfloat_gammainv_31024_storage[] = {
+    0x0483d29f7568ac17u, 0x599a5b94c398704eu, 0xe23ae0e66f947d8bu, 0x034ef126740793bdu,
+    0x6822b6a3ca312d0bu, 0x8c94d3d16984fb29u, 0xd4d2c616bd7cf637u, 0xdf2490dfe629549au,
+    0x780591659ef90d11u, 0xa7c91e0f66776402u, 0xccdbc96a4118c7a7u, 0x72b4d8af0e51f92eu,
+    0xdf9d298a5ca489cbu, 0xde5162612d4fa96du, 0x4dbcb33e2a74d8efu, 0xabaf8c2ee9d1bee0u,
+    0x19e22322a40b4eb0u, 0x5ea537ab4aa6b29cu, 0x432a1238f0db4e25u, 0xfeb3dfb066d04c4du,
+    0x9bb4b36f59d6310eu, 0x2a899b8fd0d0b26bu, 0x0c21fb08de275625u, 0xa904ef5522bb6fd6u,
+    0x00d9f9c61b6829e7u
+};
+static uint64_t mfloat_lambert_w0_11024_storage[] = {
+    0x888b74335eba2693u, 0x39c0252142cbd962u, 0x24dcaac705f1cf1eu, 0x370eb2d731d085f7u,
+    0xc96ea2fc5379054eu, 0x7b10cf6e78a653d4u, 0x2aa6d9024026ffeau, 0x8ec11680b15b3681u,
+    0xd43d63b48b236670u, 0x6ef7d966c5e563f9u, 0x26ab1d9d28c7b784u, 0xd86e6e2dac0588e1u,
+    0x34f8df610979b07au, 0x3dec188d659c50a7u, 0x4681a46abb13cfebu, 0xd3f6370795b90e1eu,
+    0xd5df5733a297bb27u, 0x49665c0ea1760e00u, 0x8dd63f36423ba821u, 0x535db2d6be9c1869u,
+    0xe48bf682b33c04e8u, 0x0324fdc0d4a38de0u, 0x385ba1bb3a15c6a2u, 0x97abf76a98a1b70au,
+    0x00244c135f1d2caeu
+};
+
+static struct _mint_t mfloat_erf_half1024_mint = { .sign = 1, .length = 26, .capacity = 26, .storage = mfloat_erf_half1024_storage };
+static struct _mint_t mfloat_erfinv_half1024_mint = { .sign = 1, .length = 26, .capacity = 26, .storage = mfloat_erfinv_half1024_storage };
+static struct _mint_t mfloat_tetragamma1_1024_mint = { .sign = 1, .length = 25, .capacity = 25, .storage = mfloat_tetragamma1_1024_storage };
+static struct _mint_t mfloat_gammainv_min1024_mint = { .sign = 1, .length = 19, .capacity = 19, .storage = mfloat_gammainv_min1024_storage };
+static struct _mint_t mfloat_gammainv_argmin1024_mint = { .sign = 1, .length = 21, .capacity = 21, .storage = mfloat_gammainv_argmin1024_storage };
+static struct _mint_t mfloat_gammainv_31024_mint = { .sign = 1, .length = 25, .capacity = 25, .storage = mfloat_gammainv_31024_storage };
+static struct _mint_t mfloat_lambert_w0_11024_mint = { .sign = 1, .length = 25, .capacity = 25, .storage = mfloat_lambert_w0_11024_storage };
+
+static struct _mfloat_t mfloat_erf_half1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -1660, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_erf_half1024_mint };
+static struct _mfloat_t mfloat_erfinv_half1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -1659, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_erfinv_half1024_mint };
+static struct _mfloat_t mfloat_tetragamma1_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = -1, .exponent2 = -1590, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_tetragamma1_1024_mint };
+static struct _mfloat_t mfloat_gammainv_min1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -1185, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_gammainv_min1024_mint };
+static struct _mfloat_t mfloat_gammainv_argmin1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -1288, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_gammainv_argmin1024_mint };
+static struct _mfloat_t mfloat_gammainv_31024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -1590, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_gammainv_31024_mint };
+static struct _mfloat_t mfloat_lambert_w0_11024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -1590, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_lambert_w0_11024_mint };
+
+static uint64_t mfloat_ln2_1024_storage[] = {
+    0x607f4ca11fb5bfb9u, 0x2da2d97c50f3fd5cu, 0x8655fa1872f20e3au, 0xaf5dfa6bd3830324u,
+    0xb72ce87b19d6548cu, 0xb256fa0ec7657f74u, 0xeb9ea9bc3b136603u, 0x51acbda11317c387u,
+    0x53e96ca16224ae8cu, 0x427573b291169b82u, 0x0ed2eae35c138214u, 0x8559552fb4afa1b1u,
+    0xbe7b876206debac9u, 0xd8a0d175b8baafa2u, 0xf40f343267298b62u, 0xbc9e3b39803f2f6au,
+    0x0b17217f7d1cf79au
+};
+static struct _mint_t mfloat_ln2_1024_mint = { .sign = 1, .length = 17u, .capacity = 17u, .storage = mfloat_ln2_1024_storage };
+static struct _mfloat_t mfloat_ln2_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -1084, .precision = 1088u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_ln2_1024_mint };
+
+static uint64_t mfloat_lgamma_asymptotic_term_0_1024_storage[] = {
+    0x5555555555555555u, 0x5555555555555555u, 0x5555555555555555u, 0x5555555555555555u,
+    0x5555555555555555u, 0x5555555555555555u, 0x5555555555555555u, 0x5555555555555555u,
+    0x5555555555555555u, 0x5555555555555555u, 0x5555555555555555u, 0x5555555555555555u,
+    0x5555555555555555u, 0x5555555555555555u, 0x5555555555555555u, 0x5555555555555555u,
+    0x0000000000000015u
+};
+static struct _mint_t mfloat_lgamma_asymptotic_term_0_1024_mint = { .sign = 1, .length = 17u, .capacity = 17u, .storage = mfloat_lgamma_asymptotic_term_0_1024_storage };
+static struct _mfloat_t mfloat_lgamma_asymptotic_term_0_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -1032, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_lgamma_asymptotic_term_0_1024_mint };
+
+static uint64_t mfloat_lgamma_asymptotic_term_1_1024_storage[] = {
+    0xb05b05b05b05b05bu, 0x5b05b05b05b05b05u, 0x05b05b05b05b05b0u, 0xb05b05b05b05b05bu,
+    0x5b05b05b05b05b05u, 0x05b05b05b05b05b0u, 0xb05b05b05b05b05bu, 0x5b05b05b05b05b05u,
+    0x05b05b05b05b05b0u, 0xb05b05b05b05b05bu, 0x5b05b05b05b05b05u, 0x05b05b05b05b05b0u,
+    0xb05b05b05b05b05bu, 0x5b05b05b05b05b05u, 0x05b05b05b05b05b0u, 0xb05b05b05b05b05bu,
+    0x0000000000000005u
+};
+static struct _mint_t mfloat_lgamma_asymptotic_term_1_1024_mint = { .sign = 1, .length = 17u, .capacity = 17u, .storage = mfloat_lgamma_asymptotic_term_1_1024_storage };
+static struct _mfloat_t mfloat_lgamma_asymptotic_term_1_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = -1, .exponent2 = -1035, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_lgamma_asymptotic_term_1_1024_mint };
+
+static uint64_t mfloat_lgamma_asymptotic_term_2_1024_storage[] = {
+    0xd00d00d00d00d00du, 0x0d00d00d00d00d00u, 0x00d00d00d00d00d0u, 0xd00d00d00d00d00du,
+    0x0d00d00d00d00d00u, 0x00d00d00d00d00d0u, 0xd00d00d00d00d00du, 0x0d00d00d00d00d00u,
+    0x00d00d00d00d00d0u, 0xd00d00d00d00d00du, 0x0d00d00d00d00d00u, 0x00d00d00d00d00d0u,
+    0xd00d00d00d00d00du, 0x0d00d00d00d00d00u, 0x00d00d00d00d00d0u, 0xd00d00d00d00d00du
+};
+static struct _mint_t mfloat_lgamma_asymptotic_term_2_1024_mint = { .sign = 1, .length = 16u, .capacity = 16u, .storage = mfloat_lgamma_asymptotic_term_2_1024_storage };
+static struct _mfloat_t mfloat_lgamma_asymptotic_term_2_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -1034, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_lgamma_asymptotic_term_2_1024_mint };
+
+static uint64_t mfloat_lgamma_asymptotic_term_3_1024_storage[] = {
+    0x7027027027027027u, 0x2702702702702702u, 0x0270270270270270u, 0x7027027027027027u,
+    0x2702702702702702u, 0x0270270270270270u, 0x7027027027027027u, 0x2702702702702702u,
+    0x0270270270270270u, 0x7027027027027027u, 0x2702702702702702u, 0x0270270270270270u,
+    0x7027027027027027u, 0x2702702702702702u, 0x0270270270270270u, 0x7027027027027027u,
+    0x0000000000000002u
+};
+static struct _mint_t mfloat_lgamma_asymptotic_term_3_1024_mint = { .sign = 1, .length = 17u, .capacity = 17u, .storage = mfloat_lgamma_asymptotic_term_3_1024_storage };
+static struct _mfloat_t mfloat_lgamma_asymptotic_term_3_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = -1, .exponent2 = -1036, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_lgamma_asymptotic_term_3_1024_mint };
+
+static uint64_t mfloat_lgamma_asymptotic_term_4_1024_storage[] = {
+    0x3a9ce01b951e2b19u, 0x6e5478ac63fc8d5cu, 0xb18ff23570ea7380u, 0xd5c3a9ce01b951e2u,
+    0x3806e5478ac63fc8u, 0x1e2b18ff23570ea7u, 0xfc8d5c3a9ce01b95u, 0xea73806e5478ac63u,
+    0xb951e2b18ff23570u, 0xc63fc8d5c3a9ce01u, 0x570ea73806e5478au, 0xe01b951e2b18ff23u,
+    0x78ac63fc8d5c3a9cu, 0xf23570ea73806e54u, 0xa9ce01b951e2b18fu, 0xe5478ac63fc8d5c3u,
+    0x0000000000000006u
+};
+static struct _mint_t mfloat_lgamma_asymptotic_term_4_1024_mint = { .sign = 1, .length = 17u, .capacity = 17u, .storage = mfloat_lgamma_asymptotic_term_4_1024_storage };
+static struct _mfloat_t mfloat_lgamma_asymptotic_term_4_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -1037, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_lgamma_asymptotic_term_4_1024_mint };
+
+static uint64_t mfloat_lgamma_asymptotic_term_5_1024_storage[] = {
+    0xb0d9993c7c81f6abu, 0xab0d9993c7c81f6au, 0x6ab0d9993c7c81f6u, 0xf6ab0d9993c7c81fu,
+    0x1f6ab0d9993c7c81u, 0x81f6ab0d9993c7c8u, 0xc81f6ab0d9993c7cu, 0x7c81f6ab0d9993c7u,
+    0xc7c81f6ab0d9993cu, 0x3c7c81f6ab0d9993u, 0x93c7c81f6ab0d999u, 0x993c7c81f6ab0d99u,
+    0x9993c7c81f6ab0d9u, 0xd9993c7c81f6ab0du, 0x0d9993c7c81f6ab0u, 0xb0d9993c7c81f6abu,
+    0x0000000000001f6au
+};
+static struct _mint_t mfloat_lgamma_asymptotic_term_5_1024_mint = { .sign = 1, .length = 17u, .capacity = 17u, .storage = mfloat_lgamma_asymptotic_term_5_1024_storage };
+static struct _mfloat_t mfloat_lgamma_asymptotic_term_5_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = -1, .exponent2 = -1046, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_lgamma_asymptotic_term_5_1024_mint };
+
+static uint64_t mfloat_lgamma_asymptotic_term_6_1024_storage[] = {
+    0x9069069069069069u, 0x6906906906906906u, 0x0690690690690690u, 0x9069069069069069u,
+    0x6906906906906906u, 0x0690690690690690u, 0x9069069069069069u, 0x6906906906906906u,
+    0x0690690690690690u, 0x9069069069069069u, 0x6906906906906906u, 0x0690690690690690u,
+    0x9069069069069069u, 0x6906906906906906u, 0x0690690690690690u, 0x9069069069069069u,
+    0x0000000000000006u
+};
+static struct _mint_t mfloat_lgamma_asymptotic_term_6_1024_mint = { .sign = 1, .length = 17u, .capacity = 17u, .storage = mfloat_lgamma_asymptotic_term_6_1024_storage };
+static struct _mfloat_t mfloat_lgamma_asymptotic_term_6_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -1034, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_lgamma_asymptotic_term_6_1024_mint };
+
+static uint64_t mfloat_lgamma_asymptotic_term_7_1024_storage[] = {
+    0x36587a9cbee10325u, 0x2547698badcff214u, 0x1436587a9cbee103u, 0x032547698badcff2u,
+    0xf21436587a9cbee1u, 0xe1032547698badcfu, 0xcff21436587a9cbeu, 0xbee1032547698badu,
+    0xadcff21436587a9cu, 0x9cbee1032547698bu, 0x8badcff21436587au, 0x7a9cbee103254769u,
+    0x698badcff2143658u, 0x587a9cbee1032547u, 0x47698badcff21436u, 0x36587a9cbee10325u,
+    0x000000000000f214u
+};
+static struct _mint_t mfloat_lgamma_asymptotic_term_7_1024_mint = { .sign = 1, .length = 17u, .capacity = 17u, .storage = mfloat_lgamma_asymptotic_term_7_1024_storage };
+static struct _mfloat_t mfloat_lgamma_asymptotic_term_7_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = -1, .exponent2 = -1045, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_lgamma_asymptotic_term_7_1024_mint };
+
+static uint64_t mfloat_lgamma_asymptotic_term_8_1024_storage[] = {
+    0x3ffd0c3b7f4b1c0fu, 0xfd0c3b7f4b1c0f03u, 0x0c3b7f4b1c0f033fu, 0x3b7f4b1c0f033ffdu,
+    0x7f4b1c0f033ffd0cu, 0x4b1c0f033ffd0c3bu, 0x1c0f033ffd0c3b7fu, 0x0f033ffd0c3b7f4bu,
+    0x033ffd0c3b7f4b1cu, 0x3ffd0c3b7f4b1c0fu, 0xfd0c3b7f4b1c0f03u, 0x0c3b7f4b1c0f033fu,
+    0x3b7f4b1c0f033ffdu, 0x7f4b1c0f033ffd0cu, 0x4b1c0f033ffd0c3bu, 0x1c0f033ffd0c3b7fu,
+    0x00000000000b7f4bu
+};
+static struct _mint_t mfloat_lgamma_asymptotic_term_8_1024_mint = { .sign = 1, .length = 17u, .capacity = 17u, .storage = mfloat_lgamma_asymptotic_term_8_1024_storage };
+static struct _mfloat_t mfloat_lgamma_asymptotic_term_8_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -1046, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_lgamma_asymptotic_term_8_1024_mint };
+
+static uint64_t mfloat_lgamma_asymptotic_term_9_1024_storage[] = {
+    0xcc4b30fa981d22c5u, 0xe02303e73db7b739u, 0x2c5307d2a9c088ecu, 0x739cc4b30fa981d2u,
+    0x8ece02303e73db7bu, 0x1d22c5307d2a9c08u, 0xb7b739cc4b30fa98u, 0xc088ece02303e73du,
+    0xa981d22c5307d2a9u, 0x73db7b739cc4b30fu, 0x2a9c088ece02303eu, 0x30fa981d22c5307du,
+    0x03e73db7b739cc4bu, 0x07d2a9c088ece023u, 0xc4b30fa981d22c53u, 0x02303e73db7b739cu,
+    0x00000000002c8eceu
+};
+static struct _mint_t mfloat_lgamma_asymptotic_term_9_1024_mint = { .sign = 1, .length = 17u, .capacity = 17u, .storage = mfloat_lgamma_asymptotic_term_9_1024_storage };
+static struct _mfloat_t mfloat_lgamma_asymptotic_term_9_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = -1, .exponent2 = -1045, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_lgamma_asymptotic_term_9_1024_mint };
+
+static uint64_t mfloat_lgamma_asymptotic_term_10_1024_storage[] = {
+    0x74f53910c8b38017u, 0xd3d4e44322ce005au, 0x4f53910c8b380169u, 0x3d4e44322ce005a7u,
+    0xf53910c8b380169du, 0xd4e44322ce005a74u, 0x53910c8b380169d3u, 0x4e44322ce005a74fu,
+    0x3910c8b380169d3du, 0xe44322ce005a74f5u, 0x910c8b380169d3d4u, 0x44322ce005a74f53u,
+    0x10c8b380169d3d4eu, 0x4322ce005a74f539u, 0x0c8b380169d3d4e4u, 0x322ce005a74f5391u,
+    0x00000000001ace44u
+};
+static struct _mint_t mfloat_lgamma_asymptotic_term_10_1024_mint = { .sign = 1, .length = 17u, .capacity = 17u, .storage = mfloat_lgamma_asymptotic_term_10_1024_storage };
+static struct _mfloat_t mfloat_lgamma_asymptotic_term_10_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -1041, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_lgamma_asymptotic_term_10_1024_mint };
+
+static uint64_t mfloat_lgamma_asymptotic_term_11_1024_storage[] = {
+    0xee25d73c0f9473b7u, 0x952525cccc1aab67u, 0xe25d73c0f9473b68u, 0x52525cccc1aab67eu,
+    0x25d73c0f9473b689u, 0x2525cccc1aab67eeu, 0x5d73c0f9473b6895u, 0x525cccc1aab67ee2u,
+    0xd73c0f9473b68952u, 0x25cccc1aab67ee25u, 0x73c0f9473b689525u, 0x5cccc1aab67ee25du,
+    0x3c0f9473b6895252u, 0xcccc1aab67ee25d7u, 0xc0f9473b68952525u, 0xccc1aab67ee25d73u,
+    0x0000000139b2525cu
+};
+static struct _mint_t mfloat_lgamma_asymptotic_term_11_1024_mint = { .sign = 1, .length = 17u, .capacity = 17u, .storage = mfloat_lgamma_asymptotic_term_11_1024_storage };
+static struct _mfloat_t mfloat_lgamma_asymptotic_term_11_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = -1, .exponent2 = -1049, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_lgamma_asymptotic_term_11_1024_mint };
+
+static uint64_t mfloat_lgamma_asymptotic_term_12_1024_storage[] = {
+    0xd0369d0369d0369du, 0x9d0369d0369d0369u, 0x69d0369d0369d036u, 0x369d0369d0369d03u,
+    0x0369d0369d0369d0u, 0xd0369d0369d0369du, 0x9d0369d0369d0369u, 0x69d0369d0369d036u,
+    0x369d0369d0369d03u, 0x0369d0369d0369d0u, 0xd0369d0369d0369du, 0x9d0369d0369d0369u,
+    0x69d0369d0369d036u, 0x369d0369d0369d03u, 0x0369d0369d0369d0u, 0xd0369d0369d0369du,
+    0x0000000000224469u
+};
+static struct _mint_t mfloat_lgamma_asymptotic_term_12_1024_mint = { .sign = 1, .length = 17u, .capacity = 17u, .storage = mfloat_lgamma_asymptotic_term_12_1024_storage };
+static struct _mfloat_t mfloat_lgamma_asymptotic_term_12_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -1034, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_lgamma_asymptotic_term_12_1024_mint };
+
+static uint64_t mfloat_lgamma_asymptotic_term_13_1024_storage[] = {
+    0x16bbd7a20371a00du, 0x08591aa839b7978du, 0xe36729b25c5fa4a1u, 0x7eb3feddd849691fu,
+    0x7c166824cae1c4abu, 0xbb303c552e462423u, 0xa8e11d45d070a4f4u, 0x6295ea98882f413cu,
+    0xe26c112cf758c6f5u, 0xf65dae6ffd8f0cecu, 0x7538bc7f07b1b4f9u, 0x00d40954332d9ebeu,
+    0x78d16bbd7a20371au, 0x4a108591aa839b79u, 0x91fe36729b25c5fau, 0x4ab7eb3feddd8496u,
+    0x00000011a198ae1cu
+};
+static struct _mint_t mfloat_lgamma_asymptotic_term_13_1024_mint = { .sign = 1, .length = 17u, .capacity = 17u, .storage = mfloat_lgamma_asymptotic_term_13_1024_storage };
+static struct _mfloat_t mfloat_lgamma_asymptotic_term_13_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = -1, .exponent2 = -1045, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_lgamma_asymptotic_term_13_1024_mint };
+
+static uint64_t mfloat_lgamma_asymptotic_term_14_1024_storage[] = {
+    0xd3560ae5824f57b9u, 0x1a732bb72c01a608u, 0xc23470867b93f711u, 0xb8d3d44632c2134du,
+    0x5f69edd1a0f72a08u, 0x9eca7b8da74d3da9u, 0x24f57b958b0211a5u, 0xc01a608d3560ae58u,
+    0xb93f7111a732bb72u, 0x2c2134dc23470867u, 0x0f72a08b8d3d4463u, 0x74d3da95f69edd1au,
+    0xb0211a59eca7b8dau, 0x560ae5824f57b958u, 0x732bb72c01a608d3u, 0x3470867b93f7111au,
+    0x00002a3441134dc2u
+};
+static struct _mint_t mfloat_lgamma_asymptotic_term_14_1024_mint = { .sign = 1, .length = 17u, .capacity = 17u, .storage = mfloat_lgamma_asymptotic_term_14_1024_storage };
+static struct _mfloat_t mfloat_lgamma_asymptotic_term_14_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -1050, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_lgamma_asymptotic_term_14_1024_mint };
+
+static uint64_t mfloat_lgamma_asymptotic_term_15_1024_storage[] = {
+    0x5de2030b4d5de203u, 0x030b4d5de2030b4du, 0x4d5de2030b4d5de2u, 0xe2030b4d5de2030bu,
+    0x0b4d5de2030b4d5du, 0x5de2030b4d5de203u, 0x030b4d5de2030b4du, 0x4d5de2030b4d5de2u,
+    0xe2030b4d5de2030bu, 0x0b4d5de2030b4d5du, 0x5de2030b4d5de203u, 0x030b4d5de2030b4du,
+    0x4d5de2030b4d5de2u, 0xe2030b4d5de2030bu, 0x0b4d5de2030b4d5du, 0x5de2030b4d5de203u,
+    0x0000744226c50b4du
+};
+static struct _mint_t mfloat_lgamma_asymptotic_term_15_1024_mint = { .sign = 1, .length = 17u, .capacity = 17u, .storage = mfloat_lgamma_asymptotic_term_15_1024_storage };
+static struct _mfloat_t mfloat_lgamma_asymptotic_term_15_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = -1, .exponent2 = -1047, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_lgamma_asymptotic_term_15_1024_mint };
+
+static uint64_t mfloat_lgamma_asymptotic_term_16_1024_storage[] = {
+    0x76f31219dbcc4867u, 0x676f31219dbcc486u, 0x8676f31219dbcc48u, 0x48676f31219dbcc4u,
+    0xc48676f31219dbccu, 0xcc48676f31219dbcu, 0xbcc48676f31219dbu, 0xdbcc48676f31219du,
+    0x9dbcc48676f31219u, 0x19dbcc48676f3121u, 0x219dbcc48676f312u, 0x1219dbcc48676f31u,
+    0x31219dbcc48676f3u, 0xf31219dbcc48676fu, 0x6f31219dbcc48676u, 0x76f31219dbcc4867u,
+    0x000002da5341ec86u
+};
+static struct _mint_t mfloat_lgamma_asymptotic_term_16_1024_mint = { .sign = 1, .length = 17u, .capacity = 17u, .storage = mfloat_lgamma_asymptotic_term_16_1024_storage };
+static struct _mfloat_t mfloat_lgamma_asymptotic_term_16_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -1037, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_lgamma_asymptotic_term_16_1024_mint };
+
+static uint64_t mfloat_lgamma_asymptotic_term_17_1024_storage[] = {
+    0xfc6c267745431a2du, 0xe12dc7ba4a6aa1f7u, 0x35182f51bb16ff4cu, 0x68a4590b8c069d56u,
+    0x19605c010dedcb3cu, 0x67ac76153e4043b9u, 0xfceb1c8eb54b098eu, 0x6023df2a525a036eu,
+    0x2b2f9f59aa78764du, 0x801460faed7d9dd5u, 0x89684b6284ee4a32u, 0x6f9bd78c3ebf39d0u,
+    0xec4c938f344120feu, 0xc19adfa948717376u, 0xa2301e4fc1e87e3cu, 0x809357125d858d36u,
+    0x8a233b3c8cddaba9u, 0x0000000000000028u
+};
+static struct _mint_t mfloat_lgamma_asymptotic_term_17_1024_mint = { .sign = 1, .length = 18u, .capacity = 18u, .storage = mfloat_lgamma_asymptotic_term_17_1024_storage };
+static struct _mfloat_t mfloat_lgamma_asymptotic_term_17_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = -1, .exponent2 = -1060, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_lgamma_asymptotic_term_17_1024_mint };
+
+static uint64_t mfloat_lgamma_asymptotic_term_18_1024_storage[] = {
+    0x8127350b88127351u, 0x27350b88127350b8u, 0x350b88127350b881u, 0x0b88127350b88127u,
+    0x88127350b8812735u, 0x127350b88127350bu, 0x7350b88127350b88u, 0x50b88127350b8812u,
+    0xb88127350b881273u, 0x8127350b88127350u, 0x27350b88127350b8u, 0x350b88127350b881u,
+    0x0b88127350b88127u, 0x88127350b8812735u, 0x127350b88127350bu, 0x7350b88127350b88u,
+    0x000a1bbcde4ea012u
+};
+static struct _mint_t mfloat_lgamma_asymptotic_term_18_1024_mint = { .sign = 1, .length = 17u, .capacity = 17u, .storage = mfloat_lgamma_asymptotic_term_18_1024_storage };
+static struct _mfloat_t mfloat_lgamma_asymptotic_term_18_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -1037, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_lgamma_asymptotic_term_18_1024_mint };
+
+static uint64_t mfloat_lgamma_asymptotic_term_19_1024_storage[] = {
+    0x6b02e295ec854487u, 0x86b02e295ec85448u, 0x486b02e295ec8544u, 0x4486b02e295ec854u,
+    0x54486b02e295ec85u, 0x854486b02e295ec8u, 0xc854486b02e295ecu, 0xec854486b02e295eu,
+    0x5ec854486b02e295u, 0x95ec854486b02e29u, 0x295ec854486b02e2u, 0xe295ec854486b02eu,
+    0x2e295ec854486b02u, 0x02e295ec854486b0u, 0xb02e295ec854486bu, 0x6b02e295ec854486u,
+    0x00b7bc07a8c85448u, 0x0000000000000168u
+};
+static struct _mint_t mfloat_lgamma_asymptotic_term_19_1024_mint = { .sign = 1, .length = 18u, .capacity = 18u, .storage = mfloat_lgamma_asymptotic_term_19_1024_storage };
+static struct _mfloat_t mfloat_lgamma_asymptotic_term_19_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = -1, .exponent2 = -1053, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_lgamma_asymptotic_term_19_1024_mint };
+
+static uint64_t mfloat_lgamma_asymptotic_term_20_1024_storage[] = {
+    0x55812a5a765b9ebbu, 0xddd9593d0ae7da3du, 0x8753cdb5d5c8db31u, 0xfa958e81363d15c7u,
+    0x1a06e6f094aa68bfu, 0xf22882d87f82c891u, 0x65b9ebafa849d261u, 0xae7da3d55812a5a7u,
+    0x5c8db31ddd9593d0u, 0x63d15c78753cdb5du, 0x4aa68bffa958e813u, 0xf82c8911a06e6f09u,
+    0x849d261f22882d87u, 0x812a5a765b9ebafau, 0xd9593d0ae7da3d55u, 0x53cdb5d5c8db31ddu,
+    0x8cd6f8f1f755c787u, 0x00000000000001bcu
+};
+static struct _mint_t mfloat_lgamma_asymptotic_term_20_1024_mint = { .sign = 1, .length = 18u, .capacity = 18u, .storage = mfloat_lgamma_asymptotic_term_20_1024_storage };
+static struct _mfloat_t mfloat_lgamma_asymptotic_term_20_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -1048, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_lgamma_asymptotic_term_20_1024_mint };
+
+static uint64_t mfloat_lgamma_asymptotic_term_21_1024_storage[] = {
+    0x3225b901be2f0a8bu, 0xde05a0284fa7ec42u, 0x3a2bef5d5ff69ccau, 0xd471d2e43bfbca17u,
+    0xa8b30da65eab49b3u, 0xc423225b901be2f0u, 0xccade05a0284fa7eu, 0xa173a2bef5d5ff69u,
+    0x9b3d471d2e43bfbcu, 0x2f0a8b30da65eab4u, 0xa7ec423225b901beu, 0xf69ccade05a0284fu,
+    0xfbca173a2bef5d5fu, 0xab49b3d471d2e43bu, 0x1be2f0a8b30da65eu, 0x84fa7ec423225b90u,
+    0xebb143bb94de5a02u, 0x00000000000004bbu
+};
+static struct _mint_t mfloat_lgamma_asymptotic_term_21_1024_mint = { .sign = 1, .length = 18u, .capacity = 18u, .storage = mfloat_lgamma_asymptotic_term_21_1024_storage };
+static struct _mfloat_t mfloat_lgamma_asymptotic_term_21_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = -1, .exponent2 = -1044, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_lgamma_asymptotic_term_21_1024_mint };
+
+static uint64_t mfloat_lgamma_asymptotic_term_22_1024_storage[] = {
+    0x91d026165a2274c3u, 0x2cbe9913537a35d2u, 0x51a96a799ae41ed3u, 0x0b755e5ef9e85b58u,
+    0xb6baf77ca18c5dc4u, 0xe68a8cf8b27e7257u, 0xfcef03974288213eu, 0x3b44f3db0ada6febu,
+    0xcd1f6e1b31960cabu, 0x24e07d3c7ad0c104u, 0x8ec97dd76943bdfeu, 0x930602fc54152445u,
+    0x37086eb6200909a4u, 0x291d026165a2274cu, 0x32cbe9913537a35du, 0x851a96a799ae41edu,
+    0x99bfad785f6c85b5u, 0x0000000000007170u
+};
+static struct _mint_t mfloat_lgamma_asymptotic_term_22_1024_mint = { .sign = 1, .length = 18u, .capacity = 18u, .storage = mfloat_lgamma_asymptotic_term_22_1024_storage };
+static struct _mfloat_t mfloat_lgamma_asymptotic_term_22_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -1043, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_lgamma_asymptotic_term_22_1024_mint };
+
+static uint64_t mfloat_lgamma_asymptotic_term_23_1024_storage[] = {
+    0x1fff7a0a35f1dea3u, 0x0fd13056a02ae43eu, 0xdc151ab5f46c69b3u, 0x71b338ad9d6f2571u,
+    0x464904c38fd3be1du, 0xab0fa853e987a59du, 0x5104ec6c40d6a2b8u, 0x307f7c97fcc366f7u,
+    0xf1dea2e1877cc0d9u, 0x2ae43e1fff7a0a35u, 0x6c69b30fd13056a0u, 0x6f2571dc151ab5f4u,
+    0xd3be1d71b338ad9du, 0x87a59d464904c38fu, 0xd6a2b8ab0fa853e9u, 0xc366f75104ec6c40u,
+    0xc56c480b5a7c97fcu, 0x000000005cf04a02u
+};
+static struct _mint_t mfloat_lgamma_asymptotic_term_23_1024_mint = { .sign = 1, .length = 18u, .capacity = 18u, .storage = mfloat_lgamma_asymptotic_term_23_1024_storage };
+static struct _mfloat_t mfloat_lgamma_asymptotic_term_23_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = -1, .exponent2 = -1053, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_lgamma_asymptotic_term_23_1024_mint };
+
+static uint64_t mfloat_lgamma_asymptotic_term_24_1024_storage[] = {
+    0x2bdaa31141b3b0d7u, 0x8e2b610c81d2167bu, 0x5699917e7ef88f1eu, 0x8c4506cec35d3fcdu,
+    0x8432074859ecaf6au, 0x45f9fbe23c7a38adu, 0x1b3b0d74ff355a66u, 0x1d2167b2bdaa3114u,
+    0xef88f1e8e2b610c8u, 0x35d3fcd5699917e7u, 0x9ecaf6a8c4506cecu, 0xc7a38ad843207485u,
+    0xf355a6645f9fbe23u, 0xdaa31141b3b0d74fu, 0x2b610c81d2167b2bu, 0x99917e7ef88f1e8eu,
+    0xf3ce358f90064d56u, 0x00000000014befddu
+};
+static struct _mint_t mfloat_lgamma_asymptotic_term_24_1024_mint = { .sign = 1, .length = 18u, .capacity = 18u, .storage = mfloat_lgamma_asymptotic_term_24_1024_storage };
+static struct _mfloat_t mfloat_lgamma_asymptotic_term_24_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -1041, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_lgamma_asymptotic_term_24_1024_mint };
+
+static uint64_t mfloat_lgamma_asymptotic_term_25_1024_storage[] = {
+    0x69a537bbc232e73bu, 0x883c904971b21924u, 0x076e79befa8d1117u, 0xe2666cdd91e59ec7u,
+    0x3af41c5cc3cf144fu, 0x2469a537bbc232e7u, 0x17883c904971b219u, 0xc7076e79befa8d11u,
+    0x4fe2666cdd91e59eu, 0xe73af41c5cc3cf14u, 0x192469a537bbc232u, 0x1117883c904971b2u,
+    0x9ec7076e79befa8du, 0x144fe2666cdd91e5u, 0x32e73af41c5cc3cfu, 0xb2192469a537bbc2u,
+    0xe550213369924971u, 0x0000000283be0395u
+};
+static struct _mint_t mfloat_lgamma_asymptotic_term_25_1024_mint = { .sign = 1, .length = 18u, .capacity = 18u, .storage = mfloat_lgamma_asymptotic_term_25_1024_storage };
+static struct _mfloat_t mfloat_lgamma_asymptotic_term_25_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = -1, .exponent2 = -1044, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_lgamma_asymptotic_term_25_1024_mint };
+
+static uint64_t mfloat_lgamma_asymptotic_term_26_1024_storage[] = {
+    0x20324269f2d13ab1u, 0x3a4f4b5b78ad0197u, 0xc19bdc46c38c0e45u, 0x26536bcb98efade1u,
+    0x34d4730b402eafd8u, 0x554121caa5d4e033u, 0x6629d7873d87a585u, 0xd149d7be55bc0fccu,
+    0x6062357ac41cadceu, 0x6f16e36b8efe4f9fu, 0x676439a588c6c468u, 0xdb5ead95a82d0fe1u,
+    0xc75507f8adddf7f1u, 0x231e832502fffebcu, 0x2690066ba7710d48u, 0x0256ec758797bf48u,
+    0x7dd999790760b0ceu, 0x00000a8ebfe48da1u
+};
+static struct _mint_t mfloat_lgamma_asymptotic_term_26_1024_mint = { .sign = 1, .length = 18u, .capacity = 18u, .storage = mfloat_lgamma_asymptotic_term_26_1024_storage };
+static struct _mfloat_t mfloat_lgamma_asymptotic_term_26_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -1048, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_lgamma_asymptotic_term_26_1024_mint };
+
+static uint64_t mfloat_lgamma_asymptotic_term_27_1024_storage[] = {
+    0x96cbec2ef3ba1b5fu, 0x8b14782409b737c7u, 0xbec2ef3ba1b5ef12u, 0x4782409b737c796cu,
+    0x2ef3ba1b5ef128b1u, 0x2409b737c796cbecu, 0x3ba1b5ef128b1478u, 0x9b737c796cbec2efu,
+    0x1b5ef128b1478240u, 0x37c796cbec2ef3bau, 0xef128b14782409b7u, 0x796cbec2ef3ba1b5u,
+    0x28b14782409b737cu, 0xcbec2ef3ba1b5ef1u, 0x14782409b737c796u, 0xc2ef3ba1b5ef128bu,
+    0xfb1724c95ab56cbeu, 0x0000bf582a433556u
+};
+static struct _mint_t mfloat_lgamma_asymptotic_term_27_1024_mint = { .sign = 1, .length = 18u, .capacity = 18u, .storage = mfloat_lgamma_asymptotic_term_27_1024_storage };
+static struct _mfloat_t mfloat_lgamma_asymptotic_term_27_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = -1, .exponent2 = -1046, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_lgamma_asymptotic_term_27_1024_mint };
+
+static uint64_t mfloat_lgamma_asymptotic_term_28_1024_storage[] = {
+    0x42c8e9a5361285edu, 0x992f11af905a88f8u, 0xf252c54240804ab3u, 0x79d2469747e290e2u,
+    0xa6e2cb593daf4267u, 0xda1dca0df4aee0f7u, 0xb5a757b7eff6a98cu, 0xc5b72d1703ade3a1u,
+    0x23a694d84a17b310u, 0xbc46be416a23e10bu, 0x4b150902012ace64u, 0x491a5d1f8a438bc9u,
+    0x8b2d64f6bd099de7u, 0x772837d2bb83de9bu, 0x9d5edfbfdaa63368u, 0xdcb45c0eb78e86d6u,
+    0xd0e7770e67104316u, 0x000e940b3723e6c7u
+};
+static struct _mint_t mfloat_lgamma_asymptotic_term_28_1024_mint = { .sign = 1, .length = 18u, .capacity = 18u, .storage = mfloat_lgamma_asymptotic_term_28_1024_storage };
+static struct _mfloat_t mfloat_lgamma_asymptotic_term_28_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -1044, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_lgamma_asymptotic_term_28_1024_mint };
+
+static uint64_t mfloat_lgamma_asymptotic_term_29_1024_storage[] = {
+    0x076e9f0132ada8c3u, 0x9bdab5deb80c7b17u, 0x426b3a8da6144e33u, 0x3c4969e5994b92fdu,
+    0x656521774c906268u, 0x49dcd442d894f4cbu, 0x5eebe74cdb187f07u, 0xf197f6dcf067c4afu,
+    0xab08244f6f91553du, 0x09e03cd87d7b40b7u, 0x46dac2b7d5f1bcb9u, 0x6f469f27269783eeu,
+    0x791fcdbe610e59dfu, 0x619aaa6b15cb7924u, 0x3e81cd5cee1ba1e0u, 0x18c9bd60a7d4b5c7u,
+    0x3b4f451835e1174bu, 0x150689672663f8ccu, 0x000000000000989au
+};
+static struct _mint_t mfloat_lgamma_asymptotic_term_29_1024_mint = { .sign = 1, .length = 19u, .capacity = 19u, .storage = mfloat_lgamma_asymptotic_term_29_1024_storage };
+static struct _mfloat_t mfloat_lgamma_asymptotic_term_29_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = -1, .exponent2 = -1065, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_lgamma_asymptotic_term_29_1024_mint };
+
+static uint64_t mfloat_lgamma_asymptotic_term_30_1024_storage[] = {
+    0x30f63528917c80b3u, 0xb30f63528917c80bu, 0x0b30f63528917c80u, 0x80b30f63528917c8u,
+    0xc80b30f63528917cu, 0x7c80b30f63528917u, 0x17c80b30f6352891u, 0x917c80b30f635289u,
+    0x8917c80b30f63528u, 0x28917c80b30f6352u, 0x528917c80b30f635u, 0x3528917c80b30f63u,
+    0x63528917c80b30f6u, 0xf63528917c80b30fu, 0x0f63528917c80b30u, 0x30f63528917c80b3u,
+    0xb563efb6570e400bu, 0x03573b230396b33fu
+};
+static struct _mint_t mfloat_lgamma_asymptotic_term_30_1024_mint = { .sign = 1, .length = 18u, .capacity = 18u, .storage = mfloat_lgamma_asymptotic_term_30_1024_storage };
+static struct _mfloat_t mfloat_lgamma_asymptotic_term_30_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -1037, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_lgamma_asymptotic_term_30_1024_mint };
+
+static uint64_t mfloat_lgamma_asymptotic_term_31_1024_storage[] = {
+    0x00bfbbab6a665615u, 0xbfbbab6a66561511u, 0xbbab6a6656151100u, 0xab6a6656151100bfu,
+    0x6a6656151100bfbbu, 0x6656151100bfbbabu, 0x56151100bfbbab6au, 0x151100bfbbab6a66u,
+    0x1100bfbbab6a6656u, 0x00bfbbab6a665615u, 0xbfbbab6a66561511u, 0xbbab6a6656151100u,
+    0xab6a6656151100bfu, 0x6a6656151100bfbbu, 0x6656151100bfbbabu, 0x56151100bfbbab6au,
+    0x2dce139c786c6a66u, 0x29b6552aeca37097u, 0x0000000000000500u
+};
+static struct _mint_t mfloat_lgamma_asymptotic_term_31_1024_mint = { .sign = 1, .length = 19u, .capacity = 19u, .storage = mfloat_lgamma_asymptotic_term_31_1024_storage };
+static struct _mfloat_t mfloat_lgamma_asymptotic_term_31_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = -1, .exponent2 = -1047, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_lgamma_asymptotic_term_31_1024_mint };
+
+static uint64_t mfloat_lgamma_asymptotic_term_32_1024_storage[] = {
+    0x1a0073ac314af8c7u, 0xe609af2ecd0c6123u, 0xa0073ac314af8c6cu, 0x609af2ecd0c61231u,
+    0x0073ac314af8c6ceu, 0x09af2ecd0c61231au, 0x073ac314af8c6ce6u, 0x9af2ecd0c61231a0u,
+    0x73ac314af8c6ce60u, 0xaf2ecd0c61231a00u, 0x3ac314af8c6ce609u, 0xf2ecd0c61231a007u,
+    0xac314af8c6ce609au, 0x2ecd0c61231a0073u, 0xc314af8c6ce609afu, 0xecd0c61231a0073au,
+    0x02af139676609af2u, 0x4038c6823c029cc8u, 0x00000000007fae52u
+};
+static struct _mint_t mfloat_lgamma_asymptotic_term_32_1024_mint = { .sign = 1, .length = 19u, .capacity = 19u, .storage = mfloat_lgamma_asymptotic_term_32_1024_storage };
+static struct _mfloat_t mfloat_lgamma_asymptotic_term_32_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -1053, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_lgamma_asymptotic_term_32_1024_mint };
+
+static uint64_t mfloat_lgamma_asymptotic_term_33_1024_storage[] = {
+    0xa65618f6933b59ebu, 0xcc8b970d80209adfu, 0x65618f6933b59eb1u, 0xc8b970d80209adfau,
+    0x5618f6933b59eb1cu, 0x8b970d80209adfa6u, 0x618f6933b59eb1ccu, 0xb970d80209adfa65u,
+    0x18f6933b59eb1cc8u, 0x970d80209adfa656u, 0x8f6933b59eb1cc8bu, 0x70d80209adfa6561u,
+    0xf6933b59eb1cc8b9u, 0x0d80209adfa65618u, 0x6933b59eb1cc8b97u, 0xd80209adfa65618fu,
+    0x652da1ac906f8970u, 0xcde8fd42524351ceu, 0x000000000000d8cau
+};
+static struct _mint_t mfloat_lgamma_asymptotic_term_33_1024_mint = { .sign = 1, .length = 19u, .capacity = 19u, .storage = mfloat_lgamma_asymptotic_term_33_1024_storage };
+static struct _mfloat_t mfloat_lgamma_asymptotic_term_33_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = -1, .exponent2 = -1039, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_lgamma_asymptotic_term_33_1024_mint };
+
+static uint64_t mfloat_lgamma_asymptotic_term_34_1024_storage[] = {
+    0xdbe0f4ffd97d3e71u, 0x6b40f5c26e26cc88u, 0x9c4c47cbc50fe324u, 0x434d4fb2316bccd0u,
+    0x94415f9010bf42feu, 0x140db0130700faedu, 0x124334fd1cffa8d8u, 0xcc2a0034b2edebd1u,
+    0xf7f310e28789cb74u, 0xb290477912ae39f3u, 0x7b4219a16c7bf001u, 0x2d4755ce22b1cc7bu,
+    0xc4d92954bb4a4f1au, 0x02592c5f0df08778u, 0xc68674846994e1e7u, 0x628a941e1b048897u,
+    0xa7fee9b6beb2614eu, 0x5e8025fa36930530u, 0x0000000061baddfau
+};
+static struct _mint_t mfloat_lgamma_asymptotic_term_34_1024_mint = { .sign = 1, .length = 19u, .capacity = 19u, .storage = mfloat_lgamma_asymptotic_term_34_1024_storage };
+static struct _mfloat_t mfloat_lgamma_asymptotic_term_34_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -1047, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_lgamma_asymptotic_term_34_1024_mint };
+
+static uint64_t mfloat_lgamma_asymptotic_term_35_1024_storage[] = {
+    0xfe1d95b668abc3b9u, 0xa69951737ce42c86u, 0xda3836312c495f54u, 0x71e6de3e50956a48u,
+    0x530982d262efb16au, 0x1453f2d6510b8e80u, 0x083af329621783eeu, 0x4cfa5f77b9c4d4d7u,
+    0x7c2cfd22550e87b5u, 0xa05e7c791cf3e091u, 0x36d302208eeb629cu, 0xe8a46175ae16e4bdu,
+    0x0cf1af5ec3f6c46cu, 0x15bdcaef3b463a6eu, 0xc165fa0c66adcf67u, 0x4cbcc0aecaa7bd9eu,
+    0xd9658951ddd34102u, 0x24e763a3c5acde64u, 0x02eb4cd886fec94bu
+};
+static struct _mint_t mfloat_lgamma_asymptotic_term_35_1024_mint = { .sign = 1, .length = 19u, .capacity = 19u, .storage = mfloat_lgamma_asymptotic_term_35_1024_storage };
+static struct _mfloat_t mfloat_lgamma_asymptotic_term_35_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = -1, .exponent2 = -1067, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_lgamma_asymptotic_term_35_1024_mint };
+
+static uint64_t mfloat_lgamma_asymptotic_term_36_1024_storage[] = {
+    0x012b404ad012b405u, 0x2b404ad012b404adu, 0x404ad012b404ad01u, 0x4ad012b404ad012bu,
+    0xd012b404ad012b40u, 0x12b404ad012b404au, 0xb404ad012b404ad0u, 0x04ad012b404ad012u,
+    0xad012b404ad012b4u, 0x012b404ad012b404u, 0x2b404ad012b404adu, 0x404ad012b404ad01u,
+    0x4ad012b404ad012bu, 0xd012b404ad012b40u, 0x12b404ad012b404au, 0xb404ad012b404ad0u,
+    0x2fe906abb0f66012u, 0x3920b45f50fd61d7u, 0x0000000bcff6120eu
+};
+static struct _mint_t mfloat_lgamma_asymptotic_term_36_1024_mint = { .sign = 1, .length = 19u, .capacity = 19u, .storage = mfloat_lgamma_asymptotic_term_36_1024_storage };
+static struct _mfloat_t mfloat_lgamma_asymptotic_term_36_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -1038, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_lgamma_asymptotic_term_36_1024_mint };
+
+static uint64_t mfloat_lgamma_asymptotic_term_37_1024_storage[] = {
+    0xfcd070de181ef293u, 0x2c99d3daae4ebbf5u, 0x8f966a0a77b1b88cu, 0x25c6336d7447e855u,
+    0xef293003a4114b52u, 0xebbf5fcd070de181u, 0x1b88c2c99d3daae4u, 0x7e8558f966a0a77bu,
+    0x14b5225c6336d744u, 0xde181ef293003a41u, 0xdaae4ebbf5fcd070u, 0x0a77b1b88c2c99d3u,
+    0x6d7447e8558f966au, 0x03a4114b5225c633u, 0xcd070de181ef2930u, 0xc99d3daae4ebbf5fu,
+    0x73dfa8ff907948c2u, 0xab673e371e77208cu, 0x00003282abec3834u
+};
+static struct _mint_t mfloat_lgamma_asymptotic_term_37_1024_mint = { .sign = 1, .length = 19u, .capacity = 19u, .storage = mfloat_lgamma_asymptotic_term_37_1024_storage };
+static struct _mfloat_t mfloat_lgamma_asymptotic_term_37_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = -1, .exponent2 = -1041, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_lgamma_asymptotic_term_37_1024_mint };
+
+static uint64_t mfloat_lgamma_asymptotic_term_38_1024_storage[] = {
+    0x3c3ac6d4730066c7u, 0xae61fed40c654311u, 0xcf7fd13a8fef8793u, 0x794b50ddf5d79f20u,
+    0x5c87484409075f18u, 0x0a95feeeb9da1106u, 0x3343fe415262d64du, 0x2ac8d99562755698u,
+    0x2918e0ed20742e10u, 0x776680a20830ecc6u, 0xb41b35948afc5867u, 0xeea44df79b168abbu,
+    0xf591d9792afeb7d4u, 0x447f89eae67a3855u, 0x8f5ccd91419dcd2fu, 0xfe3271a69e84561cu,
+    0x4767c95d95faac26u, 0xa978134fc5fbd6dfu, 0x0e3e6a8d1ceca9d6u
+};
+static struct _mint_t mfloat_lgamma_asymptotic_term_38_1024_mint = { .sign = 1, .length = 19u, .capacity = 19u, .storage = mfloat_lgamma_asymptotic_term_38_1024_storage };
+static struct _mfloat_t mfloat_lgamma_asymptotic_term_38_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -1048, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_lgamma_asymptotic_term_38_1024_mint };
+
+static uint64_t mfloat_lgamma_asymptotic_term_39_1024_storage[] = {
+    0xe415f0ce0c21a7c3u, 0x92d487454d077d08u, 0x260e3658804675e8u, 0x70acc115da5d3b56u,
+    0xd149b37a65768dc0u, 0xa9c1affea7acff41u, 0x82a0ae2822e71556u, 0x2fc6ebd06659e753u,
+    0x9e0aba9ab6b7f749u, 0x4faaea911473502eu, 0xf7875bbdd8488a99u, 0xed907a4f05bcf4eeu,
+    0x22d0a485de3ffac4u, 0x0c3818943b945205u, 0xa7294bc82b224cf1u, 0x8fd5216997792624u,
+    0x59c1a0da6c9fcaceu, 0x288b6e7f7fab43fcu, 0xb7fead15a196f6ddu, 0x00000000000043b7u
+};
+static struct _mint_t mfloat_lgamma_asymptotic_term_39_1024_mint = { .sign = 1, .length = 20u, .capacity = 20u, .storage = mfloat_lgamma_asymptotic_term_39_1024_storage };
+static struct _mfloat_t mfloat_lgamma_asymptotic_term_39_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = -1, .exponent2 = -1059, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_lgamma_asymptotic_term_39_1024_mint };
+
+static const mfloat_t * const mfloat_lgamma_asymptotic_1024[40] = {
+    &mfloat_lgamma_asymptotic_term_0_1024_static,
+    &mfloat_lgamma_asymptotic_term_1_1024_static,
+    &mfloat_lgamma_asymptotic_term_2_1024_static,
+    &mfloat_lgamma_asymptotic_term_3_1024_static,
+    &mfloat_lgamma_asymptotic_term_4_1024_static,
+    &mfloat_lgamma_asymptotic_term_5_1024_static,
+    &mfloat_lgamma_asymptotic_term_6_1024_static,
+    &mfloat_lgamma_asymptotic_term_7_1024_static,
+    &mfloat_lgamma_asymptotic_term_8_1024_static,
+    &mfloat_lgamma_asymptotic_term_9_1024_static,
+    &mfloat_lgamma_asymptotic_term_10_1024_static,
+    &mfloat_lgamma_asymptotic_term_11_1024_static,
+    &mfloat_lgamma_asymptotic_term_12_1024_static,
+    &mfloat_lgamma_asymptotic_term_13_1024_static,
+    &mfloat_lgamma_asymptotic_term_14_1024_static,
+    &mfloat_lgamma_asymptotic_term_15_1024_static,
+    &mfloat_lgamma_asymptotic_term_16_1024_static,
+    &mfloat_lgamma_asymptotic_term_17_1024_static,
+    &mfloat_lgamma_asymptotic_term_18_1024_static,
+    &mfloat_lgamma_asymptotic_term_19_1024_static,
+    &mfloat_lgamma_asymptotic_term_20_1024_static,
+    &mfloat_lgamma_asymptotic_term_21_1024_static,
+    &mfloat_lgamma_asymptotic_term_22_1024_static,
+    &mfloat_lgamma_asymptotic_term_23_1024_static,
+    &mfloat_lgamma_asymptotic_term_24_1024_static,
+    &mfloat_lgamma_asymptotic_term_25_1024_static,
+    &mfloat_lgamma_asymptotic_term_26_1024_static,
+    &mfloat_lgamma_asymptotic_term_27_1024_static,
+    &mfloat_lgamma_asymptotic_term_28_1024_static,
+    &mfloat_lgamma_asymptotic_term_29_1024_static,
+    &mfloat_lgamma_asymptotic_term_30_1024_static,
+    &mfloat_lgamma_asymptotic_term_31_1024_static,
+    &mfloat_lgamma_asymptotic_term_32_1024_static,
+    &mfloat_lgamma_asymptotic_term_33_1024_static,
+    &mfloat_lgamma_asymptotic_term_34_1024_static,
+    &mfloat_lgamma_asymptotic_term_35_1024_static,
+    &mfloat_lgamma_asymptotic_term_36_1024_static,
+    &mfloat_lgamma_asymptotic_term_37_1024_static,
+    &mfloat_lgamma_asymptotic_term_38_1024_static,
+    &mfloat_lgamma_asymptotic_term_39_1024_static,
+};
+
+
 static mfloat_t *mfloat_clone_prec(const mfloat_t *src, size_t precision);
 static int mfloat_round_to_precision(mfloat_t *mfloat, size_t precision);
 static int mfloat_compute_pi(mfloat_t *dst, size_t precision);
@@ -41,6 +601,10 @@ static void mfloat_scratch_release_slot(mfloat_scratch_slot_t *slot);
 static int mfloat_scratch_copy(mfloat_t *dst, const mfloat_t *src);
 static int mfloat_is_below_neg_bits(const mfloat_t *mfloat, long bits);
 static int mfloat_get_exact_long_value(const mfloat_t *mfloat, long *out);
+static int mfloat_set_from_const_mint_local(mfloat_t *dst, const mint_t *src, long exponent2);
+static int mfloat_make_const_rational_local(mfloat_t *dst, const mint_t *num, const mint_t *den, size_t precision);
+static int mfloat_copy_lgamma_asymptotic_term_local(mfloat_t *dst, size_t index, size_t precision);
+static int mfloat_mul_euler_gamma_coeff_local(mfloat_t *mfloat, size_t index, size_t precision);
 static int mfloat_equals_exact_long(const mfloat_t *mfloat, long value);
 static int mfloat_is_exact_half(const mfloat_t *mfloat, short sign);
 
@@ -82,6 +646,79 @@ static int mfloat_scratch_copy(mfloat_t *dst, const mfloat_t *src)
     dst->sign = src->sign;
     dst->exponent2 = src->exponent2;
     return 0;
+}
+
+static int mfloat_set_from_const_mint_local(mfloat_t *dst, const mint_t *src, long exponent2)
+{
+    mint_t *tmp;
+    int rc;
+
+    if (!dst || !src)
+        return -1;
+    tmp = mi_clone(src);
+    if (!tmp)
+        return -1;
+    rc = mfloat_set_from_signed_mint(dst, tmp, exponent2);
+    mi_free(tmp);
+    return rc;
+}
+
+static int mfloat_make_const_rational_local(mfloat_t *dst, const mint_t *num, const mint_t *den, size_t precision)
+{
+    mfloat_t *n = NULL;
+    mfloat_t *d = NULL;
+    int rc = -1;
+
+    if (!dst || !num || !den)
+        return -1;
+    n = mf_new_prec(precision);
+    d = mf_new_prec(precision);
+    if (!n || !d ||
+        mfloat_set_from_const_mint_local(n, num, 0) != 0 ||
+        mfloat_set_from_const_mint_local(d, den, 0) != 0 ||
+        mf_div(n, d) != 0)
+        goto cleanup;
+    rc = mfloat_copy_value(dst, n);
+    if (rc == 0)
+        dst->precision = precision;
+
+cleanup:
+    mf_free(n);
+    mf_free(d);
+    return rc;
+}
+
+static int mfloat_copy_lgamma_asymptotic_term_local(mfloat_t *dst, size_t index, size_t precision)
+{
+    if (!dst || index >= sizeof(mfloat_lgamma_asymptotic_terms) / sizeof(mfloat_lgamma_asymptotic_terms[0]))
+        return -1;
+    if (precision <= 1024u && mfloat_lgamma_asymptotic_1024[index])
+        return mfloat_set_from_immortal_internal(dst, mfloat_lgamma_asymptotic_1024[index], precision);
+    return mfloat_make_const_rational_local(dst,
+                                            mfloat_lgamma_asymptotic_terms[index].num,
+                                            mfloat_lgamma_asymptotic_terms[index].den,
+                                            precision);
+}
+
+static int mfloat_mul_euler_gamma_coeff_local(mfloat_t *mfloat, size_t index, size_t precision)
+{
+    mfloat_t *factor = NULL;
+    int rc = -1;
+
+    if (!mfloat || index >= sizeof(mfloat_euler_gamma_coeffs) / sizeof(mfloat_euler_gamma_coeffs[0]))
+        return -1;
+    factor = mf_new_prec(precision);
+    if (!factor ||
+        mfloat_make_const_rational_local(factor,
+                                         mfloat_euler_gamma_coeffs[index].num,
+                                         mfloat_euler_gamma_coeffs[index].den,
+                                         precision) != 0)
+        goto cleanup;
+    rc = mf_mul(mfloat, factor);
+
+cleanup:
+    mf_free(factor);
+    return rc;
 }
 
 static int mfloat_get_exact_long_value(const mfloat_t *mfloat, long *out)
@@ -238,8 +875,8 @@ static mfloat_t *mfloat_new_half_ln_pi_prec(size_t precision)
 
     if (!mfloat)
         return NULL;
-    if ((precision <= MFLOAT_INTERNAL_HALF_LN_PI->precision
-            ? mfloat_set_from_binary_seed(mfloat, MFLOAT_INTERNAL_HALF_LN_PI, precision)
+    if ((precision <= mfloat_half_ln_pi1024_static.precision
+            ? mfloat_set_from_binary_seed(mfloat, &mfloat_half_ln_pi1024_static, precision)
             : mfloat_compute_half_ln_pi(mfloat, precision)) != 0) {
         mf_free(mfloat);
         return NULL;
@@ -410,7 +1047,7 @@ static int mfloat_add_half_ln_2pi(mfloat_t *sum, size_t precision)
 
     if (!sum)
         goto cleanup;
-    half_ln_2pi = mfloat_clone_immortal_prec_internal(MFLOAT_INTERNAL_HALF_LN_2PI, precision);
+    half_ln_2pi = mfloat_clone_immortal_prec_internal(&mfloat_half_ln_2pi1024_static, precision);
     if (!half_ln_2pi)
         goto cleanup;
     if (mf_add(sum, half_ln_2pi) != 0)
@@ -432,7 +1069,7 @@ static int mfloat_copy_cached_lgamma_asymptotic_term(mfloat_t *dst, size_t index
 
     tmp = mf_new_prec(precision);
     if (!tmp ||
-        mfloat_copy_lgamma_asymptotic_term_internal(tmp, index, precision) != 0)
+        mfloat_copy_lgamma_asymptotic_term_local(tmp, index, precision) != 0)
         goto cleanup;
     rc = mfloat_copy_value(dst, tmp);
     if (rc == 0)
@@ -1600,7 +2237,7 @@ static int mfloat_compute_euler_gamma(mfloat_t *dst, size_t precision)
 
     sum = mfloat_clone_prec(MF_ZERO, work_prec);
     term = mfloat_clone_prec(MF_ONE, work_prec);
-    ln2 = mfloat_clone_immortal_prec_internal(MFLOAT_INTERNAL_LN2, work_prec);
+    ln2 = mfloat_clone_immortal_prec_internal(&mfloat_ln2_1024_static, work_prec);
     if (!sum || !term || !ln2)
         goto cleanup;
 
@@ -1636,7 +2273,7 @@ static int mfloat_compute_euler_gamma(mfloat_t *dst, size_t precision)
             goto cleanup;
         if (mf_ldexp(corr, -(int)(shift_bits * powers[k])) != 0)
             goto cleanup;
-        if (mfloat_mul_euler_gamma_coeff_internal(corr, k, work_prec) != 0)
+        if (mfloat_mul_euler_gamma_coeff_local(corr, k, work_prec) != 0)
             goto cleanup;
         if (mf_add(sum, corr) != 0)
             goto cleanup;
@@ -1811,7 +2448,7 @@ int mf_exp(mfloat_t *mfloat)
     if (work_prec < precision + 96u)
         work_prec = precision + 96u;
     x = mfloat_clone_prec(mfloat, work_prec);
-    ln2 = mfloat_clone_immortal_prec_internal(MFLOAT_INTERNAL_LN2, work_prec);
+    ln2 = mfloat_clone_immortal_prec_internal(&mfloat_ln2_1024_static, work_prec);
     if (!x || !ln2)
         goto cleanup;
 
@@ -1971,7 +2608,7 @@ int mf_log(mfloat_t *mfloat)
     mfloat_scratch_reset_slot(&slots[0], work_prec);
 
     if (exp2 != 0) {
-        if (mfloat_scratch_copy(ln2, MFLOAT_INTERNAL_LN2) != 0)
+        if (mfloat_scratch_copy(ln2, &mfloat_ln2_1024_static) != 0)
             goto cleanup;
         if (mf_mul_long(ln2, exp2) != 0)
             goto cleanup;
@@ -2967,14 +3604,14 @@ int mf_erf(mfloat_t *mfloat)
         return mfloat_apply_qfloat_unary(mfloat, qf_erf);
     work_prec = mfloat_transcendental_work_prec(precision);
     if (mfloat_is_exact_half(mfloat, 1)) {
-        sum = mfloat_clone_immortal_prec_internal(MFLOAT_INTERNAL_ERF_HALF, work_prec);
+        sum = mfloat_clone_immortal_prec_internal(&mfloat_erf_half1024_static, work_prec);
         if (!sum)
             goto cleanup;
         rc = mfloat_finish_result(mfloat, sum, precision);
         goto cleanup;
     }
     if (mfloat_is_exact_half(mfloat, -1)) {
-        sum = mfloat_clone_immortal_prec_internal(MFLOAT_INTERNAL_ERF_HALF, work_prec);
+        sum = mfloat_clone_immortal_prec_internal(&mfloat_erf_half1024_static, work_prec);
         if (sum && mf_neg(sum) != 0) {
             mf_free(sum);
             sum = NULL;
@@ -3058,7 +3695,7 @@ int mf_erfc(mfloat_t *mfloat)
     if (mfloat_is_exact_half(mfloat, 1)) {
         one = mfloat_clone_prec(MF_ONE, work_prec);
         if (one) {
-            mfloat_t *erf_half = mfloat_clone_immortal_prec_internal(MFLOAT_INTERNAL_ERF_HALF, work_prec);
+            mfloat_t *erf_half = mfloat_clone_immortal_prec_internal(&mfloat_erf_half1024_static, work_prec);
             if (!erf_half || mf_sub(one, erf_half) != 0) {
                 mf_free(one);
                 one = NULL;
@@ -3101,14 +3738,14 @@ int mf_erfinv(mfloat_t *mfloat)
         return mfloat_apply_qfloat_unary(mfloat, qf_erfinv);
     work_prec = mfloat_transcendental_work_prec(precision);
     if (mfloat_is_exact_half(mfloat, 1)) {
-        y = mfloat_clone_immortal_prec_internal(MFLOAT_INTERNAL_ERFINV_HALF, work_prec);
+        y = mfloat_clone_immortal_prec_internal(&mfloat_erfinv_half1024_static, work_prec);
         if (!y)
             goto cleanup;
         rc = mfloat_finish_result(mfloat, y, precision);
         goto cleanup;
     }
     if (mfloat_is_exact_half(mfloat, -1)) {
-        y = mfloat_clone_immortal_prec_internal(MFLOAT_INTERNAL_ERFINV_HALF, work_prec);
+        y = mfloat_clone_immortal_prec_internal(&mfloat_erfinv_half1024_static, work_prec);
         if (y && mf_neg(y) != 0) {
             mf_free(y);
             y = NULL;
@@ -3177,7 +3814,7 @@ int mf_erfcinv(mfloat_t *mfloat)
         return mfloat_apply_qfloat_unary(mfloat, qf_erfcinv);
     work_prec = mfloat_transcendental_work_prec(precision);
     if (mfloat_is_exact_half(mfloat, 1))
-        return mfloat_set_from_immortal_internal(mfloat, MFLOAT_INTERNAL_ERFINV_HALF, precision);
+        return mfloat_set_from_immortal_internal(mfloat, &mfloat_erfinv_half1024_static, precision);
     x = mfloat_clone_prec(mfloat, work_prec);
     one = mfloat_clone_prec(MF_ONE, work_prec);
     if (!x || !one || mf_sub(one, x) != 0 || mf_erfinv(one) != 0)
@@ -3505,7 +4142,7 @@ int mf_tetragamma(mfloat_t *mfloat)
     if (precision <= MFLOAT_QFLOAT_EFFECTIVE_BITS)
         return mfloat_apply_qfloat_unary(mfloat, qf_tetragamma);
     if (mfloat_equals_exact_long(mfloat, 1)) {
-        tmp = mfloat_clone_immortal_prec_internal(MFLOAT_INTERNAL_TETRAGAMMA_1, precision);
+        tmp = mfloat_clone_immortal_prec_internal(&mfloat_tetragamma1_1024_static, precision);
         if (!tmp)
             goto cleanup;
         rc = mfloat_finish_result(mfloat, tmp, precision);
@@ -3576,7 +4213,7 @@ int mf_gammainv(mfloat_t *mfloat)
 
     y = mfloat_clone_prec(mfloat, work_prec);
     one = mfloat_clone_prec(MF_ONE, work_prec);
-    minval = mfloat_clone_immortal_prec_internal(MFLOAT_INTERNAL_GAMMAINV_MIN, work_prec);
+    minval = mfloat_clone_immortal_prec_internal(&mfloat_gammainv_min1024_static, work_prec);
     if (!y || !one || !minval)
         goto cleanup;
     if (mf_lt(y, minval)) {
@@ -3584,7 +4221,7 @@ int mf_gammainv(mfloat_t *mfloat)
         goto cleanup;
     }
     if (mfloat_equals_exact_long(mfloat, 3)) {
-        rc = mfloat_set_from_immortal_internal(mfloat, MFLOAT_INTERNAL_GAMMAINV_3, precision);
+        rc = mfloat_set_from_immortal_internal(mfloat, &mfloat_gammainv_31024_static, precision);
         goto cleanup;
     }
 
@@ -3598,7 +4235,7 @@ int mf_gammainv(mfloat_t *mfloat)
         if (!x)
             x = mf_clone(logy);
         if (x && mf_lt(x, MF_ONE) &&
-            mfloat_set_from_immortal_internal(x, MFLOAT_INTERNAL_GAMMAINV_ARGMIN, work_prec) != 0)
+            mfloat_set_from_immortal_internal(x, &mfloat_gammainv_argmin1024_static, work_prec) != 0)
             goto cleanup;
     }
     if (!x)
@@ -3615,7 +4252,7 @@ int mf_gammainv(mfloat_t *mfloat)
         if (!step || mf_div(step, psi) != 0 || mf_sub(x, step) != 0)
             goto cleanup;
         if (mf_gt(y, one) && mf_lt(x, MF_ONE) &&
-            mfloat_set_from_immortal_internal(x, MFLOAT_INTERNAL_GAMMAINV_ARGMIN, work_prec) != 0)
+            mfloat_set_from_immortal_internal(x, &mfloat_gammainv_argmin1024_static, work_prec) != 0)
             goto cleanup;
         if (mfloat_is_below_neg_bits(step, (long)work_prec + 8l))
             break;
@@ -3658,14 +4295,14 @@ int mf_lambert_w0(mfloat_t *mfloat)
         return mfloat_apply_qfloat_unary(mfloat, qf_lambert_w0);
     work_prec = mfloat_transcendental_work_prec(precision);
     if (mfloat_equals_exact_long(mfloat, 1)) {
-        w = mfloat_clone_immortal_prec_internal(MFLOAT_INTERNAL_LAMBERT_W0_1, work_prec);
+        w = mfloat_clone_immortal_prec_internal(&mfloat_lambert_w0_11024_static, work_prec);
         if (!w)
             goto cleanup;
         rc = mfloat_finish_result(mfloat, w, precision);
         goto cleanup;
     }
     if (mfloat_get_exact_long_value(mfloat, &n) && n == 1) {
-        w = mfloat_clone_immortal_prec_internal(MFLOAT_INTERNAL_LAMBERT_W0_1, work_prec);
+        w = mfloat_clone_immortal_prec_internal(&mfloat_lambert_w0_11024_static, work_prec);
         if (!w)
             goto cleanup;
         rc = mfloat_finish_result(mfloat, w, precision);
@@ -4054,7 +4691,7 @@ int mf_normal_logpdf(mfloat_t *mfloat)
         return mfloat_apply_qfloat_unary(mfloat, qf_normal_logpdf);
     work_prec = mfloat_transcendental_work_prec(precision);
     x2 = mfloat_clone_prec(mfloat, work_prec);
-    c = mfloat_clone_immortal_prec_internal(MFLOAT_INTERNAL_HALF_LN_2PI, work_prec);
+    c = mfloat_clone_immortal_prec_internal(&mfloat_half_ln_2pi1024_static, work_prec);
     if (!x2 || !c ||
         mf_mul(x2, x2) != 0 || mfloat_div_long_inplace(x2, 2) != 0 ||
         mf_add(x2, c) != 0 || mf_neg(x2) != 0)

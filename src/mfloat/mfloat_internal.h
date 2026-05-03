@@ -31,16 +31,6 @@ struct _mfloat_t {
 };
 
 /* Core-owned immortal constants used only inside the mfloat module. */
-extern const mfloat_t * const MFLOAT_INTERNAL_LN2;
-extern const mfloat_t * const MFLOAT_INTERNAL_HALF_LN_PI;
-extern const mfloat_t * const MFLOAT_INTERNAL_HALF_LN_2PI;
-extern const mfloat_t * const MFLOAT_INTERNAL_ERF_HALF;
-extern const mfloat_t * const MFLOAT_INTERNAL_ERFINV_HALF;
-extern const mfloat_t * const MFLOAT_INTERNAL_TETRAGAMMA_1;
-extern const mfloat_t * const MFLOAT_INTERNAL_GAMMAINV_MIN;
-extern const mfloat_t * const MFLOAT_INTERNAL_GAMMAINV_ARGMIN;
-extern const mfloat_t * const MFLOAT_INTERNAL_GAMMAINV_3;
-extern const mfloat_t * const MFLOAT_INTERNAL_LAMBERT_W0_1;
 
 /* Core representation helpers. */
 int mfloat_is_immortal(const mfloat_t *mfloat);
@@ -57,7 +47,5 @@ mfloat_t *mfloat_clone_immortal_prec_internal(const mfloat_t *src, size_t precis
 int mfloat_set_from_immortal_internal(mfloat_t *dst, const mfloat_t *src, size_t precision);
 
 /* Internal coefficient-table helpers. */
-int mfloat_copy_lgamma_asymptotic_term_internal(mfloat_t *dst, size_t index, size_t precision);
-int mfloat_mul_euler_gamma_coeff_internal(mfloat_t *mfloat, size_t index, size_t precision);
 
 #endif
