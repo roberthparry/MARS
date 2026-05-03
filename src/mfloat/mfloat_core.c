@@ -392,6 +392,61 @@ int mfloat_normalise(mfloat_t *mfloat)
     return 0;
 }
 
+int mfloat_round_to_precision_internal(mfloat_t *mfloat, size_t precision)
+{
+    size_t bitlen, excess;
+    mint_t *hi = NULL, *trunc = NULL, *low = NULL, *half = NULL;
+    int rc = -1;
+
+    if (!mfloat || !mfloat->mantissa || !mfloat_is_finite(mfloat) || precision == 0)
+        return -1;
+
+    bitlen = mi_bit_length(mfloat->mantissa);
+    if (bitlen <= precision) {
+        mfloat->precision = precision;
+        return 0;
+    }
+
+    excess = bitlen - precision;
+    hi = mi_clone(mfloat->mantissa);
+    low = mi_clone(mfloat->mantissa);
+    if (!hi || !low)
+        goto cleanup;
+
+    if (mi_shr(hi, (long)excess) != 0)
+        goto cleanup;
+
+    trunc = mi_clone(hi);
+    if (!trunc)
+        goto cleanup;
+    if (mi_shl(trunc, (long)excess) != 0)
+        goto cleanup;
+    if (mi_sub(low, trunc) != 0)
+        goto cleanup;
+
+    half = mi_create_2pow((uint64_t)(excess - 1u));
+    if (!half)
+        goto cleanup;
+    if (mi_cmp(low, half) >= 0) {
+        if (mi_inc(hi) != 0)
+            goto cleanup;
+    }
+
+    mi_clear(mfloat->mantissa);
+    if (mi_add(mfloat->mantissa, hi) != 0)
+        goto cleanup;
+    mfloat->exponent2 += (long)excess;
+    mfloat->precision = precision;
+    rc = mfloat_normalise(mfloat);
+
+cleanup:
+    mi_free(hi);
+    mi_free(trunc);
+    mi_free(low);
+    mi_free(half);
+    return rc;
+}
+
 static mfloat_t *mfloat_alloc(size_t precision_bits)
 {
     mfloat_t *mfloat = calloc(1, sizeof(*mfloat));
@@ -772,6 +827,11 @@ mfloat_t *mfloat_clone_immortal_prec_internal(const mfloat_t *src, size_t precis
         mf_free(dst);
         return NULL;
     }
+    if (precision < src->precision &&
+        mfloat_round_to_precision_internal(dst, precision) != 0) {
+        mf_free(dst);
+        return NULL;
+    }
     dst->precision = precision;
     return dst;
 }
@@ -784,6 +844,16 @@ int mfloat_set_from_immortal_internal(mfloat_t *dst, const mfloat_t *src, size_t
         if (rc == 0)
             dst->precision = precision;
         return rc;
+    }
+    if (src && precision < src->precision) {
+        int rc = mfloat_copy_value(dst, src);
+
+        if (rc != 0)
+            return rc;
+        if (mfloat_round_to_precision_internal(dst, precision) != 0)
+            return -1;
+        dst->precision = precision;
+        return 0;
     }
     mfloat_t *tmp = mfloat_clone_immortal_prec_internal(src, precision);
     int rc;

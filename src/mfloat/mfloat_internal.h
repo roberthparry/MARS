@@ -46,6 +46,7 @@ extern const mfloat_t * const MFLOAT_INTERNAL_LAMBERT_W0_1;
 int mfloat_is_immortal(const mfloat_t *mfloat);
 int mfloat_is_finite(const mfloat_t *mfloat);
 int mfloat_normalise(mfloat_t *mfloat);
+int mfloat_round_to_precision_internal(mfloat_t *mfloat, size_t precision);
 int mfloat_copy_value(mfloat_t *dst, const mfloat_t *src);
 int mfloat_set_from_signed_mint(mfloat_t *dst, mint_t *value, long exponent2);
 mint_t *mfloat_to_scaled_mint(const mfloat_t *mfloat, long target_exp);
