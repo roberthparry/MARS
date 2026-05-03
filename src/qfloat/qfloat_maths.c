@@ -1780,7 +1780,7 @@ qfloat_t qf_gammainv(qfloat_t y)
     if (y.hi > 100.0) {
         /* For larger y on the increasing branch, gamma-space Newton is
            cheaper because qf_gamma() is much faster than qf_lgamma(). */
-        for (int i = 0; i < 20; i++) {
+        for (int i = 0; i < 10; i++) {
             qfloat_t gx   = qf_gamma(x);
             qfloat_t psi  = qf_digamma(x);
             qfloat_t f    = qf_sub(gx, y);
@@ -1788,7 +1788,7 @@ qfloat_t qf_gammainv(qfloat_t y)
             qfloat_t step = qf_div(f, den);
             x = qf_sub(x, step);
 
-            if (qf_abs(step).hi < 1e-33)
+            if (qf_abs(step).hi < 1e-31)
                 break;
         }
     } else {
