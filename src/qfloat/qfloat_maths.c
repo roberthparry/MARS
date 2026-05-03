@@ -1974,15 +1974,26 @@ qfloat_t qf_lambert_wm1(qfloat_t x)
 qfloat_t qf_beta(qfloat_t a, qfloat_t b)
 {
     qfloat_t zero = qf_from_double(0.0);
+    qfloat_t a_plus_b;
 
     /* Domain: a>0, b>0 */
     if (qf_le(a, zero) || qf_le(b, zero))
         return QF_NAN;
 
+    a_plus_b = qf_add(a, b);
+
+    /* Moderate positive arguments are cheaper and safe via
+       Γ(a)Γ(b)/Γ(a+b) directly. */
+    if (a.hi < 20.0 && b.hi < 20.0 && a_plus_b.hi < 20.0) {
+        qfloat_t ga = qf_gamma(a);
+        qfloat_t gb = qf_gamma(b);
+        qfloat_t gab = qf_gamma(a_plus_b);
+        return qf_div(qf_mul(ga, gb), gab);
+    }
+
     /* log B(a,b) = lgamma(a) + lgamma(b) - lgamma(a+b) */
     qfloat_t lg_a  = qf_lgamma(a);
     qfloat_t lg_b  = qf_lgamma(b);
-    qfloat_t a_plus_b = qf_add(a, b);
     qfloat_t lg_ab = qf_lgamma(a_plus_b);
 
     qfloat_t logB = qf_add(lg_a, lg_b);
@@ -1996,14 +2007,17 @@ qfloat_t qf_beta(qfloat_t a, qfloat_t b)
 qfloat_t qf_logbeta(qfloat_t a, qfloat_t b)
 {
     qfloat_t zero = qf_from_double(0.0);
+    qfloat_t a_plus_b;
 
     /* Domain: a>0, b>0 */
     if (qf_le(a, zero) || qf_le(b, zero))
         return QF_NAN;
 
+    a_plus_b = qf_add(a, b);
+
     qfloat_t lg_a  = qf_lgamma(a);
     qfloat_t lg_b  = qf_lgamma(b);
-    qfloat_t lg_ab = qf_lgamma(qf_add(a, b));
+    qfloat_t lg_ab = qf_lgamma(a_plus_b);
 
     qfloat_t logB = qf_add(lg_a, lg_b);
     logB        = qf_sub(logB, lg_ab);
