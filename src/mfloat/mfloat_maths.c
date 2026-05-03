@@ -1416,6 +1416,108 @@ cleanup:
     return ok;
 }
 
+static int mfloat_get_small_positive_half_step(const mfloat_t *mfloat, long *out_twice_n)
+{
+    mfloat_t *twice = NULL;
+    long twice_n = 0;
+    int ok = 0;
+
+    if (!mfloat || !out_twice_n || !mfloat_is_finite(mfloat) || mfloat->sign <= 0)
+        return 0;
+    twice = mfloat_clone_prec(mfloat, mfloat->precision);
+    if (!twice)
+        return 0;
+    if (mf_mul_long(twice, 2) != 0)
+        goto cleanup;
+    if (!mfloat_get_small_positive_integer(twice, &twice_n) || twice_n < 1)
+        goto cleanup;
+    *out_twice_n = twice_n;
+    ok = 1;
+
+cleanup:
+    mf_free(twice);
+    return ok;
+}
+
+static int mfloat_build_small_halfstep_gamma_parts(long twice_n, size_t precision,
+                                                   mfloat_t *num, mfloat_t *den, int *pi_half)
+{
+    long m;
+
+    if (twice_n < 1 || !num || !den || !pi_half)
+        return -1;
+    if ((twice_n & 1L) == 0) {
+        m = twice_n / 2;
+        *pi_half = 0;
+        if (m <= 1)
+            return 0;
+        return mfloat_set_factorial(num, m - 1, precision);
+    }
+
+    m = (twice_n - 1) / 2;
+    *pi_half = 1;
+    if (m == 0)
+        return 0;
+    if (mfloat_set_factorial(num, 2 * m, precision) != 0 || mfloat_set_factorial(den, m, precision) != 0)
+        return -1;
+    return mf_ldexp(den, 2 * (int)m);
+}
+
+static int mfloat_try_small_exact_beta(mfloat_t *dst, const mfloat_t *a, const mfloat_t *b, size_t precision)
+{
+    long twice_a, twice_b, twice_sum;
+    int pi_half_a, pi_half_b, pi_half_sum, pi_factor;
+    mfloat_t *num_a = NULL, *den_a = NULL, *num_b = NULL, *den_b = NULL;
+    mfloat_t *num_sum = NULL, *den_sum = NULL, *value = NULL, *pi = NULL;
+    int rc = -1;
+
+    if (!mfloat_get_small_positive_half_step(a, &twice_a) || !mfloat_get_small_positive_half_step(b, &twice_b))
+        return 1;
+    if (twice_a > LONG_MAX - twice_b)
+        return 1;
+    twice_sum = twice_a + twice_b;
+
+    num_a = mfloat_clone_prec(MF_ONE, precision);
+    den_a = mfloat_clone_prec(MF_ONE, precision);
+    num_b = mfloat_clone_prec(MF_ONE, precision);
+    den_b = mfloat_clone_prec(MF_ONE, precision);
+    num_sum = mfloat_clone_prec(MF_ONE, precision);
+    den_sum = mfloat_clone_prec(MF_ONE, precision);
+    value = mfloat_clone_prec(MF_ONE, precision);
+    if (!num_a || !den_a || !num_b || !den_b || !num_sum || !den_sum || !value)
+        goto cleanup;
+    if (mfloat_build_small_halfstep_gamma_parts(twice_a, precision, num_a, den_a, &pi_half_a) != 0 ||
+        mfloat_build_small_halfstep_gamma_parts(twice_b, precision, num_b, den_b, &pi_half_b) != 0 ||
+        mfloat_build_small_halfstep_gamma_parts(twice_sum, precision, num_sum, den_sum, &pi_half_sum) != 0)
+        goto cleanup;
+
+    if (mf_mul(value, num_a) != 0 || mf_mul(value, num_b) != 0 || mf_mul(value, den_sum) != 0 ||
+        mf_div(value, den_a) != 0 || mf_div(value, den_b) != 0 || mf_div(value, num_sum) != 0)
+        goto cleanup;
+
+    pi_factor = pi_half_a + pi_half_b - pi_half_sum;
+    if (pi_factor == 2) {
+        pi = mfloat_new_pi_prec(precision);
+        if (!pi || mf_mul(value, pi) != 0)
+            goto cleanup;
+    } else if (pi_factor != 0) {
+        goto cleanup;
+    }
+
+    rc = mfloat_finish_result(dst, value, precision);
+
+cleanup:
+    mf_free(num_a);
+    mf_free(den_a);
+    mf_free(num_b);
+    mf_free(den_b);
+    mf_free(num_sum);
+    mf_free(den_sum);
+    mf_free(value);
+    mf_free(pi);
+    return rc;
+}
+
 static int mfloat_get_small_integer_text(const mfloat_t *mfloat, long *out)
 {
     char *text = NULL;
@@ -2653,7 +2755,8 @@ int mf_acosh(mfloat_t *mfloat)
     }
     if (mf_eq(x, one)) {
         mf_clear(mfloat);
-        return 0;
+        rc = 0;
+        goto cleanup;
     }
     y = mfloat_new_from_qfloat_prec(qf_acosh(mf_to_qfloat(x)), work_prec);
     if (!y)
@@ -3578,7 +3681,7 @@ cleanup:
 int mf_lambert_wm1(mfloat_t *mfloat)
 {
     size_t precision, work_prec;
-    mfloat_t *x = NULL, *w = NULL, *ew = NULL, *num = NULL, *den = NULL, *step = NULL;
+    mfloat_t *x = NULL, *w = NULL, *ew = NULL, *num = NULL, *den = NULL, *step = NULL, *corr = NULL, *two = NULL;
     int rc = -1;
 
     if (!mfloat)
@@ -3600,15 +3703,23 @@ int mf_lambert_wm1(mfloat_t *mfloat)
     if (!w)
         goto cleanup;
 
-    for (int i = 0; i < 20; ++i) {
+    two = mfloat_new_from_long_prec(2, work_prec);
+    if (!two)
+        goto cleanup;
+
+    for (int i = 0; i < 12; ++i) {
         ew = mf_clone(w);
         num = mf_clone(w);
         den = mf_clone(w);
-        if (!ew || !num || !den || mf_exp(ew) != 0)
+        corr = mf_clone(w);
+        if (!ew || !num || !den || !corr || mf_exp(ew) != 0)
             goto cleanup;
         if (mf_mul(num, ew) != 0 || mf_sub(num, x) != 0)
             goto cleanup;
         if (mf_add_long(den, 1) != 0 || mf_mul(den, ew) != 0)
+            goto cleanup;
+        if (mf_add(corr, two) != 0 || mf_mul(corr, num) != 0 || mfloat_div_long_inplace(corr, 2) != 0 ||
+            mf_div(corr, den) != 0 || mf_sub(den, corr) != 0)
             goto cleanup;
         step = mf_clone(num);
         if (!step || mf_div(step, den) != 0 || mf_sub(w, step) != 0)
@@ -3619,7 +3730,8 @@ int mf_lambert_wm1(mfloat_t *mfloat)
         mf_free(num);
         mf_free(den);
         mf_free(step);
-        ew = num = den = step = NULL;
+        mf_free(corr);
+        ew = num = den = step = corr = NULL;
     }
     rc = mfloat_finish_result(mfloat, w, precision);
 
@@ -3630,6 +3742,8 @@ cleanup:
     mf_free(num);
     mf_free(den);
     mf_free(step);
+    mf_free(corr);
+    mf_free(two);
     return rc;
 }
 
@@ -3679,7 +3793,7 @@ cleanup:
 int mf_logbeta(mfloat_t *mfloat, const mfloat_t *other)
 {
     size_t precision, work_prec;
-    mfloat_t *a = NULL, *b = NULL, *sum = NULL;
+    mfloat_t *a = NULL, *b = NULL, *sum = NULL, *beta = NULL;
     int rc = -1;
 
     if (!mfloat || !other)
@@ -3687,7 +3801,17 @@ int mf_logbeta(mfloat_t *mfloat, const mfloat_t *other)
     precision = mfloat->precision;
     if (precision <= MFLOAT_QFLOAT_EFFECTIVE_BITS)
         return mfloat_apply_qfloat_binary(mfloat, other, qf_logbeta);
-    work_prec = mfloat_transcendental_work_prec(precision) + 128u;
+    work_prec = mfloat_transcendental_work_prec(precision);
+    beta = mf_new_prec(work_prec);
+    if (!beta)
+        goto cleanup;
+    if (mfloat_try_small_exact_beta(beta, mfloat, other, work_prec) == 0) {
+        if (mf_log(beta) != 0)
+            goto cleanup;
+        rc = mfloat_finish_result(mfloat, beta, precision);
+        goto cleanup;
+    }
+    work_prec += 128u;
     a = mfloat_clone_prec(mfloat, work_prec);
     b = mfloat_clone_prec(other, work_prec);
     sum = mf_clone(a);
@@ -3703,6 +3827,7 @@ cleanup:
     mf_free(a);
     mf_free(b);
     mf_free(sum);
+    mf_free(beta);
     return rc;
 }
 
