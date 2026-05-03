@@ -1,5 +1,6 @@
 #include "mfloat_internal.h"
 
+#include <limits.h>
 #include <stddef.h>
 
 #define MFLOAT_ARITH_SLACK_BITS 64u
@@ -213,15 +214,52 @@ cleanup:
 
 int mf_add_long(mfloat_t *mfloat, long value)
 {
-    mfloat_t *tmp;
-    int rc;
+    mint_t *lhs = NULL, *rhs = NULL;
+    long common_exp;
+    int rc = -1;
 
-    tmp = mf_create_long(value);
-    if (!tmp)
+    if (!mfloat)
         return -1;
-    tmp->precision = mfloat ? mfloat->precision : MFLOAT_DEFAULT_PRECISION_BITS;
-    rc = mf_add(mfloat, tmp);
-    mf_free(tmp);
+    if (value == 0)
+        return 0;
+    if (!mfloat_is_finite(mfloat)) {
+        if (mfloat->kind == MFLOAT_KIND_NAN)
+            return mfloat_set_special(mfloat, MFLOAT_KIND_NAN);
+        return 0;
+    }
+    if (value == LONG_MIN) {
+        mfloat_t *tmp = mf_create_long(value);
+
+        if (!tmp)
+            return -1;
+        tmp->precision = mfloat->precision;
+        rc = mf_add(mfloat, tmp);
+        mf_free(tmp);
+        return rc;
+    }
+    if (mf_is_zero(mfloat))
+        return mf_set_long(mfloat, value);
+
+    if (mfloat_trim_oversized_inplace(mfloat) != 0)
+        return -1;
+
+    common_exp = mfloat->exponent2 < 0 ? mfloat->exponent2 : 0;
+    lhs = mfloat_to_scaled_mint(mfloat, common_exp);
+    rhs = mi_create_long(value < 0 ? -value : value);
+    if (!lhs || !rhs)
+        goto cleanup;
+    if (common_exp < 0 && mi_shl(rhs, -common_exp) != 0)
+        goto cleanup;
+    if (value < 0 && mi_neg(rhs) != 0)
+        goto cleanup;
+    if (mi_add(lhs, rhs) != 0)
+        goto cleanup;
+
+    rc = mfloat_set_from_signed_mint(mfloat, lhs, common_exp);
+
+cleanup:
+    mi_free(lhs);
+    mi_free(rhs);
     return rc;
 }
 
@@ -285,16 +323,45 @@ int mf_mul(mfloat_t *mfloat, const mfloat_t *other)
 
 int mf_mul_long(mfloat_t *mfloat, long value)
 {
-    mfloat_t *tmp;
-    int rc;
+    long abs_value;
 
-    tmp = mf_create_long(value);
-    if (!tmp)
+    if (!mfloat)
         return -1;
-    tmp->precision = mfloat ? mfloat->precision : MFLOAT_DEFAULT_PRECISION_BITS;
-    rc = mf_mul(mfloat, tmp);
-    mf_free(tmp);
-    return rc;
+    if (value == LONG_MIN) {
+        mfloat_t *tmp = mf_create_long(value);
+        int rc;
+
+        if (!tmp)
+            return -1;
+        tmp->precision = mfloat->precision;
+        rc = mf_mul(mfloat, tmp);
+        mf_free(tmp);
+        return rc;
+    }
+    if (!mfloat_is_finite(mfloat)) {
+        if (mfloat->kind == MFLOAT_KIND_NAN)
+            return mfloat_set_special(mfloat, MFLOAT_KIND_NAN);
+        if (value == 0)
+            return mfloat_set_special(mfloat, MFLOAT_KIND_NAN);
+        if (value < 0)
+            return mfloat_set_special(mfloat,
+                                      mfloat->kind == MFLOAT_KIND_POSINF ? MFLOAT_KIND_NEGINF
+                                                                         : MFLOAT_KIND_POSINF);
+        return 0;
+    }
+    if (mf_is_zero(mfloat) || value == 0) {
+        mf_clear(mfloat);
+        return 0;
+    }
+    if (mfloat_trim_oversized_inplace(mfloat) != 0)
+        return -1;
+
+    abs_value = value < 0 ? -value : value;
+    if (mi_mul_long(mfloat->mantissa, abs_value) != 0)
+        return -1;
+    if (value < 0)
+        mfloat->sign = (short)-mfloat->sign;
+    return mfloat_normalise(mfloat);
 }
 
 int mf_div(mfloat_t *mfloat, const mfloat_t *other)
