@@ -30,6 +30,8 @@ static int mfloat_compute_pi(mfloat_t *dst, size_t precision);
 static int mfloat_compute_ln2(mfloat_t *dst, size_t precision);
 static int mfloat_compute_e(mfloat_t *dst, size_t precision);
 static int mfloat_compute_euler_gamma(mfloat_t *dst, size_t precision);
+static int mfloat_compute_sqrt_pi(mfloat_t *dst, size_t precision);
+static int mfloat_compute_half_ln_pi(mfloat_t *dst, size_t precision);
 static int mfloat_set_from_seed(mfloat_t *dst, const char *text, size_t precision);
 static int mfloat_is_below_neg_bits(const mfloat_t *mfloat, long bits);
 
@@ -41,7 +43,10 @@ static mfloat_t *mfloat_cached_e = NULL;
 static size_t mfloat_cached_e_prec = 0u;
 static mfloat_t *mfloat_cached_gamma = NULL;
 static size_t mfloat_cached_gamma_prec = 0u;
-
+static mfloat_t *mfloat_cached_sqrt_pi = NULL;
+static size_t mfloat_cached_sqrt_pi_prec = 0u;
+static mfloat_t *mfloat_cached_half_ln_pi = NULL;
+static size_t mfloat_cached_half_ln_pi_prec = 0u;
 static int mfloat_copy_cached_constant(mfloat_t *dst,
                                        mfloat_t **cache,
                                        size_t *cache_prec,
@@ -59,6 +64,40 @@ static int mfloat_copy_cached_constant(mfloat_t *dst,
         if (!tmp)
             return -1;
         if (compute(tmp, precision) != 0) {
+            mf_free(tmp);
+            return -1;
+        }
+        mf_free(*cache);
+        *cache = tmp;
+        *cache_prec = precision;
+    }
+
+    rc = mfloat_copy_value(dst, *cache);
+    if (rc == 0)
+        dst->precision = precision;
+    return rc;
+}
+
+static int mfloat_copy_cached_seeded_constant(mfloat_t *dst,
+                                              mfloat_t **cache,
+                                              size_t *cache_prec,
+                                              size_t precision,
+                                              const char *seed,
+                                              int (*compute)(mfloat_t *, size_t))
+{
+    int rc;
+
+    if (!dst || !cache || !cache_prec || !seed || !compute)
+        return -1;
+
+    if (!*cache || *cache_prec != precision) {
+        mfloat_t *tmp = mf_new_prec(precision);
+
+        if (!tmp)
+            return -1;
+        if ((precision <= MFLOAT_CONST_LITERAL_BITS
+                ? mfloat_set_from_seed(tmp, seed, precision)
+                : compute(tmp, precision)) != 0) {
             mf_free(tmp);
             return -1;
         }
@@ -179,6 +218,44 @@ static mfloat_t *mfloat_new_euler_gamma_prec(size_t precision)
     return mfloat;
 }
 
+static mfloat_t *mfloat_new_sqrt_pi_prec(size_t precision)
+{
+    mfloat_t *mfloat = mf_new_prec(precision);
+
+    if (!mfloat)
+        return NULL;
+    if (mfloat_copy_cached_seeded_constant(
+            mfloat,
+            &mfloat_cached_sqrt_pi,
+            &mfloat_cached_sqrt_pi_prec,
+            precision,
+            "1.77245385090551602729816748334114518279754945612238712821380778985291128459103",
+            mfloat_compute_sqrt_pi) != 0) {
+        mf_free(mfloat);
+        return NULL;
+    }
+    return mfloat;
+}
+
+static mfloat_t *mfloat_new_half_ln_pi_prec(size_t precision)
+{
+    mfloat_t *mfloat = mf_new_prec(precision);
+
+    if (!mfloat)
+        return NULL;
+    if (mfloat_copy_cached_seeded_constant(
+            mfloat,
+            &mfloat_cached_half_ln_pi,
+            &mfloat_cached_half_ln_pi_prec,
+            precision,
+            "0.572364942924700087071713675676529355823647406457655785756811535736068884942413",
+            mfloat_compute_half_ln_pi) != 0) {
+        mf_free(mfloat);
+        return NULL;
+    }
+    return mfloat;
+}
+
 static int mfloat_div_long_inplace(mfloat_t *mfloat, long value)
 {
     mfloat_t *tmp;
@@ -189,6 +266,42 @@ static int mfloat_div_long_inplace(mfloat_t *mfloat, long value)
         return -1;
     rc = mf_div(mfloat, tmp);
     mf_free(tmp);
+    return rc;
+}
+
+static int mfloat_compute_sqrt_pi(mfloat_t *dst, size_t precision)
+{
+    mfloat_t *pi = mfloat_new_pi_prec(precision);
+    int rc = -1;
+
+    if (!pi)
+        return -1;
+    if (mf_sqrt(pi) != 0)
+        goto cleanup;
+    rc = mfloat_copy_value(dst, pi);
+    if (rc == 0)
+        dst->precision = precision;
+
+cleanup:
+    mf_free(pi);
+    return rc;
+}
+
+static int mfloat_compute_half_ln_pi(mfloat_t *dst, size_t precision)
+{
+    mfloat_t *pi = mfloat_new_pi_prec(precision);
+    int rc = -1;
+
+    if (!pi)
+        return -1;
+    if (mf_log(pi) != 0 || mfloat_div_long_inplace(pi, 2) != 0)
+        goto cleanup;
+    rc = mfloat_copy_value(dst, pi);
+    if (rc == 0)
+        dst->precision = precision;
+
+cleanup:
+    mf_free(pi);
     return rc;
 }
 
@@ -2880,8 +2993,8 @@ cleanup:
 int mf_gamma(mfloat_t *mfloat)
 {
     size_t precision, work_prec;
-    mfloat_t *x = NULL, *tmp = NULL, *pi = NULL;
-    long n = 0;
+    mfloat_t *x = NULL, *tmp = NULL, *pi = NULL, *den = NULL;
+    long n = 0, half_n = 0;
     int rc = -1;
 
     if (!mfloat)
@@ -2898,6 +3011,23 @@ int mf_gamma(mfloat_t *mfloat)
         return mfloat_apply_qfloat_unary(mfloat, qf_gamma);
     if (mfloat_get_small_integer_text(mfloat, &n) && n >= 1)
         return mfloat_set_factorial(mfloat, n - 1, precision);
+    if (mfloat_get_small_positive_half_integer(mfloat, &half_n)) {
+        tmp = mf_new_prec(precision);
+        den = mf_new_prec(precision);
+        pi = mfloat_new_sqrt_pi_prec(precision);
+        if (!tmp || !den || !pi)
+            goto cleanup;
+        if (mfloat_set_factorial(tmp, 2 * half_n, precision) != 0 ||
+            mfloat_set_factorial(den, half_n, precision) != 0 ||
+            mf_div(tmp, den) != 0)
+            goto cleanup;
+        if (half_n > 0 && mf_ldexp(tmp, -2 * (int)half_n) != 0)
+            goto cleanup;
+        if (mf_mul(tmp, pi) != 0)
+            goto cleanup;
+        rc = mfloat_finish_result(mfloat, tmp, precision);
+        goto cleanup;
+    }
     work_prec = mfloat_transcendental_work_prec(precision);
     x = mfloat_clone_prec(mfloat, work_prec);
     if (!x)
@@ -2924,6 +3054,7 @@ cleanup:
     mf_free(x);
     mf_free(tmp);
     mf_free(pi);
+    mf_free(den);
     return rc;
 }
 
@@ -3215,7 +3346,7 @@ int mf_lgamma(mfloat_t *mfloat)
     if (mfloat_get_small_positive_half_integer(mfloat, &n)) {
         tmp = mf_new_prec(precision);
         den = mf_new_prec(precision);
-        pi = mfloat_new_pi_prec(precision);
+        pi = mfloat_new_half_ln_pi_prec(precision);
         if (!tmp || !den || !pi)
             goto cleanup;
         if (mfloat_set_factorial(tmp, 2 * n, precision) != 0 ||
@@ -3224,8 +3355,7 @@ int mf_lgamma(mfloat_t *mfloat)
             goto cleanup;
         if (n > 0 && mf_ldexp(tmp, -2 * (int)n) != 0)
             goto cleanup;
-        if (mf_log(tmp) != 0 || mf_log(pi) != 0 || mfloat_div_long_inplace(pi, 2) != 0 ||
-            mf_add(tmp, pi) != 0)
+        if (mf_log(tmp) != 0 || mf_add(tmp, pi) != 0)
             goto cleanup;
         rc = mfloat_finish_result(mfloat, tmp, precision);
         goto cleanup;
