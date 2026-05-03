@@ -3935,13 +3935,7 @@ int mf_normal_cdf(mfloat_t *mfloat)
     work_prec = mfloat_transcendental_work_prec(precision);
     t = mfloat_clone_prec(mfloat, work_prec);
     half = mfloat_clone_prec(MF_HALF, work_prec);
-    sqrt2 = mfloat_clone_prec(MF_SQRT2, MF_SQRT2->precision);
-    if (sqrt2 && mfloat_round_to_precision(sqrt2, work_prec) == 0)
-        sqrt2->precision = work_prec;
-    else if (sqrt2) {
-        mf_free(sqrt2);
-        sqrt2 = NULL;
-    }
+    sqrt2 = mfloat_clone_immortal_prec_internal(MF_SQRT2, work_prec);
     if (!t || !half || !sqrt2 || mf_div(t, sqrt2) != 0 ||
         mf_erf(t) != 0 || mf_add(t, MF_ONE) != 0 || mf_mul(t, half) != 0)
         goto cleanup;
@@ -3967,13 +3961,7 @@ int mf_normal_logpdf(mfloat_t *mfloat)
         return mfloat_apply_qfloat_unary(mfloat, qf_normal_logpdf);
     work_prec = mfloat_transcendental_work_prec(precision);
     x2 = mfloat_clone_prec(mfloat, work_prec);
-    c = mfloat_clone_prec(MFLOAT_INTERNAL_HALF_LN_2PI, MFLOAT_INTERNAL_HALF_LN_2PI->precision);
-    if (c && mfloat_round_to_precision(c, work_prec) == 0)
-        c->precision = work_prec;
-    else if (c) {
-        mf_free(c);
-        c = NULL;
-    }
+    c = mfloat_clone_immortal_prec_internal(MFLOAT_INTERNAL_HALF_LN_2PI, work_prec);
     if (!x2 || !c ||
         mf_mul(x2, x2) != 0 || mfloat_div_long_inplace(x2, 2) != 0 ||
         mf_add(x2, c) != 0 || mf_neg(x2) != 0)
