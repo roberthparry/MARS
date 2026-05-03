@@ -1061,23 +1061,9 @@ cleanup:
 
 static int mfloat_copy_cached_lgamma_asymptotic_term(mfloat_t *dst, size_t index, size_t precision)
 {
-    mfloat_t *tmp = NULL;
-    int rc = -1;
-
     if (!dst || index >= MFLOAT_LGAMMA_ASYMPTOTIC_TERM_COUNT)
         return -1;
-
-    tmp = mf_new_prec(precision);
-    if (!tmp ||
-        mfloat_copy_lgamma_asymptotic_term_local(tmp, index, precision) != 0)
-        goto cleanup;
-    rc = mfloat_copy_value(dst, tmp);
-    if (rc == 0)
-        dst->precision = precision;
-
-cleanup:
-    mf_free(tmp);
-    return rc;
+    return mfloat_copy_lgamma_asymptotic_term_local(dst, index, precision);
 }
 
 static int mfloat_is_near_integer_pole(const mfloat_t *x)
