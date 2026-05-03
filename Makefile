@@ -2,6 +2,7 @@
 # Build mode
 # ------------------------------------------------------------
 DEBUG ?= 0
+RELEASE_OPT_FLAGS ?= -O2 -flto -march=native -mtune=native
 
 ifeq ($(DEBUG),1)
     BUILD_DIR      := build/debug
@@ -10,7 +11,7 @@ ifeq ($(DEBUG),1)
 else
     BUILD_DIR      := build/release
     TEST_BUILD_DIR := tests/build/release
-    CFLAGS         := -Wall -Wextra -Werror -O2 -fPIC
+    CFLAGS         := -Wall -Wextra -Werror $(RELEASE_OPT_FLAGS) -fPIC
 endif
 
 CFLAGS += -D_GNU_SOURCE
