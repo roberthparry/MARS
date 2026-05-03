@@ -3276,12 +3276,12 @@ int mf_lgamma(mfloat_t *mfloat)
     z = x;
     x = NULL;
     acc = mfloat_clone_prec(MF_ZERO, work_prec);
-    threshold = mfloat_new_from_long_prec(100, work_prec);
+    threshold = mfloat_new_from_long_prec(90, work_prec);
     tmp = mf_new_prec(work_prec);
     if (!z || !acc || !threshold || !tmp)
         goto cleanup;
     {
-        long steps = mfloat_estimate_positive_unit_steps(z, 100);
+        long steps = mfloat_estimate_positive_unit_steps(z, 90);
 
         if (steps < 0)
             goto cleanup;
