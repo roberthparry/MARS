@@ -50,11 +50,6 @@ int mfloat_set_from_signed_mint(mfloat_t *dst, mint_t *value, long exponent2);
 mint_t *mfloat_to_scaled_mint(const mfloat_t *mfloat, long target_exp);
 size_t mfloat_get_default_precision_internal(void);
 
-/* Internal text/rational construction helpers. */
-int mfloat_set_from_seed_internal(mfloat_t *dst, const char *text, size_t precision);
-mfloat_t *mfloat_new_seed_prec_internal(const char *text, size_t precision);
-int mfloat_mul_seed_rational_internal(mfloat_t *mfloat, const char *num, const char *den, size_t precision);
-
 /* Internal immortal-constant helpers. */
 mfloat_t *mfloat_clone_immortal_prec_internal(const mfloat_t *src, size_t precision);
 int mfloat_set_from_immortal_internal(mfloat_t *dst, const mfloat_t *src, size_t precision);

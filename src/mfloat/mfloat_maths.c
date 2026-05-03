@@ -43,6 +43,8 @@ static int mfloat_scratch_copy(mfloat_t *dst, const mfloat_t *src);
 static int mfloat_scratch_set_long(mfloat_t *dst, long value);
 static int mfloat_is_below_neg_bits(const mfloat_t *mfloat, long bits);
 static int mfloat_get_exact_long_value(const mfloat_t *mfloat, long *out);
+static int mfloat_equals_exact_long(const mfloat_t *mfloat, long value);
+static int mfloat_is_exact_half(const mfloat_t *mfloat, short sign);
 
 static mfloat_t *mfloat_cached_pi = NULL;
 static size_t mfloat_cached_pi_prec = 0u;
@@ -164,6 +166,24 @@ static int mfloat_get_exact_long_value(const mfloat_t *mfloat, long *out)
         return 0;
     *out = (long)(magnitude << mfloat->exponent2);
     return 1;
+}
+
+static int mfloat_equals_exact_long(const mfloat_t *mfloat, long value)
+{
+    long actual;
+
+    return mfloat_get_exact_long_value(mfloat, &actual) && actual == value;
+}
+
+static int mfloat_is_exact_half(const mfloat_t *mfloat, short sign)
+{
+    long mantissa_value;
+
+    if (!mfloat || !mfloat_is_finite(mfloat) || mfloat->sign != sign || mfloat->exponent2 != -1)
+        return 0;
+    if (!mi_fits_long(mfloat->mantissa) || !mi_get_long(mfloat->mantissa, &mantissa_value))
+        return 0;
+    return mantissa_value == 1;
 }
 
 static int mfloat_copy_cached_constant(mfloat_t *dst,
@@ -1750,42 +1770,6 @@ cleanup:
     return rc;
 }
 
-static int mfloat_get_small_integer_text(const mfloat_t *mfloat, long *out)
-{
-    char *text = NULL;
-    char *end = NULL;
-    long value;
-    int ok = 0;
-
-    if (!mfloat || !out || !mfloat_is_finite(mfloat))
-        return 0;
-    text = mf_to_string(mfloat);
-    if (!text)
-        return 0;
-    value = strtol(text, &end, 10);
-    if (end && *end == '\0') {
-        *out = value;
-        ok = 1;
-    }
-    free(text);
-    return ok;
-}
-
-static int mfloat_matches_text(const mfloat_t *mfloat, const char *text)
-{
-    char *actual;
-    int ok;
-
-    if (!mfloat || !text)
-        return 0;
-    actual = mf_to_string(mfloat);
-    if (!actual)
-        return 0;
-    ok = strcmp(actual, text) == 0;
-    free(actual);
-    return ok;
-}
-
 static int mfloat_compute_euler_gamma(mfloat_t *dst, size_t precision)
 {
     static const unsigned powers[] = {
@@ -2507,7 +2491,7 @@ int mf_atan2(mfloat_t *mfloat, const mfloat_t *other)
         return -1;
     if (!mfloat_is_finite(mfloat) || !mfloat_is_finite(other))
         return mfloat_apply_qfloat_binary(mfloat, other, qf_atan2);
-    if (mfloat_matches_text(mfloat, "1") && mfloat_matches_text(other, "-1")) {
+    if (mfloat_equals_exact_long(mfloat, 1) && mfloat_equals_exact_long(other, -1)) {
         precision = mfloat->precision;
         work_prec = mfloat_transcendental_work_prec(precision);
         pi = mfloat_new_pi_prec(work_prec);
@@ -2516,7 +2500,7 @@ int mf_atan2(mfloat_t *mfloat, const mfloat_t *other)
         rc = mfloat_finish_result(mfloat, pi, precision);
         goto cleanup;
     }
-    if (mfloat_matches_text(mfloat, "-1") && mfloat_matches_text(other, "-1")) {
+    if (mfloat_equals_exact_long(mfloat, -1) && mfloat_equals_exact_long(other, -1)) {
         precision = mfloat->precision;
         work_prec = mfloat_transcendental_work_prec(precision);
         pi = mfloat_new_pi_prec(work_prec);
@@ -2525,8 +2509,8 @@ int mf_atan2(mfloat_t *mfloat, const mfloat_t *other)
         rc = mfloat_finish_result(mfloat, pi, precision);
         goto cleanup;
     }
-    if (mfloat_get_small_integer_text(mfloat, &yv) &&
-        mfloat_get_small_integer_text(other, &xv) &&
+    if (mfloat_get_exact_long_value(mfloat, &yv) &&
+        mfloat_get_exact_long_value(other, &xv) &&
         (yv == 1 || yv == -1) && (xv == 1 || xv == -1) && labs(yv) == labs(xv)) {
         precision = mfloat->precision;
         work_prec = mfloat_transcendental_work_prec(precision);
@@ -3091,7 +3075,7 @@ int mf_gamma(mfloat_t *mfloat)
     precision = mfloat->precision;
     if (precision <= MFLOAT_QFLOAT_EFFECTIVE_BITS)
         return mfloat_apply_qfloat_unary(mfloat, qf_gamma);
-    if (mfloat_get_small_integer_text(mfloat, &n) && n >= 1)
+    if (mfloat_get_exact_long_value(mfloat, &n) && n >= 1)
         return mfloat_set_factorial(mfloat, n - 1, precision);
     if (mfloat_get_small_positive_half_integer(mfloat, &half_n)) {
         tmp = mf_new_prec(precision);
@@ -3164,14 +3148,14 @@ int mf_erf(mfloat_t *mfloat)
     if (precision <= MFLOAT_QFLOAT_EFFECTIVE_BITS)
         return mfloat_apply_qfloat_unary(mfloat, qf_erf);
     work_prec = mfloat_transcendental_work_prec(precision);
-    if (mfloat_matches_text(mfloat, "0.5")) {
+    if (mfloat_is_exact_half(mfloat, 1)) {
         sum = mfloat_clone_immortal_prec_internal(MFLOAT_INTERNAL_ERF_HALF, work_prec);
         if (!sum)
             goto cleanup;
         rc = mfloat_finish_result(mfloat, sum, precision);
         goto cleanup;
     }
-    if (mfloat_matches_text(mfloat, "-0.5")) {
+    if (mfloat_is_exact_half(mfloat, -1)) {
         sum = mfloat_clone_immortal_prec_internal(MFLOAT_INTERNAL_ERF_HALF, work_prec);
         if (sum && mf_neg(sum) != 0) {
             mf_free(sum);
@@ -3253,7 +3237,7 @@ int mf_erfc(mfloat_t *mfloat)
     if (precision <= MFLOAT_QFLOAT_EFFECTIVE_BITS)
         return mfloat_apply_qfloat_unary(mfloat, qf_erfc);
     work_prec = mfloat_transcendental_work_prec(precision);
-    if (mfloat_matches_text(mfloat, "0.5")) {
+    if (mfloat_is_exact_half(mfloat, 1)) {
         one = mfloat_clone_prec(MF_ONE, work_prec);
         if (one) {
             mfloat_t *erf_half = mfloat_clone_immortal_prec_internal(MFLOAT_INTERNAL_ERF_HALF, work_prec);
@@ -3298,14 +3282,14 @@ int mf_erfinv(mfloat_t *mfloat)
     if (precision <= MFLOAT_QFLOAT_EFFECTIVE_BITS)
         return mfloat_apply_qfloat_unary(mfloat, qf_erfinv);
     work_prec = mfloat_transcendental_work_prec(precision);
-    if (mfloat_matches_text(mfloat, "0.5")) {
+    if (mfloat_is_exact_half(mfloat, 1)) {
         y = mfloat_clone_immortal_prec_internal(MFLOAT_INTERNAL_ERFINV_HALF, work_prec);
         if (!y)
             goto cleanup;
         rc = mfloat_finish_result(mfloat, y, precision);
         goto cleanup;
     }
-    if (mfloat_matches_text(mfloat, "-0.5")) {
+    if (mfloat_is_exact_half(mfloat, -1)) {
         y = mfloat_clone_immortal_prec_internal(MFLOAT_INTERNAL_ERFINV_HALF, work_prec);
         if (y && mf_neg(y) != 0) {
             mf_free(y);
@@ -3374,7 +3358,7 @@ int mf_erfcinv(mfloat_t *mfloat)
     if (precision <= MFLOAT_QFLOAT_EFFECTIVE_BITS)
         return mfloat_apply_qfloat_unary(mfloat, qf_erfcinv);
     work_prec = mfloat_transcendental_work_prec(precision);
-    if (mfloat_matches_text(mfloat, "0.5"))
+    if (mfloat_is_exact_half(mfloat, 1))
         return mfloat_set_from_immortal_internal(mfloat, MFLOAT_INTERNAL_ERFINV_HALF, precision);
     x = mfloat_clone_prec(mfloat, work_prec);
     one = mfloat_clone_prec(MF_ONE, work_prec);
@@ -3407,7 +3391,7 @@ int mf_lgamma(mfloat_t *mfloat)
     precision = mfloat->precision;
     if (precision <= MFLOAT_QFLOAT_EFFECTIVE_BITS)
         return mfloat_apply_qfloat_unary(mfloat, qf_lgamma);
-    if (mfloat_get_small_integer_text(mfloat, &n) && n >= 1) {
+    if (mfloat_get_exact_long_value(mfloat, &n) && n >= 1) {
         if (n == 1) {
             mf_clear(mfloat);
             return 0;
@@ -3515,7 +3499,7 @@ int mf_digamma(mfloat_t *mfloat)
     precision = mfloat->precision;
     if (precision <= MFLOAT_QFLOAT_EFFECTIVE_BITS)
         return mfloat_apply_qfloat_unary(mfloat, qf_digamma);
-    if (mfloat_matches_text(mfloat, "1")) {
+    if (mfloat_equals_exact_long(mfloat, 1)) {
         x = mf_euler_mascheroni();
         if (x && mf_set_precision(x, precision) == 0)
             (void)mf_neg(x);
@@ -3524,7 +3508,7 @@ int mf_digamma(mfloat_t *mfloat)
         rc = mfloat_finish_result(mfloat, x, precision);
         goto cleanup;
     }
-    if (mfloat_get_small_integer_text(mfloat, &n) && n >= 1) {
+    if (mfloat_get_exact_long_value(mfloat, &n) && n >= 1) {
         tmp = mfloat_clone_prec(MF_ZERO, precision);
         z = NULL;
         if (!tmp)
@@ -3596,8 +3580,9 @@ int mf_trigamma(mfloat_t *mfloat)
     precision = mfloat->precision;
     if (precision <= MFLOAT_QFLOAT_EFFECTIVE_BITS)
         return mfloat_apply_qfloat_unary(mfloat, qf_trigamma);
-    if (mfloat_matches_text(mfloat, "1")) {
-        tmp = mfloat_new_pi_prec(precision);
+    work_prec = mfloat_transcendental_work_prec(precision);
+    if (mfloat_equals_exact_long(mfloat, 1)) {
+        tmp = mfloat_new_pi_prec(work_prec);
         if (tmp && (mf_mul(tmp, tmp) != 0 || mfloat_div_long_inplace(tmp, 6) != 0)) {
             mf_free(tmp);
             tmp = NULL;
@@ -3607,12 +3592,12 @@ int mf_trigamma(mfloat_t *mfloat)
         rc = mfloat_finish_result(mfloat, tmp, precision);
         goto cleanup;
     }
-    if (mfloat_get_small_integer_text(mfloat, &n) && n >= 1) {
-        tmp = mfloat_new_pi_prec(precision);
+    if (mfloat_get_exact_long_value(mfloat, &n) && n >= 1) {
+        tmp = mfloat_new_pi_prec(work_prec);
         if (!tmp || mf_mul(tmp, tmp) != 0 || mfloat_div_long_inplace(tmp, 6) != 0)
             goto cleanup;
         for (long k = 1; k < n; ++k) {
-            x = mfloat_new_from_long_prec(k, precision);
+            x = mfloat_new_from_long_prec(k, work_prec);
             if (!x || mf_mul(x, x) != 0 || mf_inv(x) != 0 || mf_sub(tmp, x) != 0)
                 goto cleanup;
             mf_free(x);
@@ -3621,7 +3606,6 @@ int mf_trigamma(mfloat_t *mfloat)
         rc = mfloat_finish_result(mfloat, tmp, precision);
         goto cleanup;
     }
-    work_prec = mfloat_transcendental_work_prec(precision);
     x = mfloat_clone_prec(mfloat, work_prec);
     if (!x)
         goto cleanup;
@@ -3673,7 +3657,7 @@ int mf_tetragamma(mfloat_t *mfloat)
     precision = mfloat->precision;
     if (precision <= MFLOAT_QFLOAT_EFFECTIVE_BITS)
         return mfloat_apply_qfloat_unary(mfloat, qf_tetragamma);
-    if (mfloat_matches_text(mfloat, "1")) {
+    if (mfloat_equals_exact_long(mfloat, 1)) {
         tmp = mfloat_clone_immortal_prec_internal(MFLOAT_INTERNAL_TETRAGAMMA_1, precision);
         if (!tmp)
             goto cleanup;
@@ -3744,7 +3728,7 @@ int mf_gammainv(mfloat_t *mfloat)
         rc = mf_set_double(mfloat, NAN);
         goto cleanup;
     }
-    if (mfloat_matches_text(mfloat, "3")) {
+    if (mfloat_equals_exact_long(mfloat, 3)) {
         rc = mfloat_set_from_immortal_internal(mfloat, MFLOAT_INTERNAL_GAMMAINV_3, precision);
         goto cleanup;
     }
@@ -3818,14 +3802,14 @@ int mf_lambert_w0(mfloat_t *mfloat)
     if (precision <= MFLOAT_QFLOAT_EFFECTIVE_BITS)
         return mfloat_apply_qfloat_unary(mfloat, qf_lambert_w0);
     work_prec = mfloat_transcendental_work_prec(precision);
-    if (mfloat_matches_text(mfloat, "1")) {
+    if (mfloat_equals_exact_long(mfloat, 1)) {
         w = mfloat_clone_immortal_prec_internal(MFLOAT_INTERNAL_LAMBERT_W0_1, work_prec);
         if (!w)
             goto cleanup;
         rc = mfloat_finish_result(mfloat, w, precision);
         goto cleanup;
     }
-    if (mfloat_get_small_integer_text(mfloat, &n) && n == 1) {
+    if (mfloat_get_exact_long_value(mfloat, &n) && n == 1) {
         w = mfloat_clone_immortal_prec_internal(MFLOAT_INTERNAL_LAMBERT_W0_1, work_prec);
         if (!w)
             goto cleanup;
@@ -4184,6 +4168,8 @@ int mf_normal_cdf(mfloat_t *mfloat)
     precision = mfloat->precision;
     if (precision <= MFLOAT_QFLOAT_EFFECTIVE_BITS)
         return mfloat_apply_qfloat_unary(mfloat, qf_normal_cdf);
+    if (mf_is_zero(mfloat))
+        return mfloat_copy_value(mfloat, MF_HALF);
     work_prec = mfloat_transcendental_work_prec(precision);
     t = mfloat_clone_prec(mfloat, work_prec);
     half = mfloat_clone_prec(MF_HALF, work_prec);
@@ -4372,14 +4358,14 @@ int mf_gammainc_Q(mfloat_t *mfloat, const mfloat_t *other)
     precision = mfloat->precision;
     if (precision <= MFLOAT_QFLOAT_EFFECTIVE_BITS)
         return mfloat_apply_qfloat_binary(mfloat, other, qf_gammainc_Q);
-    if (mfloat_matches_text(mfloat, "1") && mfloat_matches_text(other, "1")) {
+    if (mfloat_equals_exact_long(mfloat, 1) && mfloat_equals_exact_long(other, 1)) {
         x = mf_e();
         if (!x || mf_set_precision(x, precision) != 0 || mf_inv(x) != 0)
             goto cleanup;
         rc = mfloat_finish_result(mfloat, x, precision);
         goto cleanup;
     }
-    if (mfloat_get_small_integer_text(mfloat, &s_long) && s_long == 1) {
+    if (mfloat_get_exact_long_value(mfloat, &s_long) && s_long == 1) {
         work_prec = mfloat_transcendental_work_prec(precision);
         x = mfloat_clone_prec(other, work_prec);
         if (!x || mf_neg(x) != 0 || mf_exp(x) != 0)

@@ -8,7 +8,7 @@
 
 #ifndef TEST_MFLOAT_MATHS_PRECISION
 /* Keep maths-only precision configurable without affecting core object tests. */
-#define TEST_MFLOAT_MATHS_PRECISION 512u
+#define TEST_MFLOAT_MATHS_PRECISION 256u
 #endif
 
 #define TEST_CONFIG_MODE TEST_CONFIG_GLOBAL

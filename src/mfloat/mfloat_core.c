@@ -1,4 +1,5 @@
 #include "mfloat_internal.h"
+#include "internal/mfloat_coeff_tables.h"
 #include "internal/mint_layout.h"
 
 #include <ctype.h>
@@ -671,36 +672,47 @@ size_t mfloat_get_default_precision_internal(void)
     return mfloat_default_precision_bits;
 }
 
-static mfloat_t *mfloat_from_seed_or_null_internal(const char *text, size_t precision)
+static int mfloat_set_from_const_mint_internal(mfloat_t *dst, const mint_t *src, long exponent2)
 {
-    mfloat_t *mfloat = mf_new_prec(precision);
-
-    if (!mfloat)
-        return NULL;
-    if (mf_set_string(mfloat, text) != 0) {
-        mf_free(mfloat);
-        return NULL;
-    }
-    return mfloat;
-}
-
-int mfloat_set_from_seed_internal(mfloat_t *dst, const char *text, size_t precision)
-{
-    mfloat_t *tmp = mfloat_from_seed_or_null_internal(text, precision);
+    mint_t *tmp;
     int rc;
 
+    if (!dst || !src)
+        return -1;
+    tmp = mi_clone(src);
     if (!tmp)
         return -1;
-    rc = mfloat_copy_value(dst, tmp);
-    if (rc == 0)
-        dst->precision = precision;
-    mf_free(tmp);
+    rc = mfloat_set_from_signed_mint(dst, tmp, exponent2);
+    mi_free(tmp);
     return rc;
 }
 
-mfloat_t *mfloat_new_seed_prec_internal(const char *text, size_t precision)
+static int mfloat_make_const_rational_internal(mfloat_t *dst,
+                                               const mint_t *num,
+                                               const mint_t *den,
+                                               size_t precision)
 {
-    return mfloat_from_seed_or_null_internal(text, precision);
+    mfloat_t *n = NULL;
+    mfloat_t *d = NULL;
+    int rc = -1;
+
+    if (!dst || !num || !den)
+        return -1;
+    n = mf_new_prec(precision);
+    d = mf_new_prec(precision);
+    if (!n || !d ||
+        mfloat_set_from_const_mint_internal(n, num, 0) != 0 ||
+        mfloat_set_from_const_mint_internal(d, den, 0) != 0 ||
+        mf_div(n, d) != 0)
+        goto cleanup;
+    rc = mfloat_copy_value(dst, n);
+    if (rc == 0)
+        dst->precision = precision;
+
+cleanup:
+    mf_free(n);
+    mf_free(d);
+    return rc;
 }
 
 mfloat_t *mfloat_clone_immortal_prec_internal(const mfloat_t *src, size_t precision)
@@ -734,146 +746,35 @@ int mfloat_set_from_immortal_internal(mfloat_t *dst, const mfloat_t *src, size_t
     return rc;
 }
 
-int mfloat_mul_seed_rational_internal(mfloat_t *mfloat,
-                                      const char *num,
-                                      const char *den,
-                                      size_t precision)
-{
-    mfloat_t *n = NULL, *d = NULL;
-    int rc = -1;
-
-    n = mfloat_new_seed_prec_internal(num, precision);
-    d = mfloat_new_seed_prec_internal(den, precision);
-    if (!n || !d)
-        goto cleanup;
-    if (mf_div(n, d) != 0)
-        goto cleanup;
-    rc = mf_mul(mfloat, n);
-
-cleanup:
-    mf_free(n);
-    mf_free(d);
-    return rc;
-}
-
-typedef struct mfloat_seed_rational_pair_t {
-    const char *num;
-    const char *den;
-} mfloat_seed_rational_pair_t;
-
-typedef struct mfloat_gamma_coeff_seed_t {
-    const char *num;
-    const char *den;
-    unsigned power;
-} mfloat_gamma_coeff_seed_t;
-
-static const mfloat_seed_rational_pair_t *mfloat_lgamma_asymptotic_term_text_internal(size_t index)
-{
-    static const mfloat_seed_rational_pair_t terms[] = {
-        {"1", "12"},
-        {"-1", "360"},
-        {"1", "1260"},
-        {"-1", "1680"},
-        {"1", "1188"},
-        {"-691", "360360"},
-        {"1", "156"},
-        {"-3617", "122400"},
-        {"43867", "244188"},
-        {"-174611", "125400"},
-        {"77683", "5796"},
-        {"-236364091", "1506960"},
-        {"657931", "300"},
-        {"-3392780147", "93960"},
-        {"1723168255201", "2492028"},
-        {"-7709321041217", "505920"},
-        {"151628697551", "396"},
-        {"-26315271553053477373", "2418179400"},
-        {"154210205991661", "444"},
-        {"-261082718496449122051", "21106800"},
-        {"1520097643918070802691", "3109932"},
-        {"-2530297234481911294093", "118680"},
-        {"25932657025822267968607", "25380"},
-        {"-5609403368997817686249127547", "104700960"},
-        {"19802288209643185928499101", "6468"},
-        {"-61628132164268458257532691681", "324360"},
-        {"29149963634884862421418123812691", "2283876"},
-        {"-354198989901889536240773677094747", "382800"},
-        {"2913228046513104891794716413587449", "40356"},
-        {"-1215233140483755572040304994079820246041491", "201025024200"},
-        {"396793078518930920708162576045270521", "732"},
-        {"-106783830147866529886385444979142647942017", "2056320"},
-        {"133872729284212332186510857141084758385627191", "25241580"},
-        {"-4633713579924631067171126424027918014373353", "8040"},
-        {"43010895638096200108659330496510205957469661721", "646668"},
-        {"-5827954961669944110438277244641067365282488301844260429", "716195647440"},
-        {"923038305114085622008920911661422572613197507651", "876"},
-        {"-1297636253996598563562484002136063152861329885729779", "9000"},
-        {"31911258890415448330398387349964774884015336567107729499", "1532916"},
-        {"-4603784299479457646935574969019046849794257872751288919656867", "1453663200"}
-    };
-
-    if (index >= sizeof(terms) / sizeof(terms[0]))
-        return NULL;
-    return &terms[index];
-}
-
-static const mfloat_gamma_coeff_seed_t *mfloat_euler_gamma_coeff_text_internal(size_t index)
-{
-    static const mfloat_gamma_coeff_seed_t coeffs[] = {
-        {"1", "12", 2u},
-        {"-1", "120", 4u},
-        {"1", "252", 6u},
-        {"-1", "240", 8u},
-        {"1", "132", 10u},
-        {"-691", "32760", 12u},
-        {"1", "12", 14u},
-        {"-3617", "8160", 16u},
-        {"43867", "14364", 18u},
-        {"-174611", "6600", 20u},
-        {"854513", "3036", 22u},
-        {"-236364091", "65520", 24u},
-        {"8553103", "156", 26u},
-        {"-23749461029", "24360", 28u},
-        {"8615841276005", "458304", 30u},
-        {"-7709321041217", "16320", 32u}
-    };
-
-    if (index >= sizeof(coeffs) / sizeof(coeffs[0]))
-        return NULL;
-    return &coeffs[index];
-}
-
 int mfloat_copy_lgamma_asymptotic_term_internal(mfloat_t *dst, size_t index, size_t precision)
 {
-    const mfloat_seed_rational_pair_t *term = mfloat_lgamma_asymptotic_term_text_internal(index);
-    mfloat_t *num = NULL;
-    mfloat_t *den = NULL;
-    int rc = -1;
-
-    if (!dst || !term)
+    if (!dst || index >= sizeof(mfloat_lgamma_asymptotic_terms) / sizeof(mfloat_lgamma_asymptotic_terms[0]))
         return -1;
-    num = mfloat_new_seed_prec_internal(term->num, precision);
-    den = mfloat_new_seed_prec_internal(term->den, precision);
-    if (!num || !den || mf_div(num, den) != 0)
-        goto cleanup;
-    rc = mfloat_copy_value(dst, num);
-    if (rc == 0)
-        dst->precision = precision;
-
-cleanup:
-    mf_free(num);
-    mf_free(den);
-    return rc;
+    return mfloat_make_const_rational_internal(dst,
+                                               mfloat_lgamma_asymptotic_terms[index].num,
+                                               mfloat_lgamma_asymptotic_terms[index].den,
+                                               precision);
 }
 
 int mfloat_mul_euler_gamma_coeff_internal(mfloat_t *mfloat, size_t index, size_t precision)
 {
-    const mfloat_gamma_coeff_seed_t *coeff = mfloat_euler_gamma_coeff_text_internal(index);
+    mfloat_t *factor = NULL;
+    int rc = -1;
 
-    if (!mfloat || !coeff)
+    if (!mfloat || index >= sizeof(mfloat_euler_gamma_coeffs) / sizeof(mfloat_euler_gamma_coeffs[0]))
         return -1;
-    (void)precision;
-    return mfloat_mul_seed_rational_internal(mfloat, coeff->num, coeff->den, mfloat->precision);
+    factor = mf_new_prec(precision);
+    if (!factor ||
+        mfloat_make_const_rational_internal(factor,
+                                            mfloat_euler_gamma_coeffs[index].num,
+                                            mfloat_euler_gamma_coeffs[index].den,
+                                            precision) != 0)
+        goto cleanup;
+    rc = mf_mul(mfloat, factor);
+
+cleanup:
+    mf_free(factor);
+    return rc;
 }
 
 mfloat_t *mf_create_long(long value)
