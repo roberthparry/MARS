@@ -1047,8 +1047,16 @@ static int mfloat_gammainc_cf_Q(mfloat_t *dst,
         delta = mf_clone(C);
         if (!delta || mf_mul(delta, D) != 0 || mf_mul(f, delta) != 0)
             goto cleanup;
-        if (mf_sub(delta, one) != 0 || mf_abs(delta) != 0 || mf_le(delta, tiny))
+        if (mf_sub(delta, one) != 0 || mf_abs(delta) != 0 || mf_le(delta, tiny)) {
+            mf_free(a);
+            mf_free(b);
+            mf_free(delta);
+            mf_free(nq);
+            mf_free(tmp);
+            mf_free(smn);
+            a = b = delta = nq = tmp = smn = NULL;
             break;
+        }
 
         mf_free(a);
         mf_free(b);
@@ -2143,6 +2151,9 @@ int mf_log(mfloat_t *mfloat)
     if (mf_mul_long(y, 2) != 0)
         goto cleanup;
 
+    mf_free(m);
+    m = NULL;
+
     if (exp2 != 0) {
         ln2 = mf_new_prec(work_prec);
         if (!ln2)
@@ -2173,8 +2184,8 @@ cleanup:
     mf_free(y);
     mf_free(term);
     mf_free(piece);
-    mf_free(ln2);
     mf_free(denom_m);
+    mf_free(ln2);
     return rc;
 }
 
@@ -3738,12 +3749,16 @@ int mf_gammainv(mfloat_t *mfloat)
     minval = mfloat_new_from_string_prec(gamma_min, work_prec);
     if (!y || !one || !minval)
         goto cleanup;
-    if (mf_lt(y, minval))
-        return mf_set_double(mfloat, NAN);
-    if (mfloat_matches_text(mfloat, "3"))
-        return mfloat_set_from_seed(mfloat,
+    if (mf_lt(y, minval)) {
+        rc = mf_set_double(mfloat, NAN);
+        goto cleanup;
+    }
+    if (mfloat_matches_text(mfloat, "3")) {
+        rc = mfloat_set_from_seed(mfloat,
             "3.40586998630956692469992921837555800959539579932898139431294162627714804692495440",
             precision);
+        goto cleanup;
+    }
 
     logy = mf_clone(y);
     if (!logy || mf_log(logy) != 0)
