@@ -336,19 +336,18 @@ static void mfloat_init_constants(void)
     mf_free(tmp_ln2);
 
     for (size_t i = 0; i < sizeof(mfloat_lgamma_asymptotic_1024) / sizeof(mfloat_lgamma_asymptotic_1024[0]); ++i) {
-        mfloat_t *tmp_term = mf_new_prec(1024u);
-
-        if (!tmp_term)
+        mfloat_t *tmp_term_1024 = mf_new_prec(1024u);
+        if (!tmp_term_1024)
             continue;
-        if (mfloat_make_const_rational_internal(tmp_term,
+        if (mfloat_make_const_rational_internal(tmp_term_1024,
                                                 mfloat_lgamma_asymptotic_terms[i].num,
                                                 mfloat_lgamma_asymptotic_terms[i].den,
                                                 1024u) != 0) {
-            mf_free(tmp_term);
+            mf_free(tmp_term_1024);
             continue;
         }
-        tmp_term->flags |= MFLOAT_FLAG_IMMORTAL;
-        mfloat_lgamma_asymptotic_1024[i] = tmp_term;
+        tmp_term_1024->flags |= MFLOAT_FLAG_IMMORTAL;
+        mfloat_lgamma_asymptotic_1024[i] = tmp_term_1024;
     }
 }
 
@@ -779,6 +778,13 @@ mfloat_t *mfloat_clone_immortal_prec_internal(const mfloat_t *src, size_t precis
 
 int mfloat_set_from_immortal_internal(mfloat_t *dst, const mfloat_t *src, size_t precision)
 {
+    if (src && precision == src->precision) {
+        int rc = mfloat_copy_value(dst, src);
+
+        if (rc == 0)
+            dst->precision = precision;
+        return rc;
+    }
     mfloat_t *tmp = mfloat_clone_immortal_prec_internal(src, precision);
     int rc;
 
