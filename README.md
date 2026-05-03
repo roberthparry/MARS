@@ -67,6 +67,43 @@ int main(void) {
 W0(1) = 0.5671432904097838729999686622103575
 ```
 
+**Multiprecision floating-point arithmetic with `mfloat_t`:**
+
+```c
+#include <stdio.h>
+#include "mfloat.h"
+
+int main(void) {
+    mfloat_t *x;
+    mfloat_t *y;
+    char buf[256];
+
+    mf_set_default_precision(256);
+    x = mf_create_string("2.3");
+    y = mf_create_string("2.3");
+    if (!x || !y)
+        return 1;
+
+    if (mf_gamma(x) != 0 || mf_lgamma(y) != 0)
+        return 1;
+
+    mf_sprintf(buf, sizeof(buf), "%.77mf", x);
+    printf("gamma(2.3)  = %s\n", buf);
+
+    mf_sprintf(buf, sizeof(buf), "%.77mf", y);
+    printf("lgamma(2.3) = %s\n", buf);
+
+    mf_free(x);
+    mf_free(y);
+    return 0;
+}
+```
+
+```text
+gamma(2.3)  = 1.16671190519816034504188144120291793853399434971946889397020666387299161947176
+lgamma(2.3) = 0.15418945495963058108991791148922317269570397608961402272570768556406857691921
+```
+
 **Automatic differentiation with `dval_t`:**
 
 ```c
