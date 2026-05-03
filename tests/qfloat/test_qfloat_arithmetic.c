@@ -5,6 +5,15 @@
    Arithmetic tests
    ----------------------------------------------------------- */
 
+static int qf_close_value(qfloat_t got, qfloat_t expected, double tol)
+{
+    if (qf_close(got, expected, tol))
+        return 1;
+    if (qf_eq(expected, qf_from_double(0.0)))
+        return 0;
+    return qf_close_rel(got, expected, tol);
+}
+
 static void test_add() {
     printf(C_CYAN "TEST: addition\n" C_RESET);
 
@@ -118,7 +127,7 @@ static void test_exp_log() {
     char buf_exp[64];
     qf_to_string(expected, buf_exp, sizeof(buf_exp));
 
-    if (qf_close(got, expected, 1e-28)) {
+    if (qf_close_value(got, expected, 1e-30)) {
         printf(C_GREEN "  OK: exp/log\n" C_RESET);
         print_q("  log(exp(x))", got);
         printf("  expected    = %s\n", buf_exp);
@@ -163,7 +172,7 @@ static void test_qf_exp(void)
           qf_from_string("22026.465794806716516957900645284244366353512618556") },
 
         { {-10.0,0.0}, "exp(-10)",
-          qf_from_string("0.000045399929762484851535591515564965808490280944") },
+          qf_from_string("0.00004539992976248485153559151556054979") },
 
         { {20.0,0.0}, "exp(20)",
           qf_from_string("485165195.409790277969106830541540558964462294471") },
@@ -186,7 +195,7 @@ static void test_qf_exp(void)
         qf_to_string(got, buf, sizeof(buf));
         qf_to_string(exp_tests[i].expected, buf_exp, sizeof(buf_exp));
 
-        if (qf_close_rel(got, exp_tests[i].expected, 1e-28)) {
+        if (qf_close_rel(got, exp_tests[i].expected, 1e-30)) {
             printf("%s  OK: %s = %s%s\n",
                    C_GREEN, exp_tests[i].name, buf, C_RESET);
             printf("    got      = %s\n", buf);
@@ -256,7 +265,7 @@ static void test_qf_log(void)
         qf_to_string(got, buf, sizeof(buf));
         qf_to_string(log_tests[i].expected, buf_exp, sizeof(buf_exp));
 
-        if (qf_close(got, log_tests[i].expected, 1e-29)) {
+        if (qf_close_value(got, log_tests[i].expected, 1e-30)) {
             printf("%s  OK: %s = %s%s\n",
                    C_GREEN, log_tests[i].name, buf, C_RESET);
             printf("    got      = %s\n", buf);
@@ -338,4 +347,3 @@ void test_arithmetic(void) {
 /* -----------------------------------------------------------
    String conversion tests
    ----------------------------------------------------------- */
-

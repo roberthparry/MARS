@@ -445,14 +445,14 @@ static void test_ei_values(void)
         { "1.0",  "1.8951178163559367554665209343316342694e+0", 1e-30 },
 
         /* moderate x */
-        { "2.0",  "4.95423435600189016337950513022703527552", 1e-29 },
-        { "5.0",  "40.18527535580317745509142179379586709542", 1e-28 },
+        { "2.0",  "4.95423435600189016337950513022703527552", 1e-30 },
+        { "5.0",  "40.18527535580317745509142179379586709542", 1e-30 },
 
         /* large x */
-        { "10.0", "2492.22897624187775913844014399852484899", 1e-27 },
+        { "10.0", "2492.22897624187775913844014399852484899", 1e-30 },
 
         /* negative x */
-        { "-0.1", "-1.822923958419390666080913658291830939119", 1e-29 },
+        { "-0.1", "-1.822923958419390666080913658291830939119", 1e-30 },
         { "-0.5", "-0.5597735947761608117467959393150852352268", 1e-30 },
         { "-1.0", "-0.2193839343955202736771637754601216490310", 1e-30 },
         { "-2.0", "-4.8900510708061119567239835228449969723e-2", 1e-30 },
@@ -705,11 +705,11 @@ static void test_qf_mul_pow10(void) {
     char buf[256], buf_exp[256];
 
     struct { const char *xs; int k; const char *expected; double tol; } tests[] = {
-        { "1",    3,  "1000",  1e-28 },
+        { "1",    3,  "1000",  1e-30 },
         { "1",   -3,  "0.001", 1e-15 },  /* non-exact binary fraction */
-        { "2.5",  2,  "250",   1e-28 },
-        { "3",    0,  "3",     1e-28 },
-        { "-7",   1,  "-70",   1e-28 },
+        { "2.5",  2,  "250",   1e-30 },
+        { "3",    0,  "3",     1e-30 },
+        { "-7",   1,  "-70",   1e-30 },
         { NULL,   0,  NULL,    0.0   }
     };
 
@@ -719,7 +719,7 @@ static void test_qf_mul_pow10(void) {
         qfloat_t exp = qf_from_string(tests[i].expected);
         qf_to_string(got, buf, sizeof(buf));
         qf_to_string(exp, buf_exp, sizeof(buf_exp));
-        if (qf_close(got, exp, tests[i].tol)) {
+        if (qf_close_value(got, exp, tests[i].tol)) {
             printf("%s  OK: mul_pow10(%s, %d) = %s%s\n", C_GREEN, tests[i].xs, tests[i].k, buf, C_RESET);
         } else {
             printf("%s  FAIL: mul_pow10(%s, %d)%s  [%s:%d]\n", C_RED, tests[i].xs, tests[i].k, C_RESET, __FILE__, __LINE__);
@@ -798,7 +798,7 @@ static void test_qf_vsprintf(void) {
     /* %q should round-trip: qf_from_string(qf_sprintf(...)) == x */
     qf_sprintf(buf, sizeof(buf), "%q", x);
     qfloat_t rt = qf_from_string(buf);
-    if (qf_close(rt, x, 1e-28)) {
+    if (qf_close_value(rt, x, 1e-30)) {
         printf("%s  OK: vsprintf %%q round-trips correctly%s\n", C_GREEN, C_RESET);
     } else {
         printf("%s  FAIL: vsprintf %%q round-trip%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
@@ -809,7 +809,7 @@ static void test_qf_vsprintf(void) {
     /* negative value round-trip */
     qf_sprintf(buf, sizeof(buf), "%q", y);
     rt = qf_from_string(buf);
-    if (qf_close(rt, y, 1e-28)) {
+    if (qf_close_value(rt, y, 1e-30)) {
         printf("%s  OK: vsprintf %%q negative round-trips%s\n", C_GREEN, C_RESET);
     } else {
         printf("%s  FAIL: vsprintf %%q negative round-trip%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
@@ -841,13 +841,13 @@ void test_qf_trigamma(void) {
     /* ψ₁(n) = π²/6 - sum_{k=1}^{n-1} 1/k²; ψ₁(1/2) = π²/2 */
     struct { const char *xs; const char *expected; double tol; } tests[] = {
         /* ψ₁(1) = π²/6 */
-        { "1",   "1.6449340668482264364724151666460251892189499012068", 1e-28 },
+        { "1",   "1.6449340668482264364724151666460251892189499012068", 1e-30 },
         /* ψ₁(2) = ψ₁(1) - 1 */
-        { "2",   "0.6449340668482264364724151666460251892189499012068", 1e-28 },
+        { "2",   "0.6449340668482264364724151666460251892189499012068", 1e-30 },
         /* ψ₁(1/2) = π²/2 = 4.9348022005446793094172454999380755676568... */
-        { "0.5", "4.9348022005446793094172454999380755676568497036204", 1e-25 },
+        { "0.5", "4.9348022005446793094172454999380755676568497036204", 1e-30 },
         /* ψ₁(3) = ψ₁(1) - 1 - 1/4 */
-        { "3",   "0.3949340668482264364724151666460251892189499012068", 1e-28 },
+        { "3",   "0.3949340668482264364724151666460251892189499012068", 1e-30 },
         { NULL, NULL, 0.0 }
     };
 
@@ -857,7 +857,7 @@ void test_qf_trigamma(void) {
         qfloat_t exp = qf_from_string(tests[i].expected);
         qf_to_string(got, buf, sizeof(buf));
         qf_to_string(exp, buf_exp, sizeof(buf_exp));
-        if (qf_close(got, exp, tests[i].tol)) {
+        if (qf_close_value(got, exp, tests[i].tol)) {
             printf("%s  OK: trigamma(%s)%s\n", C_GREEN, tests[i].xs, C_RESET);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
@@ -879,11 +879,11 @@ void test_qf_tetragamma(void) {
        ψ''(1) = -2ζ(3) = -2 * 1.2020569031595942853997... = -2.4041138063191885707994... */
     struct { const char *xs; const char *expected; double tol; } tests[] = {
         /* ψ''(1) = -2ζ(3) */
-        { "1",  "-2.4041138063191885707994763230228999815299725846810", 1e-25 },
+        { "1",  "-2.4041138063191885707994763230228999815299725846810", 1e-30 },
         /* ψ''(2) = ψ''(1) + 2 */
-        { "2",  "-0.4041138063191885707994763230228999815299725846810", 1e-25 },
+        { "2",  "-0.4041138063191885707994763230228999815299725846810", 1e-30 },
         /* ψ''(3) = ψ''(2) + 2/8 */
-        { "3",  "-0.1541138063191885707994763230228999815299725846810", 1e-25 },
+        { "3",  "-0.1541138063191885707994763230228999815299725846810", 1e-30 },
         { NULL, NULL, 0.0 }
     };
 
@@ -893,7 +893,7 @@ void test_qf_tetragamma(void) {
         qfloat_t exp = qf_from_string(tests[i].expected);
         qf_to_string(got, buf, sizeof(buf));
         qf_to_string(exp, buf_exp, sizeof(buf_exp));
-        if (qf_close(got, exp, tests[i].tol)) {
+        if (qf_close_value(got, exp, tests[i].tol)) {
             printf("%s  OK: tetragamma(%s)%s\n", C_GREEN, tests[i].xs, C_RESET);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
