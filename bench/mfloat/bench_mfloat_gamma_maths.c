@@ -112,6 +112,8 @@ int main(void)
     puts("");
     run_unary_case("gamma_2_3_256", "2.3", 256u, mf_gamma, bench_scaled_iters(4));
     run_unary_case("lgamma_2_3_256", "2.3", 256u, mf_lgamma, bench_scaled_iters(4));
+    run_unary_case("gamma_2_3_512", "2.3", 512u, mf_gamma, bench_scaled_iters(2));
+    run_unary_case("lgamma_2_3_512", "2.3", 512u, mf_lgamma, bench_scaled_iters(2));
     run_unary_case("gamma_2_5_256", "2.5", 256u, mf_gamma, bench_scaled_iters(8));
     run_unary_case("lgamma_2_5_256", "2.5", 256u, mf_lgamma, bench_scaled_iters(8));
     run_unary_case("gamma_3_5_256", "3.5", 256u, mf_gamma, bench_scaled_iters(8));
