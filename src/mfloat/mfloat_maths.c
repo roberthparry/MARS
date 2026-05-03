@@ -1098,20 +1098,25 @@ static int mfloat_lgamma_asymptotic(mfloat_t *dst, const mfloat_t *x, size_t pre
     if (mf_div(xi, x) != 0)
         goto cleanup;
     xi2 = mf_clone(xi);
-    xpow = mf_clone(xi);
+    xpow = mf_new_prec(precision);
     term = mf_new_prec(precision);
     if (!xi2 || !xpow || !term)
         goto cleanup;
     if (mf_mul(xi2, xi) != 0)
         goto cleanup;
 
-    for (size_t i = 0; i < MFLOAT_LGAMMA_ASYMPTOTIC_TERM_COUNT; ++i) {
-        if (mfloat_copy_cached_lgamma_asymptotic_term(term, i, precision) != 0 ||
-            mf_mul(term, xpow) != 0 || mf_add(sum, term) != 0)
-            goto cleanup;
-        if (mf_mul(xpow, xi2) != 0)
+    if (mfloat_copy_cached_lgamma_asymptotic_term(term,
+                                                  MFLOAT_LGAMMA_ASYMPTOTIC_TERM_COUNT - 1u,
+                                                  precision) != 0)
+        goto cleanup;
+    for (size_t i = MFLOAT_LGAMMA_ASYMPTOTIC_TERM_COUNT - 1u; i-- > 0u;) {
+        if (mf_mul(term, xi2) != 0 ||
+            mfloat_copy_cached_lgamma_asymptotic_term(xpow, i, precision) != 0 ||
+            mf_add(term, xpow) != 0)
             goto cleanup;
     }
+    if (mf_mul(term, xi) != 0 || mf_add(sum, term) != 0)
+        goto cleanup;
 
     rc = mfloat_copy_value(dst, sum);
     if (rc == 0)
