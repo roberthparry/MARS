@@ -2910,6 +2910,8 @@ int mf_atan(mfloat_t *mfloat)
 
     precision = mfloat->precision;
     work_prec = precision + MFLOAT_CONST_GUARD_BITS;
+    if (precision > 256u)
+        work_prec += 64u;
     x = mfloat_clone_prec(mfloat, work_prec);
     if (!x)
         goto cleanup;
