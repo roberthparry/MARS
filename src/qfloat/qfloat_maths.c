@@ -154,9 +154,8 @@ qfloat_t qf_log(qfloat_t x)
     int sign = -1;
 
     for (int n = 2; n <= 40; ++n) {
-        qfloat_t nd = qf_from_double((double)n);
         u_power = qf_mul(u_power, u);          /* u^n */
-        qfloat_t frac = qf_div(u_power, nd);     /* u^n / n */
+        qfloat_t frac = qf_mul_double(u_power, 1.0 / (double)n); /* u^n / n */
 
         if (sign > 0)
             sum = qf_add(sum, frac);
