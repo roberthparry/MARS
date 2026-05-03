@@ -1125,7 +1125,7 @@ qfloat_t qf_erfinv(qfloat_t x)
     }
 
     /* Halley iteration */
-    for (int i = 0; i < 20; i++) {
+    for (int i = 0; i < 40; i++) {
 
         qfloat_t erfy = qf_erf(y);
         qfloat_t f    = qf_sub(erfy, x);
@@ -1266,20 +1266,13 @@ static int qf_is_integer(qfloat_t x)
     return 1;
 }
 
-static int qf_is_noninteger_half_integer(qfloat_t x)
-{
-    if (qf_is_integer(x))
-        return 0;
-    return qf_is_integer(qf_mul_double(x, 2.0));
-}
-
 qfloat_t qf_lgamma(qfloat_t x)
 {
     if (x.hi <= 0.0 && qf_is_integer(x)) {
         return QF_NAN;
     }
 
-    if (x.hi > 0.0 && qf_is_noninteger_half_integer(x)) {
+    if (x.hi > 0.0 && !qf_is_integer(x) && qf_is_integer(qf_mul_double(x, 2.0))) {
         return qf_log(qf_gamma(x));
     }
 
@@ -1734,6 +1727,7 @@ static const qfloat_t QF_GAMMA_MIN_VAL = { 0.885603194410888700278815900582588, 
 qfloat_t qf_gammainv(qfloat_t y)
 {
     qfloat_t one = qf_from_double(1.0);
+    qfloat_t logy = qf_log(y);
 
     /* y <= 0: no real solution */
     if (y.hi <= 0.0)
@@ -1765,25 +1759,50 @@ qfloat_t qf_gammainv(qfloat_t y)
         /* y <= 1: principal branch root is in (0,1] */
         x = one;   /* perfect starting point for Γ(x)=1 */
     } else {
-        /* y > 1: monotonic region, start near log(y) */
-        double yd = y.hi;
-        double x0 = log(yd);
-        if (x0 < 1.5) x0 = 1.5;   /* stay above the minimum */
-        x = qf_from_double(x0);
+        /* For larger y, invert the leading Stirling shape
+           x (log x - 1) ~= log(y), which gives
+           x ~= log(y) / W(log(y)/e). This is much closer than log(y)
+           on the increasing branch. */
+        if (logy.hi > 1.0) {
+            qfloat_t w = qf_lambert_w0(qf_div(logy, QF_E));
+            x = qf_div(logy, w);
+        } else {
+            /* Small y > 1 stays close to the minimum; keep a simple
+               monotone starting point above the minimiser. */
+            double yd = y.hi;
+            double x0 = log(yd);
+            if (x0 < 1.5)
+                x0 = 1.5;
+            x = qf_from_double(x0);
+        }
     }
 
-    qfloat_t logy = qf_log(y);
+    if (y.hi > 100.0) {
+        /* For larger y on the increasing branch, gamma-space Newton is
+           cheaper because qf_gamma() is much faster than qf_lgamma(). */
+        for (int i = 0; i < 20; i++) {
+            qfloat_t gx   = qf_gamma(x);
+            qfloat_t psi  = qf_digamma(x);
+            qfloat_t f    = qf_sub(gx, y);
+            qfloat_t den  = qf_mul(gx, psi);
+            qfloat_t step = qf_div(f, den);
+            x = qf_sub(x, step);
 
-    /* Newton on f(x) = lgamma(x) - log(y) */
-    for (int i = 0; i < 40; i++) {
-        qfloat_t lg   = qf_lgamma(x);
-        qfloat_t psi  = qf_digamma(x);
-        qfloat_t f    = qf_sub(lg, logy);
-        qfloat_t step = qf_div(f, psi);
-        x = qf_sub(x, step);
+            if (qf_abs(step).hi < 1e-33)
+                break;
+        }
+    } else {
+        /* Smaller y is more robust in log-space. */
+        for (int i = 0; i < 20; i++) {
+            qfloat_t lg   = qf_lgamma(x);
+            qfloat_t psi  = qf_digamma(x);
+            qfloat_t f    = qf_sub(lg, logy);
+            qfloat_t step = qf_div(f, psi);
+            x = qf_sub(x, step);
 
-        if (qf_abs(step).hi < 1e-33)
-            break;
+            if (qf_abs(step).hi < 1e-33)
+                break;
+        }
     }
 
     return x;
