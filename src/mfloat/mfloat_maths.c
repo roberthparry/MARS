@@ -280,15 +280,84 @@ static mfloat_t *mfloat_new_half_ln_pi_prec(size_t precision)
 
 static int mfloat_div_long_inplace(mfloat_t *mfloat, long value)
 {
-    mfloat_t *tmp;
-    int rc;
+    mint_t *num = NULL, *q = NULL;
+    size_t shift_bits;
+    long exponent2;
+    long rem = 0;
+    unsigned long magnitude;
+    unsigned long odd_part;
+    unsigned int shift_twos = 0u;
 
-    tmp = mfloat_new_from_long_prec(value, mfloat ? mfloat->precision : MFLOAT_DEFAULT_PRECISION_BITS);
-    if (!tmp)
+    if (!mfloat || value == 0 || !mfloat->mantissa)
         return -1;
-    rc = mf_div(mfloat, tmp);
-    mf_free(tmp);
-    return rc;
+    if (!mfloat_is_finite(mfloat)) {
+        if (mfloat->kind == MFLOAT_KIND_NAN)
+            return 0;
+        return mf_set_double(mfloat, ((value < 0) ^ (mfloat->sign < 0)) ? -INFINITY : INFINITY);
+    }
+    if (mf_is_zero(mfloat))
+        return 0;
+    if (value == 1)
+        return 0;
+    if (value == -1) {
+        mfloat->sign = (short)-mfloat->sign;
+        return 0;
+    }
+
+    magnitude = value < 0 ? (unsigned long)(-(value + 1)) + 1ul
+                          : (unsigned long)value;
+    odd_part = magnitude;
+    while ((odd_part & 1ul) == 0ul) {
+        odd_part >>= 1;
+        shift_twos++;
+    }
+
+    if (shift_twos > 0u)
+        mfloat->exponent2 -= (long)shift_twos;
+    if (odd_part == 1ul) {
+        if (value < 0)
+            mfloat->sign = (short)-mfloat->sign;
+        return 0;
+    }
+
+    num = mi_clone(mfloat->mantissa);
+    q = mi_new();
+    if (!num || !q)
+        goto cleanup;
+
+    shift_bits = mfloat->precision + MFLOAT_PARSE_GUARD_BITS + 1u;
+    if (mi_shl(num, (long)shift_bits) != 0)
+        goto cleanup;
+    if (mi_div_long(num, (long)odd_part, &rem) != 0)
+        goto cleanup;
+    if (mint_set_magnitude_u64(q, (uint64_t)(rem < 0 ? -rem : rem), 1) != 0)
+        goto cleanup;
+    if (mi_mul_long(q, 2) != 0)
+        goto cleanup;
+    if (mi_cmp_long(q, (long)odd_part) >= 0) {
+        if (mi_inc(num) != 0)
+            goto cleanup;
+    }
+
+    mi_clear(mfloat->mantissa);
+    if (mi_add(mfloat->mantissa, num) != 0)
+        goto cleanup;
+
+    exponent2 = mfloat->exponent2 - (long)shift_bits;
+    if (value < 0)
+        mfloat->sign = (short)-mfloat->sign;
+    mfloat->exponent2 = exponent2;
+    {
+        int rc = mfloat_normalise(mfloat);
+        mi_free(num);
+        mi_free(q);
+        return rc;
+    }
+
+cleanup:
+    mi_free(num);
+    mi_free(q);
+    return -1;
 }
 
 static int mfloat_compute_sqrt_pi(mfloat_t *dst, size_t precision)
@@ -1057,6 +1126,23 @@ static int mfloat_is_below_neg_bits(const mfloat_t *mfloat, long bits)
     mant_bits = mf_get_mantissa_bits(mfloat);
     top_bit = mfloat->exponent2 + (long)mant_bits - 1l;
     return top_bit < -bits;
+}
+
+static long mfloat_estimate_positive_unit_steps(const mfloat_t *value, long threshold)
+{
+    double x, delta;
+    long steps;
+
+    if (!value || !mfloat_is_finite(value))
+        return -1;
+    x = mf_to_double(value);
+    if (!isfinite(x) || x >= (double)threshold)
+        return 0;
+    delta = (double)threshold - x;
+    steps = (long)delta;
+    if ((double)steps < delta)
+        steps++;
+    return steps;
 }
 
 static int mfloat_compute_e(mfloat_t *dst, size_t precision)
@@ -3224,6 +3310,17 @@ int mf_lgamma(mfloat_t *mfloat)
     tmp = mf_new_prec(work_prec);
     if (!z || !acc || !threshold || !tmp)
         goto cleanup;
+    {
+        long steps = mfloat_estimate_positive_unit_steps(z, 100);
+
+        if (steps < 0)
+            goto cleanup;
+        for (long i = 0; i < steps; ++i) {
+            if (mfloat_copy_value(tmp, z) != 0 || mf_log(tmp) != 0 ||
+                mf_add(acc, tmp) != 0 || mf_add_long(z, 1) != 0)
+                goto cleanup;
+        }
+    }
     while (mf_lt(z, threshold)) {
         if (mfloat_copy_value(tmp, z) != 0 || mf_log(tmp) != 0 ||
             mf_add(acc, tmp) != 0 || mf_add_long(z, 1) != 0)
@@ -3249,6 +3346,7 @@ int mf_digamma(mfloat_t *mfloat)
     size_t precision, work_prec;
     mfloat_t *x = NULL, *z = NULL, *acc = NULL, *tmp = NULL, *twenty = NULL;
     long n = 0;
+    long steps = -1;
     int rc = -1;
 
     if (!mfloat)
@@ -3303,14 +3401,21 @@ int mf_digamma(mfloat_t *mfloat)
     z = mfloat_clone_prec(x, work_prec);
     acc = mfloat_clone_prec(MF_ZERO, work_prec);
     twenty = mfloat_new_from_long_prec(20, work_prec);
-    if (!z || !acc || !twenty)
+    tmp = mf_new_prec(work_prec);
+    if (!z || !acc || !twenty || !tmp)
         goto cleanup;
-    while (mf_lt(z, twenty)) {
-        tmp = mf_clone(z);
-        if (!tmp || mf_div(tmp, z) != 0 || mf_sub(acc, tmp) != 0 || mf_add_long(z, 1) != 0)
+    steps = mfloat_estimate_positive_unit_steps(z, 20);
+    if (steps < 0)
+        goto cleanup;
+    for (long i = 0; i < steps; ++i) {
+        if (mfloat_copy_value(tmp, z) != 0 || mf_div(tmp, z) != 0 ||
+            mf_sub(acc, tmp) != 0 || mf_add_long(z, 1) != 0)
             goto cleanup;
-        mf_free(tmp);
-        tmp = NULL;
+    }
+    while (mf_lt(z, twenty)) {
+        if (mfloat_copy_value(tmp, z) != 0 || mf_div(tmp, z) != 0 ||
+            mf_sub(acc, tmp) != 0 || mf_add_long(z, 1) != 0)
+            goto cleanup;
     }
     if (mfloat_digamma_asymptotic(z, z, work_prec) != 0 || mf_add(z, acc) != 0)
         goto cleanup;
@@ -3330,6 +3435,7 @@ int mf_trigamma(mfloat_t *mfloat)
     size_t precision, work_prec;
     mfloat_t *x = NULL, *z = NULL, *acc = NULL, *tmp = NULL, *twenty = NULL;
     long n = 0;
+    long steps = -1;
     int rc = -1;
 
     if (!mfloat)
@@ -3380,15 +3486,23 @@ int mf_trigamma(mfloat_t *mfloat)
     z = mfloat_clone_prec(x, work_prec);
     acc = mfloat_clone_prec(MF_ZERO, work_prec);
     twenty = mfloat_new_from_long_prec(20, work_prec);
-    if (!z || !acc || !twenty)
+    tmp = mf_new_prec(work_prec);
+    if (!z || !acc || !twenty || !tmp)
         goto cleanup;
-    while (mf_lt(z, twenty)) {
-        tmp = mf_clone(z);
-        if (!tmp || mf_mul(tmp, z) != 0 || mf_inv(tmp) != 0 || mf_add(acc, tmp) != 0 ||
+    steps = mfloat_estimate_positive_unit_steps(z, 20);
+    if (steps < 0)
+        goto cleanup;
+    for (long i = 0; i < steps; ++i) {
+        if (mfloat_copy_value(tmp, z) != 0 || mf_mul(tmp, z) != 0 ||
+            mf_inv(tmp) != 0 || mf_add(acc, tmp) != 0 ||
             mf_add_long(z, 1) != 0)
             goto cleanup;
-        mf_free(tmp);
-        tmp = NULL;
+    }
+    while (mf_lt(z, twenty)) {
+        if (mfloat_copy_value(tmp, z) != 0 || mf_mul(tmp, z) != 0 ||
+            mf_inv(tmp) != 0 || mf_add(acc, tmp) != 0 ||
+            mf_add_long(z, 1) != 0)
+            goto cleanup;
     }
     if (mfloat_trigamma_asymptotic(z, z, work_prec) != 0 || mf_add(z, acc) != 0)
         goto cleanup;
@@ -3407,6 +3521,7 @@ int mf_tetragamma(mfloat_t *mfloat)
 {
     size_t precision, work_prec;
     mfloat_t *x = NULL, *z = NULL, *acc = NULL, *tmp = NULL, *twenty = NULL;
+    long steps = -1;
     int rc = -1;
 
     if (!mfloat)
@@ -3439,15 +3554,23 @@ int mf_tetragamma(mfloat_t *mfloat)
     z = mfloat_clone_prec(x, work_prec);
     acc = mfloat_clone_prec(MF_ZERO, work_prec);
     twenty = mfloat_new_from_long_prec(20, work_prec);
-    if (!z || !acc || !twenty)
+    tmp = mf_new_prec(work_prec);
+    if (!z || !acc || !twenty || !tmp)
         goto cleanup;
-    while (mf_lt(z, twenty)) {
-        tmp = mf_clone(z);
-        if (!tmp || mf_mul(tmp, z) != 0 || mf_mul(tmp, z) != 0 || mf_inv(tmp) != 0 ||
+    steps = mfloat_estimate_positive_unit_steps(z, 20);
+    if (steps < 0)
+        goto cleanup;
+    for (long i = 0; i < steps; ++i) {
+        if (mfloat_copy_value(tmp, z) != 0 || mf_mul(tmp, z) != 0 ||
+            mf_mul(tmp, z) != 0 || mf_inv(tmp) != 0 ||
             mf_mul_long(tmp, 2) != 0 || mf_sub(acc, tmp) != 0 || mf_add_long(z, 1) != 0)
             goto cleanup;
-        mf_free(tmp);
-        tmp = NULL;
+    }
+    while (mf_lt(z, twenty)) {
+        if (mfloat_copy_value(tmp, z) != 0 || mf_mul(tmp, z) != 0 ||
+            mf_mul(tmp, z) != 0 || mf_inv(tmp) != 0 ||
+            mf_mul_long(tmp, 2) != 0 || mf_sub(acc, tmp) != 0 || mf_add_long(z, 1) != 0)
+            goto cleanup;
     }
     if (mfloat_tetragamma_asymptotic(z, z, work_prec) != 0 || mf_add(z, acc) != 0)
         goto cleanup;
