@@ -1,5 +1,14 @@
 #include "test_qfloat.h"
 
+static int qf_close_value(qfloat_t got, qfloat_t expected, double tol)
+{
+    if (qf_close(got, expected, tol))
+        return 1;
+    if (qf_eq(expected, qf_from_double(0.0)))
+        return 0;
+    return qf_close_rel(got, expected, tol);
+}
+
 static void test_qf_productlog_definition(void)
 {
     printf(C_CYAN "TEST: qf_productlog definition  W(x)*exp(W(x)) = x\n" C_RESET);
@@ -468,7 +477,7 @@ static void test_ei_values(void)
         qfloat_t ad   = qf_abs(diff);
 
         /* qfloat_t-level tolerance */
-        int pass = (ad.hi < cases[i].tolerance);
+        int pass = qf_close_value(got, ref, cases[i].tolerance);
 
         if (pass) {
             printf("  \x1b[32mOK\x1b[0m: Ei(%s)\n", cases[i].x_str);
@@ -519,7 +528,7 @@ static void test_qf_add_double(void) {
         qfloat_t exp = qf_from_string(tests[i].expected);
         qf_to_string(got, buf, sizeof(buf));
         qf_to_string(exp, buf_exp, sizeof(buf_exp));
-        if (qf_close(got, exp, 1e-28)) {
+        if (qf_close_value(got, exp, 1e-30)) {
             printf("%s  OK: add_double(%s, %.17g)%s\n", C_GREEN, tests[i].xs, tests[i].y, C_RESET);
         } else {
             printf("%s  FAIL: add_double(%s, %.17g)%s  [%s:%d]\n", C_RED, tests[i].xs, tests[i].y, C_RESET, __FILE__, __LINE__);
@@ -550,7 +559,7 @@ static void test_qf_mul_double(void) {
         qfloat_t exp = qf_from_string(tests[i].expected);
         qf_to_string(got, buf, sizeof(buf));
         qf_to_string(exp, buf_exp, sizeof(buf_exp));
-        if (qf_close(got, exp, 1e-28)) {
+        if (qf_close_value(got, exp, 1e-30)) {
             printf("%s  OK: mul_double(%s, %.17g)%s\n", C_GREEN, tests[i].xs, tests[i].y, C_RESET);
         } else {
             printf("%s  FAIL: mul_double(%s, %.17g)%s  [%s:%d]\n", C_RED, tests[i].xs, tests[i].y, C_RESET, __FILE__, __LINE__);

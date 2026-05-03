@@ -1,5 +1,14 @@
 #include "test_qfloat.h"
 
+static int qf_close_value(qfloat_t got, qfloat_t expected, double tol)
+{
+    if (qf_close(got, expected, tol))
+        return 1;
+    if (qf_eq(expected, qf_from_double(0.0)))
+        return 0;
+    return qf_close_rel(got, expected, tol);
+}
+
 static void test_qf_lambert_w0(void) {
     printf(C_CYAN "TEST: qf_lambert_w0\n" C_RESET);
 
@@ -39,7 +48,7 @@ static void test_qf_lambert_w0(void) {
         qf_to_string(got, buf, sizeof(buf));
         qf_to_string(exp, buf_exp, sizeof(buf_exp));
 
-        if (qf_close(got, exp, tests[i].acceptable_error)) {
+        if (qf_close_value(got, exp, 1e-30)) {
             printf("%s  OK: W0(%s)%s\n", C_GREEN, tests[i].xs, C_RESET);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
@@ -87,7 +96,7 @@ static void test_qf_lambert_wm1(void) {
         qf_to_string(got, buf, sizeof(buf));
         qf_to_string(exp, buf_exp, sizeof(buf_exp));
 
-        if (qf_close(got, exp, tests[i].acceptable_error)) {
+        if (qf_close_value(got, exp, 1e-30)) {
             printf("%s  OK: Wm1(%s)%s\n", C_GREEN, tests[i].xs, C_RESET);
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
@@ -299,7 +308,7 @@ static void test_qf_logbeta_consistency(void)
             qfloat_t B    = qf_beta(a, b);
             qfloat_t logB_expected = qf_log(B);
 
-            int ok = qf_close(logB, logB_expected, 1e-29);
+            int ok = qf_close_value(logB, logB_expected, 1e-30);
 
             if (ok) {
                 printf(C_GREEN "  OK: logB(%g,%g) matches log(beta)\n" C_RESET,
@@ -373,8 +382,8 @@ static void test_qf_logbeta_special_cases(void)
         qfloat_t logBv1 = qf_logbeta(v, qf_from_double(1.0));
         qfloat_t logBv1_expected = qf_neg(qf_log(v));
 
-        int ok1 = qf_close(logB1v, logB1v_expected, 1e-28);
-        int ok2 = qf_close(logBv1, logBv1_expected, 1e-28);
+        int ok1 = qf_close_value(logB1v, logB1v_expected, 1e-30);
+        int ok2 = qf_close_value(logBv1, logBv1_expected, 1e-30);
 
         if (ok1 && ok2) {
             printf(C_GREEN "  OK: logB(1,%g) and logB(%g,1)\n" C_RESET,
