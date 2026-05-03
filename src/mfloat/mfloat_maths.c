@@ -1043,57 +1043,7 @@ cleanup:
 
 static int mfloat_round_to_precision(mfloat_t *mfloat, size_t precision)
 {
-    size_t bitlen, excess;
-    mint_t *hi = NULL, *trunc = NULL, *low = NULL, *half = NULL;
-    int rc = -1;
-
-    if (!mfloat || !mfloat->mantissa || !mfloat_is_finite(mfloat) || precision == 0)
-        return -1;
-
-    bitlen = mi_bit_length(mfloat->mantissa);
-    if (bitlen <= precision) {
-        mfloat->precision = precision;
-        return 0;
-    }
-
-    excess = bitlen - precision;
-    hi = mi_clone(mfloat->mantissa);
-    low = mi_clone(mfloat->mantissa);
-    if (!hi || !low)
-        goto cleanup;
-
-    if (mi_shr(hi, (long)excess) != 0)
-        goto cleanup;
-
-    trunc = mi_clone(hi);
-    if (!trunc)
-        goto cleanup;
-    if (mi_shl(trunc, (long)excess) != 0)
-        goto cleanup;
-    if (mi_sub(low, trunc) != 0)
-        goto cleanup;
-
-    half = mi_create_2pow((uint64_t)(excess - 1u));
-    if (!half)
-        goto cleanup;
-    if (mi_cmp(low, half) >= 0) {
-        if (mi_inc(hi) != 0)
-            goto cleanup;
-    }
-
-    mi_clear(mfloat->mantissa);
-    if (mi_add(mfloat->mantissa, hi) != 0)
-        goto cleanup;
-    mfloat->exponent2 += (long)excess;
-    mfloat->precision = precision;
-    rc = mfloat_normalise(mfloat);
-
-cleanup:
-    mi_free(hi);
-    mi_free(trunc);
-    mi_free(low);
-    mi_free(half);
-    return rc;
+    return mfloat_round_to_precision_internal(mfloat, precision);
 }
 
 static int mfloat_is_below_neg_bits(const mfloat_t *mfloat, long bits)
