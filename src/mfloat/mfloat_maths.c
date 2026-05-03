@@ -2629,6 +2629,60 @@ cleanup:
     return rc;
 }
 
+static int mfloat_log1p_small_positive(mfloat_t *mfloat)
+{
+    mfloat_scratch_slot_t slots[4];
+    mfloat_t *x, *sum, *term, *piece;
+    size_t precision;
+    size_t i;
+    int rc = -1;
+
+    if (!mfloat || !mfloat_is_finite(mfloat) || mfloat->sign < 0)
+        return -1;
+    if (mf_is_zero(mfloat))
+        return 0;
+
+    precision = mfloat->precision;
+    for (i = 0; i < 4u; ++i)
+        mfloat_scratch_init_slot(&slots[i], precision);
+    x = &slots[0].value;
+    sum = &slots[1].value;
+    term = &slots[2].value;
+    piece = &slots[3].value;
+
+    if (mfloat_scratch_copy(x, mfloat) != 0 ||
+        mfloat_scratch_copy(sum, mfloat) != 0 ||
+        mfloat_scratch_copy(term, mfloat) != 0)
+        goto cleanup;
+
+    for (long k = 2; k < LONG_MAX; ++k) {
+        if (mf_mul(term, x) != 0)
+            goto cleanup;
+        if (mfloat_scratch_copy(piece, term) != 0)
+            goto cleanup;
+        if (mfloat_div_long_inplace(piece, k) != 0)
+            goto cleanup;
+        if ((k & 1l) != 0) {
+            if (mf_add(sum, piece) != 0)
+                goto cleanup;
+        } else {
+            if (mf_sub(sum, piece) != 0)
+                goto cleanup;
+        }
+        if (mfloat_is_below_neg_bits(piece, (long)precision + 8l))
+            break;
+    }
+
+    rc = mfloat_copy_value(mfloat, sum);
+    if (rc == 0)
+        mfloat->precision = precision;
+
+cleanup:
+    for (i = 0; i < 4u; ++i)
+        mfloat_scratch_release_slot(&slots[i]);
+    return rc;
+}
+
 int mf_pow(mfloat_t *mfloat, const mfloat_t *exponent)
 {
     mfloat_t *tmp = NULL;
@@ -3830,7 +3884,7 @@ cleanup:
 int mf_lgamma(mfloat_t *mfloat)
 {
     size_t precision, work_prec;
-    mfloat_t *x = NULL, *z = NULL, *acc = NULL, *tmp = NULL, *pi = NULL, *threshold = NULL, *den = NULL;
+    mfloat_t *x = NULL, *z = NULL, *acc = NULL, *tmp = NULL, *logz = NULL, *pi = NULL, *threshold = NULL, *den = NULL;
     long n = 0;
     int rc = -1;
 
@@ -3915,7 +3969,10 @@ int mf_lgamma(mfloat_t *mfloat)
     acc = mfloat_clone_prec(MF_ZERO, work_prec);
     threshold = mfloat_new_from_long_prec(90, work_prec);
     tmp = mf_new_prec(work_prec);
-    if (!z || !acc || !threshold || !tmp)
+    logz = mf_new_prec(work_prec);
+    if (!z || !acc || !threshold || !tmp || !logz)
+        goto cleanup;
+    if (mfloat_copy_value(logz, z) != 0 || mf_log(logz) != 0)
         goto cleanup;
     {
         long steps = mfloat_estimate_positive_unit_steps(z, 90);
@@ -3923,14 +3980,20 @@ int mf_lgamma(mfloat_t *mfloat)
         if (steps < 0)
             goto cleanup;
         for (long i = 0; i < steps; ++i) {
-            if (mfloat_copy_value(tmp, z) != 0 || mf_log(tmp) != 0 ||
-                mf_add(acc, tmp) != 0 || mf_add_long(z, 1) != 0)
+            if (mf_add(acc, logz) != 0)
+                goto cleanup;
+            if (mfloat_copy_value(tmp, z) != 0 || mf_inv(tmp) != 0 ||
+                mfloat_log1p_small_positive(tmp) != 0 || mf_add(logz, tmp) != 0 ||
+                mf_add_long(z, 1) != 0)
                 goto cleanup;
         }
     }
     while (mf_lt(z, threshold)) {
-        if (mfloat_copy_value(tmp, z) != 0 || mf_log(tmp) != 0 ||
-            mf_add(acc, tmp) != 0 || mf_add_long(z, 1) != 0)
+        if (mf_add(acc, logz) != 0)
+            goto cleanup;
+        if (mfloat_copy_value(tmp, z) != 0 || mf_inv(tmp) != 0 ||
+            mfloat_log1p_small_positive(tmp) != 0 || mf_add(logz, tmp) != 0 ||
+            mf_add_long(z, 1) != 0)
             goto cleanup;
     }
     if (mfloat_lgamma_asymptotic(z, z, work_prec) != 0 || mf_sub(z, acc) != 0)
@@ -3942,6 +4005,7 @@ cleanup:
     mf_free(z);
     mf_free(acc);
     mf_free(tmp);
+    mf_free(logz);
     mf_free(pi);
     mf_free(threshold);
     mf_free(den);
