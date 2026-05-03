@@ -2281,7 +2281,7 @@ int mf_sin(mfloat_t *mfloat)
         return 0;
 
     precision = mfloat->precision;
-    work_prec = precision + MFLOAT_CONST_GUARD_BITS;
+    work_prec = mfloat_transcendental_work_prec(precision);
     if (mfloat_reduce_trig_argument(mfloat, work_prec, &r, &quadrant) != 0)
         goto cleanup;
 
@@ -2638,7 +2638,7 @@ int mf_asin(mfloat_t *mfloat)
     precision = mfloat->precision;
     if (precision <= MFLOAT_QFLOAT_EFFECTIVE_BITS)
         return mfloat_apply_qfloat_unary(mfloat, qf_asin);
-    work_prec = mfloat_transcendental_work_prec(precision);
+    work_prec = precision + MFLOAT_CONST_GUARD_BITS;
 
     x = mfloat_clone_prec(mfloat, work_prec);
     one = mfloat_clone_prec(MF_ONE, work_prec);
@@ -3474,15 +3474,18 @@ int mf_lgamma(mfloat_t *mfloat)
     }
 
     z = mfloat_clone_prec(x, work_prec);
-    acc = mfloat_clone_prec(MF_ONE, work_prec);
+    acc = mfloat_clone_prec(MF_ZERO, work_prec);
     threshold = mfloat_new_from_long_prec(100, work_prec);
     if (!z || !acc || !threshold)
         goto cleanup;
     while (mf_lt(z, threshold)) {
-        if (mf_mul(acc, z) != 0 || mf_add_long(z, 1) != 0)
+        tmp = mf_clone(z);
+        if (!tmp || mf_log(tmp) != 0 || mf_add(acc, tmp) != 0 || mf_add_long(z, 1) != 0)
             goto cleanup;
+        mf_free(tmp);
+        tmp = NULL;
     }
-    if (mf_log(acc) != 0 || mfloat_lgamma_asymptotic(z, z, work_prec) != 0 || mf_sub(z, acc) != 0)
+    if (mfloat_lgamma_asymptotic(z, z, work_prec) != 0 || mf_sub(z, acc) != 0)
         goto cleanup;
     rc = mfloat_finish_result(mfloat, z, precision);
 
