@@ -1,21 +1,13 @@
 #ifndef MINT_INTERNAL_H
 #define MINT_INTERNAL_H
 
+#include "internal/mint_layout.h"
 #include "mint.h"
-
-#include <stdint.h>
 
 #define MINT_SIEVE_SEGMENT_ODDS 32768ul
 #define MINT_SMALL_PRIMES_COUNT 47u
 
 extern const unsigned long mint_small_primes[MINT_SMALL_PRIMES_COUNT];
-
-struct _mint_t {
-    short sign;       /* -1, 0, +1 */
-    size_t length;    /* number of used 64-bit limbs */
-    size_t capacity;  /* number of allocated 64-bit limbs */
-    uint64_t *storage;
-};
 
 typedef enum mint_ec_step_result_t {
     MINT_EC_STEP_OK = 0,
