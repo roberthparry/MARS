@@ -3988,31 +3988,37 @@ int mf_lgamma(mfloat_t *mfloat)
         for (long i = 0; i < steps; ++i) {
             if (mf_add(acc, logz) != 0)
                 goto cleanup;
-            if (mf_add_long(z, 1) != 0)
-                goto cleanup;
             if (use_incremental_logs) {
-                if (mfloat_copy_value(tmp, z) != 0 || mf_add_long(tmp, -1) != 0 || mf_inv(tmp) != 0 ||
+                if (mfloat_copy_value(tmp, z) != 0 || mf_inv(tmp) != 0 ||
                     mfloat_log1p_small_positive(tmp) != 0 || mf_add(logz, tmp) != 0)
                     goto cleanup;
             } else {
+                if (mf_add_long(z, 1) != 0)
+                    goto cleanup;
                 if (mfloat_copy_value(logz, z) != 0 || mf_log(logz) != 0)
                     goto cleanup;
+                continue;
             }
+            if (mf_add_long(z, 1) != 0)
+                goto cleanup;
         }
     }
     while (mf_lt(z, threshold)) {
         if (mf_add(acc, logz) != 0)
             goto cleanup;
-        if (mf_add_long(z, 1) != 0)
-            goto cleanup;
         if (precision <= mfloat_transcendental_work_prec(256u)) {
-            if (mfloat_copy_value(tmp, z) != 0 || mf_add_long(tmp, -1) != 0 || mf_inv(tmp) != 0 ||
+            if (mfloat_copy_value(tmp, z) != 0 || mf_inv(tmp) != 0 ||
                 mfloat_log1p_small_positive(tmp) != 0 || mf_add(logz, tmp) != 0)
                 goto cleanup;
         } else {
+            if (mf_add_long(z, 1) != 0)
+                goto cleanup;
             if (mfloat_copy_value(logz, z) != 0 || mf_log(logz) != 0)
                 goto cleanup;
+            continue;
         }
+        if (mf_add_long(z, 1) != 0)
+            goto cleanup;
     }
     if (mfloat_lgamma_asymptotic(z, z, work_prec) != 0 || mf_sub(z, acc) != 0)
         goto cleanup;
