@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 
 #include "mfloat.h"
@@ -29,6 +30,15 @@ static int bench_scaled_iters(int base_iters)
     return (int)(base_iters * scale);
 }
 
+static int bench_case_enabled(const char *label)
+{
+    const char *filter = getenv("MARS_BENCH_FILTER");
+
+    if (!filter || !*filter)
+        return 1;
+    return strstr(label, filter) != NULL;
+}
+
 static void run_unary_case(const char *label,
                            const char *text,
                            size_t precision,
@@ -40,6 +50,9 @@ static void run_unary_case(const char *label,
     uint64_t start;
     uint64_t end;
     double avg_us;
+
+    if (!bench_case_enabled(label))
+        return;
 
     old_prec = mf_get_default_precision();
     if (mf_set_default_precision(precision) != 0) {
@@ -97,6 +110,8 @@ int main(void)
     puts("== mfloat gamma maths bench ==");
     puts("Scale iterations with MARS_BENCH_SCALE=<n> if you want longer runs.");
     puts("");
+    run_unary_case("gamma_2_3_256", "2.3", 256u, mf_gamma, bench_scaled_iters(4));
+    run_unary_case("lgamma_2_3_256", "2.3", 256u, mf_lgamma, bench_scaled_iters(4));
     run_unary_case("gamma_2_5_256", "2.5", 256u, mf_gamma, bench_scaled_iters(8));
     run_unary_case("lgamma_2_5_256", "2.5", 256u, mf_lgamma, bench_scaled_iters(8));
     run_unary_case("gamma_3_5_256", "3.5", 256u, mf_gamma, bench_scaled_iters(8));

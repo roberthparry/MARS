@@ -11,6 +11,7 @@
 #define MFLOAT_QFLOAT_EFFECTIVE_BITS 106u
 #define MFLOAT_GAMMA_MIN_SHIFT    12u
 #define MFLOAT_GAMMA_MAX_SHIFT    18u
+#define MFLOAT_LGAMMA_ASYMPTOTIC_TERM_COUNT 40u
 
 typedef struct mfloat_gamma_coeff_t {
     const char *num;
@@ -24,6 +25,11 @@ typedef struct mfloat_asymp_term_t {
     int sign;
     long mult;
 } mfloat_asymp_term_t;
+
+typedef struct mfloat_seed_rational_term_t {
+    const char *num;
+    const char *den;
+} mfloat_seed_rational_term_t;
 
 static mfloat_t *mfloat_clone_prec(const mfloat_t *src, size_t precision);
 static int mfloat_compute_pi(mfloat_t *dst, size_t precision);
@@ -47,6 +53,8 @@ static mfloat_t *mfloat_cached_sqrt_pi = NULL;
 static size_t mfloat_cached_sqrt_pi_prec = 0u;
 static mfloat_t *mfloat_cached_half_ln_pi = NULL;
 static size_t mfloat_cached_half_ln_pi_prec = 0u;
+static mfloat_t *mfloat_cached_lgamma_asymptotic_terms[MFLOAT_LGAMMA_ASYMPTOTIC_TERM_COUNT] = {0};
+static size_t mfloat_cached_lgamma_asymptotic_terms_prec = 0u;
 static int mfloat_copy_cached_constant(mfloat_t *dst,
                                        mfloat_t **cache,
                                        size_t *cache_prec,
@@ -343,17 +351,109 @@ cleanup:
 
 static int mfloat_add_half_ln_2pi(mfloat_t *sum, size_t precision)
 {
-    mfloat_t *c = mfloat_new_from_string_prec(
-        "0.9189385332046727417803297364056176398613974736377834128171515404827656209273606",
-        precision);
+    mfloat_t *half_ln_pi = NULL;
+    mfloat_t *half_ln2 = NULL;
     int rc = -1;
 
-    if (!sum || !c)
+    if (!sum)
         goto cleanup;
-    rc = mf_add(sum, c);
+    half_ln_pi = mfloat_new_half_ln_pi_prec(precision);
+    half_ln2 = mf_new_prec(precision);
+    if (!half_ln_pi || !half_ln2)
+        goto cleanup;
+    if (mfloat_copy_cached_constant(half_ln2,
+                                    &mfloat_cached_ln2,
+                                    &mfloat_cached_ln2_prec,
+                                    precision,
+                                    mfloat_compute_ln2) != 0)
+        goto cleanup;
+    if (mfloat_div_long_inplace(half_ln2, 2) != 0)
+        goto cleanup;
+    if (mf_add(sum, half_ln_pi) != 0 || mf_add(sum, half_ln2) != 0)
+        goto cleanup;
+    rc = 0;
 
 cleanup:
-    mf_free(c);
+    mf_free(half_ln_pi);
+    mf_free(half_ln2);
+    return rc;
+}
+
+static int mfloat_copy_cached_lgamma_asymptotic_term(mfloat_t *dst, size_t index, size_t precision)
+{
+    static const mfloat_seed_rational_term_t terms[MFLOAT_LGAMMA_ASYMPTOTIC_TERM_COUNT] = {
+        {"1", "12"},
+        {"-1", "360"},
+        {"1", "1260"},
+        {"-1", "1680"},
+        {"1", "1188"},
+        {"-691", "360360"},
+        {"1", "156"},
+        {"-3617", "122400"},
+        {"43867", "244188"},
+        {"-174611", "125400"},
+        {"77683", "5796"},
+        {"-236364091", "1506960"},
+        {"657931", "300"},
+        {"-3392780147", "93960"},
+        {"1723168255201", "2492028"},
+        {"-7709321041217", "505920"},
+        {"151628697551", "396"},
+        {"-26315271553053477373", "2418179400"},
+        {"154210205991661", "444"},
+        {"-261082718496449122051", "21106800"},
+        {"1520097643918070802691", "3109932"},
+        {"-2530297234481911294093", "118680"},
+        {"25932657025822267968607", "25380"},
+        {"-5609403368997817686249127547", "104700960"},
+        {"19802288209643185928499101", "6468"},
+        {"-61628132164268458257532691681", "324360"},
+        {"29149963634884862421418123812691", "2283876"},
+        {"-354198989901889536240773677094747", "382800"},
+        {"2913228046513104891794716413587449", "40356"},
+        {"-1215233140483755572040304994079820246041491", "201025024200"},
+        {"396793078518930920708162576045270521", "732"},
+        {"-106783830147866529886385444979142647942017", "2056320"},
+        {"133872729284212332186510857141084758385627191", "25241580"},
+        {"-4633713579924631067171126424027918014373353", "8040"},
+        {"43010895638096200108659330496510205957469661721", "646668"},
+        {"-5827954961669944110438277244641067365282488301844260429", "716195647440"},
+        {"923038305114085622008920911661422572613197507651", "876"},
+        {"-1297636253996598563562484002136063152861329885729779", "9000"},
+        {"31911258890415448330398387349964774884015336567107729499", "1532916"},
+        {"-4603784299479457646935574969019046849794257872751288919656867", "1453663200"}
+    };
+    mfloat_t *term = NULL;
+    mfloat_t *div = NULL;
+    int rc = -1;
+
+    if (!dst || index >= MFLOAT_LGAMMA_ASYMPTOTIC_TERM_COUNT)
+        return -1;
+
+    if (!mfloat_cached_lgamma_asymptotic_terms[index] ||
+        mfloat_cached_lgamma_asymptotic_terms_prec != precision) {
+        if (mfloat_cached_lgamma_asymptotic_terms_prec != precision) {
+            for (size_t i = 0; i < MFLOAT_LGAMMA_ASYMPTOTIC_TERM_COUNT; ++i) {
+                mf_free(mfloat_cached_lgamma_asymptotic_terms[i]);
+                mfloat_cached_lgamma_asymptotic_terms[i] = NULL;
+            }
+            mfloat_cached_lgamma_asymptotic_terms_prec = precision;
+        }
+        term = mfloat_new_from_string_prec(terms[index].num, precision);
+        div = mfloat_new_from_string_prec(terms[index].den, precision);
+        if (!term || !div || mf_div(term, div) != 0)
+            goto cleanup;
+        mfloat_cached_lgamma_asymptotic_terms[index] = term;
+        term = NULL;
+    }
+
+    rc = mfloat_copy_value(dst, mfloat_cached_lgamma_asymptotic_terms[index]);
+    if (rc == 0)
+        dst->precision = precision;
+
+cleanup:
+    mf_free(term);
+    mf_free(div);
     return rc;
 }
 
@@ -369,26 +469,7 @@ static int mfloat_is_near_integer_pole(const mfloat_t *x)
 
 static int mfloat_lgamma_asymptotic(mfloat_t *dst, const mfloat_t *x, size_t precision)
 {
-    static const mfloat_asymp_term_t terms[] = {
-        {1, 12,  1, 1},
-        {1, 360, -1, 1},
-        {1, 1260, 1, 1},
-        {1, 1680, -1, 1},
-        {1, 1188, 1, 1},
-        {691, 360360, -1, 1},
-        {1, 156, 1, 1},
-        {3617, 122400, -1, 1},
-        {43867, 244188, 1, 1},
-        {174611, 125400, -1, 1},
-        {77683, 5796, 1, 1},
-        {236364091, 1506960, -1, 1},
-        {657931, 300, 1, 1},
-        {3392780147LL, 93960, -1, 1},
-        {1723168255201LL, 2492028, 1, 1},
-        {7709321041217LL, 505920, -1, 1},
-        {151628697551LL, 396, 1, 1}
-    };
-    mfloat_t *logx = NULL, *sum = NULL, *xi = NULL, *xi2 = NULL, *xpow = NULL;
+    mfloat_t *logx = NULL, *sum = NULL, *xi = NULL, *xi2 = NULL, *xpow = NULL, *term = NULL;
     int rc = -1;
 
     logx = mfloat_clone_prec(x, precision);
@@ -409,16 +490,15 @@ static int mfloat_lgamma_asymptotic(mfloat_t *dst, const mfloat_t *x, size_t pre
         goto cleanup;
     xi2 = mf_clone(xi);
     xpow = mf_clone(xi);
-    if (!xi2 || !xpow)
+    term = mf_new_prec(precision);
+    if (!xi2 || !xpow || !term)
         goto cleanup;
     if (mf_mul(xi2, xi) != 0)
         goto cleanup;
 
-    for (size_t i = 0; i < sizeof(terms) / sizeof(terms[0]); ++i) {
-        if (mfloat_add_signed_rational_multiple(sum, xpow,
-                                                terms[i].num, terms[i].den,
-                                                terms[i].sign, terms[i].mult,
-                                                precision) != 0)
+    for (size_t i = 0; i < MFLOAT_LGAMMA_ASYMPTOTIC_TERM_COUNT; ++i) {
+        if (mfloat_copy_cached_lgamma_asymptotic_term(term, i, precision) != 0 ||
+            mf_mul(term, xpow) != 0 || mf_add(sum, term) != 0)
             goto cleanup;
         if (mf_mul(xpow, xi2) != 0)
             goto cleanup;
@@ -434,6 +514,7 @@ cleanup:
     mf_free(xi);
     mf_free(xi2);
     mf_free(xpow);
+    mf_free(term);
     return rc;
 }
 
@@ -2470,7 +2551,7 @@ int mf_atan2(mfloat_t *mfloat, const mfloat_t *other)
     precision = mfloat->precision;
     if (precision <= MFLOAT_QFLOAT_EFFECTIVE_BITS)
         return mfloat_apply_qfloat_binary(mfloat, other, qf_atan2);
-    work_prec = mfloat_transcendental_work_prec(precision);
+    work_prec = mfloat_transcendental_work_prec(precision) + 384u;
 
     y = mfloat_clone_prec(mfloat, work_prec);
     x = mfloat_clone_prec(other, work_prec);
@@ -3393,18 +3474,15 @@ int mf_lgamma(mfloat_t *mfloat)
     }
 
     z = mfloat_clone_prec(x, work_prec);
-    acc = mfloat_clone_prec(MF_ZERO, work_prec);
-    threshold = mfloat_new_from_long_prec(20, work_prec);
+    acc = mfloat_clone_prec(MF_ONE, work_prec);
+    threshold = mfloat_new_from_long_prec(100, work_prec);
     if (!z || !acc || !threshold)
         goto cleanup;
     while (mf_lt(z, threshold)) {
-        tmp = mf_clone(z);
-        if (!tmp || mf_log(tmp) != 0 || mf_sub(acc, tmp) != 0 || mf_add_long(z, 1) != 0)
+        if (mf_mul(acc, z) != 0 || mf_add_long(z, 1) != 0)
             goto cleanup;
-        mf_free(tmp);
-        tmp = NULL;
     }
-    if (mfloat_lgamma_asymptotic(z, z, work_prec) != 0 || mf_add(z, acc) != 0)
+    if (mf_log(acc) != 0 || mfloat_lgamma_asymptotic(z, z, work_prec) != 0 || mf_sub(z, acc) != 0)
         goto cleanup;
     rc = mfloat_finish_result(mfloat, z, precision);
 

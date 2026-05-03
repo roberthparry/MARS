@@ -957,6 +957,26 @@ void test_extended_math_wrappers(void)
         "3.178053830347945619646941601297055408873990960903515214096734362117675159127693114",
         1));
 
+    ASSERT_EQ_INT(mf_set_string(i, "2.3"), 0);
+    ASSERT_EQ_INT(mf_gamma(i), 0);
+    print_mfloat_value("gamma(2.3)", i);
+    print_mfloat_error_check("gamma(2.3) mfloat error", i,
+                             "1.166711905198160345041881441202917938533994349719468893970206663872991619471764885");
+    ASSERT_TRUE(mfloat_meets_precision(
+        i,
+        "1.166711905198160345041881441202917938533994349719468893970206663872991619471764885",
+        1));
+
+    ASSERT_EQ_INT(mf_set_string(i, "2.3"), 0);
+    ASSERT_EQ_INT(mf_lgamma(i), 0);
+    print_mfloat_value("lgamma(2.3)", i);
+    print_mfloat_error_check("lgamma(2.3) mfloat error", i,
+                             "0.154189454959630581089917911489223172695703976089614022725707685564068576919212520");
+    ASSERT_TRUE(mfloat_meets_precision(
+        i,
+        "0.154189454959630581089917911489223172695703976089614022725707685564068576919212520",
+        1));
+
     ASSERT_EQ_INT(mf_digamma(j), 0);
     print_mfloat_value("digamma(1)", j);
     print_mfloat_error_check("digamma(1) mfloat error", j,
