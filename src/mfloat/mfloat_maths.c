@@ -2631,8 +2631,8 @@ cleanup:
 
 static int mfloat_log1p_small_positive(mfloat_t *mfloat)
 {
-    mfloat_scratch_slot_t slots[4];
-    mfloat_t *x, *sum, *term, *piece;
+    mfloat_scratch_slot_t slots[6];
+    mfloat_t *x, *u, *u2, *sum, *term, *piece;
     size_t precision;
     size_t i;
     int rc = -1;
@@ -2643,42 +2643,53 @@ static int mfloat_log1p_small_positive(mfloat_t *mfloat)
         return 0;
 
     precision = mfloat->precision;
-    for (i = 0; i < 4u; ++i)
+    for (i = 0; i < 6u; ++i)
         mfloat_scratch_init_slot(&slots[i], precision);
     x = &slots[0].value;
-    sum = &slots[1].value;
-    term = &slots[2].value;
-    piece = &slots[3].value;
+    u = &slots[1].value;
+    u2 = &slots[2].value;
+    sum = &slots[3].value;
+    term = &slots[4].value;
+    piece = &slots[5].value;
 
     if (mfloat_scratch_copy(x, mfloat) != 0 ||
-        mfloat_scratch_copy(sum, mfloat) != 0 ||
-        mfloat_scratch_copy(term, mfloat) != 0)
+        mfloat_scratch_copy(u, mfloat) != 0)
+        goto cleanup;
+    if (mf_add_long(x, 2l) != 0)
+        goto cleanup;
+    if (mf_div(u, x) != 0)
+        goto cleanup;
+    if (mfloat_scratch_copy(sum, u) != 0 ||
+        mfloat_scratch_copy(term, u) != 0 ||
+        mfloat_scratch_copy(u2, u) != 0)
+        goto cleanup;
+    if (mf_mul(u2, u) != 0)
         goto cleanup;
 
-    for (long k = 2; k < LONG_MAX; ++k) {
-        if (mf_mul(term, x) != 0)
+    for (long k = 1; k < LONG_MAX / 2; ++k) {
+        long denom = 2l * k + 1l;
+
+        if (mf_mul(term, u2) != 0)
             goto cleanup;
         if (mfloat_scratch_copy(piece, term) != 0)
             goto cleanup;
-        if (mfloat_div_long_inplace(piece, k) != 0)
+        if (mfloat_div_long_inplace(piece, denom) != 0)
             goto cleanup;
-        if ((k & 1l) != 0) {
-            if (mf_add(sum, piece) != 0)
-                goto cleanup;
-        } else {
-            if (mf_sub(sum, piece) != 0)
-                goto cleanup;
-        }
+        if (mf_add(sum, piece) != 0)
+            goto cleanup;
         if (mfloat_is_below_neg_bits(piece, (long)precision + 8l))
             break;
     }
+
+    if (mf_mul_long(sum, 2l) != 0)
+        goto cleanup;
 
     rc = mfloat_copy_value(mfloat, sum);
     if (rc == 0)
         mfloat->precision = precision;
 
 cleanup:
-    for (i = 0; i < 4u; ++i)
+    for (i = 0; i < 6u; ++i)
         mfloat_scratch_release_slot(&slots[i]);
     return rc;
 }
