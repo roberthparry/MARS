@@ -4434,7 +4434,8 @@ cleanup:
 int mf_lambert_wm1(mfloat_t *mfloat)
 {
     size_t precision, work_prec;
-    mfloat_t *x = NULL, *w = NULL, *ew = NULL, *num = NULL, *den = NULL, *step = NULL, *corr = NULL, *two = NULL;
+    mfloat_t *x = NULL, *w = NULL, *ew = NULL, *num = NULL, *den = NULL, *step = NULL, *one = NULL;
+    mfloat_t *two = NULL, *thresh = NULL, *minus_one = NULL, *tmp = NULL, *nx = NULL, *l1 = NULL, *minus_l1 = NULL, *l2 = NULL, *econst = NULL;
     int rc = -1;
 
     if (!mfloat)
@@ -4452,27 +4453,50 @@ int mf_lambert_wm1(mfloat_t *mfloat)
     x = mfloat_clone_prec(mfloat, work_prec);
     if (!x)
         goto cleanup;
-    w = mfloat_new_from_qfloat_prec(qf_lambert_wm1(mf_to_qfloat(x)), work_prec);
-    if (!w)
-        goto cleanup;
-
+    one = mfloat_clone_prec(MF_ONE, work_prec);
     two = mfloat_new_from_long_prec(2, work_prec);
-    if (!two)
+    minus_one = mfloat_new_from_long_prec(-1, work_prec);
+    thresh = mfloat_clone_prec(MF_TENTH, work_prec);
+    if (!one || !two || !minus_one || !thresh || mf_mul_long(thresh, -2) != 0)
         goto cleanup;
 
-    for (int i = 0; i < 12; ++i) {
+    if (mf_le(x, thresh)) {
+        econst = mfloat_clone_immortal_prec_internal(MF_E, work_prec);
+        tmp = mf_clone(x);
+        if (!econst || !tmp || mf_mul(tmp, econst) != 0 || mf_add(tmp, one) != 0 ||
+            mf_mul(tmp, two) != 0 || mf_sqrt(tmp) != 0)
+            goto cleanup;
+        w = mf_clone(minus_one);
+        if (!w || mf_sub(w, tmp) != 0)
+            goto cleanup;
+    } else {
+        nx = mf_clone(x);
+        if (!nx || mf_neg(nx) != 0)
+            goto cleanup;
+        l1 = mf_clone(nx);
+        if (!l1 || mf_log(l1) != 0)
+            goto cleanup;
+        minus_l1 = mf_clone(l1);
+        if (!minus_l1 || mf_neg(minus_l1) != 0)
+            goto cleanup;
+        l2 = mf_clone(minus_l1);
+        if (!l2 || mf_log(l2) != 0)
+            goto cleanup;
+        w = mf_clone(l1);
+        tmp = mf_clone(l2);
+        if (!w || !tmp || mf_sub(w, l2) != 0 || mf_div(tmp, l1) != 0 || mf_add(w, tmp) != 0)
+            goto cleanup;
+    }
+
+    for (int i = 0; i < 24; ++i) {
         ew = mf_clone(w);
         num = mf_clone(w);
         den = mf_clone(w);
-        corr = mf_clone(w);
-        if (!ew || !num || !den || !corr || mf_exp(ew) != 0)
+        if (!ew || !num || !den || mf_exp(ew) != 0)
             goto cleanup;
         if (mf_mul(num, ew) != 0 || mf_sub(num, x) != 0)
             goto cleanup;
-        if (mf_add_long(den, 1) != 0 || mf_mul(den, ew) != 0)
-            goto cleanup;
-        if (mf_add(corr, two) != 0 || mf_mul(corr, num) != 0 || mfloat_div_long_inplace(corr, 2) != 0 ||
-            mf_div(corr, den) != 0 || mf_sub(den, corr) != 0)
+        if (mf_add(den, one) != 0 || mf_mul(den, ew) != 0)
             goto cleanup;
         step = mf_clone(num);
         if (!step || mf_div(step, den) != 0 || mf_sub(w, step) != 0)
@@ -4483,8 +4507,7 @@ int mf_lambert_wm1(mfloat_t *mfloat)
         mf_free(num);
         mf_free(den);
         mf_free(step);
-        mf_free(corr);
-        ew = num = den = step = corr = NULL;
+        ew = num = den = step = NULL;
     }
     rc = mfloat_finish_result(mfloat, w, precision);
 
@@ -4495,8 +4518,16 @@ cleanup:
     mf_free(num);
     mf_free(den);
     mf_free(step);
-    mf_free(corr);
+    mf_free(one);
     mf_free(two);
+    mf_free(thresh);
+    mf_free(minus_one);
+    mf_free(tmp);
+    mf_free(nx);
+    mf_free(l1);
+    mf_free(minus_l1);
+    mf_free(l2);
+    mf_free(econst);
     return rc;
 }
 
