@@ -1266,10 +1266,21 @@ static int qf_is_integer(qfloat_t x)
     return 1;
 }
 
+static int qf_is_noninteger_half_integer(qfloat_t x)
+{
+    if (qf_is_integer(x))
+        return 0;
+    return qf_is_integer(qf_mul_double(x, 2.0));
+}
+
 qfloat_t qf_lgamma(qfloat_t x)
 {
     if (x.hi <= 0.0 && qf_is_integer(x)) {
         return QF_NAN;
+    }
+
+    if (x.hi > 0.0 && qf_is_noninteger_half_integer(x)) {
+        return qf_log(qf_gamma(x));
     }
 
     // Handle poles and reflection as you already do
