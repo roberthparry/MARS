@@ -282,6 +282,7 @@ static int mfloat_div_long_inplace(mfloat_t *mfloat, long value)
 {
     mint_t *num = NULL, *q = NULL;
     size_t shift_bits;
+    size_t odd_bits;
     long exponent2;
     long rem = 0;
     unsigned long magnitude;
@@ -325,7 +326,8 @@ static int mfloat_div_long_inplace(mfloat_t *mfloat, long value)
     if (!num || !q)
         goto cleanup;
 
-    shift_bits = mfloat->precision + MFLOAT_PARSE_GUARD_BITS + 1u;
+    odd_bits = (size_t)(sizeof(unsigned long) * CHAR_BIT - __builtin_clzl(odd_part));
+    shift_bits = mfloat->precision + odd_bits + MFLOAT_PARSE_GUARD_BITS;
     if (mi_shl(num, (long)shift_bits) != 0)
         goto cleanup;
     if (mi_div_long(num, (long)odd_part, &rem) != 0)
