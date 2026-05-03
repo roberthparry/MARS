@@ -1966,7 +1966,7 @@ qfloat_t qf_lambert_wm1(qfloat_t x)
         w0 = qf_add(w0, L2_over_L1);
     }
 
-    return qf_lambert_newton(x, w0);
+    return qf_lambert_halley(x, w0);
 }
 
 /* Beta function B(a,b) = Γ(a)Γ(b) / Γ(a+b) */
