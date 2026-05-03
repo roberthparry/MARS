@@ -59,6 +59,7 @@ static void print_mfloat_error_check(const char *label,
 {
     mfloat_t *expected = NULL;
     mfloat_t *error = NULL;
+    char expected_buf[1024];
     char got_buf[1024];
     char err_buf[1024];
     size_t precision_bits = 0;
@@ -78,14 +79,16 @@ static void print_mfloat_error_check(const char *label,
     if (decimal_digits < 1)
         decimal_digits = 1;
 
-    expected = mf_create_string(expected_text);
+    expected = mf_new_prec(precision_bits);
     error = mf_clone(got);
-    if (!expected || !error || mf_sub(error, expected) != 0 || mf_abs(error) != 0 ||
+    if (!expected || !error || mf_set_string(expected, expected_text) != 0 ||
+        mf_sub(error, expected) != 0 || mf_abs(error) != 0 ||
+        format_mfloat_value(expected_buf, sizeof(expected_buf), expected) < 0 ||
         format_mfloat_value(got_buf, sizeof(got_buf), got) < 0 ||
         mf_sprintf(err_buf, sizeof(err_buf), "%.6MF", error) < 0) {
         printf(C_CYAN "%s" C_RESET "\n", label);
         printf("    precision = %zu bits (~%d digits)\n", precision_bits, decimal_digits);
-        printf("    expected = %s\n", expected_text);
+        printf("    expected = <format-error>\n");
         printf("    got      = <format-error>\n");
         printf("    error    = <format-error>\n");
         mf_free(expected);
@@ -95,7 +98,7 @@ static void print_mfloat_error_check(const char *label,
 
     printf(C_CYAN "%s" C_RESET "\n", label);
     printf("    precision = %zu bits (~%d digits)\n", precision_bits, decimal_digits);
-    printf("    expected = %s\n", expected_text);
+    printf("    expected = %s\n", expected_buf);
     printf("    got      = %s\n", got_buf);
     printf("    error    = %s\n", err_buf);
 

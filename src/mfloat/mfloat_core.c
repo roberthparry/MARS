@@ -1,11 +1,16 @@
 #include "mfloat_internal.h"
-#include "internal/mfloat_coeff_tables.h"
+#include "mfloat_coeff_tables.h"
 #include "internal/mint_layout.h"
 
 #include <ctype.h>
 #include <limits.h>
 #include <math.h>
 #include <stdlib.h>
+
+static int mfloat_make_const_rational_internal(mfloat_t *dst,
+                                               const mint_t *num,
+                                               const mint_t *den,
+                                               size_t precision);
 
 static struct _mfloat_t mfloat_zero_static = {
     .kind = MFLOAT_KIND_FINITE,
@@ -169,6 +174,7 @@ static struct _mfloat_t mfloat_pi1024_static = { .kind = MFLOAT_KIND_FINITE, .si
 static struct _mfloat_t mfloat_e1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -2155, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_e1024_mint };
 static struct _mfloat_t mfloat_gamma1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -2158, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_gamma1024_mint };
 static struct _mfloat_t mfloat_sqrt_pi1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -2154, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_sqrt_pi1024_mint };
+static struct _mfloat_t mfloat_ln21024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = 0, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = NULL };
 static struct _mfloat_t mfloat_half_ln_pi1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -2158, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_half_ln_pi1024_mint };
 static struct _mfloat_t mfloat_sqrt2_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -2155, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_sqrt2_1024_mint };
 static struct _mfloat_t mfloat_half_ln_2pi1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -2158, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_half_ln_2pi1024_mint };
@@ -249,6 +255,7 @@ static struct _mfloat_t mfloat_gammainv_min1024_static = { .kind = MFLOAT_KIND_F
 static struct _mfloat_t mfloat_gammainv_argmin1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -1288, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_gammainv_argmin1024_mint };
 static struct _mfloat_t mfloat_gammainv_31024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -1590, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_gammainv_31024_mint };
 static struct _mfloat_t mfloat_lambert_w0_11024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -1590, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_lambert_w0_11024_mint };
+static mfloat_t *mfloat_lgamma_asymptotic_1024[40] = {0};
 
 static size_t mfloat_default_precision_bits = MFLOAT_DEFAULT_PRECISION_BITS;
 
@@ -262,6 +269,7 @@ const mfloat_t * const MF_E = &mfloat_e1024_static;
 const mfloat_t * const MF_EULER_MASCHERONI = &mfloat_gamma1024_static;
 const mfloat_t * const MF_SQRT2 = &mfloat_sqrt2_1024_static;
 const mfloat_t * const MF_SQRT_PI = &mfloat_sqrt_pi1024_static;
+const mfloat_t * const MFLOAT_INTERNAL_LN2 = &mfloat_ln21024_static;
 const mfloat_t * const MFLOAT_INTERNAL_HALF_LN_PI = &mfloat_half_ln_pi1024_static;
 const mfloat_t * const MFLOAT_INTERNAL_HALF_LN_2PI = &mfloat_half_ln_2pi1024_static;
 const mfloat_t * const MFLOAT_INTERNAL_ERF_HALF = &mfloat_erf_half1024_static;
@@ -279,6 +287,7 @@ static void mfloat_init_constants(void)
 {
     static int initialised = 0;
     mfloat_t *tmp_tenth = NULL;
+    mfloat_t *tmp_ln2 = NULL;
 
     if (initialised)
         return;
@@ -304,6 +313,42 @@ static void mfloat_init_constants(void)
         mfloat_tenth_static.mantissa = (mint_t *)MI_ZERO;
         mfloat_tenth_static.sign = 0;
         mfloat_tenth_static.exponent2 = 0;
+    }
+
+    tmp_ln2 = mf_new_prec(1024u);
+    if (tmp_ln2 &&
+        mfloat_copy_value(tmp_ln2, &mfloat_half_ln_2pi1024_static) == 0 &&
+        mf_sub(tmp_ln2, &mfloat_half_ln_pi1024_static) == 0 &&
+        mf_mul_long(tmp_ln2, 2) == 0) {
+        mfloat_ln21024_static.kind = tmp_ln2->kind;
+        mfloat_ln21024_static.sign = tmp_ln2->sign;
+        mfloat_ln21024_static.exponent2 = tmp_ln2->exponent2;
+        mfloat_ln21024_static.precision = tmp_ln2->precision;
+        mfloat_ln21024_static.mantissa = tmp_ln2->mantissa;
+        tmp_ln2->mantissa = NULL;
+    } else {
+        mfloat_ln21024_static.kind = MFLOAT_KIND_FINITE;
+        mfloat_ln21024_static.sign = 0;
+        mfloat_ln21024_static.exponent2 = 0;
+        mfloat_ln21024_static.precision = 1024u;
+        mfloat_ln21024_static.mantissa = (mint_t *)MI_ZERO;
+    }
+    mf_free(tmp_ln2);
+
+    for (size_t i = 0; i < sizeof(mfloat_lgamma_asymptotic_1024) / sizeof(mfloat_lgamma_asymptotic_1024[0]); ++i) {
+        mfloat_t *tmp_term = mf_new_prec(1024u);
+
+        if (!tmp_term)
+            continue;
+        if (mfloat_make_const_rational_internal(tmp_term,
+                                                mfloat_lgamma_asymptotic_terms[i].num,
+                                                mfloat_lgamma_asymptotic_terms[i].den,
+                                                1024u) != 0) {
+            mf_free(tmp_term);
+            continue;
+        }
+        tmp_term->flags |= MFLOAT_FLAG_IMMORTAL;
+        mfloat_lgamma_asymptotic_1024[i] = tmp_term;
     }
 }
 
@@ -750,6 +795,8 @@ int mfloat_copy_lgamma_asymptotic_term_internal(mfloat_t *dst, size_t index, siz
 {
     if (!dst || index >= sizeof(mfloat_lgamma_asymptotic_terms) / sizeof(mfloat_lgamma_asymptotic_terms[0]))
         return -1;
+    if (precision <= 1024u && mfloat_lgamma_asymptotic_1024[index])
+        return mfloat_set_from_immortal_internal(dst, mfloat_lgamma_asymptotic_1024[index], precision);
     return mfloat_make_const_rational_internal(dst,
                                                mfloat_lgamma_asymptotic_terms[index].num,
                                                mfloat_lgamma_asymptotic_terms[index].den,

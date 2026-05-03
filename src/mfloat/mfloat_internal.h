@@ -31,6 +31,7 @@ struct _mfloat_t {
 };
 
 /* Core-owned immortal constants used only inside the mfloat module. */
+extern const mfloat_t * const MFLOAT_INTERNAL_LN2;
 extern const mfloat_t * const MFLOAT_INTERNAL_HALF_LN_PI;
 extern const mfloat_t * const MFLOAT_INTERNAL_HALF_LN_2PI;
 extern const mfloat_t * const MFLOAT_INTERNAL_ERF_HALF;

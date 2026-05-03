@@ -31,7 +31,6 @@ typedef struct mfloat_scratch_slot_t {
 static mfloat_t *mfloat_clone_prec(const mfloat_t *src, size_t precision);
 static int mfloat_round_to_precision(mfloat_t *mfloat, size_t precision);
 static int mfloat_compute_pi(mfloat_t *dst, size_t precision);
-static int mfloat_compute_ln2(mfloat_t *dst, size_t precision);
 static int mfloat_compute_e(mfloat_t *dst, size_t precision);
 static int mfloat_compute_euler_gamma(mfloat_t *dst, size_t precision);
 static int mfloat_compute_sqrt_pi(mfloat_t *dst, size_t precision);
@@ -45,21 +44,6 @@ static int mfloat_is_below_neg_bits(const mfloat_t *mfloat, long bits);
 static int mfloat_get_exact_long_value(const mfloat_t *mfloat, long *out);
 static int mfloat_equals_exact_long(const mfloat_t *mfloat, long value);
 static int mfloat_is_exact_half(const mfloat_t *mfloat, short sign);
-
-static mfloat_t *mfloat_cached_pi = NULL;
-static size_t mfloat_cached_pi_prec = 0u;
-static mfloat_t *mfloat_cached_ln2 = NULL;
-static size_t mfloat_cached_ln2_prec = 0u;
-static mfloat_t *mfloat_cached_e = NULL;
-static size_t mfloat_cached_e_prec = 0u;
-static mfloat_t *mfloat_cached_gamma = NULL;
-static size_t mfloat_cached_gamma_prec = 0u;
-static mfloat_t *mfloat_cached_sqrt_pi = NULL;
-static size_t mfloat_cached_sqrt_pi_prec = 0u;
-static mfloat_t *mfloat_cached_half_ln_pi = NULL;
-static size_t mfloat_cached_half_ln_pi_prec = 0u;
-static mfloat_t *mfloat_cached_lgamma_asymptotic_terms[MFLOAT_LGAMMA_ASYMPTOTIC_TERM_COUNT] = {0};
-static size_t mfloat_cached_lgamma_asymptotic_terms_prec = 0u;
 
 static void mfloat_scratch_init_slot(mfloat_scratch_slot_t *slot, size_t precision)
 {
@@ -186,37 +170,6 @@ static int mfloat_is_exact_half(const mfloat_t *mfloat, short sign)
     return mantissa_value == 1;
 }
 
-static int mfloat_copy_cached_constant(mfloat_t *dst,
-                                       mfloat_t **cache,
-                                       size_t *cache_prec,
-                                       size_t precision,
-                                       int (*compute)(mfloat_t *, size_t))
-{
-    int rc;
-
-    if (!dst || !cache || !cache_prec || !compute)
-        return -1;
-
-    if (!*cache || *cache_prec != precision) {
-        mfloat_t *tmp = mf_new_prec(precision);
-
-        if (!tmp)
-            return -1;
-        if (compute(tmp, precision) != 0) {
-            mf_free(tmp);
-            return -1;
-        }
-        mf_free(*cache);
-        *cache = tmp;
-        *cache_prec = precision;
-    }
-
-    rc = mfloat_copy_value(dst, *cache);
-    if (rc == 0)
-        dst->precision = precision;
-    return rc;
-}
-
 static int mfloat_set_from_binary_seed(mfloat_t *dst, const mfloat_t *seed, size_t precision)
 {
     mfloat_t *tmp = NULL;
@@ -236,72 +189,6 @@ static int mfloat_set_from_binary_seed(mfloat_t *dst, const mfloat_t *seed, size
 cleanup:
     mf_free(tmp);
     return rc;
-}
-
-static int mfloat_copy_cached_binary_seed_constant(mfloat_t *dst,
-                                                   mfloat_t **cache,
-                                                   size_t *cache_prec,
-                                                   size_t precision,
-                                                   const mfloat_t *seed,
-                                                   int (*compute)(mfloat_t *, size_t))
-{
-    int rc;
-
-    if (!dst || !cache || !cache_prec || !seed || !compute)
-        return -1;
-
-    if (!*cache || *cache_prec != precision) {
-        mfloat_t *tmp = mf_new_prec(precision);
-
-        if (!tmp)
-            return -1;
-        if ((precision <= seed->precision
-                ? mfloat_set_from_binary_seed(tmp, seed, precision)
-                : compute(tmp, precision)) != 0) {
-            mf_free(tmp);
-            return -1;
-        }
-        mf_free(*cache);
-        *cache = tmp;
-        *cache_prec = precision;
-    }
-
-    rc = mfloat_copy_value(dst, *cache);
-    if (rc == 0)
-        dst->precision = precision;
-    return rc;
-}
-
-static mfloat_t *mfloat_create_constant_binary_cached(const mfloat_t *seed,
-                                                      int (*compute)(mfloat_t *, size_t),
-                                                      mfloat_t **cache,
-                                                      size_t *cache_prec)
-{
-    size_t precision = mfloat_get_default_precision_internal();
-    mfloat_t *tmp = mf_new_prec(precision);
-
-    if (!tmp)
-        return NULL;
-
-    if (!*cache || *cache_prec != precision) {
-        int rc;
-
-        if (precision <= seed->precision)
-            rc = mfloat_set_from_binary_seed(tmp, seed, precision);
-        else
-            rc = compute(tmp, precision);
-        if (rc != 0) {
-            mf_free(tmp);
-            return NULL;
-        }
-        mf_free(*cache);
-        *cache = tmp;
-        *cache_prec = precision;
-    } else {
-        mf_free(tmp);
-    }
-
-    return mfloat_clone_prec(*cache, precision);
 }
 
 static mfloat_t *mfloat_new_from_long_prec(long value, size_t precision)
@@ -336,11 +223,9 @@ static mfloat_t *mfloat_new_pi_prec(size_t precision)
 
     if (!mfloat)
         return NULL;
-    if (mfloat_copy_cached_constant(mfloat,
-                                    &mfloat_cached_pi,
-                                    &mfloat_cached_pi_prec,
-                                    precision,
-                                    mfloat_compute_pi) != 0) {
+    if ((precision <= MF_PI->precision
+            ? mfloat_set_from_binary_seed(mfloat, MF_PI, precision)
+            : mfloat_compute_pi(mfloat, precision)) != 0) {
         mf_free(mfloat);
         return NULL;
     }
@@ -354,11 +239,9 @@ static mfloat_t *mfloat_new_euler_gamma_prec(size_t precision)
     /* Internal series code needs Euler's constant at the actual working precision. */
     if (!mfloat)
         return NULL;
-    if (mfloat_copy_cached_constant(mfloat,
-                                    &mfloat_cached_gamma,
-                                    &mfloat_cached_gamma_prec,
-                                    precision,
-                                    mfloat_compute_euler_gamma) != 0) {
+    if ((precision <= MF_EULER_MASCHERONI->precision
+            ? mfloat_set_from_binary_seed(mfloat, MF_EULER_MASCHERONI, precision)
+            : mfloat_compute_euler_gamma(mfloat, precision)) != 0) {
         mf_free(mfloat);
         return NULL;
     }
@@ -371,13 +254,9 @@ static mfloat_t *mfloat_new_sqrt_pi_prec(size_t precision)
 
     if (!mfloat)
         return NULL;
-    if (mfloat_copy_cached_binary_seed_constant(
-            mfloat,
-            &mfloat_cached_sqrt_pi,
-            &mfloat_cached_sqrt_pi_prec,
-            precision,
-            MF_SQRT_PI,
-            mfloat_compute_sqrt_pi) != 0) {
+    if ((precision <= MF_SQRT_PI->precision
+            ? mfloat_set_from_binary_seed(mfloat, MF_SQRT_PI, precision)
+            : mfloat_compute_sqrt_pi(mfloat, precision)) != 0) {
         mf_free(mfloat);
         return NULL;
     }
@@ -390,13 +269,9 @@ static mfloat_t *mfloat_new_half_ln_pi_prec(size_t precision)
 
     if (!mfloat)
         return NULL;
-    if (mfloat_copy_cached_binary_seed_constant(
-            mfloat,
-            &mfloat_cached_half_ln_pi,
-            &mfloat_cached_half_ln_pi_prec,
-            precision,
-            MFLOAT_INTERNAL_HALF_LN_PI,
-            mfloat_compute_half_ln_pi) != 0) {
+    if ((precision <= MFLOAT_INTERNAL_HALF_LN_PI->precision
+            ? mfloat_set_from_binary_seed(mfloat, MFLOAT_INTERNAL_HALF_LN_PI, precision)
+            : mfloat_compute_half_ln_pi(mfloat, precision)) != 0) {
         mf_free(mfloat);
         return NULL;
     }
@@ -490,31 +365,20 @@ cleanup:
 
 static int mfloat_add_half_ln_2pi(mfloat_t *sum, size_t precision)
 {
-    mfloat_t *half_ln_pi = NULL;
-    mfloat_t *half_ln2 = NULL;
+    mfloat_t *half_ln_2pi = NULL;
     int rc = -1;
 
     if (!sum)
         goto cleanup;
-    half_ln_pi = mfloat_new_half_ln_pi_prec(precision);
-    half_ln2 = mf_new_prec(precision);
-    if (!half_ln_pi || !half_ln2)
+    half_ln_2pi = mfloat_clone_immortal_prec_internal(MFLOAT_INTERNAL_HALF_LN_2PI, precision);
+    if (!half_ln_2pi)
         goto cleanup;
-    if (mfloat_copy_cached_constant(half_ln2,
-                                    &mfloat_cached_ln2,
-                                    &mfloat_cached_ln2_prec,
-                                    precision,
-                                    mfloat_compute_ln2) != 0)
-        goto cleanup;
-    if (mfloat_div_long_inplace(half_ln2, 2) != 0)
-        goto cleanup;
-    if (mf_add(sum, half_ln_pi) != 0 || mf_add(sum, half_ln2) != 0)
+    if (mf_add(sum, half_ln_2pi) != 0)
         goto cleanup;
     rc = 0;
 
 cleanup:
-    mf_free(half_ln_pi);
-    mf_free(half_ln2);
+    mf_free(half_ln_2pi);
     return rc;
 }
 
@@ -526,24 +390,11 @@ static int mfloat_copy_cached_lgamma_asymptotic_term(mfloat_t *dst, size_t index
     if (!dst || index >= MFLOAT_LGAMMA_ASYMPTOTIC_TERM_COUNT)
         return -1;
 
-    if (!mfloat_cached_lgamma_asymptotic_terms[index] ||
-        mfloat_cached_lgamma_asymptotic_terms_prec != precision) {
-        if (mfloat_cached_lgamma_asymptotic_terms_prec != precision) {
-            for (size_t i = 0; i < MFLOAT_LGAMMA_ASYMPTOTIC_TERM_COUNT; ++i) {
-                mf_free(mfloat_cached_lgamma_asymptotic_terms[i]);
-                mfloat_cached_lgamma_asymptotic_terms[i] = NULL;
-            }
-            mfloat_cached_lgamma_asymptotic_terms_prec = precision;
-        }
-        tmp = mf_new_prec(precision);
-        if (!tmp ||
-            mfloat_copy_lgamma_asymptotic_term_internal(tmp, index, precision) != 0)
-            goto cleanup;
-        mfloat_cached_lgamma_asymptotic_terms[index] = tmp;
-        tmp = NULL;
-    }
-
-    rc = mfloat_copy_value(dst, mfloat_cached_lgamma_asymptotic_terms[index]);
+    tmp = mf_new_prec(precision);
+    if (!tmp ||
+        mfloat_copy_lgamma_asymptotic_term_internal(tmp, index, precision) != 0)
+        goto cleanup;
+    rc = mfloat_copy_value(dst, tmp);
     if (rc == 0)
         dst->precision = precision;
 
@@ -1377,54 +1228,6 @@ cleanup:
     return rc;
 }
 
-static int mfloat_compute_ln2(mfloat_t *dst, size_t precision)
-{
-    mfloat_t *sum = NULL, *term = NULL, *piece = NULL;
-    size_t work_prec = precision + MFLOAT_CONST_GUARD_BITS;
-    long k;
-    int rc = -1;
-
-    sum = mfloat_clone_prec(MF_ZERO, work_prec);
-    term = mfloat_clone_prec(MF_ONE, work_prec);
-    if (!sum || !term)
-        goto cleanup;
-    if (mfloat_div_long_inplace(term, 3) != 0)
-        goto cleanup;
-
-    for (k = 0; k < LONG_MAX / 2; ++k) {
-        long denom = 2l * k + 1l;
-
-        piece = mf_clone(term);
-        if (!piece)
-            goto cleanup;
-        if (mfloat_div_long_inplace(piece, denom) != 0)
-            goto cleanup;
-        if (mf_add(sum, piece) != 0)
-            goto cleanup;
-        mf_free(piece);
-        piece = NULL;
-
-        if (mfloat_is_below_neg_bits(term, (long)work_prec + 10l))
-            break;
-        if (mfloat_div_long_inplace(term, 9) != 0)
-            goto cleanup;
-    }
-
-    if (mf_mul_long(sum, 2) != 0)
-        goto cleanup;
-    if (mfloat_round_to_precision(sum, precision) != 0)
-        goto cleanup;
-    rc = mfloat_copy_value(dst, sum);
-    if (rc == 0)
-        dst->precision = precision;
-
-cleanup:
-    mf_free(sum);
-    mf_free(term);
-    mf_free(piece);
-    return rc;
-}
-
 static int mfloat_sin_kernel(mfloat_t *dst, const mfloat_t *x, size_t precision)
 {
     mfloat_t *sum = NULL, *term = NULL, *r2 = NULL;
@@ -1790,10 +1593,8 @@ static int mfloat_compute_euler_gamma(mfloat_t *dst, size_t precision)
 
     sum = mfloat_clone_prec(MF_ZERO, work_prec);
     term = mfloat_clone_prec(MF_ONE, work_prec);
-    ln2 = mf_new_prec(work_prec);
+    ln2 = mfloat_clone_immortal_prec_internal(MFLOAT_INTERNAL_LN2, work_prec);
     if (!sum || !term || !ln2)
-        goto cleanup;
-    if (mfloat_compute_ln2(ln2, work_prec) != 0)
         goto cleanup;
 
     for (k = 1; k <= n; ++k) {
@@ -1853,29 +1654,50 @@ cleanup:
 
 mfloat_t *mf_pi(void)
 {
-    return mfloat_create_constant_binary_cached(
-        MF_PI,
-        mfloat_compute_pi,
-        &mfloat_cached_pi,
-        &mfloat_cached_pi_prec);
+    size_t precision = mfloat_get_default_precision_internal();
+    mfloat_t *tmp = mf_new_prec(precision);
+
+    if (!tmp)
+        return NULL;
+    if ((precision <= MF_PI->precision
+            ? mfloat_set_from_binary_seed(tmp, MF_PI, precision)
+            : mfloat_compute_pi(tmp, precision)) != 0) {
+        mf_free(tmp);
+        return NULL;
+    }
+    return tmp;
 }
 
 mfloat_t *mf_e(void)
 {
-    return mfloat_create_constant_binary_cached(
-        MF_E,
-        mfloat_compute_e,
-        &mfloat_cached_e,
-        &mfloat_cached_e_prec);
+    size_t precision = mfloat_get_default_precision_internal();
+    mfloat_t *tmp = mf_new_prec(precision);
+
+    if (!tmp)
+        return NULL;
+    if ((precision <= MF_E->precision
+            ? mfloat_set_from_binary_seed(tmp, MF_E, precision)
+            : mfloat_compute_e(tmp, precision)) != 0) {
+        mf_free(tmp);
+        return NULL;
+    }
+    return tmp;
 }
 
 mfloat_t *mf_euler_mascheroni(void)
 {
-    return mfloat_create_constant_binary_cached(
-        MF_EULER_MASCHERONI,
-        mfloat_compute_euler_gamma,
-        &mfloat_cached_gamma,
-        &mfloat_cached_gamma_prec);
+    size_t precision = mfloat_get_default_precision_internal();
+    mfloat_t *tmp = mf_new_prec(precision);
+
+    if (!tmp)
+        return NULL;
+    if ((precision <= MF_EULER_MASCHERONI->precision
+            ? mfloat_set_from_binary_seed(tmp, MF_EULER_MASCHERONI, precision)
+            : mfloat_compute_euler_gamma(tmp, precision)) != 0) {
+        mf_free(tmp);
+        return NULL;
+    }
+    return tmp;
 }
 
 mfloat_t *mf_max(void)
@@ -1982,14 +1804,8 @@ int mf_exp(mfloat_t *mfloat)
     if (work_prec < precision + 96u)
         work_prec = precision + 96u;
     x = mfloat_clone_prec(mfloat, work_prec);
-    ln2 = mf_new_prec(work_prec);
+    ln2 = mfloat_clone_immortal_prec_internal(MFLOAT_INTERNAL_LN2, work_prec);
     if (!x || !ln2)
-        goto cleanup;
-    if (mfloat_copy_cached_constant(ln2,
-                                    &mfloat_cached_ln2,
-                                    &mfloat_cached_ln2_prec,
-                                    work_prec,
-                                    mfloat_compute_ln2) != 0)
         goto cleanup;
 
     xd = mf_to_double(x);
@@ -2149,11 +1965,7 @@ int mf_log(mfloat_t *mfloat)
     mfloat_scratch_reset_slot(&slots[0], work_prec);
 
     if (exp2 != 0) {
-        if (mfloat_copy_cached_constant(ln2,
-                                        &mfloat_cached_ln2,
-                                        &mfloat_cached_ln2_prec,
-                                        work_prec,
-                                        mfloat_compute_ln2) != 0)
+        if (mfloat_scratch_copy(ln2, MFLOAT_INTERNAL_LN2) != 0)
             goto cleanup;
         if (mf_mul_long(ln2, exp2) != 0)
             goto cleanup;
