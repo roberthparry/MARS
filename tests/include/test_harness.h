@@ -27,8 +27,10 @@
  *     iteration of the enclosing for/while loop — tests are conventionally
  *     wrapped in a for(;;){ ... break; } body or use a do/while(0) pattern.
  *
- * The three counters (tests_run, tests_failed, tests_skipped) are defined here
- * and owned by the harness; do not modify them directly.
+ * The harness tracks both:
+ *   • assertion-level counters (`tests_failed`)
+ *   • case-level counters for summary reporting
+ * and owns them; do not modify them directly.
  */
 
 #include <stdio.h>
@@ -57,6 +59,8 @@
 extern int    tests_run;
 extern int    tests_failed;
 extern int    tests_skipped;
+extern int    tests_passed_cases;
+extern int    tests_failed_cases;
 extern double tests_total_ms;
 extern int    tests_rts;      /* RUN_TEST starts — harness-internal, for group detection */
 
@@ -157,9 +161,10 @@ static inline void th_print_time(double ms) {
                                                                                   \
         tests_run++;                                                              \
                                                                                   \
-        int run_before     = tests_run;                                           \
         int failed_before  = tests_failed;                                        \
         int skipped_before = tests_skipped;                                       \
+        int passed_cases_before = tests_passed_cases;                             \
+        int failed_cases_before = tests_failed_cases;                             \
         int rts_before     = tests_rts;                                           \
                                                                                   \
         double __total_ms_before = tests_total_ms;                                \
@@ -177,14 +182,13 @@ static inline void th_print_time(double ms) {
             tests_total_ms += __th_ms;                                            \
                                                                                   \
         if (tests_skipped > skipped_before) {                                     \
-            int run_after     = tests_run;                                        \
-            int failed_after  = tests_failed;                                     \
             int skipped_after = tests_skipped;                                    \
+            int passed_cases_after = tests_passed_cases;                          \
+            int failed_cases_after = tests_failed_cases;                          \
                                                                                   \
-            int total   = (run_after - run_before);                               \
-            int failed  = failed_after  - failed_before;                          \
+            int failed  = failed_cases_after - failed_cases_before;               \
             int skipped = skipped_after - skipped_before;                         \
-            int passed  = total - failed;                                         \
+            int passed  = passed_cases_after - passed_cases_before;               \
                                                                                   \
             printf("\r" C_CYAN "GROUP: %s"                                        \
                    " " C_RESET "(" C_GREEN "%d passed" C_RESET                    \
@@ -192,8 +196,10 @@ static inline void th_print_time(double ms) {
                    "," C_YELLOW " %d skipped" C_RESET ")",                        \
                    #func, passed, failed, skipped);                               \
         } else if (tests_failed == failed_before) {                               \
+            tests_passed_cases++;                                                 \
             printf(C_BOLD C_GREEN "PASS: " C_RESET "%s", #func);                  \
         } else {                                                                  \
+            tests_failed_cases++;                                                 \
             printf(C_BOLD C_RED "FAIL: " C_RESET "%s " C_RED "(%s:%d)" C_RESET,   \
                    #func, __FILE__, __LINE__);                                    \
         }                                                                         \
@@ -218,6 +224,8 @@ int tests_main(void);
 int    tests_run      = 0;
 int    tests_failed   = 0;
 int    tests_skipped  = 0;
+int    tests_passed_cases = 0;
+int    tests_failed_cases = 0;
 double tests_total_ms = 0.0;
 int    tests_rts      = 0;
 
@@ -229,13 +237,11 @@ int main(void) {
     test_config_save();
     test_config_shutdown();
 
-    int passed = tests_run - tests_failed;
-
     printf("\n" C_CYAN "SUMMARY: " C_RESET
            "%d run, " C_GREEN "%d passed" C_RESET ", "
            C_RED "%d failed" C_RESET ", "
            C_YELLOW "%d skipped" C_RESET,
-           tests_run, passed, tests_failed, tests_skipped);
+           tests_run, tests_passed_cases, tests_failed_cases, tests_skipped);
     th_print_time(tests_total_ms);
     putchar('\n');
 
