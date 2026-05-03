@@ -283,3 +283,49 @@ locking.
 - `ig_single_integral` (and the multi-dimensional variants) require that the integrand be expressible as a `dval_t` graph. Functions with branches, loops, or external data are better served by `ig_integral`.
 - Functions with endpoint singularities or sharp peaks may require many subdivisions. Increase the max interval count via `ig_set_interval_count_max` or apply a smoothing substitution.
 - The G7K15 rule evaluates the integrand at 15 points per subinterval; the Turán rule evaluates f and f'' at 8 points (16 evaluations equivalent). For expensive callbacks, the Turán rule's lower subinterval count usually wins despite the per-node overhead.
+
+## Benchmark Coverage
+
+The dedicated integrator benchmark focuses on symbolic fast paths in
+`ig_integral_multi()` and compares them with nearby fallback cases that miss
+the exact matcher.
+
+Benchmark source:
+
+- [`bench/integrator/bench_integrator.c`](../bench/integrator/bench_integrator.c)
+
+Run it from the repository root with:
+
+```sh
+make bench_integrator
+./build/release/bench/integrator/bench_integrator
+```
+
+Current sample cases covered there include:
+
+- matched shortcut families:
+  - `affine_exp`
+  - `affine_square`
+  - `affine_quartic`
+  - `affine_times_exp`
+  - `affine_times_sin`
+  - `affine_times_sinh`
+- nearby fallback cases:
+  - `near_miss_square`
+  - `near_miss_quartic`
+  - `near_miss_exp`
+  - `near_miss_sin`
+  - `near_miss_sinh`
+
+Sample timings from [`docs/benchmarks.md`](benchmarks.md) are:
+
+| Case | Intervals | Avg ms |
+|---|---:|---:|
+| `affine_square` | `1` | `0.001` |
+| `affine_times_exp` | `1` | `0.019` |
+| `near_miss_square` | `1` | `0.179` |
+| `near_miss_quartic` | `1` | `5.977` |
+| `near_miss_exp` | `2` | `15.189` |
+
+For the full integrator benchmark discussion and fuller sample output, see
+[`docs/benchmarks.md`](benchmarks.md).
