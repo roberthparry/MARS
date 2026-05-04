@@ -208,10 +208,7 @@ static void test_euler_identity(void)
     qcomplex_t z = qc_make(qf_from_double(0.0), QF_PI);
     qcomplex_t r = qc_add(qc_exp(z), qc_make(qf_from_double(1.0), qf_from_double(0.0)));
 
-    char re[128], im[128];
-    qf_to_string(r.re, re, sizeof(re));
-    qf_to_string(r.im, im, sizeof(im));
-    printf("    exp(iπ) + 1 = %s + %si\n", re, im);
+    qc_printf("    exp(iπ) + 1 = %.34z\n", r);
 
     check_qc("exp(iπ)+1 ≈ 0 (QF_PI residual < 2e-19)", r, qcr(0.0), 2e-19);
 }

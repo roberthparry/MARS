@@ -35,15 +35,13 @@ int main(void) {
     qcomplex_t z   = qc_make(qf_from_double(0.0), QF_PI);
     qcomplex_t r   = qc_add(qc_exp(z), qc_make(qf_from_double(1.0), qf_from_double(0.0)));
 
-    char buf[256];
-    qc_to_string(r, buf, sizeof(buf));
-    printf("exp(iπ) + 1 = %s\n", buf);
+    qc_printf("exp(iπ) + 1 = %.34z\n", r);
     return 0;
 }
 ```
 
 ```text
-exp(iπ) + 1 = 0
+exp(iπ) + 1 = 0.0000000000000000000000000000000000 + 0.0000000000000000000000000000000000i
 ```
 
 ---
@@ -222,23 +220,23 @@ Current sample results:
 
 | Case | Time |
 |---|---:|
-| `qc_exp(1+i)` | `3.582 us` |
-| `qc_log(1+i)` | `5.405 us` |
-| `qc_erf(0.5+0.5i)` | `10.404 us` |
-| `qc_erfc(0.5+0.5i)` | `9.357 us` |
-| `qc_gamma(1.5+0.7i)` | `14.554 us` |
-| `qc_lgamma(1.5+0.7i)` | `13.515 us` |
-| `qc_digamma(2+i)` | `14.643 us` |
-| `qc_trigamma(2+0.5i)` | `4.596 us` |
-| `qc_tetragamma(2+0.5i)` | `6.256 us` |
-| `qc_gammainv(3.323350970447842551184064031264648)` | `95.411 us` |
-| `qc_gammainv(qc_gamma(2.5+0.3i))` | `219.491 us` |
-| `qc_productlog(1+i)` | `30.014 us` |
-| `qc_lambert_wm1(-0.2-0.1i)` | `27.295 us` |
-| `qc_ei(1+i)` | `44.938 us` |
-| `qc_e1(1+i)` | `41.641 us` |
-| `qc_beta(1.5+0.5i, 2-0.3i)` | `38.087 us` |
-| `qc_logbeta(1.5+0.5i, 2-0.3i)` | `37.286 us` |
+| `qc_exp(1+i)` | `3.582 µs` |
+| `qc_log(1+i)` | `5.405 µs` |
+| `qc_erf(0.5+0.5i)` | `10.404 µs` |
+| `qc_erfc(0.5+0.5i)` | `9.357 µs` |
+| `qc_gamma(1.5+0.7i)` | `14.554 µs` |
+| `qc_lgamma(1.5+0.7i)` | `13.515 µs` |
+| `qc_digamma(2+i)` | `14.643 µs` |
+| `qc_trigamma(2+0.5i)` | `4.596 µs` |
+| `qc_tetragamma(2+0.5i)` | `6.256 µs` |
+| `qc_gammainv(3.323350970447842551184064031264648)` | `95.411 µs` |
+| `qc_gammainv(qc_gamma(2.5+0.3i))` | `219.491 µs` |
+| `qc_productlog(1+i)` | `30.014 µs` |
+| `qc_lambert_wm1(-0.2-0.1i)` | `27.295 µs` |
+| `qc_ei(1+i)` | `44.938 µs` |
+| `qc_e1(1+i)` | `41.641 µs` |
+| `qc_beta(1.5+0.5i, 2-0.3i)` | `38.087 µs` |
+| `qc_logbeta(1.5+0.5i, 2-0.3i)` | `37.286 µs` |
 
 For a broader benchmark overview, see
 [docs/benchmarks.md](/home/rparry/Projects/MARS/docs/benchmarks.md).
