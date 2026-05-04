@@ -1,25 +1,44 @@
 #include <math.h>
 
 #include "qcomplex_internal.h"
+
+static void qc_init_faddeeva_coeffs(qfloat_t ak[32], qfloat_t ck[32])
+{
+    static int initialised = 0;
+
+    if (initialised)
+        return;
+    initialised = 1;
+
+    {
+        const int N = 32;
+        qfloat_t L   = qf_sqrt(qf_from_double((double)N));
+        qfloat_t two = qf_from_double(2.0);
+
+        for (int k = 1; k <= N; k++) {
+            qfloat_t odd = qf_from_double((double)(2 * k - 1));
+            qfloat_t angle = qf_div(qf_mul(odd, QF_PI),
+                                    qf_mul(two, qf_from_double((double)N)));
+
+            ak[k - 1] = qf_div(qf_mul(odd, QF_PI), qf_mul(two, L));
+            ck[k - 1] = qf_div(qf_add(qf_from_double(1.0), qf_cos(angle)), L);
+        }
+    }
+}
+
 static qcomplex_t qc_faddeeva(qcomplex_t z)
 {
     const int N = 32;
-    qfloat_t L   = qf_sqrt(qf_from_double((double)N));
-    qfloat_t two = qf_from_double(2.0);
+    static qfloat_t ak[32];
+    static qfloat_t ck[32];
 
     qcomplex_t sum = qcr(0.0);
 
-    for (int k = 1; k <= N; k++) {
-        qfloat_t ak = qf_div(
-            qf_mul(qf_from_double((double)(2*k - 1)), QF_PI),
-            qf_mul(two, L));
-        qfloat_t angle = qf_div(
-            qf_mul(qf_from_double((double)(2*k - 1)), QF_PI),
-            qf_mul(two, qf_from_double((double)N)));
-        qfloat_t ck = qf_div(qf_add(qf_from_double(1.0), qf_cos(angle)), L);
+    qc_init_faddeeva_coeffs(ak, ck);
 
-        qcomplex_t denom = qc_make(z.re, qf_sub(z.im, ak));
-        sum = qc_add(sum, qc_div(qcrf(ck), denom));
+    for (int k = 1; k <= N; k++) {
+        qcomplex_t denom = qc_make(z.re, qf_sub(z.im, ak[k - 1]));
+        sum = qc_add(sum, qc_div(qcrf(ck[k - 1]), denom));
     }
 
     // inside = 1 + (2i / sqrt(pi)) * sum
