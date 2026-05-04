@@ -309,15 +309,11 @@ See [`docs/building.md`](docs/building.md) for benchmark and build details.
 - [Building](docs/building.md)
 - [Testing](docs/testing.md)
 - [Benchmarks](docs/benchmarks.md)
-- [Dictionary ownership models](docs/dictionary.md#ownership-models)
-- [Set ownership models](docs/set.md#ownership-models)
-- [Array ownership models](docs/array.md#ownership-models)
 
 ## Directory Layout
 
 ```text
 include/     public headers
-include/internal/  project-internal cross-module headers
 src/         implementations
 tests/       unit tests
 docs/        detailed module documentation
@@ -331,4 +327,4 @@ and are not intended as stable external API.
 
 ## License
 
-MIT License. See [`LICENSE`](LICENSE).
+MIT License. See [LICENSE](https://en.wikipedia.org/wiki/MIT_License).
