@@ -178,29 +178,29 @@ int main(void)
     puts("Scale iterations with MARS_BENCH_SCALE=<n> if you want longer runs.");
     puts("");
 
-    run_unary_case("exp_1_plus_1i", "(1,1)", mc_exp, bench_scaled_iters(1000));
-    run_unary_case("log_1_plus_1i", "(1,1)", mc_log, bench_scaled_iters(1000));
-    run_unary_case("erf_0_5_plus_0_5i", "(0.5,0.5)", mc_erf, bench_scaled_iters(500));
-    run_unary_case("erfc_0_5_plus_0_5i", "(0.5,0.5)", mc_erfc, bench_scaled_iters(500));
+    run_unary_case("exp_1_plus_1i", "1 + 1i", mc_exp, bench_scaled_iters(1000));
+    run_unary_case("log_1_plus_1i", "1 + 1i", mc_log, bench_scaled_iters(1000));
+    run_unary_case("erf_0_5_plus_0_5i", "0.5 + 0.5i", mc_erf, bench_scaled_iters(500));
+    run_unary_case("erfc_0_5_plus_0_5i", "0.5 + 0.5i", mc_erfc, bench_scaled_iters(500));
 
-    run_unary_case("gamma_1_5_plus_0_7i", "(1.5,0.7)", mc_gamma, bench_scaled_iters(200));
-    run_unary_case("lgamma_1_5_plus_0_7i", "(1.5,0.7)", mc_lgamma, bench_scaled_iters(200));
-    run_unary_case("digamma_2_plus_1i", "(2,1)", mc_digamma, bench_scaled_iters(500));
-    run_unary_case("trigamma_2_plus_0_5i", "(2,0.5)", mc_trigamma, bench_scaled_iters(300));
-    run_unary_case("tetragamma_2_plus_0_5i", "(2,0.5)", mc_tetragamma, bench_scaled_iters(300));
+    run_unary_case("gamma_1_5_plus_0_7i", "1.5 + 0.7i", mc_gamma, bench_scaled_iters(200));
+    run_unary_case("lgamma_1_5_plus_0_7i", "1.5 + 0.7i", mc_lgamma, bench_scaled_iters(200));
+    run_unary_case("digamma_2_plus_1i", "2 + 1i", mc_digamma, bench_scaled_iters(500));
+    run_unary_case("trigamma_2_plus_0_5i", "2 + 0.5i", mc_trigamma, bench_scaled_iters(300));
+    run_unary_case("tetragamma_2_plus_0_5i", "2 + 0.5i", mc_tetragamma, bench_scaled_iters(300));
     run_unary_case("gammainv_gamma_2_5", "3.323350970447842551184064031264648", mc_gammainv, bench_scaled_iters(100));
-    run_unary_case("gammainv_gamma_2_5_0_3i", "(0,0)", bench_mc_gammainv_gamma_2_5_plus_0_3i, bench_scaled_iters(100));
+    run_unary_case("gammainv_gamma_2_5_0_3i", "0 + 0i", bench_mc_gammainv_gamma_2_5_plus_0_3i, bench_scaled_iters(100));
 
     run_unary_case("lambert_w0_1", "1", mc_lambert_w0, bench_scaled_iters(2000));
     run_unary_case("productlog_1", "1", mc_productlog, bench_scaled_iters(2000));
     run_unary_case("lambert_wm1_-0_1", "-0.1", mc_lambert_wm1, bench_scaled_iters(1000));
-    run_unary_case("productlog_1_plus_1i", "(1,1)", mc_productlog, bench_scaled_iters(300));
-    run_unary_case("lambert_wm1_-0_2_-0_1i", "(-0.2,-0.1)", mc_lambert_wm1, bench_scaled_iters(200));
-    run_unary_case("ei_1_plus_1i", "(1,1)", mc_ei, bench_scaled_iters(300));
-    run_unary_case("e1_1_plus_1i", "(1,1)", mc_e1, bench_scaled_iters(300));
+    run_unary_case("productlog_1_plus_1i", "1 + 1i", mc_productlog, bench_scaled_iters(300));
+    run_unary_case("lambert_wm1_-0_2_-0_1i", "-0.2 - 0.1i", mc_lambert_wm1, bench_scaled_iters(200));
+    run_unary_case("ei_1_plus_1i", "1 + 1i", mc_ei, bench_scaled_iters(300));
+    run_unary_case("e1_1_plus_1i", "1 + 1i", mc_e1, bench_scaled_iters(300));
 
-    run_binary_case("beta_1_5_0_5__2_-0_3", "(1.5,0.5)", "(2,-0.3)", mc_beta, bench_scaled_iters(200));
-    run_binary_case("logbeta_1_5_0_5__2_-0_3", "(1.5,0.5)", "(2,-0.3)", mc_logbeta, bench_scaled_iters(200));
+    run_binary_case("beta_1_5_0_5__2_-0_3", "1.5 + 0.5i", "2 - 0.3i", mc_beta, bench_scaled_iters(200));
+    run_binary_case("logbeta_1_5_0_5__2_-0_3", "1.5 + 0.5i", "2 - 0.3i", mc_logbeta, bench_scaled_iters(200));
 
     return 0;
 }
