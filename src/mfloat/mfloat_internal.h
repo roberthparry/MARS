@@ -1,6 +1,8 @@
 #ifndef MFLOAT_INTERNAL_H
 #define MFLOAT_INTERNAL_H
 
+#include <stdbool.h>
+
 #include "mfloat.h"
 
 #include "mint.h"
@@ -8,7 +10,7 @@
 #define MFLOAT_DEFAULT_PRECISION_BITS 256u
 #define MFLOAT_PARSE_GUARD_BITS 4u
 
-/* Internal representation tags and flags. */
+/* Internal representation tags. */
 typedef enum mfloat_kind_t {
     MFLOAT_KIND_FINITE = 0,
     MFLOAT_KIND_NAN,
@@ -16,17 +18,12 @@ typedef enum mfloat_kind_t {
     MFLOAT_KIND_NEGINF
 } mfloat_kind_t;
 
-typedef enum mfloat_flags_t {
-    MFLOAT_FLAG_NONE = 0u,
-    MFLOAT_FLAG_IMMORTAL = 1u << 0
-} mfloat_flags_t;
-
 struct _mfloat_t {
     mfloat_kind_t kind; /* finite / NaN / infinities */
     short sign;         /* -1, 0, +1 */
     long exponent2;     /* binary exponent */
     size_t precision;   /* target rounded precision in bits */
-    unsigned flags;     /* internal state flags */
+    bool immortal;      /* static immortal backing */
     mint_t *mantissa;   /* always non-negative */
 };
 

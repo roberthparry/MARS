@@ -7,13 +7,37 @@
 #include <math.h>
 #include <stdlib.h>
 
+static uint64_t mfloat_one_storage[] = { 1u };
+static uint64_t mfloat_ten_storage[] = { 10u };
+
+static struct _mint_t mfloat_zero_mint = {
+    .sign = 0,
+    .length = 0,
+    .capacity = 0,
+    .storage = NULL
+};
+
+static struct _mint_t mfloat_one_mint = {
+    .sign = 1,
+    .length = 1,
+    .capacity = 1,
+    .storage = mfloat_one_storage
+};
+
+static struct _mint_t mfloat_ten_mint = {
+    .sign = 1,
+    .length = 1,
+    .capacity = 1,
+    .storage = mfloat_ten_storage
+};
+
 static struct _mfloat_t mfloat_zero_static = {
     .kind = MFLOAT_KIND_FINITE,
     .sign = 0,
     .exponent2 = 0,
     .precision = MFLOAT_DEFAULT_PRECISION_BITS,
-    .flags = MFLOAT_FLAG_IMMORTAL,
-    .mantissa = NULL
+    .immortal = true,
+    .mantissa = &mfloat_zero_mint
 };
 
 static struct _mfloat_t mfloat_one_static = {
@@ -21,8 +45,8 @@ static struct _mfloat_t mfloat_one_static = {
     .sign = 1,
     .exponent2 = 0,
     .precision = MFLOAT_DEFAULT_PRECISION_BITS,
-    .flags = MFLOAT_FLAG_IMMORTAL,
-    .mantissa = NULL
+    .immortal = true,
+    .mantissa = &mfloat_one_mint
 };
 
 static struct _mfloat_t mfloat_half_static = {
@@ -30,8 +54,8 @@ static struct _mfloat_t mfloat_half_static = {
     .sign = 1,
     .exponent2 = -1,
     .precision = MFLOAT_DEFAULT_PRECISION_BITS,
-    .flags = MFLOAT_FLAG_IMMORTAL,
-    .mantissa = NULL
+    .immortal = true,
+    .mantissa = &mfloat_one_mint
 };
 
 static struct _mfloat_t mfloat_ten_static = {
@@ -39,8 +63,8 @@ static struct _mfloat_t mfloat_ten_static = {
     .sign = 1,
     .exponent2 = 0,
     .precision = MFLOAT_DEFAULT_PRECISION_BITS,
-    .flags = MFLOAT_FLAG_IMMORTAL,
-    .mantissa = NULL
+    .immortal = true,
+    .mantissa = &mfloat_ten_mint
 };
 
 static struct _mfloat_t mfloat_nan_static = {
@@ -48,8 +72,8 @@ static struct _mfloat_t mfloat_nan_static = {
     .sign = 0,
     .exponent2 = 0,
     .precision = MFLOAT_DEFAULT_PRECISION_BITS,
-    .flags = MFLOAT_FLAG_IMMORTAL,
-    .mantissa = NULL
+    .immortal = true,
+    .mantissa = &mfloat_zero_mint
 };
 
 static struct _mfloat_t mfloat_inf_static = {
@@ -57,8 +81,8 @@ static struct _mfloat_t mfloat_inf_static = {
     .sign = 1,
     .exponent2 = 0,
     .precision = MFLOAT_DEFAULT_PRECISION_BITS,
-    .flags = MFLOAT_FLAG_IMMORTAL,
-    .mantissa = NULL
+    .immortal = true,
+    .mantissa = &mfloat_zero_mint
 };
 
 static struct _mfloat_t mfloat_ninf_static = {
@@ -66,8 +90,8 @@ static struct _mfloat_t mfloat_ninf_static = {
     .sign = -1,
     .exponent2 = 0,
     .precision = MFLOAT_DEFAULT_PRECISION_BITS,
-    .flags = MFLOAT_FLAG_IMMORTAL,
-    .mantissa = NULL
+    .immortal = true,
+    .mantissa = &mfloat_zero_mint
 };
 
 static uint64_t mfloat_pi1024_storage[] = {
@@ -137,12 +161,12 @@ static struct _mint_t mfloat_sqrt_pi1024_mint = { .sign = 1, .length = 34, .capa
 static struct _mint_t mfloat_sqrt2_1024_mint = { .sign = 1, .length = 34, .capacity = 34, .storage = mfloat_sqrt2_1024_storage };
 static struct _mint_t mfloat_tenth_256_mint = { .sign = 1, .length = 5u, .capacity = 5u, .storage = mfloat_tenth_256_storage };
 
-static struct _mfloat_t mfloat_pi1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -2155, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_pi1024_mint };
-static struct _mfloat_t mfloat_e1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -2155, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_e1024_mint };
-static struct _mfloat_t mfloat_gamma1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -2158, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_gamma1024_mint };
-static struct _mfloat_t mfloat_sqrt_pi1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -2154, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_sqrt_pi1024_mint };
-static struct _mfloat_t mfloat_sqrt2_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -2155, .precision = 1024u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_sqrt2_1024_mint };
-static struct _mfloat_t mfloat_tenth_256_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -263, .precision = 256u, .flags = MFLOAT_FLAG_IMMORTAL, .mantissa = &mfloat_tenth_256_mint };
+static struct _mfloat_t mfloat_pi1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -2155, .precision = 1024u, .immortal = true, .mantissa = &mfloat_pi1024_mint };
+static struct _mfloat_t mfloat_e1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -2155, .precision = 1024u, .immortal = true, .mantissa = &mfloat_e1024_mint };
+static struct _mfloat_t mfloat_gamma1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -2158, .precision = 1024u, .immortal = true, .mantissa = &mfloat_gamma1024_mint };
+static struct _mfloat_t mfloat_sqrt_pi1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -2154, .precision = 1024u, .immortal = true, .mantissa = &mfloat_sqrt_pi1024_mint };
+static struct _mfloat_t mfloat_sqrt2_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -2155, .precision = 1024u, .immortal = true, .mantissa = &mfloat_sqrt2_1024_mint };
+static struct _mfloat_t mfloat_tenth_256_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -263, .precision = 256u, .immortal = true, .mantissa = &mfloat_tenth_256_mint };
 static size_t mfloat_default_precision_bits = MFLOAT_DEFAULT_PRECISION_BITS;
 
 const mfloat_t * const MF_ZERO = &mfloat_zero_static;
@@ -159,32 +183,9 @@ const mfloat_t * const MF_NAN = &mfloat_nan_static;
 const mfloat_t * const MF_INF = &mfloat_inf_static;
 const mfloat_t * const MF_NINF = &mfloat_ninf_static;
 
-static void mfloat_init_constants(void)
-{
-    static int initialised = 0;
-
-    if (initialised)
-        return;
-    initialised = 1;
-
-    mfloat_zero_static.mantissa = (mint_t *)MI_ZERO;
-    mfloat_one_static.mantissa = (mint_t *)MI_ONE;
-    mfloat_half_static.mantissa = (mint_t *)MI_ONE;
-    mfloat_ten_static.mantissa = (mint_t *)MI_TEN;
-    mfloat_nan_static.mantissa = (mint_t *)MI_ZERO;
-    mfloat_inf_static.mantissa = (mint_t *)MI_ZERO;
-    mfloat_ninf_static.mantissa = (mint_t *)MI_ZERO;
-}
-
-__attribute__((constructor))
-static void mfloat_init_constants_ctor(void)
-{
-    mfloat_init_constants();
-}
-
 int mfloat_is_immortal(const mfloat_t *mfloat)
 {
-    return mfloat && (mfloat->flags & MFLOAT_FLAG_IMMORTAL) != 0u;
+    return mfloat && mfloat->immortal;
 }
 
 int mfloat_is_finite(const mfloat_t *mfloat)
@@ -276,8 +277,6 @@ static mfloat_t *mfloat_alloc(size_t precision_bits)
 {
     mfloat_t *mfloat = calloc(1, sizeof(*mfloat));
 
-    mfloat_init_constants();
-
     if (!mfloat)
         return NULL;
 
@@ -290,7 +289,7 @@ static mfloat_t *mfloat_alloc(size_t precision_bits)
     mfloat->precision = precision_bits > 0 ? precision_bits
                                            : mfloat_default_precision_bits;
     mfloat->kind = MFLOAT_KIND_FINITE;
-    mfloat->flags = MFLOAT_FLAG_NONE;
+    mfloat->immortal = false;
     return mfloat;
 }
 
@@ -587,7 +586,6 @@ mfloat_t *mf_new(void)
 
 mfloat_t *mf_new_prec(size_t precision_bits)
 {
-    mfloat_init_constants();
     return mfloat_alloc(precision_bits);
 }
 
