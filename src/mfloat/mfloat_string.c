@@ -1,5 +1,6 @@
 #include "mfloat_internal.h"
 
+#include <float.h>
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -155,9 +156,81 @@ cleanup:
     return out;
 }
 
-double mf_to_double(const mfloat_t *mfloat)
+static uint64_t mfloat_extract_bits_u64(const mint_t *mantissa,
+                                        size_t start_bit,
+                                        size_t count)
 {
-    char *text;
+    uint64_t value = 0u;
+
+    for (size_t i = 0; i < count; i++) {
+        value <<= 1;
+        if (mi_test_bit(mantissa, start_bit + (count - 1u - i)))
+            value |= 1u;
+    }
+
+    return value;
+}
+
+static int mfloat_any_low_bits(const mint_t *mantissa, size_t bit_count)
+{
+    size_t bitlen = mi_bit_length(mantissa);
+    size_t limit = bit_count < bitlen ? bit_count : bitlen;
+
+    for (size_t i = 0; i < limit; i++) {
+        if (mi_test_bit(mantissa, i))
+            return 1;
+    }
+    return 0;
+}
+
+static uint64_t mfloat_shift_left_to_u64(const mint_t *mantissa, size_t left_shift)
+{
+    size_t bitlen = mi_bit_length(mantissa);
+    uint64_t value = 0u;
+
+    for (size_t i = 0; i < bitlen; i++) {
+        value <<= 1;
+        if (mi_test_bit(mantissa, bitlen - 1u - i))
+            value |= 1u;
+    }
+
+    return value << left_shift;
+}
+
+static uint64_t mfloat_round_shifted_to_u64(const mint_t *mantissa, long shift)
+{
+    size_t bitlen = mi_bit_length(mantissa);
+    uint64_t value;
+
+    if (bitlen == 0u)
+        return 0u;
+
+    if (shift < 0)
+        return mfloat_shift_left_to_u64(mantissa, (size_t)(-shift));
+
+    if ((size_t)shift < bitlen) {
+        size_t kept = bitlen - (size_t)shift;
+        value = mfloat_extract_bits_u64(mantissa, (size_t)shift, kept);
+    } else {
+        value = 0u;
+    }
+
+    if (shift > 0) {
+        size_t round_bit_index = (size_t)shift - 1u;
+        int round_bit = round_bit_index < bitlen ? mi_test_bit(mantissa, round_bit_index) : 0;
+        int sticky = mfloat_any_low_bits(mantissa, round_bit_index);
+
+        if (round_bit && (sticky || (value & 1u)))
+            value++;
+    }
+
+    return value;
+}
+
+static double mfloat_to_double_direct(const mfloat_t *mfloat)
+{
+    size_t bitlen;
+    long exponent;
     double value;
 
     if (!mfloat)
@@ -168,18 +241,65 @@ double mf_to_double(const mfloat_t *mfloat)
         return INFINITY;
     if (mfloat->kind == MFLOAT_KIND_NEGINF)
         return -INFINITY;
+    if (!mfloat->mantissa || mi_is_zero(mfloat->mantissa))
+        return 0.0;
 
-    text = mf_to_string(mfloat);
-    if (!text)
-        return NAN;
-    value = strtod(text, NULL);
-    free(text);
-    return value;
+    bitlen = mi_bit_length(mfloat->mantissa);
+    exponent = mfloat->exponent2 + (long)bitlen - 1l;
+
+    if (exponent > DBL_MAX_EXP - 1)
+        return mfloat->sign < 0 ? -INFINITY : INFINITY;
+
+    if (exponent >= DBL_MIN_EXP) {
+        long shift = (long)bitlen - 53l;
+        uint64_t sig;
+
+        if (shift >= 0) {
+            sig = mfloat_extract_bits_u64(mfloat->mantissa, (size_t)shift, 53u);
+            if (shift > 0) {
+                size_t round_bit_index = (size_t)shift - 1u;
+                int round_bit = mi_test_bit(mfloat->mantissa, round_bit_index);
+                int sticky = mfloat_any_low_bits(mfloat->mantissa, round_bit_index);
+
+                if (round_bit && (sticky || (sig & 1u)))
+                    sig++;
+            }
+        } else {
+            sig = mfloat_shift_left_to_u64(mfloat->mantissa, (size_t)(-shift));
+        }
+
+        if (sig == (UINT64_C(1) << 53)) {
+            sig >>= 1;
+            exponent++;
+            if (exponent > DBL_MAX_EXP - 1)
+                return mfloat->sign < 0 ? -INFINITY : INFINITY;
+        }
+
+        value = ldexp((double)sig, (int)exponent - 52);
+    } else {
+        long shift = -(mfloat->exponent2 + 1074l);
+        uint64_t frac = mfloat_round_shifted_to_u64(mfloat->mantissa, shift);
+
+        if (frac == 0u) {
+            value = 0.0;
+        } else {
+            value = ldexp((double)frac, -1074);
+        }
+    }
+
+    return mfloat->sign < 0 ? -value : value;
+}
+
+double mf_to_double(const mfloat_t *mfloat)
+{
+    return mfloat_to_double_direct(mfloat);
 }
 
 qfloat_t mf_to_qfloat(const mfloat_t *mfloat)
 {
-    char *text;
+    double hi, lo;
+    mfloat_t *residual = NULL;
+    mfloat_t *head = NULL;
     qfloat_t value;
 
     if (!mfloat)
@@ -190,11 +310,31 @@ qfloat_t mf_to_qfloat(const mfloat_t *mfloat)
         return QF_INF;
     if (mfloat->kind == MFLOAT_KIND_NEGINF)
         return QF_NINF;
+    if (!mfloat->mantissa || mi_is_zero(mfloat->mantissa))
+        return QF_ZERO;
 
-    text = mf_to_string(mfloat);
-    if (!text)
-        return QF_NAN;
-    value = qf_from_string(text);
-    free(text);
+    hi = mfloat_to_double_direct(mfloat);
+    if (!isfinite(hi))
+        return qf_from_double(hi);
+
+    residual = mf_clone(mfloat);
+    head = mf_create_double(hi);
+    if (!residual || !head)
+        goto fail;
+    if (mf_set_precision(head, residual->precision) != 0)
+        goto fail;
+    if (mf_sub(residual, head) != 0)
+        goto fail;
+
+    lo = mfloat_to_double_direct(residual);
+    value = qf_add(qf_from_double(hi), qf_from_double(lo));
+
+    mf_free(residual);
+    mf_free(head);
     return value;
+
+fail:
+    mf_free(residual);
+    mf_free(head);
+    return QF_NAN;
 }

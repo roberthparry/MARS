@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <float.h>
 #include <math.h>
 
 #include "mfloat.h"
@@ -21,6 +22,29 @@ static void print_mfloat_error_check_mode(const char *label,
                                           const mfloat_t *got,
                                           const char *expected_text,
                                           int use_decimal_format);
+
+static int qfloat_is_normalized(qfloat_t value)
+{
+    double hi = value.hi;
+    double lo = value.lo;
+    double abs_hi, ulp;
+    int exp2;
+
+    if (isnan(hi) || isnan(lo) || isinf(hi))
+        return 1;
+    if (hi == 0.0)
+        return lo == 0.0;
+
+    abs_hi = fabs(hi);
+    if (abs_hi < DBL_MIN) {
+        ulp = ldexp(1.0, -1074);
+    } else {
+        frexp(abs_hi, &exp2);
+        ulp = ldexp(1.0, exp2 - 53);
+    }
+
+    return fabs(lo) <= 0.5 * ulp;
+}
 
 static void print_mfloat_value(const char *label, const mfloat_t *value)
 {
@@ -670,11 +694,24 @@ void test_conversion_to_double_and_qfloat(void)
 {
     mfloat_t *a = mf_create_string("1.5");
     mfloat_t *b = mf_create_string("0.25");
+    mfloat_t *c = mf_create_string("1024");
+    mfloat_t *d = mf_create_string("-0.125");
+    mfloat_t *e = mf_create_string("9007199254740992");
+    qfloat_t qsrc_a = qf_from_string("1.5");
+    qfloat_t qsrc_b = qf_from_string("0.25");
+    qfloat_t qsrc_c = qf_from_string("1024");
+    qfloat_t qsrc_d = qf_from_string("-0.125");
+    qfloat_t qsrc_e = qf_from_string("9007199254740992");
     double da, db;
-    qfloat_t qa, qb, qinf, qninf, qnan;
+    qfloat_t qa, qb, qc, qd, qe, qinf, qninf, qnan;
+    char got_buf[256];
+    char expected_buf[256];
 
     ASSERT_NOT_NULL(a);
     ASSERT_NOT_NULL(b);
+    ASSERT_NOT_NULL(c);
+    ASSERT_NOT_NULL(d);
+    ASSERT_NOT_NULL(e);
     print_mfloat_value("a before mf_to_double", a);
     print_mfloat_value("b before mf_to_double", b);
 
@@ -691,6 +728,9 @@ void test_conversion_to_double_and_qfloat(void)
 
     qa = mf_to_qfloat(a);
     qb = mf_to_qfloat(b);
+    qc = mf_to_qfloat(c);
+    qd = mf_to_qfloat(d);
+    qe = mf_to_qfloat(e);
     qinf = mf_to_qfloat(MF_INF);
     qninf = mf_to_qfloat(MF_NINF);
     qnan = mf_to_qfloat(MF_NAN);
@@ -699,12 +739,49 @@ void test_conversion_to_double_and_qfloat(void)
     ASSERT_TRUE(fabs(qf_to_double(qa) - 1.5) < 1e-15);
     print_double_check("mf_to_qfloat(b)", "0.25", 0.25, qf_to_double(qb));
     ASSERT_TRUE(fabs(qf_to_double(qb) - 0.25) < 1e-15);
+    ASSERT_TRUE(qfloat_is_normalized(qa));
+    ASSERT_TRUE(qfloat_is_normalized(qb));
+
+    qf_to_string(qa, got_buf, sizeof(got_buf));
+    qf_to_string(qsrc_a, expected_buf, sizeof(expected_buf));
+    print_string_check("mf_to_qfloat(\"1.5\")", "1.5", expected_buf, got_buf);
+    ASSERT_TRUE(strcmp(got_buf, expected_buf) == 0);
+
+    qf_to_string(qb, got_buf, sizeof(got_buf));
+    qf_to_string(qsrc_b, expected_buf, sizeof(expected_buf));
+    print_string_check("mf_to_qfloat(\"0.25\")", "0.25", expected_buf, got_buf);
+    ASSERT_TRUE(strcmp(got_buf, expected_buf) == 0);
+
+    qf_to_string(qc, got_buf, sizeof(got_buf));
+    qf_to_string(qsrc_c, expected_buf, sizeof(expected_buf));
+    print_string_check("mf_to_qfloat(\"1024\")", "1024", expected_buf, got_buf);
+    ASSERT_TRUE(strcmp(got_buf, expected_buf) == 0);
+    ASSERT_TRUE(qfloat_is_normalized(qc));
+
+    qf_to_string(qd, got_buf, sizeof(got_buf));
+    qf_to_string(qsrc_d, expected_buf, sizeof(expected_buf));
+    print_string_check("mf_to_qfloat(\"-0.125\")", "-0.125", expected_buf, got_buf);
+    ASSERT_TRUE(strcmp(got_buf, expected_buf) == 0);
+    ASSERT_TRUE(qfloat_is_normalized(qd));
+
+    qf_to_string(qe, got_buf, sizeof(got_buf));
+    qf_to_string(qsrc_e, expected_buf, sizeof(expected_buf));
+    print_string_check("mf_to_qfloat(\"9007199254740992\")",
+                       "9007199254740992",
+                       expected_buf,
+                       got_buf);
+    ASSERT_TRUE(strcmp(got_buf, expected_buf) == 0);
+    ASSERT_TRUE(qfloat_is_normalized(qe));
+
     ASSERT_TRUE(qf_isposinf(qinf));
     ASSERT_TRUE(qf_isneginf(qninf));
     ASSERT_TRUE(qf_isnan(qnan));
 
     mf_free(a);
     mf_free(b);
+    mf_free(c);
+    mf_free(d);
+    mf_free(e);
 }
 
 void test_conversion_from_double_and_qfloat(void)
