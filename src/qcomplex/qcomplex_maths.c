@@ -635,15 +635,18 @@ qcomplex_t qc_ei(qcomplex_t z)
     qfloat_t tol  = qf_from_double(1e-30);
     qcomplex_t sum = qc_add(qcrf(QF_EULER_MASCHERONI), qc_log(z));
 
-    qfloat_t   fact = qf_from_double(1.0);  // fact = k!
-    qcomplex_t term = z;                     // term = z^k
+    qfloat_t one  = qf_from_double(1.0);
+    qfloat_t kf   = one;                    // k
+    qfloat_t fact = one;                    // k!
+    qcomplex_t term = z;                    // z^k
 
     for (int k = 1; k < 10000; k++) {
-        qcomplex_t add = qc_div(term, qcrf(qf_mul(qf_from_double((double)k), fact)));
+        qcomplex_t add = qc_div(term, qcrf(qf_mul(kf, fact)));
         sum = qc_add(sum, add);
         if (qf_lt(qc_abs(add), qf_mul(tol, qc_abs(sum))))
             break;
-        fact = qf_mul(fact, qf_from_double((double)(k + 1)));
+        kf = qf_add(kf, one);
+        fact = qf_mul(fact, kf);
         term = qc_mul(term, z);
     }
     return sum;
