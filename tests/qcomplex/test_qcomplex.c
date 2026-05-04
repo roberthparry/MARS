@@ -406,12 +406,12 @@ static void test_erf(void)
     check_qc("erfc(0) = 1", qc_erfc(qcr(0.0)), qcr(1.0), 1e-30);
 
     {
-        /* complex path (Faddeeva approximation — ~15 sig digits) */
+        /* complex path */
         qcomplex_t zc = qcz(0.5, 0.3);
         check_qc("erf(-z) = -erf(z) for complex z",
-                 qc_erf(qc_neg(zc)), qc_neg(qc_erf(zc)), 1e-14);
+                 qc_erf(qc_neg(zc)), qc_neg(qc_erf(zc)), 1e-24);
         check_qc("erf(z)+erfc(z) = 1 for complex z",
-                 qc_add(qc_erf(zc), qc_erfc(zc)), qcr(1.0), 1e-14);
+                 qc_add(qc_erf(zc), qc_erfc(zc)), qcr(1.0), 1e-24);
     }
 }
 
@@ -471,7 +471,7 @@ static void test_gamma(void)
         qfloat_t abs2  = qf_sqr(qc_abs(g1i));
         qfloat_t pi_over_sinh_pi = qf_div(QF_PI,
             qf_from_string("11.548739357257748337410243973894060883480498326634"));
-        check_qf("|Γ(1+i)|² = π/sinh(π)", abs2, pi_over_sinh_pi, 1e-14);
+        check_qf("|Γ(1+i)|² = π/sinh(π)", abs2, pi_over_sinh_pi, 1e-15);
     }
 
     {
@@ -480,7 +480,7 @@ static void test_gamma(void)
         qcomplex_t rhs3   = qcrf(qf_div(QF_PI, sin_pi_3));
         check_qc_rel("Γ(z)*Γ(1-z) = π/sin(πz) at z=1/3",
                      qc_mul(qc_gamma(z3), qc_gamma(qc_sub(qcr(1.0), z3))),
-                     rhs3, 1e-14);
+                     rhs3, 1e-16);
     }
 
     {
@@ -538,7 +538,7 @@ static void test_gammainv(void)
     {
         qcomplex_t z = qcz(2.5, 0.3);
         check_qc("gammainv(Γ(2.5+0.3i)) = 2.5+0.3i",
-                 qc_gammainv(qc_gamma(z)), z, 1e-24);
+                 qc_gammainv(qc_gamma(z)), z, 1e-25);
     }
 }
 
@@ -566,7 +566,7 @@ static void test_beta(void)
         qcomplex_t a2 = qcz(1.2, 0.4);
         qcomplex_t b2 = qcz(0.8, 0.2);
         check_qc_rel("beta = exp(logbeta)",
-                     qc_beta(a2, b2), qc_exp(qc_logbeta(a2, b2)), 1e-25);
+                     qc_beta(a2, b2), qc_exp(qc_logbeta(a2, b2)), 1e-26);
     }
 
     check_qc("C(5,2) = 10", qc_binomial(qcr(5.0), qcr(2.0)), qcr(10.0), 1e-28);
@@ -721,7 +721,7 @@ static void test_gammainc(void)
         qcomplex_t x3 = qcr(1.0);
         check_qc_rel("γ(s,x) + Γ(s,x) = Γ(s)",
                      qc_add(qc_gammainc_lower(s3, x3), qc_gammainc_upper(s3, x3)),
-                     qc_gamma(s3), 1e-25);
+                     qc_gamma(s3), 1e-26);
     }
 }
 
