@@ -23,7 +23,6 @@ static void check_qc(const char *label, qcomplex_t got, qcomplex_t expected, dou
 {
     double err = qf_to_double(qc_abs(qc_sub(got, expected)));
     int ok = err < tol;
-    tests_run++;
     if (!ok) tests_failed++;
     printf(ok ? C_GREEN "  OK: %s\n" C_RESET : C_RED "  FAIL: %s\n" C_RESET, label);
     print_qc("got     ", got);
@@ -36,7 +35,6 @@ static void check_qc_rel(const char *label, qcomplex_t got, qcomplex_t expected,
     qcomplex_t one = qc_make(qf_from_double(1.0), qf_from_double(0.0));
     double err = qf_to_double(qc_abs(qc_sub(qc_div(got, expected), one)));
     int ok = err < rel;
-    tests_run++;
     if (!ok) tests_failed++;
     printf(ok ? C_GREEN "  OK: %s\n" C_RESET : C_RED "  FAIL: %s\n" C_RESET, label);
     print_qc("got     ", got);
@@ -51,7 +49,6 @@ static void check_qf(const char *label, qfloat_t got, qfloat_t expected, double 
     char gs[128], es[128];
     qf_to_string(got, gs, sizeof(gs));
     qf_to_string(expected, es, sizeof(es));
-    tests_run++;
     if (!ok) tests_failed++;
     printf(ok ? C_GREEN "  OK: %s\n" C_RESET : C_RED "  FAIL: %s\n" C_RESET, label);
     printf("    got      = %s\n", gs);
@@ -61,7 +58,6 @@ static void check_qf(const char *label, qfloat_t got, qfloat_t expected, double 
 
 static void check_bool(const char *label, int cond)
 {
-    tests_run++;
     if (!cond) tests_failed++;
     printf(cond ? C_GREEN "  OK: %s\n" C_RESET : C_RED "  FAIL: %s\n" C_RESET, label);
 }
@@ -538,6 +534,12 @@ static void test_gammainv(void)
         snprintf(label, sizeof(label), "gammainv(Γ(%.1f)) = %.1f", xs[i], xs[i]);
         check_qc(label, got, z, 1e-26);
     }
+
+    {
+        qcomplex_t z = qcz(2.5, 0.3);
+        check_qc("gammainv(Γ(2.5+0.3i)) = 2.5+0.3i",
+                 qc_gammainv(qc_gamma(z)), z, 1e-24);
+    }
 }
 
 /* ====================================================================
@@ -873,7 +875,6 @@ static void test_polar(void)
 
 static void check_str(const char *label, const char *got, const char *expected)
 {
-    tests_run++;
     int ok = (strcmp(got, expected) == 0);
     if (!ok) tests_failed++;
     if (ok)
@@ -1157,7 +1158,6 @@ static void test_from_string(void)
 
         /* Failure cases: expect NaN */
         if (expect_nan) {
-            tests_run++;
             int ok = qc_isnan(z);
             if (!ok) tests_failed++;
 
@@ -1201,7 +1201,6 @@ static void test_from_string(void)
         qcomplex_t diff = qc_sub(z, expected);
         double err = qf_to_double(qc_abs(diff));
 
-        tests_run++;
         int ok = err < tol;
         if (!ok) tests_failed++;
 

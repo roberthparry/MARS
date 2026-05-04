@@ -122,6 +122,21 @@ static void run_binary_case(const char *label,
            avg_us / 1000.0);
 }
 
+static qcomplex_t bench_qc_gammainv_gamma_2_5_plus_0_3i(qcomplex_t unused)
+{
+    static int initialised = 0;
+    static qcomplex_t gamma_value;
+
+    (void)unused;
+
+    if (!initialised) {
+        gamma_value = qc_gamma(qc_make(qf_from_double(2.5), qf_from_double(0.3)));
+        initialised = 1;
+    }
+
+    return qc_gammainv(gamma_value);
+}
+
 int main(void)
 {
     puts("== qcomplex maths bench ==");
@@ -139,6 +154,7 @@ int main(void)
     run_unary_case("trigamma_2_plus_0_5i", "(2,0.5)", qc_trigamma, bench_scaled_iters(300));
     run_unary_case("tetragamma_2_plus_0_5i", "(2,0.5)", qc_tetragamma, bench_scaled_iters(300));
     run_unary_case("gammainv_gamma_2_5", "3.323350970447842551184064031264648", qc_gammainv, bench_scaled_iters(100));
+    run_unary_case("gammainv_gamma_2_5_0_3i", "(0,0)", bench_qc_gammainv_gamma_2_5_plus_0_3i, bench_scaled_iters(100));
 
     run_unary_case("productlog_1_plus_1i", "(1,1)", qc_productlog, bench_scaled_iters(300));
     run_unary_case("lambert_wm1_-0_2_-0_1i", "(-0.2,-0.1)", qc_lambert_wm1, bench_scaled_iters(200));

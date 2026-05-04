@@ -364,7 +364,13 @@ qcomplex_t qc_gammainv(qcomplex_t z)
     if (qf_eq(z.im, qf_from_double(0.0)))
         return qcrf(qf_gammainv(z.re));
 
-    qcomplex_t w = z;
+    if (qc_isnan(z) || (qf_eq(z.re, QF_ZERO) && qf_eq(z.im, QF_ZERO)))
+        return qc_make(QF_NAN, QF_NAN);
+
+    qcomplex_t logz = qc_log(z);
+    qcomplex_t w;
+    w = qc_add(qcr(1.5), logz);
+
     for (int i = 0; i < 20; i++) {
         qcomplex_t gw    = qc_gamma(w);
         qcomplex_t delta = qc_div(qc_sub(gw, z), qc_mul(gw, qc_digamma(w)));
