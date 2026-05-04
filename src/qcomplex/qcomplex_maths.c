@@ -285,7 +285,7 @@ qcomplex_t qc_trigamma(qcomplex_t z)
     // Recurrence upward until |z| >= 10
     qcomplex_t accum = qcr(0.0);
     qcomplex_t zz    = z;
-    while (qf_lt(qc_abs(zz), qf_from_double(10.0))) {
+    while (qf_lt(qc_abs2_local(zz), qf_from_double(100.0))) {
         qcomplex_t invz = qc_div(qcr(1.0), zz);
         accum = qc_add(accum, qc_mul(invz, invz));
         zz    = qc_add(zz, qcr(1.0));
@@ -334,7 +334,7 @@ qcomplex_t qc_tetragamma(qcomplex_t z)
     // Recurrence upward until |z| >= 10
     qcomplex_t accum = qcr(0.0);
     qcomplex_t zz    = z;
-    while (qf_lt(qc_abs(zz), qf_from_double(10.0))) {
+    while (qf_lt(qc_abs2_local(zz), qf_from_double(100.0))) {
         qcomplex_t invz  = qc_div(qcr(1.0), zz);
         qcomplex_t invz3 = qc_mul(invz, qc_mul(invz, invz));
         accum = qc_add(accum, qc_mul(qcr(2.0), invz3));
