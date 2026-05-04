@@ -1974,8 +1974,12 @@ qfloat_t qf_lambert_wm1(qfloat_t x)
         qfloat_t minus_L1 = qf_neg(L1);
         qfloat_t L2   = qf_log(minus_L1);
         qfloat_t L2_over_L1 = qf_div(L2, L1);
+        qfloat_t L1sq = qf_mul(L1, L1);
+        qfloat_t numer = qf_mul(L2, qf_add(qf_neg(QF_TWO), L2));
+        qfloat_t corr = qf_div(numer, qf_mul(QF_TWO, L1sq));
         w0 = qf_sub(L1, L2);
         w0 = qf_add(w0, L2_over_L1);
+        w0 = qf_add(w0, corr);
     }
 
     return qf_lambert_halley(x, w0);
