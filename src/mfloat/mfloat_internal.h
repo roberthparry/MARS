@@ -27,8 +27,6 @@ struct _mfloat_t {
     mint_t *mantissa;   /* always non-negative */
 };
 
-/* Core-owned immortal constants used only inside the mfloat module. */
-
 /* Core representation helpers. */
 int mfloat_is_immortal(const mfloat_t *mfloat);
 int mfloat_is_finite(const mfloat_t *mfloat);

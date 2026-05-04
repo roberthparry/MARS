@@ -63,6 +63,8 @@ extern int    tests_passed_cases;
 extern int    tests_failed_cases;
 extern double tests_total_ms;
 extern int    tests_rts;      /* RUN_TEST starts — harness-internal, for group detection */
+extern const char *tests_last_fail_file;
+extern int         tests_last_fail_line;
 
 /* Timing helpers */
 
@@ -94,7 +96,7 @@ static inline void th_print_time(double ms) {
         if (!(expr)) {                                                  \
             printf(C_RED "    Assertion failed at %s:%d: %s\n" C_RESET, \
                    __FILE__, __LINE__, #expr);                          \
-            TEST_FAIL();                                                \
+            TEST_FAIL_AT(__FILE__, __LINE__);                           \
             continue;                                                   \
         }                                                               \
     } while (0)
@@ -102,9 +104,11 @@ static inline void th_print_time(double ms) {
 #define ASSERT_EQ_INT(actual, expected)                         \
     do {                                                        \
         if ((actual) != (expected)) {                           \
-            printf(C_RED "    Expected %d, got %d\n" C_RESET,   \
+            printf(C_RED "    Assertion failed at %s:%d: "      \
+                   "expected %d, got %d\n" C_RESET,             \
+                   __FILE__, __LINE__,                           \
                    (int)(expected), (int)(actual));             \
-            TEST_FAIL();                                        \
+            TEST_FAIL_AT(__FILE__, __LINE__);                   \
             continue;                                           \
         }                                                       \
     } while (0)
@@ -112,9 +116,11 @@ static inline void th_print_time(double ms) {
 #define ASSERT_EQ_LONG(actual, expected)                        \
     do {                                                        \
         if ((actual) != (expected)) {                           \
-            printf(C_RED "    Expected %ld, got %ld\n" C_RESET, \
+            printf(C_RED "    Assertion failed at %s:%d: "      \
+                   "expected %ld, got %ld\n" C_RESET,           \
+                   __FILE__, __LINE__,                           \
                    (long)(expected), (long)(actual));           \
-            TEST_FAIL();                                        \
+            TEST_FAIL_AT(__FILE__, __LINE__);                   \
             continue;                                           \
         }                                                       \
     } while (0)
@@ -122,9 +128,11 @@ static inline void th_print_time(double ms) {
 #define ASSERT_EQ_DOUBLE(actual, expected, eps)                     \
     do {                                                            \
         if (fabs((actual) - (expected)) > (eps)) {                  \
-            printf(C_RED "    Expected %.12f, got %.12f\n" C_RESET, \
+            printf(C_RED "    Assertion failed at %s:%d: "          \
+                   "expected %.12f, got %.12f\n" C_RESET,           \
+                   __FILE__, __LINE__,                               \
                    (double)(expected), (double)(actual));           \
-            TEST_FAIL();                                            \
+            TEST_FAIL_AT(__FILE__, __LINE__);                       \
             continue;                                               \
         }                                                           \
     } while (0)
@@ -132,8 +140,10 @@ static inline void th_print_time(double ms) {
 #define ASSERT_NOT_NULL(ptr)                                            \
     do {                                                                \
         if ((ptr) == NULL) {                                            \
-            printf(C_RED "    Expected non-null pointer\n" C_RESET);    \
-            TEST_FAIL();                                                \
+            printf(C_RED "    Assertion failed at %s:%d: "              \
+                   "expected non-null pointer\n" C_RESET,               \
+                   __FILE__, __LINE__);                                  \
+            TEST_FAIL_AT(__FILE__, __LINE__);                           \
             continue;                                                   \
         }                                                               \
     } while (0)
@@ -141,8 +151,10 @@ static inline void th_print_time(double ms) {
 #define ASSERT_NULL(ptr)                                            \
     do {                                                            \
         if ((ptr) != NULL) {                                        \
-            printf(C_RED "    Expected NULL pointer\n" C_RESET);    \
-            TEST_FAIL();                                            \
+            printf(C_RED "    Assertion failed at %s:%d: "          \
+                   "expected NULL pointer\n" C_RESET,               \
+                   __FILE__, __LINE__);                              \
+            TEST_FAIL_AT(__FILE__, __LINE__);                       \
             continue;                                               \
         }                                                           \
     } while (0)
@@ -201,14 +213,23 @@ static inline void th_print_time(double ms) {
         } else {                                                                  \
             tests_failed_cases++;                                                 \
             printf(C_BOLD C_RED "FAIL: " C_RESET "%s " C_RED "(%s:%d)" C_RESET,   \
-                   #func, __FILE__, __LINE__);                                    \
+                   #func,                                                         \
+                   tests_last_fail_file ? tests_last_fail_file : __FILE__,        \
+                   tests_last_fail_file ? tests_last_fail_line : __LINE__);       \
         }                                                                         \
         th_print_time(__disp_ms);                                                 \
         putchar('\n');                                                            \
     } while (0)
 
 
-#define TEST_FAIL() do { tests_failed++; } while (0)
+#define TEST_FAIL_AT(file, line)          \
+    do {                                  \
+        tests_failed++;                   \
+        tests_last_fail_file = (file);    \
+        tests_last_fail_line = (line);    \
+    } while (0)
+
+#define TEST_FAIL() TEST_FAIL_AT(__FILE__, __LINE__)
 
 /* Define this in your test file. Call RUN_TEST() for each test. */
 int tests_main(void);
@@ -228,6 +249,8 @@ int    tests_passed_cases = 0;
 int    tests_failed_cases = 0;
 double tests_total_ms = 0.0;
 int    tests_rts      = 0;
+const char *tests_last_fail_file = NULL;
+int         tests_last_fail_line = 0;
 
 int main(void) {
     test_config_set_mode(TEST_CONFIG_MODE);
