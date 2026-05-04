@@ -183,6 +183,8 @@ int main(void)
     run_unary_case("erf_0_5_plus_0_5i", "0.5 + 0.5i", mc_erf, bench_scaled_iters(500));
     run_unary_case("erfc_0_5_plus_0_5i", "0.5 + 0.5i", mc_erfc, bench_scaled_iters(500));
 
+    run_unary_case("gamma_2_3_plus_0i", "2.3 + 0i", mc_gamma, bench_scaled_iters(4));
+    run_unary_case("lgamma_2_3_plus_0i", "2.3 + 0i", mc_lgamma, bench_scaled_iters(4));
     run_unary_case("gamma_1_5_plus_0_7i", "1.5 + 0.7i", mc_gamma, bench_scaled_iters(200));
     run_unary_case("lgamma_1_5_plus_0_7i", "1.5 + 0.7i", mc_lgamma, bench_scaled_iters(200));
     run_unary_case("digamma_2_plus_1i", "2 + 1i", mc_digamma, bench_scaled_iters(500));

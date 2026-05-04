@@ -1303,6 +1303,13 @@ void test_remaining_special_mfloat_functions(void)
         "3.4058699863095669246999292183755580095953957993289813943129416262771480469249543971039352849144736866311861261393708590757492573265835991956905840323578868826789864361657",
         1));
 
+    ASSERT_EQ_INT(mf_set_string(y, "1.3293403881791370204736256125058588870981620920917903461603558423896834634432742359133252053858306082197751479117489164834722524954275023497889051327665156821461717608501"), 0);
+    ASSERT_EQ_INT(mf_gammainv(y), 0);
+    print_mfloat_value("gammainv(gamma(2.5))", y);
+    print_mfloat_error_check("gammainv(gamma(2.5)) mfloat error", y,
+                             "2.5");
+    ASSERT_TRUE(mfloat_meets_precision(y, "2.5", 1));
+
     ASSERT_EQ_INT(mf_lambert_wm1(neg), 0);
     print_mfloat_value("lambert_wm1(-0.1)", neg);
     print_mfloat_error_check("lambert_wm1(-0.1) mfloat error", neg,

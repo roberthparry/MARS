@@ -5,6 +5,7 @@
 #include <time.h>
 
 #include "mfloat.h"
+#include "src/mfloat/mfloat_internal.h"
 
 static uint64_t now_ns(void)
 {
@@ -47,6 +48,7 @@ static void run_unary_case(const char *label,
 {
     size_t old_prec;
     mfloat_t *src;
+    mfloat_t *work;
     uint64_t start;
     uint64_t end;
     double avg_us;
@@ -61,37 +63,34 @@ static void run_unary_case(const char *label,
     }
 
     src = mf_create_string(text);
-    if (!src) {
+    work = mf_clone(src);
+    if (!src || !work) {
         fprintf(stderr, "%s source create failed\n", label);
+        mf_free(work);
+        mf_free(src);
         (void)mf_set_default_precision(old_prec);
         return;
     }
 
-    {
-        mfloat_t *warm = mf_clone(src);
-
-        if (!warm || fn(warm) != 0) {
-            fprintf(stderr, "%s warmup failed\n", label);
-            mf_free(warm);
-            mf_free(src);
-            (void)mf_set_default_precision(old_prec);
-            return;
-        }
-        mf_free(warm);
+    if (fn(work) != 0) {
+        fprintf(stderr, "%s warmup failed\n", label);
+        mf_free(work);
+        mf_free(src);
+        (void)mf_set_default_precision(old_prec);
+        return;
     }
 
     start = now_ns();
     for (int i = 0; i < iters; ++i) {
-        mfloat_t *value = mf_clone(src);
-
-        if (!value || fn(value) != 0) {
+        if (mfloat_copy_value(work, src) != 0 ||
+            mf_set_precision(work, precision) != 0 ||
+            fn(work) != 0) {
             fprintf(stderr, "%s timed run failed\n", label);
-            mf_free(value);
+            mf_free(work);
             mf_free(src);
             (void)mf_set_default_precision(old_prec);
             return;
         }
-        mf_free(value);
     }
     end = now_ns();
 
@@ -101,6 +100,7 @@ static void run_unary_case(const char *label,
            avg_us,
            avg_us / 1000.0);
 
+    mf_free(work);
     mf_free(src);
     (void)mf_set_default_precision(old_prec);
 }

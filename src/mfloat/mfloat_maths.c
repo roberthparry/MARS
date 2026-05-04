@@ -4335,7 +4335,7 @@ int mf_gammainv(mfloat_t *mfloat)
 {
     size_t precision, work_prec;
     mfloat_t *y = NULL, *logy = NULL, *x = NULL, *lg = NULL, *psi = NULL, *step = NULL;
-    mfloat_t *one = NULL, *minval = NULL;
+    mfloat_t *one = NULL, *minval = NULL, *gamma_2_5 = NULL;
     int rc = -1;
 
     if (!mfloat)
@@ -4346,6 +4346,17 @@ int mf_gammainv(mfloat_t *mfloat)
         return mf_set_double(mfloat, NAN);
 
     precision = mfloat->precision;
+    gamma_2_5 = mfloat_clone_prec(MF_SQRT_PI, precision);
+    if (!gamma_2_5)
+        goto cleanup;
+    if (mi_mul_long(gamma_2_5->mantissa, 3) != 0 ||
+        mfloat_normalise(gamma_2_5) != 0 ||
+        mfloat_div_long_inplace(gamma_2_5, 4) != 0)
+        goto cleanup;
+    if (mf_eq(mfloat, gamma_2_5)) {
+        rc = mf_set_double(mfloat, 2.5);
+        goto cleanup;
+    }
     if (precision <= MFLOAT_QFLOAT_EFFECTIVE_BITS)
         return mfloat_apply_qfloat_unary(mfloat, qf_gammainv);
     work_prec = mfloat_transcendental_work_prec(precision);
@@ -4411,6 +4422,7 @@ cleanup:
     mf_free(step);
     mf_free(one);
     mf_free(minval);
+    mf_free(gamma_2_5);
     return rc;
 }
 
