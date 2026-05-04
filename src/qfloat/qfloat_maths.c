@@ -697,10 +697,11 @@ qfloat_t qf_gamma(qfloat_t x)
         !qf_is_integer(x) &&
         qf_is_integer(qf_mul_double(x, 2.0));
 
-    /* The historical core polynomial is the weakest qfloat gamma path.
-       For the positive core interval, use exp(lgamma(x)) except at the
-       half-integers where qf_lgamma() intentionally delegates back here. */
-    if (x.hi > 0.75 && x.hi < 2.0 && !is_pos_half_integer)
+    /* The weakest historical gamma regime is below 1.
+       Keep that accuracy rescue, but let x >= 1 use the faster
+       reduction/polynomial path again. Avoid the half-integers where
+       qf_lgamma() intentionally delegates back here. */
+    if (x.hi > 0.75 && x.hi < 1.0 && !is_pos_half_integer)
         return qf_exp(qf_lgamma(x));
 
     /* Reject extreme magnitudes for now */
