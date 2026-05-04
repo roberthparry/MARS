@@ -385,7 +385,7 @@ qcomplex_t qc_beta(qcomplex_t a, qcomplex_t b)
     if (qf_eq(a.im, qf_from_double(0.0)) && qf_eq(b.im, qf_from_double(0.0)))
         return qcrf(qf_beta(a.re, b.re));
 
-    return qc_div(qc_mul(qc_gamma(a), qc_gamma(b)), qc_gamma(qc_add(a, b)));
+    return qc_exp(qc_logbeta(a, b));
 }
 
 qcomplex_t qc_logbeta(qcomplex_t a, qcomplex_t b)
