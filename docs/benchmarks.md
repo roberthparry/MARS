@@ -177,3 +177,43 @@ release tests stay correct under `-O2` and `-O2 -flto`, but `-march=native
 -mtune=native` caused `Ei`/`E1` regressions. Because of that, the user-facing
 `qfloat` release targets are built with a safer release profile than the
 project-wide native-tuned default.
+
+### `qcomplex`
+
+Available benchmark target:
+
+```sh
+make bench_qcomplex_maths
+```
+
+This benchmark covers a representative complex-valued slice:
+
+- `qc_exp(1+i)` and `qc_log(1+i)`
+- `qc_erf(0.5+0.5i)` and `qc_erfc(0.5+0.5i)`
+- complex gamma-family calls including `qc_gamma`, `qc_lgamma`, `qc_digamma`,
+  `qc_trigamma`, and `qc_tetragamma`
+- real and genuinely complex `qc_gammainv` cases
+- `qc_productlog` and `qc_lambert_wm1`
+- `qc_ei`, `qc_e1`, `qc_beta`, and `qc_logbeta`
+
+Current sample timings on the benchmark machine:
+
+```text
+exp_1_plus_1i                avg_us=     3.582
+log_1_plus_1i                avg_us=     5.405
+erf_0_5_plus_0_5i            avg_us=    10.404
+erfc_0_5_plus_0_5i           avg_us=     9.357
+gamma_1_5_plus_0_7i          avg_us=    14.554
+lgamma_1_5_plus_0_7i         avg_us=    13.515
+digamma_2_plus_1i            avg_us=    14.643
+trigamma_2_plus_0_5i         avg_us=     4.596
+tetragamma_2_plus_0_5i       avg_us=     6.256
+gammainv_gamma_2_5           avg_us=    95.411
+gammainv_gamma_2_5_0_3i      avg_us=   219.491
+productlog_1_plus_1i         avg_us=    30.014
+lambert_wm1_-0_2_-0_1i       avg_us=    27.295
+ei_1_plus_1i                 avg_us=    44.938
+e1_1_plus_1i                 avg_us=    41.641
+beta_1_5_0_5__2_-0_3         avg_us=    38.087
+logbeta_1_5_0_5__2_-0_3      avg_us=    37.286
+```
