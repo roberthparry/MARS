@@ -2433,6 +2433,13 @@ int mf_exp(mfloat_t *mfloat)
         mfloat->precision = precision;
         return 0;
     }
+    if (mfloat_equals_exact_long(mfloat, 1)) {
+        precision = mfloat->precision;
+        if (mfloat_set_from_immortal_internal(mfloat, MF_E, precision) != 0)
+            return -1;
+        mfloat->precision = precision;
+        return 0;
+    }
 
     precision = mfloat->precision;
     work_prec = precision + (precision / 2u);
@@ -2826,7 +2833,7 @@ int mf_cos(mfloat_t *mfloat)
         return mf_set_double(mfloat, NAN);
 
     precision = mfloat->precision;
-    work_prec = mfloat_transcendental_work_prec(precision) + 128u;
+    work_prec = mfloat_transcendental_work_prec(precision);
     if (mfloat_reduce_trig_argument(mfloat, work_prec, &r, &quadrant) != 0)
         goto cleanup;
 
