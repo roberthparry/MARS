@@ -309,19 +309,30 @@ static int mcomplex_refine_productlog(mcomplex_t *value, const mcomplex_t *input
     mcomplex_t *exp_w = NULL;
     mcomplex_t *numer = NULL;
     mcomplex_t *denom = NULL;
+    size_t precision_bits;
+    int max_iters;
     int iter;
 
     if (!value || !input)
         return -1;
+    precision_bits = mc_get_precision(value);
+    max_iters = precision_bits > 512u ? 4 : 3;
 
-    for (iter = 0; iter < 4; ++iter) {
-        exp_w = mc_clone(value);
-        numer = mc_clone(value);
-        denom = mc_clone(value);
-        if (!exp_w || !numer || !denom)
-            goto fail;
+    exp_w = mc_clone(value);
+    numer = mc_clone(value);
+    denom = mc_clone(value);
+    if (!exp_w || !numer || !denom)
+        goto fail;
 
-        if (mc_exp(exp_w) != 0 ||
+    for (iter = 0; iter < max_iters; ++iter) {
+        precision_bits = mc_get_precision(value);
+        if (mc_set_precision(exp_w, precision_bits) != 0 ||
+            mc_set_precision(numer, precision_bits) != 0 ||
+            mc_set_precision(denom, precision_bits) != 0 ||
+            mc_set(exp_w, mc_real(value), mc_imag(value)) != 0 ||
+            mc_set(numer, mc_real(value), mc_imag(value)) != 0 ||
+            mc_set(denom, mc_real(value), mc_imag(value)) != 0 ||
+            mc_exp(exp_w) != 0 ||
             mc_mul(numer, exp_w) != 0 ||
             mc_sub(numer, input) != 0 ||
             mc_add(denom, MC_ONE) != 0 ||
@@ -329,15 +340,11 @@ static int mcomplex_refine_productlog(mcomplex_t *value, const mcomplex_t *input
             mc_div(numer, denom) != 0 ||
             mc_sub(value, numer) != 0)
             goto fail;
-
-        mc_free(denom);
-        mc_free(numer);
-        mc_free(exp_w);
-        denom = NULL;
-        numer = NULL;
-        exp_w = NULL;
     }
 
+    mc_free(denom);
+    mc_free(numer);
+    mc_free(exp_w);
     return 0;
 
 fail:
@@ -859,20 +866,27 @@ int mc_normal_logpdf(mcomplex_t *mcomplex)
 int mc_productlog(mcomplex_t *mcomplex)
 {
     mcomplex_t *input = NULL;
+    size_t precision_bits;
     int rc = mcomplex_try_apply_real_lambert_exact(mcomplex, 0);
 
     if (rc != -2)
         return rc;
+    precision_bits = mc_get_precision(mcomplex);
     rc = mcomplex_apply_real_unary(mcomplex, mf_productlog);
 
-    if (rc != -2)
+    if (rc != -2) {
+        if (rc == 0 && mc_set_precision(mcomplex, precision_bits) != 0)
+            return -1;
         return rc;
+    }
     input = mc_clone(mcomplex);
     if (!input)
         return -1;
     rc = mcomplex_apply_unary(mcomplex, qc_productlog);
     if (rc == 0)
         rc = mcomplex_refine_productlog(mcomplex, input);
+    if (rc == 0 && mc_set_precision(mcomplex, precision_bits) != 0)
+        rc = -1;
     mc_free(input);
     return rc;
 }
