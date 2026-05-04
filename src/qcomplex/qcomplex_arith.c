@@ -117,14 +117,14 @@ qcomplex_t qc_asin(qcomplex_t z) {
     // asin(z) = -i log(iz + sqrt(1-z^2))
     // -i*(a+bi) = b - ai, so re=ln.im, im=-ln.re
     qcomplex_t iz        = qc_make(qf_neg(z.im), z.re);
-    qcomplex_t sqrt_term = qc_sqrt(qc_sub(qcr(1.0), qc_mul(z, z)));
+    qcomplex_t sqrt_term = qc_sqrt(qc_sub(QC_ONE, qc_mul(z, z)));
     qcomplex_t ln        = qc_log(qc_add(iz, sqrt_term));
     return qc_make(ln.im, qf_neg(ln.re));
 }
 qcomplex_t qc_acos(qcomplex_t z) {
     // acos(z) = -i log(z + i sqrt(1-z^2))
     // -i*(a+bi) = b - ai, so re=ln.im, im=-ln.re
-    qcomplex_t sqrt_term = qc_sqrt(qc_sub(qcr(1.0), qc_mul(z, z)));
+    qcomplex_t sqrt_term = qc_sqrt(qc_sub(QC_ONE, qc_mul(z, z)));
     qcomplex_t iz        = qc_make(qf_neg(sqrt_term.im), sqrt_term.re);
     qcomplex_t ln        = qc_log(qc_add(z, iz));
     return qc_make(ln.im, qf_neg(ln.re));
@@ -133,8 +133,8 @@ qcomplex_t qc_atan(qcomplex_t z) {
     // atan(z) = (i/2) * [log(1 - iz) - log(1 + iz)]
     // (i/2)*(a+bi) = -b/2 + (a/2)i, so re=-diff.im/2, im=diff.re/2
     qcomplex_t iz   = qc_make(qf_neg(z.im), z.re);
-    qcomplex_t diff = qc_sub(qc_log(qc_sub(qcr(1.0), iz)),
-                             qc_log(qc_add(qcr(1.0), iz)));
+    qcomplex_t diff = qc_sub(qc_log(qc_sub(QC_ONE, iz)),
+                             qc_log(qc_add(QC_ONE, iz)));
     return qc_make(qf_mul_double(qf_neg(diff.im), 0.5),
                    qf_mul_double(diff.re, 0.5));
 }
@@ -160,15 +160,15 @@ qcomplex_t qc_tanh(qcomplex_t z) {
 }
 qcomplex_t qc_asinh(qcomplex_t z) {
     // asinh(z) = log(z + sqrt(z^2 + 1))
-    return qc_log(qc_add(z, qc_sqrt(qc_add(qc_mul(z, z), qcr(1.0)))));
+    return qc_log(qc_add(z, qc_sqrt(qc_add(qc_mul(z, z), QC_ONE))));
 }
 qcomplex_t qc_acosh(qcomplex_t z) {
     // acosh(z) = log(z + sqrt(z+1) * sqrt(z-1))
-    return qc_log(qc_add(z, qc_mul(qc_sqrt(qc_add(z, qcr(1.0))),
-                                   qc_sqrt(qc_sub(z, qcr(1.0))))));
+    return qc_log(qc_add(z, qc_mul(qc_sqrt(qc_add(z, QC_ONE)),
+                                   qc_sqrt(qc_sub(z, QC_ONE)))));
 }
 qcomplex_t qc_atanh(qcomplex_t z) {
     // atanh(z) = 0.5 * log((1+z)/(1-z))
-    return qc_ldexp(qc_log(qc_div(qc_add(qcr(1.0), z),
-                                  qc_sub(qcr(1.0), z))), -1);
+    return qc_ldexp(qc_log(qc_div(qc_add(QC_ONE, z),
+                                  qc_sub(QC_ONE, z))), -1);
 }
