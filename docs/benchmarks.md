@@ -150,14 +150,27 @@ Available benchmark target:
 make bench_qfloat_gamma_maths
 ```
 
-This benchmark currently focuses on the `qfloat` gamma-family paths:
+This benchmark currently covers a broader `qfloat` maths slice:
 
-- `qf_gamma(2.3)`
-- `qf_lgamma(2.3)`
-- `qf_gamma(2.5)`
-- `qf_lgamma(2.5)`
-- `qf_gamma(3.5)`
-- `qf_lgamma(3.5)`
+- `qf_exp(1)` and `qf_log(10)`
+- `qf_erf(0.5)` and `qf_erfc(0.5)`
+- `qf_gamma`, `qf_lgamma`, `qf_digamma`, `qf_trigamma`, and `qf_tetragamma`
+- `qf_gammainv`
+- `qf_lambert_w0` and `qf_lambert_wm1`
+- `qf_ei` and `qf_e1`
+- `qf_beta` and `qf_logbeta`
+
+Current sample timings with `MARS_BENCH_SCALE=5` on the benchmark machine:
+
+```text
+exp_1                 avg_us=   1.146
+log_10                avg_us=   2.222
+gamma_2_3             avg_us=   1.107
+lgamma_2_3            avg_us=   3.562
+gammainv_9_5          avg_us=  83.440
+lambert_wm1_-0_1      avg_us=  55.965
+logbeta_2_3_4_5       avg_us=  17.997
+```
 
 One implementation note matters here: on the current x86_64 machine, `qfloat`
 release tests stay correct under `-O2` and `-O2 -flto`, but `-march=native

@@ -278,7 +278,7 @@ qf_printf("W0(1) = %Q\n",   x);    // scientific notation
 
 ## Benchmark Coverage
 
-`qfloat_t` has a focused gamma-family benchmark here:
+`qfloat_t` has a focused arithmetic and special-functions benchmark here:
 
 - [bench/qfloat/bench_qfloat_gamma_maths.c](/home/rparry/Projects/MARS/bench/qfloat/bench_qfloat_gamma_maths.c)
 
@@ -299,12 +299,26 @@ Current sample results with `MARS_BENCH_SCALE=5`:
 
 | Case | Time |
 |---|---:|
-| `qf_gamma(2.3)` | `1.518 us` |
-| `qf_lgamma(2.3)` | `4.063 us` |
-| `qf_gamma(2.5)` | `1.172 us` |
-| `qf_lgamma(2.5)` | `3.975 us` |
-| `qf_gamma(3.5)` | `1.156 us` |
-| `qf_lgamma(3.5)` | `6.061 us` |
+| `qf_exp(1)` | `1.146 us` |
+| `qf_log(10)` | `2.222 us` |
+| `qf_erf(0.5)` | `2.615 us` |
+| `qf_erfc(0.5)` | `2.489 us` |
+| `qf_gamma(2.3)` | `1.107 us` |
+| `qf_lgamma(2.3)` | `3.562 us` |
+| `qf_gamma(2.5)` | `1.109 us` |
+| `qf_lgamma(2.5)` | `3.073 us` |
+| `qf_gamma(3.5)` | `1.129 us` |
+| `qf_lgamma(3.5)` | `3.515 us` |
+| `qf_digamma(2.3)` | `1.828 us` |
+| `qf_trigamma(2.3)` | `3.316 us` |
+| `qf_tetragamma(2.3)` | `2.868 us` |
+| `qf_gammainv(119292.4619946090070787515047110059)` | `83.440 us` |
+| `qf_lambert_w0(1)` | `9.509 us` |
+| `qf_lambert_wm1(-0.1)` | `55.965 us` |
+| `qf_ei(1)` | `2.857 us` |
+| `qf_e1(1)` | `2.903 us` |
+| `qf_beta(2.3, 4.5)` | `3.474 us` |
+| `qf_logbeta(2.3, 4.5)` | `17.997 us` |
 
 For a broader benchmark overview, see
 [docs/benchmarks.md](/home/rparry/Projects/MARS/docs/benchmarks.md).

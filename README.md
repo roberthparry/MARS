@@ -42,6 +42,10 @@ Recent sample benchmarks on this tree show:
   `561.060 µs`
 - symbolic `dval` matrix inverse for a dense `4x4` case at about
   `2525.437 µs`
+- `qfloat_t` `gamma(2.3)` at about `1.107 µs` and `lgamma(2.3)` at about
+  `3.562 µs`
+- `qfloat_t` `gammainv(119292.4619946090070787515047110059)` at about
+  `83.440 µs`
 
 See [`docs/benchmarks.md`](docs/benchmarks.md) for commands, units, and fuller
 sample output.
