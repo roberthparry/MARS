@@ -5,51 +5,51 @@
 static inline int qf_round_to_int(qfloat_t y)
 {
     double s, e;
-    qf_two_sum(y.hi, y.lo, &s, &e);   // s = hi+lo, e = tiny residual
-    // s is a double, but it already includes the low part
+    qf_two_sum(y.hi, y.lo, &s, &e);   /* s = hi+lo, e = tiny residual */
+    /* s is a double, but it already includes the low part */
     return (int)nearbyint(s);
 }
 
 static inline qfloat_t qf_exp_kernel(qfloat_t r)
 {
     static const qfloat_t EXP_COEF[] = {
-        { 2.0078201327067089, 7.6989170590508717e-17 },   // 2.00782013270670897025569345450493539496719826451529e+00
-        { 0.12524429962246966, -1.1636659685304788e-17 },   // 1.25244299622469650888488552059403016996167595573611e-01
-        { 0.0039113387471945557, 3.6511894489906962e-19 },   // 3.91133874719455603987662155448712302851673533750791e-03
-        { 8.1459712243857609e-05, 3.4333135193980365e-21 },   // 8.14597122438576124366623158150800836320647733580159e-05
-        { 1.2725594893906429e-06, -3.3960576781977518e-24 },   // 1.27255948939064291683039536327901417762621632314779e-06
-        { 1.5904922856465758e-08, 1.1403482187347839e-24 },   // 1.59049228564657595170125652231762639869286765571089e-08
-        { 1.6566087338215546e-10, 1.0716777914367335e-26 },   // 1.65660873382155469390145424913058671922198579085015e-10
-        { 1.4790117788344555e-12, 6.2026716927995566e-29 },   // 1.47901177883445555860443152263148239761296494738770e-12
-        { 1.1554152696446826e-14, 6.0821328583739624e-31 },   // 1.15541526964468264490943783326433895465049775927119e-14
-        { 8.0233689261773118e-17, 1.9382518053908152e-33 },   // 8.02336892617731203510960531285356603278155205852885e-17
-        { 5.0144275149711857e-19, -3.6401634659733449e-35 },   // 5.01442751497118536546682134254459299542628430307812e-19
-        { 2.8490222341545035e-21, 1.1289540617549812e-37 },   // 2.84902223415450362691164782217240099497173603853959e-21
-        { 1.4838285925898211e-23, -3.1157275821681204e-40 },   // 1.48382859258982102321175521167244276028875248448675e-23
-        { 7.1336382047262347e-26, -2.2336460159428147e-42 },   // 7.13363820472623450778157613108952173312683250216815e-26
-        { 3.1846006764245595e-28, -1.8599980405806009e-44 },   // 3.18460067642455931873764058222397983713240357784294e-28
-        { 1.3268953522163381e-30, 8.6880377274428939e-48 },   // 1.32689535221633809261226907806897950248487799967001e-30
-        { 5.183110534789647e-33, -2.1987298822911846e-49 },   // 5.18311053478964681947948584290311686963786349166464e-33
-        { 1.9055310188506825e-35, 6.1261175594053182e-52 },   // 1.90553101885068255207022857815838575849458038608558e-35
-        { 6.6163515790277845e-38, 3.4484035454954892e-54 },   // 6.61635157902778484641103123076065326048415118568003e-38
-        { 2.1764090680516302e-40, 1.9134780919953053e-56 },   // 2.17640906805163038515836993176194751448446097344594e-40
-        { 6.8012150828475526e-43, 3.9199301490910886e-59 },   // 6.80121508284755295866382043328164513898264043772395e-43
-        { 2.0241540413438387e-45, -1.0218868505796425e-61 },   // 2.02415404134383859473931118210700100160333742738858e-45
-        { 5.7503932255280342e-48, -1.923854484667449e-64 },   // 5.75039322552803397348614021217735954266816983331649e-48
-        { 1.5625957970636072e-50, -9.6280561970482323e-68 },   // 1.56259579706360721898274205704425841416460611722259e-50
-        { 4.0692333959407629e-53, 8.5660473081783288e-70 },   // 4.06923339594076296494422544885785424193219373742892e-53
-        { 1.0173022354240444e-55, 1.6882208569445479e-72 },   // 1.01730223542404441594846828423852626437220498786958e-55
-        { 2.4454244585301151e-58, -9.4360149305200058e-75 },   // 2.44542445853011503523119037491844433737859505921607e-58
-        { 5.660675516561292e-61, 2.4417881040627945e-77 },   // 5.66067551656129229308827245342002270944323569890047e-61
-        { 1.2635375636764616e-63, 9.425695195996618e-80 },   // 1.26353756367646170566750409945268991172372910631121e-63
-        { 2.7231290743851696e-66, 2.2865795958219742e-82 },   // 2.72312907438516978540878719719049209293026262692022e-66
-        { 5.6731617429252378e-69, 7.0681120929698254e-86 },   // 5.67316174292523782683995630158060408724742022221520e-69
-        { 1.1437781055628525e-71, 5.2653811344675536e-88 },   // 1.14377810556285256081724318021310515009202569273747e-71
-        { 2.2339333489125188e-74, -1.1023367961606344e-90 },   // 2.23393334891251864301277236025427909727862373965758e-74
+        { 2.0078201327067089, 7.6989170590508717e-17 },   /* 2.00782013270670897025569345450493539496719826451529e+00 */
+        { 0.12524429962246966, -1.1636659685304788e-17 },   /* 1.25244299622469650888488552059403016996167595573611e-01 */
+        { 0.0039113387471945557, 3.6511894489906962e-19 },   /* 3.91133874719455603987662155448712302851673533750791e-03 */
+        { 8.1459712243857609e-05, 3.4333135193980365e-21 },   /* 8.14597122438576124366623158150800836320647733580159e-05 */
+        { 1.2725594893906429e-06, -3.3960576781977518e-24 },   /* 1.27255948939064291683039536327901417762621632314779e-06 */
+        { 1.5904922856465758e-08, 1.1403482187347839e-24 },   /* 1.59049228564657595170125652231762639869286765571089e-08 */
+        { 1.6566087338215546e-10, 1.0716777914367335e-26 },   /* 1.65660873382155469390145424913058671922198579085015e-10 */
+        { 1.4790117788344555e-12, 6.2026716927995566e-29 },   /* 1.47901177883445555860443152263148239761296494738770e-12 */
+        { 1.1554152696446826e-14, 6.0821328583739624e-31 },   /* 1.15541526964468264490943783326433895465049775927119e-14 */
+        { 8.0233689261773118e-17, 1.9382518053908152e-33 },   /* 8.02336892617731203510960531285356603278155205852885e-17 */
+        { 5.0144275149711857e-19, -3.6401634659733449e-35 },   /* 5.01442751497118536546682134254459299542628430307812e-19 */
+        { 2.8490222341545035e-21, 1.1289540617549812e-37 },   /* 2.84902223415450362691164782217240099497173603853959e-21 */
+        { 1.4838285925898211e-23, -3.1157275821681204e-40 },   /* 1.48382859258982102321175521167244276028875248448675e-23 */
+        { 7.1336382047262347e-26, -2.2336460159428147e-42 },   /* 7.13363820472623450778157613108952173312683250216815e-26 */
+        { 3.1846006764245595e-28, -1.8599980405806009e-44 },   /* 3.18460067642455931873764058222397983713240357784294e-28 */
+        { 1.3268953522163381e-30, 8.6880377274428939e-48 },   /* 1.32689535221633809261226907806897950248487799967001e-30 */
+        { 5.183110534789647e-33, -2.1987298822911846e-49 },   /* 5.18311053478964681947948584290311686963786349166464e-33 */
+        { 1.9055310188506825e-35, 6.1261175594053182e-52 },   /* 1.90553101885068255207022857815838575849458038608558e-35 */
+        { 6.6163515790277845e-38, 3.4484035454954892e-54 },   /* 6.61635157902778484641103123076065326048415118568003e-38 */
+        { 2.1764090680516302e-40, 1.9134780919953053e-56 },   /* 2.17640906805163038515836993176194751448446097344594e-40 */
+        { 6.8012150828475526e-43, 3.9199301490910886e-59 },   /* 6.80121508284755295866382043328164513898264043772395e-43 */
+        { 2.0241540413438387e-45, -1.0218868505796425e-61 },   /* 2.02415404134383859473931118210700100160333742738858e-45 */
+        { 5.7503932255280342e-48, -1.923854484667449e-64 },   /* 5.75039322552803397348614021217735954266816983331649e-48 */
+        { 1.5625957970636072e-50, -9.6280561970482323e-68 },   /* 1.56259579706360721898274205704425841416460611722259e-50 */
+        { 4.0692333959407629e-53, 8.5660473081783288e-70 },   /* 4.06923339594076296494422544885785424193219373742892e-53 */
+        { 1.0173022354240444e-55, 1.6882208569445479e-72 },   /* 1.01730223542404441594846828423852626437220498786958e-55 */
+        { 2.4454244585301151e-58, -9.4360149305200058e-75 },   /* 2.44542445853011503523119037491844433737859505921607e-58 */
+        { 5.660675516561292e-61, 2.4417881040627945e-77 },   /* 5.66067551656129229308827245342002270944323569890047e-61 */
+        { 1.2635375636764616e-63, 9.425695195996618e-80 },   /* 1.26353756367646170566750409945268991172372910631121e-63 */
+        { 2.7231290743851696e-66, 2.2865795958219742e-82 },   /* 2.72312907438516978540878719719049209293026262692022e-66 */
+        { 5.6731617429252378e-69, 7.0681120929698254e-86 },   /* 5.67316174292523782683995630158060408724742022221520e-69 */
+        { 1.1437781055628525e-71, 5.2653811344675536e-88 },   /* 1.14377810556285256081724318021310515009202569273747e-71 */
+        { 2.2339333489125188e-74, -1.1023367961606344e-90 },   /* 2.23393334891251864301277236025427909727862373965758e-74 */
     };
     static const int N_EXP_COEF = sizeof(EXP_COEF) / sizeof(EXP_COEF[0]);
 
-    // map r ∈ [-0.125, 0.125] to x ∈ [-1,1]
+    /* map r ∈ [-0.125, 0.125] to x ∈ [-1,1] */
     qfloat_t x = qf_mul_double(r, 8.0);
 
     qfloat_t b_kplus1 = QF_ZERO;
@@ -65,41 +65,41 @@ static inline qfloat_t qf_exp_kernel(qfloat_t r)
         b_kplus1 = t;
     }
 
-    // p(x) = (c0/2) + x*b1 - b2   // because c0 came from a DCT-I
+    /* p(x) = (c0/2) + x*b1 - b2, because c0 came from a DCT-I */
     qfloat_t xb1 = qf_mul(x, b_kplus1);
     qfloat_t half_c0 = qf_mul_double(EXP_COEF[0], 0.5);
     qfloat_t p = qf_add(half_c0, xb1);
     return qf_sub(p, b_kplus2);
 }
 
-// qf_exp_reduce:
-//   Input:  x  (qf)
-//   Output: *k (int), *r (qf) with |r| <= 0.1733
-//
-//   x = k*ln2 + r
-//
+/* qf_exp_reduce: */
+/*   Input:  x  (qf) */
+/*   Output: *k (int), *r (qf) with |r| <= 0.1733 */
+/*  */
+/*   x = k*ln2 + r */
+/*  */
 static inline void qf_exp_reduce(qfloat_t x, int* k, qfloat_t* r)
 {
-    // High/low split of ln2 in double
-    static const double LN2_HI = 6.93147180559945286227e-01;  // 0x3fe62e42fefa3800
-    static const double LN2_LO = 2.31904681384629955842e-17;  // ln2 - LN2_HI
+    /* High/low split of ln2 in double */
+    static const double LN2_HI = 6.93147180559945286227e-01;  /* 0x3fe62e42fefa3800 */
+    static const double LN2_LO = 2.31904681384629955842e-17;  /* ln2 - LN2_HI */
 
-    // y = x * (1/ln2) in qfloat_t
+    /* y = x * (1/ln2) in qfloat_t */
     qfloat_t y = qf_mul(x, QF_INVLN2);
 
-    // k = round(y) using qfloat_t-accurate rounding
+    /* k = round(y) using qfloat_t-accurate rounding */
     int ki = qf_round_to_int(y);
     *k = ki;
 
-    // k as double and qfloat_t
+    /* k as double and qfloat_t */
     double kd = (double)ki;
     qfloat_t kq = qf_from_double(kd);
 
-    // First subtract k * LN2_HI in qfloat_t
+    /* First subtract k * LN2_HI in qfloat_t */
     qfloat_t t_hi = qf_mul_double(kq, LN2_HI);
     qfloat_t r1   = qf_sub(x, t_hi);
 
-    // Then subtract k * LN2_LO in qfloat_t
+    /* Then subtract k * LN2_LO in qfloat_t */
     qfloat_t t_lo = qf_mul_double(kq, LN2_LO);
     qfloat_t r2   = qf_sub(r1, t_lo);
 
@@ -116,7 +116,7 @@ qfloat_t qf_exp(qfloat_t x)
 
     qfloat_t p = qf_exp_kernel(r);
 
-    // scale by 2^k
+    /* scale by 2^k */
     return qf_ldexp(p, k);
 }
 
@@ -270,11 +270,11 @@ static int qf_range_reduce_pi_over_2(qfloat_t x, qfloat_t *r_out)
 
  /* sin(r) coefficients (odd powers), highest degree first */
 static const qfloat_t SIN_COEF[] = {
-    // { 7.2654601791530714e-44, -4.3640971493544333e-61 },
-    // { -9.6775929586318907e-41, -3.2022955486455637e-57 },
-    // { 1.1516335620771951e-37, -6.0995744578845386e-54 },
-    // { -1.2161250415535179e-34, -5.5862905678888081e-51 },
-    // { 1.1309962886447716e-31, 1.0498015412959507e-47 },
+    /* { 7.2654601791530714e-44, -4.3640971493544333e-61 }, */
+    /* { -9.6775929586318907e-41, -3.2022955486455637e-57 }, */
+    /* { 1.1516335620771951e-37, -6.0995744578845386e-54 }, */
+    /* { -1.2161250415535179e-34, -5.5862905678888081e-51 }, */
+    /* { 1.1309962886447716e-31, 1.0498015412959507e-47 }, */
     { -9.183689863795546e-29, -1.4303150396787328e-45 },
     { 6.4469502843844736e-26, -1.9330404233703462e-42 },
     { -3.8681701706306841e-23, 8.8431776554823406e-40 },
@@ -294,11 +294,11 @@ static const int NSIN = sizeof(SIN_COEF) / sizeof(SIN_COEF[0]);
 
 /* cos(r) coefficients (even powers), highest degree first */
 static const qfloat_t COS_COEF[] = {
-    // { 2.6882202662866363e-42, 5.355061165943334e-59 },
-    // { -3.3871575355211618e-39, -5.0905614815108499e-56 },
-    // { 3.8003907548547434e-36, 1.7457158024652518e-52 },
-    // { -3.7699876288159054e-33, -2.5870347832750324e-49 },
-    // { 3.2798892370698378e-30, 1.5117542744029879e-46 },
+    /* { 2.6882202662866363e-42, 5.355061165943334e-59 }, */
+    /* { -3.3871575355211618e-39, -5.0905614815108499e-56 }, */
+    /* { 3.8003907548547434e-36, 1.7457158024652518e-52 }, */
+    /* { -3.7699876288159054e-33, -2.5870347832750324e-49 }, */
+    /* { 3.2798892370698378e-30, 1.5117542744029879e-46 }, */
     { -2.4795962632247976e-27, 1.2953730964765231e-43 },
     { 1.6117375710961184e-24, -3.6846573564509786e-41 },
     { -8.8967913924505741e-22, 7.9114026148723783e-38 },
@@ -339,12 +339,12 @@ static void qf_sin_cos_kernel(qfloat_t x, qfloat_t *s_out, qfloat_t *c_out)
 
 qfloat_t qf_hypot(qfloat_t x, qfloat_t y)
 {
-    // double ax = fabs(x.hi);
-    // double ay = fabs(y.hi);
+    /* double ax = fabs(x.hi); */
+    /* double ay = fabs(y.hi); */
 
     /* Reject extreme magnitudes outright */
-    //if (ax > 1e200 || ay > 1e200)
-    //    return QF_NAN;
+    /* if (ax > 1e200 || ay > 1e200) */
+    /*    return QF_NAN; */
 
     /* Normal qfloat_t path (safe mid-range) */
 
@@ -480,13 +480,13 @@ static const int NATAN = sizeof(ATAN_COEF) / sizeof(ATAN_COEF[0]);
 
 qfloat_t qf_atan_kernel(qfloat_t t)
 {
-    qfloat_t t2 = qf_mul(t, t);      // t^2
+    qfloat_t t2 = qf_mul(t, t);      /* t^2 */
 
     qfloat_t p = ATAN_COEF[NATAN - 1];
     for (int i = NATAN - 2; i >= 0; --i)
         p = qf_add(ATAN_COEF[i], qf_mul(p, t2));
 
-    qfloat_t t3 = qf_mul(t, t2);     // t^3
+    qfloat_t t3 = qf_mul(t, t2);     /* t^3 */
     return qf_sub(t, qf_mul(t3, p));
 }
 
@@ -629,7 +629,7 @@ qfloat_t qf_cosh(qfloat_t x)
 qfloat_t qf_tanh(qfloat_t x)
 {
     qfloat_t two = QF_TWO;
-    qfloat_t t   = qf_exp(qf_mul(two, x));   // e^(2x)
+    qfloat_t t   = qf_exp(qf_mul(two, x));   /* e^(2x) */
 
     qfloat_t num = qf_sub(t, QF_ONE);
     qfloat_t den = qf_add(t, QF_ONE);
@@ -799,7 +799,7 @@ qfloat_t qf_erf(qfloat_t x)
     }
 
     /* cutoff between power series and continued fraction */
-    const double cut = 1.5;
+    const double cut = 1.25;
 
     /* ------------------------------------------------------------
        POWER SERIES for |x| < cut
@@ -827,8 +827,9 @@ qfloat_t qf_erf(qfloat_t x)
             /* s += t */
             s = qf_add(s, t);
 
-            /* convergence test: |t| < 1e-35 * |s| */
-            if (fabs(t.hi) < 1e-35 * fabs(s.hi)) {
+            /* Push the series a little harder so the normal-CDF derivative
+               path stays aligned with the tightened qfloat constants. */
+            if (fabs(t.hi) < 1e-37 * fabs(s.hi)) {
 
                 /* ex2 = exp(x^2) */
                 qfloat_t ex2 = qf_exp(x2);
@@ -899,8 +900,8 @@ qfloat_t qf_erf(qfloat_t x)
         /* h *= del */
         h = qf_mul(h, del);
 
-        /* convergence: del ≈ 1 */
-        if (del.hi == 1.0 && fabs(del.lo) < 1e-30)
+        /* Tighten the continued-fraction stop slightly for the same reason. */
+        if (del.hi == 1.0 && fabs(del.lo) < 1e-32)
             break;
 
         if (i == 299) {
@@ -1175,8 +1176,8 @@ qfloat_t qf_erfcinv(qfloat_t x)
 
 /* lgamma */
 
-// Chebyshev coefficients for lgamma on x in [1,2]
-// x = 1.5 + 0.5*y, y in [-1,1]
+/* Chebyshev coefficients for lgamma on x in [1,2] */
+/* x = 1.5 + 0.5*y, y in [-1,1] */
 static const qfloat_t QF_LGAMMA_C[41] = {
     { -6.08999038183025906e-02, -1.67161028145317951e-18 },
     { 4.68966674650670226e-03, -8.00414782984271387e-20 },
@@ -1223,32 +1224,32 @@ static const qfloat_t QF_LGAMMA_C[41] = {
 
 static const int QF_LGAMMA_N = sizeof(QF_LGAMMA_C) / sizeof(QF_LGAMMA_C[0]);
 
-// x in [1,2]
-// Chebyshev core: lgamma(x) on x in [1,2]
-// x = 1.5 + 0.5*y, y in [-1,1]
+/* x in [1,2] */
+/* Chebyshev core: lgamma(x) on x in [1,2] */
+/* x = 1.5 + 0.5*y, y in [-1,1] */
 static qfloat_t qf_lgamma_core_1_2(qfloat_t x)
 {
     qfloat_t one_point_five = qf_div((qfloat_t){ 3.0, 0.0 }, (qfloat_t){ 2.0, 0.0 });
     qfloat_t two            = QF_TWO;
 
-    // y = 2*(x - 1.5)
+    /* y = 2*(x - 1.5) */
     qfloat_t t = qf_sub(x, one_point_five);
     qfloat_t y = qf_mul(two, t);
 
     qfloat_t b1 = QF_ZERO;
     qfloat_t b2 = QF_ZERO;
 
-    // k = N .. 1  (do NOT include c[0] in the loop)
+    /* k = N .. 1  (do NOT include c[0] in the loop) */
     for (int k = QF_LGAMMA_N - 1; k >= 1; --k) {
-        qfloat_t term = qf_mul(y, b1);      // y*b1
-        term        = qf_add(term, term); // 2*y*b1
-        qfloat_t bk   = qf_sub(term, b2);   // 2*y*b1 - b2
-        bk          = qf_add(bk, QF_LGAMMA_C[k]); // + c_k
+        qfloat_t term = qf_mul(y, b1);      /* y*b1 */
+        term        = qf_add(term, term); /* 2*y*b1 */
+        qfloat_t bk   = qf_sub(term, b2);   /* 2*y*b1 - b2 */
+        bk          = qf_add(bk, QF_LGAMMA_C[k]); /* + c_k */
         b2          = b1;
         b1          = bk;
     }
 
-    // f(y) = c0 + y*b1 - b2
+    /* f(y) = c0 + y*b1 - b2 */
     qfloat_t yb1 = qf_mul(y, b1);
     qfloat_t res = qf_add(QF_LGAMMA_C[0], qf_sub(yb1, b2));
     return res;
@@ -1256,7 +1257,7 @@ static qfloat_t qf_lgamma_core_1_2(qfloat_t x)
 
 static int qf_is_integer(qfloat_t x)
 {
-    // crude but effective: check hi is integer and lo is (near) zero
+    /* crude but effective: check hi is integer and lo is (near) zero */
     double r = nearbyint(x.hi);
     if (fabs(x.hi - r) > 1e-30) return 0;
     if (fabs(x.lo) > 1e-30)     return 0;
@@ -1273,7 +1274,7 @@ qfloat_t qf_lgamma(qfloat_t x)
         return qf_log(qf_gamma(x));
     }
 
-    // Handle poles and reflection as you already do
+    /* Handle poles and reflection as you already do */
     if (x.hi < 0.5) {
         qfloat_t one_minus_x = qf_sub(QF_ONE, x);
         qfloat_t lg1mx       = qf_lgamma(one_minus_x);
@@ -1286,7 +1287,7 @@ qfloat_t qf_lgamma(qfloat_t x)
         return qf_sub(term, lg1mx);
     }
 
-    // Shift x into [1,2] using recurrence
+    /* Shift x into [1,2] using recurrence */
     qfloat_t acc = QF_ZERO;
     qfloat_t one = QF_ONE;
 
@@ -1301,7 +1302,7 @@ qfloat_t qf_lgamma(qfloat_t x)
         z   = qf_add(z, one);
     }
 
-    // Now z in [1,2]
+    /* Now z in [1,2] */
     qfloat_t core = qf_lgamma_core_1_2(z);
     return qf_add(core, acc);
 }
@@ -1471,14 +1472,14 @@ static qfloat_t qf_digamma_core_8_20(qfloat_t x)
     qfloat_t halfw  = (qfloat_t){  6.0, 0.0 };
 
     qfloat_t t = qf_sub(x, center);
-    qfloat_t y = qf_div(t, halfw);   // y in [-1,1]
+    qfloat_t y = qf_div(t, halfw);   /* y in [-1,1] */
 
     qfloat_t b1 = QF_ZERO;
     qfloat_t b2 = QF_ZERO;
 
     for (int k = QF_DIGAMMA_N_8_20 - 1; k >= 1; --k) {
         qfloat_t term = qf_mul(y, b1);
-        term        = qf_add(term, term);   // 2*y*b1
+        term        = qf_add(term, term);   /* 2*y*b1 */
         qfloat_t bk   = qf_sub(term, b2);
         bk          = qf_add(bk, QF_DIGAMMA_C_8_20[k]);
         b2 = b1;
@@ -2104,6 +2105,7 @@ qfloat_t qf_logbeta_pdf(qfloat_t x, qfloat_t a, qfloat_t b)
 qfloat_t qf_normal_pdf(qfloat_t x)
 {
     qfloat_t half = QF_HALF;
+    qfloat_t inv_sqrt_2pi;
 
     /* Compute -x^2 / 2 */
     qfloat_t x2   = qf_mul(x, x);
@@ -2112,7 +2114,10 @@ qfloat_t qf_normal_pdf(qfloat_t x)
     /* exp(-x^2/2) */
     qfloat_t e = qf_exp(expo);
 
-    return qf_mul(QF_INV_SQRT_2PI, e);
+    /* Keep the normal paths internally consistent with erf/cdf:
+       1/sqrt(2pi) = (1/sqrt(2)) * (1/sqrt(pi)). */
+    inv_sqrt_2pi = qf_mul(QF_SQRT_HALF, QF_SQRT1ONPI);
+    return qf_mul(inv_sqrt_2pi, e);
 }
 
 /* Standard normal CDF: Φ(x) = 0.5 * (1 + erf(x / sqrt(2))) */
@@ -2135,7 +2140,7 @@ qfloat_t qf_normal_logpdf(qfloat_t x)
     qfloat_t half = QF_HALF;
 
     qfloat_t x2 = qf_mul(x, x);
-    qfloat_t term1 = qf_mul(half, QF_LN_2PI);   /* 0.5 * log(2π) */
+    qfloat_t term1 = QF_LOG_SQRT_2PI;           /* 0.5 * log(2π) */
     qfloat_t term2 = qf_mul(half, x2);          /* 0.5 * x^2 */
 
     return qf_neg(qf_add(term1, term2));
