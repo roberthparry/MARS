@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "mcomplex_internal.h"
+#include "../mfloat/mfloat_internal.h"
 
 static struct _mcomplex_t mcomplex_zero_static = {
     .real = (mfloat_t *)MF_ZERO,
@@ -281,8 +282,6 @@ size_t mc_get_precision(const mcomplex_t *mcomplex)
 
 int mc_set(mcomplex_t *mcomplex, const mfloat_t *real, const mfloat_t *imag)
 {
-    char *real_text = NULL;
-    char *imag_text = NULL;
     size_t precision_bits;
 
     if (!mcomplex || !real || !imag)
@@ -293,17 +292,21 @@ int mc_set(mcomplex_t *mcomplex, const mfloat_t *real, const mfloat_t *imag)
     if (mf_set_precision(mcomplex->real, precision_bits) != 0 ||
         mf_set_precision(mcomplex->imag, precision_bits) != 0)
         return -1;
-    real_text = mf_to_string(real);
-    imag_text = mf_to_string(imag);
-    if (!real_text || !imag_text ||
-        mf_set_string(mcomplex->real, real_text) != 0 ||
-        mf_set_string(mcomplex->imag, imag_text) != 0) {
-        free(real_text);
-        free(imag_text);
+    if ((mfloat_is_immortal(real)
+            ? mfloat_set_from_immortal_internal(mcomplex->real, real, precision_bits)
+            : mfloat_copy_value(mcomplex->real, real)) != 0 ||
+        (mfloat_is_immortal(imag)
+            ? mfloat_set_from_immortal_internal(mcomplex->imag, imag, precision_bits)
+            : mfloat_copy_value(mcomplex->imag, imag)) != 0)
         return -1;
-    }
-    free(real_text);
-    free(imag_text);
+    if (!mfloat_is_immortal(real) && precision_bits < mf_get_precision(real) &&
+        mfloat_round_to_precision_internal(mcomplex->real, precision_bits) != 0)
+        return -1;
+    if (!mfloat_is_immortal(imag) && precision_bits < mf_get_precision(imag) &&
+        mfloat_round_to_precision_internal(mcomplex->imag, precision_bits) != 0)
+        return -1;
+    mcomplex->real->precision = precision_bits;
+    mcomplex->imag->precision = precision_bits;
     return 0;
 }
 
