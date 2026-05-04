@@ -37,6 +37,12 @@ static int mcomplex_round_parts(mcomplex_t *mcomplex, size_t precision_bits)
 {
     if (!mcomplex)
         return -1;
+    if (mcomplex->real && mfloat_is_finite(mcomplex->real) &&
+        mfloat_round_to_precision_internal(mcomplex->real, precision_bits) != 0)
+        return -1;
+    if (mcomplex->imag && mfloat_is_finite(mcomplex->imag) &&
+        mfloat_round_to_precision_internal(mcomplex->imag, precision_bits) != 0)
+        return -1;
     if (mf_set_precision(mcomplex->real, precision_bits) != 0 ||
         mf_set_precision(mcomplex->imag, precision_bits) != 0)
         return -1;
@@ -45,37 +51,70 @@ static int mcomplex_round_parts(mcomplex_t *mcomplex, size_t precision_bits)
 
 int mc_abs(mcomplex_t *mcomplex)
 {
-    mfloat_t *mag2 = NULL, *tmp = NULL;
+    mfloat_t *mag2 = NULL, *tmp = NULL, *root = NULL;
     size_t precision_bits;
+    size_t work_prec;
+    qfloat_t seed;
+    int iter;
 
     if (!mcomplex)
         return -1;
     precision_bits = mc_get_precision(mcomplex);
+    work_prec = precision_bits + 64u;
     if (mcomplex_ensure_mutable(mcomplex) != 0)
         return -1;
     mag2 = mf_clone(mcomplex->real);
     tmp = mf_clone(mcomplex->imag);
     if (!mag2 || !tmp)
         goto fail;
+    if (mf_set_precision(mag2, work_prec) != 0 ||
+        mf_set_precision(tmp, work_prec) != 0)
+        goto fail;
     if (mf_mul(mag2, mcomplex->real) != 0 ||
         mf_mul(tmp, mcomplex->imag) != 0 ||
-        mf_add(mag2, tmp) != 0 ||
-        mf_sqrt(mag2) != 0)
+        mf_add(mag2, tmp) != 0)
         goto fail;
-    if (mfloat_copy_value(mcomplex->real, mag2) != 0)
+
+    seed = qf_sqrt(mf_to_qfloat(mag2));
+    root = mf_new_prec(work_prec);
+    if (!root || mf_set_qfloat(root, seed) != 0)
         goto fail;
-    if (precision_bits < mf_get_precision(mag2) &&
+    if (mf_is_zero(root)) {
+        if (mfloat_copy_value(root, mag2) != 0)
+            goto fail;
+    }
+
+    for (iter = 0; iter < 6; ++iter) {
+        mf_free(tmp);
+        tmp = mf_clone(mag2);
+        if (!tmp)
+            goto fail;
+        if (mf_set_precision(tmp, work_prec) != 0 ||
+            mf_div(tmp, root) != 0 ||
+            mf_add(tmp, root) != 0 ||
+            mf_ldexp(tmp, -1) != 0)
+            goto fail;
+        mf_free(root);
+        root = tmp;
+        tmp = NULL;
+    }
+
+    if (mfloat_copy_value(mcomplex->real, root) != 0)
+        goto fail;
+    if (precision_bits < mf_get_precision(root) &&
         mfloat_round_to_precision_internal(mcomplex->real, precision_bits) != 0)
         goto fail;
     mf_clear(mcomplex->imag);
     if (mcomplex_round_parts(mcomplex, precision_bits) != 0)
         goto fail;
 
+    mf_free(root);
     mf_free(tmp);
     mf_free(mag2);
     return 0;
 
 fail:
+    mf_free(root);
     mf_free(tmp);
     mf_free(mag2);
     return -1;

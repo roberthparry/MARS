@@ -1770,6 +1770,17 @@ static long mfloat_estimate_positive_unit_steps(const mfloat_t *value, long thre
     return steps;
 }
 
+static long mfloat_lgamma_asymptotic_threshold(size_t precision)
+{
+    if (precision <= 256u)
+        return 32l;
+    if (precision <= 512u)
+        return 64l;
+    if (precision <= 1024u)
+        return 96l;
+    return 128l;
+}
+
 static int mfloat_compute_e(mfloat_t *dst, size_t precision)
 {
     mfloat_t *sum = NULL, *term = NULL;
@@ -1787,7 +1798,7 @@ static int mfloat_compute_e(mfloat_t *dst, size_t precision)
             goto cleanup;
         if (mf_add(sum, term) != 0)
             goto cleanup;
-        if (mfloat_is_below_neg_bits(term, (long)work_prec + 8l))
+        if (mfloat_is_below_neg_bits(term, (long)precision + 8l))
             break;
     }
 
@@ -2590,9 +2601,7 @@ int mf_log(mfloat_t *mfloat)
     precision = mfloat->precision;
     if (precision <= MFLOAT_QFLOAT_EFFECTIVE_BITS)
         return mfloat_apply_qfloat_unary(mfloat, qf_log);
-    work_prec = precision + (precision / 2u);
-    if (work_prec < precision + 96u)
-        work_prec = precision + 96u;
+    work_prec = mfloat_transcendental_work_prec(precision) + 32u;
     for (i = 0; i < 7u; ++i)
         mfloat_scratch_init_slot(&slots[i], work_prec);
     m = &slots[0].value;
@@ -3935,6 +3944,7 @@ int mf_lgamma(mfloat_t *mfloat)
     size_t precision, work_prec;
     mfloat_t *x = NULL, *z = NULL, *acc = NULL, *tmp = NULL, *logz = NULL, *pi = NULL, *threshold = NULL, *den = NULL;
     long n = 0;
+    long threshold_long;
     int rc = -1;
 
     if (!mfloat)
@@ -4016,10 +4026,8 @@ int mf_lgamma(mfloat_t *mfloat)
     z = x;
     x = NULL;
     acc = mfloat_clone_prec(MF_ZERO, work_prec);
-    threshold = mfloat_new_from_long_prec(
-        precision > mfloat_transcendental_work_prec(512u) ? 475 :
-        (precision > mfloat_transcendental_work_prec(256u) ? 450 : 90),
-        work_prec);
+    threshold_long = mfloat_lgamma_asymptotic_threshold(precision);
+    threshold = mfloat_new_from_long_prec(threshold_long, work_prec);
     tmp = mf_new_prec(work_prec);
     logz = mf_new_prec(work_prec);
     if (!z || !acc || !threshold || !tmp || !logz)
@@ -4028,9 +4036,7 @@ int mf_lgamma(mfloat_t *mfloat)
         goto cleanup;
     {
         bool use_incremental_logs = precision <= mfloat_transcendental_work_prec(256u);
-        long steps = mfloat_estimate_positive_unit_steps(
-            z, precision > mfloat_transcendental_work_prec(512u) ? 475 :
-            (precision > mfloat_transcendental_work_prec(256u) ? 450 : 90));
+        long steps = mfloat_estimate_positive_unit_steps(z, threshold_long);
 
         if (steps < 0)
             goto cleanup;

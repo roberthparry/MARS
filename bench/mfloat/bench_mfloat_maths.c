@@ -40,6 +40,15 @@ static int bench_wants_section(const char *name)
     return strcmp(section, name) == 0;
 }
 
+static int bench_case_enabled(const char *label)
+{
+    const char *filter = getenv("MARS_BENCH_FILTER");
+
+    if (!filter || !*filter)
+        return 1;
+    return strstr(label, filter) != NULL;
+}
+
 static void run_unary_case(const char *label,
                            const char *text,
                            size_t precision,
@@ -51,6 +60,9 @@ static void run_unary_case(const char *label,
     uint64_t start;
     uint64_t end;
     double avg_us;
+
+    if (!bench_case_enabled(label))
+        return;
 
     old_prec = mf_get_default_precision();
     if (mf_set_default_precision(precision) != 0) {
@@ -117,6 +129,9 @@ static void run_binary_case(const char *label,
     uint64_t start;
     uint64_t end;
     double avg_us;
+
+    if (!bench_case_enabled(label))
+        return;
 
     old_prec = mf_get_default_precision();
     if (mf_set_default_precision(precision) != 0) {
@@ -192,6 +207,9 @@ static void run_ternary_case(const char *label,
     uint64_t end;
     double avg_us;
 
+    if (!bench_case_enabled(label))
+        return;
+
     old_prec = mf_get_default_precision();
     if (mf_set_default_precision(precision) != 0) {
         fprintf(stderr, "%s set default precision failed\n", label);
@@ -243,8 +261,9 @@ static void run_ternary_case(const char *label,
     end = now_ns();
 
     avg_us = ((double)(end - start) / (double)iters) / 1000.0;
-    printf("%-28s avg_µs=%10.3f avg_ms=%10.3f\n",
+    printf("%-28s bits=%-4zu avg_µs=%10.3f avg_ms=%10.3f\n",
            label,
+           precision,
            avg_us,
            avg_us / 1000.0);
 
@@ -263,6 +282,9 @@ static void run_const_case(const char *label,
     uint64_t start;
     uint64_t end;
     double avg_us;
+
+    if (!bench_case_enabled(label))
+        return;
 
     old_prec = mf_get_default_precision();
     if (mf_set_default_precision(precision) != 0) {
@@ -295,8 +317,9 @@ static void run_const_case(const char *label,
     end = now_ns();
 
     avg_us = ((double)(end - start) / (double)iters) / 1000.0;
-    printf("%-28s avg_µs=%10.3f avg_ms=%10.3f\n",
+    printf("%-28s bits=%-4zu avg_µs=%10.3f avg_ms=%10.3f\n",
            label,
+           precision,
            avg_us,
            avg_us / 1000.0);
 
@@ -308,6 +331,7 @@ int main(void)
     puts("== mfloat native math bench ==");
     puts("Scale iterations with MARS_BENCH_SCALE=<n> if you want longer runs.");
     puts("Limit to one section with MARS_BENCH_SECTION=constants|elem256|triage256|special256|selected512.");
+    puts("Filter individual cases with MARS_BENCH_FILTER=<substring>.");
 
     if (bench_wants_section("constants")) {
         puts("");

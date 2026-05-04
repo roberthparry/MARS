@@ -31,6 +31,9 @@ static void print_mcomplex_error_check(const char *label,
                                        const mcomplex_t *got,
                                        const char *expected_real,
                                        const char *expected_imag);
+static void print_mcomplex_error_check_value(const char *label,
+                                             const mcomplex_t *got,
+                                             const mcomplex_t *expected);
 static int mfloat_meets_precision(const mfloat_t *got,
                                   const char *expected_text,
                                   int relative_mode);
@@ -47,15 +50,47 @@ static mcomplex_t *create_real_mcomplex(const char *real_text);
 static int format_mfloat_pretty_value(char *buf, size_t buf_size, const mfloat_t *value)
 {
     char fixed_buf[512];
+    char fmt[32];
+    char *trim;
+    size_t precision_bits;
+    int precision_digits;
+    int decimal_digits;
 
     if (!buf || buf_size == 0 || !value)
         return -1;
 
-    if (mf_sprintf(fixed_buf, sizeof(fixed_buf), "%mf", value) < 0)
+    precision_bits = mf_get_precision(value);
+    precision_digits = (int)ceil((double)precision_bits * 0.3010299956639812);
+    if (precision_digits < 1)
+        precision_digits = 1;
+
+    if (precision_bits >= 512u)
+        decimal_digits = precision_digits;
+    else if (precision_bits >= 256u)
+        decimal_digits = precision_digits < 80 ? precision_digits : 80;
+    else
+        decimal_digits = 24;
+
+    snprintf(fmt, sizeof(fmt), "%%.%dmf", decimal_digits);
+    if (mf_sprintf(fixed_buf, sizeof(fixed_buf), fmt, value) < 0)
         return -1;
 
-    if (!mf_is_zero(value) && strlen(fixed_buf) > 48u)
-        return mf_sprintf(buf, buf_size, "%MF", value);
+    trim = strchr(fixed_buf, '.');
+    if (trim) {
+        char *end = fixed_buf + strlen(fixed_buf) - 1;
+
+        while (end > trim && *end == '0') {
+            *end = '\0';
+            --end;
+        }
+        if (end == trim)
+            *end = '\0';
+    }
+
+    if (!mf_is_zero(value) && strlen(fixed_buf) > 96u) {
+        snprintf(fmt, sizeof(fmt), "%%.%dMF", decimal_digits);
+        return mf_sprintf(buf, buf_size, fmt, value);
+    }
 
     if (snprintf(buf, buf_size, "%s", fixed_buf) >= (int)buf_size)
         return -1;
@@ -66,6 +101,7 @@ static int format_mfloat_pretty_value(char *buf, size_t buf_size, const mfloat_t
 static int format_mfloat_precise_value(char *buf, size_t buf_size, const mfloat_t *value)
 {
     char fmt[32];
+    char *trim;
     size_t precision_bits;
     int decimal_digits;
 
@@ -80,7 +116,22 @@ static int format_mfloat_precise_value(char *buf, size_t buf_size, const mfloat_
         decimal_digits = 240;
 
     snprintf(fmt, sizeof(fmt), "%%.%dmf", decimal_digits);
-    return mf_sprintf(buf, buf_size, fmt, value);
+    if (mf_sprintf(buf, buf_size, fmt, value) < 0)
+        return -1;
+
+    trim = strchr(buf, '.');
+    if (trim) {
+        char *end = buf + strlen(buf) - 1;
+
+        while (end > trim && *end == '0') {
+            *end = '\0';
+            --end;
+        }
+        if (end == trim)
+            *end = '\0';
+    }
+
+    return (int)strlen(buf);
 }
 
 static int format_mcomplex_parts(const mcomplex_t *value,
@@ -224,6 +275,54 @@ static void print_mcomplex_error_check(const char *label,
     mf_free(real_err);
     mf_free(imag_err);
     mc_free(expected);
+}
+
+static void print_mcomplex_error_check_value(const char *label,
+                                             const mcomplex_t *got,
+                                             const mcomplex_t *expected)
+{
+    mfloat_t *real_err = NULL;
+    mfloat_t *imag_err = NULL;
+    char real_err_buf[256];
+    char imag_err_buf[256];
+    size_t precision_bits = 0;
+    int decimal_digits = 0;
+
+    if (!label || !got || !expected ||
+        (real_err = mf_clone(mc_real(got))) == NULL ||
+        (imag_err = mf_clone(mc_imag(got))) == NULL ||
+        mf_sub(real_err, mc_real(expected)) != 0 ||
+        mf_abs(real_err) != 0 ||
+        mf_sub(imag_err, mc_imag(expected)) != 0 ||
+        mf_abs(imag_err) != 0 ||
+        mf_sprintf(real_err_buf, sizeof(real_err_buf), "%.6MF", real_err) < 0 ||
+        mf_sprintf(imag_err_buf, sizeof(imag_err_buf), "%.6MF", imag_err) < 0) {
+        printf(C_CYAN "%s" C_RESET "\n", label ? label : "<null>");
+        printf("    expected   = <format-error>\n");
+        printf("    got        = <format-error>\n");
+        printf("    error.re = <format-error>\n");
+        printf("    error.im = <format-error>\n");
+        mf_free(real_err);
+        mf_free(imag_err);
+        return;
+    }
+
+    precision_bits = mc_get_precision(got);
+    decimal_digits = (int)ceil((double)precision_bits * 0.3010299956639812);
+    if (decimal_digits < 1)
+        decimal_digits = 1;
+    printf(C_CYAN "%s" C_RESET "\n", label);
+    printf("    precision = %zu bits (~%d digits)\n", precision_bits, decimal_digits);
+    print_mcomplex_formatted_lines("expected", expected, format_mfloat_precise_value, 0);
+    print_mcomplex_formatted_lines("got", got, format_mfloat_precise_value, 0);
+    print_mcomplex_formatted_lines("expected~", expected, format_mfloat_pretty_value, 1);
+    print_mcomplex_formatted_lines("got~", got, format_mfloat_pretty_value, 1);
+    printf("    error.re  = %s\n", real_err_buf);
+    printf("    error.im  = %s\n", imag_err_buf);
+    fflush(stdout);
+
+    mf_free(real_err);
+    mf_free(imag_err);
 }
 
 static int mfloat_meets_precision(const mfloat_t *got,
@@ -515,10 +614,10 @@ static void test_arithmetic(void)
 
         ASSERT_EQ_INT(mc_abs(z), 0);
         print_mcomplex_value("z after abs(z)", z);
-        print_mcomplex_error_check("abs(-0.2 + 0.4i)", z, "0.44721359549995793928183473374625524708812367192230514485417944905545963734803978", "0");
+        print_mcomplex_error_check("abs(-0.2 + 0.4i)", z, "0.447213595499957939281834733746255247088123671922305144854179449082104185127560979882882881675756454993901635230154756700850653544889414772717272024306690541773355634638375833162255329064527971316107152270083507", "0");
         ASSERT_TRUE(mcomplex_meets_precision(
             z,
-            "0.44721359549995793928183473374625524708812367192230514485417944905545963734803978",
+            "0.447213595499957939281834733746255247088123671922305144854179449082104185127560979882882881675756454993901635230154756700850653544889414772717272024306690541773355634638375833162255329064527971316107152270083507",
             "0"));
         break;
     }
@@ -532,6 +631,7 @@ static void test_transcendentals(void)
 {
     mcomplex_t *z_exp = NULL;
     mcomplex_t *z_log = NULL;
+    mcomplex_t *expected_log = NULL;
 
     for (;;) {
         print_mcomplex_input("exp input", "0 + pi*i");
@@ -550,18 +650,17 @@ static void test_transcendentals(void)
         print_mcomplex_value("log initial", z_log);
 
         ASSERT_EQ_INT(mc_log(z_log), 0);
+        expected_log = mc_create(MF_ZERO, MF_PI);
+        ASSERT_NOT_NULL(expected_log);
         print_mcomplex_value("after log(z)", z_log);
-        print_mcomplex_error_check(
-            "log(-1 + 0i)", z_log, "0",
-            "3.141592653589793238462643383279502884197169399375105820974944592307816406286208998628034825342117068");
-        ASSERT_TRUE(mcomplex_meets_precision(
-            z_log, "0",
-            "3.141592653589793238462643383279502884197169399375105820974944592307816406286208998628034825342117068"));
+        print_mcomplex_error_check_value("log(-1 + 0i)", z_log, expected_log);
+        ASSERT_TRUE(mcomplex_matches_value(z_log, expected_log));
         break;
     }
 
     mc_free(z_exp);
     mc_free(z_log);
+    mc_free(expected_log);
 }
 
 static void test_special_functions(void)
@@ -1215,23 +1314,24 @@ static void test_difficult_mcomplex_cases(void)
     ASSERT_NOT_NULL(z);
     print_mcomplex_input("branch log input", "-1 + 1e-20i");
     ASSERT_EQ_INT(mc_log(z), 0);
-    print_mcomplex_error_check(
-        "log(-1 + 1e-20i)", z, "0",
-        "3.141592653589793238462643383279502884197169399375105820974944592307816406286208998628034825342117068");
-    ASSERT_TRUE(mcomplex_meets_precision(
-        z, "0",
-        "3.141592653589793238462643383279502884197169399375105820974944592307816406286208998628034825342117068"));
+    expected = mc_create(MF_ZERO, MF_PI);
+    ASSERT_NOT_NULL(expected);
+    print_mcomplex_error_check_value("log(-1 + 1e-20i)", z, expected);
+    ASSERT_TRUE(mcomplex_matches_value(z, expected));
+    mc_free(expected);
+    expected = NULL;
     mc_free(z);
 
     z = mc_create_string("-1 - 1e-20i");
     ASSERT_NOT_NULL(z);
     ASSERT_EQ_INT(mc_log(z), 0);
-    print_mcomplex_error_check(
-        "log(-1 - 1e-20i)", z, "0",
-        "-3.141592653589793238462643383279502884197169399375105820974944592307816406286208998628034825342117068");
-    ASSERT_TRUE(mcomplex_meets_precision(
-        z, "0",
-        "-3.141592653589793238462643383279502884197169399375105820974944592307816406286208998628034825342117068"));
+    expected = mc_create(MF_ZERO, MF_PI);
+    ASSERT_NOT_NULL(expected);
+    ASSERT_EQ_INT(mf_neg((mfloat_t *)mc_imag(expected)), 0);
+    print_mcomplex_error_check_value("log(-1 - 1e-20i)", z, expected);
+    ASSERT_TRUE(mcomplex_matches_value(z, expected));
+    mc_free(expected);
+    expected = NULL;
     mc_free(z);
 
     z = mc_create_string("0.75 + 1.25i");

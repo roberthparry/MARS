@@ -201,6 +201,7 @@ static char *mf_build_scientific(const char *fixed, int uppercase, int precision
     char *digits = NULL;
     int fixed_dp = 0;
     size_t digits_len;
+    size_t sig_digits_target = 0u;
     size_t frac_len = 0;
     char expbuf[64];
     size_t exp_len;
@@ -219,12 +220,28 @@ static char *mf_build_scientific(const char *fixed, int uppercase, int precision
 
         if (sig_digits < 1)
             sig_digits = 1;
+        sig_digits_target = (size_t)sig_digits;
         mf_limit_significant_digits(digits, &nd, &fixed_dp, sig_digits);
         digits_len = strlen(digits);
     }
-    while (digits_len > 1u && digits[digits_len - 1u] == '0') {
-        digits[digits_len - 1u] = '\0';
-        digits_len--;
+    if (precision >= 0) {
+        if (digits_len < sig_digits_target) {
+            char *grown = realloc(digits, sig_digits_target + 1u);
+
+            if (!grown) {
+                free(digits);
+                return NULL;
+            }
+            digits = grown;
+            memset(digits + digits_len, '0', sig_digits_target - digits_len);
+            digits[sig_digits_target] = '\0';
+            digits_len = sig_digits_target;
+        }
+    } else {
+        while (digits_len > 1u && digits[digits_len - 1u] == '0') {
+            digits[digits_len - 1u] = '\0';
+            digits_len--;
+        }
     }
 
     exp10 = fixed_dp - 1;

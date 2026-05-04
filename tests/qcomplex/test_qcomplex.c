@@ -757,6 +757,44 @@ static void test_ei_e1(void)
 }
 
 /* ====================================================================
+   Difficult identities and branch cases
+   ==================================================================== */
+
+static void test_difficult_cases(void)
+{
+    printf(C_CYAN "TEST: difficult identities / branch cases\n" C_RESET);
+
+    check_qc("log(-1 + 1e-20i) = iπ",
+             qc_log(qczs("-1", "1e-20")),
+             qcis("3.14159265358979323846264338327950288419716939937510"),
+             1e-26);
+
+    check_qc("log(-1 - 1e-20i) = -iπ",
+             qc_log(qczs("-1", "-1e-20")),
+             qc_neg(qcis("3.14159265358979323846264338327950288419716939937510")),
+             1e-26);
+
+    {
+        qcomplex_t z = qcz(0.75, 1.25);
+        check_qc("exp(log(0.75+1.25i)) = 0.75+1.25i",
+                 qc_exp(qc_log(z)), z, 1e-24);
+    }
+
+    {
+        qcomplex_t z = qcz(1.0, 1.0);
+        qcomplex_t w = qc_productlog(z);
+        check_qc_rel("productlog identity at 1+i",
+                     qc_mul(w, qc_exp(w)), z, 1e-24);
+    }
+
+    {
+        qcomplex_t z = qcz(1.5, 0.7);
+        check_qc_rel("exp(lgamma(1.5+0.7i)) = gamma(1.5+0.7i)",
+                     qc_exp(qc_lgamma(z)), qc_gamma(z), 1e-24);
+    }
+}
+
+/* ====================================================================
    Utility
    ==================================================================== */
 
@@ -994,6 +1032,7 @@ static void test_special_group(void)
     RUN_TEST(test_lambert_wm1, __func__);
     RUN_TEST(test_gammainc,   __func__);
     RUN_TEST(test_ei_e1,      __func__);
+    RUN_TEST(test_difficult_cases, __func__);
 }
 
 static void test_util_group(void)

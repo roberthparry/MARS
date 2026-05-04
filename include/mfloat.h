@@ -132,8 +132,8 @@ qfloat_t mf_to_qfloat(const mfloat_t *mfloat);
  *
  * Precision:
  *   - for `%mf`, `.precision` sets the number of digits after the decimal point
- *   - for `%MF`, `.precision` is currently parsed but scientific output remains
- *     in the library's default pretty-scientific form
+ *   - for `%MF`, `.precision` sets the number of digits after the leading digit
+ *     in scientific notation
  *
  * Examples:
  *

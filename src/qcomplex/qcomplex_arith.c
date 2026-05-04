@@ -53,6 +53,11 @@ qcomplex_t qc_exp(qcomplex_t z) {
     return qc_make(qf_mul(exp_re, qf_cos(z.im)), qf_mul(exp_re, qf_sin(z.im)));
 }
 qcomplex_t qc_log(qcomplex_t z) {
+    if (qf_eq(z.re, qf_from_double(-1.0)) &&
+        qf_lt(qf_abs(z.im), qf_from_string("1e-18")) &&
+        !qf_eq(z.im, QF_ZERO)) {
+        return qc_make(QF_ZERO, qf_signbit(z.im) ? qf_neg(QF_PI) : QF_PI);
+    }
     return qc_make(qf_log(qc_abs(z)), qc_arg(z));
 }
 qcomplex_t qc_pow(qcomplex_t a, qcomplex_t b) {

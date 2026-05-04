@@ -566,7 +566,8 @@
       "test_productlog": true,
       "test_lambert_wm1": true,
       "test_gammainc": true,
-      "test_ei_e1": true
+      "test_ei_e1": true,
+      "test_difficult_cases": true
     },
     "test_util_group": {
       "enabled": true,

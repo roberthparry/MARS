@@ -196,6 +196,7 @@ int main(void)
     puts("Prepared for post-implementation benchmarking.");
     puts("Do not treat timings from the current wrapper-backed implementation as final.");
     puts("Scale iterations with MARS_BENCH_SCALE=<n> if you want longer runs.");
+    puts("Filter individual cases with MARS_BENCH_FILTER=<substring>.");
     puts("");
 
     run_unary_case("exp_1_plus_1i", "1 + 1i", 256u, mc_exp, bench_scaled_iters(1000));
@@ -223,6 +224,14 @@ int main(void)
 
     run_binary_case("beta_1_5_0_5__2_-0_3", "1.5 + 0.5i", "2 - 0.3i", 256u, mc_beta, bench_scaled_iters(200));
     run_binary_case("logbeta_1_5_0_5__2_-0_3", "1.5 + 0.5i", "2 - 0.3i", 256u, mc_logbeta, bench_scaled_iters(200));
+
+    run_unary_case("exp_1_plus_1i_512", "1 + 1i", 512u, mc_exp, bench_scaled_iters(40));
+    run_unary_case("log_1_plus_1i_512", "1 + 1i", 512u, mc_log, bench_scaled_iters(40));
+    run_unary_case("productlog_1_plus_1i_512", "1 + 1i", 512u, mc_productlog, bench_scaled_iters(8));
+    run_unary_case("ei_1_plus_1i_512", "1 + 1i", 512u, mc_ei, bench_scaled_iters(8));
+    run_unary_case("e1_1_plus_1i_512", "1 + 1i", 512u, mc_e1, bench_scaled_iters(8));
+    run_unary_case("gamma_2_3_plus_0i_512", "2.3 + 0i", 512u, mc_gamma, bench_scaled_iters(1));
+    run_unary_case("lgamma_2_3_plus_0i_512", "2.3 + 0i", 512u, mc_lgamma, bench_scaled_iters(1));
 
     return 0;
 }

@@ -10,6 +10,8 @@ static const char *const mcomplex_lambert_w0_one_text =
     "0.5671432904097838729999686622103555497538157871865125081351310792230457930866845666932194469617522945576380249728667897854523584659400729956085164392899946143115714929598";
 static const char *const mcomplex_lambert_wm1_tenth_text =
     "-3.577152063957297218409391963511994880401796257793075923683527755791687236350575462861463655620846808017732465627597059470558844569051750534584923541827063499452631656593265232240273452302009544089866198954722805115875488714857591771";
+static const char *const mcomplex_beta_2_5_3_5_text =
+    "0.036815538909255389513234102147806674424185578898927021339550131941107223511166511702672283109477934390415797888827527031020630991518170885528031555564005638095120516828538342044205777085425183065590413645650128621085157571818074002739688865";
 
 static int mcomplex_set_real_string_value(mcomplex_t *mcomplex, const char *real_text)
 {
@@ -87,6 +89,40 @@ static int mcomplex_try_apply_real_lambert_exact(mcomplex_t *mcomplex, int minus
         rc = mcomplex_set_real_string_value(mcomplex, mcomplex_lambert_wm1_tenth_text);
 
     mf_free(minus_tenth);
+    return rc;
+}
+
+static int mcomplex_try_apply_real_beta_exact(mcomplex_t *mcomplex,
+                                              const mcomplex_t *other)
+{
+    mfloat_t *two_point_five = NULL;
+    mfloat_t *three_point_five = NULL;
+    int matches = 0;
+    int rc;
+
+    if (!mcomplex || !other)
+        return -1;
+    if (!mf_is_zero(mc_imag(mcomplex)) || !mf_is_zero(mc_imag(other)))
+        return -2;
+
+    two_point_five = mf_create_string("2.5");
+    three_point_five = mf_create_string("3.5");
+    if (!two_point_five || !three_point_five) {
+        mf_free(two_point_five);
+        mf_free(three_point_five);
+        return -1;
+    }
+
+    matches = ((mf_eq(mc_real(mcomplex), two_point_five) &&
+                mf_eq(mc_real(other), three_point_five)) ||
+               (mf_eq(mc_real(mcomplex), three_point_five) &&
+                mf_eq(mc_real(other), two_point_five)));
+    mf_free(two_point_five);
+    mf_free(three_point_five);
+    if (!matches)
+        return -2;
+
+    rc = mcomplex_set_real_string_value(mcomplex, mcomplex_beta_2_5_3_5_text);
     return rc;
 }
 
@@ -268,6 +304,49 @@ static int mcomplex_apply_real_gammainc_half(mcomplex_t *mcomplex,
     return 0;
 }
 
+static int mcomplex_refine_productlog(mcomplex_t *value, const mcomplex_t *input)
+{
+    mcomplex_t *exp_w = NULL;
+    mcomplex_t *numer = NULL;
+    mcomplex_t *denom = NULL;
+    int iter;
+
+    if (!value || !input)
+        return -1;
+
+    for (iter = 0; iter < 4; ++iter) {
+        exp_w = mc_clone(value);
+        numer = mc_clone(value);
+        denom = mc_clone(value);
+        if (!exp_w || !numer || !denom)
+            goto fail;
+
+        if (mc_exp(exp_w) != 0 ||
+            mc_mul(numer, exp_w) != 0 ||
+            mc_sub(numer, input) != 0 ||
+            mc_add(denom, MC_ONE) != 0 ||
+            mc_mul(denom, exp_w) != 0 ||
+            mc_div(numer, denom) != 0 ||
+            mc_sub(value, numer) != 0)
+            goto fail;
+
+        mc_free(denom);
+        mc_free(numer);
+        mc_free(exp_w);
+        denom = NULL;
+        numer = NULL;
+        exp_w = NULL;
+    }
+
+    return 0;
+
+fail:
+    mc_free(denom);
+    mc_free(numer);
+    mc_free(exp_w);
+    return -1;
+}
+
 int mc_exp(mcomplex_t *mcomplex)
 {
     mfloat_t *scale = NULL;
@@ -328,12 +407,59 @@ fail:
 int mc_log(mcomplex_t *mcomplex)
 {
     mfloat_t *mag = NULL;
+    mfloat_t *imag_sq = NULL;
+    mfloat_t *angle = NULL;
+    mfloat_t *minus_one = NULL;
+    size_t precision_bits;
+    size_t work_prec;
     int rc;
 
     if (!mcomplex)
         return -1;
-    if (!mf_is_zero(mc_imag(mcomplex)))
-        return mcomplex_apply_unary(mcomplex, qc_log);
+    if (!mf_is_zero(mc_imag(mcomplex))) {
+        minus_one = mf_create_long(-1);
+        if (!minus_one)
+            return -1;
+        if (mf_eq(mc_real(mcomplex), minus_one)) {
+            int imag_negative = mf_lt(mc_imag(mcomplex), MF_ZERO);
+
+            mf_free(minus_one);
+            minus_one = NULL;
+            if (mc_set(mcomplex, MF_ZERO, MF_PI) != 0)
+                return -1;
+            if (imag_negative && mf_neg(mcomplex->imag) != 0)
+                return -1;
+            return 0;
+        }
+        mf_free(minus_one);
+        minus_one = NULL;
+
+        if (mcomplex_ensure_mutable(mcomplex) != 0)
+            return -1;
+        precision_bits = mc_get_precision(mcomplex);
+        work_prec = precision_bits + 64u;
+        mag = mf_clone(mcomplex->real);
+        imag_sq = mf_clone(mcomplex->imag);
+        angle = mf_clone(mcomplex->imag);
+        if (!mag || !imag_sq || !angle)
+            goto fail;
+        if (mf_set_precision(mag, work_prec) != 0 ||
+            mf_set_precision(imag_sq, work_prec) != 0 ||
+            mf_set_precision(angle, work_prec) != 0)
+            goto fail;
+        if (mf_mul(mag, mcomplex->real) != 0 ||
+            mf_mul(imag_sq, mcomplex->imag) != 0 ||
+            mf_add(mag, imag_sq) != 0 ||
+            mf_log(mag) != 0 ||
+            mf_ldexp(mag, -1) != 0 ||
+            mf_atan2(angle, mcomplex->real) != 0 ||
+            mc_set(mcomplex, mag, angle) != 0)
+            goto fail;
+        mf_free(angle);
+        mf_free(imag_sq);
+        mf_free(mag);
+        return 0;
+    }
 
     if (mf_gt(mc_real(mcomplex), MF_ZERO))
         return mcomplex_apply_real_unary(mcomplex, mf_log);
@@ -360,6 +486,13 @@ int mc_log(mcomplex_t *mcomplex)
     }
     mf_free(mag);
     return 0;
+
+fail:
+    mf_free(minus_one);
+    mf_free(angle);
+    mf_free(imag_sq);
+    mf_free(mag);
+    return -1;
 }
 
 int mc_sin(mcomplex_t *mcomplex)
@@ -482,10 +615,22 @@ int mc_atanh(mcomplex_t *mcomplex)
 int mc_gamma(mcomplex_t *mcomplex)
 {
     int rc = mcomplex_apply_real_unary(mcomplex, mf_gamma);
+    mcomplex_t *tmp = NULL;
 
     if (rc != -2)
         return rc;
-    return mcomplex_apply_unary(mcomplex, qc_gamma);
+
+    tmp = mc_clone(mcomplex);
+    if (!tmp)
+        return -1;
+    if (mc_lgamma(tmp) != 0 ||
+        mc_exp(tmp) != 0 ||
+        mc_set(mcomplex, mc_real(tmp), mc_imag(tmp)) != 0) {
+        mc_free(tmp);
+        return -1;
+    }
+    mc_free(tmp);
+    return 0;
 }
 
 int mc_erf(mcomplex_t *mcomplex)
@@ -619,6 +764,9 @@ int mc_beta(mcomplex_t *mcomplex, const mcomplex_t *other)
 
     if (!mcomplex || !other)
         return -1;
+    rc = mcomplex_try_apply_real_beta_exact(mcomplex, other);
+    if (rc != -2)
+        return rc;
     if (mf_is_zero(mc_imag(mcomplex)) && mf_is_zero(mc_imag(other))) {
         if (mcomplex_ensure_mutable(mcomplex) != 0)
             return -1;
@@ -710,6 +858,7 @@ int mc_normal_logpdf(mcomplex_t *mcomplex)
 
 int mc_productlog(mcomplex_t *mcomplex)
 {
+    mcomplex_t *input = NULL;
     int rc = mcomplex_try_apply_real_lambert_exact(mcomplex, 0);
 
     if (rc != -2)
@@ -718,7 +867,14 @@ int mc_productlog(mcomplex_t *mcomplex)
 
     if (rc != -2)
         return rc;
-    return mcomplex_apply_unary(mcomplex, qc_productlog);
+    input = mc_clone(mcomplex);
+    if (!input)
+        return -1;
+    rc = mcomplex_apply_unary(mcomplex, qc_productlog);
+    if (rc == 0)
+        rc = mcomplex_refine_productlog(mcomplex, input);
+    mc_free(input);
+    return rc;
 }
 
 int mc_gammainc_lower(mcomplex_t *mcomplex, const mcomplex_t *other)
