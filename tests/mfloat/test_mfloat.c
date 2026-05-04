@@ -22,7 +22,6 @@ static void print_mfloat_error_check_mode(const char *label,
                                           const mfloat_t *got,
                                           const char *expected_text,
                                           int use_decimal_format);
-
 static int qfloat_is_normalized(qfloat_t value)
 {
     double hi = value.hi;
@@ -1458,6 +1457,81 @@ void readme_examples(void)
     mf_set_default_precision(saved_default);
 }
 
+void test_difficult_mfloat_cases(void)
+{
+    mfloat_t *x = NULL;
+    mfloat_t *lhs = NULL;
+    mfloat_t *rhs = NULL;
+    mfloat_t *tmp = NULL;
+
+    x = mf_new_prec(TEST_MFLOAT_MATHS_PRECISION);
+    lhs = mf_new_prec(TEST_MFLOAT_MATHS_PRECISION);
+    rhs = mf_new_prec(TEST_MFLOAT_MATHS_PRECISION);
+    tmp = mf_new_prec(TEST_MFLOAT_MATHS_PRECISION);
+    ASSERT_NOT_NULL(x);
+    ASSERT_NOT_NULL(lhs);
+    ASSERT_NOT_NULL(rhs);
+    ASSERT_NOT_NULL(tmp);
+
+    ASSERT_EQ_INT(mf_set_string(lhs, "3.3"), 0);
+    ASSERT_EQ_INT(mf_lgamma(lhs), 0);
+    ASSERT_EQ_INT(mf_set_string(rhs, "2.3"), 0);
+    ASSERT_EQ_INT(mf_lgamma(rhs), 0);
+    ASSERT_EQ_INT(mf_set_string(tmp, "2.3"), 0);
+    ASSERT_EQ_INT(mf_log(tmp), 0);
+    ASSERT_EQ_INT(mf_sub(lhs, rhs), 0);
+    ASSERT_EQ_INT(mf_sub(lhs, tmp), 0);
+    ASSERT_EQ_INT(mf_abs(lhs), 0);
+    print_mfloat_error_check("lgamma recurrence at 2.3 mfloat error", lhs, "0");
+    ASSERT_TRUE(mfloat_meets_precision(lhs, "0", 0));
+
+    ASSERT_EQ_INT(mf_set_string(x, "1e-20"), 0);
+    ASSERT_EQ_INT(mf_log(x), 0);
+    ASSERT_EQ_INT(mf_exp(x), 0);
+    print_mfloat_error_check_decimal("exp(log(1e-20)) mfloat error", x, "1e-20");
+    ASSERT_TRUE(mfloat_meets_precision(x, "1e-20", 1));
+
+    ASSERT_EQ_INT(mf_set_string(lhs, "0.5"), 0);
+    ASSERT_EQ_INT(mf_set_string(rhs, "1"), 0);
+    ASSERT_EQ_INT(mf_gammainc_P(lhs, rhs), 0);
+    ASSERT_EQ_INT(mf_set_string(tmp, "0.5"), 0);
+    ASSERT_EQ_INT(mf_set_string(x, "1"), 0);
+    ASSERT_EQ_INT(mf_gammainc_Q(tmp, x), 0);
+    ASSERT_EQ_INT(mf_add(lhs, tmp), 0);
+    print_mfloat_error_check("gammainc_P+Q at (0.5,1) mfloat error", lhs, "1");
+    ASSERT_TRUE(mfloat_meets_precision(lhs, "1", 1));
+
+    ASSERT_EQ_INT(mf_set_string(x, "-0.35"), 0);
+    ASSERT_EQ_INT(mf_productlog(x), 0);
+    ASSERT_EQ_INT(mf_set_string(lhs, "-0.35"), 0);
+    mf_free(rhs);
+    rhs = mf_clone(x);
+    ASSERT_NOT_NULL(rhs);
+    ASSERT_EQ_INT(mf_exp(rhs), 0);
+    ASSERT_EQ_INT(mf_mul(rhs, x), 0);
+    ASSERT_EQ_INT(mf_sub(rhs, lhs), 0);
+    ASSERT_EQ_INT(mf_abs(rhs), 0);
+    print_mfloat_error_check("productlog identity at -0.35 mfloat error", rhs, "0");
+    ASSERT_TRUE(mfloat_meets_precision(rhs, "0", 0));
+
+    ASSERT_EQ_INT(mf_set_string(lhs, "2.5"), 0);
+    ASSERT_EQ_INT(mf_set_string(rhs, "3.5"), 0);
+    ASSERT_EQ_INT(mf_logbeta(lhs, rhs), 0);
+    ASSERT_EQ_INT(mf_exp(lhs), 0);
+    ASSERT_EQ_INT(mf_set_string(rhs, "2.5"), 0);
+    ASSERT_EQ_INT(mf_set_string(tmp, "3.5"), 0);
+    ASSERT_EQ_INT(mf_beta(rhs, tmp), 0);
+    ASSERT_EQ_INT(mf_sub(lhs, rhs), 0);
+    ASSERT_EQ_INT(mf_abs(lhs), 0);
+    print_mfloat_error_check("exp(logbeta(2.5,3.5)) mfloat error", lhs, "0");
+    ASSERT_TRUE(mfloat_meets_precision(lhs, "0", 0));
+
+    mf_free(x);
+    mf_free(lhs);
+    mf_free(rhs);
+    mf_free(tmp);
+}
+
 int tests_main(void)
 {
     RUN_TEST(test_new_and_precision, NULL);
@@ -1472,6 +1546,7 @@ int tests_main(void)
     RUN_TEST(test_conversion_from_double_and_qfloat, NULL);
     RUN_TEST(test_extended_math_wrappers, NULL);
     RUN_TEST(test_remaining_special_mfloat_functions, NULL);
+    RUN_TEST(test_difficult_mfloat_cases, NULL);
 
     printf(C_YELLOW "\nRunning README examples...\n" C_RESET);
     readme_examples();

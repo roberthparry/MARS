@@ -2436,7 +2436,8 @@
     "test_conversion_from_double_and_qfloat": true,
     "test_extended_math_wrappers": true,
     "test_remaining_special_mfloat_functions": true,
-    "test_readme_examples": true
+    "test_readme_examples": true,
+    "test_difficult_mfloat_cases": true
   },
   "tests/mcomplex/test_mcomplex.c": {
     "test_lifecycle_and_constants": true,
@@ -2445,6 +2446,7 @@
     "test_special_functions": true,
     "test_conversion_to_from_qcomplex": true,
     "test_real_elementary_replacements": true,
-    "test_real_special_replacements": true
+    "test_real_special_replacements": true,
+    "test_difficult_mcomplex_cases": true
   }
 }

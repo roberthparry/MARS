@@ -2488,9 +2488,7 @@ int mf_exp(mfloat_t *mfloat)
     }
 
     precision = mfloat->precision;
-    work_prec = precision + (precision / 2u);
-    if (work_prec < precision + 96u)
-        work_prec = precision + 96u;
+    work_prec = mfloat_transcendental_work_prec(precision);
     x = mfloat_clone_prec(mfloat, work_prec);
     ln2 = mfloat_clone_immortal_prec_internal(&mfloat_ln2_1024_static, work_prec);
     if (!x || !ln2)

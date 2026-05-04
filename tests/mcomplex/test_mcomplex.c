@@ -30,9 +30,14 @@ static void print_mcomplex_error_check(const char *label,
 static int mfloat_meets_precision(const mfloat_t *got,
                                   const char *expected_text,
                                   int relative_mode);
+static int mfloat_matches_value(const mfloat_t *got,
+                                const mfloat_t *expected,
+                                int relative_mode);
 static int mcomplex_meets_precision(const mcomplex_t *got,
                                     const char *expected_real,
                                     const char *expected_imag);
+static int mcomplex_matches_value(const mcomplex_t *got,
+                                  const mcomplex_t *expected);
 static mcomplex_t *create_real_mcomplex(const char *real_text);
 
 static int format_mfloat_pretty_value(char *buf, size_t buf_size, const mfloat_t *value)
@@ -262,6 +267,47 @@ cleanup:
     return ok;
 }
 
+static int mfloat_matches_value(const mfloat_t *got,
+                                const mfloat_t *expected,
+                                int relative_mode)
+{
+    mfloat_t *error = NULL;
+    mfloat_t *tol = NULL;
+    size_t precision_bits;
+    long tol_exp2;
+    int ok = 0;
+
+    if (!got || !expected)
+        return 0;
+
+    precision_bits = mf_get_precision(got);
+    if (mf_get_precision(expected) < precision_bits)
+        precision_bits = mf_get_precision(expected);
+
+    error = mf_clone(got);
+    tol = mf_create_long(1);
+    if (!error || !tol)
+        goto cleanup;
+    if (mf_sub(error, expected) != 0 || mf_abs(error) != 0)
+        goto cleanup;
+
+    if (relative_mode && !mf_is_zero(expected)) {
+        tol_exp2 = mf_get_exponent2(expected) +
+                   (long)mf_get_mantissa_bits(expected) - 1l -
+                   (long)precision_bits;
+    } else {
+        tol_exp2 = -(long)precision_bits;
+    }
+    if (mf_ldexp(tol, (int)tol_exp2) != 0)
+        goto cleanup;
+    ok = mf_le(error, tol);
+
+cleanup:
+    mf_free(error);
+    mf_free(tol);
+    return ok;
+}
+
 static int mcomplex_meets_precision(const mcomplex_t *got,
                                     const char *expected_real,
                                     const char *expected_imag)
@@ -289,6 +335,20 @@ cleanup:
     mf_free(real_expected);
     mf_free(imag_expected);
     return ok;
+}
+
+static int mcomplex_matches_value(const mcomplex_t *got,
+                                  const mcomplex_t *expected)
+{
+    int real_relative;
+    int imag_relative;
+
+    if (!got || !expected)
+        return 0;
+    real_relative = !mf_is_zero(mc_real(expected));
+    imag_relative = !mf_is_zero(mc_imag(expected));
+    return mfloat_matches_value(mc_real(got), mc_real(expected), real_relative) &&
+           mfloat_matches_value(mc_imag(got), mc_imag(expected), imag_relative);
 }
 
 static mcomplex_t *create_real_mcomplex(const char *real_text)
@@ -1139,6 +1199,75 @@ static void test_real_special_replacements(void)
     mc_free(other);
 }
 
+static void test_difficult_mcomplex_cases(void)
+{
+    mcomplex_t *z = NULL;
+    mcomplex_t *other = NULL;
+    mcomplex_t *expected = NULL;
+
+    z = mc_create_string("-1 + 1e-20i");
+    ASSERT_NOT_NULL(z);
+    print_mcomplex_input("branch log input", "-1 + 1e-20i");
+    ASSERT_EQ_INT(mc_log(z), 0);
+    print_mcomplex_error_check(
+        "log(-1 + 1e-20i)", z, "0",
+        "3.141592653589793238462643383279502884197169399375105820974944592307816406286208998628034825342117068");
+    ASSERT_TRUE(mcomplex_meets_precision(
+        z, "0",
+        "3.141592653589793238462643383279502884197169399375105820974944592307816406286208998628034825342117068"));
+    mc_free(z);
+
+    z = mc_create_string("-1 - 1e-20i");
+    ASSERT_NOT_NULL(z);
+    ASSERT_EQ_INT(mc_log(z), 0);
+    print_mcomplex_error_check(
+        "log(-1 - 1e-20i)", z, "0",
+        "-3.141592653589793238462643383279502884197169399375105820974944592307816406286208998628034825342117068");
+    ASSERT_TRUE(mcomplex_meets_precision(
+        z, "0",
+        "-3.141592653589793238462643383279502884197169399375105820974944592307816406286208998628034825342117068"));
+    mc_free(z);
+
+    z = mc_create_string("0.75 + 1.25i");
+    expected = mc_clone(z);
+    ASSERT_NOT_NULL(z);
+    ASSERT_NOT_NULL(expected);
+    ASSERT_EQ_INT(mc_log(z), 0);
+    ASSERT_EQ_INT(mc_exp(z), 0);
+    print_mcomplex_value("exp(log(0.75 + 1.25i))", z);
+    ASSERT_TRUE(mcomplex_matches_value(z, expected));
+    mc_free(expected);
+    mc_free(z);
+
+    z = mc_create_string("1 + 1i");
+    expected = mc_clone(z);
+    ASSERT_NOT_NULL(z);
+    ASSERT_NOT_NULL(expected);
+    ASSERT_EQ_INT(mc_productlog(z), 0);
+    other = mc_clone(z);
+    ASSERT_NOT_NULL(other);
+    ASSERT_EQ_INT(mc_exp(other), 0);
+    ASSERT_EQ_INT(mc_mul(other, z), 0);
+    print_mcomplex_value("productlog identity at 1 + 1i", other);
+    ASSERT_TRUE(mcomplex_matches_value(other, expected));
+    mc_free(other);
+    mc_free(expected);
+    mc_free(z);
+
+    z = mc_create_string("1.5 + 0.7i");
+    other = mc_clone(z);
+    ASSERT_NOT_NULL(z);
+    ASSERT_NOT_NULL(other);
+    ASSERT_EQ_INT(mc_gamma(z), 0);
+    ASSERT_EQ_INT(mc_lgamma(other), 0);
+    ASSERT_EQ_INT(mc_exp(other), 0);
+    print_mcomplex_value("exp(lgamma(1.5 + 0.7i))", other);
+    print_mcomplex_value("gamma(1.5 + 0.7i)", z);
+    ASSERT_TRUE(mcomplex_matches_value(other, z));
+    mc_free(other);
+    mc_free(z);
+}
+
 int tests_main(void)
 {
     RUN_TEST(test_lifecycle_and_constants, NULL);
@@ -1148,5 +1277,6 @@ int tests_main(void)
     RUN_TEST(test_real_elementary_replacements, NULL);
     RUN_TEST(test_real_special_replacements, NULL);
     RUN_TEST(test_special_functions, NULL);
+    RUN_TEST(test_difficult_mcomplex_cases, NULL);
     return 0;
 }

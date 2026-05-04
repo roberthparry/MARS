@@ -1,4 +1,5 @@
 #include "mcomplex_internal.h"
+#include "../mfloat/mfloat_internal.h"
 
 int mcomplex_apply_unary(mcomplex_t *mcomplex, qcomplex_t (*fn)(qcomplex_t))
 {
@@ -59,9 +60,15 @@ int mc_abs(mcomplex_t *mcomplex)
     if (mf_mul(mag2, mcomplex->real) != 0 ||
         mf_mul(tmp, mcomplex->imag) != 0 ||
         mf_add(mag2, tmp) != 0 ||
-        mf_sqrt(mag2) != 0 ||
-        mc_set(mcomplex, mag2, MF_ZERO) != 0 ||
-        mcomplex_round_parts(mcomplex, precision_bits) != 0)
+        mf_sqrt(mag2) != 0)
+        goto fail;
+    if (mfloat_copy_value(mcomplex->real, mag2) != 0)
+        goto fail;
+    if (precision_bits < mf_get_precision(mag2) &&
+        mfloat_round_to_precision_internal(mcomplex->real, precision_bits) != 0)
+        goto fail;
+    mf_clear(mcomplex->imag);
+    if (mcomplex_round_parts(mcomplex, precision_bits) != 0)
         goto fail;
 
     mf_free(tmp);
@@ -145,8 +152,8 @@ int mc_mul(mcomplex_t *mcomplex, const mcomplex_t *other)
     tmp = mf_clone(a);
     if (!tmp)
         goto fail;
-    if (mf_mul(imag_part, mc_imag(other)) != 0 ||
-        mf_mul(tmp, mc_real(other)) != 0 ||
+    if (mf_mul(imag_part, mc_real(other)) != 0 ||
+        mf_mul(tmp, mc_imag(other)) != 0 ||
         mf_add(imag_part, tmp) != 0)
         goto fail;
 
