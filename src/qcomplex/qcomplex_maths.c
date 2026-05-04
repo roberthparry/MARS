@@ -82,7 +82,7 @@ static const qfloat_t qc_pi_cubed = {
     .lo = 4.1641946985288283e-16
 };
 
-static qcomplex_t qc_faddeeva(qcomplex_t z)
+static qcomplex_t qc_faddeeva_inside(qcomplex_t z)
 {
     const int N = 32;
     qcomplex_t sum = qcr(0.0);
@@ -94,9 +94,7 @@ static qcomplex_t qc_faddeeva(qcomplex_t z)
 
     // inside = 1 + (2i / sqrt(pi)) * sum
     qcomplex_t two_i_sum = qc_mul(qc_make(qf_from_double(0.0), qf_from_double(2.0)), sum);
-    qcomplex_t inside    = qc_add(qcr(1.0), qc_div(two_i_sum, qcrf(QF_SQRT_PI)));
-
-    return qc_mul(qc_exp(qc_neg(qc_mul(z, z))), inside);
+    return qc_add(qcr(1.0), qc_div(two_i_sum, qcrf(QF_SQRT_PI)));
 }
 
 qcomplex_t qc_erf(qcomplex_t z) {
@@ -106,9 +104,7 @@ qcomplex_t qc_erf(qcomplex_t z) {
     if (qf_lt(z.re, qf_from_double(0.0)))
         return qc_neg(qc_erf(qc_neg(z)));
     qcomplex_t iz = qc_make(qf_neg(z.im), z.re);
-    qcomplex_t w  = qc_faddeeva(iz);
-    qcomplex_t e  = qc_exp(qc_neg(qc_mul(z, z)));
-    return qc_sub(qcr(1.0), qc_mul(e, w));
+    return qc_sub(qcr(1.0), qc_faddeeva_inside(iz));
 }
 
 qcomplex_t qc_erfc(qcomplex_t z)
@@ -119,9 +115,7 @@ qcomplex_t qc_erfc(qcomplex_t z)
     if (qf_lt(z.re, qf_from_double(0.0)))
         return qc_sub(qcr(2.0), qc_erfc(qc_neg(z)));
     qcomplex_t iz = qc_make(qf_neg(z.im), z.re);
-    qcomplex_t w  = qc_faddeeva(iz);
-    qcomplex_t e  = qc_exp(qc_neg(qc_mul(z, z)));
-    return qc_mul(e, w);
+    return qc_faddeeva_inside(iz);
 }
 
 qcomplex_t qc_erfinv(qcomplex_t z)
