@@ -239,4 +239,4 @@ Current sample results:
 | `qc_logbeta(1.5+0.5i, 2-0.3i)` | `37.286 µs` |
 
 For a broader benchmark overview, see
-[docs/benchmarks.md](/home/rparry/Projects/MARS/docs/benchmarks.md).
+[`docs/benchmarks.md`](benchmarks.md).
