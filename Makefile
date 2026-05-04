@@ -92,15 +92,15 @@ DEPS     := $(shell find build tests/build -name '*.d' 2>/dev/null)
 # ------------------------------------------------------------
 # Object build rules
 # ------------------------------------------------------------
-$(BUILD_DIR)/%.o: src/%.c
+$(BUILD_DIR)/%.o: src/%.c Makefile
 	@mkdir -p $(dir $@) $(dir $@).deps
 	$(CC) $(CFLAGS) $(DEPFLAGS) $(INCLUDES) -c $< -o $@
 
-$(TEST_BUILD_DIR)/%.o: tests/%.c
+$(TEST_BUILD_DIR)/%.o: tests/%.c Makefile
 	@mkdir -p $(dir $@) $(dir $@).deps
 	$(CC) $(CFLAGS) $(DEPFLAGS) $(INCLUDES) -c $< -o $@
 
-$(BUILD_DIR)/bench/%.o: bench/%.c
+$(BUILD_DIR)/bench/%.o: bench/%.c Makefile
 	@mkdir -p $(dir $@) $(dir $@).deps
 	$(CC) $(CFLAGS) $(DEPFLAGS) $(INCLUDES) -c $< -o $@
 

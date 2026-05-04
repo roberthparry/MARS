@@ -217,3 +217,26 @@ e1_1_plus_1i                 avg_us=    41.641
 beta_1_5_0_5__2_-0_3         avg_us=    38.087
 logbeta_1_5_0_5__2_-0_3      avg_us=    37.286
 ```
+
+### `mcomplex`
+
+Available benchmark target:
+
+```sh
+make bench_mcomplex_maths
+```
+
+This benchmark has been prepared for the post-implementation phase and mirrors
+the current `qcomplex` coverage:
+
+- `mc_exp(1+i)` and `mc_log(1+i)`
+- `mc_erf(0.5+0.5i)` and `mc_erfc(0.5+0.5i)`
+- complex gamma-family calls including `mc_gamma`, `mc_lgamma`, `mc_digamma`,
+  `mc_trigamma`, and `mc_tetragamma`
+- real and genuinely complex `mc_gammainv` cases
+- `mc_productlog` and `mc_lambert_wm1`
+- `mc_ei`, `mc_e1`, `mc_beta`, and `mc_logbeta`
+
+No sample timings are recorded yet. The current `mcomplex` implementation still
+routes maths through the `qcomplex` backend, so benchmark interpretation should
+wait until the native `mfloat`-precision complex implementation is complete.

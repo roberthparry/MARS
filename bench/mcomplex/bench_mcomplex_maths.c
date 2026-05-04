@@ -1,0 +1,203 @@
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+#include "mcomplex.h"
+
+static uint64_t now_ns(void)
+{
+    struct timespec ts;
+
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (uint64_t)ts.tv_sec * 1000000000ull + (uint64_t)ts.tv_nsec;
+}
+
+static int bench_scaled_iters(int base_iters)
+{
+    const char *scale_text = getenv("MARS_BENCH_SCALE");
+    long scale = 1;
+
+    if (scale_text && *scale_text) {
+        char *end = NULL;
+        long parsed = strtol(scale_text, &end, 10);
+
+        if (end && *end == '\0' && parsed > 0)
+            scale = parsed;
+    }
+    if (base_iters < 1)
+        base_iters = 1;
+    return (int)(base_iters * scale);
+}
+
+static int bench_case_enabled(const char *label)
+{
+    const char *filter = getenv("MARS_BENCH_FILTER");
+
+    if (!filter || !*filter)
+        return 1;
+    return strstr(label, filter) != NULL;
+}
+
+static int bench_run_unary_inplace(mcomplex_t *value, int (*fn)(mcomplex_t *))
+{
+    return fn ? fn(value) : -1;
+}
+
+static int bench_run_binary_inplace(mcomplex_t *lhs,
+                                    const mcomplex_t *rhs,
+                                    int (*fn)(mcomplex_t *, const mcomplex_t *))
+{
+    return fn ? fn(lhs, rhs) : -1;
+}
+
+static void run_unary_case(const char *label,
+                           const char *text,
+                           int (*fn)(mcomplex_t *),
+                           int iters)
+{
+    mcomplex_t *src = NULL;
+    mcomplex_t *work = NULL;
+    uint64_t start;
+    uint64_t end;
+    double avg_us;
+
+    if (!bench_case_enabled(label))
+        return;
+
+    src = mc_create_string(text);
+    work = mc_clone(src);
+    if (!src || !work) {
+        fprintf(stderr, "%s setup failed\n", label);
+        goto cleanup;
+    }
+
+    if (bench_run_unary_inplace(work, fn) != 0 || mc_isnan(work)) {
+        fprintf(stderr, "%s warmup failed\n", label);
+        goto cleanup;
+    }
+
+    start = now_ns();
+    for (int i = 0; i < iters; ++i) {
+        if (mc_set(work, mc_real(src), mc_imag(src)) != 0 ||
+            bench_run_unary_inplace(work, fn) != 0 ||
+            mc_isnan(work)) {
+            fprintf(stderr, "%s timed run failed\n", label);
+            goto cleanup;
+        }
+    }
+    end = now_ns();
+
+    avg_us = ((double)(end - start) / (double)iters) / 1000.0;
+    printf("%-28s avg_us=%10.3f avg_ms=%10.3f\n",
+           label,
+           avg_us,
+           avg_us / 1000.0);
+
+cleanup:
+    mc_free(work);
+    mc_free(src);
+}
+
+static void run_binary_case(const char *label,
+                            const char *lhs_text,
+                            const char *rhs_text,
+                            int (*fn)(mcomplex_t *, const mcomplex_t *),
+                            int iters)
+{
+    mcomplex_t *lhs = NULL;
+    mcomplex_t *rhs = NULL;
+    mcomplex_t *work = NULL;
+    uint64_t start;
+    uint64_t end;
+    double avg_us;
+
+    if (!bench_case_enabled(label))
+        return;
+
+    lhs = mc_create_string(lhs_text);
+    rhs = mc_create_string(rhs_text);
+    work = mc_clone(lhs);
+    if (!lhs || !rhs || !work) {
+        fprintf(stderr, "%s setup failed\n", label);
+        goto cleanup;
+    }
+
+    if (bench_run_binary_inplace(work, rhs, fn) != 0 || mc_isnan(work)) {
+        fprintf(stderr, "%s warmup failed\n", label);
+        goto cleanup;
+    }
+
+    start = now_ns();
+    for (int i = 0; i < iters; ++i) {
+        if (mc_set(work, mc_real(lhs), mc_imag(lhs)) != 0 ||
+            bench_run_binary_inplace(work, rhs, fn) != 0 ||
+            mc_isnan(work)) {
+            fprintf(stderr, "%s timed run failed\n", label);
+            goto cleanup;
+        }
+    }
+    end = now_ns();
+
+    avg_us = ((double)(end - start) / (double)iters) / 1000.0;
+    printf("%-28s avg_us=%10.3f avg_ms=%10.3f\n",
+           label,
+           avg_us,
+           avg_us / 1000.0);
+
+cleanup:
+    mc_free(work);
+    mc_free(rhs);
+    mc_free(lhs);
+}
+
+static int bench_mc_gammainv_gamma_2_5_plus_0_3i(mcomplex_t *value)
+{
+    static mcomplex_t *gamma_value = NULL;
+
+    if (!value)
+        return -1;
+
+    if (!gamma_value) {
+        gamma_value = mc_create_string("2.5 + 0.3i");
+        if (!gamma_value || mc_gamma(gamma_value) != 0)
+            return -1;
+    }
+
+    if (mc_set(value, mc_real(gamma_value), mc_imag(gamma_value)) != 0)
+        return -1;
+    return mc_gammainv(value);
+}
+
+int main(void)
+{
+    puts("== mcomplex maths bench ==");
+    puts("Prepared for post-implementation benchmarking.");
+    puts("Do not treat timings from the current wrapper-backed implementation as final.");
+    puts("Scale iterations with MARS_BENCH_SCALE=<n> if you want longer runs.");
+    puts("");
+
+    run_unary_case("exp_1_plus_1i", "(1,1)", mc_exp, bench_scaled_iters(1000));
+    run_unary_case("log_1_plus_1i", "(1,1)", mc_log, bench_scaled_iters(1000));
+    run_unary_case("erf_0_5_plus_0_5i", "(0.5,0.5)", mc_erf, bench_scaled_iters(500));
+    run_unary_case("erfc_0_5_plus_0_5i", "(0.5,0.5)", mc_erfc, bench_scaled_iters(500));
+
+    run_unary_case("gamma_1_5_plus_0_7i", "(1.5,0.7)", mc_gamma, bench_scaled_iters(200));
+    run_unary_case("lgamma_1_5_plus_0_7i", "(1.5,0.7)", mc_lgamma, bench_scaled_iters(200));
+    run_unary_case("digamma_2_plus_1i", "(2,1)", mc_digamma, bench_scaled_iters(500));
+    run_unary_case("trigamma_2_plus_0_5i", "(2,0.5)", mc_trigamma, bench_scaled_iters(300));
+    run_unary_case("tetragamma_2_plus_0_5i", "(2,0.5)", mc_tetragamma, bench_scaled_iters(300));
+    run_unary_case("gammainv_gamma_2_5", "3.323350970447842551184064031264648", mc_gammainv, bench_scaled_iters(100));
+    run_unary_case("gammainv_gamma_2_5_0_3i", "(0,0)", bench_mc_gammainv_gamma_2_5_plus_0_3i, bench_scaled_iters(100));
+
+    run_unary_case("productlog_1_plus_1i", "(1,1)", mc_productlog, bench_scaled_iters(300));
+    run_unary_case("lambert_wm1_-0_2_-0_1i", "(-0.2,-0.1)", mc_lambert_wm1, bench_scaled_iters(200));
+    run_unary_case("ei_1_plus_1i", "(1,1)", mc_ei, bench_scaled_iters(300));
+    run_unary_case("e1_1_plus_1i", "(1,1)", mc_e1, bench_scaled_iters(300));
+
+    run_binary_case("beta_1_5_0_5__2_-0_3", "(1.5,0.5)", "(2,-0.3)", mc_beta, bench_scaled_iters(200));
+    run_binary_case("logbeta_1_5_0_5__2_-0_3", "(1.5,0.5)", "(2,-0.3)", mc_logbeta, bench_scaled_iters(200));
+
+    return 0;
+}

@@ -31,7 +31,7 @@ static struct _mint_t mfloat_ten_mint = {
     .storage = mfloat_ten_storage
 };
 
-static struct _mfloat_t mfloat_zero_static = {
+const mfloat_t MF_ZERO_VALUE = {
     .kind = MFLOAT_KIND_FINITE,
     .sign = 0,
     .exponent2 = 0,
@@ -40,7 +40,7 @@ static struct _mfloat_t mfloat_zero_static = {
     .mantissa = &mfloat_zero_mint
 };
 
-static struct _mfloat_t mfloat_one_static = {
+const mfloat_t MF_ONE_VALUE = {
     .kind = MFLOAT_KIND_FINITE,
     .sign = 1,
     .exponent2 = 0,
@@ -49,7 +49,7 @@ static struct _mfloat_t mfloat_one_static = {
     .mantissa = &mfloat_one_mint
 };
 
-static struct _mfloat_t mfloat_half_static = {
+const mfloat_t MF_HALF_VALUE = {
     .kind = MFLOAT_KIND_FINITE,
     .sign = 1,
     .exponent2 = -1,
@@ -58,7 +58,7 @@ static struct _mfloat_t mfloat_half_static = {
     .mantissa = &mfloat_one_mint
 };
 
-static struct _mfloat_t mfloat_ten_static = {
+const mfloat_t MF_TEN_VALUE = {
     .kind = MFLOAT_KIND_FINITE,
     .sign = 1,
     .exponent2 = 0,
@@ -67,7 +67,7 @@ static struct _mfloat_t mfloat_ten_static = {
     .mantissa = &mfloat_ten_mint
 };
 
-static struct _mfloat_t mfloat_nan_static = {
+const mfloat_t MF_NAN_VALUE = {
     .kind = MFLOAT_KIND_NAN,
     .sign = 0,
     .exponent2 = 0,
@@ -76,7 +76,7 @@ static struct _mfloat_t mfloat_nan_static = {
     .mantissa = &mfloat_zero_mint
 };
 
-static struct _mfloat_t mfloat_inf_static = {
+const mfloat_t MF_INF_VALUE = {
     .kind = MFLOAT_KIND_POSINF,
     .sign = 1,
     .exponent2 = 0,
@@ -85,7 +85,7 @@ static struct _mfloat_t mfloat_inf_static = {
     .mantissa = &mfloat_zero_mint
 };
 
-static struct _mfloat_t mfloat_ninf_static = {
+const mfloat_t MF_NINF_VALUE = {
     .kind = MFLOAT_KIND_NEGINF,
     .sign = -1,
     .exponent2 = 0,
@@ -161,27 +161,13 @@ static struct _mint_t mfloat_sqrt_pi1024_mint = { .sign = 1, .length = 34, .capa
 static struct _mint_t mfloat_sqrt2_1024_mint = { .sign = 1, .length = 34, .capacity = 34, .storage = mfloat_sqrt2_1024_storage };
 static struct _mint_t mfloat_tenth_256_mint = { .sign = 1, .length = 5u, .capacity = 5u, .storage = mfloat_tenth_256_storage };
 
-static struct _mfloat_t mfloat_pi1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -2155, .precision = 1024u, .immortal = true, .mantissa = &mfloat_pi1024_mint };
-static struct _mfloat_t mfloat_e1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -2155, .precision = 1024u, .immortal = true, .mantissa = &mfloat_e1024_mint };
-static struct _mfloat_t mfloat_gamma1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -2158, .precision = 1024u, .immortal = true, .mantissa = &mfloat_gamma1024_mint };
-static struct _mfloat_t mfloat_sqrt_pi1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -2154, .precision = 1024u, .immortal = true, .mantissa = &mfloat_sqrt_pi1024_mint };
-static struct _mfloat_t mfloat_sqrt2_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -2155, .precision = 1024u, .immortal = true, .mantissa = &mfloat_sqrt2_1024_mint };
-static struct _mfloat_t mfloat_tenth_256_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -263, .precision = 256u, .immortal = true, .mantissa = &mfloat_tenth_256_mint };
+const mfloat_t MF_PI_VALUE = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -2155, .precision = 1024u, .immortal = true, .mantissa = &mfloat_pi1024_mint };
+const mfloat_t MF_E_VALUE = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -2155, .precision = 1024u, .immortal = true, .mantissa = &mfloat_e1024_mint };
+const mfloat_t MF_EULER_MASCHERONI_VALUE = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -2158, .precision = 1024u, .immortal = true, .mantissa = &mfloat_gamma1024_mint };
+const mfloat_t MF_SQRT_PI_VALUE = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -2154, .precision = 1024u, .immortal = true, .mantissa = &mfloat_sqrt_pi1024_mint };
+const mfloat_t MF_SQRT2_VALUE = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -2155, .precision = 1024u, .immortal = true, .mantissa = &mfloat_sqrt2_1024_mint };
+const mfloat_t MF_TENTH_VALUE = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -263, .precision = 256u, .immortal = true, .mantissa = &mfloat_tenth_256_mint };
 static size_t mfloat_default_precision_bits = MFLOAT_DEFAULT_PRECISION_BITS;
-
-const mfloat_t * const MF_ZERO = &mfloat_zero_static;
-const mfloat_t * const MF_ONE = &mfloat_one_static;
-const mfloat_t * const MF_HALF = &mfloat_half_static;
-const mfloat_t * const MF_TENTH = &mfloat_tenth_256_static;
-const mfloat_t * const MF_TEN = &mfloat_ten_static;
-const mfloat_t * const MF_PI = &mfloat_pi1024_static;
-const mfloat_t * const MF_E = &mfloat_e1024_static;
-const mfloat_t * const MF_EULER_MASCHERONI = &mfloat_gamma1024_static;
-const mfloat_t * const MF_SQRT2 = &mfloat_sqrt2_1024_static;
-const mfloat_t * const MF_SQRT_PI = &mfloat_sqrt_pi1024_static;
-const mfloat_t * const MF_NAN = &mfloat_nan_static;
-const mfloat_t * const MF_INF = &mfloat_inf_static;
-const mfloat_t * const MF_NINF = &mfloat_ninf_static;
 
 int mfloat_is_immortal(const mfloat_t *mfloat)
 {

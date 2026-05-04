@@ -68,12 +68,14 @@ make bench_matrix_dval
 make bench_mint_mul
 make bench_mint_div
 make bench_mfloat_maths
+make bench_mcomplex_maths
 ```
 
 This benchmark reports both matched symbolic fast paths and nearby fallback
 cases so performance changes are easy to spot. See
 [`benchmarks.md`](benchmarks.md) for benchmark-specific notes and sample
-results.
+results. The `mcomplex` benchmark target is prepared now, but it is intended
+for use after the native `mcomplex` implementation is complete.
 
 ---
 

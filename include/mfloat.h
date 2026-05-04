@@ -28,19 +28,33 @@ typedef struct _mfloat_t mfloat_t;
  * not be modified or freed by callers.
  * @{
  */
-extern const mfloat_t * const MF_ZERO;
-extern const mfloat_t * const MF_ONE;
-extern const mfloat_t * const MF_HALF;
-extern const mfloat_t * const MF_TENTH;
-extern const mfloat_t * const MF_TEN;
-extern const mfloat_t * const MF_PI;
-extern const mfloat_t * const MF_E;
-extern const mfloat_t * const MF_EULER_MASCHERONI;
-extern const mfloat_t * const MF_SQRT2;
-extern const mfloat_t * const MF_SQRT_PI;
-extern const mfloat_t * const MF_NAN;
-extern const mfloat_t * const MF_INF;
-extern const mfloat_t * const MF_NINF;
+extern const mfloat_t MF_ZERO_VALUE;
+extern const mfloat_t MF_ONE_VALUE;
+extern const mfloat_t MF_HALF_VALUE;
+extern const mfloat_t MF_TENTH_VALUE;
+extern const mfloat_t MF_TEN_VALUE;
+extern const mfloat_t MF_PI_VALUE;
+extern const mfloat_t MF_E_VALUE;
+extern const mfloat_t MF_EULER_MASCHERONI_VALUE;
+extern const mfloat_t MF_SQRT2_VALUE;
+extern const mfloat_t MF_SQRT_PI_VALUE;
+extern const mfloat_t MF_NAN_VALUE;
+extern const mfloat_t MF_INF_VALUE;
+extern const mfloat_t MF_NINF_VALUE;
+
+#define MF_ZERO (&MF_ZERO_VALUE)
+#define MF_ONE (&MF_ONE_VALUE)
+#define MF_HALF (&MF_HALF_VALUE)
+#define MF_TENTH (&MF_TENTH_VALUE)
+#define MF_TEN (&MF_TEN_VALUE)
+#define MF_PI (&MF_PI_VALUE)
+#define MF_E (&MF_E_VALUE)
+#define MF_EULER_MASCHERONI (&MF_EULER_MASCHERONI_VALUE)
+#define MF_SQRT2 (&MF_SQRT2_VALUE)
+#define MF_SQRT_PI (&MF_SQRT_PI_VALUE)
+#define MF_NAN (&MF_NAN_VALUE)
+#define MF_INF (&MF_INF_VALUE)
+#define MF_NINF (&MF_NINF_VALUE)
 /** @} */
 
 /** @name Lifecycle

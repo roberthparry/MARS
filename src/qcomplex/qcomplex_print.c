@@ -20,8 +20,8 @@ static inline void qc_put_str(char **dst, size_t *remaining, size_t *count, cons
 }
 
 static void qc_pad_string(char *out, size_t out_size,
-                           const char *s, int width,
-                           int flag_minus, int flag_zero)
+                          const char *s, int width,
+                          int flag_minus, int flag_zero)
 {
     size_t len = strlen(s);
     int pad = (width > (int)len) ? (width - (int)len) : 0;
@@ -37,6 +37,38 @@ static void qc_pad_string(char *out, size_t out_size,
         for (size_t i = 0; s[i] && pos + 1 < out_size; i++) out[pos++] = s[i];
     }
     out[pos] = '\0';
+}
+
+static void qc_build_qfloat_format(char *out,
+                                   size_t out_size,
+                                   char spec,
+                                   int width,
+                                   int precision,
+                                   int flag_plus,
+                                   int flag_space,
+                                   int flag_minus,
+                                   int flag_zero,
+                                   int flag_hash)
+{
+    char *f = out;
+
+    if (!out || out_size == 0)
+        return;
+
+    *f++ = '%';
+    if (flag_plus)  *f++ = '+';
+    if (flag_space) *f++ = ' ';
+    if (flag_minus) *f++ = '-';
+    if (flag_zero)  *f++ = '0';
+    if (flag_hash)  *f++ = '#';
+    if (width > 0)
+        f += snprintf(f, out_size - (size_t)(f - out), "%d", width);
+    if (precision >= 0) {
+        *f++ = '.';
+        f += snprintf(f, out_size - (size_t)(f - out), "%d", precision);
+    }
+    *f++ = spec;
+    *f = '\0';
 }
 
 /* Ensure a qfloat string has exactly <precision> digits after the decimal.
@@ -143,15 +175,21 @@ int qc_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap)
             qcomplex_t z = va_arg(ap_local, qcomplex_t);
 
             char re_buf[256], im_buf[256];
+            char re_padded[256], im_padded[256];
+            char re_fmt[32], im_fmt[32];
             qfloat_t im_abs = qf_signbit(z.im) ? qf_neg(z.im) : z.im;
 
-            /* Build qfloat format: %q or %Q */
-            char cfmt[16];
-            snprintf(cfmt, sizeof(cfmt), "%%%c", (spec == 'Z') ? 'Q' : 'q');
+            qc_build_qfloat_format(re_fmt, sizeof(re_fmt),
+                                   (spec == 'Z') ? 'Q' : 'q',
+                                   width, precision,
+                                   flag_plus, flag_space, flag_minus, flag_zero, flag_hash);
+            qc_build_qfloat_format(im_fmt, sizeof(im_fmt),
+                                   (spec == 'Z') ? 'Q' : 'q',
+                                   width, precision,
+                                   0, 0, flag_minus, flag_zero, flag_hash);
 
-            /* Format real and imaginary parts */
-            qf_sprintf(re_buf, sizeof(re_buf), cfmt, z.re);
-            qf_sprintf(im_buf, sizeof(im_buf), cfmt, im_abs);
+            qf_sprintf(re_buf, sizeof(re_buf), re_fmt, z.re);
+            qf_sprintf(im_buf, sizeof(im_buf), im_fmt, im_abs);
 
             /* Enforce precision manually */
             if (precision >= 0) {
@@ -159,22 +197,20 @@ int qc_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap)
                 qc_fix_precision(im_buf, precision);
             }
 
+            qc_pad_string(re_padded, sizeof(re_padded), re_buf, width, flag_minus, flag_zero);
+            qc_pad_string(im_padded, sizeof(im_padded), im_buf, width, flag_minus, flag_zero);
+
             /* Lowercase exponent for %Z */
             if (spec == 'Z') {
-                for (char *s = re_buf; *s; s++) if (*s == 'E') *s = 'e';
-                for (char *s = im_buf; *s; s++) if (*s == 'E') *s = 'e';
+                for (char *s = re_padded; *s; s++) if (*s == 'E') *s = 'e';
+                for (char *s = im_padded; *s; s++) if (*s == 'E') *s = 'e';
             }
 
             const char *sep = qf_signbit(z.im) ? " - " : " + ";
 
             char assembled[600];
-            snprintf(assembled, sizeof(assembled), "%s%s%si", re_buf, sep, im_buf);
-
-            char padded[600];
-            qc_pad_string(padded, sizeof(padded),
-                          assembled, width, flag_minus, flag_zero);
-
-            qc_put_str(&dst, &remaining, &count, padded);
+            snprintf(assembled, sizeof(assembled), "%s%s%si", re_padded, sep, im_padded);
+            qc_put_str(&dst, &remaining, &count, assembled);
             continue;
         }
 
@@ -303,4 +339,3 @@ int qc_printf(const char *fmt, ...)
 
 /* Faddeeva w(z) via Weideman's rational approximation (N=32 for ~quad precision) */
 /* ------------------------------------------------------------ */
-
