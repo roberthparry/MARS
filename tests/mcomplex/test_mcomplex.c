@@ -405,6 +405,7 @@ static void test_arithmetic(void)
 {
     mcomplex_t *a = NULL;
     mcomplex_t *b = NULL;
+    mcomplex_t *z = NULL;
 
     for (;;) {
         print_mcomplex_input("a input", "3 + 4i");
@@ -425,11 +426,40 @@ static void test_arithmetic(void)
         print_mcomplex_value("a after a *= b", a);
         print_mcomplex_error_check("(4 + 2i) * (1 - 2i)", a, "8", "-6");
         ASSERT_TRUE(mcomplex_meets_precision(a, "8", "-6"));
+
+        z = mc_create_string("3 + 4i");
+        ASSERT_NOT_NULL(z);
+        print_mcomplex_input("z input", "3 + 4i");
+        print_mcomplex_value("z initial", z);
+
+        ASSERT_EQ_INT(mc_div(z, b), 0);
+        print_mcomplex_value("z after z /= b", z);
+        print_mcomplex_error_check("(3 + 4i) / (1 - 2i)", z, "-1", "2");
+        ASSERT_TRUE(mcomplex_meets_precision(z, "-1", "2"));
+
+        ASSERT_EQ_INT(mc_conj(z), 0);
+        print_mcomplex_value("z after conj(z)", z);
+        print_mcomplex_error_check("conj(-1 + 2i)", z, "-1", "-2");
+        ASSERT_TRUE(mcomplex_meets_precision(z, "-1", "-2"));
+
+        ASSERT_EQ_INT(mc_inv(z), 0);
+        print_mcomplex_value("z after inv(z)", z);
+        print_mcomplex_error_check("1 / (-1 - 2i)", z, "-0.2", "0.4");
+        ASSERT_TRUE(mcomplex_meets_precision(z, "-0.2", "0.4"));
+
+        ASSERT_EQ_INT(mc_abs(z), 0);
+        print_mcomplex_value("z after abs(z)", z);
+        print_mcomplex_error_check("abs(-0.2 + 0.4i)", z, "0.44721359549995793928183473374625524708812367192230514485417944905545963734803978", "0");
+        ASSERT_TRUE(mcomplex_meets_precision(
+            z,
+            "0.44721359549995793928183473374625524708812367192230514485417944905545963734803978",
+            "0"));
         break;
     }
 
     mc_free(a);
     mc_free(b);
+    mc_free(z);
 }
 
 static void test_transcendentals(void)

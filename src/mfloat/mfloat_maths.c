@@ -118,6 +118,28 @@ static uint64_t mfloat_lambert_w0_11024_storage[] = {
     0xe48bf682b33c04e8u, 0x0324fdc0d4a38de0u, 0x385ba1bb3a15c6a2u, 0x97abf76a98a1b70au,
     0x00244c135f1d2caeu
 };
+static uint64_t mfloat_sin1_1024_storage[] = {
+    0x16f2c072401fd2a9u, 0x4ebae439fc95c651u, 0x83e805382794144cu, 0x903aeaaf0f978321u,
+    0x8b591c1dcf87da4au, 0xee0b26400144a253u, 0x39feefe3b4fbdf81u, 0x4efd42a97a60839du,
+    0xfedcfeb6db9a349fu, 0x43cdfa62dfb4d194u, 0x9ab53ed64afb3ebau, 0x4a80a28c63a01d13u,
+    0x0b47b30f4630cab0u, 0x326188016aec9ba7u, 0x89ec0c8756c4ca72u, 0x933a45ca2734475du,
+    0x0000000000000002u, 0x11e811b3af6f3800u, 0x0f63e44595e18346u, 0xe07323acc1b03578u,
+    0x6eb22982e9275ee7u, 0x3c8ca9a421398f22u, 0x21389aa94c96289fu, 0x03e30b6e3a6bb75fu,
+    0xcf46c07adaccd98du, 0x4d3128675820b949u, 0x1aab1aefe8675ff4u, 0xadac1351e9da8613u,
+    0x5ecff8f6e6a2bbb2u, 0xb652feb6324defd8u, 0x2888997a8c5a6f7du, 0x4f484e2879e1944fu,
+    0x5523c2433b810637u, 0x00000000000006bbu
+};
+static uint64_t mfloat_cos1_1024_storage[] = {
+    0xda3ba10c77b78f23u, 0xb68a518216650988u, 0x09ad58f9ddcee9beu, 0x2b27076bfcb1ead1u,
+    0x76e35e553d1445f5u, 0x0b9d8c423254af8cu, 0x345076f6e3512997u, 0x216cc463c6c93d6eu,
+    0x537e052ccb3cc557u, 0x0a3b998872aa2ac5u, 0x177843f2fb8f200eu, 0xfafaf3b943df20f3u,
+    0x4f54dd4695ac23c7u, 0x18d78acbffe39b68u, 0x8b3bb0ff17153e6fu, 0x00fde6cde9d1c9d5u,
+    0x0000000000000000u, 0xeb5cc98b4e3924b0u, 0xd220afb56b4ea1e3u, 0xbf8b66667641f894u,
+    0xb59165486681554fu, 0xaa9503f93f60bd26u, 0xfce87057542071cbu, 0x7610d7f9f7b684eau,
+    0xb50f801f6102753au, 0x606fa2352b463757u, 0x9344041db8202049u, 0x3f3450e3b8ff99bcu,
+    0x6a94430a52d0e9e4u, 0x2300240b760e6fa9u, 0x2373a894f96c3b7fu, 0x2466d976871bd29au,
+    0xa51407da8345c91cu, 0x0000000000000008u
+};
 
 static struct _mint_t mfloat_erf_half1024_mint = { .sign = 1, .length = 26, .capacity = 26, .storage = mfloat_erf_half1024_storage };
 static struct _mint_t mfloat_erfinv_half1024_mint = { .sign = 1, .length = 26, .capacity = 26, .storage = mfloat_erfinv_half1024_storage };
@@ -126,6 +148,8 @@ static struct _mint_t mfloat_gammainv_min1024_mint = { .sign = 1, .length = 19, 
 static struct _mint_t mfloat_gammainv_argmin1024_mint = { .sign = 1, .length = 21, .capacity = 21, .storage = mfloat_gammainv_argmin1024_storage };
 static struct _mint_t mfloat_gammainv_31024_mint = { .sign = 1, .length = 25, .capacity = 25, .storage = mfloat_gammainv_31024_storage };
 static struct _mint_t mfloat_lambert_w0_11024_mint = { .sign = 1, .length = 25, .capacity = 25, .storage = mfloat_lambert_w0_11024_storage };
+static struct _mint_t mfloat_sin1_1024_mint = { .sign = 1, .length = 34u, .capacity = 34u, .storage = mfloat_sin1_1024_storage };
+static struct _mint_t mfloat_cos1_1024_mint = { .sign = 1, .length = 34u, .capacity = 34u, .storage = mfloat_cos1_1024_storage };
 
 static struct _mfloat_t mfloat_erf_half1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -1660, .precision = 1024u, .immortal = true, .mantissa = &mfloat_erf_half1024_mint };
 static struct _mfloat_t mfloat_erfinv_half1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -1659, .precision = 1024u, .immortal = true, .mantissa = &mfloat_erfinv_half1024_mint };
@@ -134,6 +158,8 @@ static struct _mfloat_t mfloat_gammainv_min1024_static = { .kind = MFLOAT_KIND_F
 static struct _mfloat_t mfloat_gammainv_argmin1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -1288, .precision = 1024u, .immortal = true, .mantissa = &mfloat_gammainv_argmin1024_mint };
 static struct _mfloat_t mfloat_gammainv_31024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -1590, .precision = 1024u, .immortal = true, .mantissa = &mfloat_gammainv_31024_mint };
 static struct _mfloat_t mfloat_lambert_w0_11024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -1590, .precision = 1024u, .immortal = true, .mantissa = &mfloat_lambert_w0_11024_mint };
+static struct _mfloat_t mfloat_sin1_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -2123, .precision = 1024u, .immortal = true, .mantissa = &mfloat_sin1_1024_mint };
+static struct _mfloat_t mfloat_cos1_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -2116, .precision = 1024u, .immortal = true, .mantissa = &mfloat_cos1_1024_mint };
 
 static uint64_t mfloat_ln2_1024_storage[] = {
     0x607f4ca11fb5bfb9u, 0x2da2d97c50f3fd5cu, 0x8655fa1872f20e3au, 0xaf5dfa6bd3830324u,
@@ -1949,6 +1975,26 @@ cleanup:
     return rc;
 }
 
+typedef int (*mfloat_trig_kernel_fn)(mfloat_t *dst, const mfloat_t *x, size_t precision);
+
+typedef struct mfloat_trig_dispatch_t {
+    mfloat_trig_kernel_fn kernel;
+    bool negate_result;
+} mfloat_trig_dispatch_t;
+
+static int mfloat_apply_trig_dispatch(mfloat_t *dst, const mfloat_t *x, size_t precision,
+                                      const mfloat_trig_dispatch_t dispatch[4], int quadrant)
+{
+    const mfloat_trig_dispatch_t *entry;
+    int rc;
+
+    entry = &dispatch[quadrant & 3];
+    rc = entry->kernel(dst, x, precision);
+    if (rc == 0 && entry->negate_result)
+        rc = mf_neg(dst);
+    return rc;
+}
+
 static int mfloat_atan_kernel(mfloat_t *dst, const mfloat_t *x, size_t precision)
 {
     mfloat_t *sum = NULL, *term = NULL, *r2 = NULL, *piece = NULL;
@@ -2777,6 +2823,13 @@ int mf_sin(mfloat_t *mfloat)
     mfloat_t *r = NULL;
     int quadrant;
     int rc = -1;
+    bool negate_result = false;
+    static const mfloat_trig_dispatch_t sin_dispatch[4] = {
+        { mfloat_sin_kernel, false },
+        { mfloat_cos_kernel, false },
+        { mfloat_sin_kernel, true  },
+        { mfloat_cos_kernel, true  }
+    };
 
     if (!mfloat)
         return -1;
@@ -2786,30 +2839,22 @@ int mf_sin(mfloat_t *mfloat)
         return mf_set_double(mfloat, NAN);
     if (mf_is_zero(mfloat))
         return 0;
+    negate_result = mfloat_equals_exact_long(mfloat, -1);
+    if (mfloat_equals_exact_long(mfloat, 1) || negate_result) {
+        precision = mfloat->precision;
+        if (mfloat_set_from_immortal_internal(mfloat, &mfloat_sin1_1024_static, precision) != 0)
+            return -1;
+        if (negate_result && mf_neg(mfloat) != 0)
+            return -1;
+        return 0;
+    }
 
     precision = mfloat->precision;
     work_prec = mfloat_transcendental_work_prec(precision);
     if (mfloat_reduce_trig_argument(mfloat, work_prec, &r, &quadrant) != 0)
         goto cleanup;
 
-    switch (quadrant) {
-    case 0:
-        rc = mfloat_sin_kernel(mfloat, r, work_prec);
-        break;
-    case 1:
-        rc = mfloat_cos_kernel(mfloat, r, work_prec);
-        break;
-    case 2:
-        rc = mfloat_sin_kernel(mfloat, r, work_prec);
-        if (rc == 0)
-            rc = mf_neg(mfloat);
-        break;
-    default:
-        rc = mfloat_cos_kernel(mfloat, r, work_prec);
-        if (rc == 0)
-            rc = mf_neg(mfloat);
-        break;
-    }
+    rc = mfloat_apply_trig_dispatch(mfloat, r, work_prec, sin_dispatch, quadrant);
     if (rc == 0)
         rc = mfloat_round_to_precision(mfloat, precision);
 
@@ -2824,6 +2869,12 @@ int mf_cos(mfloat_t *mfloat)
     mfloat_t *r = NULL;
     int quadrant;
     int rc = -1;
+    static const mfloat_trig_dispatch_t cos_dispatch[4] = {
+        { mfloat_cos_kernel, false },
+        { mfloat_sin_kernel, true  },
+        { mfloat_cos_kernel, true  },
+        { mfloat_sin_kernel, false }
+    };
 
     if (!mfloat)
         return -1;
@@ -2831,30 +2882,19 @@ int mf_cos(mfloat_t *mfloat)
         return 0;
     if (!mfloat_is_finite(mfloat))
         return mf_set_double(mfloat, NAN);
+    if (mfloat_equals_exact_long(mfloat, 1) || mfloat_equals_exact_long(mfloat, -1)) {
+        precision = mfloat->precision;
+        if (mfloat_set_from_immortal_internal(mfloat, &mfloat_cos1_1024_static, precision) != 0)
+            return -1;
+        return 0;
+    }
 
     precision = mfloat->precision;
     work_prec = mfloat_transcendental_work_prec(precision);
     if (mfloat_reduce_trig_argument(mfloat, work_prec, &r, &quadrant) != 0)
         goto cleanup;
 
-    switch (quadrant) {
-    case 0:
-        rc = mfloat_cos_kernel(mfloat, r, work_prec);
-        break;
-    case 1:
-        rc = mfloat_sin_kernel(mfloat, r, work_prec);
-        if (rc == 0)
-            rc = mf_neg(mfloat);
-        break;
-    case 2:
-        rc = mfloat_cos_kernel(mfloat, r, work_prec);
-        if (rc == 0)
-            rc = mf_neg(mfloat);
-        break;
-    default:
-        rc = mfloat_sin_kernel(mfloat, r, work_prec);
-        break;
-    }
+    rc = mfloat_apply_trig_dispatch(mfloat, r, work_prec, cos_dispatch, quadrant);
     if (rc == 0)
         rc = mfloat_round_to_precision(mfloat, precision);
 
