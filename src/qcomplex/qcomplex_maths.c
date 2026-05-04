@@ -72,39 +72,99 @@ static const qfloat_t qc_faddeeva_ck[32] = {
     { .hi = 0.00021293527138969463, .lo = -7.344430498602854e-21 },
 };
 
-static const qfloat_t qc_sqrt_2pi = {
-    .hi = 2.5066282746310007,
-    .lo = -1.8328579980459169e-16
+static const qcomplex_t qc_sqrt_2pi_complex = {
+    .re = { .hi = 2.5066282746310007, .lo = -1.8328579980459169e-16 },
+    .im = { .hi = 0.0, .lo = 0.0 }
 };
 
-static const qfloat_t qc_pi_cubed = {
-    .hi = 31.00627668029982,
-    .lo = 4.1641946985288283e-16
+static const qcomplex_t qc_pi_squared_complex = {
+    .re = { .hi = 9.869604401089358, .lo = 2.4674011002723397e-16 },
+    .im = { .hi = 0.0, .lo = 0.0 }
 };
 
-static const qfloat_t qc_bernoulli_b2 = {
-    .hi = 0.16666666666666666,
-    .lo = 9.2518585385429707e-18
+static const qcomplex_t qc_two_pi_cubed_complex = {
+    .re = { .hi = 62.01255336059964, .lo = 8.3283893970576566e-16 },
+    .im = { .hi = 0.0, .lo = 0.0 }
 };
 
-static const qfloat_t qc_bernoulli_b4 = {
-    .hi = -0.033333333333333333,
-    .lo = -4.6259292692714855e-19
+static const qcomplex_t qc_sqrt_pi_over_two_complex = {
+    .re = { .hi = 0.88622692545275805, .lo = -3.8332932499129024e-17 },
+    .im = { .hi = 0.0, .lo = 0.0 }
 };
 
-static const qfloat_t qc_bernoulli_b6 = {
-    .hi = 0.023809523809523808,
-    .lo = 1.3216940769347101e-18
+static const qcomplex_t qc_two_over_sqrt_pi_complex = {
+    .re = { .hi = 1.1283791670955126, .lo = 1.5335459613165487e-17 },
+    .im = { .hi = 0.0, .lo = 0.0 }
 };
 
-static const qfloat_t qc_bernoulli_b8 = {
-    .hi = -0.033333333333333333,
-    .lo = -4.6259292692714855e-19
+static const qcomplex_t qc_neg_two_over_sqrt_pi_complex = {
+    .re = { .hi = -1.1283791670955126, .lo = -1.5335459613165487e-17 },
+    .im = { .hi = 0.0, .lo = 0.0 }
 };
 
-static const qfloat_t qc_bernoulli_b10 = {
-    .hi = 0.07575757575757576,
-    .lo = -2.1026951223961299e-18
+static const qcomplex_t qc_one_and_half_complex = {
+    .re = { .hi = 1.5, .lo = 0.0 },
+    .im = { .hi = 0.0, .lo = 0.0 }
+};
+
+static const qcomplex_t qc_lanczos_shift_complex = {
+    .re = { .hi = 7.5, .lo = 0.0 },
+    .im = { .hi = 0.0, .lo = 0.0 }
+};
+
+static const qcomplex_t qc_one_third_complex = {
+    .re = { .hi = 0.33333333333333331, .lo = 1.8503717077085941e-17 },
+    .im = { .hi = 0.0, .lo = 0.0 }
+};
+
+static const qcomplex_t qc_eleven_over_seventy_two_complex = {
+    .re = { .hi = 0.15277777777777779, .lo = -6.1679056923619819e-18 },
+    .im = { .hi = 0.0, .lo = 0.0 }
+};
+
+static const qcomplex_t qc_quarter_complex = {
+    .re = { .hi = 0.25, .lo = 0.0 },
+    .im = { .hi = 0.0, .lo = 0.0 }
+};
+
+static const qcomplex_t qc_one_sixth_complex = {
+    .re = { .hi = 0.16666666666666666, .lo = 9.2518585385429707e-18 },
+    .im = { .hi = 0.0, .lo = 0.0 }
+};
+
+static const qcomplex_t qc_one_eighth_complex = {
+    .re = { .hi = 0.125, .lo = 0.0 },
+    .im = { .hi = 0.0, .lo = 0.0 }
+};
+
+static const qcomplex_t qc_one_tenth_complex = {
+    .re = { .hi = 0.10000000000000001, .lo = -5.551115123125783e-18 },
+    .im = { .hi = 0.0, .lo = 0.0 }
+};
+
+static const qcomplex_t qc_bernoulli_b2_complex = {
+    .re = { .hi = 0.16666666666666666, .lo = 9.2518585385429707e-18 },
+    .im = { .hi = 0.0, .lo = 0.0 }
+};
+
+static const qcomplex_t qc_bernoulli_b4_complex = {
+    .re = { .hi = -0.033333333333333333, .lo = -4.6259292692714855e-19 },
+    .im = { .hi = 0.0, .lo = 0.0 }
+};
+
+static const qcomplex_t qc_bernoulli_b6_complex = {
+    .re = { .hi = 0.023809523809523808, .lo = 1.3216940769347101e-18 },
+    .im = { .hi = 0.0, .lo = 0.0 }
+};
+
+static const qcomplex_t qc_bernoulli_b8_complex = {
+    .re = { .hi = -0.033333333333333333, .lo = -4.6259292692714855e-19 },
+    .im = { .hi = 0.0, .lo = 0.0 }
+};
+
+static const qcomplex_t qc_bernoulli_b10_complex = {
+    .re = { .hi = 0.07575757575757576, .lo = -2.1026951223961299e-18 },
+    .im = { .hi = 0.0, .lo = 0.0 }
 };
 
 static qfloat_t qc_abs2_local(qcomplex_t z)
@@ -115,7 +175,7 @@ static qfloat_t qc_abs2_local(qcomplex_t z)
 static qcomplex_t qc_faddeeva_inside(qcomplex_t z)
 {
     const int N = 32;
-    qcomplex_t sum = qcr(0.0);
+    qcomplex_t sum = QC_ZERO;
 
     for (int k = 1; k <= N; k++) {
         qcomplex_t denom = qc_make(z.re, qf_sub(z.im, qc_faddeeva_ak[k - 1]));
@@ -124,7 +184,7 @@ static qcomplex_t qc_faddeeva_inside(qcomplex_t z)
 
     // inside = 1 + (2i / sqrt(pi)) * sum
     qcomplex_t two_i_sum = qc_mul(qc_make(qf_from_double(0.0), qf_from_double(2.0)), sum);
-    return qc_add(qcr(1.0), qc_div(two_i_sum, qcrf(QF_SQRT_PI)));
+    return qc_add(QC_ONE, qc_div(two_i_sum, QC_SQRT_PI));
 }
 
 qcomplex_t qc_erf(qcomplex_t z) {
@@ -134,7 +194,7 @@ qcomplex_t qc_erf(qcomplex_t z) {
     if (qf_lt(z.re, qf_from_double(0.0)))
         return qc_neg(qc_erf(qc_neg(z)));
     qcomplex_t iz = qc_make(qf_neg(z.im), z.re);
-    return qc_sub(qcr(1.0), qc_faddeeva_inside(iz));
+    return qc_sub(QC_ONE, qc_faddeeva_inside(iz));
 }
 
 qcomplex_t qc_erfc(qcomplex_t z)
@@ -143,7 +203,7 @@ qcomplex_t qc_erfc(qcomplex_t z)
         return qcrf(qf_erfc(z.re));
     /* Use erfc(-z) = 2 - erfc(z) to keep Re(z) >= 0 for Faddeeva */
     if (qf_lt(z.re, qf_from_double(0.0)))
-        return qc_sub(qcr(2.0), qc_erfc(qc_neg(z)));
+        return qc_sub(QC_TWO, qc_erfc(qc_neg(z)));
     qcomplex_t iz = qc_make(qf_neg(z.im), z.re);
     return qc_faddeeva_inside(iz);
 }
@@ -151,11 +211,11 @@ qcomplex_t qc_erfc(qcomplex_t z)
 qcomplex_t qc_erfinv(qcomplex_t z)
 {
     // Newton iteration: solve erf(w) = z.  Initial guess good for small |z|.
-    qcomplex_t w = qc_mul(z, qcrf(qf_div(QF_SQRT_PI, qf_from_double(2.0))));
+    qcomplex_t w = qc_mul(z, qc_sqrt_pi_over_two_complex);
 
     for (int i = 0; i < 10; i++) {
         qcomplex_t f  = qc_sub(qc_erf(w), z);
-        qcomplex_t fp = qc_mul(qcrf(qf_div(qf_from_double(2.0), QF_SQRT_PI)),
+        qcomplex_t fp = qc_mul(qc_two_over_sqrt_pi_complex,
                                qc_exp(qc_neg(qc_mul(w, w))));
         qcomplex_t delta = qc_div(f, fp);
         w = qc_sub(w, delta);
@@ -168,11 +228,11 @@ qcomplex_t qc_erfinv(qcomplex_t z)
 qcomplex_t qc_erfcinv(qcomplex_t z)
 {
     // Newton iteration: solve erfc(w) = z.  Initial guess via erfinv(1-z).
-    qcomplex_t w = qc_erfinv(qc_sub(qcr(1.0), z));
+    qcomplex_t w = qc_erfinv(qc_sub(QC_ONE, z));
 
     for (int i = 0; i < 10; i++) {
         qcomplex_t f  = qc_sub(qc_erfc(w), z);
-        qcomplex_t fp = qc_mul(qcrf(qf_div(qf_neg(qf_from_double(2.0)), QF_SQRT_PI)),
+        qcomplex_t fp = qc_mul(qc_neg_two_over_sqrt_pi_complex,
                                qc_exp(qc_neg(qc_mul(w, w))));
         qcomplex_t delta = qc_div(f, fp);
         w = qc_sub(w, delta);
@@ -216,16 +276,16 @@ qcomplex_t qc_gamma(qcomplex_t z)
 
     if (qf_lt(z.re, qf_from_double(0.5))) {
         // Reflection: Γ(z) = π / (sin(πz) Γ(1-z))
-        qcomplex_t sin_pi_z  = qc_sin(qc_mul(z, qcrf(QF_PI)));
-        qcomplex_t gamma_1mz = qc_gamma(qc_sub(qcr(1.0), z));
-        return qc_div(qcrf(QF_PI), qc_mul(sin_pi_z, gamma_1mz));
+        qcomplex_t sin_pi_z  = qc_sin(qc_mul(z, QC_PI));
+        qcomplex_t gamma_1mz = qc_gamma(qc_sub(QC_ONE, z));
+        return qc_div(QC_PI, qc_mul(sin_pi_z, gamma_1mz));
     }
 
-    qcomplex_t z_minus_one = qc_sub(z, qcr(1.0));
+    qcomplex_t z_minus_one = qc_sub(z, QC_ONE);
     qcomplex_t sum         = lanczos_sum(z_minus_one);
-    qcomplex_t t           = qc_add(z_minus_one, qcr(7.5));  // g + 0.5, g = 7
+    qcomplex_t t           = qc_add(z_minus_one, qc_lanczos_shift_complex);  // g + 0.5, g = 7
 
-    return qc_mul(qc_mul(qcrf(qc_sqrt_2pi), qc_pow(t, qc_sub(z, qcr(0.5)))),
+    return qc_mul(qc_mul(qc_sqrt_2pi_complex, qc_pow(t, qc_sub(z, QC_HALF))),
                   qc_mul(qc_exp(qc_neg(t)), sum));
 }
 
@@ -236,16 +296,16 @@ qcomplex_t qc_lgamma(qcomplex_t z)
 
     if (qf_lt(z.re, qf_from_double(0.5))) {
         // Reflection: lgamma(z) = log(π) - log(sin(πz)) - lgamma(1-z)
-        qcomplex_t log_sin_piz = qc_log(qc_sin(qc_mul(z, qcrf(QF_PI))));
-        qcomplex_t lg_1mz      = qc_lgamma(qc_sub(qcr(1.0), z));
-        return qc_sub(qc_sub(qcrf(qf_log(QF_PI)), log_sin_piz), lg_1mz);
+        qcomplex_t log_sin_piz = qc_log(qc_sin(qc_mul(z, QC_PI)));
+        qcomplex_t lg_1mz      = qc_lgamma(qc_sub(QC_ONE, z));
+        return qc_sub(qc_sub(qc_log(QC_PI), log_sin_piz), lg_1mz);
     }
 
-    qcomplex_t z_minus_one = qc_sub(z, qcr(1.0));
+    qcomplex_t z_minus_one = qc_sub(z, QC_ONE);
     qcomplex_t sum         = lanczos_sum(z_minus_one);
-    qcomplex_t t           = qc_add(z_minus_one, qcr(7.5));
+    qcomplex_t t           = qc_add(z_minus_one, qc_lanczos_shift_complex);
     return qc_add(
-        qc_add(qcrf(QF_LOG_SQRT_2PI), qc_mul(qc_sub(z, qcr(0.5)), qc_log(t))),
+        qc_add(QC_LOG_SQRT_2PI, qc_mul(qc_sub(z, QC_HALF), qc_log(t))),
         qc_add(qc_neg(t), qc_log(sum)));
 }
 
@@ -256,22 +316,22 @@ qcomplex_t qc_digamma(qcomplex_t z)
 
     if (qf_lt(z.re, qf_from_double(0.5))) {
         // Reflection: ψ(z) = ψ(1-z) - π cot(πz)
-        qcomplex_t pi_z = qc_mul(z, qcrf(QF_PI));
+        qcomplex_t pi_z = qc_mul(z, QC_PI);
         qcomplex_t cotpz = qc_div(qc_cos(pi_z), qc_sin(pi_z));
-        return qc_sub(qc_digamma(qc_sub(qcr(1.0), z)), qc_mul(qcrf(QF_PI), cotpz));
+        return qc_sub(qc_digamma(qc_sub(QC_ONE, z)), qc_mul(QC_PI, cotpz));
     }
 
     // Shift upward until |z| >= 10
-    qcomplex_t psi = qcr(0.0);
+    qcomplex_t psi = QC_ZERO;
     qcomplex_t zz  = z;
     while (qf_lt(qc_abs(zz), qf_from_double(10.0))) {
-        psi = qc_sub(psi, qc_div(qcr(1.0), zz));
-        zz  = qc_add(zz, qcr(1.0));
+        psi = qc_sub(psi, qc_div(QC_ONE, zz));
+        zz  = qc_add(zz, QC_ONE);
     }
 
     // Asymptotic: ψ(z) ≈ log(z) - 1/(2z) - Σ B_{2k}/(2k z^{2k})
-    qcomplex_t invz   = qc_div(qcr(1.0), zz);
-    qcomplex_t result = qc_sub(qc_log(zz), qc_mul(qcr(0.5), invz));
+    qcomplex_t invz   = qc_div(QC_ONE, zz);
+    qcomplex_t result = qc_sub(qc_log(zz), qc_mul(QC_HALF, invz));
 
     qcomplex_t z2  = qc_mul(invz, invz);
     qcomplex_t z4  = qc_mul(z2, z2);
@@ -279,11 +339,11 @@ qcomplex_t qc_digamma(qcomplex_t z)
     qcomplex_t z8  = qc_mul(z6, z2);
     qcomplex_t z10 = qc_mul(z8, z2);
 
-    result = qc_sub(result, qc_mul(qcrf(qc_bernoulli_b2),  qc_mul(qcr(0.5),      z2)));
-    result = qc_sub(result, qc_mul(qcrf(qc_bernoulli_b4),  qc_mul(qcr(0.25),     z4)));
-    result = qc_sub(result, qc_mul(qcrf(qc_bernoulli_b6),  qc_mul(qcr(1.0/6.0),  z6)));
-    result = qc_sub(result, qc_mul(qcrf(qc_bernoulli_b8),  qc_mul(qcr(0.125),    z8)));
-    result = qc_sub(result, qc_mul(qcrf(qc_bernoulli_b10), qc_mul(qcr(0.1),      z10)));
+    result = qc_sub(result, qc_mul(qc_bernoulli_b2_complex,  qc_mul(QC_HALF, z2)));
+    result = qc_sub(result, qc_mul(qc_bernoulli_b4_complex,  qc_mul(qc_quarter_complex, z4)));
+    result = qc_sub(result, qc_mul(qc_bernoulli_b6_complex,  qc_mul(qc_one_sixth_complex, z6)));
+    result = qc_sub(result, qc_mul(qc_bernoulli_b8_complex,  qc_mul(qc_one_eighth_complex, z8)));
+    result = qc_sub(result, qc_mul(qc_bernoulli_b10_complex, qc_mul(qc_one_tenth_complex, z10)));
 
     return qc_add(result, psi);
 }
@@ -295,35 +355,35 @@ qcomplex_t qc_trigamma(qcomplex_t z)
 
     if (qf_lt(z.re, qf_from_double(0.5))) {
         // Reflection: ψ₁(z) = π² csc²(πz) - ψ₁(1-z)
-        qcomplex_t pi_z  = qc_mul(z, qcrf(QF_PI));
-        qcomplex_t csc   = qc_div(qcr(1.0), qc_sin(pi_z));
-        qcomplex_t term  = qc_mul(qcrf(qf_mul(QF_PI, QF_PI)), qc_mul(csc, csc));
-        return qc_sub(term, qc_trigamma(qc_sub(qcr(1.0), z)));
+        qcomplex_t pi_z  = qc_mul(z, QC_PI);
+        qcomplex_t csc   = qc_div(QC_ONE, qc_sin(pi_z));
+        qcomplex_t term  = qc_mul(qc_pi_squared_complex, qc_mul(csc, csc));
+        return qc_sub(term, qc_trigamma(qc_sub(QC_ONE, z)));
     }
 
     // Recurrence upward until |z| >= 10
-    qcomplex_t accum = qcr(0.0);
+    qcomplex_t accum = QC_ZERO;
     qcomplex_t zz    = z;
     while (qf_lt(qc_abs2_local(zz), qf_from_double(100.0))) {
-        qcomplex_t invz = qc_div(qcr(1.0), zz);
+        qcomplex_t invz = qc_div(QC_ONE, zz);
         accum = qc_add(accum, qc_mul(invz, invz));
-        zz    = qc_add(zz, qcr(1.0));
+        zz    = qc_add(zz, QC_ONE);
     }
 
     // Asymptotic: ψ₁(z) ≈ 1/z + 1/(2z²) + Σ B_{2k}/z^{2k+1}
-    qcomplex_t invz  = qc_div(qcr(1.0), zz);
+    qcomplex_t invz  = qc_div(QC_ONE, zz);
     qcomplex_t invz2 = qc_mul(invz, invz);
-    qcomplex_t result = qc_add(invz, qc_mul(qcr(0.5), invz2));
+    qcomplex_t result = qc_add(invz, qc_mul(QC_HALF, invz2));
 
     qcomplex_t z3 = qc_mul(invz2, invz);
     qcomplex_t z5 = qc_mul(z3, invz2);
     qcomplex_t z7 = qc_mul(z5, invz2);
     qcomplex_t z9 = qc_mul(z7, invz2);
 
-    result = qc_add(result, qc_mul(qcrf(qc_bernoulli_b2), z3));
-    result = qc_add(result, qc_mul(qcrf(qc_bernoulli_b4), z5));
-    result = qc_add(result, qc_mul(qcrf(qc_bernoulli_b6), z7));
-    result = qc_add(result, qc_mul(qcrf(qc_bernoulli_b8), z9));
+    result = qc_add(result, qc_mul(qc_bernoulli_b2_complex, z3));
+    result = qc_add(result, qc_mul(qc_bernoulli_b4_complex, z5));
+    result = qc_add(result, qc_mul(qc_bernoulli_b6_complex, z7));
+    result = qc_add(result, qc_mul(qc_bernoulli_b8_complex, z9));
 
     return qc_add(result, accum);
 }
@@ -335,28 +395,28 @@ qcomplex_t qc_tetragamma(qcomplex_t z)
 
     if (qf_lt(z.re, qf_from_double(0.5))) {
         // Reflection: ψ₂(z) = ψ₂(1-z) + 2π³ csc²(πz) cot(πz)
-        qcomplex_t pi_z   = qc_mul(z, qcrf(QF_PI));
+        qcomplex_t pi_z   = qc_mul(z, QC_PI);
         qcomplex_t sin_pz = qc_sin(pi_z);
-        qcomplex_t csc    = qc_div(qcr(1.0), sin_pz);
+        qcomplex_t csc    = qc_div(QC_ONE, sin_pz);
         qcomplex_t csc2   = qc_mul(csc, csc);
         qcomplex_t cot_pz = qc_div(qc_cos(pi_z), sin_pz);
-        qcomplex_t term = qc_mul(qcrf(qf_mul_double(qc_pi_cubed, 2.0)),
+        qcomplex_t term = qc_mul(qc_two_pi_cubed_complex,
                                  qc_mul(csc2, cot_pz));
-        return qc_add(qc_tetragamma(qc_sub(qcr(1.0), z)), term);
+        return qc_add(qc_tetragamma(qc_sub(QC_ONE, z)), term);
     }
 
     // Recurrence upward until |z| >= 10
-    qcomplex_t accum = qcr(0.0);
+    qcomplex_t accum = QC_ZERO;
     qcomplex_t zz    = z;
     while (qf_lt(qc_abs2_local(zz), qf_from_double(100.0))) {
-        qcomplex_t invz  = qc_div(qcr(1.0), zz);
+        qcomplex_t invz  = qc_div(QC_ONE, zz);
         qcomplex_t invz3 = qc_mul(invz, qc_mul(invz, invz));
-        accum = qc_add(accum, qc_mul(qcr(2.0), invz3));
-        zz    = qc_add(zz, qcr(1.0));
+        accum = qc_add(accum, qc_mul(QC_TWO, invz3));
+        zz    = qc_add(zz, QC_ONE);
     }
 
     // Asymptotic: ψ₂(z) ≈ 1/z² + 1/z³ + Σ B_{2k}/z^{2k+2}
-    qcomplex_t invz  = qc_div(qcr(1.0), zz);
+    qcomplex_t invz  = qc_div(QC_ONE, zz);
     qcomplex_t invz2 = qc_mul(invz, invz);
     qcomplex_t result = qc_add(invz2, qc_mul(invz2, invz));
 
@@ -365,10 +425,10 @@ qcomplex_t qc_tetragamma(qcomplex_t z)
     qcomplex_t z8  = qc_mul(z6, invz2);
     qcomplex_t z10 = qc_mul(z8, invz2);
 
-    result = qc_add(result, qc_mul(qcrf(qc_bernoulli_b2), z4));
-    result = qc_add(result, qc_mul(qcrf(qc_bernoulli_b4), z6));
-    result = qc_add(result, qc_mul(qcrf(qc_bernoulli_b6), z8));
-    result = qc_add(result, qc_mul(qcrf(qc_bernoulli_b8), z10));
+    result = qc_add(result, qc_mul(qc_bernoulli_b2_complex, z4));
+    result = qc_add(result, qc_mul(qc_bernoulli_b4_complex, z6));
+    result = qc_add(result, qc_mul(qc_bernoulli_b6_complex, z8));
+    result = qc_add(result, qc_mul(qc_bernoulli_b8_complex, z10));
 
     return qc_add(result, accum);
 }
@@ -383,7 +443,7 @@ qcomplex_t qc_gammainv(qcomplex_t z)
 
     qcomplex_t logz = qc_log(z);
     qcomplex_t w;
-    w = qc_add(qcr(1.5), logz);
+    w = qc_add(qc_one_and_half_complex, logz);
 
     for (int i = 0; i < 20; i++) {
         qcomplex_t delta = qc_div(qc_sub(qc_lgamma(w), logz), qc_digamma(w));
@@ -416,9 +476,9 @@ qcomplex_t qc_binomial(qcomplex_t a, qcomplex_t b)
         return qcrf(qf_binomial(a.re, b.re));
 
     // C(a,b) = Γ(a+1) / (Γ(b+1) Γ(a-b+1))
-    qcomplex_t a1   = qc_add(a, qcr(1.0));
-    qcomplex_t b1   = qc_add(b, qcr(1.0));
-    qcomplex_t amb1 = qc_add(qc_sub(a, b), qcr(1.0));
+    qcomplex_t a1   = qc_add(a, QC_ONE);
+    qcomplex_t b1   = qc_add(b, QC_ONE);
+    qcomplex_t amb1 = qc_add(qc_sub(a, b), QC_ONE);
     return qc_div(qc_gamma(a1), qc_mul(qc_gamma(b1), qc_gamma(amb1)));
 }
 
@@ -429,9 +489,9 @@ qcomplex_t qc_beta_pdf(qcomplex_t x, qcomplex_t a, qcomplex_t b)
         return qcrf(qf_beta_pdf(x.re, a.re, b.re));
 
     // f(x; a, b) = x^(a-1) * (1-x)^(b-1) / B(a,b)
-    qcomplex_t one_minus_x = qc_sub(qcr(1.0), x);
-    qcomplex_t num = qc_mul(qc_pow(x,           qc_sub(a, qcr(1.0))),
-                            qc_pow(one_minus_x, qc_sub(b, qcr(1.0))));
+    qcomplex_t one_minus_x = qc_sub(QC_ONE, x);
+    qcomplex_t num = qc_mul(qc_pow(x,           qc_sub(a, QC_ONE)),
+                            qc_pow(one_minus_x, qc_sub(b, QC_ONE)));
     return qc_div(num, qc_beta(a, b));
 }
 
@@ -442,8 +502,8 @@ qcomplex_t qc_logbeta_pdf(qcomplex_t x, qcomplex_t a, qcomplex_t b)
         return qcrf(qf_logbeta_pdf(x.re, a.re, b.re));
 
     // log f(x; a,b) = (a-1)log(x) + (b-1)log(1-x) - log B(a,b)
-    return qc_sub(qc_add(qc_mul(qc_sub(a, qcr(1.0)), qc_log(x)),
-                         qc_mul(qc_sub(b, qcr(1.0)), qc_log(qc_sub(qcr(1.0), x)))),
+    return qc_sub(qc_add(qc_mul(qc_sub(a, QC_ONE), qc_log(x)),
+                         qc_mul(qc_sub(b, QC_ONE), qc_log(qc_sub(QC_ONE, x)))),
                   qc_logbeta(a, b));
 }
 
@@ -453,8 +513,8 @@ qcomplex_t qc_normal_pdf(qcomplex_t z)
         return qcrf(qf_normal_pdf(z.re));
 
     // φ(z) = exp(-z²/2) / sqrt(2π)
-    return qc_mul(qcrf(QF_INV_SQRT_2PI),
-                  qc_exp(qc_mul(qcr(-0.5), qc_mul(z, z))));
+    return qc_mul(QC_INV_SQRT_2PI,
+                  qc_exp(qc_mul(qc_neg(QC_HALF), qc_mul(z, z))));
 }
 
 qcomplex_t qc_normal_cdf(qcomplex_t z)
@@ -463,8 +523,7 @@ qcomplex_t qc_normal_cdf(qcomplex_t z)
         return qcrf(qf_normal_cdf(z.re));
 
     // Φ(z) = 0.5 * (1 + erf(z / sqrt(2)))
-    qfloat_t sqrt2 = qf_sqrt(qf_from_double(2.0));
-    return qc_mul(qcr(0.5), qc_add(qcr(1.0), qc_erf(qc_div(z, qcrf(sqrt2)))));
+    return qc_mul(QC_HALF, qc_add(QC_ONE, qc_erf(qc_div(z, QC_SQRT2))));
 }
 
 qcomplex_t qc_normal_logpdf(qcomplex_t z)
@@ -473,23 +532,23 @@ qcomplex_t qc_normal_logpdf(qcomplex_t z)
         return qcrf(qf_normal_logpdf(z.re));
 
     // log φ(z) = -z²/2 - log(2π)/2
-    return qc_sub(qc_mul(qcr(-0.5), qc_mul(z, z)),
-                  qcrf(QF_LOG_SQRT_2PI));
+    return qc_sub(qc_mul(qc_neg(QC_HALF), qc_mul(z, z)),
+                  QC_LOG_SQRT_2PI);
 }
 
 static qcomplex_t qc_lambert_w_series_guess(qcomplex_t z, int branch)
 {
-    qcomplex_t ez = qc_mul(qcrf(QF_E), z);
-    qcomplex_t p = qc_sqrt(qc_mul(qcr(2.0), qc_add(qcr(1.0), ez)));
+    qcomplex_t ez = qc_mul(QC_E, z);
+    qcomplex_t p = qc_sqrt(qc_mul(QC_TWO, qc_add(QC_ONE, ez)));
     qcomplex_t p2 = qc_mul(p, p);
     qcomplex_t p3 = qc_mul(p2, p);
     qcomplex_t sign_p = (branch == -1) ? qc_neg(p) : p;
     qcomplex_t sign_p3 = (branch == -1) ? qc_neg(p3) : p3;
-    qcomplex_t w = qcr(-1.0);
+    qcomplex_t w = QC_NEG_ONE;
 
     w = qc_add(w, sign_p);
-    w = qc_sub(w, qc_mul(qcr(1.0 / 3.0), p2));
-    w = qc_add(w, qc_mul(qcr(11.0 / 72.0), sign_p3));
+    w = qc_sub(w, qc_mul(qc_one_third_complex, p2));
+    w = qc_add(w, qc_mul(qc_eleven_over_seventy_two_complex, sign_p3));
     return w;
 }
 
@@ -519,7 +578,7 @@ static qcomplex_t qc_lambert_wm1_complex(qcomplex_t z)
     if (qf_eq(z.re, QF_ZERO) && qf_eq(z.im, QF_ZERO))
         return qc_make(QF_NINF, QF_NAN);
 
-    qcomplex_t branch_probe = qc_add(qc_mul(qcrf(QF_E), z), qcr(1.0));
+    qcomplex_t branch_probe = qc_add(qc_mul(QC_E, z), QC_ONE);
     qcomplex_t w = qf_lt(qc_abs2_local(branch_probe), qf_from_double(0.0625))
         ? qc_lambert_w_series_guess(z, -1)
         : qc_lambert_w_asymptotic_guess(z, -1);
@@ -528,14 +587,14 @@ static qcomplex_t qc_lambert_wm1_complex(qcomplex_t z)
         qcomplex_t ew = qc_exp(w);
         qcomplex_t wew = qc_mul(w, ew);
         qcomplex_t f = qc_sub(wew, z);
-        qcomplex_t wp1 = qc_add(w, qcr(1.0));
+        qcomplex_t wp1 = qc_add(w, QC_ONE);
         qcomplex_t denom;
 
         if (qf_lt(qc_abs(wp1), zero_tol)) {
-            denom = qc_mul(ew, qcr(1.0));
+            denom = ew;
         } else {
-            qcomplex_t halley_corr = qc_div(qc_mul(qc_add(w, qcr(2.0)), f),
-                                            qc_mul(qcr(2.0), wp1));
+            qcomplex_t halley_corr = qc_div(qc_mul(qc_add(w, QC_TWO), f),
+                                            qc_mul(QC_TWO, wp1));
             denom = qc_sub(qc_mul(ew, wp1), halley_corr);
         }
 
@@ -565,10 +624,10 @@ qcomplex_t qc_productlog(qcomplex_t z)
         qcomplex_t ew    = qc_exp(w);
         qcomplex_t wew   = qc_mul(w, ew);
         qcomplex_t f     = qc_sub(wew, z);
-        qcomplex_t wp1   = qc_add(w, qcr(1.0));
+        qcomplex_t wp1   = qc_add(w, QC_ONE);
         qcomplex_t f1    = qc_mul(ew, wp1);
-        qcomplex_t f2    = qc_mul(ew, qc_add(w, qcr(2.0)));
-        qcomplex_t corr2 = qc_mul(qcr(0.5), qc_mul(qc_div(f, f1), f2));
+        qcomplex_t f2    = qc_mul(ew, qc_add(w, QC_TWO));
+        qcomplex_t corr2 = qc_mul(QC_HALF, qc_mul(qc_div(f, f1), f2));
         qcomplex_t delta = qc_div(f, qc_sub(f1, corr2));
         w = qc_sub(w, delta);
         if (qf_lt(qc_abs(delta), qf_from_double(1e-30)))
@@ -581,7 +640,7 @@ static qcomplex_t qc_gammainc_lower_series(qcomplex_t s, qcomplex_t x)
 {
     qfloat_t tol = qf_from_double(1e-30);
 
-    qcomplex_t term = qc_div(qcr(1.0), s);
+    qcomplex_t term = qc_div(QC_ONE, s);
     qcomplex_t sum  = term;
 
     for (int i = 1; i < 10000; i++) {
@@ -623,7 +682,7 @@ qcomplex_t qc_gammainc_Q(qcomplex_t s, qcomplex_t x)
     if (qf_eq(s.im, qf_from_double(0.0)) && qf_eq(x.im, qf_from_double(0.0)))
         return qcrf(qf_gammainc_Q(s.re, x.re));
 
-    return qc_sub(qcr(1.0), qc_gammainc_P(s, x));
+    return qc_sub(QC_ONE, qc_gammainc_P(s, x));
 }
 
 qcomplex_t qc_ei(qcomplex_t z)
@@ -633,7 +692,7 @@ qcomplex_t qc_ei(qcomplex_t z)
 
     // Ei(z) = γ + log(z) + Σ_{k=1}^∞ z^k / (k × k!)
     qfloat_t tol  = qf_from_double(1e-30);
-    qcomplex_t sum = qc_add(qcrf(QF_EULER_MASCHERONI), qc_log(z));
+    qcomplex_t sum = qc_add(QC_EULER_MASCHERONI, qc_log(z));
 
     qfloat_t one  = qf_from_double(1.0);
     qfloat_t kf   = one;                    // k

@@ -24,6 +24,151 @@ extern const qcomplex_t QC_ZERO;
 extern const qcomplex_t QC_ONE;
 
 /**
+ * @brief -1 + 0i constant
+ */
+extern const qcomplex_t QC_NEG_ONE;
+
+/**
+ * @brief 1/2 + 0i constant
+ */
+extern const qcomplex_t QC_HALF;
+
+/**
+ * @brief 2 + 0i constant
+ */
+extern const qcomplex_t QC_TWO;
+
+/**
+ * @brief 0 + 1i constant
+ */
+extern const qcomplex_t QC_I;
+
+/**
+ * @brief NaN + NaNi constant
+ */
+extern const qcomplex_t QC_NAN;
+
+/**
+ * @brief +inf + 0i constant
+ */
+extern const qcomplex_t QC_INF;
+
+/**
+ * @brief -inf + 0i constant
+ */
+extern const qcomplex_t QC_NINF;
+
+/**
+ * @brief Maximum finite qfloat value on the real axis
+ */
+extern const qcomplex_t QC_MAX;
+
+/**
+ * @brief π + 0i constant
+ */
+extern const qcomplex_t QC_PI;
+
+/**
+ * @brief 2π + 0i constant
+ */
+extern const qcomplex_t QC_2PI;
+
+/**
+ * @brief π/2 + 0i constant
+ */
+extern const qcomplex_t QC_PI_2;
+
+/**
+ * @brief π/4 + 0i constant
+ */
+extern const qcomplex_t QC_PI_4;
+
+/**
+ * @brief 3π/4 + 0i constant
+ */
+extern const qcomplex_t QC_3PI_4;
+
+/**
+ * @brief π/6 + 0i constant
+ */
+extern const qcomplex_t QC_PI_6;
+
+/**
+ * @brief π/3 + 0i constant
+ */
+extern const qcomplex_t QC_PI_3;
+
+/**
+ * @brief 2/π + 0i constant
+ */
+extern const qcomplex_t QC_2_PI;
+
+/**
+ * @brief e + 0i constant
+ */
+extern const qcomplex_t QC_E;
+
+/**
+ * @brief 1/e + 0i constant
+ */
+extern const qcomplex_t QC_INV_E;
+
+/**
+ * @brief ln(2) + 0i constant
+ */
+extern const qcomplex_t QC_LN2;
+
+/**
+ * @brief 1/ln(2) + 0i constant
+ */
+extern const qcomplex_t QC_INVLN2;
+
+/**
+ * @brief sqrt(1/2) + 0i constant
+ */
+extern const qcomplex_t QC_SQRT_HALF;
+
+/**
+ * @brief sqrt(2) + 0i constant
+ */
+extern const qcomplex_t QC_SQRT2;
+
+/**
+ * @brief sqrt(π) + 0i constant
+ */
+extern const qcomplex_t QC_SQRT_PI;
+
+/**
+ * @brief sqrt(1/π) + 0i constant
+ */
+extern const qcomplex_t QC_SQRT1ONPI;
+
+/**
+ * @brief 2/sqrt(π) + 0i constant
+ */
+extern const qcomplex_t QC_2_SQRTPI;
+
+/**
+ * @brief 1/sqrt(2π) + 0i constant
+ */
+extern const qcomplex_t QC_INV_SQRT_2PI;
+
+/**
+ * @brief log(sqrt(2π)) + 0i constant
+ */
+extern const qcomplex_t QC_LOG_SQRT_2PI;
+
+/**
+ * @brief ln(2π) + 0i constant
+ */
+extern const qcomplex_t QC_LN_2PI;
+
+/**
+ * @brief Euler-Mascheroni constant + 0i
+ */
+extern const qcomplex_t QC_EULER_MASCHERONI;
+
+/**
  * @brief Construct a qcomplex_t from real and imaginary parts.
  */
 static inline qcomplex_t qc_make(qfloat_t re, qfloat_t im) {
