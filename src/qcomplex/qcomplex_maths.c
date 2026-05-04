@@ -481,12 +481,17 @@ qcomplex_t qc_productlog(qcomplex_t z)
     if (qf_eq(z.im, qf_from_double(0.0)))
         return qcrf(qf_productlog(z.re));
 
-    /* Newton iteration on the principal branch: w e^w = z */
+    /* Halley iteration on the principal branch: w e^w = z */
     qcomplex_t w = qc_log(z);
     for (int i = 0; i < 40; i++) {
         qcomplex_t ew    = qc_exp(w);
-        qcomplex_t f     = qc_sub(qc_mul(w, ew), z);
-        qcomplex_t delta = qc_div(f, qc_mul(ew, qc_add(w, qcr(1.0))));
+        qcomplex_t wew   = qc_mul(w, ew);
+        qcomplex_t f     = qc_sub(wew, z);
+        qcomplex_t wp1   = qc_add(w, qcr(1.0));
+        qcomplex_t f1    = qc_mul(ew, wp1);
+        qcomplex_t f2    = qc_mul(ew, qc_add(w, qcr(2.0)));
+        qcomplex_t corr2 = qc_mul(qcr(0.5), qc_mul(qc_div(f, f1), f2));
+        qcomplex_t delta = qc_div(f, qc_sub(f1, corr2));
         w = qc_sub(w, delta);
         if (qf_lt(qc_abs(delta), qf_from_double(1e-30)))
             break;
