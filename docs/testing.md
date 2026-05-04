@@ -8,6 +8,8 @@ The project provides per-module test targets.
 make test_mint
 make tests/build/release/mfloat/test_mfloat
 tests/build/release/mfloat/test_mfloat
+make tests/build/release/mcomplex/test_mcomplex
+tests/build/release/mcomplex/test_mcomplex
 make test_qfloat
 make test_qcomplex
 make test_dval
@@ -37,6 +39,8 @@ make release
 make test_mint
 make tests/build/release/mfloat/test_mfloat
 tests/build/release/mfloat/test_mfloat
+make tests/build/release/mcomplex/test_mcomplex
+tests/build/release/mcomplex/test_mcomplex
 make test_qfloat
 make test_qcomplex
 make test_dval
@@ -71,11 +75,9 @@ make bench_mfloat_maths
 make bench_mcomplex_maths
 ```
 
-This benchmark reports both matched symbolic fast paths and nearby fallback
-cases so performance changes are easy to spot. See
-[`benchmarks.md`](benchmarks.md) for benchmark-specific notes and sample
-results. The `mcomplex` benchmark target is prepared now, but it is intended
-for use after the native `mcomplex` implementation is complete.
+These benchmark targets track the numeric and symbolic hot paths we are
+actively optimizing. See [`benchmarks.md`](benchmarks.md) for benchmark-
+specific notes and sample results.
 
 ---
 

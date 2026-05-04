@@ -95,8 +95,9 @@ static void run_unary_case(const char *label,
     end = now_ns();
 
     avg_us = ((double)(end - start) / (double)iters) / 1000.0;
-    printf("%-28s avg_us=%10.3f avg_ms=%10.3f\n",
+    printf("%-28s bits=%-4zu avg_µs=%10.3f avg_ms=%10.3f\n",
            label,
+           precision,
            avg_us,
            avg_us / 1000.0);
 

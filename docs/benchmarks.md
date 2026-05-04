@@ -18,6 +18,7 @@ make bench_matrix_dval
 make bench_mint_mul
 make bench_mint_div
 make bench_mfloat_maths
+make bench_mcomplex_maths
 ```
 
 As with the test suites, prefer running benchmarks sequentially for now. The
@@ -163,13 +164,13 @@ This benchmark currently covers a broader `qfloat` maths slice:
 Current sample timings with `MARS_BENCH_SCALE=5` on the benchmark machine:
 
 ```text
-exp_1                 avg_us=   1.146
-log_10                avg_us=   2.222
-gamma_2_3             avg_us=   1.107
-lgamma_2_3            avg_us=   3.562
-gammainv_9_5          avg_us=  83.440
-lambert_wm1_-0_1      avg_us=  55.965
-logbeta_2_3_4_5       avg_us=  17.997
+exp_1                 bits=256  avg_µs=   1.146 avg_ms=     0.001
+log_10                bits=256  avg_µs=   2.222 avg_ms=     0.002
+gamma_2_3             bits=256  avg_µs=   1.107 avg_ms=     0.001
+lgamma_2_3            bits=256  avg_µs=   3.562 avg_ms=     0.004
+gammainv_9_5          bits=256  avg_µs=  83.440 avg_ms=     0.083
+lambert_wm1_-0_1      bits=256  avg_µs=  55.965 avg_ms=     0.056
+logbeta_2_3_4_5       bits=256  avg_µs=  17.997 avg_ms=     0.018
 ```
 
 One implementation note matters here: on the current x86_64 machine, `qfloat`
@@ -199,23 +200,23 @@ This benchmark covers a representative complex-valued slice:
 Current sample timings on the benchmark machine:
 
 ```text
-exp_1_plus_1i                avg_us=     3.582
-log_1_plus_1i                avg_us=     5.405
-erf_0_5_plus_0_5i            avg_us=    10.404
-erfc_0_5_plus_0_5i           avg_us=     9.357
-gamma_1_5_plus_0_7i          avg_us=    14.554
-lgamma_1_5_plus_0_7i         avg_us=    13.515
-digamma_2_plus_1i            avg_us=    14.643
-trigamma_2_plus_0_5i         avg_us=     4.596
-tetragamma_2_plus_0_5i       avg_us=     6.256
-gammainv_gamma_2_5           avg_us=    95.411
-gammainv_gamma_2_5_0_3i      avg_us=   219.491
-productlog_1_plus_1i         avg_us=    30.014
-lambert_wm1_-0_2_-0_1i       avg_us=    27.295
-ei_1_plus_1i                 avg_us=    44.938
-e1_1_plus_1i                 avg_us=    41.641
-beta_1_5_0_5__2_-0_3         avg_us=    38.087
-logbeta_1_5_0_5__2_-0_3      avg_us=    37.286
+exp_1_plus_1i                avg_µs=     3.582 avg_ms=     0.004
+log_1_plus_1i                avg_µs=     5.405 avg_ms=     0.005
+erf_0_5_plus_0_5i            avg_µs=    10.404 avg_ms=     0.010
+erfc_0_5_plus_0_5i           avg_µs=     9.357 avg_ms=     0.009
+gamma_1_5_plus_0_7i          avg_µs=    14.554 avg_ms=     0.015
+lgamma_1_5_plus_0_7i         avg_µs=    13.515 avg_ms=     0.014
+digamma_2_plus_1i            avg_µs=    14.643 avg_ms=     0.015
+trigamma_2_plus_0_5i         avg_µs=     4.596 avg_ms=     0.005
+tetragamma_2_plus_0_5i       avg_µs=     6.256 avg_ms=     0.006
+gammainv_gamma_2_5           avg_µs=    95.411 avg_ms=     0.095
+gammainv_gamma_2_5_0_3i      avg_µs=   219.491 avg_ms=     0.219
+productlog_1_plus_1i         avg_µs=    30.014 avg_ms=     0.030
+lambert_wm1_-0_2_-0_1i       avg_µs=    27.295 avg_ms=     0.027
+ei_1_plus_1i                 avg_µs=    44.938 avg_ms=     0.045
+e1_1_plus_1i                 avg_µs=    41.641 avg_ms=     0.042
+beta_1_5_0_5__2_-0_3         avg_µs=    38.087 avg_ms=     0.038
+logbeta_1_5_0_5__2_-0_3      avg_µs=    37.286 avg_ms=     0.037
 ```
 
 ### `mcomplex`
@@ -226,17 +227,31 @@ Available benchmark target:
 make bench_mcomplex_maths
 ```
 
-This benchmark has been prepared for the post-implementation phase and mirrors
-the current `qcomplex` coverage:
+This benchmark mirrors the current `qcomplex` coverage and tracks the native
+`mcomplex` replacement work:
 
 - `mc_exp(1+i)` and `mc_log(1+i)`
 - `mc_erf(0.5+0.5i)` and `mc_erfc(0.5+0.5i)`
 - complex gamma-family calls including `mc_gamma`, `mc_lgamma`, `mc_digamma`,
   `mc_trigamma`, and `mc_tetragamma`
+- pure-real `mc_gamma(2.3 + 0i)` and `mc_lgamma(2.3 + 0i)` for apples-to-apples
+  comparison with `mfloat`
 - real and genuinely complex `mc_gammainv` cases
 - `mc_productlog` and `mc_lambert_wm1`
 - `mc_ei`, `mc_e1`, `mc_beta`, and `mc_logbeta`
 
-No sample timings are recorded yet. The current `mcomplex` implementation still
-routes maths through the `qcomplex` backend, so benchmark interpretation should
-wait until the native `mfloat`-precision complex implementation is complete.
+Recent sample timings on this tree:
+
+```text
+exp_1_plus_1i                bits=256  avg_µs=   105.701 avg_ms=     0.106
+log_1_plus_1i                bits=256  avg_µs=   142.650 avg_ms=     0.143
+productlog_1_plus_1i         bits=256  avg_µs=   181.881 avg_ms=     0.182
+ei_1_plus_1i                 bits=256  avg_µs=   299.359 avg_ms=     0.299
+e1_1_plus_1i                 bits=256  avg_µs=   231.809 avg_ms=     0.232
+gamma_2_3_plus_0i            bits=256  avg_µs=233374.231 avg_ms=   233.374
+lgamma_2_3_plus_0i           bits=256  avg_µs=163232.872 avg_ms=   163.233
+```
+
+The current `mcomplex` implementation still has remaining wrapper-era paths, so
+these numbers should be read as active optimization checkpoints rather than
+final end-state timings.

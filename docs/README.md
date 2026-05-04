@@ -12,6 +12,7 @@ This directory contains the longer module documentation for MARS.
 
 - [`mint_t`](mint.md) — arbitrary-precision signed integers and number theory helpers
 - [`mfloat_t`](mfloat.md) — opaque multiprecision floating-point arithmetic
+- [`mcomplex_t`](mcomplex.md) — opaque multiprecision complex arithmetic backed by `mfloat_t`
 - [`qfloat_t`](qfloat.md) — double-double arithmetic and special functions
 - [`qcomplex_t`](qcomplex.md) — double-double complex arithmetic and special functions
 - [`matrix_t`](matrix.md) — generic high-precision matrix with pluggable element types and storage kinds

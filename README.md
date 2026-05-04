@@ -263,6 +263,7 @@ M_2281 is prime    M_3217 is prime    M_4253 is prime    M_4423 is prime
 |---|---|---|
 | `mint_t` | Arbitrary-precision signed integers and number-theory helpers | [`docs/mint.md`](docs/mint.md) |
 | `mfloat_t` | Opaque multiprecision floating-point arithmetic | [`docs/mfloat.md`](docs/mfloat.md) |
+| `mcomplex_t` | Opaque multiprecision complex arithmetic backed by `mfloat_t` | [`docs/mcomplex.md`](docs/mcomplex.md) |
 | `qfloat_t` | Double-double arithmetic and special functions | [`docs/qfloat.md`](docs/qfloat.md) |
 | `qcomplex_t` | Double-double complex arithmetic and special functions | [`docs/qcomplex.md`](docs/qcomplex.md) |
 | `matrix_t` | Generic high-precision matrix with numeric and symbolic element types | [`docs/matrix.md`](docs/matrix.md) |
@@ -299,6 +300,7 @@ make bench_matrix_dval
 make bench_mint_mul
 make bench_mint_div
 make bench_mfloat_maths
+make bench_mcomplex_maths
 ```
 
 See [`docs/building.md`](docs/building.md) for benchmark and build details.
