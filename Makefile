@@ -60,6 +60,7 @@ TEST_HELPER_OBJS  := $(TEST_HELPER_SRCS:tests/%.c=$(TEST_BUILD_DIR)/%.o)
 BENCH_SRCS        := $(shell find bench -name 'bench_*.c' 2>/dev/null | sort)
 BENCH_OBJS        := $(BENCH_SRCS:bench/%.c=$(BUILD_DIR)/bench/%.o)
 BENCH_BINS        := $(patsubst bench/%.c,$(BUILD_DIR)/bench/%,$(BENCH_SRCS))
+QFLOAT_TOOL_BIN   := $(BUILD_DIR)/tools/qfloat/gen_qfloat_tables
 
 HEADERS      := $(wildcard include/*.h)
 
@@ -137,6 +138,10 @@ $(BUILD_DIR)/bench/%: $(BUILD_DIR)/bench/%.o $(STATIC_LIB) $(SHARED_LIB)
 	@mkdir -p $(dir $@)
 	$(CC) -o $@ $< $(STATIC_LIB) $(LDLIBS)
 
+$(QFLOAT_TOOL_BIN): tools/qfloat/gen_qfloat_tables.c $(STATIC_LIB)
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $< $(STATIC_LIB) $(LDLIBS)
+
 # ------------------------------------------------------------
 # Test targets
 # ------------------------------------------------------------
@@ -207,6 +212,23 @@ $(eval $(call BENCH_ALIAS_RULES,bench_qfloat_gamma_maths,$(QFLOAT_GAMMA_BENCH_BI
 endif
 
 $(foreach bin,$(BENCH_ALIAS_BINS),$(eval $(call BENCH_ALIAS_RULES,$(notdir $(bin)),$(bin))))
+
+.PHONY: gen_qfloat_tables gen_qfloat_constants
+ifeq ($(RELEASE_BUILD),1)
+gen_qfloat_tables:
+	@$(MAKE) DEBUG=0 RELEASE_OPT_FLAGS="$(QFLOAT_RELEASE_OPT_FLAGS)" $(QFLOAT_TOOL_BIN)
+	@$(QFLOAT_TOOL_BIN) --exp-coef
+
+gen_qfloat_constants:
+	@$(MAKE) DEBUG=0 RELEASE_OPT_FLAGS="$(QFLOAT_RELEASE_OPT_FLAGS)" $(QFLOAT_TOOL_BIN)
+	@$(QFLOAT_TOOL_BIN)
+else
+gen_qfloat_tables: $(QFLOAT_TOOL_BIN)
+	@$(QFLOAT_TOOL_BIN) --exp-coef
+
+gen_qfloat_constants: $(QFLOAT_TOOL_BIN)
+	@$(QFLOAT_TOOL_BIN)
+endif
 
 # ------------------------------------------------------------
 # Help
