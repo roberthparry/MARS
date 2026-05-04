@@ -490,7 +490,7 @@ static qcomplex_t qc_lambert_w_asymptotic_guess(qcomplex_t z, int branch)
     qcomplex_t L1 = qc_log(z);
     L1.im = qf_add(L1.im, qf_mul_double(two_pi, (double)branch));
 
-    if (qc_abs(L1).hi == 0.0)
+    if (qf_eq(qc_abs2_local(L1), QF_ZERO))
         return L1;
 
     qcomplex_t L2 = qc_log(L1);
@@ -511,7 +511,7 @@ static qcomplex_t qc_lambert_wm1_complex(qcomplex_t z)
         return qc_make(QF_NINF, QF_NAN);
 
     qcomplex_t branch_probe = qc_add(qc_mul(qcrf(QF_E), z), qcr(1.0));
-    qcomplex_t w = qf_lt(qc_abs(branch_probe), qf_from_double(0.25))
+    qcomplex_t w = qf_lt(qc_abs2_local(branch_probe), qf_from_double(0.0625))
         ? qc_lambert_w_series_guess(z, -1)
         : qc_lambert_w_asymptotic_guess(z, -1);
 
@@ -533,7 +533,7 @@ static qcomplex_t qc_lambert_wm1_complex(qcomplex_t z)
         qcomplex_t delta = qc_div(f, denom);
         w = qc_sub(w, delta);
 
-        if (qf_lt(qc_abs(delta), zero_tol))
+        if (qf_lt(qc_abs2_local(delta), qf_mul(zero_tol, zero_tol)))
             break;
     }
 
