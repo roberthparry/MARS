@@ -2,6 +2,8 @@
 
 #include <math.h>
 
+static int qf_is_integer(qfloat_t x);
+
 static inline int qf_round_to_int(qfloat_t y)
 {
     double s, e;
@@ -690,6 +692,17 @@ qfloat_t qf_atanh(qfloat_t x)
 
 qfloat_t qf_gamma(qfloat_t x)
 {
+    int is_pos_half_integer =
+        x.hi > 0.0 &&
+        !qf_is_integer(x) &&
+        qf_is_integer(qf_mul_double(x, 2.0));
+
+    /* The historical core polynomial is the weakest qfloat gamma path.
+       For the positive core interval, use exp(lgamma(x)) except at the
+       half-integers where qf_lgamma() intentionally delegates back here. */
+    if (x.hi > 0.75 && x.hi < 2.0 && !is_pos_half_integer)
+        return qf_exp(qf_lgamma(x));
+
     /* Reject extreme magnitudes for now */
     if (fabs(x.hi) > 1e+240) 
         return (qfloat_t){ NAN, NAN };
