@@ -1775,9 +1775,9 @@ static long mfloat_lgamma_asymptotic_threshold(size_t precision)
     if (precision <= 256u)
         return 32l;
     if (precision <= 512u)
-        return 64l;
+        return 512l;
     if (precision <= 1024u)
-        return 96l;
+        return 512l;
     return 128l;
 }
 
@@ -2499,7 +2499,7 @@ int mf_exp(mfloat_t *mfloat)
     }
 
     precision = mfloat->precision;
-    work_prec = mfloat_transcendental_work_prec(precision);
+    work_prec = precision;
     x = mfloat_clone_prec(mfloat, work_prec);
     ln2 = mfloat_clone_immortal_prec_internal(&mfloat_ln2_1024_static, work_prec);
     if (!x || !ln2)
@@ -2857,7 +2857,7 @@ int mf_sin(mfloat_t *mfloat)
     }
 
     precision = mfloat->precision;
-    work_prec = mfloat_transcendental_work_prec(precision);
+    work_prec = precision;
     if (mfloat_reduce_trig_argument(mfloat, work_prec, &r, &quadrant) != 0)
         goto cleanup;
 
