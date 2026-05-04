@@ -2,43 +2,94 @@
 
 #include "qcomplex_internal.h"
 
-static void qc_init_faddeeva_coeffs(qfloat_t ak[32], qfloat_t ck[32])
-{
-    static int initialised = 0;
+static const qfloat_t qc_faddeeva_ak[32] = {
+    { .hi = 0.27768018363489788, .lo = 9.0767120701630337e-18 },
+    { .hi = 0.83304055090469364, .lo = 2.7230136210489064e-17 },
+    { .hi = 1.3884009181744894, .lo = 4.5383560350815163e-17 },
+    { .hi = 1.9437612854442852, .lo = 6.3536984491141175e-17 },
+    { .hi = 2.4991216527140812, .lo = -1.4035419629356404e-16 },
+    { .hi = 3.0544820199838769, .lo = -1.2220077215323797e-16 },
+    { .hi = 3.6098423872536727, .lo = -1.0404734801291188e-16 },
+    { .hi = 4.1652027545234684, .lo = -8.589392387258579e-17 },
+    { .hi = 4.7205631217932638, .lo = 3.7634871011780275e-16 },
+    { .hi = 5.27592348906306, .lo = -4.9587075591933679e-17 },
+    { .hi = 5.8312838563328553, .lo = 4.1265555839845498e-16 },
+    { .hi = 6.3866442236026515, .lo = -1.3280227311281643e-17 },
+    { .hi = 6.9420045908724477, .lo = -4.3921601302101817e-16 },
+    { .hi = 7.497364958142243, .lo = 2.3026620969370541e-17 },
+    { .hi = 8.0527253254120392, .lo = -4.0290916474036598e-16 },
+    { .hi = 8.6080856926818345, .lo = 5.9333469250022725e-17 },
+    { .hi = 9.1634460599516299, .lo = 5.2157610324041134e-16 },
+    { .hi = 9.718806427221427, .lo = -7.9253810216945052e-16 },
+    { .hi = 10.274166794491222, .lo = -3.3029546817906181e-16 },
+    { .hi = 10.829527161761018, .lo = 1.3194716581132695e-16 },
+    { .hi = 11.384887529030813, .lo = 5.941897998017156e-16 },
+    { .hi = 11.94024789630061, .lo = -7.1992440560814635e-16 },
+    { .hi = 12.495608263570405, .lo = -2.5768177161775784e-16 },
+    { .hi = 13.050968630840201, .lo = 2.0456086237263117e-16 },
+    { .hi = 13.606328998109996, .lo = 6.6680349636301987e-16 },
+    { .hi = 14.161689365379793, .lo = -6.4731070904684198e-16 },
+    { .hi = 14.717049732649588, .lo = -1.8506807505645327e-16 },
+    { .hi = 15.272410099919384, .lo = 2.7717455893393539e-16 },
+    { .hi = 15.827770467189179, .lo = 7.3941719292432414e-16 },
+    { .hi = 16.383130834458974, .lo = 1.2016598269147127e-15 },
+    { .hi = 16.93849120172877, .lo = 1.6639024609051016e-15 },
+    { .hi = 17.493851568998569, .lo = -1.4265685839050107e-15 },
+};
 
-    if (initialised)
-        return;
-    initialised = 1;
+static const qfloat_t qc_faddeeva_ck[32] = {
+    { .hi = 0.35334045532188407, .lo = -5.1060356717009355e-18 },
+    { .hi = 0.35164004979327168, .lo = -1.7896523109490442e-17 },
+    { .hi = 0.3482556145708236, .lo = 3.9344395413187435e-18 },
+    { .hi = 0.34321974361585256, .lo = 2.1438505844416959e-18 },
+    { .hi = 0.33658093511854198, .lo = 5.1930164514014062e-18 },
+    { .hi = 0.32840312443386288, .lo = -1.4351829991431114e-17 },
+    { .hi = 0.31876506834915475, .lo = -2.3680555894473439e-17 },
+    { .hi = 0.30775958661321068, .lo = 3.6417051543110264e-18 },
+    { .hi = 0.29549266803135615, .lo = 2.4628289459045659e-17 },
+    { .hi = 0.28208244973531427, .lo = 1.7021070742208289e-17 },
+    { .hi = 0.26765807945804687, .lo = 2.2530497410534951e-17 },
+    { .hi = 0.25235847177048698, .lo = -8.5797690063293585e-18 },
+    { .hi = 0.23633097025828204, .lo = -2.0894686963217415e-19 },
+    { .hi = 0.21972992852251819, .lo = -1.2392959193406266e-17 },
+    { .hi = 0.20271522367016331, .lo = 1.3218712990283339e-17 },
+    { .hi = 0.18545071661012946, .lo = 5.0162237656232391e-18 },
+    { .hi = 0.1681026739831443, .lo = -1.4288814336266023e-18 },
+    { .hi = 0.15083816692311044, .lo = -9.6313706582867086e-18 },
+    { .hi = 0.1338234620707556, .lo = -1.1775274090226018e-17 },
+    { .hi = 0.11722242033499172, .lo = 3.7962892016288056e-18 },
+    { .hi = 0.10119491882278679, .lo = -1.7106764694884606e-18 },
+    { .hi = 0.085895311135226873, .lo = -5.0653672707238615e-18 },
+    { .hi = 0.071470940857959478, .lo = 4.4405939760279703e-19 },
+    { .hi = 0.058060722561917584, .lo = -2.2426541532734527e-19 },
+    { .hi = 0.04579380398006308, .lo = -5.4362822314392653e-20 },
+    { .hi = 0.034788322244119041, .lo = -4.8767738915884548e-19 },
+    { .hi = 0.025150266159410895, .lo = 5.919375636596669e-19 },
+    { .hi = 0.016972455474731779, .lo = -1.6056741194047767e-18 },
+    { .hi = 0.010333646977421203, .lo = -2.9123172842187257e-19 },
+    { .hi = 0.0052977760224501569, .lo = -3.4709720932211063e-19 },
+    { .hi = 0.0019133408000020994, .lo = 1.6662426274081609e-20 },
+    { .hi = 0.00021293527138969463, .lo = -7.344430498602854e-21 },
+};
 
-    {
-        const int N = 32;
-        qfloat_t L   = qf_sqrt(qf_from_double((double)N));
-        qfloat_t two = qf_from_double(2.0);
+static const qfloat_t qc_sqrt_2pi = {
+    .hi = 2.5066282746310007,
+    .lo = -1.8328579980459169e-16
+};
 
-        for (int k = 1; k <= N; k++) {
-            qfloat_t odd = qf_from_double((double)(2 * k - 1));
-            qfloat_t angle = qf_div(qf_mul(odd, QF_PI),
-                                    qf_mul(two, qf_from_double((double)N)));
-
-            ak[k - 1] = qf_div(qf_mul(odd, QF_PI), qf_mul(two, L));
-            ck[k - 1] = qf_div(qf_add(qf_from_double(1.0), qf_cos(angle)), L);
-        }
-    }
-}
+static const qfloat_t qc_pi_cubed = {
+    .hi = 31.00627668029982,
+    .lo = 4.1641946985288283e-16
+};
 
 static qcomplex_t qc_faddeeva(qcomplex_t z)
 {
     const int N = 32;
-    static qfloat_t ak[32];
-    static qfloat_t ck[32];
-
     qcomplex_t sum = qcr(0.0);
 
-    qc_init_faddeeva_coeffs(ak, ck);
-
     for (int k = 1; k <= N; k++) {
-        qcomplex_t denom = qc_make(z.re, qf_sub(z.im, ak[k - 1]));
-        sum = qc_add(sum, qc_div(qcrf(ck[k - 1]), denom));
+        qcomplex_t denom = qc_make(z.re, qf_sub(z.im, qc_faddeeva_ak[k - 1]));
+        sum = qc_add(sum, qc_div(qcrf(qc_faddeeva_ck[k - 1]), denom));
     }
 
     // inside = 1 + (2i / sqrt(pi)) * sum
@@ -150,8 +201,7 @@ qcomplex_t qc_gamma(qcomplex_t z)
     qcomplex_t sum         = lanczos_sum(z_minus_one);
     qcomplex_t t           = qc_add(z_minus_one, qcr(7.5));  // g + 0.5, g = 7
 
-    qfloat_t sqrt_2pi = qf_sqrt(qf_mul(qf_from_double(2.0), QF_PI));
-    return qc_mul(qc_mul(qcrf(sqrt_2pi), qc_pow(t, qc_sub(z, qcr(0.5)))),
+    return qc_mul(qc_mul(qcrf(qc_sqrt_2pi), qc_pow(t, qc_sub(z, qcr(0.5)))),
                   qc_mul(qc_exp(qc_neg(t)), sum));
 }
 
@@ -170,10 +220,8 @@ qcomplex_t qc_lgamma(qcomplex_t z)
     qcomplex_t z_minus_one = qc_sub(z, qcr(1.0));
     qcomplex_t sum         = lanczos_sum(z_minus_one);
     qcomplex_t t           = qc_add(z_minus_one, qcr(7.5));
-
-    qfloat_t sqrt_2pi = qf_sqrt(qf_mul(qf_from_double(2.0), QF_PI));
     return qc_add(
-        qc_add(qcrf(qf_log(sqrt_2pi)), qc_mul(qc_sub(z, qcr(0.5)), qc_log(t))),
+        qc_add(qcrf(QF_LOG_SQRT_2PI), qc_mul(qc_sub(z, qcr(0.5)), qc_log(t))),
         qc_add(qc_neg(t), qc_log(sum)));
 }
 
@@ -279,8 +327,7 @@ qcomplex_t qc_tetragamma(qcomplex_t z)
         qcomplex_t csc    = qc_div(qcr(1.0), sin_pz);
         qcomplex_t csc2   = qc_mul(csc, csc);
         qcomplex_t cot_pz = qc_div(qc_cos(pi_z), sin_pz);
-        qfloat_t pi3 = qf_mul(qf_mul(QF_PI, QF_PI), QF_PI);
-        qcomplex_t term = qc_mul(qcrf(qf_mul_double(pi3, 2.0)),
+        qcomplex_t term = qc_mul(qcrf(qf_mul_double(qc_pi_cubed, 2.0)),
                                  qc_mul(csc2, cot_pz));
         return qc_add(qc_tetragamma(qc_sub(qcr(1.0), z)), term);
     }
@@ -393,8 +440,8 @@ qcomplex_t qc_normal_pdf(qcomplex_t z)
         return qcrf(qf_normal_pdf(z.re));
 
     // φ(z) = exp(-z²/2) / sqrt(2π)
-    qfloat_t sqrt_2pi = qf_sqrt(qf_mul(qf_from_double(2.0), QF_PI));
-    return qc_div(qc_exp(qc_mul(qcr(-0.5), qc_mul(z, z))), qcrf(sqrt_2pi));
+    return qc_mul(qcrf(QF_INV_SQRT_2PI),
+                  qc_exp(qc_mul(qcr(-0.5), qc_mul(z, z))));
 }
 
 qcomplex_t qc_normal_cdf(qcomplex_t z)
@@ -413,9 +460,8 @@ qcomplex_t qc_normal_logpdf(qcomplex_t z)
         return qcrf(qf_normal_logpdf(z.re));
 
     // log φ(z) = -z²/2 - log(2π)/2
-    qfloat_t log_2pi = qf_log(qf_mul(qf_from_double(2.0), QF_PI));
     return qc_sub(qc_mul(qcr(-0.5), qc_mul(z, z)),
-                  qcrf(qf_mul_double(log_2pi, 0.5)));
+                  qcrf(QF_LOG_SQRT_2PI));
 }
 
 static qcomplex_t qc_lambert_w_series_guess(qcomplex_t z, int branch)
