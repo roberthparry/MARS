@@ -5,6 +5,10 @@
 
 #include "mcomplex.h"
 
+#ifndef TEST_MCOMPLEX_MATHS_PRECISION
+#define TEST_MCOMPLEX_MATHS_PRECISION 512u
+#endif
+
 #define TEST_CONFIG_MODE TEST_CONFIG_GLOBAL
 #define TEST_CONFIG_MAIN
 #include "test_harness.h"
@@ -442,6 +446,8 @@ static void test_lifecycle_and_constants(void)
         print_mcomplex_input("input string", "3.5 - 2.25i");
         z = mc_create_string("3.5 - 2.25i");
         ASSERT_NOT_NULL(z);
+        ASSERT_EQ_INT(mc_set_precision_digits(z, 50), 0);
+        ASSERT_EQ_LONG((long)mc_get_precision_digits(z), 50);
         print_mcomplex_value("parsed z", z);
         print_mcomplex_error_check("mc_create_string(\"3.5 - 2.25i\")", z, "3.5", "-2.25");
         ASSERT_TRUE(mcomplex_meets_precision(z, "3.5", "-2.25"));
@@ -1270,6 +1276,9 @@ static void test_difficult_mcomplex_cases(void)
 
 int tests_main(void)
 {
+    size_t saved_default = mf_get_default_precision();
+
+    ASSERT_EQ_INT(mf_set_default_precision(TEST_MCOMPLEX_MATHS_PRECISION), 0);
     RUN_TEST(test_lifecycle_and_constants, NULL);
     RUN_TEST(test_conversion_to_from_qcomplex, NULL);
     RUN_TEST(test_arithmetic, NULL);
@@ -1278,5 +1287,6 @@ int tests_main(void)
     RUN_TEST(test_real_special_replacements, NULL);
     RUN_TEST(test_special_functions, NULL);
     RUN_TEST(test_difficult_mcomplex_cases, NULL);
+    ASSERT_EQ_INT(mf_set_default_precision(saved_default), 0);
     return 0;
 }

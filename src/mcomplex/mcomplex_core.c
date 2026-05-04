@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 #include "mcomplex_internal.h"
 #include "../mfloat/mfloat_internal.h"
@@ -269,6 +270,15 @@ int mc_set_precision(mcomplex_t *mcomplex, size_t precision_bits)
     return 0;
 }
 
+int mc_set_precision_digits(mcomplex_t *mcomplex, size_t significant_digits)
+{
+    if (!mcomplex)
+        return -1;
+    return mc_set_precision(mcomplex,
+                            (size_t)ceil((double)significant_digits *
+                                         3.3219280948873626));
+}
+
 size_t mc_get_precision(const mcomplex_t *mcomplex)
 {
     size_t real_prec, imag_prec;
@@ -278,6 +288,17 @@ size_t mc_get_precision(const mcomplex_t *mcomplex)
     real_prec = mf_get_precision(mcomplex->real);
     imag_prec = mf_get_precision(mcomplex->imag);
     return real_prec > imag_prec ? real_prec : imag_prec;
+}
+
+size_t mc_get_precision_digits(const mcomplex_t *mcomplex)
+{
+    size_t precision_bits = mc_get_precision(mcomplex);
+    size_t digits;
+
+    if (precision_bits == 0u)
+        return 0u;
+    digits = (size_t)floor((double)precision_bits * 0.3010299956639812);
+    return digits > 0u ? digits : 1u;
 }
 
 int mc_set(mcomplex_t *mcomplex, const mfloat_t *real, const mfloat_t *imag)

@@ -42,6 +42,8 @@ void mc_clear(mcomplex_t *mcomplex);
 
 int mc_set_precision(mcomplex_t *mcomplex, size_t precision_bits);
 size_t mc_get_precision(const mcomplex_t *mcomplex);
+int mc_set_precision_digits(mcomplex_t *mcomplex, size_t significant_digits);
+size_t mc_get_precision_digits(const mcomplex_t *mcomplex);
 int mc_set(mcomplex_t *mcomplex, const mfloat_t *real, const mfloat_t *imag);
 int mc_set_qcomplex(mcomplex_t *mcomplex, qcomplex_t value);
 int mc_set_string(mcomplex_t *mcomplex, const char *text);

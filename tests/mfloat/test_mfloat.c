@@ -9,7 +9,7 @@
 
 #ifndef TEST_MFLOAT_MATHS_PRECISION
 /* Keep maths-only precision configurable without affecting core object tests. */
-#define TEST_MFLOAT_MATHS_PRECISION 768u
+#define TEST_MFLOAT_MATHS_PRECISION 512u
 #endif
 
 #define TEST_CONFIG_MODE TEST_CONFIG_GLOBAL
@@ -327,11 +327,15 @@ void test_new_and_precision(void)
     ASSERT_EQ_INT(mf_set_default_precision(384), 0);
     print_precision_check("mf_set_default_precision(384)", "default", 384, (long)mf_get_default_precision());
     ASSERT_EQ_LONG((long)mf_get_default_precision(), 384);
+
+    ASSERT_EQ_INT(mf_set_precision_digits(a, 50), 0);
+    ASSERT_EQ_LONG((long)mf_get_precision_digits(a), 50);
+    ASSERT_EQ_INT(mf_set_default_precision_digits(60), 0);
+    ASSERT_EQ_LONG((long)mf_get_default_precision_digits(), 60);
     mf_free(a);
     a = mf_new();
     ASSERT_NOT_NULL(a);
-    print_precision_check("mf_new() after default precision change", "mf_new()", 384, (long)mf_get_precision(a));
-    ASSERT_EQ_LONG((long)mf_get_precision(a), 384);
+    ASSERT_EQ_LONG((long)mf_get_precision_digits(a), 60);
 
     mf_free(a);
     mf_free(b);

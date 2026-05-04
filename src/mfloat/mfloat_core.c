@@ -9,6 +9,8 @@
 
 static uint64_t mfloat_one_storage[] = { 1u };
 static uint64_t mfloat_ten_storage[] = { 10u };
+static const double MFLOAT_LOG10_2 = 0.3010299956639812;
+static const double MFLOAT_LOG2_10 = 3.3219280948873626;
 
 static struct _mint_t mfloat_zero_mint = {
     .sign = 0,
@@ -728,6 +730,26 @@ int mf_set_default_precision(size_t precision_bits)
     return 0;
 }
 
+static size_t mfloat_bits_to_decimal_digits(size_t precision_bits)
+{
+    size_t digits;
+
+    if (precision_bits == 0u)
+        return 0u;
+    digits = (size_t)floor((double)precision_bits * MFLOAT_LOG10_2);
+    return digits > 0u ? digits : 1u;
+}
+
+static size_t mfloat_decimal_digits_to_bits(size_t significant_digits)
+{
+    size_t bits;
+
+    if (significant_digits == 0u)
+        return 0u;
+    bits = (size_t)ceil((double)significant_digits * MFLOAT_LOG2_10);
+    return bits > 0u ? bits : 1u;
+}
+
 size_t mf_get_default_precision(void)
 {
     return mfloat_default_precision_bits;
@@ -736,6 +758,28 @@ size_t mf_get_default_precision(void)
 size_t mf_get_precision(const mfloat_t *mfloat)
 {
     return mfloat ? mfloat->precision : 0;
+}
+
+int mf_set_default_precision_digits(size_t significant_digits)
+{
+    return mf_set_default_precision(
+        mfloat_decimal_digits_to_bits(significant_digits));
+}
+
+size_t mf_get_default_precision_digits(void)
+{
+    return mfloat_bits_to_decimal_digits(mf_get_default_precision());
+}
+
+int mf_set_precision_digits(mfloat_t *mfloat, size_t significant_digits)
+{
+    return mf_set_precision(mfloat,
+                            mfloat_decimal_digits_to_bits(significant_digits));
+}
+
+size_t mf_get_precision_digits(const mfloat_t *mfloat)
+{
+    return mfloat_bits_to_decimal_digits(mf_get_precision(mfloat));
 }
 
 int mf_set_long(mfloat_t *mfloat, long value)
