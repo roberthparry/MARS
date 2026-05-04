@@ -321,4 +321,4 @@ Current sample results with `MARS_BENCH_SCALE=5`:
 | `qf_logbeta(2.3, 4.5)` | `17.997 µs` |
 
 For a broader benchmark overview, see
-[docs/benchmarks.md](/home/rparry/Projects/MARS/docs/benchmarks.md).
+[`docs/benchmarks.md`](benchmarks.md).
