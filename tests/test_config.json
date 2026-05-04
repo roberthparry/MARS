@@ -2437,5 +2437,11 @@
     "test_extended_math_wrappers": true,
     "test_remaining_special_mfloat_functions": true,
     "test_readme_examples": true
+  },
+  "tests/mcomplex/test_mcomplex.c": {
+    "test_lifecycle_and_constants": true,
+    "test_arithmetic": true,
+    "test_transcendentals": true,
+    "test_special_functions": true
   }
 }
