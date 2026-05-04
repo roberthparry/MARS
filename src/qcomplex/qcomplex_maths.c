@@ -82,6 +82,31 @@ static const qfloat_t qc_pi_cubed = {
     .lo = 4.1641946985288283e-16
 };
 
+static const qfloat_t qc_bernoulli_b2 = {
+    .hi = 0.16666666666666666,
+    .lo = 9.2518585385429707e-18
+};
+
+static const qfloat_t qc_bernoulli_b4 = {
+    .hi = -0.033333333333333333,
+    .lo = -4.6259292692714855e-19
+};
+
+static const qfloat_t qc_bernoulli_b6 = {
+    .hi = 0.023809523809523808,
+    .lo = 1.3216940769347101e-18
+};
+
+static const qfloat_t qc_bernoulli_b8 = {
+    .hi = -0.033333333333333333,
+    .lo = -4.6259292692714855e-19
+};
+
+static const qfloat_t qc_bernoulli_b10 = {
+    .hi = 0.07575757575757576,
+    .lo = -2.1026951223961299e-18
+};
+
 static qfloat_t qc_abs2_local(qcomplex_t z)
 {
     return qf_add(qf_mul(z.re, z.re), qf_mul(z.im, z.im));
@@ -248,23 +273,17 @@ qcomplex_t qc_digamma(qcomplex_t z)
     qcomplex_t invz   = qc_div(qcr(1.0), zz);
     qcomplex_t result = qc_sub(qc_log(zz), qc_mul(qcr(0.5), invz));
 
-    qfloat_t B2  = qf_div(qf_from_double( 1.0), qf_from_double( 6.0));
-    qfloat_t B4  = qf_div(qf_from_double(-1.0), qf_from_double(30.0));
-    qfloat_t B6  = qf_div(qf_from_double( 1.0), qf_from_double(42.0));
-    qfloat_t B8  = qf_div(qf_from_double(-1.0), qf_from_double(30.0));
-    qfloat_t B10 = qf_div(qf_from_double( 5.0), qf_from_double(66.0));
-
     qcomplex_t z2  = qc_mul(invz, invz);
     qcomplex_t z4  = qc_mul(z2, z2);
     qcomplex_t z6  = qc_mul(z4, z2);
     qcomplex_t z8  = qc_mul(z6, z2);
     qcomplex_t z10 = qc_mul(z8, z2);
 
-    result = qc_sub(result, qc_mul(qcrf(B2),  qc_mul(qcr(0.5),      z2)));
-    result = qc_sub(result, qc_mul(qcrf(B4),  qc_mul(qcr(0.25),     z4)));
-    result = qc_sub(result, qc_mul(qcrf(B6),  qc_mul(qcr(1.0/6.0),  z6)));
-    result = qc_sub(result, qc_mul(qcrf(B8),  qc_mul(qcr(0.125),    z8)));
-    result = qc_sub(result, qc_mul(qcrf(B10), qc_mul(qcr(0.1),      z10)));
+    result = qc_sub(result, qc_mul(qcrf(qc_bernoulli_b2),  qc_mul(qcr(0.5),      z2)));
+    result = qc_sub(result, qc_mul(qcrf(qc_bernoulli_b4),  qc_mul(qcr(0.25),     z4)));
+    result = qc_sub(result, qc_mul(qcrf(qc_bernoulli_b6),  qc_mul(qcr(1.0/6.0),  z6)));
+    result = qc_sub(result, qc_mul(qcrf(qc_bernoulli_b8),  qc_mul(qcr(0.125),    z8)));
+    result = qc_sub(result, qc_mul(qcrf(qc_bernoulli_b10), qc_mul(qcr(0.1),      z10)));
 
     return qc_add(result, psi);
 }
@@ -296,20 +315,15 @@ qcomplex_t qc_trigamma(qcomplex_t z)
     qcomplex_t invz2 = qc_mul(invz, invz);
     qcomplex_t result = qc_add(invz, qc_mul(qcr(0.5), invz2));
 
-    qfloat_t B2 = qf_div(qf_from_double( 1.0), qf_from_double( 6.0));
-    qfloat_t B4 = qf_div(qf_from_double(-1.0), qf_from_double(30.0));
-    qfloat_t B6 = qf_div(qf_from_double( 1.0), qf_from_double(42.0));
-    qfloat_t B8 = qf_div(qf_from_double(-1.0), qf_from_double(30.0));
-
     qcomplex_t z3 = qc_mul(invz2, invz);
     qcomplex_t z5 = qc_mul(z3, invz2);
     qcomplex_t z7 = qc_mul(z5, invz2);
     qcomplex_t z9 = qc_mul(z7, invz2);
 
-    result = qc_add(result, qc_mul(qcrf(B2), z3));
-    result = qc_add(result, qc_mul(qcrf(B4), z5));
-    result = qc_add(result, qc_mul(qcrf(B6), z7));
-    result = qc_add(result, qc_mul(qcrf(B8), z9));
+    result = qc_add(result, qc_mul(qcrf(qc_bernoulli_b2), z3));
+    result = qc_add(result, qc_mul(qcrf(qc_bernoulli_b4), z5));
+    result = qc_add(result, qc_mul(qcrf(qc_bernoulli_b6), z7));
+    result = qc_add(result, qc_mul(qcrf(qc_bernoulli_b8), z9));
 
     return qc_add(result, accum);
 }
@@ -346,20 +360,15 @@ qcomplex_t qc_tetragamma(qcomplex_t z)
     qcomplex_t invz2 = qc_mul(invz, invz);
     qcomplex_t result = qc_add(invz2, qc_mul(invz2, invz));
 
-    qfloat_t B2 = qf_div(qf_from_double( 1.0), qf_from_double( 6.0));
-    qfloat_t B4 = qf_div(qf_from_double(-1.0), qf_from_double(30.0));
-    qfloat_t B6 = qf_div(qf_from_double( 1.0), qf_from_double(42.0));
-    qfloat_t B8 = qf_div(qf_from_double(-1.0), qf_from_double(30.0));
-
     qcomplex_t z4  = qc_mul(invz2, invz2);
     qcomplex_t z6  = qc_mul(z4, invz2);
     qcomplex_t z8  = qc_mul(z6, invz2);
     qcomplex_t z10 = qc_mul(z8, invz2);
 
-    result = qc_add(result, qc_mul(qcrf(B2), z4));
-    result = qc_add(result, qc_mul(qcrf(B4), z6));
-    result = qc_add(result, qc_mul(qcrf(B6), z8));
-    result = qc_add(result, qc_mul(qcrf(B8), z10));
+    result = qc_add(result, qc_mul(qcrf(qc_bernoulli_b2), z4));
+    result = qc_add(result, qc_mul(qcrf(qc_bernoulli_b4), z6));
+    result = qc_add(result, qc_mul(qcrf(qc_bernoulli_b6), z8));
+    result = qc_add(result, qc_mul(qcrf(qc_bernoulli_b8), z10));
 
     return qc_add(result, accum);
 }
