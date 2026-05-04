@@ -53,94 +53,94 @@ typedef struct {
    Constants
    ------------------------------------------------------------------------- */
 
-/// @brief Zero
+/** @brief Zero */
 extern const qfloat_t QF_ZERO;
 
-/// @brief One
+/** @brief One */
 extern const qfloat_t QF_ONE;
 
-/// @brief Negative one
+/** @brief Negative one */
 extern const qfloat_t QF_NEG_ONE;
 
-/// @brief One half
+/** @brief One half */
 extern const qfloat_t QF_HALF;
 
-/// @brief Two
+/** @brief Two */
 extern const qfloat_t QF_TWO;
 
-/// @brief Ten
+/** @brief Ten */
 extern const qfloat_t QF_TEN;
 
-/// @brief NaN
+/** @brief NaN */
 extern const qfloat_t QF_NAN;
 
-/// @brief +∞
+/** @brief +∞ */
 extern const qfloat_t QF_INF;
 
-/// @brief -∞
+/** @brief -∞ */
 extern const qfloat_t QF_NINF;
 
-/// @brief Maximum possible qfloat_t value
+/** @brief Maximum possible qfloat_t value */
 extern const qfloat_t QF_MAX;
 
-/// @brief PI
+/** @brief PI */
 extern const qfloat_t QF_PI;
 
-/// @brief 2*PI
+/** @brief 2*PI */
 extern const qfloat_t QF_2PI;
 
-/// @brief PI/2
+/** @brief PI/2 */
 extern const qfloat_t QF_PI_2;
 
-/// @brief PI/4
+/** @brief PI/4 */
 extern const qfloat_t QF_PI_4;
 
-/// @brief 3*PI/4
+/** @brief 3*PI/4 */
 extern const qfloat_t QF_3PI_4;
 
-/// @brief PI/6
+/** @brief PI/6 */
 extern const qfloat_t QF_PI_6;
 
-/// @brief PI/3
+/** @brief PI/3 */
 extern const qfloat_t QF_PI_3;
 
-/// @brief 2/PI
+/** @brief 2/PI */
 extern const qfloat_t QF_2_PI;
 
-/// @brief e
+/** @brief e */
 extern const qfloat_t QF_E;
 
-/// @brief 1/e
+/** @brief 1/e */
 extern const qfloat_t QF_INV_E;
 
-/// @brief ln(2)
+/** @brief ln(2) */
 extern const qfloat_t QF_LN2;
 
-/// @brief 1/ln(2)
+/** @brief 1/ln(2) */
 extern const qfloat_t QF_INVLN2;
 
-/// @brief sqrt(0.5)
+/** @brief sqrt(0.5) */
 extern const qfloat_t QF_SQRT_HALF;
 
-/// @brief sqrt(π)
+/** @brief sqrt(π) */
 extern const qfloat_t QF_SQRT_PI;
 
-/// @brief sqrt(1/π)
+/** @brief sqrt(1/π) */
 extern const qfloat_t QF_SQRT1ONPI;
 
-/// @brief 2*sqrt(1/π)
+/** @brief 2*sqrt(1/π) */
 extern const qfloat_t QF_2_SQRTPI;
 
-/// @brief 1/sqrt(2π)
+/** @brief 1/sqrt(2π) */
 extern const qfloat_t QF_INV_SQRT_2PI;
 
-/// @brief ln(sqrt(2π))
+/** @brief ln(sqrt(2π)) */
 extern const qfloat_t QF_LOG_SQRT_2PI;
 
-/// @brief ln(2π)
+/** @brief ln(2π) */
 extern const qfloat_t QF_LN_2PI;
 
-/// @brief Euler–Mascheroni constant γ
+/** @brief Euler–Mascheroni constant γ */
 extern const qfloat_t QF_EULER_MASCHERONI;
 
 /* -------------------------------------------------------------------------
@@ -310,7 +310,7 @@ qfloat_t qf_mul_pow10(qfloat_t x, int k);
  *   pass qfloat_t directly, not qfloat_t*.
  *
  *       qfloat_t x = qf_from_double(3.14);
- *       qf_printf("x = %q\n", x);   // correct
+ *       qf_printf("x = %q\n", x);   valid usage
  *
  * Supported qfloat_t‑specific format specifiers:
  *   - %Q : scientific notation (uppercase exponent)
@@ -338,7 +338,7 @@ int qf_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap);
  *   qfloat_t arguments to %q and %Q MUST be passed by value.
  *
  *       qfloat_t x = qf_from_double(3.14);
- *       qf_sprintf(buf, n, "x = %q", x);   // correct
+ *       qf_sprintf(buf, n, "x = %q", x);   valid usage
  *
  * All non‑qfloat_t specifiers behave exactly like snprintf().
  *
@@ -362,7 +362,7 @@ int qf_sprintf(char *out, size_t out_size, const char *fmt, ...);
  *   qfloat_t arguments to %q and %Q MUST be passed by value.
  *
  *       qfloat_t x = qf_from_double(3.14159);
- *       qf_printf("x = %Q\n", x);   // correct
+ *       qf_printf("x = %Q\n", x);   valid usage
  *
  * All other format specifiers behave exactly like printf().
  *

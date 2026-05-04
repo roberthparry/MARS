@@ -325,9 +325,9 @@ qcomplex_t qc_from_string(const char *s);
  * IMPORTANT: qcomplex_t and qfloat_t arguments are passed BY VALUE.
  *
  *     qcomplex_t z = qc_make(qf_from_double(3.0), qf_from_double(4.0));
- *     qc_printf("%z\n", z);          // "3 + 4i"
- *     qc_printf("%.4z\n", z);        // "3.0000 + 4.0000i"
- *     qc_printf("%Z\n", z);          // "3e+0 + 4e+0i"
+ *     qc_printf("%z\n", z);          yields "3 + 4i"
+ *     qc_printf("%.4z\n", z);        yields "3.0000 + 4.0000i"
+ *     qc_printf("%Z\n", z);          yields "3e+0 + 4e+0i"
  *
  * @param out      Output buffer (NULL for dry-run count).
  * @param out_size Size of output buffer.
@@ -363,4 +363,4 @@ int qc_sprintf(char *out, size_t out_size, const char *fmt, ...);
  */
 int qc_printf(const char *fmt, ...);
 
-#endif // QCOMPLEX_H
+#endif /* QCOMPLEX_H */
