@@ -64,19 +64,20 @@ qfloat_t qf_from_string(const char *s)
     qfloat_t result = QF_ZERO;
     qfloat_t ten    = QF_TEN;
 
-    int sign     = 1;
-    int exp10    = 0;
+    int sign = 1;
+    int exp10 = 0;
     int seen_dot = 0;
 
-    /* skip leading space */
     while (*s == ' ' || *s == '\t')
         s++;
 
-    /* sign */
-    if (*s == '-') { sign = -1; s++; }
-    else if (*s == '+') s++;
+    if (*s == '-') {
+        sign = -1;
+        s++;
+    } else if (*s == '+') {
+        s++;
+    }
 
-    /* integer + fractional digits */
     while ((*s >= '0' && *s <= '9') || *s == '.') {
         if (*s == '.') {
             if (!seen_dot)
@@ -85,10 +86,12 @@ qfloat_t qf_from_string(const char *s)
             continue;
         }
 
-        int digit = *s - '0';
+        {
+            int digit = *s - '0';
 
-        result = qf_mul(result, ten);
-        result = qf_add(result, qf_from_double((double)digit));
+            result = qf_mul(result, ten);
+            result = qf_add(result, qf_from_double((double)digit));
+        }
 
         if (seen_dot)
             exp10--;
@@ -96,14 +99,18 @@ qfloat_t qf_from_string(const char *s)
         s++;
     }
 
-    /* optional exponent */
     if (*s == 'e' || *s == 'E') {
-        s++;
         int esign = 1;
-        if (*s == '-') { esign = -1; s++; }
-        else if (*s == '+') s++;
-
         int e = 0;
+
+        s++;
+        if (*s == '-') {
+            esign = -1;
+            s++;
+        } else if (*s == '+') {
+            s++;
+        }
+
         while (*s >= '0' && *s <= '9') {
             e = e * 10 + (*s - '0');
             s++;
@@ -111,7 +118,6 @@ qfloat_t qf_from_string(const char *s)
         exp10 += esign * e;
     }
 
-    /* scale by exact 10^exp10 from table */
     if (!qf_iszero(result)) {
         if (exp10 == 308 && qf_eq(result, QF_ONE)) {
             result = (qfloat_t){ 1.0000000000000000e+308, -1.0979063629440455e+291 };

@@ -156,6 +156,7 @@ const qcomplex_t QC_EULER_MASCHERONI = {
     .re = { .hi = 0.57721566490153287, .lo = -4.9429151524310308e-18 },
     .im = { .hi = 0.0, .lo = 0.0 }
 };
+
 qfloat_t qc_abs(qcomplex_t z) {
     return qf_hypot(z.re, z.im);
 }
@@ -171,7 +172,7 @@ void qc_to_polar(qcomplex_t z, qfloat_t *r, qfloat_t *theta) {
     *theta = qc_arg(z);
 }
 
-// Elementary functions
+/* Elementary functions */
 qcomplex_t qc_ldexp(qcomplex_t z, int k) {
     return qc_make(qf_ldexp(z.re, k), qf_ldexp(z.im, k));
 }
@@ -179,11 +180,11 @@ qcomplex_t qc_floor(qcomplex_t z) {
     return qc_make(qf_floor(z.re), qf_floor(z.im));
 }
 qcomplex_t qc_hypot(qcomplex_t x, qcomplex_t y) {
-    // Not standard for complex; defined as sqrt(|x|^2 + |y|^2)
+    /* Not standard for complex; defined as sqrt(|x|^2 + |y|^2) */
     return qcrf(qf_hypot(qc_abs(x), qc_abs(y)));
 }
 
-// Comparison
+/* Comparison */
 bool qc_eq(qcomplex_t a, qcomplex_t b) {
     return qf_eq(a.re, b.re) && qf_eq(a.im, b.im);
 }

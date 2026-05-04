@@ -19,27 +19,27 @@ qfloat_t qf_sub(qfloat_t a, qfloat_t b) {
 qfloat_t qf_mul(qfloat_t a, qfloat_t b) {
     double hx, tx, hy, ty, C, c;
 
-    // Split a.hi
+    /* Split a.hi */
     C  = QF_SPLIT * a.hi;
     hx = C - a.hi;
     hx = C - hx;
     tx = a.hi - hx;
 
-    // Split b.hi
+    /* Split b.hi */
     double d = QF_SPLIT * b.hi;
     hy = d - b.hi;
     hy = d - hy;
     ty = b.hi - hy;
 
-    // High product
+    /* High product */
     C = a.hi * b.hi;
 
-    // Error term from Dekker split + cross terms
+    /* Error term from Dekker split + cross terms */
     c = ((((hx * hy - C) + hx * ty) + tx * hy) + tx * ty)
         + (a.hi * b.lo + a.lo * b.hi)
         + (a.lo * b.lo);
 
-    // Renormalize: (C + c) as double-double
+    /* Renormalize: (C + c) as double-double */
     double hi, lo;
     qf_two_sum(C, c, &hi, &lo);
 
