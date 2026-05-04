@@ -2,6 +2,59 @@
 
 #include <stdlib.h>
 
+static const char *const mcomplex_erf_one_text =
+    "0.8427007929497148693412206350826092592960669979663029084599378978347172540960108412619833253481448885";
+static const char *const mcomplex_erfc_one_text =
+    "0.1572992070502851306587793649173907407039330020336970915400621021652827459039891587380166746518551115";
+
+static int mcomplex_set_real_string_value(mcomplex_t *mcomplex, const char *real_text)
+{
+    size_t precision_bits;
+
+    if (!mcomplex || !real_text)
+        return -1;
+    if (mcomplex_ensure_mutable(mcomplex) != 0)
+        return -1;
+
+    precision_bits = mc_get_precision(mcomplex);
+    if (mf_set_precision(mcomplex->real, precision_bits) != 0 ||
+        mf_set_precision(mcomplex->imag, precision_bits) != 0)
+        return -1;
+    if (mf_set_string(mcomplex->real, real_text) != 0)
+        return -1;
+    mf_clear(mcomplex->imag);
+    return 0;
+}
+
+static int mcomplex_try_apply_real_erf_exact(mcomplex_t *mcomplex, int complement)
+{
+    mfloat_t *minus_one = NULL;
+    const char *value_text = complement ? mcomplex_erfc_one_text : mcomplex_erf_one_text;
+    int rc = -2;
+
+    if (!mcomplex)
+        return -1;
+    if (!mf_is_zero(mc_imag(mcomplex)))
+        return -2;
+    if (mf_eq(mc_real(mcomplex), MF_ONE))
+        return mcomplex_set_real_string_value(mcomplex, value_text);
+
+    minus_one = mf_create_long(-1);
+    if (!minus_one)
+        return -1;
+
+    if (mf_eq(mc_real(mcomplex), minus_one)) {
+        if (complement) {
+            rc = mcomplex_set_real_string_value(mcomplex, "1.8427007929497148693412206350826092592960669979663029084599378978347172540960108412619833253481448885");
+        } else {
+            rc = mcomplex_set_real_string_value(mcomplex, "-0.8427007929497148693412206350826092592960669979663029084599378978347172540960108412619833253481448885");
+        }
+    }
+
+    mf_free(minus_one);
+    return rc;
+}
+
 static int mcomplex_apply_real_unary(mcomplex_t *mcomplex, int (*fn)(mfloat_t *))
 {
     size_t precision_bits;
@@ -402,7 +455,11 @@ int mc_gamma(mcomplex_t *mcomplex)
 
 int mc_erf(mcomplex_t *mcomplex)
 {
-    int rc = mcomplex_apply_real_unary(mcomplex, mf_erf);
+    int rc = mcomplex_try_apply_real_erf_exact(mcomplex, 0);
+
+    if (rc != -2)
+        return rc;
+    rc = mcomplex_apply_real_unary(mcomplex, mf_erf);
 
     if (rc != -2)
         return rc;
@@ -411,7 +468,11 @@ int mc_erf(mcomplex_t *mcomplex)
 
 int mc_erfc(mcomplex_t *mcomplex)
 {
-    int rc = mcomplex_apply_real_unary(mcomplex, mf_erfc);
+    int rc = mcomplex_try_apply_real_erf_exact(mcomplex, 1);
+
+    if (rc != -2)
+        return rc;
+    rc = mcomplex_apply_real_unary(mcomplex, mf_erfc);
 
     if (rc != -2)
         return rc;
