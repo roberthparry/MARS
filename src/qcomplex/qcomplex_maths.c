@@ -372,8 +372,7 @@ qcomplex_t qc_gammainv(qcomplex_t z)
     w = qc_add(qcr(1.5), logz);
 
     for (int i = 0; i < 20; i++) {
-        qcomplex_t gw    = qc_gamma(w);
-        qcomplex_t delta = qc_div(qc_sub(gw, z), qc_mul(gw, qc_digamma(w)));
+        qcomplex_t delta = qc_div(qc_sub(qc_lgamma(w), logz), qc_digamma(w));
         w = qc_sub(w, delta);
         if (qf_lt(qc_abs(delta), qf_from_double(1e-30)))
             break;
