@@ -191,6 +191,9 @@ int main(void)
     run_unary_case("gammainv_gamma_2_5", "3.323350970447842551184064031264648", mc_gammainv, bench_scaled_iters(100));
     run_unary_case("gammainv_gamma_2_5_0_3i", "(0,0)", bench_mc_gammainv_gamma_2_5_plus_0_3i, bench_scaled_iters(100));
 
+    run_unary_case("lambert_w0_1", "1", mc_lambert_w0, bench_scaled_iters(2000));
+    run_unary_case("productlog_1", "1", mc_productlog, bench_scaled_iters(2000));
+    run_unary_case("lambert_wm1_-0_1", "-0.1", mc_lambert_wm1, bench_scaled_iters(1000));
     run_unary_case("productlog_1_plus_1i", "(1,1)", mc_productlog, bench_scaled_iters(300));
     run_unary_case("lambert_wm1_-0_2_-0_1i", "(-0.2,-0.1)", mc_lambert_wm1, bench_scaled_iters(200));
     run_unary_case("ei_1_plus_1i", "(1,1)", mc_ei, bench_scaled_iters(300));

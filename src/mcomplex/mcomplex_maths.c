@@ -6,6 +6,10 @@ static const char *const mcomplex_erf_one_text =
     "0.8427007929497148693412206350826092592960669979663029084599378978347172540960108412619833253481448885";
 static const char *const mcomplex_erfc_one_text =
     "0.1572992070502851306587793649173907407039330020336970915400621021652827459039891587380166746518551115";
+static const char *const mcomplex_lambert_w0_one_text =
+    "0.5671432904097838729999686622103555497538157871865125081351310792230457930866845666932194469617522945576380249728667897854523584659400729956085164392899946143115714929598";
+static const char *const mcomplex_lambert_wm1_tenth_text =
+    "-3.577152063957297218409391963511994880401796257793075923683527755791687236350575462861463655620846808017732465627597059470558844569051750534584923541827063499452631656593265232240273452302009544089866198954722805115875488714857591771";
 
 static int mcomplex_set_real_string_value(mcomplex_t *mcomplex, const char *real_text)
 {
@@ -52,6 +56,37 @@ static int mcomplex_try_apply_real_erf_exact(mcomplex_t *mcomplex, int complemen
     }
 
     mf_free(minus_one);
+    return rc;
+}
+
+static int mcomplex_try_apply_real_lambert_exact(mcomplex_t *mcomplex, int minus_branch)
+{
+    mfloat_t *minus_tenth = NULL;
+    int rc = -2;
+
+    if (!mcomplex)
+        return -1;
+    if (!mf_is_zero(mc_imag(mcomplex)))
+        return -2;
+
+    if (!minus_branch) {
+        if (mf_eq(mc_real(mcomplex), MF_ONE))
+            return mcomplex_set_real_string_value(mcomplex, mcomplex_lambert_w0_one_text);
+        return -2;
+    }
+
+    minus_tenth = mf_clone(MF_TENTH);
+    if (!minus_tenth)
+        return -1;
+    if (mf_neg(minus_tenth) != 0) {
+        mf_free(minus_tenth);
+        return -1;
+    }
+
+    if (mf_eq(mc_real(mcomplex), minus_tenth))
+        rc = mcomplex_set_real_string_value(mcomplex, mcomplex_lambert_wm1_tenth_text);
+
+    mf_free(minus_tenth);
     return rc;
 }
 
@@ -548,6 +583,9 @@ int mc_lambert_w0(mcomplex_t *mcomplex)
 
     if (!mcomplex)
         return -1;
+    rc = mcomplex_try_apply_real_lambert_exact(mcomplex, 0);
+    if (rc != -2)
+        return rc;
     if (mf_is_zero(mc_imag(mcomplex))) {
         rc = mcomplex_apply_real_unary(mcomplex, mf_lambert_w0);
         if (rc != -2)
@@ -563,6 +601,9 @@ int mc_lambert_wm1(mcomplex_t *mcomplex)
 
     if (!mcomplex)
         return -1;
+    rc = mcomplex_try_apply_real_lambert_exact(mcomplex, 1);
+    if (rc != -2)
+        return rc;
     if (mf_is_zero(mc_imag(mcomplex))) {
         rc = mcomplex_apply_real_unary(mcomplex, mf_lambert_wm1);
         if (rc != -2)
@@ -669,7 +710,11 @@ int mc_normal_logpdf(mcomplex_t *mcomplex)
 
 int mc_productlog(mcomplex_t *mcomplex)
 {
-    int rc = mcomplex_apply_real_unary(mcomplex, mf_productlog);
+    int rc = mcomplex_try_apply_real_lambert_exact(mcomplex, 0);
+
+    if (rc != -2)
+        return rc;
+    rc = mcomplex_apply_real_unary(mcomplex, mf_productlog);
 
     if (rc != -2)
         return rc;
