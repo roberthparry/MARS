@@ -196,3 +196,49 @@ All declarations are in `include/qcomplex.h`.
 - **Fast paths:** For all functions, if the imaginary part is zero, the real-valued `qf_` implementation is used for maximum speed and accuracy.
 
 If you need details about the implementation of a specific function or want to know about accuracy in a particular region of the complex plane, see the source code or contact the maintainers.
+
+---
+
+## Benchmark Coverage
+
+`qcomplex_t` has a focused arithmetic and special-functions benchmark here:
+
+- [bench/qcomplex/bench_qcomplex_maths.c](/home/rparry/Projects/MARS/bench/qcomplex/bench_qcomplex_maths.c)
+
+Run it with:
+
+```sh
+make bench_qcomplex_maths
+```
+
+Sample results below were measured on:
+
+- `Linux x86_64`
+- kernel `6.8.0-110-generic`
+- `Intel(R) Core(TM) i7-4510U CPU @ 2.00GHz`
+- `4` logical CPUs
+
+Current sample results:
+
+| Case | Time |
+|---|---:|
+| `qc_exp(1+i)` | `3.582 us` |
+| `qc_log(1+i)` | `5.405 us` |
+| `qc_erf(0.5+0.5i)` | `10.404 us` |
+| `qc_erfc(0.5+0.5i)` | `9.357 us` |
+| `qc_gamma(1.5+0.7i)` | `14.554 us` |
+| `qc_lgamma(1.5+0.7i)` | `13.515 us` |
+| `qc_digamma(2+i)` | `14.643 us` |
+| `qc_trigamma(2+0.5i)` | `4.596 us` |
+| `qc_tetragamma(2+0.5i)` | `6.256 us` |
+| `qc_gammainv(3.323350970447842551184064031264648)` | `95.411 us` |
+| `qc_gammainv(qc_gamma(2.5+0.3i))` | `219.491 us` |
+| `qc_productlog(1+i)` | `30.014 us` |
+| `qc_lambert_wm1(-0.2-0.1i)` | `27.295 us` |
+| `qc_ei(1+i)` | `44.938 us` |
+| `qc_e1(1+i)` | `41.641 us` |
+| `qc_beta(1.5+0.5i, 2-0.3i)` | `38.087 us` |
+| `qc_logbeta(1.5+0.5i, 2-0.3i)` | `37.286 us` |
+
+For a broader benchmark overview, see
+[docs/benchmarks.md](/home/rparry/Projects/MARS/docs/benchmarks.md).
