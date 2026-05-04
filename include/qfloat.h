@@ -59,6 +59,18 @@ extern const qfloat_t QF_ZERO;
 /// @brief One
 extern const qfloat_t QF_ONE;
 
+/// @brief Negative one
+extern const qfloat_t QF_NEG_ONE;
+
+/// @brief One half
+extern const qfloat_t QF_HALF;
+
+/// @brief Two
+extern const qfloat_t QF_TWO;
+
+/// @brief Ten
+extern const qfloat_t QF_TEN;
+
 /// @brief NaN
 extern const qfloat_t QF_NAN;
 

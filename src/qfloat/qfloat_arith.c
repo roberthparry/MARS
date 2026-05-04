@@ -49,7 +49,7 @@ qfloat_t qf_mul(qfloat_t a, qfloat_t b) {
 /* Correct double-double division */
 qfloat_t qf_div(qfloat_t a, qfloat_t b)
 {
-    qfloat_t zero = qf_from_double(0.0);
+    qfloat_t zero = QF_ZERO;
 
     if (qf_eq(b, zero))
         return QF_NAN;
@@ -69,15 +69,15 @@ qfloat_t qf_div(qfloat_t a, qfloat_t b)
 qfloat_t qf_pow_int(qfloat_t x, int n)
 {
     if (n == 0) {
-        return qf_from_double(1.0);
+        return QF_ONE;
     }
 
     if (n < 0) {
         qfloat_t r = qf_pow_int(x, -n);
-        return qf_div(qf_from_double(1.0), r);
+        return qf_div(QF_ONE, r);
     }
 
-    qfloat_t result = qf_from_double(1.0);
+    qfloat_t result = QF_ONE;
     qfloat_t base   = x;
 
     while (n > 0) {
@@ -97,7 +97,7 @@ qfloat_t qf_pow(qfloat_t x, qfloat_t y)
         double yd = qf_to_double(y);
         if (yd <= 0.0)
             return QF_NAN;
-        return qf_from_double(0.0);
+        return QF_ZERO;
     }
 
     /* x < 0: y must be (close to) an integer, and we use integer power */
@@ -145,7 +145,7 @@ qfloat_t qf_ldexp(qfloat_t x, int e)
 
 qfloat_t qf_sqrt(qfloat_t x)
 {
-    qfloat_t zero = qf_from_double(0.0);
+    qfloat_t zero = QF_ZERO;
 
     if (qf_eq(x, zero))
         return zero;
@@ -160,7 +160,7 @@ qfloat_t qf_sqrt(qfloat_t x)
     for (int i = 0; i < 4; ++i) {
         qfloat_t x_over_y = qf_div(x, y);
         qfloat_t sum      = qf_add(y, x_over_y);
-        y = qf_mul(qf_from_double(0.5), sum);
+        y = qf_mul(QF_HALF, sum);
     }
 
     return y;

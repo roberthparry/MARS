@@ -8,6 +8,14 @@ const qfloat_t QF_ZERO = { 0.0, 0.0 };
 
 const qfloat_t QF_ONE  = { 1.0, 0.0 };
 
+const qfloat_t QF_NEG_ONE = { -1.0, 0.0 };
+
+const qfloat_t QF_HALF = { 0.5, 0.0 };
+
+const qfloat_t QF_TWO = { 2.0, 0.0 };
+
+const qfloat_t QF_TEN = { 10.0, 0.0 };
+
 const qfloat_t QF_NAN = { NAN, NAN };
 
 const qfloat_t QF_INF  = { INFINITY, 0.0 };
@@ -179,7 +187,7 @@ qfloat_t qf_floor(qfloat_t x)
 /* Round qfloat_t to nearest integer (ties to even) */
 qfloat_t qf_rint(qfloat_t x)
 {
-    qfloat_t t = qf_from_double(0.5);
+    qfloat_t t = QF_HALF;
     t = qf_add(t, x);
     return qf_floor(t);
 }

@@ -47,7 +47,7 @@ static inline qfloat_t qf_scale_pow10(qfloat_t x, int exp10)
 
 qfloat_t qf_pow10(int e)
 {
-    return qf_scale_pow10((qfloat_t){1.0, 0.0}, e);
+    return qf_scale_pow10(QF_ONE, e);
 }
 
 static inline int qf_iszero(qfloat_t x)
@@ -61,8 +61,8 @@ static inline int qf_iszero(qfloat_t x)
 /* 32-digit decimal parser (no long double) */
 qfloat_t qf_from_string(const char *s)
 {
-    qfloat_t result = qf_from_double(0.0);
-    qfloat_t ten    = qf_from_double(10.0);
+    qfloat_t result = QF_ZERO;
+    qfloat_t ten    = QF_TEN;
 
     int sign     = 1;
     int exp10    = 0;
@@ -113,7 +113,7 @@ qfloat_t qf_from_string(const char *s)
 
     /* scale by exact 10^exp10 from table */
     if (!qf_iszero(result)) {
-        if (exp10 == 308 && qf_eq(result, (qfloat_t){1,0})) {
+        if (exp10 == 308 && qf_eq(result, QF_ONE)) {
             result = (qfloat_t){ 1.0000000000000000e+308, -1.0979063629440455e+291 };
         } else {
             result = qf_mul(result, qf_pow10(exp10));
@@ -172,7 +172,7 @@ int qf_to_decimal_digits(qfloat_t x, char *digits, int ndigits, int *out_exp10)
     int exp10 = qf_decimal_exponent(x);
     qfloat_t y  = qf_scale_pow10(x, -exp10);   /* y ≈ [1,10) */
 
-    qfloat_t ten = (qfloat_t){ 10.0, 0.0 };
+    qfloat_t ten = QF_TEN;
 
     for (int i = 0; i < ndigits; i++) {
 
