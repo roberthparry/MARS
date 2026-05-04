@@ -82,6 +82,11 @@ static const qfloat_t qc_pi_cubed = {
     .lo = 4.1641946985288283e-16
 };
 
+static qfloat_t qc_abs2_local(qcomplex_t z)
+{
+    return qf_add(qf_mul(z.re, z.re), qf_mul(z.im, z.im));
+}
+
 static qcomplex_t qc_faddeeva_inside(qcomplex_t z)
 {
     const int N = 32;
@@ -129,7 +134,7 @@ qcomplex_t qc_erfinv(qcomplex_t z)
                                qc_exp(qc_neg(qc_mul(w, w))));
         qcomplex_t delta = qc_div(f, fp);
         w = qc_sub(w, delta);
-        if (qf_lt(qc_abs(delta), qf_from_double(1e-30)))
+        if (qf_lt(qc_abs2_local(delta), qf_from_double(1e-60)))
             break;
     }
     return w;
