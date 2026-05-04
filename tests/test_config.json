@@ -2442,6 +2442,9 @@
     "test_lifecycle_and_constants": true,
     "test_arithmetic": true,
     "test_transcendentals": true,
-    "test_special_functions": true
+    "test_special_functions": true,
+    "test_conversion_to_from_qcomplex": true,
+    "test_real_elementary_replacements": true,
+    "test_real_special_replacements": true
   }
 }
