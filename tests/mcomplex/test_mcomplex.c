@@ -17,9 +17,10 @@ static int format_mcomplex_parts(const mcomplex_t *value,
                                  char *imag_buf, size_t imag_buf_size,
                                  char *imag_sign,
                                  const char **imag_digits);
-static int format_mcomplex_value(char *buf, size_t buf_size, const mcomplex_t *value);
-static int format_mcomplex_pretty_value(char *buf, size_t buf_size, const mcomplex_t *value);
-static int format_mcomplex_precise_value(char *buf, size_t buf_size, const mcomplex_t *value);
+static void print_mcomplex_formatted_lines(const char *label,
+                                           const mcomplex_t *value,
+                                           int (*part_formatter)(char *buf, size_t buf_size, const mfloat_t *value),
+                                           int allow_single_line);
 static void print_mcomplex_value(const char *label, const mcomplex_t *value);
 static void print_mcomplex_input(const char *label, const char *text);
 static void print_mcomplex_error_check(const char *label,
@@ -96,73 +97,46 @@ static int format_mcomplex_parts(const mcomplex_t *value,
     return 0;
 }
 
-static int format_mcomplex_value(char *buf, size_t buf_size, const mcomplex_t *value)
-{
-    if (!buf || buf_size == 0 || !value)
-        return -1;
-    return mc_sprintf(buf, buf_size, "%MZ", value);
-}
-
-static int format_mcomplex_pretty_value(char *buf, size_t buf_size, const mcomplex_t *value)
-{
-    char real_buf[512];
-    char imag_buf[512];
-    const char *imag_digits = NULL;
-    char imag_sign = '+';
-    int written;
-
-    if (!buf || buf_size == 0 || !value)
-        return -1;
-
-    if (format_mcomplex_parts(value,
-                              format_mfloat_pretty_value,
-                              real_buf, sizeof(real_buf),
-                              imag_buf, sizeof(imag_buf),
-                              &imag_sign, &imag_digits) != 0)
-        return -1;
-
-    written = snprintf(buf, buf_size, "%s %c %si",
-                       real_buf,
-                       imag_sign,
-                       imag_digits);
-    if (written < 0 || (size_t)written >= buf_size)
-        return -1;
-
-    return written;
-}
-
-static int format_mcomplex_precise_value(char *buf, size_t buf_size, const mcomplex_t *value)
+static void print_mcomplex_formatted_lines(const char *label,
+                                           const mcomplex_t *value,
+                                           int (*part_formatter)(char *buf, size_t buf_size, const mfloat_t *value),
+                                           int allow_single_line)
 {
     char real_buf[1024];
     char imag_buf[1024];
     const char *imag_digits = NULL;
     char imag_sign = '+';
-    int written;
+    size_t inline_len;
 
-    if (!buf || buf_size == 0 || !value)
-        return -1;
+    if (!label || !value || !part_formatter) {
+        printf("    %s.re = <format-error>\n", label ? label : "<null>");
+        printf("    %s.im = <format-error>\n", label ? label : "<null>");
+        return;
+    }
 
     if (format_mcomplex_parts(value,
-                              format_mfloat_precise_value,
+                              part_formatter,
                               real_buf, sizeof(real_buf),
                               imag_buf, sizeof(imag_buf),
-                              &imag_sign, &imag_digits) != 0)
-        return -1;
+                              &imag_sign, &imag_digits) != 0) {
+        printf("    %s.re = <format-error>\n", label);
+        printf("    %s.im = <format-error>\n", label);
+        return;
+    }
 
-    written = snprintf(buf, buf_size, "%s %c %si",
-                       real_buf,
-                       imag_sign,
-                       imag_digits);
-    if (written < 0 || (size_t)written >= buf_size)
-        return -1;
+    inline_len = strlen(real_buf) + strlen(imag_digits) + 4u;
+    if (allow_single_line && inline_len <= 48u) {
+        printf("    %-10s = " C_WHITE "%s %c %si" C_RESET "\n",
+               label, real_buf, imag_sign, imag_digits);
+        return;
+    }
 
-    return written;
+    printf("    %-10s = " C_WHITE "  %s" C_RESET "\n", label, real_buf);
+    printf("    %-10s   " C_WHITE "%c %si" C_RESET "\n", "", imag_sign, imag_digits);
 }
 
 static void print_mcomplex_value(const char *label, const mcomplex_t *value)
 {
-    char pretty_buf[768];
-    char sci_buf[768];
     size_t precision_bits;
     int decimal_digits;
 
@@ -175,15 +149,10 @@ static void print_mcomplex_value(const char *label, const mcomplex_t *value)
     if (decimal_digits < 1)
         decimal_digits = 1;
 
-    if (format_mcomplex_pretty_value(pretty_buf, sizeof(pretty_buf), value) < 0 ||
-        format_mcomplex_value(sci_buf, sizeof(sci_buf), value) < 0) {
-        printf(C_CYAN "%s" C_RESET " = <format-error>\n", label);
-        return;
-    }
     printf(C_CYAN "%s" C_RESET "\n", label);
     printf("    precision = %zu bits (~%d digits)\n", precision_bits, decimal_digits);
-    printf("    pretty    = " C_WHITE "%s" C_RESET "\n", pretty_buf);
-    printf("    sci       = " C_WHITE "%s" C_RESET "\n", sci_buf);
+    print_mcomplex_formatted_lines("pretty", value, format_mfloat_pretty_value, 1);
+    print_mcomplex_formatted_lines("sci", value, format_mfloat_precise_value, 0);
     fflush(stdout);
 }
 
@@ -201,10 +170,6 @@ static void print_mcomplex_error_check(const char *label,
     mcomplex_t *expected = NULL;
     mfloat_t *real_err = NULL;
     mfloat_t *imag_err = NULL;
-    char got_buf[2304];
-    char expected_buf[2304];
-    char got_pretty_buf[768];
-    char expected_pretty_buf[768];
     char real_err_buf[256];
     char imag_err_buf[256];
     size_t precision_bits = 0;
@@ -220,15 +185,11 @@ static void print_mcomplex_error_check(const char *label,
         mf_abs(real_err) != 0 ||
         mf_sub(imag_err, mc_imag(expected)) != 0 ||
         mf_abs(imag_err) != 0 ||
-        format_mcomplex_precise_value(got_buf, sizeof(got_buf), got) < 0 ||
-        format_mcomplex_precise_value(expected_buf, sizeof(expected_buf), expected) < 0 ||
-        format_mcomplex_pretty_value(got_pretty_buf, sizeof(got_pretty_buf), got) < 0 ||
-        format_mcomplex_pretty_value(expected_pretty_buf, sizeof(expected_pretty_buf), expected) < 0 ||
         mf_sprintf(real_err_buf, sizeof(real_err_buf), "%.6MF", real_err) < 0 ||
         mf_sprintf(imag_err_buf, sizeof(imag_err_buf), "%.6MF", imag_err) < 0) {
         printf(C_CYAN "%s" C_RESET "\n", label);
-        printf("    expected = <format-error>\n");
-        printf("    got      = <format-error>\n");
+        printf("    expected   = <format-error>\n");
+        printf("    got        = <format-error>\n");
         printf("    error.re = <format-error>\n");
         printf("    error.im = <format-error>\n");
         mf_free(real_err);
@@ -243,10 +204,10 @@ static void print_mcomplex_error_check(const char *label,
         decimal_digits = 1;
     printf(C_CYAN "%s" C_RESET "\n", label);
     printf("    precision = %zu bits (~%d digits)\n", precision_bits, decimal_digits);
-    printf("    expected  = %s\n", expected_buf);
-    printf("    got       = %s\n", got_buf);
-    printf("    expected~ = %s\n", expected_pretty_buf);
-    printf("    got~      = %s\n", got_pretty_buf);
+    print_mcomplex_formatted_lines("expected", expected, format_mfloat_precise_value, 0);
+    print_mcomplex_formatted_lines("got", got, format_mfloat_precise_value, 0);
+    print_mcomplex_formatted_lines("expected~", expected, format_mfloat_pretty_value, 1);
+    print_mcomplex_formatted_lines("got~", got, format_mfloat_pretty_value, 1);
     printf("    error.re  = %s\n", real_err_buf);
     printf("    error.im  = %s\n", imag_err_buf);
     fflush(stdout);
