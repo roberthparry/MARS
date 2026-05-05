@@ -37,6 +37,8 @@ static int bench_case_enabled(const char *label)
 
     if (!filter || !*filter)
         return 1;
+    if (*filter == '=')
+        return strcmp(label, filter + 1) == 0;
     return strstr(label, filter) != NULL;
 }
 
@@ -79,6 +81,15 @@ static void run_unary_case(const char *label,
         (void)mf_set_default_precision(old_prec);
         return;
     }
+    if (mfloat_copy_value(work, src) != 0 ||
+        mf_set_precision(work, precision) != 0 ||
+        fn(work) != 0) {
+        fprintf(stderr, "%s warmup failed\n", label);
+        mf_free(work);
+        mf_free(src);
+        (void)mf_set_default_precision(old_prec);
+        return;
+    }
 
     start = now_ns();
     for (int i = 0; i < iters; ++i) {
@@ -111,12 +122,12 @@ int main(void)
     puts("== mfloat gamma maths bench ==");
     puts("Scale iterations with MARS_BENCH_SCALE=<n> if you want longer runs.");
     puts("");
-    run_unary_case("gamma_2_3_256", "2.3", 256u, mf_gamma, bench_scaled_iters(4));
-    run_unary_case("lgamma_2_3_256", "2.3", 256u, mf_lgamma, bench_scaled_iters(4));
+    run_unary_case("gamma_2_3_256", "2.3", 256u, mf_gamma, bench_scaled_iters(2));
+    run_unary_case("lgamma_2_3_256", "2.3", 256u, mf_lgamma, bench_scaled_iters(2));
     run_unary_case("gamma_2_3_512", "2.3", 512u, mf_gamma, bench_scaled_iters(2));
     run_unary_case("lgamma_2_3_512", "2.3", 512u, mf_lgamma, bench_scaled_iters(2));
-    run_unary_case("gamma_2_3_768", "2.3", 768u, mf_gamma, bench_scaled_iters(1));
-    run_unary_case("lgamma_2_3_768", "2.3", 768u, mf_lgamma, bench_scaled_iters(1));
+    run_unary_case("gamma_2_3_768", "2.3", 768u, mf_gamma, bench_scaled_iters(2));
+    run_unary_case("lgamma_2_3_768", "2.3", 768u, mf_lgamma, bench_scaled_iters(2));
     run_unary_case("gamma_2_5_256", "2.5", 256u, mf_gamma, bench_scaled_iters(8));
     run_unary_case("lgamma_2_5_256", "2.5", 256u, mf_lgamma, bench_scaled_iters(8));
     run_unary_case("gamma_3_5_256", "3.5", 256u, mf_gamma, bench_scaled_iters(8));

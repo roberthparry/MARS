@@ -6,7 +6,7 @@
 #include "mcomplex.h"
 
 #ifndef TEST_MCOMPLEX_MATHS_PRECISION
-#define TEST_MCOMPLEX_MATHS_PRECISION 512u
+#define TEST_MCOMPLEX_MATHS_PRECISION 768u
 #endif
 
 #define TEST_CONFIG_MODE TEST_CONFIG_GLOBAL
@@ -571,6 +571,8 @@ static void test_arithmetic(void)
     mcomplex_t *a = NULL;
     mcomplex_t *b = NULL;
     mcomplex_t *z = NULL;
+    mfloat_t *abs_sq = NULL;
+    mfloat_t *expected_sq = NULL;
 
     for (;;) {
         print_mcomplex_input("a input", "3 + 4i");
@@ -614,14 +616,20 @@ static void test_arithmetic(void)
 
         ASSERT_EQ_INT(mc_abs(z), 0);
         print_mcomplex_value("z after abs(z)", z);
-        print_mcomplex_error_check("abs(-0.2 + 0.4i)", z, "0.447213595499957939281834733746255247088123671922305144854179449082104185127560979882882881675756454993901635230154756700850653544889414772717272024306690541773355634638375833162255329064527971316107152270083507", "0");
-        ASSERT_TRUE(mcomplex_meets_precision(
-            z,
-            "0.447213595499957939281834733746255247088123671922305144854179449082104185127560979882882881675756454993901635230154756700850653544889414772717272024306690541773355634638375833162255329064527971316107152270083507",
-            "0"));
+        abs_sq = mf_clone(mc_real(z));
+        expected_sq = mf_create_string("0.2");
+        ASSERT_NOT_NULL(abs_sq);
+        ASSERT_NOT_NULL(expected_sq);
+        ASSERT_EQ_INT(mf_set_precision(expected_sq, mf_get_precision(abs_sq) - 8u), 0);
+        ASSERT_EQ_INT(mf_mul(abs_sq, abs_sq), 0);
+        ASSERT_TRUE(mfloat_matches_value(abs_sq, expected_sq, 1));
+        ASSERT_TRUE(mf_is_zero(mc_imag(z)));
+        ASSERT_TRUE(mf_ge(mc_real(z), MF_ZERO));
         break;
     }
 
+    mf_free(abs_sq);
+    mf_free(expected_sq);
     mc_free(a);
     mc_free(b);
     mc_free(z);
@@ -1340,7 +1348,7 @@ static void test_difficult_mcomplex_cases(void)
     ASSERT_NOT_NULL(expected);
     ASSERT_EQ_INT(mc_log(z), 0);
     ASSERT_EQ_INT(mc_exp(z), 0);
-    print_mcomplex_value("exp(log(0.75 + 1.25i))", z);
+    print_mcomplex_value("exp(log(0.75 + 1.25i)) should recover 0.75 + 1.25i", z);
     ASSERT_TRUE(mcomplex_matches_value(z, expected));
     mc_free(expected);
     mc_free(z);
@@ -1354,7 +1362,7 @@ static void test_difficult_mcomplex_cases(void)
     ASSERT_NOT_NULL(other);
     ASSERT_EQ_INT(mc_exp(other), 0);
     ASSERT_EQ_INT(mc_mul(other, z), 0);
-    print_mcomplex_value("productlog identity at 1 + 1i", other);
+    print_mcomplex_value("productlog(1 + 1i) * exp(productlog(1 + 1i)) should recover 1 + 1i", other);
     ASSERT_TRUE(mcomplex_matches_value(other, expected));
     mc_free(other);
     mc_free(expected);
@@ -1367,7 +1375,7 @@ static void test_difficult_mcomplex_cases(void)
     ASSERT_EQ_INT(mc_gamma(z), 0);
     ASSERT_EQ_INT(mc_lgamma(other), 0);
     ASSERT_EQ_INT(mc_exp(other), 0);
-    print_mcomplex_value("exp(lgamma(1.5 + 0.7i))", other);
+    print_mcomplex_value("exp(lgamma(1.5 + 0.7i)) should match gamma(1.5 + 0.7i)", other);
     print_mcomplex_value("gamma(1.5 + 0.7i)", z);
     ASSERT_TRUE(mcomplex_matches_value(other, z));
     mc_free(other);

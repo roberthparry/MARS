@@ -243,15 +243,15 @@ This benchmark mirrors the current `qcomplex` coverage and tracks the native
 Recent sample timings on this tree:
 
 ```text
-exp_1_plus_1i                bits=256  avg_µs=   105.701 avg_ms=     0.106
-log_1_plus_1i                bits=256  avg_µs=   142.650 avg_ms=     0.143
-productlog_1_plus_1i         bits=256  avg_µs=   181.881 avg_ms=     0.182
-ei_1_plus_1i                 bits=256  avg_µs=   299.359 avg_ms=     0.299
-e1_1_plus_1i                 bits=256  avg_µs=   231.809 avg_ms=     0.232
-gamma_2_3_plus_0i            bits=256  avg_µs=233374.231 avg_ms=   233.374
-lgamma_2_3_plus_0i           bits=256  avg_µs=163232.872 avg_ms=   163.233
+exp_1_plus_1i_512            bits=512  avg_µs=    12.014 avg_ms=     0.012
+log_1_plus_1i_512            bits=512  avg_µs=    17.694 avg_ms=     0.018
+productlog_1_plus_1i_512     bits=512  avg_µs= 92528.000 avg_ms=    92.528
+ei_1_plus_1i_512             bits=512  avg_µs=    59.575 avg_ms=     0.060
+e1_1_plus_1i_512             bits=512  avg_µs=    56.693 avg_ms=     0.057
 ```
 
 The current `mcomplex` implementation still has remaining wrapper-era paths, so
 these numbers should be read as active optimization checkpoints rather than
-final end-state timings.
+final end-state timings. The bench target still covers the pure-real gamma and
+lgamma cases; this snapshot highlights the complex hot paths we tuned in this
+phase.

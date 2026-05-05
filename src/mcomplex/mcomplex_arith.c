@@ -60,7 +60,7 @@ int mc_abs(mcomplex_t *mcomplex)
     if (!mcomplex)
         return -1;
     precision_bits = mc_get_precision(mcomplex);
-    work_prec = precision_bits + 64u;
+    work_prec = precision_bits * 2u;
     if (mcomplex_ensure_mutable(mcomplex) != 0)
         return -1;
     mag2 = mf_clone(mcomplex->real);
@@ -84,7 +84,7 @@ int mc_abs(mcomplex_t *mcomplex)
             goto fail;
     }
 
-    for (iter = 0; iter < 6; ++iter) {
+    for (iter = 0; iter < 10; ++iter) {
         mf_free(tmp);
         tmp = mf_clone(mag2);
         if (!tmp)

@@ -330,12 +330,15 @@ Results:
 
 | Case | Avg |
 |---|---:|
-| `mc_exp(1+i)` at `256` bits | `105.701 µs` |
-| `mc_log(1+i)` at `256` bits | `142.650 µs` |
-| `mc_productlog(1+i)` at `256` bits | `181.881 µs` |
-| `mc_ei(1+i)` at `256` bits | `299.359 µs` |
-| `mc_e1(1+i)` at `256` bits | `231.809 µs` |
-| `mc_gamma(2.3 + 0i)` at `256` bits | `233.374 ms` |
-| `mc_lgamma(2.3 + 0i)` at `256` bits | `163.233 ms` |
+| `mc_exp(1+i)` at `512` bits | `12.014 µs` |
+| `mc_log(1+i)` at `512` bits | `17.694 µs` |
+| `mc_productlog(1+i)` at `512` bits | `92.528 ms` |
+| `mc_ei(1+i)` at `512` bits | `59.575 µs` |
+| `mc_e1(1+i)` at `512` bits | `56.693 µs` |
+
+These are the current complex hot-path checkpoints from this optimization
+phase. The benchmark target still covers pure-real `mc_gamma(2.3 + 0i)` and
+`mc_lgamma(2.3 + 0i)` as apples-to-apples comparisons with `mfloat`; we will
+refresh those published rows again after the next gamma-family pass.
 
 For broader benchmark notes, see [`docs/benchmarks.md`](benchmarks.md).

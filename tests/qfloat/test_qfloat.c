@@ -53,8 +53,8 @@ void test_difficult_qfloat_cases(void)
     printf(C_CYAN "TEST: difficult qfloat cases\n" C_RESET);
 
     lhs = qf_sub(qf_sub(lhs, rhs), tmp);
-    print_q("    lgamma recurrence error", lhs);
-    check_bool("lgamma recurrence at 2.3",
+    print_q("    lgamma(3.3) - lgamma(2.3) - log(2.3)", lhs);
+    check_bool("lgamma(3.3) - lgamma(2.3) - log(2.3) = 0",
                qf_abs(lhs).hi < 1e-28);
 
     y = qf_exp(qf_log(y));
@@ -63,19 +63,19 @@ void test_difficult_qfloat_cases(void)
                qf_close_rel(y, qf_from_string("1e-20"), 1e-28));
 
     ident = qf_add(qf_gammainc_P(s, gx), qf_gammainc_Q(s, gx));
-    print_q("    gammainc_P + gammainc_Q", ident);
-    check_bool("gammainc_P+Q at (0.5,1) = 1",
+    print_q("    gammainc_P(0.5,1) + gammainc_Q(0.5,1)", ident);
+    check_bool("gammainc_P(0.5,1) + gammainc_Q(0.5,1) = 1",
                qf_close(ident, one, 1e-28));
 
     ident = qf_sub(qf_mul(w, qf_exp(w)), qf_from_string("-0.35"));
-    print_q("    productlog identity error", ident);
-    check_bool("productlog identity at -0.35",
+    print_q("    productlog(-0.35) * exp(productlog(-0.35)) - (-0.35)", ident);
+    check_bool("productlog(-0.35) * exp(productlog(-0.35)) = -0.35",
                qf_abs(ident).hi < 1e-28);
 
     logb = qf_logbeta(a, b);
     beta = qf_beta(a, b);
     ident = qf_sub(qf_exp(logb), beta);
-    print_q("    exp(logbeta)-beta", ident);
+    print_q("    exp(logbeta(2.5,3.5)) - beta(2.5,3.5)", ident);
     check_bool("exp(logbeta(2.5,3.5)) = beta(2.5,3.5)",
                qf_abs(ident).hi < 1e-28);
 }

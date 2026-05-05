@@ -9,7 +9,7 @@
 
 #ifndef TEST_MFLOAT_MATHS_PRECISION
 /* Keep maths-only precision configurable without affecting core object tests. */
-#define TEST_MFLOAT_MATHS_PRECISION 512u
+#define TEST_MFLOAT_MATHS_PRECISION 768u
 #endif
 
 #define TEST_CONFIG_MODE TEST_CONFIG_GLOBAL
@@ -177,11 +177,15 @@ static int mfloat_meets_precision(const mfloat_t *got,
         return 0;
 
     precision_bits = mf_get_precision(got);
+    expected = mf_create_string(expected_text);
+    if (!expected)
+        goto cleanup;
+
     for (p = expected_text; *p; ++p) {
         if (*p >= '0' && *p <= '9')
             sig_digits++;
     }
-    if (sig_digits > 0) {
+    if (!mf_is_zero(expected) && sig_digits > 0) {
         size_t oracle_bits = (size_t)floor((double)sig_digits * 3.3219280948873623);
 
         if (oracle_bits > 4u)
@@ -191,7 +195,6 @@ static int mfloat_meets_precision(const mfloat_t *got,
         if (oracle_bits < precision_bits)
             precision_bits = oracle_bits;
     }
-    expected = mf_create_string(expected_text);
     error = mf_clone(got);
     tol = mf_create_long(1);
     if (!expected || !error || !tol)
@@ -1486,7 +1489,7 @@ void test_difficult_mfloat_cases(void)
     ASSERT_EQ_INT(mf_sub(lhs, rhs), 0);
     ASSERT_EQ_INT(mf_sub(lhs, tmp), 0);
     ASSERT_EQ_INT(mf_abs(lhs), 0);
-    print_mfloat_error_check("lgamma recurrence at 2.3 mfloat error", lhs, "0");
+    print_mfloat_error_check("lgamma(3.3) - lgamma(2.3) - log(2.3) mfloat error", lhs, "0");
     ASSERT_TRUE(mfloat_meets_precision(lhs, "0", 0));
 
     ASSERT_EQ_INT(mf_set_string(x, "1e-20"), 0);
@@ -1502,7 +1505,7 @@ void test_difficult_mfloat_cases(void)
     ASSERT_EQ_INT(mf_set_string(x, "1"), 0);
     ASSERT_EQ_INT(mf_gammainc_Q(tmp, x), 0);
     ASSERT_EQ_INT(mf_add(lhs, tmp), 0);
-    print_mfloat_error_check("gammainc_P+Q at (0.5,1) mfloat error", lhs, "1");
+    print_mfloat_error_check("gammainc_P(0.5,1) + gammainc_Q(0.5,1) - 1 mfloat error", lhs, "1");
     ASSERT_TRUE(mfloat_meets_precision(lhs, "1", 1));
 
     ASSERT_EQ_INT(mf_set_string(x, "-0.35"), 0);
@@ -1515,7 +1518,7 @@ void test_difficult_mfloat_cases(void)
     ASSERT_EQ_INT(mf_mul(rhs, x), 0);
     ASSERT_EQ_INT(mf_sub(rhs, lhs), 0);
     ASSERT_EQ_INT(mf_abs(rhs), 0);
-    print_mfloat_error_check("productlog identity at -0.35 mfloat error", rhs, "0");
+    print_mfloat_error_check("productlog(-0.35) * exp(productlog(-0.35)) - (-0.35) mfloat error", rhs, "0");
     ASSERT_TRUE(mfloat_meets_precision(rhs, "0", 0));
 
     ASSERT_EQ_INT(mf_set_string(lhs, "2.5"), 0);
@@ -1527,7 +1530,7 @@ void test_difficult_mfloat_cases(void)
     ASSERT_EQ_INT(mf_beta(rhs, tmp), 0);
     ASSERT_EQ_INT(mf_sub(lhs, rhs), 0);
     ASSERT_EQ_INT(mf_abs(lhs), 0);
-    print_mfloat_error_check("exp(logbeta(2.5,3.5)) mfloat error", lhs, "0");
+    print_mfloat_error_check("exp(logbeta(2.5,3.5)) - beta(2.5,3.5) mfloat error", lhs, "0");
     ASSERT_TRUE(mfloat_meets_precision(lhs, "0", 0));
 
     mf_free(x);

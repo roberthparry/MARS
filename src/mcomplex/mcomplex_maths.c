@@ -360,11 +360,15 @@ int mc_exp(mcomplex_t *mcomplex)
     mfloat_t *new_real = NULL;
     mfloat_t *new_imag = NULL;
     mfloat_t *neg_pi = NULL;
+    size_t precision_bits;
+    size_t work_prec;
 
     if (!mcomplex)
         return -1;
     if (mcomplex_ensure_mutable(mcomplex) != 0)
         return -1;
+    precision_bits = mc_get_precision(mcomplex);
+    work_prec = precision_bits * 2u + 256u;
 
     if (mf_is_zero(mcomplex->real)) {
         neg_pi = mf_clone(MF_PI);
@@ -389,6 +393,10 @@ int mc_exp(mcomplex_t *mcomplex)
     new_imag = mf_clone(mcomplex->imag);
     if (!scale || !new_real || !new_imag)
         goto fail;
+    if (mf_set_precision(scale, work_prec) != 0 ||
+        mf_set_precision(new_real, work_prec) != 0 ||
+        mf_set_precision(new_imag, work_prec) != 0)
+        goto fail;
 
     if (mf_exp(scale) != 0 ||
         mf_cos(new_real) != 0 ||
@@ -396,12 +404,11 @@ int mc_exp(mcomplex_t *mcomplex)
         mf_mul(new_real, scale) != 0 ||
         mf_mul(new_imag, scale) != 0)
         goto fail;
-
-    mf_free(mcomplex->real);
-    mf_free(mcomplex->imag);
-    mcomplex->real = new_real;
-    mcomplex->imag = new_imag;
+    if (mc_set(mcomplex, new_real, new_imag) != 0)
+        goto fail;
     mf_free(scale);
+    mf_free(new_real);
+    mf_free(new_imag);
     return 0;
 
 fail:
@@ -444,7 +451,7 @@ int mc_log(mcomplex_t *mcomplex)
         if (mcomplex_ensure_mutable(mcomplex) != 0)
             return -1;
         precision_bits = mc_get_precision(mcomplex);
-        work_prec = precision_bits + 64u;
+        work_prec = precision_bits + 128u;
         mag = mf_clone(mcomplex->real);
         imag_sq = mf_clone(mcomplex->imag);
         angle = mf_clone(mcomplex->imag);
@@ -459,8 +466,11 @@ int mc_log(mcomplex_t *mcomplex)
             mf_add(mag, imag_sq) != 0 ||
             mf_log(mag) != 0 ||
             mf_ldexp(mag, -1) != 0 ||
-            mf_atan2(angle, mcomplex->real) != 0 ||
-            mc_set(mcomplex, mag, angle) != 0)
+            mf_atan2(angle, mcomplex->real) != 0)
+            goto fail;
+        if (mc_set_precision(mcomplex, work_prec) != 0 ||
+            mc_set(mcomplex, mag, angle) != 0 ||
+            mc_set_precision(mcomplex, precision_bits) != 0)
             goto fail;
         mf_free(angle);
         mf_free(imag_sq);

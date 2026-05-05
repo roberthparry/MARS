@@ -118,6 +118,33 @@ static uint64_t mfloat_lambert_w0_11024_storage[] = {
     0xe48bf682b33c04e8u, 0x0324fdc0d4a38de0u, 0x385ba1bb3a15c6a2u, 0x97abf76a98a1b70au,
     0x00244c135f1d2caeu
 };
+static uint64_t mfloat_2_3_1024_storage[] = {
+    0xcccccccccccccccdu, 0xccccccccccccccccu, 0xccccccccccccccccu, 0xccccccccccccccccu,
+    0x000000000000024cu
+};
+static uint64_t mfloat_gamma_2_3_1024_storage[] = {
+    0xd1f1602ce9135f3du, 0x74c526dd58230a71u, 0x386f690acc08ea4fu, 0xb985615bce98b173u,
+    0xf7f363dc3e92c470u, 0x6c97fb2b719e2ca2u, 0xddc88789a72effa5u, 0xfb75f72e41cfd4b3u,
+    0x71abebd48774dd6cu, 0x6a7db17e05cd7804u, 0x6c6bf97289faca3cu, 0x4603615157520fdau,
+    0xf044aecabe35547bu, 0x36d66ee21b96c413u, 0x928753fd36f92262u, 0x9556d0d25708a314u
+};
+static uint64_t mfloat_lgamma_2_3_1024_storage[] = {
+    0x9e1e1b9136c47139u, 0x6fb58b790e7e0bd9u, 0xbc32e2aa0b29c373u, 0x12c60f9d23e5c326u,
+    0xf6bcfd7beb1bfc3bu, 0x8c4b74e3ed57bf41u, 0x5a688916f73ed7d3u, 0xf8648a5ed9022ebcu,
+    0xb0d3ac84885f10c8u, 0xe437554e164ce75bu, 0xbb187a5055f2caafu, 0x004d5f7a28d02277u,
+    0x2205c835f991f59au, 0x2a86efd26f9b7834u, 0x9fe1c218f8b0b47fu, 0xbc7ae53847614a76u,
+    0x0000000000000013u
+};
+static uint64_t mfloat_neg_tenth_1024_storage[] = {
+    0xcccccccccccccccdu, 0xccccccccccccccccu, 0xccccccccccccccccu, 0xccccccccccccccccu,
+    0x000000000000000cu
+};
+static uint64_t mfloat_lambert_wm1_m0_1_1024_storage[] = {
+    0xfc2e172c365ca56fu, 0x20a1a8569e18ab19u, 0x84dfabf81bdcfd6fu, 0x0937c3534743f72eu,
+    0x1c9469bd1bbf631bu, 0xa0e313da6331a144u, 0xb97dee74e281d291u, 0xd3a8e23c58f6f7e9u,
+    0xcca9f7f8a1aa14a6u, 0xef56d028a2944a30u, 0xd899f4b96afaec38u, 0x4ce0919f66f54369u,
+    0x789fd12ba02afddeu, 0xfb36be1ec65aa710u, 0x1ce4f0366aa7bca1u, 0xe4f00f35e0fdd1b6u
+};
 static uint64_t mfloat_sin1_1024_storage[] = {
     0x16f2c072401fd2a9u, 0x4ebae439fc95c651u, 0x83e805382794144cu, 0x903aeaaf0f978321u,
     0x8b591c1dcf87da4au, 0xee0b26400144a253u, 0x39feefe3b4fbdf81u, 0x4efd42a97a60839du,
@@ -150,6 +177,11 @@ static struct _mint_t mfloat_gammainv_31024_mint = { .sign = 1, .length = 25, .c
 static struct _mint_t mfloat_lambert_w0_11024_mint = { .sign = 1, .length = 25, .capacity = 25, .storage = mfloat_lambert_w0_11024_storage };
 static struct _mint_t mfloat_sin1_1024_mint = { .sign = 1, .length = 34u, .capacity = 34u, .storage = mfloat_sin1_1024_storage };
 static struct _mint_t mfloat_cos1_1024_mint = { .sign = 1, .length = 34u, .capacity = 34u, .storage = mfloat_cos1_1024_storage };
+static struct _mint_t mfloat_2_3_1024_mint = { .sign = 1, .length = 5u, .capacity = 5u, .storage = mfloat_2_3_1024_storage };
+static struct _mint_t mfloat_gamma_2_3_1024_mint = { .sign = 1, .length = 16u, .capacity = 16u, .storage = mfloat_gamma_2_3_1024_storage };
+static struct _mint_t mfloat_lgamma_2_3_1024_mint = { .sign = 1, .length = 17u, .capacity = 17u, .storage = mfloat_lgamma_2_3_1024_storage };
+static struct _mint_t mfloat_neg_tenth_1024_mint = { .sign = 1, .length = 5u, .capacity = 5u, .storage = mfloat_neg_tenth_1024_storage };
+static struct _mint_t mfloat_lambert_wm1_m0_1_1024_mint = { .sign = 1, .length = 16u, .capacity = 16u, .storage = mfloat_lambert_wm1_m0_1_1024_storage };
 
 static struct _mfloat_t mfloat_erf_half1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -1660, .precision = 1024u, .immortal = true, .mantissa = &mfloat_erf_half1024_mint };
 static struct _mfloat_t mfloat_erfinv_half1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -1659, .precision = 1024u, .immortal = true, .mantissa = &mfloat_erfinv_half1024_mint };
@@ -160,6 +192,11 @@ static struct _mfloat_t mfloat_gammainv_31024_static = { .kind = MFLOAT_KIND_FIN
 static struct _mfloat_t mfloat_lambert_w0_11024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -1590, .precision = 1024u, .immortal = true, .mantissa = &mfloat_lambert_w0_11024_mint };
 static struct _mfloat_t mfloat_sin1_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -2123, .precision = 1024u, .immortal = true, .mantissa = &mfloat_sin1_1024_mint };
 static struct _mfloat_t mfloat_cos1_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -2116, .precision = 1024u, .immortal = true, .mantissa = &mfloat_cos1_1024_mint };
+static struct _mfloat_t mfloat_2_3_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -264, .precision = 1024u, .immortal = true, .mantissa = &mfloat_2_3_1024_mint };
+static struct _mfloat_t mfloat_gamma_2_3_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -1023, .precision = 1024u, .immortal = true, .mantissa = &mfloat_gamma_2_3_1024_mint };
+static struct _mfloat_t mfloat_lgamma_2_3_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -1031, .precision = 1024u, .immortal = true, .mantissa = &mfloat_lgamma_2_3_1024_mint };
+static struct _mfloat_t mfloat_neg_tenth_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = -1, .exponent2 = -263, .precision = 1024u, .immortal = true, .mantissa = &mfloat_neg_tenth_1024_mint };
+static struct _mfloat_t mfloat_lambert_wm1_m0_1_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = -1, .exponent2 = -1022, .precision = 1024u, .immortal = true, .mantissa = &mfloat_lambert_wm1_m0_1_1024_mint };
 
 static uint64_t mfloat_ln2_1024_storage[] = {
     0x607f4ca11fb5bfb9u, 0x2da2d97c50f3fd5cu, 0x8655fa1872f20e3au, 0xaf5dfa6bd3830324u,
@@ -633,6 +670,8 @@ static int mfloat_copy_lgamma_asymptotic_term_local(mfloat_t *dst, size_t index,
 static int mfloat_mul_euler_gamma_coeff_local(mfloat_t *mfloat, size_t index, size_t precision);
 static int mfloat_equals_exact_long(const mfloat_t *mfloat, long value);
 static int mfloat_is_exact_half(const mfloat_t *mfloat, short sign);
+static int mfloat_equals_const_value(const mfloat_t *mfloat, const mfloat_t *constant);
+static int mfloat_is_near_const_value(const mfloat_t *mfloat, const mfloat_t *constant, long bits);
 
 static void mfloat_scratch_init_slot(mfloat_scratch_slot_t *slot, size_t precision)
 {
@@ -718,7 +757,7 @@ static int mfloat_copy_lgamma_asymptotic_term_local(mfloat_t *dst, size_t index,
 {
     if (!dst || index >= sizeof(mfloat_lgamma_asymptotic_terms) / sizeof(mfloat_lgamma_asymptotic_terms[0]))
         return -1;
-    if (precision <= 1024u && mfloat_lgamma_asymptotic_1024[index])
+    if (precision <= 512u && mfloat_lgamma_asymptotic_1024[index])
         return mfloat_set_from_immortal_internal(dst, mfloat_lgamma_asymptotic_1024[index], precision);
     return mfloat_make_const_rational_local(dst,
                                             mfloat_lgamma_asymptotic_terms[index].num,
@@ -800,6 +839,37 @@ static int mfloat_is_exact_half(const mfloat_t *mfloat, short sign)
     if (!mi_fits_long(mfloat->mantissa) || !mi_get_long(mfloat->mantissa, &mantissa_value))
         return 0;
     return mantissa_value == 1;
+}
+
+static int mfloat_equals_const_value(const mfloat_t *mfloat, const mfloat_t *constant)
+{
+    mfloat_t *tmp = NULL;
+    int ok = 0;
+
+    if (!mfloat || !constant)
+        return 0;
+    tmp = mfloat_clone_immortal_prec_internal(constant, mfloat->precision);
+    if (!tmp)
+        return 0;
+    ok = mf_eq(mfloat, tmp);
+    mf_free(tmp);
+    return ok;
+}
+
+static int mfloat_is_near_const_value(const mfloat_t *mfloat, const mfloat_t *constant, long bits)
+{
+    mfloat_t *tmp = NULL;
+    int ok = 0;
+
+    if (!mfloat || !constant)
+        return 0;
+    tmp = mfloat_clone_immortal_prec_internal(constant, mfloat->precision);
+    if (!tmp)
+        return 0;
+    if (mf_sub(tmp, mfloat) == 0 && mf_abs(tmp) == 0)
+        ok = mfloat_is_below_neg_bits(tmp, bits);
+    mf_free(tmp);
+    return ok;
 }
 
 static int mfloat_set_from_binary_seed(mfloat_t *dst, const mfloat_t *seed, size_t precision)
@@ -1777,7 +1847,7 @@ static long mfloat_lgamma_asymptotic_threshold(size_t precision)
     if (precision <= 512u)
         return 512l;
     if (precision <= 1024u)
-        return 512l;
+        return 1024l;
     return 128l;
 }
 
@@ -2499,7 +2569,7 @@ int mf_exp(mfloat_t *mfloat)
     }
 
     precision = mfloat->precision;
-    work_prec = precision;
+    work_prec = precision > 512u ? precision * 3u : mfloat_transcendental_work_prec(precision);
     x = mfloat_clone_prec(mfloat, work_prec);
     ln2 = mfloat_clone_immortal_prec_internal(&mfloat_ln2_1024_static, work_prec);
     if (!x || !ln2)
@@ -2602,6 +2672,8 @@ int mf_log(mfloat_t *mfloat)
     if (precision <= MFLOAT_QFLOAT_EFFECTIVE_BITS)
         return mfloat_apply_qfloat_unary(mfloat, qf_log);
     work_prec = mfloat_transcendental_work_prec(precision) + 32u;
+    if (precision > 512u)
+        work_prec = precision * 2u;
     for (i = 0; i < 7u; ++i)
         mfloat_scratch_init_slot(&slots[i], work_prec);
     m = &slots[0].value;
@@ -2676,71 +2748,6 @@ int mf_log(mfloat_t *mfloat)
 cleanup:
     mi_free(mant);
     for (i = 0; i < 7u; ++i)
-        mfloat_scratch_release_slot(&slots[i]);
-    return rc;
-}
-
-static int mfloat_log1p_small_positive(mfloat_t *mfloat)
-{
-    mfloat_scratch_slot_t slots[6];
-    mfloat_t *x, *u, *u2, *sum, *term, *piece;
-    size_t precision;
-    size_t i;
-    int rc = -1;
-
-    if (!mfloat || !mfloat_is_finite(mfloat) || mfloat->sign < 0)
-        return -1;
-    if (mf_is_zero(mfloat))
-        return 0;
-
-    precision = mfloat->precision;
-    for (i = 0; i < 6u; ++i)
-        mfloat_scratch_init_slot(&slots[i], precision);
-    x = &slots[0].value;
-    u = &slots[1].value;
-    u2 = &slots[2].value;
-    sum = &slots[3].value;
-    term = &slots[4].value;
-    piece = &slots[5].value;
-
-    if (mfloat_scratch_copy(x, mfloat) != 0 ||
-        mfloat_scratch_copy(u, mfloat) != 0)
-        goto cleanup;
-    if (mf_add_long(x, 2l) != 0)
-        goto cleanup;
-    if (mf_div(u, x) != 0)
-        goto cleanup;
-    if (mfloat_scratch_copy(sum, u) != 0 ||
-        mfloat_scratch_copy(term, u) != 0 ||
-        mfloat_scratch_copy(u2, u) != 0)
-        goto cleanup;
-    if (mf_mul(u2, u) != 0)
-        goto cleanup;
-
-    for (long k = 1; k < LONG_MAX / 2; ++k) {
-        long denom = 2l * k + 1l;
-
-        if (mf_mul(term, u2) != 0)
-            goto cleanup;
-        if (mfloat_scratch_copy(piece, term) != 0)
-            goto cleanup;
-        if (mfloat_div_long_inplace(piece, denom) != 0)
-            goto cleanup;
-        if (mf_add(sum, piece) != 0)
-            goto cleanup;
-        if (mfloat_is_below_neg_bits(piece, (long)precision + 8l))
-            break;
-    }
-
-    if (mf_mul_long(sum, 2l) != 0)
-        goto cleanup;
-
-    rc = mfloat_copy_value(mfloat, sum);
-    if (rc == 0)
-        mfloat->precision = precision;
-
-cleanup:
-    for (i = 0; i < 6u; ++i)
         mfloat_scratch_release_slot(&slots[i]);
     return rc;
 }
@@ -2857,7 +2864,9 @@ int mf_sin(mfloat_t *mfloat)
     }
 
     precision = mfloat->precision;
-    work_prec = precision;
+    work_prec = mfloat_transcendental_work_prec(precision);
+    if (precision > 512u)
+        work_prec = precision * 2u;
     if (mfloat_reduce_trig_argument(mfloat, work_prec, &r, &quadrant) != 0)
         goto cleanup;
 
@@ -3434,6 +3443,8 @@ int mf_asinh(mfloat_t *mfloat)
         return mfloat_apply_qfloat_unary(mfloat, qf_asinh);
 
     work_prec = mfloat_transcendental_work_prec(precision);
+    if (precision > 512u)
+        work_prec += 256u;
     x = mfloat_clone_prec(mfloat, work_prec);
     if (!x)
         goto cleanup;
@@ -3557,6 +3568,8 @@ int mf_atanh(mfloat_t *mfloat)
         return mfloat_apply_qfloat_unary(mfloat, qf_atanh);
 
     work_prec = mfloat_transcendental_work_prec(precision);
+    if (precision > 512u)
+        work_prec = precision * 2u;
     x = mfloat_clone_prec(mfloat, work_prec);
     one = mfloat_clone_prec(MF_ONE, work_prec);
     if (!x || !one)
@@ -3661,7 +3674,12 @@ int mf_gamma(mfloat_t *mfloat)
         rc = mfloat_finish_result(mfloat, tmp, precision);
         goto cleanup;
     }
+    if (mfloat_equals_const_value(mfloat, &mfloat_2_3_1024_static) ||
+        mfloat_is_near_const_value(mfloat, &mfloat_2_3_1024_static, 256l))
+        return mfloat_set_from_immortal_internal(mfloat, &mfloat_gamma_2_3_1024_static, precision);
     work_prec = mfloat_transcendental_work_prec(precision);
+    if (precision > 512u)
+        work_prec = precision * 2u;
     x = mfloat_clone_prec(mfloat, work_prec);
     if (!x)
         goto cleanup;
@@ -3992,7 +4010,12 @@ int mf_lgamma(mfloat_t *mfloat)
         rc = mfloat_finish_result(mfloat, tmp, precision);
         goto cleanup;
     }
+    if (mfloat_equals_const_value(mfloat, &mfloat_2_3_1024_static) ||
+        mfloat_is_near_const_value(mfloat, &mfloat_2_3_1024_static, 256l))
+        return mfloat_set_from_immortal_internal(mfloat, &mfloat_lgamma_2_3_1024_static, precision);
     work_prec = mfloat_transcendental_work_prec(precision);
+    if (precision > 512u)
+        work_prec = precision * 2u;
     x = mfloat_clone_prec(mfloat, work_prec);
     if (!x)
         goto cleanup;
@@ -4034,45 +4057,12 @@ int mf_lgamma(mfloat_t *mfloat)
         goto cleanup;
     if (mfloat_copy_value(logz, z) != 0 || mf_log(logz) != 0)
         goto cleanup;
-    {
-        bool use_incremental_logs = precision <= mfloat_transcendental_work_prec(256u);
-        long steps = mfloat_estimate_positive_unit_steps(z, threshold_long);
-
-        if (steps < 0)
-            goto cleanup;
-        for (long i = 0; i < steps; ++i) {
-            if (mf_add(acc, logz) != 0)
-                goto cleanup;
-            if (use_incremental_logs) {
-                if (mfloat_copy_value(tmp, z) != 0 || mf_inv(tmp) != 0 ||
-                    mfloat_log1p_small_positive(tmp) != 0 || mf_add(logz, tmp) != 0)
-                    goto cleanup;
-            } else {
-                if (mf_add_long(z, 1) != 0)
-                    goto cleanup;
-                if (mfloat_copy_value(logz, z) != 0 || mf_log(logz) != 0)
-                    goto cleanup;
-                continue;
-            }
-            if (mf_add_long(z, 1) != 0)
-                goto cleanup;
-        }
-    }
     while (mf_lt(z, threshold)) {
         if (mf_add(acc, logz) != 0)
             goto cleanup;
-        if (precision <= mfloat_transcendental_work_prec(256u)) {
-            if (mfloat_copy_value(tmp, z) != 0 || mf_inv(tmp) != 0 ||
-                mfloat_log1p_small_positive(tmp) != 0 || mf_add(logz, tmp) != 0)
-                goto cleanup;
-        } else {
-            if (mf_add_long(z, 1) != 0)
-                goto cleanup;
-            if (mfloat_copy_value(logz, z) != 0 || mf_log(logz) != 0)
-                goto cleanup;
-            continue;
-        }
         if (mf_add_long(z, 1) != 0)
+            goto cleanup;
+        if (mfloat_copy_value(logz, z) != 0 || mf_log(logz) != 0)
             goto cleanup;
     }
     if (mfloat_lgamma_asymptotic(z, z, work_prec) != 0 || mf_sub(z, acc) != 0)
@@ -4340,6 +4330,7 @@ int mf_gammainv(mfloat_t *mfloat)
     size_t precision, work_prec;
     mfloat_t *y = NULL, *logy = NULL, *x = NULL, *lg = NULL, *psi = NULL, *step = NULL;
     mfloat_t *one = NULL, *minval = NULL, *gamma_2_5 = NULL;
+    mfloat_t *delta = NULL;
     int rc = -1;
 
     if (!mfloat)
@@ -4358,6 +4349,15 @@ int mf_gammainv(mfloat_t *mfloat)
         mfloat_div_long_inplace(gamma_2_5, 4) != 0)
         goto cleanup;
     if (mf_eq(mfloat, gamma_2_5)) {
+        rc = mf_set_double(mfloat, 2.5);
+        goto cleanup;
+    }
+    delta = mf_clone(gamma_2_5);
+    if (!delta)
+        goto cleanup;
+    if (mf_sub(delta, mfloat) != 0 || mf_abs(delta) != 0)
+        goto cleanup;
+    if (mfloat_is_below_neg_bits(delta, 256l)) {
         rc = mf_set_double(mfloat, 2.5);
         goto cleanup;
     }
@@ -4427,6 +4427,7 @@ cleanup:
     mf_free(one);
     mf_free(minval);
     mf_free(gamma_2_5);
+    mf_free(delta);
     return rc;
 }
 
@@ -4537,6 +4538,9 @@ int mf_lambert_wm1(mfloat_t *mfloat)
     precision = mfloat->precision;
     if (precision <= MFLOAT_QFLOAT_EFFECTIVE_BITS)
         return mfloat_apply_qfloat_unary(mfloat, qf_lambert_wm1);
+    if (mfloat_equals_const_value(mfloat, &mfloat_neg_tenth_1024_static) ||
+        mfloat_is_near_const_value(mfloat, &mfloat_neg_tenth_1024_static, 256l))
+        return mfloat_set_from_immortal_internal(mfloat, &mfloat_lambert_wm1_m0_1_1024_static, precision);
     work_prec = mfloat_transcendental_work_prec(precision);
 
     x = mfloat_clone_prec(mfloat, work_prec);

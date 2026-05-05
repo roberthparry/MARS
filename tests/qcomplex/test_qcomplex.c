@@ -562,7 +562,7 @@ static void test_beta(void)
     {
         qcomplex_t a2 = qcz(1.2, 0.4);
         qcomplex_t b2 = qcz(0.8, 0.2);
-        check_qc_rel("beta = exp(logbeta)",
+        check_qc_rel("exp(logbeta(a,b)) = beta(a,b)",
                      qc_beta(a2, b2), qc_exp(qc_logbeta(a2, b2)), 1e-26);
     }
 
@@ -578,7 +578,7 @@ static void test_beta(void)
         qcomplex_t x2 = qcr(0.3);
         qcomplex_t a2 = qcr(2.5);
         qcomplex_t b2 = qcr(1.5);
-        check_qc_rel("beta_pdf = exp(logbeta_pdf)",
+        check_qc_rel("exp(logbeta_pdf(x,a,b)) = beta_pdf(x,a,b)",
                      qc_beta_pdf(x2, a2, b2), qc_exp(qc_logbeta_pdf(x2, a2, b2)), 1e-28);
     }
 }
@@ -783,7 +783,7 @@ static void test_difficult_cases(void)
     {
         qcomplex_t z = qcz(1.0, 1.0);
         qcomplex_t w = qc_productlog(z);
-        check_qc_rel("productlog identity at 1+i",
+        check_qc_rel("productlog(1+i) * exp(productlog(1+i)) = 1+i",
                      qc_mul(w, qc_exp(w)), z, 1e-24);
     }
 

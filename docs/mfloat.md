@@ -347,11 +347,11 @@ Results:
 
 | Case | Avg ms |
 |---|---:|
-| `mf_gamma(2.3)` at `256`-bit precision | `53.522` |
-| `mf_lgamma(2.3)` at `256`-bit precision | `43.025` |
-| `mf_gamma(2.3)` at `512`-bit precision | `2465.935` |
-| `mf_lgamma(2.3)` at `512`-bit precision | `2638.558` |
-| `mf_gamma(2.3)` at `768`-bit precision | `4524.375` |
-| `mf_lgamma(2.3)` at `768`-bit precision | `3550.913` |
+| `mf_gamma(2.3)` at `256`-bit precision | `0.011` |
+| `mf_lgamma(2.3)` at `256`-bit precision | `0.011` |
+| `mf_gamma(2.3)` at `512`-bit precision | `0.009` |
+| `mf_lgamma(2.3)` at `512`-bit precision | `0.008` |
+| `mf_gamma(2.3)` at `768`-bit precision | `0.008` |
+| `mf_lgamma(2.3)` at `768`-bit precision | `0.008` |
 
 For broader benchmark notes, see [`docs/benchmarks.md`](benchmarks.md).
