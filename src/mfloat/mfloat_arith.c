@@ -535,6 +535,8 @@ int mf_ldexp(mfloat_t *mfloat, int exponent2)
 
 int mf_sqrt(mfloat_t *mfloat)
 {
+    mint_t *root = NULL;
+    mint_t *check = NULL;
     mint_t *work = NULL;
     size_t bitlen;
     long exponent2;
@@ -548,6 +550,41 @@ int mf_sqrt(mfloat_t *mfloat)
         return -1;
     if (mf_is_zero(mfloat))
         return 0;
+
+    if ((mfloat->exponent2 & 1l) == 0) {
+        root = mi_clone(mfloat->mantissa);
+        check = mi_clone(mfloat->mantissa);
+        if (!root || !check) {
+            mi_free(root);
+            mi_free(check);
+            return -1;
+        }
+        if (mi_sqrt(root) != 0 || mi_square(root) != 0) {
+            mi_free(root);
+            mi_free(check);
+            return -1;
+        }
+        if (mi_cmp(root, check) == 0) {
+            if (mi_sqrt(check) != 0) {
+                mi_free(root);
+                mi_free(check);
+                return -1;
+            }
+            mi_clear(mfloat->mantissa);
+            if (mi_add(mfloat->mantissa, check) != 0) {
+                mi_free(root);
+                mi_free(check);
+                return -1;
+            }
+            mfloat->sign = 1;
+            mfloat->exponent2 /= 2l;
+            mi_free(root);
+            mi_free(check);
+            return mfloat_normalise(mfloat);
+        }
+        mi_free(root);
+        mi_free(check);
+    }
 
     bitlen = mi_bit_length(mfloat->mantissa);
     shift_bits = mfloat->precision * 2u + MFLOAT_PARSE_GUARD_BITS;

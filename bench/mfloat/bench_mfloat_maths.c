@@ -349,6 +349,7 @@ int main(void)
         puts("-- elementary 256-bit --");
         run_unary_case("exp_256", "1.23456789", 256u, mf_exp, bench_scaled_iters(8));
         run_unary_case("log_256", "1.23456789", 256u, mf_log, bench_scaled_iters(8));
+        run_unary_case("sqrt_256", "2.25", 256u, mf_sqrt, bench_scaled_iters(8));
         run_unary_case("sin_256", "0.7", 256u, mf_sin, bench_scaled_iters(8));
         run_unary_case("cos_256", "0.7", 256u, mf_cos, bench_scaled_iters(8));
         run_unary_case("tan_256", "0.7", 256u, mf_tan, bench_scaled_iters(6));
@@ -410,6 +411,7 @@ int main(void)
         puts("-- selected 512-bit --");
         run_unary_case("exp_512", "1.23456789", 512u, mf_exp, bench_scaled_iters(2));
         run_unary_case("log_512", "1.23456789", 512u, mf_log, bench_scaled_iters(2));
+        run_unary_case("sqrt_512", "2.25", 512u, mf_sqrt, bench_scaled_iters(2));
         run_unary_case("sin_512", "0.7", 512u, mf_sin, bench_scaled_iters(2));
         run_unary_case("cos_512", "0.7", 512u, mf_cos, bench_scaled_iters(2));
         run_unary_case("tan_512", "0.7", 512u, mf_tan, bench_scaled_iters(1));
@@ -435,6 +437,7 @@ int main(void)
         puts("-- selected 768-bit --");
         run_unary_case("exp_768", "1.23456789", 768u, mf_exp, bench_scaled_iters(1));
         run_unary_case("log_768", "1.23456789", 768u, mf_log, bench_scaled_iters(1));
+        run_unary_case("sqrt_768", "2.25", 768u, mf_sqrt, bench_scaled_iters(1));
         run_unary_case("sin_768", "0.7", 768u, mf_sin, bench_scaled_iters(1));
         run_unary_case("cos_768", "0.7", 768u, mf_cos, bench_scaled_iters(1));
         run_unary_case("tan_768", "0.7", 768u, mf_tan, bench_scaled_iters(1));
