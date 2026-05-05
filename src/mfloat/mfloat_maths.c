@@ -3437,16 +3437,14 @@ int mf_asinh(mfloat_t *mfloat)
     if (precision <= MFLOAT_QFLOAT_EFFECTIVE_BITS)
         return mfloat_apply_qfloat_unary(mfloat, qf_asinh);
 
-    work_prec = mfloat_transcendental_work_prec(precision);
-    if (precision > 512u)
-        work_prec += 256u;
+    work_prec = mfloat_cap_work_prec(mfloat_transcendental_work_prec(precision));
     x = mfloat_clone_prec(mfloat, work_prec);
     if (!x)
         goto cleanup;
     y = mfloat_new_from_qfloat_prec(qf_asinh(mf_to_qfloat(x)), work_prec);
     if (!y)
         goto cleanup;
-    for (int iter = 0; iter < 3; ++iter) {
+    for (int iter = 0; iter < 2; ++iter) {
         sinh_y = mf_clone(y);
         cosh_y = mf_clone(y);
         if (!sinh_y || !cosh_y)
@@ -3496,7 +3494,7 @@ int mf_acosh(mfloat_t *mfloat)
     if (precision <= MFLOAT_QFLOAT_EFFECTIVE_BITS)
         return mfloat_apply_qfloat_unary(mfloat, qf_acosh);
 
-    work_prec = mfloat_transcendental_work_prec(precision);
+    work_prec = mfloat_cap_work_prec(mfloat_transcendental_work_prec(precision));
     x = mfloat_clone_prec(mfloat, work_prec);
     one = mfloat_clone_prec(MF_ONE, work_prec);
     if (!x || !one)
@@ -3513,7 +3511,7 @@ int mf_acosh(mfloat_t *mfloat)
     y = mfloat_new_from_qfloat_prec(qf_acosh(mf_to_qfloat(x)), work_prec);
     if (!y)
         goto cleanup;
-    for (int iter = 0; iter < 3; ++iter) {
+    for (int iter = 0; iter < 2; ++iter) {
         cosh_y = mf_clone(y);
         sinh_y = mf_clone(y);
         if (!cosh_y || !sinh_y)
