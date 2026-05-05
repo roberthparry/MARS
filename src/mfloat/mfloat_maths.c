@@ -3224,7 +3224,7 @@ int mf_asin(mfloat_t *mfloat)
     if (!y)
         goto cleanup;
 
-    for (int iter = 0; iter < 5; ++iter) {
+    for (int iter = 0; iter < 4; ++iter) {
         sin_y = mf_clone(y);
         cos_y = mf_clone(y);
         if (!sin_y || !cos_y)
