@@ -333,7 +333,7 @@ Run it from the repository root with:
 
 ```sh
 make bench_mfloat_maths
-MARS_BENCH_SCALE=5 ./build/release/bench/mfloat/bench_mfloat_gamma_maths
+MARS_BENCH_SCALE=10 ./build/release/bench/mfloat/bench_mfloat_maths
 ```
 
 Current sample results from that command on this tree, measured on:
@@ -345,13 +345,14 @@ Current sample results from that command on this tree, measured on:
 
 Results:
 
-| Case | Avg ms |
-|---|---:|
-| `mf_gamma(2.3)` at `256`-bit precision | `0.011` |
-| `mf_lgamma(2.3)` at `256`-bit precision | `0.011` |
-| `mf_gamma(2.3)` at `512`-bit precision | `0.009` |
-| `mf_lgamma(2.3)` at `512`-bit precision | `0.008` |
-| `mf_gamma(2.3)` at `768`-bit precision | `0.008` |
-| `mf_lgamma(2.3)` at `768`-bit precision | `0.008` |
+| Case | `256` bits | `512` bits | `768` bits |
+|---|---:|---:|---:|
+| `mf_exp(1.23456789)` | `6.681 ms` | `38.681 ms` | `630.834 ms` |
+| `mf_log(1.23456789)` | `3.426 ms` | `11.252 ms` | `52.357 ms` |
+| `mf_sin(0.7)` | `11.172 ms` | `17.415 ms` | `256.148 ms` |
+| `mf_asin(0.5)` | `122.371 ms` | `547.263 ms` | `401.761 ms` |
+| `mf_erf(0.5)` | `6.288 µs` | `7.197 µs` | `6.174 µs` |
+| `mf_lambert_w0(1)` | `6.423 µs` | `7.707 µs` | `6.934 µs` |
+| `mf_lambert_wm1(-0.1)` | `11.498 µs` | `8.568 µs` | `7.590 µs` |
 
 For broader benchmark notes, see [`docs/benchmarks.md`](benchmarks.md).

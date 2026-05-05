@@ -330,7 +330,7 @@ int main(void)
 {
     puts("== mfloat native math bench ==");
     puts("Scale iterations with MARS_BENCH_SCALE=<n> if you want longer runs.");
-    puts("Limit to one section with MARS_BENCH_SECTION=constants|elem256|triage256|special256|selected512.");
+        puts("Limit to one section with MARS_BENCH_SECTION=constants|elem256|triage256|special256|selected512|selected768.");
     puts("Filter individual cases with MARS_BENCH_FILTER=<substring>.");
 
     if (bench_wants_section("constants")) {
@@ -411,6 +411,10 @@ int main(void)
         run_unary_case("exp_512", "1.23456789", 512u, mf_exp, bench_scaled_iters(2));
         run_unary_case("log_512", "1.23456789", 512u, mf_log, bench_scaled_iters(2));
         run_unary_case("sin_512", "0.7", 512u, mf_sin, bench_scaled_iters(2));
+        run_unary_case("asin_512", "0.5", 512u, mf_asin, bench_scaled_iters(1));
+        run_unary_case("erf_512", "0.5", 512u, mf_erf, bench_scaled_iters(2));
+        run_unary_case("lambert_w0_512", "1", 512u, mf_lambert_w0, bench_scaled_iters(2));
+        run_unary_case("lambert_wm1_512", "-0.1", 512u, mf_lambert_wm1, bench_scaled_iters(1));
         run_unary_case("atan_512", "0.7", 512u, mf_atan, bench_scaled_iters(2));
         run_binary_case("pow_512", "1.23456789", "3.5", 512u, mf_pow, bench_scaled_iters(1));
         run_binary_case("logbeta_512", "2.5", "3.5", 512u, mf_logbeta, bench_scaled_iters(1));
@@ -418,6 +422,18 @@ int main(void)
         run_unary_case("normal_pdf_512", "0.5", 512u, mf_normal_pdf, bench_scaled_iters(1));
         run_unary_case("ei_512", "1", 512u, mf_ei, bench_scaled_iters(1));
         run_unary_case("e1_512", "1", 512u, mf_e1, bench_scaled_iters(1));
+    }
+
+    if (bench_wants_section("selected768")) {
+        puts("");
+        puts("-- selected 768-bit --");
+        run_unary_case("exp_768", "1.23456789", 768u, mf_exp, bench_scaled_iters(1));
+        run_unary_case("log_768", "1.23456789", 768u, mf_log, bench_scaled_iters(1));
+        run_unary_case("sin_768", "0.7", 768u, mf_sin, bench_scaled_iters(1));
+        run_unary_case("asin_768", "0.5", 768u, mf_asin, bench_scaled_iters(1));
+        run_unary_case("erf_768", "0.5", 768u, mf_erf, bench_scaled_iters(1));
+        run_unary_case("lambert_w0_768", "1", 768u, mf_lambert_w0, bench_scaled_iters(1));
+        run_unary_case("lambert_wm1_768", "-0.1", 768u, mf_lambert_wm1, bench_scaled_iters(1));
     }
 
     return EXIT_SUCCESS;

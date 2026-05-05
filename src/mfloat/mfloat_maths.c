@@ -118,23 +118,6 @@ static uint64_t mfloat_lambert_w0_11024_storage[] = {
     0xe48bf682b33c04e8u, 0x0324fdc0d4a38de0u, 0x385ba1bb3a15c6a2u, 0x97abf76a98a1b70au,
     0x00244c135f1d2caeu
 };
-static uint64_t mfloat_2_3_1024_storage[] = {
-    0xcccccccccccccccdu, 0xccccccccccccccccu, 0xccccccccccccccccu, 0xccccccccccccccccu,
-    0x000000000000024cu
-};
-static uint64_t mfloat_gamma_2_3_1024_storage[] = {
-    0xd1f1602ce9135f3du, 0x74c526dd58230a71u, 0x386f690acc08ea4fu, 0xb985615bce98b173u,
-    0xf7f363dc3e92c470u, 0x6c97fb2b719e2ca2u, 0xddc88789a72effa5u, 0xfb75f72e41cfd4b3u,
-    0x71abebd48774dd6cu, 0x6a7db17e05cd7804u, 0x6c6bf97289faca3cu, 0x4603615157520fdau,
-    0xf044aecabe35547bu, 0x36d66ee21b96c413u, 0x928753fd36f92262u, 0x9556d0d25708a314u
-};
-static uint64_t mfloat_lgamma_2_3_1024_storage[] = {
-    0x9e1e1b9136c47139u, 0x6fb58b790e7e0bd9u, 0xbc32e2aa0b29c373u, 0x12c60f9d23e5c326u,
-    0xf6bcfd7beb1bfc3bu, 0x8c4b74e3ed57bf41u, 0x5a688916f73ed7d3u, 0xf8648a5ed9022ebcu,
-    0xb0d3ac84885f10c8u, 0xe437554e164ce75bu, 0xbb187a5055f2caafu, 0x004d5f7a28d02277u,
-    0x2205c835f991f59au, 0x2a86efd26f9b7834u, 0x9fe1c218f8b0b47fu, 0xbc7ae53847614a76u,
-    0x0000000000000013u
-};
 static uint64_t mfloat_neg_tenth_1024_storage[] = {
     0xcccccccccccccccdu, 0xccccccccccccccccu, 0xccccccccccccccccu, 0xccccccccccccccccu,
     0x000000000000000cu
@@ -177,9 +160,6 @@ static struct _mint_t mfloat_gammainv_31024_mint = { .sign = 1, .length = 25, .c
 static struct _mint_t mfloat_lambert_w0_11024_mint = { .sign = 1, .length = 25, .capacity = 25, .storage = mfloat_lambert_w0_11024_storage };
 static struct _mint_t mfloat_sin1_1024_mint = { .sign = 1, .length = 34u, .capacity = 34u, .storage = mfloat_sin1_1024_storage };
 static struct _mint_t mfloat_cos1_1024_mint = { .sign = 1, .length = 34u, .capacity = 34u, .storage = mfloat_cos1_1024_storage };
-static struct _mint_t mfloat_2_3_1024_mint = { .sign = 1, .length = 5u, .capacity = 5u, .storage = mfloat_2_3_1024_storage };
-static struct _mint_t mfloat_gamma_2_3_1024_mint = { .sign = 1, .length = 16u, .capacity = 16u, .storage = mfloat_gamma_2_3_1024_storage };
-static struct _mint_t mfloat_lgamma_2_3_1024_mint = { .sign = 1, .length = 17u, .capacity = 17u, .storage = mfloat_lgamma_2_3_1024_storage };
 static struct _mint_t mfloat_neg_tenth_1024_mint = { .sign = 1, .length = 5u, .capacity = 5u, .storage = mfloat_neg_tenth_1024_storage };
 static struct _mint_t mfloat_lambert_wm1_m0_1_1024_mint = { .sign = 1, .length = 16u, .capacity = 16u, .storage = mfloat_lambert_wm1_m0_1_1024_storage };
 
@@ -192,9 +172,6 @@ static struct _mfloat_t mfloat_gammainv_31024_static = { .kind = MFLOAT_KIND_FIN
 static struct _mfloat_t mfloat_lambert_w0_11024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -1590, .precision = 1024u, .immortal = true, .mantissa = &mfloat_lambert_w0_11024_mint };
 static struct _mfloat_t mfloat_sin1_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -2123, .precision = 1024u, .immortal = true, .mantissa = &mfloat_sin1_1024_mint };
 static struct _mfloat_t mfloat_cos1_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -2116, .precision = 1024u, .immortal = true, .mantissa = &mfloat_cos1_1024_mint };
-static struct _mfloat_t mfloat_2_3_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -264, .precision = 1024u, .immortal = true, .mantissa = &mfloat_2_3_1024_mint };
-static struct _mfloat_t mfloat_gamma_2_3_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -1023, .precision = 1024u, .immortal = true, .mantissa = &mfloat_gamma_2_3_1024_mint };
-static struct _mfloat_t mfloat_lgamma_2_3_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -1031, .precision = 1024u, .immortal = true, .mantissa = &mfloat_lgamma_2_3_1024_mint };
 static struct _mfloat_t mfloat_neg_tenth_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = -1, .exponent2 = -263, .precision = 1024u, .immortal = true, .mantissa = &mfloat_neg_tenth_1024_mint };
 static struct _mfloat_t mfloat_lambert_wm1_m0_1_1024_static = { .kind = MFLOAT_KIND_FINITE, .sign = -1, .exponent2 = -1022, .precision = 1024u, .immortal = true, .mantissa = &mfloat_lambert_wm1_m0_1_1024_mint };
 
@@ -3674,9 +3651,6 @@ int mf_gamma(mfloat_t *mfloat)
         rc = mfloat_finish_result(mfloat, tmp, precision);
         goto cleanup;
     }
-    if (mfloat_equals_const_value(mfloat, &mfloat_2_3_1024_static) ||
-        mfloat_is_near_const_value(mfloat, &mfloat_2_3_1024_static, 256l))
-        return mfloat_set_from_immortal_internal(mfloat, &mfloat_gamma_2_3_1024_static, precision);
     work_prec = mfloat_transcendental_work_prec(precision);
     if (precision > 512u)
         work_prec = precision * 2u;
@@ -4010,9 +3984,6 @@ int mf_lgamma(mfloat_t *mfloat)
         rc = mfloat_finish_result(mfloat, tmp, precision);
         goto cleanup;
     }
-    if (mfloat_equals_const_value(mfloat, &mfloat_2_3_1024_static) ||
-        mfloat_is_near_const_value(mfloat, &mfloat_2_3_1024_static, 256l))
-        return mfloat_set_from_immortal_internal(mfloat, &mfloat_lgamma_2_3_1024_static, precision);
     work_prec = mfloat_transcendental_work_prec(precision);
     if (precision > 512u)
         work_prec = precision * 2u;
