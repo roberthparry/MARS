@@ -3543,7 +3543,7 @@ cleanup:
 int mf_atanh(mfloat_t *mfloat)
 {
     size_t precision, work_prec;
-    mfloat_t *x = NULL, *one = NULL, *y = NULL, *tanh_y = NULL, *deriv = NULL, *delta = NULL, *tmp = NULL;
+    mfloat_t *x = NULL, *one = NULL, *num = NULL, *den = NULL;
     int rc = -1;
 
     if (!mfloat)
@@ -3557,12 +3557,12 @@ int mf_atanh(mfloat_t *mfloat)
     if (precision <= MFLOAT_QFLOAT_EFFECTIVE_BITS)
         return mfloat_apply_qfloat_unary(mfloat, qf_atanh);
 
-    work_prec = mfloat_transcendental_work_prec(precision);
-    if (precision > 512u)
-        work_prec = precision * 2u;
+    work_prec = mfloat_cap_work_prec(mfloat_transcendental_work_prec(precision));
     x = mfloat_clone_prec(mfloat, work_prec);
     one = mfloat_clone_prec(MF_ONE, work_prec);
-    if (!x || !one)
+    num = mfloat_clone_prec(MF_ONE, work_prec);
+    den = mfloat_clone_prec(MF_ONE, work_prec);
+    if (!x || !one || !num || !den)
         goto cleanup;
     if (x->sign < 0) {
         mfloat_t *absx = mf_clone(x);
@@ -3584,45 +3584,17 @@ int mf_atanh(mfloat_t *mfloat)
             goto cleanup;
         }
     }
-    y = mfloat_new_from_qfloat_prec(qf_atanh(mf_to_qfloat(x)), work_prec);
-    if (!y)
+    if (mf_add(num, x) != 0 || mf_sub(den, x) != 0 || mf_div(num, den) != 0)
         goto cleanup;
-    for (int iter = 0; iter < 8; ++iter) {
-        tanh_y = mf_clone(y);
-        deriv = mfloat_clone_prec(MF_ONE, work_prec);
-        tmp = mf_clone(y);
-        if (!tanh_y || !deriv || !tmp)
-            goto cleanup;
-        if (mf_tanh(tanh_y) != 0 || mf_tanh(tmp) != 0 || mf_mul(tmp, tmp) != 0)
-            goto cleanup;
-        if (mf_sub(tanh_y, x) != 0 || mf_sub(deriv, tmp) != 0)
-            goto cleanup;
-        delta = mf_clone(tanh_y);
-        if (!delta)
-            goto cleanup;
-        if (mf_div(delta, deriv) != 0 || mf_sub(y, delta) != 0)
-            goto cleanup;
-        if (mfloat_is_below_neg_bits(delta, (long)work_prec + 8l))
-            break;
-        mf_free(delta);
-        delta = NULL;
-        mf_free(tanh_y);
-        tanh_y = NULL;
-        mf_free(deriv);
-        deriv = NULL;
-        mf_free(tmp);
-        tmp = NULL;
-    }
-    rc = mfloat_finish_result(mfloat, y, precision);
+    if (mf_log(num) != 0 || mfloat_div_long_inplace(num, 2) != 0)
+        goto cleanup;
+    rc = mfloat_finish_result(mfloat, num, precision);
 
 cleanup:
     mf_free(x);
     mf_free(one);
-    mf_free(y);
-    mf_free(tanh_y);
-    mf_free(deriv);
-    mf_free(delta);
-    mf_free(tmp);
+    mf_free(num);
+    mf_free(den);
     return rc;
 }
 
