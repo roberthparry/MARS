@@ -3441,7 +3441,7 @@ int mf_asinh(mfloat_t *mfloat)
     y = mfloat_new_from_qfloat_prec(qf_asinh(mf_to_qfloat(x)), work_prec);
     if (!y)
         goto cleanup;
-    for (int iter = 0; iter < 8; ++iter) {
+    for (int iter = 0; iter < 3; ++iter) {
         sinh_y = mf_clone(y);
         cosh_y = mf_clone(y);
         if (!sinh_y || !cosh_y)
@@ -3508,7 +3508,7 @@ int mf_acosh(mfloat_t *mfloat)
     y = mfloat_new_from_qfloat_prec(qf_acosh(mf_to_qfloat(x)), work_prec);
     if (!y)
         goto cleanup;
-    for (int iter = 0; iter < 8; ++iter) {
+    for (int iter = 0; iter < 3; ++iter) {
         cosh_y = mf_clone(y);
         sinh_y = mf_clone(y);
         if (!cosh_y || !sinh_y)
