@@ -3629,7 +3629,7 @@ cleanup:
 int mf_sinh(mfloat_t *mfloat)
 {
     size_t precision, work_prec;
-    mfloat_t *x = NULL, *sinh_tmp = NULL, *cosh_tmp = NULL;
+    mfloat_t *sinh_tmp = NULL, *cosh_tmp = NULL;
     int rc = -1;
 
     if (!mfloat)
@@ -3642,17 +3642,15 @@ int mf_sinh(mfloat_t *mfloat)
     precision = mfloat->precision;
     work_prec = mfloat_cap_work_prec(mfloat_transcendental_work_prec(precision));
 
-    x = mfloat_clone_prec(mfloat, work_prec);
     sinh_tmp = mfloat_clone_prec(MF_ZERO, work_prec);
     cosh_tmp = mfloat_clone_prec(MF_ZERO, work_prec);
-    if (!x || !sinh_tmp || !cosh_tmp)
+    if (!sinh_tmp || !cosh_tmp)
         goto cleanup;
-    if (mfloat_sinhcosh_pair(sinh_tmp, cosh_tmp, x, work_prec) != 0)
+    if (mfloat_sinhcosh_pair(sinh_tmp, cosh_tmp, mfloat, work_prec) != 0)
         goto cleanup;
     rc = mfloat_finish_result(mfloat, sinh_tmp, precision);
 
 cleanup:
-    mf_free(x);
     mf_free(sinh_tmp);
     mf_free(cosh_tmp);
     return rc;
@@ -3661,7 +3659,7 @@ cleanup:
 int mf_cosh(mfloat_t *mfloat)
 {
     size_t precision, work_prec;
-    mfloat_t *x = NULL, *sinh_tmp = NULL, *cosh_tmp = NULL;
+    mfloat_t *sinh_tmp = NULL, *cosh_tmp = NULL;
     int rc = -1;
 
     if (!mfloat)
@@ -3674,17 +3672,15 @@ int mf_cosh(mfloat_t *mfloat)
     precision = mfloat->precision;
     work_prec = mfloat_cap_work_prec(mfloat_transcendental_work_prec(precision));
 
-    x = mfloat_clone_prec(mfloat, work_prec);
     sinh_tmp = mfloat_clone_prec(MF_ZERO, work_prec);
     cosh_tmp = mfloat_clone_prec(MF_ZERO, work_prec);
-    if (!x || !sinh_tmp || !cosh_tmp)
+    if (!sinh_tmp || !cosh_tmp)
         goto cleanup;
-    if (mfloat_sinhcosh_pair(sinh_tmp, cosh_tmp, x, work_prec) != 0)
+    if (mfloat_sinhcosh_pair(sinh_tmp, cosh_tmp, mfloat, work_prec) != 0)
         goto cleanup;
     rc = mfloat_finish_result(mfloat, cosh_tmp, precision);
 
 cleanup:
-    mf_free(x);
     mf_free(sinh_tmp);
     mf_free(cosh_tmp);
     return rc;
