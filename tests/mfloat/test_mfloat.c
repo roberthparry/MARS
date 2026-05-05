@@ -22,6 +22,12 @@ static void print_mfloat_error_check_mode(const char *label,
                                           const mfloat_t *got,
                                           const char *expected_text,
                                           int use_decimal_format);
+static void print_mfloat_error_check_value(const char *label,
+                                           const mfloat_t *got,
+                                           const mfloat_t *expected);
+static int mfloat_meets_precision_value(const mfloat_t *got,
+                                        const mfloat_t *expected,
+                                        int relative_mode);
 static int qfloat_is_normalized(qfloat_t value)
 {
     double hi = value.hi;
@@ -160,6 +166,54 @@ static void print_mfloat_error_check_mode(const char *label,
     mf_free(error);
 }
 
+static void print_mfloat_error_check_value(const char *label,
+                                           const mfloat_t *got,
+                                           const mfloat_t *expected)
+{
+    mfloat_t *error = NULL;
+    char expected_buf[1024];
+    char got_buf[1024];
+    char err_buf[1024];
+    size_t precision_bits = 0;
+    int decimal_digits = 0;
+
+    if (!got || !expected) {
+        printf(C_CYAN "%s" C_RESET "\n", label);
+        printf("    precision = <unknown>\n");
+        printf("    expected = <null>\n");
+        printf("    got      = <null>\n");
+        printf("    error    = <null>\n");
+        return;
+    }
+
+    precision_bits = mf_get_precision(got);
+    decimal_digits = (int)ceil((double)precision_bits * 0.3010299956639812);
+    if (decimal_digits < 1)
+        decimal_digits = 1;
+
+    error = mf_clone(got);
+    if (!error || mf_sub(error, expected) != 0 || mf_abs(error) != 0 ||
+        format_mfloat_value(expected_buf, sizeof(expected_buf), expected) < 0 ||
+        format_mfloat_value(got_buf, sizeof(got_buf), got) < 0 ||
+        mf_sprintf(err_buf, sizeof(err_buf), "%.6MF", error) < 0) {
+        printf(C_CYAN "%s" C_RESET "\n", label);
+        printf("    precision = %zu bits (~%d digits)\n", precision_bits, decimal_digits);
+        printf("    expected = <format-error>\n");
+        printf("    got      = <format-error>\n");
+        printf("    error    = <format-error>\n");
+        mf_free(error);
+        return;
+    }
+
+    printf(C_CYAN "%s" C_RESET "\n", label);
+    printf("    precision = %zu bits (~%d digits)\n", precision_bits, decimal_digits);
+    printf("    expected = %s\n", expected_buf);
+    printf("    got      = %s\n", got_buf);
+    printf("    error    = %s\n", err_buf);
+
+    mf_free(error);
+}
+
 static int mfloat_meets_precision(const mfloat_t *got,
                                   const char *expected_text,
                                   int relative_mode)
@@ -218,6 +272,47 @@ static int mfloat_meets_precision(const mfloat_t *got,
 
 cleanup:
     mf_free(expected);
+    mf_free(error);
+    mf_free(tol);
+    return ok;
+}
+
+static int mfloat_meets_precision_value(const mfloat_t *got,
+                                        const mfloat_t *expected,
+                                        int relative_mode)
+{
+    mfloat_t *error = NULL;
+    mfloat_t *tol = NULL;
+    size_t precision_bits;
+    long tol_exp2;
+    int ok = 0;
+
+    if (!got || !expected)
+        return 0;
+
+    precision_bits = mf_get_precision(got);
+    error = mf_clone(got);
+    tol = mf_create_long(1);
+    if (!error || !tol)
+        goto cleanup;
+
+    if (mf_sub(error, expected) != 0 || mf_abs(error) != 0)
+        goto cleanup;
+
+    if (relative_mode && !mf_is_zero(expected)) {
+        tol_exp2 = mf_get_exponent2(expected) +
+                   (long)mf_get_mantissa_bits(expected) - 1l -
+                   (long)precision_bits;
+    } else {
+        tol_exp2 = -(long)precision_bits;
+    }
+
+    if (mf_ldexp(tol, (int)tol_exp2) != 0)
+        goto cleanup;
+
+    ok = mf_le(error, tol);
+
+cleanup:
     mf_free(error);
     mf_free(tol);
     return ok;
@@ -1022,29 +1117,41 @@ void test_extended_math_wrappers(void)
         1));
     ASSERT_TRUE(fabs(mf_to_double(c) - atan(0.5)) < 1e-9);
 
-    ASSERT_EQ_INT(mf_set_string(c, "0.5"), 0);
-    ASSERT_EQ_INT(mf_asin(c), 0);
-    print_mfloat_value("c after asin", c);
-    print_double_check("asin(0.5)", "0.5", asin(0.5), mf_to_double(c));
-    print_mfloat_error_check("asin(0.5) mfloat error", c,
-                             "0.5235987755982988730771072305465838140328615665625176368291574320513027343810348331046724708903528446636913477522137177745156407682584303719542265680214135195750473504503230868509266074371581591550636607381351626109889076880792747053");
-    ASSERT_TRUE(mfloat_meets_precision(
-        c,
-        "0.5235987755982988730771072305465838140328615665625176368291574320513027343810348331046724708903528446636913477522137177745156407682584303719542265680214135195750473504503230868509266074371581591550636607381351626109889076880792747053",
-        1));
-    ASSERT_TRUE(fabs(mf_to_double(c) - asin(0.5)) < 1e-9);
+    {
+        mfloat_t *asin_expected = mf_pi();
+        mfloat_t *six = mf_create_long(6);
+        ASSERT_NOT_NULL(asin_expected);
+        ASSERT_NOT_NULL(six);
+        ASSERT_EQ_INT(mf_set_precision(asin_expected, TEST_MFLOAT_MATHS_PRECISION), 0);
+        ASSERT_EQ_INT(mf_div(asin_expected, six), 0);
+        ASSERT_EQ_INT(mf_set_string(c, "0.5"), 0);
+        ASSERT_EQ_INT(mf_asin(c), 0);
+        print_mfloat_value("c after asin", c);
+        print_double_check("asin(0.5)", "0.5", asin(0.5), mf_to_double(c));
+        print_mfloat_error_check_value("asin(0.5) mfloat error", c, asin_expected);
+        ASSERT_TRUE(mfloat_meets_precision_value(c, asin_expected, 1));
+        ASSERT_TRUE(fabs(mf_to_double(c) - asin(0.5)) < 1e-9);
+        mf_free(six);
+        mf_free(asin_expected);
+    }
 
-    ASSERT_EQ_INT(mf_set_string(c, "0.5"), 0);
-    ASSERT_EQ_INT(mf_acos(c), 0);
-    print_mfloat_value("c after acos", c);
-    print_double_check("acos(0.5)", "0.5", acos(0.5), mf_to_double(c));
-    print_mfloat_error_check("acos(0.5) mfloat error", c,
-                             "1.047197551196597746154214461093167628065723133125035273658314864102605468762069666209344941780705689327382695504427435549031281536516860743908453136042827039150094700900646173701853214874316318310127321476270325221977815376158549411");
-    ASSERT_TRUE(mfloat_meets_precision(
-        c,
-        "1.047197551196597746154214461093167628065723133125035273658314864102605468762069666209344941780705689327382695504427435549031281536516860743908453136042827039150094700900646173701853214874316318310127321476270325221977815376158549411",
-        1));
-    ASSERT_TRUE(fabs(mf_to_double(c) - acos(0.5)) < 1e-9);
+    {
+        mfloat_t *acos_expected = mf_pi();
+        mfloat_t *three = mf_create_long(3);
+        ASSERT_NOT_NULL(acos_expected);
+        ASSERT_NOT_NULL(three);
+        ASSERT_EQ_INT(mf_set_precision(acos_expected, TEST_MFLOAT_MATHS_PRECISION), 0);
+        ASSERT_EQ_INT(mf_div(acos_expected, three), 0);
+        ASSERT_EQ_INT(mf_set_string(c, "0.5"), 0);
+        ASSERT_EQ_INT(mf_acos(c), 0);
+        print_mfloat_value("c after acos", c);
+        print_double_check("acos(0.5)", "0.5", acos(0.5), mf_to_double(c));
+        print_mfloat_error_check_value("acos(0.5) mfloat error", c, acos_expected);
+        ASSERT_TRUE(mfloat_meets_precision_value(c, acos_expected, 1));
+        ASSERT_TRUE(fabs(mf_to_double(c) - acos(0.5)) < 1e-9);
+        mf_free(three);
+        mf_free(acos_expected);
+    }
 
     ASSERT_EQ_INT(mf_set_string(c, "0.5"), 0);
     ASSERT_EQ_INT(mf_tanh(c), 0);

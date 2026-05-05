@@ -693,7 +693,7 @@ static int mfloat_scratch_copy(mfloat_t *dst, const mfloat_t *src)
 static int mfloat_set_from_const_mint_local(mfloat_t *dst, const mint_t *src, long exponent2)
 {
     mint_t *tmp;
-    int rc;
+    int rc = -1;
 
     if (!dst || !src)
         return -1;
@@ -2044,7 +2044,7 @@ static int mfloat_apply_trig_dispatch(mfloat_t *dst, const mfloat_t *x, size_t p
                                       const mfloat_trig_dispatch_t dispatch[4], int quadrant)
 {
     const mfloat_trig_dispatch_t *entry;
-    int rc;
+    int rc = -1;
 
     entry = &dispatch[quadrant & 3];
     rc = entry->kernel(dst, x, precision);
@@ -3224,6 +3224,20 @@ int mf_asin(mfloat_t *mfloat)
         mf_free(pi);
         goto cleanup;
     }
+    if (mfloat_is_exact_half(mfloat, 1) || mfloat_is_exact_half(mfloat, -1)) {
+        mfloat_t *pi = mfloat_new_pi_prec(work_prec);
+        if (!pi || mfloat_div_long_inplace(pi, 6) != 0) {
+            mf_free(pi);
+            goto cleanup;
+        }
+        if (mfloat_is_exact_half(mfloat, -1) && mf_neg(pi) != 0) {
+            mf_free(pi);
+            goto cleanup;
+        }
+        rc = mfloat_finish_result(mfloat, pi, precision);
+        mf_free(pi);
+        goto cleanup;
+    }
     y = mfloat_new_from_qfloat_prec(qf_asin(mf_to_qfloat(x)), work_prec);
     if (!y)
         goto cleanup;
@@ -3281,6 +3295,22 @@ int mf_acos(mfloat_t *mfloat)
         return mfloat_apply_qfloat_unary(mfloat, qf_acos);
 
     work_prec = mfloat_transcendental_work_prec(precision);
+    if (mfloat_is_exact_half(mfloat, 1) || mfloat_is_exact_half(mfloat, -1)) {
+        pi = mfloat_new_pi_prec(work_prec);
+        if (!pi || mfloat_div_long_inplace(pi, 3) != 0)
+            goto cleanup;
+        if (mfloat_is_exact_half(mfloat, -1)) {
+            mfloat_t *two_thirds_pi = mf_clone(pi);
+            if (!two_thirds_pi || mf_mul_long(two_thirds_pi, 2) != 0) {
+                mf_free(two_thirds_pi);
+                goto cleanup;
+            }
+            mf_free(pi);
+            pi = two_thirds_pi;
+        }
+        rc = mfloat_finish_result(mfloat, pi, precision);
+        goto cleanup;
+    }
     tmp = mfloat_clone_prec(mfloat, work_prec);
     pi = mfloat_new_pi_prec(work_prec);
     if (!tmp || !pi)
