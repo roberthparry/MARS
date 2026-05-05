@@ -649,6 +649,10 @@ static int mfloat_equals_exact_long(const mfloat_t *mfloat, long value);
 static int mfloat_is_exact_half(const mfloat_t *mfloat, short sign);
 static int mfloat_equals_const_value(const mfloat_t *mfloat, const mfloat_t *constant);
 static int mfloat_is_near_const_value(const mfloat_t *mfloat, const mfloat_t *constant, long bits);
+static int mfloat_reduce_trig_argument(const mfloat_t *src,
+                                       size_t precision,
+                                       mfloat_t **r_out,
+                                       int *quadrant_out);
 
 static void mfloat_scratch_init_slot(mfloat_scratch_slot_t *slot, size_t precision)
 {
@@ -2053,6 +2057,39 @@ static int mfloat_apply_trig_dispatch(mfloat_t *dst, const mfloat_t *x, size_t p
     return rc;
 }
 
+static int mfloat_sincos_pair(mfloat_t *sin_dst, mfloat_t *cos_dst, const mfloat_t *x, size_t precision)
+{
+    mfloat_t *r = NULL;
+    int quadrant;
+    int rc = -1;
+    static const mfloat_trig_dispatch_t sin_dispatch[4] = {
+        { mfloat_sin_kernel, false },
+        { mfloat_cos_kernel, false },
+        { mfloat_sin_kernel, true  },
+        { mfloat_cos_kernel, true  }
+    };
+    static const mfloat_trig_dispatch_t cos_dispatch[4] = {
+        { mfloat_cos_kernel, false },
+        { mfloat_sin_kernel, true  },
+        { mfloat_cos_kernel, true  },
+        { mfloat_sin_kernel, false }
+    };
+
+    if (!sin_dst || !cos_dst || !x)
+        return -1;
+    if (mfloat_reduce_trig_argument(x, precision, &r, &quadrant) != 0)
+        goto cleanup;
+    if (mfloat_apply_trig_dispatch(sin_dst, r, precision, sin_dispatch, quadrant) != 0)
+        goto cleanup;
+    if (mfloat_apply_trig_dispatch(cos_dst, r, precision, cos_dispatch, quadrant) != 0)
+        goto cleanup;
+    rc = 0;
+
+cleanup:
+    mf_free(r);
+    return rc;
+}
+
 static int mfloat_atan_kernel(mfloat_t *dst, const mfloat_t *x, size_t precision)
 {
     mfloat_t *sum = NULL, *term = NULL, *r2 = NULL, *piece = NULL;
@@ -3247,7 +3284,7 @@ int mf_asin(mfloat_t *mfloat)
         cos_y = mf_clone(y);
         if (!sin_y || !cos_y)
             goto cleanup;
-        if (mf_sin(sin_y) != 0 || mf_cos(cos_y) != 0)
+        if (mfloat_sincos_pair(sin_y, cos_y, y, work_prec) != 0)
             goto cleanup;
         if (mf_sub(sin_y, x) != 0 || mf_div(sin_y, cos_y) != 0)
             goto cleanup;
