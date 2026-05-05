@@ -205,6 +205,7 @@ int mf_mul_pow10(mfloat_t *mfloat, int exponent10);
 int mf_hypot(mfloat_t *mfloat, const mfloat_t *other);
 int mf_exp(mfloat_t *mfloat);
 int mf_log(mfloat_t *mfloat);
+int mf_sincos(const mfloat_t *x, mfloat_t *sin_out, mfloat_t *cos_out);
 int mf_sin(mfloat_t *mfloat);
 int mf_cos(mfloat_t *mfloat);
 int mf_tan(mfloat_t *mfloat);

@@ -953,6 +953,8 @@ void test_extended_math_wrappers(void)
     mfloat_t *k = NULL;
     mfloat_t *h = NULL;
     mfloat_t *p = NULL;
+    mfloat_t *sin_pair = NULL;
+    mfloat_t *cos_pair = NULL;
     mfloat_t *expected_e = NULL;
     mfloat_t *expected_calc = NULL;
     mfloat_t *g = NULL;
@@ -970,6 +972,8 @@ void test_extended_math_wrappers(void)
     k = mf_create_long(-1);
     h = mf_create_long(2);
     p = mf_create_long(10);
+    sin_pair = mf_new_prec(TEST_MFLOAT_MATHS_PRECISION);
+    cos_pair = mf_new_prec(TEST_MFLOAT_MATHS_PRECISION);
 
     ASSERT_NOT_NULL(a);
     ASSERT_NOT_NULL(b);
@@ -982,6 +986,8 @@ void test_extended_math_wrappers(void)
     ASSERT_NOT_NULL(k);
     ASSERT_NOT_NULL(h);
     ASSERT_NOT_NULL(p);
+    ASSERT_NOT_NULL(sin_pair);
+    ASSERT_NOT_NULL(cos_pair);
     print_mfloat_value("a initial", a);
     print_mfloat_value("b initial", b);
     print_mfloat_value("c initial", c);
@@ -1032,6 +1038,20 @@ void test_extended_math_wrappers(void)
         "0.4794255386042030002732879352155713880818033679406006751886166131255350002878148322096312746843482690861320910845057174178110937486099402827801539620461919246099572939322814005335463381880552285956701356998542336391210717207773801529",
         1));
     ASSERT_TRUE(fabs(mf_to_double(c) - sin(0.5)) < 1e-12);
+    ASSERT_EQ_INT(mf_set_string(c, "0.5"), 0);
+    ASSERT_EQ_INT(mf_sincos(c, sin_pair, cos_pair), 0);
+    print_mfloat_error_check("sincos(sin, 0.5) mfloat error", sin_pair,
+                             "0.4794255386042030002732879352155713880818033679406006751886166131255350002878148322096312746843482690861320910845057174178110937486099402827801539620461919246099572939322814005335463381880552285956701356998542336391210717207773801529");
+    print_mfloat_error_check("sincos(cos, 0.5) mfloat error", cos_pair,
+                             "0.8775825618903727161162815826038296519916451971097440529976108683159507632742139474057941840846822583554784005931090539934138279768332802667997561209502240155876291568785907234769393109896167396770144089976491285702134682183845438182");
+    ASSERT_TRUE(mfloat_meets_precision(
+        sin_pair,
+        "0.4794255386042030002732879352155713880818033679406006751886166131255350002878148322096312746843482690861320910845057174178110937486099402827801539620461919246099572939322814005335463381880552285956701356998542336391210717207773801529",
+        1));
+    ASSERT_TRUE(mfloat_meets_precision(
+        cos_pair,
+        "0.8775825618903727161162815826038296519916451971097440529976108683159507632742139474057941840846822583554784005931090539934138279768332802667997561209502240155876291568785907234769393109896167396770144089976491285702134682183845438182",
+        1));
     ASSERT_EQ_INT(mf_set_string(c, "0.5"), 0);
     ASSERT_EQ_INT(mf_cos(c), 0);
     print_mfloat_value("c after cos", c);
@@ -1347,6 +1367,8 @@ void test_extended_math_wrappers(void)
     mf_free(k);
     mf_free(h);
     mf_free(p);
+    mf_free(sin_pair);
+    mf_free(cos_pair);
     mf_free(expected_e);
     mf_free(expected_calc);
     mf_free(g);

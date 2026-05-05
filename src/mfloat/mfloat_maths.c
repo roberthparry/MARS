@@ -649,10 +649,13 @@ static int mfloat_equals_exact_long(const mfloat_t *mfloat, long value);
 static int mfloat_is_exact_half(const mfloat_t *mfloat, short sign);
 static int mfloat_equals_const_value(const mfloat_t *mfloat, const mfloat_t *constant);
 static int mfloat_is_near_const_value(const mfloat_t *mfloat, const mfloat_t *constant, long bits);
+static size_t mfloat_transcendental_work_prec(size_t precision);
+static size_t mfloat_cap_work_prec(size_t work_prec);
 static int mfloat_reduce_trig_argument(const mfloat_t *src,
                                        size_t precision,
                                        mfloat_t **r_out,
                                        int *quadrant_out);
+static int mfloat_finish_result(mfloat_t *dst, mfloat_t *src, size_t precision);
 
 static void mfloat_scratch_init_slot(mfloat_scratch_slot_t *slot, size_t precision)
 {
@@ -2087,6 +2090,51 @@ static int mfloat_sincos_pair(mfloat_t *sin_dst, mfloat_t *cos_dst, const mfloat
 
 cleanup:
     mf_free(r);
+    return rc;
+}
+
+int mf_sincos(const mfloat_t *x, mfloat_t *sin_out, mfloat_t *cos_out)
+{
+    size_t sin_prec, cos_prec, work_prec;
+    mfloat_t *work_x = NULL, *sin_tmp = NULL, *cos_tmp = NULL;
+    int rc = -1;
+
+    if (!sin_out || !cos_out || !x || sin_out == cos_out)
+        return -1;
+    if (x->kind == MFLOAT_KIND_NAN) {
+        if (mf_set_double(sin_out, NAN) != 0 || mf_set_double(cos_out, NAN) != 0)
+            return -1;
+        return 0;
+    }
+    if (!mfloat_is_finite(x)) {
+        if (mf_set_double(sin_out, NAN) != 0 || mf_set_double(cos_out, NAN) != 0)
+            return -1;
+        return 0;
+    }
+
+    sin_prec = sin_out->precision;
+    cos_prec = cos_out->precision;
+    work_prec = sin_prec > cos_prec ? sin_prec : cos_prec;
+    work_prec = mfloat_cap_work_prec(mfloat_transcendental_work_prec(work_prec));
+
+    work_x = mfloat_clone_prec(x, work_prec);
+    sin_tmp = mfloat_clone_prec(MF_ZERO, work_prec);
+    cos_tmp = mfloat_clone_prec(MF_ZERO, work_prec);
+    if (!work_x || !sin_tmp || !cos_tmp)
+        goto cleanup;
+
+    if (mfloat_sincos_pair(sin_tmp, cos_tmp, work_x, work_prec) != 0)
+        goto cleanup;
+    if (mfloat_finish_result(sin_out, sin_tmp, sin_prec) != 0 ||
+        mfloat_finish_result(cos_out, cos_tmp, cos_prec) != 0)
+        goto cleanup;
+
+    rc = 0;
+
+cleanup:
+    mf_free(work_x);
+    mf_free(sin_tmp);
+    mf_free(cos_tmp);
     return rc;
 }
 

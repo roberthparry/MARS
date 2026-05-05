@@ -191,6 +191,75 @@ static void run_binary_case(const char *label,
     (void)mf_set_default_precision(old_prec);
 }
 
+static void run_sincos_case(const char *label, const char *text, size_t precision, int iters)
+{
+    size_t old_prec;
+    mfloat_t *src;
+    uint64_t start;
+    uint64_t end;
+    double avg_us;
+
+    if (!bench_case_enabled(label))
+        return;
+
+    old_prec = mf_get_default_precision();
+    if (mf_set_default_precision(precision) != 0) {
+        fprintf(stderr, "%s set default precision failed\n", label);
+        return;
+    }
+
+    src = mf_create_string(text);
+    if (!src) {
+        fprintf(stderr, "%s source create failed\n", label);
+        (void)mf_set_default_precision(old_prec);
+        return;
+    }
+
+    {
+        mfloat_t *warm_sin = mf_new_prec(precision);
+        mfloat_t *warm_cos = mf_new_prec(precision);
+
+        if (!warm_sin || !warm_cos || mf_sincos(src, warm_sin, warm_cos) != 0) {
+            fprintf(stderr, "%s warmup failed\n", label);
+            mf_free(warm_sin);
+            mf_free(warm_cos);
+            mf_free(src);
+            (void)mf_set_default_precision(old_prec);
+            return;
+        }
+        mf_free(warm_sin);
+        mf_free(warm_cos);
+    }
+
+    start = now_ns();
+    for (int i = 0; i < iters; ++i) {
+        mfloat_t *sin_value = mf_new_prec(precision);
+        mfloat_t *cos_value = mf_new_prec(precision);
+
+        if (!sin_value || !cos_value || mf_sincos(src, sin_value, cos_value) != 0) {
+            fprintf(stderr, "%s timed run failed\n", label);
+            mf_free(sin_value);
+            mf_free(cos_value);
+            mf_free(src);
+            (void)mf_set_default_precision(old_prec);
+            return;
+        }
+        mf_free(sin_value);
+        mf_free(cos_value);
+    }
+    end = now_ns();
+
+    avg_us = ((double)(end - start) / (double)iters) / 1000.0;
+    printf("%-28s bits=%-4zu avg_µs=%10.3f avg_ms=%10.3f\n",
+           label,
+           precision,
+           avg_us,
+           avg_us / 1000.0);
+
+    mf_free(src);
+    (void)mf_set_default_precision(old_prec);
+}
+
 static void run_ternary_case(const char *label,
                              const char *x_text,
                              const char *a_text,
@@ -352,6 +421,7 @@ int main(void)
         run_unary_case("sqrt_256", "2.25", 256u, mf_sqrt, bench_scaled_iters(8));
         run_unary_case("sin_256", "0.7", 256u, mf_sin, bench_scaled_iters(8));
         run_unary_case("cos_256", "0.7", 256u, mf_cos, bench_scaled_iters(8));
+        run_sincos_case("sincos_256", "0.7", 256u, bench_scaled_iters(6));
         run_unary_case("tan_256", "0.7", 256u, mf_tan, bench_scaled_iters(6));
         run_unary_case("atan_256", "0.7", 256u, mf_atan, bench_scaled_iters(8));
         run_unary_case("asin_256", "0.5", 256u, mf_asin, bench_scaled_iters(4));
@@ -417,6 +487,7 @@ int main(void)
         run_unary_case("sqrt_512", "2.25", 512u, mf_sqrt, bench_scaled_iters(2));
         run_unary_case("sin_512", "0.7", 512u, mf_sin, bench_scaled_iters(2));
         run_unary_case("cos_512", "0.7", 512u, mf_cos, bench_scaled_iters(2));
+        run_sincos_case("sincos_512", "0.7", 512u, bench_scaled_iters(1));
         run_unary_case("tan_512", "0.7", 512u, mf_tan, bench_scaled_iters(1));
         run_unary_case("atan_512", "0.7", 512u, mf_atan, bench_scaled_iters(2));
         run_unary_case("asin_512", "0.5", 512u, mf_asin, bench_scaled_iters(1));
@@ -447,6 +518,7 @@ int main(void)
         run_unary_case("sqrt_768", "2.25", 768u, mf_sqrt, bench_scaled_iters(1));
         run_unary_case("sin_768", "0.7", 768u, mf_sin, bench_scaled_iters(1));
         run_unary_case("cos_768", "0.7", 768u, mf_cos, bench_scaled_iters(1));
+        run_sincos_case("sincos_768", "0.7", 768u, bench_scaled_iters(1));
         run_unary_case("tan_768", "0.7", 768u, mf_tan, bench_scaled_iters(1));
         run_unary_case("atan_768", "0.7", 768u, mf_atan, bench_scaled_iters(1));
         run_unary_case("asin_768", "0.5", 768u, mf_asin, bench_scaled_iters(1));
