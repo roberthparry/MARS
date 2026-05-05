@@ -2072,8 +2072,11 @@ static int mfloat_atan_kernel(mfloat_t *dst, const mfloat_t *x, size_t precision
 
         if (mf_mul(term, r2) != 0 || mf_neg(term) != 0)
             goto cleanup;
-        piece = mf_clone(term);
         if (!piece)
+            piece = mfloat_clone_prec(term, precision);
+        if (!piece)
+            goto cleanup;
+        if (mfloat_copy_value(piece, term) != 0)
             goto cleanup;
         if (mfloat_div_long_inplace(piece, denom) != 0)
             goto cleanup;
@@ -2081,8 +2084,6 @@ static int mfloat_atan_kernel(mfloat_t *dst, const mfloat_t *x, size_t precision
             goto cleanup;
         if (mfloat_is_below_neg_bits(piece, (long)precision + 8l))
             break;
-        mf_free(piece);
-        piece = NULL;
     }
 
     if (mfloat_round_to_precision(sum, precision - MFLOAT_CONST_GUARD_BITS) != 0)
@@ -2964,8 +2965,6 @@ int mf_atan(mfloat_t *mfloat)
 
     precision = mfloat->precision;
     work_prec = mfloat_cap_work_prec(mfloat_transcendental_work_prec(precision));
-    if (precision > 256u)
-        work_prec += 64u;
     x = mfloat_clone_prec(mfloat, work_prec);
     if (!x)
         goto cleanup;
