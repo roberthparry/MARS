@@ -1827,11 +1827,11 @@ static long mfloat_estimate_positive_unit_steps(const mfloat_t *value, long thre
 static long mfloat_lgamma_asymptotic_threshold(size_t precision)
 {
     if (precision <= 256u)
-        return 32l;
+        return 8l;
     if (precision <= 512u)
-        return 512l;
+        return 32l;
     if (precision <= 1024u)
-        return 1024l;
+        return 64l;
     return 128l;
 }
 
@@ -3266,7 +3266,7 @@ int mf_atan(mfloat_t *mfloat)
         return 0;
 
     precision = mfloat->precision;
-    work_prec = mfloat_cap_work_prec(mfloat_transcendental_work_prec(precision));
+    work_prec = precision;
     x = mfloat_clone_prec(mfloat, work_prec);
     if (!x)
         goto cleanup;
@@ -3945,9 +3945,7 @@ int mf_gamma(mfloat_t *mfloat)
         rc = mfloat_finish_result(mfloat, tmp, precision);
         goto cleanup;
     }
-    work_prec = mfloat_transcendental_work_prec(precision);
-    if (precision > 512u)
-        work_prec = precision * 2u;
+    work_prec = mfloat_cap_work_prec(mfloat_transcendental_work_prec(precision));
     x = mfloat_clone_prec(mfloat, work_prec);
     if (!x)
         goto cleanup;
@@ -4228,9 +4226,10 @@ cleanup:
 int mf_lgamma(mfloat_t *mfloat)
 {
     size_t precision, work_prec;
-    mfloat_t *x = NULL, *z = NULL, *acc = NULL, *tmp = NULL, *logz = NULL, *pi = NULL, *threshold = NULL, *den = NULL;
+    mfloat_t *x = NULL, *z = NULL, *acc = NULL, *tmp = NULL, *pi = NULL, *threshold = NULL, *den = NULL, *prod = NULL;
     long n = 0;
     long threshold_long;
+    unsigned chunk_count = 0u;
     int rc = -1;
 
     if (!mfloat)
@@ -4317,18 +4316,21 @@ int mf_lgamma(mfloat_t *mfloat)
     threshold_long = mfloat_lgamma_asymptotic_threshold(precision);
     threshold = mfloat_new_from_long_prec(threshold_long, work_prec);
     tmp = mf_new_prec(work_prec);
-    logz = mf_new_prec(work_prec);
-    if (!z || !acc || !threshold || !tmp || !logz)
-        goto cleanup;
-    if (mfloat_copy_value(logz, z) != 0 || mf_log(logz) != 0)
+    prod = mfloat_clone_prec(MF_ONE, work_prec);
+    if (!z || !acc || !threshold || !tmp || !prod)
         goto cleanup;
     while (mf_lt(z, threshold)) {
-        if (mf_add(acc, logz) != 0)
+        if (mf_mul(prod, z) != 0)
             goto cleanup;
         if (mf_add_long(z, 1) != 0)
             goto cleanup;
-        if (mfloat_copy_value(logz, z) != 0 || mf_log(logz) != 0)
+        if (++chunk_count < 128u && mf_lt(z, threshold))
+            continue;
+        if (mfloat_copy_value(tmp, prod) != 0 || mf_log(tmp) != 0 || mf_add(acc, tmp) != 0)
             goto cleanup;
+        if (mfloat_copy_value(prod, MF_ONE) != 0)
+            goto cleanup;
+        chunk_count = 0u;
     }
     if (mfloat_lgamma_asymptotic(z, z, work_prec) != 0 || mf_sub(z, acc) != 0)
         goto cleanup;
@@ -4339,10 +4341,10 @@ cleanup:
     mf_free(z);
     mf_free(acc);
     mf_free(tmp);
-    mf_free(logz);
     mf_free(pi);
     mf_free(threshold);
     mf_free(den);
+    mf_free(prod);
     return rc;
 }
 
@@ -5091,7 +5093,7 @@ int mf_normal_pdf(mfloat_t *mfloat)
     precision = mfloat->precision;
     if (precision <= MFLOAT_QFLOAT_EFFECTIVE_BITS)
         return mfloat_apply_qfloat_unary(mfloat, qf_normal_pdf);
-    work_prec = mfloat_transcendental_work_prec(precision) + 32u;
+    work_prec = mfloat_cap_work_prec(mfloat_transcendental_work_prec(precision));
     x2 = mfloat_clone_prec(mfloat, work_prec);
     if (!x2)
         goto cleanup;
