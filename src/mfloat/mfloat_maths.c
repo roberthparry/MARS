@@ -2857,9 +2857,7 @@ int mf_sin(mfloat_t *mfloat)
     }
 
     precision = mfloat->precision;
-    work_prec = mfloat_transcendental_work_prec(precision);
-    if (precision > 512u)
-        work_prec = precision * 2u;
+    work_prec = mfloat_cap_work_prec(mfloat_transcendental_work_prec(precision));
     if (mfloat_reduce_trig_argument(mfloat, work_prec, &r, &quadrant) != 0)
         goto cleanup;
 
@@ -2965,7 +2963,7 @@ int mf_atan(mfloat_t *mfloat)
         return 0;
 
     precision = mfloat->precision;
-    work_prec = precision + MFLOAT_CONST_GUARD_BITS;
+    work_prec = mfloat_cap_work_prec(mfloat_transcendental_work_prec(precision));
     if (precision > 256u)
         work_prec += 64u;
     x = mfloat_clone_prec(mfloat, work_prec);
@@ -3226,7 +3224,7 @@ int mf_asin(mfloat_t *mfloat)
     if (!y)
         goto cleanup;
 
-    for (int iter = 0; iter < 8; ++iter) {
+    for (int iter = 0; iter < 5; ++iter) {
         sin_y = mf_clone(y);
         cos_y = mf_clone(y);
         if (!sin_y || !cos_y)
