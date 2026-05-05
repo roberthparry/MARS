@@ -357,6 +357,7 @@ int main(void)
         run_unary_case("asin_256", "0.5", 256u, mf_asin, bench_scaled_iters(4));
         run_unary_case("acos_256", "0.5", 256u, mf_acos, bench_scaled_iters(4));
         run_binary_case("atan2_256", "1", "-1", 256u, mf_atan2, bench_scaled_iters(4));
+        run_binary_case("atan2_general_256", "0.5", "-0.75", 256u, mf_atan2, bench_scaled_iters(2));
         run_unary_case("sinh_256", "0.7", 256u, mf_sinh, bench_scaled_iters(4));
         run_unary_case("cosh_256", "0.7", 256u, mf_cosh, bench_scaled_iters(4));
         run_unary_case("tanh_256", "0.7", 256u, mf_tanh, bench_scaled_iters(4));
@@ -418,6 +419,8 @@ int main(void)
         run_unary_case("atan_512", "0.7", 512u, mf_atan, bench_scaled_iters(2));
         run_unary_case("asin_512", "0.5", 512u, mf_asin, bench_scaled_iters(1));
         run_unary_case("acos_512", "0.5", 512u, mf_acos, bench_scaled_iters(1));
+        run_binary_case("atan2_512", "1", "-1", 512u, mf_atan2, bench_scaled_iters(2));
+        run_binary_case("atan2_general_512", "0.5", "-0.75", 512u, mf_atan2, bench_scaled_iters(1));
         run_unary_case("asinh_512", "0.5", 512u, mf_asinh, bench_scaled_iters(1));
         run_unary_case("acosh_512", "2.0", 512u, mf_acosh, bench_scaled_iters(1));
         run_unary_case("atanh_512", "0.5", 512u, mf_atanh, bench_scaled_iters(1));
@@ -444,6 +447,8 @@ int main(void)
         run_unary_case("atan_768", "0.7", 768u, mf_atan, bench_scaled_iters(1));
         run_unary_case("asin_768", "0.5", 768u, mf_asin, bench_scaled_iters(1));
         run_unary_case("acos_768", "0.5", 768u, mf_acos, bench_scaled_iters(1));
+        run_binary_case("atan2_768", "1", "-1", 768u, mf_atan2, bench_scaled_iters(1));
+        run_binary_case("atan2_general_768", "0.5", "-0.75", 768u, mf_atan2, bench_scaled_iters(1));
         run_unary_case("asinh_768", "0.5", 768u, mf_asinh, bench_scaled_iters(1));
         run_unary_case("acosh_768", "2.0", 768u, mf_acosh, bench_scaled_iters(1));
         run_unary_case("atanh_768", "0.5", 768u, mf_atanh, bench_scaled_iters(1));

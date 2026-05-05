@@ -3102,7 +3102,7 @@ int mf_atan2(mfloat_t *mfloat, const mfloat_t *other)
     precision = mfloat->precision;
     if (precision <= MFLOAT_QFLOAT_EFFECTIVE_BITS)
         return mfloat_apply_qfloat_binary(mfloat, other, qf_atan2);
-    work_prec = mfloat_transcendental_work_prec(precision) + 384u;
+    work_prec = mfloat_cap_work_prec(mfloat_transcendental_work_prec(precision));
 
     y = mfloat_clone_prec(mfloat, work_prec);
     x = mfloat_clone_prec(other, work_prec);
@@ -3145,7 +3145,12 @@ int mf_atan2(mfloat_t *mfloat, const mfloat_t *other)
         goto cleanup;
     }
 
-    if (mf_div(y, x) != 0 || mf_atan(y) != 0)
+    if (mf_div(y, x) != 0)
+        goto cleanup;
+    if (mfloat_round_to_precision(y, precision) != 0)
+        goto cleanup;
+    y->precision = precision;
+    if (mf_atan(y) != 0)
         goto cleanup;
 
     if (x->sign < 0) {
