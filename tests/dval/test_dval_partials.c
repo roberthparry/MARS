@@ -392,15 +392,15 @@ static void test_partial_to_string_sin_xy(void)
 
 void test_partial_derivatives(void)
 {
-    RUN_TEST(test_partial_xy_product,   __func__);
-    RUN_TEST(test_partial_poly,         __func__);
-    RUN_TEST(test_partial_sin_exp,      __func__);
-    RUN_TEST(test_partial_symmetry,     __func__);
-    RUN_TEST(test_partial_get_borrowed, __func__);
-    RUN_TEST(test_partial_to_string,            __func__);
-    RUN_TEST(test_partial_to_string_functions,  __func__);
-    RUN_TEST(test_partial_to_string_log_r2,     __func__);
-    RUN_TEST(test_partial_to_string_sin_xy,     __func__);
+    RUN_SUBTEST(test_partial_xy_product);
+    RUN_SUBTEST(test_partial_poly);
+    RUN_SUBTEST(test_partial_sin_exp);
+    RUN_SUBTEST(test_partial_symmetry);
+    RUN_SUBTEST(test_partial_get_borrowed);
+    RUN_SUBTEST(test_partial_to_string);
+    RUN_SUBTEST(test_partial_to_string_functions);
+    RUN_SUBTEST(test_partial_to_string_log_r2);
+    RUN_SUBTEST(test_partial_to_string_sin_xy);
 }
 
 /* ------------------------------------------------------------------------- */

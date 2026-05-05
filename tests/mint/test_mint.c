@@ -976,24 +976,24 @@ void test_readme_mersenne_prime_search(void)
 
 int tests_main(void)
 {
-    RUN_TEST(test_create_and_to_string, NULL);
-    RUN_TEST(test_setters_and_clear, NULL);
-    RUN_TEST(test_ulong_and_hex_constructors, NULL);
-    RUN_TEST(test_clone_copies_value, NULL);
-    RUN_TEST(test_addition, NULL);
-    RUN_TEST(test_multiplication, NULL);
-    RUN_TEST(test_division_and_modulo, NULL);
-    RUN_TEST(test_pow_and_pow10, NULL);
-    RUN_TEST(test_factorial_fibonacci_and_binomial, NULL);
-    RUN_TEST(test_compare_and_negate, NULL);
-    RUN_TEST(test_inc_dec_and_bits, NULL);
-    RUN_TEST(test_shifts, NULL);
-    RUN_TEST(test_integer_sqrt, NULL);
-    RUN_TEST(test_bitwise, NULL);
-    RUN_TEST(test_sub_abs_predicates_conversions_gcd_lcm, NULL);
-    RUN_TEST(test_long_hex_bits_and_nextprime, NULL);
-    RUN_TEST(test_divmod_square_gcdext_modinv, NULL);
-    RUN_TEST(test_powmod_isprime_and_factors, NULL);
-    RUN_TEST(test_readme_mersenne_prime_search, NULL);
-    return tests_failed;
+    RUN_TEST_CASE(test_create_and_to_string);
+    RUN_TEST_CASE(test_setters_and_clear);
+    RUN_TEST_CASE(test_ulong_and_hex_constructors);
+    RUN_TEST_CASE(test_clone_copies_value);
+    RUN_TEST_CASE(test_addition);
+    RUN_TEST_CASE(test_multiplication);
+    RUN_TEST_CASE(test_division_and_modulo);
+    RUN_TEST_CASE(test_pow_and_pow10);
+    RUN_TEST_CASE(test_factorial_fibonacci_and_binomial);
+    RUN_TEST_CASE(test_compare_and_negate);
+    RUN_TEST_CASE(test_inc_dec_and_bits);
+    RUN_TEST_CASE(test_shifts);
+    RUN_TEST_CASE(test_integer_sqrt);
+    RUN_TEST_CASE(test_bitwise);
+    RUN_TEST_CASE(test_sub_abs_predicates_conversions_gcd_lcm);
+    RUN_TEST_CASE(test_long_hex_bits_and_nextprime);
+    RUN_TEST_CASE(test_divmod_square_gcdext_modinv);
+    RUN_TEST_CASE(test_powmod_isprime_and_factors);
+    RUN_TEST_CASE(test_readme_mersenne_prime_search);
+    return TESTS_EXIT_CODE();
 }

@@ -243,22 +243,22 @@ void test_readme_examples(void) {
 int tests_main(void) {
 
     printf(C_BOLD C_CYAN "=== Integer Tests ===\n" C_RESET);
-    RUN_TEST(test_ints, NULL);
+    RUN_TEST_CASE(test_ints);
 
     printf(C_BOLD C_CYAN "=== String Tests ===\n" C_RESET);
-    RUN_TEST(test_strings, NULL);
+    RUN_TEST_CASE(test_strings);
 
     printf(C_BOLD C_CYAN "=== Deep Struct Tests ===\n" C_RESET);
-    RUN_TEST(test_deep, NULL);
+    RUN_TEST_CASE(test_deep);
 
     printf(C_BOLD C_CYAN "=== Sorted Order Tests ===\n" C_RESET);
-    RUN_TEST(test_sorted, NULL);
+    RUN_TEST_CASE(test_sorted);
 
     printf(C_BOLD C_CYAN "=== Fuzz Tests ===\n" C_RESET);
-    RUN_TEST(test_fuzz, NULL);
+    RUN_TEST_CASE(test_fuzz);
 
     printf(C_YELLOW "\nRunning README examples...\n" C_RESET);
-    RUN_TEST(test_readme_examples, NULL);
+    RUN_TEST_CASE(test_readme_examples);
 
-    return tests_failed;
+    return TESTS_EXIT_CODE();
 }

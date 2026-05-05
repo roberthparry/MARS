@@ -1387,14 +1387,14 @@ int tests_main(void)
     size_t saved_default = mf_get_default_precision();
 
     ASSERT_EQ_INT(mf_set_default_precision(TEST_MCOMPLEX_MATHS_PRECISION), 0);
-    RUN_TEST(test_lifecycle_and_constants, NULL);
-    RUN_TEST(test_conversion_to_from_qcomplex, NULL);
-    RUN_TEST(test_arithmetic, NULL);
-    RUN_TEST(test_transcendentals, NULL);
-    RUN_TEST(test_real_elementary_replacements, NULL);
-    RUN_TEST(test_real_special_replacements, NULL);
-    RUN_TEST(test_special_functions, NULL);
-    RUN_TEST(test_difficult_mcomplex_cases, NULL);
+    RUN_TEST_CASE(test_lifecycle_and_constants);
+    RUN_TEST_CASE(test_conversion_to_from_qcomplex);
+    RUN_TEST_CASE(test_arithmetic);
+    RUN_TEST_CASE(test_transcendentals);
+    RUN_TEST_CASE(test_real_elementary_replacements);
+    RUN_TEST_CASE(test_real_special_replacements);
+    RUN_TEST_CASE(test_special_functions);
+    RUN_TEST_CASE(test_difficult_mcomplex_cases);
     ASSERT_EQ_INT(mf_set_default_precision(saved_default), 0);
     return 0;
 }

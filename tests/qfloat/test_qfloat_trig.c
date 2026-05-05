@@ -453,9 +453,9 @@ static void test_qf_atan2(void)
 }
 
 void test_trigonometric(void) {
-    RUN_TEST(test_qf_trig, __func__);
-    RUN_TEST(test_qf_atan, __func__);
-    RUN_TEST(test_qf_atan2, __func__);
-    RUN_TEST(test_qf_asin, __func__);
-    RUN_TEST(test_qf_acos, __func__);
+    RUN_SUBTEST(test_qf_trig);
+    RUN_SUBTEST(test_qf_atan);
+    RUN_SUBTEST(test_qf_atan2);
+    RUN_SUBTEST(test_qf_asin);
+    RUN_SUBTEST(test_qf_acos);
 }

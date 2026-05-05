@@ -394,42 +394,42 @@ void example_bitset_ops(void) {
 }
 
 int tests_main(void) {
-    printf(C_BOLD C_CYAN "=== Lifecycle Tests ===\n" C_RESET);
-    RUN_TEST(test_create_and_destroy, NULL);
+    TEST_SECTION("Lifecycle Tests");
+    RUN_TEST_CASE(test_create_and_destroy);
 
-    printf(C_BOLD C_CYAN "=== Single-Bit Tests ===\n" C_RESET);
-    RUN_TEST(test_set_and_test, NULL);
-    RUN_TEST(test_unset, NULL);
-    RUN_TEST(test_toggle, NULL);
-    RUN_TEST(test_clear, NULL);
+    TEST_SECTION("Single-Bit Tests");
+    RUN_TEST_CASE(test_set_and_test);
+    RUN_TEST_CASE(test_unset);
+    RUN_TEST_CASE(test_toggle);
+    RUN_TEST_CASE(test_clear);
 
-    printf(C_BOLD C_CYAN "=== Range Tests ===\n" C_RESET);
-    RUN_TEST(test_set_range, NULL);
-    RUN_TEST(test_unset_range, NULL);
+    TEST_SECTION("Range Tests");
+    RUN_TEST_CASE(test_set_range);
+    RUN_TEST_CASE(test_unset_range);
 
-    printf(C_BOLD C_CYAN "=== Query Tests ===\n" C_RESET);
-    RUN_TEST(test_popcount, NULL);
-    RUN_TEST(test_any_none, NULL);
-    RUN_TEST(test_next_set, NULL);
+    TEST_SECTION("Query Tests");
+    RUN_TEST_CASE(test_popcount);
+    RUN_TEST_CASE(test_any_none);
+    RUN_TEST_CASE(test_next_set);
 
-    printf(C_BOLD C_CYAN "=== Clone Test ===\n" C_RESET);
-    RUN_TEST(test_clone, NULL);
+    TEST_SECTION("Clone Test");
+    RUN_TEST_CASE(test_clone);
 
-    printf(C_BOLD C_CYAN "=== Bitwise Operation Tests ===\n" C_RESET);
-    RUN_TEST(test_bitwise_and, NULL);
-    RUN_TEST(test_bitwise_or, NULL);
-    RUN_TEST(test_bitwise_xor, NULL);
-    RUN_TEST(test_bitwise_not, NULL);
+    TEST_SECTION("Bitwise Operation Tests");
+    RUN_TEST_CASE(test_bitwise_and);
+    RUN_TEST_CASE(test_bitwise_or);
+    RUN_TEST_CASE(test_bitwise_xor);
+    RUN_TEST_CASE(test_bitwise_not);
 
-    printf(C_BOLD C_CYAN "=== Growth Test ===\n" C_RESET);
-    RUN_TEST(test_growth, NULL);
+    TEST_SECTION("Growth Test");
+    RUN_TEST_CASE(test_growth);
 
-    printf(C_BOLD C_CYAN "=== Thread Safety Test ===\n" C_RESET);
-    RUN_TEST(test_thread_safety, NULL);
+    TEST_SECTION("Thread Safety Test");
+    RUN_TEST_CASE(test_thread_safety);
 
     printf(C_BOLD C_GREEN "\n=== README Output Examples ===\n" C_RESET);
     example_bitset_basic();
     example_bitset_ops();
 
-    return tests_failed;
+    return TESTS_EXIT_CODE();
 }

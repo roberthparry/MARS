@@ -84,9 +84,9 @@ int tests_main(void)
 {
     printf(C_YELLOW "Running test_config tests...\n" C_RESET);
 
-    RUN_TEST(test_top_level_default_true, NULL);
+    RUN_TEST_CASE(test_top_level_default_true);
     RUN_TEST(test_subtest_default_true, "test_top_level_default_true");
-    RUN_TEST(test_repeat_lookup_same_value, NULL);
+    RUN_TEST_CASE(test_repeat_lookup_same_value);
     RUN_TEST(test_subtest_grouping, "parent_group");
 
     RUN_TEST(test_sub_sub_function, "test_subtest_grouping");

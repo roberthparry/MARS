@@ -716,11 +716,11 @@ static void test_from_string_simplified_identity_text(void)
 
 static void test_from_string_ascii_alternatives(void)
 {
-    RUN_TEST(test_from_string_subscripts, __func__);
-    RUN_TEST(test_from_string_star_mul,   __func__);
-    RUN_TEST(test_from_string_func_power, __func__);
-    RUN_TEST(test_from_string_composed,   __func__);
-    RUN_TEST(test_from_string_simplified_identity_text, __func__);
+    RUN_SUBTEST(test_from_string_subscripts);
+    RUN_SUBTEST(test_from_string_star_mul);
+    RUN_SUBTEST(test_from_string_composed);
+    RUN_SUBTEST(test_from_string_func_power);
+    RUN_SUBTEST(test_from_string_simplified_identity_text);
 }
 
 /* ---- f, f', f'' of exp(sin(x)) + 3*x^2 - 7: parse, evaluate, differentiate ----
@@ -1045,18 +1045,18 @@ static void test_from_string_round_trips(void)
 
 void test_dval_t_from_string(void)
 {
-    RUN_TEST(test_from_string_pure_const,           __func__);
-    RUN_TEST(test_from_string_arithmetic,           __func__);
-    RUN_TEST(test_from_string_functions,            __func__);
-    RUN_TEST(test_from_string_special_functions,    __func__);
-    RUN_TEST(test_from_string_named_consts,         __func__);
-    RUN_TEST(test_from_string_bracketed_names,   __func__);
-    RUN_TEST(test_from_string_name_normalization, __func__);
-    RUN_TEST(test_from_string_implicit_symbolic_bindings, __func__);
-    RUN_TEST(test_from_string_ascii_alternatives,__func__);
-    RUN_TEST(test_from_string_errors,            __func__);
-    RUN_TEST(test_from_expression_string_api,    __func__);
-    RUN_TEST(test_from_string_bindings_api,      __func__);
-    RUN_TEST(test_from_string_round_trips,       __func__);
-    RUN_TEST(test_from_string_deriv,             __func__);
+    RUN_SUBTEST(test_from_string_pure_const);
+    RUN_SUBTEST(test_from_string_arithmetic);
+    RUN_SUBTEST(test_from_string_functions);
+    RUN_SUBTEST(test_from_string_special_functions);
+    RUN_SUBTEST(test_from_string_named_consts);
+    RUN_SUBTEST(test_from_string_bracketed_names);
+    RUN_SUBTEST(test_from_string_name_normalization);
+    RUN_SUBTEST(test_from_string_implicit_symbolic_bindings);
+    RUN_SUBTEST(test_from_string_ascii_alternatives);
+    RUN_SUBTEST(test_from_string_errors);
+    RUN_SUBTEST(test_from_expression_string_api);
+    RUN_SUBTEST(test_from_string_bindings_api);
+    RUN_SUBTEST(test_from_string_round_trips);
+    RUN_SUBTEST(test_from_string_deriv);
 }

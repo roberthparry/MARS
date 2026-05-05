@@ -669,36 +669,36 @@ void example_stack_deep(void) {
 
 int tests_main(void) {
     printf(C_BOLD C_CYAN "=== Integer Array Tests ===\n" C_RESET);
-    RUN_TEST(test_ints, NULL);
+    RUN_TEST_CASE(test_ints);
 
     printf(C_BOLD C_CYAN "=== String Array Tests ===\n" C_RESET);
-    RUN_TEST(test_strings, NULL);
+    RUN_TEST_CASE(test_strings);
 
     printf(C_BOLD C_CYAN "=== Append Array Tests ===\n" C_RESET);
-    RUN_TEST(test_append_array, NULL);
+    RUN_TEST_CASE(test_append_array);
 
     printf(C_BOLD C_CYAN "=== Thread Safety Tests ===\n" C_RESET);
-    RUN_TEST(test_thread_safety_append, NULL);
+    RUN_TEST_CASE(test_thread_safety_append);
 
     printf(C_BOLD C_CYAN "=== Remove/Insert Tests ===\n" C_RESET);
-    RUN_TEST(test_remove_and_remove_elements, NULL);
-    RUN_TEST(test_insert_and_insert_carray, NULL);
-    RUN_TEST(test_insert_array, NULL);
+    RUN_TEST_CASE(test_remove_and_remove_elements);
+    RUN_TEST_CASE(test_insert_and_insert_carray);
+    RUN_TEST_CASE(test_insert_array);
 
     printf(C_BOLD C_CYAN "=== Swap/Rotate Tests ===\n" C_RESET);
-    RUN_TEST(test_swap_rotate, NULL);
+    RUN_TEST_CASE(test_swap_rotate);
 
     printf(C_BOLD C_CYAN "=== Slice/From Slice Tests ===\n" C_RESET);
-    RUN_TEST(test_slice_and_from_slice, NULL);
-    RUN_TEST(test_slice_view_ops, NULL);
+    RUN_TEST_CASE(test_slice_and_from_slice);
+    RUN_TEST_CASE(test_slice_view_ops);
 
     printf(C_BOLD C_CYAN "=== Stack Tests ===\n" C_RESET);
-    RUN_TEST(test_stack_ints, NULL);
-    RUN_TEST(test_stack_strings, NULL);
+    RUN_TEST_CASE(test_stack_ints);
+    RUN_TEST_CASE(test_stack_strings);
 
     printf(C_YELLOW "\nRunning README examples...\n" C_RESET);
-    RUN_TEST(test_readme_examples, NULL);
-    RUN_TEST(test_readme_deep_struct, NULL);
+    RUN_TEST_CASE(test_readme_examples);
+    RUN_TEST_CASE(test_readme_deep_struct);
 
     printf(C_BOLD C_GREEN "\n=== README Output Examples ===\n" C_RESET);
     example_array_primitive();
@@ -710,8 +710,8 @@ int tests_main(void) {
     example_stack_deep();
 
     printf(C_BOLD C_CYAN "=== Stack Tests ===\n" C_RESET);
-    RUN_TEST(test_stack_ints, NULL);
-    RUN_TEST(test_stack_strings, NULL);
+    RUN_TEST_CASE(test_stack_ints);
+    RUN_TEST_CASE(test_stack_strings);
 
-    return tests_failed;
+    return TESTS_EXIT_CODE();
 }

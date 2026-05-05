@@ -502,26 +502,26 @@ static void test_qf_printf_stdout(void)
 void test_qf_sprintf_and_printf(void)
 {
     /* Original tests */
-    RUN_TEST(test_qd_sprintf_basic, __func__);
-    RUN_TEST(test_qd_sprintf_multiple, __func__);
-    RUN_TEST(test_qd_sprintf_mixed, __func__);
-    RUN_TEST(test_qd_sprintf_buffer_limit, __func__);
-    RUN_TEST(test_qd_sprintf_edge_cases, __func__);
+    RUN_SUBTEST(test_qd_sprintf_basic);
+    RUN_SUBTEST(test_qd_sprintf_multiple);
+    RUN_SUBTEST(test_qd_sprintf_mixed);
+    RUN_SUBTEST(test_qd_sprintf_buffer_limit);
+    RUN_SUBTEST(test_qd_sprintf_edge_cases);
 
-    RUN_TEST(test_qd_sprintf_q_precision, __func__);
-    RUN_TEST(test_qd_sprintf_q_zero_precision, __func__);
-    RUN_TEST(test_qd_sprintf_q_flags, __func__);
-    RUN_TEST(test_qd_sprintf_q_width, __func__);
-    RUN_TEST(test_qd_sprintf_q_fallback, __func__);
-    RUN_TEST(test_qd_sprintf_q_fallback_width, __func__);
-    RUN_TEST(test_qf_sprintf_q_concise, __func__);
+    RUN_SUBTEST(test_qd_sprintf_q_precision);
+    RUN_SUBTEST(test_qd_sprintf_q_zero_precision);
+    RUN_SUBTEST(test_qd_sprintf_q_flags);
+    RUN_SUBTEST(test_qd_sprintf_q_width);
+    RUN_SUBTEST(test_qd_sprintf_q_fallback);
+    RUN_SUBTEST(test_qd_sprintf_q_fallback_width);
+    RUN_SUBTEST(test_qf_sprintf_q_concise);
 
     /* New tests */
-    RUN_TEST(test_qf_sprintf_null_safe_new, __func__);
-    RUN_TEST(test_qf_sprintf_two_pass_new, __func__);
-    RUN_TEST(test_qf_printf_stdout, __func__);
+    RUN_SUBTEST(test_qf_sprintf_null_safe_new);
+    RUN_SUBTEST(test_qf_sprintf_two_pass_new);
+    RUN_SUBTEST(test_qf_printf_stdout);
 }
 
 void test_printf(void) {
-    RUN_TEST(test_qf_sprintf_and_printf, __func__);
+    RUN_SUBTEST(test_qf_sprintf_and_printf);
 }

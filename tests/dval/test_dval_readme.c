@@ -131,9 +131,9 @@ static void test_readme_partial_example(void) {
 }
 
 void test_README_md_example(void) {
-    RUN_TEST(test_readme_example,             __func__);
-    RUN_TEST(test_readme_from_string_example, __func__);
-    RUN_TEST(test_readme_partial_example,     __func__);
+    RUN_SUBTEST(test_readme_example);
+    RUN_SUBTEST(test_readme_from_string_example);
+    RUN_SUBTEST(test_readme_partial_example);
 }
 
 /* ------------------------------------------------------------------------- */

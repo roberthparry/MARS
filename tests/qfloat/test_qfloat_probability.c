@@ -240,9 +240,9 @@ static void test_qf_beta_special_cases(void)
    ------------------------------------------------------------------------- */
 static void test_qf_beta_all(void)
 {
-    RUN_TEST(test_qf_beta_definition, __func__);
-    RUN_TEST(test_qf_beta_symmetry, __func__);
-    RUN_TEST(test_qf_beta_special_cases, __func__);
+    RUN_SUBTEST(test_qf_beta_definition);
+    RUN_SUBTEST(test_qf_beta_symmetry);
+    RUN_SUBTEST(test_qf_beta_special_cases);
 }
 
 /* -------------------------------------------------------------------------
@@ -406,10 +406,10 @@ static void test_qf_logbeta_special_cases(void)
    ------------------------------------------------------------------------- */
 static void test_qf_logbeta_all(void)
 {
-    RUN_TEST(test_qf_logbeta_definition, __func__);
-    RUN_TEST(test_qf_logbeta_consistency, __func__);
-    RUN_TEST(test_qf_logbeta_symmetry, __func__);
-    RUN_TEST(test_qf_logbeta_special_cases, __func__);
+    RUN_SUBTEST(test_qf_logbeta_definition);
+    RUN_SUBTEST(test_qf_logbeta_consistency);
+    RUN_SUBTEST(test_qf_logbeta_symmetry);
+    RUN_SUBTEST(test_qf_logbeta_special_cases);
 }
 
 /* -------------------------------------------------------------------------
@@ -528,9 +528,9 @@ static void test_qf_binomial_special_cases(void)
    ------------------------------------------------------------------------- */
 static void test_qf_binomial_all(void)
 {
-    RUN_TEST(test_qf_binomial_definition, __func__);
-    RUN_TEST(test_qf_binomial_symmetry, __func__);
-    RUN_TEST(test_qf_binomial_special_cases, __func__);
+    RUN_SUBTEST(test_qf_binomial_definition);
+    RUN_SUBTEST(test_qf_binomial_symmetry);
+    RUN_SUBTEST(test_qf_binomial_special_cases);
 }
 
 /* -------------------------------------------------------------------------
@@ -675,9 +675,9 @@ static void test_qf_beta_pdf_symmetry(void)
    ------------------------------------------------------------------------- */
 static void test_qf_beta_pdf_all(void)
 {
-    RUN_TEST(test_qf_beta_pdf_definition, __func__);
-    RUN_TEST(test_qf_beta_pdf_logform, __func__);
-    RUN_TEST(test_qf_beta_pdf_symmetry, __func__);
+    RUN_SUBTEST(test_qf_beta_pdf_definition);
+    RUN_SUBTEST(test_qf_beta_pdf_logform);
+    RUN_SUBTEST(test_qf_beta_pdf_symmetry);
 }
 
 /* -------------------------------------------------------------------------
@@ -816,9 +816,9 @@ static void test_qf_logbeta_pdf_symmetry(void)
    ------------------------------------------------------------------------- */
 static void test_qf_logbeta_pdf_all(void)
 {
-    RUN_TEST(test_qf_logbeta_pdf_definition, __func__);
-    RUN_TEST(test_qf_logbeta_pdf_consistency, __func__);
-    RUN_TEST(test_qf_logbeta_pdf_symmetry, __func__);
+    RUN_SUBTEST(test_qf_logbeta_pdf_definition);
+    RUN_SUBTEST(test_qf_logbeta_pdf_consistency);
+    RUN_SUBTEST(test_qf_logbeta_pdf_symmetry);
 }
 
 /* -------------------------------------------------------------------------
@@ -958,10 +958,10 @@ static void test_qf_normal_pdf_logform(void)
    ------------------------------------------------------------------------- */
 static void test_qf_normal_pdf_all(void)
 {
-    RUN_TEST(test_qf_normal_pdf_definition, __func__);
-    RUN_TEST(test_qf_normal_pdf_symmetry, __func__);
-    RUN_TEST(test_qf_normal_pdf_at_zero, __func__);
-    RUN_TEST(test_qf_normal_pdf_logform, __func__);
+    RUN_SUBTEST(test_qf_normal_pdf_definition);
+    RUN_SUBTEST(test_qf_normal_pdf_symmetry);
+    RUN_SUBTEST(test_qf_normal_pdf_at_zero);
+    RUN_SUBTEST(test_qf_normal_pdf_logform);
 }
 
 /* -------------------------------------------------------------------------
@@ -1139,10 +1139,10 @@ static void test_qf_normal_cdf_pdf_consistency(void)
    ------------------------------------------------------------------------- */
 static void test_qf_normal_cdf_all(void)
 {
-    RUN_TEST(test_qf_normal_cdf_definition, __func__);
-    RUN_TEST(test_qf_normal_cdf_symmetry, __func__);
-    RUN_TEST(test_qf_normal_cdf_known_values, __func__);
-    RUN_TEST(test_qf_normal_cdf_pdf_consistency, __func__);
+    RUN_SUBTEST(test_qf_normal_cdf_definition);
+    RUN_SUBTEST(test_qf_normal_cdf_symmetry);
+    RUN_SUBTEST(test_qf_normal_cdf_known_values);
+    RUN_SUBTEST(test_qf_normal_cdf_pdf_consistency);
 }
 
 /* -------------------------------------------------------------------------
@@ -1277,27 +1277,27 @@ static void test_qf_normal_logpdf_at_zero(void)
    ------------------------------------------------------------------------- */
 static void test_qf_normal_logpdf_all(void)
 {
-    RUN_TEST(test_qf_normal_logpdf_definition, __func__);
-    RUN_TEST(test_qf_normal_logpdf_consistency, __func__);
-    RUN_TEST(test_qf_normal_logpdf_symmetry, __func__);
-    RUN_TEST(test_qf_normal_logpdf_at_zero, __func__);
+    RUN_SUBTEST(test_qf_normal_logpdf_definition);
+    RUN_SUBTEST(test_qf_normal_logpdf_consistency);
+    RUN_SUBTEST(test_qf_normal_logpdf_symmetry);
+    RUN_SUBTEST(test_qf_normal_logpdf_at_zero);
 }
 
 void test_lambert_w(void) {
-    RUN_TEST(test_qf_lambert_w0, __func__);
-    RUN_TEST(test_qf_lambert_wm1, __func__);
-    RUN_TEST(test_qf_productlog_all, __func__);
+    RUN_SUBTEST(test_qf_lambert_w0);
+    RUN_SUBTEST(test_qf_lambert_wm1);
+    RUN_SUBTEST(test_qf_productlog_all);
 }
 
 void test_beta_logbeta_binomial_beta_pdf_logbeta_pdf_normal_pdf_cdf_logpdf(void) {
-    RUN_TEST(test_qf_beta_all, __func__);
-    RUN_TEST(test_qf_logbeta_all, __func__);
-    RUN_TEST(test_qf_binomial_all, __func__);
-    RUN_TEST(test_qf_beta_pdf_all, __func__);
-    RUN_TEST(test_qf_logbeta_pdf_all, __func__);
-    RUN_TEST(test_qf_normal_pdf_all, __func__);
-    RUN_TEST(test_qf_normal_cdf_all, __func__);
-    RUN_TEST(test_qf_normal_logpdf_all, __func__);
+    RUN_SUBTEST(test_qf_beta_all);
+    RUN_SUBTEST(test_qf_logbeta_all);
+    RUN_SUBTEST(test_qf_binomial_all);
+    RUN_SUBTEST(test_qf_beta_pdf_all);
+    RUN_SUBTEST(test_qf_logbeta_pdf_all);
+    RUN_SUBTEST(test_qf_normal_pdf_all);
+    RUN_SUBTEST(test_qf_normal_cdf_all);
+    RUN_SUBTEST(test_qf_normal_logpdf_all);
 }
 
 /* -------------------------------------------------------------------------

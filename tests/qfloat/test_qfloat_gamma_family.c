@@ -130,20 +130,20 @@ static void test_qf_hypot(void)
 }
 
 void test_hypotenus(void) {
-    RUN_TEST(test_qf_hypot, __func__);
+    RUN_SUBTEST(test_qf_hypot);
 }
 
 void test_gamma_erf_erfc_erfinv_erfcinv_digamma(void) {
-    RUN_TEST(test_qf_gamma, __func__);
-    RUN_TEST(test_qf_erf, __func__);
-    RUN_TEST(test_qf_erfc, __func__);
-    RUN_TEST(test_qf_erfinv, __func__);
-    RUN_TEST(test_qf_erfcinv, __func__);
-    RUN_TEST(test_qf_lgamma, __func__);
-    RUN_TEST(test_qf_digamma, __func__);
-    RUN_TEST(test_qf_gammainv, __func__);
-    RUN_TEST(test_qf_trigamma, __func__);
-    RUN_TEST(test_qf_tetragamma, __func__);
+    RUN_SUBTEST(test_qf_gamma);
+    RUN_SUBTEST(test_qf_erf);
+    RUN_SUBTEST(test_qf_erfc);
+    RUN_SUBTEST(test_qf_erfinv);
+    RUN_SUBTEST(test_qf_erfcinv);
+    RUN_SUBTEST(test_qf_lgamma);
+    RUN_SUBTEST(test_qf_digamma);
+    RUN_SUBTEST(test_qf_gammainv);
+    RUN_SUBTEST(test_qf_trigamma);
+    RUN_SUBTEST(test_qf_tetragamma);
 }
 
 static void test_qf_gamma(void)

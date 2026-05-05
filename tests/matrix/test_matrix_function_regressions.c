@@ -867,10 +867,10 @@ static void test_mat_fun_qf_qc(void)
 
 void run_matrix_function_regression_tests(void)
 {
-    RUN_TEST(test_mat_fun_qf_qc, NULL);
-    RUN_TEST(test_mat_error_handling, NULL);
-    RUN_TEST(test_mat_fun_3x3, NULL);
-    RUN_TEST(test_mat_fun_4x4, NULL);
-    RUN_TEST(test_mat_fun_3x3_qf, NULL);
-    RUN_TEST(test_mat_fun_3x3_qc, NULL);
+    RUN_TEST_CASE(test_mat_fun_qf_qc);
+    RUN_TEST_CASE(test_mat_error_handling);
+    RUN_TEST_CASE(test_mat_fun_3x3);
+    RUN_TEST_CASE(test_mat_fun_4x4);
+    RUN_TEST_CASE(test_mat_fun_3x3_qf);
+    RUN_TEST_CASE(test_mat_fun_3x3_qc);
 }

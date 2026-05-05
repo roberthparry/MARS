@@ -67,9 +67,9 @@ static void test_simplify_inverse_unary_pairs(void)
 
 void test_runtime_regressions(void)
 {
-    RUN_TEST(test_cmp_qfloat_precision, __func__);
-    RUN_TEST(test_get_val_updates_after_set, __func__);
-    RUN_TEST(test_simplify_inverse_unary_pairs, __func__);
+    RUN_SUBTEST(test_cmp_qfloat_precision);
+    RUN_SUBTEST(test_get_val_updates_after_set);
+    RUN_SUBTEST(test_simplify_inverse_unary_pairs);
 }
 
 /* ------------------------------------------------------------------------- */

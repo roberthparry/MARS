@@ -123,18 +123,18 @@ void test_div_d(void)
 
 void test_arithmetic(void)
 {
-    RUN_TEST(test_add, __func__);
-    RUN_TEST(test_sub, __func__);
-    RUN_TEST(test_mul, __func__);
-    RUN_TEST(test_div, __func__);
-    RUN_TEST(test_mixed, __func__);
+    RUN_SUBTEST(test_add);
+    RUN_SUBTEST(test_sub);
+    RUN_SUBTEST(test_mul);
+    RUN_SUBTEST(test_div);
+    RUN_SUBTEST(test_mixed);
 }
 
 void test_d_variants(void)
 {
-    RUN_TEST(test_add_d, __func__);
-    RUN_TEST(test_mul_d, __func__);
-    RUN_TEST(test_div_d, __func__);
+    RUN_SUBTEST(test_add_d);
+    RUN_SUBTEST(test_mul_d);
+    RUN_SUBTEST(test_div_d);
 }
 
 /* ------------------------------------------------------------------------- */

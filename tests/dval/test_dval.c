@@ -58,45 +58,45 @@ void print_expr_of(const dval_t *f)
 int tests_main(void)
 {
     /* ---------------- Arithmetic ---------------- */
-    printf(C_BOLD C_CYAN "=== Arithmetic ===\n" C_RESET);
-    RUN_TEST(test_arithmetic, NULL);
+    TEST_SECTION("Arithmetic");
+    RUN_TEST_CASE(test_arithmetic);
 
     /* ---------------- _d variants ---------------- */
-    printf(C_BOLD C_CYAN "=== _d variants ===\n" C_RESET);
-    RUN_TEST(test_d_variants, NULL);
+    TEST_SECTION("_d variants");
+    RUN_TEST_CASE(test_d_variants);
 
     /* ---------------- Math functions ------------- */
-    printf(C_BOLD C_CYAN "=== Math functions ===\n" C_RESET);
-    RUN_TEST(test_maths_functions, NULL);
+    TEST_SECTION("Math functions");
+    RUN_TEST_CASE(test_maths_functions);
 
     /* ---------------- First derivatives ---------- */
-    printf(C_BOLD C_CYAN "=== First derivatives ===\n" C_RESET);
-    RUN_TEST(test_first_derivatives, NULL);
+    TEST_SECTION("First derivatives");
+    RUN_TEST_CASE(test_first_derivatives);
 
     /* ---------------- Second derivatives --------- */
-    printf(C_BOLD C_CYAN "=== Second derivatives ===\n" C_RESET);
-    RUN_TEST(test_second_derivatives, NULL);
+    TEST_SECTION("Second derivatives");
+    RUN_TEST_CASE(test_second_derivatives);
 
-    printf(C_BOLD C_CYAN "=== dval_t to_string Tests ===\n" C_RESET);
-    RUN_TEST(test_dval_t_to_string, NULL);
+    TEST_SECTION("dval_t to_string Tests");
+    RUN_TEST_CASE(test_dval_t_to_string);
 
-    printf(C_BOLD C_CYAN "=== dval_t from_string Tests ===\n" C_RESET);
-    RUN_TEST(test_dval_t_from_string, NULL);
+    TEST_SECTION("dval_t from_string Tests");
+    RUN_TEST_CASE(test_dval_t_from_string);
 
-    printf(C_BOLD C_CYAN "=== Partial derivatives ===\n" C_RESET);
-    RUN_TEST(test_partial_derivatives, NULL);
+    TEST_SECTION("Partial derivatives");
+    RUN_TEST_CASE(test_partial_derivatives);
 
-    printf(C_BOLD C_CYAN "=== dval_pattern helpers ===\n" C_RESET);
-    RUN_TEST(test_dval_pattern_helpers, NULL);
+    TEST_SECTION("dval_pattern helpers");
+    RUN_TEST_CASE(test_dval_pattern_helpers);
 
-    printf(C_BOLD C_CYAN "=== Runtime regressions ===\n" C_RESET);
-    RUN_TEST(test_runtime_regressions, NULL);
+    TEST_SECTION("Runtime regressions");
+    RUN_TEST_CASE(test_runtime_regressions);
 
-    printf(C_BOLD C_CYAN "=== Reverse mode ===\n" C_RESET);
-    RUN_TEST(test_reverse_mode, NULL);
+    TEST_SECTION("Reverse mode");
+    RUN_TEST_CASE(test_reverse_mode);
 
-    printf(C_BOLD C_CYAN "=== README.md example ===\n" C_RESET);
-    RUN_TEST(test_README_md_example, NULL);
+    TEST_SECTION("README.md example");
+    RUN_TEST_CASE(test_README_md_example);
 
-    return tests_failed;
+    return TESTS_EXIT_CODE();
 }

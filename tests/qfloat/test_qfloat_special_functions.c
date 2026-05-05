@@ -142,10 +142,10 @@ static void test_qf_productlog_monotonicity(void)
    ------------------------------------------------------------------------- */
 void test_qf_productlog_all(void)
 {
-    RUN_TEST(test_qf_productlog_definition, __func__);
-    RUN_TEST(test_qf_productlog_consistency, __func__);
-    RUN_TEST(test_qf_productlog_special, __func__);
-    RUN_TEST(test_qf_productlog_monotonicity, __func__);
+    RUN_SUBTEST(test_qf_productlog_definition);
+    RUN_SUBTEST(test_qf_productlog_consistency);
+    RUN_SUBTEST(test_qf_productlog_special);
+    RUN_SUBTEST(test_qf_productlog_monotonicity);
 }
 
 /* -------------------------------------------------------------------------
@@ -276,9 +276,9 @@ static void test_qf_gammainc_special_s1(void)
    ------------------------------------------------------------------------- */
 static void test_qf_gammainc_all(void)
 {
-    RUN_TEST(test_qf_gammainc_PQ_identity, __func__);
-    RUN_TEST(test_qf_gammainc_lower_upper_identity, __func__);
-    RUN_TEST(test_qf_gammainc_special_s1, __func__);
+    RUN_SUBTEST(test_qf_gammainc_PQ_identity);
+    RUN_SUBTEST(test_qf_gammainc_lower_upper_identity);
+    RUN_SUBTEST(test_qf_gammainc_special_s1);
 }
 
 /* Approximate derivative using symmetric difference:
@@ -503,10 +503,10 @@ static void test_ei_values(void)
 
 static void test_qf_ei_e1_all(void)
 {
-    RUN_TEST(test_qf_ei_deriv, __func__);
-    RUN_TEST(test_qf_e1_deriv, __func__);
-    RUN_TEST(test_qf_ei_e1_identity, __func__);
-    RUN_TEST(test_ei_values, __func__);
+    RUN_SUBTEST(test_qf_ei_deriv);
+    RUN_SUBTEST(test_qf_e1_deriv);
+    RUN_SUBTEST(test_qf_ei_e1_identity);
+    RUN_SUBTEST(test_ei_values);
 }
 
 static void test_qf_add_double(void) {
@@ -908,22 +908,22 @@ void test_qf_tetragamma(void) {
 }
 
 void test_arithmetic_extensions(void) {
-    RUN_TEST(test_qf_add_double, __func__);
-    RUN_TEST(test_qf_mul_double, __func__);
-    RUN_TEST(test_qf_sqr, __func__);
-    RUN_TEST(test_qf_ldexp, __func__);
-    RUN_TEST(test_qf_mul_pow10, __func__);
-    RUN_TEST(test_qf_floor, __func__);
-    RUN_TEST(test_qf_cmp, __func__);
-    RUN_TEST(test_qf_signbit, __func__);
-    RUN_TEST(test_qf_isinf, __func__);
+    RUN_SUBTEST(test_qf_add_double);
+    RUN_SUBTEST(test_qf_mul_double);
+    RUN_SUBTEST(test_qf_sqr);
+    RUN_SUBTEST(test_qf_ldexp);
+    RUN_SUBTEST(test_qf_mul_pow10);
+    RUN_SUBTEST(test_qf_floor);
+    RUN_SUBTEST(test_qf_cmp);
+    RUN_SUBTEST(test_qf_signbit);
+    RUN_SUBTEST(test_qf_isinf);
 }
 
 void test_vsprintf(void) {
-    RUN_TEST(test_qf_vsprintf, __func__);
+    RUN_SUBTEST(test_qf_vsprintf);
 }
 
 void test_gammainc_ei_e1(void) {
-    RUN_TEST(test_qf_gammainc_all, __func__);
-    RUN_TEST(test_qf_ei_e1_all, __func__);
+    RUN_SUBTEST(test_qf_gammainc_all);
+    RUN_SUBTEST(test_qf_ei_e1_all);
 }

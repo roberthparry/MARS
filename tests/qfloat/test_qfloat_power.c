@@ -181,7 +181,7 @@ static void test_qf_pow10(void)
 }
 
 void test_power(void) {
-    RUN_TEST(test_qf_pow_int, __func__);
-    RUN_TEST(test_qf_pow, __func__);
-    RUN_TEST(test_qf_pow10, __func__);
+    RUN_SUBTEST(test_qf_pow_int);
+    RUN_SUBTEST(test_qf_pow);
+    RUN_SUBTEST(test_qf_pow10);
 }

@@ -244,12 +244,12 @@ static void test_qf_acosh(void)
 }
 
 void test_hyperbolic(void) {
-    RUN_TEST(test_qf_cosh, __func__);
-    RUN_TEST(test_qf_sinh, __func__);
-    RUN_TEST(test_qf_tanh, __func__);
-    RUN_TEST(test_qf_asinh, __func__);
-    RUN_TEST(test_qf_acosh, __func__);
-    RUN_TEST(test_qf_atanh, __func__);
+    RUN_SUBTEST(test_qf_cosh);
+    RUN_SUBTEST(test_qf_sinh);
+    RUN_SUBTEST(test_qf_tanh);
+    RUN_SUBTEST(test_qf_asinh);
+    RUN_SUBTEST(test_qf_acosh);
+    RUN_SUBTEST(test_qf_atanh);
 }
 
 static void test_qf_atanh(void)

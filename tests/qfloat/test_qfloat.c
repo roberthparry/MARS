@@ -89,25 +89,25 @@ int tests_main() {
 
     printf(C_YELLOW "Running qfloat_t tests...\n\n" C_RESET);
 
-    RUN_TEST(test_arithmetic, NULL);
-    RUN_TEST(test_arithmetic_extensions, NULL);
-    RUN_TEST(test_strings, NULL);
-    RUN_TEST(test_printf, NULL);
-    RUN_TEST(test_vsprintf, NULL);
-    RUN_TEST(test_power, NULL);
-    RUN_TEST(test_trigonometric, NULL);
-    RUN_TEST(test_hyperbolic, NULL);
-    RUN_TEST(test_hypotenus, NULL);
-    RUN_TEST(test_gamma_erf_erfc_erfinv_erfcinv_digamma, NULL);
-    RUN_TEST(test_lambert_w, NULL);
-    RUN_TEST(test_beta_logbeta_binomial_beta_pdf_logbeta_pdf_normal_pdf_cdf_logpdf, NULL);
-    RUN_TEST(test_gammainc_ei_e1, NULL);
-    RUN_TEST(test_difficult_qfloat_cases, NULL);
+    RUN_TEST_CASE(test_arithmetic);
+    RUN_TEST_CASE(test_arithmetic_extensions);
+    RUN_TEST_CASE(test_strings);
+    RUN_TEST_CASE(test_printf);
+    RUN_TEST_CASE(test_vsprintf);
+    RUN_TEST_CASE(test_power);
+    RUN_TEST_CASE(test_trigonometric);
+    RUN_TEST_CASE(test_hyperbolic);
+    RUN_TEST_CASE(test_hypotenus);
+    RUN_TEST_CASE(test_gamma_erf_erfc_erfinv_erfcinv_digamma);
+    RUN_TEST_CASE(test_lambert_w);
+    RUN_TEST_CASE(test_beta_logbeta_binomial_beta_pdf_logbeta_pdf_normal_pdf_cdf_logpdf);
+    RUN_TEST_CASE(test_gammainc_ei_e1);
+    RUN_TEST_CASE(test_difficult_qfloat_cases);
 
     printf(C_YELLOW "\nRunning README examples...\n" C_RESET);
-    RUN_TEST(test_readme_examples, NULL);
+    RUN_TEST_CASE(test_readme_examples);
 
     printf("\n" C_YELLOW "Done.\n" C_RESET);
 
-    return tests_failed;
+    return TESTS_EXIT_CODE();
 }

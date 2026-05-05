@@ -14,5 +14,5 @@ int tests_main(void)
     run_matrix_readme_example();
 
     clear_matrix_input_context();
-    return tests_failed;
+    return TESTS_EXIT_CODE();
 }

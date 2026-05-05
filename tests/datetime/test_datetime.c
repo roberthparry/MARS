@@ -496,54 +496,54 @@ void test_readme_examples(void) {
 int tests_main(void) {
 
     /* Basic Julian and date initialisation tests */
-    RUN_TEST(test_datetime_init_jd, NULL);
-    RUN_TEST(test_datetime_jdn_and_getJulianDay, NULL);
-    RUN_TEST(test_datetime_year_initialized, NULL);
-    RUN_TEST(test_datetime_init_now, NULL);
+    RUN_TEST_CASE(test_datetime_init_jd);
+    RUN_TEST_CASE(test_datetime_jdn_and_getJulianDay);
+    RUN_TEST_CASE(test_datetime_year_initialized);
+    RUN_TEST_CASE(test_datetime_init_now);
 
     /* GMT conversion tests */
-    RUN_TEST(test_datetime_to_gmt_basic, NULL);
-    RUN_TEST(test_datetime_to_gmt_null_pointer, NULL);
-    RUN_TEST(test_datetime_to_gmt_preserves_julian_values, NULL);
-    RUN_TEST(test_datetime_to_gmt_multiple_calls, NULL);
-    RUN_TEST(test_datetime_to_gmt_uninitialized, NULL);
-    RUN_TEST(test_datetime_to_gmt_with_julian_values, NULL);
+    RUN_TEST_CASE(test_datetime_to_gmt_basic);
+    RUN_TEST_CASE(test_datetime_to_gmt_null_pointer);
+    RUN_TEST_CASE(test_datetime_to_gmt_preserves_julian_values);
+    RUN_TEST_CASE(test_datetime_to_gmt_multiple_calls);
+    RUN_TEST_CASE(test_datetime_to_gmt_uninitialized);
+    RUN_TEST_CASE(test_datetime_to_gmt_with_julian_values);
 
     /* Easter Sunday tests */
-    RUN_TEST(test_datetime_init_easter_basic, NULL);
-    RUN_TEST(test_datetime_init_easter_known_dates, NULL);
-    RUN_TEST(test_datetime_init_easter_invalid_years, NULL);
-    RUN_TEST(test_datetime_init_easter_always_sunday, NULL);
-    RUN_TEST(test_datetime_init_easter_time_fields_zero, NULL);
+    RUN_TEST_CASE(test_datetime_init_easter_basic);
+    RUN_TEST_CASE(test_datetime_init_easter_known_dates);
+    RUN_TEST_CASE(test_datetime_init_easter_invalid_years);
+    RUN_TEST_CASE(test_datetime_init_easter_always_sunday);
+    RUN_TEST_CASE(test_datetime_init_easter_time_fields_zero);
 
     /* Basic allocation and initialisation tests */
-    RUN_TEST(test_datetime_alloc, NULL);
-    RUN_TEST(test_datetime_init_ymd, NULL);
-    RUN_TEST(test_datetime_init_ymdt, NULL);
-    RUN_TEST(test_datetime_init_copy, NULL);
-    RUN_TEST(test_datetime_init_jdn, NULL);
+    RUN_TEST_CASE(test_datetime_alloc);
+    RUN_TEST_CASE(test_datetime_init_ymd);
+    RUN_TEST_CASE(test_datetime_init_ymdt);
+    RUN_TEST_CASE(test_datetime_init_copy);
+    RUN_TEST_CASE(test_datetime_init_jdn);
 
     /* Chinese New Year tests */
-    RUN_TEST(test_datetime_init_chinese_new_year_basic, NULL);
-    RUN_TEST(test_datetime_init_chinese_new_year_known_dates, NULL);
-    RUN_TEST(test_datetime_init_chinese_new_year_invalid_years, NULL);
-    RUN_TEST(test_datetime_init_chinese_new_year_time_fields_zero, NULL);
+    RUN_TEST_CASE(test_datetime_init_chinese_new_year_basic);
+    RUN_TEST_CASE(test_datetime_init_chinese_new_year_known_dates);
+    RUN_TEST_CASE(test_datetime_init_chinese_new_year_invalid_years);
+    RUN_TEST_CASE(test_datetime_init_chinese_new_year_time_fields_zero);
 
     /* Timezone offset tests */
-    RUN_TEST(test_dttm_computeTimeZoneOffset_basic, NULL);
-    RUN_TEST(test_dttm_computeTimeZoneOffset_null_pointer, NULL);
-    RUN_TEST(test_dttm_computeTimeZoneOffset_uninitialized, NULL);
+    RUN_TEST_CASE(test_dttm_computeTimeZoneOffset_basic);
+    RUN_TEST_CASE(test_dttm_computeTimeZoneOffset_null_pointer);
+    RUN_TEST_CASE(test_dttm_computeTimeZoneOffset_uninitialized);
 
     /* Julian consistency, getters, comparisons, days-in-month */
-    RUN_TEST(test_dttm_julian_roundtrip, NULL);
-    RUN_TEST(test_datetime_getters, NULL);
-    RUN_TEST(test_datetime_compare_equal, NULL);
-    RUN_TEST(test_datetime_compare_less, NULL);
-    RUN_TEST(test_datetime_compare_greater, NULL);
-    RUN_TEST(test_datetime_days_in_month, NULL);
+    RUN_TEST_CASE(test_dttm_julian_roundtrip);
+    RUN_TEST_CASE(test_datetime_getters);
+    RUN_TEST_CASE(test_datetime_compare_equal);
+    RUN_TEST_CASE(test_datetime_compare_less);
+    RUN_TEST_CASE(test_datetime_compare_greater);
+    RUN_TEST_CASE(test_datetime_days_in_month);
 
     printf(C_YELLOW "\nRunning README examples...\n" C_RESET);
-    RUN_TEST(test_readme_examples, NULL);
+    RUN_TEST_CASE(test_readme_examples);
 
-    return tests_failed;
+    return TESTS_EXIT_CODE();
 }

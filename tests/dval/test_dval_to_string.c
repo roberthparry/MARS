@@ -124,8 +124,8 @@ static void test_to_string_basic_const_func(void)
 
 void test_to_string_basic_const(void)
 {
-    RUN_TEST(test_to_string_basic_const_expr, __func__);
-    RUN_TEST(test_to_string_basic_const_func, __func__);
+    RUN_SUBTEST(test_to_string_basic_const_expr);
+    RUN_SUBTEST(test_to_string_basic_const_func);
 }
 
 /* ============================================================
@@ -167,8 +167,8 @@ static void test_to_string_basic_var_func(void)
 
 void test_to_string_basic_var(void)
 {
-    RUN_TEST(test_to_string_basic_var_expr, __func__);
-    RUN_TEST(test_to_string_basic_var_func, __func__);
+    RUN_SUBTEST(test_to_string_basic_var_expr);
+    RUN_SUBTEST(test_to_string_basic_var_func);
 }
 
 static void test_to_string_non_simple_var_bracketed_expr(void)
@@ -206,8 +206,8 @@ static void test_to_string_non_simple_var_bracketed_func(void)
 
 void test_to_string_non_simple_var_bracketed(void)
 {
-    RUN_TEST(test_to_string_non_simple_var_bracketed_expr, __func__);
-    RUN_TEST(test_to_string_non_simple_var_bracketed_func, __func__);
+    RUN_SUBTEST(test_to_string_non_simple_var_bracketed_expr);
+    RUN_SUBTEST(test_to_string_non_simple_var_bracketed_func);
 }
 
 /* ============================================================
@@ -259,8 +259,8 @@ static void test_to_string_addition_func(void)
 
 void test_to_string_addition(void)
 {
-    RUN_TEST(test_to_string_addition_expr, __func__);
-    RUN_TEST(test_to_string_addition_func, __func__);
+    RUN_SUBTEST(test_to_string_addition_expr);
+    RUN_SUBTEST(test_to_string_addition_func);
 }
 
 static void test_to_string_negative_rhs_expr(void)
@@ -406,8 +406,8 @@ static void test_to_string_nested_mul_add_func(void)
 
 void test_to_string_nested_mul_add(void)
 {
-    RUN_TEST(test_to_string_nested_mul_add_expr, __func__);
-    RUN_TEST(test_to_string_nested_mul_add_func, __func__);
+    RUN_SUBTEST(test_to_string_nested_mul_add_expr);
+    RUN_SUBTEST(test_to_string_nested_mul_add_func);
 }
 
 static void test_to_string_atan2_expr(void)
@@ -457,8 +457,8 @@ static void test_to_string_atan2_func(void)
 
 void test_to_string_atan2(void)
 {
-    RUN_TEST(test_to_string_atan2_expr, __func__);
-    RUN_TEST(test_to_string_atan2_func, __func__);
+    RUN_SUBTEST(test_to_string_atan2_expr);
+    RUN_SUBTEST(test_to_string_atan2_func);
 }
 
 /* ============================================================
@@ -505,8 +505,8 @@ static void test_to_string_pow_superscript_func(void)
 
 void test_to_string_pow_superscript(void)
 {
-    RUN_TEST(test_to_string_pow_superscript_expr, __func__);
-    RUN_TEST(test_to_string_pow_superscript_func, __func__);
+    RUN_SUBTEST(test_to_string_pow_superscript_expr);
+    RUN_SUBTEST(test_to_string_pow_superscript_func);
 }
 
 /* ============================================================
@@ -553,8 +553,8 @@ static void test_to_string_unary_sin_func(void)
 
 void test_to_string_unary_sin(void)
 {
-    RUN_TEST(test_to_string_unary_sin_expr, __func__);
-    RUN_TEST(test_to_string_unary_sin_func, __func__);
+    RUN_SUBTEST(test_to_string_unary_sin_expr);
+    RUN_SUBTEST(test_to_string_unary_sin_func);
 }
 
 static void test_to_string_unary_sqrt_expr(void)
@@ -595,8 +595,8 @@ static void test_to_string_unary_sqrt_func(void)
 
 void test_to_string_unary_sqrt(void)
 {
-    RUN_TEST(test_to_string_unary_sqrt_expr, __func__);
-    RUN_TEST(test_to_string_unary_sqrt_func, __func__);
+    RUN_SUBTEST(test_to_string_unary_sqrt_expr);
+    RUN_SUBTEST(test_to_string_unary_sqrt_func);
 }
 
 /* ============================================================
@@ -638,8 +638,8 @@ static void test_to_string_function_style_func(void)
 
 void test_to_string_function_style(void)
 {
-    RUN_TEST(test_to_string_function_style_expr, __func__);
-    RUN_TEST(test_to_string_function_style_func, __func__);
+    RUN_SUBTEST(test_to_string_function_style_expr);
+    RUN_SUBTEST(test_to_string_function_style_func);
 }
 
 /* ============================================================
@@ -694,20 +694,20 @@ void test_to_string_special_functions(void)
 
 void test_to_string_all(void)
 {
-    RUN_TEST(test_to_string_basic_const, __func__);
-    RUN_TEST(test_to_string_basic_var, __func__);
-    RUN_TEST(test_to_string_non_simple_var_bracketed, __func__);
-    RUN_TEST(test_to_string_addition, __func__);
-    RUN_TEST(test_to_string_negative_rhs_expr, __func__);
-    RUN_TEST(test_to_string_double_negative_expr, __func__);
-    RUN_TEST(test_to_string_nested_negative_rhs_expr, __func__);
-    RUN_TEST(test_to_string_nested_mul_add, __func__);
-    RUN_TEST(test_to_string_atan2, __func__);
-    RUN_TEST(test_to_string_pow_superscript, __func__);
-    RUN_TEST(test_to_string_unary_sin, __func__);
-    RUN_TEST(test_to_string_unary_sqrt, __func__);
-    RUN_TEST(test_to_string_function_style, __func__);
-    RUN_TEST(test_to_string_special_functions, __func__);
+    RUN_SUBTEST(test_to_string_basic_const);
+    RUN_SUBTEST(test_to_string_basic_var);
+    RUN_SUBTEST(test_to_string_non_simple_var_bracketed);
+    RUN_SUBTEST(test_to_string_addition);
+    RUN_SUBTEST(test_to_string_negative_rhs_expr);
+    RUN_SUBTEST(test_to_string_double_negative_expr);
+    RUN_SUBTEST(test_to_string_nested_negative_rhs_expr);
+    RUN_SUBTEST(test_to_string_nested_mul_add);
+    RUN_SUBTEST(test_to_string_atan2);
+    RUN_SUBTEST(test_to_string_pow_superscript);
+    RUN_SUBTEST(test_to_string_unary_sin);
+    RUN_SUBTEST(test_to_string_unary_sqrt);
+    RUN_SUBTEST(test_to_string_function_style);
+    RUN_SUBTEST(test_to_string_special_functions);
 }
 
 /* ============================================================

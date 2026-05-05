@@ -334,14 +334,14 @@ static void test_stability() {
 }
 
 void test_arithmetic(void) {
-    RUN_TEST(test_add, __func__);
-    RUN_TEST(test_mul, __func__);
-    RUN_TEST(test_div, __func__);
-    RUN_TEST(test_sqrt, __func__);
-    RUN_TEST(test_exp_log, __func__);
-    RUN_TEST(test_qf_exp, __func__);
-    RUN_TEST(test_qf_log, __func__);
-    RUN_TEST(test_stability, __func__);
+    RUN_SUBTEST(test_add);
+    RUN_SUBTEST(test_mul);
+    RUN_SUBTEST(test_div);
+    RUN_SUBTEST(test_sqrt);
+    RUN_SUBTEST(test_exp_log);
+    RUN_SUBTEST(test_qf_exp);
+    RUN_SUBTEST(test_qf_log);
+    RUN_SUBTEST(test_stability);
 }
 
 /* -----------------------------------------------------------

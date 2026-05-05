@@ -98,8 +98,8 @@ static void test_reverse_gradient_missing_variable(void)
 
 void test_reverse_mode(void)
 {
-    RUN_TEST(test_reverse_gradient_polynomial, __func__);
-    RUN_TEST(test_reverse_gradient_shared_subexpression, __func__);
-    RUN_TEST(test_reverse_matches_forward_composite, __func__);
-    RUN_TEST(test_reverse_gradient_missing_variable, __func__);
+    RUN_SUBTEST(test_reverse_gradient_polynomial);
+    RUN_SUBTEST(test_reverse_gradient_shared_subexpression);
+    RUN_SUBTEST(test_reverse_matches_forward_composite);
+    RUN_SUBTEST(test_reverse_gradient_missing_variable);
 }

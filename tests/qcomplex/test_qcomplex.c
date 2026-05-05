@@ -999,47 +999,47 @@ static void test_printf(void)
 
 static void test_arithmetic_group(void)
 {
-    RUN_TEST(test_add_sub,  __func__);
-    RUN_TEST(test_mul_div,  __func__);
-    RUN_TEST(test_conj,     __func__);
-    RUN_TEST(test_abs_arg,  __func__);
-    RUN_TEST(test_polar,    __func__);
+    RUN_SUBTEST(test_add_sub);
+    RUN_SUBTEST(test_mul_div);
+    RUN_SUBTEST(test_conj);
+    RUN_SUBTEST(test_abs_arg);
+    RUN_SUBTEST(test_polar);
 }
 
 static void test_elementary_group(void)
 {
-    RUN_TEST(test_exp,      __func__);
-    RUN_TEST(test_log,      __func__);
-    RUN_TEST(test_pow_sqrt, __func__);
+    RUN_SUBTEST(test_exp);
+    RUN_SUBTEST(test_log);
+    RUN_SUBTEST(test_pow_sqrt);
 }
 
 static void test_trig_group(void)
 {
-    RUN_TEST(test_trig,       __func__);
-    RUN_TEST(test_hyperbolic, __func__);
+    RUN_SUBTEST(test_trig);
+    RUN_SUBTEST(test_hyperbolic);
 }
 
 static void test_special_group(void)
 {
-    RUN_TEST(test_erf,        __func__);
-    RUN_TEST(test_erfinv,     __func__);
-    RUN_TEST(test_gamma,      __func__);
-    RUN_TEST(test_digamma,    __func__);
-    RUN_TEST(test_gammainv,   __func__);
-    RUN_TEST(test_beta,       __func__);
-    RUN_TEST(test_normal,     __func__);
-    RUN_TEST(test_productlog, __func__);
-    RUN_TEST(test_lambert_wm1, __func__);
-    RUN_TEST(test_gammainc,   __func__);
-    RUN_TEST(test_ei_e1,      __func__);
-    RUN_TEST(test_difficult_cases, __func__);
+    RUN_SUBTEST(test_erf);
+    RUN_SUBTEST(test_erfinv);
+    RUN_SUBTEST(test_gamma);
+    RUN_SUBTEST(test_digamma);
+    RUN_SUBTEST(test_gammainv);
+    RUN_SUBTEST(test_beta);
+    RUN_SUBTEST(test_normal);
+    RUN_SUBTEST(test_productlog);
+    RUN_SUBTEST(test_lambert_wm1);
+    RUN_SUBTEST(test_gammainc);
+    RUN_SUBTEST(test_ei_e1);
+    RUN_SUBTEST(test_difficult_cases);
 }
 
 static void test_util_group(void)
 {
-    RUN_TEST(test_utility,   __func__);
-    RUN_TEST(test_comparison, __func__);
-    RUN_TEST(test_printf,    __func__);
+    RUN_SUBTEST(test_utility);
+    RUN_SUBTEST(test_comparison);
+    RUN_SUBTEST(test_printf);
 }
 
 /* ====================================================================
@@ -1255,13 +1255,13 @@ static void test_from_string(void)
 
 int tests_main(void)
 {
-    RUN_TEST(test_arithmetic_group, NULL);
-    RUN_TEST(test_elementary_group, NULL);
-    RUN_TEST(test_trig_group,       NULL);
-    RUN_TEST(test_special_group,    NULL);
-    RUN_TEST(test_util_group,       NULL);
-    RUN_TEST(test_from_string,      NULL);
-    RUN_TEST(test_euler_identity,   NULL);
+    RUN_TEST_CASE(test_arithmetic_group);
+    RUN_TEST_CASE(test_elementary_group);
+    RUN_TEST_CASE(test_trig_group);
+    RUN_TEST_CASE(test_special_group);
+    RUN_TEST_CASE(test_util_group);
+    RUN_TEST_CASE(test_from_string);
+    RUN_TEST_CASE(test_euler_identity);
 
-    return tests_failed;
+    return TESTS_EXIT_CODE();
 }

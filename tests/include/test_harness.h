@@ -12,12 +12,17 @@
  *        #define TEST_CONFIG_MAIN
  *      before including this header.
  *   2. Define the entry point expected by main():
- *        int tests_main(void) { RUN_TEST(...); return 0; }
+ *        int tests_main(void) {
+ *            TEST_SECTION("Arithmetic");
+ *            RUN_TEST_CASE(test_addition);
+ *            return TESTS_EXIT_CODE();
+ *        }
  *   3. Any additional helper translation units may include this header
  *      without defining TEST_CONFIG_MAIN.
- *   4. Call RUN_TEST(func, parent) for each test or test-group function:
- *        RUN_TEST(test_addition, NULL);          // top-level test
- *        RUN_TEST(test_group_arithmetic, NULL);  // group (calls RUN_TEST itself)
+ *   4. Use the helper macros for the common cases:
+ *        RUN_TEST_CASE(test_addition);     // top-level JSON entry
+ *        RUN_SUBTEST(test_parse_basic);    // child of the current function
+ *        RUN_TEST(test_group_math, NULL);  // explicit parent when needed
  *
  * RUN_TEST behaviour:
  *   • Consults test_config to decide whether to SKIP the test.
@@ -87,6 +92,13 @@ static inline void th_print_time(double ms) {
     else
         printf("%.2f s", ms / 1000.0);
     printf("]" C_RESET);
+}
+
+static inline void th_print_section(const char *title)
+{
+    if (!title)
+        title = "";
+    printf(C_BOLD C_CYAN "=== %s ===\n" C_RESET, title);
 }
 
 /* Assertion helpers */
@@ -166,7 +178,12 @@ static inline void th_print_time(double ms) {
         tests_rts++;                                                              \
         /* Check enable/disable state */                                          \
         if (!test_enabled(__FILE__, #func, parent)) {                             \
-            printf("\r" C_YELLOW "SKIP: %-30s" C_RESET, #func);                   \
+            const char *__th_parent = (parent);                                   \
+            if (__th_parent)                                                      \
+                printf(C_YELLOW "SKIP: %s (in %s)" C_RESET "\n",                  \
+                       #func, __th_parent);                                       \
+            else                                                                  \
+                printf(C_YELLOW "SKIP: %s" C_RESET "\n", #func);                  \
             tests_skipped++;                                                      \
             break;                                                                \
         }                                                                         \
@@ -220,6 +237,17 @@ static inline void th_print_time(double ms) {
         th_print_time(__disp_ms);                                                 \
         putchar('\n');                                                            \
     } while (0)
+
+#define RUN_TEST_CASE(func) RUN_TEST(func, NULL)
+
+#define RUN_SUBTEST(func) RUN_TEST(func, __func__)
+
+#define TEST_SECTION(title)        \
+    do {                           \
+        th_print_section(title);   \
+    } while (0)
+
+#define TESTS_EXIT_CODE() (tests_failed ? 1 : 0)
 
 
 #define TEST_FAIL_AT(file, line)          \

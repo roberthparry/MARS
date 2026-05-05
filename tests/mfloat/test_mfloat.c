@@ -1712,19 +1712,19 @@ void test_difficult_mfloat_cases(void)
 
 int tests_main(void)
 {
-    RUN_TEST(test_new_and_precision, NULL);
-    RUN_TEST(test_set_long_normalises, NULL);
-    RUN_TEST(test_clone_and_clear, NULL);
-    RUN_TEST(test_set_string_and_basic_arithmetic, NULL);
-    RUN_TEST(test_division_and_power, NULL);
-    RUN_TEST(test_string_roundtrip, NULL);
-    RUN_TEST(test_printf_family, NULL);
-    RUN_TEST(test_constants_and_named_values, NULL);
-    RUN_TEST(test_conversion_to_double_and_qfloat, NULL);
-    RUN_TEST(test_conversion_from_double_and_qfloat, NULL);
-    RUN_TEST(test_extended_math_wrappers, NULL);
-    RUN_TEST(test_remaining_special_mfloat_functions, NULL);
-    RUN_TEST(test_difficult_mfloat_cases, NULL);
+    RUN_TEST_CASE(test_new_and_precision);
+    RUN_TEST_CASE(test_set_long_normalises);
+    RUN_TEST_CASE(test_clone_and_clear);
+    RUN_TEST_CASE(test_set_string_and_basic_arithmetic);
+    RUN_TEST_CASE(test_division_and_power);
+    RUN_TEST_CASE(test_string_roundtrip);
+    RUN_TEST_CASE(test_printf_family);
+    RUN_TEST_CASE(test_constants_and_named_values);
+    RUN_TEST_CASE(test_conversion_to_double_and_qfloat);
+    RUN_TEST_CASE(test_conversion_from_double_and_qfloat);
+    RUN_TEST_CASE(test_extended_math_wrappers);
+    RUN_TEST_CASE(test_remaining_special_mfloat_functions);
+    RUN_TEST_CASE(test_difficult_mfloat_cases);
 
     printf(C_YELLOW "\nRunning README examples...\n" C_RESET);
     readme_examples();

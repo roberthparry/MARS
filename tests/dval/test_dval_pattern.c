@@ -875,22 +875,22 @@ static void test_generic_affine_poly_deg4_times_unary_matcher(void)
 
 void test_dval_pattern_helpers(void)
 {
-    RUN_TEST(test_match_affine_families, __func__);
-    RUN_TEST(test_generic_unary_affine_matchers, __func__);
-    RUN_TEST(test_pattern_rejections, __func__);
-    RUN_TEST(test_scaled_expr_and_var_usage, __func__);
-    RUN_TEST(test_substitute_and_powd, __func__);
-    RUN_TEST(test_square_affine_matchers, __func__);
-    RUN_TEST(test_cube_affine_matchers, __func__);
-    RUN_TEST(test_quartic_affine_matchers, __func__);
-    RUN_TEST(test_affine_times_exp_affine_matcher, __func__);
-    RUN_TEST(test_square_affine_times_exp_affine_matcher, __func__);
-    RUN_TEST(test_square_affine_times_trig_affine_matchers, __func__);
-    RUN_TEST(test_affine_times_trig_affine_matchers, __func__);
-    RUN_TEST(test_affine_times_hyperbolic_affine_matchers, __func__);
-    RUN_TEST(test_square_affine_times_hyperbolic_affine_matchers, __func__);
-    RUN_TEST(test_cube_affine_times_unary_affine_matchers, __func__);
-    RUN_TEST(test_quartic_affine_times_unary_affine_matchers, __func__);
-    RUN_TEST(test_affine_poly_deg4_times_unary_affine_matchers, __func__);
-    RUN_TEST(test_generic_affine_poly_deg4_times_unary_matcher, __func__);
+    RUN_SUBTEST(test_match_affine_families);
+    RUN_SUBTEST(test_generic_unary_affine_matchers);
+    RUN_SUBTEST(test_pattern_rejections);
+    RUN_SUBTEST(test_scaled_expr_and_var_usage);
+    RUN_SUBTEST(test_substitute_and_powd);
+    RUN_SUBTEST(test_square_affine_matchers);
+    RUN_SUBTEST(test_cube_affine_matchers);
+    RUN_SUBTEST(test_quartic_affine_matchers);
+    RUN_SUBTEST(test_affine_times_exp_affine_matcher);
+    RUN_SUBTEST(test_square_affine_times_exp_affine_matcher);
+    RUN_SUBTEST(test_square_affine_times_trig_affine_matchers);
+    RUN_SUBTEST(test_affine_times_trig_affine_matchers);
+    RUN_SUBTEST(test_affine_times_hyperbolic_affine_matchers);
+    RUN_SUBTEST(test_square_affine_times_hyperbolic_affine_matchers);
+    RUN_SUBTEST(test_cube_affine_times_unary_affine_matchers);
+    RUN_SUBTEST(test_quartic_affine_times_unary_affine_matchers);
+    RUN_SUBTEST(test_affine_poly_deg4_times_unary_affine_matchers);
+    RUN_SUBTEST(test_generic_affine_poly_deg4_times_unary_matcher);
 }

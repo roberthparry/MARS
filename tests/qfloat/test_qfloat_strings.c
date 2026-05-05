@@ -223,13 +223,10 @@ static void test_round_trip(void)
 }
 
 void test_strings(void) {
-    RUN_TEST(test_qf_to_string, __func__);
-    RUN_TEST(test_qf_from_string, __func__);
-    RUN_TEST(test_from_string_basic, __func__);
-    RUN_TEST(test_from_string_scientific, __func__);
-    RUN_TEST(test_round_trip, __func__);
+    RUN_SUBTEST(test_qf_to_string);
+    RUN_SUBTEST(test_qf_from_string);
+    RUN_SUBTEST(test_from_string_basic);
+    RUN_SUBTEST(test_from_string_scientific);
+    RUN_SUBTEST(test_round_trip);
 }
 
-/* -----------------------------------------------------------
-   qf_sprintf tests
-   ----------------------------------------------------------- */
