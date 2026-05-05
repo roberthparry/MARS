@@ -2166,6 +2166,11 @@ static size_t mfloat_transcendental_work_prec(size_t precision)
     return work_prec;
 }
 
+static size_t mfloat_cap_work_prec(size_t work_prec)
+{
+    return work_prec > 1024u ? 1024u : work_prec;
+}
+
 static int mfloat_get_small_positive_integer(const mfloat_t *mfloat, long *out)
 {
     double value;
@@ -2546,7 +2551,7 @@ int mf_exp(mfloat_t *mfloat)
     }
 
     precision = mfloat->precision;
-    work_prec = precision > 512u ? precision * 3u : mfloat_transcendental_work_prec(precision);
+    work_prec = mfloat_cap_work_prec(mfloat_transcendental_work_prec(precision));
     x = mfloat_clone_prec(mfloat, work_prec);
     ln2 = mfloat_clone_immortal_prec_internal(&mfloat_ln2_1024_static, work_prec);
     if (!x || !ln2)
@@ -2648,9 +2653,7 @@ int mf_log(mfloat_t *mfloat)
     precision = mfloat->precision;
     if (precision <= MFLOAT_QFLOAT_EFFECTIVE_BITS)
         return mfloat_apply_qfloat_unary(mfloat, qf_log);
-    work_prec = mfloat_transcendental_work_prec(precision) + 32u;
-    if (precision > 512u)
-        work_prec = precision * 2u;
+    work_prec = mfloat_cap_work_prec(mfloat_transcendental_work_prec(precision) + 32u);
     for (i = 0; i < 7u; ++i)
         mfloat_scratch_init_slot(&slots[i], work_prec);
     m = &slots[0].value;
@@ -2667,6 +2670,19 @@ int mf_log(mfloat_t *mfloat)
         goto cleanup;
     if (mfloat_set_from_signed_mint(m, mant, -((long)mant_bits - 1l)) != 0)
         goto cleanup;
+
+    md = mf_to_double(m);
+    if (!(md > 0.0))
+        goto cleanup;
+    if (md < M_SQRT1_2) {
+        if (mf_mul_long(m, 2) != 0)
+            goto cleanup;
+        exp2 -= 1;
+    } else if (md > M_SQRT2) {
+        if (mf_ldexp(m, -1) != 0)
+            goto cleanup;
+        exp2 += 1;
+    }
 
     md = mf_to_double(m);
     if (!(md > 0.0))
