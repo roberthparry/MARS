@@ -3294,7 +3294,7 @@ int mf_acos(mfloat_t *mfloat)
     if (precision <= MFLOAT_QFLOAT_EFFECTIVE_BITS)
         return mfloat_apply_qfloat_unary(mfloat, qf_acos);
 
-    work_prec = mfloat_transcendental_work_prec(precision);
+    work_prec = precision;
     if (mfloat_is_exact_half(mfloat, 1) || mfloat_is_exact_half(mfloat, -1)) {
         pi = mfloat_new_pi_prec(work_prec);
         if (!pi || mfloat_div_long_inplace(pi, 3) != 0)
@@ -3312,7 +3312,7 @@ int mf_acos(mfloat_t *mfloat)
         goto cleanup;
     }
     tmp = mfloat_clone_prec(mfloat, work_prec);
-    pi = mfloat_new_pi_prec(work_prec + MFLOAT_CONST_GUARD_BITS);
+    pi = mfloat_new_pi_prec(work_prec);
     if (!tmp || !pi)
         goto cleanup;
     if (mf_asin(tmp) != 0 || mfloat_div_long_inplace(pi, 2) != 0)
