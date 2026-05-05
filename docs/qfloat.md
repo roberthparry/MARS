@@ -71,7 +71,7 @@ the result renormalised into a stable `(hi, lo)` pair.
 
 Functions such as `exp`, `log`, `sin`, `cos`, `sqrt`, `pow`, and `atan2` are
 built from argument reduction, polynomial or rational approximation,
-Newton-style refinement, and renormalization back into `(hi, lo)` form.
+Newton-style refinement, and renormalisation back into `(hi, lo)` form.
 Special functions build on the same arithmetic core.
 
 ### Formatting and Parsing
@@ -179,7 +179,7 @@ All declarations are in `include/qfloat.h`.
 
 - `qfloat_t qf_neg(qfloat_t x)` — unary negation `-x`
 - `qfloat_t qf_abs(qfloat_t x)` — absolute value `|x|`
-- `qfloat_t qf_add(qfloat_t a, qfloat_t b)` — `a + b` using TwoSum + renormalization
+- `qfloat_t qf_add(qfloat_t a, qfloat_t b)` — `a + b` using TwoSum + renormalisation
 - `qfloat_t qf_add_double(qfloat_t x, double y)` — `x + y`
 - `qfloat_t qf_sub(qfloat_t a, qfloat_t b)` — `a - b`
 - `qfloat_t qf_mul(qfloat_t a, qfloat_t b)` — `a * b` using Dekker TwoProd

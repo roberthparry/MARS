@@ -336,7 +336,7 @@ Results:
 | `mc_ei(1+i)` at `512` bits | `59.575 µs` |
 | `mc_e1(1+i)` at `512` bits | `56.693 µs` |
 
-These are the current complex hot-path checkpoints from this optimization
+These are the current complex hot-path checkpoints from this optimisation
 phase. The benchmark target still covers pure-real `mc_gamma(2.3 + 0i)` and
 `mc_lgamma(2.3 + 0i)` as apples-to-apples comparisons with `mfloat`; we will
 refresh those published rows again after the next gamma-family pass.

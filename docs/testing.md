@@ -76,7 +76,7 @@ make bench_mcomplex_maths
 ```
 
 These benchmark targets track the numeric and symbolic hot paths we are
-actively optimizing. See [`benchmarks.md`](benchmarks.md) for benchmark-
+actively optimising. See [`benchmarks.md`](benchmarks.md) for benchmark-
 specific notes and sample results.
 
 ---
@@ -132,7 +132,7 @@ Test files declare one of two modes before including `test_harness.h`:
 | Mode | File consulted |
 |---|---|
 | `TEST_CONFIG_GLOBAL` | `tests/test_config.json` (shared by all test binaries) |
-| `TEST_CONFIG_LOCAL` | `<normalized test source path>.json` (one file per test binary) |
+| `TEST_CONFIG_LOCAL` | `<normalised test source path>.json` (one file per test binary) |
 
 For example, `tests/test_config/test_test_config.c` uses `tests/test_config/test_test_config.json` in local mode.
 

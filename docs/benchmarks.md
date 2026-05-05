@@ -251,7 +251,7 @@ e1_1_plus_1i_512             bits=512  avg_µs=    56.693 avg_ms=     0.057
 ```
 
 The current `mcomplex` implementation still has remaining wrapper-era paths, so
-these numbers should be read as active optimization checkpoints rather than
+these numbers should be read as active optimisation checkpoints rather than
 final end-state timings. The bench target still covers the pure-real gamma and
 lgamma cases; this snapshot highlights the complex hot paths we tuned in this
 phase.
