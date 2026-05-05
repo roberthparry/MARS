@@ -955,6 +955,8 @@ void test_extended_math_wrappers(void)
     mfloat_t *p = NULL;
     mfloat_t *sin_pair = NULL;
     mfloat_t *cos_pair = NULL;
+    mfloat_t *sinh_pair = NULL;
+    mfloat_t *cosh_pair = NULL;
     mfloat_t *expected_e = NULL;
     mfloat_t *expected_calc = NULL;
     mfloat_t *g = NULL;
@@ -974,6 +976,8 @@ void test_extended_math_wrappers(void)
     p = mf_create_long(10);
     sin_pair = mf_new_prec(TEST_MFLOAT_MATHS_PRECISION);
     cos_pair = mf_new_prec(TEST_MFLOAT_MATHS_PRECISION);
+    sinh_pair = mf_new_prec(TEST_MFLOAT_MATHS_PRECISION);
+    cosh_pair = mf_new_prec(TEST_MFLOAT_MATHS_PRECISION);
 
     ASSERT_NOT_NULL(a);
     ASSERT_NOT_NULL(b);
@@ -988,6 +992,8 @@ void test_extended_math_wrappers(void)
     ASSERT_NOT_NULL(p);
     ASSERT_NOT_NULL(sin_pair);
     ASSERT_NOT_NULL(cos_pair);
+    ASSERT_NOT_NULL(sinh_pair);
+    ASSERT_NOT_NULL(cosh_pair);
     print_mfloat_value("a initial", a);
     print_mfloat_value("b initial", b);
     print_mfloat_value("c initial", c);
@@ -1112,6 +1118,20 @@ void test_extended_math_wrappers(void)
         "0.5210953054937473616224256264114915591059289826114805279460935764528022508902335923170644542741885934882214239811341359140666794448283313132498958147711911861109207062907779867237162829057943448262401667428326636169984336690720577785",
         1));
     ASSERT_TRUE(fabs(mf_to_double(c) - sinh(0.5)) < 1e-9);
+    ASSERT_EQ_INT(mf_set_string(c, "0.5"), 0);
+    ASSERT_EQ_INT(mf_sinhcosh(c, sinh_pair, cosh_pair), 0);
+    print_mfloat_error_check("sinhcosh(sinh, 0.5) mfloat error", sinh_pair,
+                             "0.5210953054937473616224256264114915591059289826114805279460935764528022508902335923170644542741885934882214239811341359140666794448283313132498958147711911861109207062907779867237162829057943448262401667428326636169984336690720577785");
+    print_mfloat_error_check("sinhcosh(cosh, 0.5) mfloat error", cosh_pair,
+                             "1.127625965206380785226225161402672012547847118098667483628985735187858770303982016315712065782178049514645213775173661090604487530391277846591075637718868610818501952807625927996232181753694900070628738593585802103842632987787742311");
+    ASSERT_TRUE(mfloat_meets_precision(
+        sinh_pair,
+        "0.5210953054937473616224256264114915591059289826114805279460935764528022508902335923170644542741885934882214239811341359140666794448283313132498958147711911861109207062907779867237162829057943448262401667428326636169984336690720577785",
+        1));
+    ASSERT_TRUE(mfloat_meets_precision(
+        cosh_pair,
+        "1.127625965206380785226225161402672012547847118098667483628985735187858770303982016315712065782178049514645213775173661090604487530391277846591075637718868610818501952807625927996232181753694900070628738593585802103842632987787742311",
+        1));
 
     ASSERT_EQ_INT(mf_set_string(c, "0.5"), 0);
     ASSERT_EQ_INT(mf_cosh(c), 0);
@@ -1185,29 +1205,47 @@ void test_extended_math_wrappers(void)
         1));
     ASSERT_TRUE(fabs(mf_to_double(c) - tanh(0.5)) < 1e-9);
 
-    ASSERT_EQ_INT(mf_set_string(c, "0.5"), 0);
-    ASSERT_EQ_INT(mf_asinh(c), 0);
-    print_mfloat_value("c after asinh", c);
-    print_double_check("asinh(0.5)", "0.5", asinh(0.5), mf_to_double(c));
-    print_mfloat_error_check("asinh(0.5) mfloat error", c,
-                             "0.4812118250596034474977589134243684231351843343856605196610181688401638676082217744120094291227234749972318399582936564112725683237267376227530592418644097541824170072118371502238239374691872752432791930187970790035617267969445457523");
-    ASSERT_TRUE(mfloat_meets_precision(
-        c,
-        "0.4812118250596034474977589134243684231351843343856605196610181688401638676082217744120094291227234749972318399582936564112725683237267376227530592418644097541824170072118371502238239374691872752432791930187970790035617267969445457523",
-        1));
-    ASSERT_TRUE(fabs(mf_to_double(c) - asinh(0.5)) < 1e-9);
+    {
+        mfloat_t *asinh_expected = mf_create_string("0.5");
+        mfloat_t *tmp = mf_create_string("0.5");
+        ASSERT_NOT_NULL(asinh_expected);
+        ASSERT_NOT_NULL(tmp);
+        ASSERT_EQ_INT(mf_mul(tmp, tmp), 0);
+        ASSERT_EQ_INT(mf_add(tmp, MF_ONE), 0);
+        ASSERT_EQ_INT(mf_sqrt(tmp), 0);
+        ASSERT_EQ_INT(mf_add(asinh_expected, tmp), 0);
+        ASSERT_EQ_INT(mf_log(asinh_expected), 0);
+        ASSERT_EQ_INT(mf_set_string(c, "0.5"), 0);
+        ASSERT_EQ_INT(mf_asinh(c), 0);
+        print_mfloat_value("c after asinh", c);
+        print_double_check("asinh(0.5)", "0.5", asinh(0.5), mf_to_double(c));
+        print_mfloat_error_check_value("asinh(0.5) mfloat error", c, asinh_expected);
+        ASSERT_TRUE(mfloat_meets_precision_value(c, asinh_expected, 1));
+        ASSERT_TRUE(fabs(mf_to_double(c) - asinh(0.5)) < 1e-9);
+        mf_free(tmp);
+        mf_free(asinh_expected);
+    }
 
-    ASSERT_EQ_INT(mf_set_string(c, "2"), 0);
-    ASSERT_EQ_INT(mf_acosh(c), 0);
-    print_mfloat_value("c after acosh", c);
-    print_double_check("acosh(2)", "2", acosh(2.0), mf_to_double(c));
-    print_mfloat_error_check("acosh(2) mfloat error", c,
-                             "1.316957896924816708625046347307968444026981971467516479768472256920460185416443976074219013450101783556465436565604979319809816862106371532726763345709920676905831128776256958170470437336863711940955650446796732000825937475377912891");
-    ASSERT_TRUE(mfloat_meets_precision(
-        c,
-        "1.316957896924816708625046347307968444026981971467516479768472256920460185416443976074219013450101783556465436565604979319809816862106371532726763345709920676905831128776256958170470437336863711940955650446796732000825937475377912891",
-        1));
-    ASSERT_TRUE(fabs(mf_to_double(c) - acosh(2.0)) < 1e-9);
+    {
+        mfloat_t *acosh_expected = mf_create_string("2");
+        mfloat_t *tmp = mf_create_string("2");
+        ASSERT_NOT_NULL(acosh_expected);
+        ASSERT_NOT_NULL(tmp);
+        ASSERT_EQ_INT(mf_mul(tmp, tmp), 0);
+        ASSERT_EQ_INT(mf_sub(tmp, MF_ONE), 0);
+        ASSERT_EQ_INT(mf_sqrt(tmp), 0);
+        ASSERT_EQ_INT(mf_add(acosh_expected, tmp), 0);
+        ASSERT_EQ_INT(mf_log(acosh_expected), 0);
+        ASSERT_EQ_INT(mf_set_string(c, "2"), 0);
+        ASSERT_EQ_INT(mf_acosh(c), 0);
+        print_mfloat_value("c after acosh", c);
+        print_double_check("acosh(2)", "2", acosh(2.0), mf_to_double(c));
+        print_mfloat_error_check_value("acosh(2) mfloat error", c, acosh_expected);
+        ASSERT_TRUE(mfloat_meets_precision_value(c, acosh_expected, 1));
+        ASSERT_TRUE(fabs(mf_to_double(c) - acosh(2.0)) < 1e-9);
+        mf_free(tmp);
+        mf_free(acosh_expected);
+    }
 
     ASSERT_EQ_INT(mf_set_string(c, "0.5"), 0);
     ASSERT_EQ_INT(mf_atanh(c), 0);
@@ -1369,6 +1407,8 @@ void test_extended_math_wrappers(void)
     mf_free(p);
     mf_free(sin_pair);
     mf_free(cos_pair);
+    mf_free(sinh_pair);
+    mf_free(cosh_pair);
     mf_free(expected_e);
     mf_free(expected_calc);
     mf_free(g);

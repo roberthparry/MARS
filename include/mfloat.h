@@ -215,6 +215,7 @@ int mf_asin(mfloat_t *mfloat);
 int mf_acos(mfloat_t *mfloat);
 int mf_sinh(mfloat_t *mfloat);
 int mf_cosh(mfloat_t *mfloat);
+int mf_sinhcosh(const mfloat_t *x, mfloat_t *sinh_out, mfloat_t *cosh_out);
 int mf_tanh(mfloat_t *mfloat);
 int mf_asinh(mfloat_t *mfloat);
 int mf_acosh(mfloat_t *mfloat);

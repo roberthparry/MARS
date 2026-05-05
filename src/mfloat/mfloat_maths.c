@@ -2093,6 +2093,42 @@ cleanup:
     return rc;
 }
 
+static int mfloat_sinhcosh_pair(mfloat_t *sinh_dst, mfloat_t *cosh_dst, const mfloat_t *x, size_t precision)
+{
+    mfloat_t *ex = NULL, *emx = NULL, *sinh_tmp = NULL, *cosh_tmp = NULL;
+    int rc = -1;
+
+    if (!sinh_dst || !cosh_dst || !x)
+        return -1;
+
+    ex = mfloat_clone_prec(x, precision);
+    emx = mfloat_clone_prec(x, precision);
+    if (!ex || !emx)
+        goto cleanup;
+    if (mf_exp(ex) != 0 || mf_neg(emx) != 0 || mf_exp(emx) != 0)
+        goto cleanup;
+
+    sinh_tmp = mf_clone(ex);
+    cosh_tmp = mf_clone(ex);
+    if (!sinh_tmp || !cosh_tmp)
+        goto cleanup;
+    if (mf_sub(sinh_tmp, emx) != 0 || mfloat_div_long_inplace(sinh_tmp, 2) != 0)
+        goto cleanup;
+    if (mf_add(cosh_tmp, emx) != 0 || mfloat_div_long_inplace(cosh_tmp, 2) != 0)
+        goto cleanup;
+    if (mfloat_copy_value(sinh_dst, sinh_tmp) != 0 || mfloat_copy_value(cosh_dst, cosh_tmp) != 0)
+        goto cleanup;
+
+    rc = 0;
+
+cleanup:
+    mf_free(ex);
+    mf_free(emx);
+    mf_free(sinh_tmp);
+    mf_free(cosh_tmp);
+    return rc;
+}
+
 int mf_sincos(const mfloat_t *x, mfloat_t *sin_out, mfloat_t *cos_out)
 {
     size_t sin_prec, cos_prec, work_prec;
@@ -2115,7 +2151,7 @@ int mf_sincos(const mfloat_t *x, mfloat_t *sin_out, mfloat_t *cos_out)
     sin_prec = sin_out->precision;
     cos_prec = cos_out->precision;
     work_prec = sin_prec > cos_prec ? sin_prec : cos_prec;
-    work_prec = mfloat_cap_work_prec(mfloat_transcendental_work_prec(work_prec));
+    work_prec = mfloat_transcendental_work_prec(work_prec);
 
     work_x = mfloat_clone_prec(x, work_prec);
     sin_tmp = mfloat_clone_prec(MF_ZERO, work_prec);
@@ -2135,6 +2171,51 @@ cleanup:
     mf_free(work_x);
     mf_free(sin_tmp);
     mf_free(cos_tmp);
+    return rc;
+}
+
+int mf_sinhcosh(const mfloat_t *x, mfloat_t *sinh_out, mfloat_t *cosh_out)
+{
+    size_t sinh_prec, cosh_prec, work_prec;
+    mfloat_t *work_x = NULL, *sinh_tmp = NULL, *cosh_tmp = NULL;
+    int rc = -1;
+
+    if (!x || !sinh_out || !cosh_out || sinh_out == cosh_out)
+        return -1;
+    if (x->kind == MFLOAT_KIND_NAN) {
+        if (mf_set_double(sinh_out, NAN) != 0 || mf_set_double(cosh_out, NAN) != 0)
+            return -1;
+        return 0;
+    }
+    if (x->kind == MFLOAT_KIND_POSINF || x->kind == MFLOAT_KIND_NEGINF) {
+        if (mf_set_double(sinh_out, x->kind == MFLOAT_KIND_POSINF ? INFINITY : -INFINITY) != 0 ||
+            mf_set_double(cosh_out, INFINITY) != 0)
+            return -1;
+        return 0;
+    }
+
+    sinh_prec = sinh_out->precision;
+    cosh_prec = cosh_out->precision;
+    work_prec = sinh_prec > cosh_prec ? sinh_prec : cosh_prec;
+    work_prec = mfloat_cap_work_prec(mfloat_transcendental_work_prec(work_prec));
+
+    work_x = mfloat_clone_prec(x, work_prec);
+    sinh_tmp = mfloat_clone_prec(MF_ZERO, work_prec);
+    cosh_tmp = mfloat_clone_prec(MF_ZERO, work_prec);
+    if (!work_x || !sinh_tmp || !cosh_tmp)
+        goto cleanup;
+    if (mfloat_sinhcosh_pair(sinh_tmp, cosh_tmp, work_x, work_prec) != 0)
+        goto cleanup;
+    if (mfloat_finish_result(sinh_out, sinh_tmp, sinh_prec) != 0 ||
+        mfloat_finish_result(cosh_out, cosh_tmp, cosh_prec) != 0)
+        goto cleanup;
+
+    rc = 0;
+
+cleanup:
+    mf_free(work_x);
+    mf_free(sinh_tmp);
+    mf_free(cosh_tmp);
     return rc;
 }
 
@@ -2637,7 +2718,7 @@ int mf_exp(mfloat_t *mfloat)
     }
 
     precision = mfloat->precision;
-    work_prec = mfloat_cap_work_prec(mfloat_transcendental_work_prec(precision));
+    work_prec = mfloat_transcendental_work_prec(precision);
     x = mfloat_clone_prec(mfloat, work_prec);
     ln2 = mfloat_clone_immortal_prec_internal(&mfloat_ln2_1024_static, work_prec);
     if (!x || !ln2)
@@ -2943,7 +3024,7 @@ int mf_sin(mfloat_t *mfloat)
     }
 
     precision = mfloat->precision;
-    work_prec = mfloat_cap_work_prec(mfloat_transcendental_work_prec(precision));
+    work_prec = mfloat_transcendental_work_prec(precision);
     if (mfloat_reduce_trig_argument(mfloat, work_prec, &r, &quadrant) != 0)
         goto cleanup;
 
@@ -3418,7 +3499,7 @@ cleanup:
 int mf_sinh(mfloat_t *mfloat)
 {
     size_t precision, work_prec;
-    mfloat_t *ex = NULL, *emx = NULL;
+    mfloat_t *x = NULL, *sinh_tmp = NULL, *cosh_tmp = NULL;
     int rc = -1;
 
     if (!mfloat)
@@ -3429,28 +3510,28 @@ int mf_sinh(mfloat_t *mfloat)
         return 0;
 
     precision = mfloat->precision;
-    work_prec = mfloat_transcendental_work_prec(precision);
+    work_prec = mfloat_cap_work_prec(mfloat_transcendental_work_prec(precision));
 
-    ex = mfloat_clone_prec(mfloat, work_prec);
-    emx = mfloat_clone_prec(mfloat, work_prec);
-    if (!ex || !emx)
+    x = mfloat_clone_prec(mfloat, work_prec);
+    sinh_tmp = mfloat_clone_prec(MF_ZERO, work_prec);
+    cosh_tmp = mfloat_clone_prec(MF_ZERO, work_prec);
+    if (!x || !sinh_tmp || !cosh_tmp)
         goto cleanup;
-    if (mf_exp(ex) != 0 || mf_neg(emx) != 0 || mf_exp(emx) != 0)
+    if (mfloat_sinhcosh_pair(sinh_tmp, cosh_tmp, x, work_prec) != 0)
         goto cleanup;
-    if (mf_sub(ex, emx) != 0 || mfloat_div_long_inplace(ex, 2) != 0)
-        goto cleanup;
-    rc = mfloat_finish_result(mfloat, ex, precision);
+    rc = mfloat_finish_result(mfloat, sinh_tmp, precision);
 
 cleanup:
-    mf_free(ex);
-    mf_free(emx);
+    mf_free(x);
+    mf_free(sinh_tmp);
+    mf_free(cosh_tmp);
     return rc;
 }
 
 int mf_cosh(mfloat_t *mfloat)
 {
     size_t precision, work_prec;
-    mfloat_t *ex = NULL, *emx = NULL;
+    mfloat_t *x = NULL, *sinh_tmp = NULL, *cosh_tmp = NULL;
     int rc = -1;
 
     if (!mfloat)
@@ -3461,21 +3542,21 @@ int mf_cosh(mfloat_t *mfloat)
         return mf_set_double(mfloat, INFINITY);
 
     precision = mfloat->precision;
-    work_prec = mfloat_transcendental_work_prec(precision);
+    work_prec = mfloat_cap_work_prec(mfloat_transcendental_work_prec(precision));
 
-    ex = mfloat_clone_prec(mfloat, work_prec);
-    emx = mfloat_clone_prec(mfloat, work_prec);
-    if (!ex || !emx)
+    x = mfloat_clone_prec(mfloat, work_prec);
+    sinh_tmp = mfloat_clone_prec(MF_ZERO, work_prec);
+    cosh_tmp = mfloat_clone_prec(MF_ZERO, work_prec);
+    if (!x || !sinh_tmp || !cosh_tmp)
         goto cleanup;
-    if (mf_exp(ex) != 0 || mf_neg(emx) != 0 || mf_exp(emx) != 0)
+    if (mfloat_sinhcosh_pair(sinh_tmp, cosh_tmp, x, work_prec) != 0)
         goto cleanup;
-    if (mf_add(ex, emx) != 0 || mfloat_div_long_inplace(ex, 2) != 0)
-        goto cleanup;
-    rc = mfloat_finish_result(mfloat, ex, precision);
+    rc = mfloat_finish_result(mfloat, cosh_tmp, precision);
 
 cleanup:
-    mf_free(ex);
-    mf_free(emx);
+    mf_free(x);
+    mf_free(sinh_tmp);
+    mf_free(cosh_tmp);
     return rc;
 }
 
@@ -3538,7 +3619,7 @@ cleanup:
 int mf_asinh(mfloat_t *mfloat)
 {
     size_t precision, work_prec;
-    mfloat_t *x = NULL, *y = NULL, *sinh_y = NULL, *cosh_y = NULL, *delta = NULL;
+    mfloat_t *x = NULL, *y = NULL, *sinh_y = NULL, *cosh_y = NULL;
     int rc = -1;
 
     if (!mfloat)
@@ -3557,27 +3638,21 @@ int mf_asinh(mfloat_t *mfloat)
     if (!x)
         goto cleanup;
     y = mfloat_new_from_qfloat_prec(qf_asinh(mf_to_qfloat(x)), work_prec);
-    if (!y)
+    sinh_y = mfloat_clone_prec(MF_ZERO, work_prec);
+    cosh_y = mfloat_clone_prec(MF_ZERO, work_prec);
+    if (!y || !sinh_y || !cosh_y)
         goto cleanup;
     for (int iter = 0; iter < 2; ++iter) {
-        sinh_y = mf_clone(y);
-        cosh_y = mf_clone(y);
-        if (!sinh_y || !cosh_y)
+        if (mf_set_precision(sinh_y, work_prec) != 0 || mf_set_precision(cosh_y, work_prec) != 0)
             goto cleanup;
-        if (mf_sinh(sinh_y) != 0 || mf_cosh(cosh_y) != 0)
+        if (mfloat_sinhcosh_pair(sinh_y, cosh_y, y, work_prec) != 0)
             goto cleanup;
         if (mf_sub(sinh_y, x) != 0 || mf_div(sinh_y, cosh_y) != 0)
             goto cleanup;
-        delta = sinh_y;
-        sinh_y = NULL;
-        if (mf_sub(y, delta) != 0)
+        if (mf_sub(y, sinh_y) != 0)
             goto cleanup;
-        if (mfloat_is_below_neg_bits(delta, (long)work_prec + 8l))
+        if (mfloat_is_below_neg_bits(sinh_y, (long)work_prec + 8l))
             break;
-        mf_free(delta);
-        delta = NULL;
-        mf_free(cosh_y);
-        cosh_y = NULL;
     }
     rc = mfloat_finish_result(mfloat, y, precision);
 
@@ -3586,14 +3661,13 @@ cleanup:
     mf_free(y);
     mf_free(sinh_y);
     mf_free(cosh_y);
-    mf_free(delta);
     return rc;
 }
 
 int mf_acosh(mfloat_t *mfloat)
 {
     size_t precision, work_prec;
-    mfloat_t *x = NULL, *one = NULL, *y = NULL, *cosh_y = NULL, *sinh_y = NULL, *delta = NULL;
+    mfloat_t *x = NULL, *one = NULL, *y = NULL, *cosh_y = NULL, *sinh_y = NULL;
     int rc = -1;
 
     if (!mfloat)
@@ -3624,27 +3698,21 @@ int mf_acosh(mfloat_t *mfloat)
         goto cleanup;
     }
     y = mfloat_new_from_qfloat_prec(qf_acosh(mf_to_qfloat(x)), work_prec);
-    if (!y)
+    cosh_y = mfloat_clone_prec(MF_ZERO, work_prec);
+    sinh_y = mfloat_clone_prec(MF_ZERO, work_prec);
+    if (!y || !cosh_y || !sinh_y)
         goto cleanup;
     for (int iter = 0; iter < 2; ++iter) {
-        cosh_y = mf_clone(y);
-        sinh_y = mf_clone(y);
-        if (!cosh_y || !sinh_y)
+        if (mf_set_precision(cosh_y, work_prec) != 0 || mf_set_precision(sinh_y, work_prec) != 0)
             goto cleanup;
-        if (mf_cosh(cosh_y) != 0 || mf_sinh(sinh_y) != 0)
+        if (mfloat_sinhcosh_pair(sinh_y, cosh_y, y, work_prec) != 0)
             goto cleanup;
         if (mf_sub(cosh_y, x) != 0 || mf_div(cosh_y, sinh_y) != 0)
             goto cleanup;
-        delta = cosh_y;
-        cosh_y = NULL;
-        if (mf_sub(y, delta) != 0)
+        if (mf_sub(y, cosh_y) != 0)
             goto cleanup;
-        if (mfloat_is_below_neg_bits(delta, (long)work_prec + 8l))
+        if (mfloat_is_below_neg_bits(cosh_y, (long)work_prec + 8l))
             break;
-        mf_free(delta);
-        delta = NULL;
-        mf_free(sinh_y);
-        sinh_y = NULL;
     }
     rc = mfloat_finish_result(mfloat, y, precision);
 
@@ -3654,7 +3722,6 @@ cleanup:
     mf_free(y);
     mf_free(cosh_y);
     mf_free(sinh_y);
-    mf_free(delta);
     return rc;
 }
 
