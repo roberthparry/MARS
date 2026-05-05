@@ -3194,7 +3194,7 @@ int mf_asin(mfloat_t *mfloat)
     precision = mfloat->precision;
     if (precision <= MFLOAT_QFLOAT_EFFECTIVE_BITS)
         return mfloat_apply_qfloat_unary(mfloat, qf_asin);
-    work_prec = precision + MFLOAT_CONST_GUARD_BITS;
+    work_prec = precision + (MFLOAT_CONST_GUARD_BITS / 2u);
 
     x = mfloat_clone_prec(mfloat, work_prec);
     one = mfloat_clone_prec(MF_ONE, work_prec);
