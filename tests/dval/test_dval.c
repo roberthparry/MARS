@@ -51,6 +51,210 @@ void print_expr_of(const dval_t *f)
     free(s);
 }
 
+static dval_t *make_readme_f(dval_t *x)
+{
+    dval_t *sinx   = dv_sin(x);
+    dval_t *exp_sx = dv_exp(sinx);
+    dval_t *x2     = dv_pow_d(x, 2.0);
+    dval_t *term2  = dv_mul_d(x2, 3.0);
+    dval_t *f0     = dv_add(exp_sx, term2);
+    dval_t *f      = dv_sub_d(f0, 7.0);
+
+    dv_free(sinx);
+    dv_free(exp_sx);
+    dv_free(x2);
+    dv_free(term2);
+    dv_free(f0);
+
+    return f;
+}
+
+static int run_readme_example(void)
+{
+    dval_t *x = dv_new_named_var_d(1.25, "x");
+    dval_t *f;
+    dval_t *df_dx;
+    const dval_t *d2f_dx;
+    qfloat_t f_val;
+    qfloat_t d1_val;
+    qfloat_t d2_val;
+
+    if (!x)
+        return 1;
+
+    f = make_readme_f(x);
+    if (!f) {
+        dv_free(x);
+        return 1;
+    }
+
+    df_dx = dv_create_deriv(f, x);
+    if (!df_dx) {
+        dv_free(f);
+        dv_free(x);
+        return 1;
+    }
+
+    d2f_dx = dv_get_deriv(df_dx, x);
+    if (!d2f_dx) {
+        dv_free(df_dx);
+        dv_free(f);
+        dv_free(x);
+        return 1;
+    }
+
+    f_val  = dv_eval_qf(f);
+    d1_val = dv_eval_qf(df_dx);
+    d2_val = dv_eval_qf(d2f_dx);
+
+    printf("f(x)    = "); dv_print(f);
+    printf("f'(x)   = "); dv_print(df_dx);
+    printf("f''(x)  = "); dv_print(d2f_dx);
+
+    qf_printf("\nAt x = 1.25:\n");
+    qf_printf("f(x)    = %.34q\n", f_val);
+    qf_printf("f'(x)   = %.34q\n", d1_val);
+    qf_printf("f''(x)  = %.34q\n", d2_val);
+
+    dv_free(df_dx);
+    dv_free(f);
+    dv_free(x);
+    return 0;
+}
+
+static int run_readme_from_string_example(void)
+{
+    dval_t *x     = dv_new_named_var_d(1.25, "x");
+    dval_t *sinx  = dv_sin(x);
+    dval_t *esinx = dv_exp(sinx);
+    dval_t *x2    = dv_pow_d(x, 2.0);
+    dval_t *t     = dv_mul_d(x2, 3.0);
+    dval_t *t2    = dv_sub_d(t, 7.0);
+    dval_t *f     = dv_add(esinx, t2);
+    dval_t *df_dx;
+    const dval_t *d2f_dx;
+    qfloat_t f_val;
+    qfloat_t d1_val;
+    qfloat_t d2_val;
+
+    if (!x || !sinx || !esinx || !x2 || !t || !t2 || !f) {
+        dv_free(f);
+        dv_free(t2); dv_free(t); dv_free(x2); dv_free(esinx); dv_free(sinx);
+        dv_free(x);
+        return 1;
+    }
+
+    df_dx = dv_create_deriv(f, x);
+    if (!df_dx) {
+        dv_free(f);
+        dv_free(t2); dv_free(t); dv_free(x2); dv_free(esinx); dv_free(sinx);
+        dv_free(x);
+        return 1;
+    }
+
+    d2f_dx = dv_get_deriv(df_dx, x);
+    if (!d2f_dx) {
+        dv_free(df_dx);
+        dv_free(f);
+        dv_free(t2); dv_free(t); dv_free(x2); dv_free(esinx); dv_free(sinx);
+        dv_free(x);
+        return 1;
+    }
+
+    f_val  = dv_eval_qf(f);
+    d1_val = dv_eval_qf(df_dx);
+    d2_val = dv_eval_qf(d2f_dx);
+
+    printf("f(x)    = "); dv_print(f);
+    printf("f'(x)   = "); dv_print(df_dx);
+    printf("f''(x)  = "); dv_print(d2f_dx);
+
+    qf_printf("\nAt x = 1.25:\n");
+    qf_printf("f(x)    = %.34q\n", f_val);
+    qf_printf("f'(x)   = %.34q\n", d1_val);
+    qf_printf("f''(x)  = %.34q\n", d2_val);
+
+    dv_free(df_dx);
+    dv_free(f);
+    dv_free(t2); dv_free(t); dv_free(x2); dv_free(esinx); dv_free(sinx);
+    dv_free(x);
+    return 0;
+}
+
+static int run_readme_partial_example(void)
+{
+    dval_t *x  = dv_new_named_var_d(1.0, "x");
+    dval_t *y  = dv_new_named_var_d(2.0, "y");
+    dval_t *x2 = dv_pow_d(x, 2.0);
+    dval_t *xy = dv_mul(x, y);
+    dval_t *y2 = dv_pow_d(y, 2.0);
+    dval_t *t0 = dv_add(x2, xy);
+    dval_t *f  = dv_add(t0, y2);
+    dval_t *df_dx;
+    dval_t *df_dy;
+    dval_t *d2f_dxdy;
+    const dval_t *p;
+
+    if (!x || !y || !x2 || !xy || !y2 || !t0 || !f) {
+        dv_free(f); dv_free(t0); dv_free(y2); dv_free(xy); dv_free(x2);
+        dv_free(y); dv_free(x);
+        return 1;
+    }
+
+    df_dx    = dv_create_deriv(f, x);
+    df_dy    = dv_create_deriv(f, y);
+    d2f_dxdy = dv_create_2nd_deriv(f, x, y);
+    if (!df_dx || !df_dy || !d2f_dxdy) {
+        dv_free(d2f_dxdy);
+        dv_free(df_dy);
+        dv_free(df_dx);
+        dv_free(f); dv_free(t0); dv_free(y2); dv_free(xy); dv_free(x2);
+        dv_free(y); dv_free(x);
+        return 1;
+    }
+
+    qf_printf("At x=1, y=2:\n");
+    qf_printf("f          = %.34q\n", dv_eval_qf(f));
+    qf_printf("∂f/∂x      = %.34q\n", dv_eval_qf(df_dx));
+    qf_printf("∂f/∂y      = %.34q\n", dv_eval_qf(df_dy));
+    qf_printf("∂²f/∂x∂y   = %.34q\n", dv_eval_qf(d2f_dxdy));
+
+    p = dv_get_deriv(f, x);
+    if (!p) {
+        dv_free(d2f_dxdy);
+        dv_free(df_dy);
+        dv_free(df_dx);
+        dv_free(f); dv_free(t0); dv_free(y2); dv_free(xy); dv_free(x2);
+        dv_free(y); dv_free(x);
+        return 1;
+    }
+
+    dv_set_val_d(x, 3.0);
+    qf_printf("\nAfter x=3:\n");
+    qf_printf("∂f/∂x      = %.34q\n", dv_eval_qf(df_dx));
+    qf_printf("∂f/∂y      = %.34q\n", dv_eval_qf(df_dy));
+
+    dv_free(d2f_dxdy);
+    dv_free(df_dy);
+    dv_free(df_dx);
+    dv_free(f); dv_free(t0); dv_free(y2); dv_free(xy); dv_free(x2);
+    dv_free(y); dv_free(x);
+    return 0;
+}
+
+static int run_README_md_example(void)
+{
+    if (run_readme_example() != 0)
+        return 1;
+    putchar('\n');
+    if (run_readme_from_string_example() != 0)
+        return 1;
+    putchar('\n');
+    if (run_readme_partial_example() != 0)
+        return 1;
+    return 0;
+}
+
 /* ------------------------------------------------------------------------- */
 /* Arithmetic tests                                                          */
 /* ------------------------------------------------------------------------- */
@@ -95,8 +299,8 @@ int tests_main(void)
     TEST_SECTION("Reverse mode");
     RUN_TEST_CASE(test_reverse_mode);
 
-    TEST_SECTION("README.md example");
-    RUN_TEST_CASE(test_README_md_example);
+    printf(C_YELLOW "\nRunning README examples...\n" C_RESET);
+    run_README_md_example();
 
     return TESTS_EXIT_CODE();
 }

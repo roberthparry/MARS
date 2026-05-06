@@ -25,7 +25,6 @@ void test_partial_derivatives(void);
 void test_dval_pattern_helpers(void);
 void test_runtime_regressions(void);
 void test_reverse_mode(void);
-void test_README_md_example(void);
 
 void test_to_string_all(void);
 void test_expressions(void);

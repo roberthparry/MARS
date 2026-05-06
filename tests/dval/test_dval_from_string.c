@@ -357,13 +357,13 @@ static void test_from_string_implicit_symbolic_bindings(void)
     }
 
     if (gamma_alias && gamma_as &&
-        str_eq(gamma_as, "{ γ | γ = 0.5772156649015328606065120900820167 }")) {
+        str_eq(gamma_as, "{ γ | γ = 0.5772156649015328606065120900824012 }")) {
         to_string_pass("implicit @gamma constant inference", gamma_as,
-                       "{ γ | γ = 0.5772156649015328606065120900820167 }");
+                       "{ γ | γ = 0.5772156649015328606065120900824012 }");
     } else {
         to_string_fail(__FILE__, __LINE__, 1, "implicit @gamma constant inference",
                        gamma_as ? gamma_as : "(null)",
-                       "{ γ | γ = 0.5772156649015328606065120900820167 }");
+                       "{ γ | γ = 0.5772156649015328606065120900824012 }");
     }
 
     if (tau_alias && tau_as && str_eq(tau_as, "{ τ | τ = NAN }")) {
