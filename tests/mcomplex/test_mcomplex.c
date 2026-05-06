@@ -6,7 +6,7 @@
 #include "mcomplex.h"
 
 #ifndef TEST_MCOMPLEX_MATHS_PRECISION
-#define TEST_MCOMPLEX_MATHS_PRECISION 1024u
+#define TEST_MCOMPLEX_MATHS_PRECISION 256u
 #endif
 
 #define TEST_CONFIG_MODE TEST_CONFIG_GLOBAL
@@ -1771,6 +1771,32 @@ static void test_difficult_mcomplex_cases(void)
     mc_free(z);
 }
 
+static int run_README_md_example(void)
+{
+    mcomplex_t *z;
+    char buf[256];
+    size_t saved_default_digits;
+
+    saved_default_digits = mf_get_default_precision_digits();
+    mf_set_default_precision_digits(50);
+    z = mc_create_string("1 + 1i");
+    if (!z)
+        return 1;
+
+    if (mc_exp(z) != 0) {
+        mc_free(z);
+        mf_set_default_precision_digits(saved_default_digits);
+        return 1;
+    }
+
+    mc_sprintf(buf, sizeof(buf), "%mz", z);
+    printf("exp(1 + i) = %s\n", buf);
+
+    mc_free(z);
+    mf_set_default_precision_digits(saved_default_digits);
+    return 0;
+}
+
 int tests_main(void)
 {
     size_t saved_default = mf_get_default_precision();
@@ -1784,6 +1810,10 @@ int tests_main(void)
     RUN_TEST_CASE(test_real_special_replacements);
     RUN_TEST_CASE(test_special_functions);
     RUN_TEST_CASE(test_difficult_mcomplex_cases);
+
+    printf(C_YELLOW "\nRunning README example...\n" C_RESET);
+    run_README_md_example();
+
     ASSERT_EQ_INT(mf_set_default_precision(saved_default), 0);
     return 0;
 }

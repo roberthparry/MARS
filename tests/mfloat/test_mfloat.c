@@ -1611,28 +1611,6 @@ void test_remaining_special_mfloat_functions(void)
     ASSERT_EQ_INT(mf_set_default_precision(saved_default), 0);
 }
 
-void readme_examples(void)
-{
-    size_t saved_default = mf_get_default_precision();
-    mfloat_t *x = NULL;
-    mfloat_t *y = NULL;
-    char buf[256];
-
-    mf_set_default_precision(256u);
-    x = mf_create_string("2.3");
-    y = mf_create_string("2.3");
-
-    if (x && mf_gamma(x) == 0 && mf_sprintf(buf, sizeof(buf), "%.77mf", x) >= 0)
-        printf("gamma(2.3)  = %s\n", buf);
-
-    if (y && mf_lgamma(y) == 0 && mf_sprintf(buf, sizeof(buf), "%.77mf", y) >= 0)
-        printf("lgamma(2.3) = %s\n", buf);
-
-    mf_free(x);
-    mf_free(y);
-    mf_set_default_precision(saved_default);
-}
-
 void test_difficult_mfloat_cases(void)
 {
     mfloat_t *x = NULL;
@@ -1719,6 +1697,32 @@ void test_difficult_mfloat_cases(void)
     mf_free(tmp);
 }
 
+static int readme_example(void)
+{
+    mfloat_t *x;
+    mfloat_t *y;
+    char buf[256];
+
+    mf_set_default_precision(256);
+    x = mf_create_string("2.3");
+    y = mf_create_string("2.3");
+    if (!x || !y)
+        return 1;
+
+    if (mf_gamma(x) != 0 || mf_lgamma(y) != 0)
+        return 1;
+
+    mf_sprintf(buf, sizeof(buf), "%.77mf", x);
+    printf("gamma(2.3)  = %s\n", buf);
+
+    mf_sprintf(buf, sizeof(buf), "%.77mf", y);
+    printf("lgamma(2.3) = %s\n", buf);
+
+    mf_free(x);
+    mf_free(y);
+    return 0;
+}
+
 int tests_main(void)
 {
     RUN_TEST_CASE(test_new_and_precision);
@@ -1735,8 +1739,8 @@ int tests_main(void)
     RUN_TEST_CASE(test_remaining_special_mfloat_functions);
     RUN_TEST_CASE(test_difficult_mfloat_cases);
 
-    printf(C_YELLOW "\nRunning README examples...\n" C_RESET);
-    readme_examples();
+    printf(C_YELLOW "\nRunning README example...\n" C_RESET);
+    readme_example();
 
     return 0;
 }
