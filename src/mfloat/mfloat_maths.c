@@ -2061,17 +2061,26 @@ cleanup:
 static int mfloat_sincos_kernel_pair(mfloat_t *sin_dst, mfloat_t *cos_dst,
                                      const mfloat_t *x, size_t precision)
 {
-    mfloat_t *sin_sum = NULL, *sin_term = NULL, *cos_sum = NULL, *cos_term = NULL, *r2 = NULL;
+    mfloat_scratch_slot_t slots[5];
+    mfloat_t *sin_sum, *sin_term, *cos_sum, *cos_term, *r2;
     long n;
     int rc = -1;
     size_t out_prec = precision - MFLOAT_CONST_GUARD_BITS;
+    size_t i;
 
-    sin_sum = mfloat_clone_prec(x, precision);
-    sin_term = mfloat_clone_prec(x, precision);
-    cos_sum = mfloat_clone_prec(MF_ONE, precision);
-    cos_term = mfloat_clone_prec(MF_ONE, precision);
-    r2 = mfloat_clone_prec(x, precision);
-    if (!sin_sum || !sin_term || !cos_sum || !cos_term || !r2)
+    for (i = 0; i < 5u; ++i)
+        mfloat_scratch_init_slot(&slots[i], precision);
+    sin_sum = &slots[0].value;
+    sin_term = &slots[1].value;
+    cos_sum = &slots[2].value;
+    cos_term = &slots[3].value;
+    r2 = &slots[4].value;
+
+    if (mfloat_scratch_copy(sin_sum, x) != 0 ||
+        mfloat_scratch_copy(sin_term, x) != 0 ||
+        mfloat_scratch_copy(r2, x) != 0 ||
+        mfloat_scratch_copy(cos_sum, MF_ONE) != 0 ||
+        mfloat_scratch_copy(cos_term, MF_ONE) != 0)
         goto cleanup;
     if (mf_mul(r2, x) != 0)
         goto cleanup;
@@ -2115,11 +2124,8 @@ static int mfloat_sincos_kernel_pair(mfloat_t *sin_dst, mfloat_t *cos_dst,
     rc = 0;
 
 cleanup:
-    mf_free(sin_sum);
-    mf_free(sin_term);
-    mf_free(cos_sum);
-    mf_free(cos_term);
-    mf_free(r2);
+    for (i = 0; i < 5u; ++i)
+        mfloat_scratch_release_slot(&slots[i]);
     return rc;
 }
 
@@ -2154,19 +2160,21 @@ static int mfloat_abs_eq(const mfloat_t *a, const mfloat_t *b)
 
 static int mfloat_sincos_pair(mfloat_t *sin_dst, mfloat_t *cos_dst, const mfloat_t *x, size_t precision)
 {
+    mfloat_scratch_slot_t slots[2];
     mfloat_t *r = NULL;
     int quadrant;
     int rc = -1;
-    mfloat_t *sin_tmp = NULL, *cos_tmp = NULL;
+    mfloat_t *sin_tmp, *cos_tmp;
+    size_t i;
 
     if (!sin_dst || !cos_dst || !x)
         return -1;
     if (mfloat_reduce_trig_argument(x, precision, &r, &quadrant) != 0)
         goto cleanup;
-    sin_tmp = mfloat_clone_prec(MF_ZERO, precision);
-    cos_tmp = mfloat_clone_prec(MF_ZERO, precision);
-    if (!sin_tmp || !cos_tmp)
-        goto cleanup;
+    for (i = 0; i < 2u; ++i)
+        mfloat_scratch_init_slot(&slots[i], precision);
+    sin_tmp = &slots[0].value;
+    cos_tmp = &slots[1].value;
     if (mfloat_sincos_kernel_pair(sin_tmp, cos_tmp, r, precision) != 0)
         goto cleanup;
     switch (quadrant & 3) {
@@ -2203,8 +2211,8 @@ static int mfloat_sincos_pair(mfloat_t *sin_dst, mfloat_t *cos_dst, const mfloat
 
 cleanup:
     mf_free(r);
-    mf_free(sin_tmp);
-    mf_free(cos_tmp);
+    for (i = 0; i < 2u; ++i)
+        mfloat_scratch_release_slot(&slots[i]);
     return rc;
 }
 
@@ -2261,8 +2269,10 @@ cleanup:
 int mf_sincos(const mfloat_t *x, mfloat_t *sin_out, mfloat_t *cos_out)
 {
     size_t sin_prec, cos_prec, work_prec;
-    mfloat_t *sin_tmp = NULL, *cos_tmp = NULL;
+    mfloat_scratch_slot_t slots[2];
+    mfloat_t *sin_tmp, *cos_tmp;
     int rc = -1;
+    size_t i;
 
     if (!sin_out || !cos_out || !x || sin_out == cos_out)
         return -1;
@@ -2282,10 +2292,10 @@ int mf_sincos(const mfloat_t *x, mfloat_t *sin_out, mfloat_t *cos_out)
     work_prec = sin_prec > cos_prec ? sin_prec : cos_prec;
     work_prec = mfloat_transcendental_work_prec(work_prec);
 
-    sin_tmp = mfloat_clone_prec(MF_ZERO, work_prec);
-    cos_tmp = mfloat_clone_prec(MF_ZERO, work_prec);
-    if (!sin_tmp || !cos_tmp)
-        goto cleanup;
+    for (i = 0; i < 2u; ++i)
+        mfloat_scratch_init_slot(&slots[i], work_prec);
+    sin_tmp = &slots[0].value;
+    cos_tmp = &slots[1].value;
 
     if (mfloat_sincos_pair(sin_tmp, cos_tmp, x, work_prec) != 0)
         goto cleanup;
@@ -2296,16 +2306,18 @@ int mf_sincos(const mfloat_t *x, mfloat_t *sin_out, mfloat_t *cos_out)
     rc = 0;
 
 cleanup:
-    mf_free(sin_tmp);
-    mf_free(cos_tmp);
+    for (i = 0; i < 2u; ++i)
+        mfloat_scratch_release_slot(&slots[i]);
     return rc;
 }
 
 int mf_sinhcosh(const mfloat_t *x, mfloat_t *sinh_out, mfloat_t *cosh_out)
 {
     size_t sinh_prec, cosh_prec, work_prec;
-    mfloat_t *sinh_tmp = NULL, *cosh_tmp = NULL;
+    mfloat_scratch_slot_t slots[2];
+    mfloat_t *sinh_tmp, *cosh_tmp;
     int rc = -1;
+    size_t i;
 
     if (!x || !sinh_out || !cosh_out || sinh_out == cosh_out)
         return -1;
@@ -2326,10 +2338,10 @@ int mf_sinhcosh(const mfloat_t *x, mfloat_t *sinh_out, mfloat_t *cosh_out)
     work_prec = sinh_prec > cosh_prec ? sinh_prec : cosh_prec;
     work_prec = mfloat_cap_work_prec(mfloat_transcendental_work_prec(work_prec));
 
-    sinh_tmp = mfloat_clone_prec(MF_ZERO, work_prec);
-    cosh_tmp = mfloat_clone_prec(MF_ZERO, work_prec);
-    if (!sinh_tmp || !cosh_tmp)
-        goto cleanup;
+    for (i = 0; i < 2u; ++i)
+        mfloat_scratch_init_slot(&slots[i], work_prec);
+    sinh_tmp = &slots[0].value;
+    cosh_tmp = &slots[1].value;
     if (mfloat_sinhcosh_pair(sinh_tmp, cosh_tmp, x, work_prec) != 0)
         goto cleanup;
     if (mfloat_finish_result(sinh_out, sinh_tmp, sinh_prec) != 0 ||
@@ -2339,8 +2351,8 @@ int mf_sinhcosh(const mfloat_t *x, mfloat_t *sinh_out, mfloat_t *cosh_out)
     rc = 0;
 
 cleanup:
-    mf_free(sinh_tmp);
-    mf_free(cosh_tmp);
+    for (i = 0; i < 2u; ++i)
+        mfloat_scratch_release_slot(&slots[i]);
     return rc;
 }
 
@@ -3209,8 +3221,10 @@ cleanup:
 int mf_tan(mfloat_t *mfloat)
 {
     size_t precision, work_prec;
-    mfloat_t *x = NULL, *s = NULL, *c = NULL;
+    mfloat_scratch_slot_t slots[2];
+    mfloat_t *s, *c;
     int rc = -1;
+    size_t i;
 
     if (!mfloat)
         return -1;
@@ -3236,21 +3250,19 @@ int mf_tan(mfloat_t *mfloat)
     }
 
     work_prec = mfloat_transcendental_work_prec(precision);
-    x = mfloat_clone_prec(mfloat, work_prec);
-    s = mfloat_clone_prec(MF_ZERO, work_prec);
-    c = mfloat_clone_prec(MF_ZERO, work_prec);
-    if (!x || !s || !c)
-        goto cleanup;
-    if (mfloat_sincos_pair(s, c, x, work_prec) != 0)
+    for (i = 0; i < 2u; ++i)
+        mfloat_scratch_init_slot(&slots[i], work_prec);
+    s = &slots[0].value;
+    c = &slots[1].value;
+    if (mfloat_sincos_pair(s, c, mfloat, work_prec) != 0)
         goto cleanup;
     if (mf_div(s, c) != 0)
         goto cleanup;
     rc = mfloat_finish_result(mfloat, s, precision);
 
 cleanup:
-    mf_free(x);
-    mf_free(s);
-    mf_free(c);
+    for (i = 0; i < 2u; ++i)
+        mfloat_scratch_release_slot(&slots[i]);
     return rc;
 }
 
@@ -3649,8 +3661,10 @@ cleanup:
 int mf_sinh(mfloat_t *mfloat)
 {
     size_t precision, work_prec;
-    mfloat_t *sinh_tmp = NULL, *cosh_tmp = NULL;
+    mfloat_scratch_slot_t slots[2];
+    mfloat_t *sinh_tmp, *cosh_tmp;
     int rc = -1;
+    size_t i;
 
     if (!mfloat)
         return -1;
@@ -3662,25 +3676,27 @@ int mf_sinh(mfloat_t *mfloat)
     precision = mfloat->precision;
     work_prec = mfloat_cap_work_prec(mfloat_transcendental_work_prec(precision));
 
-    sinh_tmp = mfloat_clone_prec(MF_ZERO, work_prec);
-    cosh_tmp = mfloat_clone_prec(MF_ZERO, work_prec);
-    if (!sinh_tmp || !cosh_tmp)
-        goto cleanup;
+    for (i = 0; i < 2u; ++i)
+        mfloat_scratch_init_slot(&slots[i], work_prec);
+    sinh_tmp = &slots[0].value;
+    cosh_tmp = &slots[1].value;
     if (mfloat_sinhcosh_pair(sinh_tmp, cosh_tmp, mfloat, work_prec) != 0)
         goto cleanup;
     rc = mfloat_finish_result(mfloat, sinh_tmp, precision);
 
 cleanup:
-    mf_free(sinh_tmp);
-    mf_free(cosh_tmp);
+    for (i = 0; i < 2u; ++i)
+        mfloat_scratch_release_slot(&slots[i]);
     return rc;
 }
 
 int mf_cosh(mfloat_t *mfloat)
 {
     size_t precision, work_prec;
-    mfloat_t *sinh_tmp = NULL, *cosh_tmp = NULL;
+    mfloat_scratch_slot_t slots[2];
+    mfloat_t *sinh_tmp, *cosh_tmp;
     int rc = -1;
+    size_t i;
 
     if (!mfloat)
         return -1;
@@ -3692,17 +3708,17 @@ int mf_cosh(mfloat_t *mfloat)
     precision = mfloat->precision;
     work_prec = mfloat_cap_work_prec(mfloat_transcendental_work_prec(precision));
 
-    sinh_tmp = mfloat_clone_prec(MF_ZERO, work_prec);
-    cosh_tmp = mfloat_clone_prec(MF_ZERO, work_prec);
-    if (!sinh_tmp || !cosh_tmp)
-        goto cleanup;
+    for (i = 0; i < 2u; ++i)
+        mfloat_scratch_init_slot(&slots[i], work_prec);
+    sinh_tmp = &slots[0].value;
+    cosh_tmp = &slots[1].value;
     if (mfloat_sinhcosh_pair(sinh_tmp, cosh_tmp, mfloat, work_prec) != 0)
         goto cleanup;
     rc = mfloat_finish_result(mfloat, cosh_tmp, precision);
 
 cleanup:
-    mf_free(sinh_tmp);
-    mf_free(cosh_tmp);
+    for (i = 0; i < 2u; ++i)
+        mfloat_scratch_release_slot(&slots[i]);
     return rc;
 }
 

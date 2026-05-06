@@ -326,19 +326,32 @@ Current sample results from that command on this tree, measured on:
 - `Intel(R) Core(TM) i7-4510U CPU @ 2.00GHz`
 - `4` logical CPUs
 
-Results:
+Results with genuinely complex inputs:
 
-| Case | Avg |
-|---|---:|
-| `mc_exp(1+i)` at `512` bits | `12.014 µs` |
-| `mc_log(1+i)` at `512` bits | `17.694 µs` |
-| `mc_productlog(1+i)` at `512` bits | `92.528 ms` |
-| `mc_ei(1+i)` at `512` bits | `59.575 µs` |
-| `mc_e1(1+i)` at `512` bits | `56.693 µs` |
+| Case | `256` bits | `512` bits | `768` bits | `1024` bits |
+|---|---:|---:|---:|---:|
+| `mc_exp(0.567 + 0.321i)` | `136.878 ms` | `89.493 ms` | `230.703 ms` | `275.844 ms` |
+| `mc_log(0.567 + 0.321i)` | `5.596 ms` | `16.197 ms` | `23.095 ms` | `51.885 ms` |
+| `mc_sin(0.567 + 0.321i)` | `0.027 ms` | `0.016 ms` | `0.016 ms` | `0.016 ms` |
+| `mc_cos(0.567 + 0.321i)` | `0.022 ms` | `0.017 ms` | `0.017 ms` | `0.016 ms` |
+| `mc_tan(0.567 + 0.321i)` | `0.032 ms` | `0.023 ms` | `0.023 ms` | `0.023 ms` |
+| `mc_atan(0.567 + 0.321i)` | `0.023 ms` | `0.017 ms` | `0.017 ms` | `0.017 ms` |
+| `mc_asin(0.7 + 0.2i)` | `1.713 ms` | `0.016 ms` | `0.020 ms` | `0.016 ms` |
+| `mc_acos(0.7 + 0.2i)` | `0.025 ms` | `0.017 ms` | `0.016 ms` | `0.016 ms` |
+| `mc_atan2(0.5 + 0.25i, -0.75 + 0.1i)` | `0.033 ms` | `0.023 ms` | `0.023 ms` | `0.039 ms` |
+| `mc_sinh(0.567 + 0.321i)` | `0.023 ms` | `0.016 ms` | `0.016 ms` | `0.017 ms` |
+| `mc_cosh(0.567 + 0.321i)` | `0.020 ms` | `0.016 ms` | `0.016 ms` | `0.016 ms` |
+| `mc_tanh(0.567 + 0.321i)` | `0.031 ms` | `0.033 ms` | `0.023 ms` | `0.023 ms` |
+| `mc_asinh(0.5 + 0.25i)` | `0.057 ms` | `0.016 ms` | `0.017 ms` | `0.017 ms` |
+| `mc_acosh(2 + 0.5i)` | `0.034 ms` | `0.020 ms` | `0.020 ms` | `0.020 ms` |
+| `mc_atanh(0.5 + 0.25i)` | `0.013 ms` | `0.013 ms` | `0.013 ms` | `0.013 ms` |
+| `mc_gamma(1.5 + 0.7i)` | not yet published | not yet published | not yet published | not yet published |
+| `mc_lgamma(1.5 + 0.7i)` | not yet published | not yet published | not yet published | not yet published |
+| `mc_lambert_w0(1 + 1i)` | not yet published | not yet published | not yet published | not yet published |
+| `mc_lambert_wm1(-0.2 - 0.1i)` | not yet published | not yet published | not yet published | not yet published |
+| `mc_productlog(1 + 1i)` | not yet published | not yet published | not yet published | not yet published |
 
-These are the current complex hot-path checkpoints from this optimisation
-phase. The benchmark target still covers pure-real `mc_gamma(2.3 + 0i)` and
-`mc_lgamma(2.3 + 0i)` as apples-to-apples comparisons with `mfloat`; we will
-refresh those published rows again after the next gamma-family pass.
+Most of these genuinely complex rows still exercise the current `qcomplex`
+fallback path rather than a native multiprecision complex implementation.
 
 For broader benchmark notes, see [`docs/benchmarks.md`](benchmarks.md).

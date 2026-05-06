@@ -150,7 +150,6 @@ static int mcomplex_apply_real_binary(mcomplex_t *mcomplex,
                                       const mcomplex_t *other,
                                       int (*fn)(mfloat_t *, const mfloat_t *))
 {
-    mfloat_t *other_real = NULL;
     size_t precision_bits;
     int rc;
 
@@ -161,13 +160,7 @@ static int mcomplex_apply_real_binary(mcomplex_t *mcomplex,
     if (mcomplex_ensure_mutable(mcomplex) != 0)
         return -1;
     precision_bits = mc_get_precision(mcomplex);
-
-    other_real = mf_clone(mc_real(other));
-    if (!other_real)
-        return -1;
-
-    rc = fn(mcomplex->real, other_real);
-    mf_free(other_real);
+    rc = fn(mcomplex->real, mc_real(other));
     if (rc != 0)
         return -1;
 
@@ -183,8 +176,6 @@ static int mcomplex_apply_real_ternary(mcomplex_t *mcomplex,
                                        const mcomplex_t *b,
                                        int (*fn)(mfloat_t *, const mfloat_t *, const mfloat_t *))
 {
-    mfloat_t *a_real = NULL;
-    mfloat_t *b_real = NULL;
     size_t precision_bits;
     int rc;
 
@@ -195,18 +186,7 @@ static int mcomplex_apply_real_ternary(mcomplex_t *mcomplex,
     if (mcomplex_ensure_mutable(mcomplex) != 0)
         return -1;
     precision_bits = mc_get_precision(mcomplex);
-
-    a_real = mf_clone(mc_real(a));
-    b_real = mf_clone(mc_real(b));
-    if (!a_real || !b_real) {
-        mf_free(a_real);
-        mf_free(b_real);
-        return -1;
-    }
-
-    rc = fn(mcomplex->real, a_real, b_real);
-    mf_free(a_real);
-    mf_free(b_real);
+    rc = fn(mcomplex->real, mc_real(a), mc_real(b));
     if (rc != 0)
         return -1;
 
@@ -352,6 +332,99 @@ fail:
     mc_free(numer);
     mc_free(exp_w);
     return -1;
+}
+
+static size_t mcomplex_native_work_prec(const mcomplex_t *mcomplex)
+{
+    size_t precision_bits = mc_get_precision(mcomplex);
+
+    return precision_bits + 512u;
+}
+
+static int mcomplex_native_sin_cos(mcomplex_t *mcomplex, int want_cos)
+{
+    mcomplex_t *positive = NULL;
+    mcomplex_t *negative = NULL;
+    mcomplex_t *denom = NULL;
+    size_t work_prec;
+    int rc = -1;
+
+    if (!mcomplex)
+        return -1;
+
+    work_prec = mcomplex_native_work_prec(mcomplex);
+    positive = mc_clone(mcomplex);
+    negative = mc_clone(mcomplex);
+    denom = want_cos ? mc_create_long(2) : mc_create_string("0 + 2i");
+    if (!positive || !negative || !denom)
+        goto cleanup;
+
+    if (mc_set_precision(positive, work_prec) != 0 ||
+        mc_set_precision(negative, work_prec) != 0 ||
+        mc_set_precision(denom, work_prec) != 0)
+        goto cleanup;
+
+    if (mc_mul(positive, MC_I) != 0 ||
+        mc_mul(negative, MC_I) != 0 ||
+        mc_neg(negative) != 0 ||
+        mc_exp(positive) != 0 ||
+        mc_exp(negative) != 0)
+        goto cleanup;
+
+    if ((want_cos ? mc_add(positive, negative) : mc_sub(positive, negative)) != 0 ||
+        mc_div(positive, denom) != 0 ||
+        mc_set(mcomplex, mc_real(positive), mc_imag(positive)) != 0)
+        goto cleanup;
+
+    rc = 0;
+
+cleanup:
+    mc_free(denom);
+    mc_free(negative);
+    mc_free(positive);
+    return rc;
+}
+
+static int mcomplex_native_sinh_cosh(mcomplex_t *mcomplex, int want_cosh)
+{
+    mcomplex_t *positive = NULL;
+    mcomplex_t *negative = NULL;
+    mcomplex_t *denom = NULL;
+    size_t work_prec;
+    int rc = -1;
+
+    if (!mcomplex)
+        return -1;
+
+    work_prec = mcomplex_native_work_prec(mcomplex);
+    positive = mc_clone(mcomplex);
+    negative = mc_clone(mcomplex);
+    denom = mc_create_long(2);
+    if (!positive || !negative || !denom)
+        goto cleanup;
+
+    if (mc_set_precision(positive, work_prec) != 0 ||
+        mc_set_precision(negative, work_prec) != 0 ||
+        mc_set_precision(denom, work_prec) != 0)
+        goto cleanup;
+
+    if (mc_neg(negative) != 0 ||
+        mc_exp(positive) != 0 ||
+        mc_exp(negative) != 0)
+        goto cleanup;
+
+    if ((want_cosh ? mc_add(positive, negative) : mc_sub(positive, negative)) != 0 ||
+        mc_div(positive, denom) != 0 ||
+        mc_set(mcomplex, mc_real(positive), mc_imag(positive)) != 0)
+        goto cleanup;
+
+    rc = 0;
+
+cleanup:
+    mc_free(denom);
+    mc_free(negative);
+    mc_free(positive);
+    return rc;
 }
 
 int mc_exp(mcomplex_t *mcomplex)
@@ -518,7 +591,7 @@ int mc_sin(mcomplex_t *mcomplex)
 
     if (rc != -2)
         return rc;
-    return mcomplex_apply_unary(mcomplex, qc_sin);
+    return mcomplex_native_sin_cos(mcomplex, 0);
 }
 
 int mc_cos(mcomplex_t *mcomplex)
@@ -527,25 +600,97 @@ int mc_cos(mcomplex_t *mcomplex)
 
     if (rc != -2)
         return rc;
-    return mcomplex_apply_unary(mcomplex, qc_cos);
+    return mcomplex_native_sin_cos(mcomplex, 1);
 }
 
 int mc_tan(mcomplex_t *mcomplex)
 {
+    mcomplex_t *value = NULL;
+    mcomplex_t *denom = NULL;
+    mcomplex_t *two = NULL;
+    size_t precision_bits;
+    size_t work_prec;
     int rc = mcomplex_apply_real_unary(mcomplex, mf_tan);
 
     if (rc != -2)
         return rc;
-    return mcomplex_apply_unary(mcomplex, qc_tan);
+    precision_bits = mc_get_precision(mcomplex);
+    work_prec = mcomplex_native_work_prec(mcomplex);
+    value = mc_clone(mcomplex);
+    denom = mc_clone(mcomplex);
+    two = mc_create_long(2);
+    if (!value || !denom || !two)
+        return -1;
+    if (mc_set_precision(value, work_prec) != 0 ||
+        mc_set_precision(denom, work_prec) != 0 ||
+        mc_set_precision(two, work_prec) != 0 ||
+        mc_mul(value, MC_I) != 0 ||
+        mc_mul(value, two) != 0 ||
+        mc_exp(value) != 0 ||
+        mc_set(denom, mc_real(value), mc_imag(value)) != 0 ||
+        mc_sub(value, MC_ONE) != 0 ||
+        mc_add(denom, MC_ONE) != 0 ||
+        mc_div(value, denom) != 0 ||
+        mc_mul(value, MC_I) != 0 ||
+        mc_neg(value) != 0 ||
+        mc_set_precision(value, precision_bits) != 0 ||
+        mc_set(mcomplex, mc_real(value), mc_imag(value)) != 0) {
+        mc_free(value);
+        mc_free(two);
+        mc_free(denom);
+        return -1;
+    }
+    mc_free(value);
+    mc_free(two);
+    mc_free(denom);
+    return 0;
 }
 
 int mc_atan(mcomplex_t *mcomplex)
 {
+    mcomplex_t *left = NULL;
+    mcomplex_t *right = NULL;
+    mcomplex_t *two = NULL;
+    size_t precision_bits;
+    size_t work_prec;
     int rc = mcomplex_apply_real_unary(mcomplex, mf_atan);
 
     if (rc != -2)
         return rc;
-    return mcomplex_apply_unary(mcomplex, qc_atan);
+    precision_bits = mc_get_precision(mcomplex);
+    work_prec = mcomplex_native_work_prec(mcomplex);
+    left = mc_clone(mcomplex);
+    right = mc_clone(mcomplex);
+    two = mc_create_long(2);
+    if (!left || !right || !two)
+        goto fail;
+    if (mc_set_precision(left, work_prec) != 0 ||
+        mc_set_precision(right, work_prec) != 0 ||
+        mc_set_precision(two, work_prec) != 0)
+        goto fail;
+    if (mc_mul(left, MC_I) != 0 ||
+        mc_mul(right, MC_I) != 0 ||
+        mc_neg(left) != 0 ||
+        mc_add(left, MC_ONE) != 0 ||
+        mc_add(right, MC_ONE) != 0 ||
+        mc_log(left) != 0 ||
+        mc_log(right) != 0 ||
+        mc_sub(left, right) != 0 ||
+        mc_mul(left, MC_I) != 0 ||
+        mc_div(left, two) != 0 ||
+        mc_set_precision(left, precision_bits) != 0 ||
+        mc_set(mcomplex, mc_real(left), mc_imag(left)) != 0)
+        goto fail;
+    mc_free(two);
+    mc_free(right);
+    mc_free(left);
+    return 0;
+
+fail:
+    mc_free(two);
+    mc_free(right);
+    mc_free(left);
+    return -1;
 }
 
 int mc_atan2(mcomplex_t *mcomplex, const mcomplex_t *other)
@@ -559,20 +704,80 @@ int mc_atan2(mcomplex_t *mcomplex, const mcomplex_t *other)
 
 int mc_asin(mcomplex_t *mcomplex)
 {
+    mcomplex_t *square = NULL;
+    mcomplex_t *iz = NULL;
+    size_t precision_bits;
+    size_t work_prec;
     int rc = mcomplex_apply_real_unary(mcomplex, mf_asin);
 
     if (rc != -2)
         return rc;
-    return mcomplex_apply_unary(mcomplex, qc_asin);
+    precision_bits = mc_get_precision(mcomplex);
+    work_prec = mcomplex_native_work_prec(mcomplex);
+    square = mc_clone(mcomplex);
+    iz = mc_clone(mcomplex);
+    if (!square || !iz)
+        goto fail;
+    if (mc_set_precision(square, work_prec) != 0 ||
+        mc_set_precision(iz, work_prec) != 0)
+        goto fail;
+    if (mc_mul(square, mcomplex) != 0 ||
+        mc_neg(square) != 0 ||
+        mc_add(square, MC_ONE) != 0 ||
+        mc_sqrt(square) != 0 ||
+        mc_mul(iz, MC_I) != 0 ||
+        mc_add(square, iz) != 0 ||
+        mc_log(square) != 0 ||
+        mc_mul(square, MC_I) != 0 ||
+        mc_neg(square) != 0 ||
+        mc_set_precision(square, precision_bits) != 0 ||
+        mc_set(mcomplex, mc_real(square), mc_imag(square)) != 0)
+        goto fail;
+    mc_free(iz);
+    mc_free(square);
+    return 0;
+
+fail:
+    mc_free(iz);
+    mc_free(square);
+    return -1;
 }
 
 int mc_acos(mcomplex_t *mcomplex)
 {
+    mcomplex_t *asin_value = NULL;
+    mcomplex_t *half_pi = NULL;
+    mcomplex_t *two = NULL;
+    size_t work_prec;
     int rc = mcomplex_apply_real_unary(mcomplex, mf_acos);
 
     if (rc != -2)
         return rc;
-    return mcomplex_apply_unary(mcomplex, qc_acos);
+    work_prec = mcomplex_native_work_prec(mcomplex);
+    asin_value = mc_clone(mcomplex);
+    half_pi = mc_clone(MC_PI);
+    two = mc_create_long(2);
+    if (!asin_value || !half_pi || !two)
+        goto fail;
+    if (mc_set_precision(asin_value, work_prec) != 0 ||
+        mc_set_precision(half_pi, work_prec) != 0 ||
+        mc_set_precision(two, work_prec) != 0)
+        goto fail;
+    if (mc_asin(asin_value) != 0 ||
+        mc_div(half_pi, two) != 0 ||
+        mc_sub(half_pi, asin_value) != 0 ||
+        mc_set(mcomplex, mc_real(half_pi), mc_imag(half_pi)) != 0)
+        goto fail;
+    mc_free(two);
+    mc_free(half_pi);
+    mc_free(asin_value);
+    return 0;
+
+fail:
+    mc_free(two);
+    mc_free(half_pi);
+    mc_free(asin_value);
+    return -1;
 }
 
 int mc_sinh(mcomplex_t *mcomplex)
@@ -581,7 +786,7 @@ int mc_sinh(mcomplex_t *mcomplex)
 
     if (rc != -2)
         return rc;
-    return mcomplex_apply_unary(mcomplex, qc_sinh);
+    return mcomplex_native_sinh_cosh(mcomplex, 0);
 }
 
 int mc_cosh(mcomplex_t *mcomplex)
@@ -590,43 +795,172 @@ int mc_cosh(mcomplex_t *mcomplex)
 
     if (rc != -2)
         return rc;
-    return mcomplex_apply_unary(mcomplex, qc_cosh);
+    return mcomplex_native_sinh_cosh(mcomplex, 1);
 }
 
 int mc_tanh(mcomplex_t *mcomplex)
 {
+    mcomplex_t *value = NULL;
+    mcomplex_t *denom = NULL;
+    mcomplex_t *two = NULL;
+    size_t precision_bits;
+    size_t work_prec;
     int rc = mcomplex_apply_real_unary(mcomplex, mf_tanh);
 
     if (rc != -2)
         return rc;
-    return mcomplex_apply_unary(mcomplex, qc_tanh);
+    precision_bits = mc_get_precision(mcomplex);
+    work_prec = mcomplex_native_work_prec(mcomplex);
+    value = mc_clone(mcomplex);
+    denom = mc_clone(mcomplex);
+    two = mc_create_long(2);
+    if (!value || !denom || !two)
+        return -1;
+    if (mc_set_precision(value, work_prec) != 0 ||
+        mc_set_precision(denom, work_prec) != 0 ||
+        mc_set_precision(two, work_prec) != 0 ||
+        mc_mul(value, two) != 0 ||
+        mc_exp(value) != 0 ||
+        mc_set(denom, mc_real(value), mc_imag(value)) != 0 ||
+        mc_sub(value, MC_ONE) != 0 ||
+        mc_add(denom, MC_ONE) != 0 ||
+        mc_div(value, denom) != 0 ||
+        mc_set_precision(value, precision_bits) != 0 ||
+        mc_set(mcomplex, mc_real(value), mc_imag(value)) != 0) {
+        mc_free(value);
+        mc_free(two);
+        mc_free(denom);
+        return -1;
+    }
+    mc_free(value);
+    mc_free(two);
+    mc_free(denom);
+    return 0;
 }
 
 int mc_asinh(mcomplex_t *mcomplex)
 {
+    mcomplex_t *square = NULL;
+    mcomplex_t *orig = NULL;
+    size_t precision_bits;
+    size_t work_prec;
     int rc = mcomplex_apply_real_unary(mcomplex, mf_asinh);
 
     if (rc != -2)
         return rc;
-    return mcomplex_apply_unary(mcomplex, qc_asinh);
+    precision_bits = mc_get_precision(mcomplex);
+    work_prec = mcomplex_native_work_prec(mcomplex);
+    square = mc_clone(mcomplex);
+    orig = mc_clone(mcomplex);
+    if (!square || !orig)
+        goto fail;
+    if (mc_set_precision(square, work_prec) != 0 ||
+        mc_set_precision(orig, work_prec) != 0)
+        goto fail;
+    if (mc_mul(square, mcomplex) != 0 ||
+        mc_add(square, MC_ONE) != 0 ||
+        mc_sqrt(square) != 0 ||
+        mc_add(square, orig) != 0 ||
+        mc_log(square) != 0 ||
+        mc_set_precision(square, precision_bits) != 0 ||
+        mc_set(mcomplex, mc_real(square), mc_imag(square)) != 0)
+        goto fail;
+    mc_free(orig);
+    mc_free(square);
+    return 0;
+
+fail:
+    mc_free(orig);
+    mc_free(square);
+    return -1;
 }
 
 int mc_acosh(mcomplex_t *mcomplex)
 {
+    mcomplex_t *plus = NULL;
+    mcomplex_t *minus = NULL;
+    mcomplex_t *orig = NULL;
+    size_t precision_bits;
+    size_t work_prec;
     int rc = mcomplex_apply_real_unary(mcomplex, mf_acosh);
 
     if (rc != -2)
         return rc;
-    return mcomplex_apply_unary(mcomplex, qc_acosh);
+    precision_bits = mc_get_precision(mcomplex);
+    work_prec = mcomplex_native_work_prec(mcomplex);
+    plus = mc_clone(mcomplex);
+    minus = mc_clone(mcomplex);
+    orig = mc_clone(mcomplex);
+    if (!plus || !minus || !orig)
+        goto fail;
+    if (mc_set_precision(plus, work_prec) != 0 ||
+        mc_set_precision(minus, work_prec) != 0 ||
+        mc_set_precision(orig, work_prec) != 0)
+        goto fail;
+    if (mc_add(plus, MC_ONE) != 0 ||
+        mc_sub(minus, MC_ONE) != 0 ||
+        mc_sqrt(plus) != 0 ||
+        mc_sqrt(minus) != 0 ||
+        mc_mul(plus, minus) != 0 ||
+        mc_add(plus, orig) != 0 ||
+        mc_log(plus) != 0 ||
+        mc_set_precision(plus, precision_bits) != 0 ||
+        mc_set(mcomplex, mc_real(plus), mc_imag(plus)) != 0)
+        goto fail;
+    mc_free(orig);
+    mc_free(minus);
+    mc_free(plus);
+    return 0;
+
+fail:
+    mc_free(orig);
+    mc_free(minus);
+    mc_free(plus);
+    return -1;
 }
 
 int mc_atanh(mcomplex_t *mcomplex)
 {
+    mcomplex_t *plus = NULL;
+    mcomplex_t *minus = NULL;
+    mcomplex_t *two = NULL;
+    size_t precision_bits;
+    size_t work_prec;
     int rc = mcomplex_apply_real_unary(mcomplex, mf_atanh);
 
     if (rc != -2)
         return rc;
-    return mcomplex_apply_unary(mcomplex, qc_atanh);
+    precision_bits = mc_get_precision(mcomplex);
+    work_prec = mcomplex_native_work_prec(mcomplex);
+    plus = mc_clone(mcomplex);
+    minus = mc_clone(mcomplex);
+    two = mc_create_long(2);
+    if (!plus || !minus || !two)
+        goto fail;
+    if (mc_set_precision(plus, work_prec) != 0 ||
+        mc_set_precision(minus, work_prec) != 0 ||
+        mc_set_precision(two, work_prec) != 0)
+        goto fail;
+    if (mc_add(plus, MC_ONE) != 0 ||
+        mc_neg(minus) != 0 ||
+        mc_add(minus, MC_ONE) != 0 ||
+        mc_log(plus) != 0 ||
+        mc_log(minus) != 0 ||
+        mc_sub(plus, minus) != 0 ||
+        mc_div(plus, two) != 0 ||
+        mc_set_precision(plus, precision_bits) != 0 ||
+        mc_set(mcomplex, mc_real(plus), mc_imag(plus)) != 0)
+        goto fail;
+    mc_free(two);
+    mc_free(minus);
+    mc_free(plus);
+    return 0;
+
+fail:
+    mc_free(two);
+    mc_free(minus);
+    mc_free(plus);
+    return -1;
 }
 
 int mc_gamma(mcomplex_t *mcomplex)

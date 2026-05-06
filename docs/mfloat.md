@@ -322,6 +322,7 @@ The dedicated `mfloat` gamma benchmark includes direct `2.3` timing cases at:
 - `256` bits
 - `512` bits
 - `768` bits
+- `1024` bits
 
 alongside the existing half-integer spot checks.
 
@@ -345,14 +346,28 @@ Current sample results from that command on this tree, measured on:
 
 Results:
 
-| Case | `256` bits | `512` bits | `768` bits |
-|---|---:|---:|---:|
-| `mf_exp(1.23456789)` | `6.681 ms` | `38.681 ms` | `630.834 ms` |
-| `mf_log(1.23456789)` | `3.426 ms` | `11.252 ms` | `52.357 ms` |
-| `mf_sin(0.7)` | `11.172 ms` | `17.415 ms` | `256.148 ms` |
-| `mf_asin(0.5)` | `122.371 ms` | `547.263 ms` | `401.761 ms` |
-| `mf_erf(0.5)` | `6.288 µs` | `7.197 µs` | `6.174 µs` |
-| `mf_lambert_w0(1)` | `6.423 µs` | `7.707 µs` | `6.934 µs` |
-| `mf_lambert_wm1(-0.1)` | `11.498 µs` | `8.568 µs` | `7.590 µs` |
+| Case | `256` bits | `512` bits | `768` bits | `1024` bits |
+|---|---:|---:|---:|---:|
+| `mf_exp(1.23456789)` | `12.206 ms` | `55.345 ms` | `144.914 ms` | `66.627 ms` |
+| `mf_log(1.23456789)` | `1.473 ms` | `10.830 ms` | `23.519 ms` | `21.242 ms` |
+| `mf_gamma(2.3)` | `298.908 ms` | `3285.926 ms` | `3278.650 ms` | `6609.226 ms` |
+| `mf_lgamma(2.3)` | `176.754 ms` | `2305.999 ms` | `4022.024 ms` | `6546.156 ms` |
+| `mf_sin(0.567)` | `3.921 ms` | `10.509 ms` | `6.129 ms` | `15.347 ms` |
+| `mf_cos(0.567)` | `1.671 ms` | `3.549 ms` | `10.621 ms` | `13.791 ms` |
+| `mf_sincos(0.567)` | `5.477 ms` | `13.407 ms` | `21.026 ms` | `31.081 ms` |
+| `mf_tan(0.567)` | `5.473 ms` | `13.464 ms` | `20.653 ms` | `31.333 ms` |
+| `mf_atan(0.567)` | `1.405 ms` | `4.187 ms` | `6.599 ms` | `12.357 ms` |
+| `mf_asin(0.7)` | `9.595 ms` | `28.729 ms` | `22.993 ms` | `41.093 ms` |
+| `mf_acos(0.7)` | `9.454 ms` | `28.016 ms` | `25.840 ms` | `41.913 ms` |
+| `mf_atan2(0.5,-0.75)` | `1.290 ms` | `2.988 ms` | `5.517 ms` | `7.979 ms` |
+| `mf_sinh(0.567)` | `2.707 ms` | `31.006 ms` | `46.078 ms` | `28.592 ms` |
+| `mf_cosh(0.567)` | `2.691 ms` | `31.319 ms` | `55.356 ms` | `26.099 ms` |
+| `mf_sinhcosh(0.567)` | `2.729 ms` | `31.227 ms` | `45.093 ms` | `29.027 ms` |
+| `mf_tanh(0.567)` | `2.780 ms` | `28.795 ms` | `42.010 ms` | `27.506 ms` |
+| `mf_asinh(0.5)` | `25.673 ms` | `99.624 ms` | `78.158 ms` | `97.909 ms` |
+| `mf_acosh(2)` | `17.533 ms` | `112.606 ms` | `41.953 ms` | `52.077 ms` |
+| `mf_atanh(0.5)` | `1.991 ms` | `9.501 ms` | `8.072 ms` | `7.171 ms` |
+| `mf_lambert_w0(1)` | `8.420 µs` | `8.199 µs` | `5.168 µs` | `4.916 µs` |
+| `mf_lambert_wm1(-0.1)` | `12.057 µs` | `9.809 µs` | `8.578 µs` | `10.370 µs` |
 
 For broader benchmark notes, see [`docs/benchmarks.md`](benchmarks.md).

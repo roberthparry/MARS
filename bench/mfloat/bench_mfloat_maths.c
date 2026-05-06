@@ -468,7 +468,7 @@ int main(void)
 {
     puts("== mfloat native math bench ==");
     puts("Scale iterations with MARS_BENCH_SCALE=<n> if you want longer runs.");
-        puts("Limit to one section with MARS_BENCH_SECTION=constants|elem256|triage256|special256|selected512|selected768.");
+    puts("Limit to one section with MARS_BENCH_SECTION=constants|elem256|triage256|special256|selected512|selected768|selected1024.");
     puts("Filter individual cases with MARS_BENCH_FILTER=<substring>.");
 
     if (bench_wants_section("constants")) {
@@ -488,7 +488,7 @@ int main(void)
         run_unary_case("exp_256", "1.23456789", 256u, mf_exp, bench_scaled_iters(8));
         run_unary_case("log_256", "1.23456789", 256u, mf_log, bench_scaled_iters(8));
         run_unary_case("sqrt_256", "2.25", 256u, mf_sqrt, bench_scaled_iters(8));
-        run_unary_case("sin_256", "0.7", 256u, mf_sin, bench_scaled_iters(8));
+        run_unary_case("sin_256", "0.567", 256u, mf_sin, bench_scaled_iters(8));
         run_unary_case("cos_256", "0.7", 256u, mf_cos, bench_scaled_iters(8));
         run_sincos_case("sincos_256", "0.7", 256u, bench_scaled_iters(6));
         run_unary_case("tan_256", "0.7", 256u, mf_tan, bench_scaled_iters(6));
@@ -526,7 +526,7 @@ int main(void)
         run_unary_case("digamma_256", "2.5", 256u, mf_digamma, bench_scaled_iters(3));
         run_unary_case("trigamma_256", "2.5", 256u, mf_trigamma, bench_scaled_iters(3));
         run_unary_case("tetragamma_256", "2.5", 256u, mf_tetragamma, bench_scaled_iters(2));
-        run_unary_case("erf_256", "0.5", 256u, mf_erf, bench_scaled_iters(4));
+        run_unary_case("erf_256", "0.567", 256u, mf_erf, bench_scaled_iters(4));
         run_unary_case("erfc_256", "0.5", 256u, mf_erfc, bench_scaled_iters(4));
         run_unary_case("erfinv_256", "0.5", 256u, mf_erfinv, bench_scaled_iters(2));
         run_unary_case("erfcinv_256", "0.5", 256u, mf_erfcinv, bench_scaled_iters(2));
@@ -555,7 +555,7 @@ int main(void)
         run_unary_case("exp_512", "1.23456789", 512u, mf_exp, bench_scaled_iters(2));
         run_unary_case("log_512", "1.23456789", 512u, mf_log, bench_scaled_iters(2));
         run_unary_case("sqrt_512", "2.25", 512u, mf_sqrt, bench_scaled_iters(2));
-        run_unary_case("sin_512", "0.7", 512u, mf_sin, bench_scaled_iters(2));
+        run_unary_case("sin_512", "0.567", 512u, mf_sin, bench_scaled_iters(2));
         run_unary_case("cos_512", "0.7", 512u, mf_cos, bench_scaled_iters(2));
         run_sincos_case("sincos_512", "0.7", 512u, bench_scaled_iters(1));
         run_unary_case("tan_512", "0.7", 512u, mf_tan, bench_scaled_iters(1));
@@ -566,11 +566,14 @@ int main(void)
         run_unary_case("acos_general_512", "0.7", 512u, mf_acos, bench_scaled_iters(1));
         run_binary_case("atan2_512", "1", "-1", 512u, mf_atan2, bench_scaled_iters(2));
         run_binary_case("atan2_general_512", "0.5", "-0.75", 512u, mf_atan2, bench_scaled_iters(1));
+        run_unary_case("sinh_512", "0.7", 512u, mf_sinh, bench_scaled_iters(1));
+        run_unary_case("cosh_512", "0.7", 512u, mf_cosh, bench_scaled_iters(1));
         run_sinhcosh_case("sinhcosh_512", "0.7", 512u, bench_scaled_iters(1));
+        run_unary_case("tanh_512", "0.7", 512u, mf_tanh, bench_scaled_iters(1));
         run_unary_case("asinh_512", "0.5", 512u, mf_asinh, bench_scaled_iters(1));
         run_unary_case("acosh_512", "2.0", 512u, mf_acosh, bench_scaled_iters(1));
         run_unary_case("atanh_512", "0.5", 512u, mf_atanh, bench_scaled_iters(1));
-        run_unary_case("erf_512", "0.5", 512u, mf_erf, bench_scaled_iters(2));
+        run_unary_case("erf_512", "0.567", 512u, mf_erf, bench_scaled_iters(2));
         run_unary_case("lambert_w0_512", "1", 512u, mf_lambert_w0, bench_scaled_iters(2));
         run_unary_case("lambert_wm1_512", "-0.1", 512u, mf_lambert_wm1, bench_scaled_iters(1));
         run_binary_case("pow_512", "1.23456789", "3.5", 512u, mf_pow, bench_scaled_iters(1));
@@ -587,7 +590,7 @@ int main(void)
         run_unary_case("exp_768", "1.23456789", 768u, mf_exp, bench_scaled_iters(1));
         run_unary_case("log_768", "1.23456789", 768u, mf_log, bench_scaled_iters(1));
         run_unary_case("sqrt_768", "2.25", 768u, mf_sqrt, bench_scaled_iters(1));
-        run_unary_case("sin_768", "0.7", 768u, mf_sin, bench_scaled_iters(1));
+        run_unary_case("sin_768", "0.567", 768u, mf_sin, bench_scaled_iters(1));
         run_unary_case("cos_768", "0.7", 768u, mf_cos, bench_scaled_iters(1));
         run_sincos_case("sincos_768", "0.7", 768u, bench_scaled_iters(1));
         run_unary_case("tan_768", "0.7", 768u, mf_tan, bench_scaled_iters(1));
@@ -598,13 +601,51 @@ int main(void)
         run_unary_case("acos_general_768", "0.7", 768u, mf_acos, bench_scaled_iters(1));
         run_binary_case("atan2_768", "1", "-1", 768u, mf_atan2, bench_scaled_iters(1));
         run_binary_case("atan2_general_768", "0.5", "-0.75", 768u, mf_atan2, bench_scaled_iters(1));
+        run_unary_case("sinh_768", "0.7", 768u, mf_sinh, bench_scaled_iters(1));
+        run_unary_case("cosh_768", "0.7", 768u, mf_cosh, bench_scaled_iters(1));
         run_sinhcosh_case("sinhcosh_768", "0.7", 768u, bench_scaled_iters(1));
+        run_unary_case("tanh_768", "0.7", 768u, mf_tanh, bench_scaled_iters(1));
         run_unary_case("asinh_768", "0.5", 768u, mf_asinh, bench_scaled_iters(1));
         run_unary_case("acosh_768", "2.0", 768u, mf_acosh, bench_scaled_iters(1));
         run_unary_case("atanh_768", "0.5", 768u, mf_atanh, bench_scaled_iters(1));
-        run_unary_case("erf_768", "0.5", 768u, mf_erf, bench_scaled_iters(1));
+        run_unary_case("erf_768", "0.567", 768u, mf_erf, bench_scaled_iters(1));
         run_unary_case("lambert_w0_768", "1", 768u, mf_lambert_w0, bench_scaled_iters(1));
         run_unary_case("lambert_wm1_768", "-0.1", 768u, mf_lambert_wm1, bench_scaled_iters(1));
+    }
+
+    if (bench_wants_section("selected1024")) {
+        puts("");
+        puts("-- selected 1024-bit --");
+        run_unary_case("exp_1024", "1.23456789", 1024u, mf_exp, bench_scaled_iters(1));
+        run_unary_case("log_1024", "1.23456789", 1024u, mf_log, bench_scaled_iters(1));
+        run_unary_case("sqrt_1024", "2.25", 1024u, mf_sqrt, bench_scaled_iters(1));
+        run_unary_case("sin_1024", "0.567", 1024u, mf_sin, bench_scaled_iters(1));
+        run_unary_case("cos_1024", "0.7", 1024u, mf_cos, bench_scaled_iters(1));
+        run_sincos_case("sincos_1024", "0.7", 1024u, bench_scaled_iters(1));
+        run_unary_case("tan_1024", "0.7", 1024u, mf_tan, bench_scaled_iters(1));
+        run_unary_case("atan_1024", "0.7", 1024u, mf_atan, bench_scaled_iters(1));
+        run_unary_case("asin_1024", "0.5", 1024u, mf_asin, bench_scaled_iters(1));
+        run_unary_case("asin_general_1024", "0.7", 1024u, mf_asin, bench_scaled_iters(1));
+        run_unary_case("acos_1024", "0.5", 1024u, mf_acos, bench_scaled_iters(1));
+        run_unary_case("acos_general_1024", "0.7", 1024u, mf_acos, bench_scaled_iters(1));
+        run_binary_case("atan2_1024", "1", "-1", 1024u, mf_atan2, bench_scaled_iters(1));
+        run_binary_case("atan2_general_1024", "0.5", "-0.75", 1024u, mf_atan2, bench_scaled_iters(1));
+        run_unary_case("sinh_1024", "0.7", 1024u, mf_sinh, bench_scaled_iters(1));
+        run_unary_case("cosh_1024", "0.7", 1024u, mf_cosh, bench_scaled_iters(1));
+        run_sinhcosh_case("sinhcosh_1024", "0.7", 1024u, bench_scaled_iters(1));
+        run_unary_case("tanh_1024", "0.7", 1024u, mf_tanh, bench_scaled_iters(1));
+        run_unary_case("asinh_1024", "0.5", 1024u, mf_asinh, bench_scaled_iters(1));
+        run_unary_case("acosh_1024", "2.0", 1024u, mf_acosh, bench_scaled_iters(1));
+        run_unary_case("atanh_1024", "0.5", 1024u, mf_atanh, bench_scaled_iters(1));
+        run_unary_case("erf_1024", "0.567", 1024u, mf_erf, bench_scaled_iters(1));
+        run_unary_case("lambert_w0_1024", "1", 1024u, mf_lambert_w0, bench_scaled_iters(1));
+        run_unary_case("lambert_wm1_1024", "-0.1", 1024u, mf_lambert_wm1, bench_scaled_iters(1));
+        run_binary_case("pow_1024", "1.23456789", "3.5", 1024u, mf_pow, bench_scaled_iters(1));
+        run_binary_case("logbeta_1024", "2.5", "3.5", 1024u, mf_logbeta, bench_scaled_iters(1));
+        run_ternary_case("beta_pdf_1024", "0.5", "2.5", "3.5", 1024u, mf_beta_pdf, bench_scaled_iters(1));
+        run_unary_case("normal_pdf_1024", "0.5", 1024u, mf_normal_pdf, bench_scaled_iters(1));
+        run_unary_case("ei_1024", "1", 1024u, mf_ei, bench_scaled_iters(1));
+        run_unary_case("e1_1024", "1", 1024u, mf_e1, bench_scaled_iters(1));
     }
 
     return EXIT_SUCCESS;

@@ -330,6 +330,89 @@ int mc_ldexp(mcomplex_t *mcomplex, int exponent2)
         return -1;
     return mc_set_qcomplex(mcomplex, qc_ldexp(mc_to_qcomplex(mcomplex), exponent2));
 }
-int mc_sqrt(mcomplex_t *mcomplex) { return mcomplex_apply_unary(mcomplex, qc_sqrt); }
+int mc_sqrt(mcomplex_t *mcomplex)
+{
+    mcomplex_t *mag = NULL;
+    mfloat_t *real_part = NULL;
+    mfloat_t *imag_part = NULL;
+    mfloat_t *neg_real = NULL;
+    size_t precision_bits;
+    size_t work_prec;
+
+    if (!mcomplex)
+        return -1;
+
+    precision_bits = mc_get_precision(mcomplex);
+    work_prec = precision_bits + 192u;
+
+    if (mf_is_zero(mc_imag(mcomplex))) {
+        if (mcomplex_ensure_mutable(mcomplex) != 0)
+            return -1;
+        if (mf_ge(mc_real(mcomplex), MF_ZERO)) {
+            if (mf_sqrt(mcomplex->real) != 0)
+                return -1;
+            mf_clear(mcomplex->imag);
+            return 0;
+        }
+
+        neg_real = mf_clone(mc_real(mcomplex));
+        if (!neg_real)
+            return -1;
+        if (mf_set_precision(neg_real, work_prec) != 0 ||
+            mf_neg(neg_real) != 0 ||
+            mf_sqrt(neg_real) != 0 ||
+            mc_set(mcomplex, MF_ZERO, neg_real) != 0) {
+            mf_free(neg_real);
+            return -1;
+        }
+        mf_free(neg_real);
+        return 0;
+    }
+
+    mag = mc_clone(mcomplex);
+    if (!mag)
+        return -1;
+    if (mc_set_precision(mag, work_prec) != 0 ||
+        mc_abs(mag) != 0) {
+        mc_free(mag);
+        return -1;
+    }
+
+    real_part = mf_clone(mc_real(mag));
+    imag_part = mf_clone(mc_real(mag));
+    if (!real_part || !imag_part)
+        goto fail;
+    if (mf_set_precision(real_part, work_prec) != 0 ||
+        mf_set_precision(imag_part, work_prec) != 0)
+        goto fail;
+
+    if (mf_add(real_part, mc_real(mcomplex)) != 0 ||
+        mf_ldexp(real_part, -1) != 0 ||
+        mf_sqrt(real_part) != 0)
+        goto fail;
+
+    if (mf_sub(imag_part, mc_real(mcomplex)) != 0 ||
+        mf_ldexp(imag_part, -1) != 0 ||
+        mf_sqrt(imag_part) != 0)
+        goto fail;
+
+    if (mf_lt(mc_imag(mcomplex), MF_ZERO) && mf_neg(imag_part) != 0)
+        goto fail;
+
+    if (mc_set(mcomplex, real_part, imag_part) != 0)
+        goto fail;
+
+    mf_free(imag_part);
+    mf_free(real_part);
+    mc_free(mag);
+    return 0;
+
+fail:
+    mf_free(neg_real);
+    mf_free(imag_part);
+    mf_free(real_part);
+    mc_free(mag);
+    return -1;
+}
 int mc_floor(mcomplex_t *mcomplex) { return mcomplex_apply_unary(mcomplex, qc_floor); }
 int mc_hypot(mcomplex_t *mcomplex, const mcomplex_t *other) { return mcomplex_apply_binary(mcomplex, other, qc_hypot); }
