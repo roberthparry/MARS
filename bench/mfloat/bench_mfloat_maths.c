@@ -487,7 +487,7 @@ int main(void)
         puts("-- elementary 256-bit --");
         run_unary_case("exp_256", "1.23456789", 256u, mf_exp, bench_scaled_iters(8));
         run_unary_case("log_256", "1.23456789", 256u, mf_log, bench_scaled_iters(8));
-        run_unary_case("sqrt_256", "2.25", 256u, mf_sqrt, bench_scaled_iters(8));
+        run_unary_case("sqrt_256", "1.23456789", 256u, mf_sqrt, bench_scaled_iters(8));
         run_unary_case("sin_256", "0.567", 256u, mf_sin, bench_scaled_iters(8));
         run_unary_case("cos_256", "0.7", 256u, mf_cos, bench_scaled_iters(8));
         run_sincos_case("sincos_256", "0.7", 256u, bench_scaled_iters(6));
@@ -554,7 +554,7 @@ int main(void)
         puts("-- selected 512-bit --");
         run_unary_case("exp_512", "1.23456789", 512u, mf_exp, bench_scaled_iters(2));
         run_unary_case("log_512", "1.23456789", 512u, mf_log, bench_scaled_iters(2));
-        run_unary_case("sqrt_512", "2.25", 512u, mf_sqrt, bench_scaled_iters(2));
+        run_unary_case("sqrt_512", "1.23456789", 512u, mf_sqrt, bench_scaled_iters(2));
         run_unary_case("sin_512", "0.567", 512u, mf_sin, bench_scaled_iters(2));
         run_unary_case("cos_512", "0.7", 512u, mf_cos, bench_scaled_iters(2));
         run_sincos_case("sincos_512", "0.7", 512u, bench_scaled_iters(1));
@@ -589,7 +589,7 @@ int main(void)
         puts("-- selected 768-bit --");
         run_unary_case("exp_768", "1.23456789", 768u, mf_exp, bench_scaled_iters(1));
         run_unary_case("log_768", "1.23456789", 768u, mf_log, bench_scaled_iters(1));
-        run_unary_case("sqrt_768", "2.25", 768u, mf_sqrt, bench_scaled_iters(1));
+        run_unary_case("sqrt_768", "1.23456789", 768u, mf_sqrt, bench_scaled_iters(1));
         run_unary_case("sin_768", "0.567", 768u, mf_sin, bench_scaled_iters(1));
         run_unary_case("cos_768", "0.7", 768u, mf_cos, bench_scaled_iters(1));
         run_sincos_case("sincos_768", "0.7", 768u, bench_scaled_iters(1));
@@ -618,7 +618,7 @@ int main(void)
         puts("-- selected 1024-bit --");
         run_unary_case("exp_1024", "1.23456789", 1024u, mf_exp, bench_scaled_iters(1));
         run_unary_case("log_1024", "1.23456789", 1024u, mf_log, bench_scaled_iters(1));
-        run_unary_case("sqrt_1024", "2.25", 1024u, mf_sqrt, bench_scaled_iters(1));
+        run_unary_case("sqrt_1024", "1.23456789", 1024u, mf_sqrt, bench_scaled_iters(1));
         run_unary_case("sin_1024", "0.567", 1024u, mf_sin, bench_scaled_iters(1));
         run_unary_case("cos_1024", "0.7", 1024u, mf_cos, bench_scaled_iters(1));
         run_sincos_case("sincos_1024", "0.7", 1024u, bench_scaled_iters(1));

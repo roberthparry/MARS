@@ -1718,6 +1718,8 @@ int mint_sqrt_initial_guess(mint_t *guess, const mint_t *value)
 
     if (mint_set_magnitude_u64(guess, root, 1) != 0)
         return -1;
+    if (mint_add_small(guess, 1) != 0)
+        return -1;
 
     shift_bits = (long)((bitlen - prefix_bits) / 2);
     return mint_shl_inplace(guess, shift_bits);
