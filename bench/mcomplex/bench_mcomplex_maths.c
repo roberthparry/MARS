@@ -201,6 +201,7 @@ int main(void)
 
     run_unary_case("exp_0_567_plus_0_321i", "0.567 + 0.321i", 256u, mc_exp, bench_scaled_iters(8));
     run_unary_case("log_0_567_plus_0_321i", "0.567 + 0.321i", 256u, mc_log, bench_scaled_iters(8));
+    run_unary_case("sqrt_0_567_plus_0_321i", "0.567 + 0.321i", 256u, mc_sqrt, bench_scaled_iters(8));
     run_unary_case("sin_0_567_plus_0_321i", "0.567 + 0.321i", 256u, mc_sin, bench_scaled_iters(8));
     run_unary_case("cos_0_567_plus_0_321i", "0.567 + 0.321i", 256u, mc_cos, bench_scaled_iters(8));
     run_unary_case("tan_0_567_plus_0_321i", "0.567 + 0.321i", 256u, mc_tan, bench_scaled_iters(6));
@@ -241,6 +242,7 @@ int main(void)
 
     run_unary_case("exp_0_567_plus_0_321i_512", "0.567 + 0.321i", 512u, mc_exp, bench_scaled_iters(4));
     run_unary_case("log_0_567_plus_0_321i_512", "0.567 + 0.321i", 512u, mc_log, bench_scaled_iters(4));
+    run_unary_case("sqrt_0_567_plus_0_321i_512", "0.567 + 0.321i", 512u, mc_sqrt, bench_scaled_iters(4));
     run_unary_case("sin_0_567_plus_0_321i_512", "0.567 + 0.321i", 512u, mc_sin, bench_scaled_iters(4));
     run_unary_case("cos_0_567_plus_0_321i_512", "0.567 + 0.321i", 512u, mc_cos, bench_scaled_iters(4));
     run_unary_case("tan_0_567_plus_0_321i_512", "0.567 + 0.321i", 512u, mc_tan, bench_scaled_iters(3));
@@ -266,6 +268,7 @@ int main(void)
 
     run_unary_case("exp_0_567_plus_0_321i_768", "0.567 + 0.321i", 768u, mc_exp, bench_scaled_iters(2));
     run_unary_case("log_0_567_plus_0_321i_768", "0.567 + 0.321i", 768u, mc_log, bench_scaled_iters(2));
+    run_unary_case("sqrt_0_567_plus_0_321i_768", "0.567 + 0.321i", 768u, mc_sqrt, bench_scaled_iters(2));
     run_unary_case("sin_0_567_plus_0_321i_768", "0.567 + 0.321i", 768u, mc_sin, bench_scaled_iters(2));
     run_unary_case("cos_0_567_plus_0_321i_768", "0.567 + 0.321i", 768u, mc_cos, bench_scaled_iters(2));
     run_unary_case("tan_0_567_plus_0_321i_768", "0.567 + 0.321i", 768u, mc_tan, bench_scaled_iters(2));
@@ -287,6 +290,7 @@ int main(void)
 
     run_unary_case("exp_0_567_plus_0_321i_1024", "0.567 + 0.321i", 1024u, mc_exp, bench_scaled_iters(1));
     run_unary_case("log_0_567_plus_0_321i_1024", "0.567 + 0.321i", 1024u, mc_log, bench_scaled_iters(1));
+    run_unary_case("sqrt_0_567_plus_0_321i_1024", "0.567 + 0.321i", 1024u, mc_sqrt, bench_scaled_iters(1));
     run_unary_case("sin_0_567_plus_0_321i_1024", "0.567 + 0.321i", 1024u, mc_sin, bench_scaled_iters(1));
     run_unary_case("cos_0_567_plus_0_321i_1024", "0.567 + 0.321i", 1024u, mc_cos, bench_scaled_iters(1));
     run_unary_case("tan_0_567_plus_0_321i_1024", "0.567 + 0.321i", 1024u, mc_tan, bench_scaled_iters(1));
