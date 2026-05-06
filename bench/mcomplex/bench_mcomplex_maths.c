@@ -201,13 +201,26 @@ int main(void)
 
     run_unary_case("exp_1_plus_1i", "1 + 1i", 256u, mc_exp, bench_scaled_iters(1000));
     run_unary_case("log_1_plus_1i", "1 + 1i", 256u, mc_log, bench_scaled_iters(1000));
+    run_unary_case("sin_0_567_plus_0_321i", "0.567 + 0.321i", 256u, mc_sin, bench_scaled_iters(8));
+    run_unary_case("cos_0_567_plus_0_321i", "0.567 + 0.321i", 256u, mc_cos, bench_scaled_iters(8));
+    run_unary_case("tan_0_567_plus_0_321i", "0.567 + 0.321i", 256u, mc_tan, bench_scaled_iters(6));
+    run_unary_case("atan_0_321_plus_0_123i", "0.321 + 0.123i", 256u, mc_atan, bench_scaled_iters(6));
+    run_binary_case("atan2_0_5_0_25i__-0_75_0_1i", "0.5 + 0.25i", "-0.75 + 0.1i", 256u, mc_atan2, bench_scaled_iters(4));
+    run_unary_case("asin_0_321_plus_0_123i", "0.321 + 0.123i", 256u, mc_asin, bench_scaled_iters(4));
+    run_unary_case("acos_0_321_plus_0_123i", "0.321 + 0.123i", 256u, mc_acos, bench_scaled_iters(4));
+    run_unary_case("sinh_0_567_plus_0_321i", "0.567 + 0.321i", 256u, mc_sinh, bench_scaled_iters(8));
+    run_unary_case("cosh_0_567_plus_0_321i", "0.567 + 0.321i", 256u, mc_cosh, bench_scaled_iters(8));
+    run_unary_case("tanh_0_567_plus_0_321i", "0.567 + 0.321i", 256u, mc_tanh, bench_scaled_iters(6));
+    run_unary_case("asinh_0_321_plus_0_123i", "0.321 + 0.123i", 256u, mc_asinh, bench_scaled_iters(4));
+    run_unary_case("acosh_2_plus_0_5i", "2 + 0.5i", 256u, mc_acosh, bench_scaled_iters(4));
+    run_unary_case("atanh_0_321_plus_0_123i", "0.321 + 0.123i", 256u, mc_atanh, bench_scaled_iters(4));
     run_unary_case("erf_0_5_plus_0_5i", "0.5 + 0.5i", 256u, mc_erf, bench_scaled_iters(500));
     run_unary_case("erfc_0_5_plus_0_5i", "0.5 + 0.5i", 256u, mc_erfc, bench_scaled_iters(500));
 
     run_unary_case("gamma_2_3_plus_0i", "2.3 + 0i", 256u, mc_gamma, bench_scaled_iters(4));
     run_unary_case("lgamma_2_3_plus_0i", "2.3 + 0i", 256u, mc_lgamma, bench_scaled_iters(4));
-    run_unary_case("gamma_1_5_plus_0_7i", "1.5 + 0.7i", 256u, mc_gamma, bench_scaled_iters(200));
-    run_unary_case("lgamma_1_5_plus_0_7i", "1.5 + 0.7i", 256u, mc_lgamma, bench_scaled_iters(200));
+    run_unary_case("gamma_1_5_plus_0_7i", "1.5 + 0.7i", 256u, mc_gamma, bench_scaled_iters(8));
+    run_unary_case("lgamma_1_5_plus_0_7i", "1.5 + 0.7i", 256u, mc_lgamma, bench_scaled_iters(8));
     run_unary_case("digamma_2_plus_1i", "2 + 1i", 256u, mc_digamma, bench_scaled_iters(500));
     run_unary_case("trigamma_2_plus_0_5i", "2 + 0.5i", 256u, mc_trigamma, bench_scaled_iters(300));
     run_unary_case("tetragamma_2_plus_0_5i", "2 + 0.5i", 256u, mc_tetragamma, bench_scaled_iters(300));
@@ -217,8 +230,8 @@ int main(void)
     run_unary_case("lambert_w0_1", "1", 256u, mc_lambert_w0, bench_scaled_iters(2000));
     run_unary_case("productlog_1", "1", 256u, mc_productlog, bench_scaled_iters(2000));
     run_unary_case("lambert_wm1_-0_1", "-0.1", 256u, mc_lambert_wm1, bench_scaled_iters(1000));
-    run_unary_case("productlog_1_plus_1i", "1 + 1i", 256u, mc_productlog, bench_scaled_iters(300));
-    run_unary_case("lambert_wm1_-0_2_-0_1i", "-0.2 - 0.1i", 256u, mc_lambert_wm1, bench_scaled_iters(200));
+    run_unary_case("productlog_1_plus_1i", "1 + 1i", 256u, mc_productlog, bench_scaled_iters(8));
+    run_unary_case("lambert_wm1_-0_2_-0_1i", "-0.2 - 0.1i", 256u, mc_lambert_wm1, bench_scaled_iters(6));
     run_unary_case("ei_1_plus_1i", "1 + 1i", 256u, mc_ei, bench_scaled_iters(300));
     run_unary_case("e1_1_plus_1i", "1 + 1i", 256u, mc_e1, bench_scaled_iters(300));
 
@@ -227,9 +240,22 @@ int main(void)
 
     run_unary_case("exp_1_plus_1i_512", "1 + 1i", 512u, mc_exp, bench_scaled_iters(40));
     run_unary_case("log_1_plus_1i_512", "1 + 1i", 512u, mc_log, bench_scaled_iters(40));
+    run_unary_case("sin_0_567_plus_0_321i_512", "0.567 + 0.321i", 512u, mc_sin, bench_scaled_iters(4));
+    run_unary_case("cos_0_567_plus_0_321i_512", "0.567 + 0.321i", 512u, mc_cos, bench_scaled_iters(4));
+    run_unary_case("tan_0_567_plus_0_321i_512", "0.567 + 0.321i", 512u, mc_tan, bench_scaled_iters(3));
+    run_unary_case("atan_0_321_plus_0_123i_512", "0.321 + 0.123i", 512u, mc_atan, bench_scaled_iters(3));
+    run_binary_case("atan2_0_5_0_25i__-0_75_0_1i_512", "0.5 + 0.25i", "-0.75 + 0.1i", 512u, mc_atan2, bench_scaled_iters(8));
+    run_unary_case("asin_0_321_plus_0_123i_512", "0.321 + 0.123i", 512u, mc_asin, bench_scaled_iters(8));
+    run_unary_case("acos_0_321_plus_0_123i_512", "0.321 + 0.123i", 512u, mc_acos, bench_scaled_iters(8));
+    run_unary_case("sinh_0_567_plus_0_321i_512", "0.567 + 0.321i", 512u, mc_sinh, bench_scaled_iters(4));
+    run_unary_case("cosh_0_567_plus_0_321i_512", "0.567 + 0.321i", 512u, mc_cosh, bench_scaled_iters(4));
+    run_unary_case("tanh_0_567_plus_0_321i_512", "0.567 + 0.321i", 512u, mc_tanh, bench_scaled_iters(12));
+    run_unary_case("asinh_0_321_plus_0_123i_512", "0.321 + 0.123i", 512u, mc_asinh, bench_scaled_iters(8));
+    run_unary_case("acosh_2_plus_0_5i_512", "2 + 0.5i", 512u, mc_acosh, bench_scaled_iters(8));
+    run_unary_case("atanh_0_321_plus_0_123i_512", "0.321 + 0.123i", 512u, mc_atanh, bench_scaled_iters(8));
     run_unary_case("lambert_w0_1_plus_1i_512", "1 + 1i", 512u, mc_lambert_w0, bench_scaled_iters(4));
     run_unary_case("lambert_wm1_-0_2_-0_1i_512", "-0.2 - 0.1i", 512u, mc_lambert_wm1, bench_scaled_iters(2));
-    run_unary_case("productlog_1_plus_1i_512", "1 + 1i", 512u, mc_productlog, bench_scaled_iters(8));
+    run_unary_case("productlog_1_plus_1i_512", "1 + 1i", 512u, mc_productlog, bench_scaled_iters(4));
     run_unary_case("ei_1_plus_1i_512", "1 + 1i", 512u, mc_ei, bench_scaled_iters(8));
     run_unary_case("e1_1_plus_1i_512", "1 + 1i", 512u, mc_e1, bench_scaled_iters(8));
     run_unary_case("gamma_2_3_plus_0i_512", "2.3 + 0i", 512u, mc_gamma, bench_scaled_iters(1));
@@ -239,6 +265,19 @@ int main(void)
 
     run_unary_case("exp_1_plus_1i_768", "1 + 1i", 768u, mc_exp, bench_scaled_iters(4));
     run_unary_case("log_1_plus_1i_768", "1 + 1i", 768u, mc_log, bench_scaled_iters(4));
+    run_unary_case("sin_0_567_plus_0_321i_768", "0.567 + 0.321i", 768u, mc_sin, bench_scaled_iters(2));
+    run_unary_case("cos_0_567_plus_0_321i_768", "0.567 + 0.321i", 768u, mc_cos, bench_scaled_iters(2));
+    run_unary_case("tan_0_567_plus_0_321i_768", "0.567 + 0.321i", 768u, mc_tan, bench_scaled_iters(2));
+    run_unary_case("atan_0_321_plus_0_123i_768", "0.321 + 0.123i", 768u, mc_atan, bench_scaled_iters(2));
+    run_binary_case("atan2_0_5_0_25i__-0_75_0_1i_768", "0.5 + 0.25i", "-0.75 + 0.1i", 768u, mc_atan2, bench_scaled_iters(2));
+    run_unary_case("asin_0_321_plus_0_123i_768", "0.321 + 0.123i", 768u, mc_asin, bench_scaled_iters(2));
+    run_unary_case("acos_0_321_plus_0_123i_768", "0.321 + 0.123i", 768u, mc_acos, bench_scaled_iters(2));
+    run_unary_case("sinh_0_567_plus_0_321i_768", "0.567 + 0.321i", 768u, mc_sinh, bench_scaled_iters(2));
+    run_unary_case("cosh_0_567_plus_0_321i_768", "0.567 + 0.321i", 768u, mc_cosh, bench_scaled_iters(2));
+    run_unary_case("tanh_0_567_plus_0_321i_768", "0.567 + 0.321i", 768u, mc_tanh, bench_scaled_iters(2));
+    run_unary_case("asinh_0_321_plus_0_123i_768", "0.321 + 0.123i", 768u, mc_asinh, bench_scaled_iters(2));
+    run_unary_case("acosh_2_plus_0_5i_768", "2 + 0.5i", 768u, mc_acosh, bench_scaled_iters(2));
+    run_unary_case("atanh_0_321_plus_0_123i_768", "0.321 + 0.123i", 768u, mc_atanh, bench_scaled_iters(2));
     run_unary_case("lambert_w0_1_plus_1i_768", "1 + 1i", 768u, mc_lambert_w0, bench_scaled_iters(1));
     run_unary_case("lambert_wm1_-0_2_-0_1i_768", "-0.2 - 0.1i", 768u, mc_lambert_wm1, bench_scaled_iters(1));
     run_unary_case("productlog_1_plus_1i_768", "1 + 1i", 768u, mc_productlog, bench_scaled_iters(1));
@@ -247,6 +286,19 @@ int main(void)
 
     run_unary_case("exp_1_plus_1i_1024", "1 + 1i", 1024u, mc_exp, bench_scaled_iters(1));
     run_unary_case("log_1_plus_1i_1024", "1 + 1i", 1024u, mc_log, bench_scaled_iters(1));
+    run_unary_case("sin_0_567_plus_0_321i_1024", "0.567 + 0.321i", 1024u, mc_sin, bench_scaled_iters(1));
+    run_unary_case("cos_0_567_plus_0_321i_1024", "0.567 + 0.321i", 1024u, mc_cos, bench_scaled_iters(1));
+    run_unary_case("tan_0_567_plus_0_321i_1024", "0.567 + 0.321i", 1024u, mc_tan, bench_scaled_iters(1));
+    run_unary_case("atan_0_321_plus_0_123i_1024", "0.321 + 0.123i", 1024u, mc_atan, bench_scaled_iters(1));
+    run_binary_case("atan2_0_5_0_25i__-0_75_0_1i_1024", "0.5 + 0.25i", "-0.75 + 0.1i", 1024u, mc_atan2, bench_scaled_iters(1));
+    run_unary_case("asin_0_321_plus_0_123i_1024", "0.321 + 0.123i", 1024u, mc_asin, bench_scaled_iters(1));
+    run_unary_case("acos_0_321_plus_0_123i_1024", "0.321 + 0.123i", 1024u, mc_acos, bench_scaled_iters(1));
+    run_unary_case("sinh_0_567_plus_0_321i_1024", "0.567 + 0.321i", 1024u, mc_sinh, bench_scaled_iters(1));
+    run_unary_case("cosh_0_567_plus_0_321i_1024", "0.567 + 0.321i", 1024u, mc_cosh, bench_scaled_iters(1));
+    run_unary_case("tanh_0_567_plus_0_321i_1024", "0.567 + 0.321i", 1024u, mc_tanh, bench_scaled_iters(1));
+    run_unary_case("asinh_0_321_plus_0_123i_1024", "0.321 + 0.123i", 1024u, mc_asinh, bench_scaled_iters(1));
+    run_unary_case("acosh_2_plus_0_5i_1024", "2 + 0.5i", 1024u, mc_acosh, bench_scaled_iters(1));
+    run_unary_case("atanh_0_321_plus_0_123i_1024", "0.321 + 0.123i", 1024u, mc_atanh, bench_scaled_iters(1));
     run_unary_case("lambert_w0_1_plus_1i_1024", "1 + 1i", 1024u, mc_lambert_w0, bench_scaled_iters(1));
     run_unary_case("lambert_wm1_-0_2_-0_1i_1024", "-0.2 - 0.1i", 1024u, mc_lambert_wm1, bench_scaled_iters(1));
     run_unary_case("productlog_1_plus_1i_1024", "1 + 1i", 1024u, mc_productlog, bench_scaled_iters(1));

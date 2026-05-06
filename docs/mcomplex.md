@@ -326,32 +326,33 @@ Current sample results from that command on this tree, measured on:
 - `Intel(R) Core(TM) i7-4510U CPU @ 2.00GHz`
 - `4` logical CPUs
 
-Results with genuinely complex inputs:
+Results with genuinely complex inputs, limited to rows we have measured cleanly
+on the current native `mcomplex` implementation:
 
 | Case | `256` bits | `512` bits | `768` bits | `1024` bits |
 |---|---:|---:|---:|---:|
-| `mc_exp(0.567 + 0.321i)` | `136.878 ms` | `89.493 ms` | `230.703 ms` | `275.844 ms` |
-| `mc_log(0.567 + 0.321i)` | `5.596 ms` | `16.197 ms` | `23.095 ms` | `51.885 ms` |
-| `mc_sin(0.567 + 0.321i)` | `0.027 ms` | `0.016 ms` | `0.016 ms` | `0.016 ms` |
-| `mc_cos(0.567 + 0.321i)` | `0.022 ms` | `0.017 ms` | `0.017 ms` | `0.016 ms` |
-| `mc_tan(0.567 + 0.321i)` | `0.032 ms` | `0.023 ms` | `0.023 ms` | `0.023 ms` |
-| `mc_atan(0.567 + 0.321i)` | `0.023 ms` | `0.017 ms` | `0.017 ms` | `0.017 ms` |
-| `mc_asin(0.7 + 0.2i)` | `1.713 ms` | `0.016 ms` | `0.020 ms` | `0.016 ms` |
-| `mc_acos(0.7 + 0.2i)` | `0.025 ms` | `0.017 ms` | `0.016 ms` | `0.016 ms` |
-| `mc_atan2(0.5 + 0.25i, -0.75 + 0.1i)` | `0.033 ms` | `0.023 ms` | `0.023 ms` | `0.039 ms` |
-| `mc_sinh(0.567 + 0.321i)` | `0.023 ms` | `0.016 ms` | `0.016 ms` | `0.017 ms` |
-| `mc_cosh(0.567 + 0.321i)` | `0.020 ms` | `0.016 ms` | `0.016 ms` | `0.016 ms` |
-| `mc_tanh(0.567 + 0.321i)` | `0.031 ms` | `0.033 ms` | `0.023 ms` | `0.023 ms` |
-| `mc_asinh(0.5 + 0.25i)` | `0.057 ms` | `0.016 ms` | `0.017 ms` | `0.017 ms` |
-| `mc_acosh(2 + 0.5i)` | `0.034 ms` | `0.020 ms` | `0.020 ms` | `0.020 ms` |
-| `mc_atanh(0.5 + 0.25i)` | `0.013 ms` | `0.013 ms` | `0.013 ms` | `0.013 ms` |
-| `mc_gamma(1.5 + 0.7i)` | not yet published | not yet published | not yet published | not yet published |
-| `mc_lgamma(1.5 + 0.7i)` | not yet published | not yet published | not yet published | not yet published |
-| `mc_lambert_w0(1 + 1i)` | not yet published | not yet published | not yet published | not yet published |
-| `mc_lambert_wm1(-0.2 - 0.1i)` | not yet published | not yet published | not yet published | not yet published |
-| `mc_productlog(1 + 1i)` | not yet published | not yet published | not yet published | not yet published |
+| `mc_exp(1 + 1i)` | `0.027 ms` | `0.034 ms` | `0.033 ms` | `0.030 ms` |
+| `mc_log(1 + 1i)` | `0.041 ms` | `0.024 ms` | `0.035 ms` | `0.769 ms` |
+| `mc_sin(0.567 + 0.321i)` | `425.379 ms` | `348.170 ms` | `1259.126 ms` | `969.273 ms` |
+| `mc_cos(0.567 + 0.321i)` | `404.841 ms` | `374.350 ms` | `1215.051 ms` | `1088.182 ms` |
+| `mc_tan(0.567 + 0.321i)` | `221.499 ms` | `194.669 ms` | `495.488 ms` | `478.799 ms` |
+| `mc_atan(0.321 + 0.123i)` | `39.642 ms` | `63.823 ms` | `95.655 ms` | `147.361 ms` |
+| `mc_atan2(0.5 + 0.25i, -0.75 + 0.1i)` |  |  |  |  |
+| `mc_asin(0.321 + 0.123i)` |  |  |  |  |
+| `mc_acos(0.321 + 0.123i)` |  |  |  |  |
+| `mc_sinh(0.567 + 0.321i)` |  |  |  |  |
+| `mc_cosh(0.567 + 0.321i)` |  |  |  |  |
+| `mc_tanh(0.567 + 0.321i)` |  |  |  |  |
+| `mc_asinh(0.321 + 0.123i)` |  |  |  |  |
+| `mc_acosh(2 + 0.5i)` |  |  |  |  |
+| `mc_atanh(0.321 + 0.123i)` |  |  |  |  |
+| `mc_gamma(1.5 + 0.7i)` | `589.791 ms` | `533.394 ms` | `680.681 ms` | `1214.342 ms` |
+| `mc_lgamma(1.5 + 0.7i)` | `393.662 ms` | `512.961 ms` | `657.708 ms` | `659.451 ms` |
+| `mc_lambert_w0(1 + 1i)` |  | `962.274 ms` | `1610.380 ms` | `2281.305 ms` |
+| `mc_lambert_wm1(-0.2 - 0.1i)` | `1757.990 ms` | `3472.954 ms` | `3118.019 ms` | `4538.258 ms` |
+| `mc_productlog(1 + 1i)` | `496.905 ms` | `776.803 ms` | `1634.011 ms` | `2167.895 ms` |
 
-Most of these genuinely complex rows still exercise the current `qcomplex`
-fallback path rather than a native multiprecision complex implementation.
+Blank cells indicate rows that have not yet been refreshed cleanly enough to
+publish as representative native `mcomplex` timings.
 
 For broader benchmark notes, see [`docs/benchmarks.md`](benchmarks.md).
