@@ -1,6 +1,6 @@
 #include "mfloat_internal.h"
 #include "mfloat_coeff_tables.h"
-#include "internal/mint_layout.h"
+#include "internal/mint_internal.h"
 
 #include <ctype.h>
 #include <limits.h>

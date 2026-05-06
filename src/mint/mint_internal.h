@@ -1,7 +1,7 @@
 #ifndef MINT_INTERNAL_H
 #define MINT_INTERNAL_H
 
-#include "internal/mint_layout.h"
+#include "internal/mint_internal.h"
 #include "mint.h"
 
 #define MINT_SIEVE_SEGMENT_ODDS 32768ul

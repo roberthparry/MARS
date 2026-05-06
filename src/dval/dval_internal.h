@@ -5,8 +5,7 @@
 #include "qfloat.h"
 #include "qcomplex.h"
 #include "dval.h"
-#include "internal/dval_refcount.h"
-#include "internal/dval_symbol_rules.h"
+#include "internal/dval_internal.h"
 
 /**
  * @file dval_internal.h

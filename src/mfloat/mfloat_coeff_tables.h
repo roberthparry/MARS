@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#include "internal/mint_layout.h"
+#include "internal/mint_internal.h"
 
 typedef struct mfloat_seed_rational_pair_t {
     const mint_t *num;

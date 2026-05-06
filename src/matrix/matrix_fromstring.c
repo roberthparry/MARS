@@ -5,7 +5,7 @@
 #include <sys/types.h>
 
 #include "matrix_internal.h"
-#include "internal/dval_symbol_rules.h"
+#include "internal/dval_internal.h"
 
 typedef struct {
     char *name;
