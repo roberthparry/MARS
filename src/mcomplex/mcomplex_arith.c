@@ -332,12 +332,14 @@ int mc_ldexp(mcomplex_t *mcomplex, int exponent2)
 }
 int mc_sqrt(mcomplex_t *mcomplex)
 {
-    mcomplex_t *mag = NULL;
-    mfloat_t *real_part = NULL;
-    mfloat_t *imag_part = NULL;
+    mcomplex_t *orig = NULL;
+    mcomplex_t *root = NULL;
+    mcomplex_t *tmp = NULL;
     mfloat_t *neg_real = NULL;
     size_t precision_bits;
     size_t work_prec;
+    qcomplex_t seed;
+    int iter;
 
     if (!mcomplex)
         return -1;
@@ -369,49 +371,47 @@ int mc_sqrt(mcomplex_t *mcomplex)
         return 0;
     }
 
-    mag = mc_clone(mcomplex);
-    if (!mag)
+    orig = mc_clone(mcomplex);
+    if (!orig)
         return -1;
-    if (mc_set_precision(mag, work_prec) != 0 ||
-        mc_abs(mag) != 0) {
-        mc_free(mag);
-        return -1;
+    if (mc_set_precision(orig, work_prec) != 0)
+        goto fail;
+
+    seed = qc_sqrt(mc_to_qcomplex(mcomplex));
+    root = mc_create_qcomplex(seed);
+    tmp = mc_new_prec(work_prec);
+    if (!root || !tmp)
+        goto fail;
+    if (mc_set_precision(root, work_prec) != 0)
+        goto fail;
+    if (mc_is_zero(root)) {
+        if (mc_set(root, mc_real(orig), mc_imag(orig)) != 0)
+            goto fail;
     }
 
-    real_part = mf_clone(mc_real(mag));
-    imag_part = mf_clone(mc_real(mag));
-    if (!real_part || !imag_part)
-        goto fail;
-    if (mf_set_precision(real_part, work_prec) != 0 ||
-        mf_set_precision(imag_part, work_prec) != 0)
+    for (iter = 0; iter < 8; ++iter) {
+        if (mc_set(tmp, mc_real(orig), mc_imag(orig)) != 0 ||
+            mc_div(tmp, root) != 0 ||
+            mc_add(tmp, root) != 0 ||
+            mc_ldexp(tmp, -1) != 0 ||
+            mc_set(root, mc_real(tmp), mc_imag(tmp)) != 0)
+            goto fail;
+    }
+
+    if (mc_set_precision(root, precision_bits) != 0 ||
+        mc_set(mcomplex, mc_real(root), mc_imag(root)) != 0)
         goto fail;
 
-    if (mf_add(real_part, mc_real(mcomplex)) != 0 ||
-        mf_ldexp(real_part, -1) != 0 ||
-        mf_sqrt(real_part) != 0)
-        goto fail;
-
-    if (mf_sub(imag_part, mc_real(mcomplex)) != 0 ||
-        mf_ldexp(imag_part, -1) != 0 ||
-        mf_sqrt(imag_part) != 0)
-        goto fail;
-
-    if (mf_lt(mc_imag(mcomplex), MF_ZERO) && mf_neg(imag_part) != 0)
-        goto fail;
-
-    if (mc_set(mcomplex, real_part, imag_part) != 0)
-        goto fail;
-
-    mf_free(imag_part);
-    mf_free(real_part);
-    mc_free(mag);
+    mc_free(tmp);
+    mc_free(root);
+    mc_free(orig);
     return 0;
 
 fail:
     mf_free(neg_real);
-    mf_free(imag_part);
-    mf_free(real_part);
-    mc_free(mag);
+    mc_free(tmp);
+    mc_free(root);
+    mc_free(orig);
     return -1;
 }
 int mc_floor(mcomplex_t *mcomplex) { return mcomplex_apply_unary(mcomplex, qc_floor); }

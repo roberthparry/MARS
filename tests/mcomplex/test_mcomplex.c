@@ -1110,57 +1110,60 @@ static void test_real_elementary_replacements(void)
         mc_free(z);
         z = NULL;
 
-        z = create_real_mcomplex("1");
-        other = create_real_mcomplex("-1");
+        z = create_test_mcomplex("0.5 + 0.25i");
+        other = create_test_mcomplex("-0.75 + 0.1i");
         ASSERT_NOT_NULL(z);
         ASSERT_NOT_NULL(other);
-        print_mcomplex_input("atan2 input y", "1 + 0i");
-        print_mcomplex_input("atan2 input x", "-1 + 0i");
+        expected = mc_clone(z);
+        ASSERT_NOT_NULL(expected);
+        ASSERT_EQ_INT(mc_div(expected, other), 0);
+        print_mcomplex_input("atan2 input y", "0.5 + 0.25i");
+        print_mcomplex_input("atan2 input x", "-0.75 + 0.1i");
         print_mcomplex_value("atan2 initial y", z);
         print_mcomplex_value("atan2 initial x", other);
         ASSERT_EQ_INT(mc_atan2(z, other), 0);
         print_mcomplex_value("after atan2(y,x)", z);
-        print_mcomplex_error_check(
-            "atan2(1 + 0i, -1 + 0i)", z,
-            "2.356194490192344928846982537459627163147877049531329365731208444230862304714656748971026119006587800986611064884961729985320383457162936673794019556096360838087713077026453890829169733467211716197786473321608231749450084596356736175340087373953401431859236425192595261457840744986160045205445186855955293440259",
-            "0");
-        ASSERT_TRUE(mcomplex_meets_precision_bits(
-            z,
-            "2.356194490192344928846982537459627163147877049531329365731208444230862304714656748971026119006587800986611064884961729985320383457162936673794019556096360838087713077026453890829169733467211716197786473321608231749450084596356736175340087373953401431859236425192595261457840744986160045205445186855955293440259",
-            "0",
-            TEST_MCOMPLEX_MATHS_PRECISION));
+        ASSERT_EQ_INT(mc_tan(z), 0);
+        print_mcomplex_value("after tan(atan2(y,x))", z);
+        print_mcomplex_error_check_value("tan(atan2(0.5 + 0.25i, -0.75 + 0.1i))", z, expected);
+        ASSERT_TRUE(mcomplex_matches_value_bits(z, expected,
+                                               TEST_MCOMPLEX_MATHS_PRECISION));
+        mc_free(expected);
+        expected = NULL;
         mc_free(z);
         mc_free(other);
         z = NULL;
         other = NULL;
 
-        z = create_real_mcomplex("0.5");
+        z = create_test_mcomplex("0.321 + 0.123i");
         ASSERT_NOT_NULL(z);
-        print_mcomplex_input("asin input", "0.5 + 0i");
+        expected = mc_clone(z);
+        ASSERT_NOT_NULL(expected);
+        print_mcomplex_input("asin input", "0.321 + 0.123i");
         print_mcomplex_value("asin initial", z);
         ASSERT_EQ_INT(mc_asin(z), 0);
         print_mcomplex_value("after asin(z)", z);
-        print_mcomplex_error_check(
-            "asin(0.5 + 0i)", z,
-            "0.523598775598298873077107230546583814032861566562517636829157432051302734381034833104672470890352844663691347752213717774515640768258430371954226568021413519575047350450323086850926607437158159155063660738135162610988907688079274705631130527545200318190941427820576724768409054441368898934543374856878954097833",
-            "0");
-        ASSERT_TRUE(mcomplex_meets_precision_bits(
-            z,
-            "0.523598775598298873077107230546583814032861566562517636829157432051302734381034833104672470890352844663691347752213717774515640768258430371954226568021413519575047350450323086850926607437158159155063660738135162610988907688079274705631130527545200318190941427820576724768409054441368898934543374856878954097833",
-            "0",
-            TEST_MCOMPLEX_MATHS_PRECISION));
+        ASSERT_EQ_INT(mc_sin(z), 0);
+        print_mcomplex_value("after sin(asin(z))", z);
+        print_mcomplex_error_check_value("sin(asin(0.321 + 0.123i))", z, expected);
+        ASSERT_TRUE(mcomplex_matches_value_bits(z, expected,
+                                               TEST_MCOMPLEX_MATHS_PRECISION));
+        mc_free(expected);
+        expected = NULL;
         mc_free(z);
         z = NULL;
 
-        z = create_real_mcomplex("0.5");
+        z = create_test_mcomplex("0.321 + 0.123i");
         ASSERT_NOT_NULL(z);
-        expected = expected_real_mcomplex_from_mfloat_unary("0.5", mf_acos);
+        expected = mc_clone(z);
         ASSERT_NOT_NULL(expected);
-        print_mcomplex_input("acos input", "0.5 + 0i");
+        print_mcomplex_input("acos input", "0.321 + 0.123i");
         print_mcomplex_value("acos initial", z);
         ASSERT_EQ_INT(mc_acos(z), 0);
         print_mcomplex_value("after acos(z)", z);
-        print_mcomplex_error_check_value("acos(0.5 + 0i)", z, expected);
+        ASSERT_EQ_INT(mc_cos(z), 0);
+        print_mcomplex_value("after cos(acos(z))", z);
+        print_mcomplex_error_check_value("cos(acos(0.321 + 0.123i))", z, expected);
         ASSERT_TRUE(mcomplex_matches_value_bits(z, expected,
                                                TEST_MCOMPLEX_MATHS_PRECISION));
         mc_free(expected);
@@ -1216,57 +1219,55 @@ static void test_real_elementary_replacements(void)
         mc_free(z);
         z = NULL;
 
-        z = create_real_mcomplex("0.5");
+        z = create_test_mcomplex("0.321 + 0.123i");
         ASSERT_NOT_NULL(z);
-        print_mcomplex_input("asinh input", "0.5 + 0i");
+        expected = mc_clone(z);
+        ASSERT_NOT_NULL(expected);
+        print_mcomplex_input("asinh input", "0.321 + 0.123i");
         print_mcomplex_value("asinh initial", z);
         ASSERT_EQ_INT(mc_asinh(z), 0);
         print_mcomplex_value("after asinh(z)", z);
-        print_mcomplex_error_check(
-            "asinh(0.5 + 0i)", z,
-            "0.481211825059603447497758913424368423135184334385660519661018168840163867608221774412009429122723474997231839958293656411272568323726737622753059241864409754182417007211837150223823937469187275243279193018797079003561726796944545752305345434188765285532564902073997024822647784061343876976503325242753386755304",
-            "0");
-        ASSERT_TRUE(mcomplex_meets_precision_bits(
-            z,
-            "0.481211825059603447497758913424368423135184334385660519661018168840163867608221774412009429122723474997231839958293656411272568323726737622753059241864409754182417007211837150223823937469187275243279193018797079003561726796944545752305345434188765285532564902073997024822647784061343876976503325242753386755304",
-            "0",
-            TEST_MCOMPLEX_MATHS_PRECISION));
+        ASSERT_EQ_INT(mc_sinh(z), 0);
+        print_mcomplex_value("after sinh(asinh(z))", z);
+        print_mcomplex_error_check_value("sinh(asinh(0.321 + 0.123i))", z, expected);
+        ASSERT_TRUE(mcomplex_matches_value_bits(z, expected,
+                                               TEST_MCOMPLEX_MATHS_PRECISION));
+        mc_free(expected);
+        expected = NULL;
         mc_free(z);
         z = NULL;
 
-        z = create_real_mcomplex("2");
+        z = create_test_mcomplex("2 + 0.5i");
         ASSERT_NOT_NULL(z);
-        print_mcomplex_input("acosh input", "2 + 0i");
+        expected = mc_clone(z);
+        ASSERT_NOT_NULL(expected);
+        print_mcomplex_input("acosh input", "2 + 0.5i");
         print_mcomplex_value("acosh initial", z);
         ASSERT_EQ_INT(mc_acosh(z), 0);
         print_mcomplex_value("after acosh(z)", z);
-        print_mcomplex_error_check(
-            "acosh(2 + 0i)", z,
-            "1.31695789692481670862504634730796844402698197146751647976847225692046018541644397607421901345010178355646543656560497931980981686210637153272676334570992067690583112877625695817047043733686371194095565044679673200082593747537791289042677209263334442156084433067881666631245198970237618535389129661579567435373",
-            "0");
-        ASSERT_TRUE(mcomplex_meets_precision_bits(
-            z,
-            "1.31695789692481670862504634730796844402698197146751647976847225692046018541644397607421901345010178355646543656560497931980981686210637153272676334570992067690583112877625695817047043733686371194095565044679673200082593747537791289042677209263334442156084433067881666631245198970237618535389129661579567435373",
-            "0",
-            TEST_MCOMPLEX_MATHS_PRECISION));
+        ASSERT_EQ_INT(mc_cosh(z), 0);
+        print_mcomplex_value("after cosh(acosh(z))", z);
+        print_mcomplex_error_check_value("cosh(acosh(2 + 0.5i))", z, expected);
+        ASSERT_TRUE(mcomplex_matches_value_bits(z, expected,
+                                               TEST_MCOMPLEX_MATHS_PRECISION));
+        mc_free(expected);
+        expected = NULL;
         mc_free(z);
         z = NULL;
 
-        z = create_real_mcomplex("0.5");
+        z = create_test_mcomplex("0.321 + 0.123i");
         ASSERT_NOT_NULL(z);
-        print_mcomplex_input("atanh input", "0.5 + 0i");
+        expected = mc_clone(z);
+        ASSERT_NOT_NULL(expected);
+        print_mcomplex_input("atanh input", "0.321 + 0.123i");
         print_mcomplex_value("atanh initial", z);
         ASSERT_EQ_INT(mc_atanh(z), 0);
         print_mcomplex_value("after atanh(z)", z);
-        print_mcomplex_error_check(
-            "atanh(0.5 + 0i)", z,
-            "0.549306144334054845697622618461262852323745278911374725867347166818747146609304483436807877406866044393985014532978932871184002112965259910526400935383638705301581384591690683589686849422180479951871285158397955760572795958875335673527470083387790111101585126473448780345053260752821434069018158686649288891181",
-            "0");
-        ASSERT_TRUE(mcomplex_meets_precision_bits(
-            z,
-            "0.549306144334054845697622618461262852323745278911374725867347166818747146609304483436807877406866044393985014532978932871184002112965259910526400935383638705301581384591690683589686849422180479951871285158397955760572795958875335673527470083387790111101585126473448780345053260752821434069018158686649288891181",
-            "0",
-            TEST_MCOMPLEX_MATHS_PRECISION));
+        ASSERT_EQ_INT(mc_tanh(z), 0);
+        print_mcomplex_value("after tanh(atanh(z))", z);
+        print_mcomplex_error_check_value("tanh(atanh(0.321 + 0.123i))", z, expected);
+        ASSERT_TRUE(mcomplex_matches_value_bits(z, expected,
+                                               TEST_MCOMPLEX_MATHS_PRECISION));
         break;
     }
 
@@ -1405,41 +1406,49 @@ static void test_real_special_replacements(void)
         mc_free(z);
         z = NULL;
 
-        z = create_real_mcomplex("1");
+        z = create_test_mcomplex("1 + 1i");
         ASSERT_NOT_NULL(z);
-        expected_precision = mc_get_precision(z);
-        print_mcomplex_input("lambert_w0 input", "1 + 0i");
+        expected = mc_clone(z);
+        ASSERT_NOT_NULL(expected);
+        print_mcomplex_input("lambert_w0 input", "1 + 1i");
         print_mcomplex_value("lambert_w0 initial", z);
         ASSERT_EQ_INT(mc_lambert_w0(z), 0);
         print_mcomplex_value("after lambert_w0(z)", z);
-        ASSERT_EQ_LONG((long)mc_get_precision(z), (long)expected_precision);
-        print_mcomplex_error_check(
-            "lambert_w0(1 + 0i)", z,
-            "0.5671432904097838729999686622103555497538157871865125081351310792230457930866845666932194469617522945576380249728667897854523584659400729956085164392899946143115714929598",
-            "0");
-        ASSERT_TRUE(mcomplex_meets_precision(
-            z,
-            "0.5671432904097838729999686622103555497538157871865125081351310792230457930866845666932194469617522945576380249728667897854523584659400729956085164392899946143115714929598",
-            "0"));
+        other = mc_clone(z);
+        ASSERT_NOT_NULL(other);
+        ASSERT_EQ_INT(mc_exp(z), 0);
+        ASSERT_EQ_INT(mc_mul(z, other), 0);
+        print_mcomplex_value("after exp(lambert_w0(z)) * lambert_w0(z)", z);
+        print_mcomplex_error_check_value("lambert_w0(1 + 1i) roundtrip", z, expected);
+        ASSERT_TRUE(mcomplex_matches_value_bits(z, expected,
+                                               TEST_MCOMPLEX_MATHS_PRECISION));
+        mc_free(other);
+        other = NULL;
+        mc_free(expected);
+        expected = NULL;
         mc_free(z);
         z = NULL;
 
-        z = create_real_mcomplex("-0.1");
+        z = create_test_mcomplex("-1 - 0.5i");
         ASSERT_NOT_NULL(z);
-        expected_precision = mc_get_precision(z);
-        print_mcomplex_input("lambert_wm1 input", "-0.1 + 0i");
+        expected = mc_clone(z);
+        ASSERT_NOT_NULL(expected);
+        print_mcomplex_input("lambert_wm1 input", "-1 - 0.5i");
         print_mcomplex_value("lambert_wm1 initial", z);
         ASSERT_EQ_INT(mc_lambert_wm1(z), 0);
         print_mcomplex_value("after lambert_wm1(z)", z);
-        ASSERT_EQ_LONG((long)mc_get_precision(z), (long)expected_precision);
-        print_mcomplex_error_check(
-            "lambert_wm1(-0.1 + 0i)", z,
-            "-3.577152063957297218409391963511994880401796257793075923683527755791687236350575462861463655620846808017732465627597059470558844569051750534584923541827063499452631656593265232240273452302009544089866198954722805115875488714857591771",
-            "0");
-        ASSERT_TRUE(mcomplex_meets_precision(
-            z,
-            "-3.577152063957297218409391963511994880401796257793075923683527755791687236350575462861463655620846808017732465627597059470558844569051750534584923541827063499452631656593265232240273452302009544089866198954722805115875488714857591771",
-            "0"));
+        other = mc_clone(z);
+        ASSERT_NOT_NULL(other);
+        ASSERT_EQ_INT(mc_exp(z), 0);
+        ASSERT_EQ_INT(mc_mul(z, other), 0);
+        print_mcomplex_value("after exp(lambert_wm1(z)) * lambert_wm1(z)", z);
+        print_mcomplex_error_check_value("lambert_wm1(-1 - 0.5i) roundtrip", z, expected);
+        ASSERT_TRUE(mcomplex_matches_value_bits(z, expected,
+                                               TEST_MCOMPLEX_MATHS_PRECISION));
+        mc_free(other);
+        other = NULL;
+        mc_free(expected);
+        expected = NULL;
         mc_free(z);
         z = NULL;
 
