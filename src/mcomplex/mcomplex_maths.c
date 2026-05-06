@@ -964,12 +964,16 @@ int mc_asin(mcomplex_t *mcomplex)
     size_t precision_bits;
     size_t work_prec;
     int iter;
+    int iter_count;
+    bool use_qseed;
     int rc = mcomplex_apply_real_unary(mcomplex, mf_asin);
 
     if (rc != -2)
         return rc;
     precision_bits = mc_get_precision(mcomplex);
     work_prec = mcomplex_native_work_prec(mcomplex);
+    use_qseed = precision_bits <= 256u;
+    iter_count = use_qseed ? 4 : 5;
     square = mc_clone(mcomplex);
     iz = mc_clone(mcomplex);
     orig = mc_clone(mcomplex);
@@ -983,18 +987,23 @@ int mc_asin(mcomplex_t *mcomplex)
         mc_set_precision(corr, work_prec) != 0 ||
         mc_set_precision(deriv, work_prec) != 0)
         goto fail;
-    if (mc_mul(square, mcomplex) != 0 ||
-        mc_neg(square) != 0 ||
-        mc_add(square, MC_ONE) != 0 ||
-        mc_sqrt(square) != 0 ||
-        mc_mul(iz, MC_I) != 0 ||
-        mc_add(square, iz) != 0 ||
-        mc_log(square) != 0 ||
-        mc_mul(square, MC_I) != 0 ||
-        mc_neg(square) != 0)
-        goto fail;
+    if (use_qseed) {
+        if (mc_set_qcomplex(square, qc_asin(mc_to_qcomplex(mcomplex))) != 0)
+            goto fail;
+    } else {
+        if (mc_mul(square, mcomplex) != 0 ||
+            mc_neg(square) != 0 ||
+            mc_add(square, MC_ONE) != 0 ||
+            mc_sqrt(square) != 0 ||
+            mc_mul(iz, MC_I) != 0 ||
+            mc_add(square, iz) != 0 ||
+            mc_log(square) != 0 ||
+            mc_mul(square, MC_I) != 0 ||
+            mc_neg(square) != 0)
+            goto fail;
+    }
 
-    for (iter = 0; iter < 5; ++iter) {
+    for (iter = 0; iter < iter_count; ++iter) {
         if (mc_set(corr, mc_real(square), mc_imag(square)) != 0 ||
             mc_set(deriv, mc_real(square), mc_imag(square)) != 0 ||
             mc_sin(corr) != 0 ||
@@ -1026,7 +1035,7 @@ fail:
 int mc_acos(mcomplex_t *mcomplex)
 {
     mcomplex_t *asin_value = NULL;
-    mcomplex_t *half_pi = NULL;
+    mcomplex_t *value = NULL;
     mcomplex_t *two = NULL;
     mcomplex_t *orig = NULL;
     mcomplex_t *corr = NULL;
@@ -1034,51 +1043,61 @@ int mc_acos(mcomplex_t *mcomplex)
     size_t precision_bits;
     size_t work_prec;
     int iter;
+    int iter_count;
+    bool use_qseed;
     int rc = mcomplex_apply_real_unary(mcomplex, mf_acos);
 
     if (rc != -2)
         return rc;
     precision_bits = mc_get_precision(mcomplex);
     work_prec = mcomplex_native_work_prec(mcomplex);
+    use_qseed = (precision_bits <= 256u || precision_bits >= 768u);
+    iter_count = use_qseed ? 4 : 7;
     asin_value = mc_clone(mcomplex);
-    half_pi = mc_clone(MC_PI);
+    value = mc_clone(mcomplex);
     two = mc_create_long(2);
     orig = mc_clone(mcomplex);
     corr = mc_clone(mcomplex);
     deriv = mc_clone(mcomplex);
-    if (!asin_value || !half_pi || !two || !orig || !corr || !deriv)
+    if (!asin_value || !value || !two || !orig || !corr || !deriv)
         goto fail;
     if (mc_set_precision(asin_value, work_prec) != 0 ||
-        mc_set_precision(half_pi, work_prec) != 0 ||
+        mc_set_precision(value, work_prec) != 0 ||
         mc_set_precision(two, work_prec) != 0 ||
         mc_set_precision(orig, work_prec) != 0 ||
         mc_set_precision(corr, work_prec) != 0 ||
         mc_set_precision(deriv, work_prec) != 0)
         goto fail;
-    if (mc_asin(asin_value) != 0 ||
-        mc_div(half_pi, two) != 0 ||
-        mc_sub(half_pi, asin_value) != 0)
-        goto fail;
+    if (use_qseed) {
+        if (mc_set_qcomplex(value, qc_acos(mc_to_qcomplex(mcomplex))) != 0)
+            goto fail;
+    } else {
+        if (mc_asin(asin_value) != 0 ||
+            mc_set(value, mc_real(MC_PI), mc_imag(MC_PI)) != 0 ||
+            mc_div(value, two) != 0 ||
+            mc_sub(value, asin_value) != 0)
+            goto fail;
+    }
 
-    for (iter = 0; iter < 7; ++iter) {
-        if (mc_set(corr, mc_real(half_pi), mc_imag(half_pi)) != 0 ||
-            mc_set(deriv, mc_real(half_pi), mc_imag(half_pi)) != 0 ||
+    for (iter = 0; iter < iter_count; ++iter) {
+        if (mc_set(corr, mc_real(value), mc_imag(value)) != 0 ||
+            mc_set(deriv, mc_real(value), mc_imag(value)) != 0 ||
             mc_cos(corr) != 0 ||
             mc_sub(corr, orig) != 0 ||
             mc_sin(deriv) != 0 ||
             mc_div(corr, deriv) != 0 ||
-            mc_add(half_pi, corr) != 0)
+            mc_add(value, corr) != 0)
             goto fail;
     }
-    if (mc_set_precision(half_pi, precision_bits) != 0 ||
-        mc_set(mcomplex, mc_real(half_pi), mc_imag(half_pi)) != 0)
+    if (mc_set_precision(value, precision_bits) != 0 ||
+        mc_set(mcomplex, mc_real(value), mc_imag(value)) != 0)
         goto fail;
     mc_free(deriv);
     mc_free(corr);
     mc_free(orig);
     mc_free(two);
-    mc_free(half_pi);
     mc_free(asin_value);
+    mc_free(value);
     return 0;
 
 fail:
@@ -1086,8 +1105,8 @@ fail:
     mc_free(corr);
     mc_free(orig);
     mc_free(two);
-    mc_free(half_pi);
     mc_free(asin_value);
+    mc_free(value);
     return -1;
 }
 
