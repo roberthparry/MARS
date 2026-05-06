@@ -230,6 +230,7 @@ int main(void)
     run_unary_case("lambert_w0_1", "1", 256u, mc_lambert_w0, bench_scaled_iters(2000));
     run_unary_case("productlog_1", "1", 256u, mc_productlog, bench_scaled_iters(2000));
     run_unary_case("lambert_wm1_-0_1", "-0.1", 256u, mc_lambert_wm1, bench_scaled_iters(1000));
+    run_unary_case("lambert_w0_1_plus_1i", "1 + 1i", 256u, mc_lambert_w0, bench_scaled_iters(2));
     run_unary_case("productlog_1_plus_1i", "1 + 1i", 256u, mc_productlog, bench_scaled_iters(8));
     run_unary_case("lambert_wm1_-0_2_-0_1i", "-0.2 - 0.1i", 256u, mc_lambert_wm1, bench_scaled_iters(6));
     run_unary_case("ei_1_plus_1i", "1 + 1i", 256u, mc_ei, bench_scaled_iters(300));
