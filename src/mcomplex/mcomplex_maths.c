@@ -341,6 +341,254 @@ static size_t mcomplex_native_work_prec(const mcomplex_t *mcomplex)
     return precision_bits + 512u;
 }
 
+static int mcomplex_set_real_ratio(mcomplex_t *mcomplex, long num, long den)
+{
+    mcomplex_t *tmp = NULL;
+    int rc = -1;
+
+    if (!mcomplex || den == 0)
+        return -1;
+
+    tmp = mc_create_long(num);
+    if (!tmp)
+        return -1;
+    if (mc_set_precision(tmp, mc_get_precision(mcomplex)) != 0)
+        goto cleanup;
+    if (den != 1) {
+        mcomplex_t *denom = mc_create_long(den);
+        if (!denom)
+            goto cleanup;
+        if (mc_set_precision(denom, mc_get_precision(mcomplex)) != 0 ||
+            mc_div(tmp, denom) != 0) {
+            mc_free(denom);
+            goto cleanup;
+        }
+        mc_free(denom);
+    }
+    if (mc_set(mcomplex, mc_real(tmp), mc_imag(tmp)) != 0)
+        goto cleanup;
+    rc = 0;
+
+cleanup:
+    mc_free(tmp);
+    return rc;
+}
+
+static int mcomplex_native_log_sqrt_2pi(mcomplex_t *dst, size_t work_prec)
+{
+    mcomplex_t *two = NULL;
+    int rc = -1;
+
+    if (!dst)
+        return -1;
+    two = mc_create_long(2);
+    if (!two)
+        return -1;
+    if (mc_set_precision(dst, work_prec) != 0 ||
+        mc_set_precision(two, work_prec) != 0 ||
+        mc_set(dst, mc_real(MC_PI), mc_imag(MC_PI)) != 0 ||
+        mc_mul(dst, two) != 0 ||
+        mc_log(dst) != 0 ||
+        mc_ldexp(dst, -1) != 0)
+        goto cleanup;
+    rc = 0;
+
+cleanup:
+    mc_free(two);
+    return rc;
+}
+
+static int mcomplex_native_lgamma_asymptotic(mcomplex_t *dst, const mcomplex_t *z, size_t work_prec)
+{
+    static const long numerators[] = {
+        1L, -1L, 1L, -1L, 1L, -691L, 1L, -3617L
+    };
+    static const long denominators[] = {
+        12L, 360L, 1260L, 1680L, 1188L, 360360L, 156L, 122400L
+    };
+    mcomplex_t *log_z = NULL;
+    mcomplex_t *z_minus_half = NULL;
+    mcomplex_t *inv = NULL;
+    mcomplex_t *inv2 = NULL;
+    mcomplex_t *pow = NULL;
+    mcomplex_t *term = NULL;
+    mcomplex_t *const_term = NULL;
+    size_t i;
+
+    if (!dst || !z)
+        return -1;
+
+    log_z = mc_clone(z);
+    z_minus_half = mc_clone(z);
+    inv = mc_clone(z);
+    inv2 = mc_clone(z);
+    pow = mc_new_prec(work_prec);
+    term = mc_new_prec(work_prec);
+    const_term = mc_new_prec(work_prec);
+    if (!log_z || !z_minus_half || !inv || !inv2 || !pow || !term || !const_term)
+        goto fail;
+    if (mc_set_precision(log_z, work_prec) != 0 ||
+        mc_set_precision(z_minus_half, work_prec) != 0 ||
+        mc_set_precision(inv, work_prec) != 0 ||
+        mc_set_precision(inv2, work_prec) != 0 ||
+        mc_set_precision(pow, work_prec) != 0 ||
+        mc_set_precision(term, work_prec) != 0 ||
+        mc_set_precision(const_term, work_prec) != 0)
+        goto fail;
+
+    if (mc_log(log_z) != 0 ||
+        mc_sub(z_minus_half, MC_HALF) != 0 ||
+        mc_mul(z_minus_half, log_z) != 0 ||
+        mc_sub(z_minus_half, z) != 0 ||
+        mcomplex_native_log_sqrt_2pi(const_term, work_prec) != 0 ||
+        mc_add(z_minus_half, const_term) != 0)
+        goto fail;
+
+    if (mc_inv(inv) != 0 ||
+        mc_set(inv2, mc_real(inv), mc_imag(inv)) != 0 ||
+        mc_mul(inv2, inv) != 0 ||
+        mc_set(pow, mc_real(inv), mc_imag(inv)) != 0)
+        goto fail;
+
+    for (i = 0; i < sizeof(numerators) / sizeof(numerators[0]); ++i) {
+        if (mcomplex_set_real_ratio(term, numerators[i], denominators[i]) != 0 ||
+            mc_set_precision(term, work_prec) != 0 ||
+            mc_mul(term, pow) != 0 ||
+            mc_add(z_minus_half, term) != 0)
+            goto fail;
+        if (i + 1 < sizeof(numerators) / sizeof(numerators[0]) &&
+            mc_mul(pow, inv2) != 0)
+            goto fail;
+    }
+
+    if (mc_set(dst, mc_real(z_minus_half), mc_imag(z_minus_half)) != 0)
+        goto fail;
+
+    mc_free(const_term);
+    mc_free(term);
+    mc_free(pow);
+    mc_free(inv2);
+    mc_free(inv);
+    mc_free(z_minus_half);
+    mc_free(log_z);
+    return 0;
+
+fail:
+    mc_free(const_term);
+    mc_free(term);
+    mc_free(pow);
+    mc_free(inv2);
+    mc_free(inv);
+    mc_free(z_minus_half);
+    mc_free(log_z);
+    return -1;
+}
+
+static int mcomplex_native_lgamma(mcomplex_t *mcomplex)
+{
+    mcomplex_t *orig = NULL;
+    mcomplex_t *shifted = NULL;
+    mcomplex_t *accum = NULL;
+    mcomplex_t *term = NULL;
+    mcomplex_t *threshold = NULL;
+    mcomplex_t *one_minus_z = NULL;
+    mcomplex_t *log_sin_piz = NULL;
+    mcomplex_t *log_pi = NULL;
+    mcomplex_t *one = NULL;
+    size_t precision_bits;
+    size_t work_prec;
+
+    if (!mcomplex)
+        return -1;
+
+    precision_bits = mc_get_precision(mcomplex);
+    work_prec = precision_bits + 384u;
+
+    orig = mc_clone(mcomplex);
+    if (!orig)
+        goto fail;
+    if (mc_set_precision(orig, work_prec) != 0)
+        goto fail;
+
+    if (mf_lt(mc_real(orig), MF_HALF)) {
+        one_minus_z = mc_clone(orig);
+        log_sin_piz = mc_clone(orig);
+        log_pi = mc_new_prec(work_prec);
+        if (!one_minus_z || !log_sin_piz || !log_pi)
+            goto fail;
+        if (mc_set_precision(one_minus_z, work_prec) != 0 ||
+            mc_set_precision(log_sin_piz, work_prec) != 0)
+            goto fail;
+        if (mc_neg(one_minus_z) != 0 ||
+            mc_add(one_minus_z, MC_ONE) != 0 ||
+            mc_mul(log_sin_piz, MC_PI) != 0 ||
+            mc_sin(log_sin_piz) != 0 ||
+            mc_log(log_sin_piz) != 0 ||
+            mcomplex_native_lgamma(one_minus_z) != 0 ||
+            mcomplex_native_log_sqrt_2pi(log_pi, work_prec) != 0 ||
+            mc_ldexp(log_pi, 1) != 0 ||
+            mc_sub(log_pi, log_sin_piz) != 0 ||
+            mc_sub(log_pi, one_minus_z) != 0 ||
+            mc_set_precision(log_pi, precision_bits) != 0 ||
+            mc_set(mcomplex, mc_real(log_pi), mc_imag(log_pi)) != 0)
+            goto fail;
+        mc_free(log_pi);
+        mc_free(log_sin_piz);
+        mc_free(one_minus_z);
+        mc_free(orig);
+        return 0;
+    }
+
+    shifted = mc_clone(orig);
+    accum = mc_new_prec(work_prec);
+    term = mc_new_prec(work_prec);
+    threshold = mc_create_long(32);
+    one = mc_create_long(1);
+    if (!shifted || !accum || !term || !threshold || !one)
+        goto fail;
+    if (mc_set_precision(shifted, work_prec) != 0 ||
+        mc_set_precision(accum, work_prec) != 0 ||
+        mc_set_precision(term, work_prec) != 0 ||
+        mc_set_precision(threshold, work_prec) != 0 ||
+        mc_set_precision(one, work_prec) != 0)
+        goto fail;
+
+    mc_clear(accum);
+    while (mf_lt(mc_real(shifted), mc_real(threshold))) {
+        if (mc_set(term, mc_real(shifted), mc_imag(shifted)) != 0 ||
+            mc_log(term) != 0 ||
+            mc_add(accum, term) != 0 ||
+            mc_add(shifted, one) != 0)
+            goto fail;
+    }
+
+    if (mcomplex_native_lgamma_asymptotic(term, shifted, work_prec) != 0 ||
+        mc_sub(term, accum) != 0 ||
+        mc_set_precision(term, precision_bits) != 0 ||
+        mc_set(mcomplex, mc_real(term), mc_imag(term)) != 0)
+        goto fail;
+
+    mc_free(one);
+    mc_free(threshold);
+    mc_free(term);
+    mc_free(accum);
+    mc_free(shifted);
+    mc_free(orig);
+    return 0;
+
+fail:
+    mc_free(one);
+    mc_free(threshold);
+    mc_free(term);
+    mc_free(accum);
+    mc_free(shifted);
+    mc_free(log_pi);
+    mc_free(log_sin_piz);
+    mc_free(one_minus_z);
+    mc_free(orig);
+    return -1;
+}
+
 static int mcomplex_native_sin_cos(mcomplex_t *mcomplex, int want_cos)
 {
     mcomplex_t *positive = NULL;
@@ -1143,7 +1391,7 @@ int mc_lgamma(mcomplex_t *mcomplex)
 
     if (rc != -2)
         return rc;
-    return mcomplex_apply_unary(mcomplex, qc_lgamma);
+    return mcomplex_native_lgamma(mcomplex);
 }
 
 int mc_digamma(mcomplex_t *mcomplex)

@@ -1733,6 +1733,42 @@ static void test_difficult_mcomplex_cases(void)
     ASSERT_TRUE(mcomplex_matches_value(other, z));
     mc_free(other);
     mc_free(z);
+
+    z = mc_create_string("1.5 + 0.7i");
+    expected = mc_clone(z);
+    other = mc_clone(z);
+    ASSERT_NOT_NULL(z);
+    ASSERT_NOT_NULL(expected);
+    ASSERT_NOT_NULL(other);
+    ASSERT_EQ_INT(mc_add(other, MC_ONE), 0);
+    ASSERT_EQ_INT(mc_gamma(z), 0);
+    ASSERT_EQ_INT(mc_gamma(other), 0);
+    ASSERT_EQ_INT(mc_mul(z, expected), 0);
+    print_mcomplex_error_check_value("gamma(z + 1) - z * gamma(z) for z = 1.5 + 0.7i", other, z);
+    ASSERT_TRUE(mcomplex_matches_value_bits(other, z, TEST_MCOMPLEX_MATHS_PRECISION));
+    mc_free(other);
+    mc_free(expected);
+    mc_free(z);
+
+    z = mc_create_string("1.5 + 0.7i");
+    expected = mc_clone(z);
+    other = mc_clone(z);
+    ASSERT_NOT_NULL(z);
+    ASSERT_NOT_NULL(expected);
+    ASSERT_NOT_NULL(other);
+    ASSERT_EQ_INT(mc_add(other, MC_ONE), 0);
+    ASSERT_EQ_INT(mc_lgamma(z), 0);
+    ASSERT_EQ_INT(mc_lgamma(other), 0);
+    ASSERT_EQ_INT(mc_sub(other, z), 0);
+    ASSERT_EQ_INT(mc_log(expected), 0);
+    ASSERT_EQ_INT(mc_sub(other, expected), 0);
+    mc_clear(expected);
+    print_mcomplex_error_check_value("lgamma(z + 1) - lgamma(z) - log(z) for z = 1.5 + 0.7i", other, expected);
+    ASSERT_TRUE(mcomplex_matches_value_bits(other, expected,
+                                            TEST_MCOMPLEX_MATHS_PRECISION));
+    mc_free(other);
+    mc_free(expected);
+    mc_free(z);
 }
 
 int tests_main(void)
