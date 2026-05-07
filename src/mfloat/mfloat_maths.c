@@ -2264,7 +2264,7 @@ cleanup:
 
 static int mfloat_sinhcosh_pair(mfloat_t *sinh_dst, mfloat_t *cosh_dst, const mfloat_t *x, size_t precision)
 {
-    mfloat_scratch_slot_t slots[5];
+    mfloat_scratch_slot_t slots[4];
     mfloat_t *ax, *ex, *inv_ex, *sinh_tmp, *cosh_tmp;
     int rc = -1;
     size_t i;
@@ -2272,13 +2272,13 @@ static int mfloat_sinhcosh_pair(mfloat_t *sinh_dst, mfloat_t *cosh_dst, const mf
 
     if (!sinh_dst || !cosh_dst || !x)
         return -1;
-    for (i = 0; i < 5u; ++i)
+    for (i = 0; i < 4u; ++i)
         mfloat_scratch_init_slot(&slots[i], precision);
     ax = &slots[0].value;
     ex = &slots[1].value;
     inv_ex = &slots[2].value;
     sinh_tmp = &slots[3].value;
-    cosh_tmp = &slots[4].value;
+    cosh_tmp = ax;
 
     if (mfloat_scratch_copy(ax, x) != 0)
         goto cleanup;
@@ -2293,13 +2293,17 @@ static int mfloat_sinhcosh_pair(mfloat_t *sinh_dst, mfloat_t *cosh_dst, const mf
         goto cleanup;
     if (mfloat_scratch_copy(inv_ex, ex) != 0 || mf_inv(inv_ex) != 0)
         goto cleanup;
-    if (mfloat_scratch_copy(sinh_tmp, ex) != 0 || mfloat_scratch_copy(cosh_tmp, ex) != 0)
+    if (mfloat_scratch_copy(sinh_tmp, ex) != 0 || mfloat_scratch_copy(cosh_tmp, inv_ex) != 0)
         goto cleanup;
-    if (mf_sub(sinh_tmp, inv_ex) != 0 || mfloat_div_long_inplace(sinh_tmp, 2) != 0)
+    if (mf_sub(sinh_tmp, inv_ex) != 0)
+        goto cleanup;
+    if (mf_mul_long(cosh_tmp, 2) != 0 || mf_add(cosh_tmp, sinh_tmp) != 0)
+        goto cleanup;
+    if (mfloat_div_long_inplace(sinh_tmp, 2) != 0)
         goto cleanup;
     if (negate_sinh && mf_neg(sinh_tmp) != 0)
         goto cleanup;
-    if (mf_add(cosh_tmp, inv_ex) != 0 || mfloat_div_long_inplace(cosh_tmp, 2) != 0)
+    if (mfloat_div_long_inplace(cosh_tmp, 2) != 0)
         goto cleanup;
     if (mfloat_copy_value(sinh_dst, sinh_tmp) != 0 || mfloat_copy_value(cosh_dst, cosh_tmp) != 0)
         goto cleanup;
@@ -2307,7 +2311,7 @@ static int mfloat_sinhcosh_pair(mfloat_t *sinh_dst, mfloat_t *cosh_dst, const mf
     rc = 0;
 
 cleanup:
-    for (i = 0; i < 5u; ++i)
+    for (i = 0; i < 4u; ++i)
         mfloat_scratch_release_slot(&slots[i]);
     return rc;
 }
