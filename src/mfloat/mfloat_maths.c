@@ -2905,7 +2905,7 @@ int mf_exp(mfloat_t *mfloat)
     }
 
     precision = mfloat->precision;
-    work_prec = precision > 512u ? 1024u : mfloat_cap_work_prec(mfloat_transcendental_work_prec(precision) + 32u);
+    work_prec = mfloat_cap_work_prec(mfloat_transcendental_work_prec(precision) + 32u);
     x = mfloat_clone_prec(mfloat, work_prec);
     ln2 = mfloat_clone_immortal_prec_internal(&mfloat_ln2_seed, work_prec);
     if (!x || !ln2)
@@ -2934,7 +2934,7 @@ int mf_exp(mfloat_t *mfloat)
     if (!r || mf_sub(r, kln2) != 0)
         goto cleanup;
 
-    if (precision == 256u) {
+    if (precision <= 512u) {
         size_t refine_bits = MFLOAT_QFLOAT_EFFECTIVE_BITS;
         int refine_steps = 0;
 

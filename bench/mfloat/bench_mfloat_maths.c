@@ -5,6 +5,7 @@
 #include <time.h>
 
 #include "mfloat.h"
+#include "mfloat/mfloat_internal.h"
 
 static uint64_t now_ns(void)
 {
@@ -69,6 +70,7 @@ static void run_unary_case(const char *label,
     uint64_t start;
     uint64_t end;
     double avg_us;
+    mfloat_t *value;
 
     if (!bench_case_enabled(label))
         return;
@@ -86,31 +88,47 @@ static void run_unary_case(const char *label,
         return;
     }
 
-    {
-        mfloat_t *warm = mf_clone(src);
+    value = mf_clone(src);
+    if (!value) {
+        fprintf(stderr, "%s work clone failed\n", label);
+        mf_free(src);
+        (void)mf_set_default_precision(old_prec);
+        return;
+    }
 
-        if (!warm || fn(warm) != 0) {
+    {
+        if (fn(value) != 0) {
             fprintf(stderr, "%s warmup failed\n", label);
-            mf_free(warm);
+            mf_free(value);
             mf_free(src);
             (void)mf_set_default_precision(old_prec);
             return;
         }
-        mf_free(warm);
+        if (mfloat_copy_value(value, src) != 0) {
+            fprintf(stderr, "%s warmup reset failed\n", label);
+            mf_free(value);
+            mf_free(src);
+            (void)mf_set_default_precision(old_prec);
+            return;
+        }
     }
 
     start = now_ns();
     for (int i = 0; i < iters; ++i) {
-        mfloat_t *value = mf_clone(src);
-
-        if (!value || fn(value) != 0) {
+        if (fn(value) != 0) {
             fprintf(stderr, "%s timed run failed\n", label);
             mf_free(value);
             mf_free(src);
             (void)mf_set_default_precision(old_prec);
             return;
         }
-        mf_free(value);
+        if (i + 1 < iters && mfloat_copy_value(value, src) != 0) {
+            fprintf(stderr, "%s timed reset failed\n", label);
+            mf_free(value);
+            mf_free(src);
+            (void)mf_set_default_precision(old_prec);
+            return;
+        }
     }
     end = now_ns();
 
@@ -121,6 +139,7 @@ static void run_unary_case(const char *label,
            avg_us,
            avg_us / 1000.0);
 
+    mf_free(value);
     mf_free(src);
     (void)mf_set_default_precision(old_prec);
 }
@@ -494,10 +513,10 @@ int main(void)
     if (bench_wants_exact_section("exp")) {
         puts("");
         puts("-- exp --");
-        run_unary_case("exp_256", "1.23456789", 256u, mf_exp, bench_scaled_iters(8));
-        run_unary_case("exp_512", "1.23456789", 512u, mf_exp, bench_scaled_iters(2));
-        run_unary_case("exp_768", "1.23456789", 768u, mf_exp, bench_scaled_iters(1));
-        run_unary_case("exp_1024", "1.23456789", 1024u, mf_exp, bench_scaled_iters(1));
+        run_unary_case("exp_256", "1.23456789", 256u, mf_exp, bench_scaled_iters(12));
+        run_unary_case("exp_512", "1.23456789", 512u, mf_exp, bench_scaled_iters(6));
+        run_unary_case("exp_768", "1.23456789", 768u, mf_exp, bench_scaled_iters(4));
+        run_unary_case("exp_1024", "1.23456789", 1024u, mf_exp, bench_scaled_iters(4));
     }
 
     if (bench_wants_exact_section("log")) {
