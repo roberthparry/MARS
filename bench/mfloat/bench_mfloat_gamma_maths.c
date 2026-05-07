@@ -128,6 +128,8 @@ int main(void)
     run_unary_case("lgamma_2_3_512", "2.3", 512u, mf_lgamma, bench_scaled_iters(2));
     run_unary_case("gamma_2_3_768", "2.3", 768u, mf_gamma, bench_scaled_iters(2));
     run_unary_case("lgamma_2_3_768", "2.3", 768u, mf_lgamma, bench_scaled_iters(2));
+    run_unary_case("gamma_2_3_1024", "2.3", 1024u, mf_gamma, bench_scaled_iters(1));
+    run_unary_case("lgamma_2_3_1024", "2.3", 1024u, mf_lgamma, bench_scaled_iters(1));
     run_unary_case("gamma_2_5_256", "2.5", 256u, mf_gamma, bench_scaled_iters(8));
     run_unary_case("lgamma_2_5_256", "2.5", 256u, mf_lgamma, bench_scaled_iters(8));
     run_unary_case("gamma_3_5_256", "3.5", 256u, mf_gamma, bench_scaled_iters(8));

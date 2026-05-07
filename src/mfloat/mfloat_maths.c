@@ -1827,30 +1827,19 @@ static long mfloat_estimate_positive_unit_steps(const mfloat_t *value, long thre
 
 static long mfloat_lgamma_asymptotic_threshold(size_t precision)
 {
-    double alpha;
-    double target;
-
-    if (precision <= 100u)
-        alpha = 0.6;
-    else if (precision <= 500u)
-        alpha = 0.8;
-    else if (precision <= 1000u)
-        alpha = 1.3;
-    else if (precision <= 2000u)
-        alpha = 1.7;
-    else if (precision <= 5000u)
-        alpha = 2.2;
-    else if (precision <= 10000u)
-        alpha = 3.4;
-    else
-        alpha = 4.5;
-
-    target = alpha * (double)precision * 0.69314718055994530942;
-    if (target < 8.0)
-        target = 8.0;
-    if (target > (double)LONG_MAX)
-        target = (double)LONG_MAX;
-    return (long)target + (((double)(long)target < target) ? 1l : 0l);
+    if (precision <= 128u)
+        return 16l;
+    if (precision <= 256u)
+        return 20l;
+    if (precision <= 512u)
+        return 24l;
+    if (precision <= 1024u)
+        return 32l;
+    if (precision <= 2048u)
+        return 40l;
+    if (precision <= 4096u)
+        return 48l;
+    return 64l;
 }
 
 static int mfloat_compute_e(mfloat_t *dst, size_t precision)
