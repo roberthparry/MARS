@@ -3331,7 +3331,7 @@ int mf_tan(mfloat_t *mfloat)
         return rc;
     }
 
-    work_prec = mfloat_cap_work_prec(mfloat_transcendental_work_prec(precision));
+    work_prec = mfloat_cap_work_prec(precision + MFLOAT_CONST_GUARD_BITS);
     for (i = 0; i < 2u; ++i)
         mfloat_scratch_init_slot(&slots[i], work_prec);
     s = &slots[0].value;
