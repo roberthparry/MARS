@@ -3870,7 +3870,7 @@ int mf_asinh(mfloat_t *mfloat)
     cosh_y = mfloat_clone_prec(MF_ZERO, work_prec);
     if (!y || !sinh_y || !cosh_y)
         goto cleanup;
-    for (int iter = 0; iter < 3; ++iter) {
+    for (int iter = 0; iter < 2; ++iter) {
         if (mf_set_precision(sinh_y, work_prec) != 0 ||
             mf_set_precision(cosh_y, work_prec) != 0 ||
             mf_set_precision(y, work_prec) != 0)
@@ -3932,7 +3932,7 @@ int mf_acosh(mfloat_t *mfloat)
     sinh_y = mfloat_clone_prec(MF_ZERO, work_prec);
     if (!y || !cosh_y || !sinh_y)
         goto cleanup;
-    for (int iter = 0; iter < 3; ++iter) {
+    for (int iter = 0; iter < 2; ++iter) {
         if (mf_set_precision(cosh_y, work_prec) != 0 ||
             mf_set_precision(sinh_y, work_prec) != 0 ||
             mf_set_precision(y, work_prec) != 0)
