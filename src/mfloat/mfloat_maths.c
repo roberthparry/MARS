@@ -3305,6 +3305,7 @@ int mf_tan(mfloat_t *mfloat)
     size_t precision, work_prec;
     mfloat_scratch_slot_t slots[2];
     mfloat_t *s, *c;
+    double xd;
     int rc = -1;
     size_t i;
 
@@ -3316,6 +3317,49 @@ int mf_tan(mfloat_t *mfloat)
         return mf_set_double(mfloat, NAN);
 
     precision = mfloat->precision;
+    xd = fabs(mf_to_double(mfloat));
+    if (precision <= 512u && isfinite(xd) && xd <= 0.8) {
+        mfloat_t *x = NULL, *y = NULL, *atan_y = NULL, *step = NULL, *tmp = NULL;
+
+        work_prec = mfloat_transcendental_work_prec(precision);
+        x = mfloat_clone_prec(mfloat, work_prec);
+        y = mf_new_prec(work_prec);
+        atan_y = mf_new_prec(work_prec);
+        step = mf_new_prec(work_prec);
+        tmp = mf_new_prec(work_prec);
+        if (!x || !y || !atan_y || !step || !tmp)
+            goto tan_seed_cleanup;
+        if (mf_set_qfloat(y, qf_tan(mf_to_qfloat(x))) != 0)
+            goto tan_seed_cleanup;
+        if (mfloat_copy_value(atan_y, y) != 0 || mf_atan(atan_y) != 0)
+            goto tan_seed_cleanup;
+        if (mf_sub(atan_y, x) != 0)
+            goto tan_seed_cleanup;
+        if (mfloat_copy_value(step, y) != 0 || mf_mul(step, y) != 0 ||
+            mf_add_long(step, 1) != 0 || mf_mul(step, atan_y) != 0)
+            goto tan_seed_cleanup;
+        if (mfloat_copy_value(tmp, y) != 0 || mf_sub(tmp, step) != 0)
+            goto tan_seed_cleanup;
+        if (mfloat_finish_result(mfloat, tmp, precision) != 0)
+            goto tan_seed_cleanup;
+        mf_free(x);
+        mf_free(y);
+        mf_free(atan_y);
+        mf_free(step);
+        mf_free(tmp);
+        return 0;
+
+tan_seed_cleanup:
+        mf_free(x);
+        mf_free(y);
+        mf_free(atan_y);
+        mf_free(step);
+        mf_free(tmp);
+        rc = -1;
+        if (rc == 0)
+            return 0;
+    }
+
     if (precision <= 512u) {
         c = mf_clone(mfloat);
         if (!c)
