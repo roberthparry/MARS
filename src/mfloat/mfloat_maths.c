@@ -2872,9 +2872,11 @@ int mf_exp(mfloat_t *mfloat)
 {
     size_t precision, work_prec;
     mfloat_t *x = NULL, *ln2 = NULL, *kln2 = NULL, *r = NULL, *sum = NULL, *term = NULL;
+    mfloat_t *seed = NULL, *corr = NULL, *one_plus = NULL;
     double xd, ln2d;
     long k;
     int squarings = 0;
+    int used_seed_refine = 0;
     int rc = -1;
 
     if (!mfloat)
@@ -2932,33 +2934,61 @@ int mf_exp(mfloat_t *mfloat)
     if (!r || mf_sub(r, kln2) != 0)
         goto cleanup;
 
-    xd = fabs(mf_to_double(r));
-    while (xd > 0.125 && squarings < 8) {
-        if (mf_ldexp(r, -1) != 0)
+    if (precision == 256u) {
+        size_t refine_bits = MFLOAT_QFLOAT_EFFECTIVE_BITS;
+        int refine_steps = 0;
+
+        seed = mfloat_new_from_qfloat_prec(qf_exp(mf_to_qfloat(r)), work_prec);
+        corr = mf_new_prec(work_prec);
+        one_plus = mfloat_clone_prec(MF_ONE, work_prec);
+        if (!seed || !corr || !one_plus)
             goto cleanup;
-        xd *= 0.5;
-        squarings++;
+
+        while (refine_bits < work_prec + 8u) {
+            refine_bits <<= 1;
+            refine_steps++;
+        }
+        for (int i = 0; i < refine_steps; ++i) {
+            if (mfloat_copy_value(corr, seed) != 0 || mf_log(corr) != 0 || mf_sub(corr, r) != 0 || mf_neg(corr) != 0)
+                goto cleanup;
+            if (mfloat_is_below_neg_bits(corr, (long)work_prec + 8l))
+                break;
+            if (mfloat_copy_value(one_plus, MF_ONE) != 0 || mf_add(one_plus, corr) != 0 || mf_mul(seed, one_plus) != 0)
+                goto cleanup;
+        }
+        sum = seed;
+        used_seed_refine = 1;
+    } else {
+        xd = fabs(mf_to_double(r));
+        while (xd > 0.125 && squarings < 8) {
+            if (mf_ldexp(r, -1) != 0)
+                goto cleanup;
+            xd *= 0.5;
+            squarings++;
+        }
+
+        sum = mfloat_clone_prec(MF_ONE, work_prec);
+        term = mfloat_clone_prec(MF_ONE, work_prec);
+        if (!sum || !term)
+            goto cleanup;
+
+        for (long n = 1; n < LONG_MAX; ++n) {
+            if (mf_mul(term, r) != 0)
+                goto cleanup;
+            if (mfloat_div_long_inplace(term, n) != 0)
+                goto cleanup;
+            if (mf_add(sum, term) != 0)
+                goto cleanup;
+            if (mfloat_is_below_neg_bits(term, (long)work_prec + 8l))
+                break;
+        }
     }
 
-    sum = mfloat_clone_prec(MF_ONE, work_prec);
-    term = mfloat_clone_prec(MF_ONE, work_prec);
-    if (!sum || !term)
-        goto cleanup;
-
-    for (long n = 1; n < LONG_MAX; ++n) {
-        if (mf_mul(term, r) != 0)
-            goto cleanup;
-        if (mfloat_div_long_inplace(term, n) != 0)
-            goto cleanup;
-        if (mf_add(sum, term) != 0)
-            goto cleanup;
-        if (mfloat_is_below_neg_bits(term, (long)work_prec + 8l))
-            break;
-    }
-
-    for (int i = 0; i < squarings; ++i) {
-        if (mf_mul(sum, sum) != 0)
-            goto cleanup;
+    if (!used_seed_refine) {
+        for (int i = 0; i < squarings; ++i) {
+            if (mf_mul(sum, sum) != 0)
+                goto cleanup;
+        }
     }
 
     if (mf_ldexp(sum, (int)k) != 0)
@@ -2976,6 +3006,8 @@ cleanup:
     mf_free(r);
     mf_free(sum);
     mf_free(term);
+    mf_free(corr);
+    mf_free(one_plus);
     return rc;
 }
 

@@ -477,7 +477,7 @@ int main(void)
 {
     puts("== mfloat native math bench ==");
     puts("Scale iterations with MARS_BENCH_SCALE=<n> if you want longer runs.");
-    puts("Limit to one section with MARS_BENCH_SECTION=constants|log|elem256|triage256|special256|selected512|selected768|selected1024.");
+    puts("Limit to one section with MARS_BENCH_SECTION=constants|exp|log|elem256|triage256|special256|selected512|selected768|selected1024.");
     puts("Filter individual cases with MARS_BENCH_FILTER=<substring>.");
 
     if (bench_wants_section("constants")) {
@@ -489,6 +489,15 @@ int main(void)
         run_const_case("pi_512", 512u, mf_pi, bench_scaled_iters(4));
         run_const_case("e_512", 512u, mf_e, bench_scaled_iters(4));
         run_const_case("gamma_512", 512u, mf_euler_mascheroni, bench_scaled_iters(3));
+    }
+
+    if (bench_wants_exact_section("exp")) {
+        puts("");
+        puts("-- exp --");
+        run_unary_case("exp_256", "1.23456789", 256u, mf_exp, bench_scaled_iters(8));
+        run_unary_case("exp_512", "1.23456789", 512u, mf_exp, bench_scaled_iters(2));
+        run_unary_case("exp_768", "1.23456789", 768u, mf_exp, bench_scaled_iters(1));
+        run_unary_case("exp_1024", "1.23456789", 1024u, mf_exp, bench_scaled_iters(1));
     }
 
     if (bench_wants_exact_section("log")) {

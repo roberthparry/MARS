@@ -1018,21 +1018,6 @@ void test_extended_math_wrappers(void)
     print_mfloat_value("h initial", h);
     print_mfloat_value("p initial", p);
 
-    ASSERT_EQ_INT(mf_exp(a), 0);
-    print_mfloat_value("a after exp", a);
-    print_double_check("exp(1)", "1", 2.718281828459045, mf_to_double(a));
-    print_mfloat_error_check("exp(1) mfloat error",
-                             a,
-                             "2.71828182845904523536028747135266249775724709369995957496696762772407663035354759457138217852516642742746639193200305992181741359662904357290033429526059563073813232862794349076323382988075319525101901157383418793070215408914993488416750924");
-    ASSERT_TRUE(mfloat_meets_precision(
-        a,
-        "2.71828182845904523536028747135266249775724709369995957496696762772407663035354759457138217852516642742746639193200305992181741359662904357290033429526059563073813232862794349076323382988075319525101901157383418793070215408914993488416750924",
-        1));
-    ASSERT_TRUE(fabs(mf_to_double(a) - 2.718281828459045) < 1e-12);
-    expected_e = mf_e();
-    ASSERT_NOT_NULL(expected_e);
-    ASSERT_TRUE(mfloat_matches_expected(a, expected_e, 1));
-
     ASSERT_EQ_INT(mf_sqrt(b), 0);
     print_mfloat_value("b after sqrt", b);
     print_double_check("sqrt(4)", "4", 2.0, mf_to_double(b));
@@ -1695,7 +1680,7 @@ void test_difficult_mfloat_cases(void)
     mf_free(tmp);
 }
 
-void test_log_family(void)
+void test_exp_family(void)
 {
     size_t saved_default = mf_get_default_precision();
     mfloat_t *a = NULL;
@@ -1719,6 +1704,22 @@ void test_log_family(void)
     ASSERT_NOT_NULL(expected_e);
     ASSERT_TRUE(mfloat_matches_expected(a, expected_e, 1));
 
+    mf_free(a);
+    mf_free(expected_e);
+    ASSERT_EQ_INT(mf_set_default_precision(saved_default), 0);
+}
+
+void test_log_family(void)
+{
+    size_t saved_default = mf_get_default_precision();
+    mfloat_t *a = NULL;
+
+    ASSERT_EQ_INT(mf_set_default_precision(TEST_MFLOAT_MATHS_PRECISION), 0);
+    a = mf_create_long(1);
+    ASSERT_NOT_NULL(a);
+
+    ASSERT_EQ_INT(mf_exp(a), 0);
+
     ASSERT_EQ_INT(mf_log(a), 0);
     print_mfloat_value("log(exp(1))", a);
     print_double_check("log(exp(1))", "exp(1)", 1.0, mf_to_double(a));
@@ -1727,11 +1728,10 @@ void test_log_family(void)
     ASSERT_TRUE(fabs(mf_to_double(a) - 1.0) < 1e-12);
 
     mf_free(a);
-    mf_free(expected_e);
     ASSERT_EQ_INT(mf_set_default_precision(saved_default), 0);
 }
 
-void test_log_identities(void)
+void test_exp_identities(void)
 {
     size_t saved_default = mf_get_default_precision();
     mfloat_t *x = NULL;
@@ -1747,6 +1747,24 @@ void test_log_identities(void)
     ASSERT_TRUE(mfloat_meets_precision(x, "1e-20", 1));
 
     mf_free(x);
+    ASSERT_EQ_INT(mf_set_default_precision(saved_default), 0);
+}
+
+void test_log_identities(void)
+{
+    size_t saved_default = mf_get_default_precision();
+    mfloat_t *a = NULL;
+
+    ASSERT_EQ_INT(mf_set_default_precision(TEST_MFLOAT_MATHS_PRECISION), 0);
+    a = mf_create_long(1);
+    ASSERT_NOT_NULL(a);
+
+    ASSERT_EQ_INT(mf_exp(a), 0);
+    ASSERT_EQ_INT(mf_log(a), 0);
+    print_mfloat_error_check_decimal("log(exp(1)) mfloat error", a, "1");
+    ASSERT_TRUE(mfloat_meets_precision(a, "1", 0));
+
+    mf_free(a);
     ASSERT_EQ_INT(mf_set_default_precision(saved_default), 0);
 }
 
@@ -1902,6 +1920,8 @@ int tests_main(void)
     RUN_TEST_CASE(test_conversion_to_double_and_qfloat);
     RUN_TEST_CASE(test_conversion_from_double_and_qfloat);
     RUN_TEST_CASE(test_extended_math_wrappers);
+    RUN_TEST_CASE(test_exp_family);
+    RUN_TEST_CASE(test_exp_identities);
     RUN_TEST_CASE(test_log_family);
     RUN_TEST_CASE(test_log_identities);
     RUN_TEST_CASE(test_gamma_family);
