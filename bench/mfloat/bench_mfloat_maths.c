@@ -40,6 +40,15 @@ static int bench_wants_section(const char *name)
     return strcmp(section, name) == 0;
 }
 
+static int bench_wants_exact_section(const char *name)
+{
+    const char *section = getenv("MARS_BENCH_SECTION");
+
+    if (!section || !*section || strcmp(section, "all") == 0)
+        return 0;
+    return strcmp(section, name) == 0;
+}
+
 static int bench_case_enabled(const char *label)
 {
     const char *filter = getenv("MARS_BENCH_FILTER");
@@ -468,7 +477,7 @@ int main(void)
 {
     puts("== mfloat native math bench ==");
     puts("Scale iterations with MARS_BENCH_SCALE=<n> if you want longer runs.");
-    puts("Limit to one section with MARS_BENCH_SECTION=constants|elem256|triage256|special256|selected512|selected768|selected1024.");
+    puts("Limit to one section with MARS_BENCH_SECTION=constants|log|elem256|triage256|special256|selected512|selected768|selected1024.");
     puts("Filter individual cases with MARS_BENCH_FILTER=<substring>.");
 
     if (bench_wants_section("constants")) {
@@ -480,6 +489,15 @@ int main(void)
         run_const_case("pi_512", 512u, mf_pi, bench_scaled_iters(4));
         run_const_case("e_512", 512u, mf_e, bench_scaled_iters(4));
         run_const_case("gamma_512", 512u, mf_euler_mascheroni, bench_scaled_iters(3));
+    }
+
+    if (bench_wants_exact_section("log")) {
+        puts("");
+        puts("-- log --");
+        run_unary_case("log_256", "1.23456789", 256u, mf_log, bench_scaled_iters(8));
+        run_unary_case("log_512", "1.23456789", 512u, mf_log, bench_scaled_iters(2));
+        run_unary_case("log_768", "1.23456789", 768u, mf_log, bench_scaled_iters(1));
+        run_unary_case("log_1024", "1.23456789", 1024u, mf_log, bench_scaled_iters(1));
     }
 
     if (bench_wants_section("elem256")) {
