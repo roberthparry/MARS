@@ -368,7 +368,7 @@ Results:
 | `mf_asinh(0.5)` | `0.585 ms` | `1.493 ms` | `2.637 ms` | `4.012 ms` |
 | `mf_acosh(2)` | `0.937 ms` | `1.255 ms` | `1.583 ms` | `1.825 ms` |
 | `mf_atanh(0.5)` | `0.717 ms` | `3.454 ms` | `4.907 ms` | `3.524 ms` |
-| `mf_lambert_w0(1)` | `8.420 µs` | `8.199 µs` | `5.168 µs` | `4.916 µs` |
-| `mf_lambert_wm1(-0.1)` | `12.057 µs` | `9.809 µs` | `8.578 µs` | `10.370 µs` |
+| `mf_lambert_w0(0.7)` | `29.242 ms` | `62.759 ms` | `78.455 ms` | `67.229 ms` |
+| `mf_lambert_wm1(-0.2)` | `51.342 ms` | `69.362 ms` | `172.352 ms` | `340.897 ms` |
 
 For broader benchmark notes, see [`docs/benchmarks.md`](benchmarks.md).
