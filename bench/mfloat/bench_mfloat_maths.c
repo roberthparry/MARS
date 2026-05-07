@@ -522,10 +522,10 @@ int main(void)
     if (bench_wants_exact_section("log")) {
         puts("");
         puts("-- log --");
-        run_unary_case("log_256", "1.23456789", 256u, mf_log, bench_scaled_iters(8));
-        run_unary_case("log_512", "1.23456789", 512u, mf_log, bench_scaled_iters(2));
-        run_unary_case("log_768", "1.23456789", 768u, mf_log, bench_scaled_iters(1));
-        run_unary_case("log_1024", "1.23456789", 1024u, mf_log, bench_scaled_iters(1));
+        run_unary_case("log_256", "1.23456789", 256u, mf_log, bench_scaled_iters(12));
+        run_unary_case("log_512", "1.23456789", 512u, mf_log, bench_scaled_iters(6));
+        run_unary_case("log_768", "1.23456789", 768u, mf_log, bench_scaled_iters(4));
+        run_unary_case("log_1024", "1.23456789", 1024u, mf_log, bench_scaled_iters(4));
     }
 
     if (bench_wants_section("elem256")) {
