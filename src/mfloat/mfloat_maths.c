@@ -3870,20 +3870,12 @@ int mf_asinh(mfloat_t *mfloat)
     cosh_y = mfloat_clone_prec(MF_ZERO, work_prec);
     if (!y || !sinh_y || !cosh_y)
         goto cleanup;
-    for (int iter = 0; iter < 1; ++iter) {
-        if (mf_set_precision(sinh_y, work_prec) != 0 ||
-            mf_set_precision(cosh_y, work_prec) != 0 ||
-            mf_set_precision(y, work_prec) != 0)
-            goto cleanup;
-        if (mfloat_sinhcosh_pair(sinh_y, cosh_y, y, work_prec) != 0)
-            goto cleanup;
-        if (mf_sub(sinh_y, x) != 0 || mf_div(sinh_y, cosh_y) != 0)
-            goto cleanup;
-        if (mf_sub(y, sinh_y) != 0)
-            goto cleanup;
-        if (mfloat_is_below_neg_bits(sinh_y, (long)work_prec + 8l))
-            break;
-    }
+    if (mfloat_sinhcosh_pair(sinh_y, cosh_y, y, work_prec) != 0)
+        goto cleanup;
+    if (mf_sub(sinh_y, x) != 0 || mf_div(sinh_y, cosh_y) != 0)
+        goto cleanup;
+    if (mf_sub(y, sinh_y) != 0)
+        goto cleanup;
     rc = mfloat_finish_result(mfloat, y, precision);
 
 cleanup:
