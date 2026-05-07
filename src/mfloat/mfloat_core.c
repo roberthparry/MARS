@@ -96,7 +96,7 @@ const mfloat_t MF_NINF_VALUE = {
     .mantissa = &mfloat_zero_mint
 };
 
-static uint64_t mfloat_pi1024_storage[] = {
+static uint64_t mfloat_pi_storage[] = {
     0x3d35b9718e0cf535u, 0x9ede1b041f40a3e8u, 0x0a5545d68b8d4371u, 0xc5a5d4214278efa7u,
     0x1da034b3f62b2fb8u, 0xaf1edb0c0ffbae1cu, 0x066a4b776d5c5b6cu, 0x26f2e4a1b7fb424eu,
     0x2ac694de72f028ffu, 0xe76b027cfdfe66edu, 0xb65ed0f4dd5ac6a3u, 0x8a8bb965e3d9abe9u,
@@ -107,7 +107,7 @@ static uint64_t mfloat_pi1024_storage[] = {
     0x809bbdf2a33679a7u, 0x73644a29410f31c6u, 0xf98e804177d4c762u, 0x839a252049c1114cu,
     0x18469898cc51701bu, 0x00001921fb54442du
 };
-static uint64_t mfloat_e1024_storage[] = {
+static uint64_t mfloat_e_storage[] = {
     0x033254b0cb54c1c7u, 0xbe57aef5c19813a0u, 0x4aa859e0bea7863cu, 0x4e7e6e78bcaee1b6u,
     0xc2498c03e9e71ec5u, 0x382c220ba0f2036eu, 0xf7a172c7491a654bu, 0x55efee3358d37eb0u,
     0x9b6ffc4c02d87c91u, 0xb2f9be400b5359bdu, 0x9a7d4aac598d5ae5u, 0xa938dd06579dd3ecu,
@@ -118,7 +118,7 @@ static uint64_t mfloat_e1024_storage[] = {
     0x67df2fa5fc6c6c61u, 0x867f799273b9c493u, 0xa6d2b53c26c8228cu, 0xa79e3b1738b079c5u,
     0x695355fb8ac404e7u, 0x000015bf0a8b1457u
 };
-static uint64_t mfloat_gamma1024_storage[] = {
+static uint64_t mfloat_gamma_storage[] = {
     0x07157049d78f1759u, 0xb0cb412d6a55c813u, 0xc781589028601cd8u, 0x939e94e76e4d99dfu,
     0x0956eda56cf63b6bu, 0x9259e420fe33c158u, 0x525f7907b4aa6dffu, 0x41bc162158d7f9c7u,
     0xd5d6ab34ba2e9dbbu, 0xb2c3ea6afdcf66a6u, 0x9c2706d90390affbu, 0x86a4c0f0f2b650a2u,
@@ -129,7 +129,7 @@ static uint64_t mfloat_gamma1024_storage[] = {
     0x7c3bb4192732d884u, 0xbfef6392d67e80eau, 0x30064300f7cd1c26u, 0xb2d5a873b30ebd97u,
     0x31e9346f8fe04054u, 0x000024f119f8df6cu
 };
-static uint64_t mfloat_sqrt_pi1024_storage[] = {
+static uint64_t mfloat_sqrt_pi_storage[] = {
     0x4dd5b0b494a84e99u, 0xe2880092eeb7fc68u, 0xae6871f47474f728u, 0x42a41a74227f42a3u,
     0x7aae307974a2e3b5u, 0x76ecb0cfffbf574au, 0x9591e11b8be9ea26u, 0x7745fb2db2f56be8u,
     0xd68b0eccb4c4effdu, 0x1f75783760dfc140u, 0xcae5bb5523255143u, 0xfb59caff25ca248cu,
@@ -140,7 +140,7 @@ static uint64_t mfloat_sqrt_pi1024_storage[] = {
     0x7c76eb3639d85078u, 0x51d1bb5dbff5be50u, 0xec94b728402f4fa8u, 0xe4e0ff8e48551bd8u,
     0xdaa9e70ec1483576u, 0x00000716fe246d3bu
 };
-static uint64_t mfloat_sqrt2_1024_storage[] = {
+static uint64_t mfloat_sqrt2_storage[] = {
     0xa6c912abcd7d473du, 0x17116c2a40cbb896u, 0x4ffcd3051a73eb80u, 0x1fd65860c4575948u,
     0xede8e7a76aa772acu, 0x258e1238dd48bbd6u, 0x7b76641560957c6eu, 0x5ca8f7b5b0779173u,
     0xf46912e9d6daa8e7u, 0x15b1606967bb85a2u, 0xbd898ab34086a034u, 0x2ae8b92e295be293u,
@@ -151,24 +151,24 @@ static uint64_t mfloat_sqrt2_1024_storage[] = {
     0x8a2c3a8b1fe6fdc8u, 0x399154afc83043abu, 0xba84ced17ac85833u, 0xabe9f1d6f60ba893u,
     0xe6484597d89b3754u, 0x00000b504f333f9du
 };
-static uint64_t mfloat_tenth_256_storage[] = {
+static uint64_t mfloat_tenth_storage[] = {
     0xcccccccccccccccdu, 0xccccccccccccccccu, 0xccccccccccccccccu, 0xccccccccccccccccu,
     0x000000000000000cu
 };
 
-static struct _mint_t mfloat_pi1024_mint = { .sign = 1, .length = 34, .capacity = 34, .storage = mfloat_pi1024_storage };
-static struct _mint_t mfloat_e1024_mint = { .sign = 1, .length = 34, .capacity = 34, .storage = mfloat_e1024_storage };
-static struct _mint_t mfloat_gamma1024_mint = { .sign = 1, .length = 34, .capacity = 34, .storage = mfloat_gamma1024_storage };
-static struct _mint_t mfloat_sqrt_pi1024_mint = { .sign = 1, .length = 34, .capacity = 34, .storage = mfloat_sqrt_pi1024_storage };
-static struct _mint_t mfloat_sqrt2_1024_mint = { .sign = 1, .length = 34, .capacity = 34, .storage = mfloat_sqrt2_1024_storage };
-static struct _mint_t mfloat_tenth_256_mint = { .sign = 1, .length = 5u, .capacity = 5u, .storage = mfloat_tenth_256_storage };
+static struct _mint_t mfloat_pi_mint = { .sign = 1, .length = 34, .capacity = 34, .storage = mfloat_pi_storage };
+static struct _mint_t mfloat_e_mint = { .sign = 1, .length = 34, .capacity = 34, .storage = mfloat_e_storage };
+static struct _mint_t mfloat_gamma_mint = { .sign = 1, .length = 34, .capacity = 34, .storage = mfloat_gamma_storage };
+static struct _mint_t mfloat_sqrt_pi_mint = { .sign = 1, .length = 34, .capacity = 34, .storage = mfloat_sqrt_pi_storage };
+static struct _mint_t mfloat_sqrt2_mint = { .sign = 1, .length = 34, .capacity = 34, .storage = mfloat_sqrt2_storage };
+static struct _mint_t mfloat_tenth_mint = { .sign = 1, .length = 5u, .capacity = 5u, .storage = mfloat_tenth_storage };
 
-const mfloat_t MF_PI_VALUE = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -2155, .precision = 1024u, .immortal = true, .mantissa = &mfloat_pi1024_mint };
-const mfloat_t MF_E_VALUE = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -2155, .precision = 1024u, .immortal = true, .mantissa = &mfloat_e1024_mint };
-const mfloat_t MF_EULER_MASCHERONI_VALUE = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -2158, .precision = 1024u, .immortal = true, .mantissa = &mfloat_gamma1024_mint };
-const mfloat_t MF_SQRT_PI_VALUE = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -2154, .precision = 1024u, .immortal = true, .mantissa = &mfloat_sqrt_pi1024_mint };
-const mfloat_t MF_SQRT2_VALUE = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -2155, .precision = 1024u, .immortal = true, .mantissa = &mfloat_sqrt2_1024_mint };
-const mfloat_t MF_TENTH_VALUE = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -263, .precision = 256u, .immortal = true, .mantissa = &mfloat_tenth_256_mint };
+const mfloat_t MF_PI_VALUE = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -2155, .precision = 1024u, .immortal = true, .mantissa = &mfloat_pi_mint };
+const mfloat_t MF_E_VALUE = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -2155, .precision = 1024u, .immortal = true, .mantissa = &mfloat_e_mint };
+const mfloat_t MF_EULER_MASCHERONI_VALUE = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -2158, .precision = 1024u, .immortal = true, .mantissa = &mfloat_gamma_mint };
+const mfloat_t MF_SQRT_PI_VALUE = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -2154, .precision = 1024u, .immortal = true, .mantissa = &mfloat_sqrt_pi_mint };
+const mfloat_t MF_SQRT2_VALUE = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -2155, .precision = 1024u, .immortal = true, .mantissa = &mfloat_sqrt2_mint };
+const mfloat_t MF_TENTH_VALUE = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -263, .precision = 256u, .immortal = true, .mantissa = &mfloat_tenth_mint };
 static size_t mfloat_default_precision_bits = MFLOAT_DEFAULT_PRECISION_BITS;
 
 int mfloat_is_immortal(const mfloat_t *mfloat)

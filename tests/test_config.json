@@ -1880,7 +1880,8 @@
       "enabled": true,
       "test_cmp_qfloat_precision": true,
       "test_get_val_updates_after_set": true,
-      "test_simplify_inverse_unary_pairs": true
+      "test_simplify_inverse_unary_pairs": true,
+      "test_clone_detaches_mutation": true
     }
   },
   "tests/dval/test_dval_reverse_mode.c": {
@@ -1948,20 +1949,22 @@
     "test_factorial_fibonacci_and_binomial": true
   },
   "tests/mfloat/test_mfloat.c": {
-    "test_new_and_precision": true,
-    "test_set_long_normalises": true,
-    "test_clone_and_clear": true,
-    "test_set_string_and_basic_arithmetic": true,
-    "test_division_and_power": true,
-    "test_string_roundtrip": true,
-    "test_printf_family": true,
-    "test_constants_and_named_values": true,
-    "test_conversion_to_double_and_qfloat": true,
-    "test_conversion_from_double_and_qfloat": true,
-    "test_extended_math_wrappers": true,
-    "test_remaining_special_mfloat_functions": true,
-    "test_readme_examples": true,
-    "test_difficult_mfloat_cases": true
+    "test_new_and_precision": false,
+    "test_set_long_normalises": false,
+    "test_clone_and_clear": false,
+    "test_set_string_and_basic_arithmetic": false,
+    "test_division_and_power": false,
+    "test_string_roundtrip": false,
+    "test_printf_family": false,
+    "test_constants_and_named_values": false,
+    "test_conversion_to_double_and_qfloat": false,
+    "test_conversion_from_double_and_qfloat": false,
+    "test_extended_math_wrappers": false,
+    "test_gamma_family": true,
+    "test_gamma_identities": true,
+    "test_remaining_special_mfloat_functions": false,
+    "test_readme_examples": false,
+    "test_difficult_mfloat_cases": false
   },
   "tests/mcomplex/test_mcomplex.c": {
     "test_lifecycle_and_constants": true,

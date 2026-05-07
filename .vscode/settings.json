@@ -150,8 +150,11 @@
         "_GNU_SOURCE"
     ],
 
+    "C_Cpp.default.configurationProvider": "ms-vscode.makefile-tools",
     "C_Cpp.default.includePath": [
+        "${workspaceFolder}",
         "${workspaceFolder}/include",
+        "${workspaceFolder}/src",
         "${workspaceFolder}/tests",
         "${workspaceFolder}/tests/include",
         "${workspaceFolder}/tests/*"
@@ -163,5 +166,6 @@
         "editor.tabSize": 4
     },
     "makefile.buildLog": "",
-    "terminal.integrated.scrollback": 10000
+    "terminal.integrated.scrollback": 10000,
+    "C_Cpp.default.compilerPath": "/usr/bin/gcc"
 }
