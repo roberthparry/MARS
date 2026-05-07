@@ -3351,12 +3351,14 @@ cleanup:
 int mf_atan(mfloat_t *mfloat)
 {
     size_t precision, work_prec;
-    mfloat_t *x = NULL, *r = NULL, *pi = NULL, *half_pi = NULL, *quarter_pi = NULL;
+    mfloat_scratch_slot_t slots[2];
+    mfloat_t *r = NULL, *tmp = NULL, *arg = NULL, *pi = NULL, *half_pi = NULL, *quarter_pi = NULL;
     double xd;
     int negate = 0;
     int add_quarter_pi = 0;
     int subtract_from_half_pi = 0;
     int rc = -1;
+    size_t i;
 
     if (!mfloat)
         return -1;
@@ -3381,47 +3383,37 @@ int mf_atan(mfloat_t *mfloat)
 
     precision = mfloat->precision;
     work_prec = precision;
-    x = mfloat_clone_prec(mfloat, work_prec);
-    if (!x)
-        goto cleanup;
-    if (x->sign < 0) {
+    xd = fabs(mf_to_double(mfloat));
+    if (mfloat->sign < 0)
         negate = 1;
-        if (mf_abs(x) != 0)
-            goto cleanup;
-    }
 
-    xd = fabs(mf_to_double(x));
-    r = mf_clone(x);
-    if (!r)
+    for (i = 0; i < 2u; ++i)
+        mfloat_scratch_init_slot(&slots[i], work_prec);
+    r = &slots[0].value;
+    tmp = &slots[1].value;
+    if (mfloat_scratch_copy(r, mfloat) != 0)
         goto cleanup;
+    if (negate && mf_abs(r) != 0)
+        goto cleanup;
+    arg = r;
 
     if (xd > 1.0) {
         if (mf_inv(r) != 0)
             goto cleanup;
         subtract_from_half_pi = 1;
     } else if (xd > 0.4142135623730951) {
-        mfloat_t *num = mf_clone(r);
-        mfloat_t *den = mf_clone(r);
-
-        if (!num || !den) {
-            mf_free(num);
-            mf_free(den);
+        if (mfloat_scratch_copy(tmp, r) != 0)
+            goto cleanup;
+        if (mf_add_long(tmp, -1) != 0 ||
+            mf_add_long(r, 1) != 0 ||
+            mf_div(tmp, r) != 0) {
             goto cleanup;
         }
-        if (mf_add_long(num, -1) != 0 ||
-            mf_add_long(den, 1) != 0 ||
-            mf_div(num, den) != 0) {
-            mf_free(num);
-            mf_free(den);
-            goto cleanup;
-        }
-        mf_free(den);
-        mf_free(r);
-        r = num;
+        arg = tmp;
         add_quarter_pi = 1;
     }
 
-    if (mfloat_atan_kernel(mfloat, r, work_prec) != 0)
+    if (mfloat_atan_kernel(mfloat, arg, work_prec) != 0)
         goto cleanup;
 
     if (add_quarter_pi || subtract_from_half_pi) {
@@ -3454,8 +3446,8 @@ int mf_atan(mfloat_t *mfloat)
     rc = 0;
 
 cleanup:
-    mf_free(x);
-    mf_free(r);
+    for (i = 0; i < 2u; ++i)
+        mfloat_scratch_release_slot(&slots[i]);
     mf_free(pi);
     mf_free(half_pi);
     mf_free(quarter_pi);
