@@ -3803,9 +3803,10 @@ cleanup:
 int mf_tanh(mfloat_t *mfloat)
 {
     size_t precision, work_prec;
-    mfloat_t *x = NULL, *twox = NULL, *num = NULL, *den = NULL;
-    int negate = 0;
+    mfloat_scratch_slot_t slots[2];
+    mfloat_t *sinh_tmp, *cosh_tmp;
     int rc = -1;
+    size_t i;
 
     if (!mfloat)
         return -1;
@@ -3821,38 +3822,21 @@ int mf_tanh(mfloat_t *mfloat)
     }
 
     precision = mfloat->precision;
-    work_prec = mfloat_transcendental_work_prec(precision);
+    work_prec = mfloat_cap_work_prec(mfloat_transcendental_work_prec(precision));
 
-    x = mfloat_clone_prec(mfloat, work_prec);
-    if (!x)
+    for (i = 0; i < 2u; ++i)
+        mfloat_scratch_init_slot(&slots[i], work_prec);
+    sinh_tmp = &slots[0].value;
+    cosh_tmp = &slots[1].value;
+    if (mfloat_sinhcosh_pair(sinh_tmp, cosh_tmp, mfloat, work_prec) != 0)
         goto cleanup;
-    if (x->sign < 0) {
-        negate = 1;
-        if (mf_abs(x) != 0)
-            goto cleanup;
-    }
-
-    twox = mfloat_clone_prec(x, work_prec);
-    num = mfloat_clone_prec(MF_ONE, work_prec);
-    den = mfloat_clone_prec(MF_ONE, work_prec);
-    if (!twox || !num || !den)
+    if (mf_div(sinh_tmp, cosh_tmp) != 0)
         goto cleanup;
-    if (mf_mul_long(twox, 2) != 0 || mf_exp(twox) != 0)
-        goto cleanup;
-    if (mfloat_copy_value(num, twox) != 0 || mf_sub(num, MF_ONE) != 0)
-        goto cleanup;
-    if (mfloat_copy_value(den, twox) != 0 || mf_add(den, MF_ONE) != 0 ||
-        mf_div(num, den) != 0)
-        goto cleanup;
-    if (negate && mf_neg(num) != 0)
-        goto cleanup;
-    rc = mfloat_finish_result(mfloat, num, precision);
+    rc = mfloat_finish_result(mfloat, sinh_tmp, precision);
 
 cleanup:
-    mf_free(x);
-    mf_free(twox);
-    mf_free(num);
-    mf_free(den);
+    for (i = 0; i < 2u; ++i)
+        mfloat_scratch_release_slot(&slots[i]);
     return rc;
 }
 
