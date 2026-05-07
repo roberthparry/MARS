@@ -223,6 +223,8 @@ static void run_sincos_case(const char *label, const char *text, size_t precisio
 {
     size_t old_prec;
     mfloat_t *src;
+    mfloat_t *sin_value;
+    mfloat_t *cos_value;
     uint64_t start;
     uint64_t end;
     double avg_us;
@@ -242,29 +244,31 @@ static void run_sincos_case(const char *label, const char *text, size_t precisio
         (void)mf_set_default_precision(old_prec);
         return;
     }
+    sin_value = mf_new_prec(precision);
+    cos_value = mf_new_prec(precision);
+    if (!sin_value || !cos_value) {
+        fprintf(stderr, "%s output alloc failed\n", label);
+        mf_free(sin_value);
+        mf_free(cos_value);
+        mf_free(src);
+        (void)mf_set_default_precision(old_prec);
+        return;
+    }
 
     {
-        mfloat_t *warm_sin = mf_new_prec(precision);
-        mfloat_t *warm_cos = mf_new_prec(precision);
-
-        if (!warm_sin || !warm_cos || mf_sincos(src, warm_sin, warm_cos) != 0) {
+        if (mf_sincos(src, sin_value, cos_value) != 0) {
             fprintf(stderr, "%s warmup failed\n", label);
-            mf_free(warm_sin);
-            mf_free(warm_cos);
+            mf_free(sin_value);
+            mf_free(cos_value);
             mf_free(src);
             (void)mf_set_default_precision(old_prec);
             return;
         }
-        mf_free(warm_sin);
-        mf_free(warm_cos);
     }
 
     start = now_ns();
     for (int i = 0; i < iters; ++i) {
-        mfloat_t *sin_value = mf_new_prec(precision);
-        mfloat_t *cos_value = mf_new_prec(precision);
-
-        if (!sin_value || !cos_value || mf_sincos(src, sin_value, cos_value) != 0) {
+        if (mf_sincos(src, sin_value, cos_value) != 0) {
             fprintf(stderr, "%s timed run failed\n", label);
             mf_free(sin_value);
             mf_free(cos_value);
@@ -272,8 +276,6 @@ static void run_sincos_case(const char *label, const char *text, size_t precisio
             (void)mf_set_default_precision(old_prec);
             return;
         }
-        mf_free(sin_value);
-        mf_free(cos_value);
     }
     end = now_ns();
 
@@ -284,6 +286,8 @@ static void run_sincos_case(const char *label, const char *text, size_t precisio
            avg_us,
            avg_us / 1000.0);
 
+    mf_free(sin_value);
+    mf_free(cos_value);
     mf_free(src);
     (void)mf_set_default_precision(old_prec);
 }
