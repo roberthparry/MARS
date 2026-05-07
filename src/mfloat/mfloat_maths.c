@@ -4457,8 +4457,12 @@ int mf_lgamma(mfloat_t *mfloat)
         chunk_target = (unsigned)root_steps;
         if (chunk_target < 3u)
             chunk_target = 3u;
-        if (chunk_target > 12u)
+        if (precision <= 512u) {
+            if (chunk_target > 8u)
+                chunk_target = 8u;
+        } else if (chunk_target > 12u) {
             chunk_target = 12u;
+        }
     }
     while (steps-- > 0) {
         if (mi_mul(prod_mant, z->mantissa) != 0)
