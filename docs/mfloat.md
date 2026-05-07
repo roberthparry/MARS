@@ -124,8 +124,8 @@ int main(void) {
     char buf[256];
 
     mf_set_default_precision(256);
-    x = mf_create_string("2.3");
-    y = mf_create_string("2.3");
+    x = mf_create_string("2.345");
+    y = mf_create_string("2.345");
     if (!x || !y)
         return 1;
 
@@ -133,10 +133,10 @@ int main(void) {
         return 1;
 
     mf_sprintf(buf, sizeof(buf), "%.77mf", x);
-    printf("gamma(2.3)  = %s\n", buf);
+    printf("gamma(2.345)  = %s\n", buf);
 
     mf_sprintf(buf, sizeof(buf), "%.77mf", y);
-    printf("lgamma(2.3) = %s\n", buf);
+    printf("lgamma(2.345) = %s\n", buf);
 
     mf_free(x);
     mf_free(y);
@@ -145,8 +145,8 @@ int main(void) {
 ```
 
 ```text
-gamma(2.3)  = 1.16671190519816034504188144120291793853399434971946889397020666387299161947176
-lgamma(2.3) = 0.15418945495963058108991791148922317269570397608961402272570768556406857691921
+gamma(2.345)  = 1.19929782941531928552681533588795691209235255849057037812899793700343786859038
+lgamma(2.345) = 0.18173624337757203797862933229995978550118791690492470651875093221924437275615
 ```
 
 ## Formatting
@@ -317,7 +317,7 @@ The public surface remains in `include/mfloat.h`.
 
 ## Benchmark Coverage
 
-The dedicated `mfloat` gamma benchmark includes direct `2.3` timing cases at:
+The dedicated `mfloat` gamma benchmark includes direct `2.345` timing cases at:
 
 - `256` bits
 - `512` bits
@@ -351,8 +351,8 @@ Results:
 | `mf_exp(1.23456789)` | `12.206 ms` | `55.345 ms` | `144.914 ms` | `66.627 ms` |
 | `mf_log(1.23456789)` | `1.473 ms` | `10.830 ms` | `23.519 ms` | `21.242 ms` |
 | `mf_sqrt(1.23456789)` | `0.018 ms` | `0.033 ms` | `0.047 ms` | `0.091 ms` |
-| `mf_gamma(2.3)` | `13.889 ms` | `34.566 ms` | `95.166 ms` | `96.820 ms` |
-| `mf_lgamma(2.3)` | `9.247 ms` | `17.040 ms` | `51.146 ms` | `100.841 ms` |
+| `mf_gamma(2.345)` | `10.039 ms` | `20.047 ms` | `48.562 ms` | `101.557 ms` |
+| `mf_lgamma(2.345)` | `7.828 ms` | `13.306 ms` | `36.323 ms` | `103.124 ms` |
 | `mf_sin(0.567)` | `3.921 ms` | `10.509 ms` | `6.129 ms` | `15.347 ms` |
 | `mf_cos(0.567)` | `1.671 ms` | `3.549 ms` | `10.621 ms` | `13.791 ms` |
 | `mf_sincos(0.567)` | `5.477 ms` | `13.407 ms` | `21.026 ms` | `31.081 ms` |

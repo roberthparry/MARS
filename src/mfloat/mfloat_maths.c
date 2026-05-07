@@ -1199,7 +1199,7 @@ static int mfloat_is_near_integer_pole(const mfloat_t *x)
 
 static int mfloat_lgamma_asymptotic(mfloat_t *dst, const mfloat_t *x, size_t precision)
 {
-    size_t asymp_prec = precision + 256u;
+    size_t asymp_prec = precision + 384u;
     mfloat_t *logx = NULL, *sum = NULL, *xi = NULL, *xi2 = NULL, *xpow = NULL, *term = NULL;
     mfloat_t *abs_term = NULL, *prev_abs_term = NULL;
     int rc = -1;
@@ -1888,8 +1888,10 @@ static long mfloat_lgamma_asymptotic_threshold(size_t precision)
         return 20l;
     if (precision <= 512u)
         return 24l;
+    if (precision <= 768u)
+        return 64l;
     if (precision <= 1024u)
-        return 128l;
+        return 192l;
     if (precision <= 2048u)
         return 40l;
     if (precision <= 4096u)
@@ -4369,7 +4371,7 @@ int mf_lgamma(mfloat_t *mfloat)
         rc = mfloat_finish_result(mfloat, tmp, precision);
         goto cleanup;
     }
-    work_prec = precision + 128u;
+    work_prec = precision + 256u;
     if (work_prec < precision + MFLOAT_CONST_GUARD_BITS)
         work_prec = precision + MFLOAT_CONST_GUARD_BITS;
     x = mfloat_clone_prec(mfloat, work_prec);
