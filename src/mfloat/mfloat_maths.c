@@ -3883,7 +3883,7 @@ cleanup:
 int mf_acosh(mfloat_t *mfloat)
 {
     size_t precision, work_prec;
-    mfloat_t *x = NULL, *y = NULL, *cosh_y = NULL, *sinh_y = NULL;
+    mfloat_t *x = NULL, *one = NULL, *two = NULL;
     int rc = -1;
 
     if (!mfloat)
@@ -3910,34 +3910,22 @@ int mf_acosh(mfloat_t *mfloat)
     }
     work_prec = mfloat_cap_work_prec(mfloat_transcendental_work_prec(precision));
     x = mfloat_clone_prec(mfloat, work_prec);
-    if (!x)
+    one = mfloat_clone_prec(MF_ONE, work_prec);
+    two = mfloat_clone_prec(MF_ONE, work_prec);
+    if (!x || !one || !two)
         goto cleanup;
-    y = mfloat_new_from_qfloat_prec(qf_acosh(mf_to_qfloat(x)), work_prec);
-    cosh_y = mfloat_clone_prec(MF_ZERO, work_prec);
-    sinh_y = mfloat_clone_prec(MF_ZERO, work_prec);
-    if (!y || !cosh_y || !sinh_y)
+    if (mf_set_long(two, 2) != 0)
         goto cleanup;
-    for (int iter = 0; iter < 1; ++iter) {
-        if (mf_set_precision(cosh_y, work_prec) != 0 ||
-            mf_set_precision(sinh_y, work_prec) != 0 ||
-            mf_set_precision(y, work_prec) != 0)
-            goto cleanup;
-        if (mfloat_sinhcosh_pair(sinh_y, cosh_y, y, work_prec) != 0)
-            goto cleanup;
-        if (mf_sub(cosh_y, x) != 0 || mf_div(cosh_y, sinh_y) != 0)
-            goto cleanup;
-        if (mf_sub(y, cosh_y) != 0)
-            goto cleanup;
-        if (mfloat_is_below_neg_bits(cosh_y, (long)work_prec + 8l))
-            break;
-    }
-    rc = mfloat_finish_result(mfloat, y, precision);
+    if (mf_sub(x, one) != 0 || mf_div(x, two) != 0 || mf_sqrt(x) != 0)
+        goto cleanup;
+    if (mf_asinh(x) != 0 || mf_mul(x, two) != 0)
+        goto cleanup;
+    rc = mfloat_finish_result(mfloat, x, precision);
 
 cleanup:
     mf_free(x);
-    mf_free(y);
-    mf_free(cosh_y);
-    mf_free(sinh_y);
+    mf_free(one);
+    mf_free(two);
     return rc;
 }
 
