@@ -571,11 +571,11 @@ int main(void)
     if (bench_wants_section("special256")) {
         puts("");
         puts("-- special 256-bit --");
-        run_unary_case("gamma_256", "2.5", 256u, mf_gamma, bench_scaled_iters(3));
-        run_unary_case("lgamma_256", "2.5", 256u, mf_lgamma, bench_scaled_iters(3));
-        run_unary_case("digamma_256", "2.5", 256u, mf_digamma, bench_scaled_iters(3));
-        run_unary_case("trigamma_256", "2.5", 256u, mf_trigamma, bench_scaled_iters(3));
-        run_unary_case("tetragamma_256", "2.5", 256u, mf_tetragamma, bench_scaled_iters(2));
+        run_unary_case("gamma_256", "2.345", 256u, mf_gamma, bench_scaled_iters(3));
+        run_unary_case("lgamma_256", "2.345", 256u, mf_lgamma, bench_scaled_iters(3));
+        run_unary_case("digamma_256", "2.345", 256u, mf_digamma, bench_scaled_iters(3));
+        run_unary_case("trigamma_256", "2.345", 256u, mf_trigamma, bench_scaled_iters(3));
+        run_unary_case("tetragamma_256", "2.345", 256u, mf_tetragamma, bench_scaled_iters(2));
         run_unary_case("erf_256", "0.567", 256u, mf_erf, bench_scaled_iters(4));
         run_unary_case("erfc_256", "0.5", 256u, mf_erfc, bench_scaled_iters(4));
         run_unary_case("erfinv_256", "0.5", 256u, mf_erfinv, bench_scaled_iters(2));
@@ -624,6 +624,11 @@ int main(void)
         run_unary_case("acosh_512", "2.0", 512u, mf_acosh, bench_scaled_iters(1));
         run_unary_case("atanh_512", "0.5", 512u, mf_atanh, bench_scaled_iters(1));
         run_unary_case("erf_512", "0.567", 512u, mf_erf, bench_scaled_iters(2));
+        run_unary_case("gamma_512", "2.345", 512u, mf_gamma, bench_scaled_iters(1));
+        run_unary_case("lgamma_512", "2.345", 512u, mf_lgamma, bench_scaled_iters(1));
+        run_unary_case("digamma_512", "2.345", 512u, mf_digamma, bench_scaled_iters(1));
+        run_unary_case("trigamma_512", "2.345", 512u, mf_trigamma, bench_scaled_iters(1));
+        run_unary_case("tetragamma_512", "2.345", 512u, mf_tetragamma, bench_scaled_iters(1));
         run_unary_case("lambert_w0_512", "0.7", 512u, mf_lambert_w0, bench_scaled_iters(2));
         run_unary_case("lambert_wm1_512", "-0.2", 512u, mf_lambert_wm1, bench_scaled_iters(1));
         run_binary_case("pow_512", "1.23456789", "3.5", 512u, mf_pow, bench_scaled_iters(1));
@@ -659,6 +664,13 @@ int main(void)
         run_unary_case("acosh_768", "2.0", 768u, mf_acosh, bench_scaled_iters(1));
         run_unary_case("atanh_768", "0.5", 768u, mf_atanh, bench_scaled_iters(1));
         run_unary_case("erf_768", "0.567", 768u, mf_erf, bench_scaled_iters(1));
+        run_unary_case("gamma_768", "2.345", 768u, mf_gamma, bench_scaled_iters(1));
+        run_unary_case("lgamma_768", "2.345", 768u, mf_lgamma, bench_scaled_iters(1));
+        run_unary_case("digamma_768", "2.345", 768u, mf_digamma, bench_scaled_iters(1));
+        run_unary_case("trigamma_768", "2.345", 768u, mf_trigamma, bench_scaled_iters(1));
+        run_unary_case("tetragamma_768", "2.345", 768u, mf_tetragamma, bench_scaled_iters(1));
+        run_unary_case("ei_768", "1", 768u, mf_ei, bench_scaled_iters(1));
+        run_unary_case("e1_768", "1", 768u, mf_e1, bench_scaled_iters(1));
         run_unary_case("lambert_w0_768", "0.7", 768u, mf_lambert_w0, bench_scaled_iters(1));
         run_unary_case("lambert_wm1_768", "-0.2", 768u, mf_lambert_wm1, bench_scaled_iters(1));
     }
@@ -688,6 +700,11 @@ int main(void)
         run_unary_case("acosh_1024", "2.0", 1024u, mf_acosh, bench_scaled_iters(1));
         run_unary_case("atanh_1024", "0.5", 1024u, mf_atanh, bench_scaled_iters(1));
         run_unary_case("erf_1024", "0.567", 1024u, mf_erf, bench_scaled_iters(1));
+        run_unary_case("gamma_1024", "2.345", 1024u, mf_gamma, bench_scaled_iters(1));
+        run_unary_case("lgamma_1024", "2.345", 1024u, mf_lgamma, bench_scaled_iters(1));
+        run_unary_case("digamma_1024", "2.345", 1024u, mf_digamma, bench_scaled_iters(1));
+        run_unary_case("trigamma_1024", "2.345", 1024u, mf_trigamma, bench_scaled_iters(1));
+        run_unary_case("tetragamma_1024", "2.345", 1024u, mf_tetragamma, bench_scaled_iters(1));
         run_unary_case("lambert_w0_1024", "0.7", 1024u, mf_lambert_w0, bench_scaled_iters(1));
         run_unary_case("lambert_wm1_1024", "-0.2", 1024u, mf_lambert_wm1, bench_scaled_iters(1));
         run_binary_case("pow_1024", "1.23456789", "3.5", 1024u, mf_pow, bench_scaled_iters(1));

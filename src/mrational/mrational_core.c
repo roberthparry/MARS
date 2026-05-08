@@ -1,3 +1,4 @@
+#include "internal/mint_internal.h"
 #include "mrational_internal.h"
 
 #include <ctype.h>
@@ -280,18 +281,18 @@ bool mr_is_integer(const mrational_t *rational)
     return rational && rational->denominator && mi_cmp_long(rational->denominator, 1) == 0;
 }
 
-mint_t *mr_numerator(const mrational_t *rational)
+const mint_t *mr_numerator(const mrational_t *rational)
 {
     if (!rational)
         return NULL;
-    return mi_clone(rational->numerator);
+    return rational->numerator;
 }
 
-mint_t *mr_denominator(const mrational_t *rational)
+const mint_t *mr_denominator(const mrational_t *rational)
 {
     if (!rational)
         return NULL;
-    return mi_clone(rational->denominator);
+    return rational->denominator;
 }
 
 int mr_cmp(const mrational_t *a, const mrational_t *b)

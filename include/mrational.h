@@ -2,6 +2,7 @@
 #define MRATIONAL_H
 
 #include <stdbool.h>
+#include <stddef.h>
 
 #include "mint.h"
 
@@ -38,13 +39,14 @@ char *mr_to_string(const mrational_t *rational);
 /** @} */
 
 /** @name Queries and accessors
- * Accessor helpers return owned clones that must be released with `mi_free()`.
+ * Accessor helpers return borrowed read-only views that remain valid while
+ * the owning `mrational_t` is alive.
  * @{
  */
 bool mr_is_zero(const mrational_t *rational);
 bool mr_is_integer(const mrational_t *rational);
-mint_t *mr_numerator(const mrational_t *rational);
-mint_t *mr_denominator(const mrational_t *rational);
+const mint_t *mr_numerator(const mrational_t *rational);
+const mint_t *mr_denominator(const mrational_t *rational);
 /** @} */
 
 /** @name Comparisons

@@ -262,6 +262,7 @@ M_2281 is prime    M_3217 is prime    M_4253 is prime    M_4423 is prime
 | Module | Description | Docs |
 |---|---|---|
 | `mint_t` | Arbitrary-precision signed integers and number-theory helpers | [`docs/mint.md`](docs/mint.md) |
+| `mrational_t` | Opaque exact rational arithmetic backed by `mint_t` | [`docs/mrational.md`](docs/mrational.md) |
 | `mfloat_t` | Opaque multiprecision floating-point arithmetic | [`docs/mfloat.md`](docs/mfloat.md) |
 | `mcomplex_t` | Opaque multiprecision complex arithmetic backed by `mfloat_t` | [`docs/mcomplex.md`](docs/mcomplex.md) |
 | `qfloat_t` | Double-double arithmetic and special functions | [`docs/qfloat.md`](docs/qfloat.md) |

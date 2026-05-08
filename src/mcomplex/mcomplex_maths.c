@@ -1,32 +1,74 @@
 #include "mcomplex_internal.h"
 
+#include "../mfloat/mfloat_internal.h"
+#include "internal/mint_internal.h"
+
 #include <stdlib.h>
 
-static const char *const mcomplex_erf_one_text =
-    "0.8427007929497148693412206350826092592960669979663029084599378978347172540960108412619833253481448885";
-static const char *const mcomplex_erfc_one_text =
-    "0.1572992070502851306587793649173907407039330020336970915400621021652827459039891587380166746518551115";
-static const char *const mcomplex_lambert_w0_one_text =
-    "0.5671432904097838729999686622103555497538157871865125081351310792230457930866845666932194469617522945576380249728667897854523584659400729956085164392899946143115714929598";
-static const char *const mcomplex_lambert_wm1_tenth_text =
-    "-3.577152063957297218409391963511994880401796257793075923683527755791687236350575462861463655620846808017732465627597059470558844569051750534584923541827063499452631656593265232240273452302009544089866198954722805115875488714857591771";
-static const char *const mcomplex_beta_2_5_3_5_text =
-    "0.036815538909255389513234102147806674424185578898927021339550131941107223511166511702672283109477934390415797888827527031020630991518170885528031555564005638095120516828538342044205777085425183065590413645650128621085157571818074002739688865";
+static uint64_t mcomplex_erf_one_storage[] = {
+    0xa8f89b6589322b5bu, 0x0fad5e2533e21000u, 0xa5b3f01af8bb04c3u, 0x3d87aedf2043045bu,
+    0x1c219a7d640f9019u, 0x8fc1a0b0869ea711u, 0x54c99dca27625028u, 0x7a0e058234ea7e00u,
+    0x7d28bc11ea75ab75u, 0xfdbb0d26f3a64318u, 0x7a741088ac6d0110u, 0x000000000001af76u
+};
+static uint64_t mcomplex_erfc_one_storage[] = {
+    0x5707649a76cdd4a5u, 0xf052a1dacc1defffu, 0x5a4c0fe50744fb3cu, 0xc2785120dfbcfba4u,
+    0xe3de65829bf06fe6u, 0x703e5f4f796158eeu, 0xab366235d89dafd7u, 0x85f1fa7dcb1581ffu,
+    0x82d743ee158a548au, 0x0244f2d90c59bce7u, 0x858bef775392feefu, 0x0000000000005089u
+};
+static uint64_t mcomplex_lambert_w0_one_storage[] = {
+    0x888b74335eba2693u, 0x39c0252142cbd962u, 0x24dcaac705f1cf1eu, 0x370eb2d731d085f7u,
+    0xc96ea2fc5379054eu, 0x7b10cf6e78a653d4u, 0x2aa6d9024026ffeau, 0x8ec11680b15b3681u,
+    0xd43d63b48b236670u, 0x6ef7d966c5e563f9u, 0x26ab1d9d28c7b784u, 0xd86e6e2dac0588e1u,
+    0x34f8df610979b07au, 0x3dec188d659c50a7u, 0x4681a46abb13cfebu, 0xd3f6370795b90e1eu,
+    0xd5df5733a297bb27u, 0x49665c0ea1760e00u, 0x8dd63f36423ba821u, 0x535db2d6be9c1869u,
+    0xe48bf682b33c04e8u, 0x0324fdc0d4a38de0u, 0x385ba1bb3a15c6a2u, 0x97abf76a98a1b70au,
+    0x00244c135f1d2caeu
+};
+static uint64_t mcomplex_lambert_wm1_tenth_storage[] = {
+    0xf2cbca9f27b68f1fu, 0xd74fcf3b25c7197bu, 0x8426ef56db6ec332u, 0x7481927c731b1a85u,
+    0xe1ce55b1603abb4eu, 0xedc3b1f9d65dd1a8u, 0xd99d2a9a52ac2628u, 0x445665302012f51bu,
+    0x3cc673aa94ec626au, 0x38c9ab6e766c7a9cu, 0x244583493e215bafu, 0x382b5801674b2b25u,
+    0x0b85cb0d97295bc0u, 0x286a15a7862ac67fu, 0x37eafe06f73f5bc8u, 0x4df0d4d1d0fdcba1u,
+    0x251a6f46efd8c6c2u, 0x38c4f698cc685107u, 0x5f7b9d38a074a468u, 0xea388f163dbdfa6eu,
+    0x2a7dfe286a8529b4u, 0xd5b40a28a5128c33u, 0x267d2e5abebb0e3bu, 0x382467d9bd50da76u,
+    0x27f44ae80abf7793u, 0xcdaf87b196a9c41eu, 0x393c0d9aa9ef287eu, 0x3c03cd783f746d87u,
+    0x0000000000000039u
+};
+static uint64_t mcomplex_beta_2_5_3_5_storage[] = {
+    0xea2f327a31bdde39u, 0xfc9e42989a81eed6u, 0x10b035d4604cee6bu, 0x37935075330d2a05u,
+    0xf0ac372f8914b9dcu, 0x1f3234a9416d2086u, 0xb349c21f0357692eu, 0x7e32dcbcee5cbeb5u,
+    0x72d2bd5f9f5add83u, 0xc81aa08e9970505du, 0xbf09bec7085dc9b1u, 0xe273dd13356cb7c1u,
+    0x41c858c8d48138c1u, 0x22599941ebe5e24cu, 0xe26d4d98ac8d0848u, 0xbb5216679f700554u,
+    0x907ce6f7885eeb5eu, 0x26e0a13e4e554a1fu, 0xe7953e42091ff0b1u, 0x1938dbe2a6e72645u,
+    0x423faa368d6c8903u, 0x4eb8e9e52f7d1d02u, 0xdb3d764a8c8408fau, 0x6554e074ce75fa68u,
+    0x9589d68b379ef0cbu, 0xccf9bb2ae03119dfu, 0x1414a2b39bd83750u, 0x3321d234f272993du,
+    0x0000000012d97c7fu
+};
 
-static int mcomplex_set_real_string_value(mcomplex_t *mcomplex, const char *real_text)
+static struct _mint_t mcomplex_erf_one_mint = { .sign = 1, .length = 12, .capacity = 12, .storage = mcomplex_erf_one_storage };
+static struct _mint_t mcomplex_erfc_one_mint = { .sign = 1, .length = 12, .capacity = 12, .storage = mcomplex_erfc_one_storage };
+static struct _mint_t mcomplex_lambert_w0_one_mint = { .sign = 1, .length = 25, .capacity = 25, .storage = mcomplex_lambert_w0_one_storage };
+static struct _mint_t mcomplex_lambert_wm1_tenth_mint = { .sign = 1, .length = 29, .capacity = 29, .storage = mcomplex_lambert_wm1_tenth_storage };
+static struct _mint_t mcomplex_beta_2_5_3_5_mint = { .sign = 1, .length = 29, .capacity = 29, .storage = mcomplex_beta_2_5_3_5_storage };
+
+static struct _mfloat_t mcomplex_erf_one_seed = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -721, .precision = 384u, .immortal = true, .mantissa = &mcomplex_erf_one_mint };
+static struct _mfloat_t mcomplex_erfc_one_seed = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -721, .precision = 384u, .immortal = true, .mantissa = &mcomplex_erfc_one_mint };
+static struct _mfloat_t mcomplex_lambert_w0_one_seed = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -1590, .precision = 1024u, .immortal = true, .mantissa = &mcomplex_lambert_w0_one_mint };
+static struct _mfloat_t mcomplex_lambert_wm1_tenth_seed = { .kind = MFLOAT_KIND_FINITE, .sign = -1, .exponent2 = -1796, .precision = 1024u, .immortal = true, .mantissa = &mcomplex_lambert_wm1_tenth_mint };
+static struct _mfloat_t mcomplex_beta_2_5_3_5_seed = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -1825, .precision = 1024u, .immortal = true, .mantissa = &mcomplex_beta_2_5_3_5_mint };
+
+static int mcomplex_set_real_immortal_value(mcomplex_t *mcomplex, const mfloat_t *value)
 {
     size_t precision_bits;
 
-    if (!mcomplex || !real_text)
+    if (!mcomplex || !value)
         return -1;
     if (mcomplex_ensure_mutable(mcomplex) != 0)
         return -1;
 
     precision_bits = mc_get_precision(mcomplex);
-    if (mf_set_precision(mcomplex->real, precision_bits) != 0 ||
+    if (mfloat_set_from_immortal_internal(mcomplex->real, value, precision_bits) != 0 ||
         mf_set_precision(mcomplex->imag, precision_bits) != 0)
-        return -1;
-    if (mf_set_string(mcomplex->real, real_text) != 0)
         return -1;
     mf_clear(mcomplex->imag);
     return 0;
@@ -35,7 +77,7 @@ static int mcomplex_set_real_string_value(mcomplex_t *mcomplex, const char *real
 static int mcomplex_try_apply_real_erf_exact(mcomplex_t *mcomplex, int complement)
 {
     mfloat_t *minus_one = NULL;
-    const char *value_text = complement ? mcomplex_erfc_one_text : mcomplex_erf_one_text;
+    const mfloat_t *value_seed = complement ? &mcomplex_erfc_one_seed : &mcomplex_erf_one_seed;
     int rc = -2;
 
     if (!mcomplex)
@@ -43,7 +85,7 @@ static int mcomplex_try_apply_real_erf_exact(mcomplex_t *mcomplex, int complemen
     if (!mf_is_zero(mc_imag(mcomplex)))
         return -2;
     if (mf_eq(mc_real(mcomplex), MF_ONE))
-        return mcomplex_set_real_string_value(mcomplex, value_text);
+        return mcomplex_set_real_immortal_value(mcomplex, value_seed);
 
     minus_one = mf_create_long(-1);
     if (!minus_one)
@@ -51,9 +93,13 @@ static int mcomplex_try_apply_real_erf_exact(mcomplex_t *mcomplex, int complemen
 
     if (mf_eq(mc_real(mcomplex), minus_one)) {
         if (complement) {
-            rc = mcomplex_set_real_string_value(mcomplex, "1.8427007929497148693412206350826092592960669979663029084599378978347172540960108412619833253481448885");
+            rc = mcomplex_set_real_immortal_value(mcomplex, &mcomplex_erf_one_seed);
+            if (rc == 0)
+                rc = mf_add(mcomplex->real, MF_ONE);
         } else {
-            rc = mcomplex_set_real_string_value(mcomplex, "-0.8427007929497148693412206350826092592960669979663029084599378978347172540960108412619833253481448885");
+            rc = mcomplex_set_real_immortal_value(mcomplex, &mcomplex_erf_one_seed);
+            if (rc == 0)
+                rc = mf_neg(mcomplex->real);
         }
     }
 
@@ -73,7 +119,7 @@ static int mcomplex_try_apply_real_lambert_exact(mcomplex_t *mcomplex, int minus
 
     if (!minus_branch) {
         if (mf_eq(mc_real(mcomplex), MF_ONE))
-            return mcomplex_set_real_string_value(mcomplex, mcomplex_lambert_w0_one_text);
+            return mcomplex_set_real_immortal_value(mcomplex, &mcomplex_lambert_w0_one_seed);
         return -2;
     }
 
@@ -86,7 +132,7 @@ static int mcomplex_try_apply_real_lambert_exact(mcomplex_t *mcomplex, int minus
     }
 
     if (mf_eq(mc_real(mcomplex), minus_tenth))
-        rc = mcomplex_set_real_string_value(mcomplex, mcomplex_lambert_wm1_tenth_text);
+        rc = mcomplex_set_real_immortal_value(mcomplex, &mcomplex_lambert_wm1_tenth_seed);
 
     mf_free(minus_tenth);
     return rc;
@@ -105,8 +151,8 @@ static int mcomplex_try_apply_real_beta_exact(mcomplex_t *mcomplex,
     if (!mf_is_zero(mc_imag(mcomplex)) || !mf_is_zero(mc_imag(other)))
         return -2;
 
-    two_point_five = mf_create_string("2.5");
-    three_point_five = mf_create_string("3.5");
+    two_point_five = mf_create_double(2.5);
+    three_point_five = mf_create_double(3.5);
     if (!two_point_five || !three_point_five) {
         mf_free(two_point_five);
         mf_free(three_point_five);
@@ -122,7 +168,7 @@ static int mcomplex_try_apply_real_beta_exact(mcomplex_t *mcomplex,
     if (!matches)
         return -2;
 
-    rc = mcomplex_set_real_string_value(mcomplex, mcomplex_beta_2_5_3_5_text);
+    rc = mcomplex_set_real_immortal_value(mcomplex, &mcomplex_beta_2_5_3_5_seed);
     return rc;
 }
 
@@ -241,15 +287,12 @@ static int mcomplex_apply_real_gammainc_half(mcomplex_t *mcomplex,
     }
 
     if (mf_eq(mc_real(other), MF_ONE)) {
-        static const char *const erf_one_text =
-            "0.8427007929497148693412206350826092592960669979663029084599378978347172540960108412619833253481448885";
-        static const char *const erfc_one_text =
-            "0.1572992070502851306587793649173907407039330020336970915400621021652827459039891587380166746518551115";
+        const mfloat_t *value_seed = use_upper ? &mcomplex_erfc_one_seed : &mcomplex_erf_one_seed;
 
         value = mf_new_prec(mc_get_precision(mcomplex));
         if (!value)
             return -1;
-        rc = mf_set_string(value, use_upper ? erfc_one_text : erf_one_text);
+        rc = mfloat_set_from_immortal_internal(value, value_seed, mc_get_precision(mcomplex));
         if (rc == 0 && use_unregularized)
             rc = mf_mul(value, MF_SQRT_PI);
         if (rc != 0) {
@@ -1176,7 +1219,6 @@ int mc_asinh(mcomplex_t *mcomplex)
     mcomplex_t *deriv = NULL;
     size_t precision_bits;
     size_t work_prec;
-    int iter;
     int rc = mcomplex_apply_real_unary(mcomplex, mf_asinh);
 
     if (rc != -2)
@@ -1236,7 +1278,6 @@ int mc_acosh(mcomplex_t *mcomplex)
     mcomplex_t *deriv = NULL;
     size_t precision_bits;
     size_t work_prec;
-    int iter;
     int rc = mcomplex_apply_real_unary(mcomplex, mf_acosh);
 
     if (rc != -2)

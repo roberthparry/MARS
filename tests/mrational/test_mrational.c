@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "mint.h"
+#include "internal/mrational_internal.h"
 #include "mrational.h"
 
 #define TEST_CONFIG_MODE TEST_CONFIG_GLOBAL
@@ -19,7 +20,7 @@ static void assert_mr_string(const mrational_t *rational, const char *expected)
     free(got);
 }
 
-static void assert_mint_clone_string(mint_t *mint, const char *expected)
+static void assert_mint_clone_string(const mint_t *mint, const char *expected)
 {
     char *got = mi_to_string(mint);
 
@@ -64,8 +65,8 @@ void test_create_and_normalise(void)
 void test_setters_and_accessors(void)
 {
     mrational_t *r = mr_new();
-    mint_t *num = NULL;
-    mint_t *den = NULL;
+    const mint_t *num = NULL;
+    const mint_t *den = NULL;
 
     ASSERT_NOT_NULL(r);
     ASSERT_EQ_INT(mr_set_frac_long(r, 14, 21), 0);
@@ -77,8 +78,6 @@ void test_setters_and_accessors(void)
     ASSERT_NOT_NULL(den);
     assert_mint_clone_string(num, "2");
     assert_mint_clone_string(den, "3");
-    mi_free(num);
-    mi_free(den);
     num = den = NULL;
 
     ASSERT_EQ_INT(mr_set_string(r, "5"), 0);
@@ -180,6 +179,23 @@ void test_large_values(void)
     mr_free(b);
 }
 
+void test_bernoulli_accessors(void)
+{
+    const mrational_t *b1 = mr_bernoulli_even_term(1u);
+    const mrational_t *b2 = mr_bernoulli_even_term(2u);
+    const mrational_t *blast = mr_bernoulli_even_term(mr_bernoulli_even_term_count());
+
+    ASSERT_TRUE(mr_bernoulli_even_term_count() >= 100u);
+    ASSERT_NOT_NULL(b1);
+    ASSERT_NOT_NULL(b2);
+    ASSERT_NOT_NULL(blast);
+    ASSERT_TRUE(mr_bernoulli_even_term(0u) == NULL);
+    ASSERT_TRUE(mr_bernoulli_even_term(mr_bernoulli_even_term_count() + 1u) == NULL);
+
+    assert_mr_string(b1, "1/6");
+    assert_mr_string(b2, "-1/30");
+}
+
 int tests_main(void)
 {
     RUN_TEST_CASE(test_create_and_normalise);
@@ -187,5 +203,6 @@ int tests_main(void)
     RUN_TEST_CASE(test_clone_compare_and_order);
     RUN_TEST_CASE(test_arithmetic);
     RUN_TEST_CASE(test_large_values);
+    RUN_TEST_CASE(test_bernoulli_accessors);
     return 0;
 }

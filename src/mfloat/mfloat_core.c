@@ -1,7 +1,7 @@
 #include "mfloat_internal.h"
 #include "mfloat_coeff_tables.h"
 #include "internal/mint_internal.h"
-#include "mrational/mrational_internal.h"
+#include "mrational.h"
 
 #include <ctype.h>
 #include <limits.h>
@@ -874,33 +874,139 @@ int mf_set_qfloat(mfloat_t *mfloat, qfloat_t value)
 
 int mf_set_mrational(mfloat_t *mfloat, const mrational_t *value)
 {
+    if (!mfloat || !value || mfloat_is_immortal(mfloat))
+        return -1;
+    if (mf_set_long(mfloat, 0) != 0)
+        return -1;
+    return mf_add_mrational(mfloat, value);
+}
+
+int mf_add_mrational(mfloat_t *mfloat, const mrational_t *value)
+{
     size_t precision, work_prec;
-    mfloat_t *num = NULL;
-    mfloat_t *den = NULL;
+    const mint_t *num = NULL;
+    const mint_t *den = NULL;
+    mint_t *lhs_num = NULL;
+    mint_t *rhs_num = NULL;
+    mint_t *common_den = NULL;
+    mfloat_t *tmp = NULL;
+    mfloat_t *den_mf = NULL;
     int rc = -1;
 
-    if (!mfloat || !value || !value->numerator || !value->denominator)
+    if (!mfloat || !value)
         return -1;
-    if (mfloat_is_immortal(mfloat) || mi_is_zero(value->denominator))
+    if (mfloat_is_immortal(mfloat))
         return -1;
+
+    num = mr_numerator(value);
+    den = mr_denominator(value);
+    if (!num || !den || mi_is_zero(den))
+        goto cleanup;
 
     precision = mfloat->precision;
     work_prec = precision + 32u;
-    num = mf_new_prec(work_prec);
-    den = mf_new_prec(work_prec);
-    if (!num || !den)
+    tmp = mf_clone(mfloat);
+    den_mf = mf_new_prec(work_prec);
+    if (!tmp || !den_mf)
         goto cleanup;
-    if (mfloat_set_from_signed_mint(num, value->numerator, 0) != 0 ||
-        mfloat_set_from_signed_mint(den, value->denominator, 0) != 0 ||
-        mf_div(num, den) != 0)
+    if (mf_set_precision(tmp, work_prec) != 0)
         goto cleanup;
-    if (mfloat_copy_value(mfloat, num) != 0)
+
+    lhs_num = mi_clone(tmp->mantissa);
+    rhs_num = mi_clone(num);
+    common_den = mi_clone(den);
+    if (!lhs_num || !rhs_num || !common_den)
+        goto cleanup;
+    if (tmp->sign < 0 && mi_neg(lhs_num) != 0)
+        goto cleanup;
+
+    if (tmp->exponent2 >= 0) {
+        if (mi_shl(lhs_num, tmp->exponent2) != 0 ||
+            mi_mul(lhs_num, common_den) != 0)
+            goto cleanup;
+    } else {
+        long shift = -tmp->exponent2;
+        if (mi_mul(lhs_num, common_den) != 0 ||
+            mi_shl(rhs_num, shift) != 0 ||
+            mi_shl(common_den, shift) != 0)
+            goto cleanup;
+    }
+
+    if (mi_add(lhs_num, rhs_num) != 0)
+        goto cleanup;
+    if (mfloat_set_from_signed_mint(tmp, lhs_num, 0) != 0 ||
+        mfloat_set_from_signed_mint(den_mf, common_den, 0) != 0 ||
+        mf_div(tmp, den_mf) != 0)
+        goto cleanup;
+    if (mfloat_copy_value(mfloat, tmp) != 0)
         goto cleanup;
     rc = mfloat_round_to_precision_internal(mfloat, precision);
 
 cleanup:
-    mf_free(num);
-    mf_free(den);
+    mi_free(lhs_num);
+    mi_free(rhs_num);
+    mi_free(common_den);
+    mf_free(tmp);
+    mf_free(den_mf);
+    return rc;
+}
+
+int mf_mul_mrational(mfloat_t *mfloat, const mrational_t *value)
+{
+    size_t precision, work_prec;
+    const mint_t *num = NULL;
+    const mint_t *den = NULL;
+    mint_t *num_mag = NULL;
+    mint_t *den_mag = NULL;
+    mfloat_t *tmp = NULL;
+    mfloat_t *den_mf = NULL;
+    int rc = -1;
+
+    if (!mfloat || !value)
+        return -1;
+    if (mfloat_is_immortal(mfloat))
+        return -1;
+
+    num = mr_numerator(value);
+    den = mr_denominator(value);
+    if (!num || !den || mi_is_zero(den))
+        goto cleanup;
+
+    precision = mfloat->precision;
+    work_prec = precision + 32u;
+    tmp = mf_clone(mfloat);
+    den_mf = mf_new_prec(work_prec);
+    if (!tmp || !den_mf)
+        goto cleanup;
+    if (mf_set_precision(tmp, work_prec) != 0)
+        goto cleanup;
+
+    if (mi_is_zero(num)) {
+        rc = mf_set_long(mfloat, 0);
+        goto cleanup;
+    }
+
+    num_mag = mi_clone(num);
+    den_mag = mi_clone(den);
+    if (!num_mag || !den_mag)
+        goto cleanup;
+    if (mi_is_negative(num)) {
+        if (mf_neg(tmp) != 0 || mi_abs(num_mag) != 0)
+            goto cleanup;
+    }
+    if (mi_mul(tmp->mantissa, num_mag) != 0 || mfloat_normalise(tmp) != 0)
+        goto cleanup;
+    if (mfloat_set_from_signed_mint(den_mf, den_mag, 0) != 0 || mf_div(tmp, den_mf) != 0)
+        goto cleanup;
+    if (mfloat_copy_value(mfloat, tmp) != 0)
+        goto cleanup;
+    rc = mfloat_round_to_precision_internal(mfloat, precision);
+
+cleanup:
+    mi_free(num_mag);
+    mi_free(den_mag);
+    mf_free(tmp);
+    mf_free(den_mf);
     return rc;
 }
 
