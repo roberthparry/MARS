@@ -282,6 +282,32 @@ fail:
     return -1;
 }
 
+int mc_div_long(mcomplex_t *mcomplex, long value)
+{
+    mfloat_t *den = NULL;
+    size_t precision_bits;
+    int rc = -1;
+
+    if (!mcomplex || value == 0)
+        return -1;
+    precision_bits = mc_get_precision(mcomplex);
+    if (mcomplex_ensure_mutable(mcomplex) != 0)
+        return -1;
+    den = mf_create_long(value);
+    if (!den)
+        return -1;
+    if (mf_set_precision(den, precision_bits) != 0 ||
+        mf_div(mcomplex->real, den) != 0 ||
+        mf_div(mcomplex->imag, den) != 0 ||
+        mcomplex_round_parts(mcomplex, precision_bits) != 0)
+        goto cleanup;
+    rc = 0;
+
+cleanup:
+    mf_free(den);
+    return rc;
+}
+
 int mc_inv(mcomplex_t *mcomplex)
 {
     mfloat_t *den = NULL, *tmp = NULL;

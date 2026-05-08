@@ -72,6 +72,7 @@ int mc_add(mcomplex_t *mcomplex, const mcomplex_t *other);
 int mc_sub(mcomplex_t *mcomplex, const mcomplex_t *other);
 int mc_mul(mcomplex_t *mcomplex, const mcomplex_t *other);
 int mc_div(mcomplex_t *mcomplex, const mcomplex_t *other);
+int mc_div_long(mcomplex_t *mcomplex, long value);
 int mc_inv(mcomplex_t *mcomplex);
 int mc_pow_int(mcomplex_t *mcomplex, int exponent);
 int mc_pow(mcomplex_t *mcomplex, const mcomplex_t *exponent);

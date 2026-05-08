@@ -2,6 +2,7 @@
 
 #include "../mfloat/mfloat_internal.h"
 #include "internal/mint_internal.h"
+#include "internal/mrational_internal.h"
 
 #include <stdlib.h>
 
@@ -384,37 +385,20 @@ static size_t mcomplex_native_work_prec(const mcomplex_t *mcomplex)
     return precision_bits + 512u;
 }
 
-static int mcomplex_set_real_ratio(mcomplex_t *mcomplex, long num, long den)
+static int mcomplex_mul_real_mrational_scaled(mcomplex_t *mcomplex,
+                                              const mrational_t *value,
+                                              long denominator)
 {
-    mcomplex_t *tmp = NULL;
-    int rc = -1;
-
-    if (!mcomplex || den == 0)
+    if (!mcomplex || !value || denominator == 0)
         return -1;
-
-    tmp = mc_create_long(num);
-    if (!tmp)
+    if (mf_mul_mrational(mcomplex->real, value) != 0 ||
+        mf_mul_mrational(mcomplex->imag, value) != 0)
         return -1;
-    if (mc_set_precision(tmp, mc_get_precision(mcomplex)) != 0)
-        goto cleanup;
-    if (den != 1) {
-        mcomplex_t *denom = mc_create_long(den);
-        if (!denom)
-            goto cleanup;
-        if (mc_set_precision(denom, mc_get_precision(mcomplex)) != 0 ||
-            mc_div(tmp, denom) != 0) {
-            mc_free(denom);
-            goto cleanup;
-        }
-        mc_free(denom);
-    }
-    if (mc_set(mcomplex, mc_real(tmp), mc_imag(tmp)) != 0)
-        goto cleanup;
-    rc = 0;
-
-cleanup:
-    mc_free(tmp);
-    return rc;
+    if (denominator == 1)
+        return 0;
+    if (mc_div_long(mcomplex, denominator) != 0)
+        return -1;
+    return 0;
 }
 
 static int mcomplex_native_log_sqrt_2pi(mcomplex_t *dst, size_t work_prec)
@@ -443,12 +427,6 @@ cleanup:
 
 static int mcomplex_native_lgamma_asymptotic(mcomplex_t *dst, const mcomplex_t *z, size_t work_prec)
 {
-    static const long numerators[] = {
-        1L, -1L, 1L, -1L, 1L, -691L, 1L, -3617L
-    };
-    static const long denominators[] = {
-        12L, 360L, 1260L, 1680L, 1188L, 360360L, 156L, 122400L
-    };
     mcomplex_t *log_z = NULL;
     mcomplex_t *z_minus_half = NULL;
     mcomplex_t *inv = NULL;
@@ -456,6 +434,8 @@ static int mcomplex_native_lgamma_asymptotic(mcomplex_t *dst, const mcomplex_t *
     mcomplex_t *pow = NULL;
     mcomplex_t *term = NULL;
     mcomplex_t *const_term = NULL;
+    const mrational_t *bernoulli = NULL;
+    size_t term_count;
     size_t i;
 
     if (!dst || !z)
@@ -493,13 +473,18 @@ static int mcomplex_native_lgamma_asymptotic(mcomplex_t *dst, const mcomplex_t *
         mc_set(pow, mc_real(inv), mc_imag(inv)) != 0)
         goto fail;
 
-    for (i = 0; i < sizeof(numerators) / sizeof(numerators[0]); ++i) {
-        if (mcomplex_set_real_ratio(term, numerators[i], denominators[i]) != 0 ||
-            mc_set_precision(term, work_prec) != 0 ||
-            mc_mul(term, pow) != 0 ||
+    term_count = mr_bernoulli_even_term_count();
+    if (term_count > 8u)
+        term_count = 8u;
+
+    for (i = 1u; i <= term_count; ++i) {
+        bernoulli = mr_bernoulli_even_term(i);
+        if (!bernoulli ||
+            mc_set(term, mc_real(pow), mc_imag(pow)) != 0 ||
+            mcomplex_mul_real_mrational_scaled(term, bernoulli, (long)((2u * i) * (2u * i - 1u))) != 0 ||
             mc_add(z_minus_half, term) != 0)
             goto fail;
-        if (i + 1 < sizeof(numerators) / sizeof(numerators[0]) &&
+        if (i < term_count &&
             mc_mul(pow, inv2) != 0)
             goto fail;
     }
