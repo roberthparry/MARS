@@ -1946,7 +1946,8 @@
     "test_inc_dec_and_bits": true,
     "test_long_hex_bits_and_nextprime": true,
     "test_ulong_and_hex_constructors": true,
-    "test_factorial_fibonacci_and_binomial": true
+    "test_factorial_fibonacci_and_binomial": true,
+    "test_readme_examples": true
   },
   "tests/mrational/test_mrational.c": {
     "test_create_and_normalise": true,

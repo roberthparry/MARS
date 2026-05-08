@@ -55,22 +55,17 @@ callers.
 #include "mint.h"
 
 int main(void) {
-    mint_t *n = mi_create_long(52);
-    mint_t *k = mi_create_long(5);
-    mint_t *c = NULL;
+    mint_t *c = mi_new();
 
-    if (!n || !k)
+    if (!c)
         return 1;
 
-    c = mi_clone(n);
-    if (!c || mi_binomial(c, k) != 0)
+    if (mi_binomial(c, 52ul, 5ul) != 0)
         return 1;
 
     printf("C(52, 5) = %s\n", mi_to_string(c));
 
     mi_free(c);
-    mi_free(k);
-    mi_free(n);
     return 0;
 }
 ```
@@ -114,6 +109,7 @@ disabled in `tests/test_config.json` for normal test runs.
 From the repository root:
 
 ```sh
+make bench_mint_arith
 make bench_mint_add
 make bench_mint_mul
 make bench_mint_div
@@ -126,6 +122,68 @@ There is also a compare helper for the division benchmark:
 ```sh
 bench/mint/compare_mint_div.sh <git-ref>
 ```
+
+The new banded arithmetic benchmark reports one combined timing table for:
+
+- `mi_add`
+- `mi_sub`
+- `mi_mul`
+- `mi_div`
+- `mi_mod`
+- `mi_gcd`
+- `mi_lcm`
+
+Rows are grouped by operation and left-operand bit band, columns by
+right-operand bit band, and each cell reports the average time per call over
+representative exact integers in the bucket.
+
+Recent measured timings on this tree were:
+
+<table>
+  <thead>
+    <tr>
+      <th rowspan="2">Operation</th>
+      <th rowspan="2">Left bits</th>
+      <th colspan="4" style="text-align: center;">Right bits</th>
+    </tr>
+    <tr>
+      <th><strong><code>  1 - 256</code></strong></th>
+      <th><strong><code>257 - 512</code></strong></th>
+      <th><strong><code>513 - 768</code></strong></th>
+      <th><strong><code>769 - 1024</code></strong></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td rowspan="4"><code>mi_add</code></td><td><strong><code>  1 - 256</code></strong></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.426 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.634 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.702 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.754 µs</span></td></tr>
+    <tr><td><strong><code>257 - 512</code></strong></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.422 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.453 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.841 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.786 µs</span></td></tr>
+    <tr><td><strong><code>513 - 768</code></strong></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.417 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.371 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.460 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.465 µs</span></td></tr>
+    <tr><td><strong><code>769 - 1024</code></strong></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.458 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.467 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.472 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.527 µs</span></td></tr>
+    <tr><td rowspan="4"><code>mi_sub</code></td><td><strong><code>  1 - 256</code></strong></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.479 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.407 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.789 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.803 µs</span></td></tr>
+    <tr><td><strong><code>257 - 512</code></strong></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.442 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.418 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.810 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.893 µs</span></td></tr>
+    <tr><td><strong><code>513 - 768</code></strong></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.449 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.403 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.450 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.511 µs</span></td></tr>
+    <tr><td><strong><code>769 - 1024</code></strong></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.389 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.400 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.488 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.479 µs</span></td></tr>
+    <tr><td rowspan="4"><code>mi_mul</code></td><td><strong><code>  1 - 256</code></strong></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.405 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.490 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.573 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.711 µs</span></td></tr>
+    <tr><td><strong><code>257 - 512</code></strong></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.443 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.714 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.786 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.981 µs</span></td></tr>
+    <tr><td><strong><code>513 - 768</code></strong></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.544 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.779 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">1.048 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">1.237 µs</span></td></tr>
+    <tr><td><strong><code>769 - 1024</code></strong></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.640 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.976 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">1.350 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">1.410 µs</span></td></tr>
+    <tr><td rowspan="4"><code>mi_div</code></td><td><strong><code>  1 - 256</code></strong></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">1.090 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">1.235 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">1.226 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">1.157 µs</span></td></tr>
+    <tr><td><strong><code>257 - 512</code></strong></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">1.654 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">1.502 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">1.179 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">1.220 µs</span></td></tr>
+    <tr><td><strong><code>513 - 768</code></strong></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">1.881 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">2.557 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">1.607 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">1.190 µs</span></td></tr>
+    <tr><td><strong><code>769 - 1024</code></strong></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">1.880 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">2.452 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">1.557 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.800 µs</span></td></tr>
+    <tr><td rowspan="4"><code>mi_mod</code></td><td><strong><code>  1 - 256</code></strong></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.404 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.426 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.421 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.425 µs</span></td></tr>
+    <tr><td><strong><code>257 - 512</code></strong></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.695 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.947 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.848 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.756 µs</span></td></tr>
+    <tr><td><strong><code>513 - 768</code></strong></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">1.275 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">1.543 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">1.012 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">0.765 µs</span></td></tr>
+    <tr><td><strong><code>769 - 1024</code></strong></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">1.543 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">2.225 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">2.028 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">1.325 µs</span></td></tr>
+    <tr><td rowspan="4"><code>mi_gcd</code></td><td><strong><code>  1 - 256</code></strong></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">3.505 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">6.200 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">7.719 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">8.958 µs</span></td></tr>
+    <tr><td><strong><code>257 - 512</code></strong></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">4.897 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">8.727 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">12.097 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">12.926 µs</span></td></tr>
+    <tr><td><strong><code>513 - 768</code></strong></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">5.388 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">12.965 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">12.005 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">16.585 µs</span></td></tr>
+    <tr><td><strong><code>769 - 1024</code></strong></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">7.038 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">7.458 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">15.097 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">12.660 µs</span></td></tr>
+    <tr><td rowspan="4"><code>mi_lcm</code></td><td><strong><code>  1 - 256</code></strong></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">4.585 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">7.087 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">8.226 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">9.954 µs</span></td></tr>
+    <tr><td><strong><code>257 - 512</code></strong></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">6.155 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">9.712 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">13.497 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">14.349 µs</span></td></tr>
+    <tr><td><strong><code>513 - 768</code></strong></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">6.587 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">11.595 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">14.271 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">30.662 µs</span></td></tr>
+    <tr><td><strong><code>769 - 1024</code></strong></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">11.286 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">15.538 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">25.718 µs</span></td><td style="text-align: center;"><span style="font-family: monospace; font-size: 0.74em;">23.061 µs</span></td></tr>
+  </tbody>
+</table>
 
 ## Internal Layout
 

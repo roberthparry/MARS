@@ -107,6 +107,7 @@ numeric cores.
 Available benchmark targets include:
 
 ```sh
+make bench_mint_arith
 make bench_mint_add
 make bench_mint_mul
 make bench_mint_div
@@ -116,7 +117,8 @@ make bench_mint_combinatorics
 
 These cover the main optimisation areas in the arbitrary-precision integer
 subsystem: small/native-word fast paths, wider multiply/divide behaviour,
-`gcd`/`lcm`/`modinv`, and combinatorics helpers.
+`gcd`/`lcm`/`modinv`, combinatorics helpers, and a banded operand-size matrix
+for the core binary arithmetic paths.
 
 ### `mrational`
 

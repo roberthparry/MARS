@@ -8,13 +8,26 @@
 #define TEST_CONFIG_MAIN
 #include "test_harness.h"
 
+static const char *g_last_mint_check_label = NULL;
+
+static void set_mint_check_label(const char *label)
+{
+    g_last_mint_check_label = label;
+}
+
+static void print_mint_check_heading(const char *label)
+{
+    printf(C_WHITE C_BOLD "%s" C_RESET "\n", label ? label : "<unspecified>");
+}
+
 static void assert_mint_string(const mint_t *mint, const char *expected)
 {
     char *got = mi_to_string(mint);
 
     ASSERT_NOT_NULL(got);
+    print_mint_check_heading(g_last_mint_check_label);
     printf("    expected = %s\n", expected);
-    printf("    got      = %s\n", got);
+    printf("    got      = %s\n\n", got);
     ASSERT_TRUE(strcmp(got, expected) == 0);
     free(got);
 }
@@ -24,8 +37,9 @@ static void assert_mint_hex(const mint_t *mint, const char *expected)
     char *got = mi_to_hex(mint);
 
     ASSERT_NOT_NULL(got);
+    print_mint_check_heading(g_last_mint_check_label);
     printf("    expected hex = %s\n", expected);
-    printf("    got hex      = %s\n", got);
+    printf("    got hex      = %s\n\n", got);
     ASSERT_TRUE(strcmp(got, expected) == 0);
     free(got);
 }
@@ -35,6 +49,7 @@ static void print_mint_input(const char *label, const mint_t *mint)
     char *text = mi_to_string(mint);
 
     ASSERT_NOT_NULL(text);
+    set_mint_check_label(label);
     printf("%s%s%s = %s%s%s\n", C_CYAN, label, C_RESET, C_WHITE, text, C_RESET);
     free(text);
 }
@@ -46,10 +61,11 @@ static void assert_factor_pair(const mint_factor_t *factor,
     char *prime = mi_to_string(factor->prime);
 
     ASSERT_NOT_NULL(prime);
+    print_mint_check_heading(g_last_mint_check_label);
     printf("    expected prime    = %s\n", expected_prime);
     printf("    got prime         = %s\n", prime);
     printf("    expected exponent = %lu\n", expected_exponent);
-    printf("    got exponent      = %lu\n", factor->exponent);
+    printf("    got exponent      = %lu\n\n", factor->exponent);
     ASSERT_TRUE(strcmp(prime, expected_prime) == 0);
     ASSERT_EQ_LONG((long)factor->exponent, (long)expected_exponent);
     free(prime);
@@ -57,6 +73,7 @@ static void assert_factor_pair(const mint_factor_t *factor,
 
 void test_create_and_to_string(void)
 {
+    printf(C_CYAN "Testing construction and formatting...\n" C_RESET);
     mint_t *zero = mi_new();
     mint_t *pow2_zero = mi_create_2pow(0);
     mint_t *pos = mi_create_long(65);
@@ -111,6 +128,7 @@ void test_create_and_to_string(void)
 
 void test_setters_and_clear(void)
 {
+    printf(C_CYAN "Testing setters and clear...\n" C_RESET);
     mint_t *mint = mi_new();
 
     ASSERT_NOT_NULL(mint);
@@ -134,6 +152,7 @@ void test_setters_and_clear(void)
 
 void test_ulong_and_hex_constructors(void)
 {
+    printf(C_CYAN "Testing ulong and hex constructors...\n" C_RESET);
     mint_t *u = mi_create_ulong(ULONG_MAX);
     mint_t *h = mi_create_hex("0x10000000000000000");
     mint_t *m = mi_new();
@@ -160,6 +179,7 @@ void test_ulong_and_hex_constructors(void)
 
 void test_clone_copies_value(void)
 {
+    printf(C_CYAN "Testing clone semantics...\n" C_RESET);
     mint_t *a = mi_create_long(7);
     mint_t *b;
 
@@ -181,6 +201,7 @@ void test_clone_copies_value(void)
 
 void test_addition(void)
 {
+    printf(C_CYAN "Testing addition paths...\n" C_RESET);
     mint_t *a = mi_create_string("18446744073709551616");
     mint_t *b = mi_create_long(5);
     mint_t *c = mi_create_long(-100);
@@ -233,6 +254,7 @@ void test_addition(void)
 
 void test_multiplication(void)
 {
+    printf(C_CYAN "Testing multiplication paths...\n" C_RESET);
     mint_t *a = mi_create_string("18446744073709551616");
     mint_t *b = mi_create_long(10);
     mint_t *c = mi_create_long(-12);
@@ -268,6 +290,7 @@ void test_multiplication(void)
 
 void test_division_and_modulo(void)
 {
+    printf(C_CYAN "Testing division and modulo...\n" C_RESET);
     mint_t *a = mi_create_string("18446744073709551621");
     mint_t *b = mi_create_long(10);
     mint_t *rem = mi_new();
@@ -313,8 +336,9 @@ void test_division_and_modulo(void)
     ASSERT_EQ_INT(mi_div_long(modv, -10, &rem_long), 0);
     print_mint_input("modv after /= -10", modv);
     assert_mint_string(modv, "-10");
+    print_mint_check_heading("mi_div_long(101, -10)");
     printf("    expected rem_long = 1\n");
-    printf("    got rem_long      = %ld\n", rem_long);
+    printf("    got rem_long      = %ld\n\n", rem_long);
     ASSERT_EQ_LONG(rem_long, 1);
 
     mi_free(a);
@@ -328,6 +352,7 @@ void test_division_and_modulo(void)
 
 void test_pow_and_pow10(void)
 {
+    printf(C_CYAN "Testing powers and decimal scaling...\n" C_RESET);
     mint_t *a = mi_create_long(12);
     mint_t *b = mi_create_long(-2);
     mint_t *c = mi_create_long(123);
@@ -358,6 +383,7 @@ void test_pow_and_pow10(void)
 
 void test_factorial_fibonacci_and_binomial(void)
 {
+    printf(C_CYAN "Testing combinatorics and sequences...\n" C_RESET);
     mint_t *fact0 = mi_new();
     mint_t *fact10 = mi_new();
     mint_t *fib0 = mi_new();
@@ -415,6 +441,7 @@ void test_factorial_fibonacci_and_binomial(void)
 
 void test_compare_and_negate(void)
 {
+    printf(C_CYAN "Testing comparison and negation...\n" C_RESET);
     mint_t *a = mi_create_long(5);
     mint_t *b = mi_create_long(-7);
     mint_t *c = mi_create_long(5);
@@ -443,6 +470,7 @@ void test_compare_and_negate(void)
 
 void test_inc_dec_and_bits(void)
 {
+    printf(C_CYAN "Testing increment, decrement, and bit queries...\n" C_RESET);
     mint_t *a = mi_create_long(0);
     mint_t *b = mi_create_string("18446744073709551616");
     mint_t *c = mi_create_long(-2);
@@ -479,6 +507,7 @@ void test_inc_dec_and_bits(void)
 
 void test_shifts(void)
 {
+    printf(C_CYAN "Testing shifts...\n" C_RESET);
     mint_t *a = mi_create_long(3);
     mint_t *b = mi_create_string("18446744073709551616");
     mint_t *c = mi_create_long(-9);
@@ -509,6 +538,7 @@ void test_shifts(void)
 
 void test_integer_sqrt(void)
 {
+    printf(C_CYAN "Testing integer square root...\n" C_RESET);
     mint_t *a = mi_create_long(144);
     mint_t *b = mi_create_long(200);
     mint_t *c = mi_create_string("18446744073709551616");
@@ -539,6 +569,7 @@ void test_integer_sqrt(void)
 
 void test_bitwise(void)
 {
+    printf(C_CYAN "Testing bitwise operations...\n" C_RESET);
     mint_t *a = mi_create_long(13);
     mint_t *b = mi_create_long(11);
     mint_t *c = mi_create_long(13);
@@ -586,6 +617,7 @@ void test_bitwise(void)
 
 void test_powmod_isprime_and_factors(void)
 {
+    printf(C_CYAN "Testing powmod, primality, and factors...\n" C_RESET);
     mint_t *base = mi_create_long(4);
     mint_t *exp = mi_create_long(13);
     mint_t *mod = mi_create_long(497);
@@ -698,6 +730,7 @@ void test_powmod_isprime_and_factors(void)
 
 void test_sub_abs_predicates_conversions_gcd_lcm(void)
 {
+    printf(C_CYAN "Testing subtraction, predicates, conversions, gcd, and lcm...\n" C_RESET);
     mint_t *a = mi_create_long(100);
     mint_t *b = mi_create_long(30);
     mint_t *c = mi_create_long(-42);
@@ -736,8 +769,9 @@ void test_sub_abs_predicates_conversions_gcd_lcm(void)
 
     ASSERT_TRUE(mi_fits_long(c));
     ASSERT_TRUE(mi_get_long(c, &value));
+    print_mint_check_heading("mi_get_long(42)");
     printf("    expected long = 42\n");
-    printf("    got long      = %ld\n", value);
+    printf("    got long      = %ld\n\n", value);
     ASSERT_EQ_LONG(value, 42);
 
     ASSERT_TRUE(!mi_fits_long(d));
@@ -767,6 +801,7 @@ void test_sub_abs_predicates_conversions_gcd_lcm(void)
 
 void test_long_hex_bits_and_nextprime(void)
 {
+    printf(C_CYAN "Testing long/hex helpers, bit twiddling, and nextprime...\n" C_RESET);
     mint_t *a = mi_create_long(100);
     mint_t *b = mi_create_string("18446744073709551616");
     mint_t *c = mi_new();
@@ -843,6 +878,7 @@ void test_long_hex_bits_and_nextprime(void)
 
 void test_divmod_square_gcdext_modinv(void)
 {
+    printf(C_CYAN "Testing divmod, square, gcdext, and modinv...\n" C_RESET);
     mint_t *n = mi_create_long(123);
     mint_t *d = mi_create_long(10);
     mint_t *q = mi_new();
@@ -932,6 +968,7 @@ void test_divmod_square_gcdext_modinv(void)
 
 void test_readme_mersenne_prime_search(void)
 {
+    printf(C_CYAN "Running README Mersenne prime search...\n" C_RESET);
     static const unsigned expected_exponents[] = {
         2, 3, 5, 7,
         13, 17, 19, 31,
@@ -974,6 +1011,34 @@ void test_readme_mersenne_prime_search(void)
                   (int)(sizeof(expected_exponents) / sizeof(expected_exponents[0])));
 }
 
+static int readme_example(void)
+{
+    mint_t *c = mi_new();
+    char *text = NULL;
+
+    if (!c) {
+        mi_free(c);
+        return 1;
+    }
+
+    if (mi_binomial(c, 52ul, 5ul) != 0) {
+        mi_free(c);
+        return 1;
+    }
+
+    text = mi_to_string(c);
+    if (!text) {
+        mi_free(c);
+        return 1;
+    }
+
+    printf("C(52, 5) = %s\n", text);
+
+    free(text);
+    mi_free(c);
+    return 0;
+}
+
 int tests_main(void)
 {
     RUN_TEST_CASE(test_create_and_to_string);
@@ -995,5 +1060,8 @@ int tests_main(void)
     RUN_TEST_CASE(test_divmod_square_gcdext_modinv);
     RUN_TEST_CASE(test_powmod_isprime_and_factors);
     RUN_TEST_CASE(test_readme_mersenne_prime_search);
+
+    printf(C_YELLOW "\nRunning README example...\n" C_RESET);
+    ASSERT_EQ_INT(readme_example(), 0);
     return TESTS_EXIT_CODE();
 }

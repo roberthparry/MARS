@@ -261,20 +261,20 @@ M_2281 is prime    M_3217 is prime    M_4253 is prime    M_4423 is prime
 
 | Module | Description | Docs |
 |---|---|---|
-| `mint_t` | Arbitrary-precision signed integers and number-theory helpers | [`docs/mint.md`](docs/mint.md) |
-| `mrational_t` | Opaque exact rational arithmetic backed by `mint_t` | [`docs/mrational.md`](docs/mrational.md) |
-| `mfloat_t` | Opaque multiprecision floating-point arithmetic | [`docs/mfloat.md`](docs/mfloat.md) |
-| `mcomplex_t` | Opaque multiprecision complex arithmetic backed by `mfloat_t` | [`docs/mcomplex.md`](docs/mcomplex.md) |
-| `qfloat_t` | Double-double arithmetic and special functions | [`docs/qfloat.md`](docs/qfloat.md) |
-| `qcomplex_t` | Double-double complex arithmetic and special functions | [`docs/qcomplex.md`](docs/qcomplex.md) |
-| `matrix_t` | Generic high-precision matrix with numeric and symbolic element types | [`docs/matrix.md`](docs/matrix.md) |
-| `dval_t` | Differentiable expression DAGs with matrix integration | [`docs/dval.md`](docs/dval.md) |
 | `datetime_t` | Civil and astronomical date/time utilities | [`docs/datetime.md`](docs/datetime.md) |
+| `string_t` | UTF-8-aware dynamic strings | [`docs/string.md`](docs/string.md) |
 | `dictionary_t` | Generic key/value storage with ownership models | [`docs/dictionary.md`](docs/dictionary.md) |
 | `set_t` | Generic set storage with ownership models | [`docs/set.md`](docs/set.md) |
 | `array_t` | Generic array storage with ownership models | [`docs/array.md`](docs/array.md) |
-| `string_t` | UTF-8-aware dynamic strings | [`docs/string.md`](docs/string.md) |
 | `bitset_t` | Dynamic thread-safe bitset | [`docs/bitset.md`](docs/bitset.md) |
+| `mint_t` | Arbitrary-precision signed integers and number-theory helpers | [`docs/mint.md`](docs/mint.md) |
+| `mrational_t` | Opaque exact rational arithmetic backed by `mint_t` | [`docs/mrational.md`](docs/mrational.md) |
+| `qfloat_t` | Double-double arithmetic and special functions | [`docs/qfloat.md`](docs/qfloat.md) |
+| `qcomplex_t` | Double-double complex arithmetic and special functions | [`docs/qcomplex.md`](docs/qcomplex.md) |
+| `mfloat_t` | Opaque multiprecision floating-point arithmetic | [`docs/mfloat.md`](docs/mfloat.md) |
+| `mcomplex_t` | Opaque multiprecision complex arithmetic backed by `mfloat_t` | [`docs/mcomplex.md`](docs/mcomplex.md) |
+| `matrix_t` | Generic high-precision matrix with numeric and symbolic element types | [`docs/matrix.md`](docs/matrix.md) |
+| `dval_t` | Differentiable expression DAGs with matrix integration | [`docs/dval.md`](docs/dval.md) |
 | `integrator_t` | Adaptive G7K15 numerical integrator | [`docs/integrator.md`](docs/integrator.md) |
 
 ## Build
