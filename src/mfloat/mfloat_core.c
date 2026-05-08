@@ -1,6 +1,7 @@
 #include "mfloat_internal.h"
 #include "mfloat_coeff_tables.h"
 #include "internal/mint_internal.h"
+#include "mrational/mrational_internal.h"
 
 #include <ctype.h>
 #include <limits.h>
@@ -674,6 +675,19 @@ mfloat_t *mf_create_qfloat(qfloat_t value)
     return mfloat;
 }
 
+mfloat_t *mf_create_mrational(const mrational_t *value)
+{
+    mfloat_t *mfloat = mf_new();
+
+    if (!mfloat)
+        return NULL;
+    if (mf_set_mrational(mfloat, value) != 0) {
+        mf_free(mfloat);
+        return NULL;
+    }
+    return mfloat;
+}
+
 mfloat_t *mf_clone(const mfloat_t *mfloat)
 {
     mfloat_t *copy;
@@ -855,6 +869,38 @@ int mf_set_qfloat(mfloat_t *mfloat, qfloat_t value)
 
     rc = mf_add(mfloat, tmp);
     mf_free(tmp);
+    return rc;
+}
+
+int mf_set_mrational(mfloat_t *mfloat, const mrational_t *value)
+{
+    size_t precision, work_prec;
+    mfloat_t *num = NULL;
+    mfloat_t *den = NULL;
+    int rc = -1;
+
+    if (!mfloat || !value || !value->numerator || !value->denominator)
+        return -1;
+    if (mfloat_is_immortal(mfloat) || mi_is_zero(value->denominator))
+        return -1;
+
+    precision = mfloat->precision;
+    work_prec = precision + 32u;
+    num = mf_new_prec(work_prec);
+    den = mf_new_prec(work_prec);
+    if (!num || !den)
+        goto cleanup;
+    if (mfloat_set_from_signed_mint(num, value->numerator, 0) != 0 ||
+        mfloat_set_from_signed_mint(den, value->denominator, 0) != 0 ||
+        mf_div(num, den) != 0)
+        goto cleanup;
+    if (mfloat_copy_value(mfloat, num) != 0)
+        goto cleanup;
+    rc = mfloat_round_to_precision_internal(mfloat, precision);
+
+cleanup:
+    mf_free(num);
+    mf_free(den);
     return rc;
 }
 

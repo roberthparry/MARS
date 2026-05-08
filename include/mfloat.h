@@ -8,6 +8,8 @@
 
 #include "qfloat.h"
 
+typedef struct _mrational_t mrational_t;
+
 /**
  * @file mfloat.h
  * @brief Opaque multiprecision floating-point type.
@@ -68,6 +70,7 @@ mfloat_t *mf_new_prec(size_t precision_bits);
 mfloat_t *mf_create_long(long value);
 mfloat_t *mf_create_double(double value);
 mfloat_t *mf_create_qfloat(qfloat_t value);
+mfloat_t *mf_create_mrational(const mrational_t *value);
 mfloat_t *mf_create_string(const char *text);
 mfloat_t *mf_pi(void);
 mfloat_t *mf_e(void);
@@ -98,6 +101,7 @@ size_t mf_get_precision_digits(const mfloat_t *mfloat);
 int mf_set_long(mfloat_t *mfloat, long value);
 int mf_set_double(mfloat_t *mfloat, double value);
 int mf_set_qfloat(mfloat_t *mfloat, qfloat_t value);
+int mf_set_mrational(mfloat_t *mfloat, const mrational_t *value);
 int mf_set_string(mfloat_t *mfloat, const char *text);
 char *mf_to_string(const mfloat_t *mfloat);
 double mf_to_double(const mfloat_t *mfloat);
