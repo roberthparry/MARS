@@ -217,6 +217,45 @@ void test_bernoulli_accessors(void)
     assert_mr_string(b2, "-1/30");
 }
 
+static int readme_example(void)
+{
+    mrational_t *a = mr_create_frac_long(2, 3);
+    mrational_t *b = mr_create_string("5/4");
+    char *text;
+
+    if (!a || !b) {
+        mr_free(a);
+        mr_free(b);
+        return 1;
+    }
+
+    if (mr_mul(a, b) != 0) {
+        mr_free(a);
+        mr_free(b);
+        return 1;
+    }
+
+    text = mr_to_string(a);
+    if (!text) {
+        mr_free(a);
+        mr_free(b);
+        return 1;
+    }
+
+    printf("(2/3) * (5/4) = %s\n", text);
+
+    free(text);
+    mr_free(a);
+    mr_free(b);
+    return 0;
+}
+
+void test_readme_examples(void)
+{
+    printf(C_YELLOW "\nRunning README example...\n" C_RESET);
+    ASSERT_EQ_INT(readme_example(), 0);
+}
+
 int tests_main(void)
 {
     RUN_TEST_CASE(test_create_and_normalise);
@@ -225,5 +264,6 @@ int tests_main(void)
     RUN_TEST_CASE(test_arithmetic);
     RUN_TEST_CASE(test_large_values);
     RUN_TEST_CASE(test_bernoulli_accessors);
+    RUN_TEST_CASE(test_readme_examples);
     return 0;
 }
