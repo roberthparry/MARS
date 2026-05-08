@@ -65,10 +65,14 @@ void test_create_and_normalise(void)
 void test_setters_and_accessors(void)
 {
     mrational_t *r = mr_new();
+    mint_t *src_num = mi_create_string("84");
+    mint_t *src_den = mi_create_string("-126");
     const mint_t *num = NULL;
     const mint_t *den = NULL;
 
     ASSERT_NOT_NULL(r);
+    ASSERT_NOT_NULL(src_num);
+    ASSERT_NOT_NULL(src_den);
     ASSERT_EQ_INT(mr_set_frac_long(r, 14, 21), 0);
     assert_mr_string(r, "2/3");
 
@@ -84,6 +88,11 @@ void test_setters_and_accessors(void)
     assert_mr_string(r, "5");
     ASSERT_TRUE(mr_is_integer(r));
 
+    ASSERT_EQ_INT(mr_set_mints(r, src_num, src_den), 0);
+    assert_mr_string(r, "-2/3");
+    assert_mint_clone_string(src_num, "84");
+    assert_mint_clone_string(src_den, "-126");
+
     ASSERT_EQ_INT(mr_set_string(r, "7/0"), -1);
     ASSERT_EQ_INT(mr_set_long(r, 0), 0);
     ASSERT_TRUE(mr_is_zero(r));
@@ -91,6 +100,8 @@ void test_setters_and_accessors(void)
 
     mr_clear(r);
     assert_mr_string(r, "0");
+    mi_free(src_num);
+    mi_free(src_den);
     mr_free(r);
 }
 
@@ -165,18 +176,28 @@ void test_large_values(void)
 {
     mrational_t *a = mr_create_string("18446744073709551616/3");
     mrational_t *b = mr_create_string("5/7");
+    mint_t *num = mi_create_string("18446744073709551616");
+    mint_t *den = mi_create_string("3");
+    mrational_t *c = mr_create_mints(num, den);
 
     ASSERT_NOT_NULL(a);
     ASSERT_NOT_NULL(b);
+    ASSERT_NOT_NULL(num);
+    ASSERT_NOT_NULL(den);
+    ASSERT_NOT_NULL(c);
 
     ASSERT_EQ_INT(mr_mul(a, b), 0);
     assert_mr_string(a, "92233720368547758080/21");
 
     ASSERT_EQ_INT(mr_div(a, b), 0);
     assert_mr_string(a, "18446744073709551616/3");
+    assert_mr_string(c, "18446744073709551616/3");
 
     mr_free(a);
     mr_free(b);
+    mr_free(c);
+    mi_free(num);
+    mi_free(den);
 }
 
 void test_bernoulli_accessors(void)

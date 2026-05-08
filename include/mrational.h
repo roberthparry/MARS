@@ -23,6 +23,7 @@ typedef struct _mrational_t mrational_t;
 mrational_t *mr_new(void);
 mrational_t *mr_create_long(long value);
 mrational_t *mr_create_frac_long(long numerator, long denominator);
+mrational_t *mr_create_mints(const mint_t *numerator, const mint_t *denominator);
 mrational_t *mr_create_string(const char *text);
 mrational_t *mr_clone(const mrational_t *rational);
 void mr_free(mrational_t *rational);
@@ -34,6 +35,7 @@ void mr_clear(mrational_t *rational);
  */
 int mr_set_long(mrational_t *rational, long value);
 int mr_set_frac_long(mrational_t *rational, long numerator, long denominator);
+int mr_set_mints(mrational_t *rational, const mint_t *numerator, const mint_t *denominator);
 int mr_set_string(mrational_t *rational, const char *text);
 char *mr_to_string(const mrational_t *rational);
 /** @} */

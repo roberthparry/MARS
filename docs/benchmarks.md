@@ -17,6 +17,7 @@ make bench_integrator
 make bench_matrix_dval
 make bench_mint_mul
 make bench_mint_div
+make bench_mrational_arith
 make bench_mfloat_maths
 make bench_mcomplex_maths
 ```
@@ -116,6 +117,25 @@ make bench_mint_combinatorics
 These cover the main optimisation areas in the arbitrary-precision integer
 subsystem: small/native-word fast paths, wider multiply/divide behaviour,
 `gcd`/`lcm`/`modinv`, and combinatorics helpers.
+
+### `mrational`
+
+Available benchmark target:
+
+```sh
+make bench_mrational_arith
+```
+
+This benchmark reports one combined timing table for:
+
+- `mr_add`
+- `mr_sub`
+- `mr_mul`
+- `mr_div`
+- `mr_inv`
+
+Rows are grouped by operation and numerator-bit band, columns by
+denominator-bit band, and each cell reports the average time per call.
 
 ### `mfloat`
 

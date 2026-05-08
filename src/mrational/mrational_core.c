@@ -136,6 +136,19 @@ mrational_t *mr_create_frac_long(long numerator, long denominator)
     return rational;
 }
 
+mrational_t *mr_create_mints(const mint_t *numerator, const mint_t *denominator)
+{
+    mrational_t *rational = mr_new();
+
+    if (!rational)
+        return NULL;
+    if (mr_set_mints(rational, numerator, denominator) != 0) {
+        mr_free(rational);
+        return NULL;
+    }
+    return rational;
+}
+
 mrational_t *mr_create_string(const char *text)
 {
     mrational_t *rational = mr_new();
@@ -201,6 +214,11 @@ int mr_set_frac_long(mrational_t *rational, long numerator, long denominator)
         mi_set_long(rational->denominator, denominator) != 0)
         return -1;
     return mr_normalise(rational);
+}
+
+int mr_set_mints(mrational_t *rational, const mint_t *numerator, const mint_t *denominator)
+{
+    return mr_set_frac_mints(rational, numerator, denominator);
 }
 
 int mr_set_string(mrational_t *rational, const char *text)
