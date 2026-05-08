@@ -1200,8 +1200,7 @@ int mc_asinh(mcomplex_t *mcomplex)
         mc_add(square, orig) != 0 ||
         mc_log(square) != 0)
         goto fail;
-
-    for (iter = 0; iter < 5; ++iter) {
+    for (int iter = 0; iter < 2; ++iter) {
         if (mc_set(corr, mc_real(square), mc_imag(square)) != 0 ||
             mc_set(deriv, mc_real(square), mc_imag(square)) != 0 ||
             mc_sinh(corr) != 0 ||
@@ -1265,8 +1264,7 @@ int mc_acosh(mcomplex_t *mcomplex)
         mc_add(plus, orig) != 0 ||
         mc_log(plus) != 0)
         goto fail;
-
-    for (iter = 0; iter < 5; ++iter) {
+    for (int iter = 0; iter < 2; ++iter) {
         if (mc_set(corr, mc_real(plus), mc_imag(plus)) != 0 ||
             mc_set(deriv, mc_real(plus), mc_imag(plus)) != 0 ||
             mc_cosh(corr) != 0 ||
