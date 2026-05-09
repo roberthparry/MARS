@@ -156,6 +156,9 @@ int mf_printf(const char *fmt, ...);
  * Introspection helpers for the current normalised representation.
  * @{
  */
+bool mf_is_finite(const mfloat_t *mfloat);
+bool mf_is_nan(const mfloat_t *mfloat);
+bool mf_is_inf(const mfloat_t *mfloat);
 bool mf_is_zero(const mfloat_t *mfloat);
 short mf_get_sign(const mfloat_t *mfloat);
 long mf_get_exponent2(const mfloat_t *mfloat);

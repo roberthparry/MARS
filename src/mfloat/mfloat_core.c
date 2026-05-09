@@ -172,14 +172,40 @@ const mfloat_t MF_SQRT2_VALUE = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .expone
 const mfloat_t MF_TENTH_VALUE = { .kind = MFLOAT_KIND_FINITE, .sign = 1, .exponent2 = -263, .precision = 256u, .immortal = true, .mantissa = &mfloat_tenth_mint };
 static size_t mfloat_default_precision_bits = MFLOAT_DEFAULT_PRECISION_BITS;
 
-int mfloat_is_immortal(const mfloat_t *mfloat)
+bool mfloat_is_immortal(const mfloat_t *mfloat)
 {
     return mfloat && mfloat->immortal;
 }
 
-int mfloat_is_finite(const mfloat_t *mfloat)
+bool mfloat_is_finite(const mfloat_t *mfloat)
 {
     return mfloat && mfloat->kind == MFLOAT_KIND_FINITE;
+}
+
+bool mfloat_is_nan(const mfloat_t *mfloat)
+{
+    return mfloat && mfloat->kind == MFLOAT_KIND_NAN;
+}
+
+bool mfloat_is_inf(const mfloat_t *mfloat)
+{
+    return mfloat &&
+        (mfloat->kind == MFLOAT_KIND_POSINF || mfloat->kind == MFLOAT_KIND_NEGINF);
+}
+
+bool mf_is_finite(const mfloat_t *mfloat)
+{
+    return mfloat_is_finite(mfloat);
+}
+
+bool mf_is_nan(const mfloat_t *mfloat)
+{
+    return mfloat_is_nan(mfloat);
+}
+
+bool mf_is_inf(const mfloat_t *mfloat)
+{
+    return mfloat_is_inf(mfloat);
 }
 
 int mfloat_normalise(mfloat_t *mfloat)

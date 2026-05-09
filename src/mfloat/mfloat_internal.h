@@ -28,8 +28,6 @@ struct _mfloat_t {
 };
 
 /* Core representation helpers. */
-int mfloat_is_immortal(const mfloat_t *mfloat);
-int mfloat_is_finite(const mfloat_t *mfloat);
 int mfloat_normalise(mfloat_t *mfloat);
 int mfloat_round_to_precision_internal(mfloat_t *mfloat, size_t precision);
 int mfloat_copy_value(mfloat_t *dst, const mfloat_t *src);

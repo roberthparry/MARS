@@ -37,10 +37,10 @@ static int mcomplex_round_parts(mcomplex_t *mcomplex, size_t precision_bits)
 {
     if (!mcomplex)
         return -1;
-    if (mcomplex->real && mfloat_is_finite(mcomplex->real) &&
+    if (mcomplex->real && mf_is_finite(mcomplex->real) &&
         mfloat_round_to_precision_internal(mcomplex->real, precision_bits) != 0)
         return -1;
-    if (mcomplex->imag && mfloat_is_finite(mcomplex->imag) &&
+    if (mcomplex->imag && mf_is_finite(mcomplex->imag) &&
         mfloat_round_to_precision_internal(mcomplex->imag, precision_bits) != 0)
         return -1;
     if (mf_set_precision(mcomplex->real, precision_bits) != 0 ||

@@ -12,6 +12,7 @@ struct _mcomplex_t {
     bool immortal;
 };
 
+bool mcomplex_is_immortal(const mcomplex_t *mcomplex);
 int mcomplex_ensure_mutable(mcomplex_t *mcomplex);
 int mcomplex_apply_unary(mcomplex_t *mcomplex, qcomplex_t (*fn)(qcomplex_t));
 int mcomplex_apply_binary(mcomplex_t *mcomplex,

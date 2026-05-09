@@ -144,6 +144,11 @@ int mcomplex_ensure_mutable(mcomplex_t *mcomplex)
     return 0;
 }
 
+bool mcomplex_is_immortal(const mcomplex_t *mcomplex)
+{
+    return mcomplex && mcomplex->immortal;
+}
+
 qcomplex_t mc_to_qcomplex(const mcomplex_t *mcomplex)
 {
     return qc_make(mf_to_qfloat(mcomplex->real), mf_to_qfloat(mcomplex->imag));
