@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "qcomplex_internal.h"
+#include "qcomplex.h"
 static inline void qc_put_char(char **dst, size_t *remaining, size_t *count, char c) {
     if (*remaining > 1 && *dst) {
         **dst = c;

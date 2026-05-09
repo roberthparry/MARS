@@ -1,6 +1,6 @@
 #include <math.h>
 
-#include "qcomplex_internal.h"
+#include "qcomplex.h"
 
 static qcomplex_t qc_pow_int(qcomplex_t z, int n)
 {
@@ -80,7 +80,7 @@ qcomplex_t qc_pow(qcomplex_t a, qcomplex_t b) {
 
     if (qf_eq(a.im, QF_ZERO) && qf_eq(b.im, QF_ZERO)) {
         if (!qf_signbit(a.re))
-            return qcrf(qf_pow(a.re, b.re));
+            return qc_make(qf_pow(a.re, b.re), QF_ZERO);
 
         {
             qfloat_t mag = qf_pow(qf_abs(a.re), b.re);
@@ -145,7 +145,7 @@ qcomplex_t qc_atan(qcomplex_t z) {
 }
 qcomplex_t qc_atan2(qcomplex_t y, qcomplex_t x) {
     if (qf_eq(y.im, qf_from_double(0.0)) && qf_eq(x.im, qf_from_double(0.0)))
-        return qcrf(qf_atan2(y.re, x.re));
+        return qc_make(qf_atan2(y.re, x.re), QF_ZERO);
     return qc_atan(qc_div(y, x));
 }
 

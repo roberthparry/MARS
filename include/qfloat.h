@@ -29,12 +29,13 @@
 #define QFLOAT_H
 
 #include <stdbool.h>
+#include <math.h>
 #include <stddef.h>
 #include <stdarg.h>
 
 /**
  * @struct qfloat_t
- * @brief Double‑double precision floating‑point number.
+ * @brief Double-double precision floating-point number.
  *
  * A qfloat_t stores a number as:
  *
@@ -47,7 +48,6 @@ typedef struct {
     double hi; /**< Leading part (most significant 53 bits). */
     double lo; /**< Trailing part (error term, ~53 bits).    */
 } qfloat_t;
-
 
 /* -------------------------------------------------------------------------
    Constants
@@ -122,14 +122,26 @@ extern const qfloat_t QF_INVLN2;
 /** @brief sqrt(0.5) */
 extern const qfloat_t QF_SQRT_HALF;
 
+/** @brief sqrt(2) */
+extern const qfloat_t QF_SQRT2;
+
+/** @brief sqrt(2π) */
+extern const qfloat_t QF_SQRT_2PI;
+
 /** @brief sqrt(π) */
 extern const qfloat_t QF_SQRT_PI;
+
+/** @brief sqrt(π/2) */
+extern const qfloat_t QF_SQRT_PI_OVER_TWO;
 
 /** @brief sqrt(1/π) */
 extern const qfloat_t QF_SQRT1ONPI;
 
 /** @brief 2*sqrt(1/π) */
 extern const qfloat_t QF_2_SQRTPI;
+
+/** @brief -2*sqrt(1/π) */
+extern const qfloat_t QF_NEG_TWO_OVER_SQRT_PI;
 
 /** @brief 1/sqrt(2π) */
 extern const qfloat_t QF_INV_SQRT_2PI;
@@ -142,6 +154,30 @@ extern const qfloat_t QF_LN_2PI;
 
 /** @brief Euler–Mascheroni constant γ */
 extern const qfloat_t QF_EULER_MASCHERONI;
+
+/** @brief π² */
+extern const qfloat_t QF_PI_SQUARED;
+
+/** @brief (2π)³ */
+extern const qfloat_t QF_2PI_CUBED;
+
+/** @brief 3/2 */
+extern const qfloat_t QF_ONE_AND_HALF;
+
+/** @brief 1/3 */
+extern const qfloat_t QF_ONE_THIRD;
+
+/** @brief 1/4 */
+extern const qfloat_t QF_QUARTER;
+
+/** @brief 1/6 */
+extern const qfloat_t QF_ONE_SIXTH;
+
+/** @brief 1/8 */
+extern const qfloat_t QF_ONE_EIGHTH;
+
+/** @brief 1/10 */
+extern const qfloat_t QF_ONE_TENTH;
 
 /* -------------------------------------------------------------------------
    Constructors and conversions

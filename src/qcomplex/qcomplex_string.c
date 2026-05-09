@@ -3,9 +3,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "qcomplex_internal.h"
+#include "qcomplex.h"
 void qc_to_string(qcomplex_t z, char *out, size_t out_size) {
-    if (qf_cmp(z.im, (qfloat_t){0.0, 0.0}) < 0) {
+    if (qf_cmp(z.im, qf_from_double(0.0)) < 0) {
         qf_sprintf(out, out_size, "%q - %qi", z.re, qf_neg(z.im));
     } else {
         qf_sprintf(out, out_size, "%q + %qi", z.re, z.im);
@@ -141,7 +141,7 @@ qcomplex_t qc_from_string(const char *s)
                 if (qc_parse_real_imag_parts(left, right, &e) != 0)
                     return qc_parse_fail("invalid numbers in exp(a+bi)", s_original);
 
-                return qc_mul(qcrf(r), qc_exp(e));
+                return qc_mul(qc_make(r, QF_ZERO), qc_exp(e));
             }
         }
 
@@ -230,4 +230,3 @@ qcomplex_t qc_from_string(const char *s)
 /* ------------------------------------------------------------------ */
 /*  qc_vsprintf / qc_sprintf / qc_printf                               */
 /* ------------------------------------------------------------------ */
-

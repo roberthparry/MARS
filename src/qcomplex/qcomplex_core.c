@@ -1,6 +1,6 @@
 #include <math.h>
 
-#include "qcomplex_internal.h"
+#include "qcomplex.h"
 
 const qcomplex_t QC_ZERO = {
     .re = { .hi = 0.0, .lo = 0.0 },
@@ -181,7 +181,7 @@ qcomplex_t qc_floor(qcomplex_t z) {
 }
 qcomplex_t qc_hypot(qcomplex_t x, qcomplex_t y) {
     /* Not standard for complex; defined as sqrt(|x|^2 + |y|^2) */
-    return qcrf(qf_hypot(qc_abs(x), qc_abs(y)));
+    return qc_make(qf_hypot(qc_abs(x), qc_abs(y)), QF_ZERO);
 }
 
 /* Comparison */
