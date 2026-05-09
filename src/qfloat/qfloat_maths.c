@@ -205,6 +205,16 @@ bool qf_isinf(qfloat_t x)
     return qf_eq(x, QF_INF) || qf_eq(x, QF_NINF);
 }
 
+long qf_get_exponent2(qfloat_t x)
+{
+    double hi = fabs(x.hi);
+    double lo = fabs(x.lo);
+    double lead = hi != 0.0 ? hi : lo;
+    int exp2 = ilogb(lead);
+
+    return exp2 == FP_ILOGB0 || exp2 == FP_ILOGBNAN ? 0l : (long)exp2;
+}
+
 
 /*------------------------------------------------------------
  *  High-precision sin/cos/tan using Newton refinement

@@ -9,6 +9,7 @@
 #include "qfloat.h"
 
 typedef struct _mrational_t mrational_t;
+typedef struct _mfloat_t mfloat_t;
 
 /**
  * @file mfloat.h
@@ -23,8 +24,6 @@ typedef struct _mrational_t mrational_t;
 /**
  * @brief Opaque multiprecision floating-point type.
  */
-typedef struct _mfloat_t mfloat_t;
-
 /** @name Constants
  * Process-lifetime convenience values owned by the mfloat subsystem. They must
  * not be modified or freed by callers.

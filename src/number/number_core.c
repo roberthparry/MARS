@@ -448,16 +448,9 @@ static long number_get_exponent2_double(const number_t *number)
 
 static long number_get_exponent2_qfloat(const number_t *number)
 {
-    double hi, lo, lead;
-    int exp2;
-
     if (!number)
         return 0l;
-    hi = fabs(number_impl_const(number)->value.qf.hi);
-    lo = fabs(number_impl_const(number)->value.qf.lo);
-    lead = hi != 0.0 ? hi : lo;
-    exp2 = ilogb(lead);
-    return exp2 == FP_ILOGB0 || exp2 == FP_ILOGBNAN ? 0l : (long)exp2;
+    return qf_get_exponent2(number_impl_const(number)->value.qf);
 }
 
 static long number_get_exponent2_zero(const number_t *number)

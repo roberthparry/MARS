@@ -2,6 +2,8 @@
 
 #include <math.h>
 
+#include "mfloat.h"
+
 /* Constants */
 
 const qfloat_t QF_ZERO = { 0.0, 0.0 };
@@ -56,6 +58,37 @@ qfloat_t qf_from_double(double x)
 
 double qf_to_double(qfloat_t x) {
     return x.hi + x.lo;
+}
+
+int qf_to_mfloat_exact(mfloat_t *mfloat, qfloat_t value)
+{
+    mfloat_t *tmp = NULL;
+    int rc;
+
+    if (!mfloat)
+        return -1;
+
+    if (qf_isnan(value) || qf_isposinf(value) || qf_isneginf(value))
+        return mf_set_double(mfloat, qf_to_double(value));
+
+    rc = mf_set_double(mfloat, value.hi);
+    if (rc != 0)
+        return rc;
+
+    if (value.lo == 0.0)
+        return 0;
+
+    tmp = mf_create_double(value.lo);
+    if (!tmp)
+        return -1;
+    if (mf_set_precision(tmp, mf_get_precision(mfloat)) != 0) {
+        mf_free(tmp);
+        return -1;
+    }
+
+    rc = mf_add(mfloat, tmp);
+    mf_free(tmp);
+    return rc;
 }
 
 

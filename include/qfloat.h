@@ -311,6 +311,17 @@ int qf_cmp(qfloat_t a, qfloat_t b);
 int qf_signbit(qfloat_t x);
 
 /**
+ * @brief Returns the base-2 exponent of a finite nonzero qfloat_t.
+ *
+ * This is analogous to `ilogb()` for qfloat_t values. For zero, NaN, and
+ * infinities, this function returns 0.
+ *
+ * @param x Input qfloat_t.
+ * @return Unbiased base-2 exponent, or 0 for zero/non-finite inputs.
+ */
+long qf_get_exponent2(qfloat_t x);
+
+/**
  * @brief Square of a qfloat_t.
  *
  * @param x Input qfloat_t.

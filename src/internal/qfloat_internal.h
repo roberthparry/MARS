@@ -1,7 +1,11 @@
 #ifndef QFLOAT_SHARED_INTERNAL_H
 #define QFLOAT_SHARED_INTERNAL_H
 
+typedef struct _mfloat_t mfloat_t;
+
 #include "qfloat.h"
+
+int qf_to_mfloat_exact(mfloat_t *mfloat, qfloat_t value);
 
 extern const qfloat_t QFI_FADDEEVA_AK[32];
 extern const qfloat_t QFI_FADDEEVA_CK[32];

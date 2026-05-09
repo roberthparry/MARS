@@ -1,5 +1,6 @@
 #include "mfloat_internal.h"
 #include "mfloat_coeff_tables.h"
+#include "internal/qfloat_internal.h"
 #include "internal/mint_internal.h"
 #include "mrational.h"
 
@@ -849,53 +850,11 @@ int mf_set_double(mfloat_t *mfloat, double value)
 
 int mf_set_qfloat(mfloat_t *mfloat, qfloat_t value)
 {
-    mfloat_t *tmp = NULL;
-    int rc;
-
     if (!mfloat)
         return -1;
     if (mfloat_is_immortal(mfloat))
         return -1;
-    if (qf_isnan(value)) {
-        mi_clear(mfloat->mantissa);
-        mfloat->kind = MFLOAT_KIND_NAN;
-        mfloat->sign = 0;
-        mfloat->exponent2 = 0;
-        return 0;
-    }
-    if (qf_isposinf(value)) {
-        mi_clear(mfloat->mantissa);
-        mfloat->kind = MFLOAT_KIND_POSINF;
-        mfloat->sign = 1;
-        mfloat->exponent2 = 0;
-        return 0;
-    }
-    if (qf_isneginf(value)) {
-        mi_clear(mfloat->mantissa);
-        mfloat->kind = MFLOAT_KIND_NEGINF;
-        mfloat->sign = -1;
-        mfloat->exponent2 = 0;
-        return 0;
-    }
-
-    rc = mfloat_set_double_exact(mfloat, value.hi);
-    if (rc != 0)
-        return rc;
-
-    if (value.lo == 0.0)
-        return 0;
-
-    tmp = mf_create_double(value.lo);
-    if (!tmp)
-        return -1;
-    if (mf_set_precision(tmp, mfloat->precision) != 0) {
-        mf_free(tmp);
-        return -1;
-    }
-
-    rc = mf_add(mfloat, tmp);
-    mf_free(tmp);
-    return rc;
+    return qf_to_mfloat_exact(mfloat, value);
 }
 
 int mf_set_mrational(mfloat_t *mfloat, const mrational_t *value)
