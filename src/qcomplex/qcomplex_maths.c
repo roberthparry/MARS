@@ -5,7 +5,7 @@
 
 static qfloat_t qc_abs2_local(qcomplex_t z)
 {
-    return qf_add(qf_mul(z.re, z.re), qf_mul(z.im, z.im));
+    return qf_add(qf_mul(qc_real(z), qc_real(z)), qf_mul(qc_imag(z), qc_imag(z)));
 }
 
 static qcomplex_t qc_faddeeva_inside(qcomplex_t z)
@@ -14,7 +14,7 @@ static qcomplex_t qc_faddeeva_inside(qcomplex_t z)
     qcomplex_t sum = QC_ZERO;
 
     for (int k = 1; k <= N; k++) {
-        qcomplex_t denom = qc_make(z.re, qf_sub(z.im, QFI_FADDEEVA_AK[k - 1]));
+        qcomplex_t denom = qc_make(qc_real(z), qf_sub(qc_imag(z), QFI_FADDEEVA_AK[k - 1]));
         sum = qc_add(sum, qc_div(qc_make(QFI_FADDEEVA_CK[k - 1], QF_ZERO), denom));
     }
 
@@ -24,23 +24,23 @@ static qcomplex_t qc_faddeeva_inside(qcomplex_t z)
 }
 
 qcomplex_t qc_erf(qcomplex_t z) {
-    if (qf_eq(z.im, qf_from_double(0.0)))
-        return qc_make(qf_erf(z.re), QF_ZERO);
+    if (qf_eq(qc_imag(z), qf_from_double(0.0)))
+        return qc_make(qf_erf(qc_real(z)), QF_ZERO);
     /* Faddeeva requires Im(iz) = Re(z) >= 0; use antisymmetry erf(-z) = -erf(z) otherwise */
-    if (qf_lt(z.re, qf_from_double(0.0)))
+    if (qf_lt(qc_real(z), qf_from_double(0.0)))
         return qc_neg(qc_erf(qc_neg(z)));
-    qcomplex_t iz = qc_make(qf_neg(z.im), z.re);
+    qcomplex_t iz = qc_make(qf_neg(qc_imag(z)), qc_real(z));
     return qc_sub(QC_ONE, qc_faddeeva_inside(iz));
 }
 
 qcomplex_t qc_erfc(qcomplex_t z)
 {
-    if (qf_eq(z.im, qf_from_double(0.0)))
-        return qc_make(qf_erfc(z.re), QF_ZERO);
+    if (qf_eq(qc_imag(z), qf_from_double(0.0)))
+        return qc_make(qf_erfc(qc_real(z)), QF_ZERO);
     /* Use erfc(-z) = 2 - erfc(z) to keep Re(z) >= 0 for Faddeeva */
-    if (qf_lt(z.re, qf_from_double(0.0)))
+    if (qf_lt(qc_real(z), qf_from_double(0.0)))
         return qc_sub(QC_TWO, qc_erfc(qc_neg(z)));
-    qcomplex_t iz = qc_make(qf_neg(z.im), z.re);
+    qcomplex_t iz = qc_make(qf_neg(qc_imag(z)), qc_real(z));
     return qc_faddeeva_inside(iz);
 }
 
@@ -95,10 +95,10 @@ static qcomplex_t lanczos_sum(qcomplex_t z_minus_one)
 
 qcomplex_t qc_gamma(qcomplex_t z)
 {
-    if (qf_eq(z.im, qf_from_double(0.0)))
-        return qc_make(qf_gamma(z.re), QF_ZERO);
+    if (qf_eq(qc_imag(z), qf_from_double(0.0)))
+        return qc_make(qf_gamma(qc_real(z)), QF_ZERO);
 
-    if (qf_lt(z.re, qf_from_double(0.5))) {
+    if (qf_lt(qc_real(z), qf_from_double(0.5))) {
         /* Reflection: Γ(z) = π / (sin(πz) Γ(1-z)) */
         qcomplex_t sin_pi_z  = qc_sin(qc_mul(z, QC_PI));
         qcomplex_t gamma_1mz = qc_gamma(qc_sub(QC_ONE, z));
@@ -115,10 +115,10 @@ qcomplex_t qc_gamma(qcomplex_t z)
 
 qcomplex_t qc_lgamma(qcomplex_t z)
 {
-    if (qf_eq(z.im, qf_from_double(0.0)))
-        return qc_make(qf_lgamma(z.re), QF_ZERO);
+    if (qf_eq(qc_imag(z), qf_from_double(0.0)))
+        return qc_make(qf_lgamma(qc_real(z)), QF_ZERO);
 
-    if (qf_lt(z.re, qf_from_double(0.5))) {
+    if (qf_lt(qc_real(z), qf_from_double(0.5))) {
         /* Reflection: lgamma(z) = log(π) - log(sin(πz)) - lgamma(1-z) */
         qcomplex_t log_sin_piz = qc_log(qc_sin(qc_mul(z, QC_PI)));
         qcomplex_t lg_1mz      = qc_lgamma(qc_sub(QC_ONE, z));
@@ -135,10 +135,10 @@ qcomplex_t qc_lgamma(qcomplex_t z)
 
 qcomplex_t qc_digamma(qcomplex_t z)
 {
-    if (qf_eq(z.im, qf_from_double(0.0)))
-        return qc_make(qf_digamma(z.re), QF_ZERO);
+    if (qf_eq(qc_imag(z), qf_from_double(0.0)))
+        return qc_make(qf_digamma(qc_real(z)), QF_ZERO);
 
-    if (qf_lt(z.re, qf_from_double(0.5))) {
+    if (qf_lt(qc_real(z), qf_from_double(0.5))) {
         /* Reflection: ψ(z) = ψ(1-z) - π cot(πz) */
         qcomplex_t pi_z = qc_mul(z, QC_PI);
         qcomplex_t cotpz = qc_div(qc_cos(pi_z), qc_sin(pi_z));
@@ -174,10 +174,10 @@ qcomplex_t qc_digamma(qcomplex_t z)
 
 qcomplex_t qc_trigamma(qcomplex_t z)
 {
-    if (qf_eq(z.im, qf_from_double(0.0)))
-        return qc_make(qf_trigamma(z.re), QF_ZERO);
+    if (qf_eq(qc_imag(z), qf_from_double(0.0)))
+        return qc_make(qf_trigamma(qc_real(z)), QF_ZERO);
 
-    if (qf_lt(z.re, qf_from_double(0.5))) {
+    if (qf_lt(qc_real(z), qf_from_double(0.5))) {
         /* Reflection: ψ₁(z) = π² csc²(πz) - ψ₁(1-z) */
         qcomplex_t pi_z  = qc_mul(z, QC_PI);
         qcomplex_t csc   = qc_div(QC_ONE, qc_sin(pi_z));
@@ -214,10 +214,10 @@ qcomplex_t qc_trigamma(qcomplex_t z)
 
 qcomplex_t qc_tetragamma(qcomplex_t z)
 {
-    if (qf_eq(z.im, qf_from_double(0.0)))
-        return qc_make(qf_tetragamma(z.re), QF_ZERO);
+    if (qf_eq(qc_imag(z), qf_from_double(0.0)))
+        return qc_make(qf_tetragamma(qc_real(z)), QF_ZERO);
 
-    if (qf_lt(z.re, qf_from_double(0.5))) {
+    if (qf_lt(qc_real(z), qf_from_double(0.5))) {
         /* Reflection: ψ₂(z) = ψ₂(1-z) + 2π³ csc²(πz) cot(πz) */
         qcomplex_t pi_z   = qc_mul(z, QC_PI);
         qcomplex_t sin_pz = qc_sin(pi_z);
@@ -259,10 +259,10 @@ qcomplex_t qc_tetragamma(qcomplex_t z)
 
 qcomplex_t qc_gammainv(qcomplex_t z)
 {
-    if (qf_eq(z.im, qf_from_double(0.0)))
-        return qc_make(qf_gammainv(z.re), QF_ZERO);
+    if (qf_eq(qc_imag(z), qf_from_double(0.0)))
+        return qc_make(qf_gammainv(qc_real(z)), QF_ZERO);
 
-    if (qc_isnan(z) || (qf_eq(z.re, QF_ZERO) && qf_eq(z.im, QF_ZERO)))
+    if (qc_isnan(z) || (qf_eq(qc_real(z), QF_ZERO) && qf_eq(qc_imag(z), QF_ZERO)))
         return qc_make(QF_NAN, QF_NAN);
 
     qcomplex_t logz = qc_log(z);
@@ -280,24 +280,24 @@ qcomplex_t qc_gammainv(qcomplex_t z)
 
 qcomplex_t qc_beta(qcomplex_t a, qcomplex_t b)
 {
-    if (qf_eq(a.im, qf_from_double(0.0)) && qf_eq(b.im, qf_from_double(0.0)))
-        return qc_make(qf_beta(a.re, b.re), QF_ZERO);
+    if (qf_eq(qc_imag(a), qf_from_double(0.0)) && qf_eq(qc_imag(b), qf_from_double(0.0)))
+        return qc_make(qf_beta(qc_real(a), qc_real(b)), QF_ZERO);
 
     return qc_exp(qc_logbeta(a, b));
 }
 
 qcomplex_t qc_logbeta(qcomplex_t a, qcomplex_t b)
 {
-    if (qf_eq(a.im, qf_from_double(0.0)) && qf_eq(b.im, qf_from_double(0.0)))
-        return qc_make(qf_logbeta(a.re, b.re), QF_ZERO);
+    if (qf_eq(qc_imag(a), qf_from_double(0.0)) && qf_eq(qc_imag(b), qf_from_double(0.0)))
+        return qc_make(qf_logbeta(qc_real(a), qc_real(b)), QF_ZERO);
 
     return qc_sub(qc_add(qc_lgamma(a), qc_lgamma(b)), qc_lgamma(qc_add(a, b)));
 }
 
 qcomplex_t qc_binomial(qcomplex_t a, qcomplex_t b)
 {
-    if (qf_eq(a.im, qf_from_double(0.0)) && qf_eq(b.im, qf_from_double(0.0)))
-        return qc_make(qf_binomial(a.re, b.re), QF_ZERO);
+    if (qf_eq(qc_imag(a), qf_from_double(0.0)) && qf_eq(qc_imag(b), qf_from_double(0.0)))
+        return qc_make(qf_binomial(qc_real(a), qc_real(b)), QF_ZERO);
 
     /* C(a,b) = Γ(a+1) / (Γ(b+1) Γ(a-b+1)) */
     qcomplex_t a1   = qc_add(a, QC_ONE);
@@ -308,9 +308,9 @@ qcomplex_t qc_binomial(qcomplex_t a, qcomplex_t b)
 
 qcomplex_t qc_beta_pdf(qcomplex_t x, qcomplex_t a, qcomplex_t b)
 {
-    if (qf_eq(x.im, qf_from_double(0.0)) && qf_eq(a.im, qf_from_double(0.0)) &&
-        qf_eq(b.im, qf_from_double(0.0)))
-        return qc_make(qf_beta_pdf(x.re, a.re, b.re), QF_ZERO);
+    if (qf_eq(qc_imag(x), qf_from_double(0.0)) && qf_eq(qc_imag(a), qf_from_double(0.0)) &&
+        qf_eq(qc_imag(b), qf_from_double(0.0)))
+        return qc_make(qf_beta_pdf(qc_real(x), qc_real(a), qc_real(b)), QF_ZERO);
 
     /* f(x; a, b) = x^(a-1) * (1-x)^(b-1) / B(a,b) */
     qcomplex_t one_minus_x = qc_sub(QC_ONE, x);
@@ -321,9 +321,9 @@ qcomplex_t qc_beta_pdf(qcomplex_t x, qcomplex_t a, qcomplex_t b)
 
 qcomplex_t qc_logbeta_pdf(qcomplex_t x, qcomplex_t a, qcomplex_t b)
 {
-    if (qf_eq(x.im, qf_from_double(0.0)) && qf_eq(a.im, qf_from_double(0.0)) &&
-        qf_eq(b.im, qf_from_double(0.0)))
-        return qc_make(qf_logbeta_pdf(x.re, a.re, b.re), QF_ZERO);
+    if (qf_eq(qc_imag(x), qf_from_double(0.0)) && qf_eq(qc_imag(a), qf_from_double(0.0)) &&
+        qf_eq(qc_imag(b), qf_from_double(0.0)))
+        return qc_make(qf_logbeta_pdf(qc_real(x), qc_real(a), qc_real(b)), QF_ZERO);
 
     /* log f(x; a,b) = (a-1)log(x) + (b-1)log(1-x) - log B(a,b) */
     return qc_sub(qc_add(qc_mul(qc_sub(a, QC_ONE), qc_log(x)),
@@ -333,8 +333,8 @@ qcomplex_t qc_logbeta_pdf(qcomplex_t x, qcomplex_t a, qcomplex_t b)
 
 qcomplex_t qc_normal_pdf(qcomplex_t z)
 {
-    if (qf_eq(z.im, qf_from_double(0.0)))
-        return qc_make(qf_normal_pdf(z.re), QF_ZERO);
+    if (qf_eq(qc_imag(z), qf_from_double(0.0)))
+        return qc_make(qf_normal_pdf(qc_real(z)), QF_ZERO);
 
     /* φ(z) = exp(-z²/2) / sqrt(2π) */
     return qc_mul(QC_INV_SQRT_2PI,
@@ -343,8 +343,8 @@ qcomplex_t qc_normal_pdf(qcomplex_t z)
 
 qcomplex_t qc_normal_cdf(qcomplex_t z)
 {
-    if (qf_eq(z.im, qf_from_double(0.0)))
-        return qc_make(qf_normal_cdf(z.re), QF_ZERO);
+    if (qf_eq(qc_imag(z), qf_from_double(0.0)))
+        return qc_make(qf_normal_cdf(qc_real(z)), QF_ZERO);
 
     /* Φ(z) = 0.5 * (1 + erf(z / sqrt(2))) */
     return qc_mul(QC_HALF, qc_add(QC_ONE, qc_erf(qc_div(z, QC_SQRT2))));
@@ -352,8 +352,8 @@ qcomplex_t qc_normal_cdf(qcomplex_t z)
 
 qcomplex_t qc_normal_logpdf(qcomplex_t z)
 {
-    if (qf_eq(z.im, qf_from_double(0.0)))
-        return qc_make(qf_normal_logpdf(z.re), QF_ZERO);
+    if (qf_eq(qc_imag(z), qf_from_double(0.0)))
+        return qc_make(qf_normal_logpdf(qc_real(z)), QF_ZERO);
 
     /* log φ(z) = -z²/2 - log(2π)/2 */
     return qc_sub(qc_mul(qc_neg(QC_HALF), qc_mul(z, z)),
@@ -380,7 +380,7 @@ static qcomplex_t qc_lambert_w_asymptotic_guess(qcomplex_t z, int branch)
 {
     qfloat_t two_pi = qf_mul_double(QF_PI, 2.0);
     qcomplex_t L1 = qc_log(z);
-    L1.im = qf_add(L1.im, qf_mul_double(two_pi, (double)branch));
+    L1 = qc_make(qc_real(L1), qf_add(qc_imag(L1), qf_mul_double(two_pi, (double)branch)));
 
     if (qf_eq(qc_abs2_local(L1), QF_ZERO))
         return L1;
@@ -396,10 +396,10 @@ static qcomplex_t qc_lambert_wm1_complex(qcomplex_t z)
     if (qc_isnan(z))
         return qc_make(QF_NAN, QF_NAN);
 
-    if (qf_eq(z.im, qf_from_double(0.0)))
-        return qc_make(qf_lambert_wm1(z.re), QF_ZERO);
+    if (qf_eq(qc_imag(z), qf_from_double(0.0)))
+        return qc_make(qf_lambert_wm1(qc_real(z)), QF_ZERO);
 
-    if (qf_eq(z.re, QF_ZERO) && qf_eq(z.im, QF_ZERO))
+    if (qf_eq(qc_real(z), QF_ZERO) && qf_eq(qc_imag(z), QF_ZERO))
         return qc_make(QF_NINF, QF_NAN);
 
     qcomplex_t branch_probe = qc_add(qc_mul(QC_E, z), QC_ONE);
@@ -439,8 +439,8 @@ qcomplex_t qc_lambert_wm1(qcomplex_t z)
 
 qcomplex_t qc_productlog(qcomplex_t z)
 {
-    if (qf_eq(z.im, qf_from_double(0.0)))
-        return qc_make(qf_productlog(z.re), QF_ZERO);
+    if (qf_eq(qc_imag(z), qf_from_double(0.0)))
+        return qc_make(qf_productlog(qc_real(z)), QF_ZERO);
 
     /* Halley iteration on the principal branch: w e^w = z */
     qcomplex_t w = qc_log(z);
@@ -479,40 +479,40 @@ static qcomplex_t qc_gammainc_lower_series(qcomplex_t s, qcomplex_t x)
 
 qcomplex_t qc_gammainc_lower(qcomplex_t s, qcomplex_t x)
 {
-    if (qf_eq(s.im, qf_from_double(0.0)) && qf_eq(x.im, qf_from_double(0.0)))
-        return qc_make(qf_gammainc_lower(s.re, x.re), QF_ZERO);
+    if (qf_eq(qc_imag(s), qf_from_double(0.0)) && qf_eq(qc_imag(x), qf_from_double(0.0)))
+        return qc_make(qf_gammainc_lower(qc_real(s), qc_real(x)), QF_ZERO);
 
     return qc_gammainc_lower_series(s, x);
 }
 
 qcomplex_t qc_gammainc_upper(qcomplex_t s, qcomplex_t x)
 {
-    if (qf_eq(s.im, qf_from_double(0.0)) && qf_eq(x.im, qf_from_double(0.0)))
-        return qc_make(qf_gammainc_upper(s.re, x.re), QF_ZERO);
+    if (qf_eq(qc_imag(s), qf_from_double(0.0)) && qf_eq(qc_imag(x), qf_from_double(0.0)))
+        return qc_make(qf_gammainc_upper(qc_real(s), qc_real(x)), QF_ZERO);
 
     return qc_sub(qc_gamma(s), qc_gammainc_lower_series(s, x));
 }
 
 qcomplex_t qc_gammainc_P(qcomplex_t s, qcomplex_t x)
 {
-    if (qf_eq(s.im, qf_from_double(0.0)) && qf_eq(x.im, qf_from_double(0.0)))
-        return qc_make(qf_gammainc_P(s.re, x.re), QF_ZERO);
+    if (qf_eq(qc_imag(s), qf_from_double(0.0)) && qf_eq(qc_imag(x), qf_from_double(0.0)))
+        return qc_make(qf_gammainc_P(qc_real(s), qc_real(x)), QF_ZERO);
 
     return qc_div(qc_gammainc_lower_series(s, x), qc_gamma(s));
 }
 
 qcomplex_t qc_gammainc_Q(qcomplex_t s, qcomplex_t x)
 {
-    if (qf_eq(s.im, qf_from_double(0.0)) && qf_eq(x.im, qf_from_double(0.0)))
-        return qc_make(qf_gammainc_Q(s.re, x.re), QF_ZERO);
+    if (qf_eq(qc_imag(s), qf_from_double(0.0)) && qf_eq(qc_imag(x), qf_from_double(0.0)))
+        return qc_make(qf_gammainc_Q(qc_real(s), qc_real(x)), QF_ZERO);
 
     return qc_sub(QC_ONE, qc_gammainc_P(s, x));
 }
 
 qcomplex_t qc_ei(qcomplex_t z)
 {
-    if (qf_eq(z.im, qf_from_double(0.0)))
-        return qc_make(qf_ei(z.re), QF_ZERO);
+    if (qf_eq(qc_imag(z), qf_from_double(0.0)))
+        return qc_make(qf_ei(qc_real(z)), QF_ZERO);
 
     /* Ei(z) = γ + log(z) + Σ_{k=1}^∞ z^k / (k × k!) */
     qfloat_t tol  = qf_from_double(1e-30);
@@ -537,8 +537,8 @@ qcomplex_t qc_ei(qcomplex_t z)
 
 qcomplex_t qc_e1(qcomplex_t z)
 {
-    if (qf_eq(z.im, qf_from_double(0.0)))
-        return qc_make(qf_e1(z.re), QF_ZERO);
+    if (qf_eq(qc_imag(z), qf_from_double(0.0)))
+        return qc_make(qf_e1(qc_real(z)), QF_ZERO);
 
     return qc_neg(qc_ei(qc_neg(z)));
 }

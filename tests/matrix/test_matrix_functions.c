@@ -156,7 +156,7 @@ static void test_eigen_qc(void)
     print_qc("eigenvalue[0]", ev[0]);
     print_qc("eigenvalue[1]", ev[1]);
 
-    int e0_smaller = qf_to_double(ev[0].re) < qf_to_double(ev[1].re);
+    int e0_smaller = qf_to_double(qc_real(ev[0])) < qf_to_double(qc_real(ev[1]));
     qcomplex_t ev_min = e0_smaller ? ev[0] : ev[1];
     qcomplex_t ev_max = e0_smaller ? ev[1] : ev[0];
     qcomplex_t exp_min = qc_make(qf_from_double(1), QF_ZERO);

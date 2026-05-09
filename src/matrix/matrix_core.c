@@ -4192,9 +4192,9 @@ const struct elem_vtable qfloat_elem = {
 
 static qcomplex_t qc_inv(qcomplex_t z)
 {
-    qfloat_t denom = qf_add(qf_mul(z.re, z.re), qf_mul(z.im, z.im));
-    qfloat_t re = qf_div(z.re, denom);
-    qfloat_t im = qf_neg(qf_div(z.im, denom));
+    qfloat_t denom = qf_add(qf_mul(qc_real(z), qc_real(z)), qf_mul(qc_imag(z), qc_imag(z)));
+    qfloat_t re = qf_div(qc_real(z), denom);
+    qfloat_t im = qf_neg(qf_div(qc_imag(z), denom));
     return qc_make(re, im);
 }
 
@@ -4223,9 +4223,9 @@ static int qcomplex_cmp(const void *a, const void *b)
     if (qc_eq(A, B)) return 0;
 
     /* arbitrary but consistent ordering */
-    if (qf_lt(A.re, B.re)) return -1;
-    if (qf_gt(A.re, B.re)) return 1;
-    if (qf_lt(A.im, B.im)) return -1;
+    if (qf_lt(qc_real(A), qc_real(B))) return -1;
+    if (qf_gt(qc_real(A), qc_real(B))) return 1;
+    if (qf_lt(qc_imag(A), qc_imag(B))) return -1;
     return 1;
 }
 
@@ -4235,7 +4235,7 @@ static void qc_print_wrap(const void *v, char *buf, size_t n) {
 
 static double qc_abs2_wrap(const void *a) {
     qcomplex_t z = *(const qcomplex_t*)a;
-    return qf_to_double(qf_add(qf_mul(z.re, z.re), qf_mul(z.im, z.im)));
+    return qf_to_double(qf_add(qf_mul(qc_real(z), qc_real(z)), qf_mul(qc_imag(z), qc_imag(z))));
 }
 static double qc_to_real_wrap(const void *a) {
     return qf_to_double(((const qcomplex_t*)a)->re);
@@ -7668,8 +7668,8 @@ int mat_qr_factor(const matrix_t *A, mat_qr_factor_t *out)
             qfloat_t norm2 = QF_ZERO;
             qcomplex_t rjj;
             for (size_t r = 0; r < m; r++)
-                norm2 = qf_add(norm2, qf_add(qf_mul(v[r].re, v[r].re),
-                                             qf_mul(v[r].im, v[r].im)));
+                norm2 = qf_add(norm2, qf_add(qf_mul(qc_real(v[r]), qc_real(v[r])),
+                                             qf_mul(qc_imag(v[r]), qc_imag(v[r]))));
 
             if (qf_to_double(norm2) < 1e-300) {
                 rjj = QC_ZERO;
@@ -7684,8 +7684,8 @@ int mat_qr_factor(const matrix_t *A, mat_qr_factor_t *out)
                 rjj = qc_make(norm, QF_ZERO);
                 mat_set(Rq, j, j, &rjj);
                 for (size_t r = 0; r < m; r++) {
-                    qcomplex_t qcol = qc_make(qf_mul(inv, v[r].re),
-                                              qf_mul(inv, v[r].im));
+                    qcomplex_t qcol = qc_make(qf_mul(inv, qc_real(v[r])),
+                                              qf_mul(inv, qc_imag(v[r])));
                     mat_set(Qq, r, j, &qcol);
                 }
             }
@@ -7752,14 +7752,14 @@ int mat_cholesky(const matrix_t *A, mat_cholesky_t *out)
             }
 
             if (i == j) {
-                double imag_abs = fabs(qf_to_double(sum.im));
-                double real_val = qf_to_double(sum.re);
+                double imag_abs = fabs(qf_to_double(qc_imag(sum)));
+                double real_val = qf_to_double(qc_real(sum));
                 if (imag_abs > 1e-12 || real_val <= 0.0) {
                     mat_free(Z);
                     mat_free(Lq);
                     return -4;
                 }
-                qcomplex_t diag = qc_make(qf_sqrt(sum.re), QF_ZERO);
+                qcomplex_t diag = qc_make(qf_sqrt(qc_real(sum)), QF_ZERO);
                 mat_set(Lq, i, j, &diag);
             } else {
                 qcomplex_t ljj;
@@ -7879,9 +7879,9 @@ int mat_svd_factor(const matrix_t *A, mat_svd_factor_t *out)
             goto fail;
 
         for (size_t i = 0; i < n; i++) {
-            double re = qf_to_double(evals[i].re);
+            double re = qf_to_double(qc_real(evals[i]));
             order[i] = i;
-            sigma[i] = (re > 0.0) ? qf_sqrt(evals[i].re) : QF_ZERO;
+            sigma[i] = (re > 0.0) ? qf_sqrt(qc_real(evals[i])) : QF_ZERO;
         }
 
         for (size_t i = 0; i < n; i++)
@@ -7942,9 +7942,9 @@ int mat_svd_factor(const matrix_t *A, mat_svd_factor_t *out)
             goto fail;
 
         for (size_t i = 0; i < m; i++) {
-            double re = qf_to_double(evals[i].re);
+            double re = qf_to_double(qc_real(evals[i]));
             order[i] = i;
-            sigma[i] = (re > 0.0) ? qf_sqrt(evals[i].re) : QF_ZERO;
+            sigma[i] = (re > 0.0) ? qf_sqrt(qc_real(evals[i])) : QF_ZERO;
         }
 
         for (size_t i = 0; i < m; i++)
@@ -8403,7 +8403,7 @@ matrix_t *mat_nullspace(const matrix_t *A)
         goto fail;
 
     for (size_t i = 0; i < A->cols; i++) {
-        double d = qf_to_double(qf_abs(evals[i].re));
+        double d = qf_to_double(qf_abs(qc_real(evals[i])));
         if (d > sigma_max)
             sigma_max = d;
     }
@@ -8411,7 +8411,7 @@ matrix_t *mat_nullspace(const matrix_t *A)
     tol *= tol;
 
     for (size_t i = 0; i < A->cols; i++) {
-        double d = qf_to_double(qf_abs(evals[i].re));
+        double d = qf_to_double(qf_abs(qc_real(evals[i])));
         if (d <= tol)
             nullity++;
     }
@@ -8421,7 +8421,7 @@ matrix_t *mat_nullspace(const matrix_t *A)
         goto fail;
 
     for (size_t i = 0; i < A->cols; i++) {
-        double d = qf_to_double(qf_abs(evals[i].re));
+        double d = qf_to_double(qf_abs(qc_real(evals[i])));
         if (d > tol)
             continue;
         for (size_t r = 0; r < A->cols; r++) {
@@ -8915,12 +8915,12 @@ static int mat_eigendecompose_hermitian(const matrix_t *A, void *eigenvalues, ma
 
 static inline qfloat_t qc_abs2_qf(qcomplex_t z)
 {
-    return qf_add(qf_mul(z.re, z.re), qf_mul(z.im, z.im));
+    return qf_add(qf_mul(qc_real(z), qc_real(z)), qf_mul(qc_imag(z), qc_imag(z)));
 }
 
 static inline qcomplex_t qcs(qfloat_t s, qcomplex_t z)
 {
-    return qc_make(qf_mul(s, z.re), qf_mul(s, z.im));
+    return qc_make(qf_mul(s, qc_real(z)), qf_mul(s, qc_imag(z)));
 }
 
 /* Detect whether A is Hermitian: A[i,j] == conj(A[j,i]) within tolerance */
@@ -9393,7 +9393,7 @@ static inline void qc_mul_inplace(qcomplex_t *x, qcomplex_t y)
 
 static inline qcomplex_t qc_scale(qcomplex_t z, qfloat_t s)
 {
-    return qc_make(qf_mul(z.re, s), qf_mul(z.im, s));
+    return qc_make(qf_mul(qc_real(z), s), qf_mul(qc_imag(z), s));
 }
 
 /* norm2 of a complex vector (as qfloat) */

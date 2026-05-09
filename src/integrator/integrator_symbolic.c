@@ -233,7 +233,7 @@ static qfloat_t eval_box_affine_unary_special(affine_poly_special_kind_t kind,
                                  qf_cos(qf_add(qf_mul(coeffs[dim], hi[dim]), constant))),
                           coeffs[dim]);
         }
-        return integral_exp_i_affine_box(ndim, coeffs, constant, lo, hi, active).im;
+        return qc_imag(integral_exp_i_affine_box(ndim, coeffs, constant, lo, hi, active));
     case AFFINE_POLY_SPECIAL_COS:
         if (find_single_active_dim(ndim, active, &dim)) {
             if (qf_eq(coeffs[dim], QF_ZERO))
@@ -242,7 +242,7 @@ static qfloat_t eval_box_affine_unary_special(affine_poly_special_kind_t kind,
                                  qf_sin(qf_add(qf_mul(coeffs[dim], lo[dim]), constant))),
                           coeffs[dim]);
         }
-        return integral_exp_i_affine_box(ndim, coeffs, constant, lo, hi, active).re;
+        return qc_real(integral_exp_i_affine_box(ndim, coeffs, constant, lo, hi, active));
     }
 
     return QF_NAN;
@@ -806,9 +806,9 @@ static qfloat_t eval_box_affine_poly_deg4_times_special(affine_poly_special_kind
     case AFFINE_POLY_SPECIAL_EXP:
         return eval_box_affine_poly_times_exp_common(ndim, coeffs, constant, lo, hi, active, poly);
     case AFFINE_POLY_SPECIAL_SIN:
-        return eval_box_affine_poly_times_exp_i_common(ndim, coeffs, constant, lo, hi, active, poly).im;
+        return qc_imag(eval_box_affine_poly_times_exp_i_common(ndim, coeffs, constant, lo, hi, active, poly));
     case AFFINE_POLY_SPECIAL_COS:
-        return eval_box_affine_poly_times_exp_i_common(ndim, coeffs, constant, lo, hi, active, poly).re;
+        return qc_real(eval_box_affine_poly_times_exp_i_common(ndim, coeffs, constant, lo, hi, active, poly));
     case AFFINE_POLY_SPECIAL_SINH:
     case AFFINE_POLY_SPECIAL_COSH: {
         qfloat_t *neg_coeffs = malloc(ndim * sizeof(*neg_coeffs));

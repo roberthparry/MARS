@@ -141,29 +141,29 @@ void dv_reverse_sub(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_
 
 void dv_reverse_mul(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
 {
-    *a_bar = qf_mul(out_bar, dv->b->x.re);
-    *b_bar = qf_mul(out_bar, dv->a->x.re);
+    *a_bar = qf_mul(out_bar, qc_real(dv->b->x));
+    *b_bar = qf_mul(out_bar, qc_real(dv->a->x));
 }
 
 void dv_reverse_div(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
 {
-    qfloat_t denom_sq = qf_mul(dv->b->x.re, dv->b->x.re);
-    *a_bar = qf_div(out_bar, dv->b->x.re);
-    *b_bar = qf_neg(qf_div(qf_mul(out_bar, dv->a->x.re), denom_sq));
+    qfloat_t denom_sq = qf_mul(qc_real(dv->b->x), qc_real(dv->b->x));
+    *a_bar = qf_div(out_bar, qc_real(dv->b->x));
+    *b_bar = qf_neg(qf_div(qf_mul(out_bar, qc_real(dv->a->x)), denom_sq));
 }
 
 void dv_reverse_pow(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
 {
-    qfloat_t z = dv->x.re;
-    *a_bar = qf_mul(out_bar, qf_div(qf_mul(z, dv->b->x.re), dv->a->x.re));
-    *b_bar = qf_mul(out_bar, qf_mul(z, qf_log(dv->a->x.re)));
+    qfloat_t z = qc_real(dv->x);
+    *a_bar = qf_mul(out_bar, qf_div(qf_mul(z, qc_real(dv->b->x)), qc_real(dv->a->x)));
+    *b_bar = qf_mul(out_bar, qf_mul(z, qf_log(qc_real(dv->a->x))));
 }
 
 void dv_reverse_pow_d(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
 {
-    qfloat_t exponent = dv->c.re;
+    qfloat_t exponent = qc_real(dv->c);
     qfloat_t one_less = qf_sub(exponent, QF_ONE);
-    *a_bar = qf_mul(out_bar, qf_mul(exponent, qf_pow(dv->a->x.re, one_less)));
+    *a_bar = qf_mul(out_bar, qf_mul(exponent, qf_pow(qc_real(dv->a->x), one_less)));
     *b_bar = QF_ZERO;
 }
 

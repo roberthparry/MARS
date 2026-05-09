@@ -116,16 +116,16 @@ void qf_to_string_simple(qcomplex_t v, char *buf, size_t n)
         return;
     }
 
-    if (qf_eq(v.im, QF_ZERO)) {
-        qf_sprintf(buf, n, "%q", v.re);
+    if (qf_eq(qc_imag(v), QF_ZERO)) {
+        qf_sprintf(buf, n, "%q", qc_real(v));
         return;
     }
 
-    if (qf_eq(v.re, QF_ZERO)) {
+    if (qf_eq(qc_real(v), QF_ZERO)) {
         char imag[128];
         size_t len;
 
-        qf_sprintf(imag, sizeof(imag), "%q", v.im);
+        qf_sprintf(imag, sizeof(imag), "%q", qc_imag(v));
         len = strlen(imag);
         if (len + 2 > n) {
             if (n > 0)
@@ -144,8 +144,8 @@ void qf_to_string_simple(qcomplex_t v, char *buf, size_t n)
 int dv_tostring_is_negative_const(const dval_t *f)
 {
     return dv_is_const(f) &&
-           qf_eq(f->c.im, QF_ZERO) &&
-           qf_to_double(f->c.re) < 0.0;
+           qf_eq(qc_imag(f->c), QF_ZERO) &&
+           qf_to_double(qc_real(f->c)) < 0.0;
 }
 
 int dv_tostring_is_var_pow_d(const dval_t *f)

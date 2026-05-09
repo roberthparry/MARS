@@ -29,7 +29,7 @@ static bool dv_match_const_leaf(const dval_t *expr, qfloat_t *value_out, const c
     if (!is_kind(expr, DV_KIND_CONST))
         return false;
     if (value_out)
-        *value_out = expr->c.re;
+        *value_out = qc_real(expr->c);
     if (name_out)
         *name_out = (expr->name && *expr->name) ? expr->name : NULL;
     return true;
@@ -40,7 +40,7 @@ static bool dv_match_var_leaf(const dval_t *expr, qfloat_t *value_out, const cha
     if (!is_kind(expr, DV_KIND_VAR))
         return false;
     if (value_out)
-        *value_out = expr->c.re;
+        *value_out = qc_real(expr->c);
     if (name_out)
         *name_out = (expr->name && *expr->name) ? expr->name : NULL;
     return true;
@@ -251,7 +251,7 @@ static bool dv_match_affine_power_exact(const dval_t *expr,
         return false;
 
     if (dv_match_unary_kind(expr, DV_KIND_POW_D, &arg) &&
-        qf_eq(expr->c.re, qf_from_double((double) degree))) {
+        qf_eq(qc_real(expr->c), qf_from_double((double) degree))) {
         for (size_t i = 0; i < nvars; ++i)
             coeffs_out[i] = QF_ZERO;
         if (!dv_match_affine_term(arg, nvars, vars, QF_ONE, &constant, coeffs_out))

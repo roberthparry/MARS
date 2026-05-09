@@ -334,7 +334,7 @@ static bool number_is_one_qfloat(const number_t *number)
 
 static bool number_is_real_qcomplex(const number_t *number)
 {
-    return number && qf_eq(number_impl_const(number)->value.qc.im, QF_ZERO);
+    return number && qf_eq(qc_imag(number_impl_const(number)->value.qc), QF_ZERO);
 }
 
 static bool number_is_one_qcomplex(const number_t *number)
@@ -2322,8 +2322,10 @@ static int number_cmp_same_kind(const number_t *a, const number_t *b)
     if (number_impl_const(a)->kind == NUMBER_QFLOAT)
         return qf_cmp(number_impl_const(a)->value.qf, number_impl_const(b)->value.qf);
     if (number_impl_const(a)->kind == NUMBER_QCOMPLEX) {
-        int rc = qf_cmp(number_impl_const(a)->value.qc.re, number_impl_const(b)->value.qc.re);
-        return rc != 0 ? rc : qf_cmp(number_impl_const(a)->value.qc.im, number_impl_const(b)->value.qc.im);
+        qcomplex_t left = number_impl_const(a)->value.qc;
+        qcomplex_t right = number_impl_const(b)->value.qc;
+        int rc = qf_cmp(qc_real(left), qc_real(right));
+        return rc != 0 ? rc : qf_cmp(qc_imag(left), qc_imag(right));
     }
     if (number_impl_const(a)->kind == NUMBER_MINT)
         return mi_cmp(number_impl_const(a)->value.mi, number_impl_const(b)->value.mi);
@@ -3001,8 +3003,8 @@ bool num_is_integer(const number_t number)
     if (number_impl_const(&number)->kind == NUMBER_QFLOAT)
         return qf_eq(qf_floor(number_impl_const(&number)->value.qf), number_impl_const(&number)->value.qf);
     if (number_impl_const(&number)->kind == NUMBER_QCOMPLEX)
-        return qf_eq(number_impl_const(&number)->value.qc.im, QF_ZERO) &&
-            qf_eq(qf_floor(number_impl_const(&number)->value.qc.re), number_impl_const(&number)->value.qc.re);
+        return qf_eq(qc_imag(number_impl_const(&number)->value.qc), QF_ZERO) &&
+            qf_eq(qf_floor(qc_real(number_impl_const(&number)->value.qc)), qc_real(number_impl_const(&number)->value.qc));
     if (number_impl_const(&number)->kind == NUMBER_MINT)
         return true;
     if (number_impl_const(&number)->kind == NUMBER_MRATIONAL)
@@ -3215,7 +3217,7 @@ number_t num_real_part(const number_t number)
     if (!number_kind_is_complex(number_impl_const(&number)->kind))
         return num_clone(number);
     if (number_impl_const(&number)->kind == NUMBER_QCOMPLEX)
-        return num_create_qfloat(number_impl_const(&number)->value.qc.re);
+        return num_create_qfloat(qc_real(number_impl_const(&number)->value.qc));
     return num_create_mfloat_prec(mc_real(number_impl_const(&number)->value.mc),
                                   mc_get_precision(number_impl_const(&number)->value.mc));
 }
@@ -3235,7 +3237,7 @@ number_t num_imag_part(const number_t number)
     if (number_impl_const(&number)->kind == NUMBER_MFLOAT)
         return num_create_mfloat_prec(MF_ZERO, num_get_precision(number));
     if (number_impl_const(&number)->kind == NUMBER_QCOMPLEX)
-        return num_create_qfloat(number_impl_const(&number)->value.qc.im);
+        return num_create_qfloat(qc_imag(number_impl_const(&number)->value.qc));
     return num_create_mfloat_prec(mc_imag(number_impl_const(&number)->value.mc),
                                   mc_get_precision(number_impl_const(&number)->value.mc));
 }

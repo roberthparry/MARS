@@ -5,10 +5,10 @@
 
 #include "qcomplex.h"
 void qc_to_string(qcomplex_t z, char *out, size_t out_size) {
-    if (qf_cmp(z.im, qf_from_double(0.0)) < 0) {
-        qf_sprintf(out, out_size, "%q - %qi", z.re, qf_neg(z.im));
+    if (qf_cmp(qc_imag(z), qf_from_double(0.0)) < 0) {
+        qf_sprintf(out, out_size, "%q - %qi", qc_real(z), qf_neg(qc_imag(z)));
     } else {
-        qf_sprintf(out, out_size, "%q + %qi", z.re, z.im);
+        qf_sprintf(out, out_size, "%q + %qi", qc_real(z), qc_imag(z));
     }
 }
 

@@ -158,7 +158,7 @@ static dval_t *deriv_pow(dval_t *dv)
 
 static dval_t *deriv_pow_d(dval_t *dv)
 {
-    double  c    = qf_to_double(dv->c.re);
+    double  c    = qf_to_double(qc_real(dv->c));
     dval_t *da   = dv_get_dx_internal(dv->a);
     dval_t *p    = dv_pow_d(dv->a, c - 1.0);
     dval_t *coef = dv_new_const_d(c);

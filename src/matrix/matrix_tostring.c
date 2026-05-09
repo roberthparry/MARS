@@ -74,9 +74,11 @@ static int mt_qc_to_pretty(char *buf, size_t buf_size, qcomplex_t z)
 {
     char re_buf[512];
     char im_buf[512];
-    qfloat_t im_abs = qf_signbit(z.im) ? qf_neg(z.im) : z.im;
-    int re_zero = qf_eq(z.re, QF_ZERO);
-    int im_zero = qf_eq(z.im, QF_ZERO);
+    qfloat_t z_re = qc_real(z);
+    qfloat_t z_im = qc_imag(z);
+    qfloat_t im_abs = qf_signbit(z_im) ? qf_neg(z_im) : z_im;
+    int re_zero = qf_eq(z_re, QF_ZERO);
+    int im_zero = qf_eq(z_im, QF_ZERO);
     int im_one = qf_eq(im_abs, QF_ONE);
 
     if (re_zero && im_zero) {
@@ -85,27 +87,27 @@ static int mt_qc_to_pretty(char *buf, size_t buf_size, qcomplex_t z)
     }
 
     if (im_zero) {
-        mt_qf_to_pretty(buf, buf_size, z.re);
+        mt_qf_to_pretty(buf, buf_size, z_re);
         return 0;
     }
 
     if (re_zero) {
         if (im_one)
-            snprintf(buf, buf_size, "%si", qf_signbit(z.im) ? "-" : "");
+            snprintf(buf, buf_size, "%si", qf_signbit(z_im) ? "-" : "");
         else {
             mt_qf_to_pretty(im_buf, sizeof(im_buf), im_abs);
-            snprintf(buf, buf_size, "%s%si", qf_signbit(z.im) ? "-" : "", im_buf);
+            snprintf(buf, buf_size, "%s%si", qf_signbit(z_im) ? "-" : "", im_buf);
         }
         return 0;
     }
 
-    mt_qf_to_pretty(re_buf, sizeof(re_buf), z.re);
+    mt_qf_to_pretty(re_buf, sizeof(re_buf), z_re);
     if (buf_size == 0)
         return 0;
 
     buf[0] = '\0';
     strncat(buf, re_buf, buf_size - 1);
-    strncat(buf, qf_signbit(z.im) ? "-" : "+", buf_size - strlen(buf) - 1);
+    strncat(buf, qf_signbit(z_im) ? "-" : "+", buf_size - strlen(buf) - 1);
     if (im_one) {
         strncat(buf, "i", buf_size - strlen(buf) - 1);
     } else {

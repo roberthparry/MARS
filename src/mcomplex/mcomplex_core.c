@@ -165,8 +165,8 @@ int mc_set_qcomplex(mcomplex_t *mcomplex, qcomplex_t value)
         return -1;
     if (mf_set_precision(mcomplex->real, precision_bits) != 0 ||
         mf_set_precision(mcomplex->imag, precision_bits) != 0 ||
-        mf_set_qfloat(mcomplex->real, value.re) != 0 ||
-        mf_set_qfloat(mcomplex->imag, value.im) != 0)
+        mf_set_qfloat(mcomplex->real, qc_real(value)) != 0 ||
+        mf_set_qfloat(mcomplex->imag, qc_imag(value)) != 0)
         return -1;
     return 0;
 }

@@ -152,9 +152,9 @@ void qf_to_coloured_string(qfloat_t x, char *out, size_t out_size)
 void qc_to_coloured_string(qcomplex_t z, char *out, size_t out_size)
 {
     char re[128], im[128];
-    qf_sprintf(re, sizeof(re), "%q", z.re);
-    qf_sprintf(im, sizeof(im), "%q", qf_abs(z.im));
-    const char *sign = (z.im.hi >= 0.0) ? "+" : "-";
+    qf_sprintf(re, sizeof(re), "%q", qc_real(z));
+    qf_sprintf(im, sizeof(im), "%q", qf_abs(qc_imag(z)));
+    const char *sign = (qc_imag(z).hi >= 0.0) ? "+" : "-";
     snprintf(out, out_size,
              C_GREEN "%s" C_RESET " " C_WHITE "%s" C_RESET " " C_MAGENTA "%si" C_RESET,
              re, sign, im);
@@ -794,10 +794,10 @@ void check_qf_val(const char *label, qfloat_t got, qfloat_t expected, double tol
 
 void check_qc_val(const char *label, qcomplex_t got, qcomplex_t expected, double tol)
 {
-    double got_re = qf_to_double(got.re);
-    double got_im = qf_to_double(got.im);
-    double exp_re = qf_to_double(expected.re);
-    double exp_im = qf_to_double(expected.im);
+    double got_re = qf_to_double(qc_real(got));
+    double got_im = qf_to_double(qc_imag(got));
+    double exp_re = qf_to_double(qc_real(expected));
+    double exp_im = qf_to_double(qc_imag(expected));
     int both_nan = isnan(got_re) && isnan(got_im) && isnan(exp_re) && isnan(exp_im);
     double err = both_nan ? 0.0 : qf_to_double(qc_abs(qc_sub(got, expected)));
     int ok = both_nan || err < tol;

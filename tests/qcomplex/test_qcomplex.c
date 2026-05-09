@@ -684,7 +684,7 @@ static void test_lambert_wm1(void)
         check_bool("W_-1(-0.2-0.1i) is distinct from W0",
                    qf_gt(qc_abs(qc_sub(w, w0)), qf_from_double(1e-8)));
         check_bool("W_-1(-0.2-0.1i) has negative imaginary part",
-                   qf_lt(w.im, qf_from_double(0.0)));
+                   qf_lt(qc_imag(w), qf_from_double(0.0)));
     }
 }
 

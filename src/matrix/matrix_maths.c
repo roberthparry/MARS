@@ -2180,8 +2180,8 @@ static void mat_scale_qf(matrix_t *A, qfloat_t r)
 
     if (cache->spectral_evals) {
         for (size_t i = 0; i < A->rows; ++i)
-            cache->spectral_evals[i] = qc_make(qf_mul(cache->spectral_evals[i].re, r),
-                                               qf_mul(cache->spectral_evals[i].im, r));
+            cache->spectral_evals[i] = qc_make(qf_mul(qc_real(cache->spectral_evals[i]), r),
+                                               qf_mul(qc_imag(cache->spectral_evals[i]), r));
     }
 
     if (cache->exp_preimage) {

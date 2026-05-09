@@ -177,7 +177,7 @@ int qc_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap)
             char re_buf[256], im_buf[256];
             char re_padded[256], im_padded[256];
             char re_fmt[32], im_fmt[32];
-            qfloat_t im_abs = qf_signbit(z.im) ? qf_neg(z.im) : z.im;
+            qfloat_t im_abs = qf_signbit(qc_imag(z)) ? qf_neg(qc_imag(z)) : qc_imag(z);
 
             qc_build_qfloat_format(re_fmt, sizeof(re_fmt),
                                    (spec == 'Z') ? 'Q' : 'q',
@@ -188,7 +188,7 @@ int qc_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap)
                                    width, precision,
                                    0, 0, flag_minus, flag_zero, flag_hash);
 
-            qf_sprintf(re_buf, sizeof(re_buf), re_fmt, z.re);
+            qf_sprintf(re_buf, sizeof(re_buf), re_fmt, qc_real(z));
             qf_sprintf(im_buf, sizeof(im_buf), im_fmt, im_abs);
 
             /* Enforce precision manually */
@@ -206,7 +206,7 @@ int qc_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap)
                 for (char *s = im_padded; *s; s++) if (*s == 'E') *s = 'e';
             }
 
-            const char *sep = qf_signbit(z.im) ? " - " : " + ";
+            const char *sep = qf_signbit(qc_imag(z)) ? " - " : " + ";
 
             char assembled[600];
             snprintf(assembled, sizeof(assembled), "%s%s%si", re_padded, sep, im_padded);

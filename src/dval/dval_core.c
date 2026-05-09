@@ -173,7 +173,7 @@ qcomplex_t dv_eval(const dval_t *dv)
 
 qfloat_t dv_eval_qf(const dval_t *dv)
 {
-    return dv_eval_qc(dv).re;
+    return qc_real(dv_eval_qc(dv));
 }
 
 double dv_eval_d(const dval_t *dv)
@@ -236,12 +236,12 @@ void dv_set_name(dval_t *dv, const char *name)
 
 double dv_get_val_d(const dval_t *dv)
 {
-    return qf_to_double(dv_eval_qc((dval_t *)dv).re);
+    return qf_to_double(qc_real(dv_eval_qc((dval_t *)dv)));
 }
 
 qfloat_t dv_get_val_qf(const dval_t *dv)
 {
-    return dv_eval_qc((dval_t *)dv).re;
+    return qc_real(dv_eval_qc((dval_t *)dv));
 }
 
 qcomplex_t dv_get_val(const dval_t *dv)
@@ -296,9 +296,9 @@ int dv_cmp(const dval_t *dv1, const dval_t *dv2) {
     qcomplex_t a = dv_eval(dv1);
     qcomplex_t b = dv_eval(dv2);
 
-    if (!qf_eq(a.re, b.re))
-        return qf_cmp(a.re, b.re);
-    return qf_cmp(a.im, b.im);
+    if (!qf_eq(qc_real(a), qc_real(b)))
+        return qf_cmp(qc_real(a), qc_real(b));
+    return qf_cmp(qc_imag(a), qc_imag(b));
 }
 
 

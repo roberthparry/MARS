@@ -975,7 +975,7 @@ void test_multi_3d_sin_affine(void) {
                                                         qc_make(QF_ZERO, qf_from_double(2.0))),
                                                  qc_div(qc_sub(qc_exp(qc_make(QF_ZERO, qf_from_double(-1.0))), QC_ONE),
                                                         qc_make(QF_ZERO, qf_from_double(-1.0))))));
-    qfloat_t expected = expected_z.im;
+    qfloat_t expected = qc_imag(expected_z);
 
     printf("  ∫₀¹∫₀¹∫₀¹ sin(x+2y-z+0.3) dx dy dz  [affine sin]\n");
     qf_printf("  result   = %q\n", result);
@@ -1025,7 +1025,7 @@ void test_multi_3d_cos_affine(void) {
                                                         qc_make(QF_ZERO, qf_from_double(-1.0))),
                                                  qc_div(qc_sub(qc_exp(qc_make(QF_ZERO, qf_from_double(1.5))), QC_ONE),
                                                         qc_make(QF_ZERO, qf_from_double(1.5))))));
-    qfloat_t expected = expected_z.re;
+    qfloat_t expected = qc_real(expected_z);
 
     printf("  ∫₀¹∫₀¹∫₀¹ cos(0.5x-y+1.5z-0.2) dx dy dz  [affine cos]\n");
     qf_printf("  result   = %q\n", result);
@@ -1123,11 +1123,11 @@ void test_multi_2d_sum_of_specials(void) {
     qcomplex_t sin_expected_z = qc_mul(qc_exp(qc_make(QF_ZERO, qf_from_double(0.2))),
                                        qc_div(qc_sub(qc_exp(qc_make(QF_ZERO, qf_from_double(1.0))), QC_ONE),
                                               qc_make(QF_ZERO, qf_from_double(1.0))));
-    qfloat_t sin_expected = sin_expected_z.im;
+    qfloat_t sin_expected = qc_imag(sin_expected_z);
     qcomplex_t cos_expected_z = qc_mul(qc_exp(qc_make(QF_ZERO, qf_from_double(-0.1))),
                                        qc_div(qc_sub(qc_exp(qc_make(QF_ZERO, qf_from_double(2.0))), QC_ONE),
                                               qc_make(QF_ZERO, qf_from_double(2.0))));
-    qfloat_t cos_expected = cos_expected_z.re;
+    qfloat_t cos_expected = qc_real(cos_expected_z);
     qfloat_t exp_expected = qf_mul(qf_sub(QF_E, QF_ONE),
                                    qf_sub(QF_ONE, qf_div(QF_ONE, QF_E)));
     qfloat_t expected = qf_add(qf_add(sin_expected, cos_expected), exp_expected);

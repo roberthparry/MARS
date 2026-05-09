@@ -177,6 +177,20 @@ static inline qcomplex_t qc_make(qfloat_t re, qfloat_t im) {
 }
 
 /**
+ * @brief Return the real component of a complex value.
+ */
+static inline qfloat_t qc_real(qcomplex_t z) {
+    return z.re;
+}
+
+/**
+ * @brief Return the imaginary component of a complex value.
+ */
+static inline qfloat_t qc_imag(qcomplex_t z) {
+    return z.im;
+}
+
+/**
  * @name Basic arithmetic
  * @{
  */

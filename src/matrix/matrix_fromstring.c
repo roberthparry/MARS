@@ -794,9 +794,9 @@ static int mf_try_parse_numeric_matrix(char **entries,
             free(rvals);
             return -1;
         }
-        if (!qf_eq(zvals[i].im, QF_ZERO))
+        if (!qf_eq(qc_imag(zvals[i]), QF_ZERO))
             any_complex = true;
-        rvals[i] = zvals[i].re;
+        rvals[i] = qc_real(zvals[i]);
     }
 
     if (any_complex)

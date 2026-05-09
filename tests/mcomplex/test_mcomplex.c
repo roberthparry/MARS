@@ -826,16 +826,16 @@ static void test_conversion_to_from_qcomplex(void)
         print_mcomplex_value("mc_create_qcomplex value", a);
 
         qa = mc_to_qcomplex(a);
-        qf_to_string(qa.re, got_buf, sizeof(got_buf));
-        qf_to_string(q.re, expected_buf, sizeof(expected_buf));
+        qf_to_string(qc_real(qa), got_buf, sizeof(got_buf));
+        qf_to_string(qc_real(q), expected_buf, sizeof(expected_buf));
         printf(C_CYAN "mc_to_qcomplex real part" C_RESET "\n");
         printf("    expected = %s\n", expected_buf);
         printf("    got      = " C_WHITE "%s" C_RESET "\n", got_buf);
         fflush(stdout);
         ASSERT_TRUE(strcmp(got_buf, expected_buf) == 0);
 
-        qf_to_string(qa.im, got_buf, sizeof(got_buf));
-        qf_to_string(q.im, expected_buf, sizeof(expected_buf));
+        qf_to_string(qc_imag(qa), got_buf, sizeof(got_buf));
+        qf_to_string(qc_imag(q), expected_buf, sizeof(expected_buf));
         printf(C_CYAN "mc_to_qcomplex imag part" C_RESET "\n");
         printf("    expected = %s\n", expected_buf);
         printf("    got      = " C_WHITE "%s" C_RESET "\n", got_buf);

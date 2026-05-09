@@ -11,6 +11,14 @@ typedef struct {
 } qcomplex_t;
 ```
 
+In day-to-day code, prefer the semantic helpers:
+
+- `qc_real(z)` for the real component
+- `qc_imag(z)` for the imaginary component
+
+That keeps call sites aligned with the public API even though `qcomplex_t`
+currently remains a transparent by-value struct.
+
 ## Capabilities
 
 - ~106 bits of precision (~31–32 decimal digits)
@@ -34,14 +42,20 @@ int main(void) {
     /* Euler's identity: exp(iπ) + 1 = 0 */
     qcomplex_t z   = qc_make(qf_from_double(0.0), QF_PI);
     qcomplex_t r   = qc_add(qc_exp(z), qc_make(qf_from_double(1.0), qf_from_double(0.0)));
+    qfloat_t real  = qc_real(r);
+    qfloat_t imag  = qc_imag(r);
 
     qc_printf("exp(iπ) + 1 = %.34z\n", r);
+    qf_printf("real part    = %.34q\n", real);
+    qf_printf("imag part    = %.34q\n", imag);
     return 0;
 }
 ```
 
 ```text
 exp(iπ) + 1 = 0.0000000000000000000000000000000000 + 0.0000000000000000000000000000000000i
+real part    = 0.0000000000000000000000000000000000
+imag part    = 0.0000000000000000000000000000000000
 ```
 
 ---
@@ -53,6 +67,11 @@ All declarations are in `include/qcomplex.h`.
 ### Construction
 
 - `qcomplex_t qc_make(qfloat_t re, qfloat_t im)` — construct from real and imaginary parts (inline).
+
+### Component Access
+
+- `qfloat_t qc_real(qcomplex_t z)` — return the real component.
+- `qfloat_t qc_imag(qcomplex_t z)` — return the imaginary component.
 
 ### Basic Arithmetic
 
@@ -149,7 +168,7 @@ All declarations are in `include/qcomplex.h`.
 | `qc_floor(z)` | component-wise floor |
 | `qc_hypot(x, y)` | `sqrt(|x|² + |y|²)` |
 
-### Extractors and Additional Utilities
+### Additional Utilities
 
 | Function | Description |
 |---|---|
@@ -187,7 +206,7 @@ All declarations are in `include/qcomplex.h`.
 ## Implementation Notes
 
 - **Precision:** All arithmetic and elementary functions operate at full `qfloat_t` precision (~31–32 decimal digits, ~106 bits), both for real and complex arguments, unless otherwise noted.
-- **Special functions:** For real arguments (`im == 0`), all special functions use the corresponding `qf_` implementation, preserving full precision. For complex arguments, algorithms are chosen to maximize accuracy and stability, but some special functions may have slightly reduced precision due to the complexity of analytic continuation or series evaluation in the complex plane.
+- **Special functions:** For real arguments where `qc_imag(z) == 0`, all special functions use the corresponding `qf_` implementation, preserving full precision. For complex arguments, algorithms are chosen to maximize accuracy and stability, but some special functions may have slightly reduced precision due to the complexity of analytic continuation or series evaluation in the complex plane.
 - **Gamma and polygamma:** Implemented using high-precision algorithms (e.g., Lanczos, asymptotic expansions) to maintain as much precision as possible for both real and complex arguments.
 - **Lambert W, incomplete gamma, exponential integrals:** Use iterative or series/continued-fraction methods adapted for complex arguments, with careful attention to branch cuts and principal values.
 - **Parsing and formatting:** Parsing from string and printf-style formatting are supported for all complex numbers, with full control over decimal/scientific notation and alignment.

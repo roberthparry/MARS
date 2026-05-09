@@ -442,7 +442,7 @@ static void emit_expr_abs(const dval_t *f, sbuf_t *b, int parent_prec)
 
         for (int i = 0; i < n; ++i) {
             if (dv_tostring_is_negative_const(fac[i])) {
-                if (qf_to_double(fac[i]->c.re) == -1.0) {
+                if (qf_to_double(qc_real(fac[i]->c)) == -1.0) {
                     for (int j = i; j < n - 1; ++j)
                         fac[j] = fac[j + 1];
                     --n;
@@ -551,7 +551,7 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
         int need = PREC_POW < parent_prec;
         if (need) sbuf_putc(b, '(');
 
-        double ed = qf_to_double(f->c.re);
+        double ed = qf_to_double(qc_real(f->c));
         long   ei = (long)ed;
 
         /* For unary functions raised to a power, write func²(arg)
@@ -614,7 +614,7 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
             sign = -sign;
 
             if (dv_tostring_is_negative_const(fac[i])) {
-                if (qf_to_double(fac[i]->c.re) == -1.0) {
+                if (qf_to_double(qc_real(fac[i]->c)) == -1.0) {
                     for (int j = i; j < n - 1; j++)
                         fac[j] = fac[j + 1];
                     n--;
