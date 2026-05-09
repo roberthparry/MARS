@@ -13,6 +13,7 @@ datetime utilities, UTF-8 strings, and generic containers.
 
 - **`mint_t`** — arbitrary-precision signed integers with number theory, combinatorics, and sequence helpers
 - **`mfloat_t`** — opaque multiprecision floating-point values with exact conversion, pretty/scientific formatting, and a growing native math layer
+- **`number_t`** — generic numeric value cluster spanning exact, fixed-precision, and multiprecision backends behind one by-value public handle
 - **`qfloat_t`** — double-double arithmetic and special functions (~34 decimal digits of precision)
 - **`matrix_t`** — generic high-precision matrix with pluggable element types (`double`, `qfloat_t`, `qcomplex_t`, `dval_t *`), string-based matrix parsing and formatting, symbolic linear algebra support including Schur complements, block inverse/solve, Jordan helpers, entrywise matrix derivatives, Jacobian helpers, and first matrix-calculus helpers for trace, determinant, inverse, block inverse, solve, and block solve, and eigendecomposition at full `qfloat_t` precision
 - **`dval_t`** — differentiable expression DAGs with first/second derivatives, symbolic matrix integration, and structural matcher helpers for higher-level symbolic code
@@ -109,6 +110,36 @@ int main(void) {
 ```text
 gamma(2.3)  = 1.16671190519816034504188144120291793853399434971946889397020666387299161947176
 lgamma(2.3) = 0.15418945495963058108991791148922317269570397608961402272570768556406857691921
+```
+
+**Generic numeric arithmetic with `number_t`:**
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include "number.h"
+
+int main(void) {
+    number_t a = num_create_string("2");
+    number_t b = num_create_string("5/6");
+    number_t c = num_add(a, b);
+    char *text = num_to_string(c);
+
+    if (!text)
+        return 1;
+
+    printf("2 + 5/6 = %s\n", text);
+
+    free(text);
+    num_clear(&a);
+    num_clear(&b);
+    num_clear(&c);
+    return 0;
+}
+```
+
+```text
+2 + 5/6 = 17/6
 ```
 
 **Automatic differentiation with `dval_t`:**
@@ -269,6 +300,7 @@ M_2281 is prime    M_3217 is prime    M_4253 is prime    M_4423 is prime
 | `bitset_t` | Dynamic thread-safe bitset | [`docs/bitset.md`](docs/bitset.md) |
 | `mint_t` | Arbitrary-precision signed integers and number-theory helpers | [`docs/mint.md`](docs/mint.md) |
 | `mrational_t` | Opaque exact rational arithmetic backed by `mint_t` | [`docs/mrational.md`](docs/mrational.md) |
+| `number_t` | Generic numeric value cluster over exact, fixed-precision, and multiprecision backends | [`docs/number.md`](docs/number.md) |
 | `qfloat_t` | Double-double arithmetic and special functions | [`docs/qfloat.md`](docs/qfloat.md) |
 | `qcomplex_t` | Double-double complex arithmetic and special functions | [`docs/qcomplex.md`](docs/qcomplex.md) |
 | `mfloat_t` | Opaque multiprecision floating-point arithmetic | [`docs/mfloat.md`](docs/mfloat.md) |
