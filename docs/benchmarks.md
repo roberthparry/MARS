@@ -20,6 +20,7 @@ make bench_mint_div
 make bench_mrational_arith
 make bench_mfloat_maths
 make bench_mcomplex_maths
+make bench_number_maths
 ```
 
 As with the test suites, prefer running benchmarks sequentially for now. The
@@ -164,6 +165,47 @@ bench/mfloat/compare_mfloat_maths.sh <git-ref>
 ```
 
 Use a reference that already contains the `mfloat` subsystem.
+
+### `number`
+
+Available benchmark target:
+
+```sh
+make bench_number_maths
+```
+
+This benchmark mirrors the `mfloat` maths coverage through the generic
+`number_t` API, including:
+
+- elementary functions such as `exp`, `log`, `sqrt`, `sin`, `cos`, `atan`,
+  `sinh`, `tanh`, and `pow`
+- paired output functions such as `sincos` and `sinhcosh`
+- special functions such as `gamma`, `lgamma`, `digamma`, `trigamma`,
+  `tetragamma`, `erf`, `erfc`, `gammainv`, `lambert_w0`, `lambert_wm1`,
+  `beta`, `logbeta`, `binomial`, `normal_pdf`, `normal_cdf`, `ei`, and `e1`
+- named constants such as `pi`, `e`, and Euler-Mascheroni
+
+Because `number_t` accepts exact integer and rational inputs as well as
+floating-point values, this benchmark is useful for measuring the combined cost
+of generic promotion, backend dispatch, and the underlying maths implementation
+on the same workloads used by `bench_mfloat_maths`.
+
+Current sample timings on the benchmark machine:
+
+```text
+exp_256                      bits=256  avg_µs=  2049.302 avg_ms=     2.049
+log_256                      bits=256  avg_µs=  1008.783 avg_ms=     1.009
+sin_512                      bits=512  avg_µs= 11982.001 avg_ms=    11.982
+cos_512                      bits=512  avg_µs=  5136.849 avg_ms=     5.137
+gamma_512                    bits=512  avg_µs= 42240.280 avg_ms=    42.240
+ei_512                       bits=512  avg_µs=  4107.908 avg_ms=     4.108
+exp_1024                     bits=1024 avg_µs=  4493.779 avg_ms=     4.494
+log_1024                     bits=1024 avg_µs=  3683.389 avg_ms=     3.683
+sin_1024                     bits=1024 avg_µs= 19986.712 avg_ms=    19.987
+gamma_1024                   bits=1024 avg_µs=230718.232 avg_ms=   230.718
+ei_1024                      bits=1024 avg_µs=709675.044 avg_ms=   709.675
+e1_1024                      bits=1024 avg_µs= 31515.867 avg_ms=    31.516
+```
 
 ### `qfloat`
 

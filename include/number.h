@@ -301,6 +301,14 @@ number_t num_sqr(const number_t number);
 number_t num_floor(const number_t number);
 number_t num_mul_pow10(const number_t number, int exponent10);
 number_t num_hypot(const number_t a, const number_t b);
+/**
+ * @brief Computes `sin(x)` and `cos(x)` into caller-provided outputs.
+ *
+ * `sin_out` and `cos_out` must point to fresh or already-cleared `number_t`
+ * objects, such as values returned by `num_new()`. This function does not
+ * release any existing live contents in those outputs; callers remain
+ * responsible for clearing them first if needed.
+ */
 int num_sincos(const number_t x, number_t *sin_out, number_t *cos_out);
 number_t num_sin(const number_t number);
 number_t num_cos(const number_t number);
@@ -311,6 +319,14 @@ number_t num_asin(const number_t number);
 number_t num_acos(const number_t number);
 number_t num_sinh(const number_t number);
 number_t num_cosh(const number_t number);
+/**
+ * @brief Computes `sinh(x)` and `cosh(x)` into caller-provided outputs.
+ *
+ * `sinh_out` and `cosh_out` must point to fresh or already-cleared `number_t`
+ * objects, such as values returned by `num_new()`. This function does not
+ * release any existing live contents in those outputs; callers remain
+ * responsible for clearing them first if needed.
+ */
 int num_sinhcosh(const number_t x, number_t *sinh_out, number_t *cosh_out);
 number_t num_tanh(const number_t number);
 number_t num_asinh(const number_t number);

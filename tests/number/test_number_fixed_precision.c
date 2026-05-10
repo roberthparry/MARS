@@ -19,10 +19,10 @@ void run_number_fixed_precision_tests(void)
         number_t qc_prod = num_mul(qc_z, qc_conj);
         number_t qc_sqrt = num_sqrt(qc_z);
         number_t zero = num_create_string("0");
-        number_t sin_zero;
-        number_t cos_zero;
-        number_t sinh_zero;
-        number_t cosh_zero;
+        number_t sin_zero = num_new();
+        number_t cos_zero = num_new();
+        number_t sinh_zero = num_new();
+        number_t cosh_zero = num_new();
 
         assert_number_string("num_neg(double 1.25)", d_neg, "-1.25");
         ASSERT_TRUE(num_is_real(d));

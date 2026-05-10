@@ -225,3 +225,78 @@ int main(void) {
 2 + 5/6 = 17/6
 beta(2, 3) = 0.083333333333333333333333333333333
 ```
+
+## Benchmarks
+
+The generic numeric layer has a matching benchmark target:
+
+```sh
+make bench_number_maths
+```
+
+It mirrors the main `mfloat` maths benchmark through the public `number_t` API,
+so it measures both backend maths cost and generic promotion/dispatch overhead
+on the same representative workload.
+
+## Benchmark Coverage
+
+The dedicated `number_t` maths benchmark includes matching timing cases at:
+
+- `256` bits
+- `512` bits
+- `768` bits
+- `1024` bits
+
+across the same broad slice used for the native `mfloat` benchmark.
+
+Benchmark source:
+
+- [`bench/number/bench_number_maths.c`](../bench/number/bench_number_maths.c)
+
+Run it from the repository root with:
+
+```sh
+make bench_number_maths
+MARS_BENCH_SCALE=10 ./build/release/bench/number/bench_number_maths
+```
+
+Current sample results from that command on this tree, measured on:
+
+- `Linux x86_64`
+- kernel `6.8.0-110-generic`
+- `Intel(R) Core(TM) i7-4510U CPU @ 2.00GHz`
+- `4` logical CPUs
+
+Results:
+
+| Case | `256` bits | `512` bits | `768` bits | `1024` bits |
+|---|---:|---:|---:|---:|
+| `num_exp(1.23456789)` | `2.049 ms` | `8.041 ms` | `5.437 ms` | `4.494 ms` |
+| `num_log(2.345678)` | `1.009 ms` | `2.058 ms` | `2.433 ms` | `3.683 ms` |
+| `num_sqrt(1.23456789)` | `0.016 ms` | `0.023 ms` | `0.014 ms` | `0.019 ms` |
+| `num_sin(0.567)` | `3.004 ms` | `11.982 ms` | `8.111 ms` | `19.987 ms` |
+| `num_cos(0.567)` | `1.681 ms` | `5.137 ms` | `4.493 ms` | `10.435 ms` |
+| `num_sincos(0.7)` | `6.188 ms` | `10.375 ms` | `11.204 ms` | `17.567 ms` |
+| `num_tan(0.7)` | `0.783 ms` | `2.169 ms` | `10.881 ms` | `17.654 ms` |
+| `num_atan(0.567)` | `0.830 ms` | `2.499 ms` | `2.753 ms` | `3.795 ms` |
+| `num_asin(0.7)` | `2.900 ms` | `11.639 ms` | `4.877 ms` | `13.005 ms` |
+| `num_acos(0.7)` | `2.900 ms` | `11.563 ms` | `4.889 ms` | `19.099 ms` |
+| `num_atan2(0.5,-0.75)` | `1.026 ms` | `2.258 ms` | `2.582 ms` | `6.191 ms` |
+| `num_sinh(0.7)` | `3.050 ms` | `7.868 ms` | `2.995 ms` | `6.757 ms` |
+| `num_cosh(0.7)` | `3.065 ms` | `8.015 ms` | `3.000 ms` | `7.466 ms` |
+| `num_sinhcosh(0.7)` | `3.067 ms` | `7.606 ms` | `2.997 ms` | `7.872 ms` |
+| `num_tanh(0.7)` | `3.002 ms` | `8.016 ms` | `2.977 ms` | `7.964 ms` |
+| `num_asinh(0.5)` | `1.269 ms` | `3.240 ms` | `2.727 ms` | `4.391 ms` |
+| `num_acosh(2)` | `1.122 ms` | `2.038 ms` | `1.749 ms` | `2.397 ms` |
+| `num_atanh(0.5)` | `1.501 ms` | `4.415 ms` | `3.012 ms` | `4.049 ms` |
+| `num_lambert_w0(0.7)` | `57.527 ms` | `67.351 ms` | `89.971 ms` | `103.493 ms` |
+| `num_lambert_wm1(-0.2)` | `82.290 ms` | `73.982 ms` | `131.892 ms` | `318.031 ms` |
+| `num_gamma(2.345)` | `30.452 ms` | `42.240 ms` | `55.464 ms` | `230.718 ms` |
+| `num_lgamma(2.345)` | `29.102 ms` | `31.248 ms` | `53.431 ms` | `219.636 ms` |
+| `num_digamma(2.345)` | `2.883 ms` | `3.774 ms` | `14.578 ms` | `11.921 ms` |
+| `num_trigamma(2.345)` | `2.391 ms` | `2.447 ms` | `10.856 ms` | `5.597 ms` |
+| `num_tetragamma(2.345)` | `3.417 ms` | `2.669 ms` | `8.462 ms` | `5.318 ms` |
+| `num_ei(1)` | `4.402 ms` | `4.108 ms` | `48.975 ms` | `709.675 ms` |
+| `num_e1(1)` | `4.673 ms` | `4.274 ms` | `28.783 ms` | `31.516 ms` |
+
+For broader benchmark notes, see [`docs/benchmarks.md`](benchmarks.md).

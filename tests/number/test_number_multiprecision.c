@@ -65,4 +65,30 @@ void run_number_multiprecision_tests(void)
         mf_free(base_real);
         mc_free(base_complex);
     }
+
+    {
+        number_t exact_int;
+        number_t exact_rat;
+        number_t ei_int;
+        number_t log_rat;
+
+        ASSERT_EQ_INT(num_set_default_precision(768u), 0);
+
+        exact_int = num_create_string("1");
+        exact_rat = num_create_string("3/2");
+        ei_int = num_ei(exact_int);
+        log_rat = num_log(exact_rat);
+
+        ASSERT_EQ_INT((int)num_get_precision(exact_int), 0);
+        ASSERT_EQ_INT((int)num_get_precision(exact_rat), 0);
+        ASSERT_EQ_INT((int)num_get_precision(ei_int), 768);
+        ASSERT_EQ_INT((int)num_get_precision(log_rat), 768);
+
+        num_clear(&exact_int);
+        num_clear(&exact_rat);
+        num_clear(&ei_int);
+        num_clear(&log_rat);
+
+        ASSERT_EQ_INT(num_set_default_precision(1024u), 0);
+    }
 }
