@@ -20,6 +20,257 @@
 /* Ownership helpers                                                         */
 /* ------------------------------------------------------------------------- */
 
+static inline dval_t *dv_num_const_d(double x)
+{
+    number_t n = num_create_from_qfloat(qf_from_double(x));
+    dval_t *dv = dv_new_const_num(n);
+
+    num_destroy(&n);
+    return dv;
+}
+
+static inline dval_t *dv_num_const_qf(qfloat_t x)
+{
+    number_t n = num_create_from_qfloat(x);
+    dval_t *dv = dv_new_const_num(n);
+
+    num_destroy(&n);
+    return dv;
+}
+
+static inline dval_t *dv_num_const_qc(qcomplex_t x)
+{
+    number_t n = num_create_from_qcomplex(x);
+    dval_t *dv = dv_new_const_num(n);
+
+    num_destroy(&n);
+    return dv;
+}
+
+static inline dval_t *dv_num_named_const_d(double x, const char *name)
+{
+    number_t n = num_create_from_qfloat(qf_from_double(x));
+    dval_t *dv = dv_new_named_const_num(n, name);
+
+    num_destroy(&n);
+    return dv;
+}
+
+static inline dval_t *dv_num_named_const_qf(qfloat_t x, const char *name)
+{
+    number_t n = num_create_from_qfloat(x);
+    dval_t *dv = dv_new_named_const_num(n, name);
+
+    num_destroy(&n);
+    return dv;
+}
+
+static inline dval_t *dv_num_named_const_qc(qcomplex_t x, const char *name)
+{
+    number_t n = num_create_from_qcomplex(x);
+    dval_t *dv = dv_new_named_const_num(n, name);
+
+    num_destroy(&n);
+    return dv;
+}
+
+static inline dval_t *dv_num_var_d(double x)
+{
+    number_t n = num_create_from_qfloat(qf_from_double(x));
+    dval_t *dv = dv_new_var_num(n);
+
+    num_destroy(&n);
+    return dv;
+}
+
+static inline dval_t *dv_num_var_qf(qfloat_t x)
+{
+    number_t n = num_create_from_qfloat(x);
+    dval_t *dv = dv_new_var_num(n);
+
+    num_destroy(&n);
+    return dv;
+}
+
+static inline dval_t *dv_num_var_qc(qcomplex_t x)
+{
+    number_t n = num_create_from_qcomplex(x);
+    dval_t *dv = dv_new_var_num(n);
+
+    num_destroy(&n);
+    return dv;
+}
+
+static inline dval_t *dv_num_named_var_d(double x, const char *name)
+{
+    number_t n = num_create_from_qfloat(qf_from_double(x));
+    dval_t *dv = dv_new_named_var_num(n, name);
+
+    num_destroy(&n);
+    return dv;
+}
+
+static inline dval_t *dv_num_named_var_qf(qfloat_t x, const char *name)
+{
+    number_t n = num_create_from_qfloat(x);
+    dval_t *dv = dv_new_named_var_num(n, name);
+
+    num_destroy(&n);
+    return dv;
+}
+
+static inline dval_t *dv_num_named_var_qc(qcomplex_t x, const char *name)
+{
+    number_t n = num_create_from_qcomplex(x);
+    dval_t *dv = dv_new_named_var_num(n, name);
+
+    num_destroy(&n);
+    return dv;
+}
+
+static inline void dv_num_set_d(dval_t *dv, double x)
+{
+    number_t n = num_create_from_qfloat(qf_from_double(x));
+
+    dv_set_val_num(dv, n);
+    num_destroy(&n);
+}
+
+static inline void dv_num_set_qf(dval_t *dv, qfloat_t x)
+{
+    number_t n = num_create_from_qfloat(x);
+
+    dv_set_val_num(dv, n);
+    num_destroy(&n);
+}
+
+static inline void dv_num_set_qc(dval_t *dv, qcomplex_t x)
+{
+    number_t n = num_create_from_qcomplex(x);
+
+    dv_set_val_num(dv, n);
+    num_destroy(&n);
+}
+
+#ifndef dv_add_d
+static inline dval_t *dv_add_d(const dval_t *dv, double x)
+{
+    number_t n = num_create_from_double(x);
+    dval_t *out = dv_add_num(dv, &n);
+
+    num_destroy(&n);
+    return out;
+}
+#endif
+
+#ifndef dv_sub_d
+static inline dval_t *dv_sub_d(const dval_t *dv, double x)
+{
+    number_t n = num_create_from_double(x);
+    dval_t *out = dv_sub_num(dv, &n);
+
+    num_destroy(&n);
+    return out;
+}
+#endif
+
+#ifndef dv_d_sub
+static inline dval_t *dv_d_sub(double x, const dval_t *dv)
+{
+    number_t n = num_create_from_double(x);
+    dval_t *out = dv_num_sub(&n, dv);
+
+    num_destroy(&n);
+    return out;
+}
+#endif
+
+#ifndef dv_mul_d
+static inline dval_t *dv_mul_d(const dval_t *dv, double x)
+{
+    number_t n = num_create_from_double(x);
+    dval_t *out = dv_mul_num(dv, &n);
+
+    num_destroy(&n);
+    return out;
+}
+#endif
+
+#ifndef dv_div_d
+static inline dval_t *dv_div_d(const dval_t *dv, double x)
+{
+    number_t n = num_create_from_double(x);
+    dval_t *out = dv_div_num(dv, &n);
+
+    num_destroy(&n);
+    return out;
+}
+#endif
+
+#ifndef dv_d_div
+static inline dval_t *dv_d_div(double x, const dval_t *dv)
+{
+    number_t n = num_create_from_double(x);
+    dval_t *out = dv_num_div(&n, dv);
+
+    num_destroy(&n);
+    return out;
+}
+#endif
+
+#ifndef dv_pow_d
+static inline dval_t *dv_pow_d(const dval_t *dv, double x)
+{
+    number_t n = num_create_from_double(x);
+    dval_t *out = dv_pow_num(dv, &n);
+
+    num_destroy(&n);
+    return out;
+}
+#endif
+
+#ifndef dv_pow_qc
+static inline dval_t *dv_pow_qc(const dval_t *dv, qcomplex_t x)
+{
+    number_t n = num_create_from_qcomplex(x);
+    dval_t *out = dv_pow_num(dv, &n);
+
+    num_destroy(&n);
+    return out;
+}
+#endif
+
+static inline double dv_num_eval_d(const dval_t *dv)
+{
+    number_t n = dv_eval_num(dv);
+    double out = num_to_double(n);
+
+    num_destroy(&n);
+    return out;
+}
+
+static inline qfloat_t dv_num_eval_qf(const dval_t *dv)
+{
+    number_t n = dv_eval_num(dv);
+    qfloat_t out = num_to_qfloat(n);
+
+    num_destroy(&n);
+    return out;
+}
+
+static inline qcomplex_t dv_num_eval_qc(const dval_t *dv)
+{
+    number_t n = dv_eval_num(dv);
+    number_t re_n = num_real_part(n);
+    number_t im_n = num_imag_part(n);
+    qcomplex_t out = qc_make(num_to_qfloat(re_n), num_to_qfloat(im_n));
+
+    num_destroy(&im_n);
+    num_destroy(&re_n);
+    num_destroy(&n);
+    return out;
+}
+
 void dv_retain(const dval_t *dv);
 
 /* ------------------------------------------------------------------------- */

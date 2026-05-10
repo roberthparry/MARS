@@ -81,22 +81,22 @@ void gturan_eval_dv(dval_t *expr, dval_t *x_var, dval_t *d2_expr,
     qfloat_t h2 = qf_mul(h, h);
 
     /* Center node */
-    dv_set_val_qf(x_var, c);
-    qfloat_t f0  = dv_eval_qf(expr);
-    qfloat_t d20 = same ? f0 : dv_eval_qf(d2_expr);
+    ig_dv_set_val_qf(x_var, c);
+    qfloat_t f0  = ig_dv_eval_qf(expr);
+    qfloat_t d20 = same ? f0 : ig_dv_eval_qf(d2_expr);
 
     /* Seven symmetric pairs */
     qfloat_t fpos[7], fneg[7], d2pos[7], d2neg[7];
     for (int i = 0; i < 7; i++) {
         qfloat_t hi = qf_mul(h, tn_node[i + 1]);
 
-        dv_set_val_qf(x_var, qf_add(c, hi));
-        fpos[i]  = dv_eval_qf(expr);
-        d2pos[i] = same ? fpos[i] : dv_eval_qf(d2_expr);
+        ig_dv_set_val_qf(x_var, qf_add(c, hi));
+        fpos[i]  = ig_dv_eval_qf(expr);
+        d2pos[i] = same ? fpos[i] : ig_dv_eval_qf(d2_expr);
 
-        dv_set_val_qf(x_var, qf_sub(c, hi));
-        fneg[i]  = dv_eval_qf(expr);
-        d2neg[i] = same ? fneg[i] : dv_eval_qf(d2_expr);
+        ig_dv_set_val_qf(x_var, qf_sub(c, hi));
+        fneg[i]  = ig_dv_eval_qf(expr);
+        d2neg[i] = same ? fneg[i] : ig_dv_eval_qf(d2_expr);
     }
 
     /* T15 accumulation (all 8 positions) */
@@ -144,7 +144,7 @@ static void gturan_eval_dv_2d(
     qfloat_t hy2 = qf_mul(hy, hy);
     qfloat_t dummy;
 
-    dv_set_val_qf(y_var, cy);
+    ig_dv_set_val_qf(y_var, cy);
     qfloat_t F0, Fpp0;
     gturan_eval_dv(expr,    x_var, d2x_expr,     ax, bx, &F0,   &dummy);
     gturan_eval_dv(d2y_expr, x_var, d2x_d2y_expr, ax, bx, &Fpp0, &dummy);
@@ -153,11 +153,11 @@ static void gturan_eval_dv_2d(
     for (int i = 0; i < 7; i++) {
         qfloat_t hi = qf_mul(hy, tn_node[i + 1]);
 
-        dv_set_val_qf(y_var, qf_add(cy, hi));
+        ig_dv_set_val_qf(y_var, qf_add(cy, hi));
         gturan_eval_dv(expr,    x_var, d2x_expr,     ax, bx, &Fpos[i],   &dummy);
         gturan_eval_dv(d2y_expr, x_var, d2x_d2y_expr, ax, bx, &Fpppos[i], &dummy);
 
-        dv_set_val_qf(y_var, qf_sub(cy, hi));
+        ig_dv_set_val_qf(y_var, qf_sub(cy, hi));
         gturan_eval_dv(expr,    x_var, d2x_expr,     ax, bx, &Fneg[i],   &dummy);
         gturan_eval_dv(d2y_expr, x_var, d2x_d2y_expr, ax, bx, &Fppneg[i], &dummy);
     }
@@ -227,7 +227,7 @@ static void gturan_eval_dv_3d(
     qfloat_t hz  = qf_mul_double(qf_sub(bz, az), 0.5);
     qfloat_t hz2 = qf_mul(hz, hz);
 
-    dv_set_val_qf(z_var, cz);
+    ig_dv_set_val_qf(z_var, cz);
     qfloat_t F0   = eval_2d_t15(expr,    x_var, d2x_expr,     d2y_expr,     d2x_d2y_expr,
                                  y_var, ax, bx, ay, by);
     qfloat_t Fpp0 = eval_2d_t15(d2z_expr, x_var, d2x_d2z_expr, d2y_d2z_expr, d2x_d2y_d2z_expr,
@@ -237,13 +237,13 @@ static void gturan_eval_dv_3d(
     for (int i = 0; i < 7; i++) {
         qfloat_t hi = qf_mul(hz, tn_node[i + 1]);
 
-        dv_set_val_qf(z_var, qf_add(cz, hi));
+        ig_dv_set_val_qf(z_var, qf_add(cz, hi));
         Fpos[i]   = eval_2d_t15(expr,    x_var, d2x_expr,     d2y_expr,     d2x_d2y_expr,
                                  y_var, ax, bx, ay, by);
         Fpppos[i] = eval_2d_t15(d2z_expr, x_var, d2x_d2z_expr, d2y_d2z_expr, d2x_d2y_d2z_expr,
                                  y_var, ax, bx, ay, by);
 
-        dv_set_val_qf(z_var, qf_sub(cz, hi));
+        ig_dv_set_val_qf(z_var, qf_sub(cz, hi));
         Fneg[i]   = eval_2d_t15(expr,    x_var, d2x_expr,     d2y_expr,     d2x_d2y_expr,
                                  y_var, ax, bx, ay, by);
         Fppneg[i] = eval_2d_t15(d2z_expr, x_var, d2x_d2z_expr, d2y_d2z_expr, d2x_d2y_d2z_expr,
@@ -284,8 +284,8 @@ int ig_single_integral(integrator_t *ig, dval_t *expr, dval_t *x_var,
     static const double tp[2] = { 0.31415, 0.71828 };
     int d2_same = 1;
     for (int t = 0; t < 2 && d2_same; t++) {
-        dv_set_val_qf(x_var, qf_from_double(tp[t]));
-        if (!qf_eq(dv_eval_qf(expr), dv_eval_qf(d2_expr)))
+        ig_dv_set_val_qf(x_var, qf_from_double(tp[t]));
+        if (!qf_eq(ig_dv_eval_qf(expr), ig_dv_eval_qf(d2_expr)))
             d2_same = 0;
     }
     dval_t *d2_use = d2_same ? expr : d2_expr;

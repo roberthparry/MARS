@@ -25,6 +25,65 @@ static qfloat_t tol20 = { 9.9999999999999995e-21, 5.4846728545790429e-37 };  /* 
 static qfloat_t tol15 = { 1.0000000000000001e-15, -4.3320984004882613e-32 }; /* 1e-15 */
 static qfloat_t tol27 = { 1e-27, -3.8494869749191836e-44 }; /* 1e-27 */
 
+static dval_t *test_dv_new_const_d(double x)
+{
+    number_t n = num_create_from_qfloat(qf_from_double(x));
+    dval_t *dv = dv_new_const_num(n);
+
+    num_destroy(&n);
+    return dv;
+}
+
+static dval_t *test_dv_new_var_qf(qfloat_t x)
+{
+    number_t n = num_create_from_qfloat(x);
+    dval_t *dv = dv_new_var_num(n);
+
+    num_destroy(&n);
+    return dv;
+}
+
+static dval_t *test_dv_add_d(const dval_t *dv, double x)
+{
+    number_t n = num_create_from_double(x);
+    dval_t *out = dv_add_num(dv, &n);
+
+    num_destroy(&n);
+    return out;
+}
+
+static dval_t *test_dv_sub_d(const dval_t *dv, double x)
+{
+    number_t n = num_create_from_double(x);
+    dval_t *out = dv_sub_num(dv, &n);
+
+    num_destroy(&n);
+    return out;
+}
+
+static dval_t *test_dv_mul_d(const dval_t *dv, double x)
+{
+    number_t n = num_create_from_double(x);
+    dval_t *out = dv_mul_num(dv, &n);
+
+    num_destroy(&n);
+    return out;
+}
+
+static dval_t *test_dv_pow_d(const dval_t *dv, double x)
+{
+    number_t n = num_create_from_double(x);
+    dval_t *out = dv_pow_num(dv, &n);
+
+    num_destroy(&n);
+    return out;
+}
+
+#define dv_add_d test_dv_add_d
+#define dv_sub_d test_dv_sub_d
+#define dv_mul_d test_dv_mul_d
+#define dv_pow_d test_dv_pow_d
+
 /* -----------------------------------------------------------------------
  * Integrands
  * --------------------------------------------------------------------- */
@@ -65,7 +124,7 @@ void test_create_and_destroy(void) {
 void test_polynomial(void) {
     /* ∫₀¹ x² dx = 1/3 — degree-2 polynomial; Turán is exact to full qfloat_t precision */
     integrator_t *ig = ig_new();
-    dval_t *x    = dv_new_var(qf_from_double(0.0));
+    dval_t *x    = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *expr = dv_mul(x, x);
 
     qfloat_t result, err;
@@ -163,8 +222,8 @@ void test_log(void) {
 void test_constant(void) {
     /* ∫₀^5 1 dx = 5 — constant integrand; Turán is polynomially exact at qfloat precision */
     integrator_t *ig = ig_new();
-    dval_t *x    = dv_new_var(qf_from_double(0.0));
-    dval_t *expr = dv_new_const_d(1.0);
+    dval_t *x    = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *expr = test_dv_new_const_d(1.0);
 
     qfloat_t result, err;
     int s = ig_single_integral(ig, expr, x,
@@ -186,7 +245,7 @@ void test_constant(void) {
 void test_linear(void) {
     /* ∫₀^5 x dx = 12.5 — linear integrand; Turán is polynomially exact at qfloat precision */
     integrator_t *ig = ig_new();
-    dval_t *x    = dv_new_var(qf_from_double(0.0));
+    dval_t *x    = test_dv_new_var_qf(qf_from_double(0.0));
 
     qfloat_t result, err;
     int s = ig_single_integral(ig, x, x,
@@ -279,7 +338,7 @@ void test_null_safety(void) {
 void test_reversed_limits(void) {
     /* ∫₁⁰ x² dx = -1/3 — reversed limits; Turán handles sign and is polynomially exact */
     integrator_t *ig = ig_new();
-    dval_t *x    = dv_new_var(qf_from_double(0.0));
+    dval_t *x    = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *expr = dv_mul(x, x);
 
     qfloat_t result, err;
@@ -306,7 +365,7 @@ void test_reversed_limits(void) {
 void test_dv_sin(void) {
     /* ∫₀^π sin(x) dx = 2 */
     integrator_t *ig = ig_new();
-    dval_t *x    = dv_new_var(qf_from_double(0.0));
+    dval_t *x    = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *expr = dv_sin(x);
 
     qfloat_t result, err;
@@ -330,7 +389,7 @@ void test_dv_sin(void) {
 void test_dv_exp(void) {
     /* ∫₀¹ exp(x) dx = e - 1 */
     integrator_t *ig = ig_new();
-    dval_t *x    = dv_new_var(qf_from_double(0.0));
+    dval_t *x    = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *expr = dv_exp(x);
 
     qfloat_t result, err;
@@ -354,8 +413,8 @@ void test_dv_exp(void) {
 void test_dv_arctan(void) {
     /* ∫₋₁¹ 1/(1+x²) dx = π/2 */
     integrator_t *ig = ig_new();
-    dval_t *x    = dv_new_var(qf_from_double(0.0));
-    dval_t *one  = dv_new_const_d(1.0);
+    dval_t *x    = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *one  = test_dv_new_const_d(1.0);
     dval_t *x2   = dv_mul(x, x);
     dval_t *denom = dv_add(one, x2);
     dval_t *expr = dv_div(one, denom);
@@ -382,7 +441,7 @@ void test_dv_arctan(void) {
 
 void test_dv_null_safety(void) {
     integrator_t *ig = ig_new();
-    dval_t *x    = dv_new_var(qf_from_double(0.0));
+    dval_t *x    = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *expr = dv_exp(x);
     qfloat_t result;
 
@@ -416,8 +475,8 @@ void test_dv_null_safety(void) {
 void test_double_polynomial(void) {
     /* ∫₀¹∫₀¹ x·y dx dy = 1/4 — polynomial; Turán is exact to full qfloat precision */
     integrator_t *ig = ig_new();
-    dval_t *x    = dv_new_var(qf_from_double(0.0));
-    dval_t *y    = dv_new_var(qf_from_double(0.0));
+    dval_t *x    = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *y    = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *expr = dv_mul(x, y);
 
     qfloat_t result, err;
@@ -442,8 +501,8 @@ void test_double_polynomial(void) {
 void test_double_exp(void) {
     /* ∫₀¹∫₀¹ exp(x+y) dx dy = (e−1)² */
     integrator_t *ig = ig_new();
-    dval_t *x    = dv_new_var(qf_from_double(0.0));
-    dval_t *y    = dv_new_var(qf_from_double(0.0));
+    dval_t *x    = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *y    = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *sum  = dv_add(x, y);           // store intermediate
     dval_t *expr = dv_exp(sum);
 
@@ -471,8 +530,8 @@ void test_double_exp(void) {
 void test_double_nonunit_bounds(void) {
     /* ∫₀²∫₀³ x·y dx dy = 9 — polynomial with non-unit bounds */
     integrator_t *ig = ig_new();
-    dval_t *x    = dv_new_var(qf_from_double(0.0));
-    dval_t *y    = dv_new_var(qf_from_double(0.0));
+    dval_t *x    = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *y    = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *expr = dv_mul(x, y);
 
     qfloat_t result, err;
@@ -496,8 +555,8 @@ void test_double_nonunit_bounds(void) {
 
 void test_double_null_safety(void) {
     integrator_t *ig = ig_new();
-    dval_t *x    = dv_new_var(qf_from_double(0.0));
-    dval_t *y    = dv_new_var(qf_from_double(0.0));
+    dval_t *x    = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *y    = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *expr = dv_mul(x, y);
     qfloat_t result;
     qfloat_t z = qf_from_double(0.0), o = qf_from_double(1.0);
@@ -518,9 +577,9 @@ void test_double_null_safety(void) {
 void test_triple_polynomial(void) {
     /* ∫₀¹∫₀¹∫₀¹ x·y·z dx dy dz = 1/8 — polynomial exact */
     integrator_t *ig = ig_new();
-    dval_t *x    = dv_new_var(qf_from_double(0.0));
-    dval_t *y    = dv_new_var(qf_from_double(0.0));
-    dval_t *z    = dv_new_var(qf_from_double(0.0));
+    dval_t *x    = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *y    = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *z    = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *xy   = dv_mul(x, y);           // store intermediate
     dval_t *expr = dv_mul(xy, z);
 
@@ -549,9 +608,9 @@ void test_triple_polynomial(void) {
 void test_triple_exp(void) {
     /* ∫₀¹∫₀¹∫₀¹ exp(x+y+z) dx dy dz = (e−1)³ */
     integrator_t *ig = ig_new();
-    dval_t *x    = dv_new_var(qf_from_double(0.0));
-    dval_t *y    = dv_new_var(qf_from_double(0.0));
-    dval_t *z    = dv_new_var(qf_from_double(0.0));
+    dval_t *x    = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *y    = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *z    = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *xy   = dv_add(x, y);           // store intermediate
     dval_t *xyz  = dv_add(xy, z);          // store intermediate
     dval_t *expr = dv_exp(xyz);
@@ -582,9 +641,9 @@ void test_triple_exp(void) {
 
 void test_triple_null_safety(void) {
     integrator_t *ig = ig_new();
-    dval_t *x    = dv_new_var(qf_from_double(0.0));
-    dval_t *y    = dv_new_var(qf_from_double(0.0));
-    dval_t *z    = dv_new_var(qf_from_double(0.0));
+    dval_t *x    = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *y    = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *z    = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *xy   = dv_mul(x, y);           // store intermediate
     dval_t *expr = dv_mul(xy, z);
     qfloat_t result;
@@ -609,8 +668,8 @@ void test_triple_null_safety(void) {
 void test_multi_2d(void) {
     /* ∫₀¹ ∫₀¹ (x+y) dx dy = 1 — linear; expect qfloat precision */
     integrator_t *ig = ig_new();
-    dval_t *x    = dv_new_var(qf_from_double(0.0));
-    dval_t *y    = dv_new_var(qf_from_double(0.0));
+    dval_t *x    = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *y    = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *expr = dv_add(x, y);
 
     dval_t *vars[2] = { x, y };
@@ -637,9 +696,9 @@ void test_multi_2d(void) {
 void test_multi_3d(void) {
     /* ∫₀¹ ∫₀¹ ∫₀¹ (x+y+z) dx dy dz = 1.5 — linear; expect qfloat precision */
     integrator_t *ig = ig_new();
-    dval_t *x    = dv_new_var(qf_from_double(0.0));
-    dval_t *y    = dv_new_var(qf_from_double(0.0));
-    dval_t *z    = dv_new_var(qf_from_double(0.0));
+    dval_t *x    = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *y    = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *z    = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *xy   = dv_add(x, y);           // store intermediate
     dval_t *expr = dv_add(xy, z);
 
@@ -668,7 +727,7 @@ void test_multi_3d(void) {
 
 void test_multi_null_safety(void) {
     integrator_t *ig = ig_new();
-    dval_t *x    = dv_new_var(qf_from_double(0.0));
+    dval_t *x    = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *expr = dv_exp(x);
     dval_t *vars[1] = { x };
     qfloat_t lo[1] = { qf_from_double(0.0) };
@@ -688,7 +747,7 @@ void test_multi_null_safety(void) {
 void test_multi_nd1(void) {
     /* ndim=1 degenerates to ig_single_integral: ∫₀¹ exp(x) dx = e−1 */
     integrator_t *ig = ig_new();
-    dval_t *x    = dv_new_var(qf_from_double(0.0));
+    dval_t *x    = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *expr = dv_exp(x);
     dval_t *vars[1] = { x };
     qfloat_t lo[1]  = { qf_from_double(0.0) };
@@ -712,10 +771,10 @@ void test_multi_nd1(void) {
 void test_multi_4d(void) {
     /* ∫₀¹∫₀¹∫₀¹∫₀¹ (x+y+z+w) dx dy dz dw = 2.0 — linear polynomial in 4D, exact */
     integrator_t *ig = ig_new();
-    dval_t *x    = dv_new_var(qf_from_double(0.0));
-    dval_t *y    = dv_new_var(qf_from_double(0.0));
-    dval_t *z    = dv_new_var(qf_from_double(0.0));
-    dval_t *w    = dv_new_var(qf_from_double(0.0));
+    dval_t *x    = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *y    = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *z    = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *w    = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *xy   = dv_add(x, y);           // store intermediate
     dval_t *zw   = dv_add(z, w);           // store intermediate
     dval_t *expr = dv_add(xy, zw);
@@ -749,10 +808,10 @@ void test_multi_4d(void) {
 void test_multi_4d_exp(void) {
     /* ∫₀¹∫₀¹∫₀¹∫₀¹ exp(x+y+z+w) dx dy dz dw = (e−1)⁴ */
     integrator_t *ig = ig_new();
-    dval_t *x    = dv_new_var(qf_from_double(0.0));
-    dval_t *y    = dv_new_var(qf_from_double(0.0));
-    dval_t *z    = dv_new_var(qf_from_double(0.0));
-    dval_t *w    = dv_new_var(qf_from_double(0.0));
+    dval_t *x    = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *y    = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *z    = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *w    = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *xy   = dv_add(x, y);           // store intermediate
     dval_t *zw   = dv_add(z, w);           // store intermediate
     dval_t *sum  = dv_add(xy, zw);         // store intermediate
@@ -790,10 +849,10 @@ void test_multi_4d_exp(void) {
 void test_multi_4d_exp_affine(void) {
     /* ∫ exp(2x - y + 0.5z + 3w + 1) dV = e * Π_i ∫ exp(a_i t) dt on [0,1]^4 */
     integrator_t *ig = ig_new();
-    dval_t *x    = dv_new_var(qf_from_double(0.0));
-    dval_t *y    = dv_new_var(qf_from_double(0.0));
-    dval_t *z    = dv_new_var(qf_from_double(0.0));
-    dval_t *w    = dv_new_var(qf_from_double(0.0));
+    dval_t *x    = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *y    = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *z    = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *w    = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *two_x = dv_mul_d(x, 2.0);
     dval_t *neg_y = dv_neg(y);
     dval_t *half_z = dv_mul_d(z, 0.5);
@@ -847,9 +906,9 @@ void test_multi_4d_exp_affine(void) {
 void test_multi_3d_sinh_affine(void) {
     /* ∫₀¹∫₀¹∫₀¹ sinh(x - 2y + 0.5z + 1) dV */
     integrator_t *ig = ig_new();
-    dval_t *x = dv_new_var(qf_from_double(0.0));
-    dval_t *y = dv_new_var(qf_from_double(0.0));
-    dval_t *z = dv_new_var(qf_from_double(0.0));
+    dval_t *x = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *y = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *z = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *neg2y = dv_mul_d(y, -2.0);
     dval_t *halfz = dv_mul_d(z, 0.5);
     dval_t *sum_xy = dv_add(x, neg2y);
@@ -898,9 +957,9 @@ void test_multi_3d_sinh_affine(void) {
 void test_multi_3d_cosh_affine(void) {
     /* ∫₀¹∫₀¹∫₀¹ cosh(1.5x + y - z + 0.25) dV */
     integrator_t *ig = ig_new();
-    dval_t *x = dv_new_var(qf_from_double(0.0));
-    dval_t *y = dv_new_var(qf_from_double(0.0));
-    dval_t *z = dv_new_var(qf_from_double(0.0));
+    dval_t *x = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *y = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *z = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *onept5x = dv_mul_d(x, 1.5);
     dval_t *negz = dv_neg(z);
     dval_t *sum_xy = dv_add(onept5x, y);
@@ -951,9 +1010,9 @@ void test_multi_3d_cosh_affine(void) {
 void test_multi_3d_sin_affine(void) {
     /* ∫₀¹∫₀¹∫₀¹ sin(x+2y-z+0.3) dx dy dz  [affine sin] */
     integrator_t *ig = ig_new();
-    dval_t *x = dv_new_var(qf_from_double(0.0));
-    dval_t *y = dv_new_var(qf_from_double(0.0));
-    dval_t *z = dv_new_var(qf_from_double(0.0));
+    dval_t *x = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *y = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *z = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *two_y = dv_mul_d(y, 2.0);
     dval_t *neg_z = dv_neg(z);
     dval_t *sum_xy = dv_add(x, two_y);
@@ -1000,9 +1059,9 @@ void test_multi_3d_sin_affine(void) {
 void test_multi_3d_cos_affine(void) {
     /* ∫₀¹∫₀¹∫₀¹ cos(0.5x-y+1.5z-0.2) dx dy dz  [affine cos] */
     integrator_t *ig = ig_new();
-    dval_t *x = dv_new_var(qf_from_double(0.0));
-    dval_t *y = dv_new_var(qf_from_double(0.0));
-    dval_t *z = dv_new_var(qf_from_double(0.0));
+    dval_t *x = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *y = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *z = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *half_x = dv_mul_d(x, 0.5);
     dval_t *neg_y = dv_neg(y);
     dval_t *onept5_z = dv_mul_d(z, 1.5);
@@ -1051,9 +1110,9 @@ void test_multi_3d_cos_affine(void) {
 void test_multi_3d_scaled_sum_specials(void) {
     /* 2*exp(x+y) - 3*cosh(z+0.5) + 4 */
     integrator_t *ig = ig_new();
-    dval_t *x = dv_new_var(qf_from_double(0.0));
-    dval_t *y = dv_new_var(qf_from_double(0.0));
-    dval_t *z = dv_new_var(qf_from_double(0.0));
+    dval_t *x = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *y = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *z = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *xy = dv_add(x, y);
     dval_t *exp_xy = dv_exp(xy);
     dval_t *term1 = dv_mul_d(exp_xy, 2.0);
@@ -1101,8 +1160,8 @@ void test_multi_3d_scaled_sum_specials(void) {
 void test_multi_2d_sum_of_specials(void) {
     /* sin(x+0.2) + cos(2y-0.1) + exp(x-y) */
     integrator_t *ig = ig_new();
-    dval_t *x = dv_new_var(qf_from_double(0.0));
-    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *x = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *y = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *sin_arg = dv_add_d(x, 0.2);
     dval_t *sin_term = dv_sin(sin_arg);
     dval_t *two_y = dv_mul_d(y, 2.0);
@@ -1157,9 +1216,9 @@ void test_multi_2d_sum_of_specials(void) {
 void test_multi_3d_separable_product(void) {
     /* exp(x) * cos(2y-0.1) * sinh(z+0.2) */
     integrator_t *ig = ig_new();
-    dval_t *x = dv_new_var(qf_from_double(0.0));
-    dval_t *y = dv_new_var(qf_from_double(0.0));
-    dval_t *z = dv_new_var(qf_from_double(0.0));
+    dval_t *x = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *y = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *z = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *exp_x = dv_exp(x);
     dval_t *two_y = dv_mul_d(y, 2.0);
     dval_t *cos_arg = dv_sub_d(two_y, 0.1);
@@ -1209,9 +1268,9 @@ void test_multi_3d_separable_product(void) {
 void test_multi_3d_regrouped_separable_product(void) {
     /* (x*cos(y)) * (x*exp(z)) -> x^2 * cos(y) * exp(z) */
     integrator_t *ig = ig_new();
-    dval_t *x = dv_new_var(qf_from_double(0.0));
-    dval_t *y = dv_new_var(qf_from_double(0.0));
-    dval_t *z = dv_new_var(qf_from_double(0.0));
+    dval_t *x = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *y = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *z = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *cos_y = dv_cos(y);
     dval_t *exp_z = dv_exp(z);
     dval_t *left = dv_mul(x, cos_y);
@@ -1252,8 +1311,8 @@ void test_multi_3d_regrouped_separable_product(void) {
 void test_multi_2d_sum_of_separable_products(void) {
     /* exp(x)cos(y) + sinh(x+0.1)exp(y) */
     integrator_t *ig = ig_new();
-    dval_t *x = dv_new_var(qf_from_double(0.0));
-    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *x = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *y = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *exp_x = dv_exp(x);
     dval_t *cos_y = dv_cos(y);
     dval_t *term1 = dv_mul(exp_x, cos_y);
@@ -1301,8 +1360,8 @@ void test_multi_2d_sum_of_separable_products(void) {
 void test_multi_2d_affine_square(void) {
     /* (x + 2y + 3)^2 */
     integrator_t *ig = ig_new();
-    dval_t *x = dv_new_var(qf_from_double(0.0));
-    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *x = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *y = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *two_y = dv_mul_d(y, 2.0);
     dval_t *sum_xy = dv_add(x, two_y);
     dval_t *affine = dv_add_d(sum_xy, 3.0);
@@ -1336,8 +1395,8 @@ void test_multi_2d_affine_square(void) {
 void test_multi_2d_affine_cube(void) {
     /* (x + 2y + 3)^3 */
     integrator_t *ig = ig_new();
-    dval_t *x = dv_new_var(qf_from_double(0.0));
-    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *x = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *y = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *two_y = dv_mul_d(y, 2.0);
     dval_t *sum_xy = dv_add(x, two_y);
     dval_t *affine = dv_add_d(sum_xy, 3.0);
@@ -1373,8 +1432,8 @@ void test_multi_2d_affine_cube(void) {
 void test_multi_2d_affine_quartic(void) {
     /* (x + 2y + 3)^4 */
     integrator_t *ig = ig_new();
-    dval_t *x = dv_new_var(qf_from_double(0.0));
-    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *x = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *y = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *two_y = dv_mul_d(y, 2.0);
     dval_t *sum_xy = dv_add(x, two_y);
     dval_t *affine = dv_add_d(sum_xy, 3.0);
@@ -1412,8 +1471,8 @@ void test_multi_2d_affine_quartic(void) {
 void test_multi_2d_affine_poly_deg4(void) {
     /* 3(x + 2y + 3)^4 - 2(x + 2y + 3)^2 + (x + 2y + 3) + 7 */
     integrator_t *ig = ig_new();
-    dval_t *x = dv_new_var(qf_from_double(0.0));
-    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *x = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *y = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *two_y = dv_mul_d(y, 2.0);
     dval_t *sum_xy = dv_add(x, two_y);
     dval_t *affine = dv_add_d(sum_xy, 3.0);
@@ -1422,7 +1481,7 @@ void test_multi_2d_affine_poly_deg4(void) {
     dval_t *scaled_quartic = dv_mul_d(quartic, 3.0);
     dval_t *scaled_square = dv_mul_d(square, 2.0);
     dval_t *poly_core = dv_sub(scaled_quartic, scaled_square);
-    dval_t *seven = dv_new_const_d(7.0);
+    dval_t *seven = test_dv_new_const_d(7.0);
     dval_t *affine_plus_seven = dv_add(affine, seven);
     dval_t *poly = dv_add(poly_core, affine_plus_seven);
 
@@ -1461,8 +1520,8 @@ void test_multi_2d_affine_poly_deg4(void) {
 void test_multi_2d_affine_times_exp_affine(void) {
     /* (x + 2y + 3) * exp(x + 2y + 3) */
     integrator_t *ig = ig_new();
-    dval_t *x = dv_new_var(qf_from_double(0.0));
-    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *x = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *y = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *two_y = dv_mul_d(y, 2.0);
     dval_t *sum_xy = dv_add(x, two_y);
     dval_t *affine = dv_add_d(sum_xy, 3.0);
@@ -1503,8 +1562,8 @@ void test_multi_2d_affine_times_exp_affine(void) {
 void test_multi_2d_square_affine_times_exp_affine(void) {
     /* (x + 2y + 3)^2 * exp(x + 2y + 3) */
     integrator_t *ig = ig_new();
-    dval_t *x = dv_new_var(qf_from_double(0.0));
-    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *x = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *y = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *two_y = dv_mul_d(y, 2.0);
     dval_t *sum_xy = dv_add(x, two_y);
     dval_t *affine = dv_add_d(sum_xy, 3.0);
@@ -1549,8 +1608,8 @@ void test_multi_2d_square_affine_times_exp_affine(void) {
 void test_multi_2d_affine_times_sin_affine(void) {
     /* (x + 2y + 3) * sin(x + 2y + 3) */
     integrator_t *ig = ig_new();
-    dval_t *x = dv_new_var(qf_from_double(0.0));
-    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *x = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *y = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *two_y = dv_mul_d(y, 2.0);
     dval_t *sum_xy = dv_add(x, two_y);
     dval_t *affine = dv_add_d(sum_xy, 3.0);
@@ -1594,8 +1653,8 @@ void test_multi_2d_affine_times_sin_affine(void) {
 void test_multi_2d_square_affine_times_sin_affine(void) {
     /* (x + 2y + 3)^2 * sin(x + 2y + 3) */
     integrator_t *ig = ig_new();
-    dval_t *x = dv_new_var(qf_from_double(0.0));
-    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *x = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *y = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *two_y = dv_mul_d(y, 2.0);
     dval_t *sum_xy = dv_add(x, two_y);
     dval_t *affine = dv_add_d(sum_xy, 3.0);
@@ -1649,8 +1708,8 @@ void test_multi_2d_square_affine_times_sin_affine(void) {
 void test_multi_2d_affine_times_cos_affine(void) {
     /* (x + 2y + 3) * cos(x + 2y + 3) */
     integrator_t *ig = ig_new();
-    dval_t *x = dv_new_var(qf_from_double(0.0));
-    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *x = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *y = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *two_y = dv_mul_d(y, 2.0);
     dval_t *sum_xy = dv_add(x, two_y);
     dval_t *affine = dv_add_d(sum_xy, 3.0);
@@ -1694,8 +1753,8 @@ void test_multi_2d_affine_times_cos_affine(void) {
 void test_multi_2d_square_affine_times_cos_affine(void) {
     /* (x + 2y + 3)^2 * cos(x + 2y + 3) */
     integrator_t *ig = ig_new();
-    dval_t *x = dv_new_var(qf_from_double(0.0));
-    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *x = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *y = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *two_y = dv_mul_d(y, 2.0);
     dval_t *sum_xy = dv_add(x, two_y);
     dval_t *affine = dv_add_d(sum_xy, 3.0);
@@ -1749,8 +1808,8 @@ void test_multi_2d_square_affine_times_cos_affine(void) {
 void test_multi_2d_affine_times_sinh_affine(void) {
     /* (x + 2y + 3) * sinh(x + 2y + 3) */
     integrator_t *ig = ig_new();
-    dval_t *x = dv_new_var(qf_from_double(0.0));
-    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *x = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *y = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *two_y = dv_mul_d(y, 2.0);
     dval_t *sum_xy = dv_add(x, two_y);
     dval_t *affine = dv_add_d(sum_xy, 3.0);
@@ -1798,8 +1857,8 @@ void test_multi_2d_affine_times_sinh_affine(void) {
 void test_multi_2d_square_affine_times_sinh_affine(void) {
     /* (x + 2y + 3)^2 * sinh(x + 2y + 3) */
     integrator_t *ig = ig_new();
-    dval_t *x = dv_new_var(qf_from_double(0.0));
-    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *x = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *y = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *two_y = dv_mul_d(y, 2.0);
     dval_t *sum_xy = dv_add(x, two_y);
     dval_t *affine = dv_add_d(sum_xy, 3.0);
@@ -1853,8 +1912,8 @@ void test_multi_2d_square_affine_times_sinh_affine(void) {
 void test_multi_2d_affine_times_cosh_affine(void) {
     /* (x + 2y + 3) * cosh(x + 2y + 3) */
     integrator_t *ig = ig_new();
-    dval_t *x = dv_new_var(qf_from_double(0.0));
-    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *x = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *y = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *two_y = dv_mul_d(y, 2.0);
     dval_t *sum_xy = dv_add(x, two_y);
     dval_t *affine = dv_add_d(sum_xy, 3.0);
@@ -1902,8 +1961,8 @@ void test_multi_2d_affine_times_cosh_affine(void) {
 void test_multi_2d_square_affine_times_cosh_affine(void) {
     /* (x + 2y + 3)^2 * cosh(x + 2y + 3) */
     integrator_t *ig = ig_new();
-    dval_t *x = dv_new_var(qf_from_double(0.0));
-    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *x = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *y = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *two_y = dv_mul_d(y, 2.0);
     dval_t *sum_xy = dv_add(x, two_y);
     dval_t *affine = dv_add_d(sum_xy, 3.0);
@@ -1957,8 +2016,8 @@ void test_multi_2d_square_affine_times_cosh_affine(void) {
 void test_multi_2d_cube_affine_times_exp_affine(void) {
     /* (x + 2y + 3)^3 * exp(x + 2y + 3) */
     integrator_t *ig = ig_new();
-    dval_t *x = dv_new_var(qf_from_double(0.0));
-    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *x = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *y = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *two_y = dv_mul_d(y, 2.0);
     dval_t *sum_xy = dv_add(x, two_y);
     dval_t *affine = dv_add_d(sum_xy, 3.0);
@@ -2003,8 +2062,8 @@ void test_multi_2d_cube_affine_times_exp_affine(void) {
 void test_multi_2d_cube_affine_times_sin_affine(void) {
     /* (x + 2y + 3)^3 * sin(x + 2y + 3) */
     integrator_t *ig = ig_new();
-    dval_t *x = dv_new_var(qf_from_double(0.0));
-    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *x = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *y = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *two_y = dv_mul_d(y, 2.0);
     dval_t *sum_xy = dv_add(x, two_y);
     dval_t *affine = dv_add_d(sum_xy, 3.0);
@@ -2064,8 +2123,8 @@ void test_multi_2d_cube_affine_times_sin_affine(void) {
 void test_multi_2d_cube_affine_times_cos_affine(void) {
     /* (x + 2y + 3)^3 * cos(x + 2y + 3) */
     integrator_t *ig = ig_new();
-    dval_t *x = dv_new_var(qf_from_double(0.0));
-    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *x = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *y = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *two_y = dv_mul_d(y, 2.0);
     dval_t *sum_xy = dv_add(x, two_y);
     dval_t *affine = dv_add_d(sum_xy, 3.0);
@@ -2123,8 +2182,8 @@ void test_multi_2d_cube_affine_times_cos_affine(void) {
 void test_multi_2d_cube_affine_times_sinh_affine(void) {
     /* (x + 2y + 3)^3 * sinh(x + 2y + 3) */
     integrator_t *ig = ig_new();
-    dval_t *x = dv_new_var(qf_from_double(0.0));
-    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *x = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *y = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *two_y = dv_mul_d(y, 2.0);
     dval_t *sum_xy = dv_add(x, two_y);
     dval_t *affine = dv_add_d(sum_xy, 3.0);
@@ -2178,8 +2237,8 @@ void test_multi_2d_cube_affine_times_sinh_affine(void) {
 void test_multi_2d_cube_affine_times_cosh_affine(void) {
     /* (x + 2y + 3)^3 * cosh(x + 2y + 3) */
     integrator_t *ig = ig_new();
-    dval_t *x = dv_new_var(qf_from_double(0.0));
-    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *x = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *y = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *two_y = dv_mul_d(y, 2.0);
     dval_t *sum_xy = dv_add(x, two_y);
     dval_t *affine = dv_add_d(sum_xy, 3.0);
@@ -2235,8 +2294,8 @@ void test_multi_2d_cube_affine_times_cosh_affine(void) {
 void test_multi_2d_quartic_affine_times_exp_affine(void) {
     /* (x + 2y + 3)^4 * exp(x + 2y + 3) */
     integrator_t *ig = ig_new();
-    dval_t *x = dv_new_var(qf_from_double(0.0));
-    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *x = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *y = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *two_y = dv_mul_d(y, 2.0);
     dval_t *sum_xy = dv_add(x, two_y);
     dval_t *affine = dv_add_d(sum_xy, 3.0);
@@ -2275,8 +2334,8 @@ void test_multi_2d_quartic_affine_times_exp_affine(void) {
 void test_multi_2d_quartic_affine_times_sin_affine(void) {
     /* (x + 2y + 3)^4 * sin(x + 2y + 3) */
     integrator_t *ig = ig_new();
-    dval_t *x = dv_new_var(qf_from_double(0.0));
-    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *x = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *y = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *two_y = dv_mul_d(y, 2.0);
     dval_t *sum_xy = dv_add(x, two_y);
     dval_t *affine = dv_add_d(sum_xy, 3.0);
@@ -2319,8 +2378,8 @@ void test_multi_2d_quartic_affine_times_sin_affine(void) {
 void test_multi_2d_quartic_affine_times_cos_affine(void) {
     /* (x + 2y + 3)^4 * cos(x + 2y + 3) */
     integrator_t *ig = ig_new();
-    dval_t *x = dv_new_var(qf_from_double(0.0));
-    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *x = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *y = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *two_y = dv_mul_d(y, 2.0);
     dval_t *sum_xy = dv_add(x, two_y);
     dval_t *affine = dv_add_d(sum_xy, 3.0);
@@ -2359,8 +2418,8 @@ void test_multi_2d_quartic_affine_times_cos_affine(void) {
 void test_multi_2d_quartic_affine_times_sinh_affine(void) {
     /* (x + 2y + 3)^4 * sinh(x + 2y + 3) */
     integrator_t *ig = ig_new();
-    dval_t *x = dv_new_var(qf_from_double(0.0));
-    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *x = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *y = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *two_y = dv_mul_d(y, 2.0);
     dval_t *sum_xy = dv_add(x, two_y);
     dval_t *affine = dv_add_d(sum_xy, 3.0);
@@ -2399,8 +2458,8 @@ void test_multi_2d_quartic_affine_times_sinh_affine(void) {
 void test_multi_2d_quartic_affine_times_cosh_affine(void) {
     /* (x + 2y + 3)^4 * cosh(x + 2y + 3) */
     integrator_t *ig = ig_new();
-    dval_t *x = dv_new_var(qf_from_double(0.0));
-    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *x = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *y = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *two_y = dv_mul_d(y, 2.0);
     dval_t *sum_xy = dv_add(x, two_y);
     dval_t *affine = dv_add_d(sum_xy, 3.0);
@@ -2443,8 +2502,8 @@ void test_multi_2d_quartic_affine_times_cosh_affine(void) {
 void test_multi_2d_affine_poly_times_exp_affine_combination(void) {
     /* (3a^4 - 2a^2 + a) * exp(a), a = x + 2y + 3 */
     integrator_t *ig = ig_new();
-    dval_t *x = dv_new_var(qf_from_double(0.0));
-    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *x = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *y = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *two_y = dv_mul_d(y, 2.0);
     dval_t *sum_xy = dv_add(x, two_y);
     dval_t *affine = dv_add_d(sum_xy, 3.0);
@@ -2499,8 +2558,8 @@ void test_multi_2d_affine_poly_times_exp_affine_combination(void) {
 void test_multi_2d_affine_poly_times_sin_affine_combination(void) {
     /* (2a^4 + a^2 - 3a) * sin(a), a = x + 2y + 3 */
     integrator_t *ig = ig_new();
-    dval_t *x = dv_new_var(qf_from_double(0.0));
-    dval_t *y = dv_new_var(qf_from_double(0.0));
+    dval_t *x = test_dv_new_var_qf(qf_from_double(0.0));
+    dval_t *y = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *two_y = dv_mul_d(y, 2.0);
     dval_t *sum_xy = dv_add(x, two_y);
     dval_t *affine = dv_add_d(sum_xy, 3.0);
@@ -2603,7 +2662,7 @@ void example_integrator_dv(void) {
      * Exact value: √π · erf(3).  Compare interval count with example_integrator(). */
     integrator_t *ig = ig_new();
 
-    dval_t *x    = dv_new_var(qf_from_double(0.0));
+    dval_t *x    = test_dv_new_var_qf(qf_from_double(0.0));
     dval_t *x2   = dv_mul(x, x);
     dval_t *negx2 = dv_neg(x2);
     dval_t *expr = dv_exp(negx2);

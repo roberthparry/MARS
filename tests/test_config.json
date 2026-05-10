@@ -320,6 +320,7 @@
       "test_from_string_special_functions": true,
       "test_from_string_named_consts": true,
       "test_from_string_bracketed_names": true,
+      "test_from_string_number_literals": true,
       "test_from_string_ascii_alternatives": true,
       "test_from_string_errors": true,
       "test_from_string_round_trips": true,
@@ -1600,7 +1601,10 @@
       "enabled": true,
       "test_add_d": true,
       "test_mul_d": true,
-      "test_div_d": true
+      "test_div_d": true,
+      "test_add_num": true,
+      "test_mul_num": true,
+      "test_div_num": true
     }
   },
   "tests/dval/test_dval_unary_maths.c": {
@@ -1642,7 +1646,8 @@
       "test_ei": true,
       "test_e1": true,
       "test_beta": true,
-      "test_logbeta": true
+      "test_logbeta": true,
+      "test_pow_d_complex": true
     }
   },
   "tests/dval/test_dval_first_derivatives.c": {
@@ -1850,7 +1855,8 @@
       "test_from_expression_string_api": true,
       "test_from_string_implicit_symbolic_bindings": true,
       "test_from_string_bindings_api": true,
-      "test_from_string_name_normalization": true
+      "test_from_string_name_normalization": true,
+      "test_from_string_number_literals": true
     },
     "test_from_string_ascii_alternatives": {
       "enabled": true,
@@ -1881,7 +1887,26 @@
       "test_cmp_qfloat_precision": true,
       "test_get_val_updates_after_set": true,
       "test_simplify_inverse_unary_pairs": true,
-      "test_clone_detaches_mutation": true
+      "test_new_const_num": true,
+      "test_new_const_num_rational_complex": true,
+      "test_new_var_num_and_set_val_num": true,
+      "test_named_number_constructors": true,
+      "test_eval_num_on_expression": true,
+      "test_eval_num_function_values": true,
+      "test_eval_num_function_derivatives": true,
+      "test_high_precision_mfloat_function_values": true,
+      "test_high_precision_mfloat_function_derivatives": true,
+      "test_high_precision_mcomplex_function_values": true,
+      "test_set_val_num_named_constant": true,
+      "test_new_const_num_preserves_qfloat_precision": true,
+      "test_set_val_num_preserves_qfloat_precision": true,
+      "test_default_constants_preserve_qfloat_precision": true,
+      "test_new_const_num_preserves_mfloat_precision": true,
+      "test_set_val_num_preserves_mfloat_precision": true,
+      "test_new_const_num_preserves_mcomplex_precision": true,
+      "test_set_val_num_preserves_mcomplex_precision": true,
+      "test_eval_expression_preserves_mfloat_precision": true,
+      "test_eval_expression_preserves_mcomplex_precision": true
     }
   },
   "tests/dval/test_dval_reverse_mode.c": {
@@ -1890,7 +1915,9 @@
       "test_reverse_gradient_polynomial": true,
       "test_reverse_gradient_shared_subexpression": true,
       "test_reverse_matches_forward_composite": true,
-      "test_reverse_gradient_missing_variable": true
+      "test_reverse_gradient_missing_variable": true,
+      "test_reverse_gradient_polynomial_num": true,
+      "test_reverse_gradient_complex_number_t": true
     }
   },
   "tests/dval/test_dval_readme.c": {

@@ -441,7 +441,7 @@ static int mf_collect_expression_names(const char *expr, symbol_vec_t *symbols)
                                    has_default_value || dv_is_default_constant_name(name),
                                    has_default_value,
                                    has_default_value ? default_value
-                                                     : qc_make(QF_NAN, QF_NAN)) != 0) {
+                                                     : qc_make(QF_NAN, QF_ZERO)) != 0) {
                     free(name);
                     return -1;
                 }
@@ -757,8 +757,12 @@ static int mf_parse_binding_section(const char *text, symbol_vec_t *symbols)
             symbols->items[found].is_constant = in_constants;
             symbols->items[found].has_value = true;
             symbols->items[found].value = value;
-            if (symbols->items[found].symbol)
-                dv_set_val(symbols->items[found].symbol, value);
+            if (symbols->items[found].symbol) {
+                if (qf_eq(qc_imag(value), QF_ZERO))
+                    dv_num_set_qf(symbols->items[found].symbol, qc_real(value));
+                else
+                    dv_num_set_qc(symbols->items[found].symbol, value);
+            }
             free(name);
         } else {
             if (symbol_vec_add(symbols, name, in_constants, true, value) != 0) {
@@ -831,7 +835,7 @@ static int mf_seed_shared_symbols(symbol_vec_t *symbols,
                            name,
                            shared_bindings[i].is_constant,
                            false,
-                           qc_make(QF_NAN, QF_NAN)) != 0) {
+                           qc_make(QF_NAN, QF_ZERO)) != 0) {
             free(name);
             return -1;
         }
@@ -871,18 +875,29 @@ static int mf_build_symbolic_matrix(char **entries,
     for (size_t i = 0, active = 0; ok && i < symbols->count; ++i) {
         qcomplex_t init = symbols->items[i].has_value
                         ? symbols->items[i].value
-                        : qc_make(QF_NAN, QF_NAN);
+                        : qc_make(QF_NAN, QF_ZERO);
 
         if (!symbols->items[i].used_in_expr)
             continue;
 
         if (!symbols->items[i].symbol) {
-            symbols->items[i].symbol = symbols->items[i].is_constant
-                                     ? dv_new_named_const_qc(init, symbols->items[i].name)
-                                     : dv_new_named_var_qc(init, symbols->items[i].name);
+            if (qf_eq(qc_imag(init), QF_ZERO)) {
+                symbols->items[i].symbol = symbols->items[i].is_constant
+                                         ? dv_num_named_const_qf(qc_real(init),
+                                                                 symbols->items[i].name)
+                                         : dv_num_named_var_qf(qc_real(init),
+                                                               symbols->items[i].name);
+            } else {
+                symbols->items[i].symbol = symbols->items[i].is_constant
+                                         ? dv_num_named_const_qc(init, symbols->items[i].name)
+                                         : dv_num_named_var_qc(init, symbols->items[i].name);
+            }
             symbols->items[i].owns_symbol = true;
         } else if (symbols->items[i].has_value) {
-            dv_set_val(symbols->items[i].symbol, init);
+            if (qf_eq(qc_imag(init), QF_ZERO))
+                dv_num_set_qf(symbols->items[i].symbol, qc_real(init));
+            else
+                dv_num_set_qc(symbols->items[i].symbol, init);
         }
 
         if (!symbols->items[i].symbol)
@@ -1147,7 +1162,7 @@ int mat_binding_set_qf(binding_t *bindings, size_t number, const char *name, qfl
 
     if (!binding)
         return -1;
-    dv_set_val_qf(binding->symbol, value);
+    dv_num_set_qf(binding->symbol, value);
     return 0;
 }
 
@@ -1157,7 +1172,7 @@ int mat_binding_set_qc(binding_t *bindings, size_t number, const char *name, qco
 
     if (!binding)
         return -1;
-    dv_set_val(binding->symbol, value);
+    dv_num_set_qc(binding->symbol, value);
     return 0;
 }
 
@@ -1167,6 +1182,6 @@ int mat_binding_set_d(binding_t *bindings, size_t number, const char *name, doub
 
     if (!binding)
         return -1;
-    dv_set_val_d(binding->symbol, value);
+    dv_num_set_d(binding->symbol, value);
     return 0;
 }

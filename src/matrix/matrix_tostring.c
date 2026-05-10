@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
+#include <ctype.h>
 
 #include "matrix_internal.h"
 #include "internal/dval_internal.h"
@@ -15,6 +17,35 @@ typedef struct {
     char *name;
     char *value;
 } mt_binding_token_t;
+
+static int mt_value_is_nan(const char *value)
+{
+    size_t len;
+    char compact[256];
+    size_t j = 0;
+
+    if (!value)
+        return 0;
+
+    len = strlen(value);
+    if (len >= sizeof(compact))
+        return 0;
+
+    for (size_t i = 0; i < len; ++i) {
+        if (value[i] == ' ' || value[i] == '\t')
+            continue;
+        compact[j++] = (char)tolower((unsigned char)value[i]);
+    }
+    compact[j] = '\0';
+
+    if (strcmp(compact, "nan") == 0)
+        return 1;
+    if (strcmp(compact, "nan+0i") == 0 || strcmp(compact, "nan-0i") == 0)
+        return 1;
+    if (strcmp(compact, "nan+0.0i") == 0 || strcmp(compact, "nan-0.0i") == 0)
+        return 1;
+    return 0;
+}
 
 static int mb_reserve(mat_buf_t *b, size_t extra)
 {
@@ -298,7 +329,7 @@ static int mt_all_bindings_are_nan(char **var_bindings,
 
         if (mt_parse_binding_token(var_bindings[i], &token) != 0)
             return 0;
-        if (!strstr(token.value, "NAN") && !strstr(token.value, "nan")) {
+        if (!mt_value_is_nan(token.value)) {
             mt_free_binding_token(&token);
             return 0;
         }
@@ -310,7 +341,7 @@ static int mt_all_bindings_are_nan(char **var_bindings,
 
         if (mt_parse_binding_token(const_bindings[i], &token) != 0)
             return 0;
-        if (!strstr(token.value, "NAN") && !strstr(token.value, "nan")) {
+        if (!mt_value_is_nan(token.value)) {
             mt_free_binding_token(&token);
             return 0;
         }

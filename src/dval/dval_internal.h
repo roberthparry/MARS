@@ -101,12 +101,12 @@ typedef dval_t *(*dval_apply_unary_fn)(const dval_t *arg);
 typedef dval_t *(*dval_apply_binary_fn)(const dval_t *left, const dval_t *right);
 typedef dval_t *(*dval_simplify_fn)(const dval_t *tmpl, dval_t *a, dval_t *b);
 typedef int (*dval_fold_const_unary_fn)(qfloat_t in, qfloat_t *out);
-typedef void (*dval_reverse_fn)(const dval_t *dv, qfloat_t out_bar,
-                                qfloat_t *a_bar, qfloat_t *b_bar);
+typedef void (*dval_reverse_fn)(const dval_t *dv, const number_t *out_bar,
+                                number_t *a_bar, number_t *b_bar);
 
 typedef struct dval_ops {
-    /** Compute the primal value of the node. Returns a qcomplex_t by value. */
-    qcomplex_t  (*eval)(dval_t *dv);
+    /** Compute the primal value of the node. Returns an owning `number_t` by value. */
+    number_t  (*eval)(dval_t *dv);
 
     /** Build a new DAG node for the symbolic derivative. Returns owning (refcount=1). */
     dval_t *(*deriv)(dval_t *dv);
@@ -206,14 +206,14 @@ struct _dval_t {
     dval_t *a;
     dval_t *b;
 
-    qcomplex_t  c;
+    number_t  c;
 
-    qcomplex_t  x;
+    number_t  x;
     int       x_valid;
 
     /* epoch tracks the maximum variable generation seen at last evaluation.
-     * For variable nodes, incremented by dv_set_val(). For computed nodes,
-     * set to max(child epochs) after each recomputation. dv_eval() uses
+     * For variable nodes, incremented by `dv_set_val_num()`. For computed nodes,
+     * set to max(child epochs) after each recomputation. dv_eval_num() uses
      * this to detect stale caches automatically. */
     uint64_t  epoch;
 
@@ -307,10 +307,22 @@ extern const dval_ops_t ops_e1;
 
 dval_t *dv_pow_qf(const dval_t *a, qfloat_t exponent);
 dval_t *dv_alloc(const dval_ops_t *ops);
+dval_t *dv_make_const_num(number_t x);
+dval_t *dv_make_var_num(number_t x);
 dval_t *dv_make_const_qc(qcomplex_t x);
 dval_t *dv_make_var_qc(qcomplex_t x);
 qcomplex_t dv_qc_real_qf(qfloat_t x);
 qcomplex_t dv_qc_real_d(double x);
+qcomplex_t dv_qc_from_number(number_t x);
+number_t dv_number_from_qc(qcomplex_t z);
+int dv_get_default_constant_num(const char *name, number_t *value_out);
+int dv_try_get_const_real_qf(const dval_t *dv, qfloat_t *out);
+int dv_try_get_value_real_qf(const dval_t *dv, qfloat_t *out);
+void dv_store_const_qc(dval_t *dv, qcomplex_t value);
+void dv_store_value_qc(dval_t *dv, qcomplex_t value);
+void dv_store_const_num(dval_t *dv, number_t value);
+void dv_store_value_num(dval_t *dv, number_t value);
+number_t dv_eval_num_internal(const dval_t *dv);
 qcomplex_t dv_eval_qc_internal(const dval_t *dv);
 dval_t *dv_get_dx_internal(const dval_t *dv);
 const dval_t *dv_current_wrt_internal(void);
@@ -323,6 +335,35 @@ dval_t *dv_new_pow_qc_internal(const dval_t *a, qcomplex_t exponent);
 static inline int dv_qf_is_zero(qfloat_t x) { return qf_eq(x, QF_ZERO); }
 static inline int dv_qf_is_one(qfloat_t x) { return qf_eq(x, QF_ONE); }
 static inline int dv_qf_is_minus_one(qfloat_t x) { return qf_eq(x, qf_neg(QF_ONE)); }
+static inline qcomplex_t dv_const_qc(const dval_t *dv) { return dv_qc_from_number(dv->c); }
+static inline qcomplex_t dv_value_qc(const dval_t *dv) { return dv_qc_from_number(dv->x); }
+static inline qfloat_t dv_const_real_qf(const dval_t *dv)
+{
+    qfloat_t value;
+
+    return dv_try_get_const_real_qf(dv, &value) ? value : QF_NAN;
+}
+
+static inline qfloat_t dv_value_real_qf(const dval_t *dv)
+{
+    qfloat_t value;
+
+    return dv_try_get_value_real_qf(dv, &value) ? value : QF_NAN;
+}
+static inline int dv_const_is_zero(const dval_t *dv)
+{
+    return dv && dv->ops == &ops_const && num_eq(dv->c, NUM_ZERO);
+}
+
+static inline int dv_const_is_one(const dval_t *dv)
+{
+    return dv && dv->ops == &ops_const && num_eq(dv->c, NUM_ONE);
+}
+
+static inline int dv_const_is_minus_one(const dval_t *dv)
+{
+    return dv && dv->ops == &ops_const && num_eq(dv->c, NUM_NEG_ONE);
+}
 
 static inline int dv_is_op(const dval_t *dv, const dval_ops_t *ops)
 {
@@ -389,49 +430,49 @@ int dv_fold_exp_const(qfloat_t in, qfloat_t *out);
 int dv_fold_log_const(qfloat_t in, qfloat_t *out);
 int dv_fold_sqrt_const(qfloat_t in, qfloat_t *out);
 
-void dv_reverse_atom(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar);
-void dv_reverse_add(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar);
-void dv_reverse_sub(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar);
-void dv_reverse_mul(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar);
-void dv_reverse_div(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar);
-void dv_reverse_pow(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar);
-void dv_reverse_pow_d(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar);
-void dv_reverse_atan2(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar);
-void dv_reverse_neg(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar);
-void dv_reverse_sin(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar);
-void dv_reverse_cos(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar);
-void dv_reverse_tan(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar);
-void dv_reverse_sinh(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar);
-void dv_reverse_cosh(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar);
-void dv_reverse_tanh(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar);
-void dv_reverse_asin(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar);
-void dv_reverse_acos(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar);
-void dv_reverse_atan(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar);
-void dv_reverse_asinh(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar);
-void dv_reverse_acosh(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar);
-void dv_reverse_atanh(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar);
-void dv_reverse_exp(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar);
-void dv_reverse_log(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar);
-void dv_reverse_sqrt(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar);
-void dv_reverse_abs(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar);
-void dv_reverse_hypot(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar);
-void dv_reverse_erf(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar);
-void dv_reverse_erfc(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar);
-void dv_reverse_erfinv(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar);
-void dv_reverse_erfcinv(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar);
-void dv_reverse_gamma(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar);
-void dv_reverse_lgamma(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar);
-void dv_reverse_digamma(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar);
-void dv_reverse_trigamma(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar);
-void dv_reverse_lambert_w0(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar);
-void dv_reverse_lambert_wm1(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar);
-void dv_reverse_normal_pdf(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar);
-void dv_reverse_normal_cdf(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar);
-void dv_reverse_normal_logpdf(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar);
-void dv_reverse_ei(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar);
-void dv_reverse_e1(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar);
-void dv_reverse_beta(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar);
-void dv_reverse_logbeta(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar);
+void dv_reverse_atom(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_add(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_sub(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_mul(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_div(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_pow(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_pow_d(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_atan2(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_neg(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_sin(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_cos(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_tan(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_sinh(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_cosh(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_tanh(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_asin(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_acos(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_atan(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_asinh(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_acosh(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_atanh(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_exp(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_log(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_sqrt(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_abs(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_hypot(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_erf(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_erfc(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_erfinv(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_erfcinv(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_gamma(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_lgamma(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_digamma(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_trigamma(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_lambert_w0(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_lambert_wm1(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_normal_pdf(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_normal_cdf(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_normal_logpdf(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_ei(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_e1(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_beta(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_logbeta(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 
 /**
  * @brief Simplify a differentiable value node using algebraic identities.

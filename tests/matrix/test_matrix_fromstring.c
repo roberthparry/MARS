@@ -65,7 +65,7 @@ static void test_mat_from_string_symbolic_wrapped(void)
         check_qf_val("wrapped symbolic A[1,1] initial",
                      dv_eval_qf(dv), qf_from_double(3.0), 1e-18);
         if (c_binding)
-            dv_set_val_qf(c_binding->symbol, qf_from_double(5.0));
+            test_dv_set_val_qf(c_binding->symbol, qf_from_double(5.0));
         check_qf_val("wrapped symbolic A[1,1] tracks binding update",
                      dv_eval_qf(dv), qf_from_double(5.0), 1e-18);
     }

@@ -32,7 +32,7 @@ static qfloat_t eval_nd_t15(const multi_ctx_t *ctx, int dim, size_t dmask,
     qfloat_t h2  = qf_mul(h, h);
     size_t   bit = (size_t)1 << dim;
 
-    dv_set_val_qf(ctx->vars[dim], c);
+    ig_dv_set_val_qf(ctx->vars[dim], c);
     qfloat_t F0   = eval_nd_t15(ctx, dim-1, dmask,       ctx->lo[dim-1], ctx->hi[dim-1]);
     qfloat_t Fpp0 = ctx->all_same ? F0
                   : eval_nd_t15(ctx, dim-1, dmask | bit, ctx->lo[dim-1], ctx->hi[dim-1]);
@@ -40,11 +40,11 @@ static qfloat_t eval_nd_t15(const multi_ctx_t *ctx, int dim, size_t dmask,
     qfloat_t Fpos[7], Fneg[7], Fpppos[7], Fppneg[7];
     for (int i = 0; i < 7; i++) {
         qfloat_t ht = qf_mul(h, tn_node[i + 1]);
-        dv_set_val_qf(ctx->vars[dim], qf_add(c, ht));
+        ig_dv_set_val_qf(ctx->vars[dim], qf_add(c, ht));
         Fpos[i]   = eval_nd_t15(ctx, dim-1, dmask,       ctx->lo[dim-1], ctx->hi[dim-1]);
         Fpppos[i] = ctx->all_same ? Fpos[i]
                   : eval_nd_t15(ctx, dim-1, dmask | bit, ctx->lo[dim-1], ctx->hi[dim-1]);
-        dv_set_val_qf(ctx->vars[dim], qf_sub(c, ht));
+        ig_dv_set_val_qf(ctx->vars[dim], qf_sub(c, ht));
         Fneg[i]   = eval_nd_t15(ctx, dim-1, dmask,       ctx->lo[dim-1], ctx->hi[dim-1]);
         Fppneg[i] = ctx->all_same ? Fneg[i]
                   : eval_nd_t15(ctx, dim-1, dmask | bit, ctx->lo[dim-1], ctx->hi[dim-1]);
@@ -74,7 +74,7 @@ static void eval_nd_turan(const multi_ctx_t *ctx, int dim, size_t dmask,
     qfloat_t h2  = qf_mul(h, h);
     size_t   bit = (size_t)1 << dim;
 
-    dv_set_val_qf(ctx->vars[dim], c);
+    ig_dv_set_val_qf(ctx->vars[dim], c);
     qfloat_t F0   = eval_nd_t15(ctx, dim-1, dmask,       ctx->lo[dim-1], ctx->hi[dim-1]);
     qfloat_t Fpp0 = ctx->all_same ? F0
                   : eval_nd_t15(ctx, dim-1, dmask | bit, ctx->lo[dim-1], ctx->hi[dim-1]);
@@ -82,11 +82,11 @@ static void eval_nd_turan(const multi_ctx_t *ctx, int dim, size_t dmask,
     qfloat_t Fpos[7], Fneg[7], Fpppos[7], Fppneg[7];
     for (int i = 0; i < 7; i++) {
         qfloat_t ht = qf_mul(h, tn_node[i + 1]);
-        dv_set_val_qf(ctx->vars[dim], qf_add(c, ht));
+        ig_dv_set_val_qf(ctx->vars[dim], qf_add(c, ht));
         Fpos[i]   = eval_nd_t15(ctx, dim-1, dmask,       ctx->lo[dim-1], ctx->hi[dim-1]);
         Fpppos[i] = ctx->all_same ? Fpos[i]
                   : eval_nd_t15(ctx, dim-1, dmask | bit, ctx->lo[dim-1], ctx->hi[dim-1]);
-        dv_set_val_qf(ctx->vars[dim], qf_sub(c, ht));
+        ig_dv_set_val_qf(ctx->vars[dim], qf_sub(c, ht));
         Fneg[i]   = eval_nd_t15(ctx, dim-1, dmask,       ctx->lo[dim-1], ctx->hi[dim-1]);
         Fppneg[i] = ctx->all_same ? Fneg[i]
                   : eval_nd_t15(ctx, dim-1, dmask | bit, ctx->lo[dim-1], ctx->hi[dim-1]);
@@ -148,10 +148,10 @@ int ig_integral_multi(integrator_t *ig, dval_t *expr,
         static const double tp[2] = { 0.31415, 0.71828 };
         for (int t = 0; t < 2 && all_same; t++) {
             for (size_t v = 0; v < ndim; v++)
-                dv_set_val_qf(vars[v], qf_from_double(tp[t]));
-            qfloat_t ref = dv_eval_qf(deriv_exprs[0]);
+                ig_dv_set_val_qf(vars[v], qf_from_double(tp[t]));
+            qfloat_t ref = ig_dv_eval_qf(deriv_exprs[0]);
             for (size_t mask = 1; mask < nexprs && all_same; mask++) {
-                if (!qf_eq(ref, dv_eval_qf(deriv_exprs[mask])))
+                if (!qf_eq(ref, ig_dv_eval_qf(deriv_exprs[mask])))
                     all_same = 0;
             }
         }

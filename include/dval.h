@@ -3,8 +3,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
-#include "qfloat.h"
-#include "qcomplex.h"
+#include "number.h"
 
 /**
  * @file dval.h
@@ -55,69 +54,60 @@ extern const dval_t * const DV_ONE;
 /* ------------------------------------------------------------------------- */
 
 /**
- * @brief Create a constant node from a double, qfloat_t, or qcomplex_t value.
+ * @brief Create a constant node from a `number_t` value.
  *
  * Constants have no variable binding; their derivative is always zero.
  * Returns an owning handle; caller must call dv_free() exactly once.
  */
-dval_t *dv_new_const_d(double x);
-dval_t *dv_new_const(qfloat_t x);
-dval_t *dv_new_const_qc(qcomplex_t x);
+dval_t *dv_new_const_num(number_t x);
 
 /**
  * @brief Create a named constant node.
  *
- * Behaves like dv_new_const() but attaches a symbolic name used in
+ * Behaves like `dv_new_const_num()` but attaches a symbolic name used in
  * dv_to_string() output and debug printing. @p name is copied.
  * Returns an owning handle; caller must call dv_free() exactly once.
  */
-dval_t *dv_new_named_const(qfloat_t x, const char *name);
-dval_t *dv_new_named_const_qc(qcomplex_t x, const char *name);
-dval_t *dv_new_named_const_d(double x, const char *name);
+dval_t *dv_new_named_const_num(number_t x, const char *name);
 
 /* ------------------------------------------------------------------------- */
 /* Constructors — variables                                                  */
 /* ------------------------------------------------------------------------- */
 
 /**
- * @brief Create a variable node from a double, qfloat_t, or qcomplex_t value.
+ * @brief Create a variable node from a `number_t` value.
  *
- * Variables are leaf nodes whose value can be updated via dv_set_val().
+ * Variables are leaf nodes whose value can be updated via `dv_set_val_num()`.
  * Derivative of a variable with respect to itself is 1.
  * Returns an owning handle; caller must call dv_free() exactly once.
  */
-dval_t *dv_new_var_d(double x);
-dval_t *dv_new_var(qfloat_t x);
-dval_t *dv_new_var_qc(qcomplex_t x);
+dval_t *dv_new_var_num(number_t x);
 
 /**
  * @brief Create a named variable node.
  *
- * Behaves like dv_new_var() but attaches a symbolic name used in
+ * Behaves like `dv_new_var_num()` but attaches a symbolic name used in
  * dv_to_string() output and debug printing. @p name is copied.
  * Returns an owning handle; caller must call dv_free() exactly once.
  */
-dval_t *dv_new_named_var(qfloat_t x, const char *name);
-dval_t *dv_new_named_var_qc(qcomplex_t x, const char *name);
-dval_t *dv_new_named_var_d(double x, const char *name);
+dval_t *dv_new_named_var_num(number_t x, const char *name);
 
 /* ------------------------------------------------------------------------- */
 /* Mutators                                                                  */
 /* ------------------------------------------------------------------------- */
 
 /**
- * @brief Update the value of a variable node.
+ * @brief Update the value of a variable or named-constant node.
  *
  * Sets the node's value and advances the node's internal epoch counter.
- * The next call to dv_eval() on any expression that depends on @p dv will
+ * The next call to dv_eval_num() on any expression that depends on @p dv will
  * automatically detect the change and recompute. Calling dv_invalidate()
- * before dv_eval() is no longer required.
+ * before dv_eval_num() is no longer required.
  *
- * @p dv must be a variable node (created with dv_new_var or dv_new_named_var).
+ * @p dv must be a variable node (created with `dv_new_var_num()` or
+ * `dv_new_named_var_num()`) or a named constant node.
  */
-void dv_set_val(dval_t *dv, qcomplex_t value);
-void dv_set_val_qf(dval_t *dv, qfloat_t value);
-void dv_set_val_d(dval_t *dv, double value);
+void dv_set_val_num(dval_t *dv, number_t value);
 
 /**
  * @brief Attach or replace the symbolic name of a node.
@@ -131,15 +121,13 @@ void dv_set_name(dval_t *dv, const char *name);
 /* ------------------------------------------------------------------------- */
 
 /**
- * @brief Return the current primal value of a node.
+ * @brief Return the current primal value of a node as an owning `number_t`.
  *
  * This function evaluates the node if required and returns the current
- * primal value. Use dv_eval() when you want that intent to be explicit;
+ * primal value. Use dv_eval_num() when you want that intent to be explicit;
  * these accessors are convenient value-returning wrappers.
  */
-double dv_get_val_d(const dval_t *dv);
-qfloat_t dv_get_val_qf(const dval_t *dv);
-qcomplex_t dv_get_val(const dval_t *dv);
+number_t dv_get_val_num(const dval_t *dv);
 
 /**
  * @brief Get the derivative ∂expr/∂wrt (borrowed).
@@ -160,9 +148,7 @@ const dval_t *dv_get_deriv(const dval_t *expr, const dval_t *wrt);
  * Traverses the DAG recursively, recomputing any nodes whose cache is
  * stale. The result is stored in the node's cache and returned.
  */
-qcomplex_t dv_eval(const dval_t *dv);
-qfloat_t dv_eval_qf(const dval_t *dv);
-double dv_eval_d(const dval_t *dv);
+number_t dv_eval_num(const dval_t *dv);
 
 /**
  * @brief Evaluate a scalar expression and compute derivatives with respect to
@@ -181,15 +167,20 @@ double dv_eval_d(const dval_t *dv);
  * @param expr       Expression whose value and derivatives are required.
  * @param nvars      Number of entries in @p vars and @p derivs_out.
  * @param vars       Variable nodes with respect to which derivatives are taken.
- * @param value_out  Optional destination for the primal value of @p expr.
- * @param derivs_out Output array of length @p nvars for derivative values.
- * @return           0 on success, non-zero on invalid input.
+ * @param value_out  Optional destination for the owning primal value of @p expr.
+ * @param derivs_out Optional output array of length @p nvars for owning
+ *                   derivative values.
+ * @return           0 on success, non-zero on invalid input or allocation
+ *                   failure while building the result array.
+ *
+ * On success, any non-NULL outputs receive owning `number_t` values that the
+ * caller must later release with num_destroy().
  */
 int dv_eval_derivatives(const dval_t *expr,
                         size_t nvars,
                         const dval_t *const *vars,
-                        qfloat_t *value_out,
-                        qfloat_t *derivs_out);
+                        number_t *value_out,
+                        number_t *derivs_out);
 
 /* ------------------------------------------------------------------------- */
 /* Derivative creation (owning)                                              */
@@ -198,7 +189,8 @@ int dv_eval_derivatives(const dval_t *expr,
 /**
  * @brief Build a new DAG node representing a derivative of @p expr w.r.t. @p wrt.
  *
- * @p wrt must be a variable node (created with dv_new_var or dv_new_named_var)
+ * @p wrt must be a variable node (created with `dv_new_var_num()` or
+ * `dv_new_named_var_num()`)
  * that appears in the expression DAG rooted at @p expr.  Only the nominated
  * variable contributes a derivative of 1; all other variable nodes contribute 0.
  *
@@ -224,8 +216,9 @@ dval_t *dv_create_nth_deriv(unsigned int n, const dval_t *expr, const dval_t *wr
  * and return an owning handle. Arguments are retained (not consumed); the
  * caller remains responsible for freeing its own handles.
  *
- * _d variants accept a plain double for the scalar operand; d_sub and d_div
- * treat the double as the left-hand operand (d - dv and d / dv).
+ * _num variants borrow a scalar `number_t` pointer and do not consume or
+ * modify the pointed-to value; num_sub and num_div treat the scalar as the
+ * left-hand operand (`value - dv` and `value / dv`).
  */
 dval_t *dv_neg(const dval_t *dv);
 dval_t *dv_add(const dval_t *dv1, const dval_t *dv2);
@@ -233,12 +226,12 @@ dval_t *dv_sub(const dval_t *dv1, const dval_t *dv2);
 dval_t *dv_mul(const dval_t *dv1, const dval_t *dv2);
 dval_t *dv_div(const dval_t *dv1, const dval_t *dv2);
 
-dval_t *dv_add_d(const dval_t *dv, double d);
-dval_t *dv_sub_d(const dval_t *dv, double d);
-dval_t *dv_d_sub(double d, const dval_t *dv);
-dval_t *dv_mul_d(const dval_t *dv, double d);
-dval_t *dv_div_d(const dval_t *dv, double d);
-dval_t *dv_d_div(double d, const dval_t *dv);
+dval_t *dv_add_num(const dval_t *dv, const number_t *value);
+dval_t *dv_sub_num(const dval_t *dv, const number_t *value);
+dval_t *dv_num_sub(const number_t *value, const dval_t *dv);
+dval_t *dv_mul_num(const dval_t *dv, const number_t *value);
+dval_t *dv_div_num(const dval_t *dv, const number_t *value);
+dval_t *dv_num_div(const number_t *value, const dval_t *dv);
 
 /* ------------------------------------------------------------------------- */
 /* Comparison                                                                */
@@ -247,8 +240,8 @@ dval_t *dv_d_div(double d, const dval_t *dv);
 /**
  * @brief Compare the primal values of two nodes.
  *
- * Forces evaluation of both nodes, then compares their `qcomplex_t` primal
- * values lexicographically: real part first, then imaginary part.
+ * Forces evaluation of both nodes, then compares their primal values
+ * lexicographically: real part first, then imaginary part.
  * Returns -1 if dv1 < dv2, 0 if equal, +1 if dv1 > dv2.
  */
 int dv_cmp(const dval_t *dv1, const dval_t *dv2);
@@ -261,8 +254,8 @@ int dv_cmp(const dval_t *dv1, const dval_t *dv2);
  * All elementary functions build a new DAG node and return an owning handle.
  * Arguments are retained (not consumed).
  *
- * dv_pow_d(dv, d) computes dv^d for a constant double exponent.
- * dv_pow_qc(dv, z) computes dv^z for a constant complex exponent.
+ * dv_pow_num(dv, exponent) computes dv^exponent for a constant scalar
+ * exponent supplied as a borrowed `number_t`.
  * dv_pow(dv1, dv2) computes dv1^dv2 where both operands are differentiable.
  */
 dval_t *dv_sin(const dval_t *dv);
@@ -281,8 +274,7 @@ dval_t *dv_atanh(const dval_t *dv);
 dval_t *dv_exp(const dval_t *dv);
 dval_t *dv_log(const dval_t *dv);
 dval_t *dv_sqrt(const dval_t *dv);
-dval_t *dv_pow_d(const dval_t *dv, double d);
-dval_t *dv_pow_qc(const dval_t *dv, qcomplex_t z);
+dval_t *dv_pow_num(const dval_t *dv, const number_t *exponent);
 dval_t *dv_pow(const dval_t *dv1, const dval_t *dv2);
 
 /* ------------------------------------------------------------------------- */
@@ -458,28 +450,15 @@ dval_binding_t *dval_binding_find(dval_binding_t *bindings,
                                   const char *name);
 
 /**
- * @brief Set a returned symbolic binding from a qfloat_t value.
+ * @brief Set a returned symbolic binding from a `number_t` value.
+ *
+ * @p value is passed by value and cloned into the binding target.
+ * Returns 0 on success, or -1 if no binding named @p name exists.
  */
-int dval_binding_set_qf(dval_binding_t *bindings,
-                        size_t number,
-                        const char *name,
-                        qfloat_t value);
-
-/**
- * @brief Set a returned symbolic binding from a qcomplex_t value.
- */
-int dval_binding_set_qc(dval_binding_t *bindings,
-                        size_t number,
-                        const char *name,
-                        qcomplex_t value);
-
-/**
- * @brief Set a returned symbolic binding from a double value.
- */
-int dval_binding_set_d(dval_binding_t *bindings,
-                       size_t number,
-                       const char *name,
-                       double value);
+int dval_binding_set_num(dval_binding_t *bindings,
+                         size_t number,
+                         const char *name,
+                         number_t value);
 
 /**
  * @brief Construct a dval_t from a bare expression string using supplied symbols.

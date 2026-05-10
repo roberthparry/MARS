@@ -1,8 +1,10 @@
 #include "number.h"
 #include "number_internal.h"
 
+#include <errno.h>
 #include <limits.h>
 #include <math.h>
+#include <stdlib.h>
 
 typedef qfloat_t (*number_qfloat_unary_fn)(qfloat_t);
 typedef qcomplex_t (*number_qcomplex_unary_fn)(qcomplex_t);
@@ -65,25 +67,42 @@ static int number_try_get_pure_imag(const number_t number,
 
 static int number_try_get_exact_int(const number_t number, int *out)
 {
+    char *text;
+    char *end;
+    long parsed;
     uint64_t mantissa;
     long exponent2;
     int sign;
     int value;
 
     if (!out || !num_is_integer(number) || !num_is_real(number) ||
-        !num_is_finite(number) || !num_get_mantissa_u64(number, &mantissa))
+        !num_is_finite(number))
         return 0;
 
-    exponent2 = num_get_exponent2(number);
-    if (exponent2 < 0 || exponent2 >= (long)(sizeof(int) * 8u - 1u) ||
-        mantissa > ((uint64_t)INT_MAX >> exponent2))
-        return 0;
+    if (num_get_mantissa_u64(number, &mantissa)) {
+        exponent2 = num_get_exponent2(number);
+        if (exponent2 < 0 || exponent2 >= (long)(sizeof(int) * 8u - 1u) ||
+            mantissa > ((uint64_t)INT_MAX >> exponent2))
+            return 0;
 
-    value = (int)(mantissa << exponent2);
-    sign = num_get_sign(number);
-    if (sign < 0)
-        value = -value;
-    *out = value;
+        value = (int)(mantissa << exponent2);
+        sign = num_get_sign(number);
+        if (sign < 0)
+            value = -value;
+        *out = value;
+        return 1;
+    }
+
+    text = num_to_string(number);
+    if (!text)
+        return 0;
+    errno = 0;
+    parsed = strtol(text, &end, 10);
+    free(text);
+    if (errno != 0 || !end || *end != '\0' ||
+        parsed < (long)INT_MIN || parsed > (long)INT_MAX)
+        return 0;
+    *out = (int)parsed;
     return 1;
 }
 
@@ -726,8 +745,6 @@ number_t num_pow(const number_t base, const number_t exponent)
     number_t quarter;
     number_t eighth;
     number_t root;
-    uint64_t mantissa;
-    long exponent2;
     int exp_int;
 
     if (!number_is_valid_value(&base) || !number_is_valid_value(&exponent))
@@ -765,17 +782,8 @@ number_t num_pow(const number_t base, const number_t exponent)
         return result;
     }
 
-    if (num_is_integer(exponent) && num_is_real(exponent) &&
-        num_is_finite(exponent) && num_get_mantissa_u64(exponent, &mantissa)) {
-        exponent2 = num_get_exponent2(exponent);
-        if (exponent2 >= 0 && exponent2 < (long)(sizeof(int) * 8u - 1u) &&
-            mantissa <= ((uint64_t)INT_MAX >> exponent2)) {
-            exp_int = (int)(mantissa << exponent2);
-            if (num_get_sign(exponent) < 0)
-                exp_int = -exp_int;
-            return num_pow_int(base, exp_int);
-        }
-    }
+    if (number_try_get_exact_int(exponent, &exp_int))
+        return num_pow_int(base, exp_int);
 
     return number_apply_binary_math(base, exponent, qf_pow, qc_pow, mf_pow, mc_pow);
 }
@@ -819,6 +827,10 @@ number_t num_ldexp(const number_t number, int exponent2)
 
 number_t num_sqr(const number_t number)
 {
+    if (!number_is_valid_value(&number))
+        return number_invalid();
+    if (!num_is_real(number))
+        return num_mul(number, number);
     return number_apply_unary_math(number, qf_sqr, NULL, mf_sqr, NULL);
 }
 
@@ -1111,7 +1123,7 @@ number_t num_gamma(const number_t number)
 
 number_t num_lgamma(const number_t number)
 {
-    return number_apply_unary_math(number, NULL, NULL, mf_lgamma, mc_lgamma);
+    return number_apply_unary_math(number, qf_lgamma, qc_lgamma, mf_lgamma, mc_lgamma);
 }
 
 number_t num_digamma(const number_t number)

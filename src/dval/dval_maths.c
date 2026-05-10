@@ -2,20 +2,15 @@
 
 #include "dval_math_internal.h"
 
-static inline qcomplex_t dv_eval_unary_qc(dval_t *dv, qcomplex_t (*fn)(qcomplex_t))
+static inline number_t dv_eval_unary_num(dval_t *dv, number_t (*fn)(const number_t))
 {
-    return fn(dv_eval_qc_internal(dv->a));
+    return fn(dv_eval_num_internal(dv->a));
 }
 
-static inline qcomplex_t dv_eval_unary_real(dval_t *dv, qfloat_t (*fn)(qcomplex_t))
+static inline number_t dv_eval_binary_num(
+    dval_t *dv, number_t (*fn)(const number_t, const number_t))
 {
-    return dv_qc_real_qf(fn(dv_eval_qc_internal(dv->a)));
-}
-
-static inline qcomplex_t dv_eval_binary_qc(
-    dval_t *dv, qcomplex_t (*fn)(qcomplex_t, qcomplex_t))
-{
-    return fn(dv_eval_qc_internal(dv->a), dv_eval_qc_internal(dv->b));
+    return fn(dv_eval_num_internal(dv->a), dv_eval_num_internal(dv->b));
 }
 
 static dval_t *dv_chain_rule_with_factor(const dval_t *dv, dval_t *factor)
@@ -27,62 +22,60 @@ static dval_t *dv_chain_rule_with_factor(const dval_t *dv, dval_t *factor)
     return out;
 }
 
-qcomplex_t eval_sin(dval_t *dv) { return dv_eval_unary_qc(dv, qc_sin); }
-qcomplex_t eval_cos(dval_t *dv) { return dv_eval_unary_qc(dv, qc_cos); }
-qcomplex_t eval_tan(dval_t *dv) { return dv_eval_unary_qc(dv, qc_tan); }
+number_t eval_sin(dval_t *dv) { return dv_eval_unary_num(dv, num_sin); }
+number_t eval_cos(dval_t *dv) { return dv_eval_unary_num(dv, num_cos); }
+number_t eval_tan(dval_t *dv) { return dv_eval_unary_num(dv, num_tan); }
 
-qcomplex_t eval_sinh(dval_t *dv) { return dv_eval_unary_qc(dv, qc_sinh); }
-qcomplex_t eval_cosh(dval_t *dv) { return dv_eval_unary_qc(dv, qc_cosh); }
-qcomplex_t eval_tanh(dval_t *dv) { return dv_eval_unary_qc(dv, qc_tanh); }
+number_t eval_sinh(dval_t *dv) { return dv_eval_unary_num(dv, num_sinh); }
+number_t eval_cosh(dval_t *dv) { return dv_eval_unary_num(dv, num_cosh); }
+number_t eval_tanh(dval_t *dv) { return dv_eval_unary_num(dv, num_tanh); }
 
-qcomplex_t eval_asin(dval_t *dv) { return dv_eval_unary_qc(dv, qc_asin); }
-qcomplex_t eval_acos(dval_t *dv) { return dv_eval_unary_qc(dv, qc_acos); }
-qcomplex_t eval_atan(dval_t *dv) { return dv_eval_unary_qc(dv, qc_atan); }
+number_t eval_asin(dval_t *dv) { return dv_eval_unary_num(dv, num_asin); }
+number_t eval_acos(dval_t *dv) { return dv_eval_unary_num(dv, num_acos); }
+number_t eval_atan(dval_t *dv) { return dv_eval_unary_num(dv, num_atan); }
 
-qcomplex_t eval_asinh(dval_t *dv) { return dv_eval_unary_qc(dv, qc_asinh); }
-qcomplex_t eval_acosh(dval_t *dv) { return dv_eval_unary_qc(dv, qc_acosh); }
-qcomplex_t eval_atanh(dval_t *dv) { return dv_eval_unary_qc(dv, qc_atanh); }
+number_t eval_asinh(dval_t *dv) { return dv_eval_unary_num(dv, num_asinh); }
+number_t eval_acosh(dval_t *dv) { return dv_eval_unary_num(dv, num_acosh); }
+number_t eval_atanh(dval_t *dv) { return dv_eval_unary_num(dv, num_atanh); }
 
-qcomplex_t eval_exp(dval_t *dv) { return dv_eval_unary_qc(dv, qc_exp); }
-qcomplex_t eval_log(dval_t *dv) { return dv_eval_unary_qc(dv, qc_log); }
-qcomplex_t eval_sqrt(dval_t *dv) { return dv_eval_unary_qc(dv, qc_sqrt); }
-qcomplex_t eval_abs(dval_t *dv) { return dv_eval_unary_real(dv, qc_abs); }
-qcomplex_t eval_erf(dval_t *dv) { return dv_eval_unary_qc(dv, qc_erf); }
-qcomplex_t eval_erfc(dval_t *dv) { return dv_eval_unary_qc(dv, qc_erfc); }
-qcomplex_t eval_lgamma(dval_t *dv) { return dv_eval_unary_qc(dv, qc_lgamma); }
-qcomplex_t eval_erfinv(dval_t *dv) { return dv_eval_unary_qc(dv, qc_erfinv); }
-qcomplex_t eval_erfcinv(dval_t *dv) { return dv_eval_unary_qc(dv, qc_erfcinv); }
-qcomplex_t eval_gamma(dval_t *dv) { return dv_eval_unary_qc(dv, qc_gamma); }
-qcomplex_t eval_digamma(dval_t *dv) { return dv_eval_unary_qc(dv, qc_digamma); }
-qcomplex_t eval_trigamma(dval_t *dv) { return dv_eval_unary_qc(dv, qc_trigamma); }
-qcomplex_t eval_lambert_w0(dval_t *dv) { return dv_eval_unary_qc(dv, qc_productlog); }
-qcomplex_t eval_lambert_wm1(dval_t *dv) { return dv_eval_unary_qc(dv, qc_lambert_wm1); }
-qcomplex_t eval_normal_pdf(dval_t *dv) { return dv_eval_unary_qc(dv, qc_normal_pdf); }
-qcomplex_t eval_normal_cdf(dval_t *dv) { return dv_eval_unary_qc(dv, qc_normal_cdf); }
-qcomplex_t eval_normal_logpdf(dval_t *dv) { return dv_eval_unary_qc(dv, qc_normal_logpdf); }
-qcomplex_t eval_ei(dval_t *dv) { return dv_eval_unary_qc(dv, qc_ei); }
-qcomplex_t eval_e1(dval_t *dv) { return dv_eval_unary_qc(dv, qc_e1); }
+number_t eval_exp(dval_t *dv) { return dv_eval_unary_num(dv, num_exp); }
+number_t eval_log(dval_t *dv) { return dv_eval_unary_num(dv, num_log); }
+number_t eval_sqrt(dval_t *dv) { return dv_eval_unary_num(dv, num_sqrt); }
+number_t eval_abs(dval_t *dv) { return dv_eval_unary_num(dv, num_abs); }
+number_t eval_erf(dval_t *dv) { return dv_eval_unary_num(dv, num_erf); }
+number_t eval_erfc(dval_t *dv) { return dv_eval_unary_num(dv, num_erfc); }
+number_t eval_lgamma(dval_t *dv) { return dv_eval_unary_num(dv, num_lgamma); }
+number_t eval_erfinv(dval_t *dv) { return dv_eval_unary_num(dv, num_erfinv); }
+number_t eval_erfcinv(dval_t *dv) { return dv_eval_unary_num(dv, num_erfcinv); }
+number_t eval_gamma(dval_t *dv) { return dv_eval_unary_num(dv, num_gamma); }
+number_t eval_digamma(dval_t *dv) { return dv_eval_unary_num(dv, num_digamma); }
+number_t eval_trigamma(dval_t *dv) { return dv_eval_unary_num(dv, num_trigamma); }
+number_t eval_lambert_w0(dval_t *dv) { return dv_eval_unary_num(dv, num_lambert_w0); }
+number_t eval_lambert_wm1(dval_t *dv) { return dv_eval_unary_num(dv, num_lambert_wm1); }
+number_t eval_normal_pdf(dval_t *dv) { return dv_eval_unary_num(dv, num_normal_pdf); }
+number_t eval_normal_cdf(dval_t *dv) { return dv_eval_unary_num(dv, num_normal_cdf); }
+number_t eval_normal_logpdf(dval_t *dv) { return dv_eval_unary_num(dv, num_normal_logpdf); }
+number_t eval_ei(dval_t *dv) { return dv_eval_unary_num(dv, num_ei); }
+number_t eval_e1(dval_t *dv) { return dv_eval_unary_num(dv, num_e1); }
 
-qcomplex_t eval_hypot(dval_t *dv)
+number_t eval_hypot(dval_t *dv)
 {
-    return dv_eval_binary_qc(dv, qc_hypot);
+    return dv_eval_binary_num(dv, num_hypot);
 }
 
-qcomplex_t eval_beta(dval_t *dv)
+number_t eval_beta(dval_t *dv)
 {
-    return dv_eval_binary_qc(dv, qc_beta);
+    return dv_eval_binary_num(dv, num_beta);
 }
 
-qcomplex_t eval_logbeta(dval_t *dv)
+number_t eval_logbeta(dval_t *dv)
 {
-    return dv_eval_binary_qc(dv, qc_logbeta);
+    return dv_eval_binary_num(dv, num_logbeta);
 }
 
-qcomplex_t eval_atan2(dval_t *dv)
+number_t eval_atan2(dval_t *dv)
 {
-    qcomplex_t fy = dv_eval_qc_internal(dv->a);
-    qcomplex_t gx = dv_eval_qc_internal(dv->b);
-    return qc_atan2(fy, gx);
+    return num_atan2(dv_eval_num_internal(dv->a), dv_eval_num_internal(dv->b));
 }
 
 dval_t *deriv_sin(dval_t *dv)
@@ -107,7 +100,7 @@ dval_t *deriv_tan(dval_t *dv)
     dval_t *da  = dv_get_dx_internal(dv->a);
     dval_t *t   = dv_tan(dv->a);
     dval_t *t2  = dv_pow_d(t, 2.0);
-    dval_t *one = dv_new_const_d(1.0);
+    dval_t *one = dv_num_const_d(1.0);
     dval_t *fac = dv_add(one, t2);
     dval_t *out = dv_mul(fac, da);
     dv_free(da);
@@ -133,7 +126,7 @@ dval_t *deriv_tanh(dval_t *dv)
     dval_t *da  = dv_get_dx_internal(dv->a);
     dval_t *t   = dv_tanh(dv->a);
     dval_t *t2  = dv_pow_d(t, 2.0);
-    dval_t *one = dv_new_const_d(1.0);
+    dval_t *one = dv_num_const_d(1.0);
     dval_t *fac = dv_sub(one, t2);
     dval_t *out = dv_mul(fac, da);
     dv_free(da);
@@ -160,7 +153,7 @@ dval_t *deriv_log(dval_t *dv)
 dval_t *deriv_sqrt(dval_t *dv)
 {
     dval_t *da   = dv_get_dx_internal(dv->a);
-    dval_t *two  = dv_new_const_d(2.0);
+    dval_t *two  = dv_num_const_d(2.0);
     dval_t *sqra = dv_sqrt(dv->a);
     dval_t *den  = dv_mul(two, sqra);
     dv_free(sqra);
@@ -175,7 +168,7 @@ dval_t *deriv_asin(dval_t *dv)
 {
     dval_t *da   = dv_get_dx_internal(dv->a);
     dval_t *a2   = dv_pow_d(dv->a, 2.0);
-    dval_t *one  = dv_new_const_d(1.0);
+    dval_t *one  = dv_num_const_d(1.0);
     dval_t *sub  = dv_sub(one, a2);
     dval_t *den  = dv_sqrt(sub);
     dv_free(sub);
@@ -191,7 +184,7 @@ dval_t *deriv_acos(dval_t *dv)
 {
     dval_t *da   = dv_get_dx_internal(dv->a);
     dval_t *a2   = dv_pow_d(dv->a, 2.0);
-    dval_t *one  = dv_new_const_d(1.0);
+    dval_t *one  = dv_num_const_d(1.0);
     dval_t *sub  = dv_sub(one, a2);
     dval_t *den  = dv_sqrt(sub);
     dv_free(sub);
@@ -209,7 +202,7 @@ dval_t *deriv_atan(dval_t *dv)
 {
     dval_t *da  = dv_get_dx_internal(dv->a);
     dval_t *a2  = dv_pow_d(dv->a, 2.0);
-    dval_t *one = dv_new_const_d(1.0);
+    dval_t *one = dv_num_const_d(1.0);
     dval_t *den = dv_add(one, a2);
     dval_t *out = dv_div(da, den);
     dv_free(da);
@@ -247,7 +240,7 @@ dval_t *deriv_asinh(dval_t *dv)
 {
     dval_t *da   = dv_get_dx_internal(dv->a);
     dval_t *a2   = dv_pow_d(dv->a, 2.0);
-    dval_t *one  = dv_new_const_d(1.0);
+    dval_t *one  = dv_num_const_d(1.0);
     dval_t *sum  = dv_add(one, a2);
     dval_t *den  = dv_sqrt(sum);
     dv_free(sum);
@@ -262,7 +255,7 @@ dval_t *deriv_asinh(dval_t *dv)
 dval_t *deriv_acosh(dval_t *dv)
 {
     dval_t *da  = dv_get_dx_internal(dv->a);
-    dval_t *one = dv_new_const_d(1.0);
+    dval_t *one = dv_num_const_d(1.0);
     dval_t *am1 = dv_sub(dv->a, one);
     dval_t *ap1 = dv_add(dv->a, one);
     dval_t *s1  = dv_sqrt(am1);
@@ -283,7 +276,7 @@ dval_t *deriv_atanh(dval_t *dv)
 {
     dval_t *da  = dv_get_dx_internal(dv->a);
     dval_t *a2  = dv_pow_d(dv->a, 2.0);
-    dval_t *one = dv_new_const_d(1.0);
+    dval_t *one = dv_num_const_d(1.0);
     dval_t *den = dv_sub(one, a2);
     dval_t *out = dv_div(da, den);
     dv_free(da);
@@ -314,7 +307,7 @@ static qfloat_t two_over_sqrtpi(void)
 dval_t *deriv_erf(dval_t *dv)
 {
     dval_t *da     = dv_get_dx_internal(dv->a);
-    dval_t *c      = dv_new_const(two_over_sqrtpi());
+    dval_t *c      = dv_num_const_qf(two_over_sqrtpi());
     dval_t *a2     = dv_pow_d(dv->a, 2.0);
     dval_t *neg_a2 = dv_neg(a2);
     dval_t *ea2    = dv_exp(neg_a2);
@@ -332,7 +325,7 @@ dval_t *deriv_erf(dval_t *dv)
 dval_t *deriv_erfc(dval_t *dv)
 {
     dval_t *da     = dv_get_dx_internal(dv->a);
-    dval_t *c      = dv_new_const(qf_neg(two_over_sqrtpi()));
+    dval_t *c      = dv_num_const_qf(qf_neg(two_over_sqrtpi()));
     dval_t *a2     = dv_pow_d(dv->a, 2.0);
     dval_t *neg_a2 = dv_neg(a2);
     dval_t *ea2    = dv_exp(neg_a2);
@@ -384,7 +377,7 @@ dval_t *deriv_erfinv(dval_t *dv)
     dval_t *w   = dv_erfinv(dv->a);
     dval_t *w2  = dv_pow_d(w, 2.0);
     dval_t *ew2 = dv_exp(w2);
-    dval_t *c   = dv_new_const(sqrtpi_over_2());
+    dval_t *c   = dv_num_const_qf(sqrtpi_over_2());
     dval_t *fac = dv_mul(c, ew2);
     dval_t *out = dv_mul(fac, da);
     dv_free(da); dv_free(w); dv_free(w2); dv_free(ew2); dv_free(c); dv_free(fac);
@@ -397,7 +390,7 @@ dval_t *deriv_erfcinv(dval_t *dv)
     dval_t *w   = dv_erfcinv(dv->a);
     dval_t *w2  = dv_pow_d(w, 2.0);
     dval_t *ew2 = dv_exp(w2);
-    dval_t *c   = dv_new_const(qf_neg(sqrtpi_over_2()));
+    dval_t *c   = dv_num_const_qf(qf_neg(sqrtpi_over_2()));
     dval_t *fac = dv_mul(c, ew2);
     dval_t *out = dv_mul(fac, da);
     dv_free(da); dv_free(w); dv_free(w2); dv_free(ew2); dv_free(c); dv_free(fac);
@@ -422,9 +415,9 @@ dval_t *deriv_digamma(dval_t *dv)
 
 dval_t *deriv_trigamma(dval_t *dv)
 {
-    qfloat_t t2     = qf_tetragamma(dv_eval_qf(dv->a));
+    qfloat_t t2     = qf_tetragamma(dv_num_eval_qf(dv->a));
     dval_t *da    = dv_get_dx_internal(dv->a);
-    dval_t *coeff = dv_new_const(t2);
+    dval_t *coeff = dv_num_const_qf(t2);
     dval_t *out   = dv_mul(coeff, da);
     dv_free(da); dv_free(coeff);
     return out;

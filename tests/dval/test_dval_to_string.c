@@ -91,7 +91,7 @@ int str_eq(const char *a, const char *b)
 
 static void test_to_string_basic_const_expr(void)
 {
-    dval_t *c = dv_new_const_d(3.5);
+    dval_t *c = test_dv_new_const_d(3.5);
     char *got = dv_to_string(c, style_EXPRESSION);
 
     const char *expect = "{ 3.5 }";
@@ -107,7 +107,7 @@ static void test_to_string_basic_const_expr(void)
 
 static void test_to_string_basic_const_func(void)
 {
-    dval_t *c = dv_new_const_d(3.5);
+    dval_t *c = test_dv_new_const_d(3.5);
     char *got = dv_to_string(c, style_FUNCTION);
 
     const char *expect = "c = 3.5\n"
@@ -134,7 +134,7 @@ void test_to_string_basic_const(void)
 
 static void test_to_string_basic_var_expr(void)
 {
-    dval_t *x = dv_new_named_var_d(42.0, "x");
+    dval_t *x = test_dv_new_named_var_d(42.0, "x");
     char *got = dv_to_string(x, style_EXPRESSION);
 
     const char *expect = "{ x | x = 42 }";
@@ -150,7 +150,7 @@ static void test_to_string_basic_var_expr(void)
 
 static void test_to_string_basic_var_func(void)
 {
-    dval_t *x = dv_new_named_var_d(42.0, "x");
+    dval_t *x = test_dv_new_named_var_d(42.0, "x");
     char *got = dv_to_string(x, style_FUNCTION);
 
     const char *expect = "x = 42\n"
@@ -173,7 +173,7 @@ void test_to_string_basic_var(void)
 
 static void test_to_string_non_simple_var_bracketed_expr(void)
 {
-    dval_t *v = dv_new_named_var_d(42.0, "a0b0");
+    dval_t *v = test_dv_new_named_var_d(42.0, "a0b0");
     char *got = dv_to_string(v, style_EXPRESSION);
 
     const char *expect = "{ [a0b₀] | [a0b₀] = 42 }";
@@ -189,7 +189,7 @@ static void test_to_string_non_simple_var_bracketed_expr(void)
 
 static void test_to_string_non_simple_var_bracketed_func(void)
 {
-    dval_t *v = dv_new_named_var_d(42.0, "a0b0");
+    dval_t *v = test_dv_new_named_var_d(42.0, "a0b0");
     char *got = dv_to_string(v, style_FUNCTION);
 
     const char *expect = "[a0b₀] = 42\n"
@@ -216,8 +216,8 @@ void test_to_string_non_simple_var_bracketed(void)
 
 static void test_to_string_addition_expr(void)
 {
-    dval_t *x = dv_new_named_var_d(1, "x");
-    dval_t *y = dv_new_named_var_d(2, "y");
+    dval_t *x = test_dv_new_named_var_d(1, "x");
+    dval_t *y = test_dv_new_named_var_d(2, "y");
     dval_t *f = dv_add(x, y);
 
     char *got = dv_to_string(f, style_EXPRESSION);
@@ -236,8 +236,8 @@ static void test_to_string_addition_expr(void)
 
 static void test_to_string_addition_func(void)
 {
-    dval_t *x = dv_new_named_var_d(1, "x");
-    dval_t *y = dv_new_named_var_d(2, "y");
+    dval_t *x = test_dv_new_named_var_d(1, "x");
+    dval_t *y = test_dv_new_named_var_d(2, "y");
     dval_t *f = dv_add(x, y);
 
     char *got = dv_to_string(f, style_FUNCTION);
@@ -265,9 +265,9 @@ void test_to_string_addition(void)
 
 static void test_to_string_negative_rhs_expr(void)
 {
-    dval_t *x = dv_new_named_var_d(2, "x");
-    dval_t *y = dv_new_named_var_d(3, "y");
-    dval_t *z = dv_new_named_var_d(4, "z");
+    dval_t *x = test_dv_new_named_var_d(2, "x");
+    dval_t *y = test_dv_new_named_var_d(3, "y");
+    dval_t *z = test_dv_new_named_var_d(4, "z");
     dval_t *neg_y = dv_neg(y);
     dval_t *frac = dv_div(neg_y, z);
     dval_t *f = dv_sub(x, frac);
@@ -290,8 +290,8 @@ static void test_to_string_negative_rhs_expr(void)
 
 static void test_to_string_double_negative_expr(void)
 {
-    dval_t *x = dv_new_named_var_d(2, "x");
-    dval_t *y = dv_new_named_var_d(3, "y");
+    dval_t *x = test_dv_new_named_var_d(2, "x");
+    dval_t *y = test_dv_new_named_var_d(3, "y");
     dval_t *neg_y = dv_neg(y);
     dval_t *f = dv_sub(x, neg_y);
     char *got = dv_to_string(f, style_EXPRESSION);
@@ -311,15 +311,15 @@ static void test_to_string_double_negative_expr(void)
 
 static void test_to_string_nested_negative_rhs_expr(void)
 {
-    dval_t *a = dv_new_named_var_d(5, "a");
-    dval_t *b = dv_new_named_var_d(6, "b");
-    dval_t *one = dv_new_const_d(1);
-    dval_t *two = dv_new_const_d(2);
+    dval_t *a = test_dv_new_named_var_d(5, "a");
+    dval_t *b = test_dv_new_named_var_d(6, "b");
+    dval_t *one = test_dv_new_const_d(1);
+    dval_t *two = test_dv_new_const_d(2);
     dval_t *two_over_a = dv_div(two, a);
     dval_t *inner = dv_sub(one, two_over_a);
     dval_t *neg_inner = dv_neg(inner);
     dval_t *neg_inner_over_a = dv_div(neg_inner, a);
-    dval_t *minus_two = dv_new_const_d(-2);
+    dval_t *minus_two = test_dv_new_const_d(-2);
     dval_t *rhs = dv_div(neg_inner_over_a, b);
     dval_t *lhs = dv_div(minus_two, a);
     dval_t *f = dv_sub(lhs, rhs);
@@ -352,9 +352,9 @@ static void test_to_string_nested_negative_rhs_expr(void)
 
 static void test_to_string_nested_mul_add_expr(void)
 {
-    dval_t *x = dv_new_named_var_d(2, "x");
-    dval_t *y = dv_new_named_var_d(3, "y");
-    dval_t *z = dv_new_named_var_d(4, "z");
+    dval_t *x = test_dv_new_named_var_d(2, "x");
+    dval_t *y = test_dv_new_named_var_d(3, "y");
+    dval_t *z = test_dv_new_named_var_d(4, "z");
 
     dval_t *xy = dv_mul(x, y);
     dval_t *f  = dv_add(xy, z);
@@ -377,9 +377,9 @@ static void test_to_string_nested_mul_add_expr(void)
 
 static void test_to_string_nested_mul_add_func(void)
 {
-    dval_t *x = dv_new_named_var_d(2, "x");
-    dval_t *y = dv_new_named_var_d(3, "y");
-    dval_t *z = dv_new_named_var_d(4, "z");
+    dval_t *x = test_dv_new_named_var_d(2, "x");
+    dval_t *y = test_dv_new_named_var_d(3, "y");
+    dval_t *z = test_dv_new_named_var_d(4, "z");
 
     dval_t *xy = dv_mul(x, y);
     dval_t *f  = dv_add(xy, z);
@@ -412,8 +412,8 @@ void test_to_string_nested_mul_add(void)
 
 static void test_to_string_atan2_expr(void)
 {
-    dval_t *x = dv_new_named_var_d(2, "x");
-    dval_t *y = dv_new_named_var_d(3, "y");
+    dval_t *x = test_dv_new_named_var_d(2, "x");
+    dval_t *y = test_dv_new_named_var_d(3, "y");
 
     dval_t *f = dv_atan2(x, y);
 
@@ -433,8 +433,8 @@ static void test_to_string_atan2_expr(void)
 
 static void test_to_string_atan2_func(void)
 {
-    dval_t *x = dv_new_named_var_d(2, "x");
-    dval_t *y = dv_new_named_var_d(3, "y");
+    dval_t *x = test_dv_new_named_var_d(2, "x");
+    dval_t *y = test_dv_new_named_var_d(3, "y");
 
     dval_t *f = dv_atan2(x, y);
 
@@ -467,7 +467,7 @@ void test_to_string_atan2(void)
 
 static void test_to_string_pow_superscript_expr(void)
 {
-    dval_t *x = dv_new_named_var_d(2, "x");
+    dval_t *x = test_dv_new_named_var_d(2, "x");
     dval_t *f = dv_pow_d(x, 3);
 
     char *got = dv_to_string(f, style_EXPRESSION);
@@ -485,7 +485,7 @@ static void test_to_string_pow_superscript_expr(void)
 
 static void test_to_string_pow_superscript_func(void)
 {
-    dval_t *x = dv_new_named_var_d(2, "x");
+    dval_t *x = test_dv_new_named_var_d(2, "x");
     dval_t *f = dv_pow_d(x, 3);
 
     char *got = dv_to_string(f, style_FUNCTION);
@@ -515,7 +515,7 @@ void test_to_string_pow_superscript(void)
 
 static void test_to_string_unary_sin_expr(void)
 {
-    dval_t *x = dv_new_named_var_d(0.5, "x");
+    dval_t *x = test_dv_new_named_var_d(0.5, "x");
     dval_t *f = dv_sin(x);
 
     char *got = dv_to_string(f, style_EXPRESSION);
@@ -533,7 +533,7 @@ static void test_to_string_unary_sin_expr(void)
 
 static void test_to_string_unary_sin_func(void)
 {
-    dval_t *x = dv_new_named_var_d(0.5, "x");
+    dval_t *x = test_dv_new_named_var_d(0.5, "x");
     dval_t *f = dv_sin(x);
 
     char *got = dv_to_string(f, style_FUNCTION);
@@ -559,7 +559,7 @@ void test_to_string_unary_sin(void)
 
 static void test_to_string_unary_sqrt_expr(void)
 {
-    dval_t *x = dv_new_named_var_d(4.0, "x");
+    dval_t *x = test_dv_new_named_var_d(4.0, "x");
     dval_t *f = dv_sqrt(x);
     char *got = dv_to_string(f, style_EXPRESSION);
     const char *expect = "{ √(x) | x = 4 }";
@@ -576,7 +576,7 @@ static void test_to_string_unary_sqrt_expr(void)
 
 static void test_to_string_unary_sqrt_func(void)
 {
-    dval_t *x = dv_new_named_var_d(4.0, "x");
+    dval_t *x = test_dv_new_named_var_d(4.0, "x");
     dval_t *f = dv_sqrt(x);
     char *got = dv_to_string(f, style_FUNCTION);
     const char *expect = "x = 4\n"
@@ -605,7 +605,7 @@ void test_to_string_unary_sqrt(void)
 
 static void test_to_string_function_style_expr(void)
 {
-    dval_t *x = dv_new_named_var_d(10, "x");
+    dval_t *x = test_dv_new_named_var_d(10, "x");
     char *got = dv_to_string(x, style_EXPRESSION);
 
     const char *expect = "{ x | x = 10 }";
@@ -621,7 +621,7 @@ static void test_to_string_function_style_expr(void)
 
 static void test_to_string_function_style_func(void)
 {
-    dval_t *x = dv_new_named_var_d(10, "x");
+    dval_t *x = test_dv_new_named_var_d(10, "x");
     char *got = dv_to_string(x, style_FUNCTION);
 
     const char *expect = "x = 10\n"
@@ -652,37 +652,37 @@ void check_roundtrip(const char *label, dval_t *f, int line);
 void test_to_string_special_functions(void)
 {
     /* Unary functions */
-    { dval_t *x = dv_new_named_var_d(-3.0, "x"); check_roundtrip("to_string: abs(x)",           dv_abs(x),           __LINE__); dv_free(x); }
-    { dval_t *x = dv_new_named_var_d( 0.5, "x"); check_roundtrip("to_string: erf(x)",           dv_erf(x),           __LINE__); dv_free(x); }
-    { dval_t *x = dv_new_named_var_d( 0.5, "x"); check_roundtrip("to_string: erfc(x)",          dv_erfc(x),          __LINE__); dv_free(x); }
-    { dval_t *x = dv_new_named_var_d( 0.5, "x"); check_roundtrip("to_string: erfinv(x)",        dv_erfinv(x),        __LINE__); dv_free(x); }
-    { dval_t *x = dv_new_named_var_d( 0.5, "x"); check_roundtrip("to_string: erfcinv(x)",       dv_erfcinv(x),       __LINE__); dv_free(x); }
-    { dval_t *x = dv_new_named_var_d( 3.0, "x"); check_roundtrip("to_string: gamma(x)",         dv_gamma(x),         __LINE__); dv_free(x); }
-    { dval_t *x = dv_new_named_var_d( 3.0, "x"); check_roundtrip("to_string: lgamma(x)",        dv_lgamma(x),        __LINE__); dv_free(x); }
-    { dval_t *x = dv_new_named_var_d( 1.0, "x"); check_roundtrip("to_string: digamma(x)",       dv_digamma(x),       __LINE__); dv_free(x); }
-    { dval_t *x = dv_new_named_var_d( 1.0, "x"); check_roundtrip("to_string: lambert_w0(x)",    dv_lambert_w0(x),    __LINE__); dv_free(x); }
-    { dval_t *x = dv_new_named_var_d(-0.2, "x"); check_roundtrip("to_string: lambert_wm1(x)",   dv_lambert_wm1(x),   __LINE__); dv_free(x); }
-    { dval_t *x = dv_new_named_var_d( 0.0, "x"); check_roundtrip("to_string: normal_pdf(x)",    dv_normal_pdf(x),    __LINE__); dv_free(x); }
-    { dval_t *x = dv_new_named_var_d( 0.0, "x"); check_roundtrip("to_string: normal_cdf(x)",    dv_normal_cdf(x),    __LINE__); dv_free(x); }
-    { dval_t *x = dv_new_named_var_d( 0.0, "x"); check_roundtrip("to_string: normal_logpdf(x)", dv_normal_logpdf(x), __LINE__); dv_free(x); }
-    { dval_t *x = dv_new_named_var_d( 1.0, "x"); check_roundtrip("to_string: ei(x)",            dv_ei(x),            __LINE__); dv_free(x); }
-    { dval_t *x = dv_new_named_var_d( 1.0, "x"); check_roundtrip("to_string: e1(x)",            dv_e1(x),            __LINE__); dv_free(x); }
+    { dval_t *x = test_dv_new_named_var_d(-3.0, "x"); check_roundtrip("to_string: abs(x)",           dv_abs(x),           __LINE__); dv_free(x); }
+    { dval_t *x = test_dv_new_named_var_d( 0.5, "x"); check_roundtrip("to_string: erf(x)",           dv_erf(x),           __LINE__); dv_free(x); }
+    { dval_t *x = test_dv_new_named_var_d( 0.5, "x"); check_roundtrip("to_string: erfc(x)",          dv_erfc(x),          __LINE__); dv_free(x); }
+    { dval_t *x = test_dv_new_named_var_d( 0.5, "x"); check_roundtrip("to_string: erfinv(x)",        dv_erfinv(x),        __LINE__); dv_free(x); }
+    { dval_t *x = test_dv_new_named_var_d( 0.5, "x"); check_roundtrip("to_string: erfcinv(x)",       dv_erfcinv(x),       __LINE__); dv_free(x); }
+    { dval_t *x = test_dv_new_named_var_d( 3.0, "x"); check_roundtrip("to_string: gamma(x)",         dv_gamma(x),         __LINE__); dv_free(x); }
+    { dval_t *x = test_dv_new_named_var_d( 3.0, "x"); check_roundtrip("to_string: lgamma(x)",        dv_lgamma(x),        __LINE__); dv_free(x); }
+    { dval_t *x = test_dv_new_named_var_d( 1.0, "x"); check_roundtrip("to_string: digamma(x)",       dv_digamma(x),       __LINE__); dv_free(x); }
+    { dval_t *x = test_dv_new_named_var_d( 1.0, "x"); check_roundtrip("to_string: lambert_w0(x)",    dv_lambert_w0(x),    __LINE__); dv_free(x); }
+    { dval_t *x = test_dv_new_named_var_d(-0.2, "x"); check_roundtrip("to_string: lambert_wm1(x)",   dv_lambert_wm1(x),   __LINE__); dv_free(x); }
+    { dval_t *x = test_dv_new_named_var_d( 0.0, "x"); check_roundtrip("to_string: normal_pdf(x)",    dv_normal_pdf(x),    __LINE__); dv_free(x); }
+    { dval_t *x = test_dv_new_named_var_d( 0.0, "x"); check_roundtrip("to_string: normal_cdf(x)",    dv_normal_cdf(x),    __LINE__); dv_free(x); }
+    { dval_t *x = test_dv_new_named_var_d( 0.0, "x"); check_roundtrip("to_string: normal_logpdf(x)", dv_normal_logpdf(x), __LINE__); dv_free(x); }
+    { dval_t *x = test_dv_new_named_var_d( 1.0, "x"); check_roundtrip("to_string: ei(x)",            dv_ei(x),            __LINE__); dv_free(x); }
+    { dval_t *x = test_dv_new_named_var_d( 1.0, "x"); check_roundtrip("to_string: e1(x)",            dv_e1(x),            __LINE__); dv_free(x); }
     /* Binary functions */
     {
-        dval_t *x = dv_new_named_var_d(2.0, "x");
-        dval_t *y = dv_new_named_var_d(3.0, "y");
+        dval_t *x = test_dv_new_named_var_d(2.0, "x");
+        dval_t *y = test_dv_new_named_var_d(3.0, "y");
         dval_t *f = dv_beta(x, y);    dv_free(x); dv_free(y);
         check_roundtrip("to_string: beta(x,y)", f, __LINE__);
     }
     {
-        dval_t *x = dv_new_named_var_d(2.0, "x");
-        dval_t *y = dv_new_named_var_d(3.0, "y");
+        dval_t *x = test_dv_new_named_var_d(2.0, "x");
+        dval_t *y = test_dv_new_named_var_d(3.0, "y");
         dval_t *f = dv_logbeta(x, y); dv_free(x); dv_free(y);
         check_roundtrip("to_string: logbeta(x,y)", f, __LINE__);
     }
     {
-        dval_t *x = dv_new_named_var_d(3.0, "x");
-        dval_t *y = dv_new_named_var_d(4.0, "y");
+        dval_t *x = test_dv_new_named_var_d(3.0, "x");
+        dval_t *y = test_dv_new_named_var_d(4.0, "y");
         dval_t *f = dv_hypot(x, y);   dv_free(x); dv_free(y);
         check_roundtrip("to_string: hypot(x,y)", f, __LINE__);
     }
@@ -715,7 +715,7 @@ void test_to_string_all(void)
  * ============================================================ */
 static dval_t *make_expr_01(void)
 {
-    dval_t *x = dv_new_named_var_d(1.25, "x");
+    dval_t *x = test_dv_new_named_var_d(1.25, "x");
 
     dval_t *t1 = dv_mul(x, x);   /* x*x */
 
@@ -728,7 +728,7 @@ static dval_t *make_expr_01(void)
  * ============================================================ */
 static dval_t *make_expr_02(void)
 {
-    dval_t *x = dv_new_named_var_d(1.25, "x");
+    dval_t *x = test_dv_new_named_var_d(1.25, "x");
 
     dval_t *t1 = dv_mul(x, x);   /* x*x      */
     dval_t *t2 = dv_mul(t1, x);  /* x*x*x    */
@@ -743,8 +743,8 @@ static dval_t *make_expr_02(void)
  * ============================================================ */
 static dval_t *make_expr_03(void)
 {
-    dval_t *x   = dv_new_named_var_d(1.25, "x");
-    dval_t *pi  = dv_new_named_const(QF_PI, "@pi");
+    dval_t *x   = test_dv_new_named_var_d(1.25, "x");
+    dval_t *pi  = test_dv_new_named_const_qf(QF_PI, "@pi");
 
     dval_t *t1 = dv_pow_d(x, 2.0);   /* x^2      */
     dval_t *t2 = dv_mul(pi, t1);     /* π * x^2  */
@@ -760,7 +760,7 @@ static dval_t *make_expr_03(void)
  * ============================================================ */
 static dval_t *make_expr_04(void)
 {
-    dval_t *x = dv_new_named_var_d(1.25, "x");
+    dval_t *x = test_dv_new_named_var_d(1.25, "x");
 
     dval_t *t1 = dv_mul(x, x);       /* x*x        */
     dval_t *t2 = dv_mul(x, x);       /* x*x        */
@@ -777,7 +777,7 @@ static dval_t *make_expr_04(void)
  * ============================================================ */
 static dval_t *make_expr_05(void)
 {
-    dval_t *x = dv_new_named_var_d(1.25, "x");
+    dval_t *x = test_dv_new_named_var_d(1.25, "x");
 
     dval_t *t1 = dv_mul(x, x);        /* x*x          */
     dval_t *t2 = dv_mul_d(t1, 3.0);   /* 3*x*x        */
@@ -796,7 +796,7 @@ static dval_t *make_expr_05(void)
  * ============================================================ */
 static dval_t *make_expr_06(void)
 {
-    dval_t *x = dv_new_named_var_d(1.25, "x");
+    dval_t *x = test_dv_new_named_var_d(1.25, "x");
 
     dval_t *t1 = dv_mul_d(x, 2.0);   /* 2*x   */
     dval_t *t2 = dv_mul_d(x, 5.0);   /* 5*x   */
@@ -813,7 +813,7 @@ static dval_t *make_expr_06(void)
  * ============================================================ */
 static dval_t *make_expr_07(void)
 {
-    dval_t *x = dv_new_named_var_d(1.25, "x");
+    dval_t *x = test_dv_new_named_var_d(1.25, "x");
 
     dval_t *t1 = dv_pow_d(x, 2.0);   /* x^2      */
     dval_t *t2 = dv_pow_d(x, 3.0);   /* x^3      */
@@ -830,7 +830,7 @@ static dval_t *make_expr_07(void)
  * ============================================================ */
 static dval_t *make_expr_08(void)
 {
-    dval_t *x = dv_new_named_var_d(1.25, "x");
+    dval_t *x = test_dv_new_named_var_d(1.25, "x");
 
     dval_t *t1 = dv_pow_d(x, 2.0);   /* x^2        */
     dval_t *t2 = dv_mul(t1, x);      /* x^2*x      */
@@ -849,8 +849,8 @@ static dval_t *make_expr_08(void)
  * ============================================================ */
 static dval_t *make_expr_09(void)
 {
-    dval_t *x = dv_new_named_var_d(1.25, "x");
-    dval_t *y = dv_new_named_var_d(1.25, "y");
+    dval_t *x = test_dv_new_named_var_d(1.25, "x");
+    dval_t *y = test_dv_new_named_var_d(1.25, "y");
 
     dval_t *t1 = dv_pow_d(x, 2.0);   /* x^2        */
     dval_t *t2 = dv_pow_d(y, 3.0);   /* y^3        */
@@ -870,7 +870,7 @@ static dval_t *make_expr_09(void)
  * ============================================================ */
 static dval_t *make_expr_10(void)
 {
-    dval_t *x = dv_new_named_var_d(1.25, "x");
+    dval_t *x = test_dv_new_named_var_d(1.25, "x");
 
     dval_t *t1 = dv_pow_d(x, 2.0);    /* x^2        */
     dval_t *t2 = dv_mul_d(t1, 3.0);   /* 3*x^2      */
@@ -889,8 +889,8 @@ static dval_t *make_expr_10(void)
  * ============================================================ */
 static dval_t *make_expr_11(void)
 {
-    dval_t *x = dv_new_named_var_d(1.25, "x");
-    dval_t *y = dv_new_named_var_d(1.25, "y");
+    dval_t *x = test_dv_new_named_var_d(1.25, "x");
+    dval_t *y = test_dv_new_named_var_d(1.25, "y");
 
     dval_t *t1 = dv_mul_d(x, 3.0);      /* 3*x     */
     dval_t *t2 = dv_mul_d(y, 2.0);      /* 2*y     */
@@ -912,8 +912,8 @@ static dval_t *make_expr_11(void)
  * ============================================================ */
 static dval_t *make_expr_12(void)
 {
-    dval_t *x = dv_new_named_var_d(1.25, "x");
-    dval_t *y = dv_new_named_var_d(1.25, "y");
+    dval_t *x = test_dv_new_named_var_d(1.25, "x");
+    dval_t *y = test_dv_new_named_var_d(1.25, "y");
 
     dval_t *t1 = dv_mul(x, x);      /* x*x     */
     dval_t *t2 = dv_mul(t1, y);     /* x*x*y   */
@@ -931,7 +931,7 @@ static dval_t *make_expr_12(void)
  * ============================================================ */
 static dval_t *make_expr_13(void)
 {
-    dval_t *x = dv_new_named_var_d(1.25, "x");
+    dval_t *x = test_dv_new_named_var_d(1.25, "x");
 
     dval_t *t1 = dv_mul_d(x, 3.0);   /* 3*x */
 
@@ -944,7 +944,7 @@ static dval_t *make_expr_13(void)
  * ============================================================ */
 static dval_t *make_expr_14(void)
 {
-    dval_t *x = dv_new_named_var_d(1.25, "x");
+    dval_t *x = test_dv_new_named_var_d(1.25, "x");
 
     dval_t *t1 = dv_mul(x, x);       /* x*x   */
     dval_t *t2 = dv_mul_d(t1, 3.0);  /* 3*x*x */
@@ -959,7 +959,7 @@ static dval_t *make_expr_14(void)
  * ============================================================ */
 static dval_t *make_expr_15(void)
 {
-    dval_t *x = dv_new_named_var_d(1.25, "x");
+    dval_t *x = test_dv_new_named_var_d(1.25, "x");
 
     dval_t *t1 = dv_mul_d(x, 6.0);   /* 6*x */
 
@@ -972,7 +972,7 @@ static dval_t *make_expr_15(void)
  * ============================================================ */
 static dval_t *make_expr_16(void)
 {
-    dval_t *x = dv_new_named_var_d(1.25, "x");
+    dval_t *x = test_dv_new_named_var_d(1.25, "x");
 
     dval_t *t1 = dv_pow_d(x, 2.0);    /* x^2     */
     dval_t *t2 = dv_mul_d(t1, 7.0);   /* 7*x^2   */
@@ -987,8 +987,8 @@ static dval_t *make_expr_16(void)
  * ============================================================ */
 static dval_t *make_expr_17(void)
 {
-    dval_t *x = dv_new_named_var_d(1.25, "x");
-    dval_t *y = dv_new_named_var_d(1.25, "y");
+    dval_t *x = test_dv_new_named_var_d(1.25, "x");
+    dval_t *y = test_dv_new_named_var_d(1.25, "y");
 
     dval_t *t1 = dv_mul(x, y);        /* x*y     */
     dval_t *t2 = dv_mul_d(t1, 2.0);   /* 2*x*y   */
@@ -1004,7 +1004,7 @@ static dval_t *make_expr_17(void)
  * ============================================================ */
 static dval_t *make_expr_18(void)
 {
-    dval_t *x = dv_new_named_var_d(1.25, "x");
+    dval_t *x = test_dv_new_named_var_d(1.25, "x");
 
     dval_t *t1 = dv_sin(x);       /* sin(x) */
     dval_t *t2 = dv_cos(x);       /* cos(x) */
@@ -1021,7 +1021,7 @@ static dval_t *make_expr_18(void)
  * ============================================================ */
 static dval_t *make_expr_19(void)
 {
-    dval_t *x = dv_new_named_var_d(1.25, "x");
+    dval_t *x = test_dv_new_named_var_d(1.25, "x");
 
     dval_t *t1 = dv_cos(x);       /* cos(x) */
     dval_t *t2 = dv_exp(x);       /* exp(x) */
@@ -1038,7 +1038,7 @@ static dval_t *make_expr_19(void)
  * ============================================================ */
 static dval_t *make_expr_20(void)
 {
-    dval_t *x = dv_new_named_var_d(1.25, "x");
+    dval_t *x = test_dv_new_named_var_d(1.25, "x");
 
     dval_t *t1 = dv_exp(x);       /* exp(x) */
     dval_t *t2 = dv_mul(x, x);    /* x*x    */
@@ -1055,7 +1055,7 @@ static dval_t *make_expr_20(void)
  * ============================================================ */
 static dval_t *make_expr_21(void)
 {
-    dval_t *x = dv_new_named_var_d(1.25, "x");
+    dval_t *x = test_dv_new_named_var_d(1.25, "x");
 
     dval_t *t1 = dv_exp(x);          /* exp(x)     */
     dval_t *t2 = dv_mul_d(t1, 3.0);  /* 3*exp(x)   */
@@ -1074,7 +1074,7 @@ static dval_t *make_expr_21(void)
  * ============================================================ */
 static dval_t *make_expr_22(void)
 {
-    dval_t *x = dv_new_named_var_d(1.25, "x");
+    dval_t *x = test_dv_new_named_var_d(1.25, "x");
 
     dval_t *t1 = dv_sin(x);          /* sin(x) */
     dval_t *t2 = dv_pow_d(x, 2.0);   /* x^2    */
@@ -1091,7 +1091,7 @@ static dval_t *make_expr_22(void)
  * ============================================================ */
 static dval_t *make_expr_23(void)
 {
-    dval_t *x = dv_new_named_var_d(1.25, "x");
+    dval_t *x = test_dv_new_named_var_d(1.25, "x");
 
     dval_t *t1 = dv_sin(x);       /* sin(x) */
     dval_t *t2 = dv_mul(x, t1);   /* x*sin(x) */
@@ -1108,7 +1108,7 @@ static dval_t *make_expr_23(void)
  * ============================================================ */
 static dval_t *make_expr_24(void)
 {
-    dval_t *x = dv_new_named_var_d(1.25, "x");
+    dval_t *x = test_dv_new_named_var_d(1.25, "x");
 
     dval_t *t1 = dv_sin(x);       /* sin(x) */
     dval_t *t2 = dv_exp(t1);      /* exp(sin(x)) */
@@ -1123,7 +1123,7 @@ static dval_t *make_expr_24(void)
  * ============================================================ */
 static dval_t *make_expr_25(void)
 {
-    dval_t *x = dv_new_named_var_d(1.25, "x");
+    dval_t *x = test_dv_new_named_var_d(1.25, "x");
 
     dval_t *t1 = dv_cos(x);       /* cos(x) */
     dval_t *t2 = dv_sin(x);       /* sin(x) */
@@ -1142,7 +1142,7 @@ static dval_t *make_expr_25(void)
  * ============================================================ */
 static dval_t *make_expr_26(void)
 {
-    dval_t *x = dv_new_named_var_d(1.25, "x");
+    dval_t *x = test_dv_new_named_var_d(1.25, "x");
 
     dval_t *t1 = dv_mul(x, x);    /* x*x */
     dval_t *t2 = dv_sin(x);       /* sin(x) */
@@ -1161,7 +1161,7 @@ static dval_t *make_expr_26(void)
  * ============================================================ */
 static dval_t *make_expr_27(void)
 {
-    dval_t *x = dv_new_named_var_d(1.25, "x");
+    dval_t *x = test_dv_new_named_var_d(1.25, "x");
 
     dval_t *t1 = dv_sin(x);       /* sin(x) */
     dval_t *t2 = dv_exp(t1);      /* exp(sin(x)) */
@@ -1182,7 +1182,7 @@ static dval_t *make_expr_27(void)
  * ============================================================ */
 static dval_t *make_expr_28(void)
 {
-    dval_t *x = dv_new_named_var_d(1.25, "x");
+    dval_t *x = test_dv_new_named_var_d(1.25, "x");
 
     dval_t *t1 = dv_pow_d(x, 2.0);     /* x^2       */
     dval_t *t2 = dv_exp(t1);           /* exp(x^2)  */
@@ -1203,7 +1203,7 @@ static dval_t *make_expr_28(void)
  * ============================================================ */
 static dval_t *make_expr_29(void)
 {
-    dval_t *x = dv_new_named_var_d(1.25, "x");
+    dval_t *x = test_dv_new_named_var_d(1.25, "x");
 
     dval_t *t1 = dv_exp(x);          /* exp(x)   */
     dval_t *t2 = dv_mul_d(x, 2.0);   /* 2*x      */
@@ -1222,7 +1222,7 @@ static dval_t *make_expr_29(void)
  * ============================================================ */
 static dval_t *make_expr_30(void)
 {
-    dval_t *x = dv_new_named_var_d(1.25, "x");
+    dval_t *x = test_dv_new_named_var_d(1.25, "x");
 
     dval_t *t1 = dv_sin(x);       /* sin(x) */
     dval_t *t2 = dv_exp(t1);      /* exp(sin(x)) */
@@ -1247,8 +1247,8 @@ static dval_t *make_expr_30(void)
  * ============================================================ */
 static dval_t *make_expr_31(void)
 {
-    dval_t *x  = dv_new_named_var_d(1.25, "x");
-    dval_t *pi = dv_new_named_const(QF_PI, "@pi");
+    dval_t *x  = test_dv_new_named_var_d(1.25, "x");
+    dval_t *pi = test_dv_new_named_const_qf(QF_PI, "@pi");
 
     dval_t *t1 = dv_sin(x);       /* sin(x)   */
     dval_t *t2 = dv_mul(pi, t1);  /* π*sin(x) */
@@ -1264,8 +1264,8 @@ static dval_t *make_expr_31(void)
  * ============================================================ */
 static dval_t *make_expr_32(void)
 {
-    dval_t *x   = dv_new_named_var_d(1.25, "x");
-    dval_t *tau = dv_new_named_const(QF_2PI, "@tau");
+    dval_t *x   = test_dv_new_named_var_d(1.25, "x");
+    dval_t *tau = test_dv_new_named_const_qf(QF_2PI, "@tau");
 
     dval_t *t1 = dv_cos(x);        /* cos(x)   */
     dval_t *t2 = dv_mul(tau, t1);  /* τ*cos(x) */
@@ -1281,8 +1281,8 @@ static dval_t *make_expr_32(void)
  * ============================================================ */
 static dval_t *make_expr_33(void)
 {
-    dval_t *x = dv_new_named_var_d(1.25, "x");
-    dval_t *e = dv_new_named_const(QF_E, "e");
+    dval_t *x = test_dv_new_named_var_d(1.25, "x");
+    dval_t *e = test_dv_new_named_const_qf(QF_E, "e");
 
     dval_t *t1 = dv_pow_d(x, 2.0);   /* x^2    */
     dval_t *t2 = dv_mul(e, t1);      /* e*x^2  */
@@ -1298,9 +1298,9 @@ static dval_t *make_expr_33(void)
  * ============================================================ */
 static dval_t *make_expr_34(void)
 {
-    dval_t *pi  = dv_new_named_const(QF_PI, "@pi");
-    dval_t *tau = dv_new_named_const(QF_2PI, "@tau");
-    dval_t *e   = dv_new_named_const(QF_E, "e");
+    dval_t *pi  = test_dv_new_named_const_qf(QF_PI, "@pi");
+    dval_t *tau = test_dv_new_named_const_qf(QF_2PI, "@tau");
+    dval_t *e   = test_dv_new_named_const_qf(QF_E, "e");
 
     dval_t *t1 = dv_mul(pi, tau);   /* π*τ   */
     dval_t *t2 = dv_mul(t1, e);     /* π*τ*e */
@@ -1317,10 +1317,10 @@ static dval_t *make_expr_34(void)
  * ============================================================ */
 static dval_t *make_expr_35(void)
 {
-    dval_t *x   = dv_new_named_var_d(1.25, "x");
-    dval_t *y   = dv_new_named_var_d(1.25, "y");
-    dval_t *pi  = dv_new_named_const(QF_PI, "@pi");
-    dval_t *tau = dv_new_named_const(QF_2PI, "@tau");
+    dval_t *x   = test_dv_new_named_var_d(1.25, "x");
+    dval_t *y   = test_dv_new_named_var_d(1.25, "y");
+    dval_t *pi  = test_dv_new_named_const_qf(QF_PI, "@pi");
+    dval_t *tau = test_dv_new_named_const_qf(QF_2PI, "@tau");
 
     dval_t *t1 = dv_mul(pi, x);      /* π*x     */
     dval_t *t2 = dv_mul(t1, tau);    /* π*x*τ   */
@@ -1340,8 +1340,8 @@ static dval_t *make_expr_35(void)
  * ============================================================ */
 static dval_t *make_expr_36(void)
 {
-    dval_t *x  = dv_new_named_var_d(1.25, "x");
-    dval_t *pi = dv_new_named_const(QF_PI, "@pi");
+    dval_t *x  = test_dv_new_named_var_d(1.25, "x");
+    dval_t *pi = test_dv_new_named_const_qf(QF_PI, "@pi");
 
     dval_t *t1 = dv_exp(x);       /* exp(x) */
     dval_t *t2 = dv_mul(t1, pi);  /* exp(x)*π */
@@ -1357,8 +1357,8 @@ static dval_t *make_expr_36(void)
  * ============================================================ */
 static dval_t *make_expr_37(void)
 {
-    dval_t *x   = dv_new_named_var_d(1.25, "x");
-    dval_t *tau = dv_new_named_const(QF_2PI, "@tau");
+    dval_t *x   = test_dv_new_named_var_d(1.25, "x");
+    dval_t *tau = test_dv_new_named_const_qf(QF_2PI, "@tau");
 
     dval_t *t1 = dv_pow_d(x, 2.0);   /* x^2        */
     dval_t *t2 = dv_exp(t1);         /* exp(x^2)   */
@@ -1376,9 +1376,9 @@ static dval_t *make_expr_37(void)
  * ============================================================ */
 static dval_t *make_expr_38(void)
 {
-    dval_t *x = dv_new_named_var_d(1.25, "x");
-    dval_t *y = dv_new_named_var_d(1.25, "y");
-    dval_t *e = dv_new_named_const(QF_E, "e");
+    dval_t *x = test_dv_new_named_var_d(1.25, "x");
+    dval_t *y = test_dv_new_named_var_d(1.25, "y");
+    dval_t *e = test_dv_new_named_const_qf(QF_E, "e");
 
     dval_t *t1 = dv_sin(x);       /* sin(x) */
     dval_t *t2 = dv_cos(y);       /* cos(y) */
@@ -1399,9 +1399,9 @@ static dval_t *make_expr_38(void)
  * ============================================================ */
 static dval_t *make_expr_39(void)
 {
-    dval_t *x   = dv_new_named_var_d(1.25, "x");
-    dval_t *pi  = dv_new_named_const(QF_PI, "@pi");
-    dval_t *tau = dv_new_named_const(QF_2PI, "@tau");
+    dval_t *x   = test_dv_new_named_var_d(1.25, "x");
+    dval_t *pi  = test_dv_new_named_const_qf(QF_PI, "@pi");
+    dval_t *tau = test_dv_new_named_const_qf(QF_2PI, "@tau");
 
     dval_t *t1 = dv_mul(tau, x);   /* τ*x        */
     dval_t *t2 = dv_exp(t1);       /* exp(τ*x)   */
@@ -1420,9 +1420,9 @@ static dval_t *make_expr_39(void)
  * ============================================================ */
 static dval_t *make_expr_40(void)
 {
-    dval_t *x   = dv_new_named_var_d(1.25, "x");
-    dval_t *pi  = dv_new_named_const(QF_PI, "@pi");
-    dval_t *tau = dv_new_named_const(QF_2PI, "@tau");
+    dval_t *x   = test_dv_new_named_var_d(1.25, "x");
+    dval_t *pi  = test_dv_new_named_const_qf(QF_PI, "@pi");
+    dval_t *tau = test_dv_new_named_const_qf(QF_2PI, "@tau");
 
     dval_t *t1 = dv_mul(pi, x);   /* π*x      */
     dval_t *t2 = dv_exp(t1);      /* exp(π*x) */
@@ -1441,8 +1441,8 @@ static dval_t *make_expr_40(void)
  * ============================================================ */
 static dval_t *make_expr_41(void)
 {
-    dval_t *x  = dv_new_named_var_d(1.25, "x");
-    dval_t *pi = dv_new_named_const(QF_PI, "@pi");
+    dval_t *x  = test_dv_new_named_var_d(1.25, "x");
+    dval_t *pi = test_dv_new_named_const_qf(QF_PI, "@pi");
 
     dval_t *t1 = dv_mul(pi, x);   /* π*x       */
     dval_t *t2 = dv_sin(t1);      /* sin(π*x)  */
@@ -1458,8 +1458,8 @@ static dval_t *make_expr_41(void)
  * ============================================================ */
 static dval_t *make_expr_42(void)
 {
-    dval_t *x   = dv_new_named_var_d(1.25, "x");
-    dval_t *tau = dv_new_named_const(QF_2PI, "@tau");
+    dval_t *x   = test_dv_new_named_var_d(1.25, "x");
+    dval_t *tau = test_dv_new_named_const_qf(QF_2PI, "@tau");
 
     dval_t *t1 = dv_mul(tau, x);  /* τ*x       */
     dval_t *t2 = dv_cos(t1);      /* cos(τ*x)  */
@@ -1475,9 +1475,9 @@ static dval_t *make_expr_42(void)
  * ============================================================ */
 static dval_t *make_expr_43(void)
 {
-    dval_t *x   = dv_new_named_var_d(1.25, "x");
-    dval_t *pi  = dv_new_named_const(QF_PI, "@pi");
-    dval_t *tau = dv_new_named_const(QF_2PI, "@tau");
+    dval_t *x   = test_dv_new_named_var_d(1.25, "x");
+    dval_t *pi  = test_dv_new_named_const_qf(QF_PI, "@pi");
+    dval_t *tau = test_dv_new_named_const_qf(QF_2PI, "@tau");
 
     dval_t *t1 = dv_mul(pi, tau);  /* π*τ      */
     dval_t *t2 = dv_mul(t1, x);    /* π*τ*x    */
@@ -1496,7 +1496,7 @@ static dval_t *make_expr_43(void)
  * ============================================================ */
 static dval_t *make_expr_44(void)
 {
-    dval_t *x = dv_new_named_var_d(1.25, "x");
+    dval_t *x = test_dv_new_named_var_d(1.25, "x");
 
     dval_t *t1 = dv_sin(x);       /* sin(x) */
     dval_t *t2 = dv_cos(x);       /* cos(x) */
@@ -1517,11 +1517,11 @@ static dval_t *make_expr_44(void)
  * ============================================================ */
 static dval_t *make_expr_45(void)
 {
-    dval_t *x   = dv_new_named_var_d(1.25, "x");
-    dval_t *y   = dv_new_named_var_d(1.25, "y");
-    dval_t *pi  = dv_new_named_const(QF_PI, "@pi");
-    dval_t *tau = dv_new_named_const(QF_2PI, "@tau");
-    dval_t *e   = dv_new_named_const(QF_E, "e");
+    dval_t *x   = test_dv_new_named_var_d(1.25, "x");
+    dval_t *y   = test_dv_new_named_var_d(1.25, "y");
+    dval_t *pi  = test_dv_new_named_const_qf(QF_PI, "@pi");
+    dval_t *tau = test_dv_new_named_const_qf(QF_2PI, "@tau");
+    dval_t *e   = test_dv_new_named_const_qf(QF_E, "e");
 
     dval_t *t1 = dv_add(x, y);     /* x+y     */
     dval_t *t2 = dv_add(t1, pi);   /* x+y+π   */
@@ -1544,11 +1544,11 @@ static dval_t *make_expr_45(void)
  * ============================================================ */
 static dval_t *make_expr_46(void)
 {
-    dval_t *x   = dv_new_named_var_d(1.25, "x");
-    dval_t *y   = dv_new_named_var_d(1.25, "y");
-    dval_t *pi  = dv_new_named_const(QF_PI, "@pi");
-    dval_t *tau = dv_new_named_const(QF_2PI, "@tau");
-    dval_t *e   = dv_new_named_const(QF_E, "e");
+    dval_t *x   = test_dv_new_named_var_d(1.25, "x");
+    dval_t *y   = test_dv_new_named_var_d(1.25, "y");
+    dval_t *pi  = test_dv_new_named_const_qf(QF_PI, "@pi");
+    dval_t *tau = test_dv_new_named_const_qf(QF_2PI, "@tau");
+    dval_t *e   = test_dv_new_named_const_qf(QF_E, "e");
 
     dval_t *t1 = dv_mul(x, y);     /* x*y     */
     dval_t *t2 = dv_mul(pi, x);    /* π*x     */
@@ -1575,10 +1575,10 @@ static dval_t *make_expr_46(void)
  * ============================================================ */
 static dval_t *make_expr_47(void)
 {
-    dval_t *x   = dv_new_named_var_d(1.25, "x");
-    dval_t *y   = dv_new_named_var_d(1.25, "y");
-    dval_t *pi  = dv_new_named_const(QF_PI, "@pi");
-    dval_t *tau = dv_new_named_const(QF_2PI, "@tau");
+    dval_t *x   = test_dv_new_named_var_d(1.25, "x");
+    dval_t *y   = test_dv_new_named_var_d(1.25, "y");
+    dval_t *pi  = test_dv_new_named_const_qf(QF_PI, "@pi");
+    dval_t *tau = test_dv_new_named_const_qf(QF_2PI, "@tau");
 
     dval_t *t1 = dv_add(x, pi);     /* x+π */
     dval_t *t2 = dv_add(y, tau);    /* y+τ */
@@ -1598,10 +1598,10 @@ static dval_t *make_expr_47(void)
  * ============================================================ */
 static dval_t *make_expr_48(void)
 {
-    dval_t *x   = dv_new_named_var_d(1.25, "x");
-    dval_t *y   = dv_new_named_var_d(1.25, "y");
-    dval_t *pi  = dv_new_named_const(QF_PI, "@pi");
-    dval_t *tau = dv_new_named_const(QF_2PI, "@tau");
+    dval_t *x   = test_dv_new_named_var_d(1.25, "x");
+    dval_t *y   = test_dv_new_named_var_d(1.25, "y");
+    dval_t *pi  = test_dv_new_named_const_qf(QF_PI, "@pi");
+    dval_t *tau = test_dv_new_named_const_qf(QF_2PI, "@tau");
 
     dval_t *t1 = dv_add(x, pi);     /* x+π */
     dval_t *t2 = dv_exp(t1);        /* exp(x+π) */
@@ -1625,10 +1625,10 @@ static dval_t *make_expr_48(void)
  * ============================================================ */
 static dval_t *make_expr_49(void)
 {
-    dval_t *x   = dv_new_named_var_d(1.25, "x");
-    dval_t *y   = dv_new_named_var_d(1.25, "y");
-    dval_t *pi  = dv_new_named_const(QF_PI, "@pi");
-    dval_t *tau = dv_new_named_const(QF_2PI, "@tau");
+    dval_t *x   = test_dv_new_named_var_d(1.25, "x");
+    dval_t *y   = test_dv_new_named_var_d(1.25, "y");
+    dval_t *pi  = test_dv_new_named_const_qf(QF_PI, "@pi");
+    dval_t *tau = test_dv_new_named_const_qf(QF_2PI, "@tau");
 
     dval_t *t1 = dv_add(x, pi);     /* x+π */
     dval_t *t2 = dv_sin(t1);        /* sin(x+π) */
@@ -1652,10 +1652,10 @@ static dval_t *make_expr_49(void)
  * ============================================================ */
 static dval_t *make_expr_50(void)
 {
-    dval_t *x   = dv_new_named_var_d(1.25, "x");
-    dval_t *y   = dv_new_named_var_d(1.25, "y");
-    dval_t *pi  = dv_new_named_const(QF_PI, "@pi");
-    dval_t *tau = dv_new_named_const(QF_2PI, "@tau");
+    dval_t *x   = test_dv_new_named_var_d(1.25, "x");
+    dval_t *y   = test_dv_new_named_var_d(1.25, "y");
+    dval_t *pi  = test_dv_new_named_const_qf(QF_PI, "@pi");
+    dval_t *tau = test_dv_new_named_const_qf(QF_2PI, "@tau");
 
     dval_t *t1 = dv_add(x, pi);     /* x+π */
     dval_t *t2 = dv_sin(t1);        /* sin(x+π) */
@@ -2362,7 +2362,7 @@ void test_expressions(void)
 /* U01: x₀² */
 dval_t *make_expr_u01(void)
 {
-    dval_t *x  = dv_new_var_d(1.25);
+    dval_t *x  = test_dv_new_var_d(1.25);
     dval_t *f  = dv_mul(x, x);
     dv_free(x);
     return f;
@@ -2371,7 +2371,7 @@ dval_t *make_expr_u01(void)
 /* U02: x₀³ */
 dval_t *make_expr_u02(void)
 {
-    dval_t *x  = dv_new_var_d(1.25);
+    dval_t *x  = test_dv_new_var_d(1.25);
     dval_t *t1 = dv_mul(x, x);
     dval_t *f  = dv_mul(t1, x);
     dv_free(x);
@@ -2382,8 +2382,8 @@ dval_t *make_expr_u02(void)
 /* U03: x₀³x₁³  (mirrors test 09, but with unnamed vars) */
 dval_t *make_expr_u03(void)
 {
-    dval_t *x  = dv_new_var_d(1.25);
-    dval_t *y  = dv_new_var_d(1.25);
+    dval_t *x  = test_dv_new_var_d(1.25);
+    dval_t *y  = test_dv_new_var_d(1.25);
     dval_t *t1 = dv_pow_d(x, 2.0);
     dval_t *t2 = dv_pow_d(y, 3.0);
     dval_t *t3 = dv_mul(t1, t2);
@@ -2399,7 +2399,7 @@ dval_t *make_expr_u03(void)
 /* U04: 2x₀²  (coefficient stays numeric after simplification) */
 dval_t *make_expr_u04(void)
 {
-    dval_t *x  = dv_new_var_d(1.25);
+    dval_t *x  = test_dv_new_var_d(1.25);
     dval_t *t1 = dv_mul(x, x);
     dval_t *t2 = dv_mul(x, x);
     dval_t *f  = dv_add(t1, t2);
@@ -2412,7 +2412,7 @@ dval_t *make_expr_u04(void)
 /* U05: sin(x₀)·cos(x₀) */
 dval_t *make_expr_u05(void)
 {
-    dval_t *x  = dv_new_var_d(1.25);
+    dval_t *x  = test_dv_new_var_d(1.25);
     dval_t *sx = dv_sin(x);
     dval_t *cx = dv_cos(x);
     dval_t *f  = dv_mul(sx, cx);
@@ -2425,7 +2425,7 @@ dval_t *make_expr_u05(void)
 /* U06: exp(sin(x₀) + cos(x₀))  (exp merge) */
 dval_t *make_expr_u06(void)
 {
-    dval_t *x  = dv_new_var_d(1.25);
+    dval_t *x  = test_dv_new_var_d(1.25);
     dval_t *sx = dv_sin(x);
     dval_t *cx = dv_cos(x);
     dval_t *t1 = dv_exp(sx);
@@ -2443,15 +2443,15 @@ dval_t *make_expr_u06(void)
  *  Builders for manually-subscripted constant tests (C01–C04)
  *
  *  Callers pass "c\xE2\x82\x80" (c₀) and "c\xE2\x82\x81" (c₁)
- *  as the name argument to dv_new_named_const so the names are
+ *  as the name argument to dv_new_named_const_num so the names are
  *  simple (letter + subscript digit) — they won't be bracketed.
  * ============================================================ */
 
 /* C01: c₀x₀²  (named const × unnamed var²) */
 dval_t *make_expr_c01(void)
 {
-    dval_t *x  = dv_new_var_d(1.25);
-    dval_t *c  = dv_new_named_const(QF_PI, "c\xE2\x82\x80");
+    dval_t *x  = test_dv_new_var_d(1.25);
+    dval_t *c  = test_dv_new_named_const_qf(QF_PI, "c\xE2\x82\x80");
     dval_t *x2 = dv_pow_d(x, 2.0);
     dval_t *f  = dv_mul(c, x2);
     dv_free(x);
@@ -2463,8 +2463,8 @@ dval_t *make_expr_c01(void)
 /* C02: c₀·sin(x₀)  (named const × function — needs separator) */
 dval_t *make_expr_c02(void)
 {
-    dval_t *x  = dv_new_var_d(1.25);
-    dval_t *c  = dv_new_named_const(QF_E, "c\xE2\x82\x80");
+    dval_t *x  = test_dv_new_var_d(1.25);
+    dval_t *c  = test_dv_new_named_const_qf(QF_E, "c\xE2\x82\x80");
     dval_t *sx = dv_sin(x);
     dval_t *f  = dv_mul(c, sx);
     dv_free(x);
@@ -2476,9 +2476,9 @@ dval_t *make_expr_c02(void)
 /* C03: x₀ + x₁ + c₀ */
 dval_t *make_expr_c03(void)
 {
-    dval_t *x  = dv_new_var_d(1.25);
-    dval_t *y  = dv_new_var_d(1.25);
-    dval_t *c  = dv_new_named_const(QF_PI, "c\xE2\x82\x80");
+    dval_t *x  = test_dv_new_var_d(1.25);
+    dval_t *y  = test_dv_new_var_d(1.25);
+    dval_t *c  = test_dv_new_named_const_qf(QF_PI, "c\xE2\x82\x80");
     dval_t *t1 = dv_add(x, y);
     dval_t *f  = dv_add(t1, c);
     dv_free(x);
@@ -2491,9 +2491,9 @@ dval_t *make_expr_c03(void)
 /* C04: c₀x₀ + c₁  (two named consts with unnamed var; tests multi-const bindings) */
 dval_t *make_expr_c04(void)
 {
-    dval_t *x  = dv_new_var_d(1.25);
-    dval_t *c0 = dv_new_named_const(QF_PI, "c\xE2\x82\x80");
-    dval_t *c1 = dv_new_named_const(QF_E,  "c\xE2\x82\x81");
+    dval_t *x  = test_dv_new_var_d(1.25);
+    dval_t *c0 = test_dv_new_named_const_qf(QF_PI, "c\xE2\x82\x80");
+    dval_t *c1 = test_dv_new_named_const_qf(QF_E,  "c\xE2\x82\x81");
     dval_t *t1 = dv_mul(c0, x);
     dval_t *f  = dv_add(t1, c1);
     dv_free(x);
@@ -2510,7 +2510,7 @@ dval_t *make_expr_c04(void)
 /* L01: [radius]² */
 dval_t *make_expr_l01(void)
 {
-    dval_t *r = dv_new_named_var_d(1.25, "radius");
+    dval_t *r = test_dv_new_named_var_d(1.25, "radius");
     dval_t *f = dv_pow_d(r, 2.0);
     dv_free(r);
     return f;
@@ -2519,8 +2519,8 @@ dval_t *make_expr_l01(void)
 /* L02: [base]·[height]  (two multi-char vars — separator needed) */
 dval_t *make_expr_l02(void)
 {
-    dval_t *base   = dv_new_named_var_d(1.25, "base");
-    dval_t *height = dv_new_named_var_d(1.25, "height");
+    dval_t *base   = test_dv_new_named_var_d(1.25, "base");
+    dval_t *height = test_dv_new_named_var_d(1.25, "height");
     dval_t *f      = dv_mul(base, height);
     dv_free(base);
     dv_free(height);
@@ -2530,8 +2530,8 @@ dval_t *make_expr_l02(void)
 /* L03: [pi]·[radius]²  (multi-char named const × multi-char named var²) */
 dval_t *make_expr_l03(void)
 {
-    dval_t *r  = dv_new_named_var_d(1.25, "radius");
-    dval_t *pi = dv_new_named_const(QF_PI, "pi");
+    dval_t *r  = test_dv_new_named_var_d(1.25, "radius");
+    dval_t *pi = test_dv_new_named_const_qf(QF_PI, "pi");
     dval_t *r2 = dv_pow_d(r, 2.0);
     dval_t *f  = dv_mul(pi, r2);
     dv_free(r);
@@ -2543,8 +2543,8 @@ dval_t *make_expr_l03(void)
 /* L04: π·[radius]²  (@pi → π is simple; radius is not — separator needed) */
 dval_t *make_expr_l04(void)
 {
-    dval_t *r  = dv_new_named_var_d(1.25, "radius");
-    dval_t *pi = dv_new_named_const(QF_PI, "@pi");
+    dval_t *r  = test_dv_new_named_var_d(1.25, "radius");
+    dval_t *pi = test_dv_new_named_const_qf(QF_PI, "@pi");
     dval_t *r2 = dv_pow_d(r, 2.0);
     dval_t *f  = dv_mul(pi, r2);
     dv_free(r);
@@ -2556,7 +2556,7 @@ dval_t *make_expr_l04(void)
 /* L05: sin([theta])·cos([theta]) */
 dval_t *make_expr_l05(void)
 {
-    dval_t *t  = dv_new_named_var_d(1.25, "theta");
+    dval_t *t  = test_dv_new_named_var_d(1.25, "theta");
     dval_t *st = dv_sin(t);
     dval_t *ct = dv_cos(t);
     dval_t *f  = dv_mul(st, ct);
@@ -2569,9 +2569,9 @@ dval_t *make_expr_l05(void)
 /* L06: [pi]·[tau]·x  (two multi-char consts + one single-char var) */
 dval_t *make_expr_l06(void)
 {
-    dval_t *x   = dv_new_named_var_d(1.25, "x");
-    dval_t *pi  = dv_new_named_const(QF_PI,  "pi");
-    dval_t *tau = dv_new_named_const(QF_2PI, "tau");
+    dval_t *x   = test_dv_new_named_var_d(1.25, "x");
+    dval_t *pi  = test_dv_new_named_const_qf(QF_PI,  "pi");
+    dval_t *tau = test_dv_new_named_const_qf(QF_2PI, "tau");
     dval_t *t1  = dv_mul(pi, tau);
     dval_t *f   = dv_mul(t1, x);
     dv_free(x);
@@ -2584,7 +2584,7 @@ dval_t *make_expr_l06(void)
 /* L07: [my var]²  (space in name) */
 dval_t *make_expr_l07(void)
 {
-    dval_t *x = dv_new_named_var_d(1.25, "my var");
+    dval_t *x = test_dv_new_named_var_d(1.25, "my var");
     dval_t *f = dv_pow_d(x, 2.0);
     dv_free(x);
     return f;
@@ -2593,8 +2593,8 @@ dval_t *make_expr_l07(void)
 /* L08: [2pi]·x  (name starting with a digit) */
 dval_t *make_expr_l08(void)
 {
-    dval_t *x = dv_new_named_var_d(1.25, "x");
-    dval_t *c = dv_new_named_const(QF_PI, "2pi");
+    dval_t *x = test_dv_new_named_var_d(1.25, "x");
+    dval_t *c = test_dv_new_named_const_qf(QF_PI, "2pi");
     dval_t *f = dv_mul(c, x);
     dv_free(x);
     dv_free(c);
@@ -2604,7 +2604,7 @@ dval_t *make_expr_l08(void)
 /* L09: [x']²  (non-alphanumeric character — apostrophe/prime) */
 dval_t *make_expr_l09(void)
 {
-    dval_t *x = dv_new_named_var_d(1.25, "x'");
+    dval_t *x = test_dv_new_named_var_d(1.25, "x'");
     dval_t *f = dv_pow_d(x, 2.0);
     dv_free(x);
     return f;

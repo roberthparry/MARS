@@ -5,52 +5,49 @@
 /* EVALUATION FUNCTIONS                                                      */
 /* ------------------------------------------------------------------------- */
 
-static qcomplex_t eval_const(dval_t *dv)
+static number_t eval_const(dval_t *dv)
 {
-    return dv->c;
+    return num_clone(dv->c);
 }
 
-static qcomplex_t eval_var(dval_t *dv)
+static number_t eval_var(dval_t *dv)
 {
-    return dv->c;
+    return num_clone(dv->c);
 }
 
-static qcomplex_t eval_add(dval_t *dv)
+static number_t eval_add(dval_t *dv)
 {
-    return qc_add(dv_eval_qc_internal(dv->a), dv_eval_qc_internal(dv->b));
+    return num_add(dv_eval_num_internal(dv->a), dv_eval_num_internal(dv->b));
 }
 
-static qcomplex_t eval_sub(dval_t *dv)
+static number_t eval_sub(dval_t *dv)
 {
-    return qc_sub(dv_eval_qc_internal(dv->a), dv_eval_qc_internal(dv->b));
+    return num_sub(dv_eval_num_internal(dv->a), dv_eval_num_internal(dv->b));
 }
 
-static qcomplex_t eval_mul(dval_t *dv)
+static number_t eval_mul(dval_t *dv)
 {
-    return qc_mul(dv_eval_qc_internal(dv->a), dv_eval_qc_internal(dv->b));
+    return num_mul(dv_eval_num_internal(dv->a), dv_eval_num_internal(dv->b));
 }
 
-static qcomplex_t eval_div(dval_t *dv)
+static number_t eval_div(dval_t *dv)
 {
-    return qc_div(dv_eval_qc_internal(dv->a), dv_eval_qc_internal(dv->b));
+    return num_div(dv_eval_num_internal(dv->a), dv_eval_num_internal(dv->b));
 }
 
-static qcomplex_t eval_neg(dval_t *dv)
+static number_t eval_neg(dval_t *dv)
 {
-    return qc_neg(dv_eval_qc_internal(dv->a));
+    return num_neg(dv_eval_num_internal(dv->a));
 }
 
-static qcomplex_t eval_pow(dval_t *dv)
+static number_t eval_pow(dval_t *dv)
 {
-    qcomplex_t base = dv_eval_qc_internal(dv->a);
-    qcomplex_t exp  = dv_eval_qc_internal(dv->b);
-    return qc_pow(base, exp);
+    return num_pow(dv_eval_num_internal(dv->a), dv_eval_num_internal(dv->b));
 }
 
-static qcomplex_t eval_pow_d(dval_t *dv)
+static number_t eval_pow_d(dval_t *dv)
 {
-    qcomplex_t base = dv_eval_qc_internal(dv->a);
-    return qc_pow(base, dv->c);
+    return num_pow(dv_eval_num_internal(dv->a), dv->c);
 }
 
 /* ------------------------------------------------------------------------- */
@@ -60,13 +57,13 @@ static qcomplex_t eval_pow_d(dval_t *dv)
 static dval_t *deriv_const(dval_t *dv)
 {
     (void)dv;
-    return dv_new_const_d(0.0);
+    return dv_num_const_d(0.0);
 }
 
 static dval_t *deriv_var(dval_t *dv)
 {
     const dval_t *wrt = dv_current_wrt_internal();
-    return dv_new_const_d(wrt == NULL || dv == wrt ? 1.0 : 0.0);
+    return dv_num_const_d(wrt == NULL || dv == wrt ? 1.0 : 0.0);
 }
 
 static dval_t *deriv_add(dval_t *dv)
@@ -158,10 +155,10 @@ static dval_t *deriv_pow(dval_t *dv)
 
 static dval_t *deriv_pow_d(dval_t *dv)
 {
-    double  c    = qf_to_double(qc_real(dv->c));
+    qfloat_t exponent = dv_const_real_qf(dv);
     dval_t *da   = dv_get_dx_internal(dv->a);
-    dval_t *p    = dv_pow_d(dv->a, c - 1.0);
-    dval_t *coef = dv_new_const_d(c);
+    dval_t *p    = dv_pow_qf(dv->a, qf_sub(exponent, QF_ONE));
+    dval_t *coef = dv_num_const_qf(exponent);
     dval_t *cp   = dv_mul(coef, p);
     dval_t *out  = dv_mul(cp, da);
     dv_free(da);
@@ -349,14 +346,6 @@ dval_t *dv_pow(const dval_t *a, const dval_t *b)
     return dv_new_binary_internal(&ops_pow, a, b);
 }
 
-dval_t *dv_pow_d(const dval_t *a, double d)
-{
-    if (!a)
-        return NULL;
-    dv_retain(a);
-    return dv_new_pow_d_internal(a, d);
-}
-
 dval_t *dv_pow_qf(const dval_t *a, qfloat_t exponent)
 {
     if (!a)
@@ -365,58 +354,102 @@ dval_t *dv_pow_qf(const dval_t *a, qfloat_t exponent)
     return dv_new_pow_qf_internal(a, exponent);
 }
 
-dval_t *dv_pow_qc(const dval_t *a, qcomplex_t exponent)
+dval_t *dv_pow_num(const dval_t *dv, const number_t *exponent)
 {
-    if (!a)
+    if (!dv || !exponent)
         return NULL;
-    dv_retain(a);
-    return dv_new_pow_qc_internal(a, exponent);
+    dv_retain(dv);
+    if (num_is_real(*exponent))
+        return dv_new_pow_qf_internal(dv, num_to_qfloat(*exponent));
+    return dv_new_pow_qc_internal(dv, dv_qc_from_number(*exponent));
 }
 
-dval_t *dv_add_d(const dval_t *dv, double d)
+dval_t *dv_add_num(const dval_t *dv, const number_t *value)
 {
-    dval_t *c = dv_new_const_d(d);
-    dval_t *r = dv_add(dv, c);
+    dval_t *c;
+    dval_t *r;
+
+    if (!value)
+        return NULL;
+    c = dv_new_const_num(*value);
+    if (!c)
+        return NULL;
+    r = dv_add(dv, c);
     dv_free(c);
     return r;
 }
 
-dval_t *dv_sub_d(const dval_t *dv, double d)
+dval_t *dv_sub_num(const dval_t *dv, const number_t *value)
 {
-    dval_t *c = dv_new_const_d(d);
-    dval_t *r = dv_sub(dv, c);
+    dval_t *c;
+    dval_t *r;
+
+    if (!value)
+        return NULL;
+    c = dv_new_const_num(*value);
+    if (!c)
+        return NULL;
+    r = dv_sub(dv, c);
     dv_free(c);
     return r;
 }
 
-dval_t *dv_d_sub(double d, const dval_t *dv)
+dval_t *dv_num_sub(const number_t *value, const dval_t *dv)
 {
-    dval_t *c = dv_new_const_d(d);
-    dval_t *r = dv_sub(c, dv);
+    dval_t *c;
+    dval_t *r;
+
+    if (!value)
+        return NULL;
+    c = dv_new_const_num(*value);
+    if (!c)
+        return NULL;
+    r = dv_sub(c, dv);
     dv_free(c);
     return r;
 }
 
-dval_t *dv_mul_d(const dval_t *dv, double d)
+dval_t *dv_mul_num(const dval_t *dv, const number_t *value)
 {
-    dval_t *c = dv_new_const_d(d);
-    dval_t *r = dv_mul(dv, c);
+    dval_t *c;
+    dval_t *r;
+
+    if (!value)
+        return NULL;
+    c = dv_new_const_num(*value);
+    if (!c)
+        return NULL;
+    r = dv_mul(dv, c);
     dv_free(c);
     return r;
 }
 
-dval_t *dv_div_d(const dval_t *dv, double d)
+dval_t *dv_div_num(const dval_t *dv, const number_t *value)
 {
-    dval_t *c = dv_new_const_d(d);
-    dval_t *r = dv_div(dv, c);
+    dval_t *c;
+    dval_t *r;
+
+    if (!value)
+        return NULL;
+    c = dv_new_const_num(*value);
+    if (!c)
+        return NULL;
+    r = dv_div(dv, c);
     dv_free(c);
     return r;
 }
 
-dval_t *dv_d_div(double d, const dval_t *dv)
+dval_t *dv_num_div(const number_t *value, const dval_t *dv)
 {
-    dval_t *c = dv_new_const_d(d);
-    dval_t *r = dv_div(c, dv);
+    dval_t *c;
+    dval_t *r;
+
+    if (!value)
+        return NULL;
+    c = dv_new_const_num(*value);
+    if (!c)
+        return NULL;
+    r = dv_div(c, dv);
     dv_free(c);
     return r;
 }

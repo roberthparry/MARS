@@ -5,7 +5,7 @@
  *   - Reference counting (dv_retain / dv_free)
  *   - Name handling, including ASCII-to-Unicode normalisation for Greek letter
  *     names (e.g. "alpha" -> "alpha-as-unicode") so names are canonical in output
- *   - Lazy primal evaluation (dv_eval) via vtable dispatch (ops->eval)
+ *   - Lazy primal evaluation (dv_eval_num) via vtable dispatch (ops->eval)
  *   - Lazy derivative construction (dv_get_deriv / dv_create_deriv) via
  *     vtable dispatch (ops->deriv), with the result cached in dval_t::dx_cache
  *   - All arithmetic and math operator constructors (dv_add, dv_sin, etc.)
@@ -29,6 +29,7 @@
 #include <strings.h>
 #include <limits.h>
 #include <math.h>
+#include "number.h"
 #include "qcomplex.h"
 #include "dval_internal.h"
 #include "dval.h"
@@ -39,22 +40,12 @@
  * not a general thread-safety mechanism for the DAG. */
 static __thread const dval_t *tl_wrt = NULL;
 
-static inline int qc_is_zero(qcomplex_t z)
-{
-    return qc_eq(z, QC_ZERO);
-}
-
-static inline int qc_is_one(qcomplex_t z)
-{
-    return qc_eq(z, QC_ONE);
-}
-
 static struct _dval_t _DV_NAN_NODE = {
     .ops = &ops_const,
     .a = NULL,
     .b = NULL,
-    .c = { { NAN, 0.0 }, { NAN, 0.0 } },
-    .x = { { NAN, 0.0 }, { NAN, 0.0 } },
+    .c = { { 0, 0, 0, 0, 0 } },
+    .x = { { 0, 0, 0, 0, 0 } },
     .x_valid = 1,
     .epoch = 0,
     .dx_cache = NULL,
@@ -65,6 +56,13 @@ static struct _dval_t _DV_NAN_NODE = {
 
 static dval_t *dv_nan_const_shared(void)
 {
+    static int initialized = 0;
+
+    if (!initialized) {
+        _DV_NAN_NODE.c = NUM_NAN;
+        _DV_NAN_NODE.x = NUM_NAN;
+        initialized = 1;
+    }
     return &_DV_NAN_NODE;
 }
 
@@ -72,10 +70,10 @@ static dval_t *dv_nan_const_shared(void)
 /* Lazy eval / deriv                                                         */
 /* ------------------------------------------------------------------------- */
 
-static qcomplex_t dv_eval_qc(const dval_t *dv)
+static number_t dv_eval_cached_num(const dval_t *dv)
 {
     if (!dv)
-        return QC_ZERO;
+        return NUM_ZERO;
 
     dval_t *m = (dval_t *)dv;
 
@@ -86,25 +84,30 @@ static qcomplex_t dv_eval_qc(const dval_t *dv)
     /* Recurse into children to bring their epochs current, then check whether
      * this node's cached value is still valid. ops->eval() will call dv_eval_qc
      * on children a second time, but those calls return immediately (x_valid=1). */
-    dv_eval_qc(m->a);
+    dv_eval_cached_num(m->a);
     if (m->ops->arity == DV_OP_BINARY)
-        dv_eval_qc(m->b);
+        dv_eval_cached_num(m->b);
 
     uint64_t child_epoch = m->a ? m->a->epoch : 0;
     if (m->b && m->b->epoch > child_epoch)
         child_epoch = m->b->epoch;
 
     if (!m->x_valid || child_epoch > m->epoch) {
-        m->x       = m->ops->eval(m);
+        dv_store_value_num(m, m->ops->eval(m));
         m->x_valid = 1;
         m->epoch   = child_epoch;
     }
     return m->x;
 }
 
+number_t dv_eval_num_internal(const dval_t *dv)
+{
+    return dv_eval_cached_num(dv);
+}
+
 qcomplex_t dv_eval_qc_internal(const dval_t *dv)
 {
-    return dv_eval_qc(dv);
+    return dv_qc_from_number(dv_eval_cached_num(dv));
 }
 
 static uint64_t current_wrt_id(void)
@@ -149,7 +152,7 @@ static dval_t *get_dx(const dval_t *dv)
         dv_retain((dval_t *)d);
         return (dval_t *)d;
     }
-    return dv_new_const_d(0.0);
+    return dv_num_const_d(0.0);
 }
 
 dval_t *dv_get_dx_internal(const dval_t *dv)
@@ -162,23 +165,9 @@ const dval_t *dv_current_wrt_internal(void)
     return tl_wrt;
 }
 
-/* ------------------------------------------------------------------------- */
-/* Public eval                                                               */
-/* ------------------------------------------------------------------------- */
-
-qcomplex_t dv_eval(const dval_t *dv)
+number_t dv_eval_num(const dval_t *dv)
 {
-    return dv_eval_qc(dv);
-}
-
-qfloat_t dv_eval_qf(const dval_t *dv)
-{
-    return qc_real(dv_eval_qc(dv));
-}
-
-double dv_eval_d(const dval_t *dv)
-{
-    return qf_to_double(dv_eval_qf(dv));
+    return num_clone(dv_eval_num_internal(dv));
 }
 
 /* ------------------------------------------------------------------------- */
@@ -200,27 +189,17 @@ const dval_t *dv_get_deriv(const dval_t *expr, const dval_t *wrt)
 /* Setters                                                                   */
 /* ------------------------------------------------------------------------- */
 
-void dv_set_val(dval_t *dv, qcomplex_t v)
+void dv_set_val_num(dval_t *dv, number_t value)
 {
     if (!dv)
         abort();
     if (dv->ops != &ops_var &&
         !(dv->ops == &ops_const && dv->name && *dv->name))
         abort();
-    dv->c = v;
-    dv->x = v;
+    dv_store_const_num(dv, num_clone(value));
+    dv_store_value_num(dv, num_clone(dv->c));
     dv->x_valid = 1;
     dv->epoch++;
-}
-
-void dv_set_val_qf(dval_t *dv, qfloat_t v)
-{
-    dv_set_val(dv, dv_qc_real_qf(v));
-}
-
-void dv_set_val_d(dval_t *dv, double v)
-{
-    dv_set_val(dv, dv_qc_real_d(v));
 }
 
 void dv_set_name(dval_t *dv, const char *name)
@@ -230,23 +209,9 @@ void dv_set_name(dval_t *dv, const char *name)
     dv->name = dv_normalize_name(name);
 }
 
-/* ------------------------------------------------------------------------- */
-/* Accessors                                                                 */
-/* ------------------------------------------------------------------------- */
-
-double dv_get_val_d(const dval_t *dv)
+number_t dv_get_val_num(const dval_t *dv)
 {
-    return qf_to_double(qc_real(dv_eval_qc((dval_t *)dv)));
-}
-
-qfloat_t dv_get_val_qf(const dval_t *dv)
-{
-    return qc_real(dv_eval_qc((dval_t *)dv));
-}
-
-qcomplex_t dv_get_val(const dval_t *dv)
-{
-    return dv_eval_qc((dval_t *)dv);
+    return dv_eval_num(dv);
 }
 
 /* ------------------------------------------------------------------------- */
@@ -272,7 +237,7 @@ dval_t *dv_new_pow_d_internal(const dval_t *a, double d)
 {
     dval_t *dv = dv_alloc(&ops_pow_d);
     dv->a = (dval_t *)a;
-    dv->c = dv_qc_real_d(d);
+    dv_store_const_num(dv, num_create_from_qfloat(qf_from_double(d)));
     return dv;
 }
 
@@ -280,7 +245,7 @@ dval_t *dv_new_pow_qf_internal(const dval_t *a, qfloat_t exponent)
 {
     dval_t *dv = dv_alloc(&ops_pow_d);
     dv->a = (dval_t *)a;
-    dv->c = dv_qc_real_qf(exponent);
+    dv_store_const_num(dv, num_create_from_qfloat(exponent));
     return dv;
 }
 
@@ -288,17 +253,29 @@ dval_t *dv_new_pow_qc_internal(const dval_t *a, qcomplex_t exponent)
 {
     dval_t *dv = dv_alloc(&ops_pow_d);
     dv->a = (dval_t *)a;
-    dv->c = exponent;
+    dv_store_const_num(dv, dv_number_from_qc(exponent));
     return dv;
 }
 
 int dv_cmp(const dval_t *dv1, const dval_t *dv2) {
-    qcomplex_t a = dv_eval(dv1);
-    qcomplex_t b = dv_eval(dv2);
+    number_t a = dv_eval_num_internal(dv1);
+    number_t b = dv_eval_num_internal(dv2);
+    number_t a_real = num_real_part(a);
+    number_t b_real = num_real_part(b);
+    int cmp = num_cmp(a_real, b_real);
 
-    if (!qf_eq(qc_real(a), qc_real(b)))
-        return qf_cmp(qc_real(a), qc_real(b));
-    return qf_cmp(qc_imag(a), qc_imag(b));
+    if (cmp == 0) {
+        number_t a_imag = num_imag_part(a);
+        number_t b_imag = num_imag_part(b);
+
+        cmp = num_cmp(a_imag, b_imag);
+        num_destroy(&a_imag);
+        num_destroy(&b_imag);
+    }
+
+    num_destroy(&a_real);
+    num_destroy(&b_real);
+    return cmp;
 }
 
 

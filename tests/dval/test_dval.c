@@ -51,40 +51,92 @@ void print_expr_of(const dval_t *f)
     free(s);
 }
 
+static char *format_num_at_own_precision(const number_t value)
+{
+    char fmt[32];
+    char *out;
+    size_t significant_digits = num_get_prec_digits(value);
+    int needed;
+    size_t precision;
+
+    if (num_is_exact(value) || significant_digits == 0u)
+        return num_to_string(value);
+
+    precision = significant_digits > 0u ? significant_digits - 1u : 0u;
+    snprintf(fmt, sizeof(fmt), "%%.%zuN", precision);
+    needed = num_sprintf(NULL, 0u, fmt, value);
+    if (needed < 0)
+        return NULL;
+    out = malloc((size_t)needed + 1u);
+    if (!out)
+        return NULL;
+    if (num_sprintf(out, (size_t)needed + 1u, fmt, value) < 0) {
+        free(out);
+        return NULL;
+    }
+    return out;
+}
+
+static void print_num_line(const char *label, const number_t value)
+{
+    char *text = format_num_at_own_precision(value);
+
+    if (!text)
+        text = num_to_string(value);
+    printf("%-8s = %s\n", label, text ? text : "(unavailable)");
+    free(text);
+}
+
 static dval_t *make_readme_f(dval_t *x)
 {
+    number_t two = num_create_from_long(2);
+    number_t three = num_create_from_long(3);
+    number_t seven = num_create_from_long(7);
     dval_t *sinx   = dv_sin(x);
     dval_t *exp_sx = dv_exp(sinx);
-    dval_t *x2     = dv_pow_d(x, 2.0);
-    dval_t *term2  = dv_mul_d(x2, 3.0);
+    dval_t *x2     = dv_pow_num(x, &two);
+    dval_t *term2  = dv_mul_num(x2, &three);
     dval_t *f0     = dv_add(exp_sx, term2);
-    dval_t *f      = dv_sub_d(f0, 7.0);
+    dval_t *f      = dv_sub_num(f0, &seven);
 
     dv_free(sinx);
     dv_free(exp_sx);
     dv_free(x2);
     dv_free(term2);
     dv_free(f0);
+    num_destroy(&two);
+    num_destroy(&seven);
+    num_destroy(&three);
 
     return f;
 }
 
 static int run_readme_example(void)
 {
-    dval_t *x = dv_new_named_var_d(1.25, "x");
+    const size_t old_prec_bits = num_get_default_prec_bits();
+    number_t x0;
+    dval_t *x;
     dval_t *f;
     dval_t *df_dx;
     const dval_t *d2f_dx;
-    qfloat_t f_val;
-    qfloat_t d1_val;
-    qfloat_t d2_val;
+    number_t f_val;
+    number_t d1_val;
+    number_t d2_val;
 
-    if (!x)
+    if (num_set_default_prec_bits(384u) != 0)
         return 1;
+    x0 = num_create_from_string("1.25");
+    x = dv_new_named_var_num(x0, "x");
+    num_destroy(&x0);
+    if (!x) {
+        num_set_default_prec_bits(old_prec_bits);
+        return 1;
+    }
 
     f = make_readme_f(x);
     if (!f) {
         dv_free(x);
+        num_set_default_prec_bits(old_prec_bits);
         return 1;
     }
 
@@ -92,6 +144,7 @@ static int run_readme_example(void)
     if (!df_dx) {
         dv_free(f);
         dv_free(x);
+        num_set_default_prec_bits(old_prec_bits);
         return 1;
     }
 
@@ -100,47 +153,75 @@ static int run_readme_example(void)
         dv_free(df_dx);
         dv_free(f);
         dv_free(x);
+        num_set_default_prec_bits(old_prec_bits);
         return 1;
     }
 
-    f_val  = dv_eval_qf(f);
-    d1_val = dv_eval_qf(df_dx);
-    d2_val = dv_eval_qf(d2f_dx);
+    f_val  = dv_eval_num(f);
+    d1_val = dv_eval_num(df_dx);
+    d2_val = dv_eval_num(d2f_dx);
 
     printf("f(x)    = "); dv_print(f);
     printf("f'(x)   = "); dv_print(df_dx);
     printf("f''(x)  = "); dv_print(d2f_dx);
 
-    qf_printf("\nAt x = 1.25:\n");
-    qf_printf("f(x)    = %.34q\n", f_val);
-    qf_printf("f'(x)   = %.34q\n", d1_val);
-    qf_printf("f''(x)  = %.34q\n", d2_val);
+    printf("\nAt x = 1.25 (384 bits, %zu significant digits):\n",
+           num_get_prec_digits(f_val));
+    print_num_line("f(x)", f_val);
+    print_num_line("f'(x)", d1_val);
+    print_num_line("f''(x)", d2_val);
 
+    num_destroy(&d2_val);
+    num_destroy(&d1_val);
+    num_destroy(&f_val);
     dv_free(df_dx);
     dv_free(f);
     dv_free(x);
+    num_set_default_prec_bits(old_prec_bits);
     return 0;
 }
 
 static int run_readme_from_string_example(void)
 {
-    dval_t *x     = dv_new_named_var_d(1.25, "x");
-    dval_t *sinx  = dv_sin(x);
-    dval_t *esinx = dv_exp(sinx);
-    dval_t *x2    = dv_pow_d(x, 2.0);
-    dval_t *t     = dv_mul_d(x2, 3.0);
-    dval_t *t2    = dv_sub_d(t, 7.0);
-    dval_t *f     = dv_add(esinx, t2);
+    const size_t old_prec_bits = num_get_default_prec_bits();
+    number_t x0;
+    dval_t *x;
+    dval_t *sinx;
+    dval_t *esinx;
+    dval_t *x2;
+    dval_t *t;
+    dval_t *t2;
+    dval_t *f;
     dval_t *df_dx;
     const dval_t *d2f_dx;
-    qfloat_t f_val;
-    qfloat_t d1_val;
-    qfloat_t d2_val;
+    number_t f_val;
+    number_t d1_val;
+    number_t d2_val;
+
+    if (num_set_default_prec_bits(384u) != 0)
+        return 1;
+    x0 = num_create_from_string("1.25");
+    x = dv_new_named_var_num(x0, "x");
+    num_destroy(&x0);
+    sinx = dv_sin(x);
+    esinx = dv_exp(sinx);
+    x2 = dv_pow_d(x, 2.0);
+    {
+        number_t three = num_create_from_long(3);
+        number_t seven = num_create_from_long(7);
+
+        t = dv_mul_num(x2, &three);
+        t2 = dv_sub_num(t, &seven);
+        num_destroy(&seven);
+        num_destroy(&three);
+    }
+    f = dv_add(esinx, t2);
 
     if (!x || !sinx || !esinx || !x2 || !t || !t2 || !f) {
         dv_free(f);
         dv_free(t2); dv_free(t); dv_free(x2); dv_free(esinx); dv_free(sinx);
         dv_free(x);
+        num_set_default_prec_bits(old_prec_bits);
         return 1;
     }
 
@@ -149,6 +230,7 @@ static int run_readme_from_string_example(void)
         dv_free(f);
         dv_free(t2); dv_free(t); dv_free(x2); dv_free(esinx); dv_free(sinx);
         dv_free(x);
+        num_set_default_prec_bits(old_prec_bits);
         return 1;
     }
 
@@ -158,46 +240,71 @@ static int run_readme_from_string_example(void)
         dv_free(f);
         dv_free(t2); dv_free(t); dv_free(x2); dv_free(esinx); dv_free(sinx);
         dv_free(x);
+        num_set_default_prec_bits(old_prec_bits);
         return 1;
     }
 
-    f_val  = dv_eval_qf(f);
-    d1_val = dv_eval_qf(df_dx);
-    d2_val = dv_eval_qf(d2f_dx);
+    f_val  = dv_eval_num(f);
+    d1_val = dv_eval_num(df_dx);
+    d2_val = dv_eval_num(d2f_dx);
 
     printf("f(x)    = "); dv_print(f);
     printf("f'(x)   = "); dv_print(df_dx);
     printf("f''(x)  = "); dv_print(d2f_dx);
 
-    qf_printf("\nAt x = 1.25:\n");
-    qf_printf("f(x)    = %.34q\n", f_val);
-    qf_printf("f'(x)   = %.34q\n", d1_val);
-    qf_printf("f''(x)  = %.34q\n", d2_val);
+    printf("\nAt x = 1.25 (384 bits, %zu significant digits):\n",
+           num_get_prec_digits(f_val));
+    print_num_line("f(x)", f_val);
+    print_num_line("f'(x)", d1_val);
+    print_num_line("f''(x)", d2_val);
 
+    num_destroy(&d2_val);
+    num_destroy(&d1_val);
+    num_destroy(&f_val);
     dv_free(df_dx);
     dv_free(f);
     dv_free(t2); dv_free(t); dv_free(x2); dv_free(esinx); dv_free(sinx);
     dv_free(x);
+    num_set_default_prec_bits(old_prec_bits);
     return 0;
 }
 
 static int run_readme_partial_example(void)
 {
-    dval_t *x  = dv_new_named_var_d(1.0, "x");
-    dval_t *y  = dv_new_named_var_d(2.0, "y");
-    dval_t *x2 = dv_pow_d(x, 2.0);
-    dval_t *xy = dv_mul(x, y);
-    dval_t *y2 = dv_pow_d(y, 2.0);
-    dval_t *t0 = dv_add(x2, xy);
-    dval_t *f  = dv_add(t0, y2);
+    const size_t old_prec_bits = num_get_default_prec_bits();
+    number_t x0;
+    number_t y0;
+    dval_t *x;
+    dval_t *y;
+    dval_t *x2;
+    dval_t *xy;
+    dval_t *y2;
+    dval_t *t0;
+    dval_t *f;
     dval_t *df_dx;
     dval_t *df_dy;
     dval_t *d2f_dxdy;
     const dval_t *p;
+    number_t value;
+
+    if (num_set_default_prec_bits(384u) != 0)
+        return 1;
+    x0 = num_create_from_string("1");
+    y0 = num_create_from_string("2");
+    x = dv_new_named_var_num(x0, "x");
+    y = dv_new_named_var_num(y0, "y");
+    num_destroy(&y0);
+    num_destroy(&x0);
+    x2 = dv_pow_d(x, 2.0);
+    xy = dv_mul(x, y);
+    y2 = dv_pow_d(y, 2.0);
+    t0 = dv_add(x2, xy);
+    f = dv_add(t0, y2);
 
     if (!x || !y || !x2 || !xy || !y2 || !t0 || !f) {
         dv_free(f); dv_free(t0); dv_free(y2); dv_free(xy); dv_free(x2);
         dv_free(y); dv_free(x);
+        num_set_default_prec_bits(old_prec_bits);
         return 1;
     }
 
@@ -210,14 +317,24 @@ static int run_readme_partial_example(void)
         dv_free(df_dx);
         dv_free(f); dv_free(t0); dv_free(y2); dv_free(xy); dv_free(x2);
         dv_free(y); dv_free(x);
+        num_set_default_prec_bits(old_prec_bits);
         return 1;
     }
 
-    qf_printf("At x=1, y=2:\n");
-    qf_printf("f          = %.34q\n", dv_eval_qf(f));
-    qf_printf("∂f/∂x      = %.34q\n", dv_eval_qf(df_dx));
-    qf_printf("∂f/∂y      = %.34q\n", dv_eval_qf(df_dy));
-    qf_printf("∂²f/∂x∂y   = %.34q\n", dv_eval_qf(d2f_dxdy));
+    value = dv_eval_num(f);
+    printf("At x=1, y=2 (384 bits, %zu significant digits):\n",
+           num_get_prec_digits(value));
+    print_num_line("f", value);
+    num_destroy(&value);
+    value = dv_eval_num(df_dx);
+    print_num_line("∂f/∂x", value);
+    num_destroy(&value);
+    value = dv_eval_num(df_dy);
+    print_num_line("∂f/∂y", value);
+    num_destroy(&value);
+    value = dv_eval_num(d2f_dxdy);
+    print_num_line("∂²f/∂x∂y", value);
+    num_destroy(&value);
 
     p = dv_get_deriv(f, x);
     if (!p) {
@@ -226,19 +343,109 @@ static int run_readme_partial_example(void)
         dv_free(df_dx);
         dv_free(f); dv_free(t0); dv_free(y2); dv_free(xy); dv_free(x2);
         dv_free(y); dv_free(x);
+        num_set_default_prec_bits(old_prec_bits);
         return 1;
     }
 
-    dv_set_val_d(x, 3.0);
-    qf_printf("\nAfter x=3:\n");
-    qf_printf("∂f/∂x      = %.34q\n", dv_eval_qf(df_dx));
-    qf_printf("∂f/∂y      = %.34q\n", dv_eval_qf(df_dy));
+    x0 = num_create_from_string("3");
+    dv_set_val_num(x, x0);
+    num_destroy(&x0);
+    printf("\nAfter x=3:\n");
+    value = dv_eval_num(df_dx);
+    print_num_line("∂f/∂x", value);
+    num_destroy(&value);
+    value = dv_eval_num(df_dy);
+    print_num_line("∂f/∂y", value);
+    num_destroy(&value);
 
     dv_free(d2f_dxdy);
     dv_free(df_dy);
     dv_free(df_dx);
     dv_free(f); dv_free(t0); dv_free(y2); dv_free(xy); dv_free(x2);
     dv_free(y); dv_free(x);
+    num_set_default_prec_bits(old_prec_bits);
+    return 0;
+}
+
+static int run_readme_eval_derivatives_example(void)
+{
+    const size_t old_prec_bits = num_get_default_prec_bits();
+    number_t x0;
+    number_t y0;
+    dval_t *x;
+    dval_t *y;
+    dval_t *xy;
+    dval_t *sin_xy;
+    dval_t *exp_xy;
+    dval_t *log_y;
+    dval_t *x_log_y;
+    dval_t *f;
+    const dval_t *vars[2];
+    number_t value;
+    number_t grads[2];
+
+    if (num_set_default_prec_bits(384u) != 0)
+        return 1;
+
+    x0 = num_create_from_string("1");
+    y0 = num_create_from_string("2");
+    x = dv_new_named_var_num(x0, "x");
+    y = dv_new_named_var_num(y0, "y");
+    num_destroy(&y0);
+    num_destroy(&x0);
+    xy = dv_mul(x, y);
+    sin_xy = dv_sin(xy);
+    exp_xy = dv_exp(sin_xy);
+    log_y = dv_log(y);
+    x_log_y = dv_mul(x, log_y);
+    f = dv_add(exp_xy, x_log_y);
+
+    if (!x || !y || !xy || !sin_xy || !exp_xy || !log_y || !x_log_y || !f) {
+        dv_free(f);
+        dv_free(x_log_y);
+        dv_free(log_y);
+        dv_free(exp_xy);
+        dv_free(sin_xy);
+        dv_free(xy);
+        dv_free(y);
+        dv_free(x);
+        num_set_default_prec_bits(old_prec_bits);
+        return 1;
+    }
+
+    vars[0] = x;
+    vars[1] = y;
+    if (dv_eval_derivatives(f, 2u, vars, &value, grads) != 0) {
+        dv_free(f);
+        dv_free(x_log_y);
+        dv_free(log_y);
+        dv_free(exp_xy);
+        dv_free(sin_xy);
+        dv_free(xy);
+        dv_free(y);
+        dv_free(x);
+        num_set_default_prec_bits(old_prec_bits);
+        return 1;
+    }
+
+    printf("Evaluating derivatives at x=1, y=2 (384 bits, %zu significant digits):\n",
+           num_get_prec_digits(value));
+    print_num_line("f", value);
+    print_num_line("∂f/∂x", grads[0]);
+    print_num_line("∂f/∂y", grads[1]);
+
+    num_destroy(&grads[1]);
+    num_destroy(&grads[0]);
+    num_destroy(&value);
+    dv_free(f);
+    dv_free(x_log_y);
+    dv_free(log_y);
+    dv_free(exp_xy);
+    dv_free(sin_xy);
+    dv_free(xy);
+    dv_free(y);
+    dv_free(x);
+    num_set_default_prec_bits(old_prec_bits);
     return 0;
 }
 
@@ -251,6 +458,9 @@ static int run_README_md_example(void)
         return 1;
     putchar('\n');
     if (run_readme_partial_example() != 0)
+        return 1;
+    putchar('\n');
+    if (run_readme_eval_derivatives_example() != 0)
         return 1;
     return 0;
 }

@@ -2,231 +2,453 @@
 
 #include "dval_internal.h"
 
-static inline void dv_reverse_unary(qfloat_t value, qfloat_t *a_bar, qfloat_t *b_bar)
+static inline void dv_reverse_unary(number_t value, number_t *a_bar, number_t *b_bar)
 {
     *a_bar = value;
-    *b_bar = QF_ZERO;
+    *b_bar = num_clone(NUM_ZERO);
 }
 
-static inline qfloat_t qf_from_int_local(int x)
+static inline number_t num_sq_local(const number_t value)
 {
-    return qf_from_double((double)x);
+    return num_mul(value, value);
 }
 
-static inline qfloat_t qf_sq_local(qfloat_t x)
+static inline number_t num_inverse_local(const number_t value)
 {
-    return qf_mul(x, x);
+    return num_div(NUM_ONE, value);
 }
 
-void dv_reverse_atan2(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+void dv_reverse_atan2(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
-    qfloat_t denom = qf_add(qf_sq_local(qc_real(dv->a->x)), qf_sq_local(qc_real(dv->b->x)));
-    *a_bar = qf_mul(out_bar, qf_div(qc_real(dv->b->x), denom));
-    *b_bar = qf_neg(qf_mul(out_bar, qf_div(qc_real(dv->a->x), denom)));
+    number_t ax2 = num_sq_local(dv_eval_num_internal(dv->a));
+    number_t bx2 = num_sq_local(dv_eval_num_internal(dv->b));
+    number_t denom = num_add(ax2, bx2);
+    number_t y_over_denom = num_div(dv_eval_num_internal(dv->b), denom);
+    number_t x_over_denom = num_div(dv_eval_num_internal(dv->a), denom);
+    number_t scaled_x = num_mul(*out_bar, x_over_denom);
+
+    *a_bar = num_mul(*out_bar, y_over_denom);
+    *b_bar = num_neg(scaled_x);
+
+    num_destroy(&scaled_x);
+    num_destroy(&x_over_denom);
+    num_destroy(&y_over_denom);
+    num_destroy(&denom);
+    num_destroy(&bx2);
+    num_destroy(&ax2);
 }
 
-void dv_reverse_sin(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+void dv_reverse_sin(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
-    dv_reverse_unary(qf_mul(out_bar, qf_cos(qc_real(dv->a->x))), a_bar, b_bar);
+    number_t cos_x = num_cos(dv_eval_num_internal(dv->a));
+    number_t factor = num_mul(*out_bar, cos_x);
+
+    dv_reverse_unary(factor, a_bar, b_bar);
+    num_destroy(&cos_x);
 }
 
-void dv_reverse_cos(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+void dv_reverse_cos(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
-    dv_reverse_unary(qf_neg(qf_mul(out_bar, qf_sin(qc_real(dv->a->x)))), a_bar, b_bar);
+    number_t sin_x = num_sin(dv_eval_num_internal(dv->a));
+    number_t product = num_mul(*out_bar, sin_x);
+
+    dv_reverse_unary(num_neg(product), a_bar, b_bar);
+    num_destroy(&sin_x);
+    num_destroy(&product);
 }
 
-void dv_reverse_tan(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+void dv_reverse_tan(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
-    qfloat_t cos_x = qf_cos(qc_real(dv->a->x));
-    *a_bar = qf_mul(out_bar, qf_div(QF_ONE, qf_sq_local(cos_x)));
-    *b_bar = QF_ZERO;
+    number_t cos_x = num_cos(dv_eval_num_internal(dv->a));
+    number_t cos_sq = num_sq_local(cos_x);
+    number_t inv = num_inverse_local(cos_sq);
+
+    dv_reverse_unary(num_mul(*out_bar, inv), a_bar, b_bar);
+    num_destroy(&inv);
+    num_destroy(&cos_sq);
+    num_destroy(&cos_x);
 }
 
-void dv_reverse_sinh(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+void dv_reverse_sinh(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
-    dv_reverse_unary(qf_mul(out_bar, qf_cosh(qc_real(dv->a->x))), a_bar, b_bar);
+    number_t cosh_x = num_cosh(dv_eval_num_internal(dv->a));
+    number_t factor = num_mul(*out_bar, cosh_x);
+
+    dv_reverse_unary(factor, a_bar, b_bar);
+    num_destroy(&cosh_x);
 }
 
-void dv_reverse_cosh(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+void dv_reverse_cosh(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
-    dv_reverse_unary(qf_mul(out_bar, qf_sinh(qc_real(dv->a->x))), a_bar, b_bar);
+    number_t sinh_x = num_sinh(dv_eval_num_internal(dv->a));
+    number_t factor = num_mul(*out_bar, sinh_x);
+
+    dv_reverse_unary(factor, a_bar, b_bar);
+    num_destroy(&sinh_x);
 }
 
-void dv_reverse_tanh(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+void dv_reverse_tanh(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
-    dv_reverse_unary(qf_mul(out_bar, qf_sub(QF_ONE, qf_sq_local(qc_real(dv->x)))), a_bar, b_bar);
+    number_t dv_sq = num_sq_local(dv_eval_num_internal(dv));
+    number_t factor = num_sub(NUM_ONE, dv_sq);
+
+    dv_reverse_unary(num_mul(*out_bar, factor), a_bar, b_bar);
+    num_destroy(&factor);
+    num_destroy(&dv_sq);
 }
 
-void dv_reverse_asin(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+void dv_reverse_asin(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
-    dv_reverse_unary(qf_div(out_bar, qf_sqrt(qf_sub(QF_ONE, qf_sq_local(qc_real(dv->a->x))))), a_bar, b_bar);
+    number_t x_sq = num_sq_local(dv_eval_num_internal(dv->a));
+    number_t inner = num_sub(NUM_ONE, x_sq);
+    number_t denom = num_sqrt(inner);
+
+    dv_reverse_unary(num_div(*out_bar, denom), a_bar, b_bar);
+    num_destroy(&denom);
+    num_destroy(&inner);
+    num_destroy(&x_sq);
 }
 
-void dv_reverse_acos(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+void dv_reverse_acos(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
-    dv_reverse_unary(qf_neg(qf_div(out_bar, qf_sqrt(qf_sub(QF_ONE, qf_sq_local(qc_real(dv->a->x)))))), a_bar, b_bar);
+    number_t x_sq = num_sq_local(dv_eval_num_internal(dv->a));
+    number_t inner = num_sub(NUM_ONE, x_sq);
+    number_t denom = num_sqrt(inner);
+    number_t frac = num_div(*out_bar, denom);
+
+    dv_reverse_unary(num_neg(frac), a_bar, b_bar);
+    num_destroy(&frac);
+    num_destroy(&denom);
+    num_destroy(&inner);
+    num_destroy(&x_sq);
 }
 
-void dv_reverse_atan(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+void dv_reverse_atan(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
-    dv_reverse_unary(qf_div(out_bar, qf_add(QF_ONE, qf_sq_local(qc_real(dv->a->x)))), a_bar, b_bar);
+    number_t x_sq = num_sq_local(dv_eval_num_internal(dv->a));
+    number_t denom = num_add(NUM_ONE, x_sq);
+
+    dv_reverse_unary(num_div(*out_bar, denom), a_bar, b_bar);
+    num_destroy(&denom);
+    num_destroy(&x_sq);
 }
 
-void dv_reverse_asinh(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+void dv_reverse_asinh(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
-    dv_reverse_unary(qf_div(out_bar, qf_sqrt(qf_add(qf_sq_local(qc_real(dv->a->x)), QF_ONE))), a_bar, b_bar);
+    number_t x_sq = num_sq_local(dv_eval_num_internal(dv->a));
+    number_t inner = num_add(x_sq, NUM_ONE);
+    number_t denom = num_sqrt(inner);
+
+    dv_reverse_unary(num_div(*out_bar, denom), a_bar, b_bar);
+    num_destroy(&denom);
+    num_destroy(&inner);
+    num_destroy(&x_sq);
 }
 
-void dv_reverse_acosh(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+void dv_reverse_acosh(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
-    qfloat_t denom = qf_mul(qf_sqrt(qf_sub(qc_real(dv->a->x), QF_ONE)),
-                            qf_sqrt(qf_add(qc_real(dv->a->x), QF_ONE)));
-    *a_bar = qf_div(out_bar, denom);
-    *b_bar = QF_ZERO;
+    number_t xm1 = num_sub(dv_eval_num_internal(dv->a), NUM_ONE);
+    number_t xp1 = num_add(dv_eval_num_internal(dv->a), NUM_ONE);
+    number_t sqrt_xm1 = num_sqrt(xm1);
+    number_t sqrt_xp1 = num_sqrt(xp1);
+    number_t denom = num_mul(sqrt_xm1, sqrt_xp1);
+
+    dv_reverse_unary(num_div(*out_bar, denom), a_bar, b_bar);
+    num_destroy(&sqrt_xp1);
+    num_destroy(&sqrt_xm1);
+    num_destroy(&denom);
+    num_destroy(&xp1);
+    num_destroy(&xm1);
 }
 
-void dv_reverse_atanh(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+void dv_reverse_atanh(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
-    dv_reverse_unary(qf_div(out_bar, qf_sub(QF_ONE, qf_sq_local(qc_real(dv->a->x)))), a_bar, b_bar);
+    number_t x_sq = num_sq_local(dv_eval_num_internal(dv->a));
+    number_t denom = num_sub(NUM_ONE, x_sq);
+
+    dv_reverse_unary(num_div(*out_bar, denom), a_bar, b_bar);
+    num_destroy(&denom);
+    num_destroy(&x_sq);
 }
 
-void dv_reverse_exp(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+void dv_reverse_exp(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
-    dv_reverse_unary(qf_mul(out_bar, qc_real(dv->x)), a_bar, b_bar);
+    number_t factor = num_mul(*out_bar, dv_eval_num_internal(dv));
+
+    dv_reverse_unary(factor, a_bar, b_bar);
 }
 
-void dv_reverse_log(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+void dv_reverse_log(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
-    dv_reverse_unary(qf_div(out_bar, qc_real(dv->a->x)), a_bar, b_bar);
+    number_t factor = num_div(*out_bar, dv_eval_num_internal(dv->a));
+
+    dv_reverse_unary(factor, a_bar, b_bar);
 }
 
-void dv_reverse_sqrt(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+void dv_reverse_sqrt(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
-    dv_reverse_unary(qf_div(out_bar, qf_mul(qf_from_int_local(2), qc_real(dv->x))), a_bar, b_bar);
+    number_t denom = num_mul(NUM_TWO, dv_eval_num_internal(dv));
+
+    dv_reverse_unary(num_div(*out_bar, denom), a_bar, b_bar);
+    num_destroy(&denom);
 }
 
-void dv_reverse_abs(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+void dv_reverse_abs(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
-    int cmp = qf_cmp(qc_real(dv->a->x), QF_ZERO);
-    if (cmp > 0)
-        *a_bar = out_bar;
-    else if (cmp < 0)
-        *a_bar = qf_neg(out_bar);
-    else
-        *a_bar = QF_ZERO;
-    *b_bar = QF_ZERO;
+    if (!num_is_real(dv_eval_num_internal(dv->a))) {
+        *a_bar = num_clone(NUM_NAN);
+        *b_bar = num_clone(NUM_ZERO);
+        return;
+    }
+    switch (num_cmp(dv_eval_num_internal(dv->a), NUM_ZERO)) {
+    case 1:
+        *a_bar = num_clone(*out_bar);
+        break;
+    case -1:
+        *a_bar = num_neg(*out_bar);
+        break;
+    default:
+        *a_bar = num_clone(NUM_ZERO);
+        break;
+    }
+    *b_bar = num_clone(NUM_ZERO);
 }
 
-void dv_reverse_hypot(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+void dv_reverse_hypot(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
-    *a_bar = qf_mul(out_bar, qf_div(qc_real(dv->a->x), qc_real(dv->x)));
-    *b_bar = qf_mul(out_bar, qf_div(qc_real(dv->b->x), qc_real(dv->x)));
+    number_t ax = num_div(dv_eval_num_internal(dv->a), dv_eval_num_internal(dv));
+    number_t bx = num_div(dv_eval_num_internal(dv->b), dv_eval_num_internal(dv));
+
+    *a_bar = num_mul(*out_bar, ax);
+    *b_bar = num_mul(*out_bar, bx);
+
+    num_destroy(&bx);
+    num_destroy(&ax);
 }
 
-void dv_reverse_erf(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+void dv_reverse_erf(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
-    qfloat_t scale = qf_div(qf_from_int_local(2), qf_sqrt(QF_PI));
-    *a_bar = qf_mul(out_bar, qf_mul(scale, qf_exp(qf_neg(qf_sq_local(qc_real(dv->a->x))))));
-    *b_bar = QF_ZERO;
+    number_t x_sq = num_sq_local(dv_eval_num_internal(dv->a));
+    number_t neg_x_sq = num_neg(x_sq);
+    number_t exp_term = num_exp(neg_x_sq);
+    number_t factor = num_mul(NUM_2_SQRTPI, exp_term);
+
+    dv_reverse_unary(num_mul(*out_bar, factor), a_bar, b_bar);
+    num_destroy(&exp_term);
+    num_destroy(&factor);
+    num_destroy(&neg_x_sq);
+    num_destroy(&x_sq);
 }
 
-void dv_reverse_erfc(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+void dv_reverse_erfc(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
-    qfloat_t scale = qf_div(qf_from_int_local(2), qf_sqrt(QF_PI));
-    *a_bar = qf_neg(qf_mul(out_bar, qf_mul(scale, qf_exp(qf_neg(qf_sq_local(qc_real(dv->a->x)))))));
-    *b_bar = QF_ZERO;
+    number_t x_sq = num_sq_local(dv_eval_num_internal(dv->a));
+    number_t neg_x_sq = num_neg(x_sq);
+    number_t exp_term = num_exp(neg_x_sq);
+    number_t factor = num_mul(NUM_NEG_TWO_OVER_SQRT_PI, exp_term);
+
+    dv_reverse_unary(num_mul(*out_bar, factor), a_bar, b_bar);
+    num_destroy(&exp_term);
+    num_destroy(&factor);
+    num_destroy(&neg_x_sq);
+    num_destroy(&x_sq);
 }
 
-void dv_reverse_erfinv(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+void dv_reverse_erfinv(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
-    qfloat_t scale = qf_div(qf_sqrt(QF_PI), qf_from_int_local(2));
-    *a_bar = qf_mul(out_bar, qf_mul(scale, qf_exp(qf_sq_local(qc_real(dv->x)))));
-    *b_bar = QF_ZERO;
+    number_t y_sq = num_sq_local(dv_eval_num_internal(dv));
+    number_t exp_term = num_exp(y_sq);
+    number_t scale = num_div(NUM_SQRT_PI, NUM_TWO);
+    number_t factor = num_mul(scale, exp_term);
+
+    dv_reverse_unary(num_mul(*out_bar, factor), a_bar, b_bar);
+    num_destroy(&scale);
+    num_destroy(&exp_term);
+    num_destroy(&factor);
+    num_destroy(&y_sq);
 }
 
-void dv_reverse_erfcinv(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+void dv_reverse_erfcinv(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
-    qfloat_t scale = qf_div(qf_sqrt(QF_PI), qf_from_int_local(2));
-    *a_bar = qf_neg(qf_mul(out_bar, qf_mul(scale, qf_exp(qf_sq_local(qc_real(dv->x))))));
-    *b_bar = QF_ZERO;
+    number_t y_sq = num_sq_local(dv_eval_num_internal(dv));
+    number_t scale = num_div(NUM_SQRT_PI, NUM_TWO);
+    number_t neg_scale = num_neg(scale);
+    number_t exp_term = num_exp(y_sq);
+    number_t factor = num_mul(neg_scale, exp_term);
+
+    dv_reverse_unary(num_mul(*out_bar, factor), a_bar, b_bar);
+    num_destroy(&scale);
+    num_destroy(&neg_scale);
+    num_destroy(&exp_term);
+    num_destroy(&factor);
+    num_destroy(&y_sq);
 }
 
-void dv_reverse_gamma(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+void dv_reverse_gamma(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
-    dv_reverse_unary(qf_mul(out_bar, qf_mul(qc_real(dv->x), qf_digamma(qc_real(dv->a->x)))), a_bar, b_bar);
+    number_t digamma_x = num_digamma(dv_eval_num_internal(dv->a));
+    number_t factor = num_mul(dv_eval_num_internal(dv), digamma_x);
+
+    dv_reverse_unary(num_mul(*out_bar, factor), a_bar, b_bar);
+    num_destroy(&digamma_x);
+    num_destroy(&factor);
 }
 
-void dv_reverse_lgamma(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+void dv_reverse_lgamma(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
     (void)dv;
-    dv_reverse_unary(qf_mul(out_bar, qf_digamma(qc_real(dv->a->x))), a_bar, b_bar);
+    number_t digamma_x = num_digamma(dv_eval_num_internal(dv->a));
+    number_t factor = num_mul(*out_bar, digamma_x);
+
+    dv_reverse_unary(factor, a_bar, b_bar);
+    num_destroy(&digamma_x);
 }
 
-void dv_reverse_digamma(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+void dv_reverse_digamma(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
     (void)dv;
-    dv_reverse_unary(qf_mul(out_bar, qf_trigamma(qc_real(dv->a->x))), a_bar, b_bar);
+    number_t trigamma_x = num_trigamma(dv_eval_num_internal(dv->a));
+    number_t factor = num_mul(*out_bar, trigamma_x);
+
+    dv_reverse_unary(factor, a_bar, b_bar);
+    num_destroy(&trigamma_x);
 }
 
-void dv_reverse_trigamma(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+void dv_reverse_trigamma(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
     (void)dv;
-    dv_reverse_unary(qf_mul(out_bar, qf_tetragamma(qc_real(dv->a->x))), a_bar, b_bar);
+    number_t tetragamma_x = num_tetragamma(dv_eval_num_internal(dv->a));
+    number_t factor = num_mul(*out_bar, tetragamma_x);
+
+    dv_reverse_unary(factor, a_bar, b_bar);
+    num_destroy(&tetragamma_x);
 }
 
-static qfloat_t qf_lambert_reverse_factor(qfloat_t z, qfloat_t w)
+static number_t num_lambert_reverse_factor(const number_t z, const number_t w)
 {
-    if (qf_eq(z, QF_ZERO))
-        return QF_ONE;
-    return qf_div(w, qf_mul(z, qf_add(QF_ONE, w)));
+    number_t one_plus_w;
+
+    if (num_eq(z, NUM_ZERO))
+        return num_clone(NUM_ONE);
+    one_plus_w = num_add(NUM_ONE, w);
+    {
+        number_t denom = num_mul(z, one_plus_w);
+        number_t out = num_div(w, denom);
+
+        num_destroy(&denom);
+        num_destroy(&one_plus_w);
+        return out;
+    }
 }
 
-void dv_reverse_lambert_w0(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+void dv_reverse_lambert_w0(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
-    dv_reverse_unary(qf_mul(out_bar, qf_lambert_reverse_factor(qc_real(dv->a->x), qc_real(dv->x))), a_bar, b_bar);
+    number_t factor = num_lambert_reverse_factor(dv_eval_num_internal(dv->a), dv_eval_num_internal(dv));
+
+    dv_reverse_unary(num_mul(*out_bar, factor), a_bar, b_bar);
+    num_destroy(&factor);
 }
 
-void dv_reverse_lambert_wm1(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+void dv_reverse_lambert_wm1(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
-    dv_reverse_unary(qf_mul(out_bar, qf_lambert_reverse_factor(qc_real(dv->a->x), qc_real(dv->x))), a_bar, b_bar);
+    number_t factor = num_lambert_reverse_factor(dv_eval_num_internal(dv->a), dv_eval_num_internal(dv));
+
+    dv_reverse_unary(num_mul(*out_bar, factor), a_bar, b_bar);
+    num_destroy(&factor);
 }
 
-void dv_reverse_normal_pdf(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+void dv_reverse_normal_pdf(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
-    dv_reverse_unary(qf_neg(qf_mul(out_bar, qf_mul(qc_real(dv->a->x), qc_real(dv->x)))), a_bar, b_bar);
+    number_t x_pdf = num_mul(dv_eval_num_internal(dv->a), dv_eval_num_internal(dv));
+    number_t factor = num_neg(x_pdf);
+
+    dv_reverse_unary(num_mul(*out_bar, factor), a_bar, b_bar);
+    num_destroy(&factor);
+    num_destroy(&x_pdf);
 }
 
-void dv_reverse_normal_cdf(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+void dv_reverse_normal_cdf(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
-    dv_reverse_unary(qf_mul(out_bar, qf_normal_pdf(qc_real(dv->a->x))), a_bar, b_bar);
+    number_t pdf_x = num_normal_pdf(dv_eval_num_internal(dv->a));
+    number_t factor = num_mul(*out_bar, pdf_x);
+
+    dv_reverse_unary(factor, a_bar, b_bar);
+    num_destroy(&pdf_x);
 }
 
-void dv_reverse_normal_logpdf(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+void dv_reverse_normal_logpdf(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
-    dv_reverse_unary(qf_neg(qf_mul(out_bar, qc_real(dv->a->x))), a_bar, b_bar);
+    number_t neg_x = num_neg(dv_eval_num_internal(dv->a));
+    number_t factor = num_mul(*out_bar, neg_x);
+
+    dv_reverse_unary(factor, a_bar, b_bar);
+    num_destroy(&neg_x);
 }
 
-void dv_reverse_ei(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+void dv_reverse_ei(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
-    dv_reverse_unary(qf_mul(out_bar, qf_div(qf_exp(qc_real(dv->a->x)), qc_real(dv->a->x))), a_bar, b_bar);
+    number_t exp_x = num_exp(dv_eval_num_internal(dv->a));
+    number_t factor = num_div(exp_x, dv_eval_num_internal(dv->a));
+
+    dv_reverse_unary(num_mul(*out_bar, factor), a_bar, b_bar);
+    num_destroy(&exp_x);
+    num_destroy(&factor);
 }
 
-void dv_reverse_e1(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+void dv_reverse_e1(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
-    dv_reverse_unary(qf_neg(qf_mul(out_bar, qf_div(qf_exp(qf_neg(qc_real(dv->a->x))), qc_real(dv->a->x)))), a_bar, b_bar);
+    number_t neg_x = num_neg(dv_eval_num_internal(dv->a));
+    number_t exp_neg_x = num_exp(neg_x);
+    number_t factor = num_div(exp_neg_x, dv_eval_num_internal(dv->a));
+    number_t neg_factor = num_neg(factor);
+
+    dv_reverse_unary(num_mul(*out_bar, neg_factor), a_bar, b_bar);
+    num_destroy(&neg_factor);
+    num_destroy(&factor);
+    num_destroy(&exp_neg_x);
+    num_destroy(&neg_x);
 }
 
-void dv_reverse_beta(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+void dv_reverse_beta(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
-    qfloat_t psi_ab = qf_digamma(qf_add(qc_real(dv->a->x), qc_real(dv->b->x)));
-    *a_bar = qf_mul(out_bar, qf_mul(qc_real(dv->x), qf_sub(qf_digamma(qc_real(dv->a->x)), psi_ab)));
-    *b_bar = qf_mul(out_bar, qf_mul(qc_real(dv->x), qf_sub(qf_digamma(qc_real(dv->b->x)), psi_ab)));
+    number_t a_plus_b = num_add(dv_eval_num_internal(dv->a), dv_eval_num_internal(dv->b));
+    number_t digamma_a = num_digamma(dv_eval_num_internal(dv->a));
+    number_t digamma_b = num_digamma(dv_eval_num_internal(dv->b));
+    number_t psi_ab = num_digamma(a_plus_b);
+    number_t psi_a_minus = num_sub(digamma_a, psi_ab);
+    number_t psi_b_minus = num_sub(digamma_b, psi_ab);
+    number_t scale_a = num_mul(dv_eval_num_internal(dv), psi_a_minus);
+    number_t scale_b = num_mul(dv_eval_num_internal(dv), psi_b_minus);
+
+    *a_bar = num_mul(*out_bar, scale_a);
+    *b_bar = num_mul(*out_bar, scale_b);
+
+    num_destroy(&scale_b);
+    num_destroy(&scale_a);
+    num_destroy(&psi_b_minus);
+    num_destroy(&psi_a_minus);
+    num_destroy(&psi_ab);
+    num_destroy(&digamma_b);
+    num_destroy(&digamma_a);
+    num_destroy(&a_plus_b);
 }
 
-void dv_reverse_logbeta(const dval_t *dv, qfloat_t out_bar, qfloat_t *a_bar, qfloat_t *b_bar)
+void dv_reverse_logbeta(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
-    qfloat_t psi_ab = qf_digamma(qf_add(qc_real(dv->a->x), qc_real(dv->b->x)));
-    (void)dv;
-    *a_bar = qf_mul(out_bar, qf_sub(qf_digamma(qc_real(dv->a->x)), psi_ab));
-    *b_bar = qf_mul(out_bar, qf_sub(qf_digamma(qc_real(dv->b->x)), psi_ab));
+    number_t a_plus_b = num_add(dv_eval_num_internal(dv->a), dv_eval_num_internal(dv->b));
+    number_t digamma_a = num_digamma(dv_eval_num_internal(dv->a));
+    number_t digamma_b = num_digamma(dv_eval_num_internal(dv->b));
+    number_t psi_ab = num_digamma(a_plus_b);
+    number_t scale_a = num_sub(digamma_a, psi_ab);
+    number_t scale_b = num_sub(digamma_b, psi_ab);
+
+    *a_bar = num_mul(*out_bar, scale_a);
+    *b_bar = num_mul(*out_bar, scale_b);
+
+    num_destroy(&scale_b);
+    num_destroy(&scale_a);
+    num_destroy(&psi_ab);
+    num_destroy(&digamma_b);
+    num_destroy(&digamma_a);
+    num_destroy(&a_plus_b);
 }

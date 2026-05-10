@@ -8,6 +8,11 @@
 
 extern dval_t *dv_simplify(const dval_t *dv);
 
+static int dv_try_get_unnamed_const_real_qf(const dval_t *dv, qfloat_t *out)
+{
+    return dv_is_unnamed_const(dv) && dv_try_get_const_real_qf(dv, out);
+}
+
 static void *dv_terms_xrealloc(void *ptr, size_t size)
 {
     void *grown = realloc(ptr, size);
@@ -21,21 +26,25 @@ static void *dv_terms_xrealloc(void *ptr, size_t size)
 
 static qfloat_t term_coeff(const dval_t *term, const dval_t **base)
 {
+    qfloat_t value;
+
     if (dv_is_unnamed_const(term)) {
         *base = NULL;
-        return qc_real(term->c);
+        return dv_try_get_unnamed_const_real_qf(term, &value) ? value : QF_NAN;
     }
     if (dv_is_op(term, &ops_neg)) {
         if (dv_is_op(term->a, &ops_mul) && dv_is_unnamed_const(term->a->a)) {
             *base = term->a->b;
-            return qf_neg(qc_real(term->a->a->c));
+            return dv_try_get_unnamed_const_real_qf(term->a->a, &value)
+                     ? qf_neg(value)
+                     : QF_NAN;
         }
         *base = term->a;
         return qf_from_double(-1.0);
     }
     if (dv_is_op(term, &ops_mul) && dv_is_unnamed_const(term->a)) {
         *base = term->b;
-        return qc_real(term->a->c);
+        return dv_try_get_unnamed_const_real_qf(term->a, &value) ? value : QF_NAN;
     }
     *base = term;
     return qf_from_double(1.0);
@@ -43,13 +52,16 @@ static qfloat_t term_coeff(const dval_t *term, const dval_t **base)
 
 dval_t *dv_make_scaled(qfloat_t coeff, dval_t *base)
 {
-    if (dv_qf_is_zero(coeff)) { dv_free(base); return dv_new_const_d(0.0); }
+    if (dv_qf_is_zero(coeff)) { dv_free(base); return dv_num_const_d(0.0); }
     if (dv_qf_is_one(coeff))  return base;
     if (dv_qf_is_minus_one(coeff)) {
         if (dv_is_op(base, &ops_div) && dv_is_op(base->a, &ops_mul) &&
-            dv_is_unnamed_const(base->a->a) &&
-            qf_cmp(qc_real(base->a->a->c), QF_ZERO) < 0) {
-            qfloat_t pos_c = qf_neg(qc_real(base->a->a->c));
+            dv_is_unnamed_const(base->a->a)) {
+            qfloat_t numer_coeff;
+
+            if (dv_try_get_unnamed_const_real_qf(base->a->a, &numer_coeff) &&
+                qf_cmp(numer_coeff, QF_ZERO) < 0) {
+                qfloat_t pos_c = qf_neg(numer_coeff);
             dval_t *rest = base->a->b;
             dval_t *den = base->b;
             dv_retain(rest);
@@ -60,6 +72,7 @@ dval_t *dv_make_scaled(qfloat_t coeff, dval_t *base)
             dv_free(new_num);
             dv_free(den);
             return r;
+            }
         }
         if (dv_is_op(base, &ops_div) && dv_is_op(base->a, &ops_neg)) {
             dval_t *inner = base->a->a;
@@ -77,7 +90,11 @@ dval_t *dv_make_scaled(qfloat_t coeff, dval_t *base)
         return r;
     }
     if (dv_is_op(base, &ops_mul) && dv_is_unnamed_const(base->a)) {
-        qfloat_t folded = qf_mul(coeff, qc_real(base->a->c));
+        qfloat_t folded_coeff;
+
+        if (!dv_try_get_unnamed_const_real_qf(base->a, &folded_coeff))
+            folded_coeff = dv_const_real_qf(base->a);
+        qfloat_t folded = qf_mul(coeff, folded_coeff);
         dv_retain(base->b);
         dval_t *rest = base->b;
         dv_free(base);
@@ -86,7 +103,11 @@ dval_t *dv_make_scaled(qfloat_t coeff, dval_t *base)
     if (dv_is_op(base, &ops_mul) &&
         dv_is_op(base->a, &ops_mul) &&
         dv_is_unnamed_const(base->a->a)) {
-        qfloat_t folded = qf_mul(coeff, qc_real(base->a->a->c));
+        qfloat_t folded_coeff;
+
+        if (!dv_try_get_unnamed_const_real_qf(base->a->a, &folded_coeff))
+            folded_coeff = dv_const_real_qf(base->a->a);
+        qfloat_t folded = qf_mul(coeff, folded_coeff);
         dv_retain(base->a->b);
         dv_retain(base->b);
         dval_t *inner = dv_mul(base->a->b, base->b);
@@ -95,7 +116,7 @@ dval_t *dv_make_scaled(qfloat_t coeff, dval_t *base)
         dv_free(base);
         return dv_make_scaled(folded, inner);
     }
-    dval_t *cn = dv_new_const(coeff);
+    dval_t *cn = dv_num_const_qf(coeff);
     dval_t *r = dv_mul(cn, base);
     dv_free(cn);
     dv_free(base);
@@ -239,7 +260,12 @@ void dv_collect_addends(dval_t *dv, qfloat_t scale, qfloat_t *c_const,
         if (dv_is_op(dv->a, &ops_mul) &&
             dv_is_unnamed_const(dv->a->a) &&
             dv_is_addsub(dv->a->b)) {
-            qfloat_t ns = qf_mul(qf_neg(scale), qc_real(dv->a->a->c));
+            qfloat_t coeff;
+            qfloat_t ns;
+
+            if (!dv_try_get_unnamed_const_real_qf(dv->a->a, &coeff))
+                return;
+            ns = qf_mul(qf_neg(scale), coeff);
             dv_collect_addends(dv->a->b, ns, c_const, terms, n, cap);
             return;
         }
@@ -247,16 +273,26 @@ void dv_collect_addends(dval_t *dv, qfloat_t scale, qfloat_t *c_const,
     if (dv_is_op(dv, &ops_mul) &&
         dv_is_unnamed_const(dv->a) &&
         dv_is_addsub(dv->b)) {
-        qfloat_t ns = qf_mul(scale, qc_real(dv->a->c));
+        qfloat_t coeff;
+        qfloat_t ns;
+
+        if (!dv_try_get_unnamed_const_real_qf(dv->a, &coeff))
+            return;
+        ns = qf_mul(scale, coeff);
         dv_collect_addends(dv->b, ns, c_const, terms, n, cap);
         return;
     }
     if (dv_is_op(dv, &ops_mul) &&
         dv_is_op(dv->a, &ops_mul) &&
         dv_is_unnamed_const(dv->a->a)) {
-        qfloat_t ns = qf_mul(scale, qc_real(dv->a->a->c));
+        qfloat_t coeff;
+        qfloat_t ns;
         dval_t *raw;
         dval_t *simp;
+
+        if (!dv_try_get_unnamed_const_real_qf(dv->a->a, &coeff))
+            return;
+        ns = qf_mul(scale, coeff);
 
         dv_retain(dv->a->b);
         dv_retain(dv->b);
@@ -326,7 +362,11 @@ int dv_extract_common_addend_coeff(const addend_t *terms, size_t n,
 
 static int is_trig_square_of(const dval_t *dv, const dval_ops_t *op, const dval_t **arg_out)
 {
-    if (!dv_is_pow_d_expr(dv) || !qf_eq(qc_real(dv->c), qf_from_double(2.0)))
+    qfloat_t exponent;
+
+    if (!dv_is_pow_d_expr(dv) ||
+        !dv_try_get_const_real_qf(dv, &exponent) ||
+        !qf_eq(exponent, qf_from_double(2.0)))
         return 0;
     if (!dv_is_op(dv->a, op))
         return 0;
@@ -363,7 +403,7 @@ dval_t *dv_try_trig_pythagorean_identity(const addend_t *terms, size_t n,
     if (nonzero_terms != 2 || !sin_arg || !cos_arg || !dv_struct_eq(sin_arg, cos_arg))
         return NULL;
 
-    return dv_new_const(common_coeff);
+    return dv_num_const_qf(common_coeff);
 }
 
 static void flatten_add(dval_t *root, dval_t **addends, int *na, int max)
@@ -435,7 +475,11 @@ void dv_append_node(dval_t ***nodes, size_t *count, size_t *cap, dval_t *node)
 
 static qfloat_t pow_exponent(const dval_t *dv)
 {
-    return dv_is_op(dv, &ops_pow_d) ? qc_real(dv->c) : QF_ONE;
+    qfloat_t exponent;
+
+    if (!dv_is_op(dv, &ops_pow_d))
+        return QF_ONE;
+    return dv_try_get_const_real_qf(dv, &exponent) ? exponent : QF_NAN;
 }
 
 static dval_t *pow_base(const dval_t *dv)
@@ -447,7 +491,7 @@ dval_t *dv_make_pow_like(dval_t *base, qfloat_t exponent)
 {
     if (qf_eq(exponent, QF_ZERO)) {
         dv_free(base);
-        return dv_new_const_d(1.0);
+        return dv_num_const_d(1.0);
     }
     if (qf_eq(exponent, QF_ONE))
         return base;
@@ -478,10 +522,14 @@ void dv_split_division_terms(qfloat_t *c_acc, int *is_zero,
         terms[i] = NULL;
 
         if (dv_is_unnamed_const(num)) {
-            if (dv_qf_is_zero(qc_real(num->c)))
+            qfloat_t numer;
+
+            if (!dv_try_get_unnamed_const_real_qf(num, &numer))
+                numer = dv_const_real_qf(num);
+            if (dv_qf_is_zero(numer))
                 *is_zero = 1;
             else
-                *c_acc = qf_mul(*c_acc, qc_real(num->c));
+                *c_acc = qf_mul(*c_acc, numer);
             dv_free(num);
         } else {
             terms[i] = num;
@@ -493,7 +541,11 @@ void dv_split_division_terms(qfloat_t *c_acc, int *is_zero,
         }
 
         if (dv_is_unnamed_const(den)) {
-            *c_acc = qf_div(*c_acc, qc_real(den->c));
+            qfloat_t denom;
+
+            if (!dv_try_get_unnamed_const_real_qf(den, &denom))
+                denom = dv_const_real_qf(den);
+            *c_acc = qf_div(*c_acc, denom);
             dv_free(den);
             continue;
         }
@@ -699,7 +751,7 @@ dval_t *dv_rebuild_product_chain(qfloat_t c_acc, dval_t **terms, size_t nterms)
     dval_t *cur = NULL;
 
     if (!dv_qf_is_one(c_acc))
-        cur = dv_new_const(c_acc);
+        cur = dv_num_const_qf(c_acc);
 
     for (size_t i = 0; i < nterms; ++i) {
         if (!terms[i])
@@ -715,7 +767,7 @@ dval_t *dv_rebuild_product_chain(qfloat_t c_acc, dval_t **terms, size_t nterms)
     }
 
     free(terms);
-    return cur ? cur : dv_new_const(c_acc);
+    return cur ? cur : dv_num_const_qf(c_acc);
 }
 
 dval_t *dv_rebuild_division_chain(dval_t **den_terms, size_t nden_terms)

@@ -2,7 +2,7 @@
 
 void test_second_deriv_var(void)
 {
-    dval_t *x   = dv_new_var_d(2.0);
+    dval_t *x   = test_dv_new_var_d(2.0);
     dval_t *df  = dv_create_deriv(x, x);
     const dval_t *ddf = dv_get_deriv(df, x);
 
@@ -17,7 +17,7 @@ void test_second_deriv_var(void)
 
 void test_second_deriv_neg(void)
 {
-    dval_t *x   = dv_new_var_d(3.0);
+    dval_t *x   = test_dv_new_var_d(3.0);
     dval_t *f   = dv_neg(x);
     dval_t *df  = dv_create_deriv(f, x);
     const dval_t *ddf = dv_get_deriv(df, x);
@@ -34,7 +34,7 @@ void test_second_deriv_neg(void)
 
 void test_second_deriv_add_d(void)
 {
-    dval_t *x   = dv_new_var_d(2.0);
+    dval_t *x   = test_dv_new_var_d(2.0);
     dval_t *f   = dv_add_d(x, 5.0);
     dval_t *df  = dv_create_deriv(f, x);
     const dval_t *ddf = dv_get_deriv(df, x);
@@ -51,7 +51,7 @@ void test_second_deriv_add_d(void)
 
 void test_second_deriv_mul_d(void)
 {
-    dval_t *x   = dv_new_var_d(4.0);
+    dval_t *x   = test_dv_new_var_d(4.0);
     dval_t *f   = dv_mul_d(x, 7.0);
     dval_t *df  = dv_create_deriv(f, x);
     const dval_t *ddf = dv_get_deriv(df, x);
@@ -68,7 +68,7 @@ void test_second_deriv_mul_d(void)
 
 void test_second_deriv_div_d(void)
 {
-    dval_t *x   = dv_new_var_d(9.0);
+    dval_t *x   = test_dv_new_var_d(9.0);
     dval_t *f   = dv_div_d(x, 3.0);
     dval_t *df  = dv_create_deriv(f, x);
     const dval_t *ddf = dv_get_deriv(df, x);
@@ -85,7 +85,7 @@ void test_second_deriv_div_d(void)
 
 void test_second_deriv_x2(void)
 {
-    dval_t *x   = dv_new_var_d(3.0);
+    dval_t *x   = test_dv_new_var_d(3.0);
     dval_t *f   = dv_mul(x, x);
     dval_t *df  = dv_create_deriv(f, x);
     const dval_t *ddf = dv_get_deriv(df, x);
@@ -102,7 +102,7 @@ void test_second_deriv_x2(void)
 
 void test_second_deriv_x3(void)
 {
-    dval_t *x   = dv_new_var_d(2.0);
+    dval_t *x   = test_dv_new_var_d(2.0);
     dval_t *f   = dv_pow_d(x, 3.0);
     dval_t *df  = dv_create_deriv(f, x);
     const dval_t *ddf = dv_get_deriv(df, x);
@@ -119,10 +119,10 @@ void test_second_deriv_x3(void)
 
 void test_second_deriv_pow_xy(void)
 {
-    dval_t *x = dv_new_var_d(2.0);
+    dval_t *x = test_dv_new_var_d(2.0);
 
     dval_t *x2  = dv_mul(x, x);
-    dval_t *one = dv_new_const_d(1.0);
+    dval_t *one = test_dv_new_const_d(1.0);
     dval_t *y   = dv_add(x2, one);
 
     dval_t *f   = dv_pow(x, y);
@@ -160,7 +160,7 @@ void test_second_deriv_pow_xy(void)
 
 void test_second_deriv_sin(void)
 {
-    dval_t *x   = dv_new_var_d(0.5);
+    dval_t *x   = test_dv_new_var_d(0.5);
     dval_t *f   = dv_sin(x);
     dval_t *df  = dv_create_deriv(f, x);
     const dval_t *ddf = dv_get_deriv(df, x);
@@ -177,7 +177,7 @@ void test_second_deriv_sin(void)
 
 void test_second_deriv_cos(void)
 {
-    dval_t *x   = dv_new_var_d(0.5);
+    dval_t *x   = test_dv_new_var_d(0.5);
     dval_t *f   = dv_cos(x);
     dval_t *df  = dv_create_deriv(f, x);
     const dval_t *ddf = dv_get_deriv(df, x);
@@ -194,7 +194,7 @@ void test_second_deriv_cos(void)
 
 void test_second_deriv_tan(void)
 {
-    dval_t *x   = dv_new_var_d(0.5);
+    dval_t *x   = test_dv_new_var_d(0.5);
     dval_t *f   = dv_tan(x);
     dval_t *df  = dv_create_deriv(f, x);
     const dval_t *ddf = dv_get_deriv(df, x);
@@ -213,7 +213,7 @@ void test_second_deriv_tan(void)
 
 void test_second_deriv_sinh(void)
 {
-    dval_t *x   = dv_new_var_d(0.5);
+    dval_t *x   = test_dv_new_var_d(0.5);
     dval_t *f   = dv_sinh(x);
     dval_t *df  = dv_create_deriv(f, x);
     const dval_t *ddf = dv_get_deriv(df, x);
@@ -230,7 +230,7 @@ void test_second_deriv_sinh(void)
 
 void test_second_deriv_cosh(void)
 {
-    dval_t *x   = dv_new_var_d(0.5);
+    dval_t *x   = test_dv_new_var_d(0.5);
     dval_t *f   = dv_cosh(x);
     dval_t *df  = dv_create_deriv(f, x);
     const dval_t *ddf = dv_get_deriv(df, x);
@@ -247,7 +247,7 @@ void test_second_deriv_cosh(void)
 
 void test_second_deriv_tanh(void)
 {
-    dval_t *x   = dv_new_var_d(0.5);
+    dval_t *x   = test_dv_new_var_d(0.5);
     dval_t *f   = dv_tanh(x);
     dval_t *df  = dv_create_deriv(f, x);
     const dval_t *ddf = dv_get_deriv(df, x);
@@ -267,7 +267,7 @@ void test_second_deriv_tanh(void)
 
 void test_second_deriv_asin(void)
 {
-    dval_t *x   = dv_new_var_d(0.25);
+    dval_t *x   = test_dv_new_var_d(0.25);
     dval_t *f   = dv_asin(x);
     dval_t *df  = dv_create_deriv(f, x);
     const dval_t *ddf = dv_get_deriv(df, x);
@@ -287,7 +287,7 @@ void test_second_deriv_asin(void)
 
 void test_second_deriv_acos(void)
 {
-    dval_t *x   = dv_new_var_d(0.25);
+    dval_t *x   = test_dv_new_var_d(0.25);
     dval_t *f   = dv_acos(x);
     dval_t *df  = dv_create_deriv(f, x);
     const dval_t *ddf = dv_get_deriv(df, x);
@@ -307,7 +307,7 @@ void test_second_deriv_acos(void)
 
 void test_second_deriv_atan(void)
 {
-    dval_t *x   = dv_new_var_d(0.25);
+    dval_t *x   = test_dv_new_var_d(0.25);
     dval_t *f   = dv_atan(x);
     dval_t *df  = dv_create_deriv(f, x);
     const dval_t *ddf = dv_get_deriv(df, x);
@@ -327,8 +327,8 @@ void test_second_deriv_atan(void)
 
 void test_second_deriv_atan2(void)
 {
-    dval_t *x   = dv_new_var_d(0.25);
-    dval_t *one = dv_new_const_d(1.0);
+    dval_t *x   = test_dv_new_var_d(0.25);
+    dval_t *one = test_dv_new_const_d(1.0);
     dval_t *f   = dv_atan2(x, one);
     dval_t *df  = dv_create_deriv(f, x);
     const dval_t *ddf = dv_get_deriv(df, x);
@@ -350,7 +350,7 @@ void test_second_deriv_atan2(void)
 
 void test_second_deriv_asinh(void)
 {
-    dval_t *x   = dv_new_var_d(0.25);
+    dval_t *x   = test_dv_new_var_d(0.25);
     dval_t *f   = dv_asinh(x);
     dval_t *df  = dv_create_deriv(f, x);
     const dval_t *ddf = dv_get_deriv(df, x);
@@ -371,7 +371,7 @@ void test_second_deriv_asinh(void)
 
 void test_second_deriv_acosh(void)
 {
-    dval_t *x   = dv_new_var_d(1.25);
+    dval_t *x   = test_dv_new_var_d(1.25);
     dval_t *f   = dv_acosh(x);
     dval_t *df  = dv_create_deriv(f, x);
     const dval_t *ddf = dv_get_deriv(df, x);
@@ -395,7 +395,7 @@ void test_second_deriv_acosh(void)
 
 void test_second_deriv_atanh(void)
 {
-    dval_t *x   = dv_new_var_d(0.25);
+    dval_t *x   = test_dv_new_var_d(0.25);
     dval_t *f   = dv_atanh(x);
     dval_t *df  = dv_create_deriv(f, x);
     const dval_t *ddf = dv_get_deriv(df, x);
@@ -416,7 +416,7 @@ void test_second_deriv_atanh(void)
 
 void test_second_deriv_exp(void)
 {
-    dval_t *x   = dv_new_var_d(1.5);
+    dval_t *x   = test_dv_new_var_d(1.5);
     dval_t *f   = dv_exp(x);
     dval_t *df  = dv_create_deriv(f, x);
     const dval_t *ddf = dv_get_deriv(df, x);
@@ -434,7 +434,7 @@ void test_second_deriv_exp(void)
 
 void test_second_deriv_log(void)
 {
-    dval_t *x   = dv_new_var_d(2.0);
+    dval_t *x   = test_dv_new_var_d(2.0);
     dval_t *f   = dv_log(x);
     dval_t *df  = dv_create_deriv(f, x);
     const dval_t *ddf = dv_get_deriv(df, x);
@@ -451,7 +451,7 @@ void test_second_deriv_log(void)
 
 void test_second_deriv_sqrt(void)
 {
-    dval_t *x   = dv_new_var_d(4.0);
+    dval_t *x   = test_dv_new_var_d(4.0);
     dval_t *f   = dv_sqrt(x);
     dval_t *df  = dv_create_deriv(f, x);
     const dval_t *ddf = dv_get_deriv(df, x);
@@ -472,7 +472,7 @@ void test_second_deriv_sqrt(void)
 
 void test_second_deriv_composite(void)
 {
-    dval_t *x   = dv_new_var_d(1.0);
+    dval_t *x   = test_dv_new_var_d(1.0);
     dval_t *sx  = dv_sin(x);
     dval_t *ex  = dv_exp(x);
     dval_t *f   = dv_mul(sx, ex);
@@ -496,7 +496,7 @@ void test_second_deriv_composite(void)
 
 void test_second_deriv_sin_log(void)
 {
-    dval_t *x   = dv_new_var(qf_from_string("1.3"));
+    dval_t *x   = test_dv_new_var_qf(qf_from_string("1.3"));
     dval_t *sx  = dv_sin(x);
     dval_t *lx  = dv_log(x);
     dval_t *f   = dv_mul(sx, lx);
@@ -523,7 +523,7 @@ void test_second_deriv_sin_log(void)
 
 void test_second_deriv_exp_tanh(void)
 {
-    dval_t *x   = dv_new_var(qf_from_string("0.7"));
+    dval_t *x   = test_dv_new_var_qf(qf_from_string("0.7"));
     dval_t *ex  = dv_exp(x);
     dval_t *tx  = dv_tanh(x);
     dval_t *f   = dv_mul(ex, tx);
@@ -549,7 +549,7 @@ void test_second_deriv_exp_tanh(void)
 
 void test_second_deriv_sqrt_sin_x2(void)
 {
-    dval_t *x   = dv_new_var(qf_from_string("1.1"));
+    dval_t *x   = test_dv_new_var_qf(qf_from_string("1.1"));
     dval_t *x2  = dv_mul(x, x);
     dval_t *sqx = dv_sqrt(x);
     dval_t *sx2 = dv_sin(x2);
@@ -592,7 +592,7 @@ void test_second_deriv_sqrt_sin_x2(void)
 
 void test_second_deriv_log_cosh(void)
 {
-    dval_t *x   = dv_new_var(qf_from_string("0.9"));
+    dval_t *x   = test_dv_new_var_qf(qf_from_string("0.9"));
     dval_t *cx  = dv_cosh(x);
     dval_t *f   = dv_log(cx);
     dval_t *df  = dv_create_deriv(f, x);
@@ -615,7 +615,7 @@ void test_second_deriv_log_cosh(void)
 
 void test_second_deriv_x2_exp_negx(void)
 {
-    dval_t *x   = dv_new_var(qf_from_string("1.7"));
+    dval_t *x   = test_dv_new_var_qf(qf_from_string("1.7"));
     dval_t *xm  = dv_neg(x);
     dval_t *ex  = dv_exp(xm);
     dval_t *x2  = dv_mul(x, x);
@@ -642,10 +642,10 @@ void test_second_deriv_x2_exp_negx(void)
 
 void test_second_deriv_atan_x_over_sqrt(void)
 {
-    dval_t *x   = dv_new_var(qf_from_string("0.8"));
+    dval_t *x   = test_dv_new_var_qf(qf_from_string("0.8"));
 
     dval_t *x2  = dv_mul(x, x);
-    dval_t *one = dv_new_const_d(1.0);
+    dval_t *one = test_dv_new_const_d(1.0);
     dval_t *sum = dv_add(one, x2);
     dval_t *den = dv_sqrt(sum);
     dval_t *g   = dv_div(one, den);
@@ -685,7 +685,7 @@ void test_second_deriv_atan_x_over_sqrt(void)
 
 void test_second_deriv_abs(void)
 {
-    dval_t *x   = dv_new_var(qf_from_string("0.8"));
+    dval_t *x   = test_dv_new_var_qf(qf_from_string("0.8"));
     dval_t *f   = dv_abs(x);
     dval_t *df  = dv_create_deriv(f, x);
     const dval_t *ddf = dv_get_deriv(df, x);
@@ -703,8 +703,8 @@ void test_second_deriv_abs(void)
 
 void test_second_deriv_hypot(void)
 {
-    dval_t *x   = dv_new_var_d(3.0);
-    dval_t *yc  = dv_new_const_d(4.0);
+    dval_t *x   = test_dv_new_var_d(3.0);
+    dval_t *yc  = test_dv_new_const_d(4.0);
     dval_t *f   = dv_hypot(x, yc);
     dval_t *df  = dv_create_deriv(f, x);
     const dval_t *ddf = dv_get_deriv(df, x);
@@ -726,7 +726,7 @@ void test_second_deriv_hypot(void)
 
 void test_second_deriv_erf(void)
 {
-    dval_t *x   = dv_new_var_d(0.5);
+    dval_t *x   = test_dv_new_var_d(0.5);
     dval_t *f   = dv_erf(x);
     dval_t *df  = dv_create_deriv(f, x);
     const dval_t *ddf = dv_get_deriv(df, x);
@@ -746,7 +746,7 @@ void test_second_deriv_erf(void)
 
 void test_second_deriv_erfc(void)
 {
-    dval_t *x   = dv_new_var_d(0.5);
+    dval_t *x   = test_dv_new_var_d(0.5);
     dval_t *f   = dv_erfc(x);
     dval_t *df  = dv_create_deriv(f, x);
     const dval_t *ddf = dv_get_deriv(df, x);
@@ -766,7 +766,7 @@ void test_second_deriv_erfc(void)
 
 void test_second_deriv_gamma(void)
 {
-    dval_t *x   = dv_new_var_d(2.0);
+    dval_t *x   = test_dv_new_var_d(2.0);
     dval_t *f   = dv_gamma(x);
     dval_t *df  = dv_create_deriv(f, x);
     const dval_t *ddf = dv_get_deriv(df, x);
@@ -789,7 +789,7 @@ void test_second_deriv_gamma(void)
 
 void test_second_deriv_lgamma(void)
 {
-    dval_t *x   = dv_new_var_d(2.0);
+    dval_t *x   = test_dv_new_var_d(2.0);
     dval_t *f   = dv_lgamma(x);
     dval_t *df  = dv_create_deriv(f, x);
     const dval_t *ddf = dv_get_deriv(df, x);
@@ -808,7 +808,7 @@ void test_second_deriv_lgamma(void)
 
 void test_second_deriv_normal_pdf(void)
 {
-    dval_t *x   = dv_new_var_d(0.5);
+    dval_t *x   = test_dv_new_var_d(0.5);
     dval_t *f   = dv_normal_pdf(x);
     dval_t *df  = dv_create_deriv(f, x);
     const dval_t *ddf = dv_get_deriv(df, x);
@@ -828,7 +828,7 @@ void test_second_deriv_normal_pdf(void)
 
 void test_second_deriv_normal_cdf(void)
 {
-    dval_t *x   = dv_new_var_d(0.5);
+    dval_t *x   = test_dv_new_var_d(0.5);
     dval_t *f   = dv_normal_cdf(x);
     dval_t *df  = dv_create_deriv(f, x);
     const dval_t *ddf = dv_get_deriv(df, x);
@@ -847,7 +847,7 @@ void test_second_deriv_normal_cdf(void)
 
 void test_second_deriv_normal_logpdf(void)
 {
-    dval_t *x   = dv_new_var_d(0.5);
+    dval_t *x   = test_dv_new_var_d(0.5);
     dval_t *f   = dv_normal_logpdf(x);
     dval_t *df  = dv_create_deriv(f, x);
     const dval_t *ddf = dv_get_deriv(df, x);
@@ -865,7 +865,7 @@ void test_second_deriv_normal_logpdf(void)
 
 void test_second_deriv_ei(void)
 {
-    dval_t *x   = dv_new_var_d(1.0);
+    dval_t *x   = test_dv_new_var_d(1.0);
     dval_t *f   = dv_ei(x);
     dval_t *df  = dv_create_deriv(f, x);
     const dval_t *ddf = dv_get_deriv(df, x);
@@ -885,7 +885,7 @@ void test_second_deriv_ei(void)
 
 void test_second_deriv_e1(void)
 {
-    dval_t *x   = dv_new_var_d(1.0);
+    dval_t *x   = test_dv_new_var_d(1.0);
     dval_t *f   = dv_e1(x);
     dval_t *df  = dv_create_deriv(f, x);
     const dval_t *ddf = dv_get_deriv(df, x);
@@ -905,7 +905,7 @@ void test_second_deriv_e1(void)
 
 void test_second_deriv_erfinv(void)
 {
-    dval_t *x   = dv_new_var_d(0.5);
+    dval_t *x   = test_dv_new_var_d(0.5);
     dval_t *f   = dv_erfinv(x);
     dval_t *df  = dv_create_deriv(f, x);
     const dval_t *ddf = dv_get_deriv(df, x);
@@ -926,7 +926,7 @@ void test_second_deriv_erfinv(void)
 
 void test_second_deriv_erfcinv(void)
 {
-    dval_t *x   = dv_new_var_d(0.5);
+    dval_t *x   = test_dv_new_var_d(0.5);
     dval_t *f   = dv_erfcinv(x);
     dval_t *df  = dv_create_deriv(f, x);
     const dval_t *ddf = dv_get_deriv(df, x);
@@ -947,7 +947,7 @@ void test_second_deriv_erfcinv(void)
 
 void test_second_deriv_lambert_w0(void)
 {
-    dval_t *x   = dv_new_var_d(1.0);
+    dval_t *x   = test_dv_new_var_d(1.0);
     dval_t *f   = dv_lambert_w0(x);
     dval_t *df  = dv_create_deriv(f, x);
     const dval_t *ddf = dv_get_deriv(df, x);
@@ -971,7 +971,7 @@ void test_second_deriv_lambert_w0(void)
 
 void test_second_deriv_lambert_wm1(void)
 {
-    dval_t *x   = dv_new_var(qf_from_string("-0.1"));
+    dval_t *x   = test_dv_new_var_qf(qf_from_string("-0.1"));
     dval_t *f   = dv_lambert_wm1(x);
     dval_t *df  = dv_create_deriv(f, x);
     const dval_t *ddf = dv_get_deriv(df, x);
@@ -995,8 +995,8 @@ void test_second_deriv_lambert_wm1(void)
 
 void test_second_deriv_beta(void)
 {
-    dval_t *x   = dv_new_var_d(2.0);
-    dval_t *bc  = dv_new_const_d(3.0);
+    dval_t *x   = test_dv_new_var_d(2.0);
+    dval_t *bc  = test_dv_new_const_d(3.0);
     dval_t *f   = dv_beta(x, bc);
     dval_t *df  = dv_create_deriv(f, x);
     const dval_t *ddf = dv_get_deriv(df, x);
@@ -1021,8 +1021,8 @@ void test_second_deriv_beta(void)
 
 void test_second_deriv_logbeta(void)
 {
-    dval_t *x   = dv_new_var_d(2.0);
-    dval_t *bc  = dv_new_const_d(3.0);
+    dval_t *x   = test_dv_new_var_d(2.0);
+    dval_t *bc  = test_dv_new_const_d(3.0);
     dval_t *f   = dv_logbeta(x, bc);
     dval_t *df  = dv_create_deriv(f, x);
     const dval_t *ddf = dv_get_deriv(df, x);

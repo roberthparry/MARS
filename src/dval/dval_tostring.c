@@ -189,14 +189,14 @@ static void emit_atom(dval_t *f, sbuf_t *b)
             emit_name(b, f->name);
         } else {
             char buf[64];
-            qf_to_string_simple(f->c, buf, sizeof(buf));
+            qf_to_string_simple(dv_const_qc(f), buf, sizeof(buf));
             sbuf_puts(b, buf);
         }
     } else if (dv_is_var(f)) {
         emit_name(b, f->name ? f->name : "x");
     } else {
         char buf[64];
-        qf_to_string_simple(dv_get_val(f), buf, sizeof(buf));
+        qf_to_string_simple(dv_num_eval_qc(f), buf, sizeof(buf));
         sbuf_puts(b, buf);
     }
 }
@@ -420,10 +420,11 @@ static void emit_expr_abs(const dval_t *f, sbuf_t *b, int parent_prec)
     }
 
     if (dv_tostring_is_negative_const(f)) {
-        dval_t tmp = *f;
-        tmp.c = qc_neg(tmp.c);
-        tmp.x_valid = 0;
-        emit_expr(&tmp, b, parent_prec);
+        qcomplex_t pos_value = qc_neg(dv_const_qc(f));
+        char buf[64];
+
+        qf_to_string_simple(pos_value, buf, sizeof(buf));
+        sbuf_puts(b, buf);
         return;
     }
 
@@ -434,7 +435,6 @@ static void emit_expr_abs(const dval_t *f, sbuf_t *b, int parent_prec)
 
     if (dv_is_mul(f)) {
         dval_t *fac[64];
-        dval_t pos_const;
         int n = 0;
 
         flatten_mul((dval_t *)f, fac, &n, 64);
@@ -442,15 +442,10 @@ static void emit_expr_abs(const dval_t *f, sbuf_t *b, int parent_prec)
 
         for (int i = 0; i < n; ++i) {
             if (dv_tostring_is_negative_const(fac[i])) {
-                if (qf_to_double(qc_real(fac[i]->c)) == -1.0) {
+                if (qf_to_double(dv_const_real_qf(fac[i])) == -1.0) {
                     for (int j = i; j < n - 1; ++j)
                         fac[j] = fac[j + 1];
                     --n;
-                } else {
-                    pos_const = *fac[i];
-                    pos_const.c = qc_neg(fac[i]->c);
-                    pos_const.x_valid = 0;
-                    fac[i] = &pos_const;
                 }
             }
         }
@@ -551,7 +546,7 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
         int need = PREC_POW < parent_prec;
         if (need) sbuf_putc(b, '(');
 
-        double ed = qf_to_double(qc_real(f->c));
+        double ed = qf_to_double(dv_const_real_qf(f));
         long   ei = (long)ed;
 
         /* For unary functions raised to a power, write func²(arg)
@@ -568,7 +563,7 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
             else {
                 sbuf_putc(b, '^');
                 char buf[64];
-                qf_to_string_simple(f->c, buf, sizeof(buf));
+                qf_to_string_simple(dv_const_qc(f), buf, sizeof(buf));
                 sbuf_puts(b, buf);
             }
 
@@ -587,7 +582,7 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
         else {
             sbuf_putc(b, '^');
             char buf[64];
-            qf_to_string_simple(f->c, buf, sizeof(buf));
+            qf_to_string_simple(dv_const_qc(f), buf, sizeof(buf));
             sbuf_puts(b, buf);
         }
 
@@ -606,7 +601,6 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
         sort_factors(fac, n);
 
         int sign = 1;
-        dval_t pos_const;
         for (int i = 0; i < n; i++) {
             if (!expr_is_negative(fac[i]))
                 continue;
@@ -614,17 +608,13 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
             sign = -sign;
 
             if (dv_tostring_is_negative_const(fac[i])) {
-                if (qf_to_double(qc_real(fac[i]->c)) == -1.0) {
+                if (qf_to_double(dv_const_real_qf(fac[i])) == -1.0) {
                     for (int j = i; j < n - 1; j++)
                         fac[j] = fac[j + 1];
                     n--;
                     i--;
                     continue;
                 }
-                pos_const = *fac[i];
-                pos_const.c = qc_neg(fac[i]->c);
-                pos_const.x_valid = 0;
-                fac[i] = &pos_const;
                 continue;
             }
 
@@ -749,7 +739,7 @@ static void emit_func(const dval_t *f, sbuf_t *b, int parent_prec)
             emit_name_func(b, f->name);
         else {
             char buf[64];
-            qf_to_string_simple(f->c, buf, sizeof(buf));
+            qf_to_string_simple(dv_const_qc(f), buf, sizeof(buf));
             sbuf_puts(b, buf);
         }
         return;
@@ -781,7 +771,7 @@ static void emit_func(const dval_t *f, sbuf_t *b, int parent_prec)
 
         sbuf_putc(b, '^');
         char buf[64];
-        qf_to_string_simple(f->c, buf, sizeof(buf));
+        qf_to_string_simple(dv_const_qc(f), buf, sizeof(buf));
         sbuf_puts(b, buf);
 
         if (need) sbuf_putc(b, ')');
@@ -978,8 +968,8 @@ static char *dv_to_string_function(const dval_t *f)
      * the names survive into the simplified tree — var leaf nodes are shared by
      * reference, so the name set here is visible throughout the tree after
      * dv_simplify returns.  Unnamed numeric constants (coefficients created by
-     * dv_mul_d / dv_add_d etc.) are not auto-named; they appear as plain numbers.
-     * Callers that want symbolic unnamed constants should use dv_new_named_const. */
+     * dv_mul_num / dv_add_num etc.) are not auto-named; they appear as plain numbers.
+     * Callers that want symbolic unnamed constants should use dv_new_named_const_num(). */
     autoname_table_t vnames;
     autoname_init(&vnames);
     assign_unnamed_vars_dfs((dval_t *)f, &vnames);
@@ -999,13 +989,13 @@ static char *dv_to_string_function(const dval_t *f)
     /* Emit variable bindings */
     for (size_t i = 0; i < vl.count; ++i) {
         dval_t *v = vl.vars[i];
-        emit_binding_line(&b, dv_name_or_default(v, "x"), v->c, emit_name_func);
+        emit_binding_line(&b, dv_name_or_default(v, "x"), dv_const_qc(v), emit_name_func);
     }
 
     /* Emit named constant bindings */
     for (size_t i = 0; i < cl.count; ++i) {
         dval_t *c = cl.vars[i];
-        emit_binding_line(&b, c->name, c->c, emit_name_func);
+        emit_binding_line(&b, c->name, dv_const_qc(c), emit_name_func);
     }
 
     /* Pure variable */
@@ -1026,7 +1016,7 @@ static char *dv_to_string_function(const dval_t *f)
     if (dv_is_const(g)) {
         const char *cname = dv_name_or_default(g, "c");
 
-        emit_binding_line(&b, cname, g->c, emit_name_func);
+        emit_binding_line(&b, cname, dv_const_qc(g), emit_name_func);
 
         sbuf_puts(&b, "return ");
         emit_name_func(&b, cname);
@@ -1103,7 +1093,7 @@ static char *dv_to_string_expr(const dval_t *f)
             dval_t *v = vl.vars[i];
             char valbuf[64];
 
-            qf_to_string_simple(v->c, valbuf, sizeof(valbuf));
+            qf_to_string_simple(dv_const_qc(v), valbuf, sizeof(valbuf));
             emit_name(&b, dv_name_or_default(v, "x"));
             sbuf_puts(&b, " = ");
             sbuf_puts(&b, valbuf);
@@ -1119,7 +1109,7 @@ static char *dv_to_string_expr(const dval_t *f)
             for (size_t i = 0; i < cl.count; ++i) {
                 dval_t *c = cl.vars[i];
                 char valbuf[64];
-                qf_to_string_simple(c->c, valbuf, sizeof(valbuf));
+                qf_to_string_simple(dv_const_qc(c), valbuf, sizeof(valbuf));
                 emit_name(&b, c->name);
                 sbuf_puts(&b, " = ");
                 sbuf_puts(&b, valbuf);

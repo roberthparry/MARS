@@ -6,9 +6,14 @@
 #include <string.h>
 #include <strings.h>
 
+#include "number.h"
 #include "qcomplex.h"
 #include "dval_internal.h"
 #include "dval.h"
+
+/* ------------------------------------------------------------------------- */
+/* Legacy scalar / complex conversion helpers                                */
+/* ------------------------------------------------------------------------- */
 
 qcomplex_t dv_qc_real_qf(qfloat_t x)
 {
@@ -20,12 +25,80 @@ qcomplex_t dv_qc_real_d(double x)
     return qc_make(qf_from_double(x), QF_ZERO);
 }
 
+qcomplex_t dv_qc_from_number(number_t x)
+{
+    char *text;
+    qcomplex_t value;
+
+    if (num_is_real(x))
+        return dv_qc_real_qf(num_to_qfloat(x));
+
+    text = num_to_string(x);
+    if (!text)
+        return qc_make(QF_NAN, QF_NAN);
+    value = qc_from_string(text);
+    free(text);
+    return value;
+}
+
+number_t dv_number_from_qc(qcomplex_t z)
+{
+    return qf_eq(qc_imag(z), QF_ZERO) ? num_create_from_qfloat(qc_real(z))
+                                      : num_create_from_qcomplex(z);
+}
+
+/* ------------------------------------------------------------------------- */
+/* Real-scalar extraction helpers used by older simplifier paths             */
+/* ------------------------------------------------------------------------- */
+
+int dv_try_get_const_real_qf(const dval_t *dv, qfloat_t *out)
+{
+    if (!dv || !out || !num_is_real(dv->c))
+        return 0;
+    *out = num_to_qfloat(dv->c);
+    return 1;
+}
+
+int dv_try_get_value_real_qf(const dval_t *dv, qfloat_t *out)
+{
+    if (!dv || !out || !num_is_real(dv->x))
+        return 0;
+    *out = num_to_qfloat(dv->x);
+    return 1;
+}
+
+void dv_store_const_num(dval_t *dv, number_t value)
+{
+    num_destroy(&dv->c);
+    dv->c = value;
+}
+
+void dv_store_value_num(dval_t *dv, number_t value)
+{
+    num_destroy(&dv->x);
+    dv->x = value;
+}
+
+void dv_store_const_qc(dval_t *dv, qcomplex_t value)
+{
+    dv_store_const_num(dv, dv_number_from_qc(value));
+}
+
+void dv_store_value_qc(dval_t *dv, qcomplex_t value)
+{
+    dv_store_value_num(dv, dv_number_from_qc(value));
+}
+
+/* ------------------------------------------------------------------------- */
+/* Canonical singleton leaves                                                */
+/* ------------------------------------------------------------------------- */
+
 static struct _dval_t _DV_ZERO_NODE = {
     .ops = &ops_const,
     .a = NULL,
     .b = NULL,
-    .c = { { 0.0, 0.0 }, { 0.0, 0.0 } },
-    .x = { { 0.0, 0.0 }, { 0.0, 0.0 } },
+    .c = { { 0, 0, 0, 0, 0 } },
+    .x = { { 0, 0, 0, 0, 0 } },
     .x_valid = 1,
     .epoch = 0,
     .dx_cache = NULL,
@@ -38,8 +111,8 @@ static struct _dval_t _DV_ONE_NODE = {
     .ops = &ops_const,
     .a = NULL,
     .b = NULL,
-    .c = { { 1.0, 0.0 }, { 0.0, 0.0 } },
-    .x = { { 1.0, 0.0 }, { 0.0, 0.0 } },
+    .c = { { 0, 0, 0, 0, 0 } },
+    .x = { { 0, 0, 0, 0, 0 } },
     .x_valid = 1,
     .epoch = 0,
     .dx_cache = NULL,
@@ -52,6 +125,19 @@ const dval_t * const DV_ZERO = &_DV_ZERO_NODE;
 const dval_t * const DV_ONE = &_DV_ONE_NODE;
 
 static uint64_t next_var_id = 1;
+static int dv_singletons_ready = 0;
+
+static void dv_init_singletons(void)
+{
+    if (dv_singletons_ready)
+        return;
+
+    _DV_ZERO_NODE.c = NUM_ZERO;
+    _DV_ZERO_NODE.x = NUM_ZERO;
+    _DV_ONE_NODE.c = NUM_ONE;
+    _DV_ONE_NODE.x = NUM_ONE;
+    dv_singletons_ready = 1;
+}
 
 static inline void refcount_inc(int *rc)
 {
@@ -349,19 +435,19 @@ int dv_is_default_constant_name(const char *name)
     return 0;
 }
 
-int dv_get_default_constant_value(const char *name, qcomplex_t *value_out)
+int dv_get_default_constant_num(const char *name, number_t *value_out)
 {
     if (!name || !value_out)
         return 0;
 
     if (strcmp(name, "e") == 0) {
-        *value_out = qc_make(QF_E, QF_ZERO);
+        *value_out = num_create_from_qfloat(QF_E);
         return 1;
     }
 
     if (strcmp(name, "pi") == 0 || strcmp(name, "@pi") == 0 ||
         strcmp(name, "\xcf\x80") == 0) {
-        *value_out = qc_make(QF_PI, QF_ZERO);
+        *value_out = num_create_from_qfloat(QF_PI);
         return 1;
     }
 
@@ -369,16 +455,27 @@ int dv_get_default_constant_value(const char *name, qcomplex_t *value_out)
         qfloat_t phi = qf_div(qf_add(qf_from_double(1.0), qf_sqrt(qf_from_double(5.0))),
                               qf_from_double(2.0));
 
-        *value_out = qc_make(phi, QF_ZERO);
+        *value_out = num_create_from_qfloat(phi);
         return 1;
     }
 
     if (strcmp(name, "@gamma") == 0 || strcmp(name, "\xce\xb3") == 0) {
-        *value_out = qc_make(QF_EULER_MASCHERONI, QF_ZERO);
+        *value_out = num_create_from_qfloat(QF_EULER_MASCHERONI);
         return 1;
     }
 
     return 0;
+}
+
+int dv_get_default_constant_value(const char *name, qcomplex_t *value_out)
+{
+    number_t value;
+
+    if (!value_out || !dv_get_default_constant_num(name, &value))
+        return 0;
+    *value_out = dv_qc_from_number(value);
+    num_destroy(&value);
+    return 1;
 }
 
 const char *dv_default_constant_canonical_name(const char *name)
@@ -400,8 +497,13 @@ const char *dv_default_constant_canonical_name(const char *name)
     return name;
 }
 
+/* ------------------------------------------------------------------------- */
+/* Lifetime                                                                  */
+/* ------------------------------------------------------------------------- */
+
 void dv_retain(const dval_t *dv)
 {
+    dv_init_singletons();
     if (dv)
         refcount_inc(&((dval_t *)dv)->refcount);
 }
@@ -414,6 +516,7 @@ static void dv_release(dval_t *dv)
 
     if (!dv)
         return;
+    dv_init_singletons();
     if (refcount_dec(&dv->refcount) > 1)
         return;
 
@@ -430,6 +533,8 @@ static void dv_release(dval_t *dv)
 
     if (dv->name)
         free(dv->name);
+    num_destroy(&dv->c);
+    num_destroy(&dv->x);
     free(dv);
 
     dv_release(a);
@@ -448,11 +553,12 @@ dval_t *dv_alloc(const dval_ops_t *ops)
     if (!dv)
         abort();
 
+    dv_init_singletons();
     dv->ops = ops;
     dv->a = NULL;
     dv->b = NULL;
-    dv->c = QC_ZERO;
-    dv->x = QC_ZERO;
+    dv->c = NUM_ZERO;
+    dv->x = NUM_ZERO;
     dv->x_valid = 0;
     dv->epoch = 0;
     dv->dx_cache = NULL;
@@ -463,42 +569,53 @@ dval_t *dv_alloc(const dval_ops_t *ops)
     return dv;
 }
 
-dval_t *dv_make_const_qc(qcomplex_t x)
+/* ------------------------------------------------------------------------- */
+/* Internal number_t-first leaf builders                                     */
+/* ------------------------------------------------------------------------- */
+
+dval_t *dv_make_const_num(number_t x)
 {
     dval_t *dv = dv_alloc(&ops_const);
-    dv->c = x;
-    dv->x = x;
+
+    dv_store_const_num(dv, x);
+    dv_store_value_num(dv, num_clone(dv->c));
     dv->x_valid = 1;
     return dv;
 }
 
-dval_t *dv_make_var_qc(qcomplex_t x)
+dval_t *dv_make_var_num(number_t x)
 {
     dval_t *dv = dv_alloc(&ops_var);
-    dv->c = x;
-    dv->x = x;
+
+    dv_store_const_num(dv, x);
+    dv_store_value_num(dv, num_clone(dv->c));
     dv->x_valid = 1;
     dv->var_id = alloc_var_id();
     return dv;
 }
 
-dval_t *dv_new_const_d(double x) { return dv_make_const_qc(dv_qc_real_d(x)); }
-dval_t *dv_new_const(qfloat_t x) { return dv_make_const_qc(dv_qc_real_qf(x)); }
-dval_t *dv_new_const_qc(qcomplex_t x) { return dv_make_const_qc(x); }
-
-dval_t *dv_new_var_d(double x)
+dval_t *dv_make_const_qc(qcomplex_t x)
 {
-    return dv_make_var_qc(dv_qc_real_d(x));
+    return dv_make_const_num(dv_number_from_qc(x));
 }
 
-dval_t *dv_new_var(qfloat_t x)
+dval_t *dv_make_var_qc(qcomplex_t x)
 {
-    return dv_make_var_qc(dv_qc_real_qf(x));
+    return dv_make_var_num(dv_number_from_qc(x));
 }
 
-dval_t *dv_new_var_qc(qcomplex_t x)
+/* ------------------------------------------------------------------------- */
+/* Public number_t constructors                                              */
+/* ------------------------------------------------------------------------- */
+
+dval_t *dv_new_const_num(number_t x)
 {
-    return dv_make_var_qc(x);
+    return dv_make_const_num(num_clone(x));
+}
+
+dval_t *dv_new_var_num(number_t x)
+{
+    return dv_make_var_num(num_clone(x));
 }
 
 static dval_t *dv_attach_name(dval_t *dv, const char *name)
@@ -507,32 +624,12 @@ static dval_t *dv_attach_name(dval_t *dv, const char *name)
     return dv;
 }
 
-dval_t *dv_new_named_const(qfloat_t x, const char *name)
+dval_t *dv_new_named_const_num(number_t x, const char *name)
 {
-    return dv_attach_name(dv_new_const(x), name);
+    return dv_attach_name(dv_new_const_num(x), name);
 }
 
-dval_t *dv_new_named_const_qc(qcomplex_t x, const char *name)
+dval_t *dv_new_named_var_num(number_t x, const char *name)
 {
-    return dv_attach_name(dv_new_const_qc(x), name);
-}
-
-dval_t *dv_new_named_const_d(double x, const char *name)
-{
-    return dv_new_named_const(qf_from_double(x), name);
-}
-
-dval_t *dv_new_named_var(qfloat_t x, const char *name)
-{
-    return dv_attach_name(dv_new_var(x), name);
-}
-
-dval_t *dv_new_named_var_qc(qcomplex_t x, const char *name)
-{
-    return dv_attach_name(dv_new_var_qc(x), name);
-}
-
-dval_t *dv_new_named_var_d(double x, const char *name)
-{
-    return dv_new_named_var(qf_from_double(x), name);
+    return dv_attach_name(dv_new_var_num(x), name);
 }

@@ -20,7 +20,11 @@ static void collect_mul_factors_borrowed(const dval_t *dv,
                                          size_t *cap)
 {
     if (dv_is_unnamed_const(dv)) {
-        *c_acc = qf_mul(*c_acc, qc_real(dv->c));
+        qfloat_t value;
+
+        if (!dv_try_get_const_real_qf(dv, &value))
+            return;
+        *c_acc = qf_mul(*c_acc, value);
         return;
     }
     if (dv_is_neg(dv)) {
@@ -95,7 +99,7 @@ int dv_struct_eq(const dval_t *u, const dval_t *v)
     if (u->ops != v->ops)
         return 0;
     if (dv_is_const(u))
-        return qf_eq(qc_real(u->c), qc_real(v->c));
+        return num_eq(u->c, v->c);
     if (dv_is_var(u))
         return u == v;
     if (dv_is_mul(u))
@@ -103,6 +107,6 @@ int dv_struct_eq(const dval_t *u, const dval_t *v)
     if (dv_is_neg(u))
         return dv_struct_eq(u->a, v->a);
     if (dv_is_pow_d_expr(u))
-        return dv_struct_eq(u->a, v->a) && qf_eq(qc_real(u->c), qc_real(v->c));
+        return dv_struct_eq(u->a, v->a) && num_eq(u->c, v->c);
     return dv_struct_eq(u->a, v->a) && dv_struct_eq(u->b, v->b);
 }

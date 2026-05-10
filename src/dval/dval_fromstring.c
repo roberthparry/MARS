@@ -264,6 +264,89 @@ static int parse_qfloat_literal(const char **p_in, const char *end, qfloat_t *ou
     return 1;
 }
 
+static size_t scan_number_atom_len(const char *s, const char *end)
+{
+    size_t len = scan_decimal_len(s, end);
+    const char *p;
+    size_t tail;
+
+    if (len == 0)
+        return 0;
+
+    p = s + len;
+    if (p < end && *p == '/') {
+        tail = scan_decimal_len(p + 1, end);
+        if (tail == 0)
+            return len;
+        p += 1 + tail;
+    }
+
+    if (p < end && (*p == 'i' || *p == 'I'))
+        p++;
+
+    return (size_t)(p - s);
+}
+
+static int parse_number_region(const char *start, const char *end, number_t *out)
+{
+    char *buf;
+    size_t len;
+    char *roundtrip;
+
+    while (start < end && isspace((unsigned char)*start))
+        start++;
+    while (end > start && isspace((unsigned char)end[-1]))
+        end--;
+
+    if (start >= end)
+        return 0;
+
+    len = (size_t)(end - start);
+    buf = (char *)fs_xmalloc(len + 1);
+    memcpy(buf, start, len);
+    buf[len] = '\0';
+
+    *out = num_create_from_string(buf);
+    free(buf);
+
+    roundtrip = num_to_string(*out);
+    if (!roundtrip) {
+        num_destroy(out);
+        return 0;
+    }
+
+    free(roundtrip);
+    return 1;
+}
+
+static const char *scan_binding_value_end(const char *p, const char *end)
+{
+    int depth = 0;
+
+    while (p < end) {
+        if (*p == '(' || *p == '[') {
+            depth++;
+            p++;
+            continue;
+        }
+        if ((*p == ')' || *p == ']') && depth > 0) {
+            depth--;
+            p++;
+            continue;
+        }
+        if (depth == 0 && (*p == ',' || *p == ';'))
+            break;
+
+        {
+            unsigned int c;
+            int len = fs_utf8_decode(p, &c);
+            p += (len > 0) ? len : 1;
+        }
+    }
+
+    return p;
+}
+
 static int read_optional_display_exponent(const char **p_in)
 {
     const char *p = *p_in;
@@ -344,14 +427,20 @@ static dval_t *parse_atom(parser_t *p)
         return result;
     }
 
-    /* Decimal number (starts with digit or '.') */
+    /* Numeric atom (integer/decimal/rational, optionally with trailing i) */
     if (isdigit((unsigned char)*p->p) || *p->p == '.') {
-        qfloat_t value;
-        if (!parse_qfloat_literal(&p->p, p->end, &value)) {
+        size_t len = scan_number_atom_len(p->p, p->end);
+        number_t value;
+        dval_t *node;
+
+        if (len == 0 || !parse_number_region(p->p, p->p + len, &value)) {
             set_error(p, "expected numeric literal");
             return NULL;
         }
-        return dv_new_const(value);
+        p->p += len;
+        node = dv_new_const_num(value);
+        num_destroy(&value);
+        return node;
     }
 
     if (cp_len > 0 && cp == 0x221A) {
@@ -620,7 +709,7 @@ static dval_t *parse_addexpr(parser_t *p)
 /* ------------------------------------------------------------------ */
 
 /* Parse comma-separated "name = value" pairs from [s, end).
- * is_var: 1 → create dv_new_named_var; 0 → create dv_new_named_const.
+ * is_var: 1 → create dv_new_named_var_num(); 0 → create dv_new_named_const_num().
  * On success returns 0; on failure writes to errmsg and returns -1. */
 static int parse_bindings(const char *s, const char *end,
                            int is_var, symtab_t *syms,
@@ -647,16 +736,21 @@ static int parse_bindings(const char *s, const char *end,
         p++; /* skip '=' */
         skip_spaces(&p, end);
 
-        qfloat_t val;
-        if (!parse_qfloat_literal(&p, end, &val)) {
+        const char *value_end = scan_binding_value_end(p, end);
+        number_t val;
+        dval_t *node;
+
+        if (!parse_number_region(p, value_end, &val)) {
             free(name);
             snprintf(errmsg, errmsg_n, "expected numeric value in binding");
             return -1;
         }
+        p = value_end;
 
-        dval_t *node = is_var
-            ? dv_new_named_var(val, name)
-            : dv_new_named_const(val, name);
+        node = is_var
+            ? dv_new_named_var_num(val, name)
+            : dv_new_named_const_num(val, name);
+        num_destroy(&val);
 
         /* dv_new_named_* calls dv_normalize_name, which may transform the name
          * (e.g. "@pi" → "π").  Use the normalised form as the lookup key so it
@@ -703,18 +797,20 @@ static dval_t *parse_pure_const(const char *s, const char *end,
     p++;
     skip_spaces(&p, end);
 
-    qfloat_t val;
-    if (!parse_qfloat_literal(&p, end, &val)) {
+    number_t val;
+    if (!parse_number_region(p, end, &val)) {
         free(name);
         snprintf(errmsg, errmsg_n, "expected value in constant format");
         return NULL;
     }
 
     if (!name) {
+        num_destroy(&val);
         snprintf(errmsg, errmsg_n, "constant name is required in pure-constant format");
         return NULL;
     }
-    dval_t *result = dv_new_named_const(val, name);
+    dval_t *result = dv_new_named_const_num(val, name);
+    num_destroy(&val);
     free(name);
     return result;
 }
@@ -757,7 +853,7 @@ static int collect_implicit_symbols(const char *start, const char *end,
         char *name = read_any_name(&p);
         dval_t *node;
         int is_const;
-        qcomplex_t value;
+        number_t value;
         const char *canonical_name = name;
         char *key = NULL;
 
@@ -769,13 +865,14 @@ static int collect_implicit_symbols(const char *start, const char *end,
         }
 
         is_const = dv_is_default_constant_name(name);
-        if (dv_get_default_constant_value(name, &value)) {
+        if (dv_get_default_constant_num(name, &value)) {
             canonical_name = dv_default_constant_canonical_name(name);
-            node = dv_new_named_const_qc(value, canonical_name);
+            node = dv_new_named_const_num(value, canonical_name);
+            num_destroy(&value);
         } else {
             node = is_const
-                ? dv_new_named_const(QF_NAN, name)
-                : dv_new_named_var(QF_NAN, name);
+                ? dv_num_named_const_qf(QF_NAN, name)
+                : dv_num_named_var_qf(QF_NAN, name);
         }
 
         key = dv_normalize_name(canonical_name);
@@ -1088,41 +1185,15 @@ dval_binding_t *dval_binding_find(dval_binding_t *bindings,
     return dval_binding_get(bindings, number, name);
 }
 
-int dval_binding_set_qf(dval_binding_t *bindings,
-                        size_t number,
-                        const char *name,
-                        qfloat_t value)
+int dval_binding_set_num(dval_binding_t *bindings,
+                         size_t number,
+                         const char *name,
+                         number_t value)
 {
     dval_binding_t *binding = dval_binding_get(bindings, number, name);
 
     if (!binding)
         return -1;
-    dv_set_val_qf(binding->symbol, value);
-    return 0;
-}
-
-int dval_binding_set_qc(dval_binding_t *bindings,
-                        size_t number,
-                        const char *name,
-                        qcomplex_t value)
-{
-    dval_binding_t *binding = dval_binding_get(bindings, number, name);
-
-    if (!binding)
-        return -1;
-    dv_set_val(binding->symbol, value);
-    return 0;
-}
-
-int dval_binding_set_d(dval_binding_t *bindings,
-                       size_t number,
-                       const char *name,
-                       double value)
-{
-    dval_binding_t *binding = dval_binding_get(bindings, number, name);
-
-    if (!binding)
-        return -1;
-    dv_set_val_d(binding->symbol, value);
+    dv_set_val_num(binding->symbol, value);
     return 0;
 }

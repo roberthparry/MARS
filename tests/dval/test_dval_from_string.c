@@ -203,11 +203,11 @@ static void test_from_string_bracketed_names(void)
 
 static void test_from_string_name_normalization(void)
 {
-    dval_t *a1 = dv_new_named_var_d(1.0, "a1");
-    dval_t *a12 = dv_new_named_var_d(1.0, "a12");
-    dval_t *a123 = dv_new_named_var_d(1.0, "a123");
-    dval_t *pi1 = dv_new_named_var_d(1.0, "@pi1");
-    dval_t *pi2 = dv_new_named_var_d(1.0, "@pi_2");
+    dval_t *a1 = test_dv_new_named_var_d(1.0, "a1");
+    dval_t *a12 = test_dv_new_named_var_d(1.0, "a12");
+    dval_t *a123 = test_dv_new_named_var_d(1.0, "a123");
+    dval_t *pi1 = test_dv_new_named_var_d(1.0, "@pi1");
+    dval_t *pi2 = test_dv_new_named_var_d(1.0, "@pi_2");
     dval_t *parsed_pi1 = dval_from_string("{ @pi1 }");
     char *a1s = a1 ? dv_to_string(a1, style_EXPRESSION) : NULL;
     char *a12s = a12 ? dv_to_string(a12, style_EXPRESSION) : NULL;
@@ -760,6 +760,61 @@ static void check_dval_d(const char *label, const dval_t *node,
     free(expr);
 }
 
+static void check_parse_num(const char *label, const char *s,
+                            const char *expect_text, int line)
+{
+    dval_t *expr = dval_from_string(s);
+    number_t got;
+    number_t expect;
+    char *expr_text;
+
+    if (!expr) {
+        printf(C_BOLD C_RED "FAIL" C_RESET " %s %s:%d:1\n", label, __FILE__, line);
+        printf(C_BOLD "  input  " C_RESET "%s\n", s);
+        printf(C_BOLD "  error  " C_RESET "parser returned NULL\n\n");
+        TEST_FAIL();
+        return;
+    }
+
+    got = dv_eval_num(expr);
+    expect = num_create_from_string(expect_text);
+    expr_text = dv_to_string(expr, style_EXPRESSION);
+
+    if (num_eq(got, expect)) {
+        printf(C_BOLD C_GREEN "PASS" C_RESET " %s\n", label);
+        printf(C_BOLD "  input  " C_RESET "%s\n", s);
+        printf(C_BOLD "  expr   " C_RESET "%s\n", expr_text ? expr_text : "(null)");
+        printf(C_BOLD "  value  " C_RESET "%s\n\n", expect_text);
+    } else {
+        char *got_text = num_to_string(got);
+
+        printf(C_BOLD C_RED "FAIL" C_RESET " %s %s:%d:1\n", label, __FILE__, line);
+        printf(C_BOLD "  input  " C_RESET "%s\n", s);
+        printf(C_BOLD "  expr   " C_RESET "%s\n", expr_text ? expr_text : "(null)");
+        printf(C_BOLD "  got    " C_RESET "%s\n", got_text ? got_text : "(null)");
+        printf(C_BOLD "  expect " C_RESET "%s\n\n", expect_text);
+        free(got_text);
+        TEST_FAIL();
+    }
+
+    free(expr_text);
+    num_destroy(&expect);
+    num_destroy(&got);
+    dv_free(expr);
+}
+
+static void test_from_string_number_literals(void)
+{
+    check_parse_num("pure const rational", "{ [half] = 1/2 }", "1/2", __LINE__);
+    check_parse_num("rational atom expression", "{ 1/2 + 1/4 }", "3/4", __LINE__);
+    check_parse_num("pure imaginary coefficient atom", "{ 3/2i }", "0 + 3/2i", __LINE__);
+    check_parse_num("pure const rational complex", "{ [z] = 1/2 - 3/2i }", "1/2 - 3/2i", __LINE__);
+    check_parse_num("binding rational complex", "{ z | z = 1/2 - 3/2i }", "1/2 - 3/2i", __LINE__);
+    check_parse_num("binding parenthesized imag coeff",
+        "{ z | z = 1/2 + (2)i }",
+        "1/2 + 2i", __LINE__);
+}
+
 static void test_from_string_deriv(void)
 {
     const double xv  = 1.25;
@@ -811,7 +866,7 @@ static void test_from_string_deriv(void)
     /* ---- Programmatic differentiation ---- */
     /* Build f(x) = exp(sin(x)) + 3*x^2 - 7 explicitly so we hold the wrt pointer. */
     {
-        dval_t *xvar  = dv_new_named_var_d(xv, "x");
+        dval_t *xvar  = test_dv_new_named_var_d(xv, "x");
         dval_t *sinx  = dv_sin(xvar);
         dval_t *esinx = dv_exp(sinx);
         dval_t *x2    = dv_pow_d(xvar, 2.0);
@@ -893,9 +948,9 @@ static void test_from_string_errors(void)
 
 static void test_from_expression_string_api(void)
 {
-    dval_t *x = dv_new_named_var_d(3.0, "x");
-    dval_t *y = dv_new_named_var_d(4.0, "y");
-    dval_t *c = dv_new_named_const_d(2.0, "c");
+    dval_t *x = test_dv_new_named_var_d(3.0, "x");
+    dval_t *y = test_dv_new_named_var_d(4.0, "y");
+    dval_t *c = test_dv_new_named_const_d(2.0, "c");
 
     const char *names[] = { "x", "y", "c" };
     dval_t *symbols[] = { x, y, c };
@@ -989,14 +1044,24 @@ static void test_from_string_bindings_api(void)
         printf(C_BOLD C_GREEN "PASS" C_RESET " inferred c₁ constant binding returned\n\n");
     }
 
-    if (dval_binding_set_d(bindings, nbindings, "x", 3.0) != 0 ||
-        dval_binding_set_d(bindings, nbindings, "c_1", 5.0) != 0) {
-        printf(C_BOLD C_RED "FAIL" C_RESET " binding setters failed %s:%d:1\n\n",
-               __FILE__, __LINE__);
-        TEST_FAIL();
-        free(bindings);
-        dv_free(expr);
-        return;
+    {
+        number_t xval = num_create_from_double(3.0);
+        number_t cval = num_create_from_double(5.0);
+
+        if (dval_binding_set_num(bindings, nbindings, "x", xval) != 0 ||
+            dval_binding_set_num(bindings, nbindings, "c_1", cval) != 0) {
+            num_destroy(&cval);
+            num_destroy(&xval);
+            printf(C_BOLD C_RED "FAIL" C_RESET " binding setters failed %s:%d:1\n\n",
+                   __FILE__, __LINE__);
+            TEST_FAIL();
+            free(bindings);
+            dv_free(expr);
+            return;
+        }
+
+        num_destroy(&cval);
+        num_destroy(&xval);
     }
 
     check_dval_d("parsed expr after binding update", expr, 14.0, __LINE__);
@@ -1051,6 +1116,7 @@ void test_dval_t_from_string(void)
     RUN_SUBTEST(test_from_string_special_functions);
     RUN_SUBTEST(test_from_string_named_consts);
     RUN_SUBTEST(test_from_string_bracketed_names);
+    RUN_SUBTEST(test_from_string_number_literals);
     RUN_SUBTEST(test_from_string_name_normalization);
     RUN_SUBTEST(test_from_string_implicit_symbolic_bindings);
     RUN_SUBTEST(test_from_string_ascii_alternatives);

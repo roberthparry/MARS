@@ -1,9 +1,16 @@
 # `dval_t`
 
 `dval_t` is a reference-counted expression DAG for differentiable values.
+
+The internal numeric core is now `number_t`-native:
+
+- constant and variable leaves store `number_t`
+- cached primal values are `number_t`
+- expression evaluation is `number_t`-native
+- `dv_eval_derivatives(...)` returns owning `number_t` values
+
 Expressions are built from constants, variables, and operator nodes; each node
 carries a vtable that knows how to evaluate itself and construct its derivative.
-Evaluation uses `qfloat_t` throughout for ~106-bit precision.
 
 ## Threading
 
@@ -20,7 +27,8 @@ of these graphs.
 - lazy evaluation with result caching
 - symbolic differentiation to arbitrary order
 - evaluation of derivatives for scalar outputs
-- elementary and special functions mirroring the `qfloat_t` API
+- elementary and special functions exposed through the `dval` builder API and
+  evaluated through `number_t`
 - expression parsing from and formatting to strings
 - integration as a symbolic matrix element type through `matrix_t`
 - public structural helper layers for sibling modules:
@@ -72,47 +80,82 @@ end-user arithmetic code.
 ```c
 #include <stdio.h>
 #include "dval.h"
+#include "number.h"
 
 /* f(x) = exp(sin(x)) + 3*x^2 - 7 */
 static dval_t *make_f(dval_t *x) {
+    number_t two = num_create_from_long(2);
+    number_t three = num_create_from_long(3);
+    number_t seven = num_create_from_long(7);
     dval_t *sinx   = dv_sin(x);
     dval_t *exp_sx = dv_exp(sinx);
-    dval_t *x2     = dv_pow_d(x, 2.0);
-    dval_t *term2  = dv_mul_d(x2, 3.0);
+    dval_t *x2     = dv_pow_num(x, &two);
+    dval_t *term2  = dv_mul_num(x2, &three);
     dval_t *f0     = dv_add(exp_sx, term2);
-    dval_t *f      = dv_sub_d(f0, 7.0);
+    dval_t *f      = dv_sub_num(f0, &seven);
 
     dv_free(sinx);
     dv_free(exp_sx);
     dv_free(x2);
     dv_free(term2);
     dv_free(f0);
+    num_destroy(&two);
+    num_destroy(&seven);
+    num_destroy(&three);
 
     return f;
 }
 
 int main(void) {
-    dval_t *x = dv_new_named_var_d(1.25, "x");
-    dval_t *f = make_f(x);
+    number_t x0 = num_create_from_string("1.25");
+    dval_t *x;
+    dval_t *f;
+    dval_t *df_dx;
+    const dval_t *d2f_dx;
+    number_t f_val;
+    number_t d1_val;
+    number_t d2_val;
 
-    dval_t *df_dx = dv_create_deriv(f, x);
-    const dval_t *d2f_dx = dv_get_deriv(df_dx, x);
+    num_set_default_prec_bits(384);
+    x = dv_new_named_var_num(x0, "x");
+    num_destroy(&x0);
+    f = make_f(x);
+    df_dx = dv_create_deriv(f, x);
+    d2f_dx = dv_get_deriv(df_dx, x);
 
     printf("f(x)    = "); dv_print(f);
     printf("f'(x)   = "); dv_print(df_dx);
     printf("f''(x)  = "); dv_print(d2f_dx);
 
-    qf_printf("\nAt x = 1.25:\n");
-    qf_printf("f(x)    = %.34q\n", dv_eval(f));
-    qf_printf("f'(x)   = %.34q\n", dv_eval(df_dx));
-    qf_printf("f''(x)  = %.34q\n", dv_eval(d2f_dx));
+    f_val = dv_eval_num(f);
+    d1_val = dv_eval_num(df_dx);
+    d2_val = dv_eval_num(d2f_dx);
 
+    printf("\nAt x = 1.25 (384 bits):\n");
+    num_printf("f(x)    = %.101N\n", f_val);
+    num_printf("f'(x)   = %.101N\n", d1_val);
+    num_printf("f''(x)  = %.101N\n", d2_val);
+
+    num_destroy(&d2_val);
+    num_destroy(&d1_val);
+    num_destroy(&f_val);
     dv_free(df_dx);
     dv_free(f);
     dv_free(x);
 
     return 0;
 }
+```
+
+```text
+f(x)    = { exp(sin(x)) + 3x² - 7 | x = 1.25 }
+f'(x)   = { 6x + cos(x)·exp(sin(x)) | x = 1.25 }
+f''(x)  = { cos²(x)·exp(sin(x)) - sin(x)·exp(sin(x)) + 6 | x = 1.25 }
+
+At x = 1.25 (384 bits):
+f(x)    = 0.2705855122552273437029639300167490299999821513753709749690393836985059027675459135561625639872826338
+f'(x)   = 8.3145046259933109960293996152090642497796353985778106153481685326015106615810640203903619149909273414
+f''(x)  = 3.8055231012396292258221776404244179176545341348683796728986430836039145902039198837528977153587143970
 ```
 
 ## Example: Parsing from a String
@@ -124,35 +167,59 @@ hold an explicit variable pointer so you can pass it to the derivative API.
 ```c
 #include <stdio.h>
 #include "dval.h"
+#include "number.h"
 
 int main(void) {
     /* Evaluation only — variable is internal to the parsed DAG. */
     dval_t *fparse = dval_from_string("{ exp(sin(x)) + 3*x^2 - 7 | x = 1.25 }");
+    number_t parsed_value;
     if (!fparse) return 1;
-    qf_printf("f(1.25) = %.34q\n", dv_eval(fparse));
+    num_set_default_prec_bits(384);
+    parsed_value = dv_eval_num(fparse);
+    num_printf("f(1.25) = %.101N\n", parsed_value);
+    num_destroy(&parsed_value);
     dv_free(fparse);
 
     /* Differentiation — build explicitly so x is accessible as wrt. */
-    dval_t *x     = dv_new_named_var_d(1.25, "x");
+    number_t x0 = num_create_from_string("1.25");
+    number_t two = num_create_from_long(2);
+    number_t three = num_create_from_long(3);
+    number_t seven = num_create_from_long(7);
+    dval_t *x     = dv_new_named_var_num(x0, "x");
     dval_t *sinx  = dv_sin(x);
     dval_t *esinx = dv_exp(sinx);
-    dval_t *x2    = dv_pow_d(x, 2.0);
-    dval_t *t     = dv_mul_d(x2, 3.0);
-    dval_t *t2    = dv_sub_d(t, 7.0);
+    dval_t *x2    = dv_pow_num(x, &two);
+    dval_t *t     = dv_mul_num(x2, &three);
+    dval_t *t2    = dv_sub_num(t, &seven);
     dval_t *f     = dv_add(esinx, t2);
 
     dval_t *df_dx       = dv_create_deriv(f, x);
     const dval_t *d2f_dx = dv_get_deriv(df_dx, x);
+    number_t f_val;
+    number_t d1_val;
+    number_t d2_val;
+
+    num_destroy(&x0);
+    num_destroy(&two);
 
     printf("f(x)    = "); dv_print(f);
     printf("f'(x)   = "); dv_print(df_dx);
     printf("f''(x)  = "); dv_print(d2f_dx);
 
-    qf_printf("\nAt x = 1.25:\n");
-    qf_printf("f(x)    = %.34q\n", dv_eval(f));
-    qf_printf("f'(x)   = %.34q\n", dv_eval(df_dx));
-    qf_printf("f''(x)  = %.34q\n", dv_eval(d2f_dx));
+    f_val = dv_eval_num(f);
+    d1_val = dv_eval_num(df_dx);
+    d2_val = dv_eval_num(d2f_dx);
 
+    printf("\nAt x = 1.25 (384 bits):\n");
+    num_printf("f(x)    = %.101N\n", f_val);
+    num_printf("f'(x)   = %.101N\n", d1_val);
+    num_printf("f''(x)  = %.101N\n", d2_val);
+
+    num_destroy(&d2_val);
+    num_destroy(&d1_val);
+    num_destroy(&f_val);
+    num_destroy(&seven);
+    num_destroy(&three);
     dv_free(df_dx);
     dv_free(f);
     dv_free(t2); dv_free(t); dv_free(x2); dv_free(esinx); dv_free(sinx);
@@ -160,6 +227,18 @@ int main(void) {
 
     return 0;
 }
+```
+
+```text
+f(1.25) = 0.2705855122552273437029639300167490299999821513753709749690393836985059027675459135561625639872826338
+f(x)    = { exp(sin(x)) + 3x² - 7 | x = 1.25 }
+f'(x)   = { 6x + cos(x)·exp(sin(x)) | x = 1.25 }
+f''(x)  = { cos²(x)·exp(sin(x)) - sin(x)·exp(sin(x)) + 6 | x = 1.25 }
+
+At x = 1.25 (384 bits):
+f(x)    = 0.2705855122552273437029639300167490299999821513753709749690393836985059027675459135561625639872826338
+f'(x)   = 8.3145046259933109960293996152090642497796353985778106153481685326015106615810640203903619149909273414
+f''(x)  = 3.8055231012396292258221776404244179176545341348683796728986430836039145902039198837528977153587143970
 ```
 
 ## Example: Derivatives
@@ -174,15 +253,19 @@ undefined and the derivative routines return a symbolic `NaN` node.
 ```c
 #include <stdio.h>
 #include "dval.h"
+#include "number.h"
 
 /* f(x, y) = x² + x·y + y² */
 int main(void) {
-    dval_t *x  = dv_new_named_var_d(1.0, "x");
-    dval_t *y  = dv_new_named_var_d(2.0, "y");
+    number_t two = num_create_from_long(2);
+    number_t x0 = num_create_from_string("1");
+    number_t y0 = num_create_from_string("2");
+    dval_t *x  = dv_new_named_var_num(x0, "x");
+    dval_t *y  = dv_new_named_var_num(y0, "y");
 
-    dval_t *x2 = dv_pow_d(x, 2.0);
+    dval_t *x2 = dv_pow_num(x, &two);
     dval_t *xy = dv_mul(x, y);
-    dval_t *y2 = dv_pow_d(y, 2.0);
+    dval_t *y2 = dv_pow_num(y, &two);
     dval_t *t0 = dv_add(x2, xy);
     dval_t *f  = dv_add(t0, y2);
 
@@ -193,17 +276,23 @@ int main(void) {
     /* Mixed second derivative ∂²f/∂x∂y (owning) */
     dval_t *d2f_dxdy = dv_create_2nd_deriv(f, x, y);   /* 1 */
 
-    qf_printf("At x=1, y=2:\n");
-    qf_printf("f          = %.34q\n", dv_eval(f));          /* 7 */
-    qf_printf("∂f/∂x      = %.34q\n", dv_eval(df_dx));     /* 4 */
-    qf_printf("∂f/∂y      = %.34q\n", dv_eval(df_dy));     /* 5 */
-    qf_printf("∂²f/∂x∂y   = %.34q\n", dv_eval(d2f_dxdy)); /* 1 */
+    num_set_default_prec_bits(384);
+    num_destroy(&two);
+    num_destroy(&y0);
+    num_destroy(&x0);
+    printf("At x=1, y=2 (384 bits):\n");
+    num_printf("f          = %.101N\n", dv_eval_num(f));          /* 7 */
+    num_printf("∂f/∂x      = %.101N\n", dv_eval_num(df_dx));     /* 4 */
+    num_printf("∂f/∂y      = %.101N\n", dv_eval_num(df_dy));     /* 5 */
+    num_printf("∂²f/∂x∂y   = %.101N\n", dv_eval_num(d2f_dxdy)); /* 1 */
 
     /* Update x=3 — cached partials recompute automatically */
-    dv_set_val_d(x, 3.0);
-    qf_printf("\nAfter x=3:\n");
-    qf_printf("∂f/∂x      = %.34q\n", dv_eval(df_dx));     /* 8 */
-    qf_printf("∂f/∂y      = %.34q\n", dv_eval(df_dy));     /* 7 */
+    x0 = num_create_from_string("3");
+    dv_set_val_num(x, x0);
+    num_destroy(&x0);
+    printf("\nAfter x=3:\n");
+    num_printf("∂f/∂x      = %.101N\n", dv_eval_num(df_dx));     /* 8 */
+    num_printf("∂f/∂y      = %.101N\n", dv_eval_num(df_dy));     /* 7 */
 
     dv_free(d2f_dxdy);
     dv_free(df_dy);
@@ -221,15 +310,15 @@ int main(void) {
 ```
 
 ```text
-At x=1, y=2:
-f          = 7.0000000000000000000000000000000000
-∂f/∂x      = 4.0000000000000000000000000000000000
-∂f/∂y      = 5.0000000000000000000000000000000000
-∂²f/∂x∂y   = 1.0000000000000000000000000000000000
+At x=1, y=2 (384 bits):
+f          = 7.00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+∂f/∂x      = 4.00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+∂f/∂y      = 5.00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+∂²f/∂x∂y   = 1.00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 
 After x=3:
-∂f/∂x      = 8.0000000000000000000000000000000000
-∂f/∂y      = 7.0000000000000000000000000000000000
+∂f/∂x      = 8.00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+∂f/∂y      = 7.00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 ```
 
 `dv_get_deriv` returns a *borrowed* pointer to the cached derivative — useful when
@@ -237,7 +326,7 @@ you only need to evaluate it and don't want to manage another owning handle:
 
 ```c
 const dval_t *p = dv_get_deriv(f, x);   /* borrowed — do NOT free */
-qf_printf("∂f/∂x = %.34q\n", dv_eval(p));
+num_printf("∂f/∂x = %.101N\n", dv_eval_num(p));
 ```
 
 The result is cached: repeated calls to `dv_get_deriv` with the same `wrt` variable
@@ -252,10 +341,13 @@ in a single pass than to build one symbolic derivative expression per variable.
 ```c
 #include <stdio.h>
 #include "dval.h"
+#include "number.h"
 
 int main(void) {
-    dval_t *x = dv_new_named_var_d(1.0, "x");
-    dval_t *y = dv_new_named_var_d(2.0, "y");
+    number_t x0 = num_create_from_string("1");
+    number_t y0 = num_create_from_string("2");
+    dval_t *x = dv_new_named_var_num(x0, "x");
+    dval_t *y = dv_new_named_var_num(y0, "y");
     dval_t *xy = dv_mul(x, y);
     dval_t *sin_xy = dv_sin(xy);
     dval_t *exp_xy = dv_exp(sin_xy);
@@ -263,17 +355,24 @@ int main(void) {
     dval_t *x_log_y = dv_mul(x, log_y);
     dval_t *f = dv_add(exp_xy, x_log_y);
 
-    dval_t *vars[2] = { x, y };
-    qfloat_t value;
-    qfloat_t grads[2];
+    const dval_t *vars[2] = { x, y };
+    number_t value;
+    number_t grads[2];
+
+    num_destroy(&y0);
+    num_destroy(&x0);
+    num_set_default_prec_bits(384);
 
     if (dv_eval_derivatives(f, 2, vars, &value, grads) != 0)
         return 1;
 
-    qf_printf("f      = %.34q\n", value);
-    qf_printf("df/dx  = %.34q\n", grads[0]);
-    qf_printf("df/dy  = %.34q\n", grads[1]);
+    num_printf("f      = %.101N\n", value);
+    num_printf("∂f/∂x  = %.101N\n", grads[0]);
+    num_printf("∂f/∂y  = %.101N\n", grads[1]);
 
+    num_destroy(&grads[1]);
+    num_destroy(&grads[0]);
+    num_destroy(&value);
     dv_free(f);
     dv_free(x_log_y);
     dv_free(log_y);
@@ -286,15 +385,22 @@ int main(void) {
 }
 ```
 
+```text
+multiprecision output (384 bits):
+f      = 3.175724908574945831917149463420104893478850175303443992754304840163843037995939274550553871648852083069014610380204E+0
+∂f/∂x  = -1.3730865554317237545623968995913969926617435942920790491992029459531254982125174471079436917916538178130705459902764112594175494813184E+0
+∂f/∂y  = -5.3311686799583453198981451052478678036862186432616715165994147772325956009110608135690350939403625267753601350542354849655153485853828E-1
+```
+
 ## Design Notes
 
 ### Node Model
 
 Expressions are stored as a directed acyclic graph. Each node is one of:
 
-- **constant** — a fixed `qfloat_t` value, optionally named
-- **variable** — a mutable `qfloat_t` value, optionally named; changing it via
-  `dv_set_val()` invalidates the cached primal and derivative values in all
+- **constant** — a fixed `number_t` value, optionally named
+- **variable** — a mutable `number_t` value, optionally named; changing it via
+  `dv_set_val_num()` invalidates the cached primal and derivative values in all
   ancestor nodes
 - **unary operator** — wraps one child (e.g. `sin`, `exp`, `sqrt`)
 - **binary operator** — wraps two children (e.g. `+`, `*`, `pow`)
@@ -304,14 +410,22 @@ in the graph without duplication.
 
 ### Differentiation
 
-Each node's vtable provides a `deriv` function that returns a new expression
-graph representing the derivative of that node with respect to its input.
+Each node's vtable provides:
+
+- a `deriv` hook that returns a new symbolic derivative subgraph
+- a `reverse` hook that contributes adjoints for reverse-mode evaluation
+
 Calling `dv_create_deriv(f, x)` recursively applies the chain rule across the
 graph to produce `df/dx` as a new owning expression. Higher-order derivatives
 are obtained by differentiating derivative expressions again with
 `dv_create_nth_deriv()`. All derivative functions require an explicit `wrt`
 variable pointer so the library knows which variable to differentiate with
 respect to; all other variable nodes in the graph are treated as constants.
+
+`dv_eval_derivatives(...)` does not build one symbolic derivative graph per
+requested variable. It evaluates the primal once, then performs a reverse-mode
+adjoint sweep over the existing DAG and returns owning `number_t` results for
+the primal and requested first derivatives.
 
 ### Ownership and Reference Counting
 
@@ -322,11 +436,11 @@ retain their children (increment their refcounts) but do not steal ownership.
 
 ### Evaluation
 
-`dv_eval()` walks the DAG bottom-up, caching the `qfloat_t` result in each node.
-Subsequent calls without any `dv_set_val()` return the cached result immediately.
-Setting a variable's value with `dv_set_val()` or `dv_set_val_d()` marks the
-cache invalid in the variable node; ancestor caches are invalidated lazily on
-the next evaluation pass.
+`dv_eval_num()` walks the DAG bottom-up, caching the `number_t` result in each
+node. Subsequent calls without any `dv_set_val_num()` mutation return the cached
+result immediately. Setting a variable's value with `dv_set_val_num()` marks
+the cache invalid in the variable node; ancestor caches are invalidated lazily
+on the next evaluation pass.
 
 ### Simplification
 
@@ -342,49 +456,42 @@ All public declarations are in `include/dval.h`.
 
 ### Constructors — Constants
 
-- `dval_t *dv_new_const_d(double x)` — constant node from a `double`
-- `dval_t *dv_new_const(qfloat_t x)` — constant node from a `qfloat_t`
-- `dval_t *dv_new_named_const(qfloat_t x, const char *name)` — named constant from a `qfloat_t`
-- `dval_t *dv_new_named_const_d(double x, const char *name)` — named constant from a `double`
+- `dval_t *dv_new_const_num(number_t x)` — constant node from a `number_t`
+- `dval_t *dv_new_named_const_num(number_t x, const char *name)` — named constant from a `number_t`
 
 ### Constructors — Variables
 
-- `dval_t *dv_new_var_d(double x)` — variable node from a `double`
-- `dval_t *dv_new_var(qfloat_t x)` — variable node from a `qfloat_t`
-- `dval_t *dv_new_named_var(qfloat_t x, const char *name)` — named variable from a `qfloat_t`
-- `dval_t *dv_new_named_var_d(double x, const char *name)` — named variable from a `double`
+- `dval_t *dv_new_var_num(number_t x)` — variable node from a `number_t`
+- `dval_t *dv_new_named_var_num(number_t x, const char *name)` — named variable from a `number_t`
 
 ### Mutators
 
-- `void dv_set_val(dval_t *dv, qfloat_t value)` — set the primal value (variables only); dependent expressions will recompute lazily on the next evaluation
-- `void dv_set_val_d(dval_t *dv, double value)` — set the primal value from a `double`
+- `void dv_set_val_num(dval_t *dv, number_t value)` — set the primal value from a `number_t`
 - `void dv_set_name(dval_t *dv, const char *name)` — set or replace the symbolic name
 
 ### Accessors
 
-- `qfloat_t dv_get_val(const dval_t *dv)` — return the current primal value, evaluating the node first if required
-- `double dv_get_val_d(const dval_t *dv)` — return the current primal value as a `double`
-- `const dval_t *dv_get_deriv(const dval_t *expr, dval_t *wrt)` — return the
+- `number_t dv_get_val_num(const dval_t *dv)` — return the current primal value as an owning `number_t`
+- `const dval_t *dv_get_deriv(const dval_t *expr, const dval_t *wrt)` — return the
   cached ∂expr/∂wrt node as a **borrowed** pointer; do **not** free it. Built
   lazily on first call; subsequent calls with the same `wrt` return the cached node.
 
 ### Evaluation
 
-- `qfloat_t dv_eval(const dval_t *dv)` — evaluate the expression and return a `qfloat_t`; uses cached result if valid
-- `double dv_eval_d(const dval_t *dv)` — evaluate and return a `double`
-- `int dv_eval_derivatives(const dval_t *expr, size_t nvars, dval_t *const *vars, qfloat_t *value_out, qfloat_t *derivs_out)` — evaluate a scalar expression and compute derivatives with respect to the listed variables
+- `number_t dv_eval_num(const dval_t *dv)` — evaluate and return an owning `number_t`
+- `int dv_eval_derivatives(const dval_t *expr, size_t nvars, const dval_t *const *vars, number_t *value_out, number_t *derivs_out)` — reverse-mode derivative evaluation returning owning `number_t` primal and derivative results
 
 ### Derivative Construction (owning)
 
 All returned handles must be freed by the caller. `wrt` must be a variable node
-(created with `dv_new_var` or `dv_new_named_var`) that appears in the expression
+(created with `dv_new_var_num()` or `dv_new_named_var_num()`) that appears in the expression
 DAG. All other variable nodes in the graph are treated as constants. If `wrt`
 is a named constant node, the result is symbolic `NaN`.
 
-- `dval_t *dv_create_deriv(dval_t *expr, dval_t *wrt)` — build ∂expr/∂wrt
-- `dval_t *dv_create_2nd_deriv(dval_t *expr, dval_t *wrt1, dval_t *wrt2)` — build ∂²expr/(∂wrt1 ∂wrt2)
-- `dval_t *dv_create_3rd_deriv(dval_t *expr, dval_t *wrt1, dval_t *wrt2, dval_t *wrt3)` — build the mixed third derivative
-- `dval_t *dv_create_nth_deriv(unsigned int n, dval_t *expr, dval_t *wrt)` — apply d/d(wrt) n times
+- `dval_t *dv_create_deriv(const dval_t *expr, const dval_t *wrt)` — build ∂expr/∂wrt
+- `dval_t *dv_create_2nd_deriv(const dval_t *expr, const dval_t *wrt1, const dval_t *wrt2)` — build ∂²expr/(∂wrt1 ∂wrt2)
+- `dval_t *dv_create_3rd_deriv(const dval_t *expr, const dval_t *wrt1, const dval_t *wrt2, const dval_t *wrt3)` — build the mixed third derivative
+- `dval_t *dv_create_nth_deriv(unsigned int n, const dval_t *expr, const dval_t *wrt)` — apply d/d(wrt) n times
 
 ### Arithmetic (graph-building, owning)
 
@@ -395,16 +502,16 @@ All functions return owning handles.
 - `dval_t *dv_sub(dval_t *dv1, dval_t *dv2)` — `dv1 - dv2`
 - `dval_t *dv_mul(dval_t *dv1, dval_t *dv2)` — `dv1 * dv2`
 - `dval_t *dv_div(dval_t *dv1, dval_t *dv2)` — `dv1 / dv2`
-- `dval_t *dv_add_d(dval_t *dv, double d)` — `dv + d`
-- `dval_t *dv_sub_d(dval_t *dv, double d)` — `dv - d`
-- `dval_t *dv_d_sub(double d, dval_t *dv)` — `d - dv`
-- `dval_t *dv_mul_d(dval_t *dv, double d)` — `dv * d`
-- `dval_t *dv_div_d(dval_t *dv, double d)` — `dv / d`
-- `dval_t *dv_d_div(double d, dval_t *dv)` — `d / dv`
+- `dval_t *dv_add_num(const dval_t *dv, const number_t *value)` — `dv + value`
+- `dval_t *dv_sub_num(const dval_t *dv, const number_t *value)` — `dv - value`
+- `dval_t *dv_num_sub(const number_t *value, const dval_t *dv)` — `value - dv`
+- `dval_t *dv_mul_num(const dval_t *dv, const number_t *value)` — `dv * value`
+- `dval_t *dv_div_num(const dval_t *dv, const number_t *value)` — `dv / value`
+- `dval_t *dv_num_div(const number_t *value, const dval_t *dv)` — `value / dv`
 
 ### Comparison
 
-- `int dv_cmp(const dval_t *dv1, const dval_t *dv2)` — compare by primal `qcomplex_t` value using lexicographic order (real part first, then imaginary part); returns -1, 0, or 1
+- `int dv_cmp(const dval_t *dv1, const dval_t *dv2)` — compare by primal numeric value using lexicographic order (real part first, then imaginary part); returns -1, 0, or 1
 
 ### Elementary Functions (owning)
 
@@ -424,7 +531,7 @@ All functions return owning handles.
 - `dval_t *dv_exp(dval_t *dv)` — natural exponential
 - `dval_t *dv_log(dval_t *dv)` — natural logarithm
 - `dval_t *dv_sqrt(dval_t *dv)` — square root
-- `dval_t *dv_pow_d(dval_t *dv, double d)` — `dv ^ d` (scalar exponent)
+- `dval_t *dv_pow_num(dval_t *dv, const number_t *exponent)` — `dv ^ exponent` (borrowed scalar exponent)
 - `dval_t *dv_pow(dval_t *dv1, dval_t *dv2)` — `dv1 ^ dv2`
 
 ### Special Functions (owning)
@@ -463,9 +570,7 @@ All functions return owning handles.
 - `dval_t *dval_from_string(const char *s)` — construct a `dval_t` from a string in the format produced by `dv_to_string(..., style_EXPRESSION)`:
 - `dval_t *dval_from_string_with_bindings(const char *s, dval_binding_t **bindings_out, size_t *number_out)` — same parse, but also returns a heap-allocated array of borrowed symbolic bindings when the parsed expression is symbolic
 - `dval_binding_t *dval_binding_find(dval_binding_t *bindings, size_t number, const char *name)` — find a returned symbolic binding by name
-- `int dval_binding_set_qf(dval_binding_t *bindings, size_t number, const char *name, qfloat_t value)` — update a returned binding
-- `int dval_binding_set_qc(dval_binding_t *bindings, size_t number, const char *name, qcomplex_t value)` — update a returned binding
-- `int dval_binding_set_d(dval_binding_t *bindings, size_t number, const char *name, double value)` — update a returned binding
+- `int dval_binding_set_num(dval_binding_t *bindings, size_t number, const char *name, number_t value)` — update a returned binding
 
   ```
   { expr }

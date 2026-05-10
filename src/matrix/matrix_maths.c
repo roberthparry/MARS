@@ -172,7 +172,7 @@ static dval_t *dval_fun_first_derivative_at_zero_local(
     if (!scalar_f)
         return NULL;
 
-    zero = dv_new_const_d(0.0);
+    zero = dv_num_const_d(0.0);
     if (!zero)
         return NULL;
 
@@ -212,7 +212,7 @@ static bool dval_equal_exact_local(const dval_t *a, const dval_t *b)
 static dval_t *dval_mul_or_zero_owned_local(const dval_t *a, const dval_t *b)
 {
     if (dval_is_zero_local(a) || dval_is_zero_local(b))
-        return dv_new_const_d(0.0);
+        return dv_num_const_d(0.0);
 
     dv_retain((dval_t *)a);
     dv_retain((dval_t *)b);
@@ -240,7 +240,7 @@ static int dval_fun_coeffs_up_to_second(dval_t **c0,
     if (c2)
         *c2 = NULL;
 
-    u = dv_new_named_var_d(dv_eval_d(lambda), "u");
+    u = dv_num_named_var_d(dv_num_eval_d(lambda), "u");
     if (!u)
         return -1;
 
@@ -778,7 +778,7 @@ static matrix_t *mat_fun_dval_uniform_diag_offdiag(const matrix_t *A,
     dv_retain(diag ? diag : DV_ZERO);
     dv_retain(offdiag ? offdiag : DV_ZERO);
     dval_t *scaled_offdiag = dval_mul_simplify_local(
-        dv_new_const_d((double)(n - 1)),
+        dv_num_const_d((double)(n - 1)),
         offdiag ? offdiag : DV_ZERO);
     if (!scaled_offdiag)
         goto fail;
@@ -904,7 +904,7 @@ static matrix_t *mat_fun_dval_scalar_plus_rank_one(const matrix_t *A,
         }
     }
 
-    v[q] = dv_new_const_d(1.0);
+    v[q] = dv_num_const_d(1.0);
     if (!v[q])
         goto fail;
 
@@ -1016,7 +1016,7 @@ static matrix_t *mat_fun_dval_scalar_plus_rank_one(const matrix_t *A,
         }
     }
 
-    lambda = dv_new_const_d(0.0);
+    lambda = dv_num_const_d(0.0);
     if (!lambda)
         goto fail;
     for (size_t i = 0; i < n; ++i) {
@@ -1099,7 +1099,7 @@ static matrix_t *mat_fun_dval_scalar_plus_rank_one(const matrix_t *A,
             } else {
                 mat_get(A, i, j, &aij);
                 if (dval_is_zero_local(aij)) {
-                    entry = dv_new_const_d(0.0);
+                    entry = dv_num_const_d(0.0);
                 } else {
                     dv_retain(coeff);
                     dv_retain(aij);
@@ -1210,7 +1210,7 @@ static matrix_t *mat_fun_dval_cubic_linear_exact(const matrix_t *A,
         goto fail;
 
     if (dv_is_exact_zero(s)) {
-        dval_t *zero = dv_new_const_d(0.0);
+        dval_t *zero = dv_num_const_d(0.0);
 
         if (!zero)
             goto fail;
@@ -1220,7 +1220,7 @@ static matrix_t *mat_fun_dval_cubic_linear_exact(const matrix_t *A,
         }
         dv_free(zero);
     } else {
-        dval_t *zero = dv_new_const_d(0.0);
+        dval_t *zero = dv_num_const_d(0.0);
         dval_t *neg_root = NULL;
         dval_t *two_root = NULL;
         dval_t *two_s = NULL;
@@ -1239,7 +1239,7 @@ static matrix_t *mat_fun_dval_cubic_linear_exact(const matrix_t *A,
         }
 
         dv_retain(root);
-        neg_root = dval_sub_simplify_local(dv_new_const_d(0.0), root);
+        neg_root = dval_sub_simplify_local(dv_num_const_d(0.0), root);
         if (!neg_root) {
             dv_free(zero);
             goto fail;
@@ -1264,7 +1264,7 @@ static matrix_t *mat_fun_dval_cubic_linear_exact(const matrix_t *A,
             goto fail;
 
         dv_retain(root);
-        two_root = dval_mul_simplify_local(dv_new_const_d(2.0), root);
+        two_root = dval_mul_simplify_local(dv_num_const_d(2.0), root);
         if (!two_root)
             goto fail;
         c1 = dval_div_simplify_local(diff, two_root);
@@ -1280,7 +1280,7 @@ static matrix_t *mat_fun_dval_cubic_linear_exact(const matrix_t *A,
             goto fail;
 
         dv_retain(c0);
-        tmp = dval_mul_simplify_local(dv_new_const_d(2.0), c0);
+        tmp = dval_mul_simplify_local(dv_num_const_d(2.0), c0);
         if (!tmp)
             goto fail;
         sum = dval_sub_simplify_local(sum, tmp);
@@ -1289,7 +1289,7 @@ static matrix_t *mat_fun_dval_cubic_linear_exact(const matrix_t *A,
             goto fail;
 
         dv_retain(s);
-        two_s = dval_mul_simplify_local(dv_new_const_d(2.0), s);
+        two_s = dval_mul_simplify_local(dv_num_const_d(2.0), s);
         if (!two_s)
             goto fail;
         c2 = dval_div_simplify_local(sum, two_s);
@@ -1454,7 +1454,7 @@ static matrix_t *mat_fun_dval_quartic_biquadratic_exact(const matrix_t *A,
     if (!step_sq)
         goto fail;
     dv_retain(step_sq);
-    s = dval_mul_simplify_local(dv_new_const_d(3.0), step_sq);
+    s = dval_mul_simplify_local(dv_num_const_d(3.0), step_sq);
     if (!s)
         goto fail;
 
@@ -1463,7 +1463,7 @@ static matrix_t *mat_fun_dval_quartic_biquadratic_exact(const matrix_t *A,
     dval_t *step_four = dval_mul_simplify_local(step_sq, step_sq);
     if (!step_four)
         goto fail;
-    t = dval_sub_simplify_local(dv_new_const_d(0.0), step_four);
+    t = dval_sub_simplify_local(dv_num_const_d(0.0), step_four);
     if (!t)
         goto fail;
 
@@ -1506,7 +1506,7 @@ static matrix_t *mat_fun_dval_quartic_biquadratic_exact(const matrix_t *A,
         goto fail;
 
     dv_retain(t);
-    dval_t *four_t = dval_mul_simplify_local(dv_new_const_d(4.0), t);
+    dval_t *four_t = dval_mul_simplify_local(dv_num_const_d(4.0), t);
     if (!four_t)
         goto fail;
     disc = dval_add_simplify_local(disc, four_t);
@@ -1548,9 +1548,9 @@ static matrix_t *mat_fun_dval_quartic_biquadratic_exact(const matrix_t *A,
         goto fail;
 
     dv_retain(r1);
-    nr1 = dval_sub_simplify_local(dv_new_const_d(0.0), r1);
+    nr1 = dval_sub_simplify_local(dv_num_const_d(0.0), r1);
     dv_retain(r2);
-    nr2 = dval_sub_simplify_local(dv_new_const_d(0.0), r2);
+    nr2 = dval_sub_simplify_local(dv_num_const_d(0.0), r2);
     if (!nr1 || !nr2)
         goto fail;
 
@@ -1594,7 +1594,7 @@ static matrix_t *mat_fun_dval_quartic_biquadratic_exact(const matrix_t *A,
         if (!num)
             goto fail;
         dv_retain(r1);
-        den = dval_mul_simplify_local(dv_new_const_d(2.0), r1);
+        den = dval_mul_simplify_local(dv_num_const_d(2.0), r1);
         if (!den)
             goto fail;
         h1 = dval_div_simplify_local(num, den);
@@ -1613,7 +1613,7 @@ static matrix_t *mat_fun_dval_quartic_biquadratic_exact(const matrix_t *A,
         if (!num)
             goto fail;
         dv_retain(r2);
-        den = dval_mul_simplify_local(dv_new_const_d(2.0), r2);
+        den = dval_mul_simplify_local(dv_num_const_d(2.0), r2);
         if (!den)
             goto fail;
         h2 = dval_div_simplify_local(num, den);
@@ -1687,7 +1687,7 @@ static matrix_t *mat_fun_dval_quartic_biquadratic_exact(const matrix_t *A,
                 if (!entry)
                     goto fail;
             } else {
-                entry = dv_new_const_d(0.0);
+                entry = dv_num_const_d(0.0);
                 if (!entry)
                     goto fail;
             }
@@ -1898,7 +1898,7 @@ static matrix_t *mat_fun_dval_quadratic_exact(const matrix_t *A,
         goto fail;
 
     dv_retain(q);
-    dval_t *four_q = dval_mul_simplify_local(dv_new_const_d(4.0), q);
+    dval_t *four_q = dval_mul_simplify_local(dv_num_const_d(4.0), q);
     if (!four_q)
         goto fail;
     disc = dval_add_simplify_local(disc, four_q);
@@ -2073,7 +2073,7 @@ static matrix_t *mat_fun_dval_structured(const matrix_t *A,
             dval_t *diag_i = NULL;
             qfloat_t diff;
             mat_get(A, i, i, &diag_i);
-            diff = qc_abs(qc_sub(dv_get_val(diag_i), dv_get_val(diag0)));
+            diff = qc_abs(qc_sub(dv_num_eval_qc(diag_i), dv_num_eval_qc(diag0)));
             if (qf_lt(tol, diff))
                 return mat_fun_triangular(A, scalar_f);
         }

@@ -3,8 +3,8 @@
 
 static void test_match_affine_families(void)
 {
-    dval_t *x = dv_new_named_var_d(1.0, "x");
-    dval_t *y = dv_new_named_var_d(2.0, "y");
+    dval_t *x = test_dv_new_named_var_d(1.0, "x");
+    dval_t *y = test_dv_new_named_var_d(2.0, "y");
     dval_t *vars[] = { x, y };
     qfloat_t constant;
     qfloat_t coeffs[2];
@@ -46,8 +46,8 @@ static void test_match_affine_families(void)
 
 static void test_generic_unary_affine_matchers(void)
 {
-    dval_t *x = dv_new_named_var_d(1.0, "x");
-    dval_t *y = dv_new_named_var_d(2.0, "y");
+    dval_t *x = test_dv_new_named_var_d(1.0, "x");
+    dval_t *y = test_dv_new_named_var_d(2.0, "y");
     dval_t *vars[] = { x, y };
     qfloat_t constant;
     qfloat_t coeffs[2];
@@ -74,9 +74,9 @@ static void test_generic_unary_affine_matchers(void)
 
 static void test_pattern_rejections(void)
 {
-    dval_t *x = dv_new_named_var_d(1.0, "x");
-    dval_t *y = dv_new_named_var_d(2.0, "y");
-    dval_t *c = dv_new_named_const_d(5.0, "c");
+    dval_t *x = test_dv_new_named_var_d(1.0, "x");
+    dval_t *y = test_dv_new_named_var_d(2.0, "y");
+    dval_t *c = test_dv_new_named_const_d(5.0, "c");
     dval_t *vars[] = { x, y };
     qfloat_t value;
     qfloat_t constant;
@@ -103,9 +103,9 @@ static void test_pattern_rejections(void)
 
 static void test_scaled_expr_and_var_usage(void)
 {
-    dval_t *x = dv_new_named_var_d(1.0, "x");
-    dval_t *y = dv_new_named_var_d(2.0, "y");
-    dval_t *z = dv_new_named_var_d(3.0, "z");
+    dval_t *x = test_dv_new_named_var_d(1.0, "x");
+    dval_t *y = test_dv_new_named_var_d(2.0, "y");
+    dval_t *z = test_dv_new_named_var_d(3.0, "z");
     dval_t *vars[] = { x, y, z };
     qfloat_t scale;
     const dval_t *base = NULL;
@@ -140,9 +140,9 @@ static void test_scaled_expr_and_var_usage(void)
 
 static void test_substitute_and_powd(void)
 {
-    dval_t *x = dv_new_named_var_d(2.0, "x");
-    dval_t *y = dv_new_named_var_d(3.0, "y");
-    dval_t *c = dv_new_named_const_d(2.0, "c");
+    dval_t *x = test_dv_new_named_var_d(2.0, "x");
+    dval_t *y = test_dv_new_named_var_d(3.0, "y");
+    dval_t *c = test_dv_new_named_const_d(2.0, "c");
 
     dval_t *x2 = dv_pow_d(x, 2.0);
     dval_t *expr = dv_add(x2, c);
@@ -154,10 +154,10 @@ static void test_substitute_and_powd(void)
     ASSERT_NOT_NULL(s);
     check_q_at(__FILE__, __LINE__, 1, "substitute initial eval", dv_eval_qf(sub), qf_from_double(18.0));
 
-    dv_set_val_d(x, 10.0);
+    test_dv_set_val_d(x, 10.0);
     check_q_at(__FILE__, __LINE__, 1, "substitute ignores old x", dv_eval_qf(sub), qf_from_double(18.0));
 
-    dv_set_val_d(y, 4.0);
+    test_dv_set_val_d(y, 4.0);
     check_q_at(__FILE__, __LINE__, 1, "substitute tracks replacement y", dv_eval_qf(sub), qf_from_double(27.0));
 
     ASSERT_TRUE(strstr(s, "y") != NULL);
@@ -175,8 +175,8 @@ static void test_substitute_and_powd(void)
 
 static void test_square_affine_matchers(void)
 {
-    dval_t *x = dv_new_named_var_d(1.0, "x");
-    dval_t *y = dv_new_named_var_d(2.0, "y");
+    dval_t *x = test_dv_new_named_var_d(1.0, "x");
+    dval_t *y = test_dv_new_named_var_d(2.0, "y");
     dval_t *vars[] = { x, y };
     qfloat_t poly[5];
     qfloat_t constant;
@@ -211,8 +211,8 @@ static void test_square_affine_matchers(void)
 
 static void test_cube_affine_matchers(void)
 {
-    dval_t *x = dv_new_named_var_d(1.0, "x");
-    dval_t *y = dv_new_named_var_d(2.0, "y");
+    dval_t *x = test_dv_new_named_var_d(1.0, "x");
+    dval_t *y = test_dv_new_named_var_d(2.0, "y");
     dval_t *vars[] = { x, y };
     qfloat_t poly[5];
     qfloat_t constant;
@@ -249,8 +249,8 @@ static void test_cube_affine_matchers(void)
 
 static void test_quartic_affine_matchers(void)
 {
-    dval_t *x = dv_new_named_var_d(1.0, "x");
-    dval_t *y = dv_new_named_var_d(2.0, "y");
+    dval_t *x = test_dv_new_named_var_d(1.0, "x");
+    dval_t *y = test_dv_new_named_var_d(2.0, "y");
     dval_t *vars[] = { x, y };
     qfloat_t poly[5];
     qfloat_t constant;
@@ -289,8 +289,8 @@ static void test_quartic_affine_matchers(void)
 
 static void test_affine_times_exp_affine_matcher(void)
 {
-    dval_t *x = dv_new_named_var_d(1.0, "x");
-    dval_t *y = dv_new_named_var_d(2.0, "y");
+    dval_t *x = test_dv_new_named_var_d(1.0, "x");
+    dval_t *y = test_dv_new_named_var_d(2.0, "y");
     dval_t *vars[] = { x, y };
     qfloat_t constant;
     qfloat_t coeffs[2];
@@ -325,8 +325,8 @@ static void test_affine_times_exp_affine_matcher(void)
 
 static void test_square_affine_times_exp_affine_matcher(void)
 {
-    dval_t *x = dv_new_named_var_d(1.0, "x");
-    dval_t *y = dv_new_named_var_d(2.0, "y");
+    dval_t *x = test_dv_new_named_var_d(1.0, "x");
+    dval_t *y = test_dv_new_named_var_d(2.0, "y");
     dval_t *vars[] = { x, y };
     qfloat_t constant;
     qfloat_t coeffs[2];
@@ -374,8 +374,8 @@ static void test_square_affine_times_exp_affine_matcher(void)
 
 static void test_square_affine_times_trig_affine_matchers(void)
 {
-    dval_t *x = dv_new_named_var_d(1.0, "x");
-    dval_t *y = dv_new_named_var_d(2.0, "y");
+    dval_t *x = test_dv_new_named_var_d(1.0, "x");
+    dval_t *y = test_dv_new_named_var_d(2.0, "y");
     dval_t *vars[] = { x, y };
     qfloat_t constant;
     qfloat_t coeffs[2];
@@ -430,8 +430,8 @@ static void test_square_affine_times_trig_affine_matchers(void)
 
 static void test_affine_times_trig_affine_matchers(void)
 {
-    dval_t *x = dv_new_named_var_d(1.0, "x");
-    dval_t *y = dv_new_named_var_d(2.0, "y");
+    dval_t *x = test_dv_new_named_var_d(1.0, "x");
+    dval_t *y = test_dv_new_named_var_d(2.0, "y");
     dval_t *vars[] = { x, y };
     qfloat_t constant;
     qfloat_t coeffs[2];
@@ -478,8 +478,8 @@ static void test_affine_times_trig_affine_matchers(void)
 
 static void test_affine_times_hyperbolic_affine_matchers(void)
 {
-    dval_t *x = dv_new_named_var_d(1.0, "x");
-    dval_t *y = dv_new_named_var_d(2.0, "y");
+    dval_t *x = test_dv_new_named_var_d(1.0, "x");
+    dval_t *y = test_dv_new_named_var_d(2.0, "y");
     dval_t *vars[] = { x, y };
     qfloat_t constant;
     qfloat_t coeffs[2];
@@ -526,8 +526,8 @@ static void test_affine_times_hyperbolic_affine_matchers(void)
 
 static void test_square_affine_times_hyperbolic_affine_matchers(void)
 {
-    dval_t *x = dv_new_named_var_d(1.0, "x");
-    dval_t *y = dv_new_named_var_d(2.0, "y");
+    dval_t *x = test_dv_new_named_var_d(1.0, "x");
+    dval_t *y = test_dv_new_named_var_d(2.0, "y");
     dval_t *vars[] = { x, y };
     qfloat_t constant;
     qfloat_t coeffs[2];
@@ -582,8 +582,8 @@ static void test_square_affine_times_hyperbolic_affine_matchers(void)
 
 static void test_cube_affine_times_unary_affine_matchers(void)
 {
-    dval_t *x = dv_new_named_var_d(1.0, "x");
-    dval_t *y = dv_new_named_var_d(2.0, "y");
+    dval_t *x = test_dv_new_named_var_d(1.0, "x");
+    dval_t *y = test_dv_new_named_var_d(2.0, "y");
     dval_t *vars[] = { x, y };
     qfloat_t constant;
     qfloat_t coeffs[2];
@@ -665,8 +665,8 @@ static void test_cube_affine_times_unary_affine_matchers(void)
 
 static void test_quartic_affine_times_unary_affine_matchers(void)
 {
-    dval_t *x = dv_new_named_var_d(1.0, "x");
-    dval_t *y = dv_new_named_var_d(2.0, "y");
+    dval_t *x = test_dv_new_named_var_d(1.0, "x");
+    dval_t *y = test_dv_new_named_var_d(2.0, "y");
     dval_t *vars[] = { x, y };
     qfloat_t constant;
     qfloat_t coeffs[2];
@@ -754,8 +754,8 @@ static void test_quartic_affine_times_unary_affine_matchers(void)
 
 static void test_affine_poly_deg4_times_unary_affine_matchers(void)
 {
-    dval_t *x = dv_new_named_var_d(1.0, "x");
-    dval_t *y = dv_new_named_var_d(2.0, "y");
+    dval_t *x = test_dv_new_named_var_d(1.0, "x");
+    dval_t *y = test_dv_new_named_var_d(2.0, "y");
     dval_t *vars[] = { x, y };
     qfloat_t poly[5];
     qfloat_t constant;
@@ -824,8 +824,8 @@ static void test_affine_poly_deg4_times_unary_affine_matchers(void)
 
 static void test_generic_affine_poly_deg4_times_unary_matcher(void)
 {
-    dval_t *x = dv_new_named_var_d(1.0, "x");
-    dval_t *y = dv_new_named_var_d(2.0, "y");
+    dval_t *x = test_dv_new_named_var_d(1.0, "x");
+    dval_t *y = test_dv_new_named_var_d(2.0, "y");
     dval_t *vars[] = { x, y };
     qfloat_t poly[5];
     qfloat_t constant;

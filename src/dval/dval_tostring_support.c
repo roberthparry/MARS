@@ -143,9 +143,14 @@ void qf_to_string_simple(qcomplex_t v, char *buf, size_t n)
 
 int dv_tostring_is_negative_const(const dval_t *f)
 {
-    return dv_is_const(f) &&
-           qf_eq(qc_imag(f->c), QF_ZERO) &&
-           qf_to_double(qc_real(f->c)) < 0.0;
+    qcomplex_t value;
+
+    if (!dv_is_unnamed_const(f))
+        return 0;
+
+    value = dv_const_qc(f);
+    return qf_eq(qc_imag(value), QF_ZERO) &&
+           qf_to_double(qc_real(value)) < 0.0;
 }
 
 int dv_tostring_is_var_pow_d(const dval_t *f)

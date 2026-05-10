@@ -120,8 +120,8 @@ lgamma(2.3) = 0.1541894549596305810899179114892231726957039760896140227257076855
 #include "number.h"
 
 int main(void) {
-    number_t a = num_create_string("2");
-    number_t b = num_create_string("5/6");
+    number_t a = num_create_from_string("2");
+    number_t b = num_create_from_string("5/6");
     number_t c = num_add(a, b);
     char *text = num_to_string(c);
 
@@ -131,9 +131,9 @@ int main(void) {
     printf("2 + 5/6 = %s\n", text);
 
     free(text);
-    num_clear(&a);
-    num_clear(&b);
-    num_clear(&c);
+    num_destroy(&a);
+    num_destroy(&b);
+    num_destroy(&c);
     return 0;
 }
 ```
@@ -147,40 +147,65 @@ int main(void) {
 ```c
 #include <stdio.h>
 #include "dval.h"
+#include "number.h"
 
 /* f(x) = exp(sin(x)) + 3*x^2 - 7 */
 static dval_t *make_f(dval_t *x) {
+    number_t two = num_create_from_long(2);
+    number_t three = num_create_from_long(3);
+    number_t seven = num_create_from_long(7);
     dval_t *sinx   = dv_sin(x);
     dval_t *exp_sx = dv_exp(sinx);
-    dval_t *x2     = dv_pow_d(x, 2.0);
-    dval_t *term2  = dv_mul_d(x2, 3.0);
+    dval_t *x2     = dv_pow_num(x, &two);
+    dval_t *term2  = dv_mul_num(x2, &three);
     dval_t *f0     = dv_add(exp_sx, term2);
-    dval_t *f      = dv_sub_d(f0, 7.0);
+    dval_t *f      = dv_sub_num(f0, &seven);
 
     dv_free(sinx);
     dv_free(exp_sx);
     dv_free(x2);
     dv_free(term2);
     dv_free(f0);
+    num_destroy(&two);
+    num_destroy(&seven);
+    num_destroy(&three);
 
     return f;
 }
 
 int main(void) {
-    dval_t *x = dv_new_named_var_d(1.25, "x");
-    dval_t *f = make_f(x);
-    dval_t *df_dx = dv_create_deriv(f, x);
-    const dval_t *d2f_dx = dv_get_deriv(df_dx, x);
+    number_t x0 = num_create_from_string("1.25");
+    dval_t *x;
+    dval_t *f;
+    dval_t *df_dx;
+    const dval_t *d2f_dx;
+    number_t f_val;
+    number_t d1_val;
+    number_t d2_val;
+
+    num_set_default_prec_bits(384);
+    x = dv_new_named_var_num(x0, "x");
+    num_destroy(&x0);
+    f = make_f(x);
+    df_dx = dv_create_deriv(f, x);
+    d2f_dx = dv_get_deriv(df_dx, x);
 
     printf("f(x)    = "); dv_print(f);
     printf("f'(x)   = "); dv_print(df_dx);
     printf("f''(x)  = "); dv_print(d2f_dx);
 
-    qf_printf("\nAt x = 1.25:\n");
-    qf_printf("f(x)    = %.34q\n", dv_eval(f));
-    qf_printf("f'(x)   = %.34q\n", dv_eval(df_dx));
-    qf_printf("f''(x)  = %.34q\n", dv_eval(d2f_dx));
+    f_val = dv_eval_num(f);
+    d1_val = dv_eval_num(df_dx);
+    d2_val = dv_eval_num(d2f_dx);
 
+    printf("\nAt x = 1.25 (384 bits):\n");
+    num_printf("f(x)    = %.101N\n", f_val);
+    num_printf("f'(x)   = %.101N\n", d1_val);
+    num_printf("f''(x)  = %.101N\n", d2_val);
+
+    num_destroy(&d2_val);
+    num_destroy(&d1_val);
+    num_destroy(&f_val);
     dv_free(df_dx);
     dv_free(f);
     dv_free(x);
@@ -193,10 +218,10 @@ f(x)    = { exp(sin(x)) + 3x² - 7 | x = 1.25 }
 f'(x)   = { 6x + cos(x)·exp(sin(x)) | x = 1.25 }
 f''(x)  = { cos²(x)·exp(sin(x)) - sin(x)·exp(sin(x)) + 6 | x = 1.25 }
 
-At x = 1.25:
-f(x)    = 7.2705855122552272007396823028102510
-f'(x)   = 7.5000000000000000000000000000000000
-f''(x)  = 6.0000000000000000000000000000000000
+At x = 1.25 (384 bits):
+f(x)    = 0.2705855122552273437029639300167490299999821513753709749690393836985059027675459135561625639872826338
+f'(x)   = 8.3145046259933109960293996152090642497796353985778106153481685326015106615810640203903619149909273414
+f''(x)  = 3.8055231012396292258221776404244179176545341348683796728986430836039145902039198837528977153587143970
 ```
 
 **Symbolic matrix from a string:**

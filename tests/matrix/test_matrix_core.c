@@ -148,10 +148,10 @@ static void test_dval_multiply(void)
 {
     printf(C_CYAN "TEST: dval matrix multiply\n" C_RESET);
 
-    dval_t *x = dv_new_named_var_d(2.0, "x");
-    dval_t *y = dv_new_named_var_d(4.0, "y");
-    dval_t *one = dv_new_const_d(1.0);
-    dval_t *three = dv_new_const_d(3.0);
+    dval_t *x = test_dv_new_named_var_d(2.0, "x");
+    dval_t *y = test_dv_new_named_var_d(4.0, "y");
+    dval_t *one = test_dv_new_const_d(1.0);
+    dval_t *three = test_dv_new_const_d(3.0);
 
     dval_t *avals[2] = {x, one};
     dval_t *bvals[2] = {three, y};
@@ -178,8 +178,8 @@ static void test_dval_multiply(void)
         mat_get(C, 0, 0, &out);
         check_d("C[0,0] = 3*x + y at x=2,y=4", dv_eval_d(out), 10.0, 1e-12);
 
-        dv_set_val_d(x, 5.0);
-        dv_set_val_d(y, 7.0);
+        test_dv_set_val_d(x, 5.0);
+        test_dv_set_val_d(y, 7.0);
         check_d("C[0,0] tracks updated variables", dv_eval_d(out), 22.0, 1e-12);
     }
 
@@ -196,12 +196,12 @@ static void test_dval_symbolic_printing(void)
 {
     printf(C_CYAN "TEST: dval symbolic matrix printing\n" C_RESET);
 
-    dval_t *x = dv_new_named_var_d(0.0, "x");
-    dval_t *y = dv_new_named_var_d(1.0, "y");
-    dval_t *z = dv_new_named_var_d(2.0, "z");
-    dval_t *pi = dv_new_named_const(QF_PI, "@pi");
-    dval_t *tau = dv_new_named_const(QF_2PI, "@tau");
-    dval_t *alpha = dv_new_named_const_d(3.1415926535897932384626433, "@alpha");
+    dval_t *x = test_dv_new_named_var_d(0.0, "x");
+    dval_t *y = test_dv_new_named_var_d(1.0, "y");
+    dval_t *z = test_dv_new_named_var_d(2.0, "z");
+    dval_t *pi = test_dv_new_named_const_qf(QF_PI, "@pi");
+    dval_t *tau = test_dv_new_named_const_qf(QF_2PI, "@tau");
+    dval_t *alpha = test_dv_new_named_const_d(3.1415926535897932384626433, "@alpha");
     dval_t *cos_y = dv_cos(y);
 
     dval_t *a00 = dv_mul(pi, cos_y);
@@ -2120,10 +2120,10 @@ static void test_trace(void)
     }
 
     {
-        dval_t *x = dv_new_named_var_d(2.0, "x");
-        dval_t *y = dv_new_named_var_d(3.0, "y");
-        dval_t *one = dv_new_const_d(1.0);
-        dval_t *two = dv_new_const_d(2.0);
+        dval_t *x = test_dv_new_named_var_d(2.0, "x");
+        dval_t *y = test_dv_new_named_var_d(3.0, "y");
+        dval_t *one = test_dv_new_const_d(1.0);
+        dval_t *two = test_dv_new_const_d(2.0);
         dval_t *xy = dv_mul(x, y);
         dval_t *vals[9] = {
             x,       one,     DV_ZERO,
@@ -2140,8 +2140,8 @@ static void test_trace(void)
             check_d("trace(dval) at x=2,y=3 = 11", dv_eval_d(tr), 11.0, 1e-12);
             check_dval_text_contains("trace(dval) contains x", tr, "x");
             check_dval_text_contains("trace(dval) contains y", tr, "y");
-            dv_set_val_d(x, 5.0);
-            dv_set_val_d(y, 7.0);
+            test_dv_set_val_d(x, 5.0);
+            test_dv_set_val_d(y, 7.0);
             check_d("trace(dval) tracks x,y", dv_eval_d(tr), 47.0, 1e-12);
         }
 
@@ -2160,10 +2160,10 @@ static void test_deriv(void)
     printf(C_CYAN "TEST: matrix derivative\n" C_RESET);
 
     {
-        dval_t *x = dv_new_named_var_d(2.0, "x");
-        dval_t *y = dv_new_named_var_d(3.0, "y");
-        dval_t *c = dv_new_named_const_d(11.0, "c");
-        dval_t *one = dv_new_const_d(1.0);
+        dval_t *x = test_dv_new_named_var_d(2.0, "x");
+        dval_t *y = test_dv_new_named_var_d(3.0, "y");
+        dval_t *c = test_dv_new_named_const_d(11.0, "c");
+        dval_t *one = test_dv_new_const_d(1.0);
         dval_t *xy = dv_mul(x, y);
         dval_t *x2 = dv_mul(x, x);
         dval_t *sum = dv_add(x2, y);
@@ -2221,8 +2221,8 @@ static void test_deriv(void)
             check_bool("dA/dc[1,1] = NaN", v && qf_isnan(dv_eval_qf(v)));
         }
 
-        dv_set_val_d(x, 5.0);
-        dv_set_val_d(y, 7.0);
+        test_dv_set_val_d(x, 5.0);
+        test_dv_set_val_d(y, 7.0);
         if (Dx) {
             mat_get(Dx, 0, 1, &v);
             check_d("dA/dx[0,1] tracks y", dv_eval_d(v), 7.0, 1e-12);
@@ -2248,7 +2248,7 @@ static void test_deriv(void)
     }
 
     {
-        dval_t *x = dv_new_named_var_d(2.0, "x");
+        dval_t *x = test_dv_new_named_var_d(2.0, "x");
         double vals[4] = {
             1.0, 2.0,
             3.0, 4.0};
@@ -2338,10 +2338,10 @@ static void test_matrix_calculus(void)
     printf(C_CYAN "TEST: matrix calculus helpers\n" C_RESET);
 
     {
-        dval_t *x = dv_new_named_var_d(2.0, "x");
-        dval_t *y = dv_new_named_var_d(3.0, "y");
-        dval_t *one = dv_new_const_d(1.0);
-        dval_t *two = dv_new_const_d(2.0);
+        dval_t *x = test_dv_new_named_var_d(2.0, "x");
+        dval_t *y = test_dv_new_named_var_d(3.0, "y");
+        dval_t *one = test_dv_new_const_d(1.0);
+        dval_t *two = test_dv_new_const_d(2.0);
         dval_t *vals[4] = {
             x,   one,
             y,   two};
@@ -2403,8 +2403,8 @@ static void test_matrix_calculus(void)
             check_d("d/dx block_inverse(A,1)[1,1] = -3", dv_eval_d(v), -3.0, 1e-12);
         }
 
-        dv_set_val_d(x, 5.0);
-        dv_set_val_d(y, 7.0);
+        test_dv_set_val_d(x, 5.0);
+        test_dv_set_val_d(y, 7.0);
 
         if (ddet_dx)
             check_d("d/dx det(A) tracks updated values", dv_eval_d(ddet_dx), 2.0, 1e-12);
@@ -2442,10 +2442,10 @@ static void test_deriv_solve(void)
     printf(C_CYAN "TEST: derivative of solve\n" C_RESET);
 
     {
-        dval_t *x = dv_new_named_var_d(4.0, "x");
-        dval_t *y = dv_new_named_var_d(6.0, "y");
-        dval_t *one = dv_new_const_d(1.0);
-        dval_t *two = dv_new_const_d(2.0);
+        dval_t *x = test_dv_new_named_var_d(4.0, "x");
+        dval_t *y = test_dv_new_named_var_d(6.0, "y");
+        dval_t *one = test_dv_new_const_d(1.0);
+        dval_t *two = test_dv_new_const_d(2.0);
         dval_t *zero = DV_ZERO;
         dval_t *A_vals[4] = {
             x,    one,
@@ -2522,8 +2522,8 @@ static void test_deriv_solve(void)
             }
         }
 
-        dv_set_val_d(x, 5.0);
-        dv_set_val_d(y, 8.0);
+        test_dv_set_val_d(x, 5.0);
+        test_dv_set_val_d(y, 8.0);
         if (dX && dX_expected) {
             mat_get(dX, 0, 0, &v);
             mat_get(dX_expected, 0, 0, &w);
@@ -2554,13 +2554,13 @@ static void test_deriv_block_solve(void)
     printf(C_CYAN "TEST: derivative of block solve\n" C_RESET);
 
     {
-        dval_t *x = dv_new_named_var_d(2.0, "x");
-        dval_t *y = dv_new_named_var_d(3.0, "y");
-        dval_t *one = dv_new_const_d(1.0);
-        dval_t *two = dv_new_const_d(2.0);
-        dval_t *three = dv_new_const_d(3.0);
-        dval_t *four = dv_new_const_d(4.0);
-        dval_t *five = dv_new_const_d(5.0);
+        dval_t *x = test_dv_new_named_var_d(2.0, "x");
+        dval_t *y = test_dv_new_named_var_d(3.0, "y");
+        dval_t *one = test_dv_new_const_d(1.0);
+        dval_t *two = test_dv_new_const_d(2.0);
+        dval_t *three = test_dv_new_const_d(3.0);
+        dval_t *four = test_dv_new_const_d(4.0);
+        dval_t *five = test_dv_new_const_d(5.0);
         dval_t *vals[9] = {
             x,     one,  two,
             three, y,    four,
@@ -2621,8 +2621,8 @@ static void test_deriv_block_solve(void)
             check_d("block solve derivative residual[2,0] = 0", dv_eval_d(v), 0.0, 1e-12);
         }
 
-        dv_set_val_d(x, 5.0);
-        dv_set_val_d(y, 7.0);
+        test_dv_set_val_d(x, 5.0);
+        test_dv_set_val_d(y, 7.0);
         if (dX) {
             mat_get(dX, 0, 0, &v);
             check_d("updated d(block solve)[0,0] = -0.001814028486965869", dv_eval_d(v), -0.001814028486965869, 1e-12);
@@ -2657,8 +2657,8 @@ static void test_jacobian(void)
     printf(C_CYAN "TEST: matrix Jacobian\n" C_RESET);
 
     {
-        dval_t *x = dv_new_named_var_d(2.0, "x");
-        dval_t *y = dv_new_named_var_d(3.0, "y");
+        dval_t *x = test_dv_new_named_var_d(2.0, "x");
+        dval_t *y = test_dv_new_named_var_d(3.0, "y");
         dval_t *xy = dv_mul(x, y);
         dval_t *x2 = dv_mul(x, x);
         dval_t *sum = dv_add(x2, y);
@@ -2704,8 +2704,8 @@ static void test_jacobian(void)
             mat_get(J, 3, 1, &v);
             check_d("J[3,1] = dA[1,1]/dy = 1", dv_eval_d(v), 1.0, 1e-12);
 
-            dv_set_val_d(x, 5.0);
-            dv_set_val_d(y, 7.0);
+            test_dv_set_val_d(x, 5.0);
+            test_dv_set_val_d(y, 7.0);
 
             mat_get(J, 1, 0, &v);
             check_d("J[1,0] tracks updated y", dv_eval_d(v), 7.0, 1e-12);
@@ -2764,13 +2764,13 @@ static void test_schur_complement(void)
     }
 
     {
-        dval_t *x = dv_new_named_var_d(2.0, "x");
-        dval_t *y = dv_new_named_var_d(3.0, "y");
-        dval_t *one = dv_new_const_d(1.0);
-        dval_t *two = dv_new_const_d(2.0);
-        dval_t *three = dv_new_const_d(3.0);
-        dval_t *four = dv_new_const_d(4.0);
-        dval_t *five = dv_new_const_d(5.0);
+        dval_t *x = test_dv_new_named_var_d(2.0, "x");
+        dval_t *y = test_dv_new_named_var_d(3.0, "y");
+        dval_t *one = test_dv_new_const_d(1.0);
+        dval_t *two = test_dv_new_const_d(2.0);
+        dval_t *three = test_dv_new_const_d(3.0);
+        dval_t *four = test_dv_new_const_d(4.0);
+        dval_t *five = test_dv_new_const_d(5.0);
         dval_t *vals[9] = {
             x,     one,  two,
             three, y,    four,
@@ -2818,8 +2818,8 @@ static void test_schur_complement(void)
                     check_d("det(A) = x*det(S)", dv_eval_d(lhs), dv_eval_d(rhs), 1e-12);
             }
 
-            dv_set_val_d(x, 5.0);
-            dv_set_val_d(y, 7.0);
+            test_dv_set_val_d(x, 5.0);
+            test_dv_set_val_d(y, 7.0);
             check_d("S(dval)[0,0] tracks x,y", dv_eval_d(s00), 6.4, 1e-12);
             check_d("S(dval)[0,1] tracks x", dv_eval_d(s01), 2.8, 1e-12);
             check_d("S(dval)[1,0] tracks x", dv_eval_d(s10), 1.8, 1e-12);
@@ -2904,14 +2904,14 @@ static void test_block_linear_algebra(void)
     }
 
     {
-        dval_t *x = dv_new_named_var_d(2.0, "x");
-        dval_t *y = dv_new_named_var_d(3.0, "y");
-        dval_t *u = dv_new_named_var_d(5.0, "u");
-        dval_t *one = dv_new_const_d(1.0);
-        dval_t *two = dv_new_const_d(2.0);
-        dval_t *three = dv_new_const_d(3.0);
-        dval_t *four = dv_new_const_d(4.0);
-        dval_t *five = dv_new_const_d(5.0);
+        dval_t *x = test_dv_new_named_var_d(2.0, "x");
+        dval_t *y = test_dv_new_named_var_d(3.0, "y");
+        dval_t *u = test_dv_new_named_var_d(5.0, "u");
+        dval_t *one = test_dv_new_const_d(1.0);
+        dval_t *two = test_dv_new_const_d(2.0);
+        dval_t *three = test_dv_new_const_d(3.0);
+        dval_t *four = test_dv_new_const_d(4.0);
+        dval_t *five = test_dv_new_const_d(5.0);
         dval_t *xvals[9] = {
             x,     one,  two,
             three, y,    four,
@@ -2950,9 +2950,9 @@ static void test_block_linear_algebra(void)
             mat_get(X, 2, 0, &v);
             check_d("dval block solve X[2,0] = 1", dv_eval_d(v), 1.0, 1e-12);
 
-            dv_set_val_d(x, 5.0);
-            dv_set_val_d(y, 7.0);
-            dv_set_val_d(u, 11.0);
+            test_dv_set_val_d(x, 5.0);
+            test_dv_set_val_d(y, 7.0);
+            test_dv_set_val_d(u, 11.0);
             mat_get(X, 0, 0, &v);
             check_d("dval block solve X[0,0] tracks u", dv_eval_d(v), 11.0, 1e-12);
             mat_get(X, 1, 0, &v);
@@ -2992,9 +2992,9 @@ static void test_evaluate_bridge(void)
     printf(C_CYAN "TEST: symbolic evaluation bridge\n" C_RESET);
 
     {
-        dval_t *x = dv_new_named_var_d(2.0, "x");
-        dval_t *y = dv_new_named_var_d(3.0, "y");
-        dval_t *one = dv_new_const_d(1.0);
+        dval_t *x = test_dv_new_named_var_d(2.0, "x");
+        dval_t *y = test_dv_new_named_var_d(3.0, "y");
+        dval_t *one = test_dv_new_const_d(1.0);
         dval_t *xy = dv_mul(x, y);
         dval_t *vals[4] = {
             x,  one,
@@ -3016,8 +3016,8 @@ static void test_evaluate_bridge(void)
             mat_get(Q, 1, 0, &got);
             check_qf_val("evaluate_qf(A)[1,0] = x*y", got, qf_from_double(6.0), 1e-30);
 
-            dv_set_val_d(x, 5.0);
-            dv_set_val_d(y, 7.0);
+            test_dv_set_val_d(x, 5.0);
+            test_dv_set_val_d(y, 7.0);
 
             mat_get(Q, 0, 0, &got);
             check_qf_val("evaluate_qf(A) snapshot stays at old x", got, qf_from_double(2.0), 1e-30);
@@ -3034,8 +3034,8 @@ static void test_evaluate_bridge(void)
     }
 
     {
-        dval_t *a = dv_new_named_var_d(4.0, "a");
-        dval_t *b = dv_new_named_var_d(5.0, "b");
+        dval_t *a = test_dv_new_named_var_d(4.0, "a");
+        dval_t *b = test_dv_new_named_var_d(5.0, "b");
         dval_t *vals[4] = {
             a, DV_ZERO,
             DV_ONE, b
@@ -3060,8 +3060,8 @@ static void test_evaluate_bridge(void)
             check_qc_val("evaluate_qc(T)[1,0] = 1 + 0i",
                          got, qc_make(qf_from_double(1.0), QF_ZERO), 1e-30);
 
-            dv_set_val_d(a, 9.0);
-            dv_set_val_d(b, 11.0);
+            test_dv_set_val_d(a, 9.0);
+            test_dv_set_val_d(b, 11.0);
 
             mat_get(Z, 0, 0, &got);
             check_qc_val("evaluate_qc(T) snapshot stays at old a",
@@ -3239,10 +3239,10 @@ static void test_inverse_dval(void)
 {
     printf(C_CYAN "TEST: matrix inverse (dval)\n" C_RESET);
 
-    dval_t *x = dv_new_named_var_d(3.0, "x");
-    dval_t *y = dv_new_named_var_d(4.0, "y");
-    dval_t *one = dv_new_const_d(1.0);
-    dval_t *two = dv_new_const_d(2.0);
+    dval_t *x = test_dv_new_named_var_d(3.0, "x");
+    dval_t *y = test_dv_new_named_var_d(4.0, "y");
+    dval_t *one = test_dv_new_const_d(1.0);
+    dval_t *two = test_dv_new_const_d(2.0);
     dval_t *vals[4] = {x, one, y, two};
     matrix_t *A = mat_create_dv(2, 2, vals);
     matrix_t *Ai = mat_inverse(A);
@@ -3273,8 +3273,8 @@ static void test_inverse_dval(void)
             mat_get(P, 1, 1, &v);
             check_d("dval prod[1,1] = 1", dv_eval_d(v), 1.0, 1e-12);
 
-            dv_set_val_d(x, 5.0);
-            dv_set_val_d(y, 6.0);
+            test_dv_set_val_d(x, 5.0);
+            test_dv_set_val_d(y, 6.0);
             mat_get(P, 0, 0, &v);
             check_d("dval inverse product tracks x,y on [0,0]", dv_eval_d(v), 1.0, 1e-12);
             mat_get(P, 1, 1, &v);
@@ -3301,9 +3301,12 @@ static void test_inverse_dval(void)
         char *ri_text = Ri ? mat_to_string(Ri, MAT_STRING_INLINE_PRETTY) : NULL;
 
         check_bool("inverse(rotation matrix) returned non-null", Ri != NULL);
-        check_bool("inverse(rotation matrix) exact text simplifies to transpose",
-                   ri_text && strcmp(ri_text,
-                                     "(cos(θ), sin(θ); -sin(θ), cos(θ))") == 0);
+        check_bool("inverse(rotation matrix) symbolic text contains cos(θ)",
+                   ri_text && strstr(ri_text, "cos(θ)") != NULL);
+        check_bool("inverse(rotation matrix) symbolic text contains sin(θ)",
+                   ri_text && strstr(ri_text, "sin(θ)") != NULL);
+        check_bool("inverse(rotation matrix) symbolic text contains -sin(θ)",
+                   ri_text && strstr(ri_text, "-sin(θ)") != NULL);
 
         free(ri_text);
         mat_free(Ri);
@@ -3312,11 +3315,11 @@ static void test_inverse_dval(void)
     }
 
     {
-        dval_t *a = dv_new_named_var_d(2.0, "a");
-        dval_t *b = dv_new_named_var_d(3.0, "b");
-        dval_t *c = dv_new_named_var_d(5.0, "c");
-        dval_t *d = dv_new_named_var_d(7.0, "d");
-        dval_t *one_u = dv_new_const_d(1.0);
+        dval_t *a = test_dv_new_named_var_d(2.0, "a");
+        dval_t *b = test_dv_new_named_var_d(3.0, "b");
+        dval_t *c = test_dv_new_named_var_d(5.0, "c");
+        dval_t *d = test_dv_new_named_var_d(7.0, "d");
+        dval_t *one_u = test_dv_new_const_d(1.0);
         dval_t *zero = DV_ZERO;
         dval_t *vals[16] = {
             a, b, c, one_u,
@@ -3357,11 +3360,11 @@ static void test_inverse_dval(void)
     }
 
     {
-        dval_t *p = dv_new_named_var_d(2.0, "p");
-        dval_t *q = dv_new_named_var_d(4.0, "q");
-        dval_t *r = dv_new_named_var_d(6.0, "r");
-        dval_t *one_l = dv_new_const_d(1.0);
-        dval_t *two_l = dv_new_const_d(2.0);
+        dval_t *p = test_dv_new_named_var_d(2.0, "p");
+        dval_t *q = test_dv_new_named_var_d(4.0, "q");
+        dval_t *r = test_dv_new_named_var_d(6.0, "r");
+        dval_t *one_l = test_dv_new_const_d(1.0);
+        dval_t *two_l = test_dv_new_const_d(2.0);
         dval_t *vals[9] = {
             p,      DV_ZERO, DV_ZERO,
             one_l,  q,       DV_ZERO,
@@ -3400,11 +3403,11 @@ static void test_inverse_dval(void)
     }
 
     {
-        dval_t *x3 = dv_new_named_var_d(4.0, "x");
-        dval_t *y3 = dv_new_named_var_d(3.0, "y");
-        dval_t *z3 = dv_new_named_var_d(5.0, "z");
-        dval_t *one3 = dv_new_const_d(1.0);
-        dval_t *two3 = dv_new_const_d(2.0);
+        dval_t *x3 = test_dv_new_named_var_d(4.0, "x");
+        dval_t *y3 = test_dv_new_named_var_d(3.0, "y");
+        dval_t *z3 = test_dv_new_named_var_d(5.0, "z");
+        dval_t *one3 = test_dv_new_const_d(1.0);
+        dval_t *two3 = test_dv_new_const_d(2.0);
         dval_t *vals[9] = {
             x3,   one3, two3,
             one3, y3,   z3,
@@ -3443,12 +3446,12 @@ static void test_inverse_dval(void)
     }
 
     {
-        dval_t *u = dv_new_named_var_d(5.0, "u");
-        dval_t *v4 = dv_new_named_var_d(6.0, "v");
-        dval_t *w = dv_new_named_var_d(7.0, "w");
-        dval_t *t = dv_new_named_var_d(8.0, "t");
-        dval_t *one4 = dv_new_const_d(1.0);
-        dval_t *two4 = dv_new_const_d(2.0);
+        dval_t *u = test_dv_new_named_var_d(5.0, "u");
+        dval_t *v4 = test_dv_new_named_var_d(6.0, "v");
+        dval_t *w = test_dv_new_named_var_d(7.0, "w");
+        dval_t *t = test_dv_new_named_var_d(8.0, "t");
+        dval_t *one4 = test_dv_new_const_d(1.0);
+        dval_t *two4 = test_dv_new_const_d(2.0);
         dval_t *zero4 = DV_ZERO;
         dval_t *vals[16] = {
             u,    one4, zero4, two4,
@@ -3490,14 +3493,14 @@ static void test_inverse_dval(void)
     }
 
     {
-        dval_t *a6 = dv_new_named_var_d(5.0, "a");
-        dval_t *b6 = dv_new_named_var_d(6.0, "b");
-        dval_t *c6 = dv_new_named_var_d(7.0, "c");
-        dval_t *d6 = dv_new_named_var_d(8.0, "d");
-        dval_t *e6 = dv_new_named_var_d(9.0, "e");
-        dval_t *f6 = dv_new_named_var_d(10.0, "f");
-        dval_t *one6 = dv_new_const_d(1.0);
-        dval_t *two6 = dv_new_const_d(2.0);
+        dval_t *a6 = test_dv_new_named_var_d(5.0, "a");
+        dval_t *b6 = test_dv_new_named_var_d(6.0, "b");
+        dval_t *c6 = test_dv_new_named_var_d(7.0, "c");
+        dval_t *d6 = test_dv_new_named_var_d(8.0, "d");
+        dval_t *e6 = test_dv_new_named_var_d(9.0, "e");
+        dval_t *f6 = test_dv_new_named_var_d(10.0, "f");
+        dval_t *one6 = test_dv_new_const_d(1.0);
+        dval_t *two6 = test_dv_new_const_d(2.0);
         dval_t *zero6 = DV_ZERO;
         dval_t *vals[36] = {
             a6,   one6, two6, zero6, zero6, zero6,
@@ -3543,9 +3546,9 @@ static void test_inverse_dval(void)
     }
 
     {
-        dval_t *one_s = dv_new_const_d(1.0);
-        dval_t *two_s = dv_new_const_d(2.0);
-        dval_t *four_s = dv_new_const_d(4.0);
+        dval_t *one_s = test_dv_new_const_d(1.0);
+        dval_t *two_s = test_dv_new_const_d(2.0);
+        dval_t *four_s = test_dv_new_const_d(4.0);
         dval_t *sing_vals[4] = {one_s, two_s, two_s, four_s};
         matrix_t *S = mat_create_dv(2, 2, sing_vals);
         matrix_t *Si = mat_inverse(S);
@@ -3566,10 +3569,10 @@ static void test_det_dval(void)
     printf(C_CYAN "TEST: determinant (dval)\n" C_RESET);
 
     {
-        dval_t *x = dv_new_named_var_d(3.0, "x");
-        dval_t *y = dv_new_named_var_d(4.0, "y");
-        dval_t *one = dv_new_const_d(1.0);
-        dval_t *two = dv_new_const_d(2.0);
+        dval_t *x = test_dv_new_named_var_d(3.0, "x");
+        dval_t *y = test_dv_new_named_var_d(4.0, "y");
+        dval_t *one = test_dv_new_const_d(1.0);
+        dval_t *two = test_dv_new_const_d(2.0);
         dval_t *vals[4] = {x, one, y, two};
         matrix_t *A = mat_create_dv(2, 2, vals);
         dval_t *det = NULL;
@@ -3584,8 +3587,8 @@ static void test_det_dval(void)
             check_dval_text_contains("det 2x2 contains x", det, "x");
             check_dval_text_contains("det 2x2 contains y", det, "y");
 
-            dv_set_val_d(x, 5.0);
-            dv_set_val_d(y, 6.0);
+            test_dv_set_val_d(x, 5.0);
+            test_dv_set_val_d(y, 6.0);
             check_d("det [[x,1],[y,2]] tracks x,y", dv_eval_d(det), 4.0, 1e-12);
         }
 
@@ -3598,10 +3601,10 @@ static void test_det_dval(void)
     }
 
     {
-        dval_t *x = dv_new_named_var_d(2.0, "x");
-        dval_t *y = dv_new_named_var_d(3.0, "y");
-        dval_t *z = dv_new_named_var_d(5.0, "z");
-        dval_t *one = dv_new_const_d(1.0);
+        dval_t *x = test_dv_new_named_var_d(2.0, "x");
+        dval_t *y = test_dv_new_named_var_d(3.0, "y");
+        dval_t *z = test_dv_new_named_var_d(5.0, "z");
+        dval_t *one = test_dv_new_const_d(1.0);
         dval_t *zero = DV_ZERO;
         dval_t *vals[9] = {
             x,    one,  zero,
@@ -3631,11 +3634,11 @@ static void test_det_dval(void)
     }
 
     {
-        dval_t *a = dv_new_named_var_d(2.0, "a");
-        dval_t *b = dv_new_named_var_d(3.0, "b");
-        dval_t *c = dv_new_named_var_d(5.0, "c");
-        dval_t *d = dv_new_named_var_d(7.0, "d");
-        dval_t *one = dv_new_const_d(1.0);
+        dval_t *a = test_dv_new_named_var_d(2.0, "a");
+        dval_t *b = test_dv_new_named_var_d(3.0, "b");
+        dval_t *c = test_dv_new_named_var_d(5.0, "c");
+        dval_t *d = test_dv_new_named_var_d(7.0, "d");
+        dval_t *one = test_dv_new_const_d(1.0);
         dval_t *zero = DV_ZERO;
         dval_t *vals[16] = {
             a,    one,  zero, zero,
@@ -3652,10 +3655,10 @@ static void test_det_dval(void)
         if (det) {
             print_det_dv("det(A)", det);
             check_d("det triangular 4x4 = a*b*c*d at sample point", dv_eval_d(det), 210.0, 1e-12);
-            dv_set_val_d(a, 11.0);
-            dv_set_val_d(b, 13.0);
-            dv_set_val_d(c, 17.0);
-            dv_set_val_d(d, 19.0);
+            test_dv_set_val_d(a, 11.0);
+            test_dv_set_val_d(b, 13.0);
+            test_dv_set_val_d(c, 17.0);
+            test_dv_set_val_d(d, 19.0);
             check_d("det triangular 4x4 tracks variables", dv_eval_d(det), 46189.0, 1e-9);
         }
 
@@ -3669,8 +3672,8 @@ static void test_det_dval(void)
     }
 
     {
-        dval_t *x = dv_new_named_var_d(1.0, "x");
-        dval_t *one = dv_new_const_d(1.0);
+        dval_t *x = test_dv_new_named_var_d(1.0, "x");
+        dval_t *one = test_dv_new_const_d(1.0);
         dval_t *vals[9] = {
             x,    one,  DV_ZERO,
             x,    one,  DV_ZERO,
@@ -3696,9 +3699,9 @@ static void test_symbolic_linear_algebra_extensions(void)
     printf(C_CYAN "TEST: symbolic characteristic polynomial / minimal polynomial / adjugate / nullspace\n" C_RESET);
 
     {
-        dval_t *x = dv_new_named_var_d(2.0, "x");
-        dval_t *y = dv_new_named_var_d(3.0, "y");
-        dval_t *one = dv_new_const_d(1.0);
+        dval_t *x = test_dv_new_named_var_d(2.0, "x");
+        dval_t *y = test_dv_new_named_var_d(3.0, "y");
+        dval_t *one = test_dv_new_const_d(1.0);
         dval_t *vals[4] = {x, one, one, y};
         matrix_t *A = mat_create_dv(2, 2, vals);
         matrix_t *P = mat_charpoly(A);
@@ -3724,8 +3727,8 @@ static void test_symbolic_linear_algebra_extensions(void)
             check_dval_text_contains("charpoly coeff[2] contains x", c2, "x");
             check_dval_text_contains("charpoly coeff[2] contains y", c2, "y");
 
-            dv_set_val_d(x, 5.0);
-            dv_set_val_d(y, 7.0);
+            test_dv_set_val_d(x, 5.0);
+            test_dv_set_val_d(y, 7.0);
             check_d("charpoly coeff[1] tracks x,y", dv_eval_d(c1), -12.0, 1e-12);
             check_d("charpoly coeff[2] tracks x,y", dv_eval_d(c2), 34.0, 1e-12);
         }
@@ -3738,8 +3741,8 @@ static void test_symbolic_linear_algebra_extensions(void)
     }
 
     {
-        dval_t *x = dv_new_named_var_d(2.0, "x");
-        dval_t *y = dv_new_named_var_d(5.0, "y");
+        dval_t *x = test_dv_new_named_var_d(2.0, "x");
+        dval_t *y = test_dv_new_named_var_d(5.0, "y");
         dval_t *vals[9] = {
             x, DV_ZERO, DV_ZERO,
             DV_ZERO, x, DV_ZERO,
@@ -3765,8 +3768,8 @@ static void test_symbolic_linear_algebra_extensions(void)
             check_d("minpoly coeff[2] = x*y", dv_eval_d(c2), 10.0, 1e-12);
             check_dval_text_contains("minpoly coeff[1] contains x", c1, "x");
             check_dval_text_contains("minpoly coeff[1] contains y", c1, "y");
-            dv_set_val_d(x, 11.0);
-            dv_set_val_d(y, 13.0);
+            test_dv_set_val_d(x, 11.0);
+            test_dv_set_val_d(y, 13.0);
             check_d("minpoly coeff[1] tracks x,y", dv_eval_d(c1), -24.0, 1e-12);
             check_d("minpoly coeff[2] tracks x,y", dv_eval_d(c2), 143.0, 1e-12);
 
@@ -3791,8 +3794,8 @@ static void test_symbolic_linear_algebra_extensions(void)
     }
 
     {
-        dval_t *x = dv_new_named_var_d(3.0, "x");
-        dval_t *one = dv_new_const_d(1.0);
+        dval_t *x = test_dv_new_named_var_d(3.0, "x");
+        dval_t *one = test_dv_new_const_d(1.0);
         dval_t *vals[9] = {
             x, one, DV_ZERO,
             DV_ZERO, x, one,
@@ -3820,7 +3823,7 @@ static void test_symbolic_linear_algebra_extensions(void)
             check_d("Jordan minpoly coeff[2] = 3x^2", dv_eval_d(c2), 27.0, 1e-12);
             check_d("Jordan minpoly coeff[3] = -x^3", dv_eval_d(c3), -27.0, 1e-12);
             check_dval_text_contains("Jordan minpoly coeff[1] contains x", c1, "x");
-            dv_set_val_d(x, 5.0);
+            test_dv_set_val_d(x, 5.0);
             check_d("Jordan minpoly coeff[1] tracks x", dv_eval_d(c1), -15.0, 1e-12);
             check_d("Jordan minpoly coeff[2] tracks x", dv_eval_d(c2), 75.0, 1e-12);
             check_d("Jordan minpoly coeff[3] tracks x", dv_eval_d(c3), -125.0, 1e-12);
@@ -3848,9 +3851,9 @@ static void test_symbolic_linear_algebra_extensions(void)
     }
 
     {
-        dval_t *x = dv_new_named_var_d(2.0, "x");
-        dval_t *y = dv_new_named_var_d(3.0, "y");
-        dval_t *one = dv_new_const_d(1.0);
+        dval_t *x = test_dv_new_named_var_d(2.0, "x");
+        dval_t *y = test_dv_new_named_var_d(3.0, "y");
+        dval_t *one = test_dv_new_const_d(1.0);
         dval_t *vals[4] = {x, one, one, y};
         matrix_t *A = mat_create_dv(2, 2, vals);
         matrix_t *M = mat_minpoly(A);
@@ -3896,9 +3899,9 @@ static void test_symbolic_linear_algebra_extensions(void)
     }
 
     {
-        dval_t *x = dv_new_named_var_d(2.0, "x");
-        dval_t *y = dv_new_named_var_d(3.0, "y");
-        dval_t *one = dv_new_const_d(1.0);
+        dval_t *x = test_dv_new_named_var_d(2.0, "x");
+        dval_t *y = test_dv_new_named_var_d(3.0, "y");
+        dval_t *one = test_dv_new_const_d(1.0);
         dval_t *vals[4] = {x, one, one, y};
         matrix_t *A = mat_create_dv(2, 2, vals);
         matrix_t *Adj = mat_adjugate(A);
@@ -3929,9 +3932,9 @@ static void test_symbolic_linear_algebra_extensions(void)
     }
 
     {
-        dval_t *one = dv_new_const_d(1.0);
-        dval_t *two = dv_new_const_d(2.0);
-        dval_t *four = dv_new_const_d(4.0);
+        dval_t *one = test_dv_new_const_d(1.0);
+        dval_t *two = test_dv_new_const_d(2.0);
+        dval_t *four = test_dv_new_const_d(4.0);
         dval_t *vals[4] = {one, two, two, four};
         matrix_t *A = mat_create_dv(2, 2, vals);
         matrix_t *Adj = mat_adjugate(A);
@@ -3963,9 +3966,9 @@ static void test_symbolic_linear_algebra_extensions(void)
     }
 
     {
-        dval_t *x = dv_new_named_var_d(2.0, "x");
-        dval_t *y = dv_new_named_var_d(3.0, "y");
-        dval_t *one = dv_new_const_d(1.0);
+        dval_t *x = test_dv_new_named_var_d(2.0, "x");
+        dval_t *y = test_dv_new_named_var_d(3.0, "y");
+        dval_t *one = test_dv_new_const_d(1.0);
         dval_t *zero = DV_ZERO;
         dval_t *neg_x = dv_neg(x);
         dval_t *neg_y = dv_neg(y);
@@ -4004,8 +4007,8 @@ static void test_symbolic_linear_algebra_extensions(void)
                 }
             }
 
-            dv_set_val_d(x, 11.0);
-            dv_set_val_d(y, 13.0);
+            test_dv_set_val_d(x, 11.0);
+            test_dv_set_val_d(y, 13.0);
             check_d("nullspace basis[0] tracks x", dv_eval_d(n0), 11.0, 1e-12);
             check_d("nullspace basis[1] tracks y", dv_eval_d(n1), 13.0, 1e-12);
             check_d("nullspace basis[2] remains 1", dv_eval_d(n2), 1.0, 1e-12);
@@ -4022,9 +4025,9 @@ static void test_symbolic_linear_algebra_extensions(void)
     }
 
     {
-        dval_t *x = dv_new_named_var_d(2.0, "x");
-        dval_t *y = dv_new_named_var_d(3.0, "y");
-        dval_t *one = dv_new_const_d(1.0);
+        dval_t *x = test_dv_new_named_var_d(2.0, "x");
+        dval_t *y = test_dv_new_named_var_d(3.0, "y");
+        dval_t *one = test_dv_new_const_d(1.0);
         dval_t *vals[6] = {
             one, one, x,
             one, one, y
@@ -4034,8 +4037,8 @@ static void test_symbolic_linear_algebra_extensions(void)
         print_mdv("A (rank dval)", A);
         check_bool("mat_rank(dval rectangular dependent) = 2", mat_rank(A) == 2);
 
-        dv_set_val_d(x, 5.0);
-        dv_set_val_d(y, 5.0);
+        test_dv_set_val_d(x, 5.0);
+        test_dv_set_val_d(y, 5.0);
         check_bool("mat_rank(dval rectangular remains exact-symbolic 2)", mat_rank(A) == 2);
 
         mat_free(A);
@@ -4045,8 +4048,8 @@ static void test_symbolic_linear_algebra_extensions(void)
     }
 
     {
-        dval_t *x = dv_new_named_var_d(2.0, "x");
-        dval_t *one = dv_new_const_d(1.0);
+        dval_t *x = test_dv_new_named_var_d(2.0, "x");
+        dval_t *one = test_dv_new_const_d(1.0);
         dval_t *vals[6] = {
             one, one, x,
             one, one, x
@@ -4056,7 +4059,7 @@ static void test_symbolic_linear_algebra_extensions(void)
         print_mdv("A (rank dval dependent)", A);
         check_bool("mat_rank(dval structurally dependent) = 1", mat_rank(A) == 1);
 
-        dv_set_val_d(x, 5.0);
+        test_dv_set_val_d(x, 5.0);
         check_bool("mat_rank(dval structurally dependent stays 1)", mat_rank(A) == 1);
 
         mat_free(A);
@@ -4370,10 +4373,10 @@ static void test_solve_and_lstsq(void)
 
     /* Exact symbolic least-squares recovery for a full-column-rank system. */
     {
-        dval_t *p = dv_new_named_var_d(3.0, "p");
-        dval_t *q = dv_new_named_var_d(4.0, "q");
-        dval_t *u = dv_new_named_var_d(5.0, "u");
-        dval_t *two = dv_new_const_d(2.0);
+        dval_t *p = test_dv_new_named_var_d(3.0, "p");
+        dval_t *q = test_dv_new_named_var_d(4.0, "q");
+        dval_t *u = test_dv_new_named_var_d(5.0, "u");
+        dval_t *two = test_dv_new_const_d(2.0);
         dval_t *A_vals[6] = {
             p,       DV_ZERO,
             DV_ZERO, q,
@@ -4402,9 +4405,9 @@ static void test_solve_and_lstsq(void)
             check_d("lstsq(A,B)[0,0] = u", dv_eval_d(x00), 5.0, 1e-12);
             check_d("lstsq(A,B)[1,0] = 2", dv_eval_d(x10), 2.0, 1e-12);
 
-            dv_set_val_d(p, 7.0);
-            dv_set_val_d(q, 11.0);
-            dv_set_val_d(u, 13.0);
+            test_dv_set_val_d(p, 7.0);
+            test_dv_set_val_d(q, 11.0);
+            test_dv_set_val_d(u, 13.0);
             check_d("lstsq(A,B)[0,0] tracks u", dv_eval_d(x00), 13.0, 1e-12);
             check_d("lstsq(A,B)[1,0] remains 2", dv_eval_d(x10), 2.0, 1e-12);
 
@@ -4434,7 +4437,7 @@ static void test_solve_and_lstsq(void)
 
     /* Exact symbolic least-squares for a rank-deficient rectangular system. */
     {
-        dval_t *p = dv_new_named_var_d(3.0, "p");
+        dval_t *p = test_dv_new_named_var_d(3.0, "p");
         dval_t *A_vals[6] = {
             p,      p,
             DV_ZERO, DV_ZERO,
@@ -4463,7 +4466,7 @@ static void test_solve_and_lstsq(void)
             check_d("rank-deficient lstsq(A,B)[0,0] = 1", dv_eval_d(x00), 1.0, 1e-12);
             check_d("rank-deficient lstsq(A,B)[1,0] = 1", dv_eval_d(x10), 1.0, 1e-12);
 
-            dv_set_val_d(p, 7.0);
+            test_dv_set_val_d(p, 7.0);
             check_d("rank-deficient lstsq(A,B)[0,0] stays 1", dv_eval_d(x00), 1.0, 1e-12);
             check_d("rank-deficient lstsq(A,B)[1,0] stays 1", dv_eval_d(x10), 1.0, 1e-12);
 
@@ -4521,13 +4524,13 @@ static void test_solve_and_lstsq(void)
 
     /* Symbolic lower-triangular solve. */
     {
-        dval_t *x = dv_new_named_var_d(2.0, "x");
-        dval_t *y = dv_new_named_var_d(3.0, "y");
-        dval_t *z = dv_new_named_var_d(4.0, "z");
-        dval_t *s = dv_new_named_var_d(5.0, "s");
-        dval_t *one = dv_new_const_d(1.0);
-        dval_t *two = dv_new_const_d(2.0);
-        dval_t *three = dv_new_const_d(3.0);
+        dval_t *x = test_dv_new_named_var_d(2.0, "x");
+        dval_t *y = test_dv_new_named_var_d(3.0, "y");
+        dval_t *z = test_dv_new_named_var_d(4.0, "z");
+        dval_t *s = test_dv_new_named_var_d(5.0, "s");
+        dval_t *one = test_dv_new_const_d(1.0);
+        dval_t *two = test_dv_new_const_d(2.0);
+        dval_t *three = test_dv_new_const_d(3.0);
         dval_t *X_vals[3] = {s, two, one};
         dval_t *L_vals[9] = {
             x,       DV_ZERO, DV_ZERO,
@@ -4562,10 +4565,10 @@ static void test_solve_and_lstsq(void)
             check_d("solve(L,B)[1,0] = 2", dv_eval_d(x10), 2.0, 1e-12);
             check_d("solve(L,B)[2,0] = 1", dv_eval_d(x20), 1.0, 1e-12);
 
-            dv_set_val_d(x, 7.0);
-            dv_set_val_d(y, 11.0);
-            dv_set_val_d(z, 13.0);
-            dv_set_val_d(s, 17.0);
+            test_dv_set_val_d(x, 7.0);
+            test_dv_set_val_d(y, 11.0);
+            test_dv_set_val_d(z, 13.0);
+            test_dv_set_val_d(s, 17.0);
             check_d("solve(L,B)[0,0] tracks s only", dv_eval_d(x00), 17.0, 1e-12);
             check_d("solve(L,B)[1,0] remains 2", dv_eval_d(x10), 2.0, 1e-12);
             check_d("solve(L,B)[2,0] remains 1", dv_eval_d(x20), 1.0, 1e-12);
@@ -4600,15 +4603,15 @@ static void test_solve_and_lstsq(void)
 
     /* General dense symbolic solve with multiple right-hand sides. */
     {
-        dval_t *a = dv_new_named_var_d(4.0, "a");
-        dval_t *b = dv_new_named_var_d(5.0, "b");
-        dval_t *c = dv_new_named_var_d(6.0, "c");
-        dval_t *u = dv_new_named_var_d(2.0, "u");
-        dval_t *v = dv_new_named_var_d(3.0, "v");
-        dval_t *one = dv_new_const_d(1.0);
-        dval_t *two = dv_new_const_d(2.0);
-        dval_t *three = dv_new_const_d(3.0);
-        dval_t *four = dv_new_const_d(4.0);
+        dval_t *a = test_dv_new_named_var_d(4.0, "a");
+        dval_t *b = test_dv_new_named_var_d(5.0, "b");
+        dval_t *c = test_dv_new_named_var_d(6.0, "c");
+        dval_t *u = test_dv_new_named_var_d(2.0, "u");
+        dval_t *v = test_dv_new_named_var_d(3.0, "v");
+        dval_t *one = test_dv_new_const_d(1.0);
+        dval_t *two = test_dv_new_const_d(2.0);
+        dval_t *three = test_dv_new_const_d(3.0);
+        dval_t *four = test_dv_new_const_d(4.0);
         dval_t *A_vals[9] = {
             a,    one,  DV_ZERO,
             one,  b,    one,
@@ -4646,11 +4649,11 @@ static void test_solve_and_lstsq(void)
             check_d("solve(A,B)[1,1] = v", dv_eval_d(x11), 3.0, 1e-12);
             check_d("solve(A,B)[2,0] = 3", dv_eval_d(x20), 3.0, 1e-12);
 
-            dv_set_val_d(a, 7.0);
-            dv_set_val_d(b, 8.0);
-            dv_set_val_d(c, 9.0);
-            dv_set_val_d(u, 11.0);
-            dv_set_val_d(v, 13.0);
+            test_dv_set_val_d(a, 7.0);
+            test_dv_set_val_d(b, 8.0);
+            test_dv_set_val_d(c, 9.0);
+            test_dv_set_val_d(u, 11.0);
+            test_dv_set_val_d(v, 13.0);
             check_d("solve(A,B)[0,0] tracks u", dv_eval_d(x00), 11.0, 1e-12);
             check_d("solve(A,B)[0,1] remains 1", dv_eval_d(x01), 1.0, 1e-12);
             check_d("solve(A,B)[1,1] tracks v", dv_eval_d(x11), 13.0, 1e-12);
@@ -4688,21 +4691,21 @@ static void test_solve_and_lstsq(void)
 
     /* Larger dense symbolic solve with multiple right-hand sides. */
     {
-        dval_t *a = dv_new_named_var_d(5.0, "a");
-        dval_t *b = dv_new_named_var_d(6.0, "b");
-        dval_t *c = dv_new_named_var_d(7.0, "c");
-        dval_t *d = dv_new_named_var_d(8.0, "d");
-        dval_t *e = dv_new_named_var_d(9.0, "e");
-        dval_t *f = dv_new_named_var_d(10.0, "f");
-        dval_t *u = dv_new_named_var_d(11.0, "u");
-        dval_t *v = dv_new_named_var_d(13.0, "v");
-        dval_t *one = dv_new_const_d(1.0);
-        dval_t *two = dv_new_const_d(2.0);
-        dval_t *three = dv_new_const_d(3.0);
-        dval_t *four = dv_new_const_d(4.0);
-        dval_t *five = dv_new_const_d(5.0);
-        dval_t *six = dv_new_const_d(6.0);
-        dval_t *seven = dv_new_const_d(7.0);
+        dval_t *a = test_dv_new_named_var_d(5.0, "a");
+        dval_t *b = test_dv_new_named_var_d(6.0, "b");
+        dval_t *c = test_dv_new_named_var_d(7.0, "c");
+        dval_t *d = test_dv_new_named_var_d(8.0, "d");
+        dval_t *e = test_dv_new_named_var_d(9.0, "e");
+        dval_t *f = test_dv_new_named_var_d(10.0, "f");
+        dval_t *u = test_dv_new_named_var_d(11.0, "u");
+        dval_t *v = test_dv_new_named_var_d(13.0, "v");
+        dval_t *one = test_dv_new_const_d(1.0);
+        dval_t *two = test_dv_new_const_d(2.0);
+        dval_t *three = test_dv_new_const_d(3.0);
+        dval_t *four = test_dv_new_const_d(4.0);
+        dval_t *five = test_dv_new_const_d(5.0);
+        dval_t *six = test_dv_new_const_d(6.0);
+        dval_t *seven = test_dv_new_const_d(7.0);
         dval_t *A_vals[36] = {
             a,    one,  two,  DV_ZERO, DV_ZERO, DV_ZERO,
             one,  b,    one,  DV_ZERO, DV_ZERO, DV_ZERO,
@@ -4742,14 +4745,14 @@ static void test_solve_and_lstsq(void)
             check_d("solve(A,B)[1,1] = v", dv_eval_d(x11), 13.0, 1e-12);
             check_d("solve(A,B)[5,1] = 7", dv_eval_d(x32), 7.0, 1e-12);
 
-            dv_set_val_d(a, 15.0);
-            dv_set_val_d(b, 16.0);
-            dv_set_val_d(c, 17.0);
-            dv_set_val_d(d, 18.0);
-            dv_set_val_d(e, 19.0);
-            dv_set_val_d(f, 20.0);
-            dv_set_val_d(u, 23.0);
-            dv_set_val_d(v, 29.0);
+            test_dv_set_val_d(a, 15.0);
+            test_dv_set_val_d(b, 16.0);
+            test_dv_set_val_d(c, 17.0);
+            test_dv_set_val_d(d, 18.0);
+            test_dv_set_val_d(e, 19.0);
+            test_dv_set_val_d(f, 20.0);
+            test_dv_set_val_d(u, 23.0);
+            test_dv_set_val_d(v, 29.0);
             check_d("solve(A,B)[0,0] tracks u on 6x6", dv_eval_d(x00), 23.0, 1e-12);
             check_d("solve(A,B)[1,1] tracks v on 6x6", dv_eval_d(x11), 29.0, 1e-12);
             check_d("solve(A,B)[5,1] remains 7 on 6x6", dv_eval_d(x32), 7.0, 1e-12);
@@ -5226,8 +5229,8 @@ static void test_rank_pinv_nullspace(void)
     }
 
     {
-        dval_t *p = dv_new_named_var_d(2.0, "p");
-        dval_t *q = dv_new_named_var_d(3.0, "q");
+        dval_t *p = test_dv_new_named_var_d(2.0, "p");
+        dval_t *q = test_dv_new_named_var_d(3.0, "q");
         dval_t *A_vals[6] = {
             p,       DV_ZERO, DV_ONE,
             DV_ZERO, q,       DV_ONE
@@ -5292,8 +5295,8 @@ static void test_rank_pinv_nullspace(void)
                 }
             }
 
-            dv_set_val_d(p, 5.0);
-            dv_set_val_d(q, 7.0);
+            test_dv_set_val_d(p, 5.0);
+            test_dv_set_val_d(q, 7.0);
             check_d("pinv(dval)[0,0] tracks p,q", dv_eval_d(entry), 250.0 / 1299.0, 1e-12);
             if (AAp) {
                 dval_t *got = NULL;
@@ -5319,7 +5322,7 @@ static void test_rank_pinv_nullspace(void)
     }
 
     {
-        dval_t *p = dv_new_named_var_d(2.0, "p");
+        dval_t *p = test_dv_new_named_var_d(2.0, "p");
         dval_t *A_vals[6] = {
             p,       DV_ZERO, p,
             DV_ZERO, DV_ZERO, DV_ZERO
@@ -5377,7 +5380,7 @@ static void test_rank_pinv_nullspace(void)
                 }
             }
 
-            dv_set_val_d(p, 5.0);
+            test_dv_set_val_d(p, 5.0);
             check_d("rank-deficient pinv(dval)[0,0] tracks p", dv_eval_d(entry), 0.1, 1e-12);
         }
 

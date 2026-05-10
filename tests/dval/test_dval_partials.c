@@ -2,8 +2,8 @@
 
 static void test_partial_xy_product(void)
 {
-    dval_t *x = dv_new_var_d(2.0);
-    dval_t *y = dv_new_var_d(3.0);
+    dval_t *x = test_dv_new_var_d(2.0);
+    dval_t *y = test_dv_new_var_d(3.0);
     dval_t *f = dv_mul(x, y);
 
     dval_t *df_dx = dv_create_deriv(f, x);
@@ -25,8 +25,8 @@ static void test_partial_xy_product(void)
 /* f(x,y) = x² + y³  →  ∂f/∂x = 2x,  ∂f/∂y = 3y²,  ∂²f/∂x² = 2,  ∂²f/∂y² = 6y */
 static void test_partial_poly(void)
 {
-    dval_t *x  = dv_new_var_d(2.0);
-    dval_t *y  = dv_new_var_d(3.0);
+    dval_t *x  = test_dv_new_var_d(2.0);
+    dval_t *y  = test_dv_new_var_d(3.0);
     dval_t *x2 = dv_pow_d(x, 2.0);
     dval_t *y3 = dv_pow_d(y, 3.0);
     dval_t *f  = dv_add(x2, y3);
@@ -60,8 +60,8 @@ static void test_partial_poly(void)
    ∂²f/∂x∂y = cos(x)*exp(y) */
 static void test_partial_sin_exp(void)
 {
-    dval_t *x    = dv_new_var_d(1.0);
-    dval_t *y    = dv_new_var_d(2.0);
+    dval_t *x    = test_dv_new_var_d(1.0);
+    dval_t *y    = test_dv_new_var_d(2.0);
     dval_t *sinx = dv_sin(x);
     dval_t *expy = dv_exp(y);
     dval_t *f    = dv_mul(sinx, expy);
@@ -93,8 +93,8 @@ static void test_partial_sin_exp(void)
 /* Cross-partial symmetry: ∂²f/∂x∂y == ∂²f/∂y∂x for f = x*y + x²*y */
 static void test_partial_symmetry(void)
 {
-    dval_t *x   = dv_new_var_d(2.0);
-    dval_t *y   = dv_new_var_d(3.0);
+    dval_t *x   = test_dv_new_var_d(2.0);
+    dval_t *y   = test_dv_new_var_d(3.0);
     dval_t *xy  = dv_mul(x, y);
     dval_t *x2  = dv_pow_d(x, 2.0);
     dval_t *x2y = dv_mul(x2, y);
@@ -121,8 +121,8 @@ static void test_partial_symmetry(void)
    and that repeated calls return the cached result (same pointer) */
 static void test_partial_get_borrowed(void)
 {
-    dval_t *x = dv_new_var_d(4.0);
-    dval_t *y = dv_new_var_d(5.0);
+    dval_t *x = test_dv_new_var_d(4.0);
+    dval_t *y = test_dv_new_var_d(5.0);
     dval_t *f = dv_mul(x, y);  /* f = x*y */
 
     const dval_t *p1 = dv_get_deriv(f, x);
@@ -147,8 +147,8 @@ static void test_partial_get_borrowed(void)
 static void test_partial_to_string(void)
 {
     fprintf(stderr, "\n  [%s]\n", __func__);
-    dval_t *x = dv_new_named_var_d(2.0, "x");
-    dval_t *y = dv_new_named_var_d(3.0, "y");
+    dval_t *x = test_dv_new_named_var_d(2.0, "x");
+    dval_t *y = test_dv_new_named_var_d(3.0, "y");
 
     /* f = xy */
     dval_t *f        = dv_mul(x, y);
@@ -219,8 +219,8 @@ static void test_partial_to_string(void)
 static void test_partial_to_string_functions(void)
 {
     fprintf(stderr, "\n  [%s]\n", __func__);
-    dval_t *x    = dv_new_named_var_d(1.0, "x");
-    dval_t *y    = dv_new_named_var_d(2.0, "y");
+    dval_t *x    = test_dv_new_named_var_d(1.0, "x");
+    dval_t *y    = test_dv_new_named_var_d(2.0, "y");
     dval_t *sinx = dv_sin(x);
     dval_t *expy = dv_exp(y);
     dval_t *f    = dv_mul(sinx, expy);
@@ -276,8 +276,8 @@ static void test_partial_to_string_functions(void)
 static void test_partial_to_string_log_r2(void)
 {
     fprintf(stderr, "\n  [%s]\n", __func__);
-    dval_t *x   = dv_new_named_var_d(1.0, "x");
-    dval_t *y   = dv_new_named_var_d(2.0, "y");
+    dval_t *x   = test_dv_new_named_var_d(1.0, "x");
+    dval_t *y   = test_dv_new_named_var_d(2.0, "y");
     dval_t *x2  = dv_pow_d(x, 2.0);
     dval_t *y2  = dv_pow_d(y, 2.0);
     dval_t *sum = dv_add(x2, y2);
@@ -335,8 +335,8 @@ static void test_partial_to_string_log_r2(void)
 static void test_partial_to_string_sin_xy(void)
 {
     fprintf(stderr, "\n  [%s]\n", __func__);
-    dval_t *x     = dv_new_named_var_d(1.0, "x");
-    dval_t *y     = dv_new_named_var_d(2.0, "y");
+    dval_t *x     = test_dv_new_named_var_d(1.0, "x");
+    dval_t *y     = test_dv_new_named_var_d(2.0, "y");
     dval_t *xy    = dv_mul(x, y);
     dval_t *sinxy = dv_sin(xy);
     dval_t *logy  = dv_log(y);

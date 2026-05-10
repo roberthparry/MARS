@@ -106,8 +106,13 @@ static dval_t *dval_clone_for_storage(const dval_t *dv)
 {
     if (!dv)
         return NULL;
-    if (dv == DV_ZERO || dv == DV_ONE)
-        return dv_new_const_qc(dv_get_val(dv));
+    if (dv == DV_ZERO || dv == DV_ONE) {
+        number_t value = dv_get_val_num(dv);
+        dval_t *clone = dv_new_const_num(value);
+
+        num_destroy(&value);
+        return clone;
+    }
     dv_retain(dv);
     return (dval_t *)dv;
 }
@@ -439,7 +444,7 @@ static int mat_eigenvalues_dval(const matrix_t *A, dval_t **eigenvalues)
         if (!bc)
             goto fail_2x2;
 
-        scaled_bc = dval_mul_simplify(dv_new_const_d(4.0), bc);
+        scaled_bc = dval_mul_simplify(dv_num_const_d(4.0), bc);
         bc = NULL;
         if (!scaled_bc)
             goto fail_2x2;
@@ -472,7 +477,7 @@ static int mat_eigenvalues_dval(const matrix_t *A, dval_t **eigenvalues)
         if (!minus)
             goto fail_2x2;
 
-        half = dv_new_const_d(0.5);
+        half = dv_num_const_d(0.5);
         if (!half)
             goto fail_2x2;
 
@@ -548,7 +553,7 @@ static matrix_t *mat_eigenvectors_dval_triangular(const matrix_t *A)
             const dval_t *lambda = mat_get_dval_or_zero(A, k, k);
 
             for (size_t ii = k; ii-- > 0;) {
-                dval_t *sum = dv_new_const(QF_ZERO);
+                dval_t *sum = dv_num_const_qf(QF_ZERO);
                 dval_t *denom;
                 dval_t *x;
 
@@ -610,7 +615,7 @@ static matrix_t *mat_eigenvectors_dval_triangular(const matrix_t *A)
             const dval_t *lambda = mat_get_dval_or_zero(A, k, k);
 
             for (size_t i = k + 1; i < A->rows; ++i) {
-                dval_t *sum = dv_new_const(QF_ZERO);
+                dval_t *sum = dv_num_const_qf(QF_ZERO);
                 dval_t *denom;
                 dval_t *x;
 
@@ -1263,14 +1268,14 @@ static matrix_t *mat_inverse_dval_upper_exact(const matrix_t *A)
             goto fail;
 
         dv_retain(uii);
-        xii = dval_div_simplify(dv_new_const_d(1.0), uii);
+        xii = dval_div_simplify(dv_num_const_d(1.0), uii);
         if (!xii)
             goto fail;
         mat_set(I, ii, ii, &xii);
         dv_free(xii);
 
         for (size_t j = ii + 1; j < n; ++j) {
-            dval_t *sum = dv_new_const_d(0.0);
+            dval_t *sum = dv_num_const_d(0.0);
             dval_t *xij = NULL;
 
             if (!sum)
@@ -1481,7 +1486,7 @@ static int mat_det_dval_exact(const matrix_t *A, dval_t **determinant)
         }
 
         if (pivot_row == n) {
-            *determinant = dv_new_const(QF_ZERO);
+            *determinant = dv_num_const_qf(QF_ZERO);
             mat_free(M);
             return *determinant ? 0 : -3;
         }
@@ -1493,7 +1498,7 @@ static int mat_det_dval_exact(const matrix_t *A, dval_t **determinant)
 
         mat_get(M, k, k, &pivot);
         if (dval_is_exact_zero(pivot)) {
-            *determinant = dv_new_const(QF_ZERO);
+            *determinant = dv_num_const_qf(QF_ZERO);
             mat_free(M);
             return *determinant ? 0 : -3;
         }
@@ -1902,7 +1907,7 @@ static matrix_t *mat_charpoly_dval(const matrix_t *A)
 
     coeffs = mat_create_zero_with_elem(A->rows + 1, 1, &dval_elem);
     B = mat_create_zero_with_elem(A->rows, A->cols, &dval_elem);
-    coeff_prev = dv_new_const_d(1.0);
+    coeff_prev = dv_num_const_d(1.0);
     if (!coeffs || !B || !coeff_prev)
         goto fail;
 
@@ -1945,7 +1950,7 @@ static matrix_t *mat_charpoly_dval(const matrix_t *A)
             goto fail;
         }
 
-        den = dv_new_const_d((double)k);
+        den = dv_num_const_d((double)k);
         quot = dval_div_simplify(trace_val, den);
         if (!quot) {
             mat_free(Bnew);
@@ -4460,20 +4465,20 @@ static void dv_print_wrap(const void *v, char *buf, size_t n)
 static double dv_abs2_wrap(const void *a)
 {
     dval_t *dv = *(dval_t *const *)a;
-    double x = dv ? dv_eval_d(dv) : 0.0;
+    double x = dv ? dv_num_eval_d(dv) : 0.0;
     return x * x;
 }
 
 static double dv_to_real_wrap(const void *a)
 {
     dval_t *dv = *(dval_t *const *)a;
-    return dv ? dv_eval_d(dv) : 0.0;
+    return dv ? dv_num_eval_d(dv) : 0.0;
 }
 
 static void dv_from_real_wrap(void *o, double x)
 {
     dval_t *prev = *(dval_t **)o;
-    dval_t *res = dv_new_const_d(x);
+    dval_t *res = dv_num_const_d(x);
 
     if (prev)
         dv_free(prev);
@@ -4495,19 +4500,19 @@ static void dv_conj_elem(void *o, const void *a)
 static void dv_to_qf(qfloat_t *o, const void *a)
 {
     dval_t *dv = *(dval_t *const *)a;
-    *o = dv ? dv_get_val_qf(dv) : QF_ZERO;
+    *o = dv ? dv_num_eval_qf(dv) : QF_ZERO;
 }
 
 static void dv_abs_qf(qfloat_t *o, const void *a)
 {
     dval_t *dv = *(dval_t *const *)a;
-    *o = dv ? qc_abs(dv_get_val(dv)) : QF_ZERO;
+    *o = dv ? qc_abs(dv_num_eval_qc(dv)) : QF_ZERO;
 }
 
 static void dv_from_qf(void *o, const qfloat_t *x)
 {
     dval_t *prev = *(dval_t **)o;
-    dval_t *res = dv_new_const(*x);
+    dval_t *res = dv_num_const_qf(*x);
 
     if (prev)
         dv_free(prev);
@@ -4517,13 +4522,13 @@ static void dv_from_qf(void *o, const qfloat_t *x)
 static void dv_to_qc_fn(qcomplex_t *o, const void *a)
 {
     dval_t *dv = *(dval_t *const *)a;
-    *o = dv ? dv_get_val(dv) : QC_ZERO;
+    *o = dv ? dv_num_eval_qc(dv) : QC_ZERO;
 }
 
 static void dv_from_qc_fn(void *o, const qcomplex_t *z)
 {
     dval_t *prev = *(dval_t **)o;
-    dval_t *res = dv_new_const(z->re);
+    dval_t *res = dv_num_const_qf(z->re);
 
     if (prev)
         dv_free(prev);
@@ -4947,11 +4952,11 @@ static inline void id_qc(qcomplex_t *out, const qcomplex_t *a) {
 }
 
 static inline void d_as_dv(dval_t **out, const double *a) {
-    *out = dv_new_const_d(*a);
+    *out = dv_num_const_d(*a);
 }
 
 static inline void qf_as_dv(dval_t **out, const qfloat_t *a) {
-    *out = dv_new_const(*a);
+    *out = dv_num_const_qf(*a);
 }
 
 static inline void id_dv(dval_t **out, dval_t *const *a) {
@@ -6437,7 +6442,7 @@ dval_t *mat_deriv_trace(const matrix_t *A, dval_t *wrt)
     if (!A->elem)
         return NULL;
     if (A->elem->kind != ELEM_DVAL)
-        return dv_new_const_d(0.0);
+        return dv_num_const_d(0.0);
 
     if (mat_trace(A, &trace) != 0 || !trace)
         return NULL;
@@ -6457,7 +6462,7 @@ dval_t *mat_deriv_det(const matrix_t *A, dval_t *wrt)
     if (!A->elem)
         return NULL;
     if (A->elem->kind != ELEM_DVAL)
-        return dv_new_const_d(0.0);
+        return dv_num_const_d(0.0);
 
     if (mat_det(A, &det) != 0 || !det)
         return NULL;
@@ -6699,7 +6704,7 @@ int mat_trace(const matrix_t *A, void *trace)
         return -3;
 
     if (e->kind == ELEM_DVAL) {
-        dval_t *sum = dv_new_const(QF_ZERO);
+        dval_t *sum = dv_num_const_qf(QF_ZERO);
 
         if (!sum)
             return -3;

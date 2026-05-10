@@ -16,7 +16,7 @@ bool dv_is_exact_zero(const dval_t *dv)
 {
     return is_kind(dv, DV_KIND_CONST) &&
            !dv->name &&
-           qc_eq(dv->c, QC_ZERO);
+           num_eq(dv->c, NUM_ZERO);
 }
 
 bool dv_is_named_const(const dval_t *dv)
@@ -28,8 +28,8 @@ static bool dv_match_const_leaf(const dval_t *expr, qfloat_t *value_out, const c
 {
     if (!is_kind(expr, DV_KIND_CONST))
         return false;
-    if (value_out)
-        *value_out = qc_real(expr->c);
+    if (value_out && !dv_try_get_const_real_qf(expr, value_out))
+        return false;
     if (name_out)
         *name_out = (expr->name && *expr->name) ? expr->name : NULL;
     return true;
@@ -39,8 +39,8 @@ static bool dv_match_var_leaf(const dval_t *expr, qfloat_t *value_out, const cha
 {
     if (!is_kind(expr, DV_KIND_VAR))
         return false;
-    if (value_out)
-        *value_out = qc_real(expr->c);
+    if (value_out && !dv_try_get_const_real_qf(expr, value_out))
+        return false;
     if (name_out)
         *name_out = (expr->name && *expr->name) ? expr->name : NULL;
     return true;
@@ -239,13 +239,15 @@ static bool dv_match_affine_power_exact(const dval_t *expr,
     const dval_t *lr = NULL;
     const dval_t *rl = NULL;
     const dval_t *rr = NULL;
+    qfloat_t exponent = QF_ZERO;
     qfloat_t constant = QF_ZERO;
 
     if (!expr || !constant_out || !coeffs_out || (nvars > 0 && !vars))
         return false;
 
     if (dv_match_unary_kind(expr, DV_KIND_POW_D, &arg) &&
-        qf_eq(qc_real(expr->c), qf_from_double((double) degree))) {
+        dv_try_get_const_real_qf(expr, &exponent) &&
+        qf_eq(exponent, qf_from_double((double) degree))) {
         for (size_t i = 0; i < nvars; ++i)
             coeffs_out[i] = QF_ZERO;
         if (!dv_match_affine_term(arg, nvars, vars, QF_ONE, &constant, coeffs_out))
@@ -783,21 +785,21 @@ dval_t *dv_substitute(const dval_t *expr,
 
     if (dv_match_const_leaf(expr, &value, &name)) {
         if (name)
-            return dv_new_named_const(value, name);
-        return dv_new_const(value);
+            return dv_num_named_const_qf(value, name);
+        return dv_num_const_qf(value);
     }
 
     if (dv_match_var_leaf(expr, &value, &name)) {
         if (name)
-            return dv_new_named_var(value, name);
-        return dv_new_var(value);
+            return dv_num_named_var_qf(value, name);
+        return dv_num_var_qf(value);
     }
 
     if (dv_match_unary_kind(expr, DV_KIND_POW_D, &arg)) {
         left = dv_substitute(arg, needle, replacement);
         if (!left)
             return NULL;
-        out = dv_pow_qc(left, expr->c);
+        out = dv_pow_num(left, &expr->c);
         dv_free(left);
         return out;
     }

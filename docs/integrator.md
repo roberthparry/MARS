@@ -99,12 +99,13 @@ When the integrand can be expressed as a `dval_t` graph, `ig_single_integral` us
 #include "qfloat.h"
 #include "integrator.h"
 #include "dval.h"
+#include "number.h"
 
 int main(void) {
     /* ∫₀¹ exp(x) dx = e - 1, at default 1e-27 tolerance */
     integrator_t *ig = ig_new();
-
-    dval_t *x    = dv_new_var(qf_from_double(0.0));
+    number_t x0  = num_create_from_double(0.0);
+    dval_t *x    = dv_new_var_num(x0);
     dval_t *expr = dv_exp(x);
 
     qfloat_t result, err;
@@ -118,6 +119,7 @@ int main(void) {
 
     dv_free(expr);
     dv_free(x);
+    num_destroy(&x0);
     ig_free(ig);
     return 0;
 }
@@ -142,11 +144,15 @@ multiple dimensions:
 
 int main(void) {
     integrator_t *ig = ig_new();
-    dval_t *x = dv_new_var(qf_from_double(0.0));
-    dval_t *y = dv_new_var(qf_from_double(0.0));
-    dval_t *two_y = dv_mul_d(y, 2.0);
+    number_t x0 = num_create_from_double(0.0);
+    number_t y0 = num_create_from_double(0.0);
+    number_t two = num_create_from_long(2);
+    number_t three = num_create_from_long(3);
+    dval_t *x = dv_new_var_num(x0);
+    dval_t *y = dv_new_var_num(y0);
+    dval_t *two_y = dv_mul_num(y, &two);
     dval_t *sum = dv_add(x, two_y);
-    dval_t *affine = dv_add_d(sum, 3.0);
+    dval_t *affine = dv_add_num(sum, &three);
     dval_t *exp_affine = dv_exp(affine);
     dval_t *expr = dv_mul(affine, exp_affine);
     dval_t *vars[2] = { x, y };
@@ -159,6 +165,10 @@ int main(void) {
     qf_printf("result = %q\n", result);
     printf("intervals = %zu\n", ig_get_interval_count_used(ig));
 
+    num_destroy(&three);
+    num_destroy(&two);
+    num_destroy(&y0);
+    num_destroy(&x0);
     dv_free(expr);
     dv_free(exp_affine);
     dv_free(affine);
@@ -239,7 +249,7 @@ All declarations are in `include/integrator.h`.
   - Reversed limits (`a > b`) are handled correctly.
 
 - `int ig_single_integral(integrator_t *ig, dval_t *expr, dval_t *x_var, qfloat_t a, qfloat_t b, qfloat_t *result, qfloat_t *error_est)` — integrate a `dval_t` expression over `[a, b]` using Turán T15/T4 (full qfloat_t precision).
-  - `expr` is the integrand expression; `x_var` is the variable node within it created with `dv_new_var()`.
+  - `expr` is the integrand expression; `x_var` is the variable node within it created with `dv_new_var_num()`.
   - The second derivative is computed automatically; the caller's graph is not permanently modified.
   - Returns `0` on convergence, `1` if `max_intervals` was reached, `-1` on NULL argument or allocation failure.
   - `error_est` may be NULL.
@@ -270,7 +280,7 @@ All declarations are in `include/integrator.h`.
 
 **Turán degree advantage** comes from incorporating f'' directly into the quadrature weights. For an 8-node symmetric rule this raises exactness from degree 15 (f only) to degree 31. The T4 nested sub-rule uses alternating node positions (not consecutive), which keeps all weights positive and the rule well-conditioned.
 
-**Cache coherence** in `ig_single_integral`: `dv_eval` detects variable changes automatically via epoch tracking — each call to `dv_set_val` advances the variable's epoch, and computed nodes recompute when they see a newer epoch from their inputs.
+**Cache coherence** in `ig_single_integral`: `dv_eval_num` detects variable changes automatically via epoch tracking — each call to `dv_set_val_num` advances the variable's epoch, and computed nodes recompute when they see a newer epoch from their inputs.
 
 **Threading:** the current `dval_t` and symbolic-integrator path are not yet
 internally synchronised. Prefer sequential test and benchmark runs, and do not
