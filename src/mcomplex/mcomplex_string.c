@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "mcomplex_internal.h"
+#include "mrational.h"
 
 static char *mcomplex_strip_spaces(const char *text)
 {
@@ -46,6 +47,65 @@ static int mcomplex_find_split(const char *text)
     return split;
 }
 
+static char *mcomplex_normalize_scalar_token(const char *text)
+{
+    const char *body;
+    size_t len;
+    int has_sign;
+    char *out;
+
+    if (!text)
+        return NULL;
+
+    has_sign = text[0] == '+' || text[0] == '-';
+    body = text + has_sign;
+    len = strlen(body);
+
+    if (len >= 2u && body[0] == '(' && body[len - 1u] == ')') {
+        body++;
+        len -= 2u;
+    }
+
+    out = malloc((size_t)has_sign + len + 1u);
+    if (!out)
+        return NULL;
+
+    if (has_sign)
+        out[0] = text[0];
+    memcpy(out + has_sign, body, len);
+    out[has_sign + len] = '\0';
+    return out;
+}
+
+static int mcomplex_set_scalar_token(mfloat_t *value, const char *text)
+{
+    char *normalized = NULL;
+    mrational_t *rational = NULL;
+    int rc = -1;
+
+    if (!value || !text)
+        return -1;
+
+    normalized = mcomplex_normalize_scalar_token(text);
+    if (!normalized || normalized[0] == '\0')
+        goto cleanup;
+
+    if (strchr(normalized, '/')) {
+        rational = mr_create_string(normalized);
+        if (!rational)
+            goto cleanup;
+        rc = mf_set_mrational(value, rational);
+        goto cleanup;
+    }
+
+    rc = mf_set_string(value, normalized);
+
+cleanup:
+    free(normalized);
+    mr_free(rational);
+    return rc;
+}
+
 static int mcomplex_set_imag_token(mfloat_t *imag, const char *text)
 {
     if (!imag || !text)
@@ -54,7 +114,7 @@ static int mcomplex_set_imag_token(mfloat_t *imag, const char *text)
         return mf_set_string(imag, "1");
     if (strcmp(text, "-") == 0)
         return mf_set_string(imag, "-1");
-    return mf_set_string(imag, text);
+    return mcomplex_set_scalar_token(imag, text);
 }
 
 int mc_set_string(mcomplex_t *mcomplex, const char *text)
@@ -105,7 +165,7 @@ int mc_set_string(mcomplex_t *mcomplex, const char *text)
         char sign = compact[split];
 
         compact[split] = '\0';
-        if (mf_set_string(mcomplex->real, compact) != 0) {
+        if (mcomplex_set_scalar_token(mcomplex->real, compact) != 0) {
             free(compact);
             return -1;
         }

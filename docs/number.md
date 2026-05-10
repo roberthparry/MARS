@@ -34,7 +34,7 @@ but must treat the storage as opaque.
 
 ## Parsing Policy
 
-`num_create_string(...)` chooses the most suitable backend by syntax:
+`num_create_from_string(...)` chooses the most suitable backend by syntax:
 
 - integer text -> `mint_t`
 - `a/b` fraction text -> `mrational_t`
@@ -48,6 +48,24 @@ Examples:
 - `"32.123"` -> multiprecision real
 - `"1 + 2i"` -> multiprecision complex
 
+Accepted examples:
+
+- `"1 + i"` -> parsed as `1 + 1i`
+- `"1 - i"` -> parsed as `1 - 1i`
+- `"1e-23 + 2.3e12i"` -> scientific notation in both parts is accepted
+- `"1e-23 + (2.3e12)i"` -> parenthesized imaginary coefficients are accepted
+- `"1/2 - 3/2i"` -> rational real and imaginary parts are accepted
+- `"3i"` -> pure imaginary form is accepted
+
+Not currently accepted:
+
+- `"1/i"` -> algebraic expression syntax
+
+Return convention:
+
+- on success, returns a live `number_t` by value
+- on parse failure, returns an invalid `number_t`
+
 ## Precision Model
 
 For multiprecision construction, `number_t` uses a default working precision of
@@ -55,16 +73,38 @@ For multiprecision construction, `number_t` uses a default working precision of
 
 This applies to:
 
-- `num_create_string(...)` for decimal/scientific real and complex input
-- `num_create_mfloat(...)`
-- `num_create_mcomplex(...)`
+- `num_create_from_string(...)` for decimal/scientific real and complex input
+- `num_create_from_mfloat(...)`
+- `num_create_from_mcomplex(...)`
 
 Explicit precision constructors are also available:
 
-- `num_create_mfloat_prec(...)`
-- `num_create_mfloat_digits(...)`
-- `num_create_mcomplex_prec(...)`
-- `num_create_mcomplex_digits(...)`
+- `num_create_from_mfloat_with_prec_bits(...)`
+- `num_create_from_mfloat_with_prec_digits(...)`
+- `num_create_from_mcomplex_with_prec_bits(...)`
+- `num_create_from_mcomplex_with_prec_digits(...)`
+
+Precision control helpers use the same naming convention:
+
+- `num_set_default_prec_bits(...)`
+- `num_get_default_prec_bits(...)`
+- `num_set_default_prec_digits(...)`
+- `num_get_default_prec_digits(...)`
+- `num_set_prec_bits(...)`
+- `num_get_prec_bits(...)`
+- `num_set_prec_digits(...)`
+- `num_get_prec_digits(...)`
+
+Return conventions in this area:
+
+- `num_set_default_prec_bits(...)`, `num_set_default_prec_digits(...)`,
+  `num_set_prec_bits(...)`, and `num_set_prec_digits(...)` return `0` on
+  success and `-1` on invalid input or unsupported conversion.
+- `num_get_default_prec_bits(...)` and `num_get_default_prec_digits(...)`
+  return the current default precision directly.
+- `num_get_prec_bits(...)` and `num_get_prec_digits(...)` return the current
+  value precision directly, or `0` when precision is not meaningful for the
+  current backend.
 
 Exact integer and rational values remain exact rather than being rounded to the
 default floating precision.
@@ -77,20 +117,36 @@ internal state.
 That means:
 
 - functions returning `number_t` return a live value
-- callers should call `num_clear(&value)` when finished with such a value
+- callers should call `num_destroy(&value)` when finished with such a value
 - passing a `number_t` by value performs only a shallow copy
 - use `num_clone(...)` when an independent live copy is required
 
 Example:
 
 ```c
-number_t a = num_create_string("2");
-number_t b = num_create_string("5/6");
+number_t a = num_create_from_string("2");
+number_t b = num_create_from_string("5/6");
 number_t c = num_add(a, b);
 
-num_clear(&a);
-num_clear(&b);
-num_clear(&c);
+num_destroy(&a);
+num_destroy(&b);
+num_destroy(&c);
+```
+
+Example with explicit precision:
+
+```c
+num_set_default_prec_bits(768);
+
+number_t x = num_create_from_string("1.25");
+number_t y = num_create_from_mfloat_with_prec_bits(MF_PI, 512);
+
+printf("default bits: %zu\n", num_get_default_prec_bits());
+printf("x bits: %zu\n", num_get_prec_bits(x));
+printf("y bits: %zu\n", num_get_prec_bits(y));
+
+num_destroy(&x);
+num_destroy(&y);
 ```
 
 Named constants such as `NUM_PI`, `NUM_E`, and `NUM_EULER_MASCHERONI`
@@ -98,7 +154,7 @@ are safe to clear as well:
 
 ```c
 number_t pi = NUM_PI;
-num_clear(&pi);
+num_destroy(&pi);
 ```
 
 ## Formatting
@@ -109,6 +165,13 @@ num_clear(&pi);
 - `num_sprintf(...)`
 - `num_vsprintf(...)`
 - `num_to_string(...)`
+
+Return conventions:
+
+- `num_to_string(...)` returns a newly allocated string that must be released
+  with `free()`.
+- `num_sprintf(...)`, `num_vsprintf(...)`, and `num_printf(...)` follow the
+  usual `snprintf` / `printf` return conventions.
 
 Supported format specifiers:
 
@@ -144,6 +207,14 @@ For non-real values:
 - `num_cmp(...)` returns `0`
 
 This avoids pretending complex values have a natural total order.
+
+Return conventions in this area:
+
+- predicate helpers such as `num_is_real(...)`, `num_is_zero(...)`, and
+  `num_eq(...)` return `true` or `false`
+- scalar query helpers such as `num_get_sign(...)` and `num_get_exponent2(...)`
+  return the requested property directly
+- `num_cmp(...)` returns an integer ordering result for real values
 
 ## Arithmetic And Functions
 
@@ -188,6 +259,13 @@ The generic layer exposes:
 Binary arithmetic mixes supported backends automatically by promoting to a
 common target representation before dispatch.
 
+Return conventions in this area:
+
+- functions returning `number_t` return an owning by-value result
+- the caller should later pass that result to `num_destroy(...)`
+- paired-output helpers such as `num_sincos(...)` and `num_sinhcosh(...)`
+  return an `int` status code, with `0` for success and `-1` for invalid input
+
 ## Example
 
 ```c
@@ -196,9 +274,9 @@ common target representation before dispatch.
 #include "number.h"
 
 int main(void) {
-    number_t a = num_create_string("2");
-    number_t b = num_create_string("3");
-    number_t c = num_create_string("5/6");
+    number_t a = num_create_from_string("2");
+    number_t b = num_create_from_string("3");
+    number_t c = num_create_from_string("5/6");
     number_t sum = num_add(a, c);
     number_t beta = num_beta(a, b);
     char *sum_text = num_to_string(sum);
@@ -212,11 +290,11 @@ int main(void) {
 
     free(sum_text);
     free(beta_text);
-    num_clear(&a);
-    num_clear(&b);
-    num_clear(&c);
-    num_clear(&sum);
-    num_clear(&beta);
+    num_destroy(&a);
+    num_destroy(&b);
+    num_destroy(&c);
+    num_destroy(&sum);
+    num_destroy(&beta);
     return 0;
 }
 ```

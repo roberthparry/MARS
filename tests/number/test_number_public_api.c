@@ -7,11 +7,11 @@ void run_number_public_api_tests(void)
     printf(C_CYAN "Testing number_t as a standalone public API...\n" C_RESET);
 
     {
-        number_t a = num_create_string("2");
-        number_t b = num_create_string("3");
-        number_t frac = num_create_string("5/6");
-        number_t dec = num_create_string("1.25");
-        number_t z = num_create_string("1 + 2i");
+        number_t a = num_create_from_string("2");
+        number_t b = num_create_from_string("3");
+        number_t frac = num_create_from_string("5/6");
+        number_t dec = num_create_from_string("1.25");
+        number_t z = num_create_from_string("1 + 2i");
 
         number_t sum = num_add(a, b);
         number_t quot = num_div(a, b);
@@ -38,17 +38,17 @@ void run_number_public_api_tests(void)
         ASSERT_TRUE(!num_is_exact(dec));
         ASSERT_TRUE(num_eq(product, cloned));
 
-        num_clear(&a);
-        num_clear(&b);
-        num_clear(&frac);
-        num_clear(&dec);
-        num_clear(&z);
-        num_clear(&sum);
-        num_clear(&quot);
-        num_clear(&product);
-        num_clear(&logged);
-        num_clear(&rooted);
-        num_clear(&constant);
-        num_clear(&cloned);
+        num_destroy(&a);
+        num_destroy(&b);
+        num_destroy(&frac);
+        num_destroy(&dec);
+        num_destroy(&z);
+        num_destroy(&sum);
+        num_destroy(&quot);
+        num_destroy(&product);
+        num_destroy(&logged);
+        num_destroy(&rooted);
+        num_destroy(&constant);
+        num_destroy(&cloned);
     }
 }

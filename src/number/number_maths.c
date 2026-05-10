@@ -47,6 +47,19 @@ typedef struct {
     int imag;
 } number_angle_fastpath_t;
 
+typedef struct {
+    const number_t *angle;
+    number_const_id_t first_id;
+    int first_sign;
+    int first_imag;
+    number_const_id_t second_id;
+    int second_sign;
+    int second_imag;
+} number_angle_pair_fastpath_t;
+
+static const number_angle_pair_fastpath_t number_sincos_fastpaths[];
+static const number_angle_pair_fastpath_t number_sinhcosh_fastpaths[];
+
 static int number_try_get_pure_imag(const number_t number,
                                     number_t *imag_out);
 
@@ -128,30 +141,30 @@ static int number_exp_quarter_turn(const number_t *number,
 
     real = num_real_part(*number);
     if (!num_is_zero(real)) {
-        num_clear(&real);
+        num_destroy(&real);
         return 0;
     }
 
     imag = num_imag_part(*number);
     ratio = num_div(imag, NUM_PI_2);
-    num_clear(&real);
-    num_clear(&imag);
+    num_destroy(&real);
+    num_destroy(&imag);
 
     if (!number_try_get_exact_int(ratio, &quarter_turns)) {
         ratio_d = num_to_double(ratio);
         if (!isfinite(ratio_d) || ratio_d < (double)INT_MIN ||
             ratio_d > (double)INT_MAX) {
-            num_clear(&ratio);
+            num_destroy(&ratio);
             return 0;
         }
         double nearest = round(ratio_d);
         if (fabs(ratio_d - nearest) > 1e-12) {
-            num_clear(&ratio);
+            num_destroy(&ratio);
             return 0;
         }
         quarter_turns = (int)lround(ratio_d);
     }
-    num_clear(&ratio);
+    num_destroy(&ratio);
 
     mod4 = quarter_turns % 4;
     if (mod4 < 0)
@@ -189,14 +202,60 @@ static int number_hyperbolic_imag_fastpath(const number_t *number,
     if (!number_try_get_pure_imag(*number, &imag))
         return 0;
     if (!number_find_angle_fastpath(&imag, table, count, &match)) {
-        num_clear(&imag);
+        num_destroy(&imag);
         return 0;
     }
-    num_clear(&imag);
+    num_destroy(&imag);
     *out = match->imag
         ? number_return_like_imag_signed(number, match->value_id, match->sign)
         : number_return_like_signed(number, match->value_id, match->sign);
     return 1;
+}
+
+static int number_trig_real_pair_fastpath(const number_t *number,
+                                          const number_angle_pair_fastpath_t *table,
+                                          size_t count,
+                                          number_t *first_out,
+                                          number_t *second_out)
+{
+    for (size_t i = 0; i < count; ++i) {
+        if (!number_matches_value(number, table[i].angle))
+            continue;
+        *first_out = table[i].first_imag
+            ? number_return_like_imag_signed(number, table[i].first_id, table[i].first_sign)
+            : number_return_like_signed(number, table[i].first_id, table[i].first_sign);
+        *second_out = table[i].second_imag
+            ? number_return_like_imag_signed(number, table[i].second_id, table[i].second_sign)
+            : number_return_like_signed(number, table[i].second_id, table[i].second_sign);
+        return 1;
+    }
+    return 0;
+}
+
+static int number_hyperbolic_imag_pair_fastpath(const number_t *number,
+                                                const number_angle_pair_fastpath_t *table,
+                                                size_t count,
+                                                number_t *first_out,
+                                                number_t *second_out)
+{
+    number_t imag;
+
+    if (!number_try_get_pure_imag(*number, &imag))
+        return 0;
+    for (size_t i = 0; i < count; ++i) {
+        if (!number_matches_value(&imag, table[i].angle))
+            continue;
+        num_destroy(&imag);
+        *first_out = table[i].first_imag
+            ? number_return_like_imag_signed(number, table[i].first_id, table[i].first_sign)
+            : number_return_like_signed(number, table[i].first_id, table[i].first_sign);
+        *second_out = table[i].second_imag
+            ? number_return_like_imag_signed(number, table[i].second_id, table[i].second_sign)
+            : number_return_like_signed(number, table[i].second_id, table[i].second_sign);
+        return 1;
+    }
+    num_destroy(&imag);
+    return 0;
 }
 
 typedef number_t (*number_unary_math_apply_fn)(const number_t *number,
@@ -215,7 +274,7 @@ static number_t number_apply_unary_qreal(const number_t *number,
                                          const number_unary_math_ops_t *ops)
 {
     return ops && ops->qreal && number
-        ? num_create_qfloat(ops->qreal(number_value_to_qfloat(number)))
+        ? num_create_from_qfloat(ops->qreal(number_value_to_qfloat(number)))
         : number_invalid();
 }
 
@@ -223,7 +282,7 @@ static number_t number_apply_unary_qcomplex(const number_t *number,
                                             const number_unary_math_ops_t *ops)
 {
     return ops && ops->qcomplex && number
-        ? num_create_qcomplex(ops->qcomplex(number_value_to_qcomplex(number)))
+        ? num_create_from_qcomplex(ops->qcomplex(number_value_to_qcomplex(number)))
         : number_invalid();
 }
 
@@ -264,7 +323,7 @@ static number_t number_apply_binary_qreal(const number_t *a,
 {
     (void)target_kind;
     return ops && ops->qreal && a && b
-        ? num_create_qfloat(ops->qreal(number_value_to_qfloat(a),
+        ? num_create_from_qfloat(ops->qreal(number_value_to_qfloat(a),
             number_value_to_qfloat(b)))
         : number_invalid();
 }
@@ -276,7 +335,7 @@ static number_t number_apply_binary_qcomplex(const number_t *a,
 {
     (void)target_kind;
     return ops && ops->qcomplex && a && b
-        ? num_create_qcomplex(ops->qcomplex(number_value_to_qcomplex(a),
+        ? num_create_from_qcomplex(ops->qcomplex(number_value_to_qcomplex(a),
             number_value_to_qcomplex(b)))
         : number_invalid();
 }
@@ -333,7 +392,7 @@ static number_t number_apply_ternary_qreal(const number_t *x,
 {
     (void)target_kind;
     return ops && ops->qreal && x && a && b
-        ? num_create_qfloat(ops->qreal(number_value_to_qfloat(x),
+        ? num_create_from_qfloat(ops->qreal(number_value_to_qfloat(x),
             number_value_to_qfloat(a),
             number_value_to_qfloat(b)))
         : number_invalid();
@@ -347,7 +406,7 @@ static number_t number_apply_ternary_qcomplex(const number_t *x,
 {
     (void)target_kind;
     return ops && ops->qcomplex && x && a && b
-        ? num_create_qcomplex(ops->qcomplex(number_value_to_qcomplex(x),
+        ? num_create_from_qcomplex(ops->qcomplex(number_value_to_qcomplex(x),
             number_value_to_qcomplex(a),
             number_value_to_qcomplex(b)))
         : number_invalid();
@@ -446,7 +505,7 @@ static number_t number_apply_unary_math_with_double(const number_t number,
 {
     return number_is_valid_value(&number) &&
            number_impl_const(&number)->kind == NUMBER_DOUBLE && d_fn
-        ? num_create_double(d_fn(number_impl_const(&number)->value.d))
+        ? num_create_from_double(d_fn(number_impl_const(&number)->value.d))
         : number_apply_unary_math(number, qf_fn, qc_fn, mf_fn, mc_fn);
 }
 
@@ -491,7 +550,7 @@ static number_t number_apply_binary_math_with_double(const number_t a,
     return number_is_valid_value(&a) && number_is_valid_value(&b) &&
            number_impl_const(&a)->kind == NUMBER_DOUBLE &&
            number_impl_const(&b)->kind == NUMBER_DOUBLE && d_fn
-        ? num_create_double(d_fn(number_impl_const(&a)->value.d,
+        ? num_create_from_double(d_fn(number_impl_const(&a)->value.d,
             number_impl_const(&b)->value.d))
         : number_apply_binary_math(a, b, qf_fn, qc_fn, mf_fn, mc_fn);
 }
@@ -548,27 +607,27 @@ number_t num_exp(const number_t number)
         number_t e = number_const_like(&number, NUMBER_CONST_E);
         number_t out = num_sqrt(e);
 
-        num_clear(&e);
+        num_destroy(&e);
         return out;
     }
     if (num_eq(number, NUM_QUARTER)) {
         number_t out;
         number_t e = number_const_like(&number, NUMBER_CONST_E);
         root = num_sqrt(e);
-        num_clear(&e);
+        num_destroy(&e);
         out = num_sqrt(root);
-        num_clear(&root);
+        num_destroy(&root);
         return out;
     }
     if (num_eq(number, NUM_ONE_EIGHTH)) {
         number_t out;
         number_t e = number_const_like(&number, NUMBER_CONST_E);
         root = num_sqrt(e);
-        num_clear(&e);
+        num_destroy(&e);
         root2 = num_sqrt(root);
         out = num_sqrt(root2);
-        num_clear(&root);
-        num_clear(&root2);
+        num_destroy(&root);
+        num_destroy(&root2);
         return out;
     }
     if (number_exp_quarter_turn(&number, &out))
@@ -615,13 +674,13 @@ number_t num_log(const number_t number)
         return number_imag_const_return_like(&number, NUMBER_CONST_PI);
     neg_i = number_neg_const_return_like(&number, NUMBER_CONST_I);
     if (num_eq(number, neg_i)) {
-        num_clear(&neg_i);
+        num_destroy(&neg_i);
         out = number_imag_const_return_like(&number, NUMBER_CONST_PI_2);
         tmp = num_neg(out);
-        num_clear(&out);
+        num_destroy(&out);
         return tmp;
     }
-    num_clear(&neg_i);
+    num_destroy(&neg_i);
 
     vt = number_vt(&number);
     if (!vt)
@@ -691,7 +750,7 @@ number_t num_pow(const number_t base, const number_t exponent)
         number_t result;
         root = num_sqrt(base);
         result = num_sqrt(root);
-        num_clear(&root);
+        num_destroy(&root);
         return result;
     }
     eighth = NUM_ONE_EIGHTH;
@@ -701,8 +760,8 @@ number_t num_pow(const number_t base, const number_t exponent)
         root = num_sqrt(base);
         root2 = num_sqrt(root);
         result = num_sqrt(root2);
-        num_clear(&root);
-        num_clear(&root2);
+        num_destroy(&root);
+        num_destroy(&root2);
         return result;
     }
 
@@ -732,9 +791,9 @@ number_t num_pow_int(const number_t base, int exponent)
     if (vt && vt->pow_int)
         return number_take(vt->pow_int(&base, exponent));
 
-    expnum = num_create_long(exponent);
+    expnum = num_create_from_long(exponent);
     result = number_apply_binary_math(base, expnum, qf_pow, qc_pow, mf_pow, mc_pow);
-    num_clear(&expnum);
+    num_destroy(&expnum);
     return result;
 }
 
@@ -750,11 +809,11 @@ number_t num_ldexp(const number_t number, int exponent2)
     if (vt && vt->ldexp_value)
         return number_take(vt->ldexp_value(&number, exponent2));
 
-    two = num_create_long(2);
+    two = num_create_from_long(2);
     scale = num_pow_int(two, exponent2);
     result = num_mul(number, scale);
-    num_clear(&two);
-    num_clear(&scale);
+    num_destroy(&two);
+    num_destroy(&scale);
     return result;
 }
 
@@ -794,17 +853,6 @@ number_t num_hypot(const number_t a, const number_t b)
     return number_apply_binary_math(a, b, qf_hypot, qc_hypot, mf_hypot, mc_hypot);
 }
 
-int num_sincos(const number_t x, number_t *sin_out, number_t *cos_out)
-{
-    const number_vtable_t *vt = number_vt(&x);
-
-    if (!sin_out || !cos_out || !number_is_valid_value(&x))
-        return -1;
-    if (vt && vt->sincos_value)
-        return vt->sincos_value(&x, sin_out, cos_out);
-    return -1;
-}
-
 static int number_try_get_pure_imag(const number_t number,
                                     number_t *imag_out)
 {
@@ -814,10 +862,10 @@ static int number_try_get_pure_imag(const number_t number,
         return 0;
     real = num_real_part(number);
     if (!num_is_zero(real)) {
-        num_clear(&real);
+        num_destroy(&real);
         return 0;
     }
-    num_clear(&real);
+    num_destroy(&real);
     *imag_out = num_imag_part(number);
     return 1;
 }
@@ -842,6 +890,19 @@ static const number_angle_fastpath_t number_cos_fastpaths[] = {
     { &NUM_PI_2, NUMBER_CONST_ZERO, 1, 0 },
     { &NUM_3PI_4, NUMBER_CONST_SQRT2_OVER_TWO, -1, 0 },
     { &NUM_PI, NUMBER_CONST_NEG_ONE, 1, 0 }
+};
+
+static const number_angle_pair_fastpath_t number_sincos_fastpaths[] = {
+    { &NUM_ZERO,   NUMBER_CONST_ZERO,           1, 0, NUMBER_CONST_ONE,            1, 0 },
+    { &NUM_PI,     NUMBER_CONST_ZERO,           1, 0, NUMBER_CONST_NEG_ONE,        1, 0 },
+    { &NUM_2PI,    NUMBER_CONST_ZERO,           1, 0, NUMBER_CONST_ONE,            1, 0 },
+    { &NUM_PI_6,   NUMBER_CONST_HALF,           1, 0, NUMBER_CONST_SQRT3_OVER_TWO, 1, 0 },
+    { &NUM_PI_4,   NUMBER_CONST_SQRT2_OVER_TWO, 1, 0,
+                   NUMBER_CONST_SQRT2_OVER_TWO, 1, 0 },
+    { &NUM_PI_3,   NUMBER_CONST_SQRT3_OVER_TWO, 1, 0, NUMBER_CONST_HALF,           1, 0 },
+    { &NUM_PI_2,   NUMBER_CONST_ONE,            1, 0, NUMBER_CONST_ZERO,           1, 0 },
+    { &NUM_3PI_4,  NUMBER_CONST_SQRT2_OVER_TWO, 1, 0,
+                   NUMBER_CONST_SQRT2_OVER_TWO, -1, 0 }
 };
 
 static const number_angle_fastpath_t number_tanh_imag_fastpaths[] = {
@@ -875,6 +936,34 @@ static const number_angle_fastpath_t number_cosh_imag_fastpaths[] = {
     { &NUM_PI, NUMBER_CONST_NEG_ONE, 1, 0 }
 };
 
+static const number_angle_pair_fastpath_t number_sinhcosh_fastpaths[] = {
+    { &NUM_ZERO,   NUMBER_CONST_ZERO,           1, 0, NUMBER_CONST_ONE,            1, 0 },
+    { &NUM_PI_6,   NUMBER_CONST_HALF,           1, 1, NUMBER_CONST_SQRT3_OVER_TWO, 1, 0 },
+    { &NUM_PI_4,   NUMBER_CONST_SQRT2_OVER_TWO, 1, 1,
+                   NUMBER_CONST_SQRT2_OVER_TWO, 1, 0 },
+    { &NUM_PI_3,   NUMBER_CONST_SQRT3_OVER_TWO, 1, 1, NUMBER_CONST_HALF,           1, 0 },
+    { &NUM_PI_2,   NUMBER_CONST_ONE,            1, 1, NUMBER_CONST_ZERO,           1, 0 },
+    { &NUM_3PI_4,  NUMBER_CONST_SQRT2_OVER_TWO, 1, 1,
+                   NUMBER_CONST_SQRT2_OVER_TWO, -1, 0 },
+    { &NUM_PI,     NUMBER_CONST_ZERO,           1, 0, NUMBER_CONST_NEG_ONE,        1, 0 },
+    { &NUM_2PI,    NUMBER_CONST_ZERO,           1, 0, NUMBER_CONST_ONE,            1, 0 }
+};
+
+int num_sincos(const number_t x, number_t *sin_out, number_t *cos_out)
+{
+    const number_vtable_t *vt = number_vt(&x);
+
+    if (!sin_out || !cos_out || !number_is_valid_value(&x))
+        return -1;
+    if (number_trig_real_pair_fastpath(&x, number_sincos_fastpaths,
+            sizeof(number_sincos_fastpaths) / sizeof(number_sincos_fastpaths[0]),
+            sin_out, cos_out))
+        return 0;
+    if (vt && vt->sincos_value)
+        return vt->sincos_value(&x, sin_out, cos_out);
+    return -1;
+}
+
 number_t num_sin(const number_t number)
 {
     number_t out;
@@ -904,8 +993,8 @@ number_t num_tan(const number_t number)
         number_t sqrt3 = number_const_like(&number, NUMBER_CONST_SQRT3);
         number_t out = num_div(one, sqrt3);
 
-        num_clear(&one);
-        num_clear(&sqrt3);
+        num_destroy(&one);
+        num_destroy(&sqrt3);
         return out;
     }
     if (num_eq(number, NUM_PI_4))
@@ -963,6 +1052,10 @@ int num_sinhcosh(const number_t x, number_t *sinh_out, number_t *cosh_out)
 
     if (!sinh_out || !cosh_out || !number_is_valid_value(&x))
         return -1;
+    if (number_hyperbolic_imag_pair_fastpath(&x, number_sinhcosh_fastpaths,
+            sizeof(number_sinhcosh_fastpaths) / sizeof(number_sinhcosh_fastpaths[0]),
+            sinh_out, cosh_out))
+        return 0;
     if (vt && vt->sinhcosh_value)
         return vt->sinhcosh_value(&x, sinh_out, cosh_out);
     return -1;
@@ -984,14 +1077,14 @@ number_t num_tanh(const number_t number)
             number_t imag_unit = number_const_like(&number, NUMBER_CONST_I);
 
             out = num_mul(imag_unit, inv);
-            num_clear(&one);
-            num_clear(&sqrt3);
-            num_clear(&inv);
-            num_clear(&imag_unit);
-            num_clear(&imag);
+            num_destroy(&one);
+            num_destroy(&sqrt3);
+            num_destroy(&inv);
+            num_destroy(&imag_unit);
+            num_destroy(&imag);
             return out;
         }
-        num_clear(&imag);
+        num_destroy(&imag);
     }
     return number_apply_unary_math_with_double(number, tanh, qf_tanh, qc_tanh, mf_tanh, mc_tanh);
 }

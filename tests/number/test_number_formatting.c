@@ -9,11 +9,11 @@ void run_number_formatting_tests(void)
 
     {
         char buf[256];
-        number_t dec = num_create_string("32.123");
-        number_t rat = num_create_string("5/6");
-        number_t one = num_create_string("1");
-        number_t two = num_create_string("2");
-        number_t five = num_create_string("5");
+        number_t dec = num_create_from_string("32.123");
+        number_t rat = num_create_from_string("5/6");
+        number_t one = num_create_from_string("1");
+        number_t two = num_create_from_string("2");
+        number_t five = num_create_from_string("5");
         number_t beta = num_beta(two, two);
         number_t angle = num_atan2(one, one);
         number_t gamma5 = num_gamma(five);
@@ -43,14 +43,14 @@ void run_number_formatting_tests(void)
         assert_number_string("num_gamma(5)", gamma5, "24");
         assert_number_string_prefix("num_ei(1)", ei1, "1.89511");
 
-        num_clear(&dec);
-        num_clear(&rat);
-        num_clear(&one);
-        num_clear(&two);
-        num_clear(&five);
-        num_clear(&beta);
-        num_clear(&angle);
-        num_clear(&gamma5);
-        num_clear(&ei1);
+        num_destroy(&dec);
+        num_destroy(&rat);
+        num_destroy(&one);
+        num_destroy(&two);
+        num_destroy(&five);
+        num_destroy(&beta);
+        num_destroy(&angle);
+        num_destroy(&gamma5);
+        num_destroy(&ei1);
     }
 }

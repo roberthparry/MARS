@@ -35,6 +35,16 @@ mcomplex_t *mc_new_prec(size_t precision_bits);
 mcomplex_t *mc_create(const mfloat_t *real, const mfloat_t *imag);
 mcomplex_t *mc_create_long(long real);
 mcomplex_t *mc_create_qcomplex(qcomplex_t value);
+/**
+ * @brief Parses a multiprecision complex literal.
+ *
+ * Accepted forms include real values like `42` or `1e-23`, pure imaginary
+ * values like `3i` or `-i`, and complex values like `1 + 2i`, `1 + i`,
+ * `1e-23 + (2.3e12)i`, or `1/2 - 3/2i`.
+ *
+ * This is a literal parser, not an expression parser, so forms like `1/i` are
+ * rejected.
+ */
 mcomplex_t *mc_create_string(const char *text);
 mcomplex_t *mc_clone(const mcomplex_t *mcomplex);
 void mc_free(mcomplex_t *mcomplex);
@@ -46,6 +56,13 @@ int mc_set_precision_digits(mcomplex_t *mcomplex, size_t significant_digits);
 size_t mc_get_precision_digits(const mcomplex_t *mcomplex);
 int mc_set(mcomplex_t *mcomplex, const mfloat_t *real, const mfloat_t *imag);
 int mc_set_qcomplex(mcomplex_t *mcomplex, qcomplex_t value);
+/**
+ * @brief Replaces a complex value by parsing a multiprecision complex literal.
+ *
+ * Accepted forms match `mc_create_string()`, including `a + bi`, `bi`,
+ * parenthesized imaginary coefficients like `1e-23 + (2.3e12)i`, and rational
+ * parts like `1/2 - 3/2i`. Returns `0` on success and `-1` on invalid input.
+ */
 int mc_set_string(mcomplex_t *mcomplex, const char *text);
 char *mc_to_string(const mcomplex_t *mcomplex);
 qcomplex_t mc_to_qcomplex(const mcomplex_t *mcomplex);

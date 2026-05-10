@@ -362,9 +362,9 @@ static bool number_eq_same_tol_with_precision(const number_t *a,
     one = number_create_exact_mfloat_long_prec(1, precision_bits);
     tolerance = num_ldexp(one, 4 - (int)precision_bits);
     rc = num_cmp(diff, tolerance) <= 0;
-    num_clear(&diff);
-    num_clear(&one);
-    num_clear(&tolerance);
+    num_destroy(&diff);
+    num_destroy(&one);
+    num_destroy(&tolerance);
     return rc;
 }
 
@@ -731,8 +731,8 @@ static bool number_is_integer_mfloat(const number_t *number)
     copy = num_clone(*number);
     floored = num_floor(copy);
     rc = num_eq(copy, floored);
-    num_clear(&copy);
-    num_clear(&floored);
+    num_destroy(&copy);
+    num_destroy(&floored);
     return rc;
 }
 
@@ -749,9 +749,9 @@ static bool number_is_integer_mcomplex(const number_t *number)
     real = num_real_part(*number);
     floored = num_floor(real);
     rc = num_is_zero(imag) && num_eq(real, floored);
-    num_clear(&imag);
-    num_clear(&real);
-    num_clear(&floored);
+    num_destroy(&imag);
+    num_destroy(&real);
+    num_destroy(&floored);
     return rc;
 }
 
@@ -2526,38 +2526,38 @@ done:
     return result;
 }
 
-number_t num_create_double(double value)
+number_t num_create_from_double(double value)
 {
     return number_take(number_wrap_double(value));
 }
 
-number_t num_create_qfloat(qfloat_t value)
+number_t num_create_from_qfloat(qfloat_t value)
 {
     return number_take(number_wrap_qfloat(value));
 }
 
-number_t num_create_qcomplex(qcomplex_t value)
+number_t num_create_from_qcomplex(qcomplex_t value)
 {
     return number_take(number_wrap_qcomplex(value));
 }
 
-number_t num_create_mint(const mint_t *value)
+number_t num_create_from_mint(const mint_t *value)
 {
     return value ? number_take(number_wrap_mint(mi_clone(value))) : number_invalid();
 }
 
-number_t num_create_mrational(const mrational_t *value)
+number_t num_create_from_mrational(const mrational_t *value)
 {
     return value ? number_take(number_wrap_mrational(mr_clone(value))) : number_invalid();
 }
 
-number_t num_create_mfloat(const mfloat_t *value)
+number_t num_create_from_mfloat(const mfloat_t *value)
 {
     return value ? number_wrap_mfloat_with_precision(mf_clone(value),
         number_default_precision_bits) : number_invalid();
 }
 
-number_t num_create_mfloat_prec(const mfloat_t *value, size_t precision_bits)
+number_t num_create_from_mfloat_with_prec_bits(const mfloat_t *value, size_t precision_bits)
 {
     mfloat_t *copy;
 
@@ -2573,7 +2573,7 @@ number_t num_create_mfloat_prec(const mfloat_t *value, size_t precision_bits)
     return number_take(number_wrap_mfloat(copy));
 }
 
-number_t num_create_mfloat_digits(const mfloat_t *value, size_t significant_digits)
+number_t num_create_from_mfloat_with_prec_digits(const mfloat_t *value, size_t significant_digits)
 {
     mfloat_t *copy;
 
@@ -2589,13 +2589,13 @@ number_t num_create_mfloat_digits(const mfloat_t *value, size_t significant_digi
     return number_take(number_wrap_mfloat(copy));
 }
 
-number_t num_create_mcomplex(const mcomplex_t *value)
+number_t num_create_from_mcomplex(const mcomplex_t *value)
 {
     return value ? number_wrap_mcomplex_with_precision(mc_clone(value),
         number_default_precision_bits) : number_invalid();
 }
 
-number_t num_create_mcomplex_prec(const mcomplex_t *value, size_t precision_bits)
+number_t num_create_from_mcomplex_with_prec_bits(const mcomplex_t *value, size_t precision_bits)
 {
     mcomplex_t *copy;
 
@@ -2611,7 +2611,7 @@ number_t num_create_mcomplex_prec(const mcomplex_t *value, size_t precision_bits
     return number_take(number_wrap_mcomplex(copy));
 }
 
-number_t num_create_mcomplex_digits(const mcomplex_t *value, size_t significant_digits)
+number_t num_create_from_mcomplex_with_prec_digits(const mcomplex_t *value, size_t significant_digits)
 {
     mcomplex_t *copy;
 
@@ -2627,7 +2627,7 @@ number_t num_create_mcomplex_digits(const mcomplex_t *value, size_t significant_
     return number_take(number_wrap_mcomplex(copy));
 }
 
-number_t num_create_string(const char *text)
+number_t num_create_from_string(const char *text)
 {
     const char *trimmed = number_skip_ws(text);
 
@@ -2651,7 +2651,7 @@ number_t num_clone(const number_t number)
     return vt ? number_take(vt->clone(&number)) : number_invalid();
 }
 
-void num_clear(number_t *number)
+void num_destroy(number_t *number)
 {
     const number_vtable_t *vt;
 
@@ -2707,14 +2707,14 @@ long num_get_exponent2(const number_t number)
     return vt && vt->get_exponent2 ? vt->get_exponent2(&number) : 0l;
 }
 
-int num_set_precision(number_t *number, size_t precision_bits)
+int num_set_prec_bits(number_t *number, size_t precision_bits)
 {
     const number_vtable_t *vt = number_vt(number);
 
     return vt && vt->set_precision ? vt->set_precision(number, precision_bits) : -1;
 }
 
-size_t num_get_precision(const number_t number)
+size_t num_get_prec_bits(const number_t number)
 {
     const number_vtable_t *vt = number_vt(&number);
 
@@ -2819,10 +2819,10 @@ static size_t number_digits_to_bits(size_t significant_digits)
 void number_assign(number_t *dst, number_t value)
 {
     if (!dst) {
-        num_clear(&value);
+        num_destroy(&value);
         return;
     }
-    num_clear(dst);
+    num_destroy(dst);
     *dst = value;
 }
 
@@ -2908,20 +2908,20 @@ static number_t number_const_like_double(const number_t *like, number_const_id_t
 {
     (void)like;
     if (number_const_has_double(id))
-        return num_create_double(number_const_double_value(id));
+        return num_create_from_double(number_const_double_value(id));
     return number_invalid();
 }
 
 static number_t number_const_like_qfloat(const number_t *like, number_const_id_t id)
 {
     (void)like;
-    return num_create_qfloat(number_const_qfloat(id));
+    return num_create_from_qfloat(number_const_qfloat(id));
 }
 
 static number_t number_const_like_qcomplex(const number_t *like, number_const_id_t id)
 {
     (void)like;
-    return num_create_qcomplex(number_const_qcomplex(id));
+    return num_create_from_qcomplex(number_const_qcomplex(id));
 }
 
 static number_t number_const_like_mexact(const number_t *like, number_const_id_t id)
@@ -2939,7 +2939,7 @@ static number_t number_const_like_mexact(const number_t *like, number_const_id_t
         return number_wrap_mcomplex_with_precision(
             mc_create(MF_ZERO, MF_ONE), precision_bits);
     mf_value = number_const_mfloat_value(id);
-    return mf_value ? num_create_mfloat_prec(mf_value, precision_bits) : number_invalid();
+    return mf_value ? num_create_from_mfloat_with_prec_bits(mf_value, precision_bits) : number_invalid();
 }
 
 static number_t number_const_like_mfloat(const number_t *like, number_const_id_t id)
@@ -2958,7 +2958,7 @@ static number_t number_const_like_mfloat(const number_t *like, number_const_id_t
     if (number_is_valid_value(&out))
         return out;
     mf_value = number_const_mfloat_value(id);
-    return mf_value ? num_create_mfloat_prec(mf_value, precision_bits) : number_invalid();
+    return mf_value ? num_create_from_mfloat_with_prec_bits(mf_value, precision_bits) : number_invalid();
 }
 
 static number_t number_const_like_mcomplex(const number_t *like, number_const_id_t id)
@@ -2977,7 +2977,7 @@ static number_t number_const_like_mcomplex(const number_t *like, number_const_id
     if (number_is_valid_value(&real_value)) {
         number_t out = number_wrap_mcomplex_with_precision(
             mc_create(number_impl_const(&real_value)->value.mf, MF_ZERO), precision_bits);
-        num_clear(&real_value);
+        num_destroy(&real_value);
         return out;
     }
     mf_value = number_const_mfloat_value(id);
@@ -3016,18 +3016,18 @@ number_t num_new(void)
     return number_take(number_wrap_mfloat(mf_new_prec(number_default_precision_bits)));
 }
 
-number_t num_new_prec(size_t precision_bits)
+number_t num_new_with_prec_bits(size_t precision_bits)
 {
     return precision_bits == 0u ? number_invalid() :
         number_take(number_wrap_mfloat(mf_new_prec(precision_bits)));
 }
 
-number_t num_create_long(long value)
+number_t num_create_from_long(long value)
 {
     return number_take(number_wrap_mint(mi_create_long(value)));
 }
 
-int num_set_default_precision(size_t precision_bits)
+int num_set_default_prec_bits(size_t precision_bits)
 {
     if (precision_bits == 0u)
         return -1;
@@ -3035,38 +3035,38 @@ int num_set_default_precision(size_t precision_bits)
     return 0;
 }
 
-size_t num_get_default_precision(void)
+size_t num_get_default_prec_bits(void)
 {
     return number_default_precision_bits;
 }
 
-int num_set_default_precision_digits(size_t significant_digits)
+int num_set_default_prec_digits(size_t significant_digits)
 {
     size_t bits = number_digits_to_bits(significant_digits);
-    return bits == 0u ? -1 : num_set_default_precision(bits);
+    return bits == 0u ? -1 : num_set_default_prec_bits(bits);
 }
 
-size_t num_get_default_precision_digits(void)
+size_t num_get_default_prec_digits(void)
 {
     return number_bits_to_digits(number_default_precision_bits);
 }
 
-int num_set_precision_digits(number_t *number, size_t significant_digits)
+int num_set_prec_digits(number_t *number, size_t significant_digits)
 {
     size_t bits = number_digits_to_bits(significant_digits);
-    return bits == 0u ? -1 : num_set_precision(number, bits);
+    return bits == 0u ? -1 : num_set_prec_bits(number, bits);
 }
 
-size_t num_get_precision_digits(const number_t number)
+size_t num_get_prec_digits(const number_t number)
 {
-    return number_bits_to_digits(num_get_precision(number));
+    return number_bits_to_digits(num_get_prec_bits(number));
 }
 
 int num_set_long(number_t *number, long value)
 {
     if (!number)
         return -1;
-    number_assign(number, num_create_long(value));
+    number_assign(number, num_create_from_long(value));
     return number_is_valid_value(number) ? 0 : -1;
 }
 
@@ -3074,7 +3074,7 @@ int num_set_double(number_t *number, double value)
 {
     if (!number)
         return -1;
-    number_assign(number, num_create_double(value));
+    number_assign(number, num_create_from_double(value));
     return number_is_valid_value(number) ? 0 : -1;
 }
 
@@ -3082,7 +3082,7 @@ int num_set_qfloat(number_t *number, qfloat_t value)
 {
     if (!number)
         return -1;
-    number_assign(number, num_create_qfloat(value));
+    number_assign(number, num_create_from_qfloat(value));
     return number_is_valid_value(number) ? 0 : -1;
 }
 
@@ -3090,15 +3090,15 @@ int num_set_mrational(number_t *number, const mrational_t *value)
 {
     if (!number || !value)
         return -1;
-    number_assign(number, num_create_mrational(value));
+    number_assign(number, num_create_from_mrational(value));
     return number_is_valid_value(number) ? 0 : -1;
 }
 
-int num_set_string(number_t *number, const char *text)
+int num_set_from_string(number_t *number, const char *text)
 {
     if (!number || !text)
         return -1;
-    number_assign(number, num_create_string(text));
+    number_assign(number, num_create_from_string(text));
     return number_is_valid_value(number) ? 0 : -1;
 }
 
@@ -3285,42 +3285,42 @@ number_t num_arg(const number_t number)
     if (vt && vt->arg_value)
         return number_take(vt->arg_value(&number));
     number_t zero = number_create_exact_mfloat_long_prec(
-        0, num_get_precision(number) ? num_get_precision(number) : number_default_precision_bits);
+        0, num_get_prec_bits(number) ? num_get_prec_bits(number) : number_default_precision_bits);
     number_t real = vt && vt->complex ? num_real_part(number) : num_clone(number);
     number_t result = num_atan2(zero, real);
-    num_clear(&zero);
-    num_clear(&real);
+    num_destroy(&zero);
+    num_destroy(&real);
     return result;
 }
 
 number_t num_add_mrational(const number_t number, const mrational_t *value)
 {
-    number_t rhs = num_create_mrational(value);
+    number_t rhs = num_create_from_mrational(value);
     number_t result = num_add(number, rhs);
-    num_clear(&rhs);
+    num_destroy(&rhs);
     return result;
 }
 
 number_t num_add_long(const number_t number, long value)
 {
-    number_t rhs = num_create_long(value);
+    number_t rhs = num_create_from_long(value);
     number_t result = num_add(number, rhs);
-    num_clear(&rhs);
+    num_destroy(&rhs);
     return result;
 }
 
 number_t num_mul_long(const number_t number, long value)
 {
-    number_t rhs = num_create_long(value);
+    number_t rhs = num_create_from_long(value);
     number_t result = num_mul(number, rhs);
-    num_clear(&rhs);
+    num_destroy(&rhs);
     return result;
 }
 
 number_t num_mul_mrational(const number_t number, const mrational_t *value)
 {
-    number_t rhs = num_create_mrational(value);
+    number_t rhs = num_create_from_mrational(value);
     number_t result = num_mul(number, rhs);
-    num_clear(&rhs);
+    num_destroy(&rhs);
     return result;
 }

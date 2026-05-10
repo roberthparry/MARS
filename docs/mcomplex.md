@@ -101,6 +101,20 @@ Each object carries a target precision shared by its real and imaginary parts.
 Because `mcomplex_t` is built on `mfloat_t`, callers can choose either binary
 precision or user-facing significant digits depending on what is more natural.
 
+## Parsing Policy
+
+`mc_create_string(...)` and `mc_set_string(...)` parse literal complex values.
+
+Accepted forms include:
+
+- real literals like `"42"` or `"1e-23"`
+- pure imaginary literals like `"3i"`, `"+i"`, or `"-i"`
+- cartesian complex literals like `"1 + 2i"` or `"1 - i"`
+- parenthesized imaginary coefficients like `"1e-23 + (2.3e12)i"`
+- rational real or imaginary parts like `"1/2 - 3/2i"`
+
+This parser does not evaluate expressions, so forms like `"1/i"` are rejected.
+
 ## Example
 
 ```c

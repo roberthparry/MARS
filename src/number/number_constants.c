@@ -563,7 +563,7 @@ number_t number_neg_const_return_like(const number_t *like, number_const_id_t id
     number_t value = number_const_like(like, id);
     number_t out = num_neg(value);
 
-    num_clear(&value);
+    num_destroy(&value);
     return out;
 }
 
@@ -573,7 +573,7 @@ number_t number_imag_const_return_like(const number_t *like, number_const_id_t i
     number_t value = number_const_like(like, id);
     number_t out = num_mul(imag_unit, value);
 
-    num_clear(&imag_unit);
-    num_clear(&value);
+    num_destroy(&imag_unit);
+    num_destroy(&value);
     return out;
 }

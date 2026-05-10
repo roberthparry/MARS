@@ -7,11 +7,11 @@ void run_number_special_function_tests(void)
     printf(C_CYAN "Testing special functions and extended dispatch...\n" C_RESET);
 
     {
-        number_t zero = num_create_string("0");
-        number_t one = num_create_string("1");
-        number_t two = num_create_string("2");
-        number_t five = num_create_string("5");
-        number_t fifty_two = num_create_string("52");
+        number_t zero = num_create_from_string("0");
+        number_t one = num_create_from_string("1");
+        number_t two = num_create_from_string("2");
+        number_t five = num_create_from_string("5");
+        number_t fifty_two = num_create_from_string("52");
         number_t lgamma5 = num_lgamma(five);
         number_t digamma1 = num_digamma(one);
         number_t trigamma1 = num_trigamma(one);
@@ -44,22 +44,22 @@ void run_number_special_function_tests(void)
         ASSERT_TRUE(num_is_real(beta22));
         ASSERT_TRUE(num_is_real(logbeta22));
 
-        num_clear(&zero);
-        num_clear(&one);
-        num_clear(&two);
-        num_clear(&five);
-        num_clear(&fifty_two);
-        num_clear(&lgamma5);
-        num_clear(&digamma1);
-        num_clear(&trigamma1);
-        num_clear(&erf1);
-        num_clear(&erfc1);
-        num_clear(&w0_1);
-        num_clear(&beta22);
-        num_clear(&logbeta22);
-        num_clear(&binom);
-        num_clear(&normal_pdf0);
-        num_clear(&normal_cdf0);
-        num_clear(&e1_1);
+        num_destroy(&zero);
+        num_destroy(&one);
+        num_destroy(&two);
+        num_destroy(&five);
+        num_destroy(&fifty_two);
+        num_destroy(&lgamma5);
+        num_destroy(&digamma1);
+        num_destroy(&trigamma1);
+        num_destroy(&erf1);
+        num_destroy(&erfc1);
+        num_destroy(&w0_1);
+        num_destroy(&beta22);
+        num_destroy(&logbeta22);
+        num_destroy(&binom);
+        num_destroy(&normal_pdf0);
+        num_destroy(&normal_cdf0);
+        num_destroy(&e1_1);
     }
 }

@@ -32,10 +32,10 @@ void run_number_exact_backend_tests(void)
         ASSERT_NOT_NULL(mr_half);
         ASSERT_NOT_NULL(mr_third);
 
-        two_from_mint = num_create_mint(mi_two);
-        three_from_mint = num_create_mint(mi_three);
-        half_from_mr = num_create_mrational(mr_half);
-        third_from_mr = num_create_mrational(mr_third);
+        two_from_mint = num_create_from_mint(mi_two);
+        three_from_mint = num_create_from_mint(mi_three);
+        half_from_mr = num_create_from_mrational(mr_half);
+        third_from_mr = num_create_from_mrational(mr_third);
 
         sum = num_add(two_from_mint, three_from_mint);
         diff = num_sub(three_from_mint, two_from_mint);
@@ -71,27 +71,27 @@ void run_number_exact_backend_tests(void)
         ASSERT_EQ_INT(num_get_sign(half_from_mr), 1);
         ASSERT_EQ_INT(num_get_exponent2(two_from_mint), 1);
         ASSERT_EQ_INT(num_get_exponent2(half_from_mr), -1);
-        ASSERT_EQ_INT((int)num_get_precision(two_from_mint), 0);
-        ASSERT_EQ_INT((int)num_get_precision(half_from_mr), 0);
-        ASSERT_EQ_INT(num_set_precision(&two_from_mint, 512u), 0);
-        ASSERT_EQ_INT(num_set_precision(&half_from_mr, 512u), 0);
-        ASSERT_EQ_INT((int)num_get_precision(two_from_mint), 0);
-        ASSERT_EQ_INT((int)num_get_precision(half_from_mr), 0);
+        ASSERT_EQ_INT((int)num_get_prec_bits(two_from_mint), 0);
+        ASSERT_EQ_INT((int)num_get_prec_bits(half_from_mr), 0);
+        ASSERT_EQ_INT(num_set_prec_bits(&two_from_mint, 512u), 0);
+        ASSERT_EQ_INT(num_set_prec_bits(&half_from_mr, 512u), 0);
+        ASSERT_EQ_INT((int)num_get_prec_bits(two_from_mint), 0);
+        ASSERT_EQ_INT((int)num_get_prec_bits(half_from_mr), 0);
 
-        num_clear(&two_from_mint);
-        num_clear(&three_from_mint);
-        num_clear(&half_from_mr);
-        num_clear(&third_from_mr);
-        num_clear(&sum);
-        num_clear(&diff);
-        num_clear(&prod);
-        num_clear(&quot);
-        num_clear(&frac_sum);
-        num_clear(&inv_two);
-        num_clear(&zero_const);
-        num_clear(&one_const);
-        num_clear(&half_const);
-        num_clear(&ten_const);
+        num_destroy(&two_from_mint);
+        num_destroy(&three_from_mint);
+        num_destroy(&half_from_mr);
+        num_destroy(&third_from_mr);
+        num_destroy(&sum);
+        num_destroy(&diff);
+        num_destroy(&prod);
+        num_destroy(&quot);
+        num_destroy(&frac_sum);
+        num_destroy(&inv_two);
+        num_destroy(&zero_const);
+        num_destroy(&one_const);
+        num_destroy(&half_const);
+        num_destroy(&ten_const);
 
         mi_free(mi_two);
         mi_free(mi_three);
