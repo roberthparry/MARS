@@ -22,6 +22,16 @@ const qcomplex_t QC_HALF = {
     .im = { .hi = 0.0, .lo = 0.0 }
 };
 
+const qcomplex_t QC_QUARTER = {
+    .re = { .hi = 0.25, .lo = 0.0 },
+    .im = { .hi = 0.0, .lo = 0.0 }
+};
+
+const qcomplex_t QC_ONE_EIGHTH = {
+    .re = { .hi = 0.125, .lo = 0.0 },
+    .im = { .hi = 0.0, .lo = 0.0 }
+};
+
 const qcomplex_t QC_TWO = {
     .re = { .hi = 2.0, .lo = 0.0 },
     .im = { .hi = 0.0, .lo = 0.0 }
@@ -119,6 +129,21 @@ const qcomplex_t QC_SQRT_HALF = {
 
 const qcomplex_t QC_SQRT2 = {
     .re = { .hi = 1.4142135623730951, .lo = -9.6672933134529704e-17 },
+    .im = { .hi = 0.0, .lo = 0.0 }
+};
+
+const qcomplex_t QC_SQRT3 = {
+    .re = { .hi = 1.7320508075688772, .lo = 1.0035084221806903e-16 },
+    .im = { .hi = 0.0, .lo = 0.0 }
+};
+
+const qcomplex_t QC_SQRT2_OVER_TWO = {
+    .re = { .hi = 0.70710678118654757, .lo = -4.8336466567264851e-17 },
+    .im = { .hi = 0.0, .lo = 0.0 }
+};
+
+const qcomplex_t QC_SQRT3_OVER_TWO = {
+    .re = { .hi = 0.8660254037844386, .lo = 5.0175421109034515e-17 },
     .im = { .hi = 0.0, .lo = 0.0 }
 };
 

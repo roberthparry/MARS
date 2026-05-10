@@ -6,6 +6,7 @@
 struct _mrational_t {
     mint_t *numerator;
     mint_t *denominator;
+    bool immortal;
 };
 
 int mr_normalise(mrational_t *rational);

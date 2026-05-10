@@ -18,14 +18,14 @@ void run_number_public_api_tests(void)
         number_t product = num_mul(sum, frac);
         number_t logged = num_log(dec);
         number_t rooted = num_sqrt(z);
-        number_t constant = num_pi();
+        number_t constant = NUM_PI;
         number_t cloned = num_clone(product);
 
         assert_number_string("num_add(\"2\", \"3\")", sum, "5");
         assert_number_string("num_div(\"2\", \"3\")", quot, "2/3");
         assert_number_string("num_mul(\"5\", \"5/6\")", product, "25/6");
         assert_number_string("num_clone(\"25/6\")", cloned, "25/6");
-        assert_number_string_prefix("num_pi()", constant, "3.14159");
+        assert_number_string_prefix("NUM_PI", constant, "3.14159");
 
         ASSERT_TRUE(num_is_real(a));
         ASSERT_TRUE(num_is_real(frac));

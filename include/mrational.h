@@ -16,6 +16,20 @@
  */
 typedef struct _mrational_t mrational_t;
 
+/** @name Constants
+ * Process-lifetime convenience values owned by the mrational subsystem. They
+ * must not be modified or freed by callers.
+ * @{
+ */
+extern const mrational_t * const MR_HALF;
+extern const mrational_t * const MR_ONE_AND_HALF;
+extern const mrational_t * const MR_ONE_THIRD;
+extern const mrational_t * const MR_QUARTER;
+extern const mrational_t * const MR_ONE_SIXTH;
+extern const mrational_t * const MR_ONE_EIGHTH;
+extern const mrational_t * const MR_ONE_TENTH;
+/** @} */
+
 /** @name Lifecycle
  * Constructors return newly allocated values or `NULL` on error.
  * @{

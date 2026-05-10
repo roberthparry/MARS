@@ -22,6 +22,10 @@ void run_number_exact_backend_tests(void)
         number_t quot;
         number_t frac_sum;
         number_t inv_two;
+        number_t zero_const;
+        number_t one_const;
+        number_t half_const;
+        number_t ten_const;
 
         ASSERT_NOT_NULL(mi_two);
         ASSERT_NOT_NULL(mi_three);
@@ -39,16 +43,27 @@ void run_number_exact_backend_tests(void)
         quot = num_div(two_from_mint, three_from_mint);
         frac_sum = num_add(half_from_mr, third_from_mr);
         inv_two = num_inv(two_from_mint);
+        zero_const = NUM_ZERO;
+        one_const = NUM_ONE;
+        half_const = NUM_HALF;
+        ten_const = NUM_TEN;
 
+        assert_number_string("NUM_ZERO", zero_const, "0");
+        assert_number_string("NUM_ONE", one_const, "1");
         assert_number_string("num_add(mint 2, mint 3)", sum, "5");
         assert_number_string("num_sub(mint 3, mint 2)", diff, "1");
         assert_number_string("num_mul(mint 2, mint 3)", prod, "6");
         assert_number_string("num_div(mint 2, mint 3)", quot, "2/3");
         assert_number_string("num_add(1/2, 1/3)", frac_sum, "5/6");
         assert_number_string("num_inv(mint 2)", inv_two, "1/2");
+        assert_number_string("NUM_HALF", half_const, "1/2");
+        assert_number_string("NUM_TEN", ten_const, "10");
 
+        ASSERT_TRUE(num_is_exact(zero_const));
+        ASSERT_TRUE(num_is_exact(one_const));
         ASSERT_TRUE(num_is_exact(two_from_mint));
         ASSERT_TRUE(num_is_exact(half_from_mr));
+        ASSERT_TRUE(num_is_exact(half_const));
         ASSERT_TRUE(!num_is_integer(half_from_mr));
         ASSERT_TRUE(num_is_real(two_from_mint));
         ASSERT_TRUE(num_is_real(half_from_mr));
@@ -73,6 +88,10 @@ void run_number_exact_backend_tests(void)
         num_clear(&quot);
         num_clear(&frac_sum);
         num_clear(&inv_two);
+        num_clear(&zero_const);
+        num_clear(&one_const);
+        num_clear(&half_const);
+        num_clear(&ten_const);
 
         mi_free(mi_two);
         mi_free(mi_three);

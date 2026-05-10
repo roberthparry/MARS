@@ -1,7 +1,10 @@
 #include "number.h"
 #include "number_internal.h"
+#include "internal/mcomplex_internal.h"
+#include "internal/mfloat_internal.h"
 
 #include <ctype.h>
+#include <limits.h>
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -122,7 +125,7 @@ static bool number_is_decimal_text(const char *text)
 }
 
 
-static number_t number_wrap_mfloat_borrowed(const mfloat_t *value)
+number_t number_wrap_mfloat_borrowed(const mfloat_t *value)
 {
     number_t *number;
 
@@ -135,7 +138,7 @@ static number_t number_wrap_mfloat_borrowed(const mfloat_t *value)
     return number_take(number);
 }
 
-static number_t number_wrap_mfloat_with_precision(mfloat_t *value, size_t precision_bits)
+number_t number_wrap_mfloat_with_precision(mfloat_t *value, size_t precision_bits)
 {
     if (!value)
         return number_invalid();
@@ -146,7 +149,7 @@ static number_t number_wrap_mfloat_with_precision(mfloat_t *value, size_t precis
     return number_take(number_wrap_mfloat(value));
 }
 
-static number_t number_wrap_mcomplex_with_precision(mcomplex_t *value, size_t precision_bits)
+number_t number_wrap_mcomplex_with_precision(mcomplex_t *value, size_t precision_bits)
 {
     if (!value)
         return number_invalid();
@@ -207,8 +210,11 @@ static void number_destroy_mfloat(number_t *number)
 
 static void number_destroy_mcomplex(number_t *number)
 {
-    if (number)
-        mc_free(number_impl(number)->value.mc);
+    if (!number || !number_impl(number)->value.mc)
+        return;
+    if (mcomplex_is_immortal(number_impl(number)->value.mc))
+        return;
+    mc_free(number_impl(number)->value.mc);
 }
 
 static bool number_is_real_default(const number_t *number)
@@ -339,6 +345,68 @@ static bool number_eq_same_mcomplex(const number_t *a, const number_t *b)
 {
     return a && b &&
         mc_eq(number_impl_const(a)->value.mc, number_impl_const(b)->value.mc);
+}
+
+static bool number_eq_same_tol_with_precision(const number_t *a,
+                                              const number_t *b,
+                                              size_t precision_bits)
+{
+    number_t diff;
+    number_t one;
+    number_t tolerance;
+    bool rc;
+
+    if (!a || !b || precision_bits == 0u)
+        return false;
+    diff = num_abs(num_sub(*a, *b));
+    one = number_create_exact_mfloat_long_prec(1, precision_bits);
+    tolerance = num_ldexp(one, 4 - (int)precision_bits);
+    rc = num_cmp(diff, tolerance) <= 0;
+    num_clear(&diff);
+    num_clear(&one);
+    num_clear(&tolerance);
+    return rc;
+}
+
+static bool number_eq_same_tol_double(const number_t *a, const number_t *b)
+{
+    return number_eq_same_tol_with_precision(a, b, 53u);
+}
+
+static bool number_eq_same_tol_qfloat(const number_t *a, const number_t *b)
+{
+    return number_eq_same_tol_with_precision(a, b, 106u);
+}
+
+static bool number_eq_same_tol_qcomplex(const number_t *a, const number_t *b)
+{
+    return number_eq_same_tol_with_precision(a, b, 106u);
+}
+
+static bool number_eq_same_tol_mint(const number_t *a, const number_t *b)
+{
+    return number_eq_same_mint(a, b);
+}
+
+static bool number_eq_same_tol_mrational(const number_t *a, const number_t *b)
+{
+    return number_eq_same_mrational(a, b);
+}
+
+static bool number_eq_same_tol_mfloat(const number_t *a, const number_t *b)
+{
+    const number_vtable_t *vt = a ? number_vt(a) : NULL;
+
+    return number_eq_same_tol_with_precision(a, b,
+        (a && vt && vt->get_precision) ? vt->get_precision(a) : 0u);
+}
+
+static bool number_eq_same_tol_mcomplex(const number_t *a, const number_t *b)
+{
+    const number_vtable_t *vt = a ? number_vt(a) : NULL;
+
+    return number_eq_same_tol_with_precision(a, b,
+        (a && vt && vt->get_precision) ? vt->get_precision(a) : 0u);
 }
 
 static bool number_is_finite_double(const number_t *number)
@@ -1943,6 +2011,7 @@ static const number_vtable_t number_double_vt = {
     .is_nan = number_is_nan_double,
     .is_inf = number_is_inf_double,
     .eq_same = number_eq_same_double,
+    .eq_same_tol = number_eq_same_tol_double,
     .cmp_same = number_cmp_same_double,
     .format_inexact = number_format_double,
     .set_precision = number_set_precision_noop,
@@ -1991,6 +2060,7 @@ static const number_vtable_t number_qfloat_vt = {
     .is_nan = number_is_nan_qfloat,
     .is_inf = number_is_inf_qfloat,
     .eq_same = number_eq_same_qfloat,
+    .eq_same_tol = number_eq_same_tol_qfloat,
     .cmp_same = number_cmp_same_qfloat,
     .format_inexact = number_format_qfloat,
     .set_precision = number_set_precision_noop,
@@ -2039,6 +2109,7 @@ static const number_vtable_t number_qcomplex_vt = {
     .is_nan = number_is_nan_qcomplex,
     .is_inf = number_is_inf_qcomplex,
     .eq_same = number_eq_same_qcomplex,
+    .eq_same_tol = number_eq_same_tol_qcomplex,
     .cmp_same = number_cmp_same_qcomplex,
     .format_inexact = number_format_qcomplex,
     .set_precision = number_set_precision_noop,
@@ -2087,6 +2158,7 @@ static const number_vtable_t number_mint_vt = {
     .is_nan = number_is_nan_exact,
     .is_inf = number_is_inf_exact,
     .eq_same = number_eq_same_mint,
+    .eq_same_tol = number_eq_same_tol_mint,
     .cmp_same = number_cmp_same_mint,
     .format_inexact = NULL,
     .set_precision = number_set_precision_noop,
@@ -2135,6 +2207,7 @@ static const number_vtable_t number_mrational_vt = {
     .is_nan = number_is_nan_exact,
     .is_inf = number_is_inf_exact,
     .eq_same = number_eq_same_mrational,
+    .eq_same_tol = number_eq_same_tol_mrational,
     .cmp_same = number_cmp_same_mrational,
     .format_inexact = NULL,
     .set_precision = number_set_precision_noop,
@@ -2183,6 +2256,7 @@ static const number_vtable_t number_mfloat_vt = {
     .is_nan = number_is_nan_mfloat,
     .is_inf = number_is_inf_mfloat,
     .eq_same = number_eq_same_mfloat,
+    .eq_same_tol = number_eq_same_tol_mfloat,
     .cmp_same = number_cmp_same_mfloat,
     .format_inexact = number_format_mfloat,
     .set_precision = number_set_precision_mfloat,
@@ -2231,6 +2305,7 @@ static const number_vtable_t number_mcomplex_vt = {
     .is_nan = number_is_nan_mcomplex,
     .is_inf = number_is_inf_mcomplex,
     .eq_same = number_eq_same_mcomplex,
+    .eq_same_tol = number_eq_same_tol_mcomplex,
     .cmp_same = number_cmp_same_mcomplex,
     .format_inexact = number_format_mcomplex,
     .set_precision = number_set_precision_mcomplex,
@@ -2569,32 +2644,6 @@ number_t num_create_string(const char *text)
     return number_take(number_wrap_mint(mi_create_string(trimmed)));
 }
 
-number_t num_pi(void)
-{
-    return number_wrap_mfloat_borrowed(MF_PI);
-}
-
-number_t num_e(void)
-{
-    return number_wrap_mfloat_borrowed(MF_E);
-}
-
-number_t num_euler_mascheroni(void)
-{
-    return number_wrap_mfloat_borrowed(MF_EULER_MASCHERONI);
-}
-
-number_t num_max(void)
-{
-    return number_wrap_mfloat_with_precision(mf_max(), number_default_precision_bits);
-}
-
-number_t num_pow10(int exponent10)
-{
-    return number_wrap_mfloat_with_precision(mf_pow10(exponent10),
-        number_default_precision_bits);
-}
-
 number_t num_clone(const number_t number)
 {
     const number_vtable_t *vt = number_vt(&number);
@@ -2808,6 +2857,160 @@ static inline int number_cmp_same_kind(const number_t *a, const number_t *b)
     const number_vtable_t *vt = a ? number_vt(a) : NULL;
 
     return a && b && vt && vt->cmp_same ? vt->cmp_same(a, b) : 0;
+}
+
+static inline bool number_eq_same_kind(const number_t *a, const number_t *b)
+{
+    const number_vtable_t *vt = a ? number_vt(a) : NULL;
+
+    return a && b && vt && vt->eq_same ? vt->eq_same(a, b) : false;
+}
+
+bool number_matches_value(const number_t *reference, const number_t *target)
+{
+    const number_vtable_t *reference_vt;
+    const number_vtable_t *target_vt;
+    number_t *coerced_target;
+    size_t precision_bits;
+    bool matches;
+
+    if (!reference || !target || !number_is_valid_value(reference) ||
+        !number_is_valid_value(target))
+        return false;
+    reference_vt = number_vt(reference);
+    if (!reference_vt)
+        return false;
+    coerced_target = number_coerce(target, number_impl_const(reference)->kind);
+    if (!coerced_target)
+        return false;
+    target_vt = number_vt(coerced_target);
+    precision_bits = reference_vt->get_precision
+        ? reference_vt->get_precision(reference)
+        : 0u;
+    if (precision_bits != 0u && target_vt && target_vt->set_precision)
+        target_vt->set_precision(coerced_target, precision_bits);
+    matches = reference_vt->eq_same_tol
+        ? reference_vt->eq_same_tol(reference, coerced_target)
+        : number_eq_same_kind(reference, coerced_target);
+    number_box_free(coerced_target);
+    return matches;
+}
+
+static number_t number_const_mfloat_special(number_const_id_t id, size_t precision_bits)
+{
+    if (id == NUMBER_CONST_NEG_ONE)
+        return number_create_exact_mfloat_long_prec(-1, precision_bits);
+    if (number_const_has_ldexp(id))
+        return number_create_exact_mfloat_dyadic_prec(
+            1, number_const_ldexp_value(id), precision_bits);
+    return number_invalid();
+}
+
+static number_t number_const_like_double(const number_t *like, number_const_id_t id)
+{
+    (void)like;
+    if (number_const_has_double(id))
+        return num_create_double(number_const_double_value(id));
+    return number_invalid();
+}
+
+static number_t number_const_like_qfloat(const number_t *like, number_const_id_t id)
+{
+    (void)like;
+    return num_create_qfloat(number_const_qfloat(id));
+}
+
+static number_t number_const_like_qcomplex(const number_t *like, number_const_id_t id)
+{
+    (void)like;
+    return num_create_qcomplex(number_const_qcomplex(id));
+}
+
+static number_t number_const_like_mexact(const number_t *like, number_const_id_t id)
+{
+    size_t precision_bits;
+    number_t exact;
+    const mfloat_t *mf_value;
+
+    (void)like;
+    exact = number_const_mreal_exact(id);
+    if (number_is_valid_value(&exact))
+        return exact;
+    precision_bits = number_default_precision_bits;
+    if (id == NUMBER_CONST_I)
+        return number_wrap_mcomplex_with_precision(
+            mc_create(MF_ZERO, MF_ONE), precision_bits);
+    mf_value = number_const_mfloat_value(id);
+    return mf_value ? num_create_mfloat_prec(mf_value, precision_bits) : number_invalid();
+}
+
+static number_t number_const_like_mfloat(const number_t *like, number_const_id_t id)
+{
+    const number_vtable_t *vt = number_vt(like);
+    size_t precision_bits = vt && vt->get_precision ? vt->get_precision(like) : 0u;
+    number_t out;
+    const mfloat_t *mf_value;
+
+    if (precision_bits == 0u)
+        precision_bits = number_default_precision_bits;
+    if (id == NUMBER_CONST_I)
+        return number_wrap_mcomplex_with_precision(
+            mc_create(MF_ZERO, MF_ONE), precision_bits);
+    out = number_const_mfloat_special(id, precision_bits);
+    if (number_is_valid_value(&out))
+        return out;
+    mf_value = number_const_mfloat_value(id);
+    return mf_value ? num_create_mfloat_prec(mf_value, precision_bits) : number_invalid();
+}
+
+static number_t number_const_like_mcomplex(const number_t *like, number_const_id_t id)
+{
+    const number_vtable_t *vt = number_vt(like);
+    size_t precision_bits = vt && vt->get_precision ? vt->get_precision(like) : 0u;
+    number_t real_value;
+    const mfloat_t *mf_value;
+
+    if (precision_bits == 0u)
+        precision_bits = number_default_precision_bits;
+    if (id == NUMBER_CONST_I)
+        return number_wrap_mcomplex_with_precision(
+            mc_create(MF_ZERO, MF_ONE), precision_bits);
+    real_value = number_const_mfloat_special(id, precision_bits);
+    if (number_is_valid_value(&real_value)) {
+        number_t out = number_wrap_mcomplex_with_precision(
+            mc_create(number_impl_const(&real_value)->value.mf, MF_ZERO), precision_bits);
+        num_clear(&real_value);
+        return out;
+    }
+    mf_value = number_const_mfloat_value(id);
+    return mf_value
+        ? number_wrap_mcomplex_with_precision(mc_create(mf_value, MF_ZERO), precision_bits)
+        : number_invalid();
+}
+
+typedef number_t (*number_const_like_fn)(const number_t *like, number_const_id_t id);
+
+static const number_const_like_fn number_const_like_table[] = {
+    [NUMBER_DOUBLE] = number_const_like_double,
+    [NUMBER_QFLOAT] = number_const_like_qfloat,
+    [NUMBER_QCOMPLEX] = number_const_like_qcomplex,
+    [NUMBER_MINT] = number_const_like_mexact,
+    [NUMBER_MRATIONAL] = number_const_like_mexact,
+    [NUMBER_MFLOAT] = number_const_like_mfloat,
+    [NUMBER_MCOMPLEX] = number_const_like_mcomplex
+};
+
+number_t number_const_like(const number_t *like, number_const_id_t id)
+{
+    number_const_like_fn fn;
+    number_kind_t kind;
+
+    if (!like || !number_is_valid_value(like) || (unsigned)id >= NUMBER_CONST_COUNT)
+        return number_invalid();
+    kind = number_impl_const(like)->kind;
+    fn = (unsigned)kind < (sizeof(number_const_like_table) / sizeof(number_const_like_table[0]))
+        ? number_const_like_table[kind] : NULL;
+    return fn ? fn(like, id) : number_invalid();
 }
 
 number_t num_new(void)
@@ -3088,7 +3291,8 @@ number_t num_arg(const number_t number)
     if (vt && vt->arg_value)
         return number_take(vt->arg_value(&number));
     {
-        number_t zero = num_create_mfloat_prec(MF_ZERO, num_get_precision(number) ? num_get_precision(number) : number_default_precision_bits);
+        number_t zero = number_create_exact_mfloat_long_prec(
+            0, num_get_precision(number) ? num_get_precision(number) : number_default_precision_bits);
         number_t real = vt && vt->complex ? num_real_part(number) : num_clone(number);
         number_t result = num_atan2(zero, real);
         num_clear(&zero);

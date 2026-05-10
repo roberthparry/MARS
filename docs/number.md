@@ -93,11 +93,11 @@ num_clear(&b);
 num_clear(&c);
 ```
 
-Named constants such as `num_pi()`, `num_e()`, and `num_euler_mascheroni()`
+Named constants such as `NUM_PI`, `NUM_E`, and `NUM_EULER_MASCHERONI`
 are safe to clear as well:
 
 ```c
-number_t pi = num_pi();
+number_t pi = NUM_PI;
 num_clear(&pi);
 ```
 

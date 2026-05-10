@@ -23,35 +23,53 @@ static const uint64_t mint_wheel210_residues[] = {
 };
 
 static uint64_t mnt_one_storage[] = { 1 };
+static uint64_t mnt_two_storage[] = { 2 };
 static uint64_t mnt_ten_storage[] = { 10 };
 
-static struct _mint_t mnt_zero_static = {
+const mint_t MI_ZERO_VALUE = {
     .sign = 0,
     .length = 0,
     .capacity = 0,
     .storage = NULL
 };
 
-static struct _mint_t mnt_one_static = {
+const mint_t MI_ONE_VALUE = {
     .sign = 1,
     .length = 1,
     .capacity = 1,
     .storage = mnt_one_storage
 };
 
-static struct _mint_t mnt_ten_static = {
+const mint_t MI_NEG_ONE_VALUE = {
+    .sign = -1,
+    .length = 1,
+    .capacity = 1,
+    .storage = mnt_one_storage
+};
+
+const mint_t MI_TWO_VALUE = {
+    .sign = 1,
+    .length = 1,
+    .capacity = 1,
+    .storage = mnt_two_storage
+};
+
+const mint_t MI_TEN_VALUE = {
     .sign = 1,
     .length = 1,
     .capacity = 1,
     .storage = mnt_ten_storage
 };
 
-const mint_t * const MI_ZERO = &mnt_zero_static;
-const mint_t * const MI_ONE = &mnt_one_static;
-const mint_t * const MI_TEN = &mnt_ten_static;
+const mint_t * const MI_ZERO = &MI_ZERO_VALUE;
+const mint_t * const MI_ONE = &MI_ONE_VALUE;
+const mint_t * const MI_NEG_ONE = &MI_NEG_ONE_VALUE;
+const mint_t * const MI_TWO = &MI_TWO_VALUE;
+const mint_t * const MI_TEN = &MI_TEN_VALUE;
 int mint_is_immortal(const mint_t *mint)
 {
-    return mint == MI_ZERO || mint == MI_ONE || mint == MI_TEN;
+    return mint == MI_ZERO || mint == MI_ONE || mint == MI_NEG_ONE ||
+        mint == MI_TWO || mint == MI_TEN;
 }
 
 int mint_is_zero_internal(const mint_t *mint)

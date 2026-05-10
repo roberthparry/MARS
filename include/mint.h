@@ -51,6 +51,8 @@ typedef enum mint_primality_result_t {
  */
 extern const mint_t * const MI_ZERO;
 extern const mint_t * const MI_ONE;
+extern const mint_t * const MI_NEG_ONE;
+extern const mint_t * const MI_TWO;
 extern const mint_t * const MI_TEN;
 /** @} */
 

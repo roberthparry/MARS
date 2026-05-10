@@ -39,6 +39,7 @@ typedef struct number_vtable_t {
     bool (*is_nan)(const number_t *number);
     bool (*is_inf)(const number_t *number);
     bool (*eq_same)(const number_t *a, const number_t *b);
+    bool (*eq_same_tol)(const number_t *a, const number_t *b);
     int (*cmp_same)(const number_t *a, const number_t *b);
     char *(*format_inexact)(const number_t *number, bool scientific, int precision);
     int (*set_precision)(number_t *number, size_t precision_bits);
@@ -93,6 +94,32 @@ typedef enum number_binary_op_t {
     NUMBER_OP_MUL,
     NUMBER_OP_DIV
 } number_binary_op_t;
+
+typedef enum number_const_id_t {
+    NUMBER_CONST_ZERO,
+    NUMBER_CONST_ONE,
+    NUMBER_CONST_NEG_ONE,
+    NUMBER_CONST_HALF,
+    NUMBER_CONST_QUARTER,
+    NUMBER_CONST_ONE_EIGHTH,
+    NUMBER_CONST_TWO,
+    NUMBER_CONST_PI,
+    NUMBER_CONST_2PI,
+    NUMBER_CONST_PI_2,
+    NUMBER_CONST_PI_4,
+    NUMBER_CONST_3PI_4,
+    NUMBER_CONST_PI_6,
+    NUMBER_CONST_PI_3,
+    NUMBER_CONST_E,
+    NUMBER_CONST_INV_E,
+    NUMBER_CONST_LN2,
+    NUMBER_CONST_SQRT2,
+    NUMBER_CONST_SQRT3,
+    NUMBER_CONST_SQRT2_OVER_TWO,
+    NUMBER_CONST_SQRT3_OVER_TWO,
+    NUMBER_CONST_I,
+    NUMBER_CONST_COUNT
+} number_const_id_t;
 
 extern const number_math_family_t number_math_family_binary_table[][NUMBER_MATH_MCOMPLEX + 1];
 extern const number_kind_t number_math_family_target_kind_table[];
@@ -179,8 +206,28 @@ number_t *number_wrap_mint(mint_t *value);
 number_t *number_wrap_mrational(mrational_t *value);
 number_t *number_wrap_mfloat(mfloat_t *value);
 number_t *number_wrap_mcomplex(mcomplex_t *value);
+number_t number_wrap_mfloat_borrowed(const mfloat_t *value);
+number_t number_wrap_mfloat_with_precision(mfloat_t *value, size_t precision_bits);
+number_t number_wrap_mcomplex_with_precision(mcomplex_t *value, size_t precision_bits);
 number_kind_t number_common_kind(const number_t *a, const number_t *b,
                                  number_binary_op_t op);
 number_t *number_coerce(const number_t *number, number_kind_t target_kind);
+bool number_matches_value(const number_t *reference, const number_t *target);
+qfloat_t number_const_qfloat(number_const_id_t id);
+const mfloat_t *number_const_mfloat_value(number_const_id_t id);
+qcomplex_t number_const_qcomplex(number_const_id_t id);
+number_t number_const_mreal_exact(number_const_id_t id);
+bool number_const_has_double(number_const_id_t id);
+double number_const_double_value(number_const_id_t id);
+bool number_const_has_ldexp(number_const_id_t id);
+int number_const_ldexp_value(number_const_id_t id);
+number_t number_create_exact_mfloat_long_prec(long value, size_t precision_bits);
+number_t number_create_exact_mfloat_dyadic_prec(long numerator,
+                                                int exponent2,
+                                                size_t precision_bits);
+number_t number_const_return_like(const number_t *like, number_const_id_t id);
+number_t number_neg_const_return_like(const number_t *like, number_const_id_t id);
+number_t number_imag_const_return_like(const number_t *like, number_const_id_t id);
+number_t number_const_like(const number_t *like, number_const_id_t id);
 
 #endif

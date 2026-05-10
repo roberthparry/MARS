@@ -34,6 +34,16 @@ extern const qcomplex_t QC_NEG_ONE;
 extern const qcomplex_t QC_HALF;
 
 /**
+ * @brief 1/4 + 0i constant
+ */
+extern const qcomplex_t QC_QUARTER;
+
+/**
+ * @brief 1/8 + 0i constant
+ */
+extern const qcomplex_t QC_ONE_EIGHTH;
+
+/**
  * @brief 2 + 0i constant
  */
 extern const qcomplex_t QC_TWO;
@@ -132,6 +142,21 @@ extern const qcomplex_t QC_SQRT_HALF;
  * @brief sqrt(2) + 0i constant
  */
 extern const qcomplex_t QC_SQRT2;
+
+/**
+ * @brief sqrt(3) + 0i constant
+ */
+extern const qcomplex_t QC_SQRT3;
+
+/**
+ * @brief sqrt(2)/2 + 0i constant
+ */
+extern const qcomplex_t QC_SQRT2_OVER_TWO;
+
+/**
+ * @brief sqrt(3)/2 + 0i constant
+ */
+extern const qcomplex_t QC_SQRT3_OVER_TWO;
 
 /**
  * @brief sqrt(π) + 0i constant

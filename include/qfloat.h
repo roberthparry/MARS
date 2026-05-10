@@ -125,6 +125,15 @@ extern const qfloat_t QF_SQRT_HALF;
 /** @brief sqrt(2) */
 extern const qfloat_t QF_SQRT2;
 
+/** @brief sqrt(3) */
+extern const qfloat_t QF_SQRT3;
+
+/** @brief sqrt(2)/2 */
+extern const qfloat_t QF_SQRT2_OVER_TWO;
+
+/** @brief sqrt(3)/2 */
+extern const qfloat_t QF_SQRT3_OVER_TWO;
+
 /** @brief sqrt(2π) */
 extern const qfloat_t QF_SQRT_2PI;
 

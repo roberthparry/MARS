@@ -5,6 +5,12 @@
 
 #include "mint.h"
 
+extern const mint_t MI_ZERO_VALUE;
+extern const mint_t MI_ONE_VALUE;
+extern const mint_t MI_NEG_ONE_VALUE;
+extern const mint_t MI_TWO_VALUE;
+extern const mint_t MI_TEN_VALUE;
+
 struct _mint_t {
     short sign;       /* -1, 0, +1 */
     size_t length;    /* number of used 64-bit limbs */

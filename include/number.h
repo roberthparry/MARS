@@ -43,8 +43,8 @@
  * - `char *` strings returned by `num_to_string()` must be released with
  *   `free()`
  *
- * For immortal-backed values such as `num_pi()`, `num_e()`, and
- * `num_euler_mascheroni()`, `num_clear(&value)` is safe and may be a no-op.
+ * For immortal-backed values such as `NUM_PI`, `NUM_E`, and `NUM_HALF`,
+ * `num_clear(&value)` is safe and may be a no-op.
  *
  * Pure arithmetic helpers never mutate their by-value inputs. Functions that
  * write to an existing `number_t` take a `number_t *` destination.
@@ -115,32 +115,77 @@ number_t num_create_mcomplex_digits(const mcomplex_t *value, size_t significant_
  */
 number_t num_create_string(const char *text);
 /**
- * @brief Returns a `number_t` representation of pi backed by an immortal constant.
- *
- * `num_clear(&value)` is safe to call when finished and is a no-op for this
- * immortal-backed value.
+ * @brief Process-lifetime `number_t` constant representing exact zero.
  */
-number_t num_pi(void);
+extern const number_t NUM_ZERO;
 /**
- * @brief Returns a `number_t` representation of Euler's number backed by an immortal constant.
- *
- * `num_clear(&value)` is safe to call when finished and is a no-op for this
- * immortal-backed value.
+ * @brief Process-lifetime `number_t` constant representing exact one.
  */
-number_t num_e(void);
+extern const number_t NUM_ONE;
+extern const number_t NUM_NEG_ONE;
 /**
- * @brief Returns a `number_t` representation of the Euler-Mascheroni constant backed by an immortal constant.
+ * @brief Process-lifetime `number_t` constant representing the exact rational value `1/2`.
  *
- * `num_clear(&value)` is safe to call when finished and is a no-op for this
- * immortal-backed value.
+ * `num_clear()` on a by-value copy is safe and is a no-op for the shared
+ * immortal payload.
  */
-number_t num_euler_mascheroni(void);
+extern const number_t NUM_HALF;
+extern const number_t NUM_ONE_AND_HALF;
+extern const number_t NUM_ONE_THIRD;
+extern const number_t NUM_QUARTER;
+extern const number_t NUM_ONE_SIXTH;
+extern const number_t NUM_ONE_EIGHTH;
+extern const number_t NUM_ONE_TENTH;
+extern const number_t NUM_TWO;
 /**
- * @brief Returns an owning `number_t` representing the current maximum value sentinel.
- *
- * Call `num_clear(&value)` when finished with the returned value.
+ * @brief Process-lifetime `number_t` constant representing exact ten.
  */
-number_t num_max(void);
+extern const number_t NUM_TEN;
+extern const number_t NUM_NAN;
+extern const number_t NUM_INF;
+extern const number_t NUM_NINF;
+/**
+ * @brief Process-lifetime `number_t` constant representing pi.
+ */
+extern const number_t NUM_PI;
+extern const number_t NUM_2PI;
+extern const number_t NUM_PI_2;
+extern const number_t NUM_PI_4;
+extern const number_t NUM_3PI_4;
+extern const number_t NUM_PI_6;
+extern const number_t NUM_PI_3;
+extern const number_t NUM_2_PI;
+/**
+ * @brief Process-lifetime `number_t` constant representing Euler's number.
+ */
+extern const number_t NUM_E;
+extern const number_t NUM_INV_E;
+extern const number_t NUM_LN2;
+extern const number_t NUM_INVLN2;
+/**
+ * @brief Process-lifetime `number_t` constant representing the Euler-Mascheroni constant.
+ */
+extern const number_t NUM_EULER_MASCHERONI;
+extern const number_t NUM_SQRT_HALF;
+extern const number_t NUM_SQRT2;
+extern const number_t NUM_SQRT3;
+extern const number_t NUM_SQRT2_OVER_TWO;
+extern const number_t NUM_SQRT3_OVER_TWO;
+extern const number_t NUM_SQRT_2PI;
+extern const number_t NUM_SQRT_PI;
+extern const number_t NUM_SQRT_PI_OVER_TWO;
+extern const number_t NUM_SQRT1ONPI;
+extern const number_t NUM_2_SQRTPI;
+extern const number_t NUM_NEG_TWO_OVER_SQRT_PI;
+extern const number_t NUM_INV_SQRT_2PI;
+extern const number_t NUM_LOG_SQRT_2PI;
+extern const number_t NUM_LN_2PI;
+extern const number_t NUM_PI_SQUARED;
+extern const number_t NUM_2PI_CUBED;
+/**
+ * @brief Process-lifetime `number_t` constant representing the imaginary unit.
+ */
+extern const number_t NUM_I;
 /**
  * @brief Returns an owning `number_t` representing `10^exponent10`.
  *
