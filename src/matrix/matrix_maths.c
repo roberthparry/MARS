@@ -797,11 +797,9 @@ static matrix_t *mat_fun_dval_uniform_diag_offdiag(const matrix_t *A,
     delta = dval_sub_simplify_local(fb, fa);
     if (!delta)
         goto fail;
-    {
-        dval_t *scaled_delta = dv_div_d(delta, (double)n);
-        dv_free(delta);
-        delta = dval_simplify_owned_local(scaled_delta);
-    }
+    dval_t *scaled_delta = dv_div_d(delta, (double)n);
+    dv_free(delta);
+    delta = dval_simplify_owned_local(scaled_delta);
     if (!delta)
         goto fail;
 
@@ -961,38 +959,36 @@ static matrix_t *mat_fun_dval_scalar_plus_rank_one(const matrix_t *A,
     if (!alpha)
         goto fail;
 
-    {
-        dval_t *app = NULL;
-        dval_t *diag_p = NULL;
-        dval_t *aqq = NULL;
-        dval_t *diag_q = NULL;
-        dval_t *apq = NULL;
+    dval_t *app = NULL;
+    dval_t *diag_p = NULL;
+    dval_t *aqq = NULL;
+    dval_t *diag_q = NULL;
+    dval_t *apq = NULL;
 
-        mat_get(A, p, p, &app);
-        dv_retain(app ? app : DV_ZERO);
-        dv_retain(alpha);
-        diag_p = dval_sub_simplify_local(app ? app : DV_ZERO, alpha);
-        if (!diag_p)
-            goto fail;
+    mat_get(A, p, p, &app);
+    dv_retain(app ? app : DV_ZERO);
+    dv_retain(alpha);
+    diag_p = dval_sub_simplify_local(app ? app : DV_ZERO, alpha);
+    if (!diag_p)
+        goto fail;
 
-        mat_get(A, p, q, &apq);
-        if (dval_is_zero_local(apq))
-            goto fail;
-        dv_retain(diag_p);
-        dv_retain(apq);
-        v[p] = dval_div_simplify_local(diag_p, apq);
-        dv_free(diag_p);
-        if (!v[p])
-            goto fail;
+    mat_get(A, p, q, &apq);
+    if (dval_is_zero_local(apq))
+        goto fail;
+    dv_retain(diag_p);
+    dv_retain(apq);
+    v[p] = dval_div_simplify_local(diag_p, apq);
+    dv_free(diag_p);
+    if (!v[p])
+        goto fail;
 
-        mat_get(A, q, q, &aqq);
-        dv_retain(aqq ? aqq : DV_ZERO);
-        dv_retain(alpha);
-        diag_q = dval_sub_simplify_local(aqq ? aqq : DV_ZERO, alpha);
-        if (!diag_q)
-            goto fail;
-        u[q] = diag_q;
-    }
+    mat_get(A, q, q, &aqq);
+    dv_retain(aqq ? aqq : DV_ZERO);
+    dv_retain(alpha);
+    diag_q = dval_sub_simplify_local(aqq ? aqq : DV_ZERO, alpha);
+    if (!diag_q)
+        goto fail;
+    u[q] = diag_q;
 
     for (size_t i = 0; i < n; ++i) {
         for (size_t j = 0; j < n; ++j) {
@@ -1625,55 +1621,53 @@ static matrix_t *mat_fun_dval_quartic_biquadratic_exact(const matrix_t *A,
     if (!h2)
         goto fail;
 
-    {
-        dval_t *num = NULL;
-        dval_t *den = NULL;
+    dval_t *num = NULL;
+    dval_t *den = NULL;
+    dval_t *e1mu;
 
-        dv_retain(g1);
-        dv_retain(g2);
-        num = dval_sub_simplify_local(g1, g2);
-        dv_retain(mu1);
-        dv_retain(mu2);
-        den = dval_sub_simplify_local(mu1, mu2);
-        e1 = dval_div_simplify_local(num, den);
-        if (!e1)
-            goto fail;
+    dv_retain(g1);
+    dv_retain(g2);
+    num = dval_sub_simplify_local(g1, g2);
+    dv_retain(mu1);
+    dv_retain(mu2);
+    den = dval_sub_simplify_local(mu1, mu2);
+    e1 = dval_div_simplify_local(num, den);
+    if (!e1)
+        goto fail;
 
-        dv_retain(e1);
-        dv_retain(mu1);
-        dval_t *e1mu = dval_mul_simplify_local(e1, mu1);
-        if (!e1mu)
-            goto fail;
-        dv_retain(g1);
-        e0 = dval_sub_simplify_local(g1, e1mu);
-        if (!e0)
-            goto fail;
-    }
+    dv_retain(e1);
+    dv_retain(mu1);
+    e1mu = dval_mul_simplify_local(e1, mu1);
+    if (!e1mu)
+        goto fail;
+    dv_retain(g1);
+    e0 = dval_sub_simplify_local(g1, e1mu);
+    if (!e0)
+        goto fail;
 
-    {
-        dval_t *num = NULL;
-        dval_t *den = NULL;
+    dval_t *num2 = NULL;
+    dval_t *den2 = NULL;
+    dval_t *o1mu;
 
-        dv_retain(h1);
-        dv_retain(h2);
-        num = dval_sub_simplify_local(h1, h2);
-        dv_retain(mu1);
-        dv_retain(mu2);
-        den = dval_sub_simplify_local(mu1, mu2);
-        o1 = dval_div_simplify_local(num, den);
-        if (!o1)
-            goto fail;
+    dv_retain(h1);
+    dv_retain(h2);
+    num2 = dval_sub_simplify_local(h1, h2);
+    dv_retain(mu1);
+    dv_retain(mu2);
+    den2 = dval_sub_simplify_local(mu1, mu2);
+    o1 = dval_div_simplify_local(num2, den2);
+    if (!o1)
+        goto fail;
 
-        dv_retain(o1);
-        dv_retain(mu1);
-        dval_t *o1mu = dval_mul_simplify_local(o1, mu1);
-        if (!o1mu)
-            goto fail;
-        dv_retain(h1);
-        o0 = dval_sub_simplify_local(h1, o1mu);
-        if (!o0)
-            goto fail;
-    }
+    dv_retain(o1);
+    dv_retain(mu1);
+    o1mu = dval_mul_simplify_local(o1, mu1);
+    if (!o1mu)
+        goto fail;
+    dv_retain(h1);
+    o0 = dval_sub_simplify_local(h1, o1mu);
+    if (!o0)
+        goto fail;
 
     out = mat_new_dv(A->rows, A->cols);
     if (!out)
@@ -2480,11 +2474,9 @@ matrix_t *mat_fun_schur(const matrix_t *A,
         return out;
     }
 
-    {
-        mat_fun_cache_entry_t *cache = mat_fun_cache_find(A);
-        if (cache && cache->spectral_Vq && cache->spectral_evals)
-            return mat_fun_from_spectral_cache(A, scalar_f);
-    }
+    mat_fun_cache_entry_t *cache = mat_fun_cache_find(A);
+    if (cache && cache->spectral_Vq && cache->spectral_evals)
+        return mat_fun_from_spectral_cache(A, scalar_f);
 
     if (mat_is_hermitian(A))
         return mat_fun_hermitian(A, scalar_f);

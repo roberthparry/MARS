@@ -349,6 +349,34 @@ static void qf_sin_cos_kernel(qfloat_t x, qfloat_t *s_out, qfloat_t *c_out)
     *c_out = c;
 }
 
+typedef struct {
+    unsigned char use_cos;
+    unsigned char negate;
+} qfloat_sincos_dispatch_t;
+
+static qfloat_t qf_finish_sincos_dispatch(const qfloat_sincos_dispatch_t *dispatch,
+                                          qfloat_t s,
+                                          qfloat_t c)
+{
+    qfloat_t out = dispatch->use_cos ? c : s;
+
+    return dispatch->negate ? qf_neg(out) : out;
+}
+
+static const qfloat_sincos_dispatch_t qf_sin_dispatch[4] = {
+    {0, 0},
+    {1, 0},
+    {0, 1},
+    {1, 1}
+};
+
+static const qfloat_sincos_dispatch_t qf_cos_dispatch[4] = {
+    {1, 0},
+    {0, 1},
+    {1, 1},
+    {0, 0}
+};
+
 qfloat_t qf_hypot(qfloat_t x, qfloat_t y)
 {
     /* double ax = fabs(x.hi); */
@@ -392,44 +420,22 @@ qfloat_t qf_sin(qfloat_t x)
 {
     qfloat_t r;
     int q = qf_range_reduce_pi_over_2(x, &r);
-
     qfloat_t s, c;
+
     qf_sin_cos_kernel(r, &s, &c);
 
-    /* Quadrant reconstruction:
-     * q = 0:  sin(x) =  sin(r)
-     * q = 1:  sin(x) =  cos(r)
-     * q = 2:  sin(x) = -sin(r)
-     * q = 3:  sin(x) = -cos(r)
-     */
-    switch (q) {
-    case 0:  return s;
-    case 1:  return c;
-    case 2:  return qf_neg(s);
-    default: return qf_neg(c);
-    }
+    return qf_finish_sincos_dispatch(&qf_sin_dispatch[q & 3], s, c);
 }
 
 qfloat_t qf_cos(qfloat_t x)
 {
     qfloat_t r;
     int q = qf_range_reduce_pi_over_2(x, &r);
-
     qfloat_t s, c;
+
     qf_sin_cos_kernel(r, &s, &c);
 
-    /* Quadrant reconstruction:
-     * q = 0:  cos(x) =  cos(r)
-     * q = 1:  cos(x) = -sin(r)
-     * q = 2:  cos(x) = -cos(r)
-     * q = 3:  cos(x) =  sin(r)
-     */
-    switch (q) {
-    case 0:  return c;
-    case 1:  return qf_neg(s);
-    case 2:  return qf_neg(c);
-    default: return s;
-    }
+    return qf_finish_sincos_dispatch(&qf_cos_dispatch[q & 3], s, c);
 }
 
 qfloat_t qf_tan(qfloat_t x)

@@ -69,24 +69,22 @@ bool mi_isprime(const mint_t *mint)
         return mint_isprime_sieved_upto_ulong(mint, root_limit) > 0;
     }
 
-    {
-        mint_t *plus_one = mint_dup_value(mint);
-        int is_mersenne_prime = 0;
+    mint_t *plus_one = mint_dup_value(mint);
+    int is_mersenne_prime = 0;
 
-        if (!plus_one)
-            return false;
-        if (mint_add_small(plus_one, 1) != 0) {
-            mi_free(plus_one);
-            return false;
-        }
-        if (mint_detect_power_of_two_exponent(plus_one, &mersenne_exponent) &&
-            mint_isprime_small_ulong((unsigned long)mersenne_exponent)) {
-            is_mersenne_prime = mint_isprime_lucas_lehmer(mint, mersenne_exponent);
-            mi_free(plus_one);
-            return is_mersenne_prime;
-        }
+    if (!plus_one)
+        return false;
+    if (mint_add_small(plus_one, 1) != 0) {
         mi_free(plus_one);
+        return false;
     }
+    if (mint_detect_power_of_two_exponent(plus_one, &mersenne_exponent) &&
+        mint_isprime_small_ulong((unsigned long)mersenne_exponent)) {
+        is_mersenne_prime = mint_isprime_lucas_lehmer(mint, mersenne_exponent);
+        mi_free(plus_one);
+        return is_mersenne_prime;
+    }
+    mi_free(plus_one);
 
     if (mint_isprime_strong_probable_prime_base2(mint) <= 0)
         return false;

@@ -82,19 +82,15 @@ qcomplex_t qc_pow(qcomplex_t a, qcomplex_t b) {
         if (!qf_signbit(qc_real(a)))
             return qc_make(qf_pow(qc_real(a), qc_real(b)), QF_ZERO);
 
-        {
-            qfloat_t mag = qf_pow(qf_abs(qc_real(a)), qc_real(b));
-            qfloat_t theta = qf_mul(qc_real(b), QF_PI);
-            return qc_make(qf_mul(mag, qf_cos(theta)),
-                           qf_mul(mag, qf_sin(theta)));
-        }
+        qfloat_t mag = qf_pow(qf_abs(qc_real(a)), qc_real(b));
+        qfloat_t theta = qf_mul(qc_real(b), QF_PI);
+        return qc_make(qf_mul(mag, qf_cos(theta)),
+                       qf_mul(mag, qf_sin(theta)));
     }
 
-    {
-        qcomplex_t log_a = qc_log(a);
-        qcomplex_t prod = qc_mul(b, log_a);
-        return qc_exp(prod);
-    }
+    qcomplex_t log_a = qc_log(a);
+    qcomplex_t prod = qc_mul(b, log_a);
+    return qc_exp(prod);
 }
 qcomplex_t qc_sqrt(qcomplex_t z) {
     qfloat_t r          = qc_abs(z);

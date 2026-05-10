@@ -214,16 +214,15 @@ static char *mf_build_scientific(const char *fixed, int uppercase, int precision
         return NULL;
 
     digits_len = strlen(digits);
-    {
-        int nd = (int)digits_len;
-        int sig_digits = precision >= 0 ? (precision + 1) : MF_PRINT_SIG_DIGITS;
+    int nd = (int)digits_len;
+    int sig_digits = precision >= 0 ? (precision + 1) : MF_PRINT_SIG_DIGITS;
 
-        if (sig_digits < 1)
-            sig_digits = 1;
-        sig_digits_target = (size_t)sig_digits;
-        mf_limit_significant_digits(digits, &nd, &fixed_dp, sig_digits);
-        digits_len = strlen(digits);
-    }
+    if (sig_digits < 1)
+        sig_digits = 1;
+    sig_digits_target = (size_t)sig_digits;
+    mf_limit_significant_digits(digits, &nd, &fixed_dp, sig_digits);
+    digits_len = strlen(digits);
+
     if (precision >= 0) {
         if (digits_len < sig_digits_target) {
             char *grown = realloc(digits, sig_digits_target + 1u);

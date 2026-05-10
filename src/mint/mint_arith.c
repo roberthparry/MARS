@@ -105,30 +105,28 @@ int mint_add_inplace(mint_t *mint, const mint_t *other)
         return 0;
     }
 
-    {
-        uint64_t *scratch = NULL;
-        size_t scratch_len = mint->length;
+    uint64_t *scratch = NULL;
+    size_t scratch_len = mint->length;
 
-        if (scratch_len > 0) {
-            scratch = malloc(scratch_len * sizeof(*scratch));
-            if (!scratch)
-                return -1;
-            memcpy(scratch, mint->storage, scratch_len * sizeof(*scratch));
-        }
-
-        if (mint_ensure_capacity(mint, other->length) != 0) {
-            free(scratch);
+    if (scratch_len > 0) {
+        scratch = malloc(scratch_len * sizeof(*scratch));
+        if (!scratch)
             return -1;
-        }
-        memcpy(mint->storage, other->storage,
-               other->length * sizeof(*mint->storage));
-        mint->length = other->length;
-        mint_abs_sub_raw_inplace(mint->storage, &mint->length,
-                                 scratch, scratch_len);
-        mint->sign = mint->length == 0 ? 0 : other->sign;
-        free(scratch);
-        return 0;
+        memcpy(scratch, mint->storage, scratch_len * sizeof(*scratch));
     }
+
+    if (mint_ensure_capacity(mint, other->length) != 0) {
+        free(scratch);
+        return -1;
+    }
+    memcpy(mint->storage, other->storage,
+           other->length * sizeof(*mint->storage));
+    mint->length = other->length;
+    mint_abs_sub_raw_inplace(mint->storage, &mint->length,
+                             scratch, scratch_len);
+    mint->sign = mint->length == 0 ? 0 : other->sign;
+    free(scratch);
+    return 0;
 }
 
 int mint_and_inplace(mint_t *mint, const mint_t *other)
@@ -188,14 +186,12 @@ int mi_cmp_long(const mint_t *mint, long value)
     if (mint->sign > 0 && value < 0)
         return 1;
 
-    {
-        uint64_t magnitude = value < 0
-                                 ? (uint64_t)((unsigned long)(-(value + 1)) + 1ul)
-                                 : (uint64_t)(unsigned long)value;
-        int cmp = mint_cmp_abs_u64(mint, magnitude);
+    uint64_t magnitude = value < 0
+                             ? (uint64_t)((unsigned long)(-(value + 1)) + 1ul)
+                             : (uint64_t)(unsigned long)value;
+    int cmp = mint_cmp_abs_u64(mint, magnitude);
 
-        return mint->sign < 0 ? -cmp : cmp;
-    }
+    return mint->sign < 0 ? -cmp : cmp;
 }
 
 int mi_sub(mint_t *mint, const mint_t *other)
@@ -233,30 +229,28 @@ int mi_sub(mint_t *mint, const mint_t *other)
         return 0;
     }
 
-    {
-        uint64_t *scratch = NULL;
-        size_t scratch_len = mint->length;
+    uint64_t *scratch = NULL;
+    size_t scratch_len = mint->length;
 
-        if (scratch_len > 0) {
-            scratch = malloc(scratch_len * sizeof(*scratch));
-            if (!scratch)
-                return -1;
-            memcpy(scratch, mint->storage, scratch_len * sizeof(*scratch));
-        }
-
-        if (mint_ensure_capacity(mint, other->length) != 0) {
-            free(scratch);
+    if (scratch_len > 0) {
+        scratch = malloc(scratch_len * sizeof(*scratch));
+        if (!scratch)
             return -1;
-        }
-        memcpy(mint->storage, other->storage,
-               other->length * sizeof(*mint->storage));
-        mint->length = other->length;
-        mint_abs_sub_raw_inplace(mint->storage, &mint->length,
-                                 scratch, scratch_len);
-        mint->sign = mint->length == 0 ? 0 : (short)-other->sign;
-        free(scratch);
-        return 0;
+        memcpy(scratch, mint->storage, scratch_len * sizeof(*scratch));
     }
+
+    if (mint_ensure_capacity(mint, other->length) != 0) {
+        free(scratch);
+        return -1;
+    }
+    memcpy(mint->storage, other->storage,
+           other->length * sizeof(*mint->storage));
+    mint->length = other->length;
+    mint_abs_sub_raw_inplace(mint->storage, &mint->length,
+                             scratch, scratch_len);
+    mint->sign = mint->length == 0 ? 0 : (short)-other->sign;
+    free(scratch);
+    return 0;
 }
 int mi_abs(mint_t *mint)
 {

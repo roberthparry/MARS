@@ -510,6 +510,56 @@ static void mt_pretty_dval_expr(char **expr_io,
     }
 }
 
+typedef int (*mt_scalar_formatter_fn)(const unsigned char *raw,
+                                      int scientific,
+                                      char *buf,
+                                      size_t buf_size);
+
+static int mt_format_scalar_double(const unsigned char *raw,
+                                   int scientific,
+                                   char *buf,
+                                   size_t buf_size)
+{
+    double x = *(const double *)raw;
+
+    if (scientific)
+        snprintf(buf, buf_size, "%.16E", x);
+    else
+        snprintf(buf, buf_size, "%.16g", x);
+    return 0;
+}
+
+static int mt_format_scalar_qfloat(const unsigned char *raw,
+                                   int scientific,
+                                   char *buf,
+                                   size_t buf_size)
+{
+    qfloat_t x = *(const qfloat_t *)raw;
+
+    qf_sprintf(buf, buf_size, scientific ? "%Q" : "%q", x);
+    return 0;
+}
+
+static int mt_format_scalar_qcomplex(const unsigned char *raw,
+                                     int scientific,
+                                     char *buf,
+                                     size_t buf_size)
+{
+    qcomplex_t z = *(const qcomplex_t *)raw;
+
+    if (scientific)
+        qc_sprintf(buf, buf_size, "%Z", z);
+    else
+        mt_qc_to_pretty(buf, buf_size, z);
+    return 0;
+}
+
+static const mt_scalar_formatter_fn mt_scalar_formatters[ELEM_MAX] = {
+    [ELEM_DOUBLE] = mt_format_scalar_double,
+    [ELEM_QFLOAT] = mt_format_scalar_qfloat,
+    [ELEM_QCOMPLEX] = mt_format_scalar_qcomplex
+};
+
 static int mt_format_scalar(const matrix_t *A,
                             size_t i,
                             size_t j,
@@ -518,33 +568,18 @@ static int mt_format_scalar(const matrix_t *A,
                             size_t buf_size)
 {
     unsigned char raw[64] = {0};
+    mt_scalar_formatter_fn formatter;
 
     mat_get(A, i, j, raw);
-    switch (A->elem->kind) {
-    case ELEM_DOUBLE: {
-        double x = *(double *)raw;
-        if (scientific)
-            snprintf(buf, buf_size, "%.16E", x);
-        else
-            snprintf(buf, buf_size, "%.16g", x);
-        return 0;
-    }
-    case ELEM_QFLOAT: {
-        qfloat_t x = *(qfloat_t *)raw;
-        qf_sprintf(buf, buf_size, scientific ? "%Q" : "%q", x);
-        return 0;
-    }
-    case ELEM_QCOMPLEX: {
-        qcomplex_t z = *(qcomplex_t *)raw;
-        if (scientific)
-            qc_sprintf(buf, buf_size, "%Z", z);
-        else
-            mt_qc_to_pretty(buf, buf_size, z);
-        return 0;
-    }
-    default:
+
+    if ((unsigned)A->elem->kind >= ELEM_MAX)
         return -1;
-    }
+
+    formatter = mt_scalar_formatters[A->elem->kind];
+    if (!formatter)
+        return -1;
+
+    return formatter(raw, scientific, buf, buf_size);
 }
 
 static char *mat_to_string_numeric(const matrix_t *A, mat_string_style_t style)

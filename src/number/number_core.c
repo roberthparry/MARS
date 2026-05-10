@@ -2748,12 +2748,10 @@ bool num_eq(const number_t a, const number_t b)
     rhs = number_coerce(&b, kind);
     if (!lhs || !rhs || number_impl_const(lhs)->kind != number_impl_const(rhs)->kind)
         goto done;
-    {
-        const number_vtable_t *vt = number_vt(lhs);
-        if (!vt || !vt->eq_same)
-            goto done;
-        eq = vt->eq_same(lhs, rhs);
-    }
+    const number_vtable_t *vt = number_vt(lhs);
+    if (!vt || !vt->eq_same)
+        goto done;
+    eq = vt->eq_same(lhs, rhs);
 
 done:
     number_box_free(lhs);
@@ -3116,11 +3114,9 @@ double num_to_double(const number_t number)
     tmp = number_coerce(&number, NUMBER_MFLOAT);
     if (!tmp)
         return NAN;
-    {
-        double value = mf_to_double(number_impl_const(tmp)->value.mf);
-        number_box_free(tmp);
-        return value;
-    }
+    double value = mf_to_double(number_impl_const(tmp)->value.mf);
+    number_box_free(tmp);
+    return value;
 }
 
 qfloat_t num_to_qfloat(const number_t number)
@@ -3135,11 +3131,9 @@ qfloat_t num_to_qfloat(const number_t number)
     tmp = number_coerce(&number, NUMBER_MFLOAT);
     if (!tmp)
         return QF_NAN;
-    {
-        qfloat_t value = mf_to_qfloat(number_impl_const(tmp)->value.mf);
-        number_box_free(tmp);
-        return value;
-    }
+    qfloat_t value = mf_to_qfloat(number_impl_const(tmp)->value.mf);
+    number_box_free(tmp);
+    return value;
 }
 
 bool num_is_integer(const number_t number)
@@ -3290,15 +3284,13 @@ number_t num_arg(const number_t number)
         return number_invalid();
     if (vt && vt->arg_value)
         return number_take(vt->arg_value(&number));
-    {
-        number_t zero = number_create_exact_mfloat_long_prec(
-            0, num_get_precision(number) ? num_get_precision(number) : number_default_precision_bits);
-        number_t real = vt && vt->complex ? num_real_part(number) : num_clone(number);
-        number_t result = num_atan2(zero, real);
-        num_clear(&zero);
-        num_clear(&real);
-        return result;
-    }
+    number_t zero = number_create_exact_mfloat_long_prec(
+        0, num_get_precision(number) ? num_get_precision(number) : number_default_precision_bits);
+    number_t real = vt && vt->complex ? num_real_part(number) : num_clone(number);
+    number_t result = num_atan2(zero, real);
+    num_clear(&zero);
+    num_clear(&real);
+    return result;
 }
 
 number_t num_add_mrational(const number_t number, const mrational_t *value)

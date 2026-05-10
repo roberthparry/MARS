@@ -65,28 +65,28 @@ static int mo_format_scalar(char *tmp, size_t tmp_size, char spec, va_list *ap)
     snprintf(fmtbuf, sizeof(fmtbuf), "%%%c", spec);
 
     switch (spec) {
-    case 'd':
-        return snprintf(tmp, tmp_size, fmtbuf, va_arg(*ap, int));
-    case 'u':
-        return snprintf(tmp, tmp_size, fmtbuf, va_arg(*ap, unsigned));
-    case 'g':
-    case 'f':
-    case 'e':
-    case 'E':
-        return snprintf(tmp, tmp_size, fmtbuf, va_arg(*ap, double));
-    case 'c':
-        return snprintf(tmp, tmp_size, fmtbuf, va_arg(*ap, int));
-    case 's': {
-        const char *v = va_arg(*ap, const char *);
-        return snprintf(tmp, tmp_size, fmtbuf, v ? v : "(null)");
-    }
-    case 'p':
-        return snprintf(tmp, tmp_size, fmtbuf, va_arg(*ap, void *));
-    default:
-        tmp[0] = '%';
-        tmp[1] = spec;
-        tmp[2] = '\0';
-        return 2;
+        case 'd':
+            return snprintf(tmp, tmp_size, fmtbuf, va_arg(*ap, int));
+        case 'u':
+            return snprintf(tmp, tmp_size, fmtbuf, va_arg(*ap, unsigned));
+        case 'g':
+        case 'f':
+        case 'e':
+        case 'E':
+            return snprintf(tmp, tmp_size, fmtbuf, va_arg(*ap, double));
+        case 'c':
+            return snprintf(tmp, tmp_size, fmtbuf, va_arg(*ap, int));
+        case 's': {
+            const char *v = va_arg(*ap, const char *);
+            return snprintf(tmp, tmp_size, fmtbuf, v ? v : "(null)");
+        }
+        case 'p':
+            return snprintf(tmp, tmp_size, fmtbuf, va_arg(*ap, void *));
+        default:
+            tmp[0] = '%';
+            tmp[1] = spec;
+            tmp[2] = '\0';
+            return 2;
     }
 }
 

@@ -565,12 +565,10 @@ static int mfloat_div_long_inplace(mfloat_t *mfloat, long value)
     if (value < 0)
         mfloat->sign = (short)-mfloat->sign;
     mfloat->exponent2 = exponent2;
-    {
-        int rc = mfloat_normalise(mfloat);
-        mi_free(num);
-        mi_free(q);
-        return rc;
-    }
+    int rc = mfloat_normalise(mfloat);
+    mi_free(num);
+    mi_free(q);
+    return rc;
 
 cleanup:
     mi_free(num);
@@ -1712,6 +1710,12 @@ typedef struct mfloat_trig_dispatch_t {
     bool negate_result;
 } mfloat_trig_dispatch_t;
 
+typedef struct mfloat_sincos_dispatch_t {
+    bool swap;
+    bool negate_sin;
+    bool negate_cos;
+} mfloat_sincos_dispatch_t;
+
 static int mfloat_apply_trig_dispatch(mfloat_t *dst, const mfloat_t *x, size_t precision,
                                       const mfloat_trig_dispatch_t dispatch[4], int quadrant)
 {
@@ -1725,6 +1729,29 @@ static int mfloat_apply_trig_dispatch(mfloat_t *dst, const mfloat_t *x, size_t p
     return rc;
 }
 
+static int mfloat_finish_sincos_dispatch(mfloat_t *sin_dst,
+                                         mfloat_t *cos_dst,
+                                         const mfloat_t *sin_tmp,
+                                         const mfloat_t *cos_tmp,
+                                         const mfloat_sincos_dispatch_t dispatch[4],
+                                         int quadrant)
+{
+    const mfloat_sincos_dispatch_t *entry = &dispatch[quadrant & 3];
+    const mfloat_t *sin_src = entry->swap ? cos_tmp : sin_tmp;
+    const mfloat_t *cos_src = entry->swap ? sin_tmp : cos_tmp;
+
+    if (mfloat_copy_value(sin_dst, sin_src) != 0 ||
+        mfloat_copy_value(cos_dst, cos_src) != 0)
+        return -1;
+    sin_dst->precision = sin_src->precision;
+    cos_dst->precision = cos_src->precision;
+    if (entry->negate_sin && mf_neg(sin_dst) != 0)
+        return -1;
+    if (entry->negate_cos && mf_neg(cos_dst) != 0)
+        return -1;
+    return 0;
+}
+
 static int mfloat_abs_eq(const mfloat_t *a, const mfloat_t *b)
 {
     if (!a || !b || !mfloat_is_finite(a) || !mfloat_is_finite(b))
@@ -1736,6 +1763,12 @@ static int mfloat_abs_eq(const mfloat_t *a, const mfloat_t *b)
 
 static int mfloat_sincos_pair(mfloat_t *sin_dst, mfloat_t *cos_dst, const mfloat_t *x, size_t precision)
 {
+    static const mfloat_sincos_dispatch_t dispatch[4] = {
+        { .swap = false, .negate_sin = false, .negate_cos = false },
+        { .swap = true,  .negate_sin = false, .negate_cos = true  },
+        { .swap = false, .negate_sin = true,  .negate_cos = true  },
+        { .swap = true,  .negate_sin = true,  .negate_cos = false }
+    };
     mfloat_scratch_slot_t slots[2];
     mfloat_t *r = NULL;
     int quadrant;
@@ -1753,37 +1786,8 @@ static int mfloat_sincos_pair(mfloat_t *sin_dst, mfloat_t *cos_dst, const mfloat
     cos_tmp = &slots[1].value;
     if (mfloat_sincos_kernel_pair(sin_tmp, cos_tmp, r, precision) != 0)
         goto cleanup;
-    switch (quadrant & 3) {
-    case 0:
-        break;
-    case 1:
-        if (mfloat_copy_value(sin_dst, cos_tmp) != 0 || mfloat_copy_value(cos_dst, sin_tmp) != 0)
-            goto cleanup;
-        cos_dst->precision = sin_tmp->precision;
-        sin_dst->precision = cos_tmp->precision;
-        if (mf_neg(cos_dst) != 0)
-            goto cleanup;
-        rc = 0;
-        goto cleanup;
-    case 2:
-        if (mf_neg(sin_tmp) != 0 || mf_neg(cos_tmp) != 0)
-            goto cleanup;
-        break;
-    case 3:
-        if (mfloat_copy_value(sin_dst, cos_tmp) != 0 || mfloat_copy_value(cos_dst, sin_tmp) != 0)
-            goto cleanup;
-        cos_dst->precision = sin_tmp->precision;
-        sin_dst->precision = cos_tmp->precision;
-        if (mf_neg(sin_dst) != 0)
-            goto cleanup;
-        rc = 0;
-        goto cleanup;
-    }
-    if (mfloat_copy_value(sin_dst, sin_tmp) != 0 || mfloat_copy_value(cos_dst, cos_tmp) != 0)
-        goto cleanup;
-    sin_dst->precision = sin_tmp->precision;
-    cos_dst->precision = cos_tmp->precision;
-    rc = 0;
+    rc = mfloat_finish_sincos_dispatch(sin_dst, cos_dst, sin_tmp, cos_tmp,
+        dispatch, quadrant);
 
 cleanup:
     mf_free(r);

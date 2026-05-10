@@ -165,28 +165,22 @@ static bool dv_match_affine_term(const dval_t *dv,
 static bool dv_pattern_unary_kind_to_op(dv_pattern_unary_affine_kind_t kind,
                                         dval_op_kind_t *op_kind_out)
 {
+    static const dval_op_kind_t unary_op_table[] = {
+        DV_KIND_EXP,
+        DV_KIND_SIN,
+        DV_KIND_COS,
+        DV_KIND_SINH,
+        DV_KIND_COSH
+    };
+
     if (!op_kind_out)
         return false;
 
-    switch (kind) {
-    case DV_PATTERN_UNARY_EXP:
-        *op_kind_out = DV_KIND_EXP;
-        return true;
-    case DV_PATTERN_UNARY_SIN:
-        *op_kind_out = DV_KIND_SIN;
-        return true;
-    case DV_PATTERN_UNARY_COS:
-        *op_kind_out = DV_KIND_COS;
-        return true;
-    case DV_PATTERN_UNARY_SINH:
-        *op_kind_out = DV_KIND_SINH;
-        return true;
-    case DV_PATTERN_UNARY_COSH:
-        *op_kind_out = DV_KIND_COSH;
-        return true;
-    default:
+    if ((unsigned)kind >= sizeof(unary_op_table) / sizeof(unary_op_table[0]))
         return false;
-    }
+
+    *op_kind_out = unary_op_table[kind];
+    return true;
 }
 
 static bool dv_match_unary_affine_op(const dval_t *expr,

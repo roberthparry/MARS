@@ -374,49 +374,47 @@ static dval_t *parse_atom(parser_t *p)
      * the current position (letters, digits, underscores; stops before UTF-8
      * superscripts and '^'), look it up in the hash table, then confirm that
      * '(' (optionally preceded by a superscript) follows. */
-    {
-        const char *id = p->p;
-        const char *id_end = id;
-        while (id_end < p->end &&
-               (isalpha((unsigned char)*id_end) ||
-                isdigit((unsigned char)*id_end) ||
-                *id_end == '_'))
-            id_end++;
-        size_t id_len = (size_t)(id_end - id);
+    const char *id = p->p;
+    const char *id_end = id;
+    while (id_end < p->end &&
+           (isalpha((unsigned char)*id_end) ||
+            isdigit((unsigned char)*id_end) ||
+            *id_end == '_'))
+        id_end++;
+    size_t id_len = (size_t)(id_end - id);
 
-        if (id_len > 0) {
-            const func_entry_t *fe = lookup_func(id, id_len);
-            if (fe) {
-                const char *paren = func_call_start(p->p, fe->kw, fe->klen);
-                if (paren) {
-                    const char *after_kw = p->p + fe->klen;
-                    int sup = read_optional_display_exponent(&after_kw);
-                    (void)after_kw;
+    if (id_len > 0) {
+        const func_entry_t *fe = lookup_func(id, id_len);
+        if (fe) {
+            const char *paren = func_call_start(p->p, fe->kw, fe->klen);
+            if (paren) {
+                const char *after_kw = p->p + fe->klen;
+                int sup = read_optional_display_exponent(&after_kw);
+                (void)after_kw;
 
-                    p->p = paren + 1; /* skip past '(' */
+                p->p = paren + 1; /* skip past '(' */
 
-                    if (fe->is_binary) {
-                        dval_t *a = NULL, *b = NULL;
-                        if (!parse_two_args(p, &a, &b)) return NULL;
-                        if (!parse_required_char(p, ')', "expected ')' after binary function")) {
-                            dv_free(a);
-                            dv_free(b);
-                            return NULL;
-                        }
-                        dval_t *result = fe->bfn(a, b);
+                if (fe->is_binary) {
+                    dval_t *a = NULL, *b = NULL;
+                    if (!parse_two_args(p, &a, &b)) return NULL;
+                    if (!parse_required_char(p, ')', "expected ')' after binary function")) {
                         dv_free(a);
                         dv_free(b);
-                        return apply_integer_power_if_present(result, sup);
-                    } else {
-                        dval_t *arg = parse_enclosed_addexpr(
-                            p, ')', "expected ')' after function argument");
-                        dval_t *result;
-                        if (!arg)
-                            return NULL;
-                        result = fe->ufn(arg);
-                        dv_free(arg);
-                        return apply_integer_power_if_present(result, sup);
+                        return NULL;
                     }
+                    dval_t *result = fe->bfn(a, b);
+                    dv_free(a);
+                    dv_free(b);
+                    return apply_integer_power_if_present(result, sup);
+                } else {
+                    dval_t *arg = parse_enclosed_addexpr(
+                        p, ')', "expected ')' after function argument");
+                    dval_t *result;
+                    if (!arg)
+                        return NULL;
+                    result = fe->ufn(arg);
+                    dv_free(arg);
+                    return apply_integer_power_if_present(result, sup);
                 }
             }
         }

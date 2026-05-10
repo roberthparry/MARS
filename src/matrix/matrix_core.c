@@ -1906,10 +1906,8 @@ static matrix_t *mat_charpoly_dval(const matrix_t *A)
     if (!coeffs || !B || !coeff_prev)
         goto fail;
 
-    {
-        const dval_t *one = DV_ONE;
-        mat_set(coeffs, 0, 0, &one);
-    }
+    const dval_t *one = DV_ONE;
+    mat_set(coeffs, 0, 0, &one);
 
     for (size_t k = 1; k <= A->rows; ++k) {
         matrix_t *T = mat_copy_as_dense(B);
@@ -2018,18 +2016,16 @@ static dval_t **dval_poly_multiply_linear(dval_t **coeffs, size_t degree, dval_t
             goto fail;
     }
 
-    {
-        dval_t *tail = NULL;
+    dval_t *tail = NULL;
 
-        dv_retain(lambda);
-        dv_retain(coeffs[degree]);
-        tail = dval_mul_simplify(lambda, coeffs[degree]);
-        if (!tail)
-            goto fail;
-        next[degree + 1] = dval_neg_simplify(tail);
-        if (!next[degree + 1])
-            goto fail;
-    }
+    dv_retain(lambda);
+    dv_retain(coeffs[degree]);
+    tail = dval_mul_simplify(lambda, coeffs[degree]);
+    if (!tail)
+        goto fail;
+    next[degree + 1] = dval_neg_simplify(tail);
+    if (!next[degree + 1])
+        goto fail;
 
     return next;
 
@@ -6727,17 +6723,15 @@ int mat_trace(const matrix_t *A, void *trace)
         return *(dval_t **)trace ? 0 : -3;
     }
 
-    {
-        unsigned char sum[64];
-        unsigned char term[64];
+    unsigned char sum[64];
+    unsigned char term[64];
 
-        memcpy(sum, e->zero, e->size);
-        for (size_t i = 0; i < A->rows; ++i) {
-            mat_get(A, i, i, term);
-            e->add(sum, sum, term);
-        }
-        memcpy(trace, sum, e->size);
+    memcpy(sum, e->zero, e->size);
+    for (size_t i = 0; i < A->rows; ++i) {
+        mat_get(A, i, i, term);
+        e->add(sum, sum, term);
     }
+    memcpy(trace, sum, e->size);
 
     return 0;
 }
@@ -6776,13 +6770,11 @@ matrix_t *mat_apply_poly(const matrix_t *A, const matrix_t *coeffs)
     if (A->elem != coeffs->elem)
         return NULL;
 
-    {
-        unsigned char c0[64] = {0};
-        mat_get(coeffs, 0, 0, c0);
-        R = mat_const_identity_with_elem(A->rows, A->elem, c0);
-        if (!R)
-            return NULL;
-    }
+    unsigned char c0[64] = {0};
+    mat_get(coeffs, 0, 0, c0);
+    R = mat_const_identity_with_elem(A->rows, A->elem, c0);
+    if (!R)
+        return NULL;
 
     for (size_t k = 1; k < coeffs->rows; ++k) {
         unsigned char ck[64] = {0};
@@ -8160,43 +8152,41 @@ int mat_condition_number(const matrix_t *A, mat_norm_type_t type, qfloat_t *out)
         return 0;
     }
 
-    {
-        qfloat_t na, ni;
-        matrix_t *Aw = NULL;
-        matrix_t *Ai = NULL;
-        int rc_a, rc_i;
+    qfloat_t na, ni;
+    matrix_t *Aw = NULL;
+    matrix_t *Ai = NULL;
+    int rc_a, rc_i;
 
-        Aw = mat_convert_dense(A, &qcomplex_elem);
-        if (!Aw)
-            return -2;
+    Aw = mat_convert_dense(A, &qcomplex_elem);
+    if (!Aw)
+        return -2;
 
-        if (Aw->rows == Aw->cols) {
-            matrix_t *I = mat_create_identity_with_elem(Aw->rows, Aw->elem);
-            if (!I)
-                goto fail_non2;
-            Ai = mat_solve(Aw, I);
-            mat_free(I);
-        } else {
-            Ai = mat_pseudoinverse(Aw);
-        }
-
-        if (!Ai)
+    if (Aw->rows == Aw->cols) {
+        matrix_t *I = mat_create_identity_with_elem(Aw->rows, Aw->elem);
+        if (!I)
             goto fail_non2;
+        Ai = mat_solve(Aw, I);
+        mat_free(I);
+    } else {
+        Ai = mat_pseudoinverse(Aw);
+    }
 
-        rc_a = mat_norm(Aw, type, &na);
-        rc_i = mat_norm(Ai, type, &ni);
-        mat_free(Ai);
-        mat_free(Aw);
-        if (rc_a != 0 || rc_i != 0)
-            return -2;
-        *out = qf_mul(na, ni);
-        return 0;
+    if (!Ai)
+        goto fail_non2;
+
+    rc_a = mat_norm(Aw, type, &na);
+    rc_i = mat_norm(Ai, type, &ni);
+    mat_free(Ai);
+    mat_free(Aw);
+    if (rc_a != 0 || rc_i != 0)
+        return -2;
+    *out = qf_mul(na, ni);
+    return 0;
 
 fail_non2:
-        mat_free(Aw);
-        mat_free(Ai);
-        return -2;
-    }
+    mat_free(Aw);
+    mat_free(Ai);
+    return -2;
 }
 
 int mat_rank(const matrix_t *A)
@@ -8868,14 +8858,12 @@ static int mat_eigendecompose_hermitian(const matrix_t *A, void *eigenvalues, ma
     if (!V) { mat_free(W); return -3; }
 
     double fro2 = 0.0;
-    {
-        unsigned char fv[64];
-        for (size_t i = 0; i < n; i++)
-            for (size_t j = 0; j < n; j++) {
-                mat_get(W, i, j, fv);
-                fro2 += e->abs2(fv);
-            }
-    }
+    unsigned char fv[64];
+    for (size_t i = 0; i < n; i++)
+        for (size_t j = 0; j < n; j++) {
+            mat_get(W, i, j, fv);
+            fro2 += e->abs2(fv);
+        }
     double tol = fro2 * 1e-29;
 
     for (int sweep = 0; sweep < 50; sweep++) {
@@ -9267,15 +9255,13 @@ static int mat_eigendecompose_general(const matrix_t *A, void *eigenvalues,
 
     /* Load A into flat qcomplex array H */
     qcomplex_t *H = (qcomplex_t *)malloc(n * n * sizeof(qcomplex_t));
+    unsigned char raw[64];
     if (!H) return -3;
-    {
-        unsigned char raw[64];
-        for (size_t i = 0; i < n; i++)
-            for (size_t j = 0; j < n; j++) {
-                mat_get(A, i, j, raw);
-                e->to_qc(&QCM(H, i, j, n), raw);
-            }
-    }
+    for (size_t i = 0; i < n; i++)
+        for (size_t j = 0; j < n; j++) {
+            mat_get(A, i, j, raw);
+            e->to_qc(&QCM(H, i, j, n), raw);
+        }
 
     /* Q = identity (accumulates similarity transforms) */
     qcomplex_t *Qm = (qcomplex_t *)calloc(n * n, sizeof(qcomplex_t));
@@ -9988,24 +9974,22 @@ static void qc_fun_coeffs_up_to_second(qcomplex_t *c0,
         return;
     }
 
-    {
-        qfloat_t h = qf_from_double(1e-6);
-        qcomplex_t ih = qc_make(QF_ZERO, h);
-        qcomplex_t fp, fm, lambda_p, lambda_m;
-        qcomplex_t denom1 = qc_make(QF_ZERO, qf_mul_double(h, 2.0));
-        qcomplex_t denom2 = qc_make(qf_mul_double(qf_mul(h, h), -2.0), QF_ZERO);
-        qcomplex_t two_f0 = qc_mul(qc_make(qf_from_double(2.0), QF_ZERO), f0);
+    qfloat_t h = qf_from_double(1e-6);
+    qcomplex_t ih = qc_make(QF_ZERO, h);
+    qcomplex_t fp, fm, lambda_p, lambda_m;
+    qcomplex_t denom1 = qc_make(QF_ZERO, qf_mul_double(h, 2.0));
+    qcomplex_t denom2 = qc_make(qf_mul_double(qf_mul(h, h), -2.0), QF_ZERO);
+    qcomplex_t two_f0 = qc_mul(qc_make(qf_from_double(2.0), QF_ZERO), f0);
 
-        lambda_p = qc_add(lambda, ih);
-        lambda_m = qc_sub(lambda, ih);
-        scalar_f(&fp, &lambda_p);
-        scalar_f(&fm, &lambda_m);
+    lambda_p = qc_add(lambda, ih);
+    lambda_m = qc_sub(lambda, ih);
+    scalar_f(&fp, &lambda_p);
+    scalar_f(&fm, &lambda_m);
 
-        if (c1)
-            *c1 = qc_div(qc_sub(fp, fm), denom1);
-        if (c2)
-            *c2 = qc_div(qc_add(qc_sub(fp, two_f0), fm), denom2);
-    }
+    if (c1)
+        *c1 = qc_div(qc_sub(fp, fm), denom1);
+    if (c2)
+        *c2 = qc_div(qc_add(qc_sub(fp, two_f0), fm), denom2);
 }
 
 static matrix_t *mat_fun_triangular_equal_diag(const matrix_t *T,
@@ -10089,24 +10073,22 @@ matrix_t *mat_fun_triangular(const matrix_t *T,
     unsigned char t_ik[64] = {0}, t_kj[64] = {0}, f_ik[64] = {0}, f_kj[64] = {0};
     unsigned char denom[64] = {0}, inv_denom[64] = {0};
 
-    {
-        int all_diag_equal = 1;
-        qcomplex_t lam0, lami;
-        qfloat_t tol = qf_from_double(1e-24);
-        unsigned char lam0_raw[64] = {0}, lami_raw[64] = {0};
-        mat_get(T, 0, 0, lam0_raw);
-        e->to_qc(&lam0, lam0_raw);
-        for (size_t i = 1; i < n; ++i) {
-            mat_get(T, i, i, lami_raw);
-            e->to_qc(&lami, lami_raw);
-            if (qf_lt(tol, qc_abs(qc_sub(lami, lam0)))) {
-                all_diag_equal = 0;
-                break;
-            }
+    int all_diag_equal = 1;
+    qcomplex_t lam0, lami;
+    qfloat_t tol = qf_from_double(1e-24);
+    unsigned char lam0_raw[64] = {0}, lami_raw[64] = {0};
+    mat_get(T, 0, 0, lam0_raw);
+    e->to_qc(&lam0, lam0_raw);
+    for (size_t i = 1; i < n; ++i) {
+        mat_get(T, i, i, lami_raw);
+        e->to_qc(&lami, lami_raw);
+        if (qf_lt(tol, qc_abs(qc_sub(lami, lam0)))) {
+            all_diag_equal = 0;
+            break;
         }
-        if (all_diag_equal)
-            return mat_fun_triangular_equal_diag(T, scalar_f);
     }
+    if (all_diag_equal)
+        return mat_fun_triangular_equal_diag(T, scalar_f);
 
     matrix_t *F = mat_create_upper_triangular_with_elem(n, n, e);
     if (!F)

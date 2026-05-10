@@ -1487,9 +1487,8 @@ int mint_div_abs(const mint_t *numerator, const mint_t *denominator,
     quotient->length = m + 1;
     quotient->sign = 1;
 
-    {
-        uint64_t v1 = v[n - 1];
-        uint64_t v2 = v[n - 2];
+    uint64_t v1 = v[n - 1];
+    uint64_t v2 = v[n - 2];
 
     for (j = m + 1; j-- > 0;) {
         __uint128_t numhat =
@@ -1557,8 +1556,6 @@ int mint_div_abs(const mint_t *numerator, const mint_t *denominator,
         }
         quotient->storage[j] = qhat;
     }
-    }
-
     mint_normalise(quotient);
     if (mint_ensure_capacity(remainder, n) != 0)
         goto cleanup;
@@ -1623,9 +1620,8 @@ int mint_mod_abs(const mint_t *numerator, const mint_t *denominator,
                                                     numerator->length, shift);
     (void)mint_shift_left_bits_raw(v, denominator->storage, n, shift);
 
-    {
-        uint64_t v1 = v[n - 1];
-        uint64_t v2 = v[n - 2];
+    uint64_t v1 = v[n - 1];
+    uint64_t v2 = v[n - 2];
 
         for (j = m + 1; j-- > 0;) {
             __uint128_t numhat =
@@ -1689,7 +1685,6 @@ int mint_mod_abs(const mint_t *numerator, const mint_t *denominator,
                 u[j + n] += (uint64_t)add_carry;
             }
         }
-    }
 
     if (mint_ensure_capacity(remainder, n) != 0)
         goto cleanup;
@@ -2813,47 +2808,40 @@ mint_primality_result_t mint_prove_prime_internal(const mint_t *mint)
             : MI_PRIMALITY_COMPOSITE;
     }
 
-    {
-        mint_t *plus_one = mint_dup_value(mint);
+    mint_t *plus_one = mint_dup_value(mint);
 
-        if (!plus_one)
-            return MI_PRIMALITY_UNKNOWN;
-        if (mint_add_small(plus_one, 1) != 0) {
-            mi_free(plus_one);
-            return MI_PRIMALITY_UNKNOWN;
-        }
-        if (mint_detect_power_of_two_exponent(plus_one, &mersenne_exponent) &&
-            mint_isprime_small_ulong((unsigned long)mersenne_exponent)) {
-            mint_primality_result_t rr =
-                mint_isprime_lucas_lehmer(mint, mersenne_exponent)
-                    ? MI_PRIMALITY_PRIME
-                    : MI_PRIMALITY_COMPOSITE;
-
-            mi_free(plus_one);
-            return rr;
-        }
+    if (!plus_one)
+        return MI_PRIMALITY_UNKNOWN;
+    if (mint_add_small(plus_one, 1) != 0) {
         mi_free(plus_one);
+        return MI_PRIMALITY_UNKNOWN;
     }
+    if (mint_detect_power_of_two_exponent(plus_one, &mersenne_exponent) &&
+        mint_isprime_small_ulong((unsigned long)mersenne_exponent)) {
+        mint_primality_result_t rr =
+            mint_isprime_lucas_lehmer(mint, mersenne_exponent)
+                ? MI_PRIMALITY_PRIME
+                : MI_PRIMALITY_COMPOSITE;
+
+        mi_free(plus_one);
+        return rr;
+    }
+    mi_free(plus_one);
 
     if (mint_isprime_strong_probable_prime_base2(mint) <= 0)
         return MI_PRIMALITY_COMPOSITE;
     if (mint_isprime_lucas_selfridge(mint) <= 0)
         return MI_PRIMALITY_COMPOSITE;
 
-    {
-        mint_primality_result_t exact = mint_prove_prime_pocklington(mint);
+    mint_primality_result_t exact = mint_prove_prime_pocklington(mint);
 
-        if (exact != MI_PRIMALITY_UNKNOWN)
-            return exact;
-    }
+    if (exact != MI_PRIMALITY_UNKNOWN)
+        return exact;
 
-    {
-        mint_primality_result_t exact =
-            mint_prove_prime_ec_nplus1_supersingular(mint);
+    exact = mint_prove_prime_ec_nplus1_supersingular(mint);
 
-        if (exact != MI_PRIMALITY_UNKNOWN)
-            return exact;
-    }
+    if (exact != MI_PRIMALITY_UNKNOWN)
+        return exact;
 
     return mint_prove_prime_ec_witness(mint);
 }

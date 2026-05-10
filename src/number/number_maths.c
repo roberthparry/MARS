@@ -40,6 +40,16 @@ typedef struct {
     number_mcomplex_ternary_mut_fn mcomplex;
 } number_ternary_math_ops_t;
 
+typedef struct {
+    const number_t *angle;
+    number_const_id_t value_id;
+    int sign;
+    int imag;
+} number_angle_fastpath_t;
+
+static int number_try_get_pure_imag(const number_t number,
+                                    number_t *imag_out);
+
 static int number_try_get_exact_int(const number_t number, int *out)
 {
     uint64_t mantissa;
@@ -61,6 +71,131 @@ static int number_try_get_exact_int(const number_t number, int *out)
     if (sign < 0)
         value = -value;
     *out = value;
+    return 1;
+}
+
+static number_t number_return_like_signed(const number_t *like,
+                                          number_const_id_t id,
+                                          int sign)
+{
+    return sign < 0
+        ? number_neg_const_return_like(like, id)
+        : number_const_return_like(like, id);
+}
+
+static number_t number_return_like_imag_signed(const number_t *like,
+                                               number_const_id_t id,
+                                               int sign)
+{
+    return sign < 0
+        ? number_neg_const_return_like(like, id)
+        : number_imag_const_return_like(like, id);
+}
+
+static int number_find_angle_fastpath(const number_t *value,
+                                      const number_angle_fastpath_t *table,
+                                      size_t count,
+                                      const number_angle_fastpath_t **match_out)
+{
+    for (size_t i = 0; i < count; ++i) {
+        if (number_matches_value(value, table[i].angle)) {
+            *match_out = &table[i];
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static const number_angle_fastpath_t number_exp_quarter_turn_fastpaths[] = {
+    { &NUM_ZERO, NUMBER_CONST_ONE, 1, 0 },
+    { &NUM_ZERO, NUMBER_CONST_I, 1, 0 },
+    { &NUM_ZERO, NUMBER_CONST_NEG_ONE, 1, 0 },
+    { &NUM_ZERO, NUMBER_CONST_I, -1, 0 }
+};
+
+static int number_exp_quarter_turn(const number_t *number,
+                                   number_t *out)
+{
+    number_t real;
+    number_t imag;
+    number_t ratio;
+    int quarter_turns;
+    int mod4;
+    double ratio_d;
+
+    if (num_is_real(*number))
+        return 0;
+
+    real = num_real_part(*number);
+    if (!num_is_zero(real)) {
+        num_clear(&real);
+        return 0;
+    }
+
+    imag = num_imag_part(*number);
+    ratio = num_div(imag, NUM_PI_2);
+    num_clear(&real);
+    num_clear(&imag);
+
+    if (!number_try_get_exact_int(ratio, &quarter_turns)) {
+        ratio_d = num_to_double(ratio);
+        if (!isfinite(ratio_d) || ratio_d < (double)INT_MIN ||
+            ratio_d > (double)INT_MAX) {
+            num_clear(&ratio);
+            return 0;
+        }
+        double nearest = round(ratio_d);
+        if (fabs(ratio_d - nearest) > 1e-12) {
+            num_clear(&ratio);
+            return 0;
+        }
+        quarter_turns = (int)lround(ratio_d);
+    }
+    num_clear(&ratio);
+
+    mod4 = quarter_turns % 4;
+    if (mod4 < 0)
+        mod4 += 4;
+
+    *out = number_return_like_signed(number,
+        number_exp_quarter_turn_fastpaths[mod4].value_id,
+        number_exp_quarter_turn_fastpaths[mod4].sign);
+    return 1;
+}
+
+static int number_trig_real_fastpath(const number_t *number,
+                                     const number_angle_fastpath_t *table,
+                                     size_t count,
+                                     number_t *out)
+{
+    const number_angle_fastpath_t *match;
+
+    if (!number_find_angle_fastpath(number, table, count, &match))
+        return 0;
+    *out = match->imag
+        ? number_return_like_imag_signed(number, match->value_id, match->sign)
+        : number_return_like_signed(number, match->value_id, match->sign);
+    return 1;
+}
+
+static int number_hyperbolic_imag_fastpath(const number_t *number,
+                                           const number_angle_fastpath_t *table,
+                                           size_t count,
+                                           number_t *out)
+{
+    number_t imag;
+    const number_angle_fastpath_t *match;
+
+    if (!number_try_get_pure_imag(*number, &imag))
+        return 0;
+    if (!number_find_angle_fastpath(&imag, table, count, &match)) {
+        num_clear(&imag);
+        return 0;
+    }
+    num_clear(&imag);
+    *out = match->imag
+        ? number_return_like_imag_signed(number, match->value_id, match->sign)
+        : number_return_like_signed(number, match->value_id, match->sign);
     return 1;
 }
 
@@ -396,15 +531,12 @@ static number_t number_apply_ternary_math(const number_t x,
 
 number_t num_exp(const number_t number)
 {
+    const number_vtable_t *vt;
     number_t *promoted = NULL;
     number_t *result = NULL;
     number_t root;
     number_t root2;
-    number_t real;
-    number_t imag;
-    number_t ratio;
-    int quarter_turns;
-    int mod4;
+    number_t out;
 
     if (num_eq(number, NUM_ZERO))
         return number_const_return_like(&number, NUMBER_CONST_ONE);
@@ -439,75 +571,20 @@ number_t num_exp(const number_t number)
         num_clear(&root2);
         return out;
     }
-    if (!num_is_real(number)) {
-        real = num_real_part(number);
-        if (num_is_zero(real)) {
-            double ratio_d;
-            imag = num_imag_part(number);
-            ratio = num_div(imag, NUM_PI_2);
-            if (number_try_get_exact_int(ratio, &quarter_turns)) {
-                mod4 = quarter_turns % 4;
-                if (mod4 < 0)
-                    mod4 += 4;
-                num_clear(&real);
-                num_clear(&imag);
-                num_clear(&ratio);
-                switch (mod4) {
-                case 0:
-                    return number_const_return_like(&number, NUMBER_CONST_ONE);
-                case 1:
-                    return number_const_return_like(&number, NUMBER_CONST_I);
-                case 2:
-                    return number_const_return_like(&number, NUMBER_CONST_NEG_ONE);
-                default:
-                    return number_neg_const_return_like(&number, NUMBER_CONST_I);
-                }
-            }
-            ratio_d = num_to_double(ratio);
-            if (isfinite(ratio_d) && ratio_d >= (double)INT_MIN &&
-                ratio_d <= (double)INT_MAX) {
-                double nearest = round(ratio_d);
-                if (fabs(ratio_d - nearest) <= 1e-12) {
-                    quarter_turns = (int)lround(ratio_d);
-                    mod4 = quarter_turns % 4;
-                    if (mod4 < 0)
-                        mod4 += 4;
-                    num_clear(&real);
-                    num_clear(&imag);
-                    num_clear(&ratio);
-                    switch (mod4) {
-                    case 0:
-                        return number_const_return_like(&number, NUMBER_CONST_ONE);
-                    case 1:
-                        return number_const_return_like(&number, NUMBER_CONST_I);
-                    case 2:
-                        return number_const_return_like(&number, NUMBER_CONST_NEG_ONE);
-                    default:
-                        return number_neg_const_return_like(&number, NUMBER_CONST_I);
-                    }
-                }
-            }
-            num_clear(&imag);
-            num_clear(&ratio);
-        }
-        num_clear(&real);
-    }
+    if (number_exp_quarter_turn(&number, &out))
+        return out;
 
-    {
-        const number_vtable_t *vt = number_vt(&number);
+    vt = number_vt(&number);
+    if (!vt)
+        return number_invalid();
+    if (vt->exp_same)
+        return number_take(vt->exp_same(&number));
 
-        if (!vt)
-            return number_invalid();
-        if (vt->exp_same)
-            return number_take(vt->exp_same(&number));
-    }
     promoted = number_coerce(&number, NUMBER_MFLOAT);
-    {
-        const number_vtable_t *vt = number_vt(promoted);
-        if (!vt || !vt->exp_same)
-            goto done;
-        result = vt->exp_same(promoted);
-    }
+    vt = number_vt(promoted);
+    if (!vt || !vt->exp_same)
+        goto done;
+    result = vt->exp_same(promoted);
 done:
     number_box_free(promoted);
     return number_take(result);
@@ -515,10 +592,12 @@ done:
 
 number_t num_log(const number_t number)
 {
+    const number_vtable_t *vt;
     number_t *promoted = NULL;
     number_t *result = NULL;
     number_t neg_i;
     number_t out;
+    number_t tmp;
 
     if (num_eq(number, NUM_ONE))
         return number_const_return_like(&number, NUMBER_CONST_ZERO);
@@ -538,29 +617,23 @@ number_t num_log(const number_t number)
     if (num_eq(number, neg_i)) {
         num_clear(&neg_i);
         out = number_imag_const_return_like(&number, NUMBER_CONST_PI_2);
-        {
-            number_t tmp = num_neg(out);
-            num_clear(&out);
-            return tmp;
-        }
+        tmp = num_neg(out);
+        num_clear(&out);
+        return tmp;
     }
     num_clear(&neg_i);
 
-    {
-        const number_vtable_t *vt = number_vt(&number);
+    vt = number_vt(&number);
+    if (!vt)
+        return number_invalid();
+    if (vt->log_same)
+        return number_take(vt->log_same(&number));
 
-        if (!vt)
-            return number_invalid();
-        if (vt->log_same)
-            return number_take(vt->log_same(&number));
-    }
     promoted = number_coerce(&number, NUMBER_MFLOAT);
-    {
-        const number_vtable_t *vt = number_vt(promoted);
-        if (!vt || !vt->log_same)
-            goto done;
-        result = vt->log_same(promoted);
-    }
+    vt = number_vt(promoted);
+    if (!vt || !vt->log_same)
+        goto done;
+    result = vt->log_same(promoted);
 done:
     number_box_free(promoted);
     return number_take(result);
@@ -568,24 +641,21 @@ done:
 
 number_t num_sqrt(const number_t number)
 {
+    const number_vtable_t *vt;
     number_t *promoted = NULL;
     number_t *result = NULL;
 
-    {
-        const number_vtable_t *vt = number_vt(&number);
+    vt = number_vt(&number);
+    if (!vt)
+        return number_invalid();
+    if (vt->sqrt_same)
+        return number_take(vt->sqrt_same(&number));
 
-        if (!vt)
-            return number_invalid();
-        if (vt->sqrt_same)
-            return number_take(vt->sqrt_same(&number));
-    }
     promoted = number_coerce(&number, NUMBER_MFLOAT);
-    {
-        const number_vtable_t *vt = number_vt(promoted);
-        if (!vt || !vt->sqrt_same)
-            goto done;
-        result = vt->sqrt_same(promoted);
-    }
+    vt = number_vt(promoted);
+    if (!vt || !vt->sqrt_same)
+        goto done;
+    result = vt->sqrt_same(promoted);
 done:
     number_box_free(promoted);
     return number_take(result);
@@ -654,36 +724,38 @@ number_t num_pow(const number_t base, const number_t exponent)
 number_t num_pow_int(const number_t base, int exponent)
 {
     const number_vtable_t *vt = number_vt(&base);
+    number_t expnum;
+    number_t result;
 
     if (!number_is_valid_value(&base))
         return number_invalid();
     if (vt && vt->pow_int)
         return number_take(vt->pow_int(&base, exponent));
-    {
-        number_t expnum = num_create_long(exponent);
-        number_t result = number_apply_binary_math(base, expnum, qf_pow, qc_pow, mf_pow, mc_pow);
-        num_clear(&expnum);
-        return result;
-    }
+
+    expnum = num_create_long(exponent);
+    result = number_apply_binary_math(base, expnum, qf_pow, qc_pow, mf_pow, mc_pow);
+    num_clear(&expnum);
+    return result;
 }
 
 number_t num_ldexp(const number_t number, int exponent2)
 {
     const number_vtable_t *vt = number_vt(&number);
+    number_t two;
+    number_t scale;
+    number_t result;
 
     if (!number_is_valid_value(&number))
         return number_invalid();
     if (vt && vt->ldexp_value)
         return number_take(vt->ldexp_value(&number, exponent2));
-    {
-        number_t two = num_create_long(2);
-        number_t scale = num_pow_int(two, exponent2);
-        number_t result = num_mul(number, scale);
 
-        num_clear(&two);
-        num_clear(&scale);
-        return result;
-    }
+    two = num_create_long(2);
+    scale = num_pow_int(two, exponent2);
+    result = num_mul(number, scale);
+    num_clear(&two);
+    num_clear(&scale);
+    return result;
 }
 
 number_t num_sqr(const number_t number)
@@ -750,39 +822,76 @@ static int number_try_get_pure_imag(const number_t number,
     return 1;
 }
 
+static const number_angle_fastpath_t number_sin_fastpaths[] = {
+    { &NUM_ZERO, NUMBER_CONST_ZERO, 1, 0 },
+    { &NUM_PI, NUMBER_CONST_ZERO, 1, 0 },
+    { &NUM_2PI, NUMBER_CONST_ZERO, 1, 0 },
+    { &NUM_PI_6, NUMBER_CONST_HALF, 1, 0 },
+    { &NUM_PI_4, NUMBER_CONST_SQRT2_OVER_TWO, 1, 0 },
+    { &NUM_PI_3, NUMBER_CONST_SQRT3_OVER_TWO, 1, 0 },
+    { &NUM_PI_2, NUMBER_CONST_ONE, 1, 0 },
+    { &NUM_3PI_4, NUMBER_CONST_SQRT2_OVER_TWO, 1, 0 }
+};
+
+static const number_angle_fastpath_t number_cos_fastpaths[] = {
+    { &NUM_ZERO, NUMBER_CONST_ONE, 1, 0 },
+    { &NUM_2PI, NUMBER_CONST_ONE, 1, 0 },
+    { &NUM_PI_6, NUMBER_CONST_SQRT3_OVER_TWO, 1, 0 },
+    { &NUM_PI_4, NUMBER_CONST_SQRT2_OVER_TWO, 1, 0 },
+    { &NUM_PI_3, NUMBER_CONST_HALF, 1, 0 },
+    { &NUM_PI_2, NUMBER_CONST_ZERO, 1, 0 },
+    { &NUM_3PI_4, NUMBER_CONST_SQRT2_OVER_TWO, -1, 0 },
+    { &NUM_PI, NUMBER_CONST_NEG_ONE, 1, 0 }
+};
+
+static const number_angle_fastpath_t number_tanh_imag_fastpaths[] = {
+    { &NUM_ZERO, NUMBER_CONST_ZERO, 1, 0 },
+    { &NUM_PI, NUMBER_CONST_ZERO, 1, 0 },
+    { &NUM_2PI, NUMBER_CONST_ZERO, 1, 0 },
+    { &NUM_PI_4, NUMBER_CONST_I, 1, 0 },
+    { &NUM_PI_3, NUMBER_CONST_SQRT3, 1, 1 },
+    { &NUM_3PI_4, NUMBER_CONST_I, -1, 0 }
+};
+
+static const number_angle_fastpath_t number_sinh_imag_fastpaths[] = {
+    { &NUM_ZERO, NUMBER_CONST_ZERO, 1, 0 },
+    { &NUM_PI, NUMBER_CONST_ZERO, 1, 0 },
+    { &NUM_2PI, NUMBER_CONST_ZERO, 1, 0 },
+    { &NUM_PI_6, NUMBER_CONST_HALF, 1, 1 },
+    { &NUM_PI_4, NUMBER_CONST_SQRT2_OVER_TWO, 1, 1 },
+    { &NUM_PI_3, NUMBER_CONST_SQRT3_OVER_TWO, 1, 1 },
+    { &NUM_PI_2, NUMBER_CONST_I, 1, 0 },
+    { &NUM_3PI_4, NUMBER_CONST_SQRT2_OVER_TWO, 1, 1 }
+};
+
+static const number_angle_fastpath_t number_cosh_imag_fastpaths[] = {
+    { &NUM_ZERO, NUMBER_CONST_ONE, 1, 0 },
+    { &NUM_2PI, NUMBER_CONST_ONE, 1, 0 },
+    { &NUM_PI_6, NUMBER_CONST_SQRT3_OVER_TWO, 1, 0 },
+    { &NUM_PI_4, NUMBER_CONST_SQRT2_OVER_TWO, 1, 0 },
+    { &NUM_PI_3, NUMBER_CONST_HALF, 1, 0 },
+    { &NUM_PI_2, NUMBER_CONST_ZERO, 1, 0 },
+    { &NUM_3PI_4, NUMBER_CONST_SQRT2_OVER_TWO, -1, 0 },
+    { &NUM_PI, NUMBER_CONST_NEG_ONE, 1, 0 }
+};
+
 number_t num_sin(const number_t number)
 {
-    if (num_eq(number, NUM_ZERO) || num_eq(number, NUM_PI) || num_eq(number, NUM_2PI))
-        return number_const_return_like(&number, NUMBER_CONST_ZERO);
-    if (num_eq(number, NUM_PI_6))
-        return number_const_return_like(&number, NUMBER_CONST_HALF);
-    if (num_eq(number, NUM_PI_4))
-        return number_const_return_like(&number, NUMBER_CONST_SQRT2_OVER_TWO);
-    if (num_eq(number, NUM_PI_3))
-        return number_const_return_like(&number, NUMBER_CONST_SQRT3_OVER_TWO);
-    if (num_eq(number, NUM_PI_2))
-        return number_const_return_like(&number, NUMBER_CONST_ONE);
-    if (num_eq(number, NUM_3PI_4))
-        return number_const_return_like(&number, NUMBER_CONST_SQRT2_OVER_TWO);
+    number_t out;
+
+    if (number_trig_real_fastpath(&number, number_sin_fastpaths,
+            sizeof(number_sin_fastpaths) / sizeof(number_sin_fastpaths[0]), &out))
+        return out;
     return number_apply_unary_math_with_double(number, sin, qf_sin, qc_sin, mf_sin, mc_sin);
 }
 
 number_t num_cos(const number_t number)
 {
-    if (num_eq(number, NUM_ZERO) || num_eq(number, NUM_2PI))
-        return number_const_return_like(&number, NUMBER_CONST_ONE);
-    if (num_eq(number, NUM_PI_6))
-        return number_const_return_like(&number, NUMBER_CONST_SQRT3_OVER_TWO);
-    if (num_eq(number, NUM_PI_4))
-        return number_const_return_like(&number, NUMBER_CONST_SQRT2_OVER_TWO);
-    if (num_eq(number, NUM_PI_3))
-        return number_const_return_like(&number, NUMBER_CONST_HALF);
-    if (num_eq(number, NUM_PI_2))
-        return number_const_return_like(&number, NUMBER_CONST_ZERO);
-    if (num_eq(number, NUM_3PI_4))
-        return number_neg_const_return_like(&number, NUMBER_CONST_SQRT2_OVER_TWO);
-    if (num_eq(number, NUM_PI))
-        return number_const_return_like(&number, NUMBER_CONST_NEG_ONE);
+    number_t out;
+
+    if (number_trig_real_fastpath(&number, number_cos_fastpaths,
+            sizeof(number_cos_fastpaths) / sizeof(number_cos_fastpaths[0]), &out))
+        return out;
     return number_apply_unary_math_with_double(number, cos, qf_cos, qc_cos, mf_cos, mc_cos);
 }
 
@@ -830,68 +939,21 @@ number_t num_acos(const number_t number)
 
 number_t num_sinh(const number_t number)
 {
-    number_t imag;
+    number_t out;
 
-    if (num_eq(number, NUM_ZERO))
-        return number_const_return_like(&number, NUMBER_CONST_ZERO);
-    if (number_try_get_pure_imag(number, &imag)) {
-        number_t out;
-
-        if (number_matches_value(&imag, &NUM_ZERO) ||
-            number_matches_value(&imag, &NUM_PI) ||
-            number_matches_value(&imag, &NUM_2PI))
-            out = number_const_return_like(&number, NUMBER_CONST_ZERO);
-        else if (number_matches_value(&imag, &NUM_PI_6))
-            out = number_imag_const_return_like(&number, NUMBER_CONST_HALF);
-        else if (number_matches_value(&imag, &NUM_PI_4))
-            out = number_imag_const_return_like(&number, NUMBER_CONST_SQRT2_OVER_TWO);
-        else if (number_matches_value(&imag, &NUM_PI_3))
-            out = number_imag_const_return_like(&number, NUMBER_CONST_SQRT3_OVER_TWO);
-        else if (number_matches_value(&imag, &NUM_PI_2))
-            out = number_const_return_like(&number, NUMBER_CONST_I);
-        else if (number_matches_value(&imag, &NUM_3PI_4))
-            out = number_imag_const_return_like(&number, NUMBER_CONST_SQRT2_OVER_TWO);
-        else {
-            num_clear(&imag);
-            return number_apply_unary_math_with_double(number, sinh, qf_sinh, qc_sinh, mf_sinh, mc_sinh);
-        }
-        num_clear(&imag);
+    if (number_hyperbolic_imag_fastpath(&number, number_sinh_imag_fastpaths,
+            sizeof(number_sinh_imag_fastpaths) / sizeof(number_sinh_imag_fastpaths[0]), &out))
         return out;
-    }
     return number_apply_unary_math_with_double(number, sinh, qf_sinh, qc_sinh, mf_sinh, mc_sinh);
 }
 
 number_t num_cosh(const number_t number)
 {
-    number_t imag;
+    number_t out;
 
-    if (num_eq(number, NUM_ZERO))
-        return number_const_return_like(&number, NUMBER_CONST_ONE);
-    if (number_try_get_pure_imag(number, &imag)) {
-        number_t out;
-
-        if (number_matches_value(&imag, &NUM_ZERO) ||
-            number_matches_value(&imag, &NUM_2PI))
-            out = number_const_return_like(&number, NUMBER_CONST_ONE);
-        else if (number_matches_value(&imag, &NUM_PI_6))
-            out = number_const_return_like(&number, NUMBER_CONST_SQRT3_OVER_TWO);
-        else if (number_matches_value(&imag, &NUM_PI_4))
-            out = number_const_return_like(&number, NUMBER_CONST_SQRT2_OVER_TWO);
-        else if (number_matches_value(&imag, &NUM_PI_3))
-            out = number_const_return_like(&number, NUMBER_CONST_HALF);
-        else if (number_matches_value(&imag, &NUM_PI_2))
-            out = number_const_return_like(&number, NUMBER_CONST_ZERO);
-        else if (number_matches_value(&imag, &NUM_3PI_4))
-            out = number_neg_const_return_like(&number, NUMBER_CONST_SQRT2_OVER_TWO);
-        else if (number_matches_value(&imag, &NUM_PI))
-            out = number_const_return_like(&number, NUMBER_CONST_NEG_ONE);
-        else {
-            num_clear(&imag);
-            return number_apply_unary_math_with_double(number, cosh, qf_cosh, qc_cosh, mf_cosh, mc_cosh);
-        }
-        num_clear(&imag);
+    if (number_hyperbolic_imag_fastpath(&number, number_cosh_imag_fastpaths,
+            sizeof(number_cosh_imag_fastpaths) / sizeof(number_cosh_imag_fastpaths[0]), &out))
         return out;
-    }
     return number_apply_unary_math_with_double(number, cosh, qf_cosh, qc_cosh, mf_cosh, mc_cosh);
 }
 
@@ -909,17 +971,13 @@ int num_sinhcosh(const number_t x, number_t *sinh_out, number_t *cosh_out)
 number_t num_tanh(const number_t number)
 {
     number_t imag;
+    number_t out;
 
-    if (num_eq(number, NUM_ZERO))
-        return number_const_return_like(&number, NUMBER_CONST_ZERO);
+    if (number_hyperbolic_imag_fastpath(&number, number_tanh_imag_fastpaths,
+            sizeof(number_tanh_imag_fastpaths) / sizeof(number_tanh_imag_fastpaths[0]), &out))
+        return out;
     if (number_try_get_pure_imag(number, &imag)) {
-        number_t out;
-
-        if (number_matches_value(&imag, &NUM_ZERO) ||
-            number_matches_value(&imag, &NUM_PI) ||
-            number_matches_value(&imag, &NUM_2PI))
-            out = number_const_return_like(&number, NUMBER_CONST_ZERO);
-        else if (number_matches_value(&imag, &NUM_PI_6)) {
+        if (number_matches_value(&imag, &NUM_PI_6)) {
             number_t one = number_const_like(&number, NUMBER_CONST_ONE);
             number_t sqrt3 = number_const_like(&number, NUMBER_CONST_SQRT3);
             number_t inv = num_div(one, sqrt3);
@@ -930,18 +988,10 @@ number_t num_tanh(const number_t number)
             num_clear(&sqrt3);
             num_clear(&inv);
             num_clear(&imag_unit);
-        } else if (number_matches_value(&imag, &NUM_PI_4))
-            out = number_const_return_like(&number, NUMBER_CONST_I);
-        else if (number_matches_value(&imag, &NUM_PI_3))
-            out = number_imag_const_return_like(&number, NUMBER_CONST_SQRT3);
-        else if (number_matches_value(&imag, &NUM_3PI_4))
-            out = number_neg_const_return_like(&number, NUMBER_CONST_I);
-        else {
             num_clear(&imag);
-            return number_apply_unary_math_with_double(number, tanh, qf_tanh, qc_tanh, mf_tanh, mc_tanh);
+            return out;
         }
         num_clear(&imag);
-        return out;
     }
     return number_apply_unary_math_with_double(number, tanh, qf_tanh, qc_tanh, mf_tanh, mc_tanh);
 }

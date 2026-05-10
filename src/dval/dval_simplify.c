@@ -262,15 +262,13 @@ dval_t *dv_simplify_add_sub_operator(const dval_t *dv, dval_t *a, dval_t *b)
     dv_sort_addends(terms, n);
     dv_extract_common_addend_coeff(terms, n, c_const, &common_coeff);
 
-    {
-        dval_t *identity = dv_try_trig_pythagorean_identity(terms, n, c_const, common_coeff);
+    dval_t *identity = dv_try_trig_pythagorean_identity(terms, n, c_const, common_coeff);
 
-        if (identity) {
-            for (size_t i = 0; i < n; ++i)
-                dv_free(terms[i].base);
-            free(terms);
-            return identity;
-        }
+    if (identity) {
+        for (size_t i = 0; i < n; ++i)
+            dv_free(terms[i].base);
+        free(terms);
+        return identity;
     }
 
     /* find the leading non-cancelled symbolic term */

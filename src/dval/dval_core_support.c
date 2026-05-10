@@ -240,33 +240,31 @@ char *dv_normalize_name(const char *name)
     }
     canon[out_len] = '\0';
 
-    {
-        size_t run_start = out_len;
+    size_t run_start = out_len;
 
-        while (run_start > 0 &&
-               isdigit((unsigned char)canon[run_start - 1])) {
-            run_start--;
-        }
+    while (run_start > 0 &&
+           isdigit((unsigned char)canon[run_start - 1])) {
+        run_start--;
+    }
 
-        if (run_start < out_len && run_start > 0) {
-            char *final = malloc(out_len * 3 + 1);
-            size_t final_len = 0;
+    if (run_start < out_len && run_start > 0) {
+        char *final = malloc(out_len * 3 + 1);
+        size_t final_len = 0;
 
-            if (!final) {
-                free(canon);
-                free(t);
-                abort();
-            }
-
-            for (size_t i = 0; i < run_start; ++i)
-                final[final_len++] = canon[i];
-            for (size_t i = run_start; i < out_len; ++i)
-                append_subscript_digit(final, &final_len, canon[i]);
-            final[final_len] = '\0';
-
+        if (!final) {
             free(canon);
-            canon = final;
+            free(t);
+            abort();
         }
+
+        for (size_t i = 0; i < run_start; ++i)
+            final[final_len++] = canon[i];
+        for (size_t i = run_start; i < out_len; ++i)
+            append_subscript_digit(final, &final_len, canon[i]);
+        final[final_len] = '\0';
+
+        free(canon);
+        canon = final;
     }
 
     free(t);
@@ -301,17 +299,15 @@ char *dv_normalize_binding_name(const char *name)
         return inner;
     }
 
-    {
-        size_t n = (size_t)(e - s);
-        char *trimmed = malloc(n + 1);
+    size_t n = (size_t)(e - s);
+    char *trimmed = malloc(n + 1);
 
-        if (!trimmed)
-            abort();
-        memcpy(trimmed, s, n);
-        trimmed[n] = '\0';
-        out = dv_normalize_name(dv_default_constant_canonical_name(trimmed));
-        free(trimmed);
-    }
+    if (!trimmed)
+        abort();
+    memcpy(trimmed, s, n);
+    trimmed[n] = '\0';
+    out = dv_normalize_name(dv_default_constant_canonical_name(trimmed));
+    free(trimmed);
 
     return out;
 }
