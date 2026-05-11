@@ -1,0 +1,990 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "matrix_internal.h"
+#include "matrix_vtable_defs.h"
+#include "internal/dval_internal.h"
+
+static bool mat_uses_sparse_like_storage(const matrix_t *A)
+{
+    return A && A->store && A->store->is_sparse_like &&
+           A->store->is_sparse_like(A);
+}
+
+matrix_t *mat_copy_with_store(const matrix_t *A,
+                              const struct store_vtable *store)
+{
+    matrix_t *C;
+    unsigned char raw[64] = {0};
+
+    if (!A || !A->elem || !store)
+        return NULL;
+
+    C = mat_create_with_store(A->rows, A->cols, A->elem, store);
+    if (!C)
+        return NULL;
+
+    for (size_t i = 0; i < A->rows; i++)
+        for (size_t j = 0; j < A->cols; j++) {
+            mat_get(A, i, j, raw);
+            mat_set(C, i, j, raw);
+        }
+
+    return C;
+}
+
+matrix_t *mat_copy_preserving_store(const matrix_t *A)
+{
+    if (!A)
+        return NULL;
+
+    return mat_copy_with_store(A, A->store);
+}
+
+matrix_t *mat_copy_as_dense(const matrix_t *A)
+{
+    return mat_copy_with_store(A, &dense_store);
+}
+
+matrix_t *mat_simplify_symbolic(const matrix_t *A)
+{
+    matrix_t *C;
+
+    if (!A)
+        return NULL;
+
+    C = mat_copy_preserving_store(A);
+    if (!C)
+        return NULL;
+
+    if (mat_simplify_symbolic_inplace(C) != 0) {
+        mat_free(C);
+        return NULL;
+    }
+
+    return C;
+}
+
+matrix_t *mat_convert_with_store(const matrix_t *A,
+                                 const struct elem_vtable *target,
+                                 const struct store_vtable *store)
+{
+    matrix_t *C;
+    unsigned char src[64], dst[64];
+
+    if (!A || !target || !store)
+        return NULL;
+
+    C = mat_create_with_store(A->rows, A->cols, target, store);
+    if (!C)
+        return NULL;
+
+    mat_value_init_zero(A, src);
+    elem_init_zero_value(target, dst);
+
+    for (size_t i = 0; i < A->rows; i++)
+        for (size_t j = 0; j < A->cols; j++) {
+            qcomplex_t z;
+
+            mat_value_destroy(A, src);
+            elem_destroy_value(target, dst);
+            mat_value_init_zero(A, src);
+            elem_init_zero_value(target, dst);
+            mat_get_owned(A, i, j, src);
+            A->elem->to_qc(&z, src);
+            target->from_qc(dst, &z);
+            mat_set(C, i, j, dst);
+            elem_destroy_value(target, dst);
+        }
+
+    mat_value_destroy(A, src);
+    elem_destroy_value(target, dst);
+    return C;
+}
+
+matrix_t *mat_convert_dense(const matrix_t *A, const struct elem_vtable *target)
+{
+    return mat_convert_with_store(A, target, &dense_store);
+}
+
+matrix_t *mat_convert_preserving_store(const matrix_t *A,
+                                       const struct elem_vtable *target)
+{
+    if (!A || !target)
+        return NULL;
+
+    return mat_convert_with_store(A, target, A->store);
+}
+
+const struct store_vtable *mat_sparse_factor_store(const matrix_t *A,
+                                                   const struct store_vtable *structured_store)
+{
+    if (!structured_store)
+        return NULL;
+
+    return mat_uses_sparse_like_storage(A) ? &sparse_store : structured_store;
+}
+
+static void mat_swap_rows(matrix_t *A, size_t r1, size_t r2)
+{
+    if (!A || !A->store || !A->store->swap_rows)
+        return;
+
+    A->store->swap_rows(A, r1, r2);
+}
+
+static void mat_row_eliminate_from(matrix_t *A, size_t dst_row, size_t src_row,
+                                   size_t col_start, const void *factor)
+{
+    if (!A || !A->store || !A->store->row_eliminate_from)
+        return;
+
+    A->store->row_eliminate_from(A, dst_row, src_row, col_start, factor);
+}
+
+static size_t mat_find_pivot_row(const matrix_t *A, size_t col, size_t start)
+{
+    const struct elem_vtable *e = A->elem;
+    unsigned char v[64];
+    size_t best = start;
+    double best_abs2 = -1.0;
+
+    for (size_t i = start; i < A->rows; i++) {
+        mat_get(A, i, col, v);
+        double abs2 = e->abs2(v);
+        if (abs2 > best_abs2) {
+            best_abs2 = abs2;
+            best = i;
+        }
+    }
+
+    return best;
+}
+
+static matrix_t *mat_apply_row_permutation(const matrix_t *P,
+                                           const matrix_t *B,
+                                           const struct elem_vtable *elem)
+{
+    matrix_t *PB;
+    unsigned char pivot[64], value[64];
+
+    if (!P || !B || !elem || P->rows != B->rows)
+        return NULL;
+
+    PB = mat_create_elementwise_unary_result(B->rows, B->cols, elem, B);
+    if (!PB)
+        return NULL;
+
+    for (size_t i = 0; i < P->rows; i++) {
+        size_t src_row = P->cols;
+
+        for (size_t j = 0; j < P->cols; j++) {
+            mat_get(P, i, j, pivot);
+            if (elem->cmp(pivot, elem->zero) != 0) {
+                src_row = j;
+                break;
+            }
+        }
+
+        if (src_row >= P->cols) {
+            mat_free(PB);
+            return NULL;
+        }
+
+        for (size_t j = 0; j < B->cols; j++) {
+            mat_get(B, src_row, j, value);
+            mat_set(PB, i, j, value);
+        }
+    }
+
+    return PB;
+}
+
+matrix_t *mat_create_direct_solve_result(const matrix_t *A,
+                                         const matrix_t *B,
+                                         const struct elem_vtable *elem)
+{
+    const struct store_vtable *store = &dense_store;
+
+    if (!A || !B || !elem)
+        return NULL;
+
+    if (mat_has_diagonal_structure(A) &&
+        B->store && B->store->elementwise_unary_store)
+        store = B->store->elementwise_unary_store(B);
+
+    return mat_create_with_store(A->cols, B->cols, elem, store);
+}
+
+static matrix_t *mat_solve_diagonal(const matrix_t *A,
+                                    const matrix_t *B,
+                                    const struct elem_vtable *elem)
+{
+    matrix_t *X;
+    unsigned char diag[64], inv_diag[64], rhs[64], out[64];
+
+    X = mat_create_direct_solve_result(A, B, elem);
+    if (!X)
+        return NULL;
+
+    for (size_t i = 0; i < A->rows; i++) {
+        mat_get(A, i, i, diag);
+        if (elem->abs2(diag) < 1e-300) {
+            mat_free(X);
+            return NULL;
+        }
+
+        elem->inv(inv_diag, diag);
+        for (size_t j = 0; j < B->cols; j++) {
+            mat_get(B, i, j, rhs);
+            elem->mul(out, inv_diag, rhs);
+            mat_set(X, i, j, out);
+        }
+    }
+
+    return X;
+}
+
+static matrix_t *mat_forward_substitute(const matrix_t *L,
+                                        const matrix_t *B,
+                                        const struct elem_vtable *elem)
+{
+    matrix_t *X;
+    unsigned char diag[64], inv_diag[64], sum[64], a[64], b[64], prod[64], out[64];
+
+    X = mat_create_dense_with_elem(L->cols, B->cols, elem);
+    if (!X)
+        return NULL;
+
+    for (size_t i = 0; i < L->rows; i++) {
+        mat_get(L, i, i, diag);
+        if (elem->abs2(diag) < 1e-300) {
+            mat_free(X);
+            return NULL;
+        }
+
+        elem->inv(inv_diag, diag);
+        for (size_t j = 0; j < B->cols; j++) {
+            mat_get(B, i, j, sum);
+            for (size_t k = 0; k < i; k++) {
+                mat_get(L, i, k, a);
+                mat_get(X, k, j, b);
+                elem->mul(prod, a, b);
+                elem->sub(sum, sum, prod);
+            }
+            elem->mul(out, inv_diag, sum);
+            mat_set(X, i, j, out);
+        }
+    }
+
+    return X;
+}
+
+static matrix_t *mat_backward_substitute(const matrix_t *U,
+                                         const matrix_t *B,
+                                         const struct elem_vtable *elem)
+{
+    matrix_t *X;
+    unsigned char diag[64], inv_diag[64], sum[64], a[64], b[64], prod[64], out[64];
+
+    X = mat_create_dense_with_elem(U->cols, B->cols, elem);
+    if (!X)
+        return NULL;
+
+    for (size_t ii = U->rows; ii-- > 0;) {
+        mat_get(U, ii, ii, diag);
+        if (elem->abs2(diag) < 1e-300) {
+            mat_free(X);
+            return NULL;
+        }
+
+        elem->inv(inv_diag, diag);
+        for (size_t j = 0; j < B->cols; j++) {
+            mat_get(B, ii, j, sum);
+            for (size_t k = ii + 1; k < U->cols; k++) {
+                mat_get(U, ii, k, a);
+                mat_get(X, k, j, b);
+                elem->mul(prod, a, b);
+                elem->sub(sum, sum, prod);
+            }
+            elem->mul(out, inv_diag, sum);
+            mat_set(X, ii, j, out);
+        }
+    }
+
+    return X;
+}
+
+struct matrix_t *mat_transpose(const struct matrix_t *A)
+{
+    const struct elem_vtable *e;
+    struct matrix_t *T;
+    unsigned char v[64];
+
+    if (!A)
+        return NULL;
+
+    e = elem_of(A);
+    T = mat_create_transpose_result(A->cols, A->rows, e, A);
+    if (!T)
+        return NULL;
+
+    mat_value_init_zero(A, v);
+
+    for (size_t i = 0; i < A->rows; i++)
+        for (size_t j = 0; j < A->cols; j++) {
+            mat_value_destroy(A, v);
+            mat_value_init_zero(A, v);
+            mat_get_owned(A, i, j, v);
+            mat_set(T, j, i, v);
+        }
+
+    mat_value_destroy(A, v);
+    return T;
+}
+
+struct matrix_t *mat_conj(const struct matrix_t *A)
+{
+    const struct elem_vtable *e;
+    struct matrix_t *C;
+    unsigned char v[64], cv[64];
+
+    if (!A)
+        return NULL;
+
+    e = elem_of(A);
+    C = mat_create_elementwise_unary_result(A->rows, A->cols, e, A);
+    if (!C)
+        return NULL;
+
+    mat_value_init_zero(A, v);
+    mat_value_init_zero(C, cv);
+
+    for (size_t i = 0; i < A->rows; i++)
+        for (size_t j = 0; j < A->cols; j++) {
+            mat_value_destroy(A, v);
+            mat_value_destroy(C, cv);
+            mat_value_init_zero(A, v);
+            mat_value_init_zero(C, cv);
+            mat_get_owned(A, i, j, v);
+            e->conj_elem(cv, v);
+            mat_set(C, i, j, cv);
+            elem_destroy_value(e, cv);
+        }
+
+    mat_value_destroy(A, v);
+    mat_value_destroy(C, cv);
+    return C;
+}
+
+matrix_t *mat_hermitian(const matrix_t *A)
+{
+    matrix_t *H;
+    matrix_t *T;
+
+    if (!A)
+        return NULL;
+
+    T = mat_transpose(A);
+    if (!T)
+        return NULL;
+
+    H = mat_conj(T);
+    mat_free(T);
+    return H;
+}
+
+int mat_trace(const matrix_t *A, void *trace)
+{
+    const struct elem_vtable *e;
+
+    if (!A || !trace)
+        return -1;
+    if (A->rows != A->cols)
+        return -2;
+
+    e = A->elem;
+    if (!e)
+        return -3;
+
+    if (elem_is_symbolic(e)) {
+        dval_t *sum = dv_num_const_qf(QF_ZERO);
+
+        if (!sum)
+            return -3;
+
+        for (size_t i = 0; i < A->rows; ++i) {
+            dval_t *term = NULL;
+            dval_t *tmp = NULL;
+
+            mat_get(A, i, i, &term);
+            if (!term)
+                term = (dval_t *)DV_ZERO;
+
+            tmp = dv_add(sum, term);
+            dv_free(sum);
+            sum = tmp;
+            if (!sum)
+                return -3;
+        }
+
+        *(dval_t **)trace = dval_simplify_owned(sum);
+        return *(dval_t **)trace ? 0 : -3;
+    }
+
+    unsigned char sum[64];
+    unsigned char term[64];
+
+    memcpy(sum, e->zero, e->size);
+    for (size_t i = 0; i < A->rows; ++i) {
+        mat_get(A, i, i, term);
+        e->add(sum, sum, term);
+    }
+    memcpy(trace, sum, e->size);
+
+    return 0;
+}
+
+int mat_det(const matrix_t *A, void *determinant)
+{
+    size_t n;
+    const struct elem_vtable *e;
+    matrix_t *M;
+    unsigned char *val;
+    unsigned char *pivot;
+    unsigned char *inv_pivot;
+    unsigned char *factor;
+    unsigned char *a;
+    unsigned char *b;
+    unsigned char *prod;
+    unsigned char *tmp;
+    unsigned char *det;
+
+    if (matrix_is_symbolic(A))
+        return mat_det_dval_exact(A, (dval_t **)determinant);
+    if (!A || !determinant)
+        return -1;
+    if (!elem_supports_numeric_algorithms(A->elem))
+        return -3;
+    if (A->rows != A->cols)
+        return -2;
+
+    n = A->rows;
+    e = A->elem;
+    if (n == 1) {
+        mat_get_owned(A, 0, 0, determinant);
+        return 0;
+    }
+
+    M = mat_create_dense_with_elem(A->rows, A->cols, e);
+    if (!M)
+        return -3;
+
+    val = calloc(1u, e->size ? e->size : 1u);
+    for (size_t i = 0; i < A->rows; i++)
+        for (size_t j = 0; j < A->cols; j++) {
+            mat_get_owned(A, i, j, val);
+            mat_set(M, i, j, val);
+            elem_destroy_value(e, val);
+            elem_init_zero_value(e, val);
+        }
+
+    pivot = calloc(1u, e->size ? e->size : 1u);
+    inv_pivot = calloc(1u, e->size ? e->size : 1u);
+    factor = calloc(1u, e->size ? e->size : 1u);
+    a = calloc(1u, e->size ? e->size : 1u);
+    b = calloc(1u, e->size ? e->size : 1u);
+    prod = calloc(1u, e->size ? e->size : 1u);
+    tmp = calloc(1u, e->size ? e->size : 1u);
+    det = calloc(1u, e->size ? e->size : 1u);
+
+    if (!val || !pivot || !inv_pivot || !factor || !a || !b || !prod || !tmp || !det) {
+        free(val);
+        free(pivot);
+        free(inv_pivot);
+        free(factor);
+        free(a);
+        free(b);
+        free(prod);
+        free(tmp);
+        free(det);
+        mat_free(M);
+        return -3;
+    }
+
+    elem_copy_value(e, det, e->one);
+
+    for (size_t k = 0; k < n; k++) {
+        mat_get_owned(M, k, k, pivot);
+        if (elem_is_structural_zero(e, pivot)) {
+            elem_copy_value(e, determinant, e->zero);
+            elem_destroy_value(e, pivot);
+            elem_destroy_value(e, inv_pivot);
+            elem_destroy_value(e, factor);
+            elem_destroy_value(e, a);
+            elem_destroy_value(e, b);
+            elem_destroy_value(e, prod);
+            elem_destroy_value(e, tmp);
+            elem_destroy_value(e, det);
+            free(val);
+            free(pivot);
+            free(inv_pivot);
+            free(factor);
+            free(a);
+            free(b);
+            free(prod);
+            free(tmp);
+            free(det);
+            mat_free(M);
+            return 0;
+        }
+
+        e->inv(inv_pivot, pivot);
+        elem_destroy_value(e, pivot);
+        elem_init_zero_value(e, pivot);
+
+        for (size_t i = k + 1; i < n; i++) {
+            mat_get_owned(M, i, k, factor);
+            e->mul(factor, inv_pivot, factor);
+
+            for (size_t j = k; j < n; j++) {
+                mat_get_owned(M, i, j, a);
+                mat_get_owned(M, k, j, b);
+                e->mul(prod, factor, b);
+                e->sub(tmp, a, prod);
+                mat_set(M, i, j, tmp);
+                elem_destroy_value(e, a);
+                elem_destroy_value(e, b);
+                elem_destroy_value(e, prod);
+                elem_destroy_value(e, tmp);
+                elem_init_zero_value(e, a);
+                elem_init_zero_value(e, b);
+                elem_init_zero_value(e, prod);
+                elem_init_zero_value(e, tmp);
+            }
+            elem_destroy_value(e, factor);
+            elem_init_zero_value(e, factor);
+        }
+        elem_destroy_value(e, inv_pivot);
+        elem_init_zero_value(e, inv_pivot);
+    }
+
+    for (size_t i = 0; i < n; i++) {
+        mat_get_owned(M, i, i, a);
+        e->mul(det, det, a);
+        elem_destroy_value(e, a);
+        elem_init_zero_value(e, a);
+    }
+
+    elem_copy_value(e, determinant, det);
+    elem_destroy_value(e, val);
+    elem_destroy_value(e, pivot);
+    elem_destroy_value(e, inv_pivot);
+    elem_destroy_value(e, factor);
+    elem_destroy_value(e, a);
+    elem_destroy_value(e, b);
+    elem_destroy_value(e, prod);
+    elem_destroy_value(e, tmp);
+    elem_destroy_value(e, det);
+    free(val);
+    free(pivot);
+    free(inv_pivot);
+    free(factor);
+    free(a);
+    free(b);
+    free(prod);
+    free(tmp);
+    free(det);
+    mat_free(M);
+    return 0;
+}
+
+matrix_t *mat_adjugate(const matrix_t *A)
+{
+    return mat_adjugate_exact(A);
+}
+
+matrix_t *mat_inverse(const matrix_t *A)
+{
+    size_t n;
+    const struct elem_vtable *e;
+    matrix_t *M;
+    matrix_t *I;
+    unsigned char *v;
+    unsigned char *pivot;
+    unsigned char *inv_pivot;
+    unsigned char *factor;
+    unsigned char *a;
+    unsigned char *b;
+    unsigned char *prod;
+    unsigned char *tmp;
+
+    if (!A)
+        return NULL;
+    if (A->rows != A->cols)
+        return NULL;
+    if (matrix_is_symbolic(A))
+        return mat_inverse_dval_exact(A);
+    if (!elem_supports_numeric_algorithms(A->elem))
+        return NULL;
+
+    n = A->rows;
+    e = A->elem;
+    M = mat_create_dense_with_elem(n, n, e);
+    I = mat_create_identity_with_elem(n, e);
+    if (!M || !I) {
+        if (M)
+            mat_free(M);
+        if (I)
+            mat_free(I);
+        return NULL;
+    }
+
+    v = calloc(1u, e->size ? e->size : 1u);
+    for (size_t i = 0; i < n; i++)
+        for (size_t j = 0; j < n; j++) {
+            mat_get_owned(A, i, j, v);
+            mat_set(M, i, j, v);
+            elem_destroy_value(e, v);
+            elem_init_zero_value(e, v);
+        }
+
+    pivot = calloc(1u, e->size ? e->size : 1u);
+    inv_pivot = calloc(1u, e->size ? e->size : 1u);
+    factor = calloc(1u, e->size ? e->size : 1u);
+    a = calloc(1u, e->size ? e->size : 1u);
+    b = calloc(1u, e->size ? e->size : 1u);
+    prod = calloc(1u, e->size ? e->size : 1u);
+    tmp = calloc(1u, e->size ? e->size : 1u);
+
+    if (!v || !pivot || !inv_pivot || !factor || !a || !b || !prod || !tmp) {
+        free(v);
+        free(pivot);
+        free(inv_pivot);
+        free(factor);
+        free(a);
+        free(b);
+        free(prod);
+        free(tmp);
+        mat_free(M);
+        mat_free(I);
+        return NULL;
+    }
+
+    for (size_t k = 0; k < n; k++) {
+        mat_get_owned(M, k, k, pivot);
+        if (elem_is_structural_zero(e, pivot)) {
+            elem_destroy_value(e, v);
+            elem_destroy_value(e, pivot);
+            elem_destroy_value(e, inv_pivot);
+            elem_destroy_value(e, factor);
+            elem_destroy_value(e, a);
+            elem_destroy_value(e, b);
+            elem_destroy_value(e, prod);
+            elem_destroy_value(e, tmp);
+            free(v);
+            free(pivot);
+            free(inv_pivot);
+            free(factor);
+            free(a);
+            free(b);
+            free(prod);
+            free(tmp);
+            mat_free(M);
+            mat_free(I);
+            return NULL;
+        }
+
+        e->inv(inv_pivot, pivot);
+        elem_destroy_value(e, pivot);
+        elem_init_zero_value(e, pivot);
+
+        for (size_t j = 0; j < n; j++) {
+            mat_get_owned(M, k, j, a);
+            e->mul(a, inv_pivot, a);
+            mat_set(M, k, j, a);
+            elem_destroy_value(e, a);
+            elem_init_zero_value(e, a);
+
+            mat_get_owned(I, k, j, b);
+            e->mul(b, inv_pivot, b);
+            mat_set(I, k, j, b);
+            elem_destroy_value(e, b);
+            elem_init_zero_value(e, b);
+        }
+
+        for (size_t i = 0; i < n; i++) {
+            if (i == k)
+                continue;
+
+            mat_get_owned(M, i, k, factor);
+            if (elem_is_structural_zero(e, factor)) {
+                elem_destroy_value(e, factor);
+                elem_init_zero_value(e, factor);
+                continue;
+            }
+
+            for (size_t j = 0; j < n; j++) {
+                mat_get_owned(M, i, j, a);
+                mat_get_owned(M, k, j, b);
+                e->mul(prod, factor, b);
+                e->sub(tmp, a, prod);
+                mat_set(M, i, j, tmp);
+                elem_destroy_value(e, a);
+                elem_destroy_value(e, b);
+                elem_destroy_value(e, prod);
+                elem_destroy_value(e, tmp);
+                elem_init_zero_value(e, a);
+                elem_init_zero_value(e, b);
+                elem_init_zero_value(e, prod);
+                elem_init_zero_value(e, tmp);
+
+                mat_get_owned(I, i, j, a);
+                mat_get_owned(I, k, j, b);
+                e->mul(prod, factor, b);
+                e->sub(tmp, a, prod);
+                mat_set(I, i, j, tmp);
+                elem_destroy_value(e, a);
+                elem_destroy_value(e, b);
+                elem_destroy_value(e, prod);
+                elem_destroy_value(e, tmp);
+                elem_init_zero_value(e, a);
+                elem_init_zero_value(e, b);
+                elem_init_zero_value(e, prod);
+                elem_init_zero_value(e, tmp);
+            }
+            elem_destroy_value(e, factor);
+            elem_init_zero_value(e, factor);
+        }
+        elem_destroy_value(e, inv_pivot);
+        elem_init_zero_value(e, inv_pivot);
+    }
+
+    elem_destroy_value(e, v);
+    elem_destroy_value(e, pivot);
+    elem_destroy_value(e, inv_pivot);
+    elem_destroy_value(e, factor);
+    elem_destroy_value(e, a);
+    elem_destroy_value(e, b);
+    elem_destroy_value(e, prod);
+    elem_destroy_value(e, tmp);
+    free(v);
+    free(pivot);
+    free(inv_pivot);
+    free(factor);
+    free(a);
+    free(b);
+    free(prod);
+    free(tmp);
+    mat_free(M);
+    return I;
+}
+
+matrix_t *mat_solve(const matrix_t *A, const matrix_t *B)
+{
+    mat_lu_factor_t lu = {0};
+    const struct elem_vtable *e;
+    matrix_t *Ac = NULL, *Bc = NULL, *PB = NULL, *Y = NULL, *X = NULL;
+
+    if (!A || !B || A->rows != A->cols || A->rows != B->rows)
+        return NULL;
+    if (matrix_is_symbolic(A) && matrix_is_symbolic(B))
+        return mat_solve_dval_exact(A, B);
+    if (!elem_supports_numeric_algorithms(A->elem) ||
+        !elem_supports_numeric_algorithms(B->elem))
+        return NULL;
+
+    e = mat_binary_result_elem(A, B);
+    if (!e)
+        return NULL;
+
+    Ac = mat_convert_preserving_store(A, e);
+    Bc = mat_convert_preserving_store(B, e);
+    if (!Ac || !Bc)
+        goto fail;
+
+    if (mat_has_diagonal_structure(Ac)) {
+        X = mat_solve_diagonal(Ac, Bc, e);
+        mat_free(Ac);
+        mat_free(Bc);
+        return X;
+    }
+
+    if (mat_has_lower_triangular_structure(Ac)) {
+        X = mat_forward_substitute(Ac, Bc, e);
+        mat_free(Ac);
+        mat_free(Bc);
+        return X;
+    }
+
+    if (mat_has_upper_triangular_structure(Ac)) {
+        X = mat_backward_substitute(Ac, Bc, e);
+        mat_free(Ac);
+        mat_free(Bc);
+        return X;
+    }
+
+    if (mat_lu_factor(Ac, &lu) != 0)
+        goto fail;
+
+    PB = mat_apply_row_permutation(lu.P, Bc, e);
+    if (!PB)
+        goto fail;
+
+    Y = mat_forward_substitute(lu.L, PB, e);
+    if (!Y)
+        goto fail;
+
+    X = mat_backward_substitute(lu.U, Y, e);
+    if (!X)
+        goto fail;
+
+    mat_free(Ac);
+    mat_free(Bc);
+    mat_free(PB);
+    mat_free(Y);
+    mat_lu_factor_free(&lu);
+    return X;
+
+fail:
+    mat_free(Ac);
+    mat_free(Bc);
+    mat_free(PB);
+    mat_free(Y);
+    mat_free(X);
+    mat_lu_factor_free(&lu);
+    return NULL;
+}
+
+matrix_t *mat_least_squares(const matrix_t *A, const matrix_t *B)
+{
+    matrix_t *A_pinv = NULL, *Bn = NULL, *X = NULL;
+
+    if (!A || !B || A->rows != B->rows)
+        return NULL;
+    if (matrix_is_symbolic(A) && matrix_is_symbolic(B)) {
+        A_pinv = mat_pseudoinverse_dval_exact(A);
+        X = A_pinv ? mat_mul(A_pinv, B) : NULL;
+        mat_free(A_pinv);
+        return mat_finalize_symbolic_result(X);
+    }
+    if (!elem_supports_numeric_algorithms(A->elem) ||
+        !elem_supports_numeric_algorithms(B->elem))
+        return NULL;
+
+    if (A->rows == A->cols)
+        return mat_solve(A, B);
+
+    A_pinv = mat_pseudoinverse(A);
+    Bn = mat_evaluate_num(B);
+    X = (A_pinv && Bn) ? mat_mul(A_pinv, Bn) : NULL;
+
+    mat_free(A_pinv);
+    mat_free(Bn);
+    return X;
+}
+
+void mat_lu_factor_free(mat_lu_factor_t *out)
+{
+    if (!out)
+        return;
+    mat_free(out->P);
+    mat_free(out->L);
+    mat_free(out->U);
+    out->P = out->L = out->U = NULL;
+}
+
+int mat_lu_factor(const matrix_t *A, mat_lu_factor_t *out)
+{
+    const struct elem_vtable *e;
+    const struct store_vtable *permutation_store;
+    const struct store_vtable *lower_store;
+    const struct store_vtable *upper_store;
+    const struct store_vtable *working_lower_store;
+    matrix_t *P_seed = NULL, *P = NULL, *L = NULL, *U = NULL;
+    matrix_t *L_out = NULL, *U_out = NULL;
+    unsigned char pivot[64], inv_pivot[64], factor[64];
+    unsigned char a[64], b[64];
+
+    if (!A || !out)
+        return -1;
+    if (!elem_supports_numeric_algorithms(A->elem))
+        return -3;
+    if (A->rows != A->cols)
+        return -2;
+
+    e = A->elem;
+    permutation_store = mat_sparse_factor_store(A, &identity_store);
+    lower_store = mat_sparse_factor_store(A, &lower_triangular_store);
+    upper_store = mat_sparse_factor_store(A, &upper_triangular_store);
+    working_lower_store = mat_sparse_factor_store(A, &lower_triangular_store);
+    P_seed = mat_create_identity_with_elem(A->rows, e);
+    P = mat_convert_with_store(P_seed, e, permutation_store);
+    L = mat_create_with_store(A->rows, A->rows, e, working_lower_store);
+    U = mat_convert_preserving_store(A, e);
+    mat_free(P_seed);
+    if (!P || !L || !U) {
+        mat_free(P);
+        mat_free(L);
+        mat_free(U);
+        return -3;
+    }
+
+    for (size_t i = 0; i < A->rows; i++)
+        mat_set(L, i, i, e->one);
+
+    for (size_t k = 0; k < A->rows; k++) {
+        size_t pivot_row = mat_find_pivot_row(U, k, k);
+        mat_get(U, pivot_row, k, pivot);
+        if (e->abs2(pivot) < 1e-300) {
+            mat_free(P);
+            mat_free(L);
+            mat_free(U);
+            return -4;
+        }
+
+        if (pivot_row != k) {
+            mat_swap_rows(U, k, pivot_row);
+            mat_swap_rows(P, k, pivot_row);
+            for (size_t j = 0; j < k; j++) {
+                mat_get(L, k, j, a);
+                mat_get(L, pivot_row, j, b);
+                mat_set(L, k, j, b);
+                mat_set(L, pivot_row, j, a);
+            }
+        }
+
+        mat_get(U, k, k, pivot);
+        e->inv(inv_pivot, pivot);
+
+        for (size_t i = k + 1; i < A->rows; i++) {
+            mat_get(U, i, k, factor);
+            if (e->abs2(factor) < 1e-300) {
+                mat_set(L, i, k, e->zero);
+                continue;
+            }
+
+            e->mul(factor, factor, inv_pivot);
+            mat_set(L, i, k, factor);
+            mat_set(U, i, k, e->zero);
+            mat_row_eliminate_from(U, i, k, k + 1, factor);
+        }
+    }
+
+    L_out = mat_convert_with_store(L, e, lower_store);
+    U_out = mat_convert_with_store(U, e, upper_store);
+    mat_free(U);
+    mat_free(L);
+    if (!L_out || !U_out) {
+        mat_free(P);
+        mat_free(L_out);
+        mat_free(U_out);
+        return -3;
+    }
+
+    out->P = P;
+    out->L = L_out;
+    out->U = U_out;
+    return 0;
+}

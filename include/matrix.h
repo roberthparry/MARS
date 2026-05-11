@@ -44,9 +44,6 @@ typedef enum {
  * @brief Matrix element type.
  */
 typedef enum {
-    MAT_TYPE_DOUBLE,
-    MAT_TYPE_QFLOAT,
-    MAT_TYPE_QCOMPLEX,
     MAT_TYPE_NUMBER,
     MAT_TYPE_DVAL
 } mat_type_t;
@@ -325,14 +322,29 @@ void mat_free(matrix_t *A);
 /**
  * @brief Read one matrix element into @p out.
  *
- * For dval matrices, the returned dval_t* handle is borrowed from the matrix.
- * Do not call dv_free() on it unless you first create or retain your own
- * owning reference by other means.
+ * This is the low-level accessor. It writes the entry into @p out using the
+ * matrix's native stored element representation, so the caller must pass a
+ * pointer to the matching underlying type.
+ *
+ * For numeric matrices, that means @p out receives the stored numeric element
+ * form directly. For example, a `MAT_TYPE_NUMBER` matrix should be read into a
+ * `number_t *`, while legacy internal numeric storage may still use its own
+ * concrete scalar type.
+ *
+ * For dval matrices, the returned `dval_t *` handle is borrowed from the
+ * matrix. Do not call `dv_free()` on it unless you first create or retain your
+ * own owning reference by other means.
+ *
+ * If you want a uniform owning numeric result regardless of the matrix's
+ * underlying storage type, use mat_get_num() instead.
  */
 void mat_get(const matrix_t *A, size_t i, size_t j, void *out);
 
 /**
  * @brief Read one matrix element as an owning `number_t`.
+ *
+ * This is the high-level numeric accessor. It always returns an owning
+ * `number_t`, regardless of how the entry is stored internally.
  *
  * For `MAT_TYPE_NUMBER`, this returns an independent live clone of the stored
  * value. For other numeric matrix types, the entry is converted into a new

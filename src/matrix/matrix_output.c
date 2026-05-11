@@ -174,3 +174,16 @@ int mat_printf(const char *fmt, ...)
     free(buf);
     return needed;
 }
+
+void mat_print(const matrix_t *A)
+{
+    char *s = mat_to_string(A, MAT_STRING_LAYOUT_PRETTY);
+
+    if (!s) {
+        printf("(null)\n");
+        return;
+    }
+
+    printf("%s\n", s);
+    free(s);
+}
