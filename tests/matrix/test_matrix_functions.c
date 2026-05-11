@@ -246,6 +246,94 @@ static void test_eigen_qc(void)
     mat_free(V2);
 }
 
+static void test_eigen_num_hermitian(void)
+{
+    printf(C_CYAN "TEST: eigendecomposition (number Hermitian)\n" C_RESET);
+
+    number_t A_vals[4] = {
+        num_create_from_long(2),
+        num_create_from_string("1 + i"),
+        num_create_from_string("1 - i"),
+        num_create_from_long(3)};
+    matrix_t *A = mat_create_num(2, 2, A_vals);
+    number_t ev[2] = {num_new(), num_new()};
+    number_t ev2[2] = {num_new(), num_new()};
+    matrix_t *V = NULL;
+    matrix_t *V2 = NULL;
+
+    for (size_t i = 0; i < 4; ++i)
+        num_destroy(&A_vals[i]);
+
+    print_mnum("A", A);
+
+    mat_eigenvalues(A, ev);
+    num_printf("    eigenvalue[0]: %N\n", ev[0]);
+    num_printf("    eigenvalue[1]: %N\n", ev[1]);
+
+    {
+        int e0_smaller = num_lt(ev[0], ev[1]);
+        number_t ev_min = e0_smaller ? num_clone(ev[0]) : num_clone(ev[1]);
+        number_t ev_max = e0_smaller ? num_clone(ev[1]) : num_clone(ev[0]);
+        check_qc_val("number Hermitian eigenvalue min = 1+0i",
+                     num_to_qcomplex(ev_min),
+                     qc_make(qf_from_double(1), QF_ZERO), 1e-25);
+        check_qc_val("number Hermitian eigenvalue max = 4+0i",
+                     num_to_qcomplex(ev_max),
+                     qc_make(qf_from_double(4), QF_ZERO), 1e-25);
+        num_destroy(&ev_min);
+        num_destroy(&ev_max);
+    }
+
+    check_bool("number Hermitian eigendecompose rc = 0",
+               mat_eigendecompose(A, ev2, &V) == 0);
+    check_bool("number Hermitian eigenvectors V not NULL", V != NULL);
+    check_bool("number Hermitian eigenvectors V type is number",
+               V && mat_typeof(V) == MAT_TYPE_NUMBER);
+
+    if (V) {
+        matrix_t *Aq = test_mat_evaluate_qc(A);
+        matrix_t *Vq = test_mat_evaluate_qc(V);
+
+        print_mnum("V", V);
+        for (size_t k = 0; Aq && Vq && k < 2; k++) {
+            qcomplex_t lam = num_to_qcomplex(ev2[k]);
+            for (size_t i = 0; i < 2; i++) {
+                qcomplex_t Av_ik = QC_ZERO;
+                qcomplex_t vik;
+                for (size_t j = 0; j < 2; j++) {
+                    qcomplex_t aij, vjk;
+                    mat_get(Aq, i, j, &aij);
+                    mat_get(Vq, j, k, &vjk);
+                    Av_ik = qc_add(Av_ik, qc_mul(aij, vjk));
+                }
+                mat_get(Vq, i, k, &vik);
+
+                char label[80];
+                snprintf(label, sizeof(label),
+                         "number Hermitian: (Av)[%zu,%zu] = lv[%zu,%zu]",
+                         i, k, i, k);
+                check_qc_val(label, Av_ik, qc_mul(lam, vik), 1e-25);
+            }
+        }
+
+        mat_free(Aq);
+        mat_free(Vq);
+    }
+
+    V2 = mat_eigenvectors(A);
+    print_mnum("eigenvectors (mat_eigenvectors)", V2);
+    check_bool("number Hermitian eigenvectors V2 type is number",
+               V2 && mat_typeof(V2) == MAT_TYPE_NUMBER);
+
+    num_destroy(&ev[0]);
+    num_destroy(&ev[1]);
+    num_destroy(&ev2[0]);
+    num_destroy(&ev2[1]);
+    mat_free(A);
+    mat_free(V);
+    mat_free(V2);
+}
+
 /* ------------------------------------------------------------------ eigenvalues: dval */
 
 static void check_dval_eigen_relation(const char *label_prefix,
@@ -5867,14 +5955,14 @@ static void test_dval_matrix_functions_extended(void)
         check_bool("manual qc sin(dval dense 3x3) not NULL", Sqc != NULL);
         check_bool("manual qc gamma(dval dense 3x3) not NULL", Gqc != NULL);
 
-        check_bool("manual qc exp(dval dense 3x3) -> MAT_TYPE_QCOMPLEX",
-                   Eqc != NULL && mat_typeof(Eqc) == MAT_TYPE_QCOMPLEX);
-        check_bool("manual qc log(dval dense 3x3) -> MAT_TYPE_QCOMPLEX",
-                   Lqc != NULL && mat_typeof(Lqc) == MAT_TYPE_QCOMPLEX);
-        check_bool("manual qc sin(dval dense 3x3) -> MAT_TYPE_QCOMPLEX",
-                   Sqc != NULL && mat_typeof(Sqc) == MAT_TYPE_QCOMPLEX);
-        check_bool("manual qc gamma(dval dense 3x3) -> MAT_TYPE_QCOMPLEX",
-                   Gqc != NULL && mat_typeof(Gqc) == MAT_TYPE_QCOMPLEX);
+        check_bool("manual qc exp(dval dense 3x3) -> MAT_TYPE_NUMBER",
+                   Eqc != NULL && mat_typeof(Eqc) == MAT_TYPE_NUMBER);
+        check_bool("manual qc log(dval dense 3x3) -> MAT_TYPE_NUMBER",
+                   Lqc != NULL && mat_typeof(Lqc) == MAT_TYPE_NUMBER);
+        check_bool("manual qc sin(dval dense 3x3) -> MAT_TYPE_NUMBER",
+                   Sqc != NULL && mat_typeof(Sqc) == MAT_TYPE_NUMBER);
+        check_bool("manual qc gamma(dval dense 3x3) -> MAT_TYPE_NUMBER",
+                   Gqc != NULL && mat_typeof(Gqc) == MAT_TYPE_NUMBER);
 
         mat_free(Aqc);
         mat_free(Eqc);
@@ -6448,6 +6536,7 @@ void run_matrix_function_tests(void)
     RUN_TEST_CASE(test_eigen_d);
     RUN_TEST_CASE(test_eigen_qf);
     RUN_TEST_CASE(test_eigen_qc);
+    RUN_TEST_CASE(test_eigen_num_hermitian);
     RUN_TEST_CASE(test_eigen_dval);
     RUN_TEST_CASE(test_eigenspace_dval);
     RUN_TEST_CASE(test_generalized_eigenspace_dval);

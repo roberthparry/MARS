@@ -13,33 +13,293 @@
 
 static inline qcomplex_t test_num_to_qcomplex(const number_t x)
 {
-    return number_value_to_qcomplex(&x);
+    number_t re = num_real_part(x);
+    number_t im = num_imag_part(x);
+    qcomplex_t z = qc_make(num_to_qfloat(re), num_to_qfloat(im));
+
+    num_destroy(&re);
+    num_destroy(&im);
+    return z;
 }
 
 #define num_to_qcomplex test_num_to_qcomplex
 
+static inline number_t test_num_from_d(double x)
+{
+    return num_create_from_double(x);
+}
+
+static inline number_t test_num_from_qf(qfloat_t x)
+{
+    return num_create_from_qfloat(x);
+}
+
+static inline number_t test_num_from_qc(qcomplex_t z)
+{
+    return num_create_from_qcomplex(z);
+}
+
+static inline void test_mat_set_num_slot(matrix_t *A, size_t i, size_t j, const number_t *value)
+{
+    mat_set(A, i, j, value);
+}
+
+static inline void test_mat_set_d(matrix_t *A, size_t i, size_t j, const double *value)
+{
+    number_t n = test_num_from_d(*value);
+    mat_set(A, i, j, &n);
+    num_destroy(&n);
+}
+
+static inline void test_mat_set_qf(matrix_t *A, size_t i, size_t j, const qfloat_t *value)
+{
+    number_t n = test_num_from_qf(*value);
+    mat_set(A, i, j, &n);
+    num_destroy(&n);
+}
+
+static inline void test_mat_set_qc(matrix_t *A, size_t i, size_t j, const qcomplex_t *value)
+{
+    number_t n = test_num_from_qc(*value);
+    mat_set(A, i, j, &n);
+    num_destroy(&n);
+}
+
+static inline void test_mat_set_dv_slot(matrix_t *A, size_t i, size_t j, dval_t *const *value)
+{
+    mat_set(A, i, j, value);
+}
+
+static inline void test_mat_get_num_slot(const matrix_t *A, size_t i, size_t j, number_t *out)
+{
+    if (!out)
+        return;
+    *out = mat_get_num(A, i, j);
+}
+
+static inline void test_mat_get_d(const matrix_t *A, size_t i, size_t j, double *out)
+{
+    number_t n;
+
+    if (!out)
+        return;
+    n = mat_get_num(A, i, j);
+    *out = num_to_double(n);
+    num_destroy(&n);
+}
+
+static inline void test_mat_get_qf(const matrix_t *A, size_t i, size_t j, qfloat_t *out)
+{
+    number_t n;
+
+    if (!out)
+        return;
+    n = mat_get_num(A, i, j);
+    *out = num_to_qfloat(n);
+    num_destroy(&n);
+}
+
+static inline void test_mat_get_qc(const matrix_t *A, size_t i, size_t j, qcomplex_t *out)
+{
+    number_t n;
+
+    if (!out)
+        return;
+    n = mat_get_num(A, i, j);
+    *out = test_num_to_qcomplex(n);
+    num_destroy(&n);
+}
+
+static inline void test_mat_get_dv_slot(const matrix_t *A, size_t i, size_t j, dval_t **out)
+{
+    mat_get(A, i, j, out);
+}
+
+static inline void test_mat_set_data_num_slot(matrix_t *A, const number_t *data)
+{
+    mat_set_data(A, data);
+}
+
+static inline void test_mat_set_data_dv_slot(matrix_t *A, dval_t *const *data)
+{
+    mat_set_data(A, data);
+}
+
+static inline void test_mat_set_data_d(matrix_t *A, const double *data)
+{
+    size_t count, i;
+    number_t *tmp;
+
+    if (!A || !data)
+        return;
+
+    count = mat_get_row_count(A) * mat_get_col_count(A);
+    tmp = calloc(count, sizeof(*tmp));
+    if (!tmp)
+        return;
+
+    for (i = 0; i < count; ++i)
+        tmp[i] = test_num_from_d(data[i]);
+
+    mat_set_data(A, tmp);
+
+    for (i = 0; i < count; ++i)
+        num_destroy(&tmp[i]);
+    free(tmp);
+}
+
+static inline void test_mat_set_data_qf(matrix_t *A, const qfloat_t *data)
+{
+    size_t count, i;
+    number_t *tmp;
+
+    if (!A || !data)
+        return;
+
+    count = mat_get_row_count(A) * mat_get_col_count(A);
+    tmp = calloc(count, sizeof(*tmp));
+    if (!tmp)
+        return;
+
+    for (i = 0; i < count; ++i)
+        tmp[i] = test_num_from_qf(data[i]);
+
+    mat_set_data(A, tmp);
+
+    for (i = 0; i < count; ++i)
+        num_destroy(&tmp[i]);
+    free(tmp);
+}
+
+static inline void test_mat_set_data_qc(matrix_t *A, const qcomplex_t *data)
+{
+    size_t count, i;
+    number_t *tmp;
+
+    if (!A || !data)
+        return;
+
+    count = mat_get_row_count(A) * mat_get_col_count(A);
+    tmp = calloc(count, sizeof(*tmp));
+    if (!tmp)
+        return;
+
+    for (i = 0; i < count; ++i)
+        tmp[i] = test_num_from_qc(data[i]);
+
+    mat_set_data(A, tmp);
+
+    for (i = 0; i < count; ++i)
+        num_destroy(&tmp[i]);
+    free(tmp);
+}
+
+static inline void test_mat_get_data_num_slot(const matrix_t *A, number_t *data)
+{
+    mat_get_data_num(A, data);
+}
+
+static inline void test_mat_get_data_dv_slot(const matrix_t *A, dval_t **data)
+{
+    mat_get_data(A, data);
+}
+
+static inline void test_mat_get_data_d(const matrix_t *A, double *data)
+{
+    size_t rows, cols, idx = 0;
+
+    if (!A || !data)
+        return;
+
+    rows = mat_get_row_count(A);
+    cols = mat_get_col_count(A);
+    for (size_t i = 0; i < rows; ++i)
+        for (size_t j = 0; j < cols; ++j)
+            test_mat_get_d(A, i, j, &data[idx++]);
+}
+
+static inline void test_mat_get_data_qf(const matrix_t *A, qfloat_t *data)
+{
+    size_t rows, cols, idx = 0;
+
+    if (!A || !data)
+        return;
+
+    rows = mat_get_row_count(A);
+    cols = mat_get_col_count(A);
+    for (size_t i = 0; i < rows; ++i)
+        for (size_t j = 0; j < cols; ++j)
+            test_mat_get_qf(A, i, j, &data[idx++]);
+}
+
+static inline void test_mat_get_data_qc(const matrix_t *A, qcomplex_t *data)
+{
+    size_t rows, cols, idx = 0;
+
+    if (!A || !data)
+        return;
+
+    rows = mat_get_row_count(A);
+    cols = mat_get_col_count(A);
+    for (size_t i = 0; i < rows; ++i)
+        for (size_t j = 0; j < cols; ++j)
+            test_mat_get_qc(A, i, j, &data[idx++]);
+}
+
+#define mat_set(A, i, j, value) \
+    _Generic(*(value), \
+        double: test_mat_set_d, \
+        const double: test_mat_set_d, \
+        qfloat_t: test_mat_set_qf, \
+        const qfloat_t: test_mat_set_qf, \
+        qcomplex_t: test_mat_set_qc, \
+        const qcomplex_t: test_mat_set_qc, \
+        number_t: test_mat_set_num_slot, \
+        const number_t: test_mat_set_num_slot, \
+        dval_t *: test_mat_set_dv_slot, \
+        const dval_t *: test_mat_set_dv_slot \
+    )((A), (i), (j), (value))
+
+#define mat_get(A, i, j, out) \
+    _Generic(*(out), \
+        double: test_mat_get_d, \
+        qfloat_t: test_mat_get_qf, \
+        qcomplex_t: test_mat_get_qc, \
+        number_t: test_mat_get_num_slot, \
+        dval_t *: test_mat_get_dv_slot \
+    )((A), (i), (j), (out))
+
+#define mat_set_data(A, data) \
+    _Generic(*(data), \
+        double: test_mat_set_data_d, \
+        const double: test_mat_set_data_d, \
+        qfloat_t: test_mat_set_data_qf, \
+        const qfloat_t: test_mat_set_data_qf, \
+        qcomplex_t: test_mat_set_data_qc, \
+        const qcomplex_t: test_mat_set_data_qc, \
+        number_t: test_mat_set_data_num_slot, \
+        const number_t: test_mat_set_data_num_slot, \
+        dval_t *: test_mat_set_data_dv_slot, \
+        const dval_t *: test_mat_set_data_dv_slot \
+    )((A), (data))
+
+#define mat_get_data(A, data) \
+    _Generic(*(data), \
+        double: test_mat_get_data_d, \
+        qfloat_t: test_mat_get_data_qf, \
+        qcomplex_t: test_mat_get_data_qc, \
+        number_t: test_mat_get_data_num_slot, \
+        dval_t *: test_mat_get_data_dv_slot \
+    )((A), (data))
+
 static inline matrix_t *test_mat_evaluate_qf(const matrix_t *A)
 {
-    matrix_t *N = mat_evaluate_num(A);
-    matrix_t *Q = NULL;
-
-    if (!N)
-        return NULL;
-    Q = mat_convert_with_store(N, &qfloat_elem, N->store);
-    mat_free(N);
-    return Q;
+    return mat_evaluate_num(A);
 }
 
 static inline matrix_t *test_mat_evaluate_qc(const matrix_t *A)
 {
-    matrix_t *N = mat_evaluate_num(A);
-    matrix_t *Z = NULL;
-
-    if (!N)
-        return NULL;
-    Z = mat_convert_with_store(N, &qcomplex_elem, N->store);
-    mat_free(N);
-    return Z;
+    return mat_evaluate_num(A);
 }
 
 static inline dval_t *test_dv_new_const_d(double x)
@@ -207,47 +467,59 @@ static inline qfloat_t test_dv_eval_qf(const dval_t *dv)
 
 static inline matrix_t *test_mat_dense_d(size_t rows, size_t cols)
 {
-    return mat_create_dense_with_elem(rows, cols, &double_elem);
+    size_t count = rows * cols;
+    number_t *vals = calloc(count, sizeof(*vals));
+    matrix_t *A;
+
+    if (!vals)
+        return NULL;
+    for (size_t i = 0; i < count; ++i)
+        vals[i] = num_clone(NUM_ZERO);
+    A = mat_create_num(rows, cols, vals);
+    for (size_t i = 0; i < count; ++i)
+        num_destroy(&vals[i]);
+    free(vals);
+    return A;
 }
 
 static inline matrix_t *test_mat_dense_qf(size_t rows, size_t cols)
 {
-    return mat_create_dense_with_elem(rows, cols, &qfloat_elem);
+    return test_mat_dense_d(rows, cols);
 }
 
 static inline matrix_t *test_mat_dense_qc(size_t rows, size_t cols)
 {
-    return mat_create_dense_with_elem(rows, cols, &qcomplex_elem);
+    return test_mat_dense_d(rows, cols);
 }
 
 static inline matrix_t *test_mat_sparse_d(size_t rows, size_t cols)
 {
-    return mat_create_sparse_with_elem(rows, cols, &double_elem);
+    return mat_new_sparse_num(rows, cols);
 }
 
 static inline matrix_t *test_mat_sparse_qf(size_t rows, size_t cols)
 {
-    return mat_create_sparse_with_elem(rows, cols, &qfloat_elem);
+    return mat_new_sparse_num(rows, cols);
 }
 
 static inline matrix_t *test_mat_sparse_qc(size_t rows, size_t cols)
 {
-    return mat_create_sparse_with_elem(rows, cols, &qcomplex_elem);
+    return mat_new_sparse_num(rows, cols);
 }
 
 static inline matrix_t *test_mat_square_d(size_t n)
 {
-    return mat_create_dense_with_elem(n, n, &double_elem);
+    return test_mat_dense_d(n, n);
 }
 
 static inline matrix_t *test_mat_square_qf(size_t n)
 {
-    return mat_create_dense_with_elem(n, n, &qfloat_elem);
+    return test_mat_dense_d(n, n);
 }
 
 static inline matrix_t *test_mat_square_qc(size_t n)
 {
-    return mat_create_dense_with_elem(n, n, &qcomplex_elem);
+    return test_mat_dense_d(n, n);
 }
 
 static inline matrix_t *test_mat_square_dv(size_t n)
@@ -257,76 +529,133 @@ static inline matrix_t *test_mat_square_dv(size_t n)
 
 static inline matrix_t *test_mat_identity_d(size_t n)
 {
-    return mat_create_identity_with_elem(n, &double_elem);
+    return mat_create_identity_num(n);
 }
 
 static inline matrix_t *test_mat_identity_qf(size_t n)
 {
-    return mat_create_identity_with_elem(n, &qfloat_elem);
+    return mat_create_identity_num(n);
 }
 
 static inline matrix_t *test_mat_identity_qc(size_t n)
 {
-    return mat_create_identity_with_elem(n, &qcomplex_elem);
+    return mat_create_identity_num(n);
 }
 
 static inline matrix_t *test_mat_diagonal_d(size_t n, const double *diagonal)
 {
-    matrix_t *A = mat_create_diagonal_with_elem(n, &double_elem);
+    matrix_t *A;
+    number_t *vals;
 
-    if (!A || !diagonal)
-        return A;
+    if (!diagonal)
+        return NULL;
+    vals = calloc(n, sizeof(*vals));
+    if (!vals)
+        return NULL;
     for (size_t i = 0; i < n; ++i)
-        mat_set(A, i, i, &diagonal[i]);
+        vals[i] = test_num_from_d(diagonal[i]);
+    A = mat_create_diagonal_num(n, vals);
+    for (size_t i = 0; i < n; ++i)
+        num_destroy(&vals[i]);
+    free(vals);
     return A;
 }
 
 static inline matrix_t *test_mat_diagonal_qf(size_t n, const qfloat_t *diagonal)
 {
-    matrix_t *A = mat_create_diagonal_with_elem(n, &qfloat_elem);
+    matrix_t *A;
+    number_t *vals;
 
-    if (!A || !diagonal)
-        return A;
+    if (!diagonal)
+        return NULL;
+    vals = calloc(n, sizeof(*vals));
+    if (!vals)
+        return NULL;
     for (size_t i = 0; i < n; ++i)
-        mat_set(A, i, i, &diagonal[i]);
+        vals[i] = test_num_from_qf(diagonal[i]);
+    A = mat_create_diagonal_num(n, vals);
+    for (size_t i = 0; i < n; ++i)
+        num_destroy(&vals[i]);
+    free(vals);
     return A;
 }
 
 static inline matrix_t *test_mat_diagonal_qc(size_t n, const qcomplex_t *diagonal)
 {
-    matrix_t *A = mat_create_diagonal_with_elem(n, &qcomplex_elem);
+    matrix_t *A;
+    number_t *vals;
 
-    if (!A || !diagonal)
-        return A;
+    if (!diagonal)
+        return NULL;
+    vals = calloc(n, sizeof(*vals));
+    if (!vals)
+        return NULL;
     for (size_t i = 0; i < n; ++i)
-        mat_set(A, i, i, &diagonal[i]);
+        vals[i] = test_num_from_qc(diagonal[i]);
+    A = mat_create_diagonal_num(n, vals);
+    for (size_t i = 0; i < n; ++i)
+        num_destroy(&vals[i]);
+    free(vals);
     return A;
 }
 
 static inline matrix_t *test_mat_create_d(size_t rows, size_t cols, const double *data)
 {
-    matrix_t *A = mat_create_dense_with_elem(rows, cols, &double_elem);
+    matrix_t *A;
+    number_t *vals;
+    size_t count = rows * cols;
 
-    if (A && data)
-        mat_set_data(A, data);
+    if (!data)
+        return NULL;
+    vals = calloc(count, sizeof(*vals));
+    if (!vals)
+        return NULL;
+    for (size_t i = 0; i < count; ++i)
+        vals[i] = test_num_from_d(data[i]);
+    A = mat_create_num(rows, cols, vals);
+    for (size_t i = 0; i < count; ++i)
+        num_destroy(&vals[i]);
+    free(vals);
     return A;
 }
 
 static inline matrix_t *test_mat_create_qf(size_t rows, size_t cols, const qfloat_t *data)
 {
-    matrix_t *A = mat_create_dense_with_elem(rows, cols, &qfloat_elem);
+    matrix_t *A;
+    number_t *vals;
+    size_t count = rows * cols;
 
-    if (A && data)
-        mat_set_data(A, data);
+    if (!data)
+        return NULL;
+    vals = calloc(count, sizeof(*vals));
+    if (!vals)
+        return NULL;
+    for (size_t i = 0; i < count; ++i)
+        vals[i] = test_num_from_qf(data[i]);
+    A = mat_create_num(rows, cols, vals);
+    for (size_t i = 0; i < count; ++i)
+        num_destroy(&vals[i]);
+    free(vals);
     return A;
 }
 
 static inline matrix_t *test_mat_create_qc(size_t rows, size_t cols, const qcomplex_t *data)
 {
-    matrix_t *A = mat_create_dense_with_elem(rows, cols, &qcomplex_elem);
+    matrix_t *A;
+    number_t *vals;
+    size_t count = rows * cols;
 
-    if (A && data)
-        mat_set_data(A, data);
+    if (!data)
+        return NULL;
+    vals = calloc(count, sizeof(*vals));
+    if (!vals)
+        return NULL;
+    for (size_t i = 0; i < count; ++i)
+        vals[i] = test_num_from_qc(data[i]);
+    A = mat_create_num(rows, cols, vals);
+    for (size_t i = 0; i < count; ++i)
+        num_destroy(&vals[i]);
+    free(vals);
     return A;
 }
 

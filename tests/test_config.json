@@ -1586,7 +1586,8 @@
     "test_jordan_profile_dval": true,
     "test_readme_string_quantum_example": true,
     "test_mat_simplify_symbolic_helper": true,
-    "test_number_matrix_functions": true
+    "test_number_matrix_functions": true,
+    "test_eigen_num_hermitian": true
   },
   "tests/matrix/test_matrix_function_regressions.c": {
     "test_mat_fun_qf_qc": true,

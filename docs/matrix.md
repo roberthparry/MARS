@@ -1,9 +1,12 @@
 # `matrix_t`
 
-`matrix_t` is a generic high-precision matrix type with pluggable element types
-(`double`, `qfloat_t`, `qcomplex_t`, `dval_t *`) and pluggable storage kinds (dense, sparse,
-identity, diagonal, upper triangular, lower triangular). All operations dispatch
-through internal vtables; no type switches or storage switches appear in user code.
+`matrix_t` is a generic high-precision matrix type with two public element
+families: `number_t` for numeric work and `dval_t *` for symbolic work.
+Numeric matrices can still hold exact rationals, floating-point values, and
+complex values through the `number_t` layer. Storage remains pluggable
+(`dense`, `sparse`, `identity`, `diagonal`, `upper triangular`, `lower triangular`).
+All operations dispatch through internal vtables; no type switches or storage
+switches appear in user code.
 
 ## Representation
 
@@ -17,7 +20,9 @@ the API. Internally each matrix carries:
 
 ## Capabilities
 
-- element types: `double`, `qfloat_t` (~31–32 decimal digits), `qcomplex_t` (~31–32 decimal digits), `dval_t *` (symbolic differentiable values)
+- element families:
+  - `MAT_TYPE_NUMBER` backed by `number_t`, covering exact rational, floating, and complex numeric entries
+  - `MAT_TYPE_DVAL` backed by retained `dval_t *` symbolic entries
 - storage kinds:
   - dense (fully materialised)
   - sparse (stores only non-zero elements explicitly)
@@ -35,7 +40,7 @@ the API. Internally each matrix carries:
 - condition number computation
 - matrix functions: exp, sin, cos, tan, sinh, cosh, tanh, sqrt, log, asin, acos, atan, asinh, acosh, atanh, erf, erfc
 - power functions: integer power (binary exponentiation), real power via exp/log
-- all eigendecomposition computed at full `qfloat_t`/`qcomplex_t` precision regardless of element type; all matrix functions computed at full `qcomplex_t` precision
+- all numeric eigendecomposition is computed at full `qfloat_t`/`qcomplex_t` internal precision regardless of stored numeric syntax; all numeric matrix functions are computed through the same high-precision internal path
 
 ## `dval_t *` Matrices
 
@@ -83,31 +88,26 @@ matrix type when you want the full numerical linear-algebra toolbox.
 ```c
 #include <stdio.h>
 #include "matrix.h"
-#include "qcomplex.h"
-#include "qfloat.h"
+#include "number.h"
 
 int main(void) {
     /* Hermitian 2×2 matrix with eigenvalues 1 and 4:
      *   [ 2    1+i ]
      *   [ 1-i  3   ]
      */
-    qcomplex_t A_vals[4] = {
-        qc_make(qf_from_double(2.0), qf_from_double(0.0)),
-        qc_make(qf_from_double(1.0), qf_from_double(1.0)),
-        qc_make(qf_from_double(1.0), qf_from_double(-1.0)),
-        qc_make(qf_from_double(3.0), qf_from_double(0.0))
-    };
-    matrix_t *A = mat_create_num(2, 2, A_vals);
+    matrix_t *A = mat_from_string("(2, 1+i; 1-i, 3)", NULL);
+    number_t eigenvalues[2] = {num_new(), num_new()};
+    matrix_t *evecs = NULL;
 
-    qcomplex_t eigenvalues[2];
-    matrix_t  *evecs = NULL;
     mat_eigendecompose(A, eigenvalues, &evecs);
 
-    qc_printf("eigenvalue[0] = %z\n", eigenvalues[0]);
-    qc_printf("eigenvalue[1] = %z\n", eigenvalues[1]);
+    num_printf("eigenvalue[0] = %N\n", eigenvalues[0]);
+    num_printf("eigenvalue[1] = %N\n", eigenvalues[1]);
 
     mat_free(A);
     mat_free(evecs);
+    num_destroy(&eigenvalues[0]);
+    num_destroy(&eigenvalues[1]);
     return 0;
 }
 ```
@@ -335,6 +335,7 @@ off-diagonal element). For bulk initialisation prefer the `mat_create_*` forms b
 
 | Function | Element type | Description |
 |---|---|---|
+| `mat_create_num(rows, cols, data)` | `number_t` | Allocate and fill from a row-major `number_t[]`; each entry is cloned into matrix-owned storage |
 | `mat_create_dv(rows, cols, data)` | `dval_t *` | Allocate and fill from a row-major `dval_t * []`; each handle is retained by the matrix |
 
 #### Identity matrices
@@ -344,6 +345,7 @@ materialises the matrix as dense.
 
 | Function | Element type | Description |
 |---|---|---|
+| `mat_create_identity_num(n)` | `number_t` | `n × n` identity matrix of exact numeric ones and zeros |
 | `mat_create_identity_dv(n)` | `dval_t *` | `n × n` identity matrix of symbolic ones and zeros |
 
 #### Diagonal matrices
@@ -354,6 +356,7 @@ to survive through compatible operations.
 
 | Function | Element type | Description |
 |---|---|---|
+| `mat_create_diagonal_num(n, diagonal)` | `number_t` | `n × n` diagonal matrix of cloned `number_t` values |
 | `mat_create_diagonal_dv(n, diagonal)` | `dval_t *` | `n × n` diagonal matrix of retained `dval_t *` handles |
 
 ### Destruction
@@ -362,7 +365,8 @@ to survive through compatible operations.
 
 ### Element Access
 
-- `void mat_get(const matrix_t *A, size_t i, size_t j, void *out)` — write the element at row `i`, column `j` into the buffer `out`. `out` must be large enough for the element type. For `MAT_TYPE_DVAL`, the written value is a borrowed `dval_t *`.
+- `void mat_get(const matrix_t *A, size_t i, size_t j, void *out)` — low-level accessor that writes the entry at row `i`, column `j` into `out` using the matrix's native stored element representation. The caller must pass a pointer to the matching underlying type. For numeric matrices this means reading the concrete stored numeric element directly; for `MAT_TYPE_DVAL`, the written value is a borrowed `dval_t *`.
+- `number_t mat_get_num(const matrix_t *A, size_t i, size_t j)` — high-level numeric accessor that always returns an owning `number_t`. Use this when you want a uniform numeric read regardless of the matrix's underlying storage type, or when reading a symbolic entry as its current evaluated numeric value.
 - `void mat_set(matrix_t *A, size_t i, size_t j, const void *val)` — copy `val` into position `(i, j)`. For `MAT_TYPE_DVAL`, the matrix retains the incoming handle.
 - `size_t mat_get_row_count(const matrix_t *A)` — number of rows.
 - `size_t mat_get_col_count(const matrix_t *A)` — number of columns.
@@ -667,15 +671,15 @@ clean exact solve, this returns the `X` that minimises the residual norm
 Example:
 
 ```c
-double A_data[] = {
-    0.0, 1.0,
-    1.0, 1.0,
-    2.0, 1.0
+number_t A_data[] = {
+    num_create_from_double(0.0), num_create_from_double(1.0),
+    num_create_from_double(1.0), num_create_from_double(1.0),
+    num_create_from_double(2.0), num_create_from_double(1.0)
 };
-double B_data[] = {
-    1.0,
-    3.0,
-    5.1
+number_t B_data[] = {
+    num_create_from_double(1.0),
+    num_create_from_double(3.0),
+    num_create_from_double(5.1)
 };
 
 matrix_t *A = mat_create_num(3, 2, A_data);
@@ -684,6 +688,10 @@ matrix_t *X = mat_least_squares(A, B);
 
 mat_print(X);
 
+for (size_t i = 0; i < 6; ++i)
+    num_destroy(&A_data[i]);
+for (size_t i = 0; i < 3; ++i)
+    num_destroy(&B_data[i]);
 mat_free(X);
 mat_free(B);
 mat_free(A);
@@ -847,9 +855,10 @@ representation used for non-Hermitian eigenvalue problems and for matrix
 functions such as `exp(A)`, `log(A)`, and `sqrt(A)`.
 
 The result is stored in the `mat_schur_factor_t` struct containing `Q` and `T`.
-These factors are returned as `qcomplex` matrices even when `A` is real-valued,
-since a general real matrix may have complex Schur data. Returns 0 on success,
-negative on error. Use `mat_schur_factor_free` to release the decomposition.
+These factors are returned as numeric `matrix_t` values (`MAT_TYPE_NUMBER`)
+even when the Schur data is complex, since `number_t` already covers complex
+entries. Returns 0 on success, negative on error. Use
+`mat_schur_factor_free` to release the decomposition.
 
 ### Matrix Functions
 
@@ -866,8 +875,9 @@ the Parlett recurrence on the triangular Schur factor.
    When `T_{ii} = T_{jj}` the recurrence uses a numerical derivative of the scalar function.
 3. Reconstruct `f(A) = Q · f(T) · Q*`.
 
-All internal arithmetic uses `qcomplex_t`. If the input matrix has a narrower element
-type the result is converted back to that type before returning.
+All internal arithmetic uses `qcomplex_t`. Numeric results are returned as
+`MAT_TYPE_NUMBER` matrices, so exact, floating, and complex values all come
+back through the public `number_t` layer.
 
 For `MAT_TYPE_DVAL`, the story is different:
 
@@ -995,9 +1005,10 @@ int mat_printf(const char *fmt, ...);
 - wrapped symbolic matrices such as `{ (x, 1; 1, c1) | x = 2; c1 = 3 }`
 - bare symbolic matrices such as `(c1, c2*y; x, y)`
 
-Numeric input produces either a `qfloat_t` matrix or a `qcomplex_t` matrix,
-depending on whether any entry has a non-zero imaginary part. Symbolic input
-produces a `dval_t *` matrix.
+Numeric input produces a `MAT_TYPE_NUMBER` matrix. Complex syntax such as
+`1+i` or exact rational syntax such as `2/3` is preserved through the
+underlying `number_t` values. Symbolic input produces a `MAT_TYPE_DVAL`
+matrix.
 
 Rows are separated by semicolons and columns by commas. The outer `{ ... | ... }`
 wrapper, when present, still carries one binding section for the entire matrix.
@@ -1104,7 +1115,7 @@ specifiers:
 Every `matrix_t` carries two vtable pointers:
 
 - **element vtable** — arithmetic (`add`, `sub`, `mul`, `div`, `conj`, …),
-  conversion to/from `qfloat_t`, and formatting. One instance per element type.
+  conversion helpers, and formatting. One instance per internal element backend.
 - **storage vtable** — `get`/`set` and any type-specific fast paths. One instance
   per storage kind.
 
@@ -1121,14 +1132,14 @@ Eigenvalues are real and eigenvectors are orthonormal.
 
 **Eigendecomposition, general path** — Hessenberg reduction (Householder
 reflectors) followed by implicit single-shift QR (Francis/Wilkinson). All
-internal arithmetic uses `qcomplex_t` flat arrays, so the algorithm handles real,
-qfloat, and complex matrices uniformly. Hermitian detection compares `A[i,j]`
-against `conj(A[j,i])` within a tolerance relative to the Frobenius norm; matrices
-that pass this test take the faster Jacobi path automatically.
+internal arithmetic uses `qcomplex_t` flat arrays, so the algorithm handles all
+numeric `number_t` matrices uniformly. Hermitian detection compares `A[i,j]`
+against `conj(A[j,i])` within a tolerance relative to the Frobenius norm;
+matrices that pass this test take the faster Jacobi path automatically.
 
-**Matrix functions** — all use the Schur + Parlett path regardless of whether the
-matrix is Hermitian. Internal arithmetic is always `qcomplex_t`; the result is
-cast back to the input element type before returning.
+**Matrix functions** — all use the Schur + Parlett path regardless of whether
+the matrix is Hermitian. Internal arithmetic is always `qcomplex_t`; numeric
+results are returned through `MAT_TYPE_NUMBER`.
 
 ### Identity Storage
 

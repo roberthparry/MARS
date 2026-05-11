@@ -5842,6 +5842,40 @@ static void test_factorisations(void)
     }
 
     {
+        number_t A_vals[6] = {
+            num_create_from_long(1), num_create_from_long(1),
+            num_create_from_long(1), num_create_from_long(0),
+            num_create_from_long(0), num_create_from_long(1)
+        };
+        matrix_t *A = mat_create_num(3, 2, A_vals);
+        mat_qr_factor_t qr = {0};
+        matrix_t *QR = NULL;
+
+        for (size_t i = 0; i < 6; ++i)
+            num_destroy(&A_vals[i]);
+
+        check_bool("mat_qr_factor(number) rc=0", mat_qr_factor(A, &qr) == 0);
+        check_bool("QR(number) factors non-null", qr.Q && qr.R);
+        check_bool("QR(number) Q uses number_t", qr.Q && mat_typeof(qr.Q) == MAT_TYPE_NUMBER);
+        check_bool("QR(number) R uses number_t", qr.R && mat_typeof(qr.R) == MAT_TYPE_NUMBER);
+        if (qr.Q && qr.R) {
+            matrix_t *QRq = NULL, *Aq = NULL;
+            QR = mat_mul(qr.Q, qr.R);
+            check_bool("QR(number) Q*R not NULL", QR != NULL);
+            QRq = QR ? test_mat_evaluate_qc(QR) : NULL;
+            Aq = test_mat_evaluate_qc(A);
+            if (QRq && Aq)
+                check_mat_qc("QR(number): Q*R = A", QRq, Aq, 1e-12);
+            mat_free(QRq);
+            mat_free(Aq);
+        }
+
+        mat_free(QR);
+        mat_qr_factor_free(&qr);
+        mat_free(A);
+    }
+
+    {
         double A_vals[9] = {4.0, 1.0, 1.0,
                             1.0, 3.0, 0.5,
                             1.0, 0.5, 2.0};
@@ -5865,6 +5899,40 @@ static void test_factorisations(void)
                 check_mat_qc("L*L^T = A", LLHq, Aqc, 1e-12);
             mat_free(LLHq);
             mat_free(Aqc);
+        }
+
+        mat_free(LH);
+        mat_free(LLH);
+        mat_cholesky_free(&chol);
+        mat_free(A);
+    }
+
+    {
+        number_t A_vals[4] = {
+            num_create_from_long(2), num_create_from_long(1),
+            num_create_from_long(1), num_create_from_long(2)
+        };
+        matrix_t *A = mat_create_num(2, 2, A_vals);
+        mat_cholesky_t chol = {0};
+        matrix_t *LH = NULL, *LLH = NULL;
+
+        for (size_t i = 0; i < 4; ++i)
+            num_destroy(&A_vals[i]);
+
+        check_bool("mat_cholesky(number) rc=0", mat_cholesky(A, &chol) == 0);
+        check_bool("Cholesky(number) factor non-null", chol.L != NULL);
+        check_bool("Cholesky(number) factor uses number_t", chol.L && mat_typeof(chol.L) == MAT_TYPE_NUMBER);
+        if (chol.L) {
+            matrix_t *LLHq = NULL, *Aq = NULL;
+            LH = mat_hermitian(chol.L);
+            LLH = LH ? mat_mul(chol.L, LH) : NULL;
+            check_bool("Cholesky(number) L*L^H not NULL", LLH != NULL);
+            LLHq = LLH ? test_mat_evaluate_qc(LLH) : NULL;
+            Aq = test_mat_evaluate_qc(A);
+            if (LLHq && Aq)
+                check_mat_qc("Cholesky(number): L*L^H = A", LLHq, Aq, 1e-12);
+            mat_free(LLHq);
+            mat_free(Aq);
         }
 
         mat_free(LH);
@@ -6042,6 +6110,45 @@ static void test_factorisations(void)
         mat_free(UH);
         mat_free(UHU);
         mat_free(VHV);
+        mat_svd_factor_free(&svd);
+        mat_free(A);
+    }
+
+    {
+        number_t A_vals[6] = {
+            num_create_from_long(3), num_create_from_long(0),
+            num_create_from_long(0), num_create_from_long(2),
+            num_create_from_long(0), num_create_from_long(0)
+        };
+        matrix_t *A = mat_create_num(3, 2, A_vals);
+        mat_svd_factor_t svd = {0};
+        matrix_t *US = NULL, *VH = NULL, *USVH = NULL;
+
+        for (size_t i = 0; i < 6; ++i)
+            num_destroy(&A_vals[i]);
+
+        check_bool("mat_svd_factor(number) rc=0", mat_svd_factor(A, &svd) == 0);
+        check_bool("number SVD factors non-null", svd.U && svd.S && svd.V);
+        check_bool("number SVD U uses number_t", svd.U && mat_typeof(svd.U) == MAT_TYPE_NUMBER);
+        check_bool("number SVD S uses number_t", svd.S && mat_typeof(svd.S) == MAT_TYPE_NUMBER);
+        check_bool("number SVD V uses number_t", svd.V && mat_typeof(svd.V) == MAT_TYPE_NUMBER);
+        if (svd.U && svd.S && svd.V) {
+            matrix_t *USVHq = NULL, *Aq = NULL;
+            US = mat_mul(svd.U, svd.S);
+            VH = mat_hermitian(svd.V);
+            USVH = (US && VH) ? mat_mul(US, VH) : NULL;
+            check_bool("number U*S*V^H not NULL", USVH != NULL);
+            USVHq = USVH ? test_mat_evaluate_qc(USVH) : NULL;
+            Aq = test_mat_evaluate_qc(A);
+            if (USVHq && Aq)
+                check_mat_qc("number U*S*V^H = A", USVHq, Aq, 1e-24);
+            mat_free(USVHq);
+            mat_free(Aq);
+        }
+
+        mat_free(US);
+        mat_free(VH);
+        mat_free(USVH);
         mat_svd_factor_free(&svd);
         mat_free(A);
     }

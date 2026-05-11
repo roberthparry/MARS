@@ -11,11 +11,10 @@ static matrix_t *clone_matrix_snapshot(const matrix_t *A)
 
     switch (mat_typeof(A))
     {
-    case MAT_TYPE_DOUBLE:
-    case MAT_TYPE_QFLOAT:
-    case MAT_TYPE_QCOMPLEX:
     case MAT_TYPE_NUMBER:
-        return mat_evaluate_num(A);
+        /* Numeric tests already print concrete matrices inline; avoid
+         * retaining extra numeric snapshots in the harness. */
+        return NULL;
     case MAT_TYPE_DVAL:
         return mat_to_dense(A);
     }
@@ -732,9 +731,6 @@ void print_current_input_matrix(void)
 
     switch (mat_typeof(current_matrix_input))
     {
-    case MAT_TYPE_DOUBLE:
-    case MAT_TYPE_QFLOAT:
-    case MAT_TYPE_QCOMPLEX:
     case MAT_TYPE_NUMBER:
         print_mnum_raw("input matrix", current_matrix_input);
         break;
