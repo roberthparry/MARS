@@ -172,14 +172,12 @@ hold an explicit variable pointer so you can pass it to the derivative API.
 #include "number.h"
 
 int main(void) {
-    dval_binding_t *bindings = NULL;
-    size_t nbindings = 0;
-    dval_binding_t *x_binding;
-    dval_t *f = dval_from_string_with_bindings(
+    dval_bindings_t *bindings = NULL;
+    dval_t *f = dval_from_string(
         "{ exp(sin(x)) + 3*x^2 - 7 | x = 1.25 }",
-        &bindings,
-        &nbindings
+        &bindings
     );
+    dval_t *x;
     dval_t *df_dx;
     const dval_t *d2f_dx;
     number_t f_val;
@@ -189,17 +187,17 @@ int main(void) {
     if (!f)
         return 1;
 
-    x_binding = dval_binding_find(bindings, nbindings, "x");
-    if (!x_binding) {
+    x = dval_bindings_get(bindings, "x");
+    if (!x) {
         dv_free(f);
-        free(bindings);
+        dval_bindings_free(bindings);
         return 1;
     }
 
     num_set_default_prec_bits(384);
 
-    df_dx = dv_create_deriv(f, x_binding->dval);
-    d2f_dx = dv_get_deriv(df_dx, x_binding->dval);
+    df_dx = dv_create_deriv(f, x);
+    d2f_dx = dv_get_deriv(df_dx, x);
 
     printf("f(x)    = "); dv_print(f);
     printf("f'(x)   = "); dv_print(df_dx);
@@ -219,7 +217,7 @@ int main(void) {
     num_destroy(&f_val);
     dv_free(df_dx);
     dv_free(f);
-    free(bindings);
+    dval_bindings_free(bindings);
 
     return 0;
 }
@@ -564,10 +562,9 @@ All functions return owning handles.
 
 ### Parsing
 
-- `dval_t *dval_from_string(const char *s)` — construct a `dval_t` from a string in the format produced by `dv_to_string(..., style_EXPRESSION)`:
-- `dval_t *dval_from_string_with_bindings(const char *s, dval_binding_t **bindings_out, size_t *number_out)` — same parse, but also returns a heap-allocated array of borrowed symbolic bindings when the parsed expression is symbolic
-- `dval_binding_t *dval_binding_find(dval_binding_t *bindings, size_t number, const char *name)` — find a returned symbolic binding by name
-- `int dval_binding_set_num(dval_binding_t *bindings, size_t number, const char *name, number_t value)` — update a returned binding
+- `dval_t *dval_from_string(const char *s, dval_bindings_t **bnd_out)` — construct a `dval_t` from a string in the format produced by `dv_to_string(..., style_EXPRESSION)`. When `bnd_out` is non-NULL and the parse is symbolic, the parser also returns an opaque bindings object.
+- `dval_t *dval_bindings_get(dval_bindings_t *bnd, const char *name)` — find a returned symbolic binding by name; lookup accepts the same normalisation rules as parsing, so aliases like `@pi`/`π`, `@phi`/`φ`, `@gamma`/`γ`, and `@tau`/`τ` all resolve to the same binding
+- `void dval_bindings_free(dval_bindings_t *bnd)` — destroy a bindings object returned by `dval_from_string(...)`
 
   ```
   { expr }
@@ -605,12 +602,11 @@ All functions return owning handles.
   expression resolve to the same underlying leaf node. Reusing the same name as
   both a variable and a constant in one parse is rejected.
 
-  When `bindings_out` is non-NULL, `dval_from_string_with_bindings(...)`
-  returns a flat array of borrowed symbolic bindings:
-  - `dval_binding_t.name` is the normalised symbol name
-  - `dval_binding_t.dval` is the underlying differentiable-value leaf
-  - `dval_binding_t.is_constant` tells you whether the symbol is a constant placeholder
-
-  This is the public way to differentiate a parsed bare symbolic expression:
-  parse with bindings, find the inferred variable handle, then pass that
-  `dval_t *` to `dv_create_deriv(...)`.
+  When `bnd_out` is non-NULL, `dval_from_string(...)` returns an opaque
+  bindings object. Use `dval_bindings_get(...)` to recover the borrowed `dval_t *`
+  leaf for a parsed symbol, then pass that handle to `dv_create_deriv(...)`
+  if you want to differentiate with respect to it. Release the bindings
+  object later with `dval_bindings_free(...)`. The lookup path uses the same
+  name normalisation as parsing, so Greek-style aliases may be queried in
+  either form, such as `@pi` or `π`, `@phi` or `φ`, `@gamma` or `γ`, and
+  `@tau` or `τ`.

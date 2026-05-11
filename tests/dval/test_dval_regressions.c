@@ -57,13 +57,17 @@ static number_t oracle_error_magnitude(const number_t got,
 {
     number_t promoted_got = num_clone(got);
     number_t diff;
+    number_t error;
 
     if (num_get_prec_bits(expected) > 0u)
         ASSERT_EQ_INT(num_set_prec_bits(&promoted_got, num_get_prec_bits(expected)), 0);
     diff = num_sub(promoted_got, expected);
     num_destroy(&promoted_got);
-    if (num_is_real(diff))
-        return num_abs(diff);
+    if (num_is_real(diff)) {
+        error = num_abs(diff);
+        num_destroy(&diff);
+        return error;
+    }
     {
         number_t real = num_real_part(diff);
         number_t imag = num_imag_part(diff);
@@ -856,9 +860,9 @@ static void test_set_val_num_preserves_qfloat_precision(void)
 
 static void test_default_constants_preserve_qfloat_precision(void)
 {
-    dval_t *pi = dval_from_string("{ pi }");
-    dval_t *e = dval_from_string("{ e }");
-    dval_t *phi = dval_from_string("{ @phi }");
+    dval_t *pi = dval_from_string("{ pi }", NULL);
+    dval_t *e = dval_from_string("{ e }", NULL);
+    dval_t *phi = dval_from_string("{ @phi }", NULL);
 
     ASSERT_NOT_NULL(pi);
     ASSERT_NOT_NULL(e);

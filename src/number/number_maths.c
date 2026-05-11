@@ -98,10 +98,13 @@ static int number_try_get_exact_int(const number_t number, int *out)
         return 0;
     errno = 0;
     parsed = strtol(text, &end, 10);
-    free(text);
     if (errno != 0 || !end || *end != '\0' ||
         parsed < (long)INT_MIN || parsed > (long)INT_MAX)
+    {
+        free(text);
         return 0;
+    }
+    free(text);
     *out = (int)parsed;
     return 1;
 }
@@ -852,12 +855,17 @@ number_t num_pow10(int exponent10)
 number_t num_mul_pow10(const number_t number, int exponent10)
 {
     const number_vtable_t *vt = number_vt(&number);
+    number_t scale;
+    number_t result;
 
     if (!number_is_valid_value(&number))
         return number_invalid();
     if (vt && vt->mul_pow10_value)
         return number_take(vt->mul_pow10_value(&number, exponent10));
-    return num_mul(number, num_pow10(exponent10));
+    scale = num_pow10(exponent10);
+    result = num_mul(number, scale);
+    num_destroy(&scale);
+    return result;
 }
 
 number_t num_hypot(const number_t a, const number_t b)

@@ -2995,7 +2995,7 @@ void test_expressions_longname(void)
 void check_roundtrip(const char *label, dval_t *f, int line)
 {
     char *s = dv_to_string(f, style_EXPRESSION);
-    dval_t *g = dval_from_string(s);
+    dval_t *g = dval_from_string(s, NULL);
 
     if (!g) {
         printf(C_BOLD C_RED "FAIL" C_RESET " %s (from_string returned NULL) %s:%d:1\n",
@@ -3037,7 +3037,7 @@ void check_roundtrip(const char *label, dval_t *f, int line)
 void check_parse_val(const char *label, const char *s,
                              double expect_d, int line)
 {
-    dval_t *g = dval_from_string(s);
+    dval_t *g = dval_from_string(s, NULL);
     if (!g) {
         printf(C_BOLD C_RED "FAIL" C_RESET " %s (NULL) %s:%d:1\n",
                label, __FILE__, line);
@@ -3070,7 +3070,7 @@ void check_parse_val(const char *label, const char *s,
  * Note: dval_from_string prints diagnostics to stderr for error cases. */
 void check_parse_null(const char *label, const char *s, int line)
 {
-    dval_t *g = dval_from_string(s);
+    dval_t *g = dval_from_string(s, NULL);
     if (!g) {
         printf(C_BOLD C_GREEN "PASS" C_RESET " %s\n\n", label);
     } else {

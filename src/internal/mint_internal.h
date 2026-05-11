@@ -20,5 +20,6 @@ struct _mint_t {
 
 int mint_copy_value(mint_t *dst, const mint_t *src);
 int mint_set_magnitude_u64(mint_t *mint, uint64_t magnitude, short sign);
+int mint_is_immortal(const mint_t *mint);
 
 #endif

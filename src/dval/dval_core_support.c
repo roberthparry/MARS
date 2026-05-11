@@ -8,6 +8,7 @@
 
 #include "number.h"
 #include "qcomplex.h"
+#include "dictionary.h"
 #include "dval_internal.h"
 #include "dval.h"
 
@@ -45,6 +46,97 @@ number_t dv_number_from_qc(qcomplex_t z)
 {
     return qf_eq(qc_imag(z), QF_ZERO) ? num_create_from_qfloat(qc_real(z))
                                       : num_create_from_qcomplex(z);
+}
+
+static size_t dv_alias_hash(const void *key)
+{
+    const unsigned char *s = (const unsigned char *)*(const char * const *)key;
+    size_t hash = 1469598103934665603ull;
+
+    while (*s) {
+        hash ^= (size_t)*s++;
+        hash *= 1099511628211ull;
+    }
+    return hash;
+}
+
+static int dv_alias_cmp(const void *a, const void *b)
+{
+    const char *ka = *(const char * const *)a;
+    const char *kb = *(const char * const *)b;
+
+    return strcmp(ka, kb);
+}
+
+static dictionary_t *dv_default_constant_alias_table_storage = NULL;
+
+static void dv_destroy_default_constant_alias_table(void)
+{
+    dictionary_destroy(dv_default_constant_alias_table_storage);
+    dv_default_constant_alias_table_storage = NULL;
+}
+
+static dictionary_t *dv_default_constant_alias_table(void)
+{
+    static int cleanup_registered = 0;
+    static const struct {
+        const char *key;
+        const char *value;
+    } aliases[] = {
+        { "pi",       "@pi"    },
+        { "@pi",      "@pi"    },
+        { "\xcf\x80", "@pi"    },
+        { "@phi",     "@phi"   },
+        { "\xcf\x86", "@phi"   },
+        { "@gamma",   "@gamma" },
+        { "\xce\xb3", "@gamma" },
+        { "@tau",     "@tau"   },
+        { "\xcf\x84", "@tau"   },
+    };
+
+    if (dv_default_constant_alias_table_storage)
+        return dv_default_constant_alias_table_storage;
+
+    dv_default_constant_alias_table_storage = dictionary_create(sizeof(const char *),
+                                                                sizeof(const char *),
+                                                                dv_alias_hash,
+                                                                dv_alias_cmp,
+                                                                NULL,
+                                                                NULL,
+                                                                NULL,
+                                                                NULL,
+                                                                NULL);
+    if (!dv_default_constant_alias_table_storage)
+        abort();
+    if (!cleanup_registered) {
+        if (atexit(dv_destroy_default_constant_alias_table) != 0)
+            abort();
+        cleanup_registered = 1;
+    }
+
+    for (size_t i = 0; i < sizeof(aliases) / sizeof(aliases[0]); ++i) {
+        const char *key = aliases[i].key;
+        const char *value = aliases[i].value;
+
+        if (!dictionary_set(dv_default_constant_alias_table_storage, &key, &value))
+            abort();
+    }
+
+    return dv_default_constant_alias_table_storage;
+}
+
+static const char *dv_lookup_default_constant_alias(const char *name)
+{
+    const char *mapped = NULL;
+    dictionary_t *table;
+
+    if (!name)
+        return NULL;
+
+    table = dv_default_constant_alias_table();
+    if (dictionary_get(table, &name, &mapped))
+        return mapped;
+    return name;
 }
 
 /* ------------------------------------------------------------------------- */
@@ -437,21 +529,22 @@ int dv_is_default_constant_name(const char *name)
 
 int dv_get_default_constant_num(const char *name, number_t *value_out)
 {
+    const char *canon = dv_lookup_default_constant_alias(name);
+
     if (!name || !value_out)
         return 0;
 
-    if (strcmp(name, "e") == 0) {
+    if (strcmp(canon, "e") == 0) {
         *value_out = num_create_from_qfloat(QF_E);
         return 1;
     }
 
-    if (strcmp(name, "pi") == 0 || strcmp(name, "@pi") == 0 ||
-        strcmp(name, "\xcf\x80") == 0) {
+    if (strcmp(canon, "@pi") == 0) {
         *value_out = num_create_from_qfloat(QF_PI);
         return 1;
     }
 
-    if (strcmp(name, "@phi") == 0 || strcmp(name, "\xcf\x86") == 0) {
+    if (strcmp(canon, "@phi") == 0) {
         qfloat_t phi = qf_div(qf_add(qf_from_double(1.0), qf_sqrt(qf_from_double(5.0))),
                               qf_from_double(2.0));
 
@@ -459,7 +552,7 @@ int dv_get_default_constant_num(const char *name, number_t *value_out)
         return 1;
     }
 
-    if (strcmp(name, "@gamma") == 0 || strcmp(name, "\xce\xb3") == 0) {
+    if (strcmp(canon, "@gamma") == 0) {
         *value_out = num_create_from_qfloat(QF_EULER_MASCHERONI);
         return 1;
     }
@@ -480,21 +573,7 @@ int dv_get_default_constant_value(const char *name, qcomplex_t *value_out)
 
 const char *dv_default_constant_canonical_name(const char *name)
 {
-    if (!name)
-        return NULL;
-
-    if (strcmp(name, "pi") == 0 || strcmp(name, "@pi") == 0 ||
-        strcmp(name, "\xcf\x80") == 0) {
-        return "@pi";
-    }
-
-    if (strcmp(name, "@phi") == 0 || strcmp(name, "\xcf\x86") == 0)
-        return "@phi";
-
-    if (strcmp(name, "@gamma") == 0 || strcmp(name, "\xce\xb3") == 0)
-        return "@gamma";
-
-    return name;
+    return dv_lookup_default_constant_alias(name);
 }
 
 /* ------------------------------------------------------------------------- */

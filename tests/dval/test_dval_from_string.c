@@ -208,7 +208,7 @@ static void test_from_string_name_normalization(void)
     dval_t *a123 = test_dv_new_named_var_d(1.0, "a123");
     dval_t *pi1 = test_dv_new_named_var_d(1.0, "@pi1");
     dval_t *pi2 = test_dv_new_named_var_d(1.0, "@pi_2");
-    dval_t *parsed_pi1 = dval_from_string("{ @pi1 }");
+    dval_t *parsed_pi1 = dval_from_string("{ @pi1 }", NULL);
     char *a1s = a1 ? dv_to_string(a1, style_EXPRESSION) : NULL;
     char *a12s = a12 ? dv_to_string(a12, style_EXPRESSION) : NULL;
     char *a123s = a123 ? dv_to_string(a123, style_EXPRESSION) : NULL;
@@ -284,15 +284,15 @@ static void test_from_string_name_normalization(void)
 
 static void test_from_string_implicit_symbolic_bindings(void)
 {
-    dval_t *x = dval_from_string("{ x }");
-    dval_t *e = dval_from_string("{ e }");
-    dval_t *pi_ascii = dval_from_string("{ pi }");
-    dval_t *pi_alias = dval_from_string("{ @pi }");
-    dval_t *tau = dval_from_string("{ τ }");
-    dval_t *phi_alias = dval_from_string("{ @phi }");
-    dval_t *gamma_alias = dval_from_string("{ @gamma }");
-    dval_t *tau_alias = dval_from_string("{ @tau }");
-    dval_t *f = dval_from_string("{ [radius]^2 + c_1 + π + e }");
+    dval_t *x = dval_from_string("{ x }", NULL);
+    dval_t *e = dval_from_string("{ e }", NULL);
+    dval_t *pi_ascii = dval_from_string("{ pi }", NULL);
+    dval_t *pi_alias = dval_from_string("{ @pi }", NULL);
+    dval_t *tau = dval_from_string("{ τ }", NULL);
+    dval_t *phi_alias = dval_from_string("{ @phi }", NULL);
+    dval_t *gamma_alias = dval_from_string("{ @gamma }", NULL);
+    dval_t *tau_alias = dval_from_string("{ @tau }", NULL);
+    dval_t *f = dval_from_string("{ [radius]^2 + c_1 + π + e }", NULL);
     char *xs = x ? dv_to_string(x, style_EXPRESSION) : NULL;
     char *es = e ? dv_to_string(e, style_EXPRESSION) : NULL;
     char *pi_as = pi_ascii ? dv_to_string(pi_ascii, style_EXPRESSION) : NULL;
@@ -695,7 +695,7 @@ static void test_from_string_composed(void)
 
 static void test_from_string_simplified_identity_text(void)
 {
-    dval_t *expr = dval_from_string("{ sin^2(x) + cos^2(x) | x = 1.234 }");
+    dval_t *expr = dval_from_string("{ sin^2(x) + cos^2(x) | x = 1.234 }", NULL);
     char *text = expr ? dv_to_string(expr, style_EXPRESSION) : NULL;
 
     if (!(text && strcmp(text, "{ 1 }") == 0)) {
@@ -763,7 +763,7 @@ static void check_dval_d(const char *label, const dval_t *node,
 static void check_parse_num(const char *label, const char *s,
                             const char *expect_text, int line)
 {
-    dval_t *expr = dval_from_string(s);
+    dval_t *expr = dval_from_string(s, NULL);
     number_t got;
     number_t expect;
     char *expr_text;
@@ -1011,11 +1011,10 @@ static void test_from_expression_string_api(void)
 
 static void test_from_string_bindings_api(void)
 {
-    dval_binding_t *bindings = NULL;
-    size_t nbindings = 0;
-    dval_t *expr = dval_from_string_with_bindings("{ x^2 + c_1 }", &bindings, &nbindings);
-    dval_binding_t *x_binding;
-    dval_binding_t *c_binding;
+    dval_bindings_t *bindings = NULL;
+    dval_t *expr = dval_from_string("{ x^2 + c_1 }", &bindings);
+    dval_t *x_binding;
+    dval_t *c_binding;
     dval_t *deriv;
 
     if (!expr) {
@@ -1025,19 +1024,19 @@ static void test_from_string_bindings_api(void)
         return;
     }
 
-    x_binding = dval_binding_find(bindings, nbindings, "x");
-    c_binding = dval_binding_find(bindings, nbindings, "c₁");
+    x_binding = dval_bindings_get(bindings, "x");
+    c_binding = dval_bindings_get(bindings, "c₁");
 
-    if (!x_binding || x_binding->is_constant) {
-        printf(C_BOLD C_RED "FAIL" C_RESET " inferred x binding missing or wrong kind %s:%d:1\n\n",
+    if (!x_binding) {
+        printf(C_BOLD C_RED "FAIL" C_RESET " inferred x binding missing %s:%d:1\n\n",
                __FILE__, __LINE__);
         TEST_FAIL();
     } else {
         printf(C_BOLD C_GREEN "PASS" C_RESET " inferred x binding returned for differentiation\n\n");
     }
 
-    if (!c_binding || !c_binding->is_constant) {
-        printf(C_BOLD C_RED "FAIL" C_RESET " inferred c₁ binding missing or wrong kind %s:%d:1\n\n",
+    if (!c_binding) {
+        printf(C_BOLD C_RED "FAIL" C_RESET " inferred c₁ binding missing %s:%d:1\n\n",
                __FILE__, __LINE__);
         TEST_FAIL();
     } else {
@@ -1048,17 +1047,19 @@ static void test_from_string_bindings_api(void)
         number_t xval = num_create_from_double(3.0);
         number_t cval = num_create_from_double(5.0);
 
-        if (dval_binding_set_num(bindings, nbindings, "x", xval) != 0 ||
-            dval_binding_set_num(bindings, nbindings, "c_1", cval) != 0) {
+        if (!x_binding || !c_binding) {
             num_destroy(&cval);
             num_destroy(&xval);
-            printf(C_BOLD C_RED "FAIL" C_RESET " binding setters failed %s:%d:1\n\n",
+            printf(C_BOLD C_RED "FAIL" C_RESET " binding lookup failed before assignment %s:%d:1\n\n",
                    __FILE__, __LINE__);
             TEST_FAIL();
-            free(bindings);
+            dval_bindings_free(bindings);
             dv_free(expr);
             return;
         }
+
+        dv_set_val_num(x_binding, xval);
+        dv_set_val_num(c_binding, cval);
 
         num_destroy(&cval);
         num_destroy(&xval);
@@ -1066,7 +1067,7 @@ static void test_from_string_bindings_api(void)
 
     check_dval_d("parsed expr after binding update", expr, 14.0, __LINE__);
 
-    deriv = dv_create_deriv(expr, x_binding->dval);
+    deriv = dv_create_deriv(expr, x_binding);
     if (!deriv) {
         printf(C_BOLD C_RED "FAIL" C_RESET " derivative from inferred binding returned NULL %s:%d:1\n\n",
                __FILE__, __LINE__);
@@ -1076,7 +1077,7 @@ static void test_from_string_bindings_api(void)
         dv_free(deriv);
     }
 
-    free(bindings);
+    dval_bindings_free(bindings);
     dv_free(expr);
 }
 

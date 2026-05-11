@@ -946,16 +946,12 @@ static dval_t *parse_expression_region(const char *start,
 /* ------------------------------------------------------------------ */
 
 static dval_t *dval_from_string_impl(const char *s,
-                                     dval_binding_t **bindings_out,
-                                     size_t *number_out)
+                                     dval_bindings_t **bindings_out)
 {
-    dval_binding_t *bindings = NULL;
-    size_t nbindings = 0;
+    dval_bindings_t *bindings = NULL;
 
     if (bindings_out)
         *bindings_out = NULL;
-    if (number_out)
-        *number_out = 0;
     if (!s) return NULL;
 
     while (isspace((unsigned char)*s)) s++;
@@ -1005,12 +1001,8 @@ static dval_t *dval_from_string_impl(const char *s,
                                                  "dval_from_string", 0);
 
         if (result) {
-            if (bindings_out) {
-                bindings = single_binding_from_node(result, &nbindings);
-                *bindings_out = bindings;
-            }
-            if (number_out)
-                *number_out = nbindings;
+            if (bindings_out)
+                *bindings_out = single_binding_from_node(result);
             return result;
         }
 
@@ -1022,13 +1014,11 @@ static dval_t *dval_from_string_impl(const char *s,
                                                  "dval_from_string", 1);
             }
             if (result && bindings_out)
-                bindings = symtab_build_bindings(&syms, &nbindings);
+                bindings = symtab_build_bindings(&syms);
             symtab_free(&syms);
             if (result) {
                 if (bindings_out)
                     *bindings_out = bindings;
-                if (number_out)
-                    *number_out = nbindings;
                 return result;
             }
         }
@@ -1037,12 +1027,8 @@ static dval_t *dval_from_string_impl(const char *s,
         result = parse_pure_const(s, content_end, errmsg, sizeof(errmsg));
         if (!result)
             fprintf(stderr, "dval_from_string: %s\n", errmsg);
-        else if (bindings_out) {
-            bindings = single_binding_from_node(result, &nbindings);
-            *bindings_out = bindings;
-        }
-        if (number_out)
-            *number_out = nbindings;
+        else if (bindings_out)
+            *bindings_out = single_binding_from_node(result);
         return result;
     }
 
@@ -1083,26 +1069,51 @@ static dval_t *dval_from_string_impl(const char *s,
     dval_t *result = parse_expression_region(s, expr_end, &syms,
                                              "dval_from_string", 1);
     if (result && bindings_out)
-        bindings = symtab_build_bindings(&syms, &nbindings);
+        bindings = symtab_build_bindings(&syms);
 
     symtab_free(&syms);
     if (result && bindings_out)
         *bindings_out = bindings;
-    if (result && number_out)
-        *number_out = nbindings;
     return result;
 }
 
-dval_t *dval_from_string(const char *s)
+dval_t *dval_from_string(const char *s, dval_bindings_t **bnd_out)
 {
-    return dval_from_string_impl(s, NULL, NULL);
+    return dval_from_string_impl(s, bnd_out);
 }
 
-dval_t *dval_from_string_with_bindings(const char *s,
-                                       dval_binding_t **bindings_out,
-                                       size_t *number_out)
+static dval_binding_entry_t *bnd_find_entry(dval_bindings_t *bnd,
+                                            const char *name)
 {
-    return dval_from_string_impl(s, bindings_out, number_out);
+    char *norm;
+    dval_binding_entry_t *entry = NULL;
+
+    if (!bnd || !bnd->index || !name)
+        return NULL;
+
+    norm = dv_normalize_binding_name(name);
+    if (!norm)
+        return NULL;
+
+    dictionary_get(bnd->index, &norm, &entry);
+    free(norm);
+    return entry;
+}
+
+dval_t *dval_bindings_get(dval_bindings_t *bnd, const char *name)
+{
+    dval_binding_entry_t *entry = bnd_find_entry(bnd, name);
+
+    return entry ? entry->dval : NULL;
+}
+
+void dval_bindings_free(dval_bindings_t *bnd)
+{
+    if (!bnd)
+        return;
+    dictionary_destroy(bnd->index);
+    free(bnd->storage);
+    free(bnd);
 }
 
 dval_t *dval_from_expression_string(const char *expr,
@@ -1152,48 +1163,4 @@ dval_t *dval_from_expression_string(const char *expr,
                                      "dval_from_expression_string", 1);
     symtab_free(&syms);
     return result;
-}
-
-dval_binding_t *dval_binding_get(dval_binding_t *bindings,
-                                 size_t number,
-                                 const char *name)
-{
-    char *norm;
-
-    if (!bindings || !name)
-        return NULL;
-
-    norm = dv_normalize_binding_name(name);
-    if (!norm)
-        return NULL;
-
-    for (size_t i = 0; i < number; ++i) {
-        if (strcmp(bindings[i].name, norm) == 0) {
-            free(norm);
-            return &bindings[i];
-        }
-    }
-
-    free(norm);
-    return NULL;
-}
-
-dval_binding_t *dval_binding_find(dval_binding_t *bindings,
-                                  size_t number,
-                                  const char *name)
-{
-    return dval_binding_get(bindings, number, name);
-}
-
-int dval_binding_set_num(dval_binding_t *bindings,
-                         size_t number,
-                         const char *name,
-                         number_t value)
-{
-    dval_binding_t *binding = dval_binding_get(bindings, number, name);
-
-    if (!binding)
-        return -1;
-    dv_set_val_num(binding->dval, value);
-    return 0;
 }

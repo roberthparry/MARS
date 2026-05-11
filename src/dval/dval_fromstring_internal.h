@@ -3,6 +3,7 @@
 
 #include <stddef.h>
 
+#include "dictionary.h"
 #include "dval.h"
 #include "dval_internal.h"
 
@@ -33,7 +34,21 @@ void symtab_add(symtab_t *t, const char *name, dval_t *node);
 dval_t *symtab_lookup(const symtab_t *t, const char *name);
 void symtab_free(symtab_t *t);
 int symtab_add_borrowed(symtab_t *t, const char *name, dval_t *node);
-dval_binding_t *symtab_build_bindings(const symtab_t *t, size_t *number_out);
-dval_binding_t *single_binding_from_node(dval_t *node, size_t *number_out);
+
+typedef struct {
+    const char *name;
+    dval_t *dval;
+    bool is_constant;
+} dval_binding_entry_t;
+
+struct dval_bindings_t {
+    size_t count;
+    dval_binding_entry_t *entries;
+    dictionary_t *index;
+    void *storage;
+};
+
+dval_bindings_t *symtab_build_bindings(const symtab_t *t);
+dval_bindings_t *single_binding_from_node(dval_t *node);
 
 #endif

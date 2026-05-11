@@ -184,9 +184,8 @@ static int run_readme_example(void)
 static int run_readme_from_string_example(void)
 {
     const size_t old_prec_bits = num_get_default_prec_bits();
-    dval_binding_t *bindings = NULL;
-    size_t nbindings = 0;
-    dval_binding_t *x_binding;
+    dval_bindings_t *bindings = NULL;
+    dval_t *x;
     dval_t *f;
     dval_t *df_dx;
     const dval_t *d2f_dx;
@@ -196,34 +195,33 @@ static int run_readme_from_string_example(void)
 
     if (num_set_default_prec_bits(384u) != 0)
         return 1;
-    f = dval_from_string_with_bindings("{ exp(sin(x)) + 3*x^2 - 7 | x = 1.25 }",
-                                       &bindings,
-                                       &nbindings);
+    f = dval_from_string("{ exp(sin(x)) + 3*x^2 - 7 | x = 1.25 }",
+                         &bindings);
     if (!f) {
         num_set_default_prec_bits(old_prec_bits);
         return 1;
     }
-    x_binding = dval_binding_find(bindings, nbindings, "x");
-    if (!x_binding) {
+    x = dval_bindings_get(bindings, "x");
+    if (!x) {
         dv_free(f);
-        free(bindings);
+        dval_bindings_free(bindings);
         num_set_default_prec_bits(old_prec_bits);
         return 1;
     }
 
-    df_dx = dv_create_deriv(f, x_binding->dval);
+    df_dx = dv_create_deriv(f, x);
     if (!df_dx) {
         dv_free(f);
-        free(bindings);
+        dval_bindings_free(bindings);
         num_set_default_prec_bits(old_prec_bits);
         return 1;
     }
 
-    d2f_dx = dv_get_deriv(df_dx, x_binding->dval);
+    d2f_dx = dv_get_deriv(df_dx, x);
     if (!d2f_dx) {
         dv_free(df_dx);
         dv_free(f);
-        free(bindings);
+        dval_bindings_free(bindings);
         num_set_default_prec_bits(old_prec_bits);
         return 1;
     }
@@ -247,7 +245,7 @@ static int run_readme_from_string_example(void)
     num_destroy(&f_val);
     dv_free(df_dx);
     dv_free(f);
-    free(bindings);
+    dval_bindings_free(bindings);
     num_set_default_prec_bits(old_prec_bits);
     return 0;
 }

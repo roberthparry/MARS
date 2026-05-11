@@ -110,8 +110,8 @@ int dv_eval_derivatives(const dval_t *expr,
         if (node->ops->arity == DV_OP_ATOM || num_is_zero(bars[i]))
             continue;
 
-        a_bar = dv_reverse_zero();
-        b_bar = dv_reverse_zero();
+        a_bar = (number_t){0};
+        b_bar = (number_t){0};
         node->ops->reverse(node, &bars[i], &a_bar, &b_bar);
 
         if (node->ops->arity != DV_OP_ATOM) {

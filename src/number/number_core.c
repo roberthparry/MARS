@@ -1,7 +1,9 @@
 #include "number.h"
 #include "number_internal.h"
+#include "internal/mint_internal.h"
 #include "internal/mcomplex_internal.h"
 #include "internal/mfloat_internal.h"
+#include "mrational/mrational_internal.h"
 
 #include <ctype.h>
 #include <limits.h>
@@ -191,12 +193,20 @@ static void number_destroy_none(number_t *number)
 
 static void number_destroy_mint(number_t *number)
 {
+    if (!number)
+        return;
+    if (mint_is_immortal(number_impl(number)->value.mi))
+        return;
     if (number)
         mi_free(number_impl(number)->value.mi);
 }
 
 static void number_destroy_mrational(number_t *number)
 {
+    if (!number)
+        return;
+    if (number_impl(number)->value.mr && number_impl(number)->value.mr->immortal)
+        return;
     if (number)
         mr_free(number_impl(number)->value.mr);
 }
@@ -351,6 +361,7 @@ static bool number_eq_same_tol_with_precision(const number_t *a,
                                               const number_t *b,
                                               size_t precision_bits)
 {
+    number_t delta;
     number_t diff;
     number_t one;
     number_t tolerance;
@@ -358,10 +369,12 @@ static bool number_eq_same_tol_with_precision(const number_t *a,
 
     if (!a || !b || precision_bits == 0u)
         return false;
-    diff = num_abs(num_sub(*a, *b));
+    delta = num_sub(*a, *b);
+    diff = num_abs(delta);
     one = number_create_exact_mfloat_long_prec(1, precision_bits);
     tolerance = num_ldexp(one, 4 - (int)precision_bits);
     rc = num_cmp(diff, tolerance) <= 0;
+    num_destroy(&delta);
     num_destroy(&diff);
     num_destroy(&one);
     num_destroy(&tolerance);
@@ -956,6 +969,8 @@ static number_t *number_clone_mint(const number_t *number)
 
     if (!number || !number_impl_const(number)->value.mi)
         return NULL;
+    if (mint_is_immortal(number_impl_const(number)->value.mi))
+        return number_wrap_mint(number_impl_const(number)->value.mi);
     copy = mi_clone(number_impl_const(number)->value.mi);
     return copy ? number_wrap_mint(copy) : NULL;
 }
@@ -966,6 +981,8 @@ static number_t *number_clone_mrational(const number_t *number)
 
     if (!number || !number_impl_const(number)->value.mr)
         return NULL;
+    if (number_impl_const(number)->value.mr->immortal)
+        return number_wrap_mrational(number_impl_const(number)->value.mr);
     copy = mr_clone(number_impl_const(number)->value.mr);
     return copy ? number_wrap_mrational(copy) : NULL;
 }

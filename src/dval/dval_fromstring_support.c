@@ -363,60 +363,133 @@ int symtab_add_borrowed(symtab_t *t, const char *name, dval_t *node)
     return 0;
 }
 
-dval_binding_t *symtab_build_bindings(const symtab_t *t, size_t *number_out)
+static size_t binding_name_hash(const void *key)
 {
-    dval_binding_t *bindings;
+    const unsigned char *s = (const unsigned char *)*(const char * const *)key;
+    size_t hash = 1469598103934665603ull;
+
+    while (*s) {
+        hash ^= (size_t)*s++;
+        hash *= 1099511628211ull;
+    }
+    return hash;
+}
+
+static int binding_name_cmp(const void *a, const void *b)
+{
+    const char *ka = *(const char * const *)a;
+    const char *kb = *(const char * const *)b;
+
+    return strcmp(ka, kb);
+}
+
+static dictionary_t *binding_index_create(void)
+{
+    return dictionary_create(sizeof(char *),
+                             sizeof(dval_binding_entry_t *),
+                             binding_name_hash,
+                             binding_name_cmp,
+                             NULL,
+                             NULL,
+                             NULL,
+                             NULL,
+                             NULL);
+}
+
+static void bindings_destroy_partial(dval_bindings_t *bindings)
+{
+    if (!bindings)
+        return;
+    dictionary_destroy(bindings->index);
+    free(bindings->storage);
+    free(bindings);
+}
+
+static dval_bindings_t *bindings_create(size_t count, size_t total_name_bytes)
+{
+    dval_bindings_t *bindings = calloc(1, sizeof(*bindings));
+
+    if (!bindings)
+        return NULL;
+
+    bindings->storage = calloc(1, sizeof(bindings->entries[0]) * count +
+                                  total_name_bytes);
+    bindings->index = binding_index_create();
+    if (!bindings->storage || !bindings->index) {
+        bindings_destroy_partial(bindings);
+        return NULL;
+    }
+
+    bindings->count = count;
+    bindings->entries = (dval_binding_entry_t *)bindings->storage;
+    return bindings;
+}
+
+static int bindings_index_entry(dval_bindings_t *bindings,
+                                dval_binding_entry_t *entry)
+{
+    return dictionary_set(bindings->index, &entry->name, &entry) ? 0 : -1;
+}
+
+dval_bindings_t *symtab_build_bindings(const symtab_t *t)
+{
+    dval_bindings_t *bindings;
     char *name_store;
     size_t total_name_bytes = 0;
 
-    if (number_out)
-        *number_out = 0;
     if (!t || t->count <= 0)
         return NULL;
 
     for (int i = 0; i < t->count; ++i)
         total_name_bytes += strlen(t->entries[i].name) + 1;
 
-    bindings = calloc(1, sizeof(*bindings) * (size_t)t->count + total_name_bytes);
+    bindings = bindings_create((size_t)t->count, total_name_bytes);
     if (!bindings)
         return NULL;
-
-    name_store = (char *)(bindings + t->count);
+    name_store = (char *)(bindings->entries + t->count);
     for (int i = 0; i < t->count; ++i) {
+        dval_binding_entry_t *entry;
         size_t n = strlen(t->entries[i].name) + 1;
+
         memcpy(name_store, t->entries[i].name, n);
-        bindings[i].name = name_store;
-        bindings[i].dval = t->entries[i].node;
-        bindings[i].is_constant = (t->entries[i].node &&
-                                   t->entries[i].node->ops == &ops_const);
+        entry = &bindings->entries[i];
+        entry->name = name_store;
+        entry->dval = t->entries[i].node;
+        entry->is_constant = (t->entries[i].node &&
+                              t->entries[i].node->ops == &ops_const);
+        if (bindings_index_entry(bindings, entry) != 0) {
+            bindings_destroy_partial(bindings);
+            return NULL;
+        }
         name_store += n;
     }
 
-    if (number_out)
-        *number_out = (size_t)t->count;
     return bindings;
 }
 
-dval_binding_t *single_binding_from_node(dval_t *node, size_t *number_out)
+dval_bindings_t *single_binding_from_node(dval_t *node)
 {
-    dval_binding_t *bindings;
+    dval_bindings_t *bindings;
     size_t n;
 
-    if (number_out)
-        *number_out = 0;
     if (!node || !node->name || !*node->name)
         return NULL;
 
     n = strlen(node->name) + 1;
-    bindings = calloc(1, sizeof(*bindings) + n);
+    bindings = bindings_create(1u, n);
     if (!bindings)
         return NULL;
+    bindings->entries[0].name = (char *)(bindings->entries + 1);
+    memcpy((char *)bindings->entries[0].name, node->name, n);
+    bindings->entries[0].dval = node;
+    bindings->entries[0].is_constant = (node->ops == &ops_const);
+    {
+        dval_binding_entry_t *entry = &bindings->entries[0];
 
-    bindings[0].name = (char *)(bindings + 1);
-    memcpy((char *)bindings[0].name, node->name, n);
-    bindings[0].dval = node;
-    bindings[0].is_constant = (node->ops == &ops_const);
-    if (number_out)
-        *number_out = 1;
+        if (bindings_index_entry(bindings, entry) != 0) {
+            bindings_destroy_partial(bindings);
+            return NULL;
+        }
+    }
     return bindings;
 }

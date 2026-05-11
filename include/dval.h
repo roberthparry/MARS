@@ -27,19 +27,7 @@
  */
 
 typedef struct _dval_t dval_t;
-
-/**
- * @brief Borrowed symbolic binding returned by dval_from_string_with_bindings().
- *
- * The @p name pointer and @p dval handle remain valid for as long as the
- * dval returned by dval_from_string_with_bindings() remains alive. Releasing
- * the bindings array itself only requires a plain free(bindings).
- */
-typedef struct {
-    const char *name;
-    dval_t *dval;
-    bool is_constant;
-} dval_binding_t;
+typedef struct dval_bindings_t dval_bindings_t;
 
 /**
  * @brief Canonical differentiable constants for zero and one.
@@ -411,54 +399,34 @@ void dv_print(const dval_t *dv);
  *   everything else, including @p τ and @p @tau, becomes a named variable
  *   initialised to NaN
  *
+ * If @p bnd_out is non-NULL and the parsed expression is symbolic, the
+ * function also returns an opaque bindings object that can be queried with
+ * dval_bindings_get() and later released with dval_bindings_free(). If bindings are not needed,
+ * pass NULL.
+ *
  * Returns an owning handle on success, or NULL on error (details written to
- * stderr).  The caller must call dv_free() on the returned pointer exactly
+ * stderr). The caller must call dv_free() on the returned pointer exactly
  * once.
  */
-dval_t *dval_from_string(const char *s);
+dval_t *dval_from_string(const char *s, dval_bindings_t **bnd_out);
 
 /**
- * @brief Construct a dval_t from an expression-style string and return bindings.
+ * @brief Look up a parsed binding by name.
  *
- * Behaves like dval_from_string(), but when the parsed expression is symbolic
- * it can also return a heap-allocated array of borrowed symbol bindings.
- * The array itself should be released with free(*bindings_out).
+ * The lookup accepts normalised binding names. Bracketed names may be queried
+ * either as @p [radius] or @p radius. Greek-style aliases are normalised too,
+ * so a parsed binding may be queried as either @p @pi or @p π, @p @phi or
+ * @p φ, @p @gamma or @p γ, and @p @tau or @p τ.
  *
- * If the parsed expression is purely numeric, @p *bindings_out is set to NULL
- * and @p *number_out is set to 0.
+ * Returns the borrowed `dval_t *` leaf for that binding, or NULL if no such
+ * binding exists.
  */
-dval_t *dval_from_string_with_bindings(const char *s,
-                                       dval_binding_t **bindings_out,
-                                       size_t *number_out);
+dval_t *dval_bindings_get(dval_bindings_t *bnd, const char *name);
 
 /**
- * @brief Find a returned symbolic binding by name.
- *
- * The lookup accepts the normalised binding names returned by
- * dval_from_string_with_bindings(). Bracketed names may be queried either as
- * @p [radius] or @p radius.
+ * @brief Destroy an opaque bindings object returned by dval_from_string().
  */
-dval_binding_t *dval_binding_get(dval_binding_t *bindings,
-                                 size_t number,
-                                 const char *name);
-
-/**
- * @brief Synonym for dval_binding_get().
- */
-dval_binding_t *dval_binding_find(dval_binding_t *bindings,
-                                  size_t number,
-                                  const char *name);
-
-/**
- * @brief Set a returned symbolic binding from a `number_t` value.
- *
- * @p value is passed by value and cloned into the binding target.
- * Returns 0 on success, or -1 if no binding named @p name exists.
- */
-int dval_binding_set_num(dval_binding_t *bindings,
-                         size_t number,
-                         const char *name,
-                         number_t value);
+void dval_bindings_free(dval_bindings_t *bnd);
 
 /**
  * @brief Construct a dval_t from a bare expression string using supplied symbols.
