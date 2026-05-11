@@ -127,6 +127,15 @@ typedef enum number_const_id_t {
 
 extern const number_math_family_t number_math_family_binary_table[][NUMBER_MATH_MCOMPLEX + 1];
 extern const number_kind_t number_math_family_target_kind_table[];
+/* Concrete backend vtables (defined in number_vtables.c). */
+extern const number_vtable_t number_double_vt;
+extern const number_vtable_t number_qfloat_vt;
+extern const number_vtable_t number_qcomplex_vt;
+extern const number_vtable_t number_mint_vt;
+extern const number_vtable_t number_mrational_vt;
+extern const number_vtable_t number_mfloat_vt;
+extern const number_vtable_t number_mcomplex_vt;
+/* Backend vtable registry (defined in number_vtables.c). */
 extern const number_vtable_t *const number_dispatch[];
 extern const size_t number_dispatch_count;
 extern size_t number_default_precision_bits;

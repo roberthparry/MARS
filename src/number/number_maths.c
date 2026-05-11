@@ -1176,7 +1176,7 @@ number_t num_erfcinv(const number_t number)
 
 number_t num_lambert_w0(const number_t number)
 {
-    return number_apply_unary_math(number, qf_lambert_w0, NULL, mf_lambert_w0, mc_lambert_w0);
+    return number_apply_unary_math(number, qf_lambert_w0, qc_productlog, mf_lambert_w0, mc_lambert_w0);
 }
 
 number_t num_lambert_wm1(const number_t number)

@@ -162,36 +162,36 @@ number_t number_wrap_mcomplex_with_precision(mcomplex_t *value, size_t precision
     return number_take(number_wrap_mcomplex(value));
 }
 
-static int number_set_precision_noop(number_t *number, size_t precision_bits)
+ int number_set_precision_noop(number_t *number, size_t precision_bits)
 {
     (void)number;
     return precision_bits == 0u ? -1 : 0;
 }
 
-static size_t number_precision_fixed53(const number_t *number)
+ size_t number_precision_fixed53(const number_t *number)
 {
     (void)number;
     return 53u;
 }
 
-static size_t number_precision_fixed106(const number_t *number)
+ size_t number_precision_fixed106(const number_t *number)
 {
     (void)number;
     return 106u;
 }
 
-static size_t number_precision_zero(const number_t *number)
+ size_t number_precision_zero(const number_t *number)
 {
     (void)number;
     return 0u;
 }
 
-static void number_destroy_none(number_t *number)
+void number_destroy_none(number_t *number)
 {
     (void)number;
 }
 
-static void number_destroy_mint(number_t *number)
+void number_destroy_mint(number_t *number)
 {
     if (!number)
         return;
@@ -201,7 +201,7 @@ static void number_destroy_mint(number_t *number)
         mi_free(number_impl(number)->value.mi);
 }
 
-static void number_destroy_mrational(number_t *number)
+void number_destroy_mrational(number_t *number)
 {
     if (!number)
         return;
@@ -211,14 +211,14 @@ static void number_destroy_mrational(number_t *number)
         mr_free(number_impl(number)->value.mr);
 }
 
-static void number_destroy_mfloat(number_t *number)
+void number_destroy_mfloat(number_t *number)
 {
     if (!number || !number_impl(number)->value.mf)
         return;
     mf_free(number_impl(number)->value.mf);
 }
 
-static void number_destroy_mcomplex(number_t *number)
+void number_destroy_mcomplex(number_t *number)
 {
     if (!number || !number_impl(number)->value.mc)
         return;
@@ -227,62 +227,55 @@ static void number_destroy_mcomplex(number_t *number)
     mc_free(number_impl(number)->value.mc);
 }
 
-static const number_vtable_t number_double_vt;
-static const number_vtable_t number_qfloat_vt;
-static const number_vtable_t number_qcomplex_vt;
-static const number_vtable_t number_mint_vt;
-static const number_vtable_t number_mrational_vt;
-static const number_vtable_t number_mfloat_vt;
-static const number_vtable_t number_mcomplex_vt;
-static number_t number_const_like_double(const number_t *like, number_const_id_t id);
-static number_t number_const_like_qfloat(const number_t *like, number_const_id_t id);
-static number_t number_const_like_qcomplex(const number_t *like, number_const_id_t id);
-static number_t number_const_like_mexact(const number_t *like, number_const_id_t id);
-static number_t number_const_like_mfloat(const number_t *like, number_const_id_t id);
-static number_t number_const_like_mcomplex(const number_t *like, number_const_id_t id);
+ number_t number_const_like_double(const number_t *like, number_const_id_t id);
+ number_t number_const_like_qfloat(const number_t *like, number_const_id_t id);
+ number_t number_const_like_qcomplex(const number_t *like, number_const_id_t id);
+ number_t number_const_like_mexact(const number_t *like, number_const_id_t id);
+ number_t number_const_like_mfloat(const number_t *like, number_const_id_t id);
+ number_t number_const_like_mcomplex(const number_t *like, number_const_id_t id);
 
-static bool number_is_real_default(const number_t *number)
+ bool number_is_real_default(const number_t *number)
 {
     return number != NULL;
 }
 
-static bool number_value_is_immortal_double(const number_t *number)
+ bool number_value_is_immortal_double(const number_t *number)
 {
     (void)number;
     return false;
 }
 
-static bool number_value_is_immortal_qfloat(const number_t *number)
+ bool number_value_is_immortal_qfloat(const number_t *number)
 {
     (void)number;
     return false;
 }
 
-static bool number_value_is_immortal_qcomplex(const number_t *number)
+ bool number_value_is_immortal_qcomplex(const number_t *number)
 {
     (void)number;
     return false;
 }
 
-static bool number_value_is_immortal_mint(const number_t *number)
+ bool number_value_is_immortal_mint(const number_t *number)
 {
     return number && number_impl_const(number)->value.mi &&
         mint_is_immortal(number_impl_const(number)->value.mi);
 }
 
-static bool number_value_is_immortal_mrational(const number_t *number)
+ bool number_value_is_immortal_mrational(const number_t *number)
 {
     return number && number_impl_const(number)->value.mr &&
         number_impl_const(number)->value.mr->immortal;
 }
 
-static bool number_value_is_immortal_mfloat(const number_t *number)
+ bool number_value_is_immortal_mfloat(const number_t *number)
 {
     return number && number_impl_const(number)->value.mf &&
         mfloat_is_immortal(number_impl_const(number)->value.mf);
 }
 
-static bool number_value_is_immortal_mcomplex(const number_t *number)
+ bool number_value_is_immortal_mcomplex(const number_t *number)
 {
     return number && number_impl_const(number)->value.mc &&
         mcomplex_is_immortal(number_impl_const(number)->value.mc);
@@ -297,68 +290,68 @@ static bool number_value_is_immortal(const number_t *number)
     return vt->is_immortal(number);
 }
 
-static bool number_is_zero_double(const number_t *number)
+ bool number_is_zero_double(const number_t *number)
 {
     return number && number_impl_const(number)->value.d == 0.0;
 }
 
-static bool number_is_zero_qfloat(const number_t *number)
+ bool number_is_zero_qfloat(const number_t *number)
 {
     return number && qf_eq(number_impl_const(number)->value.qf, QF_ZERO);
 }
 
-static bool number_is_zero_qcomplex(const number_t *number)
+ bool number_is_zero_qcomplex(const number_t *number)
 {
     return number && qc_eq(number_impl_const(number)->value.qc, QC_ZERO);
 }
 
-static bool number_is_zero_mint(const number_t *number)
+ bool number_is_zero_mint(const number_t *number)
 {
     return number && mi_is_zero(number_impl_const(number)->value.mi);
 }
 
-static bool number_is_zero_mrational(const number_t *number)
+ bool number_is_zero_mrational(const number_t *number)
 {
     return number && mr_is_zero(number_impl_const(number)->value.mr);
 }
 
-static bool number_is_zero_mfloat(const number_t *number)
+ bool number_is_zero_mfloat(const number_t *number)
 {
     return number && mf_is_zero(number_impl_const(number)->value.mf);
 }
 
-static bool number_is_zero_mcomplex(const number_t *number)
+ bool number_is_zero_mcomplex(const number_t *number)
 {
     return number && mc_is_zero(number_impl_const(number)->value.mc);
 }
 
-static bool number_is_one_double(const number_t *number)
+ bool number_is_one_double(const number_t *number)
 {
     return number && number_impl_const(number)->value.d == 1.0;
 }
 
-static bool number_is_one_qfloat(const number_t *number)
+ bool number_is_one_qfloat(const number_t *number)
 {
     return number && qf_eq(number_impl_const(number)->value.qf, QF_ONE);
 }
 
-static bool number_is_real_qcomplex(const number_t *number)
+ bool number_is_real_qcomplex(const number_t *number)
 {
     return number && qf_eq(qc_imag(number_impl_const(number)->value.qc), QF_ZERO);
 }
 
-static bool number_is_one_qcomplex(const number_t *number)
+ bool number_is_one_qcomplex(const number_t *number)
 {
     return number && qc_eq(number_impl_const(number)->value.qc, QC_ONE);
 }
 
-static bool number_is_one_mint(const number_t *number)
+ bool number_is_one_mint(const number_t *number)
 {
     return number && number_impl_const(number)->value.mi &&
         mi_cmp(number_impl_const(number)->value.mi, MI_ONE) == 0;
 }
 
-static bool number_is_one_mrational(const number_t *number)
+ bool number_is_one_mrational(const number_t *number)
 {
     if (!number || !number_impl_const(number)->value.mr)
         return false;
@@ -366,57 +359,57 @@ static bool number_is_one_mrational(const number_t *number)
         mi_cmp(mr_numerator(number_impl_const(number)->value.mr), MI_ONE) == 0;
 }
 
-static bool number_is_one_mfloat(const number_t *number)
+ bool number_is_one_mfloat(const number_t *number)
 {
     return number && mf_eq(number_impl_const(number)->value.mf, MF_ONE);
 }
 
-static bool number_is_real_mcomplex(const number_t *number)
+ bool number_is_real_mcomplex(const number_t *number)
 {
     return number && mf_is_zero(mc_imag(number_impl_const(number)->value.mc));
 }
 
-static bool number_is_one_mcomplex(const number_t *number)
+ bool number_is_one_mcomplex(const number_t *number)
 {
     return number && mc_eq(number_impl_const(number)->value.mc, MC_ONE);
 }
 
-static bool number_eq_same_double(const number_t *a, const number_t *b)
+ bool number_eq_same_double(const number_t *a, const number_t *b)
 {
     return a && b && number_impl_const(a)->value.d == number_impl_const(b)->value.d;
 }
 
-static bool number_eq_same_qfloat(const number_t *a, const number_t *b)
+ bool number_eq_same_qfloat(const number_t *a, const number_t *b)
 {
     return a && b &&
         qf_eq(number_impl_const(a)->value.qf, number_impl_const(b)->value.qf);
 }
 
-static bool number_eq_same_qcomplex(const number_t *a, const number_t *b)
+ bool number_eq_same_qcomplex(const number_t *a, const number_t *b)
 {
     return a && b &&
         qc_eq(number_impl_const(a)->value.qc, number_impl_const(b)->value.qc);
 }
 
-static bool number_eq_same_mint(const number_t *a, const number_t *b)
+ bool number_eq_same_mint(const number_t *a, const number_t *b)
 {
     return a && b &&
         mi_cmp(number_impl_const(a)->value.mi, number_impl_const(b)->value.mi) == 0;
 }
 
-static bool number_eq_same_mrational(const number_t *a, const number_t *b)
+ bool number_eq_same_mrational(const number_t *a, const number_t *b)
 {
     return a && b &&
         mr_eq(number_impl_const(a)->value.mr, number_impl_const(b)->value.mr);
 }
 
-static bool number_eq_same_mfloat(const number_t *a, const number_t *b)
+ bool number_eq_same_mfloat(const number_t *a, const number_t *b)
 {
     return a && b &&
         mf_eq(number_impl_const(a)->value.mf, number_impl_const(b)->value.mf);
 }
 
-static bool number_eq_same_mcomplex(const number_t *a, const number_t *b)
+ bool number_eq_same_mcomplex(const number_t *a, const number_t *b)
 {
     return a && b &&
         mc_eq(number_impl_const(a)->value.mc, number_impl_const(b)->value.mc);
@@ -446,32 +439,32 @@ static bool number_eq_same_tol_with_precision(const number_t *a,
     return rc;
 }
 
-static bool number_eq_same_tol_double(const number_t *a, const number_t *b)
+ bool number_eq_same_tol_double(const number_t *a, const number_t *b)
 {
     return number_eq_same_tol_with_precision(a, b, 53u);
 }
 
-static bool number_eq_same_tol_qfloat(const number_t *a, const number_t *b)
+ bool number_eq_same_tol_qfloat(const number_t *a, const number_t *b)
 {
     return number_eq_same_tol_with_precision(a, b, 106u);
 }
 
-static bool number_eq_same_tol_qcomplex(const number_t *a, const number_t *b)
+ bool number_eq_same_tol_qcomplex(const number_t *a, const number_t *b)
 {
     return number_eq_same_tol_with_precision(a, b, 106u);
 }
 
-static bool number_eq_same_tol_mint(const number_t *a, const number_t *b)
+ bool number_eq_same_tol_mint(const number_t *a, const number_t *b)
 {
     return number_eq_same_mint(a, b);
 }
 
-static bool number_eq_same_tol_mrational(const number_t *a, const number_t *b)
+ bool number_eq_same_tol_mrational(const number_t *a, const number_t *b)
 {
     return number_eq_same_mrational(a, b);
 }
 
-static bool number_eq_same_tol_mfloat(const number_t *a, const number_t *b)
+ bool number_eq_same_tol_mfloat(const number_t *a, const number_t *b)
 {
     const number_vtable_t *vt = a ? number_vt(a) : NULL;
 
@@ -479,7 +472,7 @@ static bool number_eq_same_tol_mfloat(const number_t *a, const number_t *b)
         (a && vt && vt->get_precision) ? vt->get_precision(a) : 0u);
 }
 
-static bool number_eq_same_tol_mcomplex(const number_t *a, const number_t *b)
+ bool number_eq_same_tol_mcomplex(const number_t *a, const number_t *b)
 {
     const number_vtable_t *vt = a ? number_vt(a) : NULL;
 
@@ -487,34 +480,34 @@ static bool number_eq_same_tol_mcomplex(const number_t *a, const number_t *b)
         (a && vt && vt->get_precision) ? vt->get_precision(a) : 0u);
 }
 
-static bool number_is_finite_double(const number_t *number)
+ bool number_is_finite_double(const number_t *number)
 {
     return number && isfinite(number_impl_const(number)->value.d);
 }
 
-static bool number_is_finite_qfloat(const number_t *number)
+ bool number_is_finite_qfloat(const number_t *number)
 {
     return number && !qf_isnan(number_impl_const(number)->value.qf) &&
         !qf_isinf(number_impl_const(number)->value.qf);
 }
 
-static bool number_is_finite_qcomplex(const number_t *number)
+ bool number_is_finite_qcomplex(const number_t *number)
 {
     return number && !qc_isnan(number_impl_const(number)->value.qc) &&
         !qc_isinf(number_impl_const(number)->value.qc);
 }
 
-static bool number_is_finite_exact(const number_t *number)
+ bool number_is_finite_exact(const number_t *number)
 {
     return number != NULL;
 }
 
-static bool number_is_finite_mfloat(const number_t *number)
+ bool number_is_finite_mfloat(const number_t *number)
 {
     return number && mf_is_finite(number_impl_const(number)->value.mf);
 }
 
-static bool number_is_finite_mcomplex(const number_t *number)
+ bool number_is_finite_mcomplex(const number_t *number)
 {
     return number && !mc_isnan(number_impl_const(number)->value.mc) &&
         !mc_isinf(number_impl_const(number)->value.mc) &&
@@ -522,69 +515,69 @@ static bool number_is_finite_mcomplex(const number_t *number)
         mf_is_finite(mc_imag(number_impl_const(number)->value.mc));
 }
 
-static bool number_is_nan_double(const number_t *number)
+ bool number_is_nan_double(const number_t *number)
 {
     return !number || isnan(number_impl_const(number)->value.d);
 }
 
-static bool number_is_nan_qfloat(const number_t *number)
+ bool number_is_nan_qfloat(const number_t *number)
 {
     return !number || qf_isnan(number_impl_const(number)->value.qf);
 }
 
-static bool number_is_nan_qcomplex(const number_t *number)
+ bool number_is_nan_qcomplex(const number_t *number)
 {
     return !number || qc_isnan(number_impl_const(number)->value.qc);
 }
 
-static bool number_is_nan_exact(const number_t *number)
+ bool number_is_nan_exact(const number_t *number)
 {
     (void)number;
     return false;
 }
 
-static bool number_is_nan_mfloat(const number_t *number)
+ bool number_is_nan_mfloat(const number_t *number)
 {
     return !number || mf_is_nan(number_impl_const(number)->value.mf);
 }
 
-static bool number_is_nan_mcomplex(const number_t *number)
+ bool number_is_nan_mcomplex(const number_t *number)
 {
     return !number || mc_isnan(number_impl_const(number)->value.mc);
 }
 
-static bool number_is_inf_double(const number_t *number)
+ bool number_is_inf_double(const number_t *number)
 {
     return number && isinf(number_impl_const(number)->value.d);
 }
 
-static bool number_is_inf_qfloat(const number_t *number)
+ bool number_is_inf_qfloat(const number_t *number)
 {
     return number && qf_isinf(number_impl_const(number)->value.qf);
 }
 
-static bool number_is_inf_qcomplex(const number_t *number)
+ bool number_is_inf_qcomplex(const number_t *number)
 {
     return number && qc_isinf(number_impl_const(number)->value.qc);
 }
 
-static bool number_is_inf_exact(const number_t *number)
+ bool number_is_inf_exact(const number_t *number)
 {
     (void)number;
     return false;
 }
 
-static bool number_is_inf_mfloat(const number_t *number)
+ bool number_is_inf_mfloat(const number_t *number)
 {
     return number && mf_is_inf(number_impl_const(number)->value.mf);
 }
 
-static bool number_is_inf_mcomplex(const number_t *number)
+ bool number_is_inf_mcomplex(const number_t *number)
 {
     return number && mc_isinf(number_impl_const(number)->value.mc);
 }
 
-static int number_cmp_same_double(const number_t *a, const number_t *b)
+ int number_cmp_same_double(const number_t *a, const number_t *b)
 {
     double av, bv;
 
@@ -595,13 +588,13 @@ static int number_cmp_same_double(const number_t *a, const number_t *b)
     return av < bv ? -1 : (av > bv ? 1 : 0);
 }
 
-static int number_cmp_same_qfloat(const number_t *a, const number_t *b)
+ int number_cmp_same_qfloat(const number_t *a, const number_t *b)
 {
     return (a && b) ? qf_cmp(number_impl_const(a)->value.qf,
                              number_impl_const(b)->value.qf) : 0;
 }
 
-static int number_cmp_same_qcomplex(const number_t *a, const number_t *b)
+ int number_cmp_same_qcomplex(const number_t *a, const number_t *b)
 {
     qcomplex_t left, right;
     int rc;
@@ -614,25 +607,25 @@ static int number_cmp_same_qcomplex(const number_t *a, const number_t *b)
     return rc != 0 ? rc : qf_cmp(qc_imag(left), qc_imag(right));
 }
 
-static int number_cmp_same_mint(const number_t *a, const number_t *b)
+ int number_cmp_same_mint(const number_t *a, const number_t *b)
 {
     return (a && b) ? mi_cmp(number_impl_const(a)->value.mi,
                              number_impl_const(b)->value.mi) : 0;
 }
 
-static int number_cmp_same_mrational(const number_t *a, const number_t *b)
+ int number_cmp_same_mrational(const number_t *a, const number_t *b)
 {
     return (a && b) ? mr_cmp(number_impl_const(a)->value.mr,
                              number_impl_const(b)->value.mr) : 0;
 }
 
-static int number_cmp_same_mfloat(const number_t *a, const number_t *b)
+ int number_cmp_same_mfloat(const number_t *a, const number_t *b)
 {
     return (a && b) ? mf_cmp(number_impl_const(a)->value.mf,
                              number_impl_const(b)->value.mf) : 0;
 }
 
-static int number_cmp_same_mcomplex(const number_t *a, const number_t *b)
+ int number_cmp_same_mcomplex(const number_t *a, const number_t *b)
 {
     int rc;
 
@@ -644,31 +637,31 @@ static int number_cmp_same_mcomplex(const number_t *a, const number_t *b)
                                  mc_imag(number_impl_const(b)->value.mc));
 }
 
-static int number_set_precision_mfloat(number_t *number, size_t precision_bits)
+ int number_set_precision_mfloat(number_t *number, size_t precision_bits)
 {
     return number && number_impl(number)->value.mf ?
         mf_set_precision(number_impl(number)->value.mf, precision_bits) : -1;
 }
 
-static size_t number_get_precision_mfloat(const number_t *number)
+ size_t number_get_precision_mfloat(const number_t *number)
 {
     return number && number_impl_const(number)->value.mf ?
         mf_get_precision(number_impl_const(number)->value.mf) : 0u;
 }
 
-static int number_set_precision_mcomplex(number_t *number, size_t precision_bits)
+ int number_set_precision_mcomplex(number_t *number, size_t precision_bits)
 {
     return number && number_impl(number)->value.mc ?
         mc_set_precision(number_impl(number)->value.mc, precision_bits) : -1;
 }
 
-static size_t number_get_precision_mcomplex(const number_t *number)
+ size_t number_get_precision_mcomplex(const number_t *number)
 {
     return number && number_impl_const(number)->value.mc ?
         mc_get_precision(number_impl_const(number)->value.mc) : 0u;
 }
 
-static long number_get_exponent2_double(const number_t *number)
+ long number_get_exponent2_double(const number_t *number)
 {
     int exp2;
 
@@ -678,25 +671,25 @@ static long number_get_exponent2_double(const number_t *number)
     return exp2 == FP_ILOGB0 || exp2 == FP_ILOGBNAN ? 0l : (long)exp2;
 }
 
-static long number_get_exponent2_qfloat(const number_t *number)
+ long number_get_exponent2_qfloat(const number_t *number)
 {
     if (!number)
         return 0l;
     return qf_get_exponent2(number_impl_const(number)->value.qf);
 }
 
-static long number_get_exponent2_zero(const number_t *number)
+ long number_get_exponent2_zero(const number_t *number)
 {
     (void)number;
     return 0l;
 }
 
-static long number_get_exponent2_mint(const number_t *number)
+ long number_get_exponent2_mint(const number_t *number)
 {
     return number ? (long)mi_bit_length(number_impl_const(number)->value.mi) - 1l : 0l;
 }
 
-static long number_get_exponent2_mrational(const number_t *number)
+ long number_get_exponent2_mrational(const number_t *number)
 {
     mint_t *num;
     mint_t *den;
@@ -730,42 +723,42 @@ static long number_get_exponent2_mrational(const number_t *number)
     return exp2;
 }
 
-static long number_get_exponent2_mfloat(const number_t *number)
+ long number_get_exponent2_mfloat(const number_t *number)
 {
     return number ? mf_get_exponent2(number_impl_const(number)->value.mf) : 0l;
 }
 
-static double number_to_double_double(const number_t *number)
+ double number_to_double_double(const number_t *number)
 {
     return number ? number_impl_const(number)->value.d : NAN;
 }
 
-static double number_to_double_qfloat(const number_t *number)
+ double number_to_double_qfloat(const number_t *number)
 {
     return number ? qf_to_double(number_impl_const(number)->value.qf) : NAN;
 }
 
-static double number_to_double_mfloat(const number_t *number)
+ double number_to_double_mfloat(const number_t *number)
 {
     return number ? mf_to_double(number_impl_const(number)->value.mf) : NAN;
 }
 
-static qfloat_t number_to_qfloat_double(const number_t *number)
+ qfloat_t number_to_qfloat_double(const number_t *number)
 {
     return number ? qf_from_double(number_impl_const(number)->value.d) : QF_NAN;
 }
 
-static qfloat_t number_to_qfloat_qfloat(const number_t *number)
+ qfloat_t number_to_qfloat_qfloat(const number_t *number)
 {
     return number ? number_impl_const(number)->value.qf : QF_NAN;
 }
 
-static qfloat_t number_to_qfloat_mfloat(const number_t *number)
+ qfloat_t number_to_qfloat_mfloat(const number_t *number)
 {
     return number ? mf_to_qfloat(number_impl_const(number)->value.mf) : QF_NAN;
 }
 
-static bool number_is_integer_double(const number_t *number)
+ bool number_is_integer_double(const number_t *number)
 {
     double x;
 
@@ -775,30 +768,30 @@ static bool number_is_integer_double(const number_t *number)
     return isfinite(x) && floor(x) == x;
 }
 
-static bool number_is_integer_qfloat(const number_t *number)
+ bool number_is_integer_qfloat(const number_t *number)
 {
     return number && qf_eq(qf_floor(number_impl_const(number)->value.qf),
                            number_impl_const(number)->value.qf);
 }
 
-static bool number_is_integer_qcomplex(const number_t *number)
+ bool number_is_integer_qcomplex(const number_t *number)
 {
     return number && qf_eq(qc_imag(number_impl_const(number)->value.qc), QF_ZERO) &&
         qf_eq(qf_floor(qc_real(number_impl_const(number)->value.qc)),
               qc_real(number_impl_const(number)->value.qc));
 }
 
-static bool number_is_integer_mint(const number_t *number)
+ bool number_is_integer_mint(const number_t *number)
 {
     return number != NULL;
 }
 
-static bool number_is_integer_mrational(const number_t *number)
+ bool number_is_integer_mrational(const number_t *number)
 {
     return number && mr_is_integer(number_impl_const(number)->value.mr);
 }
 
-static bool number_is_integer_mfloat(const number_t *number)
+ bool number_is_integer_mfloat(const number_t *number)
 {
     number_t copy;
     number_t floored;
@@ -814,7 +807,7 @@ static bool number_is_integer_mfloat(const number_t *number)
     return rc;
 }
 
-static bool number_is_integer_mcomplex(const number_t *number)
+ bool number_is_integer_mcomplex(const number_t *number)
 {
     number_t imag;
     number_t real;
@@ -833,13 +826,13 @@ static bool number_is_integer_mcomplex(const number_t *number)
     return rc;
 }
 
-static size_t number_get_mantissa_bits_double(const number_t *number)
+ size_t number_get_mantissa_bits_double(const number_t *number)
 {
     return number && isfinite(number_impl_const(number)->value.d) &&
             number_impl_const(number)->value.d != 0.0 ? 53u : 0u;
 }
 
-static size_t number_get_mantissa_bits_qfloat(const number_t *number)
+ size_t number_get_mantissa_bits_qfloat(const number_t *number)
 {
     return number &&
             !qf_isnan(number_impl_const(number)->value.qf) &&
@@ -847,73 +840,73 @@ static size_t number_get_mantissa_bits_qfloat(const number_t *number)
             !qf_eq(number_impl_const(number)->value.qf, QF_ZERO) ? 106u : 0u;
 }
 
-static size_t number_get_mantissa_bits_zero(const number_t *number)
+ size_t number_get_mantissa_bits_zero(const number_t *number)
 {
     (void)number;
     return 0u;
 }
 
-static size_t number_get_mantissa_bits_mfloat(const number_t *number)
+ size_t number_get_mantissa_bits_mfloat(const number_t *number)
 {
     return number ? mf_get_mantissa_bits(number_impl_const(number)->value.mf) : 0u;
 }
 
-static size_t number_get_mantissa_bits_mcomplex(const number_t *number)
+ size_t number_get_mantissa_bits_mcomplex(const number_t *number)
 {
     return number ? mf_get_mantissa_bits(mc_real(number_impl_const(number)->value.mc)) : 0u;
 }
 
-static bool number_get_mantissa_u64_false(const number_t *number, uint64_t *out)
+ bool number_get_mantissa_u64_false(const number_t *number, uint64_t *out)
 {
     (void)number;
     (void)out;
     return false;
 }
 
-static bool number_get_mantissa_u64_mfloat(const number_t *number, uint64_t *out)
+ bool number_get_mantissa_u64_mfloat(const number_t *number, uint64_t *out)
 {
     return number && out &&
         mf_get_mantissa_u64(number_impl_const(number)->value.mf, out);
 }
 
-static bool number_get_mantissa_u64_mcomplex(const number_t *number, uint64_t *out)
+ bool number_get_mantissa_u64_mcomplex(const number_t *number, uint64_t *out)
 {
     return number && out &&
         mf_get_mantissa_u64(mc_real(number_impl_const(number)->value.mc), out);
 }
 
-static int number_sign_double(const number_t *number)
+ int number_sign_double(const number_t *number)
 {
     return number && number_impl_const(number)->value.d < 0.0 ? -1 : 1;
 }
 
-static int number_sign_qfloat(const number_t *number)
+ int number_sign_qfloat(const number_t *number)
 {
     return number && qf_lt(number_impl_const(number)->value.qf, QF_ZERO) ? -1 : 1;
 }
 
-static int number_sign_zero(const number_t *number)
+ int number_sign_zero(const number_t *number)
 {
     (void)number;
     return 0;
 }
 
-static int number_sign_mint(const number_t *number)
+ int number_sign_mint(const number_t *number)
 {
     return number && mi_is_negative(number_impl_const(number)->value.mi) ? -1 : 1;
 }
 
-static int number_sign_mrational(const number_t *number)
+ int number_sign_mrational(const number_t *number)
 {
     return number && mi_is_negative(mr_numerator(number_impl_const(number)->value.mr)) ? -1 : 1;
 }
 
-static int number_sign_mfloat(const number_t *number)
+ int number_sign_mfloat(const number_t *number)
 {
     return number ? mf_get_sign(number_impl_const(number)->value.mf) : 0;
 }
 
-static char *number_to_string_double(const number_t *number)
+char *number_to_string_double(const number_t *number)
 {
     char buf[64];
 
@@ -923,7 +916,7 @@ static char *number_to_string_double(const number_t *number)
     return number_strdup(buf);
 }
 
-static char *number_to_string_qfloat(const number_t *number)
+char *number_to_string_qfloat(const number_t *number)
 {
     int needed;
     char *out;
@@ -943,7 +936,7 @@ static char *number_to_string_qfloat(const number_t *number)
     return out;
 }
 
-static char *number_to_string_qcomplex(const number_t *number)
+char *number_to_string_qcomplex(const number_t *number)
 {
     int needed;
     char *out;
@@ -963,17 +956,17 @@ static char *number_to_string_qcomplex(const number_t *number)
     return out;
 }
 
-static char *number_to_string_mint(const number_t *number)
+char *number_to_string_mint(const number_t *number)
 {
     return number ? mi_to_string(number_impl_const(number)->value.mi) : NULL;
 }
 
-static char *number_to_string_mrational(const number_t *number)
+char *number_to_string_mrational(const number_t *number)
 {
     return number ? mr_to_string(number_impl_const(number)->value.mr) : NULL;
 }
 
-static char *number_to_string_mfloat(const number_t *number)
+char *number_to_string_mfloat(const number_t *number)
 {
     int needed;
     char *out;
@@ -993,7 +986,7 @@ static char *number_to_string_mfloat(const number_t *number)
     return out;
 }
 
-static char *number_to_string_mcomplex(const number_t *number)
+char *number_to_string_mcomplex(const number_t *number)
 {
     int needed;
     char *out;
@@ -1013,22 +1006,22 @@ static char *number_to_string_mcomplex(const number_t *number)
     return out;
 }
 
-static number_t *number_clone_double(const number_t *number)
+number_t *number_clone_double(const number_t *number)
 {
     return number ? number_wrap_double(number_impl_const(number)->value.d) : NULL;
 }
 
-static number_t *number_clone_qfloat(const number_t *number)
+number_t *number_clone_qfloat(const number_t *number)
 {
     return number ? number_wrap_qfloat(number_impl_const(number)->value.qf) : NULL;
 }
 
-static number_t *number_clone_qcomplex(const number_t *number)
+number_t *number_clone_qcomplex(const number_t *number)
 {
     return number ? number_wrap_qcomplex(number_impl_const(number)->value.qc) : NULL;
 }
 
-static number_t *number_clone_mint(const number_t *number)
+number_t *number_clone_mint(const number_t *number)
 {
     mint_t *copy;
 
@@ -1040,7 +1033,7 @@ static number_t *number_clone_mint(const number_t *number)
     return copy ? number_wrap_mint(copy) : NULL;
 }
 
-static number_t *number_clone_mrational(const number_t *number)
+number_t *number_clone_mrational(const number_t *number)
 {
     mrational_t *copy;
 
@@ -1052,7 +1045,7 @@ static number_t *number_clone_mrational(const number_t *number)
     return copy ? number_wrap_mrational(copy) : NULL;
 }
 
-static number_t *number_clone_mfloat(const number_t *number)
+number_t *number_clone_mfloat(const number_t *number)
 {
     mfloat_t *copy;
 
@@ -1064,7 +1057,7 @@ static number_t *number_clone_mfloat(const number_t *number)
     return copy ? number_wrap_mfloat(copy) : NULL;
 }
 
-static number_t *number_clone_mcomplex(const number_t *number)
+number_t *number_clone_mcomplex(const number_t *number)
 {
     mcomplex_t *copy;
 
@@ -1076,22 +1069,22 @@ static number_t *number_clone_mcomplex(const number_t *number)
     return copy ? number_wrap_mcomplex(copy) : NULL;
 }
 
-static number_t *number_neg_double(const number_t *number)
+number_t *number_neg_double(const number_t *number)
 {
     return number ? number_wrap_double(-number_impl_const(number)->value.d) : NULL;
 }
 
-static number_t *number_neg_qfloat(const number_t *number)
+number_t *number_neg_qfloat(const number_t *number)
 {
     return number ? number_wrap_qfloat(qf_neg(number_impl_const(number)->value.qf)) : NULL;
 }
 
-static number_t *number_neg_qcomplex(const number_t *number)
+number_t *number_neg_qcomplex(const number_t *number)
 {
     return number ? number_wrap_qcomplex(qc_neg(number_impl_const(number)->value.qc)) : NULL;
 }
 
-static number_t *number_neg_mint(const number_t *number)
+number_t *number_neg_mint(const number_t *number)
 {
     mint_t *copy;
 
@@ -1105,7 +1098,7 @@ static number_t *number_neg_mint(const number_t *number)
     return number_wrap_mint(copy);
 }
 
-static number_t *number_neg_mrational(const number_t *number)
+number_t *number_neg_mrational(const number_t *number)
 {
     mrational_t *copy;
 
@@ -1119,7 +1112,7 @@ static number_t *number_neg_mrational(const number_t *number)
     return number_wrap_mrational(copy);
 }
 
-static number_t *number_neg_mfloat(const number_t *number)
+number_t *number_neg_mfloat(const number_t *number)
 {
     mfloat_t *copy;
 
@@ -1133,7 +1126,7 @@ static number_t *number_neg_mfloat(const number_t *number)
     return number_wrap_mfloat(copy);
 }
 
-static number_t *number_neg_mcomplex(const number_t *number)
+number_t *number_neg_mcomplex(const number_t *number)
 {
     mcomplex_t *copy;
 
@@ -1147,22 +1140,22 @@ static number_t *number_neg_mcomplex(const number_t *number)
     return number_wrap_mcomplex(copy);
 }
 
-static number_t *number_inv_double(const number_t *number)
+number_t *number_inv_double(const number_t *number)
 {
     return number ? number_wrap_double(1.0 / number_impl_const(number)->value.d) : NULL;
 }
 
-static number_t *number_inv_qfloat(const number_t *number)
+number_t *number_inv_qfloat(const number_t *number)
 {
     return number ? number_wrap_qfloat(qf_div(QF_ONE, number_impl_const(number)->value.qf)) : NULL;
 }
 
-static number_t *number_inv_qcomplex(const number_t *number)
+number_t *number_inv_qcomplex(const number_t *number)
 {
     return number ? number_wrap_qcomplex(qc_div(QC_ONE, number_impl_const(number)->value.qc)) : NULL;
 }
 
-static number_t *number_inv_mrational(const number_t *number)
+number_t *number_inv_mrational(const number_t *number)
 {
     mrational_t *copy;
 
@@ -1176,7 +1169,7 @@ static number_t *number_inv_mrational(const number_t *number)
     return number_wrap_mrational(copy);
 }
 
-static number_t *number_inv_mfloat(const number_t *number)
+number_t *number_inv_mfloat(const number_t *number)
 {
     mfloat_t *copy;
 
@@ -1190,7 +1183,7 @@ static number_t *number_inv_mfloat(const number_t *number)
     return number_wrap_mfloat(copy);
 }
 
-static number_t *number_inv_mcomplex(const number_t *number)
+number_t *number_inv_mcomplex(const number_t *number)
 {
     mcomplex_t *copy;
 
@@ -1204,22 +1197,22 @@ static number_t *number_inv_mcomplex(const number_t *number)
     return number_wrap_mcomplex(copy);
 }
 
-static number_t *number_abs_double(const number_t *number)
+number_t *number_abs_double(const number_t *number)
 {
     return number ? number_wrap_double(fabs(number_impl_const(number)->value.d)) : NULL;
 }
 
-static number_t *number_abs_qfloat(const number_t *number)
+number_t *number_abs_qfloat(const number_t *number)
 {
     return number ? number_wrap_qfloat(qf_abs(number_impl_const(number)->value.qf)) : NULL;
 }
 
-static number_t *number_abs_qcomplex(const number_t *number)
+number_t *number_abs_qcomplex(const number_t *number)
 {
     return number ? number_wrap_qfloat(qc_abs(number_impl_const(number)->value.qc)) : NULL;
 }
 
-static number_t *number_abs_mint(const number_t *number)
+number_t *number_abs_mint(const number_t *number)
 {
     mint_t *copy;
 
@@ -1233,7 +1226,7 @@ static number_t *number_abs_mint(const number_t *number)
     return number_wrap_mint(copy);
 }
 
-static number_t *number_abs_mrational(const number_t *number)
+number_t *number_abs_mrational(const number_t *number)
 {
     mrational_t *copy;
 
@@ -1247,7 +1240,7 @@ static number_t *number_abs_mrational(const number_t *number)
     return number_wrap_mrational(copy);
 }
 
-static number_t *number_abs_mfloat(const number_t *number)
+number_t *number_abs_mfloat(const number_t *number)
 {
     mfloat_t *copy;
 
@@ -1261,7 +1254,7 @@ static number_t *number_abs_mfloat(const number_t *number)
     return number_wrap_mfloat(copy);
 }
 
-static number_t *number_abs_mcomplex(const number_t *number)
+number_t *number_abs_mcomplex(const number_t *number)
 {
     mcomplex_t *copy;
     number_t *result;
@@ -1280,12 +1273,12 @@ static number_t *number_abs_mcomplex(const number_t *number)
     return result;
 }
 
-static number_t *number_conj_qcomplex(const number_t *number)
+number_t *number_conj_qcomplex(const number_t *number)
 {
     return number ? number_wrap_qcomplex(qc_conj(number_impl_const(number)->value.qc)) : NULL;
 }
 
-static number_t *number_conj_mcomplex(const number_t *number)
+number_t *number_conj_mcomplex(const number_t *number)
 {
     mcomplex_t *copy;
 
@@ -1299,12 +1292,12 @@ static number_t *number_conj_mcomplex(const number_t *number)
     return number_wrap_mcomplex(copy);
 }
 
-static number_t *number_real_qcomplex(const number_t *number)
+number_t *number_real_qcomplex(const number_t *number)
 {
     return number ? number_wrap_qfloat(qc_real(number_impl_const(number)->value.qc)) : NULL;
 }
 
-static number_t *number_real_mcomplex(const number_t *number)
+number_t *number_real_mcomplex(const number_t *number)
 {
     mfloat_t *copy;
 
@@ -1314,31 +1307,31 @@ static number_t *number_real_mcomplex(const number_t *number)
     return copy ? number_wrap_mfloat(copy) : NULL;
 }
 
-static number_t *number_imag_double_zero(const number_t *number)
+number_t *number_imag_double_zero(const number_t *number)
 {
     (void)number;
     return number_wrap_double(0.0);
 }
 
-static number_t *number_imag_qfloat_zero(const number_t *number)
+number_t *number_imag_qfloat_zero(const number_t *number)
 {
     (void)number;
     return number_wrap_qfloat(QF_ZERO);
 }
 
-static number_t *number_imag_mint_zero(const number_t *number)
+number_t *number_imag_mint_zero(const number_t *number)
 {
     (void)number;
     return number_wrap_mint(mi_create_long(0L));
 }
 
-static number_t *number_imag_mrational_zero(const number_t *number)
+number_t *number_imag_mrational_zero(const number_t *number)
 {
     (void)number;
     return number_wrap_mrational(mr_create_mints(MI_ZERO, MI_ONE));
 }
 
-static number_t *number_imag_mfloat_zero(const number_t *number)
+number_t *number_imag_mfloat_zero(const number_t *number)
 {
     mfloat_t *copy;
 
@@ -1352,12 +1345,12 @@ static number_t *number_imag_mfloat_zero(const number_t *number)
     return number_wrap_mfloat(copy);
 }
 
-static number_t *number_imag_qcomplex(const number_t *number)
+number_t *number_imag_qcomplex(const number_t *number)
 {
     return number ? number_wrap_qfloat(qc_imag(number_impl_const(number)->value.qc)) : NULL;
 }
 
-static number_t *number_imag_mcomplex(const number_t *number)
+number_t *number_imag_mcomplex(const number_t *number)
 {
     mfloat_t *copy;
 
@@ -1367,22 +1360,22 @@ static number_t *number_imag_mcomplex(const number_t *number)
     return copy ? number_wrap_mfloat(copy) : NULL;
 }
 
-static number_t *number_arg_double(const number_t *number)
+number_t *number_arg_double(const number_t *number)
 {
     return number ? number_wrap_double(atan2(0.0, number_impl_const(number)->value.d)) : NULL;
 }
 
-static number_t *number_arg_qfloat(const number_t *number)
+number_t *number_arg_qfloat(const number_t *number)
 {
     return number ? number_wrap_qfloat(qf_atan2(QF_ZERO, number_impl_const(number)->value.qf)) : NULL;
 }
 
-static number_t *number_arg_qcomplex(const number_t *number)
+number_t *number_arg_qcomplex(const number_t *number)
 {
     return number ? number_wrap_qfloat(qc_arg(number_impl_const(number)->value.qc)) : NULL;
 }
 
-static number_t *number_arg_mcomplex(const number_t *number)
+number_t *number_arg_mcomplex(const number_t *number)
 {
     mfloat_t *arg;
 
@@ -1396,22 +1389,22 @@ static number_t *number_arg_mcomplex(const number_t *number)
     return number_wrap_mfloat(arg);
 }
 
-static number_t *number_floor_double(const number_t *number)
+number_t *number_floor_double(const number_t *number)
 {
     return number ? number_wrap_double(floor(number_impl_const(number)->value.d)) : NULL;
 }
 
-static number_t *number_floor_qfloat(const number_t *number)
+number_t *number_floor_qfloat(const number_t *number)
 {
     return number ? number_wrap_qfloat(qf_floor(number_impl_const(number)->value.qf)) : NULL;
 }
 
-static number_t *number_floor_qcomplex(const number_t *number)
+number_t *number_floor_qcomplex(const number_t *number)
 {
     return number ? number_wrap_qcomplex(qc_floor(number_impl_const(number)->value.qc)) : NULL;
 }
 
-static number_t *number_floor_mfloat(const number_t *number)
+number_t *number_floor_mfloat(const number_t *number)
 {
     mfloat_t *copy;
 
@@ -1425,7 +1418,7 @@ static number_t *number_floor_mfloat(const number_t *number)
     return number_wrap_mfloat(copy);
 }
 
-static number_t *number_floor_mcomplex(const number_t *number)
+number_t *number_floor_mcomplex(const number_t *number)
 {
     mcomplex_t *copy;
 
@@ -1439,23 +1432,23 @@ static number_t *number_floor_mcomplex(const number_t *number)
     return number_wrap_mcomplex(copy);
 }
 
-static number_t *number_pow_int_double(const number_t *number, int exponent)
+number_t *number_pow_int_double(const number_t *number, int exponent)
 {
     return number ? number_wrap_double(pow(number_impl_const(number)->value.d, (double)exponent)) : NULL;
 }
 
-static number_t *number_pow_int_qfloat(const number_t *number, int exponent)
+number_t *number_pow_int_qfloat(const number_t *number, int exponent)
 {
     return number ? number_wrap_qfloat(qf_pow_int(number_impl_const(number)->value.qf, exponent)) : NULL;
 }
 
-static number_t *number_pow_int_qcomplex(const number_t *number, int exponent)
+number_t *number_pow_int_qcomplex(const number_t *number, int exponent)
 {
     return number ? number_wrap_qcomplex(qc_pow(number_impl_const(number)->value.qc,
         qc_make(qf_from_double((double)exponent), QF_ZERO))) : NULL;
 }
 
-static number_t *number_pow_int_mint(const number_t *number, int exponent)
+number_t *number_pow_int_mint(const number_t *number, int exponent)
 {
     mint_t *copy;
 
@@ -1469,7 +1462,7 @@ static number_t *number_pow_int_mint(const number_t *number, int exponent)
     return number_wrap_mint(copy);
 }
 
-static number_t *number_pow_int_mfloat(const number_t *number, int exponent)
+number_t *number_pow_int_mfloat(const number_t *number, int exponent)
 {
     mfloat_t *copy;
 
@@ -1483,7 +1476,7 @@ static number_t *number_pow_int_mfloat(const number_t *number, int exponent)
     return number_wrap_mfloat(copy);
 }
 
-static number_t *number_pow_int_mcomplex(const number_t *number, int exponent)
+number_t *number_pow_int_mcomplex(const number_t *number, int exponent)
 {
     mcomplex_t *copy;
 
@@ -1497,22 +1490,22 @@ static number_t *number_pow_int_mcomplex(const number_t *number, int exponent)
     return number_wrap_mcomplex(copy);
 }
 
-static number_t *number_ldexp_double(const number_t *number, int exponent2)
+number_t *number_ldexp_double(const number_t *number, int exponent2)
 {
     return number ? number_wrap_double(ldexp(number_impl_const(number)->value.d, exponent2)) : NULL;
 }
 
-static number_t *number_ldexp_qfloat(const number_t *number, int exponent2)
+number_t *number_ldexp_qfloat(const number_t *number, int exponent2)
 {
     return number ? number_wrap_qfloat(qf_ldexp(number_impl_const(number)->value.qf, exponent2)) : NULL;
 }
 
-static number_t *number_ldexp_qcomplex(const number_t *number, int exponent2)
+number_t *number_ldexp_qcomplex(const number_t *number, int exponent2)
 {
     return number ? number_wrap_qcomplex(qc_ldexp(number_impl_const(number)->value.qc, exponent2)) : NULL;
 }
 
-static number_t *number_ldexp_mfloat(const number_t *number, int exponent2)
+number_t *number_ldexp_mfloat(const number_t *number, int exponent2)
 {
     mfloat_t *copy;
 
@@ -1526,7 +1519,7 @@ static number_t *number_ldexp_mfloat(const number_t *number, int exponent2)
     return number_wrap_mfloat(copy);
 }
 
-static number_t *number_ldexp_mcomplex(const number_t *number, int exponent2)
+number_t *number_ldexp_mcomplex(const number_t *number, int exponent2)
 {
     mcomplex_t *copy;
 
@@ -1540,7 +1533,7 @@ static number_t *number_ldexp_mcomplex(const number_t *number, int exponent2)
     return number_wrap_mcomplex(copy);
 }
 
-static int number_sincos_double(const number_t *number, number_t *sin_out, number_t *cos_out)
+ int number_sincos_double(const number_t *number, number_t *sin_out, number_t *cos_out)
 {
     if (!number || !sin_out || !cos_out)
         return -1;
@@ -1549,7 +1542,7 @@ static int number_sincos_double(const number_t *number, number_t *sin_out, numbe
     return 0;
 }
 
-static int number_sincos_qfloat(const number_t *number, number_t *sin_out, number_t *cos_out)
+ int number_sincos_qfloat(const number_t *number, number_t *sin_out, number_t *cos_out)
 {
     if (!number || !sin_out || !cos_out)
         return -1;
@@ -1558,7 +1551,7 @@ static int number_sincos_qfloat(const number_t *number, number_t *sin_out, numbe
     return 0;
 }
 
-static int number_sincos_mfloat(const number_t *number, number_t *sin_out, number_t *cos_out)
+ int number_sincos_mfloat(const number_t *number, number_t *sin_out, number_t *cos_out)
 {
     mfloat_t *s = NULL;
     mfloat_t *c = NULL;
@@ -1579,7 +1572,7 @@ static int number_sincos_mfloat(const number_t *number, number_t *sin_out, numbe
     return 0;
 }
 
-static int number_sinhcosh_double(const number_t *number, number_t *sinh_out, number_t *cosh_out)
+ int number_sinhcosh_double(const number_t *number, number_t *sinh_out, number_t *cosh_out)
 {
     if (!number || !sinh_out || !cosh_out)
         return -1;
@@ -1588,7 +1581,7 @@ static int number_sinhcosh_double(const number_t *number, number_t *sinh_out, nu
     return 0;
 }
 
-static int number_sinhcosh_qfloat(const number_t *number, number_t *sinh_out, number_t *cosh_out)
+ int number_sinhcosh_qfloat(const number_t *number, number_t *sinh_out, number_t *cosh_out)
 {
     if (!number || !sinh_out || !cosh_out)
         return -1;
@@ -1597,7 +1590,7 @@ static int number_sinhcosh_qfloat(const number_t *number, number_t *sinh_out, nu
     return 0;
 }
 
-static int number_sinhcosh_mfloat(const number_t *number, number_t *sinh_out, number_t *cosh_out)
+ int number_sinhcosh_mfloat(const number_t *number, number_t *sinh_out, number_t *cosh_out)
 {
     mfloat_t *s = NULL;
     mfloat_t *c = NULL;
@@ -1649,27 +1642,27 @@ static int number_pair_real_mfloat(const number_t *number,
     return 0;
 }
 
-static int number_sincos_real_mfloat(const number_t *number, number_t *sin_out, number_t *cos_out)
+ int number_sincos_real_mfloat(const number_t *number, number_t *sin_out, number_t *cos_out)
 {
     return number_pair_real_mfloat(number, sin_out, cos_out, mf_sincos);
 }
 
-static int number_sinhcosh_real_mfloat(const number_t *number, number_t *sinh_out, number_t *cosh_out)
+ int number_sinhcosh_real_mfloat(const number_t *number, number_t *sinh_out, number_t *cosh_out)
 {
     return number_pair_real_mfloat(number, sinh_out, cosh_out, mf_sinhcosh);
 }
 
-static number_t *number_mul_pow10_double(const number_t *number, int exponent10)
+number_t *number_mul_pow10_double(const number_t *number, int exponent10)
 {
     return number ? number_wrap_double(number_impl_const(number)->value.d * pow(10.0, (double)exponent10)) : NULL;
 }
 
-static number_t *number_mul_pow10_qfloat(const number_t *number, int exponent10)
+number_t *number_mul_pow10_qfloat(const number_t *number, int exponent10)
 {
     return number ? number_wrap_qfloat(qf_mul_pow10(number_impl_const(number)->value.qf, exponent10)) : NULL;
 }
 
-static number_t *number_mul_pow10_mfloat(const number_t *number, int exponent10)
+number_t *number_mul_pow10_mfloat(const number_t *number, int exponent10)
 {
     mfloat_t *copy;
 
@@ -1683,67 +1676,67 @@ static number_t *number_mul_pow10_mfloat(const number_t *number, int exponent10)
     return number_wrap_mfloat(copy);
 }
 
-static number_t *number_add_same_double(const number_t *a, const number_t *b)
+number_t *number_add_same_double(const number_t *a, const number_t *b)
 {
     return (a && b) ? number_wrap_double(number_impl_const(a)->value.d + number_impl_const(b)->value.d) : NULL;
 }
 
-static number_t *number_sub_same_double(const number_t *a, const number_t *b)
+number_t *number_sub_same_double(const number_t *a, const number_t *b)
 {
     return (a && b) ? number_wrap_double(number_impl_const(a)->value.d - number_impl_const(b)->value.d) : NULL;
 }
 
-static number_t *number_mul_same_double(const number_t *a, const number_t *b)
+number_t *number_mul_same_double(const number_t *a, const number_t *b)
 {
     return (a && b) ? number_wrap_double(number_impl_const(a)->value.d * number_impl_const(b)->value.d) : NULL;
 }
 
-static number_t *number_div_same_double(const number_t *a, const number_t *b)
+number_t *number_div_same_double(const number_t *a, const number_t *b)
 {
     return (a && b) ? number_wrap_double(number_impl_const(a)->value.d / number_impl_const(b)->value.d) : NULL;
 }
 
-static number_t *number_add_same_qfloat(const number_t *a, const number_t *b)
+number_t *number_add_same_qfloat(const number_t *a, const number_t *b)
 {
     return (a && b) ? number_wrap_qfloat(qf_add(number_impl_const(a)->value.qf, number_impl_const(b)->value.qf)) : NULL;
 }
 
-static number_t *number_sub_same_qfloat(const number_t *a, const number_t *b)
+number_t *number_sub_same_qfloat(const number_t *a, const number_t *b)
 {
     return (a && b) ? number_wrap_qfloat(qf_sub(number_impl_const(a)->value.qf, number_impl_const(b)->value.qf)) : NULL;
 }
 
-static number_t *number_mul_same_qfloat(const number_t *a, const number_t *b)
+number_t *number_mul_same_qfloat(const number_t *a, const number_t *b)
 {
     return (a && b) ? number_wrap_qfloat(qf_mul(number_impl_const(a)->value.qf, number_impl_const(b)->value.qf)) : NULL;
 }
 
-static number_t *number_div_same_qfloat(const number_t *a, const number_t *b)
+number_t *number_div_same_qfloat(const number_t *a, const number_t *b)
 {
     return (a && b) ? number_wrap_qfloat(qf_div(number_impl_const(a)->value.qf, number_impl_const(b)->value.qf)) : NULL;
 }
 
-static number_t *number_add_same_qcomplex(const number_t *a, const number_t *b)
+number_t *number_add_same_qcomplex(const number_t *a, const number_t *b)
 {
     return (a && b) ? number_wrap_qcomplex(qc_add(number_impl_const(a)->value.qc, number_impl_const(b)->value.qc)) : NULL;
 }
 
-static number_t *number_sub_same_qcomplex(const number_t *a, const number_t *b)
+number_t *number_sub_same_qcomplex(const number_t *a, const number_t *b)
 {
     return (a && b) ? number_wrap_qcomplex(qc_sub(number_impl_const(a)->value.qc, number_impl_const(b)->value.qc)) : NULL;
 }
 
-static number_t *number_mul_same_qcomplex(const number_t *a, const number_t *b)
+number_t *number_mul_same_qcomplex(const number_t *a, const number_t *b)
 {
     return (a && b) ? number_wrap_qcomplex(qc_mul(number_impl_const(a)->value.qc, number_impl_const(b)->value.qc)) : NULL;
 }
 
-static number_t *number_div_same_qcomplex(const number_t *a, const number_t *b)
+number_t *number_div_same_qcomplex(const number_t *a, const number_t *b)
 {
     return (a && b) ? number_wrap_qcomplex(qc_div(number_impl_const(a)->value.qc, number_impl_const(b)->value.qc)) : NULL;
 }
 
-static number_t *number_add_same_mint(const number_t *a, const number_t *b)
+number_t *number_add_same_mint(const number_t *a, const number_t *b)
 {
     mint_t *copy;
 
@@ -1757,7 +1750,7 @@ static number_t *number_add_same_mint(const number_t *a, const number_t *b)
     return number_wrap_mint(copy);
 }
 
-static number_t *number_sub_same_mint(const number_t *a, const number_t *b)
+number_t *number_sub_same_mint(const number_t *a, const number_t *b)
 {
     mint_t *copy;
 
@@ -1771,7 +1764,7 @@ static number_t *number_sub_same_mint(const number_t *a, const number_t *b)
     return number_wrap_mint(copy);
 }
 
-static number_t *number_mul_same_mint(const number_t *a, const number_t *b)
+number_t *number_mul_same_mint(const number_t *a, const number_t *b)
 {
     mint_t *copy;
 
@@ -1785,7 +1778,7 @@ static number_t *number_mul_same_mint(const number_t *a, const number_t *b)
     return number_wrap_mint(copy);
 }
 
-static number_t *number_add_same_mrational(const number_t *a, const number_t *b)
+number_t *number_add_same_mrational(const number_t *a, const number_t *b)
 {
     mrational_t *copy;
 
@@ -1799,7 +1792,7 @@ static number_t *number_add_same_mrational(const number_t *a, const number_t *b)
     return number_wrap_mrational(copy);
 }
 
-static number_t *number_sub_same_mrational(const number_t *a, const number_t *b)
+number_t *number_sub_same_mrational(const number_t *a, const number_t *b)
 {
     mrational_t *copy;
 
@@ -1813,7 +1806,7 @@ static number_t *number_sub_same_mrational(const number_t *a, const number_t *b)
     return number_wrap_mrational(copy);
 }
 
-static number_t *number_mul_same_mrational(const number_t *a, const number_t *b)
+number_t *number_mul_same_mrational(const number_t *a, const number_t *b)
 {
     mrational_t *copy;
 
@@ -1827,7 +1820,7 @@ static number_t *number_mul_same_mrational(const number_t *a, const number_t *b)
     return number_wrap_mrational(copy);
 }
 
-static number_t *number_div_same_mrational(const number_t *a, const number_t *b)
+number_t *number_div_same_mrational(const number_t *a, const number_t *b)
 {
     mrational_t *copy;
 
@@ -1841,7 +1834,7 @@ static number_t *number_div_same_mrational(const number_t *a, const number_t *b)
     return number_wrap_mrational(copy);
 }
 
-static number_t *number_add_same_mfloat(const number_t *a, const number_t *b)
+number_t *number_add_same_mfloat(const number_t *a, const number_t *b)
 {
     mfloat_t *copy;
 
@@ -1855,7 +1848,7 @@ static number_t *number_add_same_mfloat(const number_t *a, const number_t *b)
     return number_wrap_mfloat(copy);
 }
 
-static number_t *number_sub_same_mfloat(const number_t *a, const number_t *b)
+number_t *number_sub_same_mfloat(const number_t *a, const number_t *b)
 {
     mfloat_t *copy;
 
@@ -1869,7 +1862,7 @@ static number_t *number_sub_same_mfloat(const number_t *a, const number_t *b)
     return number_wrap_mfloat(copy);
 }
 
-static number_t *number_mul_same_mfloat(const number_t *a, const number_t *b)
+number_t *number_mul_same_mfloat(const number_t *a, const number_t *b)
 {
     mfloat_t *copy;
 
@@ -1883,7 +1876,7 @@ static number_t *number_mul_same_mfloat(const number_t *a, const number_t *b)
     return number_wrap_mfloat(copy);
 }
 
-static number_t *number_div_same_mfloat(const number_t *a, const number_t *b)
+number_t *number_div_same_mfloat(const number_t *a, const number_t *b)
 {
     mfloat_t *copy;
 
@@ -1897,7 +1890,7 @@ static number_t *number_div_same_mfloat(const number_t *a, const number_t *b)
     return number_wrap_mfloat(copy);
 }
 
-static number_t *number_add_same_mcomplex(const number_t *a, const number_t *b)
+number_t *number_add_same_mcomplex(const number_t *a, const number_t *b)
 {
     mcomplex_t *copy;
 
@@ -1911,7 +1904,7 @@ static number_t *number_add_same_mcomplex(const number_t *a, const number_t *b)
     return number_wrap_mcomplex(copy);
 }
 
-static number_t *number_sub_same_mcomplex(const number_t *a, const number_t *b)
+number_t *number_sub_same_mcomplex(const number_t *a, const number_t *b)
 {
     mcomplex_t *copy;
 
@@ -1925,7 +1918,7 @@ static number_t *number_sub_same_mcomplex(const number_t *a, const number_t *b)
     return number_wrap_mcomplex(copy);
 }
 
-static number_t *number_mul_same_mcomplex(const number_t *a, const number_t *b)
+number_t *number_mul_same_mcomplex(const number_t *a, const number_t *b)
 {
     mcomplex_t *copy;
 
@@ -1939,7 +1932,7 @@ static number_t *number_mul_same_mcomplex(const number_t *a, const number_t *b)
     return number_wrap_mcomplex(copy);
 }
 
-static number_t *number_div_same_mcomplex(const number_t *a, const number_t *b)
+number_t *number_div_same_mcomplex(const number_t *a, const number_t *b)
 {
     mcomplex_t *copy;
 
@@ -1953,52 +1946,52 @@ static number_t *number_div_same_mcomplex(const number_t *a, const number_t *b)
     return number_wrap_mcomplex(copy);
 }
 
-static number_t *number_exp_same_double(const number_t *number)
+number_t *number_exp_same_double(const number_t *number)
 {
     return number ? number_wrap_double(exp(number_impl_const(number)->value.d)) : NULL;
 }
 
-static number_t *number_log_same_double(const number_t *number)
+number_t *number_log_same_double(const number_t *number)
 {
     return number ? number_wrap_double(log(number_impl_const(number)->value.d)) : NULL;
 }
 
-static number_t *number_sqrt_same_double(const number_t *number)
+number_t *number_sqrt_same_double(const number_t *number)
 {
     return number ? number_wrap_double(sqrt(number_impl_const(number)->value.d)) : NULL;
 }
 
-static number_t *number_exp_same_qfloat(const number_t *number)
+number_t *number_exp_same_qfloat(const number_t *number)
 {
     return number ? number_wrap_qfloat(qf_exp(number_impl_const(number)->value.qf)) : NULL;
 }
 
-static number_t *number_log_same_qfloat(const number_t *number)
+number_t *number_log_same_qfloat(const number_t *number)
 {
     return number ? number_wrap_qfloat(qf_log(number_impl_const(number)->value.qf)) : NULL;
 }
 
-static number_t *number_sqrt_same_qfloat(const number_t *number)
+number_t *number_sqrt_same_qfloat(const number_t *number)
 {
     return number ? number_wrap_qfloat(qf_sqrt(number_impl_const(number)->value.qf)) : NULL;
 }
 
-static number_t *number_exp_same_qcomplex(const number_t *number)
+number_t *number_exp_same_qcomplex(const number_t *number)
 {
     return number ? number_wrap_qcomplex(qc_exp(number_impl_const(number)->value.qc)) : NULL;
 }
 
-static number_t *number_log_same_qcomplex(const number_t *number)
+number_t *number_log_same_qcomplex(const number_t *number)
 {
     return number ? number_wrap_qcomplex(qc_log(number_impl_const(number)->value.qc)) : NULL;
 }
 
-static number_t *number_sqrt_same_qcomplex(const number_t *number)
+number_t *number_sqrt_same_qcomplex(const number_t *number)
 {
     return number ? number_wrap_qcomplex(qc_sqrt(number_impl_const(number)->value.qc)) : NULL;
 }
 
-static number_t *number_exp_same_mfloat(const number_t *number)
+number_t *number_exp_same_mfloat(const number_t *number)
 {
     mfloat_t *copy;
 
@@ -2012,7 +2005,7 @@ static number_t *number_exp_same_mfloat(const number_t *number)
     return number_wrap_mfloat(copy);
 }
 
-static number_t *number_log_same_mfloat(const number_t *number)
+number_t *number_log_same_mfloat(const number_t *number)
 {
     mfloat_t *copy;
 
@@ -2026,7 +2019,7 @@ static number_t *number_log_same_mfloat(const number_t *number)
     return number_wrap_mfloat(copy);
 }
 
-static number_t *number_sqrt_same_mfloat(const number_t *number)
+number_t *number_sqrt_same_mfloat(const number_t *number)
 {
     mfloat_t *copy;
 
@@ -2040,7 +2033,7 @@ static number_t *number_sqrt_same_mfloat(const number_t *number)
     return number_wrap_mfloat(copy);
 }
 
-static number_t *number_exp_same_mcomplex(const number_t *number)
+number_t *number_exp_same_mcomplex(const number_t *number)
 {
     mcomplex_t *copy;
 
@@ -2054,7 +2047,7 @@ static number_t *number_exp_same_mcomplex(const number_t *number)
     return number_wrap_mcomplex(copy);
 }
 
-static number_t *number_log_same_mcomplex(const number_t *number)
+number_t *number_log_same_mcomplex(const number_t *number)
 {
     mcomplex_t *copy;
 
@@ -2068,7 +2061,7 @@ static number_t *number_log_same_mcomplex(const number_t *number)
     return number_wrap_mcomplex(copy);
 }
 
-static number_t *number_sqrt_same_mcomplex(const number_t *number)
+number_t *number_sqrt_same_mcomplex(const number_t *number)
 {
     mcomplex_t *copy;
 
@@ -2081,374 +2074,6 @@ static number_t *number_sqrt_same_mcomplex(const number_t *number)
     }
     return number_wrap_mcomplex(copy);
 }
-
-static const number_vtable_t number_double_vt = {
-    .kind = NUMBER_DOUBLE,
-    .math_family = NUMBER_MATH_QREAL,
-    .exact = false,
-    .complex = false,
-    .destroy_payload = number_destroy_none,
-    .clone = number_clone_double,
-    .to_string = number_to_string_double,
-    .is_immortal = number_value_is_immortal_double,
-    .is_real = number_is_real_default,
-    .is_zero = number_is_zero_double,
-    .is_one = number_is_one_double,
-    .is_finite = number_is_finite_double,
-    .is_nan = number_is_nan_double,
-    .is_inf = number_is_inf_double,
-    .eq_same = number_eq_same_double,
-    .eq_same_tol = number_eq_same_tol_double,
-    .cmp_same = number_cmp_same_double,
-    .const_like = number_const_like_double,
-    .format_inexact = number_format_double,
-    .set_precision = number_set_precision_noop,
-    .get_precision = number_precision_fixed53,
-    .get_exponent2 = number_get_exponent2_double,
-    .to_double = number_to_double_double,
-    .to_qfloat = number_to_qfloat_double,
-    .is_integer = number_is_integer_double,
-    .get_mantissa_bits = number_get_mantissa_bits_double,
-    .get_mantissa_u64 = number_get_mantissa_u64_false,
-    .sign = number_sign_double,
-    .neg = number_neg_double,
-    .abs_value = number_abs_double,
-    .inv = number_inv_double,
-    .conj_value = number_clone_double,
-    .real_part = number_clone_double,
-    .imag_part = number_imag_double_zero,
-    .arg_value = number_arg_double,
-    .pow_int = number_pow_int_double,
-    .mul_pow10_value = number_mul_pow10_double,
-    .ldexp_value = number_ldexp_double,
-    .floor_value = number_floor_double,
-    .sincos_value = number_sincos_double,
-    .sinhcosh_value = number_sinhcosh_double,
-    .add_same = number_add_same_double,
-    .sub_same = number_sub_same_double,
-    .mul_same = number_mul_same_double,
-    .div_same = number_div_same_double,
-    .exp_same = number_exp_same_double,
-    .log_same = number_log_same_double,
-    .sqrt_same = number_sqrt_same_double
-};
-
-static const number_vtable_t number_qfloat_vt = {
-    .kind = NUMBER_QFLOAT,
-    .math_family = NUMBER_MATH_QREAL,
-    .exact = false,
-    .complex = false,
-    .destroy_payload = number_destroy_none,
-    .clone = number_clone_qfloat,
-    .to_string = number_to_string_qfloat,
-    .is_immortal = number_value_is_immortal_qfloat,
-    .is_real = number_is_real_default,
-    .is_zero = number_is_zero_qfloat,
-    .is_one = number_is_one_qfloat,
-    .is_finite = number_is_finite_qfloat,
-    .is_nan = number_is_nan_qfloat,
-    .is_inf = number_is_inf_qfloat,
-    .eq_same = number_eq_same_qfloat,
-    .eq_same_tol = number_eq_same_tol_qfloat,
-    .cmp_same = number_cmp_same_qfloat,
-    .const_like = number_const_like_qfloat,
-    .format_inexact = number_format_qfloat,
-    .set_precision = number_set_precision_noop,
-    .get_precision = number_precision_fixed106,
-    .get_exponent2 = number_get_exponent2_qfloat,
-    .to_double = number_to_double_qfloat,
-    .to_qfloat = number_to_qfloat_qfloat,
-    .is_integer = number_is_integer_qfloat,
-    .get_mantissa_bits = number_get_mantissa_bits_qfloat,
-    .get_mantissa_u64 = number_get_mantissa_u64_false,
-    .sign = number_sign_qfloat,
-    .neg = number_neg_qfloat,
-    .abs_value = number_abs_qfloat,
-    .inv = number_inv_qfloat,
-    .conj_value = number_clone_qfloat,
-    .real_part = number_clone_qfloat,
-    .imag_part = number_imag_qfloat_zero,
-    .arg_value = number_arg_qfloat,
-    .pow_int = number_pow_int_qfloat,
-    .mul_pow10_value = number_mul_pow10_qfloat,
-    .ldexp_value = number_ldexp_qfloat,
-    .floor_value = number_floor_qfloat,
-    .sincos_value = number_sincos_qfloat,
-    .sinhcosh_value = number_sinhcosh_qfloat,
-    .add_same = number_add_same_qfloat,
-    .sub_same = number_sub_same_qfloat,
-    .mul_same = number_mul_same_qfloat,
-    .div_same = number_div_same_qfloat,
-    .exp_same = number_exp_same_qfloat,
-    .log_same = number_log_same_qfloat,
-    .sqrt_same = number_sqrt_same_qfloat
-};
-
-static const number_vtable_t number_qcomplex_vt = {
-    .kind = NUMBER_QCOMPLEX,
-    .math_family = NUMBER_MATH_QCOMPLEX,
-    .exact = false,
-    .complex = true,
-    .destroy_payload = number_destroy_none,
-    .clone = number_clone_qcomplex,
-    .to_string = number_to_string_qcomplex,
-    .is_immortal = number_value_is_immortal_qcomplex,
-    .is_real = number_is_real_qcomplex,
-    .is_zero = number_is_zero_qcomplex,
-    .is_one = number_is_one_qcomplex,
-    .is_finite = number_is_finite_qcomplex,
-    .is_nan = number_is_nan_qcomplex,
-    .is_inf = number_is_inf_qcomplex,
-    .eq_same = number_eq_same_qcomplex,
-    .eq_same_tol = number_eq_same_tol_qcomplex,
-    .cmp_same = number_cmp_same_qcomplex,
-    .const_like = number_const_like_qcomplex,
-    .format_inexact = number_format_qcomplex,
-    .set_precision = number_set_precision_noop,
-    .get_precision = number_precision_fixed106,
-    .get_exponent2 = number_get_exponent2_zero,
-    .to_double = NULL,
-    .to_qfloat = NULL,
-    .is_integer = number_is_integer_qcomplex,
-    .get_mantissa_bits = number_get_mantissa_bits_zero,
-    .get_mantissa_u64 = number_get_mantissa_u64_false,
-    .sign = number_sign_zero,
-    .neg = number_neg_qcomplex,
-    .abs_value = number_abs_qcomplex,
-    .inv = number_inv_qcomplex,
-    .conj_value = number_conj_qcomplex,
-    .real_part = number_real_qcomplex,
-    .imag_part = number_imag_qcomplex,
-    .arg_value = number_arg_qcomplex,
-    .pow_int = number_pow_int_qcomplex,
-    .mul_pow10_value = NULL,
-    .ldexp_value = number_ldexp_qcomplex,
-    .floor_value = number_floor_qcomplex,
-    .sincos_value = NULL,
-    .sinhcosh_value = NULL,
-    .add_same = number_add_same_qcomplex,
-    .sub_same = number_sub_same_qcomplex,
-    .mul_same = number_mul_same_qcomplex,
-    .div_same = number_div_same_qcomplex,
-    .exp_same = number_exp_same_qcomplex,
-    .log_same = number_log_same_qcomplex,
-    .sqrt_same = number_sqrt_same_qcomplex
-};
-
-static const number_vtable_t number_mint_vt = {
-    .kind = NUMBER_MINT,
-    .math_family = NUMBER_MATH_MREAL,
-    .exact = true,
-    .complex = false,
-    .destroy_payload = number_destroy_mint,
-    .clone = number_clone_mint,
-    .to_string = number_to_string_mint,
-    .is_immortal = number_value_is_immortal_mint,
-    .is_real = number_is_real_default,
-    .is_zero = number_is_zero_mint,
-    .is_one = number_is_one_mint,
-    .is_finite = number_is_finite_exact,
-    .is_nan = number_is_nan_exact,
-    .is_inf = number_is_inf_exact,
-    .eq_same = number_eq_same_mint,
-    .eq_same_tol = number_eq_same_tol_mint,
-    .cmp_same = number_cmp_same_mint,
-    .const_like = number_const_like_mexact,
-    .format_inexact = NULL,
-    .set_precision = number_set_precision_noop,
-    .get_precision = number_precision_zero,
-    .get_exponent2 = number_get_exponent2_mint,
-    .to_double = NULL,
-    .to_qfloat = NULL,
-    .is_integer = number_is_integer_mint,
-    .get_mantissa_bits = number_get_mantissa_bits_zero,
-    .get_mantissa_u64 = number_get_mantissa_u64_false,
-    .sign = number_sign_mint,
-    .neg = number_neg_mint,
-    .abs_value = number_abs_mint,
-    .inv = NULL,
-    .conj_value = number_clone_mint,
-    .real_part = number_clone_mint,
-    .imag_part = number_imag_mint_zero,
-    .arg_value = NULL,
-    .pow_int = number_pow_int_mint,
-    .mul_pow10_value = NULL,
-    .ldexp_value = NULL,
-    .floor_value = NULL,
-    .sincos_value = number_sincos_real_mfloat,
-    .sinhcosh_value = number_sinhcosh_real_mfloat,
-    .add_same = number_add_same_mint,
-    .sub_same = number_sub_same_mint,
-    .mul_same = number_mul_same_mint,
-    .div_same = NULL,
-    .exp_same = NULL,
-    .log_same = NULL,
-    .sqrt_same = NULL
-};
-
-static const number_vtable_t number_mrational_vt = {
-    .kind = NUMBER_MRATIONAL,
-    .math_family = NUMBER_MATH_MREAL,
-    .exact = true,
-    .complex = false,
-    .destroy_payload = number_destroy_mrational,
-    .clone = number_clone_mrational,
-    .to_string = number_to_string_mrational,
-    .is_immortal = number_value_is_immortal_mrational,
-    .is_real = number_is_real_default,
-    .is_zero = number_is_zero_mrational,
-    .is_one = number_is_one_mrational,
-    .is_finite = number_is_finite_exact,
-    .is_nan = number_is_nan_exact,
-    .is_inf = number_is_inf_exact,
-    .eq_same = number_eq_same_mrational,
-    .eq_same_tol = number_eq_same_tol_mrational,
-    .cmp_same = number_cmp_same_mrational,
-    .const_like = number_const_like_mexact,
-    .format_inexact = NULL,
-    .set_precision = number_set_precision_noop,
-    .get_precision = number_precision_zero,
-    .get_exponent2 = number_get_exponent2_mrational,
-    .to_double = NULL,
-    .to_qfloat = NULL,
-    .is_integer = number_is_integer_mrational,
-    .get_mantissa_bits = number_get_mantissa_bits_zero,
-    .get_mantissa_u64 = number_get_mantissa_u64_false,
-    .sign = number_sign_mrational,
-    .neg = number_neg_mrational,
-    .abs_value = number_abs_mrational,
-    .inv = number_inv_mrational,
-    .conj_value = number_clone_mrational,
-    .real_part = number_clone_mrational,
-    .imag_part = number_imag_mrational_zero,
-    .arg_value = NULL,
-    .pow_int = NULL,
-    .mul_pow10_value = NULL,
-    .ldexp_value = NULL,
-    .floor_value = NULL,
-    .sincos_value = number_sincos_real_mfloat,
-    .sinhcosh_value = number_sinhcosh_real_mfloat,
-    .add_same = number_add_same_mrational,
-    .sub_same = number_sub_same_mrational,
-    .mul_same = number_mul_same_mrational,
-    .div_same = number_div_same_mrational,
-    .exp_same = NULL,
-    .log_same = NULL,
-    .sqrt_same = NULL
-};
-
-static const number_vtable_t number_mfloat_vt = {
-    .kind = NUMBER_MFLOAT,
-    .math_family = NUMBER_MATH_MREAL,
-    .exact = false,
-    .complex = false,
-    .destroy_payload = number_destroy_mfloat,
-    .clone = number_clone_mfloat,
-    .to_string = number_to_string_mfloat,
-    .is_immortal = number_value_is_immortal_mfloat,
-    .is_real = number_is_real_default,
-    .is_zero = number_is_zero_mfloat,
-    .is_one = number_is_one_mfloat,
-    .is_finite = number_is_finite_mfloat,
-    .is_nan = number_is_nan_mfloat,
-    .is_inf = number_is_inf_mfloat,
-    .eq_same = number_eq_same_mfloat,
-    .eq_same_tol = number_eq_same_tol_mfloat,
-    .cmp_same = number_cmp_same_mfloat,
-    .const_like = number_const_like_mfloat,
-    .format_inexact = number_format_mfloat,
-    .set_precision = number_set_precision_mfloat,
-    .get_precision = number_get_precision_mfloat,
-    .get_exponent2 = number_get_exponent2_mfloat,
-    .to_double = number_to_double_mfloat,
-    .to_qfloat = number_to_qfloat_mfloat,
-    .is_integer = number_is_integer_mfloat,
-    .get_mantissa_bits = number_get_mantissa_bits_mfloat,
-    .get_mantissa_u64 = number_get_mantissa_u64_mfloat,
-    .sign = number_sign_mfloat,
-    .neg = number_neg_mfloat,
-    .abs_value = number_abs_mfloat,
-    .inv = number_inv_mfloat,
-    .conj_value = number_clone_mfloat,
-    .real_part = number_clone_mfloat,
-    .imag_part = number_imag_mfloat_zero,
-    .arg_value = NULL,
-    .pow_int = number_pow_int_mfloat,
-    .mul_pow10_value = number_mul_pow10_mfloat,
-    .ldexp_value = number_ldexp_mfloat,
-    .floor_value = number_floor_mfloat,
-    .sincos_value = number_sincos_mfloat,
-    .sinhcosh_value = number_sinhcosh_mfloat,
-    .add_same = number_add_same_mfloat,
-    .sub_same = number_sub_same_mfloat,
-    .mul_same = number_mul_same_mfloat,
-    .div_same = number_div_same_mfloat,
-    .exp_same = number_exp_same_mfloat,
-    .log_same = number_log_same_mfloat,
-    .sqrt_same = number_sqrt_same_mfloat
-};
-
-static const number_vtable_t number_mcomplex_vt = {
-    .kind = NUMBER_MCOMPLEX,
-    .math_family = NUMBER_MATH_MCOMPLEX,
-    .exact = false,
-    .complex = true,
-    .destroy_payload = number_destroy_mcomplex,
-    .clone = number_clone_mcomplex,
-    .to_string = number_to_string_mcomplex,
-    .is_immortal = number_value_is_immortal_mcomplex,
-    .is_real = number_is_real_mcomplex,
-    .is_zero = number_is_zero_mcomplex,
-    .is_one = number_is_one_mcomplex,
-    .is_finite = number_is_finite_mcomplex,
-    .is_nan = number_is_nan_mcomplex,
-    .is_inf = number_is_inf_mcomplex,
-    .eq_same = number_eq_same_mcomplex,
-    .eq_same_tol = number_eq_same_tol_mcomplex,
-    .cmp_same = number_cmp_same_mcomplex,
-    .const_like = number_const_like_mcomplex,
-    .format_inexact = number_format_mcomplex,
-    .set_precision = number_set_precision_mcomplex,
-    .get_precision = number_get_precision_mcomplex,
-    .get_exponent2 = number_get_exponent2_zero,
-    .to_double = NULL,
-    .to_qfloat = NULL,
-    .is_integer = number_is_integer_mcomplex,
-    .get_mantissa_bits = number_get_mantissa_bits_mcomplex,
-    .get_mantissa_u64 = number_get_mantissa_u64_mcomplex,
-    .sign = number_sign_zero,
-    .neg = number_neg_mcomplex,
-    .abs_value = number_abs_mcomplex,
-    .inv = number_inv_mcomplex,
-    .conj_value = number_conj_mcomplex,
-    .real_part = number_real_mcomplex,
-    .imag_part = number_imag_mcomplex,
-    .arg_value = number_arg_mcomplex,
-    .pow_int = number_pow_int_mcomplex,
-    .mul_pow10_value = NULL,
-    .ldexp_value = number_ldexp_mcomplex,
-    .floor_value = number_floor_mcomplex,
-    .sincos_value = NULL,
-    .sinhcosh_value = NULL,
-    .add_same = number_add_same_mcomplex,
-    .sub_same = number_sub_same_mcomplex,
-    .mul_same = number_mul_same_mcomplex,
-    .div_same = number_div_same_mcomplex,
-    .exp_same = number_exp_same_mcomplex,
-    .log_same = number_log_same_mcomplex,
-    .sqrt_same = number_sqrt_same_mcomplex
-};
-
-const number_vtable_t *const number_dispatch[] = {
-    [NUMBER_DOUBLE] = &number_double_vt,
-    [NUMBER_QFLOAT] = &number_qfloat_vt,
-    [NUMBER_QCOMPLEX] = &number_qcomplex_vt,
-    [NUMBER_MINT] = &number_mint_vt,
-    [NUMBER_MRATIONAL] = &number_mrational_vt,
-    [NUMBER_MFLOAT] = &number_mfloat_vt,
-    [NUMBER_MCOMPLEX] = &number_mcomplex_vt
-};
-const size_t number_dispatch_count = sizeof(number_dispatch) / sizeof(number_dispatch[0]);
 
 void number_box_free(number_t *number)
 {
@@ -3009,7 +2634,7 @@ static number_t number_const_mfloat_special(number_const_id_t id, size_t precisi
     return number_invalid();
 }
 
-static number_t number_const_like_double(const number_t *like, number_const_id_t id)
+ number_t number_const_like_double(const number_t *like, number_const_id_t id)
 {
     (void)like;
     if (number_const_has_double(id))
@@ -3017,19 +2642,19 @@ static number_t number_const_like_double(const number_t *like, number_const_id_t
     return number_invalid();
 }
 
-static number_t number_const_like_qfloat(const number_t *like, number_const_id_t id)
+ number_t number_const_like_qfloat(const number_t *like, number_const_id_t id)
 {
     (void)like;
     return num_create_from_qfloat(number_const_qfloat(id));
 }
 
-static number_t number_const_like_qcomplex(const number_t *like, number_const_id_t id)
+ number_t number_const_like_qcomplex(const number_t *like, number_const_id_t id)
 {
     (void)like;
     return num_create_from_qcomplex(number_const_qcomplex(id));
 }
 
-static number_t number_const_like_mexact(const number_t *like, number_const_id_t id)
+ number_t number_const_like_mexact(const number_t *like, number_const_id_t id)
 {
     size_t precision_bits;
     number_t exact;
@@ -3047,7 +2672,7 @@ static number_t number_const_like_mexact(const number_t *like, number_const_id_t
     return mf_value ? num_create_from_mfloat_with_prec_bits(mf_value, precision_bits) : number_invalid();
 }
 
-static number_t number_const_like_mfloat(const number_t *like, number_const_id_t id)
+ number_t number_const_like_mfloat(const number_t *like, number_const_id_t id)
 {
     const number_vtable_t *vt = number_vt(like);
     size_t precision_bits = vt && vt->get_precision ? vt->get_precision(like) : 0u;
@@ -3066,7 +2691,7 @@ static number_t number_const_like_mfloat(const number_t *like, number_const_id_t
     return mf_value ? num_create_from_mfloat_with_prec_bits(mf_value, precision_bits) : number_invalid();
 }
 
-static number_t number_const_like_mcomplex(const number_t *like, number_const_id_t id)
+ number_t number_const_like_mcomplex(const number_t *like, number_const_id_t id)
 {
     const number_vtable_t *vt = number_vt(like);
     size_t precision_bits = vt && vt->get_precision ? vt->get_precision(like) : 0u;

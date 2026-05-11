@@ -25,6 +25,9 @@ void run_number_fixed_precision_tests(void)
         number_t sinh_i = num_sinh(qc_i);
         number_t cosh_i = num_cosh(qc_i);
         number_t tanh_i = num_tanh(qc_i);
+        number_t qc_w0_arg = num_create_from_qcomplex(qc_from_string("0.2 + 0.1i"));
+        number_t qc_w0 = num_lambert_w0(qc_w0_arg);
+        number_t expected_w0 = num_create_from_qcomplex(qc_productlog(qc_from_string("0.2 + 0.1i")));
         number_t expected_sin_i = num_create_from_qcomplex(qc_sin(qc_from_string("0 + 1i")));
         number_t expected_cos_i = num_create_from_qcomplex(qc_cos(qc_from_string("0 + 1i")));
         number_t expected_tan_i = num_create_from_qcomplex(qc_tan(qc_from_string("0 + 1i")));
@@ -61,6 +64,7 @@ void run_number_fixed_precision_tests(void)
         ASSERT_TRUE(num_eq(sinh_i, expected_sinh_i));
         ASSERT_TRUE(num_eq(cosh_i, expected_cosh_i));
         ASSERT_TRUE(num_eq(tanh_i, expected_tanh_i));
+        ASSERT_TRUE(num_eq(qc_w0, expected_w0));
 
         ASSERT_EQ_INT(num_sincos(zero, &sin_zero, &cos_zero), 0);
         assert_number_string("num_sincos(0).sin", sin_zero, "0");
@@ -88,6 +92,9 @@ void run_number_fixed_precision_tests(void)
         num_destroy(&sinh_i);
         num_destroy(&cosh_i);
         num_destroy(&tanh_i);
+        num_destroy(&qc_w0_arg);
+        num_destroy(&qc_w0);
+        num_destroy(&expected_w0);
         num_destroy(&expected_sin_i);
         num_destroy(&expected_cos_i);
         num_destroy(&expected_tan_i);
