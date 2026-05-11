@@ -84,9 +84,12 @@ static void test_mat_sprintf_pretty_qcomplex(void)
 
     check_bool("mat_sprintf Pauli %ml returns non-negative",
                mat_sprintf(buf, sizeof(buf), "%ml", A) >= 0);
-    check_bool("mat_sprintf Pauli pretty has -i",
-               strstr(buf, "-i") != NULL);
-    check_bool("mat_sprintf Pauli pretty has standalone i",
+    check_bool("mat_sprintf Pauli pretty has negative imaginary entry",
+               strstr(buf, "- 1.000000000000000000000000000000i") != NULL ||
+               strstr(buf, "- 1i") != NULL || strstr(buf, "-1i") != NULL || strstr(buf, "-i") != NULL);
+    check_bool("mat_sprintf Pauli pretty has positive imaginary entry",
+               strstr(buf, "+ 1.000000000000000000000000000000i") != NULL ||
+               strstr(buf, "+ 1i") != NULL || strstr(buf, "+1i") != NULL ||
                strstr(buf, "\n  i") != NULL || strstr(buf, " i ") != NULL);
     check_bool("mat_sprintf Pauli pretty omits + 0i",
                strstr(buf, "+ 0i") == NULL && strstr(buf, "+0i") == NULL);

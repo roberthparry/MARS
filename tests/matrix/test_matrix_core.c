@@ -1340,6 +1340,72 @@ static void test_sparse_support(void)
         mat_free(Expected);
         mat_free(S);
     }
+
+    {
+        dval_t *x = test_dv_new_named_var_d(2.0, "x");
+        dval_t *expr = dv_add(x, DV_ONE);
+        dval_t *zero = DV_ZERO;
+        dval_t *got = NULL;
+        matrix_t *S = mat_new_sparse_dv(2, 2);
+        matrix_t *D = NULL;
+
+        check_bool("mat_new_sparse_dv non-null", S != NULL);
+        check_bool("mat_new_sparse_dv reports sparse", S && mat_is_sparse(S));
+        check_bool("new sparse dval matrix nnz = 0", S && mat_nonzero_count(S) == 0);
+        check_bool("mat_new_sparse_dv -> MAT_TYPE_DVAL",
+                   S != NULL && mat_typeof(S) == MAT_TYPE_DVAL);
+
+        if (S) {
+            mat_set(S, 0, 1, &expr);
+            check_bool("dval sparse nnz after insert = 1", mat_nonzero_count(S) == 1);
+
+            mat_get_owned(S, 0, 1, &got);
+            check_bool("dval sparse readback non-null", got != NULL);
+            if (got) {
+                check_d("dval sparse readback evaluates", dv_eval_d(got), 3.0, 1e-12);
+                check_dval_text_contains("dval sparse readback keeps expression", got, "x + 1");
+                dv_free(got);
+                got = NULL;
+            }
+
+            mat_set(S, 1, 1, &zero);
+            check_bool("setting dval structural zero keeps nnz = 1", mat_nonzero_count(S) == 1);
+
+            D = mat_to_dense(S);
+            check_bool("mat_to_dense(dval sparse) not NULL", D != NULL);
+            check_bool("dense(dval sparse) keeps MAT_TYPE_DVAL",
+                       D != NULL && mat_typeof(D) == MAT_TYPE_DVAL);
+            if (D) {
+                mat_get_owned(D, 0, 0, &got);
+                check_bool("dense(dval sparse) offdiag zero [0,0]", got != NULL && dv_eval_d(got) == 0.0);
+                dv_free(got);
+                got = NULL;
+
+                mat_get_owned(D, 0, 1, &got);
+                check_bool("dense(dval sparse) expression slot non-null", got != NULL);
+                if (got) {
+                    check_d("dense(dval sparse) expression evaluates", dv_eval_d(got), 3.0, 1e-12);
+                    dv_free(got);
+                    got = NULL;
+                }
+
+                mat_get_owned(D, 1, 0, &got);
+                check_bool("dense(dval sparse) offdiag zero [1,0]", got != NULL && dv_eval_d(got) == 0.0);
+                dv_free(got);
+                got = NULL;
+
+                mat_get_owned(D, 1, 1, &got);
+                check_bool("dense(dval sparse) offdiag zero [1,1]", got != NULL && dv_eval_d(got) == 0.0);
+                dv_free(got);
+                got = NULL;
+            }
+        }
+
+        mat_free(D);
+        mat_free(S);
+        dv_free(expr);
+        dv_free(x);
+    }
 }
 
 static void test_layout_policy_regressions(void)

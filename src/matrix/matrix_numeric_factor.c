@@ -9,6 +9,78 @@
 #include "matrix.h"
 #include "internal/dval_internal.h"
 #include "internal/number_internal.h"
+#include "number/number_internal.h"
+
+static qfloat_t mat_numeric_epsilon_from_precision_bits(size_t precision_bits)
+{
+    if (precision_bits == 0u)
+        precision_bits = 106u;
+    if (precision_bits > 106u)
+        precision_bits = 106u;
+
+    return qf_from_double(ldexp(1.0, 4 - (int)precision_bits));
+}
+
+static size_t mat_numeric_number_precision_bits(const number_t *value)
+{
+    size_t precision_bits;
+    number_kind_t kind;
+
+    if (!value || !number_is_valid_value(value))
+        return 53u;
+
+    kind = number_kind_value(value);
+    switch (kind) {
+    case NUMBER_DOUBLE:
+        return 53u;
+    case NUMBER_QFLOAT:
+    case NUMBER_QCOMPLEX:
+        return 106u;
+    case NUMBER_MINT:
+    case NUMBER_MRATIONAL:
+        return 106u;
+    case NUMBER_MFLOAT:
+    case NUMBER_MCOMPLEX:
+        precision_bits = num_get_prec_bits(*value);
+        return precision_bits == 0u ? 106u : precision_bits;
+    default:
+        return 53u;
+    }
+}
+
+static qfloat_t mat_numeric_relative_epsilon(const matrix_t *A)
+{
+    size_t precision_bits = 106u;
+
+    if (!A)
+        return mat_numeric_epsilon_from_precision_bits(precision_bits);
+
+    if (A->elem == &dval_elem)
+        return mat_numeric_epsilon_from_precision_bits(106u);
+
+    if (A->elem == &number_elem) {
+        size_t weakest_precision_bits = (size_t)-1;
+
+        for (size_t i = 0; i < A->rows; ++i) {
+            for (size_t j = 0; j < A->cols; ++j) {
+                unsigned char raw[64];
+                number_t value;
+                size_t cell_precision_bits;
+
+                mat_get(A, i, j, raw);
+                memcpy(&value, raw, sizeof(value));
+                cell_precision_bits = mat_numeric_number_precision_bits(&value);
+                if (cell_precision_bits < weakest_precision_bits)
+                    weakest_precision_bits = cell_precision_bits;
+            }
+        }
+
+        if (weakest_precision_bits != (size_t)-1)
+            precision_bits = weakest_precision_bits;
+    }
+
+    return mat_numeric_epsilon_from_precision_bits(precision_bits);
+}
 
 void mat_qr_factor_free(mat_qr_factor_t *out)
 {
@@ -52,7 +124,7 @@ int mat_qr_factor(const matrix_t *A, mat_qr_factor_t *out)
             unsigned char raw[64];
 
             mat_get(A, i, j, raw);
-            A->elem->to_qc(&Z[i * n + j], raw);
+            Z[i * n + j] = mat_raw_value_to_qcomplex(A->elem, raw);
         }
     }
 
@@ -177,7 +249,7 @@ int mat_cholesky(const matrix_t *A, mat_cholesky_t *out)
             unsigned char raw[64];
 
             mat_get(A, i, j, raw);
-            A->elem->to_qc(&Z[i * n + j], raw);
+            Z[i * n + j] = mat_raw_value_to_qcomplex(A->elem, raw);
         }
     }
 
@@ -253,7 +325,7 @@ static double mat_singular_tolerance(const matrix_t *A, double sigma_max)
 {
     qfloat_t sigma_qf = qf_from_double(sigma_max);
     qfloat_t dim_qf = qf_from_double((double)((A->rows > A->cols) ? A->rows : A->cols));
-    qfloat_t tol_qf = qf_mul(qf_mul(sigma_qf, dim_qf), A->elem->relative_epsilon);
+    qfloat_t tol_qf = qf_mul(qf_mul(sigma_qf, dim_qf), mat_numeric_relative_epsilon(A));
     qfloat_t algo_floor = qf_mul(qf_from_double(1.0e4),
                                  qf_from_double(2.2204460492503131e-16));
 
@@ -276,13 +348,7 @@ static qcomplex_t *mat_qcomplex_array_mul(const qcomplex_t *A, size_t a_rows,
 
 static qcomplex_t num_as_qcomplex(number_t value)
 {
-    number_t real = num_real_part(value);
-    number_t imag = num_imag_part(value);
-    qcomplex_t out = qc_make(num_to_qfloat(real), num_to_qfloat(imag));
-
-    num_destroy(&imag);
-    num_destroy(&real);
-    return out;
+    return mat_number_to_qcomplex_value(&value);
 }
 
 static int mat_norm_via_svd(const matrix_t *A, qfloat_t *out)
@@ -302,7 +368,7 @@ static int mat_norm_via_svd(const matrix_t *A, qfloat_t *out)
         unsigned char raw[64];
         qfloat_t sig;
         mat_get(svd.S, i, i, raw);
-        svd.S->elem->to_qf(&sig, raw);
+        sig = mat_raw_value_to_qfloat(svd.S->elem, raw);
         sig = qf_abs(sig);
         if (qf_gt(sig, best))
             best = sig;
@@ -363,7 +429,7 @@ int mat_svd_factor(const matrix_t *A, mat_svd_factor_t *out)
             number_t re_num = num_real_part(evals[i]);
             double re = num_to_double(re_num);
             order[i] = i;
-            sigma[i] = (re > 0.0) ? qf_sqrt(num_to_qfloat(re_num)) : QF_ZERO;
+            sigma[i] = (re > 0.0) ? qf_sqrt(mat_number_to_real_qfloat_value(&re_num)) : QF_ZERO;
             num_destroy(&re_num);
         }
 
@@ -429,7 +495,7 @@ int mat_svd_factor(const matrix_t *A, mat_svd_factor_t *out)
             number_t re_num = num_real_part(evals[i]);
             double re = num_to_double(re_num);
             order[i] = i;
-            sigma[i] = (re > 0.0) ? qf_sqrt(num_to_qfloat(re_num)) : QF_ZERO;
+            sigma[i] = (re > 0.0) ? qf_sqrt(mat_number_to_real_qfloat_value(&re_num)) : QF_ZERO;
             num_destroy(&re_num);
         }
 
@@ -526,7 +592,7 @@ static int mat_norm_one(const matrix_t *A, qfloat_t *out)
             unsigned char raw[64];
             qfloat_t mag;
             mat_get(A, i, j, raw);
-            e->abs_qf(&mag, raw);
+            mag = mat_raw_value_abs_qfloat(e, raw);
             sum = qf_add(sum, mag);
         }
         if (qf_gt(sum, best))
@@ -547,7 +613,7 @@ static int mat_norm_infinity(const matrix_t *A, qfloat_t *out)
             unsigned char raw[64];
             qfloat_t mag;
             mat_get(A, i, j, raw);
-            e->abs_qf(&mag, raw);
+            mag = mat_raw_value_abs_qfloat(e, raw);
             sum = qf_add(sum, mag);
         }
         if (qf_gt(sum, best))
@@ -567,7 +633,7 @@ static int mat_norm_frobenius(const matrix_t *A, qfloat_t *out)
             unsigned char raw[64];
             qfloat_t mag;
             mat_get(A, i, j, raw);
-            e->abs_qf(&mag, raw);
+            mag = mat_raw_value_abs_qfloat(e, raw);
             sumsq = qf_add(sumsq, qf_mul(mag, mag));
         }
     }
@@ -628,6 +694,41 @@ int mat_condition_number(const matrix_t *A, mat_norm_type_t type, qfloat_t *out)
         return 0;
     }
 
+    if (mat_has_diagonal_structure(A)) {
+        qfloat_t sigma_max = QF_ZERO;
+        qfloat_t sigma_min = QF_INF;
+        qfloat_t sumsq = QF_ZERO;
+        qfloat_t inv_sumsq = QF_ZERO;
+
+        for (size_t i = 0; i < kdim; ++i) {
+            unsigned char raw[64];
+            qfloat_t mag;
+
+            mat_get(A, i, i, raw);
+            mag = mat_raw_value_abs_qfloat(A->elem, raw);
+            if (qf_gt(mag, sigma_max))
+                sigma_max = mag;
+            if (qf_lt(mag, sigma_min))
+                sigma_min = mag;
+            sumsq = qf_add(sumsq, qf_mul(mag, mag));
+            inv_sumsq = qf_add(inv_sumsq,
+                               qf_mul(qf_div(QF_ONE, mag), qf_div(QF_ONE, mag)));
+        }
+
+        switch (type) {
+        case MAT_NORM_1:
+        case MAT_NORM_INF:
+        case MAT_NORM_2:
+            *out = qf_div(sigma_max, sigma_min);
+            return 0;
+        case MAT_NORM_FRO:
+            *out = qf_mul(qf_sqrt(sumsq), qf_sqrt(inv_sumsq));
+            return 0;
+        default:
+            break;
+        }
+    }
+
     if (mat_norm_function_for(type) == mat_norm_via_svd) {
         mat_svd_factor_t svd = {0};
         qfloat_t sigma_max = QF_ZERO;
@@ -638,7 +739,7 @@ int mat_condition_number(const matrix_t *A, mat_norm_type_t type, qfloat_t *out)
             unsigned char raw[64];
             qfloat_t sig;
             mat_get(svd.S, i, i, raw);
-            svd.S->elem->to_qf(&sig, raw);
+            sig = mat_raw_value_to_qfloat(svd.S->elem, raw);
             sig = qf_abs(sig);
             if (qf_gt(sig, sigma_max))
                 sigma_max = sig;
@@ -655,16 +756,12 @@ int mat_condition_number(const matrix_t *A, mat_norm_type_t type, qfloat_t *out)
     matrix_t *Ai = NULL;
     int rc_a, rc_i;
 
-    Aw = mat_convert_dense(A, &qcomplex_elem);
+    Aw = mat_convert_dense(A, &number_elem);
     if (!Aw)
         return -2;
 
     if (Aw->rows == Aw->cols) {
-        matrix_t *I = mat_create_identity_with_elem(Aw->rows, Aw->elem);
-        if (!I)
-            goto fail_non2;
-        Ai = mat_solve(Aw, I);
-        mat_free(I);
+        Ai = mat_inverse(Aw);
     } else {
         Ai = mat_pseudoinverse(Aw);
     }
@@ -710,7 +807,7 @@ int mat_rank(const matrix_t *A)
         qfloat_t sig;
         double d;
         mat_get(svd.S, i, i, raw);
-        svd.S->elem->to_qf(&sig, raw);
+        sig = mat_raw_value_to_qfloat(svd.S->elem, raw);
         d = qf_to_double(qf_abs(sig));
         if (d > sigma_max)
             sigma_max = d;
@@ -722,7 +819,7 @@ int mat_rank(const matrix_t *A)
         qfloat_t sig;
         double d;
         mat_get(svd.S, i, i, raw);
-        svd.S->elem->to_qf(&sig, raw);
+        sig = mat_raw_value_to_qfloat(svd.S->elem, raw);
         d = qf_to_double(qf_abs(sig));
         if (d > tol)
             rank++;
@@ -757,7 +854,7 @@ matrix_t *mat_pseudoinverse(const matrix_t *A)
         qfloat_t sig;
         double d;
         mat_get(svd.S, i, i, raw);
-        svd.S->elem->to_qf(&sig, raw);
+        sig = mat_raw_value_to_qfloat(svd.S->elem, raw);
         d = qf_to_double(qf_abs(sig));
         if (d > sigma_max)
             sigma_max = d;
@@ -779,7 +876,7 @@ matrix_t *mat_pseudoinverse(const matrix_t *A)
         double d;
         qcomplex_t val;
         mat_get(svd.S, i, i, raw);
-        svd.S->elem->to_qf(&sig, raw);
+        sig = mat_raw_value_to_qfloat(svd.S->elem, raw);
         d = qf_to_double(qf_abs(sig));
         if (d > tol)
             val = qc_make(qf_div(QF_ONE, sig), QF_ZERO);
@@ -1142,7 +1239,7 @@ matrix_t *mat_jordan_profile(const matrix_t *A, const void *eigenvalue)
     }
 
     blocks = dims[1];
-    P = mat_create_dense_with_elem(blocks, 1, &double_elem);
+    P = mat_create_dense_with_elem(blocks, 1, &number_elem);
     if (!P)
         goto fail;
 
@@ -1150,14 +1247,17 @@ matrix_t *mat_jordan_profile(const matrix_t *A, const void *eigenvalue)
         size_t at_least_k = dims[k] - dims[k - 1];
         size_t at_least_next = (k < n) ? (dims[k + 1] - dims[k]) : 0;
         size_t exact_k = at_least_k - at_least_next;
-        double block_size = (double)k;
+        number_t block_size = num_create_from_long((long)k);
 
         for (size_t c = 0; c < exact_k; ++c) {
-            if (out >= blocks)
+            if (out >= blocks) {
+                num_destroy(&block_size);
                 goto fail;
+            }
             mat_set(P, out, 0, &block_size);
             out++;
         }
+        num_destroy(&block_size);
 
         if (k == 1)
             break;
@@ -1283,7 +1383,7 @@ static int mat_eigendecompose_hermitian(const matrix_t *A, void *eigenvalues, ma
             unsigned char raw[64];
 
             mat_get(A, i, j, raw);
-            A->elem->to_qc(&W[i * n + j], raw);
+            W[i * n + j] = mat_raw_value_to_qcomplex(A->elem, raw);
         }
     }
 
@@ -1696,7 +1796,7 @@ static int mat_eigendecompose_general(const matrix_t *A, void *eigenvalues,
     for (size_t i = 0; i < n; i++)
         for (size_t j = 0; j < n; j++) {
             mat_get(A, i, j, raw);
-            e->to_qc(&QCM(H, i, j, n), raw);
+            QCM(H, i, j, n) = mat_raw_value_to_qcomplex(e, raw);
         }
 
     /* Q = identity (accumulates similarity transforms) */
@@ -1837,7 +1937,7 @@ static qcomplex_t *mat_load_qcomplex_array(const matrix_t *A)
             unsigned char v_raw[64];
 
             mat_get(A, i, j, v_raw);
-            A->elem->to_qc(&Z[i * A->cols + j], v_raw);
+            Z[i * A->cols + j] = mat_raw_value_to_qcomplex(A->elem, v_raw);
         }
     }
 

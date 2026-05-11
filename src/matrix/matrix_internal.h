@@ -93,15 +93,6 @@ struct elem_vtable {
     void   (*from_real)(void *out, double x);
     void   (*conj_elem)(void *out, const void *a);
 
-    /* qfloat-precision scalar queries */
-    void (*to_qf)(qfloat_t *out, const void *a);
-    void (*abs_qf)(qfloat_t *out, const void *a);
-    void (*from_qf)(void *out, const qfloat_t *x);
-
-    /* qcomplex cast */
-    void (*to_qc)(qcomplex_t *out, const void *a);
-    void (*from_qc)(void *out, const qcomplex_t *z);
-
     /* constants */
     const void *zero;
     const void *one;
@@ -112,9 +103,6 @@ struct elem_vtable {
     /* printing */
     void (*print)(const void *val, char *buf, size_t buflen);
     int (*format_scalar)(const void *val, int scientific, char *buf, size_t buflen);
-
-    /* numerical tolerance scale for rank/conditioning decisions */
-    qfloat_t relative_epsilon;
 
     const struct elem_fun_vtable *fun;
 };
@@ -166,9 +154,6 @@ struct matrix_t {
    Element vtable instances (defined in matrix_vtables.c)
    ============================================================ */
 
-extern const struct elem_vtable double_elem;
-extern const struct elem_vtable qfloat_elem;
-extern const struct elem_vtable qcomplex_elem;
 extern const struct elem_vtable number_elem;
 extern const struct elem_vtable dval_elem;
 
@@ -232,6 +217,22 @@ const struct store_vtable *mat_sparse_factor_store(const struct matrix_t *A,
 void mat_get_owned(const struct matrix_t *A, size_t i, size_t j, void *out);
 void mat_value_init_zero(const struct matrix_t *A, void *slot);
 void mat_value_destroy(const struct matrix_t *A, void *slot);
+number_t mat_raw_value_to_number(const struct elem_vtable *elem, const void *value);
+void mat_raw_value_from_number(const struct elem_vtable *elem, void *out,
+                               const number_t *value);
+qcomplex_t mat_number_to_qcomplex_value(const number_t *value);
+qfloat_t mat_number_to_real_qfloat_value(const number_t *value);
+qfloat_t mat_number_abs_qfloat_value(const number_t *value);
+qcomplex_t mat_raw_value_to_qcomplex(const struct elem_vtable *elem,
+                                     const void *value);
+qfloat_t mat_raw_value_to_qfloat(const struct elem_vtable *elem,
+                                 const void *value);
+qfloat_t mat_raw_value_abs_qfloat(const struct elem_vtable *elem,
+                                  const void *value);
+void mat_raw_value_from_qcomplex(const struct elem_vtable *elem, void *out,
+                                 qcomplex_t value);
+void mat_raw_value_from_qfloat(const struct elem_vtable *elem, void *out,
+                               qfloat_t value);
 void dense_swap_rows(struct matrix_t *A, size_t r1, size_t r2);
 struct matrix_t *mat_extract_block(const struct matrix_t *A,
                                    size_t row0, size_t rows,

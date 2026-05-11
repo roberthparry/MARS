@@ -97,9 +97,7 @@ void mat_get(const struct matrix_t *A, size_t i, size_t j, void *out) {
 
 number_t mat_get_num(const struct matrix_t *A, size_t i, size_t j)
 {
-    unsigned char raw[64] = {0};
     number_t out = num_new();
-    qcomplex_t z = QC_ZERO;
 
     if (!A)
         return out;
@@ -117,11 +115,6 @@ number_t mat_get_num(const struct matrix_t *A, size_t i, size_t j)
             out = dv_eval_num(dv);
         return out;
     }
-
-    mat_get(A, i, j, raw);
-    if (A->elem->to_qc)
-        A->elem->to_qc(&z, raw);
-    out = num_create_from_qcomplex(z);
     return out;
 }
 

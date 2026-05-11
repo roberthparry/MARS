@@ -75,6 +75,8 @@ matrix_t *mat_convert_with_store(const matrix_t *A,
 
     if (!A || !target || !store)
         return NULL;
+    if (A->elem == target)
+        return mat_copy_with_store(A, store);
 
     C = mat_create_with_store(A->rows, A->cols, target, store);
     if (!C)
@@ -85,15 +87,15 @@ matrix_t *mat_convert_with_store(const matrix_t *A,
 
     for (size_t i = 0; i < A->rows; i++)
         for (size_t j = 0; j < A->cols; j++) {
-            qcomplex_t z;
-
+            number_t value;
             mat_value_destroy(A, src);
             elem_destroy_value(target, dst);
             mat_value_init_zero(A, src);
             elem_init_zero_value(target, dst);
             mat_get_owned(A, i, j, src);
-            A->elem->to_qc(&z, src);
-            target->from_qc(dst, &z);
+            value = mat_raw_value_to_number(A->elem, src);
+            mat_raw_value_from_number(target, dst, &value);
+            num_destroy(&value);
             mat_set(C, i, j, dst);
             elem_destroy_value(target, dst);
         }
@@ -228,21 +230,42 @@ static matrix_t *mat_solve_diagonal(const matrix_t *A,
     if (!X)
         return NULL;
 
+    elem_init_zero_value(elem, diag);
+    elem_init_zero_value(elem, inv_diag);
+    elem_init_zero_value(elem, rhs);
+    elem_init_zero_value(elem, out);
+
     for (size_t i = 0; i < A->rows; i++) {
-        mat_get(A, i, i, diag);
+        elem_destroy_value(elem, diag);
+        elem_init_zero_value(elem, diag);
+        mat_get_owned(A, i, i, diag);
         if (elem->abs2(diag) < 1e-300) {
+            elem_destroy_value(elem, diag);
+            elem_destroy_value(elem, inv_diag);
+            elem_destroy_value(elem, rhs);
+            elem_destroy_value(elem, out);
             mat_free(X);
             return NULL;
         }
 
+        elem_destroy_value(elem, inv_diag);
+        elem_init_zero_value(elem, inv_diag);
         elem->inv(inv_diag, diag);
         for (size_t j = 0; j < B->cols; j++) {
-            mat_get(B, i, j, rhs);
+            elem_destroy_value(elem, rhs);
+            elem_destroy_value(elem, out);
+            elem_init_zero_value(elem, rhs);
+            elem_init_zero_value(elem, out);
+            mat_get_owned(B, i, j, rhs);
             elem->mul(out, inv_diag, rhs);
             mat_set(X, i, j, out);
         }
     }
 
+    elem_destroy_value(elem, diag);
+    elem_destroy_value(elem, inv_diag);
+    elem_destroy_value(elem, rhs);
+    elem_destroy_value(elem, out);
     return X;
 }
 
@@ -257,19 +280,48 @@ static matrix_t *mat_forward_substitute(const matrix_t *L,
     if (!X)
         return NULL;
 
+    elem_init_zero_value(elem, diag);
+    elem_init_zero_value(elem, inv_diag);
+    elem_init_zero_value(elem, sum);
+    elem_init_zero_value(elem, a);
+    elem_init_zero_value(elem, b);
+    elem_init_zero_value(elem, prod);
+    elem_init_zero_value(elem, out);
+
     for (size_t i = 0; i < L->rows; i++) {
-        mat_get(L, i, i, diag);
+        elem_destroy_value(elem, diag);
+        elem_init_zero_value(elem, diag);
+        mat_get_owned(L, i, i, diag);
         if (elem->abs2(diag) < 1e-300) {
+            elem_destroy_value(elem, diag);
+            elem_destroy_value(elem, inv_diag);
+            elem_destroy_value(elem, sum);
+            elem_destroy_value(elem, a);
+            elem_destroy_value(elem, b);
+            elem_destroy_value(elem, prod);
+            elem_destroy_value(elem, out);
             mat_free(X);
             return NULL;
         }
 
+        elem_destroy_value(elem, inv_diag);
+        elem_init_zero_value(elem, inv_diag);
         elem->inv(inv_diag, diag);
         for (size_t j = 0; j < B->cols; j++) {
-            mat_get(B, i, j, sum);
+            elem_destroy_value(elem, sum);
+            elem_destroy_value(elem, out);
+            elem_init_zero_value(elem, sum);
+            elem_init_zero_value(elem, out);
+            mat_get_owned(B, i, j, sum);
             for (size_t k = 0; k < i; k++) {
-                mat_get(L, i, k, a);
-                mat_get(X, k, j, b);
+                elem_destroy_value(elem, a);
+                elem_destroy_value(elem, b);
+                elem_destroy_value(elem, prod);
+                elem_init_zero_value(elem, a);
+                elem_init_zero_value(elem, b);
+                elem_init_zero_value(elem, prod);
+                mat_get_owned(L, i, k, a);
+                mat_get_owned(X, k, j, b);
                 elem->mul(prod, a, b);
                 elem->sub(sum, sum, prod);
             }
@@ -278,6 +330,13 @@ static matrix_t *mat_forward_substitute(const matrix_t *L,
         }
     }
 
+    elem_destroy_value(elem, diag);
+    elem_destroy_value(elem, inv_diag);
+    elem_destroy_value(elem, sum);
+    elem_destroy_value(elem, a);
+    elem_destroy_value(elem, b);
+    elem_destroy_value(elem, prod);
+    elem_destroy_value(elem, out);
     return X;
 }
 
@@ -292,19 +351,48 @@ static matrix_t *mat_backward_substitute(const matrix_t *U,
     if (!X)
         return NULL;
 
+    elem_init_zero_value(elem, diag);
+    elem_init_zero_value(elem, inv_diag);
+    elem_init_zero_value(elem, sum);
+    elem_init_zero_value(elem, a);
+    elem_init_zero_value(elem, b);
+    elem_init_zero_value(elem, prod);
+    elem_init_zero_value(elem, out);
+
     for (size_t ii = U->rows; ii-- > 0;) {
-        mat_get(U, ii, ii, diag);
+        elem_destroy_value(elem, diag);
+        elem_init_zero_value(elem, diag);
+        mat_get_owned(U, ii, ii, diag);
         if (elem->abs2(diag) < 1e-300) {
+            elem_destroy_value(elem, diag);
+            elem_destroy_value(elem, inv_diag);
+            elem_destroy_value(elem, sum);
+            elem_destroy_value(elem, a);
+            elem_destroy_value(elem, b);
+            elem_destroy_value(elem, prod);
+            elem_destroy_value(elem, out);
             mat_free(X);
             return NULL;
         }
 
+        elem_destroy_value(elem, inv_diag);
+        elem_init_zero_value(elem, inv_diag);
         elem->inv(inv_diag, diag);
         for (size_t j = 0; j < B->cols; j++) {
-            mat_get(B, ii, j, sum);
+            elem_destroy_value(elem, sum);
+            elem_destroy_value(elem, out);
+            elem_init_zero_value(elem, sum);
+            elem_init_zero_value(elem, out);
+            mat_get_owned(B, ii, j, sum);
             for (size_t k = ii + 1; k < U->cols; k++) {
-                mat_get(U, ii, k, a);
-                mat_get(X, k, j, b);
+                elem_destroy_value(elem, a);
+                elem_destroy_value(elem, b);
+                elem_destroy_value(elem, prod);
+                elem_init_zero_value(elem, a);
+                elem_init_zero_value(elem, b);
+                elem_init_zero_value(elem, prod);
+                mat_get_owned(U, ii, k, a);
+                mat_get_owned(X, k, j, b);
                 elem->mul(prod, a, b);
                 elem->sub(sum, sum, prod);
             }
@@ -313,6 +401,13 @@ static matrix_t *mat_backward_substitute(const matrix_t *U,
         }
     }
 
+    elem_destroy_value(elem, diag);
+    elem_destroy_value(elem, inv_diag);
+    elem_destroy_value(elem, sum);
+    elem_destroy_value(elem, a);
+    elem_destroy_value(elem, b);
+    elem_destroy_value(elem, prod);
+    elem_destroy_value(elem, out);
     return X;
 }
 
@@ -931,13 +1026,26 @@ int mat_lu_factor(const matrix_t *A, mat_lu_factor_t *out)
         return -3;
     }
 
+    elem_init_zero_value(e, pivot);
+    elem_init_zero_value(e, inv_pivot);
+    elem_init_zero_value(e, factor);
+    elem_init_zero_value(e, a);
+    elem_init_zero_value(e, b);
+
     for (size_t i = 0; i < A->rows; i++)
         mat_set(L, i, i, e->one);
 
     for (size_t k = 0; k < A->rows; k++) {
         size_t pivot_row = mat_find_pivot_row(U, k, k);
-        mat_get(U, pivot_row, k, pivot);
+        elem_destroy_value(e, pivot);
+        elem_init_zero_value(e, pivot);
+        mat_get_owned(U, pivot_row, k, pivot);
         if (e->abs2(pivot) < 1e-300) {
+            elem_destroy_value(e, pivot);
+            elem_destroy_value(e, inv_pivot);
+            elem_destroy_value(e, factor);
+            elem_destroy_value(e, a);
+            elem_destroy_value(e, b);
             mat_free(P);
             mat_free(L);
             mat_free(U);
@@ -948,27 +1056,39 @@ int mat_lu_factor(const matrix_t *A, mat_lu_factor_t *out)
             mat_swap_rows(U, k, pivot_row);
             mat_swap_rows(P, k, pivot_row);
             for (size_t j = 0; j < k; j++) {
-                mat_get(L, k, j, a);
-                mat_get(L, pivot_row, j, b);
+                elem_destroy_value(e, a);
+                elem_destroy_value(e, b);
+                elem_init_zero_value(e, a);
+                elem_init_zero_value(e, b);
+                mat_get_owned(L, k, j, a);
+                mat_get_owned(L, pivot_row, j, b);
                 mat_set(L, k, j, b);
                 mat_set(L, pivot_row, j, a);
             }
         }
 
-        mat_get(U, k, k, pivot);
+        elem_destroy_value(e, pivot);
+        elem_destroy_value(e, inv_pivot);
+        elem_init_zero_value(e, pivot);
+        elem_init_zero_value(e, inv_pivot);
+        mat_get_owned(U, k, k, pivot);
         e->inv(inv_pivot, pivot);
 
         for (size_t i = k + 1; i < A->rows; i++) {
-            mat_get(U, i, k, factor);
+            elem_destroy_value(e, factor);
+            elem_destroy_value(e, a);
+            elem_init_zero_value(e, factor);
+            elem_init_zero_value(e, a);
+            mat_get_owned(U, i, k, factor);
             if (e->abs2(factor) < 1e-300) {
                 mat_set(L, i, k, e->zero);
                 continue;
             }
 
-            e->mul(factor, factor, inv_pivot);
-            mat_set(L, i, k, factor);
+            e->mul(a, factor, inv_pivot);
+            mat_set(L, i, k, a);
             mat_set(U, i, k, e->zero);
-            mat_row_eliminate_from(U, i, k, k + 1, factor);
+            mat_row_eliminate_from(U, i, k, k + 1, a);
         }
     }
 
@@ -980,9 +1100,19 @@ int mat_lu_factor(const matrix_t *A, mat_lu_factor_t *out)
         mat_free(P);
         mat_free(L_out);
         mat_free(U_out);
+        elem_destroy_value(e, pivot);
+        elem_destroy_value(e, inv_pivot);
+        elem_destroy_value(e, factor);
+        elem_destroy_value(e, a);
+        elem_destroy_value(e, b);
         return -3;
     }
 
+    elem_destroy_value(e, pivot);
+    elem_destroy_value(e, inv_pivot);
+    elem_destroy_value(e, factor);
+    elem_destroy_value(e, a);
+    elem_destroy_value(e, b);
     out->P = P;
     out->L = L_out;
     out->U = U_out;

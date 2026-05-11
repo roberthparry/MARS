@@ -4730,6 +4730,8 @@ static void test_number_matrix_functions(void)
     matrix_t *J_log = NULL;
     matrix_t *J_sqrt = NULL;
     matrix_t *J_trig = NULL;
+    matrix_t *J_confluent = NULL;
+    matrix_t *J_confluent_exp = NULL;
     matrix_t *J_asin = NULL;
     matrix_t *J_acos = NULL;
     matrix_t *J_asinh = NULL;
@@ -4808,6 +4810,54 @@ static void test_number_matrix_functions(void)
         print_matrix_precision_comparison("sqrt(diag_real)[0,0]", got, expected);
         num_destroy(&expected);
         num_destroy(&got);
+    }
+
+    J_confluent = mat_from_string("(0, 1, 1; 0, 2, 1; 0, 0, 0)", NULL);
+    check_bool("mat_from_string(number confluent upper triangular) not NULL",
+               J_confluent != NULL);
+
+    J_confluent_exp = mat_exp(J_confluent);
+    check_bool("mat_exp(number confluent upper triangular) not NULL",
+               J_confluent_exp != NULL);
+    check_bool("mat_exp(number confluent upper triangular) -> MAT_TYPE_NUMBER",
+               J_confluent_exp != NULL &&
+               mat_typeof(J_confluent_exp) == MAT_TYPE_NUMBER);
+
+    if (J_confluent_exp) {
+        qcomplex_t expected00 = qc_make(QF_ONE, QF_ZERO);
+        qcomplex_t expected11 = qc_make(qf_from_double(exp(2.0)), QF_ZERO);
+        qcomplex_t expected22 = qc_make(QF_ONE, QF_ZERO);
+        qcomplex_t expected01 = qc_make(qf_from_double((exp(2.0) - 1.0) / 2.0), QF_ZERO);
+        qcomplex_t expected12 = qc_make(qf_from_double((exp(2.0) - 1.0) / 2.0), QF_ZERO);
+        qcomplex_t expected02 = qc_make(qf_from_double((exp(2.0) + 1.0) / 4.0), QF_ZERO);
+        number_t got00, got11, got22, got01, got12, got02;
+
+        got00 = mat_get_num(J_confluent_exp, 0, 0);
+        got11 = mat_get_num(J_confluent_exp, 1, 1);
+        got22 = mat_get_num(J_confluent_exp, 2, 2);
+        got01 = mat_get_num(J_confluent_exp, 0, 1);
+        got12 = mat_get_num(J_confluent_exp, 1, 2);
+        got02 = mat_get_num(J_confluent_exp, 0, 2);
+
+        check_qc_val("exp(confluent upper triangular)[0,0] = 1",
+                     num_to_qcomplex(got00), expected00, 1e-10);
+        check_qc_val("exp(confluent upper triangular)[1,1] = exp(2)",
+                     num_to_qcomplex(got11), expected11, 1e-10);
+        check_qc_val("exp(confluent upper triangular)[2,2] = 1",
+                     num_to_qcomplex(got22), expected22, 1e-10);
+        check_qc_val("exp(confluent upper triangular)[0,1]",
+                     num_to_qcomplex(got01), expected01, 1e-10);
+        check_qc_val("exp(confluent upper triangular)[1,2]",
+                     num_to_qcomplex(got12), expected12, 1e-10);
+        check_qc_val("exp(confluent upper triangular)[0,2]",
+                     num_to_qcomplex(got02), expected02, 1e-10);
+
+        num_destroy(&got00);
+        num_destroy(&got11);
+        num_destroy(&got22);
+        num_destroy(&got01);
+        num_destroy(&got12);
+        num_destroy(&got02);
     }
 
     diag_complex[0] = num_create_from_string("1 + 2i");
@@ -5601,6 +5651,8 @@ static void test_number_matrix_functions(void)
     mat_free(J_upper_exact);
     mat_free(J_upper_hp);
     mat_free(J_lower_hp);
+    mat_free(J_confluent_exp);
+    mat_free(J_confluent);
     mat_free(J_log);
     mat_free(J_sqrt);
     mat_free(J_trig);

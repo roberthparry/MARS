@@ -79,23 +79,27 @@ static inline void test_mat_get_num_slot(const matrix_t *A, size_t i, size_t j, 
 
 static inline void test_mat_get_d(const matrix_t *A, size_t i, size_t j, double *out)
 {
-    number_t n;
+    number_t n, re;
 
     if (!out)
         return;
     n = mat_get_num(A, i, j);
-    *out = num_to_double(n);
+    re = num_real_part(n);
+    *out = num_to_double(re);
+    num_destroy(&re);
     num_destroy(&n);
 }
 
 static inline void test_mat_get_qf(const matrix_t *A, size_t i, size_t j, qfloat_t *out)
 {
-    number_t n;
+    number_t n, re;
 
     if (!out)
         return;
     n = mat_get_num(A, i, j);
-    *out = num_to_qfloat(n);
+    re = num_real_part(n);
+    *out = num_to_qfloat(re);
+    num_destroy(&re);
     num_destroy(&n);
 }
 
@@ -112,7 +116,7 @@ static inline void test_mat_get_qc(const matrix_t *A, size_t i, size_t j, qcompl
 
 static inline void test_mat_get_dv_slot(const matrix_t *A, size_t i, size_t j, dval_t **out)
 {
-    mat_get(A, i, j, out);
+    mat_get_owned(A, i, j, out);
 }
 
 static inline void test_mat_set_data_num_slot(matrix_t *A, const number_t *data)
@@ -201,7 +205,16 @@ static inline void test_mat_get_data_num_slot(const matrix_t *A, number_t *data)
 
 static inline void test_mat_get_data_dv_slot(const matrix_t *A, dval_t **data)
 {
-    mat_get_data(A, data);
+    size_t rows, cols, idx = 0;
+
+    if (!A || !data)
+        return;
+
+    rows = mat_get_row_count(A);
+    cols = mat_get_col_count(A);
+    for (size_t i = 0; i < rows; ++i)
+        for (size_t j = 0; j < cols; ++j)
+            mat_get_owned(A, i, j, &data[idx++]);
 }
 
 static inline void test_mat_get_data_d(const matrix_t *A, double *data)
@@ -244,6 +257,142 @@ static inline void test_mat_get_data_qc(const matrix_t *A, qcomplex_t *data)
     for (size_t i = 0; i < rows; ++i)
         for (size_t j = 0; j < cols; ++j)
             test_mat_get_qc(A, i, j, &data[idx++]);
+}
+
+static inline int test_mat_trace_num_slot(const matrix_t *A, number_t *trace)
+{
+    return mat_trace(A, trace);
+}
+
+static inline int test_mat_trace_d(const matrix_t *A, double *trace)
+{
+    number_t n, re;
+    int rc;
+
+    if (!trace)
+        return -1;
+    *trace = 0.0;
+
+    rc = mat_trace(A, &n);
+    if (rc != 0)
+        return rc;
+
+    re = num_real_part(n);
+    *trace = num_to_double(re);
+    num_destroy(&re);
+    num_destroy(&n);
+    return 0;
+}
+
+static inline int test_mat_trace_qf(const matrix_t *A, qfloat_t *trace)
+{
+    number_t n, re;
+    int rc;
+
+    if (!trace)
+        return -1;
+    *trace = QF_ZERO;
+
+    rc = mat_trace(A, &n);
+    if (rc != 0)
+        return rc;
+
+    re = num_real_part(n);
+    *trace = num_to_qfloat(re);
+    num_destroy(&re);
+    num_destroy(&n);
+    return 0;
+}
+
+static inline int test_mat_trace_qc(const matrix_t *A, qcomplex_t *trace)
+{
+    number_t n;
+    int rc;
+
+    if (!trace)
+        return -1;
+    *trace = QC_ZERO;
+
+    rc = mat_trace(A, &n);
+    if (rc != 0)
+        return rc;
+
+    *trace = test_num_to_qcomplex(n);
+    num_destroy(&n);
+    return 0;
+}
+
+static inline int test_mat_trace_dv_slot(const matrix_t *A, dval_t **trace)
+{
+    return mat_trace(A, trace);
+}
+
+static inline int test_mat_det_num_slot(const matrix_t *A, number_t *det)
+{
+    return mat_det(A, det);
+}
+
+static inline int test_mat_det_d(const matrix_t *A, double *det)
+{
+    number_t n, re;
+    int rc;
+
+    if (!det)
+        return -1;
+    *det = 0.0;
+
+    rc = mat_det(A, &n);
+    if (rc != 0)
+        return rc;
+
+    re = num_real_part(n);
+    *det = num_to_double(re);
+    num_destroy(&re);
+    num_destroy(&n);
+    return 0;
+}
+
+static inline int test_mat_det_qf(const matrix_t *A, qfloat_t *det)
+{
+    number_t n, re;
+    int rc;
+
+    if (!det)
+        return -1;
+    *det = QF_ZERO;
+
+    rc = mat_det(A, &n);
+    if (rc != 0)
+        return rc;
+
+    re = num_real_part(n);
+    *det = num_to_qfloat(re);
+    num_destroy(&re);
+    num_destroy(&n);
+    return 0;
+}
+
+static inline int test_mat_det_qc(const matrix_t *A, qcomplex_t *det)
+{
+    number_t n;
+    int rc;
+
+    if (!det)
+        return -1;
+    *det = QC_ZERO;
+
+    rc = mat_det(A, &n);
+    if (rc != 0)
+        return rc;
+
+    *det = test_num_to_qcomplex(n);
+    num_destroy(&n);
+    return 0;
+}
+
+static inline int test_mat_det_dv_slot(const matrix_t *A, dval_t **det)
+{
+    return mat_det(A, det);
 }
 
 #define mat_set(A, i, j, value) \
@@ -291,6 +440,24 @@ static inline void test_mat_get_data_qc(const matrix_t *A, qcomplex_t *data)
         number_t: test_mat_get_data_num_slot, \
         dval_t *: test_mat_get_data_dv_slot \
     )((A), (data))
+
+#define mat_trace(A, trace) \
+    _Generic(*(trace), \
+        double: test_mat_trace_d, \
+        qfloat_t: test_mat_trace_qf, \
+        qcomplex_t: test_mat_trace_qc, \
+        number_t: test_mat_trace_num_slot, \
+        dval_t *: test_mat_trace_dv_slot \
+    )((A), (trace))
+
+#define mat_det(A, det) \
+    _Generic(*(det), \
+        double: test_mat_det_d, \
+        qfloat_t: test_mat_det_qf, \
+        qcomplex_t: test_mat_det_qc, \
+        number_t: test_mat_det_num_slot, \
+        dval_t *: test_mat_det_dv_slot \
+    )((A), (det))
 
 static inline matrix_t *test_mat_evaluate_qf(const matrix_t *A)
 {

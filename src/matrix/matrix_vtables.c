@@ -114,215 +114,6 @@ const struct store_vtable lower_triangular_store = {
     .transpose_store          = lower_triangular_transpose_store
 };
 
-static const double D_ZERO = 0.0;
-static const double D_ONE  = 1.0;
-static const qfloat_t D_REL_EPS = { 2.2204460492503131e-16, 0.0 };
-static const qfloat_t Q_REL_EPS = { 1.0e-30, 0.0 };
-
-static const struct elem_fun_vtable double_fun = {
-    .exp  = d_scalar_exp,
-    .sin  = d_scalar_sin,
-    .cos  = d_scalar_cos,
-    .tan  = d_scalar_tan,
-
-    .sinh = d_scalar_sinh,
-    .cosh = d_scalar_cosh,
-    .tanh = d_scalar_tanh,
-
-    .sqrt = d_scalar_sqrt,
-    .log  = d_scalar_log,
-
-    .asin = d_scalar_asin,
-    .acos = d_scalar_acos,
-    .atan = d_scalar_atan,
-
-    .asinh = d_scalar_asinh,
-    .acosh = d_scalar_acosh,
-    .atanh = d_scalar_atanh,
-
-    .erf  = d_scalar_erf,
-    .erfc = d_scalar_erfc,
-    .erfinv = d_scalar_erfinv,
-    .erfcinv = d_scalar_erfcinv,
-    .gamma = d_scalar_gamma,
-    .lgamma = d_scalar_lgamma,
-    .digamma = d_scalar_digamma,
-    .trigamma = d_scalar_trigamma,
-    .tetragamma = d_scalar_tetragamma,
-    .gammainv = d_scalar_gammainv,
-    .normal_pdf = d_scalar_normal_pdf,
-    .normal_cdf = d_scalar_normal_cdf,
-    .normal_logpdf = d_scalar_normal_logpdf,
-    .lambert_w0 = d_scalar_lambert_w0,
-    .lambert_wm1 = d_scalar_lambert_wm1,
-    .productlog = d_scalar_productlog,
-    .ei = d_scalar_ei,
-    .e1 = d_scalar_e1
-};
-
-const struct elem_vtable double_elem = {
-    .size            = sizeof(double),
-    .kind            = ELEM_NUMBER,
-    .public_type     = MAT_TYPE_NUMBER,
-    .init_zero_slot  = d_init_zero_slot,
-    .add             = d_add,
-    .sub             = d_sub,
-    .mul             = d_mul,
-    .inv             = d_inv,
-    .abs2            = d_abs2,
-    .to_real         = d_to_real,
-    .from_real       = d_from_real,
-    .conj_elem       = d_conj_elem,
-    .to_qf           = d_to_qf,
-    .abs_qf          = d_abs_qf,
-    .from_qf         = d_from_qf,
-    .to_qc           = d_to_qc_fn,
-    .from_qc         = d_from_qc_fn,
-    .zero            = &D_ZERO,
-    .one             = &D_ONE,
-    .cmp             = d_cmp,
-    .print           = d_print,
-    .format_scalar   = d_format_scalar,
-    .relative_epsilon = D_REL_EPS,
-    .fun             = &double_fun
-};
-
-static const struct elem_fun_vtable qfloat_fun = {
-    .exp  = qf_scalar_exp,
-    .sin  = qf_scalar_sin,
-    .cos  = qf_scalar_cos,
-    .tan  = qf_scalar_tan,
-
-    .sinh = qf_scalar_sinh,
-    .cosh = qf_scalar_cosh,
-    .tanh = qf_scalar_tanh,
-
-    .sqrt = qf_scalar_sqrt,
-    .log  = qf_scalar_log,
-
-    .asin = qf_scalar_asin,
-    .acos = qf_scalar_acos,
-    .atan = qf_scalar_atan,
-
-    .asinh = qf_scalar_asinh,
-    .acosh = qf_scalar_acosh,
-    .atanh = qf_scalar_atanh,
-
-    .erf  = qf_scalar_erf,
-    .erfc = qf_scalar_erfc,
-    .erfinv = qf_scalar_erfinv,
-    .erfcinv = qf_scalar_erfcinv,
-    .gamma = qf_scalar_gamma,
-    .lgamma = qf_scalar_lgamma,
-    .digamma = qf_scalar_digamma,
-    .trigamma = qf_scalar_trigamma,
-    .tetragamma = qf_scalar_tetragamma,
-    .gammainv = qf_scalar_gammainv,
-    .normal_pdf = qf_scalar_normal_pdf,
-    .normal_cdf = qf_scalar_normal_cdf,
-    .normal_logpdf = qf_scalar_normal_logpdf,
-    .lambert_w0 = qf_scalar_lambert_w0,
-    .lambert_wm1 = qf_scalar_lambert_wm1,
-    .productlog = qf_scalar_productlog,
-    .ei = qf_scalar_ei,
-    .e1 = qf_scalar_e1
-};
-
-const struct elem_vtable qfloat_elem = {
-    .size            = sizeof(qfloat_t),
-    .kind            = ELEM_NUMBER,
-    .public_type     = MAT_TYPE_NUMBER,
-    .init_zero_slot  = qf_init_zero_slot,
-    .add             = qf_add_wrap,
-    .sub             = qf_sub_wrap,
-    .mul             = qf_mul_wrap,
-    .inv             = qf_inv_wrap,
-    .abs2            = qf_abs2_wrap,
-    .to_real         = qf_to_real_wrap,
-    .from_real       = qf_from_real_wrap,
-    .conj_elem       = qf_conj_elem,
-    .to_qf           = qf_to_qf,
-    .abs_qf          = qf_abs_qf,
-    .from_qf         = qf_from_qf,
-    .to_qc           = qf_to_qc_fn,
-    .from_qc         = qf_from_qc_fn,
-    .zero            = &QF_ZERO,
-    .one             = &QF_ONE,
-    .cmp             = qfloat_cmp,
-    .print           = qf_print_wrap,
-    .format_scalar   = qf_format_scalar,
-    .relative_epsilon = Q_REL_EPS,
-    .fun             = &qfloat_fun
-};
-
-static const struct elem_fun_vtable qcomplex_fun = {
-    .exp  = qc_scalar_exp,
-    .sin  = qc_scalar_sin,
-    .cos  = qc_scalar_cos,
-    .tan  = qc_scalar_tan,
-
-    .sinh = qc_scalar_sinh,
-    .cosh = qc_scalar_cosh,
-    .tanh = qc_scalar_tanh,
-
-    .sqrt = qc_scalar_sqrt,
-    .log  = qc_scalar_log,
-
-    .asin = qc_scalar_asin,
-    .acos = qc_scalar_acos,
-    .atan = qc_scalar_atan,
-
-    .asinh = qc_scalar_asinh,
-    .acosh = qc_scalar_acosh,
-    .atanh = qc_scalar_atanh,
-
-    .erf  = qc_scalar_erf,
-    .erfc = qc_scalar_erfc,
-    .erfinv = qc_scalar_erfinv,
-    .erfcinv = qc_scalar_erfcinv,
-    .gamma = qc_scalar_gamma,
-    .lgamma = qc_scalar_lgamma,
-    .digamma = qc_scalar_digamma,
-    .trigamma = qc_scalar_trigamma,
-    .tetragamma = qc_scalar_tetragamma,
-    .gammainv = qc_scalar_gammainv,
-    .normal_pdf = qc_scalar_normal_pdf,
-    .normal_cdf = qc_scalar_normal_cdf,
-    .normal_logpdf = qc_scalar_normal_logpdf,
-    .lambert_w0 = qc_scalar_lambert_w0,
-    .lambert_wm1 = qc_scalar_lambert_wm1,
-    .productlog = qc_scalar_productlog,
-    .ei = qc_scalar_ei,
-    .e1 = qc_scalar_e1
-};
-
-const struct elem_vtable qcomplex_elem = {
-    .size            = sizeof(qcomplex_t),
-    .kind            = ELEM_NUMBER,
-    .public_type     = MAT_TYPE_NUMBER,
-    .init_zero_slot  = qc_init_zero_slot,
-    .add             = qc_add_wrap,
-    .sub             = qc_sub_wrap,
-    .mul             = qc_mul_wrap,
-    .inv             = qc_inv_wrap,
-    .abs2            = qc_abs2_wrap,
-    .to_real         = qc_to_real_wrap,
-    .from_real       = qc_from_real_wrap,
-    .conj_elem       = qc_conj_elem,
-    .to_qf           = qc_to_qf,
-    .abs_qf          = qc_abs_qf,
-    .from_qf         = qc_from_qf,
-    .to_qc           = qc_to_qc_fn,
-    .from_qc         = qc_from_qc_fn,
-    .zero            = &QC_ZERO,
-    .one             = &QC_ONE,
-    .cmp             = qcomplex_cmp,
-    .print           = qc_print_wrap,
-    .format_scalar   = qc_format_scalar,
-    .relative_epsilon = Q_REL_EPS,
-    .fun             = &qcomplex_fun
-};
-
 static const struct elem_fun_vtable number_fun = {
     .exp = num_scalar_exp,
     .sin = num_scalar_sin,
@@ -375,17 +166,11 @@ const struct elem_vtable number_elem = {
     .to_real         = num_to_real_wrap,
     .from_real       = num_from_real_wrap,
     .conj_elem       = num_conj_elem,
-    .to_qf           = num_to_qf_fn,
-    .abs_qf          = num_abs_qf_fn,
-    .from_qf         = num_from_qf_fn,
-    .to_qc           = num_to_qc_fn,
-    .from_qc         = num_from_qc_fn,
     .zero            = &NUM_ZERO,
     .one             = &NUM_ONE,
     .cmp             = number_cmp_wrap,
     .print           = num_print_wrap,
     .format_scalar   = num_format_scalar,
-    .relative_epsilon = Q_REL_EPS,
     .fun             = &number_fun
 };
 
@@ -442,16 +227,10 @@ const struct elem_vtable dval_elem = {
     .to_real         = dv_to_real_wrap,
     .from_real       = dv_from_real_wrap,
     .conj_elem       = dv_conj_elem,
-    .to_qf           = dv_to_qf,
-    .abs_qf          = dv_abs_qf,
-    .from_qf         = dv_from_qf,
-    .to_qc           = dv_to_qc_fn,
-    .from_qc         = dv_from_qc_fn,
     .zero            = &DV_ZERO,
     .one             = &DV_ONE,
     .cmp             = dval_cmp_wrap,
     .print           = dv_print_wrap,
     .format_scalar   = NULL,
-    .relative_epsilon = Q_REL_EPS,
     .fun             = &dval_fun
 };
