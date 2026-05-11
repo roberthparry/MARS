@@ -232,11 +232,13 @@ f''(x)  = 3.80552310123962922582217764042441791765453413486837967289864308360391
 #include "matrix.h"
 
 int main(void) {
+    mat_bindings_t *bindings = NULL;
     matrix_t *H = mat_from_string(
         "{ (Δ, Ω; Ω, -Δ) | Δ = 1.5; Ω = 0.25 }",
-        NULL, NULL);
+        &bindings);
 
     mat_printf("%ml\n", H);
+    mat_bindings_free(bindings);
     mat_free(H);
     return 0;
 }

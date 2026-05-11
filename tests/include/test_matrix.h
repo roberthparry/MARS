@@ -61,6 +61,26 @@ static inline void test_dv_set_val_qf(dval_t *dv, qfloat_t x)
     num_destroy(&n);
 }
 
+static inline int test_mat_bindings_set_d(mat_bindings_t *bnd, const char *name, double x)
+{
+    dval_t *dv = mat_bindings_get(bnd, name);
+
+    if (!dv)
+        return -1;
+    test_dv_set_val_d(dv, x);
+    return 0;
+}
+
+static inline int test_mat_bindings_set_qf(mat_bindings_t *bnd, const char *name, qfloat_t x)
+{
+    dval_t *dv = mat_bindings_get(bnd, name);
+
+    if (!dv)
+        return -1;
+    test_dv_set_val_qf(dv, x);
+    return 0;
+}
+
 static inline dval_t *test_dv_add_d(const dval_t *dv, double x)
 {
     number_t n = num_create_from_double(x);
@@ -151,6 +171,10 @@ static inline qfloat_t test_dv_eval_qf(const dval_t *dv)
 #define dv_div_d   test_dv_div_d
 #define dv_d_div   test_dv_d_div
 #define dv_pow_d   test_dv_pow_d
+#define mat_binding_find(bnd, number, name) mat_bindings_get((bnd), (name))
+#define mat_binding_get(bnd, number, name)  mat_bindings_get((bnd), (name))
+#define mat_binding_set_d(bnd, number, name, value) test_mat_bindings_set_d((bnd), (name), (value))
+#define mat_binding_set_qf(bnd, number, name, value) test_mat_bindings_set_qf((bnd), (name), (value))
 
 extern char current_matrix_input_label[128];
 

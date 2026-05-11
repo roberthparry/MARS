@@ -4,7 +4,7 @@
 
 static void test_mat_from_string_numeric_qf(void)
 {
-    matrix_t *A = mat_from_string("(1, 2; 3, 4)", NULL, NULL);
+    matrix_t *A = mat_from_string("(1, 2; 3, 4)", NULL);
     qfloat_t x = QF_ZERO;
 
     check_bool("mat_from_string qfloat matrix non-null", A != NULL);
@@ -21,7 +21,7 @@ static void test_mat_from_string_numeric_qf(void)
 
 static void test_mat_from_string_numeric_qc(void)
 {
-    matrix_t *A = mat_from_string("((1,2), 3i-1; 4, (5,-6); 3, 2j+4)", NULL, NULL);
+    matrix_t *A = mat_from_string("((1,2), 3i-1; 4, (5,-6); 3, 2j+4)", NULL);
     qcomplex_t z = QC_ZERO;
 
     check_bool("mat_from_string qcomplex matrix non-null", A != NULL);
@@ -43,20 +43,17 @@ static void test_mat_from_string_numeric_qc(void)
 
 static void test_mat_from_string_symbolic_wrapped(void)
 {
-    binding_t *bindings = NULL;
-    size_t nbindings = 0;
+    mat_bindings_t *bindings = NULL;
     matrix_t *A = mat_from_string("{ (x, 1; 1, c1) | x = 2; c1 = 3 }",
-                                  &bindings, &nbindings);
+                                  &bindings);
     dval_t *dv = NULL;
-    binding_t *x_binding;
-    binding_t *c_binding;
+    dval_t *x_binding;
+    dval_t *c_binding;
 
     check_bool("mat_from_string wrapped symbolic matrix non-null", A != NULL);
     check_bool("mat_from_string wrapped symbolic matrix type", A && mat_typeof(A) == MAT_TYPE_DVAL);
-    check_bool("mat_from_string wrapped bindings count", nbindings == 2);
-
-    x_binding = mat_binding_find(bindings, nbindings, "x");
-    c_binding = mat_binding_find(bindings, nbindings, "c₁");
+    x_binding = mat_bindings_get(bindings, "x");
+    c_binding = mat_bindings_get(bindings, "c₁");
     check_bool("wrapped symbolic binding x present", x_binding != NULL);
     check_bool("wrapped symbolic binding c₁ present", c_binding != NULL);
 
@@ -65,59 +62,53 @@ static void test_mat_from_string_symbolic_wrapped(void)
         check_qf_val("wrapped symbolic A[1,1] initial",
                      dv_eval_qf(dv), qf_from_double(3.0), 1e-18);
         if (c_binding)
-            test_dv_set_val_qf(c_binding->symbol, qf_from_double(5.0));
+            test_dv_set_val_qf(c_binding, qf_from_double(5.0));
         check_qf_val("wrapped symbolic A[1,1] tracks binding update",
                      dv_eval_qf(dv), qf_from_double(5.0), 1e-18);
     }
 
-    free(bindings);
+    mat_bindings_free(bindings);
     mat_free(A);
 }
 
 static void test_mat_from_string_symbolic_bare(void)
 {
-    binding_t *bindings = NULL;
-    size_t nbindings = 0;
+    mat_bindings_t *bindings = NULL;
     matrix_t *A = mat_from_string("(c1, c2*y, c2*x; x, y, z; a, b, c)",
-                                  &bindings, &nbindings);
+                                  &bindings);
     dval_t *dv = NULL;
-    binding_t *x_binding;
-    binding_t *y_binding;
-    binding_t *c2_binding;
+    dval_t *x_binding;
+    dval_t *y_binding;
+    dval_t *c2_binding;
     qfloat_t x_initial = QF_ZERO;
     qfloat_t c2_initial = QF_ZERO;
 
     check_bool("mat_from_string bare symbolic matrix non-null", A != NULL);
     check_bool("mat_from_string bare symbolic matrix type", A && mat_typeof(A) == MAT_TYPE_DVAL);
     check_bool("mat_from_string bare bindings returned", bindings != NULL);
-    check_bool("mat_from_string bare bindings count", nbindings == 8);
 
-    x_binding = mat_binding_find(bindings, nbindings, "x");
-    y_binding = mat_binding_find(bindings, nbindings, "y");
-    c2_binding = mat_binding_find(bindings, nbindings, "c₂");
+    x_binding = mat_bindings_get(bindings, "x");
+    y_binding = mat_bindings_get(bindings, "y");
+    c2_binding = mat_bindings_get(bindings, "c₂");
     check_bool("bare symbolic x binding present", x_binding != NULL);
     check_bool("bare symbolic y binding present", y_binding != NULL);
     check_bool("bare symbolic c₂ binding present", c2_binding != NULL);
-    check_bool("bare symbolic x recognised as variable",
-               x_binding && !x_binding->is_constant);
-    check_bool("bare symbolic c₂ recognised as constant",
-               c2_binding && c2_binding->is_constant);
 
     if (x_binding)
-        x_initial = dv_eval_qf(x_binding->symbol);
+        x_initial = dv_eval_qf(x_binding);
     if (c2_binding)
-        c2_initial = dv_eval_qf(c2_binding->symbol);
+        c2_initial = dv_eval_qf(c2_binding);
     check_bool("bare symbolic x starts as NaN",
                x_binding && qf_isnan(x_initial));
     check_bool("bare symbolic c₂ starts as NaN",
                c2_binding && qf_isnan(c2_initial));
 
     check_bool("bare symbolic set x binding",
-               mat_binding_set_qf(bindings, nbindings, "x", qf_from_double(2.0)) == 0);
+               test_mat_bindings_set_qf(bindings, "x", qf_from_double(2.0)) == 0);
     check_bool("bare symbolic set y binding",
-               mat_binding_set_qf(bindings, nbindings, "y", qf_from_double(3.0)) == 0);
+               test_mat_bindings_set_qf(bindings, "y", qf_from_double(3.0)) == 0);
     check_bool("bare symbolic set c₂ binding",
-               mat_binding_set_qf(bindings, nbindings, "c₂", qf_from_double(5.0)) == 0);
+               test_mat_bindings_set_qf(bindings, "c₂", qf_from_double(5.0)) == 0);
 
     if (A) {
         mat_get(A, 0, 1, &dv);
@@ -128,32 +119,31 @@ static void test_mat_from_string_symbolic_bare(void)
                      dv_eval_qf(dv), qf_from_double(10.0), 1e-18);
     }
 
-    free(bindings);
+    mat_bindings_free(bindings);
     mat_free(A);
 }
 
 static void test_mat_from_string_symbolic_at_aliases(void)
 {
-    binding_t *bindings = NULL;
-    size_t nbindings = 0;
+    mat_bindings_t *bindings = NULL;
     matrix_t *A = mat_from_string("(@DELTA, @OMEGA; @OMEGA, -@DELTA)",
-                                  &bindings, &nbindings);
+                                  &bindings);
     dval_t *dv = NULL;
 
     check_bool("mat_from_string @alias symbolic matrix non-null", A != NULL);
     check_bool("mat_from_string @alias symbolic matrix type", A && mat_typeof(A) == MAT_TYPE_DVAL);
     check_bool("mat_from_string @alias Δ binding present",
-               mat_binding_get(bindings, nbindings, "Δ") != NULL);
+               mat_bindings_get(bindings, "Δ") != NULL);
     check_bool("mat_from_string @alias Ω binding present",
-               mat_binding_get(bindings, nbindings, "Ω") != NULL);
+               mat_bindings_get(bindings, "Ω") != NULL);
     check_bool("mat_from_string @alias @DELTA binding present",
-               mat_binding_get(bindings, nbindings, "@DELTA") != NULL);
+               mat_bindings_get(bindings, "@DELTA") != NULL);
     check_bool("mat_from_string @alias @OMEGA binding present",
-               mat_binding_get(bindings, nbindings, "@OMEGA") != NULL);
+               mat_bindings_get(bindings, "@OMEGA") != NULL);
     check_bool("mat_from_string @alias set @DELTA",
-               mat_binding_set_d(bindings, nbindings, "@DELTA", 2.0) == 0);
+               test_mat_bindings_set_d(bindings, "@DELTA", 2.0) == 0);
     check_bool("mat_from_string @alias set @OMEGA",
-               mat_binding_set_d(bindings, nbindings, "@OMEGA", 3.0) == 0);
+               test_mat_bindings_set_d(bindings, "@OMEGA", 3.0) == 0);
 
     if (A) {
         mat_get(A, 0, 0, &dv);
@@ -167,26 +157,25 @@ static void test_mat_from_string_symbolic_at_aliases(void)
                      dv_eval_qf(dv), qf_from_double(-2.0), 1e-18);
     }
 
-    free(bindings);
+    mat_bindings_free(bindings);
     mat_free(A);
 }
 
 static void test_mat_from_string_symbolic_math_conventions(void)
 {
-    binding_t *bindings = NULL;
-    size_t nbindings = 0;
+    mat_bindings_t *bindings = NULL;
     matrix_t *A = mat_from_string("(x, e; pi, τ; @phi, @gamma; [radius], c1; a, d_2)",
-                                  &bindings, &nbindings);
-    binding_t *x_binding;
-    binding_t *e_binding;
-    binding_t *pi_binding;
-    binding_t *phi_binding;
-    binding_t *gamma_binding;
-    binding_t *tau_binding;
-    binding_t *radius_binding;
-    binding_t *c1_binding;
-    binding_t *a_binding;
-    binding_t *d2_binding;
+                                  &bindings);
+    dval_t *x_binding;
+    dval_t *e_binding;
+    dval_t *pi_binding;
+    dval_t *phi_binding;
+    dval_t *gamma_binding;
+    dval_t *tau_binding;
+    dval_t *radius_binding;
+    dval_t *c1_binding;
+    dval_t *a_binding;
+    dval_t *d2_binding;
     dval_t *dv = NULL;
     qfloat_t e_initial = QF_ZERO;
     qfloat_t pi_initial = QF_ZERO;
@@ -198,16 +187,16 @@ static void test_mat_from_string_symbolic_math_conventions(void)
     check_bool("mat_from_string math-convention symbolic matrix type",
                A && mat_typeof(A) == MAT_TYPE_DVAL);
 
-    x_binding = mat_binding_find(bindings, nbindings, "x");
-    e_binding = mat_binding_find(bindings, nbindings, "e");
-    pi_binding = mat_binding_find(bindings, nbindings, "π");
-    phi_binding = mat_binding_find(bindings, nbindings, "φ");
-    gamma_binding = mat_binding_find(bindings, nbindings, "γ");
-    tau_binding = mat_binding_find(bindings, nbindings, "τ");
-    radius_binding = mat_binding_find(bindings, nbindings, "radius");
-    c1_binding = mat_binding_find(bindings, nbindings, "c₁");
-    a_binding = mat_binding_find(bindings, nbindings, "a");
-    d2_binding = mat_binding_find(bindings, nbindings, "d₂");
+    x_binding = mat_bindings_get(bindings, "x");
+    e_binding = mat_bindings_get(bindings, "e");
+    pi_binding = mat_bindings_get(bindings, "π");
+    phi_binding = mat_bindings_get(bindings, "φ");
+    gamma_binding = mat_bindings_get(bindings, "γ");
+    tau_binding = mat_bindings_get(bindings, "τ");
+    radius_binding = mat_bindings_get(bindings, "radius");
+    c1_binding = mat_bindings_get(bindings, "c₁");
+    a_binding = mat_bindings_get(bindings, "a");
+    d2_binding = mat_bindings_get(bindings, "d₂");
 
     check_bool("math-convention x binding present", x_binding != NULL);
     check_bool("math-convention e binding present", e_binding != NULL);
@@ -220,37 +209,16 @@ static void test_mat_from_string_symbolic_math_conventions(void)
     check_bool("math-convention a binding present", a_binding != NULL);
     check_bool("math-convention d₂ binding present", d2_binding != NULL);
 
-    check_bool("math-convention x inferred variable",
-               x_binding && !x_binding->is_constant);
-    check_bool("math-convention e inferred built-in constant",
-               e_binding && e_binding->is_constant);
-    check_bool("math-convention π inferred built-in constant",
-               pi_binding && pi_binding->is_constant);
-    check_bool("math-convention φ inferred built-in constant",
-               phi_binding && phi_binding->is_constant);
-    check_bool("math-convention γ inferred built-in constant",
-               gamma_binding && gamma_binding->is_constant);
-    check_bool("math-convention τ inferred variable",
-               tau_binding && !tau_binding->is_constant);
-    check_bool("math-convention radius inferred variable",
-               radius_binding && !radius_binding->is_constant);
-    check_bool("math-convention c₁ inferred constant",
-               c1_binding && c1_binding->is_constant);
-    check_bool("math-convention a inferred constant",
-               a_binding && a_binding->is_constant);
-    check_bool("math-convention d₂ inferred constant",
-               d2_binding && d2_binding->is_constant);
-
     if (e_binding)
-        e_initial = dv_eval_qf(e_binding->symbol);
+        e_initial = dv_eval_qf(e_binding);
     if (pi_binding)
-        pi_initial = dv_eval_qf(pi_binding->symbol);
+        pi_initial = dv_eval_qf(pi_binding);
     if (phi_binding)
-        phi_initial = dv_eval_qf(phi_binding->symbol);
+        phi_initial = dv_eval_qf(phi_binding);
     if (gamma_binding)
-        gamma_initial = dv_eval_qf(gamma_binding->symbol);
+        gamma_initial = dv_eval_qf(gamma_binding);
     if (tau_binding)
-        tau_initial = dv_eval_qf(tau_binding->symbol);
+        tau_initial = dv_eval_qf(tau_binding);
 
     check_qf_val("math-convention e built-in value",
                  e_initial, QF_E, 1e-30);
@@ -284,59 +252,50 @@ static void test_mat_from_string_symbolic_math_conventions(void)
                      dv_eval_qf(dv), QF_EULER_MASCHERONI, 1e-30);
     }
 
-    free(bindings);
+    mat_bindings_free(bindings);
     mat_free(A);
 }
 
 static void test_mat_from_string_invalid_syntax(void)
 {
-    binding_t *bindings = (binding_t *)(uintptr_t)1;
-    size_t nbindings = 123;
+    mat_bindings_t *bindings = (mat_bindings_t *)(uintptr_t)1;
     matrix_t *A;
 
-    A = mat_from_string("(1, 2; 3)", &bindings, &nbindings);
+    A = mat_from_string("(1, 2; 3)", &bindings);
     check_bool("mat_from_string rejects ragged matrix", A == NULL);
     check_bool("mat_from_string ragged clears bindings", bindings == NULL);
-    check_bool("mat_from_string ragged clears count", nbindings == 0);
 
-    bindings = (binding_t *)(uintptr_t)1;
-    nbindings = 123;
-    A = mat_from_string("(1, 2; 3, 4", &bindings, &nbindings);
+    bindings = (mat_bindings_t *)(uintptr_t)1;
+    A = mat_from_string("(1, 2; 3, 4", &bindings);
     check_bool("mat_from_string rejects missing closing paren", A == NULL);
     check_bool("mat_from_string missing paren clears bindings", bindings == NULL);
-    check_bool("mat_from_string missing paren clears count", nbindings == 0);
 
-    bindings = (binding_t *)(uintptr_t)1;
-    nbindings = 123;
-    A = mat_from_string("{ (x, 1; 1, y) | x = }", &bindings, &nbindings);
+    bindings = (mat_bindings_t *)(uintptr_t)1;
+    A = mat_from_string("{ (x, 1; 1, y) | x = }", &bindings);
     check_bool("mat_from_string rejects invalid binding syntax", A == NULL);
     check_bool("mat_from_string invalid binding clears bindings", bindings == NULL);
-    check_bool("mat_from_string invalid binding clears count", nbindings == 0);
 
-    bindings = (binding_t *)(uintptr_t)1;
-    nbindings = 123;
-    A = mat_from_string("(Δ, Ω; Ω, -)", &bindings, &nbindings);
+    bindings = (mat_bindings_t *)(uintptr_t)1;
+    A = mat_from_string("(Δ, Ω; Ω, -)", &bindings);
     check_bool("mat_from_string rejects invalid symbolic expression", A == NULL);
     check_bool("mat_from_string invalid symbolic clears bindings", bindings == NULL);
-    check_bool("mat_from_string invalid symbolic clears count", nbindings == 0);
 }
 
 static void test_mat_from_string_bracketed_names(void)
 {
-    binding_t *bindings = NULL;
-    size_t nbindings = 0;
+    mat_bindings_t *bindings = NULL;
     matrix_t *A = mat_from_string("{ ([radius], [scale]*x; y, [offset]) | x = 2, y = 5; [radius] = 3, [scale] = 4, [offset] = 7 }",
-                                  &bindings, &nbindings);
+                                  &bindings);
     dval_t *dv = NULL;
 
     check_bool("mat_from_string bracketed symbolic matrix non-null", A != NULL);
     check_bool("mat_from_string bracketed symbolic matrix type", A && mat_typeof(A) == MAT_TYPE_DVAL);
     check_bool("mat_from_string bracketed binding radius present",
-               mat_binding_find(bindings, nbindings, "[radius]") != NULL);
+               mat_bindings_get(bindings, "[radius]") != NULL);
     check_bool("mat_from_string bracketed binding scale present",
-               mat_binding_find(bindings, nbindings, "scale") != NULL);
+               mat_bindings_get(bindings, "scale") != NULL);
     check_bool("mat_from_string bracketed binding offset present",
-               mat_binding_find(bindings, nbindings, "[offset]") != NULL);
+               mat_bindings_get(bindings, "[offset]") != NULL);
 
     if (A) {
         mat_get(A, 0, 0, &dv);
@@ -350,68 +309,14 @@ static void test_mat_from_string_bracketed_names(void)
                      dv_eval_qf(dv), qf_from_double(7.0), 1e-18);
     }
 
-    free(bindings);
-    mat_free(A);
-}
-
-static void test_mat_from_string_with_bindings_shared_symbols(void)
-{
-    binding_t *lhs_bindings = NULL;
-    binding_t *rhs_bindings = NULL;
-    size_t nlhs = 0;
-    size_t nrhs = 0;
-    matrix_t *A = mat_from_string("(x, y)", &lhs_bindings, &nlhs);
-    matrix_t *B = mat_from_string_with_bindings("(x, z)", lhs_bindings, nlhs,
-                                                &rhs_bindings, &nrhs);
-    binding_t *lhs_x = NULL;
-    binding_t *rhs_x = NULL;
-    binding_t *rhs_z = NULL;
-    dval_t *dv = NULL;
-
-    check_bool("mat_from_string_with_bindings source matrix non-null", A != NULL);
-    check_bool("mat_from_string_with_bindings shared matrix non-null", B != NULL);
-
-    lhs_x = mat_binding_find(lhs_bindings, nlhs, "x");
-    rhs_x = mat_binding_find(rhs_bindings, nrhs, "x");
-    rhs_z = mat_binding_find(rhs_bindings, nrhs, "z");
-
-    check_bool("mat_from_string_with_bindings shared x present", lhs_x && rhs_x);
-    check_bool("mat_from_string_with_bindings new z present", rhs_z != NULL);
-    check_bool("mat_from_string_with_bindings reuses x symbol",
-               lhs_x && rhs_x && lhs_x->symbol == rhs_x->symbol);
-    check_bool("mat_from_string_with_bindings returns only referenced bindings",
-               nrhs == 2);
-
-    check_bool("mat_from_string_with_bindings set shared x via rhs bindings",
-               mat_binding_set_d(rhs_bindings, nrhs, "x", 4.0) == 0);
-    check_bool("mat_from_string_with_bindings set new z via rhs bindings",
-               mat_binding_set_d(rhs_bindings, nrhs, "z", 9.0) == 0);
-
-    if (A) {
-        mat_get(A, 0, 0, &dv);
-        check_qf_val("mat_from_string_with_bindings shared x updates source matrix",
-                     dv_eval_qf(dv), qf_from_double(4.0), 1e-18);
-    }
-    if (B) {
-        mat_get(B, 0, 0, &dv);
-        check_qf_val("mat_from_string_with_bindings shared x updates target matrix",
-                     dv_eval_qf(dv), qf_from_double(4.0), 1e-18);
-        mat_get(B, 0, 1, &dv);
-        check_qf_val("mat_from_string_with_bindings new z evaluates",
-                     dv_eval_qf(dv), qf_from_double(9.0), 1e-18);
-    }
-
-    free(rhs_bindings);
-    mat_free(B);
-    free(lhs_bindings);
+    mat_bindings_free(bindings);
     mat_free(A);
 }
 
 static void test_mat_symbolic_derivative_helpers_by_name(void)
 {
-    binding_t *bindings = NULL;
-    size_t nbindings = 0;
-    matrix_t *A = mat_from_string("([radius], x*y; y, c1)", &bindings, &nbindings);
+    mat_bindings_t *bindings = NULL;
+    matrix_t *A = mat_from_string("([radius], x*y; y, c1)", &bindings);
     matrix_t *Dr = NULL;
     dval_t *dtr = NULL;
     dval_t *ddet = NULL;
@@ -419,23 +324,23 @@ static void test_mat_symbolic_derivative_helpers_by_name(void)
 
     check_bool("mat symbolic helpers source non-null", A != NULL);
     check_bool("mat symbolic helpers set x",
-               mat_binding_set_d(bindings, nbindings, "x", 2.0) == 0);
+               test_mat_bindings_set_d(bindings, "x", 2.0) == 0);
     check_bool("mat symbolic helpers set y",
-               mat_binding_set_d(bindings, nbindings, "y", 3.0) == 0);
+               test_mat_bindings_set_d(bindings, "y", 3.0) == 0);
     check_bool("mat symbolic helpers set [radius]",
-               mat_binding_set_d(bindings, nbindings, "[radius]", 5.0) == 0);
+               test_mat_bindings_set_d(bindings, "[radius]", 5.0) == 0);
     check_bool("mat symbolic helpers set c₁",
-               mat_binding_set_d(bindings, nbindings, "c₁", 7.0) == 0);
+               test_mat_bindings_set_d(bindings, "c₁", 7.0) == 0);
 
-    Dr = mat_deriv_by_name(A, bindings, nbindings, "[radius]");
-    dtr = mat_deriv_trace_by_name(A, bindings, nbindings, "[radius]");
-    ddet = mat_deriv_det_by_name(A, bindings, nbindings, "[radius]");
+    Dr = mat_deriv_by_name(A, bindings, "[radius]");
+    dtr = mat_deriv_trace_by_name(A, bindings, "[radius]");
+    ddet = mat_deriv_det_by_name(A, bindings, "[radius]");
 
     check_bool("mat_deriv_by_name([radius]) not NULL", Dr != NULL);
     check_bool("mat_deriv_trace_by_name([radius]) not NULL", dtr != NULL);
     check_bool("mat_deriv_det_by_name([radius]) not NULL", ddet != NULL);
     check_bool("mat_deriv_by_name missing symbol returns NULL",
-               mat_deriv_by_name(A, bindings, nbindings, "missing") == NULL);
+               mat_deriv_by_name(A, bindings, "missing") == NULL);
 
     if (Dr) {
         mat_get(Dr, 0, 0, &dv);
@@ -462,31 +367,30 @@ static void test_mat_symbolic_derivative_helpers_by_name(void)
     dv_free(ddet);
     dv_free(dtr);
     mat_free(Dr);
-    free(bindings);
+    mat_bindings_free(bindings);
     mat_free(A);
 }
 
 static void test_mat_symbolic_jacobian_helper_by_names(void)
 {
-    binding_t *bindings = NULL;
-    size_t nbindings = 0;
-    matrix_t *A = mat_from_string("(x, x*y)", &bindings, &nbindings);
+    mat_bindings_t *bindings = NULL;
+    matrix_t *A = mat_from_string("(x, x*y)", &bindings);
     const char *names[2] = {"x", "y"};
     matrix_t *J = NULL;
     dval_t *dv = NULL;
 
     check_bool("mat symbolic Jacobian helper source non-null", A != NULL);
     check_bool("mat symbolic Jacobian helper set x",
-               mat_binding_set_d(bindings, nbindings, "x", 2.0) == 0);
+               test_mat_bindings_set_d(bindings, "x", 2.0) == 0);
     check_bool("mat symbolic Jacobian helper set y",
-               mat_binding_set_d(bindings, nbindings, "y", 3.0) == 0);
+               test_mat_bindings_set_d(bindings, "y", 3.0) == 0);
 
-    J = mat_jacobian_by_names(A, bindings, nbindings, names, 2);
+    J = mat_jacobian_by_names(A, bindings, names, 2);
     check_bool("mat_jacobian_by_names not NULL", J != NULL);
     check_bool("mat_jacobian_by_names rows", J && mat_get_row_count(J) == 2);
     check_bool("mat_jacobian_by_names cols", J && mat_get_col_count(J) == 2);
     check_bool("mat_jacobian_by_names missing symbol returns NULL",
-               mat_jacobian_by_names(A, bindings, nbindings,
+               mat_jacobian_by_names(A, bindings,
                                      (const char *const[]){"x", "missing"}, 2) == NULL);
 
     if (J) {
@@ -505,20 +409,18 @@ static void test_mat_symbolic_jacobian_helper_by_names(void)
     }
 
     mat_free(J);
-    free(bindings);
+    mat_bindings_free(bindings);
     mat_free(A);
 }
 
 static void test_mat_symbolic_matrix_calculus_helpers_by_name(void)
 {
-    binding_t *bindings = NULL;
-    binding_t *rhs_bindings = NULL;
-    size_t nbindings = 0;
-    size_t nrhs = 0;
-    matrix_t *A = mat_from_string("(x, 1; y, 2)", &bindings, &nbindings);
-    binding_t *x_binding = NULL;
-    matrix_t *B = mat_from_string_with_bindings("(x; y)", bindings, nbindings,
-                                                &rhs_bindings, &nrhs);
+    mat_bindings_t *bindings = NULL;
+    matrix_t *A = mat_from_string("(x, 1; y, 2)", &bindings);
+    dval_t *x_binding = NULL;
+    dval_t *y_binding = NULL;
+    dval_t *b_entries[2] = {NULL, NULL};
+    matrix_t *B = NULL;
     matrix_t *dAi = NULL;
     matrix_t *dAbi = NULL;
     matrix_t *dX = NULL;
@@ -526,29 +428,33 @@ static void test_mat_symbolic_matrix_calculus_helpers_by_name(void)
     dval_t *dv = NULL;
 
     check_bool("mat symbolic calculus by-name source A non-null", A != NULL);
-    x_binding = mat_binding_find(bindings, nbindings, "x");
+    x_binding = mat_bindings_get(bindings, "x");
+    y_binding = mat_bindings_get(bindings, "y");
     check_bool("mat symbolic calculus by-name shared x binding present", x_binding != NULL);
+    check_bool("mat symbolic calculus by-name shared y binding present", y_binding != NULL);
+    if (x_binding && y_binding) {
+        b_entries[0] = x_binding;
+        b_entries[1] = y_binding;
+        B = mat_create_dv(2, 1, b_entries);
+    }
     check_bool("mat symbolic calculus by-name source B non-null", B != NULL);
-    check_bool("mat symbolic calculus by-name B reuses x symbol",
-               x_binding && mat_binding_find(rhs_bindings, nrhs, "x")
-               && x_binding->symbol == mat_binding_find(rhs_bindings, nrhs, "x")->symbol);
 
     check_bool("mat symbolic calculus by-name set A x",
-               mat_binding_set_d(bindings, nbindings, "x", 2.0) == 0);
+               test_mat_bindings_set_d(bindings, "x", 2.0) == 0);
     check_bool("mat symbolic calculus by-name set A y",
-               mat_binding_set_d(bindings, nbindings, "y", 3.0) == 0);
+               test_mat_bindings_set_d(bindings, "y", 3.0) == 0);
 
-    dAi = mat_deriv_inverse_by_name(A, bindings, nbindings, "x");
-    dAbi = mat_deriv_block_inverse_by_name(A, 1, bindings, nbindings, "x");
-    dX = mat_deriv_solve_by_name(A, B, bindings, nbindings, "x");
-    dXb = mat_deriv_block_solve_by_name(A, B, 1, bindings, nbindings, "x");
+    dAi = mat_deriv_inverse_by_name(A, bindings, "x");
+    dAbi = mat_deriv_block_inverse_by_name(A, 1, bindings, "x");
+    dX = mat_deriv_solve_by_name(A, B, bindings, "x");
+    dXb = mat_deriv_block_solve_by_name(A, B, 1, bindings, "x");
 
     check_bool("mat_deriv_inverse_by_name(x) not NULL", dAi != NULL);
     check_bool("mat_deriv_block_inverse_by_name(x) not NULL", dAbi != NULL);
     check_bool("mat_deriv_solve_by_name(x) not NULL", dX != NULL);
     check_bool("mat_deriv_block_solve_by_name(x) not NULL", dXb != NULL);
     check_bool("mat_deriv_inverse_by_name missing symbol returns NULL",
-               mat_deriv_inverse_by_name(A, bindings, nbindings, "missing") == NULL);
+               mat_deriv_inverse_by_name(A, bindings, "missing") == NULL);
 
     if (dAi) {
         mat_get(dAi, 0, 0, &dv);
@@ -590,9 +496,8 @@ static void test_mat_symbolic_matrix_calculus_helpers_by_name(void)
     mat_free(dX);
     mat_free(dAbi);
     mat_free(dAi);
-    free(rhs_bindings);
     mat_free(B);
-    free(bindings);
+    mat_bindings_free(bindings);
     mat_free(A);
 }
 
@@ -605,7 +510,6 @@ void run_matrix_fromstring_tests(void)
     test_mat_from_string_symbolic_at_aliases();
     test_mat_from_string_symbolic_math_conventions();
     test_mat_from_string_bracketed_names();
-    test_mat_from_string_with_bindings_shared_symbols();
     test_mat_symbolic_derivative_helpers_by_name();
     test_mat_symbolic_jacobian_helper_by_names();
     test_mat_symbolic_matrix_calculus_helpers_by_name();

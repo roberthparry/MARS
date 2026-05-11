@@ -26,10 +26,9 @@ static void test_mat_to_string_numeric(void)
 
 static void test_mat_to_string_symbolic(void)
 {
-    binding_t *bindings = NULL;
-    size_t nbindings = 0;
+    mat_bindings_t *bindings = NULL;
     matrix_t *A = mat_from_string("{ (x, 1; 1, c1) | x = 2; c1 = 3 }",
-                                  &bindings, &nbindings);
+                                  &bindings);
     char *inline_pretty = mat_to_string(A, MAT_STRING_INLINE_PRETTY);
     char *layout_pretty = mat_to_string(A, MAT_STRING_LAYOUT_PRETTY);
 
@@ -44,15 +43,14 @@ static void test_mat_to_string_symbolic(void)
 
     free(inline_pretty);
     free(layout_pretty);
-    free(bindings);
+    mat_bindings_free(bindings);
     mat_free(A);
 }
 
 static void test_mat_to_string_symbolic_all_nan_elides_wrapper(void)
 {
-    binding_t *bindings = NULL;
-    size_t nbindings = 0;
-    matrix_t *A = mat_from_string("(x, c1)", &bindings, &nbindings);
+    mat_bindings_t *bindings = NULL;
+    matrix_t *A = mat_from_string("(x, c1)", &bindings);
     char *inline_pretty = mat_to_string(A, MAT_STRING_INLINE_PRETTY);
     char *layout_pretty = mat_to_string(A, MAT_STRING_LAYOUT_PRETTY);
 
@@ -65,18 +63,16 @@ static void test_mat_to_string_symbolic_all_nan_elides_wrapper(void)
 
     free(inline_pretty);
     free(layout_pretty);
-    free(bindings);
+    mat_bindings_free(bindings);
     mat_free(A);
 }
 
 static void test_mat_to_string_symbolic_roundtrip(void)
 {
-    binding_t *bindings = NULL;
-    size_t nbindings = 0;
-    matrix_t *A = mat_from_string("(x, c1; x*y, [radius])", &bindings, &nbindings);
+    mat_bindings_t *bindings = NULL;
+    matrix_t *A = mat_from_string("(x, c1; x*y, [radius])", &bindings);
     char *inline_pretty = NULL;
-    binding_t *roundtrip_bindings = NULL;
-    size_t roundtrip_nbindings = 0;
+    mat_bindings_t *roundtrip_bindings = NULL;
     matrix_t *roundtrip = NULL;
     dval_t *dv = NULL;
 
@@ -84,29 +80,29 @@ static void test_mat_to_string_symbolic_roundtrip(void)
     check_bool("mat_to_string symbolic roundtrip source bindings returned",
                bindings != NULL);
     check_bool("mat_to_string symbolic roundtrip set x",
-               mat_binding_set_d(bindings, nbindings, "x", 2.0) == 0);
+               test_mat_bindings_set_d(bindings, "x", 2.0) == 0);
     check_bool("mat_to_string symbolic roundtrip set y",
-               mat_binding_set_d(bindings, nbindings, "y", 3.0) == 0);
+               test_mat_bindings_set_d(bindings, "y", 3.0) == 0);
     check_bool("mat_to_string symbolic roundtrip set c₁",
-               mat_binding_set_d(bindings, nbindings, "c₁", 5.0) == 0);
+               test_mat_bindings_set_d(bindings, "c₁", 5.0) == 0);
     check_bool("mat_to_string symbolic roundtrip set [radius]",
-               mat_binding_set_d(bindings, nbindings, "[radius]", 7.0) == 0);
+               test_mat_bindings_set_d(bindings, "[radius]", 7.0) == 0);
 
     inline_pretty = mat_to_string(A, MAT_STRING_INLINE_PRETTY);
     check_bool("mat_to_string symbolic roundtrip string non-null", inline_pretty != NULL);
     check_bool("mat_to_string symbolic roundtrip keeps wrapper",
                inline_pretty && strstr(inline_pretty, "{ (") != NULL);
 
-    roundtrip = mat_from_string(inline_pretty, &roundtrip_bindings, &roundtrip_nbindings);
+    roundtrip = mat_from_string(inline_pretty, &roundtrip_bindings);
     check_bool("mat_to_string symbolic roundtrip reparses", roundtrip != NULL);
     check_bool("mat_to_string symbolic roundtrip reparsed type",
                roundtrip && mat_typeof(roundtrip) == MAT_TYPE_DVAL);
     check_bool("mat_to_string symbolic roundtrip x binding present",
-               mat_binding_find(roundtrip_bindings, roundtrip_nbindings, "x") != NULL);
+               mat_bindings_get(roundtrip_bindings, "x") != NULL);
     check_bool("mat_to_string symbolic roundtrip c₁ binding present",
-               mat_binding_find(roundtrip_bindings, roundtrip_nbindings, "c₁") != NULL);
+               mat_bindings_get(roundtrip_bindings, "c₁") != NULL);
     check_bool("mat_to_string symbolic roundtrip [radius] binding present",
-               mat_binding_find(roundtrip_bindings, roundtrip_nbindings, "[radius]") != NULL);
+               mat_bindings_get(roundtrip_bindings, "[radius]") != NULL);
 
     if (roundtrip) {
         mat_get(roundtrip, 0, 0, &dv);
@@ -124,35 +120,33 @@ static void test_mat_to_string_symbolic_roundtrip(void)
     }
 
     free(inline_pretty);
-    free(roundtrip_bindings);
+    mat_bindings_free(roundtrip_bindings);
     mat_free(roundtrip);
-    free(bindings);
+    mat_bindings_free(bindings);
     mat_free(A);
 }
 
 static void test_mat_to_string_symbolic_derivative_roundtrip(void)
 {
-    binding_t *bindings = NULL;
-    size_t nbindings = 0;
-    matrix_t *A = mat_from_string("(x, c1; x*y, y)", &bindings, &nbindings);
-    binding_t *x_binding = NULL;
+    mat_bindings_t *bindings = NULL;
+    matrix_t *A = mat_from_string("(x, c1; x*y, y)", &bindings);
+    dval_t *x_binding = NULL;
     matrix_t *Dx = NULL;
     char *inline_pretty = NULL;
-    binding_t *roundtrip_bindings = NULL;
-    size_t roundtrip_nbindings = 0;
+    mat_bindings_t *roundtrip_bindings = NULL;
     matrix_t *roundtrip = NULL;
     dval_t *dv = NULL;
 
     check_bool("mat_to_string symbolic derivative source non-null", A != NULL);
-    x_binding = mat_binding_find(bindings, nbindings, "x");
+    x_binding = mat_bindings_get(bindings, "x");
     check_bool("mat_to_string symbolic derivative x binding present", x_binding != NULL);
     check_bool("mat_to_string symbolic derivative set y",
-               mat_binding_set_d(bindings, nbindings, "y", 4.0) == 0);
+               test_mat_bindings_set_d(bindings, "y", 4.0) == 0);
     check_bool("mat_to_string symbolic derivative set c₁",
-               mat_binding_set_d(bindings, nbindings, "c₁", 7.0) == 0);
+               test_mat_bindings_set_d(bindings, "c₁", 7.0) == 0);
 
     if (A && x_binding)
-        Dx = mat_deriv(A, x_binding->symbol);
+        Dx = mat_deriv(A, x_binding);
     check_bool("mat_to_string symbolic derivative matrix non-null", Dx != NULL);
 
     inline_pretty = mat_to_string(Dx, MAT_STRING_INLINE_PRETTY);
@@ -162,16 +156,16 @@ static void test_mat_to_string_symbolic_derivative_roundtrip(void)
     check_bool("mat_to_string symbolic derivative keeps y binding value",
                inline_pretty && strstr(inline_pretty, "y = 4") != NULL);
 
-    roundtrip = mat_from_string(inline_pretty, &roundtrip_bindings, &roundtrip_nbindings);
+    roundtrip = mat_from_string(inline_pretty, &roundtrip_bindings);
     check_bool("mat_to_string symbolic derivative reparses", roundtrip != NULL);
     check_bool("mat_to_string symbolic derivative reparsed type",
                roundtrip && mat_typeof(roundtrip) == MAT_TYPE_DVAL);
     check_bool("mat_to_string symbolic derivative reparsed has y",
-               mat_binding_find(roundtrip_bindings, roundtrip_nbindings, "y") != NULL);
+               mat_bindings_get(roundtrip_bindings, "y") != NULL);
     check_bool("mat_to_string symbolic derivative reparsed omits x",
-               mat_binding_find(roundtrip_bindings, roundtrip_nbindings, "x") == NULL);
+               mat_bindings_get(roundtrip_bindings, "x") == NULL);
     check_bool("mat_to_string symbolic derivative reparsed set y",
-               mat_binding_set_d(roundtrip_bindings, roundtrip_nbindings, "y", 4.0) == 0);
+               test_mat_bindings_set_d(roundtrip_bindings, "y", 4.0) == 0);
 
     if (roundtrip) {
         mat_get(roundtrip, 0, 0, &dv);
@@ -189,10 +183,10 @@ static void test_mat_to_string_symbolic_derivative_roundtrip(void)
     }
 
     free(inline_pretty);
-    free(roundtrip_bindings);
+    mat_bindings_free(roundtrip_bindings);
     mat_free(roundtrip);
     mat_free(Dx);
-    free(bindings);
+    mat_bindings_free(bindings);
     mat_free(A);
 }
 

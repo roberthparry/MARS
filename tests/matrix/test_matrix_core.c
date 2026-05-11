@@ -3293,10 +3293,9 @@ static void test_inverse_dval(void)
     dv_free(two);
 
     {
-        binding_t *bindings = NULL;
-        size_t nbindings = 0;
+        mat_bindings_t *bindings = NULL;
         matrix_t *R = mat_from_string("(cos(@theta), -sin(@theta); sin(@theta), cos(@theta))",
-                                      &bindings, &nbindings);
+                                      &bindings);
         matrix_t *Ri = mat_inverse(R);
         char *ri_text = Ri ? mat_to_string(Ri, MAT_STRING_INLINE_PRETTY) : NULL;
 
@@ -3311,7 +3310,7 @@ static void test_inverse_dval(void)
         free(ri_text);
         mat_free(Ri);
         mat_free(R);
-        free(bindings);
+        mat_bindings_free(bindings);
     }
 
     {

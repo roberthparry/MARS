@@ -5,7 +5,20 @@
 #include <sys/types.h>
 
 #include "matrix_internal.h"
+#include "dictionary.h"
 #include "internal/dval_internal.h"
+
+typedef struct {
+    const char *name;
+    dval_t *dval;
+} mat_binding_entry_t;
+
+struct mat_bindings_t {
+    size_t count;
+    mat_binding_entry_t *entries;
+    dictionary_t *index;
+    void *storage;
+};
 
 typedef struct {
     char *name;
@@ -28,6 +41,74 @@ typedef struct {
     size_t count;
     size_t cap;
 } symbol_vec_t;
+
+static size_t mf_binding_name_hash(const void *key)
+{
+    const unsigned char *s = (const unsigned char *)*(const char * const *)key;
+    size_t hash = 1469598103934665603ull;
+
+    while (*s) {
+        hash ^= (size_t)*s++;
+        hash *= 1099511628211ull;
+    }
+    return hash;
+}
+
+static int mf_binding_name_cmp(const void *a, const void *b)
+{
+    const char *ka = *(const char * const *)a;
+    const char *kb = *(const char * const *)b;
+
+    return strcmp(ka, kb);
+}
+
+static dictionary_t *mf_binding_index_create(void)
+{
+    return dictionary_create(sizeof(char *),
+                             sizeof(mat_binding_entry_t *),
+                             mf_binding_name_hash,
+                             mf_binding_name_cmp,
+                             NULL,
+                             NULL,
+                             NULL,
+                             NULL,
+                             NULL);
+}
+
+static void mf_bindings_destroy_partial(mat_bindings_t *bindings)
+{
+    if (!bindings)
+        return;
+    dictionary_destroy(bindings->index);
+    free(bindings->storage);
+    free(bindings);
+}
+
+static mat_bindings_t *mf_bindings_create(size_t count, size_t total_name_bytes)
+{
+    mat_bindings_t *bindings = calloc(1, sizeof(*bindings));
+
+    if (!bindings)
+        return NULL;
+
+    bindings->storage = calloc(1, sizeof(bindings->entries[0]) * count +
+                                  total_name_bytes);
+    bindings->index = mf_binding_index_create();
+    if (!bindings->storage || !bindings->index) {
+        mf_bindings_destroy_partial(bindings);
+        return NULL;
+    }
+
+    bindings->count = count;
+    bindings->entries = (mat_binding_entry_t *)bindings->storage;
+    return bindings;
+}
+
+static int mf_bindings_index_entry(mat_bindings_t *bindings,
+                                   mat_binding_entry_t *entry)
+{
+    return dictionary_set(bindings->index, &entry->name, &entry) ? 0 : -1;
+}
 
 static void *mf_xmalloc(size_t n)
 {
@@ -814,44 +895,11 @@ static int mf_try_parse_numeric_matrix(char **entries,
     return A ? 0 : -1;
 }
 
-static int mf_seed_shared_symbols(symbol_vec_t *symbols,
-                                  binding_t *shared_bindings,
-                                  size_t shared_number)
-{
-    if (!shared_bindings)
-        return 0;
-
-    for (size_t i = 0; i < shared_number; ++i) {
-        char *name;
-
-        if (!shared_bindings[i].name || !shared_bindings[i].symbol)
-            return -1;
-
-        name = mf_strdup(shared_bindings[i].name);
-        if (!name)
-            return -1;
-
-        if (symbol_vec_add(symbols,
-                           name,
-                           shared_bindings[i].is_constant,
-                           false,
-                           qc_make(QF_NAN, QF_ZERO)) != 0) {
-            free(name);
-            return -1;
-        }
-
-        symbols->items[symbols->count - 1].symbol = shared_bindings[i].symbol;
-    }
-
-    return 0;
-}
-
 static int mf_build_symbolic_matrix(char **entries,
                                     size_t rows,
                                     size_t cols,
                                     symbol_vec_t *symbols,
-                                    binding_t **bindings_out,
-                                    size_t *number_out,
+                                    mat_bindings_t **bindings_out,
                                     matrix_t **A_out)
 {
     size_t n = rows * cols;
@@ -860,7 +908,7 @@ static int mf_build_symbolic_matrix(char **entries,
     const char **names = NULL;
     dval_t **refs = NULL;
     matrix_t *A = NULL;
-    binding_t *bindings = NULL;
+    mat_bindings_t *bindings = NULL;
     int ok = nodes != NULL;
 
     for (size_t i = 0; i < symbols->count; ++i) {
@@ -927,6 +975,7 @@ static int mf_build_symbolic_matrix(char **entries,
     if (ok && bindings_out) {
         size_t total_names = 0;
         size_t active = 0;
+        char *name_store;
 
         for (size_t i = 0; i < symbols->count; ++i) {
             if (!symbols->items[i].used_in_expr)
@@ -935,22 +984,27 @@ static int mf_build_symbolic_matrix(char **entries,
             active++;
         }
 
-        bindings = calloc(1, sizeof(*bindings) * (active ? active : 1)
-                             + total_names);
+        bindings = mf_bindings_create(active ? active : 1, total_names);
         if (!bindings)
             ok = 0;
         if (ok) {
-            char *name_store = (char *)(bindings + active);
+            name_store = (char *)(bindings->entries + bindings->count);
 
             for (size_t i = 0, j = 0; i < symbols->count; ++i) {
-                size_t name_len = strlen(symbols->items[i].name) + 1;
+                mat_binding_entry_t *entry;
+                size_t name_len;
 
                 if (!symbols->items[i].used_in_expr)
                     continue;
+                entry = &bindings->entries[j];
+                name_len = strlen(symbols->items[i].name) + 1;
                 memcpy(name_store, symbols->items[i].name, name_len);
-                bindings[j].name = name_store;
-                bindings[j].symbol = symbols->items[i].symbol;
-                bindings[j].is_constant = symbols->items[i].is_constant;
+                entry->name = name_store;
+                entry->dval = symbols->items[i].symbol;
+                if (mf_bindings_index_entry(bindings, entry) != 0) {
+                    ok = 0;
+                    break;
+                }
                 name_store += name_len;
                 j++;
             }
@@ -958,7 +1012,7 @@ static int mf_build_symbolic_matrix(char **entries,
     }
 
     if (!ok) {
-        free(bindings);
+        mf_bindings_destroy_partial(bindings);
         mat_free(A);
         A = NULL;
     }
@@ -976,17 +1030,12 @@ static int mf_build_symbolic_matrix(char **entries,
 
     if (bindings_out)
         *bindings_out = bindings;
-    if (number_out)
-        *number_out = active_count;
     *A_out = A;
     return 0;
 }
 
 static matrix_t *mf_parse_matrix_string(const char *s,
-                                        binding_t *shared_bindings,
-                                        size_t shared_number,
-                                        binding_t **bindings_out,
-                                        size_t *number_out)
+                                        mat_bindings_t **bindings_out)
 {
     const char *body_start;
     const char *body_end;
@@ -1005,8 +1054,6 @@ static matrix_t *mf_parse_matrix_string(const char *s,
 
     if (bindings_out)
         *bindings_out = NULL;
-    if (number_out)
-        *number_out = 0;
     if (!s) {
         mf_report_error("NULL input");
         return NULL;
@@ -1058,18 +1105,13 @@ static matrix_t *mf_parse_matrix_string(const char *s,
             goto cleanup;
     }
 
-    if (mf_seed_shared_symbols(&symbols, shared_bindings, shared_number) != 0) {
-        error_msg = "invalid shared bindings";
-        goto cleanup;
-    }
-
     if (mf_parse_matrix_body(body, &entries, &rows, &cols) != 0) {
         error_msg = "invalid matrix body syntax";
         goto cleanup;
     }
     nentries = rows * cols;
 
-    if (!wrapped && shared_number == 0 &&
+    if (!wrapped &&
         mf_try_parse_numeric_matrix(entries, rows, cols, &A) == 0)
         goto cleanup_success;
 
@@ -1088,7 +1130,7 @@ static matrix_t *mf_parse_matrix_string(const char *s,
     }
 
     if (mf_build_symbolic_matrix(entries, rows, cols, &symbols,
-                                 bindings_out, number_out, &A) != 0) {
+                                 bindings_out, &A) != 0) {
         error_msg = "invalid symbolic expression";
         goto cleanup;
     }
@@ -1108,31 +1150,15 @@ cleanup:
     mf_report_error(error_msg);
     if (bindings_out)
         *bindings_out = NULL;
-    if (number_out)
-        *number_out = 0;
     mat_free(A);
     A = NULL;
     goto cleanup_success;
 }
 
-matrix_t *mat_from_string_with_bindings(const char *s,
-                                        binding_t *shared_bindings,
-                                        size_t shared_number,
-                                        binding_t **bindings_out,
-                                        size_t *number_out)
-{
-    return mf_parse_matrix_string(s, shared_bindings, shared_number,
-                                  bindings_out, number_out);
-}
-
-matrix_t *mat_from_string(const char *s, binding_t **bindings_out, size_t *number_out)
-{
-    return mat_from_string_with_bindings(s, NULL, 0, bindings_out, number_out);
-}
-
-binding_t *mat_binding_get(binding_t *bindings, size_t number, const char *name)
+dval_t *mat_bindings_get(mat_bindings_t *bindings, const char *name)
 {
     char *norm;
+    mat_binding_entry_t *entry = NULL;
 
     if (!bindings || !name)
         return NULL;
@@ -1141,47 +1167,17 @@ binding_t *mat_binding_get(binding_t *bindings, size_t number, const char *name)
     if (!norm)
         return NULL;
 
-    for (size_t i = 0; i < number; ++i) {
-        if (strcmp(bindings[i].name, norm) == 0) {
-            free(norm);
-            return &bindings[i];
-        }
-    }
+    dictionary_get(bindings->index, &norm, &entry);
     free(norm);
-    return NULL;
+    return entry ? entry->dval : NULL;
 }
 
-binding_t *mat_binding_find(binding_t *bindings, size_t number, const char *name)
+void mat_bindings_free(mat_bindings_t *bindings)
 {
-    return mat_binding_get(bindings, number, name);
+    mf_bindings_destroy_partial(bindings);
 }
 
-int mat_binding_set_qf(binding_t *bindings, size_t number, const char *name, qfloat_t value)
+matrix_t *mat_from_string(const char *s, mat_bindings_t **bindings_out)
 {
-    binding_t *binding = mat_binding_get(bindings, number, name);
-
-    if (!binding)
-        return -1;
-    dv_num_set_qf(binding->symbol, value);
-    return 0;
-}
-
-int mat_binding_set_qc(binding_t *bindings, size_t number, const char *name, qcomplex_t value)
-{
-    binding_t *binding = mat_binding_get(bindings, number, name);
-
-    if (!binding)
-        return -1;
-    dv_num_set_qc(binding->symbol, value);
-    return 0;
-}
-
-int mat_binding_set_d(binding_t *bindings, size_t number, const char *name, double value)
-{
-    binding_t *binding = mat_binding_get(bindings, number, name);
-
-    if (!binding)
-        return -1;
-    dv_num_set_d(binding->symbol, value);
-    return 0;
+    return mf_parse_matrix_string(s, bindings_out);
 }

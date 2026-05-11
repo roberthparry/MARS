@@ -135,15 +135,14 @@ keyboard:
 
 int main(void)
 {
-    binding_t *bindings = NULL;
-    size_t nbindings = 0;
+    mat_bindings_t *bindings = NULL;
     matrix_t *H = mat_from_string(
         "{ (@DELTA, @OMEGA; @OMEGA, -@DELTA) | @DELTA = 1.5; @OMEGA = 0.25 }",
-        &bindings, &nbindings);
-    binding_t *delta = mat_binding_find(bindings, nbindings, "@DELTA");
+        &bindings);
+    dval_t *delta = mat_bindings_get(bindings, "@DELTA");
     matrix_t *charpoly = mat_charpoly(H);
     dval_t *detH = NULL;
-    dval_t *ddet_dDelta = mat_deriv_det(H, delta->symbol);
+    dval_t *ddet_dDelta = mat_deriv_det(H, delta);
     char *H_text;
     char *p_text;
     char *det_text;
@@ -165,7 +164,7 @@ int main(void)
     free(p_text);
     free(det_text);
     free(ddet_text);
-    free(bindings);
+    mat_bindings_free(bindings);
     dv_free(ddet_dDelta);
     mat_free(charpoly);
     mat_free(H);
@@ -215,19 +214,20 @@ This is a pleasing example because the algebra stays exact:
 
 int main(void)
 {
-    binding_t *bindings = NULL;
-    size_t nbindings = 0;
+    mat_bindings_t *bindings = NULL;
+    number_t delta = num_create_from_double(1.5);
+    number_t omega = num_create_from_double(0.25);
     matrix_t *H = mat_from_string(
         "(@DELTA, @OMEGA; @OMEGA, -@DELTA)",
-        &bindings, &nbindings);
+        &bindings);
     matrix_t *H2 = mat_pow_int(H, 2);
     matrix_t *P = mat_charpoly(H);
     dval_t *evals[2] = {NULL, NULL};
     dval_t *trace = NULL;
     dval_t *c2 = NULL;
 
-    mat_binding_set_d(bindings, nbindings, "@DELTA", 1.5);
-    mat_binding_set_d(bindings, nbindings, "@OMEGA", 0.25);
+    dv_set_val_num(mat_bindings_get(bindings, "@DELTA"), delta);
+    dv_set_val_num(mat_bindings_get(bindings, "@OMEGA"), omega);
 
     mat_eigenvalues(H, evals);
     mat_trace(H, &trace);
@@ -241,7 +241,9 @@ int main(void)
            dv_to_string(evals[0], style_EXPRESSION),
            dv_to_string(evals[1], style_EXPRESSION));
 
-    free(bindings);
+    num_destroy(&omega);
+    num_destroy(&delta);
+    mat_bindings_free(bindings);
     mat_free(P);
     mat_free(H2);
     mat_free(H);
@@ -304,11 +306,7 @@ typedef struct {
     matrix_t *T;  /* Upper-triangular Schur form */
 } mat_schur_factor_t;
 
-typedef struct {
-    const char *name;
-    dval_t *symbol;
-    bool is_constant;
-} binding_t;
+typedef struct mat_bindings_t mat_bindings_t;
 
 typedef enum {
     MAT_STRING_INLINE_SCIENTIFIC,
@@ -473,22 +471,22 @@ newly allocated zero matrix with the same shape and element type as `A`.
 #### Matrix Calculus Helpers
 
 ```c
-dval_t   *mat_deriv_trace_by_name(const matrix_t *A, binding_t *bindings, size_t number, const char *name);
-dval_t   *mat_deriv_det_by_name(const matrix_t *A, binding_t *bindings, size_t number, const char *name);
-matrix_t *mat_deriv_by_name(const matrix_t *A, binding_t *bindings, size_t number, const char *name);
+dval_t   *mat_deriv_trace_by_name(const matrix_t *A, mat_bindings_t *bindings, const char *name);
+dval_t   *mat_deriv_det_by_name(const matrix_t *A, mat_bindings_t *bindings, const char *name);
+matrix_t *mat_deriv_by_name(const matrix_t *A, mat_bindings_t *bindings, const char *name);
 dval_t   *mat_deriv_trace(const matrix_t *A, dval_t *wrt);
 dval_t   *mat_deriv_det(const matrix_t *A, dval_t *wrt);
-dval_t   *mat_deriv_trace_by_name(const matrix_t *A, binding_t *bindings, size_t number, const char *name);
-dval_t   *mat_deriv_det_by_name(const matrix_t *A, binding_t *bindings, size_t number, const char *name);
+dval_t   *mat_deriv_trace_by_name(const matrix_t *A, mat_bindings_t *bindings, const char *name);
+dval_t   *mat_deriv_det_by_name(const matrix_t *A, mat_bindings_t *bindings, const char *name);
 matrix_t *mat_deriv_inverse(const matrix_t *A, dval_t *wrt);
-matrix_t *mat_deriv_inverse_by_name(const matrix_t *A, binding_t *bindings, size_t number, const char *name);
+matrix_t *mat_deriv_inverse_by_name(const matrix_t *A, mat_bindings_t *bindings, const char *name);
 matrix_t *mat_deriv_block_inverse(const matrix_t *A, size_t split, dval_t *wrt);
-matrix_t *mat_deriv_block_inverse_by_name(const matrix_t *A, size_t split, binding_t *bindings, size_t number, const char *name);
+matrix_t *mat_deriv_block_inverse_by_name(const matrix_t *A, size_t split, mat_bindings_t *bindings, const char *name);
 matrix_t *mat_deriv_solve(const matrix_t *A, const matrix_t *B, dval_t *wrt);
-matrix_t *mat_deriv_solve_by_name(const matrix_t *A, const matrix_t *B, binding_t *bindings, size_t number, const char *name);
+matrix_t *mat_deriv_solve_by_name(const matrix_t *A, const matrix_t *B, mat_bindings_t *bindings, const char *name);
 matrix_t *mat_deriv_block_solve(const matrix_t *A, const matrix_t *B, size_t split, dval_t *wrt);
-matrix_t *mat_deriv_block_solve_by_name(const matrix_t *A, const matrix_t *B, size_t split, binding_t *bindings, size_t number, const char *name);
-matrix_t *mat_jacobian_by_names(const matrix_t *A, binding_t *bindings, size_t number, const char *const *names, size_t nnames);
+matrix_t *mat_deriv_block_solve_by_name(const matrix_t *A, const matrix_t *B, size_t split, mat_bindings_t *bindings, const char *name);
+matrix_t *mat_jacobian_by_names(const matrix_t *A, mat_bindings_t *bindings, const char *const *names, size_t nnames);
 matrix_t *mat_jacobian(const matrix_t *A, dval_t *const *vars, size_t nvars);
 ```
 
@@ -993,21 +991,19 @@ every cell.
 ### String Construction and Output
 
 ```c
-matrix_t *mat_from_string(const char *s, binding_t **bindings_out, size_t *number_out);
-matrix_t *mat_from_string_with_bindings(const char *s, binding_t *shared_bindings, size_t shared_number,
-                                        binding_t **bindings_out, size_t *number_out);
-binding_t *mat_binding_find(binding_t *bindings, size_t number, const char *name);
-int mat_binding_set_qf(binding_t *bindings, size_t number, const char *name, qfloat_t value);
-int mat_binding_set_qc(binding_t *bindings, size_t number, const char *name, qcomplex_t value);
-int mat_binding_set_d(binding_t *bindings, size_t number, const char *name, double value);
-matrix_t *mat_deriv_by_name(const matrix_t *A, binding_t *bindings, size_t number, const char *name);
-dval_t *mat_deriv_trace_by_name(const matrix_t *A, binding_t *bindings, size_t number, const char *name);
-dval_t *mat_deriv_det_by_name(const matrix_t *A, binding_t *bindings, size_t number, const char *name);
-matrix_t *mat_deriv_inverse_by_name(const matrix_t *A, binding_t *bindings, size_t number, const char *name);
-matrix_t *mat_deriv_block_inverse_by_name(const matrix_t *A, size_t split, binding_t *bindings, size_t number, const char *name);
-matrix_t *mat_deriv_solve_by_name(const matrix_t *A, const matrix_t *B, binding_t *bindings, size_t number, const char *name);
-matrix_t *mat_deriv_block_solve_by_name(const matrix_t *A, const matrix_t *B, size_t split, binding_t *bindings, size_t number, const char *name);
-matrix_t *mat_jacobian_by_names(const matrix_t *A, binding_t *bindings, size_t number, const char *const *names, size_t nnames);
+typedef struct mat_bindings_t mat_bindings_t;
+
+matrix_t *mat_from_string(const char *s, mat_bindings_t **bnd_out);
+dval_t *mat_bindings_get(mat_bindings_t *bnd, const char *name);
+void mat_bindings_free(mat_bindings_t *bnd);
+matrix_t *mat_deriv_by_name(const matrix_t *A, mat_bindings_t *bindings, const char *name);
+dval_t *mat_deriv_trace_by_name(const matrix_t *A, mat_bindings_t *bindings, const char *name);
+dval_t *mat_deriv_det_by_name(const matrix_t *A, mat_bindings_t *bindings, const char *name);
+matrix_t *mat_deriv_inverse_by_name(const matrix_t *A, mat_bindings_t *bindings, const char *name);
+matrix_t *mat_deriv_block_inverse_by_name(const matrix_t *A, size_t split, mat_bindings_t *bindings, const char *name);
+matrix_t *mat_deriv_solve_by_name(const matrix_t *A, const matrix_t *B, mat_bindings_t *bindings, const char *name);
+matrix_t *mat_deriv_block_solve_by_name(const matrix_t *A, const matrix_t *B, size_t split, mat_bindings_t *bindings, const char *name);
+matrix_t *mat_jacobian_by_names(const matrix_t *A, mat_bindings_t *bindings, const char *const *names, size_t nnames);
 char *mat_to_string(const matrix_t *A, mat_string_style_t style);
 int mat_sprintf(char *out, size_t out_size, const char *fmt, ...);
 int mat_printf(const char *fmt, ...);
@@ -1067,48 +1063,34 @@ Bracketed `dval` identifiers such as `[radius]` are available inside matrix
 entries and in the matrix-wide binding section, for example
 `{ ([radius], [scale]*x; y, [offset]) | x = 2; [radius] = 3, [scale] = 4, [offset] = 7 }`.
 Returned binding names are normalised to the bracket contents, so
-`mat_binding_find(bindings, n, "[radius]")` and `mat_binding_find(bindings, n, "radius")`
+`mat_bindings_get(bindings, "[radius]")` and `mat_bindings_get(bindings, "radius")`
 both resolve the same symbol.
 
 For compatibility, the older bracket-row forms such as `[[1 2][3 4]]` are still
 accepted on input, but the separator-based parenthesised form above is now the
 canonical matrix syntax and the format emitted by `mat_to_string(...)`.
 
-If `bindings_out` is non-NULL, `mat_from_string(...)` returns a flat array of
-borrowed symbolic bindings for the names actually referenced by the matrix
-entries:
+If `bnd_out` is non-NULL, `mat_from_string(...)` returns an opaque bindings
+object for the names actually referenced by the matrix entries. Use
+`mat_bindings_get(...)` to retrieve the borrowed underlying `dval_t *` leaf,
+and release the bindings object itself with `mat_bindings_free(...)` when it
+is no longer needed. The borrowed `dval_t *` handles remain valid only while
+the matrix returned by `mat_from_string(...)` remains alive.
 
-- `binding_t.name` is the normalised symbol name
-- `binding_t.symbol` is the underlying symbolic leaf
-- `binding_t.is_constant` tells you whether the symbol is a constant placeholder
-
-The returned bindings array itself should be released with a plain `free(...)`.
-The `binding_t.symbol` handles remain valid only while the matrix returned by
-`mat_from_string(...)` remains alive.
-
-Use `mat_binding_find(...)` to look up a binding by name, or
-`mat_binding_set_qf(...)`, `mat_binding_set_qc(...)`, or `mat_binding_set_d(...)`
-to assign values directly without hand-writing the lookup loop. These helpers
-accept either the normalised name (`Δ`) or an alias form such as `@DELTA`.
-
-`mat_from_string_with_bindings(...)` parses a second matrix against an existing
-binding table and reuses any matching symbolic leaves instead of creating fresh
-ones. That gives separately parsed matrices true shared-symbol behaviour:
+To assign a value, look up the binding and update the returned `dval_t *`
+through the ordinary `dval` API:
 
 ```c
-binding_t *a_bindings = NULL;
-binding_t *b_bindings = NULL;
-size_t na = 0, nb = 0;
-matrix_t *A = mat_from_string("(x, 1; y, 2)", &a_bindings, &na);
-matrix_t *B = mat_from_string_with_bindings("(x; y)", a_bindings, na,
-                                            &b_bindings, &nb);
-```
+mat_bindings_t *bindings = NULL;
+number_t x = num_create_from_double(2.0);
+matrix_t *A = mat_from_string("(x, c1; x*y, [radius])", &bindings);
 
-In that example, the `x` and `y` bindings returned for `B` point to the same
-underlying leaves as the corresponding bindings from `A`, so updating either
-binding table changes both matrices and helpers such as
-`mat_deriv_solve_by_name(...)` can differentiate across the shared system
-directly.
+dv_set_val_num(mat_bindings_get(bindings, "x"), x);
+
+num_destroy(&x);
+mat_bindings_free(bindings);
+mat_free(A);
+```
 
 If you want to stay at the matrix layer, `mat_deriv_by_name(...)`,
 `mat_deriv_trace_by_name(...)`, `mat_deriv_det_by_name(...)`,
@@ -1117,12 +1099,6 @@ If you want to stay at the matrix layer, `mat_deriv_by_name(...)`,
 `mat_jacobian_by_names(...)` let you differentiate directly against those
 returned binding names without manually extracting the underlying `dval_t *`
 symbol first.
-
-For multi-matrix helpers such as `mat_deriv_solve_by_name(...)` and
-`mat_deriv_block_solve_by_name(...)`, the named differentiation leaf must be
-the same underlying shared symbol wherever it appears in the participating
-matrices. `mat_from_string_with_bindings(...)` is now the most direct way to
-guarantee that sharing across separately parsed matrices.
 
 `mat_to_string(...)` allocates a freshly formatted string which the caller owns
 and must release with `free(...)`.

@@ -28,19 +28,7 @@
  */
 
 typedef struct matrix_t matrix_t;
-
-/**
- * @brief Borrowed symbolic binding returned by mat_from_string().
- *
- * The @p name pointer and @p symbol handle remain valid for as long as the
- * matrix returned by mat_from_string() remains alive. Releasing the bindings
- * array itself only requires a plain free(bindings).
- */
-typedef struct {
-    const char *name;
-    dval_t *symbol;
-    bool is_constant;
-} binding_t;
+typedef struct mat_bindings_t mat_bindings_t;
 
 /**
  * @brief Matrix string rendering style.
@@ -290,132 +278,89 @@ matrix_t *mat_create_dv(size_t rows, size_t cols, dval_t *const *data);
  *
  * Suffixed names such as `@pi1` normalise to Greek-with-subscript names such
  * as `π₁`, but remain ordinary symbolic variables rather than built-in
- * constants. When @p bindings_out is non-NULL for a symbolic matrix, it
- * receives a heap-allocated array of borrowed bindings for the symbols
- * actually referenced by the matrix body that remain valid while the returned
- * matrix remains alive; releasing that array only requires free(*bindings_out).
+ * constants.
+ *
+ * If @p bnd_out is non-NULL and the parsed matrix is symbolic, the function
+ * also returns an opaque bindings object that can be queried with
+ * mat_bindings_get() and later released with mat_bindings_free(). If bindings
+ * are not needed, pass NULL.
  */
-matrix_t *mat_from_string(const char *s, binding_t **bindings_out, size_t *number_out);
+matrix_t *mat_from_string(const char *s, mat_bindings_t **bnd_out);
 
 /**
- * @brief Parse a matrix from a string while reusing an existing symbolic binding table.
+ * @brief Look up a parsed matrix binding by name.
  *
- * This behaves like mat_from_string(...), but any symbol name that matches one
- * of the provided @p shared_bindings reuses that underlying symbolic leaf
- * instead of creating a fresh one. This is the easiest way to make separately
- * parsed matrices genuinely share symbols for workflows such as
- * mat_deriv_solve_by_name(...).
+ * The lookup accepts the same normalised names as the parser. Bracketed names
+ * may be queried either as `[radius]` or `radius`. Greek-style aliases are
+ * normalised too, so a parsed binding may be queried as either `@pi` or `π`,
+ * `@phi` or `φ`, `@gamma` or `γ`, `@tau` or `τ`, `@DELTA` or `Δ`, and
+ * `@OMEGA` or `Ω`.
  *
- * Explicit bindings in @p s update reused named leaves in place. Reusing the
- * same normalised name with conflicting variable/constant roles is rejected.
- * Newly discovered symbols are still inferred and created as usual.
+ * The returned @ref dval_t pointer is borrowed from the parsed matrix and
+ * remains valid only while that matrix remains alive.
  *
- * When @p bindings_out is non-NULL, it receives a fresh heap-allocated array
- * describing only the symbols referenced by the parsed matrix body. Reused
- * entries point at the shared underlying leaves.
+ * @return Borrowed symbolic leaf on success, or NULL if not found.
  */
-matrix_t *mat_from_string_with_bindings(const char *s,
-                                        binding_t *shared_bindings,
-                                        size_t shared_number,
-                                        binding_t **bindings_out,
-                                        size_t *number_out);
+dval_t *mat_bindings_get(mat_bindings_t *bnd, const char *name);
 
 /**
- * @brief Find a returned symbolic binding by name.
- *
- * The lookup uses the normalised binding names returned by mat_from_string(),
- * such as `c₁` for `c1`. Convenience aliases such as `@DELTA`, `@OMEGA`,
- * `@pi`, and `@tau` are also accepted.
- *
- * @return Pointer to the matching borrowed binding, or NULL if not found.
+ * @brief Release a bindings object previously returned by mat_from_string().
  */
-binding_t *mat_binding_get(binding_t *bindings, size_t number, const char *name);
-
-/**
- * @brief Find a returned symbolic binding by name.
- *
- * Synonym for mat_binding_get().
- *
- * @return Pointer to the matching borrowed binding, or NULL if not found.
- */
-binding_t *mat_binding_find(binding_t *bindings, size_t number, const char *name);
-
-/**
- * @brief Set a returned symbolic binding from a qfloat_t value.
- *
- * @return 0 on success, or -1 if the named binding is not present.
- */
-int mat_binding_set_qf(binding_t *bindings, size_t number, const char *name, qfloat_t value);
-
-/**
- * @brief Set a returned symbolic binding from a qcomplex_t value.
- *
- * @return 0 on success, or -1 if the named binding is not present.
- */
-int mat_binding_set_qc(binding_t *bindings, size_t number, const char *name, qcomplex_t value);
-
-/**
- * @brief Set a returned symbolic binding from a double value.
- *
- * @return 0 on success, or -1 if the named binding is not present.
- */
-int mat_binding_set_d(binding_t *bindings, size_t number, const char *name, double value);
+void mat_bindings_free(mat_bindings_t *bnd);
 
 /**
  * @brief Differentiate a matrix entrywise with respect to a returned binding name.
  *
- * This is a convenience wrapper around mat_binding_find(...) followed by
+ * This is a convenience wrapper around mat_bindings_get(...) followed by
  * mat_deriv(...). The lookup accepts normalised names such as `Δ`, convenience
  * aliases such as `@DELTA`, and bracketed identifiers such as `[radius]`.
  *
  * @param A         Matrix to differentiate.
  * @param bindings  Borrowed bindings previously returned by mat_from_string().
- * @param number    Number of bindings in @p bindings.
  * @param name      Binding name to differentiate with respect to.
  * @return          Newly allocated derivative matrix on success, or NULL if
  *                  the named binding is not present or inputs are invalid.
  */
-matrix_t *mat_deriv_by_name(const matrix_t *A, binding_t *bindings, size_t number,
+matrix_t *mat_deriv_by_name(const matrix_t *A, mat_bindings_t *bindings,
                             const char *name);
 
 /**
  * @brief Differentiate the trace of a matrix with respect to a returned binding name.
  *
- * Convenience wrapper around mat_binding_find(...) followed by
+ * Convenience wrapper around mat_bindings_get(...) followed by
  * mat_deriv_trace(...).
  *
  * @return Newly allocated symbolic derivative, or NULL on error.
  */
-dval_t *mat_deriv_trace_by_name(const matrix_t *A, binding_t *bindings, size_t number,
+dval_t *mat_deriv_trace_by_name(const matrix_t *A, mat_bindings_t *bindings,
                                 const char *name);
 
 /**
  * @brief Differentiate the determinant of a matrix with respect to a returned binding name.
  *
- * Convenience wrapper around mat_binding_find(...) followed by
+ * Convenience wrapper around mat_bindings_get(...) followed by
  * mat_deriv_det(...).
  *
  * @return Newly allocated symbolic derivative, or NULL on error.
  */
-dval_t *mat_deriv_det_by_name(const matrix_t *A, binding_t *bindings, size_t number,
+dval_t *mat_deriv_det_by_name(const matrix_t *A, mat_bindings_t *bindings,
                               const char *name);
 
 /**
  * @brief Build a Jacobian for a matrix-valued symbolic output by binding names.
  *
- * Convenience wrapper around mat_binding_find(...) followed by
+ * Convenience wrapper around mat_bindings_get(...) followed by
  * mat_jacobian(...). Every requested name must be present in the returned
  * bindings.
  *
  * @param A       Matrix-valued symbolic output.
  * @param bindings Borrowed bindings previously returned by mat_from_string().
- * @param number  Number of bindings in @p bindings.
  * @param names   Array of binding names to differentiate with respect to.
  * @param nnames  Number of names in @p names.
  * @return        Newly allocated Jacobian matrix on success, or NULL if any
  *                name is missing or inputs are invalid.
  */
-matrix_t *mat_jacobian_by_names(const matrix_t *A, binding_t *bindings, size_t number,
+matrix_t *mat_jacobian_by_names(const matrix_t *A, mat_bindings_t *bindings,
                                 const char *const *names, size_t nnames);
 
 /* -------------------------------------------------------------------------
@@ -676,12 +621,12 @@ matrix_t *mat_deriv_inverse(const matrix_t *A, dval_t *wrt);
 /**
  * @brief Differentiate the inverse of a matrix with respect to a returned binding name.
  *
- * Convenience wrapper around mat_binding_find(...) followed by
+ * Convenience wrapper around mat_bindings_get(...) followed by
  * mat_deriv_inverse(...).
  *
  * @return Newly allocated derivative matrix on success, or NULL on error.
  */
-matrix_t *mat_deriv_inverse_by_name(const matrix_t *A, binding_t *bindings, size_t number,
+matrix_t *mat_deriv_inverse_by_name(const matrix_t *A, mat_bindings_t *bindings,
                                     const char *name);
 
 /**
@@ -702,13 +647,13 @@ matrix_t *mat_deriv_block_inverse(const matrix_t *A, size_t split, dval_t *wrt);
 /**
  * @brief Differentiate the block inverse of a matrix with respect to a returned binding name.
  *
- * Convenience wrapper around mat_binding_find(...) followed by
+ * Convenience wrapper around mat_bindings_get(...) followed by
  * mat_deriv_block_inverse(...).
  *
  * @return Newly allocated derivative matrix on success, or NULL on error.
  */
 matrix_t *mat_deriv_block_inverse_by_name(const matrix_t *A, size_t split,
-                                          binding_t *bindings, size_t number,
+                                          mat_bindings_t *bindings,
                                           const char *name);
 
 /**
@@ -846,13 +791,13 @@ matrix_t *mat_deriv_block_solve(const matrix_t *A, const matrix_t *B, size_t spl
 /**
  * @brief Differentiate the block solution of `A X = B` with respect to a returned binding name.
  *
- * Convenience wrapper around mat_binding_find(...) followed by
+ * Convenience wrapper around mat_bindings_get(...) followed by
  * mat_deriv_block_solve(...).
  *
  * @return Newly allocated derivative matrix on success, or NULL on error.
  */
 matrix_t *mat_deriv_block_solve_by_name(const matrix_t *A, const matrix_t *B, size_t split,
-                                        binding_t *bindings, size_t number,
+                                        mat_bindings_t *bindings,
                                         const char *name);
 
 /**
@@ -882,13 +827,13 @@ matrix_t *mat_deriv_solve(const matrix_t *A, const matrix_t *B, dval_t *wrt);
 /**
  * @brief Differentiate the solution of `A X = B` with respect to a returned binding name.
  *
- * Convenience wrapper around mat_binding_find(...) followed by
+ * Convenience wrapper around mat_bindings_get(...) followed by
  * mat_deriv_solve(...).
  *
  * @return Newly allocated derivative matrix on success, or NULL on error.
  */
 matrix_t *mat_deriv_solve_by_name(const matrix_t *A, const matrix_t *B,
-                                  binding_t *bindings, size_t number,
+                                  mat_bindings_t *bindings,
                                   const char *name);
 
 /**

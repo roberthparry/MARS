@@ -4084,9 +4084,8 @@ static void test_mat_pow_int_d(void)
 
     /* symbolic Jordan block: [[x,1],[0,x]]^n */
     {
-        binding_t *bindings = NULL;
-        size_t number = 0;
-        matrix_t *J = mat_from_string("(x, 1; 0, x)", &bindings, &number);
+        mat_bindings_t *bindings = NULL;
+        matrix_t *J = mat_from_string("(x, 1; 0, x)", &bindings);
         matrix_t *J2 = NULL;
         matrix_t *J3 = NULL;
         char *j2_text = NULL;
@@ -4095,7 +4094,7 @@ static void test_mat_pow_int_d(void)
         check_bool("symbolic Jordan block allocated", J != NULL);
         check_bool("symbolic Jordan block bindings returned", bindings != NULL);
         check_bool("symbolic Jordan block x binding present",
-                   bindings && mat_binding_find(bindings, number, "x") != NULL);
+                   bindings && mat_bindings_get(bindings, "x") != NULL);
 
         J2 = mat_pow_int(J, 2);
         J3 = mat_pow_int(J, 3);
@@ -4118,7 +4117,7 @@ static void test_mat_pow_int_d(void)
         free(j2_text);
         mat_free(J3);
         mat_free(J2);
-        free(bindings);
+        mat_bindings_free(bindings);
         mat_free(J);
     }
 }
@@ -4646,11 +4645,10 @@ static void test_dval_matrix_functions_extended(void)
     }
 
     {
-        binding_t *bindings = NULL;
-        size_t nbindings = 0;
+        mat_bindings_t *bindings = NULL;
         matrix_t *A = mat_from_string(
             "[[0 x 0][x 0 x][0 x 0]]",
-            &bindings, &nbindings);
+            &bindings);
         matrix_t *E = NULL;
         matrix_t *S = NULL;
         dval_t *v = NULL;
@@ -4659,7 +4657,7 @@ static void test_dval_matrix_functions_extended(void)
         check_bool("dense dval cubic-linear 3x3 input not NULL", A != NULL);
         if (bindings) {
             check_bool("dense dval cubic-linear 3x3 set x",
-                       mat_binding_set_d(bindings, nbindings, "x", 2.0) == 0);
+                       test_mat_bindings_set_d(bindings, "x", 2.0) == 0);
         }
 
         E = mat_exp(A);
@@ -4696,7 +4694,7 @@ static void test_dval_matrix_functions_extended(void)
 
         if (bindings) {
             check_bool("dense dval cubic-linear 3x3 update x",
-                       mat_binding_set_d(bindings, nbindings, "x", 3.0) == 0);
+                       test_mat_bindings_set_d(bindings, "x", 3.0) == 0);
         }
 
         r = sqrt(18.0);
@@ -4714,15 +4712,14 @@ static void test_dval_matrix_functions_extended(void)
         mat_free(A);
         mat_free(E);
         mat_free(S);
-        free(bindings);
+        mat_bindings_free(bindings);
     }
 
     {
-        binding_t *bindings = NULL;
-        size_t nbindings = 0;
+        mat_bindings_t *bindings = NULL;
         matrix_t *A = mat_from_string(
             "[[0 x x][x 0 x][x x 0]]",
-            &bindings, &nbindings);
+            &bindings);
         matrix_t *E = NULL;
         matrix_t *S = NULL;
         dval_t *v = NULL;
@@ -4730,7 +4727,7 @@ static void test_dval_matrix_functions_extended(void)
         check_bool("dense dval quadratic 3x3 input not NULL", A != NULL);
         if (bindings) {
             check_bool("dense dval quadratic 3x3 set x",
-                       mat_binding_set_d(bindings, nbindings, "x", 2.0) == 0);
+                       test_mat_bindings_set_d(bindings, "x", 2.0) == 0);
         }
 
         E = mat_exp(A);
@@ -4767,7 +4764,7 @@ static void test_dval_matrix_functions_extended(void)
 
         if (bindings) {
             check_bool("dense dval quadratic 3x3 update x",
-                       mat_binding_set_d(bindings, nbindings, "x", 3.0) == 0);
+                       test_mat_bindings_set_d(bindings, "x", 3.0) == 0);
         }
 
         if (E) {
@@ -4784,19 +4781,18 @@ static void test_dval_matrix_functions_extended(void)
         mat_free(A);
         mat_free(E);
         mat_free(S);
-        free(bindings);
+        mat_bindings_free(bindings);
     }
 
     {
-        binding_t *bindings = NULL;
-        size_t nbindings = 0;
+        mat_bindings_t *bindings = NULL;
         matrix_t *A = mat_from_string(
             "[[x 1 1 1 1]"
              "[1 x 1 1 1]"
              "[1 1 x 1 1]"
              "[1 1 1 x 1]"
              "[1 1 1 1 x]]",
-            &bindings, &nbindings);
+            &bindings);
         matrix_t *E = NULL;
         matrix_t *S = NULL;
         dval_t *v = NULL;
@@ -4804,7 +4800,7 @@ static void test_dval_matrix_functions_extended(void)
         check_bool("uniform dense dval 5x5 input not NULL", A != NULL);
         if (bindings) {
             check_bool("uniform dense dval 5x5 set x",
-                       mat_binding_set_d(bindings, nbindings, "x", 2.0) == 0);
+                       test_mat_bindings_set_d(bindings, "x", 2.0) == 0);
         }
 
         E = mat_exp(A);
@@ -4837,7 +4833,7 @@ static void test_dval_matrix_functions_extended(void)
 
         if (bindings) {
             check_bool("uniform dense dval 5x5 update x",
-                       mat_binding_set_d(bindings, nbindings, "x", 3.0) == 0);
+                       test_mat_bindings_set_d(bindings, "x", 3.0) == 0);
         }
 
         if (E) {
@@ -4854,18 +4850,17 @@ static void test_dval_matrix_functions_extended(void)
         mat_free(A);
         mat_free(E);
         mat_free(S);
-        free(bindings);
+        mat_bindings_free(bindings);
     }
 
     {
-        binding_t *bindings = NULL;
-        size_t nbindings = 0;
+        mat_bindings_t *bindings = NULL;
         matrix_t *A = mat_from_string(
             "(7, x, 2, 1;"
              " 10, 2*x + 2, 4, 2;"
              " 15, 3*x, 8, 3;"
              " 20, 4*x, 8, 6)",
-            &bindings, &nbindings);
+            &bindings);
         matrix_t *E = NULL;
         matrix_t *S = NULL;
         dval_t *v = NULL;
@@ -4875,7 +4870,7 @@ static void test_dval_matrix_functions_extended(void)
         check_bool("rank-one perturbation dense dval 4x4 input not NULL", A != NULL);
         if (bindings) {
             check_bool("rank-one perturbation dense dval 4x4 set x",
-                       mat_binding_set_d(bindings, nbindings, "x", 3.0) == 0);
+                       test_mat_bindings_set_d(bindings, "x", 3.0) == 0);
         }
 
         E = mat_exp(A);
@@ -4914,7 +4909,7 @@ static void test_dval_matrix_functions_extended(void)
 
         if (bindings) {
             check_bool("rank-one perturbation dense dval 4x4 update x",
-                       mat_binding_set_d(bindings, nbindings, "x", 4.0) == 0);
+                       test_mat_bindings_set_d(bindings, "x", 4.0) == 0);
         }
 
         cexp = (exp(25.0) - exp(2.0)) / 23.0;
@@ -4934,18 +4929,17 @@ static void test_dval_matrix_functions_extended(void)
         mat_free(A);
         mat_free(E);
         mat_free(S);
-        free(bindings);
+        mat_bindings_free(bindings);
     }
 
     {
-        binding_t *bindings = NULL;
-        size_t nbindings = 0;
+        mat_bindings_t *bindings = NULL;
         matrix_t *A = mat_from_string(
             "[[0 x 0 0]"
              "[x 0 x 0]"
              "[0 x 0 x]"
              "[0 0 x 0]]",
-            &bindings, &nbindings);
+            &bindings);
         matrix_t *E = NULL;
         matrix_t *S = NULL;
         matrix_t *Aqc = NULL;
@@ -4958,7 +4952,7 @@ static void test_dval_matrix_functions_extended(void)
         check_bool("dense dval biquadratic quartic 4x4 input not NULL", A != NULL);
         if (bindings) {
             check_bool("dense dval biquadratic quartic 4x4 set x",
-                       mat_binding_set_d(bindings, nbindings, "x", 2.0) == 0);
+                       test_mat_bindings_set_d(bindings, "x", 2.0) == 0);
         }
 
         E = mat_exp(A);
@@ -5009,7 +5003,7 @@ static void test_dval_matrix_functions_extended(void)
 
         if (bindings) {
             check_bool("dense dval biquadratic quartic 4x4 update x",
-                       mat_binding_set_d(bindings, nbindings, "x", 3.0) == 0);
+                       test_mat_bindings_set_d(bindings, "x", 3.0) == 0);
         }
 
         if (E && S) {
@@ -5035,15 +5029,14 @@ static void test_dval_matrix_functions_extended(void)
         mat_free(A);
         mat_free(E);
         mat_free(S);
-        free(bindings);
+        mat_bindings_free(bindings);
     }
 
     {
-        binding_t *bindings = NULL;
-        size_t nbindings = 0;
+        mat_bindings_t *bindings = NULL;
         matrix_t *A = mat_from_string(
             "[[x 1 0 0][1 x 0 0][0 0 y 1][0 0 1 y]]",
-            &bindings, &nbindings);
+            &bindings);
         matrix_t *E = NULL;
         matrix_t *S = NULL;
         dval_t *v = NULL;
@@ -5051,9 +5044,9 @@ static void test_dval_matrix_functions_extended(void)
         check_bool("block-diagonal dense dval 4x4 input not NULL", A != NULL);
         if (bindings) {
             check_bool("block-diagonal dense dval 4x4 set x",
-                       mat_binding_set_d(bindings, nbindings, "x", 2.0) == 0);
+                       test_mat_bindings_set_d(bindings, "x", 2.0) == 0);
             check_bool("block-diagonal dense dval 4x4 set y",
-                       mat_binding_set_d(bindings, nbindings, "y", 3.0) == 0);
+                       test_mat_bindings_set_d(bindings, "y", 3.0) == 0);
         }
 
         E = mat_exp(A);
@@ -5099,9 +5092,9 @@ static void test_dval_matrix_functions_extended(void)
 
         if (bindings) {
             check_bool("block-diagonal dense dval 4x4 update x",
-                       mat_binding_set_d(bindings, nbindings, "x", 4.0) == 0);
+                       test_mat_bindings_set_d(bindings, "x", 4.0) == 0);
             check_bool("block-diagonal dense dval 4x4 update y",
-                       mat_binding_set_d(bindings, nbindings, "y", 5.0) == 0);
+                       test_mat_bindings_set_d(bindings, "y", 5.0) == 0);
         }
 
         if (E) {
@@ -5118,15 +5111,14 @@ static void test_dval_matrix_functions_extended(void)
         mat_free(A);
         mat_free(E);
         mat_free(S);
-        free(bindings);
+        mat_bindings_free(bindings);
     }
 
     {
-        binding_t *bindings = NULL;
-        size_t nbindings = 0;
+        mat_bindings_t *bindings = NULL;
         matrix_t *A = mat_from_string(
             "[[x 0 1 0][0 y 0 1][1 0 x 0][0 1 0 y]]",
-            &bindings, &nbindings);
+            &bindings);
         matrix_t *E = NULL;
         matrix_t *S = NULL;
         dval_t *v = NULL;
@@ -5134,9 +5126,9 @@ static void test_dval_matrix_functions_extended(void)
         check_bool("permuted block-diagonal dense dval 4x4 input not NULL", A != NULL);
         if (bindings) {
             check_bool("permuted block-diagonal dense dval 4x4 set x",
-                       mat_binding_set_d(bindings, nbindings, "x", 2.0) == 0);
+                       test_mat_bindings_set_d(bindings, "x", 2.0) == 0);
             check_bool("permuted block-diagonal dense dval 4x4 set y",
-                       mat_binding_set_d(bindings, nbindings, "y", 3.0) == 0);
+                       test_mat_bindings_set_d(bindings, "y", 3.0) == 0);
         }
 
         E = mat_exp(A);
@@ -5175,9 +5167,9 @@ static void test_dval_matrix_functions_extended(void)
 
         if (bindings) {
             check_bool("permuted block-diagonal dense dval 4x4 update x",
-                       mat_binding_set_d(bindings, nbindings, "x", 4.0) == 0);
+                       test_mat_bindings_set_d(bindings, "x", 4.0) == 0);
             check_bool("permuted block-diagonal dense dval 4x4 update y",
-                       mat_binding_set_d(bindings, nbindings, "y", 5.0) == 0);
+                       test_mat_bindings_set_d(bindings, "y", 5.0) == 0);
         }
 
         if (E) {
@@ -5194,7 +5186,7 @@ static void test_dval_matrix_functions_extended(void)
         mat_free(A);
         mat_free(E);
         mat_free(S);
-        free(bindings);
+        mat_bindings_free(bindings);
     }
 
 }
