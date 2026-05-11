@@ -15,7 +15,8 @@ typedef enum {
     ELEM_DOUBLE = 0,
     ELEM_QFLOAT = 1,
     ELEM_QCOMPLEX = 2,
-    ELEM_DVAL = 3,
+    ELEM_NUMBER = 3,
+    ELEM_DVAL = 4,
     ELEM_MAX
 } elem_kind;
 
@@ -76,6 +77,13 @@ struct elem_vtable {
     size_t size;
     elem_kind kind;
     mat_type_t public_type;
+
+    /* storage lifetime */
+    void (*init_zero_slot)(void *slot);
+    void (*copy_value)(void *dst, const void *src);
+    void (*destroy_value)(void *slot);
+    void (*simplify_value)(void *slot);
+    bool (*is_structural_zero)(const void *val);
 
     /* arithmetic */
     void (*add)(void *out, const void *a, const void *b);
@@ -164,6 +172,7 @@ struct matrix_t {
 extern const struct elem_vtable double_elem;
 extern const struct elem_vtable qfloat_elem;
 extern const struct elem_vtable qcomplex_elem;
+extern const struct elem_vtable number_elem;
 extern const struct elem_vtable dval_elem;
 
 /* ============================================================
@@ -182,6 +191,9 @@ struct matrix_t *mat_create_upper_triangular_with_elem(size_t rows, size_t cols,
                                                        const struct elem_vtable *elem);
 struct matrix_t *mat_create_lower_triangular_with_elem(size_t rows, size_t cols,
                                                        const struct elem_vtable *elem);
+struct matrix_t *mat_create_elementwise_unary_result(size_t rows, size_t cols,
+                                                     const struct elem_vtable *elem,
+                                                     const struct matrix_t *layout_src);
 struct matrix_t *mat_copy_with_store(const struct matrix_t *A,
                                      const struct store_vtable *store);
 struct matrix_t *mat_copy_preserving_store(const struct matrix_t *A);
@@ -189,6 +201,9 @@ struct matrix_t *mat_copy_as_dense(const struct matrix_t *A);
 struct matrix_t *mat_convert_with_store(const struct matrix_t *A,
                                         const struct elem_vtable *target,
                                         const struct store_vtable *store);
+void mat_get_owned(const struct matrix_t *A, size_t i, size_t j, void *out);
+void mat_value_init_zero(const struct matrix_t *A, void *slot);
+void mat_value_destroy(const struct matrix_t *A, void *slot);
 
 /* ============================================================
    Convenience accessor

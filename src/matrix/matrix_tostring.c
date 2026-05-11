@@ -585,10 +585,33 @@ static int mt_format_scalar_qcomplex(const unsigned char *raw,
     return 0;
 }
 
+static int mt_format_scalar_number(const unsigned char *raw,
+                                   int scientific,
+                                   char *buf,
+                                   size_t buf_size)
+{
+    number_t value = *(const number_t *)raw;
+    char fmt[32];
+    size_t significant_digits = num_get_prec_digits(value);
+    size_t precision;
+    int written;
+
+    if (num_is_exact(value) || significant_digits == 0u) {
+        written = num_sprintf(buf, buf_size, scientific ? "%N" : "%n", value);
+        return written < 0 ? -1 : 0;
+    }
+
+    precision = significant_digits > 0u ? significant_digits - 1u : 0u;
+    snprintf(fmt, sizeof(fmt), "%%.%zu%c", precision, scientific ? 'N' : 'n');
+    written = num_sprintf(buf, buf_size, fmt, value);
+    return written < 0 ? -1 : 0;
+}
+
 static const mt_scalar_formatter_fn mt_scalar_formatters[ELEM_MAX] = {
     [ELEM_DOUBLE] = mt_format_scalar_double,
     [ELEM_QFLOAT] = mt_format_scalar_qfloat,
-    [ELEM_QCOMPLEX] = mt_format_scalar_qcomplex
+    [ELEM_QCOMPLEX] = mt_format_scalar_qcomplex,
+    [ELEM_NUMBER] = mt_format_scalar_number
 };
 
 static int mt_format_scalar(const matrix_t *A,
@@ -598,19 +621,33 @@ static int mt_format_scalar(const matrix_t *A,
                             char *buf,
                             size_t buf_size)
 {
-    unsigned char raw[64] = {0};
+    unsigned char *raw;
     mt_scalar_formatter_fn formatter;
+    int rc;
 
-    mat_get(A, i, j, raw);
-
-    if ((unsigned)A->elem->kind >= ELEM_MAX)
+    raw = calloc(1u, A->elem->size ? A->elem->size : 1u);
+    if (!raw)
         return -1;
+
+    mat_get_owned(A, i, j, raw);
+
+    if ((unsigned)A->elem->kind >= ELEM_MAX) {
+        mat_value_destroy(A, raw);
+        free(raw);
+        return -1;
+    }
 
     formatter = mt_scalar_formatters[A->elem->kind];
-    if (!formatter)
+    if (!formatter) {
+        mat_value_destroy(A, raw);
+        free(raw);
         return -1;
+    }
 
-    return formatter(raw, scientific, buf, buf_size);
+    rc = formatter(raw, scientific, buf, buf_size);
+    mat_value_destroy(A, raw);
+    free(raw);
+    return rc;
 }
 
 static char *mat_to_string_numeric(const matrix_t *A, mat_string_style_t style)

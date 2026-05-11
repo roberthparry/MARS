@@ -176,6 +176,8 @@ static inline void th_print_section(const char *title)
 #define RUN_TEST(func, parent)                                                    \
     do {                                                                          \
         tests_rts++;                                                              \
+        tests_run++;                                                              \
+                                                                                  \
         /* Check enable/disable state */                                          \
         if (!test_enabled(__FILE__, #func, parent)) {                             \
             const char *__th_parent = (parent);                                   \
@@ -187,8 +189,6 @@ static inline void th_print_section(const char *title)
             tests_skipped++;                                                      \
             break;                                                                \
         }                                                                         \
-                                                                                  \
-        tests_run++;                                                              \
                                                                                   \
         int failed_before  = tests_failed;                                        \
         int skipped_before = tests_skipped;                                       \

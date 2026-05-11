@@ -47,11 +47,37 @@ static matrix_t *clone_matrix_snapshot(const matrix_t *A)
         free(data);
         return copy;
     }
+    case MAT_TYPE_NUMBER:
+    {
+        number_t *data = malloc(rows * cols * sizeof(number_t));
+        matrix_t *copy;
+        if (!data)
+            return NULL;
+        mat_get_data_num(A, data);
+        copy = mat_create_num(rows, cols, data);
+        for (size_t i = 0; i < rows * cols; ++i)
+            num_destroy(&data[i]);
+        free(data);
+        return copy;
+    }
     case MAT_TYPE_DVAL:
         return mat_to_dense(A);
     }
 
     return NULL;
+}
+
+static void print_mnum_raw(const char *label, matrix_t *A)
+{
+    char *s = mat_to_string(A, MAT_STRING_LAYOUT_PRETTY);
+
+    if (!s) {
+        printf(C_YELLOW "%s = <null>\n" C_RESET, label);
+        return;
+    }
+
+    printf(C_YELLOW "%s = \n%s\n" C_RESET, label, s);
+    free(s);
 }
 
 static int is_primary_matrix_label(const char *label)
@@ -743,6 +769,9 @@ void print_current_input_matrix(void)
     case MAT_TYPE_QCOMPLEX:
         print_mqc_raw("input matrix", current_matrix_input);
         break;
+    case MAT_TYPE_NUMBER:
+        print_mnum_raw("input matrix", current_matrix_input);
+        break;
     case MAT_TYPE_DVAL:
         print_mdv_raw("input matrix", current_matrix_input);
         break;
@@ -756,7 +785,6 @@ void check_d(const char *label, double got, double expected, double tol)
     double err = fabs(got - expected);
     int ok = err < tol;
 
-    tests_run++;
     if (!ok)
         tests_failed++;
 
@@ -779,7 +807,6 @@ void check_qf_val(const char *label, qfloat_t got, qfloat_t expected, double tol
     double err = diff.hi;
     int ok = err < tol;
 
-    tests_run++;
     if (!ok)
         tests_failed++;
 
@@ -802,7 +829,6 @@ void check_qc_val(const char *label, qcomplex_t got, qcomplex_t expected, double
     double err = both_nan ? 0.0 : qf_to_double(qc_abs(qc_sub(got, expected)));
     int ok = both_nan || err < tol;
 
-    tests_run++;
     if (!ok)
         tests_failed++;
 
@@ -817,7 +843,6 @@ void check_qc_val(const char *label, qcomplex_t got, qcomplex_t expected, double
 
 void check_bool(const char *label, int cond)
 {
-    tests_run++;
     if (!cond)
         tests_failed++;
 

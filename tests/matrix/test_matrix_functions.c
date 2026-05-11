@@ -2540,7 +2540,6 @@ cleanup:
 
 void check_mat_d(const char *label, matrix_t *got, matrix_t *expected_mat, double tol)
 {
-    tests_run++;
     if (!got || !expected_mat)
     {
         tests_failed++;
@@ -2676,7 +2675,6 @@ void check_mat_identity_d(const char *label, matrix_t *R, size_t n, double tol)
 
 void check_mat_qf(const char *label, matrix_t *got, matrix_t *expected_mat, double tol)
 {
-    tests_run++;
     if (!got || !expected_mat)
     {
         tests_failed++;
@@ -2789,7 +2787,6 @@ void check_mat_qf(const char *label, matrix_t *got, matrix_t *expected_mat, doub
 
 void check_mat_qc(const char *label, matrix_t *got, matrix_t *expected_mat, double tol)
 {
-    tests_run++;
     if (!got || !expected_mat)
     {
         tests_failed++;
@@ -4341,6 +4338,784 @@ static void test_mat_typeof(void)
     mat_free(E_qf);
 }
 
+static char *format_matrix_number_at_own_precision(const number_t value)
+{
+    char fmt[32];
+    char *out;
+    size_t significant_digits = num_get_prec_digits(value);
+    int needed;
+    size_t precision;
+
+    if (num_is_exact(value) || significant_digits == 0u)
+        return num_to_string(value);
+
+    precision = significant_digits > 0u ? significant_digits - 1u : 0u;
+    snprintf(fmt, sizeof(fmt), "%%.%zuN", precision);
+    needed = num_sprintf(NULL, 0u, fmt, value);
+    if (needed < 0)
+        return NULL;
+    out = malloc((size_t)needed + 1u);
+    if (!out)
+        return NULL;
+    if (num_sprintf(out, (size_t)needed + 1u, fmt, value) < 0) {
+        free(out);
+        return NULL;
+    }
+    return out;
+}
+
+static char *format_matrix_number_for_test_output(const number_t value)
+{
+    char *text = format_matrix_number_at_own_precision(value);
+
+    if (text)
+        return text;
+    text = num_to_string(value);
+    if (text)
+        return text;
+    return strdup("(unavailable)");
+}
+
+static char *format_matrix_error_for_test_output(const number_t value)
+{
+    int needed = num_sprintf(NULL, 0u, "%.6N", value);
+    char *out;
+
+    if (needed < 0) {
+        out = num_to_string(value);
+        if (out)
+            return out;
+        return strdup("(unavailable)");
+    }
+    out = malloc((size_t)needed + 1u);
+    if (!out)
+        return NULL;
+    if (num_sprintf(out, (size_t)needed + 1u, "%.6N", value) < 0) {
+        free(out);
+        out = num_to_string(value);
+        if (out)
+            return out;
+        return strdup("(unavailable)");
+    }
+    return out;
+}
+
+static number_t matrix_number_error_magnitude(const number_t got,
+                                              const number_t expected)
+{
+    number_t promoted_got = num_clone(got);
+    number_t diff;
+    number_t error;
+
+    if (num_get_prec_bits(expected) > 0u)
+        ASSERT_EQ_INT(num_set_prec_bits(&promoted_got, num_get_prec_bits(expected)), 0);
+    diff = num_sub(promoted_got, expected);
+    num_destroy(&promoted_got);
+
+    if (num_is_real(diff)) {
+        error = num_abs(diff);
+        num_destroy(&diff);
+        return error;
+    }
+
+    {
+        number_t real = num_real_part(diff);
+        number_t imag = num_imag_part(diff);
+        number_t mag = num_hypot(real, imag);
+
+        num_destroy(&imag);
+        num_destroy(&real);
+        num_destroy(&diff);
+        return mag;
+    }
+}
+
+static void print_matrix_precision_comparison(const char *label,
+                                             const number_t got,
+                                             const number_t expected)
+{
+    char *expected_text = NULL;
+    char *got_text = NULL;
+    char *error_text = NULL;
+    number_t error;
+
+    expected_text = format_matrix_number_for_test_output(expected);
+    got_text = format_matrix_number_for_test_output(got);
+    error = matrix_number_error_magnitude(got, expected);
+    error_text = format_matrix_error_for_test_output(error);
+
+    ASSERT_NOT_NULL(expected_text);
+    ASSERT_NOT_NULL(got_text);
+    ASSERT_NOT_NULL(error_text);
+
+    printf("    %s\n", label);
+    printf("        expected = %s\n", expected_text);
+    printf("        got      = %s\n", got_text);
+    printf("        error    = %s\n", error_text);
+    printf("        precision: %zu bits, %zu significant digits\n",
+           num_get_prec_bits(got), num_get_prec_digits(got));
+
+    free(error_text);
+    num_destroy(&error);
+    free(got_text);
+    free(expected_text);
+}
+
+static void test_number_matrix_functions(void)
+{
+    printf(C_CYAN "TEST: number_t matrix functions\n" C_RESET);
+
+    number_t diag_real[2];
+    number_t diag_complex[2];
+    number_t jordan_upper_data[4];
+    number_t jordan_lower_data[4];
+    number_t jordan_log_data[4];
+    number_t jordan_sqrt_data[4];
+    number_t jordan_trig_data[4];
+    number_t jordan_asinh_data[4];
+    number_t jordan_atanh_data[4];
+    number_t expected;
+    number_t got;
+    matrix_t *A_real = NULL;
+    matrix_t *A_complex = NULL;
+    matrix_t *J_upper_exact = NULL;
+    matrix_t *J_upper_hp = NULL;
+    matrix_t *J_lower_hp = NULL;
+    matrix_t *J_log = NULL;
+    matrix_t *J_sqrt = NULL;
+    matrix_t *J_trig = NULL;
+    matrix_t *J_asinh = NULL;
+    matrix_t *J_atanh = NULL;
+    matrix_t *Jexp = NULL;
+    matrix_t *E = NULL;
+    matrix_t *L = NULL;
+    matrix_t *R = NULL;
+    matrix_t *S = NULL;
+    matrix_t *C = NULL;
+    matrix_t *T = NULL;
+    matrix_t *SH = NULL;
+    matrix_t *CH = NULL;
+    matrix_t *TH = NULL;
+    matrix_t *ASH = NULL;
+    matrix_t *ATH = NULL;
+
+    diag_real[0] = num_create_from_string("1.25");
+    diag_real[1] = num_create_from_string("2.5");
+    num_set_prec_bits(&diag_real[0], 512u);
+    num_set_prec_bits(&diag_real[1], 512u);
+
+    A_real = mat_create_diagonal_num(2, diag_real);
+    check_bool("mat_create_diagonal_num(real) not NULL", A_real != NULL);
+    check_bool("mat_create_diagonal_num(real) -> MAT_TYPE_NUMBER",
+               A_real != NULL && mat_typeof(A_real) == MAT_TYPE_NUMBER);
+
+    E = mat_exp(A_real);
+    L = mat_log(A_real);
+    R = mat_sqrt(A_real);
+
+    check_bool("mat_exp(number diagonal) -> MAT_TYPE_NUMBER",
+               E != NULL && mat_typeof(E) == MAT_TYPE_NUMBER);
+    check_bool("mat_log(number diagonal) -> MAT_TYPE_NUMBER",
+               L != NULL && mat_typeof(L) == MAT_TYPE_NUMBER);
+    check_bool("mat_sqrt(number diagonal) -> MAT_TYPE_NUMBER",
+               R != NULL && mat_typeof(R) == MAT_TYPE_NUMBER);
+
+    if (E) {
+        got = mat_get_num(E, 0, 0);
+        expected = num_exp(diag_real[0]);
+        check_bool("mat_exp(number diagonal)[0,0] matches num_exp",
+                   num_eq(got, expected));
+        check_bool("mat_exp(number diagonal)[0,0] preserves precision",
+                   num_get_prec_bits(got) == 512u);
+        print_matrix_precision_comparison("exp(diag_real)[0,0]", got, expected);
+        num_destroy(&expected);
+        num_destroy(&got);
+    }
+
+    if (L) {
+        got = mat_get_num(L, 1, 1);
+        expected = num_log(diag_real[1]);
+        check_bool("mat_log(number diagonal)[1,1] matches num_log",
+                   num_eq(got, expected));
+        check_bool("mat_log(number diagonal)[1,1] preserves precision",
+                   num_get_prec_bits(got) == 512u);
+        print_matrix_precision_comparison("log(diag_real)[1,1]", got, expected);
+        num_destroy(&expected);
+        num_destroy(&got);
+    }
+
+    if (R) {
+        got = mat_get_num(R, 0, 0);
+        expected = num_sqrt(diag_real[0]);
+        check_bool("mat_sqrt(number diagonal)[0,0] matches num_sqrt",
+                   num_eq(got, expected));
+        check_bool("mat_sqrt(number diagonal)[0,0] preserves precision",
+                   num_get_prec_bits(got) == 512u);
+        print_matrix_precision_comparison("sqrt(diag_real)[0,0]", got, expected);
+        num_destroy(&expected);
+        num_destroy(&got);
+    }
+
+    diag_complex[0] = num_create_from_string("1 + 2i");
+    diag_complex[1] = num_create_from_string("0");
+    num_set_prec_bits(&diag_complex[0], 384u);
+
+    A_complex = mat_create_diagonal_num(2, diag_complex);
+    check_bool("mat_create_diagonal_num(complex) not NULL", A_complex != NULL);
+
+    S = mat_sin(A_complex);
+    check_bool("mat_sin(number complex diagonal) -> MAT_TYPE_NUMBER",
+               S != NULL && mat_typeof(S) == MAT_TYPE_NUMBER);
+
+    if (S) {
+        got = mat_get_num(S, 0, 0);
+        expected = num_sin(diag_complex[0]);
+        check_bool("mat_sin(number complex diagonal)[0,0] matches num_sin",
+                   num_eq(got, expected));
+        check_bool("mat_sin(number complex diagonal)[0,0] preserves precision",
+                   num_get_prec_bits(got) == 384u);
+        print_matrix_precision_comparison("sin(diag_complex)[0,0]", got, expected);
+        num_destroy(&expected);
+        num_destroy(&got);
+    }
+
+    jordan_upper_data[0] = num_clone(NUM_ZERO);
+    jordan_upper_data[1] = num_clone(NUM_ONE);
+    jordan_upper_data[2] = num_clone(NUM_ZERO);
+    jordan_upper_data[3] = num_clone(NUM_ZERO);
+    J_upper_exact = mat_create_num(2, 2, jordan_upper_data);
+    check_bool("mat_create_num(number nilpotent upper Jordan) not NULL",
+               J_upper_exact != NULL);
+    Jexp = mat_exp(J_upper_exact);
+    check_bool("mat_exp(number nilpotent upper Jordan) -> MAT_TYPE_NUMBER",
+               Jexp != NULL && mat_typeof(Jexp) == MAT_TYPE_NUMBER);
+    if (Jexp) {
+        got = mat_get_num(Jexp, 0, 0);
+        check_bool("exp(number nilpotent upper Jordan)[0,0] = 1", num_eq(got, NUM_ONE));
+        num_destroy(&got);
+        got = mat_get_num(Jexp, 0, 1);
+        check_bool("exp(number nilpotent upper Jordan)[0,1] = 1", num_eq(got, NUM_ONE));
+        num_destroy(&got);
+        got = mat_get_num(Jexp, 1, 0);
+        check_bool("exp(number nilpotent upper Jordan)[1,0] = 0", num_eq(got, NUM_ZERO));
+        num_destroy(&got);
+        got = mat_get_num(Jexp, 1, 1);
+        check_bool("exp(number nilpotent upper Jordan)[1,1] = 1", num_eq(got, NUM_ONE));
+        num_destroy(&got);
+        check_bool("exp(number nilpotent upper Jordan) preserves upper-triangular structure",
+                   mat_is_upper_triangular(Jexp));
+    }
+    mat_free(Jexp);
+    Jexp = NULL;
+    num_destroy(&jordan_upper_data[0]);
+    num_destroy(&jordan_upper_data[1]);
+    num_destroy(&jordan_upper_data[2]);
+    num_destroy(&jordan_upper_data[3]);
+
+    jordan_upper_data[0] = num_create_from_string("1.25");
+    jordan_upper_data[1] = num_clone(NUM_ONE);
+    jordan_upper_data[2] = num_clone(NUM_ZERO);
+    jordan_upper_data[3] = num_create_from_string("1.25");
+    num_set_prec_bits(&jordan_upper_data[0], 512u);
+    num_set_prec_bits(&jordan_upper_data[3], 512u);
+    J_upper_hp = mat_create_num(2, 2, jordan_upper_data);
+    check_bool("mat_create_num(number upper Jordan high precision) not NULL",
+               J_upper_hp != NULL);
+    Jexp = mat_exp(J_upper_hp);
+    check_bool("mat_exp(number upper Jordan high precision) -> MAT_TYPE_NUMBER",
+               Jexp != NULL && mat_typeof(Jexp) == MAT_TYPE_NUMBER);
+    if (Jexp) {
+        expected = num_exp(jordan_upper_data[0]);
+        got = mat_get_num(Jexp, 0, 0);
+        check_bool("exp(number upper Jordan)[0,0] matches exp(lambda)",
+                   num_eq(got, expected));
+        check_bool("exp(number upper Jordan)[0,0] preserves precision",
+                   num_get_prec_bits(got) == 512u);
+        print_matrix_precision_comparison("exp(number upper Jordan)[0,0]", got, expected);
+        num_destroy(&got);
+
+        got = mat_get_num(Jexp, 0, 1);
+        check_bool("exp(number upper Jordan)[0,1] matches exp(lambda)",
+                   num_eq(got, expected));
+        check_bool("exp(number upper Jordan)[0,1] preserves precision",
+                   num_get_prec_bits(got) == 512u);
+        print_matrix_precision_comparison("exp(number upper Jordan)[0,1]", got, expected);
+        num_destroy(&got);
+        num_destroy(&expected);
+        check_bool("exp(number upper Jordan) preserves upper-triangular structure",
+                   mat_is_upper_triangular(Jexp));
+    }
+    mat_free(Jexp);
+    Jexp = NULL;
+    num_destroy(&jordan_upper_data[0]);
+    num_destroy(&jordan_upper_data[1]);
+    num_destroy(&jordan_upper_data[2]);
+    num_destroy(&jordan_upper_data[3]);
+
+    jordan_lower_data[0] = num_create_from_string("1.25");
+    jordan_lower_data[1] = num_clone(NUM_ZERO);
+    jordan_lower_data[2] = num_clone(NUM_ONE);
+    jordan_lower_data[3] = num_create_from_string("1.25");
+    num_set_prec_bits(&jordan_lower_data[0], 512u);
+    num_set_prec_bits(&jordan_lower_data[3], 512u);
+    J_lower_hp = mat_create_num(2, 2, jordan_lower_data);
+    check_bool("mat_create_num(number lower Jordan high precision) not NULL",
+               J_lower_hp != NULL);
+    Jexp = mat_exp(J_lower_hp);
+    check_bool("mat_exp(number lower Jordan high precision) -> MAT_TYPE_NUMBER",
+               Jexp != NULL && mat_typeof(Jexp) == MAT_TYPE_NUMBER);
+    if (Jexp) {
+        expected = num_exp(jordan_lower_data[0]);
+        got = mat_get_num(Jexp, 1, 0);
+        check_bool("exp(number lower Jordan)[1,0] matches exp(lambda)",
+                   num_eq(got, expected));
+        check_bool("exp(number lower Jordan)[1,0] preserves precision",
+                   num_get_prec_bits(got) == 512u);
+        print_matrix_precision_comparison("exp(number lower Jordan)[1,0]", got, expected);
+        num_destroy(&got);
+        num_destroy(&expected);
+        check_bool("exp(number lower Jordan) preserves lower-triangular structure",
+                   mat_is_lower_triangular(Jexp));
+    }
+    mat_free(L);
+    L = NULL;
+    mat_free(R);
+    R = NULL;
+
+    jordan_log_data[0] = num_create_from_string("1.25");
+    jordan_log_data[1] = num_clone(NUM_ONE);
+    jordan_log_data[2] = num_clone(NUM_ZERO);
+    jordan_log_data[3] = num_create_from_string("1.25");
+    num_set_prec_bits(&jordan_log_data[0], 512u);
+    num_set_prec_bits(&jordan_log_data[3], 512u);
+    J_log = mat_create_num(2, 2, jordan_log_data);
+    check_bool("mat_create_num(number upper Jordan for log) not NULL",
+               J_log != NULL);
+    L = mat_log(J_log);
+    check_bool("mat_log(number upper Jordan high precision) -> MAT_TYPE_NUMBER",
+               L != NULL && mat_typeof(L) == MAT_TYPE_NUMBER);
+    if (L) {
+        expected = num_log(jordan_log_data[0]);
+        got = mat_get_num(L, 0, 0);
+        check_bool("log(number upper Jordan)[0,0] matches log(lambda)",
+                   num_eq(got, expected));
+        check_bool("log(number upper Jordan)[0,0] preserves precision",
+                   num_get_prec_bits(got) == 512u);
+        print_matrix_precision_comparison("log(number upper Jordan)[0,0]", got, expected);
+        num_destroy(&got);
+        num_destroy(&expected);
+
+        expected = num_inv(jordan_log_data[0]);
+        got = mat_get_num(L, 0, 1);
+        check_bool("log(number upper Jordan)[0,1] matches 1/lambda",
+                   num_eq(got, expected));
+        check_bool("log(number upper Jordan)[0,1] preserves precision",
+                   num_get_prec_bits(got) == 512u);
+        print_matrix_precision_comparison("log(number upper Jordan)[0,1]", got, expected);
+        num_destroy(&got);
+        num_destroy(&expected);
+        check_bool("log(number upper Jordan) preserves upper-triangular structure",
+                   mat_is_upper_triangular(L));
+    }
+
+    jordan_sqrt_data[0] = num_create_from_string("1.25");
+    jordan_sqrt_data[1] = num_clone(NUM_ONE);
+    jordan_sqrt_data[2] = num_clone(NUM_ZERO);
+    jordan_sqrt_data[3] = num_create_from_string("1.25");
+    num_set_prec_bits(&jordan_sqrt_data[0], 512u);
+    num_set_prec_bits(&jordan_sqrt_data[3], 512u);
+    J_sqrt = mat_create_num(2, 2, jordan_sqrt_data);
+    check_bool("mat_create_num(number upper Jordan for sqrt) not NULL",
+               J_sqrt != NULL);
+    R = mat_sqrt(J_sqrt);
+    check_bool("mat_sqrt(number upper Jordan high precision) -> MAT_TYPE_NUMBER",
+               R != NULL && mat_typeof(R) == MAT_TYPE_NUMBER);
+    if (R) {
+        number_t two = num_create_from_long(2);
+
+        expected = num_sqrt(jordan_sqrt_data[0]);
+        got = mat_get_num(R, 0, 0);
+        check_bool("sqrt(number upper Jordan)[0,0] matches sqrt(lambda)",
+                   num_eq(got, expected));
+        check_bool("sqrt(number upper Jordan)[0,0] preserves precision",
+                   num_get_prec_bits(got) == 512u);
+        print_matrix_precision_comparison("sqrt(number upper Jordan)[0,0]", got, expected);
+        num_destroy(&got);
+
+        {
+            number_t denom = num_mul(two, expected);
+            number_t offdiag_expected = num_inv(denom);
+            number_t offdiag_error;
+            number_t offdiag_tolerance = num_create_from_string("1e-150");
+
+            got = mat_get_num(R, 0, 1);
+            offdiag_error = matrix_number_error_magnitude(got, offdiag_expected);
+            check_bool("sqrt(number upper Jordan)[0,1] matches 1/(2*sqrt(lambda))",
+                       num_le(offdiag_error, offdiag_tolerance));
+            check_bool("sqrt(number upper Jordan)[0,1] does not lose precision",
+                       num_get_prec_bits(got) >= 512u);
+            print_matrix_precision_comparison("sqrt(number upper Jordan)[0,1]", got, offdiag_expected);
+            num_destroy(&offdiag_tolerance);
+            num_destroy(&offdiag_error);
+            num_destroy(&got);
+            num_destroy(&offdiag_expected);
+            num_destroy(&denom);
+        }
+
+        num_destroy(&expected);
+        num_destroy(&two);
+        check_bool("sqrt(number upper Jordan) preserves upper-triangular structure",
+                   mat_is_upper_triangular(R));
+    }
+
+    jordan_trig_data[0] = num_create_from_string("1.25");
+    jordan_trig_data[1] = num_clone(NUM_ONE);
+    jordan_trig_data[2] = num_clone(NUM_ZERO);
+    jordan_trig_data[3] = num_create_from_string("1.25");
+    num_set_prec_bits(&jordan_trig_data[0], 512u);
+    num_set_prec_bits(&jordan_trig_data[3], 512u);
+    J_trig = mat_create_num(2, 2, jordan_trig_data);
+    check_bool("mat_create_num(number upper Jordan for trig/hyperbolic) not NULL",
+               J_trig != NULL);
+
+    S = mat_sin(J_trig);
+    C = mat_cos(J_trig);
+    T = mat_tan(J_trig);
+    SH = mat_sinh(J_trig);
+    CH = mat_cosh(J_trig);
+    TH = mat_tanh(J_trig);
+
+    check_bool("mat_sin(number upper Jordan high precision) -> MAT_TYPE_NUMBER",
+               S != NULL && mat_typeof(S) == MAT_TYPE_NUMBER);
+    check_bool("mat_cos(number upper Jordan high precision) -> MAT_TYPE_NUMBER",
+               C != NULL && mat_typeof(C) == MAT_TYPE_NUMBER);
+    check_bool("mat_tan(number upper Jordan high precision) -> MAT_TYPE_NUMBER",
+               T != NULL && mat_typeof(T) == MAT_TYPE_NUMBER);
+    check_bool("mat_sinh(number upper Jordan high precision) -> MAT_TYPE_NUMBER",
+               SH != NULL && mat_typeof(SH) == MAT_TYPE_NUMBER);
+    check_bool("mat_cosh(number upper Jordan high precision) -> MAT_TYPE_NUMBER",
+               CH != NULL && mat_typeof(CH) == MAT_TYPE_NUMBER);
+    check_bool("mat_tanh(number upper Jordan high precision) -> MAT_TYPE_NUMBER",
+               TH != NULL && mat_typeof(TH) == MAT_TYPE_NUMBER);
+
+    if (S && C && T && SH && CH && TH) {
+        number_t tol = num_create_from_string("1e-90");
+        number_t lambda = num_clone(jordan_trig_data[0]);
+        number_t sin_lambda = num_sin(lambda);
+        number_t cos_lambda = num_cos(lambda);
+        number_t tan_lambda = num_tan(lambda);
+        number_t sinh_lambda = num_sinh(lambda);
+        number_t cosh_lambda = num_cosh(lambda);
+        number_t tanh_lambda = num_tanh(lambda);
+        number_t cos_sq = num_mul(cos_lambda, cos_lambda);
+        number_t cosh_sq = num_mul(cosh_lambda, cosh_lambda);
+        number_t sec2 = num_inv(cos_sq);
+        number_t sech2 = num_inv(cosh_sq);
+        number_t neg_sin_lambda = num_neg(sin_lambda);
+        number_t err;
+
+        got = mat_get_num(S, 0, 0);
+        err = matrix_number_error_magnitude(got, sin_lambda);
+        check_bool("sin(number upper Jordan)[0,0] matches sin(lambda)",
+                   num_le(err, tol));
+        check_bool("sin(number upper Jordan)[0,0] preserves precision",
+                   num_get_prec_bits(got) >= 512u);
+        print_matrix_precision_comparison("sin(number upper Jordan)[0,0]", got, sin_lambda);
+        num_destroy(&err);
+        num_destroy(&got);
+
+        got = mat_get_num(S, 0, 1);
+        err = matrix_number_error_magnitude(got, cos_lambda);
+        check_bool("sin(number upper Jordan)[0,1] matches cos(lambda)",
+                   num_le(err, tol));
+        check_bool("sin(number upper Jordan)[0,1] preserves precision",
+                   num_get_prec_bits(got) >= 512u);
+        print_matrix_precision_comparison("sin(number upper Jordan)[0,1]", got, cos_lambda);
+        num_destroy(&err);
+        num_destroy(&got);
+
+        got = mat_get_num(C, 0, 0);
+        err = matrix_number_error_magnitude(got, cos_lambda);
+        check_bool("cos(number upper Jordan)[0,0] matches cos(lambda)",
+                   num_le(err, tol));
+        check_bool("cos(number upper Jordan)[0,0] preserves precision",
+                   num_get_prec_bits(got) >= 512u);
+        print_matrix_precision_comparison("cos(number upper Jordan)[0,0]", got, cos_lambda);
+        num_destroy(&err);
+        num_destroy(&got);
+
+        got = mat_get_num(C, 0, 1);
+        err = matrix_number_error_magnitude(got, neg_sin_lambda);
+        check_bool("cos(number upper Jordan)[0,1] matches -sin(lambda)",
+                   num_le(err, tol));
+        check_bool("cos(number upper Jordan)[0,1] preserves precision",
+                   num_get_prec_bits(got) >= 512u);
+        print_matrix_precision_comparison("cos(number upper Jordan)[0,1]", got, neg_sin_lambda);
+        num_destroy(&err);
+        num_destroy(&got);
+
+        got = mat_get_num(T, 0, 0);
+        err = matrix_number_error_magnitude(got, tan_lambda);
+        check_bool("tan(number upper Jordan)[0,0] matches tan(lambda)",
+                   num_le(err, tol));
+        check_bool("tan(number upper Jordan)[0,0] preserves precision",
+                   num_get_prec_bits(got) >= 512u);
+        print_matrix_precision_comparison("tan(number upper Jordan)[0,0]", got, tan_lambda);
+        num_destroy(&err);
+        num_destroy(&got);
+
+        got = mat_get_num(T, 0, 1);
+        err = matrix_number_error_magnitude(got, sec2);
+        check_bool("tan(number upper Jordan)[0,1] matches sec(lambda)^2",
+                   num_le(err, tol));
+        check_bool("tan(number upper Jordan)[0,1] preserves precision",
+                   num_get_prec_bits(got) >= 512u);
+        print_matrix_precision_comparison("tan(number upper Jordan)[0,1]", got, sec2);
+        num_destroy(&err);
+        num_destroy(&got);
+
+        got = mat_get_num(SH, 0, 0);
+        err = matrix_number_error_magnitude(got, sinh_lambda);
+        check_bool("sinh(number upper Jordan)[0,0] matches sinh(lambda)",
+                   num_le(err, tol));
+        check_bool("sinh(number upper Jordan)[0,0] preserves precision",
+                   num_get_prec_bits(got) >= 512u);
+        print_matrix_precision_comparison("sinh(number upper Jordan)[0,0]", got, sinh_lambda);
+        num_destroy(&err);
+        num_destroy(&got);
+
+        got = mat_get_num(SH, 0, 1);
+        err = matrix_number_error_magnitude(got, cosh_lambda);
+        check_bool("sinh(number upper Jordan)[0,1] matches cosh(lambda)",
+                   num_le(err, tol));
+        check_bool("sinh(number upper Jordan)[0,1] preserves precision",
+                   num_get_prec_bits(got) >= 512u);
+        print_matrix_precision_comparison("sinh(number upper Jordan)[0,1]", got, cosh_lambda);
+        num_destroy(&err);
+        num_destroy(&got);
+
+        got = mat_get_num(CH, 0, 0);
+        err = matrix_number_error_magnitude(got, cosh_lambda);
+        check_bool("cosh(number upper Jordan)[0,0] matches cosh(lambda)",
+                   num_le(err, tol));
+        check_bool("cosh(number upper Jordan)[0,0] preserves precision",
+                   num_get_prec_bits(got) >= 512u);
+        print_matrix_precision_comparison("cosh(number upper Jordan)[0,0]", got, cosh_lambda);
+        num_destroy(&err);
+        num_destroy(&got);
+
+        got = mat_get_num(CH, 0, 1);
+        err = matrix_number_error_magnitude(got, sinh_lambda);
+        check_bool("cosh(number upper Jordan)[0,1] matches sinh(lambda)",
+                   num_le(err, tol));
+        check_bool("cosh(number upper Jordan)[0,1] preserves precision",
+                   num_get_prec_bits(got) >= 512u);
+        print_matrix_precision_comparison("cosh(number upper Jordan)[0,1]", got, sinh_lambda);
+        num_destroy(&err);
+        num_destroy(&got);
+
+        got = mat_get_num(TH, 0, 0);
+        err = matrix_number_error_magnitude(got, tanh_lambda);
+        check_bool("tanh(number upper Jordan)[0,0] matches tanh(lambda)",
+                   num_le(err, tol));
+        check_bool("tanh(number upper Jordan)[0,0] preserves precision",
+                   num_get_prec_bits(got) >= 512u);
+        print_matrix_precision_comparison("tanh(number upper Jordan)[0,0]", got, tanh_lambda);
+        num_destroy(&err);
+        num_destroy(&got);
+
+        got = mat_get_num(TH, 0, 1);
+        err = matrix_number_error_magnitude(got, sech2);
+        check_bool("tanh(number upper Jordan)[0,1] matches sech(lambda)^2",
+                   num_le(err, tol));
+        check_bool("tanh(number upper Jordan)[0,1] preserves precision",
+                   num_get_prec_bits(got) >= 512u);
+        print_matrix_precision_comparison("tanh(number upper Jordan)[0,1]", got, sech2);
+        num_destroy(&err);
+        num_destroy(&got);
+
+        check_bool("sin(number upper Jordan) preserves upper-triangular structure",
+                   mat_is_upper_triangular(S));
+        check_bool("cos(number upper Jordan) preserves upper-triangular structure",
+                   mat_is_upper_triangular(C));
+        check_bool("tan(number upper Jordan) preserves upper-triangular structure",
+                   mat_is_upper_triangular(T));
+        check_bool("sinh(number upper Jordan) preserves upper-triangular structure",
+                   mat_is_upper_triangular(SH));
+        check_bool("cosh(number upper Jordan) preserves upper-triangular structure",
+                   mat_is_upper_triangular(CH));
+        check_bool("tanh(number upper Jordan) preserves upper-triangular structure",
+                   mat_is_upper_triangular(TH));
+
+        num_destroy(&tol);
+        num_destroy(&lambda);
+        num_destroy(&sin_lambda);
+        num_destroy(&cos_lambda);
+        num_destroy(&tan_lambda);
+        num_destroy(&sinh_lambda);
+        num_destroy(&cosh_lambda);
+        num_destroy(&tanh_lambda);
+        num_destroy(&cos_sq);
+        num_destroy(&cosh_sq);
+        num_destroy(&sec2);
+        num_destroy(&sech2);
+        num_destroy(&neg_sin_lambda);
+    }
+
+    jordan_asinh_data[0] = num_create_from_string("1.25");
+    jordan_asinh_data[1] = num_clone(NUM_ONE);
+    jordan_asinh_data[2] = num_clone(NUM_ZERO);
+    jordan_asinh_data[3] = num_create_from_string("1.25");
+    num_set_prec_bits(&jordan_asinh_data[0], 512u);
+    num_set_prec_bits(&jordan_asinh_data[3], 512u);
+    J_asinh = mat_create_num(2, 2, jordan_asinh_data);
+    check_bool("mat_create_num(number upper Jordan for asinh) not NULL",
+               J_asinh != NULL);
+    ASH = mat_asinh(J_asinh);
+    check_bool("mat_asinh(number upper Jordan high precision) -> MAT_TYPE_NUMBER",
+               ASH != NULL && mat_typeof(ASH) == MAT_TYPE_NUMBER);
+    if (ASH) {
+        number_t tol = num_create_from_string("1e-90");
+        number_t lambda = num_clone(jordan_asinh_data[0]);
+        number_t lambda_sq = num_mul(lambda, lambda);
+        number_t inside = num_add(lambda_sq, NUM_ONE);
+        number_t deriv_expected = num_inv(num_sqrt(inside));
+        number_t err;
+
+        expected = num_asinh(lambda);
+        got = mat_get_num(ASH, 0, 0);
+        err = matrix_number_error_magnitude(got, expected);
+        check_bool("asinh(number upper Jordan)[0,0] matches asinh(lambda)",
+                   num_le(err, tol));
+        check_bool("asinh(number upper Jordan)[0,0] preserves precision",
+                   num_get_prec_bits(got) >= 512u);
+        print_matrix_precision_comparison("asinh(number upper Jordan)[0,0]", got, expected);
+        num_destroy(&err);
+        num_destroy(&got);
+        num_destroy(&expected);
+
+        got = mat_get_num(ASH, 0, 1);
+        err = matrix_number_error_magnitude(got, deriv_expected);
+        check_bool("asinh(number upper Jordan)[0,1] matches 1/sqrt(1+lambda^2)",
+                   num_le(err, tol));
+        check_bool("asinh(number upper Jordan)[0,1] preserves precision",
+                   num_get_prec_bits(got) >= 512u);
+        print_matrix_precision_comparison("asinh(number upper Jordan)[0,1]", got, deriv_expected);
+        num_destroy(&err);
+        num_destroy(&got);
+        check_bool("asinh(number upper Jordan) preserves upper-triangular structure",
+                   mat_is_upper_triangular(ASH));
+
+        num_destroy(&tol);
+        num_destroy(&lambda);
+        num_destroy(&lambda_sq);
+        num_destroy(&inside);
+        num_destroy(&deriv_expected);
+    }
+
+    jordan_atanh_data[0] = num_create_from_string("0.25");
+    jordan_atanh_data[1] = num_clone(NUM_ONE);
+    jordan_atanh_data[2] = num_clone(NUM_ZERO);
+    jordan_atanh_data[3] = num_create_from_string("0.25");
+    num_set_prec_bits(&jordan_atanh_data[0], 512u);
+    num_set_prec_bits(&jordan_atanh_data[3], 512u);
+    J_atanh = mat_create_num(2, 2, jordan_atanh_data);
+    check_bool("mat_create_num(number upper Jordan for atanh) not NULL",
+               J_atanh != NULL);
+    ATH = mat_atanh(J_atanh);
+    check_bool("mat_atanh(number upper Jordan high precision) -> MAT_TYPE_NUMBER",
+               ATH != NULL && mat_typeof(ATH) == MAT_TYPE_NUMBER);
+    if (ATH) {
+        number_t tol = num_create_from_string("1e-90");
+        number_t lambda = num_clone(jordan_atanh_data[0]);
+        number_t lambda_sq = num_mul(lambda, lambda);
+        number_t denom = num_sub(NUM_ONE, lambda_sq);
+        number_t deriv_expected = num_inv(denom);
+        number_t err;
+
+        expected = num_atanh(lambda);
+        got = mat_get_num(ATH, 0, 0);
+        err = matrix_number_error_magnitude(got, expected);
+        check_bool("atanh(number upper Jordan)[0,0] matches atanh(lambda)",
+                   num_le(err, tol));
+        check_bool("atanh(number upper Jordan)[0,0] preserves precision",
+                   num_get_prec_bits(got) >= 512u);
+        print_matrix_precision_comparison("atanh(number upper Jordan)[0,0]", got, expected);
+        num_destroy(&err);
+        num_destroy(&got);
+        num_destroy(&expected);
+
+        got = mat_get_num(ATH, 0, 1);
+        err = matrix_number_error_magnitude(got, deriv_expected);
+        check_bool("atanh(number upper Jordan)[0,1] matches 1/(1-lambda^2)",
+                   num_le(err, tol));
+        check_bool("atanh(number upper Jordan)[0,1] preserves precision",
+                   num_get_prec_bits(got) >= 512u);
+        print_matrix_precision_comparison("atanh(number upper Jordan)[0,1]", got, deriv_expected);
+        num_destroy(&err);
+        num_destroy(&got);
+        check_bool("atanh(number upper Jordan) preserves upper-triangular structure",
+                   mat_is_upper_triangular(ATH));
+
+        num_destroy(&tol);
+        num_destroy(&lambda);
+        num_destroy(&lambda_sq);
+        num_destroy(&denom);
+        num_destroy(&deriv_expected);
+    }
+
+    mat_free(A_real);
+    mat_free(A_complex);
+    mat_free(J_upper_exact);
+    mat_free(J_upper_hp);
+    mat_free(J_lower_hp);
+    mat_free(J_log);
+    mat_free(J_sqrt);
+    mat_free(J_trig);
+    mat_free(J_asinh);
+    mat_free(J_atanh);
+    mat_free(Jexp);
+    mat_free(E);
+    mat_free(L);
+    mat_free(R);
+    mat_free(S);
+    mat_free(C);
+    mat_free(T);
+    mat_free(SH);
+    mat_free(CH);
+    mat_free(TH);
+    mat_free(ASH);
+    mat_free(ATH);
+    num_destroy(&diag_real[0]);
+    num_destroy(&diag_real[1]);
+    num_destroy(&diag_complex[0]);
+    num_destroy(&diag_complex[1]);
+    num_destroy(&jordan_lower_data[0]);
+    num_destroy(&jordan_lower_data[1]);
+    num_destroy(&jordan_lower_data[2]);
+    num_destroy(&jordan_lower_data[3]);
+    num_destroy(&jordan_log_data[0]);
+    num_destroy(&jordan_log_data[1]);
+    num_destroy(&jordan_log_data[2]);
+    num_destroy(&jordan_log_data[3]);
+    num_destroy(&jordan_sqrt_data[0]);
+    num_destroy(&jordan_sqrt_data[1]);
+    num_destroy(&jordan_sqrt_data[2]);
+    num_destroy(&jordan_sqrt_data[3]);
+    num_destroy(&jordan_trig_data[0]);
+    num_destroy(&jordan_trig_data[1]);
+    num_destroy(&jordan_trig_data[2]);
+    num_destroy(&jordan_trig_data[3]);
+    num_destroy(&jordan_asinh_data[0]);
+    num_destroy(&jordan_asinh_data[1]);
+    num_destroy(&jordan_asinh_data[2]);
+    num_destroy(&jordan_asinh_data[3]);
+    num_destroy(&jordan_atanh_data[0]);
+    num_destroy(&jordan_atanh_data[1]);
+    num_destroy(&jordan_atanh_data[2]);
+    num_destroy(&jordan_atanh_data[3]);
+}
+
 static void check_dval_expr_contains(const char *label,
                                      dval_t *dv,
                                      const char *needle)
@@ -5251,6 +6026,7 @@ void run_matrix_function_tests(void)
     RUN_TEST_CASE(test_mat_special_unary_extensions);
     RUN_TEST_CASE(test_mat_special_unary_square_extensions);
     RUN_TEST_CASE(test_mat_typeof);
+    RUN_TEST_CASE(test_number_matrix_functions);
     RUN_TEST_CASE(test_dval_matrix_functions);
     RUN_TEST_CASE(test_dval_matrix_functions_extended);
     RUN_TEST_CASE(test_mat_simplify_symbolic_helper);

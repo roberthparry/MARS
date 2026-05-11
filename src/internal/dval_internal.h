@@ -152,6 +152,8 @@ static inline void dv_num_set_qc(dval_t *dv, qcomplex_t x)
     num_destroy(&n);
 }
 
+int dv_get_default_constant_num(const char *name, number_t *value_out);
+
 #ifndef dv_add_d
 static inline dval_t *dv_add_d(const dval_t *dv, double x)
 {

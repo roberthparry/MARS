@@ -47,6 +47,7 @@ typedef enum {
     MAT_TYPE_DOUBLE,
     MAT_TYPE_QFLOAT,
     MAT_TYPE_QCOMPLEX,
+    MAT_TYPE_NUMBER,
     MAT_TYPE_DVAL
 } mat_type_t;
 
@@ -156,6 +157,16 @@ matrix_t *mat_new_qc(size_t rows, size_t cols);
 matrix_t *mat_new_sparse_qc(size_t rows, size_t cols);
 
 /**
+ * @brief Allocate a new (incomplete) matrix of number_t values.
+ *
+ * Stored values are cloned into matrix-owned storage. When extracting values
+ * back out, prefer `mat_get_num()` or `mat_get_data_num()` so the returned
+ * `number_t` objects can be destroyed independently of the matrix.
+ */
+matrix_t *mat_new_num(size_t rows, size_t cols);
+matrix_t *mat_new_sparse_num(size_t rows, size_t cols);
+
+/**
  * @brief Allocate a new (incomplete) matrix of dval_t* handles.
  *
  * Each stored handle is retained by the matrix. Callers remain responsible
@@ -180,6 +191,11 @@ matrix_t *matsq_new_qf(size_t n);
 matrix_t *matsq_new_qc(size_t n);
 
 /**
+ * @brief Allocate a new (incomplete) square matrix of number_t values.
+ */
+matrix_t *matsq_new_num(size_t n);
+
+/**
  * @brief Allocate a new (incomplete) square matrix of dval_t* handles.
  */
 matrix_t *matsq_new_dv(size_t n);
@@ -198,6 +214,11 @@ matrix_t *mat_create_identity_qf(size_t n);
  * @brief Create a complete identity matrix of qcomplex_t.
  */
 matrix_t *mat_create_identity_qc(size_t n);
+
+/**
+ * @brief Create a complete identity matrix of number_t values.
+ */
+matrix_t *mat_create_identity_num(size_t n);
 
 /**
  * @brief Create a complete identity matrix of dval_t* handles.
@@ -227,6 +248,11 @@ matrix_t *mat_create_diagonal_qf(size_t n, const qfloat_t *diagonal);
 matrix_t *mat_create_diagonal_qc(size_t n, const qcomplex_t *diagonal);
 
 /**
+ * @brief Create a diagonal matrix of number_t values from its diagonal entries.
+ */
+matrix_t *mat_create_diagonal_num(size_t n, const number_t *diagonal);
+
+/**
  * @brief Create a diagonal matrix of dval_t* handles from its diagonal entries.
  */
 matrix_t *mat_create_diagonal_dv(size_t n, dval_t *const *diagonal);
@@ -251,6 +277,13 @@ matrix_t *mat_create_qf(size_t rows, size_t cols, const qfloat_t *data);
 matrix_t *mat_create_qc(size_t rows, size_t cols, const qcomplex_t *data);
 
 /**
+ * @brief Create a complete matrix of number_t values from a flat array.
+ *
+ * Each entry is cloned into matrix-owned storage.
+ */
+matrix_t *mat_create_num(size_t rows, size_t cols, const number_t *data);
+
+/**
  * @brief Create a complete matrix of dval_t* handles from a flat array.
  *
  * Each handle is retained by the created matrix.
@@ -265,11 +298,11 @@ matrix_t *mat_create_dv(size_t rows, size_t cols, dval_t *const *data);
  *   (a, b, c; d, e, f)
  *   { (a, b; c, d) | x = 1, y = 2; c1 = 3 }
  *
- * Purely numeric matrices become qfloat or qcomplex matrices depending on
- * whether any entry is genuinely complex. Symbolic matrices become dval
- * matrices. For bare symbolic input without outer braces, all discovered
- * bindings start as NaN and symbol kind is inferred from the name. The bare
- * inference rule matches dval parsing:
+ * Purely numeric matrices become `number_t` matrices, preserving exact,
+ * floating, or complex numeric entries through the generic number layer.
+ * Symbolic matrices become dval matrices. For bare symbolic input without
+ * outer braces, all discovered bindings start as NaN and symbol kind is
+ * inferred from the name. The bare inference rule matches dval parsing:
  *   - built-in valued constants: `e`, `pi`, `π`, `@pi`, `@phi`, `@gamma`
  *   - constant placeholders: `a`, `b`, `c`, `d`, and indexed forms such as
  *     `c1`, `c_2`, and `d₃`
@@ -383,6 +416,18 @@ void mat_free(matrix_t *A);
 void mat_get(const matrix_t *A, size_t i, size_t j, void *out);
 
 /**
+ * @brief Read one matrix element as an owning `number_t`.
+ *
+ * For `MAT_TYPE_NUMBER`, this returns an independent live clone of the stored
+ * value. For other numeric matrix types, the entry is converted into a new
+ * `number_t`. For symbolic `MAT_TYPE_DVAL`, the current entry value is
+ * evaluated and returned as a new `number_t`.
+ *
+ * Call `num_destroy(&value)` when finished with the returned value.
+ */
+number_t mat_get_num(const matrix_t *A, size_t i, size_t j);
+
+/**
  * @brief Store one matrix element from @p val.
  *
  * For dval matrices, the matrix retains the incoming dval_t* handle. The caller
@@ -417,6 +462,21 @@ bool   mat_is_sparse(const matrix_t *A);
 size_t mat_nonzero_count(const matrix_t *A);
 matrix_t *mat_to_sparse(const matrix_t *A);
 matrix_t *mat_to_dense(const matrix_t *A);
+
+/**
+ * @brief Evaluate a matrix into number_t form.
+ *
+ * For dval matrices, each symbolic entry is evaluated at the current variable
+ * values and copied into a newly allocated number-valued matrix. The result is
+ * a numeric snapshot and does not continue to track later variable changes.
+ *
+ * For non-dval matrices, this returns a number-valued copy in the same shape.
+ * Existing number_t entries preserve their current backend and precision.
+ *
+ * @param A  Input matrix.
+ * @return   Newly allocated number-valued matrix on success, or NULL on error.
+ */
+matrix_t *mat_evaluate_num(const matrix_t *A);
 
 /**
  * @brief Evaluate a matrix into qfloat_t form.
@@ -516,6 +576,14 @@ void mat_set_data(matrix_t *A, const void *data);
  */
 void mat_get_data(const matrix_t *A, void *data);
 
+/**
+ * @brief Get all matrix elements into a flat row-major `number_t` buffer.
+ *
+ * Each output slot receives an owning `number_t` value. Call
+ * `num_destroy(&data[k])` for every element when finished with the buffer.
+ */
+void mat_get_data_num(const matrix_t *A, number_t *data);
+
 /* -------------------------------------------------------------------------
    Basic operations
    ------------------------------------------------------------------------- */
@@ -523,10 +591,12 @@ void mat_get_data(const matrix_t *A, void *data);
 matrix_t *mat_scalar_mul_d(matrix_t *A, double s);
 matrix_t *mat_scalar_mul_qf(matrix_t *A, qfloat_t s);
 matrix_t *mat_scalar_mul_qc(matrix_t *A, qcomplex_t s);
+matrix_t *mat_scalar_mul_num(matrix_t *A, const number_t *s);
 
 matrix_t *mat_scalar_div_d(matrix_t *A, double s);
 matrix_t *mat_scalar_div_qf(matrix_t *A, qfloat_t s);
 matrix_t *mat_scalar_div_qc(matrix_t *A, qcomplex_t s);
+matrix_t *mat_scalar_div_num(matrix_t *A, const number_t *s);
 
 matrix_t *mat_add(const matrix_t *A, const matrix_t *B);
 matrix_t *mat_sub(const matrix_t *A, const matrix_t *B);

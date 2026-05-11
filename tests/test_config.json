@@ -1520,7 +1520,14 @@
     "test_matrix_calculus": true,
     "test_jacobian": true,
     "test_deriv_solve": true,
-    "test_deriv_block_solve": true
+    "test_deriv_block_solve": true,
+    "test_dval_storage_lifecycle_regressions": true,
+    "test_owned_element_reads_and_transforms": true,
+    "test_number_creation_and_readback": true,
+    "test_number_special_constructors": true,
+    "test_number_matrix_arithmetic": true,
+    "test_number_det_and_inverse": true,
+    "test_mixed_number_backend_matrices": true
   },
   "tests/matrix/test_matrix_functions.c": {
     "test_mat_neg_convenience": true,
@@ -1578,7 +1585,8 @@
     "test_jordan_chain_dval": true,
     "test_jordan_profile_dval": true,
     "test_readme_string_quantum_example": true,
-    "test_mat_simplify_symbolic_helper": true
+    "test_mat_simplify_symbolic_helper": true,
+    "test_number_matrix_functions": true
   },
   "tests/matrix/test_matrix_function_regressions.c": {
     "test_mat_fun_qf_qc": true,

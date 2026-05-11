@@ -26,7 +26,7 @@ typedef struct {
     bool has_value;
     bool used_in_expr;
     bool owns_symbol;
-    qcomplex_t value;
+    number_t value;
     dval_t *symbol;
 } matrix_symbol_t;
 
@@ -330,7 +330,7 @@ static int symbol_vec_add(symbol_vec_t *v,
                           char *name,
                           bool is_constant,
                           bool has_value,
-                          qcomplex_t value)
+                          number_t value)
 {
     matrix_symbol_t *grown;
 
@@ -362,6 +362,7 @@ static void symbol_vec_free(symbol_vec_t *v)
 {
     for (size_t i = 0; i < v->count; ++i) {
         free(v->items[i].name);
+        num_destroy(&v->items[i].value);
         if (v->items[i].owns_symbol && v->items[i].symbol)
             dv_free(v->items[i].symbol);
     }
@@ -491,6 +492,29 @@ static int mf_entry_requires_symbolic(const char *entry)
     return 0;
 }
 
+static int mf_parse_number_literal(const char *text, number_t *out)
+{
+    number_t value;
+    qcomplex_t legacy;
+
+    if (!text || !out)
+        return -1;
+
+    value = num_new();
+    if (num_set_from_string(&value, text) == 0) {
+        *out = value;
+        return 0;
+    }
+    num_destroy(&value);
+
+    legacy = qc_from_string(text);
+    if (qc_isnan(legacy))
+        return -1;
+
+    *out = num_create_from_qcomplex(legacy);
+    return 0;
+}
+
 static int mf_is_function_name(const char *p)
 {
     while (*p && isspace((unsigned char)*p))
@@ -513,21 +537,22 @@ static int mf_collect_expression_names(const char *expr, symbol_vec_t *symbols)
 
         if (!mf_is_function_name(p)) {
             ssize_t found = symbol_vec_find(symbols, name);
-            qcomplex_t default_value = QC_ZERO;
-            bool has_default_value = dv_get_default_constant_value(name, &default_value);
+            number_t default_number = num_new();
+            bool has_default_value = dv_get_default_constant_num(name, &default_number);
 
             if (found < 0) {
                 if (symbol_vec_add(symbols,
                                    name,
                                    has_default_value || dv_is_default_constant_name(name),
                                    has_default_value,
-                                   has_default_value ? default_value
-                                                     : qc_make(QF_NAN, QF_ZERO)) != 0) {
+                                   default_number) != 0) {
                     free(name);
+                    num_destroy(&default_number);
                     return -1;
                 }
                 symbols->items[symbols->count - 1].used_in_expr = true;
             } else {
+                num_destroy(&default_number);
                 symbols->items[found].used_in_expr = true;
                 free(name);
             }
@@ -776,7 +801,7 @@ static int mf_parse_binding_section(const char *text, symbol_vec_t *symbols)
         char *value_text;
         ssize_t found;
         int paren_depth = 0;
-        qcomplex_t value;
+        number_t value;
 
         while (*p && (isspace((unsigned char)*p) || *p == ','))
             p++;
@@ -818,36 +843,37 @@ static int mf_parse_binding_section(const char *text, symbol_vec_t *symbols)
             return -1;
         }
 
-        value = qc_from_string(value_text);
-        free(value_text);
-        if (qc_isnan(value)) {
+        if (mf_parse_number_literal(value_text, &value) != 0) {
             free(name);
+            free(value_text);
             return -1;
         }
+        free(value_text);
 
         found = symbol_vec_find(symbols, name);
         if (found >= 0) {
             if (symbols->items[found].has_value) {
                 free(name);
+                num_destroy(&value);
                 return -1;
             }
             if (symbols->items[found].is_constant != in_constants) {
                 free(name);
+                num_destroy(&value);
                 return -1;
             }
             symbols->items[found].is_constant = in_constants;
             symbols->items[found].has_value = true;
+            num_destroy(&symbols->items[found].value);
             symbols->items[found].value = value;
             if (symbols->items[found].symbol) {
-                if (qf_eq(qc_imag(value), QF_ZERO))
-                    dv_num_set_qf(symbols->items[found].symbol, qc_real(value));
-                else
-                    dv_num_set_qc(symbols->items[found].symbol, value);
+                dv_set_val_num(symbols->items[found].symbol, value);
             }
             free(name);
         } else {
             if (symbol_vec_add(symbols, name, in_constants, true, value) != 0) {
                 free(name);
+                num_destroy(&value);
                 return -1;
             }
         }
@@ -862,35 +888,29 @@ static int mf_try_parse_numeric_matrix(char **entries,
                                        matrix_t **A_out)
 {
     size_t n = rows * cols;
-    qcomplex_t *zvals = mf_xmalloc(n * sizeof(*zvals));
-    qfloat_t *rvals = mf_xmalloc(n * sizeof(*rvals));
-    bool any_complex = false;
+    number_t *vals = mf_xmalloc(n * sizeof(*vals));
     matrix_t *A = NULL;
 
     for (size_t i = 0; i < n; ++i) {
         if (mf_entry_requires_symbolic(entries[i])) {
-            free(zvals);
-            free(rvals);
+            for (size_t j = 0; j < i; ++j)
+                num_destroy(&vals[j]);
+            free(vals);
             return -1;
         }
-        zvals[i] = qc_from_string(entries[i]);
-        if (qc_isnan(zvals[i])) {
-            free(zvals);
-            free(rvals);
+        if (mf_parse_number_literal(entries[i], &vals[i]) != 0) {
+            for (size_t j = 0; j < i; ++j)
+                num_destroy(&vals[j]);
+            free(vals);
             return -1;
         }
-        if (!qf_eq(qc_imag(zvals[i]), QF_ZERO))
-            any_complex = true;
-        rvals[i] = qc_real(zvals[i]);
     }
 
-    if (any_complex)
-        A = mat_create_qc(rows, cols, zvals);
-    else
-        A = mat_create_qf(rows, cols, rvals);
+    A = mat_create_num(rows, cols, vals);
 
-    free(zvals);
-    free(rvals);
+    for (size_t i = 0; i < n; ++i)
+        num_destroy(&vals[i]);
+    free(vals);
     *A_out = A;
     return A ? 0 : -1;
 }
@@ -921,32 +941,26 @@ static int mf_build_symbolic_matrix(char **entries,
     ok = ok && names && refs;
 
     for (size_t i = 0, active = 0; ok && i < symbols->count; ++i) {
-        qcomplex_t init = symbols->items[i].has_value
-                        ? symbols->items[i].value
-                        : qc_make(QF_NAN, QF_ZERO);
+        number_t init;
 
         if (!symbols->items[i].used_in_expr)
             continue;
 
+        init = symbols->items[i].has_value
+             ? symbols->items[i].value
+             : num_create_from_qfloat(QF_NAN);
+
         if (!symbols->items[i].symbol) {
-            if (qf_eq(qc_imag(init), QF_ZERO)) {
-                symbols->items[i].symbol = symbols->items[i].is_constant
-                                         ? dv_num_named_const_qf(qc_real(init),
-                                                                 symbols->items[i].name)
-                                         : dv_num_named_var_qf(qc_real(init),
-                                                               symbols->items[i].name);
-            } else {
-                symbols->items[i].symbol = symbols->items[i].is_constant
-                                         ? dv_num_named_const_qc(init, symbols->items[i].name)
-                                         : dv_num_named_var_qc(init, symbols->items[i].name);
-            }
+            symbols->items[i].symbol = symbols->items[i].is_constant
+                                     ? dv_new_named_const_num(init, symbols->items[i].name)
+                                     : dv_new_named_var_num(init, symbols->items[i].name);
             symbols->items[i].owns_symbol = true;
         } else if (symbols->items[i].has_value) {
-            if (qf_eq(qc_imag(init), QF_ZERO))
-                dv_num_set_qf(symbols->items[i].symbol, qc_real(init));
-            else
-                dv_num_set_qc(symbols->items[i].symbol, init);
+            dv_set_val_num(symbols->items[i].symbol, init);
         }
+
+        if (!symbols->items[i].has_value)
+            num_destroy(&init);
 
         if (!symbols->items[i].symbol)
             ok = 0;

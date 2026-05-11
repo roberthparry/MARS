@@ -2,42 +2,117 @@
 
 #include "test_matrix.h"
 
-static void test_mat_from_string_numeric_qf(void)
+static void test_mat_from_string_numeric_num_real(void)
 {
-    matrix_t *A = mat_from_string("(1, 2; 3, 4)", NULL);
-    qfloat_t x = QF_ZERO;
+    matrix_t *A = mat_from_string("(1/2, 2; 3, 4.5)", NULL);
+    number_t x = num_new();
+    number_t expected = num_create_from_string("3");
+    number_t half = num_create_from_string("1/2");
 
-    check_bool("mat_from_string qfloat matrix non-null", A != NULL);
-    check_bool("mat_from_string qfloat matrix type", A && mat_typeof(A) == MAT_TYPE_QFLOAT);
-    check_bool("mat_from_string qfloat rows", A && mat_get_row_count(A) == 2);
-    check_bool("mat_from_string qfloat cols", A && mat_get_col_count(A) == 2);
+    check_bool("mat_from_string number matrix non-null", A != NULL);
+    check_bool("mat_from_string number matrix type", A && mat_typeof(A) == MAT_TYPE_NUMBER);
+    check_bool("mat_from_string number rows", A && mat_get_row_count(A) == 2);
+    check_bool("mat_from_string number cols", A && mat_get_col_count(A) == 2);
     if (A) {
-        mat_get(A, 1, 0, &x);
-        check_qf_val("mat_from_string qfloat A[1,0]", x, qf_from_double(3.0), 1e-18);
+        x = mat_get_num(A, 0, 0);
+        check_bool("mat_from_string rational A[0,0]", num_eq(x, half));
+        num_destroy(&x);
+        x = mat_get_num(A, 1, 0);
+        check_bool("mat_from_string number A[1,0]", num_eq(x, expected));
     }
 
+    num_destroy(&half);
+    num_destroy(&expected);
+    num_destroy(&x);
     mat_free(A);
 }
 
-static void test_mat_from_string_numeric_qc(void)
+static void test_mat_from_string_numeric_num_complex(void)
 {
-    matrix_t *A = mat_from_string("((1,2), 3i-1; 4, (5,-6); 3, 2j+4)", NULL);
-    qcomplex_t z = QC_ZERO;
+    matrix_t *A = mat_from_string("(1 + i, 3i-1; 1/2 - 3/2i, (5,-6); 3, 2j+4)", NULL);
+    number_t z = num_new();
+    number_t expected = num_new();
 
-    check_bool("mat_from_string qcomplex matrix non-null", A != NULL);
-    check_bool("mat_from_string qcomplex matrix type", A && mat_typeof(A) == MAT_TYPE_QCOMPLEX);
+    check_bool("mat_from_string complex number matrix non-null", A != NULL);
+    check_bool("mat_from_string complex number matrix type", A && mat_typeof(A) == MAT_TYPE_NUMBER);
     if (A) {
-        mat_get(A, 0, 0, &z);
-        check_qc_val("mat_from_string qcomplex A[0,0]",
-                     z, qc_make(qf_from_double(1.0), qf_from_double(2.0)), 1e-18);
-        mat_get(A, 1, 1, &z);
-        check_qc_val("mat_from_string qcomplex A[1,1]",
-                     z, qc_make(qf_from_double(5.0), qf_from_double(-6.0)), 1e-18);
-        mat_get(A, 2, 1, &z);
-        check_qc_val("mat_from_string qcomplex A[2,1]",
-                     z, qc_make(qf_from_double(4.0), qf_from_double(2.0)), 1e-18);
+        expected = num_create_from_string("1 + i");
+        z = mat_get_num(A, 0, 0);
+        check_bool("mat_from_string number A[0,0]", num_eq(z, expected));
+        num_destroy(&z);
+        num_destroy(&expected);
+
+        expected = num_create_from_string("1/2 - 3/2i");
+        z = mat_get_num(A, 1, 0);
+        check_bool("mat_from_string rational complex A[1,0]", num_eq(z, expected));
+        num_destroy(&z);
+        num_destroy(&expected);
+
+        expected = num_create_from_qcomplex(qc_make(qf_from_double(5.0), qf_from_double(-6.0)));
+        z = mat_get_num(A, 1, 1);
+        check_bool("mat_from_string legacy tuple complex A[1,1]", num_eq(z, expected));
+        num_destroy(&z);
+        num_destroy(&expected);
+
+        expected = num_create_from_qcomplex(qc_make(qf_from_double(4.0), qf_from_double(2.0)));
+        z = mat_get_num(A, 2, 1);
+        check_bool("mat_from_string legacy j-complex A[2,1]", num_eq(z, expected));
     }
 
+    num_destroy(&z);
+    num_destroy(&expected);
+    mat_free(A);
+}
+
+static void test_mat_from_string_symbolic_number_bindings(void)
+{
+    mat_bindings_t *bindings = NULL;
+    matrix_t *A = mat_from_string("{ (x, z; 1, c1) | x = 1/2; z = 1/2 - 3/2i; c1 = 5/2 }",
+                                  &bindings);
+    dval_t *dv = NULL;
+    dval_t *x_binding;
+    dval_t *z_binding;
+    dval_t *c_binding;
+    number_t got = num_new();
+    number_t expect = num_new();
+
+    check_bool("mat_from_string symbolic number bindings non-null", A != NULL);
+    check_bool("mat_from_string symbolic number bindings type",
+               A && mat_typeof(A) == MAT_TYPE_DVAL);
+    x_binding = mat_bindings_get(bindings, "x");
+    z_binding = mat_bindings_get(bindings, "z");
+    c_binding = mat_bindings_get(bindings, "c₁");
+    check_bool("symbolic number binding x present", x_binding != NULL);
+    check_bool("symbolic number binding z present", z_binding != NULL);
+    check_bool("symbolic number binding c₁ present", c_binding != NULL);
+
+    if (x_binding) {
+        got = dv_eval_num(x_binding);
+        expect = num_create_from_string("1/2");
+        check_bool("symbolic number binding x exact", num_eq(got, expect));
+        num_destroy(&got);
+        num_destroy(&expect);
+    }
+
+    if (A) {
+        mat_get(A, 0, 1, &dv);
+        got = dv_eval_num(dv);
+        expect = num_create_from_string("1/2 - 3/2i");
+        check_bool("symbolic number binding z matrix entry", num_eq(got, expect));
+        num_destroy(&got);
+        num_destroy(&expect);
+
+        mat_get(A, 1, 1, &dv);
+        got = dv_eval_num(dv);
+        expect = num_create_from_string("5/2");
+        check_bool("symbolic number binding c₁ exact", num_eq(got, expect));
+        num_destroy(&got);
+        num_destroy(&expect);
+    }
+
+    num_destroy(&got);
+    num_destroy(&expect);
+    mat_bindings_free(bindings);
     mat_free(A);
 }
 
@@ -503,8 +578,9 @@ static void test_mat_symbolic_matrix_calculus_helpers_by_name(void)
 
 void run_matrix_fromstring_tests(void)
 {
-    test_mat_from_string_numeric_qf();
-    test_mat_from_string_numeric_qc();
+    test_mat_from_string_numeric_num_real();
+    test_mat_from_string_numeric_num_complex();
+    test_mat_from_string_symbolic_number_bindings();
     test_mat_from_string_symbolic_wrapped();
     test_mat_from_string_symbolic_bare();
     test_mat_from_string_symbolic_at_aliases();

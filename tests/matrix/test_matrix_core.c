@@ -1,4 +1,5 @@
 #include "test_matrix.h"
+#include "matrix/matrix_internal.h"
 
 /*
  * The public API now exposes DV_ZERO / DV_ONE as read-only immortal nodes.
@@ -141,6 +142,539 @@ static void test_writing(void)
         check_qc_val("write qcomplex C[1,1]", vals[3], z, 1e-30);
 
         mat_free(C);
+    }
+}
+
+static void test_number_creation_and_readback(void)
+{
+    printf(C_CYAN "TEST: number_t matrix creation and owned readback\n" C_RESET);
+
+    number_t vals[4];
+    number_t got;
+    number_t flat[4];
+    matrix_t *A;
+
+    vals[0] = num_create_from_string("1/2");
+    vals[1] = num_create_from_long(3);
+    vals[2] = num_create_from_string("1 + 2i");
+    vals[3] = num_create_from_string("1.25");
+    num_set_prec_bits(&vals[3], 512);
+
+    A = mat_create_num(2, 2, vals);
+    check_bool("mat_create_num non-null", A != NULL);
+    check_bool("mat_create_num -> MAT_TYPE_NUMBER",
+               A != NULL && mat_typeof(A) == MAT_TYPE_NUMBER);
+
+    got = mat_get_num(A, 0, 0);
+    check_bool("mat_get_num exact rational", num_eq(got, vals[0]));
+    num_destroy(&got);
+
+    got = mat_get_num(A, 1, 0);
+    check_bool("mat_get_num complex value", num_eq(got, vals[2]));
+    check_bool("mat_get_num complex stays non-real", !num_is_real(got));
+    num_destroy(&got);
+
+    got = mat_get_num(A, 1, 1);
+    check_bool("mat_get_num preserves multiprecision value", num_eq(got, vals[3]));
+    check_bool("mat_get_num preserves precision bits", num_get_prec_bits(got) == 512);
+    num_destroy(&got);
+
+    mat_get_data_num(A, flat);
+    check_bool("mat_get_data_num[0]", num_eq(flat[0], vals[0]));
+    check_bool("mat_get_data_num[1]", num_eq(flat[1], vals[1]));
+    check_bool("mat_get_data_num[2]", num_eq(flat[2], vals[2]));
+    check_bool("mat_get_data_num[3] precision", num_get_prec_bits(flat[3]) == 512);
+
+    for (size_t i = 0; i < 4; ++i) {
+        num_destroy(&flat[i]);
+        num_destroy(&vals[i]);
+    }
+    mat_free(A);
+}
+
+static void test_number_special_constructors(void)
+{
+    printf(C_CYAN "TEST: number_t matrix specialised constructors\n" C_RESET);
+
+    number_t diag[2];
+    number_t got;
+    matrix_t *I;
+    matrix_t *D;
+
+    diag[0] = num_create_from_string("2/3");
+    diag[1] = num_create_from_string("5");
+
+    I = mat_create_identity_num(2);
+    D = mat_create_diagonal_num(2, diag);
+
+    check_bool("mat_create_identity_num non-null", I != NULL);
+    check_bool("mat_create_diagonal_num non-null", D != NULL);
+
+    got = mat_get_num(I, 0, 0);
+    check_bool("identity number diag one", num_eq(got, NUM_ONE));
+    num_destroy(&got);
+
+    got = mat_get_num(I, 0, 1);
+    check_bool("identity number offdiag zero", num_eq(got, NUM_ZERO));
+    num_destroy(&got);
+
+    got = mat_get_num(D, 0, 0);
+    check_bool("diagonal number entry 0", num_eq(got, diag[0]));
+    num_destroy(&got);
+
+    got = mat_get_num(D, 1, 1);
+    check_bool("diagonal number entry 1", num_eq(got, diag[1]));
+    num_destroy(&got);
+
+    got = mat_get_num(D, 0, 1);
+    check_bool("diagonal number offdiag zero", num_eq(got, NUM_ZERO));
+    num_destroy(&got);
+
+    num_destroy(&diag[0]);
+    num_destroy(&diag[1]);
+    mat_free(I);
+    mat_free(D);
+}
+
+static void test_number_matrix_arithmetic(void)
+{
+    printf(C_CYAN "TEST: number_t matrix arithmetic and promotion\n" C_RESET);
+
+    number_t avals[4];
+    number_t bvals[4];
+    number_t scalar;
+    number_t got;
+    qfloat_t qfvals[4];
+    matrix_t *A;
+    matrix_t *B;
+    matrix_t *C;
+    matrix_t *Q;
+    matrix_t *M;
+    number_t expected;
+
+    avals[0] = num_create_from_long(1);
+    avals[1] = num_create_from_long(2);
+    avals[2] = num_create_from_long(3);
+    avals[3] = num_create_from_long(4);
+    bvals[0] = num_create_from_long(5);
+    bvals[1] = num_create_from_long(6);
+    bvals[2] = num_create_from_long(7);
+    bvals[3] = num_create_from_long(8);
+
+    A = mat_create_num(2, 2, avals);
+    B = mat_create_num(2, 2, bvals);
+    C = mat_add(A, B);
+
+    check_bool("number + number -> MAT_TYPE_NUMBER",
+               C != NULL && mat_typeof(C) == MAT_TYPE_NUMBER);
+
+    got = mat_get_num(C, 0, 0);
+    expected = num_create_from_long(6);
+    check_bool("number add [0,0] = 6", num_eq(got, expected));
+    num_destroy(&expected);
+    num_destroy(&got);
+    got = mat_get_num(C, 1, 1);
+    expected = num_create_from_long(12);
+    check_bool("number add [1,1] = 12", num_eq(got, expected));
+    num_destroy(&expected);
+    num_destroy(&got);
+    mat_free(C);
+
+    C = mat_mul(A, B);
+    check_bool("number * number -> MAT_TYPE_NUMBER",
+               C != NULL && mat_typeof(C) == MAT_TYPE_NUMBER);
+    got = mat_get_num(C, 0, 0);
+    expected = num_create_from_long(19);
+    check_bool("number mul [0,0] = 19", num_eq(got, expected));
+    num_destroy(&expected);
+    num_destroy(&got);
+    got = mat_get_num(C, 1, 1);
+    expected = num_create_from_long(50);
+    check_bool("number mul [1,1] = 50", num_eq(got, expected));
+    num_destroy(&expected);
+    num_destroy(&got);
+    mat_free(C);
+
+    scalar = num_create_from_string("1/2");
+    C = mat_scalar_mul_num(A, &scalar);
+    check_bool("mat_scalar_mul_num non-null", C != NULL);
+    got = mat_get_num(C, 0, 1);
+    check_bool("scalar mul number exact half", num_eq(got, NUM_ONE));
+    num_destroy(&got);
+    mat_free(C);
+
+    C = mat_scalar_div_num(B, &scalar);
+    check_bool("mat_scalar_div_num non-null", C != NULL);
+    got = mat_get_num(C, 0, 0);
+    expected = num_create_from_long(10);
+    check_bool("scalar div number by half", num_eq(got, expected));
+    num_destroy(&expected);
+    num_destroy(&got);
+    mat_free(C);
+    num_destroy(&scalar);
+
+    qfvals[0] = qf_from_double(0.5);
+    qfvals[1] = qf_from_double(1.5);
+    qfvals[2] = qf_from_double(2.5);
+    qfvals[3] = qf_from_double(3.5);
+    Q = mat_create_qf(2, 2, qfvals);
+    M = mat_add(A, Q);
+    check_bool("number + qfloat promotes to number",
+               M != NULL && mat_typeof(M) == MAT_TYPE_NUMBER);
+    got = mat_get_num(M, 0, 0);
+    expected = num_create_from_string("1.5");
+    check_bool("number + qfloat value", num_eq(got, expected));
+    num_destroy(&expected);
+    num_destroy(&got);
+
+    mat_free(M);
+    mat_free(Q);
+    mat_free(B);
+    mat_free(A);
+    for (size_t i = 0; i < 4; ++i) {
+        num_destroy(&avals[i]);
+        num_destroy(&bvals[i]);
+    }
+}
+
+static char *format_matrix_core_num_at_own_precision(const number_t value)
+{
+    char fmt[32];
+    char *out;
+    size_t significant_digits = num_get_prec_digits(value);
+    int needed;
+    size_t precision;
+
+    if (num_is_exact(value) || significant_digits == 0u)
+        return num_to_string(value);
+
+    precision = significant_digits > 0u ? significant_digits - 1u : 0u;
+    snprintf(fmt, sizeof(fmt), "%%.%zuN", precision);
+    needed = num_sprintf(NULL, 0u, fmt, value);
+    if (needed < 0)
+        return NULL;
+    out = malloc((size_t)needed + 1u);
+    if (!out)
+        return NULL;
+    if (num_sprintf(out, (size_t)needed + 1u, fmt, value) < 0) {
+        free(out);
+        return NULL;
+    }
+    return out;
+}
+
+static char *format_matrix_core_num_error(const number_t value)
+{
+    int needed = num_sprintf(NULL, 0u, "%.6N", value);
+    char *out;
+
+    if (needed < 0)
+        return num_to_string(value);
+    out = malloc((size_t)needed + 1u);
+    if (!out)
+        return NULL;
+    if (num_sprintf(out, (size_t)needed + 1u, "%.6N", value) < 0) {
+        free(out);
+        return num_to_string(value);
+    }
+    return out;
+}
+
+static number_t matrix_core_num_error_magnitude(const number_t got,
+                                                const number_t expected)
+{
+    number_t promoted_got = num_clone(got);
+    number_t diff;
+    number_t error;
+
+    if (num_get_prec_bits(expected) > 0u)
+        num_set_prec_bits(&promoted_got, num_get_prec_bits(expected));
+    diff = num_sub(promoted_got, expected);
+    num_destroy(&promoted_got);
+
+    if (num_is_real(diff)) {
+        error = num_abs(diff);
+        num_destroy(&diff);
+        return error;
+    }
+
+    {
+        number_t real = num_real_part(diff);
+        number_t imag = num_imag_part(diff);
+        number_t mag = num_hypot(real, imag);
+
+        num_destroy(&imag);
+        num_destroy(&real);
+        num_destroy(&diff);
+        return mag;
+    }
+}
+
+static void print_matrix_core_num_comparison(const char *label,
+                                             const number_t got,
+                                             const number_t expected)
+{
+    char *expected_text = format_matrix_core_num_at_own_precision(expected);
+    char *got_text = format_matrix_core_num_at_own_precision(got);
+    number_t error = matrix_core_num_error_magnitude(got, expected);
+    char *error_text = format_matrix_core_num_error(error);
+
+    printf("    %s\n", label);
+    printf("        expected = %s\n", expected_text ? expected_text : "(unavailable)");
+    printf("        got      = %s\n", got_text ? got_text : "(unavailable)");
+    printf("        error    = %s\n", error_text ? error_text : "(unavailable)");
+    printf("        precision: %zu bits, %zu significant digits\n",
+           num_get_prec_bits(got), num_get_prec_digits(got));
+
+    free(error_text);
+    num_destroy(&error);
+    free(got_text);
+    free(expected_text);
+}
+
+static void test_number_det_and_inverse(void)
+{
+    printf(C_CYAN "TEST: determinant/inverse (number_t)\n" C_RESET);
+
+    {
+        number_t diag[2];
+        number_t det;
+        number_t got;
+        number_t expected;
+        matrix_t *A;
+        matrix_t *Ai;
+
+        diag[0] = num_create_from_long(2);
+        diag[1] = num_create_from_string("3/2");
+        A = mat_create_diagonal_num(2, diag);
+        det = num_new();
+        check_bool("mat_create_diagonal_num(exact) non-null", A != NULL);
+        check_bool("mat_det(number exact diagonal) rc = 0", A && mat_det(A, &det) == 0);
+        expected = num_create_from_long(3);
+        check_bool("mat_det(number exact diagonal) stays exact", num_eq(det, expected));
+        num_destroy(&expected);
+        num_destroy(&det);
+
+        Ai = mat_inverse(A);
+        check_bool("mat_inverse(number exact diagonal) not NULL", Ai != NULL);
+        check_bool("mat_inverse(number exact diagonal) -> MAT_TYPE_NUMBER",
+                   Ai != NULL && mat_typeof(Ai) == MAT_TYPE_NUMBER);
+
+        got = mat_get_num(Ai, 0, 0);
+        expected = num_create_from_string("1/2");
+        check_bool("inverse exact [0,0] = 1/2", num_eq(got, expected));
+        num_destroy(&expected);
+        num_destroy(&got);
+
+        got = mat_get_num(Ai, 1, 1);
+        expected = num_create_from_string("2/3");
+        check_bool("inverse exact [1,1] = 2/3", num_eq(got, expected));
+        num_destroy(&expected);
+        num_destroy(&got);
+
+        mat_free(Ai);
+        mat_free(A);
+        num_destroy(&diag[0]);
+        num_destroy(&diag[1]);
+    }
+
+    {
+        mfloat_t *a_base = mf_create_string("1.25");
+        mfloat_t *b_base = mf_create_string("2.5");
+        number_t diag[2];
+        number_t det = num_new();
+        number_t expected;
+        number_t got;
+        matrix_t *A;
+        matrix_t *Ai;
+
+        check_bool("number inverse/det mfloat base a non-null", a_base != NULL);
+        check_bool("number inverse/det mfloat base b non-null", b_base != NULL);
+        diag[0] = num_create_from_mfloat_with_prec_bits(a_base, 512u);
+        diag[1] = num_create_from_mfloat_with_prec_bits(b_base, 512u);
+        A = mat_create_diagonal_num(2, diag);
+
+        check_bool("mat_det(number mp diagonal) rc = 0", A && mat_det(A, &det) == 0);
+        expected = num_mul(diag[0], diag[1]);
+        check_bool("mat_det(number mp diagonal) matches", num_eq(det, expected));
+        check_bool("mat_det(number mp diagonal) does not lose precision",
+                   num_get_prec_bits(det) >= num_get_prec_bits(diag[0]) &&
+                   num_get_prec_bits(det) >= num_get_prec_bits(diag[1]));
+        print_matrix_core_num_comparison("det(number diagonal)", det, expected);
+        num_destroy(&expected);
+        num_destroy(&det);
+
+        Ai = mat_inverse(A);
+        check_bool("mat_inverse(number mp diagonal) not NULL", Ai != NULL);
+        check_bool("mat_inverse(number mp diagonal) -> MAT_TYPE_NUMBER",
+                   Ai != NULL && mat_typeof(Ai) == MAT_TYPE_NUMBER);
+
+        got = mat_get_num(Ai, 0, 0);
+        expected = num_inv(diag[0]);
+        check_bool("mat_inverse(number mp diagonal)[0,0] matches", num_eq(got, expected));
+        check_bool("mat_inverse(number mp diagonal)[0,0] preserves precision",
+                   num_get_prec_bits(got) == 512u);
+        print_matrix_core_num_comparison("inverse(number diagonal)[0,0]", got, expected);
+        num_destroy(&expected);
+        num_destroy(&got);
+
+        mat_free(Ai);
+        mat_free(A);
+        num_destroy(&diag[0]);
+        num_destroy(&diag[1]);
+        mf_free(a_base);
+        mf_free(b_base);
+    }
+}
+
+static void test_mixed_number_backend_matrices(void)
+{
+    printf(C_CYAN "TEST: mixed number_t backend matrices\n" C_RESET);
+
+    {
+        mfloat_t *real_base = mf_create_string("1.25");
+        mcomplex_t *complex_base = mc_create_string("1 + 2i");
+        number_t vals[4];
+        number_t doubled_expected;
+        number_t got;
+        matrix_t *A;
+        matrix_t *B;
+
+        check_bool("mixed number matrix real base non-null", real_base != NULL);
+        check_bool("mixed number matrix complex base non-null", complex_base != NULL);
+
+        vals[0] = num_create_from_long(2);
+        vals[1] = num_create_from_string("1/3");
+        vals[2] = num_create_from_mfloat_with_prec_bits(real_base, 512u);
+        vals[3] = num_create_from_mcomplex_with_prec_bits(complex_base, 384u);
+
+        A = mat_create_num(2, 2, vals);
+        check_bool("mixed number matrix create non-null", A != NULL);
+        check_bool("mixed number matrix type", A != NULL && mat_typeof(A) == MAT_TYPE_NUMBER);
+
+        got = mat_get_num(A, 0, 0);
+        check_bool("mixed number matrix integer entry", num_eq(got, vals[0]));
+        num_destroy(&got);
+
+        got = mat_get_num(A, 0, 1);
+        check_bool("mixed number matrix rational entry", num_eq(got, vals[1]));
+        num_destroy(&got);
+
+        got = mat_get_num(A, 1, 0);
+        check_bool("mixed number matrix mfloat entry", num_eq(got, vals[2]));
+        check_bool("mixed number matrix mfloat precision", num_get_prec_bits(got) == 512u);
+        num_destroy(&got);
+
+        got = mat_get_num(A, 1, 1);
+        check_bool("mixed number matrix mcomplex entry", num_eq(got, vals[3]));
+        check_bool("mixed number matrix mcomplex precision", num_get_prec_bits(got) == 384u);
+        num_destroy(&got);
+
+        B = mat_add(A, A);
+        check_bool("mixed number matrix add non-null", B != NULL);
+        check_bool("mixed number matrix add type", B != NULL && mat_typeof(B) == MAT_TYPE_NUMBER);
+
+        got = mat_get_num(B, 0, 0);
+        doubled_expected = num_add(vals[0], vals[0]);
+        check_bool("mixed number add integer entry", num_eq(got, doubled_expected));
+        num_destroy(&doubled_expected);
+        num_destroy(&got);
+
+        got = mat_get_num(B, 0, 1);
+        doubled_expected = num_add(vals[1], vals[1]);
+        check_bool("mixed number add rational entry", num_eq(got, doubled_expected));
+        num_destroy(&doubled_expected);
+        num_destroy(&got);
+
+        got = mat_get_num(B, 1, 0);
+        doubled_expected = num_add(vals[2], vals[2]);
+        check_bool("mixed number add mfloat entry", num_eq(got, doubled_expected));
+        check_bool("mixed number add mfloat precision does not shrink",
+                   num_get_prec_bits(got) >= num_get_prec_bits(vals[2]));
+        print_matrix_core_num_comparison("mixed add [1,0]", got, doubled_expected);
+        num_destroy(&doubled_expected);
+        num_destroy(&got);
+
+        got = mat_get_num(B, 1, 1);
+        doubled_expected = num_add(vals[3], vals[3]);
+        check_bool("mixed number add mcomplex entry", num_eq(got, doubled_expected));
+        check_bool("mixed number add mcomplex precision does not shrink",
+                   num_get_prec_bits(got) >= num_get_prec_bits(vals[3]));
+        print_matrix_core_num_comparison("mixed add [1,1]", got, doubled_expected);
+        num_destroy(&doubled_expected);
+        num_destroy(&got);
+
+        mat_free(B);
+        mat_free(A);
+        for (size_t i = 0; i < 4u; ++i)
+            num_destroy(&vals[i]);
+        mf_free(real_base);
+        mc_free(complex_base);
+    }
+
+    {
+        mfloat_t *real_base = mf_create_string("1.25");
+        mcomplex_t *complex_base = mc_create_string("1 + 2i");
+        number_t diag[4];
+        number_t det = num_new();
+        number_t expected;
+        number_t got;
+        matrix_t *A;
+        matrix_t *Ai;
+
+        check_bool("mixed diagonal real base non-null", real_base != NULL);
+        check_bool("mixed diagonal complex base non-null", complex_base != NULL);
+
+        diag[0] = num_create_from_long(2);
+        diag[1] = num_create_from_string("1/3");
+        diag[2] = num_create_from_mfloat_with_prec_bits(real_base, 512u);
+        diag[3] = num_create_from_mcomplex_with_prec_bits(complex_base, 384u);
+
+        A = mat_create_diagonal_num(4, diag);
+        check_bool("mixed diagonal create non-null", A != NULL);
+
+        check_bool("mixed diagonal det rc = 0", A && mat_det(A, &det) == 0);
+        expected = num_mul(num_mul(diag[0], diag[1]), num_mul(diag[2], diag[3]));
+        check_bool("mixed diagonal det matches", num_eq(det, expected));
+        check_bool("mixed diagonal det precision does not shrink",
+                   num_get_prec_bits(det) >= num_get_prec_bits(diag[2]) &&
+                   num_get_prec_bits(det) >= num_get_prec_bits(diag[3]));
+        print_matrix_core_num_comparison("mixed det(diagonal)", det, expected);
+        num_destroy(&expected);
+        num_destroy(&det);
+
+        Ai = mat_inverse(A);
+        check_bool("mixed diagonal inverse non-null", Ai != NULL);
+        check_bool("mixed diagonal inverse type", Ai != NULL && mat_typeof(Ai) == MAT_TYPE_NUMBER);
+
+        got = mat_get_num(Ai, 1, 1);
+        expected = num_inv(diag[1]);
+        check_bool("mixed diagonal inverse rational entry", num_eq(got, expected));
+        num_destroy(&expected);
+        num_destroy(&got);
+
+        got = mat_get_num(Ai, 2, 2);
+        expected = num_inv(diag[2]);
+        check_bool("mixed diagonal inverse mfloat entry", num_eq(got, expected));
+        check_bool("mixed diagonal inverse mfloat precision", num_get_prec_bits(got) == 512u);
+        print_matrix_core_num_comparison("mixed inverse [2,2]", got, expected);
+        num_destroy(&expected);
+        num_destroy(&got);
+
+        got = mat_get_num(Ai, 3, 3);
+        expected = num_inv(diag[3]);
+        check_bool("mixed diagonal inverse mcomplex entry", num_eq(got, expected));
+        check_bool("mixed diagonal inverse mcomplex precision", num_get_prec_bits(got) >= 384u);
+        print_matrix_core_num_comparison("mixed inverse [3,3]", got, expected);
+        num_destroy(&expected);
+        num_destroy(&got);
+
+        mat_free(Ai);
+        mat_free(A);
+        for (size_t i = 0; i < 4u; ++i)
+            num_destroy(&diag[i]);
+        mf_free(real_base);
+        mc_free(complex_base);
     }
 }
 
@@ -418,6 +952,153 @@ static void test_identity_set(void)
     check_d("diagonal preserved", vals[4], 1.0, 1e-30);
 
     mat_free(I);
+}
+
+static void test_owned_element_reads_and_transforms(void)
+{
+    printf(C_CYAN "TEST: owned element reads and transforms\n" C_RESET);
+
+    number_t x0 = num_create_from_double(2.0);
+    dval_t *x = dv_new_named_var_num(x0, "x");
+    dval_t *one = DV_ONE;
+    dval_t *owned_x = NULL;
+    dval_t *owned_one = NULL;
+    matrix_t *A = mat_new_dv(1, 2);
+    matrix_t *T = NULL;
+    dval_t *t_entry = NULL;
+
+    num_destroy(&x0);
+
+    check_bool("mat_new_dv owned-read source non-null", A != NULL);
+    if (!A || !x)
+        goto cleanup;
+
+    mat_set(A, 0, 0, &x);
+    mat_set(A, 0, 1, &one);
+
+    mat_value_init_zero(A, &owned_x);
+    mat_value_init_zero(A, &owned_one);
+
+    mat_get_owned(A, 0, 0, &owned_x);
+    mat_get_owned(A, 0, 1, &owned_one);
+
+    check_bool("mat_get_owned dval variable non-null", owned_x != NULL);
+    check_bool("mat_get_owned dval constant non-null", owned_one != NULL);
+    check_d("owned x read evaluates", dv_eval_d(owned_x), 2.0, 1e-30);
+    check_d("owned one read evaluates", dv_eval_d(owned_one), 1.0, 1e-30);
+
+    dv_free(owned_x);
+    owned_x = NULL;
+    dv_free(owned_one);
+    owned_one = NULL;
+
+    test_dv_set_val_d(x, 4.5);
+    {
+        dval_t *entry = NULL;
+        mat_get(A, 0, 0, &entry);
+        check_d("matrix entry survives owned read destruction", dv_eval_d(entry), 4.5, 1e-30);
+    }
+
+    T = mat_transpose(A);
+    check_bool("mat_transpose(dval owned-read source) non-null", T != NULL);
+    mat_free(A);
+    A = NULL;
+
+    if (!T)
+        goto cleanup;
+
+    mat_get(T, 0, 0, &t_entry);
+    check_bool("transposed dval entry non-null", t_entry != NULL);
+    check_d("transposed dval entry tracks x after source free", dv_eval_d(t_entry), 4.5, 1e-30);
+
+cleanup:
+    if (owned_x)
+        dv_free(owned_x);
+    if (owned_one)
+        dv_free(owned_one);
+    mat_value_destroy(A ? A : T, &owned_x);
+    mat_value_destroy(A ? A : T, &owned_one);
+    mat_free(T);
+    mat_free(A);
+    dv_free(x);
+}
+
+static void test_dval_storage_lifecycle_regressions(void)
+{
+    printf(C_CYAN "TEST: dval storage lifecycle regressions\n" C_RESET);
+
+    {
+        matrix_t *A = mat_new_dv(2, 2);
+        dval_t *x = test_dv_new_named_var_d(2.0, "x");
+        dval_t *entry = NULL;
+
+        check_bool("mat_new_dv dense non-null", A != NULL);
+        if (A) {
+            mat_set(A, 0, 0, &x);
+            mat_get(A, 0, 0, &entry);
+            check_d("dense dval slot stores x", dv_eval_d(entry), 2.0, 1e-12);
+
+            test_dv_set_val_d(x, 3.5);
+            check_d("dense dval slot tracks x", dv_eval_d(entry), 3.5, 1e-12);
+        }
+
+        mat_free(A);
+        dv_free(x);
+    }
+
+    {
+        dval_t *diag_vals[2];
+        matrix_t *D;
+        dval_t *x = test_dv_new_named_var_d(4.0, "x");
+        dval_t *y = test_dv_new_named_var_d(5.0, "y");
+        dval_t *one = test_dv_new_const_d(1.0);
+        dval_t *entry = NULL;
+
+        diag_vals[0] = x;
+        diag_vals[1] = y;
+        D = mat_create_diagonal_dv(2, diag_vals);
+
+        check_bool("mat_create_diagonal_dv non-null", D != NULL);
+        if (D) {
+            mat_set(D, 0, 1, &one);
+
+            mat_get(D, 0, 0, &entry);
+            check_d("diagonal materialise preserves [0,0]", dv_eval_d(entry), 4.0, 1e-12);
+            mat_get(D, 1, 1, &entry);
+            check_d("diagonal materialise preserves [1,1]", dv_eval_d(entry), 5.0, 1e-12);
+            mat_get(D, 0, 1, &entry);
+            check_d("diagonal materialise sets off-diagonal", dv_eval_d(entry), 1.0, 1e-12);
+        }
+
+        mat_free(D);
+        dv_free(x);
+        dv_free(y);
+        dv_free(one);
+    }
+
+    {
+        matrix_t *I = mat_create_identity_dv(2);
+        dval_t *x = test_dv_new_named_var_d(6.0, "x");
+        dval_t *entry = NULL;
+
+        check_bool("mat_create_identity_dv non-null", I != NULL);
+        if (I) {
+            mat_set(I, 0, 1, &x);
+
+            mat_get(I, 0, 0, &entry);
+            check_d("identity materialise preserves [0,0]", dv_eval_d(entry), 1.0, 1e-12);
+            mat_get(I, 1, 1, &entry);
+            check_d("identity materialise preserves [1,1]", dv_eval_d(entry), 1.0, 1e-12);
+            mat_get(I, 0, 1, &entry);
+            check_d("identity materialise sets off-diagonal", dv_eval_d(entry), 6.0, 1e-12);
+
+            test_dv_set_val_d(x, 8.0);
+            check_d("identity materialise tracks x", dv_eval_d(entry), 8.0, 1e-12);
+        }
+
+        mat_free(I);
+        dv_free(x);
+    }
 }
 
 static void test_sparse_support(void)
@@ -3034,6 +3715,55 @@ static void test_evaluate_bridge(void)
     }
 
     {
+        dval_t *x = test_dv_new_named_var_d(2.0, "x");
+        dval_t *y = test_dv_new_named_var_d(3.0, "y");
+        dval_t *one = test_dv_new_const_d(1.0);
+        dval_t *xy = dv_mul(x, y);
+        number_t two = num_create_from_long(2);
+        number_t six = num_create_from_long(6);
+        dval_t *vals[4] = {
+            x,  one,
+            xy, y
+        };
+        matrix_t *A = mat_create_dv(2, 2, vals);
+        matrix_t *N = mat_evaluate_num(A);
+        number_t got;
+
+        check_bool("mat_evaluate_num(dval) not NULL", N != NULL);
+        check_bool("mat_evaluate_num(dval) -> MAT_TYPE_NUMBER",
+                   N != NULL && mat_typeof(N) == MAT_TYPE_NUMBER);
+        if (N) {
+            got = mat_get_num(N, 0, 0);
+            check_bool("mat_evaluate_num(dval)[0,0] = x", num_eq(got, two));
+            num_destroy(&got);
+
+            got = mat_get_num(N, 1, 0);
+            check_bool("mat_evaluate_num(dval)[1,0] = x*y", num_eq(got, six));
+            num_destroy(&got);
+
+            test_dv_set_val_d(x, 5.0);
+            test_dv_set_val_d(y, 7.0);
+
+            got = mat_get_num(N, 0, 0);
+            check_bool("mat_evaluate_num(dval) snapshot stays at old x", num_eq(got, two));
+            num_destroy(&got);
+
+            got = mat_get_num(N, 1, 0);
+            check_bool("mat_evaluate_num(dval) snapshot stays at old x*y", num_eq(got, six));
+            num_destroy(&got);
+        }
+
+        mat_free(N);
+        mat_free(A);
+        num_destroy(&six);
+        num_destroy(&two);
+        dv_free(x);
+        dv_free(y);
+        dv_free(one);
+        dv_free(xy);
+    }
+
+    {
         dval_t *a = test_dv_new_named_var_d(4.0, "a");
         dval_t *b = test_dv_new_named_var_d(5.0, "b");
         dval_t *vals[4] = {
@@ -3075,6 +3805,40 @@ static void test_evaluate_bridge(void)
         mat_free(T);
         dv_free(a);
         dv_free(b);
+    }
+
+    {
+        number_t vals[4] = {
+            num_create_from_long(1),
+            num_create_from_long(2),
+            num_create_from_string("3.125"),
+            num_create_from_mfloat_with_prec_bits(MF_PI, 512)
+        };
+        matrix_t *A = mat_create_num(2, 2, vals);
+        matrix_t *N = mat_evaluate_num(A);
+        number_t got;
+
+        check_bool("mat_evaluate_num(number) not NULL", N != NULL);
+        check_bool("mat_evaluate_num(number) -> MAT_TYPE_NUMBER",
+                   N != NULL && mat_typeof(N) == MAT_TYPE_NUMBER);
+        if (N) {
+            got = mat_get_num(N, 1, 1);
+            check_bool("mat_evaluate_num(number) preserves multiprecision value",
+                       num_eq(got, vals[3]));
+            check_bool("mat_evaluate_num(number) preserves precision bits",
+                       num_get_prec_bits(got) == 512);
+            num_destroy(&got);
+
+            got = mat_get_num(N, 0, 1);
+            check_bool("mat_evaluate_num(number) copies ordinary entries",
+                       num_eq(got, vals[1]));
+            num_destroy(&got);
+        }
+
+        mat_free(N);
+        mat_free(A);
+        for (size_t i = 0; i < 4; ++i)
+            num_destroy(&vals[i]);
     }
 }
 
@@ -5547,6 +6311,11 @@ void run_matrix_core_tests(void)
     RUN_TEST_CASE(test_creation);
     RUN_TEST_CASE(test_reading);
     RUN_TEST_CASE(test_writing);
+    RUN_TEST_CASE(test_number_creation_and_readback);
+    RUN_TEST_CASE(test_number_special_constructors);
+    RUN_TEST_CASE(test_number_matrix_arithmetic);
+    RUN_TEST_CASE(test_number_det_and_inverse);
+    RUN_TEST_CASE(test_mixed_number_backend_matrices);
     RUN_TEST_CASE(test_dval_multiply);
     RUN_TEST_CASE(test_dval_symbolic_printing);
     RUN_TEST_CASE(test_add_sub);
@@ -5554,6 +6323,8 @@ void run_matrix_core_tests(void)
     RUN_TEST_CASE(test_transpose_conjugate);
     RUN_TEST_CASE(test_identity_get);
     RUN_TEST_CASE(test_identity_set);
+    RUN_TEST_CASE(test_dval_storage_lifecycle_regressions);
+    RUN_TEST_CASE(test_owned_element_reads_and_transforms);
     RUN_TEST_CASE(test_sparse_support);
     RUN_TEST_CASE(test_structural_queries_and_diagonal_construction);
     RUN_TEST_CASE(test_layout_policy_regressions);

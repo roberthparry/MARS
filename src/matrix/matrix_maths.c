@@ -22,11 +22,14 @@ static mat_fun_cache_entry_t *mat_fun_cache_head = NULL;
 
 static matrix_t *mat_fun_apply(const matrix_t *A,
                                void (*qcomplex_f)(void *out, const void *a),
-                               void (*dval_f)(void *out, const void *a));
+                               void (*dval_f)(void *out, const void *a),
+                               void (*native_f)(void *out, const void *a));
 static matrix_t *mat_fun_dval_structured(const matrix_t *A,
                                          void (*scalar_f)(void *out, const void *in));
 static matrix_t *mat_apply_unary_via_qc_eval(const matrix_t *A,
                                              matrix_t *(*fun)(const matrix_t *));
+static matrix_t *mat_fun_elementwise_same_type(const matrix_t *A,
+                                               void (*scalar_f)(void *out, const void *in));
 static matrix_t *mat_fun_dval_uniform_diag_offdiag(const matrix_t *A,
                                                    void (*scalar_f)(void *out, const void *in));
 static matrix_t *mat_fun_dval_scalar_plus_rank_one(const matrix_t *A,
@@ -38,12 +41,24 @@ static int dval_fun_coeffs_up_to_second(dval_t **c0,
                                         dval_t **c2,
                                         void (*scalar_f)(void *out, const void *in),
                                         dval_t *lambda);
+static matrix_t *mat_exp_number_triangular_equal_diag(const matrix_t *A);
+static matrix_t *mat_log_number_triangular_equal_diag(const matrix_t *A);
+static matrix_t *mat_sqrt_number_triangular_equal_diag(const matrix_t *A);
+static matrix_t *mat_sin_number_triangular_equal_diag(const matrix_t *A);
+static matrix_t *mat_cos_number_triangular_equal_diag(const matrix_t *A);
+static matrix_t *mat_tan_number_triangular_equal_diag(const matrix_t *A);
+static matrix_t *mat_sinh_number_triangular_equal_diag(const matrix_t *A);
+static matrix_t *mat_cosh_number_triangular_equal_diag(const matrix_t *A);
+static matrix_t *mat_tanh_number_triangular_equal_diag(const matrix_t *A);
+static matrix_t *mat_asinh_number_triangular_equal_diag(const matrix_t *A);
+static matrix_t *mat_atanh_number_triangular_equal_diag(const matrix_t *A);
 
 static matrix_t *mat_apply_unary(const matrix_t *A,
                                  void (*qcomplex_f)(void *out, const void *a),
-                                 void (*dval_f)(void *out, const void *a))
+                                 void (*dval_f)(void *out, const void *a),
+                                 void (*native_f)(void *out, const void *a))
 {
-    return mat_fun_apply(A, qcomplex_f, dval_elem.fun ? dval_f : NULL);
+    return mat_fun_apply(A, qcomplex_f, dval_elem.fun ? dval_f : NULL, native_f);
 }
 
 static matrix_t *mat_apply_unary_via_qc_eval(const matrix_t *A,
@@ -67,6 +82,43 @@ static matrix_t *mat_apply_unary_via_qc_eval(const matrix_t *A,
 static int mat_elem_supports_numeric_algorithms(const matrix_t *A)
 {
     return A && A->elem && A->elem->kind != ELEM_DVAL;
+}
+
+static matrix_t *mat_fun_elementwise_same_type(const matrix_t *A,
+                                               void (*scalar_f)(void *out, const void *in))
+{
+    const struct elem_vtable *elem;
+    matrix_t *R;
+    unsigned char in_raw[64];
+    unsigned char out_raw[64];
+
+    if (!A || !scalar_f)
+        return NULL;
+
+    elem = A->elem;
+    if (!elem)
+        return NULL;
+
+    R = mat_create_elementwise_unary_result(A->rows, A->cols, elem, A);
+    if (!R)
+        return NULL;
+
+    mat_value_init_zero(A, in_raw);
+    mat_value_init_zero(R, out_raw);
+
+    for (size_t i = 0; i < A->rows; ++i) {
+        mat_value_destroy(A, in_raw);
+        mat_value_destroy(R, out_raw);
+        mat_value_init_zero(A, in_raw);
+        mat_value_init_zero(R, out_raw);
+        mat_get_owned(A, i, i, in_raw);
+        scalar_f(out_raw, in_raw);
+        mat_set(R, i, i, out_raw);
+    }
+
+    mat_value_destroy(A, in_raw);
+    mat_value_destroy(R, out_raw);
+    return R;
 }
 
 static dval_t *dval_simplify_owned_local(dval_t *dv)
@@ -217,6 +269,485 @@ static dval_t *dval_mul_or_zero_owned_local(const dval_t *a, const dval_t *b)
     dv_retain((dval_t *)a);
     dv_retain((dval_t *)b);
     return dval_mul_simplify_local((dval_t *)a, (dval_t *)b);
+}
+
+static bool mat_number_diagonal_equal_local(const matrix_t *A)
+{
+    number_t diag0;
+    bool equal = true;
+
+    if (!A || A->rows != A->cols || A->rows == 0 || A->elem != &number_elem)
+        return false;
+
+    diag0 = mat_get_num(A, 0, 0);
+    for (size_t i = 1; i < A->rows; ++i) {
+        number_t diag_i = mat_get_num(A, i, i);
+        if (!num_eq(diag_i, diag0))
+            equal = false;
+        num_destroy(&diag_i);
+        if (!equal)
+            break;
+    }
+    num_destroy(&diag0);
+    return equal;
+}
+
+static matrix_t *mat_number_strict_triangular_copy(const matrix_t *A, bool upper)
+{
+    size_t n;
+    matrix_t *N;
+
+    if (!A || A->rows != A->cols || A->elem != &number_elem)
+        return NULL;
+
+    n = A->rows;
+    N = upper ? mat_create_upper_triangular_with_elem(n, n, &number_elem)
+              : mat_create_lower_triangular_with_elem(n, n, &number_elem);
+    if (!N)
+        return NULL;
+
+    for (size_t i = 0; i < n; ++i) {
+        for (size_t j = 0; j < n; ++j) {
+            bool active = upper ? (j > i) : (i > j);
+            number_t value;
+
+            if (!active)
+                continue;
+
+            value = mat_get_num(A, i, j);
+            mat_set(N, i, j, &value);
+            num_destroy(&value);
+        }
+    }
+
+    return N;
+}
+
+static matrix_t *mat_number_triangular_mul(const matrix_t *A,
+                                           const matrix_t *B,
+                                           bool upper)
+{
+    size_t n;
+    matrix_t *C;
+
+    if (!A || !B || A->rows != A->cols || B->rows != B->cols ||
+        A->rows != B->rows || A->elem != &number_elem || B->elem != &number_elem)
+        return NULL;
+
+    n = A->rows;
+    C = upper ? mat_create_upper_triangular_with_elem(n, n, &number_elem)
+              : mat_create_lower_triangular_with_elem(n, n, &number_elem);
+    if (!C)
+        return NULL;
+
+    for (size_t i = 0; i < n; ++i) {
+        for (size_t j = 0; j < n; ++j) {
+            bool active = upper ? (j > i) : (i > j);
+            number_t sum;
+            size_t k_begin;
+            size_t k_end;
+
+            if (!active)
+                continue;
+
+            sum = num_clone(NUM_ZERO);
+            k_begin = upper ? i + 1u : j;
+            k_end = upper ? j + 1u : i + 1u;
+
+            for (size_t k = k_begin; k < k_end; ++k) {
+                number_t aik = mat_get_num(A, i, k);
+                number_t bkj = mat_get_num(B, k, j);
+                number_t prod = num_mul(aik, bkj);
+                number_t next = num_add(sum, prod);
+
+                num_destroy(&prod);
+                num_destroy(&bkj);
+                num_destroy(&aik);
+                num_destroy(&sum);
+                sum = next;
+            }
+
+            if (!num_eq(sum, NUM_ZERO)) {
+                mat_set(C, i, j, &sum);
+            }
+            num_destroy(&sum);
+        }
+    }
+
+    return C;
+}
+
+static int mat_number_add_scaled_triangular(matrix_t *F,
+                                            const matrix_t *Npower,
+                                            const number_t coeff,
+                                            bool upper)
+{
+    size_t n;
+
+    if (!F || !Npower || F->rows != F->cols || Npower->rows != Npower->cols ||
+        F->rows != Npower->rows || F->elem != &number_elem || Npower->elem != &number_elem)
+        return -1;
+
+    n = F->rows;
+    for (size_t i = 0; i < n; ++i) {
+        for (size_t j = 0; j < n; ++j) {
+            bool active = upper ? (j > i) : (i > j);
+            number_t np_ij;
+            number_t term;
+            number_t fij;
+            number_t sum;
+
+            if (!active)
+                continue;
+
+            np_ij = mat_get_num(Npower, i, j);
+            if (num_eq(np_ij, NUM_ZERO)) {
+                num_destroy(&np_ij);
+                continue;
+            }
+
+            term = num_mul(coeff, np_ij);
+            num_destroy(&np_ij);
+            fij = mat_get_num(F, i, j);
+            sum = num_add(fij, term);
+            num_destroy(&fij);
+            num_destroy(&term);
+            mat_set(F, i, j, &sum);
+            num_destroy(&sum);
+        }
+    }
+
+    return 0;
+}
+
+static matrix_t *mat_exp_number_triangular_equal_diag_upper(const matrix_t *T)
+{
+    size_t n;
+    matrix_t *F = NULL;
+    matrix_t *N = NULL;
+    matrix_t *Npower = NULL;
+    number_t lambda;
+    number_t coeff0;
+
+    if (!T || T->rows != T->cols || T->elem != &number_elem || !mat_is_upper_triangular(T))
+        return NULL;
+
+    n = T->rows;
+    if (n == 0)
+        return mat_copy_preserving_store(T);
+
+    lambda = mat_get_num(T, 0, 0);
+    coeff0 = num_exp(lambda);
+    num_destroy(&lambda);
+
+    F = mat_create_upper_triangular_with_elem(n, n, &number_elem);
+    N = mat_number_strict_triangular_copy(T, true);
+    if (!F || !N) {
+        mat_free(F);
+        mat_free(N);
+        num_destroy(&coeff0);
+        return NULL;
+    }
+
+    for (size_t i = 0; i < n; ++i)
+        mat_set(F, i, i, &coeff0);
+
+    Npower = N;
+    for (size_t k = 1; k < n; ++k) {
+        number_t k_num = num_create_from_long((long)k);
+        number_t coeff = num_div(coeff0, k_num);
+
+        for (size_t d = 1; d < k; ++d) {
+            number_t d_num = num_create_from_long((long)d);
+            number_t next = num_div(coeff, d_num);
+            num_destroy(&coeff);
+            num_destroy(&d_num);
+            coeff = next;
+        }
+
+        if (mat_number_add_scaled_triangular(F, Npower, coeff, true) != 0) {
+            num_destroy(&coeff);
+            num_destroy(&k_num);
+            mat_free(Npower);
+            mat_free(F);
+            num_destroy(&coeff0);
+            return NULL;
+        }
+
+        num_destroy(&coeff);
+        num_destroy(&k_num);
+
+        if (k + 1u < n) {
+            matrix_t *next = mat_number_triangular_mul(Npower, N, true);
+            mat_free(Npower);
+            Npower = next;
+            if (!Npower) {
+                mat_free(F);
+                mat_free(N);
+                num_destroy(&coeff0);
+                return NULL;
+            }
+        }
+    }
+
+    mat_free(Npower);
+    if (Npower != N)
+        mat_free(N);
+    num_destroy(&coeff0);
+    return F;
+}
+
+static matrix_t *mat_exp_number_triangular_equal_diag(const matrix_t *A)
+{
+    matrix_t *T = NULL;
+    matrix_t *FT = NULL;
+    matrix_t *out = NULL;
+
+    if (!A || A->rows != A->cols || A->elem != &number_elem || !mat_number_diagonal_equal_local(A))
+        return NULL;
+
+    if (mat_is_upper_triangular(A))
+        return mat_exp_number_triangular_equal_diag_upper(A);
+    if (!mat_is_lower_triangular(A))
+        return NULL;
+
+    T = mat_transpose(A);
+    if (!T)
+        return NULL;
+    FT = mat_exp_number_triangular_equal_diag_upper(T);
+    out = FT ? mat_transpose(FT) : NULL;
+    mat_free(T);
+    mat_free(FT);
+    return out;
+}
+
+static matrix_t *mat_number_series_from_scaled_strict_triangular(
+    const matrix_t *A,
+    bool upper,
+    number_t diag_value,
+    number_t scaled_coeff0,
+    number_t (*next_coeff)(const number_t prev_coeff, size_t k, void *ctx),
+    void *ctx)
+{
+    size_t n;
+    matrix_t *F = NULL;
+    matrix_t *S = NULL;
+    matrix_t *Spower = NULL;
+
+    if (!A || A->rows != A->cols || A->elem != &number_elem || !next_coeff)
+        return NULL;
+
+    n = A->rows;
+    F = upper ? mat_create_upper_triangular_with_elem(n, n, &number_elem)
+              : mat_create_lower_triangular_with_elem(n, n, &number_elem);
+    S = mat_number_strict_triangular_copy(A, upper);
+    if (!F || !S) {
+        mat_free(F);
+        mat_free(S);
+        return NULL;
+    }
+
+    for (size_t i = 0; i < n; ++i)
+        mat_set(F, i, i, &diag_value);
+
+    if (n == 0) {
+        mat_free(S);
+        return F;
+    }
+
+    Spower = S;
+    {
+        number_t coeff = num_clone(scaled_coeff0);
+
+        for (size_t k = 1; k < n; ++k) {
+            if (mat_number_add_scaled_triangular(F, Spower, coeff, upper) != 0) {
+                num_destroy(&coeff);
+                mat_free(Spower);
+                if (Spower != S)
+                    mat_free(S);
+                mat_free(F);
+                return NULL;
+            }
+
+            if (k + 1u < n) {
+                matrix_t *next = mat_number_triangular_mul(Spower, S, upper);
+                number_t next_coeff_value = next_coeff(coeff, k + 1u, ctx);
+
+                num_destroy(&coeff);
+                coeff = next_coeff_value;
+                mat_free(Spower);
+                Spower = next;
+                if (!Spower) {
+                    num_destroy(&coeff);
+                    if (Spower != S)
+                        mat_free(S);
+                    mat_free(F);
+                    return NULL;
+                }
+            } else {
+                num_destroy(&coeff);
+            }
+        }
+    }
+
+    mat_free(Spower);
+    if (Spower != S)
+        mat_free(S);
+    return F;
+}
+
+typedef struct mat_number_log_series_ctx {
+    number_t neg_one;
+} mat_number_log_series_ctx_t;
+
+static number_t mat_number_log_next_coeff(const number_t prev_coeff, size_t k, void *ctx_void)
+{
+    mat_number_log_series_ctx_t *ctx = (mat_number_log_series_ctx_t *)ctx_void;
+    number_t ratio_num = num_create_from_long((long)(k - 1u));
+    number_t ratio_den = num_create_from_long((long)k);
+    number_t ratio = num_div(ratio_num, ratio_den);
+    number_t signed_ratio = num_mul(ctx->neg_one, ratio);
+    number_t next = num_mul(prev_coeff, signed_ratio);
+
+    num_destroy(&signed_ratio);
+    num_destroy(&ratio);
+    num_destroy(&ratio_den);
+    num_destroy(&ratio_num);
+    return next;
+}
+
+static matrix_t *mat_log_number_triangular_equal_diag_upper(const matrix_t *A)
+{
+    number_t lambda;
+    number_t diag_value;
+    number_t inv_lambda;
+    mat_number_log_series_ctx_t ctx;
+    matrix_t *out;
+
+    if (!A || A->rows != A->cols || A->elem != &number_elem || !mat_is_upper_triangular(A))
+        return NULL;
+
+    lambda = mat_get_num(A, 0, 0);
+    if (num_eq(lambda, NUM_ZERO)) {
+        num_destroy(&lambda);
+        return NULL;
+    }
+
+    diag_value = num_log(lambda);
+    inv_lambda = num_inv(lambda);
+    ctx.neg_one = num_create_from_long(-1);
+    out = mat_number_series_from_scaled_strict_triangular(A, true, diag_value, inv_lambda,
+                                                          mat_number_log_next_coeff, &ctx);
+    num_destroy(&ctx.neg_one);
+    num_destroy(&inv_lambda);
+    num_destroy(&diag_value);
+    num_destroy(&lambda);
+    return out;
+}
+
+static matrix_t *mat_log_number_triangular_equal_diag(const matrix_t *A)
+{
+    matrix_t *T = NULL;
+    matrix_t *FT = NULL;
+    matrix_t *out = NULL;
+
+    if (!A || A->rows != A->cols || A->elem != &number_elem || !mat_number_diagonal_equal_local(A))
+        return NULL;
+
+    if (mat_is_upper_triangular(A))
+        return mat_log_number_triangular_equal_diag_upper(A);
+    if (!mat_is_lower_triangular(A))
+        return NULL;
+
+    T = mat_transpose(A);
+    if (!T)
+        return NULL;
+    FT = mat_log_number_triangular_equal_diag_upper(T);
+    out = FT ? mat_transpose(FT) : NULL;
+    mat_free(T);
+    mat_free(FT);
+    return out;
+}
+
+typedef struct mat_number_sqrt_series_ctx {
+    number_t alpha;
+} mat_number_sqrt_series_ctx_t;
+
+static number_t mat_number_sqrt_next_coeff(const number_t prev_coeff, size_t k, void *ctx_void)
+{
+    mat_number_sqrt_series_ctx_t *ctx = (mat_number_sqrt_series_ctx_t *)ctx_void;
+    number_t km1 = num_create_from_long((long)(k - 1u));
+    number_t diff = num_sub(ctx->alpha, km1);
+    number_t k_num = num_create_from_long((long)k);
+    number_t ratio = num_div(diff, k_num);
+    number_t next = num_mul(prev_coeff, ratio);
+
+    num_destroy(&ratio);
+    num_destroy(&k_num);
+    num_destroy(&diff);
+    num_destroy(&km1);
+    return next;
+}
+
+static matrix_t *mat_sqrt_number_triangular_equal_diag_upper(const matrix_t *A)
+{
+    number_t lambda;
+    number_t diag_value;
+    number_t inv_lambda;
+    number_t coeff0;
+    mat_number_sqrt_series_ctx_t ctx;
+    matrix_t *out;
+
+    if (!A || A->rows != A->cols || A->elem != &number_elem || !mat_is_upper_triangular(A))
+        return NULL;
+
+    lambda = mat_get_num(A, 0, 0);
+    if (num_eq(lambda, NUM_ZERO)) {
+        num_destroy(&lambda);
+        return NULL;
+    }
+
+    diag_value = num_sqrt(lambda);
+    inv_lambda = num_inv(lambda);
+    ctx.alpha = num_create_from_string("1/2");
+    coeff0 = num_mul(diag_value, inv_lambda);
+    {
+        number_t seeded = num_mul(coeff0, ctx.alpha);
+        num_destroy(&coeff0);
+        coeff0 = seeded;
+    }
+    out = mat_number_series_from_scaled_strict_triangular(A, true, diag_value, coeff0,
+                                                          mat_number_sqrt_next_coeff, &ctx);
+    num_destroy(&ctx.alpha);
+    num_destroy(&coeff0);
+    num_destroy(&inv_lambda);
+    num_destroy(&diag_value);
+    num_destroy(&lambda);
+    return out;
+}
+
+static matrix_t *mat_sqrt_number_triangular_equal_diag(const matrix_t *A)
+{
+    matrix_t *T = NULL;
+    matrix_t *FT = NULL;
+    matrix_t *out = NULL;
+
+    if (!A || A->rows != A->cols || A->elem != &number_elem || !mat_number_diagonal_equal_local(A))
+        return NULL;
+
+    if (mat_is_upper_triangular(A))
+        return mat_sqrt_number_triangular_equal_diag_upper(A);
+    if (!mat_is_lower_triangular(A))
+        return NULL;
+
+    T = mat_transpose(A);
+    if (!T)
+        return NULL;
+    FT = mat_sqrt_number_triangular_equal_diag_upper(T);
+    out = FT ? mat_transpose(FT) : NULL;
+    mat_free(T);
+    mat_free(FT);
+    return out;
 }
 
 static int dval_fun_coeffs_up_to_second(dval_t **c0,
@@ -412,6 +943,194 @@ static matrix_t *mat_fun_triangular_equal_diag_dval(const matrix_t *T,
     dv_free(c2);
     mat_free(N);
     return F;
+}
+
+static matrix_t *mat_sinh_number_triangular_equal_diag(const matrix_t *A)
+{
+    matrix_t *negA = NULL, *Epos = NULL, *Eneg = NULL, *diff = NULL, *R = NULL;
+    number_t minus_one = num_create_from_long(-1);
+    number_t half = num_create_from_string("1/2");
+
+    negA = mat_scalar_mul_num((matrix_t *)A, &minus_one);
+    Epos = mat_exp(A);
+    Eneg = mat_exp(negA);
+    diff = mat_sub(Epos, Eneg);
+    if (diff)
+        R = mat_scalar_mul_num(diff, &half);
+
+    num_destroy(&minus_one);
+    num_destroy(&half);
+    mat_free(negA);
+    mat_free(Epos);
+    mat_free(Eneg);
+    mat_free(diff);
+    return R;
+}
+
+static matrix_t *mat_cosh_number_triangular_equal_diag(const matrix_t *A)
+{
+    matrix_t *negA = NULL, *Epos = NULL, *Eneg = NULL, *sum = NULL, *R = NULL;
+    number_t minus_one = num_create_from_long(-1);
+    number_t half = num_create_from_string("1/2");
+
+    negA = mat_scalar_mul_num((matrix_t *)A, &minus_one);
+    Epos = mat_exp(A);
+    Eneg = mat_exp(negA);
+    sum = mat_add(Epos, Eneg);
+    if (sum)
+        R = mat_scalar_mul_num(sum, &half);
+
+    num_destroy(&minus_one);
+    num_destroy(&half);
+    mat_free(negA);
+    mat_free(Epos);
+    mat_free(Eneg);
+    mat_free(sum);
+    return R;
+}
+
+static matrix_t *mat_sin_number_triangular_equal_diag(const matrix_t *A)
+{
+    matrix_t *iA = NULL, *neg_iA = NULL, *Epos = NULL, *Eneg = NULL, *diff = NULL, *R = NULL;
+    number_t i_unit = num_create_from_string("i");
+    number_t neg_i_unit = num_neg(i_unit);
+    number_t two = num_create_from_long(2);
+    number_t two_i = num_mul(two, i_unit);
+    number_t inv_two_i = num_inv(two_i);
+
+    iA = mat_scalar_mul_num((matrix_t *)A, &i_unit);
+    neg_iA = mat_scalar_mul_num((matrix_t *)A, &neg_i_unit);
+    Epos = mat_exp(iA);
+    Eneg = mat_exp(neg_iA);
+    diff = mat_sub(Epos, Eneg);
+    if (diff)
+        R = mat_scalar_mul_num(diff, &inv_two_i);
+
+    num_destroy(&i_unit);
+    num_destroy(&neg_i_unit);
+    num_destroy(&two);
+    num_destroy(&two_i);
+    num_destroy(&inv_two_i);
+    mat_free(iA);
+    mat_free(neg_iA);
+    mat_free(Epos);
+    mat_free(Eneg);
+    mat_free(diff);
+    return R;
+}
+
+static matrix_t *mat_cos_number_triangular_equal_diag(const matrix_t *A)
+{
+    matrix_t *iA = NULL, *neg_iA = NULL, *Epos = NULL, *Eneg = NULL, *sum = NULL, *R = NULL;
+    number_t i_unit = num_create_from_string("i");
+    number_t neg_i_unit = num_neg(i_unit);
+    number_t half = num_create_from_string("1/2");
+
+    iA = mat_scalar_mul_num((matrix_t *)A, &i_unit);
+    neg_iA = mat_scalar_mul_num((matrix_t *)A, &neg_i_unit);
+    Epos = mat_exp(iA);
+    Eneg = mat_exp(neg_iA);
+    sum = mat_add(Epos, Eneg);
+    if (sum)
+        R = mat_scalar_mul_num(sum, &half);
+
+    num_destroy(&i_unit);
+    num_destroy(&neg_i_unit);
+    num_destroy(&half);
+    mat_free(iA);
+    mat_free(neg_iA);
+    mat_free(Epos);
+    mat_free(Eneg);
+    mat_free(sum);
+    return R;
+}
+
+static matrix_t *mat_tan_number_triangular_equal_diag(const matrix_t *A)
+{
+    matrix_t *S = mat_sin_number_triangular_equal_diag(A);
+    matrix_t *C = mat_cos_number_triangular_equal_diag(A);
+    matrix_t *Cinv = NULL;
+    matrix_t *R = NULL;
+
+    if (C)
+        Cinv = mat_inverse(C);
+    if (S && Cinv)
+        R = mat_mul(S, Cinv);
+
+    mat_free(S);
+    mat_free(C);
+    mat_free(Cinv);
+    return R;
+}
+
+static matrix_t *mat_tanh_number_triangular_equal_diag(const matrix_t *A)
+{
+    matrix_t *S = mat_sinh_number_triangular_equal_diag(A);
+    matrix_t *C = mat_cosh_number_triangular_equal_diag(A);
+    matrix_t *Cinv = NULL;
+    matrix_t *R = NULL;
+
+    if (C)
+        Cinv = mat_inverse(C);
+    if (S && Cinv)
+        R = mat_mul(S, Cinv);
+
+    mat_free(S);
+    mat_free(C);
+    mat_free(Cinv);
+    return R;
+}
+
+static matrix_t *mat_asinh_number_triangular_equal_diag(const matrix_t *A)
+{
+    matrix_t *AA = NULL, *I = NULL, *sum = NULL, *root = NULL, *inner = NULL, *R = NULL;
+
+    AA = mat_mul(A, A);
+    I = mat_create_identity_num(A ? A->rows : 0u);
+    if (AA && I)
+        sum = mat_add(AA, I);
+    if (sum)
+        root = mat_sqrt(sum);
+    if (root)
+        inner = mat_add(A, root);
+    if (inner)
+        R = mat_log(inner);
+
+    mat_free(AA);
+    mat_free(I);
+    mat_free(sum);
+    mat_free(root);
+    mat_free(inner);
+    return R;
+}
+
+static matrix_t *mat_atanh_number_triangular_equal_diag(const matrix_t *A)
+{
+    matrix_t *I = NULL, *plus = NULL, *minus = NULL, *Lp = NULL, *Lm = NULL, *diff = NULL, *R = NULL;
+    number_t half = num_create_from_string("1/2");
+
+    I = mat_create_identity_num(A ? A->rows : 0u);
+    if (I) {
+        plus = mat_add(I, A);
+        minus = mat_sub(I, A);
+    }
+    if (plus)
+        Lp = mat_log(plus);
+    if (minus)
+        Lm = mat_log(minus);
+    if (Lp && Lm)
+        diff = mat_sub(Lp, Lm);
+    if (diff)
+        R = mat_scalar_mul_num(diff, &half);
+
+    num_destroy(&half);
+    mat_free(I);
+    mat_free(plus);
+    mat_free(minus);
+    mat_free(Lp);
+    mat_free(Lm);
+    mat_free(diff);
+    return R;
 }
 
 static matrix_t *mat_fun_dval_diagonalizable_2x2(const matrix_t *A,
@@ -2119,10 +2838,13 @@ static matrix_t *mat_fun_dval_structured(const matrix_t *A,
 
 static matrix_t *mat_fun_apply(const matrix_t *A,
                                void (*qcomplex_scalar_f)(void *out, const void *in),
-                               void (*dval_scalar_f)(void *out, const void *in))
+                               void (*dval_scalar_f)(void *out, const void *in),
+                               void (*native_scalar_f)(void *out, const void *in))
 {
     if (A && A->elem && A->elem->kind == ELEM_DVAL)
         return dval_scalar_f ? mat_fun_dval_structured(A, dval_scalar_f) : NULL;
+    if (A && A->rows == A->cols && native_scalar_f && mat_is_diagonal(A))
+        return mat_fun_elementwise_same_type(A, native_scalar_f);
     return mat_fun_schur(A, qcomplex_scalar_f);
 }
 
@@ -2535,17 +3257,43 @@ matrix_t *mat_fun_schur(const matrix_t *A,
 
 matrix_t *mat_exp(const matrix_t *A)
 {
+    matrix_t *structured = NULL;
+
     if (A) {
         mat_fun_cache_entry_t *cache = mat_fun_cache_find(A);
         if (cache && cache->exp_preimage)
             return mat_copy_preserving_store(cache->exp_preimage);
+        if (A->elem == &number_elem &&
+            A->rows == A->cols &&
+            (mat_is_upper_triangular(A) || mat_is_lower_triangular(A)) &&
+            mat_number_diagonal_equal_local(A)) {
+            structured = mat_exp_number_triangular_equal_diag(A);
+            if (structured)
+                return structured;
+        }
     }
-    return mat_apply_unary(A, qcomplex_elem.fun->exp, dval_elem.fun->exp);
+    return mat_apply_unary(A, qcomplex_elem.fun->exp, dval_elem.fun->exp,
+                           A && A->elem && A->elem->fun ? A->elem->fun->exp : NULL);
 }
 
 matrix_t *mat_log(const matrix_t *A)
 {
-    matrix_t *R = mat_apply_unary(A, qcomplex_elem.fun->log, dval_elem.fun->log);
+    matrix_t *structured = NULL;
+
+    if (A &&
+        A->elem == &number_elem &&
+        A->rows == A->cols &&
+        (mat_is_upper_triangular(A) || mat_is_lower_triangular(A)) &&
+        mat_number_diagonal_equal_local(A)) {
+        structured = mat_log_number_triangular_equal_diag(A);
+        if (structured) {
+            mat_set_exp_preimage_cache(structured, A);
+            return structured;
+        }
+    }
+
+    matrix_t *R = mat_apply_unary(A, qcomplex_elem.fun->log, dval_elem.fun->log,
+                                  A && A->elem && A->elem->fun ? A->elem->fun->log : NULL);
     if (R)
         mat_set_exp_preimage_cache(R, A);
     return R;
@@ -2553,157 +3301,272 @@ matrix_t *mat_log(const matrix_t *A)
 
 matrix_t *mat_sin(const matrix_t *A)
 {
-    return mat_apply_unary(A, qcomplex_elem.fun->sin, dval_elem.fun->sin);
+    if (A &&
+        A->elem == &number_elem &&
+        A->rows == A->cols &&
+        (mat_is_upper_triangular(A) || mat_is_lower_triangular(A)) &&
+        mat_number_diagonal_equal_local(A)) {
+        matrix_t *structured = mat_sin_number_triangular_equal_diag(A);
+        if (structured)
+            return structured;
+    }
+    return mat_apply_unary(A, qcomplex_elem.fun->sin, dval_elem.fun->sin,
+                           A && A->elem && A->elem->fun ? A->elem->fun->sin : NULL);
 }
 
 matrix_t *mat_cos(const matrix_t *A)
 {
-    return mat_apply_unary(A, qcomplex_elem.fun->cos, dval_elem.fun->cos);
+    if (A &&
+        A->elem == &number_elem &&
+        A->rows == A->cols &&
+        (mat_is_upper_triangular(A) || mat_is_lower_triangular(A)) &&
+        mat_number_diagonal_equal_local(A)) {
+        matrix_t *structured = mat_cos_number_triangular_equal_diag(A);
+        if (structured)
+            return structured;
+    }
+    return mat_apply_unary(A, qcomplex_elem.fun->cos, dval_elem.fun->cos,
+                           A && A->elem && A->elem->fun ? A->elem->fun->cos : NULL);
 }
 
 matrix_t *mat_tan(const matrix_t *A)
 {
-    return mat_apply_unary(A, qcomplex_elem.fun->tan, dval_elem.fun->tan);
+    if (A &&
+        A->elem == &number_elem &&
+        A->rows == A->cols &&
+        (mat_is_upper_triangular(A) || mat_is_lower_triangular(A)) &&
+        mat_number_diagonal_equal_local(A)) {
+        matrix_t *structured = mat_tan_number_triangular_equal_diag(A);
+        if (structured)
+            return structured;
+    }
+    return mat_apply_unary(A, qcomplex_elem.fun->tan, dval_elem.fun->tan,
+                           A && A->elem && A->elem->fun ? A->elem->fun->tan : NULL);
 }
 
 matrix_t *mat_sinh(const matrix_t *A)
 {
-    return mat_apply_unary(A, qcomplex_elem.fun->sinh, dval_elem.fun->sinh);
+    if (A &&
+        A->elem == &number_elem &&
+        A->rows == A->cols &&
+        (mat_is_upper_triangular(A) || mat_is_lower_triangular(A)) &&
+        mat_number_diagonal_equal_local(A)) {
+        matrix_t *structured = mat_sinh_number_triangular_equal_diag(A);
+        if (structured)
+            return structured;
+    }
+    return mat_apply_unary(A, qcomplex_elem.fun->sinh, dval_elem.fun->sinh,
+                           A && A->elem && A->elem->fun ? A->elem->fun->sinh : NULL);
 }
 
 matrix_t *mat_cosh(const matrix_t *A)
 {
-    return mat_apply_unary(A, qcomplex_elem.fun->cosh, dval_elem.fun->cosh);
+    if (A &&
+        A->elem == &number_elem &&
+        A->rows == A->cols &&
+        (mat_is_upper_triangular(A) || mat_is_lower_triangular(A)) &&
+        mat_number_diagonal_equal_local(A)) {
+        matrix_t *structured = mat_cosh_number_triangular_equal_diag(A);
+        if (structured)
+            return structured;
+    }
+    return mat_apply_unary(A, qcomplex_elem.fun->cosh, dval_elem.fun->cosh,
+                           A && A->elem && A->elem->fun ? A->elem->fun->cosh : NULL);
 }
 
 matrix_t *mat_tanh(const matrix_t *A)
 {
-    return mat_apply_unary(A, qcomplex_elem.fun->tanh, dval_elem.fun->tanh);
+    if (A &&
+        A->elem == &number_elem &&
+        A->rows == A->cols &&
+        (mat_is_upper_triangular(A) || mat_is_lower_triangular(A)) &&
+        mat_number_diagonal_equal_local(A)) {
+        matrix_t *structured = mat_tanh_number_triangular_equal_diag(A);
+        if (structured)
+            return structured;
+    }
+    return mat_apply_unary(A, qcomplex_elem.fun->tanh, dval_elem.fun->tanh,
+                           A && A->elem && A->elem->fun ? A->elem->fun->tanh : NULL);
 }
 
 matrix_t *mat_sqrt(const matrix_t *A)
 {
-    return mat_apply_unary(A, qcomplex_elem.fun->sqrt, dval_elem.fun->sqrt);
+    matrix_t *structured = NULL;
+
+    if (A &&
+        A->elem == &number_elem &&
+        A->rows == A->cols &&
+        (mat_is_upper_triangular(A) || mat_is_lower_triangular(A)) &&
+        mat_number_diagonal_equal_local(A)) {
+        structured = mat_sqrt_number_triangular_equal_diag(A);
+        if (structured)
+            return structured;
+    }
+
+    return mat_apply_unary(A, qcomplex_elem.fun->sqrt, dval_elem.fun->sqrt,
+                           A && A->elem && A->elem->fun ? A->elem->fun->sqrt : NULL);
 }
 
 matrix_t *mat_asin(const matrix_t *A)
 {
-    return mat_apply_unary(A, qcomplex_elem.fun->asin, dval_elem.fun->asin);
+    return mat_apply_unary(A, qcomplex_elem.fun->asin, dval_elem.fun->asin,
+                           A && A->elem && A->elem->fun ? A->elem->fun->asin : NULL);
 }
 
 matrix_t *mat_acos(const matrix_t *A)
 {
-    return mat_apply_unary(A, qcomplex_elem.fun->acos, dval_elem.fun->acos);
+    return mat_apply_unary(A, qcomplex_elem.fun->acos, dval_elem.fun->acos,
+                           A && A->elem && A->elem->fun ? A->elem->fun->acos : NULL);
 }
 
 matrix_t *mat_atan(const matrix_t *A)
 {
-    return mat_apply_unary(A, qcomplex_elem.fun->atan, dval_elem.fun->atan);
+    return mat_apply_unary(A, qcomplex_elem.fun->atan, dval_elem.fun->atan,
+                           A && A->elem && A->elem->fun ? A->elem->fun->atan : NULL);
 }
 
 matrix_t *mat_asinh(const matrix_t *A)
 {
-    return mat_apply_unary(A, qcomplex_elem.fun->asinh, dval_elem.fun->asinh);
+    if (A &&
+        A->elem == &number_elem &&
+        A->rows == A->cols &&
+        (mat_is_upper_triangular(A) || mat_is_lower_triangular(A)) &&
+        mat_number_diagonal_equal_local(A)) {
+        matrix_t *structured = mat_asinh_number_triangular_equal_diag(A);
+        if (structured)
+            return structured;
+    }
+    return mat_apply_unary(A, qcomplex_elem.fun->asinh, dval_elem.fun->asinh,
+                           A && A->elem && A->elem->fun ? A->elem->fun->asinh : NULL);
 }
 
 matrix_t *mat_acosh(const matrix_t *A)
 {
-    return mat_apply_unary(A, qcomplex_elem.fun->acosh, dval_elem.fun->acosh);
+    return mat_apply_unary(A, qcomplex_elem.fun->acosh, dval_elem.fun->acosh,
+                           A && A->elem && A->elem->fun ? A->elem->fun->acosh : NULL);
 }
 
 matrix_t *mat_atanh(const matrix_t *A)
 {
-    return mat_apply_unary(A, qcomplex_elem.fun->atanh, dval_elem.fun->atanh);
+    if (A &&
+        A->elem == &number_elem &&
+        A->rows == A->cols &&
+        (mat_is_upper_triangular(A) || mat_is_lower_triangular(A)) &&
+        mat_number_diagonal_equal_local(A)) {
+        matrix_t *structured = mat_atanh_number_triangular_equal_diag(A);
+        if (structured)
+            return structured;
+    }
+    return mat_apply_unary(A, qcomplex_elem.fun->atanh, dval_elem.fun->atanh,
+                           A && A->elem && A->elem->fun ? A->elem->fun->atanh : NULL);
 }
 
 matrix_t *mat_erf(const matrix_t *A)
 {
-    return mat_apply_unary(A, qcomplex_elem.fun->erf, dval_elem.fun->erf);
+    return mat_apply_unary(A, qcomplex_elem.fun->erf, dval_elem.fun->erf,
+                           A && A->elem && A->elem->fun ? A->elem->fun->erf : NULL);
 }
 
 matrix_t *mat_erfc(const matrix_t *A)
 {
-    return mat_apply_unary(A, qcomplex_elem.fun->erfc, dval_elem.fun->erfc);
+    return mat_apply_unary(A, qcomplex_elem.fun->erfc, dval_elem.fun->erfc,
+                           A && A->elem && A->elem->fun ? A->elem->fun->erfc : NULL);
 }
 
 matrix_t *mat_erfinv(const matrix_t *A)
 {
-    return mat_apply_unary(A, qcomplex_elem.fun->erfinv, dval_elem.fun->erfinv);
+    return mat_apply_unary(A, qcomplex_elem.fun->erfinv, dval_elem.fun->erfinv,
+                           A && A->elem && A->elem->fun ? A->elem->fun->erfinv : NULL);
 }
 
 matrix_t *mat_erfcinv(const matrix_t *A)
 {
-    return mat_apply_unary(A, qcomplex_elem.fun->erfcinv, dval_elem.fun->erfcinv);
+    return mat_apply_unary(A, qcomplex_elem.fun->erfcinv, dval_elem.fun->erfcinv,
+                           A && A->elem && A->elem->fun ? A->elem->fun->erfcinv : NULL);
 }
 
 matrix_t *mat_gamma(const matrix_t *A)
 {
-    return mat_apply_unary(A, qcomplex_elem.fun->gamma, dval_elem.fun->gamma);
+    return mat_apply_unary(A, qcomplex_elem.fun->gamma, dval_elem.fun->gamma,
+                           A && A->elem && A->elem->fun ? A->elem->fun->gamma : NULL);
 }
 
 matrix_t *mat_lgamma(const matrix_t *A)
 {
-    return mat_apply_unary(A, qcomplex_elem.fun->lgamma, dval_elem.fun->lgamma);
+    return mat_apply_unary(A, qcomplex_elem.fun->lgamma, dval_elem.fun->lgamma,
+                           A && A->elem && A->elem->fun ? A->elem->fun->lgamma : NULL);
 }
 
 matrix_t *mat_digamma(const matrix_t *A)
 {
-    return mat_apply_unary(A, qcomplex_elem.fun->digamma, dval_elem.fun->digamma);
+    return mat_apply_unary(A, qcomplex_elem.fun->digamma, dval_elem.fun->digamma,
+                           A && A->elem && A->elem->fun ? A->elem->fun->digamma : NULL);
 }
 
 matrix_t *mat_trigamma(const matrix_t *A)
 {
-    return mat_apply_unary(A, qcomplex_elem.fun->trigamma, dval_elem.fun->trigamma);
+    return mat_apply_unary(A, qcomplex_elem.fun->trigamma, dval_elem.fun->trigamma,
+                           A && A->elem && A->elem->fun ? A->elem->fun->trigamma : NULL);
 }
 
 matrix_t *mat_tetragamma(const matrix_t *A)
 {
-    return mat_apply_unary(A, qcomplex_elem.fun->tetragamma, dval_elem.fun->tetragamma);
+    return mat_apply_unary(A, qcomplex_elem.fun->tetragamma, dval_elem.fun->tetragamma,
+                           A && A->elem && A->elem->fun ? A->elem->fun->tetragamma : NULL);
 }
 
 matrix_t *mat_gammainv(const matrix_t *A)
 {
-    return mat_apply_unary(A, qcomplex_elem.fun->gammainv, dval_elem.fun->gammainv);
+    return mat_apply_unary(A, qcomplex_elem.fun->gammainv, dval_elem.fun->gammainv,
+                           A && A->elem && A->elem->fun ? A->elem->fun->gammainv : NULL);
 }
 
 matrix_t *mat_normal_pdf(const matrix_t *A)
 {
-    return mat_apply_unary(A, qcomplex_elem.fun->normal_pdf, dval_elem.fun->normal_pdf);
+    return mat_apply_unary(A, qcomplex_elem.fun->normal_pdf, dval_elem.fun->normal_pdf,
+                           A && A->elem && A->elem->fun ? A->elem->fun->normal_pdf : NULL);
 }
 
 matrix_t *mat_normal_cdf(const matrix_t *A)
 {
-    return mat_apply_unary(A, qcomplex_elem.fun->normal_cdf, dval_elem.fun->normal_cdf);
+    return mat_apply_unary(A, qcomplex_elem.fun->normal_cdf, dval_elem.fun->normal_cdf,
+                           A && A->elem && A->elem->fun ? A->elem->fun->normal_cdf : NULL);
 }
 
 matrix_t *mat_normal_logpdf(const matrix_t *A)
 {
-    return mat_apply_unary(A, qcomplex_elem.fun->normal_logpdf, dval_elem.fun->normal_logpdf);
+    return mat_apply_unary(A, qcomplex_elem.fun->normal_logpdf, dval_elem.fun->normal_logpdf,
+                           A && A->elem && A->elem->fun ? A->elem->fun->normal_logpdf : NULL);
 }
 
 matrix_t *mat_lambert_w0(const matrix_t *A)
 {
-    return mat_apply_unary(A, qcomplex_elem.fun->lambert_w0, dval_elem.fun->lambert_w0);
+    return mat_apply_unary(A, qcomplex_elem.fun->lambert_w0, dval_elem.fun->lambert_w0,
+                           A && A->elem && A->elem->fun ? A->elem->fun->lambert_w0 : NULL);
 }
 
 matrix_t *mat_lambert_wm1(const matrix_t *A)
 {
-    return mat_apply_unary(A, qcomplex_elem.fun->lambert_wm1, dval_elem.fun->lambert_wm1);
+    return mat_apply_unary(A, qcomplex_elem.fun->lambert_wm1, dval_elem.fun->lambert_wm1,
+                           A && A->elem && A->elem->fun ? A->elem->fun->lambert_wm1 : NULL);
 }
 
 matrix_t *mat_productlog(const matrix_t *A)
 {
-    return mat_apply_unary(A, qcomplex_elem.fun->productlog, dval_elem.fun->productlog);
+    return mat_apply_unary(A, qcomplex_elem.fun->productlog, dval_elem.fun->productlog,
+                           A && A->elem && A->elem->fun ? A->elem->fun->productlog : NULL);
 }
 
 matrix_t *mat_ei(const matrix_t *A)
 {
-    return mat_apply_unary(A, qcomplex_elem.fun->ei, dval_elem.fun->ei);
+    return mat_apply_unary(A, qcomplex_elem.fun->ei, dval_elem.fun->ei,
+                           A && A->elem && A->elem->fun ? A->elem->fun->ei : NULL);
 }
 
 matrix_t *mat_e1(const matrix_t *A)
 {
-    return mat_apply_unary(A, qcomplex_elem.fun->e1, dval_elem.fun->e1);
+    return mat_apply_unary(A, qcomplex_elem.fun->e1, dval_elem.fun->e1,
+                           A && A->elem && A->elem->fun ? A->elem->fun->e1 : NULL);
 }
 
 matrix_t *mat_exp_eval_qc(const matrix_t *A)

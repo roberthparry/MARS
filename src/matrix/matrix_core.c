@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <math.h>
 #include "matrix_internal.h"
+#include "number.h"
 #include "qfloat.h"
 #include "qcomplex.h"
 #include "matrix.h"
@@ -58,9 +59,6 @@ static const struct store_vtable *lower_triangular_transpose_store(const struct 
 static struct matrix_t *mat_create_with_store(size_t rows, size_t cols,
                                               const struct elem_vtable *elem,
                                               const struct store_vtable *store);
-static struct matrix_t *mat_create_elementwise_unary_result(size_t rows, size_t cols,
-                                                            const struct elem_vtable *elem,
-                                                            const struct matrix_t *layout_src);
 static struct matrix_t *mat_create_transpose_result(size_t rows, size_t cols,
                                                     const struct elem_vtable *elem,
                                                     const struct matrix_t *layout_src);
@@ -91,11 +89,6 @@ static const struct store_vtable sparse_store;
 static const struct store_vtable diagonal_store;
 static const struct store_vtable upper_triangular_store;
 static const struct store_vtable lower_triangular_store;
-
-static bool elem_is_dval(const struct elem_vtable *elem)
-{
-    return elem && elem->kind == ELEM_DVAL;
-}
 
 static bool dval_is_exact_zero(const dval_t *dv)
 {
@@ -129,39 +122,155 @@ static matrix_t *mat_finalize_symbolic_result(matrix_t *A)
     return simplified;
 }
 
-static void elem_copy_value(const struct elem_vtable *elem, void *dst, const void *src)
+static void elem_init_zero_value(const struct elem_vtable *elem, void *slot)
 {
-    if (!elem_is_dval(elem)) {
-        memcpy(dst, src, elem->size);
+    if (!elem || !slot)
+        return;
+    if (elem->init_zero_slot) {
+        elem->init_zero_slot(slot);
         return;
     }
+    memcpy(slot, elem->zero, elem->size);
+}
 
-    dval_t *dv = src ? *(dval_t *const *)src : NULL;
-    *(dval_t **)dst = dval_clone_for_storage(dv);
+static void elem_copy_value(const struct elem_vtable *elem, void *dst, const void *src)
+{
+    if (!elem || !dst)
+        return;
+    if (elem->copy_value) {
+        elem->copy_value(dst, src);
+        return;
+    }
+    if (src)
+        memcpy(dst, src, elem->size);
 }
 
 static void elem_destroy_value(const struct elem_vtable *elem, void *slot)
 {
-    dval_t *dv;
+    if (!elem || !slot)
+        return;
+    if (elem->destroy_value)
+        elem->destroy_value(slot);
+}
 
-    if (!elem_is_dval(elem) || !slot)
+static void elem_simplify_value(const struct elem_vtable *elem, void *slot)
+{
+    if (!elem || !slot)
+        return;
+    if (elem->simplify_value)
+        elem->simplify_value(slot);
+}
+
+static bool elem_is_structural_zero(const struct elem_vtable *elem, const void *val)
+{
+    if (!elem)
+        return true;
+    if (elem->is_structural_zero)
+        return elem->is_structural_zero(val);
+    return elem->cmp(val, elem->zero) == 0;
+}
+
+static bool elem_supports_numeric_algorithms(const struct elem_vtable *elem)
+{
+    return elem && elem->kind != ELEM_DVAL;
+}
+
+void mat_value_init_zero(const struct matrix_t *A, void *slot)
+{
+    if (!A || !slot)
+        return;
+    elem_init_zero_value(A->elem, slot);
+}
+
+void mat_value_destroy(const struct matrix_t *A, void *slot)
+{
+    if (!A || !slot)
+        return;
+    elem_destroy_value(A->elem, slot);
+}
+
+void mat_get_owned(const struct matrix_t *A, size_t i, size_t j, void *out)
+{
+    unsigned char raw[64] = {0};
+
+    if (!A || !out)
         return;
 
-    dv = *(dval_t **)slot;
+    if (A->elem->copy_value) {
+        A->store->get(A, i, j, raw);
+        A->elem->copy_value(out, raw);
+        return;
+    }
+
+    A->store->get(A, i, j, out);
+}
+
+static void d_init_zero_slot(void *slot)
+{
+    *(double *)slot = 0.0;
+}
+
+static void qf_init_zero_slot(void *slot)
+{
+    *(qfloat_t *)slot = QF_ZERO;
+}
+
+static void qc_init_zero_slot(void *slot)
+{
+    *(qcomplex_t *)slot = QC_ZERO;
+}
+
+static void num_init_zero_slot(void *slot)
+{
+    *(number_t *)slot = NUM_ZERO;
+}
+
+static void num_copy_value(void *dst, const void *src)
+{
+    const number_t *value = src ? (const number_t *)src : &NUM_ZERO;
+
+    *(number_t *)dst = num_clone(*value);
+}
+
+static void num_destroy_value(void *slot)
+{
+    number_t *value = (number_t *)slot;
+
+    num_destroy(value);
+    *value = num_new();
+}
+
+static bool num_is_structural_zero(const void *val)
+{
+    return !val || num_is_zero(*(const number_t *)val);
+}
+
+static void dv_init_zero_slot(void *slot)
+{
+    *(dval_t **)slot = NULL;
+}
+
+static void dv_copy_value(void *dst, const void *src)
+{
+    dval_t *dv = src ? *(dval_t *const *)src : NULL;
+
+    *(dval_t **)dst = dval_clone_for_storage(dv);
+}
+
+static void dv_destroy_value(void *slot)
+{
+    dval_t *dv = *(dval_t **)slot;
+
     if (dv)
         dv_free(dv);
     *(dval_t **)slot = NULL;
 }
 
-static void elem_simplify_value(const struct elem_vtable *elem, void *slot)
+static void dv_simplify_value(void *slot)
 {
-    dval_t *dv;
+    dval_t *dv = *(dval_t **)slot;
     dval_t *simp;
 
-    if (!elem_is_dval(elem) || !slot)
-        return;
-
-    dv = *(dval_t **)slot;
     if (!dv)
         return;
 
@@ -170,20 +279,9 @@ static void elem_simplify_value(const struct elem_vtable *elem, void *slot)
     *(dval_t **)slot = simp;
 }
 
-static bool elem_is_structural_zero(const struct elem_vtable *elem, const void *val)
+static bool dv_is_structural_zero(const void *val)
 {
-    if (!elem)
-        return true;
-
-    if (!elem_is_dval(elem))
-        return elem->cmp(val, elem->zero) == 0;
-
     return dval_is_exact_zero(*(dval_t *const *)val);
-}
-
-static bool elem_supports_numeric_algorithms(const struct elem_vtable *elem)
-{
-    return elem && elem->kind != ELEM_DVAL;
 }
 
 static void dense_swap_rows(struct matrix_t *A, size_t r1, size_t r2);
@@ -2662,12 +2760,22 @@ static bool dense_alloc(struct matrix_t *A) {
     if (!A->data)
         return false;
     for (size_t i = 0; i < n; i++) {
-        A->data[i] = calloc(m, es);
+        A->data[i] = malloc(m * es);
         if (!A->data[i]) {
-            for (size_t k = 0; k < i; k++) free(A->data[k]);
+            for (size_t k = 0; k < i; k++) {
+                for (size_t j = 0; j < m; j++) {
+                    void *slot = (char *)A->data[k] + j * es;
+                    elem_destroy_value(A->elem, slot);
+                }
+                free(A->data[k]);
+            }
             free(A->data);
             A->data = NULL;
             return false;
+        }
+        for (size_t j = 0; j < m; j++) {
+            void *slot = (char *)A->data[i] + j * es;
+            elem_init_zero_value(A->elem, slot);
         }
     }
     A->nnz = 0;
@@ -2677,11 +2785,9 @@ static bool dense_alloc(struct matrix_t *A) {
 static void dense_free(struct matrix_t *A) {
     if (!A->data) return;
     for (size_t i = 0; i < A->rows; i++) {
-        if (elem_is_dval(A->elem)) {
-            for (size_t j = 0; j < A->cols; j++) {
-                void *slot = (char *)A->data[i] + j * A->elem->size;
-                elem_destroy_value(A->elem, slot);
-            }
+        for (size_t j = 0; j < A->cols; j++) {
+            void *slot = (char *)A->data[i] + j * A->elem->size;
+            elem_destroy_value(A->elem, slot);
         }
         free(A->data[i]);
     }
@@ -3023,16 +3129,18 @@ static bool diagonal_alloc(struct matrix_t *A)
         return false;
 
     for (i = 0; i < A->rows; i++) {
-        A->data[i] = calloc(1, A->elem->size);
+        A->data[i] = malloc(A->elem->size);
         if (!A->data[i]) {
             while (i > 0) {
                 i--;
+                elem_destroy_value(A->elem, A->data[i]);
                 free(A->data[i]);
             }
             free(A->data);
             A->data = NULL;
             return false;
         }
+        elem_init_zero_value(A->elem, A->data[i]);
     }
 
     A->nnz = 0;
@@ -3160,22 +3268,24 @@ static bool triangular_alloc(struct matrix_t *A, size_t (*row_width)(const struc
 
     for (i = 0; i < A->rows; i++) {
         size_t width = row_width(A, i);
-        A->data[i] = width ? calloc(width, A->elem->size) : NULL;
+        A->data[i] = width ? malloc(width * A->elem->size) : NULL;
         if (width && !A->data[i]) {
             while (i > 0) {
                 i--;
-                if (elem_is_dval(A->elem) && A->data[i]) {
-                    size_t old_width = row_width(A, i);
-                    for (size_t j = 0; j < old_width; j++) {
-                        void *slot = (char *)A->data[i] + j * A->elem->size;
-                        elem_destroy_value(A->elem, slot);
-                    }
+                size_t old_width = row_width(A, i);
+                for (size_t j = 0; j < old_width; j++) {
+                    void *slot = (char *)A->data[i] + j * A->elem->size;
+                    elem_destroy_value(A->elem, slot);
                 }
                 free(A->data[i]);
             }
             free(A->data);
             A->data = NULL;
             return false;
+        }
+        for (size_t j = 0; j < width; j++) {
+            void *slot = (char *)A->data[i] + j * A->elem->size;
+            elem_init_zero_value(A->elem, slot);
         }
     }
 
@@ -3189,14 +3299,12 @@ static void triangular_free(struct matrix_t *A)
         return;
 
     for (size_t i = 0; i < A->rows; i++) {
-        if (elem_is_dval(A->elem)) {
-            size_t width = (A->store == &upper_triangular_store)
-                         ? upper_triangular_row_width(A, i)
-                         : lower_triangular_row_width(A, i);
-            for (size_t j = 0; j < width; j++) {
-                void *slot = (char *)A->data[i] + j * A->elem->size;
-                elem_destroy_value(A->elem, slot);
-            }
+        size_t width = (A->store == &upper_triangular_store)
+                     ? upper_triangular_row_width(A, i)
+                     : lower_triangular_row_width(A, i);
+        for (size_t j = 0; j < width; j++) {
+            void *slot = (char *)A->data[i] + j * A->elem->size;
+            elem_destroy_value(A->elem, slot);
         }
         free(A->data[i]);
     }
@@ -3755,9 +3863,9 @@ struct matrix_t *mat_create_lower_triangular_with_elem(size_t rows, size_t cols,
     return mat_create_with_store(rows, cols, elem, &lower_triangular_store);
 }
 
-static struct matrix_t *mat_create_elementwise_unary_result(size_t rows, size_t cols,
-                                                            const struct elem_vtable *elem,
-                                                            const struct matrix_t *layout_src)
+struct matrix_t *mat_create_elementwise_unary_result(size_t rows, size_t cols,
+                                                     const struct elem_vtable *elem,
+                                                     const struct matrix_t *layout_src)
 {
     const struct store_vtable *store;
 
@@ -4017,6 +4125,7 @@ const struct elem_vtable double_elem = {
     .size            = sizeof(double),
     .kind            = ELEM_DOUBLE,
     .public_type     = MAT_TYPE_DOUBLE,
+    .init_zero_slot  = d_init_zero_slot,
     .add             = d_add,
     .sub             = d_sub,
     .mul             = d_mul,
@@ -4168,6 +4277,7 @@ const struct elem_vtable qfloat_elem = {
     .size            = sizeof(qfloat_t),
     .kind            = ELEM_QFLOAT,
     .public_type     = MAT_TYPE_QFLOAT,
+    .init_zero_slot  = qf_init_zero_slot,
     .add             = qf_add_wrap,
     .sub             = qf_sub_wrap,
     .mul             = qf_mul_wrap,
@@ -4343,6 +4453,7 @@ const struct elem_vtable qcomplex_elem = {
     .size            = sizeof(qcomplex_t),
     .kind            = ELEM_QCOMPLEX,
     .public_type     = MAT_TYPE_QCOMPLEX,
+    .init_zero_slot  = qc_init_zero_slot,
     .add             = qc_add_wrap,
     .sub             = qc_sub_wrap,
     .mul             = qc_mul_wrap,
@@ -4362,6 +4473,207 @@ const struct elem_vtable qcomplex_elem = {
     .print           = qc_print_wrap,
     .relative_epsilon = Q_REL_EPS,
     .fun             = &qcomplex_fun
+};
+
+/* ---------- number ---------- */
+
+static void num_add_wrap(void *o, const void *a, const void *b)
+{
+    *(number_t *)o = num_add(*(const number_t *)a, *(const number_t *)b);
+}
+
+static void num_sub_wrap(void *o, const void *a, const void *b)
+{
+    *(number_t *)o = num_sub(*(const number_t *)a, *(const number_t *)b);
+}
+
+static void num_mul_wrap(void *o, const void *a, const void *b)
+{
+    *(number_t *)o = num_mul(*(const number_t *)a, *(const number_t *)b);
+}
+
+static void num_inv_wrap(void *o, const void *a)
+{
+    *(number_t *)o = num_inv(*(const number_t *)a);
+}
+
+static int number_cmp_wrap(const void *a, const void *b)
+{
+    return num_cmp(*(const number_t *)a, *(const number_t *)b);
+}
+
+static void num_print_wrap(const void *v, char *buf, size_t n)
+{
+    char *text = num_to_string(*(const number_t *)v);
+
+    if (!text) {
+        snprintf(buf, n, "<num>");
+        return;
+    }
+
+    snprintf(buf, n, "%s", text);
+    free(text);
+}
+
+static double num_abs2_wrap(const void *a)
+{
+    number_t abs_value = num_abs(*(const number_t *)a);
+    number_t squared = num_mul(abs_value, abs_value);
+    double out = num_to_double(squared);
+
+    num_destroy(&abs_value);
+    num_destroy(&squared);
+    return out;
+}
+
+static double num_to_real_wrap(const void *a)
+{
+    return num_to_double(*(const number_t *)a);
+}
+
+static void num_from_real_wrap(void *o, double x)
+{
+    *(number_t *)o = num_create_from_double(x);
+}
+
+static void num_conj_elem(void *o, const void *a)
+{
+    *(number_t *)o = num_conj(*(const number_t *)a);
+}
+
+static void num_to_qf_fn(qfloat_t *o, const void *a)
+{
+    number_t real = num_real_part(*(const number_t *)a);
+
+    *o = num_to_qfloat(real);
+    num_destroy(&real);
+}
+
+static void num_abs_qf_fn(qfloat_t *o, const void *a)
+{
+    number_t abs_value = num_abs(*(const number_t *)a);
+
+    *o = num_to_qfloat(abs_value);
+    num_destroy(&abs_value);
+}
+
+static void num_from_qf_fn(void *o, const qfloat_t *x)
+{
+    *(number_t *)o = num_create_from_qfloat(*x);
+}
+
+static void num_to_qc_fn(qcomplex_t *o, const void *a)
+{
+    number_t real = num_real_part(*(const number_t *)a);
+    number_t imag = num_imag_part(*(const number_t *)a);
+
+    *o = qc_make(num_to_qfloat(real), num_to_qfloat(imag));
+    num_destroy(&real);
+    num_destroy(&imag);
+}
+
+static void num_from_qc_fn(void *o, const qcomplex_t *z)
+{
+    *(number_t *)o = num_create_from_qcomplex(*z);
+}
+
+static void num_scalar_exp(void *out, const void *a) { *(number_t *)out = num_exp(*(const number_t *)a); }
+static void num_scalar_log(void *out, const void *a) { *(number_t *)out = num_log(*(const number_t *)a); }
+static void num_scalar_sin(void *out, const void *a) { *(number_t *)out = num_sin(*(const number_t *)a); }
+static void num_scalar_cos(void *out, const void *a) { *(number_t *)out = num_cos(*(const number_t *)a); }
+static void num_scalar_tan(void *out, const void *a) { *(number_t *)out = num_tan(*(const number_t *)a); }
+static void num_scalar_sinh(void *out, const void *a) { *(number_t *)out = num_sinh(*(const number_t *)a); }
+static void num_scalar_cosh(void *out, const void *a) { *(number_t *)out = num_cosh(*(const number_t *)a); }
+static void num_scalar_tanh(void *out, const void *a) { *(number_t *)out = num_tanh(*(const number_t *)a); }
+static void num_scalar_sqrt(void *out, const void *a) { *(number_t *)out = num_sqrt(*(const number_t *)a); }
+static void num_scalar_asin(void *out, const void *a) { *(number_t *)out = num_asin(*(const number_t *)a); }
+static void num_scalar_acos(void *out, const void *a) { *(number_t *)out = num_acos(*(const number_t *)a); }
+static void num_scalar_atan(void *out, const void *a) { *(number_t *)out = num_atan(*(const number_t *)a); }
+static void num_scalar_asinh(void *out, const void *a) { *(number_t *)out = num_asinh(*(const number_t *)a); }
+static void num_scalar_acosh(void *out, const void *a) { *(number_t *)out = num_acosh(*(const number_t *)a); }
+static void num_scalar_atanh(void *out, const void *a) { *(number_t *)out = num_atanh(*(const number_t *)a); }
+static void num_scalar_erf(void *out, const void *a) { *(number_t *)out = num_erf(*(const number_t *)a); }
+static void num_scalar_erfc(void *out, const void *a) { *(number_t *)out = num_erfc(*(const number_t *)a); }
+static void num_scalar_erfinv(void *out, const void *a) { *(number_t *)out = num_erfinv(*(const number_t *)a); }
+static void num_scalar_erfcinv(void *out, const void *a) { *(number_t *)out = num_erfcinv(*(const number_t *)a); }
+static void num_scalar_gamma(void *out, const void *a) { *(number_t *)out = num_gamma(*(const number_t *)a); }
+static void num_scalar_lgamma(void *out, const void *a) { *(number_t *)out = num_lgamma(*(const number_t *)a); }
+static void num_scalar_digamma(void *out, const void *a) { *(number_t *)out = num_digamma(*(const number_t *)a); }
+static void num_scalar_trigamma(void *out, const void *a) { *(number_t *)out = num_trigamma(*(const number_t *)a); }
+static void num_scalar_tetragamma(void *out, const void *a) { *(number_t *)out = num_tetragamma(*(const number_t *)a); }
+static void num_scalar_gammainv(void *out, const void *a) { *(number_t *)out = num_gammainv(*(const number_t *)a); }
+static void num_scalar_normal_pdf(void *out, const void *a) { *(number_t *)out = num_normal_pdf(*(const number_t *)a); }
+static void num_scalar_normal_cdf(void *out, const void *a) { *(number_t *)out = num_normal_cdf(*(const number_t *)a); }
+static void num_scalar_normal_logpdf(void *out, const void *a) { *(number_t *)out = num_normal_logpdf(*(const number_t *)a); }
+static void num_scalar_lambert_w0(void *out, const void *a) { *(number_t *)out = num_lambert_w0(*(const number_t *)a); }
+static void num_scalar_lambert_wm1(void *out, const void *a) { *(number_t *)out = num_lambert_wm1(*(const number_t *)a); }
+static void num_scalar_productlog(void *out, const void *a) { *(number_t *)out = num_productlog(*(const number_t *)a); }
+static void num_scalar_ei(void *out, const void *a) { *(number_t *)out = num_ei(*(const number_t *)a); }
+static void num_scalar_e1(void *out, const void *a) { *(number_t *)out = num_e1(*(const number_t *)a); }
+
+static const struct elem_fun_vtable number_fun = {
+    .exp = num_scalar_exp,
+    .sin = num_scalar_sin,
+    .cos = num_scalar_cos,
+    .tan = num_scalar_tan,
+    .sinh = num_scalar_sinh,
+    .cosh = num_scalar_cosh,
+    .tanh = num_scalar_tanh,
+    .sqrt = num_scalar_sqrt,
+    .log = num_scalar_log,
+    .asin = num_scalar_asin,
+    .acos = num_scalar_acos,
+    .atan = num_scalar_atan,
+    .asinh = num_scalar_asinh,
+    .acosh = num_scalar_acosh,
+    .atanh = num_scalar_atanh,
+    .erf = num_scalar_erf,
+    .erfc = num_scalar_erfc,
+    .erfinv = num_scalar_erfinv,
+    .erfcinv = num_scalar_erfcinv,
+    .gamma = num_scalar_gamma,
+    .lgamma = num_scalar_lgamma,
+    .digamma = num_scalar_digamma,
+    .trigamma = num_scalar_trigamma,
+    .tetragamma = num_scalar_tetragamma,
+    .gammainv = num_scalar_gammainv,
+    .normal_pdf = num_scalar_normal_pdf,
+    .normal_cdf = num_scalar_normal_cdf,
+    .normal_logpdf = num_scalar_normal_logpdf,
+    .lambert_w0 = num_scalar_lambert_w0,
+    .lambert_wm1 = num_scalar_lambert_wm1,
+    .productlog = num_scalar_productlog,
+    .ei = num_scalar_ei,
+    .e1 = num_scalar_e1
+};
+
+const struct elem_vtable number_elem = {
+    .size            = sizeof(number_t),
+    .kind            = ELEM_NUMBER,
+    .public_type     = MAT_TYPE_NUMBER,
+    .init_zero_slot  = num_init_zero_slot,
+    .copy_value      = num_copy_value,
+    .destroy_value   = num_destroy_value,
+    .is_structural_zero = num_is_structural_zero,
+    .add             = num_add_wrap,
+    .sub             = num_sub_wrap,
+    .mul             = num_mul_wrap,
+    .inv             = num_inv_wrap,
+    .abs2            = num_abs2_wrap,
+    .to_real         = num_to_real_wrap,
+    .from_real       = num_from_real_wrap,
+    .conj_elem       = num_conj_elem,
+    .to_qf           = num_to_qf_fn,
+    .abs_qf          = num_abs_qf_fn,
+    .from_qf         = num_from_qf_fn,
+    .to_qc           = num_to_qc_fn,
+    .from_qc         = num_from_qc_fn,
+    .zero            = &NUM_ZERO,
+    .one             = &NUM_ONE,
+    .cmp             = number_cmp_wrap,
+    .print           = num_print_wrap,
+    .relative_epsilon = Q_REL_EPS,
+    .fun             = &number_fun
 };
 
 /* ---------- dval_t* ---------- */
@@ -4905,6 +5217,11 @@ const struct elem_vtable dval_elem = {
     .size            = sizeof(dval_t *),
     .kind            = ELEM_DVAL,
     .public_type     = MAT_TYPE_DVAL,
+    .init_zero_slot  = dv_init_zero_slot,
+    .copy_value      = dv_copy_value,
+    .destroy_value   = dv_destroy_value,
+    .simplify_value  = dv_simplify_value,
+    .is_structural_zero = dv_is_structural_zero,
     .add             = dv_add_wrap,
     .sub             = dv_sub_wrap,
     .mul             = dv_mul_wrap,
@@ -4957,6 +5274,10 @@ static inline void d_as_dv(dval_t **out, const double *a) {
 
 static inline void qf_as_dv(dval_t **out, const qfloat_t *a) {
     *out = dv_num_const_qf(*a);
+}
+
+static inline void num_as_dv(dval_t **out, const number_t *a) {
+    *out = dv_new_const_num(*a);
 }
 
 static inline void id_dv(dval_t **out, dval_t *const *a) {
@@ -5229,6 +5550,217 @@ static void mul_dv_qf(void *out, const void *a, const void *b)
     dv_free(B);
 }
 
+/* ---- double <-> number ---- */
+
+static void add_d_num(void *out, const void *a, const void *b)
+{
+    number_t lhs = num_create_from_double(*(const double *)a);
+    *(number_t *)out = num_add(lhs, *(const number_t *)b);
+    num_destroy(&lhs);
+}
+
+static void add_num_d(void *out, const void *a, const void *b)
+{
+    number_t rhs = num_create_from_double(*(const double *)b);
+    *(number_t *)out = num_add(*(const number_t *)a, rhs);
+    num_destroy(&rhs);
+}
+
+static void sub_d_num(void *out, const void *a, const void *b)
+{
+    number_t lhs = num_create_from_double(*(const double *)a);
+    *(number_t *)out = num_sub(lhs, *(const number_t *)b);
+    num_destroy(&lhs);
+}
+
+static void sub_num_d(void *out, const void *a, const void *b)
+{
+    number_t rhs = num_create_from_double(*(const double *)b);
+    *(number_t *)out = num_sub(*(const number_t *)a, rhs);
+    num_destroy(&rhs);
+}
+
+static void mul_d_num(void *out, const void *a, const void *b)
+{
+    number_t lhs = num_create_from_double(*(const double *)a);
+    *(number_t *)out = num_mul(lhs, *(const number_t *)b);
+    num_destroy(&lhs);
+}
+
+static void mul_num_d(void *out, const void *a, const void *b)
+{
+    number_t rhs = num_create_from_double(*(const double *)b);
+    *(number_t *)out = num_mul(*(const number_t *)a, rhs);
+    num_destroy(&rhs);
+}
+
+/* ---- qfloat <-> number ---- */
+
+static void add_qf_num(void *out, const void *a, const void *b)
+{
+    number_t lhs = num_create_from_qfloat(*(const qfloat_t *)a);
+    *(number_t *)out = num_add(lhs, *(const number_t *)b);
+    num_destroy(&lhs);
+}
+
+static void add_num_qf(void *out, const void *a, const void *b)
+{
+    number_t rhs = num_create_from_qfloat(*(const qfloat_t *)b);
+    *(number_t *)out = num_add(*(const number_t *)a, rhs);
+    num_destroy(&rhs);
+}
+
+static void sub_qf_num(void *out, const void *a, const void *b)
+{
+    number_t lhs = num_create_from_qfloat(*(const qfloat_t *)a);
+    *(number_t *)out = num_sub(lhs, *(const number_t *)b);
+    num_destroy(&lhs);
+}
+
+static void sub_num_qf(void *out, const void *a, const void *b)
+{
+    number_t rhs = num_create_from_qfloat(*(const qfloat_t *)b);
+    *(number_t *)out = num_sub(*(const number_t *)a, rhs);
+    num_destroy(&rhs);
+}
+
+static void mul_qf_num(void *out, const void *a, const void *b)
+{
+    number_t lhs = num_create_from_qfloat(*(const qfloat_t *)a);
+    *(number_t *)out = num_mul(lhs, *(const number_t *)b);
+    num_destroy(&lhs);
+}
+
+static void mul_num_qf(void *out, const void *a, const void *b)
+{
+    number_t rhs = num_create_from_qfloat(*(const qfloat_t *)b);
+    *(number_t *)out = num_mul(*(const number_t *)a, rhs);
+    num_destroy(&rhs);
+}
+
+/* ---- qcomplex <-> number ---- */
+
+static void add_qc_num(void *out, const void *a, const void *b)
+{
+    number_t lhs = num_create_from_qcomplex(*(const qcomplex_t *)a);
+    *(number_t *)out = num_add(lhs, *(const number_t *)b);
+    num_destroy(&lhs);
+}
+
+static void add_num_qc(void *out, const void *a, const void *b)
+{
+    number_t rhs = num_create_from_qcomplex(*(const qcomplex_t *)b);
+    *(number_t *)out = num_add(*(const number_t *)a, rhs);
+    num_destroy(&rhs);
+}
+
+static void sub_qc_num(void *out, const void *a, const void *b)
+{
+    number_t lhs = num_create_from_qcomplex(*(const qcomplex_t *)a);
+    *(number_t *)out = num_sub(lhs, *(const number_t *)b);
+    num_destroy(&lhs);
+}
+
+static void sub_num_qc(void *out, const void *a, const void *b)
+{
+    number_t rhs = num_create_from_qcomplex(*(const qcomplex_t *)b);
+    *(number_t *)out = num_sub(*(const number_t *)a, rhs);
+    num_destroy(&rhs);
+}
+
+static void mul_qc_num(void *out, const void *a, const void *b)
+{
+    number_t lhs = num_create_from_qcomplex(*(const qcomplex_t *)a);
+    *(number_t *)out = num_mul(lhs, *(const number_t *)b);
+    num_destroy(&lhs);
+}
+
+static void mul_num_qc(void *out, const void *a, const void *b)
+{
+    number_t rhs = num_create_from_qcomplex(*(const qcomplex_t *)b);
+    *(number_t *)out = num_mul(*(const number_t *)a, rhs);
+    num_destroy(&rhs);
+}
+
+/* ---- number <-> dval ---- */
+
+static void add_num_dv(void *out, const void *a, const void *b)
+{
+    dval_t *lhs = dv_new_const_num(*(const number_t *)a);
+    dval_t *rhs;
+
+    id_dv(&rhs, (dval_t *const *)b);
+    *(dval_t **)out = dv_add(lhs, rhs);
+    dv_free(lhs);
+}
+
+static void add_dv_num(void *out, const void *a, const void *b)
+{
+    dval_t *lhs;
+    dval_t *rhs = dv_new_const_num(*(const number_t *)b);
+
+    id_dv(&lhs, (dval_t *const *)a);
+    *(dval_t **)out = dv_add(lhs, rhs);
+    dv_free(rhs);
+}
+
+static void sub_num_dv(void *out, const void *a, const void *b)
+{
+    dval_t *lhs = dv_new_const_num(*(const number_t *)a);
+    dval_t *rhs;
+
+    id_dv(&rhs, (dval_t *const *)b);
+    *(dval_t **)out = dv_sub(lhs, rhs);
+    dv_free(lhs);
+}
+
+static void sub_dv_num(void *out, const void *a, const void *b)
+{
+    dval_t *lhs;
+    dval_t *rhs = dv_new_const_num(*(const number_t *)b);
+
+    id_dv(&lhs, (dval_t *const *)a);
+    *(dval_t **)out = dv_sub(lhs, rhs);
+    dv_free(rhs);
+}
+
+static void mul_num_dv(void *out, const void *a, const void *b)
+{
+    dval_t *lhs = dv_new_const_num(*(const number_t *)a);
+    dval_t *rhs;
+
+    id_dv(&rhs, (dval_t *const *)b);
+    *(dval_t **)out = dv_mul(lhs, rhs);
+    dv_free(lhs);
+}
+
+static void mul_dv_num(void *out, const void *a, const void *b)
+{
+    dval_t *lhs;
+    dval_t *rhs = dv_new_const_num(*(const number_t *)b);
+
+    id_dv(&lhs, (dval_t *const *)a);
+    *(dval_t **)out = dv_mul(lhs, rhs);
+    dv_free(rhs);
+}
+
+/* ---- number <-> number ---- */
+
+static void add_num_num(void *out, const void *a, const void *b)
+{
+    *(number_t *)out = num_add(*(const number_t *)a, *(const number_t *)b);
+}
+
+static void sub_num_num(void *out, const void *a, const void *b)
+{
+    *(number_t *)out = num_sub(*(const number_t *)a, *(const number_t *)b);
+}
+
+static void mul_num_num(void *out, const void *a, const void *b)
+{
+    *(number_t *)out = num_mul(*(const number_t *)a, *(const number_t *)b);
+}
+
 /* ---- dval <-> dval ---- */
 
 static void add_dv_dv(void *out, const void *a, const void *b)
@@ -5287,6 +5819,13 @@ static const binop_vtable binops[ELEM_MAX][ELEM_MAX] = {
             .sub = sub_d_qc,
             .mul = mul_d_qc
         },
+        /* double op number -> number */
+        [ELEM_NUMBER] = {
+            .result_elem = &number_elem,
+            .add = add_d_num,
+            .sub = sub_d_num,
+            .mul = mul_d_num
+        },
         /* double op dval -> dval */
         [ELEM_DVAL] = {
             .result_elem = &dval_elem,
@@ -5318,6 +5857,13 @@ static const binop_vtable binops[ELEM_MAX][ELEM_MAX] = {
             .sub = sub_qf_qc,
             .mul = mul_qf_qc
         },
+        /* qfloat op number -> number */
+        [ELEM_NUMBER] = {
+            .result_elem = &number_elem,
+            .add = add_qf_num,
+            .sub = sub_qf_num,
+            .mul = mul_qf_num
+        },
         /* qfloat op dval -> dval */
         [ELEM_DVAL] = {
             .result_elem = &dval_elem,
@@ -5348,6 +5894,46 @@ static const binop_vtable binops[ELEM_MAX][ELEM_MAX] = {
             .add = qc_add_wrap,
             .sub = qc_sub_wrap,
             .mul = qc_mul_wrap
+        },
+        /* qcomplex op number -> number */
+        [ELEM_NUMBER] = {
+            .result_elem = &number_elem,
+            .add = add_qc_num,
+            .sub = sub_qc_num,
+            .mul = mul_qc_num
+        }
+    },
+
+    [ELEM_NUMBER] = {
+        [ELEM_DOUBLE] = {
+            .result_elem = &number_elem,
+            .add = add_num_d,
+            .sub = sub_num_d,
+            .mul = mul_num_d
+        },
+        [ELEM_QFLOAT] = {
+            .result_elem = &number_elem,
+            .add = add_num_qf,
+            .sub = sub_num_qf,
+            .mul = mul_num_qf
+        },
+        [ELEM_QCOMPLEX] = {
+            .result_elem = &number_elem,
+            .add = add_num_qc,
+            .sub = sub_num_qc,
+            .mul = mul_num_qc
+        },
+        [ELEM_NUMBER] = {
+            .result_elem = &number_elem,
+            .add = add_num_num,
+            .sub = sub_num_num,
+            .mul = mul_num_num
+        },
+        [ELEM_DVAL] = {
+            .result_elem = &dval_elem,
+            .add = add_num_dv,
+            .sub = sub_num_dv,
+            .mul = mul_num_dv
         }
     },
 
@@ -5365,6 +5951,13 @@ static const binop_vtable binops[ELEM_MAX][ELEM_MAX] = {
             .add = add_dv_qf,
             .sub = sub_dv_qf,
             .mul = mul_dv_qf
+        },
+        /* dval op number -> dval */
+        [ELEM_NUMBER] = {
+            .result_elem = &dval_elem,
+            .add = add_dv_num,
+            .sub = sub_dv_num,
+            .mul = mul_dv_num
         },
         /* dval op dval -> dval */
         [ELEM_DVAL] = {
@@ -5404,6 +5997,14 @@ struct matrix_t *mat_new_sparse_qc(size_t rows, size_t cols) {
     return mat_create_sparse_with_elem(rows, cols, &qcomplex_elem);
 }
 
+struct matrix_t *mat_new_num(size_t rows, size_t cols) {
+    return mat_create_dense_with_elem(rows, cols, &number_elem);
+}
+
+struct matrix_t *mat_new_sparse_num(size_t rows, size_t cols) {
+    return mat_create_sparse_with_elem(rows, cols, &number_elem);
+}
+
 struct matrix_t *mat_new_dv(size_t rows, size_t cols) {
     return mat_create_dense_with_elem(rows, cols, &dval_elem);
 }
@@ -5424,6 +6025,10 @@ struct matrix_t *matsq_new_qc(size_t n) {
     return mat_new_qc(n, n);
 }
 
+struct matrix_t *matsq_new_num(size_t n) {
+    return mat_new_num(n, n);
+}
+
 struct matrix_t *matsq_new_dv(size_t n) {
     return mat_new_dv(n, n);
 }
@@ -5438,6 +6043,10 @@ struct matrix_t *mat_create_identity_qf(size_t n) {
 
 struct matrix_t *mat_create_identity_qc(size_t n) {
     return mat_create_identity_with_elem(n, &qcomplex_elem);
+}
+
+struct matrix_t *mat_create_identity_num(size_t n) {
+    return mat_create_identity_with_elem(n, &number_elem);
 }
 
 struct matrix_t *mat_create_identity_dv(size_t n) {
@@ -5481,6 +6090,11 @@ matrix_t *mat_create_diagonal_qc(size_t n, const qcomplex_t *diagonal)
     return mat_create_diagonal_from_array(n, diagonal, &qcomplex_elem);
 }
 
+matrix_t *mat_create_diagonal_num(size_t n, const number_t *diagonal)
+{
+    return mat_create_diagonal_from_array(n, diagonal, &number_elem);
+}
+
 matrix_t *mat_create_diagonal_dv(size_t n, dval_t *const *diagonal)
 {
     return mat_create_diagonal_from_array(n, diagonal, &dval_elem);
@@ -5507,6 +6121,13 @@ matrix_t *mat_create_qc(size_t rows, size_t cols, const qcomplex_t *data)
     return A;
 }
 
+matrix_t *mat_create_num(size_t rows, size_t cols, const number_t *data)
+{
+    matrix_t *A = mat_new_num(rows, cols);
+    mat_set_data(A, data);
+    return A;
+}
+
 matrix_t *mat_create_dv(size_t rows, size_t cols, dval_t *const *data)
 {
     matrix_t *A = mat_new_dv(rows, cols);
@@ -5527,6 +6148,36 @@ void mat_free(struct matrix_t *A) {
 
 void mat_get(const struct matrix_t *A, size_t i, size_t j, void *out) {
     A->store->get(A, i, j, out);
+}
+
+number_t mat_get_num(const struct matrix_t *A, size_t i, size_t j)
+{
+    unsigned char raw[64] = {0};
+    number_t out = num_new();
+    qcomplex_t z = QC_ZERO;
+
+    if (!A)
+        return out;
+
+    if (A->elem == &number_elem) {
+        mat_get_owned(A, i, j, &out);
+        return out;
+    }
+
+    if (A->elem == &dval_elem) {
+        dval_t *dv = NULL;
+
+        mat_get(A, i, j, &dv);
+        if (dv)
+            out = dv_eval_num(dv);
+        return out;
+    }
+
+    mat_get(A, i, j, raw);
+    if (A->elem->to_qc)
+        A->elem->to_qc(&z, raw);
+    out = num_create_from_qcomplex(z);
+    return out;
 }
 
 void mat_set(struct matrix_t *A, size_t i, size_t j, const void *val) {
@@ -5602,6 +6253,18 @@ void mat_get_data(const matrix_t *A, void *data)
     mat_copy_flat((matrix_t *)A, data, (void (*)(matrix_t*,size_t,size_t,void*))mat_get);
 }
 
+void mat_get_data_num(const matrix_t *A, number_t *data)
+{
+    size_t cursor = 0;
+
+    if (!A || !data)
+        return;
+
+    for (size_t i = 0; i < A->rows; i++)
+        for (size_t j = 0; j < A->cols; j++)
+            data[cursor++] = mat_get_num(A, i, j);
+}
+
 matrix_t *mat_to_dense(const matrix_t *A)
 {
     return mat_convert_dense(A, A ? A->elem : NULL);
@@ -5633,6 +6296,28 @@ matrix_t *mat_to_sparse(const matrix_t *A)
 matrix_t *mat_evaluate_qf(const matrix_t *A)
 {
     return mat_convert_preserving_store(A, A ? &qfloat_elem : NULL);
+}
+
+matrix_t *mat_evaluate_num(const matrix_t *A)
+{
+    matrix_t *C = NULL;
+    number_t value;
+
+    if (!A)
+        return NULL;
+
+    C = mat_create_with_store(A->rows, A->cols, &number_elem, A->store);
+    if (!C)
+        return NULL;
+
+    for (size_t i = 0; i < A->rows; ++i)
+        for (size_t j = 0; j < A->cols; ++j) {
+            value = mat_get_num(A, i, j);
+            mat_set(C, i, j, &value);
+            num_destroy(&value);
+        }
+
+    return C;
 }
 
 matrix_t *mat_evaluate_qc(const matrix_t *A)
@@ -5739,6 +6424,36 @@ matrix_t *mat_scalar_mul_qc(matrix_t *A, qcomplex_t s)
     return R;
 }
 
+matrix_t *mat_scalar_mul_num(matrix_t *A, const number_t *s)
+{
+    if (!A || !s) return NULL;
+
+    elem_kind ak = elem_of(A)->kind;
+    const binop_vtable *op = &binops[ELEM_NUMBER][ak];
+    const struct elem_vtable *re;
+    matrix_t *R;
+    unsigned char a_raw[64] = {0};
+    unsigned char out_raw[64] = {0};
+
+    if (!op->mul || !op->result_elem)
+        return NULL;
+
+    re = op->result_elem;
+    R = mat_create_elementwise_unary_result(A->rows, A->cols, re, A);
+    if (!R)
+        return NULL;
+
+    for (size_t i = 0; i < A->rows; i++)
+        for (size_t j = 0; j < A->cols; j++) {
+            mat_get(A, i, j, a_raw);
+            op->mul(out_raw, s, a_raw);
+            mat_set(R, i, j, out_raw);
+            elem_destroy_value(re, out_raw);
+        }
+
+    return R;
+}
+
 matrix_t *mat_scalar_div_d(matrix_t *A, double s)
 {
     double inv = 1.0 / s;
@@ -5755,6 +6470,20 @@ matrix_t *mat_scalar_div_qc(matrix_t *A, qcomplex_t s)
 {
     qcomplex_t inv = qc_inv(s);
     return mat_scalar_mul_qc(A, inv);
+}
+
+matrix_t *mat_scalar_div_num(matrix_t *A, const number_t *s)
+{
+    number_t inv;
+    matrix_t *out;
+
+    if (!s)
+        return NULL;
+
+    inv = num_inv(*s);
+    out = mat_scalar_mul_num(A, &inv);
+    num_destroy(&inv);
+    return out;
 }
 
 /* ============================================================
@@ -6055,7 +6784,7 @@ matrix_t *mat_convert_with_store(const matrix_t *A,
                                  const struct store_vtable *store)
 {
     matrix_t *C;
-    unsigned char src[64] = {0}, dst[64] = {0};
+    unsigned char src[64], dst[64];
 
     if (!A || !target || !store)
         return NULL;
@@ -6064,16 +6793,25 @@ matrix_t *mat_convert_with_store(const matrix_t *A,
     if (!C)
         return NULL;
 
+    mat_value_init_zero(A, src);
+    elem_init_zero_value(target, dst);
+
     for (size_t i = 0; i < A->rows; i++)
         for (size_t j = 0; j < A->cols; j++) {
             qcomplex_t z;
-            mat_get(A, i, j, src);
+            mat_value_destroy(A, src);
+            elem_destroy_value(target, dst);
+            mat_value_init_zero(A, src);
+            elem_init_zero_value(target, dst);
+            mat_get_owned(A, i, j, src);
             A->elem->to_qc(&z, src);
             target->from_qc(dst, &z);
             mat_set(C, i, j, dst);
             elem_destroy_value(target, dst);
         }
 
+    mat_value_destroy(A, src);
+    elem_destroy_value(target, dst);
     return C;
 }
 
@@ -6318,12 +7056,17 @@ struct matrix_t *mat_transpose(const struct matrix_t *A) {
 
     unsigned char v[64];
 
+    mat_value_init_zero(A, v);
+
     for (size_t i = 0; i < A->rows; i++)
         for (size_t j = 0; j < A->cols; j++) {
-            mat_get(A, i, j, v);
+            mat_value_destroy(A, v);
+            mat_value_init_zero(A, v);
+            mat_get_owned(A, i, j, v);
             mat_set(T, j, i, v);
         }
 
+    mat_value_destroy(A, v);
     return T;
 }
 
@@ -6334,16 +7077,25 @@ struct matrix_t *mat_conj(const struct matrix_t *A) {
     struct matrix_t *C = mat_create_elementwise_unary_result(A->rows, A->cols, e, A);
     if (!C) return NULL;
 
-    unsigned char v[64] = {0}, cv[64] = {0};
+    unsigned char v[64], cv[64];
+
+    mat_value_init_zero(A, v);
+    mat_value_init_zero(C, cv);
 
     for (size_t i = 0; i < A->rows; i++)
         for (size_t j = 0; j < A->cols; j++) {
-            mat_get(A, i, j, v);
+            mat_value_destroy(A, v);
+            mat_value_destroy(C, cv);
+            mat_value_init_zero(A, v);
+            mat_value_init_zero(C, cv);
+            mat_get_owned(A, i, j, v);
             e->conj_elem(cv, v);
             mat_set(C, i, j, cv);
             elem_destroy_value(e, cv);
         }
 
+    mat_value_destroy(A, v);
+    mat_value_destroy(C, cv);
     return C;
 }
 
@@ -7176,7 +7928,7 @@ int mat_det(const matrix_t *A, void *determinant)
 
     /* 1×1 case */
     if (n == 1) {
-        mat_get(A, 0, 0, determinant);
+        mat_get_owned(A, 0, 0, determinant);
         return 0;
     }
 
@@ -7185,49 +7937,73 @@ int mat_det(const matrix_t *A, void *determinant)
     if (!M)
         return -3;
 
-    unsigned char val[64];
+    unsigned char *val = calloc(1u, e->size ? e->size : 1u);
     for (size_t i = 0; i < A->rows; i++)
         for (size_t j = 0; j < A->cols; j++) {
-            mat_get(A, i, j, val);
+            mat_get_owned(A, i, j, val);
             mat_set(M, i, j, val);
+            elem_destroy_value(e, val);
+            elem_init_zero_value(e, val);
         }
 
     /* Buffers for element arithmetic */
-    unsigned char pivot[64];
-    unsigned char inv_pivot[64];
-    unsigned char factor[64];
-    unsigned char a[64];
-    unsigned char b[64];
-    unsigned char prod[64];
-    unsigned char tmp[64];
+    unsigned char *pivot = calloc(1u, e->size ? e->size : 1u);
+    unsigned char *inv_pivot = calloc(1u, e->size ? e->size : 1u);
+    unsigned char *factor = calloc(1u, e->size ? e->size : 1u);
+    unsigned char *a = calloc(1u, e->size ? e->size : 1u);
+    unsigned char *b = calloc(1u, e->size ? e->size : 1u);
+    unsigned char *prod = calloc(1u, e->size ? e->size : 1u);
+    unsigned char *tmp = calloc(1u, e->size ? e->size : 1u);
+    unsigned char *det = calloc(1u, e->size ? e->size : 1u);
+
+    if (!val || !pivot || !inv_pivot || !factor || !a || !b || !prod || !tmp || !det) {
+        free(val); free(pivot); free(inv_pivot); free(factor);
+        free(a); free(b); free(prod); free(tmp); free(det);
+        mat_free(M);
+        return -3;
+    }
+
+    elem_copy_value(e, det, e->one);
 
     /* Gaussian elimination without pivoting */
     for (size_t k = 0; k < n; k++) {
 
         /* pivot = M[k][k] */
-        mat_get(M, k, k, pivot);
+        mat_get_owned(M, k, k, pivot);
 
         /* If pivot == 0 → determinant is 0 */
-        if (memcmp(pivot, e->zero, e->size) == 0) {
-            memcpy(determinant, e->zero, e->size);
+        if (elem_is_structural_zero(e, pivot)) {
+            elem_copy_value(e, determinant, e->zero);
+            elem_destroy_value(e, pivot);
+            elem_destroy_value(e, inv_pivot);
+            elem_destroy_value(e, factor);
+            elem_destroy_value(e, a);
+            elem_destroy_value(e, b);
+            elem_destroy_value(e, prod);
+            elem_destroy_value(e, tmp);
+            elem_destroy_value(e, det);
+            free(val); free(pivot); free(inv_pivot); free(factor);
+            free(a); free(b); free(prod); free(tmp); free(det);
             mat_free(M);
             return 0;
         }
 
         /* inv_pivot = 1 / pivot */
         e->inv(inv_pivot, pivot);
+        elem_destroy_value(e, pivot);
+        elem_init_zero_value(e, pivot);
 
         for (size_t i = k + 1; i < n; i++) {
 
             /* factor = M[i][k] / pivot = M[i][k] * inv_pivot */
-            mat_get(M, i, k, factor);
+            mat_get_owned(M, i, k, factor);
             e->mul(factor, inv_pivot, factor);
 
             for (size_t j = k; j < n; j++) {
 
                 /* a = M[i][j], b = M[k][j] */
-                mat_get(M, i, j, a);
-                mat_get(M, k, j, b);
+                mat_get_owned(M, i, j, a);
+                mat_get_owned(M, k, j, b);
 
                 /* prod = factor * b */
                 e->mul(prod, factor, b);
@@ -7236,20 +8012,42 @@ int mat_det(const matrix_t *A, void *determinant)
                 e->sub(tmp, a, prod);
 
                 mat_set(M, i, j, tmp);
+                elem_destroy_value(e, a);
+                elem_destroy_value(e, b);
+                elem_destroy_value(e, prod);
+                elem_destroy_value(e, tmp);
+                elem_init_zero_value(e, a);
+                elem_init_zero_value(e, b);
+                elem_init_zero_value(e, prod);
+                elem_init_zero_value(e, tmp);
             }
+            elem_destroy_value(e, factor);
+            elem_init_zero_value(e, factor);
         }
+        elem_destroy_value(e, inv_pivot);
+        elem_init_zero_value(e, inv_pivot);
     }
 
     /* determinant = product of diagonal entries */
-    unsigned char det[64];
-    memcpy(det, e->one, e->size);
-
     for (size_t i = 0; i < n; i++) {
-        mat_get(M, i, i, a);
+        mat_get_owned(M, i, i, a);
         e->mul(det, det, a);
+        elem_destroy_value(e, a);
+        elem_init_zero_value(e, a);
     }
 
-    memcpy(determinant, det, e->size);
+    elem_copy_value(e, determinant, det);
+    elem_destroy_value(e, val);
+    elem_destroy_value(e, pivot);
+    elem_destroy_value(e, inv_pivot);
+    elem_destroy_value(e, factor);
+    elem_destroy_value(e, a);
+    elem_destroy_value(e, b);
+    elem_destroy_value(e, prod);
+    elem_destroy_value(e, tmp);
+    elem_destroy_value(e, det);
+    free(val); free(pivot); free(inv_pivot); free(factor);
+    free(a); free(b); free(prod); free(tmp); free(det);
     mat_free(M);
     return 0;
 }
@@ -7285,32 +8083,52 @@ matrix_t *mat_inverse(const matrix_t *A)
         return NULL;
     }
 
-    unsigned char v[64];
+    unsigned char *v = calloc(1u, e->size ? e->size : 1u);
 
     /* Copy A into M */
     for (size_t i = 0; i < n; i++)
         for (size_t j = 0; j < n; j++) {
-            mat_get(A, i, j, v);
+            mat_get_owned(A, i, j, v);
             mat_set(M, i, j, v);
+            elem_destroy_value(e, v);
+            elem_init_zero_value(e, v);
         }
 
     /* Temporary buffers */
-    unsigned char pivot[64];
-    unsigned char inv_pivot[64];
-    unsigned char factor[64];
-    unsigned char a[64];
-    unsigned char b[64];
-    unsigned char prod[64];
-    unsigned char tmp[64];
+    unsigned char *pivot = calloc(1u, e->size ? e->size : 1u);
+    unsigned char *inv_pivot = calloc(1u, e->size ? e->size : 1u);
+    unsigned char *factor = calloc(1u, e->size ? e->size : 1u);
+    unsigned char *a = calloc(1u, e->size ? e->size : 1u);
+    unsigned char *b = calloc(1u, e->size ? e->size : 1u);
+    unsigned char *prod = calloc(1u, e->size ? e->size : 1u);
+    unsigned char *tmp = calloc(1u, e->size ? e->size : 1u);
+
+    if (!v || !pivot || !inv_pivot || !factor || !a || !b || !prod || !tmp) {
+        free(v); free(pivot); free(inv_pivot); free(factor);
+        free(a); free(b); free(prod); free(tmp);
+        mat_free(M);
+        mat_free(I);
+        return NULL;
+    }
 
     /* Gauss–Jordan elimination */
     for (size_t k = 0; k < n; k++) {
 
         /* pivot = M[k][k] */
-        mat_get(M, k, k, pivot);
+        mat_get_owned(M, k, k, pivot);
 
         /* If pivot == 0 → singular */
-        if (memcmp(pivot, e->zero, e->size) == 0) {
+        if (elem_is_structural_zero(e, pivot)) {
+            elem_destroy_value(e, v);
+            elem_destroy_value(e, pivot);
+            elem_destroy_value(e, inv_pivot);
+            elem_destroy_value(e, factor);
+            elem_destroy_value(e, a);
+            elem_destroy_value(e, b);
+            elem_destroy_value(e, prod);
+            elem_destroy_value(e, tmp);
+            free(v); free(pivot); free(inv_pivot); free(factor);
+            free(a); free(b); free(prod); free(tmp);
             mat_free(M);
             mat_free(I);
             return NULL;
@@ -7318,16 +8136,22 @@ matrix_t *mat_inverse(const matrix_t *A)
 
         /* inv_pivot = 1 / pivot */
         e->inv(inv_pivot, pivot);
+        elem_destroy_value(e, pivot);
+        elem_init_zero_value(e, pivot);
 
         /* Normalize row k: divide entire row by pivot */
         for (size_t j = 0; j < n; j++) {
-            mat_get(M, k, j, a);
+            mat_get_owned(M, k, j, a);
             e->mul(a, inv_pivot, a);
             mat_set(M, k, j, a);
+            elem_destroy_value(e, a);
+            elem_init_zero_value(e, a);
 
-            mat_get(I, k, j, b);
+            mat_get_owned(I, k, j, b);
             e->mul(b, inv_pivot, b);
             mat_set(I, k, j, b);
+            elem_destroy_value(e, b);
+            elem_init_zero_value(e, b);
         }
 
         /* Eliminate all other rows */
@@ -7335,32 +8159,65 @@ matrix_t *mat_inverse(const matrix_t *A)
             if (i == k) continue;
 
             /* factor = M[i][k] */
-            mat_get(M, i, k, factor);
+            mat_get_owned(M, i, k, factor);
 
             /* If factor == 0, skip */
-            if (memcmp(factor, e->zero, e->size) == 0)
+            if (elem_is_structural_zero(e, factor)) {
+                elem_destroy_value(e, factor);
+                elem_init_zero_value(e, factor);
                 continue;
+            }
 
             for (size_t j = 0; j < n; j++) {
 
                 /* M[i][j] -= factor * M[k][j] */
-                mat_get(M, i, j, a);
-                mat_get(M, k, j, b);
+                mat_get_owned(M, i, j, a);
+                mat_get_owned(M, k, j, b);
                 e->mul(prod, factor, b);
                 e->sub(tmp, a, prod);
                 mat_set(M, i, j, tmp);
+                elem_destroy_value(e, a);
+                elem_destroy_value(e, b);
+                elem_destroy_value(e, prod);
+                elem_destroy_value(e, tmp);
+                elem_init_zero_value(e, a);
+                elem_init_zero_value(e, b);
+                elem_init_zero_value(e, prod);
+                elem_init_zero_value(e, tmp);
 
                 /* I[i][j] -= factor * I[k][j] */
-                mat_get(I, i, j, a);
-                mat_get(I, k, j, b);
+                mat_get_owned(I, i, j, a);
+                mat_get_owned(I, k, j, b);
                 e->mul(prod, factor, b);
                 e->sub(tmp, a, prod);
                 mat_set(I, i, j, tmp);
+                elem_destroy_value(e, a);
+                elem_destroy_value(e, b);
+                elem_destroy_value(e, prod);
+                elem_destroy_value(e, tmp);
+                elem_init_zero_value(e, a);
+                elem_init_zero_value(e, b);
+                elem_init_zero_value(e, prod);
+                elem_init_zero_value(e, tmp);
             }
+            elem_destroy_value(e, factor);
+            elem_init_zero_value(e, factor);
         }
+        elem_destroy_value(e, inv_pivot);
+        elem_init_zero_value(e, inv_pivot);
     }
 
     /* M is now identity; I is A^{-1} */
+    elem_destroy_value(e, v);
+    elem_destroy_value(e, pivot);
+    elem_destroy_value(e, inv_pivot);
+    elem_destroy_value(e, factor);
+    elem_destroy_value(e, a);
+    elem_destroy_value(e, b);
+    elem_destroy_value(e, prod);
+    elem_destroy_value(e, tmp);
+    free(v); free(pivot); free(inv_pivot); free(factor);
+    free(a); free(b); free(prod); free(tmp);
     mat_free(M);
     return I;
 }

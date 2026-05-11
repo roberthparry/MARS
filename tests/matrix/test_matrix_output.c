@@ -27,15 +27,48 @@ static void test_mat_sprintf_formats(void)
 
 static void test_mat_printf_smoke(void)
 {
-    qfloat_t vals[4] = {
-        qf_from_double(1.0), qf_from_double(0.0),
-        qf_from_double(0.0), qf_from_double(1.0)
-    };
-    matrix_t *A = mat_create_qf(2, 2, vals);
-    int n = mat_printf("%m\n", A);
+    number_t vals[4];
+    matrix_t *A;
+    int n;
 
+    vals[0] = num_create_from_long(1);
+    vals[1] = num_create_from_string("1/2");
+    vals[2] = num_create_from_long(0);
+    vals[3] = num_create_from_long(1);
+    A = mat_create_num(2, 2, vals);
+    n = mat_printf("%m\n", A);
     check_bool("mat_printf returns positive count", n > 0);
+    for (size_t i = 0; i < 4u; ++i)
+        num_destroy(&vals[i]);
     mat_free(A);
+}
+
+static void test_mat_sprintf_number_precision(void)
+{
+    mfloat_t *real_base = mf_create_string("1.25");
+    number_t vals[4];
+    matrix_t *A;
+    char buf[4096];
+    char *expected = NULL;
+
+    check_bool("mat_sprintf number base non-null", real_base != NULL);
+    vals[0] = num_create_from_mfloat_with_prec_bits(real_base, 512u);
+    vals[1] = num_create_from_string("1/2");
+    vals[2] = num_create_from_long(3);
+    vals[3] = num_create_from_long(4);
+    A = mat_create_num(2, 2, vals);
+    expected = num_to_string(vals[1]);
+
+    check_bool("mat_sprintf number returns non-negative",
+               mat_sprintf(buf, sizeof(buf), "%m", A) >= 0);
+    check_bool("mat_sprintf number preserves rational text",
+               expected && strstr(buf, expected) != NULL);
+
+    free(expected);
+    mat_free(A);
+    for (size_t i = 0; i < 4u; ++i)
+        num_destroy(&vals[i]);
+    mf_free(real_base);
 }
 
 static void test_mat_sprintf_pretty_qcomplex(void)
@@ -65,5 +98,6 @@ void run_matrix_output_tests(void)
 {
     test_mat_sprintf_formats();
     test_mat_printf_smoke();
+    test_mat_sprintf_number_precision();
     test_mat_sprintf_pretty_qcomplex();
 }
