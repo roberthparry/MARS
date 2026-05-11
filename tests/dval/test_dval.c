@@ -184,13 +184,9 @@ static int run_readme_example(void)
 static int run_readme_from_string_example(void)
 {
     const size_t old_prec_bits = num_get_default_prec_bits();
-    number_t x0;
-    dval_t *x;
-    dval_t *sinx;
-    dval_t *esinx;
-    dval_t *x2;
-    dval_t *t;
-    dval_t *t2;
+    dval_binding_t *bindings = NULL;
+    size_t nbindings = 0;
+    dval_binding_t *x_binding;
     dval_t *f;
     dval_t *df_dx;
     const dval_t *d2f_dx;
@@ -200,46 +196,34 @@ static int run_readme_from_string_example(void)
 
     if (num_set_default_prec_bits(384u) != 0)
         return 1;
-    x0 = num_create_from_string("1.25");
-    x = dv_new_named_var_num(x0, "x");
-    num_destroy(&x0);
-    sinx = dv_sin(x);
-    esinx = dv_exp(sinx);
-    x2 = dv_pow_d(x, 2.0);
-    {
-        number_t three = num_create_from_long(3);
-        number_t seven = num_create_from_long(7);
-
-        t = dv_mul_num(x2, &three);
-        t2 = dv_sub_num(t, &seven);
-        num_destroy(&seven);
-        num_destroy(&three);
+    f = dval_from_string_with_bindings("{ exp(sin(x)) + 3*x^2 - 7 | x = 1.25 }",
+                                       &bindings,
+                                       &nbindings);
+    if (!f) {
+        num_set_default_prec_bits(old_prec_bits);
+        return 1;
     }
-    f = dv_add(esinx, t2);
-
-    if (!x || !sinx || !esinx || !x2 || !t || !t2 || !f) {
+    x_binding = dval_binding_find(bindings, nbindings, "x");
+    if (!x_binding) {
         dv_free(f);
-        dv_free(t2); dv_free(t); dv_free(x2); dv_free(esinx); dv_free(sinx);
-        dv_free(x);
+        free(bindings);
         num_set_default_prec_bits(old_prec_bits);
         return 1;
     }
 
-    df_dx = dv_create_deriv(f, x);
+    df_dx = dv_create_deriv(f, x_binding->symbol);
     if (!df_dx) {
         dv_free(f);
-        dv_free(t2); dv_free(t); dv_free(x2); dv_free(esinx); dv_free(sinx);
-        dv_free(x);
+        free(bindings);
         num_set_default_prec_bits(old_prec_bits);
         return 1;
     }
 
-    d2f_dx = dv_get_deriv(df_dx, x);
+    d2f_dx = dv_get_deriv(df_dx, x_binding->symbol);
     if (!d2f_dx) {
         dv_free(df_dx);
         dv_free(f);
-        dv_free(t2); dv_free(t); dv_free(x2); dv_free(esinx); dv_free(sinx);
-        dv_free(x);
+        free(bindings);
         num_set_default_prec_bits(old_prec_bits);
         return 1;
     }
@@ -263,8 +247,7 @@ static int run_readme_from_string_example(void)
     num_destroy(&f_val);
     dv_free(df_dx);
     dv_free(f);
-    dv_free(t2); dv_free(t); dv_free(x2); dv_free(esinx); dv_free(sinx);
-    dv_free(x);
+    free(bindings);
     num_set_default_prec_bits(old_prec_bits);
     return 0;
 }

@@ -167,41 +167,39 @@ hold an explicit variable pointer so you can pass it to the derivative API.
 
 ```c
 #include <stdio.h>
+#include <stdlib.h>
 #include "dval.h"
 #include "number.h"
 
 int main(void) {
-    /* Evaluation only — variable is internal to the parsed DAG. */
-    dval_t *fparse = dval_from_string("{ exp(sin(x)) + 3*x^2 - 7 | x = 1.25 }");
-    number_t parsed_value;
-    if (!fparse) return 1;
-    num_set_default_prec_bits(384);
-    parsed_value = dv_eval_num(fparse);
-    num_printf("f(1.25) = %.101N\n", parsed_value);
-    num_destroy(&parsed_value);
-    dv_free(fparse);
-
-    /* Differentiation — build explicitly so x is accessible as wrt. */
-    number_t x0 = num_create_from_string("1.25");
-    number_t two = num_create_from_long(2);
-    number_t three = num_create_from_long(3);
-    number_t seven = num_create_from_long(7);
-    dval_t *x     = dv_new_named_var_num(x0, "x");
-    dval_t *sinx  = dv_sin(x);
-    dval_t *esinx = dv_exp(sinx);
-    dval_t *x2    = dv_pow_num(x, &two);
-    dval_t *t     = dv_mul_num(x2, &three);
-    dval_t *t2    = dv_sub_num(t, &seven);
-    dval_t *f     = dv_add(esinx, t2);
-
-    dval_t *df_dx       = dv_create_deriv(f, x);
-    const dval_t *d2f_dx = dv_get_deriv(df_dx, x);
+    dval_binding_t *bindings = NULL;
+    size_t nbindings = 0;
+    dval_binding_t *x_binding;
+    dval_t *f = dval_from_string_with_bindings(
+        "{ exp(sin(x)) + 3*x^2 - 7 | x = 1.25 }",
+        &bindings,
+        &nbindings
+    );
+    dval_t *df_dx;
+    const dval_t *d2f_dx;
     number_t f_val;
     number_t d1_val;
     number_t d2_val;
 
-    num_destroy(&x0);
-    num_destroy(&two);
+    if (!f)
+        return 1;
+
+    x_binding = dval_binding_find(bindings, nbindings, "x");
+    if (!x_binding) {
+        dv_free(f);
+        free(bindings);
+        return 1;
+    }
+
+    num_set_default_prec_bits(384);
+
+    df_dx = dv_create_deriv(f, x_binding->symbol);
+    d2f_dx = dv_get_deriv(df_dx, x_binding->symbol);
 
     printf("f(x)    = "); dv_print(f);
     printf("f'(x)   = "); dv_print(df_dx);
@@ -219,19 +217,15 @@ int main(void) {
     num_destroy(&d2_val);
     num_destroy(&d1_val);
     num_destroy(&f_val);
-    num_destroy(&seven);
-    num_destroy(&three);
     dv_free(df_dx);
     dv_free(f);
-    dv_free(t2); dv_free(t); dv_free(x2); dv_free(esinx); dv_free(sinx);
-    dv_free(x);
+    free(bindings);
 
     return 0;
 }
 ```
 
 ```text
-f(1.25) = 0.2705855122552273437029639300167490299999821513753709749690393836985059027675459135561625639872826338
 Example: Parsing from a String
 f(x)    = { exp(sin(x)) + 3x² - 7 | x = 1.25 }
 f'(x)   = { 6x + cos(x)·exp(sin(x)) | x = 1.25 }
