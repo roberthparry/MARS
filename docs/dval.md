@@ -153,16 +153,16 @@ f(x)    = { exp(sin(x)) + 3x² - 7 | x = 1.25 }
 f'(x)   = { 6x + cos(x)·exp(sin(x)) | x = 1.25 }
 f''(x)  = { cos²(x)·exp(sin(x)) - sin(x)·exp(sin(x)) + 6 | x = 1.25 }
 
-Wolfram Alpha:
-  f(x)   : [open](https://www.wolframalpha.com/input?i=%28%28Exp%5BSin%5B1.25%5D%5D%2B%28%281.25%5E2%29%2A3%29%29-7%29)
-  f'(x)  : [open](https://www.wolframalpha.com/input?i=%28%286%2A1.25%29%2B%28Cos%5B1.25%5D%2AExp%5BSin%5B1.25%5D%5D%29%29)
-  f''(x) : [open](https://www.wolframalpha.com/input?i=%28%28%28Cos%5B1.25%5D%5E2%29%2AExp%5BSin%5B1.25%5D%5D%29-%28Sin%5B1.25%5D%2AExp%5BSin%5B1.25%5D%5D%29%29%2B6%29)
-
 At x = 1.25 (384 bits, 115 significant digits):
 f(x)     = 2.705855122552273437029639300167354701622137229515609890757472472673785676415953638138922546147647793112211043900459E-1
 f'(x)    = 8.314504625993310996029399615209018784051045276485022598390329993996280767846549723245286494696734820203922652319368E+0
 f''(x)   = 3.805523101239629225822177640424432554942960462475668946332693568943904891124835742842098701664527021738133356606832E+0
 ```
+
+Wolfram Alpha:
+- `f(x)`: [open](https://www.wolframalpha.com/input?i=%28%28Exp%5BSin%5B1.25%5D%5D%2B%28%281.25%5E2%29%2A3%29%29-7%29)
+- `f'(x)`: [open](https://www.wolframalpha.com/input?i=%28%286%2A1.25%29%2B%28Cos%5B1.25%5D%2AExp%5BSin%5B1.25%5D%5D%29%29)
+- `f''(x)`: [open](https://www.wolframalpha.com/input?i=%28%28%28Cos%5B1.25%5D%5E2%29%2AExp%5BSin%5B1.25%5D%5D%29-%28Sin%5B1.25%5D%2AExp%5BSin%5B1.25%5D%5D%29%29%2B6%29)
 
 ## Example: Parsing from a String
 
@@ -242,16 +242,16 @@ f(x)    = { exp(sin(x)) + 3x² - 7 | x = 1.25 }
 f'(x)   = { 6x + cos(x)·exp(sin(x)) | x = 1.25 }
 f''(x)  = { cos²(x)·exp(sin(x)) - sin(x)·exp(sin(x)) + 6 | x = 1.25 }
 
-Wolfram Alpha:
-  f(x)   : [open](https://www.wolframalpha.com/input?i=%28%28Exp%5BSin%5B1.25%5D%5D%2B%28%281.25%5E2%29%2A3%29%29-7%29)
-  f'(x)  : [open](https://www.wolframalpha.com/input?i=%28%286%2A1.25%29%2B%28Cos%5B1.25%5D%2AExp%5BSin%5B1.25%5D%5D%29%29)
-  f''(x) : [open](https://www.wolframalpha.com/input?i=%28%28%28Cos%5B1.25%5D%5E2%29%2AExp%5BSin%5B1.25%5D%5D%29-%28Sin%5B1.25%5D%2AExp%5BSin%5B1.25%5D%5D%29%29%2B6%29)
-
 At x = 1.25 (384 bits, 115 significant digits):
 f(x)     = 2.705855122552273437029639300167354701622137229515609890757472472673785676415953638138922546147647793112211043900459E-1
 f'(x)    = 8.314504625993310996029399615209018784051045276485022598390329993996280767846549723245286494696734820203922652319368E+0
 f''(x)   = 3.805523101239629225822177640424432554942960462475668946332693568943904891124835742842098701664527021738133356606832E+0
 ```
+
+Wolfram Alpha:
+- `f(x)`: [open](https://www.wolframalpha.com/input?i=%28%28Exp%5BSin%5B1.25%5D%5D%2B%28%281.25%5E2%29%2A3%29%29-7%29)
+- `f'(x)`: [open](https://www.wolframalpha.com/input?i=%28%286%2A1.25%29%2B%28Cos%5B1.25%5D%2AExp%5BSin%5B1.25%5D%5D%29%29)
+- `f''(x)`: [open](https://www.wolframalpha.com/input?i=%28%28%28Cos%5B1.25%5D%5E2%29%2AExp%5BSin%5B1.25%5D%5D%29-%28Sin%5B1.25%5D%2AExp%5BSin%5B1.25%5D%5D%29%29%2B6%29)
 
 ## Example: Derivatives
 
