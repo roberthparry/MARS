@@ -211,7 +211,7 @@ static int run_readme_from_string_example(void)
         return 1;
     }
 
-    df_dx = dv_create_deriv(f, x_binding->symbol);
+    df_dx = dv_create_deriv(f, x_binding->dval);
     if (!df_dx) {
         dv_free(f);
         free(bindings);
@@ -219,7 +219,7 @@ static int run_readme_from_string_example(void)
         return 1;
     }
 
-    d2f_dx = dv_get_deriv(df_dx, x_binding->symbol);
+    d2f_dx = dv_get_deriv(df_dx, x_binding->dval);
     if (!d2f_dx) {
         dv_free(df_dx);
         dv_free(f);

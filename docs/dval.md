@@ -198,8 +198,8 @@ int main(void) {
 
     num_set_default_prec_bits(384);
 
-    df_dx = dv_create_deriv(f, x_binding->symbol);
-    d2f_dx = dv_get_deriv(df_dx, x_binding->symbol);
+    df_dx = dv_create_deriv(f, x_binding->dval);
+    d2f_dx = dv_get_deriv(df_dx, x_binding->dval);
 
     printf("f(x)    = "); dv_print(f);
     printf("f'(x)   = "); dv_print(df_dx);
@@ -608,7 +608,7 @@ All functions return owning handles.
   When `bindings_out` is non-NULL, `dval_from_string_with_bindings(...)`
   returns a flat array of borrowed symbolic bindings:
   - `dval_binding_t.name` is the normalised symbol name
-  - `dval_binding_t.symbol` is the underlying symbolic leaf
+  - `dval_binding_t.dval` is the underlying differentiable-value leaf
   - `dval_binding_t.is_constant` tells you whether the symbol is a constant placeholder
 
   This is the public way to differentiate a parsed bare symbolic expression:

@@ -31,13 +31,13 @@ typedef struct _dval_t dval_t;
 /**
  * @brief Borrowed symbolic binding returned by dval_from_string_with_bindings().
  *
- * The @p name pointer and @p symbol handle remain valid for as long as the
+ * The @p name pointer and @p dval handle remain valid for as long as the
  * dval returned by dval_from_string_with_bindings() remains alive. Releasing
  * the bindings array itself only requires a plain free(bindings).
  */
 typedef struct {
     const char *name;
-    dval_t *symbol;
+    dval_t *dval;
     bool is_constant;
 } dval_binding_t;
 

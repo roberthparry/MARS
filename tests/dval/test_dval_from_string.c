@@ -1066,7 +1066,7 @@ static void test_from_string_bindings_api(void)
 
     check_dval_d("parsed expr after binding update", expr, 14.0, __LINE__);
 
-    deriv = dv_create_deriv(expr, x_binding->symbol);
+    deriv = dv_create_deriv(expr, x_binding->dval);
     if (!deriv) {
         printf(C_BOLD C_RED "FAIL" C_RESET " derivative from inferred binding returned NULL %s:%d:1\n\n",
                __FILE__, __LINE__);

@@ -1194,6 +1194,6 @@ int dval_binding_set_num(dval_binding_t *bindings,
 
     if (!binding)
         return -1;
-    dv_set_val_num(binding->symbol, value);
+    dv_set_val_num(binding->dval, value);
     return 0;
 }

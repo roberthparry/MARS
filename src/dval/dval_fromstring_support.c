@@ -386,7 +386,7 @@ dval_binding_t *symtab_build_bindings(const symtab_t *t, size_t *number_out)
         size_t n = strlen(t->entries[i].name) + 1;
         memcpy(name_store, t->entries[i].name, n);
         bindings[i].name = name_store;
-        bindings[i].symbol = t->entries[i].node;
+        bindings[i].dval = t->entries[i].node;
         bindings[i].is_constant = (t->entries[i].node &&
                                    t->entries[i].node->ops == &ops_const);
         name_store += n;
@@ -414,7 +414,7 @@ dval_binding_t *single_binding_from_node(dval_t *node, size_t *number_out)
 
     bindings[0].name = (char *)(bindings + 1);
     memcpy((char *)bindings[0].name, node->name, n);
-    bindings[0].symbol = node;
+    bindings[0].dval = node;
     bindings[0].is_constant = (node->ops == &ops_const);
     if (number_out)
         *number_out = 1;
