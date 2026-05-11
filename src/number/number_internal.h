@@ -24,6 +24,8 @@ typedef enum number_math_family_t {
     NUMBER_MATH_MCOMPLEX
 } number_math_family_t;
 
+typedef enum number_const_id_t number_const_id_t;
+
 typedef struct number_vtable_t {
     number_kind_t kind;
     number_math_family_t math_family;
@@ -32,6 +34,7 @@ typedef struct number_vtable_t {
     void (*destroy_payload)(number_t *number);
     number_t *(*clone)(const number_t *number);
     char *(*to_string)(const number_t *number);
+    bool (*is_immortal)(const number_t *number);
     bool (*is_real)(const number_t *number);
     bool (*is_zero)(const number_t *number);
     bool (*is_one)(const number_t *number);
@@ -41,6 +44,7 @@ typedef struct number_vtable_t {
     bool (*eq_same)(const number_t *a, const number_t *b);
     bool (*eq_same_tol)(const number_t *a, const number_t *b);
     int (*cmp_same)(const number_t *a, const number_t *b);
+    number_t (*const_like)(const number_t *like, number_const_id_t id);
     char *(*format_inexact)(const number_t *number, bool scientific, int precision);
     int (*set_precision)(number_t *number, size_t precision_bits);
     size_t (*get_precision)(const number_t *number);
@@ -151,6 +155,22 @@ static inline const number_vtable_t *number_vt(const number_t *number)
     kind = (size_t)number_impl_const(number)->kind;
     return kind < number_dispatch_count
         ? number_dispatch[kind] : NULL;
+}
+
+static inline number_kind_t number_kind_value(const number_t *number)
+{
+    const number_vtable_t *vt = number ? number_vt(number) : NULL;
+
+    return number && number_is_valid_value(number) && vt
+        ? vt->kind : NUMBER_INVALID;
+}
+
+static inline bool number_same_kind_value(const number_t *a, const number_t *b)
+{
+    number_kind_t ak = number_kind_value(a);
+    number_kind_t bk = number_kind_value(b);
+
+    return ak != NUMBER_INVALID && ak == bk;
 }
 
 static inline number_math_family_t number_math_family_value(const number_t *number)

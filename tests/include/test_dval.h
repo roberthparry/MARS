@@ -306,6 +306,7 @@ void test_erfc(void);
 void test_erfinv(void);
 void test_erfcinv(void);
 void test_gamma(void);
+void test_gammainv(void);
 void test_lgamma(void);
 void test_digamma(void);
 void test_trigamma(void);

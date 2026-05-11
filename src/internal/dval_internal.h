@@ -1,5 +1,5 @@
-#ifndef SRC_INTERNAL_DVAL_INTERNAL_H
-#define SRC_INTERNAL_DVAL_INTERNAL_H
+#ifndef DVAL_SHARED_INTERNAL_H
+#define DVAL_SHARED_INTERNAL_H
 
 #include <stdbool.h>
 #include <stddef.h>

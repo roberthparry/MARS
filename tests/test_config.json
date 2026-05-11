@@ -1655,7 +1655,8 @@
       "test_e1": true,
       "test_beta": true,
       "test_logbeta": true,
-      "test_pow_d_complex": true
+      "test_pow_d_complex": true,
+      "test_gammainv": true
     }
   },
   "tests/dval/test_dval_first_derivatives.c": {
@@ -1712,7 +1713,8 @@
       "test_deriv_e1": true,
       "test_deriv_beta": true,
       "test_deriv_logbeta": true,
-      "test_deriv_wrt_const_is_nan": true
+      "test_deriv_wrt_const_is_nan": true,
+      "test_deriv_gammainv": true
     }
   },
   "tests/dval/test_dval_second_derivatives.c": {
@@ -1766,7 +1768,8 @@
       "test_second_deriv_lambert_wm1": true,
       "test_second_deriv_beta": true,
       "test_second_deriv_logbeta": true,
-      "test_second_deriv_digamma": true
+      "test_second_deriv_digamma": true,
+      "test_second_deriv_gammainv": true
     }
   },
   "tests/dval/test_dval_string_groups.c": {

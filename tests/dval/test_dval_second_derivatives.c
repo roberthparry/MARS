@@ -969,6 +969,30 @@ void test_second_deriv_lambert_w0(void)
     dv_free(x);
 }
 
+void test_second_deriv_gammainv(void)
+{
+    qfloat_t X = qf_gamma(qf_from_double(2.5));
+    dval_t *x   = test_dv_new_var_qf(X);
+    dval_t *f   = dv_gammainv(x);
+    dval_t *df  = dv_create_deriv(f, x);
+    const dval_t *ddf = dv_get_deriv(df, x);
+
+    /* y = gammainv(x), y'' = -(ψ'(y) + ψ(y)^2) / (x^2 ψ(y)^3) */
+    qfloat_t y = qf_gammainv(X);
+    qfloat_t psi = qf_digamma(y);
+    qfloat_t psi1 = qf_trigamma(y);
+    qfloat_t numer = qf_add(psi1, qf_mul(psi, psi));
+    qfloat_t denom = qf_mul(qf_mul(X, X), qf_mul(psi, qf_mul(psi, psi)));
+    qfloat_t expect = qf_neg(qf_div(numer, denom));
+
+    check_q_at(__FILE__, __LINE__, 1, "d²/dx²{gammainv(x)} | x=gamma(2.5)", dv_eval_qf(ddf), expect);
+    print_expr_of(ddf);
+
+    dv_free(df);
+    dv_free(f);
+    dv_free(x);
+}
+
 void test_second_deriv_lambert_wm1(void)
 {
     dval_t *x   = test_dv_new_var_qf(qf_from_string("-0.1"));
@@ -1080,6 +1104,7 @@ void test_second_derivatives(void)
     RUN_SUBTEST(test_second_deriv_erfc);
     RUN_SUBTEST(test_second_deriv_gamma);
     RUN_SUBTEST(test_second_deriv_lgamma);
+    RUN_SUBTEST(test_second_deriv_gammainv);
     RUN_SUBTEST(test_second_deriv_normal_pdf);
     RUN_SUBTEST(test_second_deriv_normal_cdf);
     RUN_SUBTEST(test_second_deriv_normal_logpdf);

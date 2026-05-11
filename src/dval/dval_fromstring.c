@@ -109,7 +109,7 @@ typedef dval_t *(*binary_fn)(const dval_t *, const dval_t *);
 /* Function dispatch                                                   */
 /* ------------------------------------------------------------------ */
 
-/* Collision-free direct hash table for the current 36 function keywords.
+/* Collision-free direct hash table for the current 37 function keywords.
  * The salted hash uses modulus 54, and the highest occupied slot is 51, so
  * the backing table itself only needs 52 entries. */
 #define FUNC_HT_MODULUS  54
@@ -152,6 +152,7 @@ static const func_entry_t s_funcs[FUNC_HT_SIZE] = {
     [34] = { "asinh",          5, false, dv_asinh,         NULL        },
     [35] = { "tanh",           4, false, dv_tanh,          NULL        },
     [37] = { "erfcinv",        7, false, dv_erfcinv,       NULL        },
+    [38] = { "gammainv",       8, false, dv_gammainv,      NULL        },
     [41] = { "normal_cdf",    10, false, dv_normal_cdf,    NULL        },
     [43] = { "sqrt",           4, false, dv_sqrt,          NULL        },
     [44] = { "asin",           4, false, dv_asin,          NULL        },

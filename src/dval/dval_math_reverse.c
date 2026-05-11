@@ -1,3 +1,4 @@
+#include <math.h>
 #include <stddef.h>
 
 #include "dval_internal.h"
@@ -5,7 +6,7 @@
 static inline void dv_reverse_unary(number_t value, number_t *a_bar, number_t *b_bar)
 {
     *a_bar = value;
-    *b_bar = num_clone(NUM_ZERO);
+    *b_bar = NUM_ZERO;
 }
 
 static inline number_t num_sq_local(const number_t value)
@@ -196,8 +197,8 @@ void dv_reverse_sqrt(const dval_t *dv, const number_t *out_bar, number_t *a_bar,
 void dv_reverse_abs(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
     if (!num_is_real(dv_eval_num_internal(dv->a))) {
-        *a_bar = num_clone(NUM_NAN);
-        *b_bar = num_clone(NUM_ZERO);
+        *a_bar = NUM_NAN;
+        *b_bar = NUM_ZERO;
         return;
     }
     switch (num_cmp(dv_eval_num_internal(dv->a), NUM_ZERO)) {
@@ -208,10 +209,10 @@ void dv_reverse_abs(const dval_t *dv, const number_t *out_bar, number_t *a_bar, 
         *a_bar = num_neg(*out_bar);
         break;
     default:
-        *a_bar = num_clone(NUM_ZERO);
+        *a_bar = NUM_ZERO;
         break;
     }
-    *b_bar = num_clone(NUM_ZERO);
+    *b_bar = NUM_ZERO;
 }
 
 void dv_reverse_hypot(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
@@ -324,12 +325,25 @@ void dv_reverse_trigamma(const dval_t *dv, const number_t *out_bar, number_t *a_
     num_destroy(&tetragamma_x);
 }
 
+void dv_reverse_gammainv(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+{
+    number_t y = dv_eval_num_internal(dv);
+    number_t psi_y = num_digamma(y);
+    number_t x_psi = num_mul(dv_eval_num_internal(dv->a), psi_y);
+    number_t factor = num_inv(x_psi);
+
+    dv_reverse_unary(num_mul(*out_bar, factor), a_bar, b_bar);
+    num_destroy(&factor);
+    num_destroy(&x_psi);
+    num_destroy(&psi_y);
+}
+
 static number_t num_lambert_reverse_factor(const number_t z, const number_t w)
 {
     number_t one_plus_w;
 
     if (num_eq(z, NUM_ZERO))
-        return num_clone(NUM_ONE);
+        return NUM_ONE;
     one_plus_w = num_add(NUM_ONE, w);
     {
         number_t denom = num_mul(z, one_plus_w);

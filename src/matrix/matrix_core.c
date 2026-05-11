@@ -8,6 +8,7 @@
 #include "qcomplex.h"
 #include "matrix.h"
 #include "internal/dval_internal.h"
+#include "internal/number_internal.h"
 
 /* ============================================================
    Internal matrix construction helpers (forward declarations)
@@ -172,7 +173,7 @@ static bool elem_is_structural_zero(const struct elem_vtable *elem, const void *
 
 static bool elem_supports_numeric_algorithms(const struct elem_vtable *elem)
 {
-    return elem && elem->kind != ELEM_DVAL;
+    return elem && !elem_is_symbolic(elem);
 }
 
 void mat_value_init_zero(const struct matrix_t *A, void *slot)
@@ -229,7 +230,7 @@ static void num_copy_value(void *dst, const void *src)
 {
     const number_t *value = src ? (const number_t *)src : &NUM_ZERO;
 
-    *(number_t *)dst = num_clone(*value);
+    *(number_t *)dst = num_is_immortal(*value) ? *value : num_clone(*value);
 }
 
 static void num_destroy_value(void *slot)
@@ -1811,7 +1812,7 @@ static matrix_t *mat_create_zero_with_elem(size_t rows, size_t cols,
 
     for (size_t i = 0; i < rows; ++i) {
         for (size_t j = 0; j < cols; ++j) {
-            if (elem->kind == ELEM_DVAL) {
+            if (elem_is_symbolic(elem)) {
                 const dval_t *zero = DV_ZERO;
                 mat_set(M, i, j, &zero);
             } else {
@@ -2621,7 +2622,7 @@ static matrix_t *mat_adjugate_exact(const matrix_t *A)
         return NULL;
 
     if (A->rows == 1) {
-        if (e->kind == ELEM_DVAL) {
+        if (elem_is_symbolic(e)) {
             const dval_t *one = DV_ONE;
             mat_set(Adj, 0, 0, &one);
         } else {
@@ -2637,7 +2638,7 @@ static matrix_t *mat_adjugate_exact(const matrix_t *A)
             if (!Minor)
                 goto fail;
 
-            if (e->kind == ELEM_DVAL) {
+            if (elem_is_symbolic(e)) {
                 dval_t *det = NULL;
                 dval_t *entry;
 
@@ -3983,6 +3984,17 @@ static void d_print(const void *v, char *buf, size_t n) {
     snprintf(buf, n, "%.16g", *(const double*)v);
 }
 
+static int d_format_scalar(const void *v, int scientific, char *buf, size_t n)
+{
+    double x = *(const double *)v;
+
+    if (scientific)
+        snprintf(buf, n, "%.16E", x);
+    else
+        snprintf(buf, n, "%.16g", x);
+    return 0;
+}
+
 static double d_abs2(const void *a)              { double x = *(const double*)a; return x * x; }
 static double d_to_real(const void *a)            { return *(const double*)a; }
 static void   d_from_real(void *o, double x)      { *(double*)o = x; }
@@ -4143,6 +4155,7 @@ const struct elem_vtable double_elem = {
     .one             = &D_ONE,
     .cmp             = d_cmp,
     .print           = d_print,
+    .format_scalar   = d_format_scalar,
     .relative_epsilon = D_REL_EPS,
     .fun             = &double_fun
 };
@@ -4172,6 +4185,12 @@ static int qfloat_cmp(const void *a, const void *b)
 
 static void qf_print_wrap(const void *v, char *buf, size_t n) {
     qf_to_string(*(const qfloat_t*)v, buf, n);
+}
+
+static int qf_format_scalar(const void *v, int scientific, char *buf, size_t n)
+{
+    qf_sprintf(buf, n, scientific ? "%Q" : "%q", *(const qfloat_t *)v);
+    return 0;
 }
 
 static double qf_abs2_wrap(const void *a) {
@@ -4295,6 +4314,7 @@ const struct elem_vtable qfloat_elem = {
     .one             = &QF_ONE,
     .cmp             = qfloat_cmp,
     .print           = qf_print_wrap,
+    .format_scalar   = qf_format_scalar,
     .relative_epsilon = Q_REL_EPS,
     .fun             = &qfloat_fun
 };
@@ -4342,6 +4362,53 @@ static int qcomplex_cmp(const void *a, const void *b)
 
 static void qc_print_wrap(const void *v, char *buf, size_t n) {
     qc_to_string(*(const qcomplex_t*)v, buf, n);
+}
+
+static int qc_format_pretty(char *buf, size_t n, qcomplex_t z)
+{
+    qfloat_t re = qc_real(z);
+    qfloat_t im = qc_imag(z);
+    char rs[128];
+    char is[128];
+
+    if (qf_eq(im, QF_ZERO)) {
+        qf_sprintf(buf, n, "%q", re);
+        return 0;
+    }
+    if (qf_eq(re, QF_ZERO)) {
+        if (qf_eq(im, QF_ONE))
+            snprintf(buf, n, "i");
+        else if (qf_eq(im, qf_neg(QF_ONE)))
+            snprintf(buf, n, "-i");
+        else {
+            qf_sprintf(is, sizeof(is), "%q", im);
+            snprintf(buf, n, "%si", is);
+        }
+        return 0;
+    }
+
+    qf_sprintf(rs, sizeof(rs), "%q", re);
+    if (qf_eq(im, QF_ONE))
+        snprintf(buf, n, "%s + i", rs);
+    else if (qf_eq(im, qf_neg(QF_ONE)))
+        snprintf(buf, n, "%s - i", rs);
+    else {
+        qf_sprintf(is, sizeof(is), "%q", qf_abs(im));
+        snprintf(buf, n, qf_lt(im, QF_ZERO) ? "%s - %si" : "%s + %si", rs, is);
+    }
+
+    return 0;
+}
+
+static int qc_format_scalar(const void *v, int scientific, char *buf, size_t n)
+{
+    qcomplex_t z = *(const qcomplex_t *)v;
+
+    if (scientific)
+        qc_sprintf(buf, n, "%Z", z);
+    else
+        qc_format_pretty(buf, n, z);
+    return 0;
 }
 
 static double qc_abs2_wrap(const void *a) {
@@ -4471,6 +4538,7 @@ const struct elem_vtable qcomplex_elem = {
     .one             = &QC_ONE,
     .cmp             = qcomplex_cmp,
     .print           = qc_print_wrap,
+    .format_scalar   = qc_format_scalar,
     .relative_epsilon = Q_REL_EPS,
     .fun             = &qcomplex_fun
 };
@@ -4513,6 +4581,25 @@ static void num_print_wrap(const void *v, char *buf, size_t n)
 
     snprintf(buf, n, "%s", text);
     free(text);
+}
+
+static int num_format_scalar(const void *v, int scientific, char *buf, size_t n)
+{
+    number_t value = *(const number_t *)v;
+    char fmt[32];
+    size_t significant_digits = num_get_prec_digits(value);
+    size_t precision;
+    int written;
+
+    if (num_is_exact(value) || significant_digits == 0u) {
+        written = num_sprintf(buf, n, scientific ? "%N" : "%n", value);
+        return written < 0 ? -1 : 0;
+    }
+
+    precision = significant_digits > 0u ? significant_digits - 1u : 0u;
+    snprintf(fmt, sizeof(fmt), "%%.%zu%c", precision, scientific ? 'N' : 'n');
+    written = num_sprintf(buf, n, fmt, value);
+    return written < 0 ? -1 : 0;
 }
 
 static double num_abs2_wrap(const void *a)
@@ -4672,6 +4759,7 @@ const struct elem_vtable number_elem = {
     .one             = &NUM_ONE,
     .cmp             = number_cmp_wrap,
     .print           = num_print_wrap,
+    .format_scalar   = num_format_scalar,
     .relative_epsilon = Q_REL_EPS,
     .fun             = &number_fun
 };
@@ -5239,6 +5327,7 @@ const struct elem_vtable dval_elem = {
     .one             = &DV_ONE,
     .cmp             = dval_cmp_wrap,
     .print           = dv_print_wrap,
+    .format_scalar   = NULL,
     .relative_epsilon = Q_REL_EPS,
     .fun             = &dval_fun
 };
@@ -5970,32 +6059,8 @@ static const binop_vtable binops[ELEM_MAX][ELEM_MAX] = {
 };
 
 /* ============================================================
-   Public API constructors (preserve old names)
+   Public API constructors
    ============================================================ */
-
-struct matrix_t *mat_new_d(size_t rows, size_t cols) {
-    return mat_create_dense_with_elem(rows, cols, &double_elem);
-}
-
-struct matrix_t *mat_new_sparse_d(size_t rows, size_t cols) {
-    return mat_create_sparse_with_elem(rows, cols, &double_elem);
-}
-
-struct matrix_t *mat_new_qf(size_t rows, size_t cols) {
-    return mat_create_dense_with_elem(rows, cols, &qfloat_elem);
-}
-
-struct matrix_t *mat_new_sparse_qf(size_t rows, size_t cols) {
-    return mat_create_sparse_with_elem(rows, cols, &qfloat_elem);
-}
-
-struct matrix_t *mat_new_qc(size_t rows, size_t cols) {
-    return mat_create_dense_with_elem(rows, cols, &qcomplex_elem);
-}
-
-struct matrix_t *mat_new_sparse_qc(size_t rows, size_t cols) {
-    return mat_create_sparse_with_elem(rows, cols, &qcomplex_elem);
-}
 
 struct matrix_t *mat_new_num(size_t rows, size_t cols) {
     return mat_create_dense_with_elem(rows, cols, &number_elem);
@@ -6013,36 +6078,8 @@ struct matrix_t *mat_new_sparse_dv(size_t rows, size_t cols) {
     return mat_create_sparse_with_elem(rows, cols, &dval_elem);
 }
 
-struct matrix_t *matsq_new_d(size_t n)  {
-    return mat_new_d(n, n);
-}
-
-struct matrix_t *matsq_new_qf(size_t n) {
-    return mat_new_qf(n, n);
-}
-
-struct matrix_t *matsq_new_qc(size_t n) {
-    return mat_new_qc(n, n);
-}
-
 struct matrix_t *matsq_new_num(size_t n) {
     return mat_new_num(n, n);
-}
-
-struct matrix_t *matsq_new_dv(size_t n) {
-    return mat_new_dv(n, n);
-}
-
-struct matrix_t *mat_create_identity_d(size_t n) {
-    return mat_create_identity_with_elem(n, &double_elem);
-}
-
-struct matrix_t *mat_create_identity_qf(size_t n) {
-    return mat_create_identity_with_elem(n, &qfloat_elem);
-}
-
-struct matrix_t *mat_create_identity_qc(size_t n) {
-    return mat_create_identity_with_elem(n, &qcomplex_elem);
 }
 
 struct matrix_t *mat_create_identity_num(size_t n) {
@@ -6075,21 +6112,6 @@ static matrix_t *mat_create_diagonal_from_array(size_t n,
     return A;
 }
 
-matrix_t *mat_create_diagonal_d(size_t n, const double *diagonal)
-{
-    return mat_create_diagonal_from_array(n, diagonal, &double_elem);
-}
-
-matrix_t *mat_create_diagonal_qf(size_t n, const qfloat_t *diagonal)
-{
-    return mat_create_diagonal_from_array(n, diagonal, &qfloat_elem);
-}
-
-matrix_t *mat_create_diagonal_qc(size_t n, const qcomplex_t *diagonal)
-{
-    return mat_create_diagonal_from_array(n, diagonal, &qcomplex_elem);
-}
-
 matrix_t *mat_create_diagonal_num(size_t n, const number_t *diagonal)
 {
     return mat_create_diagonal_from_array(n, diagonal, &number_elem);
@@ -6098,27 +6120,6 @@ matrix_t *mat_create_diagonal_num(size_t n, const number_t *diagonal)
 matrix_t *mat_create_diagonal_dv(size_t n, dval_t *const *diagonal)
 {
     return mat_create_diagonal_from_array(n, diagonal, &dval_elem);
-}
-
-matrix_t *mat_create_d(size_t rows, size_t cols, const double *data)
-{
-    matrix_t *A = mat_new_d(rows, cols);
-    mat_set_data(A, data);
-    return A;
-}
-
-matrix_t *mat_create_qf(size_t rows, size_t cols, const qfloat_t *data)
-{
-    matrix_t *A = mat_new_qf(rows, cols);
-    mat_set_data(A, data);
-    return A;
-}
-
-matrix_t *mat_create_qc(size_t rows, size_t cols, const qcomplex_t *data)
-{
-    matrix_t *A = mat_new_qc(rows, cols);
-    mat_set_data(A, data);
-    return A;
 }
 
 matrix_t *mat_create_num(size_t rows, size_t cols, const number_t *data)
@@ -6293,11 +6294,6 @@ matrix_t *mat_to_sparse(const matrix_t *A)
     return S;
 }
 
-matrix_t *mat_evaluate_qf(const matrix_t *A)
-{
-    return mat_convert_preserving_store(A, A ? &qfloat_elem : NULL);
-}
-
 matrix_t *mat_evaluate_num(const matrix_t *A)
 {
     matrix_t *C = NULL;
@@ -6318,110 +6314,6 @@ matrix_t *mat_evaluate_num(const matrix_t *A)
         }
 
     return C;
-}
-
-matrix_t *mat_evaluate_qc(const matrix_t *A)
-{
-    return mat_convert_preserving_store(A, A ? &qcomplex_elem : NULL);
-}
-
-matrix_t *mat_scalar_mul_d(matrix_t *A, double s)
-{
-    if (!A) return NULL;
-
-    elem_kind ak = elem_of(A)->kind;
-
-    /* scalar is double => left kind is ELEM_DOUBLE */
-    const binop_vtable *op = &binops[ELEM_DOUBLE][ak];
-    if (!op->mul || !op->result_elem)
-        return NULL;
-
-    const struct elem_vtable *re = op->result_elem;
-    matrix_t *R = mat_create_elementwise_unary_result(A->rows, A->cols, re, A);
-    if (!R) return NULL;
-
-    unsigned char scalar_raw[64] = {0};
-    unsigned char a_raw[64] = {0};
-    unsigned char out_raw[64] = {0};
-
-    /* encode scalar as a double (left operand type) */
-    memcpy(scalar_raw, &s, sizeof(double));
-
-    for (size_t i = 0; i < A->rows; i++)
-        for (size_t j = 0; j < A->cols; j++) {
-            mat_get(A, i, j, a_raw);
-            op->mul(out_raw, scalar_raw, a_raw);
-            mat_set(R, i, j, out_raw);
-            elem_destroy_value(re, out_raw);
-        }
-
-    return R;
-}
-
-matrix_t *mat_scalar_mul_qf(matrix_t *A, qfloat_t s)
-{
-    if (!A) return NULL;
-
-    elem_kind ak = elem_of(A)->kind;
-
-    /* scalar is qfloat => left kind is ELEM_QFLOAT */
-    const binop_vtable *op = &binops[ELEM_QFLOAT][ak];
-    if (!op->mul || !op->result_elem)
-        return NULL;
-
-    const struct elem_vtable *re = op->result_elem;
-    matrix_t *R = mat_create_elementwise_unary_result(A->rows, A->cols, re, A);
-    if (!R) return NULL;
-
-    unsigned char scalar_raw[64] = {0};
-    unsigned char a_raw[64] = {0};
-    unsigned char out_raw[64] = {0};
-
-    /* encode scalar as a qfloat_t (left operand type) */
-    memcpy(scalar_raw, &s, sizeof(qfloat_t));
-
-    for (size_t i = 0; i < A->rows; i++)
-        for (size_t j = 0; j < A->cols; j++) {
-            mat_get(A, i, j, a_raw);
-            op->mul(out_raw, scalar_raw, a_raw);
-            mat_set(R, i, j, out_raw);
-            elem_destroy_value(re, out_raw);
-        }
-
-    return R;
-}
-
-matrix_t *mat_scalar_mul_qc(matrix_t *A, qcomplex_t s)
-{
-    if (!A) return NULL;
-
-    elem_kind ak = elem_of(A)->kind;
-
-    /* scalar is qcomplex => left kind is ELEM_QCOMPLEX */
-    const binop_vtable *op = &binops[ELEM_QCOMPLEX][ak];
-    if (!op->mul || !op->result_elem)
-        return NULL;
-
-    const struct elem_vtable *re = op->result_elem;
-    matrix_t *R = mat_create_elementwise_unary_result(A->rows, A->cols, re, A);
-    if (!R) return NULL;
-
-    unsigned char scalar_raw[64] = {0};
-    unsigned char a_raw[64] = {0};
-    unsigned char out_raw[64] = {0};
-
-    /* encode scalar as a qcomplex_t (left operand type) */
-    memcpy(scalar_raw, &s, sizeof(qcomplex_t));
-
-    for (size_t i = 0; i < A->rows; i++)
-        for (size_t j = 0; j < A->cols; j++) {
-            mat_get(A, i, j, a_raw);
-            op->mul(out_raw, scalar_raw, a_raw);
-            mat_set(R, i, j, out_raw);
-            elem_destroy_value(re, out_raw);
-        }
-
-    return R;
 }
 
 matrix_t *mat_scalar_mul_num(matrix_t *A, const number_t *s)
@@ -6452,24 +6344,6 @@ matrix_t *mat_scalar_mul_num(matrix_t *A, const number_t *s)
         }
 
     return R;
-}
-
-matrix_t *mat_scalar_div_d(matrix_t *A, double s)
-{
-    double inv = 1.0 / s;
-    return mat_scalar_mul_d(A, inv);
-}
-
-matrix_t *mat_scalar_div_qf(matrix_t *A, qfloat_t s)
-{
-    qfloat_t inv = qf_div(QF_ONE, s);
-    return mat_scalar_mul_qf(A, inv);
-}
-
-matrix_t *mat_scalar_div_qc(matrix_t *A, qcomplex_t s)
-{
-    qcomplex_t inv = qc_inv(s);
-    return mat_scalar_mul_qc(A, inv);
 }
 
 matrix_t *mat_scalar_div_num(matrix_t *A, const number_t *s)
@@ -7124,7 +6998,7 @@ matrix_t *mat_deriv(const matrix_t *A, dval_t *wrt)
     if (!A->elem)
         return NULL;
 
-    if (A->elem->kind != ELEM_DVAL)
+    if (!matrix_is_symbolic(A))
         return mat_create_zero_with_elem(A->rows, A->cols, A->elem);
 
     D = mat_create_zero_with_elem(A->rows, A->cols, &dval_elem);
@@ -7193,7 +7067,7 @@ dval_t *mat_deriv_trace(const matrix_t *A, dval_t *wrt)
         return NULL;
     if (!A->elem)
         return NULL;
-    if (A->elem->kind != ELEM_DVAL)
+    if (!matrix_is_symbolic(A))
         return dv_num_const_d(0.0);
 
     if (mat_trace(A, &trace) != 0 || !trace)
@@ -7213,7 +7087,7 @@ dval_t *mat_deriv_det(const matrix_t *A, dval_t *wrt)
         return NULL;
     if (!A->elem)
         return NULL;
-    if (A->elem->kind != ELEM_DVAL)
+    if (!matrix_is_symbolic(A))
         return dv_num_const_d(0.0);
 
     if (mat_det(A, &det) != 0 || !det)
@@ -7251,7 +7125,7 @@ matrix_t *mat_deriv_inverse(const matrix_t *A, dval_t *wrt)
         return NULL;
     if (!A->elem)
         return NULL;
-    if (A->elem->kind != ELEM_DVAL) {
+    if (!matrix_is_symbolic(A)) {
         Ai = mat_inverse(A);
         if (!Ai)
             return NULL;
@@ -7312,7 +7186,7 @@ matrix_t *mat_deriv_block_inverse(const matrix_t *A, size_t split, dval_t *wrt)
         return NULL;
     if (!A->elem)
         return NULL;
-    if (A->elem->kind != ELEM_DVAL) {
+    if (!matrix_is_symbolic(A)) {
         Ai = mat_block_inverse(A, split);
         if (!Ai)
             return NULL;
@@ -7368,7 +7242,7 @@ matrix_t *mat_jacobian(const matrix_t *A, dval_t *const *vars, size_t nvars)
         return NULL;
     if (!A->elem)
         return NULL;
-    if (A->elem->kind != ELEM_DVAL)
+    if (!matrix_is_symbolic(A))
         return mat_create_zero_with_elem(A->rows * A->cols, nvars, &dval_elem);
 
     J = mat_create_zero_with_elem(A->rows * A->cols, nvars, &dval_elem);
@@ -7455,7 +7329,7 @@ int mat_trace(const matrix_t *A, void *trace)
     if (!e)
         return -3;
 
-    if (e->kind == ELEM_DVAL) {
+    if (elem_is_symbolic(e)) {
         dval_t *sum = dv_num_const_qf(QF_ZERO);
 
         if (!sum)
@@ -7796,7 +7670,7 @@ matrix_t *mat_deriv_block_solve(const matrix_t *A, const matrix_t *B, size_t spl
         return NULL;
     if (!A->elem || !B->elem)
         return NULL;
-    if (A->elem->kind != ELEM_DVAL || B->elem->kind != ELEM_DVAL) {
+    if (!matrix_is_symbolic(A) || !matrix_is_symbolic(B)) {
         X = mat_block_solve(A, B, split);
         if (!X)
             return NULL;
@@ -7861,7 +7735,7 @@ matrix_t *mat_deriv_solve(const matrix_t *A, const matrix_t *B, dval_t *wrt)
         return NULL;
     if (!A->elem || !B->elem)
         return NULL;
-    if (A->elem->kind != ELEM_DVAL || B->elem->kind != ELEM_DVAL) {
+    if (!matrix_is_symbolic(A) || !matrix_is_symbolic(B)) {
         X = mat_solve(A, B);
         if (!X)
             return NULL;
@@ -7913,7 +7787,7 @@ matrix_t *mat_deriv_solve_by_name(const matrix_t *A, const matrix_t *B,
 
 int mat_det(const matrix_t *A, void *determinant)
 {
-    if (A && A->elem && A->elem->kind == ELEM_DVAL)
+    if (matrix_is_symbolic(A))
         return mat_det_dval_exact(A, (dval_t **)determinant);
     if (!A || !determinant)
         return -1;
@@ -8065,7 +7939,7 @@ matrix_t *mat_inverse(const matrix_t *A)
     if (A->rows != A->cols)
         return NULL;
 
-    if (A->elem && A->elem->kind == ELEM_DVAL)
+    if (matrix_is_symbolic(A))
         return mat_inverse_dval_exact(A);
 
     if (!elem_supports_numeric_algorithms(A->elem))
@@ -8230,9 +8104,7 @@ matrix_t *mat_solve(const matrix_t *A, const matrix_t *B)
 
     if (!A || !B || A->rows != A->cols || A->rows != B->rows)
         return NULL;
-    if (A->elem && B->elem &&
-        A->elem->kind == ELEM_DVAL &&
-        B->elem->kind == ELEM_DVAL)
+    if (matrix_is_symbolic(A) && matrix_is_symbolic(B))
         return mat_solve_dval_exact(A, B);
     if (!elem_supports_numeric_algorithms(A->elem) ||
         !elem_supports_numeric_algorithms(B->elem))
@@ -8302,15 +8174,11 @@ fail:
 
 matrix_t *mat_least_squares(const matrix_t *A, const matrix_t *B)
 {
-    mat_qr_factor_t qr = {0};
-    matrix_t *QH = NULL, *QHB = NULL, *A_pinv = NULL, *X = NULL;
-    int rank;
+    matrix_t *A_pinv = NULL, *Bn = NULL, *X = NULL;
 
     if (!A || !B || A->rows != B->rows)
         return NULL;
-    if (A->elem && B->elem &&
-        A->elem->kind == ELEM_DVAL &&
-        B->elem->kind == ELEM_DVAL) {
+    if (matrix_is_symbolic(A) && matrix_is_symbolic(B)) {
         A_pinv = mat_pseudoinverse_dval_exact(A);
         X = A_pinv ? mat_mul(A_pinv, B) : NULL;
         mat_free(A_pinv);
@@ -8323,33 +8191,12 @@ matrix_t *mat_least_squares(const matrix_t *A, const matrix_t *B)
     if (A->rows == A->cols)
         return mat_solve(A, B);
 
-    if (A->rows >= A->cols) {
-        rank = mat_rank(A);
-        if (rank < 0)
-            return NULL;
-
-        if ((size_t)rank == A->cols) {
-            if (mat_qr_factor(A, &qr) != 0)
-                goto fail;
-
-            QH = mat_hermitian(qr.Q);
-            QHB = QH ? mat_mul(QH, B) : NULL;
-            if (!QH || !QHB)
-                goto fail;
-
-            X = mat_solve(qr.R, QHB);
-            goto fail;
-        }
-    }
-
     A_pinv = mat_pseudoinverse(A);
-    X = A_pinv ? mat_mul(A_pinv, B) : NULL;
+    Bn = mat_evaluate_num(B);
+    X = (A_pinv && Bn) ? mat_mul(A_pinv, Bn) : NULL;
 
-fail:
-    mat_qr_factor_free(&qr);
-    mat_free(QH);
-    mat_free(QHB);
     mat_free(A_pinv);
+    mat_free(Bn);
     return X;
 }
 
@@ -8470,7 +8317,6 @@ int mat_qr_factor(const matrix_t *A, mat_qr_factor_t *out)
 {
     size_t m, n, kdim;
     matrix_t *Z = NULL, *Qq = NULL, *Rq = NULL;
-    const struct elem_vtable *target;
 
     if (!A || !out)
         return -1;
@@ -8480,7 +8326,6 @@ int mat_qr_factor(const matrix_t *A, mat_qr_factor_t *out)
     m = A->rows;
     n = A->cols;
     kdim = (m < n) ? m : n;
-    target = A->elem;
 
     Z = mat_convert_dense(A, &qcomplex_elem);
     Qq = mat_create_dense_with_elem(m, kdim, &qcomplex_elem);
@@ -8548,8 +8393,8 @@ int mat_qr_factor(const matrix_t *A, mat_qr_factor_t *out)
         free(v);
     }
 
-    out->Q = mat_convert_dense(Qq, target);
-    out->R = mat_convert_with_store(Rq, target, &upper_triangular_store);
+    out->Q = mat_convert_dense(Qq, &number_elem);
+    out->R = mat_convert_with_store(Rq, &number_elem, &upper_triangular_store);
     mat_free(Z);
     mat_free(Qq);
     mat_free(Rq);
@@ -8630,7 +8475,7 @@ int mat_cholesky(const matrix_t *A, mat_cholesky_t *out)
 
     }
 
-    out->L = mat_convert_with_store(Lq, A->elem, lower_store);
+    out->L = mat_convert_with_store(Lq, &number_elem, lower_store);
     mat_free(Z);
     mat_free(Lq);
 
@@ -8655,9 +8500,10 @@ static double mat_singular_tolerance(const matrix_t *A, double sigma_max)
     qfloat_t sigma_qf = qf_from_double(sigma_max);
     qfloat_t dim_qf = qf_from_double((double)((A->rows > A->cols) ? A->rows : A->cols));
     qfloat_t tol_qf = qf_mul(qf_mul(sigma_qf, dim_qf), A->elem->relative_epsilon);
+    qfloat_t algo_floor = qf_mul(qf_from_double(1.0e4), D_REL_EPS);
 
-    if (qf_lt(tol_qf, A->elem->relative_epsilon))
-        tol_qf = A->elem->relative_epsilon;
+    if (qf_lt(tol_qf, algo_floor))
+        tol_qf = algo_floor;
 
     return qf_to_double(tol_qf);
 }
@@ -8694,8 +8540,8 @@ int mat_svd_factor(const matrix_t *A, mat_svd_factor_t *out)
 {
     size_t m, n, kdim;
     matrix_t *Z = NULL, *ZH = NULL, *Gram = NULL;
-    matrix_t *EigVecs = NULL, *LeftQ = NULL, *RightQ = NULL, *Sq = NULL;
-    qcomplex_t *evals = NULL;
+    matrix_t *EigVecs = NULL, *EigVecsQ = NULL, *LeftQ = NULL, *RightQ = NULL, *Sq = NULL;
+    number_t *evals = NULL;
     qfloat_t *sigma = NULL;
     size_t *order = NULL;
     int rc;
@@ -8713,13 +8559,15 @@ int mat_svd_factor(const matrix_t *A, mat_svd_factor_t *out)
     if (!Z)
         return -3;
 
-    evals = calloc(kdim ? kdim : 1, sizeof(qcomplex_t));
+    evals = calloc(kdim ? kdim : 1, sizeof(number_t));
     sigma = calloc(kdim ? kdim : 1, sizeof(qfloat_t));
     order = calloc(kdim ? kdim : 1, sizeof(size_t));
     if (!evals || !sigma || !order) {
         rc = -3;
         goto fail;
     }
+    for (size_t i = 0; i < (kdim ? kdim : 1); ++i)
+        evals[i] = num_new();
 
     if (m >= n) {
         ZH = mat_hermitian(Z);
@@ -8731,11 +8579,18 @@ int mat_svd_factor(const matrix_t *A, mat_svd_factor_t *out)
         rc = mat_eigendecompose(Gram, evals, &EigVecs);
         if (rc != 0)
             goto fail;
+        EigVecsQ = mat_convert_dense(EigVecs, &qcomplex_elem);
+        if (!EigVecsQ) {
+            rc = -3;
+            goto fail;
+        }
 
         for (size_t i = 0; i < n; i++) {
-            double re = qf_to_double(qc_real(evals[i]));
+            number_t re_num = num_real_part(evals[i]);
+            double re = num_to_double(re_num);
             order[i] = i;
-            sigma[i] = (re > 0.0) ? qf_sqrt(qc_real(evals[i])) : QF_ZERO;
+            sigma[i] = (re > 0.0) ? qf_sqrt(num_to_qfloat(re_num)) : QF_ZERO;
+            num_destroy(&re_num);
         }
 
         for (size_t i = 0; i < n; i++)
@@ -8763,7 +8618,7 @@ int mat_svd_factor(const matrix_t *A, mat_svd_factor_t *out)
 
             for (size_t r = 0; r < n; r++) {
                 qcomplex_t v;
-                mat_get(EigVecs, r, idx, &v);
+                mat_get(EigVecsQ, r, idx, &v);
                 mat_set(RightQ, r, j, &v);
             }
 
@@ -8794,11 +8649,18 @@ int mat_svd_factor(const matrix_t *A, mat_svd_factor_t *out)
         rc = mat_eigendecompose(Gram, evals, &EigVecs);
         if (rc != 0)
             goto fail;
+        EigVecsQ = mat_convert_dense(EigVecs, &qcomplex_elem);
+        if (!EigVecsQ) {
+            rc = -3;
+            goto fail;
+        }
 
         for (size_t i = 0; i < m; i++) {
-            double re = qf_to_double(qc_real(evals[i]));
+            number_t re_num = num_real_part(evals[i]);
+            double re = num_to_double(re_num);
             order[i] = i;
-            sigma[i] = (re > 0.0) ? qf_sqrt(qc_real(evals[i])) : QF_ZERO;
+            sigma[i] = (re > 0.0) ? qf_sqrt(num_to_qfloat(re_num)) : QF_ZERO;
+            num_destroy(&re_num);
         }
 
         for (size_t i = 0; i < m; i++)
@@ -8826,7 +8688,7 @@ int mat_svd_factor(const matrix_t *A, mat_svd_factor_t *out)
 
             for (size_t r = 0; r < m; r++) {
                 qcomplex_t u;
-                mat_get(EigVecs, r, idx, &u);
+                mat_get(EigVecsQ, r, idx, &u);
                 mat_set(LeftQ, r, j, &u);
             }
 
@@ -8849,9 +8711,9 @@ int mat_svd_factor(const matrix_t *A, mat_svd_factor_t *out)
         }
     }
 
-    out->U = mat_convert_dense(LeftQ, A->elem);
-    out->S = mat_convert_with_store(Sq, A->elem, &diagonal_store);
-    out->V = mat_convert_dense(RightQ, A->elem);
+    out->U = mat_convert_dense(LeftQ, &number_elem);
+    out->S = mat_convert_with_store(Sq, &number_elem, &diagonal_store);
+    out->V = mat_convert_dense(RightQ, &number_elem);
     if (!out->U || !out->S || !out->V) {
         rc = -3;
         goto fail;
@@ -8864,9 +8726,14 @@ fail:
     mat_free(ZH);
     mat_free(Gram);
     mat_free(EigVecs);
+    mat_free(EigVecsQ);
     mat_free(LeftQ);
     mat_free(RightQ);
     mat_free(Sq);
+    if (evals) {
+        for (size_t i = 0; i < (kdim ? kdim : 1); i++)
+            num_destroy(&evals[i]);
+    }
     free(evals);
     free(sigma);
     free(order);
@@ -9154,7 +9021,7 @@ matrix_t *mat_pseudoinverse(const matrix_t *A)
     if (!UH || !VSp || !Pinvq)
         goto fail;
 
-    Pinv = mat_convert_dense(Pinvq, A->elem);
+    Pinv = mat_convert_dense(Pinvq, &number_elem);
 
 fail:
     mat_svd_factor_free(&svd);
@@ -9228,7 +9095,7 @@ done:
 matrix_t *mat_nullspace(const matrix_t *A)
 {
     matrix_t *AH = NULL, *Gram = NULL, *Gramq = NULL, *V = NULL, *Nq = NULL, *N = NULL;
-    qcomplex_t *evals = NULL;
+    number_t *evals = NULL;
     size_t nullity = 0, col = 0;
     double sigma_max = 0.0, tol;
     int rc;
@@ -9246,16 +9113,20 @@ matrix_t *mat_nullspace(const matrix_t *A)
     if (!AH || !Gram || !Gramq)
         goto fail;
 
-    evals = calloc(A->cols ? A->cols : 1, sizeof(qcomplex_t));
+    evals = calloc(A->cols ? A->cols : 1, sizeof(number_t));
     if (!evals)
         goto fail;
+    for (size_t i = 0; i < (A->cols ? A->cols : 1); ++i)
+        evals[i] = num_new();
 
     rc = mat_eigendecompose(Gramq, evals, &V);
     if (rc != 0 || !V)
         goto fail;
 
     for (size_t i = 0; i < A->cols; i++) {
-        double d = qf_to_double(qf_abs(qc_real(evals[i])));
+        number_t re_num = num_real_part(evals[i]);
+        double d = fabs(num_to_double(re_num));
+        num_destroy(&re_num);
         if (d > sigma_max)
             sigma_max = d;
     }
@@ -9263,7 +9134,9 @@ matrix_t *mat_nullspace(const matrix_t *A)
     tol *= tol;
 
     for (size_t i = 0; i < A->cols; i++) {
-        double d = qf_to_double(qf_abs(qc_real(evals[i])));
+        number_t re_num = num_real_part(evals[i]);
+        double d = fabs(num_to_double(re_num));
+        num_destroy(&re_num);
         if (d <= tol)
             nullity++;
     }
@@ -9273,7 +9146,9 @@ matrix_t *mat_nullspace(const matrix_t *A)
         goto fail;
 
     for (size_t i = 0; i < A->cols; i++) {
-        double d = qf_to_double(qf_abs(qc_real(evals[i])));
+        number_t re_num = num_real_part(evals[i]);
+        double d = fabs(num_to_double(re_num));
+        num_destroy(&re_num);
         if (d > tol)
             continue;
         for (size_t r = 0; r < A->cols; r++) {
@@ -9286,7 +9161,7 @@ matrix_t *mat_nullspace(const matrix_t *A)
         col++;
     }
 
-    N = mat_convert_dense(Nq, A->elem);
+    N = mat_convert_dense(Nq, &number_elem);
 
 fail:
     mat_free(AH);
@@ -9294,6 +9169,10 @@ fail:
     mat_free(Gramq);
     mat_free(V);
     mat_free(Nq);
+    if (evals) {
+        for (size_t i = 0; i < (A->cols ? A->cols : 1); i++)
+            num_destroy(&evals[i]);
+    }
     free(evals);
     return N;
 }
@@ -9555,7 +9434,7 @@ matrix_t *mat_jordan_profile(const matrix_t *A, const void *eigenvalue)
     }
 
     blocks = dims[1];
-    P = mat_new_d(blocks, 1);
+    P = mat_create_dense_with_elem(blocks, 1, &double_elem);
     if (!P)
         goto fail;
 
@@ -9711,12 +9590,14 @@ static void jacobi_apply(matrix_t *A, matrix_t *V, size_t p, size_t q)
 static int mat_eigendecompose_hermitian(const matrix_t *A, void *eigenvalues, matrix_t **eigenvectors)
 {
     size_t n = A->rows;
-    const struct elem_vtable *e = A->elem;
+    const struct elem_vtable *e = &qcomplex_elem;
+    matrix_t *W = mat_convert_dense(A, &qcomplex_elem);
+    matrix_t *V = NULL;
+    matrix_t *Vnum = NULL;
 
-    matrix_t *W = mat_copy_as_dense(A);
     if (!W) return -3;
 
-    matrix_t *V = mat_create_identity_with_elem(n, e);
+    V = mat_create_identity_with_elem(n, e);
     if (!V) { mat_free(W); return -3; }
 
     double fro2 = 0.0;
@@ -9736,20 +9617,25 @@ static int mat_eigendecompose_hermitian(const matrix_t *A, void *eigenvalues, ma
     }
 
     if (eigenvalues) {
-        char *ev = (char *)eigenvalues;
-        unsigned char dv[64];
+        number_t *ev = (number_t *)eigenvalues;
         for (size_t i = 0; i < n; i++) {
-            mat_get(W, i, i, dv);
-            qfloat_t re_qf;
-            e->to_qf(&re_qf, dv);
-            e->from_qf(ev + i * e->size, &re_qf);
+            qcomplex_t diag;
+            mat_get(W, i, i, &diag);
+            ev[i] = num_create_from_qfloat(qc_real(diag));
         }
     }
 
-    if (eigenvectors)
-        *eigenvectors = V;
-    else
-        mat_free(V);
+    if (eigenvectors) {
+        Vnum = mat_convert_dense(V, &number_elem);
+        if (!Vnum) {
+            mat_free(V);
+            mat_free(W);
+            return -3;
+        }
+        *eigenvectors = Vnum;
+    }
+
+    mat_free(V);
 
     mat_free(W);
     return 0;
@@ -10136,9 +10022,9 @@ static int mat_eigendecompose_general(const matrix_t *A, void *eigenvalues,
 
     /* Extract eigenvalues from diagonal of Schur matrix */
     if (eigenvalues) {
-        char *ev = (char *)eigenvalues;
+        number_t *ev = (number_t *)eigenvalues;
         for (size_t i = 0; i < n; i++)
-            e->from_qc(ev + i * e->size, &QCM(H, i, i, n));
+            ev[i] = num_create_from_qcomplex(QCM(H, i, i, n));
     }
 
     /* Compute eigenvectors if requested */
@@ -10151,17 +10037,18 @@ static int mat_eigendecompose_general(const matrix_t *A, void *eigenvalues,
             backsub_eigenvec(H, Y, n, k);
 
         /* Transform back: eigvec_A = Q * Y */
-        matrix_t *V = mat_create_dense_with_elem(n, n, e);
+        matrix_t *V = mat_create_dense_with_elem(n, n, &number_elem);
         if (!V) { free(H); free(Qm); free(Y); return -3; }
 
-        unsigned char raw[64];
+        number_t value;
         for (size_t i = 0; i < n; i++) {
             for (size_t j = 0; j < n; j++) {
                 qcomplex_t sum = QC_ZERO;
                 for (size_t k = 0; k < n; k++)
                     sum = qc_add(sum, qc_mul(QCM(Qm, i, k, n), QCM(Y, k, j, n)));
-                e->from_qc(raw, &sum);
-                mat_set(V, i, j, raw);
+                value = num_create_from_qcomplex(sum);
+                mat_set(V, i, j, &value);
+                num_destroy(&value);
             }
         }
         free(Y);
@@ -10178,7 +10065,7 @@ int mat_eigendecompose(const matrix_t *A, void *eigenvalues, matrix_t **eigenvec
     if (!A) return -1;
     if (A->rows != A->cols) return -2;
 
-    if (A->elem && A->elem->kind == ELEM_DVAL)
+    if (matrix_is_symbolic(A))
         return mat_eigendecompose_dval(A, (dval_t **)eigenvalues, eigenvectors);
 
     if (!elem_supports_numeric_algorithms(A->elem)) return -3;
@@ -10688,12 +10575,14 @@ int mat_schur_factor(const matrix_t *A, mat_schur_factor_t *out)
         return -5;
     }
 
-    /* Z is now T (Schur form), Q0 is Q */
-    out->Q = Q0;
-    out->T = mat_convert_with_store(Z, &qcomplex_elem, &upper_triangular_store);
+    /* Z is now T (Schur form), Q0 is Q. Expose both through the generic
+     * number_t layer so callers no longer depend on qcomplex matrix types. */
+    out->Q = mat_convert_dense(Q0, &number_elem);
+    out->T = mat_convert_with_store(Z, &number_elem, &upper_triangular_store);
     mat_free(Z);
-    if (!out->T) {
-        mat_free(Q0);
+    mat_free(Q0);
+    if (!out->Q || !out->T) {
+        mat_schur_factor_free(out);
         return -3;
     }
     return 0;

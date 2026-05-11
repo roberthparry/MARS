@@ -2,7 +2,7 @@
 #include "number_internal.h"
 #include "internal/mint_internal.h"
 #include "internal/mcomplex_internal.h"
-#include "internal/mfloat_internal.h"
+#include "mfloat/mfloat_internal.h"
 #include "mrational/mrational_internal.h"
 
 #include <ctype.h>
@@ -227,9 +227,74 @@ static void number_destroy_mcomplex(number_t *number)
     mc_free(number_impl(number)->value.mc);
 }
 
+static const number_vtable_t number_double_vt;
+static const number_vtable_t number_qfloat_vt;
+static const number_vtable_t number_qcomplex_vt;
+static const number_vtable_t number_mint_vt;
+static const number_vtable_t number_mrational_vt;
+static const number_vtable_t number_mfloat_vt;
+static const number_vtable_t number_mcomplex_vt;
+static number_t number_const_like_double(const number_t *like, number_const_id_t id);
+static number_t number_const_like_qfloat(const number_t *like, number_const_id_t id);
+static number_t number_const_like_qcomplex(const number_t *like, number_const_id_t id);
+static number_t number_const_like_mexact(const number_t *like, number_const_id_t id);
+static number_t number_const_like_mfloat(const number_t *like, number_const_id_t id);
+static number_t number_const_like_mcomplex(const number_t *like, number_const_id_t id);
+
 static bool number_is_real_default(const number_t *number)
 {
     return number != NULL;
+}
+
+static bool number_value_is_immortal_double(const number_t *number)
+{
+    (void)number;
+    return false;
+}
+
+static bool number_value_is_immortal_qfloat(const number_t *number)
+{
+    (void)number;
+    return false;
+}
+
+static bool number_value_is_immortal_qcomplex(const number_t *number)
+{
+    (void)number;
+    return false;
+}
+
+static bool number_value_is_immortal_mint(const number_t *number)
+{
+    return number && number_impl_const(number)->value.mi &&
+        mint_is_immortal(number_impl_const(number)->value.mi);
+}
+
+static bool number_value_is_immortal_mrational(const number_t *number)
+{
+    return number && number_impl_const(number)->value.mr &&
+        number_impl_const(number)->value.mr->immortal;
+}
+
+static bool number_value_is_immortal_mfloat(const number_t *number)
+{
+    return number && number_impl_const(number)->value.mf &&
+        mfloat_is_immortal(number_impl_const(number)->value.mf);
+}
+
+static bool number_value_is_immortal_mcomplex(const number_t *number)
+{
+    return number && number_impl_const(number)->value.mc &&
+        mcomplex_is_immortal(number_impl_const(number)->value.mc);
+}
+
+static bool number_value_is_immortal(const number_t *number)
+{
+    const number_vtable_t *vt = number ? number_vt(number) : NULL;
+
+    if (!number || !number_is_valid_value(number) || !vt || !vt->is_immortal)
+        return false;
+    return vt->is_immortal(number);
 }
 
 static bool number_is_zero_double(const number_t *number)
@@ -993,6 +1058,8 @@ static number_t *number_clone_mfloat(const number_t *number)
 
     if (!number || !number_impl_const(number)->value.mf)
         return NULL;
+    if (mfloat_is_immortal(number_impl_const(number)->value.mf))
+        return number_wrap_mfloat(number_impl_const(number)->value.mf);
     copy = mf_clone(number_impl_const(number)->value.mf);
     return copy ? number_wrap_mfloat(copy) : NULL;
 }
@@ -1003,6 +1070,8 @@ static number_t *number_clone_mcomplex(const number_t *number)
 
     if (!number || !number_impl_const(number)->value.mc)
         return NULL;
+    if (mcomplex_is_immortal(number_impl_const(number)->value.mc))
+        return number_wrap_mcomplex(number_impl_const(number)->value.mc);
     copy = mc_clone(number_impl_const(number)->value.mc);
     return copy ? number_wrap_mcomplex(copy) : NULL;
 }
@@ -2021,6 +2090,7 @@ static const number_vtable_t number_double_vt = {
     .destroy_payload = number_destroy_none,
     .clone = number_clone_double,
     .to_string = number_to_string_double,
+    .is_immortal = number_value_is_immortal_double,
     .is_real = number_is_real_default,
     .is_zero = number_is_zero_double,
     .is_one = number_is_one_double,
@@ -2030,6 +2100,7 @@ static const number_vtable_t number_double_vt = {
     .eq_same = number_eq_same_double,
     .eq_same_tol = number_eq_same_tol_double,
     .cmp_same = number_cmp_same_double,
+    .const_like = number_const_like_double,
     .format_inexact = number_format_double,
     .set_precision = number_set_precision_noop,
     .get_precision = number_precision_fixed53,
@@ -2070,6 +2141,7 @@ static const number_vtable_t number_qfloat_vt = {
     .destroy_payload = number_destroy_none,
     .clone = number_clone_qfloat,
     .to_string = number_to_string_qfloat,
+    .is_immortal = number_value_is_immortal_qfloat,
     .is_real = number_is_real_default,
     .is_zero = number_is_zero_qfloat,
     .is_one = number_is_one_qfloat,
@@ -2079,6 +2151,7 @@ static const number_vtable_t number_qfloat_vt = {
     .eq_same = number_eq_same_qfloat,
     .eq_same_tol = number_eq_same_tol_qfloat,
     .cmp_same = number_cmp_same_qfloat,
+    .const_like = number_const_like_qfloat,
     .format_inexact = number_format_qfloat,
     .set_precision = number_set_precision_noop,
     .get_precision = number_precision_fixed106,
@@ -2119,6 +2192,7 @@ static const number_vtable_t number_qcomplex_vt = {
     .destroy_payload = number_destroy_none,
     .clone = number_clone_qcomplex,
     .to_string = number_to_string_qcomplex,
+    .is_immortal = number_value_is_immortal_qcomplex,
     .is_real = number_is_real_qcomplex,
     .is_zero = number_is_zero_qcomplex,
     .is_one = number_is_one_qcomplex,
@@ -2128,6 +2202,7 @@ static const number_vtable_t number_qcomplex_vt = {
     .eq_same = number_eq_same_qcomplex,
     .eq_same_tol = number_eq_same_tol_qcomplex,
     .cmp_same = number_cmp_same_qcomplex,
+    .const_like = number_const_like_qcomplex,
     .format_inexact = number_format_qcomplex,
     .set_precision = number_set_precision_noop,
     .get_precision = number_precision_fixed106,
@@ -2168,6 +2243,7 @@ static const number_vtable_t number_mint_vt = {
     .destroy_payload = number_destroy_mint,
     .clone = number_clone_mint,
     .to_string = number_to_string_mint,
+    .is_immortal = number_value_is_immortal_mint,
     .is_real = number_is_real_default,
     .is_zero = number_is_zero_mint,
     .is_one = number_is_one_mint,
@@ -2177,6 +2253,7 @@ static const number_vtable_t number_mint_vt = {
     .eq_same = number_eq_same_mint,
     .eq_same_tol = number_eq_same_tol_mint,
     .cmp_same = number_cmp_same_mint,
+    .const_like = number_const_like_mexact,
     .format_inexact = NULL,
     .set_precision = number_set_precision_noop,
     .get_precision = number_precision_zero,
@@ -2217,6 +2294,7 @@ static const number_vtable_t number_mrational_vt = {
     .destroy_payload = number_destroy_mrational,
     .clone = number_clone_mrational,
     .to_string = number_to_string_mrational,
+    .is_immortal = number_value_is_immortal_mrational,
     .is_real = number_is_real_default,
     .is_zero = number_is_zero_mrational,
     .is_one = number_is_one_mrational,
@@ -2226,6 +2304,7 @@ static const number_vtable_t number_mrational_vt = {
     .eq_same = number_eq_same_mrational,
     .eq_same_tol = number_eq_same_tol_mrational,
     .cmp_same = number_cmp_same_mrational,
+    .const_like = number_const_like_mexact,
     .format_inexact = NULL,
     .set_precision = number_set_precision_noop,
     .get_precision = number_precision_zero,
@@ -2266,6 +2345,7 @@ static const number_vtable_t number_mfloat_vt = {
     .destroy_payload = number_destroy_mfloat,
     .clone = number_clone_mfloat,
     .to_string = number_to_string_mfloat,
+    .is_immortal = number_value_is_immortal_mfloat,
     .is_real = number_is_real_default,
     .is_zero = number_is_zero_mfloat,
     .is_one = number_is_one_mfloat,
@@ -2275,6 +2355,7 @@ static const number_vtable_t number_mfloat_vt = {
     .eq_same = number_eq_same_mfloat,
     .eq_same_tol = number_eq_same_tol_mfloat,
     .cmp_same = number_cmp_same_mfloat,
+    .const_like = number_const_like_mfloat,
     .format_inexact = number_format_mfloat,
     .set_precision = number_set_precision_mfloat,
     .get_precision = number_get_precision_mfloat,
@@ -2315,6 +2396,7 @@ static const number_vtable_t number_mcomplex_vt = {
     .destroy_payload = number_destroy_mcomplex,
     .clone = number_clone_mcomplex,
     .to_string = number_to_string_mcomplex,
+    .is_immortal = number_value_is_immortal_mcomplex,
     .is_real = number_is_real_mcomplex,
     .is_zero = number_is_zero_mcomplex,
     .is_one = number_is_one_mcomplex,
@@ -2324,6 +2406,7 @@ static const number_vtable_t number_mcomplex_vt = {
     .eq_same = number_eq_same_mcomplex,
     .eq_same_tol = number_eq_same_tol_mcomplex,
     .cmp_same = number_cmp_same_mcomplex,
+    .const_like = number_const_like_mcomplex,
     .format_inexact = number_format_mcomplex,
     .set_precision = number_set_precision_mcomplex,
     .get_precision = number_get_precision_mcomplex,
@@ -2533,7 +2616,7 @@ static number_t *number_apply_binary_generic(const number_t *a,
     kind = number_common_kind(a, b, op);
     lhs = number_coerce(a, kind);
     rhs = number_coerce(b, kind);
-    if (!lhs || !rhs || number_impl_const(lhs)->kind != number_impl_const(rhs)->kind)
+    if (!lhs || !rhs || !number_same_kind_value(lhs, rhs))
         goto done;
     result = number_apply_binary_same_kind(lhs, rhs, op);
 
@@ -2668,6 +2751,11 @@ number_t num_clone(const number_t number)
     return vt ? number_take(vt->clone(&number)) : number_invalid();
 }
 
+bool num_is_immortal(number_t number)
+{
+    return number_value_is_immortal(&number);
+}
+
 void num_destroy(number_t *number)
 {
     const number_vtable_t *vt;
@@ -2754,7 +2842,7 @@ bool num_eq(const number_t a, const number_t b)
 
     if (!number_is_valid_value(&a) || !number_is_valid_value(&b))
         return false;
-    if (number_impl_const(&a)->kind == number_impl_const(&b)->kind) {
+    if (number_same_kind_value(&a, &b)) {
         const number_vtable_t *vt = number_vt(&a);
         if (vt && vt->eq_same)
             return vt->eq_same(&a, &b);
@@ -2763,7 +2851,7 @@ bool num_eq(const number_t a, const number_t b)
     kind = number_common_kind(&a, &b, NUMBER_OP_ADD);
     lhs = number_coerce(&a, kind);
     rhs = number_coerce(&b, kind);
-    if (!lhs || !rhs || number_impl_const(lhs)->kind != number_impl_const(rhs)->kind)
+    if (!lhs || !rhs || !number_same_kind_value(lhs, rhs))
         goto done;
     const number_vtable_t *vt = number_vt(lhs);
     if (!vt || !vt->eq_same)
@@ -2791,7 +2879,7 @@ number_t num_inv(const number_t number)
         return number_invalid();
     if (vt->inv)
         return number_take(vt->inv(&number));
-    if (number_impl_const(&number)->kind == NUMBER_MINT) {
+    if (number_kind_value(&number) == NUMBER_MINT) {
         mrational_t *value = mr_create_mints(MI_ONE, number_impl_const(&number)->value.mi);
 
         return value ? number_take(number_wrap_mrational(value)) : number_invalid();
@@ -3003,29 +3091,14 @@ static number_t number_const_like_mcomplex(const number_t *like, number_const_id
         : number_invalid();
 }
 
-typedef number_t (*number_const_like_fn)(const number_t *like, number_const_id_t id);
-
-static const number_const_like_fn number_const_like_table[] = {
-    [NUMBER_DOUBLE] = number_const_like_double,
-    [NUMBER_QFLOAT] = number_const_like_qfloat,
-    [NUMBER_QCOMPLEX] = number_const_like_qcomplex,
-    [NUMBER_MINT] = number_const_like_mexact,
-    [NUMBER_MRATIONAL] = number_const_like_mexact,
-    [NUMBER_MFLOAT] = number_const_like_mfloat,
-    [NUMBER_MCOMPLEX] = number_const_like_mcomplex
-};
-
 number_t number_const_like(const number_t *like, number_const_id_t id)
 {
-    number_const_like_fn fn;
-    number_kind_t kind;
+    const number_vtable_t *vt;
 
     if (!like || !number_is_valid_value(like) || (unsigned)id >= NUMBER_CONST_COUNT)
         return number_invalid();
-    kind = number_impl_const(like)->kind;
-    fn = (unsigned)kind < (sizeof(number_const_like_table) / sizeof(number_const_like_table[0]))
-        ? number_const_like_table[kind] : NULL;
-    return fn ? fn(like, id) : number_invalid();
+    vt = number_vt(like);
+    return vt && vt->const_like ? vt->const_like(like, id) : number_invalid();
 }
 
 number_t num_new(void)
@@ -3241,7 +3314,7 @@ int num_cmp(const number_t a, const number_t b)
     if (!number_is_valid_value(&a) || !number_is_valid_value(&b) ||
         !num_is_real(a) || !num_is_real(b))
         return 0;
-    if (number_impl_const(&a)->kind == number_impl_const(&b)->kind)
+    if (number_same_kind_value(&a, &b))
         return number_cmp_same_kind(&a, &b);
     family = number_math_family_binary(number_math_family_value(&a),
         number_math_family_value(&b));

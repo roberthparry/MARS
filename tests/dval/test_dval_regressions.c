@@ -84,7 +84,25 @@ static int number_close_for_qfloat_precision(const number_t got,
                                              const number_t expected)
 {
     number_t error = oracle_error_magnitude(got, expected);
-    number_t tolerance = num_create_from_string("1e-28");
+    number_t one = num_create_from_double(1.0);
+    number_t tolerance;
+    int ok;
+
+    ASSERT_EQ_INT(num_set_prec_bits(&one, 106u), 0);
+    tolerance = num_ldexp(one, 4 - 106);
+    ok = num_le(error, tolerance);
+    num_destroy(&one);
+    num_destroy(&tolerance);
+    num_destroy(&error);
+    return ok;
+}
+
+static int number_close_with_tolerance_text(const number_t got,
+                                            const number_t expected,
+                                            const char *tolerance_text)
+{
+    number_t error = oracle_error_magnitude(got, expected);
+    number_t tolerance = num_create_from_string(tolerance_text);
     int ok = num_le(error, tolerance);
 
     num_destroy(&tolerance);
@@ -146,6 +164,7 @@ typedef struct {
     const char *input;
     dv_unary_builder_t dv_fn;
     num_unary_builder_t num_fn;
+    const char *deriv_tol_override;
 } unary_eval_case_t;
 
 typedef struct {
@@ -155,6 +174,15 @@ typedef struct {
     dv_binary_builder_t dv_fn;
     num_binary_builder_t num_fn;
 } binary_eval_case_t;
+
+#define UCASE(name_, input_, dv_fn_, num_fn_) \
+    { name_, input_, dv_fn_, num_fn_, NULL }
+
+#define UCASE_TOL(name_, input_, dv_fn_, num_fn_, tol_) \
+    { name_, input_, dv_fn_, num_fn_, tol_ }
+
+#define GAMMAINV_INPUT_TEXT \
+    "1.329340388179137020473625612505858887098162092091790346160355842389683463443274136031212992553908499062170117718211927999677114649293316951893820282202090301346528273989828842137443879771713119671699071534450972100130979"
 
 static dval_t *dv_pow3_builder(const dval_t *x)
 {
@@ -318,7 +346,9 @@ static void check_unary_derivative_case(const unary_eval_case_t *tc)
     ASSERT_EQ_INT(dv_eval_derivatives(expr, 1u, vars, &value, &grad), 0);
     snprintf(label, sizeof(label), "numeric derivative sweep: %s", tc->name);
     if (!(num_eq(deriv_value, grad) ||
-          number_close_for_qfloat_precision(deriv_value, grad))) {
+          (tc->deriv_tol_override
+               ? number_close_with_tolerance_text(deriv_value, grad, tc->deriv_tol_override)
+               : number_close_for_qfloat_precision(deriv_value, grad)))) {
         char *got_text = format_number_for_test_output(deriv_value);
         char *expected_text = format_number_for_test_output(grad);
 
@@ -1011,38 +1041,39 @@ static void test_eval_num_on_expression(void)
 static void test_eval_num_function_values(void)
 {
     static const unary_eval_case_t unary_cases[] = {
-        { "sin", "0.5", dv_sin, num_sin },
-        { "cos", "0.5", dv_cos, num_cos },
-        { "tan", "0.5", dv_tan, num_tan },
-        { "sinh", "0.5", dv_sinh, num_sinh },
-        { "cosh", "0.5", dv_cosh, num_cosh },
-        { "tanh", "0.5", dv_tanh, num_tanh },
-        { "asin", "0.25", dv_asin, num_asin },
-        { "acos", "0.25", dv_acos, num_acos },
-        { "atan", "0.25", dv_atan, num_atan },
-        { "asinh", "0.25", dv_asinh, num_asinh },
-        { "acosh", "1.25", dv_acosh, num_acosh },
-        { "atanh", "0.25", dv_atanh, num_atanh },
-        { "exp", "1.5", dv_exp, num_exp },
-        { "log", "1.5", dv_log, num_log },
-        { "sqrt", "2.0", dv_sqrt, num_sqrt },
-        { "pow_d", "2.0", dv_pow3_builder, num_pow3_builder },
-        { "abs", "-3.0", dv_abs, num_abs },
-        { "erf", "0.8", dv_erf, num_erf },
-        { "erfc", "1.2", dv_erfc, num_erfc },
-        { "erfinv", "0.5", dv_erfinv, num_erfinv },
-        { "erfcinv", "0.4", dv_erfcinv, num_erfcinv },
-        { "gamma", "2.5", dv_gamma, num_gamma },
-        { "lgamma", "2.5", dv_lgamma, num_lgamma },
-        { "digamma", "2.5", dv_digamma, num_digamma },
-        { "trigamma", "2.5", dv_trigamma, num_trigamma },
-        { "lambert_w0", "0.2", dv_lambert_w0, num_lambert_w0 },
-        { "lambert_wm1", "-0.1", dv_lambert_wm1, num_lambert_wm1 },
-        { "normal_pdf", "1.0", dv_normal_pdf, num_normal_pdf },
-        { "normal_cdf", "1.0", dv_normal_cdf, num_normal_cdf },
-        { "normal_logpdf", "1.0", dv_normal_logpdf, num_normal_logpdf },
-        { "ei", "1.0", dv_ei, num_ei },
-        { "e1", "1.0", dv_e1, num_e1 }
+        { "sin", "0.5", dv_sin, num_sin, NULL },
+        { "cos", "0.5", dv_cos, num_cos, NULL },
+        { "tan", "0.5", dv_tan, num_tan, NULL },
+        { "sinh", "0.5", dv_sinh, num_sinh, NULL },
+        { "cosh", "0.5", dv_cosh, num_cosh, NULL },
+        { "tanh", "0.5", dv_tanh, num_tanh, NULL },
+        { "asin", "0.25", dv_asin, num_asin, NULL },
+        { "acos", "0.25", dv_acos, num_acos, NULL },
+        { "atan", "0.25", dv_atan, num_atan, NULL },
+        { "asinh", "0.25", dv_asinh, num_asinh, NULL },
+        { "acosh", "1.25", dv_acosh, num_acosh, NULL },
+        { "atanh", "0.25", dv_atanh, num_atanh, NULL },
+        { "exp", "1.5", dv_exp, num_exp, NULL },
+        { "log", "1.5", dv_log, num_log, NULL },
+        { "sqrt", "2.0", dv_sqrt, num_sqrt, NULL },
+        { "pow_d", "2.0", dv_pow3_builder, num_pow3_builder, NULL },
+        { "abs", "-3.0", dv_abs, num_abs, NULL },
+        { "erf", "0.8", dv_erf, num_erf, NULL },
+        { "erfc", "1.2", dv_erfc, num_erfc, NULL },
+        { "erfinv", "0.5", dv_erfinv, num_erfinv, NULL },
+        { "erfcinv", "0.4", dv_erfcinv, num_erfcinv, NULL },
+        { "gamma", "2.5", dv_gamma, num_gamma, NULL },
+        { "gammainv", GAMMAINV_INPUT_TEXT, dv_gammainv, num_gammainv, NULL },
+        { "lgamma", "2.5", dv_lgamma, num_lgamma, NULL },
+        { "digamma", "2.5", dv_digamma, num_digamma, NULL },
+        { "trigamma", "2.5", dv_trigamma, num_trigamma, NULL },
+        { "lambert_w0", "0.2", dv_lambert_w0, num_lambert_w0, NULL },
+        UCASE_TOL("lambert_wm1", "-0.1", dv_lambert_wm1, num_lambert_wm1, "1e-30"),
+        { "normal_pdf", "1.0", dv_normal_pdf, num_normal_pdf, NULL },
+        { "normal_cdf", "1.0", dv_normal_cdf, num_normal_cdf, NULL },
+        { "normal_logpdf", "1.0", dv_normal_logpdf, num_normal_logpdf, NULL },
+        { "ei", "1.0", dv_ei, num_ei, NULL },
+        { "e1", "1.0", dv_e1, num_e1, NULL }
     };
     static const binary_eval_case_t binary_cases[] = {
         { "atan2", "2.0", "3.0", dv_atan2, num_atan2 },
@@ -1062,38 +1093,39 @@ static void test_eval_num_function_values(void)
 static void test_eval_num_function_derivatives(void)
 {
     static const unary_eval_case_t unary_cases[] = {
-        { "sin", "0.5", dv_sin, num_sin },
-        { "cos", "0.5", dv_cos, num_cos },
-        { "tan", "0.5", dv_tan, num_tan },
-        { "sinh", "0.5", dv_sinh, num_sinh },
-        { "cosh", "0.5", dv_cosh, num_cosh },
-        { "tanh", "0.5", dv_tanh, num_tanh },
-        { "asin", "0.25", dv_asin, num_asin },
-        { "acos", "0.25", dv_acos, num_acos },
-        { "atan", "0.25", dv_atan, num_atan },
-        { "asinh", "0.25", dv_asinh, num_asinh },
-        { "acosh", "1.25", dv_acosh, num_acosh },
-        { "atanh", "0.25", dv_atanh, num_atanh },
-        { "exp", "1.5", dv_exp, num_exp },
-        { "log", "1.5", dv_log, num_log },
-        { "sqrt", "2.0", dv_sqrt, num_sqrt },
-        { "pow_d", "2.0", dv_pow3_builder, num_pow3_builder },
-        { "abs", "-3.0", dv_abs, num_abs },
-        { "erf", "0.8", dv_erf, num_erf },
-        { "erfc", "1.2", dv_erfc, num_erfc },
-        { "erfinv", "0.5", dv_erfinv, num_erfinv },
-        { "erfcinv", "0.4", dv_erfcinv, num_erfcinv },
-        { "gamma", "2.5", dv_gamma, num_gamma },
-        { "lgamma", "2.5", dv_lgamma, num_lgamma },
-        { "digamma", "2.5", dv_digamma, num_digamma },
-        { "trigamma", "2.5", dv_trigamma, num_trigamma },
-        { "lambert_w0", "0.2", dv_lambert_w0, num_lambert_w0 },
-        { "lambert_wm1", "-0.1", dv_lambert_wm1, num_lambert_wm1 },
-        { "normal_pdf", "1.0", dv_normal_pdf, num_normal_pdf },
-        { "normal_cdf", "1.0", dv_normal_cdf, num_normal_cdf },
-        { "normal_logpdf", "1.0", dv_normal_logpdf, num_normal_logpdf },
-        { "ei", "1.0", dv_ei, num_ei },
-        { "e1", "1.0", dv_e1, num_e1 }
+        UCASE("sin", "0.5", dv_sin, num_sin),
+        UCASE("cos", "0.5", dv_cos, num_cos),
+        UCASE("tan", "0.5", dv_tan, num_tan),
+        UCASE("sinh", "0.5", dv_sinh, num_sinh),
+        UCASE("cosh", "0.5", dv_cosh, num_cosh),
+        UCASE("tanh", "0.5", dv_tanh, num_tanh),
+        UCASE("asin", "0.25", dv_asin, num_asin),
+        UCASE("acos", "0.25", dv_acos, num_acos),
+        UCASE("atan", "0.25", dv_atan, num_atan),
+        UCASE("asinh", "0.25", dv_asinh, num_asinh),
+        UCASE("acosh", "1.25", dv_acosh, num_acosh),
+        UCASE("atanh", "0.25", dv_atanh, num_atanh),
+        UCASE("exp", "1.5", dv_exp, num_exp),
+        UCASE("log", "1.5", dv_log, num_log),
+        UCASE("sqrt", "2.0", dv_sqrt, num_sqrt),
+        UCASE("pow_d", "2.0", dv_pow3_builder, num_pow3_builder),
+        UCASE("abs", "-3.0", dv_abs, num_abs),
+        UCASE("erf", "0.8", dv_erf, num_erf),
+        UCASE("erfc", "1.2", dv_erfc, num_erfc),
+        UCASE("erfinv", "0.5", dv_erfinv, num_erfinv),
+        UCASE("erfcinv", "0.4", dv_erfcinv, num_erfcinv),
+        UCASE("gamma", "2.5", dv_gamma, num_gamma),
+        UCASE("gammainv", GAMMAINV_INPUT_TEXT, dv_gammainv, num_gammainv),
+        UCASE("lgamma", "2.5", dv_lgamma, num_lgamma),
+        UCASE("digamma", "2.5", dv_digamma, num_digamma),
+        UCASE("trigamma", "2.5", dv_trigamma, num_trigamma),
+        UCASE("lambert_w0", "0.2", dv_lambert_w0, num_lambert_w0),
+        UCASE_TOL("lambert_wm1", "-0.1", dv_lambert_wm1, num_lambert_wm1, "1e-30"),
+        UCASE("normal_pdf", "1.0", dv_normal_pdf, num_normal_pdf),
+        UCASE("normal_cdf", "1.0", dv_normal_cdf, num_normal_cdf),
+        UCASE("normal_logpdf", "1.0", dv_normal_logpdf, num_normal_logpdf),
+        UCASE("ei", "1.0", dv_ei, num_ei),
+        UCASE("e1", "1.0", dv_e1, num_e1)
     };
     static const binary_eval_case_t binary_cases[] = {
         { "atan2", "2.0", "3.0", dv_atan2, num_atan2 },
@@ -1113,36 +1145,37 @@ static void test_eval_num_function_derivatives(void)
 static void test_high_precision_mfloat_function_values(void)
 {
     static const unary_eval_case_t unary_cases[] = {
-        { "sin", "0.5", dv_sin, num_sin },
-        { "cos", "0.5", dv_cos, num_cos },
-        { "sinh", "0.5", dv_sinh, num_sinh },
-        { "cosh", "0.5", dv_cosh, num_cosh },
-        { "tanh", "0.5", dv_tanh, num_tanh },
-        { "asin", "0.25", dv_asin, num_asin },
-        { "acos", "0.25", dv_acos, num_acos },
-        { "atan", "0.25", dv_atan, num_atan },
-        { "asinh", "0.25", dv_asinh, num_asinh },
-        { "acosh", "1.25", dv_acosh, num_acosh },
-        { "atanh", "0.25", dv_atanh, num_atanh },
-        { "log", "1.5", dv_log, num_log },
-        { "sqrt", "2.0", dv_sqrt, num_sqrt },
-        { "pow_d", "2.0", dv_pow3_builder, num_pow3_builder },
-        { "abs", "-3.0", dv_abs, num_abs },
-        { "erf", "0.8", dv_erf, num_erf },
-        { "erfc", "1.2", dv_erfc, num_erfc },
-        { "erfinv", "0.5", dv_erfinv, num_erfinv },
-        { "erfcinv", "0.4", dv_erfcinv, num_erfcinv },
-        { "gamma", "2.5", dv_gamma, num_gamma },
-        { "lgamma", "2.5", dv_lgamma, num_lgamma },
-        { "digamma", "2.5", dv_digamma, num_digamma },
-        { "trigamma", "2.5", dv_trigamma, num_trigamma },
-        { "lambert_w0", "0.2", dv_lambert_w0, num_lambert_w0 },
-        { "lambert_wm1", "-0.1", dv_lambert_wm1, num_lambert_wm1 },
-        { "normal_pdf", "1.0", dv_normal_pdf, num_normal_pdf },
-        { "normal_cdf", "1.0", dv_normal_cdf, num_normal_cdf },
-        { "normal_logpdf", "1.0", dv_normal_logpdf, num_normal_logpdf },
-        { "ei", "1.0", dv_ei, num_ei },
-        { "e1", "1.0", dv_e1, num_e1 }
+        UCASE("sin", "0.5", dv_sin, num_sin),
+        UCASE("cos", "0.5", dv_cos, num_cos),
+        UCASE("sinh", "0.5", dv_sinh, num_sinh),
+        UCASE("cosh", "0.5", dv_cosh, num_cosh),
+        UCASE("tanh", "0.5", dv_tanh, num_tanh),
+        UCASE("asin", "0.25", dv_asin, num_asin),
+        UCASE("acos", "0.25", dv_acos, num_acos),
+        UCASE("atan", "0.25", dv_atan, num_atan),
+        UCASE("asinh", "0.25", dv_asinh, num_asinh),
+        UCASE("acosh", "1.25", dv_acosh, num_acosh),
+        UCASE("atanh", "0.25", dv_atanh, num_atanh),
+        UCASE("log", "1.5", dv_log, num_log),
+        UCASE("sqrt", "2.0", dv_sqrt, num_sqrt),
+        UCASE("pow_d", "2.0", dv_pow3_builder, num_pow3_builder),
+        UCASE("abs", "-3.0", dv_abs, num_abs),
+        UCASE("erf", "0.8", dv_erf, num_erf),
+        UCASE("erfc", "1.2", dv_erfc, num_erfc),
+        UCASE("erfinv", "0.5", dv_erfinv, num_erfinv),
+        UCASE("erfcinv", "0.4", dv_erfcinv, num_erfcinv),
+        UCASE("gamma", "2.5", dv_gamma, num_gamma),
+        UCASE("gammainv", GAMMAINV_INPUT_TEXT, dv_gammainv, num_gammainv),
+        UCASE("lgamma", "2.5", dv_lgamma, num_lgamma),
+        UCASE("digamma", "2.5", dv_digamma, num_digamma),
+        UCASE("trigamma", "2.5", dv_trigamma, num_trigamma),
+        UCASE("lambert_w0", "0.2", dv_lambert_w0, num_lambert_w0),
+        UCASE("lambert_wm1", "-0.1", dv_lambert_wm1, num_lambert_wm1),
+        UCASE("normal_pdf", "1.0", dv_normal_pdf, num_normal_pdf),
+        UCASE("normal_cdf", "1.0", dv_normal_cdf, num_normal_cdf),
+        UCASE("normal_logpdf", "1.0", dv_normal_logpdf, num_normal_logpdf),
+        UCASE("ei", "1.0", dv_ei, num_ei),
+        UCASE("e1", "1.0", dv_e1, num_e1)
     };
     static const binary_eval_case_t binary_cases[] = {
         { "atan2", "2.0", "3.0", dv_atan2, num_atan2 },
@@ -1162,32 +1195,33 @@ static void test_high_precision_mfloat_function_values(void)
 static void test_high_precision_mfloat_function_derivatives(void)
 {
     static const unary_eval_case_t unary_cases[] = {
-        { "sin", "0.5", dv_sin, num_sin },
-        { "cos", "0.5", dv_cos, num_cos },
-        { "sinh", "0.5", dv_sinh, num_sinh },
-        { "cosh", "0.5", dv_cosh, num_cosh },
-        { "tanh", "0.5", dv_tanh, num_tanh },
-        { "asin", "0.25", dv_asin, num_asin },
-        { "acos", "0.25", dv_acos, num_acos },
-        { "atan", "0.25", dv_atan, num_atan },
-        { "asinh", "0.25", dv_asinh, num_asinh },
-        { "acosh", "1.25", dv_acosh, num_acosh },
-        { "atanh", "0.25", dv_atanh, num_atanh },
-        { "log", "1.5", dv_log, num_log },
-        { "sqrt", "2.0", dv_sqrt, num_sqrt },
-        { "pow_d", "2.0", dv_pow3_builder, num_pow3_builder },
-        { "abs", "-3.0", dv_abs, num_abs },
-        { "gamma", "2.5", dv_gamma, num_gamma },
-        { "lgamma", "2.5", dv_lgamma, num_lgamma },
-        { "digamma", "2.5", dv_digamma, num_digamma },
-        { "trigamma", "2.5", dv_trigamma, num_trigamma },
-        { "lambert_w0", "0.2", dv_lambert_w0, num_lambert_w0 },
-        { "lambert_wm1", "-0.1", dv_lambert_wm1, num_lambert_wm1 },
-        { "normal_pdf", "1.0", dv_normal_pdf, num_normal_pdf },
-        { "normal_cdf", "1.0", dv_normal_cdf, num_normal_cdf },
-        { "normal_logpdf", "1.0", dv_normal_logpdf, num_normal_logpdf },
-        { "ei", "1.0", dv_ei, num_ei },
-        { "e1", "1.0", dv_e1, num_e1 }
+        UCASE("sin", "0.5", dv_sin, num_sin),
+        UCASE("cos", "0.5", dv_cos, num_cos),
+        UCASE("sinh", "0.5", dv_sinh, num_sinh),
+        UCASE("cosh", "0.5", dv_cosh, num_cosh),
+        UCASE("tanh", "0.5", dv_tanh, num_tanh),
+        UCASE("asin", "0.25", dv_asin, num_asin),
+        UCASE("acos", "0.25", dv_acos, num_acos),
+        UCASE("atan", "0.25", dv_atan, num_atan),
+        UCASE("asinh", "0.25", dv_asinh, num_asinh),
+        UCASE("acosh", "1.25", dv_acosh, num_acosh),
+        UCASE("atanh", "0.25", dv_atanh, num_atanh),
+        UCASE("log", "1.5", dv_log, num_log),
+        UCASE("sqrt", "2.0", dv_sqrt, num_sqrt),
+        UCASE("pow_d", "2.0", dv_pow3_builder, num_pow3_builder),
+        UCASE("abs", "-3.0", dv_abs, num_abs),
+        UCASE("gamma", "2.5", dv_gamma, num_gamma),
+        UCASE("gammainv", GAMMAINV_INPUT_TEXT, dv_gammainv, num_gammainv),
+        UCASE("lgamma", "2.5", dv_lgamma, num_lgamma),
+        UCASE("digamma", "2.5", dv_digamma, num_digamma),
+        UCASE("trigamma", "2.5", dv_trigamma, num_trigamma),
+        UCASE("lambert_w0", "0.2", dv_lambert_w0, num_lambert_w0),
+        UCASE("lambert_wm1", "-0.1", dv_lambert_wm1, num_lambert_wm1),
+        UCASE("normal_pdf", "1.0", dv_normal_pdf, num_normal_pdf),
+        UCASE("normal_cdf", "1.0", dv_normal_cdf, num_normal_cdf),
+        UCASE("normal_logpdf", "1.0", dv_normal_logpdf, num_normal_logpdf),
+        UCASE("ei", "1.0", dv_ei, num_ei),
+        UCASE("e1", "1.0", dv_e1, num_e1)
     };
     static const binary_eval_case_t binary_cases[] = {
         { "atan2", "2.0", "3.0", dv_atan2, num_atan2 },
@@ -1207,15 +1241,15 @@ static void test_high_precision_mfloat_function_derivatives(void)
 static void test_high_precision_mcomplex_function_values(void)
 {
     static const unary_eval_case_t unary_cases[] = {
-        { "sin", "1 + 2i", dv_sin, num_sin },
-        { "cos", "1 + 2i", dv_cos, num_cos },
-        { "tan", "1 + 2i", dv_tan, num_tan },
-        { "sinh", "1 + 2i", dv_sinh, num_sinh },
-        { "cosh", "1 + 2i", dv_cosh, num_cosh },
-        { "tanh", "1 + 2i", dv_tanh, num_tanh },
-        { "exp", "1 + 2i", dv_exp, num_exp },
-        { "log", "1 + 2i", dv_log, num_log },
-        { "sqrt", "1 + 2i", dv_sqrt, num_sqrt }
+        UCASE("sin", "1 + 2i", dv_sin, num_sin),
+        UCASE("cos", "1 + 2i", dv_cos, num_cos),
+        UCASE("tan", "1 + 2i", dv_tan, num_tan),
+        UCASE("sinh", "1 + 2i", dv_sinh, num_sinh),
+        UCASE("cosh", "1 + 2i", dv_cosh, num_cosh),
+        UCASE("tanh", "1 + 2i", dv_tanh, num_tanh),
+        UCASE("exp", "1 + 2i", dv_exp, num_exp),
+        UCASE("log", "1 + 2i", dv_log, num_log),
+        UCASE("sqrt", "1 + 2i", dv_sqrt, num_sqrt)
     };
     static const binary_eval_case_t binary_cases[] = {
         { "pow", "1 + 2i", "2 - i", dv_pow, num_pow }

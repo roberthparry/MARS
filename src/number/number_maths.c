@@ -526,7 +526,7 @@ static number_t number_apply_unary_math_with_double(const number_t number,
                                                     number_mcomplex_unary_mut_fn mc_fn)
 {
     return number_is_valid_value(&number) &&
-           number_impl_const(&number)->kind == NUMBER_DOUBLE && d_fn
+           number_kind_value(&number) == NUMBER_DOUBLE && d_fn
         ? num_create_from_double(d_fn(number_impl_const(&number)->value.d))
         : number_apply_unary_math(number, qf_fn, qc_fn, mf_fn, mc_fn);
 }
@@ -570,8 +570,8 @@ static number_t number_apply_binary_math_with_double(const number_t a,
                                                      number_mcomplex_binary_mut_fn mc_fn)
 {
     return number_is_valid_value(&a) && number_is_valid_value(&b) &&
-           number_impl_const(&a)->kind == NUMBER_DOUBLE &&
-           number_impl_const(&b)->kind == NUMBER_DOUBLE && d_fn
+           number_kind_value(&a) == NUMBER_DOUBLE &&
+           number_kind_value(&b) == NUMBER_DOUBLE && d_fn
         ? num_create_from_double(d_fn(number_impl_const(&a)->value.d,
             number_impl_const(&b)->value.d))
         : number_apply_binary_math(a, b, qf_fn, qc_fn, mf_fn, mc_fn);

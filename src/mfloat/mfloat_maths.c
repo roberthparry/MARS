@@ -4310,7 +4310,9 @@ int mf_gammainv(mfloat_t *mfloat)
         mfloat_div_long_inplace(gamma_2_5, 4) != 0)
         goto cleanup;
     if (mf_eq(mfloat, gamma_2_5)) {
-        rc = mf_set_double(mfloat, 2.5);
+        rc = mf_set_long(mfloat, 5);
+        if (rc == 0)
+            rc = mfloat_div_long_inplace(mfloat, 2);
         goto cleanup;
     }
     delta = mf_clone(gamma_2_5);
@@ -4319,7 +4321,9 @@ int mf_gammainv(mfloat_t *mfloat)
     if (mf_sub(delta, mfloat) != 0 || mf_abs(delta) != 0)
         goto cleanup;
     if (mfloat_is_below_neg_bits(delta, 256l)) {
-        rc = mf_set_double(mfloat, 2.5);
+        rc = mf_set_long(mfloat, 5);
+        if (rc == 0)
+            rc = mfloat_div_long_inplace(mfloat, 2);
         goto cleanup;
     }
     if (precision <= MFLOAT_QFLOAT_EFFECTIVE_BITS)

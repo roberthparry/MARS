@@ -97,7 +97,7 @@ int main(void) {
         qc_make(qf_from_double(1.0), qf_from_double(-1.0)),
         qc_make(qf_from_double(3.0), qf_from_double(0.0))
     };
-    matrix_t *A = mat_create_qc(2, 2, A_vals);
+    matrix_t *A = mat_create_num(2, 2, A_vals);
 
     qcomplex_t eigenvalues[2];
     matrix_t  *evecs = NULL;
@@ -325,26 +325,16 @@ off-diagonal element). For bulk initialisation prefer the `mat_create_*` forms b
 
 | Function | Element type | Description |
 |---|---|---|
-| `mat_new_d(rows, cols)` | `double` | Allocate an uninitialised `rows × cols` matrix of doubles |
-| `mat_new_qf(rows, cols)` | `qfloat_t` | Allocate an uninitialised `rows × cols` matrix of `qfloat_t` |
-| `mat_new_qc(rows, cols)` | `qcomplex_t` | Allocate an uninitialised `rows × cols` matrix of `qcomplex_t` |
+| `mat_new_num(rows, cols)` | `number_t` | Allocate an uninitialised `rows × cols` matrix of `number_t` values |
 | `mat_new_dv(rows, cols)` | `dval_t *` | Allocate an uninitialised `rows × cols` matrix of retained `dval_t *` handles |
-| `mat_new_sparse_d(rows, cols)` | `double` | Allocate an uninitialised sparse `rows × cols` matrix of doubles |
-| `mat_new_sparse_qf(rows, cols)` | `qfloat_t` | Allocate an uninitialised sparse `rows × cols` matrix of `qfloat_t` |
-| `mat_new_sparse_qc(rows, cols)` | `qcomplex_t` | Allocate an uninitialised sparse `rows × cols` matrix of `qcomplex_t` |
+| `mat_new_sparse_num(rows, cols)` | `number_t` | Allocate an uninitialised sparse `rows × cols` matrix of `number_t` values |
 | `mat_new_sparse_dv(rows, cols)` | `dval_t *` | Allocate an uninitialised sparse `rows × cols` matrix of retained `dval_t *` handles |
-| `matsq_new_d(n)` | `double` | Allocate an uninitialised `n × n` matrix of doubles |
-| `matsq_new_qf(n)` | `qfloat_t` | Allocate an uninitialised `n × n` matrix of `qfloat_t` |
-| `matsq_new_qc(n)` | `qcomplex_t` | Allocate an uninitialised `n × n` matrix of `qcomplex_t` |
-| `matsq_new_dv(n)` | `dval_t *` | Allocate an uninitialised `n × n` matrix of retained `dval_t *` handles |
+| `matsq_new_num(n)` | `number_t` | Allocate an uninitialised `n × n` matrix of `number_t` values |
 
 #### Allocate and fill from a flat array
 
 | Function | Element type | Description |
 |---|---|---|
-| `mat_create_d(rows, cols, data)` | `double` | Allocate and fill from a row-major `double[]` |
-| `mat_create_qf(rows, cols, data)` | `qfloat_t` | Allocate and fill from a row-major `qfloat_t[]` |
-| `mat_create_qc(rows, cols, data)` | `qcomplex_t` | Allocate and fill from a row-major `qcomplex_t[]` |
 | `mat_create_dv(rows, cols, data)` | `dval_t *` | Allocate and fill from a row-major `dval_t * []`; each handle is retained by the matrix |
 
 #### Identity matrices
@@ -354,9 +344,6 @@ materialises the matrix as dense.
 
 | Function | Element type | Description |
 |---|---|---|
-| `mat_create_identity_d(n)` | `double` | `n × n` identity matrix of doubles |
-| `mat_create_identity_qf(n)` | `qfloat_t` | `n × n` identity matrix of `qfloat_t` |
-| `mat_create_identity_qc(n)` | `qcomplex_t` | `n × n` identity matrix of `qcomplex_t` |
 | `mat_create_identity_dv(n)` | `dval_t *` | `n × n` identity matrix of symbolic ones and zeros |
 
 #### Diagonal matrices
@@ -367,9 +354,6 @@ to survive through compatible operations.
 
 | Function | Element type | Description |
 |---|---|---|
-| `mat_create_diagonal_d(n, diagonal)` | `double` | `n × n` diagonal matrix of doubles |
-| `mat_create_diagonal_qf(n, diagonal)` | `qfloat_t` | `n × n` diagonal matrix of `qfloat_t` |
-| `mat_create_diagonal_qc(n, diagonal)` | `qcomplex_t` | `n × n` diagonal matrix of `qcomplex_t` |
 | `mat_create_diagonal_dv(n, diagonal)` | `dval_t *` | `n × n` diagonal matrix of retained `dval_t *` handles |
 
 ### Destruction
@@ -427,12 +411,8 @@ the two.
 
 | Function | Scalar type | Description |
 |---|---|---|
-| `mat_scalar_mul_d(A, s)` | `double` | `s * A` |
-| `mat_scalar_mul_qf(A, s)` | `qfloat_t` | `s * A` |
-| `mat_scalar_mul_qc(A, s)` | `qcomplex_t` | `s * A` |
-| `mat_scalar_div_d(A, s)` | `double` | `A / s` |
-| `mat_scalar_div_qf(A, s)` | `qfloat_t` | `A / s` |
-| `mat_scalar_div_qc(A, s)` | `qcomplex_t` | `A / s` |
+| `mat_scalar_mul_num(A, s)` | `number_t` | `s * A` |
+| `mat_scalar_div_num(A, s)` | `number_t` | `A / s` |
 
 ### Matrix Operations
 
@@ -698,8 +678,8 @@ double B_data[] = {
     5.1
 };
 
-matrix_t *A = mat_create_d(3, 2, A_data);
-matrix_t *B = mat_create_d(3, 1, B_data);
+matrix_t *A = mat_create_num(3, 2, A_data);
+matrix_t *B = mat_create_num(3, 1, B_data);
 matrix_t *X = mat_least_squares(A, B);
 
 mat_print(X);
@@ -895,8 +875,8 @@ For `MAT_TYPE_DVAL`, the story is different:
 - exact symbolic matrix functions are implemented for structured inputs where the
   result can be expressed entrywise without numerical approximation
 - when you want to continue numerically beyond that exact symbolic boundary,
-  first evaluate the current symbolic matrix into a `qcomplex_t` snapshot with
-  `mat_evaluate_qc(...)`, then apply the usual numeric matrix function.
+  first evaluate the current symbolic matrix into a `number_t` snapshot with
+  `mat_evaluate_num(...)`, then apply the usual numeric matrix function.
 - that exact path also includes:
   - dense symbolic matrices with one common diagonal value and one common
     off-diagonal value, handled exactly for any matrix size through the

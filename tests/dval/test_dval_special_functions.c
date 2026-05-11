@@ -416,6 +416,23 @@ void test_trigamma(void)
                qf_sub(t3, t4), qf_div(qf_from_double(1.0), qf_from_double(9.0)));
 }
 
+void test_gammainv(void)
+{
+    /* gammainv(gamma(2.5)) = 2.5 */
+    qfloat_t X = qf_from_double(2.5);
+    qfloat_t Y = qf_gamma(X);
+    dval_t *c = test_dv_new_var_qf(Y);
+    dval_t *f = dv_gammainv(c);
+    check_q_at(__FILE__, __LINE__, 1, "gammainv(gamma(2.5)) = 2.5", dv_eval_qf(f), X);
+    print_expr_of(f);
+    dv_free(f); dv_free(c);
+
+    /* Round-trip at x=3 */
+    X = qf_from_double(3.0);
+    Y = qf_gammainv(qf_gamma(X));
+    check_q_at(__FILE__, __LINE__, 1, "qf_gammainv(gamma(3)) = 3", Y, X);
+}
+
 void test_deriv_trigamma(void)
 {
     dval_t *x  = test_dv_new_var_d(3.0);

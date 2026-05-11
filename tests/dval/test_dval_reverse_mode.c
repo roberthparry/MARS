@@ -5,8 +5,13 @@ static int number_close_for_qfloat_precision(const number_t got,
 {
     number_t diff = num_sub(got, expected);
     number_t error;
-    number_t tolerance = num_create_from_string("1e-28");
+    number_t one = num_create_from_double(1.0);
+    number_t tolerance;
     int ok;
+
+    ASSERT_EQ_INT(num_set_prec_bits(&one, 106u), 0);
+    tolerance = num_ldexp(one, 4 - 106);
+    num_destroy(&one);
 
     if (num_is_real(diff))
         error = num_abs(diff);

@@ -131,6 +131,7 @@ static void test_from_string_special_functions(void)
     check_parse_val("erfinv(0) = 0",         "{ erfinv(x) | x = 0 }",        0.0,                     __LINE__);
     check_parse_val("erfcinv(1) = 0",        "{ erfcinv(x) | x = 1 }",       0.0,                     __LINE__);
     check_parse_val("gamma(3) = 2",          "{ gamma(x) | x = 3 }",         2.0,                     __LINE__);
+    check_parse_val("gammainv(gamma(2.5)) = 2.5", "{ gammainv(x) | x = 1.329340388179137 }", 2.5,   __LINE__);
     check_parse_val("lgamma(1) = 0",         "{ lgamma(x) | x = 1 }",        0.0,                     __LINE__);
     check_parse_val("digamma(1) = -gamma_E", "{ digamma(x) | x = 1 }",      -0.5772156649015329,       __LINE__);
     check_parse_val("lambert_w0(0) = 0",     "{ lambert_w0(x) | x = 0 }",    0.0,                     __LINE__);

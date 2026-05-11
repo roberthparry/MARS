@@ -9,57 +9,13 @@ static matrix_t *clone_matrix_snapshot(const matrix_t *A)
     if (!A)
         return NULL;
 
-    size_t rows = mat_get_row_count(A);
-    size_t cols = mat_get_col_count(A);
-
     switch (mat_typeof(A))
     {
     case MAT_TYPE_DOUBLE:
-    {
-        double *data = malloc(rows * cols * sizeof(double));
-        matrix_t *copy;
-        if (!data)
-            return NULL;
-        mat_get_data(A, data);
-        copy = mat_create_d(rows, cols, data);
-        free(data);
-        return copy;
-    }
     case MAT_TYPE_QFLOAT:
-    {
-        qfloat_t *data = malloc(rows * cols * sizeof(qfloat_t));
-        matrix_t *copy;
-        if (!data)
-            return NULL;
-        mat_get_data(A, data);
-        copy = mat_create_qf(rows, cols, data);
-        free(data);
-        return copy;
-    }
     case MAT_TYPE_QCOMPLEX:
-    {
-        qcomplex_t *data = malloc(rows * cols * sizeof(qcomplex_t));
-        matrix_t *copy;
-        if (!data)
-            return NULL;
-        mat_get_data(A, data);
-        copy = mat_create_qc(rows, cols, data);
-        free(data);
-        return copy;
-    }
     case MAT_TYPE_NUMBER:
-    {
-        number_t *data = malloc(rows * cols * sizeof(number_t));
-        matrix_t *copy;
-        if (!data)
-            return NULL;
-        mat_get_data_num(A, data);
-        copy = mat_create_num(rows, cols, data);
-        for (size_t i = 0; i < rows * cols; ++i)
-            num_destroy(&data[i]);
-        free(data);
-        return copy;
-    }
+        return mat_evaluate_num(A);
     case MAT_TYPE_DVAL:
         return mat_to_dense(A);
     }
@@ -745,6 +701,22 @@ static void print_mdv_raw(const char *label, matrix_t *A)
     free(w);
 }
 
+void print_mnum(const char *label, matrix_t *A)
+{
+    char display_label[160];
+
+    if (!A) {
+        printf(C_YELLOW "%s = <null>\n" C_RESET, label);
+        fflush(stdout);
+        return;
+    }
+
+    format_matrix_label(label, display_label, sizeof(display_label));
+    print_mnum_raw(display_label, A);
+    remember_matrix_input(label, A);
+    fflush(stdout);
+}
+
 void print_mdv(const char *label, matrix_t *A)
 {
     char display_label[160];
@@ -761,14 +733,8 @@ void print_current_input_matrix(void)
     switch (mat_typeof(current_matrix_input))
     {
     case MAT_TYPE_DOUBLE:
-        print_md_raw("input matrix", current_matrix_input);
-        break;
     case MAT_TYPE_QFLOAT:
-        print_mqf_raw("input matrix", current_matrix_input);
-        break;
     case MAT_TYPE_QCOMPLEX:
-        print_mqc_raw("input matrix", current_matrix_input);
-        break;
     case MAT_TYPE_NUMBER:
         print_mnum_raw("input matrix", current_matrix_input);
         break;

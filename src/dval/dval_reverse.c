@@ -5,7 +5,7 @@
 
 static number_t dv_reverse_zero(void)
 {
-    return num_clone(NUM_ZERO);
+    return NUM_ZERO;
 }
 
 static int reverse_find_node(const dval_t *const *nodes,
@@ -98,7 +98,7 @@ int dv_eval_derivatives(const dval_t *expr,
     for (size_t i = 0; i < node_count; ++i)
         bars[i] = dv_reverse_zero();
     num_destroy(&bars[node_count - 1u]);
-    bars[node_count - 1u] = num_clone(NUM_ONE);
+    bars[node_count - 1u] = NUM_ONE;
 
     for (size_t i = node_count; i-- > 0u;) {
         const dval_t *node = nodes[i];

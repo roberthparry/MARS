@@ -176,6 +176,12 @@ const dval_ops_t ops_trigamma = {
     .apply_unary = dv_trigamma, .apply_binary = NULL,
     .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
 };
+const dval_ops_t ops_gammainv = {
+    .eval = eval_gammainv, .deriv = deriv_gammainv, .reverse = dv_reverse_gammainv,
+    .kind = DV_KIND_GAMMAINV, .arity = DV_OP_UNARY, .name = "gammainv",
+    .apply_unary = dv_gammainv, .apply_binary = NULL,
+    .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
+};
 const dval_ops_t ops_lambert_w0 = {
     .eval = eval_lambert_w0, .deriv = deriv_lambert_w0, .reverse = dv_reverse_lambert_w0,
     .kind = DV_KIND_LAMBERT_W0, .arity = DV_OP_UNARY, .name = "lambert_w0",
@@ -257,6 +263,7 @@ dval_t *dv_erfcinv(const dval_t *a) { return dv_math_wrap_unary(&ops_erfcinv, a)
 dval_t *dv_gamma(const dval_t *a) { return dv_math_wrap_unary(&ops_gamma, a); }
 dval_t *dv_digamma(const dval_t *a) { return dv_math_wrap_unary(&ops_digamma, a); }
 dval_t *dv_trigamma(const dval_t *a) { return dv_math_wrap_unary(&ops_trigamma, a); }
+dval_t *dv_gammainv(const dval_t *a) { return dv_math_wrap_unary(&ops_gammainv, a); }
 dval_t *dv_lambert_w0(const dval_t *a) { return dv_math_wrap_unary(&ops_lambert_w0, a); }
 dval_t *dv_lambert_wm1(const dval_t *a) { return dv_math_wrap_unary(&ops_lambert_wm1, a); }
 dval_t *dv_normal_pdf(const dval_t *a) { return dv_math_wrap_unary(&ops_normal_pdf, a); }

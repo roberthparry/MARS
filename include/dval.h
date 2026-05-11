@@ -275,7 +275,7 @@ dval_t *dv_pow(const dval_t *dv1, const dval_t *dv2);
  *
  * Error functions:   dv_erf, dv_erfc, dv_erfinv, dv_erfcinv
  * Gamma family:      dv_gamma (Γ), dv_lgamma (log Γ), dv_digamma (ψ),
- *                    dv_trigamma (ψ₁)
+ *                    dv_trigamma (ψ₁), dv_gammainv (Γ⁻¹)
  * Lambert W:         dv_lambert_w0 (principal branch), dv_lambert_wm1 (k=-1)
  * Beta:              dv_beta (B), dv_logbeta (log B)
  * Normal dist.:      dv_normal_pdf, dv_normal_cdf, dv_normal_logpdf
@@ -291,6 +291,7 @@ dval_t *dv_gamma(const dval_t *dv);
 dval_t *dv_lgamma(const dval_t *dv);
 dval_t *dv_digamma(const dval_t *dv);
 dval_t *dv_trigamma(const dval_t *dv);
+dval_t *dv_gammainv(const dval_t *dv);
 dval_t *dv_lambert_w0(const dval_t *dv);
 dval_t *dv_lambert_wm1(const dval_t *dv);
 dval_t *dv_beta(const dval_t *dv1, const dval_t *dv2);

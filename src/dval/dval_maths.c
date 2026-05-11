@@ -50,6 +50,7 @@ number_t eval_erfcinv(dval_t *dv) { return dv_eval_unary_num(dv, num_erfcinv); }
 number_t eval_gamma(dval_t *dv) { return dv_eval_unary_num(dv, num_gamma); }
 number_t eval_digamma(dval_t *dv) { return dv_eval_unary_num(dv, num_digamma); }
 number_t eval_trigamma(dval_t *dv) { return dv_eval_unary_num(dv, num_trigamma); }
+number_t eval_gammainv(dval_t *dv) { return dv_eval_unary_num(dv, num_gammainv); }
 number_t eval_lambert_w0(dval_t *dv) { return dv_eval_unary_num(dv, num_lambert_w0); }
 number_t eval_lambert_wm1(dval_t *dv) { return dv_eval_unary_num(dv, num_lambert_wm1); }
 number_t eval_normal_pdf(dval_t *dv) { return dv_eval_unary_num(dv, num_normal_pdf); }
@@ -420,6 +421,18 @@ dval_t *deriv_trigamma(dval_t *dv)
     dval_t *coeff = dv_num_const_qf(t2);
     dval_t *out   = dv_mul(coeff, da);
     dv_free(da); dv_free(coeff);
+    return out;
+}
+
+dval_t *deriv_gammainv(dval_t *dv)
+{
+    dval_t *da   = dv_get_dx_internal(dv->a);
+    dval_t *y    = dv_gammainv(dv->a);
+    dval_t *psi  = dv_digamma(y);
+    dval_t *xpsi = dv_mul(dv->a, psi);
+    dval_t *fac  = dv_d_div(1.0, xpsi);
+    dval_t *out  = dv_mul(fac, da);
+    dv_free(da); dv_free(y); dv_free(psi); dv_free(xpsi); dv_free(fac);
     return out;
 }
 

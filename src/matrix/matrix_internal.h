@@ -5,7 +5,6 @@
 #include <stddef.h>
 
 #include "matrix.h"
-#include "matrix_eval_qc.h"
 
 /* ============================================================
    Element kinds
@@ -115,6 +114,7 @@ struct elem_vtable {
 
     /* printing */
     void (*print)(const void *val, char *buf, size_t buflen);
+    int (*format_scalar)(const void *val, int scientific, char *buf, size_t buflen);
 
     /* numerical tolerance scale for rank/conditioning decisions */
     qfloat_t relative_epsilon;
@@ -210,7 +210,17 @@ void mat_value_destroy(const struct matrix_t *A, void *slot);
    ============================================================ */
 
 static inline const struct elem_vtable *elem_of(const struct matrix_t *A) {
-    return A->elem;
+    return A ? A->elem : NULL;
+}
+
+static inline bool elem_is_symbolic(const struct elem_vtable *elem)
+{
+    return elem && elem->kind == ELEM_DVAL;
+}
+
+static inline bool matrix_is_symbolic(const struct matrix_t *A)
+{
+    return elem_is_symbolic(elem_of(A));
 }
 
 /* ============================================================

@@ -728,6 +728,24 @@ void test_deriv_digamma(void)
     dv_free(x);
 }
 
+void test_deriv_gammainv(void)
+{
+    qfloat_t X = qf_gamma(qf_from_double(2.5));
+    dval_t *x  = test_dv_new_var_qf(X);
+    dval_t *f  = dv_gammainv(x);
+    const dval_t *df = dv_get_deriv(f, x);
+
+    /* d/dx{gammainv(x)} = 1 / (x * digamma(gammainv(x))) */
+    qfloat_t y = qf_gammainv(X);
+    qfloat_t expect = qf_div(qf_from_double(1.0), qf_mul(X, qf_digamma(y)));
+
+    check_q_at(__FILE__, __LINE__, 1, "d/dx{gammainv(x)} | x=gamma(2.5)", dv_eval_qf(df), expect);
+    print_expr_of(df);
+
+    dv_free(f);
+    dv_free(x);
+}
+
 void test_deriv_lambert_w0(void)
 {
     dval_t *x  = test_dv_new_var_d(1.0);
@@ -937,6 +955,7 @@ void test_first_derivatives(void)
     RUN_SUBTEST(test_deriv_gamma);
     RUN_SUBTEST(test_deriv_lgamma);
     RUN_SUBTEST(test_deriv_digamma);
+    RUN_SUBTEST(test_deriv_gammainv);
     RUN_SUBTEST(test_deriv_trigamma);
     RUN_SUBTEST(test_deriv_lambert_w0);
     RUN_SUBTEST(test_deriv_lambert_wm1);

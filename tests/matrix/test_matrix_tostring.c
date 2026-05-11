@@ -32,7 +32,7 @@ static void test_mat_to_string_numeric(void)
         qf_from_double(1.0), qf_from_double(2.0),
         qf_from_double(3.0), qf_from_double(4.0)
     };
-    matrix_t *A = mat_create_qf(2, 2, vals);
+    matrix_t *A = test_mat_create_qf(2, 2, vals);
     char *inline_pretty = mat_to_string(A, MAT_STRING_INLINE_PRETTY);
     char *layout_scientific = mat_to_string(A, MAT_STRING_LAYOUT_SCIENTIFIC);
 

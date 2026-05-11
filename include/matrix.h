@@ -136,27 +136,6 @@ typedef struct {
    ------------------------------------------------------------------------- */
 
 /**
- * @brief Allocate a new (incomplete) matrix of doubles.
- *
- * The returned matrix is allocated but contains unspecified values.
- * The caller must fill it using mat_set().
- */
-matrix_t *mat_new_d(size_t rows, size_t cols);
-matrix_t *mat_new_sparse_d(size_t rows, size_t cols);
-
-/**
- * @brief Allocate a new (incomplete) matrix of qfloat_t.
- */
-matrix_t *mat_new_qf(size_t rows, size_t cols);
-matrix_t *mat_new_sparse_qf(size_t rows, size_t cols);
-
-/**
- * @brief Allocate a new (incomplete) matrix of qcomplex_t.
- */
-matrix_t *mat_new_qc(size_t rows, size_t cols);
-matrix_t *mat_new_sparse_qc(size_t rows, size_t cols);
-
-/**
  * @brief Allocate a new (incomplete) matrix of number_t values.
  *
  * Stored values are cloned into matrix-owned storage. When extracting values
@@ -176,47 +155,18 @@ matrix_t *mat_new_dv(size_t rows, size_t cols);
 matrix_t *mat_new_sparse_dv(size_t rows, size_t cols);
 
 /**
- * @brief Allocate a new (incomplete) square matrix of doubles.
- */
-matrix_t *matsq_new_d(size_t n);
-
-/**
- * @brief Allocate a new (incomplete) square matrix of qfloat_t.
- */
-matrix_t *matsq_new_qf(size_t n);
-
-/**
- * @brief Allocate a new (incomplete) square matrix of qcomplex_t.
- */
-matrix_t *matsq_new_qc(size_t n);
-
-/**
  * @brief Allocate a new (incomplete) square matrix of number_t values.
+ *
+ * Entries are initialised to structural zero and may be filled later with
+ * mat_set() or mat_set_data().
  */
 matrix_t *matsq_new_num(size_t n);
 
 /**
- * @brief Allocate a new (incomplete) square matrix of dval_t* handles.
- */
-matrix_t *matsq_new_dv(size_t n);
-
-/**
- * @brief Create a complete identity matrix of doubles.
- */
-matrix_t *mat_create_identity_d(size_t n);
-
-/**
- * @brief Create a complete identity matrix of qfloat_t.
- */
-matrix_t *mat_create_identity_qf(size_t n);
-
-/**
- * @brief Create a complete identity matrix of qcomplex_t.
- */
-matrix_t *mat_create_identity_qc(size_t n);
-
-/**
  * @brief Create a complete identity matrix of number_t values.
+ *
+ * The result is an `n x n` number matrix with exact zeros off the diagonal
+ * and exact ones on the diagonal.
  */
 matrix_t *mat_create_identity_num(size_t n);
 
@@ -226,29 +176,10 @@ matrix_t *mat_create_identity_num(size_t n);
 matrix_t *mat_create_identity_dv(size_t n);
 
 /**
- * @brief Create a diagonal matrix of doubles from its diagonal entries.
- *
- * Only the main diagonal is stored explicitly. All off-diagonal entries are
- * zero.
- *
- * @param n         Matrix order.
- * @param diagonal  Pointer to n diagonal entries in row order.
- * @return          Newly allocated diagonal matrix on success, or NULL on error.
- */
-matrix_t *mat_create_diagonal_d(size_t n, const double *diagonal);
-
-/**
- * @brief Create a diagonal matrix of qfloat_t values from its diagonal entries.
- */
-matrix_t *mat_create_diagonal_qf(size_t n, const qfloat_t *diagonal);
-
-/**
- * @brief Create a diagonal matrix of qcomplex_t values from its diagonal entries.
- */
-matrix_t *mat_create_diagonal_qc(size_t n, const qcomplex_t *diagonal);
-
-/**
  * @brief Create a diagonal matrix of number_t values from its diagonal entries.
+ *
+ * Each supplied entry is cloned into matrix-owned storage. Off-diagonal
+ * entries are structural zero.
  */
 matrix_t *mat_create_diagonal_num(size_t n, const number_t *diagonal);
 
@@ -258,28 +189,13 @@ matrix_t *mat_create_diagonal_num(size_t n, const number_t *diagonal);
 matrix_t *mat_create_diagonal_dv(size_t n, dval_t *const *diagonal);
 
 /**
- * @brief Create a complete matrix of doubles from a flat array.
- *
- * @param rows       Number of rows.
- * @param cols       Number of columns.
- * @param data       Pointer to rows*cols values.
- */
-matrix_t *mat_create_d(size_t rows, size_t cols, const double *data);
-
-/**
- * @brief Create a complete matrix of qfloat_t from a flat array.
- */
-matrix_t *mat_create_qf(size_t rows, size_t cols, const qfloat_t *data);
-
-/**
- * @brief Create a complete matrix of qcomplex_t from a flat array.
- */
-matrix_t *mat_create_qc(size_t rows, size_t cols, const qcomplex_t *data);
-
-/**
  * @brief Create a complete matrix of number_t values from a flat array.
  *
  * Each entry is cloned into matrix-owned storage.
+ *
+ * @param rows  Number of rows.
+ * @param cols  Number of columns.
+ * @param data  Pointer to `rows * cols` row-major `number_t` values.
  */
 matrix_t *mat_create_num(size_t rows, size_t cols, const number_t *data);
 
@@ -479,36 +395,6 @@ matrix_t *mat_to_dense(const matrix_t *A);
 matrix_t *mat_evaluate_num(const matrix_t *A);
 
 /**
- * @brief Evaluate a matrix into qfloat_t form.
- *
- * For dval matrices, each symbolic entry is evaluated at the current variable
- * values and copied into a newly allocated qfloat matrix. The result is a
- * numeric snapshot and does not continue to track later variable changes.
- *
- * For non-dval matrices, this returns a qfloat-valued copy in the same shape.
- *
- * @param A  Input matrix.
- * @return   Newly allocated qfloat matrix on success, or NULL on error.
- */
-matrix_t *mat_evaluate_qf(const matrix_t *A);
-
-/**
- * @brief Evaluate a matrix into qcomplex_t form.
- *
- * For dval matrices, each symbolic entry is evaluated at the current variable
- * values and copied into a newly allocated qcomplex matrix with zero imaginary
- * part. The result is a numeric snapshot and does not continue to track later
- * variable changes.
- *
- * For non-dval matrices, this returns a qcomplex-valued copy in the same
- * shape.
- *
- * @param A  Input matrix.
- * @return   Newly allocated qcomplex matrix on success, or NULL on error.
- */
-matrix_t *mat_evaluate_qc(const matrix_t *A);
-
-/**
  * @brief Structural queries.
  *
  * These predicates report whether a matrix has diagonal, upper-triangular, or
@@ -588,14 +474,8 @@ void mat_get_data_num(const matrix_t *A, number_t *data);
    Basic operations
    ------------------------------------------------------------------------- */
 
-matrix_t *mat_scalar_mul_d(matrix_t *A, double s);
-matrix_t *mat_scalar_mul_qf(matrix_t *A, qfloat_t s);
-matrix_t *mat_scalar_mul_qc(matrix_t *A, qcomplex_t s);
 matrix_t *mat_scalar_mul_num(matrix_t *A, const number_t *s);
 
-matrix_t *mat_scalar_div_d(matrix_t *A, double s);
-matrix_t *mat_scalar_div_qf(matrix_t *A, qfloat_t s);
-matrix_t *mat_scalar_div_qc(matrix_t *A, qcomplex_t s);
 matrix_t *mat_scalar_div_num(matrix_t *A, const number_t *s);
 
 matrix_t *mat_add(const matrix_t *A, const matrix_t *B);
@@ -947,8 +827,8 @@ matrix_t *mat_block_solve(const matrix_t *A, const matrix_t *B, size_t split);
  *     5.1
  * };
  *
- * matrix_t *A = mat_create_d(3, 2, A_data);
- * matrix_t *B = mat_create_d(3, 1, B_data);
+ * matrix_t *A = mat_create_num(3, 2, A_data);
+ * matrix_t *B = mat_create_num(3, 1, B_data);
  * matrix_t *X = mat_least_squares(A, B);
  *
  * mat_print(X);
@@ -1162,6 +1042,12 @@ void mat_schur_factor_free(mat_schur_factor_t *out);
    Eigenvalues / Eigenvectors
    ------------------------------------------------------------------------- */
 
+/*
+ * For numeric matrices, `eigenvalues` must point to an array of `number_t`
+ * with length `A->rows`, and numeric eigenvector outputs are returned as
+ * `MAT_TYPE_NUMBER`. For symbolic matrices, `eigenvalues` remains a
+ * `dval_t **`.
+ */
 int       mat_eigenvalues(const matrix_t *A, void *eigenvalues);
 int       mat_eigendecompose(const matrix_t *A, void *eigenvalues,
                              matrix_t **eigenvectors);

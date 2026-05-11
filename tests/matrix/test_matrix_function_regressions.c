@@ -15,8 +15,8 @@ static void test_mat_fun_3x3(void)
         -2.0, -3.0, -1.5,
         -1.0, -1.5, -2.0};
 
-    matrix_t *A = mat_create_d(3, 3, avals);
-    matrix_t *negA = mat_create_d(3, 3, negavals);
+    matrix_t *A = test_mat_create_d(3, 3, avals);
+    matrix_t *negA = test_mat_create_d(3, 3, negavals);
 
     check_bool("A 3×3 allocated", A != NULL);
     check_bool("negA 3×3 allocated", negA != NULL);
@@ -152,8 +152,8 @@ static void test_mat_fun_4x4(void)
         -0.5, -1.0, -3.0, -1.0,
         -0.2, -0.5, -1.0, -2.0};
 
-    matrix_t *A = mat_create_d(4, 4, avals);
-    matrix_t *negA = mat_create_d(4, 4, negavals);
+    matrix_t *A = test_mat_create_d(4, 4, avals);
+    matrix_t *negA = test_mat_create_d(4, 4, negavals);
 
     check_bool("A 4×4 allocated", A != NULL);
     check_bool("negA 4×4 allocated", negA != NULL);
@@ -319,8 +319,8 @@ static void test_mat_fun_3x3_qf(void)
         qf_from_double(-2.0), qf_from_double(-3.0), qf_from_double(-1.5),
         qf_from_double(-1.0), qf_from_double(-1.5), qf_from_double(-2.0)};
 
-    matrix_t *A    = mat_create_qf(3, 3, avals);
-    matrix_t *negA = mat_create_qf(3, 3, negavals);
+    matrix_t *A    = test_mat_create_qf(3, 3, avals);
+    matrix_t *negA = test_mat_create_qf(3, 3, negavals);
 
     check_bool("qf A 3×3 allocated", A != NULL);
     check_bool("qf negA 3×3 allocated", negA != NULL);
@@ -455,8 +455,8 @@ static void test_mat_fun_3x3_qc(void)
         qc_make(qf_from_double(-0.8), qf_from_double( 0.2)),
         qc_make(qf_from_double(-2.0), QF_ZERO)};
 
-    matrix_t *A    = mat_create_qc(3, 3, avals);
-    matrix_t *negA = mat_create_qc(3, 3, negavals);
+    matrix_t *A    = test_mat_create_qc(3, 3, avals);
+    matrix_t *negA = test_mat_create_qc(3, 3, negavals);
 
     check_bool("qc A 3×3 allocated", A != NULL);
     check_bool("qc negA 3×3 allocated", negA != NULL);
@@ -573,7 +573,7 @@ static void test_mat_error_handling(void)
     {
         double out = 0.0;
         check_bool("mat_det(NULL) = -1", mat_det(NULL, &out) == -1);
-        matrix_t *rect = mat_new_d(2, 3);
+        matrix_t *rect = test_mat_dense_d(2, 3);
         check_bool("mat_det(2×3) = -2", mat_det(rect, &out) == -2);
         mat_free(rect);
     }
@@ -581,17 +581,17 @@ static void test_mat_error_handling(void)
     /* mat_inverse */
     {
         check_bool("mat_inverse(NULL) = NULL", mat_inverse(NULL) == NULL);
-        matrix_t *rect = mat_new_d(3, 2);
+        matrix_t *rect = test_mat_dense_d(3, 2);
         check_bool("mat_inverse(3×2) = NULL", mat_inverse(rect) == NULL);
         mat_free(rect);
     }
 
     /* mat_solve / mat_least_squares */
     {
-        matrix_t *A = mat_new_d(2, 3);
-        matrix_t *B = mat_new_d(2, 1);
-        matrix_t *C = mat_new_d(3, 1);
-        matrix_t *D = mat_new_d(2, 2);
+        matrix_t *A = test_mat_dense_d(2, 3);
+        matrix_t *B = test_mat_dense_d(2, 1);
+        matrix_t *C = test_mat_dense_d(3, 1);
+        matrix_t *D = test_mat_dense_d(2, 2);
         check_bool("mat_solve(NULL,NULL) = NULL", mat_solve(NULL, NULL) == NULL);
         check_bool("mat_solve(2×3,2×1) = NULL", mat_solve(A, B) == NULL);
         check_bool("mat_solve(2×2,3×1) = NULL", mat_solve(D, C) == NULL);
@@ -605,7 +605,7 @@ static void test_mat_error_handling(void)
 
     /* factorisation entry points */
     {
-        matrix_t *rect = mat_new_d(2, 3);
+        matrix_t *rect = test_mat_dense_d(2, 3);
         mat_lu_factor_t lu = {0};
         mat_qr_factor_t qr = {0};
         mat_schur_factor_t schur = {0};
@@ -640,30 +640,34 @@ static void test_mat_error_handling(void)
 
     /* mat_eigenvalues */
     {
-        double ev[4];
+        number_t ev[4] = {num_new(), num_new(), num_new(), num_new()};
         check_bool("mat_eigenvalues(NULL) < 0", mat_eigenvalues(NULL, ev) < 0);
-        matrix_t *rect = mat_new_d(2, 3);
+        matrix_t *rect = test_mat_dense_d(2, 3);
         check_bool("mat_eigenvalues(2×3) < 0", mat_eigenvalues(rect, ev) < 0);
+        for (size_t i = 0; i < 4; ++i)
+            num_destroy(&ev[i]);
         mat_free(rect);
     }
 
     /* mat_eigendecompose */
     {
-        double ev[4];
+        number_t ev[4] = {num_new(), num_new(), num_new(), num_new()};
         matrix_t *evecs = NULL;
         check_bool("mat_eigendecompose(NULL) < 0",
                    mat_eigendecompose(NULL, ev, &evecs) < 0);
-        matrix_t *rect = mat_new_d(2, 3);
+        matrix_t *rect = test_mat_dense_d(2, 3);
         check_bool("mat_eigendecompose(2×3) < 0",
                    mat_eigendecompose(rect, ev, &evecs) < 0);
+        for (size_t i = 0; i < 4; ++i)
+            num_destroy(&ev[i]);
         mat_free(rect);
     }
 
     /* dimension mismatch in arithmetic */
     {
-        matrix_t *A = mat_new_d(2, 3);
-        matrix_t *B = mat_new_d(3, 2);
-        matrix_t *C = mat_new_d(4, 4);
+        matrix_t *A = test_mat_dense_d(2, 3);
+        matrix_t *B = test_mat_dense_d(3, 2);
+        matrix_t *C = test_mat_dense_d(4, 4);
 
         check_bool("mat_add(2×3, 3×2) = NULL", mat_add(A, B) == NULL);
         check_bool("mat_sub(2×3, 3×2) = NULL", mat_sub(A, B) == NULL);
@@ -676,7 +680,7 @@ static void test_mat_error_handling(void)
 
     /* mat_pow_int on non-square */
     {
-        matrix_t *rect = mat_new_d(2, 3);
+        matrix_t *rect = test_mat_dense_d(2, 3);
         check_bool("mat_pow_int(2×3, 2) = NULL", mat_pow_int(rect, 2) == NULL);
         mat_free(rect);
     }
@@ -691,7 +695,7 @@ static void test_mat_fun_qf_qc(void)
     qfloat_t qfvals[4] = {
         qf_from_double(0.3), qf_from_double(0.1),
         qf_from_double(0.1), qf_from_double(0.4)};
-    matrix_t *A_qf = mat_create_qf(2, 2, qfvals);
+    matrix_t *A_qf = test_mat_create_qf(2, 2, qfvals);
     check_bool("A_qf allocated", A_qf != NULL);
     if (!A_qf)
         return;
@@ -767,7 +771,7 @@ static void test_mat_fun_qf_qc(void)
         qfloat_t pdvals[4] = {
             qf_from_double(2.0), qf_from_double(0.5),
             qf_from_double(0.5), qf_from_double(2.0)};
-        matrix_t *PD = mat_create_qf(2, 2, pdvals);
+        matrix_t *PD = test_mat_create_qf(2, 2, pdvals);
         matrix_t *L = mat_log(PD);
         check_bool("qf log(PD) not NULL", L != NULL);
         if (L)
@@ -808,7 +812,7 @@ static void test_mat_fun_qf_qc(void)
         qfloat_t dvals[4] = {
             qf_from_double(2.0), QF_ZERO,
             QF_ZERO, qf_from_double(3.0)};
-        matrix_t *D = mat_create_qf(2, 2, dvals);
+        matrix_t *D = test_mat_create_qf(2, 2, dvals);
         matrix_t *R = mat_pow_int(D, 3);
         check_bool("qf pow_int(diag(2,3),3) not NULL", R != NULL);
         if (R)
@@ -839,8 +843,8 @@ static void test_mat_fun_qf_qc(void)
             qc_make(qf_from_double(-0.1), QF_ZERO),
             qc_make(qf_from_double(-0.1), QF_ZERO),
             qc_make(qf_from_double(-0.4), QF_ZERO)};
-        matrix_t *A_qc = mat_create_qc(2, 2, qcvals);
-        matrix_t *negA_qc = mat_create_qc(2, 2, neg_qcvals);
+        matrix_t *A_qc = test_mat_create_qc(2, 2, qcvals);
+        matrix_t *negA_qc = test_mat_create_qc(2, 2, neg_qcvals);
         matrix_t *E = mat_exp(A_qc);
         matrix_t *En = mat_exp(negA_qc);
         check_bool("qc exp(A) not NULL", E != NULL);

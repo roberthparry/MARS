@@ -86,6 +86,7 @@ typedef enum {
     DV_KIND_GAMMA,
     DV_KIND_DIGAMMA,
     DV_KIND_TRIGAMMA,
+    DV_KIND_GAMMAINV,
     DV_KIND_LAMBERT_W0,
     DV_KIND_LAMBERT_WM1,
     DV_KIND_NORMAL_PDF,
@@ -283,6 +284,7 @@ extern const dval_ops_t ops_gamma;
 extern const dval_ops_t ops_lgamma;
 extern const dval_ops_t ops_digamma;
 extern const dval_ops_t ops_trigamma;
+extern const dval_ops_t ops_gammainv;
 
 /* Lambert W (principal and k=-1 branches) */
 extern const dval_ops_t ops_lambert_w0;
@@ -464,6 +466,7 @@ void dv_reverse_gamma(const dval_t *dv, const number_t *out_bar, number_t *a_bar
 void dv_reverse_lgamma(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void dv_reverse_digamma(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void dv_reverse_trigamma(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_gammainv(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void dv_reverse_lambert_w0(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void dv_reverse_lambert_wm1(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void dv_reverse_normal_pdf(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);

@@ -10,24 +10,32 @@ static int run_readme_example(void)
         qc_make(qf_from_double(1.0), qf_from_double(-1.0)),
         qc_make(qf_from_double(3.0), qf_from_double(0.0))
     };
-    matrix_t *A = mat_create_qc(2, 2, A_vals);
+    matrix_t *A = test_mat_create_qc(2, 2, A_vals);
 
-    qcomplex_t eigenvalues[2];
+    number_t eigenvalues[2] = {num_new(), num_new()};
     matrix_t *evecs = NULL;
 
     if (!A)
+    {
+        num_destroy(&eigenvalues[0]);
+        num_destroy(&eigenvalues[1]);
         return 1;
+    }
 
     if (mat_eigendecompose(A, eigenvalues, &evecs) != 0 || !evecs)
     {
+        num_destroy(&eigenvalues[0]);
+        num_destroy(&eigenvalues[1]);
         mat_free(A);
         mat_free(evecs);
         return 1;
     }
 
-    qc_printf("eigenvalue[0] = %z\n", eigenvalues[0]);
-    qc_printf("eigenvalue[1] = %z\n", eigenvalues[1]);
+    num_printf("eigenvalue[0] = %N\n", eigenvalues[0]);
+    num_printf("eigenvalue[1] = %N\n", eigenvalues[1]);
 
+    num_destroy(&eigenvalues[0]);
+    num_destroy(&eigenvalues[1]);
     mat_free(A);
     mat_free(evecs);
     return 0;

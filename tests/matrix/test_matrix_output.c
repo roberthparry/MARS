@@ -8,7 +8,7 @@ static void test_mat_sprintf_formats(void)
         qc_make(qf_from_double(4.0), QF_ZERO),
         qc_make(qf_from_double(5.0), qf_from_double(-6.0))
     };
-    matrix_t *A = mat_create_qc(2, 2, vals);
+    matrix_t *A = test_mat_create_qc(2, 2, vals);
     char buf[4096];
     int n_inline = mat_sprintf(buf, sizeof(buf), "%m", A);
 
@@ -79,7 +79,7 @@ static void test_mat_sprintf_pretty_qcomplex(void)
         qc_make(QF_ZERO, qf_from_double(1.0)),
         QC_ZERO
     };
-    matrix_t *A = mat_create_qc(2, 2, vals);
+    matrix_t *A = test_mat_create_qc(2, 2, vals);
     char buf[4096];
 
     check_bool("mat_sprintf Pauli %ml returns non-negative",

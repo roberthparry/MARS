@@ -658,6 +658,7 @@ void test_to_string_special_functions(void)
     { dval_t *x = test_dv_new_named_var_d( 0.5, "x"); check_roundtrip("to_string: erfinv(x)",        dv_erfinv(x),        __LINE__); dv_free(x); }
     { dval_t *x = test_dv_new_named_var_d( 0.5, "x"); check_roundtrip("to_string: erfcinv(x)",       dv_erfcinv(x),       __LINE__); dv_free(x); }
     { dval_t *x = test_dv_new_named_var_d( 3.0, "x"); check_roundtrip("to_string: gamma(x)",         dv_gamma(x),         __LINE__); dv_free(x); }
+    { dval_t *x = test_dv_new_named_var_d( 1.329340388179137, "x"); check_roundtrip("to_string: gammainv(x)",      dv_gammainv(x),      __LINE__); dv_free(x); }
     { dval_t *x = test_dv_new_named_var_d( 3.0, "x"); check_roundtrip("to_string: lgamma(x)",        dv_lgamma(x),        __LINE__); dv_free(x); }
     { dval_t *x = test_dv_new_named_var_d( 1.0, "x"); check_roundtrip("to_string: digamma(x)",       dv_digamma(x),       __LINE__); dv_free(x); }
     { dval_t *x = test_dv_new_named_var_d( 1.0, "x"); check_roundtrip("to_string: lambert_w0(x)",    dv_lambert_w0(x),    __LINE__); dv_free(x); }

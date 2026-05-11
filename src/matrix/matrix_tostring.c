@@ -95,60 +95,6 @@ static char *mb_take(mat_buf_t *b)
     return b->data;
 }
 
-static int mt_qf_to_pretty(char *buf, size_t buf_size, qfloat_t x)
-{
-    qf_sprintf(buf, buf_size, "%q", x);
-    return 0;
-}
-
-static int mt_qc_to_pretty(char *buf, size_t buf_size, qcomplex_t z)
-{
-    char re_buf[512];
-    char im_buf[512];
-    qfloat_t z_re = qc_real(z);
-    qfloat_t z_im = qc_imag(z);
-    qfloat_t im_abs = qf_signbit(z_im) ? qf_neg(z_im) : z_im;
-    int re_zero = qf_eq(z_re, QF_ZERO);
-    int im_zero = qf_eq(z_im, QF_ZERO);
-    int im_one = qf_eq(im_abs, QF_ONE);
-
-    if (re_zero && im_zero) {
-        snprintf(buf, buf_size, "0");
-        return 0;
-    }
-
-    if (im_zero) {
-        mt_qf_to_pretty(buf, buf_size, z_re);
-        return 0;
-    }
-
-    if (re_zero) {
-        if (im_one)
-            snprintf(buf, buf_size, "%si", qf_signbit(z_im) ? "-" : "");
-        else {
-            mt_qf_to_pretty(im_buf, sizeof(im_buf), im_abs);
-            snprintf(buf, buf_size, "%s%si", qf_signbit(z_im) ? "-" : "", im_buf);
-        }
-        return 0;
-    }
-
-    mt_qf_to_pretty(re_buf, sizeof(re_buf), z_re);
-    if (buf_size == 0)
-        return 0;
-
-    buf[0] = '\0';
-    strncat(buf, re_buf, buf_size - 1);
-    strncat(buf, qf_signbit(z_im) ? "-" : "+", buf_size - strlen(buf) - 1);
-    if (im_one) {
-        strncat(buf, "i", buf_size - strlen(buf) - 1);
-    } else {
-        mt_qf_to_pretty(im_buf, sizeof(im_buf), im_abs);
-        strncat(buf, im_buf, buf_size - strlen(buf) - 1);
-        strncat(buf, "i", buf_size - strlen(buf) - 1);
-    }
-    return 0;
-}
-
 static char *mt_dup_trimmed_token(const char *start, size_t len)
 {
     while (len > 0 && (*start == ' ' || *start == '\t')) {
@@ -541,79 +487,6 @@ static void mt_pretty_dval_expr(char **expr_io,
     }
 }
 
-typedef int (*mt_scalar_formatter_fn)(const unsigned char *raw,
-                                      int scientific,
-                                      char *buf,
-                                      size_t buf_size);
-
-static int mt_format_scalar_double(const unsigned char *raw,
-                                   int scientific,
-                                   char *buf,
-                                   size_t buf_size)
-{
-    double x = *(const double *)raw;
-
-    if (scientific)
-        snprintf(buf, buf_size, "%.16E", x);
-    else
-        snprintf(buf, buf_size, "%.16g", x);
-    return 0;
-}
-
-static int mt_format_scalar_qfloat(const unsigned char *raw,
-                                   int scientific,
-                                   char *buf,
-                                   size_t buf_size)
-{
-    qfloat_t x = *(const qfloat_t *)raw;
-
-    qf_sprintf(buf, buf_size, scientific ? "%Q" : "%q", x);
-    return 0;
-}
-
-static int mt_format_scalar_qcomplex(const unsigned char *raw,
-                                     int scientific,
-                                     char *buf,
-                                     size_t buf_size)
-{
-    qcomplex_t z = *(const qcomplex_t *)raw;
-
-    if (scientific)
-        qc_sprintf(buf, buf_size, "%Z", z);
-    else
-        mt_qc_to_pretty(buf, buf_size, z);
-    return 0;
-}
-
-static int mt_format_scalar_number(const unsigned char *raw,
-                                   int scientific,
-                                   char *buf,
-                                   size_t buf_size)
-{
-    number_t value = *(const number_t *)raw;
-    char fmt[32];
-    size_t significant_digits = num_get_prec_digits(value);
-    size_t precision;
-    int written;
-
-    if (num_is_exact(value) || significant_digits == 0u) {
-        written = num_sprintf(buf, buf_size, scientific ? "%N" : "%n", value);
-        return written < 0 ? -1 : 0;
-    }
-
-    precision = significant_digits > 0u ? significant_digits - 1u : 0u;
-    snprintf(fmt, sizeof(fmt), "%%.%zu%c", precision, scientific ? 'N' : 'n');
-    written = num_sprintf(buf, buf_size, fmt, value);
-    return written < 0 ? -1 : 0;
-}
-
-static const mt_scalar_formatter_fn mt_scalar_formatters[ELEM_MAX] = {
-    [ELEM_DOUBLE] = mt_format_scalar_double,
-    [ELEM_QFLOAT] = mt_format_scalar_qfloat,
-    [ELEM_QCOMPLEX] = mt_format_scalar_qcomplex,
-    [ELEM_NUMBER] = mt_format_scalar_number
-};
-
 static int mt_format_scalar(const matrix_t *A,
                             size_t i,
                             size_t j,
@@ -622,7 +495,6 @@ static int mt_format_scalar(const matrix_t *A,
                             size_t buf_size)
 {
     unsigned char *raw;
-    mt_scalar_formatter_fn formatter;
     int rc;
 
     raw = calloc(1u, A->elem->size ? A->elem->size : 1u);
@@ -631,20 +503,13 @@ static int mt_format_scalar(const matrix_t *A,
 
     mat_get_owned(A, i, j, raw);
 
-    if ((unsigned)A->elem->kind >= ELEM_MAX) {
+    if (!A->elem->format_scalar) {
         mat_value_destroy(A, raw);
         free(raw);
         return -1;
     }
 
-    formatter = mt_scalar_formatters[A->elem->kind];
-    if (!formatter) {
-        mat_value_destroy(A, raw);
-        free(raw);
-        return -1;
-    }
-
-    rc = formatter(raw, scientific, buf, buf_size);
+    rc = A->elem->format_scalar(raw, scientific, buf, buf_size);
     mat_value_destroy(A, raw);
     free(raw);
     return rc;
@@ -802,7 +667,7 @@ char *mat_to_string(const matrix_t *A, mat_string_style_t style)
     if (!A)
         return strdup("(null)");
 
-    if (A->elem->kind == ELEM_DVAL)
+    if (matrix_is_symbolic(A))
         return mat_to_string_dval(A, style);
     return mat_to_string_numeric(A, style);
 }

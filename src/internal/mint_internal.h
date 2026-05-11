@@ -1,5 +1,5 @@
-#ifndef SRC_INTERNAL_MINT_INTERNAL_H
-#define SRC_INTERNAL_MINT_INTERNAL_H
+#ifndef MINT_SHARED_INTERNAL_H
+#define MINT_SHARED_INTERNAL_H
 
 #include <stdint.h>
 

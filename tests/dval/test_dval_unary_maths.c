@@ -320,6 +320,7 @@ void test_maths_functions(void)
     RUN_SUBTEST(test_erfinv);
     RUN_SUBTEST(test_erfcinv);
     RUN_SUBTEST(test_gamma);
+    RUN_SUBTEST(test_gammainv);
     RUN_SUBTEST(test_lgamma);
     RUN_SUBTEST(test_digamma);
     RUN_SUBTEST(test_trigamma);
