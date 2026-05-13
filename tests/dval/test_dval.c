@@ -94,7 +94,7 @@ static dval_t *make_readme_f(dval_t *x)
     number_t seven = num_create_from_long(7);
     dval_t *sinx   = dv_sin(x);
     dval_t *exp_sx = dv_exp(sinx);
-    dval_t *x2     = dv_pow_num(x, &two);
+    dval_t *x2     = dv_pow(x, &two);
     dval_t *term2  = dv_mul_num(x2, &three);
     dval_t *f0     = dv_add(exp_sx, term2);
     dval_t *f      = dv_sub_num(f0, &seven);
@@ -126,7 +126,7 @@ static int run_readme_example(void)
     if (num_set_default_prec_bits(384u) != 0)
         return 1;
     x0 = num_create_from_string("1.25");
-    x = dv_new_named_var_num(x0, "x");
+    x = dv_new_named_var(x0, "x");
     num_destroy(&x0);
     if (!x) {
         num_set_default_prec_bits(old_prec_bits);
@@ -157,9 +157,9 @@ static int run_readme_example(void)
         return 1;
     }
 
-    f_val  = dv_eval_num(f);
-    d1_val = dv_eval_num(df_dx);
-    d2_val = dv_eval_num(d2f_dx);
+    f_val  = dv_eval(f);
+    d1_val = dv_eval(df_dx);
+    d2_val = dv_eval(d2f_dx);
 
     printf("f(x)    = "); dv_print(f);
     printf("f'(x)   = "); dv_print(df_dx);
@@ -226,9 +226,9 @@ static int run_readme_from_string_example(void)
         return 1;
     }
 
-    f_val  = dv_eval_num(f);
-    d1_val = dv_eval_num(df_dx);
-    d2_val = dv_eval_num(d2f_dx);
+    f_val  = dv_eval(f);
+    d1_val = dv_eval(df_dx);
+    d2_val = dv_eval(d2f_dx);
 
     printf("f(x)    = "); dv_print(f);
     printf("f'(x)   = "); dv_print(df_dx);
@@ -272,8 +272,8 @@ static int run_readme_partial_example(void)
         return 1;
     x0 = num_create_from_string("1");
     y0 = num_create_from_string("2");
-    x = dv_new_named_var_num(x0, "x");
-    y = dv_new_named_var_num(y0, "y");
+    x = dv_new_named_var(x0, "x");
+    y = dv_new_named_var(y0, "y");
     num_destroy(&y0);
     num_destroy(&x0);
     x2 = dv_pow_d(x, 2.0);
@@ -302,18 +302,18 @@ static int run_readme_partial_example(void)
         return 1;
     }
 
-    value = dv_eval_num(f);
+    value = dv_eval(f);
     printf("At x=1, y=2 (384 bits, %zu significant digits):\n",
            num_get_prec_digits(value));
     print_num_line("f", value);
     num_destroy(&value);
-    value = dv_eval_num(df_dx);
+    value = dv_eval(df_dx);
     print_num_line("∂f/∂x", value);
     num_destroy(&value);
-    value = dv_eval_num(df_dy);
+    value = dv_eval(df_dy);
     print_num_line("∂f/∂y", value);
     num_destroy(&value);
-    value = dv_eval_num(d2f_dxdy);
+    value = dv_eval(d2f_dxdy);
     print_num_line("∂²f/∂x∂y", value);
     num_destroy(&value);
 
@@ -329,13 +329,13 @@ static int run_readme_partial_example(void)
     }
 
     x0 = num_create_from_string("3");
-    dv_set_val_num(x, x0);
+    dv_set_val(x, x0);
     num_destroy(&x0);
     printf("\nAfter x=3:\n");
-    value = dv_eval_num(df_dx);
+    value = dv_eval(df_dx);
     print_num_line("∂f/∂x", value);
     num_destroy(&value);
-    value = dv_eval_num(df_dy);
+    value = dv_eval(df_dy);
     print_num_line("∂f/∂y", value);
     num_destroy(&value);
 
@@ -370,8 +370,8 @@ static int run_readme_eval_derivatives_example(void)
 
     x0 = num_create_from_string("1");
     y0 = num_create_from_string("2");
-    x = dv_new_named_var_num(x0, "x");
-    y = dv_new_named_var_num(y0, "y");
+    x = dv_new_named_var(x0, "x");
+    y = dv_new_named_var(y0, "y");
     num_destroy(&y0);
     num_destroy(&x0);
     xy = dv_mul(x, y);

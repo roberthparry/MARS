@@ -10,7 +10,7 @@
 static inline dval_t *ig_dv_new_const_d(double x)
 {
     number_t n = num_create_from_qfloat(qf_from_double(x));
-    dval_t *dv = dv_new_const_num(n);
+    dval_t *dv = dv_new_const(n);
 
     num_destroy(&n);
     return dv;
@@ -19,7 +19,7 @@ static inline dval_t *ig_dv_new_const_d(double x)
 static inline dval_t *ig_dv_new_var_qf(qfloat_t x)
 {
     number_t n = num_create_from_qfloat(x);
-    dval_t *dv = dv_new_var_num(n);
+    dval_t *dv = dv_new_var(n);
 
     num_destroy(&n);
     return dv;
@@ -29,13 +29,13 @@ static inline void ig_dv_set_val_qf(dval_t *dv, qfloat_t x)
 {
     number_t n = num_create_from_qfloat(x);
 
-    dv_set_val_num(dv, n);
+    dv_set_val(dv, n);
     num_destroy(&n);
 }
 
 static inline qfloat_t ig_dv_eval_qf(const dval_t *dv)
 {
-    number_t n = dv_eval_num(dv);
+    number_t n = dv_eval(dv);
     qfloat_t out = num_to_qfloat(n);
 
     num_destroy(&n);

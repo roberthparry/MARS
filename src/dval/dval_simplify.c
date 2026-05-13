@@ -340,7 +340,7 @@ dval_t *dv_simplify_add_sub_operator(const dval_t *dv, dval_t *a, dval_t *b)
     }
 
     if (!cur)
-        return dv_num_const_d(0.0);
+        return dv_new_const(NUM_ZERO);
 
     if (!dv_qf_is_one(common_coeff))
         return dv_make_scaled(common_coeff, cur);
@@ -369,7 +369,7 @@ dval_t *dv_simplify_mul_operator(const dval_t *dv, dval_t *a, dval_t *b)
         (dv_is_op(b, &ops_const) && dv_const_is_zero(b))) {
         dv_free(a);
         dv_free(b);
-        return dv_num_const_d(0.0);
+        return dv_new_const(NUM_ZERO);
     }
     if (dv_is_op(a, &ops_const) && dv_const_is_one(a)) {
         dv_free(a);
@@ -387,7 +387,7 @@ dval_t *dv_simplify_mul_operator(const dval_t *dv, dval_t *a, dval_t *b)
 
     if (is_zero) {
         dv_free_node_array(terms, nterms);
-        return dv_num_const_d(0.0);
+        return dv_new_const(NUM_ZERO);
     }
 
     dv_split_division_terms(&c_acc, &is_zero, terms, nterms,
@@ -396,7 +396,7 @@ dval_t *dv_simplify_mul_operator(const dval_t *dv, dval_t *a, dval_t *b)
     if (is_zero) {
         dv_free_node_array(terms, nterms);
         dv_free_node_array(den_terms, nden_terms);
-        return dv_num_const_d(0.0);
+        return dv_new_const(NUM_ZERO);
     }
 
     dv_combine_like_powers(den_terms, nden_terms);
@@ -514,7 +514,7 @@ div_fallback_1:
             }
         }
 
-        return cur ? cur : dv_num_const_d(0.0);
+        return cur ? cur : dv_new_const(NUM_ZERO);
     }
 div_fallback_2:
     if (dv_is_op(a, &ops_mul) && dv_struct_eq(a->a, b)) {
@@ -538,10 +538,10 @@ div_fallback_2:
     if (dv_struct_eq(a, b)) {
         dv_free(a);
         dv_free(b);
-        return dv_num_const_d(1.0);
+        return dv_new_const(NUM_ONE);
     }
     if (dv_is_op(a, &ops_const) && dv_const_is_zero(a)) {
-        dv_free(a); dv_free(b); return dv_num_const_d(0.0);
+        dv_free(a); dv_free(b); return dv_new_const(NUM_ZERO);
     }
     if (dv_is_op(a, &ops_const) && dv_is_op(b, &ops_const)) {
         qfloat_t left;
@@ -593,7 +593,7 @@ dval_t *dv_simplify_pow_d_operator(const dval_t *dv, dval_t *a, dval_t *b)
         return a;
     if (qf_eq(exponent, QF_ZERO)) {
         dv_free(a);
-        return dv_num_const_d(1.0);
+        return dv_new_const(NUM_ONE);
     }
 
     if (dv_is_unnamed_const(a)) {
@@ -626,9 +626,9 @@ dval_t *dv_simplify_pow_operator(const dval_t *dv, dval_t *a, dval_t *b)
     (void)dv;
     if (dv_is_op(b, &ops_const) && dv_const_is_one(b)) { dv_free(b); return a; }
     if (dv_is_op(b, &ops_const) && dv_const_is_zero(b)) {
-        dv_free(a); dv_free(b); return dv_num_const_d(1.0);
+        dv_free(a); dv_free(b); return dv_new_const(NUM_ONE);
     }
-    dval_t *r = dv_pow(a, b); dv_free(a); dv_free(b); return r;
+    dval_t *r = dv_pow_dv(a, b); dv_free(a); dv_free(b); return r;
 }
 
 /* --- */

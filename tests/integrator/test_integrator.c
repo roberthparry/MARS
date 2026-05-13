@@ -28,7 +28,7 @@ static qfloat_t tol27 = { 1e-27, -3.8494869749191836e-44 }; /* 1e-27 */
 static dval_t *test_dv_new_const_d(double x)
 {
     number_t n = num_create_from_qfloat(qf_from_double(x));
-    dval_t *dv = dv_new_const_num(n);
+    dval_t *dv = dv_new_const(n);
 
     num_destroy(&n);
     return dv;
@@ -37,7 +37,7 @@ static dval_t *test_dv_new_const_d(double x)
 static dval_t *test_dv_new_var_qf(qfloat_t x)
 {
     number_t n = num_create_from_qfloat(x);
-    dval_t *dv = dv_new_var_num(n);
+    dval_t *dv = dv_new_var(n);
 
     num_destroy(&n);
     return dv;
@@ -73,7 +73,7 @@ static dval_t *test_dv_mul_d(const dval_t *dv, double x)
 static dval_t *test_dv_pow_d(const dval_t *dv, double x)
 {
     number_t n = num_create_from_double(x);
-    dval_t *out = dv_pow_num(dv, &n);
+    dval_t *out = dv_pow(dv, &n);
 
     num_destroy(&n);
     return out;

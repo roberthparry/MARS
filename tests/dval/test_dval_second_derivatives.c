@@ -125,7 +125,7 @@ void test_second_deriv_pow_xy(void)
     dval_t *one = test_dv_new_const_d(1.0);
     dval_t *y   = dv_add(x2, one);
 
-    dval_t *f   = dv_pow(x, y);
+    dval_t *f   = dv_pow_dv(x, y);
     dval_t *df  = dv_create_deriv(f, x);
     const dval_t *ddf = dv_get_deriv(df, x);
 

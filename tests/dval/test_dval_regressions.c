@@ -270,9 +270,9 @@ static void assert_same_to_bits(const number_t got,
 static void check_unary_eval_case(const unary_eval_case_t *tc)
 {
     number_t input = num_from_qtext(tc->input);
-    dval_t *x = dv_new_var_num(input);
+    dval_t *x = dv_new_var(input);
     dval_t *expr = tc->dv_fn(x);
-    number_t got = dv_eval_num(expr);
+    number_t got = dv_eval(expr);
     number_t expected = tc->num_fn(input);
     char *got_text;
     char *expected_text;
@@ -300,10 +300,10 @@ static void check_binary_eval_case(const binary_eval_case_t *tc)
 {
     number_t lhs = num_from_qtext(tc->lhs);
     number_t rhs = num_from_qtext(tc->rhs);
-    dval_t *a = dv_new_var_num(lhs);
-    dval_t *b = dv_new_var_num(rhs);
+    dval_t *a = dv_new_var(lhs);
+    dval_t *b = dv_new_var(rhs);
     dval_t *expr = tc->dv_fn(a, b);
-    number_t got = dv_eval_num(expr);
+    number_t got = dv_eval(expr);
     number_t expected = tc->num_fn(lhs, rhs);
     char *got_text;
     char *expected_text;
@@ -334,12 +334,12 @@ static void check_unary_derivative_case(const unary_eval_case_t *tc)
 {
     qfloat_t input_q = qf_from_number_text(tc->input);
     number_t input = num_create_from_qfloat(input_q);
-    dval_t *x = dv_new_var_num(input);
+    dval_t *x = dv_new_var(input);
     dval_t *expr = tc->dv_fn(x);
     dval_t *deriv = dv_create_deriv(expr, x);
     number_t value;
     number_t grad;
-    number_t deriv_value = dv_eval_num(deriv);
+    number_t deriv_value = dv_eval(deriv);
     const dval_t *vars[1] = { x };
     char label[128];
 
@@ -375,15 +375,15 @@ static void check_binary_derivative_case(const binary_eval_case_t *tc)
     qfloat_t rhs_q = qf_from_number_text(tc->rhs);
     number_t lhs = num_create_from_qfloat(lhs_q);
     number_t rhs = num_create_from_qfloat(rhs_q);
-    dval_t *x = dv_new_var_num(lhs);
-    dval_t *y = dv_new_var_num(rhs);
+    dval_t *x = dv_new_var(lhs);
+    dval_t *y = dv_new_var(rhs);
     dval_t *expr = tc->dv_fn(x, y);
     dval_t *deriv_x = dv_create_deriv(expr, x);
     dval_t *deriv_y = dv_create_deriv(expr, y);
     number_t value;
     number_t grads[2];
-    number_t got_dx = dv_eval_num(deriv_x);
-    number_t got_dy = dv_eval_num(deriv_y);
+    number_t got_dx = dv_eval(deriv_x);
+    number_t got_dy = dv_eval(deriv_y);
     const dval_t *vars[2] = { x, y };
     char label[128];
 
@@ -435,12 +435,12 @@ static void check_high_precision_unary_value_case(const unary_eval_case_t *tc,
 {
     number_t input = num_from_mfloat_text_bits(tc->input, value_bits);
     number_t oracle_input = num_from_mfloat_text_bits(tc->input, oracle_bits);
-    dval_t *x = dv_new_var_num(input);
-    dval_t *oracle_x = dv_new_var_num(oracle_input);
+    dval_t *x = dv_new_var(input);
+    dval_t *oracle_x = dv_new_var(oracle_input);
     dval_t *expr = tc->dv_fn(x);
     dval_t *oracle_expr = tc->dv_fn(oracle_x);
-    number_t got = dv_eval_num(expr);
-    number_t expected = dv_eval_num(oracle_expr);
+    number_t got = dv_eval(expr);
+    number_t expected = dv_eval(oracle_expr);
 
     assert_same_to_bits(got, expected, high_precision_compare_bits(value_bits), tc->name);
 
@@ -462,14 +462,14 @@ static void check_high_precision_binary_value_case(const binary_eval_case_t *tc,
     number_t rhs = num_from_mfloat_text_bits(tc->rhs, value_bits);
     number_t oracle_lhs = num_from_mfloat_text_bits(tc->lhs, oracle_bits);
     number_t oracle_rhs = num_from_mfloat_text_bits(tc->rhs, oracle_bits);
-    dval_t *a = dv_new_var_num(lhs);
-    dval_t *b = dv_new_var_num(rhs);
-    dval_t *oracle_a = dv_new_var_num(oracle_lhs);
-    dval_t *oracle_b = dv_new_var_num(oracle_rhs);
+    dval_t *a = dv_new_var(lhs);
+    dval_t *b = dv_new_var(rhs);
+    dval_t *oracle_a = dv_new_var(oracle_lhs);
+    dval_t *oracle_b = dv_new_var(oracle_rhs);
     dval_t *expr = tc->dv_fn(a, b);
     dval_t *oracle_expr = tc->dv_fn(oracle_a, oracle_b);
-    number_t got = dv_eval_num(expr);
-    number_t expected = dv_eval_num(oracle_expr);
+    number_t got = dv_eval(expr);
+    number_t expected = dv_eval(oracle_expr);
 
     assert_same_to_bits(got, expected, high_precision_compare_bits(value_bits), tc->name);
 
@@ -493,14 +493,14 @@ static void check_high_precision_unary_derivative_case(const unary_eval_case_t *
 {
     number_t input = num_from_mfloat_text_bits(tc->input, value_bits);
     number_t oracle_input = num_from_mfloat_text_bits(tc->input, oracle_bits);
-    dval_t *x = dv_new_var_num(input);
-    dval_t *oracle_x = dv_new_var_num(oracle_input);
+    dval_t *x = dv_new_var(input);
+    dval_t *oracle_x = dv_new_var(oracle_input);
     dval_t *expr = tc->dv_fn(x);
     dval_t *oracle_expr = tc->dv_fn(oracle_x);
     dval_t *deriv = dv_create_deriv(expr, x);
     dval_t *oracle_deriv = dv_create_deriv(oracle_expr, oracle_x);
-    number_t got = dv_eval_num(deriv);
-    number_t expected = dv_eval_num(oracle_deriv);
+    number_t got = dv_eval(deriv);
+    number_t expected = dv_eval(oracle_deriv);
 
     assert_same_to_bits(got, expected, high_precision_compare_bits(value_bits), tc->name);
 
@@ -524,20 +524,20 @@ static void check_high_precision_binary_derivative_case(const binary_eval_case_t
     number_t rhs = num_from_mfloat_text_bits(tc->rhs, value_bits);
     number_t oracle_lhs = num_from_mfloat_text_bits(tc->lhs, oracle_bits);
     number_t oracle_rhs = num_from_mfloat_text_bits(tc->rhs, oracle_bits);
-    dval_t *x = dv_new_var_num(lhs);
-    dval_t *y = dv_new_var_num(rhs);
-    dval_t *oracle_x = dv_new_var_num(oracle_lhs);
-    dval_t *oracle_y = dv_new_var_num(oracle_rhs);
+    dval_t *x = dv_new_var(lhs);
+    dval_t *y = dv_new_var(rhs);
+    dval_t *oracle_x = dv_new_var(oracle_lhs);
+    dval_t *oracle_y = dv_new_var(oracle_rhs);
     dval_t *expr = tc->dv_fn(x, y);
     dval_t *oracle_expr = tc->dv_fn(oracle_x, oracle_y);
     dval_t *deriv_x = dv_create_deriv(expr, x);
     dval_t *deriv_y = dv_create_deriv(expr, y);
     dval_t *oracle_deriv_x = dv_create_deriv(oracle_expr, oracle_x);
     dval_t *oracle_deriv_y = dv_create_deriv(oracle_expr, oracle_y);
-    number_t got_dx = dv_eval_num(deriv_x);
-    number_t got_dy = dv_eval_num(deriv_y);
-    number_t expected_dx = dv_eval_num(oracle_deriv_x);
-    number_t expected_dy = dv_eval_num(oracle_deriv_y);
+    number_t got_dx = dv_eval(deriv_x);
+    number_t got_dy = dv_eval(deriv_y);
+    number_t expected_dx = dv_eval(oracle_deriv_x);
+    number_t expected_dy = dv_eval(oracle_deriv_y);
 
     assert_same_to_bits(got_dx, expected_dx, high_precision_compare_bits(value_bits), tc->name);
     assert_same_to_bits(got_dy, expected_dy, high_precision_compare_bits(value_bits), tc->name);
@@ -568,12 +568,12 @@ static void check_high_precision_complex_unary_value_case(const unary_eval_case_
 {
     number_t input = num_from_mcomplex_text_bits(tc->input, value_bits);
     number_t oracle_input = num_from_mcomplex_text_bits(tc->input, oracle_bits);
-    dval_t *z = dv_new_var_num(input);
-    dval_t *oracle_z = dv_new_var_num(oracle_input);
+    dval_t *z = dv_new_var(input);
+    dval_t *oracle_z = dv_new_var(oracle_input);
     dval_t *expr = tc->dv_fn(z);
     dval_t *oracle_expr = tc->dv_fn(oracle_z);
-    number_t got = dv_eval_num(expr);
-    number_t expected = dv_eval_num(oracle_expr);
+    number_t got = dv_eval(expr);
+    number_t expected = dv_eval(oracle_expr);
 
     assert_same_to_bits(got, expected, high_precision_compare_bits(value_bits), tc->name);
 
@@ -595,14 +595,14 @@ static void check_high_precision_complex_binary_value_case(const binary_eval_cas
     number_t rhs = num_from_mcomplex_text_bits(tc->rhs, value_bits);
     number_t oracle_lhs = num_from_mcomplex_text_bits(tc->lhs, oracle_bits);
     number_t oracle_rhs = num_from_mcomplex_text_bits(tc->rhs, oracle_bits);
-    dval_t *a = dv_new_var_num(lhs);
-    dval_t *b = dv_new_var_num(rhs);
-    dval_t *oracle_a = dv_new_var_num(oracle_lhs);
-    dval_t *oracle_b = dv_new_var_num(oracle_rhs);
+    dval_t *a = dv_new_var(lhs);
+    dval_t *b = dv_new_var(rhs);
+    dval_t *oracle_a = dv_new_var(oracle_lhs);
+    dval_t *oracle_b = dv_new_var(oracle_rhs);
     dval_t *expr = tc->dv_fn(a, b);
     dval_t *oracle_expr = tc->dv_fn(oracle_a, oracle_b);
-    number_t got = dv_eval_num(expr);
-    number_t expected = dv_eval_num(oracle_expr);
+    number_t got = dv_eval(expr);
+    number_t expected = dv_eval(oracle_expr);
 
     assert_same_to_bits(got, expected, high_precision_compare_bits(value_bits), tc->name);
 
@@ -649,8 +649,8 @@ static void test_new_const_num_preserves_mfloat_precision(void)
     ASSERT_NOT_NULL(base);
 
     n = num_create_from_mfloat_with_prec_bits(base, 512u);
-    dv = dv_new_const_num(n);
-    got = dv_eval_num(dv);
+    dv = dv_new_const(n);
+    got = dv_eval(dv);
 
     ASSERT_TRUE(num_eq(got, n));
     ASSERT_EQ_INT((int)num_get_prec_bits(got), 512);
@@ -671,8 +671,8 @@ static void test_set_val_num_preserves_mfloat_precision(void)
     ASSERT_NOT_NULL(base);
 
     n = num_create_from_mfloat_with_prec_bits(base, 640u);
-    dv_set_val_num(dv, n);
-    got = dv_eval_num(dv);
+    dv_set_val(dv, n);
+    got = dv_eval(dv);
 
     ASSERT_TRUE(num_eq(got, n));
     ASSERT_EQ_INT((int)num_get_prec_bits(got), 640);
@@ -693,8 +693,8 @@ static void test_new_const_num_preserves_mcomplex_precision(void)
     ASSERT_NOT_NULL(base);
 
     n = num_create_from_mcomplex_with_prec_bits(base, 384u);
-    dv = dv_new_const_num(n);
-    got = dv_eval_num(dv);
+    dv = dv_new_const(n);
+    got = dv_eval(dv);
 
     ASSERT_TRUE(num_eq(got, n));
     ASSERT_TRUE(!num_is_real(got));
@@ -716,8 +716,8 @@ static void test_set_val_num_preserves_mcomplex_precision(void)
     ASSERT_NOT_NULL(base);
 
     n = num_create_from_mcomplex_with_prec_bits(base, 448u);
-    dv_set_val_num(dv, n);
-    got = dv_get_val_num(dv);
+    dv_set_val(dv, n);
+    got = dv_get_val(dv);
 
     ASSERT_TRUE(num_eq(got, n));
     ASSERT_TRUE(!num_is_real(got));
@@ -748,11 +748,11 @@ static void test_eval_expression_preserves_mfloat_precision(void)
     ASSERT_NOT_NULL(base);
 
     n = num_create_from_mfloat_with_prec_bits(base, 512u);
-    x = dv_new_var_num(n);
+    x = dv_new_var(n);
     sum = dv_add(x, DV_ONE);
     root = dv_sqrt(x);
-    got_sum = dv_eval_num(sum);
-    got_root = dv_eval_num(root);
+    got_sum = dv_eval(sum);
+    got_root = dv_eval(root);
     check_sum = num_add(n, NUM_ONE);
     check_root = num_sqrt(n);
     oracle_bits = num_get_prec_bits(n) + 384u;
@@ -813,11 +813,11 @@ static void test_eval_expression_preserves_mcomplex_precision(void)
     ASSERT_NOT_NULL(base);
 
     n = num_create_from_mcomplex_with_prec_bits(base, 384u);
-    z = dv_new_var_num(n);
+    z = dv_new_var(n);
     sum = dv_add(z, DV_ONE);
     exp_z = dv_exp(z);
-    got_sum = dv_eval_num(sum);
-    got_exp = dv_eval_num(exp_z);
+    got_sum = dv_eval(sum);
+    got_exp = dv_eval(exp_z);
     check_sum = num_add(n, NUM_ONE);
     check_exp = num_exp(n);
     oracle_bits = num_get_prec_bits(n) + 384u;
@@ -865,10 +865,10 @@ static void test_new_const_num_preserves_qfloat_precision(void)
 {
     qfloat_t q = qf_from_string("1.00000000000000000001");
     number_t n = num_create_from_qfloat(q);
-    dval_t *dv = dv_new_const_num(n);
+    dval_t *dv = dv_new_const(n);
     qfloat_t got = dv_eval_qf(dv);
 
-    check_q_at(__FILE__, __LINE__, 1, "dv_new_const_num preserves qfloat precision", got, q);
+    check_q_at(__FILE__, __LINE__, 1, "dv_new_const preserves qfloat precision", got, q);
 
     dv_free(dv);
     num_destroy(&n);
@@ -880,8 +880,8 @@ static void test_set_val_num_preserves_qfloat_precision(void)
     number_t n = num_create_from_qfloat(q);
     dval_t *dv = test_dv_new_var_d(0.0);
 
-    dv_set_val_num(dv, n);
-    check_q_at(__FILE__, __LINE__, 1, "dv_set_val_num preserves qfloat precision",
+    dv_set_val(dv, n);
+    check_q_at(__FILE__, __LINE__, 1, "dv_set_val preserves qfloat precision",
                dv_eval_qf(dv), q);
 
     dv_free(dv);
@@ -926,9 +926,9 @@ static void test_get_val_updates_after_set(void)
 static void test_new_const_num(void)
 {
     number_t half = num_create_from_string("1/2");
-    dval_t *c_half = dv_new_const_num(half);
-    number_t got_half = dv_get_val_num(c_half);
-    number_t eval_half = dv_eval_num(c_half);
+    dval_t *c_half = dv_new_const(half);
+    number_t got_half = dv_get_val(c_half);
+    number_t eval_half = dv_eval(c_half);
 
     ASSERT_TRUE(num_eq(got_half, half));
     ASSERT_TRUE(num_eq(eval_half, half));
@@ -942,9 +942,9 @@ static void test_new_const_num(void)
 static void test_new_const_num_rational_complex(void)
 {
     number_t z = num_create_from_string("1/2 - 3/2i");
-    dval_t *c_z = dv_new_const_num(z);
-    number_t got_z = dv_get_val_num(c_z);
-    number_t eval_z = dv_eval_num(c_z);
+    dval_t *c_z = dv_new_const(z);
+    number_t got_z = dv_get_val(c_z);
+    number_t eval_z = dv_eval(c_z);
 
     ASSERT_TRUE(num_eq(got_z, z));
     ASSERT_TRUE(num_eq(eval_z, z));
@@ -961,24 +961,24 @@ static void test_new_var_num_and_set_val_num(void)
     number_t minus_i = num_create_from_string("-i");
     number_t quarter = num_create_from_string("1/4");
     number_t rational_complex = num_create_from_string("1/2 - 3/2i");
-    dval_t *v = dv_new_var_num(one_plus_i);
-    number_t got_var = dv_eval_num(v);
+    dval_t *v = dv_new_var(one_plus_i);
+    number_t got_var = dv_eval(v);
 
     ASSERT_TRUE(num_eq(got_var, one_plus_i));
 
-    dv_set_val_num(v, minus_i);
+    dv_set_val(v, minus_i);
     num_destroy(&got_var);
-    got_var = dv_get_val_num(v);
+    got_var = dv_get_val(v);
     ASSERT_TRUE(num_eq(got_var, minus_i));
 
-    dv_set_val_num(v, quarter);
+    dv_set_val(v, quarter);
     num_destroy(&got_var);
-    got_var = dv_eval_num(v);
+    got_var = dv_eval(v);
     ASSERT_TRUE(num_eq(got_var, quarter));
 
-    dv_set_val_num(v, rational_complex);
+    dv_set_val(v, rational_complex);
     num_destroy(&got_var);
-    got_var = dv_get_val_num(v);
+    got_var = dv_get_val(v);
     ASSERT_TRUE(num_eq(got_var, rational_complex));
 
     num_destroy(&got_var);
@@ -993,10 +993,10 @@ static void test_named_number_constructors(void)
 {
     number_t two = num_create_from_string("2");
     number_t z_value = num_create_from_string("2 + 3i");
-    dval_t *named_const = dv_new_named_const_num(two, "two");
-    dval_t *named_var = dv_new_named_var_num(z_value, "z");
-    number_t got_const = dv_get_val_num(named_const);
-    number_t got_var = dv_get_val_num(named_var);
+    dval_t *named_const = dv_new_named_const(two, "two");
+    dval_t *named_var = dv_new_named_var(z_value, "z");
+    number_t got_const = dv_get_val(named_const);
+    number_t got_var = dv_get_val(named_var);
     char *const_text = dv_to_string(named_const, style_EXPRESSION);
     char *var_text = dv_to_string(named_var, style_EXPRESSION);
 
@@ -1022,10 +1022,10 @@ static void test_eval_num_on_expression(void)
     number_t half = num_create_from_string("1/2");
     number_t two = num_create_from_string("2");
     number_t expected = num_create_from_string("5/2");
-    dval_t *x = dv_new_var_num(half);
-    dval_t *c = dv_new_const_num(two);
+    dval_t *x = dv_new_var(half);
+    dval_t *c = dv_new_const(two);
     dval_t *sum = dv_add(x, c);
-    number_t got = dv_eval_num(sum);
+    number_t got = dv_eval(sum);
 
     ASSERT_TRUE(num_eq(got, expected));
 
@@ -1077,7 +1077,7 @@ static void test_eval_num_function_values(void)
     };
     static const binary_eval_case_t binary_cases[] = {
         { "atan2", "2.0", "3.0", dv_atan2, num_atan2 },
-        { "pow", "2.0", "3.0", dv_pow, num_pow },
+        { "pow", "2.0", "3.0", dv_pow_dv, num_pow },
         { "hypot", "3.0", "4.0", dv_hypot, num_hypot },
         { "beta", "2.5", "1.5", dv_beta, num_beta },
         { "logbeta", "2.5", "1.5", dv_logbeta, num_logbeta }
@@ -1129,7 +1129,7 @@ static void test_eval_num_function_derivatives(void)
     };
     static const binary_eval_case_t binary_cases[] = {
         { "atan2", "2.0", "3.0", dv_atan2, num_atan2 },
-        { "pow", "2.0", "3.0", dv_pow, num_pow },
+        { "pow", "2.0", "3.0", dv_pow_dv, num_pow },
         { "hypot", "3.0", "4.0", dv_hypot, num_hypot },
         { "beta", "2.5", "1.5", dv_beta, num_beta },
         { "logbeta", "2.5", "1.5", dv_logbeta, num_logbeta }
@@ -1179,7 +1179,7 @@ static void test_high_precision_mfloat_function_values(void)
     };
     static const binary_eval_case_t binary_cases[] = {
         { "atan2", "2.0", "3.0", dv_atan2, num_atan2 },
-        { "pow", "2.0", "3.0", dv_pow, num_pow },
+        { "pow", "2.0", "3.0", dv_pow_dv, num_pow },
         { "hypot", "3.0", "4.0", dv_hypot, num_hypot },
         { "beta", "2.5", "1.5", dv_beta, num_beta },
         { "logbeta", "2.5", "1.5", dv_logbeta, num_logbeta }
@@ -1225,7 +1225,7 @@ static void test_high_precision_mfloat_function_derivatives(void)
     };
     static const binary_eval_case_t binary_cases[] = {
         { "atan2", "2.0", "3.0", dv_atan2, num_atan2 },
-        { "pow", "2.0", "3.0", dv_pow, num_pow },
+        { "pow", "2.0", "3.0", dv_pow_dv, num_pow },
         { "hypot", "3.0", "4.0", dv_hypot, num_hypot },
         { "beta", "2.5", "1.5", dv_beta, num_beta },
         { "logbeta", "2.5", "1.5", dv_logbeta, num_logbeta }
@@ -1252,7 +1252,7 @@ static void test_high_precision_mcomplex_function_values(void)
         UCASE("sqrt", "1 + 2i", dv_sqrt, num_sqrt)
     };
     static const binary_eval_case_t binary_cases[] = {
-        { "pow", "1 + 2i", "2 - i", dv_pow, num_pow }
+        { "pow", "1 + 2i", "2 - i", dv_pow_dv, num_pow }
     };
     size_t i;
 
@@ -1266,11 +1266,11 @@ static void test_set_val_num_named_constant(void)
 {
     number_t old_value = num_create_from_string("2");
     number_t new_value = num_create_from_string("1/2 - 3/2i");
-    dval_t *named_const = dv_new_named_const_num(old_value, "c");
+    dval_t *named_const = dv_new_named_const(old_value, "c");
     number_t got_value;
 
-    dv_set_val_num(named_const, new_value);
-    got_value = dv_eval_num(named_const);
+    dv_set_val(named_const, new_value);
+    got_value = dv_eval(named_const);
 
     ASSERT_TRUE(num_eq(got_value, new_value));
 

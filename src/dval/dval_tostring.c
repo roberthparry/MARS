@@ -969,7 +969,7 @@ static char *dv_to_string_function(const dval_t *f)
      * reference, so the name set here is visible throughout the tree after
      * dv_simplify returns.  Unnamed numeric constants (coefficients created by
      * dv_mul_num / dv_add_num etc.) are not auto-named; they appear as plain numbers.
-     * Callers that want symbolic unnamed constants should use dv_new_named_const_num(). */
+     * Callers that want symbolic unnamed constants should use dv_new_named_const(). */
     autoname_table_t vnames;
     autoname_init(&vnames);
     assign_unnamed_vars_dfs((dval_t *)f, &vnames);

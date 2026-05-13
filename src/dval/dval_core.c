@@ -5,7 +5,7 @@
  *   - Reference counting (dv_retain / dv_free)
  *   - Name handling, including ASCII-to-Unicode normalisation for Greek letter
  *     names (e.g. "alpha" -> "alpha-as-unicode") so names are canonical in output
- *   - Lazy primal evaluation (dv_eval_num) via vtable dispatch (ops->eval)
+ *   - Lazy primal evaluation (dv_eval) via vtable dispatch (ops->eval)
  *   - Lazy derivative construction (dv_get_deriv / dv_create_deriv) via
  *     vtable dispatch (ops->deriv), with the result cached in dval_t::dx_cache
  *   - All arithmetic and math operator constructors (dv_add, dv_sin, etc.)
@@ -152,7 +152,7 @@ static dval_t *get_dx(const dval_t *dv)
         dv_retain((dval_t *)d);
         return (dval_t *)d;
     }
-    return dv_num_const_d(0.0);
+    return dv_new_const(NUM_ZERO);
 }
 
 dval_t *dv_get_dx_internal(const dval_t *dv)
@@ -165,7 +165,7 @@ const dval_t *dv_current_wrt_internal(void)
     return tl_wrt;
 }
 
-number_t dv_eval_num(const dval_t *dv)
+number_t dv_eval(const dval_t *dv)
 {
     return num_clone(dv_eval_num_internal(dv));
 }
@@ -189,7 +189,7 @@ const dval_t *dv_get_deriv(const dval_t *expr, const dval_t *wrt)
 /* Setters                                                                   */
 /* ------------------------------------------------------------------------- */
 
-void dv_set_val_num(dval_t *dv, number_t value)
+void dv_set_val(dval_t *dv, number_t value)
 {
     if (!dv)
         abort();
@@ -209,9 +209,9 @@ void dv_set_name(dval_t *dv, const char *name)
     dv->name = dv_normalize_name(name);
 }
 
-number_t dv_get_val_num(const dval_t *dv)
+number_t dv_get_val(const dval_t *dv)
 {
-    return dv_eval_num(dv);
+    return dv_eval(dv);
 }
 
 /* ------------------------------------------------------------------------- */

@@ -799,7 +799,7 @@ dval_t *dv_substitute(const dval_t *expr,
         left = dv_substitute(arg, needle, replacement);
         if (!left)
             return NULL;
-        out = dv_pow_num(left, &expr->c);
+        out = dv_pow(left, &expr->c);
         dv_free(left);
         return out;
     }

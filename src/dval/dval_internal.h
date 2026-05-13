@@ -213,8 +213,8 @@ struct _dval_t {
     int       x_valid;
 
     /* epoch tracks the maximum variable generation seen at last evaluation.
-     * For variable nodes, incremented by `dv_set_val_num()`. For computed nodes,
-     * set to max(child epochs) after each recomputation. dv_eval_num() uses
+     * For variable nodes, incremented by `dv_set_val()`. For computed nodes,
+     * set to max(child epochs) after each recomputation. dv_eval() uses
      * this to detect stale caches automatically. */
     uint64_t  epoch;
 

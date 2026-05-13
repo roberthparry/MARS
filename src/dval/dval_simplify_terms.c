@@ -52,7 +52,7 @@ static qfloat_t term_coeff(const dval_t *term, const dval_t **base)
 
 dval_t *dv_make_scaled(qfloat_t coeff, dval_t *base)
 {
-    if (dv_qf_is_zero(coeff)) { dv_free(base); return dv_num_const_d(0.0); }
+    if (dv_qf_is_zero(coeff)) { dv_free(base); return dv_new_const(NUM_ZERO); }
     if (dv_qf_is_one(coeff))  return base;
     if (dv_qf_is_minus_one(coeff)) {
         if (dv_is_op(base, &ops_div) && dv_is_op(base->a, &ops_mul) &&
@@ -491,7 +491,7 @@ dval_t *dv_make_pow_like(dval_t *base, qfloat_t exponent)
 {
     if (qf_eq(exponent, QF_ZERO)) {
         dv_free(base);
-        return dv_num_const_d(1.0);
+        return dv_new_const(NUM_ONE);
     }
     if (qf_eq(exponent, QF_ONE))
         return base;

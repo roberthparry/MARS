@@ -22,6 +22,33 @@ static dval_t *dv_chain_rule_with_factor(const dval_t *dv, dval_t *factor)
     return out;
 }
 
+static dval_t *dv_const_long_local(long value)
+{
+    number_t n = num_create_from_long(value);
+    dval_t *dv = dv_new_const(n);
+
+    num_destroy(&n);
+    return dv;
+}
+
+static dval_t *dv_pow_long_local(const dval_t *dv, long exponent)
+{
+    number_t n = num_create_from_long(exponent);
+    dval_t *out = dv_pow(dv, &n);
+
+    num_destroy(&n);
+    return out;
+}
+
+static dval_t *dv_add_long_local(const dval_t *dv, long value)
+{
+    number_t n = num_create_from_long(value);
+    dval_t *out = dv_add_num(dv, &n);
+
+    num_destroy(&n);
+    return out;
+}
+
 number_t eval_sin(dval_t *dv) { return dv_eval_unary_num(dv, num_sin); }
 number_t eval_cos(dval_t *dv) { return dv_eval_unary_num(dv, num_cos); }
 number_t eval_tan(dval_t *dv) { return dv_eval_unary_num(dv, num_tan); }
@@ -100,8 +127,8 @@ dval_t *deriv_tan(dval_t *dv)
 {
     dval_t *da  = dv_get_dx_internal(dv->a);
     dval_t *t   = dv_tan(dv->a);
-    dval_t *t2  = dv_pow_d(t, 2.0);
-    dval_t *one = dv_num_const_d(1.0);
+    dval_t *t2  = dv_pow_long_local(t, 2);
+    dval_t *one = dv_new_const(NUM_ONE);
     dval_t *fac = dv_add(one, t2);
     dval_t *out = dv_mul(fac, da);
     dv_free(da);
@@ -126,8 +153,8 @@ dval_t *deriv_tanh(dval_t *dv)
 {
     dval_t *da  = dv_get_dx_internal(dv->a);
     dval_t *t   = dv_tanh(dv->a);
-    dval_t *t2  = dv_pow_d(t, 2.0);
-    dval_t *one = dv_num_const_d(1.0);
+    dval_t *t2  = dv_pow_long_local(t, 2);
+    dval_t *one = dv_new_const(NUM_ONE);
     dval_t *fac = dv_sub(one, t2);
     dval_t *out = dv_mul(fac, da);
     dv_free(da);
@@ -154,7 +181,7 @@ dval_t *deriv_log(dval_t *dv)
 dval_t *deriv_sqrt(dval_t *dv)
 {
     dval_t *da   = dv_get_dx_internal(dv->a);
-    dval_t *two  = dv_num_const_d(2.0);
+    dval_t *two  = dv_const_long_local(2);
     dval_t *sqra = dv_sqrt(dv->a);
     dval_t *den  = dv_mul(two, sqra);
     dv_free(sqra);
@@ -168,8 +195,8 @@ dval_t *deriv_sqrt(dval_t *dv)
 dval_t *deriv_asin(dval_t *dv)
 {
     dval_t *da   = dv_get_dx_internal(dv->a);
-    dval_t *a2   = dv_pow_d(dv->a, 2.0);
-    dval_t *one  = dv_num_const_d(1.0);
+    dval_t *a2   = dv_pow_long_local(dv->a, 2);
+    dval_t *one  = dv_new_const(NUM_ONE);
     dval_t *sub  = dv_sub(one, a2);
     dval_t *den  = dv_sqrt(sub);
     dv_free(sub);
@@ -184,8 +211,8 @@ dval_t *deriv_asin(dval_t *dv)
 dval_t *deriv_acos(dval_t *dv)
 {
     dval_t *da   = dv_get_dx_internal(dv->a);
-    dval_t *a2   = dv_pow_d(dv->a, 2.0);
-    dval_t *one  = dv_num_const_d(1.0);
+    dval_t *a2   = dv_pow_long_local(dv->a, 2);
+    dval_t *one  = dv_new_const(NUM_ONE);
     dval_t *sub  = dv_sub(one, a2);
     dval_t *den  = dv_sqrt(sub);
     dv_free(sub);
@@ -202,8 +229,8 @@ dval_t *deriv_acos(dval_t *dv)
 dval_t *deriv_atan(dval_t *dv)
 {
     dval_t *da  = dv_get_dx_internal(dv->a);
-    dval_t *a2  = dv_pow_d(dv->a, 2.0);
-    dval_t *one = dv_num_const_d(1.0);
+    dval_t *a2  = dv_pow_long_local(dv->a, 2);
+    dval_t *one = dv_new_const(NUM_ONE);
     dval_t *den = dv_add(one, a2);
     dval_t *out = dv_div(da, den);
     dv_free(da);
@@ -240,8 +267,8 @@ dval_t *deriv_atan2(dval_t *dv)
 dval_t *deriv_asinh(dval_t *dv)
 {
     dval_t *da   = dv_get_dx_internal(dv->a);
-    dval_t *a2   = dv_pow_d(dv->a, 2.0);
-    dval_t *one  = dv_num_const_d(1.0);
+    dval_t *a2   = dv_pow_long_local(dv->a, 2);
+    dval_t *one  = dv_new_const(NUM_ONE);
     dval_t *sum  = dv_add(one, a2);
     dval_t *den  = dv_sqrt(sum);
     dv_free(sum);
@@ -256,7 +283,7 @@ dval_t *deriv_asinh(dval_t *dv)
 dval_t *deriv_acosh(dval_t *dv)
 {
     dval_t *da  = dv_get_dx_internal(dv->a);
-    dval_t *one = dv_num_const_d(1.0);
+    dval_t *one = dv_new_const(NUM_ONE);
     dval_t *am1 = dv_sub(dv->a, one);
     dval_t *ap1 = dv_add(dv->a, one);
     dval_t *s1  = dv_sqrt(am1);
@@ -276,8 +303,8 @@ dval_t *deriv_acosh(dval_t *dv)
 dval_t *deriv_atanh(dval_t *dv)
 {
     dval_t *da  = dv_get_dx_internal(dv->a);
-    dval_t *a2  = dv_pow_d(dv->a, 2.0);
-    dval_t *one = dv_num_const_d(1.0);
+    dval_t *a2  = dv_pow_long_local(dv->a, 2);
+    dval_t *one = dv_new_const(NUM_ONE);
     dval_t *den = dv_sub(one, a2);
     dval_t *out = dv_div(da, den);
     dv_free(da);
@@ -309,7 +336,7 @@ dval_t *deriv_erf(dval_t *dv)
 {
     dval_t *da     = dv_get_dx_internal(dv->a);
     dval_t *c      = dv_num_const_qf(two_over_sqrtpi());
-    dval_t *a2     = dv_pow_d(dv->a, 2.0);
+    dval_t *a2     = dv_pow_long_local(dv->a, 2);
     dval_t *neg_a2 = dv_neg(a2);
     dval_t *ea2    = dv_exp(neg_a2);
     dval_t *fac    = dv_mul(c, ea2);
@@ -327,7 +354,7 @@ dval_t *deriv_erfc(dval_t *dv)
 {
     dval_t *da     = dv_get_dx_internal(dv->a);
     dval_t *c      = dv_num_const_qf(qf_neg(two_over_sqrtpi()));
-    dval_t *a2     = dv_pow_d(dv->a, 2.0);
+    dval_t *a2     = dv_pow_long_local(dv->a, 2);
     dval_t *neg_a2 = dv_neg(a2);
     dval_t *ea2    = dv_exp(neg_a2);
     dval_t *fac    = dv_mul(c, ea2);
@@ -376,7 +403,7 @@ dval_t *deriv_erfinv(dval_t *dv)
 {
     dval_t *da  = dv_get_dx_internal(dv->a);
     dval_t *w   = dv_erfinv(dv->a);
-    dval_t *w2  = dv_pow_d(w, 2.0);
+    dval_t *w2  = dv_pow_long_local(w, 2);
     dval_t *ew2 = dv_exp(w2);
     dval_t *c   = dv_num_const_qf(sqrtpi_over_2());
     dval_t *fac = dv_mul(c, ew2);
@@ -389,7 +416,7 @@ dval_t *deriv_erfcinv(dval_t *dv)
 {
     dval_t *da  = dv_get_dx_internal(dv->a);
     dval_t *w   = dv_erfcinv(dv->a);
-    dval_t *w2  = dv_pow_d(w, 2.0);
+    dval_t *w2  = dv_pow_long_local(w, 2);
     dval_t *ew2 = dv_exp(w2);
     dval_t *c   = dv_num_const_qf(qf_neg(sqrtpi_over_2()));
     dval_t *fac = dv_mul(c, ew2);
@@ -430,9 +457,10 @@ dval_t *deriv_gammainv(dval_t *dv)
     dval_t *y    = dv_gammainv(dv->a);
     dval_t *psi  = dv_digamma(y);
     dval_t *xpsi = dv_mul(dv->a, psi);
-    dval_t *fac  = dv_d_div(1.0, xpsi);
+    dval_t *one  = dv_new_const(NUM_ONE);
+    dval_t *fac  = dv_div(one, xpsi);
     dval_t *out  = dv_mul(fac, da);
-    dv_free(da); dv_free(y); dv_free(psi); dv_free(xpsi); dv_free(fac);
+    dv_free(da); dv_free(y); dv_free(psi); dv_free(xpsi); dv_free(one); dv_free(fac);
     return out;
 }
 
@@ -440,7 +468,7 @@ dval_t *deriv_lambert_w0(dval_t *dv)
 {
     dval_t *da  = dv_get_dx_internal(dv->a);
     dval_t *w   = dv_lambert_w0(dv->a);
-    dval_t *wp1 = dv_add_d(w, 1.0);
+    dval_t *wp1 = dv_add_long_local(w, 1);
     dval_t *den = dv_mul(dv->a, wp1);
     dval_t *fac = dv_div(w, den);
     dval_t *out = dv_mul(fac, da);
@@ -452,7 +480,7 @@ dval_t *deriv_lambert_wm1(dval_t *dv)
 {
     dval_t *da  = dv_get_dx_internal(dv->a);
     dval_t *w   = dv_lambert_wm1(dv->a);
-    dval_t *wp1 = dv_add_d(w, 1.0);
+    dval_t *wp1 = dv_add_long_local(w, 1);
     dval_t *den = dv_mul(dv->a, wp1);
     dval_t *fac = dv_div(w, den);
     dval_t *out = dv_mul(fac, da);

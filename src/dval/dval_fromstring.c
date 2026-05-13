@@ -143,7 +143,7 @@ static const func_entry_t s_funcs[FUNC_HT_SIZE] = {
     [23] = { "sinh",           4, false, dv_sinh,          NULL        },
     [24] = { "digamma",        7, false, dv_digamma,       NULL        },
     [25] = { "normal_logpdf", 13, false, dv_normal_logpdf, NULL        },
-    [26] = { "pow",            3, true,  NULL,             dv_pow      },
+    [26] = { "pow",            3, true,  NULL,             dv_pow_dv   },
     [27] = { "lambert_wm1",   11, false, dv_lambert_wm1,   NULL        },
     [29] = { "lgamma",         6, false, dv_lgamma,        NULL        },
     [30] = { "sin",            3, false, dv_sin,           NULL        },
@@ -379,7 +379,9 @@ static dval_t *apply_integer_power_if_present(dval_t *value, int exponent)
     if (exponent < 0)
         return value;
 
-    dval_t *powered = dv_pow_d(value, (double)exponent);
+    number_t exponent_num = num_create_from_long(exponent);
+    dval_t *powered = dv_pow(value, &exponent_num);
+    num_destroy(&exponent_num);
     dv_free(value);
     return powered;
 }
@@ -439,7 +441,7 @@ static dval_t *parse_atom(parser_t *p)
             return NULL;
         }
         p->p += len;
-        node = dv_new_const_num(value);
+        node = dv_new_const(value);
         num_destroy(&value);
         return node;
     }
@@ -571,7 +573,7 @@ static dval_t *parse_power(parser_t *p)
             }
             /* base is unused here — ^(a, b) is its own expression */
             dv_free(base);
-            dval_t *result = dv_pow(a, b);
+            dval_t *result = dv_pow_dv(a, b);
             dv_free(a); dv_free(b);
             return result;
         }
@@ -583,7 +585,9 @@ static dval_t *parse_power(parser_t *p)
             set_error(p, "expected exponent after '^'");
             return NULL;
         }
-        dval_t *tmp = dv_pow_d(base, qf_to_double(exponent));
+        number_t exponent_num = num_create_from_qfloat(exponent);
+        dval_t *tmp = dv_pow(base, &exponent_num);
+        num_destroy(&exponent_num);
         dv_free(base);
         return tmp;
     }
@@ -710,7 +714,7 @@ static dval_t *parse_addexpr(parser_t *p)
 /* ------------------------------------------------------------------ */
 
 /* Parse comma-separated "name = value" pairs from [s, end).
- * is_var: 1 → create dv_new_named_var_num(); 0 → create dv_new_named_const_num().
+ * is_var: 1 → create dv_new_named_var(); 0 → create dv_new_named_const().
  * On success returns 0; on failure writes to errmsg and returns -1. */
 static int parse_bindings(const char *s, const char *end,
                            int is_var, symtab_t *syms,
@@ -749,8 +753,8 @@ static int parse_bindings(const char *s, const char *end,
         p = value_end;
 
         node = is_var
-            ? dv_new_named_var_num(val, name)
-            : dv_new_named_const_num(val, name);
+            ? dv_new_named_var(val, name)
+            : dv_new_named_const(val, name);
         num_destroy(&val);
 
         /* dv_new_named_* calls dv_normalize_name, which may transform the name
@@ -810,7 +814,7 @@ static dval_t *parse_pure_const(const char *s, const char *end,
         snprintf(errmsg, errmsg_n, "constant name is required in pure-constant format");
         return NULL;
     }
-    dval_t *result = dv_new_named_const_num(val, name);
+    dval_t *result = dv_new_named_const(val, name);
     num_destroy(&val);
     free(name);
     return result;
@@ -868,7 +872,7 @@ static int collect_implicit_symbols(const char *start, const char *end,
         is_const = dv_is_default_constant_name(name);
         if (dv_get_default_constant_num(name, &value)) {
             canonical_name = dv_default_constant_canonical_name(name);
-            node = dv_new_named_const_num(value, canonical_name);
+            node = dv_new_named_const(value, canonical_name);
             num_destroy(&value);
         } else {
             node = is_const

@@ -138,7 +138,7 @@ void test_deriv_pow_xy(void)
     dval_t *one = test_dv_new_const_d(1.0);
     dval_t *y   = dv_add(x2, one);
 
-    dval_t *f   = dv_pow(x, y);
+    dval_t *f   = dv_pow_dv(x, y);
     const dval_t *df = dv_get_deriv(f, x);
 
     qfloat_t X = qf_from_double(2.0);

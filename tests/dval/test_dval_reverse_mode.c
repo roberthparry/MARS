@@ -117,14 +117,14 @@ static void test_reverse_matches_forward_composite(void)
         TEST_FAIL();
     }
 
-    expect = dv_eval_num(f);
+    expect = dv_eval(f);
     ASSERT_TRUE(num_eq(value, expect));
     num_destroy(&expect);
-    expect = dv_eval_num(df_dx);
+    expect = dv_eval(df_dx);
     ASSERT_TRUE(num_eq(grads[0], expect) ||
                 number_close_for_qfloat_precision(grads[0], expect));
     num_destroy(&expect);
-    expect = dv_eval_num(df_dy);
+    expect = dv_eval(df_dy);
     ASSERT_TRUE(num_eq(grads[1], expect) ||
                 number_close_for_qfloat_precision(grads[1], expect));
     num_destroy(&expect);
@@ -181,8 +181,8 @@ static void test_reverse_gradient_polynomial_num(void)
     ASSERT_EQ_INT(num_set_default_prec_bits(384u), 0);
     x0 = num_create_from_string("1");
     y0 = num_create_from_string("2");
-    x = dv_new_named_var_num(x0, "x");
-    y = dv_new_named_var_num(y0, "y");
+    x = dv_new_named_var(x0, "x");
+    y = dv_new_named_var(y0, "y");
     num_destroy(&y0);
     num_destroy(&x0);
     x2 = dv_pow_d(x, 2.0);
@@ -217,7 +217,7 @@ static void test_reverse_gradient_polynomial_num(void)
 static void test_reverse_gradient_complex_number_t(void)
 {
     number_t z0 = num_create_from_string("1 + 2i");
-    dval_t *z = dv_new_named_var_num(z0, "z");
+    dval_t *z = dv_new_named_var(z0, "z");
     dval_t *exp_z = dv_exp(z);
     dval_t *z2 = dv_pow_d(z, 2.0);
     dval_t *f = dv_add(exp_z, z2);
@@ -229,8 +229,8 @@ static void test_reverse_gradient_complex_number_t(void)
     number_t expect_grad;
 
     ASSERT_EQ_INT(dv_eval_derivatives(f, 1u, vars, &value, &grad), 0);
-    expect_value = dv_eval_num(f);
-    expect_grad = dv_eval_num(df_dz);
+    expect_value = dv_eval(f);
+    expect_grad = dv_eval(df_dz);
 
     ASSERT_TRUE(num_eq(value, expect_value) ||
                 number_close_for_qfloat_precision(value, expect_value));

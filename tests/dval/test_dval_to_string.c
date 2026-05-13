@@ -2444,7 +2444,7 @@ dval_t *make_expr_u06(void)
  *  Builders for manually-subscripted constant tests (C01–C04)
  *
  *  Callers pass "c\xE2\x82\x80" (c₀) and "c\xE2\x82\x81" (c₁)
- *  as the name argument to dv_new_named_const_num so the names are
+ *  as the name argument to dv_new_named_const so the names are
  *  simple (letter + subscript digit) — they won't be bracketed.
  * ============================================================ */
 

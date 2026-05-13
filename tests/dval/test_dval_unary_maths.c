@@ -210,9 +210,9 @@ void test_pow_d_complex(void)
 {
     number_t z0 = num_create_from_string("1 + 2i");
     number_t expected = num_create_from_string("-3 + 4i");
-    dval_t *base = dv_new_var_num(z0);
+    dval_t *base = dv_new_var(z0);
     dval_t *f = dv_pow_d(base, 2.0);
-    number_t got = dv_eval_num(f);
+    number_t got = dv_eval(f);
 
     ASSERT_TRUE(num_eq(got, expected));
     print_expr_of(f);
@@ -228,7 +228,7 @@ void test_pow(void)
 {
     dval_t *base = test_dv_new_var_d(2.0);
     dval_t *expo = test_dv_new_const_d(3.0);
-    dval_t *f    = dv_pow(base, expo);
+    dval_t *f    = dv_pow_dv(base, expo);
 
     check_q_at(__FILE__, __LINE__, 1, "2^3", dv_eval_qf(f), qf_pow(qf_from_double(2.0), qf_from_double(3.0)));
     print_expr_of(f);

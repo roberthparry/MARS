@@ -777,7 +777,7 @@ static void check_parse_num(const char *label, const char *s,
         return;
     }
 
-    got = dv_eval_num(expr);
+    got = dv_eval(expr);
     expect = num_create_from_string(expect_text);
     expr_text = dv_to_string(expr, style_EXPRESSION);
 
@@ -1059,8 +1059,8 @@ static void test_from_string_bindings_api(void)
             return;
         }
 
-        dv_set_val_num(x_binding, xval);
-        dv_set_val_num(c_binding, cval);
+        dv_set_val(x_binding, xval);
+        dv_set_val(c_binding, cval);
 
         num_destroy(&cval);
         num_destroy(&xval);

@@ -57,13 +57,13 @@ static number_t eval_pow_d(dval_t *dv)
 static dval_t *deriv_const(dval_t *dv)
 {
     (void)dv;
-    return dv_num_const_d(0.0);
+    return dv_new_const(NUM_ZERO);
 }
 
 static dval_t *deriv_var(dval_t *dv)
 {
     const dval_t *wrt = dv_current_wrt_internal();
-    return dv_num_const_d(wrt == NULL || dv == wrt ? 1.0 : 0.0);
+    return dv_new_const((wrt == NULL || dv == wrt) ? NUM_ONE : NUM_ZERO);
 }
 
 static dval_t *deriv_add(dval_t *dv)
@@ -107,8 +107,10 @@ static dval_t *deriv_div(dval_t *dv)
     dval_t *num1 = dv_mul(da, dv->b);
     dval_t *num2 = dv_mul(dv->a, db);
     dval_t *num  = dv_sub(num1, num2);
-    dval_t *den  = dv_pow_d(dv->b, 2.0);
+    number_t two = num_create_from_long(2);
+    dval_t *den  = dv_pow(dv->b, &two);
     dval_t *out  = dv_div(num, den);
+    num_destroy(&two);
     dv_free(da);
     dv_free(db);
     dv_free(num1);
@@ -138,7 +140,7 @@ static dval_t *deriv_pow(dval_t *dv)
     dval_t *term1   = dv_mul(db, loga);
     dval_t *term2   = dv_mul(b, da_on_a);
     dval_t *sum     = dv_add(term1, term2);
-    dval_t *powab   = dv_pow(a, b);
+    dval_t *powab   = dv_pow_dv(a, b);
     dval_t *out     = dv_mul(powab, sum);
 
     dv_free(da);
@@ -258,7 +260,7 @@ const dval_ops_t ops_pow = {
     .arity = DV_OP_BINARY,
     .name = "^",
     .apply_unary = NULL,
-    .apply_binary = dv_pow,
+    .apply_binary = dv_pow_dv,
     .simplify = dv_simplify_pow_operator,
     .fold_const_unary = NULL
 };
@@ -337,7 +339,7 @@ dval_t *dv_div(const dval_t *dv1, const dval_t *dv2)
     return dv_new_binary_internal(&ops_div, dv1, dv2);
 }
 
-dval_t *dv_pow(const dval_t *a, const dval_t *b)
+dval_t *dv_pow_dv(const dval_t *a, const dval_t *b)
 {
     if (!a || !b)
         return NULL;
@@ -354,7 +356,7 @@ dval_t *dv_pow_qf(const dval_t *a, qfloat_t exponent)
     return dv_new_pow_qf_internal(a, exponent);
 }
 
-dval_t *dv_pow_num(const dval_t *dv, const number_t *exponent)
+dval_t *dv_pow(const dval_t *dv, const number_t *exponent)
 {
     if (!dv || !exponent)
         return NULL;
@@ -371,7 +373,7 @@ dval_t *dv_add_num(const dval_t *dv, const number_t *value)
 
     if (!value)
         return NULL;
-    c = dv_new_const_num(*value);
+    c = dv_new_const(*value);
     if (!c)
         return NULL;
     r = dv_add(dv, c);
@@ -386,7 +388,7 @@ dval_t *dv_sub_num(const dval_t *dv, const number_t *value)
 
     if (!value)
         return NULL;
-    c = dv_new_const_num(*value);
+    c = dv_new_const(*value);
     if (!c)
         return NULL;
     r = dv_sub(dv, c);
@@ -401,7 +403,7 @@ dval_t *dv_num_sub(const number_t *value, const dval_t *dv)
 
     if (!value)
         return NULL;
-    c = dv_new_const_num(*value);
+    c = dv_new_const(*value);
     if (!c)
         return NULL;
     r = dv_sub(c, dv);
@@ -416,7 +418,7 @@ dval_t *dv_mul_num(const dval_t *dv, const number_t *value)
 
     if (!value)
         return NULL;
-    c = dv_new_const_num(*value);
+    c = dv_new_const(*value);
     if (!c)
         return NULL;
     r = dv_mul(dv, c);
@@ -431,7 +433,7 @@ dval_t *dv_div_num(const dval_t *dv, const number_t *value)
 
     if (!value)
         return NULL;
-    c = dv_new_const_num(*value);
+    c = dv_new_const(*value);
     if (!c)
         return NULL;
     r = dv_div(dv, c);
@@ -446,7 +448,7 @@ dval_t *dv_num_div(const number_t *value, const dval_t *dv)
 
     if (!value)
         return NULL;
-    c = dv_new_const_num(*value);
+    c = dv_new_const(*value);
     if (!c)
         return NULL;
     r = dv_div(c, dv);

@@ -82,7 +82,7 @@ int dv_eval_derivatives(const dval_t *expr,
     if (!expr || (nvars > 0u && (!vars || !derivs_out)))
         return -1;
 
-    value = dv_eval_num(expr);
+    value = dv_eval(expr);
     if (reverse_collect_postorder(expr, &nodes, &node_count, &node_capacity) != 0) {
         free(nodes);
         num_destroy(&value);

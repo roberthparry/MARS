@@ -13,7 +13,7 @@
 static inline dval_t *test_dv_new_const_d(double x)
 {
     number_t n = num_create_from_qfloat(qf_from_double(x));
-    dval_t *dv = dv_new_const_num(n);
+    dval_t *dv = dv_new_const(n);
 
     num_destroy(&n);
     return dv;
@@ -22,7 +22,7 @@ static inline dval_t *test_dv_new_const_d(double x)
 static inline dval_t *test_dv_new_const_qf(qfloat_t x)
 {
     number_t n = num_create_from_qfloat(x);
-    dval_t *dv = dv_new_const_num(n);
+    dval_t *dv = dv_new_const(n);
 
     num_destroy(&n);
     return dv;
@@ -31,7 +31,7 @@ static inline dval_t *test_dv_new_const_qf(qfloat_t x)
 static inline dval_t *test_dv_new_const_qc(qcomplex_t x)
 {
     number_t n = num_create_from_qcomplex(x);
-    dval_t *dv = dv_new_const_num(n);
+    dval_t *dv = dv_new_const(n);
 
     num_destroy(&n);
     return dv;
@@ -40,7 +40,7 @@ static inline dval_t *test_dv_new_const_qc(qcomplex_t x)
 static inline dval_t *test_dv_new_named_const_d(double x, const char *name)
 {
     number_t n = num_create_from_qfloat(qf_from_double(x));
-    dval_t *dv = dv_new_named_const_num(n, name);
+    dval_t *dv = dv_new_named_const(n, name);
 
     num_destroy(&n);
     return dv;
@@ -49,7 +49,7 @@ static inline dval_t *test_dv_new_named_const_d(double x, const char *name)
 static inline dval_t *test_dv_new_named_const_qf(qfloat_t x, const char *name)
 {
     number_t n = num_create_from_qfloat(x);
-    dval_t *dv = dv_new_named_const_num(n, name);
+    dval_t *dv = dv_new_named_const(n, name);
 
     num_destroy(&n);
     return dv;
@@ -58,7 +58,7 @@ static inline dval_t *test_dv_new_named_const_qf(qfloat_t x, const char *name)
 static inline dval_t *test_dv_new_named_const_qc(qcomplex_t x, const char *name)
 {
     number_t n = num_create_from_qcomplex(x);
-    dval_t *dv = dv_new_named_const_num(n, name);
+    dval_t *dv = dv_new_named_const(n, name);
 
     num_destroy(&n);
     return dv;
@@ -67,7 +67,7 @@ static inline dval_t *test_dv_new_named_const_qc(qcomplex_t x, const char *name)
 static inline dval_t *test_dv_new_var_d(double x)
 {
     number_t n = num_create_from_qfloat(qf_from_double(x));
-    dval_t *dv = dv_new_var_num(n);
+    dval_t *dv = dv_new_var(n);
 
     num_destroy(&n);
     return dv;
@@ -76,7 +76,7 @@ static inline dval_t *test_dv_new_var_d(double x)
 static inline dval_t *test_dv_new_var_qf(qfloat_t x)
 {
     number_t n = num_create_from_qfloat(x);
-    dval_t *dv = dv_new_var_num(n);
+    dval_t *dv = dv_new_var(n);
 
     num_destroy(&n);
     return dv;
@@ -85,7 +85,7 @@ static inline dval_t *test_dv_new_var_qf(qfloat_t x)
 static inline dval_t *test_dv_new_var_qc(qcomplex_t x)
 {
     number_t n = num_create_from_qcomplex(x);
-    dval_t *dv = dv_new_var_num(n);
+    dval_t *dv = dv_new_var(n);
 
     num_destroy(&n);
     return dv;
@@ -94,7 +94,7 @@ static inline dval_t *test_dv_new_var_qc(qcomplex_t x)
 static inline dval_t *test_dv_new_named_var_d(double x, const char *name)
 {
     number_t n = num_create_from_qfloat(qf_from_double(x));
-    dval_t *dv = dv_new_named_var_num(n, name);
+    dval_t *dv = dv_new_named_var(n, name);
 
     num_destroy(&n);
     return dv;
@@ -103,7 +103,7 @@ static inline dval_t *test_dv_new_named_var_d(double x, const char *name)
 static inline dval_t *test_dv_new_named_var_qf(qfloat_t x, const char *name)
 {
     number_t n = num_create_from_qfloat(x);
-    dval_t *dv = dv_new_named_var_num(n, name);
+    dval_t *dv = dv_new_named_var(n, name);
 
     num_destroy(&n);
     return dv;
@@ -112,7 +112,7 @@ static inline dval_t *test_dv_new_named_var_qf(qfloat_t x, const char *name)
 static inline dval_t *test_dv_new_named_var_qc(qcomplex_t x, const char *name)
 {
     number_t n = num_create_from_qcomplex(x);
-    dval_t *dv = dv_new_named_var_num(n, name);
+    dval_t *dv = dv_new_named_var(n, name);
 
     num_destroy(&n);
     return dv;
@@ -122,7 +122,7 @@ static inline void test_dv_set_val_d(dval_t *dv, double x)
 {
     number_t n = num_create_from_qfloat(qf_from_double(x));
 
-    dv_set_val_num(dv, n);
+    dv_set_val(dv, n);
     num_destroy(&n);
 }
 
@@ -130,7 +130,7 @@ static inline void test_dv_set_val_qf(dval_t *dv, qfloat_t x)
 {
     number_t n = num_create_from_qfloat(x);
 
-    dv_set_val_num(dv, n);
+    dv_set_val(dv, n);
     num_destroy(&n);
 }
 
@@ -138,7 +138,7 @@ static inline void test_dv_set_val_qc(dval_t *dv, qcomplex_t x)
 {
     number_t n = num_create_from_qcomplex(x);
 
-    dv_set_val_num(dv, n);
+    dv_set_val(dv, n);
     num_destroy(&n);
 }
 
@@ -199,7 +199,7 @@ static inline dval_t *test_dv_d_div(double x, const dval_t *dv)
 static inline dval_t *test_dv_pow_d(const dval_t *dv, double x)
 {
     number_t n = num_create_from_double(x);
-    dval_t *out = dv_pow_num(dv, &n);
+    dval_t *out = dv_pow(dv, &n);
 
     num_destroy(&n);
     return out;
@@ -208,7 +208,7 @@ static inline dval_t *test_dv_pow_d(const dval_t *dv, double x)
 static inline dval_t *test_dv_pow_qc(const dval_t *dv, qcomplex_t x)
 {
     number_t n = num_create_from_qcomplex(x);
-    dval_t *out = dv_pow_num(dv, &n);
+    dval_t *out = dv_pow(dv, &n);
 
     num_destroy(&n);
     return out;
@@ -216,7 +216,7 @@ static inline dval_t *test_dv_pow_qc(const dval_t *dv, qcomplex_t x)
 
 static inline double test_dv_eval_d(const dval_t *dv)
 {
-    number_t n = dv_eval_num(dv);
+    number_t n = dv_eval(dv);
     double out = num_to_double(n);
 
     num_destroy(&n);
@@ -225,7 +225,7 @@ static inline double test_dv_eval_d(const dval_t *dv)
 
 static inline qfloat_t test_dv_eval_qf(const dval_t *dv)
 {
-    number_t n = dv_eval_num(dv);
+    number_t n = dv_eval(dv);
     qfloat_t out = num_to_qfloat(n);
 
     num_destroy(&n);
@@ -234,7 +234,7 @@ static inline qfloat_t test_dv_eval_qf(const dval_t *dv)
 
 static inline qcomplex_t test_dv_eval_qc(const dval_t *dv)
 {
-    number_t n = dv_eval_num(dv);
+    number_t n = dv_eval(dv);
     number_t re_n = num_real_part(n);
     number_t im_n = num_imag_part(n);
     qcomplex_t out = qc_make(num_to_qfloat(re_n), num_to_qfloat(im_n));
@@ -247,7 +247,7 @@ static inline qcomplex_t test_dv_eval_qc(const dval_t *dv)
 
 static inline qfloat_t test_dv_get_val_qf(const dval_t *dv)
 {
-    number_t n = dv_get_val_num(dv);
+    number_t n = dv_get_val(dv);
     qfloat_t out = num_to_qfloat(n);
 
     num_destroy(&n);
@@ -256,7 +256,7 @@ static inline qfloat_t test_dv_get_val_qf(const dval_t *dv)
 
 static inline qcomplex_t test_dv_get_val_qc(const dval_t *dv)
 {
-    number_t n = dv_get_val_num(dv);
+    number_t n = dv_get_val(dv);
     number_t re_n = num_real_part(n);
     number_t im_n = num_imag_part(n);
     qcomplex_t out = qc_make(num_to_qfloat(re_n), num_to_qfloat(im_n));
@@ -269,9 +269,9 @@ static inline qcomplex_t test_dv_get_val_qc(const dval_t *dv)
 
 #define dv_eval_d      test_dv_eval_d
 #define dv_eval_qf     test_dv_eval_qf
-#define dv_eval        test_dv_eval_qc
+#define dv_eval_qc     test_dv_eval_qc
 #define dv_get_val_qf  test_dv_get_val_qf
-#define dv_get_val     test_dv_get_val_qc
+#define dv_get_val_qc  test_dv_get_val_qc
 #define dv_add_d       test_dv_add_d
 #define dv_sub_d       test_dv_sub_d
 #define dv_d_sub       test_dv_d_sub

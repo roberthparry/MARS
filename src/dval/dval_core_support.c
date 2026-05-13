@@ -687,12 +687,12 @@ dval_t *dv_make_var_qc(qcomplex_t x)
 /* Public number_t constructors                                              */
 /* ------------------------------------------------------------------------- */
 
-dval_t *dv_new_const_num(number_t x)
+dval_t *dv_new_const(number_t x)
 {
     return dv_make_const_num(num_clone(x));
 }
 
-dval_t *dv_new_var_num(number_t x)
+dval_t *dv_new_var(number_t x)
 {
     return dv_make_var_num(num_clone(x));
 }
@@ -703,12 +703,12 @@ static dval_t *dv_attach_name(dval_t *dv, const char *name)
     return dv;
 }
 
-dval_t *dv_new_named_const_num(number_t x, const char *name)
+dval_t *dv_new_named_const(number_t x, const char *name)
 {
-    return dv_attach_name(dv_new_const_num(x), name);
+    return dv_attach_name(dv_new_const(x), name);
 }
 
-dval_t *dv_new_named_var_num(number_t x, const char *name)
+dval_t *dv_new_named_var(number_t x, const char *name)
 {
-    return dv_attach_name(dv_new_var_num(x), name);
+    return dv_attach_name(dv_new_var(x), name);
 }
