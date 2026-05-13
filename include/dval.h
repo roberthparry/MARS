@@ -47,16 +47,16 @@ extern const dval_t * const DV_ONE;
  * Constants have no variable binding; their derivative is always zero.
  * Returns an owning handle; caller must call dv_free() exactly once.
  */
-dval_t *dv_new_const_num(number_t x);
+dval_t *dv_new_const(number_t x);
 
 /**
- * @brief Create a named constant node.
+ * @brief Create a named constant node from a `number_t` value.
  *
- * Behaves like `dv_new_const_num()` but attaches a symbolic name used in
+ * Behaves like `dv_new_const()` but attaches a symbolic name used in
  * dv_to_string() output and debug printing. @p name is copied.
  * Returns an owning handle; caller must call dv_free() exactly once.
  */
-dval_t *dv_new_named_const_num(number_t x, const char *name);
+dval_t *dv_new_named_const(number_t x, const char *name);
 
 /* ------------------------------------------------------------------------- */
 /* Constructors — variables                                                  */
@@ -65,20 +65,20 @@ dval_t *dv_new_named_const_num(number_t x, const char *name);
 /**
  * @brief Create a variable node from a `number_t` value.
  *
- * Variables are leaf nodes whose value can be updated via `dv_set_val_num()`.
+ * Variables are leaf nodes whose value can be updated via `dv_set_val()`.
  * Derivative of a variable with respect to itself is 1.
  * Returns an owning handle; caller must call dv_free() exactly once.
  */
-dval_t *dv_new_var_num(number_t x);
+dval_t *dv_new_var(number_t x);
 
 /**
- * @brief Create a named variable node.
+ * @brief Create a named variable node from a `number_t` value.
  *
- * Behaves like `dv_new_var_num()` but attaches a symbolic name used in
+ * Behaves like `dv_new_var()` but attaches a symbolic name used in
  * dv_to_string() output and debug printing. @p name is copied.
  * Returns an owning handle; caller must call dv_free() exactly once.
  */
-dval_t *dv_new_named_var_num(number_t x, const char *name);
+dval_t *dv_new_named_var(number_t x, const char *name);
 
 /* ------------------------------------------------------------------------- */
 /* Mutators                                                                  */
@@ -88,14 +88,15 @@ dval_t *dv_new_named_var_num(number_t x, const char *name);
  * @brief Update the value of a variable or named-constant node.
  *
  * Sets the node's value and advances the node's internal epoch counter.
- * The next call to dv_eval_num() on any expression that depends on @p dv will
+ * The next call to dv_eval() on any expression that depends on @p dv will
  * automatically detect the change and recompute. Calling dv_invalidate()
- * before dv_eval_num() is no longer required.
+ * before dv_eval() is no longer required.
  *
- * @p dv must be a variable node (created with `dv_new_var_num()` or
- * `dv_new_named_var_num()`) or a named constant node.
+ * @p dv must be a variable node (created with `dv_new_var()` or
+ * `dv_new_named_var()`) or a named constant node created with
+ * `dv_new_named_const()`.
  */
-void dv_set_val_num(dval_t *dv, number_t value);
+void dv_set_val(dval_t *dv, number_t value);
 
 /**
  * @brief Attach or replace the symbolic name of a node.
@@ -112,10 +113,11 @@ void dv_set_name(dval_t *dv, const char *name);
  * @brief Return the current primal value of a node as an owning `number_t`.
  *
  * This function evaluates the node if required and returns the current
- * primal value. Use dv_eval_num() when you want that intent to be explicit;
- * these accessors are convenient value-returning wrappers.
+ * primal value. Use `dv_eval()` when you want that intent to be explicit;
+ * `dv_get_val()` is a convenient accessor that still returns an owning
+ * `number_t`.
  */
-number_t dv_get_val_num(const dval_t *dv);
+number_t dv_get_val(const dval_t *dv);
 
 /**
  * @brief Get the derivative ∂expr/∂wrt (borrowed).
@@ -136,7 +138,7 @@ const dval_t *dv_get_deriv(const dval_t *expr, const dval_t *wrt);
  * Traverses the DAG recursively, recomputing any nodes whose cache is
  * stale. The result is stored in the node's cache and returned.
  */
-number_t dv_eval_num(const dval_t *dv);
+number_t dv_eval(const dval_t *dv);
 
 /**
  * @brief Evaluate a scalar expression and compute derivatives with respect to
@@ -177,8 +179,8 @@ int dv_eval_derivatives(const dval_t *expr,
 /**
  * @brief Build a new DAG node representing a derivative of @p expr w.r.t. @p wrt.
  *
- * @p wrt must be a variable node (created with `dv_new_var_num()` or
- * `dv_new_named_var_num()`)
+ * @p wrt must be a variable node (created with `dv_new_var()` or
+ * `dv_new_named_var()`)
  * that appears in the expression DAG rooted at @p expr.  Only the nominated
  * variable contributes a derivative of 1; all other variable nodes contribute 0.
  *
@@ -204,9 +206,10 @@ dval_t *dv_create_nth_deriv(unsigned int n, const dval_t *expr, const dval_t *wr
  * and return an owning handle. Arguments are retained (not consumed); the
  * caller remains responsible for freeing its own handles.
  *
- * _num variants borrow a scalar `number_t` pointer and do not consume or
- * modify the pointed-to value; num_sub and num_div treat the scalar as the
- * left-hand operand (`value - dv` and `value / dv`).
+ * Scalar helpers whose names end in `_num` borrow a constant `number_t`
+ * pointer and do not consume or modify the pointed-to value; `dv_num_sub()`
+ * and `dv_num_div()` treat the scalar as the left-hand operand
+ * (`value - dv` and `value / dv`).
  */
 dval_t *dv_neg(const dval_t *dv);
 dval_t *dv_add(const dval_t *dv1, const dval_t *dv2);
@@ -242,9 +245,10 @@ int dv_cmp(const dval_t *dv1, const dval_t *dv2);
  * All elementary functions build a new DAG node and return an owning handle.
  * Arguments are retained (not consumed).
  *
- * dv_pow_num(dv, exponent) computes dv^exponent for a constant scalar
+ * `dv_pow(dv, exponent)` computes dv^exponent for a constant numeric
  * exponent supplied as a borrowed `number_t`.
- * dv_pow(dv1, dv2) computes dv1^dv2 where both operands are differentiable.
+ * `dv_pow_dv(base, exponent)` computes base^exponent where both operands
+ * are differentiable expressions.
  */
 dval_t *dv_sin(const dval_t *dv);
 dval_t *dv_cos(const dval_t *dv);
@@ -262,8 +266,8 @@ dval_t *dv_atanh(const dval_t *dv);
 dval_t *dv_exp(const dval_t *dv);
 dval_t *dv_log(const dval_t *dv);
 dval_t *dv_sqrt(const dval_t *dv);
-dval_t *dv_pow_num(const dval_t *dv, const number_t *exponent);
-dval_t *dv_pow(const dval_t *dv1, const dval_t *dv2);
+dval_t *dv_pow(const dval_t *dv, const number_t *exponent);
+dval_t *dv_pow_dv(const dval_t *dv1, const dval_t *dv2);
 
 /* ------------------------------------------------------------------------- */
 /* Special functions (owning)                                                */

@@ -5,12 +5,10 @@
 #include <stddef.h>
 
 #include "dval.h"
-#include "qfloat.h"
-#include "qcomplex.h"
 
 /**
  * @file matrix.h
- * @brief Generic high‑precision matrix type with pluggable element types.
+ * @brief Generic high-precision matrix type over `number_t` and `dval_t`.
  *
  * This API exposes a uniform matrix abstraction while hiding all internal
  * details such as element type, storage representation, and vtables.
@@ -23,8 +21,9 @@
  *   - upper triangular
  *   - lower triangular
  *
- * All operations dispatch through internal vtables. No type switches or
- * storage switches appear in user code.
+ * Numeric matrices store `number_t` values and symbolic matrices store
+ * retained `dval_t *` handles. All operations dispatch through internal
+ * vtables. No type switches or storage switches appear in user code.
  */
 
 typedef struct matrix_t matrix_t;
@@ -204,7 +203,28 @@ matrix_t *mat_create_num(size_t rows, size_t cols, const number_t *data);
 matrix_t *mat_create_dv(size_t rows, size_t cols, dval_t *const *data);
 
 /**
- * @brief Parse a matrix from a string.
+ * @brief Parse a matrix from a string and return a numeric matrix when fully resolvable.
+ *
+ * This helper accepts both numeric and symbolic syntax, but its return type is
+ * always numeric:
+ * - purely numeric input returns a `MAT_TYPE_NUMBER` matrix
+ * - symbolic input returns a numeric matrix only if every symbol can be
+ *   resolved to a concrete numeric value during parse/evaluation
+ *
+ * Resolution may come from explicit bindings in wrapped form, for example
+ * `{ (x, y; y, x) | x = 2; y = 3/2 }`, and from built-in valued constants
+ * such as `e`, `pi`/`π`, `@pi`, `@phi`, and `@gamma`.
+ *
+ * If any required symbol remains unbound (for example bare variables such as
+ * `x`, or partially bound wrapped input), this function returns NULL.
+ *
+ * For symbolic parsing where callers need mutable bindings or symbolic output,
+ * use mat_from_string_dv(...).
+ */
+matrix_t *mat_from_string(const char *s);
+
+/**
+ * @brief Parse a numeric or symbolic matrix from a string.
  *
  * Supported forms are:
  *
@@ -231,7 +251,7 @@ matrix_t *mat_create_dv(size_t rows, size_t cols, dval_t *const *data);
  * mat_bindings_get() and later released with mat_bindings_free(). If bindings
  * are not needed, pass NULL.
  */
-matrix_t *mat_from_string(const char *s, mat_bindings_t **bnd_out);
+matrix_t *mat_from_string_dv(const char *s, mat_bindings_t **bnd_out);
 
 /**
  * @brief Look up a parsed matrix binding by name.
@@ -250,7 +270,7 @@ matrix_t *mat_from_string(const char *s, mat_bindings_t **bnd_out);
 dval_t *mat_bindings_get(mat_bindings_t *bnd, const char *name);
 
 /**
- * @brief Release a bindings object previously returned by mat_from_string().
+ * @brief Release a bindings object previously returned by mat_from_string_dv().
  */
 void mat_bindings_free(mat_bindings_t *bnd);
 
@@ -262,7 +282,7 @@ void mat_bindings_free(mat_bindings_t *bnd);
  * aliases such as `@DELTA`, and bracketed identifiers such as `[radius]`.
  *
  * @param A         Matrix to differentiate.
- * @param bindings  Borrowed bindings previously returned by mat_from_string().
+ * @param bindings  Borrowed bindings previously returned by mat_from_string_dv().
  * @param name      Binding name to differentiate with respect to.
  * @return          Newly allocated derivative matrix on success, or NULL if
  *                  the named binding is not present or inputs are invalid.
@@ -300,7 +320,7 @@ dval_t *mat_deriv_det_by_name(const matrix_t *A, mat_bindings_t *bindings,
  * bindings.
  *
  * @param A       Matrix-valued symbolic output.
- * @param bindings Borrowed bindings previously returned by mat_from_string().
+ * @param bindings Borrowed bindings previously returned by mat_from_string_dv().
  * @param names   Array of binding names to differentiate with respect to.
  * @param nnames  Number of names in @p names.
  * @return        Newly allocated Jacobian matrix on success, or NULL if any
@@ -454,8 +474,8 @@ mat_type_t mat_typeof(const matrix_t *A);
 /**
  * @brief Set all matrix elements from a flat row‑major buffer.
  *
- * The buffer must contain rows*cols elements of the matrix's element type
- * (double, qfloat_t, qcomplex_t, or dval_t* depending on A).
+ * The buffer must contain `rows * cols` elements of the matrix's element
+ * type: `number_t` for numeric matrices or `dval_t *` for symbolic matrices.
  *
  * @param A     The matrix to modify.
  * @param data  Pointer to a flat row‑major array of elements.
@@ -465,9 +485,10 @@ void mat_set_data(matrix_t *A, const void *data);
 /**
  * @brief Get all matrix elements into a flat row‑major buffer.
  *
- * The buffer must have space for rows*cols elements of the matrix's
- * element type (double, qfloat_t, qcomplex_t, or dval_t* depending on A).
- * For dval matrices, the copied handles are borrowed from the matrix.
+ * The buffer must have space for `rows * cols` elements of the matrix's
+ * element type: `number_t` for numeric matrices or `dval_t *` for symbolic
+ * matrices. For `dval` matrices, the copied handles are borrowed from the
+ * matrix.
  *
  * @param A     The matrix to read from.
  * @param data  Pointer to a flat row‑major array to receive the elements.
@@ -638,9 +659,9 @@ matrix_t *mat_jacobian(const matrix_t *A, dval_t *const *vars, size_t nvars);
 /**
  * @brief Compute the trace of a square matrix.
  *
- * The output buffer must match the matrix element type: `double`, `qfloat_t`,
- * `qcomplex_t`, or `dval_t *`. For symbolic matrices, a newly built symbolic
- * value is written through `trace`.
+ * For numeric matrices, `trace` must point to a `number_t`. For symbolic
+ * matrices, `trace` must point to a `dval_t *`, and a newly built symbolic
+ * value is written through it.
  *
  * @param A      Matrix whose trace is requested.
  * @param trace  Output buffer for the trace value.
@@ -651,9 +672,9 @@ int       mat_trace(const matrix_t *A, void *trace);
 /**
  * @brief Compute the determinant of a square matrix.
  *
- * The output buffer must match the matrix element type: `double`, `qfloat_t`,
- * `qcomplex_t`, or `dval_t *`. Symbolic `dval` matrices use the exact
- * symbolic determinant path.
+ * For numeric matrices, `determinant` must point to a `number_t`. For
+ * symbolic matrices, it must point to a `dval_t *`. Symbolic `dval` matrices
+ * use the exact symbolic determinant path.
  *
  * @param A            Matrix whose determinant is requested.
  * @param determinant  Output buffer for the determinant value.
@@ -828,15 +849,15 @@ matrix_t *mat_block_solve(const matrix_t *A, const matrix_t *B, size_t split);
  *
  * Example:
  * @code
- * double A_data[] = {
- *     0.0, 1.0,
- *     1.0, 1.0,
- *     2.0, 1.0
+ * number_t A_data[] = {
+ *     NUM_ZERO, num_create_from_double(1.0),
+ *     num_create_from_double(1.0), num_create_from_double(1.0),
+ *     num_create_from_double(2.0), num_create_from_double(1.0)
  * };
- * double B_data[] = {
- *     1.0,
- *     3.0,
- *     5.1
+ * number_t B_data[] = {
+ *     num_create_from_double(1.0),
+ *     num_create_from_double(3.0),
+ *     num_create_from_double(5.1)
  * };
  *
  * matrix_t *A = mat_create_num(3, 2, A_data);
@@ -910,27 +931,32 @@ matrix_t *mat_nullspace(const matrix_t *A);
 /**
  * @brief Compute a matrix norm.
  *
- * The selected norm is written to @p out as a qfloat_t regardless of the
- * element type of the input matrix.
+ * The selected norm is written to @p out as a `number_t`.
+ *
+ * @p out should point to a fresh or already-cleared `number_t`, such as a
+ * value previously initialised with `num_new()`.
  *
  * @param A     Input matrix.
  * @param type  Norm to compute.
  * @param out   Output location for the norm value.
  * @return      0 on success, nonzero on error.
  */
-int       mat_norm(const matrix_t *A, mat_norm_type_t type, qfloat_t *out);
+int       mat_norm(const matrix_t *A, mat_norm_type_t type, number_t *out);
 
 /**
  * @brief Compute a matrix condition number in a chosen norm.
  *
- * The condition number is written to @p out as a qfloat_t.
+ * The condition number is written to @p out as a `number_t`.
+ *
+ * @p out should point to a fresh or already-cleared `number_t`, such as a
+ * value previously initialised with `num_new()`.
  *
  * @param A     Input matrix.
  * @param type  Norm in which to compute the condition number.
  * @param out   Output location for the condition number.
  * @return      0 on success, nonzero on error.
  */
-int       mat_condition_number(const matrix_t *A, mat_norm_type_t type, qfloat_t *out);
+int       mat_condition_number(const matrix_t *A, mat_norm_type_t type, number_t *out);
 
 /**
  * @brief Compute an LU factorisation with pivoting.
@@ -1033,8 +1059,8 @@ void mat_svd_factor_free(mat_svd_factor_t *out);
  * It is especially useful for non-Hermitian eigenvalue problems and for matrix
  * functions such as exp(A), log(A), and sqrt(A).
  *
- * The returned factors are stored as qcomplex matrices even when the input is
- * real-valued, since a general real matrix may have complex Schur data.
+ * The returned factors are exposed as numeric matrices through the `number_t`
+ * layer, even when the underlying Schur data is complex.
  *
  * @param A    Input square matrix.
  * @param out  Output factorisation structure.
@@ -1136,12 +1162,15 @@ matrix_t *mat_simplify_symbolic(const matrix_t *A);
 matrix_t *mat_pow_int(const matrix_t *A, int n);
 
 /**
- * @brief Real power: A^s = exp(s * log(A)).
+ * @brief Number power: A^s = exp(s * log(A)).
+ *
+ * The exponent is supplied as a `number_t`, matching the matrix library's
+ * numeric element model directly.
  *
  * Requires A to have a well-defined matrix logarithm (positive definite
- * for real matrices).  Returns NULL on error.
+ * for real matrices). Returns NULL on error or if `s` is NULL.
  */
-matrix_t *mat_pow(const matrix_t *A, double s);
+matrix_t *mat_pow(const matrix_t *A, const number_t *s);
 
 /* -------------------------------------------------------------------------
    Debugging / I/O

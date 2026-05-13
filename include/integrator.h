@@ -120,7 +120,7 @@ size_t ig_get_interval_count_used(const integrator_t *ig);
  * @code
  *   integrator_t *ig = ig_new();
  *   number_t x0  = num_create_from_double(0.0);
- *   dval_t *x    = dv_new_var_num(x0);
+ *   dval_t *x    = dv_new_var(x0);
  *   dval_t *expr = dv_sin(x);
  *   qfloat_t result, err;
  *   ig_single_integral(ig, expr, x, qf_from_double(0.0), QF_PI, &result, &err);
@@ -131,7 +131,7 @@ size_t ig_get_interval_count_used(const integrator_t *ig);
  * @param ig         Integrator handle.
  * @param expr       dval_t expression representing the integrand f(x).
  * @param x_var      Variable node in @p expr representing x.  Must have been
- *                   created with dv_new_var_num() or dv_new_named_var_num().
+ *                   created with dv_new_var() or dv_new_named_var().
  * @param a          Lower bound.
  * @param b          Upper bound.
  * @param result     Receives the integral estimate.
@@ -220,8 +220,8 @@ int ig_triple_integral(integrator_t *ig, dval_t *expr,
  *   integrator_t *ig = ig_new();
  *   number_t x0 = num_create_from_double(0.0);
  *   number_t y0 = num_create_from_double(0.0);
- *   dval_t *x = dv_new_var_num(x0);
- *   dval_t *y = dv_new_var_num(y0);
+ *   dval_t *x = dv_new_var(x0);
+ *   dval_t *y = dv_new_var(y0);
  *   dval_t *expr = dv_add(x, y);
  *   dval_t *vars[2] = { x, y };
  *   qfloat_t lo[2] = { qf_from_double(0.0), qf_from_double(0.0) };

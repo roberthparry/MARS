@@ -89,7 +89,7 @@ static dval_t *make_f(dval_t *x) {
     number_t seven = num_create_from_long(7);
     dval_t *sinx   = dv_sin(x);
     dval_t *exp_sx = dv_exp(sinx);
-    dval_t *x2     = dv_pow_num(x, &two);
+    dval_t *x2     = dv_pow(x, &two);
     dval_t *term2  = dv_mul_num(x2, &three);
     dval_t *f0     = dv_add(exp_sx, term2);
     dval_t *f      = dv_sub_num(f0, &seven);
@@ -117,7 +117,7 @@ int main(void) {
     number_t d2_val;
 
     num_set_default_prec_bits(384);
-    x = dv_new_named_var_num(x0, "x");
+    x = dv_new_named_var(x0, "x");
     num_destroy(&x0);
     f = make_f(x);
     df_dx = dv_create_deriv(f, x);
@@ -127,9 +127,9 @@ int main(void) {
     printf("f'(x)   = "); dv_print(df_dx);
     printf("f''(x)  = "); dv_print(d2f_dx);
 
-    f_val = dv_eval_num(f);
-    d1_val = dv_eval_num(df_dx);
-    d2_val = dv_eval_num(d2f_dx);
+    f_val = dv_eval(f);
+    d1_val = dv_eval(df_dx);
+    d2_val = dv_eval(d2f_dx);
 
     printf("\nAt x = 1.25 (384 bits):\n");
     num_printf("f(x)    = %.101N\n", f_val);
@@ -203,9 +203,9 @@ int main(void) {
     printf("f'(x)   = "); dv_print(df_dx);
     printf("f''(x)  = "); dv_print(d2f_dx);
 
-    f_val = dv_eval_num(f);
-    d1_val = dv_eval_num(df_dx);
-    d2_val = dv_eval_num(d2f_dx);
+    f_val = dv_eval(f);
+    d1_val = dv_eval(df_dx);
+    d2_val = dv_eval(d2f_dx);
 
     printf("\nAt x = 1.25 (384 bits):\n");
     num_printf("f(x)    = %.101N\n", f_val);
@@ -254,12 +254,12 @@ int main(void) {
     number_t two = num_create_from_long(2);
     number_t x0 = num_create_from_string("1");
     number_t y0 = num_create_from_string("2");
-    dval_t *x  = dv_new_named_var_num(x0, "x");
-    dval_t *y  = dv_new_named_var_num(y0, "y");
+    dval_t *x  = dv_new_named_var(x0, "x");
+    dval_t *y  = dv_new_named_var(y0, "y");
 
-    dval_t *x2 = dv_pow_num(x, &two);
+    dval_t *x2 = dv_pow(x, &two);
     dval_t *xy = dv_mul(x, y);
-    dval_t *y2 = dv_pow_num(y, &two);
+    dval_t *y2 = dv_pow(y, &two);
     dval_t *t0 = dv_add(x2, xy);
     dval_t *f  = dv_add(t0, y2);
 
@@ -275,18 +275,18 @@ int main(void) {
     num_destroy(&y0);
     num_destroy(&x0);
     printf("At x=1, y=2 (384 bits):\n");
-    num_printf("f          = %.101N\n", dv_eval_num(f));          /* 7 */
-    num_printf("∂f/∂x      = %.101N\n", dv_eval_num(df_dx));     /* 4 */
-    num_printf("∂f/∂y      = %.101N\n", dv_eval_num(df_dy));     /* 5 */
-    num_printf("∂²f/∂x∂y   = %.101N\n", dv_eval_num(d2f_dxdy)); /* 1 */
+    num_printf("f          = %.101N\n", dv_eval(f));          /* 7 */
+    num_printf("∂f/∂x      = %.101N\n", dv_eval(df_dx));     /* 4 */
+    num_printf("∂f/∂y      = %.101N\n", dv_eval(df_dy));     /* 5 */
+    num_printf("∂²f/∂x∂y   = %.101N\n", dv_eval(d2f_dxdy)); /* 1 */
 
     /* Update x=3 — cached partials recompute automatically */
     x0 = num_create_from_string("3");
-    dv_set_val_num(x, x0);
+    dv_set_val(x, x0);
     num_destroy(&x0);
     printf("\nAfter x=3:\n");
-    num_printf("∂f/∂x      = %.101N\n", dv_eval_num(df_dx));     /* 8 */
-    num_printf("∂f/∂y      = %.101N\n", dv_eval_num(df_dy));     /* 7 */
+    num_printf("∂f/∂x      = %.101N\n", dv_eval(df_dx));     /* 8 */
+    num_printf("∂f/∂y      = %.101N\n", dv_eval(df_dy));     /* 7 */
 
     dv_free(d2f_dxdy);
     dv_free(df_dy);
@@ -320,7 +320,7 @@ you only need to evaluate it and don't want to manage another owning handle:
 
 ```c
 const dval_t *p = dv_get_deriv(f, x);   /* borrowed — do NOT free */
-num_printf("∂f/∂x = %.101N\n", dv_eval_num(p));
+num_printf("∂f/∂x = %.101N\n", dv_eval(p));
 ```
 
 The result is cached: repeated calls to `dv_get_deriv` with the same `wrt` variable
@@ -340,8 +340,8 @@ in a single pass than to build one symbolic derivative expression per variable.
 int main(void) {
     number_t x0 = num_create_from_string("1");
     number_t y0 = num_create_from_string("2");
-    dval_t *x = dv_new_named_var_num(x0, "x");
-    dval_t *y = dv_new_named_var_num(y0, "y");
+    dval_t *x = dv_new_named_var(x0, "x");
+    dval_t *y = dv_new_named_var(y0, "y");
     dval_t *xy = dv_mul(x, y);
     dval_t *sin_xy = dv_sin(xy);
     dval_t *exp_xy = dv_exp(sin_xy);
@@ -395,7 +395,7 @@ Expressions are stored as a directed acyclic graph. Each node is one of:
 
 - **constant** — a fixed `number_t` value, optionally named
 - **variable** — a mutable `number_t` value, optionally named; changing it via
-  `dv_set_val_num()` invalidates the cached primal and derivative values in all
+  `dv_set_val()` invalidates the cached primal and derivative values in all
   ancestor nodes
 - **unary operator** — wraps one child (e.g. `sin`, `exp`, `sqrt`)
 - **binary operator** — wraps two children (e.g. `+`, `*`, `pow`)
@@ -431,9 +431,9 @@ retain their children (increment their refcounts) but do not steal ownership.
 
 ### Evaluation
 
-`dv_eval_num()` walks the DAG bottom-up, caching the `number_t` result in each
-node. Subsequent calls without any `dv_set_val_num()` mutation return the cached
-result immediately. Setting a variable's value with `dv_set_val_num()` marks
+`dv_eval()` walks the DAG bottom-up, caching the `number_t` result in each
+node. Subsequent calls without any `dv_set_val()` mutation return the cached
+result immediately. Setting a variable's value with `dv_set_val()` marks
 the cache invalid in the variable node; ancestor caches are invalidated lazily
 on the next evaluation pass.
 
@@ -451,35 +451,35 @@ All public declarations are in `include/dval.h`.
 
 ### Constructors — Constants
 
-- `dval_t *dv_new_const_num(number_t x)` — constant node from a `number_t`
-- `dval_t *dv_new_named_const_num(number_t x, const char *name)` — named constant from a `number_t`
+- `dval_t *dv_new_const(number_t x)` — constant node from a `number_t`
+- `dval_t *dv_new_named_const(number_t x, const char *name)` — named constant from a `number_t`
 
 ### Constructors — Variables
 
-- `dval_t *dv_new_var_num(number_t x)` — variable node from a `number_t`
-- `dval_t *dv_new_named_var_num(number_t x, const char *name)` — named variable from a `number_t`
+- `dval_t *dv_new_var(number_t x)` — variable node from a `number_t`
+- `dval_t *dv_new_named_var(number_t x, const char *name)` — named variable from a `number_t`
 
 ### Mutators
 
-- `void dv_set_val_num(dval_t *dv, number_t value)` — set the primal value from a `number_t`
+- `void dv_set_val(dval_t *dv, number_t value)` — set the primal value from a `number_t`
 - `void dv_set_name(dval_t *dv, const char *name)` — set or replace the symbolic name
 
 ### Accessors
 
-- `number_t dv_get_val_num(const dval_t *dv)` — return the current primal value as an owning `number_t`
+- `number_t dv_get_val(const dval_t *dv)` — return the current primal value as an owning `number_t`
 - `const dval_t *dv_get_deriv(const dval_t *expr, const dval_t *wrt)` — return the
   cached ∂expr/∂wrt node as a **borrowed** pointer; do **not** free it. Built
   lazily on first call; subsequent calls with the same `wrt` return the cached node.
 
 ### Evaluation
 
-- `number_t dv_eval_num(const dval_t *dv)` — evaluate and return an owning `number_t`
+- `number_t dv_eval(const dval_t *dv)` — evaluate and return an owning `number_t`
 - `int dv_eval_derivatives(const dval_t *expr, size_t nvars, const dval_t *const *vars, number_t *value_out, number_t *derivs_out)` — reverse-mode derivative evaluation returning owning `number_t` primal and derivative results
 
 ### Derivative Construction (owning)
 
 All returned handles must be freed by the caller. `wrt` must be a variable node
-(created with `dv_new_var_num()` or `dv_new_named_var_num()`) that appears in the expression
+(created with `dv_new_var()` or `dv_new_named_var()`) that appears in the expression
 DAG. All other variable nodes in the graph are treated as constants. If `wrt`
 is a named constant node, the result is symbolic `NaN`.
 
@@ -526,8 +526,8 @@ All functions return owning handles.
 - `dval_t *dv_exp(dval_t *dv)` — natural exponential
 - `dval_t *dv_log(dval_t *dv)` — natural logarithm
 - `dval_t *dv_sqrt(dval_t *dv)` — square root
-- `dval_t *dv_pow_num(dval_t *dv, const number_t *exponent)` — `dv ^ exponent` (borrowed scalar exponent)
-- `dval_t *dv_pow(dval_t *dv1, dval_t *dv2)` — `dv1 ^ dv2`
+- `dval_t *dv_pow(const dval_t *dv, const number_t *exponent)` — `dv ^ exponent` (borrowed scalar numeric exponent)
+- `dval_t *dv_pow_dv(const dval_t *dv1, const dval_t *dv2)` — `dv1 ^ dv2`
 
 ### Special Functions (owning)
 

@@ -156,7 +156,7 @@ static dval_t *make_f(dval_t *x) {
     number_t seven = num_create_from_long(7);
     dval_t *sinx   = dv_sin(x);
     dval_t *exp_sx = dv_exp(sinx);
-    dval_t *x2     = dv_pow_num(x, &two);
+    dval_t *x2     = dv_pow(x, &two);
     dval_t *term2  = dv_mul_num(x2, &three);
     dval_t *f0     = dv_add(exp_sx, term2);
     dval_t *f      = dv_sub_num(f0, &seven);
@@ -184,7 +184,7 @@ int main(void) {
     number_t d2_val;
 
     num_set_default_prec_bits(384);
-    x = dv_new_named_var_num(x0, "x");
+    x = dv_new_named_var(x0, "x");
     num_destroy(&x0);
     f = make_f(x);
     df_dx = dv_create_deriv(f, x);
@@ -194,9 +194,9 @@ int main(void) {
     printf("f'(x)   = "); dv_print(df_dx);
     printf("f''(x)  = "); dv_print(d2f_dx);
 
-    f_val = dv_eval_num(f);
-    d1_val = dv_eval_num(df_dx);
-    d2_val = dv_eval_num(d2f_dx);
+    f_val = dv_eval(f);
+    d1_val = dv_eval(df_dx);
+    d2_val = dv_eval(d2f_dx);
 
     printf("\nAt x = 1.25 (384 bits):\n");
     num_printf("f(x)    = %.101N\n", f_val);

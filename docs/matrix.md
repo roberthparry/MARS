@@ -51,7 +51,7 @@ materialisation, and destruction are reference-count safe.
 What currently works for `dval` matrices:
 
 - construction in dense, sparse, identity, diagonal, and compatible structured layouts
-- string-based construction through `mat_from_string(...)` for real, complex, and symbolic matrices
+- string-based construction through `mat_from_string(...)` and `mat_from_string_dv(...)` for real, complex, and symbolic matrices
 - element access, copy, transpose, conjugate
 - add, subtract, multiply
 - scalar multiply/divide through the normal promotion rules
@@ -95,7 +95,7 @@ int main(void) {
      *   [ 2    1+i ]
      *   [ 1-i  3   ]
      */
-    matrix_t *A = mat_from_string("(2, 1+i; 1-i, 3)", NULL);
+    matrix_t *A = mat_from_string("(2, 1+i; 1-i, 3)");
     number_t eigenvalues[2] = {num_new(), num_new()};
     matrix_t *evecs = NULL;
 
@@ -136,7 +136,7 @@ keyboard:
 int main(void)
 {
     mat_bindings_t *bindings = NULL;
-    matrix_t *H = mat_from_string(
+    matrix_t *H = mat_from_string_dv(
         "{ (@DELTA, @OMEGA; @OMEGA, -@DELTA) | @DELTA = 1.5; @OMEGA = 0.25 }",
         &bindings);
     dval_t *delta = mat_bindings_get(bindings, "@DELTA");
@@ -217,7 +217,7 @@ int main(void)
     mat_bindings_t *bindings = NULL;
     number_t delta = num_create_from_double(1.5);
     number_t omega = num_create_from_double(0.25);
-    matrix_t *H = mat_from_string(
+    matrix_t *H = mat_from_string_dv(
         "(@DELTA, @OMEGA; @OMEGA, -@DELTA)",
         &bindings);
     matrix_t *H2 = mat_pow_int(H, 2);
@@ -226,8 +226,8 @@ int main(void)
     dval_t *trace = NULL;
     dval_t *c2 = NULL;
 
-    dv_set_val_num(mat_bindings_get(bindings, "@DELTA"), delta);
-    dv_set_val_num(mat_bindings_get(bindings, "@OMEGA"), omega);
+    dv_set_val(mat_bindings_get(bindings, "@DELTA"), delta);
+    dv_set_val(mat_bindings_get(bindings, "@OMEGA"), omega);
 
     mat_eigenvalues(H, evals);
     mat_trace(H, &trace);
@@ -960,15 +960,16 @@ Computes `Aⁿ` via binary exponentiation. `n` may be zero (returns the
 identity), positive, or negative (uses `mat_inverse` internally). Returns NULL
 if `A` is NULL, not square, or inversion fails when `n < 0`.
 
-#### Real power
+#### Number power
 
 ```c
-matrix_t *mat_pow(const matrix_t *A, double s);
+matrix_t *mat_pow(const matrix_t *A, const number_t *s);
 ```
 
-Computes `Aˢ = exp(s · log(A))`. Requires `A` to have a well-defined matrix
-logarithm — positive definite real matrices always satisfy this. Returns NULL
-on any error (NULL input, non-square, `mat_log` failure).
+Computes `Aˢ = exp(s · log(A))` for a borrowed numeric exponent `s`. Requires
+`A` to have a well-defined matrix logarithm — positive definite real matrices
+always satisfy this. Returns NULL on any error (NULL input, NULL exponent,
+non-square matrix, or `mat_log` failure).
 
 ### Debugging / I/O
 
@@ -983,7 +984,8 @@ every cell.
 ```c
 typedef struct mat_bindings_t mat_bindings_t;
 
-matrix_t *mat_from_string(const char *s, mat_bindings_t **bnd_out);
+matrix_t *mat_from_string(const char *s);
+matrix_t *mat_from_string_dv(const char *s, mat_bindings_t **bnd_out);
 dval_t *mat_bindings_get(mat_bindings_t *bnd, const char *name);
 void mat_bindings_free(mat_bindings_t *bnd);
 matrix_t *mat_deriv_by_name(const matrix_t *A, mat_bindings_t *bindings, const char *name);
@@ -999,7 +1001,7 @@ int mat_sprintf(char *out, size_t out_size, const char *fmt, ...);
 int mat_printf(const char *fmt, ...);
 ```
 
-`mat_from_string(...)` accepts three main forms:
+`mat_from_string(...)` and `mat_from_string_dv(...)` accept three main forms:
 
 - purely numeric matrices such as `(1, 2; 3, 4)`
 - wrapped symbolic matrices such as `{ (x, 1; 1, c1) | x = 2; c1 = 3 }`
@@ -1009,6 +1011,19 @@ Numeric input produces a `MAT_TYPE_NUMBER` matrix. Complex syntax such as
 `1+i` or exact rational syntax such as `2/3` is preserved through the
 underlying `number_t` values. Symbolic input produces a `MAT_TYPE_DVAL`
 matrix.
+
+`mat_from_string(...)` always returns a numeric matrix (`MAT_TYPE_NUMBER`) or
+`NULL`:
+
+- purely numeric input returns a numeric matrix
+- symbolic input is accepted and evaluated to numeric only if every referenced
+  symbol resolves to a concrete numeric value
+- if any required symbol remains unbound (for example bare variables or
+  partially bound wrapped input), it returns `NULL`
+
+`mat_from_string_dv(...)` is the symbolic-capable entry point. It returns a
+`MAT_TYPE_DVAL` matrix for symbolic input and optionally returns bindings
+through `bnd_out`.
 
 Rows are separated by semicolons and columns by commas. The outer `{ ... | ... }`
 wrapper, when present, still carries one binding section for the entire matrix.
@@ -1024,7 +1039,8 @@ operators as `dval`, including:
 - powers such as `x²`, `x^2`, `x^1.5`, and `sin^2(x)`
 - the usual unary and binary `dval` functions supported by `dval_from_string(...)`
 
-For bare symbolic input, the whole matrix is treated as if it had an implicit
+For bare symbolic input, `mat_from_string_dv(...)` treats the whole matrix as
+if it had an implicit
 matrix-wide binding block with no assigned values yet. In other words, a bare
 symbolic matrix behaves like the wrapped form with every discovered symbol
 initialised to `NaN`, ready to be filled in later through the returned
@@ -1061,12 +1077,12 @@ For compatibility, the older bracket-row forms such as `[[1 2][3 4]]` are still
 accepted on input, but the separator-based parenthesised form above is now the
 canonical matrix syntax and the format emitted by `mat_to_string(...)`.
 
-If `bnd_out` is non-NULL, `mat_from_string(...)` returns an opaque bindings
+If `bnd_out` is non-NULL, `mat_from_string_dv(...)` returns an opaque bindings
 object for the names actually referenced by the matrix entries. Use
 `mat_bindings_get(...)` to retrieve the borrowed underlying `dval_t *` leaf,
 and release the bindings object itself with `mat_bindings_free(...)` when it
 is no longer needed. The borrowed `dval_t *` handles remain valid only while
-the matrix returned by `mat_from_string(...)` remains alive.
+the matrix returned by `mat_from_string_dv(...)` remains alive.
 
 To assign a value, look up the binding and update the returned `dval_t *`
 through the ordinary `dval` API:
@@ -1074,9 +1090,9 @@ through the ordinary `dval` API:
 ```c
 mat_bindings_t *bindings = NULL;
 number_t x = num_create_from_double(2.0);
-matrix_t *A = mat_from_string("(x, c1; x*y, [radius])", &bindings);
+matrix_t *A = mat_from_string_dv("(x, c1; x*y, [radius])", &bindings);
 
-dv_set_val_num(mat_bindings_get(bindings, "x"), x);
+dv_set_val(mat_bindings_get(bindings, "x"), x);
 
 num_destroy(&x);
 mat_bindings_free(bindings);
