@@ -1,6 +1,7 @@
 #include "mfloat_internal.h"
 #include "mfloat_coeff_tables.h"
 #include "internal/mint_internal.h"
+#include "internal/number_scope_alloc.h"
 #include "internal/mrational_internal.h"
 #include "mrational.h"
 
@@ -220,7 +221,7 @@ static void mfloat_scratch_reset_slot(mfloat_scratch_slot_t *slot, size_t precis
 
 static void mfloat_scratch_release_slot(mfloat_scratch_slot_t *slot)
 {
-    free(slot->mantissa.storage);
+    number_scope_mem_free(slot->mantissa.storage);
     slot->mantissa.storage = NULL;
     slot->mantissa.sign = 0;
     slot->mantissa.length = 0;

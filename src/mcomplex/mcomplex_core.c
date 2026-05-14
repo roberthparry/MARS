@@ -4,6 +4,7 @@
 #include <math.h>
 
 #include "mcomplex_internal.h"
+#include "internal/number_scope_alloc.h"
 #include "../mfloat/mfloat_internal.h"
 #include "internal/mfloat_internal.h"
 
@@ -179,12 +180,13 @@ mcomplex_t *mc_new(void)
 
 mcomplex_t *mc_new_prec(size_t precision_bits)
 {
-    mcomplex_t *mcomplex = calloc(1, sizeof(*mcomplex));
+    mcomplex_t *mcomplex =
+        (mcomplex_t *)number_scope_mem_calloc(1u, sizeof(*mcomplex), _Alignof(mcomplex_t));
 
     if (!mcomplex)
         return NULL;
     if (mcomplex_alloc_parts(mcomplex, precision_bits) != 0) {
-        free(mcomplex);
+        number_scope_mem_free(mcomplex);
         return NULL;
     }
     return mcomplex;
@@ -253,7 +255,7 @@ void mc_free(mcomplex_t *mcomplex)
         mf_free(mcomplex->real);
         mf_free(mcomplex->imag);
     }
-    free(mcomplex);
+    number_scope_mem_free(mcomplex);
 }
 
 void mc_clear(mcomplex_t *mcomplex)

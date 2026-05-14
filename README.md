@@ -142,6 +142,12 @@ int main(void) {
 2 + 5/6 = 17/6
 ```
 
+For temporary-heavy internal code, `number_t` also supports optional lifetime
+scopes. The intended fast pattern is to keep short-lived intermediates inside
+the active scope while keeping rolling or returned values as ordinary owned
+`number_t` results. See [`docs/number.md`](docs/number.md) for the scope
+semantics and the `bench_number_scope` benchmark notes.
+
 **Automatic differentiation with `dval_t`:**
 
 ```c

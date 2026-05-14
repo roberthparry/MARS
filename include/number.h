@@ -65,6 +65,28 @@ typedef struct _number_t {
     uint64_t storage[5];
 } number_t;
 
+/**
+ * @brief Temporary lifetime scope for heap-backed `number_t` results.
+ *
+ * While a scope is active, newly created heap-backed temporary results are
+ * reclaimed automatically by `num_scope_leave()`, unless they are explicitly
+ * detached first. This is meant for temporary-heavy internal code paths that
+ * would otherwise create and destroy many short-lived `number_t` values.
+ *
+ * The best-performing pattern is usually:
+ * - keep short-lived intermediates inside the active scope
+ * - keep any rolling or returned value as an ordinary owned `number_t`
+ * - detach only when a scoped result truly needs to survive the scope
+ *
+ * Callers should treat the fields as opaque and only manipulate the object
+ * through the `num_scope_*` APIs.
+ */
+typedef struct num_scope_t {
+    void *records;
+    struct num_scope_t *previous;
+    int active;
+} num_scope_t;
+
 /** @name Lifecycle
  * Constructors and pure transforms in this section return a live `number_t`
  * by value. Call `num_destroy(&value)` when the returned value is no longer
@@ -237,6 +259,32 @@ number_t num_clone(const number_t number);
  * independent copy with `num_clone()`.
  */
 void num_destroy(number_t *number);
+/** @} */
+
+/** @name Temporary scopes
+ * Implicit scopes for temporary heap-backed numeric results.
+ *
+ * Outside any active scope, constructors and arithmetic helpers behave as
+ * usual and callers should release returned live values with `num_destroy()`.
+ *
+ * Inside an active scope, newly created heap-backed results are reclaimed
+ * automatically when the scope is left. Such temporaries must not outlive the
+ * scope unless they are detached from it first with `num_scope_detach()`.
+ * Detaching a plain heap-backed scoped value transfers that existing value out
+ * of the scope. Detaching an arena-backed scoped value materialises an
+ * ordinary owning copy so it can survive scope teardown safely.
+ *
+ * In hot paths, scopes work best for short-lived intermediates. Rolling state
+ * that is updated repeatedly should usually remain an ordinary owned value and
+ * be destroyed explicitly when replaced, rather than being repeatedly detached.
+ *
+ * Scopes are nestable and must be left in last-in, first-out order.
+ * @{
+ */
+void num_scope_enter(num_scope_t *scope);
+void num_scope_leave(num_scope_t *scope);
+bool num_scope_is_active(void);
+number_t num_scope_detach(number_t value);
 /** @} */
 
 /** @name Precision, setup, and conversion

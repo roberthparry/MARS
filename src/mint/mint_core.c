@@ -1,4 +1,5 @@
 #include "mint_internal.h"
+#include "internal/number_scope_alloc.h"
 
 #include <ctype.h>
 #include <limits.h>
@@ -138,6 +139,7 @@ int mint_ensure_capacity(mint_t *mint, size_t needed)
 {
     uint64_t *grown;
     size_t new_cap;
+    bool scope_owned;
 
     if (!mint)
         return -1;
@@ -155,7 +157,18 @@ int mint_ensure_capacity(mint_t *mint, size_t needed)
         }
     }
 
-    grown = realloc(mint->storage, new_cap * sizeof(*grown));
+    scope_owned = number_scope_mem_is_arena_ptr(mint) ||
+        number_scope_mem_is_arena_ptr(mint->storage);
+    if (scope_owned) {
+        grown = (uint64_t *)number_scope_mem_realloc(mint->storage,
+            new_cap * sizeof(*grown), _Alignof(uint64_t));
+    } else if (mint->storage) {
+        grown = (uint64_t *)number_scope_mem_realloc(mint->storage,
+            new_cap * sizeof(*grown), _Alignof(uint64_t));
+    } else {
+        grown = (uint64_t *)number_scope_mem_alloc_heap(
+            new_cap * sizeof(*grown), _Alignof(uint64_t));
+    }
     if (!grown)
         return -1;
 
@@ -3107,7 +3120,7 @@ int mint_factor_recursive(const mint_t *n, mint_factors_t *factors)
 }
 mint_t *mi_new(void)
 {
-    mint_t *mint = calloc(1, sizeof(*mint));
+    mint_t *mint = (mint_t *)number_scope_mem_calloc(1u, sizeof(*mint), _Alignof(mint_t));
 
     if (!mint)
         return NULL;
@@ -3178,7 +3191,7 @@ void mi_clear(mint_t *mint)
     if (!mint || mint_is_immortal(mint))
         return;
 
-    free(mint->storage);
+    number_scope_mem_free(mint->storage);
     mint->storage = NULL;
     mint->sign = 0;
     mint->length = 0;
@@ -3189,7 +3202,7 @@ void mi_free(mint_t *mint)
     if (!mint || mint_is_immortal(mint))
         return;
     mi_clear(mint);
-    free(mint);
+    number_scope_mem_free(mint);
 }
 int mi_set_long(mint_t *mint, long value)
 {

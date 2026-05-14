@@ -24,6 +24,7 @@
 #include <string.h>
 
 #include "dval_internal.h"
+#include "number/number_internal.h"
 
 /* forward declaration — helpers below call dv_simplify recursively */
 dval_t *dv_simplify(const dval_t *dv);
@@ -95,27 +96,46 @@ static void collect_mul_flat(
     number_t *c_acc, int *is_zero,
     dval_t ***terms, size_t *nterms, size_t *cap)
 {
-    if (*is_zero) return;
+    num_scope_t scope;
+
+    num_scope_enter(&scope);
+    if (*is_zero) {
+        num_scope_leave(&scope);
+        return;
+    }
 
     if (dv_is_unnamed_const(dv) && num_is_real(dv->c)) {
-        if (num_is_zero(dv->c)) { *is_zero = 1; return; }
+        if (num_is_zero(dv->c)) {
+            *is_zero = 1;
+            num_scope_leave(&scope);
+            return;
+        }
         {
+            num_scope_t *saved_scope = number_scope_suspend();
             number_t product = num_mul(*c_acc, dv->c);
+
+            number_scope_resume(saved_scope);
 
             num_destroy(c_acc);
             *c_acc = product;
         }
+        num_scope_leave(&scope);
         return;
     }
     if (dv_is_op(dv, &ops_neg)) {
+        num_scope_t *saved_scope = number_scope_suspend();
         number_t negated = num_neg(*c_acc);
+
+        number_scope_resume(saved_scope);
 
         num_destroy(c_acc);
         *c_acc = negated;
+        num_scope_leave(&scope);
         collect_mul_flat(dv->a, c_acc, is_zero, terms, nterms, cap);
         return;
     }
     if (dv_is_op(dv, &ops_mul)) {
+        num_scope_leave(&scope);
         collect_mul_flat(dv->a, c_acc, is_zero, terms, nterms, cap);
         collect_mul_flat(dv->b, c_acc, is_zero, terms, nterms, cap);
         return;
@@ -126,6 +146,7 @@ static void collect_mul_flat(
     }
     dv_retain(dv);
     (*terms)[(*nterms)++] = dv;
+    num_scope_leave(&scope);
 }
 
 /* ========================================================================= */

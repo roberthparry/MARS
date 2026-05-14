@@ -157,6 +157,56 @@ number_t pi = NUM_PI;
 num_destroy(&pi);
 ```
 
+## Temporary Scopes
+
+`number_t` also supports optional temporary scopes for heap-backed results.
+
+Outside any active scope, constructors and arithmetic helpers behave normally:
+
+- functions returning `number_t` return an owning live value
+- callers later release that value with `num_destroy(...)`
+
+Inside an active scope:
+
+- newly created heap-backed temporary results are reclaimed automatically by
+  `num_scope_leave(...)`
+- scoped temporaries must not outlive the scope unless they are detached first
+  with `num_scope_detach(...)`
+
+Detaching behaves differently depending on how the scoped value is stored:
+
+- plain heap-backed scoped values are transferred out of the scope directly
+- arena-backed scoped values are copied into an ordinary owning value so they
+  can survive scope teardown safely
+
+Example:
+
+```c
+num_scope_t scope = {0};
+num_scope_enter(&scope);
+
+number_t a = num_create_from_string("1/3");
+number_t b = num_create_from_string("1/6");
+number_t sum = num_add(a, b);
+number_t kept = num_scope_detach(sum);
+
+num_scope_leave(&scope);
+
+/* kept is still live here */
+num_destroy(&kept);
+num_destroy(&b);
+num_destroy(&a);
+```
+
+The intended fast pattern is:
+
+- put only short-lived intermediates inside the scope
+- keep rolling state or returned values as ordinary owned `number_t` values
+- destroy that rolling state explicitly when replacing it
+
+That avoids repeated detach/copy work and lets the scope reclaim the cheap
+temporary churn.
+
 ## Formatting
 
 `number_t` provides its own formatting helpers:
@@ -330,6 +380,29 @@ across the same broad slice used for the native `mfloat` benchmark.
 Benchmark source:
 
 - [`bench/number/bench_number_maths.c`](../bench/number/bench_number_maths.c)
+
+There is also a scope-focused benchmark target:
+
+```sh
+make bench_number_scope
+```
+
+That benchmark compares:
+
+- ordinary manual ownership with explicit `num_destroy(...)`
+- broad whole-scope temporary accumulation
+- the preferred `scoped temporaries + owned rolling state` pattern
+
+Recent sample results on this tree showed the preferred rolling pattern beating
+the fully manual path, while the "scope everything and destroy nothing until
+leave" pattern remained slower:
+
+```text
+mfloat chain             manual=1450.786 ms  scoped=1977.505 ms  ratio= 0.734x
+mfloat scoped+roll       manual=1450.786 ms  scoped=1071.234 ms  ratio= 1.354x
+mcomplex chain           manual= 422.498 ms  scoped= 968.822 ms  ratio= 0.436x
+mcomplex scoped+roll     manual= 422.498 ms  scoped= 332.915 ms  ratio= 1.269x
+```
 
 Run it from the repository root with:
 

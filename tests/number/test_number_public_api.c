@@ -59,4 +59,54 @@ void run_number_public_api_tests(void)
         num_destroy(&pi_cloned);
         num_destroy(&i_cloned);
     }
+
+    {
+        num_scope_t outer = {0};
+        num_scope_t inner = {0};
+        number_t one_third = num_create_from_string("1/3");
+        number_t one_sixth = num_create_from_string("1/6");
+        number_t two = num_create_from_long(2);
+        number_t five = num_create_from_long(5);
+        number_t one = num_create_from_long(1);
+        number_t sum;
+        number_t detached;
+        number_t outer_sum;
+        number_t inner_sum;
+        number_t inner_promoted;
+
+        ASSERT_TRUE(!num_scope_is_active());
+
+        num_scope_enter(&outer);
+        ASSERT_TRUE(num_scope_is_active());
+
+        sum = num_add(one_third, one_sixth);
+        detached = num_scope_detach(sum);
+        assert_number_string("num_scope_detach(scoped 1/3 + 1/6)", detached, "1/2");
+
+        num_scope_leave(&outer);
+        ASSERT_TRUE(!num_scope_is_active());
+
+        assert_number_string("detached scoped result survives leave", detached, "1/2");
+        num_destroy(&detached);
+
+        num_scope_enter(&outer);
+        outer_sum = num_add(two, five);
+        num_scope_enter(&inner);
+        inner_sum = num_add(outer_sum, one);
+        inner_promoted = num_scope_detach(inner_sum);
+        num_scope_leave(&inner);
+
+        assert_number_string("nested detached scoped result", inner_promoted, "8");
+
+        num_destroy(&outer_sum);
+        num_scope_leave(&outer);
+        ASSERT_TRUE(!num_scope_is_active());
+
+        num_destroy(&inner_promoted);
+        num_destroy(&one);
+        num_destroy(&five);
+        num_destroy(&two);
+        num_destroy(&one_third);
+        num_destroy(&one_sixth);
+    }
 }

@@ -174,6 +174,12 @@ Available benchmark target:
 make bench_number_maths
 ```
 
+There is also a scope-focused benchmark target:
+
+```sh
+make bench_number_scope
+```
+
 This benchmark mirrors the `mfloat` maths coverage through the generic
 `number_t` API, including:
 
@@ -189,6 +195,23 @@ Because `number_t` accepts exact integer and rational inputs as well as
 floating-point values, this benchmark is useful for measuring the combined cost
 of generic promotion, backend dispatch, and the underlying maths implementation
 on the same workloads used by `bench_mfloat_maths`.
+
+The scope benchmark focuses specifically on temporary-lifetime management. It
+compares:
+
+- fully manual ownership with explicit `num_destroy(...)`
+- broad whole-scope temporary accumulation
+- the preferred pattern of scoped short-lived intermediates plus an ordinary
+  owned rolling result
+
+Current sample timings on the benchmark machine for that scope benchmark:
+
+```text
+mfloat chain             manual=1450.786 ms  scoped=1977.505 ms  ratio= 0.734x
+mfloat scoped+roll       manual=1450.786 ms  scoped=1071.234 ms  ratio= 1.354x
+mcomplex chain           manual= 422.498 ms  scoped= 968.822 ms  ratio= 0.436x
+mcomplex scoped+roll     manual= 422.498 ms  scoped= 332.915 ms  ratio= 1.269x
+```
 
 Current sample timings on the benchmark machine:
 

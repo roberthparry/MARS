@@ -1,4 +1,5 @@
 #include "internal/mint_internal.h"
+#include "internal/number_scope_alloc.h"
 #include "mrational_internal.h"
 
 #include <ctype.h>
@@ -197,7 +198,8 @@ const mrational_t * const MR_ONE_TENTH = &MR_ONE_TENTH_VALUE;
 
 mrational_t *mr_new(void)
 {
-    mrational_t *rational = calloc(1, sizeof(*rational));
+    mrational_t *rational =
+        (mrational_t *)number_scope_mem_calloc(1u, sizeof(*rational), _Alignof(mrational_t));
 
     if (!rational)
         return NULL;
@@ -286,7 +288,7 @@ void mr_free(mrational_t *rational)
         return;
     mi_free(rational->numerator);
     mi_free(rational->denominator);
-    free(rational);
+    number_scope_mem_free(rational);
 }
 
 void mr_clear(mrational_t *rational)

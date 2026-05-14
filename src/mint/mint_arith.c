@@ -1,4 +1,5 @@
 #include "mint_internal.h"
+#include "internal/number_scope_alloc.h"
 
 #include <limits.h>
 #include <stdlib.h>
@@ -356,13 +357,15 @@ int mi_square(mint_t *mint)
     src = mint->storage;
     len = mint->length;
     needed = len * 2;
-    out = calloc(needed, sizeof(*out));
+    out = number_scope_mem_is_arena_ptr(mint)
+        ? (uint64_t *)number_scope_mem_calloc(needed, sizeof(*out), _Alignof(uint64_t))
+        : (uint64_t *)number_scope_mem_calloc_heap(needed, sizeof(*out), _Alignof(uint64_t));
     if (!out)
         return -1;
 
     if (len <= 4) {
         mint_mul_schoolbook_raw(out, src, len, src, len);
-        free(mint->storage);
+        number_scope_mem_free(mint->storage);
         mint->storage = out;
         mint->capacity = needed;
         mint->length = needed;
@@ -420,7 +423,7 @@ int mi_square(mint_t *mint)
         }
     }
 
-    free(mint->storage);
+    number_scope_mem_free(mint->storage);
     mint->storage = out;
     mint->capacity = needed;
     mint->length = needed;
@@ -558,12 +561,14 @@ int mint_mul_inplace(mint_t *mint, const mint_t *other)
     needed = lhs_length + rhs_length;
     lhs_storage = mint->storage;
     rhs_storage = other->storage;
-    out = calloc(needed, sizeof(*out));
+    out = number_scope_mem_is_arena_ptr(mint)
+        ? (uint64_t *)number_scope_mem_calloc(needed, sizeof(*out), _Alignof(uint64_t))
+        : (uint64_t *)number_scope_mem_calloc_heap(needed, sizeof(*out), _Alignof(uint64_t));
     if (!out)
         return -1;
     mint_mul_schoolbook_raw(out, lhs_storage, lhs_length, rhs_storage, rhs_length);
 
-    free(mint->storage);
+    number_scope_mem_free(mint->storage);
     mint->storage = out;
     mint->capacity = needed;
     mint->length = needed;

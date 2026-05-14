@@ -1,5 +1,6 @@
 #include "mfloat_internal.h"
 #include "mfloat_coeff_tables.h"
+#include "internal/number_scope_alloc.h"
 #include "internal/qfloat_internal.h"
 #include "internal/mint_internal.h"
 #include "mrational.h"
@@ -560,14 +561,15 @@ cleanup:
 
 static mfloat_t *mfloat_alloc(size_t precision_bits)
 {
-    mfloat_t *mfloat = calloc(1, sizeof(*mfloat));
+    mfloat_t *mfloat =
+        (mfloat_t *)number_scope_mem_calloc(1u, sizeof(*mfloat), _Alignof(mfloat_t));
 
     if (!mfloat)
         return NULL;
 
     mfloat->mantissa = mi_new();
     if (!mfloat->mantissa) {
-        free(mfloat);
+        number_scope_mem_free(mfloat);
         return NULL;
     }
 
@@ -1007,7 +1009,7 @@ void mf_free(mfloat_t *mfloat)
     if (mfloat_is_immortal(mfloat))
         return;
     mi_free(mfloat->mantissa);
-    free(mfloat);
+    number_scope_mem_free(mfloat);
 }
 
 void mf_clear(mfloat_t *mfloat)

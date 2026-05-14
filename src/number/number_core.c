@@ -2,6 +2,7 @@
 #include "number_internal.h"
 #include "internal/mint_internal.h"
 #include "internal/mcomplex_internal.h"
+#include "internal/number_scope_alloc.h"
 #include "mfloat/mfloat_internal.h"
 #include "mrational/mrational_internal.h"
 
@@ -12,6 +13,58 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#if defined(_MSC_VER)
+#define NUMBER_THREAD_LOCAL __declspec(thread)
+#elif defined(__GNUC__) || defined(__clang__)
+#define NUMBER_THREAD_LOCAL __thread
+#else
+#define NUMBER_THREAD_LOCAL
+#endif
+
+typedef struct number_scope_record_t {
+    number_kind_t kind;
+    void *payload;
+} number_scope_record_t;
+
+#define NUMBER_SCOPE_BLOCK_CAPACITY 64u
+#define NUMBER_SCOPE_ARENA_BLOCK_BYTES 16384u
+#define NUMBER_SCOPE_ALLOC_MAGIC 0x4e53434fu
+#define NUMBER_SCOPE_ALLOC_DESTROYED 0x1u
+#define NUMBER_SCOPE_ALLOC_TRACKED   0x2u
+
+typedef struct number_scope_block_t {
+    struct number_scope_block_t *next;
+    size_t used;
+    number_scope_record_t records[NUMBER_SCOPE_BLOCK_CAPACITY];
+} number_scope_block_t;
+
+typedef struct number_scope_arena_block_t {
+    struct number_scope_arena_block_t *next;
+    size_t used;
+    size_t capacity;
+    unsigned char data[];
+} number_scope_arena_block_t;
+
+typedef struct number_scope_alloc_header_t {
+    uint32_t magic;
+    uint32_t reserved;
+    size_t alloc_offset;
+    size_t base_offset;
+    size_t size;
+    num_scope_t *scope;
+    number_scope_record_t *record;
+    number_scope_arena_block_t *arena_block;
+} number_scope_alloc_header_t;
+
+typedef struct number_scope_state_t {
+    number_scope_block_t *records;
+    number_scope_arena_block_t *arena_blocks;
+} number_scope_state_t;
+
+static NUMBER_THREAD_LOCAL num_scope_t *number_scope_current = NULL;
+static bool number_value_is_immortal(const number_t *number);
+void number_destroy_none(number_t *number);
 
 const number_math_family_t number_math_family_binary_table[][NUMBER_MATH_MCOMPLEX + 1] = {
     [NUMBER_MATH_INVALID] = {
@@ -77,6 +130,474 @@ static number_t *number_alloc(number_kind_t kind)
     return number;
 }
 
+static number_scope_state_t *number_scope_state_get(const num_scope_t *scope)
+{
+    return scope ? (number_scope_state_t *)scope->records : NULL;
+}
+
+static number_scope_state_t *number_scope_state_ensure(num_scope_t *scope)
+{
+    number_scope_state_t *state;
+
+    if (!scope)
+        return NULL;
+    state = number_scope_state_get(scope);
+    if (state)
+        return state;
+    state = (number_scope_state_t *)calloc(1, sizeof(*state));
+    if (!state)
+        return NULL;
+    scope->records = state;
+    return state;
+}
+
+static size_t number_scope_align_up(size_t value, size_t align)
+{
+    size_t mask;
+
+    if (align <= 1u)
+        return value;
+    mask = align - 1u;
+    return (value + mask) & ~mask;
+}
+
+void *number_scope_mem_alloc_heap(size_t size, size_t align)
+{
+    size_t total_needed;
+    unsigned char *raw;
+    size_t payload_offset;
+    number_scope_alloc_header_t *header;
+
+    if (size == 0u)
+        return NULL;
+    if (align < _Alignof(max_align_t))
+        align = _Alignof(max_align_t);
+    total_needed = sizeof(number_scope_alloc_header_t) + align - 1u + size;
+    raw = (unsigned char *)malloc(total_needed);
+    if (!raw)
+        return NULL;
+    payload_offset = number_scope_align_up(sizeof(number_scope_alloc_header_t), align);
+    header = (number_scope_alloc_header_t *)(raw + payload_offset - sizeof(*header));
+    header->magic = NUMBER_SCOPE_ALLOC_MAGIC;
+    header->reserved = 0u;
+    header->alloc_offset = 0u;
+    header->base_offset = payload_offset;
+    header->size = size;
+    header->scope = NULL;
+    header->record = NULL;
+    header->arena_block = NULL;
+    return raw + payload_offset;
+}
+
+static number_scope_alloc_header_t *number_scope_alloc_header_from_ptr(const void *ptr)
+{
+    const number_scope_alloc_header_t *header;
+
+    if (!ptr)
+        return NULL;
+    header = (const number_scope_alloc_header_t *)((const unsigned char *)ptr - sizeof(*header));
+    return header->magic == NUMBER_SCOPE_ALLOC_MAGIC
+        ? (number_scope_alloc_header_t *)header : NULL;
+}
+
+static void *number_scope_arena_alloc_from_scope(num_scope_t *scope,
+                                                 size_t size,
+                                                 size_t align)
+{
+    number_scope_state_t *state;
+    number_scope_arena_block_t *block;
+    size_t total_needed;
+
+    if (!scope || size == 0u)
+        return NULL;
+    if (align < _Alignof(max_align_t))
+        align = _Alignof(max_align_t);
+    state = number_scope_state_ensure(scope);
+    if (!state)
+        return NULL;
+
+    total_needed = sizeof(number_scope_alloc_header_t) + align - 1u + size;
+    block = state->arena_blocks;
+    if (!block || block->used + total_needed > block->capacity) {
+        size_t capacity = NUMBER_SCOPE_ARENA_BLOCK_BYTES;
+
+        if (capacity < total_needed)
+            capacity = total_needed;
+        block = (number_scope_arena_block_t *)malloc(sizeof(*block) + capacity);
+        if (!block)
+            return NULL;
+        block->next = state->arena_blocks;
+        block->used = 0u;
+        block->capacity = capacity;
+        state->arena_blocks = block;
+    }
+
+    {
+        size_t base = block->used;
+        size_t payload_offset = number_scope_align_up(base + sizeof(number_scope_alloc_header_t), align);
+        number_scope_alloc_header_t *header =
+            (number_scope_alloc_header_t *)(block->data + payload_offset - sizeof(*header));
+        void *payload = block->data + payload_offset;
+
+        header->magic = NUMBER_SCOPE_ALLOC_MAGIC;
+        header->reserved = 0u;
+        header->alloc_offset = base;
+        header->base_offset = payload_offset;
+        header->size = size;
+        header->scope = scope;
+        header->record = NULL;
+        header->arena_block = block;
+        block->used = payload_offset + size;
+        return payload;
+    }
+}
+
+static number_t number_clone_unscoped(const number_t *value)
+{
+    num_scope_t *saved_scope = number_scope_current;
+    number_t cloned;
+
+    number_scope_current = NULL;
+    cloned = num_clone(*value);
+    number_scope_current = saved_scope;
+    return cloned;
+}
+
+static void number_scope_destroy_arena_value(number_scope_alloc_header_t *header)
+{
+    if (!header || !header->scope)
+        return;
+    if (!(header->reserved & NUMBER_SCOPE_ALLOC_DESTROYED) &&
+        header->arena_block &&
+        header->arena_block->used == header->base_offset + header->size)
+        header->arena_block->used = header->alloc_offset;
+    header->reserved |= NUMBER_SCOPE_ALLOC_DESTROYED;
+}
+
+num_scope_t *number_scope_suspend(void)
+{
+    num_scope_t *saved_scope = number_scope_current;
+
+    number_scope_current = NULL;
+    return saved_scope;
+}
+
+void number_scope_resume(num_scope_t *scope)
+{
+    number_scope_current = scope;
+}
+
+static void *number_scope_payload_pointer(const number_t *number)
+{
+    const number_private_t *impl;
+
+    if (!number || !number_is_valid_value(number))
+        return NULL;
+    impl = number_impl_const(number);
+    switch (impl->kind) {
+    case NUMBER_MINT:
+        return impl->value.mi;
+    case NUMBER_MRATIONAL:
+        return impl->value.mr;
+    case NUMBER_MFLOAT:
+        return impl->value.mf;
+    case NUMBER_MCOMPLEX:
+        return impl->value.mc;
+    default:
+        return NULL;
+    }
+}
+
+static bool number_scope_trackable_value(const number_t *number)
+{
+    const number_vtable_t *vt;
+    number_scope_alloc_header_t *header;
+    void *payload;
+
+    if (!number_scope_current || !number || !number_is_valid_value(number))
+        return false;
+    vt = number_vt(number);
+    if (!vt || !vt->destroy_payload || vt->destroy_payload == number_destroy_none)
+        return false;
+    if (number_value_is_immortal(number))
+        return false;
+    payload = number_scope_payload_pointer(number);
+    if (!payload)
+        return false;
+    header = number_scope_alloc_header_from_ptr(payload);
+    return header == NULL || header->scope == NULL;
+}
+
+static void number_scope_destroy_record(const number_scope_record_t *record)
+{
+    number_t number;
+    number_private_t *impl;
+    const number_vtable_t *vt;
+    number_scope_alloc_header_t *header;
+
+    if (!record)
+        return;
+    header = number_scope_alloc_header_from_ptr(record->payload);
+    if (header) {
+        header->record = NULL;
+        header->reserved &= ~NUMBER_SCOPE_ALLOC_TRACKED;
+    }
+    if (header && header->scope)
+        return;
+    number = number_invalid();
+    impl = number_impl(&number);
+    impl->kind = record->kind;
+    switch (record->kind) {
+    case NUMBER_MINT:
+        impl->value.mi = (mint_t *)record->payload;
+        break;
+    case NUMBER_MRATIONAL:
+        impl->value.mr = (mrational_t *)record->payload;
+        break;
+    case NUMBER_MFLOAT:
+        impl->value.mf = (mfloat_t *)record->payload;
+        break;
+    case NUMBER_MCOMPLEX:
+        impl->value.mc = (mcomplex_t *)record->payload;
+        break;
+    default:
+        return;
+    }
+    vt = number_vt(&number);
+    if (vt && vt->destroy_payload)
+        vt->destroy_payload(&number);
+}
+
+static void number_scope_trim_block(number_scope_block_t *block)
+{
+    if (!block)
+        return;
+    while (block->used > 0u &&
+           block->records[block->used - 1u].payload == NULL)
+        block->used--;
+}
+
+void number_scope_register_value(const number_t *number)
+{
+    number_scope_state_t *state;
+    number_scope_block_t *block;
+    number_scope_record_t *record;
+
+    if (!number_scope_trackable_value(number))
+        return;
+    state = number_scope_state_ensure(number_scope_current);
+    if (!state)
+        return;
+    block = state->records;
+    if (!block || block->used == NUMBER_SCOPE_BLOCK_CAPACITY) {
+        block = (number_scope_block_t *)calloc(1, sizeof(*block));
+        if (!block)
+            return;
+        block->next = state->records;
+        state->records = block;
+    }
+    record = &block->records[block->used++];
+    record->kind = number_kind_value(number);
+    record->payload = number_scope_payload_pointer(number);
+    {
+        number_scope_alloc_header_t *header =
+            number_scope_alloc_header_from_ptr(record->payload);
+
+        if (header) {
+            header->record = record;
+            header->reserved |= NUMBER_SCOPE_ALLOC_TRACKED;
+        }
+    }
+}
+
+int number_scope_unregister_value(const number_t *number)
+{
+    num_scope_t *scope;
+    number_kind_t kind;
+    void *payload;
+
+    if (!number || !number_is_valid_value(number))
+        return 0;
+    kind = number_kind_value(number);
+    payload = number_scope_payload_pointer(number);
+    if (!payload)
+        return 0;
+    {
+        number_scope_alloc_header_t *header = number_scope_alloc_header_from_ptr(payload);
+
+        if (header && header->record &&
+            header->record->kind == kind &&
+            header->record->payload == payload)
+        {
+            header->reserved &= ~NUMBER_SCOPE_ALLOC_TRACKED;
+            header->record->kind = NUMBER_INVALID;
+            header->record->payload = NULL;
+            header->record = NULL;
+            return 1;
+        }
+    }
+
+    for (scope = number_scope_current; scope; scope = scope->previous) {
+        number_scope_state_t *state = number_scope_state_get(scope);
+        number_scope_block_t *block = state ? state->records : NULL;
+
+        while (block) {
+            size_t i = block->used;
+
+            while (i-- > 0u) {
+                number_scope_record_t *record = &block->records[i];
+
+                if (record->payload == NULL)
+                    continue;
+                if (record->kind == kind && record->payload == payload)
+                {
+                    number_scope_alloc_header_t *header =
+                        number_scope_alloc_header_from_ptr(payload);
+
+                    record->kind = NUMBER_INVALID;
+                    record->payload = NULL;
+                    if (header) {
+                        header->record = NULL;
+                        header->reserved &= ~NUMBER_SCOPE_ALLOC_TRACKED;
+                    }
+                    number_scope_trim_block(block);
+                    return 1;
+                }
+            }
+            block = block->next;
+        }
+    }
+    return 0;
+}
+
+void *number_scope_mem_alloc(size_t size, size_t align)
+{
+    if (size == 0u)
+        return NULL;
+    return number_scope_current
+        ? number_scope_arena_alloc_from_scope(number_scope_current, size, align)
+        : number_scope_mem_alloc_heap(size, align);
+}
+
+void *number_scope_mem_calloc(size_t count, size_t size, size_t align)
+{
+    size_t total;
+    void *ptr;
+
+    if (count == 0u || size == 0u)
+        return NULL;
+    if (SIZE_MAX / count < size)
+        return NULL;
+    total = count * size;
+    ptr = number_scope_mem_alloc(total, align);
+    if (ptr)
+        memset(ptr, 0, total);
+    return ptr;
+}
+
+void *number_scope_mem_calloc_heap(size_t count, size_t size, size_t align)
+{
+    size_t total;
+    void *ptr;
+
+    if (count == 0u || size == 0u)
+        return NULL;
+    if (SIZE_MAX / count < size)
+        return NULL;
+    total = count * size;
+    ptr = number_scope_mem_alloc_heap(total, align);
+    if (ptr)
+        memset(ptr, 0, total);
+    return ptr;
+}
+
+void *number_scope_mem_realloc(void *ptr, size_t size, size_t align)
+{
+    number_scope_alloc_header_t *header;
+
+    if (!ptr)
+        return number_scope_mem_alloc(size, align);
+    if (size == 0u) {
+        number_scope_mem_free(ptr);
+        return NULL;
+    }
+    header = number_scope_alloc_header_from_ptr(ptr);
+    if (!header)
+        return realloc(ptr, size);
+    if (size <= header->size) {
+        if (header->scope && header->arena_block) {
+            size_t payload_offset = header->base_offset;
+            size_t old_end = payload_offset + header->size;
+            number_scope_arena_block_t *block = header->arena_block;
+
+            if (block->used == old_end)
+                block->used = payload_offset + size;
+        }
+        header->size = size;
+        return ptr;
+    }
+
+    {
+        if (header->scope && header->arena_block) {
+            size_t payload_offset = header->base_offset;
+            size_t old_end = payload_offset + header->size;
+            number_scope_arena_block_t *block = header->arena_block;
+
+            if (block->used == old_end &&
+                payload_offset + size <= block->capacity)
+            {
+                block->used = payload_offset + size;
+                header->size = size;
+                return ptr;
+            }
+        }
+        void *grown = header->scope
+            ? number_scope_arena_alloc_from_scope(header->scope, size, align)
+            : number_scope_mem_alloc_heap(size, align);
+
+        if (!grown)
+            return NULL;
+        memcpy(grown, ptr, header->size);
+        if (header->record) {
+            number_scope_alloc_header_t *grown_header =
+                number_scope_alloc_header_from_ptr(grown);
+
+            if (grown_header) {
+                grown_header->record = header->record;
+                header->record->payload = grown;
+                header->record = NULL;
+            }
+        }
+        if (!header->scope)
+            free((unsigned char *)ptr - header->base_offset);
+        return grown;
+    }
+}
+
+void number_scope_mem_free(void *ptr)
+{
+    number_scope_alloc_header_t *header;
+
+    if (!ptr)
+        return;
+    header = number_scope_alloc_header_from_ptr(ptr);
+    if (!header)
+    {
+        free(ptr);
+        return;
+    }
+    if (header->scope)
+        return;
+    free((unsigned char *)ptr - header->base_offset);
+}
+
+bool number_scope_mem_is_arena_ptr(const void *ptr)
+{
+    number_scope_alloc_header_t *header = number_scope_alloc_header_from_ptr(ptr);
+
+    return header != NULL && header->scope != NULL;
+}
+
 number_t number_invalid(void)
 {
     number_t number;
@@ -94,6 +615,7 @@ number_t number_take(number_t *boxed_number)
         return number_invalid();
     memcpy(&value, boxed_number, sizeof(value));
     free(boxed_number);
+    number_scope_register_value(&value);
     return value;
 }
 
@@ -2384,14 +2906,88 @@ bool num_is_immortal(number_t number)
 void num_destroy(number_t *number)
 {
     const number_vtable_t *vt;
+    number_scope_alloc_header_t *header;
+    void *payload;
 
     if (!number)
         return;
+    payload = number_scope_payload_pointer(number);
+    header = number_scope_alloc_header_from_ptr(payload);
+    if (header && header->scope) {
+        number_scope_destroy_arena_value(header);
+        memset(number, 0, sizeof(*number));
+        number_impl(number)->kind = NUMBER_INVALID;
+        return;
+    }
+    if (!header || (header->reserved & NUMBER_SCOPE_ALLOC_TRACKED))
+        number_scope_unregister_value(number);
     vt = number_vt(number);
     if (vt && vt->destroy_payload)
         vt->destroy_payload(number);
     memset(number, 0, sizeof(*number));
     number_impl(number)->kind = NUMBER_INVALID;
+}
+
+void num_scope_enter(num_scope_t *scope)
+{
+    if (!scope || scope->active)
+        return;
+    scope->records = NULL;
+    scope->previous = number_scope_current;
+    scope->active = 1;
+    number_scope_current = scope;
+}
+
+void num_scope_leave(num_scope_t *scope)
+{
+    number_scope_state_t *state;
+    number_scope_arena_block_t *arena_block;
+    number_scope_block_t *block;
+
+    if (!scope || !scope->active || number_scope_current != scope)
+        return;
+
+    state = number_scope_state_get(scope);
+    block = state ? state->records : NULL;
+    while (block) {
+        number_scope_block_t *next = block->next;
+        size_t i = block->used;
+
+        while (i-- > 0) {
+            number_scope_record_t *record = &block->records[i];
+
+            if (record->payload != NULL)
+                number_scope_destroy_record(record);
+        }
+        free(block);
+        block = next;
+    }
+    arena_block = state ? state->arena_blocks : NULL;
+    while (arena_block) {
+        number_scope_arena_block_t *next = arena_block->next;
+
+        free(arena_block);
+        arena_block = next;
+    }
+    free(state);
+
+    number_scope_current = scope->previous;
+    scope->records = NULL;
+    scope->previous = NULL;
+    scope->active = 0;
+}
+
+bool num_scope_is_active(void)
+{
+    return number_scope_current != NULL;
+}
+
+number_t num_scope_detach(number_t value)
+{
+    if (number_scope_mem_is_arena_ptr(number_scope_payload_pointer(&value)))
+        return number_clone_unscoped(&value);
+    number_scope_unregister_value(&value);
+    return value;
 }
 
 bool num_is_exact(const number_t number)
