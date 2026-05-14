@@ -49,6 +49,30 @@ static dval_t *dv_add_long_local(const dval_t *dv, long value)
     return out;
 }
 
+static dval_t *dv_const_num_local(number_t value)
+{
+    dval_t *dv = dv_new_const(value);
+
+    num_destroy(&value);
+    return dv;
+}
+
+static dval_t *dv_const_ratio_local(number_t numerator, number_t denominator)
+{
+    number_t value = num_div(numerator, denominator);
+
+    return dv_const_num_local(value);
+}
+
+static dval_t *dv_const_neg_ratio_local(number_t numerator, number_t denominator)
+{
+    number_t value = num_div(numerator, denominator);
+    number_t neg_value = num_neg(value);
+
+    num_destroy(&value);
+    return dv_const_num_local(neg_value);
+}
+
 number_t eval_sin(dval_t *dv) { return dv_eval_unary_num(dv, num_sin); }
 number_t eval_cos(dval_t *dv) { return dv_eval_unary_num(dv, num_cos); }
 number_t eval_tan(dval_t *dv) { return dv_eval_unary_num(dv, num_tan); }
@@ -326,16 +350,10 @@ dval_t *deriv_abs(dval_t *dv)
     return out;
 }
 
-static qfloat_t two_over_sqrtpi(void)
-{
-    qfloat_t pi = qf_mul(qf_from_double(4.0), qf_atan(qf_from_double(1.0)));
-    return qf_div(qf_from_double(2.0), qf_sqrt(pi));
-}
-
 dval_t *deriv_erf(dval_t *dv)
 {
     dval_t *da     = dv_get_dx_internal(dv->a);
-    dval_t *c      = dv_num_const_qf(two_over_sqrtpi());
+    dval_t *c      = dv_const_num_local(NUM_2_SQRTPI);
     dval_t *a2     = dv_pow_long_local(dv->a, 2);
     dval_t *neg_a2 = dv_neg(a2);
     dval_t *ea2    = dv_exp(neg_a2);
@@ -353,7 +371,7 @@ dval_t *deriv_erf(dval_t *dv)
 dval_t *deriv_erfc(dval_t *dv)
 {
     dval_t *da     = dv_get_dx_internal(dv->a);
-    dval_t *c      = dv_num_const_qf(qf_neg(two_over_sqrtpi()));
+    dval_t *c      = dv_const_num_local(NUM_NEG_TWO_OVER_SQRT_PI);
     dval_t *a2     = dv_pow_long_local(dv->a, 2);
     dval_t *neg_a2 = dv_neg(a2);
     dval_t *ea2    = dv_exp(neg_a2);
@@ -393,19 +411,13 @@ dval_t *deriv_hypot(dval_t *dv)
     return out;
 }
 
-static qfloat_t sqrtpi_over_2(void)
-{
-    qfloat_t pi = qf_mul(qf_from_double(4.0), qf_atan(qf_from_double(1.0)));
-    return qf_div(qf_sqrt(pi), qf_from_double(2.0));
-}
-
 dval_t *deriv_erfinv(dval_t *dv)
 {
     dval_t *da  = dv_get_dx_internal(dv->a);
     dval_t *w   = dv_erfinv(dv->a);
     dval_t *w2  = dv_pow_long_local(w, 2);
     dval_t *ew2 = dv_exp(w2);
-    dval_t *c   = dv_num_const_qf(sqrtpi_over_2());
+    dval_t *c   = dv_const_ratio_local(NUM_SQRT_PI, NUM_TWO);
     dval_t *fac = dv_mul(c, ew2);
     dval_t *out = dv_mul(fac, da);
     dv_free(da); dv_free(w); dv_free(w2); dv_free(ew2); dv_free(c); dv_free(fac);
@@ -418,7 +430,7 @@ dval_t *deriv_erfcinv(dval_t *dv)
     dval_t *w   = dv_erfcinv(dv->a);
     dval_t *w2  = dv_pow_long_local(w, 2);
     dval_t *ew2 = dv_exp(w2);
-    dval_t *c   = dv_num_const_qf(qf_neg(sqrtpi_over_2()));
+    dval_t *c   = dv_const_neg_ratio_local(NUM_SQRT_PI, NUM_TWO);
     dval_t *fac = dv_mul(c, ew2);
     dval_t *out = dv_mul(fac, da);
     dv_free(da); dv_free(w); dv_free(w2); dv_free(ew2); dv_free(c); dv_free(fac);
@@ -443,11 +455,12 @@ dval_t *deriv_digamma(dval_t *dv)
 
 dval_t *deriv_trigamma(dval_t *dv)
 {
-    qfloat_t t2     = qf_tetragamma(dv_num_eval_qf(dv->a));
+    number_t t2   = num_tetragamma(dv_eval_num_internal(dv->a));
     dval_t *da    = dv_get_dx_internal(dv->a);
-    dval_t *coeff = dv_num_const_qf(t2);
+    dval_t *coeff = dv_new_const(t2);
     dval_t *out   = dv_mul(coeff, da);
     dv_free(da); dv_free(coeff);
+    num_destroy(&t2);
     return out;
 }
 

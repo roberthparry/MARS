@@ -164,6 +164,9 @@ extern const qfloat_t QF_LN_2PI;
 /** @brief Euler–Mascheroni constant γ */
 extern const qfloat_t QF_EULER_MASCHERONI;
 
+/** @brief Golden ratio φ */
+extern const qfloat_t QF_PHI;
+
 /** @brief π² */
 extern const qfloat_t QF_PI_SQUARED;
 

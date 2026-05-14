@@ -494,8 +494,11 @@ static int mf_entry_requires_symbolic(const char *entry)
 
 static int mf_parse_number_literal(const char *text, number_t *out)
 {
-    number_t value;
-    qcomplex_t legacy;
+    number_t value = NUM_ZERO;
+    char *rewritten = NULL;
+    const char *p;
+    const char *split = NULL;
+    char op = '\0';
 
     if (!text || !out)
         return -1;
@@ -505,14 +508,54 @@ static int mf_parse_number_literal(const char *text, number_t *out)
         *out = value;
         return 0;
     }
+
+    p = text;
+    while (*p && isspace((unsigned char)*p))
+        p++;
+    for (const char *q = p; *q; ++q) {
+        if ((*q == '+' || *q == '-') && q > p) {
+            const char *r = q - 1;
+            while (r > p && isspace((unsigned char)*r))
+                r--;
+            if (*r == 'e' || *r == 'E')
+                continue;
+            split = q;
+            op = *q;
+        }
+    }
+
+    if (split) {
+        char *left = mf_trim_copy(p, (size_t)(split - p));
+        char *right = mf_trim_copy(split + 1, strlen(split + 1));
+
+        if (left && right && *left && *right) {
+            bool left_imag = strchr(left, 'i') || strchr(left, 'j');
+            bool right_imag = strchr(right, 'i') || strchr(right, 'j');
+
+            if (left_imag && !right_imag) {
+                size_t needed = strlen(left) + strlen(right) + 8;
+
+                rewritten = mf_xmalloc(needed);
+                if (op == '+')
+                    snprintf(rewritten, needed, "%s + %s", right, left);
+                else
+                    snprintf(rewritten, needed, "-%s + %s", right, left);
+            }
+        }
+
+        free(left);
+        free(right);
+    }
+
+    if (rewritten && num_set_from_string(&value, rewritten) == 0) {
+        free(rewritten);
+        *out = value;
+        return 0;
+    }
+
+    free(rewritten);
     num_destroy(&value);
-
-    legacy = qc_from_string(text);
-    if (qc_isnan(legacy))
-        return -1;
-
-    *out = num_create_from_qcomplex(legacy);
-    return 0;
+    return -1;
 }
 
 static int mf_is_function_name(const char *p)
@@ -537,7 +580,7 @@ static int mf_collect_expression_names(const char *expr, symbol_vec_t *symbols)
 
         if (!mf_is_function_name(p)) {
             ssize_t found = symbol_vec_find(symbols, name);
-            number_t default_number = num_new();
+            number_t default_number = NUM_ZERO;
             bool has_default_value = dv_get_default_constant_num(name, &default_number);
 
             if (found < 0) {
@@ -867,7 +910,7 @@ static int mf_parse_binding_section(const char *text, symbol_vec_t *symbols)
             num_destroy(&symbols->items[found].value);
             symbols->items[found].value = value;
             if (symbols->items[found].symbol) {
-                dv_set_val_num(symbols->items[found].symbol, value);
+                dv_set_val(symbols->items[found].symbol, value);
             }
             free(name);
         } else {
@@ -906,7 +949,7 @@ static int mf_try_parse_numeric_matrix(char **entries,
         }
     }
 
-    A = mat_create_num(rows, cols, vals);
+    A = mat_create(rows, cols, vals);
 
     for (size_t i = 0; i < n; ++i)
         num_destroy(&vals[i]);
@@ -948,15 +991,15 @@ static int mf_build_symbolic_matrix(char **entries,
 
         init = symbols->items[i].has_value
              ? symbols->items[i].value
-             : num_create_from_qfloat(QF_NAN);
+             : NUM_NAN;
 
         if (!symbols->items[i].symbol) {
             symbols->items[i].symbol = symbols->items[i].is_constant
-                                     ? dv_new_named_const_num(init, symbols->items[i].name)
-                                     : dv_new_named_var_num(init, symbols->items[i].name);
+                                     ? dv_new_named_const(init, symbols->items[i].name)
+                                     : dv_new_named_var(init, symbols->items[i].name);
             symbols->items[i].owns_symbol = true;
         } else if (symbols->items[i].has_value) {
-            dv_set_val_num(symbols->items[i].symbol, init);
+            dv_set_val(symbols->items[i].symbol, init);
         }
 
         if (!symbols->items[i].has_value)
@@ -1015,6 +1058,7 @@ static int mf_build_symbolic_matrix(char **entries,
                 memcpy(name_store, symbols->items[i].name, name_len);
                 entry->name = name_store;
                 entry->dval = symbols->items[i].symbol;
+                symbols->items[i].owns_symbol = false;
                 if (mf_bindings_index_entry(bindings, entry) != 0) {
                     ok = 0;
                     break;
@@ -1063,7 +1107,6 @@ static matrix_t *mf_parse_matrix_string(const char *s,
     size_t nentries = 0;
     symbol_vec_t symbols = {0};
     matrix_t *A = NULL;
-    bool wrapped = false;
     const char *error_msg = "invalid matrix string";
 
     if (bindings_out)
@@ -1086,7 +1129,6 @@ static matrix_t *mf_parse_matrix_string(const char *s,
             mf_report_error("missing closing '}'");
             return NULL;
         }
-        wrapped = true;
         while (p < close) {
             if (*p == '(')
                 depth++;
@@ -1125,8 +1167,7 @@ static matrix_t *mf_parse_matrix_string(const char *s,
     }
     nentries = rows * cols;
 
-    if (!wrapped &&
-        mf_try_parse_numeric_matrix(entries, rows, cols, &A) == 0)
+    if (mf_try_parse_numeric_matrix(entries, rows, cols, &A) == 0)
         goto cleanup_success;
 
     if (bindings && *bindings) {
@@ -1191,7 +1232,53 @@ void mat_bindings_free(mat_bindings_t *bindings)
     mf_bindings_destroy_partial(bindings);
 }
 
-matrix_t *mat_from_string(const char *s, mat_bindings_t **bindings_out)
+matrix_t *mat_from_string_dv(const char *s, mat_bindings_t **bindings_out)
 {
     return mf_parse_matrix_string(s, bindings_out);
+}
+
+matrix_t *mat_from_string(const char *s)
+{
+    matrix_t *A = NULL;
+    matrix_t *evaluated = NULL;
+    mat_bindings_t *bindings = NULL;
+
+    A = mf_parse_matrix_string(s, &bindings);
+    if (!A)
+        return NULL;
+
+    if (mat_typeof(A) == MAT_TYPE_NUMBER) {
+        mat_bindings_free(bindings);
+        return A;
+    }
+
+    if (mat_typeof(A) != MAT_TYPE_DVAL) {
+        mat_bindings_free(bindings);
+        mat_free(A);
+        return NULL;
+    }
+
+    for (size_t i = 0; i < bindings->count; ++i) {
+        number_t value;
+
+        if (!bindings->entries[i].dval) {
+            mat_bindings_free(bindings);
+            mat_free(A);
+            return NULL;
+        }
+
+        value = dv_eval(bindings->entries[i].dval);
+        if (num_is_nan(value)) {
+            num_destroy(&value);
+            mat_bindings_free(bindings);
+            mat_free(A);
+            return NULL;
+        }
+        num_destroy(&value);
+    }
+
+    evaluated = mat_evaluate(A);
+    mat_bindings_free(bindings);
+    mat_free(A);
+    return evaluated;
 }

@@ -82,9 +82,9 @@ dval_t *mat_deriv_trace(const matrix_t *A, dval_t *wrt)
     if (!A->elem)
         return NULL;
     if (!matrix_is_symbolic(A))
-        return dv_num_const_d(0.0);
+        return dv_new_const(NUM_ZERO);
 
-    if (mat_trace(A, &trace) != 0 || !trace)
+    if (mat_trace_dv(A, &trace) != 0 || !trace)
         return NULL;
 
     deriv = dv_create_deriv(trace, wrt);
@@ -102,9 +102,9 @@ dval_t *mat_deriv_det(const matrix_t *A, dval_t *wrt)
     if (!A->elem)
         return NULL;
     if (!matrix_is_symbolic(A))
-        return dv_num_const_d(0.0);
+        return dv_new_const(NUM_ZERO);
 
-    if (mat_det(A, &det) != 0 || !det)
+    if (mat_det_dv(A, &det) != 0 || !det)
         return NULL;
 
     deriv = dv_create_deriv(det, wrt);

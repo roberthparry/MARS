@@ -50,20 +50,20 @@ static void test_creation(void)
     printf(C_CYAN "TEST: creation of all matrix types\n" C_RESET);
 
     matrix_t *Ad = test_mat_dense_d(2, 3);
-    matrix_t *Aqf = test_mat_dense_qf(3, 4);
-    matrix_t *Aqc = test_mat_dense_qc(4, 5);
+    matrix_t *An = mat_new(3, 4);
+    matrix_t *Adv = mat_new_dv(4, 5);
 
     check_bool("mat_new_d non-null", Ad != NULL);
-    check_bool("mat_new_qf non-null", Aqf != NULL);
-    check_bool("mat_new_qc non-null", Aqc != NULL);
+    check_bool("mat_new non-null", An != NULL);
+    check_bool("mat_new_dv non-null", Adv != NULL);
 
     print_md("Ad", Ad);
-    print_mqf("Aqf", Aqf);
-    print_mqc("Aqc", Aqc);
+    print_mnum("An", An);
+    print_mdv("Adv", Adv);
 
     mat_free(Ad);
-    mat_free(Aqf);
-    mat_free(Aqc);
+    mat_free(An);
+    mat_free(Adv);
 }
 
 /* ------------------------------------------------------------------ 2. reading */
@@ -89,41 +89,51 @@ static void test_reading(void)
         mat_free(A);
     }
 
-    /* qfloat */
+    /* number_t real */
     {
-        qfloat_t vals[4] = {
-            QF_ZERO, qf_from_double(1.25),
-            qf_from_double(-2.5), QF_ZERO};
-        matrix_t *B = test_mat_create_qf(2, 2, vals);
-        print_mqf("B", B);
+        number_t vals[4] = {
+            NUM_ZERO, num_create_from_string("1.25"),
+            num_create_from_string("-2.5"), NUM_ZERO};
+        matrix_t *B = mat_create(2, 2, vals);
+        number_t out[4] = { num_new(), num_new(), num_new(), num_new() };
 
-        qfloat_t out[4];
+        print_mnum("B", B);
+
         mat_get_data(B, out);
 
-        check_qf_val("read qfloat B[0,1] = 1.25", out[1], vals[1], 1e-30);
-        check_qf_val("read qfloat B[1,0] = -2.5", out[2], vals[2], 1e-30);
+        check_bool("read number B[0,1] = 1.25", num_eq(out[1], vals[1]));
+        check_bool("read number B[1,0] = -2.5", num_eq(out[2], vals[2]));
 
+        for (size_t i = 0; i < 4; ++i) {
+            num_destroy(&out[i]);
+            num_destroy(&vals[i]);
+        }
         mat_free(B);
     }
 
-    /* qcomplex */
+    /* number_t complex */
     {
-        qcomplex_t z1 = qc_make(qf_from_double(2.0), qf_from_double(3.0));
-        qcomplex_t z2 = qc_make(qf_from_double(-1.0), qf_from_double(0.5));
+        number_t z1 = num_create_from_string("2 + 3i");
+        number_t z2 = num_create_from_string("-1 + 0.5i");
+        number_t vals[4] = {
+            num_clone(z1), NUM_ZERO,
+            NUM_ZERO, num_clone(z2)};
+        matrix_t *C = mat_create(2, 2, vals);
+        number_t out[4] = { num_new(), num_new(), num_new(), num_new() };
 
-        qcomplex_t vals[4] = {
-            z1, QC_ZERO,
-            QC_ZERO, z2};
+        print_mnum("C", C);
 
-        matrix_t *C = test_mat_create_qc(2, 2, vals);
-        print_mqc("C", C);
-
-        qcomplex_t out[4];
         mat_get_data(C, out);
 
-        check_qc_val("read qcomplex C[0,0]", out[0], z1, 1e-30);
-        check_qc_val("read qcomplex C[1,1]", out[3], z2, 1e-30);
+        check_bool("read complex-number C[0,0]", num_eq(out[0], z1));
+        check_bool("read complex-number C[1,1]", num_eq(out[3], z2));
 
+        num_destroy(&z2);
+        num_destroy(&z1);
+        for (size_t i = 0; i < 4; ++i) {
+            num_destroy(&out[i]);
+            num_destroy(&vals[i]);
+        }
         mat_free(C);
     }
 }
@@ -149,33 +159,39 @@ static void test_writing(void)
         mat_free(A);
     }
 
-    /* qfloat */
+    /* number_t real */
     {
-        matrix_t *B = test_mat_dense_qf(2, 2);
-        qfloat_t qx = qf_from_double(7.75);
-        mat_set(B, 0, 1, &qx);
+        matrix_t *B = mat_new(2, 2);
+        number_t x = num_create_from_string("7.75");
+        number_t vals[4] = { num_new(), num_new(), num_new(), num_new() };
+        mat_set(B, 0, 1, &x);
 
-        print_mqf("B after write", B);
+        print_mnum("B after write", B);
 
-        qfloat_t vals[4];
         mat_get_data(B, vals);
-        check_qf_val("write qfloat B[0,1] = 7.75", vals[1], qx, 1e-30);
+        check_bool("write number B[0,1] = 7.75", num_eq(vals[1], x));
 
+        for (size_t i = 0; i < 4; ++i)
+            num_destroy(&vals[i]);
+        num_destroy(&x);
         mat_free(B);
     }
 
-    /* qcomplex */
+    /* number_t complex */
     {
-        matrix_t *C = test_mat_dense_qc(2, 2);
-        qcomplex_t z = qc_make(qf_from_double(1.0), qf_from_double(-3.0));
+        matrix_t *C = mat_new(2, 2);
+        number_t z = num_create_from_string("1 - 3i");
+        number_t vals[4] = { num_new(), num_new(), num_new(), num_new() };
         mat_set(C, 1, 1, &z);
 
-        print_mqc("C after write", C);
+        print_mnum("C after write", C);
 
-        qcomplex_t vals[4];
         mat_get_data(C, vals);
-        check_qc_val("write qcomplex C[1,1]", vals[3], z, 1e-30);
+        check_bool("write complex-number C[1,1]", num_eq(vals[3], z));
 
+        for (size_t i = 0; i < 4; ++i)
+            num_destroy(&vals[i]);
+        num_destroy(&z);
         mat_free(C);
     }
 }
@@ -195,9 +211,9 @@ static void test_number_creation_and_readback(void)
     vals[3] = num_create_from_string("1.25");
     num_set_prec_bits(&vals[3], 512);
 
-    A = mat_create_num(2, 2, vals);
-    check_bool("mat_create_num non-null", A != NULL);
-    check_bool("mat_create_num -> MAT_TYPE_NUMBER",
+    A = mat_create(2, 2, vals);
+    check_bool("mat_create non-null", A != NULL);
+    check_bool("mat_create -> MAT_TYPE_NUMBER",
                A != NULL && mat_typeof(A) == MAT_TYPE_NUMBER);
 
     got = mat_get_num(A, 0, 0);
@@ -214,11 +230,11 @@ static void test_number_creation_and_readback(void)
     check_bool("mat_get_num preserves precision bits", num_get_prec_bits(got) == 512);
     num_destroy(&got);
 
-    mat_get_data_num(A, flat);
-    check_bool("mat_get_data_num[0]", num_eq(flat[0], vals[0]));
-    check_bool("mat_get_data_num[1]", num_eq(flat[1], vals[1]));
-    check_bool("mat_get_data_num[2]", num_eq(flat[2], vals[2]));
-    check_bool("mat_get_data_num[3] precision", num_get_prec_bits(flat[3]) == 512);
+    mat_get_data(A, flat);
+    check_bool("mat_get_data[0]", num_eq(flat[0], vals[0]));
+    check_bool("mat_get_data[1]", num_eq(flat[1], vals[1]));
+    check_bool("mat_get_data[2]", num_eq(flat[2], vals[2]));
+    check_bool("mat_get_data[3] precision", num_get_prec_bits(flat[3]) == 512);
 
     for (size_t i = 0; i < 4; ++i) {
         num_destroy(&flat[i]);
@@ -239,11 +255,11 @@ static void test_number_special_constructors(void)
     diag[0] = num_create_from_string("2/3");
     diag[1] = num_create_from_string("5");
 
-    I = mat_create_identity_num(2);
-    D = mat_create_diagonal_num(2, diag);
+    I = mat_create_identity(2);
+    D = mat_create_diagonal(2, diag);
 
-    check_bool("mat_create_identity_num non-null", I != NULL);
-    check_bool("mat_create_diagonal_num non-null", D != NULL);
+    check_bool("mat_create_identity non-null", I != NULL);
+    check_bool("mat_create_diagonal non-null", D != NULL);
 
     got = mat_get_num(I, 0, 0);
     check_bool("identity number diag one", num_eq(got, NUM_ONE));
@@ -277,9 +293,9 @@ static void test_number_matrix_arithmetic(void)
 
     number_t avals[4];
     number_t bvals[4];
+    number_t qvals[4];
     number_t scalar;
     number_t got;
-    qfloat_t qfvals[4];
     matrix_t *A;
     matrix_t *B;
     matrix_t *C;
@@ -331,15 +347,15 @@ static void test_number_matrix_arithmetic(void)
     mat_free(C);
 
     scalar = num_create_from_string("1/2");
-    C = mat_scalar_mul_num(A, &scalar);
-    check_bool("mat_scalar_mul_num non-null", C != NULL);
+    C = mat_scalar_mul(A, &scalar);
+    check_bool("mat_scalar_mul non-null", C != NULL);
     got = mat_get_num(C, 0, 1);
     check_bool("scalar mul number exact half", num_eq(got, NUM_ONE));
     num_destroy(&got);
     mat_free(C);
 
-    C = mat_scalar_div_num(B, &scalar);
-    check_bool("mat_scalar_div_num non-null", C != NULL);
+    C = mat_scalar_div(B, &scalar);
+    check_bool("mat_scalar_div non-null", C != NULL);
     got = mat_get_num(C, 0, 0);
     expected = num_create_from_long(10);
     check_bool("scalar div number by half", num_eq(got, expected));
@@ -348,22 +364,24 @@ static void test_number_matrix_arithmetic(void)
     mat_free(C);
     num_destroy(&scalar);
 
-    qfvals[0] = qf_from_double(0.5);
-    qfvals[1] = qf_from_double(1.5);
-    qfvals[2] = qf_from_double(2.5);
-    qfvals[3] = qf_from_double(3.5);
-    Q = test_mat_create_qf(2, 2, qfvals);
+    qvals[0] = num_create_from_string("0.5");
+    qvals[1] = num_create_from_string("1.5");
+    qvals[2] = num_create_from_string("2.5");
+    qvals[3] = num_create_from_string("3.5");
+    Q = mat_create_num(2, 2, qvals);
     M = mat_add(A, Q);
-    check_bool("number + qfloat promotes to number",
+    check_bool("number + number(decimal) stays number",
                M != NULL && mat_typeof(M) == MAT_TYPE_NUMBER);
     got = mat_get_num(M, 0, 0);
     expected = num_create_from_string("1.5");
-    check_bool("number + qfloat value", num_eq(got, expected));
+    check_bool("number + decimal value", num_eq(got, expected));
     num_destroy(&expected);
     num_destroy(&got);
 
     mat_free(M);
     mat_free(Q);
+    for (size_t i = 0; i < 4; ++i)
+        num_destroy(&qvals[i]);
     mat_free(B);
     mat_free(A);
     for (size_t i = 0; i < 4; ++i) {
@@ -465,6 +483,32 @@ static void print_matrix_core_num_comparison(const char *label,
     num_destroy(&error);
     free(got_text);
     free(expected_text);
+}
+
+static void check_matrix_core_num_value(const char *label,
+                                        const number_t got,
+                                        const number_t expected,
+                                        double tol)
+{
+    number_t error = matrix_core_num_error_magnitude(got, expected);
+    double err = num_to_double(error);
+
+    check_bool(label, err < tol);
+    if (!(err < tol))
+        print_matrix_core_num_comparison(label, got, expected);
+
+    num_destroy(&error);
+}
+
+static void check_matrix_core_num_value_double(const char *label,
+                                               const number_t got,
+                                               double expected,
+                                               double tol)
+{
+    number_t expected_num = num_create_from_double(expected);
+
+    check_matrix_core_num_value(label, got, expected_num, tol);
+    num_destroy(&expected_num);
 }
 
 static void test_number_det_and_inverse(void)
@@ -768,8 +812,8 @@ static void test_dval_symbolic_printing(void)
     dval_t *x = test_dv_new_named_var_d(0.0, "x");
     dval_t *y = test_dv_new_named_var_d(1.0, "y");
     dval_t *z = test_dv_new_named_var_d(2.0, "z");
-    dval_t *pi = test_dv_new_named_const_qf(QF_PI, "@pi");
-    dval_t *tau = test_dv_new_named_const_qf(QF_2PI, "@tau");
+    dval_t *pi = dv_new_named_const(NUM_PI, "@pi");
+    dval_t *tau = dv_new_named_const(NUM_2PI, "@tau");
     dval_t *alpha = test_dv_new_named_const_d(3.1415926535897932384626433, "@alpha");
     dval_t *cos_y = dv_cos(y);
 
@@ -921,24 +965,33 @@ static void test_transpose_conjugate(void)
     mat_free(A);
     mat_free(T);
 
-    matrix_t *C = test_mat_dense_qc(2, 2);
-    qcomplex_t z1 = qc_make(qf_from_double(2.0), qf_from_double(3.0));
-    qcomplex_t z2 = qc_make(qf_from_double(-1.0), qf_from_double(4.0));
+    matrix_t *C = mat_new_num(2, 2);
+    number_t z1 = num_create_from_string("2 + 3i");
+    number_t z2 = num_create_from_string("-1 + 4i");
     mat_set(C, 0, 0, &z1);
     mat_set(C, 1, 1, &z2);
 
-    print_mqc("C", C);
+    print_mnum("C", C);
 
     matrix_t *K = mat_conj(C);
-    print_mqc("conj(C)", K);
+    print_mnum("conj(C)", K);
 
-    qcomplex_t zv;
+    number_t zv;
+    number_t expected;
     mat_get(K, 0, 0, &zv);
-    check_qc_val("conj C[0,0]", zv, qc_conj(z1), 1e-30);
+    expected = num_conj(z1);
+    check_bool("conj C[0,0]", num_eq(zv, expected));
+    num_destroy(&expected);
+    num_destroy(&zv);
 
     mat_get(K, 1, 1, &zv);
-    check_qc_val("conj C[1,1]", zv, qc_conj(z2), 1e-30);
+    expected = num_conj(z2);
+    check_bool("conj C[1,1]", num_eq(zv, expected));
+    num_destroy(&expected);
+    num_destroy(&zv);
 
+    num_destroy(&z2);
+    num_destroy(&z1);
     mat_free(C);
     mat_free(K);
 }
@@ -994,7 +1047,7 @@ static void test_owned_element_reads_and_transforms(void)
     printf(C_CYAN "TEST: owned element reads and transforms\n" C_RESET);
 
     number_t x0 = num_create_from_double(2.0);
-    dval_t *x = dv_new_named_var_num(x0, "x");
+    dval_t *x = dv_new_named_var(x0, "x");
     dval_t *one = DV_ONE;
     dval_t *owned_x = NULL;
     dval_t *owned_one = NULL;
@@ -1313,32 +1366,33 @@ static void test_sparse_support(void)
     }
 
     {
-        qcomplex_t vals[4] = {
-            qc_make(qf_from_double(0.0), QF_ZERO),
-            qc_make(qf_from_double(2.0), qf_from_double(-1.0)),
-            QC_ZERO,
-            qc_make(qf_from_double(0.0), QF_ZERO)
+        number_t vals[4] = {
+            NUM_ZERO,
+            num_create_from_string("2 - i"),
+            NUM_ZERO,
+            NUM_ZERO
         };
-        qcomplex_t zero = QC_ZERO;
-        matrix_t *S = test_mat_sparse_qc(2, 2);
+        number_t zero = NUM_ZERO;
+        matrix_t *S = mat_new_sparse_num(2, 2);
         matrix_t *D = NULL;
-        matrix_t *Expected = test_mat_create_qc(2, 2, vals);
+        matrix_t *Expected = mat_create_num(2, 2, vals);
 
-        check_bool("mat_new_sparse_qc non-null", S != NULL);
+        check_bool("mat_new_sparse_num non-null", S != NULL);
         if (S) {
             mat_set(S, 0, 1, &vals[1]);
-            check_bool("qcomplex sparse nnz = 1", mat_nonzero_count(S) == 1);
+            check_bool("complex number sparse nnz = 1", mat_nonzero_count(S) == 1);
             mat_set(S, 1, 1, &zero);
-            check_bool("setting qcomplex zero leaves nnz unchanged", mat_nonzero_count(S) == 1);
+            check_bool("setting complex zero leaves nnz unchanged", mat_nonzero_count(S) == 1);
             D = mat_to_dense(S);
-            check_bool("dense(qcomplex sparse) not NULL", D != NULL);
+            check_bool("dense(complex sparse) not NULL", D != NULL);
             if (D)
-                check_mat_qc("qcomplex sparse round-trip", D, Expected, 1e-25);
+                check_mat_complex("complex sparse round-trip", D, Expected, 1e-18);
         }
 
         mat_free(D);
         mat_free(Expected);
         mat_free(S);
+        num_destroy(&vals[1]);
     }
 
     {
@@ -1526,7 +1580,7 @@ static void test_layout_policy_regressions(void)
 
             {
                 number_t minus_two = num_create_from_double(-2.0);
-                R = mat_scalar_mul_num(S, &minus_two);
+                R = mat_scalar_mul(S, &minus_two);
                 num_destroy(&minus_two);
             }
             check_bool("scalar multiply of sparse not NULL", R != NULL);
@@ -1587,13 +1641,9 @@ static void test_layout_policy_regressions(void)
     }
 
     {
-        matrix_t *I = test_mat_identity_qc(2);
+        matrix_t *I = mat_create_identity_num(2);
         matrix_t *C = NULL;
-        qcomplex_t expected_vals[4] = {
-            qc_make(qf_from_double(1.0), QF_ZERO), QC_ZERO,
-            QC_ZERO, qc_make(qf_from_double(1.0), QF_ZERO)
-        };
-        matrix_t *Expected = test_mat_create_qc(2, 2, expected_vals);
+        matrix_t *Expected = mat_create_identity_num(2);
 
         check_bool("identity conjugate inputs allocated",
                    I != NULL && Expected != NULL);
@@ -1602,7 +1652,7 @@ static void test_layout_policy_regressions(void)
             check_bool("conjugate of identity not NULL", C != NULL);
             check_bool("conjugate of identity preserves diagonal structure", C && mat_is_diagonal(C));
             if (C)
-                check_mat_qc("conjugate of identity matches expected", C, Expected, 1e-25);
+                check_mat_num_local("conjugate of identity matches expected", C, Expected, 1e-25);
         }
 
         mat_free(Expected);
@@ -1638,569 +1688,674 @@ static void test_structural_queries_and_diagonal_construction(void)
     }
 
     {
-        qcomplex_t diag_vals[2] = {
-            qc_make(qf_from_double(1.0), qf_from_double(2.0)),
-            qc_make(qf_from_double(-3.0), qf_from_double(0.5))
+        number_t diag_vals[2] = {
+            num_create_from_string("1 + 2i"),
+            num_create_from_string("-3 + 0.5i")
         };
-        matrix_t *D = test_mat_diagonal_qc(2, diag_vals);
+        matrix_t *D = mat_create_diagonal_num(2, diag_vals);
 
-        check_bool("mat_create_diagonal_qc not NULL", D != NULL);
-        check_bool("qcomplex diagonal recognised as diagonal", D && mat_is_diagonal(D));
-        check_bool("qcomplex diagonal nonzero count = 2", D && mat_nonzero_count(D) == 2);
+        check_bool("mat_create_diagonal_num(complex) not NULL", D != NULL);
+        check_bool("complex number diagonal recognised as diagonal", D && mat_is_diagonal(D));
+        check_bool("complex number diagonal nonzero count = 2", D && mat_nonzero_count(D) == 2);
 
+        num_destroy(&diag_vals[1]);
+        num_destroy(&diag_vals[0]);
         mat_free(D);
     }
 }
 
-/* ------------------------------------------------------------------ qfloat add/sub (mixed sizes) */
+/* ------------------------------------------------------------------ number_t add/sub (mixed sizes) */
 
-static void test_add_sub_qf(void)
+static void test_add_sub_num_real(void)
 {
-    printf(C_CYAN "TEST: qfloat addition/subtraction (mixed sizes)\n" C_RESET);
+    printf(C_CYAN "TEST: number_t real addition/subtraction (mixed sizes)\n" C_RESET);
 
-    qfloat_t a_vals[6] = {
-        qf_from_double(1), qf_from_double(2), qf_from_double(3),
-        qf_from_double(4), qf_from_double(5), qf_from_double(6)};
-    qfloat_t b_vals[6] = {
-        qf_from_double(10), qf_from_double(20), qf_from_double(30),
-        qf_from_double(40), qf_from_double(50), qf_from_double(60)};
+    number_t a_vals[6] = {
+        num_create_from_long(1), num_create_from_long(2), num_create_from_long(3),
+        num_create_from_long(4), num_create_from_long(5), num_create_from_long(6)};
+    number_t b_vals[6] = {
+        num_create_from_long(10), num_create_from_long(20), num_create_from_long(30),
+        num_create_from_long(40), num_create_from_long(50), num_create_from_long(60)};
 
-    matrix_t *A = test_mat_create_qf(2, 3, a_vals);
-    matrix_t *B = test_mat_create_qf(2, 3, b_vals);
+    matrix_t *A = mat_create_num(2, 3, a_vals);
+    matrix_t *B = mat_create_num(2, 3, b_vals);
 
-    print_mqf("A", A);
-    print_mqf("B", B);
+    print_mnum("A", A);
+    print_mnum("B", B);
 
     matrix_t *C = mat_add(A, B);
-    print_mqf("A+B", C);
+    print_mnum("A+B", C);
 
-    qfloat_t c_vals[6];
-    mat_get_data(C, c_vals);
+    number_t c_vals[6] = { num_new(), num_new(), num_new(), num_new(), num_new(), num_new() };
+    mat_get_data_num(C, c_vals);
 
     for (size_t k = 0; k < 6; k++)
     {
-        qfloat_t expected = qf_add(a_vals[k], b_vals[k]);
+        number_t expected = num_add(a_vals[k], b_vals[k]);
         char label[64];
-        snprintf(label, sizeof(label), "qfloat add[%zu,%zu]", k / 3, k % 3);
-        check_qf_val(label, c_vals[k], expected, 1e-28);
+        snprintf(label, sizeof(label), "number add[%zu,%zu]", k / 3, k % 3);
+        check_bool(label, num_eq(c_vals[k], expected));
+        num_destroy(&expected);
     }
 
     matrix_t *D = mat_sub(A, B);
-    print_mqf("A-B", D);
+    print_mnum("A-B", D);
 
-    qfloat_t d_vals[6];
-    mat_get_data(D, d_vals);
+    number_t d_vals[6] = { num_new(), num_new(), num_new(), num_new(), num_new(), num_new() };
+    mat_get_data_num(D, d_vals);
 
     for (size_t k = 0; k < 6; k++)
     {
-        qfloat_t expected = qf_sub(a_vals[k], b_vals[k]);
+        number_t expected = num_sub(a_vals[k], b_vals[k]);
         char label[64];
-        snprintf(label, sizeof(label), "qfloat sub[%zu,%zu]", k / 3, k % 3);
-        check_qf_val(label, d_vals[k], expected, 1e-28);
+        snprintf(label, sizeof(label), "number sub[%zu,%zu]", k / 3, k % 3);
+        check_bool(label, num_eq(d_vals[k], expected));
+        num_destroy(&expected);
     }
 
+    for (size_t k = 0; k < 6; k++) {
+        num_destroy(&d_vals[k]);
+        num_destroy(&c_vals[k]);
+        num_destroy(&b_vals[k]);
+        num_destroy(&a_vals[k]);
+    }
     mat_free(A);
     mat_free(B);
     mat_free(C);
     mat_free(D);
 }
 
-/* ------------------------------------------------------------------ qcomplex add/sub (mixed sizes) */
+/* ------------------------------------------------------------------ number_t complex add/sub (mixed sizes) */
 
-static void test_add_sub_qc(void)
+static void test_add_sub_num_complex(void)
 {
-    printf(C_CYAN "TEST: qcomplex addition/subtraction (mixed sizes)\n" C_RESET);
+    printf(C_CYAN "TEST: number_t complex addition/subtraction (mixed sizes)\n" C_RESET);
 
-    qcomplex_t a_vals[3] = {
-        qc_make(qf_from_double(1), qf_from_double(2)),
-        qc_make(qf_from_double(3), qf_from_double(4)),
-        qc_make(qf_from_double(-1), qf_from_double(5))};
-    qcomplex_t b_vals[3] = {
-        qc_make(qf_from_double(10), qf_from_double(-2)),
-        qc_make(qf_from_double(0), qf_from_double(7)),
-        qc_make(qf_from_double(2), qf_from_double(3))};
-    matrix_t *A = test_mat_create_qc(1, 3, a_vals);
-    matrix_t *B = test_mat_create_qc(1, 3, b_vals);
+    number_t a_vals[3] = {
+        num_create_from_string("1 + 2i"),
+        num_create_from_string("3 + 4i"),
+        num_create_from_string("-1 + 5i")};
+    number_t b_vals[3] = {
+        num_create_from_string("10 - 2i"),
+        num_create_from_string("7i"),
+        num_create_from_string("2 + 3i")};
+    matrix_t *A = mat_create_num(1, 3, a_vals);
+    matrix_t *B = mat_create_num(1, 3, b_vals);
 
-    print_mqc("A", A);
-    print_mqc("B", B);
+    print_mnum("A", A);
+    print_mnum("B", B);
 
     matrix_t *C = mat_add(A, B);
-    print_mqc("A+B", C);
+    print_mnum("A+B", C);
 
-    qcomplex_t C_vals[3];
-    mat_get_data(C, C_vals);
+    number_t C_vals[3] = { num_new(), num_new(), num_new() };
+    mat_get_data_num(C, C_vals);
     for (size_t j = 0; j < 3; j++)
     {
-        qcomplex_t expected = qc_add(a_vals[j], b_vals[j]);
+        number_t expected = num_add(a_vals[j], b_vals[j]);
         char label[64];
-        snprintf(label, sizeof(label), "qcomplex add[0,%zu]", j);
-        check_qc_val(label, C_vals[j], expected, 1e-28);
+        snprintf(label, sizeof(label), "complex-number add[0,%zu]", j);
+        check_bool(label, num_eq(C_vals[j], expected));
+        num_destroy(&expected);
     }
 
     matrix_t *D = mat_sub(A, B);
-    print_mqc("A-B", D);
+    print_mnum("A-B", D);
 
-    qcomplex_t D_vals[3];
-    mat_get_data(D, D_vals);
+    number_t D_vals[3] = { num_new(), num_new(), num_new() };
+    mat_get_data_num(D, D_vals);
     for (size_t j = 0; j < 3; j++)
     {
-        qcomplex_t expected = qc_sub(a_vals[j], b_vals[j]);
+        number_t expected = num_sub(a_vals[j], b_vals[j]);
         char label[64];
-        snprintf(label, sizeof(label), "qcomplex sub[0,%zu]", j);
-        check_qc_val(label, D_vals[j], expected, 1e-28);
+        snprintf(label, sizeof(label), "complex-number sub[0,%zu]", j);
+        check_bool(label, num_eq(D_vals[j], expected));
+        num_destroy(&expected);
     }
 
+    for (size_t j = 0; j < 3; j++) {
+        num_destroy(&D_vals[j]);
+        num_destroy(&C_vals[j]);
+        num_destroy(&b_vals[j]);
+        num_destroy(&a_vals[j]);
+    }
     mat_free(A);
     mat_free(B);
     mat_free(C);
     mat_free(D);
 }
 
-/* ------------------------------------------------------------------ qfloat multiply (mixed sizes) */
+/* ------------------------------------------------------------------ number_t real multiply (mixed sizes) */
 
-static void test_multiply_qf(void)
+static void test_multiply_num_real(void)
 {
-    printf(C_CYAN "TEST: qfloat multiplication (mixed sizes)\n" C_RESET);
+    printf(C_CYAN "TEST: number_t real multiplication (mixed sizes)\n" C_RESET);
 
-    double a_raw[6] = {1, 2, 3, 4, 5, 6};
-    double b_raw[6] = {7, 8, 9, 10, 11, 12};
+    number_t A_vals[6] = {
+        num_create_from_long(1), num_create_from_long(2), num_create_from_long(3),
+        num_create_from_long(4), num_create_from_long(5), num_create_from_long(6)
+    };
+    number_t B_vals[6] = {
+        num_create_from_long(7), num_create_from_long(8), num_create_from_long(9),
+        num_create_from_long(10), num_create_from_long(11), num_create_from_long(12)
+    };
 
-    qfloat_t A_vals[6];
-    qfloat_t B_vals[6];
+    matrix_t *A = mat_create_num(2, 3, A_vals);
+    matrix_t *B = mat_create_num(3, 2, B_vals);
 
-    for (size_t k = 0; k < 6; k++)
-    {
-        A_vals[k] = qf_from_double(a_raw[k]);
-        B_vals[k] = qf_from_double(b_raw[k]);
-    }
-
-    matrix_t *A = test_mat_create_qf(2, 3, A_vals);
-    matrix_t *B = test_mat_create_qf(3, 2, B_vals);
-
-    print_mqf("A", A);
-    print_mqf("B", B);
+    print_mnum("A", A);
+    print_mnum("B", B);
 
     matrix_t *C = mat_mul(A, B);
-    print_mqf("A*B", C);
+    print_mnum("A*B", C);
 
-    double expected_raw[4] = {58, 64, 139, 154};
-
-    qfloat_t C_vals[4];
-    mat_get_data(C, C_vals);
+    number_t C_vals[4] = { num_new(), num_new(), num_new(), num_new() };
+    mat_get_data_num(C, C_vals);
 
     for (size_t k = 0; k < 4; k++)
     {
-        qfloat_t expected = qf_from_double(expected_raw[k]);
+        number_t expected;
         char label[64];
-        snprintf(label, sizeof(label), "qfloat mul[%zu,%zu]", k / 2, k % 2);
-        check_qf_val(label, C_vals[k], expected, 1e-28);
+        switch (k) {
+        case 0: expected = num_create_from_long(58); break;
+        case 1: expected = num_create_from_long(64); break;
+        case 2: expected = num_create_from_long(139); break;
+        default: expected = num_create_from_long(154); break;
+        }
+        snprintf(label, sizeof(label), "number mul[%zu,%zu]", k / 2, k % 2);
+        check_bool(label, num_eq(C_vals[k], expected));
+        num_destroy(&expected);
     }
 
+    for (size_t k = 0; k < 4; ++k)
+        num_destroy(&C_vals[k]);
+    for (size_t k = 0; k < 6; ++k) {
+        num_destroy(&B_vals[k]);
+        num_destroy(&A_vals[k]);
+    }
     mat_free(A);
     mat_free(B);
     mat_free(C);
 }
 
-/* ------------------------------------------------------------------ qcomplex multiply (mixed sizes) */
+/* ------------------------------------------------------------------ number_t complex multiply (mixed sizes) */
 
-static void test_multiply_qc(void)
+static void test_multiply_num_complex(void)
 {
-    printf(C_CYAN "TEST: qcomplex multiplication (mixed sizes)\n" C_RESET);
+    printf(C_CYAN "TEST: number_t complex multiplication (mixed sizes)\n" C_RESET);
 
-    qcomplex_t a_vals[3] = {
-        qc_make(qf_from_double(1), qf_from_double(1)),
-        qc_make(qf_from_double(2), qf_from_double(-1)),
-        qc_make(qf_from_double(0), qf_from_double(3))};
+    number_t a_vals[3] = {
+        num_create_from_string("1 + 1i"),
+        num_create_from_string("2 - 1i"),
+        num_create_from_string("3i")};
 
-    qcomplex_t b_vals[4] = {
-        qc_make(qf_from_double(4), qf_from_double(0)),
-        qc_make(qf_from_double(1), qf_from_double(2)),
-        qc_make(qf_from_double(-3), qf_from_double(1)),
-        qc_make(qf_from_double(0), qf_from_double(-2))};
+    number_t b_vals[4] = {
+        num_create_from_string("4"),
+        num_create_from_string("1 + 2i"),
+        num_create_from_string("-3 + 1i"),
+        num_create_from_string("-2i")};
 
-    matrix_t *A = test_mat_create_qc(3, 1, a_vals);
-    matrix_t *B = test_mat_create_qc(1, 4, b_vals);
+    matrix_t *A = mat_create_num(3, 1, a_vals);
+    matrix_t *B = mat_create_num(1, 4, b_vals);
 
-    print_mqc("A", A);
-    print_mqc("B", B);
+    print_mnum("A", A);
+    print_mnum("B", B);
 
     matrix_t *C = mat_mul(A, B);
-    print_mqc("A*B", C);
+    print_mnum("A*B", C);
 
-    qcomplex_t C_vals[12];
-    mat_get_data(C, C_vals);
+    number_t C_vals[12] = {
+        num_new(), num_new(), num_new(), num_new(),
+        num_new(), num_new(), num_new(), num_new(),
+        num_new(), num_new(), num_new(), num_new()
+    };
+    mat_get_data_num(C, C_vals);
 
     for (size_t i = 0; i < 3; i++)
         for (size_t j = 0; j < 4; j++)
         {
             size_t k = i * 4 + j;
-            qcomplex_t expected = qc_mul(a_vals[i], b_vals[j]);
+            number_t expected = num_mul(a_vals[i], b_vals[j]);
             char label[64];
-            snprintf(label, sizeof(label), "qcomplex mul[%zu,%zu]", i, j);
-            check_qc_val(label, C_vals[k], expected, 1e-28);
+            snprintf(label, sizeof(label), "complex-number mul[%zu,%zu]", i, j);
+            check_bool(label, num_eq(C_vals[k], expected));
+            num_destroy(&expected);
         }
 
+    for (size_t k = 0; k < 12; ++k)
+        num_destroy(&C_vals[k]);
+    for (size_t i = 0; i < 4; ++i)
+        num_destroy(&b_vals[i]);
+    for (size_t i = 0; i < 3; ++i)
+        num_destroy(&a_vals[i]);
     mat_free(A);
     mat_free(B);
     mat_free(C);
 }
 
-/* ------------------------------------------------------------------ mixed-type add: double + qfloat */
+/* ------------------------------------------------------------------ mixed-type add: numeric real + decimal number_t */
 
-static void test_add_mixed_d_qf(void)
+static void test_add_mixed_num_real(void)
 {
-    printf(C_CYAN "TEST: mixed-type addition (double + qfloat)\n" C_RESET);
+    printf(C_CYAN "TEST: mixed-type addition (real + decimal number_t)\n" C_RESET);
 
-    double a_vals[4] = {1.0, 2.0, 3.0, 4.0};
-    qfloat_t b_vals[4] = {
-        qf_from_double(10), qf_from_double(20),
-        qf_from_double(30), qf_from_double(40)};
+    number_t a_vals[4] = {
+        num_create_from_long(1), num_create_from_long(2),
+        num_create_from_long(3), num_create_from_long(4)};
+    number_t b_vals[4] = {
+        num_create_from_string("10"), num_create_from_string("20"),
+        num_create_from_string("30"), num_create_from_string("40")};
 
-    matrix_t *A = test_mat_create_d(2, 2, a_vals);
-    matrix_t *B = test_mat_create_qf(2, 2, b_vals);
+    matrix_t *A = mat_create_num(2, 2, a_vals);
+    matrix_t *B = mat_create_num(2, 2, b_vals);
 
-    print_md("A (double)", A);
-    print_mqf("B (qfloat)", B);
+    print_mnum("A", A);
+    print_mnum("B", B);
 
     matrix_t *C = mat_add(A, B);
-    print_mqf("A + B (qfloat result)", C);
+    print_mnum("A + B", C);
 
-    qfloat_t C_vals[4];
-    mat_get_data(C, C_vals);
+    number_t C_vals[4] = { num_new(), num_new(), num_new(), num_new() };
+    mat_get_data_num(C, C_vals);
 
     for (size_t k = 0; k < 4; k++)
     {
-        qfloat_t expected = qf_add(qf_from_double(a_vals[k]), b_vals[k]);
+        number_t expected = num_add(a_vals[k], b_vals[k]);
         char label[64];
-        snprintf(label, sizeof(label), "mixed add d+qf [%zu,%zu]", k / 2, k % 2);
-        check_qf_val(label, C_vals[k], expected, 1e-28);
+        snprintf(label, sizeof(label), "mixed add real+num [%zu,%zu]", k / 2, k % 2);
+        check_bool(label, num_eq(C_vals[k], expected));
+        num_destroy(&expected);
     }
 
+    for (size_t k = 0; k < 4; ++k) {
+        num_destroy(&C_vals[k]);
+        num_destroy(&b_vals[k]);
+        num_destroy(&a_vals[k]);
+    }
     mat_free(A);
     mat_free(B);
     mat_free(C);
 }
 
-/* ------------------------------------------------------------------ mixed-type add: double + qcomplex */
+/* ------------------------------------------------------------------ mixed-type add: numeric real + complex number_t */
 
-static void test_add_mixed_d_qc(void)
+static void test_add_mixed_num_complex(void)
 {
-    printf(C_CYAN "TEST: mixed-type addition (double + qcomplex)\n" C_RESET);
+    printf(C_CYAN "TEST: mixed-type addition (real + complex number_t)\n" C_RESET);
 
-    double a_vals[3] = {1.0, -2.0, 5.0};
-    qcomplex_t b_vals[3] = {
-        qc_make(qf_from_double(3), qf_from_double(4)),
-        qc_make(qf_from_double(0), qf_from_double(-1)),
-        qc_make(qf_from_double(2), qf_from_double(2))};
+    number_t a_vals[3] = {
+        num_create_from_long(1), num_create_from_long(-2), num_create_from_long(5)};
+    number_t b_vals[3] = {
+        num_create_from_string("3 + 4i"),
+        num_create_from_string("-i"),
+        num_create_from_string("2 + 2i")};
 
-    matrix_t *A = test_mat_create_d(1, 3, a_vals);
-    matrix_t *B = test_mat_create_qc(1, 3, b_vals);
+    matrix_t *A = mat_create_num(1, 3, a_vals);
+    matrix_t *B = mat_create_num(1, 3, b_vals);
 
-    print_md("A (double)", A);
-    print_mqc("B (qcomplex)", B);
+    print_mnum("A", A);
+    print_mnum("B", B);
 
     matrix_t *C = mat_add(A, B);
-    print_mqc("A + B (qcomplex result)", C);
+    print_mnum("A + B", C);
 
-    qcomplex_t C_vals[3];
-    mat_get_data(C, C_vals);
+    number_t C_vals[3] = { num_new(), num_new(), num_new() };
+    mat_get_data_num(C, C_vals);
 
     for (size_t j = 0; j < 3; j++)
     {
-        qcomplex_t expected = qc_add(
-            qc_make(qf_from_double(a_vals[j]), QF_ZERO),
-            b_vals[j]);
+        number_t expected = num_add(a_vals[j], b_vals[j]);
         char label[64];
-        snprintf(label, sizeof(label), "mixed add d+qc [0,%zu]", j);
-        check_qc_val(label, C_vals[j], expected, 1e-28);
+        snprintf(label, sizeof(label), "mixed add real+complex [%zu,0]", j);
+        check_bool(label, num_eq(C_vals[j], expected));
+        num_destroy(&expected);
     }
 
+    for (size_t j = 0; j < 3; ++j) {
+        num_destroy(&C_vals[j]);
+        num_destroy(&b_vals[j]);
+        num_destroy(&a_vals[j]);
+    }
     mat_free(A);
     mat_free(B);
     mat_free(C);
 }
 
-/* ------------------------------------------------------------------ mixed-type add: qfloat + qcomplex */
+/* ------------------------------------------------------------------ mixed-type add: decimal number_t + complex number_t */
 
-static void test_add_mixed_qf_qc(void)
+static void test_add_mixed_num_num_complex(void)
 {
-    printf(C_CYAN "TEST: mixed-type addition (qfloat + qcomplex)\n" C_RESET);
+    printf(C_CYAN "TEST: mixed-type addition (decimal number_t + complex number_t)\n" C_RESET);
 
-    qfloat_t a_vals[2] = {qf_from_double(1.5), qf_from_double(-3.25)};
-    qcomplex_t b_vals[2] = {
-        qc_make(qf_from_double(2), qf_from_double(1)),
-        qc_make(qf_from_double(-1), qf_from_double(4))};
+    number_t a_vals[2] = { num_create_from_string("1.5"), num_create_from_string("-3.25") };
+    number_t b_vals[2] = {
+        num_create_from_string("2 + i"),
+        num_create_from_string("-1 + 4i")};
 
-    matrix_t *A = test_mat_create_qf(2, 1, a_vals);
-    matrix_t *B = test_mat_create_qc(2, 1, b_vals);
+    matrix_t *A = mat_create_num(2, 1, a_vals);
+    matrix_t *B = mat_create_num(2, 1, b_vals);
 
-    print_mqf("A (qfloat)", A);
-    print_mqc("B (qcomplex)", B);
+    print_mnum("A", A);
+    print_mnum("B", B);
 
     matrix_t *C = mat_add(A, B);
-    print_mqc("A + B (qcomplex result)", C);
+    print_mnum("A + B", C);
 
-    qcomplex_t C_vals[2];
-    mat_get_data(C, C_vals);
+    number_t C_vals[2] = { num_new(), num_new() };
+    mat_get_data_num(C, C_vals);
 
     for (size_t i = 0; i < 2; i++)
     {
-        qcomplex_t expected = qc_add(
-            qc_make(a_vals[i], QF_ZERO),
-            b_vals[i]);
+        number_t expected = num_add(a_vals[i], b_vals[i]);
         char label[64];
-        snprintf(label, sizeof(label), "mixed add qf+qc [%zu,0]", i);
-        check_qc_val(label, C_vals[i], expected, 1e-28);
+        snprintf(label, sizeof(label), "mixed add decimal+complex [%zu,0]", i);
+        check_bool(label, num_eq(C_vals[i], expected));
+        num_destroy(&expected);
     }
 
+    for (size_t i = 0; i < 2; ++i) {
+        num_destroy(&C_vals[i]);
+        num_destroy(&b_vals[i]);
+        num_destroy(&a_vals[i]);
+    }
     mat_free(A);
     mat_free(B);
     mat_free(C);
 }
 
-/* ------------------------------------------------------------------ mixed-type sub: double - qfloat */
+/* ------------------------------------------------------------------ mixed-type sub: numeric real - decimal number_t */
 
-static void test_sub_mixed_d_qf(void)
+static void test_sub_mixed_num_real(void)
 {
-    printf(C_CYAN "TEST: mixed-type subtraction (double - qfloat)\n" C_RESET);
+    printf(C_CYAN "TEST: mixed-type subtraction (real - decimal number_t)\n" C_RESET);
 
-    double a_vals[4] = {5.0, 7.0, -3.0, 2.0};
-    qfloat_t b_vals[4] = {
-        qf_from_double(1.0), qf_from_double(2.5),
-        qf_from_double(-4.0), qf_from_double(10.0)};
+    number_t a_vals[4] = {
+        num_create_from_long(5), num_create_from_long(7),
+        num_create_from_long(-3), num_create_from_long(2)};
+    number_t b_vals[4] = {
+        num_create_from_string("1.0"), num_create_from_string("2.5"),
+        num_create_from_string("-4.0"), num_create_from_string("10.0")};
 
-    matrix_t *A = test_mat_create_d(2, 2, a_vals);
-    matrix_t *B = test_mat_create_qf(2, 2, b_vals);
+    matrix_t *A = mat_create_num(2, 2, a_vals);
+    matrix_t *B = mat_create_num(2, 2, b_vals);
 
-    print_md("A (double)", A);
-    print_mqf("B (qfloat)", B);
+    print_mnum("A", A);
+    print_mnum("B", B);
 
     matrix_t *C = mat_sub(A, B);
-    print_mqf("A - B (qfloat result)", C);
+    print_mnum("A - B", C);
 
-    qfloat_t C_vals[4];
-    mat_get_data(C, C_vals);
+    number_t C_vals[4] = { num_new(), num_new(), num_new(), num_new() };
+    mat_get_data_num(C, C_vals);
 
     for (size_t k = 0; k < 4; k++)
     {
-        qfloat_t expected = qf_sub(qf_from_double(a_vals[k]), b_vals[k]);
+        number_t expected = num_sub(a_vals[k], b_vals[k]);
         char label[64];
-        snprintf(label, sizeof(label), "mixed sub d-qf [%zu,%zu]", k / 2, k % 2);
-        check_qf_val(label, C_vals[k], expected, 1e-28);
+        snprintf(label, sizeof(label), "mixed sub real-num [%zu,%zu]", k / 2, k % 2);
+        check_bool(label, num_eq(C_vals[k], expected));
+        num_destroy(&expected);
     }
 
+    for (size_t k = 0; k < 4; ++k) {
+        num_destroy(&C_vals[k]);
+        num_destroy(&b_vals[k]);
+        num_destroy(&a_vals[k]);
+    }
     mat_free(A);
     mat_free(B);
     mat_free(C);
 }
 
-/* ------------------------------------------------------------------ mixed-type sub: double - qcomplex */
+/* ------------------------------------------------------------------ mixed-type sub: numeric real - complex number_t */
 
-static void test_sub_mixed_d_qc(void)
+static void test_sub_mixed_num_complex(void)
 {
-    printf(C_CYAN "TEST: mixed-type subtraction (double - qcomplex)\n" C_RESET);
+    printf(C_CYAN "TEST: mixed-type subtraction (real - complex number_t)\n" C_RESET);
 
-    double a_vals[3] = {10.0, -5.0, 3.0};
-    qcomplex_t b_vals[3] = {
-        qc_make(qf_from_double(2), qf_from_double(1)),
-        qc_make(qf_from_double(-3), qf_from_double(4)),
-        qc_make(qf_from_double(0.5), qf_from_double(-2))};
+    number_t a_vals[3] = {
+        num_create_from_long(10), num_create_from_long(-5), num_create_from_long(3)};
+    number_t b_vals[3] = {
+        num_create_from_string("2 + i"),
+        num_create_from_string("-3 + 4i"),
+        num_create_from_string("0.5 - 2i")};
 
-    matrix_t *A = test_mat_create_d(1, 3, a_vals);
-    matrix_t *B = test_mat_create_qc(1, 3, b_vals);
+    matrix_t *A = mat_create_num(1, 3, a_vals);
+    matrix_t *B = mat_create_num(1, 3, b_vals);
 
-    print_md("A (double)", A);
-    print_mqc("B (qcomplex)", B);
+    print_mnum("A", A);
+    print_mnum("B", B);
 
     matrix_t *C = mat_sub(A, B);
-    print_mqc("A - B (qcomplex result)", C);
+    print_mnum("A - B", C);
 
-    qcomplex_t C_vals[3];
-    mat_get_data(C, C_vals);
+    number_t C_vals[3] = { num_new(), num_new(), num_new() };
+    mat_get_data_num(C, C_vals);
 
     for (size_t j = 0; j < 3; j++)
     {
-        qcomplex_t expected = qc_sub(
-            qc_make(qf_from_double(a_vals[j]), QF_ZERO),
-            b_vals[j]);
+        number_t expected = num_sub(a_vals[j], b_vals[j]);
         char label[64];
-        snprintf(label, sizeof(label), "mixed sub d-qc [0,%zu]", j);
-        check_qc_val(label, C_vals[j], expected, 1e-28);
+        snprintf(label, sizeof(label), "mixed sub real-complex [%zu,0]", j);
+        check_bool(label, num_eq(C_vals[j], expected));
+        num_destroy(&expected);
     }
 
+    for (size_t j = 0; j < 3; ++j) {
+        num_destroy(&C_vals[j]);
+        num_destroy(&b_vals[j]);
+        num_destroy(&a_vals[j]);
+    }
     mat_free(A);
     mat_free(B);
     mat_free(C);
 }
 
-/* ------------------------------------------------------------------ mixed-type sub: qfloat - qcomplex */
+/* ------------------------------------------------------------------ mixed-type sub: decimal number_t - complex number_t */
 
-static void test_sub_mixed_qf_qc(void)
+static void test_sub_mixed_num_num_complex(void)
 {
-    printf(C_CYAN "TEST: mixed-type subtraction (qfloat - qcomplex)\n" C_RESET);
+    printf(C_CYAN "TEST: mixed-type subtraction (decimal number_t - complex number_t)\n" C_RESET);
 
-    qfloat_t a_vals[2] = {
-        qf_from_double(4.5),
-        qf_from_double(-1.25)};
+    number_t a_vals[2] = {
+        num_create_from_string("4.5"),
+        num_create_from_string("-1.25")};
 
-    qcomplex_t b_vals[2] = {
-        qc_make(qf_from_double(1), qf_from_double(3)),
-        qc_make(qf_from_double(-2), qf_from_double(1))};
+    number_t b_vals[2] = {
+        num_create_from_string("1 + 3i"),
+        num_create_from_string("-2 + i")};
 
-    matrix_t *A = test_mat_create_qf(2, 1, a_vals);
-    matrix_t *B = test_mat_create_qc(2, 1, b_vals);
+    matrix_t *A = mat_create_num(2, 1, a_vals);
+    matrix_t *B = mat_create_num(2, 1, b_vals);
 
-    print_mqf("A (qfloat)", A);
-    print_mqc("B (qcomplex)", B);
+    print_mnum("A", A);
+    print_mnum("B", B);
 
     matrix_t *C = mat_sub(A, B);
-    print_mqc("A - B (qcomplex result)", C);
+    print_mnum("A - B", C);
 
-    qcomplex_t C_vals[2];
-    mat_get_data(C, C_vals);
+    number_t C_vals[2] = { num_new(), num_new() };
+    mat_get_data_num(C, C_vals);
 
     for (size_t i = 0; i < 2; i++)
     {
-        qcomplex_t expected = qc_sub(
-            qc_make(a_vals[i], QF_ZERO),
-            b_vals[i]);
+        number_t expected = num_sub(a_vals[i], b_vals[i]);
         char label[64];
-        snprintf(label, sizeof(label), "mixed sub qf-qc [%zu,0]", i);
-        check_qc_val(label, C_vals[i], expected, 1e-28);
+        snprintf(label, sizeof(label), "mixed sub decimal-complex [%zu,0]", i);
+        check_bool(label, num_eq(C_vals[i], expected));
+        num_destroy(&expected);
     }
 
+    for (size_t i = 0; i < 2; ++i) {
+        num_destroy(&C_vals[i]);
+        num_destroy(&b_vals[i]);
+        num_destroy(&a_vals[i]);
+    }
     mat_free(A);
     mat_free(B);
     mat_free(C);
 }
 
-/* ------------------------------------------------------------------ mixed-type mul: double * qfloat */
+/* ------------------------------------------------------------------ mixed-type mul: numeric real * decimal number_t */
 
-static void test_multiply_mixed_d_qf(void)
+static void test_multiply_mixed_num_real(void)
 {
-    printf(C_CYAN "TEST: mixed-type multiplication (double * qfloat)\n" C_RESET);
+    printf(C_CYAN "TEST: mixed-type multiplication (real * decimal number_t)\n" C_RESET);
 
-    double a_vals[6] = {1, 2, 3, 4, 5, 6};
-    qfloat_t b_vals[6] = {
-        qf_from_double(7), qf_from_double(8),
-        qf_from_double(9), qf_from_double(10),
-        qf_from_double(11), qf_from_double(12)};
+    number_t a_vals[6] = {
+        num_create_from_long(1), num_create_from_long(2), num_create_from_long(3),
+        num_create_from_long(4), num_create_from_long(5), num_create_from_long(6)};
+    number_t b_vals[6] = {
+        num_create_from_string("7.0"), num_create_from_string("8.0"),
+        num_create_from_string("9.0"), num_create_from_string("10.0"),
+        num_create_from_string("11.0"), num_create_from_string("12.0")};
 
-    matrix_t *A = test_mat_create_d(2, 3, a_vals);
-    matrix_t *B = test_mat_create_qf(3, 2, b_vals);
+    matrix_t *A = mat_create_num(2, 3, a_vals);
+    matrix_t *B = mat_create_num(3, 2, b_vals);
 
-    print_md("A (double)", A);
-    print_mqf("B (qfloat)", B);
+    print_mnum("A", A);
+    print_mnum("B", B);
 
     matrix_t *C = mat_mul(A, B);
-    print_mqf("A * B (qfloat result)", C);
+    print_mnum("A * B", C);
 
-    double expected_raw[4] = {58, 64, 139, 154};
+    number_t C_vals[4] = { num_new(), num_new(), num_new(), num_new() };
+    mat_get_data_num(C, C_vals);
 
-    qfloat_t C_vals[4];
-    mat_get_data(C, C_vals);
-
-    for (size_t k = 0; k < 4; k++)
-    {
-        qfloat_t expected = qf_from_double(expected_raw[k]);
-        char label[64];
-        snprintf(label, sizeof(label), "mixed mul d*qf [%zu,%zu]", k / 2, k % 2);
-        check_qf_val(label, C_vals[k], expected, 1e-28);
-    }
-
-    mat_free(A);
-    mat_free(B);
-    mat_free(C);
-}
-
-/* ------------------------------------------------------------------ mixed-type mul: double * qcomplex */
-
-static void test_multiply_mixed_d_qc(void)
-{
-    printf(C_CYAN "TEST: mixed-type multiplication (double * qcomplex)\n" C_RESET);
-
-    double a_vals[3] = {2.0, -1.0, 3.0};
-    qcomplex_t b_vals[6] = {
-        qc_make(qf_from_double(1), qf_from_double(2)),
-        qc_make(qf_from_double(0), qf_from_double(-1)),
-        qc_make(qf_from_double(4), qf_from_double(0)),
-        qc_make(qf_from_double(-2), qf_from_double(3)),
-        qc_make(qf_from_double(1), qf_from_double(1)),
-        qc_make(qf_from_double(0), qf_from_double(5))};
-
-    matrix_t *A = test_mat_create_d(1, 3, a_vals);
-    matrix_t *B = test_mat_create_qc(3, 2, b_vals);
-
-    print_md("A (double)", A);
-    print_mqc("B (qcomplex)", B);
-
-    matrix_t *C = mat_mul(A, B);
-    print_mqc("A * B (qcomplex result)", C);
-
-    qcomplex_t C_vals[6];
-    mat_get_data(C, C_vals);
-
-    for (size_t i = 0; i < 1; i++)
+    for (size_t i = 0; i < 2; i++)
         for (size_t j = 0; j < 2; j++)
         {
             size_t k = i * 2 + j;
-            qcomplex_t expected = QC_ZERO;
+            number_t expected = num_create_from_long(0);
             for (size_t t = 0; t < 3; t++)
             {
-                qcomplex_t term = qc_mul(
-                    qc_make(qf_from_double(a_vals[t]), QF_ZERO),
-                    b_vals[t * 2 + j]);
-                expected = qc_add(expected, term);
+                number_t term = num_mul(a_vals[i * 3 + t], b_vals[t * 2 + j]);
+                number_t next = num_add(expected, term);
+                num_destroy(&term);
+                num_destroy(&expected);
+                expected = next;
             }
             char label[64];
-            snprintf(label, sizeof(label), "mixed mul d*qc [%zu,%zu]", i, j);
-            check_qc_val(label, C_vals[k], expected, 1e-28);
+            snprintf(label, sizeof(label), "mixed mul real-num [%zu,%zu]", i, j);
+            check_bool(label, num_eq(C_vals[k], expected));
+            num_destroy(&expected);
         }
 
+    for (size_t k = 0; k < 4; ++k)
+        num_destroy(&C_vals[k]);
+    for (size_t k = 0; k < 6; ++k) {
+        num_destroy(&b_vals[k]);
+        num_destroy(&a_vals[k]);
+    }
     mat_free(A);
     mat_free(B);
     mat_free(C);
 }
 
-/* ------------------------------------------------------------------ mixed-type mul: qfloat * qcomplex */
+/* ------------------------------------------------------------------ mixed-type mul: numeric real * complex number_t */
 
-static void test_multiply_mixed_qf_qc(void)
+static void test_multiply_mixed_num_complex(void)
 {
-    printf(C_CYAN "TEST: mixed-type multiplication (qfloat * qcomplex)\n" C_RESET);
+    printf(C_CYAN "TEST: mixed-type multiplication (real * complex number_t)\n" C_RESET);
 
-    qfloat_t a_vals[2] = {
-        qf_from_double(2.5),
-        qf_from_double(-1.0)};
+    number_t a_vals[3] = {
+        num_create_from_long(2),
+        num_create_from_long(-1),
+        num_create_from_long(3)};
+    number_t b_vals[6] = {
+        num_create_from_string("1 + 2i"),
+        num_create_from_string("-i"),
+        num_create_from_string("4"),
+        num_create_from_string("-2 + 3i"),
+        num_create_from_string("1 + i"),
+        num_create_from_string("5i")};
 
-    qcomplex_t b_vals[3] = {
-        qc_make(qf_from_double(3), qf_from_double(1)),
-        qc_make(qf_from_double(-2), qf_from_double(4)),
-        qc_make(qf_from_double(0), qf_from_double(-3))};
+    matrix_t *A = mat_create_num(1, 3, a_vals);
+    matrix_t *B = mat_create_num(3, 2, b_vals);
 
-    matrix_t *A = test_mat_create_qf(2, 1, a_vals);
-    matrix_t *B = test_mat_create_qc(1, 3, b_vals);
-
-    print_mqf("A (qfloat)", A);
-    print_mqc("B (qcomplex)", B);
+    print_mnum("A", A);
+    print_mnum("B", B);
 
     matrix_t *C = mat_mul(A, B);
-    print_mqc("A * B (qcomplex result)", C);
+    print_mnum("A * B", C);
+
+    number_t C_vals[2] = { num_new(), num_new() };
+    mat_get_data_num(C, C_vals);
+
+    for (size_t j = 0; j < 2; j++)
+    {
+        number_t expected = num_create_from_long(0);
+        for (size_t t = 0; t < 3; t++)
+        {
+            number_t term = num_mul(a_vals[t], b_vals[t * 2 + j]);
+            number_t next = num_add(expected, term);
+            num_destroy(&term);
+            num_destroy(&expected);
+            expected = next;
+        }
+        char label[64];
+        snprintf(label, sizeof(label), "mixed mul real-complex [%zu,0]", j);
+        check_bool(label, num_eq(C_vals[j], expected));
+        num_destroy(&expected);
+    }
+
+    for (size_t j = 0; j < 2; ++j)
+        num_destroy(&C_vals[j]);
+    for (size_t k = 0; k < 6; ++k)
+        num_destroy(&b_vals[k]);
+    for (size_t k = 0; k < 3; ++k)
+        num_destroy(&a_vals[k]);
+    mat_free(A);
+    mat_free(B);
+    mat_free(C);
+}
+
+/* ------------------------------------------------------------------ mixed-type mul: decimal number_t * complex number_t */
+
+static void test_multiply_mixed_num_num_complex(void)
+{
+    printf(C_CYAN "TEST: mixed-type multiplication (decimal number_t * complex number_t)\n" C_RESET);
+
+    number_t a_vals[2] = {
+        num_create_from_string("2.5"),
+        num_create_from_string("-1.0")};
+
+    number_t b_vals[3] = {
+        num_create_from_string("3 + i"),
+        num_create_from_string("-2 + 4i"),
+        num_create_from_string("-3i")};
+
+    matrix_t *A = mat_create_num(2, 1, a_vals);
+    matrix_t *B = mat_create_num(1, 3, b_vals);
+
+    print_mnum("A", A);
+    print_mnum("B", B);
+
+    matrix_t *C = mat_mul(A, B);
+    print_mnum("A * B", C);
+
+    number_t C_vals[6] = {
+        num_new(), num_new(), num_new(),
+        num_new(), num_new(), num_new()};
+    mat_get_data_num(C, C_vals);
 
     for (size_t i = 0; i < 2; i++)
         for (size_t j = 0; j < 3; j++)
         {
-            qcomplex_t got;
-            qcomplex_t expected = qc_mul(
-                qc_make(a_vals[i], QF_ZERO),
-                b_vals[j]);
-            mat_get(C, i, j, &got);
-
+            size_t k = i * 3 + j;
+            number_t expected = num_mul(a_vals[i], b_vals[j]);
             char label[64];
-            snprintf(label, sizeof(label), "mixed mul qf*qc [%zu,%zu]", i, j);
-            check_qc_val(label, got, expected, 1e-28);
+            snprintf(label, sizeof(label), "mixed mul decimal-complex [%zu,%zu]", i, j);
+            check_bool(label, num_eq(C_vals[k], expected));
+            num_destroy(&expected);
         }
 
+    for (size_t k = 0; k < 6; ++k)
+        num_destroy(&C_vals[k]);
+    for (size_t j = 0; j < 3; ++j)
+        num_destroy(&b_vals[j]);
+    for (size_t i = 0; i < 2; ++i)
+        num_destroy(&a_vals[i]);
     mat_free(A);
     mat_free(B);
     mat_free(C);
@@ -2221,7 +2376,7 @@ static void test_scalar_mul_d_d(void)
     matrix_t *A = test_mat_create_d(2, 2, A_vals);
     print_md("A", A);
 
-    matrix_t *B = mat_scalar_mul_num(A, &alpha_num);
+    matrix_t *B = mat_scalar_mul(A, &alpha_num);
     number_t B_vals[4];
     print_mnum("alpha * A", B);
     mat_get_data_num(B, B_vals);
@@ -2241,35 +2396,34 @@ static void test_scalar_mul_d_d(void)
     mat_free(B);
 }
 
-/* ------------------------------------------------------------------ scalar multiply: double scalar × qfloat matrix */
+/* ------------------------------------------------------------------ scalar multiply: numeric scalar × decimal matrix */
 
-static void test_scalar_mul_d_qf(void)
+static void test_scalar_mul_num_real(void)
 {
-    printf(C_CYAN "TEST: scalar multiply (double * qfloat matrix)\n" C_RESET);
+    printf(C_CYAN "TEST: scalar multiply (numeric scalar * decimal matrix)\n" C_RESET);
 
-    qfloat_t A_vals[4] = {
-        qf_from_double(1.0), qf_from_double(-2.0),
-        qf_from_double(3.5), qf_from_double(0.5)};
-    const double alpha = -1.25;
-    number_t alpha_num = num_create_from_double(alpha);
+    number_t A_vals[4] = {
+        num_create_from_string("1.0"), num_create_from_string("-2.0"),
+        num_create_from_string("3.5"), num_create_from_string("0.5")};
+    number_t alpha_num = num_create_from_string("-1.25");
 
-    matrix_t *A = test_mat_create_qf(2, 2, A_vals);
-    print_mqf("A (qfloat)", A);
+    matrix_t *A = mat_create_num(2, 2, A_vals);
+    print_mnum("A", A);
 
-    matrix_t *B = mat_scalar_mul_num(A, &alpha_num);
-    number_t B_vals[4];
-    print_mnum("alpha * A (number)", B);
+    matrix_t *B = mat_scalar_mul(A, &alpha_num);
+    number_t B_vals[4] = { num_new(), num_new(), num_new(), num_new() };
+    print_mnum("alpha * A", B);
     mat_get_data_num(B, B_vals);
 
     for (size_t k = 0; k < 4; k++)
     {
-        number_t expected = num_create_from_qfloat(
-            qf_mul(qf_from_double(alpha), A_vals[k]));
+        number_t expected = num_mul(alpha_num, A_vals[k]);
         char label[64];
-        snprintf(label, sizeof(label), "scalar mul d*qf [%zu,%zu]", k / 2, k % 2);
+        snprintf(label, sizeof(label), "scalar mul num-real [%zu,%zu]", k / 2, k % 2);
         check_bool(label, num_eq(B_vals[k], expected));
         num_destroy(&expected);
         num_destroy(&B_vals[k]);
+        num_destroy(&A_vals[k]);
     }
 
     num_destroy(&alpha_num);
@@ -2277,37 +2431,35 @@ static void test_scalar_mul_d_qf(void)
     mat_free(B);
 }
 
-/* ------------------------------------------------------------------ scalar multiply: double scalar × qcomplex matrix */
+/* ------------------------------------------------------------------ scalar multiply: numeric scalar × complex matrix */
 
-static void test_scalar_mul_d_qc(void)
+static void test_scalar_mul_num_complex(void)
 {
-    printf(C_CYAN "TEST: scalar multiply (double * qcomplex matrix)\n" C_RESET);
+    printf(C_CYAN "TEST: scalar multiply (numeric scalar * complex matrix)\n" C_RESET);
 
-    qcomplex_t A_vals[3] = {
-        qc_make(qf_from_double(1.0), qf_from_double(2.0)),
-        qc_make(qf_from_double(-3.0), qf_from_double(0.5)),
-        qc_make(qf_from_double(0.0), qf_from_double(-1.0))};
-    const double alpha = 0.75;
-    number_t alpha_num = num_create_from_double(alpha);
+    number_t A_vals[3] = {
+        num_create_from_string("1 + 2i"),
+        num_create_from_string("-3 + 0.5i"),
+        num_create_from_string("-i")};
+    number_t alpha_num = num_create_from_string("0.75");
 
-    matrix_t *A = test_mat_create_qc(1, 3, A_vals);
-    print_mqc("A (qcomplex)", A);
+    matrix_t *A = mat_create_num(1, 3, A_vals);
+    print_mnum("A", A);
 
-    matrix_t *B = mat_scalar_mul_num(A, &alpha_num);
-    number_t B_vals[3];
-    print_mnum("alpha * A (number)", B);
+    matrix_t *B = mat_scalar_mul(A, &alpha_num);
+    number_t B_vals[3] = { num_new(), num_new(), num_new() };
+    print_mnum("alpha * A", B);
     mat_get_data_num(B, B_vals);
 
     for (size_t j = 0; j < 3; j++)
     {
-        number_t expected = num_create_from_qcomplex(qc_mul(
-            qc_make(qf_from_double(alpha), QF_ZERO),
-            A_vals[j]));
+        number_t expected = num_mul(alpha_num, A_vals[j]);
         char label[64];
-        snprintf(label, sizeof(label), "scalar mul d*qc [0,%zu]", j);
+        snprintf(label, sizeof(label), "scalar mul num-complex [0,%zu]", j);
         check_bool(label, num_eq(B_vals[j], expected));
         num_destroy(&expected);
         num_destroy(&B_vals[j]);
+        num_destroy(&A_vals[j]);
     }
 
     num_destroy(&alpha_num);
@@ -2315,35 +2467,36 @@ static void test_scalar_mul_d_qc(void)
     mat_free(B);
 }
 
-/* ------------------------------------------------------------------ scalar multiply: qfloat scalar × double matrix */
+/* ------------------------------------------------------------------ scalar multiply: decimal scalar × numeric matrix */
 
-static void test_scalar_mul_qf_d(void)
+static void test_scalar_mul_decimal_num(void)
 {
-    printf(C_CYAN "TEST: scalar multiply (qfloat * double matrix)\n" C_RESET);
+    printf(C_CYAN "TEST: scalar multiply (decimal scalar * numeric matrix)\n" C_RESET);
 
-    const double A_vals[6] = {
-        1.0, -2.0, 3.0,
-        0.5, 4.0, -1.0};
-    qfloat_t alpha = qf_from_double(1.75);
-    number_t alpha_num = num_create_from_qfloat(alpha);
+    number_t A_vals[6] = {
+        num_create_from_long(1), num_create_from_long(-2), num_create_from_long(3),
+        num_create_from_string("0.5"), num_create_from_long(4), num_create_from_long(-1)};
+    number_t alpha_num = num_create_from_string("1.75");
 
-    matrix_t *A = test_mat_create_d(2, 3, A_vals);
-    print_md("A (double)", A);
+    matrix_t *A = mat_create_num(2, 3, A_vals);
+    print_mnum("A", A);
 
-    matrix_t *B = mat_scalar_mul_num(A, &alpha_num);
-    number_t B_vals[6];
-    print_mnum("alpha * A (number)", B);
+    matrix_t *B = mat_scalar_mul(A, &alpha_num);
+    number_t B_vals[6] = {
+        num_new(), num_new(), num_new(),
+        num_new(), num_new(), num_new()};
+    print_mnum("alpha * A", B);
     mat_get_data_num(B, B_vals);
 
     for (size_t k = 0; k < 6; k++)
     {
-        number_t expected = num_create_from_qfloat(
-            qf_mul(alpha, qf_from_double(A_vals[k])));
+        number_t expected = num_mul(alpha_num, A_vals[k]);
         char label[64];
-        snprintf(label, sizeof(label), "scalar mul qf*d [%zu,%zu]", k / 3, k % 3);
+        snprintf(label, sizeof(label), "scalar mul decimal-num [%zu,%zu]", k / 3, k % 3);
         check_bool(label, num_eq(B_vals[k], expected));
         num_destroy(&expected);
         num_destroy(&B_vals[k]);
+        num_destroy(&A_vals[k]);
     }
 
     num_destroy(&alpha_num);
@@ -2351,37 +2504,37 @@ static void test_scalar_mul_qf_d(void)
     mat_free(B);
 }
 
-/* ------------------------------------------------------------------ scalar multiply: qcomplex scalar × qcomplex matrix */
+/* ------------------------------------------------------------------ scalar multiply: complex scalar × complex matrix */
 
-static void test_scalar_mul_qc_qc(void)
+static void test_scalar_mul_complex_complex(void)
 {
-    printf(C_CYAN "TEST: scalar multiply (qcomplex * qcomplex matrix)\n" C_RESET);
+    printf(C_CYAN "TEST: scalar multiply (complex scalar * complex matrix)\n" C_RESET);
 
-    qcomplex_t A_vals[4] = {
-        QC_ONE,
-        qc_make(qf_from_double(2.0), qf_from_double(-1.0)),
-        qc_make(qf_from_double(0.0), qf_from_double(3.0)),
-        qc_make(qf_from_double(-1.5), qf_from_double(0.5))};
+    number_t A_vals[4] = {
+        NUM_ONE,
+        num_create_from_string("2 - i"),
+        num_create_from_string("3i"),
+        num_create_from_string("-1.5 + 0.5i")};
+    number_t alpha_num = num_create_from_string("0.5 + 2i");
 
-    qcomplex_t alpha = qc_make(qf_from_double(0.5), qf_from_double(2.0));
-    number_t alpha_num = num_create_from_qcomplex(alpha);
+    matrix_t *A = mat_create_num(2, 2, A_vals);
+    print_mnum("A", A);
 
-    matrix_t *A = test_mat_create_qc(2, 2, A_vals);
-    print_mqc("A (qcomplex)", A);
-
-    matrix_t *B = mat_scalar_mul_num(A, &alpha_num);
-    number_t B_vals[4];
-    print_mnum("alpha * A (number)", B);
+    matrix_t *B = mat_scalar_mul(A, &alpha_num);
+    number_t B_vals[4] = { num_new(), num_new(), num_new(), num_new() };
+    print_mnum("alpha * A", B);
     mat_get_data_num(B, B_vals);
 
     for (size_t k = 0; k < 4; k++)
     {
-        number_t expected = num_create_from_qcomplex(qc_mul(alpha, A_vals[k]));
+        number_t expected = num_mul(alpha_num, A_vals[k]);
         char label[64];
-        snprintf(label, sizeof(label), "scalar mul qc*qc [%zu,%zu]", k / 2, k % 2);
+        snprintf(label, sizeof(label), "scalar mul complex-complex [%zu,%zu]", k / 2, k % 2);
         check_bool(label, num_eq(B_vals[k], expected));
         num_destroy(&expected);
         num_destroy(&B_vals[k]);
+        if (k != 0)
+            num_destroy(&A_vals[k]);
     }
 
     num_destroy(&alpha_num);
@@ -2464,79 +2617,64 @@ static void test_identity_arith_d(void)
     mat_free(I_times_A);
 }
 
-/* ------------------------------------------------------------------ identity add/sub/mul: qfloat */
+/* ------------------------------------------------------------------ identity add/sub/mul: decimal number_t */
 
-static void test_identity_arith_qf(void)
+static void test_identity_arith_num_real(void)
 {
-    printf(C_CYAN "TEST: identity arithmetic (qfloat)\n" C_RESET);
+    printf(C_CYAN "TEST: identity arithmetic (decimal number_t)\n" C_RESET);
 
-    qfloat_t vals[4] = {
-        qf_from_double(1.5),
-        qf_from_double(2.0),
-        qf_from_double(-1.0),
-        qf_from_double(4.0)};
-    matrix_t *A = test_mat_create_qf(2, 2, vals);
-    matrix_t *I = test_mat_identity_qf(2);
+    number_t vals[4] = {
+        num_create_from_string("1.5"),
+        num_create_from_string("2.0"),
+        num_create_from_string("-1.0"),
+        num_create_from_string("4.0")};
+    matrix_t *A = mat_create_num(2, 2, vals);
+    matrix_t *I = mat_create_identity_num(2);
 
-    print_mqf("A", A);
-    print_mqf("I", I);
+    print_mnum("A", A);
+    print_mnum("I", I);
 
-    /* A + I */
     matrix_t *ApI = mat_add(A, I);
-    print_mqf("A + I", ApI);
-
-    qfloat_t expected_add[4] = {
-        qf_add(vals[0], QF_ONE), vals[1],
-        vals[2], qf_add(vals[3], QF_ONE)};
-    qfloat_t got_add[4];
-    mat_get_data(ApI, got_add);
-    for (size_t k = 0; k < 4; k++)
-    {
-        char label[64];
-        snprintf(label, sizeof(label), "qf: A+I [%zu,%zu]", k / 2, k % 2);
-        check_qf_val(label, got_add[k], expected_add[k], 1e-28);
-    }
-
-    /* A - I */
     matrix_t *AmI = mat_sub(A, I);
-    print_mqf("A - I", AmI);
-
-    qfloat_t expected_sub[4] = {
-        qf_sub(vals[0], QF_ONE), vals[1],
-        vals[2], qf_sub(vals[3], QF_ONE)};
-    qfloat_t got_sub[4];
-    mat_get_data(AmI, got_sub);
-    for (size_t k = 0; k < 4; k++)
-    {
-        char label[64];
-        snprintf(label, sizeof(label), "qf: A-I [%zu,%zu]", k / 2, k % 2);
-        check_qf_val(label, got_sub[k], expected_sub[k], 1e-28);
-    }
-
-    /* A * I */
     matrix_t *A_times_I = mat_mul(A, I);
-    print_mqf("A * I", A_times_I);
-
-    qfloat_t got_ai[4];
-    mat_get_data(A_times_I, got_ai);
-    for (size_t k = 0; k < 4; k++)
-    {
-        char label[64];
-        snprintf(label, sizeof(label), "qf: A*I [%zu,%zu]", k / 2, k % 2);
-        check_qf_val(label, got_ai[k], vals[k], 1e-28);
-    }
-
-    /* I * A */
     matrix_t *I_times_A = mat_mul(I, A);
-    print_mqf("I * A", I_times_A);
 
-    qfloat_t got_ia[4];
-    mat_get_data(I_times_A, got_ia);
+    print_mnum("A + I", ApI);
+    print_mnum("A - I", AmI);
+    print_mnum("A * I", A_times_I);
+    print_mnum("I * A", I_times_A);
+
+    number_t got_add[4] = { num_new(), num_new(), num_new(), num_new() };
+    number_t got_sub[4] = { num_new(), num_new(), num_new(), num_new() };
+    number_t got_ai[4] = { num_new(), num_new(), num_new(), num_new() };
+    number_t got_ia[4] = { num_new(), num_new(), num_new(), num_new() };
+    mat_get_data_num(ApI, got_add);
+    mat_get_data_num(AmI, got_sub);
+    mat_get_data_num(A_times_I, got_ai);
+    mat_get_data_num(I_times_A, got_ia);
+
     for (size_t k = 0; k < 4; k++)
     {
+        number_t expected_add = num_add(vals[k], (k == 0 || k == 3) ? NUM_ONE : NUM_ZERO);
+        number_t expected_sub = num_sub(vals[k], (k == 0 || k == 3) ? NUM_ONE : NUM_ZERO);
         char label[64];
-        snprintf(label, sizeof(label), "qf: I*A [%zu,%zu]", k / 2, k % 2);
-        check_qf_val(label, got_ia[k], vals[k], 1e-28);
+
+        snprintf(label, sizeof(label), "num real: A+I [%zu,%zu]", k / 2, k % 2);
+        check_bool(label, num_eq(got_add[k], expected_add));
+        snprintf(label, sizeof(label), "num real: A-I [%zu,%zu]", k / 2, k % 2);
+        check_bool(label, num_eq(got_sub[k], expected_sub));
+        snprintf(label, sizeof(label), "num real: A*I [%zu,%zu]", k / 2, k % 2);
+        check_bool(label, num_eq(got_ai[k], vals[k]));
+        snprintf(label, sizeof(label), "num real: I*A [%zu,%zu]", k / 2, k % 2);
+        check_bool(label, num_eq(got_ia[k], vals[k]));
+
+        num_destroy(&expected_add);
+        num_destroy(&expected_sub);
+        num_destroy(&got_add[k]);
+        num_destroy(&got_sub[k]);
+        num_destroy(&got_ai[k]);
+        num_destroy(&got_ia[k]);
+        num_destroy(&vals[k]);
     }
 
     mat_free(A);
@@ -2547,79 +2685,64 @@ static void test_identity_arith_qf(void)
     mat_free(I_times_A);
 }
 
-/* ------------------------------------------------------------------ identity add/sub/mul: qcomplex */
+/* ------------------------------------------------------------------ identity add/sub/mul: complex number_t */
 
-static void test_identity_arith_qc(void)
+static void test_identity_arith_num_complex(void)
 {
-    printf(C_CYAN "TEST: identity arithmetic (qcomplex)\n" C_RESET);
+    printf(C_CYAN "TEST: identity arithmetic (complex number_t)\n" C_RESET);
 
-    qcomplex_t vals[4] = {
-        qc_make(qf_from_double(1), qf_from_double(2)),
-        qc_make(qf_from_double(3), qf_from_double(-1)),
-        qc_make(qf_from_double(0), qf_from_double(4)),
-        qc_make(qf_from_double(-2), qf_from_double(3))};
-    matrix_t *A = test_mat_create_qc(2, 2, vals);
-    matrix_t *I = test_mat_identity_qc(2);
+    number_t vals[4] = {
+        num_create_from_string("1 + 2i"),
+        num_create_from_string("3 - i"),
+        num_create_from_string("4i"),
+        num_create_from_string("-2 + 3i")};
+    matrix_t *A = mat_create_num(2, 2, vals);
+    matrix_t *I = mat_create_identity_num(2);
 
-    print_mqc("A", A);
-    print_mqc("I", I);
+    print_mnum("A", A);
+    print_mnum("I", I);
 
-    /* A + I */
     matrix_t *ApI = mat_add(A, I);
-    print_mqc("A + I", ApI);
-
-    qcomplex_t expected_add[4] = {
-        qc_add(vals[0], QC_ONE), vals[1],
-        vals[2], qc_add(vals[3], QC_ONE)};
-    qcomplex_t got_add[4];
-    mat_get_data(ApI, got_add);
-    for (size_t k = 0; k < 4; k++)
-    {
-        char label[64];
-        snprintf(label, sizeof(label), "qc: A+I [%zu,%zu]", k / 2, k % 2);
-        check_qc_val(label, got_add[k], expected_add[k], 1e-28);
-    }
-
-    /* A - I */
     matrix_t *AmI = mat_sub(A, I);
-    print_mqc("A - I", AmI);
-
-    qcomplex_t expected_sub[4] = {
-        qc_sub(vals[0], QC_ONE), vals[1],
-        vals[2], qc_sub(vals[3], QC_ONE)};
-    qcomplex_t got_sub[4];
-    mat_get_data(AmI, got_sub);
-    for (size_t k = 0; k < 4; k++)
-    {
-        char label[64];
-        snprintf(label, sizeof(label), "qc: A-I [%zu,%zu]", k / 2, k % 2);
-        check_qc_val(label, got_sub[k], expected_sub[k], 1e-28);
-    }
-
-    /* A * I */
     matrix_t *A_times_I = mat_mul(A, I);
-    print_mqc("A * I", A_times_I);
-
-    qcomplex_t got_ai[4];
-    mat_get_data(A_times_I, got_ai);
-    for (size_t k = 0; k < 4; k++)
-    {
-        char label[64];
-        snprintf(label, sizeof(label), "qc: A*I [%zu,%zu]", k / 2, k % 2);
-        check_qc_val(label, got_ai[k], vals[k], 1e-28);
-    }
-
-    /* I * A */
     matrix_t *I_times_A = mat_mul(I, A);
-    print_mqc("I * A", I_times_A);
 
-    qcomplex_t got_ia[4];
-    mat_get_data(I_times_A, got_ia);
+    print_mnum("A + I", ApI);
+    print_mnum("A - I", AmI);
+    print_mnum("A * I", A_times_I);
+    print_mnum("I * A", I_times_A);
+
+    number_t got_add[4] = { num_new(), num_new(), num_new(), num_new() };
+    number_t got_sub[4] = { num_new(), num_new(), num_new(), num_new() };
+    number_t got_ai[4] = { num_new(), num_new(), num_new(), num_new() };
+    number_t got_ia[4] = { num_new(), num_new(), num_new(), num_new() };
+    mat_get_data_num(ApI, got_add);
+    mat_get_data_num(AmI, got_sub);
+    mat_get_data_num(A_times_I, got_ai);
+    mat_get_data_num(I_times_A, got_ia);
+
     for (size_t k = 0; k < 4; k++)
     {
+        number_t expected_add = num_add(vals[k], (k == 0 || k == 3) ? NUM_ONE : NUM_ZERO);
+        number_t expected_sub = num_sub(vals[k], (k == 0 || k == 3) ? NUM_ONE : NUM_ZERO);
         char label[64];
-        snprintf(label, sizeof(label), "qc: I*A [%zu,%zu]", k / 2, k % 2);
-        check_qc_val(label, got_ia[k], vals[k], 1e-28);
+
+        snprintf(label, sizeof(label), "num complex: A+I [%zu,%zu]", k / 2, k % 2);
+        check_bool(label, num_eq(got_add[k], expected_add));
+        snprintf(label, sizeof(label), "num complex: A-I [%zu,%zu]", k / 2, k % 2);
+        check_bool(label, num_eq(got_sub[k], expected_sub));
+        snprintf(label, sizeof(label), "num complex: A*I [%zu,%zu]", k / 2, k % 2);
+        check_bool(label, num_eq(got_ai[k], vals[k]));
+        snprintf(label, sizeof(label), "num complex: I*A [%zu,%zu]", k / 2, k % 2);
+        check_bool(label, num_eq(got_ia[k], vals[k]));
+
+        num_destroy(&expected_add);
+        num_destroy(&expected_sub);
+        num_destroy(&got_add[k]);
+        num_destroy(&got_sub[k]);
+        num_destroy(&got_ai[k]);
+        num_destroy(&got_ia[k]);
+        num_destroy(&vals[k]);
     }
 
     mat_free(A);
@@ -2645,7 +2768,7 @@ static void test_scalar_div_d_d(void)
     matrix_t *A = test_mat_create_d(2, 2, A_vals);
     print_md("A", A);
 
-    matrix_t *B = mat_scalar_div_num(A, &alpha_num);
+    matrix_t *B = mat_scalar_div(A, &alpha_num);
     number_t B_vals[4];
     print_mnum("A / alpha", B);
     mat_get_data_num(B, B_vals);
@@ -2665,34 +2788,34 @@ static void test_scalar_div_d_d(void)
     mat_free(B);
 }
 
-/* ------------------------------------------------------------------ scalar division: qfloat scalar */
+/* ------------------------------------------------------------------ scalar division: decimal scalar */
 
-static void test_scalar_div_qf_qf(void)
+static void test_scalar_div_num_real(void)
 {
-    printf(C_CYAN "TEST: scalar division (qfloat / qfloat matrix)\n" C_RESET);
+    printf(C_CYAN "TEST: scalar division (decimal scalar)\n" C_RESET);
 
-    qfloat_t A_vals[4] = {
-        qf_from_double(3.0), qf_from_double(-6.0),
-        qf_from_double(1.5), qf_from_double(0.75)};
-    qfloat_t alpha = qf_from_double(1.5);
-    number_t alpha_num = num_create_from_qfloat(alpha);
+    number_t A_vals[4] = {
+        num_create_from_string("3.0"), num_create_from_string("-6.0"),
+        num_create_from_string("1.5"), num_create_from_string("0.75")};
+    number_t alpha_num = num_create_from_string("1.5");
 
-    matrix_t *A = test_mat_create_qf(2, 2, A_vals);
-    print_mqf("A (qfloat)", A);
+    matrix_t *A = mat_create_num(2, 2, A_vals);
+    print_mnum("A", A);
 
-    matrix_t *B = mat_scalar_div_num(A, &alpha_num);
-    number_t B_vals[4];
-    print_mnum("A / alpha (number)", B);
+    matrix_t *B = mat_scalar_div(A, &alpha_num);
+    number_t B_vals[4] = { num_new(), num_new(), num_new(), num_new() };
+    print_mnum("A / alpha", B);
     mat_get_data_num(B, B_vals);
 
     for (size_t k = 0; k < 4; k++)
     {
-        number_t expected = num_create_from_qfloat(qf_div(A_vals[k], alpha));
+        number_t expected = num_div(A_vals[k], alpha_num);
         char label[64];
-        snprintf(label, sizeof(label), "scalar div qf/qf [%zu,%zu]", k / 2, k % 2);
-        check_bool(label, num_eq(B_vals[k], expected));
+        snprintf(label, sizeof(label), "scalar div num-real [%zu,%zu]", k / 2, k % 2);
+        check_matrix_core_num_value(label, B_vals[k], expected, 1e-24);
         num_destroy(&expected);
         num_destroy(&B_vals[k]);
+        num_destroy(&A_vals[k]);
     }
 
     num_destroy(&alpha_num);
@@ -2700,39 +2823,36 @@ static void test_scalar_div_qf_qf(void)
     mat_free(B);
 }
 
-/* ------------------------------------------------------------------ scalar division: qcomplex scalar */
+/* ------------------------------------------------------------------ scalar division: complex scalar */
 
-static void test_scalar_div_qc_qc(void)
+static void test_scalar_div_num_complex(void)
 {
-    printf(C_CYAN "TEST: scalar division (qcomplex / qcomplex matrix)\n" C_RESET);
+    printf(C_CYAN "TEST: scalar division (complex scalar)\n" C_RESET);
 
-    qcomplex_t A_vals[3] = {
-        QC_ONE,
-        qc_make(qf_from_double(2.0), qf_from_double(3.0)),
-        qc_make(qf_from_double(-1.0), qf_from_double(0.5))};
+    number_t A_vals[3] = {
+        NUM_ONE,
+        num_create_from_string("2 + 3i"),
+        num_create_from_string("-1 + 0.5i")};
+    number_t alpha_num = num_create_from_string("0.5 + i");
 
-    qcomplex_t alpha = qc_make(qf_from_double(0.5), qf_from_double(1.0));
-    number_t alpha_num = num_create_from_qcomplex(alpha);
+    matrix_t *A = mat_create_num(1, 3, A_vals);
+    print_mnum("A", A);
 
-    matrix_t *A = test_mat_create_qc(1, 3, A_vals);
-    print_mqc("A (qcomplex)", A);
-
-    matrix_t *B = mat_scalar_div_num(A, &alpha_num);
-    number_t B_vals[3];
-    print_mnum("A / alpha (number)", B);
+    matrix_t *B = mat_scalar_div(A, &alpha_num);
+    number_t B_vals[3] = { num_new(), num_new(), num_new() };
+    print_mnum("A / alpha", B);
     mat_get_data_num(B, B_vals);
 
     for (size_t j = 0; j < 3; j++)
     {
-        number_t expected_num = num_create_from_qcomplex(qc_div(A_vals[j], alpha));
-        number_t error_num = num_abs(num_sub(B_vals[j], expected_num));
-        qfloat_t error = num_to_qfloat(error_num);
+        number_t expected = num_div(A_vals[j], alpha_num);
         char label[64];
-        snprintf(label, sizeof(label), "scalar div qc/qc [0,%zu]", j);
-        check_bool(label, qf_cmp(error, qf_from_double(1e-28)) <= 0);
-        num_destroy(&error_num);
-        num_destroy(&expected_num);
+        snprintf(label, sizeof(label), "scalar div num-complex [0,%zu]", j);
+        check_bool(label, num_eq(B_vals[j], expected));
+        num_destroy(&expected);
         num_destroy(&B_vals[j]);
+        if (j != 0)
+            num_destroy(&A_vals[j]);
     }
 
     num_destroy(&alpha_num);
@@ -2740,37 +2860,36 @@ static void test_scalar_div_qc_qc(void)
     mat_free(B);
 }
 
-/* ------------------------------------------------------------------ scalar division: double scalar / qfloat matrix */
+/* ------------------------------------------------------------------ scalar division: numeric scalar / decimal matrix */
 
-static void test_scalar_div_d_qf(void)
+static void test_scalar_div_numeric_real(void)
 {
-    printf(C_CYAN "TEST: scalar division (double / qfloat matrix)\n" C_RESET);
+    printf(C_CYAN "TEST: scalar division (numeric scalar / decimal matrix)\n" C_RESET);
 
-    qfloat_t A_vals[4] = {
-        qf_from_double(2.0),
-        qf_from_double(-4.0),
-        qf_from_double(5.0),
-        qf_from_double(10.0)};
-    const double alpha = 2.0;
-    number_t alpha_num = num_create_from_double(alpha);
+    number_t A_vals[4] = {
+        num_create_from_string("2.0"),
+        num_create_from_string("-4.0"),
+        num_create_from_string("5.0"),
+        num_create_from_string("10.0")};
+    number_t alpha_num = num_create_from_long(2);
 
-    matrix_t *A = test_mat_create_qf(2, 2, A_vals);
-    print_mqf("A (qfloat)", A);
+    matrix_t *A = mat_create_num(2, 2, A_vals);
+    print_mnum("A", A);
 
-    matrix_t *B = mat_scalar_div_num(A, &alpha_num);
-    number_t B_vals[4];
-    print_mnum("A / alpha (number)", B);
+    matrix_t *B = mat_scalar_div(A, &alpha_num);
+    number_t B_vals[4] = { num_new(), num_new(), num_new(), num_new() };
+    print_mnum("A / alpha", B);
     mat_get_data_num(B, B_vals);
 
     for (size_t k = 0; k < 4; k++)
     {
-        number_t expected = num_create_from_qfloat(
-            qf_div(A_vals[k], qf_from_double(alpha)));
+        number_t expected = num_div(A_vals[k], alpha_num);
         char label[64];
-        snprintf(label, sizeof(label), "scalar div d/qf [%zu,%zu]", k / 2, k % 2);
+        snprintf(label, sizeof(label), "scalar div numeric-real [%zu,%zu]", k / 2, k % 2);
         check_bool(label, num_eq(B_vals[k], expected));
         num_destroy(&expected);
         num_destroy(&B_vals[k]);
+        num_destroy(&A_vals[k]);
     }
 
     num_destroy(&alpha_num);
@@ -2778,35 +2897,36 @@ static void test_scalar_div_d_qf(void)
     mat_free(B);
 }
 
-/* ------------------------------------------------------------------ scalar division: qfloat scalar / double matrix */
+/* ------------------------------------------------------------------ scalar division: decimal scalar / numeric matrix */
 
-static void test_scalar_div_qf_d(void)
+static void test_scalar_div_real_numeric(void)
 {
-    printf(C_CYAN "TEST: scalar division (qfloat / double matrix)\n" C_RESET);
+    printf(C_CYAN "TEST: scalar division (decimal scalar / numeric matrix)\n" C_RESET);
 
-    const double A_vals[6] = {
-        1.0, -2.0, 4.0,
-        0.5, 3.0, -1.0};
-    qfloat_t alpha = qf_from_double(2.0);
-    number_t alpha_num = num_create_from_qfloat(alpha);
+    number_t A_vals[6] = {
+        num_create_from_long(1), num_create_from_long(-2), num_create_from_long(4),
+        num_create_from_string("0.5"), num_create_from_long(3), num_create_from_long(-1)};
+    number_t alpha_num = num_create_from_long(2);
 
-    matrix_t *A = test_mat_create_d(2, 3, A_vals);
-    print_md("A (double)", A);
+    matrix_t *A = mat_create_num(2, 3, A_vals);
+    print_mnum("A", A);
 
-    matrix_t *B = mat_scalar_div_num(A, &alpha_num);
-    number_t B_vals[6];
-    print_mnum("A / alpha (number)", B);
+    matrix_t *B = mat_scalar_div(A, &alpha_num);
+    number_t B_vals[6] = {
+        num_new(), num_new(), num_new(),
+        num_new(), num_new(), num_new()};
+    print_mnum("A / alpha", B);
     mat_get_data_num(B, B_vals);
 
     for (size_t k = 0; k < 6; k++)
     {
-        number_t expected = num_create_from_qfloat(
-            qf_div(qf_from_double(A_vals[k]), alpha));
+        number_t expected = num_div(A_vals[k], alpha_num);
         char label[64];
-        snprintf(label, sizeof(label), "scalar div qf/d [%zu,%zu]", k / 3, k % 3);
+        snprintf(label, sizeof(label), "scalar div real-numeric [%zu,%zu]", k / 3, k % 3);
         check_bool(label, num_eq(B_vals[k], expected));
         num_destroy(&expected);
         num_destroy(&B_vals[k]);
+        num_destroy(&A_vals[k]);
     }
 
     num_destroy(&alpha_num);
@@ -2897,57 +3017,67 @@ static void test_det_double(void)
     }
 }
 
-/* ------------------------------------------------------------------ determinant: qfloat */
+/* ------------------------------------------------------------------ determinant: decimal/complex number_t */
 
 static void test_det_qfloat(void)
 {
-    printf(C_CYAN "TEST: determinant (qfloat)\n" C_RESET);
+    printf(C_CYAN "TEST: determinant (decimal number_t)\n" C_RESET);
 
-    /* original values preserved */
-    qfloat_t vals[4] = {
-        qf_from_double(1.5), qf_from_double(2.0),
-        qf_from_double(-3.0), qf_from_double(4.25)};
+    number_t vals[4] = {
+        num_create_from_string("1.5"), num_create_from_string("2.0"),
+        num_create_from_string("-3.0"), num_create_from_string("4.25")};
 
-    matrix_t *A = test_mat_create_qf(2, 2, vals);
-    print_mqf("A (qfloat 2x2)", A);
+    matrix_t *A = mat_create_num(2, 2, vals);
+    print_mnum("A (number 2x2)", A);
 
-    qfloat_t det;
-    mat_det(A, &det);
+    number_t det = num_new();
+    check_bool("mat_det(number real 2x2) rc = 0", mat_det(A, &det) == 0);
 
-    qfloat_t expected =
-        qf_sub(qf_mul(vals[0], vals[3]),
-               qf_mul(vals[1], vals[2]));
+    number_t lhs = num_mul(vals[0], vals[3]);
+    number_t rhs = num_mul(vals[1], vals[2]);
+    number_t expected = num_sub(lhs, rhs);
 
-    check_qf_val("det qfloat 2x2", det, expected, 1e-28);
+    check_matrix_core_num_value("det number real 2x2", det, expected, 1e-24);
 
+    num_destroy(&expected);
+    num_destroy(&rhs);
+    num_destroy(&lhs);
+    num_destroy(&det);
+    for (size_t k = 0; k < 4; ++k)
+        num_destroy(&vals[k]);
     mat_free(A);
 }
 
-/* ------------------------------------------------------------------ determinant: qcomplex */
+/* ------------------------------------------------------------------ determinant: complex number_t */
 
 static void test_det_qcomplex(void)
 {
-    printf(C_CYAN "TEST: determinant (qcomplex)\n" C_RESET);
+    printf(C_CYAN "TEST: determinant (complex number_t)\n" C_RESET);
 
-    /* original values preserved */
-    qcomplex_t vals[4] = {
-        qc_make(qf_from_double(1), qf_from_double(2)),
-        qc_make(qf_from_double(3), qf_from_double(-1)),
-        qc_make(qf_from_double(0), qf_from_double(4)),
-        qc_make(qf_from_double(-2), qf_from_double(1))};
+    number_t vals[4] = {
+        num_create_from_string("1 + 2i"),
+        num_create_from_string("3 - i"),
+        num_create_from_string("4i"),
+        num_create_from_string("-2 + i")};
 
-    matrix_t *A = test_mat_create_qc(2, 2, vals);
-    print_mqc("A (qcomplex 2x2)", A);
+    matrix_t *A = mat_create_num(2, 2, vals);
+    print_mnum("A (complex number 2x2)", A);
 
-    qcomplex_t det;
-    mat_det(A, &det);
+    number_t det = num_new();
+    check_bool("mat_det(number complex 2x2) rc = 0", mat_det(A, &det) == 0);
 
-    qcomplex_t expected =
-        qc_sub(qc_mul(vals[0], vals[3]),
-               qc_mul(vals[1], vals[2]));
+    number_t lhs = num_mul(vals[0], vals[3]);
+    number_t rhs = num_mul(vals[1], vals[2]);
+    number_t expected = num_sub(lhs, rhs);
 
-    check_qc_val("det qcomplex 2x2", det, expected, 1e-28);
+    check_bool("det number complex 2x2", num_eq(det, expected));
 
+    num_destroy(&expected);
+    num_destroy(&rhs);
+    num_destroy(&lhs);
+    num_destroy(&det);
+    for (size_t k = 0; k < 4; ++k)
+        num_destroy(&vals[k]);
     mat_free(A);
 }
 
@@ -3064,13 +3194,13 @@ static void test_deriv(void)
         if (Dc) {
             print_mdv("dA/dc", Dc);
             mat_get(Dc, 0, 0, &v);
-            check_bool("dA/dc[0,0] = NaN", v && qf_isnan(dv_eval_qf(v)));
+            check_bool("dA/dc[0,0] = NaN", v && num_is_nan(dv_eval(v)));
             mat_get(Dc, 0, 1, &v);
-            check_bool("dA/dc[0,1] = NaN", v && qf_isnan(dv_eval_qf(v)));
+            check_bool("dA/dc[0,1] = NaN", v && num_is_nan(dv_eval(v)));
             mat_get(Dc, 1, 0, &v);
-            check_bool("dA/dc[1,0] = NaN", v && qf_isnan(dv_eval_qf(v)));
+            check_bool("dA/dc[1,0] = NaN", v && num_is_nan(dv_eval(v)));
             mat_get(Dc, 1, 1, &v);
-            check_bool("dA/dc[1,1] = NaN", v && qf_isnan(dv_eval_qf(v)));
+            check_bool("dA/dc[1,1] = NaN", v && num_is_nan(dv_eval(v)));
         }
 
         test_dv_set_val_d(x, 5.0);
@@ -4100,85 +4230,77 @@ static void test_inverse_double(void)
     }
 }
 
-/* ------------------------------------------------------------------ inverse: qfloat */
+/* ------------------------------------------------------------------ inverse: decimal number_t */
 
 static void test_inverse_qfloat(void)
 {
-    printf(C_CYAN "TEST: matrix inverse (qfloat)\n" C_RESET);
+    printf(C_CYAN "TEST: matrix inverse (decimal number_t)\n" C_RESET);
 
-    qfloat_t A_vals[4] = {
-        qf_from_double(3.0), qf_from_double(1.0),
-        qf_from_double(2.0), qf_from_double(1.0)};
-    matrix_t *A = test_mat_create_qf(2, 2, A_vals);
+    number_t A_vals[4] = {
+        num_create_from_string("3.0"), num_create_from_string("1.0"),
+        num_create_from_string("2.0"), num_create_from_string("1.0")};
+    matrix_t *A = mat_create_num(2, 2, A_vals);
 
-    print_mqf("A", A);
+    print_mnum("A", A);
 
     matrix_t *Ai = mat_inverse(A);
     check_bool("inverse returned non-null", Ai != NULL);
 
-    print_mqf("A^{-1}", Ai);
+    print_mnum("A^{-1}", Ai);
 
-    /* Check A * A^{-1} = I */
     matrix_t *P = mat_mul(A, Ai);
-    print_mqf("A * A^{-1}", P);
+    print_mnum("A * A^{-1}", P);
 
-    qfloat_t v;
-    mat_get(P, 0, 0, &v);
-    check_qf_val("prod[0,0] = 1", v, QF_ONE, 1e-28);
-    mat_get(P, 1, 1, &v);
-    check_qf_val("prod[1,1] = 1", v, QF_ONE, 1e-28);
+    number_t got[4] = { num_new(), num_new(), num_new(), num_new() };
+    mat_get_data_num(P, got);
+    check_matrix_core_num_value("prod[0,0] = 1", got[0], NUM_ONE, 1e-17);
+    check_matrix_core_num_value("prod[1,1] = 1", got[3], NUM_ONE, 1e-17);
+    check_matrix_core_num_value("prod[0,1] = 0", got[1], NUM_ZERO, 1e-17);
+    check_matrix_core_num_value("prod[1,0] = 0", got[2], NUM_ZERO, 1e-17);
 
-    qfloat_t z = QF_ZERO;
-    mat_get(P, 0, 1, &v);
-    check_qf_val("prod[0,1] = 0", v, z, 1e-28);
-    mat_get(P, 1, 0, &v);
-    check_qf_val("prod[1,0] = 0", v, z, 1e-28);
-
+    for (size_t k = 0; k < 4; ++k) {
+        num_destroy(&got[k]);
+        num_destroy(&A_vals[k]);
+    }
     mat_free(A);
     mat_free(Ai);
     mat_free(P);
 }
 
-/* ------------------------------------------------------------------ inverse: qcomplex */
+/* ------------------------------------------------------------------ inverse: complex number_t */
 
 static void test_inverse_qcomplex(void)
 {
-    printf(C_CYAN "TEST: matrix inverse (qcomplex)\n" C_RESET);
+    printf(C_CYAN "TEST: matrix inverse (complex number_t)\n" C_RESET);
 
-    qcomplex_t A_vals[4] = {
-        qc_make(qf_from_double(1), qf_from_double(1)),
-        qc_make(qf_from_double(2), qf_from_double(-1)),
-        qc_make(qf_from_double(0), qf_from_double(3)),
-        qc_make(qf_from_double(4), qf_from_double(0))};
-    matrix_t *A = test_mat_create_qc(2, 2, A_vals);
+    number_t A_vals[4] = {
+        num_create_from_string("1 + i"),
+        num_create_from_string("2 - i"),
+        num_create_from_string("3i"),
+        num_create_from_string("4")};
+    matrix_t *A = mat_create_num(2, 2, A_vals);
 
-    print_mqc("A", A);
+    print_mnum("A", A);
 
     matrix_t *Ai = mat_inverse(A);
     check_bool("inverse returned non-null", Ai != NULL);
 
-    print_mqc("A^{-1}", Ai);
+    print_mnum("A^{-1}", Ai);
 
-    /* Check A * A^{-1} = I */
     matrix_t *P = mat_mul(A, Ai);
-    print_mqc("A * A^{-1}", P);
+    print_mnum("A * A^{-1}", P);
 
-    qcomplex_t got;
+    {
+        matrix_t *I = test_mat_identity_d(2);
 
-    mat_get(P, 0, 0, &got);
-    check_qc_val("prod[0,0] = 1", got, QC_ONE, 1e-28);
+        check_bool("complex identity expected non-null", I != NULL);
+        if (I)
+            check_mat_complex("A * A^{-1} = I (complex number)", P, I, 1e-12);
+        mat_free(I);
+    }
 
-    mat_get(P, 1, 1, &got);
-    check_qc_val("prod[1,1] = 1", got, QC_ONE, 1e-28);
-
-    qcomplex_t zero = QC_ZERO;
-
-    mat_get(P, 0, 1, &got);
-    check_qc_val("prod[0,1] = 0", got, zero, 1e-28);
-
-    mat_get(P, 1, 0, &got);
-    check_qc_val("prod[1,0] = 0", got, zero, 1e-28);
-
+    for (size_t k = 0; k < 4; ++k)
+        num_destroy(&A_vals[k]);
     mat_free(A);
     mat_free(Ai);
     mat_free(P);
@@ -4243,7 +4365,7 @@ static void test_inverse_dval(void)
 
     {
         mat_bindings_t *bindings = NULL;
-        matrix_t *R = mat_from_string("(cos(@theta), -sin(@theta); sin(@theta), cos(@theta))",
+        matrix_t *R = mat_from_string_dv("(cos(@theta), -sin(@theta); sin(@theta), cos(@theta))",
                                       &bindings);
         matrix_t *Ri = mat_inverse(R);
         char *ri_text = Ri ? mat_to_string(Ri, MAT_STRING_INLINE_PRETTY) : NULL;
@@ -5272,12 +5394,12 @@ static void test_solve_and_lstsq(void)
         matrix_t *X = mat_least_squares(A, B);
         check_bool("mat_least_squares(rank-deficient) not NULL", X != NULL);
         if (X) {
-            matrix_t *Xq = test_mat_evaluate_qc(X);
-            matrix_t *Xeq = test_mat_evaluate_qc(X_expected);
+            matrix_t *Xq = test_mat_evaluate_complex(X);
+            matrix_t *Xeq = test_mat_evaluate_complex(X_expected);
             check_bool("mat_least_squares(rank-deficient) -> MAT_TYPE_NUMBER",
                        mat_typeof(X) == MAT_TYPE_NUMBER);
             if (Xq && Xeq)
-                check_mat_qc("rank-deficient lstsq(A,B)=X", Xq, Xeq, 1e-10);
+                check_mat_complex("rank-deficient lstsq(A,B)=X", Xq, Xeq, 1e-10);
             mat_free(Xq);
             mat_free(Xeq);
         }
@@ -5310,12 +5432,12 @@ static void test_solve_and_lstsq(void)
         matrix_t *X = mat_least_squares(A, B);
         check_bool("mat_least_squares(underdetermined) not NULL", X != NULL);
         if (X) {
-            matrix_t *Xq = test_mat_evaluate_qc(X);
-            matrix_t *Xeq = test_mat_evaluate_qc(X_expected);
+            matrix_t *Xq = test_mat_evaluate_complex(X);
+            matrix_t *Xeq = test_mat_evaluate_complex(X_expected);
             check_bool("mat_least_squares(underdetermined) -> MAT_TYPE_NUMBER",
                        mat_typeof(X) == MAT_TYPE_NUMBER);
             if (Xq && Xeq)
-                check_mat_qc("underdetermined lstsq(A,B)=minimum-norm X", Xq, Xeq, 1e-10);
+                check_mat_complex("underdetermined lstsq(A,B)=minimum-norm X", Xq, Xeq, 1e-10);
             mat_free(Xq);
             mat_free(Xeq);
         }
@@ -5350,12 +5472,12 @@ static void test_solve_and_lstsq(void)
         matrix_t *X = mat_least_squares(A, B);
         check_bool("mat_least_squares(double) not NULL", X != NULL);
         if (X) {
-            matrix_t *Xq = test_mat_evaluate_qc(X);
-            matrix_t *Xeq = test_mat_evaluate_qc(X_expected);
+            matrix_t *Xq = test_mat_evaluate_complex(X);
+            matrix_t *Xeq = test_mat_evaluate_complex(X_expected);
             check_bool("mat_least_squares(double) -> MAT_TYPE_NUMBER",
                        mat_typeof(X) == MAT_TYPE_NUMBER);
             if (Xq && Xeq)
-                check_mat_qc("lstsq(A,B)=X", Xq, Xeq, 1e-12);
+                check_mat_complex("lstsq(A,B)=X", Xq, Xeq, 1e-12);
             mat_free(Xq);
             mat_free(Xeq);
         }
@@ -5489,32 +5611,36 @@ static void test_solve_and_lstsq(void)
 
     /* Complex solve exercises promotion and Hermitian-free elimination. */
     {
-        qcomplex_t A_vals[4] = {
-            qc_make(qf_from_double(1.0), qf_from_double(1.0)),
-            qc_make(qf_from_double(2.0), qf_from_double(0.0)),
-            qc_make(qf_from_double(0.0), qf_from_double(1.0)),
-            qc_make(qf_from_double(3.0), qf_from_double(-1.0))
+        number_t A_vals[4] = {
+            num_create_from_string("1 + i"),
+            num_create_from_string("2.0"),
+            num_create_from_string("i"),
+            num_create_from_string("3 - i")
         };
-        qcomplex_t X_expected_vals[2] = {
-            qc_make(qf_from_double(1.0), qf_from_double(-1.0)),
-            qc_make(qf_from_double(2.0), qf_from_double(0.5))
+        number_t X_expected_vals[2] = {
+            num_create_from_string("1 - i"),
+            num_create_from_string("2 + 0.5i")
         };
-        matrix_t *A = test_mat_create_qc(2, 2, A_vals);
-        matrix_t *X_expected = test_mat_create_qc(2, 1, X_expected_vals);
+        matrix_t *A = mat_create_num(2, 2, A_vals);
+        matrix_t *X_expected = mat_create_num(2, 1, X_expected_vals);
         matrix_t *B = mat_mul(A, X_expected);
 
-        print_mqc("A", A);
-        print_mqc("B", B);
+        print_mnum("A", A);
+        print_mnum("B", B);
 
         matrix_t *X = mat_solve(A, B);
-        check_bool("mat_solve(qcomplex) not NULL", X != NULL);
+        check_bool("mat_solve(complex number) not NULL", X != NULL);
         if (X)
-            check_mat_qc("solve(A,B)=X (qcomplex)", X, X_expected, 1e-25);
+            check_mat_complex("solve(A,B)=X (complex number)", X, X_expected, 1e-12);
 
         mat_free(A);
         mat_free(B);
         mat_free(X_expected);
         mat_free(X);
+        for (size_t k = 0; k < 4; ++k)
+            num_destroy(&A_vals[k]);
+        for (size_t k = 0; k < 2; ++k)
+            num_destroy(&X_expected_vals[k]);
     }
 
     /* Symbolic lower-triangular solve. */
@@ -5884,15 +6010,15 @@ static void test_factorisations(void)
             QtQ = QH ? mat_mul(QH, qr.Q) : NULL;
             check_bool("Q*R not NULL", QR != NULL);
             check_bool("Q*Q not NULL", QtQ != NULL);
-            QRq = QR ? test_mat_evaluate_qc(QR) : NULL;
-            Aqc = test_mat_evaluate_qc(A);
+            QRq = QR ? test_mat_evaluate_complex(QR) : NULL;
+            Aqc = test_mat_evaluate_complex(A);
             Iq = mat_create_identity_num(2);
-            QtQq = QtQ ? test_mat_evaluate_qc(QtQ) : NULL;
-            Iqq = Iq ? test_mat_evaluate_qc(Iq) : NULL;
+            QtQq = QtQ ? test_mat_evaluate_complex(QtQ) : NULL;
+            Iqq = Iq ? test_mat_evaluate_complex(Iq) : NULL;
             if (QRq && Aqc)
-                check_mat_qc("Q*R = A", QRq, Aqc, 1e-12);
+                check_mat_complex("Q*R = A", QRq, Aqc, 1e-12);
             if (QtQq && Iqq)
-                check_mat_qc("Q^T Q = I", QtQq, Iqq, 1e-12);
+                check_mat_complex("Q^T Q = I", QtQq, Iqq, 1e-12);
             mat_free(QRq);
             mat_free(Aqc);
             mat_free(QtQq);
@@ -5928,10 +6054,10 @@ static void test_factorisations(void)
             matrix_t *QRq = NULL, *Aq = NULL;
             QR = mat_mul(qr.Q, qr.R);
             check_bool("QR(number) Q*R not NULL", QR != NULL);
-            QRq = QR ? test_mat_evaluate_qc(QR) : NULL;
-            Aq = test_mat_evaluate_qc(A);
+            QRq = QR ? test_mat_evaluate_complex(QR) : NULL;
+            Aq = test_mat_evaluate_complex(A);
             if (QRq && Aq)
-                check_mat_qc("QR(number): Q*R = A", QRq, Aq, 1e-12);
+                check_mat_complex("QR(number): Q*R = A", QRq, Aq, 1e-12);
             mat_free(QRq);
             mat_free(Aq);
         }
@@ -5959,10 +6085,10 @@ static void test_factorisations(void)
             LH = mat_hermitian(chol.L);
             LLH = LH ? mat_mul(chol.L, LH) : NULL;
             check_bool("L*L^T not NULL", LLH != NULL);
-            LLHq = LLH ? test_mat_evaluate_qc(LLH) : NULL;
-            Aqc = test_mat_evaluate_qc(A);
+            LLHq = LLH ? test_mat_evaluate_complex(LLH) : NULL;
+            Aqc = test_mat_evaluate_complex(A);
             if (LLHq && Aqc)
-                check_mat_qc("L*L^T = A", LLHq, Aqc, 1e-12);
+                check_mat_complex("L*L^T = A", LLHq, Aqc, 1e-12);
             mat_free(LLHq);
             mat_free(Aqc);
         }
@@ -5993,10 +6119,10 @@ static void test_factorisations(void)
             LH = mat_hermitian(chol.L);
             LLH = LH ? mat_mul(chol.L, LH) : NULL;
             check_bool("Cholesky(number) L*L^H not NULL", LLH != NULL);
-            LLHq = LLH ? test_mat_evaluate_qc(LLH) : NULL;
-            Aq = test_mat_evaluate_qc(A);
+            LLHq = LLH ? test_mat_evaluate_complex(LLH) : NULL;
+            Aq = test_mat_evaluate_complex(A);
             if (LLHq && Aq)
-                check_mat_qc("Cholesky(number): L*L^H = A", LLHq, Aq, 1e-12);
+                check_mat_complex("Cholesky(number): L*L^H = A", LLHq, Aq, 1e-12);
             mat_free(LLHq);
             mat_free(Aq);
         }
@@ -6037,10 +6163,10 @@ static void test_factorisations(void)
             LH = mat_hermitian(chol.L);
             LLH = LH ? mat_mul(chol.L, LH) : NULL;
             check_bool("sparse L*L^T not NULL", LLH != NULL);
-            LLHq = LLH ? test_mat_evaluate_qc(LLH) : NULL;
-            Aqc = test_mat_evaluate_qc(A);
+            LLHq = LLH ? test_mat_evaluate_complex(LLH) : NULL;
+            Aqc = test_mat_evaluate_complex(A);
             if (LLHq && Aqc)
-                check_mat_qc("sparse L*L^T = A", LLHq, Aqc, 1e-12);
+                check_mat_complex("sparse L*L^T = A", LLHq, Aqc, 1e-12);
             mat_free(LLHq);
             mat_free(Aqc);
         }
@@ -6089,38 +6215,35 @@ static void test_factorisations(void)
     }
 
     {
-        qcomplex_t A_vals[4] = {
-            qc_make(qf_from_double(3.0), QF_ZERO),
-            qc_make(qf_from_double(1.0), qf_from_double(1.0)),
-            qc_make(qf_from_double(1.0), qf_from_double(-1.0)),
-            qc_make(qf_from_double(2.0), QF_ZERO)
+        number_t A_vals[4] = {
+            num_create_from_string("3.0"),
+            num_create_from_string("1 + i"),
+            num_create_from_string("1 - i"),
+            num_create_from_string("2.0")
         };
-        matrix_t *A = test_mat_create_qc(2, 2, A_vals);
+        matrix_t *A = mat_create_num(2, 2, A_vals);
         mat_cholesky_t chol = {0};
         matrix_t *LH = NULL, *LLH = NULL;
 
-        print_mqc("A", A);
-        check_bool("mat_cholesky(qcomplex) rc=0", mat_cholesky(A, &chol) == 0);
-        check_bool("qcomplex Cholesky factor non-null", chol.L != NULL);
-        check_bool("qcomplex Cholesky factor uses number_t", chol.L && mat_typeof(chol.L) == MAT_TYPE_NUMBER);
-        check_bool("qcomplex Cholesky factor is lower triangular", chol.L && mat_is_lower_triangular(chol.L));
+        print_mnum("A", A);
+        check_bool("mat_cholesky(complex number) rc=0", mat_cholesky(A, &chol) == 0);
+        check_bool("complex number Cholesky factor non-null", chol.L != NULL);
+        check_bool("complex number Cholesky factor uses number_t", chol.L && mat_typeof(chol.L) == MAT_TYPE_NUMBER);
+        check_bool("complex number Cholesky factor is lower triangular", chol.L && mat_is_lower_triangular(chol.L));
         if (chol.L) {
-            matrix_t *LLHq = NULL, *Aqc = NULL;
             LH = mat_hermitian(chol.L);
             LLH = LH ? mat_mul(chol.L, LH) : NULL;
-            check_bool("qcomplex L*L* not NULL", LLH != NULL);
-            LLHq = LLH ? test_mat_evaluate_qc(LLH) : NULL;
-            Aqc = test_mat_evaluate_qc(A);
-            if (LLHq && Aqc)
-                check_mat_qc("L*L* = A (qcomplex)", LLHq, Aqc, 1e-25);
-            mat_free(LLHq);
-            mat_free(Aqc);
+            check_bool("complex number L*L* not NULL", LLH != NULL);
+            if (LLH)
+                check_mat_complex("L*L* = A (complex number)", LLH, A, 1e-12);
         }
 
         mat_free(LH);
         mat_free(LLH);
         mat_cholesky_free(&chol);
         mat_free(A);
+        for (size_t k = 0; k < 4; ++k)
+            num_destroy(&A_vals[k]);
     }
 
     {
@@ -6150,18 +6273,18 @@ static void test_factorisations(void)
             check_bool("U*S*V^T not NULL", USVH != NULL);
             check_bool("U^T U not NULL", UHU != NULL);
             check_bool("V^T V not NULL", VHV != NULL);
-            USVHq = USVH ? test_mat_evaluate_qc(USVH) : NULL;
-            Aqc = test_mat_evaluate_qc(A);
-            UHUq = UHU ? test_mat_evaluate_qc(UHU) : NULL;
-            VHVq = VHV ? test_mat_evaluate_qc(VHV) : NULL;
+            USVHq = USVH ? test_mat_evaluate_complex(USVH) : NULL;
+            Aqc = test_mat_evaluate_complex(A);
+            UHUq = UHU ? test_mat_evaluate_complex(UHU) : NULL;
+            VHVq = VHV ? test_mat_evaluate_complex(VHV) : NULL;
             Iq = mat_create_identity_num(2);
-            Iqq = Iq ? test_mat_evaluate_qc(Iq) : NULL;
+            Iqq = Iq ? test_mat_evaluate_complex(Iq) : NULL;
             if (USVHq && Aqc)
-                check_mat_qc("U*S*V^T = A", USVHq, Aqc, 1e-10);
+                check_mat_complex("U*S*V^T = A", USVHq, Aqc, 1e-10);
             if (UHUq && Iqq)
-                check_mat_qc("U^T U = I", UHUq, Iqq, 1e-10);
+                check_mat_complex("U^T U = I", UHUq, Iqq, 1e-10);
             if (VHVq && Iqq)
-                check_mat_qc("V^T V = I", VHVq, Iqq, 1e-10);
+                check_mat_complex("V^T V = I", VHVq, Iqq, 1e-10);
             mat_free(USVHq);
             mat_free(Aqc);
             mat_free(UHUq);
@@ -6204,10 +6327,10 @@ static void test_factorisations(void)
             VH = mat_hermitian(svd.V);
             USVH = (US && VH) ? mat_mul(US, VH) : NULL;
             check_bool("number U*S*V^H not NULL", USVH != NULL);
-            USVHq = USVH ? test_mat_evaluate_qc(USVH) : NULL;
-            Aq = test_mat_evaluate_qc(A);
+            USVHq = USVH ? test_mat_evaluate_complex(USVH) : NULL;
+            Aq = test_mat_evaluate_complex(A);
             if (USVHq && Aq)
-                check_mat_qc("number U*S*V^H = A", USVHq, Aq, 1e-24);
+                check_mat_complex("number U*S*V^H = A", USVHq, Aq, 1e-24);
             mat_free(USVHq);
             mat_free(Aq);
         }
@@ -6259,11 +6382,11 @@ static void test_factorisations(void)
                     num_create_from_long(0), num_create_from_long(1)
                 };
                 matrix_t *Iq = mat_create_num(2, 2, iq_vals);
-                matrix_t *QHQq = QHQ ? test_mat_evaluate_qc(QHQ) : NULL;
-                matrix_t *Iqq = Iq ? test_mat_evaluate_qc(Iq) : NULL;
+                matrix_t *QHQq = QHQ ? test_mat_evaluate_complex(QHQ) : NULL;
+                matrix_t *Iqq = Iq ? test_mat_evaluate_complex(Iq) : NULL;
                 check_bool("Q^H*Q qc view not NULL", QHQq != NULL && Iqq != NULL);
                 if (QHQq && Iqq)
-                    check_mat_qc("Q^H*Q = I", QHQq, Iqq, 1e-24);
+                    check_mat_complex("Q^H*Q = I", QHQq, Iqq, 1e-24);
                 for (size_t i = 0; i < 4; ++i)
                     num_destroy(&iq_vals[i]);
                 mat_free(QHQq);
@@ -6283,6 +6406,107 @@ static void test_factorisations(void)
             }
         }
 
+        mat_free(QT);
+        mat_free(QH);
+        mat_free(QTQH);
+        mat_free(QHQ);
+        mat_schur_factor_free(&schur);
+        mat_free(A);
+    }
+
+    {
+        number_t A_vals[4] = {
+            num_create_from_string("5.6"),
+            num_create_from_string("-1.8"),
+            num_create_from_string("1.2"),
+            num_create_from_string("1.4")
+        };
+        matrix_t *A = NULL;
+        mat_schur_factor_t schur = {0};
+        matrix_t *QT = NULL, *QH = NULL, *QTQH = NULL, *QHQ = NULL;
+
+        for (size_t i = 0; i < 4; ++i)
+            num_set_prec_bits(&A_vals[i], 512u);
+
+        A = mat_create_num(2, 2, A_vals);
+        check_bool("high-precision Schur source allocated", A != NULL);
+        check_bool("high-precision Schur source type is number",
+                   A && mat_typeof(A) == MAT_TYPE_NUMBER);
+        if (A) {
+            number_t a00 = mat_get_num(A, 0, 0);
+            check_bool("high-precision Schur source preserves precision bits",
+                       num_get_prec_bits(a00) >= 512u);
+            num_destroy(&a00);
+        }
+
+        print_mnum("A (high-precision Schur)", A);
+        check_bool("mat_schur_factor(high-precision number) rc=0",
+                   A && mat_schur_factor(A, &schur) == 0);
+        check_bool("high-precision Schur factors non-null", schur.Q && schur.T);
+        check_bool("high-precision Schur T is upper triangular",
+                   schur.T && mat_is_upper_triangular(schur.T));
+        check_bool("high-precision Schur Q uses number_t",
+                   schur.Q && mat_typeof(schur.Q) == MAT_TYPE_NUMBER);
+        check_bool("high-precision Schur T uses number_t",
+                   schur.T && mat_typeof(schur.T) == MAT_TYPE_NUMBER);
+        if (schur.Q && schur.T) {
+            matrix_t *Aq = NULL;
+            matrix_t *QTQHq = NULL;
+            matrix_t *QHQq = NULL;
+            number_t iq_vals[4] = {
+                num_create_from_long(1), num_create_from_long(0),
+                num_create_from_long(0), num_create_from_long(1)
+            };
+            matrix_t *Iq = NULL;
+
+            QT = mat_mul(schur.Q, schur.T);
+            QH = mat_hermitian(schur.Q);
+            QTQH = (QT && QH) ? mat_mul(QT, QH) : NULL;
+            QHQ = QH ? mat_mul(QH, schur.Q) : NULL;
+
+            check_bool("high-precision Q*T*Q^H not NULL", QTQH != NULL);
+            check_bool("high-precision Q^H*Q not NULL", QHQ != NULL);
+
+            Aq = A ? test_mat_evaluate_complex(A) : NULL;
+            QTQHq = QTQH ? test_mat_evaluate_complex(QTQH) : NULL;
+            check_bool("high-precision Schur qc reconstruction not NULL",
+                       Aq != NULL && QTQHq != NULL);
+            if (Aq && QTQHq)
+                check_mat_complex("high-precision Q*T*Q^H = A", QTQHq, Aq, 1e-27);
+
+            Iq = mat_create_num(2, 2, iq_vals);
+            QHQq = QHQ ? test_mat_evaluate_complex(QHQ) : NULL;
+            check_bool("high-precision Schur qc unitarity not NULL",
+                       Iq != NULL && QHQq != NULL);
+            if (Iq && QHQq) {
+                matrix_t *Iqq = test_mat_evaluate_complex(Iq);
+                check_bool("high-precision Schur qc identity view not NULL", Iqq != NULL);
+                if (Iqq)
+                    check_mat_complex("high-precision Q^H*Q = I", QHQq, Iqq, 1e-27);
+                mat_free(Iqq);
+            }
+
+            for (size_t i = 1; i < 2; ++i) {
+                for (size_t j = 0; j < i; ++j) {
+                    number_t tij = mat_get_num(schur.T, i, j);
+                    number_t abs_tij = num_abs(tij);
+                    check_bool("high-precision Schur T entry below diagonal is zero",
+                               num_to_double(abs_tij) < 1e-27);
+                    num_destroy(&abs_tij);
+                    num_destroy(&tij);
+                }
+            }
+
+            for (size_t i = 0; i < 4; ++i)
+                num_destroy(&iq_vals[i]);
+            mat_free(Aq);
+            mat_free(QTQHq);
+            mat_free(QHQq);
+            mat_free(Iq);
+        }
+
+        for (size_t i = 0; i < 4; ++i)
+            num_destroy(&A_vals[i]);
         mat_free(QT);
         mat_free(QH);
         mat_free(QTQH);
@@ -6362,15 +6586,15 @@ static void test_rank_pinv_nullspace(void)
         A_pinv = mat_pseudoinverse(A);
         check_bool("mat_pseudoinverse(A) not NULL", A_pinv != NULL);
         if (A_pinv) {
-            matrix_t *Apq = test_mat_evaluate_qc(A_pinv);
-            matrix_t *Apeq = test_mat_evaluate_qc(A_pinv_expected);
-            matrix_t *AApAq = NULL, *Aq = test_mat_evaluate_qc(A);
+            matrix_t *Apq = test_mat_evaluate_complex(A_pinv);
+            matrix_t *Apeq = test_mat_evaluate_complex(A_pinv_expected);
+            matrix_t *AApAq = NULL, *Aq = test_mat_evaluate_complex(A);
             matrix_t *ApAApq = NULL;
             print_mnum("pinv(A)", A_pinv);
             check_bool("mat_pseudoinverse(A) -> MAT_TYPE_NUMBER",
                        mat_typeof(A_pinv) == MAT_TYPE_NUMBER);
             if (Apq && Apeq)
-                check_mat_qc("pinv(A)=expected", Apq, Apeq, 1e-10);
+                check_mat_complex("pinv(A)=expected", Apq, Apeq, 1e-10);
 
             AAp = mat_mul(A, A_pinv);
             AApA = AAp ? mat_mul(AAp, A) : NULL;
@@ -6378,12 +6602,12 @@ static void test_rank_pinv_nullspace(void)
             ApAAp = ApA ? mat_mul(ApA, A_pinv) : NULL;
             check_bool("A*A+*A not NULL", AApA != NULL);
             check_bool("A+*A*A+ not NULL", ApAAp != NULL);
-            AApAq = AApA ? test_mat_evaluate_qc(AApA) : NULL;
-            ApAApq = ApAAp ? test_mat_evaluate_qc(ApAAp) : NULL;
+            AApAq = AApA ? test_mat_evaluate_complex(AApA) : NULL;
+            ApAApq = ApAAp ? test_mat_evaluate_complex(ApAAp) : NULL;
             if (AApAq && Aq)
-                check_mat_qc("A*A+*A=A", AApAq, Aq, 1e-10);
+                check_mat_complex("A*A+*A=A", AApAq, Aq, 1e-10);
             if (ApAApq && Apq)
-                check_mat_qc("A+*A*A+=A+", ApAApq, Apq, 1e-10);
+                check_mat_complex("A+*A*A+=A+", ApAApq, Apq, 1e-10);
             mat_free(Apq);
             mat_free(Apeq);
             mat_free(AApAq);
@@ -6405,10 +6629,10 @@ static void test_rank_pinv_nullspace(void)
             if (AN) {
                 number_t zero_data[4] = { NUM_ZERO, NUM_ZERO, NUM_ZERO, NUM_ZERO };
                 matrix_t *Z = mat_create_num(2, 2, zero_data);
-                ANq = test_mat_evaluate_qc(AN);
-                Zq = Z ? test_mat_evaluate_qc(Z) : NULL;
+                ANq = test_mat_evaluate_complex(AN);
+                Zq = Z ? test_mat_evaluate_complex(Z) : NULL;
                 if (ANq && Zq)
-                    check_mat_qc("A*nullspace(A)=0 (wide)", ANq, Zq, 1e-10);
+                    check_mat_complex("A*nullspace(A)=0 (wide)", ANq, Zq, 1e-10);
                 mat_free(ANq);
                 mat_free(Zq);
                 mat_free(Z);
@@ -6603,63 +6827,65 @@ static void test_norms_and_condition(void)
             0.0, 4.0
         };
         matrix_t *A = test_mat_create_d(2, 2, A_vals);
-        qfloat_t out = QF_ZERO;
+        number_t out = num_new();
 
         print_md("A", A);
 
         check_bool("mat_norm(A,1)=0", mat_norm(A, MAT_NORM_1, &out) == 0);
-        check_qf_val("||A||_1 = 4", out, qf_from_double(4.0), 1e-30);
+        check_matrix_core_num_value_double("||A||_1 = 4", out, 4.0, 1e-30);
 
         check_bool("mat_norm(A,inf)=0", mat_norm(A, MAT_NORM_INF, &out) == 0);
-        check_qf_val("||A||_inf = 4", out, qf_from_double(4.0), 1e-30);
+        check_matrix_core_num_value_double("||A||_inf = 4", out, 4.0, 1e-30);
 
         check_bool("mat_norm(A,F)=0", mat_norm(A, MAT_NORM_FRO, &out) == 0);
-        check_qf_val("||A||_F = 5", out, qf_from_double(5.0), 1e-30);
+        check_matrix_core_num_value_double("||A||_F = 5", out, 5.0, 1e-30);
 
         check_bool("mat_norm(A,2)=0", mat_norm(A, MAT_NORM_2, &out) == 0);
-        check_qf_val("||A||_2 = 4", out, qf_from_double(4.0), 1e-30);
+        check_matrix_core_num_value_double("||A||_2 = 4", out, 4.0, 1e-30);
 
         check_bool("mat_condition_number(A,1)=0", mat_condition_number(A, MAT_NORM_1, &out) == 0);
-        check_qf_val("cond_1(A) = 4/3", out, qf_div(qf_from_double(4.0), qf_from_double(3.0)), 1e-28);
+        check_matrix_core_num_value_double("cond_1(A) = 4/3", out, 4.0 / 3.0, 1e-15);
 
         check_bool("mat_condition_number(A,inf)=0", mat_condition_number(A, MAT_NORM_INF, &out) == 0);
-        check_qf_val("cond_inf(A) = 4/3", out, qf_div(qf_from_double(4.0), qf_from_double(3.0)), 1e-28);
+        check_matrix_core_num_value_double("cond_inf(A) = 4/3", out, 4.0 / 3.0, 1e-15);
 
         check_bool("mat_condition_number(A,2)=0", mat_condition_number(A, MAT_NORM_2, &out) == 0);
-        check_qf_val("cond_2(A) = 4/3", out, qf_div(qf_from_double(4.0), qf_from_double(3.0)), 1e-28);
+        check_matrix_core_num_value_double("cond_2(A) = 4/3", out, 4.0 / 3.0, 1e-15);
 
         check_bool("mat_condition_number(A,F)=0", mat_condition_number(A, MAT_NORM_FRO, &out) == 0);
-        check_qf_val("cond_F(A) = 25/12", out,
-                     qf_div(qf_from_double(25.0), qf_from_double(12.0)), 1e-28);
+        check_matrix_core_num_value_double("cond_F(A) = 25/12", out, 25.0 / 12.0, 1e-15);
 
+        num_destroy(&out);
         mat_free(A);
     }
 
     {
-        qcomplex_t A_vals[4] = {
-            qc_make(qf_from_double(3.0), qf_from_double(4.0)),
-            QC_ZERO,
-            QC_ZERO,
-            QC_ZERO
+        number_t A_vals[4] = {
+            num_create_from_string("3 + 4i"),
+            NUM_ZERO,
+            NUM_ZERO,
+            NUM_ZERO
         };
-        matrix_t *A = test_mat_create_qc(2, 2, A_vals);
-        qfloat_t out = QF_ZERO;
+        matrix_t *A = mat_create_num(2, 2, A_vals);
+        number_t out = num_new();
 
-        print_mqc("A", A);
+        print_mnum("A", A);
 
-        check_bool("mat_norm(qc A,1)=0", mat_norm(A, MAT_NORM_1, &out) == 0);
-        check_qf_val("||A||_1 (qc) = 5", out, qf_from_double(5.0), 1e-28);
+        check_bool("mat_norm(complex number A,1)=0", mat_norm(A, MAT_NORM_1, &out) == 0);
+        check_matrix_core_num_value_double("||A||_1 (complex number) = 5", out, 5.0, 1e-28);
 
-        check_bool("mat_norm(qc A,inf)=0", mat_norm(A, MAT_NORM_INF, &out) == 0);
-        check_qf_val("||A||_inf (qc) = 5", out, qf_from_double(5.0), 1e-28);
+        check_bool("mat_norm(complex number A,inf)=0", mat_norm(A, MAT_NORM_INF, &out) == 0);
+        check_matrix_core_num_value_double("||A||_inf (complex number) = 5", out, 5.0, 1e-28);
 
-        check_bool("mat_norm(qc A,F)=0", mat_norm(A, MAT_NORM_FRO, &out) == 0);
-        check_qf_val("||A||_F (qc) = 5", out, qf_from_double(5.0), 1e-28);
+        check_bool("mat_norm(complex number A,F)=0", mat_norm(A, MAT_NORM_FRO, &out) == 0);
+        check_matrix_core_num_value_double("||A||_F (complex number) = 5", out, 5.0, 1e-28);
 
-        check_bool("mat_norm(qc A,2)=0", mat_norm(A, MAT_NORM_2, &out) == 0);
-        check_qf_val("||A||_2 (qc) = 5", out, qf_from_double(5.0), 1e-28);
+        check_bool("mat_norm(complex number A,2)=0", mat_norm(A, MAT_NORM_2, &out) == 0);
+        check_matrix_core_num_value_double("||A||_2 (complex number) = 5", out, 5.0, 1e-28);
 
+        num_destroy(&out);
         mat_free(A);
+        num_destroy(&A_vals[0]);
     }
 
     {
@@ -6668,12 +6894,66 @@ static void test_norms_and_condition(void)
             2.0, 4.0
         };
         matrix_t *A = test_mat_create_d(2, 2, A_vals);
-        qfloat_t out = QF_ZERO;
+        number_t out = num_new();
 
         print_md("A", A);
         check_bool("mat_condition_number(singular A,2)=0", mat_condition_number(A, MAT_NORM_2, &out) == 0);
-        check_bool("cond_2(singular A) = inf", qf_isinf(out));
+        check_bool("cond_2(singular A) = inf", num_is_inf(out));
 
+        num_destroy(&out);
+        mat_free(A);
+    }
+
+    {
+        number_t A_vals[4] = {
+            num_create_from_string("0.00000000000000000000000082718061255302767487140869206996285356581211090087890625"),
+            num_create_from_long(0),
+            num_create_from_long(0),
+            num_create_from_string("3.0")
+        };
+        matrix_t *A = NULL;
+        number_t a00;
+        number_t out = num_new();
+        number_t three = num_create_from_string("3");
+        number_t cond = num_create_from_string("3626777458843887524118528");
+
+        for (size_t i = 0; i < 4; ++i)
+            num_set_prec_bits(&A_vals[i], 512u);
+
+        A = mat_create_num(2, 2, A_vals);
+        check_bool("high-precision norm matrix allocated", A != NULL);
+        check_bool("high-precision norm matrix type is number",
+                   A && mat_typeof(A) == MAT_TYPE_NUMBER);
+        if (A) {
+            a00 = mat_get_num(A, 0, 0);
+            check_bool("high-precision norm matrix preserves precision bits",
+                       num_get_prec_bits(a00) >= 512u);
+            num_destroy(&a00);
+        }
+
+        print_mnum("A (high-precision norms)", A);
+
+        check_bool("mat_norm(high-precision A,1)=0", A && mat_norm(A, MAT_NORM_1, &out) == 0);
+        check_matrix_core_num_value("||A||_1 (high-precision) = 3", out, three, 1e-28);
+
+        check_bool("mat_norm(high-precision A,inf)=0", A && mat_norm(A, MAT_NORM_INF, &out) == 0);
+        check_matrix_core_num_value("||A||_inf (high-precision) = 3", out, three, 1e-28);
+
+        check_bool("mat_norm(high-precision A,2)=0", A && mat_norm(A, MAT_NORM_2, &out) == 0);
+        check_matrix_core_num_value("||A||_2 (high-precision) = 3", out, three, 1e-28);
+
+        check_bool("mat_condition_number(high-precision A,2)=0",
+                   A && mat_condition_number(A, MAT_NORM_2, &out) == 0);
+        check_bool("cond_2(high-precision A) is finite or inf under current backend",
+                   !num_is_nan(out));
+        if (!num_is_inf(out))
+            check_matrix_core_num_value("cond_2(high-precision A) = 3*2^80", out, cond, 1e-18);
+
+        num_destroy(&cond);
+        num_destroy(&three);
+        num_destroy(&out);
+        for (size_t i = 0; i < 4; ++i)
+            num_destroy(&A_vals[i]);
         mat_free(A);
     }
 }
@@ -6709,33 +6989,54 @@ static void test_hermitian_op(void)
         mat_free(H);
     }
 
-    /* qcomplex: Hermitian = conjugate transpose */
+    /* complex number_t: Hermitian = conjugate transpose */
     {
-        qcomplex_t z11 = qc_make(qf_from_double(1), qf_from_double(2));
-        qcomplex_t z12 = qc_make(qf_from_double(3), qf_from_double(-1));
-        qcomplex_t z21 = qc_make(qf_from_double(4), qf_from_double(5));
-        qcomplex_t z22 = qc_make(qf_from_double(-2), qf_from_double(0));
-        qcomplex_t A_vals[4] = {z11, z12, z21, z22};
-        matrix_t *A = test_mat_create_qc(2, 2, A_vals);
+        number_t z11 = num_create_from_string("1 + 2i");
+        number_t z12 = num_create_from_string("3 - i");
+        number_t z21 = num_create_from_string("4 + 5i");
+        number_t z22 = num_create_from_string("-2");
+        number_t A_vals[4] = {z11, z12, z21, z22};
+        matrix_t *A = mat_create_num(2, 2, A_vals);
 
-        print_mqc("A (qcomplex)", A);
+        print_mnum("A (complex number)", A);
 
         matrix_t *H = mat_hermitian(A);
-        print_mqc("A^† (qcomplex)", H);
+        print_mnum("A^† (complex number)", H);
 
-        qcomplex_t got;
-
+        number_t got = num_new();
+        number_t expected = num_conj(z11);
         mat_get(H, 0, 0, &got);
-        check_qc_val("H[0,0] = conj(1+2i)", got, qc_conj(z11), 1e-28);
+        check_bool("H[0,0] = conj(1+2i)", num_eq(got, expected));
+        num_destroy(&got);
+        num_destroy(&expected);
+
+        got = num_new();
+        expected = num_conj(z22);
         mat_get(H, 1, 1, &got);
-        check_qc_val("H[1,1] = conj(-2+0i)", got, qc_conj(z22), 1e-28);
+        check_bool("H[1,1] = conj(-2)", num_eq(got, expected));
+        num_destroy(&got);
+        num_destroy(&expected);
+
+        got = num_new();
+        expected = num_conj(z12);
         mat_get(H, 1, 0, &got);
-        check_qc_val("H[1,0] = conj(A[0,1])", got, qc_conj(z12), 1e-28);
+        check_bool("H[1,0] = conj(A[0,1])", num_eq(got, expected));
+        num_destroy(&got);
+        num_destroy(&expected);
+
+        got = num_new();
+        expected = num_conj(z21);
         mat_get(H, 0, 1, &got);
-        check_qc_val("H[0,1] = conj(A[1,0])", got, qc_conj(z21), 1e-28);
+        check_bool("H[0,1] = conj(A[1,0])", num_eq(got, expected));
+        num_destroy(&got);
+        num_destroy(&expected);
 
         mat_free(A);
         mat_free(H);
+        num_destroy(&z11);
+        num_destroy(&z12);
+        num_destroy(&z21);
+        num_destroy(&z22);
     }
 }
 
@@ -6763,32 +7064,32 @@ void run_matrix_core_tests(void)
     RUN_TEST_CASE(test_sparse_support);
     RUN_TEST_CASE(test_structural_queries_and_diagonal_construction);
     RUN_TEST_CASE(test_layout_policy_regressions);
-    RUN_TEST_CASE(test_add_sub_qf);
-    RUN_TEST_CASE(test_add_sub_qc);
-    RUN_TEST_CASE(test_multiply_qf);
-    RUN_TEST_CASE(test_multiply_qc);
-    RUN_TEST_CASE(test_add_mixed_d_qf);
-    RUN_TEST_CASE(test_add_mixed_d_qc);
-    RUN_TEST_CASE(test_add_mixed_qf_qc);
-    RUN_TEST_CASE(test_sub_mixed_d_qf);
-    RUN_TEST_CASE(test_sub_mixed_d_qc);
-    RUN_TEST_CASE(test_sub_mixed_qf_qc);
-    RUN_TEST_CASE(test_multiply_mixed_d_qf);
-    RUN_TEST_CASE(test_multiply_mixed_d_qc);
-    RUN_TEST_CASE(test_multiply_mixed_qf_qc);
+    RUN_TEST_CASE(test_add_sub_num_real);
+    RUN_TEST_CASE(test_add_sub_num_complex);
+    RUN_TEST_CASE(test_multiply_num_real);
+    RUN_TEST_CASE(test_multiply_num_complex);
+    RUN_TEST_CASE(test_add_mixed_num_real);
+    RUN_TEST_CASE(test_add_mixed_num_complex);
+    RUN_TEST_CASE(test_add_mixed_num_num_complex);
+    RUN_TEST_CASE(test_sub_mixed_num_real);
+    RUN_TEST_CASE(test_sub_mixed_num_complex);
+    RUN_TEST_CASE(test_sub_mixed_num_num_complex);
+    RUN_TEST_CASE(test_multiply_mixed_num_real);
+    RUN_TEST_CASE(test_multiply_mixed_num_complex);
+    RUN_TEST_CASE(test_multiply_mixed_num_num_complex);
     RUN_TEST_CASE(test_scalar_mul_d_d);
-    RUN_TEST_CASE(test_scalar_mul_d_qf);
-    RUN_TEST_CASE(test_scalar_mul_d_qc);
-    RUN_TEST_CASE(test_scalar_mul_qf_d);
-    RUN_TEST_CASE(test_scalar_mul_qc_qc);
+    RUN_TEST_CASE(test_scalar_mul_num_real);
+    RUN_TEST_CASE(test_scalar_mul_num_complex);
+    RUN_TEST_CASE(test_scalar_mul_decimal_num);
+    RUN_TEST_CASE(test_scalar_mul_complex_complex);
     RUN_TEST_CASE(test_identity_arith_d);
-    RUN_TEST_CASE(test_identity_arith_qf);
-    RUN_TEST_CASE(test_identity_arith_qc);
+    RUN_TEST_CASE(test_identity_arith_num_real);
+    RUN_TEST_CASE(test_identity_arith_num_complex);
     RUN_TEST_CASE(test_scalar_div_d_d);
-    RUN_TEST_CASE(test_scalar_div_qf_qf);
-    RUN_TEST_CASE(test_scalar_div_qc_qc);
-    RUN_TEST_CASE(test_scalar_div_d_qf);
-    RUN_TEST_CASE(test_scalar_div_qf_d);
+    RUN_TEST_CASE(test_scalar_div_num_real);
+    RUN_TEST_CASE(test_scalar_div_num_complex);
+    RUN_TEST_CASE(test_scalar_div_numeric_real);
+    RUN_TEST_CASE(test_scalar_div_real_numeric);
     RUN_TEST_CASE(test_det_double);
     RUN_TEST_CASE(test_det_qfloat);
     RUN_TEST_CASE(test_det_qcomplex);

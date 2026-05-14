@@ -7,46 +7,9 @@
 #include <strings.h>
 
 #include "number.h"
-#include "qcomplex.h"
 #include "dictionary.h"
 #include "dval_internal.h"
 #include "dval.h"
-
-/* ------------------------------------------------------------------------- */
-/* Legacy scalar / complex conversion helpers                                */
-/* ------------------------------------------------------------------------- */
-
-qcomplex_t dv_qc_real_qf(qfloat_t x)
-{
-    return qc_make(x, QF_ZERO);
-}
-
-qcomplex_t dv_qc_real_d(double x)
-{
-    return qc_make(qf_from_double(x), QF_ZERO);
-}
-
-qcomplex_t dv_qc_from_number(number_t x)
-{
-    char *text;
-    qcomplex_t value;
-
-    if (num_is_real(x))
-        return dv_qc_real_qf(num_to_qfloat(x));
-
-    text = num_to_string(x);
-    if (!text)
-        return qc_make(QF_NAN, QF_NAN);
-    value = qc_from_string(text);
-    free(text);
-    return value;
-}
-
-number_t dv_number_from_qc(qcomplex_t z)
-{
-    return qf_eq(qc_imag(z), QF_ZERO) ? num_create_from_qfloat(qc_real(z))
-                                      : num_create_from_qcomplex(z);
-}
 
 static size_t dv_alias_hash(const void *key)
 {
@@ -139,26 +102,6 @@ static const char *dv_lookup_default_constant_alias(const char *name)
     return name;
 }
 
-/* ------------------------------------------------------------------------- */
-/* Real-scalar extraction helpers used by older simplifier paths             */
-/* ------------------------------------------------------------------------- */
-
-int dv_try_get_const_real_qf(const dval_t *dv, qfloat_t *out)
-{
-    if (!dv || !out || !num_is_real(dv->c))
-        return 0;
-    *out = num_to_qfloat(dv->c);
-    return 1;
-}
-
-int dv_try_get_value_real_qf(const dval_t *dv, qfloat_t *out)
-{
-    if (!dv || !out || !num_is_real(dv->x))
-        return 0;
-    *out = num_to_qfloat(dv->x);
-    return 1;
-}
-
 void dv_store_const_num(dval_t *dv, number_t value)
 {
     num_destroy(&dv->c);
@@ -169,16 +112,6 @@ void dv_store_value_num(dval_t *dv, number_t value)
 {
     num_destroy(&dv->x);
     dv->x = value;
-}
-
-void dv_store_const_qc(dval_t *dv, qcomplex_t value)
-{
-    dv_store_const_num(dv, dv_number_from_qc(value));
-}
-
-void dv_store_value_qc(dval_t *dv, qcomplex_t value)
-{
-    dv_store_value_num(dv, dv_number_from_qc(value));
 }
 
 /* ------------------------------------------------------------------------- */
@@ -535,40 +468,26 @@ int dv_get_default_constant_num(const char *name, number_t *value_out)
         return 0;
 
     if (strcmp(canon, "e") == 0) {
-        *value_out = num_create_from_qfloat(QF_E);
+        *value_out = num_clone(NUM_E);
         return 1;
     }
 
     if (strcmp(canon, "@pi") == 0) {
-        *value_out = num_create_from_qfloat(QF_PI);
+        *value_out = num_clone(NUM_PI);
         return 1;
     }
 
     if (strcmp(canon, "@phi") == 0) {
-        qfloat_t phi = qf_div(qf_add(qf_from_double(1.0), qf_sqrt(qf_from_double(5.0))),
-                              qf_from_double(2.0));
-
-        *value_out = num_create_from_qfloat(phi);
+        *value_out = num_clone(NUM_PHI);
         return 1;
     }
 
     if (strcmp(canon, "@gamma") == 0) {
-        *value_out = num_create_from_qfloat(QF_EULER_MASCHERONI);
+        *value_out = num_clone(NUM_EULER_MASCHERONI);
         return 1;
     }
 
     return 0;
-}
-
-int dv_get_default_constant_value(const char *name, qcomplex_t *value_out)
-{
-    number_t value;
-
-    if (!value_out || !dv_get_default_constant_num(name, &value))
-        return 0;
-    *value_out = dv_qc_from_number(value);
-    num_destroy(&value);
-    return 1;
 }
 
 const char *dv_default_constant_canonical_name(const char *name)
@@ -671,16 +590,6 @@ dval_t *dv_make_var_num(number_t x)
     dv->x_valid = 1;
     dv->var_id = alloc_var_id();
     return dv;
-}
-
-dval_t *dv_make_const_qc(qcomplex_t x)
-{
-    return dv_make_const_num(dv_number_from_qc(x));
-}
-
-dval_t *dv_make_var_qc(qcomplex_t x)
-{
-    return dv_make_var_num(dv_number_from_qc(x));
 }
 
 /* ------------------------------------------------------------------------- */

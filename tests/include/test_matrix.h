@@ -29,12 +29,12 @@ static inline number_t test_num_from_d(double x)
     return num_create_from_double(x);
 }
 
-static inline number_t test_num_from_qf(qfloat_t x)
+static inline number_t test_num_from_mp_real(qfloat_t x)
 {
     return num_create_from_qfloat(x);
 }
 
-static inline number_t test_num_from_qc(qcomplex_t z)
+static inline number_t test_num_from_complex(qcomplex_t z)
 {
     return num_create_from_qcomplex(z);
 }
@@ -51,16 +51,16 @@ static inline void test_mat_set_d(matrix_t *A, size_t i, size_t j, const double 
     num_destroy(&n);
 }
 
-static inline void test_mat_set_qf(matrix_t *A, size_t i, size_t j, const qfloat_t *value)
+static inline void test_mat_set_mp_real(matrix_t *A, size_t i, size_t j, const qfloat_t *value)
 {
-    number_t n = test_num_from_qf(*value);
+    number_t n = test_num_from_mp_real(*value);
     mat_set(A, i, j, &n);
     num_destroy(&n);
 }
 
-static inline void test_mat_set_qc(matrix_t *A, size_t i, size_t j, const qcomplex_t *value)
+static inline void test_mat_set_complex(matrix_t *A, size_t i, size_t j, const qcomplex_t *value)
 {
-    number_t n = test_num_from_qc(*value);
+    number_t n = test_num_from_complex(*value);
     mat_set(A, i, j, &n);
     num_destroy(&n);
 }
@@ -90,7 +90,7 @@ static inline void test_mat_get_d(const matrix_t *A, size_t i, size_t j, double 
     num_destroy(&n);
 }
 
-static inline void test_mat_get_qf(const matrix_t *A, size_t i, size_t j, qfloat_t *out)
+static inline void test_mat_get_mp_real(const matrix_t *A, size_t i, size_t j, qfloat_t *out)
 {
     number_t n, re;
 
@@ -103,7 +103,7 @@ static inline void test_mat_get_qf(const matrix_t *A, size_t i, size_t j, qfloat
     num_destroy(&n);
 }
 
-static inline void test_mat_get_qc(const matrix_t *A, size_t i, size_t j, qcomplex_t *out)
+static inline void test_mat_get_complex(const matrix_t *A, size_t i, size_t j, qcomplex_t *out)
 {
     number_t n;
 
@@ -126,7 +126,7 @@ static inline void test_mat_set_data_num_slot(matrix_t *A, const number_t *data)
 
 static inline void test_mat_set_data_dv_slot(matrix_t *A, dval_t *const *data)
 {
-    mat_set_data(A, data);
+    mat_set_data_dv(A, data);
 }
 
 static inline void test_mat_set_data_d(matrix_t *A, const double *data)
@@ -152,7 +152,7 @@ static inline void test_mat_set_data_d(matrix_t *A, const double *data)
     free(tmp);
 }
 
-static inline void test_mat_set_data_qf(matrix_t *A, const qfloat_t *data)
+static inline void test_mat_set_data_mp_real(matrix_t *A, const qfloat_t *data)
 {
     size_t count, i;
     number_t *tmp;
@@ -166,7 +166,7 @@ static inline void test_mat_set_data_qf(matrix_t *A, const qfloat_t *data)
         return;
 
     for (i = 0; i < count; ++i)
-        tmp[i] = test_num_from_qf(data[i]);
+        tmp[i] = test_num_from_mp_real(data[i]);
 
     mat_set_data(A, tmp);
 
@@ -175,7 +175,7 @@ static inline void test_mat_set_data_qf(matrix_t *A, const qfloat_t *data)
     free(tmp);
 }
 
-static inline void test_mat_set_data_qc(matrix_t *A, const qcomplex_t *data)
+static inline void test_mat_set_data_complex(matrix_t *A, const qcomplex_t *data)
 {
     size_t count, i;
     number_t *tmp;
@@ -189,7 +189,7 @@ static inline void test_mat_set_data_qc(matrix_t *A, const qcomplex_t *data)
         return;
 
     for (i = 0; i < count; ++i)
-        tmp[i] = test_num_from_qc(data[i]);
+        tmp[i] = test_num_from_complex(data[i]);
 
     mat_set_data(A, tmp);
 
@@ -200,21 +200,12 @@ static inline void test_mat_set_data_qc(matrix_t *A, const qcomplex_t *data)
 
 static inline void test_mat_get_data_num_slot(const matrix_t *A, number_t *data)
 {
-    mat_get_data_num(A, data);
+    mat_get_data(A, data);
 }
 
 static inline void test_mat_get_data_dv_slot(const matrix_t *A, dval_t **data)
 {
-    size_t rows, cols, idx = 0;
-
-    if (!A || !data)
-        return;
-
-    rows = mat_get_row_count(A);
-    cols = mat_get_col_count(A);
-    for (size_t i = 0; i < rows; ++i)
-        for (size_t j = 0; j < cols; ++j)
-            mat_get_owned(A, i, j, &data[idx++]);
+    mat_get_data_dv(A, data);
 }
 
 static inline void test_mat_get_data_d(const matrix_t *A, double *data)
@@ -231,7 +222,7 @@ static inline void test_mat_get_data_d(const matrix_t *A, double *data)
             test_mat_get_d(A, i, j, &data[idx++]);
 }
 
-static inline void test_mat_get_data_qf(const matrix_t *A, qfloat_t *data)
+static inline void test_mat_get_data_mp_real(const matrix_t *A, qfloat_t *data)
 {
     size_t rows, cols, idx = 0;
 
@@ -242,10 +233,10 @@ static inline void test_mat_get_data_qf(const matrix_t *A, qfloat_t *data)
     cols = mat_get_col_count(A);
     for (size_t i = 0; i < rows; ++i)
         for (size_t j = 0; j < cols; ++j)
-            test_mat_get_qf(A, i, j, &data[idx++]);
+            test_mat_get_mp_real(A, i, j, &data[idx++]);
 }
 
-static inline void test_mat_get_data_qc(const matrix_t *A, qcomplex_t *data)
+static inline void test_mat_get_data_complex(const matrix_t *A, qcomplex_t *data)
 {
     size_t rows, cols, idx = 0;
 
@@ -256,7 +247,7 @@ static inline void test_mat_get_data_qc(const matrix_t *A, qcomplex_t *data)
     cols = mat_get_col_count(A);
     for (size_t i = 0; i < rows; ++i)
         for (size_t j = 0; j < cols; ++j)
-            test_mat_get_qc(A, i, j, &data[idx++]);
+            test_mat_get_complex(A, i, j, &data[idx++]);
 }
 
 static inline int test_mat_trace_num_slot(const matrix_t *A, number_t *trace)
@@ -284,7 +275,7 @@ static inline int test_mat_trace_d(const matrix_t *A, double *trace)
     return 0;
 }
 
-static inline int test_mat_trace_qf(const matrix_t *A, qfloat_t *trace)
+static inline int test_mat_trace_mp_real(const matrix_t *A, qfloat_t *trace)
 {
     number_t n, re;
     int rc;
@@ -304,7 +295,7 @@ static inline int test_mat_trace_qf(const matrix_t *A, qfloat_t *trace)
     return 0;
 }
 
-static inline int test_mat_trace_qc(const matrix_t *A, qcomplex_t *trace)
+static inline int test_mat_trace_complex(const matrix_t *A, qcomplex_t *trace)
 {
     number_t n;
     int rc;
@@ -324,7 +315,7 @@ static inline int test_mat_trace_qc(const matrix_t *A, qcomplex_t *trace)
 
 static inline int test_mat_trace_dv_slot(const matrix_t *A, dval_t **trace)
 {
-    return mat_trace(A, trace);
+    return mat_trace_dv(A, trace);
 }
 
 static inline int test_mat_det_num_slot(const matrix_t *A, number_t *det)
@@ -352,7 +343,7 @@ static inline int test_mat_det_d(const matrix_t *A, double *det)
     return 0;
 }
 
-static inline int test_mat_det_qf(const matrix_t *A, qfloat_t *det)
+static inline int test_mat_det_mp_real(const matrix_t *A, qfloat_t *det)
 {
     number_t n, re;
     int rc;
@@ -372,7 +363,7 @@ static inline int test_mat_det_qf(const matrix_t *A, qfloat_t *det)
     return 0;
 }
 
-static inline int test_mat_det_qc(const matrix_t *A, qcomplex_t *det)
+static inline int test_mat_det_complex(const matrix_t *A, qcomplex_t *det)
 {
     number_t n;
     int rc;
@@ -392,17 +383,91 @@ static inline int test_mat_det_qc(const matrix_t *A, qcomplex_t *det)
 
 static inline int test_mat_det_dv_slot(const matrix_t *A, dval_t **det)
 {
-    return mat_det(A, det);
+    return mat_det_dv(A, det);
+}
+
+static inline int test_mat_eigenvalues_num_slot(const matrix_t *A, number_t *eigenvalues)
+{
+    return mat_eigenvalues(A, eigenvalues);
+}
+
+static inline int test_mat_eigenvalues_dv_slot(const matrix_t *A, dval_t **eigenvalues)
+{
+    return mat_eigenvalues_dv(A, eigenvalues);
+}
+
+static inline int test_mat_eigendecompose_num_slot(const matrix_t *A,
+                                                   number_t *eigenvalues,
+                                                   matrix_t **eigenvectors)
+{
+    return mat_eigendecompose(A, eigenvalues, eigenvectors);
+}
+
+static inline int test_mat_eigendecompose_dv_slot(const matrix_t *A,
+                                                  dval_t **eigenvalues,
+                                                  matrix_t **eigenvectors)
+{
+    return mat_eigendecompose_dv(A, eigenvalues, eigenvectors);
+}
+
+static inline matrix_t *test_mat_eigenspace_num_slot(const matrix_t *A, const number_t *eigenvalue)
+{
+    return mat_eigenspace(A, eigenvalue);
+}
+
+static inline matrix_t *test_mat_eigenspace_dv_slot(const matrix_t *A, dval_t *const *eigenvalue)
+{
+    return mat_eigenspace_dv(A, eigenvalue ? *eigenvalue : NULL);
+}
+
+static inline matrix_t *test_mat_generalized_eigenspace_num_slot(const matrix_t *A,
+                                                                 const number_t *eigenvalue,
+                                                                 size_t order)
+{
+    return mat_generalized_eigenspace(A, eigenvalue, order);
+}
+
+static inline matrix_t *test_mat_generalized_eigenspace_dv_slot(const matrix_t *A,
+                                                                dval_t *const *eigenvalue,
+                                                                size_t order)
+{
+    return mat_generalized_eigenspace_dv(A, eigenvalue ? *eigenvalue : NULL, order);
+}
+
+static inline matrix_t *test_mat_jordan_chain_num_slot(const matrix_t *A,
+                                                       const number_t *eigenvalue,
+                                                       size_t order)
+{
+    return mat_jordan_chain(A, eigenvalue, order);
+}
+
+static inline matrix_t *test_mat_jordan_chain_dv_slot(const matrix_t *A,
+                                                      dval_t *const *eigenvalue,
+                                                      size_t order)
+{
+    return mat_jordan_chain_dv(A, eigenvalue ? *eigenvalue : NULL, order);
+}
+
+static inline matrix_t *test_mat_jordan_profile_num_slot(const matrix_t *A,
+                                                         const number_t *eigenvalue)
+{
+    return mat_jordan_profile(A, eigenvalue);
+}
+
+static inline matrix_t *test_mat_jordan_profile_dv_slot(const matrix_t *A,
+                                                        dval_t *const *eigenvalue)
+{
+    return mat_jordan_profile_dv(A, eigenvalue ? *eigenvalue : NULL);
 }
 
 #define mat_set(A, i, j, value) \
     _Generic(*(value), \
         double: test_mat_set_d, \
         const double: test_mat_set_d, \
-        qfloat_t: test_mat_set_qf, \
-        const qfloat_t: test_mat_set_qf, \
-        qcomplex_t: test_mat_set_qc, \
-        const qcomplex_t: test_mat_set_qc, \
+        qfloat_t: test_mat_set_mp_real, \
+        const qfloat_t: test_mat_set_mp_real, \
+        qcomplex_t: test_mat_set_complex, \
+        const qcomplex_t: test_mat_set_complex, \
         number_t: test_mat_set_num_slot, \
         const number_t: test_mat_set_num_slot, \
         dval_t *: test_mat_set_dv_slot, \
@@ -412,8 +477,8 @@ static inline int test_mat_det_dv_slot(const matrix_t *A, dval_t **det)
 #define mat_get(A, i, j, out) \
     _Generic(*(out), \
         double: test_mat_get_d, \
-        qfloat_t: test_mat_get_qf, \
-        qcomplex_t: test_mat_get_qc, \
+        qfloat_t: test_mat_get_mp_real, \
+        qcomplex_t: test_mat_get_complex, \
         number_t: test_mat_get_num_slot, \
         dval_t *: test_mat_get_dv_slot \
     )((A), (i), (j), (out))
@@ -422,10 +487,10 @@ static inline int test_mat_det_dv_slot(const matrix_t *A, dval_t **det)
     _Generic(*(data), \
         double: test_mat_set_data_d, \
         const double: test_mat_set_data_d, \
-        qfloat_t: test_mat_set_data_qf, \
-        const qfloat_t: test_mat_set_data_qf, \
-        qcomplex_t: test_mat_set_data_qc, \
-        const qcomplex_t: test_mat_set_data_qc, \
+        qfloat_t: test_mat_set_data_mp_real, \
+        const qfloat_t: test_mat_set_data_mp_real, \
+        qcomplex_t: test_mat_set_data_complex, \
+        const qcomplex_t: test_mat_set_data_complex, \
         number_t: test_mat_set_data_num_slot, \
         const number_t: test_mat_set_data_num_slot, \
         dval_t *: test_mat_set_data_dv_slot, \
@@ -435,8 +500,8 @@ static inline int test_mat_det_dv_slot(const matrix_t *A, dval_t **det)
 #define mat_get_data(A, data) \
     _Generic(*(data), \
         double: test_mat_get_data_d, \
-        qfloat_t: test_mat_get_data_qf, \
-        qcomplex_t: test_mat_get_data_qc, \
+        qfloat_t: test_mat_get_data_mp_real, \
+        qcomplex_t: test_mat_get_data_complex, \
         number_t: test_mat_get_data_num_slot, \
         dval_t *: test_mat_get_data_dv_slot \
     )((A), (data))
@@ -444,8 +509,8 @@ static inline int test_mat_det_dv_slot(const matrix_t *A, dval_t **det)
 #define mat_trace(A, trace) \
     _Generic(*(trace), \
         double: test_mat_trace_d, \
-        qfloat_t: test_mat_trace_qf, \
-        qcomplex_t: test_mat_trace_qc, \
+        qfloat_t: test_mat_trace_mp_real, \
+        qcomplex_t: test_mat_trace_complex, \
         number_t: test_mat_trace_num_slot, \
         dval_t *: test_mat_trace_dv_slot \
     )((A), (trace))
@@ -453,26 +518,62 @@ static inline int test_mat_det_dv_slot(const matrix_t *A, dval_t **det)
 #define mat_det(A, det) \
     _Generic(*(det), \
         double: test_mat_det_d, \
-        qfloat_t: test_mat_det_qf, \
-        qcomplex_t: test_mat_det_qc, \
+        qfloat_t: test_mat_det_mp_real, \
+        qcomplex_t: test_mat_det_complex, \
         number_t: test_mat_det_num_slot, \
         dval_t *: test_mat_det_dv_slot \
     )((A), (det))
 
-static inline matrix_t *test_mat_evaluate_qf(const matrix_t *A)
+#define mat_eigenvalues(A, eigenvalues) \
+    _Generic(*(eigenvalues), \
+        number_t: test_mat_eigenvalues_num_slot, \
+        dval_t *: test_mat_eigenvalues_dv_slot \
+    )((A), (eigenvalues))
+
+#define mat_eigendecompose(A, eigenvalues, eigenvectors) \
+    _Generic(*(eigenvalues), \
+        number_t: test_mat_eigendecompose_num_slot, \
+        dval_t *: test_mat_eigendecompose_dv_slot \
+    )((A), (eigenvalues), (eigenvectors))
+
+#define mat_eigenspace(A, eigenvalue) \
+    _Generic(*(eigenvalue), \
+        number_t: test_mat_eigenspace_num_slot, \
+        dval_t *: test_mat_eigenspace_dv_slot \
+    )((A), (eigenvalue))
+
+#define mat_generalized_eigenspace(A, eigenvalue, order) \
+    _Generic(*(eigenvalue), \
+        number_t: test_mat_generalized_eigenspace_num_slot, \
+        dval_t *: test_mat_generalized_eigenspace_dv_slot \
+    )((A), (eigenvalue), (order))
+
+#define mat_jordan_chain(A, eigenvalue, order) \
+    _Generic(*(eigenvalue), \
+        number_t: test_mat_jordan_chain_num_slot, \
+        dval_t *: test_mat_jordan_chain_dv_slot \
+    )((A), (eigenvalue), (order))
+
+#define mat_jordan_profile(A, eigenvalue) \
+    _Generic(*(eigenvalue), \
+        number_t: test_mat_jordan_profile_num_slot, \
+        dval_t *: test_mat_jordan_profile_dv_slot \
+    )((A), (eigenvalue))
+
+static inline matrix_t *test_mat_evaluate_mp_real(const matrix_t *A)
 {
-    return mat_evaluate_num(A);
+    return mat_evaluate(A);
 }
 
-static inline matrix_t *test_mat_evaluate_qc(const matrix_t *A)
+static inline matrix_t *test_mat_evaluate_complex(const matrix_t *A)
 {
-    return mat_evaluate_num(A);
+    return mat_evaluate(A);
 }
 
 static inline dval_t *test_dv_new_const_d(double x)
 {
-    number_t n = num_create_from_qfloat(qf_from_double(x));
-    dval_t *dv = dv_new_const_num(n);
+    number_t n = num_create_from_double(x);
+    dval_t *dv = dv_new_const(n);
 
     num_destroy(&n);
     return dv;
@@ -480,17 +581,17 @@ static inline dval_t *test_dv_new_const_d(double x)
 
 static inline dval_t *test_dv_new_named_const_d(double x, const char *name)
 {
-    number_t n = num_create_from_qfloat(qf_from_double(x));
-    dval_t *dv = dv_new_named_const_num(n, name);
+    number_t n = num_create_from_double(x);
+    dval_t *dv = dv_new_named_const(n, name);
 
     num_destroy(&n);
     return dv;
 }
 
-static inline dval_t *test_dv_new_named_const_qf(qfloat_t x, const char *name)
+static inline dval_t *test_dv_new_named_const_mp_real(qfloat_t x, const char *name)
 {
     number_t n = num_create_from_qfloat(x);
-    dval_t *dv = dv_new_named_const_num(n, name);
+    dval_t *dv = dv_new_named_const(n, name);
 
     num_destroy(&n);
     return dv;
@@ -498,8 +599,8 @@ static inline dval_t *test_dv_new_named_const_qf(qfloat_t x, const char *name)
 
 static inline dval_t *test_dv_new_named_var_d(double x, const char *name)
 {
-    number_t n = num_create_from_qfloat(qf_from_double(x));
-    dval_t *dv = dv_new_named_var_num(n, name);
+    number_t n = num_create_from_double(x);
+    dval_t *dv = dv_new_named_var(n, name);
 
     num_destroy(&n);
     return dv;
@@ -507,17 +608,17 @@ static inline dval_t *test_dv_new_named_var_d(double x, const char *name)
 
 static inline void test_dv_set_val_d(dval_t *dv, double x)
 {
-    number_t n = num_create_from_qfloat(qf_from_double(x));
+    number_t n = num_create_from_double(x);
 
-    dv_set_val_num(dv, n);
+    dv_set_val(dv, n);
     num_destroy(&n);
 }
 
-static inline void test_dv_set_val_qf(dval_t *dv, qfloat_t x)
+static inline void test_dv_set_val_mp_real(dval_t *dv, qfloat_t x)
 {
     number_t n = num_create_from_qfloat(x);
 
-    dv_set_val_num(dv, n);
+    dv_set_val(dv, n);
     num_destroy(&n);
 }
 
@@ -531,13 +632,13 @@ static inline int test_mat_bindings_set_d(mat_bindings_t *bnd, const char *name,
     return 0;
 }
 
-static inline int test_mat_bindings_set_qf(mat_bindings_t *bnd, const char *name, qfloat_t x)
+static inline int test_mat_bindings_set_mp_real(mat_bindings_t *bnd, const char *name, qfloat_t x)
 {
     dval_t *dv = mat_bindings_get(bnd, name);
 
     if (!dv)
         return -1;
-    test_dv_set_val_qf(dv, x);
+    test_dv_set_val_mp_real(dv, x);
     return 0;
 }
 
@@ -598,7 +699,7 @@ static inline dval_t *test_dv_d_div(double x, const dval_t *dv)
 static inline dval_t *test_dv_pow_d(const dval_t *dv, double x)
 {
     number_t n = num_create_from_double(x);
-    dval_t *out = dv_pow_num(dv, &n);
+    dval_t *out = dv_pow(dv, &n);
 
     num_destroy(&n);
     return out;
@@ -606,16 +707,16 @@ static inline dval_t *test_dv_pow_d(const dval_t *dv, double x)
 
 static inline double test_dv_eval_d(const dval_t *dv)
 {
-    number_t n = dv_eval_num(dv);
+    number_t n = dv_eval(dv);
     double out = num_to_double(n);
 
     num_destroy(&n);
     return out;
 }
 
-static inline qfloat_t test_dv_eval_qf(const dval_t *dv)
+static inline qfloat_t test_dv_eval_mp_real(const dval_t *dv)
 {
-    number_t n = dv_eval_num(dv);
+    number_t n = dv_eval(dv);
     qfloat_t out = num_to_qfloat(n);
 
     num_destroy(&n);
@@ -623,7 +724,7 @@ static inline qfloat_t test_dv_eval_qf(const dval_t *dv)
 }
 
 #define dv_eval_d  test_dv_eval_d
-#define dv_eval_qf test_dv_eval_qf
+#define dv_eval_mp_real test_dv_eval_mp_real
 #define dv_add_d   test_dv_add_d
 #define dv_sub_d   test_dv_sub_d
 #define dv_d_sub   test_dv_d_sub
@@ -642,49 +743,19 @@ static inline matrix_t *test_mat_dense_d(size_t rows, size_t cols)
         return NULL;
     for (size_t i = 0; i < count; ++i)
         vals[i] = num_clone(NUM_ZERO);
-    A = mat_create_num(rows, cols, vals);
+    A = mat_create(rows, cols, vals);
     for (size_t i = 0; i < count; ++i)
         num_destroy(&vals[i]);
     free(vals);
     return A;
 }
 
-static inline matrix_t *test_mat_dense_qf(size_t rows, size_t cols)
-{
-    return test_mat_dense_d(rows, cols);
-}
-
-static inline matrix_t *test_mat_dense_qc(size_t rows, size_t cols)
-{
-    return test_mat_dense_d(rows, cols);
-}
-
 static inline matrix_t *test_mat_sparse_d(size_t rows, size_t cols)
 {
-    return mat_new_sparse_num(rows, cols);
-}
-
-static inline matrix_t *test_mat_sparse_qf(size_t rows, size_t cols)
-{
-    return mat_new_sparse_num(rows, cols);
-}
-
-static inline matrix_t *test_mat_sparse_qc(size_t rows, size_t cols)
-{
-    return mat_new_sparse_num(rows, cols);
+    return mat_new_sparse(rows, cols);
 }
 
 static inline matrix_t *test_mat_square_d(size_t n)
-{
-    return test_mat_dense_d(n, n);
-}
-
-static inline matrix_t *test_mat_square_qf(size_t n)
-{
-    return test_mat_dense_d(n, n);
-}
-
-static inline matrix_t *test_mat_square_qc(size_t n)
 {
     return test_mat_dense_d(n, n);
 }
@@ -696,17 +767,7 @@ static inline matrix_t *test_mat_square_dv(size_t n)
 
 static inline matrix_t *test_mat_identity_d(size_t n)
 {
-    return mat_create_identity_num(n);
-}
-
-static inline matrix_t *test_mat_identity_qf(size_t n)
-{
-    return mat_create_identity_num(n);
-}
-
-static inline matrix_t *test_mat_identity_qc(size_t n)
-{
-    return mat_create_identity_num(n);
+    return mat_create_identity(n);
 }
 
 static inline matrix_t *test_mat_diagonal_d(size_t n, const double *diagonal)
@@ -721,14 +782,14 @@ static inline matrix_t *test_mat_diagonal_d(size_t n, const double *diagonal)
         return NULL;
     for (size_t i = 0; i < n; ++i)
         vals[i] = test_num_from_d(diagonal[i]);
-    A = mat_create_diagonal_num(n, vals);
+    A = mat_create_diagonal(n, vals);
     for (size_t i = 0; i < n; ++i)
         num_destroy(&vals[i]);
     free(vals);
     return A;
 }
 
-static inline matrix_t *test_mat_diagonal_qf(size_t n, const qfloat_t *diagonal)
+static inline matrix_t *test_mat_diagonal_mp_real(size_t n, const qfloat_t *diagonal)
 {
     matrix_t *A;
     number_t *vals;
@@ -739,15 +800,15 @@ static inline matrix_t *test_mat_diagonal_qf(size_t n, const qfloat_t *diagonal)
     if (!vals)
         return NULL;
     for (size_t i = 0; i < n; ++i)
-        vals[i] = test_num_from_qf(diagonal[i]);
-    A = mat_create_diagonal_num(n, vals);
+        vals[i] = test_num_from_mp_real(diagonal[i]);
+    A = mat_create_diagonal(n, vals);
     for (size_t i = 0; i < n; ++i)
         num_destroy(&vals[i]);
     free(vals);
     return A;
 }
 
-static inline matrix_t *test_mat_diagonal_qc(size_t n, const qcomplex_t *diagonal)
+static inline matrix_t *test_mat_diagonal_complex(size_t n, const qcomplex_t *diagonal)
 {
     matrix_t *A;
     number_t *vals;
@@ -758,8 +819,8 @@ static inline matrix_t *test_mat_diagonal_qc(size_t n, const qcomplex_t *diagona
     if (!vals)
         return NULL;
     for (size_t i = 0; i < n; ++i)
-        vals[i] = test_num_from_qc(diagonal[i]);
-    A = mat_create_diagonal_num(n, vals);
+        vals[i] = test_num_from_complex(diagonal[i]);
+    A = mat_create_diagonal(n, vals);
     for (size_t i = 0; i < n; ++i)
         num_destroy(&vals[i]);
     free(vals);
@@ -779,14 +840,14 @@ static inline matrix_t *test_mat_create_d(size_t rows, size_t cols, const double
         return NULL;
     for (size_t i = 0; i < count; ++i)
         vals[i] = test_num_from_d(data[i]);
-    A = mat_create_num(rows, cols, vals);
+    A = mat_create(rows, cols, vals);
     for (size_t i = 0; i < count; ++i)
         num_destroy(&vals[i]);
     free(vals);
     return A;
 }
 
-static inline matrix_t *test_mat_create_qf(size_t rows, size_t cols, const qfloat_t *data)
+static inline matrix_t *test_mat_create_mp_real(size_t rows, size_t cols, const qfloat_t *data)
 {
     matrix_t *A;
     number_t *vals;
@@ -798,15 +859,15 @@ static inline matrix_t *test_mat_create_qf(size_t rows, size_t cols, const qfloa
     if (!vals)
         return NULL;
     for (size_t i = 0; i < count; ++i)
-        vals[i] = test_num_from_qf(data[i]);
-    A = mat_create_num(rows, cols, vals);
+        vals[i] = test_num_from_mp_real(data[i]);
+    A = mat_create(rows, cols, vals);
     for (size_t i = 0; i < count; ++i)
         num_destroy(&vals[i]);
     free(vals);
     return A;
 }
 
-static inline matrix_t *test_mat_create_qc(size_t rows, size_t cols, const qcomplex_t *data)
+static inline matrix_t *test_mat_create_complex(size_t rows, size_t cols, const qcomplex_t *data)
 {
     matrix_t *A;
     number_t *vals;
@@ -818,8 +879,8 @@ static inline matrix_t *test_mat_create_qc(size_t rows, size_t cols, const qcomp
     if (!vals)
         return NULL;
     for (size_t i = 0; i < count; ++i)
-        vals[i] = test_num_from_qc(data[i]);
-    A = mat_create_num(rows, cols, vals);
+        vals[i] = test_num_from_complex(data[i]);
+    A = mat_create(rows, cols, vals);
     for (size_t i = 0; i < count; ++i)
         num_destroy(&vals[i]);
     free(vals);
@@ -829,7 +890,17 @@ static inline matrix_t *test_mat_create_qc(size_t rows, size_t cols, const qcomp
 #define mat_binding_find(bnd, number, name) mat_bindings_get((bnd), (name))
 #define mat_binding_get(bnd, number, name)  mat_bindings_get((bnd), (name))
 #define mat_binding_set_d(bnd, number, name, value) test_mat_bindings_set_d((bnd), (name), (value))
-#define mat_binding_set_qf(bnd, number, name, value) test_mat_bindings_set_qf((bnd), (name), (value))
+#define mat_binding_set_mp_real(bnd, number, name, value) test_mat_bindings_set_mp_real((bnd), (name), (value))
+
+/* Temporary compatibility aliases while the matrix tests are migrated. */
+#define mat_new_num              mat_new
+#define mat_new_sparse_num       mat_new_sparse
+#define matsq_new_num            matsq_new
+#define mat_create_identity_num  mat_create_identity
+#define mat_create_diagonal_num  mat_create_diagonal
+#define mat_create_num           mat_create
+#define mat_evaluate_num         mat_evaluate
+#define mat_get_data_num         mat_get_data
 
 extern char current_matrix_input_label[128];
 
@@ -841,13 +912,14 @@ void d_to_coloured_err_string(double x, double tol, char *out, size_t out_size);
 void qf_to_coloured_string(qfloat_t x, char *out, size_t out_size);
 void qc_to_coloured_string(qcomplex_t z, char *out, size_t out_size);
 
-void print_qc(const char *label, qcomplex_t z);
-void print_qf(const char *label, qfloat_t x);
+void print_complex(const char *label, qcomplex_t z);
+void print_mp_real(const char *label, qfloat_t x);
 void print_md(const char *label, matrix_t *A);
 void print_mqf(const char *label, matrix_t *A);
 void print_mqc(const char *label, matrix_t *A);
 void print_mnum(const char *label, matrix_t *A);
 void print_mdv(const char *label, matrix_t *A);
+void print_matrix_working_precision_line(const char *label, const matrix_t *A);
 
 void check_d(const char *label, double got, double expected, double tol);
 void check_qf_val(const char *label, qfloat_t got, qfloat_t expected, double tol);
@@ -856,10 +928,10 @@ void check_bool(const char *label, int cond);
 
 void check_mat_d(const char *label, matrix_t *got, matrix_t *expected_mat, double tol);
 void check_mat_identity_d(const char *label, matrix_t *R, size_t n, double tol);
-void check_mat_qf(const char *label, matrix_t *got, matrix_t *expected_mat, double tol);
-void check_mat_qc(const char *label, matrix_t *got, matrix_t *expected_mat, double tol);
-void check_mat_identity_qf(const char *label, matrix_t *R, size_t n, double tol);
-void check_mat_identity_qc(const char *label, matrix_t *R, size_t n, double tol);
+void check_mat_mp_real(const char *label, matrix_t *got, matrix_t *expected_mat, double tol);
+void check_mat_complex(const char *label, matrix_t *got, matrix_t *expected_mat, double tol);
+void check_mat_identity_mp_real(const char *label, matrix_t *R, size_t n, double tol);
+void check_mat_identity_complex(const char *label, matrix_t *R, size_t n, double tol);
 
 void run_matrix_core_tests(void);
 void run_matrix_function_tests(void);

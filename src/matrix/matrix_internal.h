@@ -88,10 +88,7 @@ struct elem_vtable {
     void (*inv)(void *out, const void *a);
 
     /* scalar queries */
-    double (*abs2)(const void *a);
-    double (*to_real)(const void *a);
-    void   (*from_real)(void *out, double x);
-    void   (*conj_elem)(void *out, const void *a);
+    void (*conj_elem)(void *out, const void *a);
 
     /* constants */
     const void *zero;
@@ -135,6 +132,14 @@ struct store_vtable {
     const struct store_vtable *(*transpose_store)(const struct matrix_t *A);
 };
 
+struct mat_precision_bucket;
+
+typedef struct matrix_meta_t {
+    size_t numeric_min_precision_bits;
+    size_t numeric_inexact_count;
+    struct mat_precision_bucket *numeric_precision_hist;
+} matrix_meta_t;
+
 /* ============================================================
    Matrix object (opaque in matrix.h)
    ============================================================ */
@@ -143,6 +148,7 @@ struct matrix_t {
     size_t rows;
     size_t cols;
     size_t nnz;
+    matrix_meta_t meta;
 
     const struct elem_vtable  *elem;
     const struct store_vtable *store;
@@ -220,19 +226,11 @@ void mat_value_destroy(const struct matrix_t *A, void *slot);
 number_t mat_raw_value_to_number(const struct elem_vtable *elem, const void *value);
 void mat_raw_value_from_number(const struct elem_vtable *elem, void *out,
                                const number_t *value);
-qcomplex_t mat_number_to_qcomplex_value(const number_t *value);
-qfloat_t mat_number_to_real_qfloat_value(const number_t *value);
-qfloat_t mat_number_abs_qfloat_value(const number_t *value);
-qcomplex_t mat_raw_value_to_qcomplex(const struct elem_vtable *elem,
-                                     const void *value);
-qfloat_t mat_raw_value_to_qfloat(const struct elem_vtable *elem,
-                                 const void *value);
-qfloat_t mat_raw_value_abs_qfloat(const struct elem_vtable *elem,
-                                  const void *value);
-void mat_raw_value_from_qcomplex(const struct elem_vtable *elem, void *out,
-                                 qcomplex_t value);
-void mat_raw_value_from_qfloat(const struct elem_vtable *elem, void *out,
-                               qfloat_t value);
+size_t mat_cached_numeric_precision_bits(const struct matrix_t *A);
+void mat_numeric_precision_note_set(struct matrix_t *A,
+                                    const void *old_val,
+                                    const void *new_val);
+void mat_numeric_precision_release(struct matrix_t *A);
 void dense_swap_rows(struct matrix_t *A, size_t r1, size_t r2);
 struct matrix_t *mat_extract_block(const struct matrix_t *A,
                                    size_t row0, size_t rows,
@@ -251,6 +249,11 @@ matrix_t *mat_create_direct_solve_result(const matrix_t *A,
                                          const struct elem_vtable *elem);
 
 /* Shared structured store used outside matrix_core.c (defined in matrix_vtables.c). */
+extern const struct store_vtable dense_store;
+extern const struct store_vtable sparse_store;
+extern const struct store_vtable identity_store;
+extern const struct store_vtable diagonal_store;
+extern const struct store_vtable upper_triangular_store;
 extern const struct store_vtable lower_triangular_store;
 
 /* ============================================================
@@ -318,7 +321,7 @@ matrix_t *mat_fun_schur(const matrix_t *A,
                         void (*scalar_f)(void *out, const void *in));
 
 /* Internal Hermitian detector used to select stable fast paths. */
-int mat_is_hermitian(const matrix_t *A);
+bool mat_is_hermitian(const matrix_t *A);
 
 /* Drop any internal matrix-function cache associated with A. */
 void mat_fun_cache_forget(const matrix_t *A);

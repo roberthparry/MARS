@@ -86,6 +86,11 @@ static const number_private_t number_euler_mascheroni_value = {
     .value.mf = (mfloat_t *)&MF_EULER_MASCHERONI_VALUE
 };
 
+static const number_private_t number_phi_value = {
+    .kind = NUMBER_QFLOAT,
+    .value.qf = { 1.6180339887498949, -5.4321152036825055e-17 }
+};
+
 static const number_private_t number_sqrt_half_value = {
     .kind = NUMBER_MFLOAT,
     .value.mf = (mfloat_t *)&MF_SQRT_HALF_VALUE
@@ -264,6 +269,7 @@ static const number_const_u num_inv_e_storage = { .priv = number_inv_e_value };
 static const number_const_u num_ln2_storage = { .priv = number_ln2_value };
 static const number_const_u num_invln2_storage = { .priv = number_invln2_value };
 static const number_const_u num_euler_mascheroni_storage = { .priv = number_euler_mascheroni_value };
+static const number_const_u num_phi_storage = { .priv = number_phi_value };
 static const number_const_u num_sqrt_half_storage = { .priv = number_sqrt_half_value };
 static const number_const_u num_sqrt2_storage = { .priv = number_sqrt2_value };
 static const number_const_u num_sqrt3_storage = { .priv = number_sqrt3_value };
@@ -310,6 +316,7 @@ extern const number_t NUM_INV_E __attribute__((alias("num_inv_e_storage")));
 extern const number_t NUM_LN2 __attribute__((alias("num_ln2_storage")));
 extern const number_t NUM_INVLN2 __attribute__((alias("num_invln2_storage")));
 extern const number_t NUM_EULER_MASCHERONI __attribute__((alias("num_euler_mascheroni_storage")));
+extern const number_t NUM_PHI __attribute__((alias("num_phi_storage")));
 extern const number_t NUM_SQRT_HALF __attribute__((alias("num_sqrt_half_storage")));
 extern const number_t NUM_SQRT2 __attribute__((alias("num_sqrt2_storage")));
 extern const number_t NUM_SQRT3 __attribute__((alias("num_sqrt3_storage")));

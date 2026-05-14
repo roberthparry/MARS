@@ -157,12 +157,15 @@ static dval_t *deriv_pow(dval_t *dv)
 
 static dval_t *deriv_pow_d(dval_t *dv)
 {
-    qfloat_t exponent = dv_const_real_qf(dv);
+    number_t exponent = num_clone(dv->c);
+    number_t exponent_minus_one = num_sub(exponent, NUM_ONE);
     dval_t *da   = dv_get_dx_internal(dv->a);
-    dval_t *p    = dv_pow_qf(dv->a, qf_sub(exponent, QF_ONE));
-    dval_t *coef = dv_num_const_qf(exponent);
+    dval_t *p    = dv_pow(dv->a, &exponent_minus_one);
+    dval_t *coef = dv_new_const(exponent);
     dval_t *cp   = dv_mul(coef, p);
     dval_t *out  = dv_mul(cp, da);
+    num_destroy(&exponent_minus_one);
+    num_destroy(&exponent);
     dv_free(da);
     dv_free(p);
     dv_free(coef);
@@ -348,22 +351,12 @@ dval_t *dv_pow_dv(const dval_t *a, const dval_t *b)
     return dv_new_binary_internal(&ops_pow, a, b);
 }
 
-dval_t *dv_pow_qf(const dval_t *a, qfloat_t exponent)
-{
-    if (!a)
-        return NULL;
-    dv_retain(a);
-    return dv_new_pow_qf_internal(a, exponent);
-}
-
 dval_t *dv_pow(const dval_t *dv, const number_t *exponent)
 {
     if (!dv || !exponent)
         return NULL;
     dv_retain(dv);
-    if (num_is_real(*exponent))
-        return dv_new_pow_qf_internal(dv, num_to_qfloat(*exponent));
-    return dv_new_pow_qc_internal(dv, dv_qc_from_number(*exponent));
+    return dv_new_pow_const_internal(dv, *exponent);
 }
 
 dval_t *dv_add_num(const dval_t *dv, const number_t *value)

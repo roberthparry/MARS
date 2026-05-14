@@ -1,6 +1,5 @@
 #include <stdlib.h>
 
-#include "qfloat.h"
 #include "dval_internal.h"
 
 static void *dv_match_xrealloc(void *ptr, size_t size)
@@ -14,21 +13,23 @@ static void *dv_match_xrealloc(void *ptr, size_t size)
 }
 
 static void collect_mul_factors_borrowed(const dval_t *dv,
-                                         qfloat_t *c_acc,
+                                         number_t *c_acc,
                                          const dval_t ***terms,
                                          size_t *nterms,
                                          size_t *cap)
 {
-    if (dv_is_unnamed_const(dv)) {
-        qfloat_t value;
+    if (dv_is_unnamed_const(dv) && num_is_real(dv->c)) {
+        number_t product = num_mul(*c_acc, dv->c);
 
-        if (!dv_try_get_const_real_qf(dv, &value))
-            return;
-        *c_acc = qf_mul(*c_acc, value);
+        num_destroy(c_acc);
+        *c_acc = product;
         return;
     }
     if (dv_is_neg(dv)) {
-        *c_acc = qf_neg(*c_acc);
+        number_t negated = num_neg(*c_acc);
+
+        num_destroy(c_acc);
+        *c_acc = negated;
         collect_mul_factors_borrowed(dv->a, c_acc, terms, nterms, cap);
         return;
     }
@@ -50,14 +51,14 @@ static int mul_struct_eq(const dval_t *u, const dval_t *v)
     const dval_t **v_terms = NULL;
     unsigned char *matched = NULL;
     size_t u_n = 0, v_n = 0, u_cap = 0, v_cap = 0;
-    qfloat_t u_coeff = QF_ONE;
-    qfloat_t v_coeff = QF_ONE;
+    number_t u_coeff = NUM_ONE;
+    number_t v_coeff = NUM_ONE;
     int equal = 1;
 
     collect_mul_factors_borrowed(u, &u_coeff, &u_terms, &u_n, &u_cap);
     collect_mul_factors_borrowed(v, &v_coeff, &v_terms, &v_n, &v_cap);
 
-    if (!qf_eq(u_coeff, v_coeff) || u_n != v_n) {
+    if (!num_eq(u_coeff, v_coeff) || u_n != v_n) {
         equal = 0;
         goto cleanup;
     }
@@ -86,6 +87,8 @@ static int mul_struct_eq(const dval_t *u, const dval_t *v)
     }
 
 cleanup:
+    num_destroy(&u_coeff);
+    num_destroy(&v_coeff);
     free(matched);
     free((void *)u_terms);
     free((void *)v_terms);

@@ -4,7 +4,6 @@
 #include <string.h>
 
 #include "qfloat.h"
-#include "qcomplex.h"
 #include "dval_fromstring_internal.h"
 
 void *fs_xmalloc(size_t n)

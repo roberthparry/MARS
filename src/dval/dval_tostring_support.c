@@ -106,51 +106,11 @@ int dv_tostring_utf8_decode(const char *s, unsigned int *out)
     return -1;
 }
 
-void qf_to_string_simple(qcomplex_t v, char *buf, size_t n)
-{
-    if (n == 0)
-        return;
-
-    if (qc_eq(v, QC_ZERO)) {
-        snprintf(buf, n, "0");
-        return;
-    }
-
-    if (qf_eq(qc_imag(v), QF_ZERO)) {
-        qf_sprintf(buf, n, "%q", qc_real(v));
-        return;
-    }
-
-    if (qf_eq(qc_real(v), QF_ZERO)) {
-        char imag[128];
-        size_t len;
-
-        qf_sprintf(imag, sizeof(imag), "%q", qc_imag(v));
-        len = strlen(imag);
-        if (len + 2 > n) {
-            if (n > 0)
-                buf[0] = '\0';
-            return;
-        }
-        memcpy(buf, imag, len);
-        buf[len] = 'i';
-        buf[len + 1] = '\0';
-        return;
-    }
-
-    qc_sprintf(buf, n, "%z", v);
-}
-
 int dv_tostring_is_negative_const(const dval_t *f)
 {
-    qcomplex_t value;
-
     if (!dv_is_unnamed_const(f))
         return 0;
-
-    value = dv_const_qc(f);
-    return qf_eq(qc_imag(value), QF_ZERO) &&
-           qf_to_double(qc_real(value)) < 0.0;
+    return num_is_real(f->c) && num_get_sign(f->c) < 0;
 }
 
 int dv_tostring_is_var_pow_d(const dval_t *f)

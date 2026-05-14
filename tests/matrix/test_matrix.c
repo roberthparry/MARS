@@ -4,19 +4,21 @@
 
 static int run_readme_example(void)
 {
-    qcomplex_t A_vals[4] = {
-        qc_make(qf_from_double(2.0), qf_from_double(0.0)),
-        qc_make(qf_from_double(1.0), qf_from_double(1.0)),
-        qc_make(qf_from_double(1.0), qf_from_double(-1.0)),
-        qc_make(qf_from_double(3.0), qf_from_double(0.0))
+    number_t A_vals[4] = {
+        num_create_from_long(2),
+        num_create_from_string("1 + i"),
+        num_create_from_string("1 - i"),
+        num_create_from_long(3)
     };
-    matrix_t *A = test_mat_create_qc(2, 2, A_vals);
+    matrix_t *A = mat_create(2, 2, A_vals);
 
-    number_t eigenvalues[2] = {num_new(), num_new()};
+    number_t eigenvalues[2] = {NUM_ZERO, NUM_ZERO};
     matrix_t *evecs = NULL;
 
     if (!A)
     {
+        for (size_t i = 0; i < 4; ++i)
+            num_destroy(&A_vals[i]);
         num_destroy(&eigenvalues[0]);
         num_destroy(&eigenvalues[1]);
         return 1;
@@ -24,6 +26,8 @@ static int run_readme_example(void)
 
     if (mat_eigendecompose(A, eigenvalues, &evecs) != 0 || !evecs)
     {
+        for (size_t i = 0; i < 4; ++i)
+            num_destroy(&A_vals[i]);
         num_destroy(&eigenvalues[0]);
         num_destroy(&eigenvalues[1]);
         mat_free(A);
@@ -36,6 +40,8 @@ static int run_readme_example(void)
 
     num_destroy(&eigenvalues[0]);
     num_destroy(&eigenvalues[1]);
+    for (size_t i = 0; i < 4; ++i)
+        num_destroy(&A_vals[i]);
     mat_free(A);
     mat_free(evecs);
     return 0;
@@ -46,7 +52,7 @@ static int run_readme_string_quantum_example(void)
     mat_bindings_t *bindings = NULL;
     number_t delta = num_create_from_double(1.5);
     number_t omega = num_create_from_double(0.25);
-    matrix_t *H = mat_from_string(
+    matrix_t *H = mat_from_string_dv(
         "(@DELTA, @OMEGA; @OMEGA, -@DELTA)",
         &bindings);
     matrix_t *H2 = NULL;
@@ -54,6 +60,10 @@ static int run_readme_string_quantum_example(void)
     dval_t *evals[2] = {NULL, NULL};
     dval_t *trace = NULL;
     dval_t *c2 = NULL;
+    char *trace_s = NULL;
+    char *c2_s = NULL;
+    char *eval0_s = NULL;
+    char *eval1_s = NULL;
 
     if (!H)
         return 1;
@@ -67,8 +77,8 @@ static int run_readme_string_quantum_example(void)
         return 1;
     }
 
-    dv_set_val_num(mat_bindings_get(bindings, "@DELTA"), delta);
-    dv_set_val_num(mat_bindings_get(bindings, "@OMEGA"), omega);
+    dv_set_val(mat_bindings_get(bindings, "@DELTA"), delta);
+    dv_set_val(mat_bindings_get(bindings, "@OMEGA"), omega);
 
     H2 = mat_pow_int(H, 2);
     P = mat_charpoly(H);
@@ -110,14 +120,37 @@ static int run_readme_string_quantum_example(void)
         return 1;
     }
 
+    trace_s = dv_to_string(trace, style_EXPRESSION);
+    c2_s = dv_to_string(c2, style_EXPRESSION);
+    eval0_s = dv_to_string(evals[0], style_EXPRESSION);
+    eval1_s = dv_to_string(evals[1], style_EXPRESSION);
+    if (!trace_s || !c2_s || !eval0_s || !eval1_s) {
+        free(trace_s);
+        free(c2_s);
+        free(eval0_s);
+        free(eval1_s);
+        dv_free(trace);
+        for (size_t i = 0; i < 2; ++i)
+            dv_free(evals[i]);
+        num_destroy(&omega);
+        num_destroy(&delta);
+        mat_bindings_free(bindings);
+        mat_free(P);
+        mat_free(H2);
+        mat_free(H);
+        return 1;
+    }
+
     mat_printf("H = %ml\n", H);
     mat_printf("H² = %m\n", H2);
-    printf("tr(H) = %s\n", dv_to_string(trace, style_EXPRESSION));
-    printf("charpoly constant term = %s\n", dv_to_string(c2, style_EXPRESSION));
-    printf("eigenvalues = %s, %s\n",
-           dv_to_string(evals[0], style_EXPRESSION),
-           dv_to_string(evals[1], style_EXPRESSION));
+    printf("tr(H) = %s\n", trace_s);
+    printf("charpoly constant term = %s\n", c2_s);
+    printf("eigenvalues = %s, %s\n", eval0_s, eval1_s);
 
+    free(trace_s);
+    free(c2_s);
+    free(eval0_s);
+    free(eval1_s);
     dv_free(trace);
     for (size_t i = 0; i < 2; ++i)
         dv_free(evals[i]);
@@ -130,14 +163,14 @@ static int run_readme_string_quantum_example(void)
     return 0;
 }
 
-static void run_matrix_readme_example(void)
+static void test_readme_example(void)
 {
     printf(C_BOLD C_YELLOW "\n=== README Examples ===\n" C_RESET);
     printf(C_BOLD C_WHITE "\nexample 1:\n" C_RESET);
-    (void)run_readme_example();
+    check_bool("README example 1 runs", run_readme_example() == 0);
     printf("\n");
     printf(C_BOLD C_WHITE "example 2:\n" C_RESET);
-    (void)run_readme_string_quantum_example();
+    check_bool("README example 2 runs", run_readme_string_quantum_example() == 0);
     printf("\n");
 }
 
@@ -150,7 +183,7 @@ int tests_main(void)
     run_matrix_fromstring_tests();
     run_matrix_tostring_tests();
     run_matrix_output_tests();
-    run_matrix_readme_example();
+    RUN_TEST_CASE(test_readme_example);
 
     clear_matrix_input_context();
     return TESTS_EXIT_CODE();

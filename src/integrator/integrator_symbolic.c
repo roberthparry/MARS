@@ -1085,45 +1085,79 @@ static bool build_direct_affine_plan(const dval_t *expr,
                                      symbolic_plan_t *plan,
                                      qfloat_t *coeffs_out)
 {
+    number_t constant_num = num_new();
+    number_t poly_num[5];
+    number_t *coeffs_num = NULL;
     qfloat_t constant;
-    qfloat_t poly[5];
+    bool matched = false;
 
     if (!expr || !plan || !coeffs_out)
         return false;
+    coeffs_num = malloc(ndim * sizeof(*coeffs_num));
+    if ((ndim > 0) && !coeffs_num)
+        return false;
+    for (size_t i = 0; i < ndim; ++i)
+        coeffs_num[i] = num_new();
+    for (size_t i = 0; i < 5; ++i)
+        poly_num[i] = num_new();
 
     for (size_t i = 0; i < sizeof(affine_special_kinds) / sizeof(affine_special_kinds[0]); ++i) {
         if (!dv_match_affine_poly_deg4_times_unary_affine_kind(expr,
                                                                affine_special_kinds[i].unary_kind,
-                                                               ndim, vars, poly, &constant,
-                                                               coeffs_out))
+                                                               ndim, vars, poly_num, &constant_num,
+                                                               coeffs_num))
             continue;
+        constant = num_to_qfloat(constant_num);
+        num_destroy(&constant_num);
         plan->kind = SYMBOLIC_PLAN_AFFINE_POLY_SPECIAL;
         plan->constant = constant;
         plan->special_kind = affine_special_kinds[i].special_kind;
         for (size_t j = 0; j < 5; ++j)
-            plan->poly[j] = poly[j];
-        return true;
+            plan->poly[j] = num_to_qfloat(poly_num[j]);
+        for (size_t j = 0; j < ndim; ++j)
+            coeffs_out[j] = num_to_qfloat(coeffs_num[j]);
+        matched = true;
+        goto done;
     }
 
-    if (dv_match_affine_poly_deg4(expr, ndim, vars, poly, &constant, coeffs_out)) {
+    if (dv_match_affine_poly_deg4(expr, ndim, vars, poly_num, &constant_num, coeffs_num)) {
+        constant = num_to_qfloat(constant_num);
+        num_destroy(&constant_num);
         plan->kind = SYMBOLIC_PLAN_AFFINE_POLY;
         plan->constant = constant;
         for (size_t j = 0; j < 5; ++j)
-            plan->poly[j] = poly[j];
-        return true;
+            plan->poly[j] = num_to_qfloat(poly_num[j]);
+        for (size_t j = 0; j < ndim; ++j)
+            coeffs_out[j] = num_to_qfloat(coeffs_num[j]);
+        matched = true;
+        goto done;
     }
 
     for (size_t i = 0; i < sizeof(affine_special_kinds) / sizeof(affine_special_kinds[0]); ++i) {
         if (!dv_match_unary_affine_kind(expr, affine_special_kinds[i].unary_kind,
-                                        ndim, vars, &constant, coeffs_out))
+                                        ndim, vars, &constant_num, coeffs_num))
             continue;
+        constant = num_to_qfloat(constant_num);
+        num_destroy(&constant_num);
         plan->kind = SYMBOLIC_PLAN_AFFINE_UNARY_SPECIAL;
         plan->constant = constant;
         plan->special_kind = affine_special_kinds[i].special_kind;
-        return true;
+        for (size_t j = 0; j < ndim; ++j)
+            coeffs_out[j] = num_to_qfloat(coeffs_num[j]);
+        matched = true;
+        goto done;
     }
 
-    return false;
+done:
+    num_destroy(&constant_num);
+    for (size_t i = 0; i < 5; ++i)
+        num_destroy(&poly_num[i]);
+    if (coeffs_num) {
+        for (size_t i = 0; i < ndim; ++i)
+            num_destroy(&coeffs_num[i]);
+        free(coeffs_num);
+    }
+    return matched;
 }
 
 static bool eval_direct_affine_plan(const symbolic_plan_t *plan,
@@ -1164,6 +1198,7 @@ static bool build_symbolic_plan(const dval_t *expr,
 {
     qfloat_t constant;
     qfloat_t scale;
+    number_t matched_value = num_new();
     const dval_t *base;
     const dval_t *left;
     const dval_t *right;
@@ -1174,21 +1209,29 @@ static bool build_symbolic_plan(const dval_t *expr,
 
     symbolic_plan_reset(plan);
 
-    if (dv_match_const_value(expr, &constant)) {
+    if (dv_match_const_value(expr, &matched_value)) {
+        constant = num_to_qfloat(matched_value);
+        num_destroy(&matched_value);
         plan->kind = SYMBOLIC_PLAN_CONST;
         plan->scalar = constant;
         return true;
     }
 
-    if (coeffs_out && build_direct_affine_plan(expr, ndim, vars, plan, coeffs_out))
+    if (coeffs_out && build_direct_affine_plan(expr, ndim, vars, plan, coeffs_out)) {
+        num_destroy(&matched_value);
         return true;
+    }
 
-    if (dv_match_scaled_expr(expr, &scale, &base)) {
+    if (dv_match_scaled_expr(expr, &matched_value, &base)) {
+        scale = num_to_qfloat(matched_value);
+        num_destroy(&matched_value);
         plan->kind = SYMBOLIC_PLAN_SCALED;
         plan->scalar = scale;
         plan->base = base;
         return true;
     }
+
+    num_destroy(&matched_value);
 
     if (dv_match_add_sub_expr(expr, &left, &right, &is_sub)) {
         plan->kind = SYMBOLIC_PLAN_ADD_SUB;

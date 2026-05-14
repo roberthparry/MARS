@@ -183,6 +183,7 @@ extern const number_t NUM_INV_E;             /**< 1/e */
 extern const number_t NUM_LN2;               /**< ln(2) */
 extern const number_t NUM_INVLN2;            /**< 1/ln(2) */
 extern const number_t NUM_EULER_MASCHERONI;  /**< Euler-Mascheroni γ */
+extern const number_t NUM_PHI;               /**< golden ratio φ */
 /** @} */
 
 /** @name Root and Gaussian-normalisation constants

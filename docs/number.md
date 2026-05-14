@@ -149,7 +149,7 @@ num_destroy(&x);
 num_destroy(&y);
 ```
 
-Named constants such as `NUM_PI`, `NUM_E`, and `NUM_EULER_MASCHERONI`
+Named constants such as `NUM_PI`, `NUM_E`, `NUM_PHI`, and `NUM_EULER_MASCHERONI`
 are safe to clear as well:
 
 ```c

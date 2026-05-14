@@ -2,15 +2,17 @@
 
 static void test_mat_sprintf_formats(void)
 {
-    qcomplex_t vals[4] = {
-        qc_make(qf_from_double(1.0), qf_from_double(2.0)),
-        qc_make(qf_from_double(3.0), QF_ZERO),
-        qc_make(qf_from_double(4.0), QF_ZERO),
-        qc_make(qf_from_double(5.0), qf_from_double(-6.0))
-    };
-    matrix_t *A = test_mat_create_qc(2, 2, vals);
+    number_t vals[4];
+    matrix_t *A;
     char buf[4096];
-    int n_inline = mat_sprintf(buf, sizeof(buf), "%m", A);
+    int n_inline;
+
+    vals[0] = num_create_from_string("1+2i");
+    vals[1] = num_create_from_long(3);
+    vals[2] = num_create_from_long(4);
+    vals[3] = num_create_from_string("5-6i");
+    A = mat_create(2, 2, vals);
+    n_inline = mat_sprintf(buf, sizeof(buf), "%m", A);
 
     check_bool("mat_sprintf %m returns non-negative", n_inline >= 0);
     check_bool("mat_sprintf %m inline delimiters",
@@ -20,9 +22,13 @@ static void test_mat_sprintf_formats(void)
     check_bool("mat_sprintf %ML returns non-negative",
                mat_sprintf(buf, sizeof(buf), "%ML", A) >= 0);
     check_bool("mat_sprintf %ML has newline", strchr(buf, '\n') != NULL);
-    check_bool("mat_sprintf %ML has exponent", strchr(buf, 'e') != NULL || strchr(buf, 'E') != NULL);
+    check_bool("mat_sprintf %ML has long fixed-point formatting",
+               strstr(buf, "1.000000000000") != NULL &&
+               strstr(buf, "5.000000000000") != NULL);
 
     mat_free(A);
+    for (size_t i = 0; i < 4u; ++i)
+        num_destroy(&vals[i]);
 }
 
 static void test_mat_printf_smoke(void)
@@ -35,7 +41,7 @@ static void test_mat_printf_smoke(void)
     vals[1] = num_create_from_string("1/2");
     vals[2] = num_create_from_long(0);
     vals[3] = num_create_from_long(1);
-    A = mat_create_num(2, 2, vals);
+    A = mat_create(2, 2, vals);
     n = mat_printf("%m\n", A);
     check_bool("mat_printf returns positive count", n > 0);
     for (size_t i = 0; i < 4u; ++i)
@@ -56,7 +62,7 @@ static void test_mat_sprintf_number_precision(void)
     vals[1] = num_create_from_string("1/2");
     vals[2] = num_create_from_long(3);
     vals[3] = num_create_from_long(4);
-    A = mat_create_num(2, 2, vals);
+    A = mat_create(2, 2, vals);
     expected = num_to_string(vals[1]);
 
     check_bool("mat_sprintf number returns non-negative",
@@ -71,36 +77,39 @@ static void test_mat_sprintf_number_precision(void)
     mf_free(real_base);
 }
 
-static void test_mat_sprintf_pretty_qcomplex(void)
+static void test_mat_sprintf_pretty_number_complex(void)
 {
-    qcomplex_t vals[4] = {
-        QC_ZERO,
-        qc_make(QF_ZERO, qf_from_double(-1.0)),
-        qc_make(QF_ZERO, qf_from_double(1.0)),
-        QC_ZERO
-    };
-    matrix_t *A = test_mat_create_qc(2, 2, vals);
+    number_t vals[4];
+    matrix_t *A;
     char buf[4096];
+
+    vals[0] = NUM_ZERO;
+    vals[1] = num_create_from_string("-i");
+    vals[2] = num_create_from_string("i");
+    vals[3] = NUM_ZERO;
+    A = mat_create(2, 2, vals);
 
     check_bool("mat_sprintf Pauli %ml returns non-negative",
                mat_sprintf(buf, sizeof(buf), "%ml", A) >= 0);
     check_bool("mat_sprintf Pauli pretty has negative imaginary entry",
-               strstr(buf, "- 1.000000000000000000000000000000i") != NULL ||
+               strstr(buf, " - 1.") != NULL ||
                strstr(buf, "- 1i") != NULL || strstr(buf, "-1i") != NULL || strstr(buf, "-i") != NULL);
     check_bool("mat_sprintf Pauli pretty has positive imaginary entry",
-               strstr(buf, "+ 1.000000000000000000000000000000i") != NULL ||
+               strstr(buf, " + 1.") != NULL ||
                strstr(buf, "+ 1i") != NULL || strstr(buf, "+1i") != NULL ||
                strstr(buf, "\n  i") != NULL || strstr(buf, " i ") != NULL);
     check_bool("mat_sprintf Pauli pretty omits + 0i",
                strstr(buf, "+ 0i") == NULL && strstr(buf, "+0i") == NULL);
 
     mat_free(A);
+    num_destroy(&vals[1]);
+    num_destroy(&vals[2]);
 }
 
 void run_matrix_output_tests(void)
 {
-    test_mat_sprintf_formats();
-    test_mat_printf_smoke();
-    test_mat_sprintf_number_precision();
-    test_mat_sprintf_pretty_qcomplex();
+    RUN_TEST_CASE(test_mat_sprintf_formats);
+    RUN_TEST_CASE(test_mat_printf_smoke);
+    RUN_TEST_CASE(test_mat_sprintf_number_precision);
+    RUN_TEST_CASE(test_mat_sprintf_pretty_number_complex);
 }

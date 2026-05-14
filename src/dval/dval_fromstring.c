@@ -42,7 +42,6 @@
 #include <limits.h>
 
 #include "qfloat.h"
-#include "qcomplex.h"
 #include "dval_internal.h"
 #include "dval_fromstring_internal.h"
 #include "dval.h"
@@ -247,7 +246,7 @@ static int parse_two_args(parser_t *p, dval_t **a_out, dval_t **b_out)
     return 1;
 }
 
-static int parse_qfloat_literal(const char **p_in, const char *end, qfloat_t *out)
+static int parse_number_literal(const char **p_in, const char *end, number_t *out)
 {
     const char *start = *p_in;
     size_t len = scan_decimal_len(start, end);
@@ -255,13 +254,12 @@ static int parse_qfloat_literal(const char **p_in, const char *end, qfloat_t *ou
     if (len == 0)
         return 0;
 
-    *p_in = start + len;
-
     char *buf = (char *)fs_xmalloc(len + 1);
     memcpy(buf, start, len);
     buf[len] = '\0';
-    *out = qf_from_string(buf);
+    *out = num_create_from_string(buf);
     free(buf);
+    *p_in = start + len;
     return 1;
 }
 
@@ -579,13 +577,12 @@ static dval_t *parse_power(parser_t *p)
         }
 
         /* Numeric exponent: ^3.5 */
-        qfloat_t exponent;
-        if (!parse_qfloat_literal(&p->p, p->end, &exponent)) {
+        number_t exponent_num;
+        if (!parse_number_literal(&p->p, p->end, &exponent_num)) {
             dv_free(base);
             set_error(p, "expected exponent after '^'");
             return NULL;
         }
-        number_t exponent_num = num_create_from_qfloat(exponent);
         dval_t *tmp = dv_pow(base, &exponent_num);
         num_destroy(&exponent_num);
         dv_free(base);
@@ -876,8 +873,8 @@ static int collect_implicit_symbols(const char *start, const char *end,
             num_destroy(&value);
         } else {
             node = is_const
-                ? dv_num_named_const_qf(QF_NAN, name)
-                : dv_num_named_var_qf(QF_NAN, name);
+                ? dv_new_named_const(NUM_NAN, name)
+                : dv_new_named_var(NUM_NAN, name);
         }
 
         key = dv_normalize_name(canonical_name);

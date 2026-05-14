@@ -306,42 +306,53 @@ static void test_mat_fun_4x4(void)
 
 /* ------------------------------------------------------------------ 3×3 qfloat matrix function tests */
 
-static void test_mat_fun_3x3_qf(void)
+static void test_mat_fun_3x3_mp_real(void)
 {
-    printf(C_CYAN "TEST: 3×3 qfloat matrix functions — general SPD\n" C_RESET);
+    printf(C_CYAN "TEST: 3×3 number matrix functions — general SPD\n" C_RESET);
 
-    qfloat_t avals[9] = {
-        qf_from_double(4.0), qf_from_double(2.0), qf_from_double(1.0),
-        qf_from_double(2.0), qf_from_double(3.0), qf_from_double(1.5),
-        qf_from_double(1.0), qf_from_double(1.5), qf_from_double(2.0)};
-    qfloat_t negavals[9] = {
-        qf_from_double(-4.0), qf_from_double(-2.0), qf_from_double(-1.0),
-        qf_from_double(-2.0), qf_from_double(-3.0), qf_from_double(-1.5),
-        qf_from_double(-1.0), qf_from_double(-1.5), qf_from_double(-2.0)};
+    number_t avals[9];
+    number_t negavals[9];
+    const double ainit[9] = {4.0, 2.0, 1.0,
+                             2.0, 3.0, 1.5,
+                             1.0, 1.5, 2.0};
+    const double neginit[9] = {-4.0, -2.0, -1.0,
+                               -2.0, -3.0, -1.5,
+                               -1.0, -1.5, -2.0};
+    matrix_t *A;
+    matrix_t *negA;
 
-    matrix_t *A    = test_mat_create_qf(3, 3, avals);
-    matrix_t *negA = test_mat_create_qf(3, 3, negavals);
+    for (size_t i = 0; i < 9u; ++i) {
+        avals[i] = num_create_from_double(ainit[i]);
+        negavals[i] = num_create_from_double(neginit[i]);
+    }
 
-    check_bool("qf A 3×3 allocated", A != NULL);
-    check_bool("qf negA 3×3 allocated", negA != NULL);
+    A = mat_create(3, 3, avals);
+    negA = mat_create(3, 3, negavals);
+    for (size_t i = 0; i < 9u; ++i) {
+        num_destroy(&avals[i]);
+        num_destroy(&negavals[i]);
+    }
+
+    check_bool("num A 3×3 allocated", A != NULL);
+    check_bool("num negA 3×3 allocated", negA != NULL);
     if (!A || !negA) { mat_free(A); mat_free(negA); return; }
 
-    print_mqf("A (3×3 SPD qfloat)", A);
+    print_mnum("A (3×3 SPD number)", A);
 
     /* exp(A) · exp(-A) = I */
     {
         matrix_t *E = mat_exp(A);
         matrix_t *En = mat_exp(negA);
-        check_bool("qf exp(A) 3×3 not NULL", E != NULL);
-        check_bool("qf exp(-A) 3×3 not NULL", En != NULL);
+        check_bool("num exp(A) 3×3 not NULL", E != NULL);
+        check_bool("num exp(-A) 3×3 not NULL", En != NULL);
         if (E && En)
         {
-            print_mqf("exp(A)", E);
-            print_mqf("exp(-A)", En);
+            print_mnum("exp(A)", E);
+            print_mnum("exp(-A)", En);
             matrix_t *I = mat_mul(E, En);
             if (I)
             {
-                check_mat_identity_qf("3×3 qf exp(A)·exp(-A)=I", I, 3, 1e-25);
+                check_mat_identity_d("3×3 num exp(A)·exp(-A)=I", I, 3, 1e-12);
                 mat_free(I);
             }
         }
@@ -353,12 +364,12 @@ static void test_mat_fun_3x3_qf(void)
     {
         matrix_t *S = mat_sin(A);
         matrix_t *C = mat_cos(A);
-        check_bool("qf sin(A) 3×3 not NULL", S != NULL);
-        check_bool("qf cos(A) 3×3 not NULL", C != NULL);
+        check_bool("num sin(A) 3×3 not NULL", S != NULL);
+        check_bool("num cos(A) 3×3 not NULL", C != NULL);
         if (S && C)
         {
-            print_mqf("sin(A)", S);
-            print_mqf("cos(A)", C);
+            print_mnum("sin(A)", S);
+            print_mnum("cos(A)", C);
             matrix_t *S2 = mat_mul(S, S);
             matrix_t *C2 = mat_mul(C, C);
             if (S2 && C2)
@@ -366,7 +377,7 @@ static void test_mat_fun_3x3_qf(void)
                 matrix_t *I = mat_add(S2, C2);
                 if (I)
                 {
-                    check_mat_identity_qf("3×3 qf sin²(A)+cos²(A)=I", I, 3, 1e-25);
+                    check_mat_identity_d("3×3 num sin²(A)+cos²(A)=I", I, 3, 1e-12);
                     mat_free(I);
                 }
             }
@@ -381,12 +392,12 @@ static void test_mat_fun_3x3_qf(void)
     {
         matrix_t *CH = mat_cosh(A);
         matrix_t *SH = mat_sinh(A);
-        check_bool("qf cosh(A) 3×3 not NULL", CH != NULL);
-        check_bool("qf sinh(A) 3×3 not NULL", SH != NULL);
+        check_bool("num cosh(A) 3×3 not NULL", CH != NULL);
+        check_bool("num sinh(A) 3×3 not NULL", SH != NULL);
         if (CH && SH)
         {
-            print_mqf("cosh(A)", CH);
-            print_mqf("sinh(A)", SH);
+            print_mnum("cosh(A)", CH);
+            print_mnum("sinh(A)", SH);
             matrix_t *CH2 = mat_mul(CH, CH);
             matrix_t *SH2 = mat_mul(SH, SH);
             if (CH2 && SH2)
@@ -394,7 +405,7 @@ static void test_mat_fun_3x3_qf(void)
                 matrix_t *I = mat_sub(CH2, SH2);
                 if (I)
                 {
-                    check_mat_identity_qf("3×3 qf cosh²(A)-sinh²(A)=I", I, 3, 1e-25);
+                    check_mat_identity_d("3×3 num cosh²(A)-sinh²(A)=I", I, 3, 1e-12);
                     mat_free(I);
                 }
             }
@@ -408,15 +419,15 @@ static void test_mat_fun_3x3_qf(void)
     /* exp(log(A)) = A */
     {
         matrix_t *L = mat_log(A);
-        check_bool("qf log(A) 3×3 not NULL", L != NULL);
+        check_bool("num log(A) 3×3 not NULL", L != NULL);
         if (L)
         {
-            print_mqf("log(A)", L);
+            print_mnum("log(A)", L);
             matrix_t *R = mat_exp(L);
-            check_bool("qf exp(log(A)) 3×3 not NULL", R != NULL);
+            check_bool("num exp(log(A)) 3×3 not NULL", R != NULL);
             if (R)
             {
-                check_mat_qf("3×3 qf exp(log(A))=A", R, A, 1e-25);
+                check_mat_d("3×3 num exp(log(A))=A", R, A, 1e-12);
                 mat_free(R);
             }
             mat_free(L);
@@ -429,7 +440,7 @@ static void test_mat_fun_3x3_qf(void)
 
 /* ------------------------------------------------------------------ 3×3 qcomplex matrix function tests */
 
-static void test_mat_fun_3x3_qc(void)
+static void test_mat_fun_3x3_complex(void)
 {
     printf(C_CYAN "TEST: 3×3 qcomplex matrix functions — Hermitian positive definite\n" C_RESET);
 
@@ -455,8 +466,8 @@ static void test_mat_fun_3x3_qc(void)
         qc_make(qf_from_double(-0.8), qf_from_double( 0.2)),
         qc_make(qf_from_double(-2.0), QF_ZERO)};
 
-    matrix_t *A    = test_mat_create_qc(3, 3, avals);
-    matrix_t *negA = test_mat_create_qc(3, 3, negavals);
+    matrix_t *A    = test_mat_create_complex(3, 3, avals);
+    matrix_t *negA = test_mat_create_complex(3, 3, negavals);
 
     check_bool("qc A 3×3 allocated", A != NULL);
     check_bool("qc negA 3×3 allocated", negA != NULL);
@@ -477,7 +488,7 @@ static void test_mat_fun_3x3_qc(void)
             matrix_t *I = mat_mul(E, En);
             if (I)
             {
-                check_mat_identity_qc("3×3 qc exp(A)·exp(-A)=I", I, 3, 1e-25);
+                check_mat_identity_complex("3×3 complex exp(A)·exp(-A)=I", I, 3, 1e-25);
                 mat_free(I);
             }
         }
@@ -502,7 +513,7 @@ static void test_mat_fun_3x3_qc(void)
                 matrix_t *I = mat_add(S2, C2);
                 if (I)
                 {
-                    check_mat_identity_qc("3×3 qc sin²(A)+cos²(A)=I", I, 3, 1e-25);
+                    check_mat_identity_complex("3×3 complex sin²(A)+cos²(A)=I", I, 3, 1e-25);
                     mat_free(I);
                 }
             }
@@ -530,7 +541,7 @@ static void test_mat_fun_3x3_qc(void)
                 matrix_t *I = mat_sub(CH2, SH2);
                 if (I)
                 {
-                    check_mat_identity_qc("3×3 qc cosh²(A)-sinh²(A)=I", I, 3, 1e-25);
+                    check_mat_identity_complex("3×3 complex cosh²(A)-sinh²(A)=I", I, 3, 1e-25);
                     mat_free(I);
                 }
             }
@@ -552,7 +563,7 @@ static void test_mat_fun_3x3_qc(void)
             check_bool("qc exp(log(A)) 3×3 not NULL", R != NULL);
             if (R)
             {
-                check_mat_qc("3×3 qc exp(log(A))=A", R, A, 1e-25);
+                check_mat_complex("3×3 complex exp(log(A))=A", R, A, 1e-25);
                 mat_free(R);
             }
             mat_free(L);
@@ -688,30 +699,36 @@ static void test_mat_error_handling(void)
 
 /* ------------------------------------------------------------------ qf/qc variants of under-tested functions */
 
-static void test_mat_fun_qf_qc(void)
+static void test_mat_fun_mp_real_complex(void)
 {
-    printf(C_CYAN "TEST: qf/qc variants of tan, hyperbolic, log, erf, erfc, pow_int\n" C_RESET);
+    printf(C_CYAN "TEST: number variants of tan, hyperbolic, log, erf, erfc, pow_int\n" C_RESET);
 
-    qfloat_t qfvals[4] = {
-        qf_from_double(0.3), qf_from_double(0.1),
-        qf_from_double(0.1), qf_from_double(0.4)};
-    matrix_t *A_qf = test_mat_create_qf(2, 2, qfvals);
-    check_bool("A_qf allocated", A_qf != NULL);
-    if (!A_qf)
+    number_t vals[4];
+    matrix_t *A_num;
+
+    vals[0] = num_create_from_double(0.3);
+    vals[1] = num_create_from_double(0.1);
+    vals[2] = num_create_from_double(0.1);
+    vals[3] = num_create_from_double(0.4);
+    A_num = mat_create(2, 2, vals);
+    for (size_t i = 0; i < 4u; ++i)
+        num_destroy(&vals[i]);
+    check_bool("A_num allocated", A_num != NULL);
+    if (!A_num)
         return;
 
     /* tan: cos(A)·tan(A) = sin(A) */
     {
-        matrix_t *T = mat_tan(A_qf);
-        matrix_t *S = mat_sin(A_qf);
-        matrix_t *C = mat_cos(A_qf);
-        check_bool("qf tan(A) not NULL", T != NULL);
+        matrix_t *T = mat_tan(A_num);
+        matrix_t *S = mat_sin(A_num);
+        matrix_t *C = mat_cos(A_num);
+        check_bool("num tan(A) not NULL", T != NULL);
         if (T && S && C)
         {
             matrix_t *CT = mat_mul(C, T);
             if (CT)
             {
-                check_mat_qf("qf 2×2 cos·tan=sin", CT, S, 1e-25);
+                check_mat_d("num 2×2 cos·tan=sin", CT, S, 1e-12);
                 mat_free(CT);
             }
         }
@@ -722,10 +739,10 @@ static void test_mat_fun_qf_qc(void)
 
     /* cosh²(A) - sinh²(A) = I */
     {
-        matrix_t *CH = mat_cosh(A_qf);
-        matrix_t *SH = mat_sinh(A_qf);
-        check_bool("qf cosh(A) not NULL", CH != NULL);
-        check_bool("qf sinh(A) not NULL", SH != NULL);
+        matrix_t *CH = mat_cosh(A_num);
+        matrix_t *SH = mat_sinh(A_num);
+        check_bool("num cosh(A) not NULL", CH != NULL);
+        check_bool("num sinh(A) not NULL", SH != NULL);
         if (CH && SH)
         {
             matrix_t *CH2 = mat_mul(CH, CH);
@@ -735,7 +752,7 @@ static void test_mat_fun_qf_qc(void)
                 matrix_t *I = mat_sub(CH2, SH2);
                 if (I)
                 {
-                    check_mat_identity_qf("qf 2×2 cosh²-sinh²=I", I, 2, 1e-25);
+                    check_mat_identity_d("num 2×2 cosh²-sinh²=I", I, 2, 1e-12);
                     mat_free(I);
                 }
             }
@@ -748,16 +765,16 @@ static void test_mat_fun_qf_qc(void)
 
     /* tanh: cosh(A)·tanh(A) = sinh(A) */
     {
-        matrix_t *TH = mat_tanh(A_qf);
-        matrix_t *CH = mat_cosh(A_qf);
-        matrix_t *SH = mat_sinh(A_qf);
-        check_bool("qf tanh(A) not NULL", TH != NULL);
+        matrix_t *TH = mat_tanh(A_num);
+        matrix_t *CH = mat_cosh(A_num);
+        matrix_t *SH = mat_sinh(A_num);
+        check_bool("num tanh(A) not NULL", TH != NULL);
         if (TH && CH && SH)
         {
             matrix_t *CT = mat_mul(CH, TH);
             if (CT)
             {
-                check_mat_qf("qf 2×2 cosh·tanh=sinh", CT, SH, 1e-25);
+                check_mat_d("num 2×2 cosh·tanh=sinh", CT, SH, 1e-12);
                 mat_free(CT);
             }
         }
@@ -768,19 +785,25 @@ static void test_mat_fun_qf_qc(void)
 
     /* log: exp(log(A)) = A for positive-definite A */
     {
-        qfloat_t pdvals[4] = {
-            qf_from_double(2.0), qf_from_double(0.5),
-            qf_from_double(0.5), qf_from_double(2.0)};
-        matrix_t *PD = test_mat_create_qf(2, 2, pdvals);
-        matrix_t *L = mat_log(PD);
-        check_bool("qf log(PD) not NULL", L != NULL);
+        number_t pdvals[4];
+        matrix_t *PD;
+        matrix_t *L;
+        pdvals[0] = num_create_from_double(2.0);
+        pdvals[1] = num_create_from_double(0.5);
+        pdvals[2] = num_create_from_double(0.5);
+        pdvals[3] = num_create_from_double(2.0);
+        PD = mat_create(2, 2, pdvals);
+        for (size_t i = 0; i < 4u; ++i)
+            num_destroy(&pdvals[i]);
+        L = mat_log(PD);
+        check_bool("num log(PD) not NULL", L != NULL);
         if (L)
         {
             matrix_t *R = mat_exp(L);
-            check_bool("qf exp(log(PD)) not NULL", R != NULL);
+            check_bool("num exp(log(PD)) not NULL", R != NULL);
             if (R)
             {
-                check_mat_qf("qf 2×2 exp(log(A))=A", R, PD, 1e-25);
+                check_mat_d("num 2×2 exp(log(A))=A", R, PD, 1e-12);
                 mat_free(R);
             }
             mat_free(L);
@@ -790,16 +813,16 @@ static void test_mat_fun_qf_qc(void)
 
     /* erf + erfc = I */
     {
-        matrix_t *E = mat_erf(A_qf);
-        matrix_t *EC = mat_erfc(A_qf);
-        check_bool("qf erf(A) not NULL", E != NULL);
-        check_bool("qf erfc(A) not NULL", EC != NULL);
+        matrix_t *E = mat_erf(A_num);
+        matrix_t *EC = mat_erfc(A_num);
+        check_bool("num erf(A) not NULL", E != NULL);
+        check_bool("num erfc(A) not NULL", EC != NULL);
         if (E && EC)
         {
             matrix_t *I = mat_add(E, EC);
             if (I)
             {
-                check_mat_identity_qf("qf 2×2 erf+erfc=I", I, 2, 1e-25);
+                check_mat_identity_d("num 2×2 erf+erfc=I", I, 2, 1e-12);
                 mat_free(I);
             }
         }
@@ -807,74 +830,89 @@ static void test_mat_fun_qf_qc(void)
         mat_free(EC);
     }
 
-    /* pow_int for qf: diag(2,3)^3 = diag(8,27) */
+    /* pow_int for num: diag(2,3)^3 = diag(8,27) */
     {
-        qfloat_t dvals[4] = {
-            qf_from_double(2.0), QF_ZERO,
-            QF_ZERO, qf_from_double(3.0)};
-        matrix_t *D = test_mat_create_qf(2, 2, dvals);
-        matrix_t *R = mat_pow_int(D, 3);
-        check_bool("qf pow_int(diag(2,3),3) not NULL", R != NULL);
+        number_t dvals[4];
+        matrix_t *D;
+        matrix_t *R;
+        double r00, r11, r01, r10;
+        dvals[0] = num_create_from_double(2.0);
+        dvals[1] = NUM_ZERO;
+        dvals[2] = NUM_ZERO;
+        dvals[3] = num_create_from_double(3.0);
+        D = mat_create(2, 2, dvals);
+        num_destroy(&dvals[0]);
+        num_destroy(&dvals[3]);
+        R = mat_pow_int(D, 3);
+        check_bool("num pow_int(diag(2,3),3) not NULL", R != NULL);
         if (R)
         {
-            qfloat_t r00, r11, r01, r10;
             mat_get(R, 0, 0, &r00);
             mat_get(R, 1, 1, &r11);
             mat_get(R, 0, 1, &r01);
             mat_get(R, 1, 0, &r10);
-            check_qf_val("qf diag(2,3)^3 [0,0]=8", r00, qf_from_double(8.0), 1e-25);
-            check_qf_val("qf diag(2,3)^3 [1,1]=27", r11, qf_from_double(27.0), 1e-25);
-            check_qf_val("qf diag(2,3)^3 [0,1]=0", r01, QF_ZERO, 1e-25);
-            check_qf_val("qf diag(2,3)^3 [1,0]=0", r10, QF_ZERO, 1e-25);
+            check_d("num diag(2,3)^3 [0,0]=8", r00, 8.0, 1e-12);
+            check_d("num diag(2,3)^3 [1,1]=27", r11, 27.0, 1e-12);
+            check_d("num diag(2,3)^3 [0,1]=0", r01, 0.0, 1e-12);
+            check_d("num diag(2,3)^3 [1,0]=0", r10, 0.0, 1e-12);
             mat_free(R);
         }
         mat_free(D);
     }
 
-    /* qcomplex: exp(A_qc)·exp(-A_qc) = I */
+    /* real 2x2: exp(A)·exp(-A) = I */
     {
-        qcomplex_t qcvals[4] = {
-            qc_make(qf_from_double(0.3), QF_ZERO),
-            qc_make(qf_from_double(0.1), QF_ZERO),
-            qc_make(qf_from_double(0.1), QF_ZERO),
-            qc_make(qf_from_double(0.4), QF_ZERO)};
-        qcomplex_t neg_qcvals[4] = {
-            qc_make(qf_from_double(-0.3), QF_ZERO),
-            qc_make(qf_from_double(-0.1), QF_ZERO),
-            qc_make(qf_from_double(-0.1), QF_ZERO),
-            qc_make(qf_from_double(-0.4), QF_ZERO)};
-        matrix_t *A_qc = test_mat_create_qc(2, 2, qcvals);
-        matrix_t *negA_qc = test_mat_create_qc(2, 2, neg_qcvals);
-        matrix_t *E = mat_exp(A_qc);
-        matrix_t *En = mat_exp(negA_qc);
-        check_bool("qc exp(A) not NULL", E != NULL);
-        check_bool("qc exp(-A) not NULL", En != NULL);
+        number_t expvals[4];
+        number_t neg_expvals[4];
+        matrix_t *A_exp;
+        matrix_t *negA_exp;
+        matrix_t *E;
+        matrix_t *En;
+
+        expvals[0] = num_create_from_double(0.3);
+        expvals[1] = num_create_from_double(0.1);
+        expvals[2] = num_create_from_double(0.1);
+        expvals[3] = num_create_from_double(0.4);
+        neg_expvals[0] = num_create_from_double(-0.3);
+        neg_expvals[1] = num_create_from_double(-0.1);
+        neg_expvals[2] = num_create_from_double(-0.1);
+        neg_expvals[3] = num_create_from_double(-0.4);
+        A_exp = mat_create(2, 2, expvals);
+        negA_exp = mat_create(2, 2, neg_expvals);
+        for (size_t i = 0; i < 4u; ++i) {
+            num_destroy(&expvals[i]);
+            num_destroy(&neg_expvals[i]);
+        }
+        E = mat_exp(A_exp);
+        En = mat_exp(negA_exp);
+        check_bool("num exp(A) not NULL", E != NULL);
+        check_bool("num exp(-A) not NULL", En != NULL);
         if (E && En)
         {
             matrix_t *I = mat_mul(E, En);
             if (I)
             {
-                check_mat_identity_qc("qc 2×2 exp(A)·exp(-A)=I", I, 2, 1e-25);
+                check_mat_identity_d("num 2×2 exp(A)·exp(-A)=I", I, 2, 1e-12);
                 mat_free(I);
             }
         }
-        mat_free(A_qc);
-        mat_free(negA_qc);
+        mat_free(A_exp);
+        mat_free(negA_exp);
         mat_free(E);
         mat_free(En);
     }
 
-    mat_free(A_qf);
+    mat_free(A_num);
 }
 
 /* ------------------------------------------------------------------ tests_main */
 
 void run_matrix_function_regression_tests(void)
 {
-    RUN_TEST_CASE(test_mat_fun_qf_qc);
+    RUN_TEST_CASE(test_mat_fun_mp_real_complex);
     RUN_TEST_CASE(test_mat_error_handling);
     RUN_TEST_CASE(test_mat_fun_3x3);
     RUN_TEST_CASE(test_mat_fun_4x4);
-    RUN_TEST_CASE(test_mat_fun_3x3_qf);
-    RUN_TEST_CASE(test_mat_fun_3x3_qc);
+    RUN_TEST_CASE(test_mat_fun_3x3_mp_real);
+    RUN_TEST_CASE(test_mat_fun_3x3_complex);
 }

@@ -30,7 +30,6 @@
 #include <limits.h>
 #include <math.h>
 #include "number.h"
-#include "qcomplex.h"
 #include "dval_internal.h"
 #include "dval.h"
 
@@ -103,11 +102,6 @@ static number_t dv_eval_cached_num(const dval_t *dv)
 number_t dv_eval_num_internal(const dval_t *dv)
 {
     return dv_eval_cached_num(dv);
-}
-
-qcomplex_t dv_eval_qc_internal(const dval_t *dv)
-{
-    return dv_qc_from_number(dv_eval_cached_num(dv));
 }
 
 static uint64_t current_wrt_id(void)
@@ -233,27 +227,12 @@ dval_t *dv_new_binary_internal(const dval_ops_t *ops, const dval_t *a, const dva
     return dv;
 }
 
-dval_t *dv_new_pow_d_internal(const dval_t *a, double d)
+dval_t *dv_new_pow_const_internal(const dval_t *a, number_t exponent)
 {
     dval_t *dv = dv_alloc(&ops_pow_d);
-    dv->a = (dval_t *)a;
-    dv_store_const_num(dv, num_create_from_qfloat(qf_from_double(d)));
-    return dv;
-}
 
-dval_t *dv_new_pow_qf_internal(const dval_t *a, qfloat_t exponent)
-{
-    dval_t *dv = dv_alloc(&ops_pow_d);
     dv->a = (dval_t *)a;
-    dv_store_const_num(dv, num_create_from_qfloat(exponent));
-    return dv;
-}
-
-dval_t *dv_new_pow_qc_internal(const dval_t *a, qcomplex_t exponent)
-{
-    dval_t *dv = dv_alloc(&ops_pow_d);
-    dv->a = (dval_t *)a;
-    dv_store_const_num(dv, dv_number_from_qc(exponent));
+    dv_store_const_num(dv, num_clone(exponent));
     return dv;
 }
 

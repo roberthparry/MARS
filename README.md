@@ -15,7 +15,7 @@ datetime utilities, UTF-8 strings, and generic containers.
 - **`mfloat_t`** — opaque multiprecision floating-point values with exact conversion, pretty/scientific formatting, and a growing native math layer
 - **`number_t`** — generic numeric value cluster spanning exact, fixed-precision, and multiprecision backends behind one by-value public handle
 - **`qfloat_t`** — double-double arithmetic and special functions (~34 decimal digits of precision)
-- **`matrix_t`** — generic high-precision matrix with pluggable element types (`double`, `qfloat_t`, `qcomplex_t`, `dval_t *`), string-based matrix parsing and formatting, symbolic linear algebra support including Schur complements, block inverse/solve, Jordan helpers, entrywise matrix derivatives, Jacobian helpers, and first matrix-calculus helpers for trace, determinant, inverse, block inverse, solve, and block solve, and eigendecomposition at full `qfloat_t` precision
+- **`matrix_t`** — generic high-precision matrix over numeric `number_t` values or symbolic `dval_t *` entries, with string-based matrix parsing and formatting, symbolic linear algebra support including Schur complements, block inverse/solve, Jordan helpers, entrywise matrix derivatives, Jacobian helpers, first matrix-calculus helpers for trace, determinant, inverse, block inverse, solve, and block solve, and high-precision eigendecomposition and matrix functions through the numeric `number_t` layer
 - **`dval_t`** — differentiable expression DAGs with first/second derivatives, symbolic matrix integration, and structural matcher helpers for higher-level symbolic code
 - **`datetime_t`** — civil and astronomical date/time helpers
 - **`dictionary_t` / `set_t` / `array_t`** — generic containers with user-defined ownership

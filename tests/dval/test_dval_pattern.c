@@ -1,6 +1,125 @@
 #include "test_dval.h"
 #include "internal/dval_internal.h"
 
+static bool dv_match_unary_affine_kind_qf_local(const dval_t *expr,
+                                                dv_pattern_unary_affine_kind_t unary_kind,
+                                                size_t nvars,
+                                                dval_t *const *vars,
+                                                qfloat_t *constant_out,
+                                                qfloat_t *coeffs_out)
+{
+    number_t constant = num_new();
+    number_t *coeffs_num = NULL;
+    bool ok;
+
+    if (!constant_out)
+        return false;
+    coeffs_num = malloc(nvars * sizeof(*coeffs_num));
+    if ((nvars > 0) && !coeffs_num)
+        return false;
+    for (size_t i = 0; i < nvars; ++i)
+        coeffs_num[i] = num_new();
+    ok = dv_match_unary_affine_kind(expr, unary_kind, nvars, vars, &constant, coeffs_num);
+    if (ok)
+        *constant_out = num_to_qfloat(constant);
+    if (ok)
+        for (size_t i = 0; i < nvars; ++i)
+            coeffs_out[i] = num_to_qfloat(coeffs_num[i]);
+    for (size_t i = 0; i < nvars; ++i)
+        num_destroy(&coeffs_num[i]);
+    free(coeffs_num);
+    num_destroy(&constant);
+    return ok;
+}
+
+static bool dv_match_affine_poly_deg4_qf_local(const dval_t *expr,
+                                               size_t nvars,
+                                               dval_t *const *vars,
+                                               qfloat_t *poly_coeffs_out,
+                                               qfloat_t *constant_out,
+                                               qfloat_t *coeffs_out)
+{
+    number_t constant = num_new();
+    number_t poly_num[5];
+    number_t *coeffs_num = NULL;
+    bool ok;
+
+    if (!constant_out)
+        return false;
+    coeffs_num = malloc(nvars * sizeof(*coeffs_num));
+    if ((nvars > 0) && !coeffs_num)
+        return false;
+    for (size_t i = 0; i < nvars; ++i)
+        coeffs_num[i] = num_new();
+    for (size_t i = 0; i < 5; ++i)
+        poly_num[i] = num_new();
+    ok = dv_match_affine_poly_deg4(expr, nvars, vars, poly_num, &constant, coeffs_num);
+    if (ok)
+        *constant_out = num_to_qfloat(constant);
+    if (ok) {
+        for (size_t i = 0; i < 5; ++i)
+            poly_coeffs_out[i] = num_to_qfloat(poly_num[i]);
+        for (size_t i = 0; i < nvars; ++i)
+            coeffs_out[i] = num_to_qfloat(coeffs_num[i]);
+    }
+    for (size_t i = 0; i < 5; ++i)
+        num_destroy(&poly_num[i]);
+    for (size_t i = 0; i < nvars; ++i)
+        num_destroy(&coeffs_num[i]);
+    free(coeffs_num);
+    num_destroy(&constant);
+    return ok;
+}
+
+static bool dv_match_affine_poly_deg4_times_unary_affine_kind_qf_local(
+    const dval_t *expr,
+    dv_pattern_unary_affine_kind_t unary_kind,
+    size_t nvars,
+    dval_t *const *vars,
+    qfloat_t *poly_coeffs_out,
+    qfloat_t *constant_out,
+    qfloat_t *coeffs_out)
+{
+    number_t constant = num_new();
+    number_t poly_num[5];
+    number_t *coeffs_num = NULL;
+    bool ok;
+
+    if (!constant_out)
+        return false;
+    coeffs_num = malloc(nvars * sizeof(*coeffs_num));
+    if ((nvars > 0) && !coeffs_num)
+        return false;
+    for (size_t i = 0; i < nvars; ++i)
+        coeffs_num[i] = num_new();
+    for (size_t i = 0; i < 5; ++i)
+        poly_num[i] = num_new();
+    ok = dv_match_affine_poly_deg4_times_unary_affine_kind(
+        expr, unary_kind, nvars, vars, poly_num, &constant, coeffs_num);
+    if (ok)
+        *constant_out = num_to_qfloat(constant);
+    if (ok) {
+        for (size_t i = 0; i < 5; ++i)
+            poly_coeffs_out[i] = num_to_qfloat(poly_num[i]);
+        for (size_t i = 0; i < nvars; ++i)
+            coeffs_out[i] = num_to_qfloat(coeffs_num[i]);
+    }
+    for (size_t i = 0; i < 5; ++i)
+        num_destroy(&poly_num[i]);
+    for (size_t i = 0; i < nvars; ++i)
+        num_destroy(&coeffs_num[i]);
+    free(coeffs_num);
+    num_destroy(&constant);
+    return ok;
+}
+
+#define dv_match_unary_affine_kind(...) \
+    dv_match_unary_affine_kind_qf_local(__VA_ARGS__)
+#define dv_match_affine_poly_deg4(...) \
+    dv_match_affine_poly_deg4_qf_local(__VA_ARGS__)
+#define dv_match_affine_poly_deg4_times_unary_affine_kind(...) \
+    dv_match_affine_poly_deg4_times_unary_affine_kind_qf_local(__VA_ARGS__)
+
 static void test_match_affine_families(void)
 {
     dval_t *x = test_dv_new_named_var_d(1.0, "x");
@@ -78,10 +197,10 @@ static void test_pattern_rejections(void)
     dval_t *y = test_dv_new_named_var_d(2.0, "y");
     dval_t *c = test_dv_new_named_const_d(5.0, "c");
     dval_t *vars[] = { x, y };
-    qfloat_t value;
+    number_t value = num_new();
     qfloat_t constant;
     qfloat_t coeffs[2];
-    qfloat_t scale;
+    number_t scale = num_new();
     const dval_t *base = NULL;
 
     dval_t *xy = dv_mul(x, y);
@@ -92,6 +211,9 @@ static void test_pattern_rejections(void)
     ASSERT_TRUE(!dv_match_unary_affine_kind(exp_xy, DV_PATTERN_UNARY_EXP,
                                             2, vars, &constant, coeffs));
     ASSERT_TRUE(!dv_match_scaled_expr(x_over_y, &scale, &base));
+
+    num_destroy(&scale);
+    num_destroy(&value);
 
     dv_free(x_over_y);
     dv_free(exp_xy);
@@ -107,7 +229,7 @@ static void test_scaled_expr_and_var_usage(void)
     dval_t *y = test_dv_new_named_var_d(2.0, "y");
     dval_t *z = test_dv_new_named_var_d(3.0, "z");
     dval_t *vars[] = { x, y, z };
-    qfloat_t scale;
+    number_t scale = num_new();
     const dval_t *base = NULL;
     bool used[3];
 
@@ -119,7 +241,7 @@ static void test_scaled_expr_and_var_usage(void)
     dval_t *usage_expr = dv_add(usage_scaled, usage_exp);
 
     ASSERT_TRUE(dv_match_scaled_expr(scaled, &scale, &base));
-    check_q_at(__FILE__, __LINE__, 1, "scaled expr factor", scale, qf_from_double(-2.0));
+    check_q_at(__FILE__, __LINE__, 1, "scaled expr factor", num_to_qfloat(scale), qf_from_double(-2.0));
     ASSERT_TRUE(base == x);
 
     ASSERT_TRUE(dv_collect_var_usage(usage_expr, 3, vars, used));
@@ -127,6 +249,7 @@ static void test_scaled_expr_and_var_usage(void)
     ASSERT_TRUE(used[1]);
     ASSERT_TRUE(!used[2]);
 
+    num_destroy(&scale);
     dv_free(usage_expr);
     dv_free(usage_exp);
     dv_free(usage_scaled);

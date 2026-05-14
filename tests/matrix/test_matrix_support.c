@@ -22,17 +22,165 @@ static matrix_t *clone_matrix_snapshot(const matrix_t *A)
     return NULL;
 }
 
+typedef struct {
+    char labels[8][32];
+    size_t count;
+} precision_set_t;
+
+static int precision_set_contains(const precision_set_t *set, const char *label_text)
+{
+    for (size_t i = 0; i < set->count; ++i)
+        if (strcmp(set->labels[i], label_text) == 0)
+            return 1;
+    return 0;
+}
+
+static void precision_set_add(precision_set_t *set, const char *label_text)
+{
+    if (!set || !label_text || !*label_text || precision_set_contains(set, label_text))
+        return;
+    if (set->count >= (sizeof(set->labels) / sizeof(set->labels[0])))
+        return;
+    snprintf(set->labels[set->count], sizeof(set->labels[0]), "%.31s", label_text);
+    set->count++;
+}
+
+static const char *number_precision_label(number_t z, char *buf, size_t buf_size)
+{
+    number_kind_t kind = number_kind_value(&z);
+    size_t bits = num_get_prec_bits(z);
+
+    switch (kind) {
+    case NUMBER_DOUBLE:
+        return "double";
+    case NUMBER_QFLOAT:
+        return "qfloat";
+    case NUMBER_QCOMPLEX:
+        return "qcomplex";
+    case NUMBER_MFLOAT:
+        snprintf(buf, buf_size, "mfloat-%zu", bits ? bits : num_get_default_prec_bits());
+        return buf;
+    case NUMBER_MCOMPLEX:
+        snprintf(buf, buf_size, "mcomplex-%zu", bits ? bits : num_get_default_prec_bits());
+        return buf;
+    case NUMBER_MINT:
+    case NUMBER_MRATIONAL:
+        return "exact";
+    default:
+        return "number";
+    }
+}
+
+static int number_display_is_truncated(number_t z)
+{
+    size_t display_digits = 16u;
+    size_t prec_digits = num_get_prec_digits(z);
+    char *full = num_to_string(z);
+    int truncated = 0;
+
+    if (prec_digits > display_digits)
+        truncated = 1;
+    if (full && strlen(full) > 24u)
+        truncated = 1;
+    free(full);
+    return truncated;
+}
+
+static void format_compact_number(number_t z, char *buf, size_t buf_size)
+{
+    number_t zr = num_real_part(z);
+    number_t zi = num_imag_part(z);
+    int ellipsis = number_display_is_truncated(z);
+
+    if (num_is_real(z)) {
+        snprintf(buf, buf_size, "%.16g%s", num_to_double(zr), ellipsis ? "..." : "");
+    } else {
+        number_t abs_zi = num_abs(zi);
+        double re = num_to_double(zr);
+        double im = num_to_double(abs_zi);
+        const char *sign = (num_get_sign(zi) < 0) ? "-" : "+";
+
+        snprintf(buf, buf_size, "%.16g %s %.16gi%s",
+                 re, sign, im, ellipsis ? "..." : "");
+        num_destroy(&abs_zi);
+    }
+
+    num_destroy(&zi);
+    num_destroy(&zr);
+}
+
 static void print_mnum_raw(const char *label, matrix_t *A)
 {
-    char *s = mat_to_string(A, MAT_STRING_LAYOUT_PRETTY);
+    size_t rows;
+    size_t cols;
+    size_t *w;
+    precision_set_t precision_set = {{{0}}, 0};
+    char precision_buf[64];
 
-    if (!s) {
+    if (!A) {
         printf(C_YELLOW "%s = <null>\n" C_RESET, label);
         return;
     }
 
-    printf(C_YELLOW "%s = \n%s\n" C_RESET, label, s);
-    free(s);
+    rows = mat_get_row_count(A);
+    cols = mat_get_col_count(A);
+    w = calloc(cols ? cols : 1, sizeof(size_t));
+    if (!w) {
+        char *s = mat_to_string(A, MAT_STRING_LAYOUT_PRETTY);
+        if (!s) {
+            printf(C_YELLOW "%s = <null>\n" C_RESET, label);
+            return;
+        }
+        printf(C_YELLOW "%s = \n%s\n" C_RESET, label, s);
+        free(s);
+        return;
+    }
+
+    printf(C_YELLOW "%s = " C_CYAN "(" C_RESET "\n", label);
+
+    for (size_t i = 0; i < rows; i++) {
+        for (size_t j = 0; j < cols; j++) {
+            number_t z = mat_get_num(A, i, j);
+            char buf[256];
+            const char *plabel = number_precision_label(z, precision_buf, sizeof(precision_buf));
+
+            format_compact_number(z, buf, sizeof(buf));
+            precision_set_add(&precision_set, plabel);
+
+            if (strlen(buf) > w[j])
+                w[j] = strlen(buf);
+
+            num_destroy(&z);
+        }
+    }
+
+    if (precision_set.count > 0) {
+        printf(C_GREY "  working precision: " C_RESET);
+        for (size_t i = 0; i < precision_set.count; ++i) {
+            if (i)
+                printf(C_GREY ", " C_RESET);
+            printf(C_WHITE "%s" C_RESET, precision_set.labels[i]);
+        }
+        printf("\n");
+    }
+
+    for (size_t i = 0; i < rows; i++) {
+        printf("  ");
+        for (size_t j = 0; j < cols; j++) {
+            number_t z = mat_get_num(A, i, j);
+            char buf[256];
+
+            format_compact_number(z, buf, sizeof(buf));
+
+            printf(" %*s", (int)w[j], buf);
+
+            num_destroy(&z);
+        }
+        printf("\n");
+    }
+
+    printf(C_CYAN ")" C_RESET "\n");
+    free(w);
 }
 
 static int is_primary_matrix_label(const char *label)
@@ -141,7 +289,7 @@ void qc_to_coloured_string(qcomplex_t z, char *out, size_t out_size)
              re, sign, im);
 }
 
-void print_qc(const char *label, qcomplex_t z)
+void print_complex(const char *label, qcomplex_t z)
 {
     char buf[512];
     qc_to_coloured_string(z, buf, sizeof(buf));
@@ -149,7 +297,7 @@ void print_qc(const char *label, qcomplex_t z)
     fflush(stdout);
 }
 
-void print_qf(const char *label, qfloat_t x)
+void print_mp_real(const char *label, qfloat_t x)
 {
     char buf[512];
     qf_to_coloured_string(x, buf, sizeof(buf));
@@ -717,6 +865,39 @@ void print_mnum(const char *label, matrix_t *A)
     fflush(stdout);
 }
 
+void print_matrix_working_precision_line(const char *label, const matrix_t *A)
+{
+    precision_set_t precision_set = {{{0}}, 0};
+    char precision_buf[64];
+
+    if (!A || mat_typeof(A) != MAT_TYPE_NUMBER)
+        return;
+
+    for (size_t i = 0; i < mat_get_row_count(A); ++i) {
+        for (size_t j = 0; j < mat_get_col_count(A); ++j) {
+            number_t z = mat_get_num(A, i, j);
+            const char *plabel = number_precision_label(z, precision_buf, sizeof(precision_buf));
+            precision_set_add(&precision_set, plabel);
+            num_destroy(&z);
+        }
+    }
+
+    if (precision_set.count == 0)
+        return;
+
+    if (label && *label)
+        printf("    working precision (%s) = ", label);
+    else
+        printf("    working precision = ");
+
+    for (size_t i = 0; i < precision_set.count; ++i) {
+        if (i)
+            printf(", ");
+        printf("%s", precision_set.labels[i]);
+    }
+    printf("\n");
+}
+
 void print_mdv(const char *label, matrix_t *A)
 {
     char display_label[160];
@@ -777,8 +958,8 @@ void check_qf_val(const char *label, qfloat_t got, qfloat_t expected, double tol
               : C_BOLD C_RED "  FAIL: %s\n" C_RESET,
            label);
 
-    print_qf("got      ", got);
-    print_qf("expected ", expected);
+    print_mp_real("got      ", got);
+    print_mp_real("expected ", expected);
     printf("    error    = %.16g\n", err);
 }
 
@@ -799,8 +980,8 @@ void check_qc_val(const char *label, qcomplex_t got, qcomplex_t expected, double
               : C_BOLD C_RED "  FAIL: %s\n" C_RESET,
            label);
 
-    print_qc("got      ", got);
-    print_qc("expected ", expected);
+    print_complex("got      ", got);
+    print_complex("expected ", expected);
     printf("    error    = %.16g\n", err);
 }
 

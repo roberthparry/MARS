@@ -1,5 +1,24 @@
 #include "test_matrix.h"
 
+static void check_matrix_tostring_dv_double(const char *label,
+                                            const dval_t *dv,
+                                            double expected,
+                                            double tol)
+{
+    number_t got = dv_eval(dv);
+    number_t want = num_create_from_double(expected);
+    number_t diff = num_sub(got, want);
+    number_t mag = num_abs(diff);
+    double err = num_to_double(mag);
+
+    check_bool(label, err <= tol);
+
+    num_destroy(&mag);
+    num_destroy(&diff);
+    num_destroy(&want);
+    num_destroy(&got);
+}
+
 static char *format_matrix_test_num_at_own_precision(const number_t value, int scientific)
 {
     char fmt[32];
@@ -28,32 +47,38 @@ static char *format_matrix_test_num_at_own_precision(const number_t value, int s
 
 static void test_mat_to_string_numeric(void)
 {
-    qfloat_t vals[4] = {
-        qf_from_double(1.0), qf_from_double(2.0),
-        qf_from_double(3.0), qf_from_double(4.0)
+    number_t vals[4] = {
+        num_create_from_long(1), num_create_from_long(2),
+        num_create_from_long(3), num_create_from_long(4)
     };
-    matrix_t *A = test_mat_create_qf(2, 2, vals);
+    matrix_t *A = mat_create(2, 2, vals);
     char *inline_pretty = mat_to_string(A, MAT_STRING_INLINE_PRETTY);
     char *layout_scientific = mat_to_string(A, MAT_STRING_LAYOUT_SCIENTIFIC);
 
-    check_bool("mat_to_string qfloat inline string non-null", inline_pretty != NULL);
-    check_bool("mat_to_string qfloat inline has matrix delimiters",
+    check_bool("mat_to_string number inline string non-null", inline_pretty != NULL);
+    check_bool("mat_to_string number inline has matrix delimiters",
                inline_pretty && inline_pretty[0] == '(' && strchr(inline_pretty, ';') != NULL);
-    check_bool("mat_to_string qfloat inline keeps real entries",
+    check_bool("mat_to_string number inline keeps real entries",
                inline_pretty &&
                strstr(inline_pretty, "1") != NULL &&
                strstr(inline_pretty, "2") != NULL &&
                strstr(inline_pretty, "3") != NULL &&
                strstr(inline_pretty, "4") != NULL);
-    check_bool("mat_to_string qfloat layout scientific non-null", layout_scientific != NULL);
-    check_bool("mat_to_string qfloat layout scientific has newline",
+    check_bool("mat_to_string number layout scientific non-null", layout_scientific != NULL);
+    check_bool("mat_to_string number layout scientific has newline",
                layout_scientific && strchr(layout_scientific, '\n') != NULL);
-    check_bool("mat_to_string qfloat layout scientific has exponent",
-               layout_scientific && strchr(layout_scientific, 'E') != NULL);
+    check_bool("mat_to_string number layout scientific keeps numeric entries",
+               layout_scientific &&
+               strstr(layout_scientific, "1") != NULL &&
+               strstr(layout_scientific, "2") != NULL &&
+               strstr(layout_scientific, "3") != NULL &&
+               strstr(layout_scientific, "4") != NULL);
 
     free(inline_pretty);
     free(layout_scientific);
     mat_free(A);
+    for (size_t i = 0; i < 4; ++i)
+        num_destroy(&vals[i]);
 }
 
 static void test_mat_to_string_number_precision(void)
@@ -74,7 +99,7 @@ static void test_mat_to_string_number_precision(void)
     vals[1] = num_create_from_mcomplex_with_prec_bits(complex_base, 384u);
     vals[2] = num_create_from_string("1/2");
     vals[3] = num_create_from_long(3);
-    A = mat_create_num(2, 2, vals);
+    A = mat_create(2, 2, vals);
     inline_pretty = mat_to_string(A, MAT_STRING_INLINE_PRETTY);
     layout_scientific = mat_to_string(A, MAT_STRING_LAYOUT_SCIENTIFIC);
     expected_pretty = format_matrix_test_num_at_own_precision(vals[0], 0);
@@ -127,7 +152,7 @@ static void test_mat_to_string_number_precision(void)
 static void test_mat_to_string_symbolic(void)
 {
     mat_bindings_t *bindings = NULL;
-    matrix_t *A = mat_from_string("{ (x, 1; 1, c1) | x = 2; c1 = 3 }",
+    matrix_t *A = mat_from_string_dv("{ (x, 1; 1, c1) | x = 2; c1 = 3 }",
                                   &bindings);
     char *inline_pretty = mat_to_string(A, MAT_STRING_INLINE_PRETTY);
     char *layout_pretty = mat_to_string(A, MAT_STRING_LAYOUT_PRETTY);
@@ -150,7 +175,7 @@ static void test_mat_to_string_symbolic(void)
 static void test_mat_to_string_symbolic_all_nan_elides_wrapper(void)
 {
     mat_bindings_t *bindings = NULL;
-    matrix_t *A = mat_from_string("(x, c1)", &bindings);
+    matrix_t *A = mat_from_string_dv("(x, c1)", &bindings);
     char *inline_pretty = mat_to_string(A, MAT_STRING_INLINE_PRETTY);
     char *layout_pretty = mat_to_string(A, MAT_STRING_LAYOUT_PRETTY);
 
@@ -170,7 +195,7 @@ static void test_mat_to_string_symbolic_all_nan_elides_wrapper(void)
 static void test_mat_to_string_symbolic_roundtrip(void)
 {
     mat_bindings_t *bindings = NULL;
-    matrix_t *A = mat_from_string("(x, c1; x*y, [radius])", &bindings);
+    matrix_t *A = mat_from_string_dv("(x, c1; x*y, [radius])", &bindings);
     char *inline_pretty = NULL;
     mat_bindings_t *roundtrip_bindings = NULL;
     matrix_t *roundtrip = NULL;
@@ -193,7 +218,7 @@ static void test_mat_to_string_symbolic_roundtrip(void)
     check_bool("mat_to_string symbolic roundtrip keeps wrapper",
                inline_pretty && strstr(inline_pretty, "{ (") != NULL);
 
-    roundtrip = mat_from_string(inline_pretty, &roundtrip_bindings);
+    roundtrip = mat_from_string_dv(inline_pretty, &roundtrip_bindings);
     check_bool("mat_to_string symbolic roundtrip reparses", roundtrip != NULL);
     check_bool("mat_to_string symbolic roundtrip reparsed type",
                roundtrip && mat_typeof(roundtrip) == MAT_TYPE_DVAL);
@@ -206,17 +231,17 @@ static void test_mat_to_string_symbolic_roundtrip(void)
 
     if (roundtrip) {
         mat_get(roundtrip, 0, 0, &dv);
-        check_qf_val("mat_to_string symbolic roundtrip x entry",
-                     dv_eval_qf(dv), qf_from_double(2.0), 1e-18);
+        check_matrix_tostring_dv_double("mat_to_string symbolic roundtrip x entry",
+                                        dv, 2.0, 1e-18);
         mat_get(roundtrip, 0, 1, &dv);
-        check_qf_val("mat_to_string symbolic roundtrip c₁ entry",
-                     dv_eval_qf(dv), qf_from_double(5.0), 1e-18);
+        check_matrix_tostring_dv_double("mat_to_string symbolic roundtrip c₁ entry",
+                                        dv, 5.0, 1e-18);
         mat_get(roundtrip, 1, 0, &dv);
-        check_qf_val("mat_to_string symbolic roundtrip x*y entry",
-                     dv_eval_qf(dv), qf_from_double(6.0), 1e-18);
+        check_matrix_tostring_dv_double("mat_to_string symbolic roundtrip x*y entry",
+                                        dv, 6.0, 1e-18);
         mat_get(roundtrip, 1, 1, &dv);
-        check_qf_val("mat_to_string symbolic roundtrip [radius] entry",
-                     dv_eval_qf(dv), qf_from_double(7.0), 1e-18);
+        check_matrix_tostring_dv_double("mat_to_string symbolic roundtrip [radius] entry",
+                                        dv, 7.0, 1e-18);
     }
 
     free(inline_pretty);
@@ -229,7 +254,7 @@ static void test_mat_to_string_symbolic_roundtrip(void)
 static void test_mat_to_string_symbolic_derivative_roundtrip(void)
 {
     mat_bindings_t *bindings = NULL;
-    matrix_t *A = mat_from_string("(x, c1; x*y, y)", &bindings);
+    matrix_t *A = mat_from_string_dv("(x, c1; x*y, y)", &bindings);
     dval_t *x_binding = NULL;
     matrix_t *Dx = NULL;
     char *inline_pretty = NULL;
@@ -256,7 +281,7 @@ static void test_mat_to_string_symbolic_derivative_roundtrip(void)
     check_bool("mat_to_string symbolic derivative keeps y binding value",
                inline_pretty && strstr(inline_pretty, "y = 4") != NULL);
 
-    roundtrip = mat_from_string(inline_pretty, &roundtrip_bindings);
+    roundtrip = mat_from_string_dv(inline_pretty, &roundtrip_bindings);
     check_bool("mat_to_string symbolic derivative reparses", roundtrip != NULL);
     check_bool("mat_to_string symbolic derivative reparsed type",
                roundtrip && mat_typeof(roundtrip) == MAT_TYPE_DVAL);
@@ -269,17 +294,17 @@ static void test_mat_to_string_symbolic_derivative_roundtrip(void)
 
     if (roundtrip) {
         mat_get(roundtrip, 0, 0, &dv);
-        check_qf_val("mat_to_string symbolic derivative reparsed [0,0]",
-                     dv_eval_qf(dv), qf_from_double(1.0), 1e-18);
+        check_matrix_tostring_dv_double("mat_to_string symbolic derivative reparsed [0,0]",
+                                        dv, 1.0, 1e-18);
         mat_get(roundtrip, 0, 1, &dv);
-        check_qf_val("mat_to_string symbolic derivative reparsed [0,1]",
-                     dv_eval_qf(dv), qf_from_double(0.0), 1e-18);
+        check_matrix_tostring_dv_double("mat_to_string symbolic derivative reparsed [0,1]",
+                                        dv, 0.0, 1e-18);
         mat_get(roundtrip, 1, 0, &dv);
-        check_qf_val("mat_to_string symbolic derivative reparsed [1,0]",
-                     dv_eval_qf(dv), qf_from_double(4.0), 1e-18);
+        check_matrix_tostring_dv_double("mat_to_string symbolic derivative reparsed [1,0]",
+                                        dv, 4.0, 1e-18);
         mat_get(roundtrip, 1, 1, &dv);
-        check_qf_val("mat_to_string symbolic derivative reparsed [1,1]",
-                     dv_eval_qf(dv), qf_from_double(0.0), 1e-18);
+        check_matrix_tostring_dv_double("mat_to_string symbolic derivative reparsed [1,1]",
+                                        dv, 0.0, 1e-18);
     }
 
     free(inline_pretty);
@@ -292,10 +317,10 @@ static void test_mat_to_string_symbolic_derivative_roundtrip(void)
 
 void run_matrix_tostring_tests(void)
 {
-    test_mat_to_string_numeric();
-    test_mat_to_string_number_precision();
-    test_mat_to_string_symbolic();
-    test_mat_to_string_symbolic_all_nan_elides_wrapper();
-    test_mat_to_string_symbolic_roundtrip();
-    test_mat_to_string_symbolic_derivative_roundtrip();
+    RUN_TEST_CASE(test_mat_to_string_numeric);
+    RUN_TEST_CASE(test_mat_to_string_number_precision);
+    RUN_TEST_CASE(test_mat_to_string_symbolic);
+    RUN_TEST_CASE(test_mat_to_string_symbolic_all_nan_elides_wrapper);
+    RUN_TEST_CASE(test_mat_to_string_symbolic_roundtrip);
+    RUN_TEST_CASE(test_mat_to_string_symbolic_derivative_roundtrip);
 }

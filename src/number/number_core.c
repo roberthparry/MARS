@@ -1256,21 +1256,21 @@ number_t *number_abs_mfloat(const number_t *number)
 
 number_t *number_abs_mcomplex(const number_t *number)
 {
-    mcomplex_t *copy;
-    number_t *result;
     mfloat_t *real_copy;
+    mfloat_t *imag_copy;
 
     if (!number)
         return NULL;
-    copy = mc_clone(number_impl_const(number)->value.mc);
-    if (!copy || mc_abs(copy) != 0) {
-        mc_free(copy);
+
+    real_copy = mf_clone(mc_real(number_impl_const(number)->value.mc));
+    imag_copy = mf_clone(mc_imag(number_impl_const(number)->value.mc));
+    if (!real_copy || !imag_copy || mf_hypot(real_copy, imag_copy) != 0) {
+        mf_free(imag_copy);
+        mf_free(real_copy);
         return NULL;
     }
-    real_copy = mf_clone(mc_real(copy));
-    result = real_copy ? number_wrap_mfloat(real_copy) : NULL;
-    mc_free(copy);
-    return result;
+    mf_free(imag_copy);
+    return number_wrap_mfloat(real_copy);
 }
 
 number_t *number_conj_qcomplex(const number_t *number)

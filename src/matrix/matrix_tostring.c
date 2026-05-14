@@ -316,20 +316,21 @@ static char *mt_join_bindings(char **var_bindings,
             for (size_t i = 0; i < nconst_bindings; ++i) {
                 mt_binding_token_t token = {0};
                 char value_buf[256];
-                qcomplex_t z;
+                number_t value = num_new();
 
                 if (mt_parse_binding_token(const_bindings[i], &token) != 0)
                     continue;
-                z = qc_from_string(token.value);
-                if (qc_isnan(z))
+                if (num_set_from_string(&value, token.value) != 0) {
                     snprintf(value_buf, sizeof(value_buf), "%s", token.value);
-                else
-                    qc_sprintf(value_buf, sizeof(value_buf), "%Z", z);
+                } else {
+                    num_sprintf(value_buf, sizeof(value_buf), "%N", value);
+                }
                 if (i > 0)
                     mb_puts(&b, ", ");
                 mb_puts(&b, token.name);
                 mb_puts(&b, " = ");
                 mb_puts(&b, value_buf);
+                num_destroy(&value);
                 mt_free_binding_token(&token);
             }
             consts = mb_take(&b);

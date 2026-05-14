@@ -144,6 +144,7 @@ All declarations are in `include/qfloat.h`.
 | `QF_INV_SQRT_2PI` | 1/√(2π) |
 | `QF_LOG_SQRT_2PI` | ln √(2π) |
 | `QF_LN_2PI` | ln(2π) |
+| `QF_PHI` | golden ratio φ |
 | `QF_EULER_MASCHERONI` | Euler–Mascheroni constant γ |
 
 ### Construction and Conversion

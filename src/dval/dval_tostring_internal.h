@@ -3,7 +3,6 @@
 
 #include <stddef.h>
 
-#include "qcomplex.h"
 #include "dval_internal.h"
 
 typedef struct {
@@ -22,8 +21,6 @@ void sbuf_putc(sbuf_t *b, char c);
 void sbuf_puts(sbuf_t *b, const char *s);
 
 int dv_tostring_utf8_decode(const char *s, unsigned int *out);
-void qf_to_string_simple(qcomplex_t v, char *buf, size_t n);
-
 int dv_tostring_is_negative_const(const dval_t *f);
 int dv_tostring_is_var_pow_d(const dval_t *f);
 int dv_tostring_is_unicode_letter(unsigned int c);

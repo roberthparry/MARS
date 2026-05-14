@@ -6,11 +6,11 @@
    Public API constructors
    ============================================================ */
 
-struct matrix_t *mat_new_num(size_t rows, size_t cols) {
+struct matrix_t *mat_new(size_t rows, size_t cols) {
     return mat_create_dense_with_elem(rows, cols, &number_elem);
 }
 
-struct matrix_t *mat_new_sparse_num(size_t rows, size_t cols) {
+struct matrix_t *mat_new_sparse(size_t rows, size_t cols) {
     return mat_create_sparse_with_elem(rows, cols, &number_elem);
 }
 
@@ -22,11 +22,11 @@ struct matrix_t *mat_new_sparse_dv(size_t rows, size_t cols) {
     return mat_create_sparse_with_elem(rows, cols, &dval_elem);
 }
 
-struct matrix_t *matsq_new_num(size_t n) {
-    return mat_new_num(n, n);
+struct matrix_t *matsq_new(size_t n) {
+    return mat_new(n, n);
 }
 
-struct matrix_t *mat_create_identity_num(size_t n) {
+struct matrix_t *mat_create_identity(size_t n) {
     return mat_create_identity_with_elem(n, &number_elem);
 }
 
@@ -56,7 +56,7 @@ static matrix_t *mat_create_diagonal_from_array(size_t n,
     return A;
 }
 
-matrix_t *mat_create_diagonal_num(size_t n, const number_t *diagonal)
+matrix_t *mat_create_diagonal(size_t n, const number_t *diagonal)
 {
     return mat_create_diagonal_from_array(n, diagonal, &number_elem);
 }
@@ -66,9 +66,9 @@ matrix_t *mat_create_diagonal_dv(size_t n, dval_t *const *diagonal)
     return mat_create_diagonal_from_array(n, diagonal, &dval_elem);
 }
 
-matrix_t *mat_create_num(size_t rows, size_t cols, const number_t *data)
+matrix_t *mat_create(size_t rows, size_t cols, const number_t *data)
 {
-    matrix_t *A = mat_new_num(rows, cols);
+    matrix_t *A = mat_new(rows, cols);
     mat_set_data(A, data);
     return A;
 }
@@ -76,7 +76,7 @@ matrix_t *mat_create_num(size_t rows, size_t cols, const number_t *data)
 matrix_t *mat_create_dv(size_t rows, size_t cols, dval_t *const *data)
 {
     matrix_t *A = mat_new_dv(rows, cols);
-    mat_set_data(A, data);
+    mat_set_data_dv(A, data);
     return A;
 }
 
@@ -87,6 +87,7 @@ matrix_t *mat_create_dv(size_t rows, size_t cols, dval_t *const *data)
 void mat_free(struct matrix_t *A) {
     if (!A) return;
     mat_fun_cache_forget(A);
+    mat_numeric_precision_release(A);
     A->store->free(A);
     free(A);
 }
@@ -97,7 +98,7 @@ void mat_get(const struct matrix_t *A, size_t i, size_t j, void *out) {
 
 number_t mat_get_num(const struct matrix_t *A, size_t i, size_t j)
 {
-    number_t out = num_new();
+    number_t out = NUM_ZERO;
 
     if (!A)
         return out;
@@ -112,7 +113,7 @@ number_t mat_get_num(const struct matrix_t *A, size_t i, size_t j)
 
         mat_get(A, i, j, &dv);
         if (dv)
-            out = dv_eval_num(dv);
+            out = dv_eval(dv);
         return out;
     }
     return out;
@@ -176,7 +177,7 @@ static inline void mat_copy_flat(matrix_t *A, void *data, void (*op)(matrix_t *A
     }
 }
 
-void mat_set_data(matrix_t *A, const void *data)
+void mat_set_data_raw(matrix_t *A, const void *data)
 {
     if (!A || !data)
         return;
@@ -184,7 +185,7 @@ void mat_set_data(matrix_t *A, const void *data)
     mat_copy_flat(A, (void *)data, (void (*)(matrix_t*,size_t,size_t,void*))mat_set);
 }
 
-void mat_get_data(const matrix_t *A, void *data)
+void mat_get_data_raw(const matrix_t *A, void *data)
 {
     if (!A || !data)
         return;
@@ -192,7 +193,23 @@ void mat_get_data(const matrix_t *A, void *data)
     mat_copy_flat((matrix_t *)A, data, (void (*)(matrix_t*,size_t,size_t,void*))mat_get);
 }
 
-void mat_get_data_num(const matrix_t *A, number_t *data)
+void mat_set_data(matrix_t *A, const number_t *data)
+{
+    if (!A || !data || A->elem != &number_elem)
+        return;
+
+    mat_set_data_raw(A, data);
+}
+
+void mat_set_data_dv(matrix_t *A, dval_t *const *data)
+{
+    if (!A || !data || A->elem != &dval_elem)
+        return;
+
+    mat_set_data_raw(A, data);
+}
+
+void mat_get_data(const matrix_t *A, number_t *data)
 {
     size_t cursor = 0;
 
@@ -202,6 +219,14 @@ void mat_get_data_num(const matrix_t *A, number_t *data)
     for (size_t i = 0; i < A->rows; i++)
         for (size_t j = 0; j < A->cols; j++)
             data[cursor++] = mat_get_num(A, i, j);
+}
+
+void mat_get_data_dv(const matrix_t *A, dval_t **data)
+{
+    if (!A || !data || A->elem != &dval_elem)
+        return;
+
+    mat_get_data_raw(A, data);
 }
 
 matrix_t *mat_to_dense(const matrix_t *A)

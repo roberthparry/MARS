@@ -53,7 +53,7 @@ static bool store_false(const struct matrix_t *A);
  size_t identity_nonzero_count(const struct matrix_t *A);
  size_t diagonal_nonzero_count(const struct matrix_t *A);
  size_t upper_triangular_nonzero_count(const struct matrix_t *A);
- size_t lower_triangular_nonzero_count(const struct matrix_t *A);
+size_t lower_triangular_nonzero_count(const struct matrix_t *A);
  const struct store_vtable *store_self_unary(const struct matrix_t *A);
  const struct store_vtable *identity_unary_store(const struct matrix_t *A);
  const struct store_vtable *store_self_transpose(const struct matrix_t *A);
@@ -76,6 +76,27 @@ bool mat_has_upper_triangular_structure(const struct matrix_t *A);
 bool mat_has_lower_triangular_structure(const struct matrix_t *A);
 matrix_t *mat_convert_dense(const matrix_t *A, const struct elem_vtable *target);
 
+static size_t upper_triangular_capacity(size_t rows, size_t cols)
+{
+    size_t cap = 0;
+
+    for (size_t i = 0; i < rows; ++i) {
+        if (i < cols)
+            cap += (cols - i);
+    }
+    return cap;
+}
+
+static size_t lower_triangular_capacity(size_t rows, size_t cols)
+{
+    size_t cap = 0;
+
+    for (size_t i = 0; i < rows; ++i) {
+        cap += (i + 1 < cols) ? (i + 1) : cols;
+    }
+    return cap;
+}
+
 /* ============================================================
    Storage vtables (dense, identity)
    ============================================================ */
@@ -85,6 +106,184 @@ typedef struct sparse_entry_t {
     struct sparse_entry_t *next;
     unsigned char value[];
 } sparse_entry_t;
+
+struct mat_precision_bucket {
+    size_t bits;
+    size_t count;
+    struct mat_precision_bucket *next;
+};
+
+static size_t matrix_number_precision_bits(const number_t *value)
+{
+    size_t precision_bits;
+    number_kind_t kind;
+
+    if (!value || !number_is_valid_value(value))
+        return 53u;
+
+    kind = number_kind_value(value);
+    switch (kind) {
+    case NUMBER_DOUBLE:
+        return 53u;
+    case NUMBER_QFLOAT:
+    case NUMBER_QCOMPLEX:
+    case NUMBER_MINT:
+    case NUMBER_MRATIONAL:
+        return 106u;
+    case NUMBER_MFLOAT:
+    case NUMBER_MCOMPLEX:
+        precision_bits = num_get_prec_bits(*value);
+        return precision_bits == 0u ? 106u : precision_bits;
+    default:
+        return 53u;
+    }
+}
+
+static size_t matrix_raw_precision_bits(const struct elem_vtable *elem, const void *raw)
+{
+    if (elem != &number_elem || !raw)
+        return 106u;
+    return matrix_number_precision_bits((const number_t *)raw);
+}
+
+static bool matrix_raw_is_exact(const struct elem_vtable *elem, const void *raw)
+{
+    if (elem != &number_elem || !raw)
+        return false;
+    return num_is_exact(*(const number_t *)raw);
+}
+
+static struct mat_precision_bucket *precision_bucket_find(struct mat_precision_bucket *head, size_t bits)
+{
+    while (head) {
+        if (head->bits == bits)
+            return head;
+        head = head->next;
+    }
+    return NULL;
+}
+
+static void precision_bucket_inc(struct matrix_t *A, size_t bits, size_t amount)
+{
+    struct mat_precision_bucket *bucket;
+
+    if (!A || A->elem != &number_elem)
+        return;
+
+    bucket = precision_bucket_find(A->meta.numeric_precision_hist, bits);
+    if (bucket) {
+        bucket->count += amount;
+    } else {
+        bucket = malloc(sizeof(*bucket));
+        if (!bucket)
+            return;
+        bucket->bits = bits;
+        bucket->count = amount;
+        bucket->next = A->meta.numeric_precision_hist;
+        A->meta.numeric_precision_hist = bucket;
+    }
+
+    if (bits < A->meta.numeric_min_precision_bits)
+        A->meta.numeric_min_precision_bits = bits;
+}
+
+static void precision_bucket_dec(struct matrix_t *A, size_t bits, size_t amount)
+{
+    struct mat_precision_bucket *prev = NULL;
+    struct mat_precision_bucket *cur;
+
+    if (!A || A->elem != &number_elem)
+        return;
+
+    cur = A->meta.numeric_precision_hist;
+    while (cur && cur->bits != bits) {
+        prev = cur;
+        cur = cur->next;
+    }
+    if (!cur)
+        return;
+
+    if (cur->count > amount) {
+        cur->count -= amount;
+    } else {
+        if (prev)
+            prev->next = cur->next;
+        else
+            A->meta.numeric_precision_hist = cur->next;
+        free(cur);
+    }
+
+    if (bits == A->meta.numeric_min_precision_bits) {
+        size_t new_min = (size_t)-1;
+
+        cur = A->meta.numeric_precision_hist;
+        while (cur) {
+            if (cur->bits < new_min)
+                new_min = cur->bits;
+            cur = cur->next;
+        }
+        A->meta.numeric_min_precision_bits = (new_min == (size_t)-1) ? 106u : new_min;
+    }
+}
+
+static void precision_bucket_free_all(struct matrix_t *A)
+{
+    struct mat_precision_bucket *cur;
+
+    if (!A)
+        return;
+    cur = A->meta.numeric_precision_hist;
+    while (cur) {
+        struct mat_precision_bucket *next = cur->next;
+        free(cur);
+        cur = next;
+    }
+    A->meta.numeric_precision_hist = NULL;
+}
+
+void mat_numeric_precision_release(struct matrix_t *A)
+{
+    precision_bucket_free_all(A);
+}
+
+size_t mat_cached_numeric_precision_bits(const struct matrix_t *A)
+{
+    if (!A || A->elem != &number_elem)
+        return 106u;
+    return A->meta.numeric_min_precision_bits ? A->meta.numeric_min_precision_bits : 106u;
+}
+
+void mat_numeric_precision_note_set(struct matrix_t *A,
+                                    const void *old_val,
+                                    const void *new_val)
+{
+    size_t old_bits;
+    size_t new_bits;
+    bool old_exact;
+    bool new_exact;
+
+    if (!A || A->elem != &number_elem)
+        return;
+
+    old_bits = matrix_raw_precision_bits(A->elem, old_val);
+    new_bits = matrix_raw_precision_bits(A->elem, new_val);
+    old_exact = matrix_raw_is_exact(A->elem, old_val);
+    new_exact = matrix_raw_is_exact(A->elem, new_val);
+    if (old_bits == new_bits)
+        goto exact_update;
+
+    precision_bucket_dec(A, old_bits, 1u);
+    precision_bucket_inc(A, new_bits, 1u);
+
+exact_update:
+    if (old_exact != new_exact) {
+        if (old_exact) {
+            A->meta.numeric_inexact_count++;
+        } else if (A->meta.numeric_inexact_count > 0) {
+            A->meta.numeric_inexact_count--;
+        }
+    }
+}
 
 static bool dval_is_exact_zero(const dval_t *dv)
 {
@@ -96,8 +295,8 @@ dval_t *dval_clone_for_storage(const dval_t *dv)
     if (!dv)
         return NULL;
     if (dv == DV_ZERO || dv == DV_ONE) {
-        number_t value = dv_get_val_num(dv);
-        dval_t *clone = dv_new_const_num(value);
+        number_t value = dv_get_val(dv);
+        dval_t *clone = dv_new_const(value);
 
         num_destroy(&value);
         return clone;
@@ -201,52 +400,6 @@ void mat_get_owned(const struct matrix_t *A, size_t i, size_t j, void *out)
     A->store->get(A, i, j, out);
 }
 
-qcomplex_t mat_number_to_qcomplex_value(const number_t *value)
-{
-    number_t real;
-    number_t imag;
-    qcomplex_t out;
-
-    if (!value)
-        return QC_ZERO;
-
-    real = num_real_part(*value);
-    imag = num_imag_part(*value);
-    out = qc_make(num_to_qfloat(real), num_to_qfloat(imag));
-
-    num_destroy(&imag);
-    num_destroy(&real);
-    return out;
-}
-
-qfloat_t mat_number_to_real_qfloat_value(const number_t *value)
-{
-    number_t real;
-    qfloat_t out;
-
-    if (!value)
-        return QF_ZERO;
-
-    real = num_real_part(*value);
-    out = num_to_qfloat(real);
-    num_destroy(&real);
-    return out;
-}
-
-qfloat_t mat_number_abs_qfloat_value(const number_t *value)
-{
-    number_t abs_value;
-    qfloat_t out;
-
-    if (!value)
-        return QF_ZERO;
-
-    abs_value = num_abs(*value);
-    out = num_to_qfloat(abs_value);
-    num_destroy(&abs_value);
-    return out;
-}
-
 number_t mat_raw_value_to_number(const struct elem_vtable *elem, const void *value)
 {
     if (elem == &number_elem) {
@@ -260,7 +413,7 @@ number_t mat_raw_value_to_number(const struct elem_vtable *elem, const void *val
         dval_t *dv = NULL;
 
         memcpy(&dv, value, sizeof(dv));
-        return dv ? dv_eval_num(dv) : NUM_ZERO;
+        return dv ? dv_eval(dv) : NUM_ZERO;
     }
 
     return NUM_ZERO;
@@ -277,55 +430,7 @@ void mat_raw_value_from_number(const struct elem_vtable *elem, void *out,
     }
 
     if (elem == &dval_elem)
-        *(dval_t **)out = dv_new_const_num(*source);
-}
-
-qcomplex_t mat_raw_value_to_qcomplex(const struct elem_vtable *elem,
-                                     const void *value)
-{
-    number_t number = mat_raw_value_to_number(elem, value);
-    qcomplex_t out = mat_number_to_qcomplex_value(&number);
-
-    num_destroy(&number);
-    return out;
-}
-
-qfloat_t mat_raw_value_to_qfloat(const struct elem_vtable *elem,
-                                 const void *value)
-{
-    number_t number = mat_raw_value_to_number(elem, value);
-    qfloat_t out = mat_number_to_real_qfloat_value(&number);
-
-    num_destroy(&number);
-    return out;
-}
-
-qfloat_t mat_raw_value_abs_qfloat(const struct elem_vtable *elem,
-                                  const void *value)
-{
-    number_t number = mat_raw_value_to_number(elem, value);
-    qfloat_t out = mat_number_abs_qfloat_value(&number);
-
-    num_destroy(&number);
-    return out;
-}
-
-void mat_raw_value_from_qcomplex(const struct elem_vtable *elem, void *out,
-                                 qcomplex_t value)
-{
-    number_t number = num_create_from_qcomplex(value);
-
-    mat_raw_value_from_number(elem, out, &number);
-    num_destroy(&number);
-}
-
-void mat_raw_value_from_qfloat(const struct elem_vtable *elem, void *out,
-                               qfloat_t value)
-{
-    number_t number = num_create_from_qfloat(value);
-
-    mat_raw_value_from_number(elem, out, &number);
-    num_destroy(&number);
+        *(dval_t **)out = dv_new_const(*source);
 }
 
  void num_init_zero_slot(void *slot)
@@ -345,7 +450,7 @@ void mat_raw_value_from_qfloat(const struct elem_vtable *elem, void *out,
     number_t *value = (number_t *)slot;
 
     num_destroy(value);
-    *value = num_new();
+    *value = NUM_ZERO;
 }
 
  bool num_is_structural_zero(const void *val)
@@ -442,9 +547,21 @@ void mat_raw_value_from_qfloat(const struct elem_vtable *elem, void *out,
 
  void dense_set(struct matrix_t *A, size_t i, size_t j, const void *val) {
     void *slot = (char *)A->data[i] + j * A->elem->size;
+    number_t old_num;
+    int was_zero = elem_is_structural_zero(A->elem, slot);
+    int is_zero = elem_is_structural_zero(A->elem, val);
 
+    if (A->elem == &number_elem) {
+        old_num = *(number_t *)slot;
+        mat_numeric_precision_note_set(A, &old_num, val);
+    }
     elem_destroy_value(A->elem, slot);
     elem_copy_value(A->elem, slot, val);
+
+    if (was_zero && !is_zero)
+        A->nnz++;
+    else if (!was_zero && is_zero && A->nnz > 0)
+        A->nnz--;
 }
 
 void dense_swap_rows(struct matrix_t *A, size_t r1, size_t r2)
@@ -467,6 +584,9 @@ void dense_swap_rows(struct matrix_t *A, size_t r1, size_t r2)
     if (!A || !factor || dst_row == src_row)
         return;
 
+    elem_init_zero_value(A->elem, prod);
+    elem_init_zero_value(A->elem, out);
+
     for (size_t j = col_start; j < A->cols; j++) {
         dense_get(A, dst_row, j, dst);
         dense_get(A, src_row, j, src);
@@ -474,6 +594,9 @@ void dense_swap_rows(struct matrix_t *A, size_t r1, size_t r2)
         A->elem->sub(out, dst, prod);
         dense_set(A, dst_row, j, out);
     }
+
+    elem_destroy_value(A->elem, out);
+    elem_destroy_value(A->elem, prod);
 }
 
 
@@ -546,6 +669,8 @@ static sparse_entry_t *sparse_find_prev(const struct matrix_t *A, size_t row, si
 
     if (cur && cur->col == j) {
         if (is_zero) {
+            if (A->elem == &number_elem)
+                mat_numeric_precision_note_set(A, cur->value, A->elem->zero);
             if (prev)
                 prev->next = cur->next;
             else
@@ -555,6 +680,8 @@ static sparse_entry_t *sparse_find_prev(const struct matrix_t *A, size_t row, si
             if (A->nnz > 0)
                 A->nnz--;
         } else {
+            if (A->elem == &number_elem)
+                mat_numeric_precision_note_set(A, cur->value, val);
             elem_destroy_value(A->elem, cur->value);
             elem_copy_value(A->elem, cur->value, val);
         }
@@ -570,6 +697,8 @@ static sparse_entry_t *sparse_find_prev(const struct matrix_t *A, size_t row, si
 
     cur->col = j;
     memset(cur->value, 0, A->elem->size);
+    if (A->elem == &number_elem)
+        mat_numeric_precision_note_set(A, A->elem->zero, val);
     elem_copy_value(A->elem, cur->value, val);
     if (prev) {
         cur->next = prev->next;
@@ -606,11 +735,15 @@ static sparse_entry_t *sparse_find_prev(const struct matrix_t *A, size_t row, si
     while (cur && cur->col < col_start)
         cur = cur->next;
 
+    elem_init_zero_value(A->elem, prod);
+    elem_init_zero_value(A->elem, out);
     while (cur) {
         sparse_get(A, dst_row, cur->col, dst);
         A->elem->mul(prod, factor, cur->value);
         A->elem->sub(out, dst, prod);
         sparse_set(A, dst_row, cur->col, out);
+        elem_destroy_value(A->elem, out);
+        elem_destroy_value(A->elem, prod);
         cur = cur->next;
     }
 }
@@ -636,7 +769,6 @@ static sparse_entry_t *sparse_find_prev(const struct matrix_t *A, size_t row, si
         sparse_entry_t *cur = (sparse_entry_t *)old_rows[i];
         while (cur) {
             dense_set(A, i, cur->col, cur->value);
-            A->nnz++;
             elem_destroy_value(A->elem, cur->value);
             cur = cur->next;
         }
@@ -768,8 +900,6 @@ static sparse_entry_t *sparse_find_prev(const struct matrix_t *A, size_t row, si
 
     for (size_t i = 0; i < A->rows; i++) {
         dense_set(A, i, i, old_diagonal[i]);
-        if (!elem_is_structural_zero(A->elem, old_diagonal[i]))
-            A->nnz++;
         elem_destroy_value(A->elem, old_diagonal[i]);
         free(old_diagonal[i]);
     }
@@ -781,7 +911,12 @@ static sparse_entry_t *sparse_find_prev(const struct matrix_t *A, size_t row, si
     if (i == j) {
         int was_zero = elem_is_structural_zero(A->elem, A->data[i]);
         int is_zero = elem_is_structural_zero(A->elem, val);
+        number_t old_num;
 
+        if (A->elem == &number_elem) {
+            old_num = *(number_t *)A->data[i];
+            mat_numeric_precision_note_set(A, &old_num, val);
+        }
         elem_destroy_value(A->elem, A->data[i]);
         elem_copy_value(A->elem, A->data[i], val);
         if (was_zero && !is_zero)
@@ -796,7 +931,6 @@ static sparse_entry_t *sparse_find_prev(const struct matrix_t *A, size_t row, si
 
     diagonal_materialise(A);
     dense_set(A, i, j, val);
-    A->nnz++;
 }
 
  void diagonal_swap_rows(struct matrix_t *A, size_t r1, size_t r2)
@@ -934,8 +1068,6 @@ static bool triangular_alloc(struct matrix_t *A, size_t (*row_width)(const struc
         for (size_t offset = 0; offset < width; offset++) {
             void *src = (char *)old_rows[i] + offset * A->elem->size;
             dense_set(A, i, i + offset, src);
-            if (!elem_is_structural_zero(A->elem, src))
-                A->nnz++;
             elem_destroy_value(A->elem, src);
         }
         free(old_rows[i]);
@@ -963,8 +1095,6 @@ static bool triangular_alloc(struct matrix_t *A, size_t (*row_width)(const struc
         for (size_t j = 0; j < width; j++) {
             void *src = (char *)old_rows[i] + j * A->elem->size;
             dense_set(A, i, j, src);
-            if (!elem_is_structural_zero(A->elem, src))
-                A->nnz++;
             elem_destroy_value(A->elem, src);
         }
         free(old_rows[i]);
@@ -978,7 +1108,12 @@ static bool triangular_alloc(struct matrix_t *A, size_t (*row_width)(const struc
         void *slot = (char *)A->data[i] + (j - i) * A->elem->size;
         int was_zero = elem_is_structural_zero(A->elem, slot);
         int is_zero = elem_is_structural_zero(A->elem, val);
+        number_t old_num;
 
+        if (A->elem == &number_elem) {
+            old_num = *(number_t *)slot;
+            mat_numeric_precision_note_set(A, &old_num, val);
+        }
         elem_destroy_value(A->elem, slot);
         elem_copy_value(A->elem, slot, val);
         if (was_zero && !is_zero)
@@ -993,7 +1128,6 @@ static bool triangular_alloc(struct matrix_t *A, size_t (*row_width)(const struc
 
     upper_triangular_materialise(A);
     dense_set(A, i, j, val);
-    A->nnz++;
 }
 
  void lower_triangular_set(struct matrix_t *A, size_t i, size_t j, const void *val)
@@ -1002,7 +1136,12 @@ static bool triangular_alloc(struct matrix_t *A, size_t (*row_width)(const struc
         void *slot = (char *)A->data[i] + j * A->elem->size;
         int was_zero = elem_is_structural_zero(A->elem, slot);
         int is_zero = elem_is_structural_zero(A->elem, val);
+        number_t old_num;
 
+        if (A->elem == &number_elem) {
+            old_num = *(number_t *)slot;
+            mat_numeric_precision_note_set(A, &old_num, val);
+        }
         elem_destroy_value(A->elem, slot);
         elem_copy_value(A->elem, slot, val);
         if (was_zero && !is_zero)
@@ -1017,7 +1156,6 @@ static bool triangular_alloc(struct matrix_t *A, size_t (*row_width)(const struc
 
     lower_triangular_materialise(A);
     dense_set(A, i, j, val);
-    A->nnz++;
 }
 
  void upper_triangular_swap_rows(struct matrix_t *A, size_t r1, size_t r2)
@@ -1040,6 +1178,9 @@ static bool triangular_alloc(struct matrix_t *A, size_t (*row_width)(const struc
     if (!A || !factor || dst_row == src_row)
         return;
 
+    elem_init_zero_value(A->elem, prod);
+    elem_init_zero_value(A->elem, out);
+
     for (size_t j = col_start; j < A->cols; j++) {
         upper_triangular_get(A, dst_row, j, dst);
         upper_triangular_get(A, src_row, j, src);
@@ -1047,6 +1188,9 @@ static bool triangular_alloc(struct matrix_t *A, size_t (*row_width)(const struc
         A->elem->sub(out, dst, prod);
         upper_triangular_set(A, dst_row, j, out);
     }
+
+    elem_destroy_value(A->elem, out);
+    elem_destroy_value(A->elem, prod);
 }
 
  void lower_triangular_row_eliminate_from(struct matrix_t *A, size_t dst_row, size_t src_row,
@@ -1075,10 +1219,17 @@ static struct matrix_t *mat_create_internal(size_t rows, size_t cols,
     A->store = store;
     A->data  = NULL;
     A->nnz   = 0;
+    A->meta.numeric_min_precision_bits = 106u;
+    A->meta.numeric_inexact_count = 0;
+    A->meta.numeric_precision_hist = NULL;
 
     if (!A->store->alloc(A)) {
         free(A);
         return NULL;
+    }
+    if (A->elem == &number_elem) {
+        size_t zero_bits = matrix_raw_precision_bits(A->elem, A->elem->zero);
+        precision_bucket_inc(A, zero_bits, rows * cols);
     }
     return A;
 }
@@ -1201,6 +1352,11 @@ static bool store_false(const struct matrix_t *A)
  bool dense_is_diagonal(const struct matrix_t *A)
 {
     unsigned char raw[64];
+    size_t diag_cap;
+
+    diag_cap = (A->rows < A->cols) ? A->rows : A->cols;
+    if (A->nnz > diag_cap)
+        return false;
 
     for (size_t i = 0; i < A->rows; i++)
         for (size_t j = 0; j < A->cols; j++) {
@@ -1256,6 +1412,10 @@ static bool store_false(const struct matrix_t *A)
  bool generic_is_upper_triangular(const struct matrix_t *A)
 {
     unsigned char raw[64];
+    size_t cap = upper_triangular_capacity(A->rows, A->cols);
+
+    if (A->nnz > cap)
+        return false;
 
     for (size_t i = 0; i < A->rows; i++)
         for (size_t j = 0; j < A->cols && j < i; j++) {
@@ -1270,6 +1430,10 @@ static bool store_false(const struct matrix_t *A)
  bool generic_is_lower_triangular(const struct matrix_t *A)
 {
     unsigned char raw[64];
+    size_t cap = lower_triangular_capacity(A->rows, A->cols);
+
+    if (A->nnz > cap)
+        return false;
 
     for (size_t i = 0; i < A->rows; i++)
         for (size_t j = i + 1; j < A->cols; j++) {
@@ -1283,17 +1447,7 @@ static bool store_false(const struct matrix_t *A)
 
  size_t dense_nonzero_count(const struct matrix_t *A)
 {
-    size_t count = 0;
-    unsigned char raw[64];
-
-    for (size_t i = 0; i < A->rows; i++)
-        for (size_t j = 0; j < A->cols; j++) {
-            dense_get(A, i, j, raw);
-            if (!elem_is_structural_zero(A->elem, raw))
-                count++;
-        }
-
-    return count;
+    return A ? A->nnz : 0u;
 }
 
  size_t sparse_nonzero_count(const struct matrix_t *A)
@@ -1476,24 +1630,32 @@ bool mat_has_lower_triangular_structure(const struct matrix_t *A)
 
 /* ---------- number ---------- */
 
+static void num_replace_value(void *slot, number_t value)
+{
+    number_t *out = (number_t *)slot;
+
+    num_destroy(out);
+    *out = value;
+}
+
  void num_add_wrap(void *o, const void *a, const void *b)
 {
-    *(number_t *)o = num_add(*(const number_t *)a, *(const number_t *)b);
+    num_replace_value(o, num_add(*(const number_t *)a, *(const number_t *)b));
 }
 
  void num_sub_wrap(void *o, const void *a, const void *b)
 {
-    *(number_t *)o = num_sub(*(const number_t *)a, *(const number_t *)b);
+    num_replace_value(o, num_sub(*(const number_t *)a, *(const number_t *)b));
 }
 
  void num_mul_wrap(void *o, const void *a, const void *b)
 {
-    *(number_t *)o = num_mul(*(const number_t *)a, *(const number_t *)b);
+    num_replace_value(o, num_mul(*(const number_t *)a, *(const number_t *)b));
 }
 
  void num_inv_wrap(void *o, const void *a)
 {
-    *(number_t *)o = num_inv(*(const number_t *)a);
+    num_replace_value(o, num_inv(*(const number_t *)a));
 }
 
  int number_cmp_wrap(const void *a, const void *b)
@@ -1533,65 +1695,44 @@ bool mat_has_lower_triangular_structure(const struct matrix_t *A)
     return written < 0 ? -1 : 0;
 }
 
- double num_abs2_wrap(const void *a)
-{
-    number_t abs_value = num_abs(*(const number_t *)a);
-    number_t squared = num_mul(abs_value, abs_value);
-    double out = num_to_double(squared);
-
-    num_destroy(&abs_value);
-    num_destroy(&squared);
-    return out;
-}
-
- double num_to_real_wrap(const void *a)
-{
-    return num_to_double(*(const number_t *)a);
-}
-
- void num_from_real_wrap(void *o, double x)
-{
-    *(number_t *)o = num_create_from_double(x);
-}
-
  void num_conj_elem(void *o, const void *a)
 {
-    *(number_t *)o = num_conj(*(const number_t *)a);
+    num_replace_value(o, num_conj(*(const number_t *)a));
 }
 
- void num_scalar_exp(void *out, const void *a) { *(number_t *)out = num_exp(*(const number_t *)a); }
- void num_scalar_log(void *out, const void *a) { *(number_t *)out = num_log(*(const number_t *)a); }
- void num_scalar_sin(void *out, const void *a) { *(number_t *)out = num_sin(*(const number_t *)a); }
- void num_scalar_cos(void *out, const void *a) { *(number_t *)out = num_cos(*(const number_t *)a); }
- void num_scalar_tan(void *out, const void *a) { *(number_t *)out = num_tan(*(const number_t *)a); }
- void num_scalar_sinh(void *out, const void *a) { *(number_t *)out = num_sinh(*(const number_t *)a); }
- void num_scalar_cosh(void *out, const void *a) { *(number_t *)out = num_cosh(*(const number_t *)a); }
- void num_scalar_tanh(void *out, const void *a) { *(number_t *)out = num_tanh(*(const number_t *)a); }
- void num_scalar_sqrt(void *out, const void *a) { *(number_t *)out = num_sqrt(*(const number_t *)a); }
- void num_scalar_asin(void *out, const void *a) { *(number_t *)out = num_asin(*(const number_t *)a); }
- void num_scalar_acos(void *out, const void *a) { *(number_t *)out = num_acos(*(const number_t *)a); }
- void num_scalar_atan(void *out, const void *a) { *(number_t *)out = num_atan(*(const number_t *)a); }
- void num_scalar_asinh(void *out, const void *a) { *(number_t *)out = num_asinh(*(const number_t *)a); }
- void num_scalar_acosh(void *out, const void *a) { *(number_t *)out = num_acosh(*(const number_t *)a); }
- void num_scalar_atanh(void *out, const void *a) { *(number_t *)out = num_atanh(*(const number_t *)a); }
- void num_scalar_erf(void *out, const void *a) { *(number_t *)out = num_erf(*(const number_t *)a); }
- void num_scalar_erfc(void *out, const void *a) { *(number_t *)out = num_erfc(*(const number_t *)a); }
- void num_scalar_erfinv(void *out, const void *a) { *(number_t *)out = num_erfinv(*(const number_t *)a); }
- void num_scalar_erfcinv(void *out, const void *a) { *(number_t *)out = num_erfcinv(*(const number_t *)a); }
- void num_scalar_gamma(void *out, const void *a) { *(number_t *)out = num_gamma(*(const number_t *)a); }
- void num_scalar_lgamma(void *out, const void *a) { *(number_t *)out = num_lgamma(*(const number_t *)a); }
- void num_scalar_digamma(void *out, const void *a) { *(number_t *)out = num_digamma(*(const number_t *)a); }
- void num_scalar_trigamma(void *out, const void *a) { *(number_t *)out = num_trigamma(*(const number_t *)a); }
- void num_scalar_tetragamma(void *out, const void *a) { *(number_t *)out = num_tetragamma(*(const number_t *)a); }
- void num_scalar_gammainv(void *out, const void *a) { *(number_t *)out = num_gammainv(*(const number_t *)a); }
- void num_scalar_normal_pdf(void *out, const void *a) { *(number_t *)out = num_normal_pdf(*(const number_t *)a); }
- void num_scalar_normal_cdf(void *out, const void *a) { *(number_t *)out = num_normal_cdf(*(const number_t *)a); }
- void num_scalar_normal_logpdf(void *out, const void *a) { *(number_t *)out = num_normal_logpdf(*(const number_t *)a); }
- void num_scalar_lambert_w0(void *out, const void *a) { *(number_t *)out = num_lambert_w0(*(const number_t *)a); }
- void num_scalar_lambert_wm1(void *out, const void *a) { *(number_t *)out = num_lambert_wm1(*(const number_t *)a); }
- void num_scalar_productlog(void *out, const void *a) { *(number_t *)out = num_productlog(*(const number_t *)a); }
- void num_scalar_ei(void *out, const void *a) { *(number_t *)out = num_ei(*(const number_t *)a); }
- void num_scalar_e1(void *out, const void *a) { *(number_t *)out = num_e1(*(const number_t *)a); }
+ void num_scalar_exp(void *out, const void *a) { num_replace_value(out, num_exp(*(const number_t *)a)); }
+ void num_scalar_log(void *out, const void *a) { num_replace_value(out, num_log(*(const number_t *)a)); }
+ void num_scalar_sin(void *out, const void *a) { num_replace_value(out, num_sin(*(const number_t *)a)); }
+ void num_scalar_cos(void *out, const void *a) { num_replace_value(out, num_cos(*(const number_t *)a)); }
+ void num_scalar_tan(void *out, const void *a) { num_replace_value(out, num_tan(*(const number_t *)a)); }
+ void num_scalar_sinh(void *out, const void *a) { num_replace_value(out, num_sinh(*(const number_t *)a)); }
+ void num_scalar_cosh(void *out, const void *a) { num_replace_value(out, num_cosh(*(const number_t *)a)); }
+ void num_scalar_tanh(void *out, const void *a) { num_replace_value(out, num_tanh(*(const number_t *)a)); }
+ void num_scalar_sqrt(void *out, const void *a) { num_replace_value(out, num_sqrt(*(const number_t *)a)); }
+ void num_scalar_asin(void *out, const void *a) { num_replace_value(out, num_asin(*(const number_t *)a)); }
+ void num_scalar_acos(void *out, const void *a) { num_replace_value(out, num_acos(*(const number_t *)a)); }
+ void num_scalar_atan(void *out, const void *a) { num_replace_value(out, num_atan(*(const number_t *)a)); }
+ void num_scalar_asinh(void *out, const void *a) { num_replace_value(out, num_asinh(*(const number_t *)a)); }
+ void num_scalar_acosh(void *out, const void *a) { num_replace_value(out, num_acosh(*(const number_t *)a)); }
+ void num_scalar_atanh(void *out, const void *a) { num_replace_value(out, num_atanh(*(const number_t *)a)); }
+ void num_scalar_erf(void *out, const void *a) { num_replace_value(out, num_erf(*(const number_t *)a)); }
+ void num_scalar_erfc(void *out, const void *a) { num_replace_value(out, num_erfc(*(const number_t *)a)); }
+ void num_scalar_erfinv(void *out, const void *a) { num_replace_value(out, num_erfinv(*(const number_t *)a)); }
+ void num_scalar_erfcinv(void *out, const void *a) { num_replace_value(out, num_erfcinv(*(const number_t *)a)); }
+ void num_scalar_gamma(void *out, const void *a) { num_replace_value(out, num_gamma(*(const number_t *)a)); }
+ void num_scalar_lgamma(void *out, const void *a) { num_replace_value(out, num_lgamma(*(const number_t *)a)); }
+ void num_scalar_digamma(void *out, const void *a) { num_replace_value(out, num_digamma(*(const number_t *)a)); }
+ void num_scalar_trigamma(void *out, const void *a) { num_replace_value(out, num_trigamma(*(const number_t *)a)); }
+ void num_scalar_tetragamma(void *out, const void *a) { num_replace_value(out, num_tetragamma(*(const number_t *)a)); }
+ void num_scalar_gammainv(void *out, const void *a) { num_replace_value(out, num_gammainv(*(const number_t *)a)); }
+ void num_scalar_normal_pdf(void *out, const void *a) { num_replace_value(out, num_normal_pdf(*(const number_t *)a)); }
+ void num_scalar_normal_cdf(void *out, const void *a) { num_replace_value(out, num_normal_cdf(*(const number_t *)a)); }
+ void num_scalar_normal_logpdf(void *out, const void *a) { num_replace_value(out, num_normal_logpdf(*(const number_t *)a)); }
+ void num_scalar_lambert_w0(void *out, const void *a) { num_replace_value(out, num_lambert_w0(*(const number_t *)a)); }
+ void num_scalar_lambert_wm1(void *out, const void *a) { num_replace_value(out, num_lambert_wm1(*(const number_t *)a)); }
+ void num_scalar_productlog(void *out, const void *a) { num_replace_value(out, num_productlog(*(const number_t *)a)); }
+ void num_scalar_ei(void *out, const void *a) { num_replace_value(out, num_ei(*(const number_t *)a)); }
+ void num_scalar_e1(void *out, const void *a) { num_replace_value(out, num_e1(*(const number_t *)a)); }
 
 
 
@@ -1637,7 +1778,7 @@ bool mat_has_lower_triangular_structure(const struct matrix_t *A)
 {
     dval_t *arg = *(dval_t *const *)a;
     dval_t *prev = *(dval_t **)o;
-    dval_t *res = dv_d_div(1.0, arg);
+    dval_t *res = dv_num_div(&NUM_ONE, arg);
 
     if (prev)
         dv_free(prev);
@@ -1691,29 +1832,6 @@ bool mat_has_lower_triangular_structure(const struct matrix_t *A)
 
     snprintf(buf, n, "%s", inner);
     free(tmp);
-}
-
- double dv_abs2_wrap(const void *a)
-{
-    dval_t *dv = *(dval_t *const *)a;
-    double x = dv ? dv_num_eval_d(dv) : 0.0;
-    return x * x;
-}
-
- double dv_to_real_wrap(const void *a)
-{
-    dval_t *dv = *(dval_t *const *)a;
-    return dv ? dv_num_eval_d(dv) : 0.0;
-}
-
- void dv_from_real_wrap(void *o, double x)
-{
-    dval_t *prev = *(dval_t **)o;
-    dval_t *res = dv_num_const_d(x);
-
-    if (prev)
-        dv_free(prev);
-    *(dval_t **)o = res;
 }
 
  void dv_conj_elem(void *o, const void *a)
@@ -1948,6 +2066,17 @@ bool mat_has_lower_triangular_structure(const struct matrix_t *A)
     *(dval_t **)out = res;
 }
 
+ void dv_scalar_gammainv(void *out, const void *a)
+{
+    dval_t *arg = *(dval_t *const *)a;
+    dval_t *prev = *(dval_t **)out;
+    dval_t *res = dv_gammainv(arg);
+
+    if (prev)
+        dv_free(prev);
+    *(dval_t **)out = res;
+}
+
  void dv_scalar_lgamma(void *out, const void *a)
 {
     dval_t *arg = *(dval_t *const *)a;
@@ -2036,6 +2165,18 @@ bool mat_has_lower_triangular_structure(const struct matrix_t *A)
     *(dval_t **)out = res;
 }
 
+ void dv_scalar_productlog(void *out, const void *a)
+{
+    dval_t *arg = *(dval_t *const *)a;
+    dval_t *prev = *(dval_t **)out;
+    /* ProductLog is the principal Lambert W branch. */
+    dval_t *res = dv_lambert_w0(arg);
+
+    if (prev)
+        dv_free(prev);
+    *(dval_t **)out = res;
+}
+
  void dv_scalar_ei(void *out, const void *a)
 {
     dval_t *arg = *(dval_t *const *)a;
@@ -2065,7 +2206,7 @@ bool mat_has_lower_triangular_structure(const struct matrix_t *A)
    ============================================================ */
 
 static inline void num_as_dv(dval_t **out, const number_t *a) {
-    *out = dv_new_const_num(*a);
+    *out = dv_new_const(*a);
 }
 
 static inline void id_dv(dval_t **out, dval_t *const *a) {
@@ -2080,7 +2221,7 @@ static inline void id_dv(dval_t **out, dval_t *const *a) {
 
 static void add_num_dv(void *out, const void *a, const void *b)
 {
-    dval_t *lhs = dv_new_const_num(*(const number_t *)a);
+    dval_t *lhs = dv_new_const(*(const number_t *)a);
     dval_t *rhs;
 
     id_dv(&rhs, (dval_t *const *)b);
@@ -2091,7 +2232,7 @@ static void add_num_dv(void *out, const void *a, const void *b)
 static void add_dv_num(void *out, const void *a, const void *b)
 {
     dval_t *lhs;
-    dval_t *rhs = dv_new_const_num(*(const number_t *)b);
+    dval_t *rhs = dv_new_const(*(const number_t *)b);
 
     id_dv(&lhs, (dval_t *const *)a);
     *(dval_t **)out = dv_add(lhs, rhs);
@@ -2100,7 +2241,7 @@ static void add_dv_num(void *out, const void *a, const void *b)
 
 static void sub_num_dv(void *out, const void *a, const void *b)
 {
-    dval_t *lhs = dv_new_const_num(*(const number_t *)a);
+    dval_t *lhs = dv_new_const(*(const number_t *)a);
     dval_t *rhs;
 
     id_dv(&rhs, (dval_t *const *)b);
@@ -2111,7 +2252,7 @@ static void sub_num_dv(void *out, const void *a, const void *b)
 static void sub_dv_num(void *out, const void *a, const void *b)
 {
     dval_t *lhs;
-    dval_t *rhs = dv_new_const_num(*(const number_t *)b);
+    dval_t *rhs = dv_new_const(*(const number_t *)b);
 
     id_dv(&lhs, (dval_t *const *)a);
     *(dval_t **)out = dv_sub(lhs, rhs);
@@ -2120,7 +2261,7 @@ static void sub_dv_num(void *out, const void *a, const void *b)
 
 static void mul_num_dv(void *out, const void *a, const void *b)
 {
-    dval_t *lhs = dv_new_const_num(*(const number_t *)a);
+    dval_t *lhs = dv_new_const(*(const number_t *)a);
     dval_t *rhs;
 
     id_dv(&rhs, (dval_t *const *)b);
@@ -2131,7 +2272,7 @@ static void mul_num_dv(void *out, const void *a, const void *b)
 static void mul_dv_num(void *out, const void *a, const void *b)
 {
     dval_t *lhs;
-    dval_t *rhs = dv_new_const_num(*(const number_t *)b);
+    dval_t *rhs = dv_new_const(*(const number_t *)b);
 
     id_dv(&lhs, (dval_t *const *)a);
     *(dval_t **)out = dv_mul(lhs, rhs);
@@ -2255,7 +2396,7 @@ const struct elem_vtable *mat_binary_result_elem(const matrix_t *A,
     return binops[ak][bk].result_elem;
 }
 
-matrix_t *mat_evaluate_num(const matrix_t *A)
+matrix_t *mat_evaluate(const matrix_t *A)
 {
     matrix_t *C = NULL;
     number_t value;
@@ -2277,7 +2418,7 @@ matrix_t *mat_evaluate_num(const matrix_t *A)
     return C;
 }
 
-matrix_t *mat_scalar_mul_num(matrix_t *A, const number_t *s)
+matrix_t *mat_scalar_mul(matrix_t *A, const number_t *s)
 {
     if (!A || !s) return NULL;
 
@@ -2311,7 +2452,7 @@ matrix_t *mat_scalar_mul_num(matrix_t *A, const number_t *s)
     return R;
 }
 
-matrix_t *mat_scalar_div_num(matrix_t *A, const number_t *s)
+matrix_t *mat_scalar_div(matrix_t *A, const number_t *s)
 {
     number_t inv;
     matrix_t *out;
@@ -2320,7 +2461,7 @@ matrix_t *mat_scalar_div_num(matrix_t *A, const number_t *s)
         return NULL;
 
     inv = num_inv(*s);
-    out = mat_scalar_mul_num(A, &inv);
+    out = mat_scalar_mul(A, &inv);
     num_destroy(&inv);
     return out;
 }
@@ -2340,6 +2481,8 @@ static struct matrix_t *mat_add_or_sub_sparse(const struct matrix_t *A,
 
     if (!C)
         return NULL;
+
+    elem_init_zero_value(re, out);
 
     for (size_t i = 0; i < A->rows; i++)
         for (size_t j = 0; j < A->cols; j++) {
@@ -2369,9 +2512,14 @@ static struct matrix_t *mat_mul_sparse(const struct matrix_t *A,
     if (!re)
         return NULL;
 
+    elem_init_zero_value(re, prod);
+    elem_init_zero_value(re, sum_acc);
+
     As = mat_uses_sparse_storage(A) ? (struct matrix_t *)A : mat_to_sparse(A);
     Bs = mat_uses_sparse_storage(B) ? (struct matrix_t *)B : mat_to_sparse(B);
     if (!As || !Bs) {
+        elem_destroy_value(re, prod);
+        elem_destroy_value(re, sum_acc);
         if (As != A)
             mat_free(As);
         if (Bs != B)
@@ -2381,6 +2529,8 @@ static struct matrix_t *mat_mul_sparse(const struct matrix_t *A,
 
     C = mat_create_sparse_with_elem(A->rows, B->cols, re);
     if (!C) {
+        elem_destroy_value(re, prod);
+        elem_destroy_value(re, sum_acc);
         if (As != A)
             mat_free(As);
         if (Bs != B)
@@ -2420,6 +2570,8 @@ static struct matrix_t *mat_mul_sparse(const struct matrix_t *A,
         mat_free(As);
     if (Bs != B)
         mat_free(Bs);
+    elem_destroy_value(re, prod);
+    elem_destroy_value(re, sum_acc);
     return C;
 }
 
@@ -2446,6 +2598,7 @@ struct matrix_t *mat_add(const struct matrix_t *A, const struct matrix_t *B) {
     if (!C) return NULL;
 
     unsigned char a_raw[64] = {0}, b_raw[64] = {0}, out[64] = {0};
+    elem_init_zero_value(re, out);
 
     for (size_t i = 0; i < A->rows; i++)
         for (size_t j = 0; j < A->cols; j++) {
@@ -2483,6 +2636,7 @@ struct matrix_t *mat_sub(const struct matrix_t *A, const struct matrix_t *B) {
     if (!C) return NULL;
 
     unsigned char a_raw[64] = {0}, b_raw[64] = {0}, out[64] = {0};
+    elem_init_zero_value(re, out);
 
     for (size_t i = 0; i < A->rows; i++)
         for (size_t j = 0; j < A->cols; j++) {
@@ -2520,6 +2674,8 @@ struct matrix_t *mat_mul(const struct matrix_t *A, const struct matrix_t *B) {
     if (!C) return NULL;
 
     unsigned char x_raw[64] = {0}, y_raw[64] = {0}, prod[64] = {0}, sum[64] = {0};
+    elem_init_zero_value(re, prod);
+    elem_init_zero_value(re, sum);
 
     for (size_t i = 0; i < A->rows; i++) {
         for (size_t j = 0; j < B->cols; j++) {
@@ -2539,6 +2695,9 @@ struct matrix_t *mat_mul(const struct matrix_t *A, const struct matrix_t *B) {
             elem_destroy_value(re, sum);
         }
     }
+
+    elem_destroy_value(re, prod);
+    elem_destroy_value(re, sum);
 
     if (re == &dval_elem && mat_simplify_symbolic_inplace(C) != 0) {
         mat_free(C);
@@ -2579,21 +2738,18 @@ matrix_t *mat_neg(const matrix_t *A)
 
 /* ============================================================
    Schur decomposition: A = Q T Q*
-   Full, Hessenberg + implicit double-shift QR, qcomplex backend
+   Full, Hessenberg + implicit double-shift QR, number_t backend
    ============================================================ */
 
-static qcomplex_t mat_eval_number_scalar_qcomplex(void (*scalar_f)(void *out, const void *in),
-                                                  qcomplex_t input_qc)
+static number_t mat_eval_number_scalar_number(void (*scalar_f)(void *out, const void *in),
+                                              const number_t *input)
 {
-    number_t input = num_create_from_qcomplex(input_qc);
+    number_t safe_input = input ? num_clone(*input) : num_clone(NUM_ZERO);
     number_t output = number_invalid();
-    qcomplex_t out_qc;
 
-    scalar_f(&output, &input);
-    out_qc = mat_number_to_qcomplex_value(&output);
-    num_destroy(&output);
-    num_destroy(&input);
-    return out_qc;
+    scalar_f(&output, &safe_input);
+    num_destroy(&safe_input);
+    return output;
 }
 
 static void mat_eval_number_scalar_elem(const struct elem_vtable *elem,
@@ -2601,161 +2757,287 @@ static void mat_eval_number_scalar_elem(const struct elem_vtable *elem,
                                         void (*scalar_f)(void *out, const void *in),
                                         const void *in)
 {
-    if (elem == &number_elem) {
-        number_t result = number_invalid();
-
-        scalar_f(&result, in);
-        *(number_t *)out = result;
-        return;
-    }
-
-    qcomplex_t in_qc;
-    qcomplex_t out_qc;
-
-    in_qc = mat_raw_value_to_qcomplex(elem, in);
-    out_qc = mat_eval_number_scalar_qcomplex(scalar_f, in_qc);
-    mat_raw_value_from_qcomplex(elem, out, out_qc);
+    number_t input = mat_raw_value_to_number(elem, in);
+    number_t result = mat_eval_number_scalar_number(scalar_f, &input);
+    mat_raw_value_from_number(elem, out, &result);
+    num_destroy(&result);
+    num_destroy(&input);
 }
 
-static void qc_fun_coeffs_up_to_second(qcomplex_t *c0,
-                                       qcomplex_t *c1,
-                                       qcomplex_t *c2,
-                                       void (*scalar_f)(void *out, const void *in),
-                                       qcomplex_t lambda)
+static void num_fun_coeffs_up_to_second(number_t *c0,
+                                        number_t *c1,
+                                        number_t *c2,
+                                        void (*scalar_f)(void *out, const void *in),
+                                        const number_t *lambda)
 {
-    qcomplex_t f0 = mat_eval_number_scalar_qcomplex(scalar_f, lambda);
+    number_t f0 = mat_eval_number_scalar_number(scalar_f, lambda);
     if (c0)
-        *c0 = f0;
+        *c0 = num_clone(f0);
 
     if (scalar_f == number_elem.fun->gamma) {
-        qcomplex_t psi = qc_digamma(lambda);
-        qcomplex_t tri = qc_trigamma(lambda);
+        number_t psi = num_digamma(*lambda);
+        number_t tri = num_trigamma(*lambda);
         if (c1)
-            *c1 = qc_mul(f0, psi);
+            *c1 = num_mul(f0, psi);
         if (c2) {
-            qcomplex_t second = qc_mul(f0, qc_add(tri, qc_mul(psi, psi)));
-            *c2 = qc_mul(qc_make(qf_from_double(0.5), QF_ZERO), second);
+            number_t psi2 = num_mul(psi, psi);
+            number_t tri_plus = num_add(tri, psi2);
+            number_t second = num_mul(f0, tri_plus);
+            *c2 = num_mul(NUM_HALF, second);
+            num_destroy(&second);
+            num_destroy(&tri_plus);
+            num_destroy(&psi2);
         }
+        num_destroy(&tri);
+        num_destroy(&psi);
+        num_destroy(&f0);
         return;
     }
 
     if (scalar_f == number_elem.fun->digamma) {
         if (c1)
-            *c1 = qc_trigamma(lambda);
+            *c1 = num_trigamma(*lambda);
         if (c2)
-            *c2 = qc_mul(qc_make(qf_from_double(0.5), QF_ZERO),
-                         qc_tetragamma(lambda));
+        {
+            number_t tetra = num_tetragamma(*lambda);
+            *c2 = num_mul(NUM_HALF, tetra);
+            num_destroy(&tetra);
+        }
+        num_destroy(&f0);
         return;
     }
 
     if (scalar_f == number_elem.fun->lambert_w0 ||
         scalar_f == number_elem.fun->lambert_wm1) {
-        qcomplex_t one = qc_make(QF_ONE, QF_ZERO);
-        qcomplex_t two = qc_make(qf_from_double(2.0), QF_ZERO);
-        qcomplex_t wp1 = qc_add(one, f0);
-        qcomplex_t lam2 = qc_mul(lambda, lambda);
-        qcomplex_t denom1 = qc_mul(lambda, wp1);
+        number_t one = num_clone(NUM_ONE);
+        number_t two = num_create_from_double(2.0);
+        number_t wp1 = num_add(one, f0);
+        number_t lam2 = num_mul(*lambda, *lambda);
+        number_t denom1 = num_mul(*lambda, wp1);
         if (c1)
-            *c1 = qc_div(f0, denom1);
+            *c1 = num_div(f0, denom1);
         if (c2) {
-            qcomplex_t numer = qc_neg(qc_mul(qc_mul(f0, f0), qc_add(f0, two)));
-            qcomplex_t denom = qc_mul(lam2, qc_mul(wp1, qc_mul(wp1, wp1)));
-            *c2 = qc_mul(qc_make(qf_from_double(0.5), QF_ZERO), qc_div(numer, denom));
+            number_t f02 = num_mul(f0, f0);
+            number_t f0p2 = num_add(f0, two);
+            number_t numer_core = num_mul(f02, f0p2);
+            number_t numer = num_neg(numer_core);
+            number_t wp12 = num_mul(wp1, wp1);
+            number_t wp13 = num_mul(wp1, wp12);
+            number_t denom = num_mul(lam2, wp13);
+            number_t frac = num_div(numer, denom);
+            *c2 = num_mul(NUM_HALF, frac);
+            num_destroy(&frac);
+            num_destroy(&denom);
+            num_destroy(&wp13);
+            num_destroy(&wp12);
+            num_destroy(&numer);
+            num_destroy(&numer_core);
+            num_destroy(&f0p2);
+            num_destroy(&f02);
         }
+        num_destroy(&denom1);
+        num_destroy(&lam2);
+        num_destroy(&wp1);
+        num_destroy(&two);
+        num_destroy(&one);
+        num_destroy(&f0);
         return;
     }
 
     if (scalar_f == number_elem.fun->ei) {
-        qcomplex_t exp_lambda = qc_exp(lambda);
-        qcomplex_t one = qc_make(QF_ONE, QF_ZERO);
-        qcomplex_t lam2 = qc_mul(lambda, lambda);
+        number_t exp_lambda = num_exp(*lambda);
+        number_t one = num_clone(NUM_ONE);
+        number_t lam2 = num_mul(*lambda, *lambda);
         if (c1)
-            *c1 = qc_div(exp_lambda, lambda);
+            *c1 = num_div(exp_lambda, *lambda);
         if (c2) {
-            qcomplex_t second = qc_div(qc_mul(exp_lambda, qc_sub(lambda, one)), lam2);
-            *c2 = qc_mul(qc_make(qf_from_double(0.5), QF_ZERO), second);
+            number_t lam_m_one = num_sub(*lambda, one);
+            number_t numer = num_mul(exp_lambda, lam_m_one);
+            number_t second = num_div(numer, lam2);
+            *c2 = num_mul(NUM_HALF, second);
+            num_destroy(&second);
+            num_destroy(&numer);
+            num_destroy(&lam_m_one);
         }
+        num_destroy(&lam2);
+        num_destroy(&one);
+        num_destroy(&exp_lambda);
+        num_destroy(&f0);
         return;
     }
 
     if (scalar_f == number_elem.fun->e1) {
-        qcomplex_t one = qc_make(QF_ONE, QF_ZERO);
-        qcomplex_t emlambda = qc_exp(qc_neg(lambda));
-        qcomplex_t lam2 = qc_mul(lambda, lambda);
+        number_t one = num_clone(NUM_ONE);
+        number_t neg_lambda = num_neg(*lambda);
+        number_t emlambda = num_exp(neg_lambda);
+        number_t lam2 = num_mul(*lambda, *lambda);
         if (c1)
-            *c1 = qc_div(qc_neg(emlambda), lambda);
-        if (c2) {
-            qcomplex_t second = qc_div(qc_mul(emlambda, qc_add(lambda, one)), lam2);
-            *c2 = qc_mul(qc_make(qf_from_double(0.5), QF_ZERO), second);
+        {
+            number_t neg_emlambda = num_neg(emlambda);
+            *c1 = num_div(neg_emlambda, *lambda);
+            num_destroy(&neg_emlambda);
         }
+        if (c2) {
+            number_t lam_p_one = num_add(*lambda, one);
+            number_t numer = num_mul(emlambda, lam_p_one);
+            number_t second = num_div(numer, lam2);
+            *c2 = num_mul(NUM_HALF, second);
+            num_destroy(&second);
+            num_destroy(&numer);
+            num_destroy(&lam_p_one);
+        }
+        num_destroy(&lam2);
+        num_destroy(&emlambda);
+        num_destroy(&neg_lambda);
+        num_destroy(&one);
+        num_destroy(&f0);
         return;
     }
 
     if (scalar_f == number_elem.fun->erf) {
-        qcomplex_t scale = qc_make(qf_div(qf_from_double(2.0), QF_SQRT_PI), QF_ZERO);
-        qcomplex_t fp = qc_mul(scale, qc_exp(qc_neg(qc_mul(lambda, lambda))));
+        number_t scale = num_clone(NUM_2_SQRTPI);
+        number_t lambda2 = num_mul(*lambda, *lambda);
+        number_t neg_lambda2 = num_neg(lambda2);
+        number_t exp_term = num_exp(neg_lambda2);
+        number_t fp = num_mul(scale, exp_term);
         if (c1)
-            *c1 = fp;
+            *c1 = num_clone(fp);
         if (c2)
-            *c2 = qc_neg(qc_mul(lambda, fp));
+        {
+            number_t prod = num_mul(*lambda, fp);
+            *c2 = num_neg(prod);
+            num_destroy(&prod);
+        }
+        num_destroy(&fp);
+        num_destroy(&exp_term);
+        num_destroy(&neg_lambda2);
+        num_destroy(&lambda2);
+        num_destroy(&scale);
+        num_destroy(&f0);
         return;
     }
 
     if (scalar_f == number_elem.fun->erfc) {
-        qcomplex_t scale = qc_make(qf_div(qf_neg(qf_from_double(2.0)), QF_SQRT_PI), QF_ZERO);
-        qcomplex_t fp = qc_mul(scale, qc_exp(qc_neg(qc_mul(lambda, lambda))));
+        number_t scale = num_clone(NUM_NEG_TWO_OVER_SQRT_PI);
+        number_t lambda2 = num_mul(*lambda, *lambda);
+        number_t neg_lambda2 = num_neg(lambda2);
+        number_t exp_term = num_exp(neg_lambda2);
+        number_t fp = num_mul(scale, exp_term);
         if (c1)
-            *c1 = fp;
+            *c1 = num_clone(fp);
         if (c2)
-            *c2 = qc_neg(qc_mul(lambda, fp));
+        {
+            number_t prod = num_mul(*lambda, fp);
+            *c2 = num_neg(prod);
+            num_destroy(&prod);
+        }
+        num_destroy(&fp);
+        num_destroy(&exp_term);
+        num_destroy(&neg_lambda2);
+        num_destroy(&lambda2);
+        num_destroy(&scale);
+        num_destroy(&f0);
         return;
     }
 
     if (scalar_f == number_elem.fun->normal_pdf) {
-        qcomplex_t fp = qc_neg(qc_mul(lambda, f0));
+        number_t lambda_f0 = num_mul(*lambda, f0);
+        number_t fp = num_neg(lambda_f0);
         if (c1)
-            *c1 = fp;
+            *c1 = num_clone(fp);
         if (c2) {
-            qcomplex_t lambda2 = qc_mul(lambda, lambda);
-            *c2 = qc_mul(qc_make(qf_from_double(0.5), QF_ZERO),
-                         qc_mul(qc_sub(lambda2, qc_make(QF_ONE, QF_ZERO)), f0));
+            number_t lambda2 = num_mul(*lambda, *lambda);
+            number_t lambda2m1 = num_sub(lambda2, NUM_ONE);
+            number_t core = num_mul(lambda2m1, f0);
+            *c2 = num_mul(NUM_HALF, core);
+            num_destroy(&core);
+            num_destroy(&lambda2m1);
+            num_destroy(&lambda2);
         }
+        num_destroy(&fp);
+        num_destroy(&lambda_f0);
+        num_destroy(&f0);
         return;
     }
 
     if (scalar_f == number_elem.fun->normal_cdf) {
-        qcomplex_t pdf = qc_normal_pdf(lambda);
+        number_t pdf = num_normal_pdf(*lambda);
         if (c1)
-            *c1 = pdf;
+            *c1 = num_clone(pdf);
         if (c2)
-            *c2 = qc_mul(qc_make(qf_from_double(-0.5), QF_ZERO), qc_mul(lambda, pdf));
+        {
+            number_t lambda_pdf = num_mul(*lambda, pdf);
+            number_t neg_half = num_create_from_double(-0.5);
+            *c2 = num_mul(neg_half, lambda_pdf);
+            num_destroy(&neg_half);
+            num_destroy(&lambda_pdf);
+        }
+        num_destroy(&pdf);
+        num_destroy(&f0);
         return;
     }
 
     if (scalar_f == number_elem.fun->normal_logpdf) {
         if (c1)
-            *c1 = qc_neg(lambda);
+            *c1 = num_neg(*lambda);
         if (c2)
-            *c2 = qc_make(qf_from_double(-0.5), QF_ZERO);
+            *c2 = num_create_from_double(-0.5);
+        num_destroy(&f0);
         return;
     }
 
-    qfloat_t h = qf_from_double(1e-6);
-    qcomplex_t ih = qc_make(QF_ZERO, h);
-    qcomplex_t fp, fm, lambda_p, lambda_m;
-    qcomplex_t denom1 = qc_make(QF_ZERO, qf_mul_double(h, 2.0));
-    qcomplex_t denom2 = qc_make(qf_mul_double(qf_mul(h, h), -2.0), QF_ZERO);
-    qcomplex_t two_f0 = qc_mul(qc_make(qf_from_double(2.0), QF_ZERO), f0);
+    {
+        number_t h = num_create_from_double(1e-6);
+        number_t ih = num_mul(NUM_I, h);
+        number_t fp, fm, lambda_p, lambda_m;
+        number_t two = num_create_from_double(2.0);
+        number_t denom1 = num_mul(ih, two);
+        number_t h2 = num_mul(h, h);
+        number_t neg_two = num_create_from_double(-2.0);
+        number_t denom2 = num_mul(h2, neg_two);
+        number_t two_f0 = num_mul(two, f0);
 
-    lambda_p = qc_add(lambda, ih);
-    lambda_m = qc_sub(lambda, ih);
-    fp = mat_eval_number_scalar_qcomplex(scalar_f, lambda_p);
-    fm = mat_eval_number_scalar_qcomplex(scalar_f, lambda_m);
+        lambda_p = num_add(*lambda, ih);
+        lambda_m = num_sub(*lambda, ih);
+        fp = mat_eval_number_scalar_number(scalar_f, &lambda_p);
+        fm = mat_eval_number_scalar_number(scalar_f, &lambda_m);
 
-    if (c1)
-        *c1 = qc_div(qc_sub(fp, fm), denom1);
-    if (c2)
-        *c2 = qc_div(qc_add(qc_sub(fp, two_f0), fm), denom2);
+        if (c1) {
+            number_t numer1 = num_sub(fp, fm);
+            *c1 = num_div(numer1, denom1);
+            num_destroy(&numer1);
+        }
+        if (c2) {
+            number_t fp_minus = num_sub(fp, two_f0);
+            number_t numer2 = num_add(fp_minus, fm);
+            *c2 = num_div(numer2, denom2);
+            num_destroy(&numer2);
+            num_destroy(&fp_minus);
+        }
+
+        num_destroy(&two_f0);
+        num_destroy(&denom2);
+        num_destroy(&neg_two);
+        num_destroy(&h2);
+        num_destroy(&denom1);
+        num_destroy(&two);
+        num_destroy(&fm);
+        num_destroy(&fp);
+        num_destroy(&lambda_m);
+        num_destroy(&lambda_p);
+        num_destroy(&ih);
+        num_destroy(&h);
+    }
+
+    num_destroy(&f0);
+}
+
+static void num_array_destroy(number_t *values, size_t count)
+{
+    if (!values)
+        return;
+    for (size_t i = 0; i < count; ++i)
+        num_destroy(&values[i]);
 }
 
 static matrix_t *mat_fun_triangular_equal_diag(const matrix_t *T,
@@ -2773,37 +3055,46 @@ static matrix_t *mat_fun_triangular_equal_diag(const matrix_t *T,
 
     unsigned char raw[64] = {0};
     unsigned char slot[64] = {0};
-    qcomplex_t lambda, c0, c1 = QC_ZERO, c2 = QC_ZERO;
+    number_t lambda = number_invalid();
+    number_t c0 = number_invalid();
+    number_t c1 = number_invalid();
+    number_t c2 = number_invalid();
     mat_get(T, 0, 0, raw);
-    lambda = mat_raw_value_to_qcomplex(e, raw);
-    qc_fun_coeffs_up_to_second(&c0, &c1, &c2, scalar_f, lambda);
+    lambda = mat_raw_value_to_number(e, raw);
+    num_fun_coeffs_up_to_second(&c0, &c1, &c2, scalar_f, &lambda);
 
     for (size_t i = 0; i < n; ++i) {
-        mat_raw_value_from_qcomplex(e, slot, c0);
+        mat_raw_value_from_number(e, slot, &c0);
         mat_set(F, i, i, slot);
         elem_destroy_value(e, slot);
         for (size_t j = i; j < n; ++j) {
-            qcomplex_t tij;
+            number_t tij = number_invalid();
             mat_get(T, i, j, raw);
-            tij = mat_raw_value_to_qcomplex(e, raw);
-            if (i == j)
-                tij = QC_ZERO;
-            mat_raw_value_from_qcomplex(e, slot, tij);
+            tij = mat_raw_value_to_number(e, raw);
+            if (i == j) {
+                num_destroy(&tij);
+                tij = num_clone(NUM_ZERO);
+            }
+            mat_raw_value_from_number(e, slot, &tij);
             mat_set(N, i, j, slot);
             elem_destroy_value(e, slot);
+            num_destroy(&tij);
         }
     }
 
     if (n >= 2) {
         for (size_t i = 0; i < n; ++i) {
             for (size_t j = i + 1; j < n; ++j) {
-                qcomplex_t nij, term;
+                number_t nij = number_invalid();
+                number_t term = number_invalid();
                 mat_get(N, i, j, raw);
-                nij = mat_raw_value_to_qcomplex(e, raw);
-                term = qc_mul(c1, nij);
-                mat_raw_value_from_qcomplex(e, slot, term);
+                nij = mat_raw_value_to_number(e, raw);
+                term = num_mul(c1, nij);
+                mat_raw_value_from_number(e, slot, &term);
                 mat_set(F, i, j, slot);
                 elem_destroy_value(e, slot);
+                num_destroy(&term);
+                num_destroy(&nij);
             }
         }
     }
@@ -2818,33 +3109,47 @@ static matrix_t *mat_fun_triangular_equal_diag(const matrix_t *T,
 
         for (size_t i = 0; i < n; ++i) {
             for (size_t j = i + 2; j < n; ++j) {
-                qcomplex_t fij, n2ij;
+                number_t fij = number_invalid();
+                number_t n2ij = number_invalid();
+                number_t term = number_invalid();
+                number_t sum = number_invalid();
                 mat_get(F, i, j, raw);
-                fij = mat_raw_value_to_qcomplex(e, raw);
+                fij = mat_raw_value_to_number(e, raw);
                 mat_get(N2, i, j, raw);
-                n2ij = mat_raw_value_to_qcomplex(e, raw);
-                fij = qc_add(fij, qc_mul(c2, n2ij));
-                mat_raw_value_from_qcomplex(e, slot, fij);
+                n2ij = mat_raw_value_to_number(e, raw);
+                term = num_mul(c2, n2ij);
+                sum = num_add(fij, term);
+                mat_raw_value_from_number(e, slot, &sum);
                 mat_set(F, i, j, slot);
                 elem_destroy_value(e, slot);
+                num_destroy(&sum);
+                num_destroy(&term);
+                num_destroy(&n2ij);
+                num_destroy(&fij);
             }
         }
 
         mat_free(N2);
     }
 
+    num_destroy(&c2);
+    num_destroy(&c1);
+    num_destroy(&c0);
+    num_destroy(&lambda);
     mat_free(N);
     return F;
 }
 
-static int qc_divided_difference_perturbed(qcomplex_t *out,
-                                           const qcomplex_t *nodes,
-                                           size_t count,
-                                           void (*scalar_f)(void *out, const void *in))
+static int num_divided_difference_perturbed(number_t *out,
+                                            const number_t *nodes,
+                                            size_t count,
+                                            void (*scalar_f)(void *out, const void *in))
 {
-    qcomplex_t *pts = NULL;
-    qcomplex_t *table = NULL;
-    qfloat_t base_step;
+    number_t *pts = NULL;
+    number_t *table = NULL;
+    number_t base_step = number_invalid();
+    number_t dup_tol = number_invalid();
+    number_t one = number_invalid();
 
     if (!out || !nodes || count == 0 || !scalar_f)
         return -1;
@@ -2857,61 +3162,93 @@ static int qc_divided_difference_perturbed(qcomplex_t *out,
         return -1;
     }
 
-    base_step = qf_from_double(1e-12);
+    for (size_t i = 0; i < count; ++i)
+        pts[i] = number_invalid();
+    for (size_t i = 0; i < count * count; ++i)
+        table[i] = number_invalid();
+
+    base_step = num_create_from_double(1e-12);
+    dup_tol = num_create_from_double(1e-24);
+    one = num_clone(NUM_ONE);
     for (size_t d = 0; d < count; ++d) {
         size_t dup_index = 0;
-        qfloat_t scale;
-        qfloat_t step;
-        qcomplex_t shift;
+        number_t scale = number_invalid();
+        number_t step = number_invalid();
+        number_t dup_num = number_invalid();
+        number_t shift = number_invalid();
+        number_t shifted = number_invalid();
 
-        pts[d] = nodes[d];
-        for (size_t p = 0; p < d; ++p)
-            if (qf_lt(qc_abs(qc_sub(nodes[d], nodes[p])), qf_from_double(1e-24)))
+        pts[d] = num_clone(nodes[d]);
+        for (size_t p = 0; p < d; ++p) {
+            number_t diff = num_sub(nodes[d], nodes[p]);
+            number_t absdiff = num_abs(diff);
+            if (num_lt(absdiff, dup_tol))
                 dup_index++;
+            num_destroy(&absdiff);
+            num_destroy(&diff);
+        }
 
         if (dup_index > 0) {
-            scale = qc_abs(nodes[d]);
-            if (qf_lt(scale, QF_ONE))
-                scale = QF_ONE;
-            step = qf_mul(base_step, scale);
-            shift = qc_make(qf_mul(step, qf_from_double((double)dup_index)), QF_ZERO);
-            pts[d] = qc_add(pts[d], shift);
+            scale = num_abs(nodes[d]);
+            if (num_lt(scale, one)) {
+                num_destroy(&scale);
+                scale = num_clone(one);
+            }
+            step = num_mul(base_step, scale);
+            dup_num = num_create_from_long((long)dup_index);
+            shift = num_mul(step, dup_num);
+            shifted = num_add(pts[d], shift);
+            num_destroy(&pts[d]);
+            pts[d] = shifted;
+            num_destroy(&shift);
+            num_destroy(&dup_num);
+            num_destroy(&step);
+            num_destroy(&scale);
         }
     }
 
     for (size_t i = 0; i < count; ++i)
-        table[i * count] = mat_eval_number_scalar_qcomplex(scalar_f, pts[i]);
+        table[i * count] = mat_eval_number_scalar_number(scalar_f, &pts[i]);
 
     for (size_t order = 1; order < count; ++order) {
         for (size_t i = 0; i + order < count; ++i) {
-            qcomplex_t numer;
-            qcomplex_t denom;
+            number_t numer = number_invalid();
+            number_t denom = number_invalid();
+            number_t quot = number_invalid();
 
-            numer = qc_sub(table[(i + 1) * count + (order - 1)],
-                           table[i * count + (order - 1)]);
-            denom = qc_sub(pts[i + order], pts[i]);
-            table[i * count + order] = qc_div(numer, denom);
+            numer = num_sub(table[(i + 1) * count + (order - 1)],
+                            table[i * count + (order - 1)]);
+            denom = num_sub(pts[i + order], pts[i]);
+            quot = num_div(numer, denom);
+            table[i * count + order] = quot;
+            num_destroy(&denom);
+            num_destroy(&numer);
         }
     }
 
-    *out = table[count - 1];
+    *out = num_clone(table[count - 1]);
+    num_destroy(&one);
+    num_destroy(&dup_tol);
+    num_destroy(&base_step);
+    num_array_destroy(table, count * count);
+    num_array_destroy(pts, count);
     free(table);
     free(pts);
     return 0;
 }
 
-static int mat_fun_triangular_confluent_sum_paths(qcomplex_t *out,
+static int mat_fun_triangular_confluent_sum_paths(number_t *out,
                                                   const matrix_t *T,
                                                   size_t start,
                                                   size_t current,
                                                   size_t end,
-                                                  qcomplex_t edge_prod,
-                                                  qcomplex_t *nodes,
+                                                  number_t edge_prod,
+                                                  number_t *nodes,
                                                   size_t depth,
                                                   void (*scalar_f)(void *out, const void *in))
 {
     const struct elem_vtable *e = T->elem;
-    qcomplex_t contrib;
+    number_t contrib = number_invalid();
     unsigned char raw[64] = {0};
 
     if (!out || !T || !nodes || !scalar_f || current > end)
@@ -2920,43 +3257,68 @@ static int mat_fun_triangular_confluent_sum_paths(qcomplex_t *out,
     (void)start;
 
     if (current == end) {
-        if (qc_divided_difference_perturbed(&contrib, nodes, depth, scalar_f) != 0)
+        if (num_divided_difference_perturbed(&contrib, nodes, depth, scalar_f) != 0)
             return -1;
-        *out = qc_add(*out, qc_mul(edge_prod, contrib));
+        {
+            number_t prod = num_mul(edge_prod, contrib);
+            number_t next_out = num_add(*out, prod);
+            num_destroy(&prod);
+            num_destroy(&contrib);
+            num_destroy(out);
+            *out = next_out;
+        }
         return 0;
     }
 
     for (size_t next = current + 1; next <= end; ++next) {
-        qcomplex_t tij;
-        qcomplex_t lam_next;
-        qcomplex_t next_prod;
+        number_t tij = number_invalid();
+        number_t lam_next = number_invalid();
+        number_t next_prod = number_invalid();
+        number_t abs_tij = number_invalid();
+        number_t zero_tol = number_invalid();
 
         mat_get(T, current, next, raw);
-        tij = mat_raw_value_to_qcomplex(e, raw);
-        if (qf_lt(qc_abs(tij), qf_from_double(1e-30)))
+        tij = mat_raw_value_to_number(e, raw);
+        abs_tij = num_abs(tij);
+        zero_tol = num_create_from_double(1e-30);
+        if (num_lt(abs_tij, zero_tol)) {
+            num_destroy(&zero_tol);
+            num_destroy(&abs_tij);
+            num_destroy(&tij);
             continue;
+        }
+        num_destroy(&zero_tol);
+        num_destroy(&abs_tij);
 
         mat_get(T, next, next, raw);
-        lam_next = mat_raw_value_to_qcomplex(e, raw);
-        nodes[depth] = lam_next;
-        next_prod = qc_mul(edge_prod, tij);
+        lam_next = mat_raw_value_to_number(e, raw);
+        num_destroy(&nodes[depth]);
+        nodes[depth] = num_clone(lam_next);
+        next_prod = num_mul(edge_prod, tij);
         if (mat_fun_triangular_confluent_sum_paths(out, T, start, next, end,
                                                    next_prod, nodes, depth + 1,
-                                                   scalar_f) != 0)
+                                                   scalar_f) != 0) {
+            num_destroy(&next_prod);
+            num_destroy(&lam_next);
+            num_destroy(&tij);
             return -1;
+        }
+        num_destroy(&next_prod);
+        num_destroy(&lam_next);
+        num_destroy(&tij);
     }
 
     return 0;
 }
 
-static int mat_fun_triangular_confluent_fallback(qcomplex_t *out,
+static int mat_fun_triangular_confluent_fallback(number_t *out,
                                                  const matrix_t *T,
                                                  size_t i,
                                                  size_t j,
                                                  void (*scalar_f)(void *out, const void *in))
 {
     const struct elem_vtable *e = T->elem;
-    qcomplex_t *nodes = NULL;
+    number_t *nodes = NULL;
     unsigned char raw[64] = {0};
 
     if (!out || !T || !scalar_f || i >= j || j >= T->rows || T->rows != T->cols)
@@ -2965,16 +3327,26 @@ static int mat_fun_triangular_confluent_fallback(qcomplex_t *out,
     nodes = calloc(j - i + 1, sizeof(*nodes));
     if (!nodes)
         return -1;
+    for (size_t idx = 0; idx < (j - i + 1); ++idx)
+        nodes[idx] = number_invalid();
 
-    *out = QC_ZERO;
+    num_destroy(out);
+    *out = num_clone(NUM_ZERO);
     mat_get(T, i, i, raw);
-    nodes[0] = mat_raw_value_to_qcomplex(e, raw);
-    if (mat_fun_triangular_confluent_sum_paths(out, T, i, i, j, qc_make(QF_ONE, QF_ZERO),
-                                               nodes, 1, scalar_f) != 0) {
-        free(nodes);
-        return -1;
+    nodes[0] = mat_raw_value_to_number(e, raw);
+    {
+        number_t edge_prod = num_clone(NUM_ONE);
+        if (mat_fun_triangular_confluent_sum_paths(out, T, i, i, j, edge_prod,
+                                                   nodes, 1, scalar_f) != 0) {
+            num_destroy(&edge_prod);
+            num_array_destroy(nodes, j - i + 1);
+            free(nodes);
+            return -1;
+        }
+        num_destroy(&edge_prod);
     }
 
+    num_array_destroy(nodes, j - i + 1);
     free(nodes);
     return 0;
 }
@@ -2997,20 +3369,34 @@ matrix_t *mat_fun_triangular(const matrix_t *T,
     unsigned char t_ik[64] = {0}, t_kj[64] = {0}, f_ik[64] = {0}, f_kj[64] = {0};
     unsigned char denom[64] = {0}, inv_denom[64] = {0};
 
-    int all_diag_equal = 1;
-    qcomplex_t lam0, lami;
-    qfloat_t tol = qf_from_double(1e-24);
+    bool all_diag_equal = true;
+    number_t lam0 = number_invalid();
+    number_t tol = num_create_from_double(1e-24);
     unsigned char lam0_raw[64] = {0}, lami_raw[64] = {0};
     mat_get(T, 0, 0, lam0_raw);
-    lam0 = mat_raw_value_to_qcomplex(e, lam0_raw);
+    lam0 = mat_raw_value_to_number(e, lam0_raw);
     for (size_t i = 1; i < n; ++i) {
+        number_t lami = number_invalid();
+        number_t diff = number_invalid();
+        number_t absdiff = number_invalid();
+
         mat_get(T, i, i, lami_raw);
-        lami = mat_raw_value_to_qcomplex(e, lami_raw);
-        if (qf_lt(tol, qc_abs(qc_sub(lami, lam0)))) {
-            all_diag_equal = 0;
+        lami = mat_raw_value_to_number(e, lami_raw);
+        diff = num_sub(lami, lam0);
+        absdiff = num_abs(diff);
+        if (num_lt(tol, absdiff)) {
+            all_diag_equal = false;
+            num_destroy(&absdiff);
+            num_destroy(&diff);
+            num_destroy(&lami);
             break;
         }
+        num_destroy(&absdiff);
+        num_destroy(&diff);
+        num_destroy(&lami);
     }
+    num_destroy(&lam0);
+    num_destroy(&tol);
     if (all_diag_equal)
         return mat_fun_triangular_equal_diag(T, scalar_f);
 
@@ -3065,11 +3451,12 @@ matrix_t *mat_fun_triangular(const matrix_t *T,
 
             /* Handle T_ii == T_jj: avoid 0/0 */
             if (e->cmp(denom, e->zero) == 0) {
-                qcomplex_t fallback = QC_ZERO;
+                number_t fallback = number_invalid();
 
                 if (mat_fun_triangular_confluent_fallback(&fallback, T, i, j, scalar_f) == 0) {
-                    mat_raw_value_from_qcomplex(e, f_ij, fallback);
+                    mat_raw_value_from_number(e, f_ij, &fallback);
                     mat_set(F, i, j, f_ij);
+                    num_destroy(&fallback);
                     elem_destroy_value(e, f_ij);
                     elem_destroy_value(e, denom);
                     elem_destroy_value(e, num);
@@ -3084,13 +3471,21 @@ matrix_t *mat_fun_triangular(const matrix_t *T,
                     unsigned char fp[64] = {0}, fm[64] = {0};
                     unsigned char h_raw[64] = {0}, two_h[64] = {0};
                     unsigned char inv_2h[64] = {0}, deriv[64] = {0};
-                    e->from_real(h_raw, 1e-10);
+                    {
+                        number_t h_num = num_create_from_double(1e-10);
+                        mat_raw_value_from_number(e, h_raw, &h_num);
+                        num_destroy(&h_num);
+                    }
                     e->add(lam_p, t_ii, h_raw);
                     e->sub(lam_m, t_ii, h_raw);
                     mat_eval_number_scalar_elem(e, fp, scalar_f, lam_p);
                     mat_eval_number_scalar_elem(e, fm, scalar_f, lam_m);
                     e->sub(deriv, fp, fm);
-                    e->from_real(two_h, 2e-10);
+                    {
+                        number_t two_h_num = num_create_from_double(2e-10);
+                        mat_raw_value_from_number(e, two_h, &two_h_num);
+                        num_destroy(&two_h_num);
+                    }
                     e->inv(inv_2h, two_h);
                     e->mul(deriv, deriv, inv_2h);
                     e->mul(f_ij, deriv, t_ij);

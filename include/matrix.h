@@ -135,11 +135,11 @@ typedef struct {
  * @brief Allocate a new (incomplete) matrix of number_t values.
  *
  * Stored values are cloned into matrix-owned storage. When extracting values
- * back out, prefer `mat_get_num()` or `mat_get_data_num()` so the returned
+ * back out, prefer `mat_get_num()` or `mat_get_data()` so the returned
  * `number_t` objects can be destroyed independently of the matrix.
  */
-matrix_t *mat_new_num(size_t rows, size_t cols);
-matrix_t *mat_new_sparse_num(size_t rows, size_t cols);
+matrix_t *mat_new(size_t rows, size_t cols);
+matrix_t *mat_new_sparse(size_t rows, size_t cols);
 
 /**
  * @brief Allocate a new (incomplete) matrix of dval_t* handles.
@@ -156,7 +156,7 @@ matrix_t *mat_new_sparse_dv(size_t rows, size_t cols);
  * Entries are initialised to structural zero and may be filled later with
  * mat_set() or mat_set_data().
  */
-matrix_t *matsq_new_num(size_t n);
+matrix_t *matsq_new(size_t n);
 
 /**
  * @brief Create a complete identity matrix of number_t values.
@@ -164,7 +164,7 @@ matrix_t *matsq_new_num(size_t n);
  * The result is an `n x n` number matrix with exact zeros off the diagonal
  * and exact ones on the diagonal.
  */
-matrix_t *mat_create_identity_num(size_t n);
+matrix_t *mat_create_identity(size_t n);
 
 /**
  * @brief Create a complete identity matrix of dval_t* handles.
@@ -177,7 +177,7 @@ matrix_t *mat_create_identity_dv(size_t n);
  * Each supplied entry is cloned into matrix-owned storage. Off-diagonal
  * entries are structural zero.
  */
-matrix_t *mat_create_diagonal_num(size_t n, const number_t *diagonal);
+matrix_t *mat_create_diagonal(size_t n, const number_t *diagonal);
 
 /**
  * @brief Create a diagonal matrix of dval_t* handles from its diagonal entries.
@@ -193,7 +193,7 @@ matrix_t *mat_create_diagonal_dv(size_t n, dval_t *const *diagonal);
  * @param cols  Number of columns.
  * @param data  Pointer to `rows * cols` row-major `number_t` values.
  */
-matrix_t *mat_create_num(size_t rows, size_t cols, const number_t *data);
+matrix_t *mat_create(size_t rows, size_t cols, const number_t *data);
 
 /**
  * @brief Create a complete matrix of dval_t* handles from a flat array.
@@ -346,10 +346,8 @@ void mat_free(matrix_t *A);
  * matrix's native stored element representation, so the caller must pass a
  * pointer to the matching underlying type.
  *
- * For numeric matrices, that means @p out receives the stored numeric element
- * form directly. For example, a `MAT_TYPE_NUMBER` matrix should be read into a
- * `number_t *`, while legacy internal numeric storage may still use its own
- * concrete scalar type.
+ * For numeric matrices, that means @p out should point to a `number_t` which
+ * receives the stored numeric entry value directly.
  *
  * For dval matrices, the returned `dval_t *` handle is borrowed from the
  * matrix. Do not call `dv_free()` on it unless you first create or retain your
@@ -424,7 +422,7 @@ matrix_t *mat_to_dense(const matrix_t *A);
  * @param A  Input matrix.
  * @return   Newly allocated number-valued matrix on success, or NULL on error.
  */
-matrix_t *mat_evaluate_num(const matrix_t *A);
+matrix_t *mat_evaluate(const matrix_t *A);
 
 /**
  * @brief Structural queries.
@@ -474,42 +472,84 @@ mat_type_t mat_typeof(const matrix_t *A);
 /**
  * @brief Set all matrix elements from a flat row‑major buffer.
  *
- * The buffer must contain `rows * cols` elements of the matrix's element
- * type: `number_t` for numeric matrices or `dval_t *` for symbolic matrices.
+ * The buffer must contain `rows * cols` `number_t` values.
  *
  * @param A     The matrix to modify.
  * @param data  Pointer to a flat row‑major array of elements.
  */
-void mat_set_data(matrix_t *A, const void *data);
+void mat_set_data(matrix_t *A, const number_t *data);
+
+/**
+ * @brief Set all symbolic matrix elements from a flat row-major buffer of `dval_t *`.
+ *
+ * Each supplied handle is retained by the matrix.
+ */
+void mat_set_data_dv(matrix_t *A, dval_t *const *data);
+
+/**
+ * @brief Low-level bulk setter using the matrix's native stored element representation.
+ *
+ * This is the native/raw counterpart of `mat_set_data(...)` and
+ * `mat_set_data_dv(...)`. The caller must supply a row-major buffer whose
+ * element type already matches the matrix's public element family:
+ * - `number_t[rows * cols]` for `MAT_TYPE_NUMBER`
+ * - `dval_t *[rows * cols]` for `MAT_TYPE_DVAL`
+ *
+ * In ordinary user code, prefer the typed entry points:
+ * - `mat_set_data(...)` for numeric matrices
+ * - `mat_set_data_dv(...)` for symbolic matrices
+ *
+ * Use `mat_set_data_raw(...)` only when writing generic code that has already
+ * inspected `mat_typeof(A)` and deliberately wants to feed the matrix its
+ * native public element buffer without choosing between the typed APIs ahead
+ * of time.
+ */
+void mat_set_data_raw(matrix_t *A, const void *data);
 
 /**
  * @brief Get all matrix elements into a flat row‑major buffer.
  *
- * The buffer must have space for `rows * cols` elements of the matrix's
- * element type: `number_t` for numeric matrices or `dval_t *` for symbolic
- * matrices. For `dval` matrices, the copied handles are borrowed from the
- * matrix.
+ * Each output slot receives an owning `number_t` value. Call
+ * `num_destroy(&data[k])` for every element when finished with the buffer.
  *
  * @param A     The matrix to read from.
  * @param data  Pointer to a flat row‑major array to receive the elements.
  */
-void mat_get_data(const matrix_t *A, void *data);
+void mat_get_data(const matrix_t *A, number_t *data);
 
 /**
- * @brief Get all matrix elements into a flat row-major `number_t` buffer.
+ * @brief Get all symbolic matrix elements into a flat row-major `dval_t *` buffer.
  *
- * Each output slot receives an owning `number_t` value. Call
- * `num_destroy(&data[k])` for every element when finished with the buffer.
+ * Returned handles are borrowed from the matrix.
  */
-void mat_get_data_num(const matrix_t *A, number_t *data);
+void mat_get_data_dv(const matrix_t *A, dval_t **data);
+
+/**
+ * @brief Low-level bulk getter using the matrix's native stored element representation.
+ *
+ * This is the native/raw counterpart of `mat_get_data(...)` and
+ * `mat_get_data_dv(...)`. The destination buffer must already match the
+ * matrix's public element family:
+ * - `number_t[rows * cols]` for `MAT_TYPE_NUMBER`
+ * - `dval_t *[rows * cols]` for `MAT_TYPE_DVAL`
+ *
+ * In ordinary user code, prefer:
+ * - `mat_get_data(...)` when you want owning `number_t` results
+ * - `mat_get_data_dv(...)` when you want borrowed symbolic handles
+ *
+ * Use `mat_get_data_raw(...)` only for generic code that has already branched
+ * on `mat_typeof(A)` and wants one low-level bulk access path after making
+ * that decision itself.
+ */
+void mat_get_data_raw(const matrix_t *A, void *data);
 
 /* -------------------------------------------------------------------------
    Basic operations
    ------------------------------------------------------------------------- */
 
-matrix_t *mat_scalar_mul_num(matrix_t *A, const number_t *s);
+matrix_t *mat_scalar_mul(matrix_t *A, const number_t *s);
 
-matrix_t *mat_scalar_div_num(matrix_t *A, const number_t *s);
+matrix_t *mat_scalar_div(matrix_t *A, const number_t *s);
 
 matrix_t *mat_add(const matrix_t *A, const matrix_t *B);
 matrix_t *mat_sub(const matrix_t *A, const matrix_t *B);
@@ -657,30 +697,44 @@ matrix_t *mat_deriv_block_inverse_by_name(const matrix_t *A, size_t split,
 matrix_t *mat_jacobian(const matrix_t *A, dval_t *const *vars, size_t nvars);
 
 /**
- * @brief Compute the trace of a square matrix.
- *
- * For numeric matrices, `trace` must point to a `number_t`. For symbolic
- * matrices, `trace` must point to a `dval_t *`, and a newly built symbolic
- * value is written through it.
+ * @brief Compute the trace of a square matrix as a `number_t`.
  *
  * @param A      Matrix whose trace is requested.
  * @param trace  Output buffer for the trace value.
  * @return       0 on success, or a negative value on error.
  */
-int       mat_trace(const matrix_t *A, void *trace);
+int       mat_trace(const matrix_t *A, number_t *trace);
 
 /**
- * @brief Compute the determinant of a square matrix.
+ * @brief Compute the trace of a square symbolic matrix as a `dval_t *`.
  *
- * For numeric matrices, `determinant` must point to a `number_t`. For
- * symbolic matrices, it must point to a `dval_t *`. Symbolic `dval` matrices
- * use the exact symbolic determinant path.
+ * A newly built symbolic value is written through @p trace.
+ *
+ * @param A      Matrix whose trace is requested.
+ * @param trace  Output buffer for the trace value.
+ * @return       0 on success, or a negative value on error.
+ */
+int       mat_trace_dv(const matrix_t *A, dval_t **trace);
+
+/**
+ * @brief Compute the determinant of a square matrix as a `number_t`.
  *
  * @param A            Matrix whose determinant is requested.
  * @param determinant  Output buffer for the determinant value.
  * @return             0 on success, or a negative value on error.
  */
-int       mat_det(const matrix_t *A, void *determinant);
+int       mat_det(const matrix_t *A, number_t *determinant);
+
+/**
+ * @brief Compute the determinant of a square symbolic matrix as a `dval_t *`.
+ *
+ * Symbolic `dval` matrices use the exact symbolic determinant path.
+ *
+ * @param A            Matrix whose determinant is requested.
+ * @param determinant  Output buffer for the determinant value.
+ * @return             0 on success, or a negative value on error.
+ */
+int       mat_det_dv(const matrix_t *A, dval_t **determinant);
 
 /**
  * @brief Compute the characteristic polynomial of a square matrix.
@@ -860,8 +914,8 @@ matrix_t *mat_block_solve(const matrix_t *A, const matrix_t *B, size_t split);
  *     num_create_from_double(5.1)
  * };
  *
- * matrix_t *A = mat_create_num(3, 2, A_data);
- * matrix_t *B = mat_create_num(3, 1, B_data);
+ * matrix_t *A = mat_create(3, 2, A_data);
+ * matrix_t *B = mat_create(3, 1, B_data);
  * matrix_t *X = mat_least_squares(A, B);
  *
  * mat_print(X);
@@ -1080,22 +1134,27 @@ void mat_schur_factor_free(mat_schur_factor_t *out);
    Eigenvalues / Eigenvectors
    ------------------------------------------------------------------------- */
 
-/*
- * For numeric matrices, `eigenvalues` must point to an array of `number_t`
- * with length `A->rows`, and numeric eigenvector outputs are returned as
- * `MAT_TYPE_NUMBER`. For symbolic matrices, `eigenvalues` remains a
- * `dval_t **`.
- */
-int       mat_eigenvalues(const matrix_t *A, void *eigenvalues);
-int       mat_eigendecompose(const matrix_t *A, void *eigenvalues,
+int       mat_eigenvalues(const matrix_t *A, number_t *eigenvalues);
+int       mat_eigenvalues_dv(const matrix_t *A, dval_t **eigenvalues);
+int       mat_eigendecompose(const matrix_t *A, number_t *eigenvalues,
                              matrix_t **eigenvectors);
+int       mat_eigendecompose_dv(const matrix_t *A, dval_t **eigenvalues,
+                                matrix_t **eigenvectors);
 matrix_t *mat_eigenvectors(const matrix_t *A);
-matrix_t *mat_eigenspace(const matrix_t *A, const void *eigenvalue);
-matrix_t *mat_generalized_eigenspace(const matrix_t *A, const void *eigenvalue,
+matrix_t *mat_eigenspace(const matrix_t *A, const number_t *eigenvalue);
+matrix_t *mat_eigenspace_dv(const matrix_t *A, const dval_t *eigenvalue);
+matrix_t *mat_generalized_eigenspace(const matrix_t *A,
+                                     const number_t *eigenvalue,
                                      size_t order);
-matrix_t *mat_jordan_chain(const matrix_t *A, const void *eigenvalue,
+matrix_t *mat_generalized_eigenspace_dv(const matrix_t *A,
+                                        const dval_t *eigenvalue,
+                                        size_t order);
+matrix_t *mat_jordan_chain(const matrix_t *A, const number_t *eigenvalue,
                            size_t order);
-matrix_t *mat_jordan_profile(const matrix_t *A, const void *eigenvalue);
+matrix_t *mat_jordan_chain_dv(const matrix_t *A, const dval_t *eigenvalue,
+                              size_t order);
+matrix_t *mat_jordan_profile(const matrix_t *A, const number_t *eigenvalue);
+matrix_t *mat_jordan_profile_dv(const matrix_t *A, const dval_t *eigenvalue);
 
 /* -------------------------------------------------------------------------
    Matrix-function helpers

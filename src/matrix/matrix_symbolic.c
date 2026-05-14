@@ -259,7 +259,11 @@ static int mat_eigenvalues_dval(const matrix_t *A, dval_t **eigenvalues)
         if (!bc)
             goto fail_2x2;
 
-        scaled_bc = dval_mul_simplify(dv_num_const_d(4.0), bc);
+        {
+            number_t four = num_create_from_long(4);
+            scaled_bc = dval_mul_simplify(dv_new_const(four), bc);
+            num_destroy(&four);
+        }
         bc = NULL;
         if (!scaled_bc)
             goto fail_2x2;
@@ -292,7 +296,13 @@ static int mat_eigenvalues_dval(const matrix_t *A, dval_t **eigenvalues)
         if (!minus)
             goto fail_2x2;
 
-        half = dv_num_const_d(0.5);
+        {
+            number_t two = num_create_from_long(2);
+            number_t half_num = num_div(NUM_ONE, two);
+            half = dv_new_const(half_num);
+            num_destroy(&two);
+            num_destroy(&half_num);
+        }
         if (!half)
             goto fail_2x2;
 
@@ -368,7 +378,7 @@ static matrix_t *mat_eigenvectors_dval_triangular(const matrix_t *A)
             const dval_t *lambda = mat_get_dval_or_zero(A, k, k);
 
             for (size_t ii = k; ii-- > 0;) {
-                dval_t *sum = dv_num_const_qf(QF_ZERO);
+                dval_t *sum = dv_new_const(NUM_ZERO);
                 dval_t *denom;
                 dval_t *x;
 
@@ -430,7 +440,7 @@ static matrix_t *mat_eigenvectors_dval_triangular(const matrix_t *A)
             const dval_t *lambda = mat_get_dval_or_zero(A, k, k);
 
             for (size_t i = k + 1; i < A->rows; ++i) {
-                dval_t *sum = dv_num_const_qf(QF_ZERO);
+                dval_t *sum = dv_new_const(NUM_ZERO);
                 dval_t *denom;
                 dval_t *x;
 
@@ -543,9 +553,7 @@ static matrix_t *mat_eigenvectors_dval_2x2(const matrix_t *A, dval_t **eigenvalu
         dv_retain(a);
         dv_retain(lambda);
         p = dval_sub_simplify(a, lambda);
-        dv_retain(b);
         q = dval_clone_for_storage(b);
-        dv_retain(c);
         r = dval_clone_for_storage(c);
         dv_retain(d);
         dv_retain(lambda);
@@ -664,6 +672,16 @@ cleanup:
     }
     free(local_ev_heap);
     return rc;
+}
+
+int mat_eigenvalues_dv(const matrix_t *A, dval_t **eigenvalues)
+{
+    return mat_eigenvalues_dval(A, eigenvalues);
+}
+
+int mat_eigendecompose_dv(const matrix_t *A, dval_t **eigenvalues, matrix_t **eigenvectors)
+{
+    return mat_eigendecompose_dval(A, eigenvalues, eigenvectors);
 }
 
 static matrix_t *mat_solve_dval_diagonal_exact(const matrix_t *A, const matrix_t *B)
@@ -1083,14 +1101,14 @@ static matrix_t *mat_inverse_dval_upper_exact(const matrix_t *A)
             goto fail;
 
         dv_retain(uii);
-        xii = dval_div_simplify(dv_num_const_d(1.0), uii);
+        xii = dval_div_simplify(dv_new_const(NUM_ONE), uii);
         if (!xii)
             goto fail;
         mat_set(I, ii, ii, &xii);
         dv_free(xii);
 
         for (size_t j = ii + 1; j < n; ++j) {
-            dval_t *sum = dv_num_const_d(0.0);
+            dval_t *sum = dv_new_const(NUM_ZERO);
             dval_t *xij = NULL;
 
             if (!sum)
@@ -1301,7 +1319,7 @@ int mat_det_dval_exact(const matrix_t *A, dval_t **determinant)
         }
 
         if (pivot_row == n) {
-            *determinant = dv_num_const_qf(QF_ZERO);
+            *determinant = dv_new_const(NUM_ZERO);
             mat_free(M);
             return *determinant ? 0 : -3;
         }
@@ -1313,7 +1331,7 @@ int mat_det_dval_exact(const matrix_t *A, dval_t **determinant)
 
         mat_get(M, k, k, &pivot);
         if (dval_is_exact_zero(pivot)) {
-            *determinant = dv_num_const_qf(QF_ZERO);
+            *determinant = dv_new_const(NUM_ZERO);
             mat_free(M);
             return *determinant ? 0 : -3;
         }
@@ -1685,12 +1703,23 @@ matrix_t *mat_charpoly_numeric(const matrix_t *A)
         if (!Bnew)
             goto fail;
 
-        if (mat_trace(Bnew, trace_val) != 0) {
-            mat_free(Bnew);
-            goto fail;
+        {
+            number_t trace_num = num_new();
+
+            if (mat_trace(Bnew, &trace_num) != 0) {
+                num_destroy(&trace_num);
+                mat_free(Bnew);
+                goto fail;
+            }
+            mat_raw_value_from_number(e, trace_val, &trace_num);
+            num_destroy(&trace_num);
         }
 
-        e->from_real(k_val, (double)k);
+        {
+            number_t k_num = num_create_from_long((long)k);
+            mat_raw_value_from_number(e, k_val, &k_num);
+            num_destroy(&k_num);
+        }
         e->inv(inv_k, k_val);
         e->mul(coeff, trace_val, inv_k);
         e->sub(coeff, e->zero, coeff);
@@ -1722,7 +1751,7 @@ matrix_t *mat_charpoly_dval(const matrix_t *A)
 
     coeffs = mat_create_zero_with_elem(A->rows + 1, 1, &dval_elem);
     B = mat_create_zero_with_elem(A->rows, A->cols, &dval_elem);
-    coeff_prev = dv_num_const_d(1.0);
+    coeff_prev = dv_new_const(NUM_ONE);
     if (!coeffs || !B || !coeff_prev)
         goto fail;
 
@@ -1760,12 +1789,16 @@ matrix_t *mat_charpoly_dval(const matrix_t *A)
         if (!Bnew)
             goto fail;
 
-        if (mat_trace(Bnew, &trace_val) != 0 || !trace_val) {
+        if (mat_trace_dv(Bnew, &trace_val) != 0 || !trace_val) {
             mat_free(Bnew);
             goto fail;
         }
 
-        den = dv_num_const_d((double)k);
+        {
+            number_t k_num = num_create_from_long((long)k);
+            den = dv_new_const(k_num);
+            num_destroy(&k_num);
+        }
         quot = dval_div_simplify(trace_val, den);
         if (!quot) {
             mat_free(Bnew);
@@ -2358,7 +2391,7 @@ matrix_t *mat_adjugate_exact(const matrix_t *A)
                 dval_t *det = NULL;
                 dval_t *entry;
 
-                if (mat_det(Minor, &det) != 0 || !det) {
+                if (mat_det_dv(Minor, &det) != 0 || !det) {
                     mat_free(Minor);
                     goto fail;
                 }
@@ -2376,15 +2409,20 @@ matrix_t *mat_adjugate_exact(const matrix_t *A)
                 mat_set(Adj, i, j, &entry);
                 dv_free(entry);
             } else {
-                unsigned char det[64];
+                number_t det_num = num_new();
 
-                if (mat_det(Minor, det) != 0) {
+                if (mat_det(Minor, &det_num) != 0) {
+                    num_destroy(&det_num);
                     mat_free(Minor);
                     goto fail;
                 }
-                if (((i + j) & 1u) != 0u)
-                    e->sub(det, e->zero, det);
-                mat_set(Adj, i, j, det);
+                if (((i + j) & 1u) != 0u) {
+                    number_t neg_det = num_neg(det_num);
+                    num_destroy(&det_num);
+                    det_num = neg_det;
+                }
+                mat_set(Adj, i, j, &det_num);
+                num_destroy(&det_num);
             }
 
             mat_free(Minor);

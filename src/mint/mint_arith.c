@@ -829,9 +829,22 @@ int mint_sqrt_inplace(mint_t *mint)
         if (cmp == 0)
             break;
         if (cmp > 0) {
-            if (mint_copy_value(next, guess) != 0)
+            if (mint_copy_value(sq, guess) != 0)
                 goto fail;
-            break;
+            if (mint_mul_inplace(sq, guess) != 0)
+                goto fail;
+            if (mi_cmp(sq, mint) <= 0) {
+                if (mint_copy_value(sq_plus, guess) != 0)
+                    goto fail;
+                if (mint_add_inplace(sq_plus, one) != 0)
+                    goto fail;
+                if (mint_copy_value(sq, sq_plus) != 0)
+                    goto fail;
+                if (mint_mul_inplace(sq, sq_plus) != 0)
+                    goto fail;
+                if (mi_cmp(sq, mint) > 0)
+                    break;
+            }
         }
         if (mint_copy_value(guess, next) != 0)
             goto fail;

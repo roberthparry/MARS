@@ -14,25 +14,44 @@
 typedef struct mat_fun_cache_entry {
     const matrix_t *key;
     matrix_t *spectral_Vq;
-    qcomplex_t *spectral_evals;
+    number_t *spectral_evals;
     matrix_t *exp_preimage;
     struct mat_fun_cache_entry *next;
 } mat_fun_cache_entry_t;
 
 static mat_fun_cache_entry_t *mat_fun_cache_head = NULL;
 
-static qcomplex_t mat_eval_number_scalar_qcomplex_local(void (*scalar_f)(void *out, const void *in),
-                                                        qcomplex_t input_qc)
+static number_t mat_eval_number_scalar_number_local(void (*scalar_f)(void *out, const void *in),
+                                                    const number_t *input)
 {
-    number_t input = num_create_from_qcomplex(input_qc);
     number_t output = number_invalid();
-    qcomplex_t out_qc;
+    number_t safe_input = input ? num_clone(*input) : num_clone(NUM_ZERO);
 
-    scalar_f(&output, &input);
-    out_qc = mat_number_to_qcomplex_value(&output);
-    num_destroy(&output);
-    num_destroy(&input);
-    return out_qc;
+    scalar_f(&output, &safe_input);
+    num_destroy(&safe_input);
+    return output;
+}
+
+static void mat_fun_number_array_invalidate(number_t *values, size_t count)
+{
+    if (!values)
+        return;
+    for (size_t i = 0; i < count; ++i)
+        values[i] = number_invalid();
+}
+
+static void mat_fun_number_array_destroy(number_t *values, size_t count)
+{
+    if (!values)
+        return;
+    for (size_t i = 0; i < count; ++i)
+        num_destroy(&values[i]);
+}
+
+static void mat_fun_cache_free_spectral_evals(number_t *values, size_t count)
+{
+    mat_fun_number_array_destroy(values, count);
+    free(values);
 }
 
 static matrix_t *mat_fun_apply(const matrix_t *A,
@@ -166,6 +185,25 @@ static dval_t *dval_simplify_owned_local(dval_t *dv)
     return simp;
 }
 
+static dval_t *dval_const_zero_local(void)
+{
+    return dv_new_const(NUM_ZERO);
+}
+
+static dval_t *dval_const_one_local(void)
+{
+    return dv_new_const(NUM_ONE);
+}
+
+static dval_t *dval_const_long_local(long value)
+{
+    number_t n = num_create_from_long(value);
+    dval_t *dv = dv_new_const(n);
+
+    num_destroy(&n);
+    return dv;
+}
+
 static dval_t *dval_div_simplify_local(const dval_t *num, const dval_t *den)
 {
     dval_t *raw;
@@ -257,7 +295,7 @@ static dval_t *dval_fun_first_derivative_at_zero_local(
     if (!scalar_f)
         return NULL;
 
-    zero = dv_num_const_d(0.0);
+    zero = dval_const_zero_local();
     if (!zero)
         return NULL;
 
@@ -297,7 +335,7 @@ static bool dval_equal_exact_local(const dval_t *a, const dval_t *b)
 static dval_t *dval_mul_or_zero_owned_local(const dval_t *a, const dval_t *b)
 {
     if (dval_is_zero_local(a) || dval_is_zero_local(b))
-        return dv_num_const_d(0.0);
+        return dval_const_zero_local();
 
     dv_retain((dval_t *)a);
     dv_retain((dval_t *)b);
@@ -643,7 +681,7 @@ static matrix_t *mat_number_unary_taylor_from_dval_upper(
         return mat_copy_preserving_store(A);
 
     lambda = mat_get_num(A, 0, 0);
-    x = dv_new_named_var_num(num_clone(lambda), "x");
+    x = dv_new_named_var(num_clone(lambda), "x");
     if (!x) {
         num_destroy(&lambda);
         return NULL;
@@ -666,7 +704,7 @@ static matrix_t *mat_number_unary_taylor_from_dval_upper(
         goto fail;
 
     {
-        number_t diag_value = dv_eval_num(derivs[0]);
+        number_t diag_value = dv_eval(derivs[0]);
 
         for (size_t i = 0; i < n; ++i)
             mat_set(F, i, i, &diag_value);
@@ -702,7 +740,7 @@ static matrix_t *mat_number_unary_taylor_from_dval_upper(
                 factorial = next_factorial;
             }
 
-            coeff = dv_eval_num(derivs[k]);
+            coeff = dv_eval(derivs[k]);
             if (k > 1u) {
                 number_t scaled = num_div(coeff, factorial);
                 num_destroy(&coeff);
@@ -953,7 +991,12 @@ static int dval_fun_coeffs_up_to_second(dval_t **c0,
     if (c2)
         *c2 = NULL;
 
-    u = dv_num_named_var_d(dv_num_eval_d(lambda), "u");
+    {
+        number_t lambda_value = dv_eval(lambda);
+
+        u = dv_new_named_var(lambda_value, "u");
+        num_destroy(&lambda_value);
+    }
     if (!u)
         return -1;
 
@@ -999,7 +1042,7 @@ static int dval_fun_coeffs_up_to_second(dval_t **c0,
             *c0 = NULL;
             return -1;
         }
-        *c2 = dv_mul_d(tmp, 0.5);
+        *c2 = dv_mul_num(tmp, &NUM_HALF);
         dv_free(tmp);
         if (!*c2) {
             dv_free(d2f_u);
@@ -1065,8 +1108,9 @@ static matrix_t *mat_fun_triangular_equal_diag_dval(const matrix_t *T,
             for (size_t j = i + 1; j < n; ++j) {
                 dval_t *nij = NULL;
                 dval_t *term = NULL;
-                mat_get(N, i, j, &nij);
+                mat_get_owned(N, i, j, &nij);
                 term = dv_mul(c1, nij);
+                dv_free(nij);
                 if (!term) {
                     dv_free(c0);
                     dv_free(c1);
@@ -1098,10 +1142,12 @@ static matrix_t *mat_fun_triangular_equal_diag_dval(const matrix_t *T,
                 dval_t *n2ij = NULL;
                 dval_t *extra = NULL;
                 dval_t *sum = NULL;
-                mat_get(F, i, j, &fij);
-                mat_get(N2, i, j, &n2ij);
+                mat_get_owned(F, i, j, &fij);
+                mat_get_owned(N2, i, j, &n2ij);
                 extra = dv_mul(c2, n2ij);
+                dv_free(n2ij);
                 sum = extra ? dv_add(fij, extra) : NULL;
+                dv_free(fij);
                 dv_free(extra);
                 if (!sum) {
                     mat_free(N2);
@@ -1133,12 +1179,12 @@ static matrix_t *mat_sinh_number_triangular_equal_diag(const matrix_t *A)
     number_t minus_one = num_create_from_long(-1);
     number_t half = num_create_from_string("1/2");
 
-    negA = mat_scalar_mul_num((matrix_t *)A, &minus_one);
+    negA = mat_scalar_mul((matrix_t *)A, &minus_one);
     Epos = mat_exp(A);
     Eneg = mat_exp(negA);
     diff = mat_sub(Epos, Eneg);
     if (diff)
-        R = mat_scalar_mul_num(diff, &half);
+        R = mat_scalar_mul(diff, &half);
 
     num_destroy(&minus_one);
     num_destroy(&half);
@@ -1155,12 +1201,12 @@ static matrix_t *mat_cosh_number_triangular_equal_diag(const matrix_t *A)
     number_t minus_one = num_create_from_long(-1);
     number_t half = num_create_from_string("1/2");
 
-    negA = mat_scalar_mul_num((matrix_t *)A, &minus_one);
+    negA = mat_scalar_mul((matrix_t *)A, &minus_one);
     Epos = mat_exp(A);
     Eneg = mat_exp(negA);
     sum = mat_add(Epos, Eneg);
     if (sum)
-        R = mat_scalar_mul_num(sum, &half);
+        R = mat_scalar_mul(sum, &half);
 
     num_destroy(&minus_one);
     num_destroy(&half);
@@ -1180,13 +1226,13 @@ static matrix_t *mat_sin_number_triangular_equal_diag(const matrix_t *A)
     number_t two_i = num_mul(two, i_unit);
     number_t inv_two_i = num_inv(two_i);
 
-    iA = mat_scalar_mul_num((matrix_t *)A, &i_unit);
-    neg_iA = mat_scalar_mul_num((matrix_t *)A, &neg_i_unit);
+    iA = mat_scalar_mul((matrix_t *)A, &i_unit);
+    neg_iA = mat_scalar_mul((matrix_t *)A, &neg_i_unit);
     Epos = mat_exp(iA);
     Eneg = mat_exp(neg_iA);
     diff = mat_sub(Epos, Eneg);
     if (diff)
-        R = mat_scalar_mul_num(diff, &inv_two_i);
+        R = mat_scalar_mul(diff, &inv_two_i);
 
     num_destroy(&i_unit);
     num_destroy(&neg_i_unit);
@@ -1208,13 +1254,13 @@ static matrix_t *mat_cos_number_triangular_equal_diag(const matrix_t *A)
     number_t neg_i_unit = num_neg(i_unit);
     number_t half = num_create_from_string("1/2");
 
-    iA = mat_scalar_mul_num((matrix_t *)A, &i_unit);
-    neg_iA = mat_scalar_mul_num((matrix_t *)A, &neg_i_unit);
+    iA = mat_scalar_mul((matrix_t *)A, &i_unit);
+    neg_iA = mat_scalar_mul((matrix_t *)A, &neg_i_unit);
     Epos = mat_exp(iA);
     Eneg = mat_exp(neg_iA);
     sum = mat_add(Epos, Eneg);
     if (sum)
-        R = mat_scalar_mul_num(sum, &half);
+        R = mat_scalar_mul(sum, &half);
 
     num_destroy(&i_unit);
     num_destroy(&neg_i_unit);
@@ -1268,7 +1314,7 @@ static matrix_t *mat_asinh_number_triangular_equal_diag(const matrix_t *A)
     matrix_t *AA = NULL, *I = NULL, *sum = NULL, *root = NULL, *inner = NULL, *R = NULL;
 
     AA = mat_mul(A, A);
-    I = mat_create_identity_num(A ? A->rows : 0u);
+    I = mat_create_identity(A ? A->rows : 0u);
     if (AA && I)
         sum = mat_add(AA, I);
     if (sum)
@@ -1301,7 +1347,7 @@ static matrix_t *mat_acosh_number_triangular_equal_diag(const matrix_t *A)
     matrix_t *I = NULL, *AmI = NULL, *ApI = NULL, *root_m = NULL, *root_p = NULL;
     matrix_t *prod = NULL, *inner = NULL, *R = NULL;
 
-    I = mat_create_identity_num(A ? A->rows : 0u);
+    I = mat_create_identity(A ? A->rows : 0u);
     if (I) {
         AmI = mat_sub(A, I);
         ApI = mat_add(A, I);
@@ -1517,7 +1563,7 @@ static matrix_t *mat_atanh_number_triangular_equal_diag(const matrix_t *A)
     matrix_t *I = NULL, *plus = NULL, *minus = NULL, *Lp = NULL, *Lm = NULL, *diff = NULL, *R = NULL;
     number_t half = num_create_from_string("1/2");
 
-    I = mat_create_identity_num(A ? A->rows : 0u);
+    I = mat_create_identity(A ? A->rows : 0u);
     if (I) {
         plus = mat_add(I, A);
         minus = mat_sub(I, A);
@@ -1529,7 +1575,7 @@ static matrix_t *mat_atanh_number_triangular_equal_diag(const matrix_t *A)
     if (Lp && Lm)
         diff = mat_sub(Lp, Lm);
     if (diff)
-        R = mat_scalar_mul_num(diff, &half);
+        R = mat_scalar_mul(diff, &half);
 
     num_destroy(&half);
     mat_free(I);
@@ -1640,7 +1686,7 @@ static matrix_t *mat_fun_dval_diagonalizable_2x2(const matrix_t *A,
     if (!A || !scalar_f || A->rows != 2 || A->cols != 2 || !matrix_is_symbolic(A))
         return NULL;
 
-    if (mat_eigendecompose(A, eigenvalues, &V) != 0 || !V)
+    if (mat_eigendecompose_dv(A, eigenvalues, &V) != 0 || !V)
         goto fail;
 
     FD = mat_create_diagonal_with_elem(2, &dval_elem);
@@ -1988,9 +2034,11 @@ static matrix_t *mat_fun_dval_uniform_diag_offdiag(const matrix_t *A,
 
     dv_retain(diag ? diag : DV_ZERO);
     dv_retain(offdiag ? offdiag : DV_ZERO);
+    number_t n_minus_one = num_create_from_long((long)(n - 1));
     dval_t *scaled_offdiag = dval_mul_simplify_local(
-        dv_num_const_d((double)(n - 1)),
+        dv_new_const(n_minus_one),
         offdiag ? offdiag : DV_ZERO);
+    num_destroy(&n_minus_one);
     if (!scaled_offdiag)
         goto fail;
     beta = dval_add_simplify_local(diag ? diag : DV_ZERO, scaled_offdiag);
@@ -2008,7 +2056,9 @@ static matrix_t *mat_fun_dval_uniform_diag_offdiag(const matrix_t *A,
     delta = dval_sub_simplify_local(fb, fa);
     if (!delta)
         goto fail;
-    dval_t *scaled_delta = dv_div_d(delta, (double)n);
+    number_t n_num = num_create_from_long((long)n);
+    dval_t *scaled_delta = dv_div_num(delta, &n_num);
+    num_destroy(&n_num);
     dv_free(delta);
     delta = dval_simplify_owned_local(scaled_delta);
     if (!delta)
@@ -2115,7 +2165,7 @@ static matrix_t *mat_fun_dval_scalar_plus_rank_one(const matrix_t *A,
         }
     }
 
-    v[q] = dv_num_const_d(1.0);
+    v[q] = dval_const_one_local();
     if (!v[q])
         goto fail;
 
@@ -2227,7 +2277,7 @@ static matrix_t *mat_fun_dval_scalar_plus_rank_one(const matrix_t *A,
         }
     }
 
-    lambda = dv_num_const_d(0.0);
+    lambda = dval_const_zero_local();
     if (!lambda)
         goto fail;
     for (size_t i = 0; i < n; ++i) {
@@ -2293,8 +2343,7 @@ static matrix_t *mat_fun_dval_scalar_plus_rank_one(const matrix_t *A,
 
                 if (dval_is_zero_local(diag_delta)) {
                     dv_free(diag_delta);
-                    dv_retain(f_alpha);
-                    entry = dval_simplify_owned_local(f_alpha);
+                    entry = dval_clone_for_storage(f_alpha);
                 } else {
                     dval_t *scaled = NULL;
 
@@ -2310,7 +2359,7 @@ static matrix_t *mat_fun_dval_scalar_plus_rank_one(const matrix_t *A,
             } else {
                 mat_get(A, i, j, &aij);
                 if (dval_is_zero_local(aij)) {
-                    entry = dv_num_const_d(0.0);
+                    entry = dval_const_zero_local();
                 } else {
                     dv_retain(coeff);
                     dv_retain(aij);
@@ -2421,7 +2470,7 @@ static matrix_t *mat_fun_dval_cubic_linear_exact(const matrix_t *A,
         goto fail;
 
     if (dv_is_exact_zero(s)) {
-        dval_t *zero = dv_num_const_d(0.0);
+        dval_t *zero = dval_const_zero_local();
 
         if (!zero)
             goto fail;
@@ -2431,7 +2480,7 @@ static matrix_t *mat_fun_dval_cubic_linear_exact(const matrix_t *A,
         }
         dv_free(zero);
     } else {
-        dval_t *zero = dv_num_const_d(0.0);
+        dval_t *zero = dval_const_zero_local();
         dval_t *neg_root = NULL;
         dval_t *two_root = NULL;
         dval_t *two_s = NULL;
@@ -2450,7 +2499,7 @@ static matrix_t *mat_fun_dval_cubic_linear_exact(const matrix_t *A,
         }
 
         dv_retain(root);
-        neg_root = dval_sub_simplify_local(dv_num_const_d(0.0), root);
+        neg_root = dval_sub_simplify_local(dval_const_zero_local(), root);
         if (!neg_root) {
             dv_free(zero);
             goto fail;
@@ -2475,7 +2524,7 @@ static matrix_t *mat_fun_dval_cubic_linear_exact(const matrix_t *A,
             goto fail;
 
         dv_retain(root);
-        two_root = dval_mul_simplify_local(dv_num_const_d(2.0), root);
+        two_root = dval_mul_simplify_local(dval_const_long_local(2), root);
         if (!two_root)
             goto fail;
         c1 = dval_div_simplify_local(diff, two_root);
@@ -2491,7 +2540,7 @@ static matrix_t *mat_fun_dval_cubic_linear_exact(const matrix_t *A,
             goto fail;
 
         dv_retain(c0);
-        tmp = dval_mul_simplify_local(dv_num_const_d(2.0), c0);
+        tmp = dval_mul_simplify_local(dval_const_long_local(2), c0);
         if (!tmp)
             goto fail;
         sum = dval_sub_simplify_local(sum, tmp);
@@ -2500,7 +2549,7 @@ static matrix_t *mat_fun_dval_cubic_linear_exact(const matrix_t *A,
             goto fail;
 
         dv_retain(s);
-        two_s = dval_mul_simplify_local(dv_num_const_d(2.0), s);
+        two_s = dval_mul_simplify_local(dval_const_long_local(2), s);
         if (!two_s)
             goto fail;
         c2 = dval_div_simplify_local(sum, two_s);
@@ -2665,7 +2714,7 @@ static matrix_t *mat_fun_dval_quartic_biquadratic_exact(const matrix_t *A,
     if (!step_sq)
         goto fail;
     dv_retain(step_sq);
-    s = dval_mul_simplify_local(dv_num_const_d(3.0), step_sq);
+    s = dval_mul_simplify_local(dval_const_long_local(3), step_sq);
     if (!s)
         goto fail;
 
@@ -2674,7 +2723,7 @@ static matrix_t *mat_fun_dval_quartic_biquadratic_exact(const matrix_t *A,
     dval_t *step_four = dval_mul_simplify_local(step_sq, step_sq);
     if (!step_four)
         goto fail;
-    t = dval_sub_simplify_local(dv_num_const_d(0.0), step_four);
+    t = dval_sub_simplify_local(dval_const_zero_local(), step_four);
     if (!t)
         goto fail;
 
@@ -2717,7 +2766,7 @@ static matrix_t *mat_fun_dval_quartic_biquadratic_exact(const matrix_t *A,
         goto fail;
 
     dv_retain(t);
-    dval_t *four_t = dval_mul_simplify_local(dv_num_const_d(4.0), t);
+    dval_t *four_t = dval_mul_simplify_local(dval_const_long_local(4), t);
     if (!four_t)
         goto fail;
     disc = dval_add_simplify_local(disc, four_t);
@@ -2734,8 +2783,8 @@ static matrix_t *mat_fun_dval_quartic_biquadratic_exact(const matrix_t *A,
     dval_t *sum = dval_add_simplify_local(s, root);
     if (!sum)
         goto fail;
-    mu1 = dv_div_d(sum, 2.0);
-    dv_free(sum);
+    mu1 = dval_div_simplify_local(sum, dval_const_long_local(2));
+    sum = NULL;
     mu1 = dval_simplify_owned_local(mu1);
     if (!mu1)
         goto fail;
@@ -2745,8 +2794,8 @@ static matrix_t *mat_fun_dval_quartic_biquadratic_exact(const matrix_t *A,
     dval_t *diff = dval_sub_simplify_local(s, root);
     if (!diff)
         goto fail;
-    mu2 = dv_div_d(diff, 2.0);
-    dv_free(diff);
+    mu2 = dval_div_simplify_local(diff, dval_const_long_local(2));
+    diff = NULL;
     mu2 = dval_simplify_owned_local(mu2);
     if (!mu2 || dval_equal_exact_local(mu1, mu2))
         goto fail;
@@ -2759,9 +2808,9 @@ static matrix_t *mat_fun_dval_quartic_biquadratic_exact(const matrix_t *A,
         goto fail;
 
     dv_retain(r1);
-    nr1 = dval_sub_simplify_local(dv_num_const_d(0.0), r1);
+    nr1 = dval_sub_simplify_local(dval_const_zero_local(), r1);
     dv_retain(r2);
-    nr2 = dval_sub_simplify_local(dv_num_const_d(0.0), r2);
+    nr2 = dval_sub_simplify_local(dval_const_zero_local(), r2);
     if (!nr1 || !nr2)
         goto fail;
 
@@ -2776,8 +2825,8 @@ static matrix_t *mat_fun_dval_quartic_biquadratic_exact(const matrix_t *A,
     dv_retain(fm1);
     g1 = dval_add_simplify_local(fp1, fm1);
     if (g1) {
-        dval_t *half = dv_div_d(g1, 2.0);
-        dv_free(g1);
+        dval_t *half = dval_div_simplify_local(g1, dval_const_long_local(2));
+        g1 = NULL;
         g1 = half ? dval_simplify_owned_local(half) : NULL;
     }
     if (!g1)
@@ -2787,8 +2836,8 @@ static matrix_t *mat_fun_dval_quartic_biquadratic_exact(const matrix_t *A,
     dv_retain(fm2);
     g2 = dval_add_simplify_local(fp2, fm2);
     if (g2) {
-        dval_t *half = dv_div_d(g2, 2.0);
-        dv_free(g2);
+        dval_t *half = dval_div_simplify_local(g2, dval_const_long_local(2));
+        g2 = NULL;
         g2 = half ? dval_simplify_owned_local(half) : NULL;
     }
     if (!g2)
@@ -2805,7 +2854,7 @@ static matrix_t *mat_fun_dval_quartic_biquadratic_exact(const matrix_t *A,
         if (!num)
             goto fail;
         dv_retain(r1);
-        den = dval_mul_simplify_local(dv_num_const_d(2.0), r1);
+        den = dval_mul_simplify_local(dval_const_long_local(2), r1);
         if (!den)
             goto fail;
         h1 = dval_div_simplify_local(num, den);
@@ -2824,7 +2873,7 @@ static matrix_t *mat_fun_dval_quartic_biquadratic_exact(const matrix_t *A,
         if (!num)
             goto fail;
         dv_retain(r2);
-        den = dval_mul_simplify_local(dv_num_const_d(2.0), r2);
+        den = dval_mul_simplify_local(dval_const_long_local(2), r2);
         if (!den)
             goto fail;
         h2 = dval_div_simplify_local(num, den);
@@ -2898,7 +2947,7 @@ static matrix_t *mat_fun_dval_quartic_biquadratic_exact(const matrix_t *A,
                 if (!entry)
                     goto fail;
             } else {
-                entry = dv_num_const_d(0.0);
+                entry = dval_const_zero_local();
                 if (!entry)
                     goto fail;
             }
@@ -3109,7 +3158,7 @@ static matrix_t *mat_fun_dval_quadratic_exact(const matrix_t *A,
         goto fail;
 
     dv_retain(q);
-    dval_t *four_q = dval_mul_simplify_local(dv_num_const_d(4.0), q);
+    dval_t *four_q = dval_mul_simplify_local(dval_const_long_local(4), q);
     if (!four_q)
         goto fail;
     disc = dval_add_simplify_local(disc, four_q);
@@ -3120,7 +3169,7 @@ static matrix_t *mat_fun_dval_quadratic_exact(const matrix_t *A,
         dval_t *lambda = NULL;
 
         dv_retain(p);
-        lambda = dv_div_d(p, 2.0);
+        lambda = dval_div_simplify_local(p, dval_const_long_local(2));
         lambda = dval_simplify_owned_local(lambda);
         if (!lambda)
             goto fail;
@@ -3162,12 +3211,12 @@ static matrix_t *mat_fun_dval_quadratic_exact(const matrix_t *A,
         if (!diff)
             goto fail;
 
-        lambda1 = dv_div_d(sum, 2.0);
+        lambda1 = dval_div_simplify_local(sum, dval_const_long_local(2));
         lambda1 = dval_simplify_owned_local(lambda1);
-        lambda2 = dv_div_d(diff, 2.0);
+        sum = NULL;
+        lambda2 = dval_div_simplify_local(diff, dval_const_long_local(2));
         lambda2 = dval_simplify_owned_local(lambda2);
-        dv_free(sum);
-        dv_free(diff);
+        diff = NULL;
         if (!lambda1 || !lambda2)
             goto fail;
 
@@ -3268,38 +3317,59 @@ static matrix_t *mat_fun_dval_structured(const matrix_t *A,
     matrix_t *FT;
     matrix_t *out;
     dval_t *diag0 = NULL;
-    qfloat_t tol = qf_from_double(1e-24);
+    number_t tol = num_create_from_double(1e-24);
 
     if (!A || !scalar_f || !matrix_is_symbolic(A))
         return NULL;
     if (A->rows != A->cols)
+    {
+        num_destroy(&tol);
         return NULL;
+    }
     if (mat_is_upper_triangular(A)) {
         if (A->rows == 0)
+        {
+            num_destroy(&tol);
             return mat_copy_preserving_store(A);
+        }
         if (mat_is_diagonal(A))
+        {
+            num_destroy(&tol);
             return mat_fun_elementwise_same_type(A, scalar_f);
+        }
 
         n = A->rows;
-        mat_get(A, 0, 0, &diag0);
+        mat_get_owned(A, 0, 0, &diag0);
         for (size_t i = 1; i < n; ++i) {
             dval_t *diag_i = NULL;
             number_t diag0_num;
             number_t diag_i_num;
-            qfloat_t diff;
-            mat_get(A, i, i, &diag_i);
-            diag0_num = dv_eval_num(diag0);
-            diag_i_num = dv_eval_num(diag_i);
-            diff = qc_abs(qc_sub(mat_number_to_qcomplex_value(&diag_i_num),
-                                 mat_number_to_qcomplex_value(&diag0_num)));
+            number_t diff_num;
+            number_t absdiff;
+            mat_get_owned(A, i, i, &diag_i);
+            diag0_num = dv_eval(diag0);
+            diag_i_num = dv_eval(diag_i);
+            diff_num = num_sub(diag_i_num, diag0_num);
+            absdiff = num_abs(diff_num);
             num_destroy(&diag_i_num);
             num_destroy(&diag0_num);
-            if (qf_lt(tol, diff))
+            dv_free(diag_i);
+            if (num_lt(tol, absdiff)) {
+                dv_free(diag0);
+                num_destroy(&absdiff);
+                num_destroy(&diff_num);
+                num_destroy(&tol);
                 return (A->rows == 2 && A->cols == 2)
                     ? mat_fun_dval_diagonalizable_2x2(A, scalar_f) : NULL;
+            }
+            num_destroy(&absdiff);
+            num_destroy(&diff_num);
         }
+        dv_free(diag0);
+        num_destroy(&tol);
         return mat_fun_triangular_equal_diag_dval(A, scalar_f);
     }
+    num_destroy(&tol);
 
     if (!mat_is_lower_triangular(A)) {
         matrix_t *block_diag = mat_fun_dval_block_diagonal(A, scalar_f);
@@ -3371,35 +3441,40 @@ void mat_fun_cache_forget(const matrix_t *A)
 
         *link = entry->next;
         mat_free(entry->spectral_Vq);
-        free(entry->spectral_evals);
+        mat_fun_cache_free_spectral_evals(entry->spectral_evals, A->rows);
         mat_free(entry->exp_preimage);
         free(entry);
         return;
     }
 }
 
-/* Scale every element of A in-place by the qfloat scalar r.
- * Using from_qf preserves full precision for qfloat/qcomplex elements. */
-static void mat_scale_qf(matrix_t *A, qfloat_t r)
+/* Scale every element of A in-place by the number scalar r. */
+static void mat_scale_number(matrix_t *A, const number_t *r)
 {
     const struct elem_vtable *e = A->elem;
-    unsigned char r_raw[64] = {0}, v[64] = {0};
-    mat_raw_value_from_qfloat(e, r_raw, r);
+    unsigned char r_raw[64] = {0}, v[64] = {0}, scaled[64] = {0};
+
+    mat_raw_value_from_number(e, r_raw, r);
+    elem_init_zero_value(e, scaled);
     for (size_t i = 0; i < A->rows; i++)
         for (size_t j = 0; j < A->cols; j++) {
             mat_get(A, i, j, v);
-            e->mul(v, r_raw, v);
-            mat_set(A, i, j, v);
+            e->mul(scaled, r_raw, v);
+            mat_set(A, i, j, scaled);
         }
+    elem_destroy_value(e, scaled);
+    elem_destroy_value(e, r_raw);
 
     mat_fun_cache_entry_t *cache = mat_fun_cache_find(A);
     if (!cache)
         return;
 
     if (cache->spectral_evals) {
-        for (size_t i = 0; i < A->rows; ++i)
-            cache->spectral_evals[i] = qc_make(qf_mul(qc_real(cache->spectral_evals[i]), r),
-                                               qf_mul(qc_imag(cache->spectral_evals[i]), r));
+        for (size_t i = 0; i < A->rows; ++i) {
+            number_t scaled = num_mul(cache->spectral_evals[i], *r);
+            num_destroy(&cache->spectral_evals[i]);
+            cache->spectral_evals[i] = scaled;
+        }
     }
 
     if (cache->exp_preimage) {
@@ -3410,27 +3485,29 @@ static void mat_scale_qf(matrix_t *A, qfloat_t r)
 
 static void mat_attach_spectral_cache(matrix_t *A,
                                       const matrix_t *Vq,
-                                      const qcomplex_t *evals)
+                                      const number_t *evals)
 {
     if (!A || !Vq || !evals || A->rows != A->cols)
         return;
 
     matrix_t *Vcopy = mat_copy_preserving_store(Vq);
-    qcomplex_t *ecopy = calloc(A->rows, sizeof(*ecopy));
+    number_t *ecopy = calloc(A->rows, sizeof(*ecopy));
     if (!Vcopy || !ecopy) {
         mat_free(Vcopy);
         free(ecopy);
         return;
     }
 
-    memcpy(ecopy, evals, A->rows * sizeof(*ecopy));
+    mat_fun_number_array_invalidate(ecopy, A->rows);
+    for (size_t i = 0; i < A->rows; ++i)
+        ecopy[i] = num_clone(evals[i]);
 
     mat_fun_cache_entry_t *entry = mat_fun_cache_find(A);
     if (!entry) {
         entry = calloc(1, sizeof(*entry));
         if (!entry) {
             mat_free(Vcopy);
-            free(ecopy);
+            mat_fun_cache_free_spectral_evals(ecopy, A->rows);
             return;
         }
         entry->key = A;
@@ -3439,7 +3516,7 @@ static void mat_attach_spectral_cache(matrix_t *A,
     }
 
     mat_free(entry->spectral_Vq);
-    free(entry->spectral_evals);
+    mat_fun_cache_free_spectral_evals(entry->spectral_evals, A->rows);
 
     entry->spectral_Vq = Vcopy;
     entry->spectral_evals = ecopy;
@@ -3452,20 +3529,17 @@ static matrix_t *mat_fun_from_spectral_cache(const matrix_t *A,
     const struct elem_vtable *orig_elem = A->elem;
     mat_fun_cache_entry_t *cache = mat_fun_cache_find(A);
     matrix_t *FD = mat_create_diagonal_with_elem(n, &number_elem);
-    qcomplex_t *mapped = calloc(n, sizeof(*mapped));
+    number_t *mapped = calloc(n, sizeof(*mapped));
     if (!cache || !cache->spectral_Vq || !cache->spectral_evals || !FD || !mapped) {
         mat_free(FD);
         free(mapped);
         return NULL;
     }
+    mat_fun_number_array_invalidate(mapped, n);
 
     for (size_t i = 0; i < n; ++i) {
-        number_t value;
-
-        mapped[i] = mat_eval_number_scalar_qcomplex_local(scalar_f, cache->spectral_evals[i]);
-        value = num_create_from_qcomplex(mapped[i]);
-        mat_set(FD, i, i, &value);
-        num_destroy(&value);
+        mapped[i] = mat_eval_number_scalar_number_local(scalar_f, &cache->spectral_evals[i]);
+        mat_set(FD, i, i, &mapped[i]);
     }
 
     matrix_t *VF = mat_mul(cache->spectral_Vq, FD);
@@ -3476,6 +3550,7 @@ static matrix_t *mat_fun_from_spectral_cache(const matrix_t *A,
     mat_free(VF);
     mat_free(Vinv);
     if (!R) {
+        mat_fun_number_array_destroy(mapped, n);
         free(mapped);
         return NULL;
     }
@@ -3483,18 +3558,21 @@ static matrix_t *mat_fun_from_spectral_cache(const matrix_t *A,
     mat_attach_spectral_cache(R, cache->spectral_Vq, mapped);
 
     if (orig_elem == R->elem) {
+        mat_fun_number_array_destroy(mapped, n);
         free(mapped);
         return R;
     }
 
     matrix_t *out = mat_convert_with_store(R, orig_elem, R->store);
     if (!out) {
+        mat_fun_number_array_destroy(mapped, n);
         free(mapped);
         mat_free(R);
         return NULL;
     }
 
     mat_attach_spectral_cache(out, cache->spectral_Vq, mapped);
+    mat_fun_number_array_destroy(mapped, n);
     free(mapped);
     mat_free(R);
     return out;
@@ -3531,34 +3609,31 @@ static matrix_t *mat_fun_hermitian(const matrix_t *A,
     size_t n = A->rows;
     const struct elem_vtable *orig_elem = A->elem;
     number_t *eval_buf = calloc(n, sizeof(*eval_buf));
-    qcomplex_t *evals = calloc(n, sizeof(*evals));
-    qcomplex_t *mapped = calloc(n, sizeof(*mapped));
-    if (!eval_buf || !evals || !mapped) {
+    number_t *mapped = calloc(n, sizeof(*mapped));
+    if (!eval_buf || !mapped) {
         free(eval_buf);
-        free(evals);
         free(mapped);
         return NULL;
     }
+    mat_fun_number_array_invalidate(eval_buf, n);
+    mat_fun_number_array_invalidate(mapped, n);
 
     matrix_t *V = NULL;
     matrix_t *Vq = NULL;
     if (mat_eigendecompose(A, eval_buf, &V) != 0) {
+        mat_fun_number_array_destroy(eval_buf, n);
         free(eval_buf);
-        free(evals);
+        mat_fun_number_array_destroy(mapped, n);
         free(mapped);
         return NULL;
     }
 
-    for (size_t i = 0; i < n; ++i)
-        evals[i] = mat_number_to_qcomplex_value(&eval_buf[i]);
-
     Vq = mat_copy_preserving_store(V);
     if (!Vq) {
         mat_free(V);
-        for (size_t i = 0; i < n; ++i)
-            num_destroy(&eval_buf[i]);
+        mat_fun_number_array_destroy(eval_buf, n);
         free(eval_buf);
-        free(evals);
+        mat_fun_number_array_destroy(mapped, n);
         free(mapped);
         return NULL;
     }
@@ -3567,21 +3642,16 @@ static matrix_t *mat_fun_hermitian(const matrix_t *A,
     if (!FD) {
         mat_free(Vq);
         mat_free(V);
-        for (size_t i = 0; i < n; ++i)
-            num_destroy(&eval_buf[i]);
+        mat_fun_number_array_destroy(eval_buf, n);
         free(eval_buf);
-        free(evals);
+        mat_fun_number_array_destroy(mapped, n);
         free(mapped);
         return NULL;
     }
 
     for (size_t i = 0; i < n; ++i) {
-        number_t value;
-
-        mapped[i] = mat_eval_number_scalar_qcomplex_local(scalar_f, evals[i]);
-        value = num_create_from_qcomplex(mapped[i]);
-        mat_set(FD, i, i, &value);
-        num_destroy(&value);
+        mapped[i] = mat_eval_number_scalar_number_local(scalar_f, &eval_buf[i]);
+        mat_set(FD, i, i, &mapped[i]);
     }
 
     matrix_t *VF = mat_mul(Vq, FD);
@@ -3595,23 +3665,21 @@ static matrix_t *mat_fun_hermitian(const matrix_t *A,
     if (!R) {
         mat_free(Vq);
         mat_free(V);
-        for (size_t i = 0; i < n; ++i)
-            num_destroy(&eval_buf[i]);
+        mat_fun_number_array_destroy(eval_buf, n);
         free(eval_buf);
-        free(evals);
+        mat_fun_number_array_destroy(mapped, n);
         free(mapped);
         return NULL;
     }
 
     mat_attach_spectral_cache(R, Vq, mapped);
 
-    for (size_t i = 0; i < n; ++i)
-        num_destroy(&eval_buf[i]);
+    mat_fun_number_array_destroy(eval_buf, n);
     free(eval_buf);
-    free(evals);
 
     matrix_t *out = mat_convert_with_store(R, orig_elem, R->store);
     if (!out) {
+        mat_fun_number_array_destroy(mapped, n);
         free(mapped);
         mat_free(Vq);
         mat_free(V);
@@ -3622,6 +3690,7 @@ static matrix_t *mat_fun_hermitian(const matrix_t *A,
     mat_attach_spectral_cache(out, Vq, mapped);
     mat_free(Vq);
     mat_free(V);
+    mat_fun_number_array_destroy(mapped, n);
     free(mapped);
     mat_free(R);
     return out;
@@ -3629,8 +3698,7 @@ static matrix_t *mat_fun_hermitian(const matrix_t *A,
 
 static int mat_is_upper_triangular_local(const matrix_t *A)
 {
-    qfloat_t tol = qf_from_double(1e-30);
-    qcomplex_t z;
+    number_t tol = num_create_from_double(1e-30);
 
     if (!A || A->rows != A->cols)
         return 0;
@@ -3638,13 +3706,22 @@ static int mat_is_upper_triangular_local(const matrix_t *A)
     for (size_t i = 1; i < A->rows; ++i) {
         for (size_t j = 0; j < i; ++j) {
             unsigned char raw[64];
+            number_t z;
+            number_t absz;
             mat_get(A, i, j, raw);
-            z = mat_raw_value_to_qcomplex(A->elem, raw);
-            if (qf_lt(tol, qc_abs(z)))
+            z = mat_raw_value_to_number(A->elem, raw);
+            absz = num_abs(z);
+            num_destroy(&z);
+            if (num_lt(tol, absz)) {
+                num_destroy(&absz);
+                num_destroy(&tol);
                 return 0;
+            }
+            num_destroy(&absz);
         }
     }
 
+    num_destroy(&tol);
     return 1;
 }
 
@@ -3695,16 +3772,19 @@ matrix_t *mat_fun_schur(const matrix_t *A,
     if (A->rows == 1) {
         const struct elem_vtable *orig_elem = A->elem;
         matrix_t *out = mat_create_diagonal_with_elem(1, orig_elem);
-        qcomplex_t in_qc, out_qc;
+        number_t in_num = number_invalid();
+        number_t out_num = number_invalid();
         unsigned char raw_in[64] = {0}, raw_out[64] = {0};
 
         if (!out)
             return NULL;
 
         mat_get(A, 0, 0, raw_in);
-        in_qc = mat_raw_value_to_qcomplex(orig_elem, raw_in);
-        out_qc = mat_eval_number_scalar_qcomplex_local(scalar_f, in_qc);
-        mat_raw_value_from_qcomplex(orig_elem, raw_out, out_qc);
+        in_num = mat_raw_value_to_number(orig_elem, raw_in);
+        out_num = mat_eval_number_scalar_number_local(scalar_f, &in_num);
+        mat_raw_value_from_number(orig_elem, raw_out, &out_num);
+        num_destroy(&out_num);
+        num_destroy(&in_num);
         mat_set(out, 0, 0, raw_out);
         return out;
     }
@@ -4196,6 +4276,9 @@ matrix_t *mat_normal_logpdf(const matrix_t *A)
 
 matrix_t *mat_lambert_w0(const matrix_t *A)
 {
+    if (A && A->elem == &dval_elem && matrix_is_symbolic(A))
+        return mat_fun_elementwise_same_type(A, dval_elem.fun->lambert_w0);
+
     if (A &&
         A->elem == &number_elem &&
         A->rows == A->cols &&
@@ -4330,9 +4413,12 @@ matrix_t *mat_pow_int(const matrix_t *A, int n)
    Requires A to admit a principal logarithm (positive definite).
    ============================================================ */
 
-matrix_t *mat_pow(const matrix_t *A, double s)
+matrix_t *mat_pow(const matrix_t *A, const number_t *s)
 {
+    matrix_t *result = NULL;
+
     if (!A || A->rows != A->cols) return NULL;
+    if (!s) return NULL;
     if (matrix_is_symbolic(A))
         return NULL;
     if (!mat_elem_supports_numeric_algorithms(A)) return NULL;
@@ -4340,9 +4426,8 @@ matrix_t *mat_pow(const matrix_t *A, double s)
     matrix_t *L = mat_log(A);
     if (!L) return NULL;
 
-    mat_scale_qf(L, qf_from_double(s));
-
-    matrix_t *result = mat_exp(L);
+    mat_scale_number(L, s);
+    result = mat_exp(L);
     mat_free(L);
     return result;
 }

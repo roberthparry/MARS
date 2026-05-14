@@ -40,7 +40,7 @@ the API. Internally each matrix carries:
 - condition number computation
 - matrix functions: exp, sin, cos, tan, sinh, cosh, tanh, sqrt, log, asin, acos, atan, asinh, acosh, atanh, erf, erfc
 - power functions: integer power (binary exponentiation), real power via exp/log
-- all numeric eigendecomposition is computed at full `qfloat_t`/`qcomplex_t` internal precision regardless of stored numeric syntax; all numeric matrix functions are computed through the same high-precision internal path
+- numeric eigendecomposition and matrix functions are computed through the high-precision numeric `number_t` layer regardless of how the original numeric entries were written
 
 ## `dval_t *` Matrices
 
@@ -325,17 +325,17 @@ off-diagonal element). For bulk initialisation prefer the `mat_create_*` forms b
 
 | Function | Element type | Description |
 |---|---|---|
-| `mat_new_num(rows, cols)` | `number_t` | Allocate an uninitialised `rows × cols` matrix of `number_t` values |
+| `mat_new(rows, cols)` | `number_t` | Allocate an uninitialised `rows × cols` matrix of `number_t` values |
 | `mat_new_dv(rows, cols)` | `dval_t *` | Allocate an uninitialised `rows × cols` matrix of retained `dval_t *` handles |
-| `mat_new_sparse_num(rows, cols)` | `number_t` | Allocate an uninitialised sparse `rows × cols` matrix of `number_t` values |
+| `mat_new_sparse(rows, cols)` | `number_t` | Allocate an uninitialised sparse `rows × cols` matrix of `number_t` values |
 | `mat_new_sparse_dv(rows, cols)` | `dval_t *` | Allocate an uninitialised sparse `rows × cols` matrix of retained `dval_t *` handles |
-| `matsq_new_num(n)` | `number_t` | Allocate an uninitialised `n × n` matrix of `number_t` values |
+| `matsq_new(n)` | `number_t` | Allocate an uninitialised `n × n` matrix of `number_t` values |
 
 #### Allocate and fill from a flat array
 
 | Function | Element type | Description |
 |---|---|---|
-| `mat_create_num(rows, cols, data)` | `number_t` | Allocate and fill from a row-major `number_t[]`; each entry is cloned into matrix-owned storage |
+| `mat_create(rows, cols, data)` | `number_t` | Allocate and fill from a row-major `number_t[]`; each entry is cloned into matrix-owned storage |
 | `mat_create_dv(rows, cols, data)` | `dval_t *` | Allocate and fill from a row-major `dval_t * []`; each handle is retained by the matrix |
 
 #### Identity matrices
@@ -345,7 +345,7 @@ materialises the matrix as dense.
 
 | Function | Element type | Description |
 |---|---|---|
-| `mat_create_identity_num(n)` | `number_t` | `n × n` identity matrix of exact numeric ones and zeros |
+| `mat_create_identity(n)` | `number_t` | `n × n` identity matrix of exact numeric ones and zeros |
 | `mat_create_identity_dv(n)` | `dval_t *` | `n × n` identity matrix of symbolic ones and zeros |
 
 #### Diagonal matrices
@@ -356,7 +356,7 @@ to survive through compatible operations.
 
 | Function | Element type | Description |
 |---|---|---|
-| `mat_create_diagonal_num(n, diagonal)` | `number_t` | `n × n` diagonal matrix of cloned `number_t` values |
+| `mat_create_diagonal(n, diagonal)` | `number_t` | `n × n` diagonal matrix of cloned `number_t` values |
 | `mat_create_diagonal_dv(n, diagonal)` | `dval_t *` | `n × n` diagonal matrix of retained `dval_t *` handles |
 
 ### Destruction
@@ -404,8 +404,19 @@ inputs are not flattened merely because an internal cache is involved.
 
 ### Bulk Element Access
 
-- `void mat_set_data(matrix_t *A, const void *data)` — copy all elements from a flat row-major buffer into `A`. The buffer must contain `rows × cols` elements of `A`'s element type. For `MAT_TYPE_DVAL`, each incoming handle is retained.
-- `void mat_get_data(const matrix_t *A, void *data)` — copy all elements of `A` into a flat row-major buffer. The buffer must have space for `rows × cols` elements of `A`'s element type. For `MAT_TYPE_DVAL`, the copied handles are borrowed.
+- `void mat_set_data(matrix_t *A, const number_t *data)` — set every entry of a numeric matrix from a row-major `number_t` buffer.
+- `void mat_set_data_dv(matrix_t *A, dval_t *const *data)` — set every entry of a symbolic matrix from a row-major `dval_t *` buffer. Each handle is retained by the matrix.
+- `void mat_get_data(const matrix_t *A, number_t *data)` — read every entry of a numeric matrix into a row-major `number_t` buffer. Each returned `number_t` is owning and should later be destroyed with `num_destroy(...)`.
+- `void mat_get_data_dv(const matrix_t *A, dval_t **data)` — read every entry of a symbolic matrix into a row-major `dval_t *` buffer. The returned handles are borrowed from the matrix.
+- `void mat_set_data_raw(matrix_t *A, const void *data)` / `void mat_get_data_raw(const matrix_t *A, void *data)` — low-level generic bulk accessors that operate on the matrix's native public element family after you have already inspected `mat_typeof(A)`.
+
+Rule of thumb:
+
+- use `mat_set_data(...)` / `mat_get_data(...)` for ordinary numeric code
+- use `mat_set_data_dv(...)` / `mat_get_data_dv(...)` for ordinary symbolic code
+- use `*_raw` only in generic helper code that already knows, via `mat_typeof(...)`, whether it is handling a `number_t` matrix or a `dval_t *` matrix and wants one branch-local bulk access path
+
+`*_raw` is not a more powerful numeric API. It is just the branch-after-type-check option for code that wants to stay generic over the two public matrix element families.
 
 ### Scalar Operations
 
@@ -415,8 +426,8 @@ the two.
 
 | Function | Scalar type | Description |
 |---|---|---|
-| `mat_scalar_mul_num(A, s)` | `number_t` | `s * A` |
-| `mat_scalar_div_num(A, s)` | `number_t` | `A / s` |
+| `mat_scalar_mul(A, s)` | `number_t` | `s * A` |
+| `mat_scalar_div(A, s)` | `number_t` | `A / s` |
 
 ### Matrix Operations
 
@@ -510,11 +521,11 @@ For `mat_jacobian(...)`, row `i * cols(A) + j` corresponds to the entry
 #### Determinant
 
 ```c
-int mat_det(const matrix_t *A, void *determinant);
+int mat_det(const matrix_t *A, number_t *determinant);
 ```
 
-Computes the determinant of square matrix `A` and writes it into `determinant`
-(caller-allocated, sized for the element type).
+Computes the determinant of square matrix `A` and writes an owning numeric
+result into `*determinant`.
 
 Return values:
 
@@ -601,18 +612,17 @@ the same zero pattern.
 #### Eigenvalues
 
 ```c
-int mat_eigenvalues(const matrix_t *A, void *eigenvalues);
+int mat_eigenvalues(const matrix_t *A, number_t *eigenvalues);
 ```
 
 Computes all eigenvalues of square matrix `A` and writes them into the
-caller-allocated buffer `eigenvalues`, which must hold `n` values of the matrix's
-element type.
+caller-allocated `number_t[n]` buffer `eigenvalues`.
 
-- **Hermitian matrices** — cyclic Jacobi sweep computed entirely in `qfloat_t`
-  precision (~31 decimal digits); eigenvalues are real.
-- **General matrices** — Hessenberg reduction followed by implicit single-shift QR
-  (Francis algorithm); all internal arithmetic uses `qcomplex_t`. Eigenvalues may
-  be complex even when `A` has real elements.
+- **Hermitian matrices** — cyclic Jacobi sweep on the numeric `number_t` path;
+  eigenvalues are real.
+- **General matrices** — Hessenberg reduction followed by implicit QR. Eigenvalues
+  may be complex even when `A` has real elements, and are returned through
+  `number_t`.
 
 Return values: `0` on success, negative on error.
 
@@ -620,7 +630,7 @@ Return values: `0` on success, negative on error.
 
 ```c
 int mat_eigendecompose(const matrix_t *A,
-                       void *eigenvalues,
+                       number_t *eigenvalues,
                        matrix_t **eigenvectors);
 ```
 
@@ -682,8 +692,8 @@ number_t B_data[] = {
     num_create_from_double(5.1)
 };
 
-matrix_t *A = mat_create_num(3, 2, A_data);
-matrix_t *B = mat_create_num(3, 1, B_data);
+matrix_t *A = mat_create(3, 2, A_data);
+matrix_t *B = mat_create(3, 1, B_data);
 matrix_t *X = mat_least_squares(A, B);
 
 mat_print(X);
@@ -752,7 +762,7 @@ Returns a matrix whose columns span the nullspace, or NULL on error.
 #### Matrix Norms
 
 ```c
-int mat_norm(const matrix_t *A, mat_norm_type_t type, qfloat_t *out);
+int mat_norm(const matrix_t *A, mat_norm_type_t type, number_t *out);
 ```
 
 Computes a matrix norm. The norm type is specified by `type`:
@@ -764,17 +774,19 @@ Computes a matrix norm. The norm type is specified by `type`:
 | `MAT_NORM_FRO` | Frobenius norm |
 | `MAT_NORM_2` | 2-norm (largest singular value) |
 
-Returns 0 on success, negative on error. The result is written to `*out`.
+Returns 0 on success, negative on error. The result is written to `*out` as an
+owning `number_t`.
 
 ```c
-int mat_condition_number(const matrix_t *A, mat_norm_type_t type, qfloat_t *out);
+int mat_condition_number(const matrix_t *A, mat_norm_type_t type, number_t *out);
 ```
 
 Computes the condition number of `A` in the specified norm and writes it to
-`*out`. The condition number measures how sensitive a linear system involving
-`A` is to perturbations: small values indicate a well-conditioned problem,
-while large values indicate numerical sensitivity. For singular matrices the
-result is infinity. Returns 0 on success, negative on error.
+`*out` as an owning `number_t`. The condition number measures how sensitive a
+linear system involving `A` is to perturbations: small values indicate a
+well-conditioned problem, while large values indicate numerical sensitivity.
+For singular matrices the result is infinity. Returns 0 on success, negative
+on error.
 
 #### Matrix Factorisations
 
@@ -875,9 +887,8 @@ the Parlett recurrence on the triangular Schur factor.
    When `T_{ii} = T_{jj}` the recurrence uses a numerical derivative of the scalar function.
 3. Reconstruct `f(A) = Q · f(T) · Q*`.
 
-All internal arithmetic uses `qcomplex_t`. Numeric results are returned as
-`MAT_TYPE_NUMBER` matrices, so exact, floating, and complex values all come
-back through the public `number_t` layer.
+Numeric results are returned as `MAT_TYPE_NUMBER` matrices, so exact, floating,
+and complex values all come back through the public `number_t` layer.
 
 For `MAT_TYPE_DVAL`, the story is different:
 
@@ -886,7 +897,7 @@ For `MAT_TYPE_DVAL`, the story is different:
   result can be expressed entrywise without numerical approximation
 - when you want to continue numerically beyond that exact symbolic boundary,
   first evaluate the current symbolic matrix into a `number_t` snapshot with
-  `mat_evaluate_num(...)`, then apply the usual numeric matrix function.
+  `mat_evaluate(...)`, then apply the usual numeric matrix function.
 - that exact path also includes:
   - dense symbolic matrices with one common diagonal value and one common
     off-diagonal value, handled exactly for any matrix size through the
@@ -1142,20 +1153,18 @@ kind directly.
 ### Precision of Linear Algebra
 
 **Eigendecomposition, Hermitian path** — cyclic Jacobi sweep. Rotation parameters
-(τ, t, c, s) are always real; they are computed through `qfloat_t` arithmetic,
-giving ~31 decimal digits of precision regardless of the matrix's element type.
-Eigenvalues are real and eigenvectors are orthonormal.
+(τ, t, c, s) are always real, eigenvalues are real, and eigenvectors are
+orthonormal.
 
 **Eigendecomposition, general path** — Hessenberg reduction (Householder
-reflectors) followed by implicit single-shift QR (Francis/Wilkinson). All
-internal arithmetic uses `qcomplex_t` flat arrays, so the algorithm handles all
-numeric `number_t` matrices uniformly. Hermitian detection compares `A[i,j]`
-against `conj(A[j,i])` within a tolerance relative to the Frobenius norm;
-matrices that pass this test take the faster Jacobi path automatically.
+reflectors) followed by implicit single-shift QR (Francis/Wilkinson). The
+algorithm works through the numeric `number_t` layer and handles all numeric
+matrices uniformly. Hermitian detection compares `A[i,j]` against `conj(A[j,i])`
+within a tolerance relative to the Frobenius norm; matrices that pass this test
+take the faster Jacobi path automatically.
 
 **Matrix functions** — all use the Schur + Parlett path regardless of whether
-the matrix is Hermitian. Internal arithmetic is always `qcomplex_t`; numeric
-results are returned through `MAT_TYPE_NUMBER`.
+the matrix is Hermitian. Numeric results are returned through `MAT_TYPE_NUMBER`.
 
 ### Identity Storage
 
