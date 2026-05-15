@@ -179,23 +179,30 @@ Detaching behaves differently depending on how the scoped value is stored:
 - arena-backed scoped values are copied into an ordinary owning value so they
   can survive scope teardown safely
 
-Example:
+Example with the public cleanup macro:
 
 ```c
-num_scope_t scope = {0};
-num_scope_enter(&scope);
+NUM_SCOPE(scope);
 
 number_t a = num_create_from_string("1/3");
 number_t b = num_create_from_string("1/6");
 number_t sum = num_add(a, b);
 number_t kept = num_scope_detach(sum);
 
-num_scope_leave(&scope);
-
 /* kept is still live here */
 num_destroy(&kept);
 num_destroy(&b);
 num_destroy(&a);
+```
+
+If you need a portable manual form instead of `NUM_SCOPE(...)`, the equivalent
+sequence is:
+
+```c
+num_scope_t scope = {0};
+num_scope_enter(&scope);
+/* ... */
+num_scope_leave(&scope);
 ```
 
 The intended fast pattern is:

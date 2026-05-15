@@ -26,8 +26,8 @@ void run_number_constant_tests(void)
         number_t tan_pi_4 = num_tan(NUM_PI_4);
         number_t tan_pi_3 = num_tan(NUM_PI_3);
         number_t tan_3pi_4 = num_tan(NUM_3PI_4);
-        number_t sin_pi_6_pair = num_new();
-        number_t cos_pi_6_pair = num_new();
+        number_t sin_pi_6_pair = NUM_ZERO;
+        number_t cos_pi_6_pair = NUM_ZERO;
         number_t i_pi_6 = num_mul(NUM_I, NUM_PI_6);
         number_t i_pi_3 = num_mul(NUM_I, NUM_PI_3);
         number_t i_pi_4 = num_mul(NUM_I, NUM_PI_4);
@@ -36,8 +36,8 @@ void run_number_constant_tests(void)
         number_t cosh_i_pi_3 = num_cosh(i_pi_3);
         number_t tanh_i_pi_4 = num_tanh(i_pi_4);
         number_t tanh_i_3pi_4 = num_tanh(i_3pi_4);
-        number_t sinh_i_pi_3_pair = num_new();
-        number_t cosh_i_pi_3_pair = num_new();
+        number_t sinh_i_pi_3_pair = NUM_ZERO;
+        number_t cosh_i_pi_3_pair = NUM_ZERO;
         number_t i_half_sqrt3 = num_mul(NUM_I, NUM_SQRT3_OVER_TWO);
         number_t half_sqrt2 = NUM_SQRT2_OVER_TWO;
         number_t half_sqrt3 = NUM_SQRT3_OVER_TWO;

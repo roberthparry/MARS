@@ -206,6 +206,7 @@ static void mfloat_scratch_init_slot(mfloat_scratch_slot_t *slot, size_t precisi
     slot->value.kind = MFLOAT_KIND_FINITE;
     slot->value.precision = precision;
     slot->value.mantissa = &slot->mantissa;
+    slot->mantissa.scope_owned_container = false;
 }
 
 static void mfloat_scratch_reset_slot(mfloat_scratch_slot_t *slot, size_t precision)
@@ -217,6 +218,7 @@ static void mfloat_scratch_reset_slot(mfloat_scratch_slot_t *slot, size_t precis
     slot->value.mantissa = &slot->mantissa;
     slot->mantissa.sign = 0;
     slot->mantissa.length = 0;
+    slot->mantissa.scope_owned_container = false;
 }
 
 static void mfloat_scratch_release_slot(mfloat_scratch_slot_t *slot)

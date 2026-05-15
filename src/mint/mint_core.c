@@ -31,35 +31,40 @@ const mint_t MI_ZERO_VALUE = {
     .sign = 0,
     .length = 0,
     .capacity = 0,
-    .storage = NULL
+    .storage = NULL,
+    .scope_owned_container = false
 };
 
 const mint_t MI_ONE_VALUE = {
     .sign = 1,
     .length = 1,
     .capacity = 1,
-    .storage = mnt_one_storage
+    .storage = mnt_one_storage,
+    .scope_owned_container = false
 };
 
 const mint_t MI_NEG_ONE_VALUE = {
     .sign = -1,
     .length = 1,
     .capacity = 1,
-    .storage = mnt_one_storage
+    .storage = mnt_one_storage,
+    .scope_owned_container = false
 };
 
 const mint_t MI_TWO_VALUE = {
     .sign = 1,
     .length = 1,
     .capacity = 1,
-    .storage = mnt_two_storage
+    .storage = mnt_two_storage,
+    .scope_owned_container = false
 };
 
 const mint_t MI_TEN_VALUE = {
     .sign = 1,
     .length = 1,
     .capacity = 1,
-    .storage = mnt_ten_storage
+    .storage = mnt_ten_storage,
+    .scope_owned_container = false
 };
 
 const mint_t * const MI_ZERO = &MI_ZERO_VALUE;
@@ -157,7 +162,7 @@ int mint_ensure_capacity(mint_t *mint, size_t needed)
         }
     }
 
-    scope_owned = number_scope_mem_is_arena_ptr(mint) ||
+    scope_owned = mint->scope_owned_container ||
         number_scope_mem_is_arena_ptr(mint->storage);
     if (scope_owned) {
         grown = (uint64_t *)number_scope_mem_realloc(mint->storage,
@@ -3129,6 +3134,7 @@ mint_t *mi_new(void)
     mint->length = 0;
     mint->capacity = 0;
     mint->storage = NULL;
+    mint->scope_owned_container = number_scope_mem_is_arena_ptr(mint);
     return mint;
 }
 

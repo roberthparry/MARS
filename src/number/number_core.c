@@ -941,6 +941,7 @@ static bool number_eq_same_tol_with_precision(const number_t *a,
                                               const number_t *b,
                                               size_t precision_bits)
 {
+    NUM_SCOPE(scope);
     number_t delta;
     number_t diff;
     number_t one;
@@ -954,10 +955,6 @@ static bool number_eq_same_tol_with_precision(const number_t *a,
     one = number_create_exact_mfloat_long_prec(1, precision_bits);
     tolerance = num_ldexp(one, 4 - (int)precision_bits);
     rc = num_cmp(diff, tolerance) <= 0;
-    num_destroy(&delta);
-    num_destroy(&diff);
-    num_destroy(&one);
-    num_destroy(&tolerance);
     return rc;
 }
 
@@ -1315,6 +1312,7 @@ static bool number_eq_same_tol_with_precision(const number_t *a,
 
  bool number_is_integer_mfloat(const number_t *number)
 {
+    NUM_SCOPE(scope);
     number_t copy;
     number_t floored;
     bool rc;
@@ -1324,13 +1322,12 @@ static bool number_eq_same_tol_with_precision(const number_t *a,
     copy = num_clone(*number);
     floored = num_floor(copy);
     rc = num_eq(copy, floored);
-    num_destroy(&copy);
-    num_destroy(&floored);
     return rc;
 }
 
  bool number_is_integer_mcomplex(const number_t *number)
 {
+    NUM_SCOPE(scope);
     number_t imag;
     number_t real;
     number_t floored;
@@ -1342,9 +1339,6 @@ static bool number_eq_same_tol_with_precision(const number_t *a,
     real = num_real_part(*number);
     floored = num_floor(real);
     rc = num_is_zero(imag) && num_eq(real, floored);
-    num_destroy(&imag);
-    num_destroy(&real);
-    num_destroy(&floored);
     return rc;
 }
 
@@ -2911,6 +2905,11 @@ void num_destroy(number_t *number)
 
     if (!number)
         return;
+    if (number_value_is_immortal(number)) {
+        memset(number, 0, sizeof(*number));
+        number_impl(number)->kind = NUMBER_INVALID;
+        return;
+    }
     payload = number_scope_payload_pointer(number);
     header = number_scope_alloc_header_from_ptr(payload);
     if (header && header->scope) {
@@ -2984,6 +2983,8 @@ bool num_scope_is_active(void)
 
 number_t num_scope_detach(number_t value)
 {
+    if (number_value_is_immortal(&value))
+        return value;
     if (number_scope_mem_is_arena_ptr(number_scope_payload_pointer(&value)))
         return number_clone_unscoped(&value);
     number_scope_unregister_value(&value);
@@ -3589,6 +3590,7 @@ number_t num_imag_part(const number_t number)
 
 number_t num_arg(const number_t number)
 {
+    NUM_SCOPE(scope);
     const number_vtable_t *vt = number_vt(&number);
 
     if (!number_is_valid_value(&number))
@@ -3599,39 +3601,37 @@ number_t num_arg(const number_t number)
         0, num_get_prec_bits(number) ? num_get_prec_bits(number) : number_default_precision_bits);
     number_t real = vt && vt->complex ? num_real_part(number) : num_clone(number);
     number_t result = num_atan2(zero, real);
-    num_destroy(&zero);
-    num_destroy(&real);
-    return result;
+    return num_scope_detach(result);
 }
 
 number_t num_add_mrational(const number_t number, const mrational_t *value)
 {
+    NUM_SCOPE(scope);
     number_t rhs = num_create_from_mrational(value);
     number_t result = num_add(number, rhs);
-    num_destroy(&rhs);
-    return result;
+    return num_scope_detach(result);
 }
 
 number_t num_add_long(const number_t number, long value)
 {
+    NUM_SCOPE(scope);
     number_t rhs = num_create_from_long(value);
     number_t result = num_add(number, rhs);
-    num_destroy(&rhs);
-    return result;
+    return num_scope_detach(result);
 }
 
 number_t num_mul_long(const number_t number, long value)
 {
+    NUM_SCOPE(scope);
     number_t rhs = num_create_from_long(value);
     number_t result = num_mul(number, rhs);
-    num_destroy(&rhs);
-    return result;
+    return num_scope_detach(result);
 }
 
 number_t num_mul_mrational(const number_t number, const mrational_t *value)
 {
+    NUM_SCOPE(scope);
     number_t rhs = num_create_from_mrational(value);
     number_t result = num_mul(number, rhs);
-    num_destroy(&rhs);
-    return result;
+    return num_scope_detach(result);
 }

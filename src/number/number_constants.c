@@ -1,6 +1,7 @@
 #include <math.h>
 
 #include "number_internal.h"
+#include "internal/number_internal.h"
 #include "internal/mcomplex_internal.h"
 #include "internal/mfloat_internal.h"
 #include "internal/mint_internal.h"
@@ -567,6 +568,7 @@ number_t number_const_return_like(const number_t *like, number_const_id_t id)
 
 number_t number_neg_const_return_like(const number_t *like, number_const_id_t id)
 {
+    NUM_SCOPE_SUSPEND(saved_scope);
     number_t value = number_const_like(like, id);
     number_t out = num_neg(value);
 
@@ -576,6 +578,7 @@ number_t number_neg_const_return_like(const number_t *like, number_const_id_t id
 
 number_t number_imag_const_return_like(const number_t *like, number_const_id_t id)
 {
+    NUM_SCOPE_SUSPEND(saved_scope);
     number_t imag_unit = number_const_like(like, NUMBER_CONST_I);
     number_t value = number_const_like(like, id);
     number_t out = num_mul(imag_unit, value);

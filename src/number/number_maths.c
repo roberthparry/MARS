@@ -207,9 +207,9 @@ static int number_trig_real_fastpath(const number_t *number,
 
     if (!number_find_angle_fastpath(number, table, count, &match))
         return 0;
-    *out = match->imag
+    *out = num_scope_detach(match->imag
         ? number_return_like_imag_signed(number, match->value_id, match->sign)
-        : number_return_like_signed(number, match->value_id, match->sign);
+        : number_return_like_signed(number, match->value_id, match->sign));
     return 1;
 }
 
@@ -243,12 +243,12 @@ static int number_trig_real_pair_fastpath(const number_t *number,
     for (size_t i = 0; i < count; ++i) {
         if (!number_matches_value(number, table[i].angle))
             continue;
-        *first_out = table[i].first_imag
+        *first_out = num_scope_detach(table[i].first_imag
             ? number_return_like_imag_signed(number, table[i].first_id, table[i].first_sign)
-            : number_return_like_signed(number, table[i].first_id, table[i].first_sign);
-        *second_out = table[i].second_imag
+            : number_return_like_signed(number, table[i].first_id, table[i].first_sign));
+        *second_out = num_scope_detach(table[i].second_imag
             ? number_return_like_imag_signed(number, table[i].second_id, table[i].second_sign)
-            : number_return_like_signed(number, table[i].second_id, table[i].second_sign);
+            : number_return_like_signed(number, table[i].second_id, table[i].second_sign));
         return 1;
     }
     return 0;
@@ -876,17 +876,16 @@ number_t num_hypot(const number_t a, const number_t b)
 static int number_try_get_pure_imag(const number_t number,
                                     number_t *imag_out)
 {
+    NUM_SCOPE(scope);
     number_t real;
 
     if (num_is_real(number))
         return 0;
     real = num_real_part(number);
     if (!num_is_zero(real)) {
-        num_destroy(&real);
         return 0;
     }
-    num_destroy(&real);
-    *imag_out = num_imag_part(number);
+    *imag_out = num_scope_detach(num_imag_part(number));
     return 1;
 }
 

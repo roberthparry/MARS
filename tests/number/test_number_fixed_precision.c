@@ -35,10 +35,10 @@ void run_number_fixed_precision_tests(void)
         number_t expected_cosh_i = num_create_from_qcomplex(qc_cosh(qc_from_string("0 + 1i")));
         number_t expected_tanh_i = num_create_from_qcomplex(qc_tanh(qc_from_string("0 + 1i")));
         number_t zero = num_create_from_string("0");
-        number_t sin_zero = num_new();
-        number_t cos_zero = num_new();
-        number_t sinh_zero = num_new();
-        number_t cosh_zero = num_new();
+        number_t sin_zero = NUM_ZERO;
+        number_t cos_zero = NUM_ZERO;
+        number_t sinh_zero = NUM_ZERO;
+        number_t cosh_zero = NUM_ZERO;
 
         assert_number_string("num_neg(double 1.25)", d_neg, "-1.25");
         ASSERT_TRUE(num_is_real(d));

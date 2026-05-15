@@ -16,6 +16,7 @@ struct _mint_t {
     size_t length;    /* number of used 64-bit limbs */
     size_t capacity;  /* number of allocated 64-bit limbs */
     uint64_t *storage;
+    bool scope_owned_container;
 };
 
 int mint_copy_value(mint_t *dst, const mint_t *src);

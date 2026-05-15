@@ -278,6 +278,10 @@ void num_destroy(number_t *number);
  * that is updated repeatedly should usually remain an ordinary owned value and
  * be destroyed explicitly when replaced, rather than being repeatedly detached.
  *
+ * On compilers that support `__attribute__((cleanup(...)))`, `NUM_SCOPE(name)`
+ * declares a local scope object, enters it immediately, and leaves it
+ * automatically on block exit.
+ *
  * Scopes are nestable and must be left in last-in, first-out order.
  * @{
  */
@@ -285,6 +289,13 @@ void num_scope_enter(num_scope_t *scope);
 void num_scope_leave(num_scope_t *scope);
 bool num_scope_is_active(void);
 number_t num_scope_detach(number_t value);
+static inline void num_scope_cleanup(num_scope_t *scope)
+{
+    num_scope_leave(scope);
+}
+#define NUM_SCOPE(name) \
+    __attribute__((cleanup(num_scope_cleanup))) num_scope_t name = {0}; \
+    num_scope_enter(&(name))
 /** @} */
 
 /** @name Precision, setup, and conversion

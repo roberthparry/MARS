@@ -28,7 +28,7 @@ void run_number_parse_tests(void)
         ASSERT_NOT_NULL(text);
         printf(C_WHITE C_BOLD "num_create_from_string(\"32.123\")" C_RESET "\n");
         printf("    selected = multiprecision real\n");
-        printf("    got      = %s\n\n", text);
+        printf("    got      = %s\n\n", text ? text : "(null)");
         ASSERT_TRUE(num_is_real(decimal));
         ASSERT_TRUE(!num_is_exact(decimal));
         free(text);
@@ -45,7 +45,7 @@ void run_number_parse_tests(void)
         ASSERT_NOT_NULL(text);
         printf(C_WHITE C_BOLD "num_create_from_double(1.25)" C_RESET "\n");
         printf("    expected = 1.25\n");
-        printf("    got      = %s\n\n", text);
+        printf("    got      = %s\n\n", text ? text : "(null)");
         ASSERT_TRUE(strcmp(text, "1.25") == 0);
         free(text);
 

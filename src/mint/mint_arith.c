@@ -357,7 +357,7 @@ int mi_square(mint_t *mint)
     src = mint->storage;
     len = mint->length;
     needed = len * 2;
-    out = number_scope_mem_is_arena_ptr(mint)
+    out = mint->scope_owned_container
         ? (uint64_t *)number_scope_mem_calloc(needed, sizeof(*out), _Alignof(uint64_t))
         : (uint64_t *)number_scope_mem_calloc_heap(needed, sizeof(*out), _Alignof(uint64_t));
     if (!out)
@@ -561,7 +561,7 @@ int mint_mul_inplace(mint_t *mint, const mint_t *other)
     needed = lhs_length + rhs_length;
     lhs_storage = mint->storage;
     rhs_storage = other->storage;
-    out = number_scope_mem_is_arena_ptr(mint)
+    out = mint->scope_owned_container
         ? (uint64_t *)number_scope_mem_calloc(needed, sizeof(*out), _Alignof(uint64_t))
         : (uint64_t *)number_scope_mem_calloc_heap(needed, sizeof(*out), _Alignof(uint64_t));
     if (!out)
