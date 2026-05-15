@@ -1,13 +1,14 @@
 #include "mfloat_internal.h"
 #include "internal/number_scope_alloc.h"
 #include "internal/qfloat_internal.h"
-#include "internal/mint_internal.h"
+#include "mint/mint_internal.h"
 #include "mrational.h"
 
 #include <ctype.h>
 #include <limits.h>
 #include <math.h>
 #include <stdlib.h>
+#include <string.h>
 
 static const double MFLOAT_LOG10_2 = 0.3010299956639812;
 static const double MFLOAT_LOG2_10 = 3.3219280948873626;
@@ -50,8 +51,44 @@ bool mf_is_inf(const mfloat_t *mfloat)
     return mfloat_is_inf(mfloat);
 }
 
+static void mfloat_shift_mantissa_right_no_spare(mint_t *mantissa, size_t shift_bits)
+{
+    size_t limb_shift;
+    unsigned bit_shift;
+    size_t i;
+
+    if (!mantissa || shift_bits == 0 || mantissa->length == 0)
+        return;
+
+    limb_shift = shift_bits / 64u;
+    bit_shift = (unsigned)(shift_bits % 64u);
+
+    if (limb_shift >= mantissa->length) {
+        mantissa->length = 0;
+        mantissa->sign = 0;
+        return;
+    }
+
+    if (limb_shift > 0) {
+        for (i = 0; i + limb_shift < mantissa->length; ++i)
+            mantissa->storage[i] = mantissa->storage[i + limb_shift];
+        mantissa->length -= limb_shift;
+    }
+
+    if (bit_shift > 0)
+        mint_shift_right_bits_raw(mantissa->storage, mantissa->storage,
+                                  mantissa->length, bit_shift);
+
+    while (mantissa->length > 0 && mantissa->storage[mantissa->length - 1] == 0)
+        --mantissa->length;
+    if (mantissa->length == 0)
+        mantissa->sign = 0;
+}
+
 int mfloat_normalise(mfloat_t *mfloat)
 {
+    size_t shift_bits;
+
     if (!mfloat || !mfloat->mantissa)
         return -1;
     if (!mfloat_is_finite(mfloat))
@@ -64,10 +101,10 @@ int mfloat_normalise(mfloat_t *mfloat)
         return 0;
     }
 
-    while (mi_is_even(mfloat->mantissa)) {
-        if (mi_shr(mfloat->mantissa, 1) != 0)
-            return -1;
-        mfloat->exponent2++;
+    shift_bits = mint_trailing_zero_bits_internal(mfloat->mantissa);
+    if (shift_bits > 0) {
+        mfloat_shift_mantissa_right_no_spare(mfloat->mantissa, shift_bits);
+        mfloat->exponent2 += (long)shift_bits;
     }
 
     if (mfloat->sign == 0)
@@ -210,10 +247,23 @@ static int mfloat_set_double_exact(mfloat_t *mfloat, double value)
 
 int mfloat_copy_value(mfloat_t *dst, const mfloat_t *src)
 {
+    size_t needed;
+
     if (!dst || !src || !dst->mantissa || !src->mantissa)
         return -1;
-    if (mi_clear(dst->mantissa), mi_add(dst->mantissa, src->mantissa) != 0)
-        return -1;
+    if (src->mantissa->length == 0) {
+        mi_clear(dst->mantissa);
+    } else {
+        needed = src->mantissa->length;
+        if (src->kind == MFLOAT_KIND_FINITE)
+            ++needed;
+        if (mint_ensure_capacity(dst->mantissa, needed) != 0)
+            return -1;
+        memcpy(dst->mantissa->storage, src->mantissa->storage,
+               src->mantissa->length * sizeof(*src->mantissa->storage));
+        dst->mantissa->length = src->mantissa->length;
+        dst->mantissa->sign = src->mantissa->sign;
+    }
     dst->kind = src->kind;
     dst->sign = src->sign;
     dst->exponent2 = src->exponent2;
@@ -366,10 +416,13 @@ static int mfloat_set_from_decimal_parts(mfloat_t *mfloat,
 {
     mint_t *work = NULL, *factor = NULL, *q = NULL, *r = NULL, *twor = NULL;
     size_t shift_bits;
+    size_t precision;
     int rc = -1;
 
     if (!mfloat || !digits || !mfloat->mantissa)
         return -1;
+
+    precision = mfloat->precision;
 
     if (mi_is_zero(digits)) {
         mf_clear(mfloat);
@@ -394,6 +447,8 @@ static int mfloat_set_from_decimal_parts(mfloat_t *mfloat,
         mfloat->sign = sign;
         mfloat->exponent2 = exp10;
         rc = mfloat_normalise(mfloat);
+        if (rc == 0 && mfloat_round_to_precision_internal(mfloat, precision) != 0)
+            rc = -1;
         goto cleanup;
     }
 
@@ -427,6 +482,8 @@ static int mfloat_set_from_decimal_parts(mfloat_t *mfloat,
     mfloat->sign = sign;
     mfloat->exponent2 = exp10 - (long)shift_bits;
     rc = mfloat_normalise(mfloat);
+    if (rc == 0 && mfloat_round_to_precision_internal(mfloat, precision) != 0)
+        rc = -1;
 
 cleanup:
     mi_free(work);
@@ -745,6 +802,78 @@ int mf_add_mrational(mfloat_t *mfloat, const mrational_t *value)
     if (!lhs_num || !rhs_num || !common_den)
         goto cleanup;
     if (tmp->sign < 0 && mi_neg(lhs_num) != 0)
+        goto cleanup;
+
+    if (tmp->exponent2 >= 0) {
+        if (mi_shl(lhs_num, tmp->exponent2) != 0 ||
+            mi_mul(lhs_num, common_den) != 0)
+            goto cleanup;
+    } else {
+        long shift = -tmp->exponent2;
+        if (mi_mul(lhs_num, common_den) != 0 ||
+            mi_shl(rhs_num, shift) != 0 ||
+            mi_shl(common_den, shift) != 0)
+            goto cleanup;
+    }
+
+    if (mi_add(lhs_num, rhs_num) != 0)
+        goto cleanup;
+    if (mfloat_set_from_signed_mint(tmp, lhs_num, 0) != 0 ||
+        mfloat_set_from_signed_mint(den_mf, common_den, 0) != 0 ||
+        mf_div(tmp, den_mf) != 0)
+        goto cleanup;
+    if (mfloat_copy_value(mfloat, tmp) != 0)
+        goto cleanup;
+    rc = mfloat_round_to_precision_internal(mfloat, precision);
+
+cleanup:
+    mi_free(lhs_num);
+    mi_free(rhs_num);
+    mi_free(common_den);
+    mf_free(tmp);
+    mf_free(den_mf);
+    return rc;
+}
+
+int mf_sub_mrational(mfloat_t *mfloat, const mrational_t *value)
+{
+    size_t precision, work_prec;
+    const mint_t *num = NULL;
+    const mint_t *den = NULL;
+    mint_t *lhs_num = NULL;
+    mint_t *rhs_num = NULL;
+    mint_t *common_den = NULL;
+    mfloat_t *tmp = NULL;
+    mfloat_t *den_mf = NULL;
+    int rc = -1;
+
+    if (!mfloat || !value)
+        return -1;
+    if (mfloat_is_immortal(mfloat))
+        return -1;
+
+    num = mr_numerator(value);
+    den = mr_denominator(value);
+    if (!num || !den || mi_is_zero(den))
+        goto cleanup;
+
+    precision = mfloat->precision;
+    work_prec = precision + 32u;
+    tmp = mf_clone(mfloat);
+    den_mf = mf_new_prec(work_prec);
+    if (!tmp || !den_mf)
+        goto cleanup;
+    if (mf_set_precision(tmp, work_prec) != 0)
+        goto cleanup;
+
+    lhs_num = mi_clone(tmp->mantissa);
+    rhs_num = mi_clone(num);
+    common_den = mi_clone(den);
+    if (!lhs_num || !rhs_num || !common_den)
+        goto cleanup;
+    if (tmp->sign < 0 && mi_neg(lhs_num) != 0)
+        goto cleanup;
+    if (mi_neg(rhs_num) != 0)
         goto cleanup;
 
     if (tmp->exponent2 >= 0) {

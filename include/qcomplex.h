@@ -306,8 +306,8 @@ qcomplex_t qc_lambert_wm1(qcomplex_t z);         /**< Lambert W branch -1 */
 qcomplex_t qc_productlog(qcomplex_t z);          /**< product log (Lambert W principal branch) */
 qcomplex_t qc_gammainc_lower(qcomplex_t s, qcomplex_t x); /**< lower incomplete gamma */
 qcomplex_t qc_gammainc_upper(qcomplex_t s, qcomplex_t x); /**< upper incomplete gamma */
-qcomplex_t qc_gammainc_P(qcomplex_t s, qcomplex_t x);     /**< regularized lower gamma */
-qcomplex_t qc_gammainc_Q(qcomplex_t s, qcomplex_t x);     /**< regularized upper gamma */
+qcomplex_t qc_gammainc_P(qcomplex_t s, qcomplex_t x);     /**< regularised lower gamma */
+qcomplex_t qc_gammainc_Q(qcomplex_t s, qcomplex_t x);     /**< regularised upper gamma */
 qcomplex_t qc_ei(qcomplex_t z);                  /**< exponential integral Ei */
 qcomplex_t qc_e1(qcomplex_t z);                  /**< exponential integral E1 */
 /** @} */

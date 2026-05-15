@@ -1113,7 +1113,8 @@ static int mfloat_ei_series(mfloat_t *dst, const mfloat_t *x, size_t precision)
         piece = NULL;
         if (mfloat_is_below_neg_bits(term, (long)precision + 8l))
             break;
-        if (mf_mul(term, x) != 0 || mfloat_div_long_inplace(term, k + 1) != 0)
+        if (mf_mul(term, x) != 0 ||
+            mfloat_div_long_inplace(term, k + 1) != 0)
             goto cleanup;
     }
 
@@ -1162,7 +1163,8 @@ static int mfloat_e1_series_positive(mfloat_t *dst, const mfloat_t *x, size_t pr
         }
         mf_free(piece);
         piece = NULL;
-        if (mf_mul(term, x) != 0 || mf_neg(term) != 0 || mfloat_div_long_inplace(term, k + 1) != 0)
+        if (mf_mul(term, x) != 0 || mf_neg(term) != 0 ||
+            mfloat_div_long_inplace(term, k + 1) != 0)
             goto cleanup;
     }
 
@@ -4092,17 +4094,22 @@ int mf_digamma(mfloat_t *mfloat)
         rc = mfloat_finish_result(mfloat, x, precision);
         goto cleanup;
     }
+    if (mfloat_equals_exact_long(mfloat, 2)) {
+        x = mf_euler_mascheroni();
+        if (!x || mf_set_precision(x, precision) != 0 || mf_neg(x) != 0 || mf_add_long(x, 1) != 0)
+            goto cleanup;
+        rc = mfloat_finish_result(mfloat, x, precision);
+        goto cleanup;
+    }
     if (mfloat_get_exact_long_value(mfloat, &n) && n >= 1) {
         tmp = mfloat_clone_prec(MF_ZERO, precision);
-        z = NULL;
-        if (!tmp)
-            return -1;
+        z = mfloat_clone_prec(MF_ONE, precision);
+        if (!tmp || !z)
+            goto cleanup;
         for (long k = 1; k < n; ++k) {
-            z = mfloat_clone_prec(MF_ONE, precision);
-            if (!z || mfloat_div_long_inplace(z, k) != 0 || mf_add(tmp, z) != 0)
+            if (mfloat_copy_value(z, MF_ONE) != 0 || mf_set_precision(z, precision) != 0 ||
+                mfloat_div_long_inplace(z, k) != 0 || mf_add(tmp, z) != 0)
                 goto cleanup;
-            mf_free(z);
-            z = NULL;
         }
         x = mf_euler_mascheroni();
         if (!x || mf_set_precision(x, precision) != 0 || mf_neg(x) != 0 || mf_add(tmp, x) != 0)
@@ -4189,16 +4196,24 @@ int mf_trigamma(mfloat_t *mfloat)
         rc = mfloat_finish_result(mfloat, tmp, precision);
         goto cleanup;
     }
+    if (mfloat_equals_exact_long(mfloat, 2)) {
+        tmp = mfloat_new_pi_prec(work_prec);
+        if (!tmp || mf_mul(tmp, tmp) != 0 || mfloat_div_long_inplace(tmp, 6) != 0 || mf_sub_long(tmp, 1) != 0)
+            goto cleanup;
+        rc = mfloat_finish_result(mfloat, tmp, precision);
+        goto cleanup;
+    }
     if (mfloat_get_exact_long_value(mfloat, &n) && n >= 1) {
         tmp = mfloat_new_pi_prec(work_prec);
-        if (!tmp || mf_mul(tmp, tmp) != 0 || mfloat_div_long_inplace(tmp, 6) != 0)
+        z = mfloat_clone_prec(MF_ONE, work_prec);
+        if (!tmp || !z || mf_mul(tmp, tmp) != 0 || mfloat_div_long_inplace(tmp, 6) != 0)
             goto cleanup;
         for (long k = 1; k < n; ++k) {
-            x = mfloat_new_from_long_prec(k, work_prec);
-            if (!x || mf_mul(x, x) != 0 || mf_inv(x) != 0 || mf_sub(tmp, x) != 0)
+            if (mfloat_copy_value(z, MF_ONE) != 0 || mf_set_precision(z, work_prec) != 0 ||
+                mfloat_div_long_inplace(z, k) != 0 ||
+                mfloat_div_long_inplace(z, k) != 0 ||
+                mf_sub(tmp, z) != 0)
                 goto cleanup;
-            mf_free(x);
-            x = NULL;
         }
         rc = mfloat_finish_result(mfloat, tmp, precision);
         goto cleanup;

@@ -60,7 +60,7 @@ int mc_set_qcomplex(mcomplex_t *mcomplex, qcomplex_t value);
  * @brief Replaces a complex value by parsing a multiprecision complex literal.
  *
  * Accepted forms match `mc_create_string()`, including `a + bi`, `bi`,
- * parenthesized imaginary coefficients like `1e-23 + (2.3e12)i`, and rational
+ * parenthesised imaginary coefficients like `1e-23 + (2.3e12)i`, and rational
  * parts like `1/2 - 3/2i`. Returns `0` on success and `-1` on invalid input.
  */
 int mc_set_string(mcomplex_t *mcomplex, const char *text);

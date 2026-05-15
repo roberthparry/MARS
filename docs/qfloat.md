@@ -226,8 +226,8 @@ All declarations are in `include/qfloat.h`.
 - `qfloat_t qf_gammainv(qfloat_t y)` — principal branch of Γ⁻¹(y)
 - `qfloat_t qf_gammainc_lower(qfloat_t s, qfloat_t x)` — lower incomplete γ(s, x)
 - `qfloat_t qf_gammainc_upper(qfloat_t s, qfloat_t x)` — upper incomplete Γ(s, x)
-- `qfloat_t qf_gammainc_P(qfloat_t s, qfloat_t x)` — regularized P(s, x) = γ(s,x)/Γ(s)
-- `qfloat_t qf_gammainc_Q(qfloat_t s, qfloat_t x)` — regularized Q(s, x) = Γ(s,x)/Γ(s)
+- `qfloat_t qf_gammainc_P(qfloat_t s, qfloat_t x)` — regularised P(s, x) = γ(s,x)/Γ(s)
+- `qfloat_t qf_gammainc_Q(qfloat_t s, qfloat_t x)` — regularised Q(s, x) = Γ(s,x)/Γ(s)
 
 **Error functions**
 
@@ -246,7 +246,7 @@ All declarations are in `include/qfloat.h`.
 
 - `qfloat_t qf_beta(qfloat_t a, qfloat_t b)` — B(a, b)
 - `qfloat_t qf_logbeta(qfloat_t a, qfloat_t b)` — ln B(a, b)
-- `qfloat_t qf_binomial(qfloat_t a, qfloat_t b)` — generalized binomial coefficient
+- `qfloat_t qf_binomial(qfloat_t a, qfloat_t b)` — generalised binomial coefficient
 - `qfloat_t qf_beta_pdf(qfloat_t x, qfloat_t a, qfloat_t b)` — beta distribution PDF
 - `qfloat_t qf_logbeta_pdf(qfloat_t x, qfloat_t a, qfloat_t b)` — log beta distribution PDF
 

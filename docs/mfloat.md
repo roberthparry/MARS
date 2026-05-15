@@ -373,7 +373,7 @@ Results:
 | `mf_digamma(2.345)` | `2.104 ms` | `5.891 ms` | `9.669 ms` | `23.900 ms` |
 | `mf_trigamma(2.345)` | `0.286 ms` | `0.310 ms` | `0.445 ms` | `0.494 ms` |
 | `mf_tetragamma(2.345)` | `2.206 ms` | `5.044 ms` | `8.088 ms` | `10.425 ms` |
-| `mf_ei(1)` | `3.983 ms` | `6.885 ms` | `23.418 ms` | `504.529 ms` |
-| `mf_e1(1)` | `4.333 ms` | `7.130 ms` | `52.530 ms` | `30.109 ms` |
+| `mf_ei(5)` | `57.941 ms` | `133.352 ms` | `242.748 ms` | `316.782 ms` |
+| `mf_e1(5)` | `36.658 ms` | `62.569 ms` | `294.946 ms` | `142.109 ms` |
 
 For broader benchmark notes, see [`docs/benchmarks.md`](benchmarks.md).

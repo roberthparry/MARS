@@ -4,6 +4,7 @@
 #include "internal/mint_internal.h"
 #include "internal/mrational_internal.h"
 
+#include <math.h>
 #include <stdlib.h>
 
 static uint64_t mcomplex_erf_one_storage[] = {
@@ -385,8 +386,19 @@ static size_t mcomplex_native_work_prec(const mcomplex_t *mcomplex)
     return precision_bits + 512u;
 }
 
+static int mcomplex_mul_long_local(mcomplex_t *mcomplex, long value)
+{
+    if (!mcomplex)
+        return -1;
+    if (mf_mul_long(mcomplex->real, value) != 0 ||
+        mf_mul_long(mcomplex->imag, value) != 0)
+        return -1;
+    return 0;
+}
+
 static int mcomplex_mul_real_mrational_scaled(mcomplex_t *mcomplex,
                                               const mrational_t *value,
+                                              long numerator,
                                               long denominator)
 {
     if (!mcomplex || !value || denominator == 0)
@@ -394,12 +406,120 @@ static int mcomplex_mul_real_mrational_scaled(mcomplex_t *mcomplex,
     if (mf_mul_mrational(mcomplex->real, value) != 0 ||
         mf_mul_mrational(mcomplex->imag, value) != 0)
         return -1;
+    if (numerator != 1 &&
+        mcomplex_mul_long_local(mcomplex, numerator) != 0)
+        return -1;
     if (denominator == 1)
         return 0;
     if (mc_div_long(mcomplex, denominator) != 0)
         return -1;
     return 0;
 }
+
+static int mcomplex_set_abs_value(mfloat_t *dst,
+                                  const mcomplex_t *value,
+                                  size_t work_prec)
+{
+    mcomplex_t *tmp = NULL;
+    int rc = -1;
+
+    if (!dst || !value)
+        return -1;
+    tmp = mc_clone(value);
+    if (!tmp)
+        return -1;
+    if (mc_set_precision(tmp, work_prec) != 0 ||
+        mc_abs(tmp) != 0 ||
+        mf_set_precision(dst, work_prec) != 0 ||
+        mfloat_copy_value(dst, mc_real(tmp)) != 0)
+        goto cleanup;
+    rc = 0;
+
+cleanup:
+    mc_free(tmp);
+    return rc;
+}
+
+static int mcomplex_abs_lt_long(const mcomplex_t *value,
+                                long threshold,
+                                size_t work_prec)
+{
+    mfloat_t *mag = NULL;
+    mfloat_t *limit = NULL;
+    int rc = -1;
+
+    mag = mf_new_prec(work_prec);
+    limit = mf_create_long(threshold);
+    if (!mag || !limit)
+        goto cleanup;
+    if (mf_set_precision(limit, work_prec) != 0 ||
+        mcomplex_set_abs_value(mag, value, work_prec) != 0)
+        goto cleanup;
+    rc = mf_lt(mag, limit) ? 1 : 0;
+
+cleanup:
+    mf_free(limit);
+    mf_free(mag);
+    return rc;
+}
+
+static int mfloat_is_below_neg_bits(const mfloat_t *value, long bits)
+{
+    size_t mant_bits;
+    long top_bit;
+
+    if (!value)
+        return -1;
+    if (mf_is_zero(value))
+        return 1;
+    mant_bits = mf_get_mantissa_bits(value);
+    top_bit = value->exponent2 + (long)mant_bits - 1l;
+    return top_bit < -bits ? 1 : 0;
+}
+
+static int mcomplex_components_imply_below_neg_bits(const mcomplex_t *value, long bits)
+{
+    int real_small;
+    int imag_small;
+
+    if (!value)
+        return -1;
+    real_small = mfloat_is_below_neg_bits(mc_real(value), bits + 1l);
+    imag_small = mfloat_is_below_neg_bits(mc_imag(value), bits + 1l);
+    if (real_small < 0 || imag_small < 0)
+        return -1;
+    if (real_small && imag_small)
+        return 1;
+    if (mf_is_zero(mc_real(value)))
+        return mfloat_is_below_neg_bits(mc_imag(value), bits);
+    if (mf_is_zero(mc_imag(value)))
+        return mfloat_is_below_neg_bits(mc_real(value), bits);
+    return 0;
+}
+
+static long mcomplex_estimate_positive_unit_steps(const mcomplex_t *value, long threshold)
+{
+    double x;
+    double delta;
+    long steps;
+
+    if (!value || !mfloat_is_finite(mc_real(value)))
+        return -1;
+    x = mf_to_double(mc_real(value));
+    if (!isfinite(x) || x >= (double)threshold)
+        return 0;
+    delta = (double)threshold - x;
+    steps = (long)delta;
+    if ((double)steps < delta)
+        steps++;
+    return steps;
+}
+
+static int mcomplex_native_digamma(mcomplex_t *mcomplex);
+static int mcomplex_native_trigamma(mcomplex_t *mcomplex);
+static int mcomplex_native_tetragamma(mcomplex_t *mcomplex);
+static int mcomplex_native_ei(mcomplex_t *mcomplex);
+static int mcomplex_native_e1(mcomplex_t *mcomplex);
 
 static int mcomplex_native_log_sqrt_2pi(mcomplex_t *dst, size_t work_prec)
 {
@@ -481,7 +601,8 @@ static int mcomplex_native_lgamma_asymptotic(mcomplex_t *dst, const mcomplex_t *
         bernoulli = mr_bernoulli_even_term(i);
         if (!bernoulli ||
             mc_set(term, mc_real(pow), mc_imag(pow)) != 0 ||
-            mcomplex_mul_real_mrational_scaled(term, bernoulli, (long)((2u * i) * (2u * i - 1u))) != 0 ||
+            mcomplex_mul_real_mrational_scaled(term, bernoulli, 1l,
+                                               (long)((2u * i) * (2u * i - 1u))) != 0 ||
             mc_add(z_minus_half, term) != 0)
             goto fail;
         if (i < term_count &&
@@ -615,6 +736,1148 @@ fail:
     mc_free(one_minus_z);
     mc_free(orig);
     return -1;
+}
+
+static int mcomplex_native_digamma_asymptotic(mcomplex_t *dst,
+                                              const mcomplex_t *z,
+                                              size_t precision)
+{
+    mcomplex_t *sum = NULL;
+    mcomplex_t *xi = NULL;
+    mcomplex_t *xi2 = NULL;
+    mcomplex_t *xpow = NULL;
+    mcomplex_t *term = NULL;
+    mfloat_t *abs_term = NULL;
+    mfloat_t *prev_abs_term = NULL;
+    const mrational_t *bernoulli = NULL;
+    size_t term_count;
+    int small_term = 0;
+
+    sum = mc_clone(z);
+    xi = mc_create_long(1);
+    xi2 = mc_new_prec(precision);
+    xpow = mc_new_prec(precision);
+    term = mc_new_prec(precision);
+    abs_term = mf_new_prec(precision);
+    prev_abs_term = mf_new_prec(precision);
+    if (!sum || !xi || !xi2 || !xpow || !term || !abs_term || !prev_abs_term)
+        goto fail;
+    if (mc_set_precision(sum, precision) != 0 ||
+        mc_set_precision(xi, precision) != 0 ||
+        mc_log(sum) != 0 ||
+        mc_div(xi, z) != 0 ||
+        mc_set(term, mc_real(xi), mc_imag(xi)) != 0 ||
+        mc_div_long(term, 2) != 0 ||
+        mc_sub(sum, term) != 0 ||
+        mc_set(xi2, mc_real(xi), mc_imag(xi)) != 0 ||
+        mc_mul(xi2, xi) != 0 ||
+        mc_set(xpow, mc_real(xi2), mc_imag(xi2)) != 0)
+        goto fail;
+
+    term_count = precision / 10u;
+    if (term_count < 20u)
+        term_count = 20u;
+    if (term_count > mr_bernoulli_even_term_count())
+        term_count = mr_bernoulli_even_term_count();
+
+    for (size_t i = 1u; i <= term_count; ++i) {
+        bernoulli = mr_bernoulli_even_term(i);
+        if (!bernoulli ||
+            mc_set(term, mc_real(xpow), mc_imag(xpow)) != 0 ||
+            mcomplex_mul_real_mrational_scaled(term, bernoulli, 1l, (long)(2u * i)) != 0 ||
+            mc_neg(term) != 0 ||
+            mc_add(sum, term) != 0 ||
+            mcomplex_set_abs_value(abs_term, term, precision) != 0)
+            goto fail;
+        if (i > 1u && !mf_lt(abs_term, prev_abs_term))
+            break;
+        small_term = mfloat_is_below_neg_bits(abs_term, (long)precision + 32l);
+        if (small_term < 0 ||
+            mfloat_copy_value(prev_abs_term, abs_term) != 0)
+            goto fail;
+        if (small_term)
+            break;
+        if (i < term_count && mc_mul(xpow, xi2) != 0)
+            goto fail;
+    }
+
+    if (mc_set(dst, mc_real(sum), mc_imag(sum)) != 0)
+        goto fail;
+
+    mf_free(prev_abs_term);
+    mf_free(abs_term);
+    mc_free(term);
+    mc_free(xpow);
+    mc_free(xi2);
+    mc_free(xi);
+    mc_free(sum);
+    return 0;
+
+fail:
+    mf_free(prev_abs_term);
+    mf_free(abs_term);
+    mc_free(term);
+    mc_free(xpow);
+    mc_free(xi2);
+    mc_free(xi);
+    mc_free(sum);
+    return -1;
+}
+
+static int mcomplex_native_trigamma_asymptotic(mcomplex_t *dst,
+                                               const mcomplex_t *z,
+                                               size_t precision)
+{
+    mcomplex_t *sum = NULL;
+    mcomplex_t *xi = NULL;
+    mcomplex_t *xi2 = NULL;
+    mcomplex_t *xpow = NULL;
+    mcomplex_t *term = NULL;
+    mfloat_t *abs_term = NULL;
+    mfloat_t *prev_abs_term = NULL;
+    const mrational_t *bernoulli = NULL;
+    size_t term_count;
+    int small_term = 0;
+
+    sum = mc_create_long(1);
+    xi = mc_create_long(1);
+    xi2 = mc_new_prec(precision);
+    xpow = mc_new_prec(precision);
+    term = mc_new_prec(precision);
+    abs_term = mf_new_prec(precision);
+    prev_abs_term = mf_new_prec(precision);
+    if (!sum || !xi || !xi2 || !xpow || !term || !abs_term || !prev_abs_term)
+        goto fail;
+    if (mc_set_precision(sum, precision) != 0 ||
+        mc_set_precision(xi, precision) != 0 ||
+        mc_div(sum, z) != 0 ||
+        mc_div(xi, z) != 0 ||
+        mc_set(term, mc_real(xi), mc_imag(xi)) != 0 ||
+        mc_mul(term, xi) != 0 ||
+        mc_div_long(term, 2) != 0 ||
+        mc_add(sum, term) != 0 ||
+        mc_set(xi2, mc_real(xi), mc_imag(xi)) != 0 ||
+        mc_mul(xi2, xi) != 0 ||
+        mc_set(xpow, mc_real(xi2), mc_imag(xi2)) != 0 ||
+        mc_mul(xpow, xi) != 0)
+        goto fail;
+
+    term_count = precision / 10u;
+    if (term_count < 20u)
+        term_count = 20u;
+    if (term_count > mr_bernoulli_even_term_count())
+        term_count = mr_bernoulli_even_term_count();
+
+    for (size_t i = 1u; i <= term_count; ++i) {
+        bernoulli = mr_bernoulli_even_term(i);
+        if (!bernoulli ||
+            mc_set(term, mc_real(xpow), mc_imag(xpow)) != 0 ||
+            mcomplex_mul_real_mrational_scaled(term, bernoulli, 1l, 1l) != 0 ||
+            mc_add(sum, term) != 0 ||
+            mcomplex_set_abs_value(abs_term, term, precision) != 0)
+            goto fail;
+        if (i > 1u && !mf_lt(abs_term, prev_abs_term))
+            break;
+        small_term = mfloat_is_below_neg_bits(abs_term, (long)precision + 32l);
+        if (small_term < 0 ||
+            mfloat_copy_value(prev_abs_term, abs_term) != 0)
+            goto fail;
+        if (small_term)
+            break;
+        if (i < term_count && mc_mul(xpow, xi2) != 0)
+            goto fail;
+    }
+
+    if (mc_set(dst, mc_real(sum), mc_imag(sum)) != 0)
+        goto fail;
+
+    mf_free(prev_abs_term);
+    mf_free(abs_term);
+    mc_free(term);
+    mc_free(xpow);
+    mc_free(xi2);
+    mc_free(xi);
+    mc_free(sum);
+    return 0;
+
+fail:
+    mf_free(prev_abs_term);
+    mf_free(abs_term);
+    mc_free(term);
+    mc_free(xpow);
+    mc_free(xi2);
+    mc_free(xi);
+    mc_free(sum);
+    return -1;
+}
+
+static int mcomplex_native_tetragamma_asymptotic(mcomplex_t *dst,
+                                                 const mcomplex_t *z,
+                                                 size_t precision)
+{
+    mcomplex_t *sum = NULL;
+    mcomplex_t *xi = NULL;
+    mcomplex_t *xi2 = NULL;
+    mcomplex_t *xpow = NULL;
+    mcomplex_t *term = NULL;
+    mfloat_t *abs_term = NULL;
+    mfloat_t *prev_abs_term = NULL;
+    const mrational_t *bernoulli = NULL;
+    size_t term_count;
+    int small_term = 0;
+
+    sum = mc_create_long(1);
+    xi = mc_create_long(1);
+    xi2 = mc_new_prec(precision);
+    xpow = mc_new_prec(precision);
+    term = mc_new_prec(precision);
+    abs_term = mf_new_prec(precision);
+    prev_abs_term = mf_new_prec(precision);
+    if (!sum || !xi || !xi2 || !xpow || !term || !abs_term || !prev_abs_term)
+        goto fail;
+    if (mc_set_precision(sum, precision) != 0 ||
+        mc_set_precision(xi, precision) != 0 ||
+        mc_div(sum, z) != 0 ||
+        mc_div(xi, z) != 0 ||
+        mc_mul(sum, xi) != 0 ||
+        mc_set(xpow, mc_real(sum), mc_imag(sum)) != 0 ||
+        mc_mul(xpow, xi) != 0 ||
+        mc_add(sum, xpow) != 0 ||
+        mc_set(xi2, mc_real(xi), mc_imag(xi)) != 0 ||
+        mc_mul(xi2, xi) != 0 ||
+        mc_mul(xpow, xi) != 0)
+        goto fail;
+
+    term_count = precision / 10u;
+    if (term_count < 20u)
+        term_count = 20u;
+    if (term_count > mr_bernoulli_even_term_count())
+        term_count = mr_bernoulli_even_term_count();
+
+    for (size_t i = 1u; i <= term_count; ++i) {
+        bernoulli = mr_bernoulli_even_term(i);
+        if (!bernoulli ||
+            mc_set(term, mc_real(xpow), mc_imag(xpow)) != 0 ||
+            mcomplex_mul_real_mrational_scaled(term, bernoulli, (long)(2u * i + 1u), 1l) != 0 ||
+            mc_add(sum, term) != 0 ||
+            mcomplex_set_abs_value(abs_term, term, precision) != 0)
+            goto fail;
+        if (i > 1u && !mf_lt(abs_term, prev_abs_term))
+            break;
+        small_term = mfloat_is_below_neg_bits(abs_term, (long)precision + 32l);
+        if (small_term < 0 ||
+            mfloat_copy_value(prev_abs_term, abs_term) != 0)
+            goto fail;
+        if (small_term)
+            break;
+        if (i < term_count && mc_mul(xpow, xi2) != 0)
+            goto fail;
+    }
+
+    if (mc_neg(sum) != 0 ||
+        mc_set(dst, mc_real(sum), mc_imag(sum)) != 0)
+        goto fail;
+
+    mf_free(prev_abs_term);
+    mf_free(abs_term);
+    mc_free(term);
+    mc_free(xpow);
+    mc_free(xi2);
+    mc_free(xi);
+    mc_free(sum);
+    return 0;
+
+fail:
+    mf_free(prev_abs_term);
+    mf_free(abs_term);
+    mc_free(term);
+    mc_free(xpow);
+    mc_free(xi2);
+    mc_free(xi);
+    mc_free(sum);
+    return -1;
+}
+
+static int mcomplex_native_digamma(mcomplex_t *mcomplex)
+{
+    mcomplex_t *orig = NULL;
+    mcomplex_t *one_minus_z = NULL;
+    mcomplex_t *pi_z = NULL;
+    mcomplex_t *sin_pi_z = NULL;
+    mcomplex_t *cos_pi_z = NULL;
+    mcomplex_t *cot_pi_z = NULL;
+    mcomplex_t *shifted = NULL;
+    mcomplex_t *accum = NULL;
+    mcomplex_t *term = NULL;
+    mcomplex_t *one = NULL;
+    size_t precision_bits;
+    size_t work_prec;
+    long shift_target;
+    long steps;
+    int abs_small;
+
+    if (!mcomplex)
+        return -1;
+    precision_bits = mc_get_precision(mcomplex);
+    work_prec = precision_bits + 64u;
+    shift_target = (long)(precision_bits / 2u);
+    if (shift_target < 50l)
+        shift_target = 50l;
+
+    orig = mc_clone(mcomplex);
+    if (!orig || mc_set_precision(orig, work_prec) != 0)
+        goto fail;
+
+    if (mf_lt(mc_real(orig), MF_HALF)) {
+        one_minus_z = mc_clone(orig);
+        pi_z = mc_clone(orig);
+        sin_pi_z = mc_clone(orig);
+        cos_pi_z = mc_clone(orig);
+        cot_pi_z = mc_clone(orig);
+        if (!one_minus_z || !pi_z || !sin_pi_z || !cos_pi_z || !cot_pi_z)
+            goto fail;
+        if (mc_neg(one_minus_z) != 0 ||
+            mc_add(one_minus_z, MC_ONE) != 0 ||
+            mcomplex_native_digamma(one_minus_z) != 0 ||
+            mc_mul(pi_z, MC_PI) != 0 ||
+            mc_set(sin_pi_z, mc_real(pi_z), mc_imag(pi_z)) != 0 ||
+            mc_set(cos_pi_z, mc_real(pi_z), mc_imag(pi_z)) != 0 ||
+            mc_sin(sin_pi_z) != 0 ||
+            mc_cos(cos_pi_z) != 0 ||
+            mc_set(cot_pi_z, mc_real(cos_pi_z), mc_imag(cos_pi_z)) != 0 ||
+            mc_div(cot_pi_z, sin_pi_z) != 0 ||
+            mc_mul(cot_pi_z, MC_PI) != 0 ||
+            mc_sub(one_minus_z, cot_pi_z) != 0 ||
+            mc_set_precision(one_minus_z, precision_bits) != 0 ||
+            mc_set(mcomplex, mc_real(one_minus_z), mc_imag(one_minus_z)) != 0)
+            goto fail;
+        mc_free(cot_pi_z);
+        mc_free(cos_pi_z);
+        mc_free(sin_pi_z);
+        mc_free(pi_z);
+        mc_free(one_minus_z);
+        mc_free(orig);
+        return 0;
+    }
+
+    shifted = mc_clone(orig);
+    accum = mc_new_prec(work_prec);
+    term = mc_new_prec(work_prec);
+    one = mc_create_long(1);
+    if (!shifted || !accum || !term || !one)
+        goto fail;
+    if (mc_set_precision(shifted, work_prec) != 0 ||
+        mc_set_precision(accum, work_prec) != 0 ||
+        mc_set_precision(term, work_prec) != 0 ||
+        mc_set_precision(one, work_prec) != 0)
+        goto fail;
+
+    mc_clear(accum);
+    steps = mcomplex_estimate_positive_unit_steps(shifted, shift_target);
+    if (steps < 0)
+        goto fail;
+    for (long i = 0; i < steps; ++i) {
+        if (mc_set(term, mc_real(shifted), mc_imag(shifted)) != 0 ||
+            mc_inv(term) != 0 ||
+            mc_sub(accum, term) != 0 ||
+            mc_add(shifted, one) != 0)
+            goto fail;
+    }
+    while (1) {
+        abs_small = mcomplex_abs_lt_long(shifted, shift_target, work_prec);
+        if (abs_small < 0)
+            goto fail;
+        if (!abs_small)
+            break;
+        if (mc_set(term, mc_real(shifted), mc_imag(shifted)) != 0 ||
+            mc_inv(term) != 0 ||
+            mc_sub(accum, term) != 0 ||
+            mc_add(shifted, one) != 0)
+            goto fail;
+    }
+
+    if (mcomplex_native_digamma_asymptotic(term, shifted, work_prec) != 0 ||
+        mc_add(term, accum) != 0 ||
+        mc_set_precision(term, precision_bits) != 0 ||
+        mc_set(mcomplex, mc_real(term), mc_imag(term)) != 0)
+        goto fail;
+
+    mc_free(one);
+    mc_free(term);
+    mc_free(accum);
+    mc_free(shifted);
+    mc_free(orig);
+    return 0;
+
+fail:
+    mc_free(one);
+    mc_free(term);
+    mc_free(accum);
+    mc_free(shifted);
+    mc_free(cot_pi_z);
+    mc_free(cos_pi_z);
+    mc_free(sin_pi_z);
+    mc_free(pi_z);
+    mc_free(one_minus_z);
+    mc_free(orig);
+    return -1;
+}
+
+static int mcomplex_native_trigamma(mcomplex_t *mcomplex)
+{
+    mcomplex_t *orig = NULL;
+    mcomplex_t *one_minus_z = NULL;
+    mcomplex_t *pi_z = NULL;
+    mcomplex_t *sin_pi_z = NULL;
+    mcomplex_t *csc = NULL;
+    mcomplex_t *term = NULL;
+    mcomplex_t *pi_squared = NULL;
+    mcomplex_t *shifted = NULL;
+    mcomplex_t *accum = NULL;
+    mcomplex_t *one = NULL;
+    size_t precision_bits;
+    size_t work_prec;
+    long shift_target;
+    long steps;
+    int abs_small;
+
+    if (!mcomplex)
+        return -1;
+    precision_bits = mc_get_precision(mcomplex);
+    work_prec = precision_bits + 64u;
+    shift_target = (long)(precision_bits / 2u);
+    if (shift_target < 50l)
+        shift_target = 50l;
+
+    orig = mc_clone(mcomplex);
+    if (!orig || mc_set_precision(orig, work_prec) != 0)
+        goto fail;
+
+    if (mf_lt(mc_real(orig), MF_HALF)) {
+        one_minus_z = mc_clone(orig);
+        pi_z = mc_clone(orig);
+        sin_pi_z = mc_clone(orig);
+        csc = mc_clone(orig);
+        term = mc_new_prec(work_prec);
+        pi_squared = mc_new_prec(work_prec);
+        if (!one_minus_z || !pi_z || !sin_pi_z || !csc || !term || !pi_squared)
+            goto fail;
+        if (mc_neg(one_minus_z) != 0 ||
+            mc_add(one_minus_z, MC_ONE) != 0 ||
+            mcomplex_native_trigamma(one_minus_z) != 0 ||
+            mc_mul(pi_z, MC_PI) != 0 ||
+            mc_set(sin_pi_z, mc_real(pi_z), mc_imag(pi_z)) != 0 ||
+            mc_sin(sin_pi_z) != 0 ||
+            mc_set(csc, mc_real(sin_pi_z), mc_imag(sin_pi_z)) != 0 ||
+            mc_inv(csc) != 0 ||
+            mc_set(term, mc_real(csc), mc_imag(csc)) != 0 ||
+            mc_mul(term, csc) != 0 ||
+            mcomplex_set_real_immortal_value(pi_squared, MF_PI_SQUARED) != 0 ||
+            mc_mul(term, pi_squared) != 0 ||
+            mc_sub(term, one_minus_z) != 0 ||
+            mc_set_precision(term, precision_bits) != 0 ||
+            mc_set(mcomplex, mc_real(term), mc_imag(term)) != 0)
+            goto fail;
+        mc_free(pi_squared);
+        mc_free(term);
+        mc_free(csc);
+        mc_free(sin_pi_z);
+        mc_free(pi_z);
+        mc_free(one_minus_z);
+        mc_free(orig);
+        return 0;
+    }
+
+    shifted = mc_clone(orig);
+    accum = mc_new_prec(work_prec);
+    term = mc_new_prec(work_prec);
+    one = mc_create_long(1);
+    if (!shifted || !accum || !term || !one)
+        goto fail;
+    if (mc_set_precision(shifted, work_prec) != 0 ||
+        mc_set_precision(accum, work_prec) != 0 ||
+        mc_set_precision(term, work_prec) != 0 ||
+        mc_set_precision(one, work_prec) != 0)
+        goto fail;
+
+    mc_clear(accum);
+    steps = mcomplex_estimate_positive_unit_steps(shifted, shift_target);
+    if (steps < 0)
+        goto fail;
+    for (long i = 0; i < steps; ++i) {
+        if (mc_set(term, mc_real(shifted), mc_imag(shifted)) != 0 ||
+            mc_mul(term, shifted) != 0 ||
+            mc_inv(term) != 0 ||
+            mc_add(accum, term) != 0 ||
+            mc_add(shifted, one) != 0)
+            goto fail;
+    }
+    while (1) {
+        abs_small = mcomplex_abs_lt_long(shifted, shift_target, work_prec);
+        if (abs_small < 0)
+            goto fail;
+        if (!abs_small)
+            break;
+        if (mc_set(term, mc_real(shifted), mc_imag(shifted)) != 0 ||
+            mc_mul(term, shifted) != 0 ||
+            mc_inv(term) != 0 ||
+            mc_add(accum, term) != 0 ||
+            mc_add(shifted, one) != 0)
+            goto fail;
+    }
+
+    if (mcomplex_native_trigamma_asymptotic(term, shifted, work_prec) != 0 ||
+        mc_add(term, accum) != 0 ||
+        mc_set_precision(term, precision_bits) != 0 ||
+        mc_set(mcomplex, mc_real(term), mc_imag(term)) != 0)
+        goto fail;
+
+    mc_free(one);
+    mc_free(term);
+    mc_free(accum);
+    mc_free(shifted);
+    mc_free(orig);
+    return 0;
+
+fail:
+    mc_free(one);
+    mc_free(accum);
+    mc_free(shifted);
+    mc_free(pi_squared);
+    mc_free(term);
+    mc_free(csc);
+    mc_free(sin_pi_z);
+    mc_free(pi_z);
+    mc_free(one_minus_z);
+    mc_free(orig);
+    return -1;
+}
+
+static int mcomplex_native_tetragamma(mcomplex_t *mcomplex)
+{
+    mcomplex_t *orig = NULL;
+    mcomplex_t *one_minus_z = NULL;
+    mcomplex_t *pi_z = NULL;
+    mcomplex_t *sin_pi_z = NULL;
+    mcomplex_t *cos_pi_z = NULL;
+    mcomplex_t *csc = NULL;
+    mcomplex_t *term = NULL;
+    mcomplex_t *pi_cubed = NULL;
+    mcomplex_t *shifted = NULL;
+    mcomplex_t *accum = NULL;
+    mcomplex_t *one = NULL;
+    size_t precision_bits;
+    size_t work_prec;
+    long shift_target;
+    long steps;
+    int abs_small;
+
+    if (!mcomplex)
+        return -1;
+    precision_bits = mc_get_precision(mcomplex);
+    work_prec = precision_bits + 64u;
+    shift_target = (long)(precision_bits / 2u);
+    if (shift_target < 50l)
+        shift_target = 50l;
+
+    orig = mc_clone(mcomplex);
+    if (!orig || mc_set_precision(orig, work_prec) != 0)
+        goto fail;
+
+    if (mf_lt(mc_real(orig), MF_HALF)) {
+        one_minus_z = mc_clone(orig);
+        pi_z = mc_clone(orig);
+        sin_pi_z = mc_clone(orig);
+        cos_pi_z = mc_clone(orig);
+        csc = mc_clone(orig);
+        term = mc_new_prec(work_prec);
+        pi_cubed = mc_new_prec(work_prec);
+        if (!one_minus_z || !pi_z || !sin_pi_z || !cos_pi_z || !csc || !term || !pi_cubed)
+            goto fail;
+        if (mc_neg(one_minus_z) != 0 ||
+            mc_add(one_minus_z, MC_ONE) != 0 ||
+            mcomplex_native_tetragamma(one_minus_z) != 0 ||
+            mc_mul(pi_z, MC_PI) != 0 ||
+            mc_set(sin_pi_z, mc_real(pi_z), mc_imag(pi_z)) != 0 ||
+            mc_set(cos_pi_z, mc_real(pi_z), mc_imag(pi_z)) != 0 ||
+            mc_sin(sin_pi_z) != 0 ||
+            mc_cos(cos_pi_z) != 0 ||
+            mc_set(csc, mc_real(sin_pi_z), mc_imag(sin_pi_z)) != 0 ||
+            mc_inv(csc) != 0 ||
+            mc_set(term, mc_real(csc), mc_imag(csc)) != 0 ||
+            mc_mul(term, csc) != 0 ||
+            mc_mul(term, cos_pi_z) != 0 ||
+            mcomplex_set_real_immortal_value(pi_cubed, MF_2PI_CUBED) != 0 ||
+            mc_mul(term, pi_cubed) != 0 ||
+            mc_add(term, one_minus_z) != 0 ||
+            mc_set_precision(term, precision_bits) != 0 ||
+            mc_set(mcomplex, mc_real(term), mc_imag(term)) != 0)
+            goto fail;
+        mc_free(pi_cubed);
+        mc_free(term);
+        mc_free(csc);
+        mc_free(cos_pi_z);
+        mc_free(sin_pi_z);
+        mc_free(pi_z);
+        mc_free(one_minus_z);
+        mc_free(orig);
+        return 0;
+    }
+
+    shifted = mc_clone(orig);
+    accum = mc_new_prec(work_prec);
+    term = mc_new_prec(work_prec);
+    one = mc_create_long(1);
+    if (!shifted || !accum || !term || !one)
+        goto fail;
+    if (mc_set_precision(shifted, work_prec) != 0 ||
+        mc_set_precision(accum, work_prec) != 0 ||
+        mc_set_precision(term, work_prec) != 0 ||
+        mc_set_precision(one, work_prec) != 0)
+        goto fail;
+
+    mc_clear(accum);
+    steps = mcomplex_estimate_positive_unit_steps(shifted, shift_target);
+    if (steps < 0)
+        goto fail;
+    for (long i = 0; i < steps; ++i) {
+        if (mc_set(term, mc_real(shifted), mc_imag(shifted)) != 0 ||
+            mc_mul(term, shifted) != 0 ||
+            mc_mul(term, shifted) != 0 ||
+            mc_inv(term) != 0 ||
+            mcomplex_mul_long_local(term, 2) != 0 ||
+            mc_sub(accum, term) != 0 ||
+            mc_add(shifted, one) != 0)
+            goto fail;
+    }
+    while (1) {
+        abs_small = mcomplex_abs_lt_long(shifted, shift_target, work_prec);
+        if (abs_small < 0)
+            goto fail;
+        if (!abs_small)
+            break;
+        if (mc_set(term, mc_real(shifted), mc_imag(shifted)) != 0 ||
+            mc_mul(term, shifted) != 0 ||
+            mc_mul(term, shifted) != 0 ||
+            mc_inv(term) != 0 ||
+            mcomplex_mul_long_local(term, 2) != 0 ||
+            mc_sub(accum, term) != 0 ||
+            mc_add(shifted, one) != 0)
+            goto fail;
+    }
+
+    if (mcomplex_native_tetragamma_asymptotic(term, shifted, work_prec) != 0 ||
+        mc_add(term, accum) != 0 ||
+        mc_set_precision(term, precision_bits) != 0 ||
+        mc_set(mcomplex, mc_real(term), mc_imag(term)) != 0)
+        goto fail;
+
+    mc_free(one);
+    mc_free(term);
+    mc_free(accum);
+    mc_free(shifted);
+    mc_free(orig);
+    return 0;
+
+fail:
+    mc_free(one);
+    mc_free(accum);
+    mc_free(shifted);
+    mc_free(pi_cubed);
+    mc_free(term);
+    mc_free(csc);
+    mc_free(cos_pi_z);
+    mc_free(sin_pi_z);
+    mc_free(pi_z);
+    mc_free(one_minus_z);
+    mc_free(orig);
+    return -1;
+}
+
+static int mcomplex_native_ei(mcomplex_t *mcomplex)
+{
+    mcomplex_t *orig = NULL;
+    mcomplex_t *sum = NULL;
+    mcomplex_t *term = NULL;
+    mcomplex_t *log_z = NULL;
+    size_t precision_bits;
+    size_t work_prec;
+    int small_term;
+
+    if (!mcomplex)
+        return -1;
+    precision_bits = mc_get_precision(mcomplex);
+    work_prec = precision_bits + 64u;
+
+    orig = mc_clone(mcomplex);
+    sum = mc_new_prec(work_prec);
+    term = mc_clone(mcomplex);
+    log_z = mc_clone(mcomplex);
+    if (!orig || !sum || !term || !log_z)
+        goto fail;
+    if (mc_set_precision(orig, work_prec) != 0 ||
+        mc_set_precision(term, work_prec) != 0 ||
+        mc_set_precision(log_z, work_prec) != 0 ||
+        mcomplex_set_real_immortal_value(sum, MF_EULER_MASCHERONI) != 0 ||
+        mc_log(log_z) != 0 ||
+        mc_add(sum, log_z) != 0)
+        goto fail;
+
+    for (long k = 1; k < 10000; ++k) {
+        if (mc_add(sum, term) != 0)
+            goto fail;
+        small_term = mcomplex_components_imply_below_neg_bits(term, (long)precision_bits + 8l);
+        if (small_term < 0)
+            goto fail;
+        if (small_term)
+            break;
+        if (mc_mul(term, orig) != 0 ||
+            mcomplex_mul_long_local(term, k) != 0 ||
+            mc_div_long(term, (k + 1l) * (k + 1l)) != 0)
+            goto fail;
+    }
+
+    if (mc_set_precision(sum, precision_bits) != 0 ||
+        mc_set(mcomplex, mc_real(sum), mc_imag(sum)) != 0)
+        goto fail;
+
+    mc_free(log_z);
+    mc_free(term);
+    mc_free(sum);
+    mc_free(orig);
+    return 0;
+
+fail:
+    mc_free(log_z);
+    mc_free(term);
+    mc_free(sum);
+    mc_free(orig);
+    return -1;
+}
+
+static int mcomplex_native_e1(mcomplex_t *mcomplex)
+{
+    if (!mcomplex)
+        return -1;
+    if (mc_neg(mcomplex) != 0 ||
+        mcomplex_native_ei(mcomplex) != 0 ||
+        mc_neg(mcomplex) != 0)
+        return -1;
+    return 0;
+}
+
+static int mcomplex_native_logbeta(mcomplex_t *mcomplex, const mcomplex_t *other)
+{
+    mcomplex_t *a = NULL;
+    mcomplex_t *b = NULL;
+    mcomplex_t *sum = NULL;
+    size_t precision_bits;
+    size_t work_prec;
+
+    if (!mcomplex || !other)
+        return -1;
+    precision_bits = mc_get_precision(mcomplex);
+    work_prec = precision_bits + 384u;
+    a = mc_clone(mcomplex);
+    b = mc_clone(other);
+    sum = mc_clone(mcomplex);
+    if (!a || !b || !sum)
+        goto fail;
+    if (mc_set_precision(a, work_prec) != 0 ||
+        mc_set_precision(b, work_prec) != 0 ||
+        mc_set_precision(sum, work_prec) != 0 ||
+        mc_add(sum, b) != 0 ||
+        mc_lgamma(a) != 0 ||
+        mc_lgamma(b) != 0 ||
+        mc_lgamma(sum) != 0 ||
+        mc_add(a, b) != 0 ||
+        mc_sub(a, sum) != 0 ||
+        mc_set_precision(a, precision_bits) != 0 ||
+        mc_set(mcomplex, mc_real(a), mc_imag(a)) != 0)
+        goto fail;
+
+    mc_free(sum);
+    mc_free(b);
+    mc_free(a);
+    return 0;
+
+fail:
+    mc_free(sum);
+    mc_free(b);
+    mc_free(a);
+    return -1;
+}
+
+static int mcomplex_native_beta(mcomplex_t *mcomplex, const mcomplex_t *other)
+{
+    if (mcomplex_native_logbeta(mcomplex, other) != 0 ||
+        mc_exp(mcomplex) != 0)
+        return -1;
+    return 0;
+}
+
+static int mcomplex_native_binomial(mcomplex_t *mcomplex, const mcomplex_t *other)
+{
+    mcomplex_t *b1 = NULL;
+    mcomplex_t *amb1 = NULL;
+    size_t precision_bits;
+    size_t work_prec;
+
+    if (!mcomplex || !other)
+        return -1;
+    precision_bits = mc_get_precision(mcomplex);
+    work_prec = precision_bits + 384u;
+    b1 = mc_clone(other);
+    amb1 = mc_clone(mcomplex);
+    if (!b1 || !amb1)
+        goto fail;
+    if (mc_set_precision(mcomplex, work_prec) != 0 ||
+        mc_set_precision(b1, work_prec) != 0 ||
+        mc_set_precision(amb1, work_prec) != 0 ||
+        mc_add(mcomplex, MC_ONE) != 0 ||
+        mc_add(b1, MC_ONE) != 0 ||
+        mc_sub(amb1, other) != 0 ||
+        mc_add(amb1, MC_ONE) != 0 ||
+        mc_gamma(mcomplex) != 0 ||
+        mc_gamma(b1) != 0 ||
+        mc_gamma(amb1) != 0 ||
+        mc_mul(b1, amb1) != 0 ||
+        mc_div(mcomplex, b1) != 0 ||
+        mc_set_precision(mcomplex, precision_bits) != 0)
+        goto fail;
+
+    mc_free(amb1);
+    mc_free(b1);
+    return 0;
+
+fail:
+    mc_free(amb1);
+    mc_free(b1);
+    return -1;
+}
+
+static int mcomplex_native_logbeta_pdf(mcomplex_t *mcomplex,
+                                       const mcomplex_t *a,
+                                       const mcomplex_t *b)
+{
+    mcomplex_t *x = NULL;
+    mcomplex_t *aa = NULL;
+    mcomplex_t *bb = NULL;
+    mcomplex_t *one_minus_x = NULL;
+    mcomplex_t *logb = NULL;
+    size_t precision_bits;
+    size_t work_prec;
+
+    if (!mcomplex || !a || !b)
+        return -1;
+    precision_bits = mc_get_precision(mcomplex);
+    work_prec = precision_bits + 384u;
+    x = mc_clone(mcomplex);
+    aa = mc_clone(a);
+    bb = mc_clone(b);
+    one_minus_x = mc_clone(MC_ONE);
+    logb = mc_clone(a);
+    if (!x || !aa || !bb || !one_minus_x || !logb)
+        goto fail;
+    if (mc_set_precision(x, work_prec) != 0 ||
+        mc_set_precision(aa, work_prec) != 0 ||
+        mc_set_precision(bb, work_prec) != 0 ||
+        mc_set_precision(one_minus_x, work_prec) != 0 ||
+        mc_set_precision(logb, work_prec) != 0 ||
+        mc_sub(one_minus_x, x) != 0 ||
+        mc_log(x) != 0 ||
+        mc_sub(aa, MC_ONE) != 0 ||
+        mc_mul(x, aa) != 0 ||
+        mc_log(one_minus_x) != 0 ||
+        mc_sub(bb, MC_ONE) != 0 ||
+        mc_mul(one_minus_x, bb) != 0 ||
+        mc_add(x, one_minus_x) != 0 ||
+        mcomplex_native_logbeta(logb, b) != 0 ||
+        mc_sub(x, logb) != 0 ||
+        mc_set_precision(x, precision_bits) != 0 ||
+        mc_set(mcomplex, mc_real(x), mc_imag(x)) != 0)
+        goto fail;
+
+    mc_free(logb);
+    mc_free(one_minus_x);
+    mc_free(bb);
+    mc_free(aa);
+    mc_free(x);
+    return 0;
+
+fail:
+    mc_free(logb);
+    mc_free(one_minus_x);
+    mc_free(bb);
+    mc_free(aa);
+    mc_free(x);
+    return -1;
+}
+
+static int mcomplex_native_beta_pdf(mcomplex_t *mcomplex,
+                                    const mcomplex_t *a,
+                                    const mcomplex_t *b)
+{
+    if (mcomplex_native_logbeta_pdf(mcomplex, a, b) != 0 ||
+        mc_exp(mcomplex) != 0)
+        return -1;
+    return 0;
+}
+
+static int mcomplex_native_gammainc_lower_series(mcomplex_t *dst,
+                                                 const mcomplex_t *s,
+                                                 const mcomplex_t *x,
+                                                 size_t precision)
+{
+    mcomplex_t *term = NULL;
+    mcomplex_t *sum = NULL;
+    mcomplex_t *denom = NULL;
+    mcomplex_t *step = NULL;
+    mcomplex_t *pref = NULL;
+    mcomplex_t *spow = NULL;
+    size_t work_prec;
+    int small_term;
+
+    if (!dst || !s || !x)
+        return -1;
+    work_prec = precision + 384u;
+    term = mc_clone(MC_ONE);
+    sum = mc_new_prec(work_prec);
+    denom = mc_clone(s);
+    step = mc_create_long(1);
+    pref = mc_clone(x);
+    spow = mc_clone(x);
+    if (!term || !sum || !denom || !step || !pref || !spow)
+        goto fail;
+    if (mc_set_precision(term, work_prec) != 0 ||
+        mc_set_precision(denom, work_prec) != 0 ||
+        mc_set_precision(step, work_prec) != 0 ||
+        mc_set_precision(pref, work_prec) != 0 ||
+        mc_set_precision(spow, work_prec) != 0 ||
+        mc_div(term, s) != 0 ||
+        mc_set(sum, mc_real(term), mc_imag(term)) != 0)
+        goto fail;
+
+    for (long i = 1; i < 10000; ++i) {
+        if (mc_add(denom, step) != 0 ||
+            mc_mul(term, x) != 0 ||
+            mc_div(term, denom) != 0 ||
+            mc_add(sum, term) != 0)
+            goto fail;
+        small_term = mcomplex_components_imply_below_neg_bits(term, (long)precision + 8l);
+        if (small_term < 0)
+            goto fail;
+        if (small_term)
+            break;
+    }
+
+    if (mc_pow(spow, s) != 0 ||
+        mc_neg(pref) != 0 ||
+        mc_exp(pref) != 0 ||
+        mc_mul(spow, pref) != 0 ||
+        mc_mul(spow, sum) != 0 ||
+        mc_set_precision(spow, precision) != 0 ||
+        mc_set(dst, mc_real(spow), mc_imag(spow)) != 0)
+        goto fail;
+
+    mc_free(step);
+    mc_free(spow);
+    mc_free(pref);
+    mc_free(denom);
+    mc_free(sum);
+    mc_free(term);
+    return 0;
+
+fail:
+    mc_free(step);
+    mc_free(spow);
+    mc_free(pref);
+    mc_free(denom);
+    mc_free(sum);
+    mc_free(term);
+    return -1;
+}
+
+static int mcomplex_native_gammainc_lower(mcomplex_t *mcomplex, const mcomplex_t *other)
+{
+    size_t precision_bits;
+    mcomplex_t *s = NULL;
+    mcomplex_t *x = NULL;
+
+    if (!mcomplex || !other)
+        return -1;
+    precision_bits = mc_get_precision(mcomplex);
+    s = mc_clone(mcomplex);
+    x = mc_clone(other);
+    if (!s || !x)
+        goto fail;
+    if (mcomplex_native_gammainc_lower_series(mcomplex, s, x, precision_bits) != 0)
+        goto fail;
+    mc_free(x);
+    mc_free(s);
+    return 0;
+
+fail:
+    mc_free(x);
+    mc_free(s);
+    return -1;
+}
+
+static int mcomplex_native_gammainc_upper(mcomplex_t *mcomplex, const mcomplex_t *other)
+{
+    mcomplex_t *gamma_s = NULL;
+    int rc = -1;
+
+    if (!mcomplex || !other)
+        return -1;
+    gamma_s = mc_clone(mcomplex);
+    if (!gamma_s)
+        return -1;
+    if (mc_gamma(gamma_s) != 0 ||
+        mcomplex_native_gammainc_lower(mcomplex, other) != 0 ||
+        mc_sub(gamma_s, mcomplex) != 0 ||
+        mc_set(mcomplex, mc_real(gamma_s), mc_imag(gamma_s)) != 0)
+        goto cleanup;
+    rc = 0;
+
+cleanup:
+    mc_free(gamma_s);
+    return rc;
+}
+
+static int mcomplex_native_gammainc_P(mcomplex_t *mcomplex, const mcomplex_t *other)
+{
+    mcomplex_t *gamma_s = NULL;
+    int rc = -1;
+
+    if (!mcomplex || !other)
+        return -1;
+    gamma_s = mc_clone(mcomplex);
+    if (!gamma_s)
+        return -1;
+    if (mc_gamma(gamma_s) != 0 ||
+        mcomplex_native_gammainc_lower(mcomplex, other) != 0 ||
+        mc_div(mcomplex, gamma_s) != 0)
+        goto cleanup;
+    rc = 0;
+
+cleanup:
+    mc_free(gamma_s);
+    return rc;
+}
+
+static int mcomplex_native_gammainc_Q(mcomplex_t *mcomplex, const mcomplex_t *other)
+{
+    if (!mcomplex || !other)
+        return -1;
+    if (mcomplex_native_gammainc_P(mcomplex, other) != 0 ||
+        mc_neg(mcomplex) != 0 ||
+        mc_add(mcomplex, MC_ONE) != 0)
+        return -1;
+    return 0;
+}
+
+static int mcomplex_native_erf(mcomplex_t *mcomplex)
+{
+    mcomplex_t *orig = NULL;
+    mcomplex_t *sum = NULL;
+    mcomplex_t *term = NULL;
+    mcomplex_t *z2 = NULL;
+    mcomplex_t *coeff = NULL;
+    size_t precision_bits;
+    size_t work_prec;
+    int small_term;
+
+    if (!mcomplex)
+        return -1;
+    precision_bits = mc_get_precision(mcomplex);
+    work_prec = precision_bits + 384u;
+
+    if (mf_lt(mc_real(mcomplex), MF_ZERO)) {
+        if (mc_neg(mcomplex) != 0 ||
+            mcomplex_native_erf(mcomplex) != 0 ||
+            mc_neg(mcomplex) != 0)
+            return -1;
+        return 0;
+    }
+
+    orig = mc_clone(mcomplex);
+    sum = mc_clone(mcomplex);
+    term = mc_clone(mcomplex);
+    z2 = mc_clone(mcomplex);
+    coeff = mc_new_prec(work_prec);
+    if (!orig || !sum || !term || !z2 || !coeff)
+        goto fail;
+    if (mc_set_precision(orig, work_prec) != 0 ||
+        mc_set_precision(sum, work_prec) != 0 ||
+        mc_set_precision(term, work_prec) != 0 ||
+        mc_set_precision(z2, work_prec) != 0 ||
+        mc_mul(z2, orig) != 0 ||
+        mc_neg(z2) != 0)
+        goto fail;
+
+    for (long n = 0; n < 10000; ++n) {
+        small_term = mcomplex_components_imply_below_neg_bits(term, (long)precision_bits + 8l);
+        if (small_term < 0)
+            goto fail;
+        if (small_term && n > 0)
+            break;
+        if (n > 0 && mc_add(sum, term) != 0)
+            goto fail;
+        if (mc_mul(term, z2) != 0 ||
+            mcomplex_mul_long_local(term, 2l * n + 1l) != 0 ||
+            mc_div_long(term, (n + 1l) * (2l * n + 3l)) != 0)
+            goto fail;
+    }
+
+    if (mcomplex_set_real_immortal_value(coeff, MF_2_SQRTPI) != 0 ||
+        mc_mul(sum, coeff) != 0 ||
+        mc_set_precision(sum, precision_bits) != 0 ||
+        mc_set(mcomplex, mc_real(sum), mc_imag(sum)) != 0)
+        goto fail;
+
+    mc_free(coeff);
+    mc_free(z2);
+    mc_free(term);
+    mc_free(sum);
+    mc_free(orig);
+    return 0;
+
+fail:
+    mc_free(coeff);
+    mc_free(z2);
+    mc_free(term);
+    mc_free(sum);
+    mc_free(orig);
+    return -1;
+}
+
+static int mcomplex_native_erfc(mcomplex_t *mcomplex)
+{
+    mcomplex_t *two = NULL;
+
+    if (!mcomplex)
+        return -1;
+    if (mf_lt(mc_real(mcomplex), MF_ZERO)) {
+        two = mc_create_long(2);
+        if (!two)
+            return -1;
+        if (mc_neg(mcomplex) != 0 ||
+            mcomplex_native_erfc(mcomplex) != 0 ||
+            mc_neg(mcomplex) != 0 ||
+            mc_neg(mcomplex) != 0 ||
+            mc_add(mcomplex, two) != 0) {
+            mc_free(two);
+            return -1;
+        }
+        mc_free(two);
+        return 0;
+    }
+    if (mcomplex_native_erf(mcomplex) != 0 ||
+        mc_neg(mcomplex) != 0 ||
+        mc_add(mcomplex, MC_ONE) != 0)
+        return -1;
+    return 0;
 }
 
 static int mcomplex_native_sin_cos(mcomplex_t *mcomplex, int want_cos)
@@ -1394,7 +2657,7 @@ int mc_erf(mcomplex_t *mcomplex)
 
     if (rc != -2)
         return rc;
-    return mcomplex_apply_unary(mcomplex, qc_erf);
+    return mcomplex_native_erf(mcomplex);
 }
 
 int mc_erfc(mcomplex_t *mcomplex)
@@ -1407,7 +2670,7 @@ int mc_erfc(mcomplex_t *mcomplex)
 
     if (rc != -2)
         return rc;
-    return mcomplex_apply_unary(mcomplex, qc_erfc);
+    return mcomplex_native_erfc(mcomplex);
 }
 
 int mc_erfinv(mcomplex_t *mcomplex)
@@ -1443,7 +2706,7 @@ int mc_digamma(mcomplex_t *mcomplex)
 
     if (rc != -2)
         return rc;
-    return mcomplex_apply_unary(mcomplex, qc_digamma);
+    return mcomplex_native_digamma(mcomplex);
 }
 
 int mc_trigamma(mcomplex_t *mcomplex)
@@ -1452,7 +2715,7 @@ int mc_trigamma(mcomplex_t *mcomplex)
 
     if (rc != -2)
         return rc;
-    return mcomplex_apply_unary(mcomplex, qc_trigamma);
+    return mcomplex_native_trigamma(mcomplex);
 }
 
 int mc_tetragamma(mcomplex_t *mcomplex)
@@ -1461,7 +2724,7 @@ int mc_tetragamma(mcomplex_t *mcomplex)
 
     if (rc != -2)
         return rc;
-    return mcomplex_apply_unary(mcomplex, qc_tetragamma);
+    return mcomplex_native_tetragamma(mcomplex);
 }
 
 int mc_gammainv(mcomplex_t *mcomplex)
@@ -1551,7 +2814,7 @@ int mc_beta(mcomplex_t *mcomplex, const mcomplex_t *other)
         mf_clear(mcomplex->imag);
         return 0;
     }
-    return mcomplex_apply_binary(mcomplex, other, qc_beta);
+    return mcomplex_native_beta(mcomplex, other);
 }
 
 int mc_logbeta(mcomplex_t *mcomplex, const mcomplex_t *other)
@@ -1560,7 +2823,7 @@ int mc_logbeta(mcomplex_t *mcomplex, const mcomplex_t *other)
 
     if (rc != -2)
         return rc;
-    return mcomplex_apply_binary(mcomplex, other, qc_logbeta);
+    return mcomplex_native_logbeta(mcomplex, other);
 }
 
 int mc_binomial(mcomplex_t *mcomplex, const mcomplex_t *other)
@@ -1569,7 +2832,7 @@ int mc_binomial(mcomplex_t *mcomplex, const mcomplex_t *other)
 
     if (rc != -2)
         return rc;
-    return mcomplex_apply_binary(mcomplex, other, qc_binomial);
+    return mcomplex_native_binomial(mcomplex, other);
 }
 
 int mc_beta_pdf(mcomplex_t *mcomplex, const mcomplex_t *a, const mcomplex_t *b)
@@ -1580,9 +2843,7 @@ int mc_beta_pdf(mcomplex_t *mcomplex, const mcomplex_t *a, const mcomplex_t *b)
         return -1;
     if (rc != -2)
         return rc;
-    return mc_set_qcomplex(
-        mcomplex,
-        qc_beta_pdf(mc_to_qcomplex(mcomplex), mc_to_qcomplex(a), mc_to_qcomplex(b)));
+    return mcomplex_native_beta_pdf(mcomplex, a, b);
 }
 
 int mc_logbeta_pdf(mcomplex_t *mcomplex, const mcomplex_t *a, const mcomplex_t *b)
@@ -1593,9 +2854,7 @@ int mc_logbeta_pdf(mcomplex_t *mcomplex, const mcomplex_t *a, const mcomplex_t *
         return -1;
     if (rc != -2)
         return rc;
-    return mc_set_qcomplex(
-        mcomplex,
-        qc_logbeta_pdf(mc_to_qcomplex(mcomplex), mc_to_qcomplex(a), mc_to_qcomplex(b)));
+    return mcomplex_native_logbeta_pdf(mcomplex, a, b);
 }
 
 int mc_normal_pdf(mcomplex_t *mcomplex)
@@ -1663,7 +2922,7 @@ int mc_gammainc_lower(mcomplex_t *mcomplex, const mcomplex_t *other)
 
     if (rc != -2)
         return rc;
-    return mcomplex_apply_binary(mcomplex, other, qc_gammainc_lower);
+    return mcomplex_native_gammainc_lower(mcomplex, other);
 }
 
 int mc_gammainc_upper(mcomplex_t *mcomplex, const mcomplex_t *other)
@@ -1676,7 +2935,7 @@ int mc_gammainc_upper(mcomplex_t *mcomplex, const mcomplex_t *other)
 
     if (rc != -2)
         return rc;
-    return mcomplex_apply_binary(mcomplex, other, qc_gammainc_upper);
+    return mcomplex_native_gammainc_upper(mcomplex, other);
 }
 
 int mc_gammainc_P(mcomplex_t *mcomplex, const mcomplex_t *other)
@@ -1689,7 +2948,7 @@ int mc_gammainc_P(mcomplex_t *mcomplex, const mcomplex_t *other)
 
     if (rc != -2)
         return rc;
-    return mcomplex_apply_binary(mcomplex, other, qc_gammainc_P);
+    return mcomplex_native_gammainc_P(mcomplex, other);
 }
 
 int mc_gammainc_Q(mcomplex_t *mcomplex, const mcomplex_t *other)
@@ -1702,7 +2961,7 @@ int mc_gammainc_Q(mcomplex_t *mcomplex, const mcomplex_t *other)
 
     if (rc != -2)
         return rc;
-    return mcomplex_apply_binary(mcomplex, other, qc_gammainc_Q);
+    return mcomplex_native_gammainc_Q(mcomplex, other);
 }
 
 int mc_ei(mcomplex_t *mcomplex)
@@ -1711,7 +2970,7 @@ int mc_ei(mcomplex_t *mcomplex)
 
     if (rc != -2)
         return rc;
-    return mcomplex_apply_unary(mcomplex, qc_ei);
+    return mcomplex_native_ei(mcomplex);
 }
 
 int mc_e1(mcomplex_t *mcomplex)
@@ -1720,5 +2979,5 @@ int mc_e1(mcomplex_t *mcomplex)
 
     if (rc != -2)
         return rc;
-    return mcomplex_apply_unary(mcomplex, qc_e1);
+    return mcomplex_native_e1(mcomplex);
 }

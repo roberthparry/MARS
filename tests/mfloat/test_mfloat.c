@@ -6,6 +6,7 @@
 #include <math.h>
 
 #include "mfloat.h"
+#include "mrational.h"
 
 #ifndef TEST_MFLOAT_MATHS_PRECISION
 /* Keep maths-only precision configurable without affecting core object tests. */
@@ -515,14 +516,26 @@ void test_set_string_and_basic_arithmetic(void)
     mfloat_t *a = mf_create_string("1.5");
     mfloat_t *b = mf_create_string("0.25");
     mfloat_t *c = mf_create_string("2.25");
+    mfloat_t *d = mf_create_string("3.5");
+    mfloat_t *e = mf_create_string("2.5");
+    mfloat_t *f = mf_create_string("1.5");
+    mfloat_t *g = mf_create_string("1.5");
     uint64_t mantissa = 0;
 
     ASSERT_NOT_NULL(a);
     ASSERT_NOT_NULL(b);
     ASSERT_NOT_NULL(c);
+    ASSERT_NOT_NULL(d);
+    ASSERT_NOT_NULL(e);
+    ASSERT_NOT_NULL(f);
+    ASSERT_NOT_NULL(g);
     print_mfloat_value("a from \"1.5\"", a);
     print_mfloat_value("b from \"0.25\"", b);
     print_mfloat_value("c from \"2.25\"", c);
+    print_mfloat_value("d from \"3.5\"", d);
+    print_mfloat_value("e from \"2.5\"", e);
+    print_mfloat_value("f from \"1.5\"", f);
+    print_mfloat_value("g from \"1.5\"", g);
 
     ASSERT_EQ_LONG((long)mf_get_sign(a), 1);
     ASSERT_EQ_LONG(mf_get_exponent2(a), -1);
@@ -550,9 +563,41 @@ void test_set_string_and_basic_arithmetic(void)
     ASSERT_TRUE(mf_get_mantissa_u64(c, &mantissa));
     ASSERT_EQ_LONG((long)mantissa, 3);
 
+    ASSERT_EQ_INT(mf_sub_long(d, 2), 0);
+    print_mfloat_value("d after d -= 2", d);
+    ASSERT_EQ_LONG((long)mf_get_sign(d), 1);
+    ASSERT_EQ_LONG(mf_get_exponent2(d), -1);
+    ASSERT_TRUE(mf_get_mantissa_u64(d, &mantissa));
+    ASSERT_EQ_LONG((long)mantissa, 3);
+
+    ASSERT_EQ_INT(mf_sub_mrational(e, MR_HALF), 0);
+    print_mfloat_value("e after e -= 1/2", e);
+    ASSERT_EQ_LONG((long)mf_get_sign(e), 1);
+    ASSERT_EQ_LONG(mf_get_exponent2(e), 1);
+    ASSERT_TRUE(mf_get_mantissa_u64(e, &mantissa));
+    ASSERT_EQ_LONG((long)mantissa, 1);
+
+    ASSERT_EQ_INT(mf_add_mint(f, MI_TWO), 0);
+    print_mfloat_value("f after f += 2", f);
+    ASSERT_EQ_LONG((long)mf_get_sign(f), 1);
+    ASSERT_EQ_LONG(mf_get_exponent2(f), -1);
+    ASSERT_TRUE(mf_get_mantissa_u64(f, &mantissa));
+    ASSERT_EQ_LONG((long)mantissa, 7);
+
+    ASSERT_EQ_INT(mf_sub_mint(g, MI_ONE), 0);
+    print_mfloat_value("g after g -= 1", g);
+    ASSERT_EQ_LONG((long)mf_get_sign(g), 1);
+    ASSERT_EQ_LONG(mf_get_exponent2(g), -1);
+    ASSERT_TRUE(mf_get_mantissa_u64(g, &mantissa));
+    ASSERT_EQ_LONG((long)mantissa, 1);
+
     mf_free(a);
     mf_free(b);
     mf_free(c);
+    mf_free(d);
+    mf_free(e);
+    mf_free(f);
+    mf_free(g);
 }
 
 void test_division_and_power(void)

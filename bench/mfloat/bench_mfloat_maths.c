@@ -59,6 +59,77 @@ static int bench_case_enabled(const char *label)
     return strstr(label, filter) != NULL;
 }
 
+static void bench_fail(const char *label, const char *message)
+{
+    fprintf(stderr, "%s %s\n", label, message);
+    exit(EXIT_FAILURE);
+}
+
+static int bench_reference_addsub(mfloat_t *dst,
+                                  const mfloat_t *lhs,
+                                  const mfloat_t *rhs,
+                                  int subtract)
+{
+    mint_t *lhs_scaled = NULL;
+    mint_t *rhs_scaled = NULL;
+    long common_exp;
+    int rc = -1;
+
+    if (!dst || !lhs || !rhs)
+        return -1;
+    if (mfloat_copy_value(dst, lhs) != 0)
+        return -1;
+
+    common_exp = lhs->exponent2 < rhs->exponent2 ? lhs->exponent2 : rhs->exponent2;
+    lhs_scaled = mfloat_to_scaled_mint(lhs, common_exp);
+    rhs_scaled = mfloat_to_scaled_mint(rhs, common_exp);
+    if (!lhs_scaled || !rhs_scaled)
+        goto cleanup;
+    if (subtract && mi_neg(rhs_scaled) != 0)
+        goto cleanup;
+    if (mi_add(lhs_scaled, rhs_scaled) != 0)
+        goto cleanup;
+    rc = mfloat_set_from_signed_mint(dst, lhs_scaled, common_exp);
+
+cleanup:
+    mi_free(lhs_scaled);
+    mi_free(rhs_scaled);
+    return rc;
+}
+
+static int bench_verify_binary_case(const char *label,
+                                    const mfloat_t *lhs_src,
+                                    const mfloat_t *rhs,
+                                    int (*fn)(mfloat_t *, const mfloat_t *))
+{
+    mfloat_t *actual = NULL;
+    mfloat_t *expected = NULL;
+    int rc = -1;
+
+    if (!(strncmp(label, "add_", 4) == 0 || strncmp(label, "sub_", 4) == 0))
+        return 0;
+
+    actual = mf_clone(lhs_src);
+    expected = mf_new_prec(lhs_src->precision);
+    if (!actual || !expected)
+        goto cleanup;
+
+    if (fn(actual, rhs) != 0)
+        goto cleanup;
+    if (bench_reference_addsub(expected, lhs_src, rhs, strncmp(label, "sub_", 4) == 0) != 0)
+        goto cleanup;
+    if (mf_cmp(actual, expected) != 0) {
+        bench_fail(label, "correctness check failed");
+    }
+
+    rc = 0;
+
+cleanup:
+    mf_free(actual);
+    mf_free(expected);
+    return rc;
+}
+
 static void run_unary_case(const char *label,
                            const char *text,
                            size_t precision,
@@ -77,57 +148,50 @@ static void run_unary_case(const char *label,
 
     old_prec = mf_get_default_precision();
     if (mf_set_default_precision(precision) != 0) {
-        fprintf(stderr, "%s set default precision failed\n", label);
-        return;
+        bench_fail(label, "set default precision failed");
     }
 
     src = mf_create_string(text);
     if (!src) {
-        fprintf(stderr, "%s source create failed\n", label);
         (void)mf_set_default_precision(old_prec);
-        return;
+        bench_fail(label, "source create failed");
     }
 
     value = mf_clone(src);
     if (!value) {
-        fprintf(stderr, "%s work clone failed\n", label);
         mf_free(src);
         (void)mf_set_default_precision(old_prec);
-        return;
+        bench_fail(label, "work clone failed");
     }
 
     {
         if (fn(value) != 0) {
-            fprintf(stderr, "%s warmup failed\n", label);
             mf_free(value);
             mf_free(src);
             (void)mf_set_default_precision(old_prec);
-            return;
+            bench_fail(label, "warmup failed");
         }
         if (mfloat_copy_value(value, src) != 0) {
-            fprintf(stderr, "%s warmup reset failed\n", label);
             mf_free(value);
             mf_free(src);
             (void)mf_set_default_precision(old_prec);
-            return;
+            bench_fail(label, "warmup reset failed");
         }
     }
 
     start = now_ns();
     for (int i = 0; i < iters; ++i) {
         if (fn(value) != 0) {
-            fprintf(stderr, "%s timed run failed\n", label);
             mf_free(value);
             mf_free(src);
             (void)mf_set_default_precision(old_prec);
-            return;
+            bench_fail(label, "timed run failed");
         }
         if (i + 1 < iters && mfloat_copy_value(value, src) != 0) {
-            fprintf(stderr, "%s timed reset failed\n", label);
             mf_free(value);
             mf_free(src);
             (void)mf_set_default_precision(old_prec);
-            return;
+            bench_fail(label, "timed reset failed");
         }
     }
     end = now_ns();
@@ -154,56 +218,81 @@ static void run_binary_case(const char *label,
     size_t old_prec;
     mfloat_t *lhs_src;
     mfloat_t *rhs;
+    mfloat_t *warm = NULL;
+    mfloat_t **values = NULL;
     uint64_t start;
     uint64_t end;
     double avg_us;
+    int i;
 
     if (!bench_case_enabled(label))
         return;
 
     old_prec = mf_get_default_precision();
     if (mf_set_default_precision(precision) != 0) {
-        fprintf(stderr, "%s set default precision failed\n", label);
-        return;
+        bench_fail(label, "set default precision failed");
     }
 
     lhs_src = mf_create_string(lhs_text);
     rhs = mf_create_string(rhs_text);
-    if (!lhs_src || !rhs) {
-        fprintf(stderr, "%s source create failed\n", label);
+    warm = lhs_src ? mf_clone(lhs_src) : NULL;
+    if (!lhs_src || !rhs || !warm) {
         mf_free(lhs_src);
         mf_free(rhs);
+        mf_free(warm);
         (void)mf_set_default_precision(old_prec);
-        return;
+        bench_fail(label, "source create failed");
+    }
+    if (bench_verify_binary_case(label, lhs_src, rhs, fn) != 0) {
+        mf_free(lhs_src);
+        mf_free(rhs);
+        mf_free(warm);
+        (void)mf_set_default_precision(old_prec);
+        bench_fail(label, "reference verification failed");
     }
 
-    {
-        mfloat_t *warm = mf_clone(lhs_src);
+    if (fn(warm, rhs) != 0) {
+        mf_free(lhs_src);
+        mf_free(rhs);
+        mf_free(warm);
+        (void)mf_set_default_precision(old_prec);
+        bench_fail(label, "warmup failed");
+    }
 
-        if (!warm || fn(warm, rhs) != 0) {
-            fprintf(stderr, "%s warmup failed\n", label);
-            mf_free(warm);
+    values = (mfloat_t **)calloc((size_t)iters, sizeof(*values));
+    if (!values) {
+        mf_free(lhs_src);
+        mf_free(rhs);
+        mf_free(warm);
+        (void)mf_set_default_precision(old_prec);
+        bench_fail(label, "work array alloc failed");
+    }
+    for (i = 0; i < iters; ++i) {
+        values[i] = mf_clone(lhs_src);
+        if (!values[i]) {
+            for (int j = 0; j < i; ++j)
+                mf_free(values[j]);
+            free(values);
             mf_free(lhs_src);
             mf_free(rhs);
+            mf_free(warm);
             (void)mf_set_default_precision(old_prec);
-            return;
+            bench_fail(label, "work clone failed");
         }
-        mf_free(warm);
     }
 
     start = now_ns();
-    for (int i = 0; i < iters; ++i) {
-        mfloat_t *value = mf_clone(lhs_src);
-
-        if (!value || fn(value, rhs) != 0) {
-            fprintf(stderr, "%s timed run failed\n", label);
-            mf_free(value);
+    for (i = 0; i < iters; ++i) {
+        if (fn(values[i], rhs) != 0) {
+            for (int j = 0; j < iters; ++j)
+                mf_free(values[j]);
+            free(values);
             mf_free(lhs_src);
             mf_free(rhs);
+            mf_free(warm);
             (void)mf_set_default_precision(old_prec);
-            return;
+            bench_fail(label, "timed run failed");
         }
-        mf_free(value);
     }
     end = now_ns();
 
@@ -216,6 +305,10 @@ static void run_binary_case(const char *label,
 
     mf_free(lhs_src);
     mf_free(rhs);
+    mf_free(warm);
+    for (i = 0; i < iters; ++i)
+        mf_free(values[i]);
+    free(values);
     (void)mf_set_default_precision(old_prec);
 }
 
@@ -500,7 +593,7 @@ int main(void)
 {
     puts("== mfloat native math bench ==");
     puts("Scale iterations with MARS_BENCH_SCALE=<n> if you want longer runs.");
-    puts("Limit to one section with MARS_BENCH_SECTION=constants|exp|log|elem256|triage256|special256|selected512|selected768|selected1024.");
+    puts("Limit to one section with MARS_BENCH_SECTION=constants|arith|exp|log|elem256|triage256|special256|selected512|selected768|selected1024.");
     puts("Filter individual cases with MARS_BENCH_FILTER=<substring>.");
 
     if (bench_wants_section("constants")) {
@@ -512,6 +605,27 @@ int main(void)
         run_const_case("pi_512", 512u, mf_pi, bench_scaled_iters(4));
         run_const_case("e_512", 512u, mf_e, bench_scaled_iters(4));
         run_const_case("gamma_512", 512u, mf_euler_mascheroni, bench_scaled_iters(3));
+    }
+
+    if (bench_wants_exact_section("arith")) {
+        puts("");
+        puts("-- arith --");
+        run_binary_case("add_256", "1.23456789", "2.345678", 256u, mf_add, bench_scaled_iters(120));
+        run_binary_case("sub_256", "1.23456789", "2.345678", 256u, mf_sub, bench_scaled_iters(120));
+        run_binary_case("mul_256", "1.23456789", "2.345678", 256u, mf_mul, bench_scaled_iters(120));
+        run_binary_case("div_256", "1.23456789", "2.345678", 256u, mf_div, bench_scaled_iters(80));
+        run_binary_case("add_512", "1.23456789", "2.345678", 512u, mf_add, bench_scaled_iters(80));
+        run_binary_case("sub_512", "1.23456789", "2.345678", 512u, mf_sub, bench_scaled_iters(80));
+        run_binary_case("mul_512", "1.23456789", "2.345678", 512u, mf_mul, bench_scaled_iters(80));
+        run_binary_case("div_512", "1.23456789", "2.345678", 512u, mf_div, bench_scaled_iters(40));
+        run_binary_case("add_768", "1.23456789", "2.345678", 768u, mf_add, bench_scaled_iters(40));
+        run_binary_case("sub_768", "1.23456789", "2.345678", 768u, mf_sub, bench_scaled_iters(40));
+        run_binary_case("mul_768", "1.23456789", "2.345678", 768u, mf_mul, bench_scaled_iters(40));
+        run_binary_case("div_768", "1.23456789", "2.345678", 768u, mf_div, bench_scaled_iters(20));
+        run_binary_case("add_1024", "1.23456789", "2.345678", 1024u, mf_add, bench_scaled_iters(20));
+        run_binary_case("sub_1024", "1.23456789", "2.345678", 1024u, mf_sub, bench_scaled_iters(20));
+        run_binary_case("mul_1024", "1.23456789", "2.345678", 1024u, mf_mul, bench_scaled_iters(20));
+        run_binary_case("div_1024", "1.23456789", "2.345678", 1024u, mf_div, bench_scaled_iters(10));
     }
 
     if (bench_wants_exact_section("exp")) {
@@ -595,8 +709,8 @@ int main(void)
         run_binary_case("gammainc_Q_256", "1", "1", 256u, mf_gammainc_Q, bench_scaled_iters(2));
         run_binary_case("gammainc_lo_256", "1", "1", 256u, mf_gammainc_lower, bench_scaled_iters(2));
         run_binary_case("gammainc_hi_256", "1", "1", 256u, mf_gammainc_upper, bench_scaled_iters(2));
-        run_unary_case("ei_256", "1", 256u, mf_ei, bench_scaled_iters(2));
-        run_unary_case("e1_256", "1", 256u, mf_e1, bench_scaled_iters(2));
+        run_unary_case("ei_5_256", "5", 256u, mf_ei, bench_scaled_iters(2));
+        run_unary_case("e1_5_256", "5", 256u, mf_e1, bench_scaled_iters(2));
     }
 
     if (bench_wants_section("selected512")) {
@@ -635,8 +749,8 @@ int main(void)
         run_binary_case("logbeta_512", "2.5", "3.5", 512u, mf_logbeta, bench_scaled_iters(1));
         run_ternary_case("beta_pdf_512", "0.5", "2.5", "3.5", 512u, mf_beta_pdf, bench_scaled_iters(1));
         run_unary_case("normal_pdf_512", "0.5", 512u, mf_normal_pdf, bench_scaled_iters(1));
-        run_unary_case("ei_512", "1", 512u, mf_ei, bench_scaled_iters(1));
-        run_unary_case("e1_512", "1", 512u, mf_e1, bench_scaled_iters(1));
+        run_unary_case("ei_5_512", "5", 512u, mf_ei, bench_scaled_iters(1));
+        run_unary_case("e1_5_512", "5", 512u, mf_e1, bench_scaled_iters(1));
     }
 
     if (bench_wants_section("selected768")) {
@@ -669,8 +783,8 @@ int main(void)
         run_unary_case("digamma_768", "2.345", 768u, mf_digamma, bench_scaled_iters(1));
         run_unary_case("trigamma_768", "2.345", 768u, mf_trigamma, bench_scaled_iters(1));
         run_unary_case("tetragamma_768", "2.345", 768u, mf_tetragamma, bench_scaled_iters(1));
-        run_unary_case("ei_768", "1", 768u, mf_ei, bench_scaled_iters(1));
-        run_unary_case("e1_768", "1", 768u, mf_e1, bench_scaled_iters(1));
+        run_unary_case("ei_5_768", "5", 768u, mf_ei, bench_scaled_iters(1));
+        run_unary_case("e1_5_768", "5", 768u, mf_e1, bench_scaled_iters(1));
         run_unary_case("lambert_w0_768", "0.7", 768u, mf_lambert_w0, bench_scaled_iters(1));
         run_unary_case("lambert_wm1_768", "-0.2", 768u, mf_lambert_wm1, bench_scaled_iters(1));
     }
@@ -711,8 +825,8 @@ int main(void)
         run_binary_case("logbeta_1024", "2.5", "3.5", 1024u, mf_logbeta, bench_scaled_iters(1));
         run_ternary_case("beta_pdf_1024", "0.5", "2.5", "3.5", 1024u, mf_beta_pdf, bench_scaled_iters(1));
         run_unary_case("normal_pdf_1024", "0.5", 1024u, mf_normal_pdf, bench_scaled_iters(1));
-        run_unary_case("ei_1024", "1", 1024u, mf_ei, bench_scaled_iters(1));
-        run_unary_case("e1_1024", "1", 1024u, mf_e1, bench_scaled_iters(1));
+        run_unary_case("ei_5_1024", "5", 1024u, mf_ei, bench_scaled_iters(1));
+        run_unary_case("e1_5_1024", "5", 1024u, mf_e1, bench_scaled_iters(1));
     }
 
     return EXIT_SUCCESS;

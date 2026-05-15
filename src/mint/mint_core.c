@@ -79,6 +79,23 @@ int mint_is_even_internal(const mint_t *mint)
     return mint_is_zero_internal(mint) || ((mint->storage[0] & 1u) == 0);
 }
 
+size_t mint_trailing_zero_bits_internal(const mint_t *mint)
+{
+    size_t limb_index;
+
+    if (mint_is_zero_internal(mint))
+        return 0;
+
+    for (limb_index = 0; limb_index < mint->length; ++limb_index) {
+        uint64_t limb = mint->storage[limb_index];
+
+        if (limb != 0)
+            return limb_index * 64u + (size_t)__builtin_ctzll(limb);
+    }
+
+    return 0;
+}
+
 int mint_is_odd_internal(const mint_t *mint)
 {
     return !mint_is_zero_internal(mint) && ((mint->storage[0] & 1u) != 0);

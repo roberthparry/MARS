@@ -1,9 +1,13 @@
 #include "mfloat_internal.h"
+#include "mint/mint_internal.h"
 
 #include <limits.h>
 #include <stddef.h>
+#include <stdlib.h>
+#include <string.h>
 
 #define MFLOAT_ARITH_SLACK_BITS 64u
+#define MFLOAT_STACK_SCRATCH_LIMBS 32u
 
 static int mfloat_set_special(mfloat_t *mfloat, mfloat_kind_t kind)
 {
@@ -34,12 +38,61 @@ static int mfloat_trim_oversized_inplace(mfloat_t *mfloat)
     return mfloat_round_to_precision_internal(mfloat, target_precision);
 }
 
-static mfloat_t *mfloat_clone_trimmed_operand(const mfloat_t *src)
+static int mfloat_normalise_fast_if_possible(mfloat_t *mfloat)
 {
+    if (!mfloat || !mfloat->mantissa || !mfloat_is_finite(mfloat))
+        return -1;
+    if (mfloat->mantissa->length == 0 || mi_is_zero(mfloat->mantissa)) {
+        mfloat->sign = 0;
+        mfloat->exponent2 = 0;
+        mfloat->kind = MFLOAT_KIND_FINITE;
+        return 0;
+    }
+    if (mfloat->sign == 0)
+        mfloat->sign = 1;
+    /*
+     * Keep fast-path add/sub results in a valid finite form without
+     * immediately re-canonicalising away every trailing factor of two.
+     * That canonical odd-mantissa normalisation is exactly the extra work
+     * MPFR avoids in its hot add/sub lane.
+     */
+    return 0;
+}
+
+static int mfloat_is_fastpath_eligible_operand(const mfloat_t *mfloat)
+{
+    size_t limb_cap;
+
+    if (!mfloat || !mfloat->mantissa || !mfloat_is_finite(mfloat) || mf_is_zero(mfloat))
+        return 0;
+    limb_cap = (mfloat->precision + MFLOAT_ARITH_SLACK_BITS + 63u) / 64u;
+    return mfloat->mantissa->length <= limb_cap;
+}
+
+static int mfloat_operands_fastpath_eligible(const mfloat_t *lhs, const mfloat_t *rhs)
+{
+    if (!mfloat_is_fastpath_eligible_operand(lhs) ||
+        !mfloat_is_fastpath_eligible_operand(rhs))
+        return 0;
+    return lhs->precision == rhs->precision;
+}
+
+static const mfloat_t *mfloat_borrow_or_clone_trimmed_operand(const mfloat_t *src,
+                                                              mfloat_t **owned_tmp)
+{
+    size_t bitlen, target_precision;
     mfloat_t *tmp;
 
+    if (owned_tmp)
+        *owned_tmp = NULL;
     if (!src)
         return NULL;
+    if (!mfloat_is_finite(src) || mf_is_zero(src))
+        return src;
+    bitlen = mi_bit_length(src->mantissa);
+    target_precision = src->precision + MFLOAT_ARITH_SLACK_BITS;
+    if (bitlen <= target_precision)
+        return src;
     tmp = mf_clone(src);
     if (!tmp)
         return NULL;
@@ -47,7 +100,647 @@ static mfloat_t *mfloat_clone_trimmed_operand(const mfloat_t *src)
         mf_free(tmp);
         return NULL;
     }
+    if (owned_tmp)
+        *owned_tmp = tmp;
     return tmp;
+}
+
+static int mfloat_align_dest_to_smaller_exponent(mfloat_t *dst, long other_exp)
+{
+    long shift;
+    size_t len;
+    uint64_t carry;
+
+    if (!dst || !dst->mantissa)
+        return -1;
+    if (dst->exponent2 <= other_exp)
+        return 0;
+
+    shift = dst->exponent2 - other_exp;
+    if (shift > 0 && shift < 64) {
+        len = dst->mantissa->length;
+        if (mint_ensure_capacity(dst->mantissa, len + 1) != 0)
+            return -1;
+        carry = mint_shift_left_bits_raw(dst->mantissa->storage,
+                                         dst->mantissa->storage,
+                                         len, (unsigned)shift);
+        if (carry != 0)
+            dst->mantissa->storage[dst->mantissa->length++] = carry;
+    } else if (mi_shl(dst->mantissa, shift) != 0) {
+        return -1;
+    }
+    dst->exponent2 = other_exp;
+    return 0;
+}
+
+static uint64_t mint_shifted_limb_at(const mint_t *src, size_t limb_index,
+                                     size_t limb_shift, unsigned bit_shift)
+{
+    size_t base;
+    uint64_t limb = 0;
+
+    if (!src || limb_index < limb_shift)
+        return 0;
+    base = limb_index - limb_shift;
+    if (bit_shift == 0)
+        return base < src->length ? src->storage[base] : 0;
+
+    if (base < src->length)
+        limb = src->storage[base] << bit_shift;
+    if (base > 0 && base - 1 < src->length)
+        limb |= src->storage[base - 1] >> (64u - bit_shift);
+    return limb;
+}
+
+static void mint_write_shifted_magnitude(uint64_t *dst_storage, size_t dst_length,
+                                         const mint_t *src, long shift_bits)
+{
+    size_t limb_shift = (size_t)(shift_bits / 64);
+    unsigned bit_shift = (unsigned)(shift_bits % 64);
+    size_t i;
+
+    for (i = 0; i < dst_length; ++i)
+        dst_storage[i] = mint_shifted_limb_at(src, i, limb_shift, bit_shift);
+}
+
+static size_t mint_shifted_length(const mint_t *src, long shift_bits);
+
+static int mint_abs_add_small_shift_inplace(mint_t *dst, const mint_t *src,
+                                            unsigned bit_shift)
+{
+    size_t i;
+    size_t orig_len;
+    uint64_t carry_bits = 0;
+    uint64_t carry_add = 0;
+    size_t need;
+
+    if (!dst || !src || bit_shift == 0 || bit_shift >= 64)
+        return -1;
+
+    orig_len = dst->length;
+    need = src->length;
+    if ((src->storage[src->length - 1] >> (64u - bit_shift)) != 0)
+        ++need;
+    if (need < orig_len)
+        need = orig_len;
+    if (dst->capacity < need + 1) {
+        if (mint_ensure_capacity(dst, need + 1) != 0)
+            return -1;
+    }
+    if (orig_len < need) {
+        memset(dst->storage + orig_len, 0,
+               (need - orig_len) * sizeof(*dst->storage));
+    }
+
+    for (i = 0; i < src->length; ++i) {
+        __uint128_t shifted = ((__uint128_t)src->storage[i] << bit_shift) | carry_bits;
+        __uint128_t sum = (__uint128_t)dst->storage[i] + (uint64_t)shifted + carry_add;
+
+        dst->storage[i] = (uint64_t)sum;
+        carry_bits = (uint64_t)(shifted >> 64);
+        carry_add = (uint64_t)(sum >> 64);
+    }
+
+    for (; carry_bits != 0 || carry_add != 0; ++i) {
+        __uint128_t sum = (__uint128_t)(i < dst->length ? dst->storage[i] : 0)
+                        + carry_bits + carry_add;
+
+        if (i >= dst->length)
+            dst->length = i + 1;
+        dst->storage[i] = (uint64_t)sum;
+        carry_bits = 0;
+        carry_add = (uint64_t)(sum >> 64);
+    }
+
+    dst->length = i > orig_len ? i : orig_len;
+    dst->sign = 1;
+    return 0;
+}
+
+static int mint_abs_add_small_shift_same_len_inplace(mint_t *dst, const mint_t *src,
+                                                     unsigned bit_shift)
+{
+    size_t i, len, need;
+    uint64_t carry_bits = 0;
+    uint64_t carry_add = 0;
+
+    if (!dst || !src || bit_shift == 0 || bit_shift >= 64 ||
+        dst->length != src->length)
+        return -1;
+
+    len = src->length;
+    need = len;
+    if ((src->storage[len - 1] >> (64u - bit_shift)) != 0)
+        ++need;
+    if (dst->capacity < need + 1) {
+        if (mint_ensure_capacity(dst, need + 1) != 0)
+            return -1;
+    }
+    if (dst->length < need) {
+        dst->storage[dst->length] = 0;
+        dst->length = need;
+    }
+
+    for (i = 0; i < len; ++i) {
+        __uint128_t shifted = ((__uint128_t)src->storage[i] << bit_shift) | carry_bits;
+        __uint128_t sum = (__uint128_t)dst->storage[i] + (uint64_t)shifted + carry_add;
+
+        dst->storage[i] = (uint64_t)sum;
+        carry_bits = (uint64_t)(shifted >> 64);
+        carry_add = (uint64_t)(sum >> 64);
+    }
+
+    if (carry_bits != 0 || carry_add != 0) {
+        __uint128_t sum = (__uint128_t)dst->storage[len] + carry_bits + carry_add;
+        dst->storage[len] = (uint64_t)sum;
+        dst->length = len + 1;
+    } else {
+        dst->length = len;
+    }
+
+    dst->sign = 1;
+    return 0;
+}
+
+static int mint_cmp_abs_small_shift(const mint_t *lhs, const mint_t *rhs,
+                                    unsigned bit_shift)
+{
+    size_t lhs_len, rhs_len, i;
+    uint64_t top_carry = 0;
+
+    if (!lhs || !rhs || bit_shift == 0 || bit_shift >= 64)
+        return 0;
+
+    lhs_len = lhs->length;
+    while (lhs_len > 0 && lhs->storage[lhs_len - 1] == 0)
+        --lhs_len;
+    rhs_len = rhs->length;
+    while (rhs_len > 0 && rhs->storage[rhs_len - 1] == 0)
+        --rhs_len;
+    if (rhs_len == 0)
+        return lhs_len == 0 ? 0 : 1;
+    top_carry = rhs->storage[rhs_len - 1] >> (64u - bit_shift);
+    if (top_carry != 0)
+        ++rhs_len;
+
+    if (lhs_len < rhs_len)
+        return -1;
+    if (lhs_len > rhs_len)
+        return 1;
+
+    for (i = lhs_len; i > 0; --i) {
+        uint64_t rhs_limb = mint_shifted_limb_at(rhs, i - 1, 0, bit_shift);
+
+        if (lhs->storage[i - 1] < rhs_limb)
+            return -1;
+        if (lhs->storage[i - 1] > rhs_limb)
+            return 1;
+    }
+    return 0;
+}
+
+static int mint_cmp_abs_small_shift_same_len(const mint_t *lhs, const mint_t *rhs,
+                                             unsigned bit_shift)
+{
+    size_t len, i;
+    uint64_t top_carry;
+
+    if (!lhs || !rhs || bit_shift == 0 || bit_shift >= 64 ||
+        lhs->length != rhs->length)
+        return 0;
+
+    len = lhs->length;
+    top_carry = rhs->storage[len - 1] >> (64u - bit_shift);
+    if (top_carry != 0)
+        return -1;
+
+    for (i = len; i > 0; --i) {
+        uint64_t rhs_limb = (rhs->storage[i - 1] << bit_shift);
+
+        if (i > 1)
+            rhs_limb |= rhs->storage[i - 2] >> (64u - bit_shift);
+        if (lhs->storage[i - 1] < rhs_limb)
+            return -1;
+        if (lhs->storage[i - 1] > rhs_limb)
+            return 1;
+    }
+    return 0;
+}
+
+static void mint_abs_sub_small_shift_inplace(mint_t *dst, const mint_t *src,
+                                             unsigned bit_shift)
+{
+    size_t i;
+    uint64_t carry_bits = 0;
+    uint64_t borrow = 0;
+
+    for (i = 0; i < src->length; ++i) {
+        __uint128_t shifted = ((__uint128_t)src->storage[i] << bit_shift) | carry_bits;
+        uint64_t sub = (uint64_t)shifted;
+        uint64_t next_carry = (uint64_t)(shifted >> 64);
+        uint64_t cur = dst->storage[i];
+        uint64_t total = sub + borrow;
+
+        borrow = (cur < total) ? 1u : 0u;
+        dst->storage[i] = cur - total;
+        carry_bits = next_carry;
+    }
+
+    for (; carry_bits != 0 || borrow != 0; ++i) {
+        uint64_t total = carry_bits + borrow;
+        uint64_t cur = dst->storage[i];
+
+        borrow = (cur < total) ? 1u : 0u;
+        dst->storage[i] = cur - total;
+        carry_bits = 0;
+    }
+
+    mint_normalise(dst);
+}
+
+static void mint_set_abs_diff_small_shift_self(mint_t *dst,
+                                               const mint_t *src,
+                                               unsigned bit_shift,
+                                               size_t sub_length)
+{
+    size_t i;
+    uint64_t carry_bits = 0;
+    uint64_t borrow = 0;
+
+    for (i = 0; i < src->length; ++i) {
+        __uint128_t shifted = ((__uint128_t)src->storage[i] << bit_shift) | carry_bits;
+        uint64_t limb = (uint64_t)shifted;
+        uint64_t next_carry = (uint64_t)(shifted >> 64);
+        uint64_t sub = i < sub_length ? dst->storage[i] : 0;
+        uint64_t total = sub + borrow;
+
+        borrow = (limb < total) ? 1u : 0u;
+        dst->storage[i] = limb - total;
+        carry_bits = next_carry;
+    }
+
+    for (; i < dst->length; ++i) {
+        uint64_t limb = carry_bits;
+        uint64_t sub = i < sub_length ? dst->storage[i] : 0;
+        uint64_t total = sub + borrow;
+
+        borrow = (limb < total) ? 1u : 0u;
+        dst->storage[i] = limb - total;
+        carry_bits = 0;
+    }
+
+    mint_normalise(dst);
+}
+
+static void mint_abs_sub_small_shift_same_len_inplace(mint_t *dst, const mint_t *src,
+                                                      unsigned bit_shift)
+{
+    size_t i, len;
+    uint64_t carry_bits = 0;
+    uint64_t borrow = 0;
+
+    len = src->length;
+    for (i = 0; i < len; ++i) {
+        __uint128_t shifted = ((__uint128_t)src->storage[i] << bit_shift) | carry_bits;
+        uint64_t sub = (uint64_t)shifted;
+        uint64_t next_carry = (uint64_t)(shifted >> 64);
+        uint64_t cur = dst->storage[i];
+        uint64_t total = sub + borrow;
+
+        borrow = (cur < total) ? 1u : 0u;
+        dst->storage[i] = cur - total;
+        carry_bits = next_carry;
+    }
+
+    dst->length = len;
+    if (dst->storage[len - 1] == 0)
+        mint_normalise(dst);
+}
+
+static int mfloat_try_small_shift_fast_path(mfloat_t *mfloat, const mfloat_t *other,
+                                            short other_sign)
+{
+    long shift_bits = other->exponent2 - mfloat->exponent2;
+    unsigned bit_shift;
+    int cmp;
+    size_t need;
+    size_t orig_lhs_length = 0;
+
+    if (shift_bits <= 0 || shift_bits >= 64)
+        return 0;
+
+    bit_shift = (unsigned)shift_bits;
+
+    if (mfloat->sign == other_sign) {
+        if ((mfloat->mantissa->length == other->mantissa->length
+                ? mint_abs_add_small_shift_same_len_inplace(mfloat->mantissa, other->mantissa, bit_shift)
+                : mint_abs_add_small_shift_inplace(mfloat->mantissa, other->mantissa, bit_shift)) != 0)
+            return -1;
+        return mfloat_normalise_fast_if_possible(mfloat) == 0 ? 1 : -1;
+    }
+
+    cmp = mfloat->mantissa->length == other->mantissa->length
+        ? mint_cmp_abs_small_shift_same_len(mfloat->mantissa, other->mantissa, bit_shift)
+        : mint_cmp_abs_small_shift(mfloat->mantissa, other->mantissa, bit_shift);
+    if (cmp == 0) {
+        mf_clear(mfloat);
+        return 1;
+    }
+    if (cmp > 0) {
+        if (mfloat->mantissa->length == other->mantissa->length)
+            mint_abs_sub_small_shift_same_len_inplace(mfloat->mantissa, other->mantissa, bit_shift);
+        else
+            mint_abs_sub_small_shift_inplace(mfloat->mantissa, other->mantissa, bit_shift);
+        return mfloat_normalise_fast_if_possible(mfloat) == 0 ? 1 : -1;
+    }
+
+    orig_lhs_length = mfloat->mantissa->length;
+    need = mint_shifted_length(other->mantissa, shift_bits);
+    if (mint_ensure_capacity(mfloat->mantissa, need) != 0)
+        return -1;
+    while (mfloat->mantissa->length < need)
+        mfloat->mantissa->storage[mfloat->mantissa->length++] = 0;
+    mint_set_abs_diff_small_shift_self(mfloat->mantissa, other->mantissa, bit_shift,
+                                       orig_lhs_length);
+    mfloat->sign = other_sign;
+    return mfloat_normalise_fast_if_possible(mfloat) == 0 ? 1 : -1;
+}
+
+static size_t mint_shifted_length(const mint_t *src, long shift_bits)
+{
+    size_t limb_shift;
+    unsigned bit_shift;
+    size_t length;
+
+    if (!src || src->length == 0)
+        return 0;
+    limb_shift = (size_t)(shift_bits / 64);
+    bit_shift = (unsigned)(shift_bits % 64);
+    length = src->length + limb_shift;
+    if (bit_shift != 0 && (src->storage[src->length - 1] >> (64u - bit_shift)) != 0)
+        ++length;
+    return length;
+}
+
+static int mint_cmp_abs_shifted(const mint_t *lhs, const mint_t *rhs, long shift_bits)
+{
+    size_t lhs_len, rhs_len, i;
+    size_t limb_shift;
+    unsigned bit_shift;
+
+    if (!lhs || !rhs || shift_bits < 0)
+        return 0;
+    lhs_len = lhs->length;
+    while (lhs_len > 0 && lhs->storage[lhs_len - 1] == 0)
+        --lhs_len;
+    rhs_len = mint_shifted_length(rhs, shift_bits);
+    if (lhs_len < rhs_len)
+        return -1;
+    if (lhs_len > rhs_len)
+        return 1;
+
+    limb_shift = (size_t)(shift_bits / 64);
+    bit_shift = (unsigned)(shift_bits % 64);
+    for (i = lhs_len; i > 0; --i) {
+        uint64_t lhs_limb = lhs->storage[i - 1];
+        uint64_t rhs_limb = mint_shifted_limb_at(rhs, i - 1, limb_shift, bit_shift);
+
+        if (lhs_limb < rhs_limb)
+            return -1;
+        if (lhs_limb > rhs_limb)
+            return 1;
+    }
+    return 0;
+}
+
+static int mint_abs_add_shifted_inplace(mint_t *dst, const mint_t *src, long shift_bits)
+{
+    size_t limb_shift, need, i;
+    unsigned bit_shift;
+    uint64_t carry = 0;
+
+    if (!dst || !src || shift_bits < 0)
+        return -1;
+    limb_shift = (size_t)(shift_bits / 64);
+    bit_shift = (unsigned)(shift_bits % 64);
+    need = mint_shifted_length(src, shift_bits);
+    if (need < dst->length)
+        need = dst->length;
+    if (dst->capacity < need + 1) {
+        if (mint_ensure_capacity(dst, need + 1) != 0)
+            return -1;
+    }
+    if (dst->length < need) {
+        memset(dst->storage + dst->length, 0,
+               (need - dst->length) * sizeof(*dst->storage));
+        dst->length = need;
+    }
+
+    for (i = 0; i < src->length; ++i) {
+        size_t idx = i + limb_shift;
+        __uint128_t shifted = ((__uint128_t)src->storage[i] << bit_shift) + carry;
+        __uint128_t sum = (__uint128_t)dst->storage[idx] + (uint64_t)shifted;
+
+        dst->storage[idx] = (uint64_t)sum;
+        carry = (uint64_t)(shifted >> 64) + (uint64_t)(sum >> 64);
+    }
+
+    for (i = src->length + limb_shift; carry != 0; ++i) {
+        __uint128_t sum = (__uint128_t)(i < dst->length ? dst->storage[i] : 0) + carry;
+
+        if (i >= dst->length)
+            dst->length = i + 1;
+        dst->storage[i] = (uint64_t)sum;
+        carry = (uint64_t)(sum >> 64);
+    }
+
+    mint_normalise(dst);
+    dst->sign = 1;
+    return 0;
+}
+
+static void mint_abs_sub_shifted_inplace(mint_t *dst, const mint_t *src, long shift_bits)
+{
+    size_t limb_shift, i;
+    unsigned bit_shift;
+    uint64_t carry = 0;
+    uint64_t borrow = 0;
+
+    limb_shift = (size_t)(shift_bits / 64);
+    bit_shift = (unsigned)(shift_bits % 64);
+
+    for (i = 0; i < src->length; ++i) {
+        size_t idx = i + limb_shift;
+        __uint128_t shifted = ((__uint128_t)src->storage[i] << bit_shift) + carry;
+        uint64_t sub = (uint64_t)shifted;
+        uint64_t next_carry = (uint64_t)(shifted >> 64);
+        uint64_t cur = dst->storage[idx];
+        uint64_t total = sub + borrow;
+
+        borrow = (cur < total) ? 1u : 0u;
+        dst->storage[idx] = cur - total;
+        carry = next_carry;
+    }
+
+    for (i = src->length + limb_shift; carry != 0 || borrow != 0; ++i) {
+        uint64_t total = carry + borrow;
+        uint64_t cur = dst->storage[i];
+
+        borrow = (cur < total) ? 1u : 0u;
+        dst->storage[i] = cur - total;
+        carry = 0;
+    }
+
+    mint_normalise(dst);
+}
+
+static void mint_set_abs_diff_self(mint_t *dst,
+                                   const mint_t *src,
+                                   size_t sub_length)
+{
+    size_t i;
+    uint64_t borrow = 0;
+
+    for (i = 0; i < src->length; ++i) {
+        uint64_t lhs = src->storage[i];
+        uint64_t rhs = i < sub_length ? dst->storage[i] : 0;
+        uint64_t total = rhs + borrow;
+
+        borrow = (lhs < total) ? 1u : 0u;
+        dst->storage[i] = lhs - total;
+    }
+
+    for (; i < dst->length; ++i) {
+        uint64_t lhs = 0;
+        uint64_t rhs = i < sub_length ? dst->storage[i] : 0;
+        uint64_t total = rhs + borrow;
+
+        borrow = (lhs < total) ? 1u : 0u;
+        dst->storage[i] = lhs - total;
+    }
+
+    mint_normalise(dst);
+}
+
+static int mfloat_copy_magnitude(mfloat_t *dst, const mint_t *src)
+{
+    if (!dst || !dst->mantissa || !src)
+        return -1;
+    return mint_copy_value(dst->mantissa, src);
+}
+
+static int mfloat_add_finite_direct(mfloat_t *mfloat, const mfloat_t *other,
+                                    short other_sign)
+{
+    long shift_bits;
+    int cmp;
+    uint64_t stack_lhs[MFLOAT_STACK_SCRATCH_LIMBS];
+    uint64_t *orig_lhs_storage = NULL;
+    size_t orig_lhs_length = 0;
+
+    if (!mfloat || !other || !mfloat->mantissa || !other->mantissa)
+        return -1;
+
+    if (mfloat->exponent2 == other->exponent2) {
+        if (mfloat->sign == other_sign) {
+            if (mint_abs_add_inplace(mfloat->mantissa, other->mantissa) != 0)
+                return -1;
+            mfloat->sign = other_sign;
+            return mfloat_normalise_fast_if_possible(mfloat);
+        }
+
+        cmp = mint_cmp_abs(mfloat->mantissa, other->mantissa);
+        if (cmp == 0) {
+            mf_clear(mfloat);
+            return 0;
+        }
+        if (cmp > 0) {
+            mint_abs_sub_inplace(mfloat->mantissa, other->mantissa);
+            return mfloat_normalise_fast_if_possible(mfloat);
+        }
+
+        orig_lhs_length = mfloat->mantissa->length;
+        if (mint_ensure_capacity(mfloat->mantissa, other->mantissa->length) != 0)
+            return -1;
+        while (mfloat->mantissa->length < other->mantissa->length)
+            mfloat->mantissa->storage[mfloat->mantissa->length++] = 0;
+        mint_set_abs_diff_self(mfloat->mantissa, other->mantissa, orig_lhs_length);
+        mfloat->sign = other_sign;
+        return mfloat_normalise_fast_if_possible(mfloat);
+    }
+
+    if (mfloat_align_dest_to_smaller_exponent(mfloat, other->exponent2) != 0)
+        return -1;
+    cmp = mfloat_try_small_shift_fast_path(mfloat, other, other_sign);
+    if (cmp != 0)
+        return cmp > 0 ? 0 : -1;
+    shift_bits = other->exponent2 - mfloat->exponent2;
+
+    if (mfloat->sign == other_sign) {
+        if (shift_bits == 0) {
+            if (mi_add(mfloat->mantissa, other->mantissa) != 0)
+                return -1;
+        } else if (mint_abs_add_shifted_inplace(mfloat->mantissa, other->mantissa, shift_bits) != 0) {
+            return -1;
+        }
+        return mfloat_normalise_fast_if_possible(mfloat);
+    }
+
+    cmp = shift_bits == 0 ? mint_cmp_abs(mfloat->mantissa, other->mantissa)
+                          : mint_cmp_abs_shifted(mfloat->mantissa, other->mantissa,
+                                                 shift_bits);
+    if (cmp == 0) {
+        mf_clear(mfloat);
+        return 0;
+    }
+
+    if (cmp > 0) {
+        if (shift_bits == 0)
+            mint_abs_sub_inplace(mfloat->mantissa, other->mantissa);
+        else
+            mint_abs_sub_shifted_inplace(mfloat->mantissa, other->mantissa, shift_bits);
+        return mfloat_normalise_fast_if_possible(mfloat);
+    }
+
+    orig_lhs_length = mfloat->mantissa->length;
+    if (orig_lhs_length <= MFLOAT_STACK_SCRATCH_LIMBS) {
+        orig_lhs_storage = stack_lhs;
+    } else {
+        orig_lhs_storage = (uint64_t *)malloc(orig_lhs_length * sizeof(*orig_lhs_storage));
+        if (!orig_lhs_storage)
+            return -1;
+    }
+    memcpy(orig_lhs_storage, mfloat->mantissa->storage,
+           orig_lhs_length * sizeof(*orig_lhs_storage));
+
+    if (shift_bits == 0) {
+        if (mfloat_copy_magnitude(mfloat, other->mantissa) != 0)
+            goto fail;
+        mint_abs_sub_raw_inplace(mfloat->mantissa->storage, &mfloat->mantissa->length,
+                                 orig_lhs_storage, orig_lhs_length);
+    } else {
+        size_t need = mint_shifted_length(other->mantissa, shift_bits);
+
+        if (mint_ensure_capacity(mfloat->mantissa, need) != 0)
+            goto fail;
+        while (mfloat->mantissa->length < need)
+            mfloat->mantissa->storage[mfloat->mantissa->length++] = 0;
+        mint_write_shifted_magnitude(mfloat->mantissa->storage, need, other->mantissa,
+                                     shift_bits);
+        mint_normalise(mfloat->mantissa);
+        mint_abs_sub_raw_inplace(mfloat->mantissa->storage, &mfloat->mantissa->length,
+                                 orig_lhs_storage, orig_lhs_length);
+    }
+    mfloat->sign = other_sign;
+    cmp = mfloat_normalise_fast_if_possible(mfloat);
+    if (orig_lhs_storage != stack_lhs)
+        free(orig_lhs_storage);
+    return cmp;
+
+fail:
+    if (orig_lhs_storage && orig_lhs_storage != stack_lhs)
+        free(orig_lhs_storage);
+    return -1;
 }
 
 int mf_cmp(const mfloat_t *a, const mfloat_t *b)
@@ -81,12 +774,10 @@ int mf_cmp(const mfloat_t *a, const mfloat_t *b)
     if (a->sign == 0)
         return 0;
 
-    ta = mfloat_clone_trimmed_operand(a);
-    tb = mfloat_clone_trimmed_operand(b);
-    if (!ta || !tb)
+    a = mfloat_borrow_or_clone_trimmed_operand(a, &ta);
+    b = mfloat_borrow_or_clone_trimmed_operand(b, &tb);
+    if (!a || !b)
         goto cleanup;
-    a = ta;
-    b = tb;
 
     common_exp = a->exponent2 < b->exponent2 ? a->exponent2 : b->exponent2;
     lhs = mfloat_to_scaled_mint(a, common_exp);
@@ -166,9 +857,7 @@ int mf_neg(mfloat_t *mfloat)
 int mf_add(mfloat_t *mfloat, const mfloat_t *other)
 {
     mfloat_t *other_trimmed = NULL;
-    mint_t *lhs = NULL, *rhs = NULL;
-    long common_exp;
-    int rc = -1;
+    int rc;
 
     if (!mfloat || !other)
         return -1;
@@ -186,29 +875,15 @@ int mf_add(mfloat_t *mfloat, const mfloat_t *other)
         return 0;
     if (mf_is_zero(mfloat))
         return mfloat_copy_value(mfloat, other);
+    if (mfloat_operands_fastpath_eligible(mfloat, other))
+        return mfloat_add_finite_direct(mfloat, other, other->sign);
     if (mfloat_trim_oversized_inplace(mfloat) != 0)
         return -1;
-    other_trimmed = mfloat_clone_trimmed_operand(other);
-    if (!other_trimmed)
+    other = mfloat_borrow_or_clone_trimmed_operand(other, &other_trimmed);
+    if (!other)
         return -1;
-    other = other_trimmed;
-
-    common_exp = mfloat->exponent2 < other->exponent2
-               ? mfloat->exponent2 : other->exponent2;
-    lhs = mfloat_to_scaled_mint(mfloat, common_exp);
-    rhs = mfloat_to_scaled_mint(other, common_exp);
-    if (!lhs || !rhs)
-        goto cleanup;
-
-    if (mi_add(lhs, rhs) != 0)
-        goto cleanup;
-
-    rc = mfloat_set_from_signed_mint(mfloat, lhs, common_exp);
-
-cleanup:
+    rc = mfloat_add_finite_direct(mfloat, other, other->sign);
     mf_free(other_trimmed);
-    mi_free(lhs);
-    mi_free(rhs);
     return rc;
 }
 
@@ -263,22 +938,189 @@ cleanup:
     return rc;
 }
 
+int mf_add_mint(mfloat_t *mfloat, const mint_t *value)
+{
+    mint_t *lhs = NULL;
+    mint_t *rhs = NULL;
+    long common_exp;
+    int rc = -1;
+
+    if (!mfloat || !value)
+        return -1;
+    if (mi_is_zero(value))
+        return 0;
+    if (!mfloat_is_finite(mfloat)) {
+        if (mfloat->kind == MFLOAT_KIND_NAN)
+            return mfloat_set_special(mfloat, MFLOAT_KIND_NAN);
+        return 0;
+    }
+    if (mf_is_zero(mfloat)) {
+        rhs = mi_clone(value);
+        if (!rhs)
+            return -1;
+        rc = mfloat_set_from_signed_mint(mfloat, rhs, 0);
+        mi_free(rhs);
+        return rc;
+    }
+
+    if (mfloat_trim_oversized_inplace(mfloat) != 0)
+        return -1;
+
+    common_exp = mfloat->exponent2 < 0 ? mfloat->exponent2 : 0;
+    lhs = mfloat_to_scaled_mint(mfloat, common_exp);
+    rhs = mi_clone(value);
+    if (!lhs || !rhs)
+        goto cleanup;
+    if (common_exp < 0 && mi_shl(rhs, -common_exp) != 0)
+        goto cleanup;
+    if (mi_add(lhs, rhs) != 0)
+        goto cleanup;
+
+    rc = mfloat_set_from_signed_mint(mfloat, lhs, common_exp);
+
+cleanup:
+    mi_free(lhs);
+    mi_free(rhs);
+    return rc;
+}
+
+int mf_sub_long(mfloat_t *mfloat, long value)
+{
+    mint_t *lhs = NULL, *rhs = NULL;
+    long common_exp;
+    int rc = -1;
+
+    if (!mfloat)
+        return -1;
+    if (value == 0)
+        return 0;
+    if (!mfloat_is_finite(mfloat)) {
+        if (mfloat->kind == MFLOAT_KIND_NAN)
+            return mfloat_set_special(mfloat, MFLOAT_KIND_NAN);
+        return 0;
+    }
+    if (value == LONG_MIN) {
+        mfloat_t *tmp = mf_create_long(value);
+
+        if (!tmp)
+            return -1;
+        tmp->precision = mfloat->precision;
+        rc = mf_sub(mfloat, tmp);
+        mf_free(tmp);
+        return rc;
+    }
+    if (mf_is_zero(mfloat))
+        return mf_set_long(mfloat, -value);
+
+    if (mfloat_trim_oversized_inplace(mfloat) != 0)
+        return -1;
+
+    common_exp = mfloat->exponent2 < 0 ? mfloat->exponent2 : 0;
+    lhs = mfloat_to_scaled_mint(mfloat, common_exp);
+    rhs = mi_create_long(value < 0 ? -value : value);
+    if (!lhs || !rhs)
+        goto cleanup;
+    if (common_exp < 0 && mi_shl(rhs, -common_exp) != 0)
+        goto cleanup;
+    if (value > 0 && mi_neg(rhs) != 0)
+        goto cleanup;
+    if (mi_add(lhs, rhs) != 0)
+        goto cleanup;
+
+    rc = mfloat_set_from_signed_mint(mfloat, lhs, common_exp);
+
+cleanup:
+    mi_free(lhs);
+    mi_free(rhs);
+    return rc;
+}
+
+int mf_sub_mint(mfloat_t *mfloat, const mint_t *value)
+{
+    mint_t *lhs = NULL;
+    mint_t *rhs = NULL;
+    long common_exp;
+    int rc = -1;
+
+    if (!mfloat || !value)
+        return -1;
+    if (mi_is_zero(value))
+        return 0;
+    if (!mfloat_is_finite(mfloat)) {
+        if (mfloat->kind == MFLOAT_KIND_NAN)
+            return mfloat_set_special(mfloat, MFLOAT_KIND_NAN);
+        return 0;
+    }
+    if (mf_is_zero(mfloat)) {
+        rhs = mi_clone(value);
+        if (!rhs)
+            return -1;
+        if (mi_neg(rhs) != 0) {
+            mi_free(rhs);
+            return -1;
+        }
+        rc = mfloat_set_from_signed_mint(mfloat, rhs, 0);
+        mi_free(rhs);
+        return rc;
+    }
+
+    if (mfloat_trim_oversized_inplace(mfloat) != 0)
+        return -1;
+
+    common_exp = mfloat->exponent2 < 0 ? mfloat->exponent2 : 0;
+    lhs = mfloat_to_scaled_mint(mfloat, common_exp);
+    rhs = mi_clone(value);
+    if (!lhs || !rhs)
+        goto cleanup;
+    if (common_exp < 0 && mi_shl(rhs, -common_exp) != 0)
+        goto cleanup;
+    if (mi_neg(rhs) != 0 || mi_add(lhs, rhs) != 0)
+        goto cleanup;
+
+    rc = mfloat_set_from_signed_mint(mfloat, lhs, common_exp);
+
+cleanup:
+    mi_free(lhs);
+    mi_free(rhs);
+    return rc;
+}
+
 int mf_sub(mfloat_t *mfloat, const mfloat_t *other)
 {
-    mfloat_t *tmp;
+    mfloat_t *other_trimmed = NULL;
     int rc;
 
     if (!mfloat || !other)
         return -1;
-    tmp = mf_clone(other);
-    if (!tmp)
-        return -1;
-    if (mf_neg(tmp) != 0) {
-        mf_free(tmp);
-        return -1;
+    if (!mfloat_is_finite(mfloat) || !mfloat_is_finite(other)) {
+        if (mfloat->kind == MFLOAT_KIND_NAN || other->kind == MFLOAT_KIND_NAN)
+            return mfloat_set_special(mfloat, MFLOAT_KIND_NAN);
+        if ((mfloat->kind == MFLOAT_KIND_POSINF && other->kind == MFLOAT_KIND_POSINF) ||
+            (mfloat->kind == MFLOAT_KIND_NEGINF && other->kind == MFLOAT_KIND_NEGINF))
+            return mfloat_set_special(mfloat, MFLOAT_KIND_NAN);
+        if (other->kind == MFLOAT_KIND_POSINF)
+            return mfloat_set_special(mfloat, MFLOAT_KIND_NEGINF);
+        if (other->kind == MFLOAT_KIND_NEGINF)
+            return mfloat_set_special(mfloat, MFLOAT_KIND_POSINF);
+        return 0;
     }
-    rc = mf_add(mfloat, tmp);
-    mf_free(tmp);
+    if (mf_is_zero(other))
+        return 0;
+    if (mf_is_zero(mfloat)) {
+        rc = mfloat_copy_value(mfloat, other);
+        if (rc == 0 && !mf_is_zero(mfloat))
+            mfloat->sign = (short)-mfloat->sign;
+        return rc;
+    }
+    if (mfloat_operands_fastpath_eligible(mfloat, other))
+        return mfloat_add_finite_direct(mfloat, other, (short)-other->sign);
+    if (mfloat_trim_oversized_inplace(mfloat) != 0)
+        return -1;
+    other = mfloat_borrow_or_clone_trimmed_operand(other, &other_trimmed);
+    if (!other)
+        return -1;
+    rc = mfloat_add_finite_direct(mfloat, other, (short)-other->sign);
+    mf_free(other_trimmed);
     return rc;
 }
 
@@ -306,10 +1148,9 @@ int mf_mul(mfloat_t *mfloat, const mfloat_t *other)
     }
     if (mfloat_trim_oversized_inplace(mfloat) != 0)
         return -1;
-    other_trimmed = mfloat_clone_trimmed_operand(other);
-    if (!other_trimmed)
+    other = mfloat_borrow_or_clone_trimmed_operand(other, &other_trimmed);
+    if (!other)
         return -1;
-    other = other_trimmed;
 
     if (mi_mul(mfloat->mantissa, other->mantissa) != 0) {
         mf_free(other_trimmed);
@@ -399,10 +1240,9 @@ int mf_div(mfloat_t *mfloat, const mfloat_t *other)
         return 0;
     if (mfloat_trim_oversized_inplace(mfloat) != 0)
         return -1;
-    other_trimmed = mfloat_clone_trimmed_operand(other);
-    if (!other_trimmed)
+    other = mfloat_borrow_or_clone_trimmed_operand(other, &other_trimmed);
+    if (!other)
         return -1;
-    other = other_trimmed;
 
     num = mi_clone(mfloat->mantissa);
     den = mi_clone(other->mantissa);

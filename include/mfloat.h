@@ -9,6 +9,7 @@
 #include "qfloat.h"
 
 typedef struct _mrational_t mrational_t;
+typedef struct _mint_t mint_t;
 typedef struct _mfloat_t mfloat_t;
 
 /**
@@ -198,9 +199,13 @@ int mf_cmp(const mfloat_t *a, const mfloat_t *b);
 int mf_abs(mfloat_t *mfloat);
 int mf_neg(mfloat_t *mfloat);
 int mf_add(mfloat_t *mfloat, const mfloat_t *other);
+int mf_add_mint(mfloat_t *mfloat, const mint_t *value);
 int mf_add_mrational(mfloat_t *mfloat, const mrational_t *value);
 int mf_add_long(mfloat_t *mfloat, long value);
 int mf_sub(mfloat_t *mfloat, const mfloat_t *other);
+int mf_sub_mint(mfloat_t *mfloat, const mint_t *value);
+int mf_sub_mrational(mfloat_t *mfloat, const mrational_t *value);
+int mf_sub_long(mfloat_t *mfloat, long value);
 int mf_mul(mfloat_t *mfloat, const mfloat_t *other);
 int mf_mul_long(mfloat_t *mfloat, long value);
 int mf_mul_mrational(mfloat_t *mfloat, const mrational_t *value);

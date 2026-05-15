@@ -33,7 +33,7 @@ the API. Internally each matrix carries:
 - arithmetic: scalar multiply/divide, matrix add, subtract, multiply
 - structural: transpose, conjugate, Hermitian (conjugate transpose)
 - string I/O: parse matrices from strings, render them back to strings, and print them with matrix-aware format specifiers
-- linear algebra: determinant, trace, characteristic polynomial, minimal polynomial, polynomial application, adjugate, inverse, block inverse, Schur complements, solve, block solve, eigenvalues, eigendecomposition, eigenvectors, eigenspaces, generalized eigenspaces, Jordan-chain helpers, rank, pseudoinverse, nullspace
+- linear algebra: determinant, trace, characteristic polynomial, minimal polynomial, polynomial application, adjugate, inverse, block inverse, Schur complements, solve, block solve, eigenvalues, eigendecomposition, eigenvectors, eigenspaces, generalised eigenspaces, Jordan-chain helpers, rank, pseudoinverse, nullspace
 - symbolic matrix calculus: entrywise derivatives via `mat_deriv(...)`, Jacobian helpers, plus derivative helpers for trace, determinant, inverse, block inverse, solve, and block solve
 - matrix norms: 1-norm, infinity-norm, Frobenius norm, 2-norm
 - matrix factorisations: LU, QR, Cholesky, SVD, Schur
@@ -59,7 +59,7 @@ What currently works for `dval` matrices:
 - exact inverse and solve, including larger dense symbolic cases
 - exact symbolic pseudoinverse, least-squares, rank, and nullspace, including rank-deficient rectangular cases
 - exact Schur complements, block inverses, and block solves, including symbolic `dval` block expressions when the leading block is invertible
-- eigenspaces, generalized eigenspaces, Jordan chains, and Jordan block-size profiles for disciplined symbolic cases
+- eigenspaces, generalised eigenspaces, Jordan chains, and Jordan block-size profiles for disciplined symbolic cases
 - entrywise symbolic matrix derivatives with respect to a chosen `dval` variable
 - row-major Jacobian extraction for matrix-valued symbolic outputs
 - symbolic derivative helpers for `trace(A)`, `det(A)`, and `A^{-1}`

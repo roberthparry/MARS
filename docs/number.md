@@ -53,7 +53,7 @@ Accepted examples:
 - `"1 + i"` -> parsed as `1 + 1i`
 - `"1 - i"` -> parsed as `1 - 1i`
 - `"1e-23 + 2.3e12i"` -> scientific notation in both parts is accepted
-- `"1e-23 + (2.3e12)i"` -> parenthesized imaginary coefficients are accepted
+- `"1e-23 + (2.3e12)i"` -> parenthesised imaginary coefficients are accepted
 - `"1/2 - 3/2i"` -> rational real and imaginary parts are accepted
 - `"3i"` -> pure imaginary form is accepted
 

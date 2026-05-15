@@ -140,7 +140,7 @@ modify a `string_t *` in place do not transfer ownership.
 
 `string_builder_t` is a `typedef` for `string_t`. It carries no extra cost;
 it is a naming convention that signals incremental construction. A builder
-*is* the finished string — no separate finalization step.
+*is* the finished string — no separate finalisation step.
 
 ### Fixed Buffers
 

@@ -8,7 +8,7 @@
 
 /**
  * @file ustring.h
- * @brief Dynamic UTF-8 string type with grapheme-cluster, normalization,
+ * @brief Dynamic UTF-8 string type with grapheme-cluster, normalisation,
  *        and Unicode-aware operations.
  *
  * ## Ownership model
