@@ -168,12 +168,12 @@ int mat_qr_factor(const matrix_t *A, mat_qr_factor_t *out)
     if (out->Q && out->R) {
         for (size_t i = 0; i < m; ++i) {
             for (size_t j = 0; j < kdim; ++j) {
-                mat_set(out->Q, i, j, &Qn[i * kdim + j]);
+                mat_set_num_owned(out->Q, i, j, &Qn[i * kdim + j]);
             }
         }
         for (size_t i = 0; i < kdim; ++i) {
             for (size_t j = i; j < n; ++j) {
-                mat_set(out->R, i, j, &Rn[i * n + j]);
+                mat_set_num_owned(out->R, i, j, &Rn[i * n + j]);
             }
         }
     }
@@ -301,7 +301,7 @@ int mat_cholesky(const matrix_t *A, mat_cholesky_t *out)
     if (out->L) {
         for (size_t i = 0; i < n; ++i) {
             for (size_t j = 0; j <= i; ++j) {
-                mat_set(out->L, i, j, &Ln[i * n + j]);
+                mat_set_num_owned(out->L, i, j, &Ln[i * n + j]);
             }
         }
         if (lower_store != &lower_triangular_store) {

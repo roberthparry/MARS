@@ -226,6 +226,7 @@ void mat_value_destroy(const struct matrix_t *A, void *slot);
 number_t mat_raw_value_to_number(const struct elem_vtable *elem, const void *value);
 void mat_raw_value_from_number(const struct elem_vtable *elem, void *out,
                                const number_t *value);
+void mat_set_num_owned(struct matrix_t *A, size_t i, size_t j, number_t *value);
 size_t mat_cached_numeric_precision_bits(const struct matrix_t *A);
 void mat_numeric_precision_note_set(struct matrix_t *A,
                                     const void *old_val,

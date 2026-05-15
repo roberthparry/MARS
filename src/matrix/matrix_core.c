@@ -107,6 +107,8 @@ typedef struct sparse_entry_t {
     unsigned char value[];
 } sparse_entry_t;
 
+static sparse_entry_t *sparse_find_prev(const struct matrix_t *A, size_t row, size_t col);
+
 struct mat_precision_bucket {
     size_t bits;
     size_t count;
@@ -431,6 +433,149 @@ void mat_raw_value_from_number(const struct elem_vtable *elem, void *out,
 
     if (elem == &dval_elem)
         *(dval_t **)out = dv_new_const(*source);
+}
+
+static void mat_number_slot_take(struct matrix_t *A, void *slot, number_t *value)
+{
+    number_t moved;
+    int was_zero;
+    int is_zero;
+    number_t old_num;
+
+    if (!A || A->elem != &number_elem || !slot)
+        return;
+
+    moved = value ? num_scope_detach(*value) : NUM_ZERO;
+    was_zero = elem_is_structural_zero(A->elem, slot);
+    is_zero = num_is_zero(moved);
+    old_num = *(number_t *)slot;
+    mat_numeric_precision_note_set(A, &old_num, &moved);
+    elem_destroy_value(A->elem, slot);
+    *(number_t *)slot = moved;
+
+    if (was_zero && !is_zero)
+        A->nnz++;
+    else if (!was_zero && is_zero && A->nnz > 0)
+        A->nnz--;
+
+    if (value)
+        *value = NUM_ZERO;
+}
+
+void mat_set_num_owned(struct matrix_t *A, size_t i, size_t j, number_t *value)
+{
+    if (!A || A->elem != &number_elem)
+        return;
+
+    if (A->store == &dense_store) {
+        void *slot = (char *)A->data[i] + j * A->elem->size;
+        mat_number_slot_take(A, slot, value);
+        return;
+    }
+
+    if (A->store == &diagonal_store) {
+        if (i == j) {
+            mat_number_slot_take(A, A->data[i], value);
+            return;
+        }
+        if (!value || num_is_zero(*value))
+            return;
+        diagonal_materialise(A);
+        mat_set_num_owned(A, i, j, value);
+        return;
+    }
+
+    if (A->store == &upper_triangular_store) {
+        if (i <= j && i < A->cols) {
+            void *slot = (char *)A->data[i] + (j - i) * A->elem->size;
+            mat_number_slot_take(A, slot, value);
+            return;
+        }
+        if (!value || num_is_zero(*value))
+            return;
+        upper_triangular_materialise(A);
+        mat_set_num_owned(A, i, j, value);
+        return;
+    }
+
+    if (A->store == &lower_triangular_store) {
+        if (j <= i && j < A->cols) {
+            void *slot = (char *)A->data[i] + j * A->elem->size;
+            mat_number_slot_take(A, slot, value);
+            return;
+        }
+        if (!value || num_is_zero(*value))
+            return;
+        lower_triangular_materialise(A);
+        mat_set_num_owned(A, i, j, value);
+        return;
+    }
+
+    if (A->store == &sparse_store) {
+        sparse_entry_t *prev;
+        sparse_entry_t *cur;
+        number_t moved = value ? num_scope_detach(*value) : NUM_ZERO;
+        int is_zero = num_is_zero(moved);
+
+        prev = sparse_find_prev(A, i, j);
+        cur = prev ? prev->next : (A->data ? (sparse_entry_t *)A->data[i] : NULL);
+
+        if (cur && cur->col == j) {
+            if (is_zero) {
+                mat_numeric_precision_note_set(A, cur->value, A->elem->zero);
+                if (prev)
+                    prev->next = cur->next;
+                else
+                    A->data[i] = cur->next;
+                elem_destroy_value(A->elem, cur->value);
+                free(cur);
+                if (A->nnz > 0)
+                    A->nnz--;
+            } else {
+                mat_numeric_precision_note_set(A, cur->value, &moved);
+                elem_destroy_value(A->elem, cur->value);
+                *(number_t *)cur->value = moved;
+            }
+            if (value)
+                *value = NUM_ZERO;
+            return;
+        }
+
+        if (is_zero) {
+            if (value)
+                *value = NUM_ZERO;
+            return;
+        }
+
+        cur = malloc(sizeof(*cur) + A->elem->size);
+        if (!cur) {
+            num_destroy(&moved);
+            if (value)
+                *value = NUM_ZERO;
+            return;
+        }
+
+        cur->col = j;
+        *(number_t *)cur->value = moved;
+        mat_numeric_precision_note_set(A, A->elem->zero, &moved);
+        if (prev) {
+            cur->next = prev->next;
+            prev->next = cur;
+        } else {
+            cur->next = (sparse_entry_t *)A->data[i];
+            A->data[i] = cur;
+        }
+        A->nnz++;
+        if (value)
+            *value = NUM_ZERO;
+        return;
+    }
+
+    mat_set(A, i, j, value ? value : &NUM_ZERO);
+    if (value) {
+        num_destroy(value);
+        *value = NUM_ZERO;
+    }
 }
 
  void num_init_zero_slot(void *slot)
@@ -2974,7 +3119,6 @@ static matrix_t *mat_fun_triangular_equal_diag(const matrix_t *T,
     }
 
     unsigned char raw[64] = {0};
-    unsigned char slot[64] = {0};
     number_t lambda = number_invalid();
     number_t c0 = number_invalid();
     number_t c1 = number_invalid();
@@ -2984,9 +3128,8 @@ static matrix_t *mat_fun_triangular_equal_diag(const matrix_t *T,
     num_fun_coeffs_up_to_second(&c0, &c1, &c2, scalar_f, &lambda);
 
     for (size_t i = 0; i < n; ++i) {
-        mat_raw_value_from_number(e, slot, &c0);
-        mat_set(F, i, i, slot);
-        elem_destroy_value(e, slot);
+        number_t diag_value = num_clone(c0);
+        mat_set_num_owned(F, i, i, &diag_value);
         for (size_t j = i; j < n; ++j) {
             number_t tij = number_invalid();
             mat_get(T, i, j, raw);
@@ -2995,10 +3138,7 @@ static matrix_t *mat_fun_triangular_equal_diag(const matrix_t *T,
                 num_destroy(&tij);
                 tij = num_clone(NUM_ZERO);
             }
-            mat_raw_value_from_number(e, slot, &tij);
-            mat_set(N, i, j, slot);
-            elem_destroy_value(e, slot);
-            num_destroy(&tij);
+            mat_set_num_owned(N, i, j, &tij);
         }
     }
 
@@ -3010,10 +3150,7 @@ static matrix_t *mat_fun_triangular_equal_diag(const matrix_t *T,
                 mat_get(N, i, j, raw);
                 nij = mat_raw_value_to_number(e, raw);
                 term = num_mul(c1, nij);
-                mat_raw_value_from_number(e, slot, &term);
-                mat_set(F, i, j, slot);
-                elem_destroy_value(e, slot);
-                num_destroy(&term);
+                mat_set_num_owned(F, i, j, &term);
                 num_destroy(&nij);
             }
         }
@@ -3039,10 +3176,7 @@ static matrix_t *mat_fun_triangular_equal_diag(const matrix_t *T,
                 n2ij = mat_raw_value_to_number(e, raw);
                 term = num_mul(c2, n2ij);
                 sum = num_add(fij, term);
-                mat_raw_value_from_number(e, slot, &sum);
-                mat_set(F, i, j, slot);
-                elem_destroy_value(e, slot);
-                num_destroy(&sum);
+                mat_set_num_owned(F, i, j, &sum);
                 num_destroy(&term);
                 num_destroy(&n2ij);
                 num_destroy(&fij);
