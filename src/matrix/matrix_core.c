@@ -2744,12 +2744,12 @@ matrix_t *mat_neg(const matrix_t *A)
 static number_t mat_eval_number_scalar_number(void (*scalar_f)(void *out, const void *in),
                                               const number_t *input)
 {
+    NUM_SCOPE(scope);
     number_t safe_input = input ? num_clone(*input) : num_clone(NUM_ZERO);
     number_t output = number_invalid();
 
     scalar_f(&output, &safe_input);
-    num_destroy(&safe_input);
-    return output;
+    return num_scope_detach(output);
 }
 
 static void mat_eval_number_scalar_elem(const struct elem_vtable *elem,
@@ -2770,40 +2770,33 @@ static void num_fun_coeffs_up_to_second(number_t *c0,
                                         void (*scalar_f)(void *out, const void *in),
                                         const number_t *lambda)
 {
+    NUM_SCOPE(scope);
     number_t f0 = mat_eval_number_scalar_number(scalar_f, lambda);
     if (c0)
-        *c0 = num_clone(f0);
+        *c0 = num_scope_detach(num_clone(f0));
 
     if (scalar_f == number_elem.fun->gamma) {
         number_t psi = num_digamma(*lambda);
         number_t tri = num_trigamma(*lambda);
         if (c1)
-            *c1 = num_mul(f0, psi);
+            *c1 = num_scope_detach(num_mul(f0, psi));
         if (c2) {
             number_t psi2 = num_mul(psi, psi);
             number_t tri_plus = num_add(tri, psi2);
             number_t second = num_mul(f0, tri_plus);
-            *c2 = num_mul(NUM_HALF, second);
-            num_destroy(&second);
-            num_destroy(&tri_plus);
-            num_destroy(&psi2);
+            *c2 = num_scope_detach(num_mul(NUM_HALF, second));
         }
-        num_destroy(&tri);
-        num_destroy(&psi);
-        num_destroy(&f0);
         return;
     }
 
     if (scalar_f == number_elem.fun->digamma) {
         if (c1)
-            *c1 = num_trigamma(*lambda);
+            *c1 = num_scope_detach(num_trigamma(*lambda));
         if (c2)
         {
             number_t tetra = num_tetragamma(*lambda);
-            *c2 = num_mul(NUM_HALF, tetra);
-            num_destroy(&tetra);
+            *c2 = num_scope_detach(num_mul(NUM_HALF, tetra));
         }
-        num_destroy(&f0);
         return;
     }
 
@@ -2815,7 +2808,7 @@ static void num_fun_coeffs_up_to_second(number_t *c0,
         number_t lam2 = num_mul(*lambda, *lambda);
         number_t denom1 = num_mul(*lambda, wp1);
         if (c1)
-            *c1 = num_div(f0, denom1);
+            *c1 = num_scope_detach(num_div(f0, denom1));
         if (c2) {
             number_t f02 = num_mul(f0, f0);
             number_t f0p2 = num_add(f0, two);
@@ -2825,22 +2818,8 @@ static void num_fun_coeffs_up_to_second(number_t *c0,
             number_t wp13 = num_mul(wp1, wp12);
             number_t denom = num_mul(lam2, wp13);
             number_t frac = num_div(numer, denom);
-            *c2 = num_mul(NUM_HALF, frac);
-            num_destroy(&frac);
-            num_destroy(&denom);
-            num_destroy(&wp13);
-            num_destroy(&wp12);
-            num_destroy(&numer);
-            num_destroy(&numer_core);
-            num_destroy(&f0p2);
-            num_destroy(&f02);
+            *c2 = num_scope_detach(num_mul(NUM_HALF, frac));
         }
-        num_destroy(&denom1);
-        num_destroy(&lam2);
-        num_destroy(&wp1);
-        num_destroy(&two);
-        num_destroy(&one);
-        num_destroy(&f0);
         return;
     }
 
@@ -2849,20 +2828,13 @@ static void num_fun_coeffs_up_to_second(number_t *c0,
         number_t one = num_clone(NUM_ONE);
         number_t lam2 = num_mul(*lambda, *lambda);
         if (c1)
-            *c1 = num_div(exp_lambda, *lambda);
+            *c1 = num_scope_detach(num_div(exp_lambda, *lambda));
         if (c2) {
             number_t lam_m_one = num_sub(*lambda, one);
             number_t numer = num_mul(exp_lambda, lam_m_one);
             number_t second = num_div(numer, lam2);
-            *c2 = num_mul(NUM_HALF, second);
-            num_destroy(&second);
-            num_destroy(&numer);
-            num_destroy(&lam_m_one);
+            *c2 = num_scope_detach(num_mul(NUM_HALF, second));
         }
-        num_destroy(&lam2);
-        num_destroy(&one);
-        num_destroy(&exp_lambda);
-        num_destroy(&f0);
         return;
     }
 
@@ -2874,23 +2846,14 @@ static void num_fun_coeffs_up_to_second(number_t *c0,
         if (c1)
         {
             number_t neg_emlambda = num_neg(emlambda);
-            *c1 = num_div(neg_emlambda, *lambda);
-            num_destroy(&neg_emlambda);
+            *c1 = num_scope_detach(num_div(neg_emlambda, *lambda));
         }
         if (c2) {
             number_t lam_p_one = num_add(*lambda, one);
             number_t numer = num_mul(emlambda, lam_p_one);
             number_t second = num_div(numer, lam2);
-            *c2 = num_mul(NUM_HALF, second);
-            num_destroy(&second);
-            num_destroy(&numer);
-            num_destroy(&lam_p_one);
+            *c2 = num_scope_detach(num_mul(NUM_HALF, second));
         }
-        num_destroy(&lam2);
-        num_destroy(&emlambda);
-        num_destroy(&neg_lambda);
-        num_destroy(&one);
-        num_destroy(&f0);
         return;
     }
 
@@ -2901,19 +2864,12 @@ static void num_fun_coeffs_up_to_second(number_t *c0,
         number_t exp_term = num_exp(neg_lambda2);
         number_t fp = num_mul(scale, exp_term);
         if (c1)
-            *c1 = num_clone(fp);
+            *c1 = num_scope_detach(num_clone(fp));
         if (c2)
         {
             number_t prod = num_mul(*lambda, fp);
-            *c2 = num_neg(prod);
-            num_destroy(&prod);
+            *c2 = num_scope_detach(num_neg(prod));
         }
-        num_destroy(&fp);
-        num_destroy(&exp_term);
-        num_destroy(&neg_lambda2);
-        num_destroy(&lambda2);
-        num_destroy(&scale);
-        num_destroy(&f0);
         return;
     }
 
@@ -2924,19 +2880,12 @@ static void num_fun_coeffs_up_to_second(number_t *c0,
         number_t exp_term = num_exp(neg_lambda2);
         number_t fp = num_mul(scale, exp_term);
         if (c1)
-            *c1 = num_clone(fp);
+            *c1 = num_scope_detach(num_clone(fp));
         if (c2)
         {
             number_t prod = num_mul(*lambda, fp);
-            *c2 = num_neg(prod);
-            num_destroy(&prod);
+            *c2 = num_scope_detach(num_neg(prod));
         }
-        num_destroy(&fp);
-        num_destroy(&exp_term);
-        num_destroy(&neg_lambda2);
-        num_destroy(&lambda2);
-        num_destroy(&scale);
-        num_destroy(&f0);
         return;
     }
 
@@ -2944,45 +2893,34 @@ static void num_fun_coeffs_up_to_second(number_t *c0,
         number_t lambda_f0 = num_mul(*lambda, f0);
         number_t fp = num_neg(lambda_f0);
         if (c1)
-            *c1 = num_clone(fp);
+            *c1 = num_scope_detach(num_clone(fp));
         if (c2) {
             number_t lambda2 = num_mul(*lambda, *lambda);
             number_t lambda2m1 = num_sub(lambda2, NUM_ONE);
             number_t core = num_mul(lambda2m1, f0);
-            *c2 = num_mul(NUM_HALF, core);
-            num_destroy(&core);
-            num_destroy(&lambda2m1);
-            num_destroy(&lambda2);
+            *c2 = num_scope_detach(num_mul(NUM_HALF, core));
         }
-        num_destroy(&fp);
-        num_destroy(&lambda_f0);
-        num_destroy(&f0);
         return;
     }
 
     if (scalar_f == number_elem.fun->normal_cdf) {
         number_t pdf = num_normal_pdf(*lambda);
         if (c1)
-            *c1 = num_clone(pdf);
+            *c1 = num_scope_detach(num_clone(pdf));
         if (c2)
         {
             number_t lambda_pdf = num_mul(*lambda, pdf);
             number_t neg_half = num_create_from_double(-0.5);
-            *c2 = num_mul(neg_half, lambda_pdf);
-            num_destroy(&neg_half);
-            num_destroy(&lambda_pdf);
+            *c2 = num_scope_detach(num_mul(neg_half, lambda_pdf));
         }
-        num_destroy(&pdf);
-        num_destroy(&f0);
         return;
     }
 
     if (scalar_f == number_elem.fun->normal_logpdf) {
         if (c1)
-            *c1 = num_neg(*lambda);
+            *c1 = num_scope_detach(num_neg(*lambda));
         if (c2)
-            *c2 = num_create_from_double(-0.5);
-        num_destroy(&f0);
+            *c2 = num_scope_detach(num_create_from_double(-0.5));
         return;
     }
 
@@ -3004,32 +2942,14 @@ static void num_fun_coeffs_up_to_second(number_t *c0,
 
         if (c1) {
             number_t numer1 = num_sub(fp, fm);
-            *c1 = num_div(numer1, denom1);
-            num_destroy(&numer1);
+            *c1 = num_scope_detach(num_div(numer1, denom1));
         }
         if (c2) {
             number_t fp_minus = num_sub(fp, two_f0);
             number_t numer2 = num_add(fp_minus, fm);
-            *c2 = num_div(numer2, denom2);
-            num_destroy(&numer2);
-            num_destroy(&fp_minus);
+            *c2 = num_scope_detach(num_div(numer2, denom2));
         }
-
-        num_destroy(&two_f0);
-        num_destroy(&denom2);
-        num_destroy(&neg_two);
-        num_destroy(&h2);
-        num_destroy(&denom1);
-        num_destroy(&two);
-        num_destroy(&fm);
-        num_destroy(&fp);
-        num_destroy(&lambda_m);
-        num_destroy(&lambda_p);
-        num_destroy(&ih);
-        num_destroy(&h);
     }
-
-    num_destroy(&f0);
 }
 
 static void num_array_destroy(number_t *values, size_t count)
@@ -3131,7 +3051,6 @@ static matrix_t *mat_fun_triangular_equal_diag(const matrix_t *T,
 
         mat_free(N2);
     }
-
     num_destroy(&c2);
     num_destroy(&c1);
     num_destroy(&c0);

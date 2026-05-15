@@ -24,12 +24,12 @@ static mat_fun_cache_entry_t *mat_fun_cache_head = NULL;
 static number_t mat_eval_number_scalar_number_local(void (*scalar_f)(void *out, const void *in),
                                                     const number_t *input)
 {
+    NUM_SCOPE(scope);
     number_t output = number_invalid();
     number_t safe_input = input ? num_clone(*input) : num_clone(NUM_ZERO);
 
     scalar_f(&output, &safe_input);
-    num_destroy(&safe_input);
-    return output;
+    return num_scope_detach(output);
 }
 
 static void mat_fun_number_array_invalidate(number_t *values, size_t count)
@@ -895,6 +895,7 @@ typedef struct mat_number_sqrt_series_ctx {
 
 static number_t mat_number_sqrt_next_coeff(const number_t prev_coeff, size_t k, void *ctx_void)
 {
+    NUM_SCOPE(scope);
     mat_number_sqrt_series_ctx_t *ctx = (mat_number_sqrt_series_ctx_t *)ctx_void;
     number_t km1 = num_create_from_long((long)(k - 1u));
     number_t diff = num_sub(ctx->alpha, km1);
@@ -902,11 +903,7 @@ static number_t mat_number_sqrt_next_coeff(const number_t prev_coeff, size_t k, 
     number_t ratio = num_div(diff, k_num);
     number_t next = num_mul(prev_coeff, ratio);
 
-    num_destroy(&ratio);
-    num_destroy(&k_num);
-    num_destroy(&diff);
-    num_destroy(&km1);
-    return next;
+    return num_scope_detach(next);
 }
 
 static matrix_t *mat_sqrt_number_triangular_equal_diag_upper(const matrix_t *A)

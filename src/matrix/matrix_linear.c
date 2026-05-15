@@ -147,24 +147,22 @@ static void mat_row_eliminate_from(matrix_t *A, size_t dst_row, size_t src_row,
 
 static number_t mat_elem_abs2_num(const struct elem_vtable *elem, const void *raw)
 {
+    NUM_SCOPE(scope);
     number_t value = mat_raw_value_to_number(elem, raw);
     number_t mag = num_abs(value);
     number_t abs2 = num_mul(mag, mag);
 
-    num_destroy(&value);
-    num_destroy(&mag);
-    return abs2;
+    return num_scope_detach(abs2);
 }
 
 static bool mat_elem_abs2_below(const struct elem_vtable *elem,
                                 const void *raw,
                                 const number_t *threshold)
 {
+    NUM_SCOPE(scope);
     number_t abs2 = mat_elem_abs2_num(elem, raw);
-    bool below = num_cmp(abs2, *threshold) < 0;
 
-    num_destroy(&abs2);
-    return below;
+    return num_cmp(abs2, *threshold) < 0;
 }
 
 static size_t mat_find_pivot_row(const matrix_t *A, size_t col, size_t start)
@@ -574,11 +572,11 @@ int mat_trace(const matrix_t *A, number_t *trace)
 
     *trace = num_clone(NUM_ZERO);
     for (size_t i = 0; i < A->rows; ++i) {
+        NUM_SCOPE(iter_scope);
         number_t term = mat_get_num(A, i, i);
         number_t next = num_add(*trace, term);
         num_destroy(trace);
-        *trace = next;
-        num_destroy(&term);
+        *trace = num_scope_detach(next);
     }
 
     return 0;

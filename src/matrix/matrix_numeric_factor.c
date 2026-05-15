@@ -104,22 +104,21 @@ int mat_qr_factor(const matrix_t *A, mat_qr_factor_t *out)
         for (size_t i = 0; i < imax; i++) {
             number_t rij = num_new();
             for (size_t r = 0; r < m; r++) {
+                NUM_SCOPE(iter_scope);
                 number_t qri_conj = num_conj(Qn[r * kdim + i]);
                 number_t term = num_mul(qri_conj, v[r]);
                 number_t next = num_add(rij, term);
-                num_destroy(&qri_conj);
-                num_destroy(&term);
                 num_destroy(&rij);
-                rij = next;
+                rij = num_scope_detach(next);
             }
             num_destroy(&Rn[i * n + j]);
             Rn[i * n + j] = num_clone(rij);
             for (size_t r = 0; r < m; r++) {
+                NUM_SCOPE(iter_scope);
                 number_t qri_rij = num_mul(Qn[r * kdim + i], rij);
                 number_t next = num_sub(v[r], qri_rij);
-                num_destroy(&qri_rij);
                 num_destroy(&v[r]);
-                v[r] = next;
+                v[r] = num_scope_detach(next);
             }
             num_destroy(&rij);
         }
@@ -127,13 +126,12 @@ int mat_qr_factor(const matrix_t *A, mat_qr_factor_t *out)
         if (j < kdim) {
             number_t norm2 = num_new();
             for (size_t r = 0; r < m; r++) {
+                NUM_SCOPE(iter_scope);
                 number_t abs_vr = num_abs(v[r]);
                 number_t abs2_vr = num_mul(abs_vr, abs_vr);
                 number_t next = num_add(norm2, abs2_vr);
-                num_destroy(&abs_vr);
-                num_destroy(&abs2_vr);
                 num_destroy(&norm2);
-                norm2 = next;
+                norm2 = num_scope_detach(next);
             }
 
             double norm2_d = num_to_double(norm2);
@@ -243,24 +241,22 @@ int mat_cholesky(const matrix_t *A, mat_cholesky_t *out)
             number_t sum = num_clone(Z[i * n + j]);
 
             for (size_t k = 0; k < j; k++) {
+                NUM_SCOPE(iter_scope);
                 number_t lik = Ln[i * n + k];
                 number_t ljk_conj = num_conj(Ln[j * n + k]);
                 number_t prod = num_mul(lik, ljk_conj);
                 number_t next = num_sub(sum, prod);
-                num_destroy(&ljk_conj);
-                num_destroy(&prod);
                 num_destroy(&sum);
-                sum = next;
+                sum = num_scope_detach(next);
             }
 
             if (i == j) {
+                NUM_SCOPE(branch_scope);
                 number_t imag = num_imag_part(sum);
                 number_t real = num_real_part(sum);
                 double imag_abs = fabs(num_to_double(imag));
                 double real_val = num_to_double(real);
-                num_destroy(&imag);
                 if (imag_abs > 1e-12 || real_val <= 0.0) {
-                    num_destroy(&real);
                     num_destroy(&sum);
                     for (size_t idx = 0; idx < count; ++idx) {
                         num_destroy(&Z[idx]);
@@ -273,13 +269,12 @@ int mat_cholesky(const matrix_t *A, mat_cholesky_t *out)
                 {
                     number_t root = num_sqrt(real);
                     num_destroy(&Ln[i * n + j]);
-                    Ln[i * n + j] = root;
-                    num_destroy(&real);
+                    Ln[i * n + j] = num_scope_detach(root);
                 }
             } else {
+                NUM_SCOPE(branch_scope);
                 number_t abs_ljj = num_abs(Ln[j * n + j]);
                 double d = num_to_double(abs_ljj);
-                num_destroy(&abs_ljj);
                 if (d < 1e-300) {
                     num_destroy(&sum);
                     for (size_t idx = 0; idx < count; ++idx) {
@@ -293,9 +288,8 @@ int mat_cholesky(const matrix_t *A, mat_cholesky_t *out)
                 {
                     number_t ljj_conj = num_conj(Ln[j * n + j]);
                     number_t quot = num_div(sum, ljj_conj);
-                    num_destroy(&ljj_conj);
                     num_destroy(&Ln[i * n + j]);
-                    Ln[i * n + j] = quot;
+                    Ln[i * n + j] = num_scope_detach(quot);
                 }
             }
             num_destroy(&sum);
