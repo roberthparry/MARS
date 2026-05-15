@@ -5,6 +5,7 @@
 #include <stddef.h>
 
 #include "matrix.h"
+#include "internal/number_internal.h"
 
 /* ============================================================
    Element kinds
@@ -227,6 +228,13 @@ number_t mat_raw_value_to_number(const struct elem_vtable *elem, const void *val
 void mat_raw_value_from_number(const struct elem_vtable *elem, void *out,
                                const number_t *value);
 void mat_set_num_owned(struct matrix_t *A, size_t i, size_t j, number_t *value);
+
+static inline void mat_set_num_clone(struct matrix_t *A, size_t i, size_t j,
+                                     const number_t *value)
+{
+    number_t copy = num_is_immortal(*value) ? *value : num_clone(*value);
+    mat_set_num_owned(A, i, j, &copy);
+}
 size_t mat_cached_numeric_precision_bits(const struct matrix_t *A);
 void mat_numeric_precision_note_set(struct matrix_t *A,
                                     const void *old_val,

@@ -2556,8 +2556,7 @@ matrix_t *mat_evaluate(const matrix_t *A)
     for (size_t i = 0; i < A->rows; ++i)
         for (size_t j = 0; j < A->cols; ++j) {
             value = mat_get_num(A, i, j);
-            mat_set(C, i, j, &value);
-            num_destroy(&value);
+            mat_set_num_owned(C, i, j, &value);
         }
 
     return C;
@@ -3128,8 +3127,7 @@ static matrix_t *mat_fun_triangular_equal_diag(const matrix_t *T,
     num_fun_coeffs_up_to_second(&c0, &c1, &c2, scalar_f, &lambda);
 
     for (size_t i = 0; i < n; ++i) {
-        number_t diag_value = num_clone(c0);
-        mat_set_num_owned(F, i, i, &diag_value);
+        mat_set_num_clone(F, i, i, &c0);
         for (size_t j = i; j < n; ++j) {
             number_t tij = number_invalid();
             mat_get(T, i, j, raw);

@@ -551,8 +551,7 @@ int mat_svd_factor(const matrix_t *A, mat_svd_factor_t *out)
                     num_destroy(&sum);
                     sum = next;
                 }
-                mat_set(Gram, i, j, &sum);
-                num_destroy(&sum);
+                mat_set_num_owned(Gram, i, j, &sum);
             }
         }
         rc = mat_eigendecompose(Gram, evals, &EigVecs);
@@ -641,8 +640,7 @@ int mat_svd_factor(const matrix_t *A, mat_svd_factor_t *out)
                     num_destroy(&sum);
                     sum = next;
                 }
-                mat_set(Gram, i, j, &sum);
-                num_destroy(&sum);
+                mat_set_num_owned(Gram, i, j, &sum);
             }
         }
         rc = mat_eigendecompose(Gram, evals, &EigVecs);
@@ -732,18 +730,14 @@ int mat_svd_factor(const matrix_t *A, mat_svd_factor_t *out)
     if (out->U) {
         for (size_t i = 0; i < m; ++i) {
             for (size_t j = 0; j < kdim; ++j) {
-                number_t value = num_clone(LeftN[i * kdim + j]);
-                mat_set(out->U, i, j, &value);
-                num_destroy(&value);
+                mat_set_num_owned(out->U, i, j, &LeftN[i * kdim + j]);
             }
         }
     }
     if (out->V) {
         for (size_t i = 0; i < n; ++i) {
             for (size_t j = 0; j < kdim; ++j) {
-                number_t value = num_clone(RightN[i * kdim + j]);
-                mat_set(out->V, i, j, &value);
-                num_destroy(&value);
+                mat_set_num_owned(out->V, i, j, &RightN[i * kdim + j]);
             }
         }
     }
@@ -1170,12 +1164,10 @@ matrix_t *mat_pseudoinverse(const matrix_t *A)
         d = num_to_double(abs_sig);
         if (d > tol) {
             inv_sig = num_inv(sig);
-            mat_set(Sp, i, i, &inv_sig);
-            num_destroy(&inv_sig);
+            mat_set_num_owned(Sp, i, i, &inv_sig);
         } else {
             number_t zero = num_new();
-            mat_set(Sp, i, i, &zero);
-            num_destroy(&zero);
+            mat_set_num_owned(Sp, i, i, &zero);
         }
         num_destroy(&abs_sig);
         num_destroy(&sig);
@@ -1255,8 +1247,7 @@ matrix_t *mat_nullspace(const matrix_t *A)
             continue;
         for (size_t r = 0; r < A->cols; r++) {
             number_t value = mat_get_num(V, r, i);
-            mat_set(N, r, col, &value);
-            num_destroy(&value);
+            mat_set_num_owned(N, r, col, &value);
         }
         col++;
     }
@@ -1293,8 +1284,7 @@ static matrix_t *mat_shift_subtract_number(const matrix_t *A, const number_t *ei
         number_t diag = mat_get_num(Shifted, i, i);
         number_t shifted = num_sub(diag, *eigenvalue);
 
-        mat_set(Shifted, i, i, &shifted);
-        num_destroy(&shifted);
+        mat_set_num_owned(Shifted, i, i, &shifted);
         num_destroy(&diag);
     }
 
@@ -1712,8 +1702,7 @@ matrix_t *mat_jordan_profile(const matrix_t *A, const number_t *eigenvalue)
                 num_destroy(&block_size);
                 goto fail;
             }
-            mat_set(P, out++, 0, &block_size);
-            num_destroy(&block_size);
+            mat_set_num_owned(P, out++, 0, &block_size);
         }
 
         if (k == 1)
@@ -1775,7 +1764,7 @@ matrix_t *mat_jordan_profile_dv(const matrix_t *A, const dval_t *eigenvalue)
                 num_destroy(&block_size);
                 goto fail;
             }
-            mat_set(P, out, 0, &block_size);
+            mat_set_num_clone(P, out, 0, &block_size);
             out++;
         }
         num_destroy(&block_size);
@@ -2192,8 +2181,8 @@ static int mat_eigendecompose_hermitian_2x2(const matrix_t *A,
                     num_destroy(&inv_norm);
                 }
 
-                mat_set(V, 0, col, &v0);
-                mat_set(V, 1, col, &v1);
+                mat_set_num_owned(V, 0, col, &v0);
+                mat_set_num_owned(V, 1, col, &v1);
 
                 num_destroy(&norm);
                 num_destroy(&norm2);
@@ -2268,9 +2257,7 @@ static int mat_eigendecompose_hermitian(const matrix_t *A, number_t *eigenvalues
         }
         for (size_t i = 0; i < n; i++) {
             for (size_t j = 0; j < n; j++) {
-                number_t value = num_clone(ws.V[i * n + j]);
-                mat_set(Vnum, i, j, &value);
-                num_destroy(&value);
+                mat_set_num_clone(Vnum, i, j, &ws.V[i * n + j]);
             }
         }
         *eigenvectors = Vnum;
@@ -3113,8 +3100,7 @@ static int mat_eigendecompose_general(const matrix_t *A, number_t *eigenvalues,
                     num_destroy(&qik);
                 }
                 value = sum;
-                mat_set(V, i, j, &value);
-                num_destroy(&value);
+                mat_set_num_owned(V, i, j, &value);
             }
         }
         for (size_t i = 0; i < n * n; ++i)
@@ -3207,14 +3193,10 @@ int mat_schur_factor(const matrix_t *A, mat_schur_factor_t *out)
 
     for (size_t i = 0; i < A->rows; ++i) {
         for (size_t j = 0; j < A->rows; ++j) {
-            number_t value = num_clone(NCM(ws.Q, i, j, A->rows));
-            mat_set(Qmat, i, j, &value);
-            num_destroy(&value);
+            mat_set_num_clone(Qmat, i, j, &NCM(ws.Q, i, j, A->rows));
         }
         for (size_t j = i; j < A->rows; ++j) {
-            number_t value = num_clone(NCM(ws.H, i, j, A->rows));
-            mat_set(Tmat, i, j, &value);
-            num_destroy(&value);
+            mat_set_num_clone(Tmat, i, j, &NCM(ws.H, i, j, A->rows));
         }
     }
 

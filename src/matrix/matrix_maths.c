@@ -386,8 +386,7 @@ static matrix_t *mat_number_strict_triangular_copy(const matrix_t *A, bool upper
                 continue;
 
             value = mat_get_num(A, i, j);
-            mat_set(N, i, j, &value);
-            num_destroy(&value);
+            mat_set_num_owned(N, i, j, &value);
         }
     }
 
@@ -439,9 +438,10 @@ static matrix_t *mat_number_triangular_mul(const matrix_t *A,
             }
 
             if (!num_eq(sum, NUM_ZERO)) {
-                mat_set(C, i, j, &sum);
+                mat_set_num_owned(C, i, j, &sum);
+            } else {
+                num_destroy(&sum);
             }
-            num_destroy(&sum);
         }
     }
 
@@ -483,8 +483,7 @@ static int mat_number_add_scaled_triangular(matrix_t *F,
             sum = num_add(fij, term);
             num_destroy(&fij);
             num_destroy(&term);
-            mat_set(F, i, j, &sum);
-            num_destroy(&sum);
+            mat_set_num_owned(F, i, j, &sum);
         }
     }
 
@@ -520,8 +519,9 @@ static matrix_t *mat_exp_number_triangular_equal_diag_upper(const matrix_t *T)
         return NULL;
     }
 
-    for (size_t i = 0; i < n; ++i)
-        mat_set(F, i, i, &coeff0);
+    for (size_t i = 0; i < n; ++i) {
+        mat_set_num_clone(F, i, i, &coeff0);
+    }
 
     Npower = N;
     for (size_t k = 1; k < n; ++k) {
@@ -616,8 +616,9 @@ static matrix_t *mat_number_series_from_scaled_strict_triangular(
         return NULL;
     }
 
-    for (size_t i = 0; i < n; ++i)
-        mat_set(F, i, i, &diag_value);
+    for (size_t i = 0; i < n; ++i) {
+        mat_set_num_clone(F, i, i, &diag_value);
+    }
 
     if (n == 0) {
         mat_free(S);
@@ -706,8 +707,9 @@ static matrix_t *mat_number_unary_taylor_from_dval_upper(
     {
         number_t diag_value = dv_eval(derivs[0]);
 
-        for (size_t i = 0; i < n; ++i)
-            mat_set(F, i, i, &diag_value);
+        for (size_t i = 0; i < n; ++i) {
+            mat_set_num_clone(F, i, i, &diag_value);
+        }
         num_destroy(&diag_value);
     }
 
@@ -1439,8 +1441,9 @@ static matrix_t *mat_atan_number_triangular_equal_diag_upper(const matrix_t *A)
         return NULL;
     }
 
-    for (size_t i = 0; i < n; ++i)
-        mat_set(F, i, i, &diag_value);
+    for (size_t i = 0; i < n; ++i) {
+        mat_set_num_clone(F, i, i, &diag_value);
+    }
 
     Npower = N;
     for (size_t k = 1; k < n; ++k) {
