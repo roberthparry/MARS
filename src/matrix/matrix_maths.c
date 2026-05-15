@@ -344,6 +344,7 @@ static dval_t *dval_mul_or_zero_owned_local(const dval_t *a, const dval_t *b)
 
 static bool mat_number_diagonal_equal_local(const matrix_t *A)
 {
+    NUM_SCOPE(scope);
     number_t diag0;
     bool equal = true;
 
@@ -352,14 +353,13 @@ static bool mat_number_diagonal_equal_local(const matrix_t *A)
 
     diag0 = mat_get_num(A, 0, 0);
     for (size_t i = 1; i < A->rows; ++i) {
+        NUM_SCOPE(iter_scope);
         number_t diag_i = mat_get_num(A, i, i);
         if (!num_eq(diag_i, diag0))
             equal = false;
-        num_destroy(&diag_i);
         if (!equal)
             break;
     }
-    num_destroy(&diag0);
     return equal;
 }
 
@@ -3312,6 +3312,7 @@ fail:
 static matrix_t *mat_fun_dval_structured(const matrix_t *A,
                                          void (*scalar_f)(void *out, const void *in))
 {
+    NUM_SCOPE(scope);
     size_t n;
     matrix_t *T;
     matrix_t *FT;
@@ -3321,26 +3322,21 @@ static matrix_t *mat_fun_dval_structured(const matrix_t *A,
 
     if (!A || !scalar_f || !matrix_is_symbolic(A))
         return NULL;
-    if (A->rows != A->cols)
-    {
-        num_destroy(&tol);
+    if (A->rows != A->cols) {
         return NULL;
     }
     if (mat_is_upper_triangular(A)) {
-        if (A->rows == 0)
-        {
-            num_destroy(&tol);
+        if (A->rows == 0) {
             return mat_copy_preserving_store(A);
         }
-        if (mat_is_diagonal(A))
-        {
-            num_destroy(&tol);
+        if (mat_is_diagonal(A)) {
             return mat_fun_elementwise_same_type(A, scalar_f);
         }
 
         n = A->rows;
         mat_get_owned(A, 0, 0, &diag0);
         for (size_t i = 1; i < n; ++i) {
+            NUM_SCOPE(iter_scope);
             dval_t *diag_i = NULL;
             number_t diag0_num;
             number_t diag_i_num;
@@ -3351,25 +3347,16 @@ static matrix_t *mat_fun_dval_structured(const matrix_t *A,
             diag_i_num = dv_eval(diag_i);
             diff_num = num_sub(diag_i_num, diag0_num);
             absdiff = num_abs(diff_num);
-            num_destroy(&diag_i_num);
-            num_destroy(&diag0_num);
             dv_free(diag_i);
             if (num_lt(tol, absdiff)) {
                 dv_free(diag0);
-                num_destroy(&absdiff);
-                num_destroy(&diff_num);
-                num_destroy(&tol);
                 return (A->rows == 2 && A->cols == 2)
                     ? mat_fun_dval_diagonalizable_2x2(A, scalar_f) : NULL;
             }
-            num_destroy(&absdiff);
-            num_destroy(&diff_num);
         }
         dv_free(diag0);
-        num_destroy(&tol);
         return mat_fun_triangular_equal_diag_dval(A, scalar_f);
     }
-    num_destroy(&tol);
 
     if (!mat_is_lower_triangular(A)) {
         matrix_t *block_diag = mat_fun_dval_block_diagonal(A, scalar_f);

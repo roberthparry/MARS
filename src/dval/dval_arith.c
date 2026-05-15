@@ -1,5 +1,6 @@
 #include <stddef.h>
 #include "dval_internal.h"
+#include "internal/number_internal.h"
 
 /* ------------------------------------------------------------------------- */
 /* EVALUATION FUNCTIONS                                                      */
@@ -102,6 +103,7 @@ static dval_t *deriv_mul(dval_t *dv)
 
 static dval_t *deriv_div(dval_t *dv)
 {
+    NUM_SCOPE(scope);
     dval_t *da   = dv_get_dx_internal(dv->a);
     dval_t *db   = dv_get_dx_internal(dv->b);
     dval_t *num1 = dv_mul(da, dv->b);
@@ -110,7 +112,6 @@ static dval_t *deriv_div(dval_t *dv)
     number_t two = num_create_from_long(2);
     dval_t *den  = dv_pow(dv->b, &two);
     dval_t *out  = dv_div(num, den);
-    num_destroy(&two);
     dv_free(da);
     dv_free(db);
     dv_free(num1);
@@ -157,6 +158,7 @@ static dval_t *deriv_pow(dval_t *dv)
 
 static dval_t *deriv_pow_d(dval_t *dv)
 {
+    NUM_SCOPE(scope);
     number_t exponent = num_clone(dv->c);
     number_t exponent_minus_one = num_sub(exponent, NUM_ONE);
     dval_t *da   = dv_get_dx_internal(dv->a);
@@ -164,8 +166,6 @@ static dval_t *deriv_pow_d(dval_t *dv)
     dval_t *coef = dv_new_const(exponent);
     dval_t *cp   = dv_mul(coef, p);
     dval_t *out  = dv_mul(cp, da);
-    num_destroy(&exponent_minus_one);
-    num_destroy(&exponent);
     dv_free(da);
     dv_free(p);
     dv_free(coef);

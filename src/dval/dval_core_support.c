@@ -105,13 +105,13 @@ static const char *dv_lookup_default_constant_alias(const char *name)
 void dv_store_const_num(dval_t *dv, number_t value)
 {
     num_destroy(&dv->c);
-    dv->c = value;
+    dv->c = num_scope_detach(value);
 }
 
 void dv_store_value_num(dval_t *dv, number_t value)
 {
     num_destroy(&dv->x);
-    dv->x = value;
+    dv->x = num_scope_detach(value);
 }
 
 /* ------------------------------------------------------------------------- */

@@ -19,6 +19,8 @@
  *   • dv_get_deriv() returns a *borrowed* view. The caller must NOT free it.
  *
  * Internally, each dval_t is a node in a reference-counted DAG.
+ * Primal numeric values, cached results, and derivative outputs are all
+ * represented with `number_t`.
  *
  * Threading:
  *   • dval_t is currently a single-threaded type.
@@ -115,7 +117,8 @@ void dv_set_name(dval_t *dv, const char *name);
  * This function evaluates the node if required and returns the current
  * primal value. Use `dv_eval()` when you want that intent to be explicit;
  * `dv_get_val()` is a convenient accessor that still returns an owning
- * `number_t`.
+ * `number_t`. The returned value does not alias internal node storage; the
+ * caller owns it and must later release it with num_destroy().
  */
 number_t dv_get_val(const dval_t *dv);
 
@@ -136,7 +139,8 @@ const dval_t *dv_get_deriv(const dval_t *expr, const dval_t *wrt);
  * @brief Evaluate the node, updating the cached primal value.
  *
  * Traverses the DAG recursively, recomputing any nodes whose cache is
- * stale. The result is stored in the node's cache and returned.
+ * stale. The result is stored in the node's cache and also returned as an
+ * owning `number_t` value for the caller.
  */
 number_t dv_eval(const dval_t *dv);
 

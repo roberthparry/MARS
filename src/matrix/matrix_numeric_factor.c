@@ -370,6 +370,7 @@ static bool mat_numeric_is_diagonal(const matrix_t *A)
 
     for (size_t i = 0; i < A->rows; ++i) {
         for (size_t j = 0; j < A->cols; ++j) {
+            NUM_SCOPE(scope);
             number_t value;
             number_t abs_value;
             bool is_zero;
@@ -380,8 +381,6 @@ static bool mat_numeric_is_diagonal(const matrix_t *A)
             value = mat_get_num(A, i, j);
             abs_value = num_abs(value);
             is_zero = num_to_double(abs_value) <= tol;
-            num_destroy(&abs_value);
-            num_destroy(&value);
             if (!is_zero)
                 return false;
         }
@@ -392,6 +391,7 @@ static bool mat_numeric_is_diagonal(const matrix_t *A)
 
 static int mat_norm_diagonal_exact(const matrix_t *A, mat_norm_type_t type, number_t *out)
 {
+    NUM_SCOPE(scope);
     size_t kdim;
     number_t best = num_new();
     number_t sumsq = num_new();
@@ -427,10 +427,10 @@ static int mat_norm_diagonal_exact(const matrix_t *A, mat_norm_type_t type, numb
     case MAT_NORM_1:
     case MAT_NORM_INF:
     case MAT_NORM_2:
-        *out = num_clone(best);
+        *out = num_scope_detach(num_clone(best));
         break;
     case MAT_NORM_FRO:
-        *out = num_sqrt(sumsq);
+        *out = num_scope_detach(num_sqrt(sumsq));
         break;
     default:
         num_destroy(&best);
@@ -445,19 +445,17 @@ static int mat_norm_diagonal_exact(const matrix_t *A, mat_norm_type_t type, numb
 
 static number_t mat_num_positive_ratio(number_t numer, number_t denom)
 {
+    NUM_SCOPE(scope);
+
     if (num_is_exact(numer) && num_is_exact(denom))
-        return num_div(numer, denom);
+        return num_scope_detach(num_div(numer, denom));
 
     {
         number_t log_numer = num_log(numer);
         number_t log_denom = num_log(denom);
         number_t log_ratio = num_sub(log_numer, log_denom);
-        number_t ratio = num_exp(log_ratio);
 
-        num_destroy(&log_ratio);
-        num_destroy(&log_denom);
-        num_destroy(&log_numer);
-        return ratio;
+        return num_scope_detach(num_exp(log_ratio));
     }
 }
 

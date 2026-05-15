@@ -1,6 +1,7 @@
 #include <stddef.h>
 
 #include "dval_math_internal.h"
+#include "internal/number_internal.h"
 
 static inline number_t dv_eval_unary_num(dval_t *dv, number_t (*fn)(const number_t))
 {
@@ -24,41 +25,41 @@ static dval_t *dv_chain_rule_with_factor(const dval_t *dv, dval_t *factor)
 
 static dval_t *dv_const_long_local(long value)
 {
+    NUM_SCOPE(scope);
     number_t n = num_create_from_long(value);
     dval_t *dv = dv_new_const(n);
 
-    num_destroy(&n);
     return dv;
 }
 
 static dval_t *dv_pow_long_local(const dval_t *dv, long exponent)
 {
+    NUM_SCOPE(scope);
     number_t n = num_create_from_long(exponent);
     dval_t *out = dv_pow(dv, &n);
 
-    num_destroy(&n);
     return out;
 }
 
 static dval_t *dv_add_long_local(const dval_t *dv, long value)
 {
+    NUM_SCOPE(scope);
     number_t n = num_create_from_long(value);
     dval_t *out = dv_add_num(dv, &n);
 
-    num_destroy(&n);
     return out;
 }
 
 static dval_t *dv_const_num_local(number_t value)
 {
+    NUM_SCOPE(scope);
     dval_t *dv = dv_new_const(value);
-
-    num_destroy(&value);
     return dv;
 }
 
 static dval_t *dv_const_ratio_local(number_t numerator, number_t denominator)
 {
+    NUM_SCOPE(scope);
     number_t value = num_div(numerator, denominator);
 
     return dv_const_num_local(value);
@@ -66,10 +67,10 @@ static dval_t *dv_const_ratio_local(number_t numerator, number_t denominator)
 
 static dval_t *dv_const_neg_ratio_local(number_t numerator, number_t denominator)
 {
+    NUM_SCOPE(scope);
     number_t value = num_div(numerator, denominator);
     number_t neg_value = num_neg(value);
 
-    num_destroy(&value);
     return dv_const_num_local(neg_value);
 }
 
@@ -455,12 +456,12 @@ dval_t *deriv_digamma(dval_t *dv)
 
 dval_t *deriv_trigamma(dval_t *dv)
 {
+    NUM_SCOPE(scope);
     number_t t2   = num_tetragamma(dv_eval_num_internal(dv->a));
     dval_t *da    = dv_get_dx_internal(dv->a);
     dval_t *coeff = dv_new_const(t2);
     dval_t *out   = dv_mul(coeff, da);
     dv_free(da); dv_free(coeff);
-    num_destroy(&t2);
     return out;
 }
 

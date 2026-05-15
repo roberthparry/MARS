@@ -32,6 +32,7 @@
 #include "number.h"
 #include "dval_internal.h"
 #include "dval.h"
+#include "internal/number_internal.h"
 
 /* Thread-local pointer to the variable being differentiated with respect to.
  * NULL = single-variable / "all variables" mode (original behaviour of
@@ -237,6 +238,7 @@ dval_t *dv_new_pow_const_internal(const dval_t *a, number_t exponent)
 }
 
 int dv_cmp(const dval_t *dv1, const dval_t *dv2) {
+    NUM_SCOPE(scope);
     number_t a = dv_eval_num_internal(dv1);
     number_t b = dv_eval_num_internal(dv2);
     number_t a_real = num_real_part(a);
@@ -248,12 +250,7 @@ int dv_cmp(const dval_t *dv1, const dval_t *dv2) {
         number_t b_imag = num_imag_part(b);
 
         cmp = num_cmp(a_imag, b_imag);
-        num_destroy(&a_imag);
-        num_destroy(&b_imag);
     }
-
-    num_destroy(&a_real);
-    num_destroy(&b_real);
     return cmp;
 }
 

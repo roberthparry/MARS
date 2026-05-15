@@ -9,6 +9,14 @@ The internal numeric core is now `number_t`-native:
 - expression evaluation is `number_t`-native
 - `dv_eval_derivatives(...)` returns owning `number_t` values
 
+That internal migration does not change the public ownership rules:
+
+- `dv_*` builders still return owning `dval_t *` handles that must be released
+  with `dv_free()`
+- `dv_get_val(...)`, `dv_eval(...)`, and `dv_eval_derivatives(...)` still
+  return owning `number_t` values that must be released with `num_destroy()`
+- `dv_get_deriv(...)` still returns a borrowed cached derivative node
+
 Expressions are built from constants, variables, and operator nodes; each node
 carries a vtable that knows how to evaluate itself and construct its derivative.
 

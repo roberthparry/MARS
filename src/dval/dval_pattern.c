@@ -79,24 +79,19 @@ static bool dv_match_scaled_inner(const dval_t *factor,
                                   number_t *scale_out,
                                   const dval_t **base_out)
 {
+    NUM_SCOPE(scope);
     number_t factor_value = num_new();
     number_t inner_scale = num_new();
     const dval_t *inner_base;
 
-    if (!dv_is_unnamed_const(factor) || !dv_match_const_value(factor, &factor_value)) {
-        num_destroy(&factor_value);
-        num_destroy(&inner_scale);
+    if (!dv_is_unnamed_const(factor) || !dv_match_const_value(factor, &factor_value))
         return false;
-    }
     if (dv_match_scaled_expr(other, &inner_scale, &inner_base)) {
-        *scale_out = num_mul(factor_value, inner_scale);
-        num_destroy(&factor_value);
-        num_destroy(&inner_scale);
+        *scale_out = num_scope_detach(num_mul(factor_value, inner_scale));
         *base_out = inner_base;
         return true;
     }
-    *scale_out = factor_value;
-    num_destroy(&inner_scale);
+    *scale_out = num_scope_detach(factor_value);
     *base_out = other;
     return true;
 }
@@ -130,14 +125,14 @@ bool dv_match_var_expr(const dval_t *expr,
 static void dv_zero_number_array(number_t *values, size_t n)
 {
     for (size_t i = 0; i < n; ++i)
-        values[i] = num_clone(NUM_ZERO);
+        values[i] = num_scope_detach(num_clone(NUM_ZERO));
 }
 
 static void dv_reset_number_array(number_t *values, size_t n)
 {
     for (size_t i = 0; i < n; ++i) {
         num_destroy(&values[i]);
-        values[i] = num_clone(NUM_ZERO);
+        values[i] = num_scope_detach(num_clone(NUM_ZERO));
     }
 }
 
@@ -164,7 +159,7 @@ static number_t *dv_clone_number_array(const number_t *values, size_t n)
     if ((n > 0) && !copy)
         return NULL;
     for (size_t i = 0; i < n; ++i)
-        copy[i] = num_clone(values[i]);
+        copy[i] = num_scope_detach(num_clone(values[i]));
     return copy;
 }
 
@@ -172,7 +167,7 @@ static void dv_copy_number_array(number_t *dst, const number_t *src, size_t n)
 {
     for (size_t i = 0; i < n; ++i) {
         num_destroy(&dst[i]);
-        dst[i] = num_clone(src[i]);
+        dst[i] = num_scope_detach(num_clone(src[i]));
     }
 }
 
@@ -183,6 +178,7 @@ static bool dv_match_affine_term(const dval_t *dv,
                                  number_t *constant_io,
                                  number_t *coeffs_io)
 {
+    NUM_SCOPE(scope);
     number_t constant = num_new();
     number_t inner_scale = num_new();
     const dval_t *base;
@@ -199,67 +195,44 @@ static bool dv_match_affine_term(const dval_t *dv,
         number_t sum;
 
         if (!num_is_real(constant) || !num_is_real(scale)) {
-            num_destroy(&constant);
-            num_destroy(&inner_scale);
             return false;
         }
         product = num_mul(scale, constant);
         sum = num_add(*constant_io, product);
-        num_destroy(&product);
         num_destroy(constant_io);
-        *constant_io = sum;
-        num_destroy(&constant);
-        num_destroy(&inner_scale);
+        *constant_io = num_scope_detach(sum);
         return true;
     }
 
     if (dv_match_var_expr(dv, nvars, vars, &idx)) {
         if (!num_is_real(scale)) {
-            num_destroy(&constant);
-            num_destroy(&inner_scale);
             return false;
         }
         {
             number_t sum = num_add(coeffs_io[idx], scale);
 
             num_destroy(&coeffs_io[idx]);
-            coeffs_io[idx] = sum;
+            coeffs_io[idx] = num_scope_detach(sum);
         }
-        num_destroy(&constant);
-        num_destroy(&inner_scale);
         return true;
     }
 
     if (dv_match_add_sub_expr(dv, &left, &right, &is_sub)) {
         number_t right_scale = is_sub ? num_neg(scale) : num_clone(scale);
-        bool ok = dv_match_affine_term(left, nvars, vars, scale, constant_io, coeffs_io) &&
-                  dv_match_affine_term(right, nvars, vars, right_scale, constant_io, coeffs_io);
-
-        num_destroy(&constant);
-        num_destroy(&inner_scale);
-        num_destroy(&right_scale);
-        return ok;
+        return dv_match_affine_term(left, nvars, vars, scale, constant_io, coeffs_io) &&
+               dv_match_affine_term(right, nvars, vars, right_scale, constant_io, coeffs_io);
     }
 
     if (dv_match_scaled_expr(dv, &inner_scale, &base)) {
         number_t product;
-        bool ok;
 
         if (!num_is_real(inner_scale) || !num_is_real(scale)) {
-            num_destroy(&constant);
-            num_destroy(&inner_scale);
             return false;
         }
         product = num_mul(scale, inner_scale);
-        ok = dv_match_affine_term(base, nvars, vars, product, constant_io, coeffs_io);
-        num_destroy(&constant);
-        num_destroy(&inner_scale);
-        num_destroy(&product);
-        return ok;
+        return dv_match_affine_term(base, nvars, vars, product, constant_io, coeffs_io);
     }
 
-    num_destroy(&constant);
-    num_destroy(&inner_scale);
     return false;
 }
 
@@ -291,6 +264,7 @@ static bool dv_match_unary_affine_op(const dval_t *expr,
                                      number_t *constant_out,
                                      number_t *coeffs_out)
 {
+    NUM_SCOPE(scope);
     number_t constant = num_clone(NUM_ZERO);
     bool ok;
 
@@ -303,13 +277,11 @@ static bool dv_match_unary_affine_op(const dval_t *expr,
     dv_zero_number_array(coeffs_out, nvars);
 
     ok = dv_match_affine_term(expr->a, nvars, vars, NUM_ONE, &constant, coeffs_out);
-    if (!ok) {
-        num_destroy(&constant);
+    if (!ok)
         return false;
-    }
 
     num_destroy(constant_out);
-    *constant_out = constant;
+    *constant_out = num_scope_detach(constant);
     return true;
 }
 
@@ -340,6 +312,68 @@ bool dv_match_unary_affine_kind(const dval_t *expr,
     return dv_match_unary_affine_kind_num_local(expr, kind, nvars, vars, constant_out, coeffs_out);
 }
 
+static bool dv_match_affine_power_mul_deg2(const dval_t *expr, const dval_t **base_out)
+{
+    const dval_t *left = NULL;
+    const dval_t *right = NULL;
+
+    if (!dv_match_binary_kind(expr, DV_KIND_MUL, &left, &right))
+        return false;
+    if (!dv_struct_eq(left, right))
+        return false;
+
+    *base_out = left;
+    return true;
+}
+
+static bool dv_match_affine_power_mul_deg3(const dval_t *expr, const dval_t **base_out)
+{
+    const dval_t *left = NULL;
+    const dval_t *right = NULL;
+    const dval_t *inner_left = NULL;
+    const dval_t *inner_right = NULL;
+
+    if (dv_match_binary_kind(expr, DV_KIND_MUL, &left, &right) &&
+        dv_match_binary_kind(left, DV_KIND_MUL, &inner_left, &inner_right) &&
+        dv_struct_eq(inner_left, inner_right) &&
+        dv_struct_eq(inner_left, right)) {
+        *base_out = inner_left;
+        return true;
+    }
+
+    if (dv_match_binary_kind(expr, DV_KIND_MUL, &left, &right) &&
+        dv_match_binary_kind(right, DV_KIND_MUL, &inner_left, &inner_right) &&
+        dv_struct_eq(left, inner_left) &&
+        dv_struct_eq(left, inner_right)) {
+        *base_out = left;
+        return true;
+    }
+
+    return false;
+}
+
+static bool dv_match_affine_power_mul_deg4(const dval_t *expr, const dval_t **base_out)
+{
+    const dval_t *left = NULL;
+    const dval_t *right = NULL;
+    const dval_t *ll = NULL;
+    const dval_t *lr = NULL;
+    const dval_t *rl = NULL;
+    const dval_t *rr = NULL;
+
+    if (!dv_match_binary_kind(expr, DV_KIND_MUL, &left, &right) ||
+        !dv_match_binary_kind(left, DV_KIND_MUL, &ll, &lr) ||
+        !dv_match_binary_kind(right, DV_KIND_MUL, &rl, &rr))
+        return false;
+    if (!dv_struct_eq(ll, lr) ||
+        !dv_struct_eq(ll, rl) ||
+        !dv_struct_eq(ll, rr))
+        return false;
+
+    *base_out = ll;
+    return true;
+}
+
 static bool dv_match_affine_power_exact(const dval_t *expr,
                                         size_t nvars,
                                         dval_t *const *vars,
@@ -347,17 +381,19 @@ static bool dv_match_affine_power_exact(const dval_t *expr,
                                         number_t *constant_out,
                                         number_t *coeffs_out)
 {
+    NUM_SCOPE(scope);
     const dval_t *arg = NULL;
-    const dval_t *left = NULL;
-    const dval_t *right = NULL;
-    const dval_t *inner_left = NULL;
-    const dval_t *inner_right = NULL;
-    const dval_t *ll = NULL;
-    const dval_t *lr = NULL;
-    const dval_t *rl = NULL;
-    const dval_t *rr = NULL;
+    const dval_t *mul_base = NULL;
     number_t constant = num_clone(NUM_ZERO);
     number_t degree_num = num_create_from_long((long)degree);
+    typedef bool (*dv_affine_power_mul_match_fn)(const dval_t *, const dval_t **);
+    static const dv_affine_power_mul_match_fn mul_matchers[] = {
+        NULL,
+        NULL,
+        dv_match_affine_power_mul_deg2,
+        dv_match_affine_power_mul_deg3,
+        dv_match_affine_power_mul_deg4
+    };
 
     if (!expr || !constant_out || !coeffs_out || (nvars > 0 && !vars))
         return false;
@@ -365,80 +401,22 @@ static bool dv_match_affine_power_exact(const dval_t *expr,
     if (dv_match_unary_kind(expr, DV_KIND_POW_D, &arg) &&
         num_eq(expr->c, degree_num)) {
         dv_zero_number_array(coeffs_out, nvars);
-        if (!dv_match_affine_term(arg, nvars, vars, NUM_ONE, &constant, coeffs_out)) {
-            num_destroy(&degree_num);
-            num_destroy(&constant);
+        if (!dv_match_affine_term(arg, nvars, vars, NUM_ONE, &constant, coeffs_out))
             return false;
-        }
         num_destroy(constant_out);
-        *constant_out = constant;
-        num_destroy(&degree_num);
+        *constant_out = num_scope_detach(constant);
         return true;
     }
-    num_destroy(&degree_num);
 
-    switch (degree) {
-    case 2:
-        if (dv_match_binary_kind(expr, DV_KIND_MUL, &left, &right) &&
-            dv_struct_eq(left, right)) {
-            dv_zero_number_array(coeffs_out, nvars);
-            if (!dv_match_affine_term(left, nvars, vars, NUM_ONE, &constant, coeffs_out)) {
-                num_destroy(&constant);
-                return false;
-            }
-            num_destroy(constant_out);
-            *constant_out = constant;
-            return true;
-        }
-        break;
-    case 3:
-        if (dv_match_binary_kind(expr, DV_KIND_MUL, &left, &right) &&
-            dv_match_binary_kind(left, DV_KIND_MUL, &inner_left, &inner_right) &&
-            dv_struct_eq(inner_left, inner_right) &&
-            dv_struct_eq(inner_left, right)) {
-            dv_zero_number_array(coeffs_out, nvars);
-            if (!dv_match_affine_term(inner_left, nvars, vars, NUM_ONE, &constant, coeffs_out)) {
-                num_destroy(&constant);
-                return false;
-            }
-            num_destroy(constant_out);
-            *constant_out = constant;
-            return true;
-        }
-
-        if (dv_match_binary_kind(expr, DV_KIND_MUL, &left, &right) &&
-            dv_match_binary_kind(right, DV_KIND_MUL, &inner_left, &inner_right) &&
-            dv_struct_eq(left, inner_left) &&
-            dv_struct_eq(left, inner_right)) {
-            dv_zero_number_array(coeffs_out, nvars);
-            if (!dv_match_affine_term(left, nvars, vars, NUM_ONE, &constant, coeffs_out)) {
-                num_destroy(&constant);
-                return false;
-            }
-            num_destroy(constant_out);
-            *constant_out = constant;
-            return true;
-        }
-        break;
-    case 4:
-        if (dv_match_binary_kind(expr, DV_KIND_MUL, &left, &right) &&
-            dv_match_binary_kind(left, DV_KIND_MUL, &ll, &lr) &&
-            dv_match_binary_kind(right, DV_KIND_MUL, &rl, &rr) &&
-            dv_struct_eq(ll, lr) &&
-            dv_struct_eq(ll, rl) &&
-            dv_struct_eq(ll, rr)) {
-            dv_zero_number_array(coeffs_out, nvars);
-            if (!dv_match_affine_term(ll, nvars, vars, NUM_ONE, &constant, coeffs_out)) {
-                num_destroy(&constant);
-                return false;
-            }
-            num_destroy(constant_out);
-            *constant_out = constant;
-            return true;
-        }
-        break;
-    default:
-        break;
+    if (degree < (sizeof(mul_matchers) / sizeof(mul_matchers[0])) &&
+        mul_matchers[degree] &&
+        mul_matchers[degree](expr, &mul_base)) {
+        dv_zero_number_array(coeffs_out, nvars);
+        if (!dv_match_affine_term(mul_base, nvars, vars, NUM_ONE, &constant, coeffs_out))
+            return false;
+        num_destroy(constant_out);
+        *constant_out = num_scope_detach(constant);
+        return true;
     }
 
     return false;
@@ -465,6 +443,7 @@ static bool dv_match_affine_power_deg4(const dval_t *expr,
                                        number_t *constant_out,
                                        number_t *coeffs_out)
 {
+    NUM_SCOPE(scope);
     number_t constant = num_clone(NUM_ZERO);
 
     if (!expr || !degree_out || !constant_out || !coeffs_out || (nvars > 0 && !vars))
@@ -473,8 +452,7 @@ static bool dv_match_affine_power_deg4(const dval_t *expr,
     if (dv_match_const_value(expr, &constant)) {
         *degree_out = 0;
         num_destroy(constant_out);
-        *constant_out = num_clone(NUM_ZERO);
-        num_destroy(&constant);
+        *constant_out = num_scope_detach(num_clone(NUM_ZERO));
         dv_zero_number_array(coeffs_out, nvars);
         return true;
     }
@@ -484,7 +462,7 @@ static bool dv_match_affine_power_deg4(const dval_t *expr,
     if (dv_match_affine_term(expr, nvars, vars, NUM_ONE, &constant, coeffs_out)) {
         *degree_out = 1;
         num_destroy(constant_out);
-        *constant_out = constant;
+        *constant_out = num_scope_detach(constant);
         return true;
     }
 
@@ -503,7 +481,6 @@ static bool dv_match_affine_power_deg4(const dval_t *expr,
         return true;
     }
 
-    num_destroy(&constant);
     return false;
 }
 
@@ -515,6 +492,7 @@ static bool dv_match_scaled_affine_power_deg4(const dval_t *expr,
                                               number_t *constant_out,
                                               number_t *coeffs_out)
 {
+    NUM_SCOPE(scope);
     number_t inner_scale = num_new();
     number_t const_value = num_new();
     const dval_t *base;
@@ -523,26 +501,20 @@ static bool dv_match_scaled_affine_power_deg4(const dval_t *expr,
         return false;
 
     if (dv_match_const_value(expr, &const_value)) {
-        if (!num_is_real(const_value)) {
-            num_destroy(&inner_scale);
-            num_destroy(&const_value);
+        if (!num_is_real(const_value))
             return false;
-        }
         num_destroy(scale_out);
-        *scale_out = const_value;
+        *scale_out = num_scope_detach(const_value);
         *degree_out = 0;
         num_destroy(constant_out);
-        *constant_out = num_clone(NUM_ZERO);
+        *constant_out = num_scope_detach(num_clone(NUM_ZERO));
         dv_zero_number_array(coeffs_out, nvars);
-        num_destroy(&inner_scale);
         return true;
     }
 
     if (dv_match_affine_power_deg4(expr, nvars, vars, degree_out, constant_out, coeffs_out)) {
         num_destroy(scale_out);
-        *scale_out = num_clone(NUM_ONE);
-        num_destroy(&inner_scale);
-        num_destroy(&const_value);
+        *scale_out = num_scope_detach(num_clone(NUM_ONE));
         return true;
     }
 
@@ -550,13 +522,10 @@ static bool dv_match_scaled_affine_power_deg4(const dval_t *expr,
         num_is_real(inner_scale) &&
         dv_match_affine_power_deg4(base, nvars, vars, degree_out, constant_out, coeffs_out)) {
         num_destroy(scale_out);
-        *scale_out = inner_scale;
-        num_destroy(&const_value);
+        *scale_out = num_scope_detach(inner_scale);
         return true;
     }
 
-    num_destroy(&inner_scale);
-    num_destroy(&const_value);
     return false;
 }
 
@@ -578,6 +547,7 @@ static bool dv_match_affine_poly_deg4_rec(const dval_t *expr,
                                           number_t *coeffs_io,
                                           bool *have_basis_io)
 {
+    NUM_SCOPE(scope);
     number_t subtree_scale = num_new();
     const dval_t *scaled_base = NULL;
     const dval_t *left = NULL;
@@ -599,11 +569,6 @@ static bool dv_match_affine_poly_deg4_rec(const dval_t *expr,
 
     term_coeffs = malloc(nvars * sizeof(*term_coeffs));
     if ((nvars > 0) && !term_coeffs) {
-        num_destroy(&subtree_scale);
-        num_destroy(&scale);
-        num_destroy(&term_constant);
-        num_destroy(&left_constant);
-        num_destroy(&right_constant);
         return false;
     }
     dv_zero_number_array(poly_left, 5);
@@ -617,15 +582,10 @@ static bool dv_match_affine_poly_deg4_rec(const dval_t *expr,
             free(term_coeffs);
             dv_clear_number_array(poly_left, 5);
             dv_clear_number_array(poly_right, 5);
-            num_destroy(&subtree_scale);
-            num_destroy(&scale);
-            num_destroy(&term_constant);
-            num_destroy(&left_constant);
-            num_destroy(&right_constant);
             return false;
         }
         num_destroy(&poly_coeffs_out[degree]);
-        poly_coeffs_out[degree] = num_clone(scale);
+        poly_coeffs_out[degree] = num_scope_detach(num_clone(scale));
 
         if (degree > 0) {
             if (*have_basis_io &&
@@ -633,15 +593,10 @@ static bool dv_match_affine_poly_deg4_rec(const dval_t *expr,
                 free(term_coeffs);
                 dv_clear_number_array(poly_left, 5);
                 dv_clear_number_array(poly_right, 5);
-                num_destroy(&subtree_scale);
-                num_destroy(&scale);
-                num_destroy(&term_constant);
-                num_destroy(&left_constant);
-                num_destroy(&right_constant);
                 return false;
             }
             num_destroy(constant_io);
-            *constant_io = num_clone(term_constant);
+            *constant_io = num_scope_detach(num_clone(term_constant));
             dv_copy_number_array(coeffs_io, term_coeffs, nvars);
             *have_basis_io = true;
         }
@@ -649,11 +604,6 @@ static bool dv_match_affine_poly_deg4_rec(const dval_t *expr,
         dv_destroy_number_array(term_coeffs, nvars);
         dv_clear_number_array(poly_left, 5);
         dv_clear_number_array(poly_right, 5);
-        num_destroy(&subtree_scale);
-        num_destroy(&scale);
-        num_destroy(&term_constant);
-        num_destroy(&left_constant);
-        num_destroy(&right_constant);
         return true;
     }
 
@@ -665,15 +615,10 @@ static bool dv_match_affine_poly_deg4_rec(const dval_t *expr,
                                       constant_io, coeffs_io, have_basis_io)) {
         for (size_t i = 0; i < 5; ++i) {
             num_destroy(&poly_coeffs_out[i]);
-            poly_coeffs_out[i] = num_mul(subtree_scale, poly_left[i]);
+            poly_coeffs_out[i] = num_scope_detach(num_mul(subtree_scale, poly_left[i]));
         }
         dv_clear_number_array(poly_left, 5);
         dv_clear_number_array(poly_right, 5);
-        num_destroy(&subtree_scale);
-        num_destroy(&scale);
-        num_destroy(&term_constant);
-        num_destroy(&left_constant);
-        num_destroy(&right_constant);
         return true;
     }
 
@@ -685,11 +630,6 @@ static bool dv_match_affine_poly_deg4_rec(const dval_t *expr,
             dv_destroy_number_array(right_coeffs, nvars);
             dv_clear_number_array(poly_left, 5);
             dv_clear_number_array(poly_right, 5);
-            num_destroy(&subtree_scale);
-            num_destroy(&scale);
-            num_destroy(&term_constant);
-            num_destroy(&left_constant);
-            num_destroy(&right_constant);
             return false;
         }
         if (!dv_match_affine_poly_deg4_rec(left, nvars, vars, poly_left,
@@ -700,11 +640,6 @@ static bool dv_match_affine_poly_deg4_rec(const dval_t *expr,
             dv_destroy_number_array(right_coeffs, nvars);
             dv_clear_number_array(poly_left, 5);
             dv_clear_number_array(poly_right, 5);
-            num_destroy(&subtree_scale);
-            num_destroy(&scale);
-            num_destroy(&term_constant);
-            num_destroy(&left_constant);
-            num_destroy(&right_constant);
             return false;
         }
 
@@ -714,33 +649,29 @@ static bool dv_match_affine_poly_deg4_rec(const dval_t *expr,
             dv_destroy_number_array(right_coeffs, nvars);
             dv_clear_number_array(poly_left, 5);
             dv_clear_number_array(poly_right, 5);
-            num_destroy(&subtree_scale);
-            num_destroy(&scale);
-            num_destroy(&term_constant);
-            num_destroy(&left_constant);
-            num_destroy(&right_constant);
             return false;
         }
 
         for (size_t i = 0; i < 5; ++i) {
             num_destroy(&poly_coeffs_out[i]);
-            poly_coeffs_out[i] = is_sub ? num_sub(poly_left[i], poly_right[i])
-                                        : num_add(poly_left[i], poly_right[i]);
+            poly_coeffs_out[i] = num_scope_detach(
+                is_sub ? num_sub(poly_left[i], poly_right[i])
+                       : num_add(poly_left[i], poly_right[i]));
         }
 
         if (have_left) {
             num_destroy(constant_io);
-            *constant_io = num_clone(left_constant);
+            *constant_io = num_scope_detach(num_clone(left_constant));
             dv_copy_number_array(coeffs_io, left_coeffs, nvars);
             *have_basis_io = true;
         } else if (have_right) {
             num_destroy(constant_io);
-            *constant_io = num_clone(right_constant);
+            *constant_io = num_scope_detach(num_clone(right_constant));
             dv_copy_number_array(coeffs_io, right_coeffs, nvars);
             *have_basis_io = true;
         } else {
             num_destroy(constant_io);
-            *constant_io = num_clone(NUM_ZERO);
+            *constant_io = num_scope_detach(num_clone(NUM_ZERO));
             dv_reset_number_array(coeffs_io, nvars);
             *have_basis_io = false;
         }
@@ -749,21 +680,11 @@ static bool dv_match_affine_poly_deg4_rec(const dval_t *expr,
         dv_destroy_number_array(right_coeffs, nvars);
         dv_clear_number_array(poly_left, 5);
         dv_clear_number_array(poly_right, 5);
-        num_destroy(&subtree_scale);
-        num_destroy(&scale);
-        num_destroy(&term_constant);
-        num_destroy(&left_constant);
-        num_destroy(&right_constant);
         return true;
     }
 
     dv_clear_number_array(poly_left, 5);
     dv_clear_number_array(poly_right, 5);
-    num_destroy(&subtree_scale);
-    num_destroy(&scale);
-    num_destroy(&term_constant);
-    num_destroy(&left_constant);
-    num_destroy(&right_constant);
     return false;
 }
 
@@ -774,6 +695,7 @@ static bool dv_match_affine_poly_deg4_num_local(const dval_t *expr,
                                                 number_t *constant_out,
                                                 number_t *coeffs_out)
 {
+    NUM_SCOPE(scope);
     bool have_basis = false;
     number_t constant = num_clone(NUM_ZERO);
 
@@ -788,7 +710,8 @@ static bool dv_match_affine_poly_deg4_num_local(const dval_t *expr,
         return false;
 
     num_destroy(constant_out);
-    *constant_out = have_basis ? constant : num_clone(NUM_ZERO);
+    *constant_out = have_basis ? num_scope_detach(constant)
+                               : num_scope_detach(num_clone(NUM_ZERO));
     return true;
 }
 
@@ -813,6 +736,7 @@ static bool dv_match_affine_poly_deg4_times_unary_affine_op(const dval_t *expr,
                                                             number_t *constant_out,
                                                             number_t *coeffs_out)
 {
+    NUM_SCOPE(scope);
     const dval_t *left = NULL;
     const dval_t *right = NULL;
     number_t unary_constant = num_clone(NUM_ZERO);
@@ -853,13 +777,11 @@ static bool dv_match_affine_poly_deg4_times_unary_affine_op(const dval_t *expr,
 
     if (matched) {
         num_destroy(constant_out);
-        *constant_out = num_clone(unary_constant);
+        *constant_out = num_scope_detach(num_clone(unary_constant));
         dv_copy_number_array(coeffs_out, unary_coeffs, nvars);
         dv_copy_number_array(poly_coeffs_out, poly_terms, 5);
     }
 
-    num_destroy(&unary_constant);
-    num_destroy(&poly_constant);
     dv_destroy_number_array(unary_coeffs, nvars);
     dv_destroy_number_array(poly_coeffs, nvars);
     dv_clear_number_array(poly_terms, 5);
@@ -907,6 +829,7 @@ bool dv_match_scaled_expr(const dval_t *expr,
                           number_t *scale_out,
                           const dval_t **base_out)
 {
+    NUM_SCOPE(scope);
     number_t inner_scale;
     number_t const_value = num_new();
     const dval_t *inner_base;
@@ -920,13 +843,11 @@ bool dv_match_scaled_expr(const dval_t *expr,
     if (dv_match_unary_kind(expr, DV_KIND_NEG, &arg)) {
         inner_scale = num_new();
         if (dv_match_scaled_expr(arg, &inner_scale, &inner_base)) {
-            *scale_out = num_neg(inner_scale);
-            num_destroy(&inner_scale);
+            *scale_out = num_scope_detach(num_neg(inner_scale));
             *base_out = inner_base;
             return true;
         }
-        num_destroy(&inner_scale);
-        *scale_out = NUM_NEG_ONE;
+        *scale_out = num_scope_detach(num_clone(NUM_NEG_ONE));
         *base_out = arg;
         return true;
     }
@@ -939,21 +860,15 @@ bool dv_match_scaled_expr(const dval_t *expr,
 
     if (dv_match_binary_kind(expr, DV_KIND_DIV, &left, &right) &&
         dv_match_unnamed_const_leaf(right, &const_value)) {
-        if (num_eq(const_value, NUM_ZERO)) {
-            num_destroy(&const_value);
+        if (num_eq(const_value, NUM_ZERO))
             return false;
-        }
         inner_scale = num_new();
         if (dv_match_scaled_expr(left, &inner_scale, &inner_base)) {
-            *scale_out = num_div(inner_scale, const_value);
-            num_destroy(&inner_scale);
-            num_destroy(&const_value);
+            *scale_out = num_scope_detach(num_div(inner_scale, const_value));
             *base_out = inner_base;
             return true;
         }
-        num_destroy(&inner_scale);
-        *scale_out = num_div(NUM_ONE, const_value);
-        num_destroy(&const_value);
+        *scale_out = num_scope_detach(num_div(NUM_ONE, const_value));
         *base_out = left;
         return true;
     }

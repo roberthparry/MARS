@@ -24,7 +24,7 @@
 #include <string.h>
 
 #include "dval_internal.h"
-#include "number/number_internal.h"
+#include "internal/number_internal.h"
 
 /* forward declaration — helpers below call dv_simplify recursively */
 dval_t *dv_simplify(const dval_t *dv);
@@ -38,6 +38,30 @@ static void *dv_xrealloc(void *ptr, size_t size)
 
     fprintf(stderr, "dval_simplify: out of memory\n");
     abort();
+}
+
+static inline dval_t *dv_new_const_owned_local(number_t value)
+{
+    NUM_SCOPE_SUSPEND(saved_scope);
+    dval_t *out = dv_new_const(value);
+
+    return out;
+}
+
+static inline dval_t *dv_make_scaled_owned_local(number_t coeff, dval_t *base)
+{
+    NUM_SCOPE_SUSPEND(saved_scope);
+    dval_t *out = dv_make_scaled(coeff, base);
+
+    return out;
+}
+
+static inline dval_t *dv_make_pow_like_owned_local(dval_t *base, number_t exponent)
+{
+    NUM_SCOPE_SUSPEND(saved_scope);
+    dval_t *out = dv_make_pow_like(base, exponent);
+
+    return out;
 }
 
 int dv_fold_zero_to_zero(const number_t *in, number_t *out)
@@ -96,46 +120,40 @@ static void collect_mul_flat(
     number_t *c_acc, int *is_zero,
     dval_t ***terms, size_t *nterms, size_t *cap)
 {
-    num_scope_t scope;
-
-    num_scope_enter(&scope);
+    NUM_SCOPE(scope);
     if (*is_zero) {
-        num_scope_leave(&scope);
+        num_scope_leave(&(scope));
         return;
     }
 
     if (dv_is_unnamed_const(dv) && num_is_real(dv->c)) {
         if (num_is_zero(dv->c)) {
             *is_zero = 1;
-            num_scope_leave(&scope);
+            num_scope_leave(&(scope));
             return;
         }
         {
-            num_scope_t *saved_scope = number_scope_suspend();
+            NUM_SCOPE_SUSPEND(saved_scope);
             number_t product = num_mul(*c_acc, dv->c);
-
-            number_scope_resume(saved_scope);
 
             num_destroy(c_acc);
             *c_acc = product;
         }
-        num_scope_leave(&scope);
+        num_scope_leave(&(scope));
         return;
     }
     if (dv_is_op(dv, &ops_neg)) {
-        num_scope_t *saved_scope = number_scope_suspend();
+        NUM_SCOPE_SUSPEND(saved_scope);
         number_t negated = num_neg(*c_acc);
-
-        number_scope_resume(saved_scope);
 
         num_destroy(c_acc);
         *c_acc = negated;
-        num_scope_leave(&scope);
+        num_scope_leave(&(scope));
         collect_mul_flat(dv->a, c_acc, is_zero, terms, nterms, cap);
         return;
     }
     if (dv_is_op(dv, &ops_mul)) {
-        num_scope_leave(&scope);
+        num_scope_leave(&(scope));
         collect_mul_flat(dv->a, c_acc, is_zero, terms, nterms, cap);
         collect_mul_flat(dv->b, c_acc, is_zero, terms, nterms, cap);
         return;
@@ -146,7 +164,7 @@ static void collect_mul_flat(
     }
     dv_retain(dv);
     (*terms)[(*nterms)++] = dv;
-    num_scope_leave(&scope);
+    num_scope_leave(&(scope));
 }
 
 /* ========================================================================= */
@@ -165,6 +183,7 @@ dval_t *dv_simplify_passthrough(const dval_t *dv, dval_t *a, dval_t *b)
 
 dval_t *dv_simplify_unary_operator(const dval_t *dv, dval_t *a, dval_t *b)
 {
+    NUM_SCOPE(scope);
     (void)b;
 
     /* exp(log(x)) -> x, log(exp(x)) -> x */
@@ -180,20 +199,17 @@ dval_t *dv_simplify_unary_operator(const dval_t *dv, dval_t *a, dval_t *b)
         number_t folded = num_new();
 
         if (dv->ops->fold_const_unary && dv->ops->fold_const_unary(&a->c, &folded)) {
-            dval_t *out = dv_new_const(folded);
+            dval_t *out = dv_new_const_owned_local(folded);
 
-            num_destroy(&folded);
             dv_free(a);
             return out;
         }
-        num_destroy(&folded);
 
         if ((!a->name || !*a->name) && dv->ops->apply_unary) {
             dval_t *tmp = dv->ops->apply_unary(a);
             number_t value = tmp->ops->eval(tmp);
-            dval_t *out = dv_new_const(value);
+            dval_t *out = dv_new_const_owned_local(value);
 
-            num_destroy(&value);
             dv_free(tmp);
             dv_free(a);
             return out;
@@ -217,15 +233,10 @@ dval_t *dv_simplify_unary_operator(const dval_t *dv, dval_t *a, dval_t *b)
                 simp = dv_simplify(raw);
                 dv_free(raw);
                 dv_free(a);
-                dval_t *out = dv_make_scaled(coeff_root, simp);
+                dval_t *out = dv_make_scaled_owned_local(coeff_root, simp);
 
-                num_destroy(&coeff_square);
-                num_destroy(&coeff_root);
                 return out;
             }
-
-            num_destroy(&coeff_square);
-            num_destroy(&coeff_root);
         }
     }
 
@@ -242,15 +253,17 @@ dval_t *dv_simplify_unary_operator(const dval_t *dv, dval_t *a, dval_t *b)
 
 dval_t *dv_simplify_binary_operator(const dval_t *dv, dval_t *a, dval_t *b)
 {
+    NUM_SCOPE(scope);
     if ((!a || !b) || !dv->ops->apply_binary)
+    {
         return dv_simplify_passthrough(dv, a, b);
+    }
 
     if (dv_is_unnamed_const(a) && dv_is_unnamed_const(b)) {
         dval_t *tmp = dv->ops->apply_binary(a, b);
         number_t value = tmp->ops->eval(tmp);
-        dval_t *out = dv_new_const(value);
+        dval_t *out = dv_new_const_owned_local(value);
 
-        num_destroy(&value);
         dv_free(tmp);
         dv_free(a);
         dv_free(b);
@@ -269,6 +282,7 @@ dval_t *dv_simplify_binary_operator(const dval_t *dv, dval_t *a, dval_t *b)
 
 dval_t *dv_simplify_neg_operator(const dval_t *dv, dval_t *a, dval_t *b)
 {
+    NUM_SCOPE(scope);
     (void)dv;
     (void)b;
     /* --x → x */
@@ -278,9 +292,8 @@ dval_t *dv_simplify_neg_operator(const dval_t *dv, dval_t *a, dval_t *b)
     /* neg(c) → -c */
     if (dv_is_op(a, &ops_const)) {
         number_t c = num_neg(a->c);
-        dval_t *out = dv_new_const(c);
+        dval_t *out = dv_new_const_owned_local(c);
 
-        num_destroy(&c);
         dv_free(a);
         return out;
     }
@@ -294,9 +307,8 @@ dval_t *dv_simplify_neg_operator(const dval_t *dv, dval_t *a, dval_t *b)
             dv_retain(a->b);
             dval_t *rest = a->b;
             dv_free(a);
-            dval_t *out = dv_make_scaled(pos_c, rest);
+            dval_t *out = dv_make_scaled_owned_local(pos_c, rest);
 
-            num_destroy(&pos_c);
             return out;
         }
     }
@@ -307,6 +319,7 @@ dval_t *dv_simplify_neg_operator(const dval_t *dv, dval_t *a, dval_t *b)
 
 dval_t *dv_simplify_add_sub_operator(const dval_t *dv, dval_t *a, dval_t *b)
 {
+    NUM_SCOPE(scope);
     number_t c_const = num_clone(NUM_ZERO);
     number_t common_coeff = num_clone(NUM_ONE);
     addend_t *terms   = NULL;
@@ -329,8 +342,6 @@ dval_t *dv_simplify_add_sub_operator(const dval_t *dv, dval_t *a, dval_t *b)
             num_destroy(&terms[i].coeff);
         }
         free(terms);
-        num_destroy(&c_const);
-        num_destroy(&common_coeff);
         return identity;
     }
 
@@ -362,7 +373,6 @@ dval_t *dv_simplify_add_sub_operator(const dval_t *dv, dval_t *a, dval_t *b)
         number_t scaled_coeff = num_div(terms[i].coeff, common_coeff);
         dval_t *term = dv_make_scaled(scaled_coeff, terms[i].base);
 
-        num_destroy(&scaled_coeff);
         num_destroy(&terms[i].coeff);
         if (!cur) cur = term;
         else {
@@ -387,8 +397,6 @@ dval_t *dv_simplify_add_sub_operator(const dval_t *dv, dval_t *a, dval_t *b)
     if (!num_is_one(common_coeff))
         cur = dv_make_scaled(common_coeff, cur);
 
-    num_destroy(&c_const);
-    num_destroy(&common_coeff);
     return cur;
 }
 
@@ -396,6 +404,7 @@ dval_t *dv_simplify_add_sub_operator(const dval_t *dv, dval_t *a, dval_t *b)
 
 dval_t *dv_simplify_mul_operator(const dval_t *dv, dval_t *a, dval_t *b)
 {
+    NUM_SCOPE(scope);
     dval_t **terms = NULL;
     dval_t **den_terms = NULL;
     size_t nterms = 0, term_cap = 0;
@@ -431,7 +440,6 @@ dval_t *dv_simplify_mul_operator(const dval_t *dv, dval_t *a, dval_t *b)
 
     if (is_zero) {
         dv_free_node_array(terms, nterms);
-        num_destroy(&c_acc);
         return dv_new_const(NUM_ZERO);
     }
 
@@ -441,7 +449,6 @@ dval_t *dv_simplify_mul_operator(const dval_t *dv, dval_t *a, dval_t *b)
     if (is_zero) {
         dv_free_node_array(terms, nterms);
         dv_free_node_array(den_terms, nden_terms);
-        num_destroy(&c_acc);
         return dv_new_const(NUM_ZERO);
     }
 
@@ -453,12 +460,10 @@ dval_t *dv_simplify_mul_operator(const dval_t *dv, dval_t *a, dval_t *b)
 
     expanded = dv_try_expand_shallow_product(c_acc, terms, nterms, den_terms, nden_terms);
     if (expanded) {
-        num_destroy(&c_acc);
         return expanded;
     }
 
     numerator = dv_rebuild_product_chain(c_acc, terms, nterms);
-    num_destroy(&c_acc);
     if (nden_terms == 0) {
         free(den_terms);
         return numerator;
@@ -477,6 +482,7 @@ dval_t *dv_simplify_mul_operator(const dval_t *dv, dval_t *a, dval_t *b)
 
 dval_t *dv_simplify_div_operator(const dval_t *dv, dval_t *a, dval_t *b)
 {
+    NUM_SCOPE(scope);
     (void)dv;
 
     if (dv_is_op(b, &ops_const) && dv_const_is_one(b)) { dv_free(b); return a; }
@@ -492,9 +498,8 @@ dval_t *dv_simplify_div_operator(const dval_t *dv, dval_t *a, dval_t *b)
         rest = a->b;
         dv_free(a);
         dv_free(b);
-        dval_t *out = dv_make_scaled(folded, rest);
+        dval_t *out = dv_make_scaled_owned_local(folded, rest);
 
-        num_destroy(&folded);
         return out;
     }
     if (dv_is_unnamed_const(b) && dv_is_op(a, &ops_neg)) {
@@ -538,8 +543,7 @@ dval_t *dv_simplify_div_operator(const dval_t *dv, dval_t *a, dval_t *b)
 
             number_t scaled_coeff = num_div(terms[i].coeff, b->c);
 
-            term = dv_make_scaled(scaled_coeff, terms[i].base);
-            num_destroy(&scaled_coeff);
+            term = dv_make_scaled_owned_local(scaled_coeff, terms[i].base);
             num_destroy(&terms[i].coeff);
             if (!cur) cur = term;
             else {
@@ -553,9 +557,7 @@ dval_t *dv_simplify_div_operator(const dval_t *dv, dval_t *a, dval_t *b)
 
         if (!num_is_zero(c_const)) {
             number_t scaled_const = num_div(c_const, b->c);
-            dval_t *cterm = dv_new_const(scaled_const);
-
-            num_destroy(&scaled_const);
+            dval_t *cterm = dv_new_const_owned_local(scaled_const);
 
             if (!cur)
                 cur = cterm;
@@ -567,7 +569,6 @@ dval_t *dv_simplify_div_operator(const dval_t *dv, dval_t *a, dval_t *b)
             }
         }
 
-        num_destroy(&c_const);
         return cur ? cur : dv_new_const(NUM_ZERO);
     }
 div_fallback_2:
@@ -602,9 +603,8 @@ div_fallback_2:
 
         dv_free(a);
         dv_free(b);
-        dval_t *out = dv_new_const(q);
+        dval_t *out = dv_new_const_owned_local(q);
 
-        num_destroy(&q);
         return out;
     }
 
@@ -634,11 +634,13 @@ div_fallback_2:
 
 dval_t *dv_simplify_pow_d_operator(const dval_t *dv, dval_t *a, dval_t *b)
 {
+    NUM_SCOPE(scope);
     (void)b;
     number_t exponent = dv->c;
 
-    if (num_eq(exponent, NUM_ONE))
+    if (num_eq(exponent, NUM_ONE)) {
         return a;
+    }
     if (num_eq(exponent, NUM_ZERO)) {
         dv_free(a);
         return dv_new_const(NUM_ONE);
@@ -648,9 +650,8 @@ dval_t *dv_simplify_pow_d_operator(const dval_t *dv, dval_t *a, dval_t *b)
         number_t v = num_pow(a->c, exponent);
 
         dv_free(a);
-        dval_t *out = dv_new_const(v);
+        dval_t *out = dv_new_const_owned_local(v);
 
-        num_destroy(&v);
         return out;
     }
 
@@ -660,13 +661,12 @@ dval_t *dv_simplify_pow_d_operator(const dval_t *dv, dval_t *a, dval_t *b)
         dv_retain(a->a);
         dval_t *inner = a->a;
         dv_free(a);
-        dval_t *out = dv_make_pow_like( inner, half);
+        dval_t *out = dv_make_pow_like_owned_local(inner, half);
 
-        num_destroy(&half);
         return out;
     }
 
-    return dv_make_pow_like(a, exponent);
+    return dv_make_pow_like_owned_local(a, exponent);
 }
 
 /* --- */

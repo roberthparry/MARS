@@ -37,14 +37,13 @@ static int term_coeff(const dval_t *term, const dval_t **base, number_t *coeff_o
     if (dv_is_op(term, &ops_neg)) {
         if (dv_is_op(term->a, &ops_mul) && dv_is_unnamed_const(term->a->a)) {
             *base = term->a->b;
-            if (!dv_try_get_unnamed_const_real_num(term->a->a, coeff_out))
-                return 0;
-            {
-                number_t neg = num_neg(*coeff_out);
+        if (!dv_try_get_unnamed_const_real_num(term->a->a, coeff_out))
+            return 0;
+        {
+            number_t neg = num_neg(*coeff_out);
 
-                num_destroy(coeff_out);
-                *coeff_out = neg;
-            }
+            *coeff_out = neg;
+        }
             return 1;
         }
         *base = term->a;
@@ -64,6 +63,7 @@ static int term_coeff(const dval_t *term, const dval_t **base, number_t *coeff_o
 
 dval_t *dv_make_scaled(number_t coeff, dval_t *base)
 {
+    NUM_SCOPE(scope);
     if (num_is_zero(coeff)) { dv_free(base); return dv_new_const(NUM_ZERO); }
     if (num_eq(coeff, NUM_ONE))  return base;
     if (num_eq(coeff, NUM_NEG_ONE)) {
@@ -80,7 +80,6 @@ dval_t *dv_make_scaled(number_t coeff, dval_t *base)
                 dval_t *new_num = dv_make_scaled(pos_c, rest);
                 dval_t *r = dv_div(new_num, den);
 
-                num_destroy(&pos_c);
                 dv_free(new_num);
                 dv_free(den);
                 return r;
@@ -108,7 +107,6 @@ dval_t *dv_make_scaled(number_t coeff, dval_t *base)
         dv_free(base);
         dval_t *out = dv_make_scaled(folded, rest);
 
-        num_destroy(&folded);
         return out;
     }
     if (dv_is_op(base, &ops_mul) &&
@@ -124,7 +122,6 @@ dval_t *dv_make_scaled(number_t coeff, dval_t *base)
         dv_free(base);
         dval_t *out = dv_make_scaled(folded, inner);
 
-        num_destroy(&folded);
         return out;
     }
     dval_t *cn = dv_new_const(coeff);
@@ -254,6 +251,7 @@ void dv_sort_addends(addend_t *terms, size_t n)
 void dv_collect_addends(dval_t *dv, number_t scale, number_t *c_const,
                         addend_t **terms, size_t *n, size_t *cap)
 {
+    NUM_SCOPE(scope);
     if (!dv)
         return;
     if (dv_is_op(dv, &ops_add)) {
@@ -266,7 +264,6 @@ void dv_collect_addends(dval_t *dv, number_t scale, number_t *c_const,
 
         dv_collect_addends(dv->a, scale, c_const, terms, n, cap);
         dv_collect_addends(dv->b, neg_scale, c_const, terms, n, cap);
-        num_destroy(&neg_scale);
         return;
     }
     if (dv_is_op(dv, &ops_neg)) {
@@ -274,7 +271,6 @@ void dv_collect_addends(dval_t *dv, number_t scale, number_t *c_const,
             number_t neg_scale = num_neg(scale);
 
             dv_collect_addends(dv->a, neg_scale, c_const, terms, n, cap);
-            num_destroy(&neg_scale);
             return;
         }
         if (dv_is_op(dv->a, &ops_mul) &&
@@ -288,9 +284,6 @@ void dv_collect_addends(dval_t *dv, number_t scale, number_t *c_const,
                 return;
             ns = num_mul(neg_scale, coeff_num);
             dv_collect_addends(dv->a->b, ns, c_const, terms, n, cap);
-            num_destroy(&ns);
-            num_destroy(&coeff_num);
-            num_destroy(&neg_scale);
             return;
         }
     }
@@ -304,8 +297,6 @@ void dv_collect_addends(dval_t *dv, number_t scale, number_t *c_const,
             return;
         ns = num_mul(scale, coeff_num);
         dv_collect_addends(dv->b, ns, c_const, terms, n, cap);
-        num_destroy(&ns);
-        num_destroy(&coeff_num);
         return;
     }
     if (dv_is_op(dv, &ops_mul) &&
@@ -329,8 +320,6 @@ void dv_collect_addends(dval_t *dv, number_t scale, number_t *c_const,
         dv_free(raw);
         dv_collect_addends(simp, ns, c_const, terms, n, cap);
         dv_free(simp);
-        num_destroy(&ns);
-        num_destroy(&coeff_num);
         return;
     }
 
@@ -342,15 +331,13 @@ void dv_collect_addends(dval_t *dv, number_t scale, number_t *c_const,
     {
         number_t scaled = num_mul(coeff, scale);
 
-        num_destroy(&coeff);
         coeff = scaled;
     }
     if (!base) {
         number_t sum = num_add(*c_const, coeff);
 
         num_destroy(c_const);
-        *c_const = sum;
-        num_destroy(&coeff);
+        *c_const = num_scope_detach(sum);
         return;
     }
 
@@ -359,8 +346,7 @@ void dv_collect_addends(dval_t *dv, number_t scale, number_t *c_const,
             number_t sum = num_add((*terms)[i].coeff, coeff);
 
             num_destroy(&(*terms)[i].coeff);
-            (*terms)[i].coeff = sum;
-            num_destroy(&coeff);
+            (*terms)[i].coeff = num_scope_detach(sum);
             return;
         }
     }
@@ -370,13 +356,14 @@ void dv_collect_addends(dval_t *dv, number_t scale, number_t *c_const,
     }
     dv_retain((dval_t *)base);
     (*terms)[*n].base = (dval_t *)base;
-    (*terms)[*n].coeff = coeff;
+    (*terms)[*n].coeff = num_scope_detach(coeff);
     (*n)++;
 }
 
 int dv_extract_common_addend_coeff(const addend_t *terms, size_t n,
                                    number_t c_const, number_t *common_out)
 {
+    NUM_SCOPE(scope);
     number_t common = num_new();
     int have_common = 0;
     size_t nonzero_terms = 0;
@@ -391,7 +378,6 @@ int dv_extract_common_addend_coeff(const addend_t *terms, size_t n,
             common = num_clone(terms[i].coeff);
             have_common = 1;
         } else if (!num_eq(common, terms[i].coeff)) {
-            num_destroy(&common);
             return 0;
         }
         nonzero_terms++;
@@ -399,12 +385,11 @@ int dv_extract_common_addend_coeff(const addend_t *terms, size_t n,
 
     if (!have_common || nonzero_terms < 2 ||
         num_is_one(common) || num_eq(common, NUM_NEG_ONE)) {
-        num_destroy(&common);
         return 0;
     }
 
     num_destroy(common_out);
-    *common_out = common;
+    *common_out = num_scope_detach(common);
     return 1;
 }
 
@@ -548,6 +533,7 @@ void dv_split_division_terms(number_t *c_acc, int *is_zero,
                              dval_t ***den_terms, size_t *nden_terms,
                              size_t *den_cap)
 {
+    NUM_SCOPE(scope);
     for (size_t i = 0; i < nterms; ++i) {
         dval_t *term = terms[i];
         dval_t *num;
@@ -570,7 +556,7 @@ void dv_split_division_terms(number_t *c_acc, int *is_zero,
                 number_t product = num_mul(*c_acc, num->c);
 
                 num_destroy(c_acc);
-                *c_acc = product;
+                *c_acc = num_scope_detach(product);
             }
             dv_free(num);
         } else {
@@ -586,7 +572,7 @@ void dv_split_division_terms(number_t *c_acc, int *is_zero,
             number_t quotient = num_div(*c_acc, den->c);
 
             num_destroy(c_acc);
-            *c_acc = quotient;
+            *c_acc = num_scope_detach(quotient);
             dv_free(den);
             continue;
         }
@@ -597,6 +583,7 @@ void dv_split_division_terms(number_t *c_acc, int *is_zero,
 
 void dv_combine_like_powers(dval_t **terms, size_t nterms)
 {
+    NUM_SCOPE(scope);
     for (size_t i = 0; i < nterms; ++i) {
         dval_t *term = terms[i];
         dval_t *base;
@@ -620,8 +607,6 @@ void dv_combine_like_powers(dval_t **terms, size_t nterms)
                 number_t other_exponent = pow_exponent(other);
                 number_t sum = num_add(exponent, other_exponent);
 
-                num_destroy(&exponent);
-                num_destroy(&other_exponent);
                 exponent = sum;
             }
             dv_free(other);
@@ -629,14 +614,12 @@ void dv_combine_like_powers(dval_t **terms, size_t nterms)
         }
 
         if (num_is_one(exponent) && !dv_is_pow_d_expr(term)) {
-            num_destroy(&exponent);
             continue;
         }
 
         dv_retain(base);
         dv_free(term);
         terms[i] = dv_make_pow_like(base, exponent);
-        num_destroy(&exponent);
     }
 }
 

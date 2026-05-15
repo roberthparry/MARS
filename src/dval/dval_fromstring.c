@@ -45,6 +45,7 @@
 #include "dval_internal.h"
 #include "dval_fromstring_internal.h"
 #include "dval.h"
+#include "internal/number_internal.h"
 
 /* ------------------------------------------------------------------ */
 /* Parser state                                                         */
@@ -374,12 +375,12 @@ static int parse_required_char(parser_t *p, char expected, const char *errmsg)
 
 static dval_t *apply_integer_power_if_present(dval_t *value, int exponent)
 {
+    NUM_SCOPE(scope);
     if (exponent < 0)
         return value;
 
     number_t exponent_num = num_create_from_long(exponent);
     dval_t *powered = dv_pow(value, &exponent_num);
-    num_destroy(&exponent_num);
     dv_free(value);
     return powered;
 }
@@ -403,6 +404,7 @@ static dval_t *parse_enclosed_addexpr(parser_t *p, char closing, const char *err
 
 static dval_t *parse_atom(parser_t *p)
 {
+    NUM_SCOPE(scope);
     unsigned int cp = 0;
     int cp_len = fs_utf8_decode(p->p, &cp);
 
@@ -440,7 +442,6 @@ static dval_t *parse_atom(parser_t *p)
         }
         p->p += len;
         node = dv_new_const(value);
-        num_destroy(&value);
         return node;
     }
 
@@ -544,6 +545,7 @@ static dval_t *parse_atom(parser_t *p)
 
 static dval_t *parse_power(parser_t *p)
 {
+    NUM_SCOPE(scope);
     if (p->error) return NULL;
 
     dval_t *base = parse_atom(p);
@@ -584,7 +586,6 @@ static dval_t *parse_power(parser_t *p)
             return NULL;
         }
         dval_t *tmp = dv_pow(base, &exponent_num);
-        num_destroy(&exponent_num);
         dv_free(base);
         return tmp;
     }
@@ -717,6 +718,7 @@ static int parse_bindings(const char *s, const char *end,
                            int is_var, symtab_t *syms,
                            char *errmsg, size_t errmsg_n)
 {
+    NUM_SCOPE(scope);
     const char *p = s;
     while (p < end) {
         /* Skip whitespace and commas between entries */
@@ -752,7 +754,6 @@ static int parse_bindings(const char *s, const char *end,
         node = is_var
             ? dv_new_named_var(val, name)
             : dv_new_named_const(val, name);
-        num_destroy(&val);
 
         /* dv_new_named_* calls dv_normalize_name, which may transform the name
          * (e.g. "@pi" → "π").  Use the normalised form as the lookup key so it
@@ -785,6 +786,7 @@ static int parse_bindings(const char *s, const char *end,
 static dval_t *parse_pure_const(const char *s, const char *end,
                                  char *errmsg, size_t errmsg_n)
 {
+    NUM_SCOPE(scope);
     const char *p = s;
     skip_spaces(&p, end);
 
@@ -807,12 +809,10 @@ static dval_t *parse_pure_const(const char *s, const char *end,
     }
 
     if (!name) {
-        num_destroy(&val);
         snprintf(errmsg, errmsg_n, "constant name is required in pure-constant format");
         return NULL;
     }
     dval_t *result = dv_new_named_const(val, name);
-    num_destroy(&val);
     free(name);
     return result;
 }
@@ -849,6 +849,7 @@ static int has_top_level_equals(const char *start, const char *end)
 static int collect_implicit_symbols(const char *start, const char *end,
                                     symtab_t *syms)
 {
+    NUM_SCOPE(scope);
     const char *p = start;
 
     while (p < end) {
@@ -870,7 +871,6 @@ static int collect_implicit_symbols(const char *start, const char *end,
         if (dv_get_default_constant_num(name, &value)) {
             canonical_name = dv_default_constant_canonical_name(name);
             node = dv_new_named_const(value, canonical_name);
-            num_destroy(&value);
         } else {
             node = is_const
                 ? dv_new_named_const(NUM_NAN, name)

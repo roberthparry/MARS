@@ -2,10 +2,31 @@
 #include <stdlib.h>
 
 #include "dval_internal.h"
+#include "internal/number_internal.h"
 
 static number_t dv_reverse_zero(void)
 {
     return NUM_ZERO;
+}
+
+static inline number_t num_owned_clone_local(const number_t value)
+{
+    return num_clone(value);
+}
+
+static inline number_t num_owned_neg_local(const number_t value)
+{
+    return num_neg(value);
+}
+
+static inline number_t num_owned_mul_local(const number_t a, const number_t b)
+{
+    return num_mul(a, b);
+}
+
+static inline number_t num_owned_div_local(const number_t a, const number_t b)
+{
+    return num_div(a, b);
 }
 
 static int reverse_find_node(const dval_t *const *nodes,
@@ -95,23 +116,21 @@ int dv_eval_derivatives(const dval_t *expr,
         num_destroy(&value);
         return -1;
     }
-    for (size_t i = 0; i < node_count; ++i)
+    for (size_t i = 0; i + 1u < node_count; ++i)
         bars[i] = dv_reverse_zero();
-    num_destroy(&bars[node_count - 1u]);
     bars[node_count - 1u] = NUM_ONE;
 
     for (size_t i = node_count; i-- > 0u;) {
         const dval_t *node = nodes[i];
-        number_t a_bar;
-        number_t b_bar;
         int a_index;
         int b_index;
 
         if (node->ops->arity == DV_OP_ATOM || num_is_zero(bars[i]))
             continue;
 
-        a_bar = (number_t){0};
-        b_bar = (number_t){0};
+        NUM_SCOPE(scope);
+        number_t a_bar = (number_t){0};
+        number_t b_bar = (number_t){0};
         node->ops->reverse(node, &bars[i], &a_bar, &b_bar);
 
         if (node->ops->arity != DV_OP_ATOM) {
@@ -119,8 +138,6 @@ int dv_eval_derivatives(const dval_t *expr,
 
             a_index = reverse_find_node(nodes, node_count, node->a);
             if (a_index < 0) {
-                num_destroy(&b_bar);
-                num_destroy(&a_bar);
                 reverse_destroy_numbers(bars, node_count);
                 free(bars);
                 free(nodes);
@@ -129,15 +146,13 @@ int dv_eval_derivatives(const dval_t *expr,
             }
             accum = num_add(bars[a_index], a_bar);
             num_destroy(&bars[a_index]);
-            bars[a_index] = accum;
+            bars[a_index] = num_scope_detach(accum);
         }
         if (node->ops->arity == DV_OP_BINARY && node->b) {
             number_t accum;
 
             b_index = reverse_find_node(nodes, node_count, node->b);
             if (b_index < 0) {
-                num_destroy(&b_bar);
-                num_destroy(&a_bar);
                 reverse_destroy_numbers(bars, node_count);
                 free(bars);
                 free(nodes);
@@ -146,11 +161,8 @@ int dv_eval_derivatives(const dval_t *expr,
             }
             accum = num_add(bars[b_index], b_bar);
             num_destroy(&bars[b_index]);
-            bars[b_index] = accum;
+            bars[b_index] = num_scope_detach(accum);
         }
-
-        num_destroy(&b_bar);
-        num_destroy(&a_bar);
     }
 
     if (value_out)
@@ -181,21 +193,21 @@ void dv_reverse_atom(const dval_t *dv, const number_t *out_bar, number_t *a_bar,
 void dv_reverse_add(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
     (void)dv;
-    *a_bar = num_clone(*out_bar);
-    *b_bar = num_clone(*out_bar);
+    *a_bar = num_owned_clone_local(*out_bar);
+    *b_bar = num_owned_clone_local(*out_bar);
 }
 
 void dv_reverse_sub(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
     (void)dv;
-    *a_bar = num_clone(*out_bar);
-    *b_bar = num_neg(*out_bar);
+    *a_bar = num_owned_clone_local(*out_bar);
+    *b_bar = num_owned_neg_local(*out_bar);
 }
 
 void dv_reverse_mul(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
-    *a_bar = num_mul(*out_bar, dv_eval_num_internal(dv->b));
-    *b_bar = num_mul(*out_bar, dv_eval_num_internal(dv->a));
+    *a_bar = num_owned_mul_local(*out_bar, dv_eval_num_internal(dv->b));
+    *b_bar = num_owned_mul_local(*out_bar, dv_eval_num_internal(dv->a));
 }
 
 void dv_reverse_div(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
@@ -204,13 +216,9 @@ void dv_reverse_div(const dval_t *dv, const number_t *out_bar, number_t *a_bar, 
     number_t numer = num_mul(*out_bar, dv_eval_num_internal(dv->a));
     number_t frac;
 
-    *a_bar = num_div(*out_bar, dv_eval_num_internal(dv->b));
+    *a_bar = num_owned_div_local(*out_bar, dv_eval_num_internal(dv->b));
     frac = num_div(numer, denom_sq);
-    *b_bar = num_neg(frac);
-
-    num_destroy(&frac);
-    num_destroy(&numer);
-    num_destroy(&denom_sq);
+    *b_bar = num_owned_neg_local(frac);
 }
 
 void dv_reverse_pow(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
@@ -221,15 +229,10 @@ void dv_reverse_pow(const dval_t *dv, const number_t *out_bar, number_t *a_bar, 
     number_t log_a = num_log(dv_eval_num_internal(dv->a));
     number_t z_log_a;
 
-    *a_bar = num_div(numer, dv_eval_num_internal(dv->a));
-
-    num_destroy(&numer);
-    num_destroy(&z_times_b);
+    *a_bar = num_owned_div_local(numer, dv_eval_num_internal(dv->a));
 
     z_log_a = num_mul(z, log_a);
-    *b_bar = num_mul(*out_bar, z_log_a);
-    num_destroy(&z_log_a);
-    num_destroy(&log_a);
+    *b_bar = num_owned_mul_local(*out_bar, z_log_a);
 }
 
 void dv_reverse_pow_d(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
@@ -238,17 +241,13 @@ void dv_reverse_pow_d(const dval_t *dv, const number_t *out_bar, number_t *a_bar
     number_t power = num_pow(dv_eval_num_internal(dv->a), one_less);
     number_t scale = num_mul(dv->c, power);
 
-    *a_bar = num_mul(*out_bar, scale);
+    *a_bar = num_owned_mul_local(*out_bar, scale);
     *b_bar = dv_reverse_zero();
-
-    num_destroy(&scale);
-    num_destroy(&power);
-    num_destroy(&one_less);
 }
 
 void dv_reverse_neg(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
     (void)dv;
-    *a_bar = num_neg(*out_bar);
+    *a_bar = num_owned_neg_local(*out_bar);
     *b_bar = dv_reverse_zero();
 }

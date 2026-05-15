@@ -18,18 +18,19 @@ static void collect_mul_factors_borrowed(const dval_t *dv,
                                          size_t *nterms,
                                          size_t *cap)
 {
+    NUM_SCOPE(scope);
     if (dv_is_unnamed_const(dv) && num_is_real(dv->c)) {
         number_t product = num_mul(*c_acc, dv->c);
 
         num_destroy(c_acc);
-        *c_acc = product;
+        *c_acc = num_scope_detach(product);
         return;
     }
     if (dv_is_neg(dv)) {
         number_t negated = num_neg(*c_acc);
 
         num_destroy(c_acc);
-        *c_acc = negated;
+        *c_acc = num_scope_detach(negated);
         collect_mul_factors_borrowed(dv->a, c_acc, terms, nterms, cap);
         return;
     }
@@ -47,6 +48,7 @@ static void collect_mul_factors_borrowed(const dval_t *dv,
 
 static int mul_struct_eq(const dval_t *u, const dval_t *v)
 {
+    NUM_SCOPE(scope);
     const dval_t **u_terms = NULL;
     const dval_t **v_terms = NULL;
     unsigned char *matched = NULL;
@@ -87,8 +89,6 @@ static int mul_struct_eq(const dval_t *u, const dval_t *v)
     }
 
 cleanup:
-    num_destroy(&u_coeff);
-    num_destroy(&v_coeff);
     free(matched);
     free((void *)u_terms);
     free((void *)v_terms);
