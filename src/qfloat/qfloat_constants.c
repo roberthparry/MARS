@@ -1,0 +1,42 @@
+#include "qfloat_internal.h"
+
+#include <math.h>
+
+/* Exact and sentinel values. */
+const qfloat_t QF_ZERO = { 0.0, 0.0 };
+const qfloat_t QF_ONE  = { 1.0, 0.0 };
+const qfloat_t QF_NEG_ONE = { -1.0, 0.0 };
+const qfloat_t QF_HALF = { 0.5, 0.0 };
+const qfloat_t QF_TWO = { 2.0, 0.0 };
+const qfloat_t QF_TEN = { 10.0, 0.0 };
+const qfloat_t QF_NAN = { NAN, NAN };
+const qfloat_t QF_INF  = { INFINITY, 0.0 };
+const qfloat_t QF_NINF = { -INFINITY, 0.0 };
+const qfloat_t QF_MAX = { 1.79769313486231570815e+308, 9.97920154767359795037e+291 };
+
+/* Transcendental and derived constants. */
+const qfloat_t QF_PI = { 3.14159265358979311600e+00, 1.2246467991473532072e-16 };
+const qfloat_t QF_2PI = { 6.28318530717958623200e+00, 2.4492935982947064144e-16 };
+const qfloat_t QF_PI_2 = { 1.57079632679489655800e+00, 6.123233995736766036e-17 };
+const qfloat_t QF_PI_4 = { 7.8539816339744827900e-01, 3.061616997868383018e-17 };
+const qfloat_t QF_3PI_4 = { 2.356194490192344837e+00, 9.1848509936051484375e-17 };
+const qfloat_t QF_PI_6 = { 0.52359877559829893, -5.3604088322554549e-17 };
+const qfloat_t QF_PI_3 = { 1.0471975511965979, -1.072081766451091e-16 };
+const qfloat_t QF_2_PI = { 0.63661977236758138, -3.9357353350364972e-17 };
+const qfloat_t QF_E = { 2.718281828459045091e+00, 1.445646891729250158e-16 };
+const qfloat_t QF_INV_E = { 0.36787944117144233, -1.2428753672788363e-17 };
+const qfloat_t QF_LN2 = { 6.9314718055994530941723212145817656e-01, 2.3190468138462995584177710792423e-17 };
+const qfloat_t QF_INVLN2 = { 1.4426950408889634073599246810019e+00, 2.0355273740931032980408127082449e-17 };
+const qfloat_t QF_SQRT_HALF = { 0.70710678118654757, -4.8336466567264567e-17 };
+const qfloat_t QF_SQRT_PI = { 1.7724538509055161, -7.6665864998257987e-17 };
+const qfloat_t QF_SQRT1ONPI = { 0.56418958354775628, 7.6677298065829391e-18 };
+const qfloat_t QF_SQRT3 = { 1.7320508075688772, 1.0035084221806903e-16 };
+const qfloat_t QF_2_SQRTPI = { 1.1283791670955126, 1.5335459613165878e-17 };
+const qfloat_t QF_INV_SQRT_2PI = { 0.3989422804014327, -2.49232720227773e-17 };
+const qfloat_t QF_LOG_SQRT_2PI = { 0.91893853320467278, -3.8782941580672414e-17 };
+const qfloat_t QF_LN_2PI = { 1.8378770664093456, -7.7565883161344829e-17 };
+const qfloat_t QF_EULER_MASCHERONI = { 0.57721566490153287, -4.9429151524306449e-18 };
+const qfloat_t QF_PHI = { 1.6180339887498949, -5.4321152036825055e-17 };
+
+/* Machine epsilon for the qfloat format. */
+const double QF_EPS = 4.93038065763132e-32;

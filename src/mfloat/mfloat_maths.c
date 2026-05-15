@@ -287,7 +287,7 @@ static int mfloat_mul_euler_gamma_coeff_local(mfloat_t *mfloat, size_t index, si
     mfloat_t *factor = NULL;
     int rc = -1;
 
-    if (!mfloat || index >= sizeof(mfloat_euler_gamma_coeffs) / sizeof(mfloat_euler_gamma_coeffs[0]))
+    if (!mfloat || index >= MFLOAT_EULER_GAMMA_COEFF_COUNT)
         return -1;
     factor = mf_new_prec(precision);
     if (!factor ||
@@ -2331,6 +2331,29 @@ mfloat_t *mf_euler_mascheroni(void)
     if ((precision <= MF_EULER_MASCHERONI->precision
             ? mfloat_set_from_binary_seed(tmp, MF_EULER_MASCHERONI, precision)
             : mfloat_compute_euler_gamma(tmp, precision)) != 0) {
+        mf_free(tmp);
+        return NULL;
+    }
+    return tmp;
+}
+
+mfloat_t *mf_phi(void)
+{
+    size_t precision = mfloat_get_default_precision_internal();
+    mfloat_t *tmp = mf_new_prec(precision);
+
+    if (!tmp)
+        return NULL;
+    if (precision <= MF_PHI->precision) {
+        if (mfloat_set_from_binary_seed(tmp, MF_PHI, precision) != 0) {
+            mf_free(tmp);
+            return NULL;
+        }
+        return tmp;
+    }
+
+    if (mf_set_long(tmp, 5) != 0 || mf_sqrt(tmp) != 0 ||
+            mf_add_long(tmp, 1) != 0 || mf_ldexp(tmp, -1) != 0) {
         mf_free(tmp);
         return NULL;
     }
