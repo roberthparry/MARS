@@ -1677,7 +1677,8 @@
       "test_new_const_num_preserves_mcomplex_precision": true,
       "test_set_val_num_preserves_mcomplex_precision": true,
       "test_eval_expression_preserves_mfloat_precision": true,
-      "test_eval_expression_preserves_mcomplex_precision": true
+      "test_eval_expression_preserves_mcomplex_precision": true,
+      "test_default_constants_preserve_builtin_precision": true
     }
   },
   "tests/dval/test_dval_reverse_mode.c": {

@@ -1008,11 +1008,9 @@ number_t num_tan(const number_t number)
     if (num_eq(number, NUM_ZERO) || num_eq(number, NUM_PI) || num_eq(number, NUM_2PI))
         return number_const_return_like(&number, NUMBER_CONST_ZERO);
     if (num_eq(number, NUM_PI_6)) {
-        number_t one = number_const_like(&number, NUMBER_CONST_ONE);
         number_t sqrt3 = number_const_like(&number, NUMBER_CONST_SQRT3);
-        number_t out = num_div(one, sqrt3);
+        number_t out = num_div(NUM_ONE, sqrt3);
 
-        num_destroy(&one);
         num_destroy(&sqrt3);
         return out;
     }
@@ -1090,13 +1088,11 @@ number_t num_tanh(const number_t number)
         return out;
     if (number_try_get_pure_imag(number, &imag)) {
         if (number_matches_value(&imag, &NUM_PI_6)) {
-            number_t one = number_const_like(&number, NUMBER_CONST_ONE);
             number_t sqrt3 = number_const_like(&number, NUMBER_CONST_SQRT3);
-            number_t inv = num_div(one, sqrt3);
+            number_t inv = num_div(NUM_ONE, sqrt3);
             number_t imag_unit = number_const_like(&number, NUMBER_CONST_I);
 
             out = num_mul(imag_unit, inv);
-            num_destroy(&one);
             num_destroy(&sqrt3);
             num_destroy(&inv);
             num_destroy(&imag_unit);

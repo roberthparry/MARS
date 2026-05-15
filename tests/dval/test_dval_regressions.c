@@ -888,11 +888,12 @@ static void test_set_val_num_preserves_qfloat_precision(void)
     num_destroy(&n);
 }
 
-static void test_default_constants_preserve_qfloat_precision(void)
+static void test_default_constants_preserve_builtin_precision(void)
 {
     dval_t *pi = dval_from_string("{ pi }", NULL);
     dval_t *e = dval_from_string("{ e }", NULL);
     dval_t *phi = dval_from_string("{ @phi }", NULL);
+    number_t phi_value = NUM_ZERO;
 
     ASSERT_NOT_NULL(pi);
     ASSERT_NOT_NULL(e);
@@ -900,11 +901,12 @@ static void test_default_constants_preserve_qfloat_precision(void)
 
     check_q_at(__FILE__, __LINE__, 1, "dval pi uses qfloat precision", dv_eval_qf(pi), QF_PI);
     check_q_at(__FILE__, __LINE__, 1, "dval e uses qfloat precision", dv_eval_qf(e), QF_E);
-    check_q_at(__FILE__, __LINE__, 1, "dval phi uses qfloat precision",
-               dv_eval_qf(phi),
-               qf_div(qf_add(qf_from_double(1.0), qf_sqrt(qf_from_double(5.0))),
-                      qf_from_double(2.0)));
+    phi_value = dv_eval(phi);
+    ASSERT_EQ_INT((int)num_get_prec_bits(phi_value), 1088);
+    check_q_at(__FILE__, __LINE__, 1, "dval phi preserves builtin value",
+               num_to_qfloat(phi_value), QF_PHI);
 
+    num_destroy(&phi_value);
     dv_free(phi);
     dv_free(e);
     dv_free(pi);
@@ -1324,7 +1326,7 @@ void test_runtime_regressions(void)
     RUN_SUBTEST(test_eval_expression_preserves_mcomplex_precision);
     RUN_SUBTEST(test_new_const_num_preserves_qfloat_precision);
     RUN_SUBTEST(test_set_val_num_preserves_qfloat_precision);
-    RUN_SUBTEST(test_default_constants_preserve_qfloat_precision);
+    RUN_SUBTEST(test_default_constants_preserve_builtin_precision);
     RUN_SUBTEST(test_get_val_updates_after_set);
     RUN_SUBTEST(test_new_const_num);
     RUN_SUBTEST(test_new_const_num_rational_complex);

@@ -88,8 +88,8 @@ static const number_private_t number_euler_mascheroni_value = {
 };
 
 static const number_private_t number_phi_value = {
-    .kind = NUMBER_QFLOAT,
-    .value.qf = { 1.6180339887498949, -5.4321152036825055e-17 }
+    .kind = NUMBER_MFLOAT,
+    .value.mf = (mfloat_t *)&MF_PHI_VALUE
 };
 
 static const number_private_t number_sqrt_half_value = {

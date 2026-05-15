@@ -10,6 +10,7 @@ void run_number_constant_tests(void)
         number_t pi = NUM_PI;
         number_t e = NUM_E;
         number_t gamma = NUM_EULER_MASCHERONI;
+        number_t phi = NUM_PHI;
         number_t i = NUM_I;
         number_t sqrt3 = NUM_SQRT3;
         number_t million = num_pow10(6);
@@ -50,6 +51,7 @@ void run_number_constant_tests(void)
         assert_number_string_prefix("NUM_PI", pi, "3.14159");
         assert_number_string_prefix("NUM_E", e, "2.71828");
         assert_number_string_prefix("NUM_EULER_MASCHERONI", gamma, "0.57721");
+        assert_number_string_prefix("NUM_PHI", phi, "1.61803");
         assert_number_string_prefix("NUM_SQRT3", sqrt3, "1.73205");
         assert_number_string_prefix("NUM_SQRT2_OVER_TWO", half_sqrt2, "0.70710");
         assert_number_string_prefix("NUM_SQRT3_OVER_TWO", half_sqrt3, "0.86602");
@@ -59,12 +61,15 @@ void run_number_constant_tests(void)
         ASSERT_TRUE(num_is_real(pi));
         ASSERT_TRUE(num_is_real(e));
         ASSERT_TRUE(num_is_real(gamma));
+        ASSERT_TRUE(num_is_real(phi));
         ASSERT_TRUE(num_is_real(sqrt3));
         ASSERT_TRUE(!num_is_real(i));
         ASSERT_TRUE(!num_is_exact(pi));
         ASSERT_TRUE(!num_is_exact(e));
         ASSERT_TRUE(!num_is_exact(gamma));
+        ASSERT_TRUE(!num_is_exact(phi));
         ASSERT_TRUE(num_get_prec_bits(pi) > 0u);
+        ASSERT_EQ_INT((int)num_get_prec_bits(phi), 1088);
         ASSERT_TRUE(num_eq(sin_pi_6, NUM_HALF));
         ASSERT_TRUE(num_eq(sin_pi_4, half_sqrt2));
         ASSERT_TRUE(num_eq(sin_pi_3, half_sqrt3));
@@ -92,6 +97,7 @@ void run_number_constant_tests(void)
         num_destroy(&pi);
         num_destroy(&e);
         num_destroy(&gamma);
+        num_destroy(&phi);
         num_destroy(&sqrt3);
         num_destroy(&i);
         num_destroy(&million);

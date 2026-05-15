@@ -21,6 +21,7 @@ extern const mfloat_t MF_INV_E_VALUE;
 extern const mfloat_t MF_LN2_VALUE;
 extern const mfloat_t MF_INVLN2_VALUE;
 extern const mfloat_t MF_EULER_MASCHERONI_VALUE;
+extern const mfloat_t MF_PHI_VALUE;
 extern const mfloat_t MF_SQRT_HALF_VALUE;
 extern const mfloat_t MF_SQRT2_VALUE;
 extern const mfloat_t MF_SQRT3_VALUE;

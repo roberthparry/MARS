@@ -416,10 +416,18 @@ static void test_from_string_implicit_symbolic_bindings(void)
         TEST_FAIL();
     }
 
-    if (phi_alias && qf_eq(dv_eval_qf(phi_alias),
-                           qf_div(qf_add(qf_from_double(1.0), qf_sqrt(qf_from_double(5.0))),
-                                  qf_from_double(2.0)))) {
-        printf(C_BOLD C_GREEN "PASS" C_RESET " implicit @phi evaluates to built-in constant\n\n");
+    if (phi_alias) {
+        number_t phi_value = dv_eval(phi_alias);
+        bool ok = num_eq(phi_value, NUM_PHI) && num_get_prec_bits(phi_value) == 1088u;
+
+        num_destroy(&phi_value);
+        if (ok) {
+            printf(C_BOLD C_GREEN "PASS" C_RESET " implicit @phi evaluates to built-in constant\n\n");
+        } else {
+            printf(C_BOLD C_RED "FAIL" C_RESET " implicit @phi evaluates to built-in constant %s:%d:1\n\n",
+                   __FILE__, __LINE__);
+            TEST_FAIL();
+        }
     } else {
         printf(C_BOLD C_RED "FAIL" C_RESET " implicit @phi evaluates to built-in constant %s:%d:1\n\n",
                __FILE__, __LINE__);
