@@ -68,8 +68,8 @@ void run_number_public_api_tests(void)
     }
 
     {
-        num_scope_t outer = {0};
-        num_scope_t inner = {0};
+        num_scope_t *outer = NULL;
+        num_scope_t *inner = NULL;
         number_t one_third = num_create_from_string("1/3");
         number_t one_sixth = num_create_from_string("1/6");
         number_t two = num_create_from_long(2);
@@ -83,7 +83,7 @@ void run_number_public_api_tests(void)
 
         ASSERT_TRUE(!num_scope_is_active());
 
-        num_scope_enter(&outer);
+        outer = num_scope_enter();
         ASSERT_TRUE(num_scope_is_active());
 
         sum = num_add(one_third, one_sixth);
@@ -96,9 +96,9 @@ void run_number_public_api_tests(void)
         assert_number_string("detached scoped result survives leave", detached, "½");
         num_destroy(&detached);
 
-        num_scope_enter(&outer);
+        outer = num_scope_enter();
         outer_sum = num_add(two, five);
-        num_scope_enter(&inner);
+        inner = num_scope_enter();
         inner_sum = num_add(outer_sum, one);
         inner_promoted = num_scope_detach(inner_sum);
         num_scope_leave(&inner);

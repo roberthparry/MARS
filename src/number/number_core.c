@@ -62,6 +62,12 @@ typedef struct number_scope_state_t {
     number_scope_arena_block_t *arena_blocks;
 } number_scope_state_t;
 
+struct num_scope_t {
+    number_scope_state_t *state;
+    struct num_scope_t *previous;
+    int active;
+};
+
 static NUMBER_THREAD_LOCAL num_scope_t *number_scope_current = NULL;
 static NUMBER_THREAD_LOCAL size_t number_scope_suspend_depth = 0u;
 static bool number_value_is_immortal(const number_t *number);
@@ -133,7 +139,7 @@ static number_t *number_alloc(number_kind_t kind)
 
 static number_scope_state_t *number_scope_state_get(const num_scope_t *scope)
 {
-    return scope ? (number_scope_state_t *)scope->records : NULL;
+    return scope ? scope->state : NULL;
 }
 
 static number_scope_state_t *number_scope_state_ensure(num_scope_t *scope)
@@ -148,7 +154,7 @@ static number_scope_state_t *number_scope_state_ensure(num_scope_t *scope)
     state = (number_scope_state_t *)calloc(1, sizeof(*state));
     if (!state)
         return NULL;
-    scope->records = state;
+    scope->state = state;
     return state;
 }
 
@@ -3041,22 +3047,29 @@ void num_destroy(number_t *number)
     number_impl(number)->kind = NUMBER_INVALID;
 }
 
-void num_scope_enter(num_scope_t *scope)
+num_scope_t *num_scope_enter(void)
 {
-    if (!scope || scope->active)
-        return;
-    scope->records = NULL;
+    num_scope_t *scope = (num_scope_t *)calloc(1, sizeof(*scope));
+
+    if (!scope)
+        return NULL;
+    scope->state = NULL;
     scope->previous = number_scope_current;
     scope->active = 1;
     number_scope_current = scope;
+    return scope;
 }
 
-void num_scope_leave(num_scope_t *scope)
+void num_scope_leave(num_scope_t **scope_ptr)
 {
+    num_scope_t *scope;
     number_scope_state_t *state;
     number_scope_arena_block_t *arena_block;
     number_scope_block_t *block;
 
+    if (!scope_ptr)
+        return;
+    scope = *scope_ptr;
     if (!scope || !scope->active || number_scope_current != scope)
         return;
 
@@ -3085,9 +3098,11 @@ void num_scope_leave(num_scope_t *scope)
     free(state);
 
     number_scope_current = scope->previous;
-    scope->records = NULL;
+    scope->state = NULL;
     scope->previous = NULL;
     scope->active = 0;
+    free(scope);
+    *scope_ptr = NULL;
 }
 
 bool num_scope_is_active(void)

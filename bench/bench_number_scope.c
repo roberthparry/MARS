@@ -63,8 +63,7 @@ static double bench_real_scoped(void)
     double start = bench_now_seconds();
 
     for (int batch = 0; batch < REAL_BATCHES; ++batch) {
-        num_scope_t scope;
-        num_scope_enter(&scope);
+        num_scope_t *scope = num_scope_enter();
 
         number_t x = num_clone(seed);
 
@@ -93,8 +92,7 @@ static double bench_real_scoped_rolling(void)
     double start = bench_now_seconds();
 
     for (int batch = 0; batch < REAL_BATCHES; ++batch) {
-        num_scope_t scope;
-        num_scope_enter(&scope);
+        num_scope_t *scope = num_scope_enter();
         num_scope_t *saved_scope = number_scope_suspend();
         number_t x = num_clone(seed);
         number_scope_resume(saved_scope);
@@ -174,8 +172,7 @@ static double bench_complex_scoped(void)
     double start = bench_now_seconds();
 
     for (int batch = 0; batch < COMPLEX_BATCHES; ++batch) {
-        num_scope_t scope;
-        num_scope_enter(&scope);
+        num_scope_t *scope = num_scope_enter();
 
         number_t z = num_clone(seed);
 
@@ -209,8 +206,7 @@ static double bench_complex_scoped_rolling(void)
     double start = bench_now_seconds();
 
     for (int batch = 0; batch < COMPLEX_BATCHES; ++batch) {
-        num_scope_t scope;
-        num_scope_enter(&scope);
+        num_scope_t *scope = num_scope_enter();
         num_scope_t *saved_scope = number_scope_suspend();
         number_t z = num_clone(seed);
         number_scope_resume(saved_scope);

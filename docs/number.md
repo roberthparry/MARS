@@ -201,8 +201,7 @@ If you need a portable manual form instead of `NUM_SCOPE(...)`, the equivalent
 sequence is:
 
 ```c
-num_scope_t scope = {0};
-num_scope_enter(&scope);
+num_scope_t *scope = num_scope_enter();
 /* ... */
 num_scope_leave(&scope);
 ```

@@ -66,7 +66,7 @@ typedef struct _number_t {
 } number_t;
 
 /**
- * @brief Temporary lifetime scope for heap-backed `number_t` results.
+ * @brief Opaque temporary lifetime scope for heap-backed `number_t` results.
  *
  * While a scope is active, newly created heap-backed temporary results are
  * reclaimed automatically by `num_scope_leave()`, unless they are explicitly
@@ -78,14 +78,10 @@ typedef struct _number_t {
  * - keep any rolling or returned value as an ordinary owned `number_t`
  * - detach only when a scoped result truly needs to survive the scope
  *
- * Callers should treat the fields as opaque and only manipulate the object
- * through the `num_scope_*` APIs.
+ * The type is intentionally opaque; callers should only use the
+ * `num_scope_*` APIs or the `NUM_SCOPE(name)` helper macro.
  */
-typedef struct num_scope_t {
-    void *records;
-    struct num_scope_t *previous;
-    int active;
-} num_scope_t;
+typedef struct num_scope_t num_scope_t;
 
 /** @name Lifecycle
  * Constructors and pure transforms in this section return a live `number_t`
@@ -309,23 +305,22 @@ void num_destroy(number_t *number);
  * be destroyed explicitly when replaced, rather than being repeatedly detached.
  *
  * On compilers that support `__attribute__((cleanup(...)))`, `NUM_SCOPE(name)`
- * declares a local scope object, enters it immediately, and leaves it
+ * declares a local scope handle, enters it immediately, and leaves it
  * automatically on block exit.
  *
  * Scopes are nestable and must be left in last-in, first-out order.
  * @{
  */
-void num_scope_enter(num_scope_t *scope);
-void num_scope_leave(num_scope_t *scope);
+num_scope_t *num_scope_enter(void);
+void num_scope_leave(num_scope_t **scope);
 bool num_scope_is_active(void);
 number_t num_scope_detach(number_t value);
-static inline void num_scope_cleanup(num_scope_t *scope)
+static inline void num_scope_cleanup(num_scope_t **scope)
 {
     num_scope_leave(scope);
 }
 #define NUM_SCOPE(name) \
-    __attribute__((cleanup(num_scope_cleanup))) num_scope_t name = {0}; \
-    num_scope_enter(&(name))
+    __attribute__((cleanup(num_scope_cleanup))) num_scope_t *name = num_scope_enter()
 /** @} */
 
 /** @name Precision, setup, and conversion
