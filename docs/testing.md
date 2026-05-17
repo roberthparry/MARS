@@ -2,6 +2,29 @@
 
 The project provides per-module test targets.
 
+## Machine-Readable Reports
+
+The harness can emit machine-readable reports for any suite binary:
+
+```sh
+make test_qfloat
+
+MARS_TEST_REPORT_JUNIT=build/test-results/test_qfloat.xml \
+tests/build/release/qfloat/test_qfloat
+
+MARS_TEST_REPORT_JSON=build/test-results/test_qfloat.json \
+tests/build/release/qfloat/test_qfloat
+```
+
+- By default, suites emit JUnit-style XML beside their source file, for
+  example `tests/qfloat/test_qfloat.junit.xml`.
+- `MARS_TEST_REPORT_JUNIT` overrides that default path explicitly.
+- `MARS_TEST_REPORT_JSON` writes the harness's richer JSON report.
+- Because report emission lives in the shared harness runtime, every suite gets
+  it automatically.
+- Output examples are included in machine-readable reports, but remain separate
+  from correctness totals in the terminal summary.
+
 ## Run Tests
 
 ```sh

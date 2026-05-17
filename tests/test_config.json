@@ -212,7 +212,8 @@
     "test_lambert_w": true,
     "test_beta_logbeta_binomial_beta_pdf_logbeta_pdf_normal_pdf_cdf_logpdf": true,
     "test_gammainc_ei_e1": true,
-    "test_difficult_qfloat_cases": true
+    "test_difficult_qfloat_cases": true,
+    "test_readme_examples": true
   },
   "tests/qfloat/test_qfloat_arithmetic.c": {
     "test_arithmetic": {
@@ -663,7 +664,6 @@
     "test_mat_sprintf_pretty_number_complex": true
   },
   "tests/matrix/test_matrix.c": {
-    "test_readme_example": true,
     "test_readme_example_hermitian_eigendecomposition": true,
     "test_readme_example_string_quantum": true
   },

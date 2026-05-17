@@ -233,7 +233,30 @@ static const char *test_report_json_path(void)
 static const char *test_report_junit_path(void)
 {
     const char *value = getenv("MARS_TEST_REPORT_JUNIT");
-    return (value && *value) ? value : NULL;
+    static char inferred_path[1536];
+    size_t i;
+
+    if (value && *value)
+        return value;
+
+    for (i = 0; i < g_test_record_count; ++i) {
+        const char *file = g_test_records[i].file;
+        const char *dot;
+        size_t len;
+
+        if (!file || !*file)
+            continue;
+
+        dot = strrchr(file, '.');
+        len = dot ? (size_t)(dot - file) : strlen(file);
+        if (len + strlen(".junit.xml") + 1u > sizeof(inferred_path))
+            continue;
+
+        snprintf(inferred_path, sizeof(inferred_path), "%.*s.junit.xml", (int)len, file);
+        return inferred_path;
+    }
+
+    return NULL;
 }
 
 static int test_show_pass_location_enabled(void)
@@ -1061,16 +1084,28 @@ static void test_record_case(const char *file,
     next->parent = test_strdup_owned(parent);
     next->path = test_strdup_owned(path);
     next->tags = test_strdup_owned(tags);
-    next->failure_file = (outcome == TEST_OUTCOME_FAIL)
-        ? test_strdup_owned(g_test_last_fail_file) : NULL;
-    next->failure_detail = (outcome == TEST_OUTCOME_FAIL)
-        ? test_strdup_owned(g_test_last_fail_detail) : NULL;
+    next->failure_file = (outcome == TEST_OUTCOME_FAIL || outcome == TEST_OUTCOME_SKIP)
+        ? test_strdup_owned(outcome == TEST_OUTCOME_FAIL
+                                ? g_test_last_fail_file
+                                : g_test_last_skip_file)
+        : NULL;
+    if (outcome == TEST_OUTCOME_FAIL)
+        next->failure_detail = test_strdup_owned(g_test_last_fail_detail);
+    else if (outcome == TEST_OUTCOME_SKIP)
+        next->failure_detail = test_strdup_owned(g_test_last_skip_detail);
+    else
+        next->failure_detail = NULL;
     next->outcome = outcome;
     next->enabled = enabled;
     next->is_group = is_group;
     next->is_output = is_output;
     next->declaration_line = declaration_line;
-    next->failure_line = (outcome == TEST_OUTCOME_FAIL) ? g_test_last_fail_line : 0;
+    if (outcome == TEST_OUTCOME_FAIL)
+        next->failure_line = g_test_last_fail_line;
+    else if (outcome == TEST_OUTCOME_SKIP)
+        next->failure_line = g_test_last_skip_line;
+    else
+        next->failure_line = 0;
     next->group_passed = group_passed;
     next->group_failed = group_failed;
     next->group_skipped = group_skipped;
@@ -1636,7 +1671,18 @@ void test_run_output_case(const char *file,
     test_case_cleanup_all();
     ms = test_elapsed_ms(t0, t1);
 
-    if (g_test_failure_count == failure_count_before) {
+    if (g_test_skip_requested) {
+        g_test_output_skip_count++;
+        printf(TEST_COLOR_YELLOW "OUTPUT SKIP: %s " TEST_COLOR_YELLOW "(%s:%d)" TEST_COLOR_RESET,
+               name,
+               g_test_last_skip_file ? g_test_last_skip_file : file,
+               g_test_last_skip_line);
+        if (g_test_last_skip_detail && *g_test_last_skip_detail)
+            printf(" " TEST_COLOR_GREY "[%s]" TEST_COLOR_RESET, g_test_last_skip_detail);
+        test_print_tags(tags);
+        test_record_case(file, line, name, NULL, full_path, tags,
+                         TEST_OUTCOME_SKIP, 1, 0, 1, 0, 0, 0, ms);
+    } else if (g_test_failure_count == failure_count_before) {
         g_test_output_pass_count++;
         printf(TEST_COLOR_BOLD TEST_COLOR_CYAN "OUTPUT: "
                TEST_COLOR_RESET "%s", name);
@@ -1950,7 +1996,25 @@ static void test_write_junit_report(int exit_code)
         }
 
         if (rec->outcome == TEST_OUTCOME_SKIP) {
-            fputs("    <skipped message=\"disabled by test_config\"/>\n", f);
+            const char *skip_message =
+                (rec->failure_detail && *rec->failure_detail)
+                    ? rec->failure_detail
+                    : (rec->enabled ? "test skipped" : "disabled by test_config");
+
+            fputs("    <skipped message=\"", f);
+            test_xml_write_escaped(f, skip_message);
+            fputs("\">", f);
+            if (rec->failure_file && *rec->failure_file) {
+                test_xml_write_escaped(f, rec->failure_file);
+                fprintf(f, ":%d", rec->failure_line);
+                if (rec->failure_detail && *rec->failure_detail) {
+                    fputs(" ", f);
+                    test_xml_write_escaped(f, rec->failure_detail);
+                }
+            } else if (rec->failure_detail && *rec->failure_detail) {
+                test_xml_write_escaped(f, rec->failure_detail);
+            }
+            fputs("</skipped>\n", f);
         } else if (rec->outcome == TEST_OUTCOME_FAIL) {
             fputs("    <failure message=\"", f);
             test_xml_write_escaped(f,

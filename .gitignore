@@ -63,5 +63,6 @@ test_output.txt
 /a.out
 *.tmp
 *.temp
+*.xml
 
 .codex
