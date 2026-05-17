@@ -83,7 +83,8 @@ typedef enum {
     AFFINE_POLY_SPECIAL_SIN,
     AFFINE_POLY_SPECIAL_COS,
     AFFINE_POLY_SPECIAL_SINH,
-    AFFINE_POLY_SPECIAL_COSH
+    AFFINE_POLY_SPECIAL_COSH,
+    AFFINE_POLY_SPECIAL_COUNT
 } affine_poly_special_kind_t;
 
 static qfloat_t eval_box_affine_poly_times_exp_common(size_t ndim, const qfloat_t *coeffs,
@@ -171,6 +172,141 @@ static qcomplex_t eval_poly_deg4_from_complex_moments(const qfloat_t poly[5],
     return value;
 }
 
+typedef qfloat_t (*affine_unary_special_eval_fn)(size_t ndim,
+                                                 const qfloat_t *coeffs,
+                                                 qfloat_t constant,
+                                                 const qfloat_t *lo,
+                                                 const qfloat_t *hi,
+                                                 const bool *active);
+
+typedef struct {
+    dv_pattern_unary_affine_kind_t unary_kind;
+    affine_poly_special_kind_t special_kind;
+    affine_unary_special_eval_fn unary_eval;
+} affine_special_dispatch_t;
+
+static qfloat_t eval_box_affine_unary_exp(size_t ndim,
+                                          const qfloat_t *coeffs,
+                                          qfloat_t constant,
+                                          const qfloat_t *lo, const qfloat_t *hi,
+                                          const bool *active)
+{
+    return integral_exp_affine_box(ndim, coeffs, constant, lo, hi, active);
+}
+
+static qfloat_t eval_box_affine_unary_sinh(size_t ndim,
+                                           const qfloat_t *coeffs,
+                                           qfloat_t constant,
+                                           const qfloat_t *lo, const qfloat_t *hi,
+                                           const bool *active)
+{
+    size_t dim;
+
+    if (find_single_active_dim(ndim, active, &dim)) {
+        if (qf_eq(coeffs[dim], QF_ZERO))
+            return qf_mul(qf_sinh(constant), qf_sub(hi[dim], lo[dim]));
+        return qf_div(qf_sub(qf_cosh(qf_add(qf_mul(coeffs[dim], hi[dim]), constant)),
+                             qf_cosh(qf_add(qf_mul(coeffs[dim], lo[dim]), constant))),
+                      coeffs[dim]);
+    } else {
+        qfloat_t *neg_coeffs = malloc(ndim * sizeof(*neg_coeffs));
+        qfloat_t total;
+
+        if (!neg_coeffs)
+            return QF_NAN;
+        for (size_t i = 0; i < ndim; ++i)
+            neg_coeffs[i] = qf_neg(coeffs[i]);
+        total = qf_mul_double(qf_sub(integral_exp_affine_box(ndim, coeffs, constant, lo, hi, active),
+                                     integral_exp_affine_box(ndim, neg_coeffs, qf_neg(constant), lo, hi, active)),
+                              0.5);
+        free(neg_coeffs);
+        return total;
+    }
+}
+
+static qfloat_t eval_box_affine_unary_cosh(size_t ndim,
+                                           const qfloat_t *coeffs,
+                                           qfloat_t constant,
+                                           const qfloat_t *lo, const qfloat_t *hi,
+                                           const bool *active)
+{
+    size_t dim;
+
+    if (find_single_active_dim(ndim, active, &dim)) {
+        if (qf_eq(coeffs[dim], QF_ZERO))
+            return qf_mul(qf_cosh(constant), qf_sub(hi[dim], lo[dim]));
+        return qf_div(qf_sub(qf_sinh(qf_add(qf_mul(coeffs[dim], hi[dim]), constant)),
+                             qf_sinh(qf_add(qf_mul(coeffs[dim], lo[dim]), constant))),
+                      coeffs[dim]);
+    } else {
+        qfloat_t *neg_coeffs = malloc(ndim * sizeof(*neg_coeffs));
+        qfloat_t total;
+
+        if (!neg_coeffs)
+            return QF_NAN;
+        for (size_t i = 0; i < ndim; ++i)
+            neg_coeffs[i] = qf_neg(coeffs[i]);
+        total = qf_mul_double(qf_add(integral_exp_affine_box(ndim, coeffs, constant, lo, hi, active),
+                                     integral_exp_affine_box(ndim, neg_coeffs, qf_neg(constant), lo, hi, active)),
+                              0.5);
+        free(neg_coeffs);
+        return total;
+    }
+}
+
+static qfloat_t eval_box_affine_unary_sin(size_t ndim,
+                                          const qfloat_t *coeffs,
+                                          qfloat_t constant,
+                                          const qfloat_t *lo, const qfloat_t *hi,
+                                          const bool *active)
+{
+    size_t dim;
+
+    if (find_single_active_dim(ndim, active, &dim)) {
+        if (qf_eq(coeffs[dim], QF_ZERO))
+            return qf_mul(qf_sin(constant), qf_sub(hi[dim], lo[dim]));
+        return qf_div(qf_sub(qf_cos(qf_add(qf_mul(coeffs[dim], lo[dim]), constant)),
+                             qf_cos(qf_add(qf_mul(coeffs[dim], hi[dim]), constant))),
+                      coeffs[dim]);
+    }
+    return qc_imag(integral_exp_i_affine_box(ndim, coeffs, constant, lo, hi, active));
+}
+
+static qfloat_t eval_box_affine_unary_cos(size_t ndim,
+                                          const qfloat_t *coeffs,
+                                          qfloat_t constant,
+                                          const qfloat_t *lo, const qfloat_t *hi,
+                                          const bool *active)
+{
+    size_t dim;
+
+    if (find_single_active_dim(ndim, active, &dim)) {
+        if (qf_eq(coeffs[dim], QF_ZERO))
+            return qf_mul(qf_cos(constant), qf_sub(hi[dim], lo[dim]));
+        return qf_div(qf_sub(qf_sin(qf_add(qf_mul(coeffs[dim], hi[dim]), constant)),
+                             qf_sin(qf_add(qf_mul(coeffs[dim], lo[dim]), constant))),
+                      coeffs[dim]);
+    }
+    return qc_real(integral_exp_i_affine_box(ndim, coeffs, constant, lo, hi, active));
+}
+
+static const affine_special_dispatch_t affine_special_kinds[] = {
+    { DV_PATTERN_UNARY_EXP,  AFFINE_POLY_SPECIAL_EXP,  eval_box_affine_unary_exp  },
+    { DV_PATTERN_UNARY_SIN,  AFFINE_POLY_SPECIAL_SIN,  eval_box_affine_unary_sin  },
+    { DV_PATTERN_UNARY_COS,  AFFINE_POLY_SPECIAL_COS,  eval_box_affine_unary_cos  },
+    { DV_PATTERN_UNARY_SINH, AFFINE_POLY_SPECIAL_SINH, eval_box_affine_unary_sinh },
+    { DV_PATTERN_UNARY_COSH, AFFINE_POLY_SPECIAL_COSH, eval_box_affine_unary_cosh }
+};
+
+static const affine_special_dispatch_t *affine_special_dispatch(affine_poly_special_kind_t kind)
+{
+    for (size_t i = 0; i < sizeof(affine_special_kinds) / sizeof(affine_special_kinds[0]); ++i) {
+        if (affine_special_kinds[i].special_kind == kind)
+            return &affine_special_kinds[i];
+    }
+    return NULL;
+}
+
 static qfloat_t eval_box_affine_unary_special(affine_poly_special_kind_t kind,
                                               size_t ndim,
                                               const qfloat_t *coeffs,
@@ -178,74 +314,14 @@ static qfloat_t eval_box_affine_unary_special(affine_poly_special_kind_t kind,
                                               const qfloat_t *lo, const qfloat_t *hi,
                                               const bool *active)
 {
-    size_t dim;
+    const affine_special_dispatch_t *dispatch;
 
-    switch (kind) {
-    case AFFINE_POLY_SPECIAL_EXP:
-        return integral_exp_affine_box(ndim, coeffs, constant, lo, hi, active);
-    case AFFINE_POLY_SPECIAL_SINH:
-        if (find_single_active_dim(ndim, active, &dim)) {
-            if (qf_eq(coeffs[dim], QF_ZERO))
-                return qf_mul(qf_sinh(constant), qf_sub(hi[dim], lo[dim]));
-            return qf_div(qf_sub(qf_cosh(qf_add(qf_mul(coeffs[dim], hi[dim]), constant)),
-                                 qf_cosh(qf_add(qf_mul(coeffs[dim], lo[dim]), constant))),
-                          coeffs[dim]);
-        } else {
-            qfloat_t *neg_coeffs = malloc(ndim * sizeof(*neg_coeffs));
-            qfloat_t total;
-
-            if (!neg_coeffs)
-                return QF_NAN;
-            for (size_t i = 0; i < ndim; ++i)
-                neg_coeffs[i] = qf_neg(coeffs[i]);
-            total = qf_mul_double(qf_sub(integral_exp_affine_box(ndim, coeffs, constant, lo, hi, active),
-                                         integral_exp_affine_box(ndim, neg_coeffs, qf_neg(constant), lo, hi, active)),
-                                  0.5);
-            free(neg_coeffs);
-            return total;
-        }
-    case AFFINE_POLY_SPECIAL_COSH:
-        if (find_single_active_dim(ndim, active, &dim)) {
-            if (qf_eq(coeffs[dim], QF_ZERO))
-                return qf_mul(qf_cosh(constant), qf_sub(hi[dim], lo[dim]));
-            return qf_div(qf_sub(qf_sinh(qf_add(qf_mul(coeffs[dim], hi[dim]), constant)),
-                                 qf_sinh(qf_add(qf_mul(coeffs[dim], lo[dim]), constant))),
-                          coeffs[dim]);
-        } else {
-            qfloat_t *neg_coeffs = malloc(ndim * sizeof(*neg_coeffs));
-            qfloat_t total;
-
-            if (!neg_coeffs)
-                return QF_NAN;
-            for (size_t i = 0; i < ndim; ++i)
-                neg_coeffs[i] = qf_neg(coeffs[i]);
-            total = qf_mul_double(qf_add(integral_exp_affine_box(ndim, coeffs, constant, lo, hi, active),
-                                         integral_exp_affine_box(ndim, neg_coeffs, qf_neg(constant), lo, hi, active)),
-                                  0.5);
-            free(neg_coeffs);
-            return total;
-        }
-    case AFFINE_POLY_SPECIAL_SIN:
-        if (find_single_active_dim(ndim, active, &dim)) {
-            if (qf_eq(coeffs[dim], QF_ZERO))
-                return qf_mul(qf_sin(constant), qf_sub(hi[dim], lo[dim]));
-            return qf_div(qf_sub(qf_cos(qf_add(qf_mul(coeffs[dim], lo[dim]), constant)),
-                                 qf_cos(qf_add(qf_mul(coeffs[dim], hi[dim]), constant))),
-                          coeffs[dim]);
-        }
-        return qc_imag(integral_exp_i_affine_box(ndim, coeffs, constant, lo, hi, active));
-    case AFFINE_POLY_SPECIAL_COS:
-        if (find_single_active_dim(ndim, active, &dim)) {
-            if (qf_eq(coeffs[dim], QF_ZERO))
-                return qf_mul(qf_cos(constant), qf_sub(hi[dim], lo[dim]));
-            return qf_div(qf_sub(qf_sin(qf_add(qf_mul(coeffs[dim], hi[dim]), constant)),
-                                 qf_sin(qf_add(qf_mul(coeffs[dim], lo[dim]), constant))),
-                          coeffs[dim]);
-        }
-        return qc_real(integral_exp_i_affine_box(ndim, coeffs, constant, lo, hi, active));
-    }
-
-    return QF_NAN;
+    if ((size_t)kind >= AFFINE_POLY_SPECIAL_COUNT)
+        return QF_NAN;
+    dispatch = affine_special_dispatch(kind);
+    return dispatch && dispatch->unary_eval
+        ? dispatch->unary_eval(ndim, coeffs, constant, lo, hi, active)
+        : QF_NAN;
 }
 
 static bool exp_weighted_affine_stats(size_t ndim, const qfloat_t *coeffs,
@@ -830,6 +906,8 @@ static qfloat_t eval_box_affine_poly_deg4_times_special(affine_poly_special_kind
                                                               : qf_add(pos, neg),
                              0.5);
     }
+    case AFFINE_POLY_SPECIAL_COUNT:
+        break;
     }
 
     return QF_NAN;
@@ -917,17 +995,6 @@ static qfloat_t eval_box_affine_poly_deg4(size_t ndim,
                   eval_poly_deg4_from_real_moments(poly, mean, variance, QF_ZERO,
                                                    sum_fourth_central, sum_var_sq));
 }
-
-static const struct {
-    dv_pattern_unary_affine_kind_t unary_kind;
-    affine_poly_special_kind_t special_kind;
-} affine_special_kinds[] = {
-    { DV_PATTERN_UNARY_EXP,  AFFINE_POLY_SPECIAL_EXP  },
-    { DV_PATTERN_UNARY_SIN,  AFFINE_POLY_SPECIAL_SIN  },
-    { DV_PATTERN_UNARY_COS,  AFFINE_POLY_SPECIAL_COS  },
-    { DV_PATTERN_UNARY_SINH, AFFINE_POLY_SPECIAL_SINH },
-    { DV_PATTERN_UNARY_COSH, AFFINE_POLY_SPECIAL_COSH }
-};
 
 typedef enum {
     SYMBOLIC_PLAN_NONE = 0,

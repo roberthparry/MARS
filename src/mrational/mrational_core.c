@@ -106,11 +106,11 @@ static const mrational_fraction_glyph_t mrational_fraction_glyphs[] = {
     { 1ul, 10ul, "⅒" },
 };
 
-static const char *const mrational_superscript_digits[10] = {
+static const char *const mrational_superscript_digits[] = {
     "⁰", "¹", "²", "³", "⁴", "⁵", "⁶", "⁷", "⁸", "⁹",
 };
 
-static const char *const mrational_subscript_digits[10] = {
+static const char *const mrational_subscript_digits[] = {
     "₀", "₁", "₂", "₃", "₄", "₅", "₆", "₇", "₈", "₉",
 };
 
@@ -140,7 +140,7 @@ static const char *mrational_fraction_glyph_lookup(
 
 static size_t mrational_digit_table_len(
     const char *digits,
-    const char *const table[10])
+    const char *const table[])
 {
     size_t len = 0u;
 
@@ -153,7 +153,7 @@ static size_t mrational_digit_table_len(
 static char *mrational_append_digit_table(
     char *out,
     const char *digits,
-    const char *const table[10])
+    const char *const table[])
 {
     const char *encoded;
     size_t len;
@@ -238,7 +238,7 @@ static char *mrational_format_stacked_fraction(
 
 static int mrational_match_encoded_digit(
     const char **text,
-    const char *const table[10])
+    const char *const table[])
 {
     size_t len;
 
@@ -255,7 +255,7 @@ static int mrational_match_encoded_digit(
 
 static char *mrational_decode_digit_sequence(
     const char **text,
-    const char *const table[10])
+    const char *const table[])
 {
     const char *p = *text;
     size_t cap = strlen(p) + 1u;

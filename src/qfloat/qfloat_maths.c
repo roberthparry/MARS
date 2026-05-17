@@ -4,6 +4,22 @@
 
 static int qf_is_integer(qfloat_t x);
 
+enum {
+    QF_LOG_SERIES_TERMS = 40,
+    QF_LOG_NEWTON_STEPS = 1,
+    QF_ERF_SERIES_MAX_TERMS = 200,
+    QF_ERF_CF_MAX_TERMS = 300,
+    QF_ERFINV_HALLEY_MAX_STEPS = 40,
+    QF_GAMMAINV_GAMMA_NEWTON_STEPS = 10,
+    QF_GAMMAINV_LOG_NEWTON_STEPS = 20,
+    QF_LAMBERT_NEWTON_MAX_STEPS = 50,
+    QF_LAMBERT_HALLEY_MAX_STEPS = 40,
+    QF_GAMMAINC_MAX_TERMS = 2000,
+    QF_EI_ASYMP_MAX_TERMS = 50,
+    QF_EI_SERIES_MAX_TERMS = 800,
+    QF_EI_NEG_ASYMP_MAX_TERMS = 100
+};
+
 static inline int qf_round_to_int(qfloat_t y)
 {
     double s, e;
@@ -155,7 +171,7 @@ qfloat_t qf_log(qfloat_t x)
     qfloat_t u_power = u;  /* u^1 already */
     int sign = -1;
 
-    for (int n = 2; n <= 40; ++n) {
+    for (int n = 2; n <= QF_LOG_SERIES_TERMS; ++n) {
         u_power = qf_mul(u_power, u);          /* u^n */
         qfloat_t frac = qf_mul_double(u_power, 1.0 / (double)n); /* u^n / n */
 
@@ -175,7 +191,7 @@ qfloat_t qf_log(qfloat_t x)
     qfloat_t y = qf_add(sum, elog2);
 
     /* Optional Newton refinement to tighten the last bits */
-    for (int i = 0; i < 1; ++i) {
+    for (int i = 0; i < QF_LOG_NEWTON_STEPS; ++i) {
         qfloat_t ey   = qf_exp(y);
         qfloat_t diff = qf_sub(x, ey);
         qfloat_t corr = qf_div(diff, ey);
@@ -368,14 +384,14 @@ static qfloat_t qf_finish_sincos_dispatch(const qfloat_sincos_dispatch_t *dispat
     return dispatch->negate ? qf_neg(out) : out;
 }
 
-static const qfloat_sincos_dispatch_t qf_sin_dispatch[4] = {
+static const qfloat_sincos_dispatch_t qf_sin_dispatch[] = {
     {0, 0},
     {1, 0},
     {0, 1},
     {1, 1}
 };
 
-static const qfloat_sincos_dispatch_t qf_cos_dispatch[4] = {
+static const qfloat_sincos_dispatch_t qf_cos_dispatch[] = {
     {1, 0},
     {0, 1},
     {1, 1},
@@ -730,7 +746,7 @@ qfloat_t qf_gamma(qfloat_t x)
         return (qfloat_t){ NAN, NAN };
 
     /* Coefficients for 1/gamma(1+x) - x ... */
-    static const qfloat_t c[43] = {
+    static const qfloat_t c[] = {
         { 0.57721566490153287, -4.9429151524306318e-18 },
         { -0.6558780715202539,  2.137185197068536e-17 },
         { -0.042002635034095237, 1.4920306285650486e-18 },
@@ -776,7 +792,7 @@ qfloat_t qf_gamma(qfloat_t x)
         { 4.639134641058722e-35, 2.6040634859975001e-52 }
     };
 
-    const int n = 43;
+    const int n = (int)(sizeof(c) / sizeof(c[0]));
 
     /* ss = x, f = 1, sum = 0 */
     qfloat_t ss = x;
@@ -850,7 +866,7 @@ qfloat_t qf_erf(qfloat_t x)
         qfloat_t x2 = qf_mul(x, x);
 
         int i;
-        for (i = 0; i < 200; i++) {
+        for (i = 0; i < QF_ERF_SERIES_MAX_TERMS; i++) {
 
             /* ap += 1 */
             ap = qf_add(ap, QF_ONE);
@@ -905,7 +921,7 @@ qfloat_t qf_erf(qfloat_t x)
     qfloat_t h = d;
 
     int i;
-    for (i = 1; i < 300; i++) {
+    for (i = 1; i < QF_ERF_CF_MAX_TERMS; i++) {
 
         double an = i * (0.5 - i);
 
@@ -939,7 +955,7 @@ qfloat_t qf_erf(qfloat_t x)
         if (del.hi == 1.0 && fabs(del.lo) < 1e-32)
             break;
 
-        if (i == 299) {
+        if (i == QF_ERF_CF_MAX_TERMS - 1) {
             qfloat_t nan = {NAN, NAN};
             return nan;
         }
@@ -1002,7 +1018,7 @@ qfloat_t qf_erfc(qfloat_t x)
         qfloat_t x2 = qf_mul(x, x);
 
         int i;
-        for (i = 0; i < 200; i++) {
+        for (i = 0; i < QF_ERF_SERIES_MAX_TERMS; i++) {
 
             /* ap += 1 */
             ap = qf_add(ap, QF_ONE);
@@ -1059,7 +1075,7 @@ qfloat_t qf_erfc(qfloat_t x)
     qfloat_t h = d;
 
     int i;
-    for (i = 1; i < 300; i++) {
+    for (i = 1; i < QF_ERF_CF_MAX_TERMS; i++) {
 
         double an = i * (0.5 - i);
 
@@ -1093,7 +1109,7 @@ qfloat_t qf_erfc(qfloat_t x)
         if (del.hi == 1.0 && fabs(del.lo) < 1e-30)
             break;
 
-        if (i == 299) {
+        if (i == QF_ERF_CF_MAX_TERMS - 1) {
             qfloat_t nan = {NAN, NAN};
             return nan;
         }
@@ -1161,7 +1177,7 @@ qfloat_t qf_erfinv(qfloat_t x)
     }
 
     /* Halley iteration */
-    for (int i = 0; i < 40; i++) {
+    for (int i = 0; i < QF_ERFINV_HALLEY_MAX_STEPS; i++) {
 
         qfloat_t erfy = qf_erf(y);
         qfloat_t f    = qf_sub(erfy, x);
@@ -1213,7 +1229,7 @@ qfloat_t qf_erfcinv(qfloat_t x)
 
 /* Chebyshev coefficients for lgamma on x in [1,2] */
 /* x = 1.5 + 0.5*y, y in [-1,1] */
-static const qfloat_t QF_LGAMMA_C[41] = {
+static const qfloat_t QF_LGAMMA_C[] = {
     { -6.08999038183025906e-02, -1.67161028145317951e-18 },
     { 4.68966674650670226e-03, -8.00414782984271387e-20 },
     { 6.03821964754341009e-02, 8.91374388867524059e-19 },
@@ -1343,7 +1359,7 @@ qfloat_t qf_lgamma(qfloat_t x)
 }
 
 /* digamma */
-static const qfloat_t QF_DIGAMMA_C[41] = {
+static const qfloat_t QF_DIGAMMA_C[] = {
     { -1.90285404176089613e-02, 5.77950654326901646e-19 },
     { 4.91415393029387138e-01, -1.00314059023864708e-17 },
     { -5.68157478212447317e-02, 1.47606722184751199e-18 },
@@ -1415,7 +1431,7 @@ static qfloat_t qf_digamma_core_1_2(qfloat_t x)
     return res;
 }
 
-static const qfloat_t QF_DIGAMMA_C_8_20[81] = {
+static const qfloat_t QF_DIGAMMA_C_8_20[] = {
     { 2.54950422984596603e+00, -2.09119746016275927e-16 },
     { 4.68589303047532435e-01, 7.66340925430541880e-18 },
     { -5.48629055282131919e-02, 5.94722323398451975e-19 },
@@ -1813,7 +1829,7 @@ qfloat_t qf_gammainv(qfloat_t y)
     if (y.hi > 100.0) {
         /* For larger y on the increasing branch, gamma-space Newton is
            cheaper because qf_gamma() is much faster than qf_lgamma(). */
-        for (int i = 0; i < 10; i++) {
+        for (int i = 0; i < QF_GAMMAINV_GAMMA_NEWTON_STEPS; i++) {
             qfloat_t gx   = qf_gamma(x);
             qfloat_t psi  = qf_digamma(x);
             qfloat_t f    = qf_sub(gx, y);
@@ -1826,7 +1842,7 @@ qfloat_t qf_gammainv(qfloat_t y)
         }
     } else {
         /* Smaller y is more robust in log-space. */
-        for (int i = 0; i < 20; i++) {
+        for (int i = 0; i < QF_GAMMAINV_LOG_NEWTON_STEPS; i++) {
             qfloat_t lg   = qf_lgamma(x);
             qfloat_t psi  = qf_digamma(x);
             qfloat_t f    = qf_sub(lg, logy);
@@ -1849,7 +1865,7 @@ static qfloat_t qf_lambert_newton(qfloat_t x, qfloat_t w0)
 {
     qfloat_t one = QF_ONE;
 
-    for (int i = 0; i < 50; ++i) {
+    for (int i = 0; i < QF_LAMBERT_NEWTON_MAX_STEPS; ++i) {
         qfloat_t ew   = qf_exp(w0);
         qfloat_t wew  = qf_mul(w0, ew);              /* w e^w */
         qfloat_t f    = qf_sub(wew, x);              /* f(w)  */
@@ -1872,7 +1888,7 @@ static qfloat_t qf_lambert_halley(qfloat_t x, qfloat_t w0)
     qfloat_t one = QF_ONE;
     qfloat_t two = QF_TWO;
 
-    for (int i = 0; i < 40; ++i) {
+    for (int i = 0; i < QF_LAMBERT_HALLEY_MAX_STEPS; ++i) {
         qfloat_t ew   = qf_exp(w0);
         qfloat_t wew  = qf_mul(w0, ew);
         qfloat_t f    = qf_sub(wew, x);
@@ -2219,7 +2235,7 @@ static qfloat_t qf_gammainc_series_P(qfloat_t s, qfloat_t x)
 
     qfloat_t tol  = qf_from_double(1e-34);
 
-    for (int n = 1; n < 2000; ++n) {
+    for (int n = 1; n < QF_GAMMAINC_MAX_TERMS; ++n) {
         qfloat_t n_q = qf_from_double((double)n);
 
         /* term *= x / (s + n) / n */
@@ -2267,7 +2283,7 @@ static qfloat_t qf_gammainc_cf_Q(qfloat_t s, qfloat_t x)
 
     qfloat_t a, b, delta;
 
-    for (int n = 1; n < 2000; ++n) {
+    for (int n = 1; n < QF_GAMMAINC_MAX_TERMS; ++n) {
         qfloat_t n_q = qf_from_double((double)n);
 
         /* a_n = n * (s - n) */
@@ -2412,7 +2428,7 @@ static qfloat_t qf_ei_asymp_pos(qfloat_t x)
     qfloat_t sum  = term;
     qfloat_t prev_abs = qf_abs(term);
 
-    for (int k = 1; k < 50; ++k) {
+    for (int k = 1; k < QF_EI_ASYMP_MAX_TERMS; ++k) {
         qfloat_t kq = qf_from_double((double)k);
         term = qf_mul(term, kq);
         term = qf_mul(term, invx);
@@ -2440,7 +2456,7 @@ static qfloat_t qf_e1_asymp_pos(qfloat_t x)
     qfloat_t sum  = term;
     qfloat_t prev_abs = qf_abs(term);
 
-    for (int k = 1; k < 50; ++k) {
+    for (int k = 1; k < QF_EI_ASYMP_MAX_TERMS; ++k) {
         qfloat_t kq = qf_from_double((double)k);
         term = qf_mul(term, qf_neg(kq));
         term = qf_mul(term, invx);
@@ -2473,7 +2489,7 @@ static qfloat_t qf_ei_series(qfloat_t x)
 
     qfloat_t tol = qf_from_double(1e-40);  /* absolute on term */
 
-    for (int k = 2; k < 800; ++k) {
+    for (int k = 2; k < QF_EI_SERIES_MAX_TERMS; ++k) {
         qfloat_t kq = qf_from_double((double)k);
 
         /* u_k = u_{k-1} * x / k */
@@ -2506,7 +2522,7 @@ static qfloat_t qf_ei_asymp_neg(qfloat_t x)
     qfloat_t sum  = term;
     qfloat_t prev_abs = qf_abs(term);
 
-    for (int k = 1; k < 100; ++k) {   /* was 50 */
+    for (int k = 1; k < QF_EI_NEG_ASYMP_MAX_TERMS; ++k) {
         qfloat_t kq = qf_from_double((double)k);
 
         term = qf_mul(term, kq);

@@ -52,6 +52,7 @@ typedef struct number_vtable_t {
     char *(*format_inexact)(const number_t *number, bool scientific, int precision);
     int (*set_precision)(number_t *number, size_t precision_bits);
     size_t (*get_precision)(const number_t *number);
+    size_t (*get_effective_precision)(const number_t *number);
     long (*get_exponent2)(const number_t *number);
     double (*to_double)(const number_t *number);
     qfloat_t (*to_qfloat)(const number_t *number);

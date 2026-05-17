@@ -6,6 +6,7 @@
 
 #define GK_NODES    8   /* t[0]=0 plus 7 positive nodes */
 #define GK_GAUSS    4   /* Gauss nodes at t[0], t[2], t[4], t[6] */
+#define GK_SYMMETRIC_PAIRS (GK_NODES - 1)
 
 /* Kronrod abscissae (non-negative) */
 static qfloat_t t_node[GK_NODES] =  {
@@ -53,8 +54,8 @@ static void gk15_eval(integrand_fn f, void *ctx,
     qfloat_t f0 = f(c, ctx);
 
     /* Evaluate f at the 7 symmetric pairs and accumulate K15 */
-    qfloat_t fpos[7], fneg[7];
-    for (int i = 0; i < 7; i++) {
+    qfloat_t fpos[GK_SYMMETRIC_PAIRS], fneg[GK_SYMMETRIC_PAIRS];
+    for (int i = 0; i < GK_SYMMETRIC_PAIRS; i++) {
         qfloat_t hi = qf_mul(h, t_node[i + 1]);
         fpos[i] = f(qf_add(c, hi), ctx);
         fneg[i] = f(qf_sub(c, hi), ctx);
@@ -62,7 +63,7 @@ static void gk15_eval(integrand_fn f, void *ctx,
 
     /* K15: centre + 7 symmetric pairs */
     qfloat_t k15 = qf_mul(wk[0], f0);
-    for (int i = 0; i < 7; i++)
+    for (int i = 0; i < GK_SYMMETRIC_PAIRS; i++)
         k15 = qf_add(k15, qf_mul(wk[i + 1], qf_add(fpos[i], fneg[i])));
 
     /* G7: centre (t[0]) + pairs at t[2], t[4], t[6]

@@ -1,5 +1,9 @@
 #include "mcomplex_internal.h"
 
+enum {
+    MC_LAMBERT_W_HALLEY_MAX_STEPS = 80
+};
+
 static void mcomplex_prepare_constant(const mcomplex_t *mcomplex, mpfr_prec_t precision)
 {
     if (mcomplex && mcomplex->constant_id != MCCONST_NONE)
@@ -113,7 +117,7 @@ static int mcomplex_apply_lambert_w_mpc(mcomplex_t *mcomplex, int branch_m1)
     mpfr_set_ui(tol, 1u, MPFR_RNDN);
     mpfr_div_2ui(tol, tol, (unsigned long)(mpc_get_prec(mcomplex->value) + 32u), MPFR_RNDN);
 
-    for (i = 0; i < 80; ++i) {
+    for (i = 0; i < MC_LAMBERT_W_HALLEY_MAX_STEPS; ++i) {
         mpc_exp(ew, w, MPC_RNDNN);
         mpc_mul(wew, w, ew, MPC_RNDNN);
         mpc_sub(f, wew, z, MPC_RNDNN);

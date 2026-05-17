@@ -1572,7 +1572,7 @@ static matrix_t *mat_minor_matrix(const matrix_t *A, size_t skip_row, size_t ski
 
     for (size_t i = 0; i < A->rows; ++i) {
         size_t mj = 0;
-        unsigned char raw[64];
+        unsigned char raw[MATRIX_SCALAR_STORAGE_BYTES];
 
         if (i == skip_row)
             continue;
@@ -1605,7 +1605,7 @@ matrix_t *mat_extract_block(const matrix_t *A,
 
     for (size_t i = 0; i < rows; ++i) {
         for (size_t j = 0; j < cols; ++j) {
-            unsigned char raw[64];
+            unsigned char raw[MATRIX_SCALAR_STORAGE_BYTES];
             mat_get(A, row0 + i, col0 + j, raw);
             mat_set(M, i, j, raw);
         }
@@ -1623,7 +1623,7 @@ bool mat_insert_block(matrix_t *A, size_t row0, size_t col0, const matrix_t *B)
 
     for (size_t i = 0; i < B->rows; ++i) {
         for (size_t j = 0; j < B->cols; ++j) {
-            unsigned char raw[64];
+            unsigned char raw[MATRIX_SCALAR_STORAGE_BYTES];
             mat_get(B, i, j, raw);
             mat_set(A, row0 + i, col0 + j, raw);
         }
@@ -1666,12 +1666,12 @@ matrix_t *mat_charpoly_numeric(const matrix_t *A)
     const struct elem_vtable *e;
     matrix_t *coeffs = NULL;
     matrix_t *B = NULL;
-    unsigned char coeff_prev[64];
-    unsigned char trace_val[64];
-    unsigned char k_val[64];
-    unsigned char inv_k[64];
-    unsigned char coeff[64];
-    unsigned char diag[64];
+    unsigned char coeff_prev[MATRIX_SCALAR_STORAGE_BYTES];
+    unsigned char trace_val[MATRIX_SCALAR_STORAGE_BYTES];
+    unsigned char k_val[MATRIX_SCALAR_STORAGE_BYTES];
+    unsigned char inv_k[MATRIX_SCALAR_STORAGE_BYTES];
+    unsigned char coeff[MATRIX_SCALAR_STORAGE_BYTES];
+    unsigned char diag[MATRIX_SCALAR_STORAGE_BYTES];
 
     if (!A || A->rows != A->cols || !elem_supports_numeric_algorithms(A->elem))
         return NULL;

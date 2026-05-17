@@ -11,6 +11,8 @@
    Element kinds
    ============================================================ */
 
+#define MATRIX_SCALAR_STORAGE_BYTES 64u
+
 typedef enum {
     ELEM_NUMBER = 0,
     ELEM_DVAL = 1,

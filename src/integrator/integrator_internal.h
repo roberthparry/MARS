@@ -60,6 +60,7 @@ typedef struct {
 
 #define TN_NODES 8
 #define TN_T4    4
+#define TN_SYMMETRIC_PAIRS (TN_NODES - 1)
 
 extern qfloat_t tn_node[TN_NODES];
 extern qfloat_t tn_wa[TN_NODES];

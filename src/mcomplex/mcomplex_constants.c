@@ -61,8 +61,65 @@ typedef enum mcomplex_fixed_kind_t {
     MCFIX_NAN,
     MCFIX_INF,
     MCFIX_NINF,
-    MCFIX_I
+    MCFIX_I,
+    MCFIX_COUNT
 } mcomplex_fixed_kind_t;
+
+typedef void (*mcomplex_fixed_setter_t)(mcomplex_t *value);
+
+static void mcomplex_set_fixed_zero(mcomplex_t *value)
+{
+    mpc_set_ui_ui(value->value, 0u, 0u, MPC_RNDNN);
+}
+
+static void mcomplex_set_fixed_one(mcomplex_t *value)
+{
+    mpc_set_ui_ui(value->value, 1u, 0u, MPC_RNDNN);
+}
+
+static void mcomplex_set_fixed_half(mcomplex_t *value)
+{
+    mpc_set_ui_ui(value->value, 1u, 0u, MPC_RNDNN);
+    mpc_div_2ui(value->value, value->value, 1u, MPC_RNDNN);
+}
+
+static void mcomplex_set_fixed_ten(mcomplex_t *value)
+{
+    mpc_set_ui_ui(value->value, 10u, 0u, MPC_RNDNN);
+}
+
+static void mcomplex_set_fixed_nan(mcomplex_t *value)
+{
+    mpc_set_nan(value->value);
+}
+
+static void mcomplex_set_fixed_inf(mcomplex_t *value)
+{
+    mpfr_set_inf(mpc_realref(value->value), 1);
+    mpfr_set_zero(mpc_imagref(value->value), 0);
+}
+
+static void mcomplex_set_fixed_ninf(mcomplex_t *value)
+{
+    mpfr_set_inf(mpc_realref(value->value), -1);
+    mpfr_set_zero(mpc_imagref(value->value), 0);
+}
+
+static void mcomplex_set_fixed_i(mcomplex_t *value)
+{
+    mpc_set_ui_ui(value->value, 0u, 1u, MPC_RNDNN);
+}
+
+static const mcomplex_fixed_setter_t mcomplex_fixed_setters[MCFIX_COUNT] = {
+    [MCFIX_ZERO] = mcomplex_set_fixed_zero,
+    [MCFIX_ONE] = mcomplex_set_fixed_one,
+    [MCFIX_HALF] = mcomplex_set_fixed_half,
+    [MCFIX_TEN] = mcomplex_set_fixed_ten,
+    [MCFIX_NAN] = mcomplex_set_fixed_nan,
+    [MCFIX_INF] = mcomplex_set_fixed_inf,
+    [MCFIX_NINF] = mcomplex_set_fixed_ninf,
+    [MCFIX_I] = mcomplex_set_fixed_i
+};
 
 typedef struct mcomplex_const_cache_t {
     mcomplex_t *value;
@@ -97,37 +154,15 @@ static void mcomplex_init_fixed_constant_once(mcomplex_t *value,
                                               mpfr_prec_t init_prec,
                                               mcomplex_fixed_kind_t kind)
 {
+    mcomplex_fixed_setter_t setter;
+
     mcomplex_const_prepare_fixed(value, cached_prec, init_prec);
 
-    switch (kind) {
-        case MCFIX_ZERO:
-            mpc_set_ui_ui(value->value, 0u, 0u, MPC_RNDNN);
-            break;
-        case MCFIX_ONE:
-            mpc_set_ui_ui(value->value, 1u, 0u, MPC_RNDNN);
-            break;
-        case MCFIX_HALF:
-            mpc_set_ui_ui(value->value, 1u, 0u, MPC_RNDNN);
-            mpc_div_2ui(value->value, value->value, 1u, MPC_RNDNN);
-            break;
-        case MCFIX_TEN:
-            mpc_set_ui_ui(value->value, 10u, 0u, MPC_RNDNN);
-            break;
-        case MCFIX_NAN:
-            mpc_set_nan(value->value);
-            break;
-        case MCFIX_INF:
-            mpfr_set_inf(mpc_realref(value->value), 1);
-            mpfr_set_zero(mpc_imagref(value->value), 0);
-            break;
-        case MCFIX_NINF:
-            mpfr_set_inf(mpc_realref(value->value), -1);
-            mpfr_set_zero(mpc_imagref(value->value), 0);
-            break;
-        case MCFIX_I:
-            mpc_set_ui_ui(value->value, 0u, 1u, MPC_RNDNN);
-            break;
-    }
+    if ((size_t)kind >= MCFIX_COUNT)
+        return;
+    setter = mcomplex_fixed_setters[kind];
+    if (setter)
+        setter(value);
 }
 
 static void mcomplex_ensure_tenth(mpfr_prec_t precision)

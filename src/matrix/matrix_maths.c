@@ -141,8 +141,8 @@ static matrix_t *mat_fun_elementwise_same_type(const matrix_t *A,
 {
     const struct elem_vtable *elem;
     matrix_t *R;
-    unsigned char in_raw[64];
-    unsigned char out_raw[64];
+    unsigned char in_raw[MATRIX_SCALAR_STORAGE_BYTES];
+    unsigned char out_raw[MATRIX_SCALAR_STORAGE_BYTES];
 
     if (!A || !scalar_f)
         return NULL;
@@ -3439,7 +3439,7 @@ void mat_fun_cache_forget(const matrix_t *A)
 static void mat_scale_number(matrix_t *A, const number_t *r)
 {
     const struct elem_vtable *e = A->elem;
-    unsigned char r_raw[64] = {0}, v[64] = {0}, scaled[64] = {0};
+    unsigned char r_raw[MATRIX_SCALAR_STORAGE_BYTES] = {0}, v[MATRIX_SCALAR_STORAGE_BYTES] = {0}, scaled[MATRIX_SCALAR_STORAGE_BYTES] = {0};
 
     mat_raw_value_from_number(e, r_raw, r);
     elem_init_zero_value(e, scaled);
@@ -3692,7 +3692,7 @@ static int mat_is_upper_triangular_local(const matrix_t *A)
 
     for (size_t i = 1; i < A->rows; ++i) {
         for (size_t j = 0; j < i; ++j) {
-            unsigned char raw[64];
+            unsigned char raw[MATRIX_SCALAR_STORAGE_BYTES];
             number_t z;
             number_t absz;
             mat_get(A, i, j, raw);
@@ -3761,7 +3761,7 @@ matrix_t *mat_fun_schur(const matrix_t *A,
         matrix_t *out = mat_create_diagonal_with_elem(1, orig_elem);
         number_t in_num = number_invalid();
         number_t out_num = number_invalid();
-        unsigned char raw_in[64] = {0}, raw_out[64] = {0};
+        unsigned char raw_in[MATRIX_SCALAR_STORAGE_BYTES] = {0}, raw_out[MATRIX_SCALAR_STORAGE_BYTES] = {0};
 
         if (!out)
             return NULL;

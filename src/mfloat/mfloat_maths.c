@@ -6,6 +6,12 @@
 #include "mfloat_internal.h"
 #include "mrational/mrational_internal.h"
 
+enum {
+    MF_ERFINV_NEWTON_STEPS = 8,
+    MF_GAMMAINV_MAX_STEPS = 1200,
+    MF_LAMBERT_W_HALLEY_STEPS = 12
+};
+
 static void mfloat_prepare_constant(const mfloat_t *mfloat, mpfr_prec_t precision)
 {
     if (mfloat && mfloat->constant_id != MFCONST_NONE)
@@ -283,7 +289,7 @@ static int mfloat_apply_erfinv_mpfr(mfloat_t *mfloat, int erfc_mode)
             mpfr_neg(y, y, MPFR_RNDN);
     }
 
-    for (i = 0; i < 8; ++i) {
+    for (i = 0; i < MF_ERFINV_NEWTON_STEPS; ++i) {
         mpfr_erf(err, y, MPFR_RNDN);
         mpfr_sub(err, err, x, MPFR_RNDN);
 
@@ -455,7 +461,7 @@ static int mfloat_apply_gammainv_mpfr(mfloat_t *mfloat)
     mpfr_add(x, lower, upper, MPFR_RNDN);
     mpfr_div_2ui(x, x, 1u, MPFR_RNDN);
 
-    for (i = 0; i < 1200; ++i) {
+    for (i = 0; i < MF_GAMMAINV_MAX_STEPS; ++i) {
         mpfr_gamma(fx, x, MPFR_RNDN);
         mpfr_sub(fx, fx, y, MPFR_RNDN);
 
@@ -521,7 +527,7 @@ static int mfloat_apply_lambert_w_mpfr(mfloat_t *mfloat, int branch_m1)
         mpfr_log(w, x, MPFR_RNDN);
     }
 
-    for (i = 0; i < 12; ++i) {
+    for (i = 0; i < MF_LAMBERT_W_HALLEY_STEPS; ++i) {
         mpfr_exp(e, w, MPFR_RNDN);
         mpfr_mul(f, w, e, MPFR_RNDN);
         mpfr_sub(f, f, x, MPFR_RNDN);

@@ -2,10 +2,11 @@
 
 #include "number_internal.h"
 #include "internal/number_internal.h"
-#include "internal/mcomplex_internal.h"
 #include "internal/mfloat_internal.h"
 #include "internal/mint_internal.h"
 #include "internal/mrational_internal.h"
+
+extern const mcomplex_t MC_I_VALUE;
 
 static const number_private_t number_zero_value = {
     .kind = NUMBER_MINT,

@@ -3,6 +3,16 @@
 #include "internal/qfloat_internal.h"
 #include "qcomplex.h"
 
+enum {
+    QC_ERFINV_NEWTON_MAX_STEPS = 10,
+    QC_ERFCINV_NEWTON_MAX_STEPS = 10,
+    QC_GAMMAINV_NEWTON_MAX_STEPS = 20,
+    QC_LAMBERT_WM1_HALLEY_MAX_STEPS = 60,
+    QC_PRODUCTLOG_HALLEY_MAX_STEPS = 40,
+    QC_GAMMAINC_SERIES_MAX_TERMS = 10000,
+    QC_EI_SERIES_MAX_TERMS = 10000
+};
+
 static qfloat_t qc_abs2_local(qcomplex_t z)
 {
     return qf_add(qf_mul(qc_real(z), qc_real(z)), qf_mul(qc_imag(z), qc_imag(z)));
@@ -10,12 +20,11 @@ static qfloat_t qc_abs2_local(qcomplex_t z)
 
 static qcomplex_t qc_faddeeva_inside(qcomplex_t z)
 {
-    const int N = 32;
     qcomplex_t sum = QC_ZERO;
 
-    for (int k = 1; k <= N; k++) {
-        qcomplex_t denom = qc_make(qc_real(z), qf_sub(qc_imag(z), QFI_FADDEEVA_AK[k - 1]));
-        sum = qc_add(sum, qc_div(qc_make(QFI_FADDEEVA_CK[k - 1], QF_ZERO), denom));
+    for (size_t k = 0; k < QFI_FADDEEVA_TERM_COUNT; ++k) {
+        qcomplex_t denom = qc_make(qc_real(z), qf_sub(qc_imag(z), QFI_FADDEEVA_AK[k]));
+        sum = qc_add(sum, qc_div(qc_make(QFI_FADDEEVA_CK[k], QF_ZERO), denom));
     }
 
     /* inside = 1 + (2i / sqrt(pi)) * sum */
@@ -49,7 +58,7 @@ qcomplex_t qc_erfinv(qcomplex_t z)
     /* Newton iteration: solve erf(w) = z.  Initial guess good for small |z|. */
     qcomplex_t w = qc_mul(z, qc_make(QF_SQRT_PI_OVER_TWO, QF_ZERO));
 
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < QC_ERFINV_NEWTON_MAX_STEPS; i++) {
         qcomplex_t f  = qc_sub(qc_erf(w), z);
         qcomplex_t fp = qc_mul(qc_make(QF_2_SQRTPI, QF_ZERO),
                                qc_exp(qc_neg(qc_mul(w, w))));
@@ -66,7 +75,7 @@ qcomplex_t qc_erfcinv(qcomplex_t z)
     /* Newton iteration: solve erfc(w) = z.  Initial guess via erfinv(1-z). */
     qcomplex_t w = qc_erfinv(qc_sub(QC_ONE, z));
 
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < QC_ERFCINV_NEWTON_MAX_STEPS; i++) {
         qcomplex_t f  = qc_sub(qc_erfc(w), z);
         qcomplex_t fp = qc_mul(qc_make(QF_NEG_TWO_OVER_SQRT_PI, QF_ZERO),
                                qc_exp(qc_neg(qc_mul(w, w))));
@@ -82,7 +91,7 @@ qcomplex_t qc_erfcinv(qcomplex_t z)
 static qcomplex_t lanczos_sum(qcomplex_t z_minus_one)
 {
     qcomplex_t sum = qc_make(QFI_LANCZOS_C[0], QF_ZERO);
-    for (int i = 1; i < 9; i++)
+    for (size_t i = 1; i < QFI_LANCZOS_COEFF_COUNT; ++i)
         sum = qc_add(sum, qc_div(qc_make(QFI_LANCZOS_C[i], QF_ZERO),
                                  qc_add(z_minus_one, qc_make(qf_from_double((double)i), QF_ZERO))));
     return sum;
@@ -269,7 +278,7 @@ qcomplex_t qc_gammainv(qcomplex_t z)
     qcomplex_t w;
     w = qc_add(qc_make(QF_ONE_AND_HALF, QF_ZERO), logz);
 
-    for (int i = 0; i < 20; i++) {
+    for (int i = 0; i < QC_GAMMAINV_NEWTON_MAX_STEPS; i++) {
         qcomplex_t delta = qc_div(qc_sub(qc_lgamma(w), logz), qc_digamma(w));
         w = qc_sub(w, delta);
         if (qf_lt(qc_abs(delta), qf_from_double(1e-30)))
@@ -407,7 +416,7 @@ static qcomplex_t qc_lambert_wm1_complex(qcomplex_t z)
         ? qc_lambert_w_series_guess(z, -1)
         : qc_lambert_w_asymptotic_guess(z, -1);
 
-    for (int i = 0; i < 60; i++) {
+    for (int i = 0; i < QC_LAMBERT_WM1_HALLEY_MAX_STEPS; i++) {
         qcomplex_t ew = qc_exp(w);
         qcomplex_t wew = qc_mul(w, ew);
         qcomplex_t f = qc_sub(wew, z);
@@ -444,7 +453,7 @@ qcomplex_t qc_productlog(qcomplex_t z)
 
     /* Halley iteration on the principal branch: w e^w = z */
     qcomplex_t w = qc_log(z);
-    for (int i = 0; i < 40; i++) {
+    for (int i = 0; i < QC_PRODUCTLOG_HALLEY_MAX_STEPS; i++) {
         qcomplex_t ew    = qc_exp(w);
         qcomplex_t wew   = qc_mul(w, ew);
         qcomplex_t f     = qc_sub(wew, z);
@@ -467,7 +476,7 @@ static qcomplex_t qc_gammainc_lower_series(qcomplex_t s, qcomplex_t x)
     qcomplex_t term = qc_div(QC_ONE, s);
     qcomplex_t sum  = term;
 
-    for (int i = 1; i < 10000; i++) {
+    for (int i = 1; i < QC_GAMMAINC_SERIES_MAX_TERMS; i++) {
         term = qc_mul(term, qc_div(x, qc_add(s, qc_make(qf_from_double((double)i), QF_ZERO))));
         sum  = qc_add(sum, term);
         if (qf_lt(qc_abs(term), qf_mul(tol, qc_abs(sum))))
@@ -523,7 +532,7 @@ qcomplex_t qc_ei(qcomplex_t z)
     qfloat_t fact = one;                    /* k! */
     qcomplex_t term = z;                    /* z^k */
 
-    for (int k = 1; k < 10000; k++) {
+    for (int k = 1; k < QC_EI_SERIES_MAX_TERMS; k++) {
         qcomplex_t add = qc_div(term, qc_make(qf_mul(kf, fact), QF_ZERO));
         sum = qc_add(sum, add);
         if (qf_lt(qc_abs(add), qf_mul(tol, qc_abs(sum))))

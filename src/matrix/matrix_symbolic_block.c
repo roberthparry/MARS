@@ -34,14 +34,14 @@ matrix_t *mat_apply_poly(const matrix_t *A, const matrix_t *coeffs)
     if (A->elem != coeffs->elem)
         return NULL;
 
-    unsigned char c0[64] = {0};
+    unsigned char c0[MATRIX_SCALAR_STORAGE_BYTES] = {0};
     mat_get(coeffs, 0, 0, c0);
     R = mat_const_identity_with_elem(A->rows, A->elem, c0);
     if (!R)
         return NULL;
 
     for (size_t k = 1; k < coeffs->rows; ++k) {
-        unsigned char ck[64] = {0};
+        unsigned char ck[MATRIX_SCALAR_STORAGE_BYTES] = {0};
         matrix_t *AR = mat_mul(A, R);
         matrix_t *CI = NULL;
         matrix_t *Next = NULL;

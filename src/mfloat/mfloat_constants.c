@@ -160,40 +160,72 @@ typedef enum mfloat_fixed_constant_kind_t {
     MFIX_TEN,
     MFIX_NAN,
     MFIX_INF,
-    MFIX_NINF
+    MFIX_NINF,
+    MFIX_COUNT
 } mfloat_fixed_constant_kind_t;
+
+typedef void (*mfloat_fixed_constant_setter_t)(mfloat_t *value);
+
+static void mfloat_set_fixed_zero(mfloat_t *value)
+{
+    mpfr_set_zero(value->value, 0);
+}
+
+static void mfloat_set_fixed_one(mfloat_t *value)
+{
+    mpfr_set_ui(value->value, 1u, MPFR_RNDN);
+}
+
+static void mfloat_set_fixed_half(mfloat_t *value)
+{
+    mpfr_set_ui(value->value, 1u, MPFR_RNDN);
+    mpfr_div_2ui(value->value, value->value, 1u, MPFR_RNDN);
+}
+
+static void mfloat_set_fixed_ten(mfloat_t *value)
+{
+    mpfr_set_ui(value->value, 10u, MPFR_RNDN);
+}
+
+static void mfloat_set_fixed_nan(mfloat_t *value)
+{
+    mpfr_set_nan(value->value);
+}
+
+static void mfloat_set_fixed_inf(mfloat_t *value)
+{
+    mpfr_set_inf(value->value, 1);
+}
+
+static void mfloat_set_fixed_ninf(mfloat_t *value)
+{
+    mpfr_set_inf(value->value, -1);
+}
+
+static const mfloat_fixed_constant_setter_t mfloat_fixed_constant_setters[MFIX_COUNT] = {
+    [MFIX_ZERO] = mfloat_set_fixed_zero,
+    [MFIX_ONE] = mfloat_set_fixed_one,
+    [MFIX_HALF] = mfloat_set_fixed_half,
+    [MFIX_TEN] = mfloat_set_fixed_ten,
+    [MFIX_NAN] = mfloat_set_fixed_nan,
+    [MFIX_INF] = mfloat_set_fixed_inf,
+    [MFIX_NINF] = mfloat_set_fixed_ninf
+};
 
 static void mfloat_init_fixed_constant_once(mfloat_t *value,
                                             mpfr_prec_t *cached_prec,
                                             mpfr_prec_t init_prec,
                                             mfloat_fixed_constant_kind_t kind)
 {
+    mfloat_fixed_constant_setter_t setter;
+
     mfloat_const_prepare_fixed(value, cached_prec, init_prec);
 
-    switch (kind) {
-        case MFIX_ZERO:
-            mpfr_set_zero(value->value, 0);
-            break;
-        case MFIX_ONE:
-            mpfr_set_ui(value->value, 1u, MPFR_RNDN);
-            break;
-        case MFIX_HALF:
-            mpfr_set_ui(value->value, 1u, MPFR_RNDN);
-            mpfr_div_2ui(value->value, value->value, 1u, MPFR_RNDN);
-            break;
-        case MFIX_TEN:
-            mpfr_set_ui(value->value, 10u, MPFR_RNDN);
-            break;
-        case MFIX_NAN:
-            mpfr_set_nan(value->value);
-            break;
-        case MFIX_INF:
-            mpfr_set_inf(value->value, 1);
-            break;
-        case MFIX_NINF:
-            mpfr_set_inf(value->value, -1);
-            break;
-    }
+    if ((size_t)kind >= MFIX_COUNT)
+        return;
+    setter = mfloat_fixed_constant_setters[kind];
+    if (setter)
+        setter(value);
 }
 
 static void mfloat_ensure_tenth(mpfr_prec_t precision)

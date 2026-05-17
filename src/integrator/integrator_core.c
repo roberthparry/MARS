@@ -1,11 +1,17 @@
 #include "integrator_internal.h"
 
+static const char integrator_default_tolerance_text[] = "1e-27";
+
+enum {
+    INTEGRATOR_DEFAULT_MAX_INTERVALS = 500
+};
+
 integrator_t *ig_new(void) {
     integrator_t *ig = malloc(sizeof(integrator_t));
     if (!ig) return NULL;
-    ig->abs_tol       = qf_from_string("1e-27");
-    ig->rel_tol       = qf_from_string("1e-27");
-    ig->max_intervals = 500;
+    ig->abs_tol       = qf_from_string(integrator_default_tolerance_text);
+    ig->rel_tol       = qf_from_string(integrator_default_tolerance_text);
+    ig->max_intervals = INTEGRATOR_DEFAULT_MAX_INTERVALS;
     ig->last_intervals = 0;
     return ig;
 }

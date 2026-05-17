@@ -168,19 +168,19 @@ static int utf8_normalize_external(const char *in, size_t in_len,
     *out_len = in_len;
     return 0;
 #else
-    uninorm_t nf;
+    static const uninorm_t normal_forms[STRING_NORM_COUNT] = {
+        [STRING_NORM_NFC] = UNINORM_NFC,
+        [STRING_NORM_NFD] = UNINORM_NFD,
+        [STRING_NORM_NFKC] = UNINORM_NFKC,
+        [STRING_NORM_NFKD] = UNINORM_NFKD
+    };
 
-    switch (form) {
-        case STRING_NORM_NFC:  nf = UNINORM_NFC;  break;
-        case STRING_NORM_NFD:  nf = UNINORM_NFD;  break;
-        case STRING_NORM_NFKC: nf = UNINORM_NFKC; break;
-        case STRING_NORM_NFKD: nf = UNINORM_NFKD; break;
-        default: return -1;
-    }
+    if ((size_t)form >= STRING_NORM_COUNT)
+        return -1;
 
     size_t outsize = 0;
 
-    uint8_t *norm = u8_normalize(nf, (const uint8_t *)in, in_len, NULL, &outsize);
+    uint8_t *norm = u8_normalize(normal_forms[form], (const uint8_t *)in, in_len, NULL, &outsize);
 
     if (!norm)
         return -1;

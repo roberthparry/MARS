@@ -9,6 +9,10 @@
 #include "internal/number_internal.h"
 #include "number/number_internal.h"
 
+enum {
+    MATRIX_HERMITIAN_JACOBI_MAX_SWEEPS = 50
+};
+
 static double mat_numeric_epsilon_from_precision_bits(size_t precision_bits)
 {
     if (precision_bits == 0u)
@@ -418,18 +422,18 @@ static int mat_norm_diagonal_exact(const matrix_t *A, mat_norm_type_t type, numb
     }
 
     switch (type) {
-    case MAT_NORM_1:
-    case MAT_NORM_INF:
-    case MAT_NORM_2:
-        *out = num_scope_detach(num_clone(best));
-        break;
-    case MAT_NORM_FRO:
-        *out = num_scope_detach(num_sqrt(sumsq));
-        break;
-    default:
-        num_destroy(&best);
-        num_destroy(&sumsq);
-        return -2;
+        case MAT_NORM_1:
+        case MAT_NORM_INF:
+        case MAT_NORM_2:
+            *out = num_scope_detach(num_clone(best));
+            break;
+        case MAT_NORM_FRO:
+            *out = num_scope_detach(num_sqrt(sumsq));
+            break;
+        default:
+            num_destroy(&best);
+            num_destroy(&sumsq);
+            return -2;
     }
 
     num_destroy(&best);
@@ -1326,7 +1330,7 @@ static matrix_t *mat_shift_subtract_dv(const matrix_t *A, const dval_t *eigenval
 
 static bool mat_column_is_structural_zero(const matrix_t *A, size_t col)
 {
-    unsigned char raw[64];
+    unsigned char raw[MATRIX_SCALAR_STORAGE_BYTES];
     size_t row_begin = 0;
     size_t row_end;
 
@@ -1370,7 +1374,7 @@ static bool mat_column_is_structural_zero(const matrix_t *A, size_t col)
 static matrix_t *mat_extract_column_copy(const matrix_t *A, size_t col)
 {
     matrix_t *C;
-    unsigned char raw[64];
+    unsigned char raw[MATRIX_SCALAR_STORAGE_BYTES];
 
     if (!A || col >= A->cols)
         return NULL;
@@ -1533,7 +1537,7 @@ matrix_t *mat_jordan_chain(const matrix_t *A, const number_t *eigenvalue,
     Current = Tail;
     Tail = NULL;
     for (size_t j = order; j-- > 0;) {
-        unsigned char raw[64];
+        unsigned char raw[MATRIX_SCALAR_STORAGE_BYTES];
 
         for (size_t i = 0; i < A->rows; ++i) {
             mat_get(Current, i, 0, raw);
@@ -1624,7 +1628,7 @@ matrix_t *mat_jordan_chain_dv(const matrix_t *A, const dval_t *eigenvalue,
     Current = Tail;
     Tail = NULL;
     for (size_t j = order; j-- > 0;) {
-        unsigned char raw[64];
+        unsigned char raw[MATRIX_SCALAR_STORAGE_BYTES];
 
         for (size_t i = 0; i < A->rows; ++i) {
             mat_get(Current, i, 0, raw);
@@ -2013,7 +2017,7 @@ static void hermitian_jacobi_ws_run(hermitian_jacobi_ws_t *ws)
     }
     tol = fro2 * 1e-29;
 
-    for (int sweep = 0; sweep < 50; sweep++) {
+    for (int sweep = 0; sweep < MATRIX_HERMITIAN_JACOBI_MAX_SWEEPS; sweep++) {
         for (size_t p = 0; p < n - 1; p++)
             for (size_t q = p + 1; q < n; q++)
                 jacobi_apply(ws->W, ws->V, n, p, q);
@@ -2320,7 +2324,7 @@ bool mat_is_hermitian(const matrix_t *A)
 
     size_t n = A->rows;
     const struct elem_vtable *e = A->elem;
-    unsigned char aij[64], aji[64], cji[64], diff[64], diag[64];
+    unsigned char aij[MATRIX_SCALAR_STORAGE_BYTES], aji[MATRIX_SCALAR_STORAGE_BYTES], cji[MATRIX_SCALAR_STORAGE_BYTES], diff[MATRIX_SCALAR_STORAGE_BYTES], diag[MATRIX_SCALAR_STORAGE_BYTES];
     double rel_eps = mat_numeric_relative_epsilon(A);
     if (!(rel_eps > 0.0)) rel_eps = 1e-30;
     rel_eps *= 8.0;

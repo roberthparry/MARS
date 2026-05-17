@@ -9,7 +9,7 @@
 #include "number.h"
 #include "number_internal.h"
 #include "internal/mint_internal.h"
-#include "internal/number_scope_alloc.h"
+#include "number_scope_alloc.h"
 #include "mcomplex/mcomplex_internal.h"
 #include "mfloat/mfloat_internal.h"
 #include "mrational/mrational_internal.h"
@@ -270,6 +270,11 @@ void number_scope_resume(num_scope_t *scope)
     (void)scope;
     if (number_scope_suspend_depth > 0u)
         number_scope_suspend_depth--;
+}
+
+void num_scope_resume_cleanup(num_scope_t **scope)
+{
+    number_scope_resume(scope ? *scope : NULL);
 }
 
 static void *number_scope_payload_pointer(const number_t *number)
@@ -643,6 +648,14 @@ number_t number_wrap_mcomplex_with_precision(mcomplex_t *value, size_t precision
 {
     (void)number;
     return 0u;
+}
+
+size_t number_get_effective_precision_dynamic106(const number_t *number)
+{
+    const number_vtable_t *vt = number ? number_vt(number) : NULL;
+    size_t precision_bits = vt && vt->get_precision ? vt->get_precision(number) : 0u;
+
+    return precision_bits == 0u ? 106u : precision_bits;
 }
 
 void number_destroy_none(number_t *number)
@@ -3173,6 +3186,14 @@ size_t num_get_prec_bits(const number_t number)
     const number_vtable_t *vt = number_vt(&number);
 
     return vt && vt->get_precision ? vt->get_precision(&number) : 0u;
+}
+
+size_t num_get_effective_prec_bits(const number_t number)
+{
+    const number_vtable_t *vt = number_vt(&number);
+
+    return vt && vt->get_effective_precision
+        ? vt->get_effective_precision(&number) : 0u;
 }
 
 char *num_to_string(const number_t number)

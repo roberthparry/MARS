@@ -86,8 +86,9 @@ void gturan_eval_dv(dval_t *expr, dval_t *x_var, dval_t *d2_expr,
     qfloat_t d20 = same ? f0 : ig_dv_eval_qf(d2_expr);
 
     /* Seven symmetric pairs */
-    qfloat_t fpos[7], fneg[7], d2pos[7], d2neg[7];
-    for (int i = 0; i < 7; i++) {
+    qfloat_t fpos[TN_SYMMETRIC_PAIRS], fneg[TN_SYMMETRIC_PAIRS];
+    qfloat_t d2pos[TN_SYMMETRIC_PAIRS], d2neg[TN_SYMMETRIC_PAIRS];
+    for (int i = 0; i < TN_SYMMETRIC_PAIRS; i++) {
         qfloat_t hi = qf_mul(h, tn_node[i + 1]);
 
         ig_dv_set_val_qf(x_var, qf_add(c, hi));
@@ -102,7 +103,7 @@ void gturan_eval_dv(dval_t *expr, dval_t *x_var, dval_t *d2_expr,
     /* T15 accumulation (all 8 positions) */
     qfloat_t t15 = qf_add(qf_mul(tn_wa[0], f0),
                            qf_mul(tn_wd[0], qf_mul(h2, d20)));
-    for (int i = 0; i < 7; i++) {
+    for (int i = 0; i < TN_SYMMETRIC_PAIRS; i++) {
         t15 = qf_add(t15, qf_mul(tn_wa[i + 1], qf_add(fpos[i], fneg[i])));
         t15 = qf_add(t15, qf_mul(tn_wd[i + 1],
                                   qf_mul(h2, qf_add(d2pos[i], d2neg[i]))));
@@ -149,8 +150,9 @@ static void gturan_eval_dv_2d(
     gturan_eval_dv(expr,    x_var, d2x_expr,     ax, bx, &F0,   &dummy);
     gturan_eval_dv(d2y_expr, x_var, d2x_d2y_expr, ax, bx, &Fpp0, &dummy);
 
-    qfloat_t Fpos[7], Fneg[7], Fpppos[7], Fppneg[7];
-    for (int i = 0; i < 7; i++) {
+    qfloat_t Fpos[TN_SYMMETRIC_PAIRS], Fneg[TN_SYMMETRIC_PAIRS];
+    qfloat_t Fpppos[TN_SYMMETRIC_PAIRS], Fppneg[TN_SYMMETRIC_PAIRS];
+    for (int i = 0; i < TN_SYMMETRIC_PAIRS; i++) {
         qfloat_t hi = qf_mul(hy, tn_node[i + 1]);
 
         ig_dv_set_val_qf(y_var, qf_add(cy, hi));
@@ -164,7 +166,7 @@ static void gturan_eval_dv_2d(
 
     qfloat_t t15 = qf_add(qf_mul(tn_wa[0], F0),
                            qf_mul(tn_wd[0], qf_mul(hy2, Fpp0)));
-    for (int i = 0; i < 7; i++) {
+    for (int i = 0; i < TN_SYMMETRIC_PAIRS; i++) {
         t15 = qf_add(t15, qf_mul(tn_wa[i+1], qf_add(Fpos[i], Fneg[i])));
         t15 = qf_add(t15, qf_mul(tn_wd[i+1], qf_mul(hy2, qf_add(Fpppos[i], Fppneg[i]))));
     }
@@ -233,8 +235,9 @@ static void gturan_eval_dv_3d(
     qfloat_t Fpp0 = eval_2d_t15(d2z_expr, x_var, d2x_d2z_expr, d2y_d2z_expr, d2x_d2y_d2z_expr,
                                  y_var, ax, bx, ay, by);
 
-    qfloat_t Fpos[7], Fneg[7], Fpppos[7], Fppneg[7];
-    for (int i = 0; i < 7; i++) {
+    qfloat_t Fpos[TN_SYMMETRIC_PAIRS], Fneg[TN_SYMMETRIC_PAIRS];
+    qfloat_t Fpppos[TN_SYMMETRIC_PAIRS], Fppneg[TN_SYMMETRIC_PAIRS];
+    for (int i = 0; i < TN_SYMMETRIC_PAIRS; i++) {
         qfloat_t hi = qf_mul(hz, tn_node[i + 1]);
 
         ig_dv_set_val_qf(z_var, qf_add(cz, hi));
@@ -252,7 +255,7 @@ static void gturan_eval_dv_3d(
 
     qfloat_t t15 = qf_add(qf_mul(tn_wa[0], F0),
                            qf_mul(tn_wd[0], qf_mul(hz2, Fpp0)));
-    for (int i = 0; i < 7; i++) {
+    for (int i = 0; i < TN_SYMMETRIC_PAIRS; i++) {
         t15 = qf_add(t15, qf_mul(tn_wa[i+1], qf_add(Fpos[i], Fneg[i])));
         t15 = qf_add(t15, qf_mul(tn_wd[i+1], qf_mul(hz2, qf_add(Fpppos[i], Fppneg[i]))));
     }
@@ -281,9 +284,9 @@ int ig_single_integral(integrator_t *ig, dval_t *expr, dval_t *x_var,
 
     /* If d²f/dx² == f (e.g. exp(x)), pass expr for both args so gturan_eval_dv
      * can skip the redundant second evaluation at each quadrature point. */
-    static const double tp[2] = { 0.31415, 0.71828 };
+    static const double tp[] = { 0.31415, 0.71828 };
     int d2_same = 1;
-    for (int t = 0; t < 2 && d2_same; t++) {
+    for (size_t t = 0; t < sizeof(tp) / sizeof(tp[0]) && d2_same; t++) {
         ig_dv_set_val_qf(x_var, qf_from_double(tp[t]));
         if (!qf_eq(ig_dv_eval_qf(expr), ig_dv_eval_qf(d2_expr)))
             d2_same = 0;

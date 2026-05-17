@@ -237,7 +237,7 @@ matrix_t *mat_to_dense(const matrix_t *A)
 matrix_t *mat_to_sparse(const matrix_t *A)
 {
     matrix_t *S;
-    unsigned char raw[64] = {0};
+    unsigned char raw[MATRIX_SCALAR_STORAGE_BYTES] = {0};
 
     if (!A)
         return NULL;

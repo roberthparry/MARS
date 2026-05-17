@@ -16,7 +16,7 @@ matrix_t *mat_copy_with_store(const matrix_t *A,
                               const struct store_vtable *store)
 {
     matrix_t *C;
-    unsigned char raw[64] = {0};
+    unsigned char raw[MATRIX_SCALAR_STORAGE_BYTES] = {0};
 
     if (!A || !A->elem || !store)
         return NULL;
@@ -71,7 +71,7 @@ matrix_t *mat_convert_with_store(const matrix_t *A,
                                  const struct store_vtable *store)
 {
     matrix_t *C;
-    unsigned char src[64], dst[64];
+    unsigned char src[MATRIX_SCALAR_STORAGE_BYTES], dst[MATRIX_SCALAR_STORAGE_BYTES];
 
     if (!A || !target || !store)
         return NULL;
@@ -168,7 +168,7 @@ static bool mat_elem_abs2_below(const struct elem_vtable *elem,
 static size_t mat_find_pivot_row(const matrix_t *A, size_t col, size_t start)
 {
     const struct elem_vtable *e = A->elem;
-    unsigned char v[64];
+    unsigned char v[MATRIX_SCALAR_STORAGE_BYTES];
     size_t best = start;
     number_t best_abs2 = NUM_ZERO;
     bool have_best = false;
@@ -199,7 +199,7 @@ static matrix_t *mat_apply_row_permutation(const matrix_t *P,
                                            const struct elem_vtable *elem)
 {
     matrix_t *PB;
-    unsigned char pivot[64], value[64];
+    unsigned char pivot[MATRIX_SCALAR_STORAGE_BYTES], value[MATRIX_SCALAR_STORAGE_BYTES];
 
     if (!P || !B || !elem || P->rows != B->rows)
         return NULL;
@@ -254,7 +254,7 @@ static matrix_t *mat_solve_diagonal(const matrix_t *A,
                                     const struct elem_vtable *elem)
 {
     matrix_t *X;
-    unsigned char diag[64], inv_diag[64], rhs[64], out[64];
+    unsigned char diag[MATRIX_SCALAR_STORAGE_BYTES], inv_diag[MATRIX_SCALAR_STORAGE_BYTES], rhs[MATRIX_SCALAR_STORAGE_BYTES], out[MATRIX_SCALAR_STORAGE_BYTES];
     number_t near_zero_tol = num_create_from_double(1e-300);
 
     X = mat_create_direct_solve_result(A, B, elem);
@@ -307,7 +307,7 @@ static matrix_t *mat_forward_substitute(const matrix_t *L,
                                         const struct elem_vtable *elem)
 {
     matrix_t *X;
-    unsigned char diag[64], inv_diag[64], sum[64], a[64], b[64], prod[64], out[64];
+    unsigned char diag[MATRIX_SCALAR_STORAGE_BYTES], inv_diag[MATRIX_SCALAR_STORAGE_BYTES], sum[MATRIX_SCALAR_STORAGE_BYTES], a[MATRIX_SCALAR_STORAGE_BYTES], b[MATRIX_SCALAR_STORAGE_BYTES], prod[MATRIX_SCALAR_STORAGE_BYTES], out[MATRIX_SCALAR_STORAGE_BYTES];
     number_t near_zero_tol = num_create_from_double(1e-300);
 
     X = mat_create_dense_with_elem(L->cols, B->cols, elem);
@@ -381,7 +381,7 @@ static matrix_t *mat_backward_substitute(const matrix_t *U,
                                          const struct elem_vtable *elem)
 {
     matrix_t *X;
-    unsigned char diag[64], inv_diag[64], sum[64], a[64], b[64], prod[64], out[64];
+    unsigned char diag[MATRIX_SCALAR_STORAGE_BYTES], inv_diag[MATRIX_SCALAR_STORAGE_BYTES], sum[MATRIX_SCALAR_STORAGE_BYTES], a[MATRIX_SCALAR_STORAGE_BYTES], b[MATRIX_SCALAR_STORAGE_BYTES], prod[MATRIX_SCALAR_STORAGE_BYTES], out[MATRIX_SCALAR_STORAGE_BYTES];
     number_t near_zero_tol = num_create_from_double(1e-300);
 
     X = mat_create_dense_with_elem(U->cols, B->cols, elem);
@@ -454,7 +454,7 @@ struct matrix_t *mat_transpose(const struct matrix_t *A)
 {
     const struct elem_vtable *e;
     struct matrix_t *T;
-    unsigned char v[64];
+    unsigned char v[MATRIX_SCALAR_STORAGE_BYTES];
 
     if (!A)
         return NULL;
@@ -482,7 +482,7 @@ struct matrix_t *mat_conj(const struct matrix_t *A)
 {
     const struct elem_vtable *e;
     struct matrix_t *C;
-    unsigned char v[64], cv[64];
+    unsigned char v[MATRIX_SCALAR_STORAGE_BYTES], cv[MATRIX_SCALAR_STORAGE_BYTES];
 
     if (!A)
         return NULL;
@@ -1050,8 +1050,8 @@ int mat_lu_factor(const matrix_t *A, mat_lu_factor_t *out)
     const struct store_vtable *working_lower_store;
     matrix_t *P_seed = NULL, *P = NULL, *L = NULL, *U = NULL;
     matrix_t *L_out = NULL, *U_out = NULL;
-    unsigned char pivot[64], inv_pivot[64], factor[64];
-    unsigned char a[64], b[64];
+    unsigned char pivot[MATRIX_SCALAR_STORAGE_BYTES], inv_pivot[MATRIX_SCALAR_STORAGE_BYTES], factor[MATRIX_SCALAR_STORAGE_BYTES];
+    unsigned char a[MATRIX_SCALAR_STORAGE_BYTES], b[MATRIX_SCALAR_STORAGE_BYTES];
     number_t near_zero_tol = num_create_from_double(1e-300);
 
     if (!A || !out)

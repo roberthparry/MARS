@@ -61,8 +61,10 @@
  * `num_destroy()` must be used to release resources when a live value is no
  * longer needed.
  */
+#define NUMBER_STORAGE_WORDS 5u
+
 typedef struct _number_t {
-    uint64_t storage[5];
+    uint64_t storage[NUMBER_STORAGE_WORDS];
 } number_t;
 
 /**
@@ -315,12 +317,8 @@ num_scope_t *num_scope_enter(void);
 void num_scope_leave(num_scope_t **scope);
 bool num_scope_is_active(void);
 number_t num_scope_detach(number_t value);
-static inline void num_scope_cleanup(num_scope_t **scope)
-{
-    num_scope_leave(scope);
-}
-#define NUM_SCOPE(name) \
-    __attribute__((cleanup(num_scope_cleanup))) num_scope_t *name = num_scope_enter()
+
+#define NUM_SCOPE(name) __attribute__((cleanup(num_scope_leave))) num_scope_t *name = num_scope_enter()
 /** @} */
 
 /** @name Precision, setup, and conversion
@@ -349,6 +347,14 @@ size_t num_get_default_prec_digits (void);
 /** Per-value working precision, expressed in bits or decimal digits. */
 int    num_set_prec_bits   (number_t *number, size_t precision_bits);
 size_t num_get_prec_bits   (const number_t number);
+
+/**
+ * @brief Returns the effective working precision in bits.
+ *
+ * Unlike `num_get_prec_bits()`, exact backends return the precision they should
+ * participate with when mixed into inexact numeric work.
+ */
+size_t num_get_effective_prec_bits(const number_t number);
 int    num_set_prec_digits (number_t *number, size_t significant_digits);
 size_t num_get_prec_digits (const number_t number);
 

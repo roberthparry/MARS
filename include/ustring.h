@@ -855,7 +855,10 @@ typedef enum {
      *
      * Examples: "①" → "1",  "é" → "e" + combining acute,  "ﬀ" → "f" + "f"
      */
-    STRING_NORM_NFKD
+    STRING_NORM_NFKD,
+
+    /** Number of supported Unicode normalisation forms. */
+    STRING_NORM_COUNT
 
 } string_norm_form_t;
 

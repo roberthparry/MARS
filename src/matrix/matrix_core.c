@@ -115,37 +115,14 @@ struct mat_precision_bucket {
     struct mat_precision_bucket *next;
 };
 
-static size_t matrix_number_precision_bits(const number_t *value)
-{
-    size_t precision_bits;
-    number_kind_t kind;
-
-    if (!value || !number_is_valid_value(value))
-        return 53u;
-
-    kind = number_kind_value(value);
-    switch (kind) {
-    case NUMBER_DOUBLE:
-        return 53u;
-    case NUMBER_QFLOAT:
-    case NUMBER_QCOMPLEX:
-    case NUMBER_MINT:
-    case NUMBER_MRATIONAL:
-        return 106u;
-    case NUMBER_MFLOAT:
-    case NUMBER_MCOMPLEX:
-        precision_bits = num_get_prec_bits(*value);
-        return precision_bits == 0u ? 106u : precision_bits;
-    default:
-        return 53u;
-    }
-}
-
 static size_t matrix_raw_precision_bits(const struct elem_vtable *elem, const void *raw)
 {
+    size_t precision_bits;
+
     if (elem != &number_elem || !raw)
         return 106u;
-    return matrix_number_precision_bits((const number_t *)raw);
+    precision_bits = num_get_effective_prec_bits(*(const number_t *)raw);
+    return precision_bits == 0u ? 53u : precision_bits;
 }
 
 static bool matrix_raw_is_exact(const struct elem_vtable *elem, const void *raw)
@@ -388,7 +365,7 @@ void mat_value_destroy(const struct matrix_t *A, void *slot)
 
 void mat_get_owned(const struct matrix_t *A, size_t i, size_t j, void *out)
 {
-    unsigned char raw[64] = {0};
+    unsigned char raw[MATRIX_SCALAR_STORAGE_BYTES] = {0};
 
     if (!A || !out)
         return;
@@ -724,7 +701,7 @@ void dense_swap_rows(struct matrix_t *A, size_t r1, size_t r2)
  void dense_row_eliminate_from(struct matrix_t *A, size_t dst_row, size_t src_row,
                                      size_t col_start, const void *factor)
 {
-    unsigned char src[64], dst[64], prod[64], out[64];
+    unsigned char src[MATRIX_SCALAR_STORAGE_BYTES], dst[MATRIX_SCALAR_STORAGE_BYTES], prod[MATRIX_SCALAR_STORAGE_BYTES], out[MATRIX_SCALAR_STORAGE_BYTES];
 
     if (!A || !factor || dst_row == src_row)
         return;
@@ -871,7 +848,7 @@ static sparse_entry_t *sparse_find_prev(const struct matrix_t *A, size_t row, si
                                       size_t col_start, const void *factor)
 {
     sparse_entry_t *cur;
-    unsigned char dst[64], prod[64], out[64];
+    unsigned char dst[MATRIX_SCALAR_STORAGE_BYTES], prod[MATRIX_SCALAR_STORAGE_BYTES], out[MATRIX_SCALAR_STORAGE_BYTES];
 
     if (!A || !factor || dst_row == src_row || !A->data)
         return;
@@ -1318,7 +1295,7 @@ static bool triangular_alloc(struct matrix_t *A, size_t (*row_width)(const struc
  void upper_triangular_row_eliminate_from(struct matrix_t *A, size_t dst_row, size_t src_row,
                                                 size_t col_start, const void *factor)
 {
-    unsigned char src[64], dst[64], prod[64], out[64];
+    unsigned char src[MATRIX_SCALAR_STORAGE_BYTES], dst[MATRIX_SCALAR_STORAGE_BYTES], prod[MATRIX_SCALAR_STORAGE_BYTES], out[MATRIX_SCALAR_STORAGE_BYTES];
 
     if (!A || !factor || dst_row == src_row)
         return;
@@ -1496,7 +1473,7 @@ static bool store_false(const struct matrix_t *A)
 
  bool dense_is_diagonal(const struct matrix_t *A)
 {
-    unsigned char raw[64];
+    unsigned char raw[MATRIX_SCALAR_STORAGE_BYTES];
     size_t diag_cap;
 
     diag_cap = (A->rows < A->cols) ? A->rows : A->cols;
@@ -1556,7 +1533,7 @@ static bool store_false(const struct matrix_t *A)
 
  bool generic_is_upper_triangular(const struct matrix_t *A)
 {
-    unsigned char raw[64];
+    unsigned char raw[MATRIX_SCALAR_STORAGE_BYTES];
     size_t cap = upper_triangular_capacity(A->rows, A->cols);
 
     if (A->nnz > cap)
@@ -1574,7 +1551,7 @@ static bool store_false(const struct matrix_t *A)
 
  bool generic_is_lower_triangular(const struct matrix_t *A)
 {
-    unsigned char raw[64];
+    unsigned char raw[MATRIX_SCALAR_STORAGE_BYTES];
     size_t cap = lower_triangular_capacity(A->rows, A->cols);
 
     if (A->nnz > cap)
@@ -2570,8 +2547,8 @@ matrix_t *mat_scalar_mul(matrix_t *A, const number_t *s)
     const binop_vtable *op;
     const struct elem_vtable *re;
     matrix_t *R;
-    unsigned char a_raw[64] = {0};
-    unsigned char out_raw[64] = {0};
+    unsigned char a_raw[MATRIX_SCALAR_STORAGE_BYTES] = {0};
+    unsigned char out_raw[MATRIX_SCALAR_STORAGE_BYTES] = {0};
 
     if (ak >= BIN_ELEM_MAX)
         return NULL;
@@ -2621,7 +2598,7 @@ static struct matrix_t *mat_add_or_sub_sparse(const struct matrix_t *A,
 {
     const struct elem_vtable *re = op->result_elem;
     struct matrix_t *C = mat_create_sparse_with_elem(A->rows, A->cols, re);
-    unsigned char a_raw[64] = {0}, b_raw[64] = {0}, out[64] = {0};
+    unsigned char a_raw[MATRIX_SCALAR_STORAGE_BYTES] = {0}, b_raw[MATRIX_SCALAR_STORAGE_BYTES] = {0}, out[MATRIX_SCALAR_STORAGE_BYTES] = {0};
 
     if (!C)
         return NULL;
@@ -2650,8 +2627,8 @@ static struct matrix_t *mat_mul_sparse(const struct matrix_t *A,
 {
     const struct elem_vtable *re = op->result_elem;
     struct matrix_t *As = NULL, *Bs = NULL, *C = NULL;
-    unsigned char x_raw[64] = {0}, y_raw[64] = {0}, prod[64] = {0};
-    unsigned char sum[64] = {0}, sum_acc[64] = {0}, next_sum[64] = {0};
+    unsigned char x_raw[MATRIX_SCALAR_STORAGE_BYTES] = {0}, y_raw[MATRIX_SCALAR_STORAGE_BYTES] = {0}, prod[MATRIX_SCALAR_STORAGE_BYTES] = {0};
+    unsigned char sum[MATRIX_SCALAR_STORAGE_BYTES] = {0}, sum_acc[MATRIX_SCALAR_STORAGE_BYTES] = {0}, next_sum[MATRIX_SCALAR_STORAGE_BYTES] = {0};
 
     if (!re)
         return NULL;
@@ -2748,7 +2725,7 @@ struct matrix_t *mat_add(const struct matrix_t *A, const struct matrix_t *B) {
     struct matrix_t *C = mat_create_binary_result(A->rows, A->cols, re, A, B);
     if (!C) return NULL;
 
-    unsigned char a_raw[64] = {0}, b_raw[64] = {0}, out[64] = {0};
+    unsigned char a_raw[MATRIX_SCALAR_STORAGE_BYTES] = {0}, b_raw[MATRIX_SCALAR_STORAGE_BYTES] = {0}, out[MATRIX_SCALAR_STORAGE_BYTES] = {0};
     elem_init_zero_value(re, out);
 
     for (size_t i = 0; i < A->rows; i++)
@@ -2786,7 +2763,7 @@ struct matrix_t *mat_sub(const struct matrix_t *A, const struct matrix_t *B) {
     struct matrix_t *C = mat_create_binary_result(A->rows, A->cols, re, A, B);
     if (!C) return NULL;
 
-    unsigned char a_raw[64] = {0}, b_raw[64] = {0}, out[64] = {0};
+    unsigned char a_raw[MATRIX_SCALAR_STORAGE_BYTES] = {0}, b_raw[MATRIX_SCALAR_STORAGE_BYTES] = {0}, out[MATRIX_SCALAR_STORAGE_BYTES] = {0};
     elem_init_zero_value(re, out);
 
     for (size_t i = 0; i < A->rows; i++)
@@ -2824,8 +2801,8 @@ struct matrix_t *mat_mul(const struct matrix_t *A, const struct matrix_t *B) {
     struct matrix_t *C = mat_create_binary_result(A->rows, B->cols, re, A, B);
     if (!C) return NULL;
 
-    unsigned char x_raw[64] = {0}, y_raw[64] = {0}, prod[64] = {0};
-    unsigned char sum[64] = {0}, next_sum[64] = {0};
+    unsigned char x_raw[MATRIX_SCALAR_STORAGE_BYTES] = {0}, y_raw[MATRIX_SCALAR_STORAGE_BYTES] = {0}, prod[MATRIX_SCALAR_STORAGE_BYTES] = {0};
+    unsigned char sum[MATRIX_SCALAR_STORAGE_BYTES] = {0}, next_sum[MATRIX_SCALAR_STORAGE_BYTES] = {0};
     elem_init_zero_value(re, prod);
     elem_init_zero_value(re, sum);
     elem_init_zero_value(re, next_sum);
@@ -2868,7 +2845,7 @@ matrix_t *mat_neg(const matrix_t *A)
 {
     const struct elem_vtable *e;
     matrix_t *R;
-    unsigned char a_raw[64] = {0}, out_raw[64] = {0};
+    unsigned char a_raw[MATRIX_SCALAR_STORAGE_BYTES] = {0}, out_raw[MATRIX_SCALAR_STORAGE_BYTES] = {0};
 
     if (!A)
         return NULL;
@@ -3130,7 +3107,7 @@ static matrix_t *mat_fun_triangular_equal_diag(const matrix_t *T,
         return NULL;
     }
 
-    unsigned char raw[64] = {0};
+    unsigned char raw[MATRIX_SCALAR_STORAGE_BYTES] = {0};
     number_t lambda = number_invalid();
     number_t c0 = number_invalid();
     number_t c1 = number_invalid();
@@ -3442,7 +3419,7 @@ static int mat_fun_triangular_confluent_sum_paths(number_t *out,
 {
     const struct elem_vtable *e = T->elem;
     number_t contrib = number_invalid();
-    unsigned char raw[64] = {0};
+    unsigned char raw[MATRIX_SCALAR_STORAGE_BYTES] = {0};
 
     if (!out || !T || !nodes || !scalar_f || current > end)
         return -1;
@@ -3512,7 +3489,7 @@ static int mat_fun_triangular_confluent_fallback(number_t *out,
 {
     const struct elem_vtable *e = T->elem;
     number_t *nodes = NULL;
-    unsigned char raw[64] = {0};
+    unsigned char raw[MATRIX_SCALAR_STORAGE_BYTES] = {0};
 
     if (!out || !T || !scalar_f || i >= j || j >= T->rows || T->rows != T->cols)
         return -1;
@@ -3556,16 +3533,16 @@ matrix_t *mat_fun_triangular(const matrix_t *T,
     size_t n = T->rows;
     const struct elem_vtable *e = T->elem;
 
-    unsigned char t_ii[64] = {0}, t_jj[64] = {0}, t_ij[64] = {0};
-    unsigned char f_ii[64] = {0}, f_jj[64] = {0}, f_ij[64] = {0};
-    unsigned char num[64] = {0}, tmp[64] = {0}, sum[64] = {0};
-    unsigned char t_ik[64] = {0}, t_kj[64] = {0}, f_ik[64] = {0}, f_kj[64] = {0};
-    unsigned char denom[64] = {0}, inv_denom[64] = {0};
+    unsigned char t_ii[MATRIX_SCALAR_STORAGE_BYTES] = {0}, t_jj[MATRIX_SCALAR_STORAGE_BYTES] = {0}, t_ij[MATRIX_SCALAR_STORAGE_BYTES] = {0};
+    unsigned char f_ii[MATRIX_SCALAR_STORAGE_BYTES] = {0}, f_jj[MATRIX_SCALAR_STORAGE_BYTES] = {0}, f_ij[MATRIX_SCALAR_STORAGE_BYTES] = {0};
+    unsigned char num[MATRIX_SCALAR_STORAGE_BYTES] = {0}, tmp[MATRIX_SCALAR_STORAGE_BYTES] = {0}, sum[MATRIX_SCALAR_STORAGE_BYTES] = {0};
+    unsigned char t_ik[MATRIX_SCALAR_STORAGE_BYTES] = {0}, t_kj[MATRIX_SCALAR_STORAGE_BYTES] = {0}, f_ik[MATRIX_SCALAR_STORAGE_BYTES] = {0}, f_kj[MATRIX_SCALAR_STORAGE_BYTES] = {0};
+    unsigned char denom[MATRIX_SCALAR_STORAGE_BYTES] = {0}, inv_denom[MATRIX_SCALAR_STORAGE_BYTES] = {0};
 
     bool all_diag_equal = true;
     number_t lam0 = number_invalid();
     number_t tol = num_create_from_double(1e-24);
-    unsigned char lam0_raw[64] = {0}, lami_raw[64] = {0};
+    unsigned char lam0_raw[MATRIX_SCALAR_STORAGE_BYTES] = {0}, lami_raw[MATRIX_SCALAR_STORAGE_BYTES] = {0};
     mat_get(T, 0, 0, lam0_raw);
     lam0 = mat_raw_value_to_number(e, lam0_raw);
     for (size_t i = 1; i < n; ++i) {
@@ -3660,10 +3637,10 @@ matrix_t *mat_fun_triangular(const matrix_t *T,
 
                 if (e->cmp(num, e->zero) == 0) {
                     /* F[i,j] = f'(lambda) * T[i,j] via central difference */
-                    unsigned char lam_p[64] = {0}, lam_m[64] = {0};
-                    unsigned char fp[64] = {0}, fm[64] = {0};
-                    unsigned char h_raw[64] = {0}, two_h[64] = {0};
-                    unsigned char inv_2h[64] = {0}, deriv[64] = {0};
+                    unsigned char lam_p[MATRIX_SCALAR_STORAGE_BYTES] = {0}, lam_m[MATRIX_SCALAR_STORAGE_BYTES] = {0};
+                    unsigned char fp[MATRIX_SCALAR_STORAGE_BYTES] = {0}, fm[MATRIX_SCALAR_STORAGE_BYTES] = {0};
+                    unsigned char h_raw[MATRIX_SCALAR_STORAGE_BYTES] = {0}, two_h[MATRIX_SCALAR_STORAGE_BYTES] = {0};
+                    unsigned char inv_2h[MATRIX_SCALAR_STORAGE_BYTES] = {0}, deriv[MATRIX_SCALAR_STORAGE_BYTES] = {0};
                     {
                         number_t h_num = num_create_from_double(1e-10);
                         mat_raw_value_from_number(e, h_raw, &h_num);

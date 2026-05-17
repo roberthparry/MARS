@@ -37,8 +37,9 @@ static qfloat_t eval_nd_t15(const multi_ctx_t *ctx, int dim, size_t dmask,
     qfloat_t Fpp0 = ctx->all_same ? F0
                   : eval_nd_t15(ctx, dim-1, dmask | bit, ctx->lo[dim-1], ctx->hi[dim-1]);
 
-    qfloat_t Fpos[7], Fneg[7], Fpppos[7], Fppneg[7];
-    for (int i = 0; i < 7; i++) {
+    qfloat_t Fpos[TN_SYMMETRIC_PAIRS], Fneg[TN_SYMMETRIC_PAIRS];
+    qfloat_t Fpppos[TN_SYMMETRIC_PAIRS], Fppneg[TN_SYMMETRIC_PAIRS];
+    for (int i = 0; i < TN_SYMMETRIC_PAIRS; i++) {
         qfloat_t ht = qf_mul(h, tn_node[i + 1]);
         ig_dv_set_val_qf(ctx->vars[dim], qf_add(c, ht));
         Fpos[i]   = eval_nd_t15(ctx, dim-1, dmask,       ctx->lo[dim-1], ctx->hi[dim-1]);
@@ -51,7 +52,7 @@ static qfloat_t eval_nd_t15(const multi_ctx_t *ctx, int dim, size_t dmask,
     }
 
     qfloat_t t15 = qf_add(qf_mul(tn_wa[0], F0), qf_mul(tn_wd[0], qf_mul(h2, Fpp0)));
-    for (int i = 0; i < 7; i++) {
+    for (int i = 0; i < TN_SYMMETRIC_PAIRS; i++) {
         t15 = qf_add(t15, qf_mul(tn_wa[i+1], qf_add(Fpos[i], Fneg[i])));
         t15 = qf_add(t15, qf_mul(tn_wd[i+1], qf_mul(h2, qf_add(Fpppos[i], Fppneg[i]))));
     }
@@ -79,8 +80,9 @@ static void eval_nd_turan(const multi_ctx_t *ctx, int dim, size_t dmask,
     qfloat_t Fpp0 = ctx->all_same ? F0
                   : eval_nd_t15(ctx, dim-1, dmask | bit, ctx->lo[dim-1], ctx->hi[dim-1]);
 
-    qfloat_t Fpos[7], Fneg[7], Fpppos[7], Fppneg[7];
-    for (int i = 0; i < 7; i++) {
+    qfloat_t Fpos[TN_SYMMETRIC_PAIRS], Fneg[TN_SYMMETRIC_PAIRS];
+    qfloat_t Fpppos[TN_SYMMETRIC_PAIRS], Fppneg[TN_SYMMETRIC_PAIRS];
+    for (int i = 0; i < TN_SYMMETRIC_PAIRS; i++) {
         qfloat_t ht = qf_mul(h, tn_node[i + 1]);
         ig_dv_set_val_qf(ctx->vars[dim], qf_add(c, ht));
         Fpos[i]   = eval_nd_t15(ctx, dim-1, dmask,       ctx->lo[dim-1], ctx->hi[dim-1]);
@@ -93,7 +95,7 @@ static void eval_nd_turan(const multi_ctx_t *ctx, int dim, size_t dmask,
     }
 
     qfloat_t t15 = qf_add(qf_mul(tn_wa[0], F0), qf_mul(tn_wd[0], qf_mul(h2, Fpp0)));
-    for (int i = 0; i < 7; i++) {
+    for (int i = 0; i < TN_SYMMETRIC_PAIRS; i++) {
         t15 = qf_add(t15, qf_mul(tn_wa[i+1], qf_add(Fpos[i], Fneg[i])));
         t15 = qf_add(t15, qf_mul(tn_wd[i+1], qf_mul(h2, qf_add(Fpppos[i], Fppneg[i]))));
     }
@@ -145,8 +147,8 @@ int ig_integral_multi(integrator_t *ig, dval_t *expr,
      * skips redundant evaluations. Uses two test points to distinguish functions. */
     int all_same = (nexprs > 1);
     if (all_same) {
-        static const double tp[2] = { 0.31415, 0.71828 };
-        for (int t = 0; t < 2 && all_same; t++) {
+        static const double tp[] = { 0.31415, 0.71828 };
+        for (size_t t = 0; t < sizeof(tp) / sizeof(tp[0]) && all_same; t++) {
             for (size_t v = 0; v < ndim; v++)
                 ig_dv_set_val_qf(vars[v], qf_from_double(tp[t]));
             qfloat_t ref = ig_dv_eval_qf(deriv_exprs[0]);

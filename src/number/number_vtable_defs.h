@@ -106,6 +106,7 @@ bool number_get_mantissa_u64_mcomplex(const number_t *number, uint64_t *out);
 bool number_get_mantissa_u64_mfloat(const number_t *number, uint64_t *out);
 size_t number_get_precision_mcomplex(const number_t *number);
 size_t number_get_precision_mfloat(const number_t *number);
+size_t number_get_effective_precision_dynamic106(const number_t *number);
 number_t *number_imag_double_zero(const number_t *number);
 number_t *number_imag_mcomplex(const number_t *number);
 number_t *number_imag_mfloat_zero(const number_t *number);
