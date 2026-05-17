@@ -17,6 +17,8 @@ void run_number_public_api_tests(void)
         number_t quot = num_div(a, b);
         number_t product = num_mul(sum, frac);
         number_t logged = num_log(dec);
+        number_t thousand = num_create_from_long(1000);
+        number_t log10_thousand = num_log10(thousand);
         number_t rooted = num_sqrt(z);
         number_t constant = NUM_PI;
         number_t i_constant = NUM_I;
@@ -25,11 +27,14 @@ void run_number_public_api_tests(void)
         number_t i_cloned = num_clone(i_constant);
 
         assert_number_string("num_add(\"2\", \"3\")", sum, "5");
-        assert_number_string("num_div(\"2\", \"3\")", quot, "2/3");
-        assert_number_string("num_mul(\"5\", \"5/6\")", product, "25/6");
-        assert_number_string("num_clone(\"25/6\")", cloned, "25/6");
-        assert_number_string_prefix("NUM_PI", constant, "3.14159");
-        assert_number_string_prefix("num_clone(NUM_PI)", pi_cloned, "3.14159");
+        assert_number_string("num_div(\"2\", \"3\")", quot, "⅔");
+        assert_number_string("num_mul(\"5\", \"5/6\")", product, "²⁵⁄₆");
+        assert_number_string("num_clone(\"25/6\")", cloned, "²⁵⁄₆");
+        assert_number_string("num_log10(1000)", log10_thousand, "3");
+        assert_number_string_prefix("NUM_PI", constant,
+                                    "3.141592653589793238462643383279");
+        assert_number_string_prefix("num_clone(NUM_PI)", pi_cloned,
+                                    "3.141592653589793238462643383279");
         assert_number_string("num_clone(NUM_I)", i_cloned, "0 + 1i");
 
         ASSERT_TRUE(num_is_real(a));
@@ -52,6 +57,8 @@ void run_number_public_api_tests(void)
         num_destroy(&quot);
         num_destroy(&product);
         num_destroy(&logged);
+        num_destroy(&thousand);
+        num_destroy(&log10_thousand);
         num_destroy(&rooted);
         num_destroy(&constant);
         num_destroy(&i_constant);
@@ -81,12 +88,12 @@ void run_number_public_api_tests(void)
 
         sum = num_add(one_third, one_sixth);
         detached = num_scope_detach(sum);
-        assert_number_string("num_scope_detach(scoped 1/3 + 1/6)", detached, "1/2");
+        assert_number_string("num_scope_detach(scoped 1/3 + 1/6)", detached, "½");
 
         num_scope_leave(&outer);
         ASSERT_TRUE(!num_scope_is_active());
 
-        assert_number_string("detached scoped result survives leave", detached, "1/2");
+        assert_number_string("detached scoped result survives leave", detached, "½");
         num_destroy(&detached);
 
         num_scope_enter(&outer);

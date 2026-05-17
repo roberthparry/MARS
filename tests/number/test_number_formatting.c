@@ -36,12 +36,15 @@ void run_number_formatting_tests(void)
         ASSERT_TRUE(written > 0);
         printf(C_WHITE C_BOLD "num_sprintf(\"%%N\", 5/6)" C_RESET "\n");
         printf("    got      = %s\n\n", buf);
-        ASSERT_TRUE(strcmp(buf, "5/6") == 0);
+        ASSERT_TRUE(strcmp(buf, "⅚") == 0);
 
-        assert_number_string_prefix("num_beta(2, 2)", beta, "0.16666");
-        assert_number_string_prefix("num_atan2(1, 1)", angle, "0.78539");
+        assert_number_string_prefix("num_beta(2, 2)", beta,
+                                    "0.166666666666666666666666666666");
+        assert_number_string_prefix("num_atan2(1, 1)", angle,
+                                    "0.785398163397448309615660845819");
         assert_number_string("num_gamma(5)", gamma5, "24");
-        assert_number_string_prefix("num_ei(1)", ei1, "1.89511");
+        assert_number_string_prefix("num_ei(1)", ei1,
+                                    "1.895117816355936755466520934331");
 
         num_destroy(&dec);
         num_destroy(&rat);

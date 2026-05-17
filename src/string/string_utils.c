@@ -152,14 +152,14 @@ int string_buffer_append_char(string_buffer_t *b, char c)
     return 0;
 }
 
-/* Normalization hook (stub) */
+/* Normalisation hook (stub) */
 
 static int utf8_normalize_external(const char *in, size_t in_len,
                                    char **out, size_t *out_len,
                                    string_norm_form_t form)
 {
 #ifndef HAVE_UNISTRING
-    // Fallback: no-op normalization
+    // Fallback: no-op normalisation
     char *copy = malloc(in_len + 1);
     if (!copy) return -1;
     memcpy(copy, in, in_len);
@@ -192,7 +192,7 @@ static int utf8_normalize_external(const char *in, size_t in_len,
 }
 
 
-/* Normalize s in place to the given Unicode normalization form.
+/* Normalise s in place to the given Unicode normalisation form.
    Returns 0 on success, -1 on error or unsupported form. */
 int string_normalize(string_t *s, string_norm_form_t form)
 {

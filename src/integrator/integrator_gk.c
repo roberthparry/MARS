@@ -49,7 +49,7 @@ static void gk15_eval(integrand_fn f, void *ctx,
     qfloat_t c = qf_mul_double(qf_add(a, b), 0.5);
     qfloat_t h = qf_mul_double(qf_sub(b, a), 0.5);
 
-    /* Evaluate f at center */
+    /* Evaluate f at centre */
     qfloat_t f0 = f(c, ctx);
 
     /* Evaluate f at the 7 symmetric pairs and accumulate K15 */
@@ -60,12 +60,12 @@ static void gk15_eval(integrand_fn f, void *ctx,
         fneg[i] = f(qf_sub(c, hi), ctx);
     }
 
-    /* K15: center + 7 symmetric pairs */
+    /* K15: centre + 7 symmetric pairs */
     qfloat_t k15 = qf_mul(wk[0], f0);
     for (int i = 0; i < 7; i++)
         k15 = qf_add(k15, qf_mul(wk[i + 1], qf_add(fpos[i], fneg[i])));
 
-    /* G7: center (t[0]) + pairs at t[2], t[4], t[6]
+    /* G7: centre (t[0]) + pairs at t[2], t[4], t[6]
        In fpos/fneg those correspond to indices 1, 3, 5 respectively  */
     qfloat_t g7 = qf_mul(wg[0], f0);
     g7 = qf_add(g7, qf_mul(wg[1], qf_add(fpos[1], fneg[1])));

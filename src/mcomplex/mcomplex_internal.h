@@ -1,22 +1,40 @@
 #ifndef MCOMPLEX_INTERNAL_H
 #define MCOMPLEX_INTERNAL_H
 
-#include <stdbool.h>
+#include <mpc.h>
 
 #include "mcomplex.h"
-#include "qcomplex.h"
+
+typedef enum mcomplex_constant_id_t {
+    MCCONST_NONE = 0,
+    MCCONST_ZERO,
+    MCCONST_ONE,
+    MCCONST_HALF,
+    MCCONST_TENTH,
+    MCCONST_TEN,
+    MCCONST_PI,
+    MCCONST_E,
+    MCCONST_LN10,
+    MCCONST_EULER_MASCHERONI,
+    MCCONST_SQRT2,
+    MCCONST_SQRT_PI,
+    MCCONST_NAN,
+    MCCONST_INF,
+    MCCONST_NINF,
+    MCCONST_I,
+    MCCONST_COUNT
+} mcomplex_constant_id_t;
 
 struct _mcomplex_t {
-    mfloat_t *real;
-    mfloat_t *imag;
-    bool immortal;
+    mcomplex_constant_id_t constant_id;
+    mpc_t value;
+    mfloat_t *real_view;
+    mfloat_t *imag_view;
 };
 
-bool mcomplex_is_immortal(const mcomplex_t *mcomplex);
-int mcomplex_ensure_mutable(mcomplex_t *mcomplex);
-int mcomplex_apply_unary(mcomplex_t *mcomplex, qcomplex_t (*fn)(qcomplex_t));
-int mcomplex_apply_binary(mcomplex_t *mcomplex,
-                          const mcomplex_t *other,
-                          qcomplex_t (*fn)(qcomplex_t, qcomplex_t));
+void mcomplex_constant_ensure(const mcomplex_t *mcomplex, mpfr_prec_t precision);
+void mcomplex_constants_ensure_init(void);
+int mcomplex_prepare_mutable(mcomplex_t *mcomplex);
+int mcomplex_sync_views(mcomplex_t *mcomplex);
 
 #endif

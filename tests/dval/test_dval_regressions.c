@@ -902,7 +902,7 @@ static void test_default_constants_preserve_builtin_precision(void)
     check_q_at(__FILE__, __LINE__, 1, "dval pi uses qfloat precision", dv_eval_qf(pi), QF_PI);
     check_q_at(__FILE__, __LINE__, 1, "dval e uses qfloat precision", dv_eval_qf(e), QF_E);
     phi_value = dv_eval(phi);
-    ASSERT_EQ_INT((int)num_get_prec_bits(phi_value), 1088);
+    ASSERT_EQ_INT((int)num_get_prec_bits(phi_value), (int)num_get_default_prec_bits());
     check_q_at(__FILE__, __LINE__, 1, "dval phi preserves builtin value",
                num_to_qfloat(phi_value), QF_PHI);
 
@@ -910,6 +910,20 @@ static void test_default_constants_preserve_builtin_precision(void)
     dv_free(phi);
     dv_free(e);
     dv_free(pi);
+}
+
+static void test_dv_ln10_singleton(void)
+{
+    number_t got = dv_eval(DV_LN10);
+    number_t expected = num_const(NUM_LN10);
+    char *text = dv_to_string(DV_LN10, style_EXPRESSION);
+
+    ASSERT_TRUE(num_eq(got, expected));
+    ASSERT_TRUE(text && strstr(text, "ln10") != NULL);
+
+    free(text);
+    num_destroy(&expected);
+    num_destroy(&got);
 }
 
 static void test_get_val_updates_after_set(void)
@@ -1057,6 +1071,7 @@ static void test_eval_num_function_values(void)
         { "atanh", "0.25", dv_atanh, num_atanh, NULL },
         { "exp", "1.5", dv_exp, num_exp, NULL },
         { "log", "1.5", dv_log, num_log, NULL },
+        { "log10", "1.5", dv_log10, num_log10, NULL },
         { "sqrt", "2.0", dv_sqrt, num_sqrt, NULL },
         { "pow_d", "2.0", dv_pow3_builder, num_pow3_builder, NULL },
         { "abs", "-3.0", dv_abs, num_abs, NULL },
@@ -1109,6 +1124,7 @@ static void test_eval_num_function_derivatives(void)
         UCASE("atanh", "0.25", dv_atanh, num_atanh),
         UCASE("exp", "1.5", dv_exp, num_exp),
         UCASE("log", "1.5", dv_log, num_log),
+        UCASE("log10", "1.5", dv_log10, num_log10),
         UCASE("sqrt", "2.0", dv_sqrt, num_sqrt),
         UCASE("pow_d", "2.0", dv_pow3_builder, num_pow3_builder),
         UCASE("abs", "-3.0", dv_abs, num_abs),
@@ -1159,6 +1175,7 @@ static void test_high_precision_mfloat_function_values(void)
         UCASE("acosh", "1.25", dv_acosh, num_acosh),
         UCASE("atanh", "0.25", dv_atanh, num_atanh),
         UCASE("log", "1.5", dv_log, num_log),
+        UCASE("log10", "1.5", dv_log10, num_log10),
         UCASE("sqrt", "2.0", dv_sqrt, num_sqrt),
         UCASE("pow_d", "2.0", dv_pow3_builder, num_pow3_builder),
         UCASE("abs", "-3.0", dv_abs, num_abs),
@@ -1209,6 +1226,7 @@ static void test_high_precision_mfloat_function_derivatives(void)
         UCASE("acosh", "1.25", dv_acosh, num_acosh),
         UCASE("atanh", "0.25", dv_atanh, num_atanh),
         UCASE("log", "1.5", dv_log, num_log),
+        UCASE("log10", "1.5", dv_log10, num_log10),
         UCASE("sqrt", "2.0", dv_sqrt, num_sqrt),
         UCASE("pow_d", "2.0", dv_pow3_builder, num_pow3_builder),
         UCASE("abs", "-3.0", dv_abs, num_abs),
@@ -1251,6 +1269,7 @@ static void test_high_precision_mcomplex_function_values(void)
         UCASE("tanh", "1 + 2i", dv_tanh, num_tanh),
         UCASE("exp", "1 + 2i", dv_exp, num_exp),
         UCASE("log", "1 + 2i", dv_log, num_log),
+        UCASE("log10", "1 + 2i", dv_log10, num_log10),
         UCASE("sqrt", "1 + 2i", dv_sqrt, num_sqrt)
     };
     static const binary_eval_case_t binary_cases[] = {
@@ -1289,12 +1308,21 @@ static void test_simplify_inverse_unary_pairs(void)
     dval_t *exp_log_x = dv_exp(log_x);
     dval_t *exp_x = dv_exp(x);
     dval_t *log_exp_x = dv_log(exp_x);
+    dval_t *ten = dv_new_const(NUM_TEN);
+    dval_t *log10_x = dv_log10(x);
+    dval_t *ten_pow_log10_x = dv_pow_dv(ten, log10_x);
+    dval_t *ten_pow_x = dv_pow_dv(ten, x);
+    dval_t *log10_ten_pow_x = dv_log10(ten_pow_x);
     char *exp_log_s = dv_to_string(exp_log_x, style_EXPRESSION);
     char *log_exp_s = dv_to_string(log_exp_x, style_EXPRESSION);
+    char *ten_pow_log10_s = dv_to_string(ten_pow_log10_x, style_EXPRESSION);
+    char *log10_ten_pow_s = dv_to_string(log10_ten_pow_x, style_EXPRESSION);
     const char *expect = "{ x | x = 3 }";
 
     check_q_at(__FILE__, __LINE__, 1, "exp(log(x)) eval", dv_eval_qf(exp_log_x), qf_from_double(3.0));
     check_q_at(__FILE__, __LINE__, 1, "log(exp(x)) eval", dv_eval_qf(log_exp_x), qf_from_double(3.0));
+    check_q_at(__FILE__, __LINE__, 1, "10^log10(x) eval", dv_eval_qf(ten_pow_log10_x), qf_from_double(3.0));
+    check_q_at(__FILE__, __LINE__, 1, "log10(10^x) eval", dv_eval_qf(log10_ten_pow_x), qf_from_double(3.0));
 
     if (str_eq(exp_log_s, expect))
         to_string_pass("exp(log(x)) simplification (EXPR)", exp_log_s, expect);
@@ -1306,8 +1334,25 @@ static void test_simplify_inverse_unary_pairs(void)
     else
         to_string_fail(__FILE__, __LINE__, 1, "log(exp(x)) simplification (EXPR)", log_exp_s, expect);
 
+    if (str_eq(ten_pow_log10_s, expect))
+        to_string_pass("10^log10(x) simplification (EXPR)", ten_pow_log10_s, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "10^log10(x) simplification (EXPR)", ten_pow_log10_s, expect);
+
+    if (str_eq(log10_ten_pow_s, expect))
+        to_string_pass("log10(10^x) simplification (EXPR)", log10_ten_pow_s, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "log10(10^x) simplification (EXPR)", log10_ten_pow_s, expect);
+
+    free(log10_ten_pow_s);
+    free(ten_pow_log10_s);
     free(log_exp_s);
     free(exp_log_s);
+    dv_free(log10_ten_pow_x);
+    dv_free(ten_pow_x);
+    dv_free(ten_pow_log10_x);
+    dv_free(log10_x);
+    dv_free(ten);
     dv_free(log_exp_x);
     dv_free(exp_x);
     dv_free(exp_log_x);
@@ -1327,6 +1372,7 @@ void test_runtime_regressions(void)
     RUN_SUBTEST(test_new_const_num_preserves_qfloat_precision);
     RUN_SUBTEST(test_set_val_num_preserves_qfloat_precision);
     RUN_SUBTEST(test_default_constants_preserve_builtin_precision);
+    RUN_SUBTEST(test_dv_ln10_singleton);
     RUN_SUBTEST(test_get_val_updates_after_set);
     RUN_SUBTEST(test_new_const_num);
     RUN_SUBTEST(test_new_const_num_rational_complex);

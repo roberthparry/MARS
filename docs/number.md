@@ -37,7 +37,7 @@ but must treat the storage as opaque.
 `num_create_from_string(...)` chooses the most suitable backend by syntax:
 
 - integer text -> `mint_t`
-- `a/b` fraction text -> `mrational_t`
+- `a/b` fraction text, Unicode fraction glyphs, or stacked Unicode fractions -> `mrational_t`
 - decimal or scientific real text -> `mfloat_t`
 - complex text -> `mcomplex_t`
 
@@ -45,6 +45,8 @@ Examples:
 
 - `"42"` -> exact integer
 - `"5/6"` -> exact rational
+- `"⅚"` -> exact rational
+- `"³⁵⁵⁄₁₁₃"` -> exact rational
 - `"32.123"` -> multiprecision real
 - `"1 + 2i"` -> multiprecision complex
 
@@ -149,8 +151,8 @@ num_destroy(&x);
 num_destroy(&y);
 ```
 
-Named constants such as `NUM_PI`, `NUM_E`, `NUM_PHI`, and `NUM_EULER_MASCHERONI`
-are safe to clear as well:
+Named constants such as `NUM_PI`, `NUM_E`, `NUM_LN10`, `NUM_PHI`, and
+`NUM_EULER_MASCHERONI` are safe to clear as well:
 
 ```c
 number_t pi = NUM_PI;
@@ -240,7 +242,8 @@ Examples:
 
 - integer and rational values print exactly:
   - `42`
-  - `5/6`
+  - `⅚`
+  - `³⁵⁵⁄₁₁₃`
 - inexact floating and complex values print in a human-friendly form rather
   than a full exact binary-to-decimal dump
 
@@ -293,6 +296,7 @@ The generic layer exposes:
 - elementary functions:
   - `num_exp`
   - `num_log`
+  - `num_log10`
   - `num_sqrt`
   - `num_sin`, `num_cos`, `num_tan`
   - `num_sinh`, `num_cosh`, `num_tanh`
@@ -357,7 +361,7 @@ int main(void) {
 ```
 
 ```text
-2 + 5/6 = 17/6
+2 + 5/6 = ¹⁷⁄₆
 beta(2, 3) = 0.083333333333333333333333333333333
 ```
 
@@ -405,10 +409,10 @@ the fully manual path, while the "scope everything and destroy nothing until
 leave" pattern remained slower:
 
 ```text
-mfloat chain             manual=1450.786 ms  scoped=1977.505 ms  ratio= 0.734x
-mfloat scoped+roll       manual=1450.786 ms  scoped=1071.234 ms  ratio= 1.354x
-mcomplex chain           manual= 422.498 ms  scoped= 968.822 ms  ratio= 0.436x
-mcomplex scoped+roll     manual= 422.498 ms  scoped= 332.915 ms  ratio= 1.269x
+mfloat chain             manual= 129.082 ms  scoped= 125.772 ms  ratio= 1.026x
+mfloat scoped+roll       manual= 129.082 ms  scoped= 110.554 ms  ratio= 1.168x
+mcomplex chain           manual= 221.584 ms  scoped= 225.807 ms  ratio= 0.981x
+mcomplex scoped+roll     manual= 221.584 ms  scoped= 198.489 ms  ratio= 1.116x
 ```
 
 Run it from the repository root with:
@@ -425,36 +429,36 @@ Current sample results from that command on this tree, measured on:
 - `Intel(R) Core(TM) i7-4510U CPU @ 2.00GHz`
 - `4` logical CPUs
 
-Results:
+Results (microseconds per call):
 
 | Case | `256` bits | `512` bits | `768` bits | `1024` bits |
 |---|---:|---:|---:|---:|
-| `num_exp(1.23456789)` | `2.049 ms` | `8.041 ms` | `5.437 ms` | `4.494 ms` |
-| `num_log(2.345678)` | `1.009 ms` | `2.058 ms` | `2.433 ms` | `3.683 ms` |
-| `num_sqrt(1.23456789)` | `0.016 ms` | `0.023 ms` | `0.014 ms` | `0.019 ms` |
-| `num_sin(0.567)` | `3.004 ms` | `11.982 ms` | `8.111 ms` | `19.987 ms` |
-| `num_cos(0.567)` | `1.681 ms` | `5.137 ms` | `4.493 ms` | `10.435 ms` |
-| `num_sincos(0.7)` | `6.188 ms` | `10.375 ms` | `11.204 ms` | `17.567 ms` |
-| `num_tan(0.7)` | `0.783 ms` | `2.169 ms` | `10.881 ms` | `17.654 ms` |
-| `num_atan(0.567)` | `0.830 ms` | `2.499 ms` | `2.753 ms` | `3.795 ms` |
-| `num_asin(0.7)` | `2.900 ms` | `11.639 ms` | `4.877 ms` | `13.005 ms` |
-| `num_acos(0.7)` | `2.900 ms` | `11.563 ms` | `4.889 ms` | `19.099 ms` |
-| `num_atan2(0.5,-0.75)` | `1.026 ms` | `2.258 ms` | `2.582 ms` | `6.191 ms` |
-| `num_sinh(0.7)` | `3.050 ms` | `7.868 ms` | `2.995 ms` | `6.757 ms` |
-| `num_cosh(0.7)` | `3.065 ms` | `8.015 ms` | `3.000 ms` | `7.466 ms` |
-| `num_sinhcosh(0.7)` | `3.067 ms` | `7.606 ms` | `2.997 ms` | `7.872 ms` |
-| `num_tanh(0.7)` | `3.002 ms` | `8.016 ms` | `2.977 ms` | `7.964 ms` |
-| `num_asinh(0.5)` | `1.269 ms` | `3.240 ms` | `2.727 ms` | `4.391 ms` |
-| `num_acosh(2)` | `1.122 ms` | `2.038 ms` | `1.749 ms` | `2.397 ms` |
-| `num_atanh(0.5)` | `1.501 ms` | `4.415 ms` | `3.012 ms` | `4.049 ms` |
-| `num_lambert_w0(0.7)` | `57.527 ms` | `67.351 ms` | `89.971 ms` | `103.493 ms` |
-| `num_lambert_wm1(-0.2)` | `82.290 ms` | `73.982 ms` | `131.892 ms` | `318.031 ms` |
-| `num_gamma(2.345)` | `30.452 ms` | `42.240 ms` | `55.464 ms` | `230.718 ms` |
-| `num_lgamma(2.345)` | `29.102 ms` | `31.248 ms` | `53.431 ms` | `219.636 ms` |
-| `num_digamma(2.345)` | `2.883 ms` | `3.774 ms` | `14.578 ms` | `11.921 ms` |
-| `num_trigamma(2.345)` | `2.391 ms` | `2.447 ms` | `10.856 ms` | `5.597 ms` |
-| `num_tetragamma(2.345)` | `3.417 ms` | `2.669 ms` | `8.462 ms` | `5.318 ms` |
-| `num_ei(1)` | `4.402 ms` | `4.108 ms` | `48.975 ms` | `709.675 ms` |
-| `num_e1(1)` | `4.673 ms` | `4.274 ms` | `28.783 ms` | `31.516 ms` |
+| `num_exp(1.23456789)` | `3.505 µs` | `6.322 µs` | `18.045 µs` | `16.514 µs` |
+| `num_log(2.345678)` | `6.289 µs` | `9.423 µs` | `13.541 µs` | `18.625 µs` |
+| `num_sqrt(1.23456789)` | `0.477 µs` | `0.586 µs` | `0.713 µs` | `0.944 µs` |
+| `num_sin(0.567)` | `3.887 µs` | `6.208 µs` | `9.403 µs` | `17.224 µs` |
+| `num_cos(0.7)` | `3.126 µs` | `8.037 µs` | `7.760 µs` | `12.425 µs` |
+| `num_sincos(0.7)` | `4.107 µs` | `6.919 µs` | `9.520 µs` | `23.418 µs` |
+| `num_tan(0.7)` | `5.221 µs` | `6.805 µs` | `9.776 µs` | `15.327 µs` |
+| `num_atan(0.7)` | `18.394 µs` | `27.430 µs` | `36.519 µs` | `59.177 µs` |
+| `num_asin(0.7)` | `20.879 µs` | `29.391 µs` | `39.592 µs` | `112.472 µs` |
+| `num_acos(0.7)` | `21.009 µs` | `28.806 µs` | `49.956 µs` | `55.623 µs` |
+| `num_atan2(0.5,-0.75)` | `18.767 µs` | `27.120 µs` | `35.198 µs` | `56.113 µs` |
+| `num_sinh(0.7)` | `3.642 µs` | `10.898 µs` | `10.548 µs` | `15.241 µs` |
+| `num_cosh(0.7)` | `3.465 µs` | `7.267 µs` | `9.929 µs` | `14.211 µs` |
+| `num_sinhcosh(0.7)` | `3.714 µs` | `6.264 µs` | `10.075 µs` | `14.562 µs` |
+| `num_tanh(0.7)` | `3.692 µs` | `6.416 µs` | `13.818 µs` | `14.978 µs` |
+| `num_asinh(0.5)` | `7.274 µs` | `11.246 µs` | `14.858 µs` | `20.073 µs` |
+| `num_acosh(2)` | `7.117 µs` | `10.585 µs` | `18.702 µs` | `19.250 µs` |
+| `num_atanh(0.5)` | `8.562 µs` | `10.787 µs` | `18.899 µs` | `19.750 µs` |
+| `num_lambert_w0(0.7)` | `48.872 µs` | `118.778 µs` | `137.841 µs` | `206.421 µs` |
+| `num_lambert_wm1(-0.2)` | `50.517 µs` | `106.399 µs` | `146.014 µs` | `227.430 µs` |
+| `num_gamma(2.345)` | `43.748 µs` | `107.299 µs` | `178.391 µs` | `284.692 µs` |
+| `num_lgamma(2.345)` | `55.979 µs` | `99.538 µs` | `179.442 µs` | `287.482 µs` |
+| `num_digamma(2.345)` | `176.886 µs` | `298.695 µs` | `748.759 µs` | `898.651 µs` |
+| `num_trigamma(2.345)` | `225.497 µs` | `299.696 µs` | `405.454 µs` | `512.164 µs` |
+| `num_tetragamma(2.345)` | `275.397 µs` | `369.477 µs` | `459.933 µs` | `603.027 µs` |
+| `num_ei(5)` | `66.165 µs` | `101.578 µs` | `139.571 µs` | `187.089 µs` |
+| `num_e1(5)` | `164.975 µs` | `195.819 µs` | `288.246 µs` | `356.961 µs` |
 
 For broader benchmark notes, see [`docs/benchmarks.md`](benchmarks.md).

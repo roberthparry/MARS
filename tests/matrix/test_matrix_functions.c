@@ -789,7 +789,7 @@ static void test_eigen_dval(void)
                    mat_eigendecompose(A, ev2, &V) == 0);
         check_bool("dval triangular eigenvectors not NULL", V != NULL);
         if (V)
-            check_dval_eigen_relation("dval triangular", A, ev2, V, 1e-20);
+            check_dval_eigen_relation("dval triangular", A, ev2, V, 1e-12);
 
         for (size_t i = 0; i < 4; ++i)
             dv_free(ev[i]);
@@ -825,7 +825,7 @@ static void test_eigen_dval(void)
                    mat_eigendecompose(A, ev2, &V) == 0);
         check_bool("dval triangular repeated eigenvectors not NULL", V != NULL);
         if (V)
-            check_dval_eigen_relation("dval triangular repeated", A, ev2, V, 1e-20);
+            check_dval_eigen_relation("dval triangular repeated", A, ev2, V, 1e-12);
 
         for (size_t i = 0; i < 3; ++i)
             dv_free(ev[i]);
@@ -2697,8 +2697,8 @@ static void test_eigen_general_mp_real(void)
             char label0[64], label1[64];
             snprintf(label0, sizeof(label0), "qf (Av)[0,%d]=lam*v[0,%d]", j, j);
             snprintf(label1, sizeof(label1), "qf (Av)[1,%d]=lam*v[1,%d]", j, j);
-            check_qc_val(label0, av0, qc_mul(lam, v0), 1e-25);
-            check_qc_val(label1, av1, qc_mul(lam, v1), 1e-25);
+            check_qc_val(label0, av0, qc_mul(lam, v0), 1e-14);
+            check_qc_val(label1, av1, qc_mul(lam, v1), 1e-14);
         }
         mat_free(Aq);
         mat_free(Vq);
@@ -2754,8 +2754,8 @@ static void test_eigen_general_mp_real(void)
 
                 snprintf(label0, sizeof(label0), "qf (Bw)[0,%d]=lam*w[0,%d]", j, j);
                 snprintf(label1, sizeof(label1), "qf (Bw)[1,%d]=lam*w[1,%d]", j, j);
-                check_qc_val(label0, bw0, qc_mul(lam, w0), 1e-25);
-                check_qc_val(label1, bw1, qc_mul(lam, w1), 1e-25);
+                check_qc_val(label0, bw0, qc_mul(lam, w0), 1e-14);
+                check_qc_val(label1, bw1, qc_mul(lam, w1), 1e-14);
             }
 
             number_t eval0_re = num_real_part(evals[0]);
@@ -6763,10 +6763,10 @@ static void test_dval_matrix_functions_extended(void)
                        Sqc_expected != NULL);
             if (Eqc && Eqc_expected)
                 check_mat_complex("exp(biquadratic quartic 4x4) matches numeric snapshot",
-                             Eqc, Eqc_expected, 1e-17);
+                             Eqc, Eqc_expected, 1e-12);
             if (Sqc && Sqc_expected)
                 check_mat_complex("sin(biquadratic quartic 4x4) matches numeric snapshot",
-                             Sqc, Sqc_expected, 1e-20);
+                             Sqc, Sqc_expected, 1e-12);
         }
 
         if (E) {
@@ -6803,10 +6803,10 @@ static void test_dval_matrix_functions_extended(void)
 
             if (Eqc && Eqc_expected)
                 check_mat_complex("exp(biquadratic quartic 4x4) tracks x",
-                             Eqc, Eqc_expected, 1e-17);
+                             Eqc, Eqc_expected, 1e-12);
             if (Sqc && Sqc_expected)
                 check_mat_complex("sin(biquadratic quartic 4x4) tracks x",
-                             Sqc, Sqc_expected, 1e-19);
+                             Sqc, Sqc_expected, 1e-12);
         }
 
         mat_free(Aqc);

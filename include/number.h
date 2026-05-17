@@ -203,6 +203,7 @@ extern const number_t NUM_2_PI;          /**< 2/π */
 extern const number_t NUM_E;                 /**< e */
 extern const number_t NUM_INV_E;             /**< 1/e */
 extern const number_t NUM_LN2;               /**< ln(2) */
+extern const number_t NUM_LN10;              /**< ln(10) */
 extern const number_t NUM_INVLN2;            /**< 1/ln(2) */
 extern const number_t NUM_EULER_MASCHERONI;  /**< Euler-Mascheroni γ */
 extern const number_t NUM_PHI;               /**< golden ratio φ */
@@ -247,6 +248,35 @@ number_t num_pow10(int exponent10);
  * the original.
  */
 number_t num_clone(const number_t number);
+
+/**
+ * @brief Materialises a named constant using the current default precision policy.
+ *
+ * Exact constants such as `NUM_ZERO` or `NUM_HALF` are copied as exact values.
+ * Inexact multiprecision constants such as `NUM_PI` or `NUM_E` are realised at
+ * the library's current default working precision.
+ */
+number_t num_const(number_t constant);
+
+/**
+ * @brief Materialises a named constant at an explicit binary precision.
+ *
+ * This is the direct way to request a multiprecision constant such as `NUM_PI`
+ * or `NUM_I` at a specific number of bits. Exact constants remain exact;
+ * inexact multiprecision constants are rebuilt or copied at `precision_bits`.
+ * Passing `0` uses the current default working precision instead.
+ */
+number_t num_const_prec(number_t constant, size_t precision_bits);
+
+/**
+ * @brief Materialises a named constant at an explicit decimal-significance target.
+ *
+ * This behaves like `num_const_prec()`, but the requested precision is given in
+ * significant decimal digits instead of bits. Exact constants remain exact;
+ * inexact multiprecision constants are realised at a binary precision large
+ * enough to represent at least `significant_digits` decimal digits.
+ */
+number_t num_const_prec_digits(number_t constant, size_t significant_digits);
 
 /**
  * @brief Releases any owned payload and resets a number to the invalid state.
@@ -453,6 +483,7 @@ number_t num_ldexp        (const number_t number, int exponent2);
  */
 number_t num_exp      (const number_t number);
 number_t num_log      (const number_t number);
+number_t num_log10    (const number_t number);
 number_t num_sqrt     (const number_t number);
 number_t num_sqr      (const number_t number);
 number_t num_floor    (const number_t number);

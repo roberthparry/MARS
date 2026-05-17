@@ -10,7 +10,7 @@
 
 /**
  * @file mcomplex.h
- * @brief Opaque multiprecision complex type backed by two mfloat values.
+ * @brief Opaque multiprecision complex type backed by MPC.
  */
 
 typedef struct _mcomplex_t mcomplex_t;
@@ -22,6 +22,7 @@ extern const mcomplex_t * const MC_TENTH;
 extern const mcomplex_t * const MC_TEN;
 extern const mcomplex_t * const MC_PI;
 extern const mcomplex_t * const MC_E;
+extern const mcomplex_t * const MC_LN10;
 extern const mcomplex_t * const MC_EULER_MASCHERONI;
 extern const mcomplex_t * const MC_SQRT2;
 extern const mcomplex_t * const MC_SQRT_PI;
@@ -32,6 +33,11 @@ extern const mcomplex_t * const MC_I;
 
 mcomplex_t *mc_new(void);
 mcomplex_t *mc_new_prec(size_t precision_bits);
+/**
+ * @brief Materialise a named complex constant at working precision.
+ */
+mcomplex_t *mc_const(const mcomplex_t *constant);
+mcomplex_t *mc_const_prec(const mcomplex_t *constant, size_t precision_bits);
 mcomplex_t *mc_create(const mfloat_t *real, const mfloat_t *imag);
 mcomplex_t *mc_create_long(long real);
 mcomplex_t *mc_create_qcomplex(qcomplex_t value);
@@ -66,8 +72,9 @@ int mc_set_qcomplex(mcomplex_t *mcomplex, qcomplex_t value);
 int mc_set_string(mcomplex_t *mcomplex, const char *text);
 char *mc_to_string(const mcomplex_t *mcomplex);
 qcomplex_t mc_to_qcomplex(const mcomplex_t *mcomplex);
-/* %mz prints complex values in fixed format; %MZ prints scientific format.
-   Width and precision apply to the real and imaginary parts individually. */
+    /* %mz prints complex values in fixed format; %MZ prints scientific format.
+       Width and precision apply to the real and imaginary parts individually.
+       If the formatted imaginary part is zero, only the real part is printed. */
 int mc_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap);
 int mc_sprintf(char *out, size_t out_size, const char *fmt, ...);
 int mc_printf(const char *fmt, ...);
@@ -99,6 +106,7 @@ int mc_floor(mcomplex_t *mcomplex);
 int mc_hypot(mcomplex_t *mcomplex, const mcomplex_t *other);
 int mc_exp(mcomplex_t *mcomplex);
 int mc_log(mcomplex_t *mcomplex);
+int mc_log10(mcomplex_t *mcomplex);
 int mc_sin(mcomplex_t *mcomplex);
 int mc_cos(mcomplex_t *mcomplex);
 int mc_tan(mcomplex_t *mcomplex);

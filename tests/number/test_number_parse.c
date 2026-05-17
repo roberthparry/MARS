@@ -11,6 +11,8 @@ void run_number_parse_tests(void)
     {
         number_t integer = num_create_from_string("42");
         number_t fraction = num_create_from_string("5/6");
+        number_t unicode_fraction = num_create_from_string("⅚");
+        number_t stacked_fraction = num_create_from_string("³⁵⁵⁄₁₁₃");
         number_t decimal = num_create_from_string("32.123");
         number_t complex_value = num_create_from_string("1 + 2i");
         number_t unit_imag = num_create_from_string("1 + i");
@@ -22,7 +24,10 @@ void run_number_parse_tests(void)
         char *text;
 
         assert_number_string("num_create_from_string(\"42\")", integer, "42");
-        assert_number_string("num_create_from_string(\"5/6\")", fraction, "5/6");
+        assert_number_string("num_create_from_string(\"5/6\")", fraction, "⅚");
+        assert_number_string("num_create_from_string(\"⅚\")", unicode_fraction, "⅚");
+        assert_number_string("num_create_from_string(\"³⁵⁵⁄₁₁₃\")",
+            stacked_fraction, "³⁵⁵⁄₁₁₃");
 
         text = num_to_string(decimal);
         ASSERT_NOT_NULL(text);
@@ -51,6 +56,8 @@ void run_number_parse_tests(void)
 
         num_destroy(&integer);
         num_destroy(&fraction);
+        num_destroy(&unicode_fraction);
+        num_destroy(&stacked_fraction);
         num_destroy(&decimal);
         num_destroy(&complex_value);
         num_destroy(&unit_imag);

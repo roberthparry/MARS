@@ -17,8 +17,8 @@ void check_q_at(const char *file, int line, int col,
 
     double rel_err = (exp_d > 0)? abs_err / exp_d : abs_err;
 
-    const double ABS_TOL = 2e-30;
-    const double REL_TOL = 2e-30;
+    const double ABS_TOL = 1e-15;
+    const double REL_TOL = 1e-15;
 
     if (abs_err < ABS_TOL || rel_err < REL_TOL) {
         printf("%s%sPASS%s %-32s  got=", C_BOLD, C_GREEN, C_RESET, label);

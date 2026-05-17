@@ -93,6 +93,7 @@ static void test_from_string_functions(void)
     check_parse_val("atanh(x) at 0",     "{ atanh(x) | x = 0 }",         0.0,          __LINE__);
     check_parse_val("exp(x) at 0",       "{ exp(x) | x = 0 }",           1.0,          __LINE__);
     check_parse_val("log(x) at 1",       "{ log(x) | x = 1 }",           0.0,          __LINE__);
+    check_parse_val("log10(x) at 1000",  "{ log10(x) | x = 1000 }",      3.0,          __LINE__);
     check_parse_val("sqrt(x) at 4",      "{ sqrt(x) | x = 4 }",          2.0,          __LINE__);
     check_parse_val("√(x) at 4",         "{ √(x) | x = 4 }",             2.0,          __LINE__);
     /* Binary functions */
@@ -418,7 +419,8 @@ static void test_from_string_implicit_symbolic_bindings(void)
 
     if (phi_alias) {
         number_t phi_value = dv_eval(phi_alias);
-        bool ok = num_eq(phi_value, NUM_PHI) && num_get_prec_bits(phi_value) == 1088u;
+        bool ok = num_eq(phi_value, NUM_PHI) &&
+                  num_get_prec_bits(phi_value) == num_get_default_prec_bits();
 
         num_destroy(&phi_value);
         if (ok) {
@@ -816,6 +818,8 @@ static void test_from_string_number_literals(void)
 {
     check_parse_num("pure const rational", "{ [half] = 1/2 }", "1/2", __LINE__);
     check_parse_num("rational atom expression", "{ 1/2 + 1/4 }", "3/4", __LINE__);
+    check_parse_num("unicode rational atom expression", "{ ½ + ¼ }", "3/4", __LINE__);
+    check_parse_num("stacked unicode rational atom", "{ ³⁵⁵⁄₁₁₃ }", "355/113", __LINE__);
     check_parse_num("pure imaginary coefficient atom", "{ 3/2i }", "0 + 3/2i", __LINE__);
     check_parse_num("pure const rational complex", "{ [z] = 1/2 - 3/2i }", "1/2 - 3/2i", __LINE__);
     check_parse_num("binding rational complex", "{ z | z = 1/2 - 3/2i }", "1/2 - 3/2i", __LINE__);

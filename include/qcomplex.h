@@ -129,6 +129,11 @@ extern const qcomplex_t QC_INV_E;
 extern const qcomplex_t QC_LN2;
 
 /**
+ * @brief ln(10) + 0i constant
+ */
+extern const qcomplex_t QC_LN10;
+
+/**
  * @brief 1/ln(2) + 0i constant
  */
 extern const qcomplex_t QC_INVLN2;
@@ -251,6 +256,7 @@ void       qc_to_polar(qcomplex_t z, qfloat_t *r, qfloat_t *theta);
  */
 qcomplex_t qc_exp(qcomplex_t z);                 /**< exp(z) */
 qcomplex_t qc_log(qcomplex_t z);                 /**< log(z) */
+qcomplex_t qc_log10(qcomplex_t z);               /**< log10(z) */
 qcomplex_t qc_pow(qcomplex_t a, qcomplex_t b);   /**< a^b */
 qcomplex_t qc_sqrt(qcomplex_t z);                /**< sqrt(z) */
 /** @} */

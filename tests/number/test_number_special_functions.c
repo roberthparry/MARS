@@ -25,18 +25,28 @@ void run_number_special_function_tests(void)
         number_t normal_cdf0 = num_normal_cdf(zero);
         number_t e1_1 = num_e1(one);
 
-        assert_number_string_prefix("num_lgamma(5)", lgamma5, "3.17805");
-        assert_number_string_prefix("num_digamma(1)", digamma1, "-0.57721");
-        assert_number_string_prefix("num_trigamma(1)", trigamma1, "1.64493");
-        assert_number_string_prefix("num_erf(1)", erf1, "0.84270");
-        assert_number_string_prefix("num_erfc(1)", erfc1, "0.15729");
-        assert_number_string_prefix("num_lambert_w0(1)", w0_1, "0.56714");
-        assert_number_string_prefix("num_beta(2, 2)", beta22, "0.16666");
-        assert_number_string_prefix("num_logbeta(2, 2)", logbeta22, "-1.79175");
+        assert_number_string_prefix("num_lgamma(5)", lgamma5,
+                                    "3.178053830347945619646941601297");
+        assert_number_string_prefix("num_digamma(1)", digamma1,
+                                    "-0.577215664901532860606512090082");
+        assert_number_string_prefix("num_trigamma(1)", trigamma1,
+                                    "1.644934066848226436472415166646");
+        assert_number_string_prefix("num_erf(1)", erf1,
+                                    "0.842700792949714869341220635082");
+        assert_number_string_prefix("num_erfc(1)", erfc1,
+                                    "0.157299207050285130658779364917");
+        assert_number_string_prefix("num_lambert_w0(1)", w0_1,
+                                    "0.567143290409783872999968662210");
+        assert_number_string_prefix("num_beta(2, 2)", beta22,
+                                    "0.166666666666666666666666666666");
+        assert_number_string_prefix("num_logbeta(2, 2)", logbeta22,
+                                    "-1.791759469228055000812477358380");
         assert_number_string("num_binomial(52, 5)", binom, "2598960");
-        assert_number_string_prefix("num_normal_pdf(0)", normal_pdf0, "0.39894");
+        assert_number_string_prefix("num_normal_pdf(0)", normal_pdf0,
+                                    "0.398942280401432677939946059934");
         assert_number_string("num_normal_cdf(0)", normal_cdf0, "0.5");
-        assert_number_string_prefix("num_e1(1)", e1_1, "0.21938");
+        assert_number_string_prefix("num_e1(1)", e1_1,
+                                    "0.219383934395520273677163775460");
 
         ASSERT_TRUE(num_is_real(lgamma5));
         ASSERT_TRUE(num_is_real(digamma1));

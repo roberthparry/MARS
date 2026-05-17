@@ -48,13 +48,20 @@ void run_number_constant_tests(void)
         number_t i_value = NUM_I;
         number_t neg_i = num_neg(NUM_I);
 
-        assert_number_string_prefix("NUM_PI", pi, "3.14159");
-        assert_number_string_prefix("NUM_E", e, "2.71828");
-        assert_number_string_prefix("NUM_EULER_MASCHERONI", gamma, "0.57721");
-        assert_number_string_prefix("NUM_PHI", phi, "1.61803");
-        assert_number_string_prefix("NUM_SQRT3", sqrt3, "1.73205");
-        assert_number_string_prefix("NUM_SQRT2_OVER_TWO", half_sqrt2, "0.70710");
-        assert_number_string_prefix("NUM_SQRT3_OVER_TWO", half_sqrt3, "0.86602");
+        assert_number_string_prefix("NUM_PI", pi,
+                                    "3.141592653589793238462643383279");
+        assert_number_string_prefix("NUM_E", e,
+                                    "2.718281828459045235360287471352");
+        assert_number_string_prefix("NUM_EULER_MASCHERONI", gamma,
+                                    "0.577215664901532860606512090082");
+        assert_number_string_prefix("NUM_PHI", phi,
+                                    "1.618033988749894848204586834365");
+        assert_number_string_prefix("NUM_SQRT3", sqrt3,
+                                    "1.732050807568877293527446341505");
+        assert_number_string_prefix("NUM_SQRT2_OVER_TWO", half_sqrt2,
+                                    "0.707106781186547524400844362104");
+        assert_number_string_prefix("NUM_SQRT3_OVER_TWO", half_sqrt3,
+                                    "0.866025403784438646763723170752");
         assert_number_string("NUM_I", i, "0 + 1i");
         assert_number_string("num_pow10(6)", million, "1000000");
 

@@ -32,8 +32,8 @@ overlapping runs.
 Current benchmark output reports average wall-clock time per call in both
 microseconds and milliseconds:
 
-- `avg_µs=561.060 avg_ms=0.561` means about `561 µs`
-- `avg_µs=47154.829 avg_ms=47.155` means about `47.15 ms`
+- `avg_µs=6000.421 avg_ms=6.000` means about `6000 µs`
+- `avg_µs=566623.682 avg_ms=566.624` means about `566.62 ms`
 
 ## Integrator Benchmark
 
@@ -49,22 +49,25 @@ It reports:
 Sample output:
 
 ```text
-iters=200
+iters=10
 
 Matched shortcut families
-affine_exp             intervals=1    avg_µs=     7.367 avg_ms=     0.007
-affine_square          intervals=1    avg_µs=     1.238 avg_ms=     0.001
-affine_quartic         intervals=1    avg_µs=     1.408 avg_ms=     0.001
-affine_times_exp       intervals=1    avg_µs=    19.045 avg_ms=     0.019
-affine_times_sin       intervals=1    avg_µs=    27.537 avg_ms=     0.028
-affine_times_sinh      intervals=1    avg_µs=    37.119 avg_ms=     0.037
+affine_exp             intervals=1    avg_µs=   218.240 avg_ms=     0.218
+affine_square          intervals=1    avg_µs=   233.723 avg_ms=     0.234
+affine_quartic         intervals=1    avg_µs=    61.877 avg_ms=     0.062
+affine_times_exp       intervals=1    avg_µs=    77.678 avg_ms=     0.078
+affine_cube_exp        intervals=1    avg_µs=    87.244 avg_ms=     0.087
+affine_times_sin       intervals=1    avg_µs=    82.199 avg_ms=     0.082
+affine_cube_sin        intervals=1    avg_µs=   106.263 avg_ms=     0.106
+affine_times_sinh      intervals=1    avg_µs=   147.103 avg_ms=     0.147
+affine_cube_sinh       intervals=1    avg_µs=   123.834 avg_ms=     0.124
 
 Near misses (generic path)
-near_miss_square       intervals=1    avg_µs=   179.185 avg_ms=     0.179
-near_miss_quartic      intervals=1    avg_µs=  5976.778 avg_ms=     5.977
-near_miss_exp          intervals=2    avg_µs= 15188.762 avg_ms=    15.189
-near_miss_sin          intervals=2    avg_µs= 34710.213 avg_ms=    34.710
-near_miss_sinh         intervals=2    avg_µs= 34462.050 avg_ms=    34.462
+near_miss_square       intervals=1    avg_µs=  1647.171 avg_ms=     1.647
+near_miss_quartic      intervals=1    avg_µs= 17767.062 avg_ms=    17.767
+near_miss_exp          intervals=2    avg_µs= 49084.036 avg_ms=    49.084
+near_miss_sin          intervals=2    avg_µs= 40497.935 avg_ms=    40.498
+near_miss_sinh         intervals=2    avg_µs= 32043.325 avg_ms=    32.043
 ```
 
 The useful comparison is usually “matched case versus near miss,” since that
@@ -83,15 +86,15 @@ It currently covers:
 Sample output:
 
 ```text
-iters=40
+iters=3
 
 Symbolic dval solve
-solve_dense3x3_rhs2      avg_µs=   561.060 avg_ms=     0.561
-solve_dense6x6_rhs2      avg_µs= 47154.829 avg_ms=    47.155
+solve_dense3x3_rhs2      avg_µs=  6000.421 avg_ms=     6.000
+solve_dense6x6_rhs2      avg_µs=566623.682 avg_ms=   566.624
 
 Symbolic dval inverse
-inverse_dense4x4         avg_µs=  2525.437 avg_ms=     2.525
-inverse_dense6x6         avg_µs= 66841.376 avg_ms=    66.841
+inverse_dense4x4         avg_µs= 40635.324 avg_ms=    40.635
+inverse_dense6x6         avg_µs=876341.423 avg_ms=   876.341
 ```
 
 These numbers are intended as a rough baseline for the current
@@ -207,27 +210,27 @@ compares:
 Current sample timings on the benchmark machine for that scope benchmark:
 
 ```text
-mfloat chain             manual=1450.786 ms  scoped=1977.505 ms  ratio= 0.734x
-mfloat scoped+roll       manual=1450.786 ms  scoped=1071.234 ms  ratio= 1.354x
-mcomplex chain           manual= 422.498 ms  scoped= 968.822 ms  ratio= 0.436x
-mcomplex scoped+roll     manual= 422.498 ms  scoped= 332.915 ms  ratio= 1.269x
+mfloat chain             manual= 129.082 ms  scoped= 125.772 ms  ratio= 1.026x
+mfloat scoped+roll       manual= 129.082 ms  scoped= 110.554 ms  ratio= 1.168x
+mcomplex chain           manual= 221.584 ms  scoped= 225.807 ms  ratio= 0.981x
+mcomplex scoped+roll     manual= 221.584 ms  scoped= 198.489 ms  ratio= 1.116x
 ```
 
 Current sample timings on the benchmark machine:
 
 ```text
-exp_256                      bits=256  avg_µs=  2049.302 avg_ms=     2.049
-log_256                      bits=256  avg_µs=  1008.783 avg_ms=     1.009
-sin_512                      bits=512  avg_µs= 11982.001 avg_ms=    11.982
-cos_512                      bits=512  avg_µs=  5136.849 avg_ms=     5.137
-gamma_512                    bits=512  avg_µs= 42240.280 avg_ms=    42.240
-ei_512                       bits=512  avg_µs=  4107.908 avg_ms=     4.108
-exp_1024                     bits=1024 avg_µs=  4493.779 avg_ms=     4.494
-log_1024                     bits=1024 avg_µs=  3683.389 avg_ms=     3.683
-sin_1024                     bits=1024 avg_µs= 19986.712 avg_ms=    19.987
-gamma_1024                   bits=1024 avg_µs=230718.232 avg_ms=   230.718
-ei_1024                      bits=1024 avg_µs=709675.044 avg_ms=   709.675
-e1_1024                      bits=1024 avg_µs= 31515.867 avg_ms=    31.516
+exp_256                      bits=256  avg_µs=     3.505 avg_ms=     0.004
+log_256                      bits=256  avg_µs=     6.289 avg_ms=     0.006
+sin_512                      bits=512  avg_µs=     6.208 avg_ms=     0.006
+cos_512                      bits=512  avg_µs=     8.037 avg_ms=     0.008
+gamma_512                    bits=512  avg_µs=   107.299 avg_ms=     0.107
+ei_512                       bits=512  avg_µs=   101.578 avg_ms=     0.102
+exp_1024                     bits=1024 avg_µs=    16.514 avg_ms=     0.017
+log_1024                     bits=1024 avg_µs=    18.625 avg_ms=     0.019
+sin_1024                     bits=1024 avg_µs=    17.224 avg_ms=     0.017
+gamma_1024                   bits=1024 avg_µs=   284.692 avg_ms=     0.285
+ei_1024                      bits=1024 avg_µs=   187.089 avg_ms=     0.187
+e1_1024                      bits=1024 avg_µs=   356.961 avg_ms=     0.357
 ```
 
 ### `qfloat`
@@ -251,13 +254,13 @@ This benchmark currently covers a broader `qfloat` maths slice:
 Current sample timings with `MARS_BENCH_SCALE=5` on the benchmark machine:
 
 ```text
-exp_1                 bits=256  avg_µs=   1.146 avg_ms=     0.001
-log_10                bits=256  avg_µs=   2.222 avg_ms=     0.002
-gamma_2_3             bits=256  avg_µs=   1.107 avg_ms=     0.001
-lgamma_2_3            bits=256  avg_µs=   3.562 avg_ms=     0.004
-gammainv_9_5          bits=256  avg_µs=  83.440 avg_ms=     0.083
-lambert_wm1_-0_1      bits=256  avg_µs=  55.965 avg_ms=     0.056
-logbeta_2_3_4_5       bits=256  avg_µs=  17.997 avg_ms=     0.018
+exp_1                 bits=256  avg_µs=   1.370 avg_ms=     0.001
+log_10                bits=256  avg_µs=   2.471 avg_ms=     0.002
+gamma_2_3             bits=256  avg_µs=   1.246 avg_ms=     0.001
+lgamma_2_3            bits=256  avg_µs=   3.797 avg_ms=     0.004
+gammainv_9_5          bits=256  avg_µs=  82.548 avg_ms=     0.083
+lambert_wm1_-0_1      bits=256  avg_µs=  58.889 avg_ms=     0.059
+logbeta_2_3_4_5       bits=256  avg_µs=  17.206 avg_ms=     0.017
 ```
 
 One implementation note matters here: on the current x86_64 machine, `qfloat`
@@ -287,23 +290,23 @@ This benchmark covers a representative complex-valued slice:
 Current sample timings on the benchmark machine:
 
 ```text
-exp_1_plus_1i                avg_µs=     3.582 avg_ms=     0.004
-log_1_plus_1i                avg_µs=     5.405 avg_ms=     0.005
-erf_0_5_plus_0_5i            avg_µs=    10.404 avg_ms=     0.010
-erfc_0_5_plus_0_5i           avg_µs=     9.357 avg_ms=     0.009
-gamma_1_5_plus_0_7i          avg_µs=    14.554 avg_ms=     0.015
-lgamma_1_5_plus_0_7i         avg_µs=    13.515 avg_ms=     0.014
-digamma_2_plus_1i            avg_µs=    14.643 avg_ms=     0.015
-trigamma_2_plus_0_5i         avg_µs=     4.596 avg_ms=     0.005
-tetragamma_2_plus_0_5i       avg_µs=     6.256 avg_ms=     0.006
-gammainv_gamma_2_5           avg_µs=    95.411 avg_ms=     0.095
-gammainv_gamma_2_5_0_3i      avg_µs=   219.491 avg_ms=     0.219
-productlog_1_plus_1i         avg_µs=    30.014 avg_ms=     0.030
-lambert_wm1_-0_2_-0_1i       avg_µs=    27.295 avg_ms=     0.027
-ei_1_plus_1i                 avg_µs=    44.938 avg_ms=     0.045
-e1_1_plus_1i                 avg_µs=    41.641 avg_ms=     0.042
-beta_1_5_0_5__2_-0_3         avg_µs=    38.087 avg_ms=     0.038
-logbeta_1_5_0_5__2_-0_3      avg_µs=    37.286 avg_ms=     0.037
+exp_1_plus_1i                avg_µs=     2.513 avg_ms=     0.003
+log_1_plus_1i                avg_µs=     3.503 avg_ms=     0.004
+erf_0_5_plus_0_5i            avg_µs=     6.665 avg_ms=     0.007
+erfc_0_5_plus_0_5i           avg_µs=     6.299 avg_ms=     0.006
+gamma_1_5_plus_0_7i          avg_µs=     9.753 avg_ms=     0.010
+lgamma_1_5_plus_0_7i         avg_µs=     8.058 avg_ms=     0.008
+digamma_2_plus_1i            avg_µs=     9.108 avg_ms=     0.009
+trigamma_2_plus_0_5i         avg_µs=     2.895 avg_ms=     0.003
+tetragamma_2_plus_0_5i       avg_µs=     3.598 avg_ms=     0.004
+gammainv_gamma_2_5           avg_µs=    55.586 avg_ms=     0.056
+gammainv_gamma_2_5_0_3i      avg_µs=   145.943 avg_ms=     0.146
+productlog_1_plus_1i         avg_µs=    19.744 avg_ms=     0.020
+lambert_wm1_-0_2_-0_1i       avg_µs=    19.262 avg_ms=     0.019
+ei_1_plus_1i                 avg_µs=    29.968 avg_ms=     0.030
+e1_1_plus_1i                 avg_µs=    30.136 avg_ms=     0.030
+beta_1_5_0_5__2_-0_3         avg_µs=    26.146 avg_ms=     0.026
+logbeta_1_5_0_5__2_-0_3      avg_µs=    24.514 avg_ms=     0.025
 ```
 
 ### `mcomplex`
@@ -330,11 +333,11 @@ This benchmark mirrors the current `qcomplex` coverage and tracks the native
 Recent sample timings on this tree:
 
 ```text
-exp_1_plus_1i_512            bits=512  avg_µs=    12.014 avg_ms=     0.012
-log_1_plus_1i_512            bits=512  avg_µs=    17.694 avg_ms=     0.018
-productlog_1_plus_1i_512     bits=512  avg_µs= 92528.000 avg_ms=    92.528
-ei_1_plus_1i_512             bits=512  avg_µs=    59.575 avg_ms=     0.060
-e1_1_plus_1i_512             bits=512  avg_µs=    56.693 avg_ms=     0.057
+exp_0_567_plus_0_321i_512    bits=512  avg_µs=    21.237 avg_ms=     0.021
+log_0_567_plus_0_321i_512    bits=512  avg_µs=    36.909 avg_ms=     0.037
+productlog_1_plus_1i_512     bits=512  avg_µs=   144.221 avg_ms=     0.144
+ei_1_plus_1i_512             bits=512  avg_µs=    31.214 avg_ms=     0.031
+e1_1_plus_1i_512             bits=512  avg_µs=    31.427 avg_ms=     0.031
 ```
 
 The current `mcomplex` implementation still has remaining wrapper-era paths, so

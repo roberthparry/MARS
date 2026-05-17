@@ -113,9 +113,9 @@ static void test_mat_to_string_number_precision(void)
                layout_scientific && expected_scientific &&
                strstr(layout_scientific, expected_scientific) != NULL);
     check_bool("mat_to_string number inline preserves rational syntax",
-               inline_pretty && strstr(inline_pretty, "1/2") != NULL);
+               inline_pretty && strstr(inline_pretty, "½") != NULL);
     check_bool("mat_to_string number layout preserves rational syntax",
-               layout_scientific && strstr(layout_scientific, "1/2") != NULL);
+               layout_scientific && strstr(layout_scientific, "½") != NULL);
     check_bool("mat_to_string number inline preserves integer syntax",
                inline_pretty && strstr(inline_pretty, "3") != NULL);
     check_bool("mat_to_string number layout preserves integer syntax",

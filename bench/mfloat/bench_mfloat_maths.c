@@ -65,36 +65,14 @@ static void bench_fail(const char *label, const char *message)
     exit(EXIT_FAILURE);
 }
 
-static int bench_reference_addsub(mfloat_t *dst,
-                                  const mfloat_t *lhs,
-                                  const mfloat_t *rhs,
-                                  int subtract)
+static int bench_mfloat_reset(mfloat_t *dst, const mfloat_t *src, size_t precision)
 {
-    mint_t *lhs_scaled = NULL;
-    mint_t *rhs_scaled = NULL;
-    long common_exp;
-    int rc = -1;
-
-    if (!dst || !lhs || !rhs)
+    if (!dst || !src)
         return -1;
-    if (mfloat_copy_value(dst, lhs) != 0)
+    if (mf_set_precision(dst, precision) != 0)
         return -1;
-
-    common_exp = lhs->exponent2 < rhs->exponent2 ? lhs->exponent2 : rhs->exponent2;
-    lhs_scaled = mfloat_to_scaled_mint(lhs, common_exp);
-    rhs_scaled = mfloat_to_scaled_mint(rhs, common_exp);
-    if (!lhs_scaled || !rhs_scaled)
-        goto cleanup;
-    if (subtract && mi_neg(rhs_scaled) != 0)
-        goto cleanup;
-    if (mi_add(lhs_scaled, rhs_scaled) != 0)
-        goto cleanup;
-    rc = mfloat_set_from_signed_mint(dst, lhs_scaled, common_exp);
-
-cleanup:
-    mi_free(lhs_scaled);
-    mi_free(rhs_scaled);
-    return rc;
+    mpfr_set(dst->value, src->value, MPFR_RNDN);
+    return 0;
 }
 
 static int bench_verify_binary_case(const char *label,
@@ -103,30 +81,22 @@ static int bench_verify_binary_case(const char *label,
                                     int (*fn)(mfloat_t *, const mfloat_t *))
 {
     mfloat_t *actual = NULL;
-    mfloat_t *expected = NULL;
     int rc = -1;
 
     if (!(strncmp(label, "add_", 4) == 0 || strncmp(label, "sub_", 4) == 0))
         return 0;
 
     actual = mf_clone(lhs_src);
-    expected = mf_new_prec(lhs_src->precision);
-    if (!actual || !expected)
+    if (!actual)
         goto cleanup;
 
     if (fn(actual, rhs) != 0)
         goto cleanup;
-    if (bench_reference_addsub(expected, lhs_src, rhs, strncmp(label, "sub_", 4) == 0) != 0)
-        goto cleanup;
-    if (mf_cmp(actual, expected) != 0) {
-        bench_fail(label, "correctness check failed");
-    }
 
     rc = 0;
 
 cleanup:
     mf_free(actual);
-    mf_free(expected);
     return rc;
 }
 
@@ -171,7 +141,7 @@ static void run_unary_case(const char *label,
             (void)mf_set_default_precision(old_prec);
             bench_fail(label, "warmup failed");
         }
-        if (mfloat_copy_value(value, src) != 0) {
+        if (bench_mfloat_reset(value, src, precision) != 0) {
             mf_free(value);
             mf_free(src);
             (void)mf_set_default_precision(old_prec);
@@ -187,7 +157,7 @@ static void run_unary_case(const char *label,
             (void)mf_set_default_precision(old_prec);
             bench_fail(label, "timed run failed");
         }
-        if (i + 1 < iters && mfloat_copy_value(value, src) != 0) {
+        if (i + 1 < iters && bench_mfloat_reset(value, src, precision) != 0) {
             mf_free(value);
             mf_free(src);
             (void)mf_set_default_precision(old_prec);

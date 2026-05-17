@@ -1,27 +1,32 @@
 #ifndef MINT_SHARED_INTERNAL_H
 #define MINT_SHARED_INTERNAL_H
 
-#include <stdint.h>
+#include <gmp.h>
 
 #include "mint.h"
 
-extern const mint_t MI_ZERO_VALUE;
-extern const mint_t MI_ONE_VALUE;
-extern const mint_t MI_NEG_ONE_VALUE;
-extern const mint_t MI_TWO_VALUE;
-extern const mint_t MI_TEN_VALUE;
+typedef enum mint_constant_id_t {
+    MICONST_NONE = 0,
+    MICONST_ZERO,
+    MICONST_ONE,
+    MICONST_NEG_ONE,
+    MICONST_TWO,
+    MICONST_TEN,
+    MICONST_COUNT
+} mint_constant_id_t;
+
+extern mint_t MI_ZERO_VALUE;
+extern mint_t MI_ONE_VALUE;
+extern mint_t MI_NEG_ONE_VALUE;
+extern mint_t MI_TWO_VALUE;
+extern mint_t MI_TEN_VALUE;
 
 struct _mint_t {
-    short sign;       /* -1, 0, +1 */
-    size_t length;    /* number of used 64-bit limbs */
-    size_t capacity;  /* number of allocated 64-bit limbs */
-    uint64_t *storage;
-    bool scope_owned_container;
+    mint_constant_id_t constant_id;
+    mpz_t value;
 };
 
-int mint_copy_value(mint_t *dst, const mint_t *src);
-int mint_set_magnitude_u64(mint_t *mint, uint64_t magnitude, short sign);
-int mint_is_immortal(const mint_t *mint);
-size_t mint_trailing_zero_bits_internal(const mint_t *mint);
+void mint_constants_ensure_init(void);
+void mint_constant_ensure(const mint_t *mint);
 
 #endif

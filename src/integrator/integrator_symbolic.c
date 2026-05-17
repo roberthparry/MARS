@@ -1085,7 +1085,7 @@ static bool build_direct_affine_plan(const dval_t *expr,
                                      symbolic_plan_t *plan,
                                      qfloat_t *coeffs_out)
 {
-    number_t constant_num = num_new();
+    number_t constant_num = number_invalid();
     number_t poly_num[5];
     number_t *coeffs_num = NULL;
     qfloat_t constant;
@@ -1097,9 +1097,9 @@ static bool build_direct_affine_plan(const dval_t *expr,
     if ((ndim > 0) && !coeffs_num)
         return false;
     for (size_t i = 0; i < ndim; ++i)
-        coeffs_num[i] = num_new();
+        coeffs_num[i] = number_invalid();
     for (size_t i = 0; i < 5; ++i)
-        poly_num[i] = num_new();
+        poly_num[i] = number_invalid();
 
     for (size_t i = 0; i < sizeof(affine_special_kinds) / sizeof(affine_special_kinds[0]); ++i) {
         if (!dv_match_affine_poly_deg4_times_unary_affine_kind(expr,

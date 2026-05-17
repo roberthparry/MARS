@@ -2651,19 +2651,21 @@ static struct matrix_t *mat_mul_sparse(const struct matrix_t *A,
     const struct elem_vtable *re = op->result_elem;
     struct matrix_t *As = NULL, *Bs = NULL, *C = NULL;
     unsigned char x_raw[64] = {0}, y_raw[64] = {0}, prod[64] = {0};
-    unsigned char sum[64] = {0}, sum_acc[64] = {0};
+    unsigned char sum[64] = {0}, sum_acc[64] = {0}, next_sum[64] = {0};
 
     if (!re)
         return NULL;
 
     elem_init_zero_value(re, prod);
     elem_init_zero_value(re, sum_acc);
+    elem_init_zero_value(re, next_sum);
 
     As = mat_uses_sparse_storage(A) ? (struct matrix_t *)A : mat_to_sparse(A);
     Bs = mat_uses_sparse_storage(B) ? (struct matrix_t *)B : mat_to_sparse(B);
     if (!As || !Bs) {
         elem_destroy_value(re, prod);
         elem_destroy_value(re, sum_acc);
+        elem_destroy_value(re, next_sum);
         if (As != A)
             mat_free(As);
         if (Bs != B)
@@ -2675,6 +2677,7 @@ static struct matrix_t *mat_mul_sparse(const struct matrix_t *A,
     if (!C) {
         elem_destroy_value(re, prod);
         elem_destroy_value(re, sum_acc);
+        elem_destroy_value(re, next_sum);
         if (As != A)
             mat_free(As);
         if (Bs != B)
@@ -2698,8 +2701,11 @@ static struct matrix_t *mat_mul_sparse(const struct matrix_t *A,
                     elem_copy_value(re, sum_acc, sum);
                 memcpy(y_raw, b_cur->value, Bs->elem->size);
                 op->mul(prod, x_raw, y_raw);
-                re->add(sum_acc, sum_acc, prod);
-                elem_simplify_value(re, sum_acc);
+                re->add(next_sum, sum_acc, prod);
+                elem_simplify_value(re, next_sum);
+                elem_destroy_value(re, sum_acc);
+                memcpy(sum_acc, next_sum, re->size);
+                elem_init_zero_value(re, next_sum);
                 mat_set(C, i, b_cur->col, sum_acc);
                 elem_destroy_value(re, sum_acc);
                 elem_destroy_value(re, prod);
@@ -2716,6 +2722,7 @@ static struct matrix_t *mat_mul_sparse(const struct matrix_t *A,
         mat_free(Bs);
     elem_destroy_value(re, prod);
     elem_destroy_value(re, sum_acc);
+    elem_destroy_value(re, next_sum);
     return C;
 }
 
@@ -2817,9 +2824,11 @@ struct matrix_t *mat_mul(const struct matrix_t *A, const struct matrix_t *B) {
     struct matrix_t *C = mat_create_binary_result(A->rows, B->cols, re, A, B);
     if (!C) return NULL;
 
-    unsigned char x_raw[64] = {0}, y_raw[64] = {0}, prod[64] = {0}, sum[64] = {0};
+    unsigned char x_raw[64] = {0}, y_raw[64] = {0}, prod[64] = {0};
+    unsigned char sum[64] = {0}, next_sum[64] = {0};
     elem_init_zero_value(re, prod);
     elem_init_zero_value(re, sum);
+    elem_init_zero_value(re, next_sum);
 
     for (size_t i = 0; i < A->rows; i++) {
         for (size_t j = 0; j < B->cols; j++) {
@@ -2830,8 +2839,11 @@ struct matrix_t *mat_mul(const struct matrix_t *A, const struct matrix_t *B) {
                 mat_get(A, i, k, x_raw);
                 mat_get(B, k, j, y_raw);
                 op->mul(prod, x_raw, y_raw);
-                re->add(sum, sum, prod);
-                elem_simplify_value(re, sum);
+                re->add(next_sum, sum, prod);
+                elem_simplify_value(re, next_sum);
+                elem_destroy_value(re, sum);
+                memcpy(sum, next_sum, re->size);
+                elem_init_zero_value(re, next_sum);
                 elem_destroy_value(re, prod);
             }
 
@@ -2842,6 +2854,7 @@ struct matrix_t *mat_mul(const struct matrix_t *A, const struct matrix_t *B) {
 
     elem_destroy_value(re, prod);
     elem_destroy_value(re, sum);
+    elem_destroy_value(re, next_sum);
 
     if (re == &dval_elem && mat_simplify_symbolic_inplace(C) != 0) {
         mat_free(C);
@@ -3288,6 +3301,135 @@ static int num_divided_difference_perturbed(number_t *out,
     return 0;
 }
 
+static int num_divided_difference_ordinary(number_t *out,
+                                           const number_t *nodes,
+                                           size_t count,
+                                           void (*scalar_f)(void *out, const void *in))
+{
+    number_t *table = NULL;
+
+    if (!out || !nodes || count == 0 || !scalar_f)
+        return -1;
+
+    table = calloc(count * count, sizeof(*table));
+    if (!table)
+        return -1;
+
+    for (size_t i = 0; i < count * count; ++i)
+        table[i] = number_invalid();
+
+    for (size_t i = 0; i < count; ++i)
+        table[i * count] = mat_eval_number_scalar_number(scalar_f, &nodes[i]);
+
+    for (size_t order = 1; order < count; ++order) {
+        for (size_t i = 0; i + order < count; ++i) {
+            number_t numer = num_sub(table[(i + 1) * count + (order - 1)],
+                                     table[i * count + (order - 1)]);
+            number_t denom = num_sub(nodes[i + order], nodes[i]);
+            table[i * count + order] = num_div(numer, denom);
+            num_destroy(&denom);
+            num_destroy(&numer);
+        }
+    }
+
+    *out = num_clone(table[count - 1]);
+    num_array_destroy(table, count * count);
+    free(table);
+    return 0;
+}
+
+static int num_divided_difference_confluent(number_t *out,
+                                            const number_t *nodes,
+                                            size_t count,
+                                            void (*scalar_f)(void *out, const void *in))
+{
+    NUM_SCOPE(scope);
+
+    if (!out || !nodes || count == 0 || !scalar_f)
+        return -1;
+
+    if (count == 1) {
+        *out = num_scope_detach(mat_eval_number_scalar_number(scalar_f, &nodes[0]));
+        return 0;
+    }
+
+    if (count == 2 && num_eq(nodes[0], nodes[1])) {
+        number_t c1 = number_invalid();
+        num_fun_coeffs_up_to_second(NULL, &c1, NULL, scalar_f, &nodes[0]);
+        *out = num_scope_detach(c1);
+        return 0;
+    }
+
+    if (count == 3) {
+        bool eq01 = num_eq(nodes[0], nodes[1]);
+        bool eq12 = num_eq(nodes[1], nodes[2]);
+        bool eq02 = num_eq(nodes[0], nodes[2]);
+
+        if (eq01 && eq12) {
+            number_t c2 = number_invalid();
+            num_fun_coeffs_up_to_second(NULL, NULL, &c2, scalar_f, &nodes[0]);
+            *out = num_scope_detach(c2);
+            return 0;
+        }
+
+        if (eq02) {
+            number_t fa = mat_eval_number_scalar_number(scalar_f, &nodes[0]);
+            number_t fb = mat_eval_number_scalar_number(scalar_f, &nodes[1]);
+            number_t fp = number_invalid();
+            number_t a_minus_b = num_sub(nodes[0], nodes[1]);
+            number_t fa_minus_fb = num_sub(fa, fb);
+            number_t fp_scaled = number_invalid();
+            number_t numer = number_invalid();
+            number_t denom = num_mul(a_minus_b, a_minus_b);
+
+            num_fun_coeffs_up_to_second(NULL, &fp, NULL, scalar_f, &nodes[0]);
+            fp_scaled = num_mul(fp, a_minus_b);
+            numer = num_sub(fp_scaled, fa_minus_fb);
+            *out = num_scope_detach(num_div(numer, denom));
+            return 0;
+        }
+
+        if (eq01) {
+            number_t fa = mat_eval_number_scalar_number(scalar_f, &nodes[0]);
+            number_t fb = mat_eval_number_scalar_number(scalar_f, &nodes[2]);
+            number_t fp = number_invalid();
+            number_t b_minus_a = num_sub(nodes[2], nodes[0]);
+            number_t fb_minus_fa = num_sub(fb, fa);
+            number_t first_dd = num_div(fb_minus_fa, b_minus_a);
+            number_t numer = number_invalid();
+
+            num_fun_coeffs_up_to_second(NULL, &fp, NULL, scalar_f, &nodes[0]);
+            numer = num_sub(first_dd, fp);
+            *out = num_scope_detach(num_div(numer, b_minus_a));
+            return 0;
+        }
+
+        if (eq12) {
+            number_t fa = mat_eval_number_scalar_number(scalar_f, &nodes[0]);
+            number_t fb = mat_eval_number_scalar_number(scalar_f, &nodes[1]);
+            number_t fp = number_invalid();
+            number_t b_minus_a = num_sub(nodes[1], nodes[0]);
+            number_t fb_minus_fa = num_sub(fb, fa);
+            number_t first_dd = num_div(fb_minus_fa, b_minus_a);
+            number_t numer = number_invalid();
+
+            num_fun_coeffs_up_to_second(NULL, &fp, NULL, scalar_f, &nodes[1]);
+            numer = num_sub(fp, first_dd);
+            *out = num_scope_detach(num_div(numer, b_minus_a));
+            return 0;
+        }
+    }
+
+    for (size_t i = 0; i < count; ++i) {
+        for (size_t j = i + 1; j < count; ++j) {
+            if (num_eq(nodes[i], nodes[j]))
+                return num_divided_difference_perturbed(out, nodes, count, scalar_f);
+        }
+    }
+
+    return num_divided_difference_ordinary(out, nodes, count, scalar_f);
+}
+
 static int mat_fun_triangular_confluent_sum_paths(number_t *out,
                                                   const matrix_t *T,
                                                   size_t start,
@@ -3308,7 +3450,7 @@ static int mat_fun_triangular_confluent_sum_paths(number_t *out,
     (void)start;
 
     if (current == end) {
-        if (num_divided_difference_perturbed(&contrib, nodes, depth, scalar_f) != 0)
+        if (num_divided_difference_confluent(&contrib, nodes, depth, scalar_f) != 0)
             return -1;
         {
             number_t prod = num_mul(edge_prod, contrib);

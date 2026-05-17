@@ -77,6 +77,27 @@ static char *mcomplex_normalize_scalar_token(const char *text)
     return out;
 }
 
+static int mcomplex_has_unicode_fraction_text(const char *text)
+{
+    static const char *const glyphs[] = {
+        "½", "⅓", "⅔", "¼", "¾", "⅕", "⅖", "⅗", "⅘",
+        "⅙", "⅚", "⅐", "⅛", "⅜", "⅝", "⅞", "⅑", "⅒",
+    };
+    size_t i;
+
+    if (!text)
+        return 0;
+    if (strstr(text, "⁄"))
+        return 1;
+
+    for (i = 0u; i < sizeof(glyphs) / sizeof(glyphs[0]); ++i) {
+        if (strstr(text, glyphs[i]))
+            return 1;
+    }
+
+    return 0;
+}
+
 static int mcomplex_set_scalar_token(mfloat_t *value, const char *text)
 {
     char *normalized = NULL;
@@ -90,7 +111,7 @@ static int mcomplex_set_scalar_token(mfloat_t *value, const char *text)
     if (!normalized || normalized[0] == '\0')
         goto cleanup;
 
-    if (strchr(normalized, '/')) {
+    if (strchr(normalized, '/') || mcomplex_has_unicode_fraction_text(normalized)) {
         rational = mr_create_string(normalized);
         if (!rational)
             goto cleanup;
@@ -117,46 +138,51 @@ static int mcomplex_set_imag_token(mfloat_t *imag, const char *text)
     return mcomplex_set_scalar_token(imag, text);
 }
 
+mcomplex_t *mc_create_string(const char *text)
+{
+    mcomplex_t *mcomplex = mc_new();
+
+    if (!mcomplex || mc_set_string(mcomplex, text) != 0) {
+        mc_free(mcomplex);
+        return NULL;
+    }
+    return mcomplex;
+}
+
 int mc_set_string(mcomplex_t *mcomplex, const char *text)
 {
     char *compact = NULL;
     char *imag_text = NULL;
+    mfloat_t *real = NULL;
+    mfloat_t *imag = NULL;
     int split;
     size_t precision_bits;
+    int rc = -1;
 
-    if (!mcomplex || !text)
+    if (!mcomplex || !text || mcomplex_prepare_mutable(mcomplex) != 0)
         return -1;
 
     compact = mcomplex_strip_spaces(text);
     if (!compact)
-        return -1;
+        goto cleanup;
 
     precision_bits = mc_get_precision(mcomplex);
-    if (mcomplex_ensure_mutable(mcomplex) != 0) {
-        free(compact);
-        return -1;
-    }
-    if (mf_set_precision(mcomplex->real, precision_bits) != 0 ||
-        mf_set_precision(mcomplex->imag, precision_bits) != 0) {
-        free(compact);
-        return -1;
-    }
+    real = mf_new_prec(precision_bits);
+    imag = mf_new_prec(precision_bits);
+    if (!real || !imag)
+        goto cleanup;
 
     if (!strchr(compact, 'i')) {
-        if (mf_set_string(mcomplex->real, compact) != 0) {
-            free(compact);
-            return -1;
-        }
-        mf_clear(mcomplex->imag);
-        free(compact);
-        return 0;
+        if (mf_set_string(real, compact) != 0)
+            goto cleanup;
+        mf_clear(imag);
+        rc = mc_set(mcomplex, real, imag);
+        goto cleanup;
     }
 
     if (strchr(compact, 'i') != strrchr(compact, 'i') ||
-        compact[strlen(compact) - 1u] != 'i') {
-        free(compact);
-        return -1;
-    }
+        compact[strlen(compact) - 1u] != 'i')
+        goto cleanup;
 
     compact[strlen(compact) - 1u] = '\0';
     split = mcomplex_find_split(compact);
@@ -165,24 +191,25 @@ int mc_set_string(mcomplex_t *mcomplex, const char *text)
         char sign = compact[split];
 
         compact[split] = '\0';
-        if (mcomplex_set_scalar_token(mcomplex->real, compact) != 0) {
-            free(compact);
-            return -1;
-        }
+        if (mcomplex_set_scalar_token(real, compact) != 0)
+            goto cleanup;
         compact[split] = sign;
         imag_text = compact + split;
     } else {
-        mf_clear(mcomplex->real);
+        mf_clear(real);
         imag_text = compact;
     }
 
-    if (mcomplex_set_imag_token(mcomplex->imag, imag_text) != 0) {
-        free(compact);
-        return -1;
-    }
+    if (mcomplex_set_imag_token(imag, imag_text) != 0)
+        goto cleanup;
 
+    rc = mc_set(mcomplex, real, imag);
+
+cleanup:
     free(compact);
-    return 0;
+    mf_free(real);
+    mf_free(imag);
+    return rc;
 }
 
 char *mc_to_string(const mcomplex_t *mcomplex)

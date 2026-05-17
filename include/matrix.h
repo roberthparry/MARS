@@ -1171,6 +1171,7 @@ matrix_t *mat_tanh(const matrix_t *A);
 
 matrix_t *mat_sqrt(const matrix_t *A);
 matrix_t *mat_log(const matrix_t *A);
+matrix_t *mat_log10(const matrix_t *A);
 
 matrix_t *mat_asin(const matrix_t *A);
 matrix_t *mat_acos(const matrix_t *A);

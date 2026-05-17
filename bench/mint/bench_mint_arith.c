@@ -175,7 +175,7 @@ static double measure_binary_cell(mi_binary_fn fn,
         }
     }
 
-    return total_runs == 0u ? -1.0 : ((double)total_ns / (double)total_runs) / 1000.0;
+    return total_runs == 0u ? -1.0 : (double)total_ns / (double)total_runs;
 }
 
 static void print_matrix_header(void)
@@ -186,20 +186,20 @@ static void print_matrix_header(void)
 
 static void run_binary_operation_matrix(const char *name, mi_binary_fn fn, int iters)
 {
-    double cell_us[BAND_COUNT][BAND_COUNT];
+    double cell_ns[BAND_COUNT][BAND_COUNT];
 
     if (!bench_wants_operation(name))
         return;
 
     for (size_t row = 0u; row < BAND_COUNT; ++row) {
         for (size_t col = 0u; col < BAND_COUNT; ++col)
-            cell_us[row][col] = measure_binary_cell(fn, row, col, iters);
+            cell_ns[row][col] = measure_binary_cell(fn, row, col, iters);
     }
 
     for (size_t row = 0u; row < BAND_COUNT; ++row) {
         printf("| `%s` | `%s` |", name, bit_bands[row].label);
         for (size_t col = 0u; col < BAND_COUNT; ++col)
-            printf(" `%.3f µs` |", cell_us[row][col]);
+            printf(" `%.1f ns` |", cell_ns[row][col]);
         putchar('\n');
     }
 }

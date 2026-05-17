@@ -1416,7 +1416,8 @@
       "test_beta": true,
       "test_logbeta": true,
       "test_pow_d_complex": true,
-      "test_gammainv": true
+      "test_gammainv": true,
+      "test_log10": true
     }
   },
   "tests/dval/test_dval_first_derivatives.c": {
@@ -1474,7 +1475,8 @@
       "test_deriv_beta": true,
       "test_deriv_logbeta": true,
       "test_deriv_wrt_const_is_nan": true,
-      "test_deriv_gammainv": true
+      "test_deriv_gammainv": true,
+      "test_deriv_log10": true
     }
   },
   "tests/dval/test_dval_second_derivatives.c": {
@@ -1678,7 +1680,8 @@
       "test_set_val_num_preserves_mcomplex_precision": true,
       "test_eval_expression_preserves_mfloat_precision": true,
       "test_eval_expression_preserves_mcomplex_precision": true,
-      "test_default_constants_preserve_builtin_precision": true
+      "test_default_constants_preserve_builtin_precision": true,
+      "test_dv_ln10_singleton": true
     }
   },
   "tests/dval/test_dval_reverse_mode.c": {
@@ -1798,7 +1801,8 @@
     "test_remaining_special_mfloat_functions": true,
     "test_readme_examples": true,
     "test_difficult_mfloat_cases": true,
-    "test_tetragamma_function": true
+    "test_tetragamma_function": true,
+    "test_string_parser_edge_cases": true
   },
   "tests/mcomplex/test_mcomplex.c": {
     "test_lifecycle_and_constants": true,
@@ -1808,7 +1812,8 @@
     "test_conversion_to_from_qcomplex": true,
     "test_real_elementary_replacements": true,
     "test_real_special_replacements": true,
-    "test_difficult_mcomplex_cases": true
+    "test_difficult_mcomplex_cases": true,
+    "test_string_parser_edge_cases": true
   },
   "tests/matrix/test_matrix_core.c": {
     "test_creation": true,
@@ -1874,7 +1879,14 @@
     "test_inverse_double": true,
     "test_inverse_qfloat": true,
     "test_inverse_qcomplex": true,
-    "test_inverse_dval": true,
+    "test_inverse_dval_2x2": true,
+    "test_inverse_dval_rotation": true,
+    "test_inverse_dval_upper_triangular": true,
+    "test_inverse_dval_lower_triangular": true,
+    "test_inverse_dval_dense_3x3": true,
+    "test_inverse_dval_dense_4x4": true,
+    "test_inverse_dval_dense_6x6": true,
+    "test_inverse_dval_singular": true,
     "test_solve_and_lstsq": true,
     "test_factorisations": true,
     "test_rank_pinv_nullspace": true,

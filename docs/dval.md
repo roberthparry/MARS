@@ -459,6 +459,7 @@ All public declarations are in `include/dval.h`.
 
 ### Constructors — Constants
 
+- `DV_ZERO`, `DV_ONE`, `DV_LN10` — process-lifetime singleton constant nodes for common differentiable constants
 - `dval_t *dv_new_const(number_t x)` — constant node from a `number_t`
 - `dval_t *dv_new_named_const(number_t x, const char *name)` — named constant from a `number_t`
 
@@ -533,6 +534,7 @@ All functions return owning handles.
 - `dval_t *dv_atanh(dval_t *dv)` — inverse hyperbolic tangent
 - `dval_t *dv_exp(dval_t *dv)` — natural exponential
 - `dval_t *dv_log(dval_t *dv)` — natural logarithm
+- `dval_t *dv_log10(dval_t *dv)` — common logarithm
 - `dval_t *dv_sqrt(dval_t *dv)` — square root
 - `dval_t *dv_pow(const dval_t *dv, const number_t *exponent)` — `dv ^ exponent` (borrowed scalar numeric exponent)
 - `dval_t *dv_pow_dv(const dval_t *dv1, const dval_t *dv2)` — `dv1 ^ dv2`

@@ -388,6 +388,21 @@ void test_deriv_log(void)
     dv_free(x);
 }
 
+void test_deriv_log10(void)
+{
+    dval_t *x = test_dv_new_var_d(10.0);
+    dval_t *f = dv_log10(x);
+    const dval_t *df = dv_get_deriv(f, x);
+
+    qfloat_t expect = qf_div(qf_from_double(1.0), qf_mul(qf_from_double(10.0), QF_LN10));
+
+    check_q_at(__FILE__, __LINE__, 1, "d/dx{log10(x)} | x=10", dv_eval_qf(df), expect);
+    print_expr_of(df);
+
+    dv_free(f);
+    dv_free(x);
+}
+
 void test_deriv_sqrt(void)
 {
     dval_t *x = test_dv_new_var_d(4.0);
@@ -938,6 +953,7 @@ void test_first_derivatives(void)
     RUN_SUBTEST(test_deriv_atanh);
     RUN_SUBTEST(test_deriv_exp);
     RUN_SUBTEST(test_deriv_log);
+    RUN_SUBTEST(test_deriv_log10);
     RUN_SUBTEST(test_deriv_sqrt);
     RUN_SUBTEST(test_deriv_composite);
     RUN_SUBTEST(test_deriv_sin_log);

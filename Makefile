@@ -20,6 +20,11 @@ CFLAGS += -D_GNU_SOURCE
 
 CC := gcc
 AR := ar rcs
+INSTALL ?= install
+
+PREFIX ?= /usr/local
+LIBDIR ?= $(PREFIX)/lib
+INCLUDEDIR ?= $(PREFIX)/include
 
 INCLUDES := -I. -Iinclude -Isrc -Itests -Itests/include
 
@@ -43,6 +48,7 @@ endif
 
 LDLIBS += -lm
 LDLIBS += -lpthread
+LDLIBS += -lmpfr -lmpc -lgmp
 
 # ------------------------------------------------------------
 # Source discovery
@@ -60,7 +66,7 @@ BENCH_OBJS        := $(BENCH_SRCS:bench/%.c=$(BUILD_DIR)/bench/%.o)
 BENCH_BINS        := $(patsubst bench/%.c,$(BUILD_DIR)/bench/%,$(BENCH_SRCS))
 QFLOAT_TOOL_BIN   := $(BUILD_DIR)/tools/qfloat/gen_qfloat_tables
 
-HEADERS      := $(wildcard include/*.h)
+HEADERS      := $(filter-out include/test_config.h,$(wildcard include/*.h))
 
 STATIC_LIB := $(BUILD_DIR)/libmars.a
 SHARED_LIB := $(BUILD_DIR)/libmars.so
@@ -72,7 +78,7 @@ TEST_BINS  := $(patsubst tests/%.c,$(TEST_BUILD_DIR)/%,$(TEST_SRCS))
 # ------------------------------------------------------------
 # Default target
 # ------------------------------------------------------------
-.PHONY: all clean test memtest debug release help
+.PHONY: all clean test memtest debug release check-deps install uninstall help
 
 all: $(STATIC_LIB) $(SHARED_LIB) $(TEST_BINS) $(BENCH_BINS)
 
@@ -81,6 +87,57 @@ debug:
 
 release:
 	$(MAKE) DEBUG=0 all
+
+# ------------------------------------------------------------
+# Dependency checks
+# ------------------------------------------------------------
+check-deps:
+	@missing=0; \
+	check_dep() { \
+	    name="$$1"; header="$$2"; lib="$$3"; package="$$4"; body="$$5"; \
+	    if ! printf '%s\n' "#include <stdint.h>" "#include <$$header>" "int main(void) { $$body; return 0; }" \
+	        | $(CC) -x c - -o /tmp/mars-check-dep $$lib >/dev/null 2>&1; then \
+	        echo "Missing $$name development files."; \
+	        echo "  Debian/Ubuntu: sudo apt install $$package"; \
+	        missing=1; \
+	    fi; \
+	    rm -f /tmp/mars-check-dep; \
+	}; \
+	check_dep "GMP" "gmp.h" "-lgmp" "libgmp-dev" "mpz_t x; mpz_init(x); mpz_clear(x)"; \
+	check_dep "MPFR" "mpfr.h" "-lmpfr -lgmp" "libmpfr-dev" "mpfr_t x; mpfr_init2(x, 53); mpfr_clear(x)"; \
+	check_dep "MPC" "mpc.h" "-lmpc -lmpfr -lgmp" "libmpc-dev" "mpc_t x; mpc_init2(x, 53); mpc_clear(x)"; \
+	if [ "$(ENABLE_UNISTRING)" = "1" ]; then \
+	    check_dep "libunistring" "unistr.h" "-lunistring" "libunistring-dev" "(void)u8_strlen((const uint8_t *)\"x\")"; \
+	fi; \
+	if [ "$$missing" -ne 0 ]; then \
+	    echo; \
+	    echo "Install the missing development package(s), then rerun make."; \
+	    echo "For a typical Debian/Ubuntu setup:"; \
+	    if [ "$(ENABLE_UNISTRING)" = "1" ]; then \
+	        echo "  sudo apt install build-essential libgmp-dev libmpfr-dev libmpc-dev libunistring-dev"; \
+	    else \
+	        echo "  sudo apt install build-essential libgmp-dev libmpfr-dev libmpc-dev"; \
+	    fi; \
+	    exit 1; \
+	fi
+
+# ------------------------------------------------------------
+# Installation
+# ------------------------------------------------------------
+install: check-deps $(STATIC_LIB) $(SHARED_LIB)
+	$(INSTALL) -d "$(DESTDIR)$(LIBDIR)"
+	$(INSTALL) -d "$(DESTDIR)$(INCLUDEDIR)/mars"
+	$(INSTALL) -m 644 $(STATIC_LIB) "$(DESTDIR)$(LIBDIR)/libmars.a"
+	$(INSTALL) -m 755 $(SHARED_LIB) "$(DESTDIR)$(LIBDIR)/libmars.so"
+	$(INSTALL) -m 644 $(HEADERS) "$(DESTDIR)$(INCLUDEDIR)/mars"
+
+uninstall:
+	rm -f "$(DESTDIR)$(LIBDIR)/libmars.a"
+	rm -f "$(DESTDIR)$(LIBDIR)/libmars.so"
+	@for h in $(notdir $(HEADERS)); do \
+	    rm -f "$(DESTDIR)$(INCLUDEDIR)/mars/$$h"; \
+	done
+	-rmdir "$(DESTDIR)$(INCLUDEDIR)/mars"
 
 # ------------------------------------------------------------
 # Dependency tracking
@@ -198,6 +255,9 @@ help:
 	@echo "  make DEBUG=1 test_<name>    Build and run a single test (e.g. make test_dval) (debug)"
 	@echo "  make DEBUG=1 memtest_<name> Build and run a single test under valgrind (debug)"
 	@echo "  make bench_<name>           Build and run a benchmark (e.g. make bench_integrator)"
+	@echo "  make check-deps             Check required external development libraries"
+	@echo "  make install                Install libraries and headers under PREFIX (default /usr/local)"
+	@echo "  make uninstall              Remove installed libraries and headers from PREFIX"
 	@echo "  make clean                  Remove all build artifacts"
 
 # ------------------------------------------------------------

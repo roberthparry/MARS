@@ -496,6 +496,9 @@ void test_inc_dec_and_bits(void)
     print_mint_input("b for bit tests", b);
     ASSERT_EQ_LONG((long)mi_bit_length(a), 0);
     ASSERT_EQ_LONG((long)mi_bit_length(b), 65);
+    ASSERT_EQ_LONG((long)mi_log2(a), 0);
+    ASSERT_EQ_LONG((long)mi_log2(b), 64);
+    ASSERT_EQ_LONG((long)mi_log2(c), 1);
     ASSERT_TRUE(mi_test_bit(b, 64));
     ASSERT_TRUE(!mi_test_bit(b, 63));
     ASSERT_TRUE(!mi_test_bit(c, 100));

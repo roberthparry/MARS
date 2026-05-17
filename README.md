@@ -26,30 +26,40 @@ datetime utilities, UTF-8 strings, and generic containers.
 ## Requirements
 
 - C99-compliant compiler (GCC ≥ 4.8, Clang ≥ 3.5, MSVC ≥ 2019)
-- Standard C library plus `libm`
+- Standard C library plus `libm` and pthreads
+- GMP, MPFR, and MPC development libraries
 - Optional `libunistring` support for the UTF-8/string layer (`ENABLE_UNISTRING=1` by default in the Makefile)
+
+On Debian/Ubuntu, install the default build requirements with:
+
+```sh
+sudo apt install build-essential libgmp-dev libmpfr-dev libmpc-dev libunistring-dev
+```
+
+Use `make check-deps` to check for required development headers and link
+libraries before building or installing.
 
 ## Benchmark Highlights
 
 Recent sample benchmarks on this tree show:
 
 - symbolic integrator shortcuts reducing affine-family cases from fallback-style
-  tens of milliseconds to single-digit or low-double-digit microseconds
-- `affine_square` at about `1.238 µs` versus `near_miss_square` at about
-  `179.185 µs`
-- `affine_times_exp` at about `19.045 µs` versus `near_miss_exp` at about
-  `15188.762 µs`
+  tens of milliseconds to low-hundreds of microseconds
+- `affine_square` at about `233.723 µs` versus `near_miss_square` at about
+  `1647.171 µs`
+- `affine_times_exp` at about `77.678 µs` versus `near_miss_exp` at about
+  `49084.036 µs`
 - symbolic `dval` matrix solve for a dense `3x3` / `2`-RHS case at about
-  `561.060 µs`
+  `6000.421 µs`
 - symbolic `dval` matrix inverse for a dense `4x4` case at about
-  `2525.437 µs`
-- `qfloat_t` `gamma(2.3)` at about `1.107 µs` and `lgamma(2.3)` at about
-  `3.562 µs`
+  `40635.324 µs`
+- `qfloat_t` `gamma(2.3)` at about `1.246 µs` and `lgamma(2.3)` at about
+  `3.797 µs`
 - `qfloat_t` `gammainv(119292.4619946090070787515047110059)` at about
-  `83.440 µs`
-- `qcomplex_t` `exp(1+i)` at about `3.582 µs` and `log(1+i)` at about
-  `5.405 µs`
-- `qcomplex_t` `gammainv(qc_gamma(2.5+0.3i))` at about `219.491 µs`
+  `82.548 µs`
+- `qcomplex_t` `exp(1+i)` at about `2.513 µs` and `log(1+i)` at about
+  `3.503 µs`
+- `qcomplex_t` `gammainv(qc_gamma(2.5+0.3i))` at about `145.943 µs`
 
 See [`docs/benchmarks.md`](docs/benchmarks.md) for commands, units, and fuller
 sample output.
@@ -350,6 +360,27 @@ make
 
 See [`docs/building.md`](docs/building.md) for configuration options and cross-compilation notes.
 
+## Install
+
+Install MARS headers and libraries after building:
+
+```sh
+sudo make install
+```
+
+To check required development libraries before building or installing:
+
+```sh
+make check-deps
+```
+
+By default this installs to `/usr/local`, with headers under
+`/usr/local/include/mars` and libraries under `/usr/local/lib`. Override
+`PREFIX`, `LIBDIR`, `INCLUDEDIR`, or `DESTDIR` for packaged or custom installs.
+
+`make install` installs MARS itself only. It does not install system libraries;
+install the requirements above with your system package manager first.
+
 ## Run Tests
 
 ```sh
@@ -392,6 +423,22 @@ Makefile     build and test entry points
 Public consumers should include headers from `include/`. Headers under
 `include/internal/` support communication between MARS subsystems and tests,
 and are not intended as stable external API.
+
+## Acknowledgements
+
+MARS's arbitrary-precision numeric layers build directly on the GNU
+multiprecision ecosystem:
+
+- [GMP](https://gmplib.org/) provides the arbitrary-precision integer and
+  rational arithmetic foundation used by `mint_t` and `mrational_t`.
+- [MPFR](https://www.mpfr.org/) provides correctly rounded multiprecision
+  floating-point arithmetic used by `mfloat_t`.
+- [MPC](https://www.multiprecision.org/mpc/) provides multiprecision complex
+  arithmetic used by `mcomplex_t`.
+
+These projects do the heavy mathematical lifting for the modern MARS
+multiprecision wrappers. MARS depends on their development headers and runtime
+libraries when those modules are built.
 
 ## License
 

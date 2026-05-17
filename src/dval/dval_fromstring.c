@@ -59,6 +59,8 @@ typedef struct {
     char        errmsg[256];
 } parser_t;
 
+static size_t scan_unicode_fraction_len(const char *s, const char *end);
+
 static void set_error(parser_t *p, const char *msg)
 {
     if (!p->error) {
@@ -85,6 +87,7 @@ static int can_start_factor(const parser_t *p)
     if (c == ' ') return 0;
     if (c == '[' || c == '(' || c == '-' || c == '@') return 1;
     if (at_middle_dot(p)) return 1;
+    if (scan_unicode_fraction_len(p->p, p->end) > 0u) return 1;
     unsigned int uc;
     int len = fs_utf8_decode(p->p, &uc);
     if (len > 0 && fs_is_letter(uc)) return 1;
@@ -109,11 +112,11 @@ typedef dval_t *(*binary_fn)(const dval_t *, const dval_t *);
 /* Function dispatch                                                   */
 /* ------------------------------------------------------------------ */
 
-/* Collision-free direct hash table for the current 37 function keywords.
- * The salted hash uses modulus 54, and the highest occupied slot is 51, so
- * the backing table itself only needs 52 entries. */
+/* Collision-free direct hash table for the current 38 function keywords.
+ * The salted hash uses modulus 54, and the highest occupied slot is 52, so
+ * the backing table itself only needs 53 entries. */
 #define FUNC_HT_MODULUS  54
-#define FUNC_HT_SIZE     52
+#define FUNC_HT_SIZE     53
 
 typedef struct {
     const char *kw;
@@ -161,6 +164,7 @@ static const func_entry_t s_funcs[FUNC_HT_SIZE] = {
     [48] = { "gamma",          5, false, dv_gamma,         NULL        },
     [49] = { "acos",           4, false, dv_acos,          NULL        },
     [51] = { "normal_pdf",    10, false, dv_normal_pdf,    NULL        },
+    [52] = { "log10",          5, false, dv_log10,         NULL        },
 };
 
 static unsigned func_ht_hash(const char *s, size_t n)
@@ -198,6 +202,74 @@ static int is_superscript_byte(const char *p)
     if (len <= 0) return 0;
     return c == 0x00B2 || c == 0x00B3 || c == 0x00B9 || c == 0x2070 ||
            (c >= 0x2074 && c <= 0x2079);
+}
+
+static int scan_utf8_codepoint(const char *p, const char *end, unsigned int *out)
+{
+    int len;
+
+    if (p >= end)
+        return 0;
+    len = fs_utf8_decode(p, out);
+    if (len <= 0 || p + len > end)
+        return 0;
+    return len;
+}
+
+static int is_superscript_digit_codepoint(unsigned int c)
+{
+    return c == 0x00B2 || c == 0x00B3 || c == 0x00B9 || c == 0x2070 ||
+           (c >= 0x2074 && c <= 0x2079);
+}
+
+static int is_subscript_digit_codepoint(unsigned int c)
+{
+    return c >= 0x2080 && c <= 0x2089;
+}
+
+static int is_fraction_glyph_codepoint(unsigned int c)
+{
+    return c == 0x00BC || c == 0x00BD || c == 0x00BE ||
+           (c >= 0x2150 && c <= 0x215E);
+}
+
+static size_t scan_unicode_fraction_len(const char *s, const char *end)
+{
+    const char *p = s;
+    unsigned int c;
+    int len;
+    int digits = 0;
+
+    len = scan_utf8_codepoint(p, end, &c);
+    if (len <= 0)
+        return 0u;
+
+    if (is_fraction_glyph_codepoint(c))
+        return (size_t)len;
+
+    while ((len = scan_utf8_codepoint(p, end, &c)) > 0 &&
+           is_superscript_digit_codepoint(c)) {
+        p += len;
+        ++digits;
+    }
+    if (digits == 0)
+        return 0u;
+
+    len = scan_utf8_codepoint(p, end, &c);
+    if (len <= 0 || c != 0x2044)
+        return 0u;
+    p += len;
+
+    digits = 0;
+    while ((len = scan_utf8_codepoint(p, end, &c)) > 0 &&
+           is_subscript_digit_codepoint(c)) {
+        p += len;
+        ++digits;
+    }
+    if (digits == 0)
+        return 0u;
+
+    return (size_t)(p - s);
 }
 
 /* Check whether the text at pos starts with keyword kw (length klen) and is
@@ -270,8 +342,15 @@ static size_t scan_number_atom_len(const char *s, const char *end)
     const char *p;
     size_t tail;
 
-    if (len == 0)
-        return 0;
+    if (len == 0) {
+        len = scan_unicode_fraction_len(s, end);
+        if (len == 0)
+            return 0;
+        p = s + len;
+        if (p < end && (*p == 'i' || *p == 'I'))
+            p++;
+        return (size_t)(p - s);
+    }
 
     p = s + len;
     if (p < end && *p == '/') {
@@ -431,7 +510,8 @@ static dval_t *parse_atom(parser_t *p)
     }
 
     /* Numeric atom (integer/decimal/rational, optionally with trailing i) */
-    if (isdigit((unsigned char)*p->p) || *p->p == '.') {
+    if (isdigit((unsigned char)*p->p) || *p->p == '.' ||
+        scan_unicode_fraction_len(p->p, p->end) > 0u) {
         size_t len = scan_number_atom_len(p->p, p->end);
         number_t value;
         dval_t *node;

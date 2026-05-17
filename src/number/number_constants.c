@@ -77,6 +77,11 @@ static const number_private_t number_ln2_value = {
     .value.mf = (mfloat_t *)&MF_LN2_VALUE
 };
 
+static const number_private_t number_ln10_value = {
+    .kind = NUMBER_MFLOAT,
+    .value.mf = (mfloat_t *)&MF_LN10_VALUE
+};
+
 static const number_private_t number_invln2_value = {
     .kind = NUMBER_MFLOAT,
     .value.mf = (mfloat_t *)&MF_INVLN2_VALUE
@@ -268,6 +273,7 @@ static const number_const_u num_2_pi_storage = { .priv = number_2_pi_value };
 static const number_const_u num_e_storage = { .priv = number_e_value };
 static const number_const_u num_inv_e_storage = { .priv = number_inv_e_value };
 static const number_const_u num_ln2_storage = { .priv = number_ln2_value };
+static const number_const_u num_ln10_storage = { .priv = number_ln10_value };
 static const number_const_u num_invln2_storage = { .priv = number_invln2_value };
 static const number_const_u num_euler_mascheroni_storage = { .priv = number_euler_mascheroni_value };
 static const number_const_u num_phi_storage = { .priv = number_phi_value };
@@ -315,6 +321,7 @@ extern const number_t NUM_2_PI __attribute__((alias("num_2_pi_storage")));
 extern const number_t NUM_E __attribute__((alias("num_e_storage")));
 extern const number_t NUM_INV_E __attribute__((alias("num_inv_e_storage")));
 extern const number_t NUM_LN2 __attribute__((alias("num_ln2_storage")));
+extern const number_t NUM_LN10 __attribute__((alias("num_ln10_storage")));
 extern const number_t NUM_INVLN2 __attribute__((alias("num_invln2_storage")));
 extern const number_t NUM_EULER_MASCHERONI __attribute__((alias("num_euler_mascheroni_storage")));
 extern const number_t NUM_PHI __attribute__((alias("num_phi_storage")));
@@ -354,6 +361,7 @@ static const qfloat_t *const number_const_qfloat_table[NUMBER_CONST_COUNT] = {
     [NUMBER_CONST_E] = &QF_E,
     [NUMBER_CONST_INV_E] = &QF_INV_E,
     [NUMBER_CONST_LN2] = &QF_LN2,
+    [NUMBER_CONST_LN10] = &QF_LN10,
     [NUMBER_CONST_SQRT2] = &QF_SQRT2,
     [NUMBER_CONST_SQRT3] = &QF_SQRT3,
     [NUMBER_CONST_SQRT2_OVER_TWO] = &QF_SQRT2_OVER_TWO,
@@ -374,6 +382,7 @@ static const mfloat_t *const number_const_mfloat_table[NUMBER_CONST_COUNT] = {
     [NUMBER_CONST_E] = &MF_E_VALUE,
     [NUMBER_CONST_INV_E] = &MF_INV_E_VALUE,
     [NUMBER_CONST_LN2] = &MF_LN2_VALUE,
+    [NUMBER_CONST_LN10] = &MF_LN10_VALUE,
     [NUMBER_CONST_SQRT2] = &MF_SQRT2_VALUE,
     [NUMBER_CONST_SQRT3] = &MF_SQRT3_VALUE,
     [NUMBER_CONST_SQRT2_OVER_TWO] = &MF_SQRT2_OVER_TWO_VALUE,
@@ -398,6 +407,7 @@ static const qcomplex_t *const number_const_qcomplex_table[NUMBER_CONST_COUNT] =
     [NUMBER_CONST_E] = &QC_E,
     [NUMBER_CONST_INV_E] = &QC_INV_E,
     [NUMBER_CONST_LN2] = &QC_LN2,
+    [NUMBER_CONST_LN10] = &QC_LN10,
     [NUMBER_CONST_SQRT2] = &QC_SQRT2,
     [NUMBER_CONST_SQRT3] = &QC_SQRT3,
     [NUMBER_CONST_SQRT2_OVER_TWO] = &QC_SQRT2_OVER_TWO,
@@ -433,6 +443,7 @@ static const double number_const_double_table[NUMBER_CONST_COUNT] = {
     [NUMBER_CONST_E] = M_E,
     [NUMBER_CONST_INV_E] = 1.0 / M_E,
     [NUMBER_CONST_LN2] = M_LN2,
+    [NUMBER_CONST_LN10] = M_LN10,
     [NUMBER_CONST_SQRT2] = M_SQRT2,
     [NUMBER_CONST_SQRT3] = 1.73205080756887729353,
     [NUMBER_CONST_SQRT2_OVER_TWO] = M_SQRT1_2,
@@ -457,6 +468,7 @@ static const bool number_const_has_double_table[NUMBER_CONST_COUNT] = {
     [NUMBER_CONST_E] = true,
     [NUMBER_CONST_INV_E] = true,
     [NUMBER_CONST_LN2] = true,
+    [NUMBER_CONST_LN10] = true,
     [NUMBER_CONST_SQRT2] = true,
     [NUMBER_CONST_SQRT3] = true,
     [NUMBER_CONST_SQRT2_OVER_TWO] = true,
@@ -561,6 +573,23 @@ number_t number_create_exact_mfloat_dyadic_prec(long numerator,
     return number_take(number_wrap_mfloat(mfloat));
 }
 
+static number_t number_const_imag_magnitude(number_const_id_t id,
+                                            size_t precision_bits)
+{
+    const mfloat_t *mf_value;
+
+    if (id == NUMBER_CONST_NEG_ONE)
+        return number_create_exact_mfloat_long_prec(-1, precision_bits);
+    if (number_const_has_ldexp(id))
+        return number_create_exact_mfloat_dyadic_prec(
+            1, number_const_ldexp_value(id), precision_bits);
+
+    mf_value = number_const_mfloat_value(id);
+    return mf_value
+        ? num_create_from_mfloat_with_prec_bits(mf_value, precision_bits)
+        : number_invalid();
+}
+
 number_t number_const_return_like(const number_t *like, number_const_id_t id)
 {
     return number_const_like(like, id);
@@ -576,14 +605,50 @@ number_t number_neg_const_return_like(const number_t *like, number_const_id_t id
     return out;
 }
 
+number_t number_imag_const_like_qreal(const number_t *like, number_const_id_t id)
+{
+    qfloat_t imag_qf;
+
+    (void)like;
+    imag_qf = number_const_qfloat(id);
+    return qf_isnan(imag_qf)
+        ? number_invalid()
+        : num_create_from_qcomplex(qc_make(QF_ZERO, imag_qf));
+}
+
+number_t number_imag_const_like_mreal(const number_t *like, number_const_id_t id)
+{
+    const number_vtable_t *vt = number_vt(like);
+    size_t precision_bits = vt && vt->get_precision ? vt->get_precision(like) : 0u;
+    number_t magnitude;
+    mfloat_t *real;
+    mfloat_t *imag;
+    mcomplex_t *complex_value;
+
+    if (like && number_kind_value(like) == NUMBER_MCOMPLEX &&
+        precision_bits <= 1u)
+        precision_bits = number_default_precision_bits;
+    if (precision_bits == 0u)
+        precision_bits = number_default_precision_bits;
+
+    magnitude = number_const_imag_magnitude(id, precision_bits);
+    if (!number_is_valid_value(&magnitude))
+        return number_invalid();
+    real = mf_const_prec(MF_ZERO, precision_bits);
+    imag = mf_clone(number_impl_const(&magnitude)->value.mf);
+    complex_value = real && imag ? mc_create(real, imag) : NULL;
+    mf_free(real);
+    mf_free(imag);
+    num_destroy(&magnitude);
+    return complex_value
+        ? number_take(number_wrap_mcomplex(complex_value))
+        : number_invalid();
+}
+
 number_t number_imag_const_return_like(const number_t *like, number_const_id_t id)
 {
-    NUM_SCOPE_SUSPEND(saved_scope);
-    number_t imag_unit = number_const_like(like, NUMBER_CONST_I);
-    number_t value = number_const_like(like, id);
-    number_t out = num_mul(imag_unit, value);
+    const number_vtable_t *vt = number_vt(like);
 
-    num_destroy(&imag_unit);
-    num_destroy(&value);
-    return out;
+    return vt && vt->imag_const_like
+        ? vt->imag_const_like(like, id) : number_invalid();
 }

@@ -182,6 +182,18 @@ void test_log(void)
     dv_free(c);
 }
 
+void test_log10(void)
+{
+    dval_t *c = test_dv_new_var_d(1000.0);
+    dval_t *f = dv_log10(c);
+
+    check_q_at(__FILE__, __LINE__, 1, "log10(1000)", dv_eval_qf(f), qf_from_double(3.0));
+    print_expr_of(f);
+
+    dv_free(f);
+    dv_free(c);
+}
+
 void test_sqrt(void)
 {
     dval_t *c = test_dv_new_var_d(2.0);
@@ -309,6 +321,7 @@ void test_maths_functions(void)
     RUN_SUBTEST(test_atanh);
     RUN_SUBTEST(test_exp);
     RUN_SUBTEST(test_log);
+    RUN_SUBTEST(test_log10);
     RUN_SUBTEST(test_sqrt);
     RUN_SUBTEST(test_pow_d);
     RUN_SUBTEST(test_pow_d_complex);

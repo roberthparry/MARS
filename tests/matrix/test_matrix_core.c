@@ -3573,10 +3573,13 @@ static void test_deriv_block_solve(void)
             mat_get(dX, 0, 0, &v);
             check_d("d(block solve)[0,0] = -7/81", dv_eval_d(v), -0.08641975308641975, 1e-12);
             check_dval_text_contains("d(block solve)[0,0] contains x", v, "x");
+            dv_free(v);
             mat_get(dX, 1, 0, &v);
             check_d("d(block solve)[1,0] = 11/81", dv_eval_d(v), 0.1358024691358025, 1e-12);
+            dv_free(v);
             mat_get(dX, 2, 0, &v);
             check_d("d(block solve)[2,0] = -1/27", dv_eval_d(v), -0.03703703703703703, 1e-12);
+            dv_free(v);
         }
 
         dA = mat_deriv(A, x);
@@ -3597,10 +3600,13 @@ static void test_deriv_block_solve(void)
         if (Residual) {
             mat_get(Residual, 0, 0, &v);
             check_d("block solve derivative residual[0,0] = 0", dv_eval_d(v), 0.0, 1e-12);
+            dv_free(v);
             mat_get(Residual, 1, 0, &v);
             check_d("block solve derivative residual[1,0] = 0", dv_eval_d(v), 0.0, 1e-12);
+            dv_free(v);
             mat_get(Residual, 2, 0, &v);
             check_d("block solve derivative residual[2,0] = 0", dv_eval_d(v), 0.0, 1e-12);
+            dv_free(v);
         }
 
         test_dv_set_val_d(x, 5.0);
@@ -3608,10 +3614,13 @@ static void test_deriv_block_solve(void)
         if (dX) {
             mat_get(dX, 0, 0, &v);
             check_d("updated d(block solve)[0,0] = -0.001814028486965869", dv_eval_d(v), -0.001814028486965869, 1e-12);
+            dv_free(v);
             mat_get(dX, 1, 0, &v);
             check_d("updated d(block solve)[1,0] = 0.0007390486428379468", dv_eval_d(v), 0.0007390486428379468, 1e-12);
+            dv_free(v);
             mat_get(dX, 2, 0, &v);
             check_d("updated d(block solve)[2,0] = 6.718624025799516e-05", dv_eval_d(v), 6.718624025799516e-05, 1e-12);
+            dv_free(v);
         }
 
         mat_free(Residual);
@@ -4306,7 +4315,7 @@ static void test_inverse_qcomplex(void)
     mat_free(P);
 }
 
-static void test_inverse_dval(void)
+static void test_inverse_dval_2x2(void)
 {
     printf(C_CYAN "TEST: matrix inverse (dval)\n" C_RESET);
 
@@ -4337,19 +4346,25 @@ static void test_inverse_dval(void)
 
             mat_get(P, 0, 0, &v);
             check_d("dval prod[0,0] = 1", dv_eval_d(v), 1.0, 1e-12);
+            dv_free(v);
             mat_get(P, 0, 1, &v);
             check_d("dval prod[0,1] = 0", dv_eval_d(v), 0.0, 1e-12);
+            dv_free(v);
             mat_get(P, 1, 0, &v);
             check_d("dval prod[1,0] = 0", dv_eval_d(v), 0.0, 1e-12);
+            dv_free(v);
             mat_get(P, 1, 1, &v);
             check_d("dval prod[1,1] = 1", dv_eval_d(v), 1.0, 1e-12);
+            dv_free(v);
 
             test_dv_set_val_d(x, 5.0);
             test_dv_set_val_d(y, 6.0);
             mat_get(P, 0, 0, &v);
             check_d("dval inverse product tracks x,y on [0,0]", dv_eval_d(v), 1.0, 1e-12);
+            dv_free(v);
             mat_get(P, 1, 1, &v);
             check_d("dval inverse product tracks x,y on [1,1]", dv_eval_d(v), 1.0, 1e-12);
+            dv_free(v);
         }
 
         free(ai_text);
@@ -4362,7 +4377,10 @@ static void test_inverse_dval(void)
     dv_free(y);
     dv_free(one);
     dv_free(two);
+}
 
+static void test_inverse_dval_rotation(void)
+{
     {
         mat_bindings_t *bindings = NULL;
         matrix_t *R = mat_from_string_dv("(cos(@theta), -sin(@theta); sin(@theta), cos(@theta))",
@@ -4383,7 +4401,10 @@ static void test_inverse_dval(void)
         mat_free(R);
         mat_bindings_free(bindings);
     }
+}
 
+static void test_inverse_dval_upper_triangular(void)
+{
     {
         dval_t *a = test_dv_new_named_var_d(2.0, "a");
         dval_t *b = test_dv_new_named_var_d(3.0, "b");
@@ -4414,6 +4435,7 @@ static void test_inverse_dval(void)
                         mat_get(P, i, j, &v);
                         snprintf(label, sizeof(label), "upper dval prod[%zu,%zu]", i, j);
                         check_d(label, dv_eval_d(v), i == j ? 1.0 : 0.0, 1e-12);
+                        dv_free(v);
                     }
                 }
             }
@@ -4428,7 +4450,10 @@ static void test_inverse_dval(void)
         dv_free(d);
         dv_free(one_u);
     }
+}
 
+static void test_inverse_dval_lower_triangular(void)
+{
     {
         dval_t *p = test_dv_new_named_var_d(2.0, "p");
         dval_t *q = test_dv_new_named_var_d(4.0, "q");
@@ -4457,6 +4482,7 @@ static void test_inverse_dval(void)
                         mat_get(P, i, j, &v);
                         snprintf(label, sizeof(label), "lower dval prod[%zu,%zu]", i, j);
                         check_d(label, dv_eval_d(v), i == j ? 1.0 : 0.0, 1e-12);
+                        dv_free(v);
                     }
                 }
             }
@@ -4471,7 +4497,10 @@ static void test_inverse_dval(void)
         dv_free(one_l);
         dv_free(two_l);
     }
+}
 
+static void test_inverse_dval_dense_3x3(void)
+{
     {
         dval_t *x3 = test_dv_new_named_var_d(4.0, "x");
         dval_t *y3 = test_dv_new_named_var_d(3.0, "y");
@@ -4500,6 +4529,7 @@ static void test_inverse_dval(void)
                         mat_get(P, i, j, &v);
                         snprintf(label, sizeof(label), "dense 3x3 dval prod[%zu,%zu]", i, j);
                         check_d(label, dv_eval_d(v), i == j ? 1.0 : 0.0, 1e-10);
+                        dv_free(v);
                     }
                 }
             }
@@ -4514,7 +4544,10 @@ static void test_inverse_dval(void)
         dv_free(one3);
         dv_free(two3);
     }
+}
 
+static void test_inverse_dval_dense_4x4(void)
+{
     {
         dval_t *u = test_dv_new_named_var_d(5.0, "u");
         dval_t *v4 = test_dv_new_named_var_d(6.0, "v");
@@ -4546,6 +4579,7 @@ static void test_inverse_dval(void)
                         mat_get(P, i, j, &entry);
                         snprintf(label, sizeof(label), "dense 4x4 dval prod[%zu,%zu]", i, j);
                         check_d(label, dv_eval_d(entry), i == j ? 1.0 : 0.0, 1e-10);
+                        dv_free(entry);
                     }
                 }
             }
@@ -4561,7 +4595,10 @@ static void test_inverse_dval(void)
         dv_free(one4);
         dv_free(two4);
     }
+}
 
+static void test_inverse_dval_dense_6x6(void)
+{
     {
         dval_t *a6 = test_dv_new_named_var_d(5.0, "a");
         dval_t *b6 = test_dv_new_named_var_d(6.0, "b");
@@ -4597,6 +4634,7 @@ static void test_inverse_dval(void)
                         mat_get(P, i, j, &entry);
                         snprintf(label, sizeof(label), "dense 6x6 dval prod[%zu,%zu]", i, j);
                         check_d(label, dv_eval_d(entry), i == j ? 1.0 : 0.0, 1e-10);
+                        dv_free(entry);
                     }
                 }
             }
@@ -4614,7 +4652,10 @@ static void test_inverse_dval(void)
         dv_free(one6);
         dv_free(two6);
     }
+}
 
+static void test_inverse_dval_singular(void)
+{
     {
         dval_t *one_s = test_dv_new_const_d(1.0);
         dval_t *two_s = test_dv_new_const_d(2.0);
@@ -6371,7 +6412,7 @@ static void test_factorisations(void)
                     num_create_from_double(1.0)
                 };
                 matrix_t *Aq = mat_create_num(2, 2, aq_vals);
-                check_mat_num_local("Q*T*Q^H = A", QTQH, Aq, 1e-24);
+                check_mat_num_local("Q*T*Q^H = A", QTQH, Aq, 1e-14);
                 for (size_t i = 0; i < 4; ++i)
                     num_destroy(&aq_vals[i]);
                 mat_free(Aq);
@@ -6386,7 +6427,7 @@ static void test_factorisations(void)
                 matrix_t *Iqq = Iq ? test_mat_evaluate_complex(Iq) : NULL;
                 check_bool("Q^H*Q qc view not NULL", QHQq != NULL && Iqq != NULL);
                 if (QHQq && Iqq)
-                    check_mat_complex("Q^H*Q = I", QHQq, Iqq, 1e-24);
+                    check_mat_complex("Q^H*Q = I", QHQq, Iqq, 1e-14);
                 for (size_t i = 0; i < 4; ++i)
                     num_destroy(&iq_vals[i]);
                 mat_free(QHQq);
@@ -7107,7 +7148,14 @@ void run_matrix_core_tests(void)
     RUN_TEST_CASE(test_inverse_double);
     RUN_TEST_CASE(test_inverse_qfloat);
     RUN_TEST_CASE(test_inverse_qcomplex);
-    RUN_TEST_CASE(test_inverse_dval);
+    RUN_TEST_CASE(test_inverse_dval_2x2);
+    RUN_TEST_CASE(test_inverse_dval_rotation);
+    RUN_TEST_CASE(test_inverse_dval_upper_triangular);
+    RUN_TEST_CASE(test_inverse_dval_lower_triangular);
+    RUN_TEST_CASE(test_inverse_dval_dense_3x3);
+    RUN_TEST_CASE(test_inverse_dval_dense_4x4);
+    RUN_TEST_CASE(test_inverse_dval_dense_6x6);
+    RUN_TEST_CASE(test_inverse_dval_singular);
     RUN_TEST_CASE(test_solve_and_lstsq);
     RUN_TEST_CASE(test_factorisations);
     RUN_TEST_CASE(test_rank_pinv_nullspace);

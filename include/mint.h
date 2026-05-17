@@ -9,9 +9,9 @@
  * @file mint.h
  * @brief Multiprecision integers.
  *
- * The @c mint_t type stores signed integers of arbitrary size using a private
- * limb representation. Callers interact with it through this API only; the
- * concrete layout is intentionally opaque.
+ * The @c mint_t type stores signed integers of arbitrary size behind an
+ * opaque implementation. Callers interact with it through this API only; the
+ * concrete layout is intentionally hidden.
  */
 
 /**
@@ -58,13 +58,14 @@ extern const mint_t * const MI_TEN;
 
 /** @name Lifecycle
  * Allocation, copying, reset, and destruction helpers. Constructors return
- * newly allocated values, `mi_clone()` returns a deep copy, `mi_clear()`
- * resets an existing mutable value to canonical zero, and `mi_free()`
- * releases owned storage. Constructors return `NULL` on allocation or parse
- * failure.
+ * newly allocated values, `mi_const()` materialises a named constant as a
+ * mutable value, `mi_clone()` returns a deep copy, `mi_clear()` resets an
+ * existing mutable value to canonical zero, and `mi_free()` releases owned
+ * storage. Constructors return `NULL` on allocation or parse failure.
  * @{
  */
 mint_t *mi_new(void);
+mint_t *mi_const(const mint_t *constant);
 mint_t *mi_create_long(long value);
 mint_t *mi_create_ulong(unsigned long value);
 mint_t *mi_create_2pow(uint64_t n);
@@ -107,6 +108,7 @@ int mi_cmp_long(const mint_t *mint, long value);
  * helpers report whether the value fits in a native `long`; on success
  * `mi_get_long()` stores the converted value in `*out`. `mi_bit_length()`
  * returns the number of significant bits in the magnitude, and
+ * `mi_log2()` returns `floor(log2(abs(n)))`, with zero mapping to `0`.
  * `mi_test_bit()` reports whether a zero-based bit in the magnitude is set.
  * @{
  */
@@ -115,6 +117,7 @@ bool mi_is_negative(const mint_t *mint);
 bool mi_is_even(const mint_t *mint);
 bool mi_is_odd(const mint_t *mint);
 size_t mi_bit_length(const mint_t *mint);
+size_t mi_log2(const mint_t *mint);
 bool mi_test_bit(const mint_t *mint, size_t bit_index);
 bool mi_fits_long(const mint_t *mint);
 bool mi_get_long(const mint_t *mint, long *out);

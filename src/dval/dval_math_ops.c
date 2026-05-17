@@ -110,6 +110,12 @@ const dval_ops_t ops_log = {
     .apply_unary = dv_log, .apply_binary = NULL,
     .simplify = dv_simplify_unary_operator, .fold_const_unary = dv_fold_log_const
 };
+const dval_ops_t ops_log10 = {
+    .eval = eval_log10, .deriv = deriv_log10, .reverse = dv_reverse_log10,
+    .kind = DV_KIND_LOG10, .arity = DV_OP_UNARY, .name = "log10",
+    .apply_unary = dv_log10, .apply_binary = NULL,
+    .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
+};
 const dval_ops_t ops_sqrt = {
     .eval = eval_sqrt, .deriv = deriv_sqrt, .reverse = dv_reverse_sqrt,
     .kind = DV_KIND_SQRT, .arity = DV_OP_UNARY, .name = "sqrt",
@@ -240,6 +246,7 @@ const dval_ops_t ops_logbeta = {
 dval_t *dv_sqrt(const dval_t *a) { return dv_math_wrap_unary(&ops_sqrt, a); }
 dval_t *dv_exp(const dval_t *a) { return dv_math_wrap_unary(&ops_exp, a); }
 dval_t *dv_log(const dval_t *a) { return dv_math_wrap_unary(&ops_log, a); }
+dval_t *dv_log10(const dval_t *a) { return dv_math_wrap_unary(&ops_log10, a); }
 dval_t *dv_sin(const dval_t *a) { return dv_math_wrap_unary(&ops_sin, a); }
 dval_t *dv_cos(const dval_t *a) { return dv_math_wrap_unary(&ops_cos, a); }
 dval_t *dv_tan(const dval_t *a) { return dv_math_wrap_unary(&ops_tan, a); }

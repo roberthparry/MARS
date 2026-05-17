@@ -8,7 +8,7 @@
  * T15 uses all 8; T4 (nested error estimator) uses positions 0,2,4,6.
  * ------------------------------------------------------------------- */
 
-/* Turán abscissae (non-negative), index 0 = center */
+/* Turán abscissae (non-negative), index 0 = centre */
 qfloat_t tn_node[TN_NODES] = {
     { 0.0, 0.0 },
     { 0.17965850484814358, 1.3958910912084355e-18 },
@@ -80,7 +80,7 @@ void gturan_eval_dv(dval_t *expr, dval_t *x_var, dval_t *d2_expr,
     qfloat_t h  = qf_mul_double(qf_sub(b, a), 0.5);
     qfloat_t h2 = qf_mul(h, h);
 
-    /* Center node */
+    /* Centre node */
     ig_dv_set_val_qf(x_var, c);
     qfloat_t f0  = ig_dv_eval_qf(expr);
     qfloat_t d20 = same ? f0 : ig_dv_eval_qf(d2_expr);

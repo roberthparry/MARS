@@ -279,6 +279,22 @@ static void test_qf_log(void)
         }
     }
 
+    {
+        qfloat_t got = qf_log10(qf_from_double(1000.0));
+        qfloat_t expected = qf_from_double(3.0);
+        qf_to_string(got, buf, sizeof(buf));
+        qf_to_string(expected, buf_exp, sizeof(buf_exp));
+
+        if (qf_close_value(got, expected, 1e-30)) {
+            printf("%s  OK: log10(1000) = %s%s\n", C_GREEN, buf, C_RESET);
+        } else {
+            printf("%s  FAIL: log10(1000)%s\n", C_RED, C_RESET);
+            printf("    got      = %s\n", buf);
+            printf("    expected = %s\n", buf_exp);
+            TEST_FAIL();
+        }
+    }
+
     /* Round-trip: log(exp(x)) ≈ x */
     qfloat_t x = qf_from_double(5.0);
     qfloat_t ex = qf_exp(x);

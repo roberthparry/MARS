@@ -746,7 +746,7 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
         return;
     }
 
-    /* Division: normalize sign onto the outside when possible */
+    /* Division: normalise sign onto the outside when possible */
     if (dv_is_op(f, &ops_div)) {
         int need = PREC_MUL < parent_prec;
         bool neg_num = expr_is_negative(f->a);

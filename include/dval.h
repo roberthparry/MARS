@@ -32,12 +32,14 @@ typedef struct _dval_t dval_t;
 typedef struct dval_bindings_t dval_bindings_t;
 
 /**
- * @brief Canonical differentiable constants for zero and one.
+ * @brief Canonical differentiable singleton constants.
  *
- * These are process-lifetime singleton constant nodes.
+ * These are process-lifetime constant nodes. `DV_LN10` evaluates to the
+ * current `number_t` ln(10) constant at the library default precision.
  */
 extern const dval_t * const DV_ZERO;
 extern const dval_t * const DV_ONE;
+extern const dval_t * const DV_LN10;
 
 /* ------------------------------------------------------------------------- */
 /* Constructors — constants                                                  */
@@ -269,6 +271,7 @@ dval_t *dv_acosh(const dval_t *dv);
 dval_t *dv_atanh(const dval_t *dv);
 dval_t *dv_exp(const dval_t *dv);
 dval_t *dv_log(const dval_t *dv);
+dval_t *dv_log10(const dval_t *dv);
 dval_t *dv_sqrt(const dval_t *dv);
 dval_t *dv_pow(const dval_t *dv, const number_t *exponent);
 dval_t *dv_pow_dv(const dval_t *dv1, const dval_t *dv2);

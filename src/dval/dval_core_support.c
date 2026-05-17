@@ -146,11 +146,35 @@ static struct _dval_t _DV_ONE_NODE = {
     .var_id = 0
 };
 
+static struct _dval_t _DV_LN10_NODE = {
+    .ops = &ops_const,
+    .a = NULL,
+    .b = NULL,
+    .c = { { 0, 0, 0, 0, 0 } },
+    .x = { { 0, 0, 0, 0, 0 } },
+    .x_valid = 1,
+    .epoch = 0,
+    .dx_cache = NULL,
+    .name = "ln10",
+    .refcount = INT_MAX,
+    .var_id = 0
+};
+
 const dval_t * const DV_ZERO = &_DV_ZERO_NODE;
 const dval_t * const DV_ONE = &_DV_ONE_NODE;
+const dval_t * const DV_LN10 = &_DV_LN10_NODE;
 
 static uint64_t next_var_id = 1;
 static int dv_singletons_ready = 0;
+
+static void dv_shutdown_singletons(void)
+{
+    if (!dv_singletons_ready)
+        return;
+
+    num_destroy(&_DV_LN10_NODE.c);
+    num_destroy(&_DV_LN10_NODE.x);
+}
 
 static void dv_init_singletons(void)
 {
@@ -161,6 +185,10 @@ static void dv_init_singletons(void)
     _DV_ZERO_NODE.x = NUM_ZERO;
     _DV_ONE_NODE.c = NUM_ONE;
     _DV_ONE_NODE.x = NUM_ONE;
+    _DV_LN10_NODE.c = num_const(NUM_LN10);
+    _DV_LN10_NODE.x = num_clone(_DV_LN10_NODE.c);
+    if (atexit(dv_shutdown_singletons) != 0)
+        abort();
     dv_singletons_ready = 1;
 }
 
@@ -468,22 +496,22 @@ int dv_get_default_constant_num(const char *name, number_t *value_out)
         return 0;
 
     if (strcmp(canon, "e") == 0) {
-        *value_out = num_clone(NUM_E);
+        *value_out = num_const(NUM_E);
         return 1;
     }
 
     if (strcmp(canon, "@pi") == 0) {
-        *value_out = num_clone(NUM_PI);
+        *value_out = num_const(NUM_PI);
         return 1;
     }
 
     if (strcmp(canon, "@phi") == 0) {
-        *value_out = num_clone(NUM_PHI);
+        *value_out = num_const(NUM_PHI);
         return 1;
     }
 
     if (strcmp(canon, "@gamma") == 0) {
-        *value_out = num_clone(NUM_EULER_MASCHERONI);
+        *value_out = num_const(NUM_EULER_MASCHERONI);
         return 1;
     }
 

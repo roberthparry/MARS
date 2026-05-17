@@ -2,47 +2,65 @@
 #define MFLOAT_INTERNAL_H
 
 #include <stdbool.h>
+#include <mpfr.h>
 
 #include "mfloat.h"
-
-#include "mint.h"
 
 #define MFLOAT_DEFAULT_PRECISION_BITS 256u
 #define MFLOAT_PARSE_GUARD_BITS 4u
 
-/* Internal representation tags. */
-typedef enum mfloat_kind_t {
-    MFLOAT_KIND_FINITE = 0,
-    MFLOAT_KIND_NAN,
-    MFLOAT_KIND_POSINF,
-    MFLOAT_KIND_NEGINF
-} mfloat_kind_t;
+typedef enum mfloat_constant_id_t {
+    MFCONST_NONE = 0,
+    MFCONST_ZERO,
+    MFCONST_ONE,
+    MFCONST_HALF,
+    MFCONST_TENTH,
+    MFCONST_TEN,
+    MFCONST_PI,
+    MFCONST_2PI,
+    MFCONST_PI_2,
+    MFCONST_PI_4,
+    MFCONST_3PI_4,
+    MFCONST_PI_6,
+    MFCONST_PI_3,
+    MFCONST_2_PI,
+    MFCONST_E,
+    MFCONST_INV_E,
+    MFCONST_LN2,
+    MFCONST_LN10,
+    MFCONST_INVLN2,
+    MFCONST_EULER_MASCHERONI,
+    MFCONST_PHI,
+    MFCONST_SQRT_HALF,
+    MFCONST_SQRT2,
+    MFCONST_SQRT3,
+    MFCONST_SQRT2_OVER_TWO,
+    MFCONST_SQRT3_OVER_TWO,
+    MFCONST_SQRT_2PI,
+    MFCONST_SQRT_PI,
+    MFCONST_SQRT_PI_OVER_TWO,
+    MFCONST_SQRT1ONPI,
+    MFCONST_2_SQRTPI,
+    MFCONST_NEG_TWO_OVER_SQRT_PI,
+    MFCONST_INV_SQRT_2PI,
+    MFCONST_LOG_SQRT_2PI,
+    MFCONST_LN_2PI,
+    MFCONST_PI_SQUARED,
+    MFCONST_2PI_CUBED,
+    MFCONST_NAN,
+    MFCONST_INF,
+    MFCONST_NINF,
+    MFCONST_COUNT
+} mfloat_constant_id_t;
 
 struct _mfloat_t {
-    mfloat_kind_t kind; /* finite / NaN / infinities */
-    short sign;         /* -1, 0, +1 */
-    long exponent2;     /* binary exponent */
-    size_t precision;   /* target rounded precision in bits */
-    bool immortal;      /* static immortal backing */
-    mint_t *mantissa;   /* always non-negative */
+    mfloat_constant_id_t constant_id; /* internal named-constant identity */
+    mpfr_t value;                     /* authoritative representation */
 };
 
-/* Core representation helpers. */
-int mfloat_normalise(mfloat_t *mfloat);
-int mfloat_round_to_precision_internal(mfloat_t *mfloat, size_t precision);
-int mfloat_copy_value(mfloat_t *dst, const mfloat_t *src);
-int mfloat_set_from_signed_mint(mfloat_t *dst, mint_t *value, long exponent2);
-mint_t *mfloat_to_scaled_mint(const mfloat_t *mfloat, long target_exp);
-size_t mfloat_get_default_precision_internal(void);
-
-/* Internal immortal-constant helpers. */
-bool mfloat_is_immortal(const mfloat_t *mfloat);
-bool mfloat_is_finite(const mfloat_t *mfloat);
-bool mfloat_is_nan(const mfloat_t *mfloat);
-bool mfloat_is_inf(const mfloat_t *mfloat);
-mfloat_t *mfloat_clone_immortal_prec_internal(const mfloat_t *src, size_t precision);
-int mfloat_set_from_immortal_internal(mfloat_t *dst, const mfloat_t *src, size_t precision);
-
-/* Internal coefficient-table helpers. */
+/* Constant initialisation hook. */
+void mfloat_constants_ensure_init(void);
+void mfloat_constants_ensure_precision(mpfr_prec_t precision);
+void mfloat_constant_ensure(const mfloat_t *constant, mpfr_prec_t precision);
 
 #endif

@@ -53,8 +53,8 @@ static int mul_struct_eq(const dval_t *u, const dval_t *v)
     const dval_t **v_terms = NULL;
     unsigned char *matched = NULL;
     size_t u_n = 0, v_n = 0, u_cap = 0, v_cap = 0;
-    number_t u_coeff = NUM_ONE;
-    number_t v_coeff = NUM_ONE;
+    number_t u_coeff = num_const(NUM_ONE);
+    number_t v_coeff = num_const(NUM_ONE);
     int equal = 1;
 
     collect_mul_factors_borrowed(u, &u_coeff, &u_terms, &u_n, &u_cap);
@@ -89,6 +89,8 @@ static int mul_struct_eq(const dval_t *u, const dval_t *v)
     }
 
 cleanup:
+    num_destroy(&u_coeff);
+    num_destroy(&v_coeff);
     free(matched);
     free((void *)u_terms);
     free((void *)v_terms);

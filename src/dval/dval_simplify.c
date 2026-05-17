@@ -195,6 +195,17 @@ dval_t *dv_simplify_unary_operator(const dval_t *dv, dval_t *a, dval_t *b)
         return inner;
     }
 
+    /* log10(10^x) -> x */
+    if (dv_is_op(dv, &ops_log10) &&
+        dv_is_op(a, &ops_pow) &&
+        dv_is_op(a->a, &ops_const) &&
+        num_eq(a->a->c, NUM_TEN)) {
+        dval_t *inner = a->b;
+        dv_retain(inner);
+        dv_free(a);
+        return inner;
+    }
+
     if (dv_is_op(a, &ops_const)) {
         number_t folded = num_new();
 
@@ -320,8 +331,8 @@ dval_t *dv_simplify_neg_operator(const dval_t *dv, dval_t *a, dval_t *b)
 dval_t *dv_simplify_add_sub_operator(const dval_t *dv, dval_t *a, dval_t *b)
 {
     NUM_SCOPE(scope);
-    number_t c_const = num_clone(NUM_ZERO);
-    number_t common_coeff = num_clone(NUM_ONE);
+    number_t c_const = num_const(NUM_ZERO);
+    number_t common_coeff = num_const(NUM_ONE);
     addend_t *terms   = NULL;
     size_t    n = 0, cap = 0;
 
@@ -342,6 +353,8 @@ dval_t *dv_simplify_add_sub_operator(const dval_t *dv, dval_t *a, dval_t *b)
             num_destroy(&terms[i].coeff);
         }
         free(terms);
+        num_destroy(&c_const);
+        num_destroy(&common_coeff);
         return identity;
     }
 
@@ -394,8 +407,14 @@ dval_t *dv_simplify_add_sub_operator(const dval_t *dv, dval_t *a, dval_t *b)
     if (!cur)
         cur = dv_new_const(NUM_ZERO);
 
-    if (!num_is_one(common_coeff))
-        cur = dv_make_scaled(common_coeff, cur);
+    if (!num_is_one(common_coeff)) {
+        dval_t *scaled = dv_make_scaled(common_coeff, cur);
+
+        cur = scaled;
+    }
+
+    num_destroy(&c_const);
+    num_destroy(&common_coeff);
 
     return cur;
 }
@@ -409,7 +428,7 @@ dval_t *dv_simplify_mul_operator(const dval_t *dv, dval_t *a, dval_t *b)
     dval_t **den_terms = NULL;
     size_t nterms = 0, term_cap = 0;
     size_t nden_terms = 0, den_cap = 0;
-    number_t c_acc = num_clone(NUM_ONE);
+    number_t c_acc = num_const(NUM_ONE);
     int is_zero = 0;
     dval_t *expanded;
     dval_t *numerator;
@@ -440,6 +459,7 @@ dval_t *dv_simplify_mul_operator(const dval_t *dv, dval_t *a, dval_t *b)
 
     if (is_zero) {
         dv_free_node_array(terms, nterms);
+        num_destroy(&c_acc);
         return dv_new_const(NUM_ZERO);
     }
 
@@ -449,6 +469,7 @@ dval_t *dv_simplify_mul_operator(const dval_t *dv, dval_t *a, dval_t *b)
     if (is_zero) {
         dv_free_node_array(terms, nterms);
         dv_free_node_array(den_terms, nden_terms);
+        num_destroy(&c_acc);
         return dv_new_const(NUM_ZERO);
     }
 
@@ -460,10 +481,12 @@ dval_t *dv_simplify_mul_operator(const dval_t *dv, dval_t *a, dval_t *b)
 
     expanded = dv_try_expand_shallow_product(c_acc, terms, nterms, den_terms, nden_terms);
     if (expanded) {
+        num_destroy(&c_acc);
         return expanded;
     }
 
     numerator = dv_rebuild_product_chain(c_acc, terms, nterms);
+    num_destroy(&c_acc);
     if (nden_terms == 0) {
         free(den_terms);
         return numerator;
@@ -519,13 +542,17 @@ dval_t *dv_simplify_div_operator(const dval_t *dv, dval_t *a, dval_t *b)
         return dv_simplify_neg_operator(dv, simp, NULL);
     }
     if (dv_is_unnamed_const(b) && dv_is_addsub(a)) {
-        number_t c_const = num_clone(NUM_ZERO);
+        number_t c_const = num_const(NUM_ZERO);
+        number_t denom = NUM_ZERO;
         addend_t *terms = NULL;
         size_t n = 0, cap = 0;
         dval_t *cur = NULL;
 
-        if (!num_is_real(b->c))
+        if (!num_is_real(b->c)) {
+            num_destroy(&c_const);
             goto div_fallback_2;
+        }
+        denom = num_clone(b->c);
 
         dv_collect_addends(a, NUM_ONE, &c_const, &terms, &n, &cap);
         dv_free(a);
@@ -541,7 +568,7 @@ dval_t *dv_simplify_div_operator(const dval_t *dv, dval_t *a, dval_t *b)
                 continue;
             }
 
-            number_t scaled_coeff = num_div(terms[i].coeff, b->c);
+            number_t scaled_coeff = num_div(terms[i].coeff, denom);
 
             term = dv_make_scaled_owned_local(scaled_coeff, terms[i].base);
             num_destroy(&terms[i].coeff);
@@ -556,7 +583,7 @@ dval_t *dv_simplify_div_operator(const dval_t *dv, dval_t *a, dval_t *b)
         free(terms);
 
         if (!num_is_zero(c_const)) {
-            number_t scaled_const = num_div(c_const, b->c);
+            number_t scaled_const = num_div(c_const, denom);
             dval_t *cterm = dv_new_const_owned_local(scaled_const);
 
             if (!cur)
@@ -569,7 +596,13 @@ dval_t *dv_simplify_div_operator(const dval_t *dv, dval_t *a, dval_t *b)
             }
         }
 
-        return cur ? cur : dv_new_const(NUM_ZERO);
+        {
+            dval_t *out = cur ? cur : dv_new_const(NUM_ZERO);
+
+            num_destroy(&c_const);
+            num_destroy(&denom);
+            return out;
+        }
     }
 div_fallback_2:
     if (dv_is_op(a, &ops_mul) && dv_struct_eq(a->a, b)) {
@@ -677,6 +710,13 @@ dval_t *dv_simplify_pow_operator(const dval_t *dv, dval_t *a, dval_t *b)
     if (dv_is_op(b, &ops_const) && dv_const_is_one(b)) { dv_free(b); return a; }
     if (dv_is_op(b, &ops_const) && dv_const_is_zero(b)) {
         dv_free(a); dv_free(b); return dv_new_const(NUM_ONE);
+    }
+    if (dv_is_op(a, &ops_const) && num_eq(a->c, NUM_TEN) && dv_is_op(b, &ops_log10)) {
+        dval_t *inner = b->a;
+        dv_retain(inner);
+        dv_free(a);
+        dv_free(b);
+        return inner;
     }
     dval_t *r = dv_pow_dv(a, b); dv_free(a); dv_free(b); return r;
 }

@@ -171,6 +171,13 @@ void dv_reverse_log(const dval_t *dv, const number_t *out_bar, number_t *a_bar, 
     dv_reverse_unary(num_owned_clone_local(factor), a_bar, b_bar);
 }
 
+void dv_reverse_log10(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+{
+    number_t denom = num_mul(dv_eval_num_internal(dv->a), NUM_LN10);
+
+    dv_reverse_unary(num_owned_div_local(*out_bar, denom), a_bar, b_bar);
+}
+
 void dv_reverse_sqrt(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
     number_t denom = num_mul(NUM_TWO, dv_eval_num_internal(dv));

@@ -1,5 +1,6 @@
 #include "test_dval.h"
 #include "internal/dval_internal.h"
+#include "internal/number_internal.h"
 
 static bool dv_match_unary_affine_kind_qf_local(const dval_t *expr,
                                                 dv_pattern_unary_affine_kind_t unary_kind,
@@ -8,7 +9,7 @@ static bool dv_match_unary_affine_kind_qf_local(const dval_t *expr,
                                                 qfloat_t *constant_out,
                                                 qfloat_t *coeffs_out)
 {
-    number_t constant = num_new();
+    number_t constant = number_invalid();
     number_t *coeffs_num = NULL;
     bool ok;
 
@@ -18,7 +19,7 @@ static bool dv_match_unary_affine_kind_qf_local(const dval_t *expr,
     if ((nvars > 0) && !coeffs_num)
         return false;
     for (size_t i = 0; i < nvars; ++i)
-        coeffs_num[i] = num_new();
+        coeffs_num[i] = number_invalid();
     ok = dv_match_unary_affine_kind(expr, unary_kind, nvars, vars, &constant, coeffs_num);
     if (ok)
         *constant_out = num_to_qfloat(constant);
@@ -39,7 +40,7 @@ static bool dv_match_affine_poly_deg4_qf_local(const dval_t *expr,
                                                qfloat_t *constant_out,
                                                qfloat_t *coeffs_out)
 {
-    number_t constant = num_new();
+    number_t constant = number_invalid();
     number_t poly_num[5];
     number_t *coeffs_num = NULL;
     bool ok;
@@ -50,9 +51,9 @@ static bool dv_match_affine_poly_deg4_qf_local(const dval_t *expr,
     if ((nvars > 0) && !coeffs_num)
         return false;
     for (size_t i = 0; i < nvars; ++i)
-        coeffs_num[i] = num_new();
+        coeffs_num[i] = number_invalid();
     for (size_t i = 0; i < 5; ++i)
-        poly_num[i] = num_new();
+        poly_num[i] = number_invalid();
     ok = dv_match_affine_poly_deg4(expr, nvars, vars, poly_num, &constant, coeffs_num);
     if (ok)
         *constant_out = num_to_qfloat(constant);
@@ -80,7 +81,7 @@ static bool dv_match_affine_poly_deg4_times_unary_affine_kind_qf_local(
     qfloat_t *constant_out,
     qfloat_t *coeffs_out)
 {
-    number_t constant = num_new();
+    number_t constant = number_invalid();
     number_t poly_num[5];
     number_t *coeffs_num = NULL;
     bool ok;
@@ -91,9 +92,9 @@ static bool dv_match_affine_poly_deg4_times_unary_affine_kind_qf_local(
     if ((nvars > 0) && !coeffs_num)
         return false;
     for (size_t i = 0; i < nvars; ++i)
-        coeffs_num[i] = num_new();
+        coeffs_num[i] = number_invalid();
     for (size_t i = 0; i < 5; ++i)
-        poly_num[i] = num_new();
+        poly_num[i] = number_invalid();
     ok = dv_match_affine_poly_deg4_times_unary_affine_kind(
         expr, unary_kind, nvars, vars, poly_num, &constant, coeffs_num);
     if (ok)

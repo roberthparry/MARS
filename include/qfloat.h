@@ -22,7 +22,7 @@
  *
  *      |lo| <= 0.5 * ulp(hi)
  *
- * ensuring a unique, normalized representation.
+ * ensuring a unique, normalised representation.
  */
 
 #ifndef QFLOAT_H
@@ -115,6 +115,9 @@ extern const qfloat_t QF_INV_E;
 
 /** @brief ln(2) */
 extern const qfloat_t QF_LN2;
+
+/** @brief ln(10) */
+extern const qfloat_t QF_LN10;
 
 /** @brief 1/ln(2) */
 extern const qfloat_t QF_INVLN2;
@@ -232,7 +235,7 @@ double qf_to_double(qfloat_t x);
 qfloat_t qf_from_string(const char *s);
 
 /**
- * @brief Convert a qfloat_t to normalized scientific notation.
+ * @brief Convert a qfloat_t to normalised scientific notation.
  *
  * Produces exactly 32 significant digits in the form:
  *
@@ -586,6 +589,14 @@ qfloat_t qf_exp(qfloat_t x);
  * @return log(x) (double‑double precision).
  */
 qfloat_t qf_log(qfloat_t x);
+
+/**
+ * @brief Common logarithm.
+ *
+ * @param x Input value (must be > 0).
+ * @return log10(x) (double-double precision).
+ */
+qfloat_t qf_log10(qfloat_t x);
 
 /**
  * @brief Test whether a qfloat_t is a NaN value.

@@ -8,7 +8,7 @@
 
 /**
  * @file mrational.h
- * @brief Opaque exact rational values backed by multiprecision integers.
+ * @brief Opaque exact rational values backed by GMP rationals.
  */
 
 /**
@@ -35,6 +35,7 @@ extern const mrational_t * const MR_ONE_TENTH;
  * @{
  */
 mrational_t *mr_new(void);
+mrational_t *mr_const(const mrational_t *constant);
 mrational_t *mr_create_long(long value);
 mrational_t *mr_create_frac_long(long numerator, long denominator);
 mrational_t *mr_create_mints(const mint_t *numerator, const mint_t *denominator);

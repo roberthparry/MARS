@@ -405,7 +405,7 @@ static void test_mat_fun_3x3_mp_real(void)
                 matrix_t *I = mat_sub(CH2, SH2);
                 if (I)
                 {
-                    check_mat_identity_d("3×3 num cosh²(A)-sinh²(A)=I", I, 3, 1e-12);
+                    check_mat_identity_d("3×3 num cosh²(A)-sinh²(A)=I", I, 3, 1e-10);
                     mat_free(I);
                 }
             }

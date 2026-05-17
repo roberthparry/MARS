@@ -11,6 +11,10 @@ typedef number_t (*number_binary_fn)(number_t, number_t);
 typedef number_t (*number_ternary_fn)(number_t, number_t, number_t);
 typedef number_t (*number_const_fn)(void);
 
+static number_t bench_num_pi(void) { return num_clone(NUM_PI); }
+static number_t bench_num_e(void) { return num_clone(NUM_E); }
+static number_t bench_num_euler_mascheroni(void) { return num_clone(NUM_EULER_MASCHERONI); }
+
 static uint64_t now_ns(void)
 {
     struct timespec ts;
@@ -69,32 +73,31 @@ static void run_unary_case(const char *label,
     if (!bench_case_enabled(label))
         return;
 
-    old_prec = num_get_default_precision();
-    if (num_set_default_precision(precision) != 0) {
+    old_prec = num_get_default_prec_bits();
+    if (num_set_default_prec_bits(precision) != 0) {
         fprintf(stderr, "%s set default precision failed\n", label);
         return;
     }
 
-    src = num_create_string(text);
+    src = num_create_from_string(text);
     value = fn(src);
-    num_clear(&value);
+    num_destroy(&value);
 
     start = now_ns();
     for (int i = 0; i < iters; ++i) {
         value = fn(src);
-        num_clear(&value);
+        num_destroy(&value);
     }
     end = now_ns();
 
     avg_us = ((double)(end - start) / (double)iters) / 1000.0;
-    printf("%-28s bits=%-4zu avg_µs=%10.3f avg_ms=%10.3f\n",
+    printf("%-28s bits=%-4zu avg_µs=%10.3f\n",
            label,
            precision,
-           avg_us,
-           avg_us / 1000.0);
+           avg_us);
 
-    num_clear(&src);
-    (void)num_set_default_precision(old_prec);
+    num_destroy(&src);
+    (void)num_set_default_prec_bits(old_prec);
 }
 
 static void run_binary_case(const char *label,
@@ -115,34 +118,33 @@ static void run_binary_case(const char *label,
     if (!bench_case_enabled(label))
         return;
 
-    old_prec = num_get_default_precision();
-    if (num_set_default_precision(precision) != 0) {
+    old_prec = num_get_default_prec_bits();
+    if (num_set_default_prec_bits(precision) != 0) {
         fprintf(stderr, "%s set default precision failed\n", label);
         return;
     }
 
-    lhs = num_create_string(lhs_text);
-    rhs = num_create_string(rhs_text);
+    lhs = num_create_from_string(lhs_text);
+    rhs = num_create_from_string(rhs_text);
     value = fn(lhs, rhs);
-    num_clear(&value);
+    num_destroy(&value);
 
     start = now_ns();
     for (int i = 0; i < iters; ++i) {
         value = fn(lhs, rhs);
-        num_clear(&value);
+        num_destroy(&value);
     }
     end = now_ns();
 
     avg_us = ((double)(end - start) / (double)iters) / 1000.0;
-    printf("%-28s bits=%-4zu avg_µs=%10.3f avg_ms=%10.3f\n",
+    printf("%-28s bits=%-4zu avg_µs=%10.3f\n",
            label,
            precision,
-           avg_us,
-           avg_us / 1000.0);
+           avg_us);
 
-    num_clear(&lhs);
-    num_clear(&rhs);
-    (void)num_set_default_precision(old_prec);
+    num_destroy(&lhs);
+    num_destroy(&rhs);
+    (void)num_set_default_prec_bits(old_prec);
 }
 
 static void run_sincos_case(const char *label, const char *text, size_t precision, int iters)
@@ -158,44 +160,43 @@ static void run_sincos_case(const char *label, const char *text, size_t precisio
     if (!bench_case_enabled(label))
         return;
 
-    old_prec = num_get_default_precision();
-    if (num_set_default_precision(precision) != 0) {
+    old_prec = num_get_default_prec_bits();
+    if (num_set_default_prec_bits(precision) != 0) {
         fprintf(stderr, "%s set default precision failed\n", label);
         return;
     }
 
-    src = num_create_string(text);
+    src = num_create_from_string(text);
     if (num_sincos(src, &sin_value, &cos_value) != 0) {
         fprintf(stderr, "%s warmup failed\n", label);
-        num_clear(&src);
-        (void)num_set_default_precision(old_prec);
+        num_destroy(&src);
+        (void)num_set_default_prec_bits(old_prec);
         return;
     }
-    num_clear(&sin_value);
-    num_clear(&cos_value);
+    num_destroy(&sin_value);
+    num_destroy(&cos_value);
 
     start = now_ns();
     for (int i = 0; i < iters; ++i) {
         if (num_sincos(src, &sin_value, &cos_value) != 0) {
             fprintf(stderr, "%s timed run failed\n", label);
-            num_clear(&src);
-            (void)num_set_default_precision(old_prec);
+            num_destroy(&src);
+            (void)num_set_default_prec_bits(old_prec);
             return;
         }
-        num_clear(&sin_value);
-        num_clear(&cos_value);
+        num_destroy(&sin_value);
+        num_destroy(&cos_value);
     }
     end = now_ns();
 
     avg_us = ((double)(end - start) / (double)iters) / 1000.0;
-    printf("%-28s bits=%-4zu avg_µs=%10.3f avg_ms=%10.3f\n",
+    printf("%-28s bits=%-4zu avg_µs=%10.3f\n",
            label,
            precision,
-           avg_us,
-           avg_us / 1000.0);
+           avg_us);
 
-    num_clear(&src);
-    (void)num_set_default_precision(old_prec);
+    num_destroy(&src);
+    (void)num_set_default_prec_bits(old_prec);
 }
 
 static void run_sinhcosh_case(const char *label, const char *text, size_t precision, int iters)
@@ -211,44 +212,43 @@ static void run_sinhcosh_case(const char *label, const char *text, size_t precis
     if (!bench_case_enabled(label))
         return;
 
-    old_prec = num_get_default_precision();
-    if (num_set_default_precision(precision) != 0) {
+    old_prec = num_get_default_prec_bits();
+    if (num_set_default_prec_bits(precision) != 0) {
         fprintf(stderr, "%s set default precision failed\n", label);
         return;
     }
 
-    src = num_create_string(text);
+    src = num_create_from_string(text);
     if (num_sinhcosh(src, &sinh_value, &cosh_value) != 0) {
         fprintf(stderr, "%s warmup failed\n", label);
-        num_clear(&src);
-        (void)num_set_default_precision(old_prec);
+        num_destroy(&src);
+        (void)num_set_default_prec_bits(old_prec);
         return;
     }
-    num_clear(&sinh_value);
-    num_clear(&cosh_value);
+    num_destroy(&sinh_value);
+    num_destroy(&cosh_value);
 
     start = now_ns();
     for (int i = 0; i < iters; ++i) {
         if (num_sinhcosh(src, &sinh_value, &cosh_value) != 0) {
             fprintf(stderr, "%s timed run failed\n", label);
-            num_clear(&src);
-            (void)num_set_default_precision(old_prec);
+            num_destroy(&src);
+            (void)num_set_default_prec_bits(old_prec);
             return;
         }
-        num_clear(&sinh_value);
-        num_clear(&cosh_value);
+        num_destroy(&sinh_value);
+        num_destroy(&cosh_value);
     }
     end = now_ns();
 
     avg_us = ((double)(end - start) / (double)iters) / 1000.0;
-    printf("%-28s bits=%-4zu avg_µs=%10.3f avg_ms=%10.3f\n",
+    printf("%-28s bits=%-4zu avg_µs=%10.3f\n",
            label,
            precision,
-           avg_us,
-           avg_us / 1000.0);
+           avg_us);
 
-    num_clear(&src);
-    (void)num_set_default_precision(old_prec);
+    num_destroy(&src);
+    (void)num_set_default_prec_bits(old_prec);
 }
 
 static void run_ternary_case(const char *label,
@@ -271,36 +271,35 @@ static void run_ternary_case(const char *label,
     if (!bench_case_enabled(label))
         return;
 
-    old_prec = num_get_default_precision();
-    if (num_set_default_precision(precision) != 0) {
+    old_prec = num_get_default_prec_bits();
+    if (num_set_default_prec_bits(precision) != 0) {
         fprintf(stderr, "%s set default precision failed\n", label);
         return;
     }
 
-    x = num_create_string(x_text);
-    a = num_create_string(a_text);
-    b = num_create_string(b_text);
+    x = num_create_from_string(x_text);
+    a = num_create_from_string(a_text);
+    b = num_create_from_string(b_text);
     value = fn(x, a, b);
-    num_clear(&value);
+    num_destroy(&value);
 
     start = now_ns();
     for (int i = 0; i < iters; ++i) {
         value = fn(x, a, b);
-        num_clear(&value);
+        num_destroy(&value);
     }
     end = now_ns();
 
     avg_us = ((double)(end - start) / (double)iters) / 1000.0;
-    printf("%-28s bits=%-4zu avg_µs=%10.3f avg_ms=%10.3f\n",
+    printf("%-28s bits=%-4zu avg_µs=%10.3f\n",
            label,
            precision,
-           avg_us,
-           avg_us / 1000.0);
+           avg_us);
 
-    num_clear(&x);
-    num_clear(&a);
-    num_clear(&b);
-    (void)num_set_default_precision(old_prec);
+    num_destroy(&x);
+    num_destroy(&a);
+    num_destroy(&b);
+    (void)num_set_default_prec_bits(old_prec);
 }
 
 static void run_const_case(const char *label,
@@ -317,30 +316,29 @@ static void run_const_case(const char *label,
     if (!bench_case_enabled(label))
         return;
 
-    old_prec = num_get_default_precision();
-    if (num_set_default_precision(precision) != 0) {
+    old_prec = num_get_default_prec_bits();
+    if (num_set_default_prec_bits(precision) != 0) {
         fprintf(stderr, "%s set default precision failed\n", label);
         return;
     }
 
     value = fn();
-    num_clear(&value);
+    num_destroy(&value);
 
     start = now_ns();
     for (int i = 0; i < iters; ++i) {
         value = fn();
-        num_clear(&value);
+        num_destroy(&value);
     }
     end = now_ns();
 
     avg_us = ((double)(end - start) / (double)iters) / 1000.0;
-    printf("%-28s bits=%-4zu avg_µs=%10.3f avg_ms=%10.3f\n",
+    printf("%-28s bits=%-4zu avg_µs=%10.3f\n",
            label,
            precision,
-           avg_us,
-           avg_us / 1000.0);
+           avg_us);
 
-    (void)num_set_default_precision(old_prec);
+    (void)num_set_default_prec_bits(old_prec);
 }
 
 int main(void)
@@ -353,12 +351,12 @@ int main(void)
     if (bench_wants_section("constants")) {
         puts("");
         puts("-- constants --");
-        run_const_case("pi_256", 256u, num_pi, bench_scaled_iters(8));
-        run_const_case("e_256", 256u, num_e, bench_scaled_iters(8));
-        run_const_case("gamma_256", 256u, num_euler_mascheroni, bench_scaled_iters(6));
-        run_const_case("pi_512", 512u, num_pi, bench_scaled_iters(4));
-        run_const_case("e_512", 512u, num_e, bench_scaled_iters(4));
-        run_const_case("gamma_512", 512u, num_euler_mascheroni, bench_scaled_iters(3));
+        run_const_case("pi_256", 256u, bench_num_pi, bench_scaled_iters(8));
+        run_const_case("e_256", 256u, bench_num_e, bench_scaled_iters(8));
+        run_const_case("gamma_256", 256u, bench_num_euler_mascheroni, bench_scaled_iters(6));
+        run_const_case("pi_512", 512u, bench_num_pi, bench_scaled_iters(4));
+        run_const_case("e_512", 512u, bench_num_e, bench_scaled_iters(4));
+        run_const_case("gamma_512", 512u, bench_num_euler_mascheroni, bench_scaled_iters(3));
     }
 
     if (bench_wants_section("exp")) {
@@ -442,8 +440,8 @@ int main(void)
         run_binary_case("gammainc_Q_256", "1", "1", 256u, num_gammainc_Q, bench_scaled_iters(2));
         run_binary_case("gammainc_lo_256", "1", "1", 256u, num_gammainc_lower, bench_scaled_iters(2));
         run_binary_case("gammainc_hi_256", "1", "1", 256u, num_gammainc_upper, bench_scaled_iters(2));
-        run_unary_case("ei_256", "1", 256u, num_ei, bench_scaled_iters(2));
-        run_unary_case("e1_256", "1", 256u, num_e1, bench_scaled_iters(2));
+        run_unary_case("ei_5_256", "5", 256u, num_ei, bench_scaled_iters(2));
+        run_unary_case("e1_5_256", "5", 256u, num_e1, bench_scaled_iters(2));
     }
 
     if (bench_wants_section("selected512")) {
@@ -482,8 +480,8 @@ int main(void)
         run_binary_case("logbeta_512", "2.5", "3.5", 512u, num_logbeta, bench_scaled_iters(1));
         run_ternary_case("beta_pdf_512", "0.5", "2.5", "3.5", 512u, num_beta_pdf, bench_scaled_iters(1));
         run_unary_case("normal_pdf_512", "0.5", 512u, num_normal_pdf, bench_scaled_iters(1));
-        run_unary_case("ei_512", "1", 512u, num_ei, bench_scaled_iters(1));
-        run_unary_case("e1_512", "1", 512u, num_e1, bench_scaled_iters(1));
+        run_unary_case("ei_5_512", "5", 512u, num_ei, bench_scaled_iters(1));
+        run_unary_case("e1_5_512", "5", 512u, num_e1, bench_scaled_iters(1));
     }
 
     if (bench_wants_section("selected768")) {
@@ -516,8 +514,8 @@ int main(void)
         run_unary_case("digamma_768", "2.345", 768u, num_digamma, bench_scaled_iters(1));
         run_unary_case("trigamma_768", "2.345", 768u, num_trigamma, bench_scaled_iters(1));
         run_unary_case("tetragamma_768", "2.345", 768u, num_tetragamma, bench_scaled_iters(1));
-        run_unary_case("ei_768", "1", 768u, num_ei, bench_scaled_iters(1));
-        run_unary_case("e1_768", "1", 768u, num_e1, bench_scaled_iters(1));
+        run_unary_case("ei_5_768", "5", 768u, num_ei, bench_scaled_iters(1));
+        run_unary_case("e1_5_768", "5", 768u, num_e1, bench_scaled_iters(1));
         run_unary_case("lambert_w0_768", "0.7", 768u, num_lambert_w0, bench_scaled_iters(1));
         run_unary_case("lambert_wm1_768", "-0.2", 768u, num_lambert_wm1, bench_scaled_iters(1));
     }
@@ -558,8 +556,8 @@ int main(void)
         run_binary_case("logbeta_1024", "2.5", "3.5", 1024u, num_logbeta, bench_scaled_iters(1));
         run_ternary_case("beta_pdf_1024", "0.5", "2.5", "3.5", 1024u, num_beta_pdf, bench_scaled_iters(1));
         run_unary_case("normal_pdf_1024", "0.5", 1024u, num_normal_pdf, bench_scaled_iters(1));
-        run_unary_case("ei_1024", "1", 1024u, num_ei, bench_scaled_iters(1));
-        run_unary_case("e1_1024", "1", 1024u, num_e1, bench_scaled_iters(1));
+        run_unary_case("ei_5_1024", "5", 1024u, num_ei, bench_scaled_iters(1));
+        run_unary_case("e1_5_1024", "5", 1024u, num_e1, bench_scaled_iters(1));
     }
 
     return 0;

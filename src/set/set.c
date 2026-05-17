@@ -109,7 +109,7 @@ set_t *set_create(size_t elem_size,
     set->clone_fn = clone;
     set->destroy_fn = destroy;
 
-    /* Initialize hash table with smallest prime */
+    /* Initialise hash table with smallest prime */
     if (!set_rehash(set, 0)) {
         set_destroy(set);
         return NULL;

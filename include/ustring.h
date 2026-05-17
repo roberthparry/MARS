@@ -260,7 +260,7 @@ string_offset_t string_find(const string_t *s, const char *needle);
  * @brief Lexicographically compare two strings by UTF-8 byte value.
  *
  * The comparison is bytewise (not locale-aware or Unicode collation order).
- * For locale-aware comparison, normalize both strings to NFC first.
+ * For locale-aware comparison, normalise both strings to NFC first.
  *
  * @param a  First string. Must not be @c NULL.
  * @param b  Second string. Must not be @c NULL.

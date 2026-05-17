@@ -185,6 +185,11 @@ qfloat_t qf_log(qfloat_t x)
     return y;
 }
 
+qfloat_t qf_log10(qfloat_t x)
+{
+    return qf_div(qf_log(x), QF_LN10);
+}
+
 bool qf_isnan(qfloat_t x)
 {
     return (x.hi != x.hi) || (x.lo != x.lo);

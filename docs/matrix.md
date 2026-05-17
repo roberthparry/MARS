@@ -38,7 +38,7 @@ the API. Internally each matrix carries:
 - matrix norms: 1-norm, infinity-norm, Frobenius norm, 2-norm
 - matrix factorisations: LU, QR, Cholesky, SVD, Schur
 - condition number computation
-- matrix functions: exp, sin, cos, tan, sinh, cosh, tanh, sqrt, log, asin, acos, atan, asinh, acosh, atanh, erf, erfc
+- matrix functions: exp, sin, cos, tan, sinh, cosh, tanh, sqrt, log, log10, asin, acos, atan, asinh, acosh, atanh, erf, erfc
 - power functions: integer power (binary exponentiation), real power via exp/log
 - numeric eigendecomposition and matrix functions are computed through the high-precision numeric `number_t` layer regardless of how the original numeric entries were written
 
@@ -927,6 +927,7 @@ For `MAT_TYPE_DVAL`, the story is different:
 |---|---|
 | `mat_exp(A)` | Matrix exponential `eˢ` |
 | `mat_log(A)` | Matrix (principal) logarithm |
+| `mat_log10(A)` | Matrix common logarithm, computed as `mat_log(A) / log(10)` |
 | `mat_sqrt(A)` | Matrix (principal) square root |
 | `mat_sin(A)` | Matrix sine |
 | `mat_cos(A)` | Matrix cosine |

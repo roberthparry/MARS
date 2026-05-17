@@ -3877,6 +3877,24 @@ matrix_t *mat_log(const matrix_t *A)
     return R;
 }
 
+matrix_t *mat_log10(const matrix_t *A)
+{
+    matrix_t *L = mat_log(A);
+    matrix_t *R = NULL;
+    number_t log_ten;
+
+    if (!L)
+        return NULL;
+
+    log_ten = num_const(NUM_LN10);
+    R = mat_scalar_div(L, &log_ten);
+
+    num_destroy(&log_ten);
+    mat_free(L);
+
+    return R;
+}
+
 matrix_t *mat_sin(const matrix_t *A)
 {
     if (A &&

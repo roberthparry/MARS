@@ -5,6 +5,7 @@
 #include "dval_internal.h"
 #include "dval.h"
 #include "internal/dval_internal.h"
+#include "internal/number_internal.h"
 
 static bool is_kind(const dval_t *expr, dval_op_kind_t kind)
 {
@@ -27,8 +28,10 @@ static bool dv_match_const_leaf(const dval_t *expr, number_t *value_out, const c
 {
     if (!is_kind(expr, DV_KIND_CONST))
         return false;
-    if (value_out)
+    if (value_out) {
+        num_destroy(value_out);
         *value_out = num_clone(expr->c);
+    }
     if (name_out)
         *name_out = (expr->name && *expr->name) ? expr->name : NULL;
     return true;
@@ -38,8 +41,10 @@ static bool dv_match_var_leaf(const dval_t *expr, number_t *value_out, const cha
 {
     if (!is_kind(expr, DV_KIND_VAR))
         return false;
-    if (value_out)
+    if (value_out) {
+        num_destroy(value_out);
         *value_out = num_clone(expr->c);
+    }
     if (name_out)
         *name_out = (expr->name && *expr->name) ? expr->name : NULL;
     return true;
@@ -47,8 +52,13 @@ static bool dv_match_var_leaf(const dval_t *expr, number_t *value_out, const cha
 
 static bool dv_match_unnamed_const_leaf(const dval_t *expr, number_t *value_out)
 {
-    const char *name;
-    return value_out && dv_match_const_leaf(expr, value_out, &name) && !name;
+    if (!value_out || !is_kind(expr, DV_KIND_CONST))
+        return false;
+    if (expr->name && *expr->name)
+        return false;
+    num_destroy(value_out);
+    *value_out = num_clone(expr->c);
+    return true;
 }
 
 static bool dv_match_unary_kind(const dval_t *expr, dval_op_kind_t kind, const dval_t **arg_out)
@@ -87,10 +97,12 @@ static bool dv_match_scaled_inner(const dval_t *factor,
     if (!dv_is_unnamed_const(factor) || !dv_match_const_value(factor, &factor_value))
         return false;
     if (dv_match_scaled_expr(other, &inner_scale, &inner_base)) {
+        num_destroy(scale_out);
         *scale_out = num_scope_detach(num_mul(factor_value, inner_scale));
         *base_out = inner_base;
         return true;
     }
+    num_destroy(scale_out);
     *scale_out = num_scope_detach(factor_value);
     *base_out = other;
     return true;
@@ -219,18 +231,69 @@ static bool dv_match_affine_term(const dval_t *dv,
 
     if (dv_match_add_sub_expr(dv, &left, &right, &is_sub)) {
         number_t right_scale = is_sub ? num_neg(scale) : num_clone(scale);
-        return dv_match_affine_term(left, nvars, vars, scale, constant_io, coeffs_io) &&
-               dv_match_affine_term(right, nvars, vars, right_scale, constant_io, coeffs_io);
+        number_t trial_constant = num_clone(*constant_io);
+        number_t *trial_coeffs = dv_clone_number_array(coeffs_io, nvars);
+        bool ok;
+
+        if ((nvars > 0) && !trial_coeffs) {
+            num_destroy(&trial_constant);
+            return false;
+        }
+
+        ok = dv_match_affine_term(left, nvars, vars, scale, &trial_constant, trial_coeffs) &&
+             dv_match_affine_term(right, nvars, vars, right_scale, &trial_constant, trial_coeffs);
+        if (!ok) {
+            num_destroy(&trial_constant);
+            dv_destroy_number_array(trial_coeffs, nvars);
+            return false;
+        }
+
+        num_destroy(constant_io);
+        *constant_io = num_scope_detach(trial_constant);
+        for (size_t i = 0; i < nvars; ++i) {
+            num_destroy(&coeffs_io[i]);
+            coeffs_io[i] = trial_coeffs[i];
+            trial_coeffs[i] = number_invalid();
+        }
+        dv_destroy_number_array(trial_coeffs, nvars);
+        return true;
     }
 
     if (dv_match_scaled_expr(dv, &inner_scale, &base)) {
         number_t product;
+        number_t trial_constant;
+        number_t *trial_coeffs;
+        bool ok;
 
         if (!num_is_real(inner_scale) || !num_is_real(scale)) {
+            num_destroy(&inner_scale);
             return false;
         }
         product = num_mul(scale, inner_scale);
-        return dv_match_affine_term(base, nvars, vars, product, constant_io, coeffs_io);
+        num_destroy(&inner_scale);
+        trial_constant = num_clone(*constant_io);
+        trial_coeffs = dv_clone_number_array(coeffs_io, nvars);
+        if ((nvars > 0) && !trial_coeffs) {
+            num_destroy(&trial_constant);
+            return false;
+        }
+
+        ok = dv_match_affine_term(base, nvars, vars, product, &trial_constant, trial_coeffs);
+        if (!ok) {
+            num_destroy(&trial_constant);
+            dv_destroy_number_array(trial_coeffs, nvars);
+            return false;
+        }
+
+        num_destroy(constant_io);
+        *constant_io = num_scope_detach(trial_constant);
+        for (size_t i = 0; i < nvars; ++i) {
+            num_destroy(&coeffs_io[i]);
+            coeffs_io[i] = trial_coeffs[i];
+            trial_coeffs[i] = number_invalid();
+        }
+        dv_destroy_number_array(trial_coeffs, nvars);
+        return true;
     }
 
     return false;
@@ -274,11 +337,14 @@ static bool dv_match_unary_affine_op(const dval_t *expr,
     if (!is_kind(expr, op_kind) || !expr->a)
         return false;
 
-    dv_zero_number_array(coeffs_out, nvars);
+    dv_reset_number_array(coeffs_out, nvars);
 
     ok = dv_match_affine_term(expr->a, nvars, vars, NUM_ONE, &constant, coeffs_out);
-    if (!ok)
+    if (!ok) {
+        num_destroy(&constant);
+        dv_reset_number_array(coeffs_out, nvars);
         return false;
+    }
 
     num_destroy(constant_out);
     *constant_out = num_scope_detach(constant);
@@ -400,9 +466,11 @@ static bool dv_match_affine_power_exact(const dval_t *expr,
 
     if (dv_match_unary_kind(expr, DV_KIND_POW_D, &arg) &&
         num_eq(expr->c, degree_num)) {
-        dv_zero_number_array(coeffs_out, nvars);
-        if (!dv_match_affine_term(arg, nvars, vars, NUM_ONE, &constant, coeffs_out))
+        dv_reset_number_array(coeffs_out, nvars);
+        if (!dv_match_affine_term(arg, nvars, vars, NUM_ONE, &constant, coeffs_out)) {
+            num_destroy(&constant);
             return false;
+        }
         num_destroy(constant_out);
         *constant_out = num_scope_detach(constant);
         return true;
@@ -411,9 +479,11 @@ static bool dv_match_affine_power_exact(const dval_t *expr,
     if (degree < (sizeof(mul_matchers) / sizeof(mul_matchers[0])) &&
         mul_matchers[degree] &&
         mul_matchers[degree](expr, &mul_base)) {
-        dv_zero_number_array(coeffs_out, nvars);
-        if (!dv_match_affine_term(mul_base, nvars, vars, NUM_ONE, &constant, coeffs_out))
+        dv_reset_number_array(coeffs_out, nvars);
+        if (!dv_match_affine_term(mul_base, nvars, vars, NUM_ONE, &constant, coeffs_out)) {
+            num_destroy(&constant);
             return false;
+        }
         num_destroy(constant_out);
         *constant_out = num_scope_detach(constant);
         return true;
@@ -453,11 +523,11 @@ static bool dv_match_affine_power_deg4(const dval_t *expr,
         *degree_out = 0;
         num_destroy(constant_out);
         *constant_out = num_scope_detach(num_clone(NUM_ZERO));
-        dv_zero_number_array(coeffs_out, nvars);
+        dv_reset_number_array(coeffs_out, nvars);
         return true;
     }
 
-    dv_zero_number_array(coeffs_out, nvars);
+    dv_reset_number_array(coeffs_out, nvars);
 
     if (dv_match_affine_term(expr, nvars, vars, NUM_ONE, &constant, coeffs_out)) {
         *degree_out = 1;
@@ -465,6 +535,7 @@ static bool dv_match_affine_power_deg4(const dval_t *expr,
         *constant_out = num_scope_detach(constant);
         return true;
     }
+    num_destroy(&constant);
 
     if (dv_match_affine_power_exact(expr, nvars, vars, 2, constant_out, coeffs_out)) {
         *degree_out = 2;
@@ -508,7 +579,7 @@ static bool dv_match_scaled_affine_power_deg4(const dval_t *expr,
         *degree_out = 0;
         num_destroy(constant_out);
         *constant_out = num_scope_detach(num_clone(NUM_ZERO));
-        dv_zero_number_array(coeffs_out, nvars);
+        dv_reset_number_array(coeffs_out, nvars);
         return true;
     }
 
@@ -569,8 +640,15 @@ static bool dv_match_affine_poly_deg4_rec(const dval_t *expr,
 
     term_coeffs = malloc(nvars * sizeof(*term_coeffs));
     if ((nvars > 0) && !term_coeffs) {
+        num_destroy(&subtree_scale);
+        num_destroy(&scale);
+        num_destroy(&term_constant);
+        num_destroy(&left_constant);
+        num_destroy(&right_constant);
         return false;
     }
+    for (size_t i = 0; i < nvars; ++i)
+        term_coeffs[i] = number_invalid();
     dv_zero_number_array(poly_left, 5);
     dv_zero_number_array(poly_right, 5);
 
@@ -579,9 +657,15 @@ static bool dv_match_affine_poly_deg4_rec(const dval_t *expr,
     if (ok) {
         dv_reset_number_array(poly_coeffs_out, 5);
         if (!num_is_real(scale)) {
-            free(term_coeffs);
+            dv_destroy_number_array(term_coeffs, nvars);
+            term_coeffs = NULL;
             dv_clear_number_array(poly_left, 5);
             dv_clear_number_array(poly_right, 5);
+            num_destroy(&subtree_scale);
+            num_destroy(&scale);
+            num_destroy(&term_constant);
+            num_destroy(&left_constant);
+            num_destroy(&right_constant);
             return false;
         }
         num_destroy(&poly_coeffs_out[degree]);
@@ -590,9 +674,15 @@ static bool dv_match_affine_poly_deg4_rec(const dval_t *expr,
         if (degree > 0) {
             if (*have_basis_io &&
                 !dv_affine_equal(nvars, *constant_io, coeffs_io, term_constant, term_coeffs)) {
-                free(term_coeffs);
+                dv_destroy_number_array(term_coeffs, nvars);
+                term_coeffs = NULL;
                 dv_clear_number_array(poly_left, 5);
                 dv_clear_number_array(poly_right, 5);
+                num_destroy(&subtree_scale);
+                num_destroy(&scale);
+                num_destroy(&term_constant);
+                num_destroy(&left_constant);
+                num_destroy(&right_constant);
                 return false;
             }
             num_destroy(constant_io);
@@ -602,12 +692,19 @@ static bool dv_match_affine_poly_deg4_rec(const dval_t *expr,
         }
 
         dv_destroy_number_array(term_coeffs, nvars);
+        term_coeffs = NULL;
         dv_clear_number_array(poly_left, 5);
         dv_clear_number_array(poly_right, 5);
+        num_destroy(&subtree_scale);
+        num_destroy(&scale);
+        num_destroy(&term_constant);
+        num_destroy(&left_constant);
+        num_destroy(&right_constant);
         return true;
     }
 
-    free(term_coeffs);
+    dv_destroy_number_array(term_coeffs, nvars);
+    term_coeffs = NULL;
 
     if (dv_match_scaled_expr(expr, &subtree_scale, &scaled_base) &&
         num_is_real(subtree_scale) &&
@@ -619,6 +716,11 @@ static bool dv_match_affine_poly_deg4_rec(const dval_t *expr,
         }
         dv_clear_number_array(poly_left, 5);
         dv_clear_number_array(poly_right, 5);
+        num_destroy(&subtree_scale);
+        num_destroy(&scale);
+        num_destroy(&term_constant);
+        num_destroy(&left_constant);
+        num_destroy(&right_constant);
         return true;
     }
 
@@ -630,6 +732,11 @@ static bool dv_match_affine_poly_deg4_rec(const dval_t *expr,
             dv_destroy_number_array(right_coeffs, nvars);
             dv_clear_number_array(poly_left, 5);
             dv_clear_number_array(poly_right, 5);
+            num_destroy(&subtree_scale);
+            num_destroy(&scale);
+            num_destroy(&term_constant);
+            num_destroy(&left_constant);
+            num_destroy(&right_constant);
             return false;
         }
         if (!dv_match_affine_poly_deg4_rec(left, nvars, vars, poly_left,
@@ -640,6 +747,11 @@ static bool dv_match_affine_poly_deg4_rec(const dval_t *expr,
             dv_destroy_number_array(right_coeffs, nvars);
             dv_clear_number_array(poly_left, 5);
             dv_clear_number_array(poly_right, 5);
+            num_destroy(&subtree_scale);
+            num_destroy(&scale);
+            num_destroy(&term_constant);
+            num_destroy(&left_constant);
+            num_destroy(&right_constant);
             return false;
         }
 
@@ -649,6 +761,11 @@ static bool dv_match_affine_poly_deg4_rec(const dval_t *expr,
             dv_destroy_number_array(right_coeffs, nvars);
             dv_clear_number_array(poly_left, 5);
             dv_clear_number_array(poly_right, 5);
+            num_destroy(&subtree_scale);
+            num_destroy(&scale);
+            num_destroy(&term_constant);
+            num_destroy(&left_constant);
+            num_destroy(&right_constant);
             return false;
         }
 
@@ -680,11 +797,21 @@ static bool dv_match_affine_poly_deg4_rec(const dval_t *expr,
         dv_destroy_number_array(right_coeffs, nvars);
         dv_clear_number_array(poly_left, 5);
         dv_clear_number_array(poly_right, 5);
+        num_destroy(&subtree_scale);
+        num_destroy(&scale);
+        num_destroy(&term_constant);
+        num_destroy(&left_constant);
+        num_destroy(&right_constant);
         return true;
     }
 
     dv_clear_number_array(poly_left, 5);
     dv_clear_number_array(poly_right, 5);
+    num_destroy(&subtree_scale);
+    num_destroy(&scale);
+    num_destroy(&term_constant);
+    num_destroy(&left_constant);
+    num_destroy(&right_constant);
     return false;
 }
 
@@ -702,12 +829,14 @@ static bool dv_match_affine_poly_deg4_num_local(const dval_t *expr,
     if (!expr || !poly_coeffs_out || !constant_out || !coeffs_out || (nvars > 0 && !vars))
         return false;
 
-    dv_zero_number_array(coeffs_out, nvars);
-    dv_zero_number_array(poly_coeffs_out, 5);
+    dv_reset_number_array(coeffs_out, nvars);
+    dv_reset_number_array(poly_coeffs_out, 5);
 
     if (!dv_match_affine_poly_deg4_rec(expr, nvars, vars, poly_coeffs_out,
-                                       &constant, coeffs_out, &have_basis))
+                                       &constant, coeffs_out, &have_basis)) {
+        num_destroy(&constant);
         return false;
+    }
 
     num_destroy(constant_out);
     *constant_out = have_basis ? num_scope_detach(constant)
@@ -754,9 +883,13 @@ static bool dv_match_affine_poly_deg4_times_unary_affine_op(const dval_t *expr,
     unary_coeffs = malloc(nvars * sizeof(*unary_coeffs));
     poly_coeffs = malloc(nvars * sizeof(*poly_coeffs));
     if ((nvars > 0) && (!unary_coeffs || !poly_coeffs)) {
-        dv_destroy_number_array(unary_coeffs, nvars);
-        dv_destroy_number_array(poly_coeffs, nvars);
+        free(unary_coeffs);
+        free(poly_coeffs);
         return false;
+    }
+    for (size_t i = 0; i < nvars; ++i) {
+        unary_coeffs[i] = number_invalid();
+        poly_coeffs[i] = number_invalid();
     }
     dv_zero_number_array(poly_terms, 5);
 
@@ -785,6 +918,8 @@ static bool dv_match_affine_poly_deg4_times_unary_affine_op(const dval_t *expr,
     dv_destroy_number_array(unary_coeffs, nvars);
     dv_destroy_number_array(poly_coeffs, nvars);
     dv_clear_number_array(poly_terms, 5);
+    num_destroy(&unary_constant);
+    num_destroy(&poly_constant);
     return matched;
 }
 
@@ -843,10 +978,12 @@ bool dv_match_scaled_expr(const dval_t *expr,
     if (dv_match_unary_kind(expr, DV_KIND_NEG, &arg)) {
         inner_scale = num_new();
         if (dv_match_scaled_expr(arg, &inner_scale, &inner_base)) {
+            num_destroy(scale_out);
             *scale_out = num_scope_detach(num_neg(inner_scale));
             *base_out = inner_base;
             return true;
         }
+        num_destroy(scale_out);
         *scale_out = num_scope_detach(num_clone(NUM_NEG_ONE));
         *base_out = arg;
         return true;
@@ -864,10 +1001,12 @@ bool dv_match_scaled_expr(const dval_t *expr,
             return false;
         inner_scale = num_new();
         if (dv_match_scaled_expr(left, &inner_scale, &inner_base)) {
+            num_destroy(scale_out);
             *scale_out = num_scope_detach(num_div(inner_scale, const_value));
             *base_out = inner_base;
             return true;
         }
+        num_destroy(scale_out);
         *scale_out = num_scope_detach(num_div(NUM_ONE, const_value));
         *base_out = left;
         return true;

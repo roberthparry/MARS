@@ -31,6 +31,11 @@ currently remains a transparent by-value struct.
 - parsing from string
 - printf-style formatting and printing
 
+## Constants
+
+Common real constants are also available on the real axis, including
+`QC_PI`, `QC_E`, `QC_LN2`, `QC_LN10`, `QC_SQRT2`, and `QC_LN_2PI`.
+
 ## Example
 
 ```c
@@ -104,6 +109,7 @@ All declarations are in `include/qcomplex.h`.
 |---|---|
 | `qc_exp(z)` | `e^z` |
 | `qc_log(z)` | principal logarithm `ln(z)` |
+| `qc_log10(z)` | principal common logarithm `log10(z)` |
 | `qc_pow(a, b)` | `a^b = exp(b * log(a))` (principal branch) |
 | `qc_sqrt(z)` | principal square root |
 
@@ -239,23 +245,23 @@ Current sample results:
 
 | Case | Time |
 |---|---:|
-| `qc_exp(1+i)` | `3.582 µs` |
-| `qc_log(1+i)` | `5.405 µs` |
-| `qc_erf(0.5+0.5i)` | `10.404 µs` |
-| `qc_erfc(0.5+0.5i)` | `9.357 µs` |
-| `qc_gamma(1.5+0.7i)` | `14.554 µs` |
-| `qc_lgamma(1.5+0.7i)` | `13.515 µs` |
-| `qc_digamma(2+i)` | `14.643 µs` |
-| `qc_trigamma(2+0.5i)` | `4.596 µs` |
-| `qc_tetragamma(2+0.5i)` | `6.256 µs` |
-| `qc_gammainv(3.323350970447842551184064031264648)` | `95.411 µs` |
-| `qc_gammainv(qc_gamma(2.5+0.3i))` | `219.491 µs` |
-| `qc_productlog(1+i)` | `30.014 µs` |
-| `qc_lambert_wm1(-0.2-0.1i)` | `27.295 µs` |
-| `qc_ei(1+i)` | `44.938 µs` |
-| `qc_e1(1+i)` | `41.641 µs` |
-| `qc_beta(1.5+0.5i, 2-0.3i)` | `38.087 µs` |
-| `qc_logbeta(1.5+0.5i, 2-0.3i)` | `37.286 µs` |
+| `qc_exp(1+i)` | `2.513 µs` |
+| `qc_log(1+i)` | `3.503 µs` |
+| `qc_erf(0.5+0.5i)` | `6.665 µs` |
+| `qc_erfc(0.5+0.5i)` | `6.299 µs` |
+| `qc_gamma(1.5+0.7i)` | `9.753 µs` |
+| `qc_lgamma(1.5+0.7i)` | `8.058 µs` |
+| `qc_digamma(2+i)` | `9.108 µs` |
+| `qc_trigamma(2+0.5i)` | `2.895 µs` |
+| `qc_tetragamma(2+0.5i)` | `3.598 µs` |
+| `qc_gammainv(3.323350970447842551184064031264648)` | `55.586 µs` |
+| `qc_gammainv(qc_gamma(2.5+0.3i))` | `145.943 µs` |
+| `qc_productlog(1+i)` | `19.744 µs` |
+| `qc_lambert_wm1(-0.2-0.1i)` | `19.262 µs` |
+| `qc_ei(1+i)` | `29.968 µs` |
+| `qc_e1(1+i)` | `30.136 µs` |
+| `qc_beta(1.5+0.5i, 2-0.3i)` | `26.146 µs` |
+| `qc_logbeta(1.5+0.5i, 2-0.3i)` | `24.514 µs` |
 
 For a broader benchmark overview, see
 [`docs/benchmarks.md`](benchmarks.md).

@@ -32,7 +32,10 @@ typedef struct number_vtable_t {
     bool exact;
     bool complex;
     void (*destroy_payload)(number_t *number);
+    void *(*scope_payload)(const number_t *number);
+    void (*destroy_scope_payload)(void *payload);
     number_t *(*clone)(const number_t *number);
+    number_t *(*const_prec)(const number_t *number, size_t precision_bits);
     char *(*to_string)(const number_t *number);
     bool (*is_immortal)(const number_t *number);
     bool (*is_real)(const number_t *number);
@@ -45,6 +48,7 @@ typedef struct number_vtable_t {
     bool (*eq_same_tol)(const number_t *a, const number_t *b);
     int (*cmp_same)(const number_t *a, const number_t *b);
     number_t (*const_like)(const number_t *like, number_const_id_t id);
+    number_t (*imag_const_like)(const number_t *like, number_const_id_t id);
     char *(*format_inexact)(const number_t *number, bool scientific, int precision);
     int (*set_precision)(number_t *number, size_t precision_bits);
     size_t (*get_precision)(const number_t *number);
@@ -117,6 +121,7 @@ typedef enum number_const_id_t {
     NUMBER_CONST_E,
     NUMBER_CONST_INV_E,
     NUMBER_CONST_LN2,
+    NUMBER_CONST_LN10,
     NUMBER_CONST_SQRT2,
     NUMBER_CONST_SQRT3,
     NUMBER_CONST_SQRT2_OVER_TWO,

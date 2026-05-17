@@ -92,6 +92,7 @@ number_t eval_atanh(dval_t *dv) { return dv_eval_unary_num(dv, num_atanh); }
 
 number_t eval_exp(dval_t *dv) { return dv_eval_unary_num(dv, num_exp); }
 number_t eval_log(dval_t *dv) { return dv_eval_unary_num(dv, num_log); }
+number_t eval_log10(dval_t *dv) { return dv_eval_unary_num(dv, num_log10); }
 number_t eval_sqrt(dval_t *dv) { return dv_eval_unary_num(dv, num_sqrt); }
 number_t eval_abs(dval_t *dv) { return dv_eval_unary_num(dv, num_abs); }
 number_t eval_erf(dval_t *dv) { return dv_eval_unary_num(dv, num_erf); }
@@ -200,6 +201,17 @@ dval_t *deriv_log(dval_t *dv)
     dval_t *da  = dv_get_dx_internal(dv->a);
     dval_t *out = dv_div(da, dv->a);
     dv_free(da);
+    return out;
+}
+
+dval_t *deriv_log10(dval_t *dv)
+{
+    dval_t *da = dv_get_dx_internal(dv->a);
+    dval_t *den = dv_mul(dv->a, DV_LN10);
+    dval_t *out = dv_div(da, den);
+
+    dv_free(da);
+    dv_free(den);
     return out;
 }
 

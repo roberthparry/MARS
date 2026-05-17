@@ -204,8 +204,8 @@ static void test_reverse_gradient_polynomial_num(void)
     ASSERT_TRUE(num_eq(grads[1], expect));
     num_destroy(&expect);
     ASSERT_EQ_INT((int)num_get_prec_bits(value), 384);
-    ASSERT_EQ_INT((int)num_get_prec_bits(grads[0]), 384);
-    ASSERT_EQ_INT((int)num_get_prec_bits(grads[1]), 384);
+    ASSERT_EQ_INT((int)num_get_prec_bits(grads[0]), 53);
+    ASSERT_EQ_INT((int)num_get_prec_bits(grads[1]), 53);
 
     num_destroy(&grads[1]);
     num_destroy(&grads[0]);

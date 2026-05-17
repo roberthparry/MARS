@@ -33,6 +33,15 @@ This directory contains the longer module documentation for MARS.
 - [`set_t` ownership models](set.md#ownership-models)
 - [`array_t` ownership models](array.md#ownership-models)
 
+## Acknowledgements
+
+The modern multiprecision numeric modules are wrappers around the GNU
+multiprecision libraries:
+
+- [GMP](https://gmplib.org/) for integer and rational arithmetic
+- [MPFR](https://www.mpfr.org/) for correctly rounded multiprecision floats
+- [MPC](https://www.multiprecision.org/mpc/) for multiprecision complex numbers
+
 ## Notes
 
 - The repository landing page is [`../README.md`](../README.md).

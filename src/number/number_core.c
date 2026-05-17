@@ -1,11 +1,3 @@
-#include "number.h"
-#include "number_internal.h"
-#include "internal/mint_internal.h"
-#include "internal/mcomplex_internal.h"
-#include "internal/number_scope_alloc.h"
-#include "mfloat/mfloat_internal.h"
-#include "mrational/mrational_internal.h"
-
 #include <ctype.h>
 #include <limits.h>
 #include <math.h>
@@ -13,6 +5,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "number.h"
+#include "number_internal.h"
+#include "internal/mint_internal.h"
+#include "internal/number_scope_alloc.h"
+#include "mcomplex/mcomplex_internal.h"
+#include "mfloat/mfloat_internal.h"
+#include "mrational/mrational_internal.h"
 
 #if defined(_MSC_VER)
 #define NUMBER_THREAD_LOCAL __declspec(thread)
@@ -63,6 +63,7 @@ typedef struct number_scope_state_t {
 } number_scope_state_t;
 
 static NUMBER_THREAD_LOCAL num_scope_t *number_scope_current = NULL;
+static NUMBER_THREAD_LOCAL size_t number_scope_suspend_depth = 0u;
 static bool number_value_is_immortal(const number_t *number);
 void number_destroy_none(number_t *number);
 
@@ -252,69 +253,36 @@ static void *number_scope_arena_alloc_from_scope(num_scope_t *scope,
     }
 }
 
-static number_t number_clone_unscoped(const number_t *value)
-{
-    num_scope_t *saved_scope = number_scope_current;
-    number_t cloned;
-
-    number_scope_current = NULL;
-    cloned = num_clone(*value);
-    number_scope_current = saved_scope;
-    return cloned;
-}
-
-static void number_scope_destroy_arena_value(number_scope_alloc_header_t *header)
-{
-    if (!header || !header->scope)
-        return;
-    if (!(header->reserved & NUMBER_SCOPE_ALLOC_DESTROYED) &&
-        header->arena_block &&
-        header->arena_block->used == header->base_offset + header->size)
-        header->arena_block->used = header->alloc_offset;
-    header->reserved |= NUMBER_SCOPE_ALLOC_DESTROYED;
-}
-
 num_scope_t *number_scope_suspend(void)
 {
-    num_scope_t *saved_scope = number_scope_current;
-
-    number_scope_current = NULL;
-    return saved_scope;
+    number_scope_suspend_depth++;
+    return number_scope_current;
 }
 
 void number_scope_resume(num_scope_t *scope)
 {
-    number_scope_current = scope;
+    (void)scope;
+    if (number_scope_suspend_depth > 0u)
+        number_scope_suspend_depth--;
 }
 
 static void *number_scope_payload_pointer(const number_t *number)
 {
-    const number_private_t *impl;
+    const number_vtable_t *vt;
 
     if (!number || !number_is_valid_value(number))
         return NULL;
-    impl = number_impl_const(number);
-    switch (impl->kind) {
-    case NUMBER_MINT:
-        return impl->value.mi;
-    case NUMBER_MRATIONAL:
-        return impl->value.mr;
-    case NUMBER_MFLOAT:
-        return impl->value.mf;
-    case NUMBER_MCOMPLEX:
-        return impl->value.mc;
-    default:
-        return NULL;
-    }
+    vt = number_vt(number);
+    return vt && vt->scope_payload ? vt->scope_payload(number) : NULL;
 }
 
 static bool number_scope_trackable_value(const number_t *number)
 {
     const number_vtable_t *vt;
-    number_scope_alloc_header_t *header;
     void *payload;
 
-    if (!number_scope_current || !number || !number_is_valid_value(number))
+    if (!number_scope_current || number_scope_suspend_depth > 0u ||
+        !number || !number_is_valid_value(number))
         return false;
     vt = number_vt(number);
     if (!vt || !vt->destroy_payload || vt->destroy_payload == number_destroy_none)
@@ -324,48 +292,20 @@ static bool number_scope_trackable_value(const number_t *number)
     payload = number_scope_payload_pointer(number);
     if (!payload)
         return false;
-    header = number_scope_alloc_header_from_ptr(payload);
-    return header == NULL || header->scope == NULL;
+    return true;
 }
 
 static void number_scope_destroy_record(const number_scope_record_t *record)
 {
-    number_t number;
-    number_private_t *impl;
     const number_vtable_t *vt;
-    number_scope_alloc_header_t *header;
 
     if (!record)
         return;
-    header = number_scope_alloc_header_from_ptr(record->payload);
-    if (header) {
-        header->record = NULL;
-        header->reserved &= ~NUMBER_SCOPE_ALLOC_TRACKED;
-    }
-    if (header && header->scope)
+    vt = (unsigned)record->kind < number_dispatch_count
+        ? number_dispatch[record->kind] : NULL;
+    if (!vt || !vt->destroy_scope_payload)
         return;
-    number = number_invalid();
-    impl = number_impl(&number);
-    impl->kind = record->kind;
-    switch (record->kind) {
-    case NUMBER_MINT:
-        impl->value.mi = (mint_t *)record->payload;
-        break;
-    case NUMBER_MRATIONAL:
-        impl->value.mr = (mrational_t *)record->payload;
-        break;
-    case NUMBER_MFLOAT:
-        impl->value.mf = (mfloat_t *)record->payload;
-        break;
-    case NUMBER_MCOMPLEX:
-        impl->value.mc = (mcomplex_t *)record->payload;
-        break;
-    default:
-        return;
-    }
-    vt = number_vt(&number);
-    if (vt && vt->destroy_payload)
-        vt->destroy_payload(&number);
+    vt->destroy_scope_payload(record->payload);
 }
 
 static void number_scope_trim_block(number_scope_block_t *block)
@@ -399,15 +339,6 @@ void number_scope_register_value(const number_t *number)
     record = &block->records[block->used++];
     record->kind = number_kind_value(number);
     record->payload = number_scope_payload_pointer(number);
-    {
-        number_scope_alloc_header_t *header =
-            number_scope_alloc_header_from_ptr(record->payload);
-
-        if (header) {
-            header->record = record;
-            header->reserved |= NUMBER_SCOPE_ALLOC_TRACKED;
-        }
-    }
 }
 
 int number_scope_unregister_value(const number_t *number)
@@ -422,20 +353,6 @@ int number_scope_unregister_value(const number_t *number)
     payload = number_scope_payload_pointer(number);
     if (!payload)
         return 0;
-    {
-        number_scope_alloc_header_t *header = number_scope_alloc_header_from_ptr(payload);
-
-        if (header && header->record &&
-            header->record->kind == kind &&
-            header->record->payload == payload)
-        {
-            header->reserved &= ~NUMBER_SCOPE_ALLOC_TRACKED;
-            header->record->kind = NUMBER_INVALID;
-            header->record->payload = NULL;
-            header->record = NULL;
-            return 1;
-        }
-    }
 
     for (scope = number_scope_current; scope; scope = scope->previous) {
         number_scope_state_t *state = number_scope_state_get(scope);
@@ -451,15 +368,8 @@ int number_scope_unregister_value(const number_t *number)
                     continue;
                 if (record->kind == kind && record->payload == payload)
                 {
-                    number_scope_alloc_header_t *header =
-                        number_scope_alloc_header_from_ptr(payload);
-
                     record->kind = NUMBER_INVALID;
                     record->payload = NULL;
-                    if (header) {
-                        header->record = NULL;
-                        header->reserved &= ~NUMBER_SCOPE_ALLOC_TRACKED;
-                    }
                     number_scope_trim_block(block);
                     return 1;
                 }
@@ -474,7 +384,7 @@ void *number_scope_mem_alloc(size_t size, size_t align)
 {
     if (size == 0u)
         return NULL;
-    return number_scope_current
+    return (number_scope_current && number_scope_suspend_depth == 0u)
         ? number_scope_arena_alloc_from_scope(number_scope_current, size, align)
         : number_scope_mem_alloc_heap(size, align);
 }
@@ -642,6 +552,27 @@ static bool number_has_char_ci(const char *text, char needle)
     return false;
 }
 
+static bool number_has_unicode_fraction_text(const char *text)
+{
+    static const char *const glyphs[] = {
+        "½", "⅓", "⅔", "¼", "¾", "⅕", "⅖", "⅗", "⅘",
+        "⅙", "⅚", "⅐", "⅛", "⅜", "⅝", "⅞", "⅑", "⅒",
+    };
+    size_t i;
+
+    if (!text)
+        return false;
+    if (strstr(text, "⁄"))
+        return true;
+
+    for (i = 0u; i < sizeof(glyphs) / sizeof(glyphs[0]); ++i) {
+        if (strstr(text, glyphs[i]))
+            return true;
+    }
+
+    return false;
+}
+
 static bool number_is_decimal_text(const char *text)
 {
     return text && (strchr(text, '.') || strchr(text, 'e') || strchr(text, 'E') ||
@@ -717,7 +648,8 @@ void number_destroy_mint(number_t *number)
 {
     if (!number)
         return;
-    if (mint_is_immortal(number_impl(number)->value.mi))
+    if (number_impl(number)->value.mi &&
+        number_impl(number)->value.mi->constant_id != MICONST_NONE)
         return;
     if (number)
         mi_free(number_impl(number)->value.mi);
@@ -727,7 +659,8 @@ void number_destroy_mrational(number_t *number)
 {
     if (!number)
         return;
-    if (number_impl(number)->value.mr && number_impl(number)->value.mr->immortal)
+    if (number_impl(number)->value.mr &&
+        number_impl(number)->value.mr->constant_id != MRCONST_NONE)
         return;
     if (number)
         mr_free(number_impl(number)->value.mr);
@@ -744,9 +677,72 @@ void number_destroy_mcomplex(number_t *number)
 {
     if (!number || !number_impl(number)->value.mc)
         return;
-    if (mcomplex_is_immortal(number_impl(number)->value.mc))
+    if (number_impl(number)->value.mc->constant_id != MCCONST_NONE)
         return;
     mc_free(number_impl(number)->value.mc);
+}
+
+void *number_scope_payload_none(const number_t *number)
+{
+    (void)number;
+    return NULL;
+}
+
+void *number_scope_payload_mint(const number_t *number)
+{
+    return number ? number_impl_const(number)->value.mi : NULL;
+}
+
+void *number_scope_payload_mrational(const number_t *number)
+{
+    return number ? number_impl_const(number)->value.mr : NULL;
+}
+
+void *number_scope_payload_mfloat(const number_t *number)
+{
+    return number ? number_impl_const(number)->value.mf : NULL;
+}
+
+void *number_scope_payload_mcomplex(const number_t *number)
+{
+    return number ? number_impl_const(number)->value.mc : NULL;
+}
+
+void number_destroy_scope_none(void *payload)
+{
+    (void)payload;
+}
+
+void number_destroy_scope_mint(void *payload)
+{
+    mint_t *mint = (mint_t *)payload;
+
+    if (!mint || mint->constant_id != MICONST_NONE)
+        return;
+    mi_free(mint);
+}
+
+void number_destroy_scope_mrational(void *payload)
+{
+    mrational_t *rational = (mrational_t *)payload;
+
+    if (!rational || rational->constant_id != MRCONST_NONE)
+        return;
+    mr_free(rational);
+}
+
+void number_destroy_scope_mfloat(void *payload)
+{
+    mf_free((mfloat_t *)payload);
+}
+
+void number_destroy_scope_mcomplex(void *payload)
+{
+    mcomplex_t *complex_value = (mcomplex_t *)payload;
+
+    if (!complex_value || complex_value->constant_id != MCCONST_NONE)
+        return;
+    mc_free(complex_value);
 }
 
  number_t number_const_like_double(const number_t *like, number_const_id_t id);
@@ -782,25 +778,25 @@ void number_destroy_mcomplex(number_t *number)
  bool number_value_is_immortal_mint(const number_t *number)
 {
     return number && number_impl_const(number)->value.mi &&
-        mint_is_immortal(number_impl_const(number)->value.mi);
+        number_impl_const(number)->value.mi->constant_id != MICONST_NONE;
 }
 
  bool number_value_is_immortal_mrational(const number_t *number)
 {
     return number && number_impl_const(number)->value.mr &&
-        number_impl_const(number)->value.mr->immortal;
+        number_impl_const(number)->value.mr->constant_id != MRCONST_NONE;
 }
 
  bool number_value_is_immortal_mfloat(const number_t *number)
 {
     return number && number_impl_const(number)->value.mf &&
-        mfloat_is_immortal(number_impl_const(number)->value.mf);
+        number_impl_const(number)->value.mf->constant_id != MFCONST_NONE;
 }
 
  bool number_value_is_immortal_mcomplex(const number_t *number)
 {
     return number && number_impl_const(number)->value.mc &&
-        mcomplex_is_immortal(number_impl_const(number)->value.mc);
+        number_impl_const(number)->value.mc->constant_id != MCCONST_NONE;
 }
 
 static bool number_value_is_immortal(const number_t *number)
@@ -1164,8 +1160,11 @@ static bool number_eq_same_tol_with_precision(const number_t *a,
 
  size_t number_get_precision_mfloat(const number_t *number)
 {
-    return number && number_impl_const(number)->value.mf ?
-        mf_get_precision(number_impl_const(number)->value.mf) : 0u;
+    if (!number || !number_impl_const(number)->value.mf)
+        return 0u;
+    if (number_impl_const(number)->value.mf->constant_id == MFCONST_PHI)
+        mfloat_constant_ensure(number_impl_const(number)->value.mf, 1088u);
+    return mf_get_precision(number_impl_const(number)->value.mf);
 }
 
  int number_set_precision_mcomplex(number_t *number, size_t precision_bits)
@@ -1543,8 +1542,8 @@ number_t *number_clone_mint(const number_t *number)
 
     if (!number || !number_impl_const(number)->value.mi)
         return NULL;
-    if (mint_is_immortal(number_impl_const(number)->value.mi))
-        return number_wrap_mint(number_impl_const(number)->value.mi);
+    if (number_impl_const(number)->value.mi->constant_id != MICONST_NONE)
+        return number_wrap_mint(mi_const(number_impl_const(number)->value.mi));
     copy = mi_clone(number_impl_const(number)->value.mi);
     return copy ? number_wrap_mint(copy) : NULL;
 }
@@ -1555,8 +1554,8 @@ number_t *number_clone_mrational(const number_t *number)
 
     if (!number || !number_impl_const(number)->value.mr)
         return NULL;
-    if (number_impl_const(number)->value.mr->immortal)
-        return number_wrap_mrational(number_impl_const(number)->value.mr);
+    if (number_impl_const(number)->value.mr->constant_id != MRCONST_NONE)
+        return number_wrap_mrational(mr_const(number_impl_const(number)->value.mr));
     copy = mr_clone(number_impl_const(number)->value.mr);
     return copy ? number_wrap_mrational(copy) : NULL;
 }
@@ -1567,8 +1566,8 @@ number_t *number_clone_mfloat(const number_t *number)
 
     if (!number || !number_impl_const(number)->value.mf)
         return NULL;
-    if (mfloat_is_immortal(number_impl_const(number)->value.mf))
-        return number_wrap_mfloat(number_impl_const(number)->value.mf);
+    if (number_impl_const(number)->value.mf->constant_id != MFCONST_NONE)
+        return number_wrap_mfloat(mf_const(number_impl_const(number)->value.mf));
     copy = mf_clone(number_impl_const(number)->value.mf);
     return copy ? number_wrap_mfloat(copy) : NULL;
 }
@@ -1579,8 +1578,8 @@ number_t *number_clone_mcomplex(const number_t *number)
 
     if (!number || !number_impl_const(number)->value.mc)
         return NULL;
-    if (mcomplex_is_immortal(number_impl_const(number)->value.mc))
-        return number_wrap_mcomplex(number_impl_const(number)->value.mc);
+    if (number_impl_const(number)->value.mc->constant_id != MCCONST_NONE)
+        return number_wrap_mcomplex(mc_const(number_impl_const(number)->value.mc));
     copy = mc_clone(number_impl_const(number)->value.mc);
     return copy ? number_wrap_mcomplex(copy) : NULL;
 }
@@ -2748,6 +2747,7 @@ static number_t *number_apply_binary_generic(const number_t *a,
                                              number_binary_op_t op)
 {
     number_kind_t kind;
+    size_t precision_bits = 0u;
     number_t *lhs = NULL;
     number_t *rhs = NULL;
     number_t *result = NULL;
@@ -2757,6 +2757,18 @@ static number_t *number_apply_binary_generic(const number_t *a,
     kind = number_common_kind(a, b, op);
     lhs = number_coerce(a, kind);
     rhs = number_coerce(b, kind);
+    if (kind == NUMBER_MFLOAT || kind == NUMBER_MCOMPLEX) {
+        size_t a_bits = num_get_prec_bits(*a);
+        size_t b_bits = num_get_prec_bits(*b);
+
+        precision_bits = a_bits > b_bits ? a_bits : b_bits;
+        if (precision_bits == 0u)
+            precision_bits = number_default_precision_bits;
+        if (lhs)
+            num_set_prec_bits(lhs, precision_bits);
+        if (rhs)
+            num_set_prec_bits(rhs, precision_bits);
+    }
     if (!lhs || !rhs || !number_same_kind_value(lhs, rhs))
         goto done;
     result = number_apply_binary_same_kind(lhs, rhs, op);
@@ -2804,10 +2816,13 @@ number_t num_create_from_mfloat_with_prec_bits(const mfloat_t *value, size_t pre
 
     if (!value)
         return number_invalid();
-    copy = mf_clone(value);
+    copy = value->constant_id != MFCONST_NONE
+        ? mf_const_prec(value, precision_bits)
+        : mf_clone(value);
     if (!copy)
         return number_invalid();
-    if (mf_set_precision(copy, precision_bits) != 0) {
+    if (value->constant_id == MFCONST_NONE &&
+        mf_set_precision(copy, precision_bits) != 0) {
         mf_free(copy);
         return number_invalid();
     }
@@ -2817,13 +2832,20 @@ number_t num_create_from_mfloat_with_prec_bits(const mfloat_t *value, size_t pre
 number_t num_create_from_mfloat_with_prec_digits(const mfloat_t *value, size_t significant_digits)
 {
     mfloat_t *copy;
+    size_t precision_bits;
 
     if (!value)
         return number_invalid();
-    copy = mf_clone(value);
+    precision_bits = significant_digits == 0u
+        ? 0u
+        : (size_t)ceil((double)significant_digits * 3.3219280948873626);
+    copy = value->constant_id != MFCONST_NONE
+        ? mf_const_prec(value, precision_bits)
+        : mf_clone(value);
     if (!copy)
         return number_invalid();
-    if (mf_set_precision_digits(copy, significant_digits) != 0) {
+    if (value->constant_id == MFCONST_NONE &&
+        mf_set_precision_digits(copy, significant_digits) != 0) {
         mf_free(copy);
         return number_invalid();
     }
@@ -2842,10 +2864,13 @@ number_t num_create_from_mcomplex_with_prec_bits(const mcomplex_t *value, size_t
 
     if (!value)
         return number_invalid();
-    copy = mc_clone(value);
+    copy = value->constant_id != MCCONST_NONE
+        ? mc_const_prec(value, precision_bits)
+        : mc_clone(value);
     if (!copy)
         return number_invalid();
-    if (mc_set_precision(copy, precision_bits) != 0) {
+    if (value->constant_id == MCCONST_NONE &&
+        mc_set_precision(copy, precision_bits) != 0) {
         mc_free(copy);
         return number_invalid();
     }
@@ -2855,13 +2880,20 @@ number_t num_create_from_mcomplex_with_prec_bits(const mcomplex_t *value, size_t
 number_t num_create_from_mcomplex_with_prec_digits(const mcomplex_t *value, size_t significant_digits)
 {
     mcomplex_t *copy;
+    size_t precision_bits;
 
     if (!value)
         return number_invalid();
-    copy = mc_clone(value);
+    precision_bits = significant_digits == 0u
+        ? 0u
+        : (size_t)ceil((double)significant_digits * 3.3219280948873626);
+    copy = value->constant_id != MCCONST_NONE
+        ? mc_const_prec(value, precision_bits)
+        : mc_clone(value);
     if (!copy)
         return number_invalid();
-    if (mc_set_precision_digits(copy, significant_digits) != 0) {
+    if (value->constant_id == MCCONST_NONE &&
+        mc_set_precision_digits(copy, significant_digits) != 0) {
         mc_free(copy);
         return number_invalid();
     }
@@ -2877,12 +2909,105 @@ number_t num_create_from_string(const char *text)
     if (number_has_char_ci(trimmed, 'i'))
         return number_wrap_mcomplex_with_precision(mc_create_string(trimmed),
             number_default_precision_bits);
-    if (strchr(trimmed, '/'))
+    if (strchr(trimmed, '/') || number_has_unicode_fraction_text(trimmed))
         return number_take(number_wrap_mrational(mr_create_string(trimmed)));
     if (number_is_decimal_text(trimmed))
         return number_wrap_mfloat_with_precision(mf_create_string(trimmed),
             number_default_precision_bits);
     return number_take(number_wrap_mint(mi_create_string(trimmed)));
+}
+
+number_t *number_const_prec_double(const number_t *number, size_t precision_bits)
+{
+    mfloat_t *mfloat = mf_new_prec(precision_bits);
+
+    if (!number || !mfloat ||
+        mf_set_double(mfloat, number_impl_const(number)->value.d) != 0) {
+        mf_free(mfloat);
+        return NULL;
+    }
+    return number_wrap_mfloat(mfloat);
+}
+
+number_t *number_const_prec_qfloat(const number_t *number, size_t precision_bits)
+{
+    mfloat_t *mfloat = mf_new_prec(precision_bits);
+
+    if (!number || !mfloat ||
+        mf_set_qfloat(mfloat, number_impl_const(number)->value.qf) != 0) {
+        mf_free(mfloat);
+        return NULL;
+    }
+    return number_wrap_mfloat(mfloat);
+}
+
+number_t *number_const_prec_qcomplex(const number_t *number, size_t precision_bits)
+{
+    mcomplex_t *mcomplex = mc_new_prec(precision_bits);
+
+    if (!number || !mcomplex ||
+        mc_set_qcomplex(mcomplex, number_impl_const(number)->value.qc) != 0) {
+        mc_free(mcomplex);
+        return NULL;
+    }
+    return number_wrap_mcomplex(mcomplex);
+}
+
+number_t *number_const_prec_mint(const number_t *number, size_t precision_bits)
+{
+    (void)precision_bits;
+    return number_clone_mint(number);
+}
+
+number_t *number_const_prec_mrational(const number_t *number, size_t precision_bits)
+{
+    (void)precision_bits;
+    return number_clone_mrational(number);
+}
+
+number_t *number_const_prec_mfloat(const number_t *number, size_t precision_bits)
+{
+    return number && number_impl_const(number)->value.mf
+        ? number_wrap_mfloat(mf_const_prec(number_impl_const(number)->value.mf,
+                                           precision_bits))
+        : NULL;
+}
+
+number_t *number_const_prec_mcomplex(const number_t *number, size_t precision_bits)
+{
+    return number && number_impl_const(number)->value.mc
+        ? number_wrap_mcomplex(mc_const_prec(number_impl_const(number)->value.mc,
+                                             precision_bits))
+        : NULL;
+}
+
+number_t num_const_prec(number_t constant, size_t precision_bits)
+{
+    const number_vtable_t *vt;
+    number_t *materialized;
+    size_t bits = precision_bits != 0u ? precision_bits : number_default_precision_bits;
+
+    if (!number_is_valid_value(&constant))
+        return number_invalid();
+
+    vt = number_vt(&constant);
+    materialized = vt && vt->const_prec ? vt->const_prec(&constant, bits) : NULL;
+    return materialized ? number_take(materialized) : number_invalid();
+}
+
+number_t num_const_prec_digits(number_t constant, size_t significant_digits)
+{
+    size_t precision_bits;
+
+    precision_bits = significant_digits == 0u
+        ? number_default_precision_bits
+        : (size_t)ceil((double)significant_digits * 3.3219280948873626);
+    return num_const_prec(constant, precision_bits);
+}
+
+number_t num_const(number_t constant)
+{
+    return num_const_prec(constant, number_default_precision_bits);
 }
 
 number_t num_clone(const number_t number)
@@ -2900,26 +3025,15 @@ bool num_is_immortal(number_t number)
 void num_destroy(number_t *number)
 {
     const number_vtable_t *vt;
-    number_scope_alloc_header_t *header;
-    void *payload;
 
     if (!number)
         return;
+    number_scope_unregister_value(number);
     if (number_value_is_immortal(number)) {
         memset(number, 0, sizeof(*number));
         number_impl(number)->kind = NUMBER_INVALID;
         return;
     }
-    payload = number_scope_payload_pointer(number);
-    header = number_scope_alloc_header_from_ptr(payload);
-    if (header && header->scope) {
-        number_scope_destroy_arena_value(header);
-        memset(number, 0, sizeof(*number));
-        number_impl(number)->kind = NUMBER_INVALID;
-        return;
-    }
-    if (!header || (header->reserved & NUMBER_SCOPE_ALLOC_TRACKED))
-        number_scope_unregister_value(number);
     vt = number_vt(number);
     if (vt && vt->destroy_payload)
         vt->destroy_payload(number);
@@ -2978,15 +3092,13 @@ void num_scope_leave(num_scope_t *scope)
 
 bool num_scope_is_active(void)
 {
-    return number_scope_current != NULL;
+    return number_scope_current != NULL && number_scope_suspend_depth == 0u;
 }
 
 number_t num_scope_detach(number_t value)
 {
     if (number_value_is_immortal(&value))
         return value;
-    if (number_scope_mem_is_arena_ptr(number_scope_payload_pointer(&value)))
-        return number_clone_unscoped(&value);
     number_scope_unregister_value(&value);
     return value;
 }
@@ -3231,6 +3343,27 @@ static number_t number_const_mfloat_special(number_const_id_t id, size_t precisi
     return number_invalid();
 }
 
+static number_t number_make_mcomplex_from_mfloat_constant(const mfloat_t *real_value,
+                                                          size_t precision_bits)
+{
+    mfloat_t *real = NULL;
+    mfloat_t *imag = NULL;
+    mcomplex_t *complex_value = NULL;
+
+    if (!real_value || precision_bits == 0u)
+        return number_invalid();
+
+    real = mf_const_prec(real_value, precision_bits);
+    imag = mf_const_prec(MF_ZERO, precision_bits);
+    if (real && imag)
+        complex_value = mc_create(real, imag);
+    mf_free(real);
+    mf_free(imag);
+    return complex_value
+        ? number_take(number_wrap_mcomplex(complex_value))
+        : number_invalid();
+}
+
  number_t number_const_like_double(const number_t *like, number_const_id_t id)
 {
     (void)like;
@@ -3263,8 +3396,7 @@ static number_t number_const_mfloat_special(number_const_id_t id, size_t precisi
         return exact;
     precision_bits = number_default_precision_bits;
     if (id == NUMBER_CONST_I)
-        return number_wrap_mcomplex_with_precision(
-            mc_create(MF_ZERO, MF_ONE), precision_bits);
+        return number_take(number_wrap_mcomplex(mc_const_prec(MC_I, precision_bits)));
     mf_value = number_const_mfloat_value(id);
     return mf_value ? num_create_from_mfloat_with_prec_bits(mf_value, precision_bits) : number_invalid();
 }
@@ -3279,8 +3411,7 @@ static number_t number_const_mfloat_special(number_const_id_t id, size_t precisi
     if (precision_bits == 0u)
         precision_bits = number_default_precision_bits;
     if (id == NUMBER_CONST_I)
-        return number_wrap_mcomplex_with_precision(
-            mc_create(MF_ZERO, MF_ONE), precision_bits);
+        return number_take(number_wrap_mcomplex(mc_const_prec(MC_I, precision_bits)));
     out = number_const_mfloat_special(id, precision_bits);
     if (number_is_valid_value(&out))
         return out;
@@ -3295,11 +3426,12 @@ static number_t number_const_mfloat_special(number_const_id_t id, size_t precisi
     number_t real_value;
     const mfloat_t *mf_value;
 
+    if (like && precision_bits <= 1u)
+        precision_bits = number_default_precision_bits;
     if (precision_bits == 0u)
         precision_bits = number_default_precision_bits;
     if (id == NUMBER_CONST_I)
-        return number_wrap_mcomplex_with_precision(
-            mc_create(MF_ZERO, MF_ONE), precision_bits);
+        return number_take(number_wrap_mcomplex(mc_const_prec(MC_I, precision_bits)));
     real_value = number_const_mfloat_special(id, precision_bits);
     if (number_is_valid_value(&real_value)) {
         number_t out = number_wrap_mcomplex_with_precision(
@@ -3308,9 +3440,7 @@ static number_t number_const_mfloat_special(number_const_id_t id, size_t precisi
         return out;
     }
     mf_value = number_const_mfloat_value(id);
-    return mf_value
-        ? number_wrap_mcomplex_with_precision(mc_create(mf_value, MF_ZERO), precision_bits)
-        : number_invalid();
+    return number_make_mcomplex_from_mfloat_constant(mf_value, precision_bits);
 }
 
 number_t number_const_like(const number_t *like, number_const_id_t id)

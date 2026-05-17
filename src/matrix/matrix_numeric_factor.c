@@ -2416,7 +2416,7 @@ static void backsub_eigenvec(const number_t *T, number_t *Y, size_t n, size_t k,
         num_destroy(&rhs);
     }
 
-    /* Normalize */
+    /* Normalise */
     double nrm2 = 0.0;
     for (size_t i = 0; i <= k; i++)
     {

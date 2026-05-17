@@ -25,10 +25,17 @@ void assert_number_string_prefix(const char *label,
 {
     char *got;
     size_t prefix_len;
+    char format[32];
+    int written;
 
-    got = num_to_string(number);
-    ASSERT_NOT_NULL(got);
     prefix_len = strlen(expected_prefix);
+    snprintf(format, sizeof(format), "%%.%zun", prefix_len);
+    written = num_sprintf(NULL, 0u, format, number);
+    ASSERT_TRUE(written >= 0);
+    got = malloc((size_t)written + 1u);
+    ASSERT_NOT_NULL(got);
+    ASSERT_EQ_INT(num_sprintf(got, (size_t)written + 1u, format, number),
+                  written);
     printf(C_WHITE C_BOLD "%s" C_RESET "\n", label ? label : "<unspecified>");
     printf("    prefix   = %s\n", expected_prefix);
     printf("    got      = %s\n\n", got);

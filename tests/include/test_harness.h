@@ -296,7 +296,7 @@ int main(void) {
     th_print_time(tests_total_ms);
     putchar('\n');
 
-    return rc;
+    return rc ? rc : TESTS_EXIT_CODE();
 }
 
 #endif

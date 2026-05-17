@@ -1,18 +1,28 @@
-#include "mfloat_internal.h"
-
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include "mfloat_internal.h"
+
 #define MF_PRINT_SIG_DIGITS 32
+
+static char *mf_build_fixed_form(const char *fixed,
+                                 int flag_plus,
+                                 int flag_space,
+                                 int flag_hash,
+                                 int precision);
+
+static char *mf_unknown_string(void)
+{
+    return strdup("<?>");
+}
 
 static void pad_string(char *out, size_t out_size,
                        const char *s,
                        int width,
                        int flag_minus,
-                       int flag_zero,
-                       int sign_aware_zero)
+                       int flag_zero)
 {
     size_t len = strlen(s);
     int pad = (width > (int)len) ? (width - (int)len) : 0;
@@ -28,17 +38,8 @@ static void pad_string(char *out, size_t out_size,
             out[pos++] = ' ';
     } else if (flag_zero) {
         size_t i = 0;
-
-        if (sign_aware_zero &&
-            (s[0] == '+' || s[0] == '-' || s[0] == ' ')) {
-            if (pos + 1 < out_size)
-                out[pos++] = s[i++];
-            for (int j = 0; j < pad && pos + 1 < out_size; j++)
-                out[pos++] = '0';
-        } else {
-            for (int j = 0; j < pad && pos + 1 < out_size; j++)
-                out[pos++] = '0';
-        }
+        for (int j = 0; j < pad && pos + 1 < out_size; j++)
+            out[pos++] = '0';
 
         for (; s[i] && pos + 1 < out_size; i++)
             out[pos++] = s[i];
@@ -50,6 +51,23 @@ static void pad_string(char *out, size_t out_size,
     }
 
     out[pos] = '\0';
+}
+
+static char *mf_pad_alloc(const char *s, int width, int flag_minus, int flag_zero)
+{
+    size_t cap;
+    char *out;
+
+    if (!s)
+        return NULL;
+
+    cap = strlen(s) + (size_t)(width > 0 ? width : 0) + 2u;
+    out = malloc(cap);
+    if (!out)
+        return NULL;
+
+    pad_string(out, cap, s, width, flag_minus, flag_zero);
+    return out;
 }
 
 static void mf_put_char(char c, char **dst, size_t *remaining, size_t *count)
@@ -72,28 +90,6 @@ static void mf_put_str(const char *s, char **dst, size_t *remaining, size_t *cou
         mf_put_char(*s, dst, remaining, count);
         s++;
     }
-}
-
-static void mf_apply_sign_prefix(char **text_io, int flag_plus, int flag_space)
-{
-    char *text = *text_io;
-    size_t len;
-    char *out;
-
-    if (!text || text[0] == '-')
-        return;
-    if (!flag_plus && !flag_space)
-        return;
-
-    len = strlen(text);
-    out = malloc(len + 2u);
-    if (!out)
-        return;
-
-    out[0] = flag_plus ? '+' : ' ';
-    memcpy(out + 1, text, len + 1u);
-    free(text);
-    *text_io = out;
 }
 
 static void mf_round_digits_carry(char *digits,
@@ -195,7 +191,10 @@ static int mf_parse_fixed_components(const char *text,
     return 0;
 }
 
-static char *mf_build_scientific(const char *fixed, int uppercase, int precision)
+static char *mf_build_scientific(const char *fixed,
+                                 int precision,
+                                 int flag_plus,
+                                 int flag_space)
 {
     int negative;
     char *digits = NULL;
@@ -247,10 +246,11 @@ static char *mf_build_scientific(const char *fixed, int uppercase, int precision
     if (digits_len > 1u)
         frac_len = digits_len - 1u;
 
-    snprintf(expbuf, sizeof(expbuf), "%c%+d", uppercase ? 'E' : 'e', exp10);
+    snprintf(expbuf, sizeof(expbuf), "E%+d", exp10);
     exp_len = strlen(expbuf);
 
-    out_len = (negative ? 1u : 0u) + 1u + (frac_len ? 1u + frac_len : 0u) + exp_len + 1u;
+    out_len = ((negative || flag_plus || flag_space) ? 1u : 0u)
+            + 1u + (frac_len ? 1u + frac_len : 0u) + exp_len + 1u;
     out = malloc(out_len);
     if (!out) {
         free(digits);
@@ -260,6 +260,10 @@ static char *mf_build_scientific(const char *fixed, int uppercase, int precision
     p = out;
     if (negative)
         *p++ = '-';
+    else if (flag_plus)
+        *p++ = '+';
+    else if (flag_space)
+        *p++ = ' ';
     *p++ = digits[0];
     if (frac_len) {
         *p++ = '.';
@@ -270,6 +274,35 @@ static char *mf_build_scientific(const char *fixed, int uppercase, int precision
 
     free(digits);
     return out;
+}
+
+static char *mf_render_value(const mfloat_t *x,
+                             int upper,
+                             int flag_plus,
+                             int flag_space,
+                             int flag_hash,
+                             int precision)
+{
+    char *fixed = NULL;
+    char *rendered = NULL;
+
+    if (!x)
+        return mf_unknown_string();
+
+    if (!mf_is_finite(x))
+        return mf_to_string(x);
+
+    fixed = mf_to_string(x);
+    if (!fixed)
+        return mf_unknown_string();
+
+    if (upper)
+        rendered = mf_build_scientific(fixed, precision, flag_plus, flag_space);
+    else
+        rendered = mf_build_fixed_form(fixed, flag_plus, flag_space, flag_hash, precision);
+
+    free(fixed);
+    return rendered ? rendered : mf_unknown_string();
 }
 
 static char *mf_build_fixed_form(const char *fixed,
@@ -403,6 +436,31 @@ static char *mf_build_fixed_form(const char *fixed,
     return buf;
 }
 
+static void mf_format_builtin_specifier(char *tmp,
+                                        size_t tmp_size,
+                                        const char *fmtbuf,
+                                        char spec,
+                                        va_list *ap_local)
+{
+    switch (spec) {
+        case 'd': {
+            int v = va_arg(*ap_local, int);
+            snprintf(tmp, tmp_size, fmtbuf, v);
+        } break;
+        case 's': {
+            const char *v = va_arg(*ap_local, const char *);
+            snprintf(tmp, tmp_size, fmtbuf, v);
+        } break;
+        case 'c': {
+            int v = va_arg(*ap_local, int);
+            snprintf(tmp, tmp_size, fmtbuf, v);
+        } break;
+        default:
+            snprintf(tmp, tmp_size, "<?>");
+            break;
+    }
+}
+
 int mf_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap)
 {
     const char *p = fmt;
@@ -475,57 +533,18 @@ int mf_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap)
             if ((*p == 'm' && p[1] == 'f') || (*p == 'M' && p[1] == 'F')) {
                 int upper = (*p == 'M');
                 const mfloat_t *x = va_arg(ap_local, const mfloat_t *);
-                char *core = NULL;
                 char *formatted = NULL;
                 char *padded = NULL;
 
                 p += 2;
 
-                if (!x) {
-                    core = strdup("<?>");
-                } else if (!mfloat_is_finite(x)) {
-                    core = mf_to_string(x);
-                } else if (upper) {
-                    char *fixed = mf_to_string(x);
-
-                    if (fixed) {
-                        core = mf_build_scientific(fixed, 1, precision);
-                        free(fixed);
-                    }
-                } else {
-                    char *fixed = mf_to_string(x);
-
-                    if (fixed) {
-                        core = mf_build_fixed_form(fixed, flag_plus, flag_space, flag_hash, precision);
-                        free(fixed);
-                    }
-                }
-
-                if (!core)
-                    core = strdup("<?>");
-
-                if (upper) {
-                    mf_apply_sign_prefix(&core, flag_plus, flag_space);
-                    formatted = core;
-                } else {
-                    formatted = core;
-                }
-
-                if (!formatted) {
-                    free(core);
-                    core = strdup("<?>");
-                    formatted = core;
-                }
-
-                padded = malloc(strlen(formatted) + (size_t)(width > 0 ? width : 0) + 2u);
+                formatted = mf_render_value(x, upper, flag_plus, flag_space, flag_hash, precision);
+                padded = mf_pad_alloc(formatted, width, flag_minus, flag_zero);
                 if (!padded) {
                     free(formatted);
                     va_end(ap_local);
                     return -1;
                 }
-
-                pad_string(padded, strlen(formatted) + (size_t)(width > 0 ? width : 0) + 2u,
-                           formatted, width, flag_minus, flag_zero, 0);
                 mf_put_str(padded, &dst, &remaining, &count);
 
                 free(padded);
@@ -553,23 +572,7 @@ int mf_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap)
                 *f++ = *p;
                 *f = '\0';
 
-                switch (*p) {
-                    case 'd': {
-                        int v = va_arg(ap_local, int);
-                        snprintf(tmp, sizeof(tmp), fmtbuf, v);
-                    } break;
-                    case 's': {
-                        const char *v = va_arg(ap_local, const char *);
-                        snprintf(tmp, sizeof(tmp), fmtbuf, v);
-                    } break;
-                    case 'c': {
-                        int v = va_arg(ap_local, int);
-                        snprintf(tmp, sizeof(tmp), fmtbuf, v);
-                    } break;
-                    default:
-                        snprintf(tmp, sizeof(tmp), "<?>");
-                        break;
-                }
+                mf_format_builtin_specifier(tmp, sizeof(tmp), fmtbuf, *p, &ap_local);
 
                 p++;
                 mf_put_str(tmp, &dst, &remaining, &count);

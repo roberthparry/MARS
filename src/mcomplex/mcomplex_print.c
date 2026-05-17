@@ -1,3 +1,4 @@
+#include <ctype.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -25,6 +26,43 @@ static void mc_put_str(const char *s, char **dst, size_t *remaining, size_t *cou
         mc_put_char(*s, dst, remaining, count);
         s++;
     }
+}
+
+static int mc_formatted_zero(const char *s)
+{
+    const unsigned char *p = (const unsigned char *)s;
+    int saw_digit = 0;
+
+    if (!s)
+        return 0;
+
+    while (isspace(*p))
+        ++p;
+    if (*p == '+' || *p == '-')
+        ++p;
+
+    while (*p) {
+        if (*p >= '0' && *p <= '9') {
+            saw_digit = 1;
+            if (*p != '0')
+                return 0;
+            ++p;
+            continue;
+        }
+        if (*p == '.') {
+            ++p;
+            continue;
+        }
+        if (*p == 'e' || *p == 'E')
+            return saw_digit;
+        if (isspace(*p)) {
+            ++p;
+            continue;
+        }
+        return 0;
+    }
+
+    return saw_digit;
 }
 
 static int mc_format_complex(char *out,
@@ -72,7 +110,9 @@ static int mc_format_complex(char *out,
     if (imag_buf[0] == '-')
         imag_digits++;
 
-    if (imag_buf[0] == '-')
+    if (mc_formatted_zero(imag_buf))
+        snprintf(assembled, sizeof(assembled), "%s", real_buf);
+    else if (imag_buf[0] == '-')
         snprintf(assembled, sizeof(assembled), "%s - %si", real_buf, imag_digits);
     else
         snprintf(assembled, sizeof(assembled), "%s + %si", real_buf, imag_digits);

@@ -2,6 +2,50 @@
 
 MARS uses `make` as its main build entry point.
 
+## Requirements
+
+Build tools:
+
+- C99-capable C compiler
+- `make`
+- `ar`
+- standard C library headers
+
+Required libraries:
+
+- `libm`
+- pthreads
+- GMP
+- MPFR
+- MPC
+
+Optional libraries:
+
+- libunistring, enabled by default with `ENABLE_UNISTRING=1`
+
+On Debian/Ubuntu, install everything used by the default build with:
+
+```sh
+sudo apt install build-essential libgmp-dev libmpfr-dev libmpc-dev libunistring-dev
+```
+
+If you disable libunistring support, it is not required:
+
+```sh
+sudo apt install build-essential libgmp-dev libmpfr-dev libmpc-dev
+make ENABLE_UNISTRING=0
+```
+
+Before building or installing, you can ask MARS to check for the required
+development headers and link libraries:
+
+```sh
+make check-deps
+```
+
+If a required dependency is missing, the check prints the Debian/Ubuntu package
+name to install, for example `sudo apt install libmpfr-dev`.
+
 ## Common Targets
 
 Default release build, shared library, tests, and any registered benchmarks:
@@ -26,6 +70,40 @@ Clean build outputs:
 
 ```sh
 make clean
+```
+
+Install headers and libraries:
+
+```sh
+sudo make install
+```
+
+Check required development libraries before building or installing:
+
+```sh
+make check-deps
+```
+
+By default, installation uses:
+
+```text
+PREFIX=/usr/local
+LIBDIR=$(PREFIX)/lib
+INCLUDEDIR=$(PREFIX)/include
+```
+
+That places libraries in `/usr/local/lib` and public headers in
+`/usr/local/include/mars`. Override paths as needed:
+
+```sh
+make install PREFIX=/opt/mars
+make install DESTDIR=/tmp/package-root PREFIX=/usr
+```
+
+Remove installed MARS files:
+
+```sh
+sudo make uninstall
 ```
 
 Run the full test suite:
@@ -68,8 +146,11 @@ make help
 - Run commands from the repository root.
 - A C99-capable compiler is required.
 - On Linux, the default system toolchain is usually sufficient.
-- `libm` is required.
+- `libm`, pthreads, GMP, MPFR, and MPC are required.
 - `libunistring` is optional but enabled by default through `ENABLE_UNISTRING=1`.
+- `make install` installs MARS headers and libraries only. It does not install
+  external dependencies such as GMP, MPFR, MPC, or libunistring; install those
+  through your OS package manager before building MARS.
 - Benchmarks are discovered automatically from `bench/bench_*.c`.
 - Current benchmark targets include `bench_integrator` and
   `bench_matrix_dval`.

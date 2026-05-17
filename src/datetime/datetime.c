@@ -1024,7 +1024,7 @@ double datetime_duration(const datetime_t *dttm1, const datetime_t *dttm2, datet
         int minutes = dttm1->minute - dttm2->minute;
         double seconds = dttm1->second - dttm2->second;
 
-        // Normalize the span so that each component is within its normal range
+        // Normalise the span so that each component is within its normal range
         if (seconds < 0) {
             seconds += 60.0;
             minutes--;
@@ -1086,7 +1086,7 @@ size_t size_max(size_t a, size_t b) {
     return (a < b) ? b : a;
 }
 
-/* Allocate a new string_t initialized with value. */
+/* Allocate a new string_t initialised with value. */
 static string_t string_create(const char *value) {
     size_t len = strlen(value);
     size_t capacity = size_max(STR_CHUNK, STR_CHUNK*((len + STR_CHUNK)/STR_CHUNK));
@@ -1474,7 +1474,7 @@ double datetime_sun_time(long julianDayNumber, double latitude, double longitude
     // Step 8: Convert to GMT
     double gmtTime = localMeanTime - longitudeHour;
 
-    // Normalize to [0, 24)
+    // Normalise to [0, 24)
     gmtTime = fmod(gmtTime, 24.0);
     if (gmtTime < 0.0) gmtTime += 24.0;
 

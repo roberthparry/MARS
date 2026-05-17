@@ -53,10 +53,10 @@ void run_number_exact_backend_tests(void)
         assert_number_string("num_add(mint 2, mint 3)", sum, "5");
         assert_number_string("num_sub(mint 3, mint 2)", diff, "1");
         assert_number_string("num_mul(mint 2, mint 3)", prod, "6");
-        assert_number_string("num_div(mint 2, mint 3)", quot, "2/3");
-        assert_number_string("num_add(1/2, 1/3)", frac_sum, "5/6");
-        assert_number_string("num_inv(mint 2)", inv_two, "1/2");
-        assert_number_string("NUM_HALF", half_const, "1/2");
+        assert_number_string("num_div(mint 2, mint 3)", quot, "⅔");
+        assert_number_string("num_add(1/2, 1/3)", frac_sum, "⅚");
+        assert_number_string("num_inv(mint 2)", inv_two, "½");
+        assert_number_string("NUM_HALF", half_const, "½");
         assert_number_string("NUM_TEN", ten_const, "10");
 
         ASSERT_TRUE(num_is_exact(zero_const));

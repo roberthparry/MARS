@@ -136,6 +136,7 @@ All declarations are in `include/qfloat.h`.
 | `QF_E` | e |
 | `QF_INV_E` | 1/e |
 | `QF_LN2` | ln 2 |
+| `QF_LN10` | ln 10 |
 | `QF_INVLN2` | 1/ln 2 |
 | `QF_SQRT_HALF` | √(1/2) |
 | `QF_SQRT_PI` | √π |
@@ -199,6 +200,7 @@ All declarations are in `include/qfloat.h`.
 - `qfloat_t qf_sqrt(qfloat_t x)` — square root via Newton refinement
 - `qfloat_t qf_exp(qfloat_t x)` — natural exponential
 - `qfloat_t qf_log(qfloat_t x)` — natural logarithm (`x > 0`)
+- `qfloat_t qf_log10(qfloat_t x)` — common logarithm (`x > 0`)
 - `qfloat_t qf_hypot(qfloat_t x, qfloat_t y)` — `sqrt(x^2 + y^2)` without overflow
 - `qfloat_t qf_sin(qfloat_t x)` — sine (radians)
 - `qfloat_t qf_cos(qfloat_t x)` — cosine (radians)
@@ -300,26 +302,26 @@ Current sample results with `MARS_BENCH_SCALE=5`:
 
 | Case | Time |
 |---|---:|
-| `qf_exp(1)` | `1.146 µs` |
-| `qf_log(10)` | `2.222 µs` |
-| `qf_erf(0.5)` | `2.615 µs` |
-| `qf_erfc(0.5)` | `2.489 µs` |
-| `qf_gamma(2.3)` | `1.107 µs` |
-| `qf_lgamma(2.3)` | `3.562 µs` |
-| `qf_gamma(2.5)` | `1.109 µs` |
-| `qf_lgamma(2.5)` | `3.073 µs` |
-| `qf_gamma(3.5)` | `1.129 µs` |
-| `qf_lgamma(3.5)` | `3.515 µs` |
-| `qf_digamma(2.3)` | `1.828 µs` |
-| `qf_trigamma(2.3)` | `3.316 µs` |
-| `qf_tetragamma(2.3)` | `2.868 µs` |
-| `qf_gammainv(119292.4619946090070787515047110059)` | `83.440 µs` |
-| `qf_lambert_w0(1)` | `9.509 µs` |
-| `qf_lambert_wm1(-0.1)` | `55.965 µs` |
-| `qf_ei(1)` | `2.857 µs` |
-| `qf_e1(1)` | `2.903 µs` |
-| `qf_beta(2.3, 4.5)` | `3.474 µs` |
-| `qf_logbeta(2.3, 4.5)` | `17.997 µs` |
+| `qf_exp(1)` | `1.370 µs` |
+| `qf_log(10)` | `2.471 µs` |
+| `qf_erf(0.5)` | `2.769 µs` |
+| `qf_erfc(0.5)` | `2.636 µs` |
+| `qf_gamma(2.3)` | `1.246 µs` |
+| `qf_lgamma(2.3)` | `3.797 µs` |
+| `qf_gamma(2.5)` | `1.234 µs` |
+| `qf_lgamma(2.5)` | `3.289 µs` |
+| `qf_gamma(3.5)` | `1.213 µs` |
+| `qf_lgamma(3.5)` | `3.343 µs` |
+| `qf_digamma(2.3)` | `1.625 µs` |
+| `qf_trigamma(2.3)` | `2.305 µs` |
+| `qf_tetragamma(2.3)` | `2.492 µs` |
+| `qf_gammainv(119292.4619946090070787515047110059)` | `82.548 µs` |
+| `qf_lambert_w0(1)` | `9.087 µs` |
+| `qf_lambert_wm1(-0.1)` | `58.889 µs` |
+| `qf_ei(1)` | `3.154 µs` |
+| `qf_e1(1)` | `3.095 µs` |
+| `qf_beta(2.3, 4.5)` | `3.361 µs` |
+| `qf_logbeta(2.3, 4.5)` | `17.206 µs` |
 
 For a broader benchmark overview, see
 [`docs/benchmarks.md`](benchmarks.md).

@@ -229,7 +229,7 @@ int qf_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap)
                 char tmp[256];
                 qf_to_string(x, tmp, sizeof(tmp));
 
-                /* normalize to lowercase 'e' and trim mantissa only */
+                /* normalise to lowercase 'e' and trim mantissa only */
                 char *ep = strchr(tmp, 'e');
                 if (!ep) ep = strchr(tmp, 'E');
 

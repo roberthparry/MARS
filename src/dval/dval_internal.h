@@ -74,6 +74,7 @@ typedef enum {
     DV_KIND_ATANH,
     DV_KIND_EXP,
     DV_KIND_LOG,
+    DV_KIND_LOG10,
     DV_KIND_SQRT,
     DV_KIND_ABS,
     DV_KIND_HYPOT,
@@ -264,6 +265,7 @@ extern const dval_ops_t ops_atanh;
 /* Exponential / logarithm / power */
 extern const dval_ops_t ops_exp;
 extern const dval_ops_t ops_log;
+extern const dval_ops_t ops_log10;
 extern const dval_ops_t ops_sqrt;
 extern const dval_ops_t ops_pow_d;  /* dv^(constant numeric exponent) */
 extern const dval_ops_t ops_pow;    /* dv^dv */
@@ -421,6 +423,7 @@ void dv_reverse_acosh(const dval_t *dv, const number_t *out_bar, number_t *a_bar
 void dv_reverse_atanh(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void dv_reverse_exp(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void dv_reverse_log(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_log10(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void dv_reverse_sqrt(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void dv_reverse_abs(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void dv_reverse_hypot(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);

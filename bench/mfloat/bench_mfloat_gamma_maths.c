@@ -42,6 +42,16 @@ static int bench_case_enabled(const char *label)
     return strstr(label, filter) != NULL;
 }
 
+static int bench_mfloat_reset(mfloat_t *dst, const mfloat_t *src, size_t precision)
+{
+    if (!dst || !src)
+        return -1;
+    if (mf_set_precision(dst, precision) != 0)
+        return -1;
+    mpfr_set(dst->value, src->value, MPFR_RNDN);
+    return 0;
+}
+
 static void run_unary_case(const char *label,
                            const char *text,
                            size_t precision,
@@ -81,8 +91,7 @@ static void run_unary_case(const char *label,
         (void)mf_set_default_precision(old_prec);
         return;
     }
-    if (mfloat_copy_value(work, src) != 0 ||
-        mf_set_precision(work, precision) != 0 ||
+    if (bench_mfloat_reset(work, src, precision) != 0 ||
         fn(work) != 0) {
         fprintf(stderr, "%s warmup failed\n", label);
         mf_free(work);
@@ -93,8 +102,7 @@ static void run_unary_case(const char *label,
 
     start = now_ns();
     for (int i = 0; i < iters; ++i) {
-        if (mfloat_copy_value(work, src) != 0 ||
-            mf_set_precision(work, precision) != 0 ||
+        if (bench_mfloat_reset(work, src, precision) != 0 ||
             fn(work) != 0) {
             fprintf(stderr, "%s timed run failed\n", label);
             mf_free(work);

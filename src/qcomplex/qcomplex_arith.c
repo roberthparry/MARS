@@ -60,6 +60,10 @@ qcomplex_t qc_log(qcomplex_t z) {
     }
     return qc_make(qf_log(qc_abs(z)), qc_arg(z));
 }
+qcomplex_t qc_log10(qcomplex_t z) {
+    qfloat_t inv_ln10 = qf_div(QF_ONE, QF_LN10);
+    return qc_make(qf_mul(qf_log(qc_abs(z)), inv_ln10), qf_mul(qc_arg(z), inv_ln10));
+}
 qcomplex_t qc_pow(qcomplex_t a, qcomplex_t b) {
     if (qc_eq(b, QC_ZERO))
         return QC_ONE;

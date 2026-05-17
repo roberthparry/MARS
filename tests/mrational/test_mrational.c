@@ -1,8 +1,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "mint.h"
 #include "internal/mrational_internal.h"
+#include "mint.h"
 #include "mrational.h"
 
 #define TEST_CONFIG_MODE TEST_CONFIG_GLOBAL
@@ -44,11 +44,15 @@ void test_create_and_normalise(void)
     mrational_t *whole = mr_create_long(-42);
     mrational_t *frac = mr_create_frac_long(6, -8);
     mrational_t *parsed = mr_create_string("  -10/20  ");
+    mrational_t *parsed_general = mr_create_string("355/113");
+    mrational_t *parsed_unicode = mr_create_string("³⁵⁵⁄₁₁₃");
 
     ASSERT_NOT_NULL(zero);
     ASSERT_NOT_NULL(whole);
     ASSERT_NOT_NULL(frac);
     ASSERT_NOT_NULL(parsed);
+    ASSERT_NOT_NULL(parsed_general);
+    ASSERT_NOT_NULL(parsed_unicode);
 
     assert_mr_string_label("mr_new() -> 0", zero, "0");
     ASSERT_TRUE(mr_is_zero(zero));
@@ -57,16 +61,28 @@ void test_create_and_normalise(void)
     assert_mr_string_label("mr_create_long(-42)", whole, "-42");
     ASSERT_TRUE(mr_is_integer(whole));
 
-    assert_mr_string_label("mr_create_frac_long(6, -8)", frac, "-3/4");
+    assert_mr_string_label("mr_create_frac_long(6, -8)", frac, "-¾");
     ASSERT_TRUE(!mr_is_integer(frac));
 
-    assert_mr_string_label("mr_create_string(\"  -10/20  \")", parsed, "-1/2");
+    assert_mr_string_label("mr_create_string(\"  -10/20  \")", parsed, "-½");
     ASSERT_TRUE(!mr_is_integer(parsed));
+
+    assert_mr_string_label("mr_create_string(\"355/113\")",
+                           parsed_general,
+                           "³⁵⁵⁄₁₁₃");
+    ASSERT_TRUE(!mr_is_integer(parsed_general));
+
+    assert_mr_string_label("mr_create_string(\"³⁵⁵⁄₁₁₃\")",
+                           parsed_unicode,
+                           "³⁵⁵⁄₁₁₃");
+    ASSERT_TRUE(!mr_is_integer(parsed_unicode));
 
     mr_free(zero);
     mr_free(whole);
     mr_free(frac);
     mr_free(parsed);
+    mr_free(parsed_general);
+    mr_free(parsed_unicode);
 }
 
 void test_setters_and_accessors(void)
@@ -82,7 +98,7 @@ void test_setters_and_accessors(void)
     ASSERT_NOT_NULL(src_num);
     ASSERT_NOT_NULL(src_den);
     ASSERT_EQ_INT(mr_set_frac_long(r, 14, 21), 0);
-    assert_mr_string_label("mr_set_frac_long(r, 14, 21)", r, "2/3");
+    assert_mr_string_label("mr_set_frac_long(r, 14, 21)", r, "⅔");
 
     num = mr_numerator(r);
     den = mr_denominator(r);
@@ -97,7 +113,7 @@ void test_setters_and_accessors(void)
     ASSERT_TRUE(mr_is_integer(r));
 
     ASSERT_EQ_INT(mr_set_mints(r, src_num, src_den), 0);
-    assert_mr_string_label("mr_set_mints(r, 84, -126)", r, "-2/3");
+    assert_mr_string_label("mr_set_mints(r, 84, -126)", r, "-⅔");
     assert_mint_clone_string_label("source numerator unchanged", src_num, "84");
     assert_mint_clone_string_label("source denominator unchanged", src_den, "-126");
 
@@ -134,7 +150,7 @@ void test_clone_compare_and_order(void)
     ASSERT_TRUE(mr_ge(c, a));
 
     ASSERT_EQ_INT(mr_add(b, d), 0);
-    assert_mr_string_label("original a after mr_clone + mr_add(b, d)", a, "2/3");
+    assert_mr_string_label("original a after mr_clone + mr_add(b, d)", a, "⅔");
     assert_mr_string_label("mr_add(clone(2/3), 1/3)", b, "1");
 
     mr_free(a);
@@ -155,22 +171,22 @@ void test_arithmetic(void)
     ASSERT_NOT_NULL(zero);
 
     ASSERT_EQ_INT(mr_add(a, b), 0);
-    assert_mr_string_label("mr_add(1/2, 1/3)", a, "5/6");
+    assert_mr_string_label("mr_add(1/2, 1/3)", a, "⅚");
 
     ASSERT_EQ_INT(mr_sub(a, b), 0);
-    assert_mr_string_label("mr_sub(5/6, 1/3)", a, "1/2");
+    assert_mr_string_label("mr_sub(5/6, 1/3)", a, "½");
 
     ASSERT_EQ_INT(mr_mul(a, b), 0);
-    assert_mr_string_label("mr_mul(1/2, 1/3)", a, "1/6");
+    assert_mr_string_label("mr_mul(1/2, 1/3)", a, "⅙");
 
     ASSERT_EQ_INT(mr_div(a, b), 0);
-    assert_mr_string_label("mr_div(1/6, 1/3)", a, "1/2");
+    assert_mr_string_label("mr_div(1/6, 1/3)", a, "½");
 
     ASSERT_EQ_INT(mr_neg(a), 0);
-    assert_mr_string_label("mr_neg(1/2)", a, "-1/2");
+    assert_mr_string_label("mr_neg(1/2)", a, "-½");
 
     ASSERT_EQ_INT(mr_abs(a), 0);
-    assert_mr_string_label("mr_abs(-1/2)", a, "1/2");
+    assert_mr_string_label("mr_abs(-1/2)", a, "½");
 
     ASSERT_EQ_INT(mr_inv(a), 0);
     assert_mr_string_label("mr_inv(1/2)", a, "2");
@@ -200,13 +216,15 @@ void test_large_values(void)
     ASSERT_EQ_INT(mr_mul(a, b), 0);
     assert_mr_string_label("mr_mul(18446744073709551616/3, 5/7)",
                            a,
-                           "92233720368547758080/21");
+                           "⁹²²³³⁷²⁰³⁶⁸⁵⁴⁷⁷⁵⁸⁰⁸⁰⁄₂₁");
 
     ASSERT_EQ_INT(mr_div(a, b), 0);
-    assert_mr_string_label("mr_div(previous, 5/7)", a, "18446744073709551616/3");
+    assert_mr_string_label("mr_div(previous, 5/7)",
+                           a,
+                           "¹⁸⁴⁴⁶⁷⁴⁴⁰⁷³⁷⁰⁹⁵⁵¹⁶¹⁶⁄₃");
     assert_mr_string_label("mr_create_mints(18446744073709551616, 3)",
                            c,
-                           "18446744073709551616/3");
+                           "¹⁸⁴⁴⁶⁷⁴⁴⁰⁷³⁷⁰⁹⁵⁵¹⁶¹⁶⁄₃");
 
     mr_free(a);
     mr_free(b);
@@ -229,8 +247,8 @@ void test_bernoulli_accessors(void)
     ASSERT_TRUE(mr_bernoulli_even_term(0u) == NULL);
     ASSERT_TRUE(mr_bernoulli_even_term(mr_bernoulli_even_term_count() + 1u) == NULL);
 
-    assert_mr_string_label("mr_bernoulli_even_term(1)", b1, "1/6");
-    assert_mr_string_label("mr_bernoulli_even_term(2)", b2, "-1/30");
+    assert_mr_string_label("mr_bernoulli_even_term(1)", b1, "⅙");
+    assert_mr_string_label("mr_bernoulli_even_term(2)", b2, "-¹⁄₃₀");
 }
 
 static int readme_example(void)

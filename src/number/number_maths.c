@@ -65,6 +65,51 @@ static const number_angle_pair_fastpath_t number_sinhcosh_fastpaths[];
 static int number_try_get_pure_imag(const number_t number,
                                     number_t *imag_out);
 
+static size_t number_log_fastpath_precision(const number_t *number)
+{
+    size_t precision_bits = number ? num_get_prec_bits(*number) : 0u;
+
+    if (number && number_kind_value(number) == NUMBER_MCOMPLEX &&
+        precision_bits <= 1u)
+        precision_bits = num_get_default_prec_bits();
+    if (precision_bits == 0u)
+        precision_bits = num_get_default_prec_bits();
+    return precision_bits;
+}
+
+static bool number_is_plain_mfloat_value(const number_t *number)
+{
+    const number_vtable_t *vt = number_vt(number);
+
+    return number_kind_value(number) == NUMBER_MFLOAT &&
+        (!vt || !vt->is_immortal || !vt->is_immortal(number));
+}
+
+static number_t number_log_imag_multiple(const number_t *number,
+                                          number_const_id_t angle_id,
+                                          int sign)
+{
+    NUM_SCOPE(scope);
+    size_t precision_bits;
+    number_t imag_unit;
+    number_t angle;
+    number_t out;
+
+    precision_bits = number_log_fastpath_precision(number);
+    imag_unit = num_const_prec(NUM_I, precision_bits);
+    angle = number_const_like(number, angle_id);
+    if (num_get_prec_bits(angle) != 0u)
+        num_set_prec_bits(&angle, precision_bits);
+    out = num_mul(imag_unit, angle);
+    if (sign < 0) {
+        number_t neg = num_neg(out);
+
+        num_destroy(&out);
+        out = neg;
+    }
+    return num_scope_detach(out);
+}
+
 static int number_try_get_exact_int(const number_t number, int *out)
 {
     char *text;
@@ -198,6 +243,72 @@ static int number_exp_quarter_turn(const number_t *number,
     return 1;
 }
 
+static number_t number_exp_backend(const number_t *number)
+{
+    const number_vtable_t *vt;
+    number_t *promoted = NULL;
+    number_t *result = NULL;
+
+    vt = number_vt(number);
+    if (!vt)
+        return number_invalid();
+    if (vt->exp_same)
+        return number_take(vt->exp_same(number));
+
+    promoted = number_coerce(number, NUMBER_MFLOAT);
+    vt = number_vt(promoted);
+    if (!vt || !vt->exp_same)
+        goto done;
+    result = vt->exp_same(promoted);
+done:
+    number_box_free(promoted);
+    return number_take(result);
+}
+
+static number_t number_log_backend(const number_t *number)
+{
+    const number_vtable_t *vt;
+    number_t *promoted = NULL;
+    number_t *result = NULL;
+
+    vt = number_vt(number);
+    if (!vt)
+        return number_invalid();
+    if (vt->log_same)
+        return number_take(vt->log_same(number));
+
+    promoted = number_coerce(number, NUMBER_MFLOAT);
+    vt = number_vt(promoted);
+    if (!vt || !vt->log_same)
+        goto done;
+    result = vt->log_same(promoted);
+done:
+    number_box_free(promoted);
+    return number_take(result);
+}
+
+static number_t number_apply_binary_same_mfloat(const number_t *a,
+                                                const number_t *b,
+                                                number_mfloat_binary_mut_fn fn)
+{
+    mfloat_t *copy;
+    number_t *wrapped;
+
+    if (!a || !b || !fn ||
+        number_kind_value(a) != NUMBER_MFLOAT ||
+        number_kind_value(b) != NUMBER_MFLOAT)
+        return number_invalid();
+
+    copy = mf_clone(number_impl_const(a)->value.mf);
+    if (!copy || fn(copy, number_impl_const(b)->value.mf) != 0) {
+        mf_free(copy);
+        return number_invalid();
+    }
+
+    wrapped = number_wrap_mfloat(copy);
+    return wrapped ? number_take(wrapped) : number_invalid();
+}
+
 static int number_trig_real_fastpath(const number_t *number,
                                      const number_angle_fastpath_t *table,
                                      size_t count,
@@ -312,9 +423,19 @@ static number_t number_apply_unary_mreal(const number_t *number,
                                          const number_unary_math_ops_t *ops)
 {
     number_t *promoted = NULL;
+    mfloat_t *copy = NULL;
 
     if (!ops || !ops->mreal || !number)
         return number_invalid();
+    if (number_kind_value(number) == NUMBER_MFLOAT) {
+        copy = mf_clone(number_impl_const(number)->value.mf);
+        if (!copy || ops->mreal(copy) != 0) {
+            mf_free(copy);
+            return number_invalid();
+        }
+        promoted = number_wrap_mfloat(copy);
+        return promoted ? number_take(promoted) : number_invalid();
+    }
     promoted = number_coerce(number, NUMBER_MFLOAT);
     if (!promoted || ops->mreal(number_impl(promoted)->value.mf) != 0) {
         number_box_free(promoted);
@@ -612,12 +733,12 @@ static number_t number_apply_ternary_math(const number_t x,
 
 number_t num_exp(const number_t number)
 {
-    const number_vtable_t *vt;
-    number_t *promoted = NULL;
-    number_t *result = NULL;
     number_t root;
     number_t root2;
     number_t out;
+
+    if (number_is_plain_mfloat_value(&number))
+        return number_exp_backend(&number);
 
     if (num_eq(number, NUM_ZERO))
         return number_const_return_like(&number, NUMBER_CONST_ONE);
@@ -655,30 +776,15 @@ number_t num_exp(const number_t number)
     if (number_exp_quarter_turn(&number, &out))
         return out;
 
-    vt = number_vt(&number);
-    if (!vt)
-        return number_invalid();
-    if (vt->exp_same)
-        return number_take(vt->exp_same(&number));
-
-    promoted = number_coerce(&number, NUMBER_MFLOAT);
-    vt = number_vt(promoted);
-    if (!vt || !vt->exp_same)
-        goto done;
-    result = vt->exp_same(promoted);
-done:
-    number_box_free(promoted);
-    return number_take(result);
+    return number_exp_backend(&number);
 }
 
 number_t num_log(const number_t number)
 {
-    const number_vtable_t *vt;
-    number_t *promoted = NULL;
-    number_t *result = NULL;
     number_t neg_i;
-    number_t out;
-    number_t tmp;
+
+    if (number_is_plain_mfloat_value(&number))
+        return number_log_backend(&number);
 
     if (num_eq(number, NUM_ONE))
         return number_const_return_like(&number, NUMBER_CONST_ZERO);
@@ -691,33 +797,22 @@ number_t num_log(const number_t number)
     if (num_eq(number, NUM_HALF))
         return number_neg_const_return_like(&number, NUMBER_CONST_LN2);
     if (num_eq(number, NUM_I))
-        return number_imag_const_return_like(&number, NUMBER_CONST_PI_2);
+        return number_log_imag_multiple(&number, NUMBER_CONST_PI_2, 1);
     if (num_eq(number, NUM_NEG_ONE))
-        return number_imag_const_return_like(&number, NUMBER_CONST_PI);
+        return number_log_imag_multiple(&number, NUMBER_CONST_PI, 1);
     neg_i = number_neg_const_return_like(&number, NUMBER_CONST_I);
     if (num_eq(number, neg_i)) {
         num_destroy(&neg_i);
-        out = number_imag_const_return_like(&number, NUMBER_CONST_PI_2);
-        tmp = num_neg(out);
-        num_destroy(&out);
-        return tmp;
+        return number_log_imag_multiple(&number, NUMBER_CONST_PI_2, -1);
     }
     num_destroy(&neg_i);
 
-    vt = number_vt(&number);
-    if (!vt)
-        return number_invalid();
-    if (vt->log_same)
-        return number_take(vt->log_same(&number));
+    return number_log_backend(&number);
+}
 
-    promoted = number_coerce(&number, NUMBER_MFLOAT);
-    vt = number_vt(promoted);
-    if (!vt || !vt->log_same)
-        goto done;
-    result = vt->log_same(promoted);
-done:
-    number_box_free(promoted);
-    return number_take(result);
+number_t num_log10(const number_t number)
+{
+    return number_apply_unary_math_with_double(number, log10, qf_log10, qc_log10, mf_log10, mc_log10);
 }
 
 number_t num_sqrt(const number_t number)
@@ -974,6 +1069,8 @@ int num_sincos(const number_t x, number_t *sin_out, number_t *cos_out)
 
     if (!sin_out || !cos_out || !number_is_valid_value(&x))
         return -1;
+    if (number_is_plain_mfloat_value(&x) && vt && vt->sincos_value)
+        return vt->sincos_value(&x, sin_out, cos_out);
     if (number_trig_real_pair_fastpath(&x, number_sincos_fastpaths,
             sizeof(number_sincos_fastpaths) / sizeof(number_sincos_fastpaths[0]),
             sin_out, cos_out))
@@ -987,6 +1084,8 @@ number_t num_sin(const number_t number)
 {
     number_t out;
 
+    if (number_is_plain_mfloat_value(&number))
+        return number_apply_unary_math_with_double(number, sin, qf_sin, qc_sin, mf_sin, mc_sin);
     if (number_trig_real_fastpath(&number, number_sin_fastpaths,
             sizeof(number_sin_fastpaths) / sizeof(number_sin_fastpaths[0]), &out))
         return out;
@@ -997,6 +1096,8 @@ number_t num_cos(const number_t number)
 {
     number_t out;
 
+    if (number_is_plain_mfloat_value(&number))
+        return number_apply_unary_math_with_double(number, cos, qf_cos, qc_cos, mf_cos, mc_cos);
     if (number_trig_real_fastpath(&number, number_cos_fastpaths,
             sizeof(number_cos_fastpaths) / sizeof(number_cos_fastpaths[0]), &out))
         return out;
@@ -1005,6 +1106,8 @@ number_t num_cos(const number_t number)
 
 number_t num_tan(const number_t number)
 {
+    if (number_is_plain_mfloat_value(&number))
+        return number_apply_unary_math_with_double(number, tan, qf_tan, qc_tan, mf_tan, mc_tan);
     if (num_eq(number, NUM_ZERO) || num_eq(number, NUM_PI) || num_eq(number, NUM_2PI))
         return number_const_return_like(&number, NUMBER_CONST_ZERO);
     if (num_eq(number, NUM_PI_6)) {
@@ -1030,6 +1133,9 @@ number_t num_atan(const number_t number)
 
 number_t num_atan2(const number_t y, const number_t x)
 {
+    if (number_kind_value(&y) == NUMBER_MFLOAT &&
+        number_kind_value(&x) == NUMBER_MFLOAT)
+        return number_apply_binary_same_mfloat(&y, &x, mf_atan2);
     return number_apply_binary_math_with_double(y, x, atan2, qf_atan2, qc_atan2, mf_atan2, mc_atan2);
 }
 
@@ -1047,6 +1153,8 @@ number_t num_sinh(const number_t number)
 {
     number_t out;
 
+    if (number_is_plain_mfloat_value(&number))
+        return number_apply_unary_math_with_double(number, sinh, qf_sinh, qc_sinh, mf_sinh, mc_sinh);
     if (number_hyperbolic_imag_fastpath(&number, number_sinh_imag_fastpaths,
             sizeof(number_sinh_imag_fastpaths) / sizeof(number_sinh_imag_fastpaths[0]), &out))
         return out;
@@ -1057,6 +1165,8 @@ number_t num_cosh(const number_t number)
 {
     number_t out;
 
+    if (number_is_plain_mfloat_value(&number))
+        return number_apply_unary_math_with_double(number, cosh, qf_cosh, qc_cosh, mf_cosh, mc_cosh);
     if (number_hyperbolic_imag_fastpath(&number, number_cosh_imag_fastpaths,
             sizeof(number_cosh_imag_fastpaths) / sizeof(number_cosh_imag_fastpaths[0]), &out))
         return out;
@@ -1069,6 +1179,8 @@ int num_sinhcosh(const number_t x, number_t *sinh_out, number_t *cosh_out)
 
     if (!sinh_out || !cosh_out || !number_is_valid_value(&x))
         return -1;
+    if (number_is_plain_mfloat_value(&x) && vt && vt->sinhcosh_value)
+        return vt->sinhcosh_value(&x, sinh_out, cosh_out);
     if (number_hyperbolic_imag_pair_fastpath(&x, number_sinhcosh_fastpaths,
             sizeof(number_sinhcosh_fastpaths) / sizeof(number_sinhcosh_fastpaths[0]),
             sinh_out, cosh_out))
@@ -1083,6 +1195,8 @@ number_t num_tanh(const number_t number)
     number_t imag;
     number_t out;
 
+    if (number_is_plain_mfloat_value(&number))
+        return number_apply_unary_math_with_double(number, tanh, qf_tanh, qc_tanh, mf_tanh, mc_tanh);
     if (number_hyperbolic_imag_fastpath(&number, number_tanh_imag_fastpaths,
             sizeof(number_tanh_imag_fastpaths) / sizeof(number_tanh_imag_fastpaths[0]), &out))
         return out;
@@ -1191,6 +1305,23 @@ number_t num_logbeta(const number_t a, const number_t b)
 
 number_t num_binomial(const number_t a, const number_t b)
 {
+    int n;
+    int k;
+    mint_t *value;
+
+    if (number_try_get_exact_int(a, &n) &&
+        number_try_get_exact_int(b, &k) &&
+        n >= 0 && k >= 0) {
+        value = mi_new();
+        if (!value)
+            return number_invalid();
+        if (mi_binomial(value, (unsigned long)n, (unsigned long)k) != 0) {
+            mi_free(value);
+            return number_invalid();
+        }
+        return number_take(number_wrap_mint(value));
+    }
+
     return number_apply_binary_math(a, b, qf_binomial, qc_binomial, mf_binomial, mc_binomial);
 }
 

@@ -229,6 +229,10 @@ static void test_log(void)
              qc_log(qcrs("2.71828182845904523536028747135266249775724709369996")),
              qcr(1.0), 1e-30);
 
+    check_qc("log10(100) = 2",
+             qc_log10(qcr(100.0)),
+             qcr(2.0), 1e-30);
+
     {
         qcomplex_t z = qcz(0.7, 1.2);
         check_qc("log(exp(z)) = z", qc_log(qc_exp(z)), z, 1e-27);

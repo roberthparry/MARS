@@ -46,6 +46,7 @@ extern const mfloat_t * const MF_2_PI;
 extern const mfloat_t * const MF_E;
 extern const mfloat_t * const MF_INV_E;
 extern const mfloat_t * const MF_LN2;
+extern const mfloat_t * const MF_LN10;
 extern const mfloat_t * const MF_INVLN2;
 extern const mfloat_t * const MF_EULER_MASCHERONI;
 extern const mfloat_t * const MF_PHI;
@@ -72,12 +73,15 @@ extern const mfloat_t * const MF_NINF;
 
 /** @name Lifecycle
  * Constructors return newly allocated values or `NULL` on allocation failure.
- * `mf_clone()` returns a deep copy, `mf_clear()` resets an existing
+ * `mf_const()` and `mf_const_prec()` materialise named constants as mutable
+ * values, `mf_clone()` returns a deep copy, `mf_clear()` resets an existing
  * value to canonical zero, and `mf_free()` releases owned storage.
  * @{
  */
 mfloat_t *mf_new(void);
 mfloat_t *mf_new_prec(size_t precision_bits);
+mfloat_t *mf_const(const mfloat_t *constant);
+mfloat_t *mf_const_prec(const mfloat_t *constant, size_t precision_bits);
 mfloat_t *mf_create_long(long value);
 mfloat_t *mf_create_double(double value);
 mfloat_t *mf_create_qfloat(qfloat_t value);
@@ -230,6 +234,7 @@ int mf_mul_pow10(mfloat_t *mfloat, int exponent10);
 int mf_hypot(mfloat_t *mfloat, const mfloat_t *other);
 int mf_exp(mfloat_t *mfloat);
 int mf_log(mfloat_t *mfloat);
+int mf_log10(mfloat_t *mfloat);
 int mf_sincos(const mfloat_t *x, mfloat_t *sin_out, mfloat_t *cos_out);
 int mf_sin(mfloat_t *mfloat);
 int mf_cos(mfloat_t *mfloat);
