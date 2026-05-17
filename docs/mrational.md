@@ -24,7 +24,7 @@ with both parts held exactly as arbitrary-precision integers.
   - `long/long` fractions
   - decimal and fractional strings
 - exact outward conversion to:
-  - canonical rational strings
+  - canonical Unicode rational display strings
 - in-place exact arithmetic:
   - add, subtract, multiply, divide
   - reciprocal

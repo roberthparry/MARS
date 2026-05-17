@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "test_number.h"
 
@@ -115,5 +117,22 @@ void run_number_public_api_tests(void)
         num_destroy(&two);
         num_destroy(&one_third);
         num_destroy(&one_sixth);
+    }
+
+    {
+        number_t a = num_create_from_string("2");
+        number_t b = num_create_from_string("5/6");
+        number_t c = num_add(a, b);
+        char *text = num_to_string(c);
+
+        ASSERT_NOT_NULL(text);
+        printf(C_WHITE C_BOLD "README example" C_RESET "\n");
+        printf("    2 + 5/6 = %s\n\n", text ? text : "(null)");
+        ASSERT_TRUE(text && strcmp(text, "¹⁷⁄₆") == 0);
+
+        free(text);
+        num_destroy(&a);
+        num_destroy(&b);
+        num_destroy(&c);
     }
 }

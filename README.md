@@ -149,7 +149,7 @@ int main(void) {
 ```
 
 ```text
-2 + 5/6 = 17/6
+2 + 5/6 = ¹⁷⁄₆
 ```
 
 For temporary-heavy internal code, `number_t` also supports optional lifetime
