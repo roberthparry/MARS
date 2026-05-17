@@ -291,37 +291,44 @@ Run it with:
 make bench_qfloat_gamma_maths
 ```
 
-Sample results below were measured on:
+Current sample results from that command on this tree, measured on:
 
 - `Linux x86_64`
 - kernel `6.8.0-110-generic`
 - `Intel(R) Core(TM) i7-4510U CPU @ 2.00GHz`
 - `4` logical CPUs
 
-Current sample results with `MARS_BENCH_SCALE=5`:
+Markdown output uses the release benchmark with `51` timed batches per case,
+records the sample median for each row, and times only the actual `qfloat`
+math operation after argument parsing and warmup.
+
+Results:
 
 | Case | Time |
 |---|---:|
-| `qf_exp(1)` | `1.370 µs` |
-| `qf_log(10)` | `2.471 µs` |
-| `qf_erf(0.5)` | `2.769 µs` |
-| `qf_erfc(0.5)` | `2.636 µs` |
-| `qf_gamma(2.3)` | `1.246 µs` |
-| `qf_lgamma(2.3)` | `3.797 µs` |
-| `qf_gamma(2.5)` | `1.234 µs` |
-| `qf_lgamma(2.5)` | `3.289 µs` |
-| `qf_gamma(3.5)` | `1.213 µs` |
-| `qf_lgamma(3.5)` | `3.343 µs` |
-| `qf_digamma(2.3)` | `1.625 µs` |
-| `qf_trigamma(2.3)` | `2.305 µs` |
-| `qf_tetragamma(2.3)` | `2.492 µs` |
-| `qf_gammainv(119292.4619946090070787515047110059)` | `82.548 µs` |
-| `qf_lambert_w0(1)` | `9.087 µs` |
-| `qf_lambert_wm1(-0.1)` | `58.889 µs` |
-| `qf_ei(1)` | `3.154 µs` |
-| `qf_e1(1)` | `3.095 µs` |
-| `qf_beta(2.3, 4.5)` | `3.361 µs` |
-| `qf_logbeta(2.3, 4.5)` | `17.206 µs` |
+| `qf_exp(1)` | `1.5 µs` |
+| `qf_log(10)` | `3.7 µs` |
+| `qf_erf(0.5)` | `3.7 µs` |
+| `qf_erfc(0.5)` | `3.6 µs` |
+| `qf_gamma(2.3)` | `1.7 µs` |
+| `qf_lgamma(2.3)` | `6.3 µs` |
+| `qf_gamma(2.5)` | `1.8 µs` |
+| `qf_lgamma(2.5)` | `5.8 µs` |
+| `qf_gamma(3.5)` | `1.9 µs` |
+| `qf_lgamma(3.5)` | `9.6 µs` |
+| `qf_digamma(2.3)` | `3.5 µs` |
+| `qf_trigamma(2.3)` | `4.7 µs` |
+| `qf_tetragamma(2.3)` | `5.7 µs` |
+| `qf_gammainv(119292.4619946090070787515047110059)` | `143.7 µs` |
+| `qf_lambert_w0(1)` | `14.9 µs` |
+| `qf_lambert_wm1(-0.1)` | `81.8 µs` |
+| `qf_ei(1)` | `4.7 µs` |
+| `qf_e1(1)` | `4.7 µs` |
+| `qf_beta(2.3, 4.5)` | `5.2 µs` |
+| `qf_logbeta(2.3, 4.5)` | `26.6 µs` |
 
 For a broader benchmark overview, see
 [`docs/benchmarks.md`](benchmarks.md).
+
+
+

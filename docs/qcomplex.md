@@ -234,34 +234,41 @@ Run it with:
 make bench_qcomplex_maths
 ```
 
-Sample results below were measured on:
+Current sample results from that command on this tree, measured on:
 
 - `Linux x86_64`
 - kernel `6.8.0-110-generic`
 - `Intel(R) Core(TM) i7-4510U CPU @ 2.00GHz`
 - `4` logical CPUs
 
-Current sample results:
+Markdown output uses the release benchmark with `51` timed batches per case,
+records the sample median for each row, and times only the actual `qcomplex`
+math operation after argument parsing and warmup.
+
+Results:
 
 | Case | Time |
 |---|---:|
-| `qc_exp(1+i)` | `2.513 µs` |
-| `qc_log(1+i)` | `3.503 µs` |
-| `qc_erf(0.5+0.5i)` | `6.665 µs` |
-| `qc_erfc(0.5+0.5i)` | `6.299 µs` |
-| `qc_gamma(1.5+0.7i)` | `9.753 µs` |
-| `qc_lgamma(1.5+0.7i)` | `8.058 µs` |
-| `qc_digamma(2+i)` | `9.108 µs` |
-| `qc_trigamma(2+0.5i)` | `2.895 µs` |
-| `qc_tetragamma(2+0.5i)` | `3.598 µs` |
-| `qc_gammainv(3.323350970447842551184064031264648)` | `55.586 µs` |
-| `qc_gammainv(qc_gamma(2.5+0.3i))` | `145.943 µs` |
-| `qc_productlog(1+i)` | `19.744 µs` |
-| `qc_lambert_wm1(-0.2-0.1i)` | `19.262 µs` |
-| `qc_ei(1+i)` | `29.968 µs` |
-| `qc_e1(1+i)` | `30.136 µs` |
-| `qc_beta(1.5+0.5i, 2-0.3i)` | `26.146 µs` |
-| `qc_logbeta(1.5+0.5i, 2-0.3i)` | `24.514 µs` |
+| `qc_exp(1+i)` | `3.3 µs` |
+| `qc_log(1+i)` | `5.8 µs` |
+| `qc_erf(0.5+0.5i)` | `9.7 µs` |
+| `qc_erfc(0.5+0.5i)` | `11.4 µs` |
+| `qc_gamma(1.5+0.7i)` | `16.6 µs` |
+| `qc_lgamma(1.5+0.7i)` | `14.9 µs` |
+| `qc_digamma(2+i)` | `16.3 µs` |
+| `qc_trigamma(2+0.5i)` | `5.7 µs` |
+| `qc_tetragamma(2+0.5i)` | `6.5 µs` |
+| `qc_gammainv(3.323350970447842551184064031264648)` | `89.4 µs` |
+| `qc_gammainv(qc_gamma(2.5+0.3i))` | `218.0 µs` |
+| `qc_productlog(1+i)` | `29.1 µs` |
+| `qc_lambert_wm1(-0.2-0.1i)` | `29.5 µs` |
+| `qc_ei(1+i)` | `46.7 µs` |
+| `qc_e1(1+i)` | `47.9 µs` |
+| `qc_beta(1.5+0.5i, 2-0.3i)` | `41.5 µs` |
+| `qc_logbeta(1.5+0.5i, 2-0.3i)` | `37.4 µs` |
 
 For a broader benchmark overview, see
 [`docs/benchmarks.md`](benchmarks.md).
+
+
+

@@ -60,5 +60,8 @@ build/
 
 # Generated files
 test_output.txt
+/a.out
+*.tmp
+*.temp
 
 .codex

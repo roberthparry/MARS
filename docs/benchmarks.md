@@ -27,13 +27,29 @@ As with the test suites, prefer running benchmarks sequentially for now. The
 current codebase and build products are not yet fully thread-safe for
 overlapping runs.
 
+To refresh the benchmark tables in the numeric docs from the release benches,
+run:
+
+```sh
+tools/bench-docs/update_bench_docs.sh
+```
+
+To refresh only a subset of those docs, pass one or more target names:
+
+```sh
+tools/bench-docs/update_bench_docs.sh qfloat qcomplex
+```
+
 ## Output Units
 
-Current benchmark output reports average wall-clock time per call in both
-microseconds and milliseconds:
+Current benchmark output reports robust per-call timing estimates rather than a
+single average:
 
-- `avg_µs=6000.421 avg_ms=6.000` means about `6000 µs`
-- `avg_µs=566623.682 avg_ms=566.624` means about `566.62 ms`
+- plain-text scalar benches print the sample median, MAD, and a bootstrap 95%
+  confidence interval
+- markdown tables print the median in a compact display unit, keeping `1dp` in
+  the base unit and promoting to the next unit with `3dp` once the value
+  reaches `1000`
 
 ## Integrator Benchmark
 
@@ -218,20 +234,11 @@ mcomplex scoped+roll     manual= 221.584 ms  scoped= 198.489 ms  ratio= 1.116x
 
 Current sample timings on the benchmark machine:
 
-```text
-exp_256                      bits=256  avg_µs=     3.505 avg_ms=     0.004
-log_256                      bits=256  avg_µs=     6.289 avg_ms=     0.006
-sin_512                      bits=512  avg_µs=     6.208 avg_ms=     0.006
-cos_512                      bits=512  avg_µs=     8.037 avg_ms=     0.008
-gamma_512                    bits=512  avg_µs=   107.299 avg_ms=     0.107
-ei_512                       bits=512  avg_µs=   101.578 avg_ms=     0.102
-exp_1024                     bits=1024 avg_µs=    16.514 avg_ms=     0.017
-log_1024                     bits=1024 avg_µs=    18.625 avg_ms=     0.019
-sin_1024                     bits=1024 avg_µs=    17.224 avg_ms=     0.017
-gamma_1024                   bits=1024 avg_µs=   284.692 avg_ms=     0.285
-ei_1024                      bits=1024 avg_µs=   187.089 avg_ms=     0.187
-e1_1024                      bits=1024 avg_µs=   356.961 avg_ms=     0.357
-```
+Use `MARS_BENCH_FORMAT=md` with the benchmark binaries when you want
+docs-ready tables instead of the ordinary line-by-line terminal output. The
+module-specific docs for [`mint`](mint.md), [`mrational`](mrational.md),
+[`mfloat`](mfloat.md), [`number`](number.md), and [`mcomplex`](mcomplex.md)
+include current sample tables captured that way.
 
 ### `qfloat`
 

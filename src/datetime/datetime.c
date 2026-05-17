@@ -29,9 +29,11 @@
 
 #include "datetime.h"
 
-/// @brief the datetime type - this is the internal structure definition for the datetime type. It is not intended to be used 
-///        directly by users of the datetime library, but it is needed for the implementation of the datetime functions and 
-///        for testing purposes.
+/**
+ * @brief the datetime type - this is the internal structure definition for the datetime type. It is not intended to be used
+ *        directly by users of the datetime library, but it is needed for the implementation of the datetime functions and
+ *        for testing purposes.
+ */
 typedef struct _datetime_t {
     short year;
     month_t month;
@@ -43,8 +45,10 @@ typedef struct _datetime_t {
     double JulianDay;
 } datetime_t;
 
-/// @brief allocates enough memory for a datetime_t structure.
-/// @return the start address of the allocated memory.
+/**
+ * @brief allocates enough memory for a datetime_t structure.
+ * @return the start address of the allocated memory.
+ */
 datetime_t *datetime_alloc() {
     datetime_t *dttm = (datetime_t *)malloc(sizeof(datetime_t));
     if (dttm != NULL) {
@@ -188,12 +192,14 @@ datetime_t *datetime_init_easter(datetime_t *dttm, int year)
     return dttm;
 }
 
-/// @brief calculates the time of the true new moon for a given lunation number lunationIndex.
-/// The algorithm used is the ELP2000-85 algorithm, which is a well-known method for calculating the time of the true new moon.
-/// The algorithm takes the lunation number lunationIndex as input and calculates the time of the true new moon based on a series of mathematical 
-/// operations. The resulting time is returned as a Julian Ephemeris Date (JDE) in days.
-/// @param lunationIndex the lunation number for which to calculate the time of the true new moon. This should be a positive integer.
-/// @return the time of the true new moon in days as a Julian Ephemeris Date (JDE).
+/**
+ * @brief calculates the time of the true new moon for a given lunation number lunationIndex.
+ * The algorithm used is the ELP2000-85 algorithm, which is a well-known method for calculating the time of the true new moon.
+ * The algorithm takes the lunation number lunationIndex as input and calculates the time of the true new moon based on a series of mathematical
+ * operations. The resulting time is returned as a Julian Ephemeris Date (JDE) in days.
+ * @param lunationIndex the lunation number for which to calculate the time of the true new moon. This should be a positive integer.
+ * @return the time of the true new moon in days as a Julian Ephemeris Date (JDE).
+ */
 static double datetime_true_new_moon_tt(int lunationIndex)
 {
     /* Time in Julian centuries from J2000 */
@@ -257,20 +263,22 @@ static double datetime_true_new_moon_tt(int lunationIndex)
     return jdeMean + correction;
 }
 
-/// @brief calculate the difference in seconds between Terrestrial Time (TT) and Universal Time (UT) for a given year.
-///
-/// The difference between TT and UT is needed to convert between the two time standards. TT is a modern continuation of Ephemeris Time (ET), 
-/// and is the time standard used in astronomy. UT is the time standard used in everyday life. The difference between TT and UT is 
-/// caused by the Earth's slightly irregular rotation, and is usually expressed in seconds.
-///
-/// The algorithm used to calculate the difference is based on the IAU SOFA series, which provides a set of polynomial expressions to 
-/// calculate the difference between TT and UT for a given year. The expressions are based on a fit of historical astronomical data, and are 
-/// accurate to within 0.1 seconds for years between 1800 and 2500.
-///
-/// @param year the year for which to calculate the difference between TT and UT. This should be a positive integer between 1800 and 2500, 
-///        inclusive. If the input year is outside this range, the function will return an approximate value based on the nearest valid 
-///        year.
-/// @return the difference in seconds between TT and UT for the given year.
+/**
+ * @brief calculate the difference in seconds between Terrestrial Time (TT) and Universal Time (UT) for a given year.
+ *
+ * The difference between TT and UT is needed to convert between the two time standards. TT is a modern continuation of Ephemeris Time (ET),
+ * and is the time standard used in astronomy. UT is the time standard used in everyday life. The difference between TT and UT is
+ * caused by the Earth's slightly irregular rotation, and is usually expressed in seconds.
+ *
+ * The algorithm used to calculate the difference is based on the IAU SOFA series, which provides a set of polynomial expressions to
+ * calculate the difference between TT and UT for a given year. The expressions are based on a fit of historical astronomical data, and are
+ * accurate to within 0.1 seconds for years between 1800 and 2500.
+ *
+ * @param year the year for which to calculate the difference between TT and UT. This should be a positive integer between 1800 and 2500,
+ *        inclusive. If the input year is outside this range, the function will return an approximate value based on the nearest valid
+ *        year.
+ * @return the difference in seconds between TT and UT for the given year.
+ */
 static double datetime_delta_t(int year)
 {
     double offsetYears;   /* Years offset from reference epoch for this segment */
@@ -334,10 +342,12 @@ static double datetime_dec_solstice_tt(int year)
     return (((-0.000000217 * Y - 0.00000084) * Y + 0.000461) * Y + 365242.74049) * Y + 2451900.05952;
 }
 
-/// @brief Compute the Julian day number of the Chinese New Year for a given year.
-/// This function takes a year between 1700 and 2400 and returns the Julian day number of the Chinese New Year in that year.
-/// @param year The year for which the Julian day number of the Chinese New Year is to be computed.
-/// @return The Julian day number of the Chinese New Year in the given year.
+/**
+ * @brief Compute the Julian day number of the Chinese New Year for a given year.
+ * This function takes a year between 1700 and 2400 and returns the Julian day number of the Chinese New Year in that year.
+ * @param year The year for which the Julian day number of the Chinese New Year is to be computed.
+ * @return The Julian day number of the Chinese New Year in the given year.
+ */
 static long datetime_chinese_new_year_jdn(int year)
 {
     if (year < 1700 || year > 2400)
@@ -423,8 +433,8 @@ double datetime_tz_offset(const datetime_t *dttm) {
     gmt_tm = *gmtm;
 
     // Calculate the timezone offset in hours
-    double offset_hours = (local_tm.tm_hour - gmt_tm.tm_hour) + 
-                          (local_tm.tm_min - gmt_tm.tm_min) / 60.0 + 
+    double offset_hours = (local_tm.tm_hour - gmt_tm.tm_hour) +
+                          (local_tm.tm_min - gmt_tm.tm_min) / 60.0 +
                           (local_tm.tm_sec - gmt_tm.tm_sec) / 3600.0;
 
     // Adjust for day difference if necessary
@@ -470,7 +480,7 @@ datetime_t *datetime_to_gmt(datetime_t *dttm)
     dttm->hour = (uint8_t)gmt_tm.tm_hour;
     dttm->minute = (uint8_t)gmt_tm.tm_min;
     dttm->second = (double)gmt_tm.tm_sec;
-    
+
     if (dttm->JulianDayNumber != LONG_MAX) {
         dttm->JulianDayNumber = datetime_jdn(dttm);
     }
@@ -481,21 +491,25 @@ datetime_t *datetime_to_gmt(datetime_t *dttm)
     return dttm;
 }
 
-/// @brief Divide two long integers with truncation toward zero.
-/// @param numerator The numerator.
-/// @param denominator The denominator.
-/// @return The truncated result of numerator / denominator.
+/**
+ * @brief Divide two long integers with truncation toward zero.
+ * @param numerator The numerator.
+ * @param denominator The denominator.
+ * @return The truncated result of numerator / denominator.
+ */
 static inline long ldivide(long numerator, long denominator)
 {
     return (numerator >= 0L) ? (numerator / denominator) : ((numerator - denominator + 1L) / denominator);
 }
 
-/// @brief Converts a Julian Day Number into a Gregorian/Julian calendar date. Applies the Gregorian reform for JD >= 2299161 
-///        and adjusts for the absence of a year zero (1 BC = year -1).
-/// @param julianDay The Julian Day Number to convert.
-/// @param monthOut Output pointer for month (1–12).
-/// @param dayOut Output pointer for day (1–31).
-/// @param yearOut Output pointer for year (no year 0).
+/**
+ * @brief Converts a Julian Day Number into a Gregorian/Julian calendar date. Applies the Gregorian reform for JD >= 2299161
+ *        and adjusts for the absence of a year zero (1 BC = year -1).
+ * @param julianDay The Julian Day Number to convert.
+ * @param monthOut Output pointer for month (1–12).
+ * @param dayOut Output pointer for day (1–31).
+ * @param yearOut Output pointer for year (no year 0).
+ */
 static void date_julianDayNumToMDY(long julianDay, int *monthOut, int *dayOut, int *yearOut)
 {
     long gregorianOffset = ldivide(100L * julianDay - 186721625L, 3652425L);
@@ -585,13 +599,13 @@ double datetime_second(const datetime_t *dttm) {
 
 long datetime_ymd_to_jdn(short year, month_t month, uint8_t day) {
     bool isGregorian = (year > 1582) ||
-                       (year == 1582 && month > DT_October) || 
+                       (year == 1582 && month > DT_October) ||
                        (year == 1582 && month == DT_October && day >= 15);
 
     int yr = year;
     int mn = month;
     int dy = day;
-    
+
     if (yr < 0) yr++;
     if (mn <= 2) { yr--; mn += 12; }
 
@@ -641,14 +655,14 @@ weekday_t datetime_weekday(const datetime_t *dttm)
         // If we cannot calculate the Julian Day Number, we cannot calculate the weekday, so we return 0 as a sentinel value.
         return 0;
     }
-    return (weekday_t)((jdn + 1) % 7 + 1); 
+    return (weekday_t)((jdn + 1) % 7 + 1);
 }
 
 bool datetime_equal(const datetime_t *dttm1, const datetime_t *dttm2)
 {
     if (dttm1->year == SHRT_MAX) datetime_year(dttm1); // Try to calculate the year, month, day, ... if it is not initialised
     if (dttm2->year == SHRT_MAX) datetime_year(dttm2); // Try to calculate the year, month, day, ... if it is not initialised
-    
+
     return dttm1->year == dttm2->year &&
            dttm1->month == dttm2->month &&
            dttm1->day == dttm2->day &&
@@ -732,7 +746,7 @@ bool datetime_is_dst(const datetime_t *dttm)
     if (t == -1) return false; // Could not determine DST status
 
     return tmdate.tm_isdst > 0;
-}   
+}
 
 /* Invalidate Julian caches and recalculate from the current y/m/d/h/m/s fields. */
 static void datetime_refresh_julian_caches(datetime_t *dttm)
@@ -765,7 +779,7 @@ datetime_t *datetime_add_days(datetime_t *dttm, long days)
     double jdn = datetime_jd(dttm);
     datetime_init_jd(dttm, jdn + (double)days);
     datetime_year(dttm); // This will fill in the year, month, day based on the new Julian Day
-    
+
     dttm->hour = hour;
     dttm->minute = minute;
     dttm->second = second;
@@ -781,12 +795,12 @@ datetime_t *datetime_add_weeks(datetime_t *dttm, int weeks)
 datetime_t *datetime_add_months(datetime_t *dttm, int months)
 {
     if (months == 0) return dttm; // No change needed
-    
+
     if (dttm->year == SHRT_MAX) {
         // If we get here, it means the datetime is in an uninitialised state that cannot be calculated, so we cannot add seconds to it.
-        if (dttm->JulianDay == DBL_MAX && dttm->JulianDayNumber == LONG_MAX) return NULL; 
+        if (dttm->JulianDay == DBL_MAX && dttm->JulianDayNumber == LONG_MAX) return NULL;
         datetime_year(dttm); // Try to calculate the year, month, day, ... if it is not initialised
-    } 
+    }
 
     int years = months / 12;
     int remainingMonths = months % 12;
@@ -829,12 +843,12 @@ datetime_t *datetime_add_months(datetime_t *dttm, int months)
 datetime_t *datetime_add_years(datetime_t *dttm, int years)
 {
     if (years == 0) return dttm;
-    
+
     if (dttm->year == SHRT_MAX) {
         // If we get here, it means the datetime is in an uninitialised state that cannot be calculated, so we cannot add seconds to it.
-        if (dttm->JulianDay == DBL_MAX && dttm->JulianDayNumber == LONG_MAX) return NULL; 
+        if (dttm->JulianDay == DBL_MAX && dttm->JulianDayNumber == LONG_MAX) return NULL;
         datetime_year(dttm); // Try to calculate the year, month, day, ... if it is not initialised
-    } 
+    }
 
     dttm->year += years;
     if (dttm->month == DT_February && dttm->day == 29 && !datetime_is_leap_year(dttm->year)) {
@@ -852,9 +866,9 @@ datetime_t *datetime_add_hours(datetime_t *dttm, int hours)
 
     if (dttm->year == SHRT_MAX) {
         // If we get here, it means the datetime is in an uninitialised state that cannot be calculated, so we cannot add seconds to it.
-        if (dttm->JulianDay == DBL_MAX && dttm->JulianDayNumber == LONG_MAX) return NULL; 
+        if (dttm->JulianDay == DBL_MAX && dttm->JulianDayNumber == LONG_MAX) return NULL;
         datetime_year(dttm); // Try to calculate the year, month, day, ... if it is not initialised
-    } 
+    }
 
     int daysToAdd = hours / 24;
     int remainingHours = hours % 24;
@@ -885,9 +899,9 @@ datetime_t *datetime_add_minutes(datetime_t *dttm, int minutes)
 
     if (dttm->year == SHRT_MAX) {
         // If we get here, it means the datetime is in an uninitialised state that cannot be calculated, so we cannot add seconds to it.
-        if (dttm->JulianDay == DBL_MAX && dttm->JulianDayNumber == LONG_MAX) return NULL; 
+        if (dttm->JulianDay == DBL_MAX && dttm->JulianDayNumber == LONG_MAX) return NULL;
         datetime_year(dttm); // Try to calculate the year, month, day, ... if it is not initialised
-    } 
+    }
 
     int hoursToAdd = minutes / 60;
     int remainingMinutes = minutes % 60;
@@ -920,7 +934,7 @@ datetime_t *datetime_add_seconds(datetime_t *dttm, double seconds)
         // If we get here, it means the datetime is in an uninitialised state that cannot be calculated, so we cannot add seconds to it.
         if (dttm->JulianDay == DBL_MAX && dttm->JulianDayNumber == LONG_MAX) return NULL;
         datetime_year(dttm); // Try to calculate the year, month, day, ... if it is not initialised
-    } 
+    }
 
     int minutesToAdd = (int)(seconds / 60.0);
     double remainingSeconds = seconds - (double)(minutesToAdd * 60);
@@ -978,7 +992,7 @@ unsigned int datetime_hash(const datetime_t *dttm)
     unsigned int ms = (unsigned int)(dttm->hour * 3600000u +
                     dttm->minute * 60000u + (unsigned int)(dttm->second * 1000.0));
 
-    unsigned int dateKey = (((unsigned int)dttm->year  << 16) | 
+    unsigned int dateKey = (((unsigned int)dttm->year  << 16) |
                            ((unsigned int)dttm->month << 8) |
                            (unsigned int)dttm->day) * 0x9E3779B1u; // mix year, month, day
 
@@ -1010,7 +1024,7 @@ double datetime_duration(const datetime_t *dttm1, const datetime_t *dttm2, datet
         datetime_year(dttm2); // Try to calculate the year, month, day, ... if it is not initialised
 
         if (jd1 < jd2) {
-            // If dttm1 is earlier than dttm2, we swap them to calculate the span as a positive duration, and we will negate the final 
+            // If dttm1 is earlier than dttm2, we swap them to calculate the span as a positive duration, and we will negate the final
             // difference at the end.
             const datetime_t *temp = dttm1;
             dttm1 = dttm2;
@@ -1168,7 +1182,7 @@ char *datetime_format(const datetime_t *dttm, const char *format)
         "sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday" };
     static char* monthNames[] = { NULL,
         "january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december" };
-   
+
     if (format == NULL) return NULL;
     if (dttm->year == SHRT_MAX) {
         if (datetime_year(dttm) == SHRT_MAX) {
@@ -1177,11 +1191,11 @@ char *datetime_format(const datetime_t *dttm, const char *format)
     }
 
    string_t formattedString = string_create("");
-   
+
    char  buffer[ 32 ];
-   
+
    char *formatPtr = (char *)format;
-   
+
    while ( *formatPtr ) {
       if ( *formatPtr == '%' ) {
          formatPtr ++;
@@ -1189,13 +1203,13 @@ char *datetime_format(const datetime_t *dttm, const char *format)
             formattedString = string_append_char(formattedString, '%');
             break;
          }
-         
+
          switch ( *formatPtr ) {
             case '%':
                formattedString = string_append_char(formattedString, '%');
                formatPtr ++;
                break;
-               
+
             case 'd':
             case 'D':
                switch ( strspn( formatPtr, "Dd" ) ) {
@@ -1235,7 +1249,7 @@ char *datetime_format(const datetime_t *dttm, const char *format)
                      break;
                }
                break;
-               
+
             case 'o':
             case 'O':
                if ( 10 < dttm->day && dttm->day < 20 ) {
@@ -1262,7 +1276,7 @@ char *datetime_format(const datetime_t *dttm, const char *format)
                formattedString = string_append(formattedString, buffer);
                formatPtr ++;
                break;
-               
+
             case 'm':
             case 'M':
                switch ( strspn(formatPtr, "Mm")) {
@@ -1302,7 +1316,7 @@ char *datetime_format(const datetime_t *dttm, const char *format)
                      break;
                }
                break;
-            
+
             case 'y':
             case 'Y':
             {
@@ -1320,7 +1334,7 @@ char *datetime_format(const datetime_t *dttm, const char *format)
                }
                break;
             }
-            
+
             default:
                formattedString = string_append_char(formattedString, '%');
                break;
@@ -1332,7 +1346,7 @@ char *datetime_format(const datetime_t *dttm, const char *format)
             formattedString = string_append_char(formattedString, '%');
             break;
          }
-         
+
          switch (*formatPtr) {
             case 'h':
             case 'H':
@@ -1351,7 +1365,7 @@ char *datetime_format(const datetime_t *dttm, const char *format)
                }
                break;
             }
-            
+
             case 'M':
             case 'm':
                formatPtr ++;
@@ -1365,7 +1379,7 @@ char *datetime_format(const datetime_t *dttm, const char *format)
                   formattedString = string_append(formattedString, buffer);
                }
                break;
-               
+
             case 'S':
             case 's':
                formatPtr ++;
@@ -1379,7 +1393,7 @@ char *datetime_format(const datetime_t *dttm, const char *format)
                   formattedString = string_append(formattedString, buffer);
                }
                break;
-            
+
             case 'P':
                if ( dttm->hour >= 12 )
                   formattedString = string_append(formattedString, "PM");
@@ -1387,7 +1401,7 @@ char *datetime_format(const datetime_t *dttm, const char *format)
                   formattedString = string_append(formattedString, "AM");
                formatPtr ++;
                break;
-               
+
             case 'p':
                if ( dttm->hour >= 12 )
                   formattedString = string_append(formattedString, "pm");
@@ -1395,12 +1409,12 @@ char *datetime_format(const datetime_t *dttm, const char *format)
                   formattedString = string_append(formattedString, "am");
                formatPtr ++;
                break;
-            
+
             case '@':
                formattedString = string_append_char(formattedString, '@');
                formatPtr ++;
                break;
-         
+
             default:
                formattedString = string_append_char(formattedString, '@');
                break;
@@ -1481,22 +1495,24 @@ double datetime_sun_time(long julianDayNumber, double latitude, double longitude
     return gmtTime;
 }
 
-/// @brief set the time components of a datetime object to the sunrise or sunset time for its date and a given location. 
-///        This function calculates the sunrise or sunset time for the date represented by the datetime object and a given location,
-///        and sets the time components of the datetime object accordingly. The location is specified by the latitude and longitude. 
-///        The time zone offset is used to adjust the calculated time to the local time zone (inclusive of daylight saving time). 
-///        If the calculated time is less than 0, it means that the sunrise/sunset occurs on the previous day, so we add 24 hours 
-///        to the time and subtract one day from the datetime object. If the calculated time is greater than or equal to 24, 
-///        it means that the sunrise/sunset occurs on the next day, so we subtract 24 hours from the time and add one day to the 
-///        datetime object.
-/// @param dttm the datetime object to set the time components of. The date components of the datetime object should already be set 
-///        to the desired date.
-/// @param latitude the latitude of the location to calculate the sunrise/sunset time for.
-/// @param longitude the longitude of the location to calculate the sunrise/sunset time for.
-/// @param timeZoneOffset the time zone offset in hours to adjust the calculated time to the local time zone (inclusive of daylight 
-///        saving time). For example, if the local time zone is GMT+2, the timeZoneOffset should be 2.0. If the local time zone is 
-///        GMT-5, the timeZoneOffset should be -5.0.
-/// @param isSunrise a boolean value indicating whether to calculate the sunrise time (true) or the sunset time (false).
+/**
+ * @brief set the time components of a datetime object to the sunrise or sunset time for its date and a given location.
+ *        This function calculates the sunrise or sunset time for the date represented by the datetime object and a given location,
+ *        and sets the time components of the datetime object accordingly. The location is specified by the latitude and longitude.
+ *        The time zone offset is used to adjust the calculated time to the local time zone (inclusive of daylight saving time).
+ *        If the calculated time is less than 0, it means that the sunrise/sunset occurs on the previous day, so we add 24 hours
+ *        to the time and subtract one day from the datetime object. If the calculated time is greater than or equal to 24,
+ *        it means that the sunrise/sunset occurs on the next day, so we subtract 24 hours from the time and add one day to the
+ *        datetime object.
+ * @param dttm the datetime object to set the time components of. The date components of the datetime object should already be set
+ *        to the desired date.
+ * @param latitude the latitude of the location to calculate the sunrise/sunset time for.
+ * @param longitude the longitude of the location to calculate the sunrise/sunset time for.
+ * @param timeZoneOffset the time zone offset in hours to adjust the calculated time to the local time zone (inclusive of daylight
+ *        saving time). For example, if the local time zone is GMT+2, the timeZoneOffset should be 2.0. If the local time zone is
+ *        GMT-5, the timeZoneOffset should be -5.0.
+ * @param isSunrise a boolean value indicating whether to calculate the sunrise time (true) or the sunset time (false).
+ */
 static void datetime_set_sun_time(datetime_t *dttm, double latitude, double longitude, double timeZoneOffset, bool isSunrise)
 {
     long julianDayNumber = datetime_jdn(dttm);
@@ -1532,30 +1548,32 @@ static void datetime_set_sun_time(datetime_t *dttm, double latitude, double long
     dttm->second = 0.0;
 }
 
-/// @brief initialise a datetime object with the sunrise or sunset time for a given date and location. This function calculates 
-///        the sunrise or sunset time for a given date and location, and sets the time components of the datetime object accordingly.
-///        The date is specified by the Julian Day Number, and the location is specified by the latitude and longitude. The time zone
-///        offset is also taken into account to adjust the time to the local time zone (inclusive of daylight saving time). If the
-///        calculated time is less than 0, it means that the sunrise/sunset occurs on the previous day, so we add 24 hours to the 
-///        time and subtract one day from the datetime object. If the calculated time is greater than or equal to 24, it means that
-///        the sunrise/sunset occurs on the next day, so we subtract 24 hours from the time and add one day to the datetime object.
-///        Finally, we update the hour, minute, and second components of the datetime object based on the calculated time.
-/// @param dttm the datetime object to initialise with the sunrise or sunset time.
-/// @param julianDayNumber the Julian Day Number for the date to calculate the sunrise/sunset time for.
-/// @param latitude the latitude of the location to calculate the sunrise/sunset time for.
-/// @param longitude the longitude of the location to calculate the sunrise/sunset time for.
-/// @param timeZoneOffset the time zone offset in hours to adjust the calculated time to the local time zone (inclusive of daylight 
-///        saving time). For example, if the local time zone is GMT+2, the timeZoneOffset should be 2.0. If the local time zone is 
-///        GMT-5, the timeZoneOffset should be -5.0. if the timeZoneOffset is set to DBL_MAX, the function will attempt to calculate 
-///        the time zone offset based on the datetime's date and the system's time zone information. Note that this may not always 
-///        be accurate, especially if the datetime's date is far in the past or future, or if the system's time zone information is 
-///        not up to date. Therefore, it is recommended to provide an explicit timeZoneOffset whenever possible to ensure accurate 
-///        results.
-/// @param isSunrise a boolean value indicating whether to calculate the sunrise time (true) or the sunset time (false).
-/// @return a pointer to the initialised datetime object. If the sunrise/sunset time cannot be calculated for the given date and 
-///         location (e.g. polar night), the time components of the datetime object will be set to 0, and the function will return 
-///         the datetime object with the date set to the given Julian Day Number.
-static datetime_t *datetime_init_sun_time(datetime_t *dttm, long julianDayNumber, double latitude, double longitude, 
+/**
+ * @brief initialise a datetime object with the sunrise or sunset time for a given date and location. This function calculates
+ *        the sunrise or sunset time for a given date and location, and sets the time components of the datetime object accordingly.
+ *        The date is specified by the Julian Day Number, and the location is specified by the latitude and longitude. The time zone
+ *        offset is also taken into account to adjust the time to the local time zone (inclusive of daylight saving time). If the
+ *        calculated time is less than 0, it means that the sunrise/sunset occurs on the previous day, so we add 24 hours to the
+ *        time and subtract one day from the datetime object. If the calculated time is greater than or equal to 24, it means that
+ *        the sunrise/sunset occurs on the next day, so we subtract 24 hours from the time and add one day to the datetime object.
+ *        Finally, we update the hour, minute, and second components of the datetime object based on the calculated time.
+ * @param dttm the datetime object to initialise with the sunrise or sunset time.
+ * @param julianDayNumber the Julian Day Number for the date to calculate the sunrise/sunset time for.
+ * @param latitude the latitude of the location to calculate the sunrise/sunset time for.
+ * @param longitude the longitude of the location to calculate the sunrise/sunset time for.
+ * @param timeZoneOffset the time zone offset in hours to adjust the calculated time to the local time zone (inclusive of daylight
+ *        saving time). For example, if the local time zone is GMT+2, the timeZoneOffset should be 2.0. If the local time zone is
+ *        GMT-5, the timeZoneOffset should be -5.0. if the timeZoneOffset is set to DBL_MAX, the function will attempt to calculate
+ *        the time zone offset based on the datetime's date and the system's time zone information. Note that this may not always
+ *        be accurate, especially if the datetime's date is far in the past or future, or if the system's time zone information is
+ *        not up to date. Therefore, it is recommended to provide an explicit timeZoneOffset whenever possible to ensure accurate
+ *        results.
+ * @param isSunrise a boolean value indicating whether to calculate the sunrise time (true) or the sunset time (false).
+ * @return a pointer to the initialised datetime object. If the sunrise/sunset time cannot be calculated for the given date and
+ *         location (e.g. polar night), the time components of the datetime object will be set to 0, and the function will return
+ *         the datetime object with the date set to the given Julian Day Number.
+ */
+static datetime_t *datetime_init_sun_time(datetime_t *dttm, long julianDayNumber, double latitude, double longitude,
     double timeZoneOffset, bool isSunrise)
 {
     datetime_init_jdn(dttm, julianDayNumber);
@@ -1592,18 +1610,20 @@ inline void datetime_set_sunset(datetime_t *dttm, double latitude, double longit
 // length of a synodic month
 #define SYNODIC_MONTH_LENGTH 29.53058867
 
-/// @brief calculate the moon phase for a given Julian Day Number. The moon phase is calculated based on the difference between the given
-///        Julian Day Number and a known new moon date, divided by the length of a synodic month (the average time between new moons). The result is then multiplied by 8 and
-/// @param julianDayNumber the Julian Day Number to calculate the moon phase for. The Julian Day Number is a continuous count of days since the beginning of the Julian Period, which is used in astronomy and other fields to represent dates. It is calculated based on the date and time, and can be used to determine the position of celestial bodies, including the moon phase. 
-/// @return the moon phase for the given Julian Day Number. The moon phases are typically categorized as follows:
-///         DT_NewMoon:        New Moon
-///         DT_WaxingCrescent: Waxing Crescent
-///         DT_FirstQuarter:   First Quarter
-///         DT_WaxingGibbous:  Waxing Gibbous
-///         DT_FullMoon:       Full Moon
-///         DT_WaningGibbous:  Waning Gibbous
-///         DT_LastQuarter:    Last Quarter
-///         DT_WaningCrescent: Waning Crescent
+/**
+ * @brief calculate the moon phase for a given Julian Day Number. The moon phase is calculated based on the difference between the given
+ *        Julian Day Number and a known new moon date, divided by the length of a synodic month (the average time between new moons). The result is then multiplied by 8 and
+ * @param julianDayNumber the Julian Day Number to calculate the moon phase for. The Julian Day Number is a continuous count of days since the beginning of the Julian Period, which is used in astronomy and other fields to represent dates. It is calculated based on the date and time, and can be used to determine the position of celestial bodies, including the moon phase.
+ * @return the moon phase for the given Julian Day Number. The moon phases are typically categorized as follows:
+ *         DT_NewMoon:        New Moon
+ *         DT_WaxingCrescent: Waxing Crescent
+ *         DT_FirstQuarter:   First Quarter
+ *         DT_WaxingGibbous:  Waxing Gibbous
+ *         DT_FullMoon:       Full Moon
+ *         DT_WaningGibbous:  Waning Gibbous
+ *         DT_LastQuarter:    Last Quarter
+ *         DT_WaningCrescent: Waning Crescent
+ */
 static moon_phase_t datetime_moon_phase_on_jdn(long julianDayNumber)
 {
     // The moon phase is calculated based on the difference between the given Julian Day Number and a known new moon date,
@@ -1663,7 +1683,7 @@ datetime_t *datetime_next_moon_phase(const datetime_t *dttm, moon_phase_t phase)
 
     delta = fmod(delta + 1.0, 1.0);
     if (delta <= 0.03386) delta += 1.0;
-    
+
     // Convert phase fraction difference → days
     double daysToAdd = delta * SYNODIC_MONTH_LENGTH;
 
