@@ -40,10 +40,7 @@ static void test_qf_sinh(void)
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
         } else {
-            printf("%s  FAIL: %s%s  [%s:%d]\n", C_RED, sinh_tests[i].name, C_RESET, __FILE__, __LINE__);
-            printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
-            TEST_FAIL();
+            TEST_ASSERT_QFLOAT_CLOSE(got, expected);
         }
     }
 }
@@ -85,10 +82,7 @@ static void test_qf_cosh(void)
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
         } else {
-            printf("%s  FAIL: %s%s  [%s:%d]\n", C_RED, cosh_tests[i].name, C_RESET, __FILE__, __LINE__);
-            printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
-            TEST_FAIL();
+            TEST_ASSERT_QFLOAT_CLOSE(got, expected);
         }
     }
 }
@@ -136,10 +130,7 @@ static void test_qf_tanh(void)
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
         } else {
-            printf("%s  FAIL: %s%s  [%s:%d]\n", C_RED, tanh_tests[i].name, C_RESET, __FILE__, __LINE__);
-            printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
-            TEST_FAIL();
+            TEST_ASSERT_QFLOAT_CLOSE(got, expected);
         }
     }
 }
@@ -181,10 +172,7 @@ static void test_qf_asinh(void)
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
         } else {
-            printf("%s  FAIL: %s%s  [%s:%d]\n", C_RED, asinh_tests[i].name, C_RESET, __FILE__, __LINE__);
-            printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
-            TEST_FAIL();
+            TEST_ASSERT_QFLOAT_CLOSE(got, expected);
         }
     }
 }
@@ -224,10 +212,7 @@ static void test_qf_acosh(void)
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
         } else {
-            printf("%s  FAIL: %s%s  [%s:%d]\n", C_RED, acosh_tests[i].name, C_RESET, __FILE__, __LINE__);
-            printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
-            TEST_FAIL();
+            TEST_ASSERT_QFLOAT_CLOSE(got, expected);
         }
     }
 
@@ -244,12 +229,12 @@ static void test_qf_acosh(void)
 }
 
 void test_hyperbolic(void) {
-    RUN_SUBTEST(test_qf_cosh);
-    RUN_SUBTEST(test_qf_sinh);
-    RUN_SUBTEST(test_qf_tanh);
-    RUN_SUBTEST(test_qf_asinh);
-    RUN_SUBTEST(test_qf_acosh);
-    RUN_SUBTEST(test_qf_atanh);
+    TEST_RUN_SUBTEST(test_qf_cosh, NULL);
+    TEST_RUN_SUBTEST(test_qf_sinh, NULL);
+    TEST_RUN_SUBTEST(test_qf_tanh, NULL);
+    TEST_RUN_SUBTEST(test_qf_asinh, NULL);
+    TEST_RUN_SUBTEST(test_qf_acosh, NULL);
+    TEST_RUN_SUBTEST(test_qf_atanh, NULL);
 }
 
 static void test_qf_atanh(void)
@@ -289,10 +274,7 @@ static void test_qf_atanh(void)
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
         } else {
-            printf("%s  FAIL: %s%s  [%s:%d]\n", C_RED, atanh_tests[i].name, C_RESET, __FILE__, __LINE__);
-            printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
-            TEST_FAIL();
+            TEST_ASSERT_QFLOAT_CLOSE(got, expected);
         }
     }
 

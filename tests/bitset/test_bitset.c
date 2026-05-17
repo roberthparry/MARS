@@ -6,11 +6,11 @@
 #include <stdbool.h>
 #include <pthread.h>
 
-#define TEST_CONFIG_MODE TEST_CONFIG_GLOBAL
-#define TEST_CONFIG_MAIN
 #include "test_harness.h"
 
 #include "bitset.h"
+
+TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 
 /* -------------------------------------------------------------
  * Tests
@@ -395,41 +395,41 @@ void example_bitset_ops(void) {
 
 int tests_main(void) {
     TEST_SECTION("Lifecycle Tests");
-    RUN_TEST_CASE(test_create_and_destroy);
+    TEST_RUN_CASE(test_create_and_destroy, NULL);
 
     TEST_SECTION("Single-Bit Tests");
-    RUN_TEST_CASE(test_set_and_test);
-    RUN_TEST_CASE(test_unset);
-    RUN_TEST_CASE(test_toggle);
-    RUN_TEST_CASE(test_clear);
+    TEST_RUN_CASE(test_set_and_test, NULL);
+    TEST_RUN_CASE(test_unset, NULL);
+    TEST_RUN_CASE(test_toggle, NULL);
+    TEST_RUN_CASE(test_clear, NULL);
 
     TEST_SECTION("Range Tests");
-    RUN_TEST_CASE(test_set_range);
-    RUN_TEST_CASE(test_unset_range);
+    TEST_RUN_CASE(test_set_range, NULL);
+    TEST_RUN_CASE(test_unset_range, NULL);
 
     TEST_SECTION("Query Tests");
-    RUN_TEST_CASE(test_popcount);
-    RUN_TEST_CASE(test_any_none);
-    RUN_TEST_CASE(test_next_set);
+    TEST_RUN_CASE(test_popcount, NULL);
+    TEST_RUN_CASE(test_any_none, NULL);
+    TEST_RUN_CASE(test_next_set, NULL);
 
     TEST_SECTION("Clone Test");
-    RUN_TEST_CASE(test_clone);
+    TEST_RUN_CASE(test_clone, NULL);
 
     TEST_SECTION("Bitwise Operation Tests");
-    RUN_TEST_CASE(test_bitwise_and);
-    RUN_TEST_CASE(test_bitwise_or);
-    RUN_TEST_CASE(test_bitwise_xor);
-    RUN_TEST_CASE(test_bitwise_not);
+    TEST_RUN_CASE(test_bitwise_and, NULL);
+    TEST_RUN_CASE(test_bitwise_or, NULL);
+    TEST_RUN_CASE(test_bitwise_xor, NULL);
+    TEST_RUN_CASE(test_bitwise_not, NULL);
 
     TEST_SECTION("Growth Test");
-    RUN_TEST_CASE(test_growth);
+    TEST_RUN_CASE(test_growth, NULL);
 
     TEST_SECTION("Thread Safety Test");
-    RUN_TEST_CASE(test_thread_safety);
+    TEST_RUN_CASE(test_thread_safety, NULL);
 
-    printf(C_BOLD C_GREEN "\n=== README Output Examples ===\n" C_RESET);
-    example_bitset_basic();
-    example_bitset_ops();
+    TEST_SECTION("README Output Examples");
+    TEST_RUN_OUTPUT(example_bitset_basic);
+    TEST_RUN_OUTPUT(example_bitset_ops);
 
     return TESTS_EXIT_CODE();
 }

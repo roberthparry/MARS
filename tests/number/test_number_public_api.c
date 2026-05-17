@@ -48,7 +48,7 @@ void run_number_public_api_tests(void)
         ASSERT_TRUE(num_is_exact(a));
         ASSERT_TRUE(num_is_exact(frac));
         ASSERT_TRUE(!num_is_exact(dec));
-        ASSERT_TRUE(num_eq(product, cloned));
+        ASSERT_NUMBER_EQ(product, cloned);
 
         num_destroy(&a);
         num_destroy(&b);

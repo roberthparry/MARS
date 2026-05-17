@@ -22,17 +22,8 @@ static void test_qf_productlog_definition(void)
 
         qfloat_t lhs = qf_mul(w, qf_exp(w));
 
-        int ok = qf_close(lhs, x, 1e-30);
-
-        if (ok) {
-            printf(C_GREEN "  OK: W(%g)\n" C_RESET, xs[i]);
-        } else {
-            printf(C_RED "  FAIL: W(%g)  [%s:%d]\n" C_RESET, xs[i], __FILE__, __LINE__);
-            print_q("W(x)", w);
-            print_q("W*exp(W)", lhs);
-            print_q("x", x);
-            TEST_FAIL();
-        }
+        TEST_ASSERT_QFLOAT_CLOSE(lhs, x);
+        printf(C_GREEN "  OK: W(%g)\n" C_RESET, xs[i]);
     }
 
     printf("\n");
@@ -54,16 +45,8 @@ static void test_qf_productlog_consistency(void)
         qfloat_t p = qf_productlog(x);
         qfloat_t w = qf_lambert_w0(x);
 
-        int ok = qf_close(p, w, 1e-30);
-
-        if (ok) {
-            printf(C_GREEN "  OK: ProductLog(%g) = W(%g)\n" C_RESET, xs[i], xs[i]);
-        } else {
-            printf(C_RED "  FAIL: ProductLog(%g)  [%s:%d]\n" C_RESET, xs[i], __FILE__, __LINE__);
-            print_q("ProductLog", p);
-            print_q("LambertW", w);
-            TEST_FAIL();
-        }
+        TEST_ASSERT_QFLOAT_CLOSE(p, w);
+        printf(C_GREEN "  OK: ProductLog(%g) = W(%g)\n" C_RESET, xs[i], xs[i]);
     }
 
     printf("\n");
@@ -81,27 +64,17 @@ static void test_qf_productlog_special(void)
 
     /* W(0) = 0 */
     qfloat_t w0 = qf_productlog(zero);
-    int ok1 = qf_close(w0, zero, 1e-30);
-
     /* W(-1/e) = -1 */
     qfloat_t x = qf_neg(qf_exp(qf_neg(one))); /* -1/e */
     qfloat_t w = qf_productlog(x);
-    int ok2 = qf_close_rel(w, qf_neg(one), 1e-30);
 
     /* W(e) = 1 */
     qfloat_t xe = qf_exp(one);
     qfloat_t we = qf_productlog(xe);
-    int ok3 = qf_close(we, one, 1e-30);
-
-    if (ok1 && ok2 && ok3) {
-        printf(C_GREEN "  OK: special values\n" C_RESET);
-    } else {
-        printf(C_RED "  FAIL: special values  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
-        print_q("W(0)", w0);
-        print_q("W(-1/e)", w);
-        print_q("W(e)", we);
-        TEST_FAIL();
-    }
+    TEST_ASSERT_QFLOAT_CLOSE(w0, zero);
+    TEST_ASSERT_QFLOAT_CLOSE(w, qf_neg(one));
+    TEST_ASSERT_QFLOAT_CLOSE(we, one);
+    printf(C_GREEN "  OK: special values\n" C_RESET);
 
     printf("\n");
 }
@@ -142,10 +115,10 @@ static void test_qf_productlog_monotonicity(void)
    ------------------------------------------------------------------------- */
 void test_qf_productlog_all(void)
 {
-    RUN_SUBTEST(test_qf_productlog_definition);
-    RUN_SUBTEST(test_qf_productlog_consistency);
-    RUN_SUBTEST(test_qf_productlog_special);
-    RUN_SUBTEST(test_qf_productlog_monotonicity);
+    TEST_RUN_SUBTEST(test_qf_productlog_definition, NULL);
+    TEST_RUN_SUBTEST(test_qf_productlog_consistency, NULL);
+    TEST_RUN_SUBTEST(test_qf_productlog_special, NULL);
+    TEST_RUN_SUBTEST(test_qf_productlog_monotonicity, NULL);
 }
 
 /* -------------------------------------------------------------------------
@@ -168,19 +141,9 @@ static void test_qf_gammainc_PQ_identity(void)
             qfloat_t Q = qf_gammainc_Q(s, x);
             qfloat_t sum = qf_add(P, Q);
 
-            int ok = qf_close_rel(sum, qf_from_double(1.0), 1e-30);
-
-            if (ok) {
-                printf(C_GREEN "  OK: P(%g,%g) + Q(%g,%g)\n" C_RESET,
-                       ss[i], xs[j], ss[i], xs[j]);
-            } else {
-                printf(C_RED "  FAIL: P(%g,%g) + Q(%g,%g)  [%s:%d]\n" C_RESET, ss[i], xs[j], ss[i], xs[j], __FILE__, __LINE__);
-                print_q("P", P);
-                print_q("Q", Q);
-                print_q("sum", sum);
-                print_q("expected", qf_from_double(1.0));
-                TEST_FAIL();
-            }
+            TEST_ASSERT_QFLOAT_CLOSE(sum, qf_from_double(1.0));
+            printf(C_GREEN "  OK: P(%g,%g) + Q(%g,%g)\n" C_RESET,
+                   ss[i], xs[j], ss[i], xs[j]);
         }
     }
 
@@ -209,19 +172,9 @@ static void test_qf_gammainc_lower_upper_identity(void)
 
             qfloat_t gs = qf_gamma(s);
 
-            int ok = qf_close_rel(sum, gs, 1e-30);
-
-            if (ok) {
-                printf(C_GREEN "  OK: γ(%g,%g) + Γ(%g,%g)\n" C_RESET,
-                       ss[i], xs[j], ss[i], xs[j]);
-            } else {
-                printf(C_RED "  FAIL: γ(%g,%g) + Γ(%g,%g)  [%s:%d]\n" C_RESET, ss[i], xs[j], ss[i], xs[j], __FILE__, __LINE__);
-                print_q("lower γ", gl);
-                print_q("upper Γ", gu);
-                print_q("sum", sum);
-                print_q("expected Γ(s)", gs);
-                TEST_FAIL();
-            }
+            TEST_ASSERT_QFLOAT_CLOSE(sum, gs);
+            printf(C_GREEN "  OK: γ(%g,%g) + Γ(%g,%g)\n" C_RESET,
+                   ss[i], xs[j], ss[i], xs[j]);
         }
     }
 
@@ -253,19 +206,9 @@ static void test_qf_gammainc_special_s1(void)
         qfloat_t gl = qf_gammainc_lower(s, x);
         qfloat_t gu = qf_gammainc_upper(s, x);
 
-        int ok1 = qf_close_rel(gl, expected_lower, 1e-30);
-        int ok2 = qf_close_rel(gu, expected_upper, 1e-30);
-
-        if (ok1 && ok2) {
-            printf(C_GREEN "  OK: γ(1,%g) and Γ(1,%g)\n" C_RESET, xs[j], xs[j]);
-        } else {
-            printf(C_RED "  FAIL: γ(1,%g) or Γ(1,%g)  [%s:%d]\n" C_RESET, xs[j], xs[j], __FILE__, __LINE__);
-            print_q("γ(1,x)", gl);
-            print_q("expected", expected_lower);
-            print_q("Γ(1,x)", gu);
-            print_q("expected", expected_upper);
-            TEST_FAIL();
-        }
+        TEST_ASSERT_QFLOAT_CLOSE(gl, expected_lower);
+        TEST_ASSERT_QFLOAT_CLOSE(gu, expected_upper);
+        printf(C_GREEN "  OK: γ(1,%g) and Γ(1,%g)\n" C_RESET, xs[j], xs[j]);
     }
 
     printf("\n");
@@ -276,9 +219,9 @@ static void test_qf_gammainc_special_s1(void)
    ------------------------------------------------------------------------- */
 static void test_qf_gammainc_all(void)
 {
-    RUN_SUBTEST(test_qf_gammainc_PQ_identity);
-    RUN_SUBTEST(test_qf_gammainc_lower_upper_identity);
-    RUN_SUBTEST(test_qf_gammainc_special_s1);
+    TEST_RUN_SUBTEST(test_qf_gammainc_PQ_identity, NULL);
+    TEST_RUN_SUBTEST(test_qf_gammainc_lower_upper_identity, NULL);
+    TEST_RUN_SUBTEST(test_qf_gammainc_special_s1, NULL);
 }
 
 /* Approximate derivative using symmetric difference:
@@ -343,18 +286,10 @@ static void test_qf_ei_deriv(void)
         qfloat_t ex  = qf_exp(x);
         qfloat_t rhs = qf_div(ex, x); /* e^x / x */
 
-        qfloat_t res = qf_sub(dEi, rhs);
-
-        int ok = qf_close_rel(dEi, rhs, 1.02e-22);
-
-        if (ok) {
+        if (qf_close_rel(dEi, rhs, 1.02e-22)) {
             printf(C_GREEN "  OK: Ei'(%g)\n" C_RESET, xs[i]);
         } else {
-            printf(C_RED "  FAIL: Ei'(%g)  [%s:%d]\n" C_RESET, xs[i], __FILE__, __LINE__);
-            print_q("residual", res);
-            print_q("dEi",      dEi);
-            print_q("rhs",      rhs);
-            TEST_FAIL();
+            TEST_ASSERT_QFLOAT_CLOSE(dEi, rhs);
         }
     }
 
@@ -378,18 +313,10 @@ static void test_qf_e1_deriv(void)
         qfloat_t rhs  = qf_div(emx, x);      /* e^{-x} / x */
         rhs         = qf_neg(rhs);         /* -e^{-x} / x */
 
-        qfloat_t res  = qf_sub(dE1, rhs);
-
-        int ok = qf_close_rel(dE1, rhs, 1e-20);
-
-        if (ok) {
+        if (qf_close_rel(dE1, rhs, 1e-20)) {
             printf(C_GREEN "  OK: E1'(%g)\n" C_RESET, xs[i]);
         } else {
-            printf(C_RED "  FAIL: E1'(%g)  [%s:%d]\n" C_RESET, xs[i], __FILE__, __LINE__);
-            print_q("residual", res);
-            print_q("dE1",      dE1);
-            print_q("rhs",      rhs);
-            TEST_FAIL();
+            TEST_ASSERT_QFLOAT_CLOSE(dE1, rhs);
         }
     }
 
@@ -413,16 +340,11 @@ static void test_qf_ei_e1_identity(void)
 
         qfloat_t sum = qf_add(e1, ei); /* should be ~0 */
 
-        int ok = qf_close(sum, qf_from_double(0.0), 1e-30);
-
-        if (ok) {
+        qfloat_t zero = qf_from_double(0.0);
+        if (qf_close(sum, zero, 1e-30)) {
             printf(C_GREEN "  OK: E1(%g) + Ei(%g)\n" C_RESET, xs[i], -xs[i]);
         } else {
-            printf(C_RED "  FAIL: E1(%g) + Ei(%g)  [%s:%d]\n" C_RESET, xs[i], -xs[i], __FILE__, __LINE__);
-            print_q("E1(x)", e1);
-            print_q("Ei(-x)", ei);
-            print_q("sum",   sum);
-            TEST_FAIL();
+            TEST_ASSERT_QFLOAT_CLOSE(sum, zero);
         }
     }
 
@@ -503,10 +425,10 @@ static void test_ei_values(void)
 
 static void test_qf_ei_e1_all(void)
 {
-    RUN_SUBTEST(test_qf_ei_deriv);
-    RUN_SUBTEST(test_qf_e1_deriv);
-    RUN_SUBTEST(test_qf_ei_e1_identity);
-    RUN_SUBTEST(test_ei_values);
+    TEST_RUN_SUBTEST(test_qf_ei_deriv, NULL);
+    TEST_RUN_SUBTEST(test_qf_e1_deriv, NULL);
+    TEST_RUN_SUBTEST(test_qf_ei_e1_identity, NULL);
+    TEST_RUN_SUBTEST(test_ei_values, NULL);
 }
 
 static void test_qf_add_double(void) {
@@ -908,22 +830,22 @@ void test_qf_tetragamma(void) {
 }
 
 void test_arithmetic_extensions(void) {
-    RUN_SUBTEST(test_qf_add_double);
-    RUN_SUBTEST(test_qf_mul_double);
-    RUN_SUBTEST(test_qf_sqr);
-    RUN_SUBTEST(test_qf_ldexp);
-    RUN_SUBTEST(test_qf_mul_pow10);
-    RUN_SUBTEST(test_qf_floor);
-    RUN_SUBTEST(test_qf_cmp);
-    RUN_SUBTEST(test_qf_signbit);
-    RUN_SUBTEST(test_qf_isinf);
+    TEST_RUN_SUBTEST(test_qf_add_double, NULL);
+    TEST_RUN_SUBTEST(test_qf_mul_double, NULL);
+    TEST_RUN_SUBTEST(test_qf_sqr, NULL);
+    TEST_RUN_SUBTEST(test_qf_ldexp, NULL);
+    TEST_RUN_SUBTEST(test_qf_mul_pow10, NULL);
+    TEST_RUN_SUBTEST(test_qf_floor, NULL);
+    TEST_RUN_SUBTEST(test_qf_cmp, NULL);
+    TEST_RUN_SUBTEST(test_qf_signbit, NULL);
+    TEST_RUN_SUBTEST(test_qf_isinf, NULL);
 }
 
 void test_vsprintf(void) {
-    RUN_SUBTEST(test_qf_vsprintf);
+    TEST_RUN_SUBTEST(test_qf_vsprintf, NULL);
 }
 
 void test_gammainc_ei_e1(void) {
-    RUN_SUBTEST(test_qf_gammainc_all);
-    RUN_SUBTEST(test_qf_ei_e1_all);
+    TEST_RUN_SUBTEST(test_qf_gammainc_all, NULL);
+    TEST_RUN_SUBTEST(test_qf_ei_e1_all, NULL);
 }

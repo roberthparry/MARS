@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -5,9 +6,64 @@
 #include "mint.h"
 #include "mrational.h"
 
-#define TEST_CONFIG_MODE TEST_CONFIG_GLOBAL
-#define TEST_CONFIG_MAIN
 #include "test_harness.h"
+
+TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
+static int mrational_validity_equal(const void *actual, const void *expected, void *ctx);
+static void mrational_validity_format(const void *value, char *buf, size_t buf_size, void *ctx);
+static bool test_mrational_suite_setup(void);
+
+static const test_validity_contract_t mrational_exact_contract =
+    TEST_VALIDITY_CONTRACT("mrational-exact",
+                           mrational_validity_equal,
+                           mrational_validity_format,
+                           NULL);
+
+TEST_SUITE_SETUP(test_mrational_suite_setup);
+
+#define TEST_ASSERT_MRATIONAL_EQ(actual_ptr, expected_ptr) \
+    do { \
+        const mrational_t *test_mr_actual__ = (actual_ptr); \
+        const mrational_t *test_mr_expected__ = (expected_ptr); \
+        TEST_ASSERT_VALID_NAMED("mrational-exact", \
+                                &test_mr_actual__, \
+                                &test_mr_expected__); \
+    } while (0)
+
+static int mrational_validity_equal(const void *actual, const void *expected, void *ctx)
+{
+    const mrational_t *const *got = (const mrational_t *const *)actual;
+    const mrational_t *const *want = (const mrational_t *const *)expected;
+
+    (void)ctx;
+    return mr_eq(*got, *want);
+}
+
+static void mrational_validity_format(const void *value, char *buf, size_t buf_size, void *ctx)
+{
+    const mrational_t *const *rational = (const mrational_t *const *)value;
+    char *text;
+
+    (void)ctx;
+    if (!buf || buf_size == 0) {
+        return;
+    }
+
+    text = mr_to_string(*rational);
+    if (!text) {
+        snprintf(buf, buf_size, "<mr_to_string failed>");
+        return;
+    }
+
+    snprintf(buf, buf_size, "%s", text);
+    free(text);
+}
+
+static bool test_mrational_suite_setup(void)
+{
+    test_register_validity_checker("mrational-exact", &mrational_exact_contract);
+    return TEST_REQUIRE_VALIDITY_CHECKER("mrational-exact");
+}
 
 static void assert_mr_string_label(const char *label,
                                    const mrational_t *rational,
@@ -19,7 +75,7 @@ static void assert_mr_string_label(const char *label,
     printf(C_WHITE C_BOLD "%s" C_RESET "\n", label ? label : "<unspecified>");
     printf("    expected = %s\n", expected);
     printf("    got      = %s\n\n", got);
-    ASSERT_TRUE(strcmp(got, expected) == 0);
+    TEST_ASSERT_STR_EQ(got, expected);
     free(got);
 }
 
@@ -33,7 +89,7 @@ static void assert_mint_clone_string_label(const char *label,
     printf(C_WHITE C_BOLD "%s" C_RESET "\n", label ? label : "<unspecified>");
     printf("    expected = %s\n", expected);
     printf("    got      = %s\n\n", got);
-    ASSERT_TRUE(strcmp(got, expected) == 0);
+    TEST_ASSERT_STR_EQ(got, expected);
     free(got);
 }
 
@@ -142,7 +198,7 @@ void test_clone_compare_and_order(void)
     ASSERT_NOT_NULL(c);
     ASSERT_NOT_NULL(d);
 
-    ASSERT_TRUE(mr_eq(a, b));
+    TEST_ASSERT_MRATIONAL_EQ(a, b);
     ASSERT_TRUE(mr_cmp(a, b) == 0);
     ASSERT_TRUE(mr_lt(a, c));
     ASSERT_TRUE(mr_le(a, c));
@@ -251,7 +307,7 @@ void test_bernoulli_accessors(void)
     assert_mr_string_label("mr_bernoulli_even_term(2)", b2, "-¹⁄₃₀");
 }
 
-static int readme_example(void)
+static void example_mrational_basic(void)
 {
     mrational_t *a = mr_create_frac_long(2, 3);
     mrational_t *b = mr_create_string("5/4");
@@ -260,20 +316,23 @@ static int readme_example(void)
     if (!a || !b) {
         mr_free(a);
         mr_free(b);
-        return 1;
+        test_mark_failure(__FILE__, __LINE__, "failed to allocate README example inputs");
+        return;
     }
 
     if (mr_mul(a, b) != 0) {
         mr_free(a);
         mr_free(b);
-        return 1;
+        test_mark_failure(__FILE__, __LINE__, "failed to multiply README example rationals");
+        return;
     }
 
     text = mr_to_string(a);
     if (!text) {
         mr_free(a);
         mr_free(b);
-        return 1;
+        test_mark_failure(__FILE__, __LINE__, "failed to format README example rational");
+        return;
     }
 
     printf("(2/3) * (5/4) = %s\n", text);
@@ -281,23 +340,24 @@ static int readme_example(void)
     free(text);
     mr_free(a);
     mr_free(b);
-    return 0;
-}
-
-void test_readme_examples(void)
-{
-    printf(C_YELLOW "\nRunning README example...\n" C_RESET);
-    ASSERT_EQ_INT(readme_example(), 0);
 }
 
 int tests_main(void)
 {
-    RUN_TEST_CASE(test_create_and_normalise);
-    RUN_TEST_CASE(test_setters_and_accessors);
-    RUN_TEST_CASE(test_clone_compare_and_order);
-    RUN_TEST_CASE(test_arithmetic);
-    RUN_TEST_CASE(test_large_values);
-    RUN_TEST_CASE(test_bernoulli_accessors);
-    RUN_TEST_CASE(test_readme_examples);
-    return 0;
+    TEST_SECTION("Construction and Access");
+    TEST_RUN_CASE(test_create_and_normalise, NULL);
+    TEST_RUN_CASE(test_setters_and_accessors, NULL);
+
+    TEST_SECTION("Arithmetic and Ordering");
+    TEST_RUN_CASE(test_clone_compare_and_order, NULL);
+    TEST_RUN_CASE(test_arithmetic, NULL);
+    TEST_RUN_CASE(test_large_values, NULL);
+
+    TEST_SECTION("Bernoulli");
+    TEST_RUN_CASE(test_bernoulli_accessors, NULL);
+
+    TEST_SECTION("README Output Examples");
+    printf(C_YELLOW "\nRunning README example...\n" C_RESET);
+    TEST_RUN_OUTPUT_TAGS(example_mrational_basic, "mrational,readme,output");
+    return TESTS_EXIT_CODE();
 }

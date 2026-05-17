@@ -124,8 +124,8 @@ static void test_to_string_basic_const_func(void)
 
 void test_to_string_basic_const(void)
 {
-    RUN_SUBTEST(test_to_string_basic_const_expr);
-    RUN_SUBTEST(test_to_string_basic_const_func);
+    TEST_RUN_SUBTEST(test_to_string_basic_const_expr, NULL);
+    TEST_RUN_SUBTEST(test_to_string_basic_const_func, NULL);
 }
 
 /* ============================================================
@@ -167,8 +167,8 @@ static void test_to_string_basic_var_func(void)
 
 void test_to_string_basic_var(void)
 {
-    RUN_SUBTEST(test_to_string_basic_var_expr);
-    RUN_SUBTEST(test_to_string_basic_var_func);
+    TEST_RUN_SUBTEST(test_to_string_basic_var_expr, NULL);
+    TEST_RUN_SUBTEST(test_to_string_basic_var_func, NULL);
 }
 
 static void test_to_string_non_simple_var_bracketed_expr(void)
@@ -206,8 +206,8 @@ static void test_to_string_non_simple_var_bracketed_func(void)
 
 void test_to_string_non_simple_var_bracketed(void)
 {
-    RUN_SUBTEST(test_to_string_non_simple_var_bracketed_expr);
-    RUN_SUBTEST(test_to_string_non_simple_var_bracketed_func);
+    TEST_RUN_SUBTEST(test_to_string_non_simple_var_bracketed_expr, NULL);
+    TEST_RUN_SUBTEST(test_to_string_non_simple_var_bracketed_func, NULL);
 }
 
 /* ============================================================
@@ -259,8 +259,8 @@ static void test_to_string_addition_func(void)
 
 void test_to_string_addition(void)
 {
-    RUN_SUBTEST(test_to_string_addition_expr);
-    RUN_SUBTEST(test_to_string_addition_func);
+    TEST_RUN_SUBTEST(test_to_string_addition_expr, NULL);
+    TEST_RUN_SUBTEST(test_to_string_addition_func, NULL);
 }
 
 static void test_to_string_negative_rhs_expr(void)
@@ -406,8 +406,8 @@ static void test_to_string_nested_mul_add_func(void)
 
 void test_to_string_nested_mul_add(void)
 {
-    RUN_SUBTEST(test_to_string_nested_mul_add_expr);
-    RUN_SUBTEST(test_to_string_nested_mul_add_func);
+    TEST_RUN_SUBTEST(test_to_string_nested_mul_add_expr, NULL);
+    TEST_RUN_SUBTEST(test_to_string_nested_mul_add_func, NULL);
 }
 
 static void test_to_string_atan2_expr(void)
@@ -457,8 +457,8 @@ static void test_to_string_atan2_func(void)
 
 void test_to_string_atan2(void)
 {
-    RUN_SUBTEST(test_to_string_atan2_expr);
-    RUN_SUBTEST(test_to_string_atan2_func);
+    TEST_RUN_SUBTEST(test_to_string_atan2_expr, NULL);
+    TEST_RUN_SUBTEST(test_to_string_atan2_func, NULL);
 }
 
 /* ============================================================
@@ -505,8 +505,8 @@ static void test_to_string_pow_superscript_func(void)
 
 void test_to_string_pow_superscript(void)
 {
-    RUN_SUBTEST(test_to_string_pow_superscript_expr);
-    RUN_SUBTEST(test_to_string_pow_superscript_func);
+    TEST_RUN_SUBTEST(test_to_string_pow_superscript_expr, NULL);
+    TEST_RUN_SUBTEST(test_to_string_pow_superscript_func, NULL);
 }
 
 /* ============================================================
@@ -553,8 +553,8 @@ static void test_to_string_unary_sin_func(void)
 
 void test_to_string_unary_sin(void)
 {
-    RUN_SUBTEST(test_to_string_unary_sin_expr);
-    RUN_SUBTEST(test_to_string_unary_sin_func);
+    TEST_RUN_SUBTEST(test_to_string_unary_sin_expr, NULL);
+    TEST_RUN_SUBTEST(test_to_string_unary_sin_func, NULL);
 }
 
 static void test_to_string_unary_sqrt_expr(void)
@@ -595,8 +595,8 @@ static void test_to_string_unary_sqrt_func(void)
 
 void test_to_string_unary_sqrt(void)
 {
-    RUN_SUBTEST(test_to_string_unary_sqrt_expr);
-    RUN_SUBTEST(test_to_string_unary_sqrt_func);
+    TEST_RUN_SUBTEST(test_to_string_unary_sqrt_expr, NULL);
+    TEST_RUN_SUBTEST(test_to_string_unary_sqrt_func, NULL);
 }
 
 /* ============================================================
@@ -638,8 +638,8 @@ static void test_to_string_function_style_func(void)
 
 void test_to_string_function_style(void)
 {
-    RUN_SUBTEST(test_to_string_function_style_expr);
-    RUN_SUBTEST(test_to_string_function_style_func);
+    TEST_RUN_SUBTEST(test_to_string_function_style_expr, NULL);
+    TEST_RUN_SUBTEST(test_to_string_function_style_func, NULL);
 }
 
 /* ============================================================
@@ -695,20 +695,20 @@ void test_to_string_special_functions(void)
 
 void test_to_string_all(void)
 {
-    RUN_SUBTEST(test_to_string_basic_const);
-    RUN_SUBTEST(test_to_string_basic_var);
-    RUN_SUBTEST(test_to_string_non_simple_var_bracketed);
-    RUN_SUBTEST(test_to_string_addition);
-    RUN_SUBTEST(test_to_string_negative_rhs_expr);
-    RUN_SUBTEST(test_to_string_double_negative_expr);
-    RUN_SUBTEST(test_to_string_nested_negative_rhs_expr);
-    RUN_SUBTEST(test_to_string_nested_mul_add);
-    RUN_SUBTEST(test_to_string_atan2);
-    RUN_SUBTEST(test_to_string_pow_superscript);
-    RUN_SUBTEST(test_to_string_unary_sin);
-    RUN_SUBTEST(test_to_string_unary_sqrt);
-    RUN_SUBTEST(test_to_string_function_style);
-    RUN_SUBTEST(test_to_string_special_functions);
+    TEST_RUN_SUBTEST(test_to_string_basic_const, NULL);
+    TEST_RUN_SUBTEST(test_to_string_basic_var, NULL);
+    TEST_RUN_SUBTEST(test_to_string_non_simple_var_bracketed, NULL);
+    TEST_RUN_SUBTEST(test_to_string_addition, NULL);
+    TEST_RUN_SUBTEST(test_to_string_negative_rhs_expr, NULL);
+    TEST_RUN_SUBTEST(test_to_string_double_negative_expr, NULL);
+    TEST_RUN_SUBTEST(test_to_string_nested_negative_rhs_expr, NULL);
+    TEST_RUN_SUBTEST(test_to_string_nested_mul_add, NULL);
+    TEST_RUN_SUBTEST(test_to_string_atan2, NULL);
+    TEST_RUN_SUBTEST(test_to_string_pow_superscript, NULL);
+    TEST_RUN_SUBTEST(test_to_string_unary_sin, NULL);
+    TEST_RUN_SUBTEST(test_to_string_unary_sqrt, NULL);
+    TEST_RUN_SUBTEST(test_to_string_function_style, NULL);
+    TEST_RUN_SUBTEST(test_to_string_special_functions, NULL);
 }
 
 /* ============================================================
@@ -3080,6 +3080,106 @@ void check_parse_null(const char *label, const char *s, int line)
         TEST_FAIL();
         dv_free(g);
     }
+}
+
+void check_parse_null_stderr_contains(const char *label,
+                                      const char *s,
+                                      const char *expected_substring,
+                                      int line)
+{
+    const char *capture_path = NULL;
+    int saved_stderr;
+    dval_t *g;
+    FILE *f;
+    long size;
+    char *buf;
+    size_t nread;
+
+    saved_stderr = test_case_begin_stderr_capture("dval-from-string-stderr.txt",
+                                                  &capture_path);
+    if (saved_stderr < 0 || !capture_path) {
+        printf(C_BOLD C_RED "FAIL" C_RESET " %s (stderr capture unavailable) %s:%d:1\n\n",
+               label, __FILE__, line);
+        TEST_FAIL();
+        return;
+    }
+
+    g = dval_from_string(s, NULL);
+
+    if (!test_case_end_stderr_capture(saved_stderr)) {
+        printf(C_BOLD C_RED "FAIL" C_RESET " %s (stderr restore failed) %s:%d:1\n\n",
+               label, __FILE__, line);
+        TEST_FAIL();
+        if (g)
+            dv_free(g);
+        return;
+    }
+
+    if (g) {
+        printf(C_BOLD C_RED "FAIL" C_RESET " %s (expected NULL) %s:%d:1\n\n",
+               label, __FILE__, line);
+        TEST_FAIL();
+        dv_free(g);
+        return;
+    }
+
+    f = fopen(capture_path, "rb");
+    if (!f) {
+        printf(C_BOLD C_RED "FAIL" C_RESET " %s (stderr capture unreadable) %s:%d:1\n\n",
+               label, __FILE__, line);
+        TEST_FAIL();
+        return;
+    }
+
+    if (fseek(f, 0, SEEK_END) != 0) {
+        fclose(f);
+        printf(C_BOLD C_RED "FAIL" C_RESET " %s (stderr capture seek failed) %s:%d:1\n\n",
+               label, __FILE__, line);
+        TEST_FAIL();
+        return;
+    }
+
+    size = ftell(f);
+    if (size < 0 || fseek(f, 0, SEEK_SET) != 0) {
+        fclose(f);
+        printf(C_BOLD C_RED "FAIL" C_RESET " %s (stderr capture size failed) %s:%d:1\n\n",
+               label, __FILE__, line);
+        TEST_FAIL();
+        return;
+    }
+
+    buf = malloc((size_t)size + 1u);
+    if (!buf) {
+        fclose(f);
+        printf(C_BOLD C_RED "FAIL" C_RESET " %s (stderr capture alloc failed) %s:%d:1\n\n",
+               label, __FILE__, line);
+        TEST_FAIL();
+        return;
+    }
+
+    nread = fread(buf, 1, (size_t)size, f);
+    buf[nread] = '\0';
+    fclose(f);
+
+    if (expected_substring && *expected_substring &&
+        !strstr(buf, expected_substring)) {
+        printf(C_BOLD C_RED "FAIL" C_RESET " %s (missing stderr substring) %s:%d:1\n",
+               label, __FILE__, line);
+        printf(C_BOLD "  expected stderr to contain " C_RESET "%s\n",
+               expected_substring);
+        printf(C_BOLD "  got stderr             " C_RESET "%s\n\n", buf);
+        TEST_FAIL();
+        free(buf);
+        return;
+    }
+
+    printf(C_BOLD C_GREEN "PASS" C_RESET " %s\n", label);
+    if (expected_substring && *expected_substring)
+        printf(C_BOLD "  stderr  " C_RESET "contains \"%s\"\n\n",
+               expected_substring);
+    else
+        printf("\n");
+    free(buf);
 }
 
 /* ---- Legacy pure-constant parse format: { name = val } ---- */

@@ -4,6 +4,46 @@
 
 #include "test_number.h"
 
+static int number_validity_equal(const void *actual,
+                                 const void *expected,
+                                 void *ctx)
+{
+    (void)ctx;
+    return num_eq(*(const number_t *)actual, *(const number_t *)expected);
+}
+
+static void number_validity_format(const void *value,
+                                   char *buf,
+                                   size_t buf_size,
+                                   void *ctx)
+{
+    char *text;
+
+    (void)ctx;
+    if (!buf || buf_size == 0u)
+        return;
+
+    text = num_to_string(*(const number_t *)value);
+    if (!text) {
+        snprintf(buf, buf_size, "<num_to_string failed>");
+        return;
+    }
+
+    snprintf(buf, buf_size, "%s", text);
+    free(text);
+}
+
+const test_validity_contract_t *number_validity_contract_exact(void)
+{
+    static const test_validity_contract_t contract =
+        TEST_VALIDITY_CONTRACT("number-exact",
+                               number_validity_equal,
+                               number_validity_format,
+                               NULL);
+
+    return &contract;
+}
+
 void assert_number_string(const char *label,
                           number_t number,
                           const char *expected_text)

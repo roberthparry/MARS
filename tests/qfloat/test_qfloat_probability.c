@@ -1,14 +1,5 @@
 #include "test_qfloat.h"
 
-static int qf_close_value(qfloat_t got, qfloat_t expected, double tol)
-{
-    if (qf_close(got, expected, tol))
-        return 1;
-    if (qf_eq(expected, qf_from_double(0.0)))
-        return 0;
-    return qf_close_rel(got, expected, tol);
-}
-
 static void test_qf_lambert_w0(void) {
     printf(C_CYAN "TEST: qf_lambert_w0\n" C_RESET);
 
@@ -48,16 +39,10 @@ static void test_qf_lambert_w0(void) {
         qf_to_string(got, buf, sizeof(buf));
         qf_to_string(exp, buf_exp, sizeof(buf_exp));
 
-        if (qf_close_value(got, exp, 1e-30)) {
-            printf("%s  OK: W0(%s)%s\n", C_GREEN, tests[i].xs, C_RESET);
-            printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
-        } else {
-            printf(C_RED "  FAIL: W0(%s)  [%s:%d]\n" C_RESET, tests[i].xs, __FILE__, __LINE__);
-            printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
-            TEST_FAIL();
-        }
+        TEST_ASSERT_QFLOAT_CLOSE(got, exp);
+        printf("%s  OK: W0(%s)%s\n", C_GREEN, tests[i].xs, C_RESET);
+        printf("    got      = %s\n", buf);
+        printf("    expected = %s\n", buf_exp);
     }
 
     printf("\n");
@@ -96,16 +81,10 @@ static void test_qf_lambert_wm1(void) {
         qf_to_string(got, buf, sizeof(buf));
         qf_to_string(exp, buf_exp, sizeof(buf_exp));
 
-        if (qf_close_value(got, exp, 1e-30)) {
-            printf("%s  OK: Wm1(%s)%s\n", C_GREEN, tests[i].xs, C_RESET);
-            printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
-        } else {
-            printf(C_RED "  FAIL: Wm1(%s)  [%s:%d]\n" C_RESET, tests[i].xs, __FILE__, __LINE__);
-            printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
-            TEST_FAIL();
-        }
+        TEST_ASSERT_QFLOAT_CLOSE(got, exp);
+        printf("%s  OK: Wm1(%s)%s\n", C_GREEN, tests[i].xs, C_RESET);
+        printf("    got      = %s\n", buf);
+        printf("    expected = %s\n", buf_exp);
     }
 
     printf("\n");
@@ -145,16 +124,8 @@ static void test_qf_beta_definition(void)
 
             qfloat_t rhs = qf_div(qf_mul(ga, gb), gab);
 
-            int ok = qf_close_rel(B, rhs, 1e-30);
-
-            if (ok) {
-                printf(C_GREEN "  OK: B(%g,%g)\n" C_RESET, as[i], bs[j]);
-            } else {
-                printf(C_RED "  FAIL: B(%g,%g)\n" C_RESET, as[i], bs[j]);
-                print_qf("B(a,b)", B);
-                print_qf("Γ(a)Γ(b)/Γ(a+b)", rhs);
-                TEST_FAIL();
-            }
+            TEST_ASSERT_QFLOAT_CLOSE(B, rhs);
+            printf(C_GREEN "  OK: B(%g,%g)\n" C_RESET, as[i], bs[j]);
         }
     }
 
@@ -180,17 +151,9 @@ static void test_qf_beta_symmetry(void)
             qfloat_t Bab = qf_beta(a, b);
             qfloat_t Bba = qf_beta(b, a);
 
-            int ok = qf_close_rel(Bab, Bba, 1e-30);
-
-            if (ok) {
-                printf(C_GREEN "  OK: B(%g,%g) = B(%g,%g)\n" C_RESET,
-                       as[i], bs[j], bs[j], as[i]);
-            } else {
-                printf(C_RED "  FAIL: B(%g,%g) = B(%g,%g) [%s:%d]\n" C_RESET, as[i], bs[j], bs[j], as[i], __FILE__, __LINE__);
-                print_qf("B(a,b)", Bab);
-                print_qf("B(b,a)", Bba);
-                TEST_FAIL();
-            }
+            TEST_ASSERT_QFLOAT_CLOSE(Bab, Bba);
+            printf(C_GREEN "  OK: B(%g,%g) = B(%g,%g)\n" C_RESET,
+                   as[i], bs[j], bs[j], as[i]);
         }
     }
 
@@ -217,19 +180,9 @@ static void test_qf_beta_special_cases(void)
         qfloat_t Ba1 = qf_beta(a, qf_from_double(1.0));
         qfloat_t Ba1_expected = qf_div(qf_from_double(1.0), a);
 
-        int ok1 = qf_close_rel(B1b, B1b_expected, 1e-30);
-        int ok2 = qf_close_rel(Ba1, Ba1_expected, 1e-30);
-
-        if (ok1 && ok2) {
-            printf(C_GREEN "  OK: B(1,%g) and B(%g,1)\n" C_RESET, vals[i], vals[i]);
-        } else {
-            printf(C_RED "  FAIL: B(1,%g) or B(%g,1)  [%s:%d]\n" C_RESET, vals[i], vals[i], __FILE__, __LINE__);
-            print_qf("B(1,b)", B1b);
-            print_qf("expected", B1b_expected);
-            print_qf("B(a,1)", Ba1);
-            print_qf("expected", Ba1_expected);
-            TEST_FAIL();
-        }
+        TEST_ASSERT_QFLOAT_CLOSE(B1b, B1b_expected);
+        TEST_ASSERT_QFLOAT_CLOSE(Ba1, Ba1_expected);
+        printf(C_GREEN "  OK: B(1,%g) and B(%g,1)\n" C_RESET, vals[i], vals[i]);
     }
 
     printf("\n");
@@ -240,9 +193,9 @@ static void test_qf_beta_special_cases(void)
    ------------------------------------------------------------------------- */
 static void test_qf_beta_all(void)
 {
-    RUN_SUBTEST(test_qf_beta_definition);
-    RUN_SUBTEST(test_qf_beta_symmetry);
-    RUN_SUBTEST(test_qf_beta_special_cases);
+    TEST_RUN_SUBTEST(test_qf_beta_definition, NULL);
+    TEST_RUN_SUBTEST(test_qf_beta_symmetry, NULL);
+    TEST_RUN_SUBTEST(test_qf_beta_special_cases, NULL);
 }
 
 /* -------------------------------------------------------------------------
@@ -271,16 +224,8 @@ static void test_qf_logbeta_definition(void)
             qfloat_t rhs = qf_add(lg_a, lg_b);
             rhs        = qf_sub(rhs, lg_ab);
 
-            int ok = qf_close_rel(logB, rhs, 1e-30);
-
-            if (ok) {
-                printf(C_GREEN "  OK: logB(%g,%g)\n" C_RESET, as[i], bs[j]);
-            } else {
-                printf(C_RED "  FAIL: logB(%g,%g)  [%s:%d]\n" C_RESET, as[i], bs[j], __FILE__, __LINE__);
-                print_qf("logB", logB);
-                print_qf("rhs", rhs);
-                TEST_FAIL();
-            }
+            TEST_ASSERT_QFLOAT_CLOSE(logB, rhs);
+            printf(C_GREEN "  OK: logB(%g,%g)\n" C_RESET, as[i], bs[j]);
         }
     }
 
@@ -308,17 +253,9 @@ static void test_qf_logbeta_consistency(void)
             qfloat_t B    = qf_beta(a, b);
             qfloat_t logB_expected = qf_log(B);
 
-            int ok = qf_close_value(logB, logB_expected, 1e-30);
-
-            if (ok) {
-                printf(C_GREEN "  OK: logB(%g,%g) matches log(beta)\n" C_RESET,
-                       as[i], bs[j]);
-            } else {
-                printf(C_RED "  FAIL: logB(%g,%g) mismatch  [%s:%d]\n" C_RESET, as[i], bs[j], __FILE__, __LINE__);
-                print_qf("logB", logB);
-                print_qf("log(beta)", logB_expected);
-                TEST_FAIL();
-            }
+            TEST_ASSERT_QFLOAT_CLOSE(logB, logB_expected);
+            printf(C_GREEN "  OK: logB(%g,%g) matches log(beta)\n" C_RESET,
+                   as[i], bs[j]);
         }
     }
 
@@ -344,17 +281,9 @@ static void test_qf_logbeta_symmetry(void)
             qfloat_t lab = qf_logbeta(a, b);
             qfloat_t lba = qf_logbeta(b, a);
 
-            int ok = qf_close_rel(lab, lba, 1e-30);
-
-            if (ok) {
-                printf(C_GREEN "  OK: logB(%g,%g) = logB(%g,%g)\n" C_RESET,
-                       as[i], bs[j], bs[j], as[i]);
-            } else {
-                printf(C_RED "  FAIL: logB(%g,%g) = logB(%g,%g)  [%s:%d]\n" C_RESET, as[i], bs[j], bs[j], as[i], __FILE__, __LINE__);
-                print_qf("logB(a,b)", lab);
-                print_qf("logB(b,a)", lba);
-                TEST_FAIL();
-            }
+            TEST_ASSERT_QFLOAT_CLOSE(lab, lba);
+            printf(C_GREEN "  OK: logB(%g,%g) = logB(%g,%g)\n" C_RESET,
+                   as[i], bs[j], bs[j], as[i]);
         }
     }
 
@@ -382,20 +311,10 @@ static void test_qf_logbeta_special_cases(void)
         qfloat_t logBv1 = qf_logbeta(v, qf_from_double(1.0));
         qfloat_t logBv1_expected = qf_neg(qf_log(v));
 
-        int ok1 = qf_close_value(logB1v, logB1v_expected, 1e-30);
-        int ok2 = qf_close_value(logBv1, logBv1_expected, 1e-30);
-
-        if (ok1 && ok2) {
-            printf(C_GREEN "  OK: logB(1,%g) and logB(%g,1)\n" C_RESET,
-                   vals[i], vals[i]);
-        } else {
-            printf(C_RED "  FAIL: logB(1,%g) or logB(%g,1)  [%s:%d]\n" C_RESET, vals[i], vals[i], __FILE__, __LINE__);
-            print_qf("logB(1,v)", logB1v);
-            print_qf("expected", logB1v_expected);
-            print_qf("logB(v,1)", logBv1);
-            print_qf("expected", logBv1_expected);
-            TEST_FAIL();
-        }
+        TEST_ASSERT_QFLOAT_CLOSE(logB1v, logB1v_expected);
+        TEST_ASSERT_QFLOAT_CLOSE(logBv1, logBv1_expected);
+        printf(C_GREEN "  OK: logB(1,%g) and logB(%g,1)\n" C_RESET,
+               vals[i], vals[i]);
     }
 
     printf("\n");
@@ -406,10 +325,10 @@ static void test_qf_logbeta_special_cases(void)
    ------------------------------------------------------------------------- */
 static void test_qf_logbeta_all(void)
 {
-    RUN_SUBTEST(test_qf_logbeta_definition);
-    RUN_SUBTEST(test_qf_logbeta_consistency);
-    RUN_SUBTEST(test_qf_logbeta_symmetry);
-    RUN_SUBTEST(test_qf_logbeta_special_cases);
+    TEST_RUN_SUBTEST(test_qf_logbeta_definition, NULL);
+    TEST_RUN_SUBTEST(test_qf_logbeta_consistency, NULL);
+    TEST_RUN_SUBTEST(test_qf_logbeta_symmetry, NULL);
+    TEST_RUN_SUBTEST(test_qf_logbeta_special_cases, NULL);
 }
 
 /* -------------------------------------------------------------------------
@@ -437,15 +356,10 @@ static void test_qf_binomial_definition(void)
 
             qfloat_t rhs = qf_div(ga1, qf_mul(gb1, gamb1));
 
-            int ok = qf_close_rel(C, rhs, 1e-30);
-
-            if (ok) {
+            if (qf_close_rel(C, rhs, 1e-30)) {
                 printf(C_GREEN "  OK: C(%g,%g)\n" C_RESET, as[i], bs[j]);
             } else {
-                printf(C_RED "  FAIL: C(%g,%g)  [%s:%d]\n" C_RESET, as[i], bs[j], __FILE__, __LINE__);
-                print_qf("C(a,b)", C);
-                print_qf("Γ(a+1)/(Γ(b+1)Γ(a-b+1))", rhs);
-                TEST_FAIL();
+                TEST_ASSERT_QFLOAT_CLOSE(C, rhs);
             }
         }
     }
@@ -474,16 +388,11 @@ static void test_qf_binomial_symmetry(void)
             qfloat_t C1 = qf_binomial(nq, kq);
             qfloat_t C2 = qf_binomial(nq, nkq);
 
-            int ok = qf_close_rel(C1, C2, 1e-30);
-
-            if (ok) {
+            if (qf_close_rel(C1, C2, 1e-30)) {
                 printf(C_GREEN "  OK: C(%d,%d) = C(%d,%d)\n" C_RESET,
                        n, k, n, n-k);
             } else {
-                printf(C_RED "  FAIL: C(%d,%d) = C(%d,%d)  [%s:%d]\n" C_RESET, n, k, n, n-k, __FILE__, __LINE__);
-                print_qf("C(n,k)", C1);
-                print_qf("C(n,n-k)", C2);
-                TEST_FAIL();
+                TEST_ASSERT_QFLOAT_CLOSE(C1, C2);
             }
         }
     }
@@ -507,16 +416,13 @@ static void test_qf_binomial_special_cases(void)
         qfloat_t Cn0 = qf_binomial(nq, qf_from_double(0.0));
         qfloat_t Cn1 = qf_binomial(nq, qf_from_double(1.0));
 
-        int ok1 = qf_close_rel(Cn0, qf_from_double(1.0), 1e-30);
-        int ok2 = qf_close_rel(Cn1, nq, 1e-30);
+        qfloat_t one = qf_from_double(1.0);
 
-        if (ok1 && ok2) {
+        if (qf_close_rel(Cn0, one, 1e-30) && qf_close_rel(Cn1, nq, 1e-30)) {
             printf(C_GREEN "  OK: C(%d,0)=1 and C(%d,1)=%d\n" C_RESET, n, n, n);
         } else {
-            printf(C_RED "  FAIL: C(%d,0) or C(%d,1)  [%s:%d]\n" C_RESET, n, n, __FILE__, __LINE__);
-            print_qf("C(n,0)", Cn0);
-            print_qf("C(n,1)", Cn1);
-            TEST_FAIL();
+            TEST_ASSERT_QFLOAT_CLOSE(Cn0, one);
+            TEST_ASSERT_QFLOAT_CLOSE(Cn1, nq);
         }
     }
 
@@ -528,9 +434,9 @@ static void test_qf_binomial_special_cases(void)
    ------------------------------------------------------------------------- */
 static void test_qf_binomial_all(void)
 {
-    RUN_SUBTEST(test_qf_binomial_definition);
-    RUN_SUBTEST(test_qf_binomial_symmetry);
-    RUN_SUBTEST(test_qf_binomial_special_cases);
+    TEST_RUN_SUBTEST(test_qf_binomial_definition, NULL);
+    TEST_RUN_SUBTEST(test_qf_binomial_symmetry, NULL);
+    TEST_RUN_SUBTEST(test_qf_binomial_special_cases, NULL);
 }
 
 /* -------------------------------------------------------------------------
@@ -563,15 +469,10 @@ static void test_qf_beta_pdf_definition(void)
 
                 qfloat_t rhs = qf_div(qf_mul(xpow, omxpow), B);
 
-                int ok = qf_close_rel(pdf, rhs, 1e-30);
-
-                if (ok) {
+                if (qf_close_rel(pdf, rhs, 1e-30)) {
                     printf(C_GREEN "  OK: f(%g; %g,%g)\n" C_RESET, xs[i], as[j], bs[k]);
                 } else {
-                    printf(C_RED "  FAIL: f(%g; %g,%g)  [%s:%d]\n" C_RESET, xs[i], as[j], bs[k], __FILE__, __LINE__);
-                    print_qf("pdf", pdf);
-                    print_qf("rhs", rhs);
-                    TEST_FAIL();
+                    TEST_ASSERT_QFLOAT_CLOSE(pdf, rhs);
                 }
             }
         }
@@ -612,15 +513,10 @@ static void test_qf_beta_pdf_logform(void)
 
                 qfloat_t rhs = qf_sub(qf_add(term1, term2), logB);
 
-                int ok = qf_close_rel(logpdf, rhs, 1e-30);
-
-                if (ok) {
+                if (qf_close_rel(logpdf, rhs, 1e-30)) {
                     printf(C_GREEN "  OK: log f(%g; %g,%g)\n" C_RESET, xs[i], as[j], bs[k]);
                 } else {
-                    printf(C_RED "  FAIL: log f(%g; %g,%g)  [%s:%d]\n" C_RESET, xs[i], as[j], bs[k], __FILE__, __LINE__);
-                    print_qf("logpdf", logpdf);
-                    print_qf("rhs", rhs);
-                    TEST_FAIL();
+                    TEST_ASSERT_QFLOAT_CLOSE(logpdf, rhs);
                 }
             }
         }
@@ -652,16 +548,11 @@ static void test_qf_beta_pdf_symmetry(void)
                 qfloat_t f1 = qf_beta_pdf(x, a, b);
                 qfloat_t f2 = qf_beta_pdf(qf_sub(qf_from_double(1.0), x), b, a);
 
-                int ok = qf_close_rel(f1, f2, 1e-30);
-
-                if (ok) {
+                if (qf_close_rel(f1, f2, 1e-30)) {
                     printf(C_GREEN "  OK: symmetry (%g; %g,%g)\n" C_RESET,
                            xs[i], as[j], bs[k]);
                 } else {
-                    printf(C_RED "  FAIL: symmetry (%g; %g,%g)  [%s:%d]\n" C_RESET, xs[i], as[j], bs[k], __FILE__, __LINE__);
-                    print_qf("f(x;a,b)", f1);
-                    print_qf("f(1-x;b,a)", f2);
-                    TEST_FAIL();
+                    TEST_ASSERT_QFLOAT_CLOSE(f1, f2);
                 }
             }
         }
@@ -675,9 +566,9 @@ static void test_qf_beta_pdf_symmetry(void)
    ------------------------------------------------------------------------- */
 static void test_qf_beta_pdf_all(void)
 {
-    RUN_SUBTEST(test_qf_beta_pdf_definition);
-    RUN_SUBTEST(test_qf_beta_pdf_logform);
-    RUN_SUBTEST(test_qf_beta_pdf_symmetry);
+    TEST_RUN_SUBTEST(test_qf_beta_pdf_definition, NULL);
+    TEST_RUN_SUBTEST(test_qf_beta_pdf_logform, NULL);
+    TEST_RUN_SUBTEST(test_qf_beta_pdf_symmetry, NULL);
 }
 
 /* -------------------------------------------------------------------------
@@ -711,16 +602,11 @@ static void test_qf_logbeta_pdf_definition(void)
 
                 qfloat_t rhs = qf_sub(qf_add(term1, term2), logB);
 
-                int ok = qf_close_rel(logpdf, rhs, 1e-30);
-
-                if (ok) {
+                if (qf_close_rel(logpdf, rhs, 1e-30)) {
                     printf(C_GREEN "  OK: log f(%g; %g,%g)\n" C_RESET,
                            xs[i], as[j], bs[k]);
                 } else {
-                    printf(C_RED "  FAIL: log f(%g; %g,%g)  [%s:%d]\n" C_RESET, xs[i], as[j], bs[k], __FILE__, __LINE__);
-                    print_qf("logpdf", logpdf);
-                    print_qf("rhs", rhs);
-                    TEST_FAIL();
+                    TEST_ASSERT_QFLOAT_CLOSE(logpdf, rhs);
                 }
             }
         }
@@ -753,15 +639,10 @@ static void test_qf_logbeta_pdf_consistency(void)
                 qfloat_t logpdf = qf_logbeta_pdf(x, a, b);
                 qfloat_t rhs    = qf_log(pdf);
 
-                int ok = qf_close_rel(logpdf, rhs, 1e-30);
-
-                if (ok) {
+                if (qf_close_rel(logpdf, rhs, 1e-30)) {
                     printf(C_GREEN "  OK: log f matches log(pdf)\n" C_RESET);
                 } else {
-                    printf(C_RED "  FAIL: log f mismatch  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
-                    print_qf("logpdf", logpdf);
-                    print_qf("log(pdf)", rhs);
-                    TEST_FAIL();
+                    TEST_ASSERT_QFLOAT_CLOSE(logpdf, rhs);
                 }
             }
         }
@@ -793,16 +674,11 @@ static void test_qf_logbeta_pdf_symmetry(void)
                 qfloat_t f1 = qf_logbeta_pdf(x, a, b);
                 qfloat_t f2 = qf_logbeta_pdf(qf_sub(qf_from_double(1.0), x), b, a);
 
-                int ok = qf_close_rel(f1, f2, 1e-30);
-
-                if (ok) {
+                if (qf_close_rel(f1, f2, 1e-30)) {
                     printf(C_GREEN "  OK: symmetry (%g; %g,%g)\n" C_RESET,
                            xs[i], as[j], bs[k]);
                 } else {
-                    printf(C_RED "  FAIL: symmetry (%g; %g,%g)  [%s:%d]\n" C_RESET, xs[i], as[j], bs[k], __FILE__, __LINE__);
-                    print_qf("log f(x;a,b)", f1);
-                    print_qf("log f(1-x;b,a)", f2);
-                    TEST_FAIL();
+                    TEST_ASSERT_QFLOAT_CLOSE(f1, f2);
                 }
             }
         }
@@ -816,9 +692,9 @@ static void test_qf_logbeta_pdf_symmetry(void)
    ------------------------------------------------------------------------- */
 static void test_qf_logbeta_pdf_all(void)
 {
-    RUN_SUBTEST(test_qf_logbeta_pdf_definition);
-    RUN_SUBTEST(test_qf_logbeta_pdf_consistency);
-    RUN_SUBTEST(test_qf_logbeta_pdf_symmetry);
+    TEST_RUN_SUBTEST(test_qf_logbeta_pdf_definition, NULL);
+    TEST_RUN_SUBTEST(test_qf_logbeta_pdf_consistency, NULL);
+    TEST_RUN_SUBTEST(test_qf_logbeta_pdf_symmetry, NULL);
 }
 
 /* -------------------------------------------------------------------------
@@ -958,10 +834,10 @@ static void test_qf_normal_pdf_logform(void)
    ------------------------------------------------------------------------- */
 static void test_qf_normal_pdf_all(void)
 {
-    RUN_SUBTEST(test_qf_normal_pdf_definition);
-    RUN_SUBTEST(test_qf_normal_pdf_symmetry);
-    RUN_SUBTEST(test_qf_normal_pdf_at_zero);
-    RUN_SUBTEST(test_qf_normal_pdf_logform);
+    TEST_RUN_SUBTEST(test_qf_normal_pdf_definition, NULL);
+    TEST_RUN_SUBTEST(test_qf_normal_pdf_symmetry, NULL);
+    TEST_RUN_SUBTEST(test_qf_normal_pdf_at_zero, NULL);
+    TEST_RUN_SUBTEST(test_qf_normal_pdf_logform, NULL);
 }
 
 /* -------------------------------------------------------------------------
@@ -1139,10 +1015,10 @@ static void test_qf_normal_cdf_pdf_consistency(void)
    ------------------------------------------------------------------------- */
 static void test_qf_normal_cdf_all(void)
 {
-    RUN_SUBTEST(test_qf_normal_cdf_definition);
-    RUN_SUBTEST(test_qf_normal_cdf_symmetry);
-    RUN_SUBTEST(test_qf_normal_cdf_known_values);
-    RUN_SUBTEST(test_qf_normal_cdf_pdf_consistency);
+    TEST_RUN_SUBTEST(test_qf_normal_cdf_definition, NULL);
+    TEST_RUN_SUBTEST(test_qf_normal_cdf_symmetry, NULL);
+    TEST_RUN_SUBTEST(test_qf_normal_cdf_known_values, NULL);
+    TEST_RUN_SUBTEST(test_qf_normal_cdf_pdf_consistency, NULL);
 }
 
 /* -------------------------------------------------------------------------
@@ -1277,27 +1153,27 @@ static void test_qf_normal_logpdf_at_zero(void)
    ------------------------------------------------------------------------- */
 static void test_qf_normal_logpdf_all(void)
 {
-    RUN_SUBTEST(test_qf_normal_logpdf_definition);
-    RUN_SUBTEST(test_qf_normal_logpdf_consistency);
-    RUN_SUBTEST(test_qf_normal_logpdf_symmetry);
-    RUN_SUBTEST(test_qf_normal_logpdf_at_zero);
+    TEST_RUN_SUBTEST(test_qf_normal_logpdf_definition, NULL);
+    TEST_RUN_SUBTEST(test_qf_normal_logpdf_consistency, NULL);
+    TEST_RUN_SUBTEST(test_qf_normal_logpdf_symmetry, NULL);
+    TEST_RUN_SUBTEST(test_qf_normal_logpdf_at_zero, NULL);
 }
 
 void test_lambert_w(void) {
-    RUN_SUBTEST(test_qf_lambert_w0);
-    RUN_SUBTEST(test_qf_lambert_wm1);
-    RUN_SUBTEST(test_qf_productlog_all);
+    TEST_RUN_SUBTEST(test_qf_lambert_w0, NULL);
+    TEST_RUN_SUBTEST(test_qf_lambert_wm1, NULL);
+    TEST_RUN_SUBTEST(test_qf_productlog_all, NULL);
 }
 
 void test_beta_logbeta_binomial_beta_pdf_logbeta_pdf_normal_pdf_cdf_logpdf(void) {
-    RUN_SUBTEST(test_qf_beta_all);
-    RUN_SUBTEST(test_qf_logbeta_all);
-    RUN_SUBTEST(test_qf_binomial_all);
-    RUN_SUBTEST(test_qf_beta_pdf_all);
-    RUN_SUBTEST(test_qf_logbeta_pdf_all);
-    RUN_SUBTEST(test_qf_normal_pdf_all);
-    RUN_SUBTEST(test_qf_normal_cdf_all);
-    RUN_SUBTEST(test_qf_normal_logpdf_all);
+    TEST_RUN_SUBTEST(test_qf_beta_all, NULL);
+    TEST_RUN_SUBTEST(test_qf_logbeta_all, NULL);
+    TEST_RUN_SUBTEST(test_qf_binomial_all, NULL);
+    TEST_RUN_SUBTEST(test_qf_beta_pdf_all, NULL);
+    TEST_RUN_SUBTEST(test_qf_logbeta_pdf_all, NULL);
+    TEST_RUN_SUBTEST(test_qf_normal_pdf_all, NULL);
+    TEST_RUN_SUBTEST(test_qf_normal_cdf_all, NULL);
+    TEST_RUN_SUBTEST(test_qf_normal_logpdf_all, NULL);
 }
 
 /* -------------------------------------------------------------------------

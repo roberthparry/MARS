@@ -29,11 +29,7 @@ static void test_add() {
     if (qf_close(got, expected, 1e-30)) {
         printf("%s  OK: %s = %s%s\n", C_GREEN, "1.2345678901234561234567891234567 + 9.8765432109876541234567891234567", "11.1111111011111102469135782469134", C_RESET);
     } else {
-        printf("FAIL: %s:%d:1: addition\n", __FILE__, __LINE__);
-        printf("%s  FAIL: %s%s\n", C_RED, "1.2345678901234561234567891234567 + 9.8765432109876541234567891234567", C_RESET);
-        printf("    got      = %s\n", buf);
-        printf("    expected = %s\n", buf_exp);
-        TEST_FAIL();
+        TEST_ASSERT_QFLOAT_CLOSE(got, expected);
     }
 }
 
@@ -59,11 +55,7 @@ static void test_mul() {
         printf("    got      = %s\n", r_buf);
         printf("    expected = %s\n", buf_exp);
     } else {
-        printf("FAIL: %s:%d:1: multiplication\n", __FILE__, __LINE__);
-        printf("%s  FAIL: %s%s\n", C_RED, buf_name, C_RESET);
-        printf("    got      = %s\n", r_buf);
-        printf("    expected = %s\n", buf_exp);
-        TEST_FAIL();
+        TEST_ASSERT_QFLOAT_CLOSE(r, expected);
     }
 }
 
@@ -84,11 +76,7 @@ static void test_div() {
         printf("    got      = %s\n", buf);
         printf("    expected = %s\n", buf_exp);
     } else {
-        printf("FAIL: %s:%d:1: division\n", __FILE__, __LINE__);
-        printf("%s  FAIL: %s%s\n", C_RED, "1.2412731971809253340758239961506 / 9.8765431209876543171934981073984", C_RESET);
-        printf("    got      = %s\n", buf);
-        printf("    expected = %s\n", buf_exp);
-        TEST_FAIL();
+        TEST_ASSERT_QFLOAT_CLOSE(got, expected);
     }
 }
 
@@ -109,11 +97,7 @@ static void test_sqrt() {
         printf("  expected = %s\n", buf_exp);
     }
     else {
-        printf("FAIL: %s:%d:1: sqrt\n", __FILE__, __LINE__);
-        printf(C_RED "  FAIL: sqrt\n" C_RESET);
-        print_q("       got", got);
-        printf("  expected = %s\n", buf_exp);
-        TEST_FAIL();
+        TEST_ASSERT_QFLOAT_CLOSE(got, expected);
     }
 }
 
@@ -127,17 +111,10 @@ static void test_exp_log() {
     char buf_exp[64];
     qf_to_string(expected, buf_exp, sizeof(buf_exp));
 
-    if (qf_close_value(got, expected, 1e-30)) {
-        printf(C_GREEN "  OK: exp/log\n" C_RESET);
-        print_q("  log(exp(x))", got);
-        printf("  expected    = %s\n", buf_exp);
-    } else {
-        printf("FAIL: %s:%d:1: exp/log\n", __FILE__, __LINE__);
-        printf(C_RED "  FAIL: exp/log\n" C_RESET);
-        print_q("  log(exp(x))", got);
-        printf("  expected    = %s\n", buf_exp);
-        TEST_FAIL();
-    }
+    TEST_ASSERT_QFLOAT_CLOSE(got, expected);
+    printf(C_GREEN "  OK: exp/log\n" C_RESET);
+    print_q("  log(exp(x))", got);
+    printf("  expected    = %s\n", buf_exp);
 }
 
 static void test_qf_exp(void)
@@ -201,11 +178,7 @@ static void test_qf_exp(void)
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
         } else {
-            printf("%s  FAIL: %s%s\n",
-                   C_RED, exp_tests[i].name, C_RESET);
-            printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
-            TEST_FAIL();
+            TEST_ASSERT_QFLOAT_CLOSE(got, exp_tests[i].expected);
         }
     }
 
@@ -221,9 +194,7 @@ static void test_qf_exp(void)
     if (qf_close(prod, one, 1e-30)) {
         printf("%s  OK: exp(x)*exp(-x) = 1%s\n", C_GREEN, C_RESET);
     } else {
-        printf("%s  FAIL: exp(x)*exp(-x) != 1%s\n", C_RED, C_RESET);
-        printf("    got = %s\n", buf);
-        TEST_FAIL();
+        TEST_ASSERT_QFLOAT_CLOSE(prod, one);
     }
 }
 
@@ -301,12 +272,10 @@ static void test_qf_log(void)
     qfloat_t lx = qf_log(ex);
 
     qf_to_string(lx, buf, sizeof(buf));
-    if (qf_close(lx, x, 1e-30)) {
+        if (qf_close(lx, x, 1e-30)) {
         printf("%s  OK: log(exp(x)) = x%s\n", C_GREEN, C_RESET);
     } else {
-        printf("%s  FAIL: log(exp(x)) != x%s\n", C_RED, C_RESET);
-        printf("    got = %s\n", buf);
-        TEST_FAIL();
+        TEST_ASSERT_QFLOAT_CLOSE(lx, x);
     }
 
     /* Round-trip: exp(log(x)) ≈ x */
@@ -318,9 +287,7 @@ static void test_qf_log(void)
     if (qf_close(ey, y, 1e-30)) {
         printf("%s  OK: exp(log(x)) = x%s\n", C_GREEN, C_RESET);
     } else {
-        printf("%s  FAIL: exp(log(x)) != x%s\n", C_RED, C_RESET);
-        printf("    got = %s\n", buf);
-        TEST_FAIL();
+        TEST_ASSERT_QFLOAT_CLOSE(ey, y);
     }
 }
 
@@ -350,14 +317,14 @@ static void test_stability() {
 }
 
 void test_arithmetic(void) {
-    RUN_SUBTEST(test_add);
-    RUN_SUBTEST(test_mul);
-    RUN_SUBTEST(test_div);
-    RUN_SUBTEST(test_sqrt);
-    RUN_SUBTEST(test_exp_log);
-    RUN_SUBTEST(test_qf_exp);
-    RUN_SUBTEST(test_qf_log);
-    RUN_SUBTEST(test_stability);
+    TEST_RUN_SUBTEST(test_add, NULL);
+    TEST_RUN_SUBTEST(test_mul, NULL);
+    TEST_RUN_SUBTEST(test_div, NULL);
+    TEST_RUN_SUBTEST(test_sqrt, NULL);
+    TEST_RUN_SUBTEST(test_exp_log, NULL);
+    TEST_RUN_SUBTEST(test_qf_exp, NULL);
+    TEST_RUN_SUBTEST(test_qf_log, NULL);
+    TEST_RUN_SUBTEST(test_stability, NULL);
 }
 
 /* -----------------------------------------------------------

@@ -10,41 +10,6 @@
 #define DV_ZERO ((dval_t *)DV_ZERO)
 #define DV_ONE  ((dval_t *)DV_ONE)
 
-static void check_mat_num_local(const char *label,
-                                matrix_t *got,
-                                matrix_t *expected,
-                                double tol)
-{
-    int ok = 1;
-
-    if (!got || !expected ||
-        mat_get_row_count(got) != mat_get_row_count(expected) ||
-        mat_get_col_count(got) != mat_get_col_count(expected)) {
-        check_bool(label, false);
-        return;
-    }
-
-    for (size_t i = 0; i < mat_get_row_count(got) && ok; ++i) {
-        for (size_t j = 0; j < mat_get_col_count(got) && ok; ++j) {
-            number_t g = mat_get_num(got, i, j);
-            number_t e = mat_get_num(expected, i, j);
-            number_t diff = num_sub(g, e);
-            number_t mag = num_abs(diff);
-            double err = num_to_double(mag);
-
-            if (!(err < tol))
-                ok = 0;
-
-            num_destroy(&mag);
-            num_destroy(&diff);
-            num_destroy(&e);
-            num_destroy(&g);
-        }
-    }
-
-    check_bool(label, ok);
-}
-
 static void test_creation(void)
 {
     printf(C_CYAN "TEST: creation of all matrix types\n" C_RESET);
@@ -1224,8 +1189,16 @@ static void test_sparse_support(void)
             0.0, -2.0, 0.0
         });
         check_bool("mat_to_dense(sparse) not NULL", D != NULL);
-        if (D)
-            check_mat_d("dense(sparse) matches expected", D, Expected, 1e-12);
+        if (D) {
+            bool ok = test_assert_matrix_d_close(D, Expected, 1e-12,
+                                                 __FILE__, __LINE__);
+            if (!ok) {
+                mat_free(D);
+                mat_free(Expected);
+                mat_free(S);
+                return;
+            }
+        }
 
         mat_free(D);
         mat_free(Expected);
@@ -1252,13 +1225,35 @@ static void test_sparse_support(void)
         if (S) {
             Back = mat_to_dense(S);
             check_bool("dense round-trip not NULL", Back != NULL);
-            if (Back)
-                check_mat_d("dense->sparse->dense = original", Back, A, 1e-12);
+            if (Back) {
+                bool ok = test_assert_matrix_d_close(Back, A, 1e-12,
+                                                     __FILE__, __LINE__);
+                if (!ok) {
+                    mat_free(Back);
+                    mat_free(SB);
+                    mat_free(Expected);
+                    mat_free(B);
+                    mat_free(S);
+                    mat_free(A);
+                    return;
+                }
+            }
 
             SB = mat_mul(S, B);
             check_bool("sparse * dense vector not NULL", SB != NULL);
-            if (SB)
-                check_mat_d("sparse matmul gives correct result", SB, Expected, 1e-12);
+            if (SB) {
+                bool ok = test_assert_matrix_d_close(SB, Expected, 1e-12,
+                                                     __FILE__, __LINE__);
+                if (!ok) {
+                    mat_free(Back);
+                    mat_free(SB);
+                    mat_free(Expected);
+                    mat_free(B);
+                    mat_free(S);
+                    mat_free(A);
+                    return;
+                }
+            }
         }
 
         mat_free(Back);
@@ -1304,8 +1299,20 @@ static void test_sparse_support(void)
 
             check_bool("sparse + sparse not NULL", Sum != NULL);
             check_bool("sparse + sparse stays sparse", Sum && mat_is_sparse(Sum));
-            if (Sum)
-                check_mat_d("sparse + sparse matches expected", Sum, ExpectedSum, 1e-12);
+            if (Sum) {
+                bool ok = test_assert_matrix_d_close(Sum, ExpectedSum, 1e-12,
+                                                     __FILE__, __LINE__);
+                if (!ok) {
+                    mat_free(ExpectedProd);
+                    mat_free(ExpectedSum);
+                    mat_free(Prod);
+                    mat_free(Diff);
+                    mat_free(Sum);
+                    mat_free(B);
+                    mat_free(A);
+                    return;
+                }
+            }
 
             check_bool("sparse - sparse not NULL", Diff != NULL);
             check_bool("sparse - sparse stays sparse", Diff && mat_is_sparse(Diff));
@@ -1313,8 +1320,20 @@ static void test_sparse_support(void)
 
             check_bool("sparse * sparse not NULL", Prod != NULL);
             check_bool("sparse * sparse stays sparse", Prod && mat_is_sparse(Prod));
-            if (Prod)
-                check_mat_d("sparse * sparse matches expected", Prod, ExpectedProd, 1e-12);
+            if (Prod) {
+                bool ok = test_assert_matrix_d_close(Prod, ExpectedProd, 1e-12,
+                                                     __FILE__, __LINE__);
+                if (!ok) {
+                    mat_free(ExpectedProd);
+                    mat_free(ExpectedSum);
+                    mat_free(Prod);
+                    mat_free(Diff);
+                    mat_free(Sum);
+                    mat_free(B);
+                    mat_free(A);
+                    return;
+                }
+            }
         }
 
         mat_free(ExpectedProd);
@@ -1349,13 +1368,33 @@ static void test_sparse_support(void)
 
             check_bool("identity * sparse not NULL", L != NULL);
             check_bool("identity * sparse stays sparse", L && mat_is_sparse(L));
-            if (L)
-                check_mat_d("identity * sparse = sparse", L, Expected, 1e-12);
+            if (L) {
+                bool ok = test_assert_matrix_d_close(L, Expected, 1e-12,
+                                                     __FILE__, __LINE__);
+                if (!ok) {
+                    mat_free(Expected);
+                    mat_free(R);
+                    mat_free(L);
+                    mat_free(S);
+                    mat_free(I);
+                    return;
+                }
+            }
 
             check_bool("sparse * identity not NULL", R != NULL);
             check_bool("sparse * identity stays sparse", R && mat_is_sparse(R));
-            if (R)
-                check_mat_d("sparse * identity = sparse", R, Expected, 1e-12);
+            if (R) {
+                bool ok = test_assert_matrix_d_close(R, Expected, 1e-12,
+                                                     __FILE__, __LINE__);
+                if (!ok) {
+                    mat_free(Expected);
+                    mat_free(R);
+                    mat_free(L);
+                    mat_free(S);
+                    mat_free(I);
+                    return;
+                }
+            }
         }
 
         mat_free(Expected);
@@ -1385,8 +1424,17 @@ static void test_sparse_support(void)
             check_bool("setting complex zero leaves nnz unchanged", mat_nonzero_count(S) == 1);
             D = mat_to_dense(S);
             check_bool("dense(complex sparse) not NULL", D != NULL);
-            if (D)
-                check_mat_complex("complex sparse round-trip", D, Expected, 1e-18);
+            if (D) {
+                bool ok = test_assert_matrix_complex_close(D, Expected, 1e-18,
+                                                           __FILE__, __LINE__);
+                if (!ok) {
+                    mat_free(D);
+                    mat_free(Expected);
+                    mat_free(S);
+                    num_destroy(&vals[1]);
+                    return;
+                }
+            }
         }
 
         mat_free(D);
@@ -1487,8 +1535,17 @@ static void test_layout_policy_regressions(void)
             R = mat_add(D, S);
             check_bool("dense + sparse not NULL", R != NULL);
             check_bool("dense + sparse falls back to dense", R && !mat_is_sparse(R));
-            if (R)
-                check_mat_d("dense + sparse matches expected", R, Expected, 1e-12);
+            if (R) {
+                bool ok = test_assert_matrix_d_close(R, Expected, 1e-12,
+                                                     __FILE__, __LINE__);
+                if (!ok) {
+                    mat_free(Expected);
+                    mat_free(R);
+                    mat_free(D);
+                    mat_free(S);
+                    return;
+                }
+            }
         }
 
         mat_free(Expected);
@@ -1517,8 +1574,17 @@ static void test_layout_policy_regressions(void)
             R = mat_sub(I, S);
             check_bool("identity - sparse not NULL", R != NULL);
             check_bool("identity - sparse stays sparse-like", R && mat_is_sparse(R));
-            if (R)
-                check_mat_d("identity - sparse matches expected", R, Expected, 1e-12);
+            if (R) {
+                bool ok = test_assert_matrix_d_close(R, Expected, 1e-12,
+                                                     __FILE__, __LINE__);
+                if (!ok) {
+                    mat_free(Expected);
+                    mat_free(R);
+                    mat_free(S);
+                    mat_free(I);
+                    return;
+                }
+            }
         }
 
         mat_free(Expected);
@@ -1541,8 +1607,16 @@ static void test_layout_policy_regressions(void)
             N = mat_neg(I);
             check_bool("mat_neg(identity) not NULL", N != NULL);
             check_bool("mat_neg(identity) preserves diagonal structure", N && mat_is_diagonal(N));
-            if (N)
-                check_mat_d("mat_neg(identity) = -I", N, Expected, 1e-12);
+            if (N) {
+                bool ok = test_assert_matrix_d_close(N, Expected, 1e-12,
+                                                     __FILE__, __LINE__);
+                if (!ok) {
+                    mat_free(Expected);
+                    mat_free(N);
+                    mat_free(I);
+                    return;
+                }
+            }
         }
 
         mat_free(Expected);
@@ -1631,8 +1705,16 @@ static void test_layout_policy_regressions(void)
             T = mat_transpose(S);
             check_bool("transpose of sparse not NULL", T != NULL);
             check_bool("transpose of sparse stays sparse-like", T && mat_is_sparse(T));
-            if (T)
-                check_mat_d("transpose of sparse matches expected", T, Expected, 1e-12);
+            if (T) {
+                bool ok = test_assert_matrix_d_close(T, Expected, 1e-12,
+                                                     __FILE__, __LINE__);
+                if (!ok) {
+                    mat_free(Expected);
+                    mat_free(T);
+                    mat_free(S);
+                    return;
+                }
+            }
         }
 
         mat_free(Expected);
@@ -1651,8 +1733,16 @@ static void test_layout_policy_regressions(void)
             C = mat_conj(I);
             check_bool("conjugate of identity not NULL", C != NULL);
             check_bool("conjugate of identity preserves diagonal structure", C && mat_is_diagonal(C));
-            if (C)
-                check_mat_num_local("conjugate of identity matches expected", C, Expected, 1e-25);
+            if (C) {
+                bool ok = test_assert_matrix_complex_close(C, Expected, 1e-25,
+                                                           __FILE__, __LINE__);
+                if (!ok) {
+                    mat_free(Expected);
+                    mat_free(C);
+                    mat_free(I);
+                    return;
+                }
+            }
         }
 
         mat_free(Expected);
@@ -2947,7 +3037,7 @@ static void test_det_double(void)
 
         print_md("A (1x1)", A);
 
-        double det;
+        double det = 0.0;
         mat_det(A, &det);
         check_d("det 1x1 = 7", det, 7.0, 1e-30);
 
@@ -2963,7 +3053,7 @@ static void test_det_double(void)
 
         print_md("A (2x2)", A);
 
-        double det;
+        double det = 0.0;
         mat_det(A, &det);
         check_d("det [[1 2][3 4]] = -2", det, -2.0, 1e-30);
 
@@ -2980,7 +3070,7 @@ static void test_det_double(void)
 
         print_md("A (3x3)", A);
 
-        double det;
+        double det = 0.0;
         mat_det(A, &det);
         check_d("det 3x3 example = -306", det, -306.0, 1e-30);
 
@@ -2996,7 +3086,7 @@ static void test_det_double(void)
 
         print_md("A (singular)", A);
 
-        double det;
+        double det = 0.0;
         mat_det(A, &det);
         check_d("det singular = 0", det, 0.0, 1e-30);
 
@@ -3009,7 +3099,7 @@ static void test_det_double(void)
 
         print_md("I (identity)", I);
 
-        double det;
+        double det = 0.0;
         mat_det(I, &det);
         check_d("det identity = 1", det, 1.0, 1e-30);
 
@@ -3115,7 +3205,7 @@ static void test_trace(void)
         dval_t *tr = NULL;
 
         print_mdv("A (dval)", A);
-        check_bool("mat_trace(dval) rc = 0", mat_trace(A, &tr) == 0);
+        check_bool("mat_trace(dval) rc = 0", mat_trace_dv(A, &tr) == 0);
         check_bool("trace(dval) non-null", tr != NULL);
         if (tr) {
             print_det_dv("trace(A)", tr);
@@ -3266,20 +3356,115 @@ static void test_deriv(void)
         check_bool("numeric mat_deriv_block_solve(A, B, 1, x) not NULL", dXb != NULL);
         check_bool("numeric mat_jacobian(A, vars, 2) not NULL", J != NULL);
 
-        if (dA)
-            check_mat_d("numeric mat_deriv(A, x) = 0", dA, Expected2, 1e-12);
+        if (dA) {
+            bool ok = test_assert_matrix_d_close(dA, Expected2, 1e-12,
+                                                 __FILE__, __LINE__);
+            if (!ok) {
+                mat_free(J);
+                mat_free(dXb);
+                mat_free(dX);
+                mat_free(dAbi);
+                mat_free(dAi);
+                dv_free(ddet);
+                dv_free(dtr);
+                mat_free(dA);
+                mat_free(ExpectedJ);
+                mat_free(Expected21);
+                mat_free(Expected2);
+                mat_free(B);
+                mat_free(A);
+                dv_free(x);
+                return;
+            }
+        }
         if (dtr)
             check_d("numeric mat_deriv_trace(A, x) = 0", dv_eval_d(dtr), 0.0, 1e-12);
         if (ddet)
             check_d("numeric mat_deriv_det(A, x) = 0", dv_eval_d(ddet), 0.0, 1e-12);
-        if (dAi)
-            check_mat_d("numeric mat_deriv_inverse(A, x) = 0", dAi, Expected2, 1e-12);
-        if (dAbi)
-            check_mat_d("numeric mat_deriv_block_inverse(A, 1, x) = 0", dAbi, Expected2, 1e-12);
-        if (dX)
-            check_mat_d("numeric mat_deriv_solve(A, B, x) = 0", dX, Expected21, 1e-12);
-        if (dXb)
-            check_mat_d("numeric mat_deriv_block_solve(A, B, 1, x) = 0", dXb, Expected21, 1e-12);
+        if (dAi) {
+            bool ok = test_assert_matrix_d_close(dAi, Expected2, 1e-12,
+                                                 __FILE__, __LINE__);
+            if (!ok) {
+                mat_free(J);
+                mat_free(dXb);
+                mat_free(dX);
+                mat_free(dAbi);
+                mat_free(dAi);
+                dv_free(ddet);
+                dv_free(dtr);
+                mat_free(dA);
+                mat_free(ExpectedJ);
+                mat_free(Expected21);
+                mat_free(Expected2);
+                mat_free(B);
+                mat_free(A);
+                dv_free(x);
+                return;
+            }
+        }
+        if (dAbi) {
+            bool ok = test_assert_matrix_d_close(dAbi, Expected2, 1e-12,
+                                                 __FILE__, __LINE__);
+            if (!ok) {
+                mat_free(J);
+                mat_free(dXb);
+                mat_free(dX);
+                mat_free(dAbi);
+                mat_free(dAi);
+                dv_free(ddet);
+                dv_free(dtr);
+                mat_free(dA);
+                mat_free(ExpectedJ);
+                mat_free(Expected21);
+                mat_free(Expected2);
+                mat_free(B);
+                mat_free(A);
+                dv_free(x);
+                return;
+            }
+        }
+        if (dX) {
+            bool ok = test_assert_matrix_d_close(dX, Expected21, 1e-12,
+                                                 __FILE__, __LINE__);
+            if (!ok) {
+                mat_free(J);
+                mat_free(dXb);
+                mat_free(dX);
+                mat_free(dAbi);
+                mat_free(dAi);
+                dv_free(ddet);
+                dv_free(dtr);
+                mat_free(dA);
+                mat_free(ExpectedJ);
+                mat_free(Expected21);
+                mat_free(Expected2);
+                mat_free(B);
+                mat_free(A);
+                dv_free(x);
+                return;
+            }
+        }
+        if (dXb) {
+            bool ok = test_assert_matrix_d_close(dXb, Expected21, 1e-12,
+                                                 __FILE__, __LINE__);
+            if (!ok) {
+                mat_free(J);
+                mat_free(dXb);
+                mat_free(dX);
+                mat_free(dAbi);
+                mat_free(dAi);
+                dv_free(ddet);
+                dv_free(dtr);
+                mat_free(dA);
+                mat_free(ExpectedJ);
+                mat_free(Expected21);
+                mat_free(Expected2);
+                mat_free(B);
+                mat_free(A);
+                dv_free(x);
+                return;
+            }
+        }
         if (J) {
             dval_t *v = NULL;
             for (size_t i = 0; i < 4; ++i) {
@@ -4303,8 +4488,19 @@ static void test_inverse_qcomplex(void)
         matrix_t *I = test_mat_identity_d(2);
 
         check_bool("complex identity expected non-null", I != NULL);
-        if (I)
-            check_mat_complex("A * A^{-1} = I (complex number)", P, I, 1e-12);
+        if (I) {
+            bool ok = test_assert_matrix_complex_close(P, I, 1e-12,
+                                                       __FILE__, __LINE__);
+            if (!ok) {
+                mat_free(I);
+                for (size_t k = 0; k < 4; ++k)
+                    num_destroy(&A_vals[k]);
+                mat_free(A);
+                mat_free(Ai);
+                mat_free(P);
+                return;
+            }
+        }
         mat_free(I);
     }
 
@@ -5202,8 +5398,17 @@ static void test_solve_and_lstsq(void)
 
         matrix_t *X = mat_solve(A, B);
         check_bool("mat_solve(double) not NULL", X != NULL);
-        if (X)
-            check_mat_d("solve(A,B)=X", X, X_expected, 1e-12);
+        if (X) {
+            bool ok = test_assert_matrix_d_close(X, X_expected, 1e-12,
+                                                 __FILE__, __LINE__);
+            if (!ok) {
+                mat_free(A);
+                mat_free(B);
+                mat_free(X_expected);
+                mat_free(X);
+                return;
+            }
+        }
 
         mat_free(A);
         mat_free(B);
@@ -5227,8 +5432,17 @@ static void test_solve_and_lstsq(void)
 
         matrix_t *X = mat_solve(L, B);
         check_bool("mat_solve(lower triangular) not NULL", X != NULL);
-        if (X)
-            check_mat_d("solve(L,B)=X", X, X_expected, 1e-12);
+        if (X) {
+            bool ok = test_assert_matrix_d_close(X, X_expected, 1e-12,
+                                                 __FILE__, __LINE__);
+            if (!ok) {
+                mat_free(L);
+                mat_free(B);
+                mat_free(X_expected);
+                mat_free(X);
+                return;
+            }
+        }
 
         mat_free(L);
         mat_free(B);
@@ -5252,8 +5466,17 @@ static void test_solve_and_lstsq(void)
 
         matrix_t *X = mat_solve(U, B);
         check_bool("mat_solve(upper triangular) not NULL", X != NULL);
-        if (X)
-            check_mat_d("solve(U,B)=X", X, X_expected, 1e-12);
+        if (X) {
+            bool ok = test_assert_matrix_d_close(X, X_expected, 1e-12,
+                                                 __FILE__, __LINE__);
+            if (!ok) {
+                mat_free(U);
+                mat_free(B);
+                mat_free(X_expected);
+                mat_free(X);
+                return;
+            }
+        }
 
         mat_free(U);
         mat_free(B);
@@ -5289,8 +5512,17 @@ static void test_solve_and_lstsq(void)
 
         matrix_t *X = mat_solve(L, B);
         check_bool("mat_solve(sparse lower triangular) not NULL", X != NULL);
-        if (X)
-            check_mat_d("solve(sparse L,B)=X", X, X_expected, 1e-12);
+        if (X) {
+            bool ok = test_assert_matrix_d_close(X, X_expected, 1e-12,
+                                                 __FILE__, __LINE__);
+            if (!ok) {
+                mat_free(L);
+                mat_free(B);
+                mat_free(X_expected);
+                mat_free(X);
+                return;
+            }
+        }
 
         mat_free(L);
         mat_free(B);
@@ -5328,7 +5560,17 @@ static void test_solve_and_lstsq(void)
         check_bool("mat_solve(diagonal,sparse RHS) not NULL", X != NULL);
         if (X) {
             check_bool("diagonal solve preserves sparse layout of RHS", mat_is_sparse(X));
-            check_mat_d("solve(D,B)=X with sparse RHS", X, X_expected, 1e-12);
+            {
+                bool ok = test_assert_matrix_d_close(X, X_expected, 1e-12,
+                                                     __FILE__, __LINE__);
+                if (!ok) {
+                    mat_free(D);
+                    mat_free(B);
+                    mat_free(X_expected);
+                    mat_free(X);
+                    return;
+                }
+            }
         }
 
         mat_free(D);
@@ -5364,8 +5606,17 @@ static void test_solve_and_lstsq(void)
 
         matrix_t *X = mat_solve(A, B);
         check_bool("mat_solve(general sparse) not NULL", X != NULL);
-        if (X)
-            check_mat_d("solve(sparse A,B)=X", X, X_expected, 1e-12);
+        if (X) {
+            bool ok = test_assert_matrix_d_close(X, X_expected, 1e-12,
+                                                 __FILE__, __LINE__);
+            if (!ok) {
+                mat_free(A);
+                mat_free(B);
+                mat_free(X_expected);
+                mat_free(X);
+                return;
+            }
+        }
 
         mat_free(A);
         mat_free(B);
@@ -5399,8 +5650,17 @@ static void test_solve_and_lstsq(void)
 
         matrix_t *X = mat_solve(A, B);
         check_bool("mat_solve(general sparse with pivoting) not NULL", X != NULL);
-        if (X)
-            check_mat_d("solve(sparse pivoting A,B)=X", X, X_expected, 1e-12);
+        if (X) {
+            bool ok = test_assert_matrix_d_close(X, X_expected, 1e-12,
+                                                 __FILE__, __LINE__);
+            if (!ok) {
+                mat_free(A);
+                mat_free(B);
+                mat_free(X_expected);
+                mat_free(X);
+                return;
+            }
+        }
 
         mat_free(A);
         mat_free(B);
@@ -5439,8 +5699,19 @@ static void test_solve_and_lstsq(void)
             matrix_t *Xeq = test_mat_evaluate_complex(X_expected);
             check_bool("mat_least_squares(rank-deficient) -> MAT_TYPE_NUMBER",
                        mat_typeof(X) == MAT_TYPE_NUMBER);
-            if (Xq && Xeq)
-                check_mat_complex("rank-deficient lstsq(A,B)=X", Xq, Xeq, 1e-10);
+            if (Xq && Xeq) {
+                bool ok = test_assert_matrix_complex_close(Xq, Xeq, 1e-10,
+                                                           __FILE__, __LINE__);
+                if (!ok) {
+                    mat_free(Xq);
+                    mat_free(Xeq);
+                    mat_free(A);
+                    mat_free(B);
+                    mat_free(X_expected);
+                    mat_free(X);
+                    return;
+                }
+            }
             mat_free(Xq);
             mat_free(Xeq);
         }
@@ -5477,8 +5748,19 @@ static void test_solve_and_lstsq(void)
             matrix_t *Xeq = test_mat_evaluate_complex(X_expected);
             check_bool("mat_least_squares(underdetermined) -> MAT_TYPE_NUMBER",
                        mat_typeof(X) == MAT_TYPE_NUMBER);
-            if (Xq && Xeq)
-                check_mat_complex("underdetermined lstsq(A,B)=minimum-norm X", Xq, Xeq, 1e-10);
+            if (Xq && Xeq) {
+                bool ok = test_assert_matrix_complex_close(Xq, Xeq, 1e-10,
+                                                           __FILE__, __LINE__);
+                if (!ok) {
+                    mat_free(Xq);
+                    mat_free(Xeq);
+                    mat_free(A);
+                    mat_free(B);
+                    mat_free(X_expected);
+                    mat_free(X);
+                    return;
+                }
+            }
             mat_free(Xq);
             mat_free(Xeq);
         }
@@ -5517,8 +5799,19 @@ static void test_solve_and_lstsq(void)
             matrix_t *Xeq = test_mat_evaluate_complex(X_expected);
             check_bool("mat_least_squares(double) -> MAT_TYPE_NUMBER",
                        mat_typeof(X) == MAT_TYPE_NUMBER);
-            if (Xq && Xeq)
-                check_mat_complex("lstsq(A,B)=X", Xq, Xeq, 1e-12);
+            if (Xq && Xeq) {
+                bool ok = test_assert_matrix_complex_close(Xq, Xeq, 1e-12,
+                                                           __FILE__, __LINE__);
+                if (!ok) {
+                    mat_free(Xq);
+                    mat_free(Xeq);
+                    mat_free(A);
+                    mat_free(B);
+                    mat_free(X_expected);
+                    mat_free(X);
+                    return;
+                }
+            }
             mat_free(Xq);
             mat_free(Xeq);
         }
@@ -5671,8 +5964,21 @@ static void test_solve_and_lstsq(void)
 
         matrix_t *X = mat_solve(A, B);
         check_bool("mat_solve(complex number) not NULL", X != NULL);
-        if (X)
-            check_mat_complex("solve(A,B)=X (complex number)", X, X_expected, 1e-12);
+        if (X) {
+            bool ok = test_assert_matrix_complex_close(X, X_expected, 1e-12,
+                                                       __FILE__, __LINE__);
+            if (!ok) {
+                mat_free(A);
+                mat_free(B);
+                mat_free(X_expected);
+                mat_free(X);
+                for (size_t k = 0; k < 4; ++k)
+                    num_destroy(&A_vals[k]);
+                for (size_t k = 0; k < 2; ++k)
+                    num_destroy(&X_expected_vals[k]);
+                return;
+            }
+        }
 
         mat_free(A);
         mat_free(B);
@@ -5978,8 +6284,17 @@ static void test_factorisations(void)
             LU = mat_mul(lu.L, lu.U);
             check_bool("P*A not NULL", PA != NULL);
             check_bool("L*U not NULL", LU != NULL);
-            if (PA && LU)
-                check_mat_d("P*A = L*U", PA, LU, 1e-12);
+            if (PA && LU) {
+                bool ok = test_assert_matrix_d_close(PA, LU, 1e-12,
+                                                     __FILE__, __LINE__);
+                if (!ok) {
+                    mat_free(PA);
+                    mat_free(LU);
+                    mat_lu_factor_free(&lu);
+                    mat_free(A);
+                    return;
+                }
+            }
         }
 
         mat_free(PA);
@@ -6020,10 +6335,20 @@ static void test_factorisations(void)
             matrix_t *LU = mat_mul(lu.L, lu.U);
             check_bool("sparse P*A not NULL", PA != NULL);
             check_bool("sparse L*U not NULL", LU != NULL);
-            if (PA && LU)
-                check_mat_d("sparse P*A = L*U", PA, LU, 1e-12);
-            mat_free(PA);
-            mat_free(LU);
+            if (PA && LU) {
+                bool ok = test_assert_matrix_d_close(PA, LU, 1e-12,
+                                                     __FILE__, __LINE__);
+                mat_free(PA);
+                mat_free(LU);
+                if (!ok) {
+                    mat_lu_factor_free(&lu);
+                    mat_free(A);
+                    return;
+                }
+            } else {
+                mat_free(PA);
+                mat_free(LU);
+            }
         }
 
         mat_lu_factor_free(&lu);
@@ -6056,10 +6381,40 @@ static void test_factorisations(void)
             Iq = mat_create_identity_num(2);
             QtQq = QtQ ? test_mat_evaluate_complex(QtQ) : NULL;
             Iqq = Iq ? test_mat_evaluate_complex(Iq) : NULL;
-            if (QRq && Aqc)
-                check_mat_complex("Q*R = A", QRq, Aqc, 1e-12);
-            if (QtQq && Iqq)
-                check_mat_complex("Q^T Q = I", QtQq, Iqq, 1e-12);
+            if (QRq && Aqc) {
+                bool ok = test_assert_matrix_complex_close(QRq, Aqc, 1e-12,
+                                                           __FILE__, __LINE__);
+                if (!ok) {
+                    mat_free(QRq);
+                    mat_free(Aqc);
+                    mat_free(QtQq);
+                    mat_free(Iq);
+                    mat_free(Iqq);
+                    mat_free(QR);
+                    mat_free(QH);
+                    mat_free(QtQ);
+                    mat_qr_factor_free(&qr);
+                    mat_free(A);
+                    return;
+                }
+            }
+            if (QtQq && Iqq) {
+                bool ok = test_assert_matrix_complex_close(QtQq, Iqq, 1e-12,
+                                                           __FILE__, __LINE__);
+                if (!ok) {
+                    mat_free(QRq);
+                    mat_free(Aqc);
+                    mat_free(QtQq);
+                    mat_free(Iq);
+                    mat_free(Iqq);
+                    mat_free(QR);
+                    mat_free(QH);
+                    mat_free(QtQ);
+                    mat_qr_factor_free(&qr);
+                    mat_free(A);
+                    return;
+                }
+            }
             mat_free(QRq);
             mat_free(Aqc);
             mat_free(QtQq);
@@ -6097,8 +6452,18 @@ static void test_factorisations(void)
             check_bool("QR(number) Q*R not NULL", QR != NULL);
             QRq = QR ? test_mat_evaluate_complex(QR) : NULL;
             Aq = test_mat_evaluate_complex(A);
-            if (QRq && Aq)
-                check_mat_complex("QR(number): Q*R = A", QRq, Aq, 1e-12);
+            if (QRq && Aq) {
+                bool ok = test_assert_matrix_complex_close(QRq, Aq, 1e-12,
+                                                           __FILE__, __LINE__);
+                if (!ok) {
+                    mat_free(QRq);
+                    mat_free(Aq);
+                    mat_free(QR);
+                    mat_qr_factor_free(&qr);
+                    mat_free(A);
+                    return;
+                }
+            }
             mat_free(QRq);
             mat_free(Aq);
         }
@@ -6128,8 +6493,19 @@ static void test_factorisations(void)
             check_bool("L*L^T not NULL", LLH != NULL);
             LLHq = LLH ? test_mat_evaluate_complex(LLH) : NULL;
             Aqc = test_mat_evaluate_complex(A);
-            if (LLHq && Aqc)
-                check_mat_complex("L*L^T = A", LLHq, Aqc, 1e-12);
+            if (LLHq && Aqc) {
+                bool ok = test_assert_matrix_complex_close(LLHq, Aqc, 1e-12,
+                                                           __FILE__, __LINE__);
+                if (!ok) {
+                    mat_free(LLHq);
+                    mat_free(Aqc);
+                    mat_free(LH);
+                    mat_free(LLH);
+                    mat_cholesky_free(&chol);
+                    mat_free(A);
+                    return;
+                }
+            }
             mat_free(LLHq);
             mat_free(Aqc);
         }
@@ -6162,8 +6538,19 @@ static void test_factorisations(void)
             check_bool("Cholesky(number) L*L^H not NULL", LLH != NULL);
             LLHq = LLH ? test_mat_evaluate_complex(LLH) : NULL;
             Aq = test_mat_evaluate_complex(A);
-            if (LLHq && Aq)
-                check_mat_complex("Cholesky(number): L*L^H = A", LLHq, Aq, 1e-12);
+            if (LLHq && Aq) {
+                bool ok = test_assert_matrix_complex_close(LLHq, Aq, 1e-12,
+                                                           __FILE__, __LINE__);
+                if (!ok) {
+                    mat_free(LLHq);
+                    mat_free(Aq);
+                    mat_free(LH);
+                    mat_free(LLH);
+                    mat_cholesky_free(&chol);
+                    mat_free(A);
+                    return;
+                }
+            }
             mat_free(LLHq);
             mat_free(Aq);
         }
@@ -6206,8 +6593,19 @@ static void test_factorisations(void)
             check_bool("sparse L*L^T not NULL", LLH != NULL);
             LLHq = LLH ? test_mat_evaluate_complex(LLH) : NULL;
             Aqc = test_mat_evaluate_complex(A);
-            if (LLHq && Aqc)
-                check_mat_complex("sparse L*L^T = A", LLHq, Aqc, 1e-12);
+            if (LLHq && Aqc) {
+                bool ok = test_assert_matrix_complex_close(LLHq, Aqc, 1e-12,
+                                                           __FILE__, __LINE__);
+                if (!ok) {
+                    mat_free(LLHq);
+                    mat_free(Aqc);
+                    mat_free(LH);
+                    mat_free(LLH);
+                    mat_cholesky_free(&chol);
+                    mat_free(A);
+                    return;
+                }
+            }
             mat_free(LLHq);
             mat_free(Aqc);
         }
@@ -6245,10 +6643,20 @@ static void test_factorisations(void)
             matrix_t *LU = mat_mul(lu.L, lu.U);
             check_bool("sparse pivoting P*A not NULL", PA != NULL);
             check_bool("sparse pivoting L*U not NULL", LU != NULL);
-            if (PA && LU)
-                check_mat_d("sparse pivoting P*A = L*U", PA, LU, 1e-12);
-            mat_free(PA);
-            mat_free(LU);
+            if (PA && LU) {
+                bool ok = test_assert_matrix_d_close(PA, LU, 1e-12,
+                                                     __FILE__, __LINE__);
+                mat_free(PA);
+                mat_free(LU);
+                if (!ok) {
+                    mat_lu_factor_free(&lu);
+                    mat_free(A);
+                    return;
+                }
+            } else {
+                mat_free(PA);
+                mat_free(LU);
+            }
         }
 
         mat_lu_factor_free(&lu);
@@ -6275,8 +6683,19 @@ static void test_factorisations(void)
             LH = mat_hermitian(chol.L);
             LLH = LH ? mat_mul(chol.L, LH) : NULL;
             check_bool("complex number L*L* not NULL", LLH != NULL);
-            if (LLH)
-                check_mat_complex("L*L* = A (complex number)", LLH, A, 1e-12);
+            if (LLH) {
+                bool ok = test_assert_matrix_complex_close(LLH, A, 1e-12,
+                                                           __FILE__, __LINE__);
+                if (!ok) {
+                    mat_free(LH);
+                    mat_free(LLH);
+                    mat_cholesky_free(&chol);
+                    mat_free(A);
+                    for (size_t k = 0; k < 4; ++k)
+                        num_destroy(&A_vals[k]);
+                    return;
+                }
+            }
         }
 
         mat_free(LH);
@@ -6320,12 +6739,69 @@ static void test_factorisations(void)
             VHVq = VHV ? test_mat_evaluate_complex(VHV) : NULL;
             Iq = mat_create_identity_num(2);
             Iqq = Iq ? test_mat_evaluate_complex(Iq) : NULL;
-            if (USVHq && Aqc)
-                check_mat_complex("U*S*V^T = A", USVHq, Aqc, 1e-10);
-            if (UHUq && Iqq)
-                check_mat_complex("U^T U = I", UHUq, Iqq, 1e-10);
-            if (VHVq && Iqq)
-                check_mat_complex("V^T V = I", VHVq, Iqq, 1e-10);
+            if (USVHq && Aqc) {
+                bool ok = test_assert_matrix_complex_close(USVHq, Aqc, 1e-10,
+                                                           __FILE__, __LINE__);
+                if (!ok) {
+                    mat_free(USVHq);
+                    mat_free(Aqc);
+                    mat_free(UHUq);
+                    mat_free(VHVq);
+                    mat_free(Iq);
+                    mat_free(Iqq);
+                    mat_free(US);
+                    mat_free(VH);
+                    mat_free(USVH);
+                    mat_free(UH);
+                    mat_free(UHU);
+                    mat_free(VHV);
+                    mat_svd_factor_free(&svd);
+                    mat_free(A);
+                    return;
+                }
+            }
+            if (UHUq && Iqq) {
+                bool ok = test_assert_matrix_complex_close(UHUq, Iqq, 1e-10,
+                                                           __FILE__, __LINE__);
+                if (!ok) {
+                    mat_free(USVHq);
+                    mat_free(Aqc);
+                    mat_free(UHUq);
+                    mat_free(VHVq);
+                    mat_free(Iq);
+                    mat_free(Iqq);
+                    mat_free(US);
+                    mat_free(VH);
+                    mat_free(USVH);
+                    mat_free(UH);
+                    mat_free(UHU);
+                    mat_free(VHV);
+                    mat_svd_factor_free(&svd);
+                    mat_free(A);
+                    return;
+                }
+            }
+            if (VHVq && Iqq) {
+                bool ok = test_assert_matrix_complex_close(VHVq, Iqq, 1e-10,
+                                                           __FILE__, __LINE__);
+                if (!ok) {
+                    mat_free(USVHq);
+                    mat_free(Aqc);
+                    mat_free(UHUq);
+                    mat_free(VHVq);
+                    mat_free(Iq);
+                    mat_free(Iqq);
+                    mat_free(US);
+                    mat_free(VH);
+                    mat_free(USVH);
+                    mat_free(UH);
+                    mat_free(UHU);
+                    mat_free(VHV);
+                    mat_svd_factor_free(&svd);
+                    mat_free(A);
+                    return;
+                }
+            }
             mat_free(USVHq);
             mat_free(Aqc);
             mat_free(UHUq);
@@ -6370,8 +6846,20 @@ static void test_factorisations(void)
             check_bool("number U*S*V^H not NULL", USVH != NULL);
             USVHq = USVH ? test_mat_evaluate_complex(USVH) : NULL;
             Aq = test_mat_evaluate_complex(A);
-            if (USVHq && Aq)
-                check_mat_complex("number U*S*V^H = A", USVHq, Aq, 1e-24);
+            if (USVHq && Aq) {
+                bool ok = test_assert_matrix_complex_close(USVHq, Aq, 1e-24,
+                                                           __FILE__, __LINE__);
+                if (!ok) {
+                    mat_free(USVHq);
+                    mat_free(Aq);
+                    mat_free(US);
+                    mat_free(VH);
+                    mat_free(USVH);
+                    mat_svd_factor_free(&svd);
+                    mat_free(A);
+                    return;
+                }
+            }
             mat_free(USVHq);
             mat_free(Aq);
         }
@@ -6412,10 +6900,20 @@ static void test_factorisations(void)
                     num_create_from_double(1.0)
                 };
                 matrix_t *Aq = mat_create_num(2, 2, aq_vals);
-                check_mat_num_local("Q*T*Q^H = A", QTQH, Aq, 1e-14);
+                bool ok = test_assert_matrix_complex_close(QTQH, Aq, 1e-14,
+                                                           __FILE__, __LINE__);
                 for (size_t i = 0; i < 4; ++i)
                     num_destroy(&aq_vals[i]);
                 mat_free(Aq);
+                if (!ok) {
+                    mat_free(QT);
+                    mat_free(QH);
+                    mat_free(QTQH);
+                    mat_free(QHQ);
+                    mat_schur_factor_free(&schur);
+                    mat_free(A);
+                    return;
+                }
             }
             if (QHQ) {
                 number_t iq_vals[4] = {
@@ -6426,8 +6924,24 @@ static void test_factorisations(void)
                 matrix_t *QHQq = QHQ ? test_mat_evaluate_complex(QHQ) : NULL;
                 matrix_t *Iqq = Iq ? test_mat_evaluate_complex(Iq) : NULL;
                 check_bool("Q^H*Q qc view not NULL", QHQq != NULL && Iqq != NULL);
-                if (QHQq && Iqq)
-                    check_mat_complex("Q^H*Q = I", QHQq, Iqq, 1e-14);
+                if (QHQq && Iqq) {
+                    bool ok = test_assert_matrix_complex_close(QHQq, Iqq, 1e-14,
+                                                               __FILE__, __LINE__);
+                    if (!ok) {
+                        for (size_t i = 0; i < 4; ++i)
+                            num_destroy(&iq_vals[i]);
+                        mat_free(QHQq);
+                        mat_free(Iqq);
+                        mat_free(Iq);
+                        mat_free(QT);
+                        mat_free(QH);
+                        mat_free(QTQH);
+                        mat_free(QHQ);
+                        mat_schur_factor_free(&schur);
+                        mat_free(A);
+                        return;
+                    }
+                }
                 for (size_t i = 0; i < 4; ++i)
                     num_destroy(&iq_vals[i]);
                 mat_free(QHQq);
@@ -6512,8 +7026,27 @@ static void test_factorisations(void)
             QTQHq = QTQH ? test_mat_evaluate_complex(QTQH) : NULL;
             check_bool("high-precision Schur qc reconstruction not NULL",
                        Aq != NULL && QTQHq != NULL);
-            if (Aq && QTQHq)
-                check_mat_complex("high-precision Q*T*Q^H = A", QTQHq, Aq, 1e-27);
+            if (Aq && QTQHq) {
+                bool ok = test_assert_matrix_complex_close(QTQHq, Aq, 1e-27,
+                                                           __FILE__, __LINE__);
+                if (!ok) {
+                    for (size_t i = 0; i < 4; ++i)
+                        num_destroy(&iq_vals[i]);
+                    mat_free(Aq);
+                    mat_free(QTQHq);
+                    mat_free(QHQq);
+                    mat_free(Iq);
+                    mat_free(QT);
+                    mat_free(QH);
+                    mat_free(QTQH);
+                    mat_free(QHQ);
+                    mat_schur_factor_free(&schur);
+                    mat_free(A);
+                    for (size_t i = 0; i < 4; ++i)
+                        num_destroy(&A_vals[i]);
+                    return;
+                }
+            }
 
             Iq = mat_create_num(2, 2, iq_vals);
             QHQq = QHQ ? test_mat_evaluate_complex(QHQ) : NULL;
@@ -6522,8 +7055,28 @@ static void test_factorisations(void)
             if (Iq && QHQq) {
                 matrix_t *Iqq = test_mat_evaluate_complex(Iq);
                 check_bool("high-precision Schur qc identity view not NULL", Iqq != NULL);
-                if (Iqq)
-                    check_mat_complex("high-precision Q^H*Q = I", QHQq, Iqq, 1e-27);
+                if (Iqq) {
+                    bool ok = test_assert_matrix_complex_close(QHQq, Iqq, 1e-27,
+                                                               __FILE__, __LINE__);
+                    if (!ok) {
+                        mat_free(Iqq);
+                        for (size_t i = 0; i < 4; ++i)
+                            num_destroy(&iq_vals[i]);
+                        mat_free(Aq);
+                        mat_free(QTQHq);
+                        mat_free(QHQq);
+                        mat_free(Iq);
+                        mat_free(QT);
+                        mat_free(QH);
+                        mat_free(QTQH);
+                        mat_free(QHQ);
+                        mat_schur_factor_free(&schur);
+                        mat_free(A);
+                        for (size_t i = 0; i < 4; ++i)
+                            num_destroy(&A_vals[i]);
+                        return;
+                    }
+                }
                 mat_free(Iqq);
             }
 
@@ -6589,8 +7142,15 @@ static void test_rank_pinv_nullspace(void)
             if (AN) {
                 number_t zero_data[3] = { NUM_ZERO, NUM_ZERO, NUM_ZERO };
                 matrix_t *Z = mat_create_num(3, 1, zero_data);
-                check_mat_num_local("A*nullspace(A)=0", AN, Z, 1e-10);
+                bool ok = test_assert_matrix_complex_close(AN, Z, 1e-10,
+                                                           __FILE__, __LINE__);
                 mat_free(Z);
+                if (!ok) {
+                    mat_free(AN);
+                    mat_free(N);
+                    mat_free(A);
+                    return;
+                }
             }
         }
 
@@ -6634,8 +7194,27 @@ static void test_rank_pinv_nullspace(void)
             print_mnum("pinv(A)", A_pinv);
             check_bool("mat_pseudoinverse(A) -> MAT_TYPE_NUMBER",
                        mat_typeof(A_pinv) == MAT_TYPE_NUMBER);
-            if (Apq && Apeq)
-                check_mat_complex("pinv(A)=expected", Apq, Apeq, 1e-10);
+            if (Apq && Apeq) {
+                bool ok = test_assert_matrix_complex_close(Apq, Apeq, 1e-10,
+                                                           __FILE__, __LINE__);
+                if (!ok) {
+                    mat_free(Apq);
+                    mat_free(Apeq);
+                    mat_free(AApAq);
+                    mat_free(Aq);
+                    mat_free(ApAApq);
+                    mat_free(AN);
+                    mat_free(N);
+                    mat_free(AAp);
+                    mat_free(AApA);
+                    mat_free(ApA);
+                    mat_free(ApAAp);
+                    mat_free(A_pinv);
+                    mat_free(A_pinv_expected);
+                    mat_free(A);
+                    return;
+                }
+            }
 
             AAp = mat_mul(A, A_pinv);
             AApA = AAp ? mat_mul(AAp, A) : NULL;
@@ -6645,10 +7224,48 @@ static void test_rank_pinv_nullspace(void)
             check_bool("A+*A*A+ not NULL", ApAAp != NULL);
             AApAq = AApA ? test_mat_evaluate_complex(AApA) : NULL;
             ApAApq = ApAAp ? test_mat_evaluate_complex(ApAAp) : NULL;
-            if (AApAq && Aq)
-                check_mat_complex("A*A+*A=A", AApAq, Aq, 1e-10);
-            if (ApAApq && Apq)
-                check_mat_complex("A+*A*A+=A+", ApAApq, Apq, 1e-10);
+            if (AApAq && Aq) {
+                bool ok = test_assert_matrix_complex_close(AApAq, Aq, 1e-10,
+                                                           __FILE__, __LINE__);
+                if (!ok) {
+                    mat_free(Apq);
+                    mat_free(Apeq);
+                    mat_free(AApAq);
+                    mat_free(Aq);
+                    mat_free(ApAApq);
+                    mat_free(AN);
+                    mat_free(N);
+                    mat_free(AAp);
+                    mat_free(AApA);
+                    mat_free(ApA);
+                    mat_free(ApAAp);
+                    mat_free(A_pinv);
+                    mat_free(A_pinv_expected);
+                    mat_free(A);
+                    return;
+                }
+            }
+            if (ApAApq && Apq) {
+                bool ok = test_assert_matrix_complex_close(ApAApq, Apq, 1e-10,
+                                                           __FILE__, __LINE__);
+                if (!ok) {
+                    mat_free(Apq);
+                    mat_free(Apeq);
+                    mat_free(AApAq);
+                    mat_free(Aq);
+                    mat_free(ApAApq);
+                    mat_free(AN);
+                    mat_free(N);
+                    mat_free(AAp);
+                    mat_free(AApA);
+                    mat_free(ApA);
+                    mat_free(ApAAp);
+                    mat_free(A_pinv);
+                    mat_free(A_pinv_expected);
+                    mat_free(A);
+                    return;
+                }
+            }
             mat_free(Apq);
             mat_free(Apeq);
             mat_free(AApAq);
@@ -6672,8 +7289,25 @@ static void test_rank_pinv_nullspace(void)
                 matrix_t *Z = mat_create_num(2, 2, zero_data);
                 ANq = test_mat_evaluate_complex(AN);
                 Zq = Z ? test_mat_evaluate_complex(Z) : NULL;
-                if (ANq && Zq)
-                    check_mat_complex("A*nullspace(A)=0 (wide)", ANq, Zq, 1e-10);
+                if (ANq && Zq) {
+                    bool ok = test_assert_matrix_complex_close(ANq, Zq, 1e-10,
+                                                               __FILE__, __LINE__);
+                    if (!ok) {
+                        mat_free(ANq);
+                        mat_free(Zq);
+                        mat_free(Z);
+                        mat_free(AN);
+                        mat_free(N);
+                        mat_free(AAp);
+                        mat_free(AApA);
+                        mat_free(ApA);
+                        mat_free(ApAAp);
+                        mat_free(A_pinv);
+                        mat_free(A_pinv_expected);
+                        mat_free(A);
+                        return;
+                    }
+                }
                 mat_free(ANq);
                 mat_free(Zq);
                 mat_free(Z);
@@ -7085,80 +7719,80 @@ static void test_hermitian_op(void)
 
 void run_matrix_core_tests(void)
 {
-    RUN_TEST_CASE(test_creation);
-    RUN_TEST_CASE(test_reading);
-    RUN_TEST_CASE(test_writing);
-    RUN_TEST_CASE(test_number_creation_and_readback);
-    RUN_TEST_CASE(test_number_special_constructors);
-    RUN_TEST_CASE(test_number_matrix_arithmetic);
-    RUN_TEST_CASE(test_number_det_and_inverse);
-    RUN_TEST_CASE(test_mixed_number_backend_matrices);
-    RUN_TEST_CASE(test_dval_multiply);
-    RUN_TEST_CASE(test_dval_symbolic_printing);
-    RUN_TEST_CASE(test_add_sub);
-    RUN_TEST_CASE(test_multiply);
-    RUN_TEST_CASE(test_transpose_conjugate);
-    RUN_TEST_CASE(test_identity_get);
-    RUN_TEST_CASE(test_identity_set);
-    RUN_TEST_CASE(test_dval_storage_lifecycle_regressions);
-    RUN_TEST_CASE(test_owned_element_reads_and_transforms);
-    RUN_TEST_CASE(test_sparse_support);
-    RUN_TEST_CASE(test_structural_queries_and_diagonal_construction);
-    RUN_TEST_CASE(test_layout_policy_regressions);
-    RUN_TEST_CASE(test_add_sub_num_real);
-    RUN_TEST_CASE(test_add_sub_num_complex);
-    RUN_TEST_CASE(test_multiply_num_real);
-    RUN_TEST_CASE(test_multiply_num_complex);
-    RUN_TEST_CASE(test_add_mixed_num_real);
-    RUN_TEST_CASE(test_add_mixed_num_complex);
-    RUN_TEST_CASE(test_add_mixed_num_num_complex);
-    RUN_TEST_CASE(test_sub_mixed_num_real);
-    RUN_TEST_CASE(test_sub_mixed_num_complex);
-    RUN_TEST_CASE(test_sub_mixed_num_num_complex);
-    RUN_TEST_CASE(test_multiply_mixed_num_real);
-    RUN_TEST_CASE(test_multiply_mixed_num_complex);
-    RUN_TEST_CASE(test_multiply_mixed_num_num_complex);
-    RUN_TEST_CASE(test_scalar_mul_d_d);
-    RUN_TEST_CASE(test_scalar_mul_num_real);
-    RUN_TEST_CASE(test_scalar_mul_num_complex);
-    RUN_TEST_CASE(test_scalar_mul_decimal_num);
-    RUN_TEST_CASE(test_scalar_mul_complex_complex);
-    RUN_TEST_CASE(test_identity_arith_d);
-    RUN_TEST_CASE(test_identity_arith_num_real);
-    RUN_TEST_CASE(test_identity_arith_num_complex);
-    RUN_TEST_CASE(test_scalar_div_d_d);
-    RUN_TEST_CASE(test_scalar_div_num_real);
-    RUN_TEST_CASE(test_scalar_div_num_complex);
-    RUN_TEST_CASE(test_scalar_div_numeric_real);
-    RUN_TEST_CASE(test_scalar_div_real_numeric);
-    RUN_TEST_CASE(test_det_double);
-    RUN_TEST_CASE(test_det_qfloat);
-    RUN_TEST_CASE(test_det_qcomplex);
-    RUN_TEST_CASE(test_det_dval);
-    RUN_TEST_CASE(test_symbolic_linear_algebra_extensions);
-    RUN_TEST_CASE(test_trace);
-    RUN_TEST_CASE(test_deriv);
-    RUN_TEST_CASE(test_matrix_calculus);
-    RUN_TEST_CASE(test_deriv_solve);
-    RUN_TEST_CASE(test_deriv_block_solve);
-    RUN_TEST_CASE(test_jacobian);
-    RUN_TEST_CASE(test_schur_complement);
-    RUN_TEST_CASE(test_block_linear_algebra);
-    RUN_TEST_CASE(test_evaluate_bridge);
-    RUN_TEST_CASE(test_inverse_double);
-    RUN_TEST_CASE(test_inverse_qfloat);
-    RUN_TEST_CASE(test_inverse_qcomplex);
-    RUN_TEST_CASE(test_inverse_dval_2x2);
-    RUN_TEST_CASE(test_inverse_dval_rotation);
-    RUN_TEST_CASE(test_inverse_dval_upper_triangular);
-    RUN_TEST_CASE(test_inverse_dval_lower_triangular);
-    RUN_TEST_CASE(test_inverse_dval_dense_3x3);
-    RUN_TEST_CASE(test_inverse_dval_dense_4x4);
-    RUN_TEST_CASE(test_inverse_dval_dense_6x6);
-    RUN_TEST_CASE(test_inverse_dval_singular);
-    RUN_TEST_CASE(test_solve_and_lstsq);
-    RUN_TEST_CASE(test_factorisations);
-    RUN_TEST_CASE(test_rank_pinv_nullspace);
-    RUN_TEST_CASE(test_norms_and_condition);
-    RUN_TEST_CASE(test_hermitian_op);
+    TEST_RUN_CASE(test_creation, NULL);
+    TEST_RUN_CASE(test_reading, NULL);
+    TEST_RUN_CASE(test_writing, NULL);
+    TEST_RUN_CASE(test_number_creation_and_readback, NULL);
+    TEST_RUN_CASE(test_number_special_constructors, NULL);
+    TEST_RUN_CASE(test_number_matrix_arithmetic, NULL);
+    TEST_RUN_CASE(test_number_det_and_inverse, NULL);
+    TEST_RUN_CASE(test_mixed_number_backend_matrices, NULL);
+    TEST_RUN_CASE(test_dval_multiply, NULL);
+    TEST_RUN_CASE(test_dval_symbolic_printing, NULL);
+    TEST_RUN_CASE(test_add_sub, NULL);
+    TEST_RUN_CASE(test_multiply, NULL);
+    TEST_RUN_CASE(test_transpose_conjugate, NULL);
+    TEST_RUN_CASE(test_identity_get, NULL);
+    TEST_RUN_CASE(test_identity_set, NULL);
+    TEST_RUN_CASE(test_dval_storage_lifecycle_regressions, NULL);
+    TEST_RUN_CASE(test_owned_element_reads_and_transforms, NULL);
+    TEST_RUN_CASE(test_sparse_support, NULL);
+    TEST_RUN_CASE(test_structural_queries_and_diagonal_construction, NULL);
+    TEST_RUN_CASE(test_layout_policy_regressions, NULL);
+    TEST_RUN_CASE(test_add_sub_num_real, NULL);
+    TEST_RUN_CASE(test_add_sub_num_complex, NULL);
+    TEST_RUN_CASE(test_multiply_num_real, NULL);
+    TEST_RUN_CASE(test_multiply_num_complex, NULL);
+    TEST_RUN_CASE(test_add_mixed_num_real, NULL);
+    TEST_RUN_CASE(test_add_mixed_num_complex, NULL);
+    TEST_RUN_CASE(test_add_mixed_num_num_complex, NULL);
+    TEST_RUN_CASE(test_sub_mixed_num_real, NULL);
+    TEST_RUN_CASE(test_sub_mixed_num_complex, NULL);
+    TEST_RUN_CASE(test_sub_mixed_num_num_complex, NULL);
+    TEST_RUN_CASE(test_multiply_mixed_num_real, NULL);
+    TEST_RUN_CASE(test_multiply_mixed_num_complex, NULL);
+    TEST_RUN_CASE(test_multiply_mixed_num_num_complex, NULL);
+    TEST_RUN_CASE(test_scalar_mul_d_d, NULL);
+    TEST_RUN_CASE(test_scalar_mul_num_real, NULL);
+    TEST_RUN_CASE(test_scalar_mul_num_complex, NULL);
+    TEST_RUN_CASE(test_scalar_mul_decimal_num, NULL);
+    TEST_RUN_CASE(test_scalar_mul_complex_complex, NULL);
+    TEST_RUN_CASE(test_identity_arith_d, NULL);
+    TEST_RUN_CASE(test_identity_arith_num_real, NULL);
+    TEST_RUN_CASE(test_identity_arith_num_complex, NULL);
+    TEST_RUN_CASE(test_scalar_div_d_d, NULL);
+    TEST_RUN_CASE(test_scalar_div_num_real, NULL);
+    TEST_RUN_CASE(test_scalar_div_num_complex, NULL);
+    TEST_RUN_CASE(test_scalar_div_numeric_real, NULL);
+    TEST_RUN_CASE(test_scalar_div_real_numeric, NULL);
+    TEST_RUN_CASE(test_det_double, NULL);
+    TEST_RUN_CASE(test_det_qfloat, NULL);
+    TEST_RUN_CASE(test_det_qcomplex, NULL);
+    TEST_RUN_CASE(test_det_dval, NULL);
+    TEST_RUN_CASE(test_symbolic_linear_algebra_extensions, NULL);
+    TEST_RUN_CASE(test_trace, NULL);
+    TEST_RUN_CASE(test_deriv, NULL);
+    TEST_RUN_CASE(test_matrix_calculus, NULL);
+    TEST_RUN_CASE(test_deriv_solve, NULL);
+    TEST_RUN_CASE(test_deriv_block_solve, NULL);
+    TEST_RUN_CASE(test_jacobian, NULL);
+    TEST_RUN_CASE(test_schur_complement, NULL);
+    TEST_RUN_CASE(test_block_linear_algebra, NULL);
+    TEST_RUN_CASE(test_evaluate_bridge, NULL);
+    TEST_RUN_CASE(test_inverse_double, NULL);
+    TEST_RUN_CASE(test_inverse_qfloat, NULL);
+    TEST_RUN_CASE(test_inverse_qcomplex, NULL);
+    TEST_RUN_CASE(test_inverse_dval_2x2, NULL);
+    TEST_RUN_CASE(test_inverse_dval_rotation, NULL);
+    TEST_RUN_CASE(test_inverse_dval_upper_triangular, NULL);
+    TEST_RUN_CASE(test_inverse_dval_lower_triangular, NULL);
+    TEST_RUN_CASE(test_inverse_dval_dense_3x3, NULL);
+    TEST_RUN_CASE(test_inverse_dval_dense_4x4, NULL);
+    TEST_RUN_CASE(test_inverse_dval_dense_6x6, NULL);
+    TEST_RUN_CASE(test_inverse_dval_singular, NULL);
+    TEST_RUN_CASE(test_solve_and_lstsq, NULL);
+    TEST_RUN_CASE(test_factorisations, NULL);
+    TEST_RUN_CASE(test_rank_pinv_nullspace, NULL);
+    TEST_RUN_CASE(test_norms_and_condition, NULL);
+    TEST_RUN_CASE(test_hermitian_op, NULL);
 }

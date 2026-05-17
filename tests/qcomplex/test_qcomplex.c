@@ -5,9 +5,42 @@
 #include "qcomplex.h"
 #include "qfloat.h"
 
-#define TEST_CONFIG_MODE TEST_CONFIG_GLOBAL
-#define TEST_CONFIG_MAIN
 #include "test_harness.h"
+
+TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
+static int qcomplex_validity_equal(const void *actual, const void *expected, void *ctx);
+static int qfloat_validity_equal(const void *actual, const void *expected, void *ctx);
+static void qcomplex_validity_format(const void *value, char *buf, size_t buf_size, void *ctx);
+static void qfloat_validity_format(const void *value, char *buf, size_t buf_size, void *ctx);
+static bool test_qcomplex_suite_setup(void);
+static bool test_assert_qcomplex_close_tol(const char *label,
+                                           qcomplex_t actual,
+                                           qcomplex_t expected,
+                                           double tol,
+                                           int relative_mode,
+                                           const char *file,
+                                           int line);
+static bool test_assert_qfloat_close_tol(const char *label,
+                                         qfloat_t actual,
+                                         qfloat_t expected,
+                                         double tol,
+                                         const char *file,
+                                         int line);
+
+static const double qcomplex_default_tol = 1e-28;
+static const double qfloat_default_tol = 1e-28;
+static const test_validity_contract_t qcomplex_default_contract =
+    TEST_VALIDITY_CONTRACT("qcomplex-close",
+                           qcomplex_validity_equal,
+                           qcomplex_validity_format,
+                           (void *)&qcomplex_default_tol);
+static const test_validity_contract_t qfloat_default_contract =
+    TEST_VALIDITY_CONTRACT("qcomplex-qfloat-close",
+                           qfloat_validity_equal,
+                           qfloat_validity_format,
+                           (void *)&qfloat_default_tol);
+
+TEST_SUITE_SETUP(test_qcomplex_suite_setup);
 
 /* ------------------------------------------------------------------ helpers */
 
@@ -19,48 +52,144 @@ static void print_qc(const char *label, qcomplex_t z)
     fflush(stdout);
 }
 
-static void check_qc(const char *label, qcomplex_t got, qcomplex_t expected, double tol)
+static int qcomplex_validity_equal(const void *actual, const void *expected, void *ctx)
 {
-    double err = qf_to_double(qc_abs(qc_sub(got, expected)));
-    int ok = err < tol;
-    if (!ok) tests_failed++;
-    printf(ok ? C_GREEN "  OK: %s\n" C_RESET : C_RED "  FAIL: %s\n" C_RESET, label);
-    print_qc("got     ", got);
-    print_qc("expected", expected);
-    printf("    error    = %g\n", err);
+    const qcomplex_t *got = (const qcomplex_t *)actual;
+    const qcomplex_t *want = (const qcomplex_t *)expected;
+    const double *ctx_values = (const double *)ctx;
+    const double tol = ctx_values ? ctx_values[0] : 1e-28;
+    const int relative_mode = ctx_values ? ((int)ctx_values[1] != 0) : 0;
+
+    if (qc_eq(*got, *want))
+        return 1;
+
+    if (relative_mode) {
+        qcomplex_t one = qc_make(qf_from_double(1.0), qf_from_double(0.0));
+        return qf_to_double(qc_abs(qc_sub(qc_div(*got, *want), one))) < tol;
+    }
+
+    return qf_to_double(qc_abs(qc_sub(*got, *want))) < tol;
 }
 
-static void check_qc_rel(const char *label, qcomplex_t got, qcomplex_t expected, double rel)
+static int qfloat_validity_equal(const void *actual, const void *expected, void *ctx)
 {
-    qcomplex_t one = qc_make(qf_from_double(1.0), qf_from_double(0.0));
-    double err = qf_to_double(qc_abs(qc_sub(qc_div(got, expected), one)));
-    int ok = err < rel;
-    if (!ok) tests_failed++;
-    printf(ok ? C_GREEN "  OK: %s\n" C_RESET : C_RED "  FAIL: %s\n" C_RESET, label);
-    print_qc("got     ", got);
-    print_qc("expected", expected);
-    printf("    rel-err  = %g\n", err);
+    const qfloat_t *got = (const qfloat_t *)actual;
+    const qfloat_t *want = (const qfloat_t *)expected;
+    const double tol = ctx ? *(const double *)ctx : 1e-28;
+
+    return qf_eq(*got, *want) || qf_to_double(qf_abs(qf_sub(*got, *want))) < tol;
 }
 
-static void check_qf(const char *label, qfloat_t got, qfloat_t expected, double tol)
+static void qcomplex_validity_format(const void *value, char *buf, size_t buf_size, void *ctx)
 {
-    double err = qf_abs(qf_sub(got, expected)).hi;
-    int ok = err < tol;
-    char gs[128], es[128];
-    qf_to_string(got, gs, sizeof(gs));
-    qf_to_string(expected, es, sizeof(es));
-    if (!ok) tests_failed++;
-    printf(ok ? C_GREEN "  OK: %s\n" C_RESET : C_RED "  FAIL: %s\n" C_RESET, label);
-    printf("    got      = %s\n", gs);
-    printf("    expected = %s\n", es);
-    printf("    error    = %g\n", err);
+    (void)ctx;
+    qc_to_string(*(const qcomplex_t *)value, buf, buf_size);
+}
+
+static void qfloat_validity_format(const void *value, char *buf, size_t buf_size, void *ctx)
+{
+    (void)ctx;
+    qf_to_string(*(const qfloat_t *)value, buf, buf_size);
+}
+
+static bool test_qcomplex_suite_setup(void)
+{
+    test_register_validity_checker("qcomplex-close", &qcomplex_default_contract);
+    test_register_validity_checker("qcomplex-qfloat-close", &qfloat_default_contract);
+    return TEST_REQUIRE_VALIDITY_CHECKER("qcomplex-close")
+        && TEST_REQUIRE_VALIDITY_CHECKER("qcomplex-qfloat-close");
+}
+
+static bool test_assert_qcomplex_close_tol(const char *label,
+                                           qcomplex_t actual,
+                                           qcomplex_t expected,
+                                           double tol,
+                                           int relative_mode,
+                                           const char *file,
+                                           int line)
+{
+    const double ctx_values[2] = { tol, (double)relative_mode };
+    const test_validity_contract_t contract =
+        TEST_VALIDITY_CONTRACT(relative_mode ? "qcomplex-rel-close" : "qcomplex-close",
+                               qcomplex_validity_equal,
+                               qcomplex_validity_format,
+                               (void *)ctx_values);
+
+    if (test_assert_validity(&contract, &actual, &expected, file, line))
+        return true;
+
+    if (label)
+        printf("    check    = %s\n", label);
+    return false;
+}
+
+static bool test_assert_qfloat_close_tol(const char *label,
+                                         qfloat_t actual,
+                                         qfloat_t expected,
+                                         double tol,
+                                         const char *file,
+                                         int line)
+{
+    const test_validity_contract_t contract =
+        TEST_VALIDITY_CONTRACT("qcomplex-qfloat-close",
+                               qfloat_validity_equal,
+                               qfloat_validity_format,
+                               &tol);
+
+    if (test_assert_validity(&contract, &actual, &expected, file, line))
+        return true;
+
+    if (label)
+        printf("    check    = %s\n", label);
+    return false;
 }
 
 static void check_bool(const char *label, int cond)
 {
-    if (!cond) tests_failed++;
+    if (!cond) test_mark_failure(__FILE__, __LINE__, label);
     printf(cond ? C_GREEN "  OK: %s\n" C_RESET : C_RED "  FAIL: %s\n" C_RESET, label);
 }
+
+#define check_qc(label, got_value, expected_value, tol_value) \
+    do { \
+        qcomplex_t test_qc_got__ = (got_value); \
+        qcomplex_t test_qc_expected__ = (expected_value); \
+        if (!test_assert_qcomplex_close_tol((label), \
+                                            test_qc_got__, \
+                                            test_qc_expected__, \
+                                            (tol_value), \
+                                            0, \
+                                            __FILE__, \
+                                            __LINE__)) \
+            return; \
+    } while (0)
+
+#define check_qc_rel(label, got_value, expected_value, tol_value) \
+    do { \
+        qcomplex_t test_qc_got__ = (got_value); \
+        qcomplex_t test_qc_expected__ = (expected_value); \
+        if (!test_assert_qcomplex_close_tol((label), \
+                                            test_qc_got__, \
+                                            test_qc_expected__, \
+                                            (tol_value), \
+                                            1, \
+                                            __FILE__, \
+                                            __LINE__)) \
+            return; \
+    } while (0)
+
+#define check_qf(label, got_value, expected_value, tol_value) \
+    do { \
+        qfloat_t test_qf_got__ = (got_value); \
+        qfloat_t test_qf_expected__ = (expected_value); \
+        if (!test_assert_qfloat_close_tol((label), \
+                                          test_qf_got__, \
+                                          test_qf_expected__, \
+                                          (tol_value), \
+                                          __FILE__, \
+                                          __LINE__)) \
+            return; \
+    } while (0)
 
 static qcomplex_t qcr(double x)
 {
@@ -201,7 +330,7 @@ static void test_exp(void)
     }
 }
 
-static void test_euler_identity(void)
+static void example_euler_identity(void)
 {
     printf(C_CYAN "TEST: README example — Euler's identity\n" C_RESET);
 
@@ -915,7 +1044,7 @@ static void test_polar(void)
 static void check_str(const char *label, const char *got, const char *expected)
 {
     int ok = (strcmp(got, expected) == 0);
-    if (!ok) tests_failed++;
+    if (!ok) test_mark_failure(__FILE__, __LINE__, label);
     if (ok)
         printf(C_GREEN "  OK: %s\n" C_RESET, label);
     else
@@ -1003,47 +1132,47 @@ static void test_printf(void)
 
 static void test_arithmetic_group(void)
 {
-    RUN_SUBTEST(test_add_sub);
-    RUN_SUBTEST(test_mul_div);
-    RUN_SUBTEST(test_conj);
-    RUN_SUBTEST(test_abs_arg);
-    RUN_SUBTEST(test_polar);
+    TEST_RUN_SUBTEST(test_add_sub, NULL);
+    TEST_RUN_SUBTEST(test_mul_div, NULL);
+    TEST_RUN_SUBTEST(test_conj, NULL);
+    TEST_RUN_SUBTEST(test_abs_arg, NULL);
+    TEST_RUN_SUBTEST(test_polar, NULL);
 }
 
 static void test_elementary_group(void)
 {
-    RUN_SUBTEST(test_exp);
-    RUN_SUBTEST(test_log);
-    RUN_SUBTEST(test_pow_sqrt);
+    TEST_RUN_SUBTEST(test_exp, NULL);
+    TEST_RUN_SUBTEST(test_log, NULL);
+    TEST_RUN_SUBTEST(test_pow_sqrt, NULL);
 }
 
 static void test_trig_group(void)
 {
-    RUN_SUBTEST(test_trig);
-    RUN_SUBTEST(test_hyperbolic);
+    TEST_RUN_SUBTEST(test_trig, NULL);
+    TEST_RUN_SUBTEST(test_hyperbolic, NULL);
 }
 
 static void test_special_group(void)
 {
-    RUN_SUBTEST(test_erf);
-    RUN_SUBTEST(test_erfinv);
-    RUN_SUBTEST(test_gamma);
-    RUN_SUBTEST(test_digamma);
-    RUN_SUBTEST(test_gammainv);
-    RUN_SUBTEST(test_beta);
-    RUN_SUBTEST(test_normal);
-    RUN_SUBTEST(test_productlog);
-    RUN_SUBTEST(test_lambert_wm1);
-    RUN_SUBTEST(test_gammainc);
-    RUN_SUBTEST(test_ei_e1);
-    RUN_SUBTEST(test_difficult_cases);
+    TEST_RUN_SUBTEST(test_erf, NULL);
+    TEST_RUN_SUBTEST(test_erfinv, NULL);
+    TEST_RUN_SUBTEST(test_gamma, NULL);
+    TEST_RUN_SUBTEST(test_digamma, NULL);
+    TEST_RUN_SUBTEST(test_gammainv, NULL);
+    TEST_RUN_SUBTEST(test_beta, NULL);
+    TEST_RUN_SUBTEST(test_normal, NULL);
+    TEST_RUN_SUBTEST(test_productlog, NULL);
+    TEST_RUN_SUBTEST(test_lambert_wm1, NULL);
+    TEST_RUN_SUBTEST(test_gammainc, NULL);
+    TEST_RUN_SUBTEST(test_ei_e1, NULL);
+    TEST_RUN_SUBTEST(test_difficult_cases, NULL);
 }
 
 static void test_util_group(void)
 {
-    RUN_SUBTEST(test_utility);
-    RUN_SUBTEST(test_comparison);
-    RUN_SUBTEST(test_printf);
+    TEST_RUN_SUBTEST(test_utility, NULL);
+    TEST_RUN_SUBTEST(test_comparison, NULL);
+    TEST_RUN_SUBTEST(test_printf, NULL);
 }
 
 /* ====================================================================
@@ -1199,7 +1328,7 @@ static void test_from_string(void)
         /* Failure cases: expect NaN */
         if (expect_nan) {
             int ok = qc_isnan(z);
-            if (!ok) tests_failed++;
+            if (!ok) test_mark_failure(file, line, desc);
 
             printf(ok ? C_GREEN "  OK\n" C_RESET
                       : C_RED   "  FAIL\n" C_RESET);
@@ -1242,7 +1371,7 @@ static void test_from_string(void)
         double err = qf_to_double(qc_abs(diff));
 
         int ok = err < tol;
-        if (!ok) tests_failed++;
+        if (!ok) test_mark_failure(file, line, desc);
 
         printf(ok ? C_GREEN "  OK\n" C_RESET
                   : C_RED   "  FAIL\n" C_RESET);
@@ -1259,13 +1388,13 @@ static void test_from_string(void)
 
 int tests_main(void)
 {
-    RUN_TEST_CASE(test_arithmetic_group);
-    RUN_TEST_CASE(test_elementary_group);
-    RUN_TEST_CASE(test_trig_group);
-    RUN_TEST_CASE(test_special_group);
-    RUN_TEST_CASE(test_util_group);
-    RUN_TEST_CASE(test_from_string);
-    RUN_TEST_CASE(test_euler_identity);
+    TEST_RUN_CASE(test_arithmetic_group, NULL);
+    TEST_RUN_CASE(test_elementary_group, NULL);
+    TEST_RUN_CASE(test_trig_group, NULL);
+    TEST_RUN_CASE(test_special_group, NULL);
+    TEST_RUN_CASE(test_util_group, NULL);
+    TEST_RUN_CASE(test_from_string, NULL);
+    TEST_RUN_OUTPUT_TAGS(example_euler_identity, "qcomplex,readme,output");
 
     return TESTS_EXIT_CODE();
 }

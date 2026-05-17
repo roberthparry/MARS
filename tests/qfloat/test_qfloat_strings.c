@@ -1,5 +1,19 @@
 #include "test_qfloat.h"
 
+static bool qfloat_string_value_matches(qfloat_t got, qfloat_t expected, double tol)
+{
+    if (qf_isnan(expected))
+        return qf_isnan(got) && qf_signbit(got) == qf_signbit(expected);
+
+    if (qf_isinf(expected))
+        return qf_isinf(got) && qf_signbit(got) == qf_signbit(expected);
+
+    if (qf_eq(expected, qf_from_double(0.0)))
+        return qf_eq(got, expected) || qf_close(got, expected, tol);
+
+    return qf_eq(got, expected) || qf_close(got, expected, tol) || qf_close_rel(got, expected, tol);
+}
+
 static void test_qf_to_string(void)
 {
     static struct {
@@ -51,15 +65,20 @@ static void test_qf_to_string(void)
         char buf[256];
         qf_to_string(tests[i].x, buf, sizeof(buf));
         qfloat_t x = qf_from_string(buf);
-        qfloat_t err = qf_abs(qf_sub(qf_div(x, tests[i].x), (qfloat_t){1,0}));
-
-        bool ok = (strcmp(buf, tests[i].expected) == 0 || err.hi < 1e-30 || (tests[i].x.hi == x.hi && tests[i].x.lo == x.lo));
+        bool ok = (strcmp(buf, tests[i].expected) == 0 ||
+                   qfloat_string_value_matches(x, tests[i].x, 1e-30) ||
+                   (tests[i].x.hi == x.hi && tests[i].x.lo == x.lo));
 
         printf("  %s\n", tests[i].label);
         printf("    input     = hi=%.17g  lo=%.17g\n", tests[i].x.hi, tests[i].x.lo);
         printf("    got       = %s\n", buf);
         printf("    expected  = %s\n", tests[i].expected);
-        printf("    rel error = %.17g\n", err.hi);
+        if (qf_isnan(tests[i].x) || qf_isinf(tests[i].x) || qf_eq(tests[i].x, qf_from_double(0.0))) {
+            printf("    rel error = n/a\n");
+        } else {
+            qfloat_t err = qf_abs(qf_sub(qf_div(x, tests[i].x), (qfloat_t){1,0}));
+            printf("    rel error = %.17g\n", err.hi);
+        }
 
         if (ok) {
             printf("    \x1b[32mOK\x1b[0m\n");
@@ -118,14 +137,19 @@ static void test_qf_from_string(void)
 
     for (int i = 0; i < N; i++) {
         qfloat_t x = qf_from_string(tests[i].input);
-        qfloat_t err = qf_abs(qf_sub(qf_div(x, tests[i].expected), (qfloat_t){1,0}));
-        bool ok = ((err.hi < 1e-30) || (x.hi == tests[i].expected.hi && x.lo == tests[i].expected.lo));
+        bool ok = (qfloat_string_value_matches(x, tests[i].expected, 1e-30) ||
+                   (x.hi == tests[i].expected.hi && x.lo == tests[i].expected.lo));
 
         printf("  %s\n", tests[i].label);
         printf("    input     = \"%s\"\n", tests[i].input);
         printf("    got       = hi=%.17g  lo=%.17g\n", x.hi, x.lo);
         printf("    expected  = hi=%.17g  lo=%.17g\n", tests[i].expected.hi, tests[i].expected.lo);
-        printf("    rel error = %.17g\n", err.hi);
+        if (qf_isnan(tests[i].expected) || qf_isinf(tests[i].expected) || qf_eq(tests[i].expected, qf_from_double(0.0))) {
+            printf("    rel error = n/a\n");
+        } else {
+            qfloat_t err = qf_abs(qf_sub(qf_div(x, tests[i].expected), (qfloat_t){1,0}));
+            printf("    rel error = %.17g\n", err.hi);
+        }
 
         if (ok) {
             printf("    \x1b[32mOK\x1b[0m\n");
@@ -223,10 +247,15 @@ static void test_round_trip(void)
 }
 
 void test_strings(void) {
-    RUN_SUBTEST(test_qf_to_string);
-    RUN_SUBTEST(test_qf_from_string);
-    RUN_SUBTEST(test_from_string_basic);
-    RUN_SUBTEST(test_from_string_scientific);
-    RUN_SUBTEST(test_round_trip);
+    printf(C_CYAN "TEST GROUP: qfloat string conversions\n" C_RESET);
+    printf("  entering test_qf_to_string\n");
+    TEST_RUN_SUBTEST(test_qf_to_string, NULL);
+    printf("  entering test_qf_from_string\n");
+    TEST_RUN_SUBTEST(test_qf_from_string, NULL);
+    printf("  entering test_from_string_basic\n");
+    TEST_RUN_SUBTEST(test_from_string_basic, NULL);
+    printf("  entering test_from_string_scientific\n");
+    TEST_RUN_SUBTEST(test_from_string_scientific, NULL);
+    printf("  entering test_round_trip\n");
+    TEST_RUN_SUBTEST(test_round_trip, NULL);
 }
-

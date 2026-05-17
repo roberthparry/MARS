@@ -10,9 +10,67 @@
 
 #include "datetime.h"
 
-#define TEST_CONFIG_MODE TEST_CONFIG_GLOBAL
-#define TEST_CONFIG_MAIN
 #include "test_harness.h"
+
+TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
+static int datetime_validity_equal(const void *actual, const void *expected, void *ctx);
+static void datetime_validity_format(const void *value, char *buf, size_t buf_size, void *ctx);
+static bool test_datetime_suite_setup(void);
+
+static const test_validity_contract_t datetime_exact_contract =
+    TEST_VALIDITY_CONTRACT("datetime-exact",
+                           datetime_validity_equal,
+                           datetime_validity_format,
+                           NULL);
+
+TEST_SUITE_SETUP(test_datetime_suite_setup);
+
+#define TEST_ASSERT_DATETIME_EQ(actual_ptr, expected_ptr) \
+    do { \
+        const datetime_t *test_datetime_actual__ = (actual_ptr); \
+        const datetime_t *test_datetime_expected__ = (expected_ptr); \
+        TEST_ASSERT_VALID_NAMED("datetime-exact", \
+                                &test_datetime_actual__, \
+                                &test_datetime_expected__); \
+    } while (0)
+
+static int datetime_validity_equal(const void *actual, const void *expected, void *ctx)
+{
+    const datetime_t *const *got = (const datetime_t *const *)actual;
+    const datetime_t *const *want = (const datetime_t *const *)expected;
+
+    (void)ctx;
+    return datetime_year(*got) == datetime_year(*want)
+        && datetime_month(*got) == datetime_month(*want)
+        && datetime_day(*got) == datetime_day(*want)
+        && datetime_hour(*got) == datetime_hour(*want)
+        && datetime_minute(*got) == datetime_minute(*want)
+        && fabs(datetime_second(*got) - datetime_second(*want)) < 1e-4;
+}
+
+static void datetime_validity_format(const void *value, char *buf, size_t buf_size, void *ctx)
+{
+    const datetime_t *const *dt = (const datetime_t *const *)value;
+
+    (void)ctx;
+    if (!buf || buf_size == 0)
+        return;
+
+    snprintf(buf, buf_size,
+             "%04d-%02d-%02d %02d:%02d:%09.6f",
+             datetime_year(*dt),
+             (int)datetime_month(*dt),
+             (int)datetime_day(*dt),
+             datetime_hour(*dt),
+             datetime_minute(*dt),
+             datetime_second(*dt));
+}
+
+static bool test_datetime_suite_setup(void)
+{
+    test_register_validity_checker("datetime-exact", &datetime_exact_contract);
+    return TEST_REQUIRE_VALIDITY_CHECKER("datetime-exact");
+}
 
 
 /* ------------------------------------------------------------------------- */
@@ -53,12 +111,7 @@ void test_datetime_init_copy(void) {
                                                         23, 59, 59.9);
     datetime_t *dst = datetime_init_copy(datetime_alloc(), src);
 
-    ASSERT_TRUE(datetime_year(src)   == datetime_year(dst));
-    ASSERT_TRUE(datetime_month(src)  == datetime_month(dst));
-    ASSERT_TRUE(datetime_day(src)    == datetime_day(dst));
-    ASSERT_TRUE(datetime_hour(src)   == datetime_hour(dst));
-    ASSERT_TRUE(datetime_minute(src) == datetime_minute(dst));
-    ASSERT_TRUE(fabs(datetime_second(src) - datetime_second(dst)) < 1e-9);
+    TEST_ASSERT_DATETIME_EQ(src, dst);
 
     datetime_dealloc(src);
     datetime_dealloc(dst);
@@ -381,9 +434,7 @@ void test_dttm_julian_roundtrip(void) {
     datetime_t *copy = datetime_init_jd(datetime_alloc(), jd);
     datetime_year(copy);  // force initialization
 
-    ASSERT_TRUE(datetime_year(copy)  == datetime_year(dt));
-    ASSERT_TRUE(datetime_month(copy) == datetime_month(dt));
-    ASSERT_TRUE(datetime_day(copy)   == datetime_day(dt));
+    TEST_ASSERT_DATETIME_EQ(copy, dt);
 
     datetime_dealloc(dt);
     datetime_dealloc(copy);
@@ -394,10 +445,10 @@ void test_datetime_getters(void) {
         datetime_alloc(), 2024, 6, 15, 14, 22, 33.5
     );
 
-    ASSERT_EQ_INT(datetime_year(dt),   2024);
-    ASSERT_EQ_INT(datetime_month(dt),  6);
-    ASSERT_EQ_INT(datetime_day(dt),    15);
-    ASSERT_EQ_INT(datetime_hour(dt),   14);
+    ASSERT_EQ_INT(datetime_year(dt), 2024);
+    ASSERT_EQ_INT(datetime_month(dt), 6);
+    ASSERT_EQ_INT(datetime_day(dt), 15);
+    ASSERT_EQ_INT(datetime_hour(dt), 14);
     ASSERT_EQ_INT(datetime_minute(dt), 22);
     ASSERT_EQ_DOUBLE(datetime_second(dt), 33.5, 1e-9);
 
@@ -451,7 +502,7 @@ void test_datetime_days_in_month(void) {
     ASSERT_EQ_INT(datetime_days_in_month(2024, DT_January),  31);
 }
 
-void test_readme_examples(void) {
+static void example_chinese_new_years(void) {
     struct {
         int year;
         month_t month;
@@ -496,54 +547,54 @@ void test_readme_examples(void) {
 int tests_main(void) {
 
     /* Basic Julian and date initialisation tests */
-    RUN_TEST_CASE(test_datetime_init_jd);
-    RUN_TEST_CASE(test_datetime_jdn_and_getJulianDay);
-    RUN_TEST_CASE(test_datetime_year_initialized);
-    RUN_TEST_CASE(test_datetime_init_now);
+    TEST_RUN_CASE(test_datetime_init_jd, NULL);
+    TEST_RUN_CASE(test_datetime_jdn_and_getJulianDay, NULL);
+    TEST_RUN_CASE(test_datetime_year_initialized, NULL);
+    TEST_RUN_CASE(test_datetime_init_now, NULL);
 
     /* GMT conversion tests */
-    RUN_TEST_CASE(test_datetime_to_gmt_basic);
-    RUN_TEST_CASE(test_datetime_to_gmt_null_pointer);
-    RUN_TEST_CASE(test_datetime_to_gmt_preserves_julian_values);
-    RUN_TEST_CASE(test_datetime_to_gmt_multiple_calls);
-    RUN_TEST_CASE(test_datetime_to_gmt_uninitialized);
-    RUN_TEST_CASE(test_datetime_to_gmt_with_julian_values);
+    TEST_RUN_CASE(test_datetime_to_gmt_basic, NULL);
+    TEST_RUN_CASE(test_datetime_to_gmt_null_pointer, NULL);
+    TEST_RUN_CASE(test_datetime_to_gmt_preserves_julian_values, NULL);
+    TEST_RUN_CASE(test_datetime_to_gmt_multiple_calls, NULL);
+    TEST_RUN_CASE(test_datetime_to_gmt_uninitialized, NULL);
+    TEST_RUN_CASE(test_datetime_to_gmt_with_julian_values, NULL);
 
     /* Easter Sunday tests */
-    RUN_TEST_CASE(test_datetime_init_easter_basic);
-    RUN_TEST_CASE(test_datetime_init_easter_known_dates);
-    RUN_TEST_CASE(test_datetime_init_easter_invalid_years);
-    RUN_TEST_CASE(test_datetime_init_easter_always_sunday);
-    RUN_TEST_CASE(test_datetime_init_easter_time_fields_zero);
+    TEST_RUN_CASE(test_datetime_init_easter_basic, NULL);
+    TEST_RUN_CASE(test_datetime_init_easter_known_dates, NULL);
+    TEST_RUN_CASE(test_datetime_init_easter_invalid_years, NULL);
+    TEST_RUN_CASE(test_datetime_init_easter_always_sunday, NULL);
+    TEST_RUN_CASE(test_datetime_init_easter_time_fields_zero, NULL);
 
     /* Basic allocation and initialisation tests */
-    RUN_TEST_CASE(test_datetime_alloc);
-    RUN_TEST_CASE(test_datetime_init_ymd);
-    RUN_TEST_CASE(test_datetime_init_ymdt);
-    RUN_TEST_CASE(test_datetime_init_copy);
-    RUN_TEST_CASE(test_datetime_init_jdn);
+    TEST_RUN_CASE(test_datetime_alloc, NULL);
+    TEST_RUN_CASE(test_datetime_init_ymd, NULL);
+    TEST_RUN_CASE(test_datetime_init_ymdt, NULL);
+    TEST_RUN_CASE(test_datetime_init_copy, NULL);
+    TEST_RUN_CASE(test_datetime_init_jdn, NULL);
 
     /* Chinese New Year tests */
-    RUN_TEST_CASE(test_datetime_init_chinese_new_year_basic);
-    RUN_TEST_CASE(test_datetime_init_chinese_new_year_known_dates);
-    RUN_TEST_CASE(test_datetime_init_chinese_new_year_invalid_years);
-    RUN_TEST_CASE(test_datetime_init_chinese_new_year_time_fields_zero);
+    TEST_RUN_CASE(test_datetime_init_chinese_new_year_basic, NULL);
+    TEST_RUN_CASE(test_datetime_init_chinese_new_year_known_dates, NULL);
+    TEST_RUN_CASE(test_datetime_init_chinese_new_year_invalid_years, NULL);
+    TEST_RUN_CASE(test_datetime_init_chinese_new_year_time_fields_zero, NULL);
 
     /* Timezone offset tests */
-    RUN_TEST_CASE(test_dttm_computeTimeZoneOffset_basic);
-    RUN_TEST_CASE(test_dttm_computeTimeZoneOffset_null_pointer);
-    RUN_TEST_CASE(test_dttm_computeTimeZoneOffset_uninitialized);
+    TEST_RUN_CASE(test_dttm_computeTimeZoneOffset_basic, NULL);
+    TEST_RUN_CASE(test_dttm_computeTimeZoneOffset_null_pointer, NULL);
+    TEST_RUN_CASE(test_dttm_computeTimeZoneOffset_uninitialized, NULL);
 
     /* Julian consistency, getters, comparisons, days-in-month */
-    RUN_TEST_CASE(test_dttm_julian_roundtrip);
-    RUN_TEST_CASE(test_datetime_getters);
-    RUN_TEST_CASE(test_datetime_compare_equal);
-    RUN_TEST_CASE(test_datetime_compare_less);
-    RUN_TEST_CASE(test_datetime_compare_greater);
-    RUN_TEST_CASE(test_datetime_days_in_month);
+    TEST_RUN_CASE(test_dttm_julian_roundtrip, NULL);
+    TEST_RUN_CASE(test_datetime_getters, NULL);
+    TEST_RUN_CASE(test_datetime_compare_equal, NULL);
+    TEST_RUN_CASE(test_datetime_compare_less, NULL);
+    TEST_RUN_CASE(test_datetime_compare_greater, NULL);
+    TEST_RUN_CASE(test_datetime_days_in_month, NULL);
 
     printf(C_YELLOW "\nRunning README examples...\n" C_RESET);
-    RUN_TEST_CASE(test_readme_examples);
+    TEST_RUN_OUTPUT_TAGS(example_chinese_new_years, "datetime,readme,output");
 
     return TESTS_EXIT_CODE();
 }

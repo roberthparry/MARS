@@ -56,24 +56,29 @@ LDLIBS += -lmpfr -lmpc -lgmp
 SRCS    := $(shell find src -name '*.c' | sort)
 OBJS    := $(SRCS:src/%.c=$(BUILD_DIR)/%.o)
 
-TEST_ALL_SRCS     := $(shell find tests -name 'test_*.c' | sort)
-TEST_SRCS         := $(shell find tests -name 'test_*.c' | while read -r f; do d=$$(basename "$$(dirname "$$f")"); b=$$(basename "$$f"); if [ "$$b" = "test_$$d.c" ]; then printf '%s\n' "$$f"; fi; done | sort)
+TEST_ALL_SRCS     := $(shell find tests -name 'test_*.c' ! -path 'tests/test_config/*' | sort)
+TEST_SRCS         := $(shell find tests -name 'test_*.c' ! -path 'tests/test_config/*' | while read -r f; do d=$$(basename "$$(dirname "$$f")"); b=$$(basename "$$f"); if [ "$$b" = "test_$$d.c" ] || [ "$$b" = "$$d.c" ]; then printf '%s\n' "$$f"; fi; done | sort)
 TEST_HELPER_SRCS  := $(filter-out $(TEST_SRCS),$(TEST_ALL_SRCS))
+TEST_COMMON_SRCS  := $(shell find tests/test_config -name '*.c' 2>/dev/null | sort)
+TEST_SHARED_HEADERS := $(wildcard tests/include/*.h)
+TEST_SUITE_HEADERS  := $(shell find tests -mindepth 2 -maxdepth 2 -name 'test_*.h' | sort)
 TEST_OBJS         := $(TEST_SRCS:tests/%.c=$(TEST_BUILD_DIR)/%.o)
 TEST_HELPER_OBJS  := $(TEST_HELPER_SRCS:tests/%.c=$(TEST_BUILD_DIR)/%.o)
+TEST_COMMON_HELPER_OBJS := $(TEST_COMMON_SRCS:tests/%.c=$(TEST_BUILD_DIR)/%.o)
 BENCH_SRCS        := $(shell find bench -name 'bench_*.c' 2>/dev/null | sort)
 BENCH_OBJS        := $(BENCH_SRCS:bench/%.c=$(BUILD_DIR)/bench/%.o)
 BENCH_BINS        := $(patsubst bench/%.c,$(BUILD_DIR)/bench/%,$(BENCH_SRCS))
 QFLOAT_TOOL_BIN   := $(BUILD_DIR)/tools/qfloat/gen_qfloat_tables
 
-HEADERS      := $(filter-out include/test_config.h,$(wildcard include/*.h))
+HEADERS      := $(wildcard include/*.h)
 
 STATIC_LIB := $(BUILD_DIR)/libmars.a
 SHARED_LIB := $(BUILD_DIR)/libmars.so
 
 TEST_BINS  := $(patsubst tests/%.c,$(TEST_BUILD_DIR)/%,$(TEST_SRCS))
 
-.SECONDARY: $(TEST_OBJS) $(TEST_HELPER_OBJS)
+.SECONDEXPANSION:
+.SECONDARY: $(TEST_OBJS) $(TEST_HELPER_OBJS) $(TEST_COMMON_HELPER_OBJS)
 
 # ------------------------------------------------------------
 # Default target
@@ -153,7 +158,7 @@ $(BUILD_DIR)/%.o: src/%.c Makefile
 	@mkdir -p $(dir $@) $(dir $@).deps
 	$(CC) $(CFLAGS) $(DEPFLAGS) $(INCLUDES) -c $< -o $@
 
-$(TEST_BUILD_DIR)/%.o: tests/%.c Makefile
+$(TEST_BUILD_DIR)/%.o: tests/%.c Makefile $(TEST_SHARED_HEADERS) $(TEST_SUITE_HEADERS)
 	@mkdir -p $(dir $@) $(dir $@).deps
 	$(CC) $(CFLAGS) $(DEPFLAGS) $(INCLUDES) -c $< -o $@
 
@@ -177,9 +182,21 @@ $(SHARED_LIB): Makefile $(OBJS)
 # ------------------------------------------------------------
 # Test binaries
 # ------------------------------------------------------------
-$(TEST_BUILD_DIR)/%: $(TEST_BUILD_DIR)/%.o $(STATIC_LIB) $(SHARED_LIB) $(TEST_HELPER_OBJS)
-	@mkdir -p $(dir $@)
-	$(CC) -o $@ $< $(filter $(TEST_BUILD_DIR)/$(dir $*)%.o,$(TEST_HELPER_OBJS)) $(STATIC_LIB) $(LDLIBS)
+define TEST_BIN_RULE
+$(patsubst tests/%.c,$(TEST_BUILD_DIR)/%,$(1)): \
+    $(patsubst tests/%.c,$(TEST_BUILD_DIR)/%.o,$(1)) \
+    $(STATIC_LIB) $(SHARED_LIB) \
+    $(TEST_COMMON_HELPER_OBJS) \
+    $(filter $(TEST_BUILD_DIR)/$(dir $(patsubst tests/%,%,$(1)))%.o,$(TEST_HELPER_OBJS))
+	@mkdir -p $$(dir $$@)
+	$(CC) -o $$@ \
+	    $(patsubst tests/%.c,$(TEST_BUILD_DIR)/%.o,$(1)) \
+	    $(TEST_COMMON_HELPER_OBJS) \
+	    $(filter $(TEST_BUILD_DIR)/$(dir $(patsubst tests/%,%,$(1)))%.o,$(TEST_HELPER_OBJS)) \
+	    $(STATIC_LIB) $(LDLIBS)
+endef
+
+$(foreach src,$(TEST_SRCS),$(eval $(call TEST_BIN_RULE,$(src))))
 
 $(BUILD_DIR)/bench/%: $(BUILD_DIR)/bench/%.o $(STATIC_LIB) $(SHARED_LIB)
 	@mkdir -p $(dir $@)

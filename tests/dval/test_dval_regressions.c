@@ -59,8 +59,13 @@ static number_t oracle_error_magnitude(const number_t got,
     number_t diff;
     number_t error;
 
-    if (num_get_prec_bits(expected) > 0u)
-        ASSERT_EQ_INT(num_set_prec_bits(&promoted_got, num_get_prec_bits(expected)), 0);
+    if (num_get_prec_bits(expected) > 0u &&
+        num_set_prec_bits(&promoted_got, num_get_prec_bits(expected)) != 0) {
+        test_mark_failure(__FILE__, __LINE__,
+                          "num_set_prec_bits(promoted_got) failed");
+        num_destroy(&promoted_got);
+        return num_create_from_double(NAN);
+    }
     diff = num_sub(promoted_got, expected);
     num_destroy(&promoted_got);
     if (num_is_real(diff)) {
@@ -88,7 +93,13 @@ static int number_close_for_qfloat_precision(const number_t got,
     number_t tolerance;
     int ok;
 
-    ASSERT_EQ_INT(num_set_prec_bits(&one, 106u), 0);
+    if (num_set_prec_bits(&one, 106u) != 0) {
+        test_mark_failure(__FILE__, __LINE__,
+                          "num_set_prec_bits(one) failed");
+        num_destroy(&one);
+        num_destroy(&error);
+        return 0;
+    }
     tolerance = num_ldexp(one, 4 - 106);
     ok = num_le(error, tolerance);
     num_destroy(&one);
@@ -129,15 +140,26 @@ static void print_precision_comparison(const char *label,
         error_live = 1;
     }
 
-    ASSERT_NOT_NULL(expected_text);
-    ASSERT_NOT_NULL(got_text);
+    if (!expected_text) {
+        test_mark_failure(__FILE__, __LINE__,
+                          "format_number_for_test_output(expected) failed");
+        goto cleanup;
+    }
+    if (!got_text) {
+        test_mark_failure(__FILE__, __LINE__,
+                          "format_number_for_test_output(got) failed");
+        goto cleanup;
+    }
     if (show_error && !error_text) {
         error_text = malloc(sizeof("(unavailable)"));
         if (error_text)
             memcpy(error_text, "(unavailable)", sizeof("(unavailable)"));
     }
-    if (show_error)
-        ASSERT_NOT_NULL(error_text);
+    if (show_error && !error_text) {
+        test_mark_failure(__FILE__, __LINE__,
+                          "format_error_for_test_output(error) failed");
+        goto cleanup;
+    }
 
     printf("    %s\n", label);
     printf("        expected = %s\n", expected_text);
@@ -147,6 +169,7 @@ static void print_precision_comparison(const char *label,
     printf("        precision: %zu bits, %zu significant digits\n",
            num_get_prec_bits(got), num_get_prec_digits(got));
 
+cleanup:
     free(error_text);
     if (error_live)
         num_destroy(&error);
@@ -217,7 +240,10 @@ static number_t num_from_mfloat_text_bits(const char *text, size_t precision_bit
     mfloat_t *value = mf_create_string(text);
     number_t out;
 
-    ASSERT_NOT_NULL(value);
+    if (!value) {
+        test_mark_failure(__FILE__, __LINE__, "mf_create_string failed");
+        return num_create_from_double(NAN);
+    }
     out = num_create_from_mfloat_with_prec_bits(value, precision_bits);
     mf_free(value);
     return out;
@@ -228,7 +254,10 @@ static number_t num_from_mcomplex_text_bits(const char *text, size_t precision_b
     mcomplex_t *value = mc_create_string(text);
     number_t out;
 
-    ASSERT_NOT_NULL(value);
+    if (!value) {
+        test_mark_failure(__FILE__, __LINE__, "mc_create_string failed");
+        return num_create_from_double(NAN);
+    }
     out = num_create_from_mcomplex_with_prec_bits(value, precision_bits);
     mc_free(value);
     return out;
@@ -1362,30 +1391,30 @@ static void test_simplify_inverse_unary_pairs(void)
 
 void test_runtime_regressions(void)
 {
-    RUN_SUBTEST(test_cmp_qfloat_precision);
-    RUN_SUBTEST(test_new_const_num_preserves_mfloat_precision);
-    RUN_SUBTEST(test_set_val_num_preserves_mfloat_precision);
-    RUN_SUBTEST(test_new_const_num_preserves_mcomplex_precision);
-    RUN_SUBTEST(test_set_val_num_preserves_mcomplex_precision);
-    RUN_SUBTEST(test_eval_expression_preserves_mfloat_precision);
-    RUN_SUBTEST(test_eval_expression_preserves_mcomplex_precision);
-    RUN_SUBTEST(test_new_const_num_preserves_qfloat_precision);
-    RUN_SUBTEST(test_set_val_num_preserves_qfloat_precision);
-    RUN_SUBTEST(test_default_constants_preserve_builtin_precision);
-    RUN_SUBTEST(test_dv_ln10_singleton);
-    RUN_SUBTEST(test_get_val_updates_after_set);
-    RUN_SUBTEST(test_new_const_num);
-    RUN_SUBTEST(test_new_const_num_rational_complex);
-    RUN_SUBTEST(test_new_var_num_and_set_val_num);
-    RUN_SUBTEST(test_named_number_constructors);
-    RUN_SUBTEST(test_eval_num_on_expression);
-    RUN_SUBTEST(test_eval_num_function_values);
-    RUN_SUBTEST(test_eval_num_function_derivatives);
-    RUN_SUBTEST(test_high_precision_mfloat_function_values);
-    RUN_SUBTEST(test_high_precision_mfloat_function_derivatives);
-    RUN_SUBTEST(test_high_precision_mcomplex_function_values);
-    RUN_SUBTEST(test_set_val_num_named_constant);
-    RUN_SUBTEST(test_simplify_inverse_unary_pairs);
+    TEST_RUN_SUBTEST(test_cmp_qfloat_precision, NULL);
+    TEST_RUN_SUBTEST(test_new_const_num_preserves_mfloat_precision, NULL);
+    TEST_RUN_SUBTEST(test_set_val_num_preserves_mfloat_precision, NULL);
+    TEST_RUN_SUBTEST(test_new_const_num_preserves_mcomplex_precision, NULL);
+    TEST_RUN_SUBTEST(test_set_val_num_preserves_mcomplex_precision, NULL);
+    TEST_RUN_SUBTEST(test_eval_expression_preserves_mfloat_precision, NULL);
+    TEST_RUN_SUBTEST(test_eval_expression_preserves_mcomplex_precision, NULL);
+    TEST_RUN_SUBTEST(test_new_const_num_preserves_qfloat_precision, NULL);
+    TEST_RUN_SUBTEST(test_set_val_num_preserves_qfloat_precision, NULL);
+    TEST_RUN_SUBTEST(test_default_constants_preserve_builtin_precision, NULL);
+    TEST_RUN_SUBTEST(test_dv_ln10_singleton, NULL);
+    TEST_RUN_SUBTEST(test_get_val_updates_after_set, NULL);
+    TEST_RUN_SUBTEST(test_new_const_num, NULL);
+    TEST_RUN_SUBTEST(test_new_const_num_rational_complex, NULL);
+    TEST_RUN_SUBTEST(test_new_var_num_and_set_val_num, NULL);
+    TEST_RUN_SUBTEST(test_named_number_constructors, NULL);
+    TEST_RUN_SUBTEST(test_eval_num_on_expression, NULL);
+    TEST_RUN_SUBTEST(test_eval_num_function_values, NULL);
+    TEST_RUN_SUBTEST(test_eval_num_function_derivatives, NULL);
+    TEST_RUN_SUBTEST(test_high_precision_mfloat_function_values, NULL);
+    TEST_RUN_SUBTEST(test_high_precision_mfloat_function_derivatives, NULL);
+    TEST_RUN_SUBTEST(test_high_precision_mcomplex_function_values, NULL);
+    TEST_RUN_SUBTEST(test_set_val_num_named_constant, NULL);
+    TEST_RUN_SUBTEST(test_simplify_inverse_unary_pairs, NULL);
 }
 
 /* ------------------------------------------------------------------------- */

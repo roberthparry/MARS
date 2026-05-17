@@ -20,40 +20,22 @@ static void test_qf_trig()
         qfloat_t t_exp = qf_from_double(0.0);
 
         qf_to_string(s, buf, sizeof(buf));
-        if (qf_close(s, s_exp, 1e-30)) {
-            printf("%s  OK: sin(0) = %s%s\n", C_GREEN, buf, C_RESET);
-            printf("    got      = %s\n", buf);
-            printf("    expected = 0\n");
-        } else {
-            printf("%s  FAIL: sin(0)%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
-            printf("    got      = %s\n", buf);
-            printf("    expected = 0\n");
-            TEST_FAIL();
-        }
+        TEST_ASSERT_QFLOAT_CLOSE(s, s_exp);
+        printf("%s  OK: sin(0) = %s%s\n", C_GREEN, buf, C_RESET);
+        printf("    got      = %s\n", buf);
+        printf("    expected = 0\n");
 
         qf_to_string(c, buf, sizeof(buf));
-        if (qf_close(c, c_exp, 1e-30)) {
-            printf("%s  OK: cos(0) = %s%s\n", C_GREEN, buf, C_RESET);
-            printf("    got      = %s\n", buf);
-            printf("    expected = 1\n");
-        } else {
-            printf("%s  FAIL: cos(0)%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
-            printf("    got      = %s\n", buf);
-            printf("    expected = 1\n");
-            TEST_FAIL();
-        }
+        TEST_ASSERT_QFLOAT_CLOSE(c, c_exp);
+        printf("%s  OK: cos(0) = %s%s\n", C_GREEN, buf, C_RESET);
+        printf("    got      = %s\n", buf);
+        printf("    expected = 1\n");
 
         qf_to_string(t, buf, sizeof(buf));
-        if (qf_close(t, t_exp, 1e-30)) {
-            printf("%s  OK: tan(0) = %s%s\n", C_GREEN, buf, C_RESET);
-            printf("    got      = %s\n", buf);
-            printf("    expected = 0\n");
-        } else {
-            printf("%s  FAIL: tan(0)%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
-            printf("    got      = %s\n", buf);
-            printf("    expected = 0\n");
-            TEST_FAIL();
-        }
+        TEST_ASSERT_QFLOAT_CLOSE(t, t_exp);
+        printf("%s  OK: tan(0) = %s%s\n", C_GREEN, buf, C_RESET);
+        printf("    got      = %s\n", buf);
+        printf("    expected = 0\n");
     }
 
     /* 2) sin(pi/2) = 1, cos(pi/2) = 0 */
@@ -67,28 +49,16 @@ static void test_qf_trig()
         qfloat_t c_exp = qf_from_double(0.0);
 
         qf_to_string(s, buf, sizeof(buf));
-        if (qf_close(s, s_exp, 1e-30)) {
-            printf("%s  OK: sin(pi/2) = %s%s\n", C_GREEN, buf, C_RESET);
-            printf("    got      = %s\n", buf);
-            printf("    expected = 1\n");
-        } else {
-            printf("%s  FAIL: sin(pi/2)%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
-            printf("    got      = %s\n", buf);
-            printf("    expected = 1\n");
-            TEST_FAIL();
-        }
+        TEST_ASSERT_QFLOAT_CLOSE(s, s_exp);
+        printf("%s  OK: sin(pi/2) = %s%s\n", C_GREEN, buf, C_RESET);
+        printf("    got      = %s\n", buf);
+        printf("    expected = 1\n");
 
         qf_to_string(c, buf, sizeof(buf));
-        if (qf_close(c, c_exp, 1e-30)) {
-            printf("%s  OK: cos(pi/2) = %s%s\n", C_GREEN, buf, C_RESET);
-            printf("    got      = %s\n", buf);
-            printf("    expected = 0\n");
-        } else {
-            printf("%s  FAIL: cos(pi/2)%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
-            printf("    got      = %s\n", buf);
-            printf("    expected = 0\n");
-            TEST_FAIL();
-        }
+        TEST_ASSERT_QFLOAT_CLOSE(c, c_exp);
+        printf("%s  OK: cos(pi/2) = %s%s\n", C_GREEN, buf, C_RESET);
+        printf("    got      = %s\n", buf);
+        printf("    expected = 0\n");
     }
 
     /* 3) sin(pi) = 0, cos(pi) = -1 */
@@ -102,28 +72,16 @@ static void test_qf_trig()
         qfloat_t c_exp = qf_from_double(-1.0);
 
         qf_to_string(s, buf, sizeof(buf));
-        if (qf_close(s, s_exp, 1e-30)) {
-            printf("%s  OK: sin(pi) = %s%s\n", C_GREEN, buf, C_RESET);
-            printf("    got      = %s\n", buf);
-            printf("    expected = 0\n");
-        } else {
-            printf("%s  FAIL: sin(pi)%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
-            printf("    got      = %s\n", buf);
-            printf("    expected = 0\n");
-            TEST_FAIL();
-        }
+        TEST_ASSERT_QFLOAT_CLOSE(s, s_exp);
+        printf("%s  OK: sin(pi) = %s%s\n", C_GREEN, buf, C_RESET);
+        printf("    got      = %s\n", buf);
+        printf("    expected = 0\n");
 
         qf_to_string(c, buf, sizeof(buf));
-        if (qf_close(c, c_exp, 1e-30)) {
-            printf("%s  OK: cos(pi) = %s%s\n", C_GREEN, buf, C_RESET);
-            printf("    got      = %s\n", buf);
-            printf("    expected = -1\n");
-        } else {
-            printf("%s  FAIL: cos(pi)%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
-            printf("    got      = %s\n", buf);
-            printf("    expected = -1\n");
-            TEST_FAIL();
-        }
+        TEST_ASSERT_QFLOAT_CLOSE(c, c_exp);
+        printf("%s  OK: cos(pi) = %s%s\n", C_GREEN, buf, C_RESET);
+        printf("    got      = %s\n", buf);
+        printf("    expected = -1\n");
     }
 
     /* 4) tan(pi/4) = 1 */
@@ -134,16 +92,10 @@ static void test_qf_trig()
         qfloat_t t_exp = qf_from_double(1.0);
 
         qf_to_string(t, buf, sizeof(buf));
-        if (qf_close(t, t_exp, 1e-30)) {
-            printf("%s  OK: tan(pi/4) = %s%s\n", C_GREEN, buf, C_RESET);
-            printf("    got      = %s\n", buf);
-            printf("    expected = 1\n");
-        } else {
-            printf("%s  FAIL: tan(pi/4)%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
-            printf("    got      = %s\n", buf);
-            printf("    expected = 1\n");
-            TEST_FAIL();
-        }
+        TEST_ASSERT_QFLOAT_CLOSE(t, t_exp);
+        printf("%s  OK: tan(pi/4) = %s%s\n", C_GREEN, buf, C_RESET);
+        printf("    got      = %s\n", buf);
+        printf("    expected = 1\n");
     }
 
     /* 5) tan(pi/2) → NaN */
@@ -178,42 +130,24 @@ static void test_qf_trig()
 
         qf_to_string(s, buf, sizeof(buf));
         qf_to_string(s_exp, buf_exp, sizeof(buf_exp));
-        if (qf_close(s, s_exp, 1e-30)) {
-            printf("%s  OK: sin(1) = %s%s\n", C_GREEN, buf, C_RESET);
-            printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
-        } else {
-            printf("%s  FAIL: sin(1)%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
-            printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
-            TEST_FAIL();
-        }
+        TEST_ASSERT_QFLOAT_CLOSE(s, s_exp);
+        printf("%s  OK: sin(1) = %s%s\n", C_GREEN, buf, C_RESET);
+        printf("    got      = %s\n", buf);
+        printf("    expected = %s\n", buf_exp);
 
         qf_to_string(c, buf, sizeof(buf));
         qf_to_string(c_exp, buf_exp, sizeof(buf_exp));
-        if (qf_close(c, c_exp, 1e-30)) {
-            printf("%s  OK: cos(1) = %s%s\n", C_GREEN, buf, C_RESET);
-            printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
-        } else {
-            printf("%s  FAIL: cos(1)%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
-            printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
-            TEST_FAIL();
-        }
+        TEST_ASSERT_QFLOAT_CLOSE(c, c_exp);
+        printf("%s  OK: cos(1) = %s%s\n", C_GREEN, buf, C_RESET);
+        printf("    got      = %s\n", buf);
+        printf("    expected = %s\n", buf_exp);
 
         qf_to_string(t, buf, sizeof(buf));
         qf_to_string(t_exp, buf_exp, sizeof(buf_exp));
-        if (qf_close(t, t_exp, 1e-30)) {
-            printf("%s  OK: tan(1) = %s%s\n", C_GREEN, buf, C_RESET);
-            printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
-        } else {
-            printf("%s  FAIL: tan(1)%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
-            printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
-            TEST_FAIL();
-        }
+        TEST_ASSERT_QFLOAT_CLOSE(t, t_exp);
+        printf("%s  OK: tan(1) = %s%s\n", C_GREEN, buf, C_RESET);
+        printf("    got      = %s\n", buf);
+        printf("    expected = %s\n", buf_exp);
     }
 }
 
@@ -263,10 +197,7 @@ static void test_qf_atan(void)
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
         } else {
-            printf("%s  FAIL: %s%s  [%s:%d]\n", C_RED, atan_tests[i].name, C_RESET, __FILE__, __LINE__);
-            printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
-            TEST_FAIL();
+            TEST_ASSERT_QFLOAT_CLOSE(got, expected);
         }
     }
 }
@@ -315,10 +246,7 @@ static void test_qf_asin(void)
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
         } else {
-            printf("%s  FAIL: %s%s  [%s:%d]\n", C_RED, asin_tests[i].name, C_RESET, __FILE__, __LINE__);
-            printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
-            TEST_FAIL();
+            TEST_ASSERT_QFLOAT_CLOSE(got, expected);
         }
     }
 
@@ -378,10 +306,7 @@ static void test_qf_acos(void)
             printf("    got      = %s\n", buf);
             printf("    expected = %s\n", buf_exp);
         } else {
-            printf("%s  FAIL: %s%s  [%s:%d]\n", C_RED, acos_tests[i].name, C_RESET, __FILE__, __LINE__);
-            printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
-            TEST_FAIL();
+            TEST_ASSERT_QFLOAT_CLOSE(got, expected);
         }
     }
 
@@ -453,9 +378,9 @@ static void test_qf_atan2(void)
 }
 
 void test_trigonometric(void) {
-    RUN_SUBTEST(test_qf_trig);
-    RUN_SUBTEST(test_qf_atan);
-    RUN_SUBTEST(test_qf_atan2);
-    RUN_SUBTEST(test_qf_asin);
-    RUN_SUBTEST(test_qf_acos);
+    TEST_RUN_SUBTEST(test_qf_trig, NULL);
+    TEST_RUN_SUBTEST(test_qf_atan, NULL);
+    TEST_RUN_SUBTEST(test_qf_atan2, NULL);
+    TEST_RUN_SUBTEST(test_qf_asin, NULL);
+    TEST_RUN_SUBTEST(test_qf_acos, NULL);
 }

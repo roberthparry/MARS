@@ -35,15 +35,35 @@ static void test_mat_printf_smoke(void)
 {
     number_t vals[4];
     matrix_t *A;
+    const char *path = NULL;
+    FILE *captured = NULL;
+    char buf[256] = {0};
     int n;
+    int saved_stdout;
 
     vals[0] = num_create_from_long(1);
     vals[1] = num_create_from_string("1/2");
     vals[2] = num_create_from_long(0);
     vals[3] = num_create_from_long(1);
     A = mat_create(2, 2, vals);
+    saved_stdout = test_case_begin_stdout_capture("matrix-printf-smoke.txt", &path);
+    check_bool("stdout capture for mat_printf available", saved_stdout >= 0);
     n = mat_printf("%m\n", A);
+    check_bool("stdout capture for mat_printf closes cleanly",
+               test_case_end_stdout_capture(saved_stdout));
     check_bool("mat_printf returns positive count", n > 0);
+    captured = fopen(path, "r");
+    check_bool("mat_printf capture file opens", captured != NULL);
+    if (captured)
+    {
+        size_t used = fread(buf, 1u, sizeof(buf) - 1u, captured);
+        buf[used] = '\0';
+        fclose(captured);
+    }
+    check_bool("mat_printf writes inline matrix text",
+               strstr(buf, "(") != NULL &&
+               (strstr(buf, "1/2") != NULL || strstr(buf, "½") != NULL) &&
+               strchr(buf, '\n') != NULL);
     for (size_t i = 0; i < 4u; ++i)
         num_destroy(&vals[i]);
     mat_free(A);
@@ -108,8 +128,8 @@ static void test_mat_sprintf_pretty_number_complex(void)
 
 void run_matrix_output_tests(void)
 {
-    RUN_TEST_CASE(test_mat_sprintf_formats);
-    RUN_TEST_CASE(test_mat_printf_smoke);
-    RUN_TEST_CASE(test_mat_sprintf_number_precision);
-    RUN_TEST_CASE(test_mat_sprintf_pretty_number_complex);
+    TEST_RUN_CASE(test_mat_sprintf_formats, NULL);
+    TEST_RUN_CASE(test_mat_printf_smoke, NULL);
+    TEST_RUN_CASE(test_mat_sprintf_number_precision, NULL);
+    TEST_RUN_CASE(test_mat_sprintf_pretty_number_complex, NULL);
 }

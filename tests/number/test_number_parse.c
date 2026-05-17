@@ -42,7 +42,7 @@ void run_number_parse_tests(void)
         assert_number_string("num_create_from_string(\"1 + i\")", unit_imag, "1 + 1i");
         assert_number_string("num_create_from_string(\"1/2 - 3/2i\")",
             rational_complex, "0.5 - 1.5i");
-        ASSERT_TRUE(num_eq(paren_imag, plain_imag));
+        ASSERT_NUMBER_EQ(paren_imag, plain_imag);
         ASSERT_EQ_INT(num_set_from_string(&set_value, "1 - i"), 0);
         assert_number_string("num_set_from_string(\"1 - i\")", set_value, "1 - 1i");
 

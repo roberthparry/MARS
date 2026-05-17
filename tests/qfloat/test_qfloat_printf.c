@@ -443,85 +443,65 @@ static void test_qf_sprintf_two_pass_new(void)
 
 static void test_qf_printf_stdout(void)
 {
-    printf(C_CYAN "TEST: qf_printf (stdout)\n" C_RESET);
-
-    qfloat_t x = qf_from_double(1.5);
-
-    /* Save original stdout */
-    int saved_stdout = dup(fileno(stdout));
-    if (saved_stdout < 0) {
-        printf(C_RED "  FAIL: could not save stdout\n" C_RESET);
-        TEST_FAIL();
-        return;
-    }
-
-    /* Redirect stdout to a file */
-    fflush(stdout);
-    if (!freopen("test_output.txt", "w", stdout)) {
-        printf(C_RED "  FAIL: could not redirect stdout\n" C_RESET);
-        TEST_FAIL();
-        return;
-    }
-
-    int n = qf_printf("value=%Q\n", x);
-    fflush(stdout);
-
-    /* Restore stdout */
-    dup2(saved_stdout, fileno(stdout));
-    close(saved_stdout);
-
-    /* Read back the output */
-    FILE *in = fopen("test_output.txt", "r");
-    if (!in) {
-        printf(C_RED "  FAIL: could not open test_output.txt  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
-        TEST_FAIL();
-        return;
-    }
-
+    const char *output_path;
+    int saved_stdout;
+    FILE *in;
     char buf[256];
-    char *p = fgets(buf, sizeof(buf), in);
-    fclose(in);
-
+    char *p;
     const char *expected =
         "value=1.500000000000000000000000000000000E+0\n";
 
-    if (p && strcmp(buf, expected) == 0 && n == (int)strlen(expected)) {
-        printf(C_GREEN "  OK: qf_printf\n" C_RESET);
-        printf("    expected = %s", expected);
-        printf("    got      = %s", buf);
-        printf("    n        = %d\n", n);
-    } else {
-        printf(C_RED "  FAIL: qf_printf  [%s:%d]\n" C_RESET, __FILE__, __LINE__);
-        printf("    expected = %s", expected);
-        printf("    got      = %s", buf);
-        printf("    n        = %d\n", n);
-        TEST_FAIL();
-    }
+    printf(C_CYAN "TEST: qf_printf (stdout)\n" C_RESET);
+
+    qfloat_t x = qf_from_double(1.5);
+    saved_stdout = test_case_begin_stdout_capture("qfloat-printf-stdout.txt",
+                                                  &output_path);
+    TEST_ASSERT_TRUE(saved_stdout >= 0,
+                     "qfloat stdout capture should begin successfully");
+    TEST_ASSERT_NOT_NULL(output_path);
+
+    int n = qf_printf("value=%Q\n", x);
+    TEST_ASSERT_TRUE(test_case_end_stdout_capture(saved_stdout),
+                     "qfloat stdout capture should restore stdout successfully");
+
+    in = fopen(output_path, "r");
+    TEST_ASSERT_NOT_NULL(in);
+    p = fgets(buf, sizeof(buf), in);
+    fclose(in);
+    TEST_ASSERT_NOT_NULL(p);
+    TEST_ASSERT_STR_EQ(buf, expected);
+    TEST_ASSERT_INT_EQ(n, (int)strlen(expected));
+
+    printf(C_GREEN "  OK: qf_printf\n" C_RESET);
+    printf("    expected = %s", expected);
+    printf("    got      = %s", buf);
+    printf("    n        = %d\n", n);
 }
 
 void test_qf_sprintf_and_printf(void)
 {
+    printf(C_CYAN "TEST GROUP: qfloat printf/sprintf\n" C_RESET);
     /* Original tests */
-    RUN_SUBTEST(test_qd_sprintf_basic);
-    RUN_SUBTEST(test_qd_sprintf_multiple);
-    RUN_SUBTEST(test_qd_sprintf_mixed);
-    RUN_SUBTEST(test_qd_sprintf_buffer_limit);
-    RUN_SUBTEST(test_qd_sprintf_edge_cases);
+    TEST_RUN_SUBTEST(test_qd_sprintf_basic, NULL);
+    TEST_RUN_SUBTEST(test_qd_sprintf_multiple, NULL);
+    TEST_RUN_SUBTEST(test_qd_sprintf_mixed, NULL);
+    TEST_RUN_SUBTEST(test_qd_sprintf_buffer_limit, NULL);
+    TEST_RUN_SUBTEST(test_qd_sprintf_edge_cases, NULL);
 
-    RUN_SUBTEST(test_qd_sprintf_q_precision);
-    RUN_SUBTEST(test_qd_sprintf_q_zero_precision);
-    RUN_SUBTEST(test_qd_sprintf_q_flags);
-    RUN_SUBTEST(test_qd_sprintf_q_width);
-    RUN_SUBTEST(test_qd_sprintf_q_fallback);
-    RUN_SUBTEST(test_qd_sprintf_q_fallback_width);
-    RUN_SUBTEST(test_qf_sprintf_q_concise);
+    TEST_RUN_SUBTEST(test_qd_sprintf_q_precision, NULL);
+    TEST_RUN_SUBTEST(test_qd_sprintf_q_zero_precision, NULL);
+    TEST_RUN_SUBTEST(test_qd_sprintf_q_flags, NULL);
+    TEST_RUN_SUBTEST(test_qd_sprintf_q_width, NULL);
+    TEST_RUN_SUBTEST(test_qd_sprintf_q_fallback, NULL);
+    TEST_RUN_SUBTEST(test_qd_sprintf_q_fallback_width, NULL);
+    TEST_RUN_SUBTEST(test_qf_sprintf_q_concise, NULL);
 
     /* New tests */
-    RUN_SUBTEST(test_qf_sprintf_null_safe_new);
-    RUN_SUBTEST(test_qf_sprintf_two_pass_new);
-    RUN_SUBTEST(test_qf_printf_stdout);
+    TEST_RUN_SUBTEST(test_qf_sprintf_null_safe_new, NULL);
+    TEST_RUN_SUBTEST(test_qf_sprintf_two_pass_new, NULL);
+    TEST_RUN_SUBTEST(test_qf_printf_stdout, NULL);
 }
 
 void test_printf(void) {
-    RUN_SUBTEST(test_qf_sprintf_and_printf);
+    TEST_RUN_SUBTEST(test_qf_sprintf_and_printf, NULL);
 }

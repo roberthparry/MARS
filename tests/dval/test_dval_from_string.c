@@ -727,11 +727,11 @@ static void test_from_string_simplified_identity_text(void)
 
 static void test_from_string_ascii_alternatives(void)
 {
-    RUN_SUBTEST(test_from_string_subscripts);
-    RUN_SUBTEST(test_from_string_star_mul);
-    RUN_SUBTEST(test_from_string_composed);
-    RUN_SUBTEST(test_from_string_func_power);
-    RUN_SUBTEST(test_from_string_simplified_identity_text);
+    TEST_RUN_SUBTEST(test_from_string_subscripts, NULL);
+    TEST_RUN_SUBTEST(test_from_string_star_mul, NULL);
+    TEST_RUN_SUBTEST(test_from_string_composed, NULL);
+    TEST_RUN_SUBTEST(test_from_string_func_power, NULL);
+    TEST_RUN_SUBTEST(test_from_string_simplified_identity_text, NULL);
 }
 
 /* ---- f, f', f'' of exp(sin(x)) + 3*x^2 - 7: parse, evaluate, differentiate ----
@@ -910,14 +910,14 @@ static void test_from_string_errors(void)
     check_parse_null("NULL input",
         NULL, __LINE__);
     /* Missing opening '{' */
-    check_parse_null("no opening brace",
-        "x + 1", __LINE__);
+    check_parse_null_stderr_contains("no opening brace",
+        "x + 1", "{", __LINE__);
     /* Missing closing '}' */
-    check_parse_null("no closing brace",
-        "{ x | x = 1", __LINE__);
+    check_parse_null_stderr_contains("no closing brace",
+        "{ x | x = 1", "}", __LINE__);
     /* Unknown symbol in expression */
-    check_parse_null("unknown symbol",
-        "{ z | x = 1 }", __LINE__);
+    check_parse_null_stderr_contains("unknown symbol",
+        "{ z | x = 1 }", "unknown", __LINE__);
     /* Duplicate variable name */
     check_parse_null("duplicate var name",
         "{ x | x = 1, x = 2 }", __LINE__);
@@ -925,8 +925,8 @@ static void test_from_string_errors(void)
     check_parse_null("var-const name clash",
         "{ x | x = 1; x = 2 }", __LINE__);
     /* Missing '=' in binding */
-    check_parse_null("missing '=' in binding",
-        "{ x | x 1 }", __LINE__);
+    check_parse_null_stderr_contains("missing '=' in binding",
+        "{ x | x 1 }", "=", __LINE__);
     /* Missing numeric value after '=' in binding */
     check_parse_null("missing value in binding",
         "{ x | x = }", __LINE__);
@@ -1124,19 +1124,19 @@ static void test_from_string_round_trips(void)
 
 void test_dval_t_from_string(void)
 {
-    RUN_SUBTEST(test_from_string_pure_const);
-    RUN_SUBTEST(test_from_string_arithmetic);
-    RUN_SUBTEST(test_from_string_functions);
-    RUN_SUBTEST(test_from_string_special_functions);
-    RUN_SUBTEST(test_from_string_named_consts);
-    RUN_SUBTEST(test_from_string_bracketed_names);
-    RUN_SUBTEST(test_from_string_number_literals);
-    RUN_SUBTEST(test_from_string_name_normalization);
-    RUN_SUBTEST(test_from_string_implicit_symbolic_bindings);
-    RUN_SUBTEST(test_from_string_ascii_alternatives);
-    RUN_SUBTEST(test_from_string_errors);
-    RUN_SUBTEST(test_from_expression_string_api);
-    RUN_SUBTEST(test_from_string_bindings_api);
-    RUN_SUBTEST(test_from_string_round_trips);
-    RUN_SUBTEST(test_from_string_deriv);
+    TEST_RUN_SUBTEST(test_from_string_pure_const, NULL);
+    TEST_RUN_SUBTEST(test_from_string_arithmetic, NULL);
+    TEST_RUN_SUBTEST(test_from_string_functions, NULL);
+    TEST_RUN_SUBTEST(test_from_string_special_functions, NULL);
+    TEST_RUN_SUBTEST(test_from_string_named_consts, NULL);
+    TEST_RUN_SUBTEST(test_from_string_bracketed_names, NULL);
+    TEST_RUN_SUBTEST(test_from_string_number_literals, NULL);
+    TEST_RUN_SUBTEST(test_from_string_name_normalization, NULL);
+    TEST_RUN_SUBTEST(test_from_string_implicit_symbolic_bindings, NULL);
+    TEST_RUN_SUBTEST(test_from_string_ascii_alternatives, NULL);
+    TEST_RUN_SUBTEST(test_from_string_errors, NULL);
+    TEST_RUN_SUBTEST(test_from_expression_string_api, NULL);
+    TEST_RUN_SUBTEST(test_from_string_bindings_api, NULL);
+    TEST_RUN_SUBTEST(test_from_string_round_trips, NULL);
+    TEST_RUN_SUBTEST(test_from_string_deriv, NULL);
 }

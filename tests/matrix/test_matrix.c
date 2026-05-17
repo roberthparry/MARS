@@ -1,6 +1,21 @@
-#define TEST_CONFIG_MODE TEST_CONFIG_GLOBAL
-#define TEST_CONFIG_MAIN
 #include "test_matrix.h"
+
+TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
+static bool test_matrix_suite_setup(void);
+TEST_SUITE_SETUP(test_matrix_suite_setup);
+
+static bool test_matrix_suite_setup(void)
+{
+    test_register_validity_checker("matrix-double-default",
+                                   matrix_validity_contract_double_default());
+    test_register_validity_checker("matrix-mp-real-default",
+                                   matrix_validity_contract_mp_real_default());
+    test_register_validity_checker("matrix-complex-default",
+                                   matrix_validity_contract_complex_default());
+    return TEST_REQUIRE_VALIDITY_CHECKER("matrix-double-default") &&
+           TEST_REQUIRE_VALIDITY_CHECKER("matrix-mp-real-default") &&
+           TEST_REQUIRE_VALIDITY_CHECKER("matrix-complex-default");
+}
 
 static int run_readme_example(void)
 {
@@ -82,7 +97,7 @@ static int run_readme_string_quantum_example(void)
 
     H2 = mat_pow_int(H, 2);
     P = mat_charpoly(H);
-    if (mat_eigenvalues(H, evals) != 0 || !H2 || !P) {
+    if (mat_eigenvalues_dv(H, evals) != 0 || !H2 || !P) {
         num_destroy(&omega);
         num_destroy(&delta);
         for (size_t i = 0; i < 2; ++i)
@@ -94,7 +109,7 @@ static int run_readme_string_quantum_example(void)
         return 1;
     }
 
-    if (mat_trace(H, &trace) != 0) {
+    if (mat_trace_dv(H, &trace) != 0) {
         num_destroy(&omega);
         num_destroy(&delta);
         for (size_t i = 0; i < 2; ++i)
@@ -163,27 +178,40 @@ static int run_readme_string_quantum_example(void)
     return 0;
 }
 
-static void test_readme_example(void)
+static void test_readme_example_hermitian_eigendecomposition(void)
 {
-    printf(C_BOLD C_YELLOW "\n=== README Examples ===\n" C_RESET);
-    printf(C_BOLD C_WHITE "\nexample 1:\n" C_RESET);
     check_bool("README example 1 runs", run_readme_example() == 0);
-    printf("\n");
-    printf(C_BOLD C_WHITE "example 2:\n" C_RESET);
+}
+
+static void test_readme_example_string_quantum(void)
+{
     check_bool("README example 2 runs", run_readme_string_quantum_example() == 0);
-    printf("\n");
 }
 
 /* ------------------------------------------------------------------ tests_main */
 int tests_main(void)
 {
+    TEST_SECTION("Core");
     run_matrix_core_tests();
+
+    TEST_SECTION("Functions");
     run_matrix_function_tests();
     run_matrix_function_regression_tests();
+
+    TEST_SECTION("String Parsing");
     run_matrix_fromstring_tests();
+
+    TEST_SECTION("String Formatting");
     run_matrix_tostring_tests();
+
+    TEST_SECTION("Output");
     run_matrix_output_tests();
-    RUN_TEST_CASE(test_readme_example);
+
+    TEST_SECTION("README");
+    TEST_RUN_OUTPUT_TAGS(test_readme_example_hermitian_eigendecomposition,
+                         "matrix,readme,output");
+    TEST_RUN_OUTPUT_TAGS(test_readme_example_string_quantum,
+                         "matrix,readme,output");
 
     clear_matrix_input_context();
     return TESTS_EXIT_CODE();

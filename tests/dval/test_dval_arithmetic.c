@@ -129,18 +129,18 @@ void test_div_num(void)
 
 void test_arithmetic(void)
 {
-    RUN_SUBTEST(test_add);
-    RUN_SUBTEST(test_sub);
-    RUN_SUBTEST(test_mul);
-    RUN_SUBTEST(test_div);
-    RUN_SUBTEST(test_mixed);
+    TEST_RUN_SUBTEST(test_add, NULL);
+    TEST_RUN_SUBTEST(test_sub, NULL);
+    TEST_RUN_SUBTEST(test_mul, NULL);
+    TEST_RUN_SUBTEST(test_div, NULL);
+    TEST_RUN_SUBTEST(test_mixed, NULL);
 }
 
 void test_d_variants(void)
 {
-    RUN_SUBTEST(test_add_num);
-    RUN_SUBTEST(test_mul_num);
-    RUN_SUBTEST(test_div_num);
+    TEST_RUN_SUBTEST(test_add_num, NULL);
+    TEST_RUN_SUBTEST(test_mul_num, NULL);
+    TEST_RUN_SUBTEST(test_div_num, NULL);
 }
 
 /* ------------------------------------------------------------------------- */

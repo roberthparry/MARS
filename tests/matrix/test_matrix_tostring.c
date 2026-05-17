@@ -317,10 +317,10 @@ static void test_mat_to_string_symbolic_derivative_roundtrip(void)
 
 void run_matrix_tostring_tests(void)
 {
-    RUN_TEST_CASE(test_mat_to_string_numeric);
-    RUN_TEST_CASE(test_mat_to_string_number_precision);
-    RUN_TEST_CASE(test_mat_to_string_symbolic);
-    RUN_TEST_CASE(test_mat_to_string_symbolic_all_nan_elides_wrapper);
-    RUN_TEST_CASE(test_mat_to_string_symbolic_roundtrip);
-    RUN_TEST_CASE(test_mat_to_string_symbolic_derivative_roundtrip);
+    TEST_RUN_CASE(test_mat_to_string_numeric, NULL);
+    TEST_RUN_CASE(test_mat_to_string_number_precision, NULL);
+    TEST_RUN_CASE(test_mat_to_string_symbolic, NULL);
+    TEST_RUN_CASE(test_mat_to_string_symbolic_all_nan_elides_wrapper, NULL);
+    TEST_RUN_CASE(test_mat_to_string_symbolic_roundtrip, NULL);
+    TEST_RUN_CASE(test_mat_to_string_symbolic_derivative_roundtrip, NULL);
 }

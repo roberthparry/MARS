@@ -2,8 +2,8 @@
 
 void test_dval_t_to_string(void)
 {
-    RUN_SUBTEST(test_to_string_all);
-    RUN_SUBTEST(test_expressions);
-    RUN_SUBTEST(test_expressions_unnamed);
-    RUN_SUBTEST(test_expressions_longname);
+    TEST_RUN_SUBTEST(test_to_string_all, NULL);
+    TEST_RUN_SUBTEST(test_expressions, NULL);
+    TEST_RUN_SUBTEST(test_expressions_unnamed, NULL);
+    TEST_RUN_SUBTEST(test_expressions_longname, NULL);
 }

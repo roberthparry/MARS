@@ -13,7 +13,9 @@
 /* Globals */
 
 static dictionary_t       *g_root  = NULL;
+static dictionary_t       *g_seen_root = NULL;
 static int           g_mode  = TEST_CONFIG_MODE;
+static bool          g_prune_enabled = true;
 
 /* Track whether we've attempted to load JSON in this process */
 static bool          g_loaded = false;
@@ -21,8 +23,11 @@ static bool          g_loaded = false;
 /* LOCAL mode: store the real test filename (basename only) */
 static string_t     *g_local_filename = NULL;
 
+typedef struct _test_value test_value_t;
+
 /* Forward declarations for path helpers used before their definitions. */
 static string_t *normalize_test_file_path(const char *file);
+static bool ensure_group_path(dictionary_t *dict, const char *path, test_value_t *out);
 
 /* string_t* key helpers */
 
@@ -67,11 +72,11 @@ static void string_key_destroy(void *elem)
  *   content  — child dictionary (non-NULL only when is_node == true).
  *               Keys are string_t*, values are test_value_t.
  */
-typedef struct _test_value {
+struct _test_value {
     bool     is_node;
     bool     enabled;
     dictionary_t  *content;
-} test_value_t;
+};
 
 void test_value_clone(void *dst, const void *src)
 {
@@ -190,6 +195,9 @@ static void ensure_root_created(void)
     if (g_root)
         return;
 
+    if (g_mode == TEST_CONFIG_NONE)
+        return;
+
     if (g_mode == TEST_CONFIG_GLOBAL) {
         g_root = dictionary_create(
             sizeof(string_t *),
@@ -207,10 +215,38 @@ static void ensure_root_created(void)
     }
 }
 
+static void ensure_seen_root_created(void)
+{
+    if (g_seen_root)
+        return;
+
+    if (g_mode == TEST_CONFIG_NONE)
+        return;
+
+    if (g_mode == TEST_CONFIG_GLOBAL) {
+        g_seen_root = dictionary_create(
+            sizeof(string_t *),
+            sizeof(dictionary_t *),
+            string_key_hash,
+            string_key_cmp,
+            string_key_clone,
+            string_key_destroy,
+            NULL,
+            dictptr_clone,
+            dictptr_destroy
+        );
+    } else {
+        g_seen_root = create_file_dict();
+    }
+}
+
 /* File-level dictionary helpers */
 
 static dictionary_t *ensure_file_dict(const char *file)
 {
+    if (g_mode == TEST_CONFIG_NONE)
+        return NULL;
+
     ensure_root_created();
 
     if (g_mode == TEST_CONFIG_GLOBAL) {
@@ -261,6 +297,39 @@ static dictionary_t *ensure_file_dict(const char *file)
     return g_root;
 }
 
+static dictionary_t *ensure_seen_file_dict(const char *file)
+{
+    if (g_mode == TEST_CONFIG_NONE)
+        return NULL;
+
+    ensure_seen_root_created();
+
+    if (g_mode == TEST_CONFIG_GLOBAL) {
+        string_t *normalized_key = normalize_test_file_path(file);
+        dictionary_t *file_dict = NULL;
+
+        if (!normalized_key)
+            return NULL;
+
+        if (dictionary_get(g_seen_root, &normalized_key, &file_dict) && file_dict) {
+            string_free(normalized_key);
+            return file_dict;
+        }
+
+        file_dict = create_file_dict();
+        if (!file_dict) {
+            string_free(normalized_key);
+            return NULL;
+        }
+
+        dictionary_set(g_seen_root, &normalized_key, &file_dict);
+        string_free(normalized_key);
+        return file_dict;
+    }
+
+    return g_seen_root;
+}
+
 /* Per-dictionary test helpers */
 
 static bool get_test(dictionary_t *dict, const char *name, test_value_t *out)
@@ -292,6 +361,83 @@ static void ensure_leaf(dictionary_t *dict, const char *name, test_value_t *out)
     out->enabled = true;
     out->content = NULL;
     set_test(dict, name, out);
+}
+
+static void ensure_group(dictionary_t *dict, const char *name, test_value_t *out)
+{
+    bool enabled = true;
+
+    if (get_test(dict, name, out)) {
+        if (out->is_node && out->content)
+            return;
+        enabled = out->enabled;
+    }
+
+    out->is_node = true;
+    out->enabled = enabled;
+    out->content = create_file_dict();
+    if (!out->content)
+        return;
+    set_test(dict, name, out);
+}
+
+static void mark_seen_path(const char *file, const char *func, const char *parent)
+{
+    dictionary_t *file_dict;
+    test_value_t pv;
+    test_value_t cv;
+
+    if (g_mode == TEST_CONFIG_NONE || !file || !func)
+        return;
+
+    file_dict = ensure_seen_file_dict(file);
+    if (!file_dict)
+        return;
+
+    if (!parent || !*parent) {
+        ensure_leaf(file_dict, func, &cv);
+        return;
+    }
+
+    if (!ensure_group_path(file_dict, parent, &pv) || !pv.content)
+        return;
+
+    ensure_leaf(pv.content, func, &cv);
+}
+
+static bool ensure_group_path(dictionary_t *dict, const char *path, test_value_t *out)
+{
+    const char *dot;
+    char segment[256];
+    test_value_t value;
+
+    if (!dict || !path || !*path)
+        return false;
+
+    dot = strchr(path, '.');
+    if (dot) {
+        size_t len = (size_t)(dot - path);
+
+        if (len >= sizeof(segment))
+            len = sizeof(segment) - 1u;
+        memcpy(segment, path, len);
+        segment[len] = '\0';
+    } else {
+        strncpy(segment, path, sizeof(segment));
+        segment[sizeof(segment) - 1] = '\0';
+    }
+
+    ensure_group(dict, segment, &value);
+    if (!value.content)
+        return false;
+
+    if (!dot) {
+        if (out)
+            *out = value;
+        return true;
+    }
+
+    return ensure_group_path(value.content, dot + 1, out);
 }
 
 /* JSON loader */
@@ -529,6 +675,9 @@ static bool parse_object(json_stream_t *s, dictionary_t **dictp)
  */
 static bool parse_root(json_stream_t *s)
 {
+    if (g_mode == TEST_CONFIG_NONE)
+        return false;
+
     ensure_root_created();
 
     /* LOCAL mode: root is a single dictionary */
@@ -594,6 +743,11 @@ static void load_json_if_needed(void)
     if (g_loaded)
         return;
 
+    if (g_mode == TEST_CONFIG_NONE) {
+        g_loaded = true;
+        return;
+    }
+
     /* In LOCAL mode we must know the filename before loading */
     if (g_mode == TEST_CONFIG_LOCAL && !g_local_filename)
         return;
@@ -636,6 +790,7 @@ static void load_json_if_needed(void)
     json_stream_t s;
     json_stream_init(&s, buf, n);
     if (!parse_root(&s)) {
+        fprintf(stderr, "test_config: failed to parse configuration JSON; ignoring loaded state\n");
         if (g_root) {
             dictionary_destroy(g_root);
             g_root = NULL;
@@ -730,70 +885,109 @@ static bool find_node_recursive(dictionary_t  *dict,
     return find_node_recursive(v.content, dot + 1, out_value, out_parent);
 }
 
-/* Compute effective enabled state for a node by name */
-
-static bool find_effective_enabled(dictionary_t *dict,
-                                   const char *name,
-                                   bool ancestors_enabled,
-                                   bool *out_enabled)
+static bool find_node_with_effective_enabled(dictionary_t  *dict,
+                                             const char    *path,
+                                             bool           ancestors_enabled,
+                                             test_value_t  *out_value,
+                                             dictionary_t **out_parent,
+                                             bool          *out_enabled)
 {
-    if (!dict || !name)
+    const char *dot;
+    char segment[256];
+    string_t *key;
+    test_value_t value;
+    bool found;
+    bool current_enabled;
+
+    if (!dict || !path || !*path)
         return false;
 
-    size_t count = dictionary_size(dict);
+    dot = strchr(path, '.');
+    if (dot) {
+        size_t len = (size_t)(dot - path);
 
-    for (size_t i = 0; i < count; i++) {
-        const void *key_ptr = dictionary_get_key(dict, i);
-        const void *val_ptr = dictionary_get_value(dict, i);
-        if (!key_ptr || !val_ptr)
-            continue;
+        if (len >= sizeof(segment))
+            len = sizeof(segment) - 1u;
+        memcpy(segment, path, len);
+        segment[len] = '\0';
+    } else {
+        strncpy(segment, path, sizeof(segment));
+        segment[sizeof(segment) - 1] = '\0';
+    }
 
-        string_t     *key = *(string_t * const *)key_ptr;
-        test_value_t *val = (test_value_t *)val_ptr;
+    key = string_new_with(segment);
+    if (!key)
+        return false;
 
-        /* File-level enabled is ignored — treat file as always enabled */
-        bool current_enabled = ancestors_enabled && val->enabled;
+    found = dictionary_get(dict, &key, &value);
+    string_free(key);
+    if (!found)
+        return false;
 
-        if (strcmp(string_c_str(key), name) == 0) {
-            if (out_enabled)
-                *out_enabled = current_enabled;
-            return true;
+    current_enabled = ancestors_enabled && value.enabled;
+
+    if (!dot) {
+        if (out_value)
+            *out_value = value;
+        if (out_parent)
+            *out_parent = dict;
+        if (out_enabled)
+            *out_enabled = current_enabled;
+        return true;
+    }
+
+    if (!value.is_node || !value.content)
+        return false;
+
+    return find_node_with_effective_enabled(value.content,
+                                            dot + 1,
+                                            current_enabled,
+                                            out_value,
+                                            out_parent,
+                                            out_enabled);
+}
+
+static bool is_valid_group_name(const char *name)
+{
+    const unsigned char *p = (const unsigned char *)name;
+
+    if (!p || !*p)
+        return false;
+
+    while (*p) {
+        if (!( (*p >= 'A' && *p <= 'Z') ||
+               (*p >= 'a' && *p <= 'z') ||
+               (*p == '_') ))
+            return false;
+
+        ++p;
+        while (*p && *p != '.') {
+            if (!( (*p >= 'A' && *p <= 'Z') ||
+                   (*p >= 'a' && *p <= 'z') ||
+                   (*p >= '0' && *p <= '9') ||
+                   (*p == '_') ))
+                return false;
+            ++p;
         }
 
-        if (val->is_node && val->content) {
-            if (find_effective_enabled(val->content,
-                                       name,
-                                       current_enabled,
-                                       out_enabled))
-                return true;
+        if (*p == '.') {
+            ++p;
+            if (!*p)
+                return false;
         }
     }
 
-    return false;
+    return true;
 }
 
 /* Returns true if any entry in dict is a node (i.e., a group). */
-static bool dictionary_has_any_group(dictionary_t *dict)
-{
-    size_t count = dictionary_size(dict);
-
-    for (size_t i = 0; i < count; i++) {
-        const void *val_ptr = dictionary_get_value(dict, i);
-        if (!val_ptr)
-            continue;
-
-        const test_value_t *v = val_ptr;
-        if (v->is_node)
-            return true;
-    }
-
-    return false;
-}
-
 /* Public API */
 
 int test_enabled(const char *file, const char *func, const char *parent)
 {
+    if (g_mode == TEST_CONFIG_NONE)
+        return 1;
+
     /* Always record the test file name */
     if (!g_local_filename)
         g_local_filename = string_new_with(file);
@@ -803,54 +997,51 @@ int test_enabled(const char *file, const char *func, const char *parent)
 
     /* -------------------- no parent: top-level test -------------------- */
     if (!parent) {
-
-        /* If groups exist, do NOT create flat tests */
-        if (dictionary_has_any_group(file_dict))
-            return 1;
-
         test_value_t v;
+
+        mark_seen_path(file, func, parent);
 
         if (get_test(file_dict, func, &v))
             return v.enabled ? 1 : 0;
 
         ensure_leaf(file_dict, func, &v);
-
         return 1;
     }
+
+    if (!is_valid_group_name(parent)) {
+        fprintf(stderr,
+                "test_config: invalid parent group path '%s' for test '%s'; use identifiers joined by '.' via test_run_subtest() or test_run_in_group()\n",
+                parent,
+                func ? func : "(unknown)");
+        return 0;
+    }
+
+    mark_seen_path(file, func, parent);
 
     /* -------------------- parent: check effective enabled --------------- */
     bool parent_effective_enabled = true;
 
-    if (find_effective_enabled(file_dict,
-                               parent,
-                               true,
-                               &parent_effective_enabled)) {
+    /* -------------------- parent lookup/registration -------------------- */
+    test_value_t pv;
+    dictionary_t *parent_dict = NULL;
+
+    if (find_node_with_effective_enabled(file_dict,
+                                         parent,
+                                         true,
+                                         &pv,
+                                         &parent_dict,
+                                         &parent_effective_enabled)) {
         if (!parent_effective_enabled)
             return 0;
     }
 
-    /* -------------------- ensure parent node exists --------------------- */
-    test_value_t pv;
-    dictionary_t *parent_dict = NULL;
-
-    if (!find_node_recursive(file_dict, parent, &pv, &parent_dict)) {
-
-        pv.is_node = true;
-        pv.enabled = true;
-        pv.content = create_file_dict();
-        set_test(file_dict, parent, &pv);
-
-        parent_dict = file_dict;
-    }
-
-    if (!pv.is_node || !pv.content) {
-
-        pv.is_node = true;
-        pv.enabled = true;
-        pv.content = create_file_dict();
-        if (!parent_dict)
-            parent_dict = file_dict;
-        set_test(parent_dict, parent, &pv);
+    if (!find_node_recursive(file_dict, parent, &pv, &parent_dict) ||
+        !pv.is_node || !pv.content) {
+        if (!ensure_group_path(file_dict, parent, &pv))
+            return 1;
+        if (!find_node_recursive(file_dict, parent, &pv, &parent_dict) ||
+            !pv.is_node || !pv.content)
+            return 1;
     }
 
     dictionary_t *current = pv.content;
@@ -861,15 +1052,16 @@ int test_enabled(const char *file, const char *func, const char *parent)
     if (get_test(current, func, &cv))
         return cv.enabled ? 1 : 0;
 
-    /* Missing child → default true and create */
     ensure_leaf(current, func, &cv);
-
     return 1;
 }
 
 
 bool test_config_has_key(const char *file, const char *func, const char *parent)
 {
+    if (g_mode == TEST_CONFIG_NONE)
+        return false;
+
     if (g_mode == TEST_CONFIG_LOCAL && !g_local_filename)
         g_local_filename = string_new_with(file);
 
@@ -882,11 +1074,19 @@ bool test_config_has_key(const char *file, const char *func, const char *parent)
         return get_test(file_dict, func, &v);
     }
 
+    if (!is_valid_group_name(parent))
+        return false;
+
     /* -------------------- find parent anywhere -------------------- */
     test_value_t pv;
     dictionary_t *parent_dict = NULL;
 
-    if (!find_node_recursive(file_dict, parent, &pv, &parent_dict))
+    if (!find_node_with_effective_enabled(file_dict,
+                                          parent,
+                                          true,
+                                          &pv,
+                                          &parent_dict,
+                                          NULL))
         return false;
 
     if (!pv.is_node || !pv.content)
@@ -895,6 +1095,103 @@ bool test_config_has_key(const char *file, const char *func, const char *parent)
     /* -------------------- lookup child -------------------- */
     test_value_t cv;
     return get_test(pv.content, func, &cv);
+}
+
+static dictionary_t *create_pruned_test_dict(dictionary_t *actual, dictionary_t *seen)
+{
+    size_t i;
+    dictionary_t *pruned;
+    test_value_t enabled_value;
+
+    if (!seen)
+        return create_file_dict();
+
+    pruned = create_file_dict();
+    if (!pruned)
+        return NULL;
+
+    if (actual && get_test(actual, "enabled", &enabled_value))
+        set_test(pruned, "enabled", &enabled_value);
+
+    for (i = 0; i < dictionary_size(seen); ++i) {
+        const void *key_ptr = dictionary_get_key(seen, i);
+        const void *val_ptr = dictionary_get_value(seen, i);
+        string_t *key;
+        const char *kstr;
+        const test_value_t *seen_value;
+        test_value_t actual_value;
+        test_value_t preserved_value;
+        bool have_actual = false;
+
+        if (!key_ptr || !val_ptr)
+            continue;
+
+        key = *(string_t * const *)key_ptr;
+        kstr = string_c_str(key);
+        seen_value = (const test_value_t *)val_ptr;
+
+        if (strcmp(kstr, "enabled") == 0)
+            continue;
+
+        if (actual)
+            have_actual = get_test(actual, kstr, &actual_value);
+
+        if (seen_value->is_node) {
+            preserved_value.is_node = true;
+            preserved_value.enabled = have_actual ? actual_value.enabled : seen_value->enabled;
+            preserved_value.content = create_pruned_test_dict(
+                (have_actual && actual_value.is_node) ? actual_value.content : NULL,
+                seen_value->content);
+        } else {
+            preserved_value.is_node = false;
+            preserved_value.enabled = have_actual ? actual_value.enabled : seen_value->enabled;
+            preserved_value.content = NULL;
+        }
+
+        set_test(pruned, kstr, &preserved_value);
+    }
+
+    return pruned;
+}
+
+static void prune_unseen_entries(void)
+{
+    if (!g_prune_enabled || g_mode == TEST_CONFIG_NONE || !g_root || !g_seen_root)
+        return;
+
+    if (g_mode == TEST_CONFIG_LOCAL) {
+        dictionary_t *pruned = create_pruned_test_dict(g_root, g_seen_root);
+
+        if (!pruned)
+            return;
+
+        dictionary_destroy(g_root);
+        g_root = pruned;
+        return;
+    }
+
+    for (size_t i = 0; i < dictionary_size(g_seen_root); ++i) {
+        const void *key_ptr = dictionary_get_key(g_seen_root, i);
+        const void *val_ptr = dictionary_get_value(g_seen_root, i);
+        string_t *file_key;
+        dictionary_t *seen_file_dict;
+        dictionary_t *actual_file_dict = NULL;
+
+        if (!key_ptr || !val_ptr)
+            continue;
+
+        file_key = *(string_t * const *)key_ptr;
+        seen_file_dict = *(dictionary_t * const *)val_ptr;
+
+        if (!dictionary_get(g_root, &file_key, &actual_file_dict) || !actual_file_dict)
+            continue;
+
+        dictionary_t *pruned = create_pruned_test_dict(actual_file_dict, seen_file_dict);
+        if (!pruned)
+            continue;
+
+        dictionary_set(g_root, &file_key, &pruned);
+    }
 }
 
 static void write_object_internal(FILE *f, dictionary_t *dict, int indent, bool is_file_level)
@@ -1003,8 +1300,13 @@ static void write_root(FILE *f)
 
 void test_config_save(void)
 {
+    if (g_mode == TEST_CONFIG_NONE)
+        return;
+
     if (!g_root)
         return;
+
+    prune_unseen_entries();
 
     string_t *path =
         (g_mode == TEST_CONFIG_GLOBAL)
@@ -1041,16 +1343,28 @@ static void reset_state(void)
         g_root = NULL;
     }
 
+    if (g_seen_root) {
+        dictionary_destroy(g_seen_root);
+        g_seen_root = NULL;
+    }
+
     if (g_local_filename) {
         string_free(g_local_filename);
         g_local_filename = NULL;
     }
 }
 
+void test_config_set_prune_enabled(bool enabled)
+{
+    g_prune_enabled = enabled;
+}
+
 void test_config_set_mode(test_config_mode_t mode)
 {
     reset_state();
     g_mode = mode;
+    g_loaded = false;
+    g_prune_enabled = true;
 }
 
 void test_config_shutdown(void)

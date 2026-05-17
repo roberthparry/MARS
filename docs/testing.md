@@ -61,6 +61,73 @@ make test_integrator
 - The test output is intended to read cleanly in a normal terminal or in the
   Visual Studio Code integrated terminal.
 
+## Recommended Suite Shape
+
+The harness works best when each suite keeps a clear boundary between
+infrastructure and domain semantics.
+
+- The harness should own execution, grouping, counting, skip/fail handling,
+  file/line reporting, fixtures, and generic validity plumbing.
+- The suite should own what counts as a valid result for its domain.
+- Presentation checks should stay explicit; they should not be hidden inside a
+  generic validity contract.
+
+In practice, the recommended pattern is:
+
+1. Declare a config mode with `TEST_SUITE_CONFIG(...)`.
+2. Register named validity checkers in `TEST_SUITE_SETUP(...)`.
+3. Require those checkers in setup with `TEST_REQUIRE_VALIDITY_CHECKER(...)`.
+4. Expose a small suite-local assertion vocabulary in the suite header.
+5. Allow multiple semantic validity lanes when the suite genuinely needs them.
+   A mature suite often needs more than one notion of correctness:
+   exact equality, tolerance-aware equality, mp-real equality, complex
+   equality, and presentation or string rendering checks.
+6. Keep README/example/output cases on the output lane with
+   `TEST_RUN_OUTPUT(...)` or `TEST_RUN_OUTPUT_TAGS(...)`.
+7. Remove old suite-local comparison engines once the harness-backed validity
+   path is established. Remaining helpers should be thin wrappers for
+   expected-value construction, labeling, or other domain-specific setup.
+
+Output examples still participate in config discovery, enable/disable
+selection, filtering, and machine-readable reporting, but they are counted
+separately from correctness cases in the terminal summary.
+
+The current model suites are:
+
+- `qfloat`: suite-owned closeness contracts, including tolerance-aware variants
+  for numerically sensitive regions.
+- `mfloat`: suite-owned absolute and relative validity modes.
+- `mcomplex`: a suite-owned default complex validity lane plus explicit
+  precision-bit-aware variants for branch-sensitive and numerically harder
+  regions, while keeping rich complex-value diagnostics local to the suite.
+- `number`: separate lanes for semantic value equality, exact string rendering,
+  and prefix/presentation checks.
+- `matrix`: suite-owned double, mp-real, and complex validity lanes; output
+  examples on the output lane; and no remaining parallel legacy comparison
+  subsystem.
+
+Those five suites now show the intended end-state of the harness more clearly
+than older compatibility-era suites.
+
+## Recommended Authoring Pattern
+
+For a new or modernized suite, the preferred shape is:
+
+1. Put foundational readiness checks in `TEST_SUITE_SETUP(...)`.
+2. Register one or more named validity contracts there.
+3. Require those contracts before any case runs.
+4. Expose a tiny suite-local vocabulary such as:
+   `ASSERT_QFLOAT_CLOSE(...)`, `ASSERT_NUMBER_EQ(...)`, or
+   `TEST_ASSERT_MATRIX_D_CLOSE(...)`.
+5. Use fixtures for per-case resources and harness helpers for temporary files,
+   directories, environment overrides, and stream capture.
+6. Keep semantic equality checks on the validity path.
+7. Keep formatting, presentation, and README checks explicit.
+
+The important rule is that the harness should not need to know your domain
+semantics in advance. The suite provides those semantics; the harness provides
+the execution, reporting, and failure machinery.
+
 ## Benchmarks
 
 The repository also includes focused benchmark targets. For the current symbolic
@@ -83,7 +150,10 @@ specific notes and sample results.
 
 ## Enabling and Disabling Tests
 
-Individual tests and whole groups can be skipped without recompilation by editing `tests/test_config.json`. The harness reads this file at startup and writes it back on exit, so any new tests that have never appeared in the file are automatically added as `true` on first run.
+Individual tests and whole groups can be skipped without recompilation by
+editing `tests/test_config.json`. The harness reads this file at startup and
+regenerates missing keys in the enabled state during a full discovery run, so
+new tests automatically appear as `true` on first run.
 
 A missing key always means **enabled**. Set a value to `false` to skip it.
 
@@ -133,7 +203,11 @@ Test files declare one of two modes before including `test_harness.h`:
 |---|---|
 | `TEST_CONFIG_GLOBAL` | `tests/test_config.json` (shared by all test binaries) |
 | `TEST_CONFIG_LOCAL` | `<normalised test source path>.json` (one file per test binary) |
+| `TEST_CONFIG_NONE` | no config file is read or written |
 
-For example, `tests/test_config/test_test_config.c` uses `tests/test_config/test_test_config.json` in local mode.
+For example, `tests/test_test_config/test_test_config.c` uses
+`tests/test_test_config/test_test_config.json` in local mode.
 
-All current test files use `TEST_CONFIG_GLOBAL`, so `tests/test_config.json` is the single place to control everything.
+Use `TEST_CONFIG_NONE` for foundational suites such as `string` and
+`dictionary`, where the test infrastructure itself depends on those modules
+being healthy.

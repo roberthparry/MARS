@@ -32,15 +32,9 @@ static void test_qf_pow_int()
         /* THIS LINE WAS MISSING */
         qf_to_string(r, buf, sizeof(buf));
 
-        if (qf_close(r, expected, 1e-30)) {
-            printf("%s  OK: %s^%d = %s%s\n",
-                   C_GREEN, cases[i].x, cases[i].n, buf, C_RESET);
-        } else {
-            printf("%s  FAIL: %s^%d%s  [%s:%d]\n", C_RED, cases[i].x, cases[i].n, C_RESET, __FILE__, __LINE__);
-            printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", cases[i].expected);
-            TEST_FAIL();
-        }
+        TEST_ASSERT_QFLOAT_CLOSE(r, expected);
+        printf("%s  OK: %s^%d = %s%s\n",
+               C_GREEN, cases[i].x, cases[i].n, buf, C_RESET);
     }
 }
 
@@ -56,14 +50,8 @@ static void test_qf_pow()
         qfloat_t expected = qf_from_double(8.0);
         qf_to_string(r, buf, sizeof(buf));
 
-        if (qf_close(r, expected, 1e-30)) {
-            printf("%s  OK: 2^3 = %s%s\n", C_GREEN, buf, C_RESET);
-        } else {
-            printf("%s  FAIL: 2^3%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
-            printf("    got      = %s\n", buf);
-            printf("    expected = 8\n");
-            TEST_FAIL();
-        }
+        TEST_ASSERT_QFLOAT_CLOSE(r, expected);
+        printf("%s  OK: 2^3 = %s%s\n", C_GREEN, buf, C_RESET);
     }
 
     /* 2) 9^0.5 = 3 */
@@ -72,14 +60,8 @@ static void test_qf_pow()
         qfloat_t expected = qf_from_double(3.0);
         qf_to_string(r, buf, sizeof(buf));
 
-        if (qf_close(r, expected, 1e-30)) {
-            printf("%s  OK: 9^0.5 = %s%s\n", C_GREEN, buf, C_RESET);
-        } else {
-            printf("%s  FAIL: 9^0.5%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
-            printf("    got      = %s\n", buf);
-            printf("    expected = 3\n");
-            TEST_FAIL();
-        }
+        TEST_ASSERT_QFLOAT_CLOSE(r, expected);
+        printf("%s  OK: 9^0.5 = %s%s\n", C_GREEN, buf, C_RESET);
     }
 
     /* 3) 0^5 = 0 */
@@ -88,14 +70,8 @@ static void test_qf_pow()
         qfloat_t expected = qf_from_double(0.0);
         qf_to_string(r, buf, sizeof(buf));
 
-        if (qf_close(r, expected, 1e-30)) {
-            printf("%s  OK: 0^5 = %s%s\n", C_GREEN, buf, C_RESET);
-        } else {
-            printf("%s  FAIL: 0^5%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
-            printf("    got      = %s\n", buf);
-            printf("    expected = 0\n");
-            TEST_FAIL();
-        }
+        TEST_ASSERT_QFLOAT_CLOSE(r, expected);
+        printf("%s  OK: 0^5 = %s%s\n", C_GREEN, buf, C_RESET);
     }
 
     /* 4) 0^-1 → NaN */
@@ -119,14 +95,8 @@ static void test_qf_pow()
         qfloat_t expected = qf_from_double(-8.0);
         qf_to_string(r, buf, sizeof(buf));
 
-        if (qf_close(r, expected, 1e-30)) {
-            printf("%s  OK: (-2)^3 = %s%s\n", C_GREEN, buf, C_RESET);
-        } else {
-            printf("%s  FAIL: (-2)^3%s  [%s:%d]\n", C_RED, C_RESET, __FILE__, __LINE__);
-            printf("    got      = %s\n", buf);
-            printf("    expected = -8\n");
-            TEST_FAIL();
-        }
+        TEST_ASSERT_QFLOAT_CLOSE(r, expected);
+        printf("%s  OK: (-2)^3 = %s%s\n", C_GREEN, buf, C_RESET);
     }
 
     /* 6) (-2)^0.5 → NaN */
@@ -168,20 +138,14 @@ static void test_qf_pow10(void)
 
         qf_to_string(r, buf, sizeof(buf));
 
-        if (qf_close(r, expected, 1e-30)) {
-            printf("%s  OK: 10^%d = %s%s\n",
-                   C_GREEN, cases[i].n, buf, C_RESET);
-        } else {
-            printf("%s  FAIL: 10^%d%s  [%s:%d]\n", C_RED, cases[i].n, C_RESET, __FILE__, __LINE__);
-            printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", cases[i].expected);
-            TEST_FAIL();
-        }
+        TEST_ASSERT_QFLOAT_CLOSE(r, expected);
+        printf("%s  OK: 10^%d = %s%s\n",
+               C_GREEN, cases[i].n, buf, C_RESET);
     }
 }
 
 void test_power(void) {
-    RUN_SUBTEST(test_qf_pow_int);
-    RUN_SUBTEST(test_qf_pow);
-    RUN_SUBTEST(test_qf_pow10);
+    TEST_RUN_SUBTEST(test_qf_pow_int, NULL);
+    TEST_RUN_SUBTEST(test_qf_pow, NULL);
+    TEST_RUN_SUBTEST(test_qf_pow10, NULL);
 }

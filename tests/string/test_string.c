@@ -1,11 +1,14 @@
 #include "ustring.h"
 #include "test_string.h"
+#include <stdio.h>
+
+TEST_SUITE_CONFIG(TEST_CONFIG_NONE);
 
 /* ------------------------------------------------------------------------- */
 /* Tests                                                                     */
 /* ------------------------------------------------------------------------- */
 
-int test_split_basic(void)
+static void test_split_basic(void)
 {
     string_t *s = string_new_with("alpha, beta , gamma ,delta");
 
@@ -25,10 +28,9 @@ int test_split_basic(void)
 
     string_split_free(parts, n);
     string_free(s);
-    return 0;
 }
 
-int test_join_basic(void)
+static void test_join_basic(void)
 {
     string_t *s = string_new_with("alpha, beta , gamma ,delta");
 
@@ -45,10 +47,9 @@ int test_join_basic(void)
     string_free(joined);
     string_split_free(parts, n);
     string_free(s);
-    return 0;
 }
 
-int test_split_edge_cases(void)
+static void test_split_edge_cases(void)
 {
     // Leading, trailing, repeated delimiters
     string_t *s = string_new_with(",a,,b,");
@@ -63,10 +64,9 @@ int test_split_edge_cases(void)
 
     string_split_free(parts, n);
     string_free(s);
-    return 0;
 }
 
-int test_join_empty_fields(void)
+static void test_join_empty_fields(void)
 {
     // Join empty strings
     string_t *a = string_new_with("");
@@ -83,10 +83,9 @@ int test_join_empty_fields(void)
     string_free(a);
     string_free(b);
     string_free(c);
-    return 0;
 }
 
-int test_string_replace(void)
+static void test_string_replace(void)
 {
     string_t *s = string_new_with("the cat sat on the mat");
     string_replace(s, "at", "oodle");
@@ -94,10 +93,9 @@ int test_string_replace(void)
     ASSERT_STREQ(string_c_str(s), "the coodle soodle on the moodle");
 
     string_free(s);
-    return 0;
 }
 
-int test_append_format(void)
+static void test_append_format(void)
 {
     string_t *s = string_new_with("Hello");
 
@@ -111,10 +109,9 @@ int test_append_format(void)
     ASSERT_STREQ(string_c_str(s), "Hello universe 2 + 3 = 5");
 
     string_free(s);
-    return 0;
 }
 
-int test_starts_with_ends_with(void)
+static void test_starts_with_ends_with(void)
 {
     string_t *s = string_new_with("Hello universe!");
 
@@ -128,10 +125,9 @@ int test_starts_with_ends_with(void)
 
     string_free(sub);
     string_free(s);
-    return 0;
 }
 
-int test_to_upper_and_to_lower(void)
+static void test_to_upper_and_to_lower(void)
 {
     string_t *s = string_new_with("Hello World");
 
@@ -149,10 +145,9 @@ int test_to_upper_and_to_lower(void)
     string_free(a);
     string_free(b);
     string_free(s);
-    return 0;
 }
 
-int test_string_view(void)
+static void test_string_view(void)
 {
     string_t *s = string_new_with("Hello Universe");
 
@@ -169,10 +164,9 @@ int test_string_view(void)
     string_free(s);
     string_free(sub);
 
-    return 0;
 }
 
-int test_string_builder(void)
+static void test_string_builder(void)
 {
     string_t *s = string_new_with("alpha,beta,gamma,delta");
 
@@ -198,10 +192,9 @@ int test_string_builder(void)
 
     string_builder_free(b);
     string_free(s);
-    return 0;
 }
 
-int test_utf8_stuff(void)
+static void test_utf8_stuff(void)
 {
     string_t *s = string_new_with("Héllo 🌍");
 
@@ -211,10 +204,9 @@ int test_utf8_stuff(void)
     string_utf8_to_upper(s);
 
     string_free(s);
-    return 0;
 }
 
-int test_grapheme(void)
+static void test_grapheme(void)
 {
     string_t *s = string_new_with("👩‍👩‍👧‍👦 café 🇬🇧");
 
@@ -223,10 +215,9 @@ int test_grapheme(void)
     string_grapheme_reverse(s);
 
     string_free(s);
-    return 0;
 }
 
-int test_grapheme_reverse_and_substr(void)
+static void test_grapheme_reverse_and_substr(void)
 {
     string_t *s = string_new_with("👩‍👩‍👧‍👦 café 🇬🇧");
 
@@ -240,10 +231,9 @@ int test_grapheme_reverse_and_substr(void)
 
     string_free(sub);
     string_free(s);
-    return 0;
 }
 
-int test_norm_ascii_inplace(void)
+static void test_norm_ascii_inplace(void)
 {
     string_t *s = string_new_with("Hello World");
 
@@ -252,10 +242,9 @@ int test_norm_ascii_inplace(void)
     ASSERT_STREQ(string_c_str(s), "Hello World");
 
     string_free(s);
-    return 0;
 }
 
-int test_norm_combining_inplace(void)
+static void test_norm_combining_inplace(void)
 {
     string_t *s1 = string_new_with("é");   // NFD
     string_t *s2 = string_new_with("é");    // NFC
@@ -276,10 +265,9 @@ int test_norm_combining_inplace(void)
 
     string_free(s1);
     string_free(s2);
-    return 0;
 }
 
-int test_norm_hangul_inplace(void)
+static void test_norm_hangul_inplace(void)
 {
     string_t *s1 = string_new_with("가");  // NFD
     string_t *s2 = string_new_with("가");  // NFC
@@ -300,10 +288,9 @@ int test_norm_hangul_inplace(void)
 
     string_free(s1);
     string_free(s2);
-    return 0;
 }
 
-int test_norm_emoji_inplace(void)
+static void test_norm_emoji_inplace(void)
 {
     const char *emoji = "👩‍👩‍👧‍👦 🌍 🇬🇧";
     string_t *s = string_new_with(emoji);
@@ -313,10 +300,9 @@ int test_norm_emoji_inplace(void)
     ASSERT_STREQ(string_c_str(s), emoji);
 
     string_free(s);
-    return 0;
 }
 
-int test_norm_empty_inplace(void)
+static void test_norm_empty_inplace(void)
 {
     string_t *s = string_new_with("");
 
@@ -325,10 +311,9 @@ int test_norm_empty_inplace(void)
     ASSERT_STREQ(string_c_str(s), "");
 
     string_free(s);
-    return 0;
 }
 
-int test_norm_invalid_form_inplace(void)
+static void test_norm_invalid_form_inplace(void)
 {
     string_t *s = string_new_with("test");
 
@@ -337,10 +322,9 @@ int test_norm_invalid_form_inplace(void)
     ASSERT_STREQ(string_c_str(s), "test");
 
     string_free(s);
-    return 0;
 }
 
-int test_readme_example_Basic_UTF_8_Manipulation(void) {
+static void test_readme_example_Basic_UTF_8_Manipulation(void) {
     string_t *s = string_new_with("Héllo");
 
     /* Append UTF‑8 text */
@@ -356,10 +340,9 @@ int test_readme_example_Basic_UTF_8_Manipulation(void) {
 
     string_free(s);
 
-    return 0;
 }
 
-int test_readme_example_Grapheme_Iteration(void) {
+static void test_readme_example_Grapheme_Iteration(void) {
     string_t *s = string_new_with("👨‍👩‍👧‍👦 family");
 
     size_t count = string_grapheme_count(s);
@@ -373,10 +356,9 @@ int test_readme_example_Grapheme_Iteration(void) {
     }
 
     string_free(s);
-    return 0;
 }
 
-int test_readme_example_Using_the_Builder_API(void) {
+static void test_readme_example_Using_the_Builder_API(void) {
     string_builder_t *b = string_builder_new();
     string_builder_append(b, "Hello");
     string_builder_append(b, ", ");
@@ -388,47 +370,43 @@ int test_readme_example_Using_the_Builder_API(void) {
 
     string_free(out);
 
-    return 0;
 }
 
-int test_readme_examples(void) {
+static void example_readme_examples(void) {
     test_readme_example_Basic_UTF_8_Manipulation();
     test_readme_example_Grapheme_Iteration();
     test_readme_example_Using_the_Builder_API();
-    return 0;
 }
 
-/* ------------------------------------------------------------------------- */
-/* Main                                                                      */
-/* ------------------------------------------------------------------------- */
-
-int main(void)
+int tests_main(void)
 {
-    TEST(test_split_basic);
-    TEST(test_join_basic);
-    TEST(test_split_edge_cases);
-    TEST(test_join_empty_fields);
-    TEST(test_string_replace);
+    TEST_SECTION("Core");
+    TEST_RUN_CASE(test_split_basic, NULL);
+    TEST_RUN_CASE(test_join_basic, NULL);
+    TEST_RUN_CASE(test_split_edge_cases, NULL);
+    TEST_RUN_CASE(test_join_empty_fields, NULL);
+    TEST_RUN_CASE(test_string_replace, NULL);
 
-    TEST(test_append_format);
-    TEST(test_starts_with_ends_with);
-    TEST(test_to_upper_and_to_lower);
-    TEST(test_string_view);
-    TEST(test_string_builder);
-    TEST(test_utf8_stuff);
-    TEST(test_grapheme);
-    TEST(test_grapheme_reverse_and_substr);
+    TEST_SECTION("Builder And Views");
+    TEST_RUN_CASE(test_append_format, NULL);
+    TEST_RUN_CASE(test_starts_with_ends_with, NULL);
+    TEST_RUN_CASE(test_to_upper_and_to_lower, NULL);
+    TEST_RUN_CASE(test_string_view, NULL);
+    TEST_RUN_CASE(test_string_builder, NULL);
+    TEST_RUN_CASE(test_utf8_stuff, NULL);
+    TEST_RUN_CASE(test_grapheme, NULL);
+    TEST_RUN_CASE(test_grapheme_reverse_and_substr, NULL);
 
-    TEST(test_norm_ascii_inplace);
-    TEST(test_norm_combining_inplace);
-    TEST(test_norm_hangul_inplace);
-    TEST(test_norm_emoji_inplace);
-    TEST(test_norm_empty_inplace);
-    TEST(test_norm_invalid_form_inplace);
+    TEST_SECTION("Normalization");
+    TEST_RUN_CASE(test_norm_ascii_inplace, NULL);
+    TEST_RUN_CASE(test_norm_combining_inplace, NULL);
+    TEST_RUN_CASE(test_norm_hangul_inplace, NULL);
+    TEST_RUN_CASE(test_norm_emoji_inplace, NULL);
+    TEST_RUN_CASE(test_norm_empty_inplace, NULL);
+    TEST_RUN_CASE(test_norm_invalid_form_inplace, NULL);
 
-     printf("Running README examples...\n");
-     TEST(test_readme_examples);
+    TEST_SECTION("README");
+    TEST_RUN_OUTPUT_TAGS(example_readme_examples, "string,readme,output");
 
-    return tests_failed;
+    return TEST_EXIT_CODE();
 }
-

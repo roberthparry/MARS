@@ -6,6 +6,8 @@
 #include "number.h"
 #include "test_harness.h"
 
+const test_validity_contract_t *number_validity_contract_exact(void);
+
 void assert_number_string(const char *label,
                           number_t number,
                           const char *expected_text);
@@ -22,5 +24,17 @@ void run_number_constant_tests(void);
 void run_number_public_api_tests(void);
 void run_number_formatting_tests(void);
 void run_number_special_function_tests(void);
+
+#define TEST_ASSERT_NUMBER_EQ(actual, expected) \
+    do { \
+        number_t test_number_actual__ = (actual); \
+        number_t test_number_expected__ = (expected); \
+        TEST_ASSERT_VALID_NAMED("number-exact", \
+                                &test_number_actual__, \
+                                &test_number_expected__); \
+    } while (0)
+
+#define ASSERT_NUMBER_EQ(actual, expected) \
+    TEST_ASSERT_NUMBER_EQ((actual), (expected))
 
 #endif

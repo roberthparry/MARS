@@ -181,7 +181,7 @@ static void test_generic_unary_affine_matchers(void)
     check_q_at(__FILE__, __LINE__, 1, "generic unary constant", constant, qf_from_double(3.0));
     check_q_at(__FILE__, __LINE__, 1, "generic unary coeff x", coeffs[0], qf_from_double(1.0));
     check_q_at(__FILE__, __LINE__, 1, "generic unary coeff y", coeffs[1], qf_from_double(2.0));
-    ASSERT_TRUE(!dv_match_unary_affine_kind(sin_affine, (dv_pattern_unary_affine_kind_t)-1,
+    ASSERT_TRUE(!dv_match_unary_affine_kind(sin_affine, DV_PATTERN_UNARY_COS,
                                             2, vars, &constant, coeffs));
 
     dv_free(sin_affine);
@@ -998,22 +998,22 @@ static void test_generic_affine_poly_deg4_times_unary_matcher(void)
 
 void test_dval_pattern_helpers(void)
 {
-    RUN_SUBTEST(test_match_affine_families);
-    RUN_SUBTEST(test_generic_unary_affine_matchers);
-    RUN_SUBTEST(test_pattern_rejections);
-    RUN_SUBTEST(test_scaled_expr_and_var_usage);
-    RUN_SUBTEST(test_substitute_and_powd);
-    RUN_SUBTEST(test_square_affine_matchers);
-    RUN_SUBTEST(test_cube_affine_matchers);
-    RUN_SUBTEST(test_quartic_affine_matchers);
-    RUN_SUBTEST(test_affine_times_exp_affine_matcher);
-    RUN_SUBTEST(test_square_affine_times_exp_affine_matcher);
-    RUN_SUBTEST(test_square_affine_times_trig_affine_matchers);
-    RUN_SUBTEST(test_affine_times_trig_affine_matchers);
-    RUN_SUBTEST(test_affine_times_hyperbolic_affine_matchers);
-    RUN_SUBTEST(test_square_affine_times_hyperbolic_affine_matchers);
-    RUN_SUBTEST(test_cube_affine_times_unary_affine_matchers);
-    RUN_SUBTEST(test_quartic_affine_times_unary_affine_matchers);
-    RUN_SUBTEST(test_affine_poly_deg4_times_unary_affine_matchers);
-    RUN_SUBTEST(test_generic_affine_poly_deg4_times_unary_matcher);
+    TEST_RUN_SUBTEST(test_match_affine_families, NULL);
+    TEST_RUN_SUBTEST(test_generic_unary_affine_matchers, NULL);
+    TEST_RUN_SUBTEST(test_pattern_rejections, NULL);
+    TEST_RUN_SUBTEST(test_scaled_expr_and_var_usage, NULL);
+    TEST_RUN_SUBTEST(test_substitute_and_powd, NULL);
+    TEST_RUN_SUBTEST(test_square_affine_matchers, NULL);
+    TEST_RUN_SUBTEST(test_cube_affine_matchers, NULL);
+    TEST_RUN_SUBTEST(test_quartic_affine_matchers, NULL);
+    TEST_RUN_SUBTEST(test_affine_times_exp_affine_matcher, NULL);
+    TEST_RUN_SUBTEST(test_square_affine_times_exp_affine_matcher, NULL);
+    TEST_RUN_SUBTEST(test_square_affine_times_trig_affine_matchers, NULL);
+    TEST_RUN_SUBTEST(test_affine_times_trig_affine_matchers, NULL);
+    TEST_RUN_SUBTEST(test_affine_times_hyperbolic_affine_matchers, NULL);
+    TEST_RUN_SUBTEST(test_square_affine_times_hyperbolic_affine_matchers, NULL);
+    TEST_RUN_SUBTEST(test_cube_affine_times_unary_affine_matchers, NULL);
+    TEST_RUN_SUBTEST(test_quartic_affine_times_unary_affine_matchers, NULL);
+    TEST_RUN_SUBTEST(test_affine_poly_deg4_times_unary_affine_matchers, NULL);
+    TEST_RUN_SUBTEST(test_generic_affine_poly_deg4_times_unary_matcher, NULL);
 }

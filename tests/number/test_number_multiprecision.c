@@ -74,7 +74,7 @@ void run_number_multiprecision_tests(void)
 
         ASSERT_TRUE(num_is_real(default_real));
         ASSERT_TRUE(!num_is_real(default_complex));
-        ASSERT_TRUE(num_eq(default_real, clone_real));
+        ASSERT_NUMBER_EQ(default_real, clone_real);
         ASSERT_TRUE(num_is_real(log_real));
         ASSERT_TRUE(!num_is_real(sqrt_complex));
         assert_number_string_prefix("num_const_prec(QF_PI, 640)",
@@ -188,9 +188,9 @@ void run_number_multiprecision_tests(void)
                                     tan_x,
                                     "0.481574618807528644332162353056970575219078891");
 
-        ASSERT_TRUE(num_eq(trig_identity, NUM_ONE));
-        ASSERT_TRUE(num_eq(tan_x, tan_identity));
-        ASSERT_TRUE(num_eq(sqrt_identity, x));
+        ASSERT_NUMBER_EQ(trig_identity, NUM_ONE);
+        ASSERT_NUMBER_EQ(tan_x, tan_identity);
+        ASSERT_NUMBER_EQ(sqrt_identity, x);
         assert_number_string_prefix("num_log(num_exp(NUM_PI / 7)) at 256 bits",
                                     log_exp_x,
                                     "0.448798950512827605494663340468500412028167057");
@@ -217,12 +217,9 @@ void run_number_multiprecision_tests(void)
             heegner_arg = num_mul(pi_256, heegner_sqrt);
             heegner_exp = num_exp(heegner_arg);
 
-            ASSERT_EQ_INT((int)num_get_prec_bits(heegner_sqrt),
-                          MATH_PRECISION_BITS);
-            ASSERT_EQ_INT((int)num_get_prec_bits(heegner_arg),
-                          MATH_PRECISION_BITS);
-            ASSERT_EQ_INT((int)num_get_prec_bits(heegner_exp),
-                          MATH_PRECISION_BITS);
+            ASSERT_EQ_INT((int)num_get_prec_bits(heegner_sqrt), MATH_PRECISION_BITS);
+            ASSERT_EQ_INT((int)num_get_prec_bits(heegner_arg), MATH_PRECISION_BITS);
+            ASSERT_EQ_INT((int)num_get_prec_bits(heegner_exp), MATH_PRECISION_BITS);
 
             written = num_sprintf(buf, sizeof(buf), "%.78n", heegner_exp);
             ASSERT_TRUE(written > 0);
@@ -362,27 +359,27 @@ void run_number_multiprecision_tests(void)
         ASSERT_EQ_INT((int)num_get_prec_bits(ei_int), 768);
         ASSERT_EQ_INT((int)num_get_prec_bits(log_rat), 768);
         assert_number_string("num_pow(2, 0)", one_pow_zero, "1");
-        ASSERT_TRUE(num_eq(one_pow_one, two));
+        ASSERT_NUMBER_EQ(one_pow_one, two);
         assert_number_string("num_pow(2, -1)", one_pow_neg_one, "½");
         assert_number_string("num_pow(2, 2)", one_pow_two, "4");
-        ASSERT_TRUE(num_eq(pow_half, sqrt_two));
-        ASSERT_TRUE(num_eq(pow_quarter, sqrt_sqrt_two));
-        ASSERT_TRUE(num_eq(pow_eighth, sqrt_sqrt_sqrt_two));
-        ASSERT_TRUE(num_eq(complex_pow_two_exact, complex_pow_two_expected));
-        ASSERT_TRUE(num_eq(complex_pow_two_qfloat, complex_pow_two_expected));
-        ASSERT_TRUE(num_eq(complex_pow_two_text, complex_pow_two_expected));
-        ASSERT_TRUE(num_eq(exp_half, sqrt_e));
-        ASSERT_TRUE(num_eq(exp_quarter, sqrt_sqrt_e));
-        ASSERT_TRUE(num_eq(exp_eighth, sqrt_sqrt_sqrt_e));
-        ASSERT_TRUE(num_eq(exp_i_pi_2, NUM_I));
-        ASSERT_TRUE(num_eq(log_one, NUM_ZERO));
-        ASSERT_TRUE(num_eq(log_e, NUM_ONE));
-        ASSERT_TRUE(num_eq(log_inv_e, NUM_NEG_ONE));
-        ASSERT_TRUE(num_eq(log_two, ln2_768));
-        ASSERT_TRUE(num_eq(log_half, neg_ln2));
-        ASSERT_TRUE(num_eq(log_i, log_i_expected));
-        ASSERT_TRUE(num_eq(log_neg_one, i_pi));
-        ASSERT_TRUE(num_eq(log_neg_i, neg_i_pi_2));
+        ASSERT_NUMBER_EQ(pow_half, sqrt_two);
+        ASSERT_NUMBER_EQ(pow_quarter, sqrt_sqrt_two);
+        ASSERT_NUMBER_EQ(pow_eighth, sqrt_sqrt_sqrt_two);
+        ASSERT_NUMBER_EQ(complex_pow_two_exact, complex_pow_two_expected);
+        ASSERT_NUMBER_EQ(complex_pow_two_qfloat, complex_pow_two_expected);
+        ASSERT_NUMBER_EQ(complex_pow_two_text, complex_pow_two_expected);
+        ASSERT_NUMBER_EQ(exp_half, sqrt_e);
+        ASSERT_NUMBER_EQ(exp_quarter, sqrt_sqrt_e);
+        ASSERT_NUMBER_EQ(exp_eighth, sqrt_sqrt_sqrt_e);
+        ASSERT_NUMBER_EQ(exp_i_pi_2, NUM_I);
+        ASSERT_NUMBER_EQ(log_one, NUM_ZERO);
+        ASSERT_NUMBER_EQ(log_e, NUM_ONE);
+        ASSERT_NUMBER_EQ(log_inv_e, NUM_NEG_ONE);
+        ASSERT_NUMBER_EQ(log_two, ln2_768);
+        ASSERT_NUMBER_EQ(log_half, neg_ln2);
+        ASSERT_NUMBER_EQ(log_i, log_i_expected);
+        ASSERT_NUMBER_EQ(log_neg_one, i_pi);
+        ASSERT_NUMBER_EQ(log_neg_i, neg_i_pi_2);
         assert_number_string("num_pow(2, 3)", pow_three, "8");
         ASSERT_EQ_INT((int)num_get_prec_bits(pow_half), 768);
 

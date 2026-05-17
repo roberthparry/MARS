@@ -1,35 +1,5 @@
 #include "test_dval.h"
 
-static int number_close_for_qfloat_precision(const number_t got,
-                                             const number_t expected)
-{
-    number_t diff = num_sub(got, expected);
-    number_t error;
-    number_t one = num_create_from_double(1.0);
-    number_t tolerance;
-    int ok;
-
-    ASSERT_EQ_INT(num_set_prec_bits(&one, 106u), 0);
-    tolerance = num_ldexp(one, 4 - 106);
-    num_destroy(&one);
-
-    if (num_is_real(diff))
-        error = num_abs(diff);
-    else {
-        number_t real = num_real_part(diff);
-        number_t imag = num_imag_part(diff);
-
-        error = num_hypot(real, imag);
-        num_destroy(&imag);
-        num_destroy(&real);
-    }
-    ok = num_le(error, tolerance);
-    num_destroy(&tolerance);
-    num_destroy(&error);
-    num_destroy(&diff);
-    return ok;
-}
-
 static void test_reverse_gradient_polynomial(void)
 {
     dval_t *x  = test_dv_new_named_var_d(1.0, "x");
@@ -50,13 +20,13 @@ static void test_reverse_gradient_polynomial(void)
     }
 
     expect = num_create_from_string("7");
-    ASSERT_TRUE(num_eq(value, expect));
+    ASSERT_DVAL_NUMBER_EQ(value, expect);
     num_destroy(&expect);
     expect = num_create_from_string("4");
-    ASSERT_TRUE(num_eq(grads[0], expect));
+    ASSERT_DVAL_NUMBER_EQ(grads[0], expect);
     num_destroy(&expect);
     expect = num_create_from_string("5");
-    ASSERT_TRUE(num_eq(grads[1], expect));
+    ASSERT_DVAL_NUMBER_EQ(grads[1], expect);
     num_destroy(&expect);
 
     num_destroy(&grads[1]);
@@ -82,11 +52,11 @@ static void test_reverse_gradient_shared_subexpression(void)
     }
 
     expect = num_create_from_string("1");
-    ASSERT_TRUE(num_eq(value, expect));
+    ASSERT_DVAL_NUMBER_EQ(value, expect);
     num_destroy(&expect);
     expect = num_create_from_string("2");
-    ASSERT_TRUE(num_eq(grads[0], expect));
-    ASSERT_TRUE(num_eq(grads[1], expect));
+    ASSERT_DVAL_NUMBER_EQ(grads[0], expect);
+    ASSERT_DVAL_NUMBER_EQ(grads[1], expect);
     num_destroy(&expect);
 
     num_destroy(&grads[1]);
@@ -118,15 +88,13 @@ static void test_reverse_matches_forward_composite(void)
     }
 
     expect = dv_eval(f);
-    ASSERT_TRUE(num_eq(value, expect));
+    ASSERT_DVAL_NUMBER_EQ(value, expect);
     num_destroy(&expect);
     expect = dv_eval(df_dx);
-    ASSERT_TRUE(num_eq(grads[0], expect) ||
-                number_close_for_qfloat_precision(grads[0], expect));
+    ASSERT_DVAL_NUMBER_CLOSE(grads[0], expect);
     num_destroy(&expect);
     expect = dv_eval(df_dy);
-    ASSERT_TRUE(num_eq(grads[1], expect) ||
-                number_close_for_qfloat_precision(grads[1], expect));
+    ASSERT_DVAL_NUMBER_CLOSE(grads[1], expect);
     num_destroy(&expect);
 
     num_destroy(&grads[1]);
@@ -152,9 +120,9 @@ static void test_reverse_gradient_missing_variable(void)
     }
 
     expect = num_create_from_string("4");
-    ASSERT_TRUE(num_eq(grads[0], expect));
+    ASSERT_DVAL_NUMBER_EQ(grads[0], expect);
     num_destroy(&expect);
-    ASSERT_TRUE(num_eq(grads[1], NUM_ZERO));
+    ASSERT_DVAL_NUMBER_EQ(grads[1], NUM_ZERO);
 
     num_destroy(&grads[1]);
     num_destroy(&grads[0]);
@@ -195,13 +163,13 @@ static void test_reverse_gradient_polynomial_num(void)
 
     ASSERT_EQ_INT(dv_eval_derivatives(f, 2u, vars, &value, grads), 0);
     expect = num_create_from_string("7");
-    ASSERT_TRUE(num_eq(value, expect));
+    ASSERT_DVAL_NUMBER_EQ(value, expect);
     num_destroy(&expect);
     expect = num_create_from_string("4");
-    ASSERT_TRUE(num_eq(grads[0], expect));
+    ASSERT_DVAL_NUMBER_EQ(grads[0], expect);
     num_destroy(&expect);
     expect = num_create_from_string("5");
-    ASSERT_TRUE(num_eq(grads[1], expect));
+    ASSERT_DVAL_NUMBER_EQ(grads[1], expect);
     num_destroy(&expect);
     ASSERT_EQ_INT((int)num_get_prec_bits(value), 384);
     ASSERT_EQ_INT((int)num_get_prec_bits(grads[0]), 53);
@@ -232,10 +200,8 @@ static void test_reverse_gradient_complex_number_t(void)
     expect_value = dv_eval(f);
     expect_grad = dv_eval(df_dz);
 
-    ASSERT_TRUE(num_eq(value, expect_value) ||
-                number_close_for_qfloat_precision(value, expect_value));
-    ASSERT_TRUE(num_eq(grad, expect_grad) ||
-                number_close_for_qfloat_precision(grad, expect_grad));
+    ASSERT_DVAL_NUMBER_CLOSE(value, expect_value);
+    ASSERT_DVAL_NUMBER_CLOSE(grad, expect_grad);
     ASSERT_TRUE(!num_is_real(value));
     ASSERT_TRUE(!num_is_real(grad));
 
@@ -253,10 +219,10 @@ static void test_reverse_gradient_complex_number_t(void)
 
 void test_reverse_mode(void)
 {
-    RUN_SUBTEST(test_reverse_gradient_polynomial);
-    RUN_SUBTEST(test_reverse_gradient_shared_subexpression);
-    RUN_SUBTEST(test_reverse_matches_forward_composite);
-    RUN_SUBTEST(test_reverse_gradient_missing_variable);
-    RUN_SUBTEST(test_reverse_gradient_polynomial_num);
-    RUN_SUBTEST(test_reverse_gradient_complex_number_t);
+    TEST_RUN_SUBTEST(test_reverse_gradient_polynomial, NULL);
+    TEST_RUN_SUBTEST(test_reverse_gradient_shared_subexpression, NULL);
+    TEST_RUN_SUBTEST(test_reverse_matches_forward_composite, NULL);
+    TEST_RUN_SUBTEST(test_reverse_gradient_missing_variable, NULL);
+    TEST_RUN_SUBTEST(test_reverse_gradient_polynomial_num, NULL);
+    TEST_RUN_SUBTEST(test_reverse_gradient_complex_number_t, NULL);
 }

@@ -723,19 +723,19 @@ static void test_mat_symbolic_matrix_calculus_helpers_by_name(void)
 
 void run_matrix_fromstring_tests(void)
 {
-    RUN_TEST_CASE(test_mat_from_string_numeric_num_real);
-    RUN_TEST_CASE(test_mat_from_string_numeric_num_complex);
-    RUN_TEST_CASE(test_mat_from_string_symbolic_numeric_fallback);
-    RUN_TEST_CASE(test_mat_from_string_symbolic_insufficient_bindings);
-    RUN_TEST_CASE(test_mat_from_string_symbolic_builtin_constants);
-    RUN_TEST_CASE(test_mat_from_string_symbolic_number_bindings);
-    RUN_TEST_CASE(test_mat_from_string_symbolic_wrapped);
-    RUN_TEST_CASE(test_mat_from_string_symbolic_bare);
-    RUN_TEST_CASE(test_mat_from_string_symbolic_at_aliases);
-    RUN_TEST_CASE(test_mat_from_string_symbolic_math_conventions);
-    RUN_TEST_CASE(test_mat_from_string_bracketed_names);
-    RUN_TEST_CASE(test_mat_symbolic_derivative_helpers_by_name);
-    RUN_TEST_CASE(test_mat_symbolic_jacobian_helper_by_names);
-    RUN_TEST_CASE(test_mat_symbolic_matrix_calculus_helpers_by_name);
-    RUN_TEST_CASE(test_mat_from_string_invalid_syntax);
+    TEST_RUN_CASE(test_mat_from_string_numeric_num_real, NULL);
+    TEST_RUN_CASE(test_mat_from_string_numeric_num_complex, NULL);
+    TEST_RUN_CASE(test_mat_from_string_symbolic_numeric_fallback, NULL);
+    TEST_RUN_CASE(test_mat_from_string_symbolic_insufficient_bindings, NULL);
+    TEST_RUN_CASE(test_mat_from_string_symbolic_builtin_constants, NULL);
+    TEST_RUN_CASE(test_mat_from_string_symbolic_number_bindings, NULL);
+    TEST_RUN_CASE(test_mat_from_string_symbolic_wrapped, NULL);
+    TEST_RUN_CASE(test_mat_from_string_symbolic_bare, NULL);
+    TEST_RUN_CASE(test_mat_from_string_symbolic_at_aliases, NULL);
+    TEST_RUN_CASE(test_mat_from_string_symbolic_math_conventions, NULL);
+    TEST_RUN_CASE(test_mat_from_string_bracketed_names, NULL);
+    TEST_RUN_CASE(test_mat_symbolic_derivative_helpers_by_name, NULL);
+    TEST_RUN_CASE(test_mat_symbolic_jacobian_helper_by_names, NULL);
+    TEST_RUN_CASE(test_mat_symbolic_matrix_calculus_helpers_by_name, NULL);
+    TEST_RUN_CASE(test_mat_from_string_invalid_syntax, NULL);
 }

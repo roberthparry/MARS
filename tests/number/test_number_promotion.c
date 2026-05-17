@@ -33,10 +33,10 @@ void run_number_promotion_tests(void)
         ASSERT_TRUE(num_is_real(exact_log));
         ASSERT_TRUE(num_is_real(exact_sqrt));
         ASSERT_TRUE(num_is_real(exact_exp));
-        ASSERT_TRUE(num_eq(exact_inv, expected_half));
+        ASSERT_NUMBER_EQ(exact_inv, expected_half);
         ASSERT_TRUE(num_is_real(product));
-        ASSERT_TRUE(num_eq(product, expected_five));
-        ASSERT_TRUE(num_eq(exact_two, exact_two_double));
+        ASSERT_NUMBER_EQ(product, expected_five);
+        ASSERT_NUMBER_EQ(exact_two, exact_two_double);
         ASSERT_TRUE(num_lt(expected_half, exact_two));
         ASSERT_TRUE(num_gt(exact_two, expected_half));
         ASSERT_TRUE(!num_lt(z, exact_three));

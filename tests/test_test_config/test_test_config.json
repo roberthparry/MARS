@@ -1,0 +1,43 @@
+{
+  "test_top_level_default_true": {
+    "enabled": true,
+    "test_subtest_default_true": true
+  },
+  "test_repeat_lookup_same_value": true,
+  "test_fixture_is_active_for_case": true,
+  "test_parent_group": {
+    "enabled": true,
+    "test_subtest_grouping": {
+      "enabled": true,
+      "test_sub_sub_function": {
+        "enabled": true,
+        "test_sub_sub_sub_function": {
+          "enabled": true,
+          "test_sub_sub_sub_sub_function": true
+        }
+      }
+    }
+  },
+  "test_fixture_balance_after_nested_group": true,
+  "test_temp_resources_are_available_in_case": true,
+  "test_temp_resources_are_cleaned_after_case": true,
+  "test_env_override_is_available_in_case": true,
+  "test_env_override_is_restored_after_case": true,
+  "test_stdout_capture_is_available_in_case": true,
+  "test_stdout_capture_file_is_cleaned_after_case": true,
+  "test_stderr_capture_is_available_in_case": true,
+  "test_stderr_capture_file_is_cleaned_after_case": true,
+  "test_output_example_runs": true,
+  "test_output_example_disabled": false,
+  "test_output_examples_respect_config": true,
+  "test_missing_nested_path_is_materialized": true,
+  "missing_parent_group": {
+    "enabled": true,
+    "test_missing_nested_path_is_materialized": true
+  },
+  "test_invalid_parent_name_is_rejected": true,
+  "test_validity_contract_success": true,
+  "test_builtin_string_validity_contract_success": true,
+  "test_explicit_skip_example": true,
+  "test_prunes_stale_keys_and_old_nesting": true
+}

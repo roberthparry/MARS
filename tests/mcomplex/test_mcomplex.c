@@ -12,9 +12,23 @@
 #define TEST_MCOMPLEX_QCOMPLEX_GAMMA_PRECISION 48u
 #define TEST_MCOMPLEX_BRANCH_ROUNDTRIP_PRECISION 180u
 
-#define TEST_CONFIG_MODE TEST_CONFIG_GLOBAL
-#define TEST_CONFIG_MAIN
 #include "test_harness.h"
+
+TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
+static int mcomplex_validity_equal(const void *actual, const void *expected, void *ctx);
+static void mcomplex_validity_format(const void *value, char *buf, size_t buf_size, void *ctx);
+static bool test_mcomplex_suite_setup(void);
+static bool test_assert_mcomplex_matches_text_bits(const mcomplex_t *got,
+                                                   const char *expected_real,
+                                                   const char *expected_imag,
+                                                   size_t precision_bits,
+                                                   const char *file,
+                                                   int line);
+static bool test_assert_mcomplex_matches_value_bits(const mcomplex_t *got,
+                                                    const mcomplex_t *expected,
+                                                    size_t precision_bits,
+                                                    const char *file,
+                                                    int line);
 
 static int format_mfloat_pretty_value(char *buf, size_t buf_size, const mfloat_t *value);
 static int format_mfloat_precise_value(char *buf, size_t buf_size, const mfloat_t *value);
@@ -37,20 +51,9 @@ static void print_mcomplex_error_check(const char *label,
 static void print_mcomplex_error_check_value(const char *label,
                                              const mcomplex_t *got,
                                              const mcomplex_t *expected);
-static int mfloat_meets_precision_bits(const mfloat_t *got,
-                                       const char *expected_text,
-                                       int relative_mode,
-                                       size_t precision_bits);
 static int mfloat_matches_value(const mfloat_t *got,
                                 const mfloat_t *expected,
                                 int relative_mode);
-static int mcomplex_meets_precision(const mcomplex_t *got,
-                                    const char *expected_real,
-                                    const char *expected_imag);
-static int mcomplex_meets_precision_bits(const mcomplex_t *got,
-                                         const char *expected_real,
-                                         const char *expected_imag,
-                                         size_t precision_bits);
 static int mcomplex_matches_value(const mcomplex_t *got,
                                   const mcomplex_t *expected);
 static int mcomplex_matches_value_bits(const mcomplex_t *got,
@@ -67,6 +70,55 @@ static mcomplex_t *expected_complex_cosh(const mcomplex_t *input);
 static mcomplex_t *expected_complex_tanh(const mcomplex_t *input);
 static mcomplex_t *expected_real_mcomplex_from_mfloat_unary(const char *input_text,
                                                             int (*fn)(mfloat_t *));
+static int mcomplex_default_validity_bits = -1;
+static const test_validity_contract_t mcomplex_default_contract =
+    TEST_VALIDITY_CONTRACT("mcomplex-close",
+                           mcomplex_validity_equal,
+                           mcomplex_validity_format,
+                           &mcomplex_default_validity_bits);
+
+TEST_SUITE_SETUP(test_mcomplex_suite_setup);
+
+#define TEST_ASSERT_MCOMPLEX_EQ_TEXT(got_ptr, expected_real_text, expected_imag_text) \
+    do { \
+        if (!test_assert_mcomplex_matches_text_bits((got_ptr), \
+                                                    (expected_real_text), \
+                                                    (expected_imag_text), \
+                                                    mc_get_precision(got_ptr), \
+                                                    __FILE__, \
+                                                    __LINE__)) \
+            return; \
+    } while (0)
+
+#define TEST_ASSERT_MCOMPLEX_EQ_TEXT_BITS(got_ptr, expected_real_text, expected_imag_text, precision_bits_value) \
+    do { \
+        if (!test_assert_mcomplex_matches_text_bits((got_ptr), \
+                                                    (expected_real_text), \
+                                                    (expected_imag_text), \
+                                                    (precision_bits_value), \
+                                                    __FILE__, \
+                                                    __LINE__)) \
+            return; \
+    } while (0)
+
+#define TEST_ASSERT_MCOMPLEX_CLOSE(got_ptr, expected_ptr) \
+    do { \
+        const mcomplex_t *test_mcomplex_got__ = (got_ptr); \
+        const mcomplex_t *test_mcomplex_expected__ = (expected_ptr); \
+        TEST_ASSERT_VALID_NAMED("mcomplex-close", \
+                                &test_mcomplex_got__, \
+                                &test_mcomplex_expected__); \
+    } while (0)
+
+#define TEST_ASSERT_MCOMPLEX_CLOSE_BITS(got_ptr, expected_ptr, precision_bits_value) \
+    do { \
+        if (!test_assert_mcomplex_matches_value_bits((got_ptr), \
+                                                     (expected_ptr), \
+                                                     (precision_bits_value), \
+                                                     __FILE__, \
+                                                     __LINE__)) \
+            return; \
+    } while (0)
 
 static int format_mfloat_pretty_value(char *buf, size_t buf_size, const mfloat_t *value)
 {
@@ -380,52 +432,6 @@ static void print_mcomplex_error_check_value(const char *label,
     mf_free(imag_err);
 }
 
-static int mfloat_meets_precision_bits(const mfloat_t *got,
-                                       const char *expected_text,
-                                       int relative_mode,
-                                       size_t precision_bits)
-{
-    mfloat_t *expected = NULL;
-    mfloat_t *error = NULL;
-    mfloat_t *tol = NULL;
-    long tol_exp2;
-    int ok = 0;
-
-    if (!got || !expected_text)
-        return 0;
-
-    if (precision_bits > 8u)
-        precision_bits -= 8u;
-
-    expected = mf_create_string(expected_text);
-    error = mf_clone(got);
-    tol = mf_create_long(1);
-    if (!expected || !error || !tol)
-        goto cleanup;
-
-    if (mf_sub(error, expected) != 0 || mf_abs(error) != 0)
-        goto cleanup;
-
-    if (relative_mode && !mf_is_zero(expected)) {
-        tol_exp2 = mf_get_exponent2(expected) +
-                   (long)mf_get_mantissa_bits(expected) - 1l -
-                   (long)precision_bits;
-    } else {
-        tol_exp2 = -(long)precision_bits;
-    }
-
-    if (mf_ldexp(tol, (int)tol_exp2) != 0)
-        goto cleanup;
-
-    ok = mf_le(error, tol);
-
-cleanup:
-    mf_free(expected);
-    mf_free(error);
-    mf_free(tol);
-    return ok;
-}
-
 static int mfloat_matches_value(const mfloat_t *got,
                                 const mfloat_t *expected,
                                 int relative_mode)
@@ -464,48 +470,6 @@ static int mfloat_matches_value(const mfloat_t *got,
 cleanup:
     mf_free(error);
     mf_free(tol);
-    return ok;
-}
-
-static int mcomplex_meets_precision(const mcomplex_t *got,
-                                    const char *expected_real,
-                                    const char *expected_imag)
-{
-    if (!got)
-        return 0;
-    return mcomplex_meets_precision_bits(got,
-                                         expected_real,
-                                         expected_imag,
-                                         mc_get_precision(got));
-}
-
-static int mcomplex_meets_precision_bits(const mcomplex_t *got,
-                                         const char *expected_real,
-                                         const char *expected_imag,
-                                         size_t precision_bits)
-{
-    mfloat_t *real_expected = NULL;
-    mfloat_t *imag_expected = NULL;
-    int real_relative = 0;
-    int imag_relative = 0;
-    int ok = 0;
-
-    if (!got || !expected_real || !expected_imag)
-        return 0;
-
-    real_expected = mf_create_string(expected_real);
-    imag_expected = mf_create_string(expected_imag);
-    if (!real_expected || !imag_expected)
-        goto cleanup;
-
-    real_relative = !mf_is_zero(real_expected);
-    imag_relative = !mf_is_zero(imag_expected);
-    ok = mfloat_meets_precision_bits(mc_real(got), expected_real, real_relative, precision_bits) &&
-         mfloat_meets_precision_bits(mc_imag(got), expected_imag, imag_relative, precision_bits);
-
-cleanup:
-    mf_free(real_expected);
-    mf_free(imag_expected);
     return ok;
 }
 
@@ -572,6 +536,103 @@ cleanup:
     mf_free(real_err);
     mf_free(imag_err);
     return ok;
+}
+
+static int mcomplex_validity_equal(const void *actual, const void *expected, void *ctx)
+{
+    const mcomplex_t *const *got_ptr = (const mcomplex_t *const *)actual;
+    const mcomplex_t *const *expected_ptr = (const mcomplex_t *const *)expected;
+    const mcomplex_t *got = got_ptr ? *got_ptr : NULL;
+    const mcomplex_t *want = expected_ptr ? *expected_ptr : NULL;
+    const int bits_setting = ctx ? *(const int *)ctx : -1;
+
+    if (!got || !want)
+        return 0;
+    if (bits_setting >= 0)
+        return mcomplex_matches_value_bits(got, want, (size_t)bits_setting);
+    return mcomplex_matches_value(got, want);
+}
+
+static void mcomplex_validity_format(const void *value, char *buf, size_t buf_size, void *ctx)
+{
+    const mcomplex_t *const *value_ptr = (const mcomplex_t *const *)value;
+    const mcomplex_t *z = value_ptr ? *value_ptr : NULL;
+    int format_rc;
+
+    (void)ctx;
+
+    if (!buf || buf_size == 0u)
+        return;
+    if (!z) {
+        snprintf(buf, buf_size, "<null>");
+        return;
+    }
+
+    format_rc = mc_sprintf(buf, buf_size, "%mz", z);
+    if (format_rc < 0 || (size_t)format_rc >= buf_size)
+        snprintf(buf, buf_size, "<format-error>");
+}
+
+static bool test_mcomplex_suite_setup(void)
+{
+    test_register_validity_checker("mcomplex-close", &mcomplex_default_contract);
+    return TEST_REQUIRE_VALIDITY_CHECKER("mcomplex-close");
+}
+
+static bool test_assert_mcomplex_matches_text_bits(const mcomplex_t *got,
+                                                   const char *expected_real,
+                                                   const char *expected_imag,
+                                                   size_t precision_bits,
+                                                   const char *file,
+                                                   int line)
+{
+    mfloat_t *real_expected = NULL;
+    mfloat_t *imag_expected = NULL;
+    mcomplex_t *expected = NULL;
+    bool ok = false;
+
+    if (!got || !expected_real || !expected_imag) {
+        test_mark_failure(file, line, "invalid mcomplex text comparison input");
+        return false;
+    }
+
+    real_expected = mf_create_string(expected_real);
+    imag_expected = mf_create_string(expected_imag);
+    expected = (real_expected && imag_expected) ? mc_create(real_expected, imag_expected) : NULL;
+    if (!expected) {
+        test_mark_failure(file, line, "failed to build expected mcomplex value");
+        goto cleanup;
+    }
+    if (mc_set_precision(expected, mc_get_precision(got)) != 0) {
+        test_mark_failure(file, line, "failed to align expected mcomplex precision");
+        goto cleanup;
+    }
+
+    ok = test_assert_mcomplex_matches_value_bits(got, expected, precision_bits, file, line);
+
+cleanup:
+    mc_free(expected);
+    mf_free(real_expected);
+    mf_free(imag_expected);
+    return ok;
+}
+
+static bool test_assert_mcomplex_matches_value_bits(const mcomplex_t *got,
+                                                    const mcomplex_t *expected,
+                                                    size_t precision_bits,
+                                                    const char *file,
+                                                    int line)
+{
+    int bits_ctx = (int)precision_bits;
+    const mcomplex_t *got_value = got;
+    const mcomplex_t *expected_value = expected;
+    const test_validity_contract_t contract =
+        TEST_VALIDITY_CONTRACT("mcomplex-close-bits",
+                               mcomplex_validity_equal,
+                               mcomplex_validity_format,
+                               &bits_ctx);
+
+    return test_assert_validity(&contract, &got_value, &expected_value, file, line);
 }
 
 static mcomplex_t *create_real_mcomplex(const char *real_text)
@@ -891,7 +952,7 @@ static void test_conversion_to_from_qcomplex(void)
         ASSERT_EQ_INT(mc_set_qcomplex(b, qc_make(qf_from_string("1.5"), qf_from_string("0.25"))), 0);
         print_mcomplex_value("mc_set_qcomplex value", b);
         print_mcomplex_error_check("mc_set_qcomplex(1.5 + 0.25i)", b, "1.5", "0.25");
-        ASSERT_TRUE(mcomplex_meets_precision(b, "1.5", "0.25"));
+        TEST_ASSERT_MCOMPLEX_EQ_TEXT(b, "1.5", "0.25");
 
         qb = mc_to_qcomplex(b);
         qc_to_string(qb, qc_buf, sizeof(qc_buf));
@@ -923,7 +984,7 @@ static void test_lifecycle_and_constants(void)
         ASSERT_TRUE(mc_is_zero(MC_ZERO));
         ASSERT_TRUE(mc_eq(MC_ONE, MC_ONE));
         print_mcomplex_error_check("MC_I value check", MC_I, "0", "1");
-        ASSERT_TRUE(mcomplex_meets_precision(MC_I, "0", "1"));
+        TEST_ASSERT_MCOMPLEX_EQ_TEXT(MC_I, "0", "1");
 
         print_mcomplex_input("input string", "3.5 - 2.25i");
         z = mc_create_string("3.5 - 2.25i");
@@ -932,7 +993,7 @@ static void test_lifecycle_and_constants(void)
         ASSERT_EQ_LONG((long)mc_get_precision_digits(z), 50);
         print_mcomplex_value("parsed z", z);
         print_mcomplex_error_check("mc_create_string(\"3.5 - 2.25i\")", z, "3.5", "-2.25");
-        ASSERT_TRUE(mcomplex_meets_precision(z, "3.5", "-2.25"));
+        TEST_ASSERT_MCOMPLEX_EQ_TEXT(z, "3.5", "-2.25");
 
         text = mc_to_string(z);
         ASSERT_NOT_NULL(text);
@@ -980,12 +1041,12 @@ static void test_arithmetic(void)
         ASSERT_EQ_INT(mc_add(a, b), 0);
         print_mcomplex_value("a after a += b", a);
         print_mcomplex_error_check("(3 + 4i) + (1 - 2i)", a, "4", "2");
-        ASSERT_TRUE(mcomplex_meets_precision(a, "4", "2"));
+        TEST_ASSERT_MCOMPLEX_EQ_TEXT(a, "4", "2");
 
         ASSERT_EQ_INT(mc_mul(a, b), 0);
         print_mcomplex_value("a after a *= b", a);
         print_mcomplex_error_check("(4 + 2i) * (1 - 2i)", a, "8", "-6");
-        ASSERT_TRUE(mcomplex_meets_precision(a, "8", "-6"));
+        TEST_ASSERT_MCOMPLEX_EQ_TEXT(a, "8", "-6");
 
         z = mc_create_string("3 + 4i");
         ASSERT_NOT_NULL(z);
@@ -995,17 +1056,17 @@ static void test_arithmetic(void)
         ASSERT_EQ_INT(mc_div(z, b), 0);
         print_mcomplex_value("z after z /= b", z);
         print_mcomplex_error_check("(3 + 4i) / (1 - 2i)", z, "-1", "2");
-        ASSERT_TRUE(mcomplex_meets_precision(z, "-1", "2"));
+        TEST_ASSERT_MCOMPLEX_EQ_TEXT(z, "-1", "2");
 
         ASSERT_EQ_INT(mc_conj(z), 0);
         print_mcomplex_value("z after conj(z)", z);
         print_mcomplex_error_check("conj(-1 + 2i)", z, "-1", "-2");
-        ASSERT_TRUE(mcomplex_meets_precision(z, "-1", "-2"));
+        TEST_ASSERT_MCOMPLEX_EQ_TEXT(z, "-1", "-2");
 
         ASSERT_EQ_INT(mc_inv(z), 0);
         print_mcomplex_value("z after inv(z)", z);
         print_mcomplex_error_check("1 / (-1 - 2i)", z, "-0.2", "0.4");
-        ASSERT_TRUE(mcomplex_meets_precision(z, "-0.2", "0.4"));
+        TEST_ASSERT_MCOMPLEX_EQ_TEXT(z, "-0.2", "0.4");
 
         ASSERT_EQ_INT(mc_abs(z), 0);
         print_mcomplex_value("z after abs(z)", z);
@@ -1043,7 +1104,7 @@ static void test_transcendentals(void)
         ASSERT_EQ_INT(mc_exp(z_exp), 0);
         print_mcomplex_value("after exp(z)", z_exp);
         print_mcomplex_error_check("exp(i*pi)", z_exp, "-1", "0");
-        ASSERT_TRUE(mcomplex_meets_precision(z_exp, "-1", "0"));
+        TEST_ASSERT_MCOMPLEX_EQ_TEXT(z_exp, "-1", "0");
 
         print_mcomplex_input("log input", "-1 + 0i");
         z_log = mc_create_string("-1 + 0i");
@@ -1055,7 +1116,7 @@ static void test_transcendentals(void)
         ASSERT_NOT_NULL(expected_log);
         print_mcomplex_value("after log(z)", z_log);
         print_mcomplex_error_check_value("log(-1 + 0i)", z_log, expected_log);
-        ASSERT_TRUE(mcomplex_matches_value(z_log, expected_log));
+        TEST_ASSERT_MCOMPLEX_CLOSE(z_log, expected_log);
         break;
     }
 
@@ -1077,7 +1138,7 @@ static void test_special_functions(void)
         ASSERT_EQ_INT(mc_gamma(z), 0);
         print_mcomplex_value("z after gamma(z)", z);
         print_mcomplex_error_check("gamma(1 + 0i)", z, "1", "0");
-        ASSERT_TRUE(mcomplex_meets_precision(z, "1", "0"));
+        TEST_ASSERT_MCOMPLEX_EQ_TEXT(z, "1", "0");
 
         ASSERT_EQ_INT(mc_erf(z), 0);
         print_mcomplex_value("z after erf(z)", z);
@@ -1085,10 +1146,10 @@ static void test_special_functions(void)
             "erf(1 + 0i)", z,
             "0.8427007929497148693412206350826092592960669979663029084599378978347172540960108412619833253481448885",
             "0");
-        ASSERT_TRUE(mcomplex_meets_precision(
+        TEST_ASSERT_MCOMPLEX_EQ_TEXT(
             z,
             "0.8427007929497148693412206350826092592960669979663029084599378978347172540960108412619833253481448885",
-            "0"));
+            "0");
         break;
     }
 
@@ -1111,8 +1172,8 @@ static void test_real_elementary_replacements(void)
         ASSERT_EQ_INT(mc_sin(z), 0);
         print_mcomplex_value("after sin(z)", z);
         print_mcomplex_error_check_value("sin(0.567 + 0.321i)", z, expected);
-        ASSERT_TRUE(mcomplex_matches_value_bits(z, expected,
-                                               TEST_MCOMPLEX_MATHS_PRECISION));
+        TEST_ASSERT_MCOMPLEX_CLOSE_BITS(z, expected,
+                                        TEST_MCOMPLEX_MATHS_PRECISION);
         mc_free(expected);
         expected = NULL;
         mc_free(z);
@@ -1127,8 +1188,8 @@ static void test_real_elementary_replacements(void)
         ASSERT_EQ_INT(mc_cos(z), 0);
         print_mcomplex_value("after cos(z)", z);
         print_mcomplex_error_check_value("cos(0.567 + 0.321i)", z, expected);
-        ASSERT_TRUE(mcomplex_matches_value_bits(z, expected,
-                                               TEST_MCOMPLEX_MATHS_PRECISION));
+        TEST_ASSERT_MCOMPLEX_CLOSE_BITS(z, expected,
+                                        TEST_MCOMPLEX_MATHS_PRECISION);
         mc_free(expected);
         expected = NULL;
         mc_free(z);
@@ -1143,8 +1204,8 @@ static void test_real_elementary_replacements(void)
         ASSERT_EQ_INT(mc_tan(z), 0);
         print_mcomplex_value("after tan(z)", z);
         print_mcomplex_error_check_value("tan(0.567 + 0.321i)", z, expected);
-        ASSERT_TRUE(mcomplex_matches_value_bits(z, expected,
-                                               TEST_MCOMPLEX_MATHS_PRECISION));
+        TEST_ASSERT_MCOMPLEX_CLOSE_BITS(z, expected,
+                                        TEST_MCOMPLEX_MATHS_PRECISION);
         mc_free(expected);
         expected = NULL;
         mc_free(z);
@@ -1159,8 +1220,8 @@ static void test_real_elementary_replacements(void)
         ASSERT_EQ_INT(mc_atan(z), 0);
         print_mcomplex_value("after atan(z)", z);
         print_mcomplex_error_check_value("atan(0.321 + 0.123i)", z, expected);
-        ASSERT_TRUE(mcomplex_matches_value_bits(z, expected,
-                                               TEST_MCOMPLEX_MATHS_PRECISION));
+        TEST_ASSERT_MCOMPLEX_CLOSE_BITS(z, expected,
+                                        TEST_MCOMPLEX_MATHS_PRECISION);
         mc_free(expected);
         expected = NULL;
         mc_free(z);
@@ -1182,8 +1243,8 @@ static void test_real_elementary_replacements(void)
         ASSERT_EQ_INT(mc_tan(z), 0);
         print_mcomplex_value("after tan(atan2(y,x))", z);
         print_mcomplex_error_check_value("tan(atan2(0.5 + 0.25i, -0.75 + 0.1i))", z, expected);
-        ASSERT_TRUE(mcomplex_matches_value_bits(z, expected,
-                                               TEST_MCOMPLEX_MATHS_PRECISION));
+        TEST_ASSERT_MCOMPLEX_CLOSE_BITS(z, expected,
+                                        TEST_MCOMPLEX_MATHS_PRECISION);
         mc_free(expected);
         expected = NULL;
         mc_free(z);
@@ -1202,8 +1263,8 @@ static void test_real_elementary_replacements(void)
         ASSERT_EQ_INT(mc_sin(z), 0);
         print_mcomplex_value("after sin(asin(z))", z);
         print_mcomplex_error_check_value("sin(asin(0.321 + 0.123i))", z, expected);
-        ASSERT_TRUE(mcomplex_matches_value_bits(z, expected,
-                                               TEST_MCOMPLEX_MATHS_PRECISION));
+        TEST_ASSERT_MCOMPLEX_CLOSE_BITS(z, expected,
+                                        TEST_MCOMPLEX_MATHS_PRECISION);
         mc_free(expected);
         expected = NULL;
         mc_free(z);
@@ -1220,8 +1281,8 @@ static void test_real_elementary_replacements(void)
         ASSERT_EQ_INT(mc_cos(z), 0);
         print_mcomplex_value("after cos(acos(z))", z);
         print_mcomplex_error_check_value("cos(acos(0.321 + 0.123i))", z, expected);
-        ASSERT_TRUE(mcomplex_matches_value_bits(z, expected,
-                                               TEST_MCOMPLEX_MATHS_PRECISION));
+        TEST_ASSERT_MCOMPLEX_CLOSE_BITS(z, expected,
+                                        TEST_MCOMPLEX_MATHS_PRECISION);
         mc_free(expected);
         expected = NULL;
         mc_free(z);
@@ -1236,8 +1297,8 @@ static void test_real_elementary_replacements(void)
         ASSERT_EQ_INT(mc_sinh(z), 0);
         print_mcomplex_value("after sinh(z)", z);
         print_mcomplex_error_check_value("sinh(0.567 + 0.321i)", z, expected);
-        ASSERT_TRUE(mcomplex_matches_value_bits(z, expected,
-                                               TEST_MCOMPLEX_MATHS_PRECISION));
+        TEST_ASSERT_MCOMPLEX_CLOSE_BITS(z, expected,
+                                        TEST_MCOMPLEX_MATHS_PRECISION);
         mc_free(expected);
         expected = NULL;
         mc_free(z);
@@ -1252,8 +1313,8 @@ static void test_real_elementary_replacements(void)
         ASSERT_EQ_INT(mc_cosh(z), 0);
         print_mcomplex_value("after cosh(z)", z);
         print_mcomplex_error_check_value("cosh(0.567 + 0.321i)", z, expected);
-        ASSERT_TRUE(mcomplex_matches_value_bits(z, expected,
-                                               TEST_MCOMPLEX_MATHS_PRECISION));
+        TEST_ASSERT_MCOMPLEX_CLOSE_BITS(z, expected,
+                                        TEST_MCOMPLEX_MATHS_PRECISION);
         mc_free(expected);
         expected = NULL;
         mc_free(z);
@@ -1268,8 +1329,8 @@ static void test_real_elementary_replacements(void)
         ASSERT_EQ_INT(mc_tanh(z), 0);
         print_mcomplex_value("after tanh(z)", z);
         print_mcomplex_error_check_value("tanh(0.567 + 0.321i)", z, expected);
-        ASSERT_TRUE(mcomplex_matches_value_bits(z, expected,
-                                               TEST_MCOMPLEX_MATHS_PRECISION));
+        TEST_ASSERT_MCOMPLEX_CLOSE_BITS(z, expected,
+                                        TEST_MCOMPLEX_MATHS_PRECISION);
         mc_free(expected);
         expected = NULL;
         mc_free(z);
@@ -1286,8 +1347,8 @@ static void test_real_elementary_replacements(void)
         ASSERT_EQ_INT(mc_sinh(z), 0);
         print_mcomplex_value("after sinh(asinh(z))", z);
         print_mcomplex_error_check_value("sinh(asinh(0.321 + 0.123i))", z, expected);
-        ASSERT_TRUE(mcomplex_matches_value_bits(z, expected,
-                                               TEST_MCOMPLEX_MATHS_PRECISION));
+        TEST_ASSERT_MCOMPLEX_CLOSE_BITS(z, expected,
+                                        TEST_MCOMPLEX_MATHS_PRECISION);
         mc_free(expected);
         expected = NULL;
         mc_free(z);
@@ -1304,8 +1365,8 @@ static void test_real_elementary_replacements(void)
         ASSERT_EQ_INT(mc_cosh(z), 0);
         print_mcomplex_value("after cosh(acosh(z))", z);
         print_mcomplex_error_check_value("cosh(acosh(2 + 0.5i))", z, expected);
-        ASSERT_TRUE(mcomplex_matches_value_bits(z, expected,
-                                               TEST_MCOMPLEX_MATHS_PRECISION));
+        TEST_ASSERT_MCOMPLEX_CLOSE_BITS(z, expected,
+                                        TEST_MCOMPLEX_MATHS_PRECISION);
         mc_free(expected);
         expected = NULL;
         mc_free(z);
@@ -1322,8 +1383,8 @@ static void test_real_elementary_replacements(void)
         ASSERT_EQ_INT(mc_tanh(z), 0);
         print_mcomplex_value("after tanh(atanh(z))", z);
         print_mcomplex_error_check_value("tanh(atanh(0.321 + 0.123i))", z, expected);
-        ASSERT_TRUE(mcomplex_matches_value_bits(z, expected,
-                                               TEST_MCOMPLEX_MATHS_PRECISION));
+        TEST_ASSERT_MCOMPLEX_CLOSE_BITS(z, expected,
+                                        TEST_MCOMPLEX_MATHS_PRECISION);
         break;
     }
 
@@ -1350,10 +1411,10 @@ static void test_real_special_replacements(void)
             "erfinv(0.5 + 0i)", z,
             "0.4769362762044698733814183536431305598089697490594706447038826959193834477746467334886959158699890099480330386734708686181554200754487317906163612464948982829944987416840339015704779831127126",
             "0");
-        ASSERT_TRUE(mcomplex_meets_precision(
+        TEST_ASSERT_MCOMPLEX_EQ_TEXT(
             z,
             "0.4769362762044698733814183536431305598089697490594706447038826959193834477746467334886959158699890099480330386734708686181554200754487317906163612464948982829944987416840339015704779831127126",
-            "0"));
+            "0");
         mc_free(z);
         z = NULL;
 
@@ -1367,10 +1428,10 @@ static void test_real_special_replacements(void)
             "erfcinv(0.5 + 0i)", z,
             "0.4769362762044698733814183536431305598089697490594706447038826959193834477746467334886959158699890099480330386734708686181554200754487317906163612464948982829944987416840339015704779831127126",
             "0");
-        ASSERT_TRUE(mcomplex_meets_precision(
+        TEST_ASSERT_MCOMPLEX_EQ_TEXT(
             z,
             "0.4769362762044698733814183536431305598089697490594706447038826959193834477746467334886959158699890099480330386734708686181554200754487317906163612464948982829944987416840339015704779831127126",
-            "0"));
+            "0");
         mc_free(z);
         z = NULL;
 
@@ -1384,11 +1445,11 @@ static void test_real_special_replacements(void)
             "lgamma(5 + 0i)", z,
             "3.178053830347945619646941601297055408873990960903515214096734362117675159127693113691205735802988151413974472127669922943424564933204911492150814125672505296395345481668495672750294814716035980317112620662889405386862953343268716071851135633349782640780819104305918846669206449467955585611481173504519868938863",
             "0");
-        ASSERT_TRUE(mcomplex_meets_precision_bits(
+        TEST_ASSERT_MCOMPLEX_EQ_TEXT_BITS(
             z,
             "3.178053830347945619646941601297055408873990960903515214096734362117675159127693113691205735802988151413974472127669922943424564933204911492150814125672505296395345481668495672750294814716035980317112620662889405386862953343268716071851135633349782640780819104305918846669206449467955585611481173504519868938863",
             "0",
-            TEST_MCOMPLEX_MATHS_PRECISION));
+            TEST_MCOMPLEX_MATHS_PRECISION);
         mc_free(z);
         z = NULL;
 
@@ -1402,11 +1463,11 @@ static void test_real_special_replacements(void)
             "digamma(1 + 0i)", z,
             "-0.577215664901532860606512090082402431042159335939923598805767234884867726777664670936947063291746749514631447249807082480960504014486542836224173997644923536253500333742937337737673942792595258247094916008735203948165670853233151776611528621199501507984793745085705740029921354786146694029604325421519058775537",
             "0");
-        ASSERT_TRUE(mcomplex_meets_precision_bits(
+        TEST_ASSERT_MCOMPLEX_EQ_TEXT_BITS(
             z,
             "-0.577215664901532860606512090082402431042159335939923598805767234884867726777664670936947063291746749514631447249807082480960504014486542836224173997644923536253500333742937337737673942792595258247094916008735203948165670853233151776611528621199501507984793745085705740029921354786146694029604325421519058775537",
             "0",
-            TEST_MCOMPLEX_MATHS_PRECISION));
+            TEST_MCOMPLEX_MATHS_PRECISION);
         mc_free(z);
         z = NULL;
 
@@ -1420,11 +1481,11 @@ static void test_real_special_replacements(void)
             "trigamma(1 + 0i)", z,
             "1.644934066848226436472415166646025189218949901206798437735558229370007470403200873833628900619758705304004318962337190679628724687005007787935102946330866276831733309367762605095251006872140054796811558794890360823277761919840756455876963235636709710096948902085932008051636478878338846044445184059825145250681",
             "0");
-        ASSERT_TRUE(mcomplex_meets_precision_bits(
+        TEST_ASSERT_MCOMPLEX_EQ_TEXT_BITS(
             z,
             "1.644934066848226436472415166646025189218949901206798437735558229370007470403200873833628900619758705304004318962337190679628724687005007787935102946330866276831733309367762605095251006872140054796811558794890360823277761919840756455876963235636709710096948902085932008051636478878338846044445184059825145250681",
             "0",
-            TEST_MCOMPLEX_MATHS_PRECISION));
+            TEST_MCOMPLEX_MATHS_PRECISION);
         mc_free(z);
         z = NULL;
 
@@ -1438,10 +1499,10 @@ static void test_real_special_replacements(void)
             "tetragamma(1 + 0i)", z,
             "-2.4041138063191885707994763230228999815299725846809977635845431106836764115726261803729117472186705162923983155905214388369839919973465664275527936744158003229078835658987",
             "0");
-        ASSERT_TRUE(mcomplex_meets_precision(
+        TEST_ASSERT_MCOMPLEX_EQ_TEXT(
             z,
             "-2.4041138063191885707994763230228999815299725846809977635845431106836764115726261803729117472186705162923983155905214388369839919973465664275527936744158003229078835658987",
-            "0"));
+            "0");
         mc_free(z);
         z = NULL;
 
@@ -1455,10 +1516,10 @@ static void test_real_special_replacements(void)
             "gammainv(3 + 0i)", z,
             "3.4058699863095669246999292183755580095953957993289813943129416262771480469249543971039352849144736866311861261393708590757492573265835991956905840323578868826789864361657",
             "0");
-        ASSERT_TRUE(mcomplex_meets_precision(
+        TEST_ASSERT_MCOMPLEX_EQ_TEXT(
             z,
             "3.4058699863095669246999292183755580095953957993289813943129416262771480469249543971039352849144736866311861261393708590757492573265835991956905840323578868826789864361657",
-            "0"));
+            "0");
         mc_free(z);
         z = NULL;
 
@@ -1476,8 +1537,8 @@ static void test_real_special_replacements(void)
         ASSERT_EQ_INT(mc_mul(z, other), 0);
         print_mcomplex_value("after exp(lambert_w0(z)) * lambert_w0(z)", z);
         print_mcomplex_error_check_value("lambert_w0(1 + 1i) roundtrip", z, expected);
-        ASSERT_TRUE(mcomplex_matches_value_bits(z, expected,
-                                               TEST_MCOMPLEX_MATHS_PRECISION));
+        TEST_ASSERT_MCOMPLEX_CLOSE_BITS(z, expected,
+                                        TEST_MCOMPLEX_MATHS_PRECISION);
         mc_free(other);
         other = NULL;
         mc_free(expected);
@@ -1499,8 +1560,8 @@ static void test_real_special_replacements(void)
         ASSERT_EQ_INT(mc_mul(z, other), 0);
         print_mcomplex_value("after exp(lambert_wm1(z)) * lambert_wm1(z)", z);
         print_mcomplex_error_check_value("lambert_wm1(-1 - 0.5i) roundtrip", z, expected);
-        ASSERT_TRUE(mcomplex_matches_value_bits(z, expected,
-                                               TEST_MCOMPLEX_MATHS_PRECISION));
+        TEST_ASSERT_MCOMPLEX_CLOSE_BITS(z, expected,
+                                        TEST_MCOMPLEX_MATHS_PRECISION);
         mc_free(other);
         other = NULL;
         mc_free(expected);
@@ -1515,7 +1576,7 @@ static void test_real_special_replacements(void)
         ASSERT_EQ_INT(mc_normal_cdf(z), 0);
         print_mcomplex_value("after normal_cdf(z)", z);
         print_mcomplex_error_check("normal_cdf(0 + 0i)", z, "0.5", "0");
-        ASSERT_TRUE(mcomplex_meets_precision(z, "0.5", "0"));
+        TEST_ASSERT_MCOMPLEX_EQ_TEXT(z, "0.5", "0");
         mc_free(z);
         z = NULL;
 
@@ -1529,11 +1590,11 @@ static void test_real_special_replacements(void)
             "normal_pdf(0.5 + 0i)", z,
             "0.352065326764299477774680441596517653110315180375711949655469017988223197836716607487669583035291299249356331587399122698573220299362055035583750516352498411760620589162913856090085707261846603312288146954446448689332851181739266058488578246485401329467584595776962772803958724657764386036358884280558587249126",
             "0");
-        ASSERT_TRUE(mcomplex_meets_precision_bits(
+        TEST_ASSERT_MCOMPLEX_EQ_TEXT_BITS(
             z,
             "0.352065326764299477774680441596517653110315180375711949655469017988223197836716607487669583035291299249356331587399122698573220299362055035583750516352498411760620589162913856090085707261846603312288146954446448689332851181739266058488578246485401329467584595776962772803958724657764386036358884280558587249126",
             "0",
-            TEST_MCOMPLEX_MATHS_PRECISION));
+            TEST_MCOMPLEX_MATHS_PRECISION);
         mc_free(z);
         z = NULL;
 
@@ -1547,11 +1608,11 @@ static void test_real_special_replacements(void)
             "normal_logpdf(0.5 + 0i)", z,
             "-1.043938533204672741780329736405617639861397473637783412817151540482765695927260397694743298635954197622005646624634337446366862881840793572155875915222681393603560742547358669046395905991380805630163234873094627374625518251694954477410095859351391981611598130574005347695386064958992231213955692774349971100282",
             "0");
-        ASSERT_TRUE(mcomplex_meets_precision_bits(
+        TEST_ASSERT_MCOMPLEX_EQ_TEXT_BITS(
             z,
             "-1.043938533204672741780329736405617639861397473637783412817151540482765695927260397694743298635954197622005646624634337446366862881840793572155875915222681393603560742547358669046395905991380805630163234873094627374625518251694954477410095859351391981611598130574005347695386064958992231213955692774349971100282",
             "0",
-            TEST_MCOMPLEX_MATHS_PRECISION));
+            TEST_MCOMPLEX_MATHS_PRECISION);
         mc_free(z);
         z = NULL;
 
@@ -1567,10 +1628,10 @@ static void test_real_special_replacements(void)
             "productlog(1 + 0i)", z,
             "0.5671432904097838729999686622103555497538157871865125081351310792230457930866845666932194469617522945576380249728667897854523584659400729956085164392899946143115714929598",
             "0");
-        ASSERT_TRUE(mcomplex_meets_precision(
+        TEST_ASSERT_MCOMPLEX_EQ_TEXT(
             z,
             "0.5671432904097838729999686622103555497538157871865125081351310792230457930866845666932194469617522945576380249728667897854523584659400729956085164392899946143115714929598",
-            "0"));
+            "0");
         mc_free(z);
         z = NULL;
 
@@ -1583,8 +1644,8 @@ static void test_real_special_replacements(void)
         ASSERT_EQ_INT(mc_ei(z), 0);
         print_mcomplex_value("after ei(z)", z);
         print_mcomplex_error_check_value("ei(1 + 0i)", z, expected);
-        ASSERT_TRUE(mcomplex_matches_value_bits(z, expected,
-                                               TEST_MCOMPLEX_MATHS_PRECISION));
+        TEST_ASSERT_MCOMPLEX_CLOSE_BITS(z, expected,
+                                        TEST_MCOMPLEX_MATHS_PRECISION);
         mc_free(expected);
         expected = NULL;
         mc_free(z);
@@ -1600,11 +1661,11 @@ static void test_real_special_replacements(void)
             "e1(1 + 0i)", z,
             "0.219383934395520273677163775460121649031047293406908207577978613073568698559141544722210251035137249954758234630874109590176378520537096009956704487876777412931347260795733865892805139788129537181134360059345012824765585462368324969488073343679827470707634455339786303962657522117753827032411866948006272810955",
             "0");
-        ASSERT_TRUE(mcomplex_meets_precision_bits(
+        TEST_ASSERT_MCOMPLEX_EQ_TEXT_BITS(
             z,
             "0.219383934395520273677163775460121649031047293406908207577978613073568698559141544722210251035137249954758234630874109590176378520537096009956704487876777412931347260795733865892805139788129537181134360059345012824765585462368324969488073343679827470707634455339786303962657522117753827032411866948006272810955",
             "0",
-            TEST_MCOMPLEX_MATHS_PRECISION));
+            TEST_MCOMPLEX_MATHS_PRECISION);
         mc_free(z);
         z = NULL;
 
@@ -1622,10 +1683,10 @@ static void test_real_special_replacements(void)
             "beta(2.5 + 0i, 3.5 + 0i)", z,
             "0.036815538909255389513234102147806674424185578898927021339550131941107223511166511702672283109477934390415797888827527031020630991518170885528031555564005638095120516828538342044205777085425183065590413645650128621085157571818074002739688865",
             "0");
-        ASSERT_TRUE(mcomplex_meets_precision(
+        TEST_ASSERT_MCOMPLEX_EQ_TEXT(
             z,
             "0.036815538909255389513234102147806674424185578898927021339550131941107223511166511702672283109477934390415797888827527031020630991518170885528031555564005638095120516828538342044205777085425183065590413645650128621085157571818074002739688865",
-            "0"));
+            "0");
         mc_free(z);
         mc_free(other);
         z = NULL;
@@ -1645,11 +1706,11 @@ static void test_real_special_replacements(void)
             "logbeta(2.5 + 0i, 3.5 + 0i)", z,
             "-3.30183526996205260979918438338982812830921570414398100971712267083751691265412267818966759088212770384603200686990963096806795213221106804792948306350304345956626388317724421144059783678790249007604111097529531532675545585541355387251345451424424307030658003998215560185642113246331082185438686547166535348658",
             "0");
-        ASSERT_TRUE(mcomplex_meets_precision_bits(
+        TEST_ASSERT_MCOMPLEX_EQ_TEXT_BITS(
             z,
             "-3.30183526996205260979918438338982812830921570414398100971712267083751691265412267818966759088212770384603200686990963096806795213221106804792948306350304345956626388317724421144059783678790249007604111097529531532675545585541355387251345451424424307030658003998215560185642113246331082185438686547166535348658",
             "0",
-            TEST_MCOMPLEX_MATHS_PRECISION));
+            TEST_MCOMPLEX_MATHS_PRECISION);
         mc_free(z);
         mc_free(other);
         z = NULL;
@@ -1666,7 +1727,7 @@ static void test_real_special_replacements(void)
         ASSERT_EQ_INT(mc_binomial(z, other), 0);
         print_mcomplex_value("after binomial(a,b)", z);
         print_mcomplex_error_check("binomial(5.5 + 0i, 2.5 + 0i)", z, "14.4375", "0");
-        ASSERT_TRUE(mcomplex_meets_precision(z, "14.4375", "0"));
+        TEST_ASSERT_MCOMPLEX_EQ_TEXT(z, "14.4375", "0");
         mc_free(z);
         mc_free(other);
         z = NULL;
@@ -1686,10 +1747,10 @@ static void test_real_special_replacements(void)
             "gammainc_P(0.5 + 0i, 1 + 0i)", z,
             "0.8427007929497148693412206350826092592960669979663029084599378978347172540960108412619833253481448885",
             "0");
-        ASSERT_TRUE(mcomplex_meets_precision(
+        TEST_ASSERT_MCOMPLEX_EQ_TEXT(
             z,
             "0.8427007929497148693412206350826092592960669979663029084599378978347172540960108412619833253481448885",
-            "0"));
+            "0");
         mc_free(z);
         mc_free(other);
         z = NULL;
@@ -1709,11 +1770,11 @@ static void test_real_special_replacements(void)
             "gammainc_Q(1 + 0i, 1 + 0i)", z,
             "0.367879441171442321595523770161460867445811131031767834507836801697461495744899803357147274345919643746627325276843995208246975792790129008626653589494098783092194367377338115048638991125145616344987719978684475957939747302549892495453239366207964810514647520612294223089164926566600365074577283705532853738389",
             "0");
-        ASSERT_TRUE(mcomplex_meets_precision_bits(
+        TEST_ASSERT_MCOMPLEX_EQ_TEXT_BITS(
             z,
             "0.367879441171442321595523770161460867445811131031767834507836801697461495744899803357147274345919643746627325276843995208246975792790129008626653589494098783092194367377338115048638991125145616344987719978684475957939747302549892495453239366207964810514647520612294223089164926566600365074577283705532853738389",
             "0",
-            TEST_MCOMPLEX_MATHS_PRECISION));
+            TEST_MCOMPLEX_MATHS_PRECISION);
         break;
     }
 
@@ -1738,8 +1799,8 @@ static void test_difficult_mcomplex_cases(void)
     ASSERT_TRUE(mf_gt(mc_imag(z), MF_ZERO));
     ASSERT_EQ_INT(mc_exp(z), 0);
     print_mcomplex_error_check_value("exp(log(-1 + 1e-20i))", z, expected);
-    ASSERT_TRUE(mcomplex_matches_value_bits(z, expected,
-                                            TEST_MCOMPLEX_BRANCH_ROUNDTRIP_PRECISION));
+    TEST_ASSERT_MCOMPLEX_CLOSE_BITS(z, expected,
+                                    TEST_MCOMPLEX_BRANCH_ROUNDTRIP_PRECISION);
     mc_free(expected);
     expected = NULL;
     mc_free(z);
@@ -1752,8 +1813,8 @@ static void test_difficult_mcomplex_cases(void)
     ASSERT_TRUE(mf_lt(mc_imag(z), MF_ZERO));
     ASSERT_EQ_INT(mc_exp(z), 0);
     print_mcomplex_error_check_value("exp(log(-1 - 1e-20i))", z, expected);
-    ASSERT_TRUE(mcomplex_matches_value_bits(z, expected,
-                                            TEST_MCOMPLEX_BRANCH_ROUNDTRIP_PRECISION));
+    TEST_ASSERT_MCOMPLEX_CLOSE_BITS(z, expected,
+                                    TEST_MCOMPLEX_BRANCH_ROUNDTRIP_PRECISION);
     mc_free(expected);
     expected = NULL;
     mc_free(z);
@@ -1765,7 +1826,7 @@ static void test_difficult_mcomplex_cases(void)
     ASSERT_EQ_INT(mc_log(z), 0);
     ASSERT_EQ_INT(mc_exp(z), 0);
     print_mcomplex_value("exp(log(0.75 + 1.25i)) should recover 0.75 + 1.25i", z);
-    ASSERT_TRUE(mcomplex_matches_value(z, expected));
+    TEST_ASSERT_MCOMPLEX_CLOSE(z, expected);
     mc_free(expected);
     mc_free(z);
 
@@ -1775,7 +1836,7 @@ static void test_difficult_mcomplex_cases(void)
     ASSERT_NOT_NULL(expected);
     ASSERT_EQ_INT(mc_log10(z), 0);
     print_mcomplex_error_check_value("log10(100) should be 2", z, expected);
-    ASSERT_TRUE(mcomplex_matches_value(z, expected));
+    TEST_ASSERT_MCOMPLEX_CLOSE(z, expected);
     mc_free(expected);
     mc_free(z);
 
@@ -1789,8 +1850,8 @@ static void test_difficult_mcomplex_cases(void)
     ASSERT_EQ_INT(mc_exp(other), 0);
     ASSERT_EQ_INT(mc_mul(other, z), 0);
     print_mcomplex_value("productlog(1 + 1i) * exp(productlog(1 + 1i)) should recover 1 + 1i", other);
-    ASSERT_TRUE(mcomplex_matches_value_bits(other, expected,
-                                            TEST_MCOMPLEX_MATHS_PRECISION));
+    TEST_ASSERT_MCOMPLEX_CLOSE_BITS(other, expected,
+                                    TEST_MCOMPLEX_MATHS_PRECISION);
     mc_free(other);
     mc_free(expected);
     mc_free(z);
@@ -1804,8 +1865,8 @@ static void test_difficult_mcomplex_cases(void)
     ASSERT_EQ_INT(mc_exp(other), 0);
     print_mcomplex_value("exp(lgamma(1.5 + 0.7i)) should match gamma(1.5 + 0.7i)", other);
     print_mcomplex_value("gamma(1.5 + 0.7i)", z);
-    ASSERT_TRUE(mcomplex_matches_value_bits(other, z,
-                                            TEST_MCOMPLEX_QCOMPLEX_GAMMA_PRECISION));
+    TEST_ASSERT_MCOMPLEX_CLOSE_BITS(other, z,
+                                    TEST_MCOMPLEX_QCOMPLEX_GAMMA_PRECISION);
     mc_free(other);
     mc_free(z);
 
@@ -1820,8 +1881,8 @@ static void test_difficult_mcomplex_cases(void)
     ASSERT_EQ_INT(mc_gamma(other), 0);
     ASSERT_EQ_INT(mc_mul(z, expected), 0);
     print_mcomplex_error_check_value("gamma(z + 1) - z * gamma(z) for z = 1.5 + 0.7i", other, z);
-    ASSERT_TRUE(mcomplex_matches_value_bits(other, z,
-                                            TEST_MCOMPLEX_QCOMPLEX_GAMMA_PRECISION));
+    TEST_ASSERT_MCOMPLEX_CLOSE_BITS(other, z,
+                                    TEST_MCOMPLEX_QCOMPLEX_GAMMA_PRECISION);
     mc_free(other);
     mc_free(expected);
     mc_free(z);
@@ -1840,8 +1901,8 @@ static void test_difficult_mcomplex_cases(void)
     ASSERT_EQ_INT(mc_sub(other, expected), 0);
     mc_clear(expected);
     print_mcomplex_error_check_value("lgamma(z + 1) - lgamma(z) - log(z) for z = 1.5 + 0.7i", other, expected);
-    ASSERT_TRUE(mcomplex_matches_value_bits(other, expected,
-                                            TEST_MCOMPLEX_QCOMPLEX_GAMMA_PRECISION));
+    TEST_ASSERT_MCOMPLEX_CLOSE_BITS(other, expected,
+                                    TEST_MCOMPLEX_QCOMPLEX_GAMMA_PRECISION);
     mc_free(other);
     mc_free(expected);
     mc_free(z);
@@ -1858,13 +1919,13 @@ static void test_difficult_mcomplex_cases(void)
     ASSERT_EQ_INT(mc_erfc(rhs), 0);
     ASSERT_EQ_INT(mc_add(lhs, rhs), 0);
     print_mcomplex_error_check_value("erf(z) + erfc(z) for z = 0.5 + 0.25i", lhs, MC_ONE);
-    ASSERT_TRUE(mcomplex_matches_value_bits(lhs, MC_ONE, TEST_MCOMPLEX_MATHS_PRECISION));
+    TEST_ASSERT_MCOMPLEX_CLOSE_BITS(lhs, MC_ONE, TEST_MCOMPLEX_MATHS_PRECISION);
     ASSERT_EQ_INT(mc_erf(expected), 0);
     ASSERT_EQ_INT(mc_neg(expected), 0);
     ASSERT_EQ_INT(mc_neg(z), 0);
     ASSERT_EQ_INT(mc_erf(z), 0);
     print_mcomplex_error_check_value("erf(-z) + erf(z) for z = 0.5 + 0.25i", z, expected);
-    ASSERT_TRUE(mcomplex_matches_value_bits(z, expected, TEST_MCOMPLEX_MATHS_PRECISION));
+    TEST_ASSERT_MCOMPLEX_CLOSE_BITS(z, expected, TEST_MCOMPLEX_MATHS_PRECISION);
     mc_free(expected);
     mc_free(rhs);
     mc_free(lhs);
@@ -1886,8 +1947,8 @@ static void test_difficult_mcomplex_cases(void)
     ASSERT_EQ_INT(mc_logbeta(expected, rhs), 0);
     ASSERT_EQ_INT(mc_exp(expected), 0);
     print_mcomplex_error_check_value("beta(a,b) - exp(logbeta(a,b))", z, expected);
-    ASSERT_TRUE(mcomplex_matches_value_bits(z, expected,
-                                            TEST_MCOMPLEX_QCOMPLEX_PRECISION));
+    TEST_ASSERT_MCOMPLEX_CLOSE_BITS(z, expected,
+                                    TEST_MCOMPLEX_QCOMPLEX_PRECISION);
     mc_free(rhs);
     mc_free(expected);
     mc_free(other);
@@ -1912,7 +1973,7 @@ static void test_difficult_mcomplex_cases(void)
     ASSERT_EQ_INT(mc_add(lhs, rhs), 0);
     ASSERT_EQ_INT(mc_gamma(expected), 0);
     print_mcomplex_error_check_value("gammainc_lower + gammainc_upper - gamma", lhs, expected);
-    ASSERT_TRUE(mcomplex_matches_value_bits(lhs, expected, TEST_MCOMPLEX_MATHS_PRECISION));
+    TEST_ASSERT_MCOMPLEX_CLOSE_BITS(lhs, expected, TEST_MCOMPLEX_MATHS_PRECISION);
     mc_free(expected);
     expected = NULL;
     mc_free(rhs);
@@ -1936,7 +1997,7 @@ static void test_difficult_mcomplex_cases(void)
     ASSERT_EQ_INT(mc_gammainc_Q(rhs, other), 0);
     ASSERT_EQ_INT(mc_add(lhs, rhs), 0);
     print_mcomplex_error_check_value("gammainc_P + gammainc_Q - 1", lhs, MC_ONE);
-    ASSERT_TRUE(mcomplex_matches_value_bits(lhs, MC_ONE, TEST_MCOMPLEX_MATHS_PRECISION));
+    TEST_ASSERT_MCOMPLEX_CLOSE_BITS(lhs, MC_ONE, TEST_MCOMPLEX_MATHS_PRECISION);
     mc_free(rhs);
     mc_free(lhs);
     mc_free(other);
@@ -1947,7 +2008,7 @@ static void test_difficult_mcomplex_cases(void)
     z = NULL;
 }
 
-static int run_README_md_example(void)
+static void test_readme_md_example(void)
 {
     mcomplex_t *z;
     char buf[256];
@@ -1956,13 +2017,13 @@ static int run_README_md_example(void)
     saved_default_digits = mf_get_default_precision_digits();
     mf_set_default_precision_digits(50);
     z = mc_create_string("1 + 1i");
-    if (!z)
-        return 1;
+    ASSERT_NOT_NULL(z);
 
     if (mc_exp(z) != 0) {
         mc_free(z);
         mf_set_default_precision_digits(saved_default_digits);
-        return 1;
+        TEST_FAIL();
+        return;
     }
 
     mc_sprintf(buf, sizeof(buf), "%mz", z);
@@ -1970,26 +2031,37 @@ static int run_README_md_example(void)
 
     mc_free(z);
     mf_set_default_precision_digits(saved_default_digits);
-    return 0;
 }
 
 int tests_main(void)
 {
     size_t saved_default = mf_get_default_precision();
 
-    ASSERT_EQ_INT(mf_set_default_precision(TEST_MCOMPLEX_MATHS_PRECISION), 0);
-    RUN_TEST_CASE(test_lifecycle_and_constants);
-    RUN_TEST_CASE(test_conversion_to_from_qcomplex);
-    RUN_TEST_CASE(test_arithmetic);
-    RUN_TEST_CASE(test_transcendentals);
-    RUN_TEST_CASE(test_real_elementary_replacements);
-    RUN_TEST_CASE(test_real_special_replacements);
-    RUN_TEST_CASE(test_special_functions);
-    RUN_TEST_CASE(test_difficult_mcomplex_cases);
+    if (mf_set_default_precision(TEST_MCOMPLEX_MATHS_PRECISION) != 0) {
+        fprintf(stderr, "failed to set default mfloat precision to %u bits\n",
+                (unsigned)TEST_MCOMPLEX_MATHS_PRECISION);
+        return 1;
+    }
+
+    TEST_SECTION("Core and Arithmetic");
+    TEST_RUN_CASE(test_lifecycle_and_constants, NULL);
+    TEST_RUN_CASE(test_conversion_to_from_qcomplex, NULL);
+    TEST_RUN_CASE(test_arithmetic, NULL);
+
+    TEST_SECTION("Transcendentals and Special Functions");
+    TEST_RUN_CASE(test_transcendentals, NULL);
+    TEST_RUN_CASE(test_real_elementary_replacements, NULL);
+    TEST_RUN_CASE(test_real_special_replacements, NULL);
+    TEST_RUN_CASE(test_special_functions, NULL);
+    TEST_RUN_CASE(test_difficult_mcomplex_cases, NULL);
 
     printf(C_YELLOW "\nRunning README example...\n" C_RESET);
-    run_README_md_example();
+    TEST_RUN_OUTPUT_TAGS(test_readme_md_example, "mcomplex,readme,output");
 
-    ASSERT_EQ_INT(mf_set_default_precision(saved_default), 0);
-    return 0;
+    if (mf_set_default_precision(saved_default) != 0) {
+        fprintf(stderr, "failed to restore default mfloat precision\n");
+        return 1;
+    }
+
+    return TESTS_EXIT_CODE();
 }

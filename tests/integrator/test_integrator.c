@@ -3,14 +3,23 @@
 #include <stdio.h>
 #include <math.h>
 
-#define TEST_CONFIG_MODE TEST_CONFIG_GLOBAL
-#define TEST_CONFIG_MAIN
 #include "test_harness.h"
 
 #include "qfloat.h"
 #include "qcomplex.h"
 #include "integrator.h"
 #include "dval.h"
+
+TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
+static int integrator_qfloat_validity_equal(const void *actual, const void *expected, void *ctx);
+static void integrator_qfloat_validity_format(const void *value, char *buf, size_t buf_size, void *ctx);
+static bool test_integrator_suite_setup(void);
+static bool test_assert_integrator_qfloat_close_tol(qfloat_t actual,
+                                                    qfloat_t expected,
+                                                    qfloat_t tol,
+                                                    const char *file,
+                                                    int line);
+TEST_SUITE_SETUP(test_integrator_suite_setup);
 
 /* -----------------------------------------------------------------------
  * Helpers
@@ -24,6 +33,67 @@ static int qf_close(qfloat_t a, qfloat_t b, qfloat_t tol) {
 static qfloat_t tol20 = { 9.9999999999999995e-21, 5.4846728545790429e-37 };  /* 1e-20 */
 static qfloat_t tol15 = { 1.0000000000000001e-15, -4.3320984004882613e-32 }; /* 1e-15 */
 static qfloat_t tol27 = { 1e-27, -3.8494869749191836e-44 }; /* 1e-27 */
+static const test_validity_contract_t integrator_qfloat_close_contract =
+    TEST_VALIDITY_CONTRACT("integrator-qfloat-close",
+                           integrator_qfloat_validity_equal,
+                           integrator_qfloat_validity_format,
+                           &tol15);
+
+#define TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE(actual_value, expected_value) \
+    do { \
+        qfloat_t test_integrator_actual__ = (actual_value); \
+        qfloat_t test_integrator_expected__ = (expected_value); \
+        TEST_ASSERT_VALID_NAMED("integrator-qfloat-close", \
+                                &test_integrator_actual__, \
+                                &test_integrator_expected__); \
+    } while (0)
+
+#define TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE_TOL(actual_value, expected_value, tol_value) \
+    do { \
+        if (!test_assert_integrator_qfloat_close_tol((actual_value), \
+                                                     (expected_value), \
+                                                     (tol_value), \
+                                                     __FILE__, \
+                                                     __LINE__)) \
+            return; \
+    } while (0)
+
+static int integrator_qfloat_validity_equal(const void *actual, const void *expected, void *ctx)
+{
+    const qfloat_t *a = (const qfloat_t *)actual;
+    const qfloat_t *b = (const qfloat_t *)expected;
+    const qfloat_t tol = ctx ? *(const qfloat_t *)ctx : tol15;
+
+    return qf_close(*a, *b, tol);
+}
+
+static void integrator_qfloat_validity_format(const void *value, char *buf, size_t buf_size, void *ctx)
+{
+    (void)ctx;
+    qf_to_string(*(const qfloat_t *)value, buf, buf_size);
+}
+
+static bool test_integrator_suite_setup(void)
+{
+    test_register_validity_checker("integrator-qfloat-close",
+                                   &integrator_qfloat_close_contract);
+    return TEST_REQUIRE_VALIDITY_CHECKER("integrator-qfloat-close");
+}
+
+static bool test_assert_integrator_qfloat_close_tol(qfloat_t actual,
+                                                    qfloat_t expected,
+                                                    qfloat_t tol,
+                                                    const char *file,
+                                                    int line)
+{
+    const test_validity_contract_t contract =
+        TEST_VALIDITY_CONTRACT("integrator-qfloat-close",
+                               integrator_qfloat_validity_equal,
+                               integrator_qfloat_validity_format,
+                               &tol);
+
+    return test_assert_validity(&contract, &actual, &expected, file, line);
+}
 
 static dval_t *test_dv_new_const_d(double x)
 {
@@ -138,7 +208,7 @@ void test_polynomial(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol15));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE(result, expected);
     dv_free(expr);
     dv_free(x);
     ig_free(ig);
@@ -159,7 +229,7 @@ void test_sin(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol15));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE(result, expected);
     ig_free(ig);
 }
 
@@ -178,7 +248,7 @@ void test_exp(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol15));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE(result, expected);
     ig_free(ig);
 }
 
@@ -196,7 +266,7 @@ void test_arctan(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, QF_PI_2, tol20));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE_TOL(result, QF_PI_2, tol20);
     ig_free(ig);
 }
 
@@ -215,7 +285,7 @@ void test_log(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol15));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE(result, expected);
     ig_free(ig);
 }
 
@@ -236,7 +306,7 @@ void test_constant(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol15));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE(result, expected);
     dv_free(expr);
     dv_free(x);
     ig_free(ig);
@@ -258,7 +328,7 @@ void test_linear(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol15));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE(result, expected);
     dv_free(x);
     ig_free(ig);
 }
@@ -352,7 +422,7 @@ void test_reversed_limits(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol15));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE(result, expected);
     dv_free(expr);
     dv_free(x);
     ig_free(ig);
@@ -379,7 +449,7 @@ void test_dv_sin(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol15));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE(result, expected);
 
     dv_free(expr);
     dv_free(x);
@@ -403,7 +473,7 @@ void test_dv_exp(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol20));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE_TOL(result, expected, tol20);
 
     dv_free(expr);
     dv_free(x);
@@ -429,7 +499,7 @@ void test_dv_arctan(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, QF_PI_2, tol27));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE_TOL(result, QF_PI_2, tol27);
 
     dv_free(expr);
     dv_free(denom);
@@ -491,7 +561,7 @@ void test_double_polynomial(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol20));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE_TOL(result, expected, tol20);
     dv_free(expr);
     dv_free(y);
     dv_free(x);
@@ -519,7 +589,7 @@ void test_double_exp(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol20));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE_TOL(result, expected, tol20);
     dv_free(expr);
     dv_free(sum);   // free intermediate
     dv_free(y);
@@ -546,7 +616,7 @@ void test_double_nonunit_bounds(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol27));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE_TOL(result, expected, tol27);
     dv_free(expr);
     dv_free(y);
     dv_free(x);
@@ -596,7 +666,7 @@ void test_triple_polynomial(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol27));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE_TOL(result, expected, tol27);
     dv_free(expr);
     dv_free(xy);    // free intermediate
     dv_free(z);
@@ -629,7 +699,7 @@ void test_triple_exp(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol27));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE_TOL(result, expected, tol27);
     dv_free(expr);
     dv_free(xyz);   // free intermediate
     dv_free(xy);    // free intermediate
@@ -685,7 +755,7 @@ void test_multi_2d(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol27));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE_TOL(result, expected, tol27);
 
     dv_free(expr);
     dv_free(y);
@@ -715,7 +785,7 @@ void test_multi_3d(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol27));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE_TOL(result, expected, tol27);
 
     dv_free(expr);
     dv_free(xy);    // free intermediate
@@ -762,7 +832,7 @@ void test_multi_nd1(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol27));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE_TOL(result, expected, tol27);
     dv_free(expr);
     dv_free(x);
     ig_free(ig);
@@ -794,7 +864,7 @@ void test_multi_4d(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol27));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE_TOL(result, expected, tol27);
     dv_free(expr);
     dv_free(zw);    // free intermediate
     dv_free(xy);    // free intermediate
@@ -834,7 +904,7 @@ void test_multi_4d_exp(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol27));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE_TOL(result, expected, tol27);
     dv_free(expr);
     dv_free(sum);   // free intermediate
     dv_free(zw);    // free intermediate
@@ -885,7 +955,7 @@ void test_multi_4d_exp_affine(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol27));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE_TOL(result, expected, tol27);
 
     dv_free(expr);
     dv_free(affine);
@@ -940,7 +1010,7 @@ void test_multi_3d_sinh_affine(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol27));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE_TOL(result, expected, tol27);
 
     dv_free(expr);
     dv_free(affine);
@@ -993,7 +1063,7 @@ void test_multi_3d_cosh_affine(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol27));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE_TOL(result, expected, tol27);
 
     dv_free(expr);
     dv_free(affine);
@@ -1042,7 +1112,7 @@ void test_multi_3d_sin_affine(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol27));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE_TOL(result, expected, tol27);
 
     dv_free(expr);
     dv_free(affine);
@@ -1092,7 +1162,7 @@ void test_multi_3d_cos_affine(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol27));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE_TOL(result, expected, tol27);
 
     dv_free(expr);
     dv_free(affine);
@@ -1141,7 +1211,7 @@ void test_multi_3d_scaled_sum_specials(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol27));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE_TOL(result, expected, tol27);
 
     dv_free(expr);
     dv_free(partial);
@@ -1197,7 +1267,7 @@ void test_multi_2d_sum_of_specials(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol27));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE_TOL(result, expected, tol27);
 
     dv_free(expr);
     dv_free(sum1);
@@ -1249,7 +1319,7 @@ void test_multi_3d_separable_product(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol15));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE(result, expected);
 
     dv_free(expr);
     dv_free(prod_xy);
@@ -1295,7 +1365,7 @@ void test_multi_3d_regrouped_separable_product(void) {
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
     ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
-    ASSERT_TRUE(qf_close(result, expected, tol15));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE(result, expected);
 
     dv_free(expr);
     dv_free(right);
@@ -1342,7 +1412,7 @@ void test_multi_2d_sum_of_separable_products(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol15));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE(result, expected);
 
     dv_free(expr);
     dv_free(term2);
@@ -1380,7 +1450,7 @@ void test_multi_2d_affine_square(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol27));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE_TOL(result, expected, tol27);
     ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
 
     dv_free(expr);
@@ -1416,7 +1486,7 @@ void test_multi_2d_affine_cube(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol27));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE_TOL(result, expected, tol27);
     ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
 
     dv_free(expr);
@@ -1454,7 +1524,7 @@ void test_multi_2d_affine_quartic(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol27));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE_TOL(result, expected, tol27);
     ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
 
     dv_free(expr);
@@ -1498,7 +1568,7 @@ void test_multi_2d_affine_poly_deg4(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol27));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE_TOL(result, expected, tol27);
     ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
 
     dv_free(poly);
@@ -1546,7 +1616,7 @@ void test_multi_2d_affine_times_exp_affine(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol27));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE_TOL(result, expected, tol27);
     ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
 
     dv_free(expr);
@@ -1591,7 +1661,7 @@ void test_multi_2d_square_affine_times_exp_affine(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol27));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE_TOL(result, expected, tol27);
     ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
 
     dv_free(expr);
@@ -1637,7 +1707,7 @@ void test_multi_2d_affine_times_sin_affine(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol27));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE_TOL(result, expected, tol27);
     ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
 
     dv_free(expr);
@@ -1691,7 +1761,7 @@ void test_multi_2d_square_affine_times_sin_affine(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol27));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE_TOL(result, expected, tol27);
     ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
 
     dv_free(expr);
@@ -1737,7 +1807,7 @@ void test_multi_2d_affine_times_cos_affine(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol27));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE_TOL(result, expected, tol27);
     ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
 
     dv_free(expr);
@@ -1791,7 +1861,7 @@ void test_multi_2d_square_affine_times_cos_affine(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol27));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE_TOL(result, expected, tol27);
     ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
 
     dv_free(expr);
@@ -1841,7 +1911,7 @@ void test_multi_2d_affine_times_sinh_affine(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol27));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE_TOL(result, expected, tol27);
     ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
 
     dv_free(expr);
@@ -1895,7 +1965,7 @@ void test_multi_2d_square_affine_times_sinh_affine(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol27));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE_TOL(result, expected, tol27);
     ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
 
     dv_free(expr);
@@ -1945,7 +2015,7 @@ void test_multi_2d_affine_times_cosh_affine(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol27));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE_TOL(result, expected, tol27);
     ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
 
     dv_free(expr);
@@ -1999,7 +2069,7 @@ void test_multi_2d_square_affine_times_cosh_affine(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol27));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE_TOL(result, expected, tol27);
     ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
 
     dv_free(expr);
@@ -2045,7 +2115,7 @@ void test_multi_2d_cube_affine_times_exp_affine(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol27));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE_TOL(result, expected, tol27);
     ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
 
     dv_free(expr);
@@ -2105,7 +2175,7 @@ void test_multi_2d_cube_affine_times_sin_affine(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol27));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE_TOL(result, expected, tol27);
     ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
 
     dv_free(expr);
@@ -2165,7 +2235,7 @@ void test_multi_2d_cube_affine_times_cos_affine(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol27));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE_TOL(result, expected, tol27);
     ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
 
     dv_free(expr);
@@ -2220,7 +2290,7 @@ void test_multi_2d_cube_affine_times_sinh_affine(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol27));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE_TOL(result, expected, tol27);
     ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
 
     dv_free(expr);
@@ -2276,7 +2346,7 @@ void test_multi_2d_cube_affine_times_cosh_affine(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol27));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE_TOL(result, expected, tol27);
     ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
 
     dv_free(expr);
@@ -2317,7 +2387,7 @@ void test_multi_2d_quartic_affine_times_exp_affine(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol27));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE_TOL(result, expected, tol27);
     ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
 
     dv_free(expr);
@@ -2359,7 +2429,7 @@ void test_multi_2d_quartic_affine_times_sin_affine(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol27));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE_TOL(result, expected, tol27);
     ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
 
     dv_free(expr);
@@ -2401,7 +2471,7 @@ void test_multi_2d_quartic_affine_times_cos_affine(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol27));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE_TOL(result, expected, tol27);
     ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
 
     dv_free(expr);
@@ -2441,7 +2511,7 @@ void test_multi_2d_quartic_affine_times_sinh_affine(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol27));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE_TOL(result, expected, tol27);
     ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
 
     dv_free(expr);
@@ -2483,7 +2553,7 @@ void test_multi_2d_quartic_affine_times_cosh_affine(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol27));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE_TOL(result, expected, tol27);
     ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
 
     dv_free(expr);
@@ -2534,7 +2604,7 @@ void test_multi_2d_affine_poly_times_exp_affine_combination(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol27));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE_TOL(result, expected, tol27);
     ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
 
     dv_free(expr);
@@ -2590,7 +2660,7 @@ void test_multi_2d_affine_poly_times_sin_affine_combination(void) {
     qf_printf("  err      = %q\n", err);
     printf("  status = %d  intervals = %zu\n", s, ig_get_interval_count_used(ig));
     ASSERT_TRUE(s == 0);
-    ASSERT_TRUE(qf_close(result, expected, tol27));
+    TEST_ASSERT_INTEGRATOR_QFLOAT_CLOSE_TOL(result, expected, tol27);
     ASSERT_TRUE(ig_get_interval_count_used(ig) == 1);
 
     dv_free(expr);
@@ -2620,7 +2690,7 @@ static qfloat_t fn_gaussian(qfloat_t x, void *ctx) {
     return qf_exp(qf_neg(qf_sqr(x)));
 }
 
-void example_integrator(void) {
+static void example_integrator(void) {
     /* ∫₋₃³ exp(-x²) dx ≈ √π * erf(3) */
     integrator_t *ig = ig_new();
     ig_set_tolerance(ig, qf_from_string("1e-21"), qf_from_string("1e-21"));
@@ -2642,7 +2712,7 @@ static qfloat_t fn_power(qfloat_t x, void *ctx) {
     return qf_pow(x, pc->exponent);
 }
 
-void example_ctx(void) {
+static void example_ctx(void) {
     /* ∫₀¹ x^2.5 dx = 1/3.5 */
     integrator_t *ig = ig_new();
     ig_set_tolerance(ig, qf_from_string("1e-21"), qf_from_string("1e-21"));
@@ -2657,7 +2727,7 @@ void example_ctx(void) {
     ig_free(ig);
 }
 
-void example_integrator_dv(void) {
+static void example_integrator_dv(void) {
     /* ∫₋₃³ exp(-x²) dx using Turán T15/T4 with automatic differentiation.
      * Exact value: √π · erf(3).  Compare interval count with example_integrator(). */
     integrator_t *ig = ig_new();
@@ -2688,93 +2758,91 @@ void example_integrator_dv(void) {
  * --------------------------------------------------------------------- */
 
 int tests_main(void) {
-    printf(C_BOLD C_CYAN "=== Lifecycle Tests ===\n" C_RESET);
-    RUN_TEST_CASE(test_create_and_destroy);
-    RUN_TEST_CASE(test_null_safety);
+    TEST_SECTION("Lifecycle Tests");
+    TEST_RUN_CASE(test_create_and_destroy, NULL);
+    TEST_RUN_CASE(test_null_safety, NULL);
 
-    printf(C_BOLD C_CYAN "=== Integral Value Tests ===\n" C_RESET);
-    RUN_TEST_CASE(test_polynomial);
-    RUN_TEST_CASE(test_sin);
-    RUN_TEST_CASE(test_exp);
-    RUN_TEST_CASE(test_arctan);
-    RUN_TEST_CASE(test_log);
-    RUN_TEST_CASE(test_constant);
-    RUN_TEST_CASE(test_linear);
-    RUN_TEST_CASE(test_reversed_limits);
+    TEST_SECTION("Integral Value Tests");
+    TEST_RUN_CASE(test_polynomial, NULL);
+    TEST_RUN_CASE(test_sin, NULL);
+    TEST_RUN_CASE(test_exp, NULL);
+    TEST_RUN_CASE(test_arctan, NULL);
+    TEST_RUN_CASE(test_log, NULL);
+    TEST_RUN_CASE(test_constant, NULL);
+    TEST_RUN_CASE(test_linear, NULL);
+    TEST_RUN_CASE(test_reversed_limits, NULL);
 
-    printf(C_BOLD C_CYAN "=== Configuration Tests ===\n" C_RESET);
-    RUN_TEST_CASE(test_set_tol);
-    RUN_TEST_CASE(test_max_intervals);
-    RUN_TEST_CASE(test_last_intervals);
+    TEST_SECTION("Configuration Tests");
+    TEST_RUN_CASE(test_set_tol, NULL);
+    TEST_RUN_CASE(test_max_intervals, NULL);
+    TEST_RUN_CASE(test_last_intervals, NULL);
 
-    printf(C_BOLD C_CYAN "=== Turán T15/T4 dval_t Tests ===\n" C_RESET);
-    RUN_TEST_CASE(test_dv_sin);
-    RUN_TEST_CASE(test_dv_exp);
-    RUN_TEST_CASE(test_dv_arctan);
-    RUN_TEST_CASE(test_dv_null_safety);
+    TEST_SECTION("Turan T15/T4 dval_t Tests");
+    TEST_RUN_CASE(test_dv_sin, NULL);
+    TEST_RUN_CASE(test_dv_exp, NULL);
+    TEST_RUN_CASE(test_dv_arctan, NULL);
+    TEST_RUN_CASE(test_dv_null_safety, NULL);
 
-    printf(C_BOLD C_CYAN "=== ig_double_integral Tests ===\n" C_RESET);
-    RUN_TEST_CASE(test_double_polynomial);
-    RUN_TEST_CASE(test_double_exp);
-    RUN_TEST_CASE(test_double_nonunit_bounds);
-    RUN_TEST_CASE(test_double_null_safety);
+    TEST_SECTION("ig_double_integral Tests");
+    TEST_RUN_CASE(test_double_polynomial, NULL);
+    TEST_RUN_CASE(test_double_exp, NULL);
+    TEST_RUN_CASE(test_double_nonunit_bounds, NULL);
+    TEST_RUN_CASE(test_double_null_safety, NULL);
 
-    printf(C_BOLD C_CYAN "=== ig_triple_integral Tests ===\n" C_RESET);
-    RUN_TEST_CASE(test_triple_polynomial);
-    RUN_TEST_CASE(test_triple_exp);
-    RUN_TEST_CASE(test_triple_null_safety);
+    TEST_SECTION("ig_triple_integral Tests");
+    TEST_RUN_CASE(test_triple_polynomial, NULL);
+    TEST_RUN_CASE(test_triple_exp, NULL);
+    TEST_RUN_CASE(test_triple_null_safety, NULL);
 
-    printf(C_BOLD C_CYAN "=== N-dimensional Turán T15/T4 Tests ===\n" C_RESET);
-    RUN_TEST_CASE(test_multi_2d);
-    RUN_TEST_CASE(test_multi_3d);
-    RUN_TEST_CASE(test_multi_null_safety);
-    RUN_TEST_CASE(test_multi_nd1);
-    RUN_TEST_CASE(test_multi_4d);
-    RUN_TEST_CASE(test_multi_4d_exp);
-    RUN_TEST_CASE(test_multi_4d_exp_affine);
-    RUN_TEST_CASE(test_multi_3d_sinh_affine);
-    RUN_TEST_CASE(test_multi_3d_cosh_affine);
-    RUN_TEST_CASE(test_multi_3d_sin_affine);
-    RUN_TEST_CASE(test_multi_3d_cos_affine);
-    RUN_TEST_CASE(test_multi_3d_scaled_sum_specials);
-    RUN_TEST_CASE(test_multi_2d_sum_of_specials);
-    RUN_TEST_CASE(test_multi_3d_separable_product);
-    RUN_TEST_CASE(test_multi_3d_regrouped_separable_product);
-    RUN_TEST_CASE(test_multi_2d_sum_of_separable_products);
-    RUN_TEST_CASE(test_multi_2d_affine_square);
-    RUN_TEST_CASE(test_multi_2d_affine_cube);
-    RUN_TEST_CASE(test_multi_2d_affine_quartic);
-    RUN_TEST_CASE(test_multi_2d_affine_poly_deg4);
-    RUN_TEST_CASE(test_multi_2d_affine_times_exp_affine);
-    RUN_TEST_CASE(test_multi_2d_square_affine_times_exp_affine);
-    RUN_TEST_CASE(test_multi_2d_cube_affine_times_exp_affine);
-    RUN_TEST_CASE(test_multi_2d_quartic_affine_times_exp_affine);
-    RUN_TEST_CASE(test_multi_2d_affine_poly_times_exp_affine_combination);
-    RUN_TEST_CASE(test_multi_2d_affine_times_sin_affine);
-    RUN_TEST_CASE(test_multi_2d_square_affine_times_sin_affine);
-    RUN_TEST_CASE(test_multi_2d_cube_affine_times_sin_affine);
-    RUN_TEST_CASE(test_multi_2d_quartic_affine_times_sin_affine);
-    RUN_TEST_CASE(test_multi_2d_affine_poly_times_sin_affine_combination);
-    RUN_TEST_CASE(test_multi_2d_affine_times_cos_affine);
-    RUN_TEST_CASE(test_multi_2d_square_affine_times_cos_affine);
-    RUN_TEST_CASE(test_multi_2d_cube_affine_times_cos_affine);
-    RUN_TEST_CASE(test_multi_2d_quartic_affine_times_cos_affine);
-    RUN_TEST_CASE(test_multi_2d_affine_times_sinh_affine);
-    RUN_TEST_CASE(test_multi_2d_square_affine_times_sinh_affine);
-    RUN_TEST_CASE(test_multi_2d_cube_affine_times_sinh_affine);
-    RUN_TEST_CASE(test_multi_2d_quartic_affine_times_sinh_affine);
-    RUN_TEST_CASE(test_multi_2d_affine_times_cosh_affine);
-    RUN_TEST_CASE(test_multi_2d_square_affine_times_cosh_affine);
-    RUN_TEST_CASE(test_multi_2d_cube_affine_times_cosh_affine);
-    RUN_TEST_CASE(test_multi_2d_quartic_affine_times_cosh_affine);
+    TEST_SECTION("N-dimensional Turan T15/T4 Tests");
+    TEST_RUN_CASE(test_multi_2d, NULL);
+    TEST_RUN_CASE(test_multi_3d, NULL);
+    TEST_RUN_CASE(test_multi_null_safety, NULL);
+    TEST_RUN_CASE(test_multi_nd1, NULL);
+    TEST_RUN_CASE(test_multi_4d, NULL);
+    TEST_RUN_CASE(test_multi_4d_exp, NULL);
+    TEST_RUN_CASE(test_multi_4d_exp_affine, NULL);
+    TEST_RUN_CASE(test_multi_3d_sinh_affine, NULL);
+    TEST_RUN_CASE(test_multi_3d_cosh_affine, NULL);
+    TEST_RUN_CASE(test_multi_3d_sin_affine, NULL);
+    TEST_RUN_CASE(test_multi_3d_cos_affine, NULL);
+    TEST_RUN_CASE(test_multi_3d_scaled_sum_specials, NULL);
+    TEST_RUN_CASE(test_multi_2d_sum_of_specials, NULL);
+    TEST_RUN_CASE(test_multi_3d_separable_product, NULL);
+    TEST_RUN_CASE(test_multi_3d_regrouped_separable_product, NULL);
+    TEST_RUN_CASE(test_multi_2d_sum_of_separable_products, NULL);
+    TEST_RUN_CASE(test_multi_2d_affine_square, NULL);
+    TEST_RUN_CASE(test_multi_2d_affine_cube, NULL);
+    TEST_RUN_CASE(test_multi_2d_affine_quartic, NULL);
+    TEST_RUN_CASE(test_multi_2d_affine_poly_deg4, NULL);
+    TEST_RUN_CASE(test_multi_2d_affine_times_exp_affine, NULL);
+    TEST_RUN_CASE(test_multi_2d_square_affine_times_exp_affine, NULL);
+    TEST_RUN_CASE(test_multi_2d_cube_affine_times_exp_affine, NULL);
+    TEST_RUN_CASE(test_multi_2d_quartic_affine_times_exp_affine, NULL);
+    TEST_RUN_CASE(test_multi_2d_affine_poly_times_exp_affine_combination, NULL);
+    TEST_RUN_CASE(test_multi_2d_affine_times_sin_affine, NULL);
+    TEST_RUN_CASE(test_multi_2d_square_affine_times_sin_affine, NULL);
+    TEST_RUN_CASE(test_multi_2d_cube_affine_times_sin_affine, NULL);
+    TEST_RUN_CASE(test_multi_2d_quartic_affine_times_sin_affine, NULL);
+    TEST_RUN_CASE(test_multi_2d_affine_poly_times_sin_affine_combination, NULL);
+    TEST_RUN_CASE(test_multi_2d_affine_times_cos_affine, NULL);
+    TEST_RUN_CASE(test_multi_2d_square_affine_times_cos_affine, NULL);
+    TEST_RUN_CASE(test_multi_2d_cube_affine_times_cos_affine, NULL);
+    TEST_RUN_CASE(test_multi_2d_quartic_affine_times_cos_affine, NULL);
+    TEST_RUN_CASE(test_multi_2d_affine_times_sinh_affine, NULL);
+    TEST_RUN_CASE(test_multi_2d_square_affine_times_sinh_affine, NULL);
+    TEST_RUN_CASE(test_multi_2d_cube_affine_times_sinh_affine, NULL);
+    TEST_RUN_CASE(test_multi_2d_quartic_affine_times_sinh_affine, NULL);
+    TEST_RUN_CASE(test_multi_2d_affine_times_cosh_affine, NULL);
+    TEST_RUN_CASE(test_multi_2d_square_affine_times_cosh_affine, NULL);
+    TEST_RUN_CASE(test_multi_2d_cube_affine_times_cosh_affine, NULL);
+    TEST_RUN_CASE(test_multi_2d_quartic_affine_times_cosh_affine, NULL);
 
-    printf(C_BOLD C_GREEN "\n=== README Output Examples ===\n" C_RESET);
-    printf(C_BOLD C_YELLOW "Example: Gaussian integral\n" C_RESET);
-    example_integrator();
-    printf(C_BOLD C_YELLOW "\nExample: Power function with context\n" C_RESET);
-    example_ctx();
-    printf(C_BOLD C_YELLOW "\nExample: Gaussian via Turán T15/T4 + AD\n" C_RESET);
-    example_integrator_dv();
+    TEST_SECTION("README Output Examples");
+    printf(C_BOLD C_YELLOW "Running README examples...\n" C_RESET);
+    TEST_RUN_OUTPUT_TAGS(example_integrator, "integrator,readme,output");
+    TEST_RUN_OUTPUT_TAGS(example_ctx, "integrator,readme,output");
+    TEST_RUN_OUTPUT_TAGS(example_integrator_dv, "integrator,readme,output");
 
     return TESTS_EXIT_CODE();
 }

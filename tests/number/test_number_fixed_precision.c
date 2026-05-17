@@ -58,13 +58,13 @@ void run_number_fixed_precision_tests(void)
         ASSERT_EQ_INT(num_get_sign(d), 1);
         ASSERT_EQ_INT(num_get_exponent2(d), 0);
 
-        ASSERT_TRUE(num_eq(sin_i, expected_sin_i));
-        ASSERT_TRUE(num_eq(cos_i, expected_cos_i));
-        ASSERT_TRUE(num_eq(tan_i, expected_tan_i));
-        ASSERT_TRUE(num_eq(sinh_i, expected_sinh_i));
-        ASSERT_TRUE(num_eq(cosh_i, expected_cosh_i));
-        ASSERT_TRUE(num_eq(tanh_i, expected_tanh_i));
-        ASSERT_TRUE(num_eq(qc_w0, expected_w0));
+        ASSERT_NUMBER_EQ(sin_i, expected_sin_i);
+        ASSERT_NUMBER_EQ(cos_i, expected_cos_i);
+        ASSERT_NUMBER_EQ(tan_i, expected_tan_i);
+        ASSERT_NUMBER_EQ(sinh_i, expected_sinh_i);
+        ASSERT_NUMBER_EQ(cosh_i, expected_cosh_i);
+        ASSERT_NUMBER_EQ(tanh_i, expected_tanh_i);
+        ASSERT_NUMBER_EQ(qc_w0, expected_w0);
 
         ASSERT_EQ_INT(num_sincos(zero, &sin_zero, &cos_zero), 0);
         assert_number_string("num_sincos(0).sin", sin_zero, "0");

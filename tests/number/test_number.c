@@ -1,17 +1,46 @@
-#define TEST_CONFIG_MODE TEST_CONFIG_GLOBAL
-#define TEST_CONFIG_MAIN
 #include "test_number.h"
+
+static bool test_number_suite_setup(void);
+
+TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
+TEST_SUITE_SETUP(test_number_suite_setup);
+
+static bool test_number_suite_setup(void)
+{
+    test_register_validity_checker("number-exact",
+                                   number_validity_contract_exact());
+    return TEST_REQUIRE_VALIDITY_CHECKER("number-exact");
+}
 
 int tests_main(void)
 {
-    RUN_TEST_CASE(run_number_parse_tests);
-    RUN_TEST_CASE(run_number_exact_backend_tests);
-    RUN_TEST_CASE(run_number_fixed_precision_tests);
-    RUN_TEST_CASE(run_number_multiprecision_tests);
-    RUN_TEST_CASE(run_number_promotion_tests);
-    RUN_TEST_CASE(run_number_constant_tests);
-    RUN_TEST_CASE(run_number_formatting_tests);
-    RUN_TEST_CASE(run_number_special_function_tests);
-    RUN_TEST_CASE(run_number_public_api_tests);
-    return 0;
+    TEST_SECTION("Parsing");
+    TEST_RUN_CASE(run_number_parse_tests, "number,parse");
+
+    TEST_SECTION("Exact Backends");
+    TEST_RUN_CASE(run_number_exact_backend_tests, "number,exact");
+
+    TEST_SECTION("Fixed Precision");
+    TEST_RUN_CASE(run_number_fixed_precision_tests, "number,fixed-precision");
+
+    TEST_SECTION("Multiprecision");
+    TEST_RUN_CASE(run_number_multiprecision_tests, "number,multiprecision");
+
+    TEST_SECTION("Promotion");
+    TEST_RUN_CASE(run_number_promotion_tests, "number,promotion");
+
+    TEST_SECTION("Constants");
+    TEST_RUN_CASE(run_number_constant_tests, "number,constants");
+
+    TEST_SECTION("Formatting");
+    TEST_RUN_CASE(run_number_formatting_tests, "number,formatting");
+
+    TEST_SECTION("Special Functions");
+    TEST_RUN_CASE(run_number_special_function_tests,
+                  "number,special-functions");
+
+    TEST_SECTION("Public API");
+    TEST_RUN_CASE(run_number_public_api_tests, "number,public-api");
+
+    return TEST_EXIT_CODE();
 }

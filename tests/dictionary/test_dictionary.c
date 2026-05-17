@@ -7,18 +7,16 @@
 #include <stdbool.h>
 
 #include "dictionary.h"
+#include "test_harness.h"
+
+TEST_SUITE_CONFIG(TEST_CONFIG_NONE);
 
 /* -------------------------------------------------------------
  * Colour helpers
  * ------------------------------------------------------------- */
 
-#define C_RED     "\x1b[31m"
-#define C_GREEN   "\x1b[32m"
-#define C_YELLOW  "\x1b[33m"
 #define BLUE    "\x1b[34m"
 #define RESET   "\x1b[0m"
-
-static int tests_failed = 0;
 
 static void pass(const char *msg) {
     printf(C_GREEN "PASS" RESET " %s\n", msg);
@@ -26,7 +24,7 @@ static void pass(const char *msg) {
 
 static void fail(const char *msg) {
     printf(C_RED "FAIL" RESET " %s\n", msg);
-    tests_failed++;
+    test_mark_failure(__FILE__, __LINE__, msg ? msg : "dictionary failure");
 }
 
 /* -------------------------------------------------------------
@@ -667,7 +665,7 @@ static void test_sort_by_value(void) {
     dictionary_destroy(d);
 }
 
-void test_readme_examples(void) {
+static void example_dictionary_readme_examples(void) {
     printf(C_YELLOW "\ntesting README examples...\n" RESET);
 
     test_readme_example_deep();
@@ -678,23 +676,27 @@ void test_readme_examples(void) {
  * Main
  * ------------------------------------------------------------- */
 
-int main(void) {
+int tests_main(void) {
     printf(BLUE "Running dictionary tests...\n" RESET);
 
-    test_int_int();
-    test_str_int();
-    test_int_str();
-    test_deep_deep();
-    test_sorted();
-    test_entries();
-    test_foreach();
-    test_fuzz();
-    test_sorted_fuzz();
-    test_sort_by_value();
+    TEST_SECTION("Core");
+    TEST_RUN_CASE(test_int_int, NULL);
+    TEST_RUN_CASE(test_str_int, NULL);
+    TEST_RUN_CASE(test_int_str, NULL);
+    TEST_RUN_CASE(test_deep_deep, NULL);
+    TEST_RUN_CASE(test_sorted, NULL);
+    TEST_RUN_CASE(test_entries, NULL);
+    TEST_RUN_CASE(test_foreach, NULL);
 
-    test_readme_examples();
+    TEST_SECTION("Fuzz");
+    TEST_RUN_CASE(test_fuzz, NULL);
+    TEST_RUN_CASE(test_sorted_fuzz, NULL);
+    TEST_RUN_CASE(test_sort_by_value, NULL);
+
+    TEST_SECTION("README");
+    TEST_RUN_OUTPUT_TAGS(example_dictionary_readme_examples, "dictionary,readme,output");
 
     printf(BLUE "Done.\n" RESET);
-    
-    return tests_failed;
+
+    return TEST_EXIT_CODE();
 }

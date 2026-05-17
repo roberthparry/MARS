@@ -1,14 +1,69 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
 
 #include "mint.h"
 
-#define TEST_CONFIG_MODE TEST_CONFIG_GLOBAL
-#define TEST_CONFIG_MAIN
 #include "test_harness.h"
 
+TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
+static int mint_validity_equal(const void *actual, const void *expected, void *ctx);
+static void mint_validity_format(const void *value, char *buf, size_t buf_size, void *ctx);
+static bool test_mint_suite_setup(void);
+
+static const test_validity_contract_t mint_exact_contract =
+    TEST_VALIDITY_CONTRACT("mint-exact",
+                           mint_validity_equal,
+                           mint_validity_format,
+                           NULL);
+
+TEST_SUITE_SETUP(test_mint_suite_setup);
+
+#define TEST_ASSERT_MINT_EQ(actual_ptr, expected_ptr) \
+    do { \
+        const mint_t *test_mint_actual__ = (actual_ptr); \
+        const mint_t *test_mint_expected__ = (expected_ptr); \
+        TEST_ASSERT_VALID_NAMED("mint-exact", \
+                                &test_mint_actual__, \
+                                &test_mint_expected__); \
+    } while (0)
+
 static const char *g_last_mint_check_label = NULL;
+
+static int mint_validity_equal(const void *actual, const void *expected, void *ctx)
+{
+    const mint_t *const *got = (const mint_t *const *)actual;
+    const mint_t *const *want = (const mint_t *const *)expected;
+
+    (void)ctx;
+    return mi_cmp(*got, *want) == 0;
+}
+
+static void mint_validity_format(const void *value, char *buf, size_t buf_size, void *ctx)
+{
+    const mint_t *const *mint = (const mint_t *const *)value;
+    char *text;
+
+    (void)ctx;
+    if (!buf || buf_size == 0)
+        return;
+
+    text = mi_to_string(*mint);
+    if (!text) {
+        snprintf(buf, buf_size, "<mi_to_string failed>");
+        return;
+    }
+
+    snprintf(buf, buf_size, "%s", text);
+    free(text);
+}
+
+static bool test_mint_suite_setup(void)
+{
+    test_register_validity_checker("mint-exact", &mint_exact_contract);
+    return TEST_REQUIRE_VALIDITY_CHECKER("mint-exact");
+}
 
 static void set_mint_check_label(const char *label)
 {
@@ -28,7 +83,7 @@ static void assert_mint_string(const mint_t *mint, const char *expected)
     print_mint_check_heading(g_last_mint_check_label);
     printf("    expected = %s\n", expected);
     printf("    got      = %s\n\n", got);
-    ASSERT_TRUE(strcmp(got, expected) == 0);
+    TEST_ASSERT_STR_EQ(got, expected);
     free(got);
 }
 
@@ -40,7 +95,7 @@ static void assert_mint_hex(const mint_t *mint, const char *expected)
     print_mint_check_heading(g_last_mint_check_label);
     printf("    expected hex = %s\n", expected);
     printf("    got hex      = %s\n\n", got);
-    ASSERT_TRUE(strcmp(got, expected) == 0);
+    TEST_ASSERT_STR_EQ(got, expected);
     free(got);
 }
 
@@ -66,7 +121,7 @@ static void assert_factor_pair(const mint_factor_t *factor,
     printf("    got prime         = %s\n", prime);
     printf("    expected exponent = %lu\n", expected_exponent);
     printf("    got exponent      = %lu\n\n", factor->exponent);
-    ASSERT_TRUE(strcmp(prime, expected_prime) == 0);
+    TEST_ASSERT_STR_EQ(prime, expected_prime);
     ASSERT_EQ_LONG((long)factor->exponent, (long)expected_exponent);
     free(prime);
 }
@@ -456,7 +511,7 @@ void test_compare_and_negate(void)
 
     print_mint_input("a before cmp with c", a);
     print_mint_input("c before cmp", c);
-    ASSERT_EQ_INT(mi_cmp(a, c), 0);
+    TEST_ASSERT_MINT_EQ(a, c);
 
     print_mint_input("b before neg", b);
     ASSERT_EQ_INT(mi_neg(b), 0);
@@ -1010,61 +1065,65 @@ void test_readme_mersenne_prime_search(void)
         mi_free(mersenne);
         mi_free(minus_one);
     }
-    ASSERT_EQ_INT((int)found,
-                  (int)(sizeof(expected_exponents) / sizeof(expected_exponents[0])));
+    ASSERT_EQ_INT((int)found, (int)(sizeof(expected_exponents) / sizeof(expected_exponents[0])));
 }
 
-static int readme_example(void)
+static void example_binomial_cardinality(void)
 {
     mint_t *c = mi_new();
     char *text = NULL;
 
     if (!c) {
         mi_free(c);
-        return 1;
+        test_mark_failure(__FILE__, __LINE__, "failed to allocate README example value");
+        return;
     }
 
     if (mi_binomial(c, 52ul, 5ul) != 0) {
         mi_free(c);
-        return 1;
+        test_mark_failure(__FILE__, __LINE__, "failed to compute README binomial");
+        return;
     }
 
     text = mi_to_string(c);
     if (!text) {
         mi_free(c);
-        return 1;
+        test_mark_failure(__FILE__, __LINE__, "failed to format README binomial");
+        return;
     }
 
     printf("C(52, 5) = %s\n", text);
 
     free(text);
     mi_free(c);
-    return 0;
 }
 
 int tests_main(void)
 {
-    RUN_TEST_CASE(test_create_and_to_string);
-    RUN_TEST_CASE(test_setters_and_clear);
-    RUN_TEST_CASE(test_ulong_and_hex_constructors);
-    RUN_TEST_CASE(test_clone_copies_value);
-    RUN_TEST_CASE(test_addition);
-    RUN_TEST_CASE(test_multiplication);
-    RUN_TEST_CASE(test_division_and_modulo);
-    RUN_TEST_CASE(test_pow_and_pow10);
-    RUN_TEST_CASE(test_factorial_fibonacci_and_binomial);
-    RUN_TEST_CASE(test_compare_and_negate);
-    RUN_TEST_CASE(test_inc_dec_and_bits);
-    RUN_TEST_CASE(test_shifts);
-    RUN_TEST_CASE(test_integer_sqrt);
-    RUN_TEST_CASE(test_bitwise);
-    RUN_TEST_CASE(test_sub_abs_predicates_conversions_gcd_lcm);
-    RUN_TEST_CASE(test_long_hex_bits_and_nextprime);
-    RUN_TEST_CASE(test_divmod_square_gcdext_modinv);
-    RUN_TEST_CASE(test_powmod_isprime_and_factors);
-    RUN_TEST_CASE(test_readme_mersenne_prime_search);
+    TEST_SECTION("Construction and Arithmetic");
+    TEST_RUN_CASE(test_create_and_to_string, NULL);
+    TEST_RUN_CASE(test_setters_and_clear, NULL);
+    TEST_RUN_CASE(test_ulong_and_hex_constructors, NULL);
+    TEST_RUN_CASE(test_clone_copies_value, NULL);
+    TEST_RUN_CASE(test_addition, NULL);
+    TEST_RUN_CASE(test_multiplication, NULL);
+    TEST_RUN_CASE(test_division_and_modulo, NULL);
+    TEST_RUN_CASE(test_pow_and_pow10, NULL);
+    TEST_RUN_CASE(test_factorial_fibonacci_and_binomial, NULL);
 
-    printf(C_YELLOW "\nRunning README example...\n" C_RESET);
-    ASSERT_EQ_INT(readme_example(), 0);
+    TEST_SECTION("Bitwise and Number Theory");
+    TEST_RUN_CASE(test_compare_and_negate, NULL);
+    TEST_RUN_CASE(test_inc_dec_and_bits, NULL);
+    TEST_RUN_CASE(test_shifts, NULL);
+    TEST_RUN_CASE(test_integer_sqrt, NULL);
+    TEST_RUN_CASE(test_bitwise, NULL);
+    TEST_RUN_CASE(test_sub_abs_predicates_conversions_gcd_lcm, NULL);
+    TEST_RUN_CASE(test_long_hex_bits_and_nextprime, NULL);
+    TEST_RUN_CASE(test_divmod_square_gcdext_modinv, NULL);
+    TEST_RUN_CASE(test_powmod_isprime_and_factors, NULL);
+    TEST_SECTION("README Output Examples");
+    printf(C_YELLOW "\nRunning README examples...\n" C_RESET);
+    TEST_RUN_OUTPUT_TAGS(test_readme_mersenne_prime_search, "mint,readme,output");
+    TEST_RUN_OUTPUT_TAGS(example_binomial_cardinality, "mint,readme,output");
     return TESTS_EXIT_CODE();
 }

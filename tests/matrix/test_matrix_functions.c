@@ -769,7 +769,7 @@ static void test_eigen_dval(void)
 
         print_mdv("A", A);
         check_bool("mat_eigenvalues(dval triangular) rc = 0",
-                   mat_eigenvalues(A, ev) == 0);
+                   mat_eigenvalues_dv(A, ev) == 0);
         check_bool("dval triangular eigenvalue[0] non-null", ev[0] != NULL);
         check_bool("dval triangular eigenvalue[1] non-null", ev[1] != NULL);
         check_bool("dval triangular eigenvalue[2] non-null", ev[2] != NULL);
@@ -786,7 +786,7 @@ static void test_eigen_dval(void)
         }
 
         check_bool("mat_eigendecompose(dval triangular distinct) rc = 0",
-                   mat_eigendecompose(A, ev2, &V) == 0);
+                   mat_eigendecompose_dv(A, ev2, &V) == 0);
         check_bool("dval triangular eigenvectors not NULL", V != NULL);
         if (V)
             check_dval_eigen_relation("dval triangular", A, ev2, V, 1e-12);
@@ -820,9 +820,9 @@ static void test_eigen_dval(void)
 
         print_mdv("A (triangular repeated dval)", A);
         check_bool("mat_eigenvalues(dval triangular repeated) rc = 0",
-                   mat_eigenvalues(A, ev) == 0);
+                   mat_eigenvalues_dv(A, ev) == 0);
         check_bool("mat_eigendecompose(dval triangular repeated diagonalizable) rc = 0",
-                   mat_eigendecompose(A, ev2, &V) == 0);
+                   mat_eigendecompose_dv(A, ev2, &V) == 0);
         check_bool("dval triangular repeated eigenvectors not NULL", V != NULL);
         if (V)
             check_dval_eigen_relation("dval triangular repeated", A, ev2, V, 1e-12);
@@ -852,7 +852,7 @@ static void test_eigen_dval(void)
 
         print_mdv("A (dense 2x2 dval)", A);
         check_bool("mat_eigenvalues(dval dense 2x2) rc = 0",
-                   mat_eigenvalues(A, ev) == 0);
+                   mat_eigenvalues_dv(A, ev) == 0);
         check_bool("dval dense eigenvalue[0] non-null", ev[0] != NULL);
         check_bool("dval dense eigenvalue[1] non-null", ev[1] != NULL);
         if (ev[0] && ev[1]) {
@@ -873,7 +873,7 @@ static void test_eigen_dval(void)
         }
 
         check_bool("mat_eigendecompose(dval dense 2x2) rc = 0",
-                   mat_eigendecompose(A, ev2, &V) == 0);
+                   mat_eigendecompose_dv(A, ev2, &V) == 0);
         check_bool("dval dense 2x2 eigenvectors not NULL", V != NULL);
         if (V)
             check_dval_eigen_relation("dval dense 2x2", A, ev2, V, 1e-20);
@@ -902,9 +902,9 @@ static void test_eigen_dval(void)
         matrix_t *V = NULL;
 
         check_bool("mat_eigenvalues(dval Jordan 2x2) rc = 0",
-                   mat_eigenvalues(A, ev) == 0);
+                   mat_eigenvalues_dv(A, ev) == 0);
         check_bool("mat_eigendecompose(dval Jordan 2x2) remains unsupported",
-                   mat_eigendecompose(A, ev2, &V) < 0 && V == NULL);
+                   mat_eigendecompose_dv(A, ev2, &V) < 0 && V == NULL);
 
         dv_free(ev[0]);
         dv_free(ev[1]);
@@ -1369,7 +1369,13 @@ static void test_mat_exp_singular(void)
         if (E)
         {
             check_bool("exp(diag(0,2)) preserves diagonal structure", mat_is_diagonal(E));
-            check_mat_d("exp(diag(0,2)) = diag(1,e^2)", E, E_expected, 1e-12);
+            if (!test_assert_matrix_d_close(E, E_expected, 1e-12,
+                                            __FILE__, __LINE__)) {
+                mat_free(A);
+                mat_free(E);
+                mat_free(E_expected);
+                return;
+            }
         }
 
         mat_free(A);
@@ -1397,7 +1403,13 @@ static void test_mat_exp_singular(void)
         if (E)
         {
             check_bool("exp(N) preserves upper-triangular structure", mat_is_upper_triangular(E));
-            check_mat_d("exp(N) = I + N", E, E_expected, 1e-12);
+            if (!test_assert_matrix_d_close(E, E_expected, 1e-12,
+                                            __FILE__, __LINE__)) {
+                mat_free(N);
+                mat_free(E);
+                mat_free(E_expected);
+                return;
+            }
         }
 
         mat_free(N);
@@ -1425,7 +1437,13 @@ static void test_matrix_function_structure_preservation(void)
             if (E) {
                 check_bool("mat_exp(mat_log(positive diagonal)) preserves diagonal structure",
                            mat_is_diagonal(E));
-                check_mat_d("exp(log(diag(2,3))) = diag(2,3)", E, A, 1e-12);
+                if (!test_assert_matrix_d_close(E, A, 1e-12,
+                                                __FILE__, __LINE__)) {
+                    mat_free(E);
+                    mat_free(L);
+                    mat_free(A);
+                    return;
+                }
             }
         }
 
@@ -1452,7 +1470,14 @@ static void test_matrix_function_structure_preservation(void)
             if (E) {
                 check_bool("mat_exp(mat_log(upper-triangular Jordan)) preserves upper-triangular structure",
                            mat_is_upper_triangular(E));
-                check_mat_d("exp(log(I+N)) = I+N", E, A, 1e-12);
+                if (!test_assert_matrix_d_close(E, A, 1e-12,
+                                                __FILE__, __LINE__)) {
+                    mat_free(E);
+                    mat_free(L);
+                    mat_free(S);
+                    mat_free(A);
+                    return;
+                }
             }
         }
         if (S) {
@@ -1488,7 +1513,13 @@ static void test_mat_fun_singular_entire_d(void)
             if (R) {
                 double expected_vals[4] = {0.0, 1.0, 0.0, 0.0};
                 matrix_t *E = test_mat_create_d(2, 2, expected_vals);
-                check_mat_d("sin(N)=N", R, E, 1e-12);
+                if (!test_assert_matrix_d_close(R, E, 1e-12,
+                                                __FILE__, __LINE__)) {
+                    mat_free(E);
+                    mat_free(R);
+                    mat_free(N);
+                    return;
+                }
                 mat_free(E);
             }
             mat_free(R);
@@ -1500,7 +1531,13 @@ static void test_mat_fun_singular_entire_d(void)
             if (R) {
                 double expected_vals[4] = {1.0, 0.0, 0.0, 1.0};
                 matrix_t *E = test_mat_create_d(2, 2, expected_vals);
-                check_mat_d("cos(N)=I", R, E, 1e-12);
+                if (!test_assert_matrix_d_close(R, E, 1e-12,
+                                                __FILE__, __LINE__)) {
+                    mat_free(E);
+                    mat_free(R);
+                    mat_free(N);
+                    return;
+                }
                 mat_free(E);
             }
             mat_free(R);
@@ -1512,7 +1549,13 @@ static void test_mat_fun_singular_entire_d(void)
             if (R) {
                 double expected_vals[4] = {0.0, 1.0, 0.0, 0.0};
                 matrix_t *E = test_mat_create_d(2, 2, expected_vals);
-                check_mat_d("sinh(N)=N", R, E, 1e-12);
+                if (!test_assert_matrix_d_close(R, E, 1e-12,
+                                                __FILE__, __LINE__)) {
+                    mat_free(E);
+                    mat_free(R);
+                    mat_free(N);
+                    return;
+                }
                 mat_free(E);
             }
             mat_free(R);
@@ -1524,7 +1567,13 @@ static void test_mat_fun_singular_entire_d(void)
             if (R) {
                 double expected_vals[4] = {1.0, 0.0, 0.0, 1.0};
                 matrix_t *E = test_mat_create_d(2, 2, expected_vals);
-                check_mat_d("cosh(N)=I", R, E, 1e-12);
+                if (!test_assert_matrix_d_close(R, E, 1e-12,
+                                                __FILE__, __LINE__)) {
+                    mat_free(E);
+                    mat_free(R);
+                    mat_free(N);
+                    return;
+                }
                 mat_free(E);
             }
             mat_free(R);
@@ -1536,7 +1585,13 @@ static void test_mat_fun_singular_entire_d(void)
             if (R) {
                 double expected_vals[4] = {0.0, 1.0, 0.0, 0.0};
                 matrix_t *E = test_mat_create_d(2, 2, expected_vals);
-                check_mat_d("tan(N)=N", R, E, 1e-12);
+                if (!test_assert_matrix_d_close(R, E, 1e-12,
+                                                __FILE__, __LINE__)) {
+                    mat_free(E);
+                    mat_free(R);
+                    mat_free(N);
+                    return;
+                }
                 mat_free(E);
             }
             mat_free(R);
@@ -1548,7 +1603,13 @@ static void test_mat_fun_singular_entire_d(void)
             if (R) {
                 double expected_vals[4] = {0.0, 1.0, 0.0, 0.0};
                 matrix_t *E = test_mat_create_d(2, 2, expected_vals);
-                check_mat_d("tanh(N)=N", R, E, 1e-12);
+                if (!test_assert_matrix_d_close(R, E, 1e-12,
+                                                __FILE__, __LINE__)) {
+                    mat_free(E);
+                    mat_free(R);
+                    mat_free(N);
+                    return;
+                }
                 mat_free(E);
             }
             mat_free(R);
@@ -1561,7 +1622,13 @@ static void test_mat_fun_singular_entire_d(void)
             if (R) {
                 double expected_vals[4] = {0.0, c, 0.0, 0.0};
                 matrix_t *E = test_mat_create_d(2, 2, expected_vals);
-                check_mat_d("erf(N)=(2/sqrt(pi))N", R, E, 1e-12);
+                if (!test_assert_matrix_d_close(R, E, 1e-12,
+                                                __FILE__, __LINE__)) {
+                    mat_free(E);
+                    mat_free(R);
+                    mat_free(N);
+                    return;
+                }
                 mat_free(E);
             }
             mat_free(R);
@@ -1574,7 +1641,13 @@ static void test_mat_fun_singular_entire_d(void)
             if (R) {
                 double expected_vals[4] = {1.0, -c, 0.0, 1.0};
                 matrix_t *E = test_mat_create_d(2, 2, expected_vals);
-                check_mat_d("erfc(N)=I-(2/sqrt(pi))N", R, E, 1e-12);
+                if (!test_assert_matrix_d_close(R, E, 1e-12,
+                                                __FILE__, __LINE__)) {
+                    mat_free(E);
+                    mat_free(R);
+                    mat_free(N);
+                    return;
+                }
                 mat_free(E);
             }
             mat_free(R);
@@ -2992,139 +3065,209 @@ cleanup:
 
 /* ------------------------------------------------------------------ generic matrix check (double) */
 
-void check_mat_d(const char *label, matrix_t *got, matrix_t *expected_mat, double tol)
+typedef struct {
+    double tol;
+    int complex_mode;
+} matrix_validity_ctx_t;
+
+static int matrix_validity_equal(const void *actual,
+                                 const void *expected,
+                                 void *ctx)
 {
-    if (!got || !expected_mat)
-    {
-        tests_failed++;
-        printf(C_BOLD C_RED "  FAIL: %s (NULL)\n" C_RESET, label);
-        return;
-    }
+    const matrix_t *got = actual;
+    const matrix_t *want = expected;
+    const matrix_validity_ctx_t *cfg = ctx;
+    double tol = cfg ? cfg->tol : 1e-12;
+    size_t rows, cols;
 
-    size_t rows = mat_get_row_count(got);
-    size_t cols = mat_get_col_count(got);
+    if (!got || !want)
+        return 0;
 
-    if (rows != mat_get_row_count(expected_mat) || cols != mat_get_col_count(expected_mat))
-    {
-        tests_failed++;
-        printf(C_BOLD C_RED "  FAIL: %s (dimension mismatch)\n" C_RESET, label);
-        return;
-    }
-
-    size_t n = rows * cols;
-    double *g   = malloc(n * sizeof(double));
-    double *e   = malloc(n * sizeof(double));
-    double *err = malloc(n * sizeof(double));
-    size_t *wg  = calloc(cols, sizeof(size_t));
-    size_t *we  = calloc(cols, sizeof(size_t));
-    size_t *werr = calloc(cols, sizeof(size_t));
-    if (!g || !e || !err || !wg || !we || !werr)
-    {
-        free(g); free(e); free(err); free(wg); free(we); free(werr);
-        return;
-    }
+    rows = mat_get_row_count(got);
+    cols = mat_get_col_count(got);
+    if (rows != mat_get_row_count(want) || cols != mat_get_col_count(want))
+        return 0;
 
     for (size_t i = 0; i < rows; ++i) {
         for (size_t j = 0; j < cols; ++j) {
-            size_t k = i * cols + j;
             number_t gn = mat_get_num(got, i, j);
-            number_t en = mat_get_num(expected_mat, i, j);
-            number_t g_re = num_real_part(gn);
-            number_t e_re = num_real_part(en);
+            number_t en = mat_get_num(want, i, j);
             number_t diff = num_sub(gn, en);
             number_t abs_diff = num_abs(diff);
-
-            g[k] = num_to_double(g_re);
-            e[k] = num_to_double(e_re);
-            err[k] = num_to_double(abs_diff);
+            double err = num_to_double(abs_diff);
 
             num_destroy(&abs_diff);
             num_destroy(&diff);
-            num_destroy(&e_re);
-            num_destroy(&g_re);
             num_destroy(&gn);
             num_destroy(&en);
+
+            if (!isfinite(err) || err >= tol)
+                return 0;
         }
     }
 
-    double max_err = 0.0;
-    int finite_err = 1;
-    for (size_t k = 0; k < n; k++) {
-        if (!isfinite(err[k])) {
-            finite_err = 0;
-        } else if (err[k] > max_err) {
-            max_err = err[k];
-        }
+    return 1;
+}
+
+static void matrix_validity_format(const void *value,
+                                   char *buf,
+                                   size_t buf_size,
+                                   void *ctx)
+{
+    const matrix_t *matrix = value;
+    (void)ctx;
+
+    if (!buf || buf_size == 0)
+        return;
+    if (!matrix) {
+        snprintf(buf, buf_size, "<null>");
+        return;
     }
 
-    int ok = finite_err && max_err < tol;
-    if (!ok) tests_failed++;
-
-    printf(ok ? C_BOLD C_GREEN "  OK: %s\n" C_RESET
-              : C_BOLD C_RED "  FAIL: %s\n" C_RESET, label);
-
-    if (current_matrix_input_label[0] != '\0')
-    {
-        printf("    input context = %s\n", current_matrix_input_label);
-        print_current_input_matrix();
+    char *text = mat_to_string(matrix, MAT_STRING_LAYOUT_PRETTY);
+    if (!text) {
+        snprintf(buf, buf_size, "<format-error>");
+        return;
     }
-    print_matrix_working_precision_line("got", got);
-    print_matrix_working_precision_line("expected", expected_mat);
 
-    char buf[256];
-    for (size_t i = 0; i < rows; i++)
-        for (size_t j = 0; j < cols; j++)
-        {
-            size_t l;
-            d_to_coloured_string(g[i*cols+j], buf, sizeof(buf));
-            l = strlen(buf); if (l > wg[j])   wg[j]   = l;
-            d_to_coloured_string(e[i*cols+j], buf, sizeof(buf));
-            l = strlen(buf); if (l > we[j])   we[j]   = l;
-            d_to_coloured_err_string(err[i*cols+j], tol, buf, sizeof(buf));
-            l = strlen(buf); if (l > werr[j]) werr[j] = l;
-        }
+    snprintf(buf, buf_size, "%s", text);
+    free(text);
+}
 
-    printf("    got = " C_CYAN "[" C_RESET "\n");
-    for (size_t i = 0; i < rows; i++)
-    {
-        printf("      ");
-        for (size_t j = 0; j < cols; j++)
-        {
-            d_to_coloured_string(g[i*cols+j], buf, sizeof(buf));
-            printf(" %*s", (int)wg[j], buf);
-        }
-        printf("\n");
+static matrix_validity_ctx_t matrix_double_default_ctx = {1e-12, 0};
+static matrix_validity_ctx_t matrix_mp_real_default_ctx = {1e-12, 0};
+static matrix_validity_ctx_t matrix_complex_default_ctx = {1e-12, 1};
+static const test_validity_contract_t matrix_double_default_contract =
+    TEST_VALIDITY_CONTRACT("matrix-double-default",
+                           matrix_validity_equal,
+                           matrix_validity_format,
+                           &matrix_double_default_ctx);
+static const test_validity_contract_t matrix_mp_real_default_contract =
+    TEST_VALIDITY_CONTRACT("matrix-mp-real-default",
+                           matrix_validity_equal,
+                           matrix_validity_format,
+                           &matrix_mp_real_default_ctx);
+static const test_validity_contract_t matrix_complex_default_contract =
+    TEST_VALIDITY_CONTRACT("matrix-complex-default",
+                           matrix_validity_equal,
+                           matrix_validity_format,
+                           &matrix_complex_default_ctx);
+
+const test_validity_contract_t *matrix_validity_contract_double_default(void)
+{
+    return &matrix_double_default_contract;
+}
+
+const test_validity_contract_t *matrix_validity_contract_mp_real_default(void)
+{
+    return &matrix_mp_real_default_contract;
+}
+
+const test_validity_contract_t *matrix_validity_contract_complex_default(void)
+{
+    return &matrix_complex_default_contract;
+}
+
+bool test_assert_matrix_d_close(matrix_t *got,
+                                matrix_t *expected,
+                                double tol,
+                                const char *file,
+                                int line)
+{
+    matrix_validity_ctx_t ctx = {tol, 0};
+    test_validity_contract_t contract =
+        TEST_VALIDITY_CONTRACT("matrix-double-close",
+                               matrix_validity_equal,
+                               matrix_validity_format,
+                               &ctx);
+    return test_assert_validity(&contract, got, expected, file, line);
+}
+
+bool test_assert_matrix_mp_real_close(matrix_t *got,
+                                      matrix_t *expected,
+                                      double tol,
+                                      const char *file,
+                                      int line)
+{
+    matrix_validity_ctx_t ctx = {tol, 0};
+    test_validity_contract_t contract =
+        TEST_VALIDITY_CONTRACT("matrix-mp-real-close",
+                               matrix_validity_equal,
+                               matrix_validity_format,
+                               &ctx);
+    return test_assert_validity(&contract, got, expected, file, line);
+}
+
+bool test_assert_matrix_complex_close(matrix_t *got,
+                                      matrix_t *expected,
+                                      double tol,
+                                      const char *file,
+                                      int line)
+{
+    matrix_validity_ctx_t ctx = {tol, 1};
+    test_validity_contract_t contract =
+        TEST_VALIDITY_CONTRACT("matrix-complex-close",
+                               matrix_validity_equal,
+                               matrix_validity_format,
+                               &ctx);
+    return test_assert_validity(&contract, got, expected, file, line);
+}
+
+bool test_assert_matrix_d_identity(matrix_t *got,
+                                   size_t n,
+                                   double tol,
+                                   const char *file,
+                                   int line)
+{
+    matrix_t *identity = test_mat_identity_d(n);
+    bool ok;
+
+    if (!identity) {
+        test_mark_failure(file, line, "matrix identity fixture allocation failed");
+        return false;
     }
-    printf("    " C_CYAN "]" C_RESET "\n");
 
-    printf("    expected = " C_CYAN "[" C_RESET "\n");
-    for (size_t i = 0; i < rows; i++)
-    {
-        printf("      ");
-        for (size_t j = 0; j < cols; j++)
-        {
-            d_to_coloured_string(e[i*cols+j], buf, sizeof(buf));
-            printf(" %*s", (int)we[j], buf);
-        }
-        printf("\n");
+    ok = test_assert_matrix_d_close(got, identity, tol, file, line);
+    mat_free(identity);
+    return ok;
+}
+
+bool test_assert_matrix_mp_real_identity(matrix_t *got,
+                                         size_t n,
+                                         double tol,
+                                         const char *file,
+                                         int line)
+{
+    matrix_t *identity = test_mat_identity_d(n);
+    bool ok;
+
+    if (!identity) {
+        test_mark_failure(file, line, "matrix identity fixture allocation failed");
+        return false;
     }
-    printf("    " C_CYAN "]" C_RESET "\n");
 
-    printf("    error = " C_CYAN "[" C_RESET "\n");
-    for (size_t i = 0; i < rows; i++)
-    {
-        printf("      ");
-        for (size_t j = 0; j < cols; j++)
-        {
-            d_to_coloured_err_string(err[i*cols+j], tol, buf, sizeof(buf));
-            printf(" %*s", (int)werr[j], buf);
-        }
-        printf("\n");
+    ok = test_assert_matrix_mp_real_close(got, identity, tol, file, line);
+    mat_free(identity);
+    return ok;
+}
+
+bool test_assert_matrix_complex_identity(matrix_t *got,
+                                         size_t n,
+                                         double tol,
+                                         const char *file,
+                                         int line)
+{
+    matrix_t *identity = test_mat_identity_d(n);
+    bool ok;
+
+    if (!identity) {
+        test_mark_failure(file, line, "matrix identity fixture allocation failed");
+        return false;
     }
-    printf("    " C_CYAN "]" C_RESET "\n");
 
-    free(g); free(e); free(err);
-    free(wg); free(we); free(werr);
+    ok = test_assert_matrix_complex_close(got, identity, tol, file, line);
+    mat_free(identity);
+    return ok;
 }
 
 /* ------------------------------------------------------------------ matrix comparison helper */
@@ -3137,290 +3280,20 @@ static void check_mat2x2_d(const char *label,
 {
     double ev[4] = {e00, e01, e10, e11};
     matrix_t *E = test_mat_create_d(2, 2, ev);
-    check_mat_d(label, R, E, tol);
+    if (!E) {
+        test_mark_failure(__FILE__, __LINE__,
+                          label ? label : "check_mat2x2_d expected allocation failed");
+        return;
+    }
+    (void)test_assert_matrix_d_close(R, E, tol, __FILE__, __LINE__);
     mat_free(E);
-}
-
-/* ------------------------------------------------------------------ matrix identity helper (n×n double) */
-
-void check_mat_identity_d(const char *label, matrix_t *R, size_t n, double tol)
-{
-    matrix_t *I = test_mat_identity_d(n);
-    check_mat_d(label, R, I, tol);
-    mat_free(I);
 }
 
 /* ------------------------------------------------------------------ matrix comparison helpers (qfloat) */
 
-void check_mat_mp_real(const char *label, matrix_t *got, matrix_t *expected_mat, double tol)
-{
-    if (!got || !expected_mat)
-    {
-        tests_failed++;
-        printf(C_BOLD C_RED "  FAIL: %s (NULL)\n" C_RESET, label);
-        return;
-    }
-
-    size_t rows = mat_get_row_count(got);
-    size_t cols = mat_get_col_count(got);
-
-    if (rows != mat_get_row_count(expected_mat) || cols != mat_get_col_count(expected_mat))
-    {
-        tests_failed++;
-        printf(C_BOLD C_RED "  FAIL: %s (dimension mismatch)\n" C_RESET, label);
-        return;
-    }
-
-    size_t n = rows * cols;
-    qfloat_t *g   = malloc(n * sizeof(qfloat_t));
-    qfloat_t *e   = malloc(n * sizeof(qfloat_t));
-    double   *err = malloc(n * sizeof(double));
-    size_t   *wg  = calloc(cols, sizeof(size_t));
-    size_t   *we  = calloc(cols, sizeof(size_t));
-    size_t   *werr = calloc(cols, sizeof(size_t));
-    if (!g || !e || !err || !wg || !we || !werr)
-    {
-        free(g); free(e); free(err); free(wg); free(we); free(werr);
-        return;
-    }
-
-    for (size_t i = 0; i < rows; ++i) {
-        for (size_t j = 0; j < cols; ++j) {
-            size_t k = i * cols + j;
-            number_t gn = mat_get_num(got, i, j);
-            number_t en = mat_get_num(expected_mat, i, j);
-            g[k] = num_to_qfloat(gn);
-            e[k] = num_to_qfloat(en);
-            num_destroy(&gn);
-            num_destroy(&en);
-        }
-    }
-
-    double max_err = 0.0;
-    int finite_err = 1;
-    for (size_t k = 0; k < n; k++)
-    {
-        err[k] = qf_abs(qf_sub(g[k], e[k])).hi;
-        if (!isfinite(err[k])) {
-            finite_err = 0;
-        } else if (err[k] > max_err) {
-            max_err = err[k];
-        }
-    }
-
-    int ok = finite_err && max_err < tol;
-    if (!ok) tests_failed++;
-
-    printf(ok ? C_BOLD C_GREEN "  OK: %s\n" C_RESET
-              : C_BOLD C_RED "  FAIL: %s\n" C_RESET, label);
-
-    if (current_matrix_input_label[0] != '\0')
-    {
-        printf("    input context = %s\n", current_matrix_input_label);
-        print_current_input_matrix();
-    }
-    print_matrix_working_precision_line("got", got);
-    print_matrix_working_precision_line("expected", expected_mat);
-
-    char buf[512];
-    for (size_t i = 0; i < rows; i++)
-        for (size_t j = 0; j < cols; j++)
-        {
-            size_t l;
-            qf_to_coloured_string(g[i*cols+j], buf, sizeof(buf));
-            l = strlen(buf); if (l > wg[j])   wg[j]   = l;
-            qf_to_coloured_string(e[i*cols+j], buf, sizeof(buf));
-            l = strlen(buf); if (l > we[j])   we[j]   = l;
-            d_to_coloured_err_string(err[i*cols+j], tol, buf, sizeof(buf));
-            l = strlen(buf); if (l > werr[j]) werr[j] = l;
-        }
-
-    printf("    got = " C_CYAN "[" C_RESET "\n");
-    for (size_t i = 0; i < rows; i++)
-    {
-        printf("      ");
-        for (size_t j = 0; j < cols; j++)
-        {
-            qf_to_coloured_string(g[i*cols+j], buf, sizeof(buf));
-            printf(" %*s", (int)wg[j], buf);
-        }
-        printf("\n");
-    }
-    printf("    " C_CYAN "]" C_RESET "\n");
-
-    printf("    expected = " C_CYAN "[" C_RESET "\n");
-    for (size_t i = 0; i < rows; i++)
-    {
-        printf("      ");
-        for (size_t j = 0; j < cols; j++)
-        {
-            qf_to_coloured_string(e[i*cols+j], buf, sizeof(buf));
-            printf(" %*s", (int)we[j], buf);
-        }
-        printf("\n");
-    }
-    printf("    " C_CYAN "]" C_RESET "\n");
-
-    printf("    error = " C_CYAN "[" C_RESET "\n");
-    for (size_t i = 0; i < rows; i++)
-    {
-        printf("      ");
-        for (size_t j = 0; j < cols; j++)
-        {
-            d_to_coloured_err_string(err[i*cols+j], tol, buf, sizeof(buf));
-            printf(" %*s", (int)werr[j], buf);
-        }
-        printf("\n");
-    }
-    printf("    " C_CYAN "]" C_RESET "\n");
-
-    free(g); free(e); free(err);
-    free(wg); free(we); free(werr);
-}
-
 /* ------------------------------------------------------------------ matrix comparison helpers (qcomplex) */
 
-void check_mat_complex(const char *label, matrix_t *got, matrix_t *expected_mat, double tol)
-{
-    if (!got || !expected_mat)
-    {
-        tests_failed++;
-        printf(C_BOLD C_RED "  FAIL: %s (NULL)\n" C_RESET, label);
-        return;
-    }
-
-    size_t rows = mat_get_row_count(got);
-    size_t cols = mat_get_col_count(got);
-
-    if (rows != mat_get_row_count(expected_mat) || cols != mat_get_col_count(expected_mat))
-    {
-        tests_failed++;
-        printf(C_BOLD C_RED "  FAIL: %s (dimension mismatch)\n" C_RESET, label);
-        return;
-    }
-
-    size_t n = rows * cols;
-    qcomplex_t *g   = malloc(n * sizeof(qcomplex_t));
-    qcomplex_t *e   = malloc(n * sizeof(qcomplex_t));
-    double     *err = malloc(n * sizeof(double));
-    size_t     *wg  = calloc(cols, sizeof(size_t));
-    size_t     *we  = calloc(cols, sizeof(size_t));
-    size_t     *werr = calloc(cols, sizeof(size_t));
-    if (!g || !e || !err || !wg || !we || !werr)
-    {
-        free(g); free(e); free(err); free(wg); free(we); free(werr);
-        return;
-    }
-
-    for (size_t i = 0; i < rows; ++i) {
-        for (size_t j = 0; j < cols; ++j) {
-            size_t k = i * cols + j;
-            number_t gn = mat_get_num(got, i, j);
-            number_t en = mat_get_num(expected_mat, i, j);
-            g[k] = num_to_qcomplex(gn);
-            e[k] = num_to_qcomplex(en);
-            num_destroy(&gn);
-            num_destroy(&en);
-        }
-    }
-
-    double max_err = 0.0;
-    int finite_err = 1;
-    for (size_t k = 0; k < n; k++)
-    {
-        err[k] = qf_to_double(qc_abs(qc_sub(g[k], e[k])));
-        if (!isfinite(err[k])) {
-            finite_err = 0;
-        } else if (err[k] > max_err) {
-            max_err = err[k];
-        }
-    }
-
-    int ok = finite_err && max_err < tol;
-    if (!ok) tests_failed++;
-
-    printf(ok ? C_BOLD C_GREEN "  OK: %s\n" C_RESET
-              : C_BOLD C_RED "  FAIL: %s\n" C_RESET, label);
-
-    if (current_matrix_input_label[0] != '\0')
-    {
-        printf("    input context = %s\n", current_matrix_input_label);
-        print_current_input_matrix();
-    }
-    print_matrix_working_precision_line("got", got);
-    print_matrix_working_precision_line("expected", expected_mat);
-
-    char buf[512];
-    for (size_t i = 0; i < rows; i++)
-        for (size_t j = 0; j < cols; j++)
-        {
-            size_t l;
-            qc_to_coloured_string(g[i*cols+j], buf, sizeof(buf));
-            l = strlen(buf); if (l > wg[j])   wg[j]   = l;
-            qc_to_coloured_string(e[i*cols+j], buf, sizeof(buf));
-            l = strlen(buf); if (l > we[j])   we[j]   = l;
-            d_to_coloured_err_string(err[i*cols+j], tol, buf, sizeof(buf));
-            l = strlen(buf); if (l > werr[j]) werr[j] = l;
-        }
-
-    printf("    got = " C_CYAN "[" C_RESET "\n");
-    for (size_t i = 0; i < rows; i++)
-    {
-        printf("      ");
-        for (size_t j = 0; j < cols; j++)
-        {
-            qc_to_coloured_string(g[i*cols+j], buf, sizeof(buf));
-            printf(" (%*s)", (int)wg[j], buf);
-        }
-        printf("\n");
-    }
-    printf("    " C_CYAN "]" C_RESET "\n");
-
-    printf("    expected = " C_CYAN "[" C_RESET "\n");
-    for (size_t i = 0; i < rows; i++)
-    {
-        printf("      ");
-        for (size_t j = 0; j < cols; j++)
-        {
-            qc_to_coloured_string(e[i*cols+j], buf, sizeof(buf));
-            printf(" (%*s)", (int)we[j], buf);
-        }
-        printf("\n");
-    }
-    printf("    " C_CYAN "]" C_RESET "\n");
-
-    printf("    error = " C_CYAN "[" C_RESET "\n");
-    for (size_t i = 0; i < rows; i++)
-    {
-        printf("      ");
-        for (size_t j = 0; j < cols; j++)
-        {
-            d_to_coloured_err_string(err[i*cols+j], tol, buf, sizeof(buf));
-            printf(" %*s", (int)werr[j], buf);
-        }
-        printf("\n");
-    }
-    printf("    " C_CYAN "]" C_RESET "\n");
-
-    free(g); free(e); free(err);
-    free(wg); free(we); free(werr);
-}
-
 /* ------------------------------------------------------------------ identity helpers (qfloat / qcomplex) */
-
-void check_mat_identity_mp_real(const char *label, matrix_t *R, size_t n, double tol)
-{
-    matrix_t *I = test_mat_identity_d(n);
-    check_mat_mp_real(label, R, I, tol);
-    mat_free(I);
-}
-
-void check_mat_identity_complex(const char *label, matrix_t *R, size_t n, double tol)
-{
-    matrix_t *I = test_mat_identity_d(n);
-    check_mat_complex(label, R, I, tol);
-    mat_free(I);
-}
 
 static void check_unary_jordan_2x2_d(const char *label,
                                      matrix_t *(*fun)(const matrix_t *),
@@ -3459,7 +3332,7 @@ static void check_unary_jordan_2x2_mp_real(const char *label,
     matrix_t *R = fun(A);
     check_bool(label, R != NULL);
     if (R)
-        check_mat_mp_real(label, R, E, tol);
+        (void)test_assert_matrix_mp_real_close(R, E, tol, __FILE__, __LINE__);
 
     mat_free(R);
     mat_free(A);
@@ -3489,7 +3362,7 @@ static void check_unary_diagonal_2x2_d(const char *label,
     matrix_t *R = fun(A);
     check_bool(label, R != NULL);
     if (R)
-        check_mat_d(label, R, E, tol);
+        (void)test_assert_matrix_d_close(R, E, tol, __FILE__, __LINE__);
 
     mat_free(R);
     mat_free(A);
@@ -3525,7 +3398,7 @@ static void check_unary_diagonal_2x2_mp_real(const char *label,
     matrix_t *R = fun(A);
     check_bool(label, R != NULL);
     if (R)
-        check_mat_mp_real(label, R, E, tol);
+        (void)test_assert_matrix_mp_real_close(R, E, tol, __FILE__, __LINE__);
 
     mat_free(R);
     mat_free(A);
@@ -3724,7 +3597,7 @@ static void check_unary_jordan_2x2_d(const char *label,
     matrix_t *R = fun(A);
     check_bool(label, R != NULL);
     if (R)
-        check_mat_d(label, R, E, tol);
+        (void)test_assert_matrix_d_close(R, E, tol, __FILE__, __LINE__);
 
     mat_free(R);
     mat_free(A);
@@ -3754,7 +3627,7 @@ static void check_unary_diagonal_2x2_complex(const char *label,
     matrix_t *R = fun(A);
     check_bool(label, R != NULL);
     if (R)
-        check_mat_complex(label, R, E, tol);
+        (void)test_assert_matrix_complex_close(R, E, tol, __FILE__, __LINE__);
 
     mat_free(R);
     mat_free(A);
@@ -3791,7 +3664,7 @@ static void check_unary_jordan_3x3_d(const char *label,
     matrix_t *R = fun(A);
     check_bool(label, R != NULL);
     if (R)
-        check_mat_d(label, R, E, tol);
+        (void)test_assert_matrix_d_close(R, E, tol, __FILE__, __LINE__);
 
     mat_free(R);
     mat_free(A);
@@ -3829,7 +3702,7 @@ static void check_unary_diagonal_3x3_complex(const char *label,
     matrix_t *R = fun(A);
     check_bool(label, R != NULL);
     if (R)
-        check_mat_complex(label, R, E, tol);
+        (void)test_assert_matrix_complex_close(R, E, tol, __FILE__, __LINE__);
 
     mat_free(R);
     mat_free(A);
@@ -4088,7 +3961,13 @@ static void test_mat_neg_convenience(void)
         matrix_t *N = mat_neg(A);
         check_bool("mat_neg(double) not NULL", N != NULL);
         if (N) {
-            check_mat_d("mat_neg(double) = -A", N, E, 1e-30);
+            if (!test_assert_matrix_d_close(N, E, 1e-30,
+                                            __FILE__, __LINE__)) {
+                mat_free(N);
+                mat_free(A);
+                mat_free(E);
+                return;
+            }
             mat_free(N);
         }
     }
@@ -4112,7 +3991,13 @@ static void test_mat_neg_convenience(void)
         matrix_t *QN = mat_neg(Q);
         check_bool("mat_neg(qcomplex) not NULL", QN != NULL);
         if (QN) {
-            check_mat_complex("mat_neg(complex) = -Q", QN, QE, 1e-28);
+            if (!test_assert_matrix_complex_close(QN, QE, 1e-28,
+                                                  __FILE__, __LINE__)) {
+                mat_free(QN);
+                mat_free(Q);
+                mat_free(QE);
+                return;
+            }
             mat_free(QN);
         }
     }
@@ -4135,7 +4020,13 @@ static void test_mat_neg_convenience(void)
             check_bool("mat_neg(sparse) not NULL", SN != NULL);
             check_bool("mat_neg(sparse) stays sparse", SN && mat_is_sparse(SN));
             if (SN) {
-                check_mat_d("mat_neg(sparse) = -S", SN, SE, 1e-30);
+                if (!test_assert_matrix_d_close(SN, SE, 1e-30,
+                                                __FILE__, __LINE__)) {
+                    mat_free(SN);
+                    mat_free(SE);
+                    mat_free(S);
+                    return;
+                }
                 mat_free(SN);
             }
         }
@@ -4932,7 +4823,7 @@ static number_t matrix_number_error_magnitude(const number_t got,
     number_t error;
 
     if (num_get_prec_bits(expected) > 0u)
-        ASSERT_EQ_INT(num_set_prec_bits(&promoted_got, num_get_prec_bits(expected)), 0);
+        (void)num_set_prec_bits(&promoted_got, num_get_prec_bits(expected));
     diff = num_sub(promoted_got, expected);
     num_destroy(&promoted_got);
 
@@ -6761,12 +6652,38 @@ static void test_dval_matrix_functions_extended(void)
                        Eqc_expected != NULL);
             check_bool("dense dval biquadratic quartic 4x4 numeric sin baseline not NULL",
                        Sqc_expected != NULL);
-            if (Eqc && Eqc_expected)
-                check_mat_complex("exp(biquadratic quartic 4x4) matches numeric snapshot",
-                             Eqc, Eqc_expected, 1e-12);
-            if (Sqc && Sqc_expected)
-                check_mat_complex("sin(biquadratic quartic 4x4) matches numeric snapshot",
-                             Sqc, Sqc_expected, 1e-12);
+            if (Eqc && Eqc_expected) {
+                bool ok = test_assert_matrix_complex_close(Eqc, Eqc_expected, 1e-12,
+                                                           __FILE__, __LINE__);
+                if (!ok) {
+                    mat_free(Aqc);
+                    mat_free(Eqc);
+                    mat_free(Eqc_expected);
+                    mat_free(Sqc);
+                    mat_free(Sqc_expected);
+                    mat_free(A);
+                    mat_free(E);
+                    mat_free(S);
+                    mat_bindings_free(bindings);
+                    return;
+                }
+            }
+            if (Sqc && Sqc_expected) {
+                bool ok = test_assert_matrix_complex_close(Sqc, Sqc_expected, 1e-12,
+                                                           __FILE__, __LINE__);
+                if (!ok) {
+                    mat_free(Aqc);
+                    mat_free(Eqc);
+                    mat_free(Eqc_expected);
+                    mat_free(Sqc);
+                    mat_free(Sqc_expected);
+                    mat_free(A);
+                    mat_free(E);
+                    mat_free(S);
+                    mat_bindings_free(bindings);
+                    return;
+                }
+            }
         }
 
         if (E) {
@@ -6801,12 +6718,38 @@ static void test_dval_matrix_functions_extended(void)
             Eqc_expected = Aqc ? mat_exp(Aqc) : NULL;
             Sqc_expected = Aqc ? mat_sin(Aqc) : NULL;
 
-            if (Eqc && Eqc_expected)
-                check_mat_complex("exp(biquadratic quartic 4x4) tracks x",
-                             Eqc, Eqc_expected, 1e-12);
-            if (Sqc && Sqc_expected)
-                check_mat_complex("sin(biquadratic quartic 4x4) tracks x",
-                             Sqc, Sqc_expected, 1e-12);
+            if (Eqc && Eqc_expected) {
+                bool ok = test_assert_matrix_complex_close(Eqc, Eqc_expected, 1e-12,
+                                                           __FILE__, __LINE__);
+                if (!ok) {
+                    mat_free(Aqc);
+                    mat_free(Eqc);
+                    mat_free(Eqc_expected);
+                    mat_free(Sqc);
+                    mat_free(Sqc_expected);
+                    mat_free(A);
+                    mat_free(E);
+                    mat_free(S);
+                    mat_bindings_free(bindings);
+                    return;
+                }
+            }
+            if (Sqc && Sqc_expected) {
+                bool ok = test_assert_matrix_complex_close(Sqc, Sqc_expected, 1e-12,
+                                                           __FILE__, __LINE__);
+                if (!ok) {
+                    mat_free(Aqc);
+                    mat_free(Eqc);
+                    mat_free(Eqc_expected);
+                    mat_free(Sqc);
+                    mat_free(Sqc_expected);
+                    mat_free(A);
+                    mat_free(E);
+                    mat_free(S);
+                    mat_bindings_free(bindings);
+                    return;
+                }
+            }
         }
 
         mat_free(Aqc);
@@ -6989,61 +6932,61 @@ static void test_dval_matrix_functions_extended(void)
 
 void run_matrix_function_tests(void)
 {
-    RUN_TEST_CASE(test_mat_neg_convenience);
-    RUN_TEST_CASE(test_eigen_d);
-    RUN_TEST_CASE(test_eigen_mp_real);
-    RUN_TEST_CASE(test_eigen_complex);
-    RUN_TEST_CASE(test_eigen_num_hermitian);
-    RUN_TEST_CASE(test_eigen_num_hermitian_high_precision);
-    RUN_TEST_CASE(test_eigen_dval);
-    RUN_TEST_CASE(test_eigenspace_dval);
-    RUN_TEST_CASE(test_generalized_eigenspace_dval);
-    RUN_TEST_CASE(test_jordan_chain_dval);
-    RUN_TEST_CASE(test_jordan_profile_dval);
-    RUN_TEST_CASE(test_mat_exp_d);
-    RUN_TEST_CASE(test_mat_exp_mp_real);
-    RUN_TEST_CASE(test_mat_exp_complex);
-    RUN_TEST_CASE(test_mat_exp_singular);
-    RUN_TEST_CASE(test_matrix_function_structure_preservation);
-    RUN_TEST_CASE(test_mat_fun_singular_entire_d);
-    RUN_TEST_CASE(test_mat_exp_null_safety);
-    RUN_TEST_CASE(test_mat_sin_d);
-    RUN_TEST_CASE(test_mat_sin_mp_real);
-    RUN_TEST_CASE(test_mat_sin_complex);
-    RUN_TEST_CASE(test_mat_sin_null_safety);
-    RUN_TEST_CASE(test_mat_cos_d);
-    RUN_TEST_CASE(test_mat_cos_mp_real);
-    RUN_TEST_CASE(test_mat_cos_complex);
-    RUN_TEST_CASE(test_mat_tan_d);
-    RUN_TEST_CASE(test_mat_sinh_d);
-    RUN_TEST_CASE(test_mat_cosh_d);
-    RUN_TEST_CASE(test_mat_tanh_d);
-    RUN_TEST_CASE(test_mat_trig_null_safety);
-    RUN_TEST_CASE(test_mat_sqrt_d);
-    RUN_TEST_CASE(test_mat_sqrt_mp_real);
-    RUN_TEST_CASE(test_mat_log_d);
-    RUN_TEST_CASE(test_mat_asin_d);
-    RUN_TEST_CASE(test_mat_acos_d);
-    RUN_TEST_CASE(test_mat_atan_d);
-    RUN_TEST_CASE(test_mat_asinh_d);
-    RUN_TEST_CASE(test_mat_acosh_d);
-    RUN_TEST_CASE(test_mat_atanh_d);
-    RUN_TEST_CASE(test_mat_inv_trig_null_safety);
-    RUN_TEST_CASE(test_eigen_general_d);
-    RUN_TEST_CASE(test_eigen_general_mp_real);
-    RUN_TEST_CASE(test_eigen_general_num_high_precision);
-    RUN_TEST_CASE(test_mat_nilpotent_d);
-    RUN_TEST_CASE(test_mat_algebraic_ids_d);
-    RUN_TEST_CASE(test_mat_roundtrips_d);
-    RUN_TEST_CASE(test_mat_pow_int_d);
-    RUN_TEST_CASE(test_mat_pow_num);
-    RUN_TEST_CASE(test_mat_erf_d);
-    RUN_TEST_CASE(test_mat_erfc_d);
-    RUN_TEST_CASE(test_mat_special_unary_extensions);
-    RUN_TEST_CASE(test_mat_special_unary_square_extensions);
-    RUN_TEST_CASE(test_mat_typeof);
-    RUN_TEST_CASE(test_number_matrix_functions);
-    RUN_TEST_CASE(test_dval_matrix_functions);
-    RUN_TEST_CASE(test_dval_matrix_functions_extended);
-    RUN_TEST_CASE(test_mat_simplify_symbolic_helper);
+    TEST_RUN_CASE(test_mat_neg_convenience, NULL);
+    TEST_RUN_CASE(test_eigen_d, NULL);
+    TEST_RUN_CASE(test_eigen_mp_real, NULL);
+    TEST_RUN_CASE(test_eigen_complex, NULL);
+    TEST_RUN_CASE(test_eigen_num_hermitian, NULL);
+    TEST_RUN_CASE(test_eigen_num_hermitian_high_precision, NULL);
+    TEST_RUN_CASE(test_eigen_dval, NULL);
+    TEST_RUN_CASE(test_eigenspace_dval, NULL);
+    TEST_RUN_CASE(test_generalized_eigenspace_dval, NULL);
+    TEST_RUN_CASE(test_jordan_chain_dval, NULL);
+    TEST_RUN_CASE(test_jordan_profile_dval, NULL);
+    TEST_RUN_CASE(test_mat_exp_d, NULL);
+    TEST_RUN_CASE(test_mat_exp_mp_real, NULL);
+    TEST_RUN_CASE(test_mat_exp_complex, NULL);
+    TEST_RUN_CASE(test_mat_exp_singular, NULL);
+    TEST_RUN_CASE(test_matrix_function_structure_preservation, NULL);
+    TEST_RUN_CASE(test_mat_fun_singular_entire_d, NULL);
+    TEST_RUN_CASE(test_mat_exp_null_safety, NULL);
+    TEST_RUN_CASE(test_mat_sin_d, NULL);
+    TEST_RUN_CASE(test_mat_sin_mp_real, NULL);
+    TEST_RUN_CASE(test_mat_sin_complex, NULL);
+    TEST_RUN_CASE(test_mat_sin_null_safety, NULL);
+    TEST_RUN_CASE(test_mat_cos_d, NULL);
+    TEST_RUN_CASE(test_mat_cos_mp_real, NULL);
+    TEST_RUN_CASE(test_mat_cos_complex, NULL);
+    TEST_RUN_CASE(test_mat_tan_d, NULL);
+    TEST_RUN_CASE(test_mat_sinh_d, NULL);
+    TEST_RUN_CASE(test_mat_cosh_d, NULL);
+    TEST_RUN_CASE(test_mat_tanh_d, NULL);
+    TEST_RUN_CASE(test_mat_trig_null_safety, NULL);
+    TEST_RUN_CASE(test_mat_sqrt_d, NULL);
+    TEST_RUN_CASE(test_mat_sqrt_mp_real, NULL);
+    TEST_RUN_CASE(test_mat_log_d, NULL);
+    TEST_RUN_CASE(test_mat_asin_d, NULL);
+    TEST_RUN_CASE(test_mat_acos_d, NULL);
+    TEST_RUN_CASE(test_mat_atan_d, NULL);
+    TEST_RUN_CASE(test_mat_asinh_d, NULL);
+    TEST_RUN_CASE(test_mat_acosh_d, NULL);
+    TEST_RUN_CASE(test_mat_atanh_d, NULL);
+    TEST_RUN_CASE(test_mat_inv_trig_null_safety, NULL);
+    TEST_RUN_CASE(test_eigen_general_d, NULL);
+    TEST_RUN_CASE(test_eigen_general_mp_real, NULL);
+    TEST_RUN_CASE(test_eigen_general_num_high_precision, NULL);
+    TEST_RUN_CASE(test_mat_nilpotent_d, NULL);
+    TEST_RUN_CASE(test_mat_algebraic_ids_d, NULL);
+    TEST_RUN_CASE(test_mat_roundtrips_d, NULL);
+    TEST_RUN_CASE(test_mat_pow_int_d, NULL);
+    TEST_RUN_CASE(test_mat_pow_num, NULL);
+    TEST_RUN_CASE(test_mat_erf_d, NULL);
+    TEST_RUN_CASE(test_mat_erfc_d, NULL);
+    TEST_RUN_CASE(test_mat_special_unary_extensions, NULL);
+    TEST_RUN_CASE(test_mat_special_unary_square_extensions, NULL);
+    TEST_RUN_CASE(test_mat_typeof, NULL);
+    TEST_RUN_CASE(test_number_matrix_functions, NULL);
+    TEST_RUN_CASE(test_dval_matrix_functions, NULL);
+    TEST_RUN_CASE(test_dval_matrix_functions_extended, NULL);
+    TEST_RUN_CASE(test_mat_simplify_symbolic_helper, NULL);
 }

@@ -1,8 +1,141 @@
-#define TEST_CONFIG_MODE TEST_CONFIG_GLOBAL
-#define TEST_CONFIG_MAIN
 #include "test_dval.h"
 
+static bool test_dval_suite_setup(void);
+static int dval_number_exact_equal(const void *actual,
+                                   const void *expected,
+                                   void *ctx);
+static int dval_number_close_equal(const void *actual,
+                                   const void *expected,
+                                   void *ctx);
+static void dval_number_format(const void *value,
+                               char *buf,
+                               size_t buf_size,
+                               void *ctx);
+static number_t dval_error_magnitude(number_t got, number_t expected);
+
+TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
+TEST_SUITE_SETUP(test_dval_suite_setup);
+
 #pragma GCC diagnostic ignored "-Wunused-function"
+
+static bool test_dval_suite_setup(void)
+{
+    test_register_validity_checker("dval-number-exact",
+                                   dval_validity_contract_number_exact());
+    test_register_validity_checker("dval-number-close",
+                                   dval_validity_contract_number_close());
+    return TEST_REQUIRE_VALIDITY_CHECKER("dval-number-exact") &&
+           TEST_REQUIRE_VALIDITY_CHECKER("dval-number-close");
+}
+
+static int dval_number_exact_equal(const void *actual,
+                                   const void *expected,
+                                   void *ctx)
+{
+    (void)ctx;
+    return num_eq(*(const number_t *)actual, *(const number_t *)expected);
+}
+
+static number_t dval_error_magnitude(number_t got, number_t expected)
+{
+    number_t promoted_got = num_clone(got);
+    number_t diff;
+    number_t error;
+
+    if (num_get_prec_bits(expected) > 0u &&
+        num_set_prec_bits(&promoted_got, num_get_prec_bits(expected)) != 0) {
+        num_destroy(&promoted_got);
+        return num_create_from_double(NAN);
+    }
+    diff = num_sub(promoted_got, expected);
+    num_destroy(&promoted_got);
+    if (num_is_real(diff)) {
+        error = num_abs(diff);
+        num_destroy(&diff);
+        return error;
+    }
+    {
+        number_t real = num_real_part(diff);
+        number_t imag = num_imag_part(diff);
+        number_t mag = num_hypot(real, imag);
+
+        num_destroy(&imag);
+        num_destroy(&real);
+        num_destroy(&diff);
+        return mag;
+    }
+}
+
+static int dval_number_close_equal(const void *actual,
+                                   const void *expected,
+                                   void *ctx)
+{
+    number_t got = *(const number_t *)actual;
+    number_t want = *(const number_t *)expected;
+    number_t error;
+    number_t one;
+    number_t tolerance;
+    int ok;
+
+    (void)ctx;
+    if (num_eq(got, want))
+        return 1;
+
+    error = dval_error_magnitude(got, want);
+    one = num_create_from_double(1.0);
+    if (num_set_prec_bits(&one, 106u) != 0) {
+        num_destroy(&one);
+        num_destroy(&error);
+        return 0;
+    }
+    tolerance = num_ldexp(one, 4 - 106);
+    ok = num_le(error, tolerance);
+    num_destroy(&tolerance);
+    num_destroy(&one);
+    num_destroy(&error);
+    return ok;
+}
+
+static void dval_number_format(const void *value,
+                               char *buf,
+                               size_t buf_size,
+                               void *ctx)
+{
+    char *text;
+
+    (void)ctx;
+    if (!buf || buf_size == 0u)
+        return;
+    text = num_to_string(*(const number_t *)value);
+    if (!text) {
+        snprintf(buf, buf_size, "<num_to_string failed>");
+        return;
+    }
+    snprintf(buf, buf_size, "%s", text);
+    free(text);
+}
+
+const test_validity_contract_t *dval_validity_contract_number_exact(void)
+{
+    static const test_validity_contract_t contract =
+        TEST_VALIDITY_CONTRACT("dval-number-exact",
+                               dval_number_exact_equal,
+                               dval_number_format,
+                               NULL);
+
+    return &contract;
+}
+
+const test_validity_contract_t *dval_validity_contract_number_close(void)
+{
+    static const test_validity_contract_t contract =
+        TEST_VALIDITY_CONTRACT("dval-number-close",
+                               dval_number_close_equal,
+                               dval_number_format,
+                               NULL);
+
+    return &contract;
+}
 
 /* ------------------------------------------------------------------------- */
 /* Compact qfloat_t comparison (kept exactly as-is, but using harness colours) */
@@ -40,8 +173,6 @@ void check_q_at(const char *file, int line, int col,
 
     printf("\n");
 
-    /* integrate with harness */
-    tests_failed++;
 }
 
 void print_expr_of(const dval_t *f)
@@ -446,6 +577,12 @@ static int run_README_md_example(void)
     return 0;
 }
 
+static void test_readme_examples(void)
+{
+    if (run_README_md_example() != 0)
+        TEST_FAIL();
+}
+
 /* ------------------------------------------------------------------------- */
 /* Arithmetic tests                                                          */
 /* ------------------------------------------------------------------------- */
@@ -454,44 +591,44 @@ int tests_main(void)
 {
     /* ---------------- Arithmetic ---------------- */
     TEST_SECTION("Arithmetic");
-    RUN_TEST_CASE(test_arithmetic);
+    TEST_RUN_CASE(test_arithmetic, NULL);
 
     /* ---------------- _d variants ---------------- */
     TEST_SECTION("_d variants");
-    RUN_TEST_CASE(test_d_variants);
+    TEST_RUN_CASE(test_d_variants, NULL);
 
     /* ---------------- Math functions ------------- */
     TEST_SECTION("Math functions");
-    RUN_TEST_CASE(test_maths_functions);
+    TEST_RUN_CASE(test_maths_functions, NULL);
 
     /* ---------------- First derivatives ---------- */
     TEST_SECTION("First derivatives");
-    RUN_TEST_CASE(test_first_derivatives);
+    TEST_RUN_CASE(test_first_derivatives, NULL);
 
     /* ---------------- Second derivatives --------- */
     TEST_SECTION("Second derivatives");
-    RUN_TEST_CASE(test_second_derivatives);
+    TEST_RUN_CASE(test_second_derivatives, NULL);
 
     TEST_SECTION("dval_t to_string Tests");
-    RUN_TEST_CASE(test_dval_t_to_string);
+    TEST_RUN_CASE(test_dval_t_to_string, NULL);
 
     TEST_SECTION("dval_t from_string Tests");
-    RUN_TEST_CASE(test_dval_t_from_string);
+    TEST_RUN_CASE(test_dval_t_from_string, NULL);
 
     TEST_SECTION("Partial derivatives");
-    RUN_TEST_CASE(test_partial_derivatives);
+    TEST_RUN_CASE(test_partial_derivatives, NULL);
 
     TEST_SECTION("dval_pattern helpers");
-    RUN_TEST_CASE(test_dval_pattern_helpers);
+    TEST_RUN_CASE(test_dval_pattern_helpers, NULL);
 
     TEST_SECTION("Runtime regressions");
-    RUN_TEST_CASE(test_runtime_regressions);
+    TEST_RUN_CASE(test_runtime_regressions, NULL);
 
     TEST_SECTION("Reverse mode");
-    RUN_TEST_CASE(test_reverse_mode);
+    TEST_RUN_CASE(test_reverse_mode, NULL);
 
     printf(C_YELLOW "\nRunning README examples...\n" C_RESET);
-    run_README_md_example();
+    TEST_RUN_OUTPUT_TAGS(test_readme_examples, "dval,readme,output");
 
     return TESTS_EXIT_CODE();
 }

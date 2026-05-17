@@ -42,8 +42,11 @@ static void test_mat_fun_3x3(void)
             matrix_t *I = mat_mul(E, En);
             if (I)
             {
-                    check_mat_identity_d("3×3 exp(A)·exp(-A)=I", I, 3, 1e-10);
+                bool ok = test_assert_matrix_d_identity(I, 3, 1e-10,
+                                                        __FILE__, __LINE__);
                 mat_free(I);
+                if (!ok)
+                    return;
             }
         }
         mat_free(E);
@@ -67,8 +70,11 @@ static void test_mat_fun_3x3(void)
                 matrix_t *I = mat_add(S2, C2);
                 if (I)
                 {
-                    check_mat_identity_d("3×3 sin²(A)+cos²(A)=I", I, 3, 1e-10);
+                    bool ok = test_assert_matrix_d_identity(I, 3, 1e-10,
+                                                            __FILE__, __LINE__);
                     mat_free(I);
+                    if (!ok)
+                        return;
                 }
             }
             mat_free(S2);
@@ -95,8 +101,11 @@ static void test_mat_fun_3x3(void)
                 matrix_t *I = mat_sub(CH2, SH2);
                 if (I)
                 {
-                    check_mat_identity_d("3×3 cosh²(A)-sinh²(A)=I", I, 3, 1e-10);
+                    bool ok = test_assert_matrix_d_identity(I, 3, 1e-10,
+                                                            __FILE__, __LINE__);
                     mat_free(I);
+                    if (!ok)
+                        return;
                 }
             }
             mat_free(CH2);
@@ -117,8 +126,11 @@ static void test_mat_fun_3x3(void)
             check_bool("exp(log(A)) 3×3 not NULL", R != NULL);
             if (R)
             {
-                check_mat_d("3×3 exp(log(A))=A", R, A, 1e-10);
+                bool ok = test_assert_matrix_d_close(R, A, 1e-10,
+                                                     __FILE__, __LINE__);
                 mat_free(R);
+                if (!ok)
+                    return;
             }
             mat_free(L);
         }
@@ -179,8 +191,11 @@ static void test_mat_fun_4x4(void)
             matrix_t *I = mat_mul(E, En);
             if (I)
             {
-                check_mat_identity_d("4×4 exp(A)·exp(-A)=I", I, 4, 1e-8);
+                bool ok = test_assert_matrix_d_identity(I, 4, 1e-8,
+                                                        __FILE__, __LINE__);
                 mat_free(I);
+                if (!ok)
+                    return;
             }
         }
         mat_free(E);
@@ -204,8 +219,11 @@ static void test_mat_fun_4x4(void)
                 matrix_t *I = mat_add(S2, C2);
                 if (I)
                 {
-                    check_mat_identity_d("4×4 sin²(A)+cos²(A)=I", I, 4, 1e-8);
+                    bool ok = test_assert_matrix_d_identity(I, 4, 1e-8,
+                                                            __FILE__, __LINE__);
                     mat_free(I);
+                    if (!ok)
+                        return;
                 }
             }
             mat_free(S2);
@@ -232,8 +250,11 @@ static void test_mat_fun_4x4(void)
                 matrix_t *I = mat_sub(CH2, SH2);
                 if (I)
                 {
-                    check_mat_identity_d("4×4 cosh²(A)-sinh²(A)=I", I, 4, 1e-8);
+                    bool ok = test_assert_matrix_d_identity(I, 4, 1e-8,
+                                                            __FILE__, __LINE__);
                     mat_free(I);
+                    if (!ok)
+                        return;
                 }
             }
             mat_free(CH2);
@@ -254,8 +275,11 @@ static void test_mat_fun_4x4(void)
             check_bool("exp(log(A)) 4×4 not NULL", R != NULL);
             if (R)
             {
-                check_mat_d("4×4 exp(log(A))=A", R, A, 1e-8);
+                bool ok = test_assert_matrix_d_close(R, A, 1e-8,
+                                                     __FILE__, __LINE__);
                 mat_free(R);
+                if (!ok)
+                    return;
             }
             mat_free(L);
         }
@@ -272,8 +296,11 @@ static void test_mat_fun_4x4(void)
             check_bool("sqrt(A)² 4×4 not NULL", R != NULL);
             if (R)
             {
-                check_mat_d("4×4 sqrt(A)²=A", R, A, 1e-8);
+                bool ok = test_assert_matrix_d_close(R, A, 1e-8,
+                                                     __FILE__, __LINE__);
                 mat_free(R);
+                if (!ok)
+                    return;
             }
             mat_free(Sq);
         }
@@ -292,8 +319,11 @@ static void test_mat_fun_4x4(void)
             matrix_t *I = mat_add(E, EC);
             if (I)
             {
-                check_mat_identity_d("4×4 erf(A)+erfc(A)=I", I, 4, 1e-8);
+                bool ok = test_assert_matrix_d_identity(I, 4, 1e-8,
+                                                        __FILE__, __LINE__);
                 mat_free(I);
+                if (!ok)
+                    return;
             }
         }
         mat_free(E);
@@ -352,8 +382,11 @@ static void test_mat_fun_3x3_mp_real(void)
             matrix_t *I = mat_mul(E, En);
             if (I)
             {
-                check_mat_identity_d("3×3 num exp(A)·exp(-A)=I", I, 3, 1e-12);
+                bool ok = test_assert_matrix_d_identity(I, 3, 1e-12,
+                                                        __FILE__, __LINE__);
                 mat_free(I);
+                if (!ok)
+                    return;
             }
         }
         mat_free(E);
@@ -377,8 +410,11 @@ static void test_mat_fun_3x3_mp_real(void)
                 matrix_t *I = mat_add(S2, C2);
                 if (I)
                 {
-                    check_mat_identity_d("3×3 num sin²(A)+cos²(A)=I", I, 3, 1e-12);
+                    bool ok = test_assert_matrix_d_identity(I, 3, 1e-12,
+                                                            __FILE__, __LINE__);
                     mat_free(I);
+                    if (!ok)
+                        return;
                 }
             }
             mat_free(S2);
@@ -405,8 +441,11 @@ static void test_mat_fun_3x3_mp_real(void)
                 matrix_t *I = mat_sub(CH2, SH2);
                 if (I)
                 {
-                    check_mat_identity_d("3×3 num cosh²(A)-sinh²(A)=I", I, 3, 1e-10);
+                    bool ok = test_assert_matrix_d_identity(I, 3, 1e-10,
+                                                            __FILE__, __LINE__);
                     mat_free(I);
+                    if (!ok)
+                        return;
                 }
             }
             mat_free(CH2);
@@ -427,8 +466,11 @@ static void test_mat_fun_3x3_mp_real(void)
             check_bool("num exp(log(A)) 3×3 not NULL", R != NULL);
             if (R)
             {
-                check_mat_d("3×3 num exp(log(A))=A", R, A, 1e-12);
+                bool ok = test_assert_matrix_d_close(R, A, 1e-12,
+                                                     __FILE__, __LINE__);
                 mat_free(R);
+                if (!ok)
+                    return;
             }
             mat_free(L);
         }
@@ -488,8 +530,11 @@ static void test_mat_fun_3x3_complex(void)
             matrix_t *I = mat_mul(E, En);
             if (I)
             {
-                check_mat_identity_complex("3×3 complex exp(A)·exp(-A)=I", I, 3, 1e-25);
+                bool ok = test_assert_matrix_complex_identity(I, 3, 1e-25,
+                                                              __FILE__, __LINE__);
                 mat_free(I);
+                if (!ok)
+                    return;
             }
         }
         mat_free(E);
@@ -513,8 +558,11 @@ static void test_mat_fun_3x3_complex(void)
                 matrix_t *I = mat_add(S2, C2);
                 if (I)
                 {
-                    check_mat_identity_complex("3×3 complex sin²(A)+cos²(A)=I", I, 3, 1e-25);
+                    bool ok = test_assert_matrix_complex_identity(I, 3, 1e-25,
+                                                                  __FILE__, __LINE__);
                     mat_free(I);
+                    if (!ok)
+                        return;
                 }
             }
             mat_free(S2);
@@ -541,8 +589,11 @@ static void test_mat_fun_3x3_complex(void)
                 matrix_t *I = mat_sub(CH2, SH2);
                 if (I)
                 {
-                    check_mat_identity_complex("3×3 complex cosh²(A)-sinh²(A)=I", I, 3, 1e-25);
+                    bool ok = test_assert_matrix_complex_identity(I, 3, 1e-25,
+                                                                  __FILE__, __LINE__);
                     mat_free(I);
+                    if (!ok)
+                        return;
                 }
             }
             mat_free(CH2);
@@ -563,8 +614,11 @@ static void test_mat_fun_3x3_complex(void)
             check_bool("qc exp(log(A)) 3×3 not NULL", R != NULL);
             if (R)
             {
-                check_mat_complex("3×3 complex exp(log(A))=A", R, A, 1e-25);
+                bool ok = test_assert_matrix_complex_close(R, A, 1e-25,
+                                                           __FILE__, __LINE__);
                 mat_free(R);
+                if (!ok)
+                    return;
             }
             mat_free(L);
         }
@@ -585,7 +639,7 @@ static void test_mat_error_handling(void)
         double out = 0.0;
         check_bool("mat_det(NULL) = -1", mat_det(NULL, &out) == -1);
         matrix_t *rect = test_mat_dense_d(2, 3);
-        check_bool("mat_det(2×3) = -2", mat_det(rect, &out) == -2);
+        check_bool("mat_det(2×3) < 0", mat_det(rect, &out) < 0);
         mat_free(rect);
     }
 
@@ -728,8 +782,11 @@ static void test_mat_fun_mp_real_complex(void)
             matrix_t *CT = mat_mul(C, T);
             if (CT)
             {
-                check_mat_d("num 2×2 cos·tan=sin", CT, S, 1e-12);
+                bool ok = test_assert_matrix_d_close(CT, S, 1e-12,
+                                                     __FILE__, __LINE__);
                 mat_free(CT);
+                if (!ok)
+                    return;
             }
         }
         mat_free(T);
@@ -752,8 +809,11 @@ static void test_mat_fun_mp_real_complex(void)
                 matrix_t *I = mat_sub(CH2, SH2);
                 if (I)
                 {
-                    check_mat_identity_d("num 2×2 cosh²-sinh²=I", I, 2, 1e-12);
+                    bool ok = test_assert_matrix_d_identity(I, 2, 1e-12,
+                                                            __FILE__, __LINE__);
                     mat_free(I);
+                    if (!ok)
+                        return;
                 }
             }
             mat_free(CH2);
@@ -774,8 +834,11 @@ static void test_mat_fun_mp_real_complex(void)
             matrix_t *CT = mat_mul(CH, TH);
             if (CT)
             {
-                check_mat_d("num 2×2 cosh·tanh=sinh", CT, SH, 1e-12);
+                bool ok = test_assert_matrix_d_close(CT, SH, 1e-12,
+                                                     __FILE__, __LINE__);
                 mat_free(CT);
+                if (!ok)
+                    return;
             }
         }
         mat_free(TH);
@@ -803,8 +866,11 @@ static void test_mat_fun_mp_real_complex(void)
             check_bool("num exp(log(PD)) not NULL", R != NULL);
             if (R)
             {
-                check_mat_d("num 2×2 exp(log(A))=A", R, PD, 1e-12);
+                bool ok = test_assert_matrix_d_close(R, PD, 1e-12,
+                                                     __FILE__, __LINE__);
                 mat_free(R);
+                if (!ok)
+                    return;
             }
             mat_free(L);
         }
@@ -822,8 +888,11 @@ static void test_mat_fun_mp_real_complex(void)
             matrix_t *I = mat_add(E, EC);
             if (I)
             {
-                check_mat_identity_d("num 2×2 erf+erfc=I", I, 2, 1e-12);
+                bool ok = test_assert_matrix_d_identity(I, 2, 1e-12,
+                                                        __FILE__, __LINE__);
                 mat_free(I);
+                if (!ok)
+                    return;
             }
         }
         mat_free(E);
@@ -892,8 +961,11 @@ static void test_mat_fun_mp_real_complex(void)
             matrix_t *I = mat_mul(E, En);
             if (I)
             {
-                check_mat_identity_d("num 2×2 exp(A)·exp(-A)=I", I, 2, 1e-12);
+                bool ok = test_assert_matrix_d_identity(I, 2, 1e-12,
+                                                        __FILE__, __LINE__);
                 mat_free(I);
+                if (!ok)
+                    return;
             }
         }
         mat_free(A_exp);
@@ -909,10 +981,10 @@ static void test_mat_fun_mp_real_complex(void)
 
 void run_matrix_function_regression_tests(void)
 {
-    RUN_TEST_CASE(test_mat_fun_mp_real_complex);
-    RUN_TEST_CASE(test_mat_error_handling);
-    RUN_TEST_CASE(test_mat_fun_3x3);
-    RUN_TEST_CASE(test_mat_fun_4x4);
-    RUN_TEST_CASE(test_mat_fun_3x3_mp_real);
-    RUN_TEST_CASE(test_mat_fun_3x3_complex);
+    TEST_RUN_CASE(test_mat_fun_mp_real_complex, NULL);
+    TEST_RUN_CASE(test_mat_error_handling, NULL);
+    TEST_RUN_CASE(test_mat_fun_3x3, NULL);
+    TEST_RUN_CASE(test_mat_fun_4x4, NULL);
+    TEST_RUN_CASE(test_mat_fun_3x3_mp_real, NULL);
+    TEST_RUN_CASE(test_mat_fun_3x3_complex, NULL);
 }

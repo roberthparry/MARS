@@ -130,20 +130,20 @@ static void test_qf_hypot(void)
 }
 
 void test_hypotenus(void) {
-    RUN_SUBTEST(test_qf_hypot);
+    TEST_RUN_SUBTEST(test_qf_hypot, NULL);
 }
 
 void test_gamma_erf_erfc_erfinv_erfcinv_digamma(void) {
-    RUN_SUBTEST(test_qf_gamma);
-    RUN_SUBTEST(test_qf_erf);
-    RUN_SUBTEST(test_qf_erfc);
-    RUN_SUBTEST(test_qf_erfinv);
-    RUN_SUBTEST(test_qf_erfcinv);
-    RUN_SUBTEST(test_qf_lgamma);
-    RUN_SUBTEST(test_qf_digamma);
-    RUN_SUBTEST(test_qf_gammainv);
-    RUN_SUBTEST(test_qf_trigamma);
-    RUN_SUBTEST(test_qf_tetragamma);
+    TEST_RUN_SUBTEST(test_qf_gamma, NULL);
+    TEST_RUN_SUBTEST(test_qf_erf, NULL);
+    TEST_RUN_SUBTEST(test_qf_erfc, NULL);
+    TEST_RUN_SUBTEST(test_qf_erfinv, NULL);
+    TEST_RUN_SUBTEST(test_qf_erfcinv, NULL);
+    TEST_RUN_SUBTEST(test_qf_lgamma, NULL);
+    TEST_RUN_SUBTEST(test_qf_digamma, NULL);
+    TEST_RUN_SUBTEST(test_qf_gammainv, NULL);
+    TEST_RUN_SUBTEST(test_qf_trigamma, NULL);
+    TEST_RUN_SUBTEST(test_qf_tetragamma, NULL);
 }
 
 static void test_qf_gamma(void)
@@ -206,16 +206,10 @@ static void test_qf_gamma(void)
         qf_to_string(got, buf, sizeof(buf));
         qf_to_string(exp, buf_exp, sizeof(buf_exp));
 
-        if (qf_close_value(got, exp, tests[i].tol)) {
-            printf("%s  OK: gamma(%s)%s\n", C_GREEN, tests[i].xs, C_RESET);
-            printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
-        } else {
-            printf("%s  FAIL: gamma(%s)%s  [%s:%d]\n", C_RED, tests[i].xs, C_RESET, __FILE__, __LINE__);
-            printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
-            TEST_FAIL();
-        }
+        TEST_ASSERT_QFLOAT_CLOSE(got, exp);
+        printf("%s  OK: gamma(%s)%s\n", C_GREEN, tests[i].xs, C_RESET);
+        printf("    got      = %s\n", buf);
+        printf("    expected = %s\n", buf_exp);
     }
 
     /* ------------------------------------------------------------
@@ -317,16 +311,10 @@ static void test_qf_erf(void)
         qf_to_string(got, buf, sizeof(buf));
         qf_to_string(exp, buf_exp, sizeof(buf_exp));
 
-        if (qf_close_value(got, exp, 1e-30)) {
-            printf("%s  OK: erf(%s)%s\n", C_GREEN, tests[i].xs, C_RESET);
-            printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
-        } else {
-            printf("%s  FAIL: erf(%s)%s  [%s:%d]\n", C_RED, tests[i].xs, C_RESET, __FILE__, __LINE__);
-            printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
-            TEST_FAIL();
-        }
+        TEST_ASSERT_QFLOAT_CLOSE(got, exp);
+        printf("%s  OK: erf(%s)%s\n", C_GREEN, tests[i].xs, C_RESET);
+        printf("    got      = %s\n", buf);
+        printf("    expected = %s\n", buf_exp);
     }
 
     printf("\n");
@@ -388,17 +376,10 @@ static void test_qf_erfc(void)
         qf_to_string(got, buf, sizeof(buf));
         qf_to_string(exp, buf_exp, sizeof(buf_exp));
 
-        
-        if (qf_close_value(got, exp, 1e-30)) {
-            printf("%s  OK: erfc(%s)%s\n", C_GREEN, tests[i].xs, C_RESET);
-            printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
-        } else {
-            printf("%s  FAIL: erfc(%s)%s  [%s:%d]\n", C_RED, tests[i].xs, C_RESET, __FILE__, __LINE__);
-            printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
-            TEST_FAIL();
-        }
+        TEST_ASSERT_QFLOAT_CLOSE(got, exp);
+        printf("%s  OK: erfc(%s)%s\n", C_GREEN, tests[i].xs, C_RESET);
+        printf("    got      = %s\n", buf);
+        printf("    expected = %s\n", buf_exp);
     }
 
     printf("\n");
@@ -468,16 +449,10 @@ static void test_qf_erfinv(void) {
             qf_to_string(got, buf, sizeof(buf));
             qf_to_string(exp, buf_exp, sizeof(buf_exp));
 
-            if (qf_close_value(got, exp, tests[i].acceptable_error)) {
-                printf("%s  OK: erfinv(%s)%s\n", C_GREEN, tests[i].xs, C_RESET);
-                printf("    got      = %s\n", buf);
-                printf("    expected = %s\n", buf_exp);
-            } else {
-                printf("%s  FAIL: erfinv(%s)%s  [%s:%d]\n", C_RED, tests[i].xs, C_RESET, __FILE__, __LINE__);
-                printf("    got      = %s\n", buf);
-                printf("    expected = %s\n", buf_exp);
-                TEST_FAIL();
-            }
+            TEST_ASSERT_QFLOAT_CLOSE_TOL(got, exp, tests[i].acceptable_error);
+            printf("%s  OK: erfinv(%s)%s\n", C_GREEN, tests[i].xs, C_RESET);
+            printf("    got      = %s\n", buf);
+            printf("    expected = %s\n", buf_exp);
         }
     }
 
@@ -562,16 +537,10 @@ static void test_qf_erfcinv(void) {
         qf_to_string(got, buf, sizeof(buf));
         qf_to_string(exp, buf_exp, sizeof(buf_exp));
 
-        if (qf_close_value(got, exp, tests[i].acceptable_error)) {
-            printf("%s  OK: erfcinv(%s)%s\n", C_GREEN, tests[i].xs, C_RESET);
-            printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
-        } else {
-            printf("%s  FAIL: erfcinv(%s)%s  [%s:%d]\n", C_RED, tests[i].xs, C_RESET, __FILE__, __LINE__);
-            printf("    got      = %s\n", buf);
-            printf("    expected = %s\n", buf_exp);
-            TEST_FAIL();
-        }
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(got, exp, tests[i].acceptable_error);
+        printf("%s  OK: erfcinv(%s)%s\n", C_GREEN, tests[i].xs, C_RESET);
+        printf("    got      = %s\n", buf);
+        printf("    expected = %s\n", buf_exp);
     }
 
     printf("\n");

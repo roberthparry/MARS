@@ -267,6 +267,11 @@ static inline qcomplex_t test_dv_get_val_qc(const dval_t *dv)
     return out;
 }
 
+int str_eq(const char *a, const char *b);
+void to_string_pass(const char *msg, const char *got, const char *expected);
+void to_string_fail(const char *file, int line, int col, const char *msg,
+                    const char *got, const char *expected);
+
 #define dv_eval_d      test_dv_eval_d
 #define dv_eval_qf     test_dv_eval_qf
 #define dv_eval_qc     test_dv_eval_qc
@@ -284,6 +289,32 @@ static inline qcomplex_t test_dv_get_val_qc(const dval_t *dv)
 void check_q_at(const char *file, int line, int col,
                 const char *label, qfloat_t got, qfloat_t expect);
 void print_expr_of(const dval_t *f);
+const test_validity_contract_t *dval_validity_contract_number_exact(void);
+const test_validity_contract_t *dval_validity_contract_number_close(void);
+
+#define TEST_ASSERT_DVAL_NUMBER_EQ(actual, expected) \
+    do { \
+        number_t test_dval_actual__ = (actual); \
+        number_t test_dval_expected__ = (expected); \
+        TEST_ASSERT_VALID_NAMED("dval-number-exact", \
+                                &test_dval_actual__, \
+                                &test_dval_expected__); \
+    } while (0)
+
+#define TEST_ASSERT_DVAL_NUMBER_CLOSE(actual, expected) \
+    do { \
+        number_t test_dval_actual__ = (actual); \
+        number_t test_dval_expected__ = (expected); \
+        TEST_ASSERT_VALID_NAMED("dval-number-close", \
+                                &test_dval_actual__, \
+                                &test_dval_expected__); \
+    } while (0)
+
+#define ASSERT_DVAL_NUMBER_EQ(actual, expected) \
+    TEST_ASSERT_DVAL_NUMBER_EQ((actual), (expected))
+
+#define ASSERT_DVAL_NUMBER_CLOSE(actual, expected) \
+    TEST_ASSERT_DVAL_NUMBER_CLOSE((actual), (expected))
 
 void test_arithmetic(void);
 void test_d_variants(void);
@@ -323,12 +354,13 @@ void test_deriv_trigamma(void);
 void test_second_deriv_digamma(void);
 
 void check_roundtrip(const char *label, dval_t *f, int line);
-void check_parse_val(const char *label, const char *s, double expect_d, int line);
+void check_parse_val(const char *label, const char *s,
+                     double expect_d, int line);
 void check_parse_null(const char *label, const char *s, int line);
-void to_string_pass(const char *msg, const char *got, const char *expected);
-void to_string_fail(const char *file, int line, int col, const char *msg,
-                    const char *got, const char *expected);
-int str_eq(const char *a, const char *b);
+void check_parse_null_stderr_contains(const char *label,
+                                      const char *s,
+                                      const char *expected_substring,
+                                      int line);
 
 dval_t *make_expr_u01(void);
 dval_t *make_expr_u02(void);

@@ -22,6 +22,81 @@ static matrix_t *clone_matrix_snapshot(const matrix_t *A)
     return NULL;
 }
 
+matrix_t *test_mat_create_d(size_t rows, size_t cols, const double *values)
+{
+    size_t count, i;
+    number_t *tmp;
+    matrix_t *out;
+
+    if (!values)
+        return NULL;
+
+    count = rows * cols;
+    tmp = calloc(count ? count : 1u, sizeof(*tmp));
+    if (!tmp)
+        return NULL;
+
+    for (i = 0; i < count; ++i)
+        tmp[i] = test_num_from_d(values[i]);
+
+    out = mat_create(rows, cols, tmp);
+
+    for (i = 0; i < count; ++i)
+        num_destroy(&tmp[i]);
+    free(tmp);
+    return out;
+}
+
+matrix_t *test_mat_create_qf(size_t rows, size_t cols, const qfloat_t *values)
+{
+    size_t count, i;
+    number_t *tmp;
+    matrix_t *out;
+
+    if (!values)
+        return NULL;
+
+    count = rows * cols;
+    tmp = calloc(count ? count : 1u, sizeof(*tmp));
+    if (!tmp)
+        return NULL;
+
+    for (i = 0; i < count; ++i)
+        tmp[i] = test_num_from_mp_real(values[i]);
+
+    out = mat_create(rows, cols, tmp);
+
+    for (i = 0; i < count; ++i)
+        num_destroy(&tmp[i]);
+    free(tmp);
+    return out;
+}
+
+matrix_t *test_mat_create_qc(size_t rows, size_t cols, const qcomplex_t *values)
+{
+    size_t count, i;
+    number_t *tmp;
+    matrix_t *out;
+
+    if (!values)
+        return NULL;
+
+    count = rows * cols;
+    tmp = calloc(count ? count : 1u, sizeof(*tmp));
+    if (!tmp)
+        return NULL;
+
+    for (i = 0; i < count; ++i)
+        tmp[i] = test_num_from_complex(values[i]);
+
+    out = mat_create(rows, cols, tmp);
+
+    for (i = 0; i < count; ++i)
+        num_destroy(&tmp[i]);
+    free(tmp);
+    return out;
+}
+
 typedef struct {
     char labels[8][32];
     size_t count;
@@ -930,7 +1005,7 @@ void check_d(const char *label, double got, double expected, double tol)
     int ok = err < tol;
 
     if (!ok)
-        tests_failed++;
+        test_mark_failure(__FILE__, __LINE__, label ? label : "check_d failure");
 
     printf(ok ? C_BOLD C_GREEN "  OK: %s\n" C_RESET
               : C_BOLD C_RED "  FAIL: %s\n" C_RESET,
@@ -952,7 +1027,7 @@ void check_qf_val(const char *label, qfloat_t got, qfloat_t expected, double tol
     int ok = err < tol;
 
     if (!ok)
-        tests_failed++;
+        test_mark_failure(__FILE__, __LINE__, label ? label : "check_qf_val failure");
 
     printf(ok ? C_BOLD C_GREEN "  OK: %s\n" C_RESET
               : C_BOLD C_RED "  FAIL: %s\n" C_RESET,
@@ -974,7 +1049,7 @@ void check_qc_val(const char *label, qcomplex_t got, qcomplex_t expected, double
     int ok = both_nan || err < tol;
 
     if (!ok)
-        tests_failed++;
+        test_mark_failure(__FILE__, __LINE__, label ? label : "check_qc_val failure");
 
     printf(ok ? C_BOLD C_GREEN "  OK: %s\n" C_RESET
               : C_BOLD C_RED "  FAIL: %s\n" C_RESET,
@@ -988,7 +1063,7 @@ void check_qc_val(const char *label, qcomplex_t got, qcomplex_t expected, double
 void check_bool(const char *label, int cond)
 {
     if (!cond)
-        tests_failed++;
+        test_mark_failure(__FILE__, __LINE__, label ? label : "check_bool failure");
 
     printf(cond ? C_BOLD C_GREEN "  OK: %s\n" C_RESET
                 : C_BOLD C_RED "  FAIL: %s\n" C_RESET,

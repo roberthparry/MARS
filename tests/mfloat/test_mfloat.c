@@ -13,12 +13,87 @@
 #define TEST_MFLOAT_MATHS_PRECISION 1024u
 #endif
 
-#define TEST_CONFIG_MODE TEST_CONFIG_GLOBAL
-#define TEST_CONFIG_MAIN
 #include "test_harness.h"
+
+TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
+static int mfloat_validity_equal(const void *actual, const void *expected, void *ctx);
+static void mfloat_validity_format(const void *value, char *buf, size_t buf_size, void *ctx);
+static bool test_mfloat_suite_setup(void);
+static bool test_assert_mfloat_matches_text(const mfloat_t *got,
+                                            const char *expected_text,
+                                            int relative_mode,
+                                            const char *file,
+                                            int line);
+static bool test_assert_mfloat_matches_value(const mfloat_t *got,
+                                             const mfloat_t *expected,
+                                             int relative_mode,
+                                             const char *file,
+                                             int line);
+
+static int mfloat_validity_abs_mode = 0;
+static int mfloat_validity_rel_mode = 1;
+static const test_validity_contract_t mfloat_abs_contract =
+    TEST_VALIDITY_CONTRACT("mfloat-abs",
+                           mfloat_validity_equal,
+                           mfloat_validity_format,
+                           &mfloat_validity_abs_mode);
+static const test_validity_contract_t mfloat_rel_contract =
+    TEST_VALIDITY_CONTRACT("mfloat-rel",
+                           mfloat_validity_equal,
+                           mfloat_validity_format,
+                           &mfloat_validity_rel_mode);
+
+TEST_SUITE_SETUP(test_mfloat_suite_setup);
+
+#define TEST_ASSERT_MFLOAT_EQ_TEXT(got_ptr, expected_text) \
+    do { \
+        if (!test_assert_mfloat_matches_text((got_ptr), \
+                                             (expected_text), \
+                                             0, \
+                                             __FILE__, \
+                                             __LINE__)) \
+            return; \
+    } while (0)
+
+#define TEST_ASSERT_MFLOAT_REL_TEXT(got_ptr, expected_text) \
+    do { \
+        if (!test_assert_mfloat_matches_text((got_ptr), \
+                                             (expected_text), \
+                                             1, \
+                                             __FILE__, \
+                                             __LINE__)) \
+            return; \
+    } while (0)
+
+#define TEST_ASSERT_MFLOAT_EQ_VALUE(got_ptr, expected_ptr) \
+    do { \
+        if (!test_assert_mfloat_matches_value((got_ptr), \
+                                              (expected_ptr), \
+                                              0, \
+                                              __FILE__, \
+                                              __LINE__)) \
+            return; \
+    } while (0)
+
+#define TEST_ASSERT_MFLOAT_REL_VALUE(got_ptr, expected_ptr) \
+    do { \
+        if (!test_assert_mfloat_matches_value((got_ptr), \
+                                              (expected_ptr), \
+                                              1, \
+                                              __FILE__, \
+                                              __LINE__)) \
+            return; \
+    } while (0)
 
 static int format_mfloat_value(char *buf, size_t buf_size, const mfloat_t *value);
 static int format_mfloat_decimal_value(char *buf, size_t buf_size, const mfloat_t *value);
+static int mfloat_matches_expected(const mfloat_t *got,
+                                   const mfloat_t *expected,
+                                   int relative_mode);
+static int mfloat_matches_expected_bits(const mfloat_t *got,
+                                        const mfloat_t *expected,
+                                        int relative_mode,
+                                        size_t precision_bits);
 static void print_mfloat_error_check_mode(const char *label,
                                           const mfloat_t *got,
                                           const char *expected_text,
@@ -215,6 +290,96 @@ static void print_mfloat_error_check_value(const char *label,
     printf("    error    = %s\n", err_buf);
 
     mf_free(error);
+}
+
+static int mfloat_validity_equal(const void *actual, const void *expected, void *ctx)
+{
+    int relative_mode = ctx ? *(const int *)ctx : 0;
+    return mfloat_matches_expected((const mfloat_t *)actual,
+                                   (const mfloat_t *)expected,
+                                   relative_mode);
+}
+
+static void mfloat_validity_format(const void *value, char *buf, size_t buf_size, void *ctx)
+{
+    (void)ctx;
+    if (!value || format_mfloat_value(buf, buf_size, (const mfloat_t *)value) < 0) {
+        if (buf && buf_size > 0) {
+            strncpy(buf, "<format-error>", buf_size - 1u);
+            buf[buf_size - 1u] = '\0';
+        }
+    }
+}
+
+static bool test_mfloat_suite_setup(void)
+{
+    test_register_validity_checker("mfloat-abs", &mfloat_abs_contract);
+    test_register_validity_checker("mfloat-rel", &mfloat_rel_contract);
+    return TEST_REQUIRE_VALIDITY_CHECKER("mfloat-abs") &&
+           TEST_REQUIRE_VALIDITY_CHECKER("mfloat-rel");
+}
+
+static bool test_assert_mfloat_matches_text(const mfloat_t *got,
+                                            const char *expected_text,
+                                            int relative_mode,
+                                            const char *file,
+                                            int line)
+{
+    const test_validity_contract_t *contract = relative_mode
+        ? test_find_validity_checker("mfloat-rel")
+        : test_find_validity_checker("mfloat-abs");
+    mfloat_t *expected = NULL;
+    bool ok = false;
+
+    if (!contract) {
+        test_mark_failure(file,
+                          line,
+                          relative_mode
+                              ? "missing named validity checker: mfloat-rel"
+                              : "missing named validity checker: mfloat-abs");
+        return false;
+    }
+    if (!got || !expected_text) {
+        test_mark_failure(file, line, "null mfloat validity input");
+        return false;
+    }
+
+    expected = mf_new_prec(mf_get_precision(got));
+    if (!expected || mf_set_string(expected, expected_text) != 0) {
+        test_mark_failure(file, line, "failed to parse expected mfloat text");
+        mf_free(expected);
+        return false;
+    }
+
+    ok = test_assert_validity(contract, got, expected, file, line);
+    mf_free(expected);
+    return ok;
+}
+
+static bool test_assert_mfloat_matches_value(const mfloat_t *got,
+                                             const mfloat_t *expected,
+                                             int relative_mode,
+                                             const char *file,
+                                             int line)
+{
+    const test_validity_contract_t *contract = relative_mode
+        ? test_find_validity_checker("mfloat-rel")
+        : test_find_validity_checker("mfloat-abs");
+
+    if (!contract) {
+        test_mark_failure(file,
+                          line,
+                          relative_mode
+                              ? "missing named validity checker: mfloat-rel"
+                              : "missing named validity checker: mfloat-abs");
+        return false;
+    }
+    if (!got || !expected) {
+        test_mark_failure(file, line, "null mfloat validity input");
+        return false;
+    }
+
+    return test_assert_validity(contract, got, expected, file, line);
 }
 
 static int mfloat_meets_precision(const mfloat_t *got,
@@ -1100,7 +1265,7 @@ void test_extended_math_wrappers(void)
     print_mfloat_value("b after sqrt", b);
     print_double_check("sqrt(4)", "4", 2.0, mf_to_double(b));
     print_mfloat_error_check_decimal("sqrt(4) mfloat error", b, "2");
-    ASSERT_TRUE(mfloat_meets_precision(b, "2", 0));
+    TEST_ASSERT_MFLOAT_EQ_TEXT(b, "2");
     ASSERT_TRUE(fabs(mf_to_double(b) - 2.0) < 1e-12);
 
     ASSERT_EQ_INT(mf_sin(c), 0);
@@ -1108,10 +1273,9 @@ void test_extended_math_wrappers(void)
     print_double_check("sin(0.5)", "0.5", sin(0.5), mf_to_double(c));
     print_mfloat_error_check("sin(0.5) mfloat error", c,
                              "0.479425538604203000273287935215571388081803367940600675188616613125535000287814832209631274684348269086132091084505717417811093748609940282780153962046191924609957293932281400533546338188055228595670135699854233639121071720777380152979871377");
-    ASSERT_TRUE(mfloat_meets_precision(
+    TEST_ASSERT_MFLOAT_REL_TEXT(
         c,
-        "0.479425538604203000273287935215571388081803367940600675188616613125535000287814832209631274684348269086132091084505717417811093748609940282780153962046191924609957293932281400533546338188055228595670135699854233639121071720777380152979871377",
-        1));
+        "0.479425538604203000273287935215571388081803367940600675188616613125535000287814832209631274684348269086132091084505717417811093748609940282780153962046191924609957293932281400533546338188055228595670135699854233639121071720777380152979871377");
     ASSERT_TRUE(fabs(mf_to_double(c) - sin(0.5)) < 1e-12);
     ASSERT_EQ_INT(mf_set_string(c, "0.5"), 0);
     ASSERT_EQ_INT(mf_sincos(c, sin_pair, cos_pair), 0);
@@ -1119,24 +1283,21 @@ void test_extended_math_wrappers(void)
                              "0.479425538604203000273287935215571388081803367940600675188616613125535000287814832209631274684348269086132091084505717417811093748609940282780153962046191924609957293932281400533546338188055228595670135699854233639121071720777380152979871377");
     print_mfloat_error_check("sincos(cos, 0.5) mfloat error", cos_pair,
                              "0.877582561890372716116281582603829651991645197109744052997610868315950763274213947405794184084682258355478400593109053993413827976833280266799756120950224015587629156878590723476939310989616739677014408997649128570213468218384543818393316169");
-    ASSERT_TRUE(mfloat_meets_precision(
+    TEST_ASSERT_MFLOAT_REL_TEXT(
         sin_pair,
-        "0.479425538604203000273287935215571388081803367940600675188616613125535000287814832209631274684348269086132091084505717417811093748609940282780153962046191924609957293932281400533546338188055228595670135699854233639121071720777380152979871377",
-        1));
-    ASSERT_TRUE(mfloat_meets_precision(
+        "0.479425538604203000273287935215571388081803367940600675188616613125535000287814832209631274684348269086132091084505717417811093748609940282780153962046191924609957293932281400533546338188055228595670135699854233639121071720777380152979871377");
+    TEST_ASSERT_MFLOAT_REL_TEXT(
         cos_pair,
-        "0.877582561890372716116281582603829651991645197109744052997610868315950763274213947405794184084682258355478400593109053993413827976833280266799756120950224015587629156878590723476939310989616739677014408997649128570213468218384543818393316169",
-        1));
+        "0.877582561890372716116281582603829651991645197109744052997610868315950763274213947405794184084682258355478400593109053993413827976833280266799756120950224015587629156878590723476939310989616739677014408997649128570213468218384543818393316169");
     ASSERT_EQ_INT(mf_set_string(c, "0.5"), 0);
     ASSERT_EQ_INT(mf_cos(c), 0);
     print_mfloat_value("c after cos", c);
     print_double_check("cos(0.5)", "0.5", cos(0.5), mf_to_double(c));
     print_mfloat_error_check("cos(0.5) mfloat error", c,
                              "0.877582561890372716116281582603829651991645197109744052997610868315950763274213947405794184084682258355478400593109053993413827976833280266799756120950224015587629156878590723476939310989616739677014408997649128570213468218384543818393316169");
-    ASSERT_TRUE(mfloat_meets_precision(
+    TEST_ASSERT_MFLOAT_REL_TEXT(
         c,
-        "0.877582561890372716116281582603829651991645197109744052997610868315950763274213947405794184084682258355478400593109053993413827976833280266799756120950224015587629156878590723476939310989616739677014408997649128570213468218384543818393316169",
-        1));
+        "0.877582561890372716116281582603829651991645197109744052997610868315950763274213947405794184084682258355478400593109053993413827976833280266799756120950224015587629156878590723476939310989616739677014408997649128570213468218384543818393316169");
     ASSERT_TRUE(fabs(mf_to_double(c) - cos(0.5)) < 1e-9);
 
     ASSERT_EQ_INT(mf_beta(d, e), 0);
@@ -1152,7 +1313,7 @@ void test_extended_math_wrappers(void)
         ASSERT_EQ_INT(mf_div(expected_calc, twelve), 0);
         mf_free(twelve);
     }
-    ASSERT_TRUE(mfloat_matches_expected(d, expected_calc, 1));
+    TEST_ASSERT_MFLOAT_REL_VALUE(d, expected_calc);
     mf_free(expected_calc);
     expected_calc = NULL;
     ASSERT_TRUE(fabs(mf_to_double(d) - (1.0 / 12.0)) < 1e-12);
@@ -1161,7 +1322,7 @@ void test_extended_math_wrappers(void)
     print_mfloat_value("h after h^p", h);
     print_double_check("2^10", "(2,10)", 1024.0, mf_to_double(h));
     print_mfloat_error_check_decimal("2^10 mfloat error", h, "1024");
-    ASSERT_TRUE(mfloat_meets_precision(h, "1024", 0));
+    TEST_ASSERT_MFLOAT_EQ_TEXT(h, "1024");
     ASSERT_TRUE(fabs(mf_to_double(h) - 1024.0) < 1e-9);
 
     ASSERT_EQ_INT(mf_set_string(c, "0.5"), 0);
@@ -1358,8 +1519,7 @@ void test_extended_math_wrappers(void)
                              "3.178053830347945619646941601297055408873990960903515214096734362117675159127693113691205735802988151413974472127669922943424564933204911492150814125672505296395345481668495672750294814716035980317112620662889405386862953343268716071851135633349782640780819104305918846669206449467955585611481173504519868938863345642859395857241539634257930501709285066373239180");
     expected_calc = mf_new_prec(mf_get_precision(i));
     ASSERT_NOT_NULL(expected_calc);
-    ASSERT_EQ_INT(mf_set_string(expected_calc,
-                                "3.178053830347945619646941601297055408873990960903515214096734362117675159127693113691205735802988151413974472127669922943424564933204911492150814125672505296395345481668495672750294814716035980317112620662889405386862953343268716071851135633349782640780819104305918846669206449467955585611481173504519868938863345642859395857241539634257930501709285066373239180"),
+    ASSERT_EQ_INT(mf_set_string(expected_calc, "3.178053830347945619646941601297055408873990960903515214096734362117675159127693113691205735802988151413974472127669922943424564933204911492150814125672505296395345481668495672750294814716035980317112620662889405386862953343268716071851135633349782640780819104305918846669206449467955585611481173504519868938863345642859395857241539634257930501709285066373239180"),
                   0);
     ASSERT_TRUE(mfloat_matches_expected_bits(i,
                                              expected_calc,
@@ -1385,8 +1545,7 @@ void test_extended_math_wrappers(void)
                              "1.81736243377572037978629332299959785501187916904924706518750932219244372756147566473735743031038607292752413958969414805099609132105198113539342074859981496761297192175580435724507238988190666426025063057038375224409258683749353069877360951611176116800791761081983785185559793158812049519166690958335326828138351108125494900995543381974740171061565405E-01");
     expected_calc = mf_new_prec(mf_get_precision(i));
     ASSERT_NOT_NULL(expected_calc);
-    ASSERT_EQ_INT(mf_set_string(expected_calc,
-                                "1.81736243377572037978629332299959785501187916904924706518750932219244372756147566473735743031038607292752413958969414805099609132105198113539342074859981496761297192175580435724507238988190666426025063057038375224409258683749353069877360951611176116800791761081983785185559793158812049519166690958335326828138351108125494900995543381974740171061565405E-01"),
+    ASSERT_EQ_INT(mf_set_string(expected_calc, "1.81736243377572037978629332299959785501187916904924706518750932219244372756147566473735743031038607292752413958969414805099609132105198113539342074859981496761297192175580435724507238988190666426025063057038375224409258683749353069877360951611176116800791761081983785185559793158812049519166690958335326828138351108125494900995543381974740171061565405E-01"),
                   0);
     ASSERT_TRUE(mfloat_matches_expected_bits(i,
                                              expected_calc,
@@ -1611,25 +1770,23 @@ void test_remaining_special_mfloat_functions(void)
     print_mfloat_value("gammainv(gamma(2.5))", y);
     print_mfloat_error_check("gammainv(gamma(2.5)) mfloat error", y,
                              "2.5");
-    ASSERT_TRUE(mfloat_meets_precision(y, "2.5", 1));
+    TEST_ASSERT_MFLOAT_REL_TEXT(y, "2.5");
 
     ASSERT_EQ_INT(mf_lambert_wm1(neg), 0);
     print_mfloat_value("lambert_wm1(-0.1)", neg);
     print_mfloat_error_check("lambert_wm1(-0.1) mfloat error", neg,
                              "-3.577152063957297218409391963511994880401796257793075923683527755791687236350575462861463655620846808017732465627597059470558844569051750534584923541827063499452631656593265232240273452302009544089866198954722805115875488714857591771");
-    ASSERT_TRUE(mfloat_meets_precision(
+    TEST_ASSERT_MFLOAT_REL_TEXT(
         neg,
-        "-3.577152063957297218409391963511994880401796257793075923683527755791687236350575462861463655620846808017732465627597059470558844569051750534584923541827063499452631656593265232240273452302009544089866198954722805115875488714857591771",
-        1));
+        "-3.577152063957297218409391963511994880401796257793075923683527755791687236350575462861463655620846808017732465627597059470558844569051750534584923541827063499452631656593265232240273452302009544089866198954722805115875488714857591771");
 
     ASSERT_EQ_INT(mf_logbeta(a, b), 0);
     print_mfloat_value("logbeta(2.5,3.5)", a);
     print_mfloat_error_check("logbeta(2.5,3.5) mfloat error", a,
                              "-3.301835269962052609799184383389828128309215704143981009717122670837516912654122678189667590882127703846032006869909630968067952132211068047929483063503043459566263883177244211440597836787902490076041110975295315326755455855413553872");
-    ASSERT_TRUE(mfloat_meets_precision(
+    TEST_ASSERT_MFLOAT_REL_TEXT(
         a,
-        "-3.301835269962052609799184383389828128309215704143981009717122670837516912654122678189667590882127703846032006869909630968067952132211068047929483063503043459566263883177244211440597836787902490076041110975295315326755455855413553872",
-        1));
+        "-3.301835269962052609799184383389828128309215704143981009717122670837516912654122678189667590882127703846032006869909630968067952132211068047929483063503043459566263883177244211440597836787902490076041110975295315326755455855413553872");
 
     ASSERT_EQ_INT(mf_set_string(a, "5.5"), 0);
     ASSERT_EQ_INT(mf_set_string(b, "2.5"), 0);
@@ -1637,7 +1794,7 @@ void test_remaining_special_mfloat_functions(void)
     print_mfloat_value("binomial(5.5,2.5)", a);
     print_mfloat_error_check("binomial(5.5,2.5) mfloat error", a,
                              "14.4375");
-    ASSERT_TRUE(mfloat_meets_precision(a, "14.4375", 1));
+    TEST_ASSERT_MFLOAT_REL_TEXT(a, "14.4375");
 
     ASSERT_EQ_INT(mf_set_string(x, "0.5"), 0);
     ASSERT_EQ_INT(mf_set_string(a, "2.5"), 0);
@@ -1646,40 +1803,36 @@ void test_remaining_special_mfloat_functions(void)
     print_mfloat_value("beta_pdf(0.5,2.5,3.5)", x);
     print_mfloat_error_check("beta_pdf(0.5,2.5,3.5) mfloat error", x,
                              "1.697652726313550248201426809306819861700902887898202119975118336628232508098416374294547229506699583531443655752084885726857726358555505630698319047804798285111892980665696827446162628233869948679652190892985575058062532162578385377");
-    ASSERT_TRUE(mfloat_meets_precision(
+    TEST_ASSERT_MFLOAT_REL_TEXT(
         x,
-        "1.697652726313550248201426809306819861700902887898202119975118336628232508098416374294547229506699583531443655752084885726857726358555505630698319047804798285111892980665696827446162628233869948679652190892985575058062532162578385377",
-        1));
+        "1.697652726313550248201426809306819861700902887898202119975118336628232508098416374294547229506699583531443655752084885726857726358555505630698319047804798285111892980665696827446162628233869948679652190892985575058062532162578385377");
 
     ASSERT_EQ_INT(mf_set_string(x, "0.5"), 0);
     ASSERT_EQ_INT(mf_logbeta_pdf(x, a, b), 0);
     print_mfloat_value("logbeta_pdf(0.5,2.5,3.5)", x);
     print_mfloat_error_check("logbeta_pdf(0.5,2.5,3.5) mfloat error", x,
                              "0.529246547722271372130255897557121856007215166702959993234402632863942424775343815766214282896452953678026082787626888033325871189178545819798800056962739611843353599863758470679369682292335796191547710513837323505798973954722827573");
-    ASSERT_TRUE(mfloat_meets_precision(
+    TEST_ASSERT_MFLOAT_REL_TEXT(
         x,
-        "0.529246547722271372130255897557121856007215166702959993234402632863942424775343815766214282896452953678026082787626888033325871189178545819798800056962739611843353599863758470679369682292335796191547710513837323505798973954722827573",
-        1));
+        "0.529246547722271372130255897557121856007215166702959993234402632863942424775343815766214282896452953678026082787626888033325871189178545819798800056962739611843353599863758470679369682292335796191547710513837323505798973954722827573");
 
     ASSERT_EQ_INT(mf_set_string(x, "0.5"), 0);
     ASSERT_EQ_INT(mf_normal_pdf(x), 0);
     print_mfloat_value("normal_pdf(0.5)", x);
     print_mfloat_error_check("normal_pdf(0.5) mfloat error", x,
                              "0.3520653267642994777746804415965176531103151803757119496554690179882231978367166074876695830352912992493563315873991226985732202993620550355837505163524984117606205891629138560900857072618466033122881469544464486893328511817392660585");
-    ASSERT_TRUE(mfloat_meets_precision(
+    TEST_ASSERT_MFLOAT_REL_TEXT(
         x,
-        "0.3520653267642994777746804415965176531103151803757119496554690179882231978367166074876695830352912992493563315873991226985732202993620550355837505163524984117606205891629138560900857072618466033122881469544464486893328511817392660585",
-        1));
+        "0.3520653267642994777746804415965176531103151803757119496554690179882231978367166074876695830352912992493563315873991226985732202993620550355837505163524984117606205891629138560900857072618466033122881469544464486893328511817392660585");
 
     ASSERT_EQ_INT(mf_set_string(x, "0.5"), 0);
     ASSERT_EQ_INT(mf_normal_logpdf(x), 0);
     print_mfloat_value("normal_logpdf(0.5)", x);
     print_mfloat_error_check("normal_logpdf(0.5) mfloat error", x,
                              "-1.043938533204672741780329736405617639861397473637783412817151540482765695927260397694743298635954197622005646624634337446366862881840793572155875915222681393603560742547358669046395905991380805630163234873094627374625518251694954477");
-    ASSERT_TRUE(mfloat_meets_precision(
+    TEST_ASSERT_MFLOAT_REL_TEXT(
         x,
-        "-1.043938533204672741780329736405617639861397473637783412817151540482765695927260397694743298635954197622005646624634337446366862881840793572155875915222681393603560742547358669046395905991380805630163234873094627374625518251694954477",
-        1));
+        "-1.043938533204672741780329736405617639861397473637783412817151540482765695927260397694743298635954197622005646624634337446366862881840793572155875915222681393603560742547358669046395905991380805630163234873094627374625518251694954477");
 
     ASSERT_EQ_INT(mf_set_long(one, 1), 0);
     ASSERT_EQ_INT(mf_gammainc_lower(one, MF_ONE), 0);
@@ -1692,7 +1845,7 @@ void test_remaining_special_mfloat_functions(void)
     ASSERT_EQ_INT(mf_exp(expected_calc), 0);
     ASSERT_EQ_INT(mf_neg(expected_calc), 0);
     ASSERT_EQ_INT(mf_add_long(expected_calc, 1), 0);
-    ASSERT_TRUE(mfloat_matches_expected(one, expected_calc, 1));
+    TEST_ASSERT_MFLOAT_REL_VALUE(one, expected_calc);
     mf_free(expected_calc);
     expected_calc = NULL;
 
@@ -1705,7 +1858,7 @@ void test_remaining_special_mfloat_functions(void)
     ASSERT_NOT_NULL(expected_calc);
     ASSERT_EQ_INT(mf_neg(expected_calc), 0);
     ASSERT_EQ_INT(mf_exp(expected_calc), 0);
-    ASSERT_TRUE(mf_eq(one, expected_calc));
+    TEST_ASSERT_MFLOAT_EQ_VALUE(one, expected_calc);
     mf_free(expected_calc);
     expected_calc = NULL;
 
@@ -1714,10 +1867,9 @@ void test_remaining_special_mfloat_functions(void)
     print_mfloat_value("ei(1)", one);
     print_mfloat_error_check("ei(1) mfloat error", one,
                              "1.89511781635593675546652093433163426901706058173270759164622843188251383453380415354890071012613895697181109531794465374258814916416306468808818668253882866963233854509522755525848139221216645993635994854330628545576162522816686811880285663784666568688864642429701909079047289030909933801909174699979183024948");
-    ASSERT_TRUE(mfloat_meets_precision(
+    TEST_ASSERT_MFLOAT_REL_TEXT(
         one,
-        "1.89511781635593675546652093433163426901706058173270759164622843188251383453380415354890071012613895697181109531794465374258814916416306468808818668253882866963233854509522755525848139221216645993635994854330628545576162522816686811880285663784666568688864642429701909079047289030909933801909174699979183024948",
-        1));
+        "1.89511781635593675546652093433163426901706058173270759164622843188251383453380415354890071012613895697181109531794465374258814916416306468808818668253882866963233854509522755525848139221216645993635994854330628545576162522816686811880285663784666568688864642429701909079047289030909933801909174699979183024948");
 
     ASSERT_EQ_INT(mf_set_long(one, 1), 0);
     ASSERT_EQ_INT(mf_e1(one), 0);
@@ -1950,8 +2102,7 @@ void test_gamma_family(void)
                              "1.19929782941531928552681533588795691209235255849057037812899793700343786859038296672505015536325332622190399788307627291498821221250151971141605150373980519890288450084421306778553338742512597865344947027730313761685081023111422341940633896545115709375053547643389340621854889928258692319355576323521659380353754256824179530782915191753590688693789913E+00");
     expected_calc = mf_new_prec(mf_get_precision(i));
     ASSERT_NOT_NULL(expected_calc);
-    ASSERT_EQ_INT(mf_set_string(expected_calc,
-                                "1.19929782941531928552681533588795691209235255849057037812899793700343786859038296672505015536325332622190399788307627291498821221250151971141605150373980519890288450084421306778553338742512597865344947027730313761685081023111422341940633896545115709375053547643389340621854889928258692319355576323521659380353754256824179530782915191753590688693789913E+00"),
+    ASSERT_EQ_INT(mf_set_string(expected_calc, "1.19929782941531928552681533588795691209235255849057037812899793700343786859038296672505015536325332622190399788307627291498821221250151971141605150373980519890288450084421306778553338742512597865344947027730313761685081023111422341940633896545115709375053547643389340621854889928258692319355576323521659380353754256824179530782915191753590688693789913E+00"),
                   0);
     ASSERT_TRUE(mfloat_matches_expected_bits(i,
                                              expected_calc,
@@ -1967,8 +2118,7 @@ void test_gamma_family(void)
                              "1.81736243377572037978629332299959785501187916904924706518750932219244372756147566473735743031038607292752413958969414805099609132105198113539342074859981496761297192175580435724507238988190666426025063057038375224409258683749353069877360951611176116800791761081983785185559793158812049519166690958335326828138351108125494900995543381974740171061565405E-01");
     expected_calc = mf_new_prec(mf_get_precision(i));
     ASSERT_NOT_NULL(expected_calc);
-    ASSERT_EQ_INT(mf_set_string(expected_calc,
-                                "1.81736243377572037978629332299959785501187916904924706518750932219244372756147566473735743031038607292752413958969414805099609132105198113539342074859981496761297192175580435724507238988190666426025063057038375224409258683749353069877360951611176116800791761081983785185559793158812049519166690958335326828138351108125494900995543381974740171061565405E-01"),
+    ASSERT_EQ_INT(mf_set_string(expected_calc, "1.81736243377572037978629332299959785501187916904924706518750932219244372756147566473735743031038607292752413958969414805099609132105198113539342074859981496761297192175580435724507238988190666426025063057038375224409258683749353069877360951611176116800791761081983785185559793158812049519166690958335326828138351108125494900995543381974740171061565405E-01"),
                   0);
     ASSERT_TRUE(mfloat_matches_expected_bits(i,
                                              expected_calc,
@@ -2022,7 +2172,7 @@ void test_gamma_identities(void)
     ASSERT_EQ_INT(mf_set_default_precision(saved_default), 0);
 }
 
-static int readme_example(void)
+static void example_mfloat_readme(void)
 {
     mfloat_t *x;
     mfloat_t *y;
@@ -2032,10 +2182,20 @@ static int readme_example(void)
     x = mf_create_string("2.345");
     y = mf_create_string("2.345");
     if (!x || !y)
-        return 1;
+    {
+        mf_free(x);
+        mf_free(y);
+        test_mark_failure(__FILE__, __LINE__, "failed to allocate README example values");
+        return;
+    }
 
     if (mf_gamma(x) != 0 || mf_lgamma(y) != 0)
-        return 1;
+    {
+        mf_free(x);
+        mf_free(y);
+        test_mark_failure(__FILE__, __LINE__, "failed to compute README example values");
+        return;
+    }
 
     mf_sprintf(buf, sizeof(buf), "%.77mf", x);
     printf("gamma(2.345)  = %s\n", buf);
@@ -2045,37 +2205,40 @@ static int readme_example(void)
 
     mf_free(x);
     mf_free(y);
-    return 0;
 }
 
 int tests_main(void)
 {
-    RUN_TEST_CASE(test_new_and_precision);
-    RUN_TEST_CASE(test_set_long_normalises);
-    RUN_TEST_CASE(test_clone_and_clear);
-    RUN_TEST_CASE(test_set_string_and_basic_arithmetic);
-    RUN_TEST_CASE(test_string_parser_edge_cases);
-    RUN_TEST_CASE(test_division_and_power);
-    RUN_TEST_CASE(test_string_roundtrip);
-    RUN_TEST_CASE(test_printf_family);
-    RUN_TEST_CASE(test_constants_and_named_values);
-    RUN_TEST_CASE(test_conversion_to_double_and_qfloat);
-    RUN_TEST_CASE(test_conversion_from_double_and_qfloat);
-    RUN_TEST_CASE(test_extended_math_wrappers);
-    RUN_TEST_CASE(test_exp_family);
-    RUN_TEST_CASE(test_exp_identities);
-    RUN_TEST_CASE(test_log_family);
-    RUN_TEST_CASE(test_log_identities);
-    RUN_TEST_CASE(test_gamma_family);
-    RUN_TEST_CASE(test_gamma_identities);
-    RUN_TEST_CASE(test_digamma_function);
-    RUN_TEST_CASE(test_trigamma_function);
-    RUN_TEST_CASE(test_tetragamma_function);
-    RUN_TEST_CASE(test_remaining_special_mfloat_functions);
-    RUN_TEST_CASE(test_difficult_mfloat_cases);
-    printf(C_YELLOW "\nRunning README example...\n" C_RESET);
-    if (readme_example() != 0)
-        return 1;
+    TEST_SECTION("Core and Conversion");
+    TEST_RUN_CASE(test_new_and_precision, NULL);
+    TEST_RUN_CASE(test_set_long_normalises, NULL);
+    TEST_RUN_CASE(test_clone_and_clear, NULL);
+    TEST_RUN_CASE(test_set_string_and_basic_arithmetic, NULL);
+    TEST_RUN_CASE(test_string_parser_edge_cases, NULL);
+    TEST_RUN_CASE(test_division_and_power, NULL);
+    TEST_RUN_CASE(test_string_roundtrip, NULL);
+    TEST_RUN_CASE(test_printf_family, NULL);
+    TEST_RUN_CASE(test_constants_and_named_values, NULL);
+    TEST_RUN_CASE(test_conversion_to_double_and_qfloat, NULL);
+    TEST_RUN_CASE(test_conversion_from_double_and_qfloat, NULL);
 
-    return 0;
+    TEST_SECTION("Elementary and Special Functions");
+    TEST_RUN_CASE(test_extended_math_wrappers, NULL);
+    TEST_RUN_CASE(test_exp_family, NULL);
+    TEST_RUN_CASE(test_exp_identities, NULL);
+    TEST_RUN_CASE(test_log_family, NULL);
+    TEST_RUN_CASE(test_log_identities, NULL);
+    TEST_RUN_CASE(test_gamma_family, NULL);
+    TEST_RUN_CASE(test_gamma_identities, NULL);
+    TEST_RUN_CASE(test_digamma_function, NULL);
+    TEST_RUN_CASE(test_trigamma_function, NULL);
+    TEST_RUN_CASE(test_tetragamma_function, NULL);
+    TEST_RUN_CASE(test_remaining_special_mfloat_functions, NULL);
+    TEST_RUN_CASE(test_difficult_mfloat_cases, NULL);
+
+    TEST_SECTION("README Output Examples");
+    printf(C_YELLOW "\nRunning README example...\n" C_RESET);
+    TEST_RUN_OUTPUT_TAGS(example_mfloat_readme, "mfloat,readme,output");
+
+    return TESTS_EXIT_CODE();
 }

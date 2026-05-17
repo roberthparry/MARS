@@ -6,11 +6,11 @@
 #include <stdbool.h>
 #include <time.h>
 
-#define TEST_CONFIG_MODE TEST_CONFIG_GLOBAL
-#define TEST_CONFIG_MAIN
 #include "test_harness.h"
 
 #include "set.h"
+
+TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 
 /* -------------------------------------------------------------
  * strdup replacement for strict C99
@@ -205,7 +205,7 @@ void test_fuzz(void) {
     set_destroy(s);
 }
 
-void test_readme_examples(void) {
+static void example_set_strings(void) {
     /* Create a set of strings with deep‑copy semantics */
     set_t *s = set_create(
         sizeof(char *),
@@ -242,23 +242,23 @@ void test_readme_examples(void) {
 
 int tests_main(void) {
 
-    printf(C_BOLD C_CYAN "=== Integer Tests ===\n" C_RESET);
-    RUN_TEST_CASE(test_ints);
+    TEST_SECTION("Integer Tests");
+    TEST_RUN_CASE(test_ints, NULL);
 
-    printf(C_BOLD C_CYAN "=== String Tests ===\n" C_RESET);
-    RUN_TEST_CASE(test_strings);
+    TEST_SECTION("String Tests");
+    TEST_RUN_CASE(test_strings, NULL);
 
-    printf(C_BOLD C_CYAN "=== Deep Struct Tests ===\n" C_RESET);
-    RUN_TEST_CASE(test_deep);
+    TEST_SECTION("Deep Struct Tests");
+    TEST_RUN_CASE(test_deep, NULL);
 
-    printf(C_BOLD C_CYAN "=== Sorted Order Tests ===\n" C_RESET);
-    RUN_TEST_CASE(test_sorted);
+    TEST_SECTION("Sorted Order Tests");
+    TEST_RUN_CASE(test_sorted, NULL);
 
-    printf(C_BOLD C_CYAN "=== Fuzz Tests ===\n" C_RESET);
-    RUN_TEST_CASE(test_fuzz);
+    TEST_SECTION("Fuzz Tests");
+    TEST_RUN_CASE(test_fuzz, NULL);
 
     printf(C_YELLOW "\nRunning README examples...\n" C_RESET);
-    RUN_TEST_CASE(test_readme_examples);
+    TEST_RUN_OUTPUT_TAGS(example_set_strings, "set,readme,output");
 
     return TESTS_EXIT_CODE();
 }

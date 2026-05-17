@@ -5,18 +5,19 @@
  * @file test_config.h
  * @brief Hierarchical per-test enable/disable configuration with JSON persistence.
  *
- * Provides a two-level configuration system that lets individual tests or
- * whole groups be skipped without recompilation.  State is stored in a JSON
- * file and reloaded on the next run.
+ * Provides a hierarchical configuration system that lets individual tests or
+ * whole groups be skipped without recompilation. State is loaded from JSON,
+ * and missing tests/groups default to enabled and can be regenerated into the
+ * saved config as explicit default-enabled entries.
  *
- * Two modes are supported (see test_config_mode_t):
+ * Three modes are supported (see test_config_mode_t):
+ *   TEST_CONFIG_NONE    — disable config I/O entirely
  *   TEST_CONFIG_GLOBAL  — one shared JSON file for all test translation units
  *   TEST_CONFIG_LOCAL   — one JSON file per test source file
  *
  * Typical call sequence (handled automatically by test_harness.h):
  *   test_config_set_mode(mode);   // called once at startup
  *   test_enabled(file, name, parent);  // called per test
- *   test_config_save();           // persist any state changes
  *   test_config_shutdown();       // free resources
  */
 
@@ -30,7 +31,11 @@
  * @enum test_config_mode_t
  * @brief Selects how test enable/disable information is stored and resolved.
  *
- * The test configuration system supports two independent modes:
+ * The test configuration system supports three independent modes:
+ *
+ * ### TEST_CONFIG_NONE
+ * No JSON file is read or written. All tests default to enabled, and
+ * test_config_has_key() always reports false.
  *
  * ### TEST_CONFIG_GLOBAL
  * A single shared JSON file is used for all test translation units:
@@ -69,6 +74,7 @@
  * configuration, while GLOBAL mode is ideal for centralised control.
  */
 typedef enum {
+    TEST_CONFIG_NONE,    /**< Disable config file reads/writes entirely */
     TEST_CONFIG_GLOBAL,  /**< Use tests/test_config.json */
     TEST_CONFIG_LOCAL    /**< Use tests/<basename>.json */
 } test_config_mode_t;
@@ -95,6 +101,7 @@ typedef enum {
  * @param mode  The configuration mode to activate.
  */
 void test_config_set_mode(test_config_mode_t mode);
+void test_config_set_prune_enabled(bool enabled);
 
 /**
  * @brief Release all global resources held by the test configuration system.
@@ -121,12 +128,18 @@ void test_config_shutdown(void);
  *
  * Missing keys always default to "enabled = true".
  *
+ * Missing keys are treated as enabled by default. When the harness later saves
+ * configuration, discovered tests and groups may be written back with those
+ * default-enabled states so that a missing config file can be regenerated.
+ *
  * If a parent group is provided, the test inherits the effective enabled state
  * of all ancestors.
  *
  * @param file   The source filename of the test (use `__FILE__`).
  * @param func   The test function name (use `__func__` or `#func`).
- * @param parent Optional parent group name (may be NULL).
+ * @param parent Optional parent group name (may be NULL). This should be a
+ *               test/group identifier or a dot-separated chain of identifiers
+ *               for nested groups, not an arbitrary free-form string.
  *
  * @return 1 if enabled, 0 if disabled.
  */
@@ -157,7 +170,9 @@ bool test_config_has_key(const char *file, const char *func, const char *parent)
  *
  * Writes are performed atomically using a temporary file followed by rename.
  *
- * This function does nothing if no configuration has been loaded or modified.
+ * The normal test harness may call this after a run so that missing config
+ * files can be regenerated with default-enabled entries for discovered tests
+ * and groups.
  */
 void test_config_save(void);
 

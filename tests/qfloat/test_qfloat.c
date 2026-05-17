@@ -1,6 +1,19 @@
-#define TEST_CONFIG_MODE TEST_CONFIG_GLOBAL
-#define TEST_CONFIG_MAIN
 #include "test_qfloat.h"
+
+TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
+
+static int qfloat_validity_equal(const void *actual, const void *expected, void *ctx);
+static void qfloat_validity_format(const void *value, char *buf, size_t buf_size, void *ctx);
+static bool test_qfloat_suite_setup(void);
+
+static const double qfloat_validity_rel_tol = 1e-28;
+static const test_validity_contract_t qfloat_close_contract =
+    TEST_VALIDITY_CONTRACT("qfloat-close",
+                           qfloat_validity_equal,
+                           qfloat_validity_format,
+                           (void *)&qfloat_validity_rel_tol);
+
+TEST_SUITE_SETUP(test_qfloat_suite_setup);
 
 /* Helper to print qfloat_t */
 void print_q(const char *label, qfloat_t x) {
@@ -25,10 +38,51 @@ int qf_close_rel(qfloat_t a, qfloat_t b, double rel)
     return qf_abs(qf_sub(qf_div(a,b), (qfloat_t){1,0})).hi <= rel;
 }
 
+const test_validity_contract_t *qfloat_validity_contract_close(void)
+{
+    return &qfloat_close_contract;
+}
+
+bool test_assert_qfloat_close_tol(qfloat_t actual,
+                                  qfloat_t expected,
+                                  double rel_tol,
+                                  const char *file,
+                                  int line)
+{
+    const test_validity_contract_t contract =
+        TEST_VALIDITY_CONTRACT("qfloat-close",
+                               qfloat_validity_equal,
+                               qfloat_validity_format,
+                               &rel_tol);
+
+    return test_assert_validity(&contract, &actual, &expected, file, line);
+}
+
+static int qfloat_validity_equal(const void *actual, const void *expected, void *ctx)
+{
+    const qfloat_t *a = (const qfloat_t *)actual;
+    const qfloat_t *b = (const qfloat_t *)expected;
+    const double rel = ctx ? *(const double *)ctx : 1e-28;
+
+    return qf_eq(*a, *b) || qf_close(*a, *b, rel) || qf_close_rel(*a, *b, rel);
+}
+
+static void qfloat_validity_format(const void *value, char *buf, size_t buf_size, void *ctx)
+{
+    (void)ctx;
+    qf_to_string(*(const qfloat_t *)value, buf, buf_size);
+}
+
+static bool test_qfloat_suite_setup(void)
+{
+    test_register_validity_checker("qfloat-close", qfloat_validity_contract_close());
+    return TEST_REQUIRE_VALIDITY_CHECKER("qfloat-close");
+}
+
 static void check_bool(const char *label, int cond)
 {
     if (!cond)
-        tests_failed++;
+        test_mark_failure(__FILE__, __LINE__, label);
     printf(cond ? C_GREEN "  OK: %s\n" C_RESET
                 : C_RED   "  FAIL: %s\n" C_RESET, label);
 }
@@ -59,13 +113,11 @@ void test_difficult_qfloat_cases(void)
 
     y = qf_exp(qf_log(y));
     print_q("    exp(log(1e-20))", y);
-    check_bool("exp(log(1e-20)) = 1e-20",
-               qf_close_rel(y, qf_from_string("1e-20"), 1e-28));
+    TEST_ASSERT_QFLOAT_CLOSE(y, qf_from_string("1e-20"));
 
     ident = qf_add(qf_gammainc_P(s, gx), qf_gammainc_Q(s, gx));
     print_q("    gammainc_P(0.5,1) + gammainc_Q(0.5,1)", ident);
-    check_bool("gammainc_P(0.5,1) + gammainc_Q(0.5,1) = 1",
-               qf_close(ident, one, 1e-28));
+    TEST_ASSERT_QFLOAT_CLOSE(ident, one);
 
     ident = qf_sub(qf_mul(w, qf_exp(w)), qf_from_string("-0.35"));
     print_q("    productlog(-0.35) * exp(productlog(-0.35)) - (-0.35)", ident);
@@ -76,8 +128,7 @@ void test_difficult_qfloat_cases(void)
     beta = qf_beta(a, b);
     ident = qf_sub(qf_exp(logb), beta);
     print_q("    exp(logbeta(2.5,3.5)) - beta(2.5,3.5)", ident);
-    check_bool("exp(logbeta(2.5,3.5)) = beta(2.5,3.5)",
-               qf_abs(ident).hi < 1e-28);
+    TEST_ASSERT_QFLOAT_CLOSE(ident, qf_from_double(0.0));
 }
 
 int tests_main() {
@@ -89,23 +140,27 @@ int tests_main() {
 
     printf(C_YELLOW "Running qfloat_t tests...\n\n" C_RESET);
 
-    RUN_TEST_CASE(test_arithmetic);
-    RUN_TEST_CASE(test_arithmetic_extensions);
-    RUN_TEST_CASE(test_strings);
-    RUN_TEST_CASE(test_printf);
-    RUN_TEST_CASE(test_vsprintf);
-    RUN_TEST_CASE(test_power);
-    RUN_TEST_CASE(test_trigonometric);
-    RUN_TEST_CASE(test_hyperbolic);
-    RUN_TEST_CASE(test_hypotenus);
-    RUN_TEST_CASE(test_gamma_erf_erfc_erfinv_erfcinv_digamma);
-    RUN_TEST_CASE(test_lambert_w);
-    RUN_TEST_CASE(test_beta_logbeta_binomial_beta_pdf_logbeta_pdf_normal_pdf_cdf_logpdf);
-    RUN_TEST_CASE(test_gammainc_ei_e1);
-    RUN_TEST_CASE(test_difficult_qfloat_cases);
+    TEST_SECTION("Core and Elementary");
+
+    TEST_RUN_CASE(test_arithmetic, NULL);
+    TEST_RUN_CASE(test_arithmetic_extensions, NULL);
+    TEST_RUN_CASE(test_strings, NULL);
+    TEST_RUN_CASE(test_printf, NULL);
+    TEST_RUN_CASE(test_vsprintf, NULL);
+    TEST_RUN_CASE(test_power, NULL);
+    TEST_RUN_CASE(test_trigonometric, NULL);
+    TEST_RUN_CASE(test_hyperbolic, NULL);
+    TEST_RUN_CASE(test_hypotenus, NULL);
+
+    TEST_SECTION("Special Functions");
+    TEST_RUN_CASE(test_gamma_erf_erfc_erfinv_erfcinv_digamma, NULL);
+    TEST_RUN_CASE(test_lambert_w, NULL);
+    TEST_RUN_CASE(test_beta_logbeta_binomial_beta_pdf_logbeta_pdf_normal_pdf_cdf_logpdf, NULL);
+    TEST_RUN_CASE(test_gammainc_ei_e1, NULL);
+    TEST_RUN_CASE(test_difficult_qfloat_cases, NULL);
 
     printf(C_YELLOW "\nRunning README examples...\n" C_RESET);
-    RUN_TEST_CASE(test_readme_examples);
+    TEST_RUN_OUTPUT_TAGS(test_readme_examples, "qfloat,readme,output");
 
     printf("\n" C_YELLOW "Done.\n" C_RESET);
 

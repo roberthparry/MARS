@@ -6,11 +6,11 @@
 #include <stdbool.h>
 #include <pthread.h>
 
-#define TEST_CONFIG_MODE TEST_CONFIG_GLOBAL
-#define TEST_CONFIG_MAIN
 #include "test_harness.h"
 
 #include "array.h"
+
+TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 
 /* -------------------------------------------------------------
  * strdup replacement for strict C99
@@ -668,50 +668,46 @@ void example_stack_deep(void) {
 }
 
 int tests_main(void) {
-    printf(C_BOLD C_CYAN "=== Integer Array Tests ===\n" C_RESET);
-    RUN_TEST_CASE(test_ints);
+    TEST_SECTION("Integer Array Tests");
+    TEST_RUN_CASE(test_ints, NULL);
 
-    printf(C_BOLD C_CYAN "=== String Array Tests ===\n" C_RESET);
-    RUN_TEST_CASE(test_strings);
+    TEST_SECTION("String Array Tests");
+    TEST_RUN_CASE(test_strings, NULL);
 
-    printf(C_BOLD C_CYAN "=== Append Array Tests ===\n" C_RESET);
-    RUN_TEST_CASE(test_append_array);
+    TEST_SECTION("Append Array Tests");
+    TEST_RUN_CASE(test_append_array, NULL);
 
-    printf(C_BOLD C_CYAN "=== Thread Safety Tests ===\n" C_RESET);
-    RUN_TEST_CASE(test_thread_safety_append);
+    TEST_SECTION("Thread Safety Tests");
+    TEST_RUN_CASE(test_thread_safety_append, NULL);
 
-    printf(C_BOLD C_CYAN "=== Remove/Insert Tests ===\n" C_RESET);
-    RUN_TEST_CASE(test_remove_and_remove_elements);
-    RUN_TEST_CASE(test_insert_and_insert_carray);
-    RUN_TEST_CASE(test_insert_array);
+    TEST_SECTION("Remove/Insert Tests");
+    TEST_RUN_CASE(test_remove_and_remove_elements, NULL);
+    TEST_RUN_CASE(test_insert_and_insert_carray, NULL);
+    TEST_RUN_CASE(test_insert_array, NULL);
 
-    printf(C_BOLD C_CYAN "=== Swap/Rotate Tests ===\n" C_RESET);
-    RUN_TEST_CASE(test_swap_rotate);
+    TEST_SECTION("Swap/Rotate Tests");
+    TEST_RUN_CASE(test_swap_rotate, NULL);
 
-    printf(C_BOLD C_CYAN "=== Slice/From Slice Tests ===\n" C_RESET);
-    RUN_TEST_CASE(test_slice_and_from_slice);
-    RUN_TEST_CASE(test_slice_view_ops);
+    TEST_SECTION("Slice/From Slice Tests");
+    TEST_RUN_CASE(test_slice_and_from_slice, NULL);
+    TEST_RUN_CASE(test_slice_view_ops, NULL);
 
-    printf(C_BOLD C_CYAN "=== Stack Tests ===\n" C_RESET);
-    RUN_TEST_CASE(test_stack_ints);
-    RUN_TEST_CASE(test_stack_strings);
+    TEST_SECTION("Stack Tests");
+    TEST_RUN_CASE(test_stack_ints, NULL);
+    TEST_RUN_CASE(test_stack_strings, NULL);
 
     printf(C_YELLOW "\nRunning README examples...\n" C_RESET);
-    RUN_TEST_CASE(test_readme_examples);
-    RUN_TEST_CASE(test_readme_deep_struct);
+    TEST_RUN_CASE(test_readme_examples, NULL);
+    TEST_RUN_CASE(test_readme_deep_struct, NULL);
 
-    printf(C_BOLD C_GREEN "\n=== README Output Examples ===\n" C_RESET);
-    example_array_primitive();
-    example_array_deep_struct();
-    example_slice_subrange();
-    example_slice_sort();
-    example_slice_materialise();
-    example_stack_basic();
-    example_stack_deep();
-
-    printf(C_BOLD C_CYAN "=== Stack Tests ===\n" C_RESET);
-    RUN_TEST_CASE(test_stack_ints);
-    RUN_TEST_CASE(test_stack_strings);
+    TEST_SECTION("README Output Examples");
+    TEST_RUN_OUTPUT(example_array_primitive);
+    TEST_RUN_OUTPUT(example_array_deep_struct);
+    TEST_RUN_OUTPUT(example_slice_subrange);
+    TEST_RUN_OUTPUT(example_slice_sort);
+    TEST_RUN_OUTPUT(example_slice_materialise);
+    TEST_RUN_OUTPUT(example_stack_basic);
+    TEST_RUN_OUTPUT(example_stack_deep);
 
     return TESTS_EXIT_CODE();
 }
