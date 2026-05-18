@@ -130,6 +130,9 @@ typedef struct dval_ops {
     /** Human-readable operator name used in debug output and dv_to_string(). */
     const char  *name;
 
+    /** TeX presentation name for renderers that emit native TeX. */
+    const char  *tex_name;
+
     /**
      * Convenience constructor for unary ops: builds a new node wrapping @p arg.
      * NULL for non-unary operators. Returns owning (refcount=1).

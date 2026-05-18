@@ -101,4 +101,11 @@ char *dv_normalize_binding_name(const char *name);
 int dv_is_default_constant_name(const char *name);
 const char *dv_default_constant_canonical_name(const char *name);
 
+/* ------------------------------------------------------------------------- */
+/* Shared string rendering helpers                                           */
+/* ------------------------------------------------------------------------- */
+
+char *dv_tostring_texify(const char *text);
+int dv_to_tex_parts(const dval_t *dv, char **expr_out, char **bindings_out);
+
 #endif

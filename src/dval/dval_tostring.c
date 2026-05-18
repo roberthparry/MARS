@@ -436,6 +436,8 @@ static void sort_factors(dval_t **fac, int n)
 static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec);
 static void emit_expr_abs(const dval_t *f, sbuf_t *b, int parent_prec);
 static void emit_expr_abs_bars(const dval_t *f, sbuf_t *b);
+static void emit_tex_expr(const dval_t *f, sbuf_t *b, int parent_prec);
+static void emit_tex_expr_abs(const dval_t *f, sbuf_t *b, int parent_prec);
 
 static int expr_is_negative(const dval_t *f)
 {
@@ -550,6 +552,429 @@ static void emit_expr_abs_bars(const dval_t *f, sbuf_t *b)
     sbuf_putc(b, '|');
     emit_expr_abs(f, b, 0);
     sbuf_putc(b, '|');
+}
+
+static void emit_tex_name(sbuf_t *b, const char *name)
+{
+    char *tex;
+
+    if (!name || !*name) {
+        sbuf_puts(b, "x");
+        return;
+    }
+
+    if (dv_tostring_is_simple_name(name)) {
+        tex = dv_tostring_texify(name);
+        if (tex) {
+            sbuf_puts(b, tex);
+            free(tex);
+        } else {
+            sbuf_puts(b, name);
+        }
+        return;
+    }
+
+    sbuf_putc(b, '[');
+    tex = dv_tostring_texify(name);
+    if (tex) {
+        sbuf_puts(b, tex);
+        free(tex);
+    } else {
+        sbuf_puts(b, name);
+    }
+    sbuf_putc(b, ']');
+}
+
+static void emit_tex_number_value(sbuf_t *b, number_t value)
+{
+    char *text = dv_number_to_string_local(value);
+    char *tex;
+
+    if (!text)
+        return;
+
+    tex = dv_tostring_texify(text);
+    if (tex) {
+        sbuf_puts(b, tex);
+        free(tex);
+    } else {
+        sbuf_puts(b, text);
+    }
+    free(text);
+}
+
+static void emit_tex_const_value(sbuf_t *b, const dval_t *dv)
+{
+    char *text = dv_const_to_string_local(dv);
+    char *tex;
+
+    if (!text)
+        return;
+
+    tex = dv_tostring_texify(text);
+    if (tex) {
+        sbuf_puts(b, tex);
+        free(tex);
+    } else {
+        sbuf_puts(b, text);
+    }
+    free(text);
+}
+
+static void emit_tex_atom(const dval_t *f, sbuf_t *b)
+{
+    if (dv_is_const(f)) {
+        if (f->name && *f->name)
+            emit_tex_name(b, f->name);
+        else
+            emit_tex_const_value(b, f);
+        return;
+    }
+
+    if (dv_is_var(f)) {
+        emit_tex_name(b, f->name ? f->name : "x");
+        return;
+    }
+
+    emit_tex_number_value(b, dv_eval(f));
+}
+
+static const char *tex_unary_name(const dval_t *f)
+{
+    if (!f || !f->ops)
+        return NULL;
+
+    if (dv_is_op(f, &ops_abs))
+        return NULL;
+    if (dv_is_sqrt_expr(f))
+        return "\\sqrt";
+    return f->ops->tex_name;
+}
+
+static int tex_exp_needs_parens(const dval_t *e)
+{
+    if (!e)
+        return 0;
+    if (e->ops->arity == DV_OP_ATOM)
+        return 0;
+    if (dv_is_neg(e) || dv_is_pow_d_expr(e))
+        return 1;
+    if (e->ops->arity == DV_OP_UNARY)
+        return 0;
+    if (dv_is_addsub(e) || dv_is_mul(e) || dv_is_op(e, &ops_div) || dv_is_op(e, &ops_pow))
+        return 1;
+    return 0;
+}
+
+static void emit_tex_factor_abs(const dval_t *f, sbuf_t *b)
+{
+    if (expr_is_negative(f))
+        emit_tex_expr_abs(f, b, PREC_MUL);
+    else
+        emit_tex_expr(f, b, PREC_MUL);
+}
+
+static void emit_tex_expr_abs(const dval_t *f, sbuf_t *b, int parent_prec)
+{
+    if (!f) {
+        sbuf_puts(b, "0");
+        return;
+    }
+
+    if (dv_tostring_is_negative_const(f)) {
+        emit_tex_number_value(b, num_neg(f->c));
+        return;
+    }
+
+    if (dv_is_neg(f)) {
+        emit_tex_expr(f->a, b, parent_prec);
+        return;
+    }
+
+    if (dv_is_mul(f)) {
+        dval_t *fac[64];
+        int n = 0;
+
+        flatten_mul((dval_t *)f, fac, &n, 64);
+        sort_factors(fac, n);
+
+        for (int i = 0; i < n; ++i) {
+            if (dv_tostring_is_negative_const(fac[i]) && num_eq(fac[i]->c, NUM_NEG_ONE)) {
+                for (int j = i; j < n - 1; ++j)
+                    fac[j] = fac[j + 1];
+                --n;
+                break;
+            }
+        }
+
+        for (int i = 0; i < n; ++i) {
+            if (i > 0) {
+                int left_atomic = is_atomic_for_mul(fac[i - 1]);
+                int right_atomic = is_atomic_for_mul(fac[i]);
+
+                if (!(left_atomic && right_atomic))
+                    sbuf_puts(b, " \\cdot ");
+            }
+            emit_tex_factor_abs(fac[i], b);
+        }
+        return;
+    }
+
+    if (dv_is_op(f, &ops_div) && expr_is_negative(f->a)) {
+        int need = PREC_MUL < parent_prec;
+        if (need)
+            sbuf_puts(b, "\\left(");
+        sbuf_puts(b, "\\frac{");
+        emit_tex_expr_abs(f->a, b, PREC_LOWEST);
+        sbuf_puts(b, "}{");
+        emit_tex_expr(f->b, b, PREC_LOWEST);
+        sbuf_putc(b, '}');
+        if (need)
+            sbuf_puts(b, "\\right)");
+        return;
+    }
+
+    emit_tex_expr(f, b, parent_prec);
+}
+
+static void emit_tex_expr(const dval_t *f, sbuf_t *b, int parent_prec)
+{
+    if (!f) {
+        sbuf_puts(b, "0");
+        return;
+    }
+
+    if (dv_is_const(f) || dv_is_var(f)) {
+        emit_tex_atom(f, b);
+        return;
+    }
+
+    if (dv_is_neg(f)) {
+        int need = PREC_UNARY < parent_prec;
+        const dval_t *a = f->a;
+
+        if (need)
+            sbuf_puts(b, "\\left(");
+        if (dv_is_neg(a)) {
+            emit_tex_expr(a->a, b, 0);
+        } else if (expr_is_negative(a)) {
+            emit_tex_expr_abs(a, b, 0);
+        } else {
+            int child_needs_paren = dv_is_addsub(a);
+            sbuf_putc(b, '-');
+            if (child_needs_paren)
+                sbuf_puts(b, "\\left(");
+            emit_tex_expr(a, b, 0);
+            if (child_needs_paren)
+                sbuf_puts(b, "\\right)");
+        }
+        if (need)
+            sbuf_puts(b, "\\right)");
+        return;
+    }
+
+    if (f->ops->arity == DV_OP_UNARY) {
+        int need = PREC_UNARY < parent_prec;
+        const char *name = tex_unary_name(f);
+
+        if (need)
+            sbuf_puts(b, "\\left(");
+
+        if (dv_is_op(f, &ops_abs)) {
+            sbuf_puts(b, "\\left|");
+            emit_tex_expr_abs(f->a, b, 0);
+            sbuf_puts(b, "\\right|");
+        } else if (dv_is_sqrt_expr(f)) {
+            sbuf_puts(b, "\\sqrt{");
+            emit_tex_expr(f->a, b, 0);
+            sbuf_putc(b, '}');
+        } else {
+            sbuf_puts(b, name ? name : "\\operatorname{f}");
+            sbuf_putc(b, '(');
+            emit_tex_expr(f->a, b, 0);
+            sbuf_putc(b, ')');
+        }
+
+        if (need)
+            sbuf_puts(b, "\\right)");
+        return;
+    }
+
+    if (dv_is_pow_d_expr(f)) {
+        int need = PREC_POW < parent_prec;
+        long ei = 0;
+        int exponent_has_small_int = dv_try_get_small_integer_exponent(f->c, &ei);
+
+        if (need)
+            sbuf_puts(b, "\\left(");
+
+        if (f->a->ops->arity == DV_OP_UNARY && !dv_is_sqrt_expr(f->a) && !dv_is_op(f->a, &ops_abs)) {
+            const char *name = tex_unary_name(f->a);
+            sbuf_puts(b, name ? name : "\\operatorname{f}");
+            sbuf_puts(b, "^{");
+            if (exponent_has_small_int) {
+                char buf[64];
+                snprintf(buf, sizeof(buf), "%ld", ei);
+                sbuf_puts(b, buf);
+            } else {
+                emit_tex_const_value(b, f);
+            }
+            sbuf_puts(b, "}(");
+            emit_tex_expr(f->a->a, b, 0);
+            sbuf_putc(b, ')');
+        } else {
+            emit_tex_expr(f->a, b, PREC_POW);
+            sbuf_puts(b, "^{");
+            if (exponent_has_small_int) {
+                char buf[64];
+                snprintf(buf, sizeof(buf), "%ld", ei);
+                sbuf_puts(b, buf);
+            } else {
+                emit_tex_const_value(b, f);
+            }
+            sbuf_putc(b, '}');
+        }
+
+        if (need)
+            sbuf_puts(b, "\\right)");
+        return;
+    }
+
+    if (dv_is_mul(f)) {
+        int need = PREC_MUL < parent_prec;
+        dval_t *fac[64];
+        int n = 0;
+        int sign = 1;
+
+        if (need)
+            sbuf_puts(b, "\\left(");
+
+        flatten_mul((dval_t *)f, fac, &n, 64);
+        sort_factors(fac, n);
+
+        for (int i = 0; i < n; i++) {
+            if (!expr_is_negative(fac[i]))
+                continue;
+
+            sign = -sign;
+
+            if (dv_tostring_is_negative_const(fac[i])) {
+                if (num_eq(fac[i]->c, NUM_NEG_ONE)) {
+                    for (int j = i; j < n - 1; j++)
+                        fac[j] = fac[j + 1];
+                    n--;
+                    i--;
+                    continue;
+                }
+                continue;
+            }
+
+            if (dv_is_neg(fac[i])) {
+                fac[i] = fac[i]->a;
+                continue;
+            }
+
+            break;
+        }
+
+        if (sign < 0)
+            sbuf_putc(b, '-');
+
+        for (int i = 0; i < n; i++) {
+            if (i > 0) {
+                int left_atomic = is_atomic_for_mul(fac[i - 1]);
+                int right_atomic = is_atomic_for_mul(fac[i]);
+
+                if (!(left_atomic && right_atomic))
+                    sbuf_puts(b, " \\cdot ");
+            }
+            emit_tex_factor_abs(fac[i], b);
+        }
+
+        if (need)
+            sbuf_puts(b, "\\right)");
+        return;
+    }
+
+    if (dv_is_addsub(f)) {
+        int need = PREC_ADD < parent_prec;
+        bool neg = expr_renders_negative(f->b);
+
+        if (need)
+            sbuf_puts(b, "\\left(");
+        emit_tex_expr(f->a, b, PREC_ADD);
+
+        if (dv_is_op(f, &ops_add))
+            sbuf_puts(b, neg ? " - " : " + ");
+        else
+            sbuf_puts(b, neg ? " + " : " - ");
+
+        if (neg)
+            emit_tex_expr_abs(f->b, b, PREC_ADD);
+        else
+            emit_tex_expr(f->b, b, PREC_ADD);
+
+        if (need)
+            sbuf_puts(b, "\\right)");
+        return;
+    }
+
+    if (dv_is_op(f, &ops_div)) {
+        int need = PREC_MUL < parent_prec;
+        bool neg_num = expr_is_negative(f->a);
+        bool neg_den = expr_is_negative(f->b);
+
+        if (need)
+            sbuf_puts(b, "\\left(");
+        if (neg_num ^ neg_den)
+            sbuf_putc(b, '-');
+
+        sbuf_puts(b, "\\frac{");
+        if (neg_num)
+            emit_tex_expr_abs(f->a, b, PREC_LOWEST);
+        else
+            emit_tex_expr(f->a, b, PREC_LOWEST);
+        sbuf_puts(b, "}{");
+        if (neg_den)
+            emit_tex_expr_abs(f->b, b, PREC_LOWEST);
+        else
+            emit_tex_expr(f->b, b, PREC_LOWEST);
+        sbuf_putc(b, '}');
+
+        if (need)
+            sbuf_puts(b, "\\right)");
+        return;
+    }
+
+    if (dv_is_op(f, &ops_pow)) {
+        int need = PREC_POW < parent_prec;
+
+        if (need)
+            sbuf_puts(b, "\\left(");
+        emit_tex_expr(f->a, b, PREC_POW);
+        sbuf_puts(b, "^{");
+        if (tex_exp_needs_parens(f->b))
+            emit_tex_expr(f->b, b, 0);
+        else
+            emit_tex_expr(f->b, b, 0);
+        sbuf_putc(b, '}');
+        if (need)
+            sbuf_puts(b, "\\right)");
+        return;
+    }
+
+    if (f->ops->arity == DV_OP_BINARY) {
+        sbuf_puts(b, "\\operatorname{");
+        sbuf_puts(b, f->ops->name);
+        sbuf_puts(b, "}(");
+        emit_tex_expr(f->a, b, 0);
+        sbuf_puts(b, ", ");
+        emit_tex_expr(f->b, b, 0);
+        sbuf_putc(b, ')');
+        return;
+    }
+
+    emit_tex_atom(f, b);
 }
 
 static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
@@ -1214,6 +1639,87 @@ static char *dv_to_string_expr(const dval_t *f)
     return out;
 }
 
+int dv_to_tex_parts(const dval_t *dv, char **expr_out, char **bindings_out)
+{
+    autoname_table_t vnames;
+    dval_t *g;
+    varlist_t vl;
+    varlist_t cl;
+    sbuf_t expr;
+    sbuf_t bindings;
+
+    if (!expr_out || !bindings_out)
+        return -1;
+
+    *expr_out = NULL;
+    *bindings_out = NULL;
+
+    if (!dv) {
+        *expr_out = xstrdup("NULL");
+        *bindings_out = xstrdup("");
+        return (*expr_out && *bindings_out) ? 0 : -1;
+    }
+
+    autoname_init(&vnames);
+    assign_unnamed_vars_dfs((dval_t *)dv, &vnames);
+    g = dv_simplify((dval_t *)dv);
+
+    varlist_init(&vl);
+    varlist_init(&cl);
+    find_vars_dfs(g, &vl);
+    find_named_consts_dfs(g, &cl);
+
+    sbuf_init(&expr);
+    emit_tex_expr(g, &expr, PREC_LOWEST);
+
+    sbuf_init(&bindings);
+    if (vl.count > 0 || cl.count > 0) {
+        for (size_t i = 0; i < vl.count; ++i) {
+            dval_t *v = vl.vars[i];
+
+            if (i > 0)
+                sbuf_puts(&bindings, ", ");
+            emit_tex_name(&bindings, dv_name_or_default(v, "x"));
+            sbuf_puts(&bindings, " = ");
+            emit_tex_const_value(&bindings, v);
+        }
+
+        if (cl.count > 0) {
+            if (vl.count > 0)
+                sbuf_puts(&bindings, "; ");
+            for (size_t i = 0; i < cl.count; ++i) {
+                dval_t *c = cl.vars[i];
+
+                if (i > 0)
+                    sbuf_puts(&bindings, ", ");
+                emit_tex_name(&bindings, c->name);
+                sbuf_puts(&bindings, " = ");
+                emit_tex_const_value(&bindings, c);
+            }
+        }
+    }
+
+    *expr_out = xstrdup(expr.data);
+    *bindings_out = xstrdup(bindings.data);
+
+    sbuf_free(&expr);
+    sbuf_free(&bindings);
+    free(vl.vars);
+    free(cl.vars);
+    autoname_restore(&vnames);
+    dv_free(g);
+
+    if (!*expr_out || !*bindings_out) {
+        free(*expr_out);
+        free(*bindings_out);
+        *expr_out = NULL;
+        *bindings_out = NULL;
+        return -1;
+    }
+
+    return 0;
+}
+
 /* ------------------------------------------------------------------------- */
 /* Public entry points                                                       */
 /* ------------------------------------------------------------------------- */
@@ -1229,15 +1735,39 @@ static void strip_trailing_newline(char *s)
 
 char *dv_to_string(const dval_t *dv, style_t style)
 {
+    char *out;
+    char *expr = NULL;
+    char *bindings = NULL;
+
     if (!dv) {
         char *s = (char *)xmalloc(5);
         strcpy(s, "NULL");
         return s;
     }
 
-    char *out = (style == style_FUNCTION)
-        ? dv_to_string_function(dv)
-        : dv_to_string_expr(dv);
+    if (style == style_TEX) {
+        sbuf_t b;
+
+        if (dv_to_tex_parts(dv, &expr, &bindings) != 0)
+            return dv_to_string_expr(dv);
+
+        sbuf_init(&b);
+        sbuf_puts(&b, "\\left\\{ ");
+        sbuf_puts(&b, expr);
+        if (bindings && *bindings) {
+            sbuf_puts(&b, " \\;\\middle|\\; ");
+            sbuf_puts(&b, bindings);
+        }
+        sbuf_puts(&b, " \\right\\}");
+
+        free(expr);
+        free(bindings);
+        out = b.data;
+    } else if (style == style_FUNCTION) {
+        out = dv_to_string_function(dv);
+    } else {
+        out = dv_to_string_expr(dv);
+    }
 
     strip_trailing_newline(out);
     return out;

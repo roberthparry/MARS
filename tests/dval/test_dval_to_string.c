@@ -1,5 +1,134 @@
 #include "test_dval.h"
 
+typedef struct {
+    char *label;
+    char *tex;
+} tex_preview_entry_t;
+
+static tex_preview_entry_t *g_tex_preview_entries = NULL;
+static size_t g_tex_preview_count = 0u;
+static size_t g_tex_preview_cap = 0u;
+
+static char *tex_preview_strdup(const char *s)
+{
+    size_t n;
+    char *copy;
+
+    if (!s)
+        return NULL;
+
+    n = strlen(s) + 1u;
+    copy = malloc(n);
+    if (!copy)
+        return NULL;
+    memcpy(copy, s, n);
+    return copy;
+}
+
+static char *tex_preview_path_from_source(const char *source_file)
+{
+    size_t len = strlen(source_file);
+    char *path = malloc(len + 5u);
+
+    if (!path)
+        return NULL;
+
+    memcpy(path, source_file, len + 1u);
+    if (len >= 2u && strcmp(path + len - 2u, ".c") == 0)
+        strcpy(path + len - 2u, ".tex");
+    else
+        strcat(path, ".tex");
+
+    return path;
+}
+
+static void tex_preview_write_escaped(FILE *f, const char *s)
+{
+    const char *p;
+
+    if (!s)
+        return;
+
+    for (p = s; *p; ++p) {
+        switch (*p) {
+            case '\\': fputs("\\textbackslash{}", f); break;
+            case '{':  fputs("\\{", f); break;
+            case '}':  fputs("\\}", f); break;
+            case '_':  fputs("\\_", f); break;
+            case '^':  fputs("\\^{}", f); break;
+            case '%':  fputs("\\%", f); break;
+            case '&':  fputs("\\&", f); break;
+            case '#':  fputs("\\#", f); break;
+            case '$':  fputs("\\$", f); break;
+            default:   fputc(*p, f); break;
+        }
+    }
+}
+
+static void tex_preview_emit_case(const char *source_file,
+                                  const char *label,
+                                  const char *tex)
+{
+    char *path;
+    FILE *f;
+    size_t i;
+
+    if (!label || !tex)
+        return;
+
+    if (g_tex_preview_count == g_tex_preview_cap) {
+        size_t new_cap = g_tex_preview_cap == 0u ? 8u : g_tex_preview_cap * 2u;
+        tex_preview_entry_t *new_entries =
+            realloc(g_tex_preview_entries, new_cap * sizeof(*new_entries));
+        if (!new_entries)
+            return;
+        g_tex_preview_entries = new_entries;
+        g_tex_preview_cap = new_cap;
+    }
+
+    g_tex_preview_entries[g_tex_preview_count].label = tex_preview_strdup(label);
+    g_tex_preview_entries[g_tex_preview_count].tex = tex_preview_strdup(tex);
+    if (!g_tex_preview_entries[g_tex_preview_count].label ||
+        !g_tex_preview_entries[g_tex_preview_count].tex) {
+        free(g_tex_preview_entries[g_tex_preview_count].label);
+        free(g_tex_preview_entries[g_tex_preview_count].tex);
+        g_tex_preview_entries[g_tex_preview_count].label = NULL;
+        g_tex_preview_entries[g_tex_preview_count].tex = NULL;
+        return;
+    }
+    ++g_tex_preview_count;
+
+    path = tex_preview_path_from_source(source_file);
+    if (!path)
+        return;
+
+    f = fopen(path, "wb");
+    if (!f) {
+        free(path);
+        return;
+    }
+
+    fprintf(f, "\\documentclass{article}\n");
+    fprintf(f, "\\usepackage{amsmath}\n");
+    fprintf(f, "\\usepackage[margin=1in]{geometry}\n");
+    fprintf(f, "\\begin{document}\n");
+    fprintf(f, "\\section*{Generated TeX Samples}\n");
+    fprintf(f, "\\noindent Source: \\texttt{");
+    tex_preview_write_escaped(f, source_file);
+    fprintf(f, "}\n\n");
+
+    for (i = 0u; i < g_tex_preview_count; ++i) {
+        fprintf(f, "\\subsection*{Sample %zu}\n", i + 1u);
+        fprintf(f, "\\noindent\\texttt{");
+        tex_preview_write_escaped(f, g_tex_preview_entries[i].label);
+        fprintf(f, "}\n\\[\n%s\n\\]\n\n", g_tex_preview_entries[i].tex);
+    }
+
+    fprintf(f, "\\end{document}\n");
+    fclose(f);
+    free(path);
+}
+
 /* ------------------------------------------------------------------------- */
 /* dv_to_string Tests                                                        */
 /* ------------------------------------------------------------------------- */
@@ -169,6 +298,92 @@ void test_to_string_basic_var(void)
 {
     TEST_RUN_SUBTEST(test_to_string_basic_var_expr, NULL);
     TEST_RUN_SUBTEST(test_to_string_basic_var_func, NULL);
+}
+
+static void test_to_string_basic_var_tex(void)
+{
+    dval_t *x = test_dv_new_named_var_d(42.0, "x0");
+    char *got = dv_to_string(x, style_TEX);
+
+    const char *expect = "\\left\\{ x_{0} \\;\\middle|\\; x_{0} = 42 \\right\\}";
+
+    tex_preview_emit_case(__FILE__, "basic var (TEX)", got);
+
+    if (str_eq(got, expect))
+        to_string_pass("basic var (TEX)", got, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "basic var (TEX)", got, expect);
+
+    free(got);
+    dv_free(x);
+}
+
+static void test_to_string_nested_transcendental_tex(void)
+{
+    dval_t *x = test_dv_new_named_var_d(1.0, "x0");
+    dval_t *y = test_dv_new_named_var_d(2.0, "y1");
+    dval_t *xy = dv_mul(x, y);
+    dval_t *sin_xy = dv_sin(xy);
+    dval_t *exp_term = dv_exp(sin_xy);
+    dval_t *log_y = dv_log(y);
+    dval_t *x_log_y = dv_mul(x, log_y);
+    dval_t *f = dv_add(exp_term, x_log_y);
+    char *got = dv_to_string(f, style_TEX);
+
+    const char *expect =
+        "\\left\\{ \\exp(\\sin(x_{0}y_{1})) + x_{0} \\cdot \\log(y_{1}) "
+        "\\;\\middle|\\; x_{0} = 1, y_{1} = 2 \\right\\}";
+
+    tex_preview_emit_case(__FILE__, "nested transcendental (TEX)", got);
+
+    if (str_eq(got, expect))
+        to_string_pass("nested transcendental (TEX)", got, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "nested transcendental (TEX)", got, expect);
+
+    free(got);
+    dv_free(f);
+    dv_free(x_log_y);
+    dv_free(log_y);
+    dv_free(exp_term);
+    dv_free(sin_xy);
+    dv_free(xy);
+    dv_free(x);
+    dv_free(y);
+}
+
+static void test_to_string_nested_quotient_pow_tex(void)
+{
+    dval_t *x = test_dv_new_named_var_d(2.0, "x0");
+    dval_t *y = test_dv_new_named_var_d(3.0, "y1");
+    dval_t *x2 = dv_pow_d(x, 2.0);
+    dval_t *y2 = dv_pow_d(y, 2.0);
+    dval_t *sum = dv_add(x2, y2);
+    dval_t *den = dv_add_d(y, 1.0);
+    dval_t *frac = dv_div(sum, den);
+    dval_t *f = dv_log(frac);
+    char *got = dv_to_string(f, style_TEX);
+
+    const char *expect =
+        "\\left\\{ \\log(\\frac{x_{0}^{2} + y_{1}^{2}}{y_{1} + 1}) "
+        "\\;\\middle|\\; x_{0} = 2, y_{1} = 3 \\right\\}";
+
+    tex_preview_emit_case(__FILE__, "nested quotient pow (TEX)", got);
+
+    if (str_eq(got, expect))
+        to_string_pass("nested quotient pow (TEX)", got, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "nested quotient pow (TEX)", got, expect);
+
+    free(got);
+    dv_free(f);
+    dv_free(frac);
+    dv_free(den);
+    dv_free(sum);
+    dv_free(y2);
+    dv_free(x2);
+    dv_free(x);
+    dv_free(y);
 }
 
 static void test_to_string_non_simple_var_bracketed_expr(void)
@@ -697,6 +912,9 @@ void test_to_string_all(void)
 {
     TEST_RUN_SUBTEST(test_to_string_basic_const, NULL);
     TEST_RUN_SUBTEST(test_to_string_basic_var, NULL);
+    TEST_RUN_SUBTEST(test_to_string_basic_var_tex, NULL);
+    TEST_RUN_SUBTEST(test_to_string_nested_transcendental_tex, NULL);
+    TEST_RUN_SUBTEST(test_to_string_nested_quotient_pow_tex, NULL);
     TEST_RUN_SUBTEST(test_to_string_non_simple_var_bracketed, NULL);
     TEST_RUN_SUBTEST(test_to_string_addition, NULL);
     TEST_RUN_SUBTEST(test_to_string_negative_rhs_expr, NULL);

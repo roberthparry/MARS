@@ -651,11 +651,16 @@
   },
   "tests/matrix/test_matrix_tostring.c": {
     "test_mat_to_string_numeric": true,
+    "test_mat_to_string_numeric_tex": true,
     "test_mat_to_string_number_precision": true,
     "test_mat_to_string_symbolic": true,
+    "test_mat_to_string_symbolic_tex": true,
     "test_mat_to_string_symbolic_all_nan_elides_wrapper": true,
     "test_mat_to_string_symbolic_roundtrip": true,
-    "test_mat_to_string_symbolic_derivative_roundtrip": true
+    "test_mat_to_string_symbolic_derivative_roundtrip": true,
+    "test_mat_to_string_symbolic_tex_exact": true,
+    "test_mat_to_string_symbolic_tex_no_bindings_exact": true,
+    "test_mat_to_string_symbolic_all_nan_tex_elides_wrapper": true
   },
   "tests/matrix/test_matrix_output.c": {
     "test_mat_sprintf_formats": true,
@@ -891,6 +896,9 @@
           "test_to_string_basic_var_expr": true,
           "test_to_string_basic_var_func": true
         },
+        "test_to_string_basic_var_tex": true,
+        "test_to_string_nested_transcendental_tex": true,
+        "test_to_string_nested_quotient_pow_tex": true,
         "test_to_string_non_simple_var_bracketed": {
           "enabled": true,
           "test_to_string_non_simple_var_bracketed_expr": true,

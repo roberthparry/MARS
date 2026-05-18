@@ -416,6 +416,26 @@ static void mt_emit_cells(mat_buf_t *out,
         mb_putc(out, ')');
 }
 
+static void mt_emit_cells_tex(mat_buf_t *out,
+                              char **cells,
+                              size_t rows,
+                              size_t cols)
+{
+    mb_puts(out, "\\begin{bmatrix}");
+    for (size_t i = 0; i < rows; ++i) {
+        if (i > 0)
+            mb_puts(out, " \\\\ ");
+        for (size_t j = 0; j < cols; ++j) {
+            size_t idx = i * cols + j;
+
+            if (j > 0)
+                mb_puts(out, " & ");
+            mb_puts(out, cells[idx] ? cells[idx] : "");
+        }
+    }
+    mb_puts(out, "\\end{bmatrix}");
+}
+
 static int mt_split_dval_repr(const dval_t *dv, char **expr_out, char **bindings_out)
 {
     char *tmp;
@@ -516,11 +536,73 @@ static int mt_format_scalar(const matrix_t *A,
     return rc;
 }
 
+static char *mt_texify_binding_list(char **bindings, size_t nbindings)
+{
+    mat_buf_t out = {0};
+
+    for (size_t i = 0; i < nbindings; ++i) {
+        char *tex = dv_tostring_texify(bindings[i]);
+
+        if (i > 0)
+            mb_puts(&out, ", ");
+        if (tex) {
+            mb_puts(&out, tex);
+            free(tex);
+        } else {
+            mb_puts(&out, bindings[i]);
+        }
+    }
+
+    return mb_take(&out);
+}
+
+static char *mt_join_bindings_tex(char **var_bindings,
+                                  size_t nvar_bindings,
+                                  char **const_bindings,
+                                  size_t nconst_bindings)
+{
+    char *vars = nvar_bindings ? mt_texify_binding_list(var_bindings, nvar_bindings) : strdup("");
+    char *consts = nconst_bindings ? mt_texify_binding_list(const_bindings, nconst_bindings) : strdup("");
+    char *out;
+
+    if (!vars || !consts) {
+        free(vars);
+        free(consts);
+        return NULL;
+    }
+
+    if (!*vars && !*consts) {
+        free(vars);
+        return consts;
+    }
+
+    out = malloc(strlen(vars) + strlen(consts) + 4u);
+    if (!out) {
+        free(vars);
+        free(consts);
+        return NULL;
+    }
+
+    out[0] = '\0';
+    if (*vars)
+        strcat(out, vars);
+    if (*consts) {
+        if (*vars)
+            strcat(out, "; ");
+        strcat(out, consts);
+    }
+
+    free(vars);
+    free(consts);
+    return out;
+}
+
 static char *mat_to_string_numeric(const matrix_t *A, mat_string_style_t style)
 {
     mat_buf_t out = {0};
     char **cells = NULL;
     size_t *widths = NULL;
+    int tex = (style == MAT_STRING_TEX);
     int layout = (style == MAT_STRING_LAYOUT_SCIENTIFIC ||
                   style == MAT_STRING_LAYOUT_PRETTY);
     int scientific = (style == MAT_STRING_INLINE_SCIENTIFIC ||
@@ -542,7 +624,7 @@ static char *mat_to_string_numeric(const matrix_t *A, mat_string_style_t style)
                 ok = 0;
                 break;
             }
-            cells[idx] = strdup(tmp);
+            cells[idx] = tex ? dv_tostring_texify(tmp) : strdup(tmp);
             if (!cells[idx]) {
                 ok = 0;
                 break;
@@ -558,7 +640,10 @@ static char *mat_to_string_numeric(const matrix_t *A, mat_string_style_t style)
         goto cleanup;
     }
 
-    mt_emit_cells(&out, cells, A->rows, A->cols, widths, layout);
+    if (tex)
+        mt_emit_cells_tex(&out, cells, A->rows, A->cols);
+    else
+        mt_emit_cells(&out, cells, A->rows, A->cols, widths, layout);
 
 cleanup:
     if (cells) {
@@ -581,6 +666,7 @@ static char *mat_to_string_dval(const matrix_t *A, mat_string_style_t style)
     size_t *widths = calloc(A->cols ? A->cols : 1, sizeof(*widths));
     mat_buf_t out = {0};
     int ok = exprs && widths;
+    int tex = (style == MAT_STRING_TEX);
     int layout = (style == MAT_STRING_LAYOUT_SCIENTIFIC ||
                   style == MAT_STRING_LAYOUT_PRETTY);
     int scientific = (style == MAT_STRING_INLINE_SCIENTIFIC ||
@@ -595,7 +681,8 @@ static char *mat_to_string_dval(const matrix_t *A, mat_string_style_t style)
             size_t idx = i * A->cols + j;
 
             mat_get(A, i, j, &dv);
-            if (mt_split_dval_repr(dv, &expr, &binding_text) != 0) {
+            if ((tex && dv_to_tex_parts(dv, &expr, &binding_text) != 0) ||
+                (!tex && mt_split_dval_repr(dv, &expr, &binding_text) != 0)) {
                 free(expr);
                 free(binding_text);
                 ok = 0;
@@ -606,7 +693,9 @@ static char *mat_to_string_dval(const matrix_t *A, mat_string_style_t style)
                                      &var_bindings, &nvar_bindings, &capvar_bindings,
                                      &const_bindings, &nconst_bindings, &capconst_bindings,
                                      binding_text);
-            mt_pretty_dval_expr(&exprs[idx], const_bindings, nconst_bindings);
+            if (!tex) {
+                mt_pretty_dval_expr(&exprs[idx], const_bindings, nconst_bindings);
+            }
             if (strlen(exprs[idx]) > widths[j])
                 widths[j] = strlen(exprs[idx]);
             free(binding_text);
@@ -616,6 +705,21 @@ static char *mat_to_string_dval(const matrix_t *A, mat_string_style_t style)
     if (!ok) {
         free(out.data);
         out.data = strdup("<dval matrix>");
+    } else if (tex) {
+        omit_wrapper = mt_all_bindings_are_nan(var_bindings, nvar_bindings,
+                                               const_bindings, nconst_bindings);
+        char *joined = mt_join_bindings_tex(var_bindings, nvar_bindings,
+                                            const_bindings, nconst_bindings);
+        if (!omit_wrapper)
+            mb_puts(&out, "\\left\\{ ");
+        mt_emit_cells_tex(&out, exprs, A->rows, A->cols);
+        if (!omit_wrapper && joined && *joined) {
+            mb_puts(&out, " \\;\\middle|\\; ");
+            mb_puts(&out, joined);
+        }
+        if (!omit_wrapper)
+            mb_puts(&out, " \\right\\}");
+        free(joined);
     } else if (!layout) {
         omit_wrapper = mt_all_bindings_are_nan(var_bindings, nvar_bindings,
                                                const_bindings, nconst_bindings);

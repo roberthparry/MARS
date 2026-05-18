@@ -346,10 +346,12 @@ dval_t *dv_simplify(const dval_t *dv);
  * style_EXPRESSION  — infix notation, e.g. "{ sin(x₀) | x₀ = 1.0 }"
  *                     or "{ 1 }" when no bindings are needed
  * style_FUNCTION    — prefix/function notation, e.g. "sin(var(x₀=1.0))"
+ * style_TEX         — TeX math notation, e.g. "\left\{ x_{0} \;\middle|\; x_{0} = 1.0 \right\}"
  */
 typedef enum {
     style_FUNCTION,
-    style_EXPRESSION
+    style_EXPRESSION,
+    style_TEX
 } style_t;
 
 /**
