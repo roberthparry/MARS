@@ -120,15 +120,15 @@ const dval_ops_t ops_exp = {
 };
 const dval_ops_t ops_log = {
     .eval = eval_log, .deriv = deriv_log, .reverse = dv_reverse_log,
-    .kind = DV_KIND_LOG, .arity = DV_OP_UNARY, .name = "log",
-    .tex_name = "\\log",
+    .kind = DV_KIND_LOG, .arity = DV_OP_UNARY, .name = "ln",
+    .tex_name = "\\ln",
     .apply_unary = dv_log, .apply_binary = NULL,
     .simplify = dv_simplify_unary_operator, .fold_const_unary = dv_fold_log_const
 };
 const dval_ops_t ops_log10 = {
     .eval = eval_log10, .deriv = deriv_log10, .reverse = dv_reverse_log10,
-    .kind = DV_KIND_LOG10, .arity = DV_OP_UNARY, .name = "log10",
-    .tex_name = "\\log_{10}",
+    .kind = DV_KIND_LOG10, .arity = DV_OP_UNARY, .name = "log",
+    .tex_name = "\\log",
     .apply_unary = dv_log10, .apply_binary = NULL,
     .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
 };
@@ -218,15 +218,15 @@ const dval_ops_t ops_gammainv = {
 };
 const dval_ops_t ops_lambert_w0 = {
     .eval = eval_lambert_w0, .deriv = deriv_lambert_w0, .reverse = dv_reverse_lambert_w0,
-    .kind = DV_KIND_LAMBERT_W0, .arity = DV_OP_UNARY, .name = "lambert_w0",
-    .tex_name = "\\operatorname{lambert\\_w0}",
+    .kind = DV_KIND_LAMBERT_W0, .arity = DV_OP_UNARY, .name = "W₀",
+    .tex_name = "W_{0}",
     .apply_unary = dv_lambert_w0, .apply_binary = NULL,
     .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
 };
 const dval_ops_t ops_lambert_wm1 = {
     .eval = eval_lambert_wm1, .deriv = deriv_lambert_wm1, .reverse = dv_reverse_lambert_wm1,
-    .kind = DV_KIND_LAMBERT_WM1, .arity = DV_OP_UNARY, .name = "lambert_wm1",
-    .tex_name = "\\operatorname{lambert\\_wm1}",
+    .kind = DV_KIND_LAMBERT_WM1, .arity = DV_OP_UNARY, .name = "W₋₁",
+    .tex_name = "W_{-1}",
     .apply_unary = dv_lambert_wm1, .apply_binary = NULL,
     .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
 };

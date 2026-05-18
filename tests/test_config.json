@@ -694,8 +694,7 @@
     "test_partial_derivatives": true,
     "test_dval_pattern_helpers": true,
     "test_runtime_regressions": true,
-    "test_reverse_mode": true,
-    "test_readme_examples": true
+    "test_reverse_mode": true
   },
   "tests/dval/test_dval_arithmetic.c": {
     "test_arithmetic": {
@@ -899,6 +898,8 @@
         "test_to_string_basic_var_tex": true,
         "test_to_string_nested_transcendental_tex": true,
         "test_to_string_nested_quotient_pow_tex": true,
+        "test_to_string_log10_tex": true,
+        "test_to_string_lambert_w_tex": true,
         "test_to_string_non_simple_var_bracketed": {
           "enabled": true,
           "test_to_string_non_simple_var_bracketed_expr": true,

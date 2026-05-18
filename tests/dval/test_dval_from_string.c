@@ -92,7 +92,8 @@ static void test_from_string_functions(void)
     check_parse_val("acosh(x) at 1",     "{ acosh(x) | x = 1 }",         0.0,          __LINE__);
     check_parse_val("atanh(x) at 0",     "{ atanh(x) | x = 0 }",         0.0,          __LINE__);
     check_parse_val("exp(x) at 0",       "{ exp(x) | x = 0 }",           1.0,          __LINE__);
-    check_parse_val("log(x) at 1",       "{ log(x) | x = 1 }",           0.0,          __LINE__);
+    check_parse_val("ln(x) at 1",        "{ ln(x) | x = 1 }",            0.0,          __LINE__);
+    check_parse_val("log(x) at 1000",    "{ log(x) | x = 1000 }",        3.0,          __LINE__);
     check_parse_val("log10(x) at 1000",  "{ log10(x) | x = 1000 }",      3.0,          __LINE__);
     check_parse_val("sqrt(x) at 4",      "{ sqrt(x) | x = 4 }",          2.0,          __LINE__);
     check_parse_val("√(x) at 4",         "{ √(x) | x = 4 }",             2.0,          __LINE__);
@@ -135,8 +136,11 @@ static void test_from_string_special_functions(void)
     check_parse_val("gammainv(gamma(2.5)) = 2.5", "{ gammainv(x) | x = 1.329340388179137 }", 2.5,   __LINE__);
     check_parse_val("lgamma(1) = 0",         "{ lgamma(x) | x = 1 }",        0.0,                     __LINE__);
     check_parse_val("digamma(1) = -gamma_E", "{ digamma(x) | x = 1 }",      -0.5772156649015329,       __LINE__);
-    check_parse_val("lambert_w0(0) = 0",     "{ lambert_w0(x) | x = 0 }",    0.0,                     __LINE__);
-    check_parse_val("lambert_wm1(-0.2)",     "{ lambert_wm1(x) | x = -0.2 }",  -2.5426413577735265,     __LINE__);
+    check_parse_val("W₀(0) = 0 via lambert_w0", "{ lambert_w0(x) | x = 0 }", 0.0,                     __LINE__);
+    check_parse_val("W₀(0) = 0 via productlog", "{ productlog(x) | x = 0 }", 0.0,                     __LINE__);
+    check_parse_val("W₀(0) = 0",             "{ W₀(x) | x = 0 }",            0.0,                     __LINE__);
+    check_parse_val("W₋₁(-0.2) via lambert_wm1", "{ lambert_wm1(x) | x = -0.2 }", -2.5426413577735265, __LINE__);
+    check_parse_val("W₋₁(-0.2)",             "{ W₋₁(x) | x = -0.2 }",        -2.5426413577735265,     __LINE__);
     check_parse_val("normal_pdf(0)",         "{ normal_pdf(x) | x = 0 }",    1.0/sqrt(2.0*M_PI),      __LINE__);
     check_parse_val("normal_cdf(0) = 0.5",   "{ normal_cdf(x) | x = 0 }",    0.5,                     __LINE__);
     check_parse_val("normal_logpdf(0)",      "{ normal_logpdf(x) | x = 0 }", -0.5*log(2.0*M_PI),      __LINE__);
@@ -532,8 +536,8 @@ static void test_from_string_star_mul(void)
     check_parse_val("c * exp(0) = 3",
         "{ c * exp(x) | x = 0; c = 3 }",
         3.0, __LINE__);
-    check_parse_val("c * log(e) = 7",
-        "{ c * log(x) | x = 2.718281828459045; c = 7 }",
+    check_parse_val("c * ln(e) = 7",
+        "{ c * ln(x) | x = 2.718281828459045; c = 7 }",
         7.0, __LINE__);
     /* Chained '*' */
     check_parse_val("a * b * c = 24",
@@ -580,8 +584,8 @@ static void test_from_string_func_power(void)
     check_parse_val("acosh^2(1) = 0",     "{ acosh^2(x) | x = 1 }", 0.0, __LINE__);
     check_parse_val("atanh^2(0) = 0",     "{ atanh^2(x) | x = 0 }", 0.0, __LINE__);
     check_parse_val("exp^2(0) = 1",       "{ exp^2(x) | x = 0 }",   1.0, __LINE__);
-    check_parse_val("log^2(e) = 1",
-        "{ log^2(x) | x = 2.718281828459045 }",                      1.0, __LINE__);
+    check_parse_val("ln^2(e) = 1",
+        "{ ln^2(x) | x = 2.718281828459045 }",                       1.0, __LINE__);
     check_parse_val("sqrt^2(9) = 9",      "{ sqrt^2(x) | x = 9 }",  9.0, __LINE__);
     /* Non-trivial exponent values */
     check_parse_val("tan^2(pi/4) = 1",
@@ -615,11 +619,11 @@ static void test_from_string_composed(void)
         5.0, __LINE__);
 
     /* exp / log mutual inverses */
-    check_parse_val("exp(log(x_0)) = x_0 = 3",
-        "{ exp(log(x_0)) | x_0 = 3 }",
+    check_parse_val("exp(ln(x_0)) = x_0 = 3",
+        "{ exp(ln(x_0)) | x_0 = 3 }",
         3.0, __LINE__);
-    check_parse_val("log(exp(x_0)) = x_0 = 2.5",
-        "{ log(exp(x_0)) | x_0 = 2.5 }",
+    check_parse_val("ln(exp(x_0)) = x_0 = 2.5",
+        "{ ln(exp(x_0)) | x_0 = 2.5 }",
         2.5, __LINE__);
 
     /* Trig inverse pairs */
@@ -661,8 +665,8 @@ static void test_from_string_composed(void)
     check_parse_val("exp(cos(x)) * exp(-cos(x)) = 1",
         "{ exp(cos(x)) * exp(-cos(x)) | x = 1.2 }",
         1.0, __LINE__);
-    check_parse_val("exp(log(x_0)) * exp(-log(x_0)) = 1",
-        "{ exp(log(x_0)) * exp(-log(x_0)) | x_0 = 4 }",
+    check_parse_val("exp(ln(x_0)) * exp(-ln(x_0)) = 1",
+        "{ exp(ln(x_0)) * exp(-ln(x_0)) | x_0 = 4 }",
         1.0, __LINE__);
 
     /* c_0*sin^2(x_0) + c_1*cos^2(x_1): three ASCII features together */
@@ -676,9 +680,9 @@ static void test_from_string_composed(void)
         "{ c_0 * exp(-x_0^2) | x_0 = 0; c_0 = 4 }",
         4.0, __LINE__);
 
-    /* Chain: exp(c_0*x_0^2) * sin^2(x_1) + log(x_2) = 1 */
-    check_parse_val("exp(c*x^2)*sin^2(y) + log(z) = 1",
-        "{ exp(c_0*x_0^2)*sin^2(x_1) + log(x_2)"
+    /* Chain: exp(c_0*x_0^2) * sin^2(x_1) + ln(x_2) = 1 */
+    check_parse_val("exp(c*x^2)*sin^2(y) + ln(z) = 1",
+        "{ exp(c_0*x_0^2)*sin^2(x_1) + ln(x_2)"
         " | x_0 = 0, x_1 = 1.5707963267948966, x_2 = 1; c_0 = 1 }",
         1.0, __LINE__);
 
@@ -687,9 +691,9 @@ static void test_from_string_composed(void)
         "{ sqrt(exp(c_0 * x_0)) | x_0 = 1.0986122886681098; c_0 = 2 }",
         3.0, __LINE__);
 
-    /* log(x_0^3) = 3*log(x_0): at x_0=e this is 3 */
-    check_parse_val("log(x_0^3) = 3*log(e) = 3",
-        "{ log(x_0^3) | x_0 = 2.718281828459045 }",
+    /* ln(x_0^3) = 3*ln(x_0): at x_0=e this is 3 */
+    check_parse_val("ln(x_0^3) = 3*ln(e) = 3",
+        "{ ln(x_0^3) | x_0 = 2.718281828459045 }",
         3.0, __LINE__);
 
     /* cosh^2(x_0) - sinh^2(x_0) = 1 with subscripted name */

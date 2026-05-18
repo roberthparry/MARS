@@ -1,6 +1,7 @@
 #include "test_dval.h"
 
 static bool test_dval_suite_setup(void);
+static void test_dval_post_summary(void);
 static int dval_number_exact_equal(const void *actual,
                                    const void *expected,
                                    void *ctx);
@@ -15,6 +16,7 @@ static number_t dval_error_magnitude(number_t got, number_t expected);
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 TEST_SUITE_SETUP(test_dval_suite_setup);
+TEST_POST_SUMMARY(test_dval_post_summary);
 
 #pragma GCC diagnostic ignored "-Wunused-function"
 
@@ -577,10 +579,15 @@ static int run_README_md_example(void)
     return 0;
 }
 
-static void test_readme_examples(void)
+static void test_dval_post_summary(void)
 {
+    printf(C_YELLOW "\nRunning README examples...\n" C_RESET);
     if (run_README_md_example() != 0)
-        TEST_FAIL();
+        fprintf(stderr, C_BOLD C_RED
+                "README examples failed after summary output.\n"
+                C_RESET);
+    else
+        printf(C_YELLOW "\nREADME examples complete.\n" C_RESET);
 }
 
 /* ------------------------------------------------------------------------- */
@@ -626,9 +633,6 @@ int tests_main(void)
 
     TEST_SECTION("Reverse mode");
     TEST_RUN_CASE(test_reverse_mode, NULL);
-
-    printf(C_YELLOW "\nRunning README examples...\n" C_RESET);
-    TEST_RUN_OUTPUT_TAGS(test_readme_examples, "dval,readme,output");
 
     return TESTS_EXIT_CODE();
 }

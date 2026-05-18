@@ -100,6 +100,16 @@ static inline dval_t *test_dv_new_named_var_d(double x, const char *name)
     return dv;
 }
 
+static inline dval_t *test_dv_new_named_var_s(const char *text,
+                                              const char *name)
+{
+    number_t n = num_create_from_string(text);
+    dval_t *dv = dv_new_named_var(n, name);
+
+    num_destroy(&n);
+    return dv;
+}
+
 static inline dval_t *test_dv_new_named_var_qf(qfloat_t x, const char *name)
 {
     number_t n = num_create_from_qfloat(x);

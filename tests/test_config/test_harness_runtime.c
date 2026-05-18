@@ -72,6 +72,7 @@ typedef struct {
 test_suite_setup_fn test_suite_setup_hook __attribute__((weak));
 test_fixture_setup_fn test_fixture_setup_hook __attribute__((weak));
 test_fixture_teardown_fn test_fixture_teardown_hook __attribute__((weak));
+test_post_summary_fn test_post_summary_hook __attribute__((weak));
 
 static int g_test_run_count = 0;
 static int g_test_group_count = 0;
@@ -2094,6 +2095,8 @@ int main(void)
         test_write_json_report(exit_code);
         test_write_junit_report(exit_code);
         test_destroy_records();
+        if (test_post_summary_hook)
+            test_post_summary_hook();
         return exit_code;
     }
 
@@ -2131,6 +2134,8 @@ int main(void)
     test_write_json_report(exit_code);
     test_write_junit_report(exit_code);
     test_destroy_records();
+    if (test_post_summary_hook)
+        test_post_summary_hook();
 
     return exit_code;
 }

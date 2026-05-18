@@ -121,7 +121,11 @@ static void tex_preview_emit_case(const char *source_file,
         fprintf(f, "\\subsection*{Sample %zu}\n", i + 1u);
         fprintf(f, "\\noindent\\texttt{");
         tex_preview_write_escaped(f, g_tex_preview_entries[i].label);
-        fprintf(f, "}\n\\[\n%s\n\\]\n\n", g_tex_preview_entries[i].tex);
+        fprintf(f, "}\n"
+                   "\\begin{flushleft}\n"
+                   "$\\displaystyle %s$\n"
+                   "\\end{flushleft}\n\n",
+                g_tex_preview_entries[i].tex);
     }
 
     fprintf(f, "\\end{document}\n");
@@ -331,7 +335,7 @@ static void test_to_string_nested_transcendental_tex(void)
     char *got = dv_to_string(f, style_TEX);
 
     const char *expect =
-        "\\left\\{ \\exp(\\sin(x_{0}y_{1})) + x_{0} \\cdot \\log(y_{1}) "
+        "\\left\\{ e^{\\sin(x_{0}y_{1})} + x_{0} \\cdot \\ln(y_{1}) "
         "\\;\\middle|\\; x_{0} = 1, y_{1} = 2 \\right\\}";
 
     tex_preview_emit_case(__FILE__, "nested transcendental (TEX)", got);
@@ -365,7 +369,7 @@ static void test_to_string_nested_quotient_pow_tex(void)
     char *got = dv_to_string(f, style_TEX);
 
     const char *expect =
-        "\\left\\{ \\log(\\frac{x_{0}^{2} + y_{1}^{2}}{y_{1} + 1}) "
+        "\\left\\{ \\ln(\\frac{x_{0}^{2} + y_{1}^{2}}{y_{1} + 1}) "
         "\\;\\middle|\\; x_{0} = 2, y_{1} = 3 \\right\\}";
 
     tex_preview_emit_case(__FILE__, "nested quotient pow (TEX)", got);
@@ -384,6 +388,62 @@ static void test_to_string_nested_quotient_pow_tex(void)
     dv_free(x2);
     dv_free(x);
     dv_free(y);
+}
+
+static void test_to_string_log10_tex(void)
+{
+    dval_t *x = test_dv_new_named_var_d(100.0, "x0");
+    dval_t *f = dv_log10(x);
+    char *got = dv_to_string(f, style_TEX);
+
+    const char *expect =
+        "\\left\\{ \\log(x_{0}) \\;\\middle|\\; x_{0} = 100 \\right\\}";
+
+    tex_preview_emit_case(__FILE__, "log10 (TEX)", got);
+
+    if (str_eq(got, expect))
+        to_string_pass("log10 (TEX)", got, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "log10 (TEX)", got, expect);
+
+    free(got);
+    dv_free(f);
+    dv_free(x);
+}
+
+static void test_to_string_lambert_w_tex(void)
+{
+    dval_t *x0 = test_dv_new_named_var_d(1.0, "x0");
+    dval_t *x1 = test_dv_new_named_var_s("-0.2", "x1");
+    dval_t *w0 = dv_lambert_w0(x0);
+    dval_t *wm1 = dv_lambert_wm1(x1);
+    char *got_w0 = dv_to_string(w0, style_TEX);
+    char *got_wm1 = dv_to_string(wm1, style_TEX);
+
+    const char *expect_w0 =
+        "\\left\\{ W_{0}(x_{0}) \\;\\middle|\\; x_{0} = 1 \\right\\}";
+    const char *expect_wm1 =
+        "\\left\\{ W_{-1}(x_{1}) \\;\\middle|\\; x_{1} = -0.2 \\right\\}";
+
+    tex_preview_emit_case(__FILE__, "lambert W0 (TEX)", got_w0);
+    tex_preview_emit_case(__FILE__, "lambert W-1 (TEX)", got_wm1);
+
+    if (str_eq(got_w0, expect_w0))
+        to_string_pass("lambert W0 (TEX)", got_w0, expect_w0);
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "lambert W0 (TEX)", got_w0, expect_w0);
+
+    if (str_eq(got_wm1, expect_wm1))
+        to_string_pass("lambert W-1 (TEX)", got_wm1, expect_wm1);
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "lambert W-1 (TEX)", got_wm1, expect_wm1);
+
+    free(got_w0);
+    free(got_wm1);
+    dv_free(w0);
+    dv_free(wm1);
+    dv_free(x0);
+    dv_free(x1);
 }
 
 static void test_to_string_non_simple_var_bracketed_expr(void)
@@ -876,8 +936,8 @@ void test_to_string_special_functions(void)
     { dval_t *x = test_dv_new_named_var_d( 1.329340388179137, "x"); check_roundtrip("to_string: gammainv(x)",      dv_gammainv(x),      __LINE__); dv_free(x); }
     { dval_t *x = test_dv_new_named_var_d( 3.0, "x"); check_roundtrip("to_string: lgamma(x)",        dv_lgamma(x),        __LINE__); dv_free(x); }
     { dval_t *x = test_dv_new_named_var_d( 1.0, "x"); check_roundtrip("to_string: digamma(x)",       dv_digamma(x),       __LINE__); dv_free(x); }
-    { dval_t *x = test_dv_new_named_var_d( 1.0, "x"); check_roundtrip("to_string: lambert_w0(x)",    dv_lambert_w0(x),    __LINE__); dv_free(x); }
-    { dval_t *x = test_dv_new_named_var_d(-0.2, "x"); check_roundtrip("to_string: lambert_wm1(x)",   dv_lambert_wm1(x),   __LINE__); dv_free(x); }
+    { dval_t *x = test_dv_new_named_var_d( 1.0, "x"); check_roundtrip("to_string: W₀(x)",            dv_lambert_w0(x),    __LINE__); dv_free(x); }
+    { dval_t *x = test_dv_new_named_var_d(-0.2, "x"); check_roundtrip("to_string: W₋₁(x)",           dv_lambert_wm1(x),   __LINE__); dv_free(x); }
     { dval_t *x = test_dv_new_named_var_d( 0.0, "x"); check_roundtrip("to_string: normal_pdf(x)",    dv_normal_pdf(x),    __LINE__); dv_free(x); }
     { dval_t *x = test_dv_new_named_var_d( 0.0, "x"); check_roundtrip("to_string: normal_cdf(x)",    dv_normal_cdf(x),    __LINE__); dv_free(x); }
     { dval_t *x = test_dv_new_named_var_d( 0.0, "x"); check_roundtrip("to_string: normal_logpdf(x)", dv_normal_logpdf(x), __LINE__); dv_free(x); }
@@ -915,6 +975,8 @@ void test_to_string_all(void)
     TEST_RUN_SUBTEST(test_to_string_basic_var_tex, NULL);
     TEST_RUN_SUBTEST(test_to_string_nested_transcendental_tex, NULL);
     TEST_RUN_SUBTEST(test_to_string_nested_quotient_pow_tex, NULL);
+    TEST_RUN_SUBTEST(test_to_string_log10_tex, NULL);
+    TEST_RUN_SUBTEST(test_to_string_lambert_w_tex, NULL);
     TEST_RUN_SUBTEST(test_to_string_non_simple_var_bracketed, NULL);
     TEST_RUN_SUBTEST(test_to_string_addition, NULL);
     TEST_RUN_SUBTEST(test_to_string_negative_rhs_expr, NULL);

@@ -112,11 +112,12 @@ typedef dval_t *(*binary_fn)(const dval_t *, const dval_t *);
 /* Function dispatch                                                   */
 /* ------------------------------------------------------------------ */
 
-/* Collision-free direct hash table for the current 38 function keywords.
- * The salted hash uses modulus 54, and the highest occupied slot is 52, so
- * the backing table itself only needs 53 entries. */
-#define FUNC_HT_MODULUS  54
-#define FUNC_HT_SIZE     53
+/* Sorted function keyword table.
+ *
+ * With only 40 supported keywords, a compact sorted table plus binary search
+ * is smaller and easier to maintain than a sparse direct-hash array.  A small
+ * number of Unicode round-trip aliases are handled outside this table. */
+#define FUNC_TABLE_SIZE 40
 
 typedef struct {
     const char *kw;
@@ -126,71 +127,106 @@ typedef struct {
     binary_fn   bfn;
 } func_entry_t;
 
-static const func_entry_t s_funcs[FUNC_HT_SIZE] = {
-    [0]  = { "atanh",          5, false, dv_atanh,         NULL        },
-    [1]  = { "E1",             2, false, dv_e1,            NULL        },
-    [2]  = { "acosh",          5, false, dv_acosh,         NULL        },
-    [6]  = { "erf",            3, false, dv_erf,           NULL        },
-    [8]  = { "atan2",          5, true,  NULL,             dv_atan2    },
-    [9]  = { "lambert_w0",    10, false, dv_lambert_w0,    NULL        },
-    [10] = { "log",            3, false, dv_log,           NULL        },
-    [12] = { "erfc",           4, false, dv_erfc,          NULL        },
-    [13] = { "erfinv",         6, false, dv_erfinv,        NULL        },
-    [14] = { "cosh",           4, false, dv_cosh,          NULL        },
-    [15] = { "Ei",             2, false, dv_ei,            NULL        },
-    [16] = { "trigamma",       8, false, dv_trigamma,      NULL        },
-    [17] = { "cos",            3, false, dv_cos,           NULL        },
-    [18] = { "logbeta",        7, true,  NULL,             dv_logbeta  },
-    [21] = { "tan",            3, false, dv_tan,           NULL        },
-    [22] = { "exp",            3, false, dv_exp,           NULL        },
-    [23] = { "sinh",           4, false, dv_sinh,          NULL        },
-    [24] = { "digamma",        7, false, dv_digamma,       NULL        },
-    [25] = { "normal_logpdf", 13, false, dv_normal_logpdf, NULL        },
-    [26] = { "pow",            3, true,  NULL,             dv_pow_dv   },
-    [27] = { "lambert_wm1",   11, false, dv_lambert_wm1,   NULL        },
-    [29] = { "lgamma",         6, false, dv_lgamma,        NULL        },
-    [30] = { "sin",            3, false, dv_sin,           NULL        },
-    [31] = { "abs",            3, false, dv_abs,           NULL        },
-    [32] = { "hypot",          5, true,  NULL,             dv_hypot    },
-    [34] = { "asinh",          5, false, dv_asinh,         NULL        },
-    [35] = { "tanh",           4, false, dv_tanh,          NULL        },
-    [37] = { "erfcinv",        7, false, dv_erfcinv,       NULL        },
-    [38] = { "gammainv",       8, false, dv_gammainv,      NULL        },
-    [41] = { "normal_cdf",    10, false, dv_normal_cdf,    NULL        },
-    [43] = { "sqrt",           4, false, dv_sqrt,          NULL        },
-    [44] = { "asin",           4, false, dv_asin,          NULL        },
-    [45] = { "beta",           4, true,  NULL,             dv_beta     },
-    [46] = { "atan",           4, false, dv_atan,          NULL        },
-    [48] = { "gamma",          5, false, dv_gamma,         NULL        },
-    [49] = { "acos",           4, false, dv_acos,          NULL        },
-    [51] = { "normal_pdf",    10, false, dv_normal_pdf,    NULL        },
-    [52] = { "log10",          5, false, dv_log10,         NULL        },
+static const unsigned char s_func_displacements[FUNC_TABLE_SIZE] = {
+    1, 0, 1, 0, 0, 0, 1, 6, 0, 6,
+    7, 0, 2, 0, 3, 0, 0, 3, 3, 0,
+    5, 6, 2, 0, 0, 5, 0, 2, 0, 23,
+    0, 0, 3, 6, 0, 0, 0, 0, 14, 23
 };
 
-static unsigned func_ht_hash(const char *s, size_t n)
+static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
+    { "cos",            3, false, dv_cos,           NULL        },
+    { "atan2",          5, true,  NULL,             dv_atan2    },
+    { "log10",          5, false, dv_log10,         NULL        },
+    { "acos",           4, false, dv_acos,          NULL        },
+    { "productlog",    10, false, dv_lambert_w0,    NULL        },
+    { "logbeta",        7, true,  NULL,             dv_logbeta  },
+    { "atanh",          5, false, dv_atanh,         NULL        },
+    { "lambert_wm1",   11, false, dv_lambert_wm1,   NULL        },
+    { "tan",            3, false, dv_tan,           NULL        },
+    { "atan",           4, false, dv_atan,          NULL        },
+    { "sin",            3, false, dv_sin,           NULL        },
+    { "erf",            3, false, dv_erf,           NULL        },
+    { "normal_cdf",    10, false, dv_normal_cdf,    NULL        },
+    { "gammainv",       8, false, dv_gammainv,      NULL        },
+    { "normal_logpdf", 13, false, dv_normal_logpdf, NULL        },
+    { "tanh",           4, false, dv_tanh,          NULL        },
+    { "digamma",        7, false, dv_digamma,       NULL        },
+    { "exp",            3, false, dv_exp,           NULL        },
+    { "trigamma",       8, false, dv_trigamma,      NULL        },
+    { "lambert_w0",    10, false, dv_lambert_w0,    NULL        },
+    { "sinh",           4, false, dv_sinh,          NULL        },
+    { "lgamma",         6, false, dv_lgamma,        NULL        },
+    { "E1",             2, false, dv_e1,            NULL        },
+    { "log",            3, false, dv_log10,         NULL        },
+    { "erfinv",         6, false, dv_erfinv,        NULL        },
+    { "beta",           4, true,  NULL,             dv_beta     },
+    { "gamma",          5, false, dv_gamma,         NULL        },
+    { "Ei",             2, false, dv_ei,            NULL        },
+    { "asinh",          5, false, dv_asinh,         NULL        },
+    { "erfcinv",        7, false, dv_erfcinv,       NULL        },
+    { "sqrt",           4, false, dv_sqrt,          NULL        },
+    { "asin",           4, false, dv_asin,          NULL        },
+    { "abs",            3, false, dv_abs,           NULL        },
+    { "hypot",          5, true,  NULL,             dv_hypot    },
+    { "acosh",          5, false, dv_acosh,         NULL        },
+    { "ln",             2, false, dv_log,           NULL        },
+    { "normal_pdf",    10, false, dv_normal_pdf,    NULL        },
+    { "pow",            3, true,  NULL,             dv_pow_dv   },
+    { "erfc",           4, false, dv_erfc,          NULL        },
+    { "cosh",           4, false, dv_cosh,          NULL        },
+};
+
+static const func_entry_t s_func_alias_w0 = {
+    "W₀", sizeof("W₀") - 1u, false, dv_lambert_w0, NULL
+};
+
+static const func_entry_t s_func_alias_wm1 = {
+    "W₋₁", sizeof("W₋₁") - 1u, false, dv_lambert_wm1, NULL
+};
+
+static unsigned func_bucket_hash(const char *kw, size_t klen)
 {
-    unsigned h = 230u;
+    const unsigned char *s = (const unsigned char *)kw;
 
-    h += (unsigned)n;
-    for (size_t i = 0; i < n; i++) {
-        h *= 521u;
-        h ^= (unsigned char)s[i];
-    }
+    return (unsigned)(klen + s[0] + 3u * s[klen - 1u]) % FUNC_TABLE_SIZE;
+}
 
-    h ^= (h >> 13);
-    h *= 2654435761u;
+static unsigned func_slot_hash(const char *kw, size_t klen)
+{
+    const unsigned char *s = (const unsigned char *)kw;
+    unsigned h = 7u * s[0] + s[klen - 1u];
 
-    return h % FUNC_HT_MODULUS;
+    for (size_t i = 0; i < klen; i++)
+        h += (unsigned)(i + 1u) * s[i];
+
+    return h % FUNC_TABLE_SIZE;
 }
 
 static const func_entry_t *lookup_func(const char *kw, size_t klen)
 {
-    unsigned slot = func_ht_hash(kw, klen);
-    if (slot >= FUNC_HT_SIZE) return NULL;
-    if (!s_funcs[slot].kw) return NULL;
-    if (s_funcs[slot].klen == klen &&
-            memcmp(s_funcs[slot].kw, kw, klen) == 0)
-        return &s_funcs[slot];
+    const func_entry_t *entry;
+    unsigned bucket;
+    unsigned slot;
+
+    if (klen == 0u)
+        return NULL;
+
+    bucket = func_bucket_hash(kw, klen);
+    slot = (func_slot_hash(kw, klen) + s_func_displacements[bucket]) % FUNC_TABLE_SIZE;
+    entry = &s_funcs[slot];
+
+    if (entry->klen == klen && memcmp(kw, entry->kw, klen) == 0)
+        return entry;
+
+    if (klen == s_func_alias_w0.klen &&
+        memcmp(kw, s_func_alias_w0.kw, klen) == 0)
+        return &s_func_alias_w0;
+
+    if (klen == s_func_alias_wm1.klen &&
+        memcmp(kw, s_func_alias_wm1.kw, klen) == 0)
+        return &s_func_alias_wm1;
+
     return NULL;
 }
 
@@ -292,6 +328,31 @@ static const char *func_call_start(const char *pos, const char *kw, size_t klen)
         while (isdigit((unsigned char)*after)) after++;
     }
     return (*after == '(') ? after : NULL;
+}
+
+static const func_entry_t *lookup_unicode_func_alias(const char *pos, const char **paren_out)
+{
+    static const func_entry_t *const aliases[] = {
+        &s_func_alias_w0,
+        &s_func_alias_wm1,
+    };
+    size_t i;
+
+    if (paren_out)
+        *paren_out = NULL;
+
+    for (i = 0u; i < sizeof(aliases) / sizeof(aliases[0]); ++i) {
+        const char *paren = func_call_start(pos, aliases[i]->kw, aliases[i]->klen);
+
+        if (!paren)
+            continue;
+
+        if (paren_out)
+            *paren_out = paren;
+        return aliases[i];
+    }
+
+    return NULL;
 }
 
 /* ------------------------------------------------------------------ */
@@ -539,6 +600,29 @@ static dval_t *parse_atom(parser_t *p)
         result = dv_sqrt(arg);
         dv_free(arg);
         return apply_integer_power_if_present(result, sup);
+    }
+
+    {
+        const char *paren = NULL;
+        const func_entry_t *fe = lookup_unicode_func_alias(p->p, &paren);
+
+        if (fe && paren) {
+            const char *after_kw = p->p + fe->klen;
+            int sup = read_optional_display_exponent(&after_kw);
+            (void)after_kw;
+
+            p->p = paren + 1;
+
+            dval_t *arg = parse_enclosed_addexpr(
+                p, ')', "expected ')' after function argument");
+            dval_t *result;
+
+            if (!arg)
+                return NULL;
+            result = fe->ufn(arg);
+            dv_free(arg);
+            return apply_integer_power_if_present(result, sup);
+        }
     }
 
     /* Function keywords — O(1) hash lookup.  We read the ASCII identifier at

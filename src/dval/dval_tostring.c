@@ -788,6 +788,10 @@ static void emit_tex_expr(const dval_t *f, sbuf_t *b, int parent_prec)
             sbuf_puts(b, "\\sqrt{");
             emit_tex_expr(f->a, b, 0);
             sbuf_putc(b, '}');
+        } else if (dv_is_op(f, &ops_exp)) {
+            sbuf_puts(b, "e^{");
+            emit_tex_expr(f->a, b, 0);
+            sbuf_putc(b, '}');
         } else {
             sbuf_puts(b, name ? name : "\\operatorname{f}");
             sbuf_putc(b, '(');

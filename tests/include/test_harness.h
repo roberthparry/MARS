@@ -10,6 +10,7 @@ typedef void (*test_fn)(void);
 typedef bool (*test_suite_setup_fn)(void);
 typedef bool (*test_fixture_setup_fn)(void);
 typedef bool (*test_fixture_teardown_fn)(void);
+typedef void (*test_post_summary_fn)(void);
 typedef int (*test_validity_equal_fn)(const void *actual,
                                       const void *expected,
                                       void *ctx);
@@ -33,6 +34,7 @@ extern const test_config_mode_t test_suite_mode;
 extern test_suite_setup_fn test_suite_setup_hook;
 extern test_fixture_setup_fn test_fixture_setup_hook;
 extern test_fixture_teardown_fn test_fixture_teardown_hook;
+extern test_post_summary_fn test_post_summary_hook;
 
 /*
  * Recommended suite shape:
@@ -78,6 +80,9 @@ extern test_fixture_teardown_fn test_fixture_teardown_hook;
 
 #define TEST_FIXTURE_TEARDOWN(fn) \
     test_fixture_teardown_fn test_fixture_teardown_hook = (fn)
+
+#define TEST_POST_SUMMARY(fn) \
+    test_post_summary_fn test_post_summary_hook = (fn)
 
 #define C_GREEN   "\x1b[32m"
 #define C_RED     "\x1b[31m"

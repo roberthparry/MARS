@@ -168,14 +168,14 @@ void test_lambert_w0(void)
     /* W₀(0) = 0 exactly */
     dval_t *c = test_dv_new_var_d(0.0);
     dval_t *f = dv_lambert_w0(c);
-    check_q_at(__FILE__, __LINE__, 1, "lambert_w0(0) = 0", dv_eval_qf(f), qf_from_double(0.0));
+    check_q_at(__FILE__, __LINE__, 1, "W₀(0) = 0", dv_eval_qf(f), qf_from_double(0.0));
     print_expr_of(f);
     dv_free(f); dv_free(c);
 
     /* W₀(e) = 1 — use qfloat_t e so the input is accurate to ~33 digits */
     c = test_dv_new_var_qf(qf_exp(qf_from_double(1.0)));
     f = dv_lambert_w0(c);
-    check_q_at(__FILE__, __LINE__, 1, "lambert_w0(e) = 1", dv_eval_qf(f), qf_from_double(1.0));
+    check_q_at(__FILE__, __LINE__, 1, "W₀(e) = 1", dv_eval_qf(f), qf_from_double(1.0));
     print_expr_of(f);
     dv_free(f); dv_free(c);
 
@@ -183,7 +183,7 @@ void test_lambert_w0(void)
     qfloat_t X   = qf_from_double(2.0);
     qfloat_t W   = qf_lambert_w0(X);
     qfloat_t lhs = qf_mul(W, qf_exp(W));
-    check_q_at(__FILE__, __LINE__, 1, "W0(2)*exp(W0(2)) = 2", lhs, X);
+    check_q_at(__FILE__, __LINE__, 1, "W₀(2)*exp(W₀(2)) = 2", lhs, X);
 }
 
 void test_lambert_wm1(void)
@@ -192,13 +192,13 @@ void test_lambert_wm1(void)
     qfloat_t X   = qf_from_string("-0.1");
     qfloat_t W   = qf_lambert_wm1(X);
     qfloat_t lhs = qf_mul(W, qf_exp(W));
-    check_q_at(__FILE__, __LINE__, 1, "Wm1(-0.1)*exp(Wm1(-0.1)) = -0.1", lhs, X);
+    check_q_at(__FILE__, __LINE__, 1, "W₋₁(-0.1)*exp(W₋₁(-0.1)) = -0.1", lhs, X);
 
     /* W_{-1}(x)·exp(W_{-1}(x)) = x — defining equation at x=-0.3 */
     X   = qf_from_string("-0.3");
     W   = qf_lambert_wm1(X);
     lhs = qf_mul(W, qf_exp(W));
-    check_q_at(__FILE__, __LINE__, 1, "Wm1(-0.3)*exp(Wm1(-0.3)) = -0.3", lhs, X);
+    check_q_at(__FILE__, __LINE__, 1, "W₋₁(-0.3)*exp(W₋₁(-0.3)) = -0.3", lhs, X);
 }
 
 void test_normal_pdf(void)

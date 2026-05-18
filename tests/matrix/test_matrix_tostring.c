@@ -355,13 +355,13 @@ static void test_mat_to_string_symbolic_tex(void)
 static void test_mat_to_string_symbolic_tex_exact(void)
 {
     mat_bindings_t *bindings = NULL;
-    matrix_t *A = mat_from_string_dv("{ (sin(x0), exp(c1); log(x0), c1^2) | x0 = 2; c1 = 5 }",
+    matrix_t *A = mat_from_string_dv("{ (sin(x0), exp(c1); ln(x0), c1^2) | x0 = 2; c1 = 5 }",
                                      &bindings);
     char *tex = mat_to_string(A, MAT_STRING_TEX);
 
     const char *expect =
-        "\\left\\{ \\begin{bmatrix}\\sin(x_{0}) & \\exp(c_{1}) \\\\ "
-        "\\log(x_{0}) & c_{1}^{2}\\end{bmatrix} \\;\\middle|\\; "
+        "\\left\\{ \\begin{bmatrix}\\sin(x_{0}) & e^{c_{1}} \\\\ "
+        "\\ln(x_{0}) & c_{1}^{2}\\end{bmatrix} \\;\\middle|\\; "
         "x_{0} = 2, c_{1} = 5 \\right\\}";
 
     matrix_tex_preview_emit_case(__FILE__, "symbolic matrix exact with bindings (TEX)", tex);
@@ -378,12 +378,12 @@ static void test_mat_to_string_symbolic_tex_exact(void)
 static void test_mat_to_string_symbolic_tex_no_bindings_exact(void)
 {
     mat_bindings_t *bindings = NULL;
-    matrix_t *A = mat_from_string_dv("(sin(x0), exp(c1); log(x0), c1^2)",
+    matrix_t *A = mat_from_string_dv("(sin(x0), exp(c1); ln(x0), c1^2)",
                                      &bindings);
     char *tex = mat_to_string(A, MAT_STRING_TEX);
     const char *expect =
-        "\\begin{bmatrix}\\sin(x_{0}) & \\exp(c_{1}) \\\\ "
-        "\\log(x_{0}) & c_{1}^{2}\\end{bmatrix}";
+        "\\begin{bmatrix}\\sin(x_{0}) & e^{c_{1}} \\\\ "
+        "\\ln(x_{0}) & c_{1}^{2}\\end{bmatrix}";
 
     matrix_tex_preview_emit_case(__FILE__, "symbolic matrix exact without bindings (TEX)", tex);
 
