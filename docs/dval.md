@@ -600,7 +600,7 @@ All functions return owning handles.
   - `[bracket names]` for identifiers that are not single-letter-plus-subscript
 
   In the no-binding form, the default inference rule is:
-  - constants with built-in values: `e`, `pi`, `π`, `@pi`, `@phi`, and `@gamma`
+  - constants with built-in values: `e`, `i`, `pi`, `π`, `@pi`, `phi`, `@phi`, `gamma`, and `@gamma`
   - constant placeholders: `a`, `b`, `c`, `d`, and their indexed forms such as `a₀`, `b_1`, `c₂`, and `d_3`
   - variables: everything else that is a valid symbolic `dval` name, including `x`, `τ`, `@tau`, and bracketed names like `[radius]`
 

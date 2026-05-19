@@ -22,6 +22,8 @@ void run_number_public_api_tests(void)
         number_t thousand = num_create_from_long(1000);
         number_t log10_thousand = num_log10(thousand);
         number_t rooted = num_sqrt(z);
+        number_t floored = num_floor(dec);
+        number_t ceiled = num_ceil(dec);
         number_t constant = NUM_PI;
         number_t i_constant = NUM_I;
         number_t cloned = num_clone(product);
@@ -33,11 +35,13 @@ void run_number_public_api_tests(void)
         assert_number_string("num_mul(\"5\", \"5/6\")", product, "²⁵⁄₆");
         assert_number_string("num_clone(\"25/6\")", cloned, "²⁵⁄₆");
         assert_number_string("num_log10(1000)", log10_thousand, "3");
+        assert_number_string("num_floor(1.25)", floored, "1");
+        assert_number_string("num_ceil(1.25)", ceiled, "2");
         assert_number_string_prefix("NUM_PI", constant,
                                     "3.141592653589793238462643383279");
         assert_number_string_prefix("num_clone(NUM_PI)", pi_cloned,
                                     "3.141592653589793238462643383279");
-        assert_number_string("num_clone(NUM_I)", i_cloned, "0 + 1i");
+        assert_number_string("num_clone(NUM_I)", i_cloned, "1i");
 
         ASSERT_TRUE(num_is_real(a));
         ASSERT_TRUE(num_is_real(frac));
@@ -62,6 +66,8 @@ void run_number_public_api_tests(void)
         num_destroy(&thousand);
         num_destroy(&log10_thousand);
         num_destroy(&rooted);
+        num_destroy(&floored);
+        num_destroy(&ceiled);
         num_destroy(&constant);
         num_destroy(&i_constant);
         num_destroy(&cloned);

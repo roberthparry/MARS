@@ -30,6 +30,7 @@
 #include <string.h>
 #include <ctype.h>
 
+#include "dval_bindings_internal.h"
 #include "dval_internal.h"
 #include "dval_tostring_internal.h"
 #include "dval.h"
@@ -68,6 +69,26 @@ static char *dv_const_to_string_local(const dval_t *dv)
 static char *dv_eval_to_string_local(const dval_t *dv)
 {
     return dv_number_to_string_local(dv_eval(dv));
+}
+
+static bool dv_is_immortal_default_const_local(const dval_t *dv)
+{
+    const char *canon;
+    number_t builtin;
+    bool match;
+
+    if (!dv || !dv_is_const(dv) || !dv->name || !*dv->name)
+        return false;
+
+    canon = dv_default_constant_canonical_name(dv->name);
+    if (!canon)
+        return false;
+    if (!dv_get_default_constant_num(canon, &builtin))
+        return false;
+
+    match = num_eq(dv->c, builtin);
+    num_destroy(&builtin);
+    return match;
 }
 
 /* ------------------------------------------------------------------------- */
@@ -438,6 +459,8 @@ static void emit_expr_abs(const dval_t *f, sbuf_t *b, int parent_prec);
 static void emit_expr_abs_bars(const dval_t *f, sbuf_t *b);
 static void emit_tex_expr(const dval_t *f, sbuf_t *b, int parent_prec);
 static void emit_tex_expr_abs(const dval_t *f, sbuf_t *b, int parent_prec);
+static void emit_func(const dval_t *f, sbuf_t *b, int parent_prec);
+static void emit_func_abs(const dval_t *f, sbuf_t *b, int parent_prec);
 
 static int expr_is_negative(const dval_t *f)
 {
@@ -712,7 +735,9 @@ static void emit_tex_expr_abs(const dval_t *f, sbuf_t *b, int parent_prec)
                 int left_atomic = is_atomic_for_mul(fac[i - 1]);
                 int right_atomic = is_atomic_for_mul(fac[i]);
 
-                if (!(left_atomic && right_atomic))
+                if (left_atomic && right_atomic)
+                    sbuf_putc(b, ' ');
+                else
                     sbuf_puts(b, " \\cdot ");
             }
             emit_tex_factor_abs(fac[i], b);
@@ -735,6 +760,34 @@ static void emit_tex_expr_abs(const dval_t *f, sbuf_t *b, int parent_prec)
     }
 
     emit_tex_expr(f, b, parent_prec);
+}
+
+static void emit_func_abs(const dval_t *f, sbuf_t *b, int parent_prec)
+{
+    sbuf_t tmp;
+
+    if (!f) {
+        sbuf_puts(b, "0");
+        return;
+    }
+
+    if (dv_is_neg(f)) {
+        emit_func(f->a, b, parent_prec);
+        return;
+    }
+
+    if (!expr_renders_negative(f)) {
+        emit_func(f, b, parent_prec);
+        return;
+    }
+
+    sbuf_init(&tmp);
+    emit_func(f, &tmp, parent_prec);
+    if (tmp.len > 0 && tmp.data[0] == '-')
+        sbuf_puts(b, tmp.data + 1u);
+    else
+        sbuf_puts(b, tmp.data);
+    sbuf_free(&tmp);
 }
 
 static void emit_tex_expr(const dval_t *f, sbuf_t *b, int parent_prec)
@@ -784,6 +837,14 @@ static void emit_tex_expr(const dval_t *f, sbuf_t *b, int parent_prec)
             sbuf_puts(b, "\\left|");
             emit_tex_expr_abs(f->a, b, 0);
             sbuf_puts(b, "\\right|");
+        } else if (dv_is_op(f, &ops_floor)) {
+            sbuf_puts(b, "\\left\\lfloor ");
+            emit_tex_expr(f->a, b, 0);
+            sbuf_puts(b, " \\right\\rfloor");
+        } else if (dv_is_op(f, &ops_ceil)) {
+            sbuf_puts(b, "\\left\\lceil ");
+            emit_tex_expr(f->a, b, 0);
+            sbuf_puts(b, " \\right\\rceil");
         } else if (dv_is_sqrt_expr(f)) {
             sbuf_puts(b, "\\sqrt{");
             emit_tex_expr(f->a, b, 0);
@@ -889,7 +950,9 @@ static void emit_tex_expr(const dval_t *f, sbuf_t *b, int parent_prec)
                 int left_atomic = is_atomic_for_mul(fac[i - 1]);
                 int right_atomic = is_atomic_for_mul(fac[i]);
 
-                if (!(left_atomic && right_atomic))
+                if (left_atomic && right_atomic)
+                    sbuf_putc(b, ' ');
+                else
                     sbuf_puts(b, " \\cdot ");
             }
             emit_tex_factor_abs(fac[i], b);
@@ -1027,6 +1090,20 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
             if (need) sbuf_putc(b, ')');
             return;
         }
+        if (dv_is_op(f, &ops_floor)) {
+            sbuf_puts(b, "⌊");
+            emit_expr(f->a, b, 0);
+            sbuf_puts(b, "⌋");
+            if (need) sbuf_putc(b, ')');
+            return;
+        }
+        if (dv_is_op(f, &ops_ceil)) {
+            sbuf_puts(b, "⌈");
+            emit_expr(f->a, b, 0);
+            sbuf_puts(b, "⌉");
+            if (need) sbuf_putc(b, ')');
+            return;
+        }
         if (dv_is_sqrt_expr(f))
             sbuf_puts(b, "√");
         else
@@ -1048,13 +1125,18 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
         if (need) sbuf_putc(b, '(');
 
         /* For unary functions raised to a power, write func²(arg)
-         * rather than func(arg)² so the exponent binds to the function name. */
+         * rather than func(arg)² so the exponent binds to the function name.
+         * Floor/ceiling keep their mathematical brackets: ⌊x⌋². */
         if (f->a->ops->arity == DV_OP_UNARY) {
             dval_t *inner = f->a;
-            if (dv_is_sqrt_expr(inner))
-                sbuf_puts(b, "√");
-            else
-                sbuf_puts(b, inner->ops->name);
+            if (dv_is_op(inner, &ops_floor) || dv_is_op(inner, &ops_ceil)) {
+                emit_expr(inner, b, PREC_POW);
+            } else {
+                if (dv_is_sqrt_expr(inner))
+                    sbuf_puts(b, "√");
+                else
+                    sbuf_puts(b, inner->ops->name);
+            }
 
             if (exponent_has_small_int)
                 emit_superscript_int(b, ei);
@@ -1067,9 +1149,11 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
                 }
             }
 
-            sbuf_putc(b, '(');
-            emit_expr(inner->a, b, 0);
-            sbuf_putc(b, ')');
+            if (!dv_is_op(inner, &ops_floor) && !dv_is_op(inner, &ops_ceil)) {
+                sbuf_putc(b, '(');
+                emit_expr(inner->a, b, 0);
+                sbuf_putc(b, ')');
+            }
 
             if (need) sbuf_putc(b, ')');
             return;
@@ -1305,16 +1389,22 @@ static void emit_func(const dval_t *f, sbuf_t *b, int parent_prec)
 
     if (dv_is_addsub(f)) {
         int need = PREC_ADD < parent_prec;
+        int neg;
+
         if (need) sbuf_putc(b, '(');
 
         emit_func(f->a, b, PREC_ADD);
+        neg = expr_renders_negative(f->b);
 
         if (dv_is_op(f, &ops_add))
-            sbuf_puts(b, " + ");
+            sbuf_puts(b, neg ? " - " : " + ");
         else
-            sbuf_puts(b, " - ");
+            sbuf_puts(b, neg ? " + " : " - ");
 
-        emit_func(f->b, b, PREC_ADD);
+        if (neg)
+            emit_func_abs(f->b, b, PREC_ADD);
+        else
+            emit_func(f->b, b, PREC_ADD);
 
         if (need) sbuf_putc(b, ')');
         return;
@@ -1417,7 +1507,7 @@ static void find_named_consts_dfs(dval_t *f, varlist_t *cl)
     if (!f) return;
 
     if (dv_is_const(f)) {
-        if (f->name && *f->name)
+        if (f->name && *f->name && !dv_is_immortal_default_const_local(f))
             varlist_add(cl, f);
         return;
     }
@@ -1433,16 +1523,30 @@ static const char *dv_name_or_default(const dval_t *dv, const char *fallback)
     return (dv->name && *dv->name) ? dv->name : fallback;
 }
 
+static char *binding_rhs_expr_string_local(const dval_t *dv)
+{
+    if (dv && dv->binding_expr)
+        return dv_binding_expr_to_string(dv->binding_expr);
+    return dv_const_to_string_local(dv);
+}
+
+static char *binding_rhs_tex_string_local(const dval_t *dv)
+{
+    if (dv && dv->binding_expr)
+        return dv_binding_expr_to_tex(dv->binding_expr);
+    return dv_const_to_string_local(dv);
+}
+
 static void emit_binding_line(sbuf_t *b,
+                              const dval_t *dv,
                               const char *name,
-                              const number_t value,
                               void (*emit_name_style)(sbuf_t *, const char *))
 {
     char *valbuf;
 
     emit_name_style(b, name);
     sbuf_puts(b, " = ");
-    valbuf = num_to_string(value);
+    valbuf = binding_rhs_expr_string_local(dv);
     if (valbuf) {
         sbuf_puts(b, valbuf);
         free(valbuf);
@@ -1498,13 +1602,13 @@ static char *dv_to_string_function(const dval_t *f)
     /* Emit variable bindings */
     for (size_t i = 0; i < vl.count; ++i) {
         dval_t *v = vl.vars[i];
-        emit_binding_line(&b, dv_name_or_default(v, "x"), v->c, emit_name_func);
+        emit_binding_line(&b, v, dv_name_or_default(v, "x"), emit_name_func);
     }
 
     /* Emit named constant bindings */
     for (size_t i = 0; i < cl.count; ++i) {
         dval_t *c = cl.vars[i];
-        emit_binding_line(&b, c->name, c->c, emit_name_func);
+        emit_binding_line(&b, c, c->name, emit_name_func);
     }
 
     /* Pure variable */
@@ -1525,10 +1629,17 @@ static char *dv_to_string_function(const dval_t *f)
     if (dv_is_const(g)) {
         const char *cname = dv_name_or_default(g, "c");
 
-        emit_binding_line(&b, cname, g->c, emit_name_func);
-
         sbuf_puts(&b, "return ");
         emit_name_func(&b, cname);
+
+        if (!dv_is_immortal_default_const_local(g)) {
+            sbuf_t prefix;
+            sbuf_init(&prefix);
+            emit_binding_line(&prefix, g, cname, emit_name_func);
+            sbuf_puts(&prefix, b.data);
+            free(b.data);
+            b = prefix;
+        }
 
         char *out = xstrdup(b.data);
         sbuf_free(&b);
@@ -1573,18 +1684,11 @@ static char *dv_to_string_function(const dval_t *f)
 static char *dv_to_string_expr(const dval_t *f)
 {
     sbuf_t b;
-    sbuf_init(&b);
-
     autoname_table_t vnames;
     autoname_init(&vnames);
     assign_unnamed_vars_dfs((dval_t *)f, &vnames);
 
     dval_t *g = dv_simplify((dval_t *)f);
-
-    sbuf_putc(&b, '{');
-    sbuf_putc(&b, ' ');
-    emit_expr(g, &b, PREC_LOWEST);
-    sbuf_putc(&b, ' ');
 
     varlist_t vl;
     varlist_init(&vl);
@@ -1594,13 +1698,20 @@ static char *dv_to_string_expr(const dval_t *f)
     varlist_init(&cl);
     find_named_consts_dfs(g, &cl);
 
-    if (vl.count > 0 || cl.count > 0) {
+    sbuf_init(&b);
+    if (vl.count == 0 && cl.count == 0) {
+        emit_expr(g, &b, PREC_LOWEST);
+    } else {
+        sbuf_putc(&b, '{');
+        sbuf_putc(&b, ' ');
+        emit_expr(g, &b, PREC_LOWEST);
+        sbuf_putc(&b, ' ');
         sbuf_putc(&b, '|');
         sbuf_putc(&b, ' ');
 
         for (size_t i = 0; i < vl.count; ++i) {
             dval_t *v = vl.vars[i];
-            char *valbuf = dv_const_to_string_local(v);
+            char *valbuf = binding_rhs_expr_string_local(v);
             emit_name(&b, dv_name_or_default(v, "x"));
             sbuf_puts(&b, " = ");
             if (valbuf) {
@@ -1612,13 +1723,12 @@ static char *dv_to_string_expr(const dval_t *f)
                 sbuf_puts(&b, ", ");
         }
 
-        /* named constants after ';' (or directly if no variables) */
+        /* Named constants always follow ';' so round-trips preserve constness. */
         if (cl.count > 0) {
-            if (vl.count > 0)
-                sbuf_puts(&b, "; ");
+            sbuf_puts(&b, "; ");
             for (size_t i = 0; i < cl.count; ++i) {
                 dval_t *c = cl.vars[i];
-                char *valbuf = dv_const_to_string_local(c);
+                char *valbuf = binding_rhs_expr_string_local(c);
                 emit_name(&b, c->name);
                 sbuf_puts(&b, " = ");
                 if (valbuf) {
@@ -1631,8 +1741,8 @@ static char *dv_to_string_expr(const dval_t *f)
         }
 
         sbuf_putc(&b, ' ');
+        sbuf_putc(&b, '}');
     }
-    sbuf_putc(&b, '}');
 
     char *out = xstrdup(b.data);
     sbuf_free(&b);
@@ -1680,31 +1790,40 @@ int dv_to_tex_parts(const dval_t *dv, char **expr_out, char **bindings_out)
     if (vl.count > 0 || cl.count > 0) {
         for (size_t i = 0; i < vl.count; ++i) {
             dval_t *v = vl.vars[i];
+            char *binding_text;
 
             if (i > 0)
                 sbuf_puts(&bindings, ", ");
             emit_tex_name(&bindings, dv_name_or_default(v, "x"));
             sbuf_puts(&bindings, " = ");
-            emit_tex_const_value(&bindings, v);
+            binding_text = binding_rhs_tex_string_local(v);
+            if (binding_text) {
+                sbuf_puts(&bindings, binding_text);
+                free(binding_text);
+            }
         }
 
         if (cl.count > 0) {
-            if (vl.count > 0)
-                sbuf_puts(&bindings, "; ");
+            sbuf_puts(&bindings, "; ");
             for (size_t i = 0; i < cl.count; ++i) {
                 dval_t *c = cl.vars[i];
+                char *binding_text;
 
                 if (i > 0)
                     sbuf_puts(&bindings, ", ");
                 emit_tex_name(&bindings, c->name);
                 sbuf_puts(&bindings, " = ");
-                emit_tex_const_value(&bindings, c);
+                binding_text = binding_rhs_tex_string_local(c);
+                if (binding_text) {
+                    sbuf_puts(&bindings, binding_text);
+                    free(binding_text);
+                }
             }
         }
     }
 
-    *expr_out = xstrdup(expr.data);
-    *bindings_out = xstrdup(bindings.data);
+    *expr_out = dv_tostring_texify(expr.data);
+    *bindings_out = dv_tostring_texify(bindings.data);
 
     sbuf_free(&expr);
     sbuf_free(&bindings);
@@ -1756,13 +1875,15 @@ char *dv_to_string(const dval_t *dv, style_t style)
             return dv_to_string_expr(dv);
 
         sbuf_init(&b);
-        sbuf_puts(&b, "\\left\\{ ");
-        sbuf_puts(&b, expr);
         if (bindings && *bindings) {
+            sbuf_puts(&b, "\\left\\{ ");
+            sbuf_puts(&b, expr);
             sbuf_puts(&b, " \\;\\middle|\\; ");
             sbuf_puts(&b, bindings);
+            sbuf_puts(&b, " \\right\\}");
+        } else {
+            sbuf_puts(&b, expr);
         }
-        sbuf_puts(&b, " \\right\\}");
 
         free(expr);
         free(bindings);

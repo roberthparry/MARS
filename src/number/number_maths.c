@@ -941,6 +941,15 @@ number_t num_floor(const number_t number)
     return number_apply_unary_math(number, qf_floor, qc_floor, mf_floor, mc_floor);
 }
 
+number_t num_ceil(const number_t number)
+{
+    NUM_SCOPE(scope);
+    number_t neg = num_neg(number);
+    number_t floor_neg = num_floor(neg);
+
+    return num_scope_detach(num_neg(floor_neg));
+}
+
 number_t num_pow10(int exponent10)
 {
     return number_wrap_mfloat_with_precision(mf_pow10(exponent10),
@@ -1069,12 +1078,12 @@ int num_sincos(const number_t x, number_t *sin_out, number_t *cos_out)
 
     if (!sin_out || !cos_out || !number_is_valid_value(&x))
         return -1;
-    if (number_is_plain_mfloat_value(&x) && vt && vt->sincos_value)
-        return vt->sincos_value(&x, sin_out, cos_out);
     if (number_trig_real_pair_fastpath(&x, number_sincos_fastpaths,
             sizeof(number_sincos_fastpaths) / sizeof(number_sincos_fastpaths[0]),
             sin_out, cos_out))
         return 0;
+    if (number_is_plain_mfloat_value(&x) && vt && vt->sincos_value)
+        return vt->sincos_value(&x, sin_out, cos_out);
     if (vt && vt->sincos_value)
         return vt->sincos_value(&x, sin_out, cos_out);
     return -1;
@@ -1084,11 +1093,11 @@ number_t num_sin(const number_t number)
 {
     number_t out;
 
-    if (number_is_plain_mfloat_value(&number))
-        return number_apply_unary_math_with_double(number, sin, qf_sin, qc_sin, mf_sin, mc_sin);
     if (number_trig_real_fastpath(&number, number_sin_fastpaths,
             sizeof(number_sin_fastpaths) / sizeof(number_sin_fastpaths[0]), &out))
         return out;
+    if (number_is_plain_mfloat_value(&number))
+        return number_apply_unary_math_with_double(number, sin, qf_sin, qc_sin, mf_sin, mc_sin);
     return number_apply_unary_math_with_double(number, sin, qf_sin, qc_sin, mf_sin, mc_sin);
 }
 
@@ -1096,18 +1105,16 @@ number_t num_cos(const number_t number)
 {
     number_t out;
 
-    if (number_is_plain_mfloat_value(&number))
-        return number_apply_unary_math_with_double(number, cos, qf_cos, qc_cos, mf_cos, mc_cos);
     if (number_trig_real_fastpath(&number, number_cos_fastpaths,
             sizeof(number_cos_fastpaths) / sizeof(number_cos_fastpaths[0]), &out))
         return out;
+    if (number_is_plain_mfloat_value(&number))
+        return number_apply_unary_math_with_double(number, cos, qf_cos, qc_cos, mf_cos, mc_cos);
     return number_apply_unary_math_with_double(number, cos, qf_cos, qc_cos, mf_cos, mc_cos);
 }
 
 number_t num_tan(const number_t number)
 {
-    if (number_is_plain_mfloat_value(&number))
-        return number_apply_unary_math_with_double(number, tan, qf_tan, qc_tan, mf_tan, mc_tan);
     if (num_eq(number, NUM_ZERO) || num_eq(number, NUM_PI) || num_eq(number, NUM_2PI))
         return number_const_return_like(&number, NUMBER_CONST_ZERO);
     if (num_eq(number, NUM_PI_6)) {
@@ -1123,6 +1130,8 @@ number_t num_tan(const number_t number)
         return number_const_return_like(&number, NUMBER_CONST_SQRT3);
     if (num_eq(number, NUM_3PI_4))
         return number_const_return_like(&number, NUMBER_CONST_NEG_ONE);
+    if (number_is_plain_mfloat_value(&number))
+        return number_apply_unary_math_with_double(number, tan, qf_tan, qc_tan, mf_tan, mc_tan);
     return number_apply_unary_math_with_double(number, tan, qf_tan, qc_tan, mf_tan, mc_tan);
 }
 

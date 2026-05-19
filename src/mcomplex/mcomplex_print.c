@@ -112,6 +112,12 @@ static int mc_format_complex(char *out,
 
     if (mc_formatted_zero(imag_buf))
         snprintf(assembled, sizeof(assembled), "%s", real_buf);
+    else if (mc_formatted_zero(real_buf)) {
+        if (imag_buf[0] == '-')
+            snprintf(assembled, sizeof(assembled), "-%si", imag_digits);
+        else
+            snprintf(assembled, sizeof(assembled), "%si", imag_digits);
+    }
     else if (imag_buf[0] == '-')
         snprintf(assembled, sizeof(assembled), "%s - %si", real_buf, imag_digits);
     else

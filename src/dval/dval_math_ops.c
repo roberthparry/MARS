@@ -139,6 +139,20 @@ const dval_ops_t ops_sqrt = {
     .apply_unary = dv_sqrt, .apply_binary = NULL,
     .simplify = dv_simplify_unary_operator, .fold_const_unary = dv_fold_sqrt_const
 };
+const dval_ops_t ops_floor = {
+    .eval = eval_floor, .deriv = deriv_floor, .reverse = dv_reverse_floor,
+    .kind = DV_KIND_FLOOR, .arity = DV_OP_UNARY, .name = "floor",
+    .tex_name = "\\lfloor",
+    .apply_unary = dv_floor, .apply_binary = NULL,
+    .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
+};
+const dval_ops_t ops_ceil = {
+    .eval = eval_ceil, .deriv = deriv_ceil, .reverse = dv_reverse_ceil,
+    .kind = DV_KIND_CEIL, .arity = DV_OP_UNARY, .name = "ceil",
+    .tex_name = "\\lceil",
+    .apply_unary = dv_ceil, .apply_binary = NULL,
+    .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
+};
 const dval_ops_t ops_abs = {
     .eval = eval_abs, .deriv = deriv_abs, .reverse = dv_reverse_abs,
     .kind = DV_KIND_ABS, .arity = DV_OP_UNARY, .name = "abs",
@@ -284,6 +298,8 @@ dval_t *dv_sqrt(const dval_t *a) { return dv_math_wrap_unary(&ops_sqrt, a); }
 dval_t *dv_exp(const dval_t *a) { return dv_math_wrap_unary(&ops_exp, a); }
 dval_t *dv_log(const dval_t *a) { return dv_math_wrap_unary(&ops_log, a); }
 dval_t *dv_log10(const dval_t *a) { return dv_math_wrap_unary(&ops_log10, a); }
+dval_t *dv_floor(const dval_t *a) { return dv_math_wrap_unary(&ops_floor, a); }
+dval_t *dv_ceil(const dval_t *a) { return dv_math_wrap_unary(&ops_ceil, a); }
 dval_t *dv_sin(const dval_t *a) { return dv_math_wrap_unary(&ops_sin, a); }
 dval_t *dv_cos(const dval_t *a) { return dv_math_wrap_unary(&ops_cos, a); }
 dval_t *dv_tan(const dval_t *a) { return dv_math_wrap_unary(&ops_tan, a); }

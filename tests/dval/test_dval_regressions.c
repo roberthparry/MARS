@@ -1389,6 +1389,31 @@ static void test_simplify_inverse_unary_pairs(void)
     dv_free(x);
 }
 
+static void test_simplify_exp_quarter_turns(void)
+{
+    dval_t *pi = test_dv_new_named_const_qf(QF_PI, "@pi");
+    dval_t *i = test_dv_new_named_const_qc(QC_I, "i");
+    dval_t *pi_i = dv_mul(pi, i);
+    dval_t *half = test_dv_new_const_d(2.0);
+    dval_t *pi_i_over_2 = dv_div(pi_i, half);
+    dval_t *exp_pi_i_over_2 = dv_exp(pi_i_over_2);
+    char *expr_s = dv_to_string(exp_pi_i_over_2, style_EXPRESSION);
+    const char *expect = "i";
+
+    if (str_eq(expr_s, expect))
+        to_string_pass("exp(pi*i/2) simplification (EXPR)", expr_s, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "exp(pi*i/2) simplification (EXPR)", expr_s, expect);
+
+    free(expr_s);
+    dv_free(exp_pi_i_over_2);
+    dv_free(pi_i_over_2);
+    dv_free(half);
+    dv_free(pi_i);
+    dv_free(i);
+    dv_free(pi);
+}
+
 void test_runtime_regressions(void)
 {
     TEST_RUN_SUBTEST(test_cmp_qfloat_precision, NULL);
@@ -1415,6 +1440,7 @@ void test_runtime_regressions(void)
     TEST_RUN_SUBTEST(test_high_precision_mcomplex_function_values, NULL);
     TEST_RUN_SUBTEST(test_set_val_num_named_constant, NULL);
     TEST_RUN_SUBTEST(test_simplify_inverse_unary_pairs, NULL);
+    TEST_RUN_SUBTEST(test_simplify_exp_quarter_turns, NULL);
 }
 
 /* ------------------------------------------------------------------------- */

@@ -418,6 +418,22 @@ void test_deriv_sqrt(void)
     dv_free(x);
 }
 
+void test_deriv_floor_and_ceil(void)
+{
+    dval_t *x = test_dv_new_var_d(1.25);
+    dval_t *floor_x = dv_floor(x);
+    dval_t *ceil_x = dv_ceil(x);
+    const dval_t *dfloor = dv_get_deriv(floor_x, x);
+    const dval_t *dceil = dv_get_deriv(ceil_x, x);
+
+    check_q_at(__FILE__, __LINE__, 1, "d/dx{floor(x)} | x=1.25", dv_eval_qf(dfloor), qf_from_double(0.0));
+    check_q_at(__FILE__, __LINE__, 1, "d/dx{ceil(x)} | x=1.25", dv_eval_qf(dceil), qf_from_double(0.0));
+
+    dv_free(ceil_x);
+    dv_free(floor_x);
+    dv_free(x);
+}
+
 void test_deriv_composite(void)
 {
     dval_t *x  = test_dv_new_var_d(1.0);
@@ -955,6 +971,7 @@ void test_first_derivatives(void)
     TEST_RUN_SUBTEST(test_deriv_log, NULL);
     TEST_RUN_SUBTEST(test_deriv_log10, NULL);
     TEST_RUN_SUBTEST(test_deriv_sqrt, NULL);
+    TEST_RUN_SUBTEST(test_deriv_floor_and_ceil, NULL);
     TEST_RUN_SUBTEST(test_deriv_composite, NULL);
     TEST_RUN_SUBTEST(test_deriv_sin_log, NULL);
     TEST_RUN_SUBTEST(test_deriv_exp_tanh, NULL);

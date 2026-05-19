@@ -62,7 +62,7 @@ void run_number_constant_tests(void)
                                     "0.707106781186547524400844362104");
         assert_number_string_prefix("NUM_SQRT3_OVER_TWO", half_sqrt3,
                                     "0.866025403784438646763723170752");
-        assert_number_string("NUM_I", i, "0 + 1i");
+        assert_number_string("NUM_I", i, "1i");
         assert_number_string("num_pow10(6)", million, "1000000");
 
         ASSERT_TRUE(num_is_real(pi));

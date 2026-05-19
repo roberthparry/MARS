@@ -179,10 +179,10 @@ static void test_partial_to_string(void)
     free(s);
 
     s = dv_to_string(d2f_dxdy, style_EXPRESSION);
-    if (str_eq(s, "{ 1 }"))
-        to_string_pass("∂²(xy)/∂x∂y (EXPR)", s, "{ 1 }");
+    if (str_eq(s, "1"))
+        to_string_pass("∂²(xy)/∂x∂y (EXPR)", s, "1");
     else
-        to_string_fail(__FILE__, __LINE__, 1, "∂²(xy)/∂x∂y (EXPR)", s, "{ 1 }");
+        to_string_fail(__FILE__, __LINE__, 1, "∂²(xy)/∂x∂y (EXPR)", s, "1");
     free(s);
 
     /* g = x² + xy + y² */

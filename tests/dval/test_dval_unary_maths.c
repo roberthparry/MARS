@@ -206,6 +206,30 @@ void test_sqrt(void)
     dv_free(c);
 }
 
+void test_floor(void)
+{
+    dval_t *c = test_dv_new_var_d(1.75);
+    dval_t *f = dv_floor(c);
+
+    check_q_at(__FILE__, __LINE__, 1, "floor(1.75)", dv_eval_qf(f), qf_from_double(1.0));
+    print_expr_of(f);
+
+    dv_free(f);
+    dv_free(c);
+}
+
+void test_ceil(void)
+{
+    dval_t *c = test_dv_new_var_d(1.25);
+    dval_t *f = dv_ceil(c);
+
+    check_q_at(__FILE__, __LINE__, 1, "ceil(1.25)", dv_eval_qf(f), qf_from_double(2.0));
+    print_expr_of(f);
+
+    dv_free(f);
+    dv_free(c);
+}
+
 void test_pow_d(void)
 {
     dval_t *base = test_dv_new_var_d(2.0);
@@ -323,6 +347,8 @@ void test_maths_functions(void)
     TEST_RUN_SUBTEST(test_log, NULL);
     TEST_RUN_SUBTEST(test_log10, NULL);
     TEST_RUN_SUBTEST(test_sqrt, NULL);
+    TEST_RUN_SUBTEST(test_floor, NULL);
+    TEST_RUN_SUBTEST(test_ceil, NULL);
     TEST_RUN_SUBTEST(test_pow_d, NULL);
     TEST_RUN_SUBTEST(test_pow_d_complex, NULL);
     TEST_RUN_SUBTEST(test_pow, NULL);

@@ -123,7 +123,11 @@ static void matrix_tex_preview_emit_case(const char *source_file,
         fprintf(f, "\\subsection*{Sample %zu}\n", i + 1u);
         fprintf(f, "\\noindent\\texttt{");
         matrix_tex_preview_write_escaped(f, g_matrix_tex_preview_entries[i].label);
-        fprintf(f, "}\n\\[\n%s\n\\]\n\n", g_matrix_tex_preview_entries[i].tex);
+        fprintf(f, "}\n"
+                   "\\begin{flushleft}\n"
+                   "$\\displaystyle %s$\n"
+                   "\\end{flushleft}\n\n",
+                g_matrix_tex_preview_entries[i].tex);
     }
 
     fprintf(f, "\\end{document}\n");

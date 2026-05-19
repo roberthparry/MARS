@@ -139,12 +139,21 @@ char *read_simple_name(const char **pp)
     int blen = 0;
     int allow_alias = 0;
 
-    if (strncmp(p, "pi", 2) == 0 &&
-        !isalnum((unsigned char)p[2]) && p[2] != '_') {
-        char *result = (char *)fs_xmalloc(3);
-        memcpy(result, "pi", 3);
-        *pp = p + 2;
-        return result;
+    {
+        static const char *builtin_names[] = { "pi", "phi", "gamma" };
+        size_t i;
+
+        for (i = 0; i < sizeof(builtin_names) / sizeof(builtin_names[0]); ++i) {
+            size_t n = strlen(builtin_names[i]);
+
+            if (strncmp(p, builtin_names[i], n) == 0 &&
+                !isalnum((unsigned char)p[n]) && p[n] != '_') {
+                char *result = (char *)fs_xmalloc(n + 1u);
+                memcpy(result, builtin_names[i], n + 1u);
+                *pp = p + n;
+                return result;
+            }
+        }
     }
 
     if (*p == '@') {
@@ -210,6 +219,18 @@ char *read_simple_name(const char **pp)
             if (blen + 1 >= (int)sizeof(buf) - 1)
                 break;
             buf[blen++] = *p++;
+            continue;
+        }
+        if (!allow_alias && isdigit((unsigned char)*p)) {
+            int d;
+
+            if (blen + 3 >= (int)sizeof(buf) - 1)
+                break;
+            d = *p - '0';
+            buf[blen++] = (char)0xE2;
+            buf[blen++] = (char)0x82;
+            buf[blen++] = (char)(0x80 + d);
+            p++;
             continue;
         }
         if (allow_alias && *p == '_' && isdigit((unsigned char)p[1])) {

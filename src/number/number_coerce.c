@@ -340,8 +340,11 @@ static number_t *number_coerce_mint_to_mfloat(const number_t *number)
     tmp_rational = mr_create_mints(number_impl_const(number)->value.mi, MI_ONE);
     if (!tmp_rational)
         return NULL;
-    tmp_float = number_reprecision_mfloat(mf_create_mrational(tmp_rational),
-        number_default_precision_bits);
+    tmp_float = mf_new_prec(number_default_precision_bits);
+    if (!tmp_float || mf_set_mrational(tmp_float, tmp_rational) != 0) {
+        mf_free(tmp_float);
+        tmp_float = NULL;
+    }
     mr_free(tmp_rational);
     return tmp_float ? number_wrap_mfloat(tmp_float) : NULL;
 }
@@ -373,10 +376,18 @@ static number_t *number_coerce_clone_mrational(const number_t *number)
 
 static number_t *number_coerce_mrational_to_mfloat(const number_t *number)
 {
-    return number ? number_wrap_mfloat(number_reprecision_mfloat(
-                        mf_create_mrational(number_impl_const(number)->value.mr),
-                        number_default_precision_bits))
-                  : NULL;
+    mfloat_t *tmp_float;
+
+    if (!number)
+        return NULL;
+
+    tmp_float = mf_new_prec(number_default_precision_bits);
+    if (!tmp_float ||
+        mf_set_mrational(tmp_float, number_impl_const(number)->value.mr) != 0) {
+        mf_free(tmp_float);
+        return NULL;
+    }
+    return number_wrap_mfloat(tmp_float);
 }
 
 static number_t *number_coerce_mrational_to_mcomplex(const number_t *number)

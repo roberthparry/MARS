@@ -46,11 +46,14 @@ static dictionary_t *dv_default_constant_alias_table(void)
         const char *key;
         const char *value;
     } aliases[] = {
+        { "i",        "i"      },
         { "pi",       "@pi"    },
         { "@pi",      "@pi"    },
         { "\xcf\x80", "@pi"    },
+        { "phi",      "@phi"   },
         { "@phi",     "@phi"   },
         { "\xcf\x86", "@phi"   },
+        { "gamma",    "@gamma" },
         { "@gamma",   "@gamma" },
         { "\xce\xb3", "@gamma" },
         { "@tau",     "@tau"   },
@@ -185,8 +188,8 @@ static void dv_init_singletons(void)
     _DV_ZERO_NODE.x = NUM_ZERO;
     _DV_ONE_NODE.c = NUM_ONE;
     _DV_ONE_NODE.x = NUM_ONE;
-    _DV_LN10_NODE.c = num_const(NUM_LN10);
-    _DV_LN10_NODE.x = num_clone(_DV_LN10_NODE.c);
+    _DV_LN10_NODE.c = num_scope_detach(num_const(NUM_LN10));
+    _DV_LN10_NODE.x = num_scope_detach(num_clone(_DV_LN10_NODE.c));
     if (atexit(dv_shutdown_singletons) != 0)
         abort();
     dv_singletons_ready = 1;
@@ -500,6 +503,11 @@ int dv_get_default_constant_num(const char *name, number_t *value_out)
         return 1;
     }
 
+    if (strcmp(canon, "i") == 0) {
+        *value_out = num_const(NUM_I);
+        return 1;
+    }
+
     if (strcmp(canon, "@pi") == 0) {
         *value_out = num_const(NUM_PI);
         return 1;
@@ -559,6 +567,8 @@ static void dv_release(dval_t *dv)
 
     if (dv->name)
         free(dv->name);
+    if (dv->binding_expr)
+        dv_binding_expr_free(dv->binding_expr);
     num_destroy(&dv->c);
     num_destroy(&dv->x);
     free(dv);
@@ -589,6 +599,7 @@ dval_t *dv_alloc(const dval_ops_t *ops)
     dv->epoch = 0;
     dv->dx_cache = NULL;
     dv->name = NULL;
+    dv->binding_expr = NULL;
     dv->refcount = 1;
     dv->var_id = 0;
 

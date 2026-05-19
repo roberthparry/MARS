@@ -488,6 +488,7 @@ number_t num_log10    (const number_t number);
 number_t num_sqrt     (const number_t number);
 number_t num_sqr      (const number_t number);
 number_t num_floor    (const number_t number);
+number_t num_ceil     (const number_t number);
 number_t num_mul_pow10(const number_t number, int exponent10);
 number_t num_hypot    (const number_t a, const number_t b);
 /**

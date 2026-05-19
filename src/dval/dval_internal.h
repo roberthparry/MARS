@@ -76,6 +76,8 @@ typedef enum {
     DV_KIND_LOG,
     DV_KIND_LOG10,
     DV_KIND_SQRT,
+    DV_KIND_FLOOR,
+    DV_KIND_CEIL,
     DV_KIND_ABS,
     DV_KIND_HYPOT,
     DV_KIND_ERF,
@@ -191,6 +193,44 @@ typedef struct {
     number_t coeff;
 } addend_t;
 
+typedef enum {
+    DV_BINDING_EXPR_NUMBER,
+    DV_BINDING_EXPR_CONST,
+    DV_BINDING_EXPR_NEG,
+    DV_BINDING_EXPR_ADD,
+    DV_BINDING_EXPR_SUB,
+    DV_BINDING_EXPR_MUL,
+    DV_BINDING_EXPR_DIV,
+    DV_BINDING_EXPR_POWI
+} dv_binding_expr_kind_t;
+
+typedef enum {
+    DV_BINDING_CONST_E,
+    DV_BINDING_CONST_I,
+    DV_BINDING_CONST_PI,
+    DV_BINDING_CONST_PHI,
+    DV_BINDING_CONST_GAMMA
+} dv_binding_const_id_t;
+
+typedef struct dv_binding_expr {
+    dv_binding_expr_kind_t kind;
+    union {
+        char *text;
+        dv_binding_const_id_t const_id;
+        struct {
+            struct dv_binding_expr *child;
+        } unary;
+        struct {
+            struct dv_binding_expr *left;
+            struct dv_binding_expr *right;
+        } binary;
+        struct {
+            struct dv_binding_expr *base;
+            long exponent;
+        } powi;
+    } u;
+} dv_binding_expr_t;
+
 /**
  * @brief Full internal definition of a differentiable value node.
  *
@@ -202,6 +242,7 @@ typedef struct {
  *   x_valid  — whether x is valid
  *   dx_cache — singly-linked list of (wrt, dx) cache entries (owned)
  *   name     — optional symbolic name (owned)
+ *   binding_expr — optional preserved binding RHS constant expression for display (owned)
  *   refcount — reference count for DAG lifetime management
  */
 struct _dval_t {
@@ -223,7 +264,8 @@ struct _dval_t {
 
     dv_deriv_cache_t *dx_cache;
 
-    char   *name;
+    char              *name;
+    dv_binding_expr_t *binding_expr;
 
     int     refcount;
     uint64_t var_id;
@@ -270,6 +312,8 @@ extern const dval_ops_t ops_exp;
 extern const dval_ops_t ops_log;
 extern const dval_ops_t ops_log10;
 extern const dval_ops_t ops_sqrt;
+extern const dval_ops_t ops_floor;
+extern const dval_ops_t ops_ceil;
 extern const dval_ops_t ops_pow_d;  /* dv^(constant numeric exponent) */
 extern const dval_ops_t ops_pow;    /* dv^dv */
 
@@ -389,6 +433,8 @@ void dv_split_division_terms(number_t *c_acc, int *is_zero,
                              dval_t ***den_terms, size_t *nden_terms,
                              size_t *den_cap);
 void dv_combine_like_powers(dval_t **terms, size_t nterms);
+void dv_cancel_common_powers(dval_t **terms, size_t nterms,
+                             dval_t **den_terms, size_t nden_terms);
 void dv_combine_exp_terms(dval_t **terms, size_t nterms);
 void dv_merge_sqrt_terms(dval_t **terms, size_t nterms);
 dval_t *dv_try_expand_shallow_product(number_t c_acc,
@@ -428,6 +474,8 @@ void dv_reverse_exp(const dval_t *dv, const number_t *out_bar, number_t *a_bar, 
 void dv_reverse_log(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void dv_reverse_log10(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void dv_reverse_sqrt(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_floor(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_ceil(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void dv_reverse_abs(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void dv_reverse_hypot(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void dv_reverse_erf(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
@@ -448,6 +496,17 @@ void dv_reverse_ei(const dval_t *dv, const number_t *out_bar, number_t *a_bar, n
 void dv_reverse_e1(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void dv_reverse_beta(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void dv_reverse_logbeta(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+
+dv_binding_expr_t *dv_binding_expr_new_number_text(const char *text);
+dv_binding_expr_t *dv_binding_expr_new_const(dv_binding_const_id_t const_id);
+dv_binding_expr_t *dv_binding_expr_new_neg(dv_binding_expr_t *child);
+dv_binding_expr_t *dv_binding_expr_new_add(dv_binding_expr_t *left, dv_binding_expr_t *right);
+dv_binding_expr_t *dv_binding_expr_new_sub(dv_binding_expr_t *left, dv_binding_expr_t *right);
+dv_binding_expr_t *dv_binding_expr_new_mul(dv_binding_expr_t *left, dv_binding_expr_t *right);
+dv_binding_expr_t *dv_binding_expr_new_div(dv_binding_expr_t *left, dv_binding_expr_t *right);
+dv_binding_expr_t *dv_binding_expr_new_powi(dv_binding_expr_t *base, long exponent);
+void dv_binding_expr_free(dv_binding_expr_t *expr);
+number_t dv_binding_expr_eval(const dv_binding_expr_t *expr);
 
 /**
  * @brief Simplify a differentiable value node using algebraic identities.

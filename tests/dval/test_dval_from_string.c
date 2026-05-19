@@ -1,5 +1,10 @@
 #include "test_dval.h"
 
+static void check_parse_num(const char *label, const char *s,
+                            const char *expect_text, int line);
+static void check_parse_expr(const char *label, const char *s,
+                             const char *expect_expr, int line);
+
 static void test_from_string_pure_const(void)
 {
     /* Single Unicode letter name */
@@ -60,6 +65,10 @@ static void test_from_string_arithmetic(void)
     check_parse_val("x^2.5 at 4 = 32",
         "{ x^2.5 | x = 4 }",
         32.0, __LINE__);
+    check_parse_num("decimal binding stays exact through cancellation-sensitive cube",
+        "{ (5x)^3 | x = 128064.000000000120974 }",
+        "262537412640768744007706072064702817249456224221302405921303/"
+        "1000000000000000000000000000000000000000000", __LINE__);
     /* Parenthesised sub-expression with superscript */
     check_parse_val("(x\xe2\x82\x80 + x\xe2\x82\x81)\xc2\xb2 = 25",
         "{ (x\xe2\x82\x80 + x\xe2\x82\x81)\xc2\xb2 | x\xe2\x82\x80 = 2, x\xe2\x82\x81 = 3 }",
@@ -96,6 +105,26 @@ static void test_from_string_functions(void)
     check_parse_val("log(x) at 1000",    "{ log(x) | x = 1000 }",        3.0,          __LINE__);
     check_parse_val("log10(x) at 1000",  "{ log10(x) | x = 1000 }",      3.0,          __LINE__);
     check_parse_val("sqrt(x) at 4",      "{ sqrt(x) | x = 4 }",          2.0,          __LINE__);
+    check_parse_val("floor(x) at 1.75",  "{ floor(x) | x = 1.75 }",      1.0,          __LINE__);
+    check_parse_val("ceil(x) at 1.25",   "{ ceil(x) | x = 1.25 }",       2.0,          __LINE__);
+    check_parse_num("exp(pi*i/2) = i",   "{ exp(@pi*i/2) }",             "0 + 1i",     __LINE__);
+    check_parse_expr("1/pi stays symbolic", "{ 1/pi }",
+        "1/π", __LINE__);
+    check_parse_expr("pi/2 stays symbolic", "{ pi/2 }",
+        "π/2", __LINE__);
+    check_parse_expr("i^i stays symbolic", "{ i^i }",
+        "i^i", __LINE__);
+    check_parse_expr("i^(1+i) parses", "{ i^(1+i) }",
+        "i^(i + 1)", __LINE__);
+    check_parse_expr("W0 identity keeps unbound argument",
+        "{ W_0(x)*exp(W_0(x)) }",
+        "{ x | x = NAN }", __LINE__);
+    check_parse_expr("W0 identity resolves bound pi",
+        "{ W_0(x)*exp(W_0(x)) | x = pi }",
+        "π", __LINE__);
+    check_parse_expr("W-1 identity resolves bound e",
+        "{ W-1(x)*exp(W-1(x)) | x = e }",
+        "e", __LINE__);
     check_parse_val("√(x) at 4",         "{ √(x) | x = 4 }",             2.0,          __LINE__);
     /* Binary functions */
     check_parse_val("atan2(1, 1) = π/4",
@@ -139,8 +168,20 @@ static void test_from_string_special_functions(void)
     check_parse_val("W₀(0) = 0 via lambert_w0", "{ lambert_w0(x) | x = 0 }", 0.0,                     __LINE__);
     check_parse_val("W₀(0) = 0 via productlog", "{ productlog(x) | x = 0 }", 0.0,                     __LINE__);
     check_parse_val("W₀(0) = 0",             "{ W₀(x) | x = 0 }",            0.0,                     __LINE__);
+    check_parse_val("W₀(0) = 0 via W",        "{ W(x) | x = 0 }",             0.0,                     __LINE__);
+    check_parse_val("W₀(0) = 0 via W0",       "{ W0(x) | x = 0 }",            0.0,                     __LINE__);
+    check_parse_val("W₀(0) = 0 via W_0",      "{ W_0(x) | x = 0 }",           0.0,                     __LINE__);
+    check_parse_expr("W(x) infers x binding", "{ W(x) }",
+        "{ W₀(x) | x = NAN }", __LINE__);
+    check_parse_expr("W_0(x) infers x binding", "{ W_0(x) }",
+        "{ W₀(x) | x = NAN }", __LINE__);
     check_parse_val("W₋₁(-0.2) via lambert_wm1", "{ lambert_wm1(x) | x = -0.2 }", -2.5426413577735265, __LINE__);
     check_parse_val("W₋₁(-0.2)",             "{ W₋₁(x) | x = -0.2 }",        -2.5426413577735265,     __LINE__);
+    check_parse_val("W₋₁(-0.2) via W-1",     "{ W-1(x) | x = -0.2 }",        -2.5426413577735265,     __LINE__);
+    check_parse_val("W₋₁(-0.2) via W_-1",    "{ W_-1(x) | x = -0.2 }",       -2.5426413577735265,     __LINE__);
+    check_parse_val("W₋₁ identity evaluates bound e",
+        "{ W-1(x)*exp(W-1(x)) | x = e }",
+        M_E, __LINE__);
     check_parse_val("normal_pdf(0)",         "{ normal_pdf(x) | x = 0 }",    1.0/sqrt(2.0*M_PI),      __LINE__);
     check_parse_val("normal_cdf(0) = 0.5",   "{ normal_cdf(x) | x = 0 }",    0.5,                     __LINE__);
     check_parse_val("normal_logpdf(0)",      "{ normal_logpdf(x) | x = 0 }", -0.5*log(2.0*M_PI),      __LINE__);
@@ -292,7 +333,10 @@ static void test_from_string_implicit_symbolic_bindings(void)
 {
     dval_t *x = dval_from_string("{ x }", NULL);
     dval_t *e = dval_from_string("{ e }", NULL);
+    dval_t *i_unit = dval_from_string("{ i }", NULL);
     dval_t *pi_ascii = dval_from_string("{ pi }", NULL);
+    dval_t *phi_ascii = dval_from_string("{ phi }", NULL);
+    dval_t *gamma_ascii = dval_from_string("{ gamma }", NULL);
     dval_t *pi_alias = dval_from_string("{ @pi }", NULL);
     dval_t *tau = dval_from_string("{ τ }", NULL);
     dval_t *phi_alias = dval_from_string("{ @phi }", NULL);
@@ -301,7 +345,10 @@ static void test_from_string_implicit_symbolic_bindings(void)
     dval_t *f = dval_from_string("{ [radius]^2 + c_1 + π + e }", NULL);
     char *xs = x ? dv_to_string(x, style_EXPRESSION) : NULL;
     char *es = e ? dv_to_string(e, style_EXPRESSION) : NULL;
+    char *is = i_unit ? dv_to_string(i_unit, style_EXPRESSION) : NULL;
     char *pi_as = pi_ascii ? dv_to_string(pi_ascii, style_EXPRESSION) : NULL;
+    char *phi_plain = phi_ascii ? dv_to_string(phi_ascii, style_EXPRESSION) : NULL;
+    char *gamma_plain = gamma_ascii ? dv_to_string(gamma_ascii, style_EXPRESSION) : NULL;
     char *pi_ats = pi_alias ? dv_to_string(pi_alias, style_EXPRESSION) : NULL;
     char *taus = tau ? dv_to_string(tau, style_EXPRESSION) : NULL;
     char *phi_as = phi_alias ? dv_to_string(phi_alias, style_EXPRESSION) : NULL;
@@ -316,33 +363,46 @@ static void test_from_string_implicit_symbolic_bindings(void)
                        xs ? xs : "(null)", "{ x | x = NAN }");
     }
 
-    if (e && es && str_eq(es, "{ e | e = 2.718281828459045235360287471352664 }")) {
-        to_string_pass("implicit e constant inference", es,
-                       "{ e | e = 2.718281828459045235360287471352664 }");
+    if (e && es && str_eq(es, "e")) {
+        to_string_pass("implicit e constant inference", es, "e");
     } else {
         to_string_fail(__FILE__, __LINE__, 1, "implicit e constant inference",
-                       es ? es : "(null)",
-                       "{ e | e = 2.718281828459045235360287471352664 }");
+                       es ? es : "(null)", "e");
     }
 
-    if (pi_ascii && pi_as &&
-        str_eq(pi_as, "{ π | π = 3.141592653589793238462643383279505 }")) {
-        to_string_pass("implicit pi constant inference", pi_as,
-                       "{ π | π = 3.141592653589793238462643383279505 }");
+    if (i_unit && is && str_eq(is, "i")) {
+        to_string_pass("implicit i constant inference", is, "i");
+    } else {
+        to_string_fail(__FILE__, __LINE__, 1, "implicit i constant inference",
+                       is ? is : "(null)", "i");
+    }
+
+    if (pi_ascii && pi_as && str_eq(pi_as, "π")) {
+        to_string_pass("implicit pi constant inference", pi_as, "π");
     } else {
         to_string_fail(__FILE__, __LINE__, 1, "implicit pi constant inference",
-                       pi_as ? pi_as : "(null)",
-                       "{ π | π = 3.141592653589793238462643383279505 }");
+                       pi_as ? pi_as : "(null)", "π");
     }
 
-    if (pi_alias && pi_ats &&
-        str_eq(pi_ats, "{ π | π = 3.141592653589793238462643383279505 }")) {
-        to_string_pass("implicit @pi constant inference", pi_ats,
-                       "{ π | π = 3.141592653589793238462643383279505 }");
+    if (pi_alias && pi_ats && str_eq(pi_ats, "π")) {
+        to_string_pass("implicit @pi constant inference", pi_ats, "π");
     } else {
         to_string_fail(__FILE__, __LINE__, 1, "implicit @pi constant inference",
-                       pi_ats ? pi_ats : "(null)",
-                       "{ π | π = 3.141592653589793238462643383279505 }");
+                       pi_ats ? pi_ats : "(null)", "π");
+    }
+
+    if (phi_ascii && phi_plain && str_eq(phi_plain, "φ")) {
+        to_string_pass("implicit phi constant inference", phi_plain, "φ");
+    } else {
+        to_string_fail(__FILE__, __LINE__, 1, "implicit phi constant inference",
+                       phi_plain ? phi_plain : "(null)", "φ");
+    }
+
+    if (gamma_ascii && gamma_plain && str_eq(gamma_plain, "γ")) {
+        to_string_pass("implicit gamma constant inference", gamma_plain, "γ");
+    } else {
+        to_string_fail(__FILE__, __LINE__, 1, "implicit gamma constant inference",
+                       gamma_plain ? gamma_plain : "(null)", "γ");
     }
 
     if (tau && taus && str_eq(taus, "{ τ | τ = NAN }")) {
@@ -352,24 +412,18 @@ static void test_from_string_implicit_symbolic_bindings(void)
                        taus ? taus : "(null)", "{ τ | τ = NAN }");
     }
 
-    if (phi_alias && phi_as &&
-        str_eq(phi_as, "{ φ | φ = 1.618033988749894848204586834365641 }")) {
-        to_string_pass("implicit @phi constant inference", phi_as,
-                       "{ φ | φ = 1.618033988749894848204586834365641 }");
+    if (phi_alias && phi_as && str_eq(phi_as, "φ")) {
+        to_string_pass("implicit @phi constant inference", phi_as, "φ");
     } else {
         to_string_fail(__FILE__, __LINE__, 1, "implicit @phi constant inference",
-                       phi_as ? phi_as : "(null)",
-                       "{ φ | φ = 1.618033988749894848204586834365641 }");
+                       phi_as ? phi_as : "(null)", "φ");
     }
 
-    if (gamma_alias && gamma_as &&
-        str_eq(gamma_as, "{ γ | γ = 0.5772156649015328606065120900824012 }")) {
-        to_string_pass("implicit @gamma constant inference", gamma_as,
-                       "{ γ | γ = 0.5772156649015328606065120900824012 }");
+    if (gamma_alias && gamma_as && str_eq(gamma_as, "γ")) {
+        to_string_pass("implicit @gamma constant inference", gamma_as, "γ");
     } else {
         to_string_fail(__FILE__, __LINE__, 1, "implicit @gamma constant inference",
-                       gamma_as ? gamma_as : "(null)",
-                       "{ γ | γ = 0.5772156649015328606065120900824012 }");
+                       gamma_as ? gamma_as : "(null)", "γ");
     }
 
     if (tau_alias && tau_as && str_eq(tau_as, "{ τ | τ = NAN }")) {
@@ -379,13 +433,13 @@ static void test_from_string_implicit_symbolic_bindings(void)
                        tau_as ? tau_as : "(null)", "{ τ | τ = NAN }");
     }
 
-    if (f && fs && str_eq(fs, "{ c₁ + e + π + [radius]² | [radius] = NAN; c₁ = NAN, e = 2.718281828459045235360287471352664, π = 3.141592653589793238462643383279505 }")) {
+    if (f && fs && str_eq(fs, "{ c₁ + e + π + [radius]² | [radius] = NAN; c₁ = NAN }")) {
         to_string_pass("implicit mixed symbolic inference", fs,
-                       "{ c₁ + e + π + [radius]² | [radius] = NAN; c₁ = NAN, e = 2.718281828459045235360287471352664, π = 3.141592653589793238462643383279505 }");
+                       "{ c₁ + e + π + [radius]² | [radius] = NAN; c₁ = NAN }");
     } else {
         to_string_fail(__FILE__, __LINE__, 1, "implicit mixed symbolic inference",
                        fs ? fs : "(null)",
-                       "{ c₁ + e + π + [radius]² | [radius] = NAN; c₁ = NAN, e = 2.718281828459045235360287471352664, π = 3.141592653589793238462643383279505 }");
+                       "{ c₁ + e + π + [radius]² | [radius] = NAN; c₁ = NAN }");
     }
 
     if (x && qf_isnan(dv_eval_qf(x))) {
@@ -408,6 +462,14 @@ static void test_from_string_implicit_symbolic_bindings(void)
         printf(C_BOLD C_GREEN "PASS" C_RESET " implicit e evaluates to built-in constant\n\n");
     } else {
         printf(C_BOLD C_RED "FAIL" C_RESET " implicit e evaluates to built-in constant %s:%d:1\n\n",
+               __FILE__, __LINE__);
+        TEST_FAIL();
+    }
+
+    if (i_unit && num_eq(dv_eval(i_unit), NUM_I)) {
+        printf(C_BOLD C_GREEN "PASS" C_RESET " implicit i evaluates to built-in constant\n\n");
+    } else {
+        printf(C_BOLD C_RED "FAIL" C_RESET " implicit i evaluates to built-in constant %s:%d:1\n\n",
                __FILE__, __LINE__);
         TEST_FAIL();
     }
@@ -440,10 +502,37 @@ static void test_from_string_implicit_symbolic_bindings(void)
         TEST_FAIL();
     }
 
+    if (phi_ascii) {
+        number_t phi_value = dv_eval(phi_ascii);
+        bool ok = num_eq(phi_value, NUM_PHI) &&
+                  num_get_prec_bits(phi_value) == num_get_default_prec_bits();
+
+        num_destroy(&phi_value);
+        if (ok) {
+            printf(C_BOLD C_GREEN "PASS" C_RESET " implicit phi evaluates to built-in constant\n\n");
+        } else {
+            printf(C_BOLD C_RED "FAIL" C_RESET " implicit phi evaluates to built-in constant %s:%d:1\n\n",
+                   __FILE__, __LINE__);
+            TEST_FAIL();
+        }
+    } else {
+        printf(C_BOLD C_RED "FAIL" C_RESET " implicit phi evaluates to built-in constant %s:%d:1\n\n",
+               __FILE__, __LINE__);
+        TEST_FAIL();
+    }
+
     if (gamma_alias && qf_eq(dv_eval_qf(gamma_alias), QF_EULER_MASCHERONI)) {
         printf(C_BOLD C_GREEN "PASS" C_RESET " implicit @gamma evaluates to built-in constant\n\n");
     } else {
         printf(C_BOLD C_RED "FAIL" C_RESET " implicit @gamma evaluates to built-in constant %s:%d:1\n\n",
+               __FILE__, __LINE__);
+        TEST_FAIL();
+    }
+
+    if (gamma_ascii && qf_eq(dv_eval_qf(gamma_ascii), QF_EULER_MASCHERONI)) {
+        printf(C_BOLD C_GREEN "PASS" C_RESET " implicit gamma evaluates to built-in constant\n\n");
+    } else {
+        printf(C_BOLD C_RED "FAIL" C_RESET " implicit gamma evaluates to built-in constant %s:%d:1\n\n",
                __FILE__, __LINE__);
         TEST_FAIL();
     }
@@ -467,19 +556,25 @@ static void test_from_string_implicit_symbolic_bindings(void)
     free(fs);
     free(tau_as);
     free(gamma_as);
+    free(gamma_plain);
     free(phi_as);
+    free(phi_plain);
     free(taus);
     free(pi_ats);
     free(pi_as);
+    free(is);
     free(es);
     free(xs);
     dv_free(f);
     dv_free(tau_alias);
     dv_free(gamma_alias);
+    dv_free(gamma_ascii);
     dv_free(phi_alias);
+    dv_free(phi_ascii);
     dv_free(tau);
     dv_free(pi_alias);
     dv_free(pi_ascii);
+    dv_free(i_unit);
     dv_free(e);
     dv_free(x);
 }
@@ -713,11 +808,11 @@ static void test_from_string_simplified_identity_text(void)
     dval_t *expr = dval_from_string("{ sin^2(x) + cos^2(x) | x = 1.234 }", NULL);
     char *text = expr ? dv_to_string(expr, style_EXPRESSION) : NULL;
 
-    if (!(text && strcmp(text, "{ 1 }") == 0)) {
+    if (!(text && strcmp(text, "1") == 0)) {
         printf(C_BOLD C_RED "FAIL" C_RESET " sin^2(x) + cos^2(x) exact text simplifies to 1 %s:%d:1\n",
                __FILE__, __LINE__);
         printf("  got:      %s\n", text ? text : "<null>");
-        printf("  expected: { 1 }\n\n");
+        printf("  expected: 1\n\n");
         TEST_FAIL();
     } else {
         printf(C_BOLD C_GREEN "PASS" C_RESET " sin^2(x) + cos^2(x) exact text simplifies to 1\n\n");
@@ -815,6 +910,37 @@ static void check_parse_num(const char *label, const char *s,
     free(expr_text);
     num_destroy(&expect);
     num_destroy(&got);
+    dv_free(expr);
+}
+
+static void check_parse_expr(const char *label, const char *s,
+                             const char *expect_expr, int line)
+{
+    dval_t *expr = dval_from_string(s, NULL);
+    char *expr_text;
+
+    if (!expr) {
+        printf(C_BOLD C_RED "FAIL" C_RESET " %s %s:%d:1\n", label, __FILE__, line);
+        printf(C_BOLD "  input  " C_RESET "%s\n", s);
+        printf(C_BOLD "  error  " C_RESET "parser returned NULL\n\n");
+        TEST_FAIL();
+        return;
+    }
+
+    expr_text = dv_to_string(expr, style_EXPRESSION);
+    if (expr_text && strcmp(expr_text, expect_expr) == 0) {
+        printf(C_BOLD C_GREEN "PASS" C_RESET " %s\n", label);
+        printf(C_BOLD "  input  " C_RESET "%s\n", s);
+        printf(C_BOLD "  expr   " C_RESET "%s\n\n", expr_text);
+    } else {
+        printf(C_BOLD C_RED "FAIL" C_RESET " %s %s:%d:1\n", label, __FILE__, line);
+        printf(C_BOLD "  input  " C_RESET "%s\n", s);
+        printf(C_BOLD "  got    " C_RESET "%s\n", expr_text ? expr_text : "(null)");
+        printf(C_BOLD "  expect " C_RESET "%s\n\n", expect_expr);
+        TEST_FAIL();
+    }
+
+    free(expr_text);
     dv_free(expr);
 }
 
@@ -919,9 +1045,9 @@ static void test_from_string_errors(void)
     /* Missing closing '}' */
     check_parse_null_stderr_contains("no closing brace",
         "{ x | x = 1", "}", __LINE__);
-    /* Unknown symbol in expression */
-    check_parse_null_stderr_contains("unknown symbol",
-        "{ z | x = 1 }", "unknown", __LINE__);
+    /* Unexpected token in expression */
+    check_parse_null_stderr_contains("unexpected token",
+        "{ ? | x = 1 }", "expected expression", __LINE__);
     /* Duplicate variable name */
     check_parse_null("duplicate var name",
         "{ x | x = 1, x = 2 }", __LINE__);
@@ -937,12 +1063,12 @@ static void test_from_string_errors(void)
     /* Missing exponent after '^' */
     check_parse_null("missing exponent after '^'",
         "{ x^ | x = 2 }", __LINE__);
-    /* Missing exponent digits after function-name '^' */
+    /* Empty exponent after function-name '^' */
     check_parse_null("missing function exponent digits",
-        "{ sin^(x) | x = 0 }", __LINE__);
-    /* Malformed decimal exponent */
+        "{ sin^() | x = 0 }", __LINE__);
+    /* Malformed numeric exponent */
     check_parse_null("malformed decimal exponent",
-        "{ x^2e | x = 2 }", __LINE__);
+        "{ x^2e+ | x = 2 }", __LINE__);
     /* Binary function with too few arguments */
     check_parse_null("binary function missing arg",
         "{ atan2(x) | x = 1 }", __LINE__);
@@ -1098,6 +1224,196 @@ static void test_from_string_bindings_api(void)
     dv_free(expr);
 }
 
+static void test_from_string_bindings_with_implicit_builtin_constant(void)
+{
+    dval_bindings_t *bindings = NULL;
+    dval_t *expr = dval_from_string("{ exp(pi*sqrt(x)) | x = 163 }", &bindings);
+    char *got = expr ? dv_to_string(expr, style_EXPRESSION) : NULL;
+    const char *expect =
+        "{ exp(π·√(x)) | x = 163 }";
+
+    if (expr && got && str_eq(got, expect))
+        to_string_pass("bindings keep implicit pi constant inference", got, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "bindings keep implicit pi constant inference",
+                       got ? got : "(null)", expect);
+
+    free(got);
+    dval_bindings_free(bindings);
+    dv_free(expr);
+}
+
+static void test_from_string_bindings_with_constant_expression_value(void)
+{
+    dval_bindings_t *bindings = NULL;
+    dval_t *expr;
+    dval_t *x;
+    dval_t *deriv;
+    number_t dval;
+    char *deriv_text;
+
+    check_parse_val("binding value may be builtin constant expression",
+                    "{ e^(sin(x)) | x = pi/2 }",
+                    M_E,
+                    __LINE__);
+    check_parse_expr("binding value preserves symbolic pi/2",
+                     "{ e^(sin(x)) | x = pi/2 }",
+                     "{ exp(sin(x)) | x = π/2 }",
+                     __LINE__);
+    check_parse_expr("binding value preserves symbolic 3/2*pi",
+                     "{ e^(sin(x)) | x = 3/2*pi }",
+                     "{ exp(sin(x)) | x = ³⁄₂π }",
+                     __LINE__);
+    check_parse_expr("binding value preserves symbolic pi^2/2",
+                     "{ x | x = (pi^2)/2 }",
+                     "{ x | x = π²/2 }",
+                     __LINE__);
+    check_parse_expr("const-only binding preserves leading semicolon",
+                     "{ exp(π·√(H)) | ;H = 163 }",
+                     "{ exp(π·√(H)) | ; H = 163 }",
+                     __LINE__);
+    check_parse_expr("const-only binding accepts trailing digit subscript",
+                     "{ exp(π·√(H8)) | ; H8 = 163 }",
+                     "{ exp(π·√(H₈)) | ; H₈ = 163 }",
+                     __LINE__);
+    check_parse_expr("minus after factor remains subtraction",
+                     "{ exp(π·√(H8))-(5x)^3 | H8 = 163, x = NAN }",
+                     "{ exp(π·√(H₈)) - (5x)³ | H₈ = 163, x = NAN }",
+                     __LINE__);
+    check_parse_expr("absolute-value bars omit inner spaces",
+                     "{ exp(pi*sqrt(x)) - | exp(pi*sqrt(x)) | | x = NAN }",
+                     "{ exp(π·√(x)) - |exp(π·√(x))| | x = NAN }",
+                     __LINE__);
+    check_parse_expr("symbolic pi quotient cancels powers",
+                     "{ pi/pi^2 }",
+                     "1/π",
+                     __LINE__);
+    check_parse_expr("generated derivative with NaN bindings round-trips",
+                     "{ -y²z²·sin(xyz)·exp(sin(xyz)) + y²z²·cos²(xyz)·exp(sin(xyz)) | y = NAN, z = NAN, x = NAN }",
+                     "{ -y²z²·sin(xyz)·exp(sin(xyz)) + y²z²·cos²(xyz)·exp(sin(xyz)) | y = NAN, z = NAN, x = NAN }",
+                     __LINE__);
+
+    expr = dval_from_string("{ e^(sin(x)) | x = pi/2 }", &bindings);
+    x = bindings ? dval_bindings_get(bindings, "x") : NULL;
+    deriv = (expr && x) ? dv_create_deriv(expr, x) : NULL;
+    deriv_text = deriv ? dv_to_string(deriv, style_EXPRESSION) : NULL;
+
+    if (deriv_text && strcmp(deriv_text, "{ cos(x)·exp(sin(x)) | x = π/2 }") == 0) {
+        to_string_pass("e^sin(x) derivative uses exp simplification",
+                       deriv_text, "{ cos(x)·exp(sin(x)) | x = π/2 }");
+    } else {
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "e^sin(x) derivative uses exp simplification",
+                       deriv_text ? deriv_text : "(null)",
+                       "{ cos(x)·exp(sin(x)) | x = π/2 }");
+    }
+
+    if (deriv) {
+        dval = dv_eval(deriv);
+        if (num_eq(dval, NUM_ZERO)) {
+            printf(C_BOLD C_GREEN "PASS" C_RESET
+                   " derivative at symbolic pi/2 evaluates exactly to zero\n\n");
+        } else {
+            char *got = num_to_string(dval);
+
+            printf(C_BOLD C_RED "FAIL" C_RESET
+                   " derivative at symbolic pi/2 evaluates exactly to zero %s:%d:1\n",
+                   __FILE__, __LINE__);
+            printf(C_BOLD "  got    " C_RESET "%s\n", got ? got : "(null)");
+            printf(C_BOLD "  expect " C_RESET "0\n\n");
+            free(got);
+            TEST_FAIL();
+        }
+        num_destroy(&dval);
+    } else {
+        printf(C_BOLD C_RED "FAIL" C_RESET
+               " derivative at symbolic pi/2 evaluates exactly to zero %s:%d:1\n",
+               __FILE__, __LINE__);
+        printf(C_BOLD "  error  " C_RESET "parser or derivative returned NULL\n\n");
+        TEST_FAIL();
+    }
+
+    free(deriv_text);
+    if (deriv)
+        dv_free(deriv);
+    dval_bindings_free(bindings);
+    if (expr)
+        dv_free(expr);
+
+    bindings = NULL;
+    expr = dval_from_string("{ x/pi }", &bindings);
+    x = bindings ? dval_bindings_get(bindings, "x") : NULL;
+    deriv = (expr && x) ? dv_create_deriv(expr, x) : NULL;
+    deriv_text = deriv ? dv_to_string(deriv, style_EXPRESSION) : NULL;
+
+    if (deriv_text && strcmp(deriv_text, "1/π") == 0) {
+        to_string_pass("x/pi derivative simplifies symbolic quotient",
+                       deriv_text, "1/π");
+    } else {
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "x/pi derivative simplifies symbolic quotient",
+                       deriv_text ? deriv_text : "(null)",
+                       "1/π");
+    }
+
+    free(deriv_text);
+    if (deriv)
+        dv_free(deriv);
+    dval_bindings_free(bindings);
+    if (expr)
+        dv_free(expr);
+}
+
+static void test_from_string_bindings_skip_function_name_letters(void)
+{
+    dval_bindings_t *bindings = NULL;
+    dval_t *expr = dval_from_string("{ exp(@pi*i) }", &bindings);
+    dval_t *x_binding;
+    dval_t *i_binding;
+    qcomplex_t value;
+    qfloat_t err;
+
+    if (!expr) {
+        printf(C_BOLD C_RED "FAIL" C_RESET " function-name binding parse returned NULL %s:%d:1\n\n",
+               __FILE__, __LINE__);
+        TEST_FAIL();
+        return;
+    }
+
+    x_binding = dval_bindings_get(bindings, "x");
+    i_binding = dval_bindings_get(bindings, "i");
+
+    if (!x_binding) {
+        printf(C_BOLD C_GREEN "PASS" C_RESET " function names do not create bogus x binding\n\n");
+    } else {
+        printf(C_BOLD C_RED "FAIL" C_RESET " function names do not create bogus x binding %s:%d:1\n\n",
+               __FILE__, __LINE__);
+        TEST_FAIL();
+    }
+
+    if (i_binding) {
+        printf(C_BOLD C_GREEN "PASS" C_RESET " implicit i binding still returned\n\n");
+    } else {
+        printf(C_BOLD C_RED "FAIL" C_RESET " implicit i binding still returned %s:%d:1\n\n",
+               __FILE__, __LINE__);
+        TEST_FAIL();
+    }
+
+    value = test_dv_eval_qc(expr);
+    err = qc_abs(qc_sub(value, qc_make(qf_from_double(-1.0), QF_ZERO)));
+    if (qf_lt(err, qf_from_double(1e-30))) {
+        printf(C_BOLD C_GREEN "PASS" C_RESET " exp(@pi*i) close to -1\n\n");
+    } else {
+        printf(C_BOLD C_RED "FAIL" C_RESET " exp(@pi*i) close to -1 %s:%d:1\n\n",
+               __FILE__, __LINE__);
+        TEST_FAIL();
+    }
+
+    dval_bindings_free(bindings);
+    dv_free(expr);
+}
+
 /* ---- Round-trips: build → string → parse → compare value ---- */
 
 static void test_from_string_round_trips(void)
@@ -1141,6 +1457,9 @@ void test_dval_t_from_string(void)
     TEST_RUN_SUBTEST(test_from_string_errors, NULL);
     TEST_RUN_SUBTEST(test_from_expression_string_api, NULL);
     TEST_RUN_SUBTEST(test_from_string_bindings_api, NULL);
+    TEST_RUN_SUBTEST(test_from_string_bindings_with_implicit_builtin_constant, NULL);
+    TEST_RUN_SUBTEST(test_from_string_bindings_with_constant_expression_value, NULL);
+    TEST_RUN_SUBTEST(test_from_string_bindings_skip_function_name_letters, NULL);
     TEST_RUN_SUBTEST(test_from_string_round_trips, NULL);
     TEST_RUN_SUBTEST(test_from_string_deriv, NULL);
 }

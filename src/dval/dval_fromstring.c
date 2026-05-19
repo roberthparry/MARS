@@ -17,8 +17,9 @@
  * mathematical conventions and initialises every discovered symbol to NaN.
  * The parser also accepts the following ASCII alternatives for convenience:
  *
- *   _N          subscript digit N (0–9), normalised to U+2080+N internally
- *               so x_0 and x₀ are interchangeable within the same string
+ *   N or _N     trailing subscript digit N (0–9), normalised to U+2080+N
+ *               internally so x0, x_0 and x₀ are interchangeable within the
+ *               same string
  *
  *   *           explicit multiplication in place of middle-dot (·) or
  *               implicit juxtaposition; spaces around '*' are permitted
@@ -42,6 +43,7 @@
 #include <limits.h>
 
 #include "qfloat.h"
+#include "dval_bindings_internal.h"
 #include "dval_internal.h"
 #include "dval_fromstring_internal.h"
 #include "dval.h"
@@ -85,12 +87,13 @@ static int can_start_factor(const parser_t *p)
     unsigned char c = (unsigned char)*p->p;
     if (c == ')' || c == '}' || c == ',' || c == ';' || c == '|') return 0;
     if (c == ' ') return 0;
-    if (c == '[' || c == '(' || c == '-' || c == '@') return 1;
+    if (c == '[' || c == '(' || c == '@') return 1;
     if (at_middle_dot(p)) return 1;
     if (scan_unicode_fraction_len(p->p, p->end) > 0u) return 1;
     unsigned int uc;
     int len = fs_utf8_decode(p->p, &uc);
-    if (len > 0 && fs_is_letter(uc)) return 1;
+    if (len > 0 && (fs_is_letter(uc) || uc == 0x230A || uc == 0x2308))
+        return 1;
     if (isdigit(c) || c == '.') return 1;
     return 0;
 }
@@ -100,6 +103,13 @@ static int can_start_factor(const parser_t *p)
 /* ------------------------------------------------------------------ */
 
 static dval_t *parse_addexpr(parser_t *p);
+static dval_t *parse_signed_power(parser_t *p);
+static dval_t *parse_expression_region(const char *start,
+                                       const char *end,
+                                       symtab_t *syms,
+                                       const char *context_label,
+                                       int report_errors);
+static void symtab_discard_storage(symtab_t *t);
 
 /* ------------------------------------------------------------------ */
 /* Function dispatch                                                    */
@@ -114,10 +124,10 @@ typedef dval_t *(*binary_fn)(const dval_t *, const dval_t *);
 
 /* Sorted function keyword table.
  *
- * With only 40 supported keywords, a compact sorted table plus binary search
+ * With only 42 supported keywords, a compact direct table plus displacement
  * is smaller and easier to maintain than a sparse direct-hash array.  A small
  * number of Unicode round-trip aliases are handled outside this table. */
-#define FUNC_TABLE_SIZE 40
+#define FUNC_TABLE_SIZE 43
 
 typedef struct {
     const char *kw;
@@ -128,53 +138,57 @@ typedef struct {
 } func_entry_t;
 
 static const unsigned char s_func_displacements[FUNC_TABLE_SIZE] = {
-    1, 0, 1, 0, 0, 0, 1, 6, 0, 6,
-    7, 0, 2, 0, 3, 0, 0, 3, 3, 0,
-    5, 6, 2, 0, 0, 5, 0, 2, 0, 23,
-    0, 0, 3, 6, 0, 0, 0, 0, 14, 23
+    0, 0, 0, 0, 7, 0, 3, 0, 1, 0,
+    0, 2, 5, 0, 0, 4, 34, 0, 14, 0,
+    0, 0, 0, 3, 0, 0, 0, 0, 1, 0,
+    0, 9, 0, 3, 0, 8, 0, 0, 0, 2,
+    10, 0, 2
 };
 
 static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
-    { "cos",            3, false, dv_cos,           NULL        },
-    { "atan2",          5, true,  NULL,             dv_atan2    },
-    { "log10",          5, false, dv_log10,         NULL        },
-    { "acos",           4, false, dv_acos,          NULL        },
-    { "productlog",    10, false, dv_lambert_w0,    NULL        },
-    { "logbeta",        7, true,  NULL,             dv_logbeta  },
-    { "atanh",          5, false, dv_atanh,         NULL        },
-    { "lambert_wm1",   11, false, dv_lambert_wm1,   NULL        },
-    { "tan",            3, false, dv_tan,           NULL        },
     { "atan",           4, false, dv_atan,          NULL        },
-    { "sin",            3, false, dv_sin,           NULL        },
-    { "erf",            3, false, dv_erf,           NULL        },
     { "normal_cdf",    10, false, dv_normal_cdf,    NULL        },
-    { "gammainv",       8, false, dv_gammainv,      NULL        },
-    { "normal_logpdf", 13, false, dv_normal_logpdf, NULL        },
-    { "tanh",           4, false, dv_tanh,          NULL        },
-    { "digamma",        7, false, dv_digamma,       NULL        },
-    { "exp",            3, false, dv_exp,           NULL        },
-    { "trigamma",       8, false, dv_trigamma,      NULL        },
-    { "lambert_w0",    10, false, dv_lambert_w0,    NULL        },
     { "sinh",           4, false, dv_sinh,          NULL        },
-    { "lgamma",         6, false, dv_lgamma,        NULL        },
-    { "E1",             2, false, dv_e1,            NULL        },
-    { "log",            3, false, dv_log10,         NULL        },
-    { "erfinv",         6, false, dv_erfinv,        NULL        },
-    { "beta",           4, true,  NULL,             dv_beta     },
     { "gamma",          5, false, dv_gamma,         NULL        },
-    { "Ei",             2, false, dv_ei,            NULL        },
-    { "asinh",          5, false, dv_asinh,         NULL        },
-    { "erfcinv",        7, false, dv_erfcinv,       NULL        },
     { "sqrt",           4, false, dv_sqrt,          NULL        },
-    { "asin",           4, false, dv_asin,          NULL        },
-    { "abs",            3, false, dv_abs,           NULL        },
-    { "hypot",          5, true,  NULL,             dv_hypot    },
-    { "acosh",          5, false, dv_acosh,         NULL        },
-    { "ln",             2, false, dv_log,           NULL        },
-    { "normal_pdf",    10, false, dv_normal_pdf,    NULL        },
     { "pow",            3, true,  NULL,             dv_pow_dv   },
-    { "erfc",           4, false, dv_erfc,          NULL        },
+    { "gammainv",       8, false, dv_gammainv,      NULL        },
+    { "productlog",    10, false, dv_lambert_w0,    NULL        },
+    { "erfinv",         6, false, dv_erfinv,        NULL        },
+    { "Ei",             2, false, dv_ei,            NULL        },
+    { "ceil",           4, false, dv_ceil,          NULL        },
+    { "E1",             2, false, dv_e1,            NULL        },
+    { "cos",            3, false, dv_cos,           NULL        },
+    { "hypot",          5, true,  NULL,             dv_hypot    },
+    { "tan",            3, false, dv_tan,           NULL        },
+    { "trigamma",       8, false, dv_trigamma,      NULL        },
+    { "beta",           4, true,  NULL,             dv_beta     },
+    { "abs",            3, false, dv_abs,           NULL        },
+    { "atan2",          5, true,  NULL,             dv_atan2    },
+    { "normal_pdf",    10, false, dv_normal_pdf,    NULL        },
+    { "asinh",          5, false, dv_asinh,         NULL        },
+    { "lambert_wm1",   11, false, dv_lambert_wm1,   NULL        },
+    { "asin",           4, false, dv_asin,          NULL        },
+    { "logbeta",        7, true,  NULL,             dv_logbeta  },
+    { "acos",           4, false, dv_acos,          NULL        },
+    { "lgamma",         6, false, dv_lgamma,        NULL        },
+    { "acosh",          5, false, dv_acosh,         NULL        },
+    { "normal_logpdf", 13, false, dv_normal_logpdf, NULL        },
+    { "erf",            3, false, dv_erf,           NULL        },
+    { "digamma",        7, false, dv_digamma,       NULL        },
+    { NULL,             0, false, NULL,             NULL        },
     { "cosh",           4, false, dv_cosh,          NULL        },
+    { "log10",          5, false, dv_log10,         NULL        },
+    { "ln",             2, false, dv_log,           NULL        },
+    { "exp",            3, false, dv_exp,           NULL        },
+    { "erfc",           4, false, dv_erfc,          NULL        },
+    { "sin",            3, false, dv_sin,           NULL        },
+    { "tanh",           4, false, dv_tanh,          NULL        },
+    { "lambert_w0",    10, false, dv_lambert_w0,    NULL        },
+    { "log",            3, false, dv_log10,         NULL        },
+    { "erfcinv",        7, false, dv_erfcinv,       NULL        },
+    { "atanh",          5, false, dv_atanh,         NULL        },
+    { "floor",          5, false, dv_floor,         NULL        },
 };
 
 static const func_entry_t s_func_alias_w0 = {
@@ -183,6 +197,26 @@ static const func_entry_t s_func_alias_w0 = {
 
 static const func_entry_t s_func_alias_wm1 = {
     "W₋₁", sizeof("W₋₁") - 1u, false, dv_lambert_wm1, NULL
+};
+
+static const func_entry_t s_func_alias_ascii_w = {
+    "W", sizeof("W") - 1u, false, dv_lambert_w0, NULL
+};
+
+static const func_entry_t s_func_alias_ascii_w0 = {
+    "W0", sizeof("W0") - 1u, false, dv_lambert_w0, NULL
+};
+
+static const func_entry_t s_func_alias_ascii_w0_sub = {
+    "W_0", sizeof("W_0") - 1u, false, dv_lambert_w0, NULL
+};
+
+static const func_entry_t s_func_alias_ascii_wm1 = {
+    "W-1", sizeof("W-1") - 1u, false, dv_lambert_wm1, NULL
+};
+
+static const func_entry_t s_func_alias_ascii_wm1_sub = {
+    "W_-1", sizeof("W_-1") - 1u, false, dv_lambert_wm1, NULL
 };
 
 static unsigned func_bucket_hash(const char *kw, size_t klen)
@@ -335,6 +369,11 @@ static const func_entry_t *lookup_unicode_func_alias(const char *pos, const char
     static const func_entry_t *const aliases[] = {
         &s_func_alias_w0,
         &s_func_alias_wm1,
+        &s_func_alias_ascii_w,
+        &s_func_alias_ascii_w0,
+        &s_func_alias_ascii_w0_sub,
+        &s_func_alias_ascii_wm1,
+        &s_func_alias_ascii_wm1_sub,
     };
     size_t i;
 
@@ -380,23 +419,6 @@ static int parse_two_args(parser_t *p, dval_t **a_out, dval_t **b_out)
     return 1;
 }
 
-static int parse_number_literal(const char **p_in, const char *end, number_t *out)
-{
-    const char *start = *p_in;
-    size_t len = scan_decimal_len(start, end);
-
-    if (len == 0)
-        return 0;
-
-    char *buf = (char *)fs_xmalloc(len + 1);
-    memcpy(buf, start, len);
-    buf[len] = '\0';
-    *out = num_create_from_string(buf);
-    free(buf);
-    *p_in = start + len;
-    return 1;
-}
-
 static size_t scan_number_atom_len(const char *s, const char *end)
 {
     size_t len = scan_decimal_len(s, end);
@@ -431,6 +453,7 @@ static int parse_number_region(const char *start, const char *end, number_t *out
 {
     char *buf;
     size_t len;
+    size_t atom_len;
     char *roundtrip;
 
     while (start < end && isspace((unsigned char)*start))
@@ -442,6 +465,10 @@ static int parse_number_region(const char *start, const char *end, number_t *out
         return 0;
 
     len = (size_t)(end - start);
+    atom_len = scan_number_atom_len(start, end);
+    if (atom_len != len)
+        return 0;
+
     buf = (char *)fs_xmalloc(len + 1);
     memcpy(buf, start, len);
     buf[len] = '\0';
@@ -527,10 +554,14 @@ static dval_t *apply_integer_power_if_present(dval_t *value, int exponent)
 
 static dval_t *parse_enclosed_addexpr(parser_t *p, char closing, const char *errmsg)
 {
-    dval_t *inner = parse_addexpr(p);
+    dval_t *inner;
+
+    skip_spaces(&p->p, p->end);
+    inner = parse_addexpr(p);
 
     if (!inner)
         return NULL;
+    skip_spaces(&p->p, p->end);
     if (!parse_required_char(p, closing, errmsg)) {
         dv_free(inner);
         return NULL;
@@ -566,6 +597,34 @@ static dval_t *parse_atom(parser_t *p)
         if (!inner)
             return NULL;
         dval_t *result = dv_abs(inner);
+        dv_free(inner);
+        return result;
+    }
+
+    /* Mathematical floor/ceiling brackets: ⌊expr⌋ and ⌈expr⌉ */
+    if (cp_len > 0 && (cp == 0x230A || cp == 0x2308)) {
+        const unsigned int closing = (cp == 0x230A) ? 0x230B : 0x2309;
+        const char *errmsg = (cp == 0x230A) ? "expected '⌋'" : "expected '⌉'";
+        dval_t *inner;
+        dval_t *result;
+        unsigned int close_cp = 0;
+        int close_len;
+
+        p->p += cp_len;
+        inner = parse_addexpr(p);
+        if (!inner)
+            return NULL;
+        skip_spaces(&p->p, p->end);
+
+        close_len = fs_utf8_decode(p->p, &close_cp);
+        if (close_len <= 0 || close_cp != closing) {
+            dv_free(inner);
+            set_error(p, errmsg);
+            return NULL;
+        }
+        p->p += close_len;
+
+        result = (cp == 0x230A) ? dv_floor(inner) : dv_ceil(inner);
         dv_free(inner);
         return result;
     }
@@ -720,38 +779,39 @@ static dval_t *parse_power(parser_t *p)
     if (sup >= 0)
         return apply_integer_power_if_present(base, sup);
 
-    /* Caret exponent: x^n or x^(a,b) */
+    /* Caret exponent: x^n, x^y, x^(a+b), right-associative */
     if (p->p < p->end && *p->p == '^') {
+        dval_t *exponent = NULL;
+        dval_t *result = NULL;
+
         p->p++;
 
-        /* General pow: ^(a, b) */
         if (p->p < p->end && *p->p == '(') {
             p->p++;
-            dval_t *a = NULL, *b = NULL;
-            if (!parse_two_args(p, &a, &b)) { dv_free(base); return NULL; }
-            if (!parse_required_char(p, ')', "expected ')' after '^' arguments")) {
+            exponent = parse_enclosed_addexpr(p, ')', "expected ')' after exponent");
+            if (!exponent) {
                 dv_free(base);
-                dv_free(a);
-                dv_free(b);
                 return NULL;
             }
-            /* base is unused here — ^(a, b) is its own expression */
-            dv_free(base);
-            dval_t *result = dv_pow_dv(a, b);
-            dv_free(a); dv_free(b);
-            return result;
+        } else {
+            exponent = parse_signed_power(p);
+            if (!exponent) {
+                dv_free(base);
+                set_error(p, "expected exponent after '^'");
+                return NULL;
+            }
         }
 
-        /* Numeric exponent: ^3.5 */
-        number_t exponent_num;
-        if (!parse_number_literal(&p->p, p->end, &exponent_num)) {
-            dv_free(base);
-            set_error(p, "expected exponent after '^'");
-            return NULL;
+        if (dv_is_unnamed_const(exponent)) {
+            result = dv_pow(base, &exponent->c);
+        } else {
+            result = dv_pow_dv(base, exponent);
         }
-        dval_t *tmp = dv_pow(base, &exponent_num);
         dv_free(base);
-        return tmp;
+        dv_free(exponent);
+        if (!result)
+            return result;
+        return result;
     }
 
     return base;
@@ -776,7 +836,7 @@ static dval_t *parse_signed_power(parser_t *p)
 }
 
 /* ------------------------------------------------------------------ */
-/* Multiplication (implicit and '·')                                   */
+/* Multiplication / division (implicit, '*', '·', '/')                 */
 /* ------------------------------------------------------------------ */
 
 static dval_t *parse_mulexpr(parser_t *p)
@@ -799,19 +859,21 @@ static dval_t *parse_mulexpr(parser_t *p)
             continue;
         }
 
-        /* Explicit '*' (ASCII alternative to middle dot): accepted with or
-         * without surrounding spaces, e.g. "x*y" and "x * y" both work.
-         * Peek past spaces before committing — if '*' is absent we fall
-         * through without advancing p->p. */
+        /* Explicit '*' or '/' accepted with or without surrounding spaces,
+         * e.g. "x*y", "x * y", "x/y", and "x / y". Peek past spaces before
+         * committing — if neither operator is present we fall through without
+         * advancing p->p. */
         {
             const char *peek = p->p;
             while (peek < p->end && *peek == ' ') peek++;
-            if (peek < p->end && *peek == '*') {
-                p->p = peek + 1; /* consume optional leading spaces and '*' */
+            if (peek < p->end && (*peek == '*' || *peek == '/')) {
+                char op = *peek;
+
+                p->p = peek + 1; /* consume optional leading spaces and operator */
                 skip_spaces(&p->p, p->end); /* trailing spaces */
                 dval_t *rhs = parse_signed_power(p);
                 if (!rhs) { dv_free(lhs); return NULL; }
-                dval_t *tmp = dv_mul(lhs, rhs);
+                dval_t *tmp = (op == '*') ? dv_mul(lhs, rhs) : dv_div(lhs, rhs);
                 dv_free(lhs); dv_free(rhs);
                 lhs = tmp;
                 continue;
@@ -844,23 +906,19 @@ static dval_t *parse_addexpr(parser_t *p)
     if (!lhs) return NULL;
 
     for (;;) {
-        if (p->p + 2 >= p->end) break;
+        const char *peek = p->p;
 
-        if (p->p[0] == ' ' && p->p[1] == '+' && p->p[2] == ' ') {
-            p->p += 3;
+        while (peek < p->end && *peek == ' ')
+            peek++;
+
+        if (peek < p->end && (*peek == '+' || *peek == '-')) {
+            char op = *peek;
+
+            p->p = peek + 1;
+            skip_spaces(&p->p, p->end);
             dval_t *rhs = parse_mulexpr(p);
             if (!rhs) { dv_free(lhs); return NULL; }
-            dval_t *tmp = dv_add(lhs, rhs);
-            dv_free(lhs); dv_free(rhs);
-            lhs = tmp;
-            continue;
-        }
-
-        if (p->p[0] == ' ' && p->p[1] == '-' && p->p[2] == ' ') {
-            p->p += 3;
-            dval_t *rhs = parse_mulexpr(p);
-            if (!rhs) { dv_free(lhs); return NULL; }
-            dval_t *tmp = dv_sub(lhs, rhs);
+            dval_t *tmp = (op == '+') ? dv_add(lhs, rhs) : dv_sub(lhs, rhs);
             dv_free(lhs); dv_free(rhs);
             lhs = tmp;
             continue;
@@ -905,19 +963,23 @@ static int parse_bindings(const char *s, const char *end,
         skip_spaces(&p, end);
 
         const char *value_end = scan_binding_value_end(p, end);
+        dv_binding_expr_t *binding_expr;
         number_t val;
         dval_t *node;
 
-        if (!parse_number_region(p, value_end, &val)) {
+        binding_expr = dv_binding_expr_parse_region(p, value_end, errmsg, errmsg_n);
+        if (!binding_expr) {
             free(name);
-            snprintf(errmsg, errmsg_n, "expected numeric value in binding");
             return -1;
         }
+        val = dv_binding_expr_eval(binding_expr);
         p = value_end;
 
         node = is_var
             ? dv_new_named_var(val, name)
             : dv_new_named_const(val, name);
+        num_destroy(&val);
+        node->binding_expr = binding_expr;
 
         /* dv_new_named_* calls dv_normalize_name, which may transform the name
          * (e.g. "@pi" → "π").  Use the normalised form as the lookup key so it
@@ -965,18 +1027,21 @@ static dval_t *parse_pure_const(const char *s, const char *end,
     p++;
     skip_spaces(&p, end);
 
-    number_t val;
-    if (!parse_number_region(p, end, &val)) {
-        free(name);
-        snprintf(errmsg, errmsg_n, "expected value in constant format");
-        return NULL;
-    }
+        dv_binding_expr_t *binding_expr = dv_binding_expr_parse_region(p, end, errmsg, errmsg_n);
+        if (!binding_expr) {
+            free(name);
+            return NULL;
+        }
+    number_t val = dv_binding_expr_eval(binding_expr);
 
     if (!name) {
+        dv_binding_expr_free(binding_expr);
         snprintf(errmsg, errmsg_n, "constant name is required in pure-constant format");
         return NULL;
     }
     dval_t *result = dv_new_named_const(val, name);
+    num_destroy(&val);
+    result->binding_expr = binding_expr;
     free(name);
     return result;
 }
@@ -1017,6 +1082,25 @@ static int collect_implicit_symbols(const char *start, const char *end,
     const char *p = start;
 
     while (p < end) {
+        const char *id = p;
+        const char *id_end = id;
+
+        while (id_end < end &&
+               (isalpha((unsigned char)*id_end) ||
+                isdigit((unsigned char)*id_end) ||
+                *id_end == '_'))
+            id_end++;
+
+        if (id_end > id) {
+            size_t id_len = (size_t)(id_end - id);
+            const func_entry_t *fe = lookup_func(id, id_len);
+
+            if (fe && func_call_start(p, fe->kw, fe->klen)) {
+                p += fe->klen;
+                continue;
+            }
+        }
+
         char *name = read_any_name(&p);
         dval_t *node;
         int is_const;
@@ -1063,6 +1147,16 @@ static int collect_implicit_symbols(const char *start, const char *end,
     }
 
     return 0;
+}
+
+static void symtab_discard_storage(symtab_t *t)
+{
+    if (!t)
+        return;
+    for (int i = 0; i < t->count; ++i)
+        free(t->entries[i].name);
+    free(t->entries);
+    symtab_init(t);
 }
 
 static dval_t *parse_expression_region(const char *start,
@@ -1181,7 +1275,10 @@ static dval_t *dval_from_string_impl(const char *s,
             }
             if (result && bindings_out)
                 bindings = symtab_build_bindings(&syms);
-            symtab_free(&syms);
+            if (result && bindings_out)
+                symtab_discard_storage(&syms);
+            else
+                symtab_free(&syms);
             if (result) {
                 if (bindings_out)
                     *bindings_out = bindings;
@@ -1222,7 +1319,6 @@ static dval_t *dval_from_string_impl(const char *s,
         fprintf(stderr, "dval_from_string: %s\n", errmsg);
         return NULL;
     }
-
     if (semi_pos) {
         if (parse_bindings(semi_pos + 1, bind_end, 0, &syms,
                            errmsg, sizeof(errmsg)) < 0) {
@@ -1232,12 +1328,23 @@ static dval_t *dval_from_string_impl(const char *s,
         }
     }
 
+    if (collect_implicit_symbols(s, expr_end, &syms) < 0) {
+        symtab_free(&syms);
+        fprintf(stderr, "dval_from_string: out of memory\n");
+        return NULL;
+    }
+
     dval_t *result = parse_expression_region(s, expr_end, &syms,
                                              "dval_from_string", 1);
-    if (result && bindings_out)
+    if (result && bindings_out) {
         bindings = symtab_build_bindings(&syms);
+    }
 
-    symtab_free(&syms);
+    if (result && bindings_out) {
+        symtab_discard_storage(&syms);
+    } else {
+        symtab_free(&syms);
+    }
     if (result && bindings_out)
         *bindings_out = bindings;
     return result;

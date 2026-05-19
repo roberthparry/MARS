@@ -195,6 +195,7 @@ number_t *number_pow_int_double(const number_t *number, int exponent);
 number_t *number_pow_int_mcomplex(const number_t *number, int exponent);
 number_t *number_pow_int_mfloat(const number_t *number, int exponent);
 number_t *number_pow_int_mint(const number_t *number, int exponent);
+number_t *number_pow_int_mrational(const number_t *number, int exponent);
 number_t *number_pow_int_qcomplex(const number_t *number, int exponent);
 number_t *number_pow_int_qfloat(const number_t *number, int exponent);
 size_t number_precision_fixed106(const number_t *number);

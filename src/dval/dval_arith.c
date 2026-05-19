@@ -26,8 +26,36 @@ static number_t eval_sub(dval_t *dv)
     return num_sub(dv_eval_num_internal(dv->a), dv_eval_num_internal(dv->b));
 }
 
+static bool is_lambert_expr(const dval_t *dv)
+{
+    return dv_is_op(dv, &ops_lambert_w0) || dv_is_op(dv, &ops_lambert_wm1);
+}
+
+static dval_t *lambert_product_inner(dval_t *a, dval_t *b)
+{
+    dval_t *w;
+    dval_t *exp_term;
+
+    if (is_lambert_expr(a) && dv_is_exp_expr(b)) {
+        w = a;
+        exp_term = b;
+    } else if (is_lambert_expr(b) && dv_is_exp_expr(a)) {
+        w = b;
+        exp_term = a;
+    } else {
+        return NULL;
+    }
+
+    return dv_struct_eq(w, exp_term->a) ? w->a : NULL;
+}
+
 static number_t eval_mul(dval_t *dv)
 {
+    dval_t *inner = lambert_product_inner(dv->a, dv->b);
+
+    if (inner)
+        return num_clone(dv_eval_num_internal(inner));
+
     return num_mul(dv_eval_num_internal(dv->a), dv_eval_num_internal(dv->b));
 }
 

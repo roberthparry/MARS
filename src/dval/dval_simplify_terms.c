@@ -623,6 +623,59 @@ void dv_combine_like_powers(dval_t **terms, size_t nterms)
     }
 }
 
+void dv_cancel_common_powers(dval_t **terms, size_t nterms,
+                             dval_t **den_terms, size_t nden_terms)
+{
+    NUM_SCOPE(scope);
+
+    for (size_t i = 0; i < nterms; ++i) {
+        dval_t *term = terms[i];
+        dval_t *base;
+        number_t exponent;
+
+        if (!term)
+            continue;
+
+        base = pow_base(term);
+        exponent = pow_exponent(term);
+
+        for (size_t j = 0; j < nden_terms; ++j) {
+            dval_t *den = den_terms[j];
+            dval_t *common_base;
+            number_t den_exponent;
+            number_t diff;
+
+            if (!den)
+                continue;
+            if (!dv_struct_eq(base, pow_base(den)))
+                continue;
+
+            den_exponent = pow_exponent(den);
+            diff = num_sub(exponent, den_exponent);
+
+            common_base = pow_base(term);
+            dv_retain(common_base);
+            dv_free(term);
+            dv_free(den);
+
+            if (num_eq(diff, NUM_ZERO)) {
+                dv_free(common_base);
+                terms[i] = NULL;
+                den_terms[j] = NULL;
+            } else if (num_gt(diff, NUM_ZERO)) {
+                terms[i] = dv_make_pow_like(common_base, diff);
+                den_terms[j] = NULL;
+            } else {
+                number_t den_diff = num_neg(diff);
+
+                terms[i] = NULL;
+                den_terms[j] = dv_make_pow_like(common_base, den_diff);
+            }
+            break;
+        }
+    }
+}
+
 void dv_combine_exp_terms(dval_t **terms, size_t nterms)
 {
     for (size_t i = 0; i < nterms; ++i) {

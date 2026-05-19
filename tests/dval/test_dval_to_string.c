@@ -227,7 +227,7 @@ static void test_to_string_basic_const_expr(void)
     dval_t *c = test_dv_new_const_d(3.5);
     char *got = dv_to_string(c, style_EXPRESSION);
 
-    const char *expect = "{ 3.5 }";
+    const char *expect = "3.5";
 
     if (str_eq(got, expect))
         to_string_pass("basic const (EXPR)", got, expect);
@@ -335,7 +335,7 @@ static void test_to_string_nested_transcendental_tex(void)
     char *got = dv_to_string(f, style_TEX);
 
     const char *expect =
-        "\\left\\{ e^{\\sin(x_{0}y_{1})} + x_{0} \\cdot \\ln(y_{1}) "
+        "\\left\\{ e^{\\sin(x_{0} y_{1})} + x_{0} \\cdot \\ln(y_{1}) "
         "\\;\\middle|\\; x_{0} = 1, y_{1} = 2 \\right\\}";
 
     tex_preview_emit_case(__FILE__, "nested transcendental (TEX)", got);
@@ -409,6 +409,44 @@ static void test_to_string_log10_tex(void)
     free(got);
     dv_free(f);
     dv_free(x);
+}
+
+static void test_to_string_symbolic_constants_tex(void)
+{
+    dval_t *f = dval_from_string("{ exp(@pi*i*3/2*x) }", NULL);
+    char *got = f ? dv_to_string(f, style_TEX) : NULL;
+
+    const char *expect =
+        "\\left\\{ e^{\\frac{3}{2} \\pi i x} \\;\\middle|\\; x = NAN \\right\\}";
+
+    tex_preview_emit_case(__FILE__, "symbolic constants (TEX)", got);
+
+    if (str_eq(got, expect))
+        to_string_pass("symbolic constants (TEX)", got, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "symbolic constants (TEX)", got, expect);
+
+    free(got);
+    dv_free(f);
+}
+
+static void test_to_string_symbolic_constant_quotient_tex(void)
+{
+    dval_t *f = dval_from_string("{ 1/pi }", NULL);
+    char *got = f ? dv_to_string(f, style_TEX) : NULL;
+
+    const char *expect = "\\frac{1}{\\pi}";
+
+    tex_preview_emit_case(__FILE__, "symbolic constant quotient (TEX)", got);
+
+    if (str_eq(got, expect))
+        to_string_pass("symbolic constant quotient (TEX)", got, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "symbolic constant quotient (TEX)", got, expect);
+
+    free(got);
+    dv_free(f);
 }
 
 static void test_to_string_lambert_w_tex(void)
@@ -911,10 +949,128 @@ static void test_to_string_function_style_func(void)
     dv_free(x);
 }
 
+static void test_to_string_function_style_signed_sum(void)
+{
+    dval_t *x = test_dv_new_named_var_d(1, "x");
+    dval_t *three = test_dv_new_const_d(3);
+    dval_t *minus_seven = test_dv_new_const_d(-7);
+    dval_t *sin_x = dv_sin(x);
+    dval_t *exp_sin_x = dv_exp(sin_x);
+    dval_t *x2 = dv_mul(x, x);
+    dval_t *three_x2 = dv_mul(three, x2);
+    dval_t *sum = dv_add(exp_sin_x, three_x2);
+    dval_t *f = dv_add(sum, minus_seven);
+    char *got = dv_to_string(f, style_FUNCTION);
+
+    const char *expect = "x = 1\n"
+                         "expr(x) = exp(sin(x)) + 3*x^2 - 7\n"
+                         "return expr(x)\n";
+
+    if (str_eq(got, expect))
+        to_string_pass("function style signed sum (FUNC)", got, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "function style signed sum (FUNC)", got, expect);
+
+    free(got);
+    dv_free(x);
+    dv_free(three);
+    dv_free(minus_seven);
+    dv_free(sin_x);
+    dv_free(exp_sin_x);
+    dv_free(x2);
+    dv_free(three_x2);
+    dv_free(sum);
+    dv_free(f);
+}
+
+static void test_to_string_function_style_sub_negative_product(void)
+{
+    dval_t *E = test_dv_new_named_var_d(0.8, "E");
+    dval_t *ecc = test_dv_new_named_var_d(0.0167, "e");
+    dval_t *sin_E = dv_sin(E);
+    dval_t *ecc_sin_E = dv_mul(ecc, sin_E);
+    dval_t *f = dv_sub(E, ecc_sin_E);
+    char *got = dv_to_string(f, style_FUNCTION);
+
+    const char *expect = "E = 0.8000000000000000444089209850062616\n"
+                         "e = 0.01669999999999999956701302039618894\n"
+                         "expr(E,e) = E - e*sin(E)\n"
+                         "return expr(E,e)\n";
+
+    if (str_eq(got, expect))
+        to_string_pass("function style negative product rhs (FUNC)", got, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "function style negative product rhs (FUNC)", got, expect);
+
+    free(got);
+    dv_free(f);
+    dv_free(ecc_sin_E);
+    dv_free(sin_E);
+    dv_free(ecc);
+    dv_free(E);
+}
+
 void test_to_string_function_style(void)
 {
     TEST_RUN_SUBTEST(test_to_string_function_style_expr, NULL);
     TEST_RUN_SUBTEST(test_to_string_function_style_func, NULL);
+    TEST_RUN_SUBTEST(test_to_string_function_style_signed_sum, NULL);
+    TEST_RUN_SUBTEST(test_to_string_function_style_sub_negative_product, NULL);
+}
+
+static void test_to_string_floor_ceil_expr(void)
+{
+    dval_t *x = test_dv_new_named_var_d(1.5, "x");
+    dval_t *y = test_dv_new_named_var_d(-1.5, "y");
+    dval_t *floor_x = dv_floor(x);
+    dval_t *ceil_y = dv_ceil(y);
+    dval_t *f = dv_add(floor_x, ceil_y);
+    char *got = dv_to_string(f, style_EXPRESSION);
+    const char *expect = "{ ⌊x⌋ + ⌈y⌉ | x = 1.5, y = -1.5 }";
+
+    if (str_eq(got, expect))
+        to_string_pass("floor/ceil mathematical notation (EXPR)", got, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "floor/ceil mathematical notation (EXPR)", got, expect);
+
+    free(got);
+    dv_free(f);
+    dv_free(ceil_y);
+    dv_free(floor_x);
+    dv_free(y);
+    dv_free(x);
+}
+
+static void test_to_string_floor_ceil_func(void)
+{
+    dval_t *x = test_dv_new_named_var_d(1.5, "x");
+    dval_t *y = test_dv_new_named_var_d(-1.5, "y");
+    dval_t *floor_x = dv_floor(x);
+    dval_t *ceil_y = dv_ceil(y);
+    dval_t *f = dv_add(floor_x, ceil_y);
+    char *got = dv_to_string(f, style_FUNCTION);
+    const char *expect = "x = 1.5\n"
+                         "y = -1.5\n"
+                         "expr(x,y) = floor(x) + ceil(y)\n"
+                         "return expr(x,y)\n";
+
+    if (str_eq(got, expect))
+        to_string_pass("floor/ceil function notation (FUNC)", got, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "floor/ceil function notation (FUNC)", got, expect);
+
+    free(got);
+    dv_free(f);
+    dv_free(ceil_y);
+    dv_free(floor_x);
+    dv_free(y);
+    dv_free(x);
+}
+
+void test_to_string_floor_ceil(void)
+{
+    TEST_RUN_SUBTEST(test_to_string_floor_ceil_expr, NULL);
+    TEST_RUN_SUBTEST(test_to_string_floor_ceil_func, NULL);
 }
 
 /* ============================================================
@@ -928,6 +1084,8 @@ void test_to_string_special_functions(void)
 {
     /* Unary functions */
     { dval_t *x = test_dv_new_named_var_d(-3.0, "x"); check_roundtrip("to_string: abs(x)",           dv_abs(x),           __LINE__); dv_free(x); }
+    { dval_t *x = test_dv_new_named_var_d( 1.5, "x"); check_roundtrip("to_string: floor(x)",         dv_floor(x),         __LINE__); dv_free(x); }
+    { dval_t *x = test_dv_new_named_var_d( 1.5, "x"); check_roundtrip("to_string: ceil(x)",          dv_ceil(x),          __LINE__); dv_free(x); }
     { dval_t *x = test_dv_new_named_var_d( 0.5, "x"); check_roundtrip("to_string: erf(x)",           dv_erf(x),           __LINE__); dv_free(x); }
     { dval_t *x = test_dv_new_named_var_d( 0.5, "x"); check_roundtrip("to_string: erfc(x)",          dv_erfc(x),          __LINE__); dv_free(x); }
     { dval_t *x = test_dv_new_named_var_d( 0.5, "x"); check_roundtrip("to_string: erfinv(x)",        dv_erfinv(x),        __LINE__); dv_free(x); }
@@ -976,6 +1134,8 @@ void test_to_string_all(void)
     TEST_RUN_SUBTEST(test_to_string_nested_transcendental_tex, NULL);
     TEST_RUN_SUBTEST(test_to_string_nested_quotient_pow_tex, NULL);
     TEST_RUN_SUBTEST(test_to_string_log10_tex, NULL);
+    TEST_RUN_SUBTEST(test_to_string_symbolic_constants_tex, NULL);
+    TEST_RUN_SUBTEST(test_to_string_symbolic_constant_quotient_tex, NULL);
     TEST_RUN_SUBTEST(test_to_string_lambert_w_tex, NULL);
     TEST_RUN_SUBTEST(test_to_string_non_simple_var_bracketed, NULL);
     TEST_RUN_SUBTEST(test_to_string_addition, NULL);
@@ -988,6 +1148,7 @@ void test_to_string_all(void)
     TEST_RUN_SUBTEST(test_to_string_unary_sin, NULL);
     TEST_RUN_SUBTEST(test_to_string_unary_sqrt, NULL);
     TEST_RUN_SUBTEST(test_to_string_function_style, NULL);
+    TEST_RUN_SUBTEST(test_to_string_floor_ceil, NULL);
     TEST_RUN_SUBTEST(test_to_string_special_functions, NULL);
 }
 
@@ -2344,7 +2505,7 @@ void test_expressions(void)
         {
             "π*τ*e",
             make_expr_34,
-            "{ πτe | π = 3.141592653589793238462643383279505, τ = 6.283185307179586476925286766559011, e = 2.718281828459045235360287471352664 }",
+            "{ πτe | ; π = 3.141592653589793238462643383279505, τ = 6.283185307179586476925286766559011, e = 2.718281828459045235360287471352664 }",
             "π = 3.141592653589793238462643383279505\n"
             "τ = 6.283185307179586476925286766559011\n"
             "e = 2.718281828459045235360287471352664\n"

@@ -273,6 +273,8 @@ dval_t *dv_exp(const dval_t *dv);
 dval_t *dv_log(const dval_t *dv);
 dval_t *dv_log10(const dval_t *dv);
 dval_t *dv_sqrt(const dval_t *dv);
+dval_t *dv_floor(const dval_t *dv);
+dval_t *dv_ceil(const dval_t *dv);
 dval_t *dv_pow(const dval_t *dv, const number_t *exponent);
 dval_t *dv_pow_dv(const dval_t *dv1, const dval_t *dv2);
 

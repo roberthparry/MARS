@@ -1996,6 +1996,38 @@ number_t *number_pow_int_mint(const number_t *number, int exponent)
     return number_wrap_mint(copy);
 }
 
+number_t *number_pow_int_mrational(const number_t *number, int exponent)
+{
+    mrational_t *copy;
+    unsigned long mag;
+
+    if (!number)
+        return NULL;
+
+    copy = mr_clone(number_impl_const(number)->value.mr);
+    if (!copy)
+        return NULL;
+
+    if (exponent < 0 && mr_inv(copy) != 0) {
+        mr_free(copy);
+        return NULL;
+    }
+
+    mag = exponent < 0
+        ? (unsigned long)(-(long)exponent)
+        : (unsigned long)exponent;
+
+    if (mrational_prepare_mutable(copy) != 0) {
+        mr_free(copy);
+        return NULL;
+    }
+
+    mpz_pow_ui(mpq_numref(copy->value), mpq_numref(copy->value), mag);
+    mpz_pow_ui(mpq_denref(copy->value), mpq_denref(copy->value), mag);
+    mpq_canonicalize(copy->value);
+    return number_wrap_mrational(copy);
+}
+
 number_t *number_pow_int_mfloat(const number_t *number, int exponent)
 {
     mfloat_t *copy;

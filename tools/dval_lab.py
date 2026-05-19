@@ -1,0 +1,2349 @@
+#!/usr/bin/env python3
+"""
+Small local GUI for experimenting with dval expressions.
+
+The app serves a single browser page on localhost and evaluates expressions by
+delegating to build/release/scratch/try_dval.  The browser gives us a proper
+GUI surface without adding a desktop toolkit dependency to the project.
+"""
+
+from __future__ import annotations
+
+import argparse
+from decimal import Decimal, localcontext
+import html
+import http.server
+import json
+import os
+from pathlib import Path
+import re
+import socket
+import subprocess
+import sys
+import tempfile
+import threading
+import urllib.parse
+import webbrowser
+
+
+ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_BIN = ROOT / "build" / "release" / "scratch" / "try_dval"
+STATE_FILE = ROOT / ".dval_lab_state.json"
+DEFAULT_EXPRESSION = "{e^(sin(x))|x=pi/2}"
+MAX_VALUE_PRECISION_DIGITS = 1_000_000
+
+
+INDEX_HTML = r"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MARS dval Lab</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #18211f;
+      --muted: #64716d;
+      --paper: #f6f0e5;
+      --panel: #fffaf0;
+      --line: #d9cdb9;
+      --accent: #0f766e;
+      --accent-2: #9a3412;
+      --code: #10201d;
+      --shadow: rgba(49, 38, 22, 0.12);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      font: 16px/1.5 "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+      background:
+        radial-gradient(circle at 15% 10%, rgba(15, 118, 110, 0.18), transparent 28rem),
+        radial-gradient(circle at 86% 8%, rgba(154, 52, 18, 0.16), transparent 24rem),
+        linear-gradient(135deg, #f5ead6 0%, #f8f3e9 52%, #e8f1ed 100%);
+    }
+
+    header {
+      padding: 1.5rem clamp(1rem, 3vw, 2rem) 0.75rem;
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(1.8rem, 4vw, 3.2rem);
+      line-height: 1;
+      letter-spacing: -0.045em;
+    }
+
+    .subtitle {
+      margin: 0.45rem 0 0;
+      color: var(--muted);
+      max-width: 52rem;
+    }
+
+    .status {
+      min-width: 9rem;
+      text-align: right;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(18rem, 0.92fr) minmax(22rem, 1.08fr);
+      gap: 1rem;
+      padding: 0.75rem clamp(1rem, 3vw, 2rem) 2rem;
+    }
+
+    section {
+      background: color-mix(in srgb, var(--panel), white 20%);
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      box-shadow: 0 18px 55px var(--shadow);
+      overflow: hidden;
+    }
+
+    .panel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0.9rem 1rem;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.34);
+    }
+
+    h2 {
+      margin: 0;
+      font-size: 0.95rem;
+      text-transform: uppercase;
+      letter-spacing: 0.13em;
+      color: var(--muted);
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 11rem;
+      resize: vertical;
+      border: 0;
+      outline: 0;
+      padding: 1rem;
+      color: var(--code);
+      background: transparent;
+      font: 1.05rem/1.5 "Cascadia Code", "Fira Code", "DejaVu Sans Mono", monospace;
+    }
+
+    .target-row {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0 1rem 1rem;
+    }
+
+    .target-row label {
+      color: var(--muted);
+      font: 0.78rem/1.2 "Cascadia Code", "DejaVu Sans Mono", monospace;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .target-row input {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      outline: 0;
+      padding: 0.65rem 0.9rem;
+      color: var(--code);
+      background: rgba(255, 255, 255, 0.58);
+      font: 0.95rem/1.25 "Cascadia Code", "Fira Code", "DejaVu Sans Mono", monospace;
+    }
+
+    .target-row input:focus {
+      border-color: color-mix(in srgb, var(--accent), var(--line) 35%);
+      box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
+    }
+
+    .goal-start-fields {
+      display: contents;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.65rem;
+      padding: 0 1rem 1rem;
+    }
+
+    .variable-values {
+      display: grid;
+      gap: 0.7rem;
+      padding: 0 1rem 1rem;
+    }
+
+    .variable-value-box {
+      display: grid;
+      grid-template-columns: minmax(2.4rem, auto) minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 0.7rem;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 0.55rem;
+      background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.72), rgba(255, 250, 240, 0.42));
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+    }
+
+    .variable-value-name {
+      display: inline-grid;
+      min-width: 2.15rem;
+      min-height: 2.15rem;
+      place-items: center;
+      border-radius: 999px;
+      color: #075e57;
+      background: rgba(15, 118, 110, 0.1);
+      font-weight: 700;
+      font-family: "Cascadia Code", "DejaVu Sans Mono", monospace;
+    }
+
+    .variable-value-text {
+      min-width: 0;
+      overflow: hidden;
+      border: 1px solid rgba(217, 205, 185, 0.58);
+      border-radius: 999px;
+      padding: 0.42rem 0.7rem;
+      color: #16312d;
+      background: rgba(255, 255, 255, 0.54);
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font: 0.82rem/1.35 "Cascadia Code", "Fira Code", "DejaVu Sans Mono", monospace;
+    }
+
+    .variable-copy {
+      min-width: 4.1rem;
+      align-self: stretch;
+    }
+
+    button {
+      border: 0;
+      border-radius: 999px;
+      padding: 0.7rem 1rem;
+      color: white;
+      background: var(--accent);
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 10px 24px rgba(15, 118, 110, 0.2);
+    }
+
+    button.secondary {
+      color: var(--accent);
+      background: #e4f0ec;
+      box-shadow: none;
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+    }
+
+    .output-grid {
+      display: grid;
+      gap: 1rem;
+      padding: 1rem;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.5);
+      overflow: hidden;
+    }
+
+    .card-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      padding: 0.55rem 0.75rem;
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.42);
+      border-bottom: 1px solid var(--line);
+      font: 0.78rem/1.2 "Cascadia Code", "DejaVu Sans Mono", monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .card-action {
+      padding: 0.38rem 0.65rem;
+      color: var(--accent);
+      background: #e4f0ec;
+      box-shadow: none;
+      font: 0.72rem/1.1 "Cascadia Code", "DejaVu Sans Mono", monospace;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      min-width: 4.25rem;
+      transition: background 150ms ease, color 150ms ease, transform 150ms ease;
+    }
+
+    .card-action.copied {
+      color: white;
+      background: var(--accent);
+      transform: translateY(-1px);
+    }
+
+    .card-action.copy-failed {
+      color: white;
+      background: #991b1b;
+    }
+
+    .card-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+    }
+
+    .value-title {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+    }
+
+    .precision-actions {
+      justify-content: center;
+      grid-column: 2;
+    }
+
+    .value-copy {
+      justify-self: end;
+      grid-column: 3;
+    }
+
+    pre {
+      margin: 0;
+      padding: 0.9rem;
+      overflow: auto;
+      min-height: 2.75rem;
+    }
+
+    pre {
+      color: var(--code);
+      white-space: pre-wrap;
+      font: 0.92rem/1.45 "Cascadia Code", "DejaVu Sans Mono", monospace;
+    }
+
+    #value {
+      overflow-x: hidden;
+      overflow-y: visible;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      word-break: break-all;
+    }
+
+    .rendered {
+      margin: 0;
+      min-height: 12rem;
+      padding: 1.4rem 1.6rem;
+      overflow: auto;
+      font-size: 1.78rem;
+    }
+
+    .rendered svg {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      transform: scale(2);
+      transform-origin: left center;
+      filter: brightness(0) saturate(100%) invert(13%) sepia(78%) saturate(1567%) hue-rotate(198deg) brightness(88%) contrast(98%);
+    }
+
+    .error {
+      color: #991b1b;
+      background: #fff1f1;
+      border-color: #fecaca;
+    }
+
+    .help-pane {
+      padding: 1rem;
+    }
+
+    .help-card {
+      padding: 1rem;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.5);
+    }
+
+    .help-card + .help-card {
+      margin-top: 1rem;
+    }
+
+    .help-card h3 {
+      margin: 0 0 0.65rem;
+      color: var(--accent-2);
+      font-size: 1rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .help-card p {
+      margin: 0 0 0.7rem;
+      color: var(--muted);
+    }
+
+    .help-card ul {
+      margin: 0;
+      padding-left: 1.25rem;
+    }
+
+    .help-card li {
+      margin: 0.35rem 0;
+    }
+
+    .help-card code {
+      color: var(--code);
+      font: 0.92rem/1.35 "Cascadia Code", "DejaVu Sans Mono", monospace;
+      background: rgba(15, 118, 110, 0.08);
+      border-radius: 6px;
+      padding: 0.08rem 0.25rem;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    @media (max-width: 900px) {
+      header {
+        display: block;
+      }
+
+      .status {
+        text-align: left;
+        margin-top: 0.5rem;
+      }
+
+      main {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>MARS dval Lab</h1>
+      <p class="subtitle">Type a dval expression on the left. The tool evaluates it through your built scratch binary and renders the generated TeX on the right.</p>
+    </div>
+    <div class="status" id="status">Ready</div>
+  </header>
+  <main>
+    <section>
+      <div class="panel-head">
+        <h2>Expression</h2>
+      </div>
+      <textarea id="expr" spellcheck="false">__INITIAL_EXPRESSION__</textarea>
+      <div class="target-row hidden" id="targetRow">
+        <label for="goalTarget">Target</label>
+        <input id="goalTarget" spellcheck="false" value="0">
+        <div class="goal-start-fields" id="goalStartFields"></div>
+      </div>
+      <div class="controls">
+        <button id="run">Evaluate</button>
+        <button class="secondary" id="back">Back</button>
+        <button class="secondary" id="forward">Forward</button>
+        <button class="secondary" id="help">Help</button>
+        <button class="secondary" id="goalSeek">Goal seek</button>
+        <button class="secondary" id="clear">Clear</button>
+      </div>
+      <div class="controls derivative-controls" id="derivativeButtons"></div>
+      <div class="variable-values hidden" id="variableValues"></div>
+    </section>
+
+    <section>
+      <div class="panel-head">
+        <h2 id="rightPaneTitle">Result</h2>
+      </div>
+      <div class="output-grid" id="resultPane">
+        <div class="card">
+          <div class="card-title">
+            <span>Rendered TeX</span>
+            <button class="card-action copy-result hidden" id="renderedCopy" data-copy-target="rendered">Copy</button>
+          </div>
+          <div class="rendered" id="rendered"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">
+            <span>TeX</span>
+            <button class="card-action copy-result" data-copy-target="tex">Copy</button>
+          </div>
+          <pre id="tex"></pre>
+        </div>
+        <div class="card">
+          <div class="card-title">
+            <span>Expression</span>
+            <button class="card-action copy-result" data-copy-target="expression">Copy</button>
+          </div>
+          <pre id="parsed"></pre>
+        </div>
+        <div class="card">
+          <div class="card-title">
+            <span>Function</span>
+            <button class="card-action copy-result" data-copy-target="function">Copy</button>
+          </div>
+          <pre id="functionStyle"></pre>
+        </div>
+        <div class="card">
+          <div class="card-title value-title">
+            <span>Value</span>
+            <span class="card-actions precision-actions">
+              <button class="card-action" id="lessPrecision">Less precision</button>
+              <button class="card-action" id="morePrecision">More precision</button>
+            </span>
+            <button class="card-action copy-result value-copy" data-copy-target="value">Copy</button>
+          </div>
+          <pre id="value"></pre>
+        </div>
+      </div>
+      <div class="help-pane hidden" id="helpPane">
+        <div class="help-card">
+          <h3>Expression Shape</h3>
+          <p>Use braces when you want bindings. Bare expressions are wrapped for you.</p>
+          <ul>
+            <li><code>x/pi</code> becomes <code>{ x/π | x = ? }</code></li>
+            <li><code>{ e^sin(x) | x = pi/2 }</code></li>
+            <li><code>{ exp(π·√(H₈)) - (5x)^3 | x = ?; H₈ = 163 }</code></li>
+          </ul>
+        </div>
+        <div class="help-card">
+          <h3>Bindings</h3>
+          <p>Bindings before <code>;</code> are variables. Bindings after <code>;</code> are constants.</p>
+          <ul>
+            <li><code>x = ?</code> means unknown / <code>NAN</code>, so derivative buttons appear for <code>x</code>.</li>
+            <li><code>; H = 163</code> marks <code>H</code> as a constant, so no derivative button is made for it.</li>
+            <li>Binding values can use arithmetic: <code>3/2*pi</code>, <code>(pi^2)/2</code>, <code>3/2+pi/7+3*i/5</code>.</li>
+          </ul>
+        </div>
+        <div class="help-card">
+          <h3>Goal Seek</h3>
+          <p>Goal seek changes variable bindings so the expression value reaches the value in the <code>Target</code> field.</p>
+          <ul>
+            <li>Set unknowns with <code>?</code>, for example <code>{ x*y | x = ?, y = ? }</code>.</li>
+            <li>Constants after <code>;</code> are not changed, for example <code>{ exp(π·√(H₈)) - (5x)^3 | x = ?; H₈ = 163 }</code>.</li>
+            <li>If there is one variable, goal seek solves that variable directly.</li>
+            <li>If there are several variables, goal seek moves them together by the smallest local step it can find.</li>
+            <li>Optional start boxes appear for each variable. Enter numeric constant expressions only, such as <code>3</code>, <code>pi/4</code>, <code>-2.5</code>, or <code>1e-6</code>.</li>
+            <li>Use a start point when the solver needs a hint about which crossing or branch to search near, for example target <code>27</code> with expression <code>{ x^x | x = ? }</code> and start <code>3</code>.</li>
+            <li>For several variables, fill the start box beside each variable you want to seed. Blank start boxes keep their current binding value, or use <code>1</code> for unknowns.</li>
+            <li>It only reports success when <code>abs(value - target)</code> is within the current working precision.</li>
+          </ul>
+        </div>
+        <div class="help-card">
+          <h3>Constants And Functions</h3>
+          <ul>
+            <li>Built-in constants include <code>pi</code>/<code>π</code>, <code>e</code>, <code>i</code>, <code>phi</code>/<code>φ</code>, and <code>gamma</code>/<code>γ</code>.</li>
+            <li><code>ln(x)</code> is natural log; <code>log(x)</code> and <code>log10(x)</code> are base-10 log.</li>
+            <li><code>W(x)</code>, <code>W0(x)</code>, and <code>W_0(x)</code> mean <code>W₀(x)</code>. Use <code>W-1(x)</code> for <code>W₋₁(x)</code>.</li>
+          </ul>
+        </div>
+        <div class="help-card">
+          <h3>Unary Functions</h3>
+          <ul>
+            <li>Elementary: <code>abs(x)</code>, <code>floor(x)</code>, <code>ceil(x)</code>, <code>sqrt(x)</code>, <code>exp(x)</code>, <code>ln(x)</code>, <code>log(x)</code>, <code>log10(x)</code>.</li>
+            <li>Trigonometric: <code>sin(x)</code>, <code>cos(x)</code>, <code>tan(x)</code>, <code>asin(x)</code>, <code>acos(x)</code>, <code>atan(x)</code>.</li>
+            <li>Hyperbolic: <code>sinh(x)</code>, <code>cosh(x)</code>, <code>tanh(x)</code>, <code>asinh(x)</code>, <code>acosh(x)</code>, <code>atanh(x)</code>.</li>
+            <li>Gamma family: <code>gamma(x)</code>, <code>gammainv(x)</code>, <code>lgamma(x)</code>, <code>digamma(x)</code>, <code>trigamma(x)</code>.</li>
+            <li>Error functions: <code>erf(x)</code>, <code>erfc(x)</code>, <code>erfinv(x)</code>, <code>erfcinv(x)</code>.</li>
+            <li>Exponential integrals: <code>Ei(x)</code>, <code>E1(x)</code>.</li>
+          </ul>
+        </div>
+        <div class="help-card">
+          <h3>Lambert W And Normal Functions</h3>
+          <ul>
+            <li>Principal Lambert W: <code>W(x)</code>, <code>W0(x)</code>, <code>W_0(x)</code>, <code>W₀(x)</code>, <code>productlog(x)</code>, <code>lambert_w0(x)</code>.</li>
+            <li>Minus-one Lambert W branch: <code>W-1(x)</code>, <code>W_-1(x)</code>, <code>W₋₁(x)</code>, <code>lambert_wm1(x)</code>.</li>
+            <li>Normal distribution: <code>normal_pdf(x)</code>, <code>normal_cdf(x)</code>, <code>normal_logpdf(x)</code>.</li>
+          </ul>
+        </div>
+        <div class="help-card">
+          <h3>Binary Functions</h3>
+          <ul>
+            <li><code>pow(x, y)</code> is equivalent to <code>x^y</code>.</li>
+            <li><code>atan2(y, x)</code>, <code>hypot(x, y)</code>.</li>
+            <li><code>beta(x, y)</code>, <code>logbeta(x, y)</code>.</li>
+          </ul>
+        </div>
+        <div class="help-card">
+          <h3>Shortcuts</h3>
+          <ul>
+            <li><code>Ctrl+Enter</code> evaluates the expression.</li>
+            <li>Derivative buttons appear from the current variable bindings.</li>
+            <li>Enter the goal-seek target in the left pane's <code>Target</code> field.</li>
+            <li>Use the per-variable start boxes when goal seek needs better initial guesses.</li>
+            <li><code>Goal seek</code> changes all variable bindings together to move the value toward that target.</li>
+            <li>More/Less precision changes the displayed value precision without changing the expression.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const expr = document.getElementById('expr');
+    const run = document.getElementById('run');
+    const back = document.getElementById('back');
+    const forward = document.getElementById('forward');
+    const help = document.getElementById('help');
+    const goalSeek = document.getElementById('goalSeek');
+    const clear = document.getElementById('clear');
+    const targetRow = document.getElementById('targetRow');
+    const goalTarget = document.getElementById('goalTarget');
+    const goalStartFields = document.getElementById('goalStartFields');
+    const lessPrecision = document.getElementById('lessPrecision');
+    const morePrecision = document.getElementById('morePrecision');
+    const derivativeButtons = document.getElementById('derivativeButtons');
+    const variableValues = document.getElementById('variableValues');
+    const statusEl = document.getElementById('status');
+    const rightPaneTitle = document.getElementById('rightPaneTitle');
+    const resultPane = document.getElementById('resultPane');
+    const helpPane = document.getElementById('helpPane');
+    const rendered = document.getElementById('rendered');
+    const renderedCopy = document.getElementById('renderedCopy');
+    const texEl = document.getElementById('tex');
+    const parsed = document.getElementById('parsed');
+    const functionStyle = document.getElementById('functionStyle');
+    const value = document.getElementById('value');
+    const copyButtons = Array.from(document.querySelectorAll('.copy-result'));
+    let lastTex = '';
+    let displayTex = '';
+    let lastDerivativeExpression = '';
+    let currentVariables = [];
+    let expressionHistory = [];
+    let forwardHistory = [];
+    let precisionExtra = 0;
+    let fullExpressionText = '';
+    let displayedExpressionText = '';
+    let bindingValueCache = new Map();
+    const DOUBLE_PRECISION_DIGITS = 17;
+    const MAX_PRECISION_DIGITS = 1000000;
+    const START_FORBIDDEN_PATTERN = /[=,;|{}]/;
+    const PRECISION_STEPS = [
+      17, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024,
+      1200, 2000, 5000, 10000, 20000, 50000, 100000, 200000,
+      500000, 1000000
+    ];
+
+    function setStatus(text) {
+      statusEl.textContent = text;
+    }
+
+    function showResults() {
+      resultPane.classList.remove('hidden');
+      helpPane.classList.add('hidden');
+      rightPaneTitle.textContent = 'Result';
+      help.textContent = 'Help';
+    }
+
+    function showHelp() {
+      resultPane.classList.add('hidden');
+      helpPane.classList.remove('hidden');
+      rightPaneTitle.textContent = 'Help';
+      help.textContent = 'Result';
+      setStatus('Help');
+    }
+
+    function toggleHelp() {
+      if (helpPane.classList.contains('hidden'))
+        showHelp();
+      else {
+        showResults();
+        setStatus('Ready');
+      }
+    }
+
+    function showTargetEntry() {
+      const variables = variablesFromExpression(currentExpressionText());
+      renderGoalStartFields(variables);
+      targetRow.classList.remove('hidden');
+      goalSeek.textContent = 'Run goal seek';
+      goalTarget.focus();
+      goalTarget.select();
+      setStatus('Enter target');
+    }
+
+    function hideTargetEntry() {
+      targetRow.classList.add('hidden');
+      goalSeek.textContent = 'Goal seek';
+    }
+
+    function goalStartKeydown(event) {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        goalSeek.click();
+      } else if (event.key === 'Escape') {
+        event.preventDefault();
+        hideTargetEntry();
+        expr.focus();
+        setStatus('Ready');
+      }
+    }
+
+    function renderGoalStartFields(variables) {
+      goalStartFields.replaceChildren();
+      variables.forEach((name) => {
+        const id = `goalStart_${name.replace(/[^A-Za-z0-9_-]/g, '_')}`;
+        const label = document.createElement('label');
+        label.setAttribute('for', id);
+        label.textContent = `Start ${name}`;
+
+        const input = document.createElement('input');
+        input.id = id;
+        input.dataset.variable = name;
+        input.inputMode = 'decimal';
+        input.spellcheck = false;
+        input.placeholder = 'optional value';
+        input.addEventListener('keydown', goalStartKeydown);
+
+        goalStartFields.append(label, input);
+      });
+    }
+
+    function goalStartValues() {
+      const values = {};
+      for (const input of goalStartFields.querySelectorAll('input')) {
+        const text = input.value.trim();
+        if (!text)
+          continue;
+        if (START_FORBIDDEN_PATTERN.test(text)) {
+          throw new Error(`Start for ${input.dataset.variable} must be a numeric constant expression`);
+        }
+        values[input.dataset.variable] = text;
+      }
+      return values;
+    }
+
+    function splitTopLevel(text, separator) {
+      const parts = [];
+      let start = 0;
+      let depth = 0;
+      for (let i = 0; i < text.length; i++) {
+        const ch = text[i];
+        if (ch === '(' || ch === '[' || ch === '{') depth++;
+        else if (ch === ')' || ch === ']' || ch === '}') depth = Math.max(0, depth - 1);
+        else if (ch === separator && depth === 0) {
+          parts.push(text.slice(start, i));
+          start = i + 1;
+        }
+      }
+      parts.push(text.slice(start));
+      return parts;
+    }
+
+    function indexOfTopLevel(text, needle) {
+      let depth = 0;
+      for (let i = 0; i < text.length; i++) {
+        const ch = text[i];
+        if (ch === '(' || ch === '[' || ch === '{') depth++;
+        else if (ch === ')' || ch === ']' || ch === '}') depth = Math.max(0, depth - 1);
+        else if (ch === needle && depth === 0) return i;
+      }
+      return -1;
+    }
+
+    function lastIndexOfTopLevel(text, needle) {
+      let depth = 0;
+      let found = -1;
+      for (let i = 0; i < text.length; i++) {
+        const ch = text[i];
+        if (ch === '(' || ch === '[' || ch === '{') depth++;
+        else if (ch === ')' || ch === ']' || ch === '}') depth = Math.max(0, depth - 1);
+        else if (ch === needle && depth === 0) found = i;
+      }
+      return found;
+    }
+
+    function variablesFromExpression(text) {
+      text = String(text || '').trim();
+      if (text.startsWith('{') && text.endsWith('}')) {
+        text = text.slice(1, -1).trim();
+      }
+
+      const pipe = lastIndexOfTopLevel(text, '|');
+      if (pipe < 0) return [];
+
+      let bindings = text.slice(pipe + 1).trim();
+      const semi = indexOfTopLevel(bindings, ';');
+      if (semi >= 0) bindings = bindings.slice(0, semi);
+
+      return splitTopLevel(bindings, ',')
+        .map((part) => {
+          const eq = indexOfTopLevel(part, '=');
+          return eq >= 0 ? part.slice(0, eq).trim() : '';
+        })
+        .filter(Boolean);
+    }
+
+    function derivativeExpressionFromLine(line) {
+      const match = String(line || '').match(/^d\/d[^=]*=\s*(.+)$/);
+      return match ? match[1].trim() : '';
+    }
+
+    function expressionForEvaluation(text) {
+      return String(text || '').replace(/(=\s*)\?/g, '$1NAN');
+    }
+
+    function expressionForEditor(text) {
+      return String(text || '').replace(/(=\s*)NAN\b/g, '$1?');
+    }
+
+    function restoreCompactBindingValues(text) {
+      text = String(text || '').trim();
+      if (!text.includes('...'))
+        return text;
+
+      const parts = bindingParts(text);
+      if (!parts)
+        return text;
+
+      const restoreValues = new Map(bindingValueCache);
+      const fullParts = bindingParts(expr.dataset.fullExpression || fullExpressionText);
+      if (fullParts) {
+        [fullParts.variables, fullParts.constants].forEach((assignmentsText) => {
+          splitTopLevel(assignmentsText, ',').forEach((part) => {
+            const eq = indexOfTopLevel(part, '=');
+            if (eq < 0)
+              return;
+
+            const name = part.slice(0, eq).trim();
+            const value = part.slice(eq + 1).trim();
+            if (name && value && !restoreValues.has(name))
+              restoreValues.set(name, value);
+          });
+        });
+      }
+
+      if (restoreValues.size === 0)
+        return text;
+
+      let changed = false;
+      function restoreAssignments(assignmentsText) {
+        return splitTopLevel(assignmentsText, ',')
+          .map((part) => {
+            const eq = indexOfTopLevel(part, '=');
+            if (eq < 0)
+              return part.trim();
+
+            const name = part.slice(0, eq).trim();
+            const valueText = part.slice(eq + 1).trim();
+            const cached = restoreValues.get(name);
+            if (cached && valueText.endsWith('...') && cached.startsWith(valueText.slice(0, -3))) {
+              changed = true;
+              return `${name} = ${cached}`;
+            }
+            return part.trim();
+          })
+          .filter(Boolean)
+          .join(', ');
+      }
+
+      const variables = restoreAssignments(parts.variables);
+      const constants = restoreAssignments(parts.constants);
+      let bindingText = variables;
+      if (constants)
+        bindingText = bindingText ? `${bindingText}; ${constants}` : `; ${constants}`;
+
+      return changed ? `{ ${parts.body} | ${bindingText} }` : text;
+    }
+
+    function currentExpressionText() {
+      const text = expr.value.trim();
+      const full = expr.dataset.fullExpression || fullExpressionText;
+      const compact = expr.dataset.displayExpression || displayedExpressionText;
+      if (full && compact && text === compact)
+        return full;
+      if (text.includes('...'))
+        return restoreCompactBindingValues(text);
+      return text;
+    }
+
+    function clearExpressionSource() {
+      fullExpressionText = '';
+      displayedExpressionText = '';
+      bindingValueCache = new Map();
+      delete expr.dataset.fullExpression;
+      delete expr.dataset.displayExpression;
+    }
+
+    function bindingParts(text) {
+      text = String(text || '').trim();
+      const wrapped = text.startsWith('{') && text.endsWith('}');
+      if (wrapped)
+        text = text.slice(1, -1).trim();
+
+      const pipe = lastIndexOfTopLevel(text, '|');
+      if (pipe < 0)
+        return null;
+
+      const body = text.slice(0, pipe).trim();
+      const bindings = text.slice(pipe + 1).trim();
+      const semi = indexOfTopLevel(bindings, ';');
+      const variables = semi >= 0 ? bindings.slice(0, semi).trim() : bindings;
+      const constants = semi >= 0 ? bindings.slice(semi + 1).trim() : '';
+      return {wrapped, body, variables, constants};
+    }
+
+    function compactBindingValue(valueText) {
+      const text = String(valueText || '').trim();
+      if (!text || text === '?' || /^NAN$/i.test(text))
+        return {display: text, shortened: false};
+      if (text.length <= 38)
+        return {display: text, shortened: false};
+      return {display: `${text.slice(0, 34)}...`, shortened: true};
+    }
+
+    function compactExpressionForEditor(fullText) {
+      const full = expressionForEditor(fullText);
+      const parts = bindingParts(full);
+      if (!parts)
+        return {display: full, bindings: [], shortened: false};
+
+      const bindingValues = [];
+      let shortened = false;
+      const variableAssignments = splitTopLevel(parts.variables, ',')
+        .map((part) => {
+          const eq = indexOfTopLevel(part, '=');
+          if (eq < 0)
+            return part.trim();
+
+          const name = part.slice(0, eq).trim();
+          const valueText = part.slice(eq + 1).trim();
+          const compact = compactBindingValue(valueText);
+          if (name && valueText && valueText !== '?' && !/^NAN$/i.test(valueText)) {
+            bindingValues.push({name, value: valueText, display: compact.display});
+          }
+          shortened = shortened || compact.shortened;
+          return `${name} = ${compact.display}`;
+        })
+        .filter(Boolean);
+
+      let bindingText = variableAssignments.join(', ');
+      if (parts.constants)
+        bindingText = bindingText ? `${bindingText}; ${parts.constants}` : `; ${parts.constants}`;
+
+      return {
+        display: `{ ${parts.body} | ${bindingText} }`,
+        bindings: shortened ? bindingValues : [],
+        shortened
+      };
+    }
+
+    function clearVariableValues() {
+      variableValues.replaceChildren();
+      variableValues.classList.add('hidden');
+    }
+
+    function renderVariableValues(bindings) {
+      variableValues.replaceChildren();
+      bindingValueCache = new Map();
+      if (!bindings.length) {
+        variableValues.classList.add('hidden');
+        return;
+      }
+
+      bindings.forEach((binding) => {
+        bindingValueCache.set(binding.name, binding.value);
+        const box = document.createElement('div');
+        box.className = 'variable-value-box';
+
+        const name = document.createElement('span');
+        name.className = 'variable-value-name';
+        name.textContent = binding.name;
+
+        const text = document.createElement('code');
+        text.className = 'variable-value-text';
+        text.textContent = binding.value;
+        text.title = binding.value;
+
+        const copy = document.createElement('button');
+        copy.className = 'card-action variable-copy';
+        copy.type = 'button';
+        copy.textContent = 'Copy';
+        copy.addEventListener('click', async () => {
+          try {
+            await writeClipboardText(binding.value);
+            flashCopyButton(copy, true);
+            setStatus(`Copied ${binding.name}`);
+            setTimeout(() => setStatus('Ready'), 1000);
+          } catch (err) {
+            flashCopyButton(copy, false);
+            setStatus(String(err));
+          }
+        });
+
+        box.append(name, text, copy);
+        variableValues.appendChild(box);
+      });
+
+      variableValues.classList.remove('hidden');
+    }
+
+    function setExpressionEditor(fullText) {
+      const compact = compactExpressionForEditor(fullText);
+      fullExpressionText = expressionForEditor(fullText).trim();
+      displayedExpressionText = compact.display.trim();
+      expr.dataset.fullExpression = fullExpressionText;
+      expr.dataset.displayExpression = displayedExpressionText;
+      expr.value = compact.display;
+      renderVariableValues(compact.bindings);
+    }
+
+    async function loadLastExpression() {
+      try {
+        const response = await fetch('/state');
+        const data = await response.json();
+        const saved = String(data.expression || '').trim();
+        if (saved) {
+          if (!saved.includes('...')) {
+            setExpressionEditor(saved);
+            return;
+          }
+          const localSaved = localStorage.getItem('mars.dvalLab.lastExpression');
+          if (localSaved && !localSaved.includes('...')) {
+            setExpressionEditor(localSaved);
+            return;
+          }
+          expr.value = saved;
+          return;
+        }
+      } catch (_) {
+        // Fall back to localStorage below.
+      }
+
+      try {
+        const saved = localStorage.getItem('mars.dvalLab.lastExpression');
+        if (saved) {
+          if (saved.includes('...'))
+            expr.value = saved;
+          else
+            setExpressionEditor(saved);
+        }
+      } catch (_) {
+        // Private browsing or locked-down webviews can disable localStorage.
+      }
+    }
+
+    function saveLastExpression(text) {
+      text = String(text || '').trim();
+      if (text.includes('...') && fullExpressionText)
+        text = fullExpressionText;
+      if (text.includes('...'))
+        return;
+
+      try {
+        if (text)
+          localStorage.setItem('mars.dvalLab.lastExpression', text);
+      } catch (_) {
+        // The lab still works fine without persistence.
+      }
+
+      if (!text)
+        return;
+
+      fetch('/state', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({expression: text})
+      }).catch(() => {
+        // Persistence is helpful, not essential.
+      });
+    }
+
+    function setBusy(isBusy) {
+      run.disabled = isBusy;
+      back.disabled = isBusy || expressionHistory.length === 0;
+      forward.disabled = isBusy || forwardHistory.length === 0;
+      goalSeek.disabled = isBusy;
+      goalTarget.disabled = isBusy;
+      Array.from(goalStartFields.querySelectorAll('input')).forEach((input) => {
+        input.disabled = isBusy;
+      });
+      lessPrecision.disabled = isBusy || atMinimumPrecision();
+      morePrecision.disabled = isBusy;
+      copyButtons.forEach((button) => {
+        button.disabled = isBusy;
+      });
+      Array.from(variableValues.querySelectorAll('button')).forEach((button) => {
+        button.disabled = isBusy;
+      });
+      Array.from(derivativeButtons.querySelectorAll('button')).forEach((button) => {
+        button.disabled = isBusy;
+      });
+    }
+
+    function updateHistoryButtons() {
+      back.disabled = expressionHistory.length === 0;
+      forward.disabled = forwardHistory.length === 0;
+      lessPrecision.disabled = atMinimumPrecision();
+    }
+
+    function pushExpressionHistory(text) {
+      const previous = expressionHistory[expressionHistory.length - 1];
+      if (text && text !== previous) {
+        expressionHistory.push(text);
+      }
+      forwardHistory = [];
+      updateHistoryButtons();
+    }
+
+    function renderDerivativeButtons(variables) {
+      derivativeButtons.replaceChildren();
+      variables.forEach((name) => {
+        const button = document.createElement('button');
+        button.className = 'secondary';
+        button.type = 'button';
+        button.textContent = `${name} derivative`;
+        button.addEventListener('click', () => takeDerivative(name));
+        derivativeButtons.appendChild(button);
+      });
+    }
+
+    async function fetchEvaluation(text, wrt = '') {
+      const precision = requestedValuePrecision();
+      const response = await fetch('/eval', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({expression: expressionForEvaluation(text), wrt, precision})
+      });
+      const data = await response.json();
+      return {response, data};
+    }
+
+    function estimateValuePrecision() {
+      const style = getComputedStyle(value);
+      const canvas = estimateValuePrecision.canvas || document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      const padLeft = parseFloat(style.paddingLeft) || 0;
+      const padRight = parseFloat(style.paddingRight) || 0;
+      let charWidth = 9;
+
+      estimateValuePrecision.canvas = canvas;
+      if (context) {
+        context.font = style.font;
+        charWidth = context.measureText('0123456789'.repeat(8)).width / 80 || charWidth;
+      }
+
+      const usableWidth = Math.max(0, value.clientWidth - padLeft - padRight);
+      const chars = Math.floor(usableWidth / charWidth);
+
+      return Math.max(32, Math.min(220, chars - 3));
+    }
+
+    function requestedValuePrecision() {
+      const requested = estimateValuePrecision() + precisionExtra;
+      return Math.max(DOUBLE_PRECISION_DIGITS, Math.min(MAX_PRECISION_DIGITS, requested));
+    }
+
+    function atMinimumPrecision() {
+      return requestedValuePrecision() <= DOUBLE_PRECISION_DIGITS;
+    }
+
+    function setRequestedValuePrecision(precision) {
+      precisionExtra = precision - estimateValuePrecision();
+    }
+
+    function nextPrecisionStep(current) {
+      for (const step of PRECISION_STEPS) {
+        if (step > current)
+          return step;
+      }
+      return MAX_PRECISION_DIGITS;
+    }
+
+    function previousPrecisionStep(current) {
+      for (let i = PRECISION_STEPS.length - 1; i >= 0; --i) {
+        if (PRECISION_STEPS[i] < current)
+          return PRECISION_STEPS[i];
+      }
+      return DOUBLE_PRECISION_DIGITS;
+    }
+
+    function copyTextForTarget(target) {
+      if (target === 'rendered') return rendered.textContent;
+      if (target === 'tex') return lastTex || texEl.textContent;
+      if (target === 'expression') return fullExpressionText || parsed.textContent;
+      if (target === 'function') return functionStyle.dataset.fullText || functionStyle.textContent;
+      if (target === 'value') return value.textContent;
+      return '';
+    }
+
+    async function writeClipboardText(text) {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        return;
+      }
+
+      const area = document.createElement('textarea');
+      area.value = text;
+      area.setAttribute('readonly', '');
+      area.style.position = 'fixed';
+      area.style.left = '-9999px';
+      area.style.top = '0';
+      document.body.appendChild(area);
+      area.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(area);
+      if (!ok)
+        throw new Error('Copy was blocked by the browser');
+    }
+
+    function flashCopyButton(button, ok) {
+      const original = button.dataset.originalLabel || button.textContent;
+      button.dataset.originalLabel = original;
+      button.classList.remove('copied', 'copy-failed');
+      button.classList.add(ok ? 'copied' : 'copy-failed');
+      button.textContent = ok ? 'Copied' : 'Failed';
+
+      clearTimeout(button.copyResetTimer);
+      button.copyResetTimer = setTimeout(() => {
+        button.textContent = original;
+        button.classList.remove('copied', 'copy-failed');
+      }, 1200);
+    }
+
+    function clearResultPane() {
+      rendered.replaceChildren();
+      rendered.textContent = '';
+      rendered.classList.remove('error');
+      renderedCopy.classList.add('hidden');
+      texEl.textContent = '';
+      parsed.textContent = '';
+      functionStyle.textContent = '';
+      delete functionStyle.dataset.fullText;
+      value.textContent = '';
+      lastTex = '';
+      displayTex = '';
+      lastDerivativeExpression = '';
+      currentVariables = [];
+      renderDerivativeButtons(currentVariables);
+      clearVariableValues();
+    }
+
+    async function evaluateExpression(options = {}) {
+      const text = currentExpressionText();
+      if (!text) return;
+      showResults();
+      setBusy(true);
+      setStatus('Evaluating...');
+      try {
+        const {response, data} = await fetchEvaluation(text);
+
+        if (!response.ok || !data.ok) {
+          rendered.textContent = data.error || 'Evaluation failed';
+          rendered.classList.add('error');
+          renderedCopy.classList.remove('hidden');
+          texEl.textContent = '';
+          parsed.textContent = '';
+          functionStyle.textContent = '';
+          delete functionStyle.dataset.fullText;
+          value.textContent = '';
+          lastTex = '';
+          displayTex = '';
+          lastDerivativeExpression = '';
+          currentVariables = [];
+          renderDerivativeButtons(currentVariables);
+          clearVariableValues();
+          setStatus('Error');
+          return;
+        }
+
+        rendered.classList.remove('error');
+        renderedCopy.classList.add('hidden');
+        lastTex = data.tex || '';
+        displayTex = data.display_tex || lastTex;
+        if (data.svg) {
+          rendered.innerHTML = data.svg;
+        } else {
+          rendered.textContent = data.render_error || 'No rendered TeX available';
+        }
+        texEl.textContent = displayTex;
+        parsed.textContent = data.display_expression || (data.expression ? compactExpressionForEditor(data.expression).display : '');
+        functionStyle.textContent = data.display_function || data.function || '';
+        functionStyle.dataset.fullText = data.function || '';
+        value.textContent = data.value || '';
+        if (data.expression)
+          setExpressionEditor(data.expression);
+        saveLastExpression(fullExpressionText || expr.value.trim());
+        lastDerivativeExpression = derivativeExpressionFromLine(data.derivative);
+        currentVariables = variablesFromExpression(data.expression || '');
+        renderDerivativeButtons(currentVariables);
+        setStatus('Ready');
+      } catch (err) {
+        rendered.textContent = String(err);
+        rendered.classList.add('error');
+        renderedCopy.classList.remove('hidden');
+        setStatus('Error');
+      } finally {
+        setBusy(false);
+        if (!options.skipHistoryUpdate)
+          updateHistoryButtons();
+      }
+    }
+
+    run.addEventListener('click', () => {
+      forwardHistory = [];
+      precisionExtra = 0;
+      hideTargetEntry();
+      evaluateExpression();
+    });
+
+    back.addEventListener('click', () => {
+      const previous = expressionHistory.pop();
+      if (!previous) {
+        updateHistoryButtons();
+        return;
+      }
+
+      const current = currentExpressionText();
+      if (current) forwardHistory.push(current);
+      expr.value = previous;
+      clearExpressionSource();
+      clearVariableValues();
+      evaluateExpression({skipHistoryUpdate: true});
+    });
+
+    forward.addEventListener('click', () => {
+      const next = forwardHistory.pop();
+      if (!next) {
+        updateHistoryButtons();
+        return;
+      }
+
+      const current = currentExpressionText();
+      if (current) expressionHistory.push(current);
+      expr.value = next;
+      clearExpressionSource();
+      clearVariableValues();
+      evaluateExpression({skipHistoryUpdate: true});
+    });
+
+    async function takeDerivative(wrt) {
+      const text = currentExpressionText();
+      if (!text || !wrt) return;
+
+      showResults();
+      setBusy(true);
+      setStatus(`Differentiating d/d${wrt}...`);
+      try {
+        const {response, data} = await fetchEvaluation(text, wrt);
+        const derivativeExpression = derivativeExpressionFromLine(data.derivative);
+
+        if (!response.ok || !data.ok || !derivativeExpression) {
+          rendered.textContent = data.error || data.raw || `No derivative for ${wrt}`;
+          rendered.classList.add('error');
+          renderedCopy.classList.remove('hidden');
+          setStatus('Error');
+          return;
+        }
+
+        pushExpressionHistory(text);
+        expr.value = derivativeExpression;
+        clearExpressionSource();
+        clearVariableValues();
+        await evaluateExpression();
+      } catch (err) {
+        rendered.textContent = String(err);
+        rendered.classList.add('error');
+        renderedCopy.classList.remove('hidden');
+        setStatus('Error');
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    expr.addEventListener('keydown', (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+        event.preventDefault();
+        forwardHistory = [];
+        precisionExtra = 0;
+        evaluateExpression();
+      }
+    });
+
+    expr.addEventListener('input', () => {
+      if (expr.value.trim() === (expr.dataset.displayExpression || displayedExpressionText))
+        return;
+      clearExpressionSource();
+      clearVariableValues();
+    });
+
+    clear.addEventListener('click', () => {
+      const current = currentExpressionText();
+      if (current)
+        expressionHistory.push(current);
+      forwardHistory = [];
+      expr.value = '';
+      clearExpressionSource();
+      precisionExtra = 0;
+      hideTargetEntry();
+      clearResultPane();
+      updateHistoryButtons();
+      setStatus('Ready');
+      expr.focus();
+    });
+
+    help.addEventListener('click', toggleHelp);
+
+    goalSeek.addEventListener('click', async () => {
+      const text = currentExpressionText();
+      if (!text) return;
+
+      if (targetRow.classList.contains('hidden')) {
+        showTargetEntry();
+        return;
+      }
+
+      showResults();
+      setBusy(true);
+      setStatus('Goal seeking...');
+      try {
+        const target = goalTarget.value.trim() || '0';
+        const start = goalStartValues();
+        const response = await fetch('/goal_seek', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            expression: expressionForEvaluation(text),
+            target,
+            start,
+            precision: requestedValuePrecision()
+          })
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+          rendered.textContent = data.error || 'Goal seek failed';
+          rendered.classList.add('error');
+          renderedCopy.classList.remove('hidden');
+          setStatus('Error');
+          return;
+        }
+
+        pushExpressionHistory(text);
+        const solvedExpression = data.expression || text;
+        const solvedWithoutNan = expressionForEditor(solvedExpression).trim();
+        const currentWithoutNan = expressionForEditor(text).trim();
+        const unchanged = solvedWithoutNan === currentWithoutNan;
+        setExpressionEditor(solvedExpression);
+        precisionExtra = 0;
+        hideTargetEntry();
+        await evaluateExpression({skipHistoryUpdate: true});
+        setStatus(unchanged ? 'Goal already reached' : 'Goal reached');
+      } catch (err) {
+        rendered.textContent = String(err);
+        rendered.classList.add('error');
+        renderedCopy.classList.remove('hidden');
+        setStatus('Error');
+      } finally {
+        setBusy(false);
+      }
+    });
+
+    goalTarget.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        goalSeek.click();
+      } else if (event.key === 'Escape') {
+        event.preventDefault();
+        hideTargetEntry();
+        expr.focus();
+        setStatus('Ready');
+      }
+    });
+
+    morePrecision.addEventListener('click', () => {
+      setRequestedValuePrecision(nextPrecisionStep(requestedValuePrecision()));
+      setStatus(`${requestedValuePrecision()} digits`);
+      evaluateExpression({skipHistoryUpdate: true});
+    });
+
+    lessPrecision.addEventListener('click', () => {
+      setRequestedValuePrecision(previousPrecisionStep(requestedValuePrecision()));
+      setStatus(`${requestedValuePrecision()} digits`);
+      evaluateExpression({skipHistoryUpdate: true});
+    });
+
+    copyButtons.forEach((button) => {
+      button.addEventListener('click', async () => {
+        const text = copyTextForTarget(button.dataset.copyTarget);
+        if (!text) return;
+        try {
+          await writeClipboardText(text);
+          flashCopyButton(button, true);
+          setStatus('Copied');
+          setTimeout(() => setStatus('Ready'), 1000);
+        } catch (err) {
+          flashCopyButton(button, false);
+          setStatus(String(err));
+        }
+      });
+    });
+
+    loadLastExpression().finally(() => evaluateExpression());
+  </script>
+</body>
+</html>
+"""
+
+
+def load_state_expression() -> str:
+    try:
+        data = json.loads(STATE_FILE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return DEFAULT_EXPRESSION
+
+    expression = str(data.get("expression", "")).strip()
+    return expression or DEFAULT_EXPRESSION
+
+
+def save_state_expression(expression: str) -> None:
+    if "..." in expression:
+        return
+
+    STATE_FILE.write_text(
+        json.dumps({"expression": expression}, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+
+def expression_for_editor(expression: str) -> str:
+    return re.sub(r"(=\s*)NAN\b", r"\1?", expression)
+
+
+def _compact_long_text_value(value: str, limit: int = 38, keep: int = 34) -> str:
+    value = str(value or "").strip()
+    if len(value) <= limit:
+        return value
+    return value[:keep] + "..."
+
+
+def compact_binding_values_text(text: str) -> str:
+    if not text:
+        return text
+
+    def compact_after_pipe(match: re.Match[str]) -> str:
+        value = match.group(2).strip()
+        if not value:
+            return match.group(0)
+        return match.group(1) + _compact_long_text_value(value)
+
+    return re.sub(r"(=\s*)(.*?)(?=(?:\\right|[,;}\n]|$))", compact_after_pipe, text)
+
+
+def compact_function_text(text: str) -> str:
+    if not text:
+        return text
+
+    compacted: list[str] = []
+    for line in text.splitlines():
+        match = re.match(r"^(\s*[^=\s][^=]*=\s*)(.+)$", line)
+        if match and "(" not in match.group(1):
+            compacted.append(match.group(1) + _compact_long_text_value(match.group(2)))
+        else:
+            compacted.append(line)
+    return "\n".join(compacted)
+
+
+def find_free_port(host: str) -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind((host, 0))
+        return int(sock.getsockname()[1])
+
+
+def ensure_try_dval(binary: Path) -> None:
+    if binary.exists() and os.access(binary, os.X_OK):
+        return
+
+    subprocess.run(
+        ["make", "scratch/try_dval"],
+        cwd=ROOT,
+        check=True,
+        text=True,
+    )
+
+    if not binary.exists():
+        raise RuntimeError(f"try_dval binary was not created at {binary}")
+
+
+def parse_try_dval_output(output: str) -> dict[str, str]:
+    fields: dict[str, str] = {}
+    current_multiline_key: str | None = None
+    patterns = {
+        "input": r"^input\s+(.*)$",
+        "expression": r"^expression\s+(.*)$",
+        "function": r"^function\s+(.*)$",
+        "tex": r"^tex\s+(.*)$",
+        "value": r"^value\s+(.*)$",
+        "derivative": r"^derivative\s+(.*)$",
+        "derivative_value": r"^d value\s+(.*)$",
+    }
+
+    for line in output.splitlines():
+        matched = False
+        for key, pattern in patterns.items():
+            match = re.match(pattern, line)
+            if match:
+                fields[key] = match.group(1).rstrip()
+                current_multiline_key = key if key == "function" else None
+                matched = True
+                break
+        if not matched and current_multiline_key:
+            fields[current_multiline_key] += "\n" + line.rstrip()
+    return fields
+
+
+def _trim_decimal_tail(text: str) -> str:
+    mantissa, sep, exponent = text.partition("E")
+
+    if "." in mantissa:
+        mantissa = mantissa.rstrip("0").rstrip(".")
+    if mantissa in ("-0", "+0"):
+        mantissa = "0"
+    return mantissa + (sep + exponent if sep else "")
+
+
+def format_number_text_for_precision(text: str, precision: int) -> str:
+    text = str(text or "").strip()
+    if not text:
+        return text
+
+    upper = text.upper()
+    if upper in {"NAN", "+NAN", "-NAN", "INF", "+INF", "-INF", "INFINITY", "+INFINITY", "-INFINITY"}:
+        return text
+
+    match = re.match(r"^(.+?)\s+([+-])\s+(.+)i$", text)
+    if match:
+        real = format_number_text_for_precision(match.group(1), precision)
+        imag = format_number_text_for_precision(match.group(3), precision)
+        return f"{real} {match.group(2)} {imag}i"
+
+    try:
+        with localcontext() as ctx:
+            ctx.prec = max(1, min(MAX_VALUE_PRECISION_DIGITS, int(precision)))
+            rounded = +Decimal(text)
+    except (InvalidOperation, ValueError):
+        return text
+
+    return _trim_decimal_tail(format(rounded, "g").replace("e", "E"))
+
+
+def render_tex_to_svg(tex: str) -> tuple[str | None, str | None]:
+    if not tex:
+        return None, None
+
+    document = rf"""\documentclass{{article}}
+\pagestyle{{empty}}
+\usepackage{{amsmath}}
+\begin{{document}}
+\[
+{tex}
+\]
+\end{{document}}
+"""
+
+    with tempfile.TemporaryDirectory(prefix="mars-dval-tex-") as tmp_name:
+        tmp = Path(tmp_name)
+        tex_file = tmp / "expr.tex"
+        dvi_file = tmp / "expr.dvi"
+        svg_file = tmp / "expr.svg"
+        tex_file.write_text(document, encoding="utf-8")
+
+        latex = subprocess.run(
+            ["latex", "-interaction=nonstopmode", "-halt-on-error", tex_file.name],
+            cwd=tmp,
+            text=True,
+            capture_output=True,
+            timeout=10,
+        )
+        if latex.returncode != 0:
+            return None, latex.stdout + latex.stderr
+
+        dvisvgm = subprocess.run(
+            ["dvisvgm", "--no-fonts", "--exact-bbox", str(dvi_file), "-o", str(svg_file)],
+            cwd=tmp,
+            text=True,
+            capture_output=True,
+            timeout=10,
+        )
+        if dvisvgm.returncode != 0:
+            return None, dvisvgm.stdout + dvisvgm.stderr
+
+        try:
+            return svg_file.read_text(encoding="utf-8"), None
+        except OSError as exc:
+            return None, str(exc)
+
+
+def split_top_level_text(text: str, separator: str) -> list[str]:
+    parts: list[str] = []
+    start = 0
+    depth = 0
+
+    for i, ch in enumerate(text):
+        if ch in "([{":
+            depth += 1
+        elif ch in ")]}":
+            depth = max(0, depth - 1)
+        elif ch == separator and depth == 0:
+            parts.append(text[start:i])
+            start = i + 1
+
+    parts.append(text[start:])
+    return parts
+
+
+def index_top_level_text(text: str, needle: str) -> int:
+    depth = 0
+
+    for i, ch in enumerate(text):
+        if ch in "([{":
+            depth += 1
+        elif ch in ")]}":
+            depth = max(0, depth - 1)
+        elif ch == needle and depth == 0:
+            return i
+
+    return -1
+
+
+def last_index_top_level_text(text: str, needle: str) -> int:
+    depth = 0
+    found = -1
+
+    for i, ch in enumerate(text):
+        if ch in "([{":
+            depth += 1
+        elif ch in ")]}":
+            depth = max(0, depth - 1)
+        elif ch == needle and depth == 0:
+            found = i
+
+    return found
+
+
+def parse_expression_body(expression: str) -> tuple[str, str, str]:
+    text = expression.strip()
+
+    if text.startswith("{") and text.endswith("}"):
+        text = text[1:-1].strip()
+
+    pipe = last_index_top_level_text(text, "|")
+    if pipe < 0:
+        return text, "", ""
+
+    body = text[:pipe].strip()
+    bindings = text[pipe + 1:].strip()
+    semi = index_top_level_text(bindings, ";")
+    if semi < 0:
+        return body, bindings.strip(), ""
+
+    return body, bindings[:semi].strip(), bindings[semi + 1:].strip()
+
+
+def parse_binding_assignments(bindings: str) -> list[tuple[str, str]]:
+    out: list[tuple[str, str]] = []
+
+    for part in split_top_level_text(bindings, ","):
+        eq = index_top_level_text(part, "=")
+        if eq < 0:
+            continue
+        name = part[:eq].strip()
+        value = part[eq + 1:].strip()
+        if name:
+            out.append((name, value))
+
+    return out
+
+
+def format_goal_decimal(value: Decimal, digits: int) -> str:
+    with localcontext() as ctx:
+        ctx.prec = max(17, min(220, digits))
+        rounded = +value
+
+    text = format(rounded, "g").replace("e", "E")
+    return _trim_decimal_tail(text)
+
+
+def build_goal_expression(
+    expression: str,
+    variable_values: dict[str, Decimal],
+    precision: int,
+) -> str:
+    body, var_text, const_text = parse_expression_body(expression)
+    var_parts: list[str] = []
+    const_parts: list[str] = []
+    seen: set[str] = set()
+
+    for name, value in parse_binding_assignments(var_text):
+        if name in variable_values:
+            value = format_goal_decimal(variable_values[name], precision)
+            seen.add(name)
+        var_parts.append(f"{name} = {value}")
+
+    for name, value in parse_binding_assignments(const_text):
+        if name in variable_values:
+            continue
+        const_parts.append(f"{name} = {value}")
+
+    for name, value in variable_values.items():
+        if name not in seen:
+            var_parts.append(f"{name} = {format_goal_decimal(value, precision)}")
+
+    binding_text = ", ".join(var_parts)
+    if const_parts:
+        const_binding_text = ", ".join(const_parts)
+        binding_text = f"{binding_text}; {const_binding_text}" if binding_text else f"; {const_binding_text}"
+
+    return f"{{ {body} | {binding_text} }}" if binding_text else f"{{ {body} }}"
+
+
+def restore_compact_binding_values(expression: str, source_expression: str) -> str:
+    if "..." not in expression or not source_expression or "..." in source_expression:
+        return expression
+
+    body, var_text, const_text = parse_expression_body(expression)
+    _, source_var_text, source_const_text = parse_expression_body(source_expression)
+    source_values = {
+        name: value
+        for name, value in (
+            parse_binding_assignments(source_var_text)
+            + parse_binding_assignments(source_const_text)
+        )
+    }
+    if not source_values:
+        return expression
+
+    changed = False
+
+    def restore_assignments(assignments: str) -> list[str]:
+        nonlocal changed
+        out: list[str] = []
+        for part in split_top_level_text(assignments, ","):
+            eq = index_top_level_text(part, "=")
+            if eq < 0:
+                stripped = part.strip()
+                if stripped:
+                    out.append(stripped)
+                continue
+
+            name = part[:eq].strip()
+            value = part[eq + 1:].strip()
+            cached = source_values.get(name)
+            if cached and value.endswith("...") and cached.startswith(value[:-3]):
+                changed = True
+                value = cached
+            out.append(f"{name} = {value}")
+        return out
+
+    var_parts = restore_assignments(var_text)
+    const_parts = restore_assignments(const_text)
+    binding_text = ", ".join(var_parts)
+    if const_parts:
+        const_binding_text = ", ".join(const_parts)
+        binding_text = f"{binding_text}; {const_binding_text}" if binding_text else f"; {const_binding_text}"
+
+    return f"{{ {body} | {binding_text} }}" if changed else expression
+
+
+def run_try_dval_fields(
+    binary: Path,
+    expression: str,
+    precision: int,
+    wrt: str = "x",
+) -> tuple[dict[str, str], str, int]:
+    command = [str(binary), expression, wrt, str(max(17, precision))]
+    completed = subprocess.run(
+        command,
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        timeout=10,
+    )
+    raw = completed.stdout
+    if completed.stderr:
+        raw = raw + ("\n" if raw else "") + completed.stderr
+    return parse_try_dval_output(raw), raw, completed.returncode
+
+
+def decimal_from_value_text(text: str) -> Decimal:
+    text = str(text or "").strip()
+    upper = text.upper()
+    sup_digits = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹⁻", "0123456789-")
+    sub_digits = str.maketrans("₀₁₂₃₄₅₆₇₈₉₋", "0123456789-")
+
+    if not text:
+        raise ValueError("empty value")
+    if "I" in upper and upper not in {"INF", "+INF", "-INF", "INFINITY", "+INFINITY", "-INFINITY"}:
+        raise ValueError("goal seek only supports real-valued expressions")
+    if upper in {"NAN", "+NAN", "-NAN"}:
+        raise ValueError("value is NaN")
+
+    if "⁄" in text:
+        numerator, denominator = text.split("⁄", 1)
+        return Decimal(numerator.translate(sup_digits)) / Decimal(denominator.translate(sub_digits))
+
+    if "/" in text and re.match(r"^[+-]?\d+\s*/\s*[+-]?\d+$", text):
+        numerator, denominator = re.split(r"\s*/\s*", text, maxsplit=1)
+        return Decimal(numerator) / Decimal(denominator)
+
+    return Decimal(text.replace("e", "E"))
+
+
+def evaluate_decimal_expression(binary: Path, expression: str, precision: int) -> Decimal:
+    fields, raw, rc = run_try_dval_fields(binary, expression, precision)
+
+    if rc != 0:
+        raise ValueError(raw or f"try_dval exited with {rc}")
+
+    return decimal_from_value_text(fields.get("value", ""))
+
+
+def evaluate_goal_residual(
+    binary: Path,
+    expression: str,
+    variable_values: dict[str, Decimal],
+    target: Decimal,
+    precision: int,
+) -> Decimal:
+    candidate = build_goal_expression(expression, variable_values, precision)
+    return evaluate_decimal_expression(binary, candidate, precision) - target
+
+
+def goal_tolerance(target: Decimal, precision: int) -> Decimal:
+    digits = max(1, min(220, precision))
+    scale = max(Decimal(1), abs(target))
+
+    return scale * (Decimal(10) ** Decimal(-digits))
+
+
+def variable_start_value(binary: Path, text: str, precision: int) -> Decimal:
+    if not text or text == "?" or text.upper() == "NAN":
+        return Decimal(1)
+
+    try:
+        return evaluate_decimal_expression(binary, f"{{ {text} }}", precision)
+    except Exception:
+        return Decimal(1)
+
+
+def parse_goal_start_values(
+    binary: Path,
+    start_values: object,
+    variable_names: list[str],
+    precision: int,
+) -> dict[str, Decimal]:
+    if not start_values:
+        return {}
+
+    if not isinstance(start_values, dict):
+        raise ValueError("Start values must be entered in the per-variable start boxes")
+
+    starts: dict[str, Decimal] = {}
+    for name, value in start_values.items():
+        name = str(name).strip()
+        if name not in variable_names:
+            continue
+        text = str(value).strip()
+        if not text:
+            continue
+        try:
+            starts[name] = evaluate_decimal_expression(binary, f"{{ {text} }}", precision)
+        except Exception as exc:
+            raise ValueError(f"Start for {name} must be a numeric constant expression") from exc
+
+    return starts
+
+
+def solve_one_goal_variable(
+    binary: Path,
+    expression: str,
+    name: str,
+    start: Decimal,
+    target: Decimal,
+    precision: int,
+    tolerance_precision: int,
+) -> dict[str, Decimal]:
+    with localcontext() as ctx:
+        ctx.prec = max(50, min(260, precision + 35))
+        zero = Decimal(0)
+        one = Decimal(1)
+        tolerance = goal_tolerance(target, tolerance_precision)
+
+        def residual(x: Decimal) -> Decimal:
+            return evaluate_goal_residual(binary, expression, {name: x}, target, precision)
+
+        def try_residual(x: Decimal) -> Decimal | None:
+            try:
+                return residual(x)
+            except Exception:
+                return None
+
+        x0 = start
+        f0 = residual(x0)
+        if abs(f0) <= tolerance:
+            return {name: +x0}
+
+        step = max(one, abs(x0) / Decimal(8))
+        lo = hi = x0
+        flo = fhi = f0
+
+        for _ in range(80):
+            left = x0 - step
+            right = x0 + step
+            fleft = try_residual(left)
+            fright = try_residual(right)
+            if fleft is not None and fleft == zero:
+                return {name: +left}
+            if fright is not None and fright == zero:
+                return {name: +right}
+            if fleft is not None and fleft * f0 < zero:
+                lo, hi = left, x0
+                flo, fhi = fleft, f0
+                break
+            if fright is not None and f0 * fright < zero:
+                lo, hi = x0, right
+                flo, fhi = f0, fright
+                break
+            step *= 2
+        else:
+            raise ValueError(f"Could not bracket a target crossing for {name}")
+
+        for _ in range(max(160, precision * 4)):
+            if abs(flo) <= tolerance:
+                return {name: +lo}
+            if abs(fhi) <= tolerance:
+                return {name: +hi}
+
+            mid = (lo + hi) / 2
+            fmid = residual(mid)
+            if abs(fmid) <= tolerance:
+                return {name: +mid}
+
+            if flo * fmid <= zero:
+                hi, fhi = mid, fmid
+            else:
+                lo, flo = mid, fmid
+
+        return {name: +((lo + hi) / 2)}
+
+
+def solve_multi_goal_variables(
+    binary: Path,
+    expression: str,
+    variables: list[tuple[str, Decimal]],
+    target: Decimal,
+    precision: int,
+    tolerance_precision: int,
+) -> dict[str, Decimal]:
+    with localcontext() as ctx:
+        ctx.prec = max(50, min(260, precision + 35))
+        names = [name for name, _ in variables]
+        values = {name: value for name, value in variables}
+        tolerance = goal_tolerance(target, tolerance_precision)
+
+        def residual(vals: dict[str, Decimal]) -> Decimal:
+            return evaluate_goal_residual(binary, expression, vals, target, precision)
+
+        best = dict(values)
+        best_residual = residual(best)
+        if abs(best_residual) <= tolerance:
+            return best
+
+        for _ in range(100):
+            gradients: list[Decimal] = []
+            base = best_residual
+
+            for name in names:
+                x = best[name]
+                h = max(Decimal("1e-12"), abs(x) * Decimal("1e-8"))
+                trial = dict(best)
+                trial[name] = x + h
+                try:
+                    gradients.append((residual(trial) - base) / h)
+                except Exception:
+                    gradients.append(Decimal(0))
+
+            norm2 = sum(g * g for g in gradients)
+            if norm2 <= Decimal("1e-80"):
+                raise ValueError("Goal seek stalled because the local gradient is zero")
+
+            scale = -base / norm2
+            improved = False
+
+            for alpha in (Decimal(1), Decimal("0.5"), Decimal("0.25"),
+                          Decimal("0.125"), Decimal("0.0625"), Decimal("0.03125")):
+                trial = {}
+                for name, grad in zip(names, gradients):
+                    trial[name] = best[name] + alpha * scale * grad
+                try:
+                    trial_residual = residual(trial)
+                except Exception:
+                    continue
+                if abs(trial_residual) < abs(best_residual):
+                    best = trial
+                    best_residual = trial_residual
+                    improved = True
+                    break
+
+            if abs(best_residual) <= tolerance:
+                return best
+            if not improved:
+                break
+
+        if abs(best_residual) > tolerance:
+            raise ValueError(
+                f"Goal seek did not converge within working precision; "
+                f"residual is {best_residual}, tolerance is {tolerance}"
+            )
+
+        return best
+
+
+def goal_seek_expression(
+    binary: Path,
+    expression: str,
+    target_text: str,
+    precision: int,
+    start_values: object = None,
+) -> str:
+    solve_precision = max(64, min(220, precision + 30))
+    target = evaluate_decimal_expression(binary, f"{{ {target_text} }}", solve_precision)
+    _, var_text, const_text = parse_expression_body(expression)
+    variables = [
+        (name, variable_start_value(binary, value, solve_precision))
+        for name, value in parse_binding_assignments(var_text)
+    ]
+    variables.extend(
+        (name, variable_start_value(binary, value, solve_precision))
+        for name, value in parse_binding_assignments(const_text)
+        if value == "?" or value.upper() == "NAN"
+    )
+    explicit_starts = parse_goal_start_values(
+        binary,
+        start_values,
+        [name for name, _ in variables],
+        solve_precision,
+    )
+    variables = [(name, explicit_starts.get(name, value)) for name, value in variables]
+
+    if not variables:
+        raise ValueError("Goal seek needs at least one variable binding, or a '?' binding to solve")
+
+    if len(variables) == 1:
+        solved = solve_one_goal_variable(
+            binary, expression, variables[0][0], variables[0][1], target, solve_precision, precision
+        )
+    else:
+        solved = solve_multi_goal_variables(
+            binary, expression, variables, target, solve_precision, precision
+        )
+
+    residual = evaluate_goal_residual(binary, expression, solved, target, solve_precision)
+    tolerance = goal_tolerance(target, precision)
+    if abs(residual) > tolerance:
+        raise ValueError(
+            f"Goal seek did not reach the target within working precision; "
+            f"residual is {residual}, tolerance is {tolerance}"
+        )
+
+    return build_goal_expression(expression, solved, solve_precision)
+
+
+class DvalLabHandler(http.server.BaseHTTPRequestHandler):
+    binary: Path = DEFAULT_BIN
+
+    def log_message(self, fmt: str, *args: object) -> None:
+        print(f"dval_lab: {fmt % args}", file=sys.stderr)
+
+    def send_json(self, status: int, payload: dict[str, object]) -> None:
+        data = json.dumps(payload).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def do_GET(self) -> None:
+        path = urllib.parse.urlparse(self.path).path
+        if path == "/state":
+            self.send_json(200, {"expression": load_state_expression()})
+            return
+
+        if path not in ("/", "/index.html"):
+            self.send_error(404)
+            return
+
+        page = INDEX_HTML.replace(
+            "__INITIAL_EXPRESSION__",
+            html.escape(load_state_expression(), quote=False),
+        )
+        data = page.encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def do_POST(self) -> None:
+        path = urllib.parse.urlparse(self.path).path
+        if path == "/state":
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                body = self.rfile.read(length)
+                payload = json.loads(body.decode("utf-8"))
+                expression = str(payload.get("expression", "")).strip()
+                if expression and "..." not in expression:
+                    save_state_expression(expression)
+                self.send_json(200, {"ok": True})
+            except Exception as exc:
+                self.send_json(400, {"ok": False, "error": f"Bad request: {exc}"})
+            return
+
+        if path == "/goal_seek":
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                body = self.rfile.read(length)
+                payload = json.loads(body.decode("utf-8"))
+                expression = str(payload.get("expression", "")).strip()
+                target = str(payload.get("target", "0")).strip() or "0"
+                start = payload.get("start", {})
+                precision = int(payload.get("precision", 96))
+            except Exception as exc:
+                self.send_json(400, {"ok": False, "error": f"Bad request: {exc}"})
+                return
+
+            if not expression:
+                self.send_json(400, {"ok": False, "error": "Expression is empty"})
+                return
+
+            try:
+                precision = max(17, min(MAX_VALUE_PRECISION_DIGITS, precision))
+                expression = restore_compact_binding_values(expression, load_state_expression())
+                solved = goal_seek_expression(self.binary, expression, target, precision, start)
+            except Exception as exc:
+                self.send_json(422, {"ok": False, "error": str(exc)})
+                return
+
+            save_state_expression(expression_for_editor(solved))
+            self.send_json(200, {"ok": True, "expression": solved})
+            return
+
+        if path != "/eval":
+            self.send_error(404)
+            return
+
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            body = self.rfile.read(length)
+            payload = json.loads(body.decode("utf-8"))
+            expression = str(payload.get("expression", "")).strip()
+            wrt = str(payload.get("wrt", "")).strip()
+            precision = int(payload.get("precision", 96))
+        except Exception as exc:
+            self.send_json(400, {"ok": False, "error": f"Bad request: {exc}"})
+            return
+
+        if not expression:
+            self.send_json(400, {"ok": False, "error": "Expression is empty"})
+            return
+        precision = max(17, min(MAX_VALUE_PRECISION_DIGITS, precision))
+        expression = restore_compact_binding_values(expression, load_state_expression())
+
+        try:
+            command = [str(self.binary), expression]
+            command.extend([wrt, str(precision)])
+            completed = subprocess.run(
+                command,
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                timeout=10,
+            )
+        except Exception as exc:
+            self.send_json(500, {"ok": False, "error": str(exc)})
+            return
+
+        raw = completed.stdout
+        if completed.stderr:
+            raw = raw + ("\n" if raw else "") + completed.stderr
+
+        fields = parse_try_dval_output(raw)
+        fields["raw"] = raw
+        fields["ok"] = completed.returncode == 0
+        if completed.returncode != 0:
+            fields["error"] = raw or f"try_dval exited with {completed.returncode}"
+            self.send_json(422, fields)
+            return
+
+        if fields.get("value"):
+            fields["value"] = format_number_text_for_precision(fields["value"], precision)
+        if fields.get("derivative_value"):
+            fields["derivative_value"] = format_number_text_for_precision(
+                fields["derivative_value"], precision
+            )
+
+        if fields.get("expression"):
+            save_state_expression(expression_for_editor(fields["expression"]))
+
+        fields["display_expression"] = compact_binding_values_text(fields.get("expression", ""))
+        fields["display_tex"] = compact_binding_values_text(fields.get("tex", ""))
+        fields["display_function"] = compact_function_text(fields.get("function", ""))
+
+        svg, render_error = render_tex_to_svg(fields.get("display_tex", ""))
+        if svg:
+            fields["svg"] = svg
+        elif render_error:
+            fields["render_error"] = render_error
+
+        self.send_json(200, fields)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Launch the local MARS dval expression lab.")
+    parser.add_argument("--host", default="127.0.0.1", help="host to bind")
+    parser.add_argument("--port", type=int, default=0, help="port to bind, or 0 for auto")
+    parser.add_argument("--no-browser", action="store_true", help="do not open the browser automatically")
+    parser.add_argument("--binary", type=Path, default=DEFAULT_BIN, help="path to try_dval binary")
+    args = parser.parse_args()
+
+    binary = args.binary if args.binary.is_absolute() else ROOT / args.binary
+    ensure_try_dval(binary)
+
+    DvalLabHandler.binary = binary
+
+    port = args.port or find_free_port(args.host)
+    server = http.server.ThreadingHTTPServer((args.host, port), DvalLabHandler)
+    url = f"http://{args.host}:{port}/"
+
+    print(f"MARS dval Lab running at {url}")
+    print("Press Ctrl+C to stop.")
+
+    if not args.no_browser:
+        threading.Timer(0.25, lambda: webbrowser.open(url)).start()
+
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\nStopping MARS dval Lab.")
+    finally:
+        server.server_close()
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

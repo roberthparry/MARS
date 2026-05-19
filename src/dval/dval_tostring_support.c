@@ -238,22 +238,22 @@ typedef struct {
 #define DV_TEX_HASH_SYMBOL_SIZE      9u
 
 static const dv_tostring_tex_map_t dv_tostring_greek_tex_table[DV_TEX_HASH_GREEK_SIZE] = {
-    [0]  = {0x03A9, "\\Omega"},
-    [1]  = {0x03B8, "\\theta"},
-    [2]  = {0x03A0, "\\Pi"},
-    [3]  = {0x03D5, "\\phi"},
-    [4]  = {0x03BC, "\\mu"},
-    [5]  = {0x03BB, "\\lambda"},
-    [9]  = {0x03A6, "\\Phi"},
-    [10] = {0x03A3, "\\Sigma"},
-    [11] = {0x03C0, "\\pi"},
-    [12] = {0x03C6, "\\phi"},
-    [13] = {0x03C4, "\\tau"},
-    [14] = {0x03C3, "\\sigma"},
-    [15] = {0x03B4, "\\delta"},
+    [0]  = {0x03A6, "\\Phi"},
+    [3]  = {0x03A0, "\\Pi"},
+    [4]  = {0x03A3, "\\Sigma"},
+    [5]  = {0x03C4, "\\tau"},
+    [6]  = {0x03BB, "\\lambda"},
+    [7]  = {0x03C6, "\\phi"},
+    [9]  = {0x03B8, "\\theta"},
+    [10] = {0x03C0, "\\pi"},
+    [11] = {0x03C3, "\\sigma"},
+    [12] = {0x03BC, "\\mu"},
+    [13] = {0x03D5, "\\phi"},
+    [14] = {0x03B1, "\\alpha"},
+    [15] = {0x03A9, "\\Omega"},
     [16] = {0x03B3, "\\gamma"},
     [17] = {0x03B2, "\\beta"},
-    [18] = {0x03B1, "\\alpha"}
+    [18] = {0x03B4, "\\delta"}
 };
 
 static const dv_tostring_tex_map_t dv_tostring_vulgar_fraction_tex_table[DV_TEX_HASH_FRACTION_SIZE] = {
@@ -383,6 +383,11 @@ static const char *dv_tostring_symbol_tex(unsigned int cp)
                                   cp);
 }
 
+static int dv_tostring_is_ascii_letter(char c)
+{
+    return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
+}
+
 static const char *dv_tostring_collect_superscript(const char *p, sbuf_t *tmp)
 {
     while (*p) {
@@ -500,6 +505,8 @@ char *dv_tostring_texify(const char *text)
         mapped = dv_tostring_greek_tex(cp);
         if (mapped) {
             sbuf_puts(&out, mapped);
+            if (dv_tostring_is_ascii_letter(p[len]))
+                sbuf_puts(&out, "{}");
             p += len;
             continue;
         }

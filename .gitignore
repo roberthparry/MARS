@@ -53,6 +53,7 @@ dkms.conf
 
 # debug information files
 *.dwo
+__pycache__/
 
 # binaries
 tests/build/
@@ -73,4 +74,8 @@ tests/**/*.log
 tests/**/*.pdf
 tests/**/*.synctex.gz
 
+# Local scratch playgrounds
+scratch/
+
 .codex
+.dval_lab_state.json

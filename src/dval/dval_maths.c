@@ -94,6 +94,8 @@ number_t eval_exp(dval_t *dv) { return dv_eval_unary_num(dv, num_exp); }
 number_t eval_log(dval_t *dv) { return dv_eval_unary_num(dv, num_log); }
 number_t eval_log10(dval_t *dv) { return dv_eval_unary_num(dv, num_log10); }
 number_t eval_sqrt(dval_t *dv) { return dv_eval_unary_num(dv, num_sqrt); }
+number_t eval_floor(dval_t *dv) { return dv_eval_unary_num(dv, num_floor); }
+number_t eval_ceil(dval_t *dv) { return dv_eval_unary_num(dv, num_ceil); }
 number_t eval_abs(dval_t *dv) { return dv_eval_unary_num(dv, num_abs); }
 number_t eval_erf(dval_t *dv) { return dv_eval_unary_num(dv, num_erf); }
 number_t eval_erfc(dval_t *dv) { return dv_eval_unary_num(dv, num_erfc); }
@@ -227,6 +229,18 @@ dval_t *deriv_sqrt(dval_t *dv)
     dv_free(two);
     dv_free(den);
     return out;
+}
+
+dval_t *deriv_floor(dval_t *dv)
+{
+    (void)dv;
+    return dv_new_const(NUM_ZERO);
+}
+
+dval_t *deriv_ceil(dval_t *dv)
+{
+    (void)dv;
+    return dv_new_const(NUM_ZERO);
 }
 
 dval_t *deriv_asin(dval_t *dv)

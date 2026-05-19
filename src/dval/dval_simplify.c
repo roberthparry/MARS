@@ -23,6 +23,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "dval_bindings_internal.h"
 #include "dval_internal.h"
 #include "internal/number_internal.h"
 
@@ -64,6 +65,97 @@ static inline dval_t *dv_make_pow_like_owned_local(dval_t *base, number_t expone
     return out;
 }
 
+static bool dv_contains_var_local(const dval_t *dv)
+{
+    if (!dv)
+        return false;
+    if (dv_is_var(dv))
+        return true;
+    return dv_contains_var_local(dv->a) || dv_contains_var_local(dv->b);
+}
+
+static bool dv_is_lambert_expr_local(const dval_t *dv)
+{
+    return dv_is_op(dv, &ops_lambert_w0) || dv_is_op(dv, &ops_lambert_wm1);
+}
+
+static dval_t *dv_try_simplify_lambert_product(dval_t *a, dval_t *b)
+{
+    dval_t *w;
+    dval_t *exp_term;
+    dval_t *inner;
+
+    if (dv_is_lambert_expr_local(a) && dv_is_exp_expr(b)) {
+        w = a;
+        exp_term = b;
+    } else if (dv_is_lambert_expr_local(b) && dv_is_exp_expr(a)) {
+        w = b;
+        exp_term = a;
+    } else {
+        return NULL;
+    }
+
+    if (!dv_struct_eq(w, exp_term->a))
+        return NULL;
+
+    inner = w->a;
+
+    if (!dv_current_wrt_internal() && dv_is_var(inner) && inner->binding_expr)
+        return dv_binding_expr_eval_dval(inner->binding_expr);
+
+    dv_retain(inner);
+    return inner;
+}
+
+static dval_t *dv_try_simplify_exp_quarter_turn(const dval_t *arg)
+{
+    NUM_SCOPE(scope);
+    number_t arg_value;
+    number_t exp_value;
+    number_t neg_i;
+
+    if (!arg || dv_contains_var_local(arg))
+        return NULL;
+
+    arg_value = dv_eval(arg);
+    exp_value = num_exp(arg_value);
+    neg_i = num_neg(NUM_I);
+
+    if (num_eq(exp_value, NUM_I)) {
+        num_destroy(&neg_i);
+        num_destroy(&exp_value);
+        num_destroy(&arg_value);
+        return dv_new_named_const(NUM_I, "i");
+    }
+    if (num_eq(exp_value, NUM_NEG_ONE)) {
+        num_destroy(&neg_i);
+        num_destroy(&exp_value);
+        num_destroy(&arg_value);
+        return dv_new_const(NUM_NEG_ONE);
+    }
+    if (num_eq(exp_value, neg_i)) {
+        dval_t *i = dv_new_named_const(NUM_I, "i");
+        dval_t *out = dv_neg(i);
+
+        dv_free(i);
+        num_destroy(&neg_i);
+        num_destroy(&exp_value);
+        num_destroy(&arg_value);
+        return out;
+    }
+    if (num_eq(exp_value, NUM_ONE)) {
+        num_destroy(&neg_i);
+        num_destroy(&exp_value);
+        num_destroy(&arg_value);
+        return dv_new_const(NUM_ONE);
+    }
+
+    num_destroy(&neg_i);
+    num_destroy(&exp_value);
+    num_destroy(&arg_value);
+    return NULL;
+}
+
 int dv_fold_zero_to_zero(const number_t *in, number_t *out)
 {
     if (!in || !out || !num_eq(*in, NUM_ZERO))
@@ -90,10 +182,17 @@ int dv_fold_exp_const(const number_t *in, number_t *out)
 
 int dv_fold_log_const(const number_t *in, number_t *out)
 {
-    if (!in || !out || !num_eq(*in, NUM_ONE))
+    if (!in || !out)
         return 0;
-    *out = NUM_ZERO;
-    return 1;
+    if (num_eq(*in, NUM_ONE)) {
+        *out = NUM_ZERO;
+        return 1;
+    }
+    if (num_eq(*in, NUM_E)) {
+        *out = NUM_ONE;
+        return 1;
+    }
+    return 0;
 }
 
 int dv_fold_sqrt_const(const number_t *in, number_t *out)
@@ -185,6 +284,14 @@ dval_t *dv_simplify_unary_operator(const dval_t *dv, dval_t *a, dval_t *b)
 {
     NUM_SCOPE(scope);
     (void)b;
+    if (dv_is_exp_expr(dv)) {
+        dval_t *quarter_turn = dv_try_simplify_exp_quarter_turn(a);
+
+        if (quarter_turn) {
+            dv_free(a);
+            return quarter_turn;
+        }
+    }
 
     /* exp(log(x)) -> x, log(exp(x)) -> x */
     if ((dv_is_exp_expr(dv) && dv_is_op(a, &ops_log)) ||
@@ -452,6 +559,16 @@ dval_t *dv_simplify_mul_operator(const dval_t *dv, dval_t *a, dval_t *b)
         return a;
     }
 
+    {
+        dval_t *lambert_identity = dv_try_simplify_lambert_product(a, b);
+
+        if (lambert_identity) {
+            dv_free(a);
+            dv_free(b);
+            return lambert_identity;
+        }
+    }
+
     collect_mul_flat(a, &c_acc, &is_zero, &terms, &nterms, &term_cap);
     collect_mul_flat(b, &c_acc, &is_zero, &terms, &nterms, &term_cap);
     dv_free(a);
@@ -475,6 +592,7 @@ dval_t *dv_simplify_mul_operator(const dval_t *dv, dval_t *a, dval_t *b)
 
     dv_combine_like_powers(den_terms, nden_terms);
     dv_combine_like_powers(terms, nterms);
+    dv_cancel_common_powers(terms, nterms, den_terms, nden_terms);
     dv_combine_exp_terms(terms, nterms);
     dv_merge_sqrt_terms(terms, nterms);
     dv_merge_sqrt_terms(den_terms, nden_terms);
@@ -509,6 +627,40 @@ dval_t *dv_simplify_div_operator(const dval_t *dv, dval_t *a, dval_t *b)
     (void)dv;
 
     if (dv_is_op(b, &ops_const) && dv_const_is_one(b)) { dv_free(b); return a; }
+    if (dv_is_pow_d_expr(b) && dv_struct_eq(a, b->a)) {
+        number_t exponent = num_sub(b->c, NUM_ONE);
+        dval_t *base;
+        dval_t *denom;
+        dval_t *one;
+        dval_t *out;
+
+        dv_retain(b->a);
+        base = b->a;
+        dv_free(a);
+        dv_free(b);
+
+        if (num_eq(exponent, NUM_ZERO)) {
+            dv_free(base);
+            return dv_new_const(NUM_ONE);
+        }
+
+        denom = dv_make_pow_like_owned_local(base, exponent);
+        one = dv_new_const(NUM_ONE);
+        out = dv_div(one, denom);
+        dv_free(one);
+        dv_free(denom);
+        return out;
+    }
+    if (dv_is_pow_d_expr(a) && dv_struct_eq(a->a, b)) {
+        number_t exponent = num_sub(a->c, NUM_ONE);
+        dval_t *base;
+
+        dv_retain(a->a);
+        base = a->a;
+        dv_free(a);
+        dv_free(b);
+        return dv_make_pow_like_owned_local(base, exponent);
+    }
     if (dv_is_unnamed_const(b) &&
         dv_is_op(a, &ops_mul) &&
         dv_is_unnamed_const(a->a) &&
@@ -631,7 +783,7 @@ div_fallback_2:
     if (dv_is_op(a, &ops_const) && dv_const_is_zero(a)) {
         dv_free(a); dv_free(b); return dv_new_const(NUM_ZERO);
     }
-    if (dv_is_op(a, &ops_const) && dv_is_op(b, &ops_const)) {
+    if (dv_is_unnamed_const(a) && dv_is_unnamed_const(b)) {
         number_t q = num_div(a->c, b->c);
 
         dv_free(a);
@@ -710,6 +862,17 @@ dval_t *dv_simplify_pow_operator(const dval_t *dv, dval_t *a, dval_t *b)
     if (dv_is_op(b, &ops_const) && dv_const_is_one(b)) { dv_free(b); return a; }
     if (dv_is_op(b, &ops_const) && dv_const_is_zero(b)) {
         dv_free(a); dv_free(b); return dv_new_const(NUM_ONE);
+    }
+    if (dv_is_op(a, &ops_const) && num_eq(a->c, NUM_E)) {
+        dval_t *raw;
+        dval_t *out;
+
+        raw = dv_exp(b);
+        out = dv_simplify(raw);
+        dv_free(raw);
+        dv_free(a);
+        dv_free(b);
+        return out;
     }
     if (dv_is_op(a, &ops_const) && num_eq(a->c, NUM_TEN) && dv_is_op(b, &ops_log10)) {
         dval_t *inner = b->a;
