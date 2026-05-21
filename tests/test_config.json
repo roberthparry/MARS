@@ -691,6 +691,7 @@
     "test_second_derivatives": true,
     "test_dval_t_to_string": true,
     "test_dval_t_from_string": true,
+    "test_dval_t_goal_seek": true,
     "test_partial_derivatives": true,
     "test_dval_pattern_helpers": true,
     "test_runtime_regressions": true,
@@ -931,7 +932,12 @@
         "test_to_string_pow_superscript": {
           "enabled": true,
           "test_to_string_pow_superscript_expr": true,
-          "test_to_string_pow_superscript_func": true
+          "test_to_string_pow_superscript_func": true,
+          "test_to_string_complex_const_pow_expr": true,
+          "test_to_string_complex_const_pow_func": true,
+          "test_to_string_complex_const_pow_tex": true,
+          "test_to_string_parsed_complex_const_pow_tex": true,
+          "test_to_string_parsed_complex_const_pow_expr": true
         },
         "test_to_string_unary_sin": {
           "enabled": true,
@@ -1052,6 +1058,7 @@
       "test_high_precision_mfloat_function_derivatives": true,
       "test_high_precision_mcomplex_function_values": true,
       "test_set_val_num_named_constant": true,
+      "test_to_string_does_not_simplify_plain_expressions": true,
       "test_simplify_inverse_unary_pairs": true,
       "test_simplify_exp_quarter_turns": true
     }
@@ -1065,6 +1072,18 @@
       "test_reverse_gradient_missing_variable": true,
       "test_reverse_gradient_polynomial_num": true,
       "test_reverse_gradient_complex_number_t": true
+    }
+  },
+  "tests/dval/test_dval_goal_seek.c": {
+    "test_dval_t_goal_seek": {
+      "enabled": true,
+      "test_goal_seek_real_one_variable": true,
+      "test_goal_seek_complex_fallback": true,
+      "test_goal_seek_complex_fallback_from_real_axis": true,
+      "test_goal_seek_complex_uses_guard_precision": true,
+      "test_goal_seek_real_multi_variable": true,
+      "test_goal_seek_default_tolerance_uses_precision_digits": true,
+      "test_goal_seek_default_iterations_scale_with_precision": true
     }
   }
 }

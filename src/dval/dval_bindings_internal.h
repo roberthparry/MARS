@@ -10,6 +10,11 @@ dv_binding_expr_t *dv_binding_expr_parse_region(const char *start,
                                                 char *errmsg,
                                                 size_t errmsg_n);
 dval_t *dv_binding_expr_eval_dval(const dv_binding_expr_t *expr);
+bool dv_binding_expr_number_value(const dv_binding_expr_t *expr, number_t *out);
+bool dv_binding_expr_split_leading_number(const dv_binding_expr_t *expr,
+                                          number_t *coeff_out,
+                                          dv_binding_expr_t **rest_out);
+dv_binding_expr_t *dv_binding_expr_simplify(dv_binding_expr_t *expr);
 char *dv_binding_expr_to_string(const dv_binding_expr_t *expr);
 char *dv_binding_expr_to_tex(const dv_binding_expr_t *expr);
 

@@ -39,12 +39,12 @@ void run_number_parse_tests(void)
         free(text);
 
         ASSERT_TRUE(!num_is_real(complex_value));
-        assert_number_string("num_create_from_string(\"1 + i\")", unit_imag, "1 + 1i");
+        assert_number_string("num_create_from_string(\"1 + i\")", unit_imag, "1 + i");
         assert_number_string("num_create_from_string(\"1/2 - 3/2i\")",
             rational_complex, "0.5 - 1.5i");
         ASSERT_NUMBER_EQ(paren_imag, plain_imag);
         ASSERT_EQ_INT(num_set_from_string(&set_value, "1 - i"), 0);
-        assert_number_string("num_set_from_string(\"1 - i\")", set_value, "1 - 1i");
+        assert_number_string("num_set_from_string(\"1 - i\")", set_value, "1 - i");
 
         text = num_to_string(direct);
         ASSERT_NOT_NULL(text);

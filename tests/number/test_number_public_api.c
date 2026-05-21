@@ -41,7 +41,7 @@ void run_number_public_api_tests(void)
                                     "3.141592653589793238462643383279");
         assert_number_string_prefix("num_clone(NUM_PI)", pi_cloned,
                                     "3.141592653589793238462643383279");
-        assert_number_string("num_clone(NUM_I)", i_cloned, "1i");
+        assert_number_string("num_clone(NUM_I)", i_cloned, "i");
 
         ASSERT_TRUE(num_is_real(a));
         ASSERT_TRUE(num_is_real(frac));

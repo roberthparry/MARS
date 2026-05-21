@@ -622,6 +622,9 @@ int tests_main(void)
     TEST_SECTION("dval_t from_string Tests");
     TEST_RUN_CASE(test_dval_t_from_string, NULL);
 
+    TEST_SECTION("Goal seek");
+    TEST_RUN_CASE(test_dval_t_goal_seek, NULL);
+
     TEST_SECTION("Partial derivatives");
     TEST_RUN_CASE(test_partial_derivatives, NULL);
 

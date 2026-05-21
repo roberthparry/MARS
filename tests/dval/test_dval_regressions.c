@@ -1342,10 +1342,14 @@ static void test_simplify_inverse_unary_pairs(void)
     dval_t *ten_pow_log10_x = dv_pow_dv(ten, log10_x);
     dval_t *ten_pow_x = dv_pow_dv(ten, x);
     dval_t *log10_ten_pow_x = dv_log10(ten_pow_x);
-    char *exp_log_s = dv_to_string(exp_log_x, style_EXPRESSION);
-    char *log_exp_s = dv_to_string(log_exp_x, style_EXPRESSION);
-    char *ten_pow_log10_s = dv_to_string(ten_pow_log10_x, style_EXPRESSION);
-    char *log10_ten_pow_s = dv_to_string(log10_ten_pow_x, style_EXPRESSION);
+    dval_t *exp_log_simp = dv_simplify(exp_log_x);
+    dval_t *log_exp_simp = dv_simplify(log_exp_x);
+    dval_t *ten_pow_log10_simp = dv_simplify(ten_pow_log10_x);
+    dval_t *log10_ten_pow_simp = dv_simplify(log10_ten_pow_x);
+    char *exp_log_s = dv_to_string(exp_log_simp, style_EXPRESSION);
+    char *log_exp_s = dv_to_string(log_exp_simp, style_EXPRESSION);
+    char *ten_pow_log10_s = dv_to_string(ten_pow_log10_simp, style_EXPRESSION);
+    char *log10_ten_pow_s = dv_to_string(log10_ten_pow_simp, style_EXPRESSION);
     const char *expect = "{ x | x = 3 }";
 
     check_q_at(__FILE__, __LINE__, 1, "exp(log(x)) eval", dv_eval_qf(exp_log_x), qf_from_double(3.0));
@@ -1377,6 +1381,10 @@ static void test_simplify_inverse_unary_pairs(void)
     free(ten_pow_log10_s);
     free(log_exp_s);
     free(exp_log_s);
+    dv_free(log10_ten_pow_simp);
+    dv_free(ten_pow_log10_simp);
+    dv_free(log_exp_simp);
+    dv_free(exp_log_simp);
     dv_free(log10_ten_pow_x);
     dv_free(ten_pow_x);
     dv_free(ten_pow_log10_x);
@@ -1397,7 +1405,8 @@ static void test_simplify_exp_quarter_turns(void)
     dval_t *half = test_dv_new_const_d(2.0);
     dval_t *pi_i_over_2 = dv_div(pi_i, half);
     dval_t *exp_pi_i_over_2 = dv_exp(pi_i_over_2);
-    char *expr_s = dv_to_string(exp_pi_i_over_2, style_EXPRESSION);
+    dval_t *simp = dv_simplify(exp_pi_i_over_2);
+    char *expr_s = dv_to_string(simp, style_EXPRESSION);
     const char *expect = "i";
 
     if (str_eq(expr_s, expect))
@@ -1406,12 +1415,44 @@ static void test_simplify_exp_quarter_turns(void)
         to_string_fail(__FILE__, __LINE__, 1, "exp(pi*i/2) simplification (EXPR)", expr_s, expect);
 
     free(expr_s);
+    dv_free(simp);
     dv_free(exp_pi_i_over_2);
     dv_free(pi_i_over_2);
     dv_free(half);
     dv_free(pi_i);
     dv_free(i);
     dv_free(pi);
+}
+
+static void test_to_string_does_not_simplify_plain_expressions(void)
+{
+    dval_t *x = test_dv_new_named_var_d(3.0, "x");
+    dval_t *xx = dv_mul(x, x);
+    dval_t *dx = dv_create_deriv(xx, x);
+    char *expr_text = dv_to_string(xx, style_EXPRESSION);
+    char *deriv_text = dx ? dv_to_string(dx, style_EXPRESSION) : NULL;
+    const char *expr_expect = "{ xx | x = 3 }";
+    const char *deriv_expect = "{ 2x | x = 3 }";
+
+    if (str_eq(expr_text, expr_expect))
+        to_string_pass("plain to_string preserves x*x", expr_text, expr_expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "plain to_string preserves x*x",
+                       expr_text ? expr_text : "(null)", expr_expect);
+
+    if (deriv_text && str_eq(deriv_text, deriv_expect))
+        to_string_pass("derivative creation still simplifies (x*x)'", deriv_text, deriv_expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "derivative creation still simplifies (x*x)'",
+                       deriv_text ? deriv_text : "(null)", deriv_expect);
+
+    free(deriv_text);
+    free(expr_text);
+    dv_free(dx);
+    dv_free(xx);
+    dv_free(x);
 }
 
 void test_runtime_regressions(void)
@@ -1439,6 +1480,7 @@ void test_runtime_regressions(void)
     TEST_RUN_SUBTEST(test_high_precision_mfloat_function_derivatives, NULL);
     TEST_RUN_SUBTEST(test_high_precision_mcomplex_function_values, NULL);
     TEST_RUN_SUBTEST(test_set_val_num_named_constant, NULL);
+    TEST_RUN_SUBTEST(test_to_string_does_not_simplify_plain_expressions, NULL);
     TEST_RUN_SUBTEST(test_simplify_inverse_unary_pairs, NULL);
     TEST_RUN_SUBTEST(test_simplify_exp_quarter_turns, NULL);
 }

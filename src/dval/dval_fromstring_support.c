@@ -420,6 +420,10 @@ static void bindings_destroy_partial(dval_bindings_t *bindings)
 {
     if (!bindings)
         return;
+    if (bindings->entries) {
+        for (size_t i = 0; i < bindings->count; ++i)
+            dv_free(bindings->entries[i].dval);
+    }
     dictionary_destroy(bindings->index);
     free(bindings->storage);
     free(bindings);
@@ -475,6 +479,7 @@ dval_bindings_t *symtab_build_bindings(const symtab_t *t)
         entry = &bindings->entries[i];
         entry->name = name_store;
         entry->dval = t->entries[i].node;
+        dv_retain(entry->dval);
         entry->is_constant = (t->entries[i].node &&
                               t->entries[i].node->ops == &ops_const);
         if (bindings_index_entry(bindings, entry) != 0) {
@@ -502,6 +507,7 @@ dval_bindings_t *single_binding_from_node(dval_t *node)
     bindings->entries[0].name = (char *)(bindings->entries + 1);
     memcpy((char *)bindings->entries[0].name, node->name, n);
     bindings->entries[0].dval = node;
+    dv_retain(bindings->entries[0].dval);
     bindings->entries[0].is_constant = (node->ops == &ops_const);
     {
         dval_binding_entry_t *entry = &bindings->entries[0];

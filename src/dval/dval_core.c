@@ -30,6 +30,7 @@
 #include <limits.h>
 #include <math.h>
 #include "number.h"
+#include "dval_bindings_internal.h"
 #include "dval_internal.h"
 #include "dval.h"
 #include "internal/number_internal.h"
@@ -77,9 +78,22 @@ static number_t dv_eval_cached_num(const dval_t *dv)
 
     dval_t *m = (dval_t *)dv;
 
-    /* Atoms (constants and variables) are always up-to-date. */
-    if (m->ops->arity == DV_OP_ATOM)
+    /* Binding-expression atoms are lazy constants/initialisers. They only
+     * refresh when the global working precision increases. */
+    if (m->ops->arity == DV_OP_ATOM) {
+        if (m->binding_expr) {
+            number_t refreshed;
+
+            if (dv_binding_expr_eval_if_precision_increased(m->binding_expr,
+                                                            &refreshed)) {
+                dv_store_const_num(m, num_clone(refreshed));
+                dv_store_value_num(m, refreshed);
+                m->x_valid = 1;
+                m->epoch++;
+            }
+        }
         return m->x;
+    }
 
     /* Recurse into children to bring their epochs current, then check whether
      * this node's cached value is still valid. ops->eval() will call dv_eval_qc
@@ -191,6 +205,10 @@ void dv_set_val(dval_t *dv, number_t value)
     if (dv->ops != &ops_var &&
         !(dv->ops == &ops_const && dv->name && *dv->name))
         abort();
+    if (dv->binding_expr) {
+        dv_binding_expr_free(dv->binding_expr);
+        dv->binding_expr = NULL;
+    }
     dv_store_const_num(dv, num_clone(value));
     dv_store_value_num(dv, num_clone(dv->c));
     dv->x_valid = 1;

@@ -179,6 +179,67 @@ int dv_eval_derivatives(const dval_t *expr,
                         number_t *derivs_out);
 
 /* ------------------------------------------------------------------------- */
+/* Goal seek                                                                 */
+/* ------------------------------------------------------------------------- */
+
+/**
+ * @brief Options for dv_goal_seek().
+ *
+ * Zero-valued fields select library defaults. @p tolerance may be left as
+ * zero/invalid to derive an absolute tolerance of 10^-precision_digits.
+ */
+typedef struct dv_goal_seek_options {
+    size_t precision_digits;
+    size_t max_iterations;
+    bool allow_complex;
+    bool simplify_result;
+    number_t tolerance;
+} dv_goal_seek_options_t;
+
+/**
+ * @brief Result returned by dv_goal_seek().
+ *
+ * dv_goal_seek() updates the supplied binding nodes in place. @p bindings is
+ * therefore a borrowed echo of the input bindings pointer, not an owning copy.
+ *
+ * @p expr, @p value, and @p residual are owning outputs and must be released
+ * with dv_goal_seek_result_clear().
+ */
+typedef struct dv_goal_seek_result {
+    dval_t *expr;
+    dval_bindings_t *bindings;
+    number_t value;
+    number_t residual;
+    size_t iterations;
+    bool used_complex;
+    bool converged;
+} dv_goal_seek_result_t;
+
+/**
+ * @brief Adjust variable bindings so @p expr evaluates to @p target.
+ *
+ * For one variable, the solver first attempts a real-valued bracketed solve.
+ * If that cannot produce a real solution and @p options allows complex solving,
+ * it falls back to Newton iteration in the complex plane using automatic
+ * derivatives. For several variables, it takes least-norm real Newton steps
+ * using the expression gradient.
+ *
+ * Variables are the non-constant entries in @p bindings. Fixed named constants
+ * remain unchanged. Returns 0 on convergence and non-zero on invalid input or
+ * failure to converge.
+ */
+int dv_goal_seek(dval_t *expr,
+                 dval_bindings_t *bindings,
+                 number_t target,
+                 const dv_goal_seek_options_t *options,
+                 dv_goal_seek_result_t *result);
+
+/**
+ * @brief Release owning fields in a goal-seek result.
+ */
+void dv_goal_seek_result_clear(dv_goal_seek_result_t *result);
+
+/* ------------------------------------------------------------------------- */
 /* Derivative creation (owning)                                              */
 /* ------------------------------------------------------------------------- */
 

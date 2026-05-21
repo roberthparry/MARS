@@ -1087,10 +1087,10 @@ static void test_printf(void)
 
     /* Pure imaginary / pure real */
     qc_sprintf(buf, sizeof(buf), "%.1z", pure_im);
-    check_str("%.1z pure imaginary", buf, "0.0 + 2.5i");
+    check_str("%.1z pure imaginary", buf, "2.5i");
 
     qc_sprintf(buf, sizeof(buf), "%.1z", pure_re);
-    check_str("%.1z pure real", buf, "-1.0 + 0.0i");
+    check_str("%.1z pure real", buf, "-1.0");
 
     /* %q / %Q passthrough */
     qfloat_t pi = QF_PI;

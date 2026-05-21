@@ -10,10 +10,11 @@ GUI surface without adding a desktop toolkit dependency to the project.
 from __future__ import annotations
 
 import argparse
-from decimal import Decimal, localcontext
+from decimal import Decimal, InvalidOperation, localcontext
 import html
 import http.server
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -30,7 +31,10 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_BIN = ROOT / "build" / "release" / "scratch" / "try_dval"
 STATE_FILE = ROOT / ".dval_lab_state.json"
 DEFAULT_EXPRESSION = "{e^(sin(x))|x=pi/2}"
-MAX_VALUE_PRECISION_DIGITS = 1_000_000
+MAX_VALUE_PRECISION_BITS = 1_048_576
+MAX_VALUE_PRECISION_DIGITS = math.ceil(MAX_VALUE_PRECISION_BITS * math.log10(2))
+COMPACT_BINDING_VALUE_LIMIT = 20
+COMPACT_BINDING_VALUE_KEEP = 16
 
 
 INDEX_HTML = r"""<!doctype html>
@@ -190,7 +194,7 @@ INDEX_HTML = r"""<!doctype html>
     .variable-value-box {
       display: grid;
       grid-template-columns: minmax(2.4rem, auto) minmax(0, 1fr) auto;
-      align-items: center;
+      align-items: start;
       gap: 0.7rem;
       border: 1px solid var(--line);
       border-radius: 18px;
@@ -214,20 +218,36 @@ INDEX_HTML = r"""<!doctype html>
 
     .variable-value-text {
       min-width: 0;
+      max-height: 4.6rem;
       overflow: hidden;
       border: 1px solid rgba(217, 205, 185, 0.58);
-      border-radius: 999px;
-      padding: 0.42rem 0.7rem;
+      border-radius: 14px;
+      padding: 0.5rem 0.7rem;
       color: #16312d;
       background: rgba(255, 255, 255, 0.54);
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
       font: 0.82rem/1.35 "Cascadia Code", "Fira Code", "DejaVu Sans Mono", monospace;
+    }
+
+    .variable-value-box.expanded .variable-value-text {
+      max-height: none;
+      overflow: visible;
+    }
+
+    .variable-value-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+      align-self: stretch;
     }
 
     .variable-copy {
       min-width: 4.1rem;
-      align-self: stretch;
+    }
+
+    .variable-expand {
+      min-width: 4.1rem;
     }
 
     button {
@@ -310,6 +330,22 @@ INDEX_HTML = r"""<!doctype html>
       gap: 0.45rem;
     }
 
+    .expandable-title {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+    }
+
+    .digit-actions {
+      justify-content: center;
+      grid-column: 2;
+    }
+
+    .top-card-copy {
+      justify-self: end;
+      grid-column: 3;
+    }
+
     .value-title {
       display: grid;
       grid-template-columns: 1fr auto 1fr;
@@ -350,8 +386,9 @@ INDEX_HTML = r"""<!doctype html>
     .rendered {
       margin: 0;
       min-height: 12rem;
-      padding: 1.4rem 1.6rem;
-      overflow: auto;
+      padding: 2.1rem 1.6rem 1.4rem;
+      overflow-x: auto;
+      overflow-y: visible;
       font-size: 1.78rem;
     }
 
@@ -360,7 +397,8 @@ INDEX_HTML = r"""<!doctype html>
       max-width: 100%;
       height: auto;
       transform: scale(2);
-      transform-origin: left center;
+      transform-origin: left top;
+      margin-bottom: 4rem;
       filter: brightness(0) saturate(100%) invert(13%) sepia(78%) saturate(1567%) hue-rotate(198deg) brightness(88%) contrast(98%);
     }
 
@@ -472,30 +510,32 @@ INDEX_HTML = r"""<!doctype html>
       </div>
       <div class="output-grid" id="resultPane">
         <div class="card">
-          <div class="card-title">
+          <div class="card-title expandable-title">
             <span>Rendered TeX</span>
-            <button class="card-action copy-result hidden" id="renderedCopy" data-copy-target="rendered">Copy</button>
+            <span class="card-actions digit-actions">
+              <button class="card-action more-digits hidden" id="renderedMore">Show more digits</button>
+            </span>
+            <button class="card-action copy-result top-card-copy" id="renderedCopy" data-copy-target="rendered">Copy</button>
           </div>
           <div class="rendered" id="rendered"></div>
         </div>
         <div class="card">
-          <div class="card-title">
-            <span>TeX</span>
-            <button class="card-action copy-result" data-copy-target="tex">Copy</button>
-          </div>
-          <pre id="tex"></pre>
-        </div>
-        <div class="card">
-          <div class="card-title">
+          <div class="card-title expandable-title">
             <span>Expression</span>
-            <button class="card-action copy-result" data-copy-target="expression">Copy</button>
+            <span class="card-actions digit-actions">
+              <button class="card-action more-digits hidden" id="parsedMore">Show more digits</button>
+            </span>
+            <button class="card-action copy-result top-card-copy" data-copy-target="expression">Copy</button>
           </div>
           <pre id="parsed"></pre>
         </div>
         <div class="card">
-          <div class="card-title">
+          <div class="card-title expandable-title">
             <span>Function</span>
-            <button class="card-action copy-result" data-copy-target="function">Copy</button>
+            <span class="card-actions digit-actions">
+              <button class="card-action more-digits hidden" id="functionMore">Show more digits</button>
+            </span>
+            <button class="card-action copy-result top-card-copy" data-copy-target="function">Copy</button>
           </div>
           <pre id="functionStyle"></pre>
         </div>
@@ -615,32 +655,50 @@ INDEX_HTML = r"""<!doctype html>
     const helpPane = document.getElementById('helpPane');
     const rendered = document.getElementById('rendered');
     const renderedCopy = document.getElementById('renderedCopy');
-    const texEl = document.getElementById('tex');
+    const renderedMore = document.getElementById('renderedMore');
     const parsed = document.getElementById('parsed');
+    const parsedMore = document.getElementById('parsedMore');
     const functionStyle = document.getElementById('functionStyle');
+    const functionMore = document.getElementById('functionMore');
     const value = document.getElementById('value');
     const copyButtons = Array.from(document.querySelectorAll('.copy-result'));
+    const moreDigitButtons = Array.from(document.querySelectorAll('.more-digits'));
     let lastTex = '';
-    let displayTex = '';
     let lastDerivativeExpression = '';
     let currentVariables = [];
     let expressionHistory = [];
     let forwardHistory = [];
-    let precisionExtra = 0;
+    let workingPrecisionBits = 256;
     let fullExpressionText = '';
     let displayedExpressionText = '';
+    let lastEvaluationInputText = '';
     let bindingValueCache = new Map();
+    const DOUBLE_PRECISION_BITS = 53;
     const DOUBLE_PRECISION_DIGITS = 17;
-    const MAX_PRECISION_DIGITS = 1000000;
+    const QFLOAT_PRECISION_BITS = 106;
+    const MAX_PRECISION_BITS = 1048576;
     const START_FORBIDDEN_PATTERN = /[=,;|{}]/;
-    const PRECISION_STEPS = [
-      17, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024,
-      1200, 2000, 5000, 10000, 20000, 50000, 100000, 200000,
-      500000, 1000000
-    ];
+    const COMPACT_BINDING_VALUE_LIMIT = 20;
+    const COMPACT_BINDING_VALUE_KEEP = 16;
+
+    function precisionDigitsForBits(bits) {
+      if (bits <= DOUBLE_PRECISION_BITS)
+        return DOUBLE_PRECISION_DIGITS;
+      return Math.ceil(bits * Math.LOG10E * Math.LN2);
+    }
+
+    function requestedPrecisionBits() {
+      return Math.max(DOUBLE_PRECISION_BITS, Math.min(MAX_PRECISION_BITS, workingPrecisionBits));
+    }
+
+    function precisionStatusText() {
+      const bits = requestedPrecisionBits();
+      const digits = requestedValuePrecision();
+      return `${digits} digits / ${bits} bits`;
+    }
 
     function setStatus(text) {
-      statusEl.textContent = text;
+      statusEl.textContent = `${text} · ${precisionStatusText()}`;
     }
 
     function showResults() {
@@ -789,6 +847,10 @@ INDEX_HTML = r"""<!doctype html>
         .filter(Boolean);
     }
 
+    function canGoalSeek() {
+      return variablesFromExpression(currentExpressionText()).length > 0;
+    }
+
     function derivativeExpressionFromLine(line) {
       const match = String(line || '').match(/^d\/d[^=]*=\s*(.+)$/);
       return match ? match[1].trim() : '';
@@ -875,9 +937,42 @@ INDEX_HTML = r"""<!doctype html>
     function clearExpressionSource() {
       fullExpressionText = '';
       displayedExpressionText = '';
+      lastEvaluationInputText = '';
       bindingValueCache = new Map();
       delete expr.dataset.fullExpression;
       delete expr.dataset.displayExpression;
+      clearGoalSeekRequest();
+    }
+
+    function clearGoalSeekRequest() {
+      delete expr.dataset.goalSeekSource;
+      delete expr.dataset.goalSeekTarget;
+    }
+
+    function currentGoalSeekSource() {
+      const source = expr.dataset.goalSeekSource || '';
+
+      if (!source)
+        return '';
+      if (expr.value.trim() !== (expr.dataset.displayExpression || displayedExpressionText))
+        return '';
+      return source;
+    }
+
+    function expressionHasSolvedVariables(text) {
+      const parts = bindingParts(text);
+
+      if (!parts)
+        return false;
+
+      return splitTopLevel(parts.variables, ',').some((part) => {
+        const eq = indexOfTopLevel(part, '=');
+        if (eq < 0)
+          return false;
+
+        const valueText = part.slice(eq + 1).trim();
+        return valueText && valueText !== '?' && !/^NAN$/i.test(valueText);
+      });
     }
 
     function bindingParts(text) {
@@ -902,19 +997,36 @@ INDEX_HTML = r"""<!doctype html>
       const text = String(valueText || '').trim();
       if (!text || text === '?' || /^NAN$/i.test(text))
         return {display: text, shortened: false};
-      if (text.length <= 38)
+      if (text.includes('...'))
         return {display: text, shortened: false};
-      return {display: `${text.slice(0, 34)}...`, shortened: true};
+      if (text.length <= COMPACT_BINDING_VALUE_LIMIT)
+        return {display: text, shortened: false};
+      return {display: compactLongNumericTokens(text), shortened: true};
+    }
+
+    function compactLongNumericTokens(text) {
+      return String(text || '').replace(
+        /(^|[^A-Za-z0-9_.])([+-]?(?:\d+\.\d+|\d{21,})(?:[Ee][+-]?\d+)?)/g,
+        (match, prefix, numberText) => {
+          if (numberText.includes('...') || numberText.length <= COMPACT_BINDING_VALUE_LIMIT)
+            return match;
+          return `${prefix}${numberText.slice(0, COMPACT_BINDING_VALUE_KEEP)}...`;
+        }
+      );
     }
 
     function compactExpressionForEditor(fullText) {
       const full = expressionForEditor(fullText);
       const parts = bindingParts(full);
-      if (!parts)
-        return {display: full, bindings: [], shortened: false};
+      if (!parts) {
+        const display = compactLongNumericTokens(full);
+        return {display, bindings: [], shortened: display !== full};
+      }
 
       const bindingValues = [];
       let shortened = false;
+      const body = compactLongNumericTokens(parts.body);
+      shortened = shortened || body !== parts.body;
       const variableAssignments = splitTopLevel(parts.variables, ',')
         .map((part) => {
           const eq = indexOfTopLevel(part, '=');
@@ -933,12 +1045,15 @@ INDEX_HTML = r"""<!doctype html>
         .filter(Boolean);
 
       let bindingText = variableAssignments.join(', ');
-      if (parts.constants)
-        bindingText = bindingText ? `${bindingText}; ${parts.constants}` : `; ${parts.constants}`;
+      if (parts.constants) {
+        const constants = compactLongNumericTokens(parts.constants);
+        shortened = shortened || constants !== parts.constants;
+        bindingText = bindingText ? `${bindingText}; ${constants}` : `; ${constants}`;
+      }
 
       return {
-        display: `{ ${parts.body} | ${bindingText} }`,
-        bindings: shortened ? bindingValues : [],
+        display: `{ ${body} | ${bindingText} }`,
+        bindings: bindingValues,
         shortened
       };
     }
@@ -970,6 +1085,23 @@ INDEX_HTML = r"""<!doctype html>
         text.textContent = binding.value;
         text.title = binding.value;
 
+        const actions = document.createElement('div');
+        actions.className = 'variable-value-actions';
+
+        if (binding.value.length > 96) {
+          const expand = document.createElement('button');
+          expand.className = 'card-action variable-expand';
+          expand.type = 'button';
+          expand.textContent = 'Expand';
+          expand.setAttribute('aria-expanded', 'false');
+          expand.addEventListener('click', () => {
+            const expanded = box.classList.toggle('expanded');
+            expand.textContent = expanded ? 'Collapse' : 'Expand';
+            expand.setAttribute('aria-expanded', String(expanded));
+          });
+          actions.appendChild(expand);
+        }
+
         const copy = document.createElement('button');
         copy.className = 'card-action variable-copy';
         copy.type = 'button';
@@ -986,21 +1118,95 @@ INDEX_HTML = r"""<!doctype html>
           }
         });
 
-        box.append(name, text, copy);
+        actions.appendChild(copy);
+        box.append(name, text, actions);
         variableValues.appendChild(box);
       });
 
       variableValues.classList.remove('hidden');
     }
 
-    function setExpressionEditor(fullText) {
+    function assignmentValuesByName(assignmentsText) {
+      const values = new Map();
+      splitTopLevel(assignmentsText || '', ',').forEach((part) => {
+        const eq = indexOfTopLevel(part, '=');
+        if (eq < 0)
+          return;
+
+        const name = part.slice(0, eq).trim();
+        const valueText = part.slice(eq + 1).trim();
+        if (name && valueText)
+          values.set(name, valueText);
+      });
+      return values;
+    }
+
+    function solvedStartValuesForGoalSeek(sourceExpression, solvedExpression, providedStart = {}) {
+      const start = {...providedStart};
+      const sourceParts = bindingParts(sourceExpression);
+      const solvedParts = bindingParts(solvedExpression);
+      if (!sourceParts || !solvedParts)
+        return start;
+
+      const sourceVariables = new Set(assignmentValuesByName(sourceParts.variables).keys());
+      const solvedVariables = assignmentValuesByName(solvedParts.variables);
+      sourceVariables.forEach((name) => {
+        const cachedValue = bindingValueCache.get(name);
+        const solvedValue = cachedValue || solvedVariables.get(name) || '';
+        if (!solvedValue || solvedValue === '?' || /^NAN$/i.test(solvedValue))
+          return;
+        start[name] = solvedValue;
+      });
+
+      return start;
+    }
+
+    function goalSeekExpressionAndStarts(sourceExpression, providedStart = {}) {
+      const parts = bindingParts(sourceExpression);
+      const start = {...providedStart};
+
+      if (!parts)
+        return {expression: sourceExpression, start};
+
+      let changed = false;
+      const variables = splitTopLevel(parts.variables, ',')
+        .map((part) => {
+          const eq = indexOfTopLevel(part, '=');
+          if (eq < 0)
+            return part.trim();
+
+          const name = part.slice(0, eq).trim();
+          const valueText = part.slice(eq + 1).trim();
+          if (!name)
+            return part.trim();
+
+          if (valueText && valueText !== '?' && !/^NAN$/i.test(valueText) && !start[name])
+            start[name] = valueText;
+
+          changed = changed || valueText !== '?';
+          return `${name} = ?`;
+        })
+        .filter(Boolean)
+        .join(', ');
+
+      let bindingText = variables;
+      if (parts.constants)
+        bindingText = bindingText ? `${bindingText}; ${parts.constants}` : `; ${parts.constants}`;
+
+      return {
+        expression: changed ? `{ ${parts.body} | ${bindingText} }` : sourceExpression,
+        start
+      };
+    }
+
+    function setExpressionEditor(fullText, evaluatedBindings = null) {
       const compact = compactExpressionForEditor(fullText);
       fullExpressionText = expressionForEditor(fullText).trim();
-      displayedExpressionText = compact.display.trim();
+      displayedExpressionText = fullExpressionText;
       expr.dataset.fullExpression = fullExpressionText;
       expr.dataset.displayExpression = displayedExpressionText;
-      expr.value = compact.display;
-      renderVariableValues(compact.bindings);
+      expr.value = fullExpressionText;
+      renderVariableValues(evaluatedBindings || compact.bindings);
     }
 
     async function loadLastExpression() {
@@ -1018,7 +1224,6 @@ INDEX_HTML = r"""<!doctype html>
             setExpressionEditor(localSaved);
             return;
           }
-          expr.value = saved;
           return;
         }
       } catch (_) {
@@ -1027,12 +1232,8 @@ INDEX_HTML = r"""<!doctype html>
 
       try {
         const saved = localStorage.getItem('mars.dvalLab.lastExpression');
-        if (saved) {
-          if (saved.includes('...'))
-            expr.value = saved;
-          else
-            setExpressionEditor(saved);
-        }
+        if (saved && !saved.includes('...'))
+          setExpressionEditor(saved);
       } catch (_) {
         // Private browsing or locked-down webviews can disable localStorage.
       }
@@ -1068,7 +1269,10 @@ INDEX_HTML = r"""<!doctype html>
       run.disabled = isBusy;
       back.disabled = isBusy || expressionHistory.length === 0;
       forward.disabled = isBusy || forwardHistory.length === 0;
-      goalSeek.disabled = isBusy;
+      goalSeek.disabled = isBusy || !canGoalSeek();
+      goalSeek.title = goalSeek.disabled && !isBusy
+        ? 'Goal seek needs at least one variable binding'
+        : '';
       goalTarget.disabled = isBusy;
       Array.from(goalStartFields.querySelectorAll('input')).forEach((input) => {
         input.disabled = isBusy;
@@ -1076,6 +1280,9 @@ INDEX_HTML = r"""<!doctype html>
       lessPrecision.disabled = isBusy || atMinimumPrecision();
       morePrecision.disabled = isBusy;
       copyButtons.forEach((button) => {
+        button.disabled = isBusy;
+      });
+      moreDigitButtons.forEach((button) => {
         button.disabled = isBusy;
       });
       Array.from(variableValues.querySelectorAll('button')).forEach((button) => {
@@ -1090,6 +1297,10 @@ INDEX_HTML = r"""<!doctype html>
       back.disabled = expressionHistory.length === 0;
       forward.disabled = forwardHistory.length === 0;
       lessPrecision.disabled = atMinimumPrecision();
+      goalSeek.disabled = !canGoalSeek();
+      goalSeek.title = goalSeek.disabled
+        ? 'Goal seek needs at least one variable binding'
+        : '';
     }
 
     function pushExpressionHistory(text) {
@@ -1141,45 +1352,151 @@ INDEX_HTML = r"""<!doctype html>
       const usableWidth = Math.max(0, value.clientWidth - padLeft - padRight);
       const chars = Math.floor(usableWidth / charWidth);
 
-      return Math.max(32, Math.min(220, chars - 3));
+      return Math.max(96, Math.min(220, chars - 3));
     }
 
     function requestedValuePrecision() {
-      const requested = estimateValuePrecision() + precisionExtra;
-      return Math.max(DOUBLE_PRECISION_DIGITS, Math.min(MAX_PRECISION_DIGITS, requested));
+      return precisionDigitsForBits(requestedPrecisionBits());
     }
 
     function atMinimumPrecision() {
-      return requestedValuePrecision() <= DOUBLE_PRECISION_DIGITS;
+      return requestedPrecisionBits() <= DOUBLE_PRECISION_BITS;
     }
 
-    function setRequestedValuePrecision(precision) {
-      precisionExtra = precision - estimateValuePrecision();
+    function setRequestedPrecisionBits(bits) {
+      workingPrecisionBits = Math.max(DOUBLE_PRECISION_BITS, Math.min(MAX_PRECISION_BITS, bits));
     }
 
-    function nextPrecisionStep(current) {
-      for (const step of PRECISION_STEPS) {
-        if (step > current)
-          return step;
-      }
-      return MAX_PRECISION_DIGITS;
+    function nextPrecisionStepBits(current) {
+      if (current < QFLOAT_PRECISION_BITS)
+        return QFLOAT_PRECISION_BITS;
+      if (current < 256)
+        return 256;
+      return Math.min(MAX_PRECISION_BITS, Math.ceil((current + 1) / 128) * 128);
     }
 
-    function previousPrecisionStep(current) {
-      for (let i = PRECISION_STEPS.length - 1; i >= 0; --i) {
-        if (PRECISION_STEPS[i] < current)
-          return PRECISION_STEPS[i];
-      }
-      return DOUBLE_PRECISION_DIGITS;
+    function previousPrecisionStepBits(current) {
+      if (current <= QFLOAT_PRECISION_BITS)
+        return DOUBLE_PRECISION_BITS;
+      if (current <= 256)
+        return QFLOAT_PRECISION_BITS;
+      return Math.max(256, Math.floor((current - 1) / 128) * 128);
     }
 
     function copyTextForTarget(target) {
-      if (target === 'rendered') return rendered.textContent;
-      if (target === 'tex') return lastTex || texEl.textContent;
+      if (target === 'rendered') return rendered.classList.contains('error') ? rendered.textContent : lastTex;
       if (target === 'expression') return fullExpressionText || parsed.textContent;
       if (target === 'function') return functionStyle.dataset.fullText || functionStyle.textContent;
       if (target === 'value') return value.textContent;
       return '';
+    }
+
+    function resetMoreDigitsButton(button, canExpand) {
+      button.classList.toggle('hidden', !canExpand);
+      button.textContent = 'Show more digits';
+      button.dataset.expanded = 'false';
+    }
+
+    function hasAbbreviatedValue(text) {
+      return String(text || '').includes('...');
+    }
+
+    function setRenderedContent(svg, fallbackText = '') {
+      rendered.replaceChildren();
+      if (svg) {
+        rendered.innerHTML = svg;
+      } else {
+        rendered.textContent = fallbackText;
+      }
+    }
+
+    function setExpandableText(element, button, displayText, fullText) {
+      element.textContent = displayText || fullText || '';
+      element.dataset.displayText = displayText || '';
+      element.dataset.fullText = fullText || '';
+      resetMoreDigitsButton(
+        button,
+        !!fullText && !!displayText && fullText !== displayText && hasAbbreviatedValue(displayText)
+      );
+    }
+
+    function setRenderedResult(data) {
+      const displayTex = data.display_tex || data.tex || '';
+      const fullDisplayTex = data.full_display_tex || data.tex || '';
+
+      rendered.classList.remove('error');
+      lastTex = data.tex || '';
+      rendered.dataset.displayTex = displayTex;
+      rendered.dataset.fullTex = fullDisplayTex;
+      rendered.dataset.displaySvg = data.svg || '';
+      rendered.dataset.fullSvg = '';
+      rendered.dataset.renderError = data.render_error || '';
+      setRenderedContent(data.svg || '', data.render_error || 'No rendered TeX available');
+      resetMoreDigitsButton(
+        renderedMore,
+        !!fullDisplayTex &&
+          !!displayTex &&
+          fullDisplayTex !== displayTex &&
+          hasAbbreviatedValue(displayTex)
+      );
+    }
+
+    async function renderTexSvg(tex) {
+      const response = await fetch('/render_tex', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({tex})
+      });
+      const data = await response.json();
+      if (!response.ok || !data.ok)
+        throw new Error(data.error || 'Could not render TeX');
+      return data;
+    }
+
+    function toggleTextDigits(element, button) {
+      const expanded = button.dataset.expanded === 'true';
+      if (expanded) {
+        element.textContent = element.dataset.displayText || element.textContent;
+        button.textContent = 'Show more digits';
+        button.dataset.expanded = 'false';
+      } else {
+        element.textContent = element.dataset.fullText || element.textContent;
+        button.textContent = 'Show fewer digits';
+        button.dataset.expanded = 'true';
+      }
+    }
+
+    async function toggleRenderedDigits() {
+      const expanded = renderedMore.dataset.expanded === 'true';
+
+      if (expanded) {
+        setRenderedContent(rendered.dataset.displaySvg || '', rendered.dataset.renderError || '');
+        renderedMore.textContent = 'Show more digits';
+        renderedMore.dataset.expanded = 'false';
+        return;
+      }
+
+      if (!rendered.dataset.fullSvg) {
+        renderedMore.disabled = true;
+        setStatus('Rendering full TeX...');
+        try {
+          const data = await renderTexSvg(rendered.dataset.fullTex || lastTex);
+          rendered.dataset.fullSvg = data.svg || '';
+          rendered.dataset.fullRenderError = data.render_error || '';
+        } catch (err) {
+          rendered.dataset.fullRenderError = String(err);
+        } finally {
+          renderedMore.disabled = false;
+          setStatus('Ready');
+        }
+      }
+
+      setRenderedContent(
+        rendered.dataset.fullSvg || '',
+        rendered.dataset.fullRenderError || 'No rendered TeX available'
+      );
+      renderedMore.textContent = 'Show fewer digits';
+      renderedMore.dataset.expanded = 'true';
     }
 
     async function writeClipboardText(text) {
@@ -1220,14 +1537,21 @@ INDEX_HTML = r"""<!doctype html>
       rendered.replaceChildren();
       rendered.textContent = '';
       rendered.classList.remove('error');
-      renderedCopy.classList.add('hidden');
-      texEl.textContent = '';
+      resetMoreDigitsButton(renderedMore, false);
+      clearResultDetails();
+    }
+
+    function clearResultDetails() {
       parsed.textContent = '';
       functionStyle.textContent = '';
+      resetMoreDigitsButton(parsedMore, false);
+      resetMoreDigitsButton(functionMore, false);
+      delete parsed.dataset.fullText;
+      delete parsed.dataset.displayText;
       delete functionStyle.dataset.fullText;
+      delete functionStyle.dataset.displayText;
       value.textContent = '';
       lastTex = '';
-      displayTex = '';
       lastDerivativeExpression = '';
       currentVariables = [];
       renderDerivativeButtons(currentVariables);
@@ -1235,7 +1559,9 @@ INDEX_HTML = r"""<!doctype html>
     }
 
     async function evaluateExpression(options = {}) {
-      const text = currentExpressionText();
+      const text = options.reuseLastInput && lastEvaluationInputText
+        ? lastEvaluationInputText
+        : currentExpressionText();
       if (!text) return;
       showResults();
       setBusy(true);
@@ -1246,14 +1572,15 @@ INDEX_HTML = r"""<!doctype html>
         if (!response.ok || !data.ok) {
           rendered.textContent = data.error || 'Evaluation failed';
           rendered.classList.add('error');
-          renderedCopy.classList.remove('hidden');
-          texEl.textContent = '';
+          resetMoreDigitsButton(renderedMore, false);
           parsed.textContent = '';
           functionStyle.textContent = '';
+          resetMoreDigitsButton(parsedMore, false);
+          resetMoreDigitsButton(functionMore, false);
           delete functionStyle.dataset.fullText;
+          delete functionStyle.dataset.displayText;
           value.textContent = '';
           lastTex = '';
-          displayTex = '';
           lastDerivativeExpression = '';
           currentVariables = [];
           renderDerivativeButtons(currentVariables);
@@ -1262,23 +1589,24 @@ INDEX_HTML = r"""<!doctype html>
           return;
         }
 
-        rendered.classList.remove('error');
-        renderedCopy.classList.add('hidden');
-        lastTex = data.tex || '';
-        displayTex = data.display_tex || lastTex;
-        if (data.svg) {
-          rendered.innerHTML = data.svg;
-        } else {
-          rendered.textContent = data.render_error || 'No rendered TeX available';
-        }
-        texEl.textContent = displayTex;
-        parsed.textContent = data.display_expression || (data.expression ? compactExpressionForEditor(data.expression).display : '');
-        functionStyle.textContent = data.display_function || data.function || '';
-        functionStyle.dataset.fullText = data.function || '';
+        setRenderedResult(data);
+        setExpandableText(
+          parsed,
+          parsedMore,
+          data.display_expression || (data.expression ? compactExpressionForEditor(data.expression).display : ''),
+          data.full_display_expression || data.expression || ''
+        );
+        setExpandableText(
+          functionStyle,
+          functionMore,
+          data.display_function || data.function || '',
+          data.full_display_function || data.function || ''
+        );
         value.textContent = data.value || '';
+        lastEvaluationInputText = data.expression || text;
         if (data.expression)
-          setExpressionEditor(data.expression);
-        saveLastExpression(fullExpressionText || expr.value.trim());
+          setExpressionEditor(data.expression, data.binding_values || null);
+        saveLastExpression(lastEvaluationInputText || fullExpressionText || expr.value.trim());
         lastDerivativeExpression = derivativeExpressionFromLine(data.derivative);
         currentVariables = variablesFromExpression(data.expression || '');
         renderDerivativeButtons(currentVariables);
@@ -1286,7 +1614,8 @@ INDEX_HTML = r"""<!doctype html>
       } catch (err) {
         rendered.textContent = String(err);
         rendered.classList.add('error');
-        renderedCopy.classList.remove('hidden');
+        resetMoreDigitsButton(renderedMore, false);
+        clearResultDetails();
         setStatus('Error');
       } finally {
         setBusy(false);
@@ -1295,9 +1624,65 @@ INDEX_HTML = r"""<!doctype html>
       }
     }
 
+    async function runGoalSeek(sourceText, target, start, options = {}) {
+      const request = goalSeekExpressionAndStarts(sourceText, start);
+      const response = await fetch('/goal_seek', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          expression: expressionForEvaluation(request.expression),
+          target,
+          start: request.start,
+          precision: requestedValuePrecision()
+        })
+      });
+      const data = await response.json();
+
+      if (!response.ok || !data.ok) {
+        rendered.textContent = data.error || 'Goal seek failed';
+        rendered.classList.add('error');
+        resetMoreDigitsButton(renderedMore, false);
+        clearResultDetails();
+        setStatus('Error');
+        return false;
+      }
+
+      if (!options.skipHistoryUpdate)
+        pushExpressionHistory(currentExpressionText());
+
+      const solvedExpression = data.expression || sourceText;
+      const solvedWithoutNan = expressionForEditor(solvedExpression).trim();
+      const sourceWithoutNan = expressionForEditor(sourceText).trim();
+      const unchanged = solvedWithoutNan === sourceWithoutNan;
+      setRenderedResult(data);
+      setExpandableText(
+        parsed,
+        parsedMore,
+        data.display_expression || compactExpressionForEditor(solvedExpression).display,
+        data.full_display_expression || solvedExpression
+      );
+      setExpandableText(
+        functionStyle,
+        functionMore,
+        data.display_function || data.function || '',
+        data.full_display_function || data.function || ''
+      );
+      value.textContent = data.value || '';
+      lastEvaluationInputText = solvedExpression;
+      lastDerivativeExpression = '';
+      setExpressionEditor(solvedExpression, data.binding_values || null);
+      currentVariables = variablesFromExpression(solvedExpression);
+      renderDerivativeButtons(currentVariables);
+      expr.dataset.goalSeekSource = expressionForEditor(request.expression).trim();
+      expr.dataset.goalSeekTarget = target;
+      hideTargetEntry();
+      setStatus(unchanged ? 'Goal already reached' : 'Goal reached');
+      return true;
+    }
+
     run.addEventListener('click', () => {
       forwardHistory = [];
-      precisionExtra = 0;
+      clearGoalSeekRequest();
       hideTargetEntry();
       evaluateExpression();
     });
@@ -1346,7 +1731,7 @@ INDEX_HTML = r"""<!doctype html>
         if (!response.ok || !data.ok || !derivativeExpression) {
           rendered.textContent = data.error || data.raw || `No derivative for ${wrt}`;
           rendered.classList.add('error');
-          renderedCopy.classList.remove('hidden');
+          resetMoreDigitsButton(renderedMore, false);
           setStatus('Error');
           return;
         }
@@ -1359,7 +1744,7 @@ INDEX_HTML = r"""<!doctype html>
       } catch (err) {
         rendered.textContent = String(err);
         rendered.classList.add('error');
-        renderedCopy.classList.remove('hidden');
+        resetMoreDigitsButton(renderedMore, false);
         setStatus('Error');
       } finally {
         setBusy(false);
@@ -1370,7 +1755,6 @@ INDEX_HTML = r"""<!doctype html>
       if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
         event.preventDefault();
         forwardHistory = [];
-        precisionExtra = 0;
         evaluateExpression();
       }
     });
@@ -1380,6 +1764,7 @@ INDEX_HTML = r"""<!doctype html>
         return;
       clearExpressionSource();
       clearVariableValues();
+      updateHistoryButtons();
     });
 
     clear.addEventListener('click', () => {
@@ -1389,7 +1774,6 @@ INDEX_HTML = r"""<!doctype html>
       forwardHistory = [];
       expr.value = '';
       clearExpressionSource();
-      precisionExtra = 0;
       hideTargetEntry();
       clearResultPane();
       updateHistoryButtons();
@@ -1414,40 +1798,12 @@ INDEX_HTML = r"""<!doctype html>
       try {
         const target = goalTarget.value.trim() || '0';
         const start = goalStartValues();
-        const response = await fetch('/goal_seek', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({
-            expression: expressionForEvaluation(text),
-            target,
-            start,
-            precision: requestedValuePrecision()
-          })
-        });
-        const data = await response.json();
-
-        if (!response.ok || !data.ok) {
-          rendered.textContent = data.error || 'Goal seek failed';
-          rendered.classList.add('error');
-          renderedCopy.classList.remove('hidden');
-          setStatus('Error');
-          return;
-        }
-
-        pushExpressionHistory(text);
-        const solvedExpression = data.expression || text;
-        const solvedWithoutNan = expressionForEditor(solvedExpression).trim();
-        const currentWithoutNan = expressionForEditor(text).trim();
-        const unchanged = solvedWithoutNan === currentWithoutNan;
-        setExpressionEditor(solvedExpression);
-        precisionExtra = 0;
-        hideTargetEntry();
-        await evaluateExpression({skipHistoryUpdate: true});
-        setStatus(unchanged ? 'Goal already reached' : 'Goal reached');
+        await runGoalSeek(text, target, start);
       } catch (err) {
         rendered.textContent = String(err);
         rendered.classList.add('error');
-        renderedCopy.classList.remove('hidden');
+        resetMoreDigitsButton(renderedMore, false);
+        clearResultDetails();
         setStatus('Error');
       } finally {
         setBusy(false);
@@ -1466,16 +1822,36 @@ INDEX_HTML = r"""<!doctype html>
       }
     });
 
-    morePrecision.addEventListener('click', () => {
-      setRequestedValuePrecision(nextPrecisionStep(requestedValuePrecision()));
-      setStatus(`${requestedValuePrecision()} digits`);
-      evaluateExpression({skipHistoryUpdate: true});
+    morePrecision.addEventListener('click', async () => {
+      setRequestedPrecisionBits(nextPrecisionStepBits(requestedPrecisionBits()));
+      setStatus('Precision changed');
+      try {
+        await evaluateExpression({skipHistoryUpdate: true, reuseLastInput: true});
+      } finally {
+        updateHistoryButtons();
+      }
     });
 
-    lessPrecision.addEventListener('click', () => {
-      setRequestedValuePrecision(previousPrecisionStep(requestedValuePrecision()));
-      setStatus(`${requestedValuePrecision()} digits`);
-      evaluateExpression({skipHistoryUpdate: true});
+    lessPrecision.addEventListener('click', async () => {
+      setRequestedPrecisionBits(previousPrecisionStepBits(requestedPrecisionBits()));
+      setStatus('Precision changed');
+      try {
+        await evaluateExpression({skipHistoryUpdate: true, reuseLastInput: true});
+      } finally {
+        updateHistoryButtons();
+      }
+    });
+
+    renderedMore.addEventListener('click', () => {
+      toggleRenderedDigits();
+    });
+
+    parsedMore.addEventListener('click', () => {
+      toggleTextDigits(parsed, parsedMore);
+    });
+
+    functionMore.addEventListener('click', () => {
+      toggleTextDigits(functionStyle, functionMore);
     });
 
     copyButtons.forEach((button) => {
@@ -1494,6 +1870,7 @@ INDEX_HTML = r"""<!doctype html>
       });
     });
 
+    setStatus('Ready');
     loadLastExpression().finally(() => evaluateExpression());
   </script>
 </body>
@@ -1508,6 +1885,8 @@ def load_state_expression() -> str:
         return DEFAULT_EXPRESSION
 
     expression = str(data.get("expression", "")).strip()
+    if "..." in expression:
+        return DEFAULT_EXPRESSION
     return expression or DEFAULT_EXPRESSION
 
 
@@ -1525,11 +1904,52 @@ def expression_for_editor(expression: str) -> str:
     return re.sub(r"(=\s*)NAN\b", r"\1?", expression)
 
 
-def _compact_long_text_value(value: str, limit: int = 38, keep: int = 34) -> str:
+def _compact_long_text_value(
+    value: str,
+    limit: int = COMPACT_BINDING_VALUE_LIMIT,
+    keep: int = COMPACT_BINDING_VALUE_KEEP,
+) -> str:
     value = str(value or "").strip()
+    if "..." in value:
+        return value
     if len(value) <= limit:
         return value
-    return value[:keep] + "..."
+    return compact_long_numeric_tokens(value)
+
+
+def compact_long_numeric_tokens(text: str) -> str:
+    if not text:
+        return text
+
+    def compact_match(match: re.Match[str]) -> str:
+        number_text = match.group(2)
+        if len(number_text) <= COMPACT_BINDING_VALUE_LIMIT or "..." in number_text:
+            return match.group(0)
+        return match.group(1) + number_text[:COMPACT_BINDING_VALUE_KEEP] + "..."
+
+    return re.sub(
+        r"(^|[^A-Za-z0-9_.])([+-]?(?:\d+\.\d+|\d{21,})(?:[Ee][+-]?\d+)?)",
+        compact_match,
+        text,
+    )
+
+
+def precision_numeric_tokens(text: str, precision: int) -> str:
+    if not text:
+        return text
+
+    def precision_match(match: re.Match[str]) -> str:
+        return match.group(1) + format_number_text_for_precision(match.group(2), precision)
+
+    return re.sub(
+        r"(^|[^A-Za-z0-9_.])([+-]?(?:\d+\.\d+|\d{21,})(?:[Ee][+-]?\d+)?)",
+        precision_match,
+        text,
+    )
+
+
+def compact_display_text(text: str) -> str:
+    return compact_long_numeric_tokens(compact_binding_values_text(text))
 
 
 def compact_binding_values_text(text: str) -> str:
@@ -1555,8 +1975,8 @@ def compact_function_text(text: str) -> str:
         if match and "(" not in match.group(1):
             compacted.append(match.group(1) + _compact_long_text_value(match.group(2)))
         else:
-            compacted.append(line)
-    return "\n".join(compacted)
+            compacted.append(compact_long_numeric_tokens(line))
+    return compact_long_numeric_tokens("\n".join(compacted))
 
 
 def find_free_port(host: str) -> int:
@@ -1589,6 +2009,9 @@ def parse_try_dval_output(output: str) -> dict[str, str]:
         "function": r"^function\s+(.*)$",
         "tex": r"^tex\s+(.*)$",
         "value": r"^value\s+(.*)$",
+        "residual": r"^residual\s+(.*)$",
+        "iterations": r"^iterations\s+(.*)$",
+        "complex": r"^complex\s+(.*)$",
         "derivative": r"^derivative\s+(.*)$",
         "derivative_value": r"^d value\s+(.*)$",
     }
@@ -1770,48 +2193,6 @@ def parse_binding_assignments(bindings: str) -> list[tuple[str, str]]:
     return out
 
 
-def format_goal_decimal(value: Decimal, digits: int) -> str:
-    with localcontext() as ctx:
-        ctx.prec = max(17, min(220, digits))
-        rounded = +value
-
-    text = format(rounded, "g").replace("e", "E")
-    return _trim_decimal_tail(text)
-
-
-def build_goal_expression(
-    expression: str,
-    variable_values: dict[str, Decimal],
-    precision: int,
-) -> str:
-    body, var_text, const_text = parse_expression_body(expression)
-    var_parts: list[str] = []
-    const_parts: list[str] = []
-    seen: set[str] = set()
-
-    for name, value in parse_binding_assignments(var_text):
-        if name in variable_values:
-            value = format_goal_decimal(variable_values[name], precision)
-            seen.add(name)
-        var_parts.append(f"{name} = {value}")
-
-    for name, value in parse_binding_assignments(const_text):
-        if name in variable_values:
-            continue
-        const_parts.append(f"{name} = {value}")
-
-    for name, value in variable_values.items():
-        if name not in seen:
-            var_parts.append(f"{name} = {format_goal_decimal(value, precision)}")
-
-    binding_text = ", ".join(var_parts)
-    if const_parts:
-        const_binding_text = ", ".join(const_parts)
-        binding_text = f"{binding_text}; {const_binding_text}" if binding_text else f"; {const_binding_text}"
-
-    return f"{{ {body} | {binding_text} }}" if binding_text else f"{{ {body} }}"
-
-
 def restore_compact_binding_values(expression: str, source_expression: str) -> str:
     if "..." not in expression or not source_expression or "..." in source_expression:
         return expression
@@ -1880,238 +2261,60 @@ def run_try_dval_fields(
     return parse_try_dval_output(raw), raw, completed.returncode
 
 
-def decimal_from_value_text(text: str) -> Decimal:
-    text = str(text or "").strip()
-    upper = text.upper()
-    sup_digits = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹⁻", "0123456789-")
-    sub_digits = str.maketrans("₀₁₂₃₄₅₆₇₈₉₋", "0123456789-")
-
-    if not text:
-        raise ValueError("empty value")
-    if "I" in upper and upper not in {"INF", "+INF", "-INF", "INFINITY", "+INFINITY", "-INFINITY"}:
-        raise ValueError("goal seek only supports real-valued expressions")
-    if upper in {"NAN", "+NAN", "-NAN"}:
-        raise ValueError("value is NaN")
-
-    if "⁄" in text:
-        numerator, denominator = text.split("⁄", 1)
-        return Decimal(numerator.translate(sup_digits)) / Decimal(denominator.translate(sub_digits))
-
-    if "/" in text and re.match(r"^[+-]?\d+\s*/\s*[+-]?\d+$", text):
-        numerator, denominator = re.split(r"\s*/\s*", text, maxsplit=1)
-        return Decimal(numerator) / Decimal(denominator)
-
-    return Decimal(text.replace("e", "E"))
-
-
-def evaluate_decimal_expression(binary: Path, expression: str, precision: int) -> Decimal:
-    fields, raw, rc = run_try_dval_fields(binary, expression, precision)
+def evaluate_value_text(binary: Path, text: str, precision: int) -> str:
+    fields, raw, rc = run_try_dval_fields(binary, f"{{ {text} }}", precision)
 
     if rc != 0:
         raise ValueError(raw or f"try_dval exited with {rc}")
 
-    return decimal_from_value_text(fields.get("value", ""))
+    return format_number_text_for_precision(fields.get("value", ""), precision)
 
 
-def evaluate_goal_residual(
+def evaluated_variable_binding_values(
     binary: Path,
     expression: str,
-    variable_values: dict[str, Decimal],
-    target: Decimal,
     precision: int,
-) -> Decimal:
-    candidate = build_goal_expression(expression, variable_values, precision)
-    return evaluate_decimal_expression(binary, candidate, precision) - target
+) -> list[dict[str, str]]:
+    _, var_text, _ = parse_expression_body(expression)
+    values: list[dict[str, str]] = []
 
-
-def goal_tolerance(target: Decimal, precision: int) -> Decimal:
-    digits = max(1, min(220, precision))
-    scale = max(Decimal(1), abs(target))
-
-    return scale * (Decimal(10) ** Decimal(-digits))
-
-
-def variable_start_value(binary: Path, text: str, precision: int) -> Decimal:
-    if not text or text == "?" or text.upper() == "NAN":
-        return Decimal(1)
-
-    try:
-        return evaluate_decimal_expression(binary, f"{{ {text} }}", precision)
-    except Exception:
-        return Decimal(1)
-
-
-def parse_goal_start_values(
-    binary: Path,
-    start_values: object,
-    variable_names: list[str],
-    precision: int,
-) -> dict[str, Decimal]:
-    if not start_values:
-        return {}
-
-    if not isinstance(start_values, dict):
-        raise ValueError("Start values must be entered in the per-variable start boxes")
-
-    starts: dict[str, Decimal] = {}
-    for name, value in start_values.items():
-        name = str(name).strip()
-        if name not in variable_names:
+    for name, value in parse_binding_assignments(var_text):
+        if not value or value == "?" or value.upper() == "NAN":
             continue
-        text = str(value).strip()
-        if not text:
-            continue
+
         try:
-            starts[name] = evaluate_decimal_expression(binary, f"{{ {text} }}", precision)
-        except Exception as exc:
-            raise ValueError(f"Start for {name} must be a numeric constant expression") from exc
+            numeric = evaluate_value_text(binary, value, precision)
+        except Exception:
+            continue
 
-    return starts
+        values.append({
+            "name": name,
+            "value": numeric,
+            "display": _compact_long_text_value(numeric),
+        })
+
+    return values
 
 
-def solve_one_goal_variable(
-    binary: Path,
+def expression_variable_binding_values(
     expression: str,
-    name: str,
-    start: Decimal,
-    target: Decimal,
-    precision: int,
-    tolerance_precision: int,
-) -> dict[str, Decimal]:
-    with localcontext() as ctx:
-        ctx.prec = max(50, min(260, precision + 35))
-        zero = Decimal(0)
-        one = Decimal(1)
-        tolerance = goal_tolerance(target, tolerance_precision)
+    precision: int | None = None,
+) -> list[dict[str, str]]:
+    _, var_text, _ = parse_expression_body(expression)
+    values: list[dict[str, str]] = []
 
-        def residual(x: Decimal) -> Decimal:
-            return evaluate_goal_residual(binary, expression, {name: x}, target, precision)
+    for name, value in parse_binding_assignments(var_text):
+        if not value or value == "?" or value.upper() == "NAN":
+            continue
 
-        def try_residual(x: Decimal) -> Decimal | None:
-            try:
-                return residual(x)
-            except Exception:
-                return None
+        display_value = precision_numeric_tokens(value, precision) if precision is not None else value
+        values.append({
+            "name": name,
+            "value": display_value,
+            "display": _compact_long_text_value(display_value),
+        })
 
-        x0 = start
-        f0 = residual(x0)
-        if abs(f0) <= tolerance:
-            return {name: +x0}
-
-        step = max(one, abs(x0) / Decimal(8))
-        lo = hi = x0
-        flo = fhi = f0
-
-        for _ in range(80):
-            left = x0 - step
-            right = x0 + step
-            fleft = try_residual(left)
-            fright = try_residual(right)
-            if fleft is not None and fleft == zero:
-                return {name: +left}
-            if fright is not None and fright == zero:
-                return {name: +right}
-            if fleft is not None and fleft * f0 < zero:
-                lo, hi = left, x0
-                flo, fhi = fleft, f0
-                break
-            if fright is not None and f0 * fright < zero:
-                lo, hi = x0, right
-                flo, fhi = f0, fright
-                break
-            step *= 2
-        else:
-            raise ValueError(f"Could not bracket a target crossing for {name}")
-
-        for _ in range(max(160, precision * 4)):
-            if abs(flo) <= tolerance:
-                return {name: +lo}
-            if abs(fhi) <= tolerance:
-                return {name: +hi}
-
-            mid = (lo + hi) / 2
-            fmid = residual(mid)
-            if abs(fmid) <= tolerance:
-                return {name: +mid}
-
-            if flo * fmid <= zero:
-                hi, fhi = mid, fmid
-            else:
-                lo, flo = mid, fmid
-
-        return {name: +((lo + hi) / 2)}
-
-
-def solve_multi_goal_variables(
-    binary: Path,
-    expression: str,
-    variables: list[tuple[str, Decimal]],
-    target: Decimal,
-    precision: int,
-    tolerance_precision: int,
-) -> dict[str, Decimal]:
-    with localcontext() as ctx:
-        ctx.prec = max(50, min(260, precision + 35))
-        names = [name for name, _ in variables]
-        values = {name: value for name, value in variables}
-        tolerance = goal_tolerance(target, tolerance_precision)
-
-        def residual(vals: dict[str, Decimal]) -> Decimal:
-            return evaluate_goal_residual(binary, expression, vals, target, precision)
-
-        best = dict(values)
-        best_residual = residual(best)
-        if abs(best_residual) <= tolerance:
-            return best
-
-        for _ in range(100):
-            gradients: list[Decimal] = []
-            base = best_residual
-
-            for name in names:
-                x = best[name]
-                h = max(Decimal("1e-12"), abs(x) * Decimal("1e-8"))
-                trial = dict(best)
-                trial[name] = x + h
-                try:
-                    gradients.append((residual(trial) - base) / h)
-                except Exception:
-                    gradients.append(Decimal(0))
-
-            norm2 = sum(g * g for g in gradients)
-            if norm2 <= Decimal("1e-80"):
-                raise ValueError("Goal seek stalled because the local gradient is zero")
-
-            scale = -base / norm2
-            improved = False
-
-            for alpha in (Decimal(1), Decimal("0.5"), Decimal("0.25"),
-                          Decimal("0.125"), Decimal("0.0625"), Decimal("0.03125")):
-                trial = {}
-                for name, grad in zip(names, gradients):
-                    trial[name] = best[name] + alpha * scale * grad
-                try:
-                    trial_residual = residual(trial)
-                except Exception:
-                    continue
-                if abs(trial_residual) < abs(best_residual):
-                    best = trial
-                    best_residual = trial_residual
-                    improved = True
-                    break
-
-            if abs(best_residual) <= tolerance:
-                return best
-            if not improved:
-                break
-
-        if abs(best_residual) > tolerance:
-            raise ValueError(
-                f"Goal seek did not converge within working precision; "
-                f"residual is {best_residual}, tolerance is {tolerance}"
-            )
-
-        return best
+    return values
 
 
 def goal_seek_expression(
@@ -2120,48 +2323,44 @@ def goal_seek_expression(
     target_text: str,
     precision: int,
     start_values: object = None,
-) -> str:
-    solve_precision = max(64, min(220, precision + 30))
-    target = evaluate_decimal_expression(binary, f"{{ {target_text} }}", solve_precision)
-    _, var_text, const_text = parse_expression_body(expression)
-    variables = [
-        (name, variable_start_value(binary, value, solve_precision))
-        for name, value in parse_binding_assignments(var_text)
+) -> tuple[str, dict[str, str]]:
+    command = [
+        str(binary),
+        "--goal-seek",
+        expression,
+        target_text,
+        str(max(17, precision)),
     ]
-    variables.extend(
-        (name, variable_start_value(binary, value, solve_precision))
-        for name, value in parse_binding_assignments(const_text)
-        if value == "?" or value.upper() == "NAN"
+
+    if start_values:
+        if not isinstance(start_values, dict):
+            raise ValueError("Start values must be entered in the per-variable start boxes")
+        for name, value in start_values.items():
+            name_text = str(name).strip()
+            value_text = str(value).strip()
+            if not name_text or not value_text:
+                continue
+            command.append(f"{name_text}={value_text}")
+
+    completed = subprocess.run(
+        command,
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        timeout=10,
     )
-    explicit_starts = parse_goal_start_values(
-        binary,
-        start_values,
-        [name for name, _ in variables],
-        solve_precision,
-    )
-    variables = [(name, explicit_starts.get(name, value)) for name, value in variables]
+    raw = completed.stdout
+    if completed.stderr:
+        raw = raw + ("\n" if raw else "") + completed.stderr
 
-    if not variables:
-        raise ValueError("Goal seek needs at least one variable binding, or a '?' binding to solve")
+    fields = parse_try_dval_output(raw)
+    if completed.returncode != 0:
+        raise ValueError(raw or f"try_dval exited with {completed.returncode}")
 
-    if len(variables) == 1:
-        solved = solve_one_goal_variable(
-            binary, expression, variables[0][0], variables[0][1], target, solve_precision, precision
-        )
-    else:
-        solved = solve_multi_goal_variables(
-            binary, expression, variables, target, solve_precision, precision
-        )
-
-    residual = evaluate_goal_residual(binary, expression, solved, target, solve_precision)
-    tolerance = goal_tolerance(target, precision)
-    if abs(residual) > tolerance:
-        raise ValueError(
-            f"Goal seek did not reach the target within working precision; "
-            f"residual is {residual}, tolerance is {tolerance}"
-        )
-
-    return build_goal_expression(expression, solved, solve_precision)
+    expression_out = fields.get("expression", "").strip()
+    if not expression_out:
+        raise ValueError(raw or "Goal seek did not return an expression")
+    return expression_out, fields
 
 
 class DvalLabHandler(http.server.BaseHTTPRequestHandler):
@@ -2214,6 +2413,26 @@ class DvalLabHandler(http.server.BaseHTTPRequestHandler):
                 self.send_json(400, {"ok": False, "error": f"Bad request: {exc}"})
             return
 
+        if path == "/render_tex":
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                body = self.rfile.read(length)
+                payload = json.loads(body.decode("utf-8"))
+                tex = str(payload.get("tex", "")).strip()
+            except Exception as exc:
+                self.send_json(400, {"ok": False, "error": f"Bad request: {exc}"})
+                return
+
+            svg, render_error = render_tex_to_svg(tex)
+            if svg:
+                self.send_json(200, {"ok": True, "svg": svg})
+            else:
+                self.send_json(422, {
+                    "ok": False,
+                    "error": render_error or "Could not render TeX",
+                })
+            return
+
         if path == "/goal_seek":
             try:
                 length = int(self.headers.get("Content-Length", "0"))
@@ -2234,13 +2453,44 @@ class DvalLabHandler(http.server.BaseHTTPRequestHandler):
             try:
                 precision = max(17, min(MAX_VALUE_PRECISION_DIGITS, precision))
                 expression = restore_compact_binding_values(expression, load_state_expression())
-                solved = goal_seek_expression(self.binary, expression, target, precision, start)
+                solved, fields = goal_seek_expression(self.binary, expression, target, precision, start)
             except Exception as exc:
                 self.send_json(422, {"ok": False, "error": str(exc)})
                 return
 
             save_state_expression(expression_for_editor(solved))
-            self.send_json(200, {"ok": True, "expression": solved})
+            fields["ok"] = True
+            fields["expression"] = solved
+            fields["precision"] = precision
+            if fields.get("value"):
+                fields["value"] = format_number_text_for_precision(fields["value"], precision)
+            if fields.get("residual"):
+                fields["residual"] = format_number_text_for_precision(fields["residual"], precision)
+            fields["full_display_expression"] = precision_numeric_tokens(
+                fields.get("expression", ""),
+                precision,
+            )
+            fields["full_display_tex"] = precision_numeric_tokens(
+                fields.get("tex", ""),
+                precision,
+            )
+            fields["full_display_function"] = precision_numeric_tokens(
+                fields.get("function", ""),
+                precision,
+            )
+            fields["display_expression"] = compact_display_text(fields["full_display_expression"])
+            fields["display_tex"] = compact_display_text(fields["full_display_tex"])
+            fields["display_function"] = compact_function_text(fields["full_display_function"])
+            fields["binding_values"] = expression_variable_binding_values(
+                fields.get("expression", "") or solved,
+                precision,
+            )
+            svg, render_error = render_tex_to_svg(fields.get("display_tex", ""))
+            if svg:
+                fields["svg"] = svg
+            elif render_error:
+                fields["render_error"] = render_error
+            self.send_json(200, fields)
             return
 
         if path != "/eval":
@@ -2283,9 +2533,9 @@ class DvalLabHandler(http.server.BaseHTTPRequestHandler):
             raw = raw + ("\n" if raw else "") + completed.stderr
 
         fields = parse_try_dval_output(raw)
-        fields["raw"] = raw
         fields["ok"] = completed.returncode == 0
         if completed.returncode != 0:
+            fields["raw"] = raw
             fields["error"] = raw or f"try_dval exited with {completed.returncode}"
             self.send_json(422, fields)
             return
@@ -2298,11 +2548,28 @@ class DvalLabHandler(http.server.BaseHTTPRequestHandler):
             )
 
         if fields.get("expression"):
-            save_state_expression(expression_for_editor(fields["expression"]))
+            save_state_expression(expression_for_editor(expression))
 
-        fields["display_expression"] = compact_binding_values_text(fields.get("expression", ""))
-        fields["display_tex"] = compact_binding_values_text(fields.get("tex", ""))
-        fields["display_function"] = compact_function_text(fields.get("function", ""))
+        fields["full_display_expression"] = precision_numeric_tokens(
+            fields.get("expression", ""),
+            precision,
+        )
+        fields["full_display_tex"] = precision_numeric_tokens(
+            fields.get("tex", ""),
+            precision,
+        )
+        fields["full_display_function"] = precision_numeric_tokens(
+            fields.get("function", ""),
+            precision,
+        )
+        fields["display_expression"] = compact_display_text(fields["full_display_expression"])
+        fields["display_tex"] = compact_display_text(fields["full_display_tex"])
+        fields["display_function"] = compact_function_text(fields["full_display_function"])
+        fields["binding_values"] = evaluated_variable_binding_values(
+            self.binary,
+            fields.get("expression", "") or expression,
+            precision,
+        )
 
         svg, render_error = render_tex_to_svg(fields.get("display_tex", ""))
         if svg:

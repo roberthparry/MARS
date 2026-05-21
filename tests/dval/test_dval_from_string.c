@@ -4,6 +4,8 @@ static void check_parse_num(const char *label, const char *s,
                             const char *expect_text, int line);
 static void check_parse_expr(const char *label, const char *s,
                              const char *expect_expr, int line);
+static void check_parse_simplified_expr(const char *label, const char *s,
+                                        const char *expect_expr, int line);
 
 static void test_from_string_pure_const(void)
 {
@@ -107,7 +109,7 @@ static void test_from_string_functions(void)
     check_parse_val("sqrt(x) at 4",      "{ sqrt(x) | x = 4 }",          2.0,          __LINE__);
     check_parse_val("floor(x) at 1.75",  "{ floor(x) | x = 1.75 }",      1.0,          __LINE__);
     check_parse_val("ceil(x) at 1.25",   "{ ceil(x) | x = 1.25 }",       2.0,          __LINE__);
-    check_parse_num("exp(pi*i/2) = i",   "{ exp(@pi*i/2) }",             "0 + 1i",     __LINE__);
+    check_parse_num("exp(pi*i/2) = i",   "{ exp(@pi*i/2) }",             "i",          __LINE__);
     check_parse_expr("1/pi stays symbolic", "{ 1/pi }",
         "1/π", __LINE__);
     check_parse_expr("pi/2 stays symbolic", "{ pi/2 }",
@@ -115,14 +117,14 @@ static void test_from_string_functions(void)
     check_parse_expr("i^i stays symbolic", "{ i^i }",
         "i^i", __LINE__);
     check_parse_expr("i^(1+i) parses", "{ i^(1+i) }",
-        "i^(i + 1)", __LINE__);
-    check_parse_expr("W0 identity keeps unbound argument",
+        "i^(1 + i)", __LINE__);
+    check_parse_simplified_expr("W0 identity keeps unbound argument",
         "{ W_0(x)*exp(W_0(x)) }",
         "{ x | x = NAN }", __LINE__);
-    check_parse_expr("W0 identity resolves bound pi",
+    check_parse_simplified_expr("W0 identity resolves bound pi",
         "{ W_0(x)*exp(W_0(x)) | x = pi }",
         "π", __LINE__);
-    check_parse_expr("W-1 identity resolves bound e",
+    check_parse_simplified_expr("W-1 identity resolves bound e",
         "{ W-1(x)*exp(W-1(x)) | x = e }",
         "e", __LINE__);
     check_parse_val("√(x) at 4",         "{ √(x) | x = 4 }",             2.0,          __LINE__);
@@ -433,13 +435,13 @@ static void test_from_string_implicit_symbolic_bindings(void)
                        tau_as ? tau_as : "(null)", "{ τ | τ = NAN }");
     }
 
-    if (f && fs && str_eq(fs, "{ c₁ + e + π + [radius]² | [radius] = NAN; c₁ = NAN }")) {
+    if (f && fs && str_eq(fs, "{ [radius]² + c₁ + π + e | [radius] = NAN; c₁ = NAN }")) {
         to_string_pass("implicit mixed symbolic inference", fs,
-                       "{ c₁ + e + π + [radius]² | [radius] = NAN; c₁ = NAN }");
+                       "{ [radius]² + c₁ + π + e | [radius] = NAN; c₁ = NAN }");
     } else {
         to_string_fail(__FILE__, __LINE__, 1, "implicit mixed symbolic inference",
                        fs ? fs : "(null)",
-                       "{ c₁ + e + π + [radius]² | [radius] = NAN; c₁ = NAN }");
+                       "{ [radius]² + c₁ + π + e | [radius] = NAN; c₁ = NAN }");
     }
 
     if (x && qf_isnan(dv_eval_qf(x))) {
@@ -806,7 +808,8 @@ static void test_from_string_composed(void)
 static void test_from_string_simplified_identity_text(void)
 {
     dval_t *expr = dval_from_string("{ sin^2(x) + cos^2(x) | x = 1.234 }", NULL);
-    char *text = expr ? dv_to_string(expr, style_EXPRESSION) : NULL;
+    dval_t *simp = expr ? dv_simplify(expr) : NULL;
+    char *text = simp ? dv_to_string(simp, style_EXPRESSION) : NULL;
 
     if (!(text && strcmp(text, "1") == 0)) {
         printf(C_BOLD C_RED "FAIL" C_RESET " sin^2(x) + cos^2(x) exact text simplifies to 1 %s:%d:1\n",
@@ -819,6 +822,7 @@ static void test_from_string_simplified_identity_text(void)
     }
 
     free(text);
+    dv_free(simp);
     dv_free(expr);
 }
 
@@ -941,6 +945,41 @@ static void check_parse_expr(const char *label, const char *s,
     }
 
     free(expr_text);
+    dv_free(expr);
+}
+
+static void check_parse_simplified_expr(const char *label, const char *s,
+                                        const char *expect_expr, int line)
+{
+    dval_t *expr = dval_from_string(s, NULL);
+    dval_t *simp = expr ? dv_simplify(expr) : NULL;
+    char *expr_text;
+
+    if (!expr || !simp) {
+        printf(C_BOLD C_RED "FAIL" C_RESET " %s %s:%d:1\n", label, __FILE__, line);
+        printf(C_BOLD "  input  " C_RESET "%s\n", s);
+        printf(C_BOLD "  error  " C_RESET "parser or simplifier returned NULL\n\n");
+        TEST_FAIL();
+        dv_free(simp);
+        dv_free(expr);
+        return;
+    }
+
+    expr_text = dv_to_string(simp, style_EXPRESSION);
+    if (expr_text && strcmp(expr_text, expect_expr) == 0) {
+        printf(C_BOLD C_GREEN "PASS" C_RESET " %s\n", label);
+        printf(C_BOLD "  input  " C_RESET "%s\n", s);
+        printf(C_BOLD "  expr   " C_RESET "%s\n\n", expr_text);
+    } else {
+        printf(C_BOLD C_RED "FAIL" C_RESET " %s %s:%d:1\n", label, __FILE__, line);
+        printf(C_BOLD "  input  " C_RESET "%s\n", s);
+        printf(C_BOLD "  got    " C_RESET "%s\n", expr_text ? expr_text : "(null)");
+        printf(C_BOLD "  expect " C_RESET "%s\n\n", expect_expr);
+        TEST_FAIL();
+    }
+
+    free(expr_text);
+    dv_free(simp);
     dv_free(expr);
 }
 
@@ -1252,6 +1291,11 @@ static void test_from_string_bindings_with_constant_expression_value(void)
     dval_t *deriv;
     number_t dval;
     char *deriv_text;
+    size_t old_precision_bits;
+    size_t low_bits;
+    size_t high_bits;
+    number_t x_value;
+    number_t two;
 
     check_parse_val("binding value may be builtin constant expression",
                     "{ e^(sin(x)) | x = pi/2 }",
@@ -1259,15 +1303,43 @@ static void test_from_string_bindings_with_constant_expression_value(void)
                     __LINE__);
     check_parse_expr("binding value preserves symbolic pi/2",
                      "{ e^(sin(x)) | x = pi/2 }",
-                     "{ exp(sin(x)) | x = π/2 }",
+                     "{ e^sin(x) | x = π/2 }",
                      __LINE__);
     check_parse_expr("binding value preserves symbolic 3/2*pi",
                      "{ e^(sin(x)) | x = 3/2*pi }",
-                     "{ exp(sin(x)) | x = ³⁄₂π }",
+                     "{ e^sin(x) | x = ³⁄₂π }",
                      __LINE__);
     check_parse_expr("binding value preserves symbolic pi^2/2",
                      "{ x | x = (pi^2)/2 }",
                      "{ x | x = π²/2 }",
+                     __LINE__);
+    check_parse_expr("pure numeric expression preserves full math tree",
+                     "{ phi - 1/2(1+sqrt(5)) }",
+                     "φ - ¹⁄₂·(1 + √(5))",
+                     __LINE__);
+    check_parse_expr("binding value preserves full math tree",
+                     "{ x | x = 1/2(1+sqrt(5)) }",
+                     "{ x | x = ¹⁄₂·(1 + √(5)) }",
+                     __LINE__);
+    check_parse_expr("binding value round-trips pretty multiply",
+                     "{ -x + phi | x = ½·(1 + √(5)) }",
+                     "{ -x + φ | x = ½·(1 + √(5)) }",
+                     __LINE__);
+    check_parse_expr("binding value preserves math notation functions",
+                     "{ x | x = abs(-3)+floor(pi)+ceil(phi) }",
+                     "{ x | x = |-3| + ⌊π⌋ + ⌈φ⌉ }",
+                     __LINE__);
+    check_parse_expr("user-bound e remains symbolic",
+                     "{ E - M - e·sin(E) | ; M = pi/1.234, e=0.0167 }",
+                     "{ E - M - e·sin(E) | E = NAN; M = π/1.234, e = 0.0167 }",
+                     __LINE__);
+    check_parse_expr("simplified constants keep bindings",
+                     "{ ax + yb + zc - 8 | a = NAN, b = NAN, c = NAN; x=1, y = 2, z = 3 }",
+                     "{ ax + by + cz - 8 | a = NAN, b = NAN, c = NAN; x = 1, y = 2, z = 3 }",
+                     __LINE__);
+    check_parse_expr("constant bindings accept semicolon separators",
+                     "{ ax + by + cz - 8 | a = NAN, b = NAN, c = NAN; x = 1; y = 2, z = 3 }",
+                     "{ ax + by + cz - 8 | a = NAN, b = NAN, c = NAN; x = 1, y = 2, z = 3 }",
                      __LINE__);
     check_parse_expr("const-only binding preserves leading semicolon",
                      "{ exp(π·√(H)) | ;H = 163 }",
@@ -1287,12 +1359,55 @@ static void test_from_string_bindings_with_constant_expression_value(void)
                      __LINE__);
     check_parse_expr("symbolic pi quotient cancels powers",
                      "{ pi/pi^2 }",
-                     "1/π",
+                     "π/π²",
                      __LINE__);
     check_parse_expr("generated derivative with NaN bindings round-trips",
                      "{ -y²z²·sin(xyz)·exp(sin(xyz)) + y²z²·cos²(xyz)·exp(sin(xyz)) | y = NAN, z = NAN, x = NAN }",
                      "{ -y²z²·sin(xyz)·exp(sin(xyz)) + y²z²·cos²(xyz)·exp(sin(xyz)) | y = NAN, z = NAN, x = NAN }",
                      __LINE__);
+    check_parse_expr("reparsed symbolic pi derivative keeps exact coefficient",
+                     "{ (-2π·exp(π·√(x)) + 2·π²·√(x)·exp(π·√(x)))/(2·√(x))/(2·√(x))² | x = 163 }",
+                     "{ (-2π·exp(π·√(x)) + 2·π²·√(x)·exp(π·√(x)))/(2·√(x))/(2·√(x))² | x = 163 }",
+                     __LINE__);
+
+    old_precision_bits = num_get_default_prec_bits();
+    ASSERT_EQ_INT(num_set_default_prec_bits(80u), 0);
+    expr = dval_from_string("{ x - phi | x = 1/2(1+sqrt(5)) }", &bindings);
+    x = bindings ? dval_bindings_get(bindings, "x") : NULL;
+    ASSERT_NOT_NULL(expr);
+    ASSERT_NOT_NULL(x);
+    x_value = dv_eval(x);
+    low_bits = num_get_effective_prec_bits(x_value);
+    num_destroy(&x_value);
+    ASSERT_EQ_INT(num_set_default_prec_bits(256u), 0);
+    x_value = dv_eval(x);
+    high_bits = num_get_effective_prec_bits(x_value);
+    ASSERT_TRUE(high_bits > low_bits);
+    ASSERT_TRUE(high_bits >= 256u);
+    num_destroy(&x_value);
+    ASSERT_EQ_INT(num_set_default_prec_bits(old_precision_bits), 0);
+    dval_bindings_free(bindings);
+    dv_free(expr);
+
+    bindings = NULL;
+    expr = dval_from_string("{ x | x = 1/2(1+sqrt(5)) }", &bindings);
+    x = bindings ? dval_bindings_get(bindings, "x") : NULL;
+    ASSERT_NOT_NULL(expr);
+    ASSERT_NOT_NULL(x);
+    two = num_create_from_long(2L);
+    dv_set_val(x, two);
+    num_destroy(&two);
+    old_precision_bits = num_get_default_prec_bits();
+    ASSERT_EQ_INT(num_set_default_prec_bits(old_precision_bits + 64u), 0);
+    x_value = dv_eval(x);
+    two = num_create_from_long(2L);
+    ASSERT_TRUE(num_eq(x_value, two));
+    num_destroy(&two);
+    num_destroy(&x_value);
+    ASSERT_EQ_INT(num_set_default_prec_bits(old_precision_bits), 0);
+    dval_bindings_free(bindings);
+    dv_free(expr);
+    bindings = NULL;
 
     expr = dval_from_string("{ e^(sin(x)) | x = pi/2 }", &bindings);
     x = bindings ? dval_bindings_get(bindings, "x") : NULL;
@@ -1355,6 +1470,86 @@ static void test_from_string_bindings_with_constant_expression_value(void)
                        "x/pi derivative simplifies symbolic quotient",
                        deriv_text ? deriv_text : "(null)",
                        "1/π");
+    }
+
+    free(deriv_text);
+    if (deriv)
+        dv_free(deriv);
+    dval_bindings_free(bindings);
+    if (expr)
+        dv_free(expr);
+
+    bindings = NULL;
+    expr = dval_from_string("{ pi*exp(pi*sqrt(x))/(2*sqrt(x)) | x = 163 }", &bindings);
+    x = bindings ? dval_bindings_get(bindings, "x") : NULL;
+    deriv = (expr && x) ? dv_create_deriv(expr, x) : NULL;
+    deriv_text = deriv ? dv_to_string(deriv, style_EXPRESSION) : NULL;
+
+    if (deriv_text &&
+        strcmp(deriv_text,
+               "{ π·exp(π·√(x))·(π·√(x) - 1)/(4x^³⁄₂) | x = 163 }") == 0) {
+        to_string_pass("symbolic pi derivative keeps exact coefficient",
+                       deriv_text,
+                       "{ π·exp(π·√(x))·(π·√(x) - 1)/(4x^³⁄₂) | x = 163 }");
+    } else {
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "symbolic pi derivative keeps exact coefficient",
+                       deriv_text ? deriv_text : "(null)",
+                       "{ π·exp(π·√(x))·(π·√(x) - 1)/(4x^³⁄₂) | x = 163 }");
+    }
+
+    free(deriv_text);
+    if (deriv)
+        dv_free(deriv);
+    dval_bindings_free(bindings);
+    if (expr)
+        dv_free(expr);
+
+    bindings = NULL;
+    expr = dval_from_string(
+        "{ ¼π*exp(π*sqrt(x))*(π*sqrt(x)-1)/x^(3/2) | x = 30π/180 }",
+        &bindings);
+    x = bindings ? dval_bindings_get(bindings, "x") : NULL;
+    deriv = (expr && x) ? dv_create_deriv(expr, x) : NULL;
+    deriv_text = deriv ? dv_to_string(deriv, style_EXPRESSION) : NULL;
+
+    if (deriv_text &&
+        strcmp(deriv_text,
+               "{ ⅛π·exp(π·√(x))·(3 - 3π·√(x) + x·π²)/x^⁵⁄₂ | x = ⅙π }") == 0) {
+        to_string_pass("symbolic coefficient folding happens in derivative DAG",
+                       deriv_text,
+                       "{ ⅛π·exp(π·√(x))·(3 - 3π·√(x) + x·π²)/x^⁵⁄₂ | x = ⅙π }");
+    } else {
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "symbolic coefficient folding happens in derivative DAG",
+                       deriv_text ? deriv_text : "(null)",
+                       "{ ⅛π·exp(π·√(x))·(3 - 3π·√(x) + x·π²)/x^⁵⁄₂ | x = ⅙π }");
+    }
+
+    free(deriv_text);
+    if (deriv)
+        dv_free(deriv);
+    dval_bindings_free(bindings);
+    if (expr)
+        dv_free(expr);
+
+    bindings = NULL;
+    expr = dval_from_string("{ π·exp(π·√(x))·(π·√(x) - 1)/(4x^³⁄₂) | x = 163 }", &bindings);
+    x = bindings ? dval_bindings_get(bindings, "x") : NULL;
+    deriv = (expr && x) ? dv_create_deriv(expr, x) : NULL;
+    deriv_text = deriv ? dv_to_string(deriv, style_EXPRESSION) : NULL;
+
+    if (deriv_text &&
+        strcmp(deriv_text,
+               "{ ⅛π·exp(π·√(x))·(3 - 3π·√(x) + x·π²)/x^⁵⁄₂ | x = 163 }") == 0) {
+        to_string_pass("nested symbolic pi derivative factors common terms",
+                       deriv_text,
+                       "{ ⅛π·exp(π·√(x))·(3 - 3π·√(x) + x·π²)/x^⁵⁄₂ | x = 163 }");
+    } else {
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "nested symbolic pi derivative factors common terms",
+                       deriv_text ? deriv_text : "(null)",
+                       "{ ⅛π·exp(π·√(x))·(3 - 3π·√(x) + x·π²)/x^⁵⁄₂ | x = 163 }");
     }
 
     free(deriv_text);

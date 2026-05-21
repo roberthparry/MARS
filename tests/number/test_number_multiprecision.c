@@ -84,7 +84,7 @@ void run_number_multiprecision_tests(void)
         ASSERT_TRUE(strstr(qcomplex_pi_e_text,
                            "3.1415926535897932384626433832795") != NULL);
         ASSERT_TRUE(strstr(qcomplex_pi_e_text,
-                           "2.7182818284590452353602874713527") != NULL);
+                           "2.7182818284590452353602874713526") != NULL);
 
         ASSERT_EQ_INT(num_set_prec_bits(&clone_real, 256u), 0);
         ASSERT_EQ_INT((int)num_get_prec_bits(default_real), 1024);

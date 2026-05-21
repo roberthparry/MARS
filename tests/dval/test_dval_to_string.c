@@ -417,7 +417,7 @@ static void test_to_string_symbolic_constants_tex(void)
     char *got = f ? dv_to_string(f, style_TEX) : NULL;
 
     const char *expect =
-        "\\left\\{ e^{\\frac{3}{2} \\pi i x} \\;\\middle|\\; x = NAN \\right\\}";
+        "\\left\\{ e^{\\pi i \\cdot \\frac{3}{2} x} \\;\\middle|\\; x = NAN \\right\\}";
 
     tex_preview_emit_case(__FILE__, "symbolic constants (TEX)", got);
 
@@ -671,8 +671,9 @@ static void test_to_string_nested_mul_add_expr(void)
 
     dval_t *xy = dv_mul(x, y);
     dval_t *f  = dv_add(xy, z);
+    dval_t *simp = dv_simplify(f);
 
-    char *got = dv_to_string(f, style_EXPRESSION);
+    char *got = dv_to_string(simp, style_EXPRESSION);
     const char *expect = "{ z + xy | z = 4, x = 2, y = 3 }";
 
     if (str_eq(got, expect))
@@ -681,6 +682,7 @@ static void test_to_string_nested_mul_add_expr(void)
         to_string_fail(__FILE__, __LINE__, 1, "nested mul+add (EXPR)", got, expect);
 
     free(got);
+    dv_free(simp);
     dv_free(xy);
     dv_free(x);
     dv_free(y);
@@ -696,8 +698,9 @@ static void test_to_string_nested_mul_add_func(void)
 
     dval_t *xy = dv_mul(x, y);
     dval_t *f  = dv_add(xy, z);
+    dval_t *simp = dv_simplify(f);
 
-    char *got = dv_to_string(f, style_FUNCTION);
+    char *got = dv_to_string(simp, style_FUNCTION);
     const char *expect = "z = 4\n"
                          "x = 2\n"
                          "y = 3\n"
@@ -710,6 +713,7 @@ static void test_to_string_nested_mul_add_func(void)
         to_string_fail(__FILE__, __LINE__, 1, "nested mul+add (FUNC)", got, expect);
 
     free(got);
+    dv_free(simp);
     dv_free(xy);
     dv_free(x);
     dv_free(y);
@@ -816,10 +820,112 @@ static void test_to_string_pow_superscript_func(void)
     dv_free(f);
 }
 
+static void test_to_string_complex_const_pow_expr(void)
+{
+    number_t n = num_create_from_string("1 + 2i");
+    dval_t *base = dv_new_const(n);
+    dval_t *pow = dv_pow_d(base, 6.0);
+    dval_t *f = dv_add_d(pow, 1.0);
+    char *got = dv_to_string(f, style_EXPRESSION);
+    const char *expect = "(1 + 2i)⁶ + 1";
+
+    if (str_eq(got, expect))
+        to_string_pass("complex const power base (EXPR)", got, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "complex const power base (EXPR)", got, expect);
+
+    free(got);
+    dv_free(f);
+    dv_free(pow);
+    dv_free(base);
+    num_destroy(&n);
+}
+
+static void test_to_string_complex_const_pow_func(void)
+{
+    number_t n = num_create_from_string("1 + 2i");
+    dval_t *base = dv_new_const(n);
+    dval_t *pow = dv_pow_d(base, 6.0);
+    dval_t *f = dv_add_d(pow, 1.0);
+    char *got = dv_to_string(f, style_FUNCTION);
+    const char *expect =
+        "expr() = (1 + 2i)^6 + 1\n"
+        "return expr()\n";
+
+    if (str_eq(got, expect))
+        to_string_pass("complex const power base (FUNC)", got, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "complex const power base (FUNC)", got, expect);
+
+    free(got);
+    dv_free(f);
+    dv_free(pow);
+    dv_free(base);
+    num_destroy(&n);
+}
+
+static void test_to_string_complex_const_pow_tex(void)
+{
+    number_t n = num_create_from_string("1 + 2i");
+    dval_t *base = dv_new_const(n);
+    dval_t *pow = dv_pow_d(base, 6.0);
+    dval_t *f = dv_add_d(pow, 1.0);
+    char *got = dv_to_string(f, style_TEX);
+    const char *expect =
+        "\\left(1 + 2i\\right)^{6} + 1";
+
+    if (str_eq(got, expect))
+        to_string_pass("complex const power base (TEX)", got, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "complex const power base (TEX)", got, expect);
+
+    free(got);
+    dv_free(f);
+    dv_free(pow);
+    dv_free(base);
+    num_destroy(&n);
+}
+
+static void test_to_string_parsed_complex_const_pow_tex(void)
+{
+    dval_t *f = dval_from_string("{ (1 + 2i)^6 + 1 }", NULL);
+    char *got = f ? dv_to_string(f, style_TEX) : NULL;
+    const char *expect =
+        "\\left(1 + 2i\\right)^{6} + 1";
+
+    if (str_eq(got, expect))
+        to_string_pass("parsed complex const power base (TEX)", got, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "parsed complex const power base (TEX)", got, expect);
+
+    free(got);
+    dv_free(f);
+}
+
+static void test_to_string_parsed_complex_const_pow_expr(void)
+{
+    dval_t *f = dval_from_string("{ (1 + 2i)^6 + 1 }", NULL);
+    char *got = f ? dv_to_string(f, style_EXPRESSION) : NULL;
+    const char *expect = "(1 + 2i)⁶ + 1";
+
+    if (str_eq(got, expect))
+        to_string_pass("parsed complex const power base (EXPR)", got, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1, "parsed complex const power base (EXPR)", got, expect);
+
+    free(got);
+    dv_free(f);
+}
+
 void test_to_string_pow_superscript(void)
 {
     TEST_RUN_SUBTEST(test_to_string_pow_superscript_expr, NULL);
     TEST_RUN_SUBTEST(test_to_string_pow_superscript_func, NULL);
+    TEST_RUN_SUBTEST(test_to_string_complex_const_pow_expr, NULL);
+    TEST_RUN_SUBTEST(test_to_string_complex_const_pow_func, NULL);
+    TEST_RUN_SUBTEST(test_to_string_complex_const_pow_tex, NULL);
+    TEST_RUN_SUBTEST(test_to_string_parsed_complex_const_pow_tex, NULL);
+    TEST_RUN_SUBTEST(test_to_string_parsed_complex_const_pow_expr, NULL);
 }
 
 /* ============================================================
@@ -960,7 +1066,8 @@ static void test_to_string_function_style_signed_sum(void)
     dval_t *three_x2 = dv_mul(three, x2);
     dval_t *sum = dv_add(exp_sin_x, three_x2);
     dval_t *f = dv_add(sum, minus_seven);
-    char *got = dv_to_string(f, style_FUNCTION);
+    dval_t *simp = dv_simplify(f);
+    char *got = dv_to_string(simp, style_FUNCTION);
 
     const char *expect = "x = 1\n"
                          "expr(x) = exp(sin(x)) + 3*x^2 - 7\n"
@@ -972,6 +1079,7 @@ static void test_to_string_function_style_signed_sum(void)
         to_string_fail(__FILE__, __LINE__, 1, "function style signed sum (FUNC)", got, expect);
 
     free(got);
+    dv_free(simp);
     dv_free(x);
     dv_free(three);
     dv_free(minus_seven);
@@ -2733,9 +2841,10 @@ void test_expressions(void)
 
     for (int i = 0; i < N; i++) {
         dval_t *f = tests[i].make();
+        dval_t *simp = dv_simplify(f);
 
-        char *got_expr = dv_to_string(f, style_EXPRESSION);
-        char *got_func = dv_to_string(f, style_FUNCTION);
+        char *got_expr = dv_to_string(simp, style_EXPRESSION);
+        char *got_func = dv_to_string(simp, style_FUNCTION);
 
         int ok_expr = strcmp(got_expr, tests[i].expected_expr) == 0;
         int ok_func = strcmp(got_func, tests[i].expected_func) == 0;
@@ -2793,6 +2902,7 @@ void test_expressions(void)
 
         free(got_expr);
         free(got_func);
+        dv_free(simp);
         dv_free(f);
     }
 }
@@ -3186,9 +3296,10 @@ void test_expressions_unnamed(void)
 
     for (int i = 0; i < N; i++) {
         dval_t *f = tests[i].make();
+        dval_t *simp = dv_simplify(f);
 
-        char *got_expr = dv_to_string(f, style_EXPRESSION);
-        char *got_func = dv_to_string(f, style_FUNCTION);
+        char *got_expr = dv_to_string(simp, style_EXPRESSION);
+        char *got_func = dv_to_string(simp, style_FUNCTION);
 
         int ok_expr = strcmp(got_expr, tests[i].expected_expr) == 0;
         int ok_func = strcmp(got_func, tests[i].expected_func) == 0;
@@ -3242,6 +3353,7 @@ void test_expressions_unnamed(void)
 
         free(got_expr);
         free(got_func);
+        dv_free(simp);
         dv_free(f);
     }
 }

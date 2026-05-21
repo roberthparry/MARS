@@ -312,10 +312,10 @@ static void test_partial_to_string_log_r2(void)
     free(s);
 
     s = dv_to_string(d2f_dx2, style_EXPRESSION);
-    if (str_eq(s, "{ (-2x² + 2y²)/(x² + y²)² | x = 1, y = 2 }"))
-        to_string_pass("∂²log(x²+y²)/∂x² (EXPR)", s, "{ (-2x² + 2y²)/(x² + y²)² | x = 1, y = 2 }");
+    if (str_eq(s, "{ 2·(-x² + y²)/(x² + y²)² | x = 1, y = 2 }"))
+        to_string_pass("∂²log(x²+y²)/∂x² (EXPR)", s, "{ 2·(-x² + y²)/(x² + y²)² | x = 1, y = 2 }");
     else
-        to_string_fail(__FILE__, __LINE__, 1, "∂²log(x²+y²)/∂x² (EXPR)", s, "{ (-2x² + 2y²)/(x² + y²)² | x = 1, y = 2 }");
+        to_string_fail(__FILE__, __LINE__, 1, "∂²log(x²+y²)/∂x² (EXPR)", s, "{ 2·(-x² + y²)/(x² + y²)² | x = 1, y = 2 }");
     free(s);
 
     s = dv_to_string(d2f_dxdy, style_EXPRESSION);
@@ -379,10 +379,10 @@ static void test_partial_to_string_sin_xy(void)
     free(s);
 
     s = dv_to_string(d2f_dxdy, style_EXPRESSION);
-    if (str_eq(s, "{ cos(xy) + 1/y - xy·sin(xy) | x = 1, y = 2 }"))
-        to_string_pass("∂²(sin(xy)+x·ln(y))/∂x∂y (EXPR)", s, "{ cos(xy) + 1/y - xy·sin(xy) | x = 1, y = 2 }");
+    if (str_eq(s, "{ cos(xy) - xy·sin(xy) + 1/y | x = 1, y = 2 }"))
+        to_string_pass("∂²(sin(xy)+x·ln(y))/∂x∂y (EXPR)", s, "{ cos(xy) - xy·sin(xy) + 1/y | x = 1, y = 2 }");
     else
-        to_string_fail(__FILE__, __LINE__, 1, "∂²(sin(xy)+x·ln(y))/∂x∂y (EXPR)", s, "{ cos(xy) + 1/y - xy·sin(xy) | x = 1, y = 2 }");
+        to_string_fail(__FILE__, __LINE__, 1, "∂²(sin(xy)+x·ln(y))/∂x∂y (EXPR)", s, "{ cos(xy) - xy·sin(xy) + 1/y | x = 1, y = 2 }");
     free(s);
 
     dv_free(d2f_dxdy); dv_free(d2f_dx2); dv_free(df_dy); dv_free(df_dx);

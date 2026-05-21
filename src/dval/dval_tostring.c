@@ -18,8 +18,9 @@
  *   • Unicode superscript encoding for integer powers (², ³, …)
  *   • The { expr } / { expr | bindings } wrapper for expression style
  *
- * All algebraic simplification (flattening, factoring, ordering, etc.)
- * is done in dv_simplify.c before this file is reached.
+ * Algebraic simplification is deliberately not part of ordinary rendering:
+ * callers see the expression shape they built or parsed.  Owning derivative
+ * creation simplifies derivatives before they are rendered.
  */
 
 #include <stdbool.h>
@@ -49,21 +50,7 @@ static char *dv_number_to_string_local(number_t value)
 
 static char *dv_const_to_string_local(const dval_t *dv)
 {
-    if (dv && dv->name && *dv->name) {
-        const char *canon = dv_default_constant_canonical_name(dv->name);
-
-        if (canon) {
-            if (strcmp(canon, "e") == 0 && num_eq(dv->c, NUM_E))
-                return dv_tostring_xstrdup("2.718281828459045235360287471352664");
-            if (strcmp(canon, "@pi") == 0 && num_eq(dv->c, NUM_PI))
-                return dv_tostring_xstrdup("3.141592653589793238462643383279505");
-            if (strcmp(canon, "@gamma") == 0 && num_eq(dv->c, NUM_EULER_MASCHERONI))
-                return dv_tostring_xstrdup("0.5772156649015328606065120900824012");
-            if (strcmp(canon, "@phi") == 0 && num_eq(dv->c, NUM_PHI))
-                return dv_tostring_xstrdup("1.618033988749894848204586834365641");
-        }
-    }
-    return num_to_string(dv->c);
+    return dv ? num_to_string(dv->c) : NULL;
 }
 
 static char *dv_eval_to_string_local(const dval_t *dv)
@@ -82,6 +69,8 @@ static bool dv_is_immortal_default_const_local(const dval_t *dv)
 
     canon = dv_default_constant_canonical_name(dv->name);
     if (!canon)
+        return false;
+    if (strcmp(canon, "@tau") == 0)
         return false;
     if (!dv_get_default_constant_num(canon, &builtin))
         return false;
@@ -265,10 +254,36 @@ static bool dv_try_get_small_integer_exponent(number_t value, long *out)
 /* Atom helpers                                                              */
 /* ------------------------------------------------------------------------- */
 
+static int dv_tostring_should_emit_binding_expr(const dval_t *f)
+{
+    number_t value;
+    int is_builtin_const;
+    int value_matches_builtin = 0;
+
+    if (!f || !f->binding_expr)
+        return 0;
+    if (!f->name || !*f->name)
+        return 1;
+
+    is_builtin_const = dv_get_default_constant_num(f->name, &value);
+    if (is_builtin_const) {
+        value_matches_builtin = num_eq(f->c, value);
+        num_destroy(&value);
+    }
+    return is_builtin_const && value_matches_builtin;
+}
+
 static void emit_atom(dval_t *f, sbuf_t *b)
 {
     if (dv_is_const(f)) {
-        if (f->name && *f->name) {
+        if (dv_tostring_should_emit_binding_expr(f)) {
+            char *text = dv_binding_expr_to_string(f->binding_expr);
+
+            if (text) {
+                sbuf_puts(b, text);
+                free(text);
+            }
+        } else if (f->name && *f->name) {
             emit_name(b, f->name);
         } else {
             char *text = dv_const_to_string_local(f);
@@ -288,6 +303,61 @@ static void emit_atom(dval_t *f, sbuf_t *b)
     }
 }
 
+static bool emit_negative_const_binding_expr_abs(const dval_t *f,
+                                                 sbuf_t *b,
+                                                 bool tex)
+{
+    char *text;
+    const char *p;
+    const char *q;
+    size_t i;
+
+    if (!f || !f->binding_expr)
+        return false;
+
+    text = tex
+        ? dv_binding_expr_to_tex(f->binding_expr)
+        : dv_binding_expr_to_string(f->binding_expr);
+    if (!text)
+        return false;
+
+    p = text;
+    while (*p && isspace((unsigned char)*p))
+        ++p;
+    if (*p != '-') {
+        free(text);
+        return false;
+    }
+
+    ++p;
+    while (*p && isspace((unsigned char)*p))
+        ++p;
+    q = p;
+    while (isdigit((unsigned char)*q))
+        ++q;
+    if (q > p) {
+        if (tex && strncmp(q, " \\cdot \\pi", 10u) == 0) {
+            for (i = 0u; p + i < q; ++i)
+                sbuf_putc(b, p[i]);
+            sbuf_puts(b, "\\pi");
+            sbuf_puts(b, q + 10u);
+            free(text);
+            return true;
+        }
+        if (!tex && strncmp(q, "·π", sizeof("·π") - 1u) == 0) {
+            for (i = 0u; p + i < q; ++i)
+                sbuf_putc(b, p[i]);
+            sbuf_puts(b, "π");
+            sbuf_puts(b, q + sizeof("·π") - 1u);
+            free(text);
+            return true;
+        }
+    }
+    sbuf_puts(b, p);
+    free(text);
+    return true;
+}
+
 /* -------------------------------------------------------------
    Helper: does a pow exponent need wrapping parens?
    Atoms (var/const) and function calls (unary/binary — they have their own
@@ -304,6 +374,11 @@ static int pow_exp_needs_parens(const dval_t *e)
     if (dv_is_addsub(e) || dv_is_mul(e) ||
         dv_is_op(e, &ops_div) || dv_is_op(e, &ops_pow)) return 1;
     return 0;
+}
+
+static int pow_base_needs_visible_parens(const dval_t *base)
+{
+    return base && dv_is_const(base) && !num_is_real(base->c);
 }
 
 /* -------------------------------------------------------------
@@ -349,11 +424,12 @@ static void flatten_mul(dval_t *f, dval_t **buf, int *count, int max)
 }
 
 /* Sort group for multiplication factors:
- *   0 = unnamed numeric constant      (e.g. 6)
- *   1 = Greek named constant          (e.g. π, τ) — alphabetical within group
- *   2 = Latin/other named constant    (e.g. e)    — alphabetical within group
- *   3 = variable or var^n             (e.g. x, x³) — alphabetical by var name
- *   4 = everything else (unary/binary fns) — sort by primary arg var name,
+ *   0 = unnamed numeric constant       (e.g. 6)
+ *   1 = Greek immortal named constant  (e.g. π)
+ *   2 = Latin/other immortal constant  (e.g. e)
+ *   3 = variable or var^n              (e.g. x, x³)
+ *   4 = explicit bound named constant  (e.g. H or x from the const bindings)
+ *   5 = everything else (unary/binary fns) — sort by primary arg var name,
  *       stable so same-arg functions keep their original tree order
  */
 static int factor_group(const dval_t *f)
@@ -362,6 +438,8 @@ static int factor_group(const dval_t *f)
 
     if (dv_is_const(f)) {
         if (!f->name || !*f->name) return 0;
+        if (f->binding_expr && !dv_is_immortal_default_const_local(f))
+            return 4;
         /* Greek letters are UTF-8 multi-byte; first byte >= 0x80 */
         return ((unsigned char)f->name[0] >= 0x80) ? 1 : 2;
     }
@@ -372,7 +450,7 @@ static int factor_group(const dval_t *f)
     if (dv_tostring_is_var_pow_d(f))
         return 3;
 
-    return 4;
+    return 5;
 }
 
 /* DFS to find the name of the first variable in an expression. */
@@ -429,14 +507,14 @@ static void sort_factors(dval_t **fac, int n)
         dval_t *key = fac[s];
         int kg = factor_group(key);
         const char *kn = factor_sort_name(key);
-        int kd = (kg == 4) ? factor_depth(key) : 0;
+        int kd = (kg == 5) ? factor_depth(key) : 0;
         int t = s - 1;
         while (t >= 0) {
             int tg = factor_group(fac[t]);
             int cmp;
             if (tg != kg) {
                 cmp = tg - kg;
-            } else if (kg == 4) {
+            } else if (kg == 5) {
                 int td = factor_depth(fac[t]);
                 cmp = (td != kd) ? (td - kd) : strcmp(factor_sort_name(fac[t]), kn);
             } else {
@@ -513,6 +591,11 @@ static void emit_expr_abs(const dval_t *f, sbuf_t *b, int parent_prec)
     if (dv_tostring_is_negative_const(f)) {
         char *text;
         number_t pos_value = num_neg(f->c);
+
+        if (emit_negative_const_binding_expr_abs(f, b, false)) {
+            num_destroy(&pos_value);
+            return;
+        }
 
         text = dv_number_to_string_local(pos_value);
         if (text) {
@@ -647,7 +730,14 @@ static void emit_tex_const_value(sbuf_t *b, const dval_t *dv)
 static void emit_tex_atom(const dval_t *f, sbuf_t *b)
 {
     if (dv_is_const(f)) {
-        if (f->name && *f->name)
+        if (dv_tostring_should_emit_binding_expr(f)) {
+            char *text = dv_binding_expr_to_tex(f->binding_expr);
+
+            if (text) {
+                sbuf_puts(b, text);
+                free(text);
+            }
+        } else if (f->name && *f->name)
             emit_tex_name(b, f->name);
         else
             emit_tex_const_value(b, f);
@@ -705,6 +795,8 @@ static void emit_tex_expr_abs(const dval_t *f, sbuf_t *b, int parent_prec)
     }
 
     if (dv_tostring_is_negative_const(f)) {
+        if (emit_negative_const_binding_expr_abs(f, b, true))
+            return;
         emit_tex_number_value(b, num_neg(f->c));
         return;
     }
@@ -888,7 +980,13 @@ static void emit_tex_expr(const dval_t *f, sbuf_t *b, int parent_prec)
             emit_tex_expr(f->a->a, b, 0);
             sbuf_putc(b, ')');
         } else {
-            emit_tex_expr(f->a, b, PREC_POW);
+            int base_needs_parens = pow_base_needs_visible_parens(f->a);
+
+            if (base_needs_parens)
+                sbuf_puts(b, "\\left(");
+            emit_tex_expr(f->a, b, base_needs_parens ? PREC_LOWEST : PREC_POW);
+            if (base_needs_parens)
+                sbuf_puts(b, "\\right)");
             sbuf_puts(b, "^{");
             if (exponent_has_small_int) {
                 char buf[64];
@@ -1015,10 +1113,15 @@ static void emit_tex_expr(const dval_t *f, sbuf_t *b, int parent_prec)
 
     if (dv_is_op(f, &ops_pow)) {
         int need = PREC_POW < parent_prec;
+        int base_needs_parens = pow_base_needs_visible_parens(f->a);
 
         if (need)
             sbuf_puts(b, "\\left(");
-        emit_tex_expr(f->a, b, PREC_POW);
+        if (base_needs_parens)
+            sbuf_puts(b, "\\left(");
+        emit_tex_expr(f->a, b, base_needs_parens ? PREC_LOWEST : PREC_POW);
+        if (base_needs_parens)
+            sbuf_puts(b, "\\right)");
         sbuf_puts(b, "^{");
         if (tex_exp_needs_parens(f->b))
             emit_tex_expr(f->b, b, 0);
@@ -1159,7 +1262,13 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
             return;
         }
 
-        emit_expr(f->a, b, PREC_POW);
+        {
+            int base_needs_parens = pow_base_needs_visible_parens(f->a);
+
+            if (base_needs_parens) sbuf_putc(b, '(');
+            emit_expr(f->a, b, base_needs_parens ? PREC_LOWEST : PREC_POW);
+            if (base_needs_parens) sbuf_putc(b, ')');
+        }
 
         if (exponent_has_small_int)
             emit_superscript_int(b, ei);
@@ -1179,10 +1288,11 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
     /* Multiplication with sign folding */
     if (dv_is_mul(f)) {
         int need = PREC_MUL < parent_prec;
-        if (need) sbuf_putc(b, '(');
-
         dval_t *fac[64];
         int n = 0;
+
+        if (need) sbuf_putc(b, '(');
+
         flatten_mul((dval_t *)f, fac, &n, 64);
         sort_factors(fac, n);
 
@@ -1217,14 +1327,11 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
 
         for (int i = 0; i < n; i++) {
             if (i > 0) {
-                int left_atomic  = is_atomic_for_mul(fac[i-1]);
+                int left_atomic  = is_atomic_for_mul(fac[i - 1]);
                 int right_atomic = is_atomic_for_mul(fac[i]);
 
-                if (left_atomic && right_atomic) {
-                    /* implicit */
-                } else {
+                if (!(left_atomic && right_atomic))
                     sbuf_puts(b, "·");
-                }
             }
             emit_factor_abs(fac[i], b);
         }
@@ -1284,9 +1391,12 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
     /* Binary power: base^exp  or  base^(exp) when exponent needs grouping */
     if (dv_is_op(f, &ops_pow)) {
         int need = PREC_POW < parent_prec;
+        int base_needs_parens = pow_base_needs_visible_parens(f->a);
         if (need) sbuf_putc(b, '(');
 
-        emit_expr(f->a, b, PREC_POW);
+        if (base_needs_parens) sbuf_putc(b, '(');
+        emit_expr(f->a, b, base_needs_parens ? PREC_LOWEST : PREC_POW);
+        if (base_needs_parens) sbuf_putc(b, ')');
         sbuf_putc(b, '^');
         int ep = pow_exp_needs_parens(f->b);
         if (ep) sbuf_putc(b, '(');
@@ -1321,7 +1431,14 @@ static void emit_func(const dval_t *f, sbuf_t *b, int parent_prec)
     if (!f) { sbuf_puts(b, "0"); return; }
 
     if (dv_is_const(f)) {
-        if (f->name && *f->name)
+        if (dv_tostring_should_emit_binding_expr(f)) {
+            char *text = dv_binding_expr_to_string(f->binding_expr);
+
+            if (text) {
+                sbuf_puts(b, text);
+                free(text);
+            }
+        } else if (f->name && *f->name)
             emit_name_func(b, f->name);
         else {
             char *text = dv_const_to_string_local(f);
@@ -1353,9 +1470,12 @@ static void emit_func(const dval_t *f, sbuf_t *b, int parent_prec)
 
     if (dv_is_pow_d_expr(f)) {
         int need = PREC_POW < parent_prec;
+        int base_needs_parens = pow_base_needs_visible_parens(f->a);
         if (need) sbuf_putc(b, '(');
 
-        emit_func(f->a, b, PREC_POW);
+        if (base_needs_parens) sbuf_putc(b, '(');
+        emit_func(f->a, b, base_needs_parens ? PREC_LOWEST : PREC_POW);
+        if (base_needs_parens) sbuf_putc(b, ')');
 
         sbuf_putc(b, '^');
         char *text = dv_const_to_string_local(f);
@@ -1426,9 +1546,12 @@ static void emit_func(const dval_t *f, sbuf_t *b, int parent_prec)
     /* Binary power: base^exp  or  base^(exp) when exponent needs grouping */
     if (dv_is_op(f, &ops_pow)) {
         int need = PREC_POW < parent_prec;
+        int base_needs_parens = pow_base_needs_visible_parens(f->a);
         if (need) sbuf_putc(b, '(');
 
-        emit_func(f->a, b, PREC_POW);
+        if (base_needs_parens) sbuf_putc(b, '(');
+        emit_func(f->a, b, base_needs_parens ? PREC_LOWEST : PREC_POW);
+        if (base_needs_parens) sbuf_putc(b, ')');
         sbuf_putc(b, '^');
         int ep = pow_exp_needs_parens(f->b);
         if (ep) sbuf_putc(b, '(');
@@ -1487,12 +1610,12 @@ static void varlist_add(varlist_t *vl, dval_t *v)
     vl->vars[vl->count++] = v;
 }
 
-static void find_vars_dfs(dval_t *f, varlist_t *vl)
+static void find_vars_dfs(const dval_t *f, varlist_t *vl)
 {
     if (!f) return;
 
     if (dv_is_var(f)) {
-        varlist_add(vl, f);
+        varlist_add(vl, (dval_t *)f);
         return;
     }
 
@@ -1502,13 +1625,13 @@ static void find_vars_dfs(dval_t *f, varlist_t *vl)
     find_vars_dfs(f->b, vl);
 }
 
-static void find_named_consts_dfs(dval_t *f, varlist_t *cl)
+static void find_named_consts_dfs(const dval_t *f, varlist_t *cl)
 {
     if (!f) return;
 
     if (dv_is_const(f)) {
         if (f->name && *f->name && !dv_is_immortal_default_const_local(f))
-            varlist_add(cl, f);
+            varlist_add(cl, (dval_t *)f);
         return;
     }
 
@@ -1516,6 +1639,23 @@ static void find_named_consts_dfs(dval_t *f, varlist_t *cl)
 
     find_named_consts_dfs(f->a, cl);
     find_named_consts_dfs(f->b, cl);
+}
+
+static void find_explicit_named_consts_dfs(const dval_t *f, varlist_t *cl)
+{
+    if (!f) return;
+
+    if (dv_is_const(f)) {
+        if (f->name && *f->name && f->binding_expr &&
+            !dv_is_immortal_default_const_local(f))
+            varlist_add(cl, (dval_t *)f);
+        return;
+    }
+
+    if (dv_is_var(f)) return;
+
+    find_explicit_named_consts_dfs(f->a, cl);
+    find_explicit_named_consts_dfs(f->b, cl);
 }
 
 static const char *dv_name_or_default(const dval_t *dv, const char *fallback)
@@ -1577,18 +1717,15 @@ static char *dv_to_string_function(const dval_t *f)
     sbuf_t b;
     sbuf_init(&b);
 
-    /* Assign auto-names (x₀, x₁, …) to unnamed vars BEFORE simplification so
-     * the names survive into the simplified tree — var leaf nodes are shared by
-     * reference, so the name set here is visible throughout the tree after
-     * dv_simplify returns.  Unnamed numeric constants (coefficients created by
-     * dv_mul_num / dv_add_num etc.) are not auto-named; they appear as plain numbers.
+    /* Assign auto-names (x₀, x₁, …) to unnamed vars before rendering.
+     * Unnamed numeric constants (coefficients created by dv_mul_num /
+     * dv_add_num etc.) are not auto-named; they appear as plain numbers.
      * Callers that want symbolic unnamed constants should use dv_new_named_const(). */
     autoname_table_t vnames;
     autoname_init(&vnames);
     assign_unnamed_vars_dfs((dval_t *)f, &vnames);
 
-    /* Simplify first */
-    dval_t *g = dv_simplify((dval_t *)f);
+    const dval_t *g = f;
 
     /* Discover variables and named constants */
     varlist_t vl;
@@ -1597,6 +1734,7 @@ static char *dv_to_string_function(const dval_t *f)
 
     varlist_t cl;
     varlist_init(&cl);
+    find_explicit_named_consts_dfs(f, &cl);
     find_named_consts_dfs(g, &cl);
 
     /* Emit variable bindings */
@@ -1621,7 +1759,6 @@ static char *dv_to_string_function(const dval_t *f)
         free(vl.vars);
         free(cl.vars);
         autoname_restore(&vnames);
-        dv_free(g);
         return out;
     }
 
@@ -1646,7 +1783,6 @@ static char *dv_to_string_function(const dval_t *f)
         free(vl.vars);
         free(cl.vars);
         autoname_restore(&vnames);
-        dv_free(g);
         return out;
     }
 
@@ -1673,7 +1809,6 @@ static char *dv_to_string_function(const dval_t *f)
     free(vl.vars);
     free(cl.vars);
     autoname_restore(&vnames);
-    dv_free(g);
     return out;
 }
 
@@ -1688,7 +1823,7 @@ static char *dv_to_string_expr(const dval_t *f)
     autoname_init(&vnames);
     assign_unnamed_vars_dfs((dval_t *)f, &vnames);
 
-    dval_t *g = dv_simplify((dval_t *)f);
+    const dval_t *g = f;
 
     varlist_t vl;
     varlist_init(&vl);
@@ -1696,6 +1831,7 @@ static char *dv_to_string_expr(const dval_t *f)
 
     varlist_t cl;
     varlist_init(&cl);
+    find_explicit_named_consts_dfs(f, &cl);
     find_named_consts_dfs(g, &cl);
 
     sbuf_init(&b);
@@ -1749,14 +1885,13 @@ static char *dv_to_string_expr(const dval_t *f)
     free(vl.vars);
     free(cl.vars);
     autoname_restore(&vnames);
-    dv_free(g);
     return out;
 }
 
 int dv_to_tex_parts(const dval_t *dv, char **expr_out, char **bindings_out)
 {
     autoname_table_t vnames;
-    dval_t *g;
+    const dval_t *g;
     varlist_t vl;
     varlist_t cl;
     sbuf_t expr;
@@ -1776,11 +1911,12 @@ int dv_to_tex_parts(const dval_t *dv, char **expr_out, char **bindings_out)
 
     autoname_init(&vnames);
     assign_unnamed_vars_dfs((dval_t *)dv, &vnames);
-    g = dv_simplify((dval_t *)dv);
+    g = dv;
 
     varlist_init(&vl);
     varlist_init(&cl);
     find_vars_dfs(g, &vl);
+    find_explicit_named_consts_dfs(dv, &cl);
     find_named_consts_dfs(g, &cl);
 
     sbuf_init(&expr);
@@ -1830,7 +1966,6 @@ int dv_to_tex_parts(const dval_t *dv, char **expr_out, char **bindings_out)
     free(vl.vars);
     free(cl.vars);
     autoname_restore(&vnames);
-    dv_free(g);
 
     if (!*expr_out || !*bindings_out) {
         free(*expr_out);

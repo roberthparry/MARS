@@ -133,9 +133,13 @@ typedef struct {
     const char *kw;
     size_t      klen;
     bool        is_binary;
+    const dval_ops_t *ops;
     unary_fn    ufn;
     binary_fn   bfn;
 } func_entry_t;
+
+#define FUNC_ENTRY(name, is_bin, op, unary, binary) \
+    { (name), sizeof(name) - 1u, (is_bin), (op), (unary), (binary) }
 
 static const unsigned char s_func_displacements[FUNC_TABLE_SIZE] = {
     0, 0, 0, 0, 7, 0, 3, 0, 1, 0,
@@ -146,78 +150,71 @@ static const unsigned char s_func_displacements[FUNC_TABLE_SIZE] = {
 };
 
 static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
-    { "atan",           4, false, dv_atan,          NULL        },
-    { "normal_cdf",    10, false, dv_normal_cdf,    NULL        },
-    { "sinh",           4, false, dv_sinh,          NULL        },
-    { "gamma",          5, false, dv_gamma,         NULL        },
-    { "sqrt",           4, false, dv_sqrt,          NULL        },
-    { "pow",            3, true,  NULL,             dv_pow_dv   },
-    { "gammainv",       8, false, dv_gammainv,      NULL        },
-    { "productlog",    10, false, dv_lambert_w0,    NULL        },
-    { "erfinv",         6, false, dv_erfinv,        NULL        },
-    { "Ei",             2, false, dv_ei,            NULL        },
-    { "ceil",           4, false, dv_ceil,          NULL        },
-    { "E1",             2, false, dv_e1,            NULL        },
-    { "cos",            3, false, dv_cos,           NULL        },
-    { "hypot",          5, true,  NULL,             dv_hypot    },
-    { "tan",            3, false, dv_tan,           NULL        },
-    { "trigamma",       8, false, dv_trigamma,      NULL        },
-    { "beta",           4, true,  NULL,             dv_beta     },
-    { "abs",            3, false, dv_abs,           NULL        },
-    { "atan2",          5, true,  NULL,             dv_atan2    },
-    { "normal_pdf",    10, false, dv_normal_pdf,    NULL        },
-    { "asinh",          5, false, dv_asinh,         NULL        },
-    { "lambert_wm1",   11, false, dv_lambert_wm1,   NULL        },
-    { "asin",           4, false, dv_asin,          NULL        },
-    { "logbeta",        7, true,  NULL,             dv_logbeta  },
-    { "acos",           4, false, dv_acos,          NULL        },
-    { "lgamma",         6, false, dv_lgamma,        NULL        },
-    { "acosh",          5, false, dv_acosh,         NULL        },
-    { "normal_logpdf", 13, false, dv_normal_logpdf, NULL        },
-    { "erf",            3, false, dv_erf,           NULL        },
-    { "digamma",        7, false, dv_digamma,       NULL        },
-    { NULL,             0, false, NULL,             NULL        },
-    { "cosh",           4, false, dv_cosh,          NULL        },
-    { "log10",          5, false, dv_log10,         NULL        },
-    { "ln",             2, false, dv_log,           NULL        },
-    { "exp",            3, false, dv_exp,           NULL        },
-    { "erfc",           4, false, dv_erfc,          NULL        },
-    { "sin",            3, false, dv_sin,           NULL        },
-    { "tanh",           4, false, dv_tanh,          NULL        },
-    { "lambert_w0",    10, false, dv_lambert_w0,    NULL        },
-    { "log",            3, false, dv_log10,         NULL        },
-    { "erfcinv",        7, false, dv_erfcinv,       NULL        },
-    { "atanh",          5, false, dv_atanh,         NULL        },
-    { "floor",          5, false, dv_floor,         NULL        },
+    FUNC_ENTRY("atan",          false, &ops_atan,          dv_atan,          NULL),
+    FUNC_ENTRY("normal_cdf",    false, &ops_normal_cdf,    dv_normal_cdf,    NULL),
+    FUNC_ENTRY("sinh",          false, &ops_sinh,          dv_sinh,          NULL),
+    FUNC_ENTRY("gamma",         false, &ops_gamma,         dv_gamma,         NULL),
+    FUNC_ENTRY("sqrt",          false, &ops_sqrt,          dv_sqrt,          NULL),
+    FUNC_ENTRY("pow",           true,  &ops_pow,           NULL,             dv_pow_dv),
+    FUNC_ENTRY("gammainv",      false, &ops_gammainv,      dv_gammainv,      NULL),
+    FUNC_ENTRY("productlog",    false, &ops_lambert_w0,    dv_lambert_w0,    NULL),
+    FUNC_ENTRY("erfinv",        false, &ops_erfinv,        dv_erfinv,        NULL),
+    FUNC_ENTRY("Ei",            false, &ops_ei,            dv_ei,            NULL),
+    FUNC_ENTRY("ceil",          false, &ops_ceil,          dv_ceil,          NULL),
+    FUNC_ENTRY("E1",            false, &ops_e1,            dv_e1,            NULL),
+    FUNC_ENTRY("cos",           false, &ops_cos,           dv_cos,           NULL),
+    FUNC_ENTRY("hypot",         true,  &ops_hypot,         NULL,             dv_hypot),
+    FUNC_ENTRY("tan",           false, &ops_tan,           dv_tan,           NULL),
+    FUNC_ENTRY("trigamma",      false, &ops_trigamma,      dv_trigamma,      NULL),
+    FUNC_ENTRY("beta",          true,  &ops_beta,          NULL,             dv_beta),
+    FUNC_ENTRY("abs",           false, &ops_abs,           dv_abs,           NULL),
+    FUNC_ENTRY("atan2",         true,  &ops_atan2,         NULL,             dv_atan2),
+    FUNC_ENTRY("normal_pdf",    false, &ops_normal_pdf,    dv_normal_pdf,    NULL),
+    FUNC_ENTRY("asinh",         false, &ops_asinh,         dv_asinh,         NULL),
+    FUNC_ENTRY("lambert_wm1",   false, &ops_lambert_wm1,   dv_lambert_wm1,   NULL),
+    FUNC_ENTRY("asin",          false, &ops_asin,          dv_asin,          NULL),
+    FUNC_ENTRY("logbeta",       true,  &ops_logbeta,       NULL,             dv_logbeta),
+    FUNC_ENTRY("acos",          false, &ops_acos,          dv_acos,          NULL),
+    FUNC_ENTRY("lgamma",        false, &ops_lgamma,        dv_lgamma,        NULL),
+    FUNC_ENTRY("acosh",         false, &ops_acosh,         dv_acosh,         NULL),
+    FUNC_ENTRY("normal_logpdf", false, &ops_normal_logpdf, dv_normal_logpdf, NULL),
+    FUNC_ENTRY("erf",           false, &ops_erf,           dv_erf,           NULL),
+    FUNC_ENTRY("digamma",       false, &ops_digamma,       dv_digamma,       NULL),
+    { NULL, 0, false, NULL, NULL, NULL },
+    FUNC_ENTRY("cosh",          false, &ops_cosh,          dv_cosh,          NULL),
+    FUNC_ENTRY("log10",         false, &ops_log10,         dv_log10,         NULL),
+    FUNC_ENTRY("ln",            false, &ops_log,           dv_log,           NULL),
+    FUNC_ENTRY("exp",           false, &ops_exp,           dv_exp,           NULL),
+    FUNC_ENTRY("erfc",          false, &ops_erfc,          dv_erfc,          NULL),
+    FUNC_ENTRY("sin",           false, &ops_sin,           dv_sin,           NULL),
+    FUNC_ENTRY("tanh",          false, &ops_tanh,          dv_tanh,          NULL),
+    FUNC_ENTRY("lambert_w0",    false, &ops_lambert_w0,    dv_lambert_w0,    NULL),
+    FUNC_ENTRY("log",           false, &ops_log10,         dv_log10,         NULL),
+    FUNC_ENTRY("erfcinv",       false, &ops_erfcinv,       dv_erfcinv,       NULL),
+    FUNC_ENTRY("atanh",         false, &ops_atanh,         dv_atanh,         NULL),
+    FUNC_ENTRY("floor",         false, &ops_floor,         dv_floor,         NULL),
 };
 
-static const func_entry_t s_func_alias_w0 = {
-    "W₀", sizeof("W₀") - 1u, false, dv_lambert_w0, NULL
-};
+static const func_entry_t s_func_alias_w0 =
+    FUNC_ENTRY("W₀", false, &ops_lambert_w0, dv_lambert_w0, NULL);
 
-static const func_entry_t s_func_alias_wm1 = {
-    "W₋₁", sizeof("W₋₁") - 1u, false, dv_lambert_wm1, NULL
-};
+static const func_entry_t s_func_alias_wm1 =
+    FUNC_ENTRY("W₋₁", false, &ops_lambert_wm1, dv_lambert_wm1, NULL);
 
-static const func_entry_t s_func_alias_ascii_w = {
-    "W", sizeof("W") - 1u, false, dv_lambert_w0, NULL
-};
+static const func_entry_t s_func_alias_ascii_w =
+    FUNC_ENTRY("W", false, &ops_lambert_w0, dv_lambert_w0, NULL);
 
-static const func_entry_t s_func_alias_ascii_w0 = {
-    "W0", sizeof("W0") - 1u, false, dv_lambert_w0, NULL
-};
+static const func_entry_t s_func_alias_ascii_w0 =
+    FUNC_ENTRY("W0", false, &ops_lambert_w0, dv_lambert_w0, NULL);
 
-static const func_entry_t s_func_alias_ascii_w0_sub = {
-    "W_0", sizeof("W_0") - 1u, false, dv_lambert_w0, NULL
-};
+static const func_entry_t s_func_alias_ascii_w0_sub =
+    FUNC_ENTRY("W_0", false, &ops_lambert_w0, dv_lambert_w0, NULL);
 
-static const func_entry_t s_func_alias_ascii_wm1 = {
-    "W-1", sizeof("W-1") - 1u, false, dv_lambert_wm1, NULL
-};
+static const func_entry_t s_func_alias_ascii_wm1 =
+    FUNC_ENTRY("W-1", false, &ops_lambert_wm1, dv_lambert_wm1, NULL);
 
-static const func_entry_t s_func_alias_ascii_wm1_sub = {
-    "W_-1", sizeof("W_-1") - 1u, false, dv_lambert_wm1, NULL
-};
+static const func_entry_t s_func_alias_ascii_wm1_sub =
+    FUNC_ENTRY("W_-1", false, &ops_lambert_wm1, dv_lambert_wm1, NULL);
 
 static unsigned func_bucket_hash(const char *kw, size_t klen)
 {
@@ -540,6 +537,134 @@ static int parse_required_char(parser_t *p, char expected, const char *errmsg)
     return 1;
 }
 
+static int node_has_preserved_constexpr(const dval_t *node)
+{
+    number_t value;
+    int is_builtin_const;
+    int value_matches_builtin = 0;
+
+    if (!dv_is_const(node) || !node->binding_expr)
+        return 0;
+    if (!node->name || !*node->name)
+        return 1;
+
+    is_builtin_const = dv_get_default_constant_num(node->name, &value);
+    if (is_builtin_const) {
+        value_matches_builtin = num_eq(node->c, value);
+        num_destroy(&value);
+    }
+
+    return dv_is_const(node) &&
+           node->binding_expr &&
+           is_builtin_const &&
+           value_matches_builtin;
+}
+
+static dval_t *const_node_from_binding_expr(dv_binding_expr_t *expr)
+{
+    number_t value;
+    dval_t *node;
+
+    if (!expr)
+        return dv_new_const(NUM_NAN);
+
+    expr = dv_binding_expr_simplify(expr);
+    value = dv_binding_expr_eval(expr);
+    node = dv_new_const(value);
+    num_destroy(&value);
+    node->binding_expr = expr;
+    return node;
+}
+
+static dval_t *apply_unary_preserving_constexpr(const dval_ops_t *ops,
+                                                dval_t *arg,
+                                                dval_t *(*fallback)(const dval_t *))
+{
+    if (node_has_preserved_constexpr(arg)) {
+        dv_binding_expr_t *expr =
+            dv_binding_expr_new_unary_op(ops, dv_binding_expr_clone(arg->binding_expr));
+        dval_t *node = const_node_from_binding_expr(expr);
+
+        dv_free(arg);
+        return node;
+    }
+
+    {
+        dval_t *node = fallback(arg);
+        dv_free(arg);
+        return node;
+    }
+}
+
+static dv_binding_expr_t *binding_expr_for_binary_constexpr(const dval_ops_t *ops,
+                                                            const dval_t *left,
+                                                            const dval_t *right)
+{
+    dv_binding_expr_t *l = dv_binding_expr_clone(left->binding_expr);
+    dv_binding_expr_t *r = dv_binding_expr_clone(right->binding_expr);
+
+    if (ops == &ops_add)
+        return dv_binding_expr_new_add(l, r);
+    if (ops == &ops_sub)
+        return dv_binding_expr_new_sub(l, r);
+    if (ops == &ops_mul)
+        return dv_binding_expr_new_mul(l, r);
+    if (ops == &ops_div)
+        return dv_binding_expr_new_div(l, r);
+    if (ops == &ops_pow)
+        return dv_binding_expr_new_binary_op(&ops_pow, l, r);
+
+    return dv_binding_expr_new_binary_op(ops, l, r);
+}
+
+static dval_t *apply_binary_preserving_constexpr(const dval_ops_t *ops,
+                                                 dval_t *left,
+                                                 dval_t *right,
+                                                 dval_t *(*fallback)(const dval_t *,
+                                                                     const dval_t *))
+{
+    if (node_has_preserved_constexpr(left) &&
+        node_has_preserved_constexpr(right)) {
+        dv_binding_expr_t *expr = binding_expr_for_binary_constexpr(ops, left, right);
+        dval_t *node = const_node_from_binding_expr(expr);
+
+        dv_free(left);
+        dv_free(right);
+        return node;
+    }
+
+    {
+        dval_t *node = fallback(left, right);
+        dv_free(left);
+        dv_free(right);
+        return node;
+    }
+}
+
+static dval_t *apply_pow_const_preserving_constexpr(dval_t *base, const number_t *exponent)
+{
+    if (node_has_preserved_constexpr(base)) {
+        char *text = num_to_string(*exponent);
+        dv_binding_expr_t *rhs = dv_binding_expr_new_number_text(text ? text : "NAN");
+        dv_binding_expr_t *expr =
+            dv_binding_expr_new_binary_op(&ops_pow,
+                                          dv_binding_expr_clone(base->binding_expr),
+                                          rhs);
+        dval_t *node;
+
+        free(text);
+        node = const_node_from_binding_expr(expr);
+        dv_free(base);
+        return node;
+    }
+
+    {
+        dval_t *node = dv_pow(base, exponent);
+        dv_free(base);
+        return node;
+    }
+}
+
 static dval_t *apply_integer_power_if_present(dval_t *value, int exponent)
 {
     NUM_SCOPE(scope);
@@ -547,8 +672,7 @@ static dval_t *apply_integer_power_if_present(dval_t *value, int exponent)
         return value;
 
     number_t exponent_num = num_create_from_long(exponent);
-    dval_t *powered = dv_pow(value, &exponent_num);
-    dv_free(value);
+    dval_t *powered = apply_pow_const_preserving_constexpr(value, &exponent_num);
     return powered;
 }
 
@@ -596,9 +720,7 @@ static dval_t *parse_atom(parser_t *p)
         dval_t *inner = parse_enclosed_addexpr(p, '|', "expected '|'");
         if (!inner)
             return NULL;
-        dval_t *result = dv_abs(inner);
-        dv_free(inner);
-        return result;
+        return apply_unary_preserving_constexpr(&ops_abs, inner, dv_abs);
     }
 
     /* Mathematical floor/ceiling brackets: ⌊expr⌋ and ⌈expr⌉ */
@@ -624,8 +746,9 @@ static dval_t *parse_atom(parser_t *p)
         }
         p->p += close_len;
 
-        result = (cp == 0x230A) ? dv_floor(inner) : dv_ceil(inner);
-        dv_free(inner);
+        result = (cp == 0x230A)
+            ? apply_unary_preserving_constexpr(&ops_floor, inner, dv_floor)
+            : apply_unary_preserving_constexpr(&ops_ceil, inner, dv_ceil);
         return result;
     }
 
@@ -633,8 +756,10 @@ static dval_t *parse_atom(parser_t *p)
     if (isdigit((unsigned char)*p->p) || *p->p == '.' ||
         scan_unicode_fraction_len(p->p, p->end) > 0u) {
         size_t len = scan_number_atom_len(p->p, p->end);
+        const char *start = p->p;
         number_t value;
         dval_t *node;
+        char *text;
 
         if (len == 0 || !parse_number_region(p->p, p->p + len, &value)) {
             set_error(p, "expected numeric literal");
@@ -642,6 +767,11 @@ static dval_t *parse_atom(parser_t *p)
         }
         p->p += len;
         node = dv_new_const(value);
+        text = (char *)fs_xmalloc(len + 1u);
+        memcpy(text, start, len);
+        text[len] = '\0';
+        node->binding_expr = dv_binding_expr_new_number_text(text);
+        free(text);
         return node;
     }
 
@@ -656,8 +786,7 @@ static dval_t *parse_atom(parser_t *p)
         dval_t *result;
         if (!arg)
             return NULL;
-        result = dv_sqrt(arg);
-        dv_free(arg);
+        result = apply_unary_preserving_constexpr(&ops_sqrt, arg, dv_sqrt);
         return apply_integer_power_if_present(result, sup);
     }
 
@@ -678,8 +807,7 @@ static dval_t *parse_atom(parser_t *p)
 
             if (!arg)
                 return NULL;
-            result = fe->ufn(arg);
-            dv_free(arg);
+            result = apply_unary_preserving_constexpr(fe->ops, arg, fe->ufn);
             return apply_integer_power_if_present(result, sup);
         }
     }
@@ -716,9 +844,8 @@ static dval_t *parse_atom(parser_t *p)
                         dv_free(b);
                         return NULL;
                     }
-                    dval_t *result = fe->bfn(a, b);
-                    dv_free(a);
-                    dv_free(b);
+                    dval_t *result =
+                        apply_binary_preserving_constexpr(fe->ops, a, b, fe->bfn);
                     return apply_integer_power_if_present(result, sup);
                 } else {
                     dval_t *arg = parse_enclosed_addexpr(
@@ -726,8 +853,7 @@ static dval_t *parse_atom(parser_t *p)
                     dval_t *result;
                     if (!arg)
                         return NULL;
-                    result = fe->ufn(arg);
-                    dv_free(arg);
+                    result = apply_unary_preserving_constexpr(fe->ops, arg, fe->ufn);
                     return apply_integer_power_if_present(result, sup);
                 }
             }
@@ -802,13 +928,13 @@ static dval_t *parse_power(parser_t *p)
             }
         }
 
-        if (dv_is_unnamed_const(exponent)) {
-            result = dv_pow(base, &exponent->c);
+        if (dv_is_unnamed_const(exponent) &&
+            (!exponent->binding_expr || !node_has_preserved_constexpr(base))) {
+            result = apply_pow_const_preserving_constexpr(base, &exponent->c);
+            dv_free(exponent);
         } else {
-            result = dv_pow_dv(base, exponent);
+            result = apply_binary_preserving_constexpr(&ops_pow, base, exponent, dv_pow_dv);
         }
-        dv_free(base);
-        dv_free(exponent);
         if (!result)
             return result;
         return result;
@@ -828,9 +954,7 @@ static dval_t *parse_signed_power(parser_t *p)
         p->p++;
         dval_t *inner = parse_power(p);
         if (!inner) return NULL;
-        dval_t *result = dv_neg(inner);
-        dv_free(inner);
-        return result;
+        return apply_unary_preserving_constexpr(&ops_neg, inner, dv_neg);
     }
     return parse_power(p);
 }
@@ -853,9 +977,7 @@ static dval_t *parse_mulexpr(parser_t *p)
             p->p += 2;
             dval_t *rhs = parse_signed_power(p);
             if (!rhs) { dv_free(lhs); return NULL; }
-            dval_t *tmp = dv_mul(lhs, rhs);
-            dv_free(lhs); dv_free(rhs);
-            lhs = tmp;
+            lhs = apply_binary_preserving_constexpr(&ops_mul, lhs, rhs, dv_mul);
             continue;
         }
 
@@ -873,9 +995,9 @@ static dval_t *parse_mulexpr(parser_t *p)
                 skip_spaces(&p->p, p->end); /* trailing spaces */
                 dval_t *rhs = parse_signed_power(p);
                 if (!rhs) { dv_free(lhs); return NULL; }
-                dval_t *tmp = (op == '*') ? dv_mul(lhs, rhs) : dv_div(lhs, rhs);
-                dv_free(lhs); dv_free(rhs);
-                lhs = tmp;
+                lhs = (op == '*')
+                    ? apply_binary_preserving_constexpr(&ops_mul, lhs, rhs, dv_mul)
+                    : apply_binary_preserving_constexpr(&ops_div, lhs, rhs, dv_div);
                 continue;
             }
         }
@@ -884,9 +1006,7 @@ static dval_t *parse_mulexpr(parser_t *p)
         if (can_start_factor(p)) {
             dval_t *rhs = parse_signed_power(p);
             if (!rhs) { dv_free(lhs); return NULL; }
-            dval_t *tmp = dv_mul(lhs, rhs);
-            dv_free(lhs); dv_free(rhs);
-            lhs = tmp;
+            lhs = apply_binary_preserving_constexpr(&ops_mul, lhs, rhs, dv_mul);
             continue;
         }
 
@@ -918,9 +1038,9 @@ static dval_t *parse_addexpr(parser_t *p)
             skip_spaces(&p->p, p->end);
             dval_t *rhs = parse_mulexpr(p);
             if (!rhs) { dv_free(lhs); return NULL; }
-            dval_t *tmp = (op == '+') ? dv_add(lhs, rhs) : dv_sub(lhs, rhs);
-            dv_free(lhs); dv_free(rhs);
-            lhs = tmp;
+            lhs = (op == '+')
+                ? apply_binary_preserving_constexpr(&ops_add, lhs, rhs, dv_add)
+                : apply_binary_preserving_constexpr(&ops_sub, lhs, rhs, dv_sub);
             continue;
         }
 
@@ -933,7 +1053,7 @@ static dval_t *parse_addexpr(parser_t *p)
 /* Binding section parser                                               */
 /* ------------------------------------------------------------------ */
 
-/* Parse comma-separated "name = value" pairs from [s, end).
+/* Parse comma/semicolon-separated "name = value" pairs from [s, end).
  * is_var: 1 → create dv_new_named_var(); 0 → create dv_new_named_const().
  * On success returns 0; on failure writes to errmsg and returns -1. */
 static int parse_bindings(const char *s, const char *end,
@@ -943,8 +1063,8 @@ static int parse_bindings(const char *s, const char *end,
     NUM_SCOPE(scope);
     const char *p = s;
     while (p < end) {
-        /* Skip whitespace and commas between entries */
-        while (p < end && (isspace((unsigned char)*p) || *p == ',')) p++;
+        /* Skip whitespace and separators between entries. */
+        while (p < end && (isspace((unsigned char)*p) || *p == ',' || *p == ';')) p++;
         if (p >= end) break;
 
         char *name = read_any_name(&p);
@@ -972,6 +1092,7 @@ static int parse_bindings(const char *s, const char *end,
             free(name);
             return -1;
         }
+        binding_expr = dv_binding_expr_simplify(binding_expr);
         val = dv_binding_expr_eval(binding_expr);
         p = value_end;
 
@@ -1027,11 +1148,12 @@ static dval_t *parse_pure_const(const char *s, const char *end,
     p++;
     skip_spaces(&p, end);
 
-        dv_binding_expr_t *binding_expr = dv_binding_expr_parse_region(p, end, errmsg, errmsg_n);
-        if (!binding_expr) {
-            free(name);
-            return NULL;
-        }
+    dv_binding_expr_t *binding_expr = dv_binding_expr_parse_region(p, end, errmsg, errmsg_n);
+    if (!binding_expr) {
+        free(name);
+        return NULL;
+    }
+    binding_expr = dv_binding_expr_simplify(binding_expr);
     number_t val = dv_binding_expr_eval(binding_expr);
 
     if (!name) {
@@ -1117,8 +1239,13 @@ static int collect_implicit_symbols(const char *start, const char *end,
 
         is_const = dv_is_default_constant_name(name);
         if (dv_get_default_constant_num(name, &value)) {
+            char bind_err[128];
+
             canonical_name = dv_default_constant_canonical_name(name);
             node = dv_new_named_const(value, canonical_name);
+            node->binding_expr =
+                dv_binding_expr_parse_region(name, name + strlen(name),
+                                             bind_err, sizeof(bind_err));
         } else {
             node = is_const
                 ? dv_new_named_const(NUM_NAN, name)
@@ -1151,12 +1278,7 @@ static int collect_implicit_symbols(const char *start, const char *end,
 
 static void symtab_discard_storage(symtab_t *t)
 {
-    if (!t)
-        return;
-    for (int i = 0; i < t->count; ++i)
-        free(t->entries[i].name);
-    free(t->entries);
-    symtab_init(t);
+    symtab_free(t);
 }
 
 static dval_t *parse_expression_region(const char *start,
@@ -1384,6 +1506,8 @@ void dval_bindings_free(dval_bindings_t *bnd)
 {
     if (!bnd)
         return;
+    for (size_t i = 0; i < bnd->count; ++i)
+        dv_free(bnd->entries[i].dval);
     dictionary_destroy(bnd->index);
     free(bnd->storage);
     free(bnd);

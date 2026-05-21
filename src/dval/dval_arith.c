@@ -115,8 +115,15 @@ static dval_t *deriv_sub(dval_t *dv)
     return out;
 }
 
+static dval_t *deriv_exp_inverse_scaled_sqrt_product(dval_t *dv);
+
 static dval_t *deriv_mul(dval_t *dv)
 {
+    dval_t *special = deriv_exp_inverse_scaled_sqrt_product(dv);
+
+    if (special)
+        return special;
+
     dval_t *da  = dv_get_dx_internal(dv->a);
     dval_t *db  = dv_get_dx_internal(dv->b);
     dval_t *t1  = dv_mul(da, dv->b);
@@ -129,9 +136,303 @@ static dval_t *deriv_mul(dval_t *dv)
     return out;
 }
 
+static int dv_depends_on_current_wrt(const dval_t *dv)
+{
+    const dval_t *wrt = dv_current_wrt_internal();
+
+    if (!dv)
+        return 0;
+    if (!wrt)
+        return 1;
+    if (dv == wrt)
+        return 1;
+    return dv_depends_on_current_wrt(dv->a) ||
+           dv_depends_on_current_wrt(dv->b);
+}
+
+static int dv_is_deriv_foldable_real_const(const dval_t *dv)
+{
+    return dv_is_unnamed_const(dv) &&
+           (!dv->binding_expr || dv->binding_expr->kind == DV_BINDING_EXPR_NUMBER) &&
+           num_is_real(dv->c);
+}
+
+static int dv_is_sqrt_like_expr(const dval_t *dv)
+{
+    return dv_is_sqrt_expr(dv) ||
+           (dv_is_pow_d_expr(dv) && num_eq(dv->c, NUM_HALF));
+}
+
+static const dval_t *dv_sqrt_like_arg(const dval_t *dv)
+{
+    return dv->a;
+}
+
+static int split_scaled_sqrt_denominator(const dval_t *dv,
+                                         number_t *scale_out,
+                                         const dval_t **sqrt_out)
+{
+    if (dv_is_sqrt_like_expr(dv)) {
+        num_destroy(scale_out);
+        *scale_out = num_clone(NUM_ONE);
+        *sqrt_out = dv;
+        return 1;
+    }
+
+    if (!dv_is_op(dv, &ops_mul))
+        return 0;
+
+    if (dv_is_deriv_foldable_real_const(dv->a) && dv_is_sqrt_like_expr(dv->b)) {
+        num_destroy(scale_out);
+        *scale_out = num_clone(dv->a->c);
+        *sqrt_out = dv->b;
+        return 1;
+    }
+
+    if (dv_is_deriv_foldable_real_const(dv->b) && dv_is_sqrt_like_expr(dv->a)) {
+        num_destroy(scale_out);
+        *scale_out = num_clone(dv->b->c);
+        *sqrt_out = dv->a;
+        return 1;
+    }
+
+    return 0;
+}
+
+static int split_exp_numerator(const dval_t *dv,
+                               const dval_t **factor_out,
+                               const dval_t **exp_out)
+{
+    if (dv_is_exp_expr(dv)) {
+        *factor_out = NULL;
+        *exp_out = dv;
+        return 1;
+    }
+
+    if (!dv_is_op(dv, &ops_mul))
+        return 0;
+
+    if (dv_is_exp_expr(dv->a) && !dv_depends_on_current_wrt(dv->b)) {
+        *factor_out = dv->b;
+        *exp_out = dv->a;
+        return 1;
+    }
+
+    if (dv_is_exp_expr(dv->b) && !dv_depends_on_current_wrt(dv->a)) {
+        *factor_out = dv->a;
+        *exp_out = dv->b;
+        return 1;
+    }
+
+    return 0;
+}
+
+static int exp_arg_is_scaled_sqrt(const dval_t *arg, const dval_t *sqrt_node)
+{
+    const dval_t *sqrt_arg = dv_sqrt_like_arg(sqrt_node);
+
+    if (dv_struct_eq(arg, sqrt_node))
+        return 1;
+    if (dv_is_sqrt_like_expr(arg) && dv_struct_eq(dv_sqrt_like_arg(arg), sqrt_arg))
+        return 1;
+
+    if (!dv_is_op(arg, &ops_mul))
+        return 0;
+
+    if (((dv_struct_eq(arg->a, sqrt_node)) ||
+         (dv_is_sqrt_like_expr(arg->a) &&
+          dv_struct_eq(dv_sqrt_like_arg(arg->a), sqrt_arg))) &&
+        !dv_depends_on_current_wrt(arg->b))
+        return 1;
+    if (((dv_struct_eq(arg->b, sqrt_node)) ||
+         (dv_is_sqrt_like_expr(arg->b) &&
+          dv_struct_eq(dv_sqrt_like_arg(arg->b), sqrt_arg))) &&
+        !dv_depends_on_current_wrt(arg->a))
+        return 1;
+
+    return 0;
+}
+
+static dval_t *deriv_exp_over_scaled_sqrt(dval_t *dv)
+{
+    NUM_SCOPE(scope);
+    const dval_t *sqrt_den;
+    const dval_t *factor;
+    const dval_t *exp_node;
+    number_t den_scale = num_new();
+    dval_t *factor_exp = NULL;
+    dval_t *numerator = NULL;
+    dval_t *bracket = NULL;
+    dval_t *one = NULL;
+    dval_t *x_pow = NULL;
+    dval_t *quotient = NULL;
+    dval_t *out = NULL;
+
+    if (!split_scaled_sqrt_denominator(dv->b, &den_scale, &sqrt_den))
+        return NULL;
+    if (!split_exp_numerator(dv->a, &factor, &exp_node)) {
+        num_destroy(&den_scale);
+        return NULL;
+    }
+    if (!exp_arg_is_scaled_sqrt(exp_node->a, sqrt_den)) {
+        num_destroy(&den_scale);
+        return NULL;
+    }
+    if (factor && dv_depends_on_current_wrt(factor)) {
+        num_destroy(&den_scale);
+        return NULL;
+    }
+
+    if (factor) {
+        dv_retain(factor);
+        dv_retain(exp_node);
+        factor_exp = dv_mul(factor, exp_node);
+        dv_free((dval_t *)factor);
+        dv_free((dval_t *)exp_node);
+    } else {
+        dv_retain(exp_node);
+        factor_exp = (dval_t *)exp_node;
+    }
+
+    dv_retain(exp_node->a);
+    one = dv_new_const(NUM_ONE);
+    bracket = dv_sub(exp_node->a, one);
+    dv_free(exp_node->a);
+    dv_free(one);
+
+    numerator = dv_mul(factor_exp, bracket);
+    dv_free(factor_exp);
+    dv_free(bracket);
+
+    {
+        number_t three = num_create_from_long(3L);
+        number_t three_halves = num_div(three, NUM_TWO);
+        number_t two_den = num_mul(NUM_TWO, den_scale);
+        number_t scalar = num_div(NUM_ONE, two_den);
+
+        x_pow = dv_pow(dv_sqrt_like_arg(sqrt_den), &three_halves);
+        quotient = dv_div(numerator, x_pow);
+        out = dv_make_scaled(scalar, quotient);
+        dv_free(x_pow);
+        num_destroy(&three);
+        num_destroy(&three_halves);
+        num_destroy(&two_den);
+        num_destroy(&scalar);
+    }
+
+    dv_free(numerator);
+
+    num_destroy(&den_scale);
+    return out;
+}
+
+static int split_inverse_scaled_sqrt(const dval_t *dv,
+                                     number_t *num_scale_out,
+                                     number_t *den_scale_out,
+                                     const dval_t **sqrt_out)
+{
+    if (!dv_is_div(dv))
+        return 0;
+    if (!dv_is_deriv_foldable_real_const(dv->a))
+        return 0;
+    if (!split_scaled_sqrt_denominator(dv->b, den_scale_out, sqrt_out))
+        return 0;
+
+    num_destroy(num_scale_out);
+    *num_scale_out = num_clone(dv->a->c);
+    return 1;
+}
+
+static dval_t *deriv_exp_inverse_scaled_sqrt_product(dval_t *dv)
+{
+    NUM_SCOPE(scope);
+    const dval_t *factor = NULL;
+    const dval_t *exp_node = NULL;
+    const dval_t *sqrt_den = NULL;
+    number_t num_scale = num_new();
+    number_t den_scale = num_new();
+    dval_t *factor_exp = NULL;
+    dval_t *bracket = NULL;
+    dval_t *one = NULL;
+    dval_t *numerator = NULL;
+    dval_t *x_pow = NULL;
+    dval_t *quotient = NULL;
+    dval_t *out = NULL;
+    int matched;
+
+    matched = (split_exp_numerator(dv->a, &factor, &exp_node) &&
+               split_inverse_scaled_sqrt(dv->b, &num_scale, &den_scale, &sqrt_den)) ||
+              (split_exp_numerator(dv->b, &factor, &exp_node) &&
+               split_inverse_scaled_sqrt(dv->a, &num_scale, &den_scale, &sqrt_den));
+    if (!matched) {
+        num_destroy(&num_scale);
+        num_destroy(&den_scale);
+        return NULL;
+    }
+
+    if (!exp_arg_is_scaled_sqrt(exp_node->a, sqrt_den)) {
+        num_destroy(&num_scale);
+        num_destroy(&den_scale);
+        return NULL;
+    }
+    if (factor && dv_depends_on_current_wrt(factor)) {
+        num_destroy(&num_scale);
+        num_destroy(&den_scale);
+        return NULL;
+    }
+
+    if (factor) {
+        dv_retain(factor);
+        dv_retain(exp_node);
+        factor_exp = dv_mul(factor, exp_node);
+        dv_free((dval_t *)factor);
+        dv_free((dval_t *)exp_node);
+    } else {
+        dv_retain(exp_node);
+        factor_exp = (dval_t *)exp_node;
+    }
+
+    dv_retain(exp_node->a);
+    one = dv_new_const(NUM_ONE);
+    bracket = dv_sub(exp_node->a, one);
+    dv_free(exp_node->a);
+    dv_free(one);
+
+    numerator = dv_mul(factor_exp, bracket);
+    dv_free(factor_exp);
+    dv_free(bracket);
+
+    {
+        number_t three = num_create_from_long(3L);
+        number_t three_halves = num_div(three, NUM_TWO);
+        number_t two_den = num_mul(NUM_TWO, den_scale);
+        number_t scalar = num_div(num_scale, two_den);
+
+        x_pow = dv_pow(dv_sqrt_like_arg(sqrt_den), &three_halves);
+        quotient = dv_div(numerator, x_pow);
+        out = dv_make_scaled(scalar, quotient);
+        dv_free(x_pow);
+        num_destroy(&three);
+        num_destroy(&three_halves);
+        num_destroy(&two_den);
+        num_destroy(&scalar);
+    }
+
+    dv_free(numerator);
+
+    num_destroy(&num_scale);
+    num_destroy(&den_scale);
+    return out;
+}
+
 static dval_t *deriv_div(dval_t *dv)
 {
     NUM_SCOPE(scope);
+    dval_t *special = deriv_exp_over_scaled_sqrt(dv);
+
+    if (special)
+        return special;
+
     dval_t *da   = dv_get_dx_internal(dv->a);
     dval_t *db   = dv_get_dx_internal(dv->b);
     dval_t *num1 = dv_mul(da, dv->b);

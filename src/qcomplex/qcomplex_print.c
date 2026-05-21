@@ -178,6 +178,7 @@ int qc_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap)
             char re_padded[256], im_padded[256];
             char re_fmt[32], im_fmt[32];
             qfloat_t im_abs = qf_signbit(qc_imag(z)) ? qf_neg(qc_imag(z)) : qc_imag(z);
+            int imag_is_one = qf_cmp(im_abs, QF_ONE) == 0;
 
             qc_build_qfloat_format(re_fmt, sizeof(re_fmt),
                                    (spec == 'Z') ? 'Q' : 'q',
@@ -210,14 +211,20 @@ int qc_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap)
             if (qf_cmp(qc_imag(z), qf_from_double(0.0)) == 0) {
                 snprintf(assembled, sizeof(assembled), "%s", re_padded);
             } else if (qf_cmp(qc_real(z), qf_from_double(0.0)) == 0) {
-                if (qf_signbit(qc_imag(z)))
+                if (imag_is_one)
+                    snprintf(assembled, sizeof(assembled),
+                             qf_signbit(qc_imag(z)) ? "-i" : "i");
+                else if (qf_signbit(qc_imag(z)))
                     snprintf(assembled, sizeof(assembled), "-%si", im_padded);
                 else
                     snprintf(assembled, sizeof(assembled), "%si", im_padded);
             } else {
                 const char *sep = qf_signbit(qc_imag(z)) ? " - " : " + ";
 
-                snprintf(assembled, sizeof(assembled), "%s%s%si", re_padded, sep, im_padded);
+                if (imag_is_one)
+                    snprintf(assembled, sizeof(assembled), "%s%si", re_padded, sep);
+                else
+                    snprintf(assembled, sizeof(assembled), "%s%s%si", re_padded, sep, im_padded);
             }
             qc_put_str(&dst, &remaining, &count, assembled);
             continue;

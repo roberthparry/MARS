@@ -74,8 +74,5 @@ tests/**/*.log
 tests/**/*.pdf
 tests/**/*.synctex.gz
 
-# Local scratch playgrounds
-scratch/
-
 .codex
 .dval_lab_state.json

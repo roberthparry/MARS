@@ -201,7 +201,9 @@ typedef enum {
     DV_BINDING_EXPR_SUB,
     DV_BINDING_EXPR_MUL,
     DV_BINDING_EXPR_DIV,
-    DV_BINDING_EXPR_POWI
+    DV_BINDING_EXPR_POWI,
+    DV_BINDING_EXPR_UNARY_OP,
+    DV_BINDING_EXPR_BINARY_OP
 } dv_binding_expr_kind_t;
 
 typedef enum {
@@ -214,6 +216,9 @@ typedef enum {
 
 typedef struct dv_binding_expr {
     dv_binding_expr_kind_t kind;
+    number_t cached_value;
+    size_t cached_precision_bits;
+    bool cached_value_valid;
     union {
         char *text;
         dv_binding_const_id_t const_id;
@@ -228,6 +233,15 @@ typedef struct dv_binding_expr {
             struct dv_binding_expr *base;
             long exponent;
         } powi;
+        struct {
+            const dval_ops_t *ops;
+            struct dv_binding_expr *child;
+        } unary_op;
+        struct {
+            const dval_ops_t *ops;
+            struct dv_binding_expr *left;
+            struct dv_binding_expr *right;
+        } binary_op;
     } u;
 } dv_binding_expr_t;
 
@@ -505,8 +519,13 @@ dv_binding_expr_t *dv_binding_expr_new_sub(dv_binding_expr_t *left, dv_binding_e
 dv_binding_expr_t *dv_binding_expr_new_mul(dv_binding_expr_t *left, dv_binding_expr_t *right);
 dv_binding_expr_t *dv_binding_expr_new_div(dv_binding_expr_t *left, dv_binding_expr_t *right);
 dv_binding_expr_t *dv_binding_expr_new_powi(dv_binding_expr_t *base, long exponent);
+dv_binding_expr_t *dv_binding_expr_new_unary_op(const dval_ops_t *ops, dv_binding_expr_t *child);
+dv_binding_expr_t *dv_binding_expr_new_binary_op(const dval_ops_t *ops, dv_binding_expr_t *left, dv_binding_expr_t *right);
+dv_binding_expr_t *dv_binding_expr_clone(const dv_binding_expr_t *expr);
 void dv_binding_expr_free(dv_binding_expr_t *expr);
 number_t dv_binding_expr_eval(const dv_binding_expr_t *expr);
+bool dv_binding_expr_eval_if_precision_increased(dv_binding_expr_t *expr,
+                                                 number_t *value_out);
 
 /**
  * @brief Simplify a differentiable value node using algebraic identities.

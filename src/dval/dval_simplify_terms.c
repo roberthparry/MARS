@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "dval_bindings_internal.h"
 #include "dval_internal.h"
 
 extern dval_t *dv_simplify(const dval_t *dv);
@@ -10,6 +11,8 @@ extern dval_t *dv_simplify(const dval_t *dv);
 static int dv_try_get_unnamed_const_real_num(const dval_t *dv, number_t *out)
 {
     if (!dv_is_unnamed_const(dv) || !num_is_real(dv->c))
+        return 0;
+    if (dv->binding_expr && dv->binding_expr->kind != DV_BINDING_EXPR_NUMBER)
         return 0;
     *out = num_clone(dv->c);
     return 1;
@@ -26,16 +29,47 @@ static void *dv_terms_xrealloc(void *ptr, size_t size)
     abort();
 }
 
+static number_t dv_normalize_simple_rational_coeff(number_t coeff)
+{
+    if (num_eq(coeff, NUM_HALF))
+        return num_clone(NUM_HALF);
+    if (num_eq(coeff, NUM_QUARTER))
+        return num_clone(NUM_QUARTER);
+    if (num_eq(coeff, NUM_ONE_EIGHTH))
+        return num_clone(NUM_ONE_EIGHTH);
+    if (num_is_real(coeff)) {
+        double d = num_to_double(coeff);
+
+        if (d == 0.5)
+            return num_clone(NUM_HALF);
+        if (d == 0.25)
+            return num_clone(NUM_QUARTER);
+        if (d == 0.125)
+            return num_clone(NUM_ONE_EIGHTH);
+        if (d == -0.5)
+            return num_neg(NUM_HALF);
+        if (d == -0.25)
+            return num_neg(NUM_QUARTER);
+        if (d == -0.125)
+            return num_neg(NUM_ONE_EIGHTH);
+    }
+    return num_clone(coeff);
+}
+
 static int term_coeff(const dval_t *term, const dval_t **base, number_t *coeff_out)
 {
-    if (dv_is_unnamed_const(term)) {
+    if (dv_is_unnamed_const(term) &&
+        (!term->binding_expr || term->binding_expr->kind == DV_BINDING_EXPR_NUMBER)) {
         *base = NULL;
         if (!dv_try_get_unnamed_const_real_num(term, coeff_out))
             return 0;
         return 1;
     }
     if (dv_is_op(term, &ops_neg)) {
-        if (dv_is_op(term->a, &ops_mul) && dv_is_unnamed_const(term->a->a)) {
+        if (dv_is_op(term->a, &ops_mul) &&
+            dv_is_unnamed_const(term->a->a) &&
+            (!term->a->a->binding_expr ||
+             term->a->a->binding_expr->kind == DV_BINDING_EXPR_NUMBER)) {
             *base = term->a->b;
         if (!dv_try_get_unnamed_const_real_num(term->a->a, coeff_out))
             return 0;
@@ -50,7 +84,10 @@ static int term_coeff(const dval_t *term, const dval_t **base, number_t *coeff_o
         *coeff_out = num_clone(NUM_NEG_ONE);
         return 1;
     }
-    if (dv_is_op(term, &ops_mul) && dv_is_unnamed_const(term->a)) {
+    if (dv_is_op(term, &ops_mul) &&
+        dv_is_unnamed_const(term->a) &&
+        (!term->a->binding_expr ||
+         term->a->binding_expr->kind == DV_BINDING_EXPR_NUMBER)) {
         *base = term->b;
         if (!dv_try_get_unnamed_const_real_num(term->a, coeff_out))
             return 0;
@@ -59,6 +96,123 @@ static int term_coeff(const dval_t *term, const dval_t **base, number_t *coeff_o
     *base = term;
     *coeff_out = num_clone(NUM_ONE);
     return 1;
+}
+
+static int split_leading_real_scalar(const dval_t *term,
+                                     number_t *scalar_out,
+                                     const dval_t **rest_out)
+{
+    if (dv_is_unnamed_const(term) &&
+        (!term->binding_expr || term->binding_expr->kind == DV_BINDING_EXPR_NUMBER) &&
+        num_is_real(term->c)) {
+        *scalar_out = num_clone(term->c);
+        *rest_out = NULL;
+        return 1;
+    }
+
+    if (dv_is_op(term, &ops_mul) &&
+        dv_is_unnamed_const(term->a) &&
+        (!term->a->binding_expr ||
+         term->a->binding_expr->kind == DV_BINDING_EXPR_NUMBER) &&
+        num_is_real(term->a->c)) {
+        *scalar_out = num_clone(term->a->c);
+        *rest_out = term->b;
+        return 1;
+    }
+
+    *scalar_out = num_clone(NUM_ONE);
+    *rest_out = term;
+    return 0;
+}
+
+static dval_t *make_normalized_division_addend(const dval_t *num,
+                                               const dval_t *den)
+{
+    dval_t *one;
+    dval_t *out;
+
+    if (!num && !den)
+        return NULL;
+
+    if (!den) {
+        dv_retain((dval_t *)num);
+        return (dval_t *)num;
+    }
+
+    if (!num) {
+        one = dv_new_const(NUM_ONE);
+        dv_retain((dval_t *)den);
+        out = dv_div(one, (dval_t *)den);
+        dv_free(one);
+        dv_free((dval_t *)den);
+        return out;
+    }
+
+    dv_retain((dval_t *)num);
+    dv_retain((dval_t *)den);
+    out = dv_div((dval_t *)num, (dval_t *)den);
+    dv_free((dval_t *)num);
+    dv_free((dval_t *)den);
+    return out;
+}
+
+static dval_t *dv_try_fold_scaled_product(number_t coeff, dval_t *base)
+{
+    if (dv_is_op(base, &ops_mul)) {
+        dval_t *left = base->a;
+        dval_t *right = base->b;
+        dval_t *scaled_left;
+        dval_t *scaled_right;
+        dval_t *r;
+
+        if (dv_is_unnamed_const(left) && num_is_real(left->c)) {
+            dv_retain(left);
+            dv_retain(right);
+            dv_free(base);
+            scaled_left = dv_make_scaled(coeff, left);
+            r = dv_mul(scaled_left, right);
+            dv_free(scaled_left);
+            dv_free(right);
+            return r;
+        }
+
+        if (dv_is_unnamed_const(right) && num_is_real(right->c)) {
+            dv_retain(left);
+            dv_retain(right);
+            dv_free(base);
+            scaled_right = dv_make_scaled(coeff, right);
+            r = dv_mul(left, scaled_right);
+            dv_free(left);
+            dv_free(scaled_right);
+            return r;
+        }
+
+        dv_retain(left);
+        scaled_left = dv_try_fold_scaled_product(coeff, left);
+        if (scaled_left) {
+            dv_retain(right);
+            r = dv_mul(scaled_left, right);
+            dv_free(scaled_left);
+            dv_free(right);
+            dv_free(base);
+            return r;
+        }
+        dv_free(left);
+
+        dv_retain(right);
+        scaled_right = dv_try_fold_scaled_product(coeff, right);
+        if (scaled_right) {
+            dv_retain(left);
+            r = dv_mul(left, scaled_right);
+            dv_free(left);
+            dv_free(scaled_right);
+            dv_free(base);
+            return r;
+        }
+        dv_free(right);
+    }
+
+    return NULL;
 }
 
 dval_t *dv_make_scaled(number_t coeff, dval_t *base)
@@ -100,7 +254,69 @@ dval_t *dv_make_scaled(number_t coeff, dval_t *base)
         dv_free(base);
         return r;
     }
-    if (dv_is_op(base, &ops_mul) && dv_is_unnamed_const(base->a) && num_is_real(base->a->c)) {
+    if (dv_is_unnamed_const(base) && base->binding_expr && num_is_real(base->c)) {
+        number_t leading_coeff;
+        dv_binding_expr_t *rest_expr = NULL;
+
+        if (dv_binding_expr_split_leading_number(base->binding_expr,
+                                                &leading_coeff,
+                                                &rest_expr)) {
+            if (rest_expr) {
+                number_t folded = num_mul(coeff, leading_coeff);
+                dval_t *rest = dv_binding_expr_eval_dval(rest_expr);
+                dval_t *out;
+
+                dv_binding_expr_free(rest_expr);
+                num_destroy(&leading_coeff);
+                dv_free(base);
+                out = dv_make_scaled(folded, rest);
+                num_destroy(&folded);
+                return out;
+            }
+            num_destroy(&leading_coeff);
+        }
+        char *coeff_text = num_to_string(coeff);
+        dv_binding_expr_t *coeff_expr =
+            dv_binding_expr_new_number_text(coeff_text ? coeff_text : "NAN");
+        dv_binding_expr_t *expr =
+            dv_binding_expr_new_mul(coeff_expr, dv_binding_expr_clone(base->binding_expr));
+        number_t scaled = num_mul(coeff, base->c);
+        dval_t *out = dv_new_const(scaled);
+
+        expr = dv_binding_expr_simplify(expr);
+        free(coeff_text);
+        num_destroy(&scaled);
+        dv_free(base);
+        out->binding_expr = expr;
+        return out;
+    }
+    if (dv_is_op(base, &ops_div)) {
+        dval_t *num = base->a;
+        dval_t *den = base->b;
+        dval_t *scaled_num;
+        dval_t *r;
+
+        dv_retain(num);
+        dv_retain(den);
+        dv_free(base);
+
+        scaled_num = dv_make_scaled(coeff, num);
+        r = dv_div(scaled_num, den);
+        dv_free(scaled_num);
+        dv_free(den);
+        return r;
+    }
+    {
+        dval_t *folded_product = dv_try_fold_scaled_product(coeff, base);
+
+        if (folded_product)
+            return folded_product;
+    }
+    if (dv_is_op(base, &ops_mul) &&
+        dv_is_unnamed_const(base->a) &&
+        (!base->a->binding_expr ||
+         base->a->binding_expr->kind == DV_BINDING_EXPR_NUMBER) &&
+        num_is_real(base->a->c)) {
         number_t folded = num_mul(coeff, base->a->c);
         dv_retain(base->b);
         dval_t *rest = base->b;
@@ -112,6 +328,8 @@ dval_t *dv_make_scaled(number_t coeff, dval_t *base)
     if (dv_is_op(base, &ops_mul) &&
         dv_is_op(base->a, &ops_mul) &&
         dv_is_unnamed_const(base->a->a) &&
+        (!base->a->a->binding_expr ||
+         base->a->a->binding_expr->kind == DV_BINDING_EXPR_NUMBER) &&
         num_is_real(base->a->a->c)) {
         number_t folded = num_mul(coeff, base->a->a->c);
         dv_retain(base->a->b);
@@ -124,8 +342,11 @@ dval_t *dv_make_scaled(number_t coeff, dval_t *base)
 
         return out;
     }
-    dval_t *cn = dv_new_const(coeff);
+    number_t normalized = dv_normalize_simple_rational_coeff(coeff);
+    dval_t *cn = dv_new_const(normalized);
     dval_t *r = dv_mul(cn, base);
+
+    num_destroy(&normalized);
     dv_free(cn);
     dv_free(base);
     return r;
@@ -139,13 +360,95 @@ static int addend_group(const dval_t *dv)
     return 3;
 }
 
-static const char *addend_sort_name(const dval_t *dv)
+typedef struct {
+    int group;
+    int shape;
+    const char *name;
+} addend_sort_key_t;
+
+static int addend_is_default_const(const dval_t *dv)
 {
-    if (dv_is_op(dv, &ops_var) || dv_is_op(dv, &ops_const))
-        return dv->name ? dv->name : "";
-    if (dv->a && dv_is_op(dv->a, &ops_var))
-        return dv->a->name ? dv->a->name : "";
-    return "";
+    const char *canon;
+    number_t value;
+    int is_default;
+
+    if (!dv || !dv_is_op(dv, &ops_const) || !dv->name || !*dv->name)
+        return 0;
+
+    canon = dv_default_constant_canonical_name(dv->name);
+    if (canon && strcmp(canon, "@tau") == 0)
+        return 0;
+
+    is_default = dv_get_default_constant_num(dv->name, &value);
+    if (is_default)
+        num_destroy(&value);
+    return is_default;
+}
+
+static void addend_consider_leaf_key(const dval_t *dv, addend_sort_key_t *key)
+{
+    int group;
+
+    if (!dv)
+        return;
+    if (!dv->name || !*dv->name)
+        return;
+    if (!dv_is_op(dv, &ops_var) && !dv_is_op(dv, &ops_const))
+        return;
+
+    if (num_is_nan(dv->c))
+        group = 0;
+    else if (addend_is_default_const(dv))
+        group = 1;
+    else if (dv_is_op(dv, &ops_const))
+        group = 2;
+    else
+        group = 3;
+
+    if (group < key->group ||
+        (group == key->group && key->name && *key->name &&
+         strcmp(dv->name, key->name) < 0)) {
+        key->group = group;
+        key->name = dv->name;
+    }
+}
+
+static void addend_collect_product_key(const dval_t *dv, addend_sort_key_t *key)
+{
+    if (!dv)
+        return;
+
+    if (dv_is_op(dv, &ops_mul)) {
+        addend_collect_product_key(dv->a, key);
+        addend_collect_product_key(dv->b, key);
+        return;
+    }
+
+    addend_consider_leaf_key(dv, key);
+}
+
+static addend_sort_key_t addend_sort_key(const dval_t *dv)
+{
+    addend_sort_key_t key = {4, 2, ""};
+
+    if (!dv)
+        return key;
+
+    if (dv_is_op(dv, &ops_mul)) {
+        key.shape = 0;
+        addend_collect_product_key(dv, &key);
+        return key;
+    }
+
+    if (dv_is_op(dv, &ops_div)) {
+        key.shape = 1;
+        addend_collect_product_key(dv->a, &key);
+        addend_collect_product_key(dv->b, &key);
+        return key;
+    }
+
+    addend_consider_leaf_key(dv, &key);
+    return key;
 }
 
 void dv_combine_common_denominator_addends(addend_t *terms, size_t n)
@@ -215,23 +518,41 @@ void dv_combine_common_denominator_addends(addend_t *terms, size_t n)
     }
 }
 
-static int compare_addends(const addend_t *lhs, const addend_t *rhs)
+static int compare_addend_bases(const dval_t *lhs, const dval_t *rhs)
 {
     int lg, rg;
 
-    if (!lhs->base && !rhs->base)
+    if (!lhs && !rhs)
         return 0;
-    if (!lhs->base)
+    if (!lhs)
         return 1;
-    if (!rhs->base)
+    if (!rhs)
         return -1;
 
-    lg = addend_group(lhs->base);
-    rg = addend_group(rhs->base);
+    lg = addend_group(lhs);
+    rg = addend_group(rhs);
     if (lg != rg)
         return lg - rg;
 
-    return strcmp(addend_sort_name(lhs->base), addend_sort_name(rhs->base));
+    {
+        addend_sort_key_t lk = addend_sort_key(lhs);
+        addend_sort_key_t rk = addend_sort_key(rhs);
+        int cmp;
+
+        if (lk.group != rk.group)
+            return lk.group - rk.group;
+
+        cmp = strcmp(lk.name, rk.name);
+        if (cmp != 0)
+            return cmp;
+
+        return lk.shape - rk.shape;
+    }
+}
+
+static int compare_addends(const addend_t *lhs, const addend_t *rhs)
+{
+    return compare_addend_bases(lhs->base, rhs->base);
 }
 
 void dv_sort_addends(addend_t *terms, size_t n)
@@ -246,6 +567,16 @@ void dv_sort_addends(addend_t *terms, size_t n)
         }
         terms[j] = key;
     }
+}
+
+static int dv_contains_addsub_normalized(const dval_t *dv)
+{
+    if (!dv)
+        return 0;
+    if (dv_is_addsub(dv))
+        return 1;
+    return dv_contains_addsub_normalized(dv->a) ||
+           dv_contains_addsub_normalized(dv->b);
 }
 
 void dv_collect_addends(dval_t *dv, number_t scale, number_t *c_const,
@@ -280,11 +611,11 @@ void dv_collect_addends(dval_t *dv, number_t scale, number_t *c_const,
             number_t coeff_num = num_new();
             number_t neg_scale = num_neg(scale);
 
-            if (!dv_try_get_unnamed_const_real_num(dv->a->a, &coeff_num))
+            if (dv_try_get_unnamed_const_real_num(dv->a->a, &coeff_num)) {
+                ns = num_mul(neg_scale, coeff_num);
+                dv_collect_addends(dv->a->b, ns, c_const, terms, n, cap);
                 return;
-            ns = num_mul(neg_scale, coeff_num);
-            dv_collect_addends(dv->a->b, ns, c_const, terms, n, cap);
-            return;
+            }
         }
     }
     if (dv_is_op(dv, &ops_mul) &&
@@ -293,11 +624,11 @@ void dv_collect_addends(dval_t *dv, number_t scale, number_t *c_const,
         number_t ns;
         number_t coeff_num = num_new();
 
-        if (!dv_try_get_unnamed_const_real_num(dv->a, &coeff_num))
+        if (dv_try_get_unnamed_const_real_num(dv->a, &coeff_num)) {
+            ns = num_mul(scale, coeff_num);
+            dv_collect_addends(dv->b, ns, c_const, terms, n, cap);
             return;
-        ns = num_mul(scale, coeff_num);
-        dv_collect_addends(dv->b, ns, c_const, terms, n, cap);
-        return;
+        }
     }
     if (dv_is_op(dv, &ops_mul) &&
         dv_is_op(dv->a, &ops_mul) &&
@@ -307,20 +638,74 @@ void dv_collect_addends(dval_t *dv, number_t scale, number_t *c_const,
         dval_t *raw;
         dval_t *simp;
 
-        if (!dv_try_get_unnamed_const_real_num(dv->a->a, &coeff_num))
-            return;
-        ns = num_mul(scale, coeff_num);
+        if (dv_try_get_unnamed_const_real_num(dv->a->a, &coeff_num)) {
+            ns = num_mul(scale, coeff_num);
 
-        dv_retain(dv->a->b);
-        dv_retain(dv->b);
-        raw = dv_mul(dv->a->b, dv->b);
-        dv_free(dv->a->b);
-        dv_free(dv->b);
-        simp = dv_simplify(raw);
-        dv_free(raw);
-        dv_collect_addends(simp, ns, c_const, terms, n, cap);
-        dv_free(simp);
-        return;
+            dv_retain(dv->a->b);
+            dv_retain(dv->b);
+            raw = dv_mul(dv->a->b, dv->b);
+            dv_free(dv->a->b);
+            dv_free(dv->b);
+            simp = dv_simplify(raw);
+            dv_free(raw);
+            dv_collect_addends(simp, ns, c_const, terms, n, cap);
+            dv_free(simp);
+            return;
+        }
+    }
+    if (dv_is_div(dv)) {
+        number_t num_scalar = num_new();
+        number_t den_scalar = num_new();
+        number_t ns;
+        const dval_t *num_rest = NULL;
+        const dval_t *den_rest = NULL;
+        int changed_num;
+        int changed_den;
+
+        changed_num = split_leading_real_scalar(dv->a, &num_scalar, &num_rest);
+        changed_den = split_leading_real_scalar(dv->b, &den_scalar, &den_rest);
+
+        if (changed_num || changed_den) {
+            dval_t *normalized;
+
+            ns = num_mul(scale, num_scalar);
+            ns = num_div(ns, den_scalar);
+            normalized = make_normalized_division_addend(num_rest, den_rest);
+            if (normalized) {
+                if ((!num_rest && den_rest) ||
+                    !dv_contains_addsub_normalized(normalized) ||
+                    dv_struct_eq(normalized, dv)) {
+                    size_t i;
+
+                    for (i = 0; i < *n; ++i) {
+                        if (dv_struct_eq((*terms)[i].base, normalized)) {
+                            number_t sum = num_add((*terms)[i].coeff, ns);
+
+                            num_destroy(&(*terms)[i].coeff);
+                            (*terms)[i].coeff = num_scope_detach(sum);
+                            dv_free(normalized);
+                            return;
+                        }
+                    }
+                    if (*n == *cap) {
+                        *cap = *cap ? *cap * 2 : 8;
+                        *terms = dv_terms_xrealloc(*terms, *cap * sizeof(addend_t));
+                    }
+                    (*terms)[*n].base = normalized;
+                    (*terms)[*n].coeff = num_scope_detach(ns);
+                    (*n)++;
+                    return;
+                }
+                dv_collect_addends(normalized, ns, c_const, terms, n, cap);
+                dv_free(normalized);
+            } else {
+                number_t sum = num_add(*c_const, ns);
+
+                num_destroy(c_const);
+                *c_const = num_scope_detach(sum);
+            }
+            return;
+        }
     }
 
     const dval_t *base;
@@ -504,6 +889,8 @@ void dv_append_node(dval_t ***nodes, size_t *count, size_t *cap, dval_t *node)
 
 static number_t pow_exponent(const dval_t *dv)
 {
+    if (dv_is_sqrt_expr(dv))
+        return num_div(NUM_ONE, NUM_TWO);
     if (!dv_is_op(dv, &ops_pow_d))
         return num_clone(NUM_ONE);
     return num_clone(dv->c);
@@ -511,6 +898,8 @@ static number_t pow_exponent(const dval_t *dv)
 
 static dval_t *pow_base(const dval_t *dv)
 {
+    if (dv_is_sqrt_expr(dv))
+        return dv->a;
     return dv_is_op(dv, &ops_pow_d) ? dv->a : (dval_t *)dv;
 }
 
@@ -526,6 +915,45 @@ dval_t *dv_make_pow_like(dval_t *base, number_t exponent)
     dval_t *pow = dv_pow(base, &exponent);
     dv_free(base);
     return pow;
+}
+
+static void dv_append_denominator_factor(number_t *c_acc, int *is_zero,
+                                         dval_t ***den_terms,
+                                         size_t *nden_terms,
+                                         size_t *den_cap,
+                                         dval_t *den)
+{
+    if (*is_zero) {
+        dv_free(den);
+        return;
+    }
+
+    if (dv_is_op(den, &ops_mul)) {
+        dval_t *left = den->a;
+        dval_t *right = den->b;
+
+        dv_retain(left);
+        dv_retain(right);
+        dv_free(den);
+        dv_append_denominator_factor(c_acc, is_zero, den_terms,
+                                     nden_terms, den_cap, left);
+        dv_append_denominator_factor(c_acc, is_zero, den_terms,
+                                     nden_terms, den_cap, right);
+        return;
+    }
+
+    if (dv_is_unnamed_const(den) &&
+        (!den->binding_expr || den->binding_expr->kind == DV_BINDING_EXPR_NUMBER) &&
+        num_is_real(den->c)) {
+        number_t quotient = num_div(*c_acc, den->c);
+
+        num_destroy(c_acc);
+        *c_acc = num_scope_detach(quotient);
+        dv_free(den);
+        return;
+    }
+
+    dv_append_node(den_terms, nden_terms, den_cap, den);
 }
 
 void dv_split_division_terms(number_t *c_acc, int *is_zero,
@@ -549,7 +977,9 @@ void dv_split_division_terms(number_t *c_acc, int *is_zero,
         dv_free(term);
         terms[i] = NULL;
 
-        if (dv_is_unnamed_const(num) && num_is_real(num->c)) {
+        if (dv_is_unnamed_const(num) &&
+            (!num->binding_expr || num->binding_expr->kind == DV_BINDING_EXPR_NUMBER) &&
+            num_is_real(num->c)) {
             if (num_is_zero(num->c))
                 *is_zero = 1;
             else {
@@ -568,16 +998,8 @@ void dv_split_division_terms(number_t *c_acc, int *is_zero,
             continue;
         }
 
-        if (dv_is_unnamed_const(den) && num_is_real(den->c)) {
-            number_t quotient = num_div(*c_acc, den->c);
-
-            num_destroy(c_acc);
-            *c_acc = num_scope_detach(quotient);
-            dv_free(den);
-            continue;
-        }
-
-        dv_append_node(den_terms, nden_terms, den_cap, den);
+        dv_append_denominator_factor(c_acc, is_zero, den_terms, nden_terms,
+                                     den_cap, den);
     }
 }
 
@@ -588,6 +1010,7 @@ void dv_combine_like_powers(dval_t **terms, size_t nterms)
         dval_t *term = terms[i];
         dval_t *base;
         number_t exponent;
+        int combined_any = 0;
 
         if (!term)
             continue;
@@ -611,15 +1034,23 @@ void dv_combine_like_powers(dval_t **terms, size_t nterms)
             }
             dv_free(other);
             terms[j] = NULL;
+            combined_any = 1;
+        }
+
+        if (!combined_any && !dv_is_pow_d_expr(term)) {
+            num_destroy(&exponent);
+            continue;
         }
 
         if (num_is_one(exponent) && !dv_is_pow_d_expr(term)) {
+            num_destroy(&exponent);
             continue;
         }
 
         dv_retain(base);
         dv_free(term);
         terms[i] = dv_make_pow_like(base, exponent);
+        num_destroy(&exponent);
     }
 }
 
@@ -706,8 +1137,7 @@ void dv_combine_exp_terms(dval_t **terms, size_t nterms)
                 while (t >= 0) {
                     int tg = addend_group(addends[t]);
                     int cmp = (tg != kg) ? (tg - kg)
-                                         : strcmp(addend_sort_name(addends[t]),
-                                                  addend_sort_name(key));
+                                         : compare_addend_bases(addends[t], key);
                     if (cmp <= 0)
                         break;
                     addends[t + 1] = addends[t];
@@ -837,8 +1267,12 @@ dval_t *dv_rebuild_product_chain(number_t c_acc, dval_t **terms, size_t nterms)
 {
     dval_t *cur = NULL;
 
-    if (!num_is_one(c_acc))
-        cur = dv_new_const(c_acc);
+    if (!num_is_one(c_acc)) {
+        number_t normalized = dv_normalize_simple_rational_coeff(c_acc);
+
+        cur = dv_new_const(normalized);
+        num_destroy(&normalized);
+    }
 
     for (size_t i = 0; i < nterms; ++i) {
         if (!terms[i])
@@ -854,7 +1288,13 @@ dval_t *dv_rebuild_product_chain(number_t c_acc, dval_t **terms, size_t nterms)
     }
 
     free(terms);
-    return cur ? cur : dv_new_const(c_acc);
+    if (!cur) {
+        number_t normalized = dv_normalize_simple_rational_coeff(c_acc);
+
+        cur = dv_new_const(normalized);
+        num_destroy(&normalized);
+    }
+    return cur;
 }
 
 dval_t *dv_rebuild_division_chain(dval_t **den_terms, size_t nden_terms)

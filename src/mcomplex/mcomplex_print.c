@@ -1,4 +1,5 @@
 #include <ctype.h>
+#include <limits.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -65,6 +66,63 @@ static int mc_formatted_zero(const char *s)
     return saw_digit;
 }
 
+static int mc_formatted_one(const char *s)
+{
+    const unsigned char *p = (const unsigned char *)s;
+    int saw_one = 0;
+    int before_dot = 1;
+
+    if (!s)
+        return 0;
+
+    while (isspace(*p))
+        ++p;
+    if (*p == '+')
+        ++p;
+
+    while (*p) {
+        if (*p >= '0' && *p <= '9') {
+            if (before_dot) {
+                if (!saw_one) {
+                    if (*p == '1')
+                        saw_one = 1;
+                    else if (*p != '0')
+                        return 0;
+                } else {
+                    return 0;
+                }
+            } else if (*p != '0') {
+                return 0;
+            }
+            ++p;
+            continue;
+        }
+        if (*p == '.') {
+            before_dot = 0;
+            ++p;
+            continue;
+        }
+        if (*p == 'e' || *p == 'E') {
+            char *end = NULL;
+            long exponent;
+
+            ++p;
+            exponent = strtol((const char *)p, &end, 10);
+            if ((const unsigned char *)end == p || exponent != 0)
+                return 0;
+            p = (const unsigned char *)end;
+            continue;
+        }
+        if (isspace(*p)) {
+            ++p;
+            continue;
+        }
+        return 0;
+    }
+
+    return saw_one;
+}
+
 static int mc_format_complex(char *out,
                              size_t out_size,
                              const mcomplex_t *value,
@@ -74,11 +132,15 @@ static int mc_format_complex(char *out,
                              int flag_minus,
                              int flag_zero)
 {
-    char real_buf[256];
-    char imag_buf[256];
+    char *real_buf = NULL;
+    char *imag_buf = NULL;
     char fmt[32];
-    char assembled[640];
+    char *assembled = NULL;
     const char *imag_digits;
+    size_t assembled_len;
+    int real_needed;
+    int imag_needed;
+    int rc = -1;
 
     if (!value)
         return -1;
@@ -102,29 +164,76 @@ static int mc_format_complex(char *out,
                  "");
     }
 
-    if (mf_sprintf(real_buf, sizeof(real_buf), fmt, mc_real(value)) < 0 ||
-        mf_sprintf(imag_buf, sizeof(imag_buf), fmt, mc_imag(value)) < 0)
-        return -1;
+    if (precision < 0 && width == 0 && !flag_minus && !flag_zero && !scientific) {
+        real_buf = mf_to_string(mc_real(value));
+        imag_buf = mf_to_string(mc_imag(value));
+        if (!real_buf || !imag_buf)
+            goto cleanup;
+    } else {
+        real_needed = mf_sprintf(NULL, 0u, fmt, mc_real(value));
+        imag_needed = mf_sprintf(NULL, 0u, fmt, mc_imag(value));
+        if (real_needed < 0 || imag_needed < 0)
+            goto cleanup;
+
+        real_buf = malloc((size_t)real_needed + 1u);
+        imag_buf = malloc((size_t)imag_needed + 1u);
+        if (!real_buf || !imag_buf)
+            goto cleanup;
+
+        if (mf_sprintf(real_buf, (size_t)real_needed + 1u, fmt, mc_real(value)) < 0 ||
+            mf_sprintf(imag_buf, (size_t)imag_needed + 1u, fmt, mc_imag(value)) < 0)
+            goto cleanup;
+    }
 
     imag_digits = imag_buf;
     if (imag_buf[0] == '-')
         imag_digits++;
 
-    if (mc_formatted_zero(imag_buf))
-        snprintf(assembled, sizeof(assembled), "%s", real_buf);
-    else if (mc_formatted_zero(real_buf)) {
-        if (imag_buf[0] == '-')
-            snprintf(assembled, sizeof(assembled), "-%si", imag_digits);
-        else
-            snprintf(assembled, sizeof(assembled), "%si", imag_digits);
+    if (mc_formatted_zero(imag_buf)) {
+        assembled_len = strlen(real_buf);
+        assembled = malloc(assembled_len + 1u);
+        if (assembled)
+            memcpy(assembled, real_buf, assembled_len + 1u);
+    } else if (mc_formatted_zero(real_buf)) {
+        assembled_len = mc_formatted_one(imag_digits)
+                            ? (imag_buf[0] == '-' ? 2u : 1u)
+                            : strlen(imag_digits) + (imag_buf[0] == '-' ? 2u : 1u);
+        assembled = malloc(assembled_len + 1u);
+        if (assembled) {
+            if (mc_formatted_one(imag_digits))
+                snprintf(assembled, assembled_len + 1u,
+                         imag_buf[0] == '-' ? "-i" : "i");
+            else
+                snprintf(assembled, assembled_len + 1u,
+                         imag_buf[0] == '-' ? "-%si" : "%si", imag_digits);
+        }
+    } else if (imag_buf[0] == '-') {
+        assembled_len = strlen(real_buf) + (mc_formatted_one(imag_digits)
+                                                ? 4u
+                                                : strlen(imag_digits) + 5u);
+        assembled = malloc(assembled_len + 1u);
+        if (assembled) {
+            if (mc_formatted_one(imag_digits))
+                snprintf(assembled, assembled_len + 1u, "%s - i", real_buf);
+            else
+                snprintf(assembled, assembled_len + 1u, "%s - %si", real_buf, imag_digits);
+        }
+    } else {
+        assembled_len = strlen(real_buf) + (mc_formatted_one(imag_digits)
+                                                ? 4u
+                                                : strlen(imag_digits) + 5u);
+        assembled = malloc(assembled_len + 1u);
+        if (assembled) {
+            if (mc_formatted_one(imag_digits))
+                snprintf(assembled, assembled_len + 1u, "%s + i", real_buf);
+            else
+                snprintf(assembled, assembled_len + 1u, "%s + %si", real_buf, imag_digits);
+        }
     }
-    else if (imag_buf[0] == '-')
-        snprintf(assembled, sizeof(assembled), "%s - %si", real_buf, imag_digits);
-    else
-        snprintf(assembled, sizeof(assembled), "%s + %si", real_buf, imag_digits);
+    if (!assembled)
+        goto cleanup;
 
     if (out && out_size > 0u) {
-        size_t assembled_len = strlen(assembled);
         size_t copy_len = assembled_len;
 
         if (copy_len >= out_size)
@@ -134,7 +243,13 @@ static int mc_format_complex(char *out,
         out[copy_len] = '\0';
     }
 
-    return (int)strlen(assembled);
+    rc = assembled_len > (size_t)INT_MAX ? -1 : (int)assembled_len;
+
+cleanup:
+    free(assembled);
+    free(imag_buf);
+    free(real_buf);
+    return rc;
 }
 
 int mc_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap)
@@ -199,7 +314,20 @@ int mc_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap)
                     va_end(ap_local);
                     return -1;
                 }
-                mc_put_str(tmp, &dst, &remaining, &count);
+                if ((size_t)n < sizeof(tmp)) {
+                    mc_put_str(tmp, &dst, &remaining, &count);
+                } else {
+                    char *big = malloc((size_t)n + 1u);
+                    if (!big ||
+                        mc_format_complex(big, (size_t)n + 1u, value, *p == 'M',
+                                          width, precision, flag_minus, flag_zero) < 0) {
+                        free(big);
+                        va_end(ap_local);
+                        return -1;
+                    }
+                    mc_put_str(big, &dst, &remaining, &count);
+                    free(big);
+                }
                 p += 2;
                 continue;
             }
