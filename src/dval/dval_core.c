@@ -14,12 +14,12 @@
  * The operator implementations (eval/deriv bodies) live in the same file,
  * grouped by operator family after the core infrastructure.
  *
- * Partial derivatives: tl_wrt is a thread-local pointer to the variable being
+ * Partial derivatives: tl_wrt is the active variable being
  * differentiated with respect to. NULL means "single-variable / differentiate
  * w.r.t. every variable" (the original behaviour of dv_get_deriv /
- * dv_create_deriv). This isolates the active differentiation target per
- * thread, but the DAG itself remains unsynchronised and is not safe for
- * concurrent mutation or evaluation.
+ * dv_create_deriv). This is ordinary process-local differentiation context;
+ * the DAG itself remains unsynchronised and is not safe for concurrent
+ * mutation or evaluation.
  */
 
 #include <stdlib.h>
@@ -35,11 +35,11 @@
 #include "dval.h"
 #include "internal/number_internal.h"
 
-/* Thread-local pointer to the variable being differentiated with respect to.
+/* Pointer to the variable being differentiated with respect to.
  * NULL = single-variable / "all variables" mode (original behaviour of
  * dv_get_deriv / dv_create_deriv). This is differentiation context only,
  * not a general thread-safety mechanism for the DAG. */
-static __thread const dval_t *tl_wrt = NULL;
+static const dval_t *tl_wrt = NULL;
 
 static struct _dval_t _DV_NAN_NODE = {
     .ops = &ops_const,

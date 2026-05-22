@@ -2,12 +2,13 @@
 
 ![CI](https://github.com/rparry/MARS/actions/workflows/ci.yml/badge.svg)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
-![C99](https://img.shields.io/badge/C-99-blue.svg)
+![C99/GNU C](https://img.shields.io/badge/C-C99%20%2B%20GNU%20extensions-blue.svg)
 
-Portable C99 library for high-precision numerics, automatic differentiation,
-datetime utilities, UTF-8 strings, and generic containers.
+Linux-focused C99/GNU C library for high-precision numerics, automatic
+differentiation, datetime utilities, UTF-8 strings, and generic containers.
 
-**Tested on:** Linux (GCC, Clang), macOS (Apple Clang), Windows (MSVC 2019+)
+**Supported build target:** Linux with GCC or Clang. The code intentionally uses
+some GNU C extensions, so MSVC/Windows builds are not currently guaranteed.
 
 ## Highlights
 
@@ -25,7 +26,7 @@ datetime utilities, UTF-8 strings, and generic containers.
 
 ## Requirements
 
-- C99-compliant compiler (GCC ≥ 4.8, Clang ≥ 3.5, MSVC ≥ 2019)
+- GCC or Clang on Linux, compiling C99/GNU C
 - Standard C library plus `libm` and pthreads
 - GMP, MPFR, and MPC development libraries
 - Optional `libunistring` support for the UTF-8/string layer (`ENABLE_UNISTRING=1` by default in the Makefile)
@@ -358,7 +359,7 @@ M_2281 is prime    M_3217 is prime    M_4253 is prime    M_4423 is prime
 make
 ```
 
-See [`docs/building.md`](docs/building.md) for configuration options and cross-compilation notes.
+See [`docs/building.md`](docs/building.md) for configuration options.
 
 ## Install
 

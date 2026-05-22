@@ -1,12 +1,13 @@
 # Building MARS
 
-MARS uses `make` as its main build entry point.
+MARS uses `make` as its main build entry point. The supported and guaranteed
+build target is Linux with GCC or Clang.
 
 ## Requirements
 
 Build tools:
 
-- C99-capable C compiler
+- GCC or Clang on Linux
 - `make`
 - `ar`
 - standard C library headers
@@ -144,8 +145,10 @@ make help
 ## Notes
 
 - Run commands from the repository root.
-- A C99-capable compiler is required.
-- On Linux, the default system toolchain is usually sufficient.
+- The code is C99-style C with intentional GNU C extensions such as
+  `__attribute__`, so GCC or Clang is required.
+- The Linux system toolchain is the supported path; MSVC/Windows builds are not
+  currently guaranteed.
 - `libm`, pthreads, GMP, MPFR, and MPC are required.
 - `libunistring` is optional but enabled by default through `ENABLE_UNISTRING=1`.
 - `make install` installs MARS headers and libraries only. It does not install

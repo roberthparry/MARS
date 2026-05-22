@@ -1,4 +1,5 @@
 #include <stddef.h>
+#include "dval_bindings_internal.h"
 #include "dval_internal.h"
 #include "internal/number_internal.h"
 
@@ -458,6 +459,33 @@ static dval_t *deriv_neg(dval_t *dv)
     return out;
 }
 
+static dval_t *dv_unary_constexpr_from_preserved_arg(const dval_ops_t *ops,
+                                                     const dval_t *arg)
+{
+    dv_binding_expr_t *expr;
+    number_t value;
+    dval_t *node;
+
+    if (!arg || !dv_is_const(arg) || !arg->binding_expr)
+        return NULL;
+
+    expr = dv_binding_expr_new_unary_op(ops,
+                                        dv_binding_expr_clone(arg->binding_expr));
+    expr = dv_binding_expr_simplify(expr);
+    value = dv_binding_expr_eval(expr);
+    node = dv_new_const(value);
+    num_destroy(&value);
+    node->binding_expr = expr;
+    return node;
+}
+
+static dval_t *dv_log_preserving_constexpr(const dval_t *arg)
+{
+    dval_t *preserved = dv_unary_constexpr_from_preserved_arg(&ops_log, arg);
+
+    return preserved ? preserved : dv_log(arg);
+}
+
 static dval_t *deriv_pow(dval_t *dv)
 {
     dval_t *a  = dv->a;
@@ -465,13 +493,13 @@ static dval_t *deriv_pow(dval_t *dv)
     dval_t *da = dv_get_dx_internal(a);
     dval_t *db = dv_get_dx_internal(b);
 
-    dval_t *loga    = dv_log(a);
+    dval_t *loga    = dv_log_preserving_constexpr(a);
     dval_t *da_on_a = dv_div(da, a);
     dval_t *term1   = dv_mul(db, loga);
     dval_t *term2   = dv_mul(b, da_on_a);
     dval_t *sum     = dv_add(term1, term2);
     dval_t *powab   = dv_pow_dv(a, b);
-    dval_t *out     = dv_mul(powab, sum);
+    dval_t *out     = dv_mul(sum, powab);
 
     dv_free(da);
     dv_free(db);

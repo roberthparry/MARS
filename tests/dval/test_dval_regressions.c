@@ -1330,6 +1330,32 @@ static void test_set_val_num_named_constant(void)
     num_destroy(&old_value);
 }
 
+typedef dval_t *(*test_unary_dval_fn)(const dval_t *dv);
+
+static void check_direct_inverse_simplifies(const char *label,
+                                            test_unary_dval_fn outer,
+                                            test_unary_dval_fn inner)
+{
+    dval_t *x = test_dv_new_named_var_d(0.25, "x");
+    dval_t *inner_x = inner(x);
+    dval_t *outer_inner_x = outer(inner_x);
+    dval_t *simp = dv_simplify(outer_inner_x);
+    char *text = dv_to_string(simp, style_EXPRESSION);
+    const char *expect = "{ x | x = 0.25 }";
+
+    if (str_eq(text, expect))
+        to_string_pass(label, text, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1, label,
+                       text ? text : "(null)", expect);
+
+    free(text);
+    dv_free(simp);
+    dv_free(outer_inner_x);
+    dv_free(inner_x);
+    dv_free(x);
+}
+
 static void test_simplify_inverse_unary_pairs(void)
 {
     dval_t *x = test_dv_new_named_var_d(3.0, "x");
@@ -1376,6 +1402,25 @@ static void test_simplify_inverse_unary_pairs(void)
         to_string_pass("log10(10^x) simplification (EXPR)", log10_ten_pow_s, expect);
     else
         to_string_fail(__FILE__, __LINE__, 1, "log10(10^x) simplification (EXPR)", log10_ten_pow_s, expect);
+
+    check_direct_inverse_simplifies("sin(asin(x)) simplification (EXPR)",
+                                    dv_sin, dv_asin);
+    check_direct_inverse_simplifies("cos(acos(x)) simplification (EXPR)",
+                                    dv_cos, dv_acos);
+    check_direct_inverse_simplifies("tan(atan(x)) simplification (EXPR)",
+                                    dv_tan, dv_atan);
+    check_direct_inverse_simplifies("sinh(asinh(x)) simplification (EXPR)",
+                                    dv_sinh, dv_asinh);
+    check_direct_inverse_simplifies("cosh(acosh(x)) simplification (EXPR)",
+                                    dv_cosh, dv_acosh);
+    check_direct_inverse_simplifies("tanh(atanh(x)) simplification (EXPR)",
+                                    dv_tanh, dv_atanh);
+    check_direct_inverse_simplifies("erf(erfinv(x)) simplification (EXPR)",
+                                    dv_erf, dv_erfinv);
+    check_direct_inverse_simplifies("erfc(erfcinv(x)) simplification (EXPR)",
+                                    dv_erfc, dv_erfcinv);
+    check_direct_inverse_simplifies("gamma(gammainv(x)) simplification (EXPR)",
+                                    dv_gamma, dv_gammainv);
 
     free(log10_ten_pow_s);
     free(ten_pow_log10_s);
@@ -1455,6 +1500,546 @@ static void test_to_string_does_not_simplify_plain_expressions(void)
     dv_free(x);
 }
 
+static void test_symbolic_negative_pi_derivative_stays_symbolic(void)
+{
+    dval_bindings_t *bindings = NULL;
+    dval_t *expr = dval_from_string("{ -3*pi*sqrt(x) | x = NAN }", &bindings);
+    dval_t *x = bindings ? dval_bindings_get(bindings, "x") : NULL;
+    dval_t *deriv = (expr && x) ? dv_create_deriv(expr, x) : NULL;
+    char *deriv_text = deriv ? dv_to_string(deriv, style_EXPRESSION) : NULL;
+    const char *expect = "{ -³⁄₂π/√(x) | x = NAN }";
+
+    if (str_eq(deriv_text, expect))
+        to_string_pass("negative symbolic pi derivative stays symbolic",
+                       deriv_text, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "negative symbolic pi derivative stays symbolic",
+                       deriv_text ? deriv_text : "(null)", expect);
+
+    free(deriv_text);
+    dv_free(deriv);
+    dval_bindings_free(bindings);
+    dv_free(expr);
+}
+
+static void test_pow_derivative_preserves_literal_base_log(void)
+{
+    dval_bindings_t *bindings = NULL;
+    dval_t *expr = dval_from_string("{ 10^x | x = NAN }", &bindings);
+    dval_t *x = bindings ? dval_bindings_get(bindings, "x") : NULL;
+    dval_t *deriv = (expr && x) ? dv_create_deriv(expr, x) : NULL;
+    char *deriv_text = deriv ? dv_to_string(deriv, style_EXPRESSION) : NULL;
+    const char *expect = "{ ln(10)·10^x | x = NAN }";
+
+    if (str_eq(deriv_text, expect))
+        to_string_pass("10^x derivative preserves ln(10)",
+                       deriv_text, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "10^x derivative preserves ln(10)",
+                       deriv_text ? deriv_text : "(null)", expect);
+
+    free(deriv_text);
+    dv_free(deriv);
+    dval_bindings_free(bindings);
+    dv_free(expr);
+}
+
+static void test_repeated_preserved_log_factor_combines_as_power(void)
+{
+    dval_bindings_t *bindings = NULL;
+    dval_t *expr = dval_from_string("{ ln(10)*10^x | x = NAN }", &bindings);
+    dval_t *x = bindings ? dval_bindings_get(bindings, "x") : NULL;
+    dval_t *deriv = (expr && x) ? dv_create_deriv(expr, x) : NULL;
+    char *deriv_text = deriv ? dv_to_string(deriv, style_EXPRESSION) : NULL;
+    const char *expect = "{ ln(10)²·10^x | x = NAN }";
+
+    if (str_eq(deriv_text, expect))
+        to_string_pass("repeated preserved ln(10) factors combine as ln(10)^2",
+                       deriv_text, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "repeated preserved ln(10) factors combine as ln(10)^2",
+                       deriv_text ? deriv_text : "(null)", expect);
+
+    free(deriv_text);
+    dv_free(deriv);
+    dval_bindings_free(bindings);
+    dv_free(expr);
+}
+
+static void test_preserved_log_power_chain_combines_as_power(void)
+{
+    dval_bindings_t *bindings = NULL;
+    dval_t *expr = dval_from_string("{ ln(10)^2*ln(10)*10^x | x = NAN }",
+                                    &bindings);
+    dval_t *x = bindings ? dval_bindings_get(bindings, "x") : NULL;
+    dval_t *deriv = (expr && x) ? dv_create_deriv(expr, x) : NULL;
+    char *expr_text = expr ? dv_to_string(expr, style_EXPRESSION) : NULL;
+    char *deriv_text = deriv ? dv_to_string(deriv, style_EXPRESSION) : NULL;
+    const char *expr_expect = "{ ln(10)³·10^x | x = NAN }";
+    const char *deriv_expect = "{ ln(10)⁴·10^x | x = NAN }";
+
+    if (str_eq(expr_text, expr_expect))
+        to_string_pass("preserved ln(10)^2*ln(10) combines as ln(10)^3",
+                       expr_text, expr_expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "preserved ln(10)^2*ln(10) combines as ln(10)^3",
+                       expr_text ? expr_text : "(null)", expr_expect);
+
+    if (str_eq(deriv_text, deriv_expect))
+        to_string_pass("derivative preserves combined ln(10)^4 factor",
+                       deriv_text, deriv_expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "derivative preserves combined ln(10)^4 factor",
+                       deriv_text ? deriv_text : "(null)", deriv_expect);
+
+    free(deriv_text);
+    free(expr_text);
+    dv_free(deriv);
+    dval_bindings_free(bindings);
+    dv_free(expr);
+}
+
+static void test_unary_constants_preserve_user_literals_in_derivatives(void)
+{
+    struct {
+        const char *input;
+        const char *expect;
+        const char *label;
+    } cases[] = {
+        { "{ sin(1)*x | x = NAN }",  "sin(1)", "sin(1)*x derivative preserves sin(1)" },
+        { "{ sqrt(2)*x | x = NAN }", "√(2)",   "sqrt(2)*x derivative preserves sqrt(2)" },
+        { "{ exp(1)*x | x = NAN }",  "exp(1)", "exp(1)*x derivative preserves exp(1)" },
+    };
+
+    for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+        dval_bindings_t *bindings = NULL;
+        dval_t *expr = dval_from_string(cases[i].input, &bindings);
+        dval_t *x = bindings ? dval_bindings_get(bindings, "x") : NULL;
+        dval_t *deriv = (expr && x) ? dv_create_deriv(expr, x) : NULL;
+        char *deriv_text = deriv ? dv_to_string(deriv, style_EXPRESSION) : NULL;
+
+        if (str_eq(deriv_text, cases[i].expect))
+            to_string_pass(cases[i].label, deriv_text, cases[i].expect);
+        else
+            to_string_fail(__FILE__, __LINE__, 1, cases[i].label,
+                           deriv_text ? deriv_text : "(null)",
+                           cases[i].expect);
+
+        free(deriv_text);
+        dv_free(deriv);
+        dval_bindings_free(bindings);
+        dv_free(expr);
+    }
+}
+
+static void test_binary_constants_preserve_user_literals_in_derivatives(void)
+{
+    struct {
+        const char *input;
+        const char *expr_expect;
+        const char *deriv_expect;
+        const char *label;
+    } cases[] = {
+        {
+            "{ atan2(1,2)*x | x = NAN }",
+            "{ atan2(1, 2)x | x = NAN }",
+            "atan2(1, 2)",
+            "atan2(1,2)*x preserves atan2(1,2)"
+        },
+        {
+            "{ hypot(3,4)*x | x = NAN }",
+            "{ hypot(3, 4)x | x = NAN }",
+            "hypot(3, 4)",
+            "hypot(3,4)*x preserves hypot(3,4)"
+        },
+        {
+            "{ beta(2,3)*x | x = NAN }",
+            "{ beta(2, 3)x | x = NAN }",
+            "beta(2, 3)",
+            "beta(2,3)*x preserves beta(2,3)"
+        },
+        {
+            "{ logbeta(2,3)*x | x = NAN }",
+            "{ -ln(12)x | x = NAN }",
+            "-ln(12)",
+            "logbeta(2,3)*x rewrites exactly to -ln(12)"
+        },
+        {
+            "{ logbeta(1,1)*x | x = NAN }",
+            "{ 0x | x = NAN }",
+            "0",
+            "logbeta(1,1)*x rewrites exactly to zero"
+        },
+    };
+
+    for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+        dval_bindings_t *bindings = NULL;
+        dval_t *expr = dval_from_string(cases[i].input, &bindings);
+        dval_t *x = bindings ? dval_bindings_get(bindings, "x") : NULL;
+        dval_t *deriv = (expr && x) ? dv_create_deriv(expr, x) : NULL;
+        char *expr_text = expr ? dv_to_string(expr, style_EXPRESSION) : NULL;
+        char *deriv_text = deriv ? dv_to_string(deriv, style_EXPRESSION) : NULL;
+        char deriv_label[128];
+
+        if (str_eq(expr_text, cases[i].expr_expect))
+            to_string_pass(cases[i].label, expr_text, cases[i].expr_expect);
+        else
+            to_string_fail(__FILE__, __LINE__, 1, cases[i].label,
+                           expr_text ? expr_text : "(null)",
+                           cases[i].expr_expect);
+
+        snprintf(deriv_label, sizeof(deriv_label),
+                 "%s derivative", cases[i].label);
+        if (str_eq(deriv_text, cases[i].deriv_expect))
+            to_string_pass(deriv_label, deriv_text, cases[i].deriv_expect);
+        else
+            to_string_fail(__FILE__, __LINE__, 1, deriv_label,
+                           deriv_text ? deriv_text : "(null)",
+                           cases[i].deriv_expect);
+
+        free(deriv_text);
+        free(expr_text);
+        dv_free(deriv);
+        dval_bindings_free(bindings);
+        dv_free(expr);
+    }
+}
+
+static void test_symbolic_negative_pi_quotient_stays_symbolic(void)
+{
+    dval_bindings_t *bindings = NULL;
+    dval_t *expr =
+        dval_from_string("{ (1/2)*(-3*pi)/sqrt(x) | x = NAN }", &bindings);
+    char *expr_text = expr ? dv_to_string(expr, style_EXPRESSION) : NULL;
+    const char *expect = "{ -³⁄₂π/√(x) | x = NAN }";
+
+    if (str_eq(expr_text, expect))
+        to_string_pass("negative symbolic pi quotient stays symbolic",
+                       expr_text, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "negative symbolic pi quotient stays symbolic",
+                       expr_text ? expr_text : "(null)", expect);
+
+    free(expr_text);
+    dval_bindings_free(bindings);
+    dv_free(expr);
+}
+
+static void test_nested_symbolic_pi_derivative_has_no_decimalized_coefficients(void)
+{
+    dval_bindings_t *bindings = NULL;
+    dval_t *expr = dval_from_string(
+        "{ (1/16)*pi*exp(pi*sqrt(x))*(15*pi*sqrt(x) + "
+        "x*(pi*(-3*pi*sqrt(x) + pi^2*x)/sqrt(x) + 2*pi^2) - "
+        "5*pi^2*x - 15)/x^(7/2) | x = pi/6 }",
+        &bindings);
+    dval_t *x = bindings ? dval_bindings_get(bindings, "x") : NULL;
+    dval_t *deriv = (expr && x) ? dv_create_deriv(expr, x) : NULL;
+    char *deriv_text = deriv ? dv_to_string(deriv, style_EXPRESSION) : NULL;
+    int has_decimalized_pi =
+        deriv_text &&
+        (strstr(deriv_text, "4.712") ||
+         strstr(deriv_text, "9.424") ||
+         strstr(deriv_text, "3.084"));
+
+    if (deriv_text && !has_decimalized_pi)
+        to_string_pass("nested symbolic pi derivative keeps coefficients symbolic",
+                       deriv_text, "(no decimalized pi coefficients)");
+    else {
+        printf(C_RED "  FAIL: nested symbolic pi derivative keeps coefficients symbolic\n"
+               C_RESET);
+        printf("    got      = %s\n", deriv_text ? deriv_text : "(null)");
+        printf("    expected = no 4.712..., 9.424..., or 3.084... coefficients\n");
+        TEST_FAIL();
+    }
+
+    free(deriv_text);
+    dv_free(deriv);
+    dval_bindings_free(bindings);
+    dv_free(expr);
+}
+
+static void test_binding_exact_unary_numeric_expression_simplifies(void)
+{
+    static const struct {
+        const char *input;
+        const char *expect;
+        const char *label;
+    } cases[] = {
+        {
+            "{ x | x = ln(e)*pi*60/180 }",
+            "{ x | x = ⅓π }",
+            "binding ln(e)*pi*60/180 simplifies exactly",
+        },
+        {
+            "{ x | x = log(10^12) }",
+            "{ x | x = 12 }",
+            "binding log(10^12) simplifies exactly",
+        },
+        {
+            "{ x | x = log(1/1000) }",
+            "{ x | x = -3 }",
+            "binding log(1/1000) simplifies exactly",
+        },
+    };
+
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+        dval_bindings_t *bindings = NULL;
+        dval_t *expr = dval_from_string(cases[i].input, &bindings);
+        char *expr_text = expr ? dv_to_string(expr, style_EXPRESSION) : NULL;
+
+        if (str_eq(expr_text, cases[i].expect))
+            to_string_pass(cases[i].label, expr_text, cases[i].expect);
+        else
+            to_string_fail(__FILE__, __LINE__, 1, cases[i].label,
+                           expr_text ? expr_text : "(null)",
+                           cases[i].expect);
+
+        free(expr_text);
+        dval_bindings_free(bindings);
+        dv_free(expr);
+    }
+}
+
+static void test_binding_exact_trig_numeric_expression_simplifies(void)
+{
+    dval_bindings_t *bindings = NULL;
+    dval_t *expr =
+        dval_from_string("{ x | x = sin(pi/6)*pi/180*30 }", &bindings);
+    char *expr_text = expr ? dv_to_string(expr, style_EXPRESSION) : NULL;
+    const char *expect = "{ x | x = ¹⁄₁₂π }";
+
+    if (str_eq(expr_text, expect))
+        to_string_pass("binding sin(pi/6)*pi/180*30 simplifies exactly",
+                       expr_text, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "binding sin(pi/6)*pi/180*30 simplifies exactly",
+                       expr_text ? expr_text : "(null)", expect);
+
+    free(expr_text);
+    dval_bindings_free(bindings);
+    dv_free(expr);
+}
+
+static void test_binding_direct_inverse_numeric_expression_simplifies(void)
+{
+    struct {
+        const char *input;
+        const char *expect;
+        const char *label;
+    } cases[] = {
+        { "{ x | x = sin(asin(12)) }",       "{ x | x = 12 }", "binding sin(asin(12))" },
+        { "{ x | x = cos(acos(12)) }",       "{ x | x = 12 }", "binding cos(acos(12))" },
+        { "{ x | x = tan(atan(12)) }",       "{ x | x = 12 }", "binding tan(atan(12))" },
+        { "{ x | x = sinh(asinh(12)) }",     "{ x | x = 12 }", "binding sinh(asinh(12))" },
+        { "{ x | x = cosh(acosh(12)) }",     "{ x | x = 12 }", "binding cosh(acosh(12))" },
+        { "{ x | x = tanh(atanh(12)) }",     "{ x | x = 12 }", "binding tanh(atanh(12))" },
+        { "{ x | x = exp(ln(12)) }",         "{ x | x = 12 }", "binding exp(ln(12))" },
+        { "{ x | x = ln(exp(12)) }",         "{ x | x = 12 }", "binding ln(exp(12))" },
+        { "{ x | x = erf(erfinv(12)) }",     "{ x | x = 12 }", "binding erf(erfinv(12))" },
+        { "{ x | x = erfc(erfcinv(12)) }",   "{ x | x = 12 }", "binding erfc(erfcinv(12))" },
+        { "{ x | x = gamma(gammainv(12)) }", "{ x | x = 12 }", "binding gamma(gammainv(12))" },
+    };
+
+    for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+        dval_bindings_t *bindings = NULL;
+        dval_t *expr = dval_from_string(cases[i].input, &bindings);
+        char *expr_text = expr ? dv_to_string(expr, style_EXPRESSION) : NULL;
+
+        if (str_eq(expr_text, cases[i].expect))
+            to_string_pass(cases[i].label, expr_text, cases[i].expect);
+        else
+            to_string_fail(__FILE__, __LINE__, 1, cases[i].label,
+                           expr_text ? expr_text : "(null)",
+                           cases[i].expect);
+
+        free(expr_text);
+        dval_bindings_free(bindings);
+        dv_free(expr);
+    }
+}
+
+static void test_binding_principal_inverse_numeric_expression_simplifies(void)
+{
+    struct {
+        const char *input;
+        const char *expect;
+        const char *label;
+    } cases[] = {
+        { "{ x | x = atan(tan(pi/5)) }", "{ x | x = π/5 }", "binding atan(tan(pi/5))" },
+        { "{ x | x = asin(sin(pi/5)) }", "{ x | x = π/5 }", "binding asin(sin(pi/5))" },
+        { "{ x | x = acos(cos(pi/5)) }", "{ x | x = π/5 }", "binding acos(cos(pi/5))" },
+        { "{ x | x = atan(tan(3*pi/5)) }", "{ x | x = atan(tan(⅗π)) }", "binding atan(tan(3*pi/5)) is not principal" },
+    };
+
+    for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+        dval_bindings_t *bindings = NULL;
+        dval_t *expr = dval_from_string(cases[i].input, &bindings);
+        char *expr_text = expr ? dv_to_string(expr, style_EXPRESSION) : NULL;
+
+        if (str_eq(expr_text, cases[i].expect))
+            to_string_pass(cases[i].label, expr_text, cases[i].expect);
+        else
+            to_string_fail(__FILE__, __LINE__, 1, cases[i].label,
+                           expr_text ? expr_text : "(null)",
+                           cases[i].expect);
+
+        free(expr_text);
+        dval_bindings_free(bindings);
+        dv_free(expr);
+    }
+}
+
+static void test_binding_lambert_inverse_numeric_expression_simplifies(void)
+{
+    struct {
+        const char *input;
+        const char *expect;
+        const char *label;
+    } cases[] = {
+        {
+            "{ x | x = W₀(pi/5)*exp(W₀(pi/5)) }",
+            "{ x | x = π/5 }",
+            "binding W0(a)*exp(W0(a))",
+        },
+        {
+            "{ x | x = exp(W(pi/5))*W(pi/5) }",
+            "{ x | x = π/5 }",
+            "binding exp(W(a))*W(a)",
+        },
+        {
+            "{ x | x = W-1(-1/10)*exp(W-1(-1/10)) }",
+            "{ x | x = -⅒ }",
+            "binding W-1(a)*exp(W-1(a))",
+        },
+        {
+            "{ x | x = W₀(5*exp(5)) }",
+            "{ x | x = 5 }",
+            "binding W0(a*exp(a))",
+        },
+        {
+            "{ x | x = W(exp(pi/5)*pi/5) }",
+            "{ x | x = π/5 }",
+            "binding W(exp(a)*a)",
+        },
+        {
+            "{ x | x = W-1(-2*exp(-2)) }",
+            "{ x | x = -2 }",
+            "binding W-1(a*exp(a))",
+        },
+        {
+            "{ x | x = W₀(-2*exp(-2)) }",
+            "{ x | x = W₀(-2·exp(-2)) }",
+            "binding W0(a*exp(a)) outside principal branch",
+        },
+    };
+
+    for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+        dval_bindings_t *bindings = NULL;
+        dval_t *expr = dval_from_string(cases[i].input, &bindings);
+        char *expr_text = expr ? dv_to_string(expr, style_EXPRESSION) : NULL;
+
+        if (str_eq(expr_text, cases[i].expect))
+            to_string_pass(cases[i].label, expr_text, cases[i].expect);
+        else
+            to_string_fail(__FILE__, __LINE__, 1, cases[i].label,
+                           expr_text ? expr_text : "(null)",
+                           cases[i].expect);
+
+        free(expr_text);
+        dval_bindings_free(bindings);
+        dv_free(expr);
+    }
+}
+
+static void test_binding_exact_core_trig_values_simplify(void)
+{
+    struct {
+        const char *input;
+        const char *expect;
+        const char *label;
+    } cases[] = {
+        { "{ x | x = sin(0) }",      "{ x | x = 0 }",       "sin(0)" },
+        { "{ x | x = sin(pi/6) }",   "{ x | x = ½ }",       "sin(pi/6)" },
+        { "{ x | x = sin(⅙π) }",     "{ x | x = ½ }",       "sin(⅙π)" },
+        { "{ x | x = sin(pi/4) }",   "{ x | x = √(2)/2 }",  "sin(pi/4)" },
+        { "{ x | x = sin(pi/3) }",   "{ x | x = √(3)/2 }",  "sin(pi/3)" },
+        { "{ x | x = sin(pi/2) }",   "{ x | x = 1 }",       "sin(pi/2)" },
+        { "{ x | x = sin(pi) }",     "{ x | x = 0 }",       "sin(pi)" },
+        { "{ x | x = cos(0) }",      "{ x | x = 1 }",       "cos(0)" },
+        { "{ x | x = cos(pi/6) }",   "{ x | x = √(3)/2 }",  "cos(pi/6)" },
+        { "{ x | x = cos(pi/4) }",   "{ x | x = √(2)/2 }",  "cos(pi/4)" },
+        { "{ x | x = cos(pi/3) }",   "{ x | x = ½ }",       "cos(pi/3)" },
+        { "{ x | x = cos(pi/2) }",   "{ x | x = 0 }",       "cos(pi/2)" },
+        { "{ x | x = cos(pi) }",     "{ x | x = -1 }",      "cos(pi)" },
+        { "{ x | x = tan(0) }",      "{ x | x = 0 }",       "tan(0)" },
+        { "{ x | x = tan(pi/6) }",   "{ x | x = √(3)/3 }",  "tan(pi/6)" },
+        { "{ x | x = tan(pi/4) }",   "{ x | x = 1 }",       "tan(pi/4)" },
+        { "{ x | x = tan(pi/3) }",   "{ x | x = √(3) }",    "tan(pi/3)" },
+        { "{ x | x = tan(pi) }",     "{ x | x = 0 }",       "tan(pi)" },
+    };
+
+    for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+        dval_bindings_t *bindings = NULL;
+        dval_t *expr = dval_from_string(cases[i].input, &bindings);
+        char *expr_text = expr ? dv_to_string(expr, style_EXPRESSION) : NULL;
+
+        if (str_eq(expr_text, cases[i].expect))
+            to_string_pass(cases[i].label, expr_text, cases[i].expect);
+        else
+            to_string_fail(__FILE__, __LINE__, 1, cases[i].label,
+                           expr_text ? expr_text : "(null)",
+                           cases[i].expect);
+
+        free(expr_text);
+        dval_bindings_free(bindings);
+        dv_free(expr);
+    }
+}
+
+static void test_goal_seek_large_target_uses_significant_digit_tolerance(void)
+{
+    dval_bindings_t *bindings = NULL;
+    dval_t *expr = dval_from_string("{ exp(π·√(x)) | x = NAN }", &bindings);
+    dval_t *x;
+    number_t target = num_create_from_string("262537412640768744");
+    number_t expected = num_create_from_string("163");
+    number_t x_value;
+    dv_goal_seek_options_t options = {0};
+    dv_goal_seek_result_t result;
+
+    ASSERT_NOT_NULL(expr);
+    ASSERT_NOT_NULL(bindings);
+    x = dval_bindings_get(bindings, "x");
+    ASSERT_NOT_NULL(x);
+
+    options.precision_digits = 32u;
+    options.allow_complex = true;
+    options.simplify_result = false;
+
+    ASSERT_EQ_INT(dv_goal_seek(expr, bindings, target, &options, &result), 0);
+    ASSERT_TRUE(result.converged);
+    ASSERT_TRUE(!result.used_complex);
+    ASSERT_TRUE(num_is_real(result.residual));
+
+    x_value = dv_get_val(x);
+    ASSERT_TRUE(number_close_with_tolerance_text(x_value, expected, "1e-25"));
+
+    num_destroy(&x_value);
+    dv_goal_seek_result_clear(&result);
+    num_destroy(&expected);
+    num_destroy(&target);
+    dv_free(expr);
+    dval_bindings_free(bindings);
+}
+
 void test_runtime_regressions(void)
 {
     TEST_RUN_SUBTEST(test_cmp_qfloat_precision, NULL);
@@ -1483,6 +2068,21 @@ void test_runtime_regressions(void)
     TEST_RUN_SUBTEST(test_to_string_does_not_simplify_plain_expressions, NULL);
     TEST_RUN_SUBTEST(test_simplify_inverse_unary_pairs, NULL);
     TEST_RUN_SUBTEST(test_simplify_exp_quarter_turns, NULL);
+    TEST_RUN_SUBTEST(test_symbolic_negative_pi_derivative_stays_symbolic, NULL);
+    TEST_RUN_SUBTEST(test_pow_derivative_preserves_literal_base_log, NULL);
+    TEST_RUN_SUBTEST(test_repeated_preserved_log_factor_combines_as_power, NULL);
+    TEST_RUN_SUBTEST(test_preserved_log_power_chain_combines_as_power, NULL);
+    TEST_RUN_SUBTEST(test_unary_constants_preserve_user_literals_in_derivatives, NULL);
+    TEST_RUN_SUBTEST(test_binary_constants_preserve_user_literals_in_derivatives, NULL);
+    TEST_RUN_SUBTEST(test_symbolic_negative_pi_quotient_stays_symbolic, NULL);
+    TEST_RUN_SUBTEST(test_nested_symbolic_pi_derivative_has_no_decimalized_coefficients, NULL);
+    TEST_RUN_SUBTEST(test_binding_exact_unary_numeric_expression_simplifies, NULL);
+    TEST_RUN_SUBTEST(test_binding_exact_trig_numeric_expression_simplifies, NULL);
+    TEST_RUN_SUBTEST(test_binding_direct_inverse_numeric_expression_simplifies, NULL);
+    TEST_RUN_SUBTEST(test_binding_principal_inverse_numeric_expression_simplifies, NULL);
+    TEST_RUN_SUBTEST(test_binding_lambert_inverse_numeric_expression_simplifies, NULL);
+    TEST_RUN_SUBTEST(test_binding_exact_core_trig_values_simplify, NULL);
+    TEST_RUN_SUBTEST(test_goal_seek_large_target_uses_significant_digit_tolerance, NULL);
 }
 
 /* ------------------------------------------------------------------------- */

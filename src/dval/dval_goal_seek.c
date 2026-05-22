@@ -2,6 +2,7 @@
 
 #include "dval_fromstring_internal.h"
 #include "internal/dval_internal.h"
+#include "internal/number_internal.h"
 
 #define DV_GOAL_DEFAULT_DIGITS 64u
 #define DV_GOAL_DEFAULT_ITERATIONS 120u
@@ -63,8 +64,22 @@ void dv_goal_seek_result_clear(dv_goal_seek_result_t *result)
 
 static number_t goal_default_tolerance(number_t target, size_t digits)
 {
-    (void)target;
-    return num_pow10(-(int)(digits > 0u ? digits : 1u));
+    number_t eps;
+    number_t target_mag;
+    number_t scale;
+    number_t tolerance;
+
+    eps = num_pow10(-(int)(digits > 0u ? digits : 1u));
+    target_mag = num_abs(target);
+    scale = num_is_finite(target_mag) && num_gt(target_mag, NUM_ONE)
+          ? num_clone(target_mag)
+          : num_clone(NUM_ONE);
+    tolerance = num_mul(eps, scale);
+
+    num_destroy(&scale);
+    num_destroy(&target_mag);
+    num_destroy(&eps);
+    return tolerance;
 }
 
 static number_t goal_tolerance(number_t target,
@@ -145,25 +160,45 @@ static bool goal_residual_real(number_t residual)
     return num_is_real(residual) && num_is_finite(residual);
 }
 
+static number_t goal_work_value(number_t value, size_t digits)
+{
+    number_t rounded;
+    size_t bits;
+
+    if (digits == 0u)
+        return num_clone(value);
+
+    bits = (size_t)((double)digits * 3.3219280948873623 + 1.0);
+    rounded = num_is_real(value)
+            ? num_as_mfloat_prec(value, bits)
+            : num_as_mcomplex_prec(value, bits);
+
+    if (!num_is_finite(rounded) && num_is_finite(value)) {
+        num_destroy(&rounded);
+        rounded = num_clone(value);
+    }
+    num_set_prec_digits(&rounded, digits);
+    return rounded;
+}
+
 static number_t goal_start_value(dval_t *var, size_t digits)
 {
     number_t value = dv_get_val(var);
+    number_t rounded;
 
     if (!num_is_finite(value) || num_is_nan(value)) {
         num_destroy(&value);
         value = num_create_from_long(1L);
     }
-    if (digits > 0u)
-        num_set_prec_digits(&value, digits);
-    return value;
+    rounded = goal_work_value(value, digits);
+    num_destroy(&value);
+    return rounded;
 }
 
 static void goal_set_var(dval_t *var, number_t value, size_t digits)
 {
-    number_t copy = num_clone(value);
+    number_t copy = goal_work_value(value, digits);
 
-    if (digits > 0u)
-        num_set_prec_digits(&copy, digits);
     dv_set_val(var, copy);
     num_destroy(&copy);
 }

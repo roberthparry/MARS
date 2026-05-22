@@ -357,7 +357,6 @@ static int run_goal_seek(int argc, char **argv)
     dval_bindings_t *bindings = NULL;
     dval_t *expr = NULL;
     number_t target = (number_t){0};
-    number_t tolerance = (number_t){0};
     dv_goal_seek_options_t options = {0};
     dv_goal_seek_result_t result;
     char *expr_text = NULL;
@@ -402,12 +401,10 @@ static int run_goal_seek(int argc, char **argv)
     if (parse_number_expression(target_text, precision, &target) != 0)
         goto cleanup;
 
-    tolerance = num_pow10(-(precision > 0 ? precision : 64));
     options.precision_digits = precision > 0 ? (size_t)precision : 64u;
     options.max_iterations = 0u;
     options.allow_complex = true;
     options.simplify_result = false;
-    options.tolerance = tolerance;
 
     if (dv_goal_seek(expr, bindings, target, &options, &result) != 0) {
         fprintf(stderr, "Goal seek failed\n");
@@ -434,7 +431,6 @@ cleanup:
     free(tex_text);
     free(func_text);
     free(expr_text);
-    num_destroy(&tolerance);
     num_destroy(&target);
     dv_free(expr);
     dval_bindings_free(bindings);

@@ -8,11 +8,18 @@
 
 extern dval_t *dv_simplify(const dval_t *dv);
 
-static int dv_try_get_unnamed_const_real_num(const dval_t *dv, number_t *out)
+static int dv_is_foldable_unnamed_real_const(const dval_t *dv)
 {
     if (!dv_is_unnamed_const(dv) || !num_is_real(dv->c))
         return 0;
     if (dv->binding_expr && dv->binding_expr->kind != DV_BINDING_EXPR_NUMBER)
+        return 0;
+    return 1;
+}
+
+static int dv_try_get_unnamed_const_real_num(const dval_t *dv, number_t *out)
+{
+    if (!dv_is_foldable_unnamed_real_const(dv))
         return 0;
     *out = num_clone(dv->c);
     return 1;
@@ -58,26 +65,16 @@ static number_t dv_normalize_simple_rational_coeff(number_t coeff)
 
 static int term_coeff(const dval_t *term, const dval_t **base, number_t *coeff_out)
 {
-    if (dv_is_unnamed_const(term) &&
-        (!term->binding_expr || term->binding_expr->kind == DV_BINDING_EXPR_NUMBER)) {
+    if (dv_is_foldable_unnamed_real_const(term)) {
         *base = NULL;
-        if (!dv_try_get_unnamed_const_real_num(term, coeff_out))
-            return 0;
+        *coeff_out = num_clone(term->c);
         return 1;
     }
     if (dv_is_op(term, &ops_neg)) {
         if (dv_is_op(term->a, &ops_mul) &&
-            dv_is_unnamed_const(term->a->a) &&
-            (!term->a->a->binding_expr ||
-             term->a->a->binding_expr->kind == DV_BINDING_EXPR_NUMBER)) {
+            dv_is_foldable_unnamed_real_const(term->a->a)) {
             *base = term->a->b;
-        if (!dv_try_get_unnamed_const_real_num(term->a->a, coeff_out))
-            return 0;
-        {
-            number_t neg = num_neg(*coeff_out);
-
-            *coeff_out = neg;
-        }
+            *coeff_out = num_neg(term->a->a->c);
             return 1;
         }
         *base = term->a;
@@ -85,12 +82,9 @@ static int term_coeff(const dval_t *term, const dval_t **base, number_t *coeff_o
         return 1;
     }
     if (dv_is_op(term, &ops_mul) &&
-        dv_is_unnamed_const(term->a) &&
-        (!term->a->binding_expr ||
-         term->a->binding_expr->kind == DV_BINDING_EXPR_NUMBER)) {
+        dv_is_foldable_unnamed_real_const(term->a)) {
         *base = term->b;
-        if (!dv_try_get_unnamed_const_real_num(term->a, coeff_out))
-            return 0;
+        *coeff_out = num_clone(term->a->c);
         return 1;
     }
     *base = term;
@@ -102,19 +96,14 @@ static int split_leading_real_scalar(const dval_t *term,
                                      number_t *scalar_out,
                                      const dval_t **rest_out)
 {
-    if (dv_is_unnamed_const(term) &&
-        (!term->binding_expr || term->binding_expr->kind == DV_BINDING_EXPR_NUMBER) &&
-        num_is_real(term->c)) {
+    if (dv_is_foldable_unnamed_real_const(term)) {
         *scalar_out = num_clone(term->c);
         *rest_out = NULL;
         return 1;
     }
 
     if (dv_is_op(term, &ops_mul) &&
-        dv_is_unnamed_const(term->a) &&
-        (!term->a->binding_expr ||
-         term->a->binding_expr->kind == DV_BINDING_EXPR_NUMBER) &&
-        num_is_real(term->a->c)) {
+        dv_is_foldable_unnamed_real_const(term->a)) {
         *scalar_out = num_clone(term->a->c);
         *rest_out = term->b;
         return 1;
@@ -165,7 +154,7 @@ static dval_t *dv_try_fold_scaled_product(number_t coeff, dval_t *base)
         dval_t *scaled_right;
         dval_t *r;
 
-        if (dv_is_unnamed_const(left) && num_is_real(left->c)) {
+        if (dv_is_foldable_unnamed_real_const(left)) {
             dv_retain(left);
             dv_retain(right);
             dv_free(base);
@@ -176,7 +165,7 @@ static dval_t *dv_try_fold_scaled_product(number_t coeff, dval_t *base)
             return r;
         }
 
-        if (dv_is_unnamed_const(right) && num_is_real(right->c)) {
+        if (dv_is_foldable_unnamed_real_const(right)) {
             dv_retain(left);
             dv_retain(right);
             dv_free(base);
@@ -222,22 +211,21 @@ dval_t *dv_make_scaled(number_t coeff, dval_t *base)
     if (num_eq(coeff, NUM_ONE))  return base;
     if (num_eq(coeff, NUM_NEG_ONE)) {
         if (dv_is_op(base, &ops_div) && dv_is_op(base->a, &ops_mul) &&
-            dv_is_unnamed_const(base->a->a)) {
-            if (num_is_real(base->a->a->c) && num_lt(base->a->a->c, NUM_ZERO)) {
-                number_t pos_c = num_neg(base->a->a->c);
-                dval_t *rest = base->a->b;
-                dval_t *den = base->b;
+            dv_is_foldable_unnamed_real_const(base->a->a) &&
+            num_lt(base->a->a->c, NUM_ZERO)) {
+            number_t pos_c = num_neg(base->a->a->c);
+            dval_t *rest = base->a->b;
+            dval_t *den = base->b;
 
-                dv_retain(rest);
-                dv_retain(den);
-                dv_free(base);
-                dval_t *new_num = dv_make_scaled(pos_c, rest);
-                dval_t *r = dv_div(new_num, den);
+            dv_retain(rest);
+            dv_retain(den);
+            dv_free(base);
+            dval_t *new_num = dv_make_scaled(pos_c, rest);
+            dval_t *r = dv_div(new_num, den);
 
-                dv_free(new_num);
-                dv_free(den);
-                return r;
-            }
+            dv_free(new_num);
+            dv_free(den);
+            return r;
         }
         if (dv_is_op(base, &ops_div) && dv_is_op(base->a, &ops_neg)) {
             dval_t *inner = base->a->a;

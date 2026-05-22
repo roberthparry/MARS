@@ -581,8 +581,10 @@ static dval_t *apply_unary_preserving_constexpr(const dval_ops_t *ops,
                                                 dval_t *(*fallback)(const dval_t *))
 {
     if (node_has_preserved_constexpr(arg)) {
-        dv_binding_expr_t *expr =
-            dv_binding_expr_new_unary_op(ops, dv_binding_expr_clone(arg->binding_expr));
+        dv_binding_expr_t *child = dv_binding_expr_clone(arg->binding_expr);
+        dv_binding_expr_t *expr = (ops == &ops_neg)
+            ? dv_binding_expr_new_neg(child)
+            : dv_binding_expr_new_unary_op(ops, child);
         dval_t *node = const_node_from_binding_expr(expr);
 
         dv_free(arg);

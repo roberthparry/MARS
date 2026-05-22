@@ -186,7 +186,8 @@ int dv_eval_derivatives(const dval_t *expr,
  * @brief Options for dv_goal_seek().
  *
  * Zero-valued fields select library defaults. @p tolerance may be left as
- * zero/invalid to derive an absolute tolerance of 10^-precision_digits.
+ * zero/invalid to derive a significant-digits tolerance of roughly
+ * max(1, abs(target)) * 10^-precision_digits.
  */
 typedef struct dv_goal_seek_options {
     size_t precision_digits;

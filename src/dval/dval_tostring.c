@@ -1,26 +1,37 @@
 /* dval_tostring.c - symbolic/string conversion for dval_t
  *
- * Produces human-readable and round-trip-safe string representations of a
- * dval_t DAG via dv_to_string(dv, style).  Two styles are supported:
+ * Produces human-readable string representations of a dval_t DAG via
+ * dv_to_string(dv, style).  Three styles are supported:
  *
  *   style_EXPRESSION  — infix notation, e.g.
- *                         { sin(x₀) * cos(x₁) | x₀ = 1.0, x₁ = 0.5 }
+ *                         { sin(x)·cos(y) | x = 1, y = ½π }
  *                       or, when no bindings are needed:
- *                         { 1 }
- *                       This format is accepted by dval_from_string().
+ *                         sin(x)·cos(y)
+ *                       This is the preferred round-trip format accepted by
+ *                       dval_from_string().
  *
- *   style_FUNCTION    — nested prefix notation, e.g.
- *                         mul(sin(var(x₀=1.0)), cos(var(x₁=0.5)))
- *                       Useful for debugging graph structure.
+ *   style_FUNCTION    — function-like notation, e.g.
+ *                         x = 1
+ *                         y = π/2
+ *                         expr(x,y) = sin(x)*cos(y)
+ *                         return expr(x,y)
+ *                       Useful for debugging graph structure and generated
+ *                       callable forms.
+ *
+ *   style_TEX         — native TeX notation generated directly from the DAG,
+ *                       e.g.
+ *                         \left\{ \sin(x)\cos(y) \;\middle|\;
+ *                         x = 1, y = \frac{\pi}{2} \right\}
  *
  * Responsibilities of this file:
  *   • Operator precedence and parenthesisation (infix only)
- *   • Unicode superscript encoding for integer powers (², ³, …)
- *   • The { expr } / { expr | bindings } wrapper for expression style
+ *   • Unicode superscripts and fraction glyphs for compact powers/coefficients
+ *   • The { expr | bindings } wrapper when bindings are present
+ *   • Native TeX emission for expression and binding DAGs
  *
  * Algebraic simplification is deliberately not part of ordinary rendering:
  * callers see the expression shape they built or parsed.  Owning derivative
- * creation simplifies derivatives before they are rendered.
+ * creation simplifies derivatives in the DAG before they are rendered.
  */
 
 #include <stdbool.h>
@@ -35,22 +46,121 @@
 #include "dval_internal.h"
 #include "dval_tostring_internal.h"
 #include "dval.h"
+#include "internal/number_internal.h"
 
 /* ------------------------------------------------------------------------- */
 /* Small helpers                                                             */
 /* ------------------------------------------------------------------------- */
 
+static void dv_trim_decimal_display_artifacts_local(char *text);
+
 static char *dv_number_to_string_local(number_t value)
 {
-    char *text = num_to_string(value);
+    char *text;
+    size_t bits;
+    size_t digits;
+    char fmt[32];
+    int needed;
 
+    if ((!num_is_mfloat_backend(value) && !num_is_mcomplex_backend(value)) ||
+        num_is_exact(value) || !num_is_finite(value)) {
+        text = num_to_string(value);
+        dv_trim_decimal_display_artifacts_local(text);
+        num_destroy(&value);
+        return text;
+    }
+
+    bits = num_get_prec_bits(value);
+    if (bits == 0u)
+        bits = num_get_effective_prec_bits(value);
+    digits = bits == 0u ? 0u : (size_t)((double)bits * 0.3010299956639812);
+    if (digits == 0u)
+        digits = num_get_default_prec_digits();
+    if (digits == 0u || digits > (size_t)INT_MAX) {
+        text = num_to_string(value);
+        dv_trim_decimal_display_artifacts_local(text);
+        num_destroy(&value);
+        return text;
+    }
+
+    snprintf(fmt, sizeof(fmt), "%%.%dn", (int)digits);
+    needed = num_sprintf(NULL, 0u, fmt, value);
+    if (needed < 0) {
+        text = num_to_string(value);
+    } else {
+        text = malloc((size_t)needed + 1u);
+        if (text)
+            num_sprintf(text, (size_t)needed + 1u, fmt, value);
+    }
+
+    dv_trim_decimal_display_artifacts_local(text);
     num_destroy(&value);
     return text;
 }
 
+static void dv_trim_decimal_display_artifacts_local(char *text)
+{
+    char *p;
+
+    if (!text)
+        return;
+
+    p = text;
+    while ((p = strchr(p, '.')) != NULL) {
+        char *frac = p + 1;
+        char *end = frac;
+        char *q;
+        char *zero_start = NULL;
+        size_t zero_run = 0u;
+        bool seen_nonzero = false;
+
+        while (isdigit((unsigned char)*end))
+            ++end;
+        if (end == frac) {
+            ++p;
+            continue;
+        }
+
+        for (q = frac; q < end; ++q) {
+            if (*q == '0') {
+                if (seen_nonzero) {
+                    if (!zero_start)
+                        zero_start = q;
+                    ++zero_run;
+                }
+                if (zero_start && zero_run >= 24u) {
+                    memmove(zero_start, end, strlen(end) + 1u);
+                    p = zero_start;
+                    break;
+                }
+            } else {
+                seen_nonzero = true;
+                zero_start = NULL;
+                zero_run = 0u;
+            }
+        }
+        if (q != end)
+            continue;
+
+        while (end > frac && end[-1] == '0')
+            --end;
+        if (end == frac) {
+            memmove(p, q, strlen(q) + 1u);
+            continue;
+        }
+        if (*end == '\0') {
+            *end = '\0';
+            p = end;
+        } else {
+            memmove(end, q, strlen(q) + 1u);
+            p = end;
+        }
+    }
+}
+
 static char *dv_const_to_string_local(const dval_t *dv)
 {
-    return dv ? num_to_string(dv->c) : NULL;
+    return dv ? dv_number_to_string_local(num_clone(dv->c)) : NULL;
 }
 
 static char *dv_eval_to_string_local(const dval_t *dv)

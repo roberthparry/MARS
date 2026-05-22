@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=MARS dval Lab
+Comment=Explore MARS dval expressions with rendered TeX
+TryExec=@MARS_LAUNCHER@
+Exec=@MARS_LAUNCHER@
+Terminal=false
+Categories=Development;Science;Math;
+StartupNotify=true
+Icon=mars-dval-lab

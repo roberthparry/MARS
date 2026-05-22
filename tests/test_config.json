@@ -1060,7 +1060,22 @@
       "test_set_val_num_named_constant": true,
       "test_to_string_does_not_simplify_plain_expressions": true,
       "test_simplify_inverse_unary_pairs": true,
-      "test_simplify_exp_quarter_turns": true
+      "test_simplify_exp_quarter_turns": true,
+      "test_symbolic_negative_pi_derivative_stays_symbolic": true,
+      "test_pow_derivative_preserves_literal_base_log": true,
+      "test_repeated_preserved_log_factor_combines_as_power": true,
+      "test_preserved_log_power_chain_combines_as_power": true,
+      "test_unary_constants_preserve_user_literals_in_derivatives": true,
+      "test_binary_constants_preserve_user_literals_in_derivatives": true,
+      "test_symbolic_negative_pi_quotient_stays_symbolic": true,
+      "test_nested_symbolic_pi_derivative_has_no_decimalized_coefficients": true,
+      "test_binding_exact_unary_numeric_expression_simplifies": true,
+      "test_binding_exact_trig_numeric_expression_simplifies": true,
+      "test_binding_direct_inverse_numeric_expression_simplifies": true,
+      "test_binding_principal_inverse_numeric_expression_simplifies": true,
+      "test_binding_lambert_inverse_numeric_expression_simplifies": true,
+      "test_binding_exact_core_trig_values_simplify": true,
+      "test_goal_seek_large_target_uses_significant_digit_tolerance": true
     }
   },
   "tests/dval/test_dval_reverse_mode.c": {

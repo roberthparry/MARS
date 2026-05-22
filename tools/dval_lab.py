@@ -35,6 +35,12 @@ MAX_VALUE_PRECISION_BITS = 1_048_576
 MAX_VALUE_PRECISION_DIGITS = math.ceil(MAX_VALUE_PRECISION_BITS * math.log10(2))
 COMPACT_BINDING_VALUE_LIMIT = 20
 COMPACT_BINDING_VALUE_KEEP = 16
+QR_VERSION = 4
+QR_SIZE = 17 + 4 * QR_VERSION
+QR_DATA_CODEWORDS = 80
+QR_EC_CODEWORDS = 20
+QR_EC_LEVEL_L = 1
+QR_MASK_PATTERN = 0
 
 
 INDEX_HTML = r"""<!doctype html>
@@ -250,6 +256,112 @@ INDEX_HTML = r"""<!doctype html>
       min-width: 4.1rem;
     }
 
+    .header-side {
+      display: grid;
+      justify-items: end;
+      gap: 0.55rem;
+    }
+
+    .mobile-card {
+      position: relative;
+      z-index: 5;
+      width: min(24rem, calc(100vw - 2rem));
+    }
+
+    .mobile-card summary {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      list-style: none;
+      border-radius: 999px;
+      padding: 0.42rem 0.78rem;
+      color: var(--accent);
+      background: #e4f0ec;
+      font: 0.76rem/1.1 "Cascadia Code", "DejaVu Sans Mono", monospace;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .mobile-card summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .mobile-card summary::before {
+      content: "";
+      width: 0.48rem;
+      height: 0.48rem;
+      border-radius: 999px;
+      background: var(--accent);
+      box-shadow: 0 0 0 4px rgba(15, 118, 110, 0.12);
+    }
+
+    .mobile-panel {
+      position: absolute;
+      right: 0;
+      top: calc(100% + 0.5rem);
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 1rem;
+      width: min(31rem, calc(100vw - 2rem));
+      padding: 0.75rem;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(228, 240, 236, 0.9));
+      box-shadow: 0 16px 44px rgba(49, 38, 22, 0.16);
+    }
+
+    .mobile-copy {
+      display: grid;
+      gap: 0.28rem;
+      min-width: 0;
+    }
+
+    .mobile-copy strong {
+      color: #075e57;
+      font: 0.82rem/1.2 "Cascadia Code", "DejaVu Sans Mono", monospace;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .mobile-copy span {
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .mobile-copy code {
+      min-width: 0;
+      overflow-wrap: anywhere;
+      color: var(--code);
+      font: 0.9rem/1.35 "Cascadia Code", "Fira Code", "DejaVu Sans Mono", monospace;
+    }
+
+    .mobile-actions {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.55rem;
+    }
+
+    .mobile-qr {
+      width: 9rem;
+      height: 9rem;
+      padding: 0.45rem;
+      border-radius: 16px;
+      background: white;
+      border: 1px solid rgba(217, 205, 185, 0.72);
+    }
+
+    .mobile-qr svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
     button {
       border: 0;
       border-radius: 999px;
@@ -458,17 +570,235 @@ INDEX_HTML = r"""<!doctype html>
     }
 
     @media (max-width: 900px) {
+      body {
+        font-size: 15px;
+      }
+
       header {
         display: block;
+        padding: 1rem 0.75rem 0.45rem;
+      }
+
+      .header-side {
+        justify-items: start;
+        margin-top: 0.5rem;
       }
 
       .status {
         text-align: left;
-        margin-top: 0.5rem;
       }
 
       main {
         grid-template-columns: 1fr;
+        gap: 0.75rem;
+        padding: 0.5rem 0.75rem 1.25rem;
+      }
+
+      section {
+        border-radius: 17px;
+      }
+
+      .panel-head {
+        padding: 0.7rem 0.8rem;
+      }
+
+      h2 {
+        font-size: 0.82rem;
+      }
+
+      textarea {
+        min-height: 8.5rem;
+        padding: 0.85rem;
+        font-size: 0.96rem;
+        line-height: 1.45;
+      }
+
+      .target-row {
+        padding: 0 0.75rem 0.75rem;
+      }
+
+      .target-row input {
+        min-height: 2.75rem;
+      }
+
+      .controls {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.5rem;
+        padding: 0 0.75rem 0.75rem;
+      }
+
+      .controls button {
+        width: 100%;
+        min-height: 2.75rem;
+        padding: 0.65rem 0.45rem;
+      }
+
+      .derivative-controls {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .variable-values {
+        padding: 0 0.75rem 0.75rem;
+      }
+
+      .variable-value-box {
+        grid-template-columns: minmax(2.2rem, auto) minmax(0, 1fr);
+      }
+
+      .variable-value-actions {
+        grid-column: 1 / -1;
+        flex-direction: row;
+      }
+
+      .variable-value-actions button {
+        min-height: 2.5rem;
+      }
+
+      .variable-copy {
+        display: none;
+      }
+
+      .output-grid {
+        gap: 0.75rem;
+        padding: 0.75rem;
+      }
+
+      .card {
+        border-radius: 15px;
+      }
+
+      .mobile-result-extra {
+        display: none;
+      }
+
+      #resultPane .copy-result {
+        display: none;
+      }
+
+      .card-title {
+        padding: 0.5rem 0.6rem;
+        gap: 0.45rem;
+        font-size: 0.68rem;
+        letter-spacing: 0.08em;
+      }
+
+      .card-action {
+        min-height: 2.25rem;
+        padding: 0.45rem 0.55rem;
+      }
+
+      pre {
+        padding: 0.75rem;
+        font-size: 0.82rem;
+      }
+
+      .rendered {
+        min-height: 8rem;
+        padding: 1.35rem 1rem 0.8rem;
+        font-size: 1.3rem;
+      }
+
+      .rendered svg {
+        transform: scale(1.35);
+        margin-bottom: 1.5rem;
+      }
+
+      .mobile-panel {
+        position: static;
+        margin-top: 0.5rem;
+        grid-template-columns: 1fr;
+      }
+
+      .mobile-actions {
+        flex-direction: row;
+        justify-content: space-between;
+      }
+    }
+
+    @media (max-width: 560px) {
+      h1 {
+        font-size: 2rem;
+      }
+
+      .subtitle {
+        display: none;
+      }
+
+      .mobile-card {
+        display: none;
+      }
+
+      main {
+        padding: 0.45rem 0.5rem 1rem;
+      }
+
+      textarea {
+        min-height: 7rem;
+        font-size: 0.9rem;
+      }
+
+      .target-row {
+        grid-template-columns: 1fr;
+        gap: 0.35rem;
+      }
+
+      .goal-start-fields {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 0.35rem;
+      }
+
+      .controls {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .expandable-title,
+      .value-title {
+        grid-template-columns: 1fr;
+      }
+
+      .digit-actions,
+      .precision-actions,
+      .top-card-copy,
+      .value-copy {
+        grid-column: auto;
+        justify-self: stretch;
+        justify-content: center;
+      }
+
+      .digit-actions,
+      .precision-actions {
+        order: 3;
+      }
+
+      .top-card-copy,
+      .value-copy {
+        order: 2;
+      }
+
+      .precision-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .rendered {
+        min-height: 6.5rem;
+        padding: 1rem 0.75rem 0.65rem;
+        font-size: 1.12rem;
+      }
+
+      .rendered svg {
+        transform: scale(1.12);
+        margin-bottom: 0.9rem;
+      }
+
+      .help-pane {
+        padding: 0.75rem;
+      }
+
+      .help-card {
+        padding: 0.8rem;
       }
     }
   </style>
@@ -479,7 +809,23 @@ INDEX_HTML = r"""<!doctype html>
       <h1>MARS dval Lab</h1>
       <p class="subtitle">Type a dval expression on the left. The tool evaluates it through your built scratch binary and renders the generated TeX on the right.</p>
     </div>
-    <div class="status" id="status">Ready</div>
+    <div class="header-side">
+      <div class="status" id="status">Ready</div>
+      <details class="mobile-card __MOBILE_CARD_CLASS__" id="mobileAccess">
+        <summary>Mobile</summary>
+        <div class="mobile-panel">
+          <div class="mobile-copy">
+            <strong>Mobile access</strong>
+            <span>Scan from a phone on the same Wi-Fi.</span>
+            <code id="mobileUrl">__MOBILE_URL__</code>
+          </div>
+          <div class="mobile-actions">
+            <div class="mobile-qr" aria-label="QR code for mobile access">__MOBILE_QR_SVG__</div>
+            <button class="card-action copy-result" type="button" data-copy-target="mobile">Copy URL</button>
+          </div>
+        </div>
+      </details>
+    </div>
   </header>
   <main>
     <section>
@@ -519,7 +865,7 @@ INDEX_HTML = r"""<!doctype html>
           </div>
           <div class="rendered" id="rendered"></div>
         </div>
-        <div class="card">
+        <div class="card mobile-result-extra">
           <div class="card-title expandable-title">
             <span>Expression</span>
             <span class="card-actions digit-actions">
@@ -529,7 +875,7 @@ INDEX_HTML = r"""<!doctype html>
           </div>
           <pre id="parsed"></pre>
         </div>
-        <div class="card">
+        <div class="card mobile-result-extra">
           <div class="card-title expandable-title">
             <span>Function</span>
             <span class="card-actions digit-actions">
@@ -649,6 +995,7 @@ INDEX_HTML = r"""<!doctype html>
     const morePrecision = document.getElementById('morePrecision');
     const derivativeButtons = document.getElementById('derivativeButtons');
     const variableValues = document.getElementById('variableValues');
+    const mobileUrl = document.getElementById('mobileUrl');
     const statusEl = document.getElementById('status');
     const rightPaneTitle = document.getElementById('rightPaneTitle');
     const resultPane = document.getElementById('resultPane');
@@ -1388,6 +1735,7 @@ INDEX_HTML = r"""<!doctype html>
       if (target === 'expression') return fullExpressionText || parsed.textContent;
       if (target === 'function') return functionStyle.dataset.fullText || functionStyle.textContent;
       if (target === 'value') return value.textContent;
+      if (target === 'mobile') return mobileUrl ? mobileUrl.textContent.trim() : '';
       return '';
     }
 
@@ -1904,6 +2252,306 @@ def expression_for_editor(expression: str) -> str:
     return re.sub(r"(=\s*)NAN\b", r"\1?", expression)
 
 
+def _is_loopback_or_wildcard_host(host: str) -> bool:
+    host = host.strip().lower().strip("[]")
+    return (
+        not host
+        or host == "localhost"
+        or host == "0.0.0.0"
+        or host == "::"
+        or host == "::0"
+        or host == "::1"
+        or host.startswith("127.")
+    )
+
+
+def _host_from_header(host_header: str) -> str:
+    host_header = host_header.strip()
+    if host_header.startswith("["):
+        end = host_header.find("]")
+        return host_header[1:end] if end >= 0 else host_header.strip("[]")
+    return host_header.rsplit(":", 1)[0] if ":" in host_header else host_header
+
+
+def local_lan_ipv4() -> str:
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            sock.connect(("8.8.8.8", 80))
+            return str(sock.getsockname()[0])
+    except OSError:
+        pass
+
+    try:
+        for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+            address = str(info[4][0])
+            if not _is_loopback_or_wildcard_host(address):
+                return address
+    except OSError:
+        pass
+
+    try:
+        completed = subprocess.run(
+            ["hostname", "-I"],
+            text=True,
+            capture_output=True,
+            timeout=2,
+            check=False,
+        )
+        for address in completed.stdout.split():
+            if "." in address and not _is_loopback_or_wildcard_host(address):
+                return address
+    except Exception:
+        pass
+
+    try:
+        completed = subprocess.run(
+            ["ip", "-4", "route", "get", "1.1.1.1"],
+            text=True,
+            capture_output=True,
+            timeout=2,
+            check=False,
+        )
+        words = completed.stdout.split()
+        if "src" in words:
+            address = words[words.index("src") + 1]
+            if not _is_loopback_or_wildcard_host(address):
+                return address
+    except Exception:
+        pass
+
+    return ""
+
+
+def mobile_access_url(bind_host: str, port: int, host_header: str = "") -> str:
+    request_host = _host_from_header(host_header)
+    if request_host and not _is_loopback_or_wildcard_host(request_host):
+        return f"http://{request_host}:{port}/"
+
+    bind_host = bind_host.strip()
+    if bind_host in ("0.0.0.0", "::", "::0"):
+        bind_host = local_lan_ipv4()
+
+    if _is_loopback_or_wildcard_host(bind_host):
+        return ""
+
+    if ":" in bind_host and not bind_host.startswith("["):
+        bind_host = f"[{bind_host}]"
+    return f"http://{bind_host}:{port}/"
+
+
+def _qr_gf_tables() -> tuple[list[int], list[int]]:
+    exp = [0] * 512
+    log = [0] * 256
+    x = 1
+    for i in range(255):
+        exp[i] = x
+        log[x] = i
+        x <<= 1
+        if x & 0x100:
+            x ^= 0x11D
+    for i in range(255, 512):
+        exp[i] = exp[i - 255]
+    return exp, log
+
+
+_QR_GF_EXP, _QR_GF_LOG = _qr_gf_tables()
+
+
+def _qr_gf_mul(a: int, b: int) -> int:
+    if a == 0 or b == 0:
+        return 0
+    return _QR_GF_EXP[_QR_GF_LOG[a] + _QR_GF_LOG[b]]
+
+
+def _qr_rs_generator(degree: int) -> list[int]:
+    poly = [1]
+    for i in range(degree):
+        next_poly = [0] * (len(poly) + 1)
+        root = _QR_GF_EXP[i]
+        for j, coef in enumerate(poly):
+            next_poly[j] ^= coef
+            next_poly[j + 1] ^= _qr_gf_mul(coef, root)
+        poly = next_poly
+    return poly
+
+
+_QR_RS_GENERATOR = _qr_rs_generator(QR_EC_CODEWORDS)
+
+
+def _qr_rs_remainder(data: list[int]) -> list[int]:
+    result = [0] * QR_EC_CODEWORDS
+    for value in data:
+        factor = value ^ result[0]
+        result = result[1:] + [0]
+        for i in range(QR_EC_CODEWORDS):
+            result[i] ^= _qr_gf_mul(_QR_RS_GENERATOR[i + 1], factor)
+    return result
+
+
+def _qr_data_codewords(text: str) -> list[int]:
+    payload = text.encode("utf-8")
+    bits: list[int] = []
+
+    def append(value: int, width: int) -> None:
+        for shift in range(width - 1, -1, -1):
+            bits.append((value >> shift) & 1)
+
+    append(0b0100, 4)  # byte mode
+    append(len(payload), 8)
+    for byte in payload:
+        append(byte, 8)
+
+    capacity = QR_DATA_CODEWORDS * 8
+    if len(bits) > capacity:
+        raise ValueError("mobile URL is too long for the built-in QR code")
+
+    bits.extend([0] * min(4, capacity - len(bits)))
+    while len(bits) % 8:
+        bits.append(0)
+
+    codewords = [
+        sum(bits[i + bit] << (7 - bit) for bit in range(8))
+        for i in range(0, len(bits), 8)
+    ]
+    pad = 0
+    while len(codewords) < QR_DATA_CODEWORDS:
+        codewords.append(0xEC if pad % 2 == 0 else 0x11)
+        pad += 1
+    return codewords
+
+
+def _qr_format_bits() -> int:
+    data = (QR_EC_LEVEL_L << 3) | QR_MASK_PATTERN
+    rem = data
+    for _ in range(10):
+        rem = (rem << 1) ^ (0x537 if (rem >> 9) & 1 else 0)
+    return ((data << 10) | (rem & 0x3FF)) ^ 0x5412
+
+
+def _qr_make_matrix(text: str) -> list[list[int]]:
+    data = _qr_data_codewords(text)
+    codewords = data + _qr_rs_remainder(data)
+    data_bits = [
+        (codeword >> shift) & 1
+        for codeword in codewords
+        for shift in range(7, -1, -1)
+    ]
+    size = QR_SIZE
+    modules: list[list[int | None]] = [[None for _ in range(size)] for _ in range(size)]
+    reserved = [[False for _ in range(size)] for _ in range(size)]
+
+    def set_module(x: int, y: int, dark: bool, reserve: bool = True) -> None:
+        if 0 <= x < size and 0 <= y < size:
+            modules[y][x] = 1 if dark else 0
+            if reserve:
+                reserved[y][x] = True
+
+    def add_finder(x0: int, y0: int) -> None:
+        for y in range(y0 - 1, y0 + 8):
+            for x in range(x0 - 1, x0 + 8):
+                set_module(x, y, False)
+        for y in range(7):
+            for x in range(7):
+                dark = x in (0, 6) or y in (0, 6) or (2 <= x <= 4 and 2 <= y <= 4)
+                set_module(x0 + x, y0 + y, dark)
+
+    def add_alignment(cx: int, cy: int) -> None:
+        if reserved[cy][cx]:
+            return
+        for y in range(-2, 3):
+            for x in range(-2, 3):
+                dark = max(abs(x), abs(y)) != 1
+                set_module(cx + x, cy + y, dark)
+
+    add_finder(0, 0)
+    add_finder(size - 7, 0)
+    add_finder(0, size - 7)
+    add_alignment(26, 26)
+
+    for i in range(size):
+        if not reserved[6][i]:
+            set_module(i, 6, i % 2 == 0)
+        if not reserved[i][6]:
+            set_module(6, i, i % 2 == 0)
+
+    # Reserve format cells before data placement, then fill them below.
+    for x, y in (
+        [(8, i) for i in range(6)]
+        + [(8, 7), (8, 8), (7, 8)]
+        + [(i, 8) for i in range(6)]
+        + [(size - 1 - i, 8) for i in range(8)]
+        + [(8, size - 15 + i) for i in range(8, 15)]
+    ):
+        set_module(x, y, False)
+    set_module(8, size - 8, True)
+
+    bit_index = 0
+    upward = True
+    x = size - 1
+    while x > 0:
+        if x == 6:
+            x -= 1
+        for row in range(size):
+            y = size - 1 - row if upward else row
+            for dx in (0, 1):
+                xx = x - dx
+                if reserved[y][xx]:
+                    continue
+                bit = data_bits[bit_index] if bit_index < len(data_bits) else 0
+                if (xx + y) % 2 == 0:
+                    bit ^= 1
+                set_module(xx, y, bool(bit), reserve=False)
+                bit_index += 1
+        upward = not upward
+        x -= 2
+
+    fmt = _qr_format_bits()
+
+    def fmt_bit(i: int) -> bool:
+        return ((fmt >> i) & 1) != 0
+
+    for i in range(6):
+        set_module(8, i, fmt_bit(i))
+    set_module(8, 7, fmt_bit(6))
+    set_module(8, 8, fmt_bit(7))
+    set_module(7, 8, fmt_bit(8))
+    for i in range(9, 15):
+        set_module(14 - i, 8, fmt_bit(i))
+
+    for i in range(8):
+        set_module(size - 1 - i, 8, fmt_bit(i))
+    for i in range(8, 15):
+        set_module(8, size - 15 + i, fmt_bit(i))
+
+    return [[1 if value else 0 for value in row] for row in modules]
+
+
+def qr_svg(text: str) -> str:
+    if not text:
+        return ""
+
+    try:
+        matrix = _qr_make_matrix(text)
+    except ValueError:
+        return ""
+
+    quiet = 4
+    size = len(matrix) + quiet * 2
+    path = []
+    for y, row in enumerate(matrix):
+        for x, dark in enumerate(row):
+            if dark:
+                path.append(f"M{x + quiet},{y + quiet}h1v1h-1z")
+
+    return (
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {size} {size}" '
+        'role="img" aria-label="Mobile access QR code">'
+        f'<rect width="{size}" height="{size}" fill="#fff"/>'
+        f'<path fill="#0f2f5f" d="{"".join(path)}"/>'
+        "</svg>"
+    )
+
+
 def _compact_long_text_value(
     value: str,
     limit: int = COMPACT_BINDING_VALUE_LIMIT,
@@ -1946,6 +2594,15 @@ def precision_numeric_tokens(text: str, precision: int) -> str:
         precision_match,
         text,
     )
+
+
+def precision_limit_result_fields(fields: dict[str, str], precision: int) -> None:
+    for key in ("expression", "tex", "function"):
+        value = fields.get(key, "")
+        if not value:
+            continue
+        fields[f"raw_{key}"] = value
+        fields[key] = precision_numeric_tokens(value, precision)
 
 
 def compact_display_text(text: str) -> str:
@@ -2365,6 +3022,9 @@ def goal_seek_expression(
 
 class DvalLabHandler(http.server.BaseHTTPRequestHandler):
     binary: Path = DEFAULT_BIN
+    server_host: str = "127.0.0.1"
+    server_port: int = 0
+    mobile_url: str = ""
 
     def log_message(self, fmt: str, *args: object) -> None:
         print(f"dval_lab: {fmt % args}", file=sys.stderr)
@@ -2387,9 +3047,20 @@ class DvalLabHandler(http.server.BaseHTTPRequestHandler):
             self.send_error(404)
             return
 
-        page = INDEX_HTML.replace(
-            "__INITIAL_EXPRESSION__",
-            html.escape(load_state_expression(), quote=False),
+        mobile_url = mobile_access_url(
+            self.server_host,
+            self.server_port,
+            self.headers.get("Host", ""),
+        ) or self.mobile_url
+        mobile_qr = qr_svg(mobile_url)
+        page = (
+            INDEX_HTML.replace(
+                "__INITIAL_EXPRESSION__",
+                html.escape(load_state_expression(), quote=False),
+            )
+            .replace("__MOBILE_URL__", html.escape(mobile_url, quote=False))
+            .replace("__MOBILE_QR_SVG__", mobile_qr)
+            .replace("__MOBILE_CARD_CLASS__", "" if mobile_url and mobile_qr else "hidden")
         )
         data = page.encode("utf-8")
         self.send_response(200)
@@ -2458,26 +3129,18 @@ class DvalLabHandler(http.server.BaseHTTPRequestHandler):
                 self.send_json(422, {"ok": False, "error": str(exc)})
                 return
 
-            save_state_expression(expression_for_editor(solved))
             fields["ok"] = True
             fields["expression"] = solved
             fields["precision"] = precision
+            precision_limit_result_fields(fields, precision)
+            save_state_expression(expression_for_editor(fields["expression"]))
             if fields.get("value"):
                 fields["value"] = format_number_text_for_precision(fields["value"], precision)
             if fields.get("residual"):
                 fields["residual"] = format_number_text_for_precision(fields["residual"], precision)
-            fields["full_display_expression"] = precision_numeric_tokens(
-                fields.get("expression", ""),
-                precision,
-            )
-            fields["full_display_tex"] = precision_numeric_tokens(
-                fields.get("tex", ""),
-                precision,
-            )
-            fields["full_display_function"] = precision_numeric_tokens(
-                fields.get("function", ""),
-                precision,
-            )
+            fields["full_display_expression"] = fields.get("expression", "")
+            fields["full_display_tex"] = fields.get("tex", "")
+            fields["full_display_function"] = fields.get("function", "")
             fields["display_expression"] = compact_display_text(fields["full_display_expression"])
             fields["display_tex"] = compact_display_text(fields["full_display_tex"])
             fields["display_function"] = compact_function_text(fields["full_display_function"])
@@ -2547,21 +3210,13 @@ class DvalLabHandler(http.server.BaseHTTPRequestHandler):
                 fields["derivative_value"], precision
             )
 
+        precision_limit_result_fields(fields, precision)
         if fields.get("expression"):
-            save_state_expression(expression_for_editor(expression))
+            save_state_expression(expression_for_editor(fields["expression"]))
 
-        fields["full_display_expression"] = precision_numeric_tokens(
-            fields.get("expression", ""),
-            precision,
-        )
-        fields["full_display_tex"] = precision_numeric_tokens(
-            fields.get("tex", ""),
-            precision,
-        )
-        fields["full_display_function"] = precision_numeric_tokens(
-            fields.get("function", ""),
-            precision,
-        )
+        fields["full_display_expression"] = fields.get("expression", "")
+        fields["full_display_tex"] = fields.get("tex", "")
+        fields["full_display_function"] = fields.get("function", "")
         fields["display_expression"] = compact_display_text(fields["full_display_expression"])
         fields["display_tex"] = compact_display_text(fields["full_display_tex"])
         fields["display_function"] = compact_function_text(fields["full_display_function"])
@@ -2582,7 +3237,7 @@ class DvalLabHandler(http.server.BaseHTTPRequestHandler):
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Launch the local MARS dval expression lab.")
-    parser.add_argument("--host", default="127.0.0.1", help="host to bind")
+    parser.add_argument("--host", default="0.0.0.0", help="host to bind")
     parser.add_argument("--port", type=int, default=0, help="port to bind, or 0 for auto")
     parser.add_argument("--no-browser", action="store_true", help="do not open the browser automatically")
     parser.add_argument("--binary", type=Path, default=DEFAULT_BIN, help="path to try_dval binary")
@@ -2594,10 +3249,18 @@ def main() -> int:
     DvalLabHandler.binary = binary
 
     port = args.port or find_free_port(args.host)
+    DvalLabHandler.server_host = args.host
+    DvalLabHandler.server_port = port
+    DvalLabHandler.mobile_url = mobile_access_url(args.host, port)
     server = http.server.ThreadingHTTPServer((args.host, port), DvalLabHandler)
-    url = f"http://{args.host}:{port}/"
+    browser_host = "127.0.0.1" if args.host in ("0.0.0.0", "::", "::0") else args.host
+    if ":" in browser_host and not browser_host.startswith("["):
+        browser_host = f"[{browser_host}]"
+    url = f"http://{browser_host}:{port}/"
 
     print(f"MARS dval Lab running at {url}")
+    if DvalLabHandler.mobile_url:
+        print(f"Mobile access: {DvalLabHandler.mobile_url}")
     print("Press Ctrl+C to stop.")
 
     if not args.no_browser:

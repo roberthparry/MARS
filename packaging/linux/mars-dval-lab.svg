@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="MARS dval Lab">
+  <defs>
+    <linearGradient id="bg" x1="32" y1="20" x2="224" y2="236" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#102a43"/>
+      <stop offset="0.55" stop-color="#073b4c"/>
+      <stop offset="1" stop-color="#005f73"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="122" cy="104" r="140" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#d8fff6" stop-opacity="0.95"/>
+      <stop offset="0.36" stop-color="#70d6c9" stop-opacity="0.34"/>
+      <stop offset="1" stop-color="#70d6c9" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="card" x1="56" y1="54" x2="200" y2="205" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fffaf0"/>
+      <stop offset="1" stop-color="#f7d9a8"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="170%">
+      <feDropShadow dx="0" dy="14" stdDeviation="12" flood-color="#031721" flood-opacity="0.38"/>
+    </filter>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="3"/>
+    </filter>
+  </defs>
+
+  <rect width="256" height="256" rx="52" fill="url(#bg)"/>
+  <circle cx="124" cy="104" r="104" fill="url(#glow)"/>
+
+  <g opacity="0.42" fill="none" stroke="#d8fff6" stroke-width="3">
+    <ellipse cx="128" cy="132" rx="92" ry="35" transform="rotate(-18 128 132)"/>
+    <ellipse cx="128" cy="132" rx="92" ry="35" transform="rotate(28 128 132)"/>
+  </g>
+
+  <circle cx="208" cy="76" r="9" fill="#ffd166" filter="url(#soft)"/>
+  <circle cx="208" cy="76" r="5.5" fill="#ffe7a3"/>
+
+  <g filter="url(#shadow)">
+    <rect x="50" y="48" width="156" height="160" rx="28" fill="url(#card)"/>
+    <rect x="62" y="61" width="132" height="134" rx="20" fill="#fffaf4" opacity="0.92"/>
+  </g>
+
+  <path d="M79 151c18 18 80 18 98 0" fill="none" stroke="#0a4d68" stroke-width="8" stroke-linecap="round" opacity="0.18"/>
+  <text x="128" y="130"
+        text-anchor="middle"
+        font-family="STIX Two Math, Cambria Math, DejaVu Serif, serif"
+        font-size="75"
+        font-weight="700"
+        fill="#073b4c">∂x</text>
+  <text x="128" y="168"
+        text-anchor="middle"
+        font-family="STIX Two Math, Cambria Math, DejaVu Serif, serif"
+        font-size="36"
+        font-style="italic"
+        fill="#007f73">π·e<tspan baseline-shift="super" font-size="22">x</tspan></text>
+</svg>

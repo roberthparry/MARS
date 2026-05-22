@@ -104,6 +104,7 @@ typedef dval_t *(*dval_apply_unary_fn)(const dval_t *arg);
 typedef dval_t *(*dval_apply_binary_fn)(const dval_t *left, const dval_t *right);
 typedef dval_t *(*dval_simplify_fn)(const dval_t *tmpl, dval_t *a, dval_t *b);
 typedef int (*dval_fold_const_unary_fn)(const number_t *in, number_t *out);
+typedef dval_t *(*dval_inverse_unary_fn)(const dval_t *arg);
 typedef void (*dval_reverse_fn)(const dval_t *dv, const number_t *out_bar,
                                 number_t *a_bar, number_t *b_bar);
 
@@ -134,6 +135,19 @@ typedef struct dval_ops {
 
     /** TeX presentation name for renderers that emit native TeX. */
     const char  *tex_name;
+
+    /**
+     * Optional direct inverse for safe structural simplification:
+     * op(op->direct_inverse(x)) -> x.
+     */
+    const struct dval_ops *direct_inverse;
+
+    /**
+     * Optional internal inverse constructor. This is metadata for symbolic
+     * rewrites and solver machinery, not a public API promise. Branch-sensitive
+     * pairs still need guards before simplifying inverse(op(x)) -> x.
+     */
+    dval_inverse_unary_fn inverse_unary;
 
     /**
      * Convenience constructor for unary ops: builds a new node wrapping @p arg.

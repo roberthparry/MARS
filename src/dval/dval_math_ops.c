@@ -19,6 +19,29 @@ static inline dval_t *dv_math_wrap_binary(const dval_ops_t *ops, const dval_t *a
     return dv_new_binary_internal(ops, a, b);
 }
 
+static dval_t *dv_inverse_log10_internal(const dval_t *a)
+{
+    dval_t *ten = dv_new_const(NUM_TEN);
+    dval_t *out = dv_pow_dv(ten, a);
+
+    dv_free(ten);
+    return out;
+}
+
+static dval_t *dv_inverse_sqrt_internal(const dval_t *a)
+{
+    return dv_pow(a, &NUM_TWO);
+}
+
+static dval_t *dv_inverse_lambert_internal(const dval_t *a)
+{
+    dval_t *exp_a = dv_exp(a);
+    dval_t *out = exp_a ? dv_mul(a, exp_a) : NULL;
+
+    dv_free(exp_a);
+    return out;
+}
+
 const dval_ops_t ops_atan2 = {
     .eval = eval_atan2, .deriv = deriv_atan2, .reverse = dv_reverse_atan2,
     .kind = DV_KIND_ATAN2, .arity = DV_OP_BINARY, .name = "atan2",
@@ -31,6 +54,8 @@ const dval_ops_t ops_sin = {
     .eval = eval_sin, .deriv = deriv_sin, .reverse = dv_reverse_sin,
     .kind = DV_KIND_SIN, .arity = DV_OP_UNARY, .name = "sin",
     .tex_name = "\\sin",
+    .direct_inverse = &ops_asin,
+    .inverse_unary = dv_asin,
     .apply_unary = dv_sin, .apply_binary = NULL,
     .simplify = dv_simplify_unary_operator, .fold_const_unary = dv_fold_zero_to_zero
 };
@@ -38,6 +63,8 @@ const dval_ops_t ops_cos = {
     .eval = eval_cos, .deriv = deriv_cos, .reverse = dv_reverse_cos,
     .kind = DV_KIND_COS, .arity = DV_OP_UNARY, .name = "cos",
     .tex_name = "\\cos",
+    .direct_inverse = &ops_acos,
+    .inverse_unary = dv_acos,
     .apply_unary = dv_cos, .apply_binary = NULL,
     .simplify = dv_simplify_unary_operator, .fold_const_unary = dv_fold_cos_const
 };
@@ -45,6 +72,8 @@ const dval_ops_t ops_tan = {
     .eval = eval_tan, .deriv = deriv_tan, .reverse = dv_reverse_tan,
     .kind = DV_KIND_TAN, .arity = DV_OP_UNARY, .name = "tan",
     .tex_name = "\\tan",
+    .direct_inverse = &ops_atan,
+    .inverse_unary = dv_atan,
     .apply_unary = dv_tan, .apply_binary = NULL,
     .simplify = dv_simplify_unary_operator, .fold_const_unary = dv_fold_zero_to_zero
 };
@@ -52,6 +81,8 @@ const dval_ops_t ops_sinh = {
     .eval = eval_sinh, .deriv = deriv_sinh, .reverse = dv_reverse_sinh,
     .kind = DV_KIND_SINH, .arity = DV_OP_UNARY, .name = "sinh",
     .tex_name = "\\sinh",
+    .direct_inverse = &ops_asinh,
+    .inverse_unary = dv_asinh,
     .apply_unary = dv_sinh, .apply_binary = NULL,
     .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
 };
@@ -59,6 +90,8 @@ const dval_ops_t ops_cosh = {
     .eval = eval_cosh, .deriv = deriv_cosh, .reverse = dv_reverse_cosh,
     .kind = DV_KIND_COSH, .arity = DV_OP_UNARY, .name = "cosh",
     .tex_name = "\\cosh",
+    .direct_inverse = &ops_acosh,
+    .inverse_unary = dv_acosh,
     .apply_unary = dv_cosh, .apply_binary = NULL,
     .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
 };
@@ -66,6 +99,8 @@ const dval_ops_t ops_tanh = {
     .eval = eval_tanh, .deriv = deriv_tanh, .reverse = dv_reverse_tanh,
     .kind = DV_KIND_TANH, .arity = DV_OP_UNARY, .name = "tanh",
     .tex_name = "\\tanh",
+    .direct_inverse = &ops_atanh,
+    .inverse_unary = dv_atanh,
     .apply_unary = dv_tanh, .apply_binary = NULL,
     .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
 };
@@ -73,6 +108,7 @@ const dval_ops_t ops_asin = {
     .eval = eval_asin, .deriv = deriv_asin, .reverse = dv_reverse_asin,
     .kind = DV_KIND_ASIN, .arity = DV_OP_UNARY, .name = "asin",
     .tex_name = "\\arcsin",
+    .inverse_unary = dv_sin,
     .apply_unary = dv_asin, .apply_binary = NULL,
     .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
 };
@@ -80,6 +116,7 @@ const dval_ops_t ops_acos = {
     .eval = eval_acos, .deriv = deriv_acos, .reverse = dv_reverse_acos,
     .kind = DV_KIND_ACOS, .arity = DV_OP_UNARY, .name = "acos",
     .tex_name = "\\arccos",
+    .inverse_unary = dv_cos,
     .apply_unary = dv_acos, .apply_binary = NULL,
     .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
 };
@@ -87,6 +124,7 @@ const dval_ops_t ops_atan = {
     .eval = eval_atan, .deriv = deriv_atan, .reverse = dv_reverse_atan,
     .kind = DV_KIND_ATAN, .arity = DV_OP_UNARY, .name = "atan",
     .tex_name = "\\arctan",
+    .inverse_unary = dv_tan,
     .apply_unary = dv_atan, .apply_binary = NULL,
     .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
 };
@@ -94,6 +132,7 @@ const dval_ops_t ops_asinh = {
     .eval = eval_asinh, .deriv = deriv_asinh, .reverse = dv_reverse_asinh,
     .kind = DV_KIND_ASINH, .arity = DV_OP_UNARY, .name = "asinh",
     .tex_name = "\\operatorname{asinh}",
+    .inverse_unary = dv_sinh,
     .apply_unary = dv_asinh, .apply_binary = NULL,
     .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
 };
@@ -101,6 +140,7 @@ const dval_ops_t ops_acosh = {
     .eval = eval_acosh, .deriv = deriv_acosh, .reverse = dv_reverse_acosh,
     .kind = DV_KIND_ACOSH, .arity = DV_OP_UNARY, .name = "acosh",
     .tex_name = "\\operatorname{acosh}",
+    .inverse_unary = dv_cosh,
     .apply_unary = dv_acosh, .apply_binary = NULL,
     .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
 };
@@ -108,6 +148,7 @@ const dval_ops_t ops_atanh = {
     .eval = eval_atanh, .deriv = deriv_atanh, .reverse = dv_reverse_atanh,
     .kind = DV_KIND_ATANH, .arity = DV_OP_UNARY, .name = "atanh",
     .tex_name = "\\operatorname{atanh}",
+    .inverse_unary = dv_tanh,
     .apply_unary = dv_atanh, .apply_binary = NULL,
     .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
 };
@@ -115,6 +156,8 @@ const dval_ops_t ops_exp = {
     .eval = eval_exp, .deriv = deriv_exp, .reverse = dv_reverse_exp,
     .kind = DV_KIND_EXP, .arity = DV_OP_UNARY, .name = "exp",
     .tex_name = "\\exp",
+    .direct_inverse = &ops_log,
+    .inverse_unary = dv_log,
     .apply_unary = dv_exp, .apply_binary = NULL,
     .simplify = dv_simplify_unary_operator, .fold_const_unary = dv_fold_exp_const
 };
@@ -122,6 +165,8 @@ const dval_ops_t ops_log = {
     .eval = eval_log, .deriv = deriv_log, .reverse = dv_reverse_log,
     .kind = DV_KIND_LOG, .arity = DV_OP_UNARY, .name = "ln",
     .tex_name = "\\ln",
+    .direct_inverse = &ops_exp,
+    .inverse_unary = dv_exp,
     .apply_unary = dv_log, .apply_binary = NULL,
     .simplify = dv_simplify_unary_operator, .fold_const_unary = dv_fold_log_const
 };
@@ -129,6 +174,7 @@ const dval_ops_t ops_log10 = {
     .eval = eval_log10, .deriv = deriv_log10, .reverse = dv_reverse_log10,
     .kind = DV_KIND_LOG10, .arity = DV_OP_UNARY, .name = "log",
     .tex_name = "\\log",
+    .inverse_unary = dv_inverse_log10_internal,
     .apply_unary = dv_log10, .apply_binary = NULL,
     .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
 };
@@ -136,6 +182,7 @@ const dval_ops_t ops_sqrt = {
     .eval = eval_sqrt, .deriv = deriv_sqrt, .reverse = dv_reverse_sqrt,
     .kind = DV_KIND_SQRT, .arity = DV_OP_UNARY, .name = "sqrt",
     .tex_name = "\\sqrt",
+    .inverse_unary = dv_inverse_sqrt_internal,
     .apply_unary = dv_sqrt, .apply_binary = NULL,
     .simplify = dv_simplify_unary_operator, .fold_const_unary = dv_fold_sqrt_const
 };
@@ -164,6 +211,8 @@ const dval_ops_t ops_erf = {
     .eval = eval_erf, .deriv = deriv_erf, .reverse = dv_reverse_erf,
     .kind = DV_KIND_ERF, .arity = DV_OP_UNARY, .name = "erf",
     .tex_name = "\\operatorname{erf}",
+    .direct_inverse = &ops_erfinv,
+    .inverse_unary = dv_erfinv,
     .apply_unary = dv_erf, .apply_binary = NULL,
     .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
 };
@@ -171,6 +220,8 @@ const dval_ops_t ops_erfc = {
     .eval = eval_erfc, .deriv = deriv_erfc, .reverse = dv_reverse_erfc,
     .kind = DV_KIND_ERFC, .arity = DV_OP_UNARY, .name = "erfc",
     .tex_name = "\\operatorname{erfc}",
+    .direct_inverse = &ops_erfcinv,
+    .inverse_unary = dv_erfcinv,
     .apply_unary = dv_erfc, .apply_binary = NULL,
     .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
 };
@@ -192,6 +243,7 @@ const dval_ops_t ops_erfinv = {
     .eval = eval_erfinv, .deriv = deriv_erfinv, .reverse = dv_reverse_erfinv,
     .kind = DV_KIND_ERFINV, .arity = DV_OP_UNARY, .name = "erfinv",
     .tex_name = "\\operatorname{erf}^{-1}",
+    .inverse_unary = dv_erf,
     .apply_unary = dv_erfinv, .apply_binary = NULL,
     .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
 };
@@ -199,6 +251,7 @@ const dval_ops_t ops_erfcinv = {
     .eval = eval_erfcinv, .deriv = deriv_erfcinv, .reverse = dv_reverse_erfcinv,
     .kind = DV_KIND_ERFCINV, .arity = DV_OP_UNARY, .name = "erfcinv",
     .tex_name = "\\operatorname{erfc}^{-1}",
+    .inverse_unary = dv_erfc,
     .apply_unary = dv_erfcinv, .apply_binary = NULL,
     .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
 };
@@ -206,6 +259,8 @@ const dval_ops_t ops_gamma = {
     .eval = eval_gamma, .deriv = deriv_gamma, .reverse = dv_reverse_gamma,
     .kind = DV_KIND_GAMMA, .arity = DV_OP_UNARY, .name = "gamma",
     .tex_name = "\\Gamma",
+    .direct_inverse = &ops_gammainv,
+    .inverse_unary = dv_gammainv,
     .apply_unary = dv_gamma, .apply_binary = NULL,
     .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
 };
@@ -227,6 +282,7 @@ const dval_ops_t ops_gammainv = {
     .eval = eval_gammainv, .deriv = deriv_gammainv, .reverse = dv_reverse_gammainv,
     .kind = DV_KIND_GAMMAINV, .arity = DV_OP_UNARY, .name = "gammainv",
     .tex_name = "\\operatorname{gammainv}",
+    .inverse_unary = dv_gamma,
     .apply_unary = dv_gammainv, .apply_binary = NULL,
     .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
 };
@@ -234,6 +290,7 @@ const dval_ops_t ops_lambert_w0 = {
     .eval = eval_lambert_w0, .deriv = deriv_lambert_w0, .reverse = dv_reverse_lambert_w0,
     .kind = DV_KIND_LAMBERT_W0, .arity = DV_OP_UNARY, .name = "W₀",
     .tex_name = "W_{0}",
+    .inverse_unary = dv_inverse_lambert_internal,
     .apply_unary = dv_lambert_w0, .apply_binary = NULL,
     .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
 };
@@ -241,6 +298,7 @@ const dval_ops_t ops_lambert_wm1 = {
     .eval = eval_lambert_wm1, .deriv = deriv_lambert_wm1, .reverse = dv_reverse_lambert_wm1,
     .kind = DV_KIND_LAMBERT_WM1, .arity = DV_OP_UNARY, .name = "W₋₁",
     .tex_name = "W_{-1}",
+    .inverse_unary = dv_inverse_lambert_internal,
     .apply_unary = dv_lambert_wm1, .apply_binary = NULL,
     .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
 };

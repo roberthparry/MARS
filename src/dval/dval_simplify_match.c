@@ -1,6 +1,60 @@
 #include <stdlib.h>
+#include <string.h>
 
 #include "dval_internal.h"
+
+static int binding_expr_struct_eq(const dv_binding_expr_t *u,
+                                  const dv_binding_expr_t *v)
+{
+    if (u == v)
+        return 1;
+    if (!u || !v || u->kind != v->kind)
+        return 0;
+
+    switch (u->kind) {
+        case DV_BINDING_EXPR_NUMBER:
+            if (!u->u.text || !v->u.text)
+                return u->u.text == v->u.text;
+            return strcmp(u->u.text, v->u.text) == 0;
+        case DV_BINDING_EXPR_CONST:
+            return u->u.const_id == v->u.const_id;
+        case DV_BINDING_EXPR_NEG:
+            return binding_expr_struct_eq(u->u.unary.child,
+                                          v->u.unary.child);
+        case DV_BINDING_EXPR_ADD:
+        case DV_BINDING_EXPR_SUB:
+        case DV_BINDING_EXPR_MUL:
+        case DV_BINDING_EXPR_DIV:
+            return binding_expr_struct_eq(u->u.binary.left,
+                                          v->u.binary.left) &&
+                   binding_expr_struct_eq(u->u.binary.right,
+                                          v->u.binary.right);
+        case DV_BINDING_EXPR_POWI:
+            return u->u.powi.exponent == v->u.powi.exponent &&
+                   binding_expr_struct_eq(u->u.powi.base,
+                                          v->u.powi.base);
+        case DV_BINDING_EXPR_UNARY_OP:
+            return u->u.unary_op.ops == v->u.unary_op.ops &&
+                   binding_expr_struct_eq(u->u.unary_op.child,
+                                          v->u.unary_op.child);
+        case DV_BINDING_EXPR_BINARY_OP:
+            return u->u.binary_op.ops == v->u.binary_op.ops &&
+                   binding_expr_struct_eq(u->u.binary_op.left,
+                                          v->u.binary_op.left) &&
+                   binding_expr_struct_eq(u->u.binary_op.right,
+                                          v->u.binary_op.right);
+    }
+
+    return 0;
+}
+
+static int const_struct_eq(const dval_t *u, const dval_t *v)
+{
+    if (u->binding_expr || v->binding_expr)
+        return binding_expr_struct_eq(u->binding_expr, v->binding_expr);
+
+    return num_eq(u->c, v->c);
+}
 
 static void *dv_match_xrealloc(void *ptr, size_t size)
 {
@@ -19,7 +73,8 @@ static void collect_mul_factors_borrowed(const dval_t *dv,
                                          size_t *cap)
 {
     NUM_SCOPE(scope);
-    if (dv_is_unnamed_const(dv) && num_is_real(dv->c)) {
+    if (dv_is_unnamed_const(dv) && num_is_real(dv->c) &&
+        (!dv->binding_expr || dv->binding_expr->kind == DV_BINDING_EXPR_NUMBER)) {
         number_t product = num_mul(*c_acc, dv->c);
 
         num_destroy(c_acc);
@@ -104,7 +159,7 @@ int dv_struct_eq(const dval_t *u, const dval_t *v)
     if (u->ops != v->ops)
         return 0;
     if (dv_is_const(u))
-        return num_eq(u->c, v->c);
+        return const_struct_eq(u, v);
     if (dv_is_var(u))
         return u == v;
     if (dv_is_mul(u))

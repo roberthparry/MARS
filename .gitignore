@@ -74,5 +74,10 @@ tests/**/*.log
 tests/**/*.pdf
 tests/**/*.synctex.gz
 
+# Local desktop launcher/icon byproducts for MARS dval Lab
+packaging/linux/*.desktop
+packaging/linux/*.png
+
 .codex
 .dval_lab_state.json
+tools/mars-dval-lab

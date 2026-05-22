@@ -8,19 +8,12 @@
 
 #include "number.h"
 #include "number_internal.h"
+#include "internal/number_internal.h"
 #include "internal/mint_internal.h"
 #include "number_scope_alloc.h"
 #include "mcomplex/mcomplex_internal.h"
 #include "mfloat/mfloat_internal.h"
 #include "mrational/mrational_internal.h"
-
-#if defined(_MSC_VER)
-#define NUMBER_THREAD_LOCAL __declspec(thread)
-#elif defined(__GNUC__) || defined(__clang__)
-#define NUMBER_THREAD_LOCAL __thread
-#else
-#define NUMBER_THREAD_LOCAL
-#endif
 
 typedef struct number_scope_record_t {
     number_kind_t kind;
@@ -68,8 +61,8 @@ struct num_scope_t {
     int active;
 };
 
-static NUMBER_THREAD_LOCAL num_scope_t *number_scope_current = NULL;
-static NUMBER_THREAD_LOCAL size_t number_scope_suspend_depth = 0u;
+static num_scope_t *number_scope_current = NULL;
+static size_t number_scope_suspend_depth = 0u;
 static bool number_value_is_immortal(const number_t *number);
 void number_destroy_none(number_t *number);
 
@@ -3226,6 +3219,73 @@ size_t num_get_effective_prec_bits(const number_t number)
 
     return vt && vt->get_effective_precision
         ? vt->get_effective_precision(&number) : 0u;
+}
+
+bool num_is_mfloat_backend(number_t number)
+{
+    return number_kind_value(&number) == NUMBER_MFLOAT;
+}
+
+bool num_is_mcomplex_backend(number_t number)
+{
+    return number_kind_value(&number) == NUMBER_MCOMPLEX;
+}
+
+bool num_get_small_rational(number_t number, long *numerator, long *denominator)
+{
+    const number_private_t *impl = number_impl_const(&number);
+    const mint_t *num_mint;
+    const mint_t *den_mint;
+    long n;
+    long d;
+
+    if (!numerator || !denominator || !num_is_real(number))
+        return false;
+
+    if (impl->kind == NUMBER_MINT) {
+        if (!mi_get_long(impl->value.mi, &n))
+            return false;
+        *numerator = n;
+        *denominator = 1L;
+        return true;
+    }
+
+    if (impl->kind != NUMBER_MRATIONAL)
+        return false;
+
+    num_mint = mr_numerator(impl->value.mr);
+    den_mint = mr_denominator(impl->value.mr);
+    if (!mi_get_long(num_mint, &n) || !mi_get_long(den_mint, &d) || d == 0L)
+        return false;
+    if (d < 0L) {
+        n = -n;
+        d = -d;
+    }
+    *numerator = n;
+    *denominator = d;
+    return true;
+}
+
+number_t num_as_mfloat_prec(number_t number, size_t precision_bits)
+{
+    number_t *boxed = number_coerce(&number, NUMBER_MFLOAT);
+
+    if (!boxed)
+        return number_invalid();
+    if (precision_bits > 0u)
+        num_set_prec_bits(boxed, precision_bits);
+    return number_take(boxed);
+}
+
+number_t num_as_mcomplex_prec(number_t number, size_t precision_bits)
+{
+    number_t *boxed = number_coerce(&number, NUMBER_MCOMPLEX);
+
+    if (!boxed)
+        return number_invalid();
+    if (precision_bits > 0u)
+        num_set_prec_bits(boxed, precision_bits);
+    return number_take(boxed);
 }
 
 char *num_to_string(const number_t number)
