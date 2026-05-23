@@ -998,7 +998,7 @@ static dval_t *parse_power(parser_t *p)
             }
         }
 
-        if (dv_is_unnamed_const(exponent) &&
+        if (dv_is_unnamed_const(exponent) && num_is_real(exponent->c) &&
             (!exponent->binding_expr || !node_has_preserved_constexpr(base))) {
             result = apply_pow_const_preserving_constexpr(base, &exponent->c);
             dv_free(exponent);

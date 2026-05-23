@@ -3,6 +3,8 @@
 
 #include <string.h>
 
+#include <mpc.h>
+
 #include "number.h"
 
 typedef enum number_kind_t {
@@ -13,7 +15,7 @@ typedef enum number_kind_t {
     NUMBER_MINT,
     NUMBER_MRATIONAL,
     NUMBER_MFLOAT,
-    NUMBER_MCOMPLEX
+    NUMBER_COMPLEX
 } number_kind_t;
 
 typedef enum number_math_family_t {
@@ -21,7 +23,7 @@ typedef enum number_math_family_t {
     NUMBER_MATH_QREAL,
     NUMBER_MATH_QCOMPLEX,
     NUMBER_MATH_MREAL,
-    NUMBER_MATH_MCOMPLEX
+    NUMBER_MATH_COMPLEX
 } number_math_family_t;
 
 typedef enum number_const_id_t number_const_id_t;
@@ -84,6 +86,7 @@ typedef struct number_vtable_t {
 } number_vtable_t;
 
 typedef number_t *(*number_coerce_fn)(const number_t *number);
+typedef struct complex_t complex_t;
 
 typedef struct {
     number_kind_t kind;
@@ -94,9 +97,18 @@ typedef struct {
         mint_t *mi;
         mrational_t *mr;
         mfloat_t *mf;
-        mcomplex_t *mc;
+        complex_t *cx;
     } value;
 } number_private_t;
+
+typedef struct complex_t {
+    int constant_id;
+    size_t precision_bits;
+    number_t real;
+    number_t imag;
+    bool mpc_cache_valid;
+    mpc_t mpc_cache;
+} complex_t;
 
 typedef enum number_binary_op_t {
     NUMBER_OP_ADD,
@@ -132,10 +144,11 @@ typedef enum number_const_id_t {
     NUMBER_CONST_INF,
     NUMBER_CONST_NINF,
     NUMBER_CONST_I,
+    NUMBER_CONST_NEG_I,
     NUMBER_CONST_COUNT
 } number_const_id_t;
 
-extern const number_math_family_t number_math_family_binary_table[][NUMBER_MATH_MCOMPLEX + 1];
+extern const number_math_family_t number_math_family_binary_table[][NUMBER_MATH_COMPLEX + 1];
 extern const number_kind_t number_math_family_target_kind_table[];
 /* Concrete backend vtables (defined in number_vtables.c). */
 extern const number_vtable_t number_double_vt;
@@ -144,11 +157,28 @@ extern const number_vtable_t number_qcomplex_vt;
 extern const number_vtable_t number_mint_vt;
 extern const number_vtable_t number_mrational_vt;
 extern const number_vtable_t number_mfloat_vt;
-extern const number_vtable_t number_mcomplex_vt;
+extern const number_vtable_t number_complex_vt;
 /* Backend vtable registry (defined in number_vtables.c). */
 extern const number_vtable_t *const number_dispatch[];
 extern const size_t number_dispatch_count;
 extern size_t number_default_precision_bits;
+
+number_t *number_wrap_complex(complex_t *value);
+number_t number_complex_component_from_number(const number_t *value,
+                                              size_t precision_bits);
+complex_t *number_complex_create(number_t real, number_t imag);
+complex_t *number_complex_clone(const complex_t *value);
+complex_t *number_complex_create_from_mcomplex(const mcomplex_t *value,
+                                               size_t precision_bits);
+complex_t *number_complex_create_from_qcomplex(qcomplex_t value,
+                                               size_t precision_bits);
+complex_t *number_complex_create_from_string(const char *text,
+                                             size_t precision_bits);
+mcomplex_t *number_complex_to_mcomplex(const complex_t *value,
+                                       size_t precision_bits);
+const number_t *number_complex_real_ref(const complex_t *value);
+const number_t *number_complex_imag_ref(const complex_t *value);
+number_const_id_t number_complex_const_id(const complex_t *value);
 
 static inline number_private_t *number_impl(number_t *number)
 {
@@ -203,14 +233,14 @@ static inline number_math_family_t number_math_family_value(const number_t *numb
 static inline number_math_family_t number_math_family_binary(number_math_family_t a,
                                                              number_math_family_t b)
 {
-    return (unsigned)a <= NUMBER_MATH_MCOMPLEX &&
-        (unsigned)b <= NUMBER_MATH_MCOMPLEX
+    return (unsigned)a <= NUMBER_MATH_COMPLEX &&
+        (unsigned)b <= NUMBER_MATH_COMPLEX
         ? number_math_family_binary_table[a][b] : NUMBER_MATH_INVALID;
 }
 
 static inline number_kind_t number_math_family_target_kind(number_math_family_t family)
 {
-    return (unsigned)family <= NUMBER_MATH_MCOMPLEX
+    return (unsigned)family <= NUMBER_MATH_COMPLEX
         ? number_math_family_target_kind_table[family] : NUMBER_INVALID;
 }
 
@@ -229,7 +259,12 @@ static inline qcomplex_t number_value_to_qcomplex(const number_t *number)
 }
 
 number_t number_invalid(void);
+bool num_is_immortal(number_t number);
+bool num_get_small_rational(number_t number, long *numerator, long *denominator);
+bool num_is_inexact_real_backend(number_t number);
+number_t num_as_inexact_real_prec(number_t number, size_t precision_bits);
 number_t number_take(number_t *boxed_number);
+number_t *number_box_value(number_t value);
 char *number_strdup(const char *text);
 void number_box_free(number_t *number);
 void number_assign(number_t *dst, number_t value);
@@ -241,17 +276,28 @@ char *number_format_double(const number_t *number, bool scientific, int precisio
 char *number_format_qfloat(const number_t *number, bool scientific, int precision);
 char *number_format_qcomplex(const number_t *number, bool scientific, int precision);
 char *number_format_mfloat(const number_t *number, bool scientific, int precision);
-char *number_format_mcomplex(const number_t *number, bool scientific, int precision);
+char *number_format_complex(const number_t *number, bool scientific, int precision);
 number_t *number_wrap_double(double value);
 number_t *number_wrap_qfloat(qfloat_t value);
 number_t *number_wrap_qcomplex(qcomplex_t value);
 number_t *number_wrap_mint(mint_t *value);
 number_t *number_wrap_mrational(mrational_t *value);
 number_t *number_wrap_mfloat(mfloat_t *value);
-number_t *number_wrap_mcomplex(mcomplex_t *value);
+number_t *number_wrap_complex_parts(number_t real, number_t imag);
 number_t number_wrap_mfloat_borrowed(const mfloat_t *value);
 number_t number_wrap_mfloat_with_precision(mfloat_t *value, size_t precision_bits);
-number_t number_wrap_mcomplex_with_precision(mcomplex_t *value, size_t precision_bits);
+const complex_t *number_complex_value(const number_t *number);
+int number_complex_get_mpc(mpc_t out,
+                           const complex_t *value,
+                           size_t precision_bits);
+number_t *number_wrap_complex_mpc(mpc_srcptr value, size_t precision_bits);
+void number_complex_clear_mpc_cache(complex_t *value);
+int number_complex_set_mpc_cache_from_mpc(complex_t *value,
+                                          mpc_srcptr source,
+                                          size_t precision_bits);
+bool number_eq_same_tol_with_precision(const number_t *a,
+                                       const number_t *b,
+                                       size_t precision_bits);
 number_kind_t number_common_kind(const number_t *a, const number_t *b,
                                  number_binary_op_t op);
 number_t *number_coerce(const number_t *number, number_kind_t target_kind);

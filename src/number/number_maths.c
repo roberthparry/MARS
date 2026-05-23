@@ -9,37 +9,37 @@
 typedef qfloat_t (*number_qfloat_unary_fn)(qfloat_t);
 typedef qcomplex_t (*number_qcomplex_unary_fn)(qcomplex_t);
 typedef int (*number_mfloat_unary_mut_fn)(mfloat_t *);
-typedef int (*number_mcomplex_unary_mut_fn)(mcomplex_t *);
+typedef int (*number_mpc_complex_unary_mut_fn)(mcomplex_t *);
 typedef double (*number_double_unary_fn)(double);
 typedef qfloat_t (*number_qfloat_binary_fn)(qfloat_t, qfloat_t);
 typedef qcomplex_t (*number_qcomplex_binary_fn)(qcomplex_t, qcomplex_t);
 typedef int (*number_mfloat_binary_mut_fn)(mfloat_t *, const mfloat_t *);
-typedef int (*number_mcomplex_binary_mut_fn)(mcomplex_t *, const mcomplex_t *);
+typedef int (*number_mpc_complex_binary_mut_fn)(mcomplex_t *, const mcomplex_t *);
 typedef double (*number_double_binary_fn)(double, double);
 typedef qfloat_t (*number_qfloat_ternary_fn)(qfloat_t, qfloat_t, qfloat_t);
 typedef qcomplex_t (*number_qcomplex_ternary_fn)(qcomplex_t, qcomplex_t, qcomplex_t);
 typedef int (*number_mfloat_ternary_mut_fn)(mfloat_t *, const mfloat_t *, const mfloat_t *);
-typedef int (*number_mcomplex_ternary_mut_fn)(mcomplex_t *, const mcomplex_t *, const mcomplex_t *);
+typedef int (*number_mpc_complex_ternary_mut_fn)(mcomplex_t *, const mcomplex_t *, const mcomplex_t *);
 
 typedef struct {
     number_qfloat_unary_fn qreal;
     number_qcomplex_unary_fn qcomplex;
     number_mfloat_unary_mut_fn mreal;
-    number_mcomplex_unary_mut_fn mcomplex;
+    number_mpc_complex_unary_mut_fn mpc_complex;
 } number_unary_math_ops_t;
 
 typedef struct {
     number_qfloat_binary_fn qreal;
     number_qcomplex_binary_fn qcomplex;
     number_mfloat_binary_mut_fn mreal;
-    number_mcomplex_binary_mut_fn mcomplex;
+    number_mpc_complex_binary_mut_fn mpc_complex;
 } number_binary_math_ops_t;
 
 typedef struct {
     number_qfloat_ternary_fn qreal;
     number_qcomplex_ternary_fn qcomplex;
     number_mfloat_ternary_mut_fn mreal;
-    number_mcomplex_ternary_mut_fn mcomplex;
+    number_mpc_complex_ternary_mut_fn mpc_complex;
 } number_ternary_math_ops_t;
 
 typedef struct {
@@ -72,12 +72,18 @@ static const number_angle_pair_fastpath_t number_sinhcosh_fastpaths[];
 
 static int number_try_get_pure_imag(const number_t number,
                                     number_t *imag_out);
+static number_t number_apply_unary_math_with_double(const number_t number,
+                                                    number_double_unary_fn d_fn,
+                                                    number_qfloat_unary_fn qf_fn,
+                                                    number_qcomplex_unary_fn qc_fn,
+                                                    number_mfloat_unary_mut_fn mf_fn,
+                                                    number_mpc_complex_unary_mut_fn mc_fn);
 
 static size_t number_log_fastpath_precision(const number_t *number)
 {
     size_t precision_bits = number ? num_get_prec_bits(*number) : 0u;
 
-    if (number && number_kind_value(number) == NUMBER_MCOMPLEX &&
+    if (number && number_kind_value(number) == NUMBER_COMPLEX &&
         precision_bits <= 1u)
         precision_bits = num_get_default_prec_bits();
     if (precision_bits == 0u)
@@ -375,6 +381,61 @@ static number_t number_apply_binary_same_mfloat(const number_t *a,
     return wrapped ? number_take(wrapped) : number_invalid();
 }
 
+static number_t number_take_mpc_complex_result(mcomplex_t *value, size_t precision_bits)
+{
+    complex_t *complex_value;
+
+    if (!value)
+        return number_invalid();
+    complex_value = number_complex_create_from_mcomplex(value, precision_bits);
+    mc_free(value);
+    return complex_value ? number_take(number_wrap_complex(complex_value))
+                         : number_invalid();
+}
+
+static number_t number_apply_complex_mpc_unary_direct(const number_t *number,
+                                                      number_mpc_complex_unary_mut_fn fn)
+{
+    const complex_t *value;
+    size_t precision_bits;
+    mcomplex_t *tmp;
+    complex_t *out;
+
+    if (!number || !fn || number_kind_value(number) != NUMBER_COMPLEX)
+        return number_invalid();
+
+    value = number_impl_const(number)->value.cx;
+    if (!value)
+        return number_invalid();
+
+    precision_bits = num_get_prec_bits(*number);
+    if (precision_bits == 0u)
+        precision_bits = num_get_default_prec_bits();
+
+    tmp = number_complex_to_mcomplex(value, precision_bits);
+    if (!tmp || fn(tmp) != 0) {
+        mc_free(tmp);
+        return number_invalid();
+    }
+
+    out = number_complex_create_from_mcomplex(tmp, precision_bits);
+    mc_free(tmp);
+    return out ? number_take(number_wrap_complex(out)) : number_invalid();
+}
+
+static number_t number_apply_nonreal_complex_unary_or_dispatch(
+    const number_t number,
+    number_double_unary_fn d_fn,
+    number_qfloat_unary_fn qf_fn,
+    number_qcomplex_unary_fn qc_fn,
+    number_mfloat_unary_mut_fn mf_fn,
+    number_mpc_complex_unary_mut_fn mc_fn)
+{
+    if (number_kind_value(&number) == NUMBER_COMPLEX && !num_is_real(number))
+        return number_apply_complex_mpc_unary_direct(&number, mc_fn);
+    return number_apply_unary_math_with_double(number, d_fn, qf_fn, qc_fn, mf_fn, mc_fn);
+}
+
 static int number_trig_real_fastpath(const number_t *number,
                                      const number_angle_fastpath_t *table,
                                      size_t count,
@@ -510,19 +571,29 @@ static number_t number_apply_unary_mreal(const number_t *number,
     return number_take(promoted);
 }
 
-static number_t number_apply_unary_mcomplex(const number_t *number,
-                                            const number_unary_math_ops_t *ops)
+static number_t number_apply_unary_mpc_complex(const number_t *number,
+                                               const number_unary_math_ops_t *ops)
 {
     number_t *promoted = NULL;
+    mcomplex_t *value = NULL;
+    size_t precision_bits;
 
-    if (!ops || !ops->mcomplex || !number)
+    if (!ops || !ops->mpc_complex || !number)
         return number_invalid();
-    promoted = number_coerce(number, NUMBER_MCOMPLEX);
-    if (!promoted || ops->mcomplex(number_impl(promoted)->value.mc) != 0) {
-        number_box_free(promoted);
+    promoted = number_coerce(number, NUMBER_COMPLEX);
+    if (!promoted)
+        return number_invalid();
+    precision_bits = num_get_prec_bits(*promoted);
+    if (precision_bits == 0u)
+        precision_bits = num_get_default_prec_bits();
+    value = number_complex_to_mcomplex(number_impl_const(promoted)->value.cx,
+        precision_bits);
+    number_box_free(promoted);
+    if (!value || ops->mpc_complex(value) != 0) {
+        mc_free(value);
         return number_invalid();
     }
-    return number_take(promoted);
+    return number_take_mpc_complex_result(value, precision_bits);
 }
 
 static number_t number_apply_binary_qreal(const number_t *a,
@@ -571,26 +642,47 @@ static number_t number_apply_binary_mreal(const number_t *a,
     return number_take(lhs);
 }
 
-static number_t number_apply_binary_mcomplex(const number_t *a,
-                                             const number_t *b,
-                                             number_kind_t target_kind,
-                                             const number_binary_math_ops_t *ops)
+static number_t number_apply_binary_mpc_complex(const number_t *a,
+                                                const number_t *b,
+                                                number_kind_t target_kind,
+                                                const number_binary_math_ops_t *ops)
 {
     number_t *lhs = NULL;
     number_t *rhs = NULL;
+    mcomplex_t *lhs_value = NULL;
+    mcomplex_t *rhs_value = NULL;
+    size_t precision_bits;
 
-    if (!ops || !ops->mcomplex || !a || !b)
+    if (!ops || !ops->mpc_complex || !a || !b)
         return number_invalid();
-    lhs = number_coerce(a, target_kind);
-    rhs = number_coerce(b, target_kind);
-    if (!lhs || !rhs ||
-        ops->mcomplex(number_impl(lhs)->value.mc, number_impl_const(rhs)->value.mc) != 0) {
-        number_box_free(lhs);
-        number_box_free(rhs);
-        return number_invalid();
-    }
+    (void)target_kind;
+    lhs = number_coerce(a, NUMBER_COMPLEX);
+    rhs = number_coerce(b, NUMBER_COMPLEX);
+    if (!lhs || !rhs)
+        goto fail;
+    precision_bits = num_get_prec_bits(*lhs);
+    if (num_get_prec_bits(*rhs) > precision_bits)
+        precision_bits = num_get_prec_bits(*rhs);
+    if (precision_bits == 0u)
+        precision_bits = num_get_default_prec_bits();
+    lhs_value = number_complex_to_mcomplex(number_impl_const(lhs)->value.cx,
+        precision_bits);
+    rhs_value = number_complex_to_mcomplex(number_impl_const(rhs)->value.cx,
+        precision_bits);
     number_box_free(rhs);
-    return number_take(lhs);
+    number_box_free(lhs);
+    if (!lhs_value || !rhs_value || ops->mpc_complex(lhs_value, rhs_value) != 0)
+        goto fail_values;
+    mc_free(rhs_value);
+    return number_take_mpc_complex_result(lhs_value, precision_bits);
+
+fail:
+    number_box_free(lhs);
+    number_box_free(rhs);
+fail_values:
+    mc_free(lhs_value);
+    mc_free(rhs_value);
+    return number_invalid();
 }
 
 static number_t number_apply_ternary_qreal(const number_t *x,
@@ -650,57 +742,84 @@ static number_t number_apply_ternary_mreal(const number_t *x,
     return number_take(nx);
 }
 
-static number_t number_apply_ternary_mcomplex(const number_t *x,
-                                              const number_t *a,
-                                              const number_t *b,
-                                              number_kind_t target_kind,
-                                              const number_ternary_math_ops_t *ops)
+static number_t number_apply_ternary_mpc_complex(const number_t *x,
+                                                 const number_t *a,
+                                                 const number_t *b,
+                                                 number_kind_t target_kind,
+                                                 const number_ternary_math_ops_t *ops)
 {
     number_t *nx = NULL;
     number_t *na = NULL;
     number_t *nb = NULL;
+    mcomplex_t *x_value = NULL;
+    mcomplex_t *a_value = NULL;
+    mcomplex_t *b_value = NULL;
+    size_t precision_bits;
 
-    if (!ops || !ops->mcomplex || !x || !a || !b)
+    if (!ops || !ops->mpc_complex || !x || !a || !b)
         return number_invalid();
-    nx = number_coerce(x, target_kind);
-    na = number_coerce(a, target_kind);
-    nb = number_coerce(b, target_kind);
-    if (!nx || !na || !nb ||
-        ops->mcomplex(number_impl(nx)->value.mc,
-                      number_impl_const(na)->value.mc,
-                      number_impl_const(nb)->value.mc) != 0) {
-        number_box_free(nx);
-        number_box_free(na);
-        number_box_free(nb);
-        return number_invalid();
-    }
+    (void)target_kind;
+    nx = number_coerce(x, NUMBER_COMPLEX);
+    na = number_coerce(a, NUMBER_COMPLEX);
+    nb = number_coerce(b, NUMBER_COMPLEX);
+    if (!nx || !na || !nb)
+        goto fail;
+    precision_bits = num_get_prec_bits(*nx);
+    if (num_get_prec_bits(*na) > precision_bits)
+        precision_bits = num_get_prec_bits(*na);
+    if (num_get_prec_bits(*nb) > precision_bits)
+        precision_bits = num_get_prec_bits(*nb);
+    if (precision_bits == 0u)
+        precision_bits = num_get_default_prec_bits();
+    x_value = number_complex_to_mcomplex(number_impl_const(nx)->value.cx,
+        precision_bits);
+    a_value = number_complex_to_mcomplex(number_impl_const(na)->value.cx,
+        precision_bits);
+    b_value = number_complex_to_mcomplex(number_impl_const(nb)->value.cx,
+        precision_bits);
     number_box_free(na);
     number_box_free(nb);
-    return number_take(nx);
+    number_box_free(nx);
+    if (!x_value || !a_value || !b_value ||
+        ops->mpc_complex(x_value, a_value, b_value) != 0)
+        goto fail_values;
+    mc_free(a_value);
+    mc_free(b_value);
+    return number_take_mpc_complex_result(x_value, precision_bits);
+
+fail:
+    number_box_free(nx);
+    number_box_free(na);
+    number_box_free(nb);
+fail_values:
+    mc_free(x_value);
+    mc_free(a_value);
+    mc_free(b_value);
+    return number_invalid();
 }
 
 static number_t number_apply_unary_math(const number_t number,
                                         number_qfloat_unary_fn qf_fn,
                                         number_qcomplex_unary_fn qc_fn,
                                         number_mfloat_unary_mut_fn mf_fn,
-                                        number_mcomplex_unary_mut_fn mc_fn)
+                                        number_mpc_complex_unary_mut_fn mc_fn)
 {
     static const number_unary_math_apply_fn dispatch[] = {
         [NUMBER_MATH_INVALID] = NULL,
         [NUMBER_MATH_QREAL] = number_apply_unary_qreal,
         [NUMBER_MATH_QCOMPLEX] = number_apply_unary_qcomplex,
         [NUMBER_MATH_MREAL] = number_apply_unary_mreal,
-        [NUMBER_MATH_MCOMPLEX] = number_apply_unary_mcomplex
+        [NUMBER_MATH_COMPLEX] = number_apply_unary_mpc_complex
     };
     const number_unary_math_ops_t ops = {
         .qreal = qf_fn,
         .qcomplex = qc_fn,
         .mreal = mf_fn,
-        .mcomplex = mc_fn
+        .mpc_complex = mc_fn
     };
     number_math_family_t family = number_math_family_value(&number);
 
-    return (unsigned)family <= NUMBER_MATH_MCOMPLEX && dispatch[family]
+    return (unsigned)family <= NUMBER_MATH_COMPLEX && dispatch[family]
         ? dispatch[family](&number, &ops)
         : number_invalid();
 }
@@ -710,7 +829,7 @@ static number_t number_apply_unary_math_with_double(const number_t number,
                                                     number_qfloat_unary_fn qf_fn,
                                                     number_qcomplex_unary_fn qc_fn,
                                                     number_mfloat_unary_mut_fn mf_fn,
-                                                    number_mcomplex_unary_mut_fn mc_fn)
+                                                    number_mpc_complex_unary_mut_fn mc_fn)
 {
     return number_is_valid_value(&number) &&
            number_kind_value(&number) == NUMBER_DOUBLE && d_fn
@@ -723,27 +842,27 @@ static number_t number_apply_binary_math(const number_t a,
                                          number_qfloat_binary_fn qf_fn,
                                          number_qcomplex_binary_fn qc_fn,
                                          number_mfloat_binary_mut_fn mf_fn,
-                                         number_mcomplex_binary_mut_fn mc_fn)
+                                         number_mpc_complex_binary_mut_fn mc_fn)
 {
     static const number_binary_math_apply_fn dispatch[] = {
         [NUMBER_MATH_INVALID] = NULL,
         [NUMBER_MATH_QREAL] = number_apply_binary_qreal,
         [NUMBER_MATH_QCOMPLEX] = number_apply_binary_qcomplex,
         [NUMBER_MATH_MREAL] = number_apply_binary_mreal,
-        [NUMBER_MATH_MCOMPLEX] = number_apply_binary_mcomplex
+        [NUMBER_MATH_COMPLEX] = number_apply_binary_mpc_complex
     };
     const number_binary_math_ops_t ops = {
         .qreal = qf_fn,
         .qcomplex = qc_fn,
         .mreal = mf_fn,
-        .mcomplex = mc_fn
+        .mpc_complex = mc_fn
     };
     number_math_family_t family = number_math_family_binary(
         number_math_family_value(&a),
         number_math_family_value(&b));
     number_kind_t target_kind = number_math_family_target_kind(family);
 
-    return (unsigned)family <= NUMBER_MATH_MCOMPLEX && dispatch[family]
+    return (unsigned)family <= NUMBER_MATH_COMPLEX && dispatch[family]
         ? dispatch[family](&a, &b, target_kind, &ops)
         : number_invalid();
 }
@@ -754,7 +873,7 @@ static number_t number_apply_binary_math_with_double(const number_t a,
                                                      number_qfloat_binary_fn qf_fn,
                                                      number_qcomplex_binary_fn qc_fn,
                                                      number_mfloat_binary_mut_fn mf_fn,
-                                                     number_mcomplex_binary_mut_fn mc_fn)
+                                                     number_mpc_complex_binary_mut_fn mc_fn)
 {
     return number_is_valid_value(&a) && number_is_valid_value(&b) &&
            number_kind_value(&a) == NUMBER_DOUBLE &&
@@ -770,20 +889,20 @@ static number_t number_apply_ternary_math(const number_t x,
                                           number_qfloat_ternary_fn qf_fn,
                                           number_qcomplex_ternary_fn qc_fn,
                                           number_mfloat_ternary_mut_fn mf_fn,
-                                          number_mcomplex_ternary_mut_fn mc_fn)
+                                          number_mpc_complex_ternary_mut_fn mc_fn)
 {
     static const number_ternary_math_apply_fn dispatch[] = {
         [NUMBER_MATH_INVALID] = NULL,
         [NUMBER_MATH_QREAL] = number_apply_ternary_qreal,
         [NUMBER_MATH_QCOMPLEX] = number_apply_ternary_qcomplex,
         [NUMBER_MATH_MREAL] = number_apply_ternary_mreal,
-        [NUMBER_MATH_MCOMPLEX] = number_apply_ternary_mcomplex
+        [NUMBER_MATH_COMPLEX] = number_apply_ternary_mpc_complex
     };
     const number_ternary_math_ops_t ops = {
         .qreal = qf_fn,
         .qcomplex = qc_fn,
         .mreal = mf_fn,
-        .mcomplex = mc_fn
+        .mpc_complex = mc_fn
     };
     number_math_family_t family = number_math_family_binary(
         number_math_family_value(&x),
@@ -792,7 +911,7 @@ static number_t number_apply_ternary_math(const number_t x,
 
     family = number_math_family_binary(family, number_math_family_value(&b));
     target_kind = number_math_family_target_kind(family);
-    return (unsigned)family <= NUMBER_MATH_MCOMPLEX && dispatch[family]
+    return (unsigned)family <= NUMBER_MATH_COMPLEX && dispatch[family]
         ? dispatch[family](&x, &a, &b, target_kind, &ops)
         : number_invalid();
 }
@@ -805,6 +924,12 @@ number_t num_exp(const number_t number)
 
     if (number_is_plain_mfloat_value(&number))
         return number_exp_backend(&number);
+
+    if (!num_is_real(number)) {
+        if (number_exp_quarter_turn(&number, &out))
+            return out;
+        return number_exp_backend(&number);
+    }
 
     if (num_eq(number, NUM_ZERO))
         return number_const_return_like(&number, NUMBER_CONST_ONE);
@@ -839,18 +964,31 @@ number_t num_exp(const number_t number)
         num_destroy(&root2);
         return out;
     }
-    if (number_exp_quarter_turn(&number, &out))
-        return out;
-
     return number_exp_backend(&number);
 }
 
 number_t num_log(const number_t number)
 {
+    number_t imag;
     number_t neg_i;
 
     if (number_is_plain_mfloat_value(&number))
         return number_log_backend(&number);
+
+    if (!num_is_real(number)) {
+        if (number_try_get_pure_imag(number, &imag)) {
+            if (num_eq(imag, NUM_ONE)) {
+                num_destroy(&imag);
+                return number_log_imag_multiple(&number, NUMBER_CONST_PI_2, 1);
+            }
+            if (num_eq(imag, NUM_NEG_ONE)) {
+                num_destroy(&imag);
+                return number_log_imag_multiple(&number, NUMBER_CONST_PI_2, -1);
+            }
+            num_destroy(&imag);
+        }
+        return number_log_backend(&number);
+    }
 
     if (num_eq(number, NUM_ONE))
         return number_const_return_like(&number, NUMBER_CONST_ZERO);
@@ -1171,38 +1309,42 @@ number_t num_sin(const number_t number)
 {
     number_t out;
 
-    if (number_trig_real_fastpath(&number, number_sin_fastpaths,
+    if (num_is_real(number) &&
+        number_trig_real_fastpath(&number, number_sin_fastpaths,
             sizeof(number_sin_fastpaths) / sizeof(number_sin_fastpaths[0]), &out))
         return out;
-    return number_apply_unary_math_with_double(number, sin, qf_sin, qc_sin, mf_sin, mc_sin);
+    return number_apply_nonreal_complex_unary_or_dispatch(number, sin, qf_sin, qc_sin, mf_sin, mc_sin);
 }
 
 number_t num_cos(const number_t number)
 {
     number_t out;
 
-    if (number_trig_real_fastpath(&number, number_cos_fastpaths,
+    if (num_is_real(number) &&
+        number_trig_real_fastpath(&number, number_cos_fastpaths,
             sizeof(number_cos_fastpaths) / sizeof(number_cos_fastpaths[0]), &out))
         return out;
-    return number_apply_unary_math_with_double(number, cos, qf_cos, qc_cos, mf_cos, mc_cos);
+    return number_apply_nonreal_complex_unary_or_dispatch(number, cos, qf_cos, qc_cos, mf_cos, mc_cos);
 }
 
 number_t num_tan(const number_t number)
 {
     number_t out;
 
-    if (number_tan_fastpath_by_const_id(&number, number_tan_fastpaths,
-            sizeof(number_tan_fastpaths) / sizeof(number_tan_fastpaths[0]), &out))
-        return out;
-    if (number_tan_fastpath_by_value(&number, number_tan_fastpaths,
-            sizeof(number_tan_fastpaths) / sizeof(number_tan_fastpaths[0]), &out))
-        return out;
-    return number_apply_unary_math_with_double(number, tan, qf_tan, qc_tan, mf_tan, mc_tan);
+    if (num_is_real(number)) {
+        if (number_tan_fastpath_by_const_id(&number, number_tan_fastpaths,
+                sizeof(number_tan_fastpaths) / sizeof(number_tan_fastpaths[0]), &out))
+            return out;
+        if (number_tan_fastpath_by_value(&number, number_tan_fastpaths,
+                sizeof(number_tan_fastpaths) / sizeof(number_tan_fastpaths[0]), &out))
+            return out;
+    }
+    return number_apply_nonreal_complex_unary_or_dispatch(number, tan, qf_tan, qc_tan, mf_tan, mc_tan);
 }
 
 number_t num_atan(const number_t number)
 {
-    return number_apply_unary_math_with_double(number, atan, qf_atan, qc_atan, mf_atan, mc_atan);
+    return number_apply_nonreal_complex_unary_or_dispatch(number, atan, qf_atan, qc_atan, mf_atan, mc_atan);
 }
 
 number_t num_atan2(const number_t y, const number_t x)
@@ -1215,12 +1357,12 @@ number_t num_atan2(const number_t y, const number_t x)
 
 number_t num_asin(const number_t number)
 {
-    return number_apply_unary_math_with_double(number, asin, qf_asin, qc_asin, mf_asin, mc_asin);
+    return number_apply_nonreal_complex_unary_or_dispatch(number, asin, qf_asin, qc_asin, mf_asin, mc_asin);
 }
 
 number_t num_acos(const number_t number)
 {
-    return number_apply_unary_math_with_double(number, acos, qf_acos, qc_acos, mf_acos, mc_acos);
+    return number_apply_nonreal_complex_unary_or_dispatch(number, acos, qf_acos, qc_acos, mf_acos, mc_acos);
 }
 
 number_t num_sinh(const number_t number)
@@ -1230,7 +1372,7 @@ number_t num_sinh(const number_t number)
     if (number_hyperbolic_imag_fastpath(&number, number_sinh_imag_fastpaths,
             sizeof(number_sinh_imag_fastpaths) / sizeof(number_sinh_imag_fastpaths[0]), &out))
         return out;
-    return number_apply_unary_math_with_double(number, sinh, qf_sinh, qc_sinh, mf_sinh, mc_sinh);
+    return number_apply_nonreal_complex_unary_or_dispatch(number, sinh, qf_sinh, qc_sinh, mf_sinh, mc_sinh);
 }
 
 number_t num_cosh(const number_t number)
@@ -1240,7 +1382,7 @@ number_t num_cosh(const number_t number)
     if (number_hyperbolic_imag_fastpath(&number, number_cosh_imag_fastpaths,
             sizeof(number_cosh_imag_fastpaths) / sizeof(number_cosh_imag_fastpaths[0]), &out))
         return out;
-    return number_apply_unary_math_with_double(number, cosh, qf_cosh, qc_cosh, mf_cosh, mc_cosh);
+    return number_apply_nonreal_complex_unary_or_dispatch(number, cosh, qf_cosh, qc_cosh, mf_cosh, mc_cosh);
 }
 
 int num_sinhcosh(const number_t x, number_t *sinh_out, number_t *cosh_out)
@@ -1283,52 +1425,52 @@ number_t num_tanh(const number_t number)
         }
         num_destroy(&imag);
     }
-    return number_apply_unary_math_with_double(number, tanh, qf_tanh, qc_tanh, mf_tanh, mc_tanh);
+    return number_apply_nonreal_complex_unary_or_dispatch(number, tanh, qf_tanh, qc_tanh, mf_tanh, mc_tanh);
 }
 
 number_t num_asinh(const number_t number)
 {
-    return number_apply_unary_math_with_double(number, asinh, qf_asinh, qc_asinh, mf_asinh, mc_asinh);
+    return number_apply_nonreal_complex_unary_or_dispatch(number, asinh, qf_asinh, qc_asinh, mf_asinh, mc_asinh);
 }
 
 number_t num_acosh(const number_t number)
 {
-    return number_apply_unary_math_with_double(number, acosh, qf_acosh, qc_acosh, mf_acosh, mc_acosh);
+    return number_apply_nonreal_complex_unary_or_dispatch(number, acosh, qf_acosh, qc_acosh, mf_acosh, mc_acosh);
 }
 
 number_t num_atanh(const number_t number)
 {
-    return number_apply_unary_math_with_double(number, atanh, qf_atanh, qc_atanh, mf_atanh, mc_atanh);
+    return number_apply_nonreal_complex_unary_or_dispatch(number, atanh, qf_atanh, qc_atanh, mf_atanh, mc_atanh);
 }
 
 number_t num_gamma(const number_t number)
 {
-    return number_apply_unary_math(number, qf_gamma, qc_gamma, mf_gamma, mc_gamma);
+    return number_apply_nonreal_complex_unary_or_dispatch(number, NULL, qf_gamma, qc_gamma, mf_gamma, mc_gamma);
 }
 
 number_t num_lgamma(const number_t number)
 {
-    return number_apply_unary_math(number, qf_lgamma, qc_lgamma, mf_lgamma, mc_lgamma);
+    return number_apply_nonreal_complex_unary_or_dispatch(number, NULL, qf_lgamma, qc_lgamma, mf_lgamma, mc_lgamma);
 }
 
 number_t num_digamma(const number_t number)
 {
-    return number_apply_unary_math(number, qf_digamma, qc_digamma, mf_digamma, mc_digamma);
+    return number_apply_nonreal_complex_unary_or_dispatch(number, NULL, qf_digamma, qc_digamma, mf_digamma, mc_digamma);
 }
 
 number_t num_trigamma(const number_t number)
 {
-    return number_apply_unary_math(number, qf_trigamma, qc_trigamma, mf_trigamma, mc_trigamma);
+    return number_apply_nonreal_complex_unary_or_dispatch(number, NULL, qf_trigamma, qc_trigamma, mf_trigamma, mc_trigamma);
 }
 
 number_t num_tetragamma(const number_t number)
 {
-    return number_apply_unary_math(number, qf_tetragamma, qc_tetragamma, mf_tetragamma, mc_tetragamma);
+    return number_apply_nonreal_complex_unary_or_dispatch(number, NULL, qf_tetragamma, qc_tetragamma, mf_tetragamma, mc_tetragamma);
 }
 
 number_t num_gammainv(const number_t number)
 {
-    return number_apply_unary_math(number, qf_gammainv, qc_gammainv, mf_gammainv, mc_gammainv);
+    return number_apply_nonreal_complex_unary_or_dispatch(number, NULL, qf_gammainv, qc_gammainv, mf_gammainv, mc_gammainv);
 }
 
 number_t num_erf(const number_t number)
@@ -1353,12 +1495,12 @@ number_t num_erfcinv(const number_t number)
 
 number_t num_lambert_w0(const number_t number)
 {
-    return number_apply_unary_math(number, qf_lambert_w0, qc_productlog, mf_lambert_w0, mc_lambert_w0);
+    return number_apply_nonreal_complex_unary_or_dispatch(number, NULL, qf_lambert_w0, qc_productlog, mf_lambert_w0, mc_lambert_w0);
 }
 
 number_t num_lambert_wm1(const number_t number)
 {
-    return number_apply_unary_math(number, qf_lambert_wm1, qc_lambert_wm1, mf_lambert_wm1, mc_lambert_wm1);
+    return number_apply_nonreal_complex_unary_or_dispatch(number, NULL, qf_lambert_wm1, qc_lambert_wm1, mf_lambert_wm1, mc_lambert_wm1);
 }
 
 number_t num_beta(const number_t a, const number_t b)
@@ -1420,7 +1562,7 @@ number_t num_normal_logpdf(const number_t number)
 
 number_t num_productlog(const number_t number)
 {
-    return number_apply_unary_math(number, qf_productlog, qc_productlog, mf_productlog, mc_productlog);
+    return number_apply_nonreal_complex_unary_or_dispatch(number, NULL, qf_productlog, qc_productlog, mf_productlog, mc_productlog);
 }
 
 number_t num_gammainc_lower(const number_t a, const number_t b)
@@ -1445,10 +1587,10 @@ number_t num_gammainc_Q(const number_t a, const number_t b)
 
 number_t num_ei(const number_t number)
 {
-    return number_apply_unary_math(number, qf_ei, qc_ei, mf_ei, mc_ei);
+    return number_apply_nonreal_complex_unary_or_dispatch(number, NULL, qf_ei, qc_ei, mf_ei, mc_ei);
 }
 
 number_t num_e1(const number_t number)
 {
-    return number_apply_unary_math(number, qf_e1, qc_e1, mf_e1, mc_e1);
+    return number_apply_nonreal_complex_unary_or_dispatch(number, NULL, qf_e1, qc_e1, mf_e1, mc_e1);
 }

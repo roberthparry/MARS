@@ -2,6 +2,7 @@
 #include <stdlib.h>
 
 #include "mfloat_internal.h"
+#include "internal/mfloat_number_internal.h"
 #include "mint.h"
 
 static void mfloat_prepare_constant(const mfloat_t *mfloat, mpfr_prec_t precision)
@@ -222,6 +223,107 @@ int mf_mul_long(mfloat_t *mfloat, long value)
 int mf_div(mfloat_t *mfloat, const mfloat_t *other)
 {
     return mfloat_apply_binary_mpfr(mfloat, other, mpfr_div);
+}
+
+static void mfloat_prepare_complex_parts(const mfloat_t *ar,
+                                         const mfloat_t *ai,
+                                         const mfloat_t *br,
+                                         const mfloat_t *bi,
+                                         mpfr_prec_t precision)
+{
+    mfloat_prepare_constant(ar, precision);
+    mfloat_prepare_constant(ai, precision);
+    mfloat_prepare_constant(br, precision);
+    mfloat_prepare_constant(bi, precision);
+}
+
+int mf_complex_mul_parts(const mfloat_t *ar, const mfloat_t *ai,
+                         const mfloat_t *br, const mfloat_t *bi,
+                         mfloat_t **real_out, mfloat_t **imag_out)
+{
+    mfloat_t *real;
+    mfloat_t *imag;
+    mpfr_prec_t precision;
+    mpfr_t tmp;
+
+    if (!ar || !ai || !br || !bi || !real_out || !imag_out)
+        return -1;
+
+    real = mf_clone(ar);
+    imag = mf_clone(ar);
+    if (!real || !imag)
+        goto cleanup_values;
+
+    precision = mpfr_get_prec(real->value);
+    mfloat_prepare_complex_parts(ar, ai, br, bi, precision);
+    mpfr_init2(tmp, precision);
+
+    mpfr_mul(real->value, ar->value, br->value, MPFR_RNDN);
+    mpfr_mul(tmp, ai->value, bi->value, MPFR_RNDN);
+    mpfr_sub(real->value, real->value, tmp, MPFR_RNDN);
+
+    mpfr_mul(imag->value, ar->value, bi->value, MPFR_RNDN);
+    mpfr_mul(tmp, ai->value, br->value, MPFR_RNDN);
+    mpfr_add(imag->value, imag->value, tmp, MPFR_RNDN);
+
+    mpfr_clear(tmp);
+    *real_out = real;
+    *imag_out = imag;
+    return 0;
+
+cleanup_values:
+    mf_free(real);
+    mf_free(imag);
+    return -1;
+}
+
+int mf_complex_div_parts(const mfloat_t *ar, const mfloat_t *ai,
+                         const mfloat_t *br, const mfloat_t *bi,
+                         mfloat_t **real_out, mfloat_t **imag_out)
+{
+    mfloat_t *real;
+    mfloat_t *imag;
+    mpfr_prec_t precision;
+    mpfr_t tmp;
+    mpfr_t denom;
+
+    if (!ar || !ai || !br || !bi || !real_out || !imag_out)
+        return -1;
+
+    real = mf_clone(ar);
+    imag = mf_clone(ar);
+    if (!real || !imag)
+        goto cleanup_values;
+
+    precision = mpfr_get_prec(real->value);
+    mfloat_prepare_complex_parts(ar, ai, br, bi, precision);
+    mpfr_init2(tmp, precision);
+    mpfr_init2(denom, precision);
+
+    mpfr_mul(denom, br->value, br->value, MPFR_RNDN);
+    mpfr_mul(tmp, bi->value, bi->value, MPFR_RNDN);
+    mpfr_add(denom, denom, tmp, MPFR_RNDN);
+
+    mpfr_mul(real->value, ar->value, br->value, MPFR_RNDN);
+    mpfr_mul(tmp, ai->value, bi->value, MPFR_RNDN);
+    mpfr_add(real->value, real->value, tmp, MPFR_RNDN);
+    mpfr_div(real->value, real->value, denom, MPFR_RNDN);
+
+    mpfr_mul(imag->value, ai->value, br->value, MPFR_RNDN);
+    mpfr_mul(tmp, ar->value, bi->value, MPFR_RNDN);
+    mpfr_sub(imag->value, imag->value, tmp, MPFR_RNDN);
+    mpfr_div(imag->value, imag->value, denom, MPFR_RNDN);
+
+    mpfr_clear(denom);
+    mpfr_clear(tmp);
+    *real_out = real;
+    *imag_out = imag;
+    return 0;
+
+cleanup_values:
+    mf_free(real);
+    mf_free(imag);
+    return -1;
 }
 
 int mf_inv(mfloat_t *mfloat)

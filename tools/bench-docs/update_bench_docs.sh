@@ -171,6 +171,21 @@ on the current native \`mcomplex\` implementation:
 EOF
   run_md_bench "$TMP_DIR/mcomplex_table.md" "$ROOT_DIR/build/release/bench/mcomplex/bench_mcomplex_maths"
   cat "$TMP_DIR/mcomplex_table.md" >>"$TMP_DIR/mcomplex_block.md"
+  cat >>"$TMP_DIR/mcomplex_block.md" <<EOF
+
+The table below compares the same \`number_t\` operations when the underlying
+complex value is the private exact-preserving \`complex_t\` backend versus a
+forced legacy \`mcomplex_t\` backend, measured at
+\`${MARS_BENCH_COMPLEX_BITS:-256}\` bits. Ratios are
+\`complex_t / mcomplex_t\`, so values above \`1.00x\` mean the private
+\`complex_t\` path is slower for that row.
+
+EOF
+  MARS_BENCH_REPEATS=${MARS_BENCH_COMPLEX_COMPARE_REPEATS:-9} \
+  MARS_BENCH_COMPLEX_BITS=${MARS_BENCH_COMPLEX_BITS:-256} \
+      run_md_bench "$TMP_DIR/mcomplex_compare_table.md" \
+      "$ROOT_DIR/build/release/bench/number/bench_number_complex_compare"
+  cat "$TMP_DIR/mcomplex_compare_table.md" >>"$TMP_DIR/mcomplex_block.md"
   printf '\nFor broader benchmark notes, see [`docs/benchmarks.md`](benchmarks.md).\n' >>"$TMP_DIR/mcomplex_block.md"
 
   replace_block \
@@ -296,6 +311,7 @@ if target_selected number; then
 fi
 if target_selected mcomplex; then
   build_target bench_mcomplex_maths
+  build_target bench_number_complex_compare
 fi
 if target_selected mint; then
   build_target bench_mint_arith

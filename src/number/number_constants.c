@@ -6,9 +6,6 @@
 #include "internal/mint_internal.h"
 #include "internal/mrational_internal.h"
 
-extern const mcomplex_t MC_I_VALUE;
-extern const mcomplex_t MC_NEG_I_VALUE;
-
 static const number_private_t number_zero_value = {
     .kind = NUMBER_MINT,
     .value.mi = (mint_t *)&MI_ZERO_VALUE
@@ -244,14 +241,17 @@ static const number_private_t number_ninf_value = {
     .value.mf = (mfloat_t *)&MF_NINF_VALUE
 };
 
+static complex_t number_i_complex_value;
+static complex_t number_neg_i_complex_value;
+
 static const number_private_t number_i_value = {
-    .kind = NUMBER_MCOMPLEX,
-    .value.mc = (mcomplex_t *)&MC_I_VALUE
+    .kind = NUMBER_COMPLEX,
+    .value.cx = &number_i_complex_value
 };
 
 static const number_private_t number_neg_i_value = {
-    .kind = NUMBER_MCOMPLEX,
-    .value.mc = (mcomplex_t *)&MC_NEG_I_VALUE
+    .kind = NUMBER_COMPLEX,
+    .value.cx = &number_neg_i_complex_value
 };
 
 typedef union {
@@ -358,6 +358,33 @@ extern const number_t NUM_PI_SQUARED __attribute__((alias("num_pi_squared_storag
 extern const number_t NUM_2PI_CUBED __attribute__((alias("num_2pi_cubed_storage")));
 extern const number_t NUM_I __attribute__((alias("num_i_storage")));
 extern const number_t NUM_NEG_I __attribute__((alias("num_neg_i_storage")));
+
+static void number_init_complex_constant(complex_t *value,
+                                         number_const_id_t id,
+                                         number_t real,
+                                         number_t imag)
+{
+    value->constant_id = id;
+    value->precision_bits = 0u;
+    value->real = real;
+    value->imag = imag;
+    value->mpc_cache_valid = false;
+}
+
+__attribute__((constructor))
+static void number_init_complex_constants(void)
+{
+    number_init_complex_constant(
+        &number_i_complex_value,
+        NUMBER_CONST_I,
+        NUM_ZERO,
+        NUM_ONE);
+    number_init_complex_constant(
+        &number_neg_i_complex_value,
+        NUMBER_CONST_NEG_I,
+        NUM_ZERO,
+        NUM_NEG_ONE);
+}
 
 static const qfloat_t *const number_const_qfloat_table[NUMBER_CONST_COUNT] = {
     [NUMBER_CONST_ZERO] = &QF_ZERO,
@@ -539,6 +566,8 @@ qcomplex_t number_const_qcomplex(number_const_id_t id)
 
     if ((unsigned)id >= NUMBER_CONST_COUNT)
         return QC_NAN;
+    if (id == NUMBER_CONST_NEG_I)
+        return qc_make(QF_ZERO, QF_NEG_ONE);
     value = number_const_qcomplex_table[id];
     return value ? *value : qc_make(number_const_qfloat(id), QF_ZERO);
 }
@@ -652,27 +681,21 @@ number_t number_imag_const_like_mreal(const number_t *like, number_const_id_t id
     const number_vtable_t *vt = number_vt(like);
     size_t precision_bits = vt && vt->get_precision ? vt->get_precision(like) : 0u;
     number_t magnitude;
-    mfloat_t *real;
-    mfloat_t *imag;
-    mcomplex_t *complex_value;
+    number_t real;
+    complex_t *complex_value;
 
-    if (like && number_kind_value(like) == NUMBER_MCOMPLEX &&
-        precision_bits <= 1u)
-        precision_bits = number_default_precision_bits;
     if (precision_bits == 0u)
         precision_bits = number_default_precision_bits;
 
     magnitude = number_const_imag_magnitude(id, precision_bits);
     if (!number_is_valid_value(&magnitude))
         return number_invalid();
-    real = mf_const_prec(MF_ZERO, precision_bits);
-    imag = mf_clone(number_impl_const(&magnitude)->value.mf);
-    complex_value = real && imag ? mc_create(real, imag) : NULL;
-    mf_free(real);
-    mf_free(imag);
-    num_destroy(&magnitude);
+    real = number_create_exact_mfloat_long_prec(0, precision_bits);
+    complex_value = number_complex_create(real, magnitude);
+    if (complex_value)
+        complex_value->precision_bits = precision_bits;
     return complex_value
-        ? number_take(number_wrap_mcomplex(complex_value))
+        ? number_take(number_wrap_complex(complex_value))
         : number_invalid();
 }
 

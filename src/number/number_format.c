@@ -113,25 +113,35 @@ char *number_format_mfloat(const number_t *number, bool scientific, int precisio
     return out;
 }
 
-char *number_format_mcomplex(const number_t *number, bool scientific, int precision)
+char *number_format_complex(const number_t *number, bool scientific, int precision)
 {
+    const complex_t *value = number ? number_impl_const(number)->value.cx : NULL;
+    size_t precision_bits = number ? num_get_prec_bits(*number) : 0u;
+    mcomplex_t *tmp;
     int needed;
-    char *out;
     char fmt[32];
+    char *out;
 
-    if (!number)
+    if (!value)
+        return NULL;
+    if (precision_bits == 0u)
+        precision_bits = number_default_precision_bits;
+    tmp = number_complex_to_mcomplex(value, precision_bits);
+    if (!tmp)
         return NULL;
     if (precision >= 0)
         snprintf(fmt, sizeof(fmt), scientific ? "%%.%dMZ" : "%%.%dmz", precision);
     else
         snprintf(fmt, sizeof(fmt), scientific ? "%%MZ" : "%%mz");
-    needed = mc_sprintf(NULL, 0u, fmt, number_impl_const(number)->value.mc);
-    if (needed < 0)
+    needed = mc_sprintf(NULL, 0u, fmt, tmp);
+    if (needed < 0) {
+        mc_free(tmp);
         return NULL;
+    }
     out = malloc((size_t)needed + 1u);
-    if (!out)
-        return NULL;
-    mc_sprintf(out, (size_t)needed + 1u, fmt, number_impl_const(number)->value.mc);
+    if (out)
+        mc_sprintf(out, (size_t)needed + 1u, fmt, tmp);
+    mc_free(tmp);
     return out;
 }
 

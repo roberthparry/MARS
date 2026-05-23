@@ -170,8 +170,8 @@ static number_t goal_work_value(number_t value, size_t digits)
 
     bits = (size_t)((double)digits * 3.3219280948873623 + 1.0);
     rounded = num_is_real(value)
-            ? num_as_mfloat_prec(value, bits)
-            : num_as_mcomplex_prec(value, bits);
+            ? num_as_inexact_real_prec(value, bits)
+            : num_as_complex_prec(value, bits);
 
     if (!num_is_finite(rounded) && num_is_finite(value)) {
         num_destroy(&rounded);

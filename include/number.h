@@ -28,7 +28,7 @@
  * - integer text -> `mint_t`
  * - `a/b` fraction text -> `mrational_t`
  * - decimal / scientific real text -> `mfloat_t`
- * - complex text -> `mcomplex_t`
+ * - complex text -> an internal multiprecision complex representation
  *
  * Unless a precision is specified explicitly, multiprecision construction
  * uses `1024` bits.
@@ -115,7 +115,7 @@ number_t num_create_from_mfloat_with_prec_bits     (const mfloat_t *value,
 number_t num_create_from_mfloat_with_prec_digits   (const mfloat_t *value,
                                                     size_t significant_digits); /**< explicit decimal-digit precision */
 
-/** @brief `mcomplex_t` constructor family. */
+/** @brief Imports an `mcomplex_t` into the internal complex representation. */
 number_t num_create_from_mcomplex                  (const mcomplex_t *value);   /**< default working precision */
 number_t num_create_from_mcomplex_with_prec_bits   (const mcomplex_t *value,
                                                     size_t precision_bits);     /**< explicit bit precision */

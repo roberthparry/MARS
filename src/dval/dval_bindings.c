@@ -2162,7 +2162,8 @@ static bool binding_expr_is_atomic(const dv_binding_expr_t *expr)
 
     if (expr->kind == DV_BINDING_EXPR_NUMBER) {
         number_t value = num_create_from_string(expr->u.text);
-        bool atomic = num_is_real(value) || num_eq(value, NUM_I);
+        bool atomic = !num_is_nan(value) &&
+                      (num_is_real(value) || num_eq(value, NUM_I));
 
         num_destroy(&value);
         return atomic;

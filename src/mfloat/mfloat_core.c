@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "internal/mfloat_number_internal.h"
 #include "internal/mrational_internal.h"
 #include "mfloat_internal.h"
 
@@ -151,6 +152,30 @@ mfloat_t *mf_const_prec(const mfloat_t *constant, size_t precision_bits)
 mfloat_t *mf_const(const mfloat_t *constant)
 {
     return mf_const_prec(constant, mf_get_default_precision());
+}
+
+mfloat_t *mf_create_from_mpfr_prec(mpfr_srcptr value, size_t precision_bits)
+{
+    mfloat_t *out;
+
+    if (!value)
+        return NULL;
+    out = mf_new_prec(precision_bits ? precision_bits : mf_get_default_precision());
+    if (!out)
+        return NULL;
+    mpfr_set(out->value, value, MPFR_RNDN);
+    return out;
+}
+
+int mf_mpc_set_from_parts(mpc_t out, const mfloat_t *real,
+                          const mfloat_t *imag)
+{
+    if (!real || !imag)
+        return -1;
+    mfloat_prepare_constant(real, mpc_get_prec(out));
+    mfloat_prepare_constant(imag, mpc_get_prec(out));
+    mpc_set_fr_fr(out, real->value, imag->value, MPC_RNDNN);
+    return 0;
 }
 
 mfloat_t *mf_clone(const mfloat_t *mfloat)

@@ -337,7 +337,7 @@ static char *dv_number_to_string_local(number_t value)
         return dv_tostring_xstrdup("-i");
     }
 
-    if ((!num_is_mfloat_backend(value) && !num_is_mcomplex_backend(value)) ||
+    if ((!num_is_inexact_real_backend(value) && !num_is_complex_backend(value)) ||
         num_is_exact(value) || !num_is_finite(value)) {
         text = num_to_string(value);
         if (num_is_exact(value)) {
@@ -768,6 +768,8 @@ static bool emit_negative_const_binding_expr_abs(const dval_t *f,
 static int pow_exp_needs_parens(const dval_t *e)
 {
     if (!e) return 0;
+    if (dv_is_const(e) && !num_is_real(e->c) && !num_eq(e->c, NUM_I))
+        return 1;
     if (e->ops->arity == DV_OP_ATOM)  return 0;  /* var, const */
     if (dv_is_neg(e))                  return 1;
     if (dv_is_pow_d_expr(e))           return 1;  /* e.g. y² is ambiguous as exponent */
@@ -780,7 +782,15 @@ static int pow_exp_needs_parens(const dval_t *e)
 
 static int pow_base_needs_visible_parens(const dval_t *base)
 {
-    return base && dv_is_const(base) && !num_is_real(base->c);
+    number_t real;
+    int has_real_part;
+
+    if (!base || !dv_is_const(base) || num_is_real(base->c))
+        return 0;
+    real = num_real_part(base->c);
+    has_real_part = !num_eq(real, NUM_ZERO);
+    num_destroy(&real);
+    return has_real_part;
 }
 
 static int mul_factor_needs_visible_parens(const dval_t *factor)
