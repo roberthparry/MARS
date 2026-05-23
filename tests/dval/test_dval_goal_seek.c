@@ -110,7 +110,7 @@ static void test_goal_seek_complex_fallback_from_real_axis(void)
     x_value = dv_eval(x);
     x_real = num_real_part(x_value);
     ASSERT_TRUE(num_is_zero(x_real));
-    ASSERT_DVAL_NUMBER_CLOSE(num_clone(x_value), num_clone(NUM_I));
+    ASSERT_DVAL_NUMBER_CLOSE(x_value, NUM_I);
     num_destroy(&x_real);
     num_destroy(&x_value);
 

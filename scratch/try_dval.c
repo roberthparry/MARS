@@ -5,6 +5,20 @@
 
 #include "dval.h"
 
+static char *xstrdup_local(const char *text)
+{
+    size_t len;
+    char *copy;
+
+    if (!text)
+        text = "";
+    len = strlen(text);
+    copy = (char *)malloc(len + 1u);
+    if (copy)
+        memcpy(copy, text, len + 1u);
+    return copy;
+}
+
 static void trim_fraction_tail(char *text)
 {
     char *dot = strchr(text, '.');
@@ -138,6 +152,14 @@ static char *format_real_number(number_t value, int precision)
     int scientific_precision = precision > 0 ? precision - 1 : 0;
     int needed;
 
+    if (num_is_inf(value)) {
+        char *text = xstrdup_local(num_get_sign(value) < 0 ? "-∞" : "∞");
+
+        num_destroy(&zero);
+        num_destroy(&value);
+        return text;
+    }
+
     num_destroy(&zero);
     num_destroy(&value);
     value = floating;
@@ -228,7 +250,9 @@ static void print_owned_number(const char *label, number_t value, int precision)
 {
     char *text = NULL;
 
-    if (precision >= 0) {
+    if (num_is_inf(value)) {
+        text = xstrdup_local(num_get_sign(value) < 0 ? "-∞" : "∞");
+    } else if (precision >= 0) {
         text = num_is_real(value)
              ? format_real_number(num_clone(value), precision)
              : format_complex_number(value, precision);
@@ -307,7 +331,7 @@ static int apply_goal_start(dval_bindings_t *bindings,
     if (!bindings || !assignment)
         return 1;
 
-    copy = strdup(assignment);
+    copy = xstrdup_local(assignment);
     if (!copy)
         return 1;
 

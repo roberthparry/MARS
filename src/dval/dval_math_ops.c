@@ -191,7 +191,7 @@ const dval_ops_t ops_floor = {
     .kind = DV_KIND_FLOOR, .arity = DV_OP_UNARY, .name = "floor",
     .tex_name = "\\lfloor",
     .apply_unary = dv_floor, .apply_binary = NULL,
-    .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
+    .simplify = dv_simplify_unary_operator, .fold_const_unary = dv_fold_floor_const
 };
 const dval_ops_t ops_ceil = {
     .eval = eval_ceil, .deriv = deriv_ceil, .reverse = dv_reverse_ceil,

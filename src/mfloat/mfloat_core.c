@@ -3,8 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "internal/mrational_internal.h"
 #include "mfloat_internal.h"
-#include "mrational/mrational_internal.h"
 
 static const double MFLOAT_LOG10_2 = 0.3010299956639812;
 static const double MFLOAT_LOG2_10 = 3.3219280948873626;
@@ -19,13 +19,22 @@ static void mfloat_prepare_constant(const mfloat_t *mfloat, mpfr_prec_t precisio
 
 static int mfloat_set_mpq_from_mrational(mpq_ptr dst, const mrational_t *value)
 {
-    if (!dst || !value)
-        return -1;
+    return mr_copy_mpq(dst, value);
+}
 
-    mrational_constant_ensure(value);
-    mpq_set(dst, value->value);
-    mpq_canonicalize(dst);
-    return 0;
+int mfloat_set_mpfr_from_mrational(mpfr_t out, const mrational_t *value)
+{
+    mpq_t rational;
+    int rc;
+
+    if (!out || !value)
+        return -1;
+    mpq_init(rational);
+    rc = mfloat_set_mpq_from_mrational(rational, value);
+    if (rc == 0)
+        mpfr_set_q(out, rational, MPFR_RNDN);
+    mpq_clear(rational);
+    return rc;
 }
 
 static mfloat_t *mfloat_alloc(size_t precision_bits)
@@ -201,6 +210,12 @@ static size_t mfloat_decimal_digits_to_bits(size_t significant_digits)
         return 0u;
     bits = (size_t)ceil((double)significant_digits * MFLOAT_LOG2_10);
     return bits > 0u ? bits : 1u;
+}
+
+void mf_ensure_precision(const mfloat_t *mfloat, size_t precision_bits)
+{
+    if (mfloat && precision_bits > 0u)
+        mfloat_prepare_constant(mfloat, (mpfr_prec_t)precision_bits);
 }
 
 size_t mf_get_default_precision(void)

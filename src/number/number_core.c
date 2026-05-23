@@ -9,11 +9,7 @@
 #include "number.h"
 #include "number_internal.h"
 #include "internal/number_internal.h"
-#include "internal/mint_internal.h"
 #include "number_scope_alloc.h"
-#include "mcomplex/mcomplex_internal.h"
-#include "mfloat/mfloat_internal.h"
-#include "mrational/mrational_internal.h"
 
 typedef struct number_scope_record_t {
     number_kind_t kind;
@@ -660,22 +656,14 @@ void number_destroy_mint(number_t *number)
 {
     if (!number)
         return;
-    if (number_impl(number)->value.mi &&
-        number_impl(number)->value.mi->constant_id != MICONST_NONE)
-        return;
-    if (number)
-        mi_free(number_impl(number)->value.mi);
+    mi_free(number_impl(number)->value.mi);
 }
 
 void number_destroy_mrational(number_t *number)
 {
     if (!number)
         return;
-    if (number_impl(number)->value.mr &&
-        number_impl(number)->value.mr->constant_id != MRCONST_NONE)
-        return;
-    if (number)
-        mr_free(number_impl(number)->value.mr);
+    mr_free(number_impl(number)->value.mr);
 }
 
 void number_destroy_mfloat(number_t *number)
@@ -688,8 +676,6 @@ void number_destroy_mfloat(number_t *number)
 void number_destroy_mcomplex(number_t *number)
 {
     if (!number || !number_impl(number)->value.mc)
-        return;
-    if (number_impl(number)->value.mc->constant_id != MCCONST_NONE)
         return;
     mc_free(number_impl(number)->value.mc);
 }
@@ -727,20 +713,12 @@ void number_destroy_scope_none(void *payload)
 
 void number_destroy_scope_mint(void *payload)
 {
-    mint_t *mint = (mint_t *)payload;
-
-    if (!mint || mint->constant_id != MICONST_NONE)
-        return;
-    mi_free(mint);
+    mi_free((mint_t *)payload);
 }
 
 void number_destroy_scope_mrational(void *payload)
 {
-    mrational_t *rational = (mrational_t *)payload;
-
-    if (!rational || rational->constant_id != MRCONST_NONE)
-        return;
-    mr_free(rational);
+    mr_free((mrational_t *)payload);
 }
 
 void number_destroy_scope_mfloat(void *payload)
@@ -750,11 +728,7 @@ void number_destroy_scope_mfloat(void *payload)
 
 void number_destroy_scope_mcomplex(void *payload)
 {
-    mcomplex_t *complex_value = (mcomplex_t *)payload;
-
-    if (!complex_value || complex_value->constant_id != MCCONST_NONE)
-        return;
-    mc_free(complex_value);
+    mc_free((mcomplex_t *)payload);
 }
 
  number_t number_const_like_double(const number_t *like, number_const_id_t id);
@@ -787,30 +761,6 @@ void number_destroy_scope_mcomplex(void *payload)
     return false;
 }
 
- bool number_value_is_immortal_mint(const number_t *number)
-{
-    return number && number_impl_const(number)->value.mi &&
-        number_impl_const(number)->value.mi->constant_id != MICONST_NONE;
-}
-
- bool number_value_is_immortal_mrational(const number_t *number)
-{
-    return number && number_impl_const(number)->value.mr &&
-        number_impl_const(number)->value.mr->constant_id != MRCONST_NONE;
-}
-
- bool number_value_is_immortal_mfloat(const number_t *number)
-{
-    return number && number_impl_const(number)->value.mf &&
-        number_impl_const(number)->value.mf->constant_id != MFCONST_NONE;
-}
-
- bool number_value_is_immortal_mcomplex(const number_t *number)
-{
-    return number && number_impl_const(number)->value.mc &&
-        number_impl_const(number)->value.mc->constant_id != MCCONST_NONE;
-}
-
 static bool number_value_is_immortal(const number_t *number)
 {
     const number_vtable_t *vt = number ? number_vt(number) : NULL;
@@ -818,6 +768,142 @@ static bool number_value_is_immortal(const number_t *number)
     if (!number || !number_is_valid_value(number) || !vt || !vt->is_immortal)
         return false;
     return vt->is_immortal(number);
+}
+
+#define NUMBER_ARRAY_LEN(array) (sizeof(array) / sizeof((array)[0]))
+
+typedef struct {
+    const mint_t * const *slot;
+    number_const_id_t id;
+} number_mint_const_slot_t;
+
+typedef struct {
+    const mrational_t * const *slot;
+    number_const_id_t id;
+} number_mrational_const_slot_t;
+
+typedef struct {
+    const mfloat_t * const *slot;
+    number_const_id_t id;
+} number_mfloat_const_slot_t;
+
+typedef struct {
+    const mcomplex_t * const *slot;
+    number_const_id_t id;
+} number_mcomplex_const_slot_t;
+
+static const number_mint_const_slot_t mint_const_map[] = {
+    { &MI_ZERO, NUMBER_CONST_ZERO },
+    { &MI_ONE, NUMBER_CONST_ONE },
+    { &MI_NEG_ONE, NUMBER_CONST_NEG_ONE },
+    { &MI_TWO, NUMBER_CONST_TWO }
+};
+
+static const number_mrational_const_slot_t mrational_const_map[] = {
+    { &MR_HALF, NUMBER_CONST_HALF },
+    { &MR_QUARTER, NUMBER_CONST_QUARTER },
+    { &MR_ONE_EIGHTH, NUMBER_CONST_ONE_EIGHTH }
+};
+
+static const number_mfloat_const_slot_t mfloat_const_map[] = {
+    { &MF_ZERO, NUMBER_CONST_ZERO },
+    { &MF_ONE, NUMBER_CONST_ONE },
+    { &MF_HALF, NUMBER_CONST_HALF },
+    { &MF_PI, NUMBER_CONST_PI },
+    { &MF_2PI, NUMBER_CONST_2PI },
+    { &MF_PI_2, NUMBER_CONST_PI_2 },
+    { &MF_NEG_PI_2, NUMBER_CONST_NEG_PI_2 },
+    { &MF_PI_4, NUMBER_CONST_PI_4 },
+    { &MF_3PI_4, NUMBER_CONST_3PI_4 },
+    { &MF_PI_6, NUMBER_CONST_PI_6 },
+    { &MF_PI_3, NUMBER_CONST_PI_3 },
+    { &MF_E, NUMBER_CONST_E },
+    { &MF_INV_E, NUMBER_CONST_INV_E },
+    { &MF_LN2, NUMBER_CONST_LN2 },
+    { &MF_LN10, NUMBER_CONST_LN10 },
+    { &MF_SQRT2, NUMBER_CONST_SQRT2 },
+    { &MF_SQRT3, NUMBER_CONST_SQRT3 },
+    { &MF_SQRT2_OVER_TWO, NUMBER_CONST_SQRT2_OVER_TWO },
+    { &MF_SQRT3_OVER_TWO, NUMBER_CONST_SQRT3_OVER_TWO },
+    { &MF_INF, NUMBER_CONST_INF },
+    { &MF_NINF, NUMBER_CONST_NINF }
+};
+
+static const number_mcomplex_const_slot_t mcomplex_const_map[] = {
+    { &MC_ZERO, NUMBER_CONST_ZERO },
+    { &MC_ONE, NUMBER_CONST_ONE },
+    { &MC_HALF, NUMBER_CONST_HALF },
+    { &MC_PI, NUMBER_CONST_PI },
+    { &MC_E, NUMBER_CONST_E },
+    { &MC_LN10, NUMBER_CONST_LN10 },
+    { &MC_SQRT2, NUMBER_CONST_SQRT2 },
+    { &MC_INF, NUMBER_CONST_INF },
+    { &MC_NINF, NUMBER_CONST_NINF },
+    { &MC_I, NUMBER_CONST_I }
+};
+
+#define NUMBER_DEFINE_IMMORTAL_ID_FN(suffix, type, field, map)              \
+bool number_immortal_id_##suffix(const number_t *number,                   \
+                                 number_const_id_t *id_out)                \
+{                                                                          \
+    const type *value = number ? number_impl_const(number)->value.field : NULL; \
+                                                                           \
+    if (!value || !id_out)                                                  \
+        return false;                                                       \
+    for (size_t i = 0u; i < NUMBER_ARRAY_LEN(map); ++i) {                   \
+        if (*(map)[i].slot == value) {                                      \
+            *id_out = (map)[i].id;                                          \
+            return true;                                                    \
+        }                                                                   \
+    }                                                                       \
+    return false;                                                           \
+}
+
+NUMBER_DEFINE_IMMORTAL_ID_FN(mint, mint_t, mi, mint_const_map)
+NUMBER_DEFINE_IMMORTAL_ID_FN(mrational, mrational_t, mr, mrational_const_map)
+NUMBER_DEFINE_IMMORTAL_ID_FN(mfloat, mfloat_t, mf, mfloat_const_map)
+NUMBER_DEFINE_IMMORTAL_ID_FN(mcomplex, mcomplex_t, mc, mcomplex_const_map)
+
+#undef NUMBER_DEFINE_IMMORTAL_ID_FN
+
+bool number_const_id_from_immortal(const number_t *number,
+                                   number_const_id_t *id_out)
+{
+    const number_vtable_t *vt = number ? number_vt(number) : NULL;
+
+    if (id_out)
+        *id_out = NUMBER_CONST_COUNT;
+    if (!number || !id_out || !vt || !vt->immortal_id)
+        return false;
+    return vt->immortal_id(number, id_out);
+}
+
+ bool number_value_is_immortal_mint(const number_t *number)
+{
+    number_const_id_t id;
+
+    return number_immortal_id_mint(number, &id);
+}
+
+ bool number_value_is_immortal_mrational(const number_t *number)
+{
+    number_const_id_t id;
+
+    return number_immortal_id_mrational(number, &id);
+}
+
+ bool number_value_is_immortal_mfloat(const number_t *number)
+{
+    number_const_id_t id;
+
+    return number_immortal_id_mfloat(number, &id);
+}
+
+ bool number_value_is_immortal_mcomplex(const number_t *number)
+{
+    number_const_id_t id;
+
+    return number_immortal_id_mcomplex(number, &id);
 }
 
  bool number_is_zero_double(const number_t *number)
@@ -1174,8 +1260,8 @@ static bool number_eq_same_tol_with_precision(const number_t *a,
 {
     if (!number || !number_impl_const(number)->value.mf)
         return 0u;
-    if (number_impl_const(number)->value.mf->constant_id == MFCONST_PHI)
-        mfloat_constant_ensure(number_impl_const(number)->value.mf, 1088u);
+    if (number_impl_const(number)->value.mf == MF_PHI)
+        mf_ensure_precision(number_impl_const(number)->value.mf, 1088u);
     return mf_get_precision(number_impl_const(number)->value.mf);
 }
 
@@ -1554,8 +1640,6 @@ number_t *number_clone_mint(const number_t *number)
 
     if (!number || !number_impl_const(number)->value.mi)
         return NULL;
-    if (number_impl_const(number)->value.mi->constant_id != MICONST_NONE)
-        return number_wrap_mint(mi_const(number_impl_const(number)->value.mi));
     copy = mi_clone(number_impl_const(number)->value.mi);
     return copy ? number_wrap_mint(copy) : NULL;
 }
@@ -1566,8 +1650,6 @@ number_t *number_clone_mrational(const number_t *number)
 
     if (!number || !number_impl_const(number)->value.mr)
         return NULL;
-    if (number_impl_const(number)->value.mr->constant_id != MRCONST_NONE)
-        return number_wrap_mrational(mr_const(number_impl_const(number)->value.mr));
     copy = mr_clone(number_impl_const(number)->value.mr);
     return copy ? number_wrap_mrational(copy) : NULL;
 }
@@ -1578,8 +1660,6 @@ number_t *number_clone_mfloat(const number_t *number)
 
     if (!number || !number_impl_const(number)->value.mf)
         return NULL;
-    if (number_impl_const(number)->value.mf->constant_id != MFCONST_NONE)
-        return number_wrap_mfloat(mf_const(number_impl_const(number)->value.mf));
     copy = mf_clone(number_impl_const(number)->value.mf);
     return copy ? number_wrap_mfloat(copy) : NULL;
 }
@@ -1590,8 +1670,6 @@ number_t *number_clone_mcomplex(const number_t *number)
 
     if (!number || !number_impl_const(number)->value.mc)
         return NULL;
-    if (number_impl_const(number)->value.mc->constant_id != MCCONST_NONE)
-        return number_wrap_mcomplex(mc_const(number_impl_const(number)->value.mc));
     copy = mc_clone(number_impl_const(number)->value.mc);
     return copy ? number_wrap_mcomplex(copy) : NULL;
 }
@@ -1992,7 +2070,6 @@ number_t *number_pow_int_mint(const number_t *number, int exponent)
 number_t *number_pow_int_mrational(const number_t *number, int exponent)
 {
     mrational_t *copy;
-    unsigned long mag;
 
     if (!number)
         return NULL;
@@ -2001,23 +2078,10 @@ number_t *number_pow_int_mrational(const number_t *number, int exponent)
     if (!copy)
         return NULL;
 
-    if (exponent < 0 && mr_inv(copy) != 0) {
+    if (mr_pow_int(copy, exponent) != 0) {
         mr_free(copy);
         return NULL;
     }
-
-    mag = exponent < 0
-        ? (unsigned long)(-(long)exponent)
-        : (unsigned long)exponent;
-
-    if (mrational_prepare_mutable(copy) != 0) {
-        mr_free(copy);
-        return NULL;
-    }
-
-    mpz_pow_ui(mpq_numref(copy->value), mpq_numref(copy->value), mag);
-    mpz_pow_ui(mpq_denref(copy->value), mpq_denref(copy->value), mag);
-    mpq_canonicalize(copy->value);
     return number_wrap_mrational(copy);
 }
 
@@ -2858,15 +2922,10 @@ number_t num_create_from_mfloat_with_prec_bits(const mfloat_t *value, size_t pre
 {
     mfloat_t *copy;
 
-    if (!value)
+    if (!value || precision_bits == 0u)
         return number_invalid();
-    copy = value->constant_id != MFCONST_NONE
-        ? mf_const_prec(value, precision_bits)
-        : mf_clone(value);
-    if (!copy)
-        return number_invalid();
-    if (value->constant_id == MFCONST_NONE &&
-        mf_set_precision(copy, precision_bits) != 0) {
+    copy = mf_const_prec(value, precision_bits);
+    if (!copy) {
         mf_free(copy);
         return number_invalid();
     }
@@ -2878,18 +2937,11 @@ number_t num_create_from_mfloat_with_prec_digits(const mfloat_t *value, size_t s
     mfloat_t *copy;
     size_t precision_bits;
 
-    if (!value)
+    if (!value || significant_digits == 0u)
         return number_invalid();
-    precision_bits = significant_digits == 0u
-        ? 0u
-        : (size_t)ceil((double)significant_digits * 3.3219280948873626);
-    copy = value->constant_id != MFCONST_NONE
-        ? mf_const_prec(value, precision_bits)
-        : mf_clone(value);
-    if (!copy)
-        return number_invalid();
-    if (value->constant_id == MFCONST_NONE &&
-        mf_set_precision_digits(copy, significant_digits) != 0) {
+    precision_bits = (size_t)ceil((double)significant_digits * 3.3219280948873626);
+    copy = mf_const_prec(value, precision_bits);
+    if (!copy) {
         mf_free(copy);
         return number_invalid();
     }
@@ -2906,15 +2958,10 @@ number_t num_create_from_mcomplex_with_prec_bits(const mcomplex_t *value, size_t
 {
     mcomplex_t *copy;
 
-    if (!value)
+    if (!value || precision_bits == 0u)
         return number_invalid();
-    copy = value->constant_id != MCCONST_NONE
-        ? mc_const_prec(value, precision_bits)
-        : mc_clone(value);
-    if (!copy)
-        return number_invalid();
-    if (value->constant_id == MCCONST_NONE &&
-        mc_set_precision(copy, precision_bits) != 0) {
+    copy = mc_const_prec(value, precision_bits);
+    if (!copy) {
         mc_free(copy);
         return number_invalid();
     }
@@ -2926,18 +2973,11 @@ number_t num_create_from_mcomplex_with_prec_digits(const mcomplex_t *value, size
     mcomplex_t *copy;
     size_t precision_bits;
 
-    if (!value)
+    if (!value || significant_digits == 0u)
         return number_invalid();
-    precision_bits = significant_digits == 0u
-        ? 0u
-        : (size_t)ceil((double)significant_digits * 3.3219280948873626);
-    copy = value->constant_id != MCCONST_NONE
-        ? mc_const_prec(value, precision_bits)
-        : mc_clone(value);
-    if (!copy)
-        return number_invalid();
-    if (value->constant_id == MCCONST_NONE &&
-        mc_set_precision_digits(copy, significant_digits) != 0) {
+    precision_bits = (size_t)ceil((double)significant_digits * 3.3219280948873626);
+    copy = mc_const_prec(value, precision_bits);
+    if (!copy) {
         mc_free(copy);
         return number_invalid();
     }
@@ -3329,7 +3369,18 @@ done:
 number_t num_neg(const number_t number)
 {
     const number_vtable_t *vt = number_vt(&number);
+    number_const_id_t id;
 
+    if (number_const_id_from_immortal(&number, &id)) {
+        if (id == NUMBER_CONST_PI_2)
+            return NUM_NEG_PI_2;
+        if (id == NUMBER_CONST_NEG_PI_2)
+            return NUM_PI_2;
+        if (id == NUMBER_CONST_INF)
+            return NUM_NINF;
+        if (id == NUMBER_CONST_NINF)
+            return NUM_INF;
+    }
     return vt && vt->neg ? number_take(vt->neg(&number)) : number_invalid();
 }
 
@@ -3349,6 +3400,58 @@ number_t num_inv(const number_t number)
     return number_invalid();
 }
 
+static bool number_try_exact_immortal_binary(const number_t *a,
+                                             const number_t *b,
+                                             number_binary_op_t op,
+                                             number_t *out)
+{
+    typedef enum {
+        NUMBER_EXACT_RESULT_CONST,
+        NUMBER_EXACT_RESULT_NEG_CONST
+    } number_exact_result_kind_t;
+    typedef struct {
+        number_binary_op_t op;
+        number_const_id_t left;
+        number_const_id_t right;
+        number_const_id_t result;
+        number_exact_result_kind_t result_kind;
+        bool commutative;
+    } number_exact_binary_rule_t;
+    static const number_exact_binary_rule_t rules[] = {
+        { NUMBER_OP_MUL, NUMBER_CONST_PI,       NUMBER_CONST_TWO,  NUMBER_CONST_2PI,  NUMBER_EXACT_RESULT_CONST,     true  },
+        { NUMBER_OP_MUL, NUMBER_CONST_PI,       NUMBER_CONST_HALF, NUMBER_CONST_PI_2, NUMBER_EXACT_RESULT_CONST,     true  },
+        { NUMBER_OP_MUL, NUMBER_CONST_PI_2,     NUMBER_CONST_TWO,  NUMBER_CONST_PI,   NUMBER_EXACT_RESULT_CONST,     true  },
+        { NUMBER_OP_MUL, NUMBER_CONST_NEG_PI_2, NUMBER_CONST_TWO,  NUMBER_CONST_PI,   NUMBER_EXACT_RESULT_NEG_CONST, true  },
+        { NUMBER_OP_DIV, NUMBER_CONST_PI,       NUMBER_CONST_TWO,  NUMBER_CONST_PI_2, NUMBER_EXACT_RESULT_CONST,     false },
+        { NUMBER_OP_DIV, NUMBER_CONST_2PI,      NUMBER_CONST_TWO,  NUMBER_CONST_PI,   NUMBER_EXACT_RESULT_CONST,     false },
+        { NUMBER_OP_DIV, NUMBER_CONST_PI,       NUMBER_CONST_PI,   NUMBER_CONST_ONE,  NUMBER_EXACT_RESULT_CONST,     false }
+    };
+    number_const_id_t aid;
+    number_const_id_t bid;
+    size_t i;
+
+    if (!a || !b || !out ||
+        !number_const_id_from_immortal(a, &aid) ||
+        !number_const_id_from_immortal(b, &bid))
+        return false;
+
+    for (i = 0u; i < NUMBER_ARRAY_LEN(rules); ++i) {
+        bool direct = rules[i].left == aid && rules[i].right == bid;
+        bool swapped = rules[i].commutative &&
+                       rules[i].left == bid && rules[i].right == aid;
+
+        if (rules[i].op != op || (!direct && !swapped))
+            continue;
+
+        *out = rules[i].result_kind == NUMBER_EXACT_RESULT_NEG_CONST
+            ? number_neg_const_return_like(a, rules[i].result)
+            : number_const_return_like(a, rules[i].result);
+        return true;
+    }
+
+    return false;
+}
+
 number_t num_add(const number_t a, const number_t b)
 {
     return number_take(number_apply_binary_generic(&a, &b, NUMBER_OP_ADD));
@@ -3361,11 +3464,19 @@ number_t num_sub(const number_t a, const number_t b)
 
 number_t num_mul(const number_t a, const number_t b)
 {
+    number_t out;
+
+    if (number_try_exact_immortal_binary(&a, &b, NUMBER_OP_MUL, &out))
+        return out;
     return number_take(number_apply_binary_generic(&a, &b, NUMBER_OP_MUL));
 }
 
 number_t num_div(const number_t a, const number_t b)
 {
+    number_t out;
+
+    if (number_try_exact_immortal_binary(&a, &b, NUMBER_OP_DIV, &out))
+        return out;
     return number_take(number_apply_binary_generic(&a, &b, NUMBER_OP_DIV));
 }
 

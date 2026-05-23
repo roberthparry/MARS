@@ -19,6 +19,7 @@ typedef enum mfloat_constant_id_t {
     MFCONST_PI,
     MFCONST_2PI,
     MFCONST_PI_2,
+    MFCONST_NEG_PI_2,
     MFCONST_PI_4,
     MFCONST_3PI_4,
     MFCONST_PI_6,
@@ -62,5 +63,6 @@ struct _mfloat_t {
 void mfloat_constants_ensure_init(void);
 void mfloat_constants_ensure_precision(mpfr_prec_t precision);
 void mfloat_constant_ensure(const mfloat_t *constant, mpfr_prec_t precision);
+int mfloat_set_mpfr_from_mrational(mpfr_t out, const mrational_t *value);
 
 #endif

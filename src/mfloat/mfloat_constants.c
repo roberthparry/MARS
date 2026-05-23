@@ -12,6 +12,7 @@ mfloat_t MF_TEN_VALUE = MFLOAT_CONST_INIT(MFCONST_TEN);
 mfloat_t MF_PI_VALUE = MFLOAT_CONST_INIT(MFCONST_PI);
 mfloat_t MF_2PI_VALUE = MFLOAT_CONST_INIT(MFCONST_2PI);
 mfloat_t MF_PI_2_VALUE = MFLOAT_CONST_INIT(MFCONST_PI_2);
+mfloat_t MF_NEG_PI_2_VALUE = MFLOAT_CONST_INIT(MFCONST_NEG_PI_2);
 mfloat_t MF_PI_4_VALUE = MFLOAT_CONST_INIT(MFCONST_PI_4);
 mfloat_t MF_3PI_4_VALUE = MFLOAT_CONST_INIT(MFCONST_3PI_4);
 mfloat_t MF_PI_6_VALUE = MFLOAT_CONST_INIT(MFCONST_PI_6);
@@ -52,6 +53,7 @@ const mfloat_t * const MF_TEN = &MF_TEN_VALUE;
 const mfloat_t * const MF_PI = &MF_PI_VALUE;
 const mfloat_t * const MF_2PI = &MF_2PI_VALUE;
 const mfloat_t * const MF_PI_2 = &MF_PI_2_VALUE;
+const mfloat_t * const MF_NEG_PI_2 = &MF_NEG_PI_2_VALUE;
 const mfloat_t * const MF_PI_4 = &MF_PI_4_VALUE;
 const mfloat_t * const MF_3PI_4 = &MF_3PI_4_VALUE;
 const mfloat_t * const MF_PI_6 = &MF_PI_6_VALUE;
@@ -92,6 +94,7 @@ static mpfr_prec_t mf_ten_prec;
 static mpfr_prec_t mf_pi_prec;
 static mpfr_prec_t mf_2pi_prec;
 static mpfr_prec_t mf_pi_2_prec;
+static mpfr_prec_t mf_neg_pi_2_prec;
 static mpfr_prec_t mf_pi_4_prec;
 static mpfr_prec_t mf_3pi_4_prec;
 static mpfr_prec_t mf_pi_6_prec;
@@ -261,6 +264,15 @@ static void mfloat_ensure_pi_2(mpfr_prec_t precision)
     mfloat_ensure_pi(precision);
     mfloat_const_prepare(&MF_PI_2_VALUE, &mf_pi_2_prec, precision);
     mpfr_div_2ui(MF_PI_2_VALUE.value, MF_PI_VALUE.value, 1u, MPFR_RNDN);
+}
+
+static void mfloat_ensure_neg_pi_2(mpfr_prec_t precision)
+{
+    if (mf_neg_pi_2_prec >= precision)
+        return;
+    mfloat_ensure_pi_2(precision);
+    mfloat_const_prepare(&MF_NEG_PI_2_VALUE, &mf_neg_pi_2_prec, precision);
+    mpfr_neg(MF_NEG_PI_2_VALUE.value, MF_PI_2_VALUE.value, MPFR_RNDN);
 }
 
 static void mfloat_ensure_pi_4(mpfr_prec_t precision)
@@ -575,6 +587,7 @@ static const mfloat_const_ensure_fn_t mfloat_const_dispatch[MFCONST_COUNT] = {
     [MFCONST_PI] = mfloat_ensure_pi,
     [MFCONST_2PI] = mfloat_ensure_2pi,
     [MFCONST_PI_2] = mfloat_ensure_pi_2,
+    [MFCONST_NEG_PI_2] = mfloat_ensure_neg_pi_2,
     [MFCONST_PI_4] = mfloat_ensure_pi_4,
     [MFCONST_3PI_4] = mfloat_ensure_3pi_4,
     [MFCONST_PI_6] = mfloat_ensure_pi_6,
@@ -617,6 +630,7 @@ static const mfloat_const_cache_t mfloat_const_cache[MFCONST_COUNT] = {
     [MFCONST_PI] = { &MF_PI_VALUE, &mf_pi_prec },
     [MFCONST_2PI] = { &MF_2PI_VALUE, &mf_2pi_prec },
     [MFCONST_PI_2] = { &MF_PI_2_VALUE, &mf_pi_2_prec },
+    [MFCONST_NEG_PI_2] = { &MF_NEG_PI_2_VALUE, &mf_neg_pi_2_prec },
     [MFCONST_PI_4] = { &MF_PI_4_VALUE, &mf_pi_4_prec },
     [MFCONST_3PI_4] = { &MF_3PI_4_VALUE, &mf_3pi_4_prec },
     [MFCONST_PI_6] = { &MF_PI_6_VALUE, &mf_pi_6_prec },

@@ -27,6 +27,11 @@ void run_number_constant_tests(void)
         number_t tan_pi_4 = num_tan(NUM_PI_4);
         number_t tan_pi_3 = num_tan(NUM_PI_3);
         number_t tan_3pi_4 = num_tan(NUM_3PI_4);
+        number_t tan_pi_2 = num_tan(NUM_PI_2);
+        number_t pi_over_two = num_div(NUM_PI, NUM_TWO);
+        number_t tan_pi_over_two = num_tan(pi_over_two);
+        number_t neg_pi_2 = num_neg(NUM_PI_2);
+        number_t tan_neg_pi_2 = num_tan(neg_pi_2);
         number_t sin_pi_6_pair = NUM_ZERO;
         number_t cos_pi_6_pair = NUM_ZERO;
         number_t i_pi_6 = num_mul(NUM_I, NUM_PI_6);
@@ -46,7 +51,7 @@ void run_number_constant_tests(void)
         number_t inv_sqrt3 = num_div(NUM_ONE, NUM_SQRT3);
         number_t i_half = num_mul(NUM_I, NUM_HALF);
         number_t i_value = NUM_I;
-        number_t neg_i = num_neg(NUM_I);
+        number_t neg_i = NUM_NEG_I;
 
         assert_number_string_prefix("NUM_PI", pi,
                                     "3.141592653589793238462643383279");
@@ -62,7 +67,10 @@ void run_number_constant_tests(void)
                                     "0.707106781186547524400844362104");
         assert_number_string_prefix("NUM_SQRT3_OVER_TWO", half_sqrt3,
                                     "0.866025403784438646763723170752");
+        assert_number_string_prefix("NUM_NEG_PI_2", NUM_NEG_PI_2,
+                                    "-1.570796326794896619231321691639");
         assert_number_string("NUM_I", i, "i");
+        assert_number_string("NUM_NEG_I", neg_i, "-i");
         assert_number_string("num_pow10(6)", million, "1000000");
 
         ASSERT_TRUE(num_is_real(pi));
@@ -90,6 +98,10 @@ void run_number_constant_tests(void)
         ASSERT_NUMBER_EQ(tan_pi_4, NUM_ONE);
         ASSERT_NUMBER_EQ(tan_pi_3, NUM_SQRT3);
         ASSERT_NUMBER_EQ(tan_3pi_4, NUM_NEG_ONE);
+        ASSERT_NUMBER_EQ(tan_pi_over_two, NUM_INF);
+        ASSERT_NUMBER_EQ(neg_pi_2, NUM_NEG_PI_2);
+        ASSERT_NUMBER_EQ(tan_pi_2, NUM_INF);
+        ASSERT_NUMBER_EQ(tan_neg_pi_2, NUM_NINF);
         ASSERT_EQ_INT(num_sincos(NUM_PI_6, &sin_pi_6_pair, &cos_pi_6_pair), 0);
         ASSERT_NUMBER_EQ(sin_pi_6_pair, NUM_HALF);
         ASSERT_NUMBER_EQ(cos_pi_6_pair, half_sqrt3);
@@ -121,6 +133,11 @@ void run_number_constant_tests(void)
         num_destroy(&tan_pi_4);
         num_destroy(&tan_pi_3);
         num_destroy(&tan_3pi_4);
+        num_destroy(&tan_pi_2);
+        num_destroy(&pi_over_two);
+        num_destroy(&tan_pi_over_two);
+        num_destroy(&neg_pi_2);
+        num_destroy(&tan_neg_pi_2);
         num_destroy(&sin_pi_6_pair);
         num_destroy(&cos_pi_6_pair);
         num_destroy(&i_pi_6);

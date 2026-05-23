@@ -1,57 +1,22 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "dval_bindings_internal.h"
 #include "dval_internal.h"
-
-static int binding_expr_struct_eq(const dv_binding_expr_t *u,
-                                  const dv_binding_expr_t *v)
-{
-    if (u == v)
-        return 1;
-    if (!u || !v || u->kind != v->kind)
-        return 0;
-
-    switch (u->kind) {
-        case DV_BINDING_EXPR_NUMBER:
-            if (!u->u.text || !v->u.text)
-                return u->u.text == v->u.text;
-            return strcmp(u->u.text, v->u.text) == 0;
-        case DV_BINDING_EXPR_CONST:
-            return u->u.const_id == v->u.const_id;
-        case DV_BINDING_EXPR_NEG:
-            return binding_expr_struct_eq(u->u.unary.child,
-                                          v->u.unary.child);
-        case DV_BINDING_EXPR_ADD:
-        case DV_BINDING_EXPR_SUB:
-        case DV_BINDING_EXPR_MUL:
-        case DV_BINDING_EXPR_DIV:
-            return binding_expr_struct_eq(u->u.binary.left,
-                                          v->u.binary.left) &&
-                   binding_expr_struct_eq(u->u.binary.right,
-                                          v->u.binary.right);
-        case DV_BINDING_EXPR_POWI:
-            return u->u.powi.exponent == v->u.powi.exponent &&
-                   binding_expr_struct_eq(u->u.powi.base,
-                                          v->u.powi.base);
-        case DV_BINDING_EXPR_UNARY_OP:
-            return u->u.unary_op.ops == v->u.unary_op.ops &&
-                   binding_expr_struct_eq(u->u.unary_op.child,
-                                          v->u.unary_op.child);
-        case DV_BINDING_EXPR_BINARY_OP:
-            return u->u.binary_op.ops == v->u.binary_op.ops &&
-                   binding_expr_struct_eq(u->u.binary_op.left,
-                                          v->u.binary_op.left) &&
-                   binding_expr_struct_eq(u->u.binary_op.right,
-                                          v->u.binary_op.right);
-    }
-
-    return 0;
-}
 
 static int const_struct_eq(const dval_t *u, const dval_t *v)
 {
-    if (u->binding_expr || v->binding_expr)
-        return binding_expr_struct_eq(u->binding_expr, v->binding_expr);
+    if (u->binding_expr || v->binding_expr) {
+        if (dv_binding_expr_struct_eq(u->binding_expr, v->binding_expr))
+            return 1;
+        return num_eq(u->c, v->c) &&
+               (!u->binding_expr ||
+                u->binding_expr->kind == DV_BINDING_EXPR_NUMBER ||
+                u->binding_expr->kind == DV_BINDING_EXPR_CONST) &&
+               (!v->binding_expr ||
+                v->binding_expr->kind == DV_BINDING_EXPR_NUMBER ||
+                v->binding_expr->kind == DV_BINDING_EXPR_CONST);
+    }
 
     return num_eq(u->c, v->c);
 }
@@ -152,9 +117,26 @@ cleanup:
     return equal;
 }
 
+static int sqrt_half_pow_struct_eq(const dval_t *u, const dval_t *v)
+{
+    if (dv_is_sqrt_expr(u) &&
+        dv_is_pow_d_expr(v) &&
+        num_eq(v->c, NUM_HALF))
+        return dv_struct_eq(u->a, v->a);
+    if (dv_is_pow_d_expr(u) &&
+        num_eq(u->c, NUM_HALF) &&
+        dv_is_sqrt_expr(v))
+        return dv_struct_eq(u->a, v->a);
+    return 0;
+}
+
 int dv_struct_eq(const dval_t *u, const dval_t *v)
 {
     if (u == v)
+        return 1;
+    if (!u || !v)
+        return 0;
+    if (sqrt_half_pow_struct_eq(u, v))
         return 1;
     if (u->ops != v->ops)
         return 0;

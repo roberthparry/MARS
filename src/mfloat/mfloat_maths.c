@@ -4,13 +4,20 @@
 
 #include "internal/mrational_internal.h"
 #include "mfloat_internal.h"
-#include "mrational/mrational_internal.h"
 
 enum {
     MF_ERFINV_NEWTON_STEPS = 8,
     MF_GAMMAINV_MAX_STEPS = 1200,
     MF_LAMBERT_W_HALLEY_STEPS = 12
 };
+
+typedef enum {
+    MF_GAMMAINC_LOWER,
+    MF_GAMMAINC_UPPER,
+    MF_GAMMAINC_P,
+    MF_GAMMAINC_Q,
+    MF_GAMMAINC_MODE_COUNT
+} mfloat_gammainc_mode_t;
 
 static void mfloat_prepare_constant(const mfloat_t *mfloat, mpfr_prec_t precision)
 {
@@ -108,12 +115,62 @@ static int mfloat_apply_binomial_mpfr(mfloat_t *mfloat, const mfloat_t *other)
     return 0;
 }
 
-static int mfloat_apply_gammainc_mpfr(mfloat_t *mfloat, const mfloat_t *other, int mode)
+static void mfloat_gammainc_lower_mpfr(mpfr_t out,
+                                       const mpfr_t gamma_a,
+                                       const mpfr_t upper,
+                                       mpfr_t tmp)
 {
+    (void)tmp;
+    mpfr_sub(out, gamma_a, upper, MPFR_RNDN);
+}
+
+static void mfloat_gammainc_upper_mpfr(mpfr_t out,
+                                       const mpfr_t gamma_a,
+                                       const mpfr_t upper,
+                                       mpfr_t tmp)
+{
+    (void)gamma_a;
+    (void)tmp;
+    mpfr_set(out, upper, MPFR_RNDN);
+}
+
+static void mfloat_gammainc_P_mpfr(mpfr_t out,
+                                   const mpfr_t gamma_a,
+                                   const mpfr_t upper,
+                                   mpfr_t tmp)
+{
+    mpfr_sub(tmp, gamma_a, upper, MPFR_RNDN);
+    mpfr_div(out, tmp, gamma_a, MPFR_RNDN);
+}
+
+static void mfloat_gammainc_Q_mpfr(mpfr_t out,
+                                   const mpfr_t gamma_a,
+                                   const mpfr_t upper,
+                                   mpfr_t tmp)
+{
+    (void)tmp;
+    mpfr_div(out, upper, gamma_a, MPFR_RNDN);
+}
+
+static int mfloat_apply_gammainc_mpfr(mfloat_t *mfloat,
+                                      const mfloat_t *other,
+                                      mfloat_gammainc_mode_t mode)
+{
+    typedef void (*mfloat_gammainc_apply_fn)(mpfr_t,
+                                            const mpfr_t,
+                                            const mpfr_t,
+                                            mpfr_t);
+    static const mfloat_gammainc_apply_fn apply[MF_GAMMAINC_MODE_COUNT] = {
+        [MF_GAMMAINC_LOWER] = mfloat_gammainc_lower_mpfr,
+        [MF_GAMMAINC_UPPER] = mfloat_gammainc_upper_mpfr,
+        [MF_GAMMAINC_P] = mfloat_gammainc_P_mpfr,
+        [MF_GAMMAINC_Q] = mfloat_gammainc_Q_mpfr
+    };
     mpfr_t gamma_a, upper, tmp;
     mpfr_prec_t prec;
 
-    if (mfloat_prepare_mutable(mfloat) != 0 || !other)
+    if (mfloat_prepare_mutable(mfloat) != 0 || !other ||
+        (unsigned)mode >= MF_GAMMAINC_MODE_COUNT || !apply[mode])
         return -1;
     mfloat_prepare_constant(other, mfloat_binary_prec(mfloat, other));
 
@@ -127,27 +184,7 @@ static int mfloat_apply_gammainc_mpfr(mfloat_t *mfloat, const mfloat_t *other, i
 
     mpfr_gamma(gamma_a, mfloat->value, MPFR_RNDN);
     mpfr_gamma_inc(upper, mfloat->value, other->value, MPFR_RNDN);
-
-    switch (mode) {
-        case 0: /* lower */
-            mpfr_sub(mfloat->value, gamma_a, upper, MPFR_RNDN);
-            break;
-        case 1: /* upper */
-            mpfr_set(mfloat->value, upper, MPFR_RNDN);
-            break;
-        case 2: /* P */
-            mpfr_sub(tmp, gamma_a, upper, MPFR_RNDN);
-            mpfr_div(mfloat->value, tmp, gamma_a, MPFR_RNDN);
-            break;
-        case 3: /* Q */
-            mpfr_div(mfloat->value, upper, gamma_a, MPFR_RNDN);
-            break;
-        default:
-            mpfr_clear(gamma_a);
-            mpfr_clear(upper);
-            mpfr_clear(tmp);
-            return -1;
-    }
+    apply[mode](mfloat->value, gamma_a, upper, tmp);
 
     mpfr_clear(gamma_a);
     mpfr_clear(upper);
@@ -355,7 +392,10 @@ static int mfloat_apply_trigamma_mpfr(mfloat_t *mfloat)
             return -1;
         }
 
-        mpfr_set_q(term, bernoulli->value, MPFR_RNDN);
+        if (mfloat_set_mpfr_from_mrational(term, bernoulli) != 0) {
+            mpfr_clears(y, inv, inv2, power, term, sum, (mpfr_ptr)0);
+            return -1;
+        }
         mpfr_mul(term, term, power, MPFR_RNDN);
         mpfr_add(sum, sum, term, MPFR_RNDN);
         mpfr_mul(power, power, inv2, MPFR_RNDN);
@@ -412,7 +452,10 @@ static int mfloat_apply_tetragamma_mpfr(mfloat_t *mfloat)
             return -1;
         }
 
-        mpfr_set_q(term, bernoulli->value, MPFR_RNDN);
+        if (mfloat_set_mpfr_from_mrational(term, bernoulli) != 0) {
+            mpfr_clears(y, inv, inv2, power, term, sum, (mpfr_ptr)0);
+            return -1;
+        }
         mpfr_mul_ui(term, term, (unsigned long)(2 * n + 1), MPFR_RNDN);
         mpfr_mul(term, term, power, MPFR_RNDN);
         mpfr_sub(sum, sum, term, MPFR_RNDN);
@@ -694,9 +737,9 @@ int mf_normal_pdf(mfloat_t *mfloat) { return mfloat_apply_normal_pdf_mpfr(mfloat
 int mf_normal_cdf(mfloat_t *mfloat) { return mfloat_apply_normal_cdf_mpfr(mfloat); }
 int mf_normal_logpdf(mfloat_t *mfloat) { return mfloat_apply_normal_logpdf_mpfr(mfloat); }
 int mf_productlog(mfloat_t *mfloat) { return mfloat_apply_lambert_w_mpfr(mfloat, 0); }
-int mf_gammainc_lower(mfloat_t *mfloat, const mfloat_t *other) { return mfloat_apply_gammainc_mpfr(mfloat, other, 0); }
-int mf_gammainc_upper(mfloat_t *mfloat, const mfloat_t *other) { return mfloat_apply_gammainc_mpfr(mfloat, other, 1); }
-int mf_gammainc_P(mfloat_t *mfloat, const mfloat_t *other) { return mfloat_apply_gammainc_mpfr(mfloat, other, 2); }
-int mf_gammainc_Q(mfloat_t *mfloat, const mfloat_t *other) { return mfloat_apply_gammainc_mpfr(mfloat, other, 3); }
+int mf_gammainc_lower(mfloat_t *mfloat, const mfloat_t *other) { return mfloat_apply_gammainc_mpfr(mfloat, other, MF_GAMMAINC_LOWER); }
+int mf_gammainc_upper(mfloat_t *mfloat, const mfloat_t *other) { return mfloat_apply_gammainc_mpfr(mfloat, other, MF_GAMMAINC_UPPER); }
+int mf_gammainc_P(mfloat_t *mfloat, const mfloat_t *other) { return mfloat_apply_gammainc_mpfr(mfloat, other, MF_GAMMAINC_P); }
+int mf_gammainc_Q(mfloat_t *mfloat, const mfloat_t *other) { return mfloat_apply_gammainc_mpfr(mfloat, other, MF_GAMMAINC_Q); }
 int mf_ei(mfloat_t *mfloat) { return mfloat_apply_unary_mpfr(mfloat, mpfr_eint); }
 int mf_e1(mfloat_t *mfloat) { return mfloat_apply_e1_mpfr(mfloat); }

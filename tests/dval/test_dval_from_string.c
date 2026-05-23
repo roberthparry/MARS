@@ -435,13 +435,13 @@ static void test_from_string_implicit_symbolic_bindings(void)
                        tau_as ? tau_as : "(null)", "{ τ | τ = NAN }");
     }
 
-    if (f && fs && str_eq(fs, "{ [radius]² + c₁ + π + e | [radius] = NAN; c₁ = NAN }")) {
+    if (f && fs && str_eq(fs, "{ c₁ + e + π + [radius]² | [radius] = NAN; c₁ = NAN }")) {
         to_string_pass("implicit mixed symbolic inference", fs,
-                       "{ [radius]² + c₁ + π + e | [radius] = NAN; c₁ = NAN }");
+                       "{ c₁ + e + π + [radius]² | [radius] = NAN; c₁ = NAN }");
     } else {
         to_string_fail(__FILE__, __LINE__, 1, "implicit mixed symbolic inference",
                        fs ? fs : "(null)",
-                       "{ [radius]² + c₁ + π + e | [radius] = NAN; c₁ = NAN }");
+                       "{ c₁ + e + π + [radius]² | [radius] = NAN; c₁ = NAN }");
     }
 
     if (x && qf_isnan(dv_eval_qf(x))) {
@@ -468,8 +468,18 @@ static void test_from_string_implicit_symbolic_bindings(void)
         TEST_FAIL();
     }
 
-    if (i_unit && num_eq(dv_eval(i_unit), NUM_I)) {
-        printf(C_BOLD C_GREEN "PASS" C_RESET " implicit i evaluates to built-in constant\n\n");
+    if (i_unit) {
+        number_t i_value = dv_eval(i_unit);
+        bool ok = num_eq(i_value, NUM_I);
+
+        num_destroy(&i_value);
+        if (ok) {
+            printf(C_BOLD C_GREEN "PASS" C_RESET " implicit i evaluates to built-in constant\n\n");
+        } else {
+            printf(C_BOLD C_RED "FAIL" C_RESET " implicit i evaluates to built-in constant %s:%d:1\n\n",
+                   __FILE__, __LINE__);
+            TEST_FAIL();
+        }
     } else {
         printf(C_BOLD C_RED "FAIL" C_RESET " implicit i evaluates to built-in constant %s:%d:1\n\n",
                __FILE__, __LINE__);
@@ -808,21 +818,19 @@ static void test_from_string_composed(void)
 static void test_from_string_simplified_identity_text(void)
 {
     dval_t *expr = dval_from_string("{ sin^2(x) + cos^2(x) | x = 1.234 }", NULL);
-    dval_t *simp = expr ? dv_simplify(expr) : NULL;
-    char *text = simp ? dv_to_string(simp, style_EXPRESSION) : NULL;
+    char *text = expr ? dv_to_string(expr, style_EXPRESSION) : NULL;
 
     if (!(text && strcmp(text, "1") == 0)) {
-        printf(C_BOLD C_RED "FAIL" C_RESET " sin^2(x) + cos^2(x) exact text simplifies to 1 %s:%d:1\n",
+        printf(C_BOLD C_RED "FAIL" C_RESET " from_string simplifies sin^2(x) + cos^2(x) exact text to 1 %s:%d:1\n",
                __FILE__, __LINE__);
         printf("  got:      %s\n", text ? text : "<null>");
         printf("  expected: 1\n\n");
         TEST_FAIL();
     } else {
-        printf(C_BOLD C_GREEN "PASS" C_RESET " sin^2(x) + cos^2(x) exact text simplifies to 1\n\n");
+        printf(C_BOLD C_GREEN "PASS" C_RESET " from_string simplifies sin^2(x) + cos^2(x) exact text to 1\n\n");
     }
 
     free(text);
-    dv_free(simp);
     dv_free(expr);
 }
 
@@ -1303,15 +1311,15 @@ static void test_from_string_bindings_with_constant_expression_value(void)
                     __LINE__);
     check_parse_expr("binding value preserves symbolic pi/2",
                      "{ e^(sin(x)) | x = pi/2 }",
-                     "{ e^sin(x) | x = π/2 }",
+                     "{ exp(sin(x)) | x = π/2 }",
                      __LINE__);
     check_parse_expr("binding value preserves symbolic 3/2*pi",
                      "{ e^(sin(x)) | x = 3/2*pi }",
-                     "{ e^sin(x) | x = ³⁄₂π }",
+                     "{ exp(sin(x)) | x = ³⁄₂π }",
                      __LINE__);
     check_parse_expr("binding value preserves symbolic pi^2/2",
                      "{ x | x = (pi^2)/2 }",
-                     "{ x | x = π²/2 }",
+                     "π²/2",
                      __LINE__);
     check_parse_expr("pure numeric expression preserves full math tree",
                      "{ phi - 1/2(1+sqrt(5)) }",
@@ -1319,7 +1327,7 @@ static void test_from_string_bindings_with_constant_expression_value(void)
                      __LINE__);
     check_parse_expr("binding value preserves full math tree",
                      "{ x | x = 1/2(1+sqrt(5)) }",
-                     "{ x | x = ¹⁄₂·(1 + √(5)) }",
+                     "¹⁄₂·(1 + √(5))",
                      __LINE__);
     check_parse_expr("binding value round-trips pretty multiply",
                      "{ -x + phi | x = ½·(1 + √(5)) }",
@@ -1327,7 +1335,11 @@ static void test_from_string_bindings_with_constant_expression_value(void)
                      __LINE__);
     check_parse_expr("binding value preserves math notation functions",
                      "{ x | x = abs(-3)+floor(pi)+ceil(phi) }",
-                     "{ x | x = |-3| + ⌊π⌋ + ⌈φ⌉ }",
+                     "|-3| + ⌊π⌋ + ⌈φ⌉",
+                     __LINE__);
+    check_parse_expr("binding value accepts unknown marker",
+                     "{ sinh(x) | x = ? }",
+                     "{ sinh(x) | x = NAN }",
                      __LINE__);
     check_parse_expr("user-bound e remains symbolic",
                      "{ E - M - e·sin(E) | ; M = pi/1.234, e=0.0167 }",
@@ -1361,13 +1373,13 @@ static void test_from_string_bindings_with_constant_expression_value(void)
                      "{ pi/pi^2 }",
                      "π/π²",
                      __LINE__);
-    check_parse_expr("generated derivative with NaN bindings round-trips",
+    check_parse_expr("generated derivative with NaN bindings simplifies on parse",
                      "{ -y²z²·sin(xyz)·exp(sin(xyz)) + y²z²·cos²(xyz)·exp(sin(xyz)) | y = NAN, z = NAN, x = NAN }",
-                     "{ -y²z²·sin(xyz)·exp(sin(xyz)) + y²z²·cos²(xyz)·exp(sin(xyz)) | y = NAN, z = NAN, x = NAN }",
+                     "{ y²z²·exp(sin(xyz))·(-sin(xyz) + cos²(xyz)) | y = NAN, z = NAN, x = NAN }",
                      __LINE__);
-    check_parse_expr("reparsed symbolic pi derivative keeps exact coefficient",
+    check_parse_expr("reparsed symbolic pi derivative simplifies on parse",
                      "{ (-2π·exp(π·√(x)) + 2·π²·√(x)·exp(π·√(x)))/(2·√(x))/(2·√(x))² | x = 163 }",
-                     "{ (-2π·exp(π·√(x)) + 2·π²·√(x)·exp(π·√(x)))/(2·√(x))/(2·√(x))² | x = 163 }",
+                     "{ (-π + π^2·√(x))·exp(π·√(x))/(4x^³⁄₂) | x = 163 }",
                      __LINE__);
 
     old_precision_bits = num_get_default_prec_bits();

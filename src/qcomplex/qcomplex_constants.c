@@ -78,6 +78,11 @@ const qcomplex_t QC_PI_2 = {
     .im = { .hi = 0.0, .lo = 0.0 }
 };
 
+const qcomplex_t QC_NEG_PI_2 = {
+    .re = { .hi = -1.57079632679489655800e+00, .lo = -6.123233995736766036e-17 },
+    .im = { .hi = 0.0, .lo = 0.0 }
+};
+
 const qcomplex_t QC_PI_4 = {
     .re = { .hi = 7.8539816339744827900e-01, .lo = 3.061616997868383018e-17 },
     .im = { .hi = 0.0, .lo = 0.0 }

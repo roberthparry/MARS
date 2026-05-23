@@ -560,17 +560,85 @@ static int node_has_preserved_constexpr(const dval_t *node)
            value_matches_builtin;
 }
 
+static int binding_const_is_numeric_literal(dv_binding_const_id_t const_id)
+{
+    /*
+     * These constants are lexical numeric atoms rather than symbolic display
+     * constants.  Symbolic constants such as pi/gamma stay in the preserved
+     * expression tree even though they also have numeric values.
+     */
+    return const_id == DV_BINDING_CONST_I;
+}
+
+static int binding_expr_is_numeric_literal(const dv_binding_expr_t *expr)
+{
+    if (!expr)
+        return 0;
+
+    switch (expr->kind) {
+    case DV_BINDING_EXPR_NUMBER:
+        return 1;
+    case DV_BINDING_EXPR_CONST:
+        return binding_const_is_numeric_literal(expr->u.const_id);
+    case DV_BINDING_EXPR_NEG:
+        return binding_expr_is_numeric_literal(expr->u.unary.child);
+    case DV_BINDING_EXPR_ADD:
+    case DV_BINDING_EXPR_SUB:
+    case DV_BINDING_EXPR_MUL:
+    case DV_BINDING_EXPR_DIV:
+        return binding_expr_is_numeric_literal(expr->u.binary.left) &&
+               binding_expr_is_numeric_literal(expr->u.binary.right);
+    case DV_BINDING_EXPR_POWI:
+        return binding_expr_is_numeric_literal(expr->u.powi.base);
+    case DV_BINDING_EXPR_UNARY_OP:
+    case DV_BINDING_EXPR_BINARY_OP:
+        return 0;
+    }
+
+    return 0;
+}
+
+static dv_binding_expr_t *binding_expr_number_from_value_local(number_t value)
+{
+    char *text = num_to_string(value);
+    dv_binding_expr_t *expr =
+        dv_binding_expr_new_number_text(text ? text : "NAN");
+
+    free(text);
+    return expr;
+}
+
 static dval_t *const_node_from_binding_expr(dv_binding_expr_t *expr)
 {
+    dv_binding_expr_t *original_expr;
     number_t value;
     dval_t *node;
 
     if (!expr)
         return dv_new_const(NUM_NAN);
 
+    original_expr = dv_binding_expr_clone(expr);
     expr = dv_binding_expr_simplify(expr);
     value = dv_binding_expr_eval(expr);
+    if (!num_is_finite(value)) {
+        dv_binding_expr_free(expr);
+        node = dv_binding_expr_eval_dval(original_expr);
+        if (node) {
+            dv_binding_expr_free(node->binding_expr);
+            node->binding_expr = original_expr;
+        } else {
+            dv_binding_expr_free(original_expr);
+        }
+        num_destroy(&value);
+        return node ? node : dv_new_const(NUM_NAN);
+    }
+    dv_binding_expr_free(original_expr);
     node = dv_new_const(value);
+    if (binding_expr_is_numeric_literal(expr) &&
+        (num_is_exact(value) || num_is_real(value))) {
+        dv_binding_expr_free(expr);
+        expr = binding_expr_number_from_value_local(value);
+    }
     num_destroy(&value);
     node->binding_expr = expr;
     return node;
@@ -1329,6 +1397,21 @@ static dval_t *parse_expression_region(const char *start,
 /* Public entry point                                                   */
 /* ------------------------------------------------------------------ */
 
+static dval_t *simplify_parsed_result(dval_t *result)
+{
+    dval_t *simplified;
+
+    if (!result)
+        return NULL;
+
+    simplified = dv_simplify(result);
+    if (!simplified)
+        return result;
+
+    dv_free(result);
+    return simplified;
+}
+
 static dval_t *dval_from_string_impl(const char *s,
                                      dval_bindings_t **bindings_out)
 {
@@ -1385,6 +1468,7 @@ static dval_t *dval_from_string_impl(const char *s,
                                                  "dval_from_string", 0);
 
         if (result) {
+            result = simplify_parsed_result(result);
             if (bindings_out)
                 *bindings_out = single_binding_from_node(result);
             return result;
@@ -1404,6 +1488,7 @@ static dval_t *dval_from_string_impl(const char *s,
             else
                 symtab_free(&syms);
             if (result) {
+                result = simplify_parsed_result(result);
                 if (bindings_out)
                     *bindings_out = bindings;
                 return result;
@@ -1414,8 +1499,11 @@ static dval_t *dval_from_string_impl(const char *s,
         result = parse_pure_const(s, content_end, errmsg, sizeof(errmsg));
         if (!result)
             fprintf(stderr, "dval_from_string: %s\n", errmsg);
-        else if (bindings_out)
-            *bindings_out = single_binding_from_node(result);
+        else {
+            result = simplify_parsed_result(result);
+            if (bindings_out)
+                *bindings_out = single_binding_from_node(result);
+        }
         return result;
     }
 
@@ -1469,6 +1557,8 @@ static dval_t *dval_from_string_impl(const char *s,
     } else {
         symtab_free(&syms);
     }
+    if (result)
+        result = simplify_parsed_result(result);
     if (result && bindings_out)
         *bindings_out = bindings;
     return result;
@@ -1561,5 +1651,6 @@ dval_t *dval_from_expression_string(const char *expr,
                                      nsymbols ? &syms : NULL,
                                      "dval_from_expression_string", 1);
     symtab_free(&syms);
+    result = simplify_parsed_result(result);
     return result;
 }

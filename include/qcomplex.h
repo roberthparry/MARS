@@ -89,6 +89,11 @@ extern const qcomplex_t QC_2PI;
 extern const qcomplex_t QC_PI_2;
 
 /**
+ * @brief -π/2 + 0i constant
+ */
+extern const qcomplex_t QC_NEG_PI_2;
+
+/**
  * @brief π/4 + 0i constant
  */
 extern const qcomplex_t QC_PI_4;

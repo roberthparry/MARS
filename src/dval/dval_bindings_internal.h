@@ -11,6 +11,8 @@ dv_binding_expr_t *dv_binding_expr_parse_region(const char *start,
                                                 size_t errmsg_n);
 dval_t *dv_binding_expr_eval_dval(const dv_binding_expr_t *expr);
 bool dv_binding_expr_number_value(const dv_binding_expr_t *expr, number_t *out);
+bool dv_binding_expr_struct_eq(const dv_binding_expr_t *left,
+                               const dv_binding_expr_t *right);
 bool dv_binding_expr_split_leading_number(const dv_binding_expr_t *expr,
                                           number_t *coeff_out,
                                           dv_binding_expr_t **rest_out);

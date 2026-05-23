@@ -59,6 +59,14 @@ typedef struct {
     int second_imag;
 } number_angle_pair_fastpath_t;
 
+typedef struct {
+    const number_t *angle;
+    number_const_id_t angle_id;
+    number_const_id_t value_id;
+    int sign;
+    int reciprocal;
+} number_tan_fastpath_t;
+
 static const number_angle_pair_fastpath_t number_sincos_fastpaths[];
 static const number_angle_pair_fastpath_t number_sinhcosh_fastpaths[];
 
@@ -184,6 +192,64 @@ static int number_find_angle_fastpath(const number_t *value,
         }
     }
     return 0;
+}
+
+static number_t number_tan_fastpath_value(const number_t *like,
+                                          const number_tan_fastpath_t *match)
+{
+    if (match->value_id == NUMBER_CONST_INF)
+        return match->sign < 0 ? NUM_NINF : NUM_INF;
+
+    if (match->reciprocal) {
+        number_t numerator = number_const_like(like, NUMBER_CONST_ONE);
+        number_t denominator = number_const_like(like, match->value_id);
+        number_t out = num_div(numerator, denominator);
+
+        num_destroy(&numerator);
+        num_destroy(&denominator);
+        if (match->sign < 0) {
+            number_t neg = num_neg(out);
+
+            num_destroy(&out);
+            out = neg;
+        }
+        return out;
+    }
+    return number_return_like_signed(like, match->value_id, match->sign);
+}
+
+static bool number_tan_fastpath_by_const_id(const number_t *number,
+                                            const number_tan_fastpath_t *table,
+                                            size_t count,
+                                            number_t *out)
+{
+    number_const_id_t id;
+
+    if (!out || !number_const_id_from_immortal(number, &id))
+        return false;
+    for (size_t i = 0u; i < count; ++i) {
+        if (table[i].angle_id == id) {
+            *out = number_tan_fastpath_value(number, &table[i]);
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool number_tan_fastpath_by_value(const number_t *number,
+                                         const number_tan_fastpath_t *table,
+                                         size_t count,
+                                         number_t *out)
+{
+    if (!out)
+        return false;
+    for (size_t i = 0u; i < count; ++i) {
+        if (table[i].angle && num_eq(*number, *table[i].angle)) {
+            *out = number_tan_fastpath_value(number, &table[i]);
+            return true;
+        }
+    }
+    return false;
 }
 
 static const number_angle_fastpath_t number_exp_quarter_turn_fastpaths[] = {
@@ -1072,6 +1138,18 @@ static const number_angle_pair_fastpath_t number_sinhcosh_fastpaths[] = {
     { &NUM_2PI,    NUMBER_CONST_ZERO,           1, 0, NUMBER_CONST_ONE,            1, 0 }
 };
 
+static const number_tan_fastpath_t number_tan_fastpaths[] = {
+    { &NUM_ZERO,     NUMBER_CONST_ZERO,      NUMBER_CONST_ZERO,  1, 0 },
+    { &NUM_PI,       NUMBER_CONST_PI,        NUMBER_CONST_ZERO,  1, 0 },
+    { &NUM_2PI,      NUMBER_CONST_2PI,       NUMBER_CONST_ZERO,  1, 0 },
+    { &NUM_PI_2,     NUMBER_CONST_PI_2,      NUMBER_CONST_INF,   1, 0 },
+    { &NUM_NEG_PI_2, NUMBER_CONST_NEG_PI_2,  NUMBER_CONST_INF,  -1, 0 },
+    { &NUM_PI_6,     NUMBER_CONST_PI_6,      NUMBER_CONST_SQRT3, 1, 1 },
+    { &NUM_PI_4,     NUMBER_CONST_PI_4,      NUMBER_CONST_ONE,   1, 0 },
+    { &NUM_PI_3,     NUMBER_CONST_PI_3,      NUMBER_CONST_SQRT3, 1, 0 },
+    { &NUM_3PI_4,    NUMBER_CONST_3PI_4,     NUMBER_CONST_ONE,  -1, 0 }
+};
+
 int num_sincos(const number_t x, number_t *sin_out, number_t *cos_out)
 {
     const number_vtable_t *vt = number_vt(&x);
@@ -1096,8 +1174,6 @@ number_t num_sin(const number_t number)
     if (number_trig_real_fastpath(&number, number_sin_fastpaths,
             sizeof(number_sin_fastpaths) / sizeof(number_sin_fastpaths[0]), &out))
         return out;
-    if (number_is_plain_mfloat_value(&number))
-        return number_apply_unary_math_with_double(number, sin, qf_sin, qc_sin, mf_sin, mc_sin);
     return number_apply_unary_math_with_double(number, sin, qf_sin, qc_sin, mf_sin, mc_sin);
 }
 
@@ -1108,30 +1184,19 @@ number_t num_cos(const number_t number)
     if (number_trig_real_fastpath(&number, number_cos_fastpaths,
             sizeof(number_cos_fastpaths) / sizeof(number_cos_fastpaths[0]), &out))
         return out;
-    if (number_is_plain_mfloat_value(&number))
-        return number_apply_unary_math_with_double(number, cos, qf_cos, qc_cos, mf_cos, mc_cos);
     return number_apply_unary_math_with_double(number, cos, qf_cos, qc_cos, mf_cos, mc_cos);
 }
 
 number_t num_tan(const number_t number)
 {
-    if (num_eq(number, NUM_ZERO) || num_eq(number, NUM_PI) || num_eq(number, NUM_2PI))
-        return number_const_return_like(&number, NUMBER_CONST_ZERO);
-    if (num_eq(number, NUM_PI_6)) {
-        number_t sqrt3 = number_const_like(&number, NUMBER_CONST_SQRT3);
-        number_t out = num_div(NUM_ONE, sqrt3);
+    number_t out;
 
-        num_destroy(&sqrt3);
+    if (number_tan_fastpath_by_const_id(&number, number_tan_fastpaths,
+            sizeof(number_tan_fastpaths) / sizeof(number_tan_fastpaths[0]), &out))
         return out;
-    }
-    if (num_eq(number, NUM_PI_4))
-        return number_const_return_like(&number, NUMBER_CONST_ONE);
-    if (num_eq(number, NUM_PI_3))
-        return number_const_return_like(&number, NUMBER_CONST_SQRT3);
-    if (num_eq(number, NUM_3PI_4))
-        return number_const_return_like(&number, NUMBER_CONST_NEG_ONE);
-    if (number_is_plain_mfloat_value(&number))
-        return number_apply_unary_math_with_double(number, tan, qf_tan, qc_tan, mf_tan, mc_tan);
+    if (number_tan_fastpath_by_value(&number, number_tan_fastpaths,
+            sizeof(number_tan_fastpaths) / sizeof(number_tan_fastpaths[0]), &out))
+        return out;
     return number_apply_unary_math_with_double(number, tan, qf_tan, qc_tan, mf_tan, mc_tan);
 }
 
@@ -1162,8 +1227,6 @@ number_t num_sinh(const number_t number)
 {
     number_t out;
 
-    if (number_is_plain_mfloat_value(&number))
-        return number_apply_unary_math_with_double(number, sinh, qf_sinh, qc_sinh, mf_sinh, mc_sinh);
     if (number_hyperbolic_imag_fastpath(&number, number_sinh_imag_fastpaths,
             sizeof(number_sinh_imag_fastpaths) / sizeof(number_sinh_imag_fastpaths[0]), &out))
         return out;
@@ -1174,8 +1237,6 @@ number_t num_cosh(const number_t number)
 {
     number_t out;
 
-    if (number_is_plain_mfloat_value(&number))
-        return number_apply_unary_math_with_double(number, cosh, qf_cosh, qc_cosh, mf_cosh, mc_cosh);
     if (number_hyperbolic_imag_fastpath(&number, number_cosh_imag_fastpaths,
             sizeof(number_cosh_imag_fastpaths) / sizeof(number_cosh_imag_fastpaths[0]), &out))
         return out;
@@ -1204,8 +1265,6 @@ number_t num_tanh(const number_t number)
     number_t imag;
     number_t out;
 
-    if (number_is_plain_mfloat_value(&number))
-        return number_apply_unary_math_with_double(number, tanh, qf_tanh, qc_tanh, mf_tanh, mc_tanh);
     if (number_hyperbolic_imag_fastpath(&number, number_tanh_imag_fastpaths,
             sizeof(number_tanh_imag_fastpaths) / sizeof(number_tanh_imag_fastpaths[0]), &out))
         return out;

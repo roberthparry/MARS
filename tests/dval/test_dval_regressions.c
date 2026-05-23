@@ -1356,6 +1356,27 @@ static void check_direct_inverse_simplifies(const char *label,
     dv_free(x);
 }
 
+static void check_simplified_expression_string(const char *label,
+                                               const char *input,
+                                               const char *expect)
+{
+    dval_bindings_t *bindings = NULL;
+    dval_t *expr = dval_from_string(input, &bindings);
+    dval_t *simp = expr ? dv_simplify(expr) : NULL;
+    char *text = simp ? dv_to_string(simp, style_EXPRESSION) : NULL;
+
+    if (str_eq(text, expect))
+        to_string_pass(label, text, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1, label,
+                       text ? text : "(null)", expect);
+
+    free(text);
+    dv_free(simp);
+    dval_bindings_free(bindings);
+    dv_free(expr);
+}
+
 static void test_simplify_inverse_unary_pairs(void)
 {
     dval_t *x = test_dv_new_named_var_d(3.0, "x");
@@ -1469,6 +1490,215 @@ static void test_simplify_exp_quarter_turns(void)
     dv_free(pi);
 }
 
+static void test_simplify_trig_and_hyperbolic_identities(void)
+{
+    static const struct {
+        const char *input;
+        const char *expect;
+        const char *label;
+    } cases[] = {
+        {
+            "{ sin(x)^2 + cos(x)^2 | x = NAN }",
+            "1",
+            "sin^2(x)+cos^2(x) simplifies to 1",
+        },
+        {
+            "{ sin(x)/cos(x) | x = NAN }",
+            "{ tan(x) | x = NAN }",
+            "sin(x)/cos(x) simplifies to tan(x)",
+        },
+        {
+            "{ atan(tan(x)) | x = NAN }",
+            "{ x - π·⌊½·(2x/π + 1)⌋ | x = NAN }",
+            "atan(tan(x)) simplifies to saw-tooth principal value",
+        },
+        {
+            "{ tan(x - pi*floor(1/2*(2*x/pi + 1))) | x = NAN }",
+            "{ tan(x) | x = NAN }",
+            "tan of atan(tan) saw-tooth simplifies by periodicity",
+        },
+        {
+            "{ tan(x - floor(pi*(1.5+3.2i))) | x = NAN }",
+            "{ tan(x - (4 + 10i)) | x = NAN }",
+            "floor of complex const folds inside tan argument",
+        },
+        {
+            "{ tan(atan(tan(x))) | x = NAN }",
+            "{ tan(x) | x = NAN }",
+            "tan(atan(tan(x))) simplifies to tan(x)",
+        },
+        {
+            "{ cos(x)*tan(x) | x = NAN }",
+            "{ sin(x) | x = NAN }",
+            "cos(x)*tan(x) simplifies to sin(x)",
+        },
+        {
+            "{ tan(x)*cos(x) | x = NAN }",
+            "{ sin(x) | x = NAN }",
+            "tan(x)*cos(x) simplifies to sin(x)",
+        },
+        {
+            "{ cosh(x)^2 - sinh(x)^2 | x = NAN }",
+            "1",
+            "cosh^2(x)-sinh^2(x) simplifies to 1",
+        },
+        {
+            "{ sinh(x)/cosh(x) | x = NAN }",
+            "{ tanh(x) | x = NAN }",
+            "sinh(x)/cosh(x) simplifies to tanh(x)",
+        },
+        {
+            "{ cosh(x)*tanh(x) | x = NAN }",
+            "{ sinh(x) | x = NAN }",
+            "cosh(x)*tanh(x) simplifies to sinh(x)",
+        },
+        {
+            "{ tanh(x)*cosh(x) | x = NAN }",
+            "{ sinh(x) | x = NAN }",
+            "tanh(x)*cosh(x) simplifies to sinh(x)",
+        },
+        {
+            "{ sinh(i*x) | x = NAN }",
+            "{ i·sin(x) | x = NAN }",
+            "sinh(i*x) simplifies to i*sin(x)",
+        },
+        {
+            "{ cosh(i*x) | x = NAN }",
+            "{ cos(x) | x = NAN }",
+            "cosh(i*x) simplifies to cos(x)",
+        },
+        {
+            "{ cos(i*x) | x = NAN }",
+            "{ cosh(x) | x = NAN }",
+            "cos(i*x) simplifies to cosh(x)",
+        },
+        {
+            "{ sin(i*x) | x = NAN }",
+            "{ i·sinh(x) | x = NAN }",
+            "sin(i*x) simplifies to i*sinh(x)",
+        },
+        {
+            "{ -i*sin(i*x) | x = ? }",
+            "{ sinh(x) | x = NAN }",
+            "-i*sin(i*x) simplifies to sinh(x)",
+        },
+        {
+            "{ i^3*sinh(x) | x = ? }",
+            "{ -i·sinh(x) | x = NAN }",
+            "i^3*sinh(x) simplifies to -i*sinh(x)",
+        },
+        {
+            "{ (i)^2*sinh(x) | x = ? }",
+            "{ -sinh(x) | x = NAN }",
+            "(i)^2*sinh(x) simplifies to -sinh(x)",
+        },
+        {
+            "{ ii*sin(x) | x = NAN }",
+            "{ -sin(x) | x = NAN }",
+            "i*i*sin(x) simplifies to -sin(x)",
+        },
+        {
+            "{ (3 + 4i)*sinh((1 + 2i)*(1-i)*x) | x = ? }",
+            "{ (3 + 4i)·sinh((3 + i)x) | x = NAN }",
+            "numeric complex factors fold before multiplying variables",
+        },
+        {
+            "{ (5+i)/(5-i) }",
+            "¹²⁄₁₃ + ⁵⁄₁₃i",
+            "exact complex division preserves rational parts",
+        },
+    };
+
+    for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i)
+        check_simplified_expression_string(cases[i].label,
+                                           cases[i].input,
+                                           cases[i].expect);
+}
+
+static void test_to_string_imaginary_unit_omits_one(void)
+{
+    dval_t *i = dv_new_const(NUM_I);
+    dval_t *neg_i = dv_new_const(NUM_NEG_I);
+    char *i_text = dv_to_string(i, style_EXPRESSION);
+    char *neg_i_text = dv_to_string(neg_i, style_EXPRESSION);
+
+    if (str_eq(i_text, "i"))
+        to_string_pass("imaginary unit omits coefficient one", i_text, "i");
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "imaginary unit omits coefficient one",
+                       i_text ? i_text : "(null)", "i");
+
+    if (str_eq(neg_i_text, "-i"))
+        to_string_pass("negative imaginary unit omits coefficient one",
+                       neg_i_text, "-i");
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "negative imaginary unit omits coefficient one",
+                       neg_i_text ? neg_i_text : "(null)", "-i");
+
+    free(neg_i_text);
+    free(i_text);
+    dv_free(neg_i);
+    dv_free(i);
+}
+
+static void test_complex_coefficient_stays_grouped(void)
+{
+    dval_bindings_t *bindings = NULL;
+    dval_t *expr = dval_from_string("{ (2+3i)*x | x = 5 }", &bindings);
+    char *text = expr ? dv_to_string(expr, style_EXPRESSION) : NULL;
+
+    if (str_eq(text, "{ (2 + 3i)x | x = 5 }"))
+        to_string_pass("complex coefficient remains grouped",
+                       text, "{ (2 + 3i)x | x = 5 }");
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "complex coefficient remains grouped",
+                       text ? text : "(null)", "{ (2 + 3i)x | x = 5 }");
+
+    free(text);
+    dval_bindings_free(bindings);
+    dv_free(expr);
+}
+
+static void test_updated_decimal_binding_stays_decimal(void)
+{
+    const char *input =
+        "{ (i)^2*sinh(x) | x = "
+        "-0.881373587019543025232609324979792309028160328261635410753295608653377184222026 }";
+    const char *expect =
+        "{ -sinh(x) | x = "
+        "-0.881373587019543025232609324979792309028160328261635410753295608653377184222026 }";
+    dval_bindings_t *bindings = NULL;
+    dval_t *expr = dval_from_string(input, &bindings);
+    dval_t *x = bindings ? dval_bindings_get(bindings, "x") : NULL;
+    number_t value = x ? dv_get_val(x) : num_clone(NUM_NAN);
+    dval_t *simp;
+    char *text;
+
+    ASSERT_NOT_NULL(expr);
+    ASSERT_NOT_NULL(x);
+
+    dv_set_val(x, value);
+    num_destroy(&value);
+
+    simp = dv_simplify(expr);
+    text = simp ? dv_to_string(simp, style_EXPRESSION) : NULL;
+
+    if (str_eq(text, expect))
+        to_string_pass("updated exact decimal binding stays decimal", text, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "updated exact decimal binding stays decimal",
+                       text ? text : "(null)", expect);
+
+    free(text);
+    dv_free(simp);
+    dval_bindings_free(bindings);
+    dv_free(expr);
+}
+
 static void test_to_string_does_not_simplify_plain_expressions(void)
 {
     dval_t *x = test_dv_new_named_var_d(3.0, "x");
@@ -1496,6 +1726,50 @@ static void test_to_string_does_not_simplify_plain_expressions(void)
     free(deriv_text);
     free(expr_text);
     dv_free(dx);
+    dv_free(xx);
+    dv_free(x);
+}
+
+static void test_simplify_reuses_clean_nodes_and_dirty_mutations(void)
+{
+    dval_t *x = test_dv_new_named_var_d(3.0, "x");
+    dval_t *xx = dv_mul(x, x);
+    dval_t *first = dv_simplify(xx);
+    dval_t *second = first ? dv_simplify(first) : NULL;
+    char *first_text = first ? dv_to_string(first, style_EXPRESSION) : NULL;
+    char *second_text = second ? dv_to_string(second, style_EXPRESSION) : NULL;
+
+    if (first && second && first == second && str_eq(first_text, "{ x² | x = 3 }"))
+        to_string_pass("dv_simplify reuses already simplified clean node",
+                       second_text, "{ x² | x = 3 }");
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "dv_simplify reuses already simplified clean node",
+                       second_text ? second_text : "(null)", "{ x² | x = 3 }");
+
+    {
+        number_t five = num_from_qtext("5");
+        dv_set_val(x, five);
+        num_destroy(&five);
+    }
+
+    dval_t *third = first ? dv_simplify(first) : NULL;
+    char *third_text = third ? dv_to_string(third, style_EXPRESSION) : NULL;
+
+    if (third && third != first && str_eq(third_text, "{ x² | x = 5 }"))
+        to_string_pass("dv_set_val dirties simplified ancestors lazily",
+                       third_text, "{ x² | x = 5 }");
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "dv_set_val dirties simplified ancestors lazily",
+                       third_text ? third_text : "(null)", "{ x² | x = 5 }");
+
+    free(third_text);
+    free(second_text);
+    free(first_text);
+    dv_free(third);
+    dv_free(second);
+    dv_free(first);
     dv_free(xx);
     dv_free(x);
 }
@@ -1671,7 +1945,7 @@ static void test_binary_constants_preserve_user_literals_in_derivatives(void)
         },
         {
             "{ logbeta(1,1)*x | x = NAN }",
-            "{ 0x | x = NAN }",
+            "0",
             "0",
             "logbeta(1,1)*x rewrites exactly to zero"
         },
@@ -1774,17 +2048,17 @@ static void test_binding_exact_unary_numeric_expression_simplifies(void)
     } cases[] = {
         {
             "{ x | x = ln(e)*pi*60/180 }",
-            "{ x | x = ⅓π }",
+            "⅓π",
             "binding ln(e)*pi*60/180 simplifies exactly",
         },
         {
             "{ x | x = log(10^12) }",
-            "{ x | x = 12 }",
+            "12",
             "binding log(10^12) simplifies exactly",
         },
         {
             "{ x | x = log(1/1000) }",
-            "{ x | x = -3 }",
+            "-3",
             "binding log(1/1000) simplifies exactly",
         },
     };
@@ -1813,7 +2087,7 @@ static void test_binding_exact_trig_numeric_expression_simplifies(void)
     dval_t *expr =
         dval_from_string("{ x | x = sin(pi/6)*pi/180*30 }", &bindings);
     char *expr_text = expr ? dv_to_string(expr, style_EXPRESSION) : NULL;
-    const char *expect = "{ x | x = ¹⁄₁₂π }";
+    const char *expect = "¹⁄₁₂π";
 
     if (str_eq(expr_text, expect))
         to_string_pass("binding sin(pi/6)*pi/180*30 simplifies exactly",
@@ -1835,17 +2109,17 @@ static void test_binding_direct_inverse_numeric_expression_simplifies(void)
         const char *expect;
         const char *label;
     } cases[] = {
-        { "{ x | x = sin(asin(12)) }",       "{ x | x = 12 }", "binding sin(asin(12))" },
-        { "{ x | x = cos(acos(12)) }",       "{ x | x = 12 }", "binding cos(acos(12))" },
-        { "{ x | x = tan(atan(12)) }",       "{ x | x = 12 }", "binding tan(atan(12))" },
-        { "{ x | x = sinh(asinh(12)) }",     "{ x | x = 12 }", "binding sinh(asinh(12))" },
-        { "{ x | x = cosh(acosh(12)) }",     "{ x | x = 12 }", "binding cosh(acosh(12))" },
-        { "{ x | x = tanh(atanh(12)) }",     "{ x | x = 12 }", "binding tanh(atanh(12))" },
-        { "{ x | x = exp(ln(12)) }",         "{ x | x = 12 }", "binding exp(ln(12))" },
-        { "{ x | x = ln(exp(12)) }",         "{ x | x = 12 }", "binding ln(exp(12))" },
-        { "{ x | x = erf(erfinv(12)) }",     "{ x | x = 12 }", "binding erf(erfinv(12))" },
-        { "{ x | x = erfc(erfcinv(12)) }",   "{ x | x = 12 }", "binding erfc(erfcinv(12))" },
-        { "{ x | x = gamma(gammainv(12)) }", "{ x | x = 12 }", "binding gamma(gammainv(12))" },
+        { "{ x | x = sin(asin(12)) }",       "12", "binding sin(asin(12))" },
+        { "{ x | x = cos(acos(12)) }",       "12", "binding cos(acos(12))" },
+        { "{ x | x = tan(atan(12)) }",       "12", "binding tan(atan(12))" },
+        { "{ x | x = sinh(asinh(12)) }",     "12", "binding sinh(asinh(12))" },
+        { "{ x | x = cosh(acosh(12)) }",     "12", "binding cosh(acosh(12))" },
+        { "{ x | x = tanh(atanh(12)) }",     "12", "binding tanh(atanh(12))" },
+        { "{ x | x = exp(ln(12)) }",         "12", "binding exp(ln(12))" },
+        { "{ x | x = ln(exp(12)) }",         "12", "binding ln(exp(12))" },
+        { "{ x | x = erf(erfinv(12)) }",     "12", "binding erf(erfinv(12))" },
+        { "{ x | x = erfc(erfcinv(12)) }",   "12", "binding erfc(erfcinv(12))" },
+        { "{ x | x = gamma(gammainv(12)) }", "12", "binding gamma(gammainv(12))" },
     };
 
     for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
@@ -1873,10 +2147,10 @@ static void test_binding_principal_inverse_numeric_expression_simplifies(void)
         const char *expect;
         const char *label;
     } cases[] = {
-        { "{ x | x = atan(tan(pi/5)) }", "{ x | x = π/5 }", "binding atan(tan(pi/5))" },
-        { "{ x | x = asin(sin(pi/5)) }", "{ x | x = π/5 }", "binding asin(sin(pi/5))" },
-        { "{ x | x = acos(cos(pi/5)) }", "{ x | x = π/5 }", "binding acos(cos(pi/5))" },
-        { "{ x | x = atan(tan(3*pi/5)) }", "{ x | x = atan(tan(⅗π)) }", "binding atan(tan(3*pi/5)) is not principal" },
+        { "{ x | x = atan(tan(pi/5)) }", "π/5", "binding atan(tan(pi/5))" },
+        { "{ x | x = asin(sin(pi/5)) }", "π/5", "binding asin(sin(pi/5))" },
+        { "{ x | x = acos(cos(pi/5)) }", "π/5", "binding acos(cos(pi/5))" },
+        { "{ x | x = atan(tan(3*pi/5)) }", "atan(tan(⅗π))", "binding atan(tan(3*pi/5)) is not principal" },
     };
 
     for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
@@ -1906,37 +2180,37 @@ static void test_binding_lambert_inverse_numeric_expression_simplifies(void)
     } cases[] = {
         {
             "{ x | x = W₀(pi/5)*exp(W₀(pi/5)) }",
-            "{ x | x = π/5 }",
+            "π/5",
             "binding W0(a)*exp(W0(a))",
         },
         {
             "{ x | x = exp(W(pi/5))*W(pi/5) }",
-            "{ x | x = π/5 }",
+            "π/5",
             "binding exp(W(a))*W(a)",
         },
         {
             "{ x | x = W-1(-1/10)*exp(W-1(-1/10)) }",
-            "{ x | x = -⅒ }",
+            "-⅒",
             "binding W-1(a)*exp(W-1(a))",
         },
         {
             "{ x | x = W₀(5*exp(5)) }",
-            "{ x | x = 5 }",
+            "5",
             "binding W0(a*exp(a))",
         },
         {
             "{ x | x = W(exp(pi/5)*pi/5) }",
-            "{ x | x = π/5 }",
+            "π/5",
             "binding W(exp(a)*a)",
         },
         {
             "{ x | x = W-1(-2*exp(-2)) }",
-            "{ x | x = -2 }",
+            "-2",
             "binding W-1(a*exp(a))",
         },
         {
             "{ x | x = W₀(-2*exp(-2)) }",
-            "{ x | x = W₀(-2·exp(-2)) }",
+            "W₀(-2·exp(-2))",
             "binding W0(a*exp(a)) outside principal branch",
         },
     };
@@ -1966,24 +2240,26 @@ static void test_binding_exact_core_trig_values_simplify(void)
         const char *expect;
         const char *label;
     } cases[] = {
-        { "{ x | x = sin(0) }",      "{ x | x = 0 }",       "sin(0)" },
-        { "{ x | x = sin(pi/6) }",   "{ x | x = ½ }",       "sin(pi/6)" },
-        { "{ x | x = sin(⅙π) }",     "{ x | x = ½ }",       "sin(⅙π)" },
-        { "{ x | x = sin(pi/4) }",   "{ x | x = √(2)/2 }",  "sin(pi/4)" },
-        { "{ x | x = sin(pi/3) }",   "{ x | x = √(3)/2 }",  "sin(pi/3)" },
-        { "{ x | x = sin(pi/2) }",   "{ x | x = 1 }",       "sin(pi/2)" },
-        { "{ x | x = sin(pi) }",     "{ x | x = 0 }",       "sin(pi)" },
-        { "{ x | x = cos(0) }",      "{ x | x = 1 }",       "cos(0)" },
-        { "{ x | x = cos(pi/6) }",   "{ x | x = √(3)/2 }",  "cos(pi/6)" },
-        { "{ x | x = cos(pi/4) }",   "{ x | x = √(2)/2 }",  "cos(pi/4)" },
-        { "{ x | x = cos(pi/3) }",   "{ x | x = ½ }",       "cos(pi/3)" },
-        { "{ x | x = cos(pi/2) }",   "{ x | x = 0 }",       "cos(pi/2)" },
-        { "{ x | x = cos(pi) }",     "{ x | x = -1 }",      "cos(pi)" },
-        { "{ x | x = tan(0) }",      "{ x | x = 0 }",       "tan(0)" },
-        { "{ x | x = tan(pi/6) }",   "{ x | x = √(3)/3 }",  "tan(pi/6)" },
-        { "{ x | x = tan(pi/4) }",   "{ x | x = 1 }",       "tan(pi/4)" },
-        { "{ x | x = tan(pi/3) }",   "{ x | x = √(3) }",    "tan(pi/3)" },
-        { "{ x | x = tan(pi) }",     "{ x | x = 0 }",       "tan(pi)" },
+        { "{ x | x = sin(0) }",      "0",       "sin(0)" },
+        { "{ x | x = sin(pi/6) }",   "½",       "sin(pi/6)" },
+        { "{ x | x = sin(⅙π) }",     "½",       "sin(⅙π)" },
+        { "{ x | x = sin(pi/4) }",   "√(2)/2",  "sin(pi/4)" },
+        { "{ x | x = sin(pi/3) }",   "√(3)/2",  "sin(pi/3)" },
+        { "{ x | x = sin(pi/2) }",   "1",       "sin(pi/2)" },
+        { "{ x | x = sin(pi) }",     "0",       "sin(pi)" },
+        { "{ x | x = cos(0) }",      "1",       "cos(0)" },
+        { "{ x | x = cos(pi/6) }",   "√(3)/2",  "cos(pi/6)" },
+        { "{ x | x = cos(pi/4) }",   "√(2)/2",  "cos(pi/4)" },
+        { "{ x | x = cos(pi/3) }",   "½",       "cos(pi/3)" },
+        { "{ x | x = cos(pi/2) }",   "0",       "cos(pi/2)" },
+        { "{ x | x = cos(pi) }",     "-1",      "cos(pi)" },
+        { "{ x | x = tan(0) }",      "0",       "tan(0)" },
+        { "{ x | x = tan(pi/6) }",   "√(3)/3",  "tan(pi/6)" },
+        { "{ x | x = tan(pi/4) }",   "1",       "tan(pi/4)" },
+        { "{ x | x = tan(pi/3) }",   "√(3)",    "tan(pi/3)" },
+        { "{ x | x = tan(pi/2) }",   "∞",       "tan(pi/2)" },
+        { "{ x | x = tan(-pi/2) }",  "-∞",      "tan(-pi/2)" },
+        { "{ x | x = tan(pi) }",     "0",       "tan(pi)" },
     };
 
     for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
@@ -1998,6 +2274,69 @@ static void test_binding_exact_core_trig_values_simplify(void)
                            expr_text ? expr_text : "(null)",
                            cases[i].expect);
 
+        free(expr_text);
+        dval_bindings_free(bindings);
+        dv_free(expr);
+    }
+}
+
+static void test_tan_poles_display_as_infinity(void)
+{
+    struct {
+        const char *input;
+        const char *expr_expect;
+        const char *tex_expect;
+        int inf_sign;
+        const char *label;
+    } cases[] = {
+        {
+            "{ tan(x) | x = π/2 }",
+            "{ tan(x) | x = π/2 }",
+            "\\left\\{ \\tan(x) \\;\\middle|\\; x = \\frac{\\pi}{2} \\right\\}",
+            1,
+            "tan(pi/2) evaluates to infinity"
+        },
+        {
+            "{ tan(x) | x = -π/2 }",
+            "{ tan(x) | x = -π/2 }",
+            "\\left\\{ \\tan(x) \\;\\middle|\\; x = \\frac{-\\pi}{2} \\right\\}",
+            -1,
+            "tan(-pi/2) evaluates to negative infinity"
+        }
+    };
+
+    for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+        dval_bindings_t *bindings = NULL;
+        dval_t *expr = dval_from_string(cases[i].input, &bindings);
+        char *expr_text = expr ? dv_to_string(expr, style_EXPRESSION) : NULL;
+        char *tex_text = expr ? dv_to_string(expr, style_TEX) : NULL;
+        number_t value = expr ? dv_eval(expr) : num_clone(NUM_NAN);
+
+        if (num_is_inf(value) &&
+            num_get_sign(value) == cases[i].inf_sign)
+            printf(C_BOLD C_GREEN "PASS" C_RESET " %s\n\n", cases[i].label);
+        else {
+            printf(C_BOLD C_RED "FAIL" C_RESET " %s: value was not expected infinity\n\n",
+                   cases[i].label);
+            TEST_FAIL();
+        }
+
+        if (str_eq(expr_text, cases[i].expr_expect))
+            to_string_pass(cases[i].label, expr_text, cases[i].expr_expect);
+        else
+            to_string_fail(__FILE__, __LINE__, 1, cases[i].label,
+                           expr_text ? expr_text : "(null)",
+                           cases[i].expr_expect);
+
+        if (str_eq(tex_text, cases[i].tex_expect))
+            to_string_pass(cases[i].label, tex_text, cases[i].tex_expect);
+        else
+            to_string_fail(__FILE__, __LINE__, 1, cases[i].label,
+                           tex_text ? tex_text : "(null)",
+                           cases[i].tex_expect);
+
+        num_destroy(&value);
+        free(tex_text);
         free(expr_text);
         dval_bindings_free(bindings);
         dv_free(expr);
@@ -2066,8 +2405,13 @@ void test_runtime_regressions(void)
     TEST_RUN_SUBTEST(test_high_precision_mcomplex_function_values, NULL);
     TEST_RUN_SUBTEST(test_set_val_num_named_constant, NULL);
     TEST_RUN_SUBTEST(test_to_string_does_not_simplify_plain_expressions, NULL);
+    TEST_RUN_SUBTEST(test_simplify_reuses_clean_nodes_and_dirty_mutations, NULL);
     TEST_RUN_SUBTEST(test_simplify_inverse_unary_pairs, NULL);
     TEST_RUN_SUBTEST(test_simplify_exp_quarter_turns, NULL);
+    TEST_RUN_SUBTEST(test_simplify_trig_and_hyperbolic_identities, NULL);
+    TEST_RUN_SUBTEST(test_to_string_imaginary_unit_omits_one, NULL);
+    TEST_RUN_SUBTEST(test_complex_coefficient_stays_grouped, NULL);
+    TEST_RUN_SUBTEST(test_updated_decimal_binding_stays_decimal, NULL);
     TEST_RUN_SUBTEST(test_symbolic_negative_pi_derivative_stays_symbolic, NULL);
     TEST_RUN_SUBTEST(test_pow_derivative_preserves_literal_base_log, NULL);
     TEST_RUN_SUBTEST(test_repeated_preserved_log_factor_combines_as_power, NULL);
@@ -2082,6 +2426,7 @@ void test_runtime_regressions(void)
     TEST_RUN_SUBTEST(test_binding_principal_inverse_numeric_expression_simplifies, NULL);
     TEST_RUN_SUBTEST(test_binding_lambert_inverse_numeric_expression_simplifies, NULL);
     TEST_RUN_SUBTEST(test_binding_exact_core_trig_values_simplify, NULL);
+    TEST_RUN_SUBTEST(test_tan_poles_display_as_infinity, NULL);
     TEST_RUN_SUBTEST(test_goal_seek_large_target_uses_significant_digit_tolerance, NULL);
 }
 

@@ -11,6 +11,7 @@ extern mfloat_t MF_TEN_VALUE;
 extern mfloat_t MF_PI_VALUE;
 extern mfloat_t MF_2PI_VALUE;
 extern mfloat_t MF_PI_2_VALUE;
+extern mfloat_t MF_NEG_PI_2_VALUE;
 extern mfloat_t MF_PI_4_VALUE;
 extern mfloat_t MF_3PI_4_VALUE;
 extern mfloat_t MF_PI_6_VALUE;

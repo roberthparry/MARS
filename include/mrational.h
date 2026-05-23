@@ -88,6 +88,7 @@ int mr_add(mrational_t *rational, const mrational_t *other);
 int mr_sub(mrational_t *rational, const mrational_t *other);
 int mr_mul(mrational_t *rational, const mrational_t *other);
 int mr_div(mrational_t *rational, const mrational_t *other);
+int mr_pow_int(mrational_t *rational, int exponent);
 /** @} */
 
 #endif

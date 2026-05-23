@@ -7,7 +7,6 @@
 #include <string.h>
 
 #include "matrix.h"
-#include "matrix/matrix_internal.h"
 #include "number/number_internal.h"
 #include "../dval/test_dval.h"
 #include "test_harness.h"
@@ -207,7 +206,14 @@ static inline void test_mat_get_complex(const matrix_t *A, size_t i, size_t j, q
 
 static inline void test_mat_get_dv_slot(const matrix_t *A, size_t i, size_t j, dval_t **out)
 {
-    mat_get_owned(A, i, j, out);
+    dval_t *borrowed = NULL;
+
+    if (!out)
+        return;
+    mat_get(A, i, j, &borrowed);
+    *out = borrowed;
+    if (*out)
+        dv_retain(*out);
 }
 
 static inline void test_mat_set_data_num_slot(matrix_t *A, const number_t *data)

@@ -3,8 +3,9 @@
 #include <stdbool.h>
 #include "matrix_internal.h"
 #include "internal/dval_internal.h"
+#include "dval/dval_internal.h"
 
-static bool dval_is_exact_zero(const dval_t *dv)
+static bool dval_node_is_exact_zero(const dval_t *dv)
 {
     return !dv || dv_is_exact_zero(dv);
 }
@@ -524,7 +525,7 @@ static matrix_t *mat_eigenvectors_dval_2x2(const matrix_t *A, dval_t **eigenvalu
     c = mat_get_dval_or_zero(A, 1, 0);
     d = mat_get_dval_or_zero(A, 1, 1);
 
-    if (dval_is_exact_zero(b) && dval_is_exact_zero(c) && dval_exprs_equal_exact(a, d)) {
+    if (dval_node_is_exact_zero(b) && dval_node_is_exact_zero(c) && dval_exprs_equal_exact(a, d)) {
         if (!eigenvalues && mat_eigenvalues_dval(A, ev) != 0)
             return NULL;
         if (!eigenvalues) {
@@ -788,7 +789,7 @@ static int mat_fraction_free_eliminate_dval(matrix_t *M,
 
         for (size_t i = k; i < n; ++i) {
             const dval_t *candidate = mat_get_dval_or_zero(M, i, k);
-            if (!dval_is_exact_zero(candidate)) {
+            if (!dval_node_is_exact_zero(candidate)) {
                 pivot_row = i;
                 break;
             }
@@ -805,13 +806,13 @@ static int mat_fraction_free_eliminate_dval(matrix_t *M,
         }
 
         pivot = mat_get_dval_or_zero(M, k, k);
-        if (!pivot || dval_is_exact_zero(pivot))
+        if (!pivot || dval_node_is_exact_zero(pivot))
             return 1;
 
         for (size_t i = k + 1; i < n; ++i) {
             const dval_t *aik = mat_get_dval_or_zero(M, i, k);
 
-            if (!aik || dval_is_exact_zero(aik)) {
+            if (!aik || dval_node_is_exact_zero(aik)) {
                 const dval_t *zero = DV_ZERO;
                 mat_set(M, i, k, &zero);
                 continue;
@@ -1013,7 +1014,7 @@ static matrix_t *mat_solve_dval_dense_exact(const matrix_t *A, const matrix_t *B
     for (size_t ii = n; ii-- > 0;) {
         const dval_t *diag = mat_get_dval_or_zero(M, ii, ii);
 
-        if (!diag || dval_is_exact_zero(diag))
+        if (!diag || dval_node_is_exact_zero(diag))
             goto fail;
 
         for (size_t j = 0; j < X->cols; ++j) {
@@ -1256,6 +1257,7 @@ static matrix_t *mat_inverse_dval_dense_exact(const matrix_t *A)
         return NULL;
 
     n = A->rows;
+
     I = mat_create_identity_with_elem(n, &dval_elem);
     if (!I)
         return NULL;
@@ -1312,7 +1314,7 @@ int mat_det_dval_exact(const matrix_t *A, dval_t **determinant)
         for (size_t i = k; i < n; ++i) {
             dval_t *candidate = NULL;
             mat_get(M, i, k, &candidate);
-            if (!dval_is_exact_zero(candidate)) {
+            if (!dval_node_is_exact_zero(candidate)) {
                 pivot_row = i;
                 break;
             }
@@ -1330,7 +1332,7 @@ int mat_det_dval_exact(const matrix_t *A, dval_t **determinant)
         }
 
         mat_get(M, k, k, &pivot);
-        if (dval_is_exact_zero(pivot)) {
+        if (dval_node_is_exact_zero(pivot)) {
             *determinant = dv_new_const(NUM_ZERO);
             mat_free(M);
             return *determinant ? 0 : -3;
@@ -1410,6 +1412,7 @@ matrix_t *mat_inverse_dval_exact(const matrix_t *A)
 
     if (!A || A->rows != A->cols)
         return NULL;
+
 
     if (A->rows == 1) {
         dval_t *v = NULL;
@@ -2060,7 +2063,7 @@ static int mat_dval_rref_exact(const matrix_t *A, dval_rref_info_t *out)
         for (size_t r = row; r < A->rows; ++r) {
             dval_t *candidate = NULL;
             mat_get(R, r, col, &candidate);
-            if (!dval_is_exact_zero(candidate)) {
+            if (!dval_node_is_exact_zero(candidate)) {
                 pivot_row = r;
                 break;
             }
@@ -2098,7 +2101,7 @@ static int mat_dval_rref_exact(const matrix_t *A, dval_rref_info_t *out)
                 continue;
 
             mat_get(R, i, col, &factor);
-            if (dval_is_exact_zero(factor))
+            if (dval_node_is_exact_zero(factor))
                 continue;
             dv_retain(factor);
 
@@ -2199,7 +2202,7 @@ static matrix_t *mat_dval_build_pivot_factor(const matrix_t *A,
             dval_t *entry = NULL;
 
             mat_get(info->R, k, col, &entry);
-            if (!dval_is_exact_zero(entry))
+            if (!dval_node_is_exact_zero(entry))
                 mat_set(F, k, col, &entry);
         }
     }
@@ -2291,7 +2294,7 @@ matrix_t *mat_minpoly_dval(const matrix_t *A)
         if (!roots || !exponents)
             goto fail;
 
-        if (dval_is_exact_zero(b) && dval_is_exact_zero(c) && dval_exprs_equal_exact(a, d)) {
+        if (dval_node_is_exact_zero(b) && dval_node_is_exact_zero(c) && dval_exprs_equal_exact(a, d)) {
             roots[0] = dval_clone_for_storage(a);
             if (!roots[0])
                 goto fail;
@@ -2469,7 +2472,7 @@ matrix_t *mat_nullspace_dval_exact(const matrix_t *A)
             dval_t *coeff;
 
             mat_get(info.R, r, free_col, &entry);
-            if (dval_is_exact_zero(entry))
+            if (dval_node_is_exact_zero(entry))
                 continue;
 
             dv_retain(entry);

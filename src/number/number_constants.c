@@ -7,6 +7,7 @@
 #include "internal/mrational_internal.h"
 
 extern const mcomplex_t MC_I_VALUE;
+extern const mcomplex_t MC_NEG_I_VALUE;
 
 static const number_private_t number_zero_value = {
     .kind = NUMBER_MINT,
@@ -36,6 +37,11 @@ static const number_private_t number_2pi_value = {
 static const number_private_t number_pi_2_value = {
     .kind = NUMBER_MFLOAT,
     .value.mf = (mfloat_t *)&MF_PI_2_VALUE
+};
+
+static const number_private_t number_neg_pi_2_value = {
+    .kind = NUMBER_MFLOAT,
+    .value.mf = (mfloat_t *)&MF_NEG_PI_2_VALUE
 };
 
 static const number_private_t number_pi_4_value = {
@@ -243,6 +249,11 @@ static const number_private_t number_i_value = {
     .value.mc = (mcomplex_t *)&MC_I_VALUE
 };
 
+static const number_private_t number_neg_i_value = {
+    .kind = NUMBER_MCOMPLEX,
+    .value.mc = (mcomplex_t *)&MC_NEG_I_VALUE
+};
+
 typedef union {
     number_private_t priv;
     number_t pub;
@@ -266,6 +277,7 @@ static const number_const_u num_ninf_storage = { .priv = number_ninf_value };
 static const number_const_u num_pi_storage = { .priv = number_pi_value };
 static const number_const_u num_2pi_storage = { .priv = number_2pi_value };
 static const number_const_u num_pi_2_storage = { .priv = number_pi_2_value };
+static const number_const_u num_neg_pi_2_storage = { .priv = number_neg_pi_2_value };
 static const number_const_u num_pi_4_storage = { .priv = number_pi_4_value };
 static const number_const_u num_3pi_4_storage = { .priv = number_3pi_4_value };
 static const number_const_u num_pi_6_storage = { .priv = number_pi_6_value };
@@ -295,6 +307,7 @@ static const number_const_u num_ln_2pi_storage = { .priv = number_ln_2pi_value }
 static const number_const_u num_pi_squared_storage = { .priv = number_pi_squared_value };
 static const number_const_u num_2pi_cubed_storage = { .priv = number_2pi_cubed_value };
 static const number_const_u num_i_storage = { .priv = number_i_value };
+static const number_const_u num_neg_i_storage = { .priv = number_neg_i_value };
 
 extern const number_t NUM_ZERO __attribute__((alias("num_zero_storage")));
 extern const number_t NUM_ONE __attribute__((alias("num_one_storage")));
@@ -314,6 +327,7 @@ extern const number_t NUM_NINF __attribute__((alias("num_ninf_storage")));
 extern const number_t NUM_PI __attribute__((alias("num_pi_storage")));
 extern const number_t NUM_2PI __attribute__((alias("num_2pi_storage")));
 extern const number_t NUM_PI_2 __attribute__((alias("num_pi_2_storage")));
+extern const number_t NUM_NEG_PI_2 __attribute__((alias("num_neg_pi_2_storage")));
 extern const number_t NUM_PI_4 __attribute__((alias("num_pi_4_storage")));
 extern const number_t NUM_3PI_4 __attribute__((alias("num_3pi_4_storage")));
 extern const number_t NUM_PI_6 __attribute__((alias("num_pi_6_storage")));
@@ -343,6 +357,7 @@ extern const number_t NUM_LN_2PI __attribute__((alias("num_ln_2pi_storage")));
 extern const number_t NUM_PI_SQUARED __attribute__((alias("num_pi_squared_storage")));
 extern const number_t NUM_2PI_CUBED __attribute__((alias("num_2pi_cubed_storage")));
 extern const number_t NUM_I __attribute__((alias("num_i_storage")));
+extern const number_t NUM_NEG_I __attribute__((alias("num_neg_i_storage")));
 
 static const qfloat_t *const number_const_qfloat_table[NUMBER_CONST_COUNT] = {
     [NUMBER_CONST_ZERO] = &QF_ZERO,
@@ -355,6 +370,7 @@ static const qfloat_t *const number_const_qfloat_table[NUMBER_CONST_COUNT] = {
     [NUMBER_CONST_PI] = &QF_PI,
     [NUMBER_CONST_2PI] = &QF_2PI,
     [NUMBER_CONST_PI_2] = &QF_PI_2,
+    [NUMBER_CONST_NEG_PI_2] = &QF_NEG_PI_2,
     [NUMBER_CONST_PI_4] = &QF_PI_4,
     [NUMBER_CONST_3PI_4] = &QF_3PI_4,
     [NUMBER_CONST_PI_6] = &QF_PI_6,
@@ -366,7 +382,9 @@ static const qfloat_t *const number_const_qfloat_table[NUMBER_CONST_COUNT] = {
     [NUMBER_CONST_SQRT2] = &QF_SQRT2,
     [NUMBER_CONST_SQRT3] = &QF_SQRT3,
     [NUMBER_CONST_SQRT2_OVER_TWO] = &QF_SQRT2_OVER_TWO,
-    [NUMBER_CONST_SQRT3_OVER_TWO] = &QF_SQRT3_OVER_TWO
+    [NUMBER_CONST_SQRT3_OVER_TWO] = &QF_SQRT3_OVER_TWO,
+    [NUMBER_CONST_INF] = &QF_INF,
+    [NUMBER_CONST_NINF] = &QF_NINF
 };
 
 static const mfloat_t *const number_const_mfloat_table[NUMBER_CONST_COUNT] = {
@@ -376,6 +394,7 @@ static const mfloat_t *const number_const_mfloat_table[NUMBER_CONST_COUNT] = {
     [NUMBER_CONST_PI] = &MF_PI_VALUE,
     [NUMBER_CONST_2PI] = &MF_2PI_VALUE,
     [NUMBER_CONST_PI_2] = &MF_PI_2_VALUE,
+    [NUMBER_CONST_NEG_PI_2] = &MF_NEG_PI_2_VALUE,
     [NUMBER_CONST_PI_4] = &MF_PI_4_VALUE,
     [NUMBER_CONST_3PI_4] = &MF_3PI_4_VALUE,
     [NUMBER_CONST_PI_6] = &MF_PI_6_VALUE,
@@ -387,7 +406,9 @@ static const mfloat_t *const number_const_mfloat_table[NUMBER_CONST_COUNT] = {
     [NUMBER_CONST_SQRT2] = &MF_SQRT2_VALUE,
     [NUMBER_CONST_SQRT3] = &MF_SQRT3_VALUE,
     [NUMBER_CONST_SQRT2_OVER_TWO] = &MF_SQRT2_OVER_TWO_VALUE,
-    [NUMBER_CONST_SQRT3_OVER_TWO] = &MF_SQRT3_OVER_TWO_VALUE
+    [NUMBER_CONST_SQRT3_OVER_TWO] = &MF_SQRT3_OVER_TWO_VALUE,
+    [NUMBER_CONST_INF] = &MF_INF_VALUE,
+    [NUMBER_CONST_NINF] = &MF_NINF_VALUE
 };
 
 static const qcomplex_t *const number_const_qcomplex_table[NUMBER_CONST_COUNT] = {
@@ -401,6 +422,7 @@ static const qcomplex_t *const number_const_qcomplex_table[NUMBER_CONST_COUNT] =
     [NUMBER_CONST_PI] = &QC_PI,
     [NUMBER_CONST_2PI] = &QC_2PI,
     [NUMBER_CONST_PI_2] = &QC_PI_2,
+    [NUMBER_CONST_NEG_PI_2] = &QC_NEG_PI_2,
     [NUMBER_CONST_PI_4] = &QC_PI_4,
     [NUMBER_CONST_3PI_4] = &QC_3PI_4,
     [NUMBER_CONST_PI_6] = &QC_PI_6,
@@ -413,6 +435,8 @@ static const qcomplex_t *const number_const_qcomplex_table[NUMBER_CONST_COUNT] =
     [NUMBER_CONST_SQRT3] = &QC_SQRT3,
     [NUMBER_CONST_SQRT2_OVER_TWO] = &QC_SQRT2_OVER_TWO,
     [NUMBER_CONST_SQRT3_OVER_TWO] = &QC_SQRT3_OVER_TWO,
+    [NUMBER_CONST_INF] = &QC_INF,
+    [NUMBER_CONST_NINF] = &QC_NINF,
     [NUMBER_CONST_I] = &QC_I
 };
 
@@ -437,6 +461,7 @@ static const double number_const_double_table[NUMBER_CONST_COUNT] = {
     [NUMBER_CONST_PI] = M_PI,
     [NUMBER_CONST_2PI] = 2.0 * M_PI,
     [NUMBER_CONST_PI_2] = M_PI_2,
+    [NUMBER_CONST_NEG_PI_2] = -M_PI_2,
     [NUMBER_CONST_PI_4] = M_PI_4,
     [NUMBER_CONST_3PI_4] = 3.0 * M_PI_4,
     [NUMBER_CONST_PI_6] = M_PI / 6.0,
@@ -448,7 +473,9 @@ static const double number_const_double_table[NUMBER_CONST_COUNT] = {
     [NUMBER_CONST_SQRT2] = M_SQRT2,
     [NUMBER_CONST_SQRT3] = 1.73205080756887729353,
     [NUMBER_CONST_SQRT2_OVER_TWO] = M_SQRT1_2,
-    [NUMBER_CONST_SQRT3_OVER_TWO] = 0.86602540378443864676
+    [NUMBER_CONST_SQRT3_OVER_TWO] = 0.86602540378443864676,
+    [NUMBER_CONST_INF] = INFINITY,
+    [NUMBER_CONST_NINF] = -INFINITY
 };
 
 static const bool number_const_has_double_table[NUMBER_CONST_COUNT] = {
@@ -462,6 +489,7 @@ static const bool number_const_has_double_table[NUMBER_CONST_COUNT] = {
     [NUMBER_CONST_PI] = true,
     [NUMBER_CONST_2PI] = true,
     [NUMBER_CONST_PI_2] = true,
+    [NUMBER_CONST_NEG_PI_2] = true,
     [NUMBER_CONST_PI_4] = true,
     [NUMBER_CONST_3PI_4] = true,
     [NUMBER_CONST_PI_6] = true,
@@ -473,7 +501,9 @@ static const bool number_const_has_double_table[NUMBER_CONST_COUNT] = {
     [NUMBER_CONST_SQRT2] = true,
     [NUMBER_CONST_SQRT3] = true,
     [NUMBER_CONST_SQRT2_OVER_TWO] = true,
-    [NUMBER_CONST_SQRT3_OVER_TWO] = true
+    [NUMBER_CONST_SQRT3_OVER_TWO] = true,
+    [NUMBER_CONST_INF] = true,
+    [NUMBER_CONST_NINF] = true
 };
 
 static const bool number_const_has_ldexp_table[NUMBER_CONST_COUNT] = {

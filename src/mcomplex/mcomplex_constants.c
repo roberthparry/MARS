@@ -19,6 +19,7 @@ mcomplex_t MC_NAN_VALUE = MCOMPLEX_CONST_INIT(MCCONST_NAN);
 mcomplex_t MC_INF_VALUE = MCOMPLEX_CONST_INIT(MCCONST_INF);
 mcomplex_t MC_NINF_VALUE = MCOMPLEX_CONST_INIT(MCCONST_NINF);
 mcomplex_t MC_I_VALUE = MCOMPLEX_CONST_INIT(MCCONST_I);
+mcomplex_t MC_NEG_I_VALUE = MCOMPLEX_CONST_INIT(MCCONST_NEG_I);
 
 const mcomplex_t * const MC_ZERO = &MC_ZERO_VALUE;
 const mcomplex_t * const MC_ONE = &MC_ONE_VALUE;
@@ -35,6 +36,7 @@ const mcomplex_t * const MC_NAN = &MC_NAN_VALUE;
 const mcomplex_t * const MC_INF = &MC_INF_VALUE;
 const mcomplex_t * const MC_NINF = &MC_NINF_VALUE;
 const mcomplex_t * const MC_I = &MC_I_VALUE;
+const mcomplex_t * const MC_NEG_I = &MC_NEG_I_VALUE;
 
 static mpfr_prec_t mc_zero_prec;
 static mpfr_prec_t mc_one_prec;
@@ -51,6 +53,7 @@ static mpfr_prec_t mc_nan_prec;
 static mpfr_prec_t mc_inf_prec;
 static mpfr_prec_t mc_ninf_prec;
 static mpfr_prec_t mc_i_prec;
+static mpfr_prec_t mc_neg_i_prec;
 static bool mcomplex_runtime_initialised;
 
 typedef enum mcomplex_fixed_kind_t {
@@ -62,6 +65,7 @@ typedef enum mcomplex_fixed_kind_t {
     MCFIX_INF,
     MCFIX_NINF,
     MCFIX_I,
+    MCFIX_NEG_I,
     MCFIX_COUNT
 } mcomplex_fixed_kind_t;
 
@@ -110,6 +114,11 @@ static void mcomplex_set_fixed_i(mcomplex_t *value)
     mpc_set_ui_ui(value->value, 0u, 1u, MPC_RNDNN);
 }
 
+static void mcomplex_set_fixed_neg_i(mcomplex_t *value)
+{
+    mpc_set_si_si(value->value, 0, -1, MPC_RNDNN);
+}
+
 static const mcomplex_fixed_setter_t mcomplex_fixed_setters[MCFIX_COUNT] = {
     [MCFIX_ZERO] = mcomplex_set_fixed_zero,
     [MCFIX_ONE] = mcomplex_set_fixed_one,
@@ -118,7 +127,8 @@ static const mcomplex_fixed_setter_t mcomplex_fixed_setters[MCFIX_COUNT] = {
     [MCFIX_NAN] = mcomplex_set_fixed_nan,
     [MCFIX_INF] = mcomplex_set_fixed_inf,
     [MCFIX_NINF] = mcomplex_set_fixed_ninf,
-    [MCFIX_I] = mcomplex_set_fixed_i
+    [MCFIX_I] = mcomplex_set_fixed_i,
+    [MCFIX_NEG_I] = mcomplex_set_fixed_neg_i
 };
 
 typedef struct mcomplex_const_cache_t {
@@ -280,6 +290,12 @@ static void mcomplex_ensure_i_fixed(mpfr_prec_t precision)
     mcomplex_init_fixed_constant_once(&MC_I_VALUE, &mc_i_prec, 1, MCFIX_I);
 }
 
+static void mcomplex_ensure_neg_i_fixed(mpfr_prec_t precision)
+{
+    (void)precision;
+    mcomplex_init_fixed_constant_once(&MC_NEG_I_VALUE, &mc_neg_i_prec, 1, MCFIX_NEG_I);
+}
+
 typedef void (*mcomplex_const_ensure_fn_t)(mpfr_prec_t precision);
 
 static const mcomplex_const_ensure_fn_t mcomplex_const_dispatch[MCCONST_COUNT] = {
@@ -297,7 +313,8 @@ static const mcomplex_const_ensure_fn_t mcomplex_const_dispatch[MCCONST_COUNT] =
     [MCCONST_NAN] = mcomplex_ensure_nan_fixed,
     [MCCONST_INF] = mcomplex_ensure_inf_fixed,
     [MCCONST_NINF] = mcomplex_ensure_ninf_fixed,
-    [MCCONST_I] = mcomplex_ensure_i_fixed
+    [MCCONST_I] = mcomplex_ensure_i_fixed,
+    [MCCONST_NEG_I] = mcomplex_ensure_neg_i_fixed
 };
 
 static const mcomplex_const_cache_t mcomplex_const_cache[MCCONST_COUNT] = {
@@ -315,7 +332,8 @@ static const mcomplex_const_cache_t mcomplex_const_cache[MCCONST_COUNT] = {
     [MCCONST_NAN] = { &MC_NAN_VALUE, &mc_nan_prec },
     [MCCONST_INF] = { &MC_INF_VALUE, &mc_inf_prec },
     [MCCONST_NINF] = { &MC_NINF_VALUE, &mc_ninf_prec },
-    [MCCONST_I] = { &MC_I_VALUE, &mc_i_prec }
+    [MCCONST_I] = { &MC_I_VALUE, &mc_i_prec },
+    [MCCONST_NEG_I] = { &MC_NEG_I_VALUE, &mc_neg_i_prec }
 };
 
 static void mcomplex_ensure_runtime_init(void)

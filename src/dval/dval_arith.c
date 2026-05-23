@@ -14,6 +14,8 @@ static number_t eval_const(dval_t *dv)
 
 static number_t eval_var(dval_t *dv)
 {
+    if (dv && dv->binding_expr)
+        return dv_binding_expr_eval(dv->binding_expr);
     return num_clone(dv->c);
 }
 
@@ -117,11 +119,16 @@ static dval_t *deriv_sub(dval_t *dv)
 }
 
 static dval_t *deriv_exp_inverse_scaled_sqrt_product(dval_t *dv);
+static dval_t *deriv_power_inverse_scaled_sqrt_product(dval_t *dv);
+static dval_t *deriv_sqrt_affine_over_power(dval_t *dv);
 
 static dval_t *deriv_mul(dval_t *dv)
 {
     dval_t *special = deriv_exp_inverse_scaled_sqrt_product(dv);
 
+    if (special)
+        return special;
+    special = deriv_power_inverse_scaled_sqrt_product(dv);
     if (special)
         return special;
 
@@ -137,18 +144,70 @@ static dval_t *deriv_mul(dval_t *dv)
     return out;
 }
 
-static int dv_depends_on_current_wrt(const dval_t *dv)
+static int dv_has_composite_preserved_binding_expr_node(const dval_t *dv)
 {
-    const dval_t *wrt = dv_current_wrt_internal();
+    return dv_is_const(dv) && dv->binding_expr &&
+        dv->binding_expr->kind != DV_BINDING_EXPR_NUMBER &&
+        dv->binding_expr->kind != DV_BINDING_EXPR_CONST;
+}
+
+static int dv_binding_aware_search(const dval_t *dv,
+                                   const dval_t *needle,
+                                   int null_needle_matches_any,
+                                   int match_composite_binding)
+{
+    dval_t *expanded;
+    int depends;
 
     if (!dv)
         return 0;
-    if (!wrt)
+
+    if (match_composite_binding &&
+        dv_has_composite_preserved_binding_expr_node(dv))
         return 1;
-    if (dv == wrt)
+
+    if (!needle) {
+        if (null_needle_matches_any)
+            return 1;
+    } else if (dv == needle || dv_struct_eq(dv, needle)) {
         return 1;
-    return dv_depends_on_current_wrt(dv->a) ||
-           dv_depends_on_current_wrt(dv->b);
+    }
+
+    if (dv_has_composite_preserved_binding_expr_node(dv)) {
+        expanded = dv_binding_expr_eval_dval(dv->binding_expr);
+        depends = expanded
+            ? dv_binding_aware_search(expanded, needle,
+                                      null_needle_matches_any,
+                                      match_composite_binding)
+            : 0;
+        if (expanded)
+            dv_free(expanded);
+        return depends;
+    }
+
+    return dv_binding_aware_search(dv->a, needle,
+                                   null_needle_matches_any,
+                                   match_composite_binding) ||
+           dv_binding_aware_search(dv->b, needle,
+                                   null_needle_matches_any,
+                                   match_composite_binding);
+}
+
+static int dv_depends_on_current_wrt(const dval_t *dv)
+{
+    return dv_binding_aware_search(dv, dv_current_wrt_internal(), 1, 0);
+}
+
+static int dv_depends_on_structural_node(const dval_t *dv, const dval_t *needle)
+{
+    if (!needle)
+        return 0;
+    return dv_binding_aware_search(dv, needle, 0, 0);
+}
+
+static int dv_has_composite_preserved_binding_expr(const dval_t *dv)
+{
+    return dv_binding_aware_search(dv, NULL, 0, 1);
 }
 
 static int dv_is_deriv_foldable_real_const(const dval_t *dv)
@@ -279,7 +338,7 @@ static dval_t *deriv_exp_over_scaled_sqrt(dval_t *dv)
         num_destroy(&den_scale);
         return NULL;
     }
-    if (factor && dv_depends_on_current_wrt(factor)) {
+    if (factor && dv_depends_on_structural_node(factor, dv_sqrt_like_arg(sqrt_den))) {
         num_destroy(&den_scale);
         return NULL;
     }
@@ -344,6 +403,257 @@ static int split_inverse_scaled_sqrt(const dval_t *dv,
     return 1;
 }
 
+static int split_symbolic_inverse_scaled_sqrt(const dval_t *dv,
+                                              number_t *den_scale_out,
+                                              const dval_t **factor_out,
+                                              const dval_t **sqrt_out)
+{
+    if (!dv_is_div(dv))
+        return 0;
+    if (!split_scaled_sqrt_denominator(dv->b, den_scale_out, sqrt_out))
+        return 0;
+    if (dv_has_composite_preserved_binding_expr(dv->a))
+        return 0;
+    if (dv_depends_on_structural_node(dv->a, dv_sqrt_like_arg(*sqrt_out)))
+        return 0;
+
+    *factor_out = dv->a;
+    return 1;
+}
+
+static int split_power_like(const dval_t *dv,
+                            const dval_t **base_out,
+                            number_t *exponent_out)
+{
+    if (dv_is_sqrt_like_expr(dv)) {
+        *base_out = dv_sqrt_like_arg(dv);
+        num_destroy(exponent_out);
+        *exponent_out = num_clone(NUM_HALF);
+        return 1;
+    }
+    if (dv_is_pow_d_expr(dv)) {
+        *base_out = dv->a;
+        num_destroy(exponent_out);
+        *exponent_out = num_clone(dv->c);
+        return 1;
+    }
+    return 0;
+}
+
+static int split_scaled_sqrt_factor_owned(const dval_t *term,
+                                          const dval_t *base,
+                                          dval_t **factor_out)
+{
+    if (!term || !base)
+        return 0;
+    if (dv_is_sqrt_like_expr(term) &&
+        dv_struct_eq(dv_sqrt_like_arg(term), base)) {
+        *factor_out = dv_new_const(NUM_ONE);
+        return 1;
+    }
+    if (dv_is_neg(term)) {
+        dval_t *inner_factor = NULL;
+
+        if (!split_scaled_sqrt_factor_owned(term->a, base, &inner_factor))
+            return 0;
+        *factor_out = dv_neg(inner_factor);
+        dv_free(inner_factor);
+        return 1;
+    }
+    if (dv_is_mul(term)) {
+        if (dv_is_sqrt_like_expr(term->a) &&
+            dv_struct_eq(dv_sqrt_like_arg(term->a), base) &&
+            !dv_depends_on_structural_node(term->b, base)) {
+            dv_retain(term->b);
+            *factor_out = term->b;
+            return 1;
+        }
+        if (dv_is_sqrt_like_expr(term->b) &&
+            dv_struct_eq(dv_sqrt_like_arg(term->b), base) &&
+            !dv_depends_on_structural_node(term->a, base)) {
+            dv_retain(term->a);
+            *factor_out = term->a;
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static int split_sqrt_affine_numerator_owned(const dval_t *num,
+                                             const dval_t *base,
+                                             dval_t **factor_out,
+                                             dval_t **constant_out)
+{
+    dval_t *factor = NULL;
+
+    if (split_scaled_sqrt_factor_owned(num, base, &factor)) {
+        *factor_out = factor;
+        *constant_out = dv_new_const(NUM_ZERO);
+        return 1;
+    }
+
+    if (!dv_is_addsub(num))
+        return 0;
+
+    if (split_scaled_sqrt_factor_owned(num->a, base, &factor) &&
+        !dv_depends_on_structural_node(num->b, base)) {
+        *factor_out = factor;
+        if (dv_is_op(num, &ops_sub)) {
+            dval_t *neg_const;
+
+            dv_retain(num->b);
+            neg_const = dv_neg(num->b);
+            dv_free(num->b);
+            *constant_out = neg_const;
+        } else {
+            dv_retain(num->b);
+            *constant_out = num->b;
+        }
+        return 1;
+    }
+    dv_free(factor);
+    factor = NULL;
+
+    if (dv_is_op(num, &ops_add) &&
+        split_scaled_sqrt_factor_owned(num->b, base, &factor) &&
+        !dv_depends_on_structural_node(num->a, base)) {
+        dv_retain(num->a);
+        *factor_out = factor;
+        *constant_out = num->a;
+        return 1;
+    }
+
+    if (dv_is_op(num, &ops_sub) &&
+        split_scaled_sqrt_factor_owned(num->b, base, &factor) &&
+        !dv_depends_on_structural_node(num->a, base)) {
+        dval_t *neg_factor = dv_neg(factor);
+
+        dv_free(factor);
+        dv_retain(num->a);
+        *factor_out = neg_factor;
+        *constant_out = num->a;
+        return 1;
+    }
+    dv_free(factor);
+    return 0;
+}
+
+static dval_t *deriv_sqrt_affine_over_power(dval_t *dv)
+{
+    NUM_SCOPE(scope);
+    const dval_t *base = NULL;
+    number_t exponent = num_new();
+    number_t half_minus_exponent = num_new();
+    number_t neg_exponent = num_new();
+    number_t den_exponent = num_new();
+    dval_t *factor = NULL;
+    dval_t *constant = NULL;
+    dval_t *sqrt_base = NULL;
+    dval_t *sqrt_term = NULL;
+    dval_t *term1 = NULL;
+    dval_t *term2 = NULL;
+    dval_t *sum = NULL;
+    dval_t *den = NULL;
+    dval_t *out = NULL;
+
+    if (!split_power_like(dv->b, &base, &exponent))
+        goto cleanup;
+    if (!split_sqrt_affine_numerator_owned(dv->a, base, &factor, &constant))
+        goto cleanup;
+
+    half_minus_exponent = num_sub(NUM_HALF, exponent);
+    neg_exponent = num_neg(exponent);
+    den_exponent = num_add(exponent, NUM_ONE);
+
+    sqrt_base = dv_sqrt(base);
+    sqrt_term = dv_mul(factor, sqrt_base);
+    term1 = dv_make_scaled(half_minus_exponent, sqrt_term);
+    sqrt_term = NULL;
+    term2 = dv_make_scaled(neg_exponent, constant);
+    constant = NULL;
+    sum = dv_add(term1, term2);
+    den = dv_pow(base, &den_exponent);
+    out = dv_div(sum, den);
+
+cleanup:
+    dv_free(factor);
+    dv_free(constant);
+    dv_free(sqrt_base);
+    dv_free(sqrt_term);
+    dv_free(term1);
+    dv_free(term2);
+    dv_free(sum);
+    dv_free(den);
+    num_destroy(&exponent);
+    num_destroy(&half_minus_exponent);
+    num_destroy(&neg_exponent);
+    num_destroy(&den_exponent);
+    return out;
+}
+
+static dval_t *deriv_power_inverse_scaled_sqrt_product(dval_t *dv)
+{
+    NUM_SCOPE(scope);
+    const dval_t *factor = NULL;
+    const dval_t *sqrt_den = NULL;
+    const dval_t *base = NULL;
+    number_t den_scale = num_new();
+    number_t exponent = num_new();
+    number_t coeff = num_new();
+    number_t out_exponent = num_new();
+    number_t three = num_create_from_long(3L);
+    number_t three_halves = num_div(three, NUM_TWO);
+    dval_t *factor_scaled = NULL;
+    dval_t *power_base = NULL;
+    dval_t *pow_term = NULL;
+    dval_t *base_dx = NULL;
+    dval_t *tmp = NULL;
+    dval_t *out = NULL;
+    int matched;
+
+    matched = (split_power_like(dv->a, &base, &exponent) &&
+               split_symbolic_inverse_scaled_sqrt(dv->b, &den_scale,
+                                                  &factor, &sqrt_den)) ||
+              (split_power_like(dv->b, &base, &exponent) &&
+               split_symbolic_inverse_scaled_sqrt(dv->a, &den_scale,
+                                                  &factor, &sqrt_den));
+    if (!matched)
+        goto cleanup;
+    if (!dv_struct_eq(base, dv_sqrt_like_arg(sqrt_den)))
+        goto cleanup;
+
+    coeff = num_sub(exponent, NUM_HALF);
+    if (num_is_zero(coeff)) {
+        out = dv_new_const(NUM_ZERO);
+        goto cleanup;
+    }
+    coeff = num_div(coeff, den_scale);
+    out_exponent = num_sub(exponent, three_halves);
+
+    dv_retain(factor);
+    factor_scaled = dv_make_scaled(coeff, (dval_t *)factor);
+    dv_retain(base);
+    power_base = (dval_t *)base;
+    pow_term = dv_make_pow_like(power_base, out_exponent);
+    base_dx = dv_get_dx_internal((dval_t *)base);
+
+    tmp = dv_mul(factor_scaled, pow_term);
+    out = dv_mul(tmp, base_dx);
+
+cleanup:
+    dv_free(factor_scaled);
+    dv_free(pow_term);
+    dv_free(base_dx);
+    dv_free(tmp);
+    num_destroy(&den_scale);
+    num_destroy(&exponent);
+    num_destroy(&coeff);
+    num_destroy(&out_exponent);
+    num_destroy(&three);
+    num_destroy(&three_halves);
+    return out;
+}
+
 static dval_t *deriv_exp_inverse_scaled_sqrt_product(dval_t *dv)
 {
     NUM_SCOPE(scope);
@@ -376,7 +686,7 @@ static dval_t *deriv_exp_inverse_scaled_sqrt_product(dval_t *dv)
         num_destroy(&den_scale);
         return NULL;
     }
-    if (factor && dv_depends_on_current_wrt(factor)) {
+    if (factor && dv_depends_on_structural_node(factor, dv_sqrt_like_arg(sqrt_den))) {
         num_destroy(&num_scale);
         num_destroy(&den_scale);
         return NULL;
@@ -431,6 +741,9 @@ static dval_t *deriv_div(dval_t *dv)
     NUM_SCOPE(scope);
     dval_t *special = deriv_exp_over_scaled_sqrt(dv);
 
+    if (special)
+        return special;
+    special = deriv_sqrt_affine_over_power(dv);
     if (special)
         return special;
 

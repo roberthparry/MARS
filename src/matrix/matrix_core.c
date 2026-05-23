@@ -264,7 +264,7 @@ exact_update:
     }
 }
 
-static bool dval_is_exact_zero(const dval_t *dv)
+static bool dval_node_is_exact_zero(const dval_t *dv)
 {
     return !dv || dv_is_exact_zero(dv);
 }
@@ -616,7 +616,7 @@ void mat_set_num_owned(struct matrix_t *A, size_t i, size_t j, number_t *value)
 
  bool dv_is_structural_zero(const void *val)
 {
-    return dval_is_exact_zero(*(dval_t *const *)val);
+    return dval_node_is_exact_zero(*(dval_t *const *)val);
 }
 
  bool dense_alloc(struct matrix_t *A) {

@@ -187,6 +187,7 @@ extern const number_t NUM_NINF;          /**< -∞ */
 extern const number_t NUM_PI;            /**< π */
 extern const number_t NUM_2PI;           /**< 2π */
 extern const number_t NUM_PI_2;          /**< π/2 */
+extern const number_t NUM_NEG_PI_2;      /**< -π/2 */
 extern const number_t NUM_PI_4;          /**< π/4 */
 extern const number_t NUM_3PI_4;         /**< 3π/4 */
 extern const number_t NUM_PI_6;          /**< π/6 */
@@ -230,6 +231,7 @@ extern const number_t NUM_2PI_CUBED;         /**< (2π)³ */
 /** @} */
 
 extern const number_t NUM_I;             /**< i */
+extern const number_t NUM_NEG_I;         /**< -i */
 /** @} */
 
 /**

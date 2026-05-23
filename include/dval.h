@@ -382,6 +382,15 @@ dval_t *dv_e1(const dval_t *dv);
 /* ------------------------------------------------------------------------- */
 
 /**
+ * @brief Increment the reference count for a borrowed handle.
+ *
+ * Use this when an API returns a borrowed `dval_t *` and the caller needs to
+ * keep an owning handle beyond the borrowed lifetime. Pair the retained handle
+ * with one later call to dv_free().
+ */
+void dv_retain(const dval_t *dv);
+
+/**
  * @brief Decrement the reference count and free if it reaches zero.
  *
  * Must be called exactly once for every owning handle returned by:
@@ -409,7 +418,8 @@ dval_t *dv_simplify(const dval_t *dv);
  *
  * style_EXPRESSION  — infix notation, e.g. "{ sin(x₀) | x₀ = 1.0 }"
  *                     or "{ 1 }" when no bindings are needed
- * style_FUNCTION    — prefix/function notation, e.g. "sin(var(x₀=1.0))"
+ * style_FUNCTION    — C-like function notation, e.g.
+ *                     "number expr(number x) { return sin(x); }"
  * style_TEX         — TeX math notation, e.g. "\left\{ x_{0} \;\middle|\; x_{0} = 1.0 \right\}"
  */
 typedef enum {

@@ -38,6 +38,7 @@ extern const mfloat_t * const MF_TEN;
 extern const mfloat_t * const MF_PI;
 extern const mfloat_t * const MF_2PI;
 extern const mfloat_t * const MF_PI_2;
+extern const mfloat_t * const MF_NEG_PI_2;
 extern const mfloat_t * const MF_PI_4;
 extern const mfloat_t * const MF_3PI_4;
 extern const mfloat_t * const MF_PI_6;
@@ -108,6 +109,7 @@ void mf_clear(mfloat_t *mfloat);
  */
 int mf_set_default_precision(size_t precision_bits);
 size_t mf_get_default_precision(void);
+void mf_ensure_precision(const mfloat_t *mfloat, size_t precision_bits);
 int mf_set_precision(mfloat_t *mfloat, size_t precision_bits);
 size_t mf_get_precision(const mfloat_t *mfloat);
 int mf_set_default_precision_digits(size_t significant_digits);

@@ -366,7 +366,7 @@ static void test_mat_to_string_symbolic_tex_exact(void)
     const char *expect =
         "\\left\\{ \\begin{bmatrix}\\sin(x_{0}) & e^{c_{1}} \\\\ "
         "\\ln(x_{0}) & c_{1}^{2}\\end{bmatrix} \\;\\middle|\\; "
-        "x_{0} = 2, c_{1} = 5 \\right\\}";
+        "x_{0} = 2; c_{1} = 5 \\right\\}";
 
     matrix_tex_preview_emit_case(__FILE__, "symbolic matrix exact with bindings (TEX)", tex);
 

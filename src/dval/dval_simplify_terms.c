@@ -25,6 +25,15 @@ static int dv_try_get_unnamed_const_real_num(const dval_t *dv, number_t *out)
     return 1;
 }
 
+static int dv_is_i_squared_term(const dval_t *dv)
+{
+    return dv_is_pow_d_expr(dv) &&
+           dv_is_op(dv->a, &ops_const) &&
+           !dv->a->binding_expr &&
+           (num_eq(dv->a->c, NUM_I) || num_eq(dv->a->c, NUM_NEG_I)) &&
+           num_eq(dv->c, NUM_TWO);
+}
+
 static void *dv_terms_xrealloc(void *ptr, size_t size)
 {
     void *grown = realloc(ptr, size);
@@ -635,9 +644,9 @@ void dv_collect_addends(dval_t *dv, number_t scale, number_t *c_const,
             dv_free(dv->a->b);
             dv_free(dv->b);
             simp = dv_simplify(raw);
-            dv_free(raw);
-            dv_collect_addends(simp, ns, c_const, terms, n, cap);
+            dv_collect_addends(simp ? simp : raw, ns, c_const, terms, n, cap);
             dv_free(simp);
+            dv_free(raw);
             return;
         }
     }
@@ -782,7 +791,13 @@ dval_t *dv_try_trig_pythagorean_identity(const addend_t *terms, size_t n,
 {
     const dval_t *sin_arg = NULL;
     const dval_t *cos_arg = NULL;
+    const dval_t *sinh_arg = NULL;
+    const dval_t *cosh_arg = NULL;
     size_t nonzero_terms = 0;
+    int have_sin = 0;
+    int have_cos = 0;
+    int have_sinh = 0;
+    int have_cosh = 0;
 
     if (!num_is_zero(c_const))
         return NULL;
@@ -790,22 +805,43 @@ dval_t *dv_try_trig_pythagorean_identity(const addend_t *terms, size_t n,
     for (size_t i = 0; i < n; ++i) {
         if (!terms[i].base || num_is_zero(terms[i].coeff))
             continue;
-        if (!num_is_one(terms[i].coeff))
-            return NULL;
         nonzero_terms++;
         if (nonzero_terms > 2)
             return NULL;
-        if (is_trig_square_of(terms[i].base, &ops_sin, &sin_arg))
+
+        if (num_is_one(terms[i].coeff) &&
+            is_trig_square_of(terms[i].base, &ops_sin, &sin_arg)) {
+            have_sin = 1;
             continue;
-        if (is_trig_square_of(terms[i].base, &ops_cos, &cos_arg))
+        }
+        if (num_is_one(terms[i].coeff) &&
+            is_trig_square_of(terms[i].base, &ops_cos, &cos_arg)) {
+            have_cos = 1;
             continue;
+        }
+        if (num_is_one(terms[i].coeff) &&
+            is_trig_square_of(terms[i].base, &ops_cosh, &cosh_arg)) {
+            have_cosh = 1;
+            continue;
+        }
+        if (num_eq(terms[i].coeff, NUM_NEG_ONE) &&
+            is_trig_square_of(terms[i].base, &ops_sinh, &sinh_arg)) {
+            have_sinh = 1;
+            continue;
+        }
         return NULL;
     }
 
-    if (nonzero_terms != 2 || !sin_arg || !cos_arg || !dv_struct_eq(sin_arg, cos_arg))
-        return NULL;
+    if (nonzero_terms == 2) {
+        if (have_sin && have_cos && sin_arg && cos_arg &&
+            dv_struct_eq(sin_arg, cos_arg))
+            return dv_new_const(common_coeff);
+        if (have_sinh && have_cosh && sinh_arg && cosh_arg &&
+            dv_struct_eq(sinh_arg, cosh_arg))
+            return dv_new_const(common_coeff);
+    }
 
-    return dv_new_const(common_coeff);
+    return NULL;
 }
 
 static void flatten_add(dval_t *root, dval_t **addends, int *na, int max)
@@ -899,6 +935,13 @@ dval_t *dv_make_pow_like(dval_t *base, number_t exponent)
     }
     if (num_eq(exponent, NUM_ONE))
         return base;
+    if (num_eq(exponent, NUM_TWO) &&
+        dv_is_op(base, &ops_const) &&
+        !base->binding_expr &&
+        (num_eq(base->c, NUM_I) || num_eq(base->c, NUM_NEG_I))) {
+        dv_free(base);
+        return dv_new_const(NUM_NEG_ONE);
+    }
 
     dval_t *pow = dv_pow(base, &exponent);
     dv_free(base);
@@ -1255,7 +1298,7 @@ dval_t *dv_rebuild_product_chain(number_t c_acc, dval_t **terms, size_t nterms)
 {
     dval_t *cur = NULL;
 
-    if (!num_is_one(c_acc)) {
+    if (!num_eq(c_acc, NUM_ONE)) {
         number_t normalized = dv_normalize_simple_rational_coeff(c_acc);
 
         cur = dv_new_const(normalized);
@@ -1265,6 +1308,12 @@ dval_t *dv_rebuild_product_chain(number_t c_acc, dval_t **terms, size_t nterms)
     for (size_t i = 0; i < nterms; ++i) {
         if (!terms[i])
             continue;
+        if (dv_is_i_squared_term(terms[i])) {
+            dval_t *neg_one = dv_new_const(NUM_NEG_ONE);
+
+            dv_free(terms[i]);
+            terms[i] = neg_one;
+        }
         if (!cur) {
             cur = terms[i];
         } else {

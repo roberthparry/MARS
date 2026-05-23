@@ -49,6 +49,8 @@ static struct _dval_t _DV_NAN_NODE = {
     .x = { { 0, 0, 0, 0, 0 } },
     .x_valid = 1,
     .epoch = 0,
+    .simplified = true,
+    .simplify_epoch = 0,
     .dx_cache = NULL,
     .name = NULL,
     .refcount = INT_MAX,
@@ -213,6 +215,8 @@ void dv_set_val(dval_t *dv, number_t value)
     dv_store_value_num(dv, num_clone(dv->c));
     dv->x_valid = 1;
     dv->epoch++;
+    dv->simplified = false;
+    dv->simplify_epoch = 0;
 }
 
 void dv_set_name(dval_t *dv, const char *name)
@@ -220,6 +224,9 @@ void dv_set_name(dval_t *dv, const char *name)
     if (!dv) return;
     if (dv->name) free(dv->name);
     dv->name = dv_normalize_name(name);
+    dv->epoch++;
+    dv->simplified = false;
+    dv->simplify_epoch = 0;
 }
 
 number_t dv_get_val(const dval_t *dv)

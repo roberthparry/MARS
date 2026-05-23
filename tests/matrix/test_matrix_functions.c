@@ -6120,7 +6120,7 @@ static void test_dval_matrix_functions(void)
             mat_get(L, 0, 0, &v);
             check_d("log(dval dense 2x2)[0,0]", dv_eval_d(v),
                     0.5 * (log(3.0) + log(1.0)), 1e-12);
-            check_dval_expr_contains("log(dval dense 2x2)[0,0] stays symbolic", v, "log");
+            check_dval_expr_contains("log(dval dense 2x2)[0,0] stays symbolic", v, "ln");
             mat_get(L, 0, 1, &v);
             check_d("log(dval dense 2x2)[0,1]", dv_eval_d(v),
                     0.5 * (log(3.0) - log(1.0)), 1e-12);
@@ -6215,7 +6215,7 @@ static void test_dval_matrix_functions_extended(void)
             check_bool("lambert_w0(T) preserves lower-triangular structure",
                        mat_is_lower_triangular(W));
             mat_get(W, 0, 0, &v);
-            check_dval_expr_contains("lambert_w0(T)[0,0] stays symbolic in x", v, "lambert_w0");
+            check_dval_expr_contains("lambert_w0(T)[0,0] stays symbolic in x", v, "W₀");
             test_dv_set_val_d(x, 0.1);
             check_bool("lambert_w0(T)[0,0] numerically finite", isfinite(dv_eval_d(v)));
         }

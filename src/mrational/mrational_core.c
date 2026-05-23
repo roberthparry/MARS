@@ -715,3 +715,36 @@ int mr_div(mrational_t *rational, const mrational_t *other)
     mpq_div(rational->value, rational->value, other->value);
     return 0;
 }
+
+int mr_pow_int(mrational_t *rational, int exponent)
+{
+    unsigned long mag;
+
+    if (!rational)
+        return -1;
+    if (exponent < 0 && mr_inv(rational) != 0)
+        return -1;
+
+    mag = exponent < 0
+        ? (unsigned long)(-(long)exponent)
+        : (unsigned long)exponent;
+
+    if (mrational_prepare_mutable(rational) != 0)
+        return -1;
+
+    mpz_pow_ui(mpq_numref(rational->value), mpq_numref(rational->value), mag);
+    mpz_pow_ui(mpq_denref(rational->value), mpq_denref(rational->value), mag);
+    mpq_canonicalize(rational->value);
+    return 0;
+}
+
+int mr_copy_mpq(mpq_ptr dst, const mrational_t *value)
+{
+    if (!dst || !value)
+        return -1;
+
+    mrational_prepare_constant(value);
+    mpq_set(dst, value->value);
+    mpq_canonicalize(dst);
+    return 0;
+}

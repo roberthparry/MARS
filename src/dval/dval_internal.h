@@ -268,6 +268,8 @@ typedef struct dv_binding_expr {
  *   c        — constant field (used by const and pow_d)
  *   x        — cached primal value
  *   x_valid  — whether x is valid
+ *   simplified — whether this node has been certified by dv_simplify()
+ *   simplify_epoch — maximum subtree epoch when simplified was certified
  *   dx_cache — singly-linked list of (wrt, dx) cache entries (owned)
  *   name     — optional symbolic name (owned)
  *   binding_expr — optional preserved binding RHS constant expression for display (owned)
@@ -289,6 +291,8 @@ struct _dval_t {
      * set to max(child epochs) after each recomputation. dv_eval() uses
      * this to detect stale caches automatically. */
     uint64_t  epoch;
+    bool      simplified;
+    uint64_t  simplify_epoch;
 
     dv_deriv_cache_t *dx_cache;
 
@@ -476,6 +480,7 @@ int dv_fold_cos_const(const number_t *in, number_t *out);
 int dv_fold_exp_const(const number_t *in, number_t *out);
 int dv_fold_log_const(const number_t *in, number_t *out);
 int dv_fold_sqrt_const(const number_t *in, number_t *out);
+int dv_fold_floor_const(const number_t *in, number_t *out);
 
 void dv_reverse_atom(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void dv_reverse_add(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);

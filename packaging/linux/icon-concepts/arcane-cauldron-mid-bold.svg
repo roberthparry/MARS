@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="MARS dval Lab Arcane Cauldron KDE-style icon">
+  <defs>
+    <linearGradient id="cool" x1="42" y1="30" x2="214" y2="226" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7bc7ec"/>
+      <stop offset="0.52" stop-color="#9178e9"/>
+      <stop offset="1" stop-color="#57caaa"/>
+    </linearGradient>
+    <linearGradient id="warm" x1="55" y1="42" x2="204" y2="215" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ff91c6"/>
+      <stop offset="0.54" stop-color="#df75c8"/>
+      <stop offset="1" stop-color="#ffc866"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="64" y1="35" x2="190" y2="218" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.92"/>
+      <stop offset="0.38" stop-color="#54d0cf" stop-opacity="0.9"/>
+      <stop offset="0.68" stop-color="#ff91c6" stop-opacity="0.92"/>
+      <stop offset="1" stop-color="#ffc866" stop-opacity="0.96"/>
+    </linearGradient>
+    <filter id="shadow" x="-45%" y="-45%" width="190%" height="190%">
+      <feDropShadow dx="0" dy="8" stdDeviation="6" flood-color="#263238" flood-opacity="0.28"/>
+    </filter>
+  </defs>
+  <g transform="translate(128 128) scale(1.14) translate(-128 -128)">
+    <g filter="url(#shadow)">
+      <ellipse cx="128" cy="103" rx="70" ry="28" fill="#54d0cf" stroke="#3e596c" stroke-width="8"/>
+      <path d="M61 106h134l-17 75c-5 22-25 37-50 37s-45-15-50-37Z" fill="url(#cool)" stroke="#3e596c" stroke-width="8" stroke-linejoin="round"/>
+      <path d="M80 114c30 16 66 17 97 1" fill="none" stroke="#ffffff" stroke-width="6" stroke-linecap="round" opacity="0.55"/>
+      <circle cx="86" cy="58" r="12" fill="#ff91c6" stroke="#3e596c" stroke-width="4"/>
+      <circle cx="130" cy="42" r="11" fill="#ffc866" stroke="#3e596c" stroke-width="4"/>
+      <circle cx="171" cy="64" r="10" fill="#92dc7a" stroke="#3e596c" stroke-width="4"/>
+      <path d="M75 217h106" stroke="#3e596c" stroke-width="8" stroke-linecap="round"/>
+    </g>
+    <text x="128" y="164" text-anchor="middle" font-family="Noto Serif, STIX Two Math, Cambria Math, DejaVu Serif, serif" font-size="58" font-weight="900" fill="#ffffff" stroke="#253541" stroke-width="4" paint-order="stroke fill">∂x</text>
+  </g>
+</svg>

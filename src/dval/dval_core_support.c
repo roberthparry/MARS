@@ -597,6 +597,8 @@ dval_t *dv_alloc(const dval_ops_t *ops)
     dv->x = NUM_ZERO;
     dv->x_valid = 0;
     dv->epoch = 0;
+    dv->simplified = false;
+    dv->simplify_epoch = 0;
     dv->dx_cache = NULL;
     dv->name = NULL;
     dv->binding_expr = NULL;

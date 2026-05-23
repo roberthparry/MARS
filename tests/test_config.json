@@ -83,7 +83,9 @@
     "test_bitwise_xor": true,
     "test_bitwise_not": true,
     "test_growth": true,
-    "test_thread_safety": true
+    "test_thread_safety": true,
+    "example_bitset_basic": true,
+    "example_bitset_ops": true
   },
   "tests/mrational/test_mrational.c": {
     "test_create_and_normalise": true,
@@ -151,7 +153,6 @@
     "test_tetragamma_function": true,
     "test_remaining_special_mfloat_functions": true,
     "test_difficult_mfloat_cases": true,
-    "test_readme_examples": true,
     "example_mfloat_readme": true
   },
   "tests/qcomplex/test_qcomplex.c": {
@@ -954,7 +955,8 @@
           "test_to_string_function_style_expr": true,
           "test_to_string_function_style_func": true,
           "test_to_string_function_style_signed_sum": true,
-          "test_to_string_function_style_sub_negative_product": true
+          "test_to_string_function_style_sub_negative_product": true,
+          "test_to_string_function_style_preserves_math_names": true
         },
         "test_to_string_floor_ceil": {
           "enabled": true,
@@ -1059,8 +1061,13 @@
       "test_high_precision_mcomplex_function_values": true,
       "test_set_val_num_named_constant": true,
       "test_to_string_does_not_simplify_plain_expressions": true,
+      "test_simplify_reuses_clean_nodes_and_dirty_mutations": true,
       "test_simplify_inverse_unary_pairs": true,
       "test_simplify_exp_quarter_turns": true,
+      "test_simplify_trig_and_hyperbolic_identities": true,
+      "test_to_string_imaginary_unit_omits_one": true,
+      "test_complex_coefficient_stays_grouped": true,
+      "test_updated_decimal_binding_stays_decimal": true,
       "test_symbolic_negative_pi_derivative_stays_symbolic": true,
       "test_pow_derivative_preserves_literal_base_log": true,
       "test_repeated_preserved_log_factor_combines_as_power": true,
@@ -1075,6 +1082,7 @@
       "test_binding_principal_inverse_numeric_expression_simplifies": true,
       "test_binding_lambert_inverse_numeric_expression_simplifies": true,
       "test_binding_exact_core_trig_values_simplify": true,
+      "test_tan_poles_display_as_infinity": true,
       "test_goal_seek_large_target_uses_significant_digit_tolerance": true
     }
   },

@@ -166,6 +166,227 @@ static dval_t *dv_simplify_direct_inverse_pair(const dval_t *outer,
     return arg;
 }
 
+static dval_t *dv_simplify_direct_inverse_pair_from_raw(const dval_t *outer,
+                                                        const dval_t *raw_inner,
+                                                        dval_t *simplified_inner)
+{
+    dval_t *arg;
+
+    if (!outer || !raw_inner || raw_inner->ops->arity != DV_OP_UNARY ||
+        outer->ops->direct_inverse != raw_inner->ops || !raw_inner->a)
+        return NULL;
+
+    arg = dv_simplify(raw_inner->a);
+    if (simplified_inner)
+        dv_free(simplified_inner);
+    return arg;
+}
+
+static dval_t *dv_simplify_atan_tan_sawtooth(dval_t *inner)
+{
+    dval_t *arg;
+    dval_t *pi_divisor;
+    dval_t *arg_over_pi;
+    dval_t *half;
+    dval_t *shifted;
+    dval_t *floored;
+    dval_t *pi_multiplier;
+    dval_t *periods;
+    dval_t *out;
+
+    if (!inner || !dv_is_op(inner, &ops_tan))
+        return NULL;
+
+    dv_retain(inner->a);
+    arg = inner->a;
+
+    pi_divisor = dv_new_named_const(NUM_PI, "@pi");
+    arg_over_pi = dv_div(arg, pi_divisor);
+    half = dv_new_const(NUM_HALF);
+    shifted = dv_add(arg_over_pi, half);
+    floored = dv_floor(shifted);
+    pi_multiplier = dv_new_named_const(NUM_PI, "@pi");
+    periods = dv_mul(pi_multiplier, floored);
+    out = dv_sub(arg, periods);
+
+    dv_free(periods);
+    dv_free(pi_multiplier);
+    dv_free(floored);
+    dv_free(shifted);
+    dv_free(half);
+    dv_free(arg_over_pi);
+    dv_free(pi_divisor);
+    dv_free(arg);
+    dv_free(inner);
+
+    return out;
+}
+
+static int dv_is_pi_const_local(const dval_t *dv)
+{
+    return dv && dv_is_op(dv, &ops_const) && num_eq(dv->c, NUM_PI);
+}
+
+static int dv_is_pi_times_floor_local(const dval_t *dv)
+{
+    const dval_t *left;
+    const dval_t *right;
+
+    if (!dv || !dv_is_op(dv, &ops_mul))
+        return 0;
+
+    left = dv->a;
+    right = dv->b;
+
+    return (dv_is_pi_const_local(left) && dv_is_op(right, &ops_floor)) ||
+           (dv_is_pi_const_local(right) && dv_is_op(left, &ops_floor));
+}
+
+static int dv_collect_pi_floor_product_local(const dval_t *dv,
+                                             number_t *coeff,
+                                             int *has_pi,
+                                             int *has_floor)
+{
+    if (!dv)
+        return 0;
+
+    if (dv_is_op(dv, &ops_neg)) {
+        number_t negated;
+
+        if (!dv_collect_pi_floor_product_local(dv->a, coeff,
+                                               has_pi, has_floor))
+            return 0;
+        negated = num_neg(*coeff);
+        num_destroy(coeff);
+        *coeff = negated;
+        return 1;
+    }
+
+    if (dv_is_op(dv, &ops_mul))
+        return dv_collect_pi_floor_product_local(dv->a, coeff,
+                                                has_pi, has_floor) &&
+               dv_collect_pi_floor_product_local(dv->b, coeff,
+                                                has_pi, has_floor);
+
+    if (dv_is_op(dv, &ops_const) && !dv->binding_expr &&
+        (!dv->name || !*dv->name) && num_is_real(dv->c)) {
+        number_t product = num_mul(*coeff, dv->c);
+
+        num_destroy(coeff);
+        *coeff = product;
+        return 1;
+    }
+
+    if (dv_is_pi_const_local(dv) && !*has_pi) {
+        *has_pi = 1;
+        return 1;
+    }
+
+    if (dv_is_op(dv, &ops_floor) && !*has_floor) {
+        *has_floor = 1;
+        return 1;
+    }
+
+    return 0;
+}
+
+static int dv_is_pos_pi_times_floor_local(const dval_t *dv)
+{
+    NUM_SCOPE(scope);
+    number_t coeff = num_const(NUM_ONE);
+    int has_pi = 0;
+    int has_floor = 0;
+    int ok;
+
+    if (dv_is_pi_times_floor_local(dv))
+        return 1;
+
+    ok = dv_collect_pi_floor_product_local(dv, &coeff, &has_pi, &has_floor) &&
+         has_pi && has_floor && num_eq(coeff, NUM_ONE);
+    num_destroy(&coeff);
+    return ok;
+}
+
+static int dv_is_period_pi_base_local(const dval_t *dv)
+{
+    return dv_is_pi_const_local(dv) || dv_is_pos_pi_times_floor_local(dv);
+}
+
+static void dv_free_addends_local(addend_t *terms, size_t n)
+{
+    size_t i;
+
+    for (i = 0u; i < n; ++i) {
+        dv_free(terms[i].base);
+        num_destroy(&terms[i].coeff);
+    }
+    free(terms);
+}
+
+static dval_t *dv_tan_periodic_base_local(dval_t *arg)
+{
+    number_t c_const = num_const(NUM_ZERO);
+    addend_t *terms = NULL;
+    size_t n = 0u;
+    size_t cap = 0u;
+    dval_t *base = NULL;
+    int have_base = 0;
+    int have_period = 0;
+    size_t i;
+
+    dv_collect_addends(arg, NUM_ONE, &c_const, &terms, &n, &cap);
+
+    if (!num_is_zero(c_const))
+        goto fail;
+
+    for (i = 0u; i < n; ++i) {
+        if (num_is_zero(terms[i].coeff))
+            continue;
+
+        if (dv_is_period_pi_base_local(terms[i].base) &&
+            num_is_integer(terms[i].coeff)) {
+            have_period = 1;
+            continue;
+        }
+
+        if (!num_eq(terms[i].coeff, NUM_ONE) || have_base)
+            goto fail;
+
+        dv_retain(terms[i].base);
+        base = terms[i].base;
+        have_base = 1;
+    }
+
+    if (!have_period)
+        goto fail;
+
+    dv_free_addends_local(terms, n);
+    num_destroy(&c_const);
+    return base ? base : dv_new_const(NUM_ZERO);
+
+fail:
+    if (base)
+        dv_free(base);
+    dv_free_addends_local(terms, n);
+    num_destroy(&c_const);
+    return NULL;
+}
+
+static dval_t *dv_try_simplify_tan_period_floor(dval_t *arg)
+{
+    dval_t *base;
+    dval_t *out;
+
+    base = dv_tan_periodic_base_local(arg);
+    if (!base)
+        return NULL;
+
+    out = dv_tan(base);
+    dv_free(base);
+    dv_free(arg);
+    return out;
+}
+
 static dval_t *dv_rebuild_factors_local(dv_factor_t *factors, size_t n)
 {
     dval_t **num_terms = NULL;
@@ -600,6 +821,68 @@ static bool dv_contains_var_local(const dval_t *dv)
     return dv_contains_var_local(dv->a) || dv_contains_var_local(dv->b);
 }
 
+static bool dv_is_numeric_arithmetic_const_local(const dval_t *dv)
+{
+    if (!dv_is_op(dv, &ops_const) || !num_is_finite(dv->c))
+        return false;
+
+    if (dv->name && *dv->name &&
+        !num_eq(dv->c, NUM_I) && !num_eq(dv->c, NUM_NEG_I))
+        return false;
+
+    if (!dv->binding_expr)
+        return true;
+
+    return !num_is_real(dv->c) ||
+           num_eq(dv->c, NUM_I) ||
+           num_eq(dv->c, NUM_NEG_I);
+}
+
+static bool dv_is_pure_numeric_arithmetic_local(const dval_t *dv)
+{
+    if (!dv)
+        return false;
+
+    if (dv_is_numeric_arithmetic_const_local(dv))
+        return true;
+
+    if (dv_is_op(dv, &ops_neg))
+        return dv_is_pure_numeric_arithmetic_local(dv->a);
+
+    if (dv_is_op(dv, &ops_add) || dv_is_op(dv, &ops_sub) ||
+        dv_is_op(dv, &ops_mul) || dv_is_op(dv, &ops_div))
+        return dv_is_pure_numeric_arithmetic_local(dv->a) &&
+               dv_is_pure_numeric_arithmetic_local(dv->b);
+
+    return false;
+}
+
+static dval_t *dv_try_fold_numeric_arithmetic_local(
+    const dval_t *dv, dval_t *a, dval_t *b)
+{
+    dval_t *raw;
+    number_t value;
+    dval_t *out;
+
+    if (!dv || !dv->ops->apply_binary ||
+        !dv_is_pure_numeric_arithmetic_local(a) ||
+        !dv_is_pure_numeric_arithmetic_local(b))
+        return NULL;
+
+    raw = dv->ops->apply_binary(a, b);
+    value = dv_eval(raw);
+    dv_free(raw);
+
+    if (!num_is_finite(value)) {
+        num_destroy(&value);
+        return NULL;
+    }
+
+    out = dv_new_const_owned_local(value);
+    num_destroy(&value);
+    return out;
+}
+
 static bool dv_is_lambert_expr_local(const dval_t *dv)
 {
     return dv_is_op(dv, &ops_lambert_w0) || dv_is_op(dv, &ops_lambert_wm1);
@@ -639,52 +922,239 @@ static dval_t *dv_try_simplify_lambert_product(dval_t *a, dval_t *b)
     return inner;
 }
 
+static dval_t *dv_try_simplify_trig_product(dval_t *a, dval_t *b)
+{
+    const dval_t *arg = NULL;
+    dval_apply_unary_fn builder = NULL;
+
+    if (dv_is_op(a, &ops_cos) && dv_is_op(b, &ops_tan) &&
+        dv_struct_eq(a->a, b->a)) {
+        arg = a->a;
+        builder = dv_sin;
+    } else if (dv_is_op(a, &ops_tan) && dv_is_op(b, &ops_cos) &&
+               dv_struct_eq(a->a, b->a)) {
+        arg = a->a;
+        builder = dv_sin;
+    } else if (dv_is_op(a, &ops_cosh) && dv_is_op(b, &ops_tanh) &&
+               dv_struct_eq(a->a, b->a)) {
+        arg = a->a;
+        builder = dv_sinh;
+    } else if (dv_is_op(a, &ops_tanh) && dv_is_op(b, &ops_cosh) &&
+               dv_struct_eq(a->a, b->a)) {
+        arg = a->a;
+        builder = dv_sinh;
+    }
+
+    if (!arg || !builder)
+        return NULL;
+
+    return builder(arg);
+}
+
 static dval_t *dv_try_simplify_exp_quarter_turn(const dval_t *arg)
 {
     NUM_SCOPE(scope);
     number_t arg_value;
     number_t exp_value;
-    number_t neg_i;
 
     if (!arg || dv_contains_var_local(arg))
         return NULL;
 
     arg_value = dv_eval(arg);
     exp_value = num_exp(arg_value);
-    neg_i = num_neg(NUM_I);
 
     if (num_eq(exp_value, NUM_I)) {
-        num_destroy(&neg_i);
         num_destroy(&exp_value);
         num_destroy(&arg_value);
         return dv_new_named_const(NUM_I, "i");
     }
     if (num_eq(exp_value, NUM_NEG_ONE)) {
-        num_destroy(&neg_i);
         num_destroy(&exp_value);
         num_destroy(&arg_value);
         return dv_new_const(NUM_NEG_ONE);
     }
-    if (num_eq(exp_value, neg_i)) {
+    if (num_eq(exp_value, NUM_NEG_I)) {
         dval_t *i = dv_new_named_const(NUM_I, "i");
         dval_t *out = dv_neg(i);
 
         dv_free(i);
-        num_destroy(&neg_i);
         num_destroy(&exp_value);
         num_destroy(&arg_value);
         return out;
     }
     if (num_eq(exp_value, NUM_ONE)) {
-        num_destroy(&neg_i);
         num_destroy(&exp_value);
         num_destroy(&arg_value);
         return dv_new_const(NUM_ONE);
     }
 
-    num_destroy(&neg_i);
     num_destroy(&exp_value);
     num_destroy(&arg_value);
+    return NULL;
+}
+
+static int dv_is_i_const_local(const dval_t *dv)
+{
+    return dv && dv_is_op(dv, &ops_const) && num_eq(dv->c, NUM_I);
+}
+
+static int dv_i_unit_sign_local(const dval_t *dv, int *sign_out)
+{
+    int child_sign;
+
+    if (!dv || !sign_out)
+        return 0;
+
+    if (dv_is_op(dv, &ops_const)) {
+        if (num_eq(dv->c, NUM_I)) {
+            *sign_out = 1;
+            return 1;
+        }
+        if (num_eq(dv->c, NUM_NEG_I)) {
+            *sign_out = -1;
+            return 1;
+        }
+    }
+
+    if (dv_is_op(dv, &ops_neg) &&
+        dv_i_unit_sign_local(dv->a, &child_sign)) {
+        *sign_out = -child_sign;
+        return 1;
+    }
+
+    return 0;
+}
+
+static int dv_extract_i_unit_factor_local(const dval_t *dv,
+                                          int *sign_out,
+                                          const dval_t **rest_out)
+{
+    if (!dv || !sign_out || !rest_out)
+        return 0;
+
+    if (dv_i_unit_sign_local(dv, sign_out)) {
+        *rest_out = NULL;
+        return 1;
+    }
+
+    if (dv_is_op(dv, &ops_mul)) {
+        if (dv_i_unit_sign_local(dv->a, sign_out)) {
+            *rest_out = dv->b;
+            return 1;
+        }
+        if (dv_i_unit_sign_local(dv->b, sign_out)) {
+            *rest_out = dv->a;
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+static dval_t *dv_try_simplify_i_unit_product_local(dval_t *a, dval_t *b)
+{
+    const dval_t *a_rest = NULL;
+    const dval_t *b_rest = NULL;
+    dval_t *base = NULL;
+    dval_t *simp = NULL;
+    int a_sign;
+    int b_sign;
+    int coeff_sign;
+
+    if (!dv_extract_i_unit_factor_local(a, &a_sign, &a_rest) ||
+        !dv_extract_i_unit_factor_local(b, &b_sign, &b_rest))
+        return NULL;
+
+    coeff_sign = -(a_sign * b_sign);
+
+    if (a_rest && b_rest) {
+        dv_retain(a_rest);
+        dv_retain(b_rest);
+        base = dv_mul(a_rest, b_rest);
+        simp = dv_simplify(base);
+        dv_free(base);
+        base = simp;
+    } else if (a_rest) {
+        dv_retain(a_rest);
+        base = (dval_t *)a_rest;
+    } else if (b_rest) {
+        dv_retain(b_rest);
+        base = (dval_t *)b_rest;
+    } else {
+        base = dv_new_const(NUM_ONE);
+    }
+
+    if (coeff_sign < 0)
+        return dv_make_scaled_owned_local(NUM_NEG_ONE, base);
+    return base;
+}
+
+static int dv_extract_i_product_arg_local(const dval_t *dv,
+                                          const dval_t **arg_out)
+{
+    if (!dv || !arg_out || !dv_is_op(dv, &ops_mul))
+        return 0;
+
+    if (dv_is_i_const_local(dv->a)) {
+        *arg_out = dv->b;
+        return 1;
+    }
+    if (dv_is_i_const_local(dv->b)) {
+        *arg_out = dv->a;
+        return 1;
+    }
+
+    return 0;
+}
+
+static dval_t *dv_try_simplify_imag_trig_bridge_local(const dval_t *dv,
+                                                      dval_t *a)
+{
+    const dval_t *arg_borrowed = NULL;
+    dval_t *arg;
+    dval_t *inner;
+    dval_t *out;
+    dval_t *simp;
+
+    if (!dv_extract_i_product_arg_local(a, &arg_borrowed))
+        return NULL;
+
+    dv_retain(arg_borrowed);
+    arg = (dval_t *)arg_borrowed;
+
+    if (dv_is_op(dv, &ops_cosh)) {
+        inner = dv_cos(arg);
+        dv_free(arg);
+        dv_free(a);
+        simp = dv_simplify(inner);
+        dv_free(inner);
+        return simp;
+    }
+
+    if (dv_is_op(dv, &ops_cos)) {
+        inner = dv_cosh(arg);
+        dv_free(arg);
+        dv_free(a);
+        simp = dv_simplify(inner);
+        dv_free(inner);
+        return simp;
+    }
+
+    if (dv_is_op(dv, &ops_sinh) || dv_is_op(dv, &ops_sin)) {
+        dval_t *i = dv_new_named_const(NUM_I, "i");
+
+        inner = dv_is_op(dv, &ops_sinh) ? dv_sin(arg) : dv_sinh(arg);
+        out = dv_mul(i, inner);
+        dv_free(i);
+        dv_free(inner);
+        dv_free(arg);
+        dv_free(a);
+        simp = dv_simplify(out);
+        dv_free(out);
+        return simp;
+    }
+
+    dv_free(arg);
     return NULL;
 }
 
@@ -742,6 +1212,17 @@ int dv_fold_sqrt_const(const number_t *in, number_t *out)
     return 0;
 }
 
+int dv_fold_floor_const(const number_t *in, number_t *out)
+{
+    if (!in || !out)
+        return 0;
+    *out = num_floor(*in);
+    return 1;
+}
+
+static dval_t *dv_try_simplify_preserved_i_power_local(
+    const dv_binding_expr_t *base_expr, number_t exponent);
+
 /* ========================================================================= */
 /* Multiplication flattening                                                  */
 /* ========================================================================= */
@@ -757,7 +1238,21 @@ static void collect_mul_flat(
         return;
     }
 
-    if (dv_is_unnamed_const(dv) && num_is_real(dv->c) &&
+    if (dv_is_op(dv, &ops_const) &&
+        (num_eq(dv->c, NUM_I) || num_eq(dv->c, NUM_NEG_I)) &&
+        (!dv->binding_expr ||
+         dv->binding_expr->kind == DV_BINDING_EXPR_NUMBER ||
+         dv->binding_expr->kind == DV_BINDING_EXPR_CONST)) {
+        NUM_SCOPE_SUSPEND(saved_scope);
+        number_t product = num_mul(*c_acc, dv->c);
+
+        num_destroy(c_acc);
+        *c_acc = product;
+        num_scope_leave(&(scope));
+        return;
+    }
+
+    if (dv_is_unnamed_const(dv) &&
         (!dv->binding_expr || dv->binding_expr->kind == DV_BINDING_EXPR_NUMBER)) {
         if (num_is_zero(dv->c)) {
             *is_zero = 1;
@@ -774,13 +1269,25 @@ static void collect_mul_flat(
         num_scope_leave(&(scope));
         return;
     }
-    if (dv_is_unnamed_const(dv) && num_is_real(dv->c) && dv->binding_expr) {
+    if (dv_is_unnamed_const(dv) && dv->binding_expr) {
         dv_binding_expr_t *base_expr = NULL;
         number_t exponent;
 
         if (binding_expr_integer_power_base_local(dv->binding_expr,
                                                   &base_expr,
                                                   &exponent)) {
+            dval_t *i_power =
+                dv_try_simplify_preserved_i_power_local(base_expr, exponent);
+
+            if (i_power) {
+                dv_binding_expr_free(base_expr);
+                num_destroy(&exponent);
+                collect_mul_flat(i_power, c_acc, is_zero, terms, nterms, cap);
+                dv_free(i_power);
+                num_scope_leave(&(scope));
+                return;
+            }
+
             dval_t *base = dval_from_preserved_binding_expr_local(base_expr);
             dval_t *powered = base ? dv_pow(base, &exponent) : NULL;
 
@@ -862,6 +1369,38 @@ static int dv_is_foldable_real_const_local(const dval_t *dv)
            (!dv->binding_expr || dv->binding_expr->kind == DV_BINDING_EXPR_NUMBER);
 }
 
+static int dv_is_exact_zero_node_local(const dval_t *dv)
+{
+    return dv == DV_ZERO ||
+           (dv_is_simplifiable_const_local(dv) && dv_const_is_zero(dv));
+}
+
+static dval_t *dv_try_simplify_i_power_local(dval_t *base, number_t exponent)
+{
+    long numerator;
+    long denominator;
+
+    if (!base || !dv_is_op(base, &ops_const))
+        return NULL;
+    if (base->binding_expr &&
+        base->binding_expr->kind != DV_BINDING_EXPR_NUMBER &&
+        base->binding_expr->kind != DV_BINDING_EXPR_CONST)
+        return NULL;
+    if (!num_eq(base->c, NUM_I) && !num_eq(base->c, NUM_NEG_I))
+        return NULL;
+    if (!num_get_small_rational(exponent, &numerator, &denominator) ||
+        denominator != 1L)
+        return NULL;
+
+    {
+        number_t folded = num_pow(base->c, exponent);
+        dval_t *out = dv_new_const_owned_local(folded);
+
+        dv_free(base);
+        return out;
+    }
+}
+
 static int binding_expr_integer_power_base_local(const dv_binding_expr_t *expr,
                                                  dv_binding_expr_t **base_out,
                                                  number_t *exponent_out)
@@ -926,6 +1465,25 @@ static dval_t *dval_from_preserved_binding_expr_local(dv_binding_expr_t *expr)
     num_destroy(&value);
     node->binding_expr = expr;
     return node;
+}
+
+static dval_t *dv_try_simplify_preserved_i_power_local(
+    const dv_binding_expr_t *base_expr, number_t exponent)
+{
+    dval_t *base;
+    dval_t *out;
+
+    if (!base_expr ||
+        base_expr->kind != DV_BINDING_EXPR_CONST ||
+        base_expr->u.const_id != DV_BINDING_CONST_I)
+        return NULL;
+
+    base = dv_new_const(NUM_I);
+    out = dv_try_simplify_i_power_local(base, exponent);
+    if (!out)
+        dv_free(base);
+
+    return out;
 }
 
 static int dv_allows_const_identity_fold_local(const dval_t *dv)
@@ -1101,6 +1659,8 @@ static dval_t *dv_simplify_flat_quotient_local(dval_t *a, dval_t *b)
     }
 
     denominator = dv_rebuild_division_chain(den_terms, nden_terms);
+    if (!denominator)
+        return numerator;
     out = dv_div(numerator, denominator);
     dv_free(numerator);
     dv_free(denominator);
@@ -1134,7 +1694,9 @@ dval_t *dv_simplify_passthrough(const dval_t *dv, dval_t *a, dval_t *b)
 dval_t *dv_simplify_unary_operator(const dval_t *dv, dval_t *a, dval_t *b)
 {
     NUM_SCOPE(scope);
+    dval_t *branch_inverse;
     dval_t *direct_inverse;
+    dval_t *imag_bridge;
 
     (void)b;
     if (dv_is_exp_expr(dv)) {
@@ -1146,9 +1708,30 @@ dval_t *dv_simplify_unary_operator(const dval_t *dv, dval_t *a, dval_t *b)
         }
     }
 
+    direct_inverse = dv_simplify_direct_inverse_pair_from_raw(dv, dv->a, a);
+    if (direct_inverse)
+        return direct_inverse;
+
+    if (dv_is_op(dv, &ops_atan)) {
+        branch_inverse = dv_simplify_atan_tan_sawtooth(a);
+        if (branch_inverse)
+            return branch_inverse;
+    }
+
     direct_inverse = dv_simplify_direct_inverse_pair(dv, a);
     if (direct_inverse)
         return direct_inverse;
+
+    if (dv_is_op(dv, &ops_tan)) {
+        dval_t *periodic = dv_try_simplify_tan_period_floor(a);
+
+        if (periodic)
+            return periodic;
+    }
+
+    imag_bridge = dv_try_simplify_imag_trig_bridge_local(dv, a);
+    if (imag_bridge)
+        return imag_bridge;
 
     /* log10(10^x) -> x */
     if (dv_is_op(dv, &ops_log10) &&
@@ -1161,10 +1744,23 @@ dval_t *dv_simplify_unary_operator(const dval_t *dv, dval_t *a, dval_t *b)
         return inner;
     }
 
+    if (dv_is_op(a, &ops_const) &&
+        (dv_is_op(dv, &ops_floor) || dv_is_op(dv, &ops_ceil))) {
+        number_t folded = dv_is_op(dv, &ops_floor)
+                        ? num_floor(a->c)
+                        : num_ceil(a->c);
+        dval_t *out = dv_new_const_owned_local(folded);
+
+        dv_free(a);
+        return out;
+    }
+
     if (dv_allows_const_identity_fold_local(a)) {
         number_t folded = num_new();
 
-        if (dv->ops->fold_const_unary && dv->ops->fold_const_unary(&a->c, &folded)) {
+        if (dv->ops->fold_const_unary &&
+            dv->ops->fold_const_unary(&a->c, &folded) &&
+            num_is_finite(folded)) {
             dval_t *out = dv_new_const_owned_local(folded);
 
             dv_free(a);
@@ -1197,7 +1793,7 @@ dval_t *dv_simplify_unary_operator(const dval_t *dv, dval_t *a, dval_t *b)
         }
     }
 
-    if (dv->ops->apply_unary) {
+    if (dv->ops->apply_unary && a != dv->a) {
         dval_t *out = dv->ops->apply_unary(a);
         dv_free(a);
         return out;
@@ -1271,6 +1867,15 @@ dval_t *dv_simplify_add_sub_operator(const dval_t *dv, dval_t *a, dval_t *b)
     number_t common_coeff = num_const(NUM_ONE);
     addend_t *terms   = NULL;
     size_t    n = 0, cap = 0;
+    dval_t *folded_numeric = dv_try_fold_numeric_arithmetic_local(dv, a, b);
+
+    if (folded_numeric) {
+        dv_free(a);
+        dv_free(b);
+        num_destroy(&c_const);
+        num_destroy(&common_coeff);
+        return folded_numeric;
+    }
 
     dv_collect_addends(a, NUM_ONE, &c_const, &terms, &n, &cap);
     dv_free(a);
@@ -1384,10 +1989,18 @@ dval_t *dv_simplify_mul_operator(const dval_t *dv, dval_t *a, dval_t *b)
     dval_t *denominator;
     dval_t *division;
 
-    (void)dv;
+    {
+        dval_t *folded_numeric = dv_try_fold_numeric_arithmetic_local(dv, a, b);
 
-    if ((dv_is_simplifiable_const_local(a) && dv_const_is_zero(a)) ||
-        (dv_is_simplifiable_const_local(b) && dv_const_is_zero(b))) {
+        if (folded_numeric) {
+            dv_free(a);
+            dv_free(b);
+            num_destroy(&c_acc);
+            return folded_numeric;
+        }
+    }
+
+    if (dv_is_exact_zero_node_local(a) || dv_is_exact_zero_node_local(b)) {
         dv_free(a);
         dv_free(b);
         return dv_new_const(NUM_ZERO);
@@ -1400,6 +2013,30 @@ dval_t *dv_simplify_mul_operator(const dval_t *dv, dval_t *a, dval_t *b)
         dv_free(b);
         return a;
     }
+    if (dv_is_simplifiable_const_local(a) && dv_const_is_minus_one(a)) {
+        dval_t *out = dv_neg(b);
+
+        dv_free(a);
+        dv_free(b);
+        return out;
+    }
+    if (dv_is_simplifiable_const_local(b) && dv_const_is_minus_one(b)) {
+        dval_t *out = dv_neg(a);
+
+        dv_free(a);
+        dv_free(b);
+        return out;
+    }
+
+    {
+        dval_t *i_unit_product = dv_try_simplify_i_unit_product_local(a, b);
+
+        if (i_unit_product) {
+            dv_free(a);
+            dv_free(b);
+            return i_unit_product;
+        }
+    }
 
     {
         dval_t *lambert_identity = dv_try_simplify_lambert_product(a, b);
@@ -1408,6 +2045,16 @@ dval_t *dv_simplify_mul_operator(const dval_t *dv, dval_t *a, dval_t *b)
             dv_free(a);
             dv_free(b);
             return lambert_identity;
+        }
+    }
+
+    {
+        dval_t *trig_identity = dv_try_simplify_trig_product(a, b);
+
+        if (trig_identity) {
+            dv_free(a);
+            dv_free(b);
+            return trig_identity;
         }
     }
 
@@ -1443,7 +2090,7 @@ dval_t *dv_simplify_mul_operator(const dval_t *dv, dval_t *a, dval_t *b)
     }
 
     dv_split_division_terms(&c_acc, &is_zero, terms, nterms,
-                         &den_terms, &nden_terms, &den_cap);
+                            &den_terms, &nden_terms, &den_cap);
 
     if (is_zero) {
         dv_free_node_array(terms, nterms);
@@ -1474,6 +2121,8 @@ dval_t *dv_simplify_mul_operator(const dval_t *dv, dval_t *a, dval_t *b)
     }
 
     denominator = dv_rebuild_division_chain(den_terms, nden_terms);
+    if (!denominator)
+        return numerator;
     division = dv_div(numerator, denominator);
     dv_free(numerator);
     dv_free(denominator);
@@ -1487,7 +2136,16 @@ dval_t *dv_simplify_mul_operator(const dval_t *dv, dval_t *a, dval_t *b)
 dval_t *dv_simplify_div_operator(const dval_t *dv, dval_t *a, dval_t *b)
 {
     NUM_SCOPE(scope);
-    (void)dv;
+
+    {
+        dval_t *folded_numeric = dv_try_fold_numeric_arithmetic_local(dv, a, b);
+
+        if (folded_numeric) {
+            dv_free(a);
+            dv_free(b);
+            return folded_numeric;
+        }
+    }
 
     if (dv_is_op(b, &ops_const) && dv_const_is_one(b)) { dv_free(b); return a; }
     if (dv_is_pow_d_expr(b) && dv_struct_eq(a, b->a)) {
@@ -1523,6 +2181,24 @@ dval_t *dv_simplify_div_operator(const dval_t *dv, dval_t *a, dval_t *b)
         dv_free(a);
         dv_free(b);
         return dv_make_pow_like_owned_local(base, exponent);
+    }
+    if (dv_is_op(a, &ops_mul) && dv_struct_eq(a->a, b)) {
+        dval_t *rest;
+
+        dv_retain(a->b);
+        rest = a->b;
+        dv_free(a);
+        dv_free(b);
+        return rest;
+    }
+    if (dv_is_op(a, &ops_mul) && dv_struct_eq(a->b, b)) {
+        dval_t *rest;
+
+        dv_retain(a->a);
+        rest = a->a;
+        dv_free(a);
+        dv_free(b);
+        return rest;
     }
     if (dv_is_foldable_real_const_local(b) &&
         dv_is_op(a, &ops_mul) &&
@@ -1624,24 +2300,6 @@ dval_t *dv_simplify_div_operator(const dval_t *dv, dval_t *a, dval_t *b)
         (dv_contains_addsub_local(a) || dv_contains_addsub_local(b)))
         return dv_simplify_flat_quotient_local(a, b);
 
-    if (dv_is_op(a, &ops_mul) && dv_struct_eq(a->a, b)) {
-        dval_t *rest;
-
-        dv_retain(a->b);
-        rest = a->b;
-        dv_free(a);
-        dv_free(b);
-        return rest;
-    }
-    if (dv_is_op(a, &ops_mul) && dv_struct_eq(a->b, b)) {
-        dval_t *rest;
-
-        dv_retain(a->a);
-        rest = a->a;
-        dv_free(a);
-        dv_free(b);
-        return rest;
-    }
     if (dv_struct_eq(a, b)) {
         dv_free(a);
         dv_free(b);
@@ -1709,6 +2367,13 @@ dval_t *dv_simplify_pow_d_operator(const dval_t *dv, dval_t *a, dval_t *b)
         return dv_make_pow_like_owned_local(base, folded_exponent);
     }
 
+    {
+        dval_t *i_power = dv_try_simplify_i_power_local(a, exponent);
+
+        if (i_power)
+            return i_power;
+    }
+
     if (dv_is_foldable_real_const_local(a)) {
         number_t v = num_pow(a->c, exponent);
 
@@ -1757,6 +2422,16 @@ dval_t *dv_simplify_pow_operator(const dval_t *dv, dval_t *a, dval_t *b)
     if (dv_is_op(b, &ops_const) && dv_const_is_zero(b)) {
         dv_free(a); dv_free(b); return dv_new_const(NUM_ONE);
     }
+
+    if (dv_is_op(b, &ops_const)) {
+        dval_t *i_power = dv_try_simplify_i_power_local(a, b->c);
+
+        if (i_power) {
+            dv_free(b);
+            return i_power;
+        }
+    }
+
     if (dv_is_op(a, &ops_const) && num_eq(a->c, NUM_E)) {
         dval_t *raw;
         dval_t *out;
@@ -1804,17 +2479,116 @@ dval_t *dv_simplify_hypot_operator(const dval_t *dv, dval_t *a, dval_t *b)
 /* Main dispatcher                                                            */
 /* ========================================================================= */
 
-dval_t *dv_simplify(const dval_t *dv)
+static uint64_t dv_simplify_subtree_epoch(const dval_t *dv)
 {
-    if (!dv) return NULL;
+    uint64_t epoch;
+    uint64_t child_epoch;
 
-    if (dv->ops->arity == DV_OP_ATOM) { dv_retain(dv); return (dval_t *)dv; }
+    if (!dv)
+        return 0;
+
+    epoch = dv->epoch;
+
+    child_epoch = dv_simplify_subtree_epoch(dv->a);
+    if (child_epoch > epoch)
+        epoch = child_epoch;
+
+    child_epoch = dv_simplify_subtree_epoch(dv->b);
+    if (child_epoch > epoch)
+        epoch = child_epoch;
+
+    return epoch;
+}
+
+static bool dv_simplify_is_current(const dval_t *dv)
+{
+    return dv && dv->simplified &&
+           dv_simplify_subtree_epoch(dv) <= dv->simplify_epoch;
+}
+
+static dval_t *dv_simplify_mark_current(dval_t *dv)
+{
+    if (dv) {
+        dv->simplified = true;
+        dv->simplify_epoch = dv_simplify_subtree_epoch(dv);
+    }
+    return dv;
+}
+
+static dval_t *dv_simplify_once(const dval_t *dv)
+{
+    dval_t *out;
+
+    if (!dv)
+        return NULL;
+
+    if (dv_simplify_is_current(dv)) {
+        dv_retain(dv);
+        return (dval_t *)dv;
+    }
+
+    if (dv->ops->arity == DV_OP_ATOM) {
+        dv_retain(dv);
+        return dv_simplify_mark_current((dval_t *)dv);
+    }
 
     dval_t *a = dv->a ? dv_simplify(dv->a) : NULL;
     dval_t *b = dv->b ? dv_simplify(dv->b) : NULL;
 
     if (dv->ops->simplify)
-        return dv->ops->simplify(dv, a, b);
+        out = dv->ops->simplify(dv, a, b);
+    else
+        out = dv_simplify_passthrough(dv, a, b);
 
-    return dv_simplify_passthrough(dv, a, b);
+    if (out == dv)
+        return dv_simplify_mark_current(out);
+
+    return out;
+}
+
+dval_t *dv_simplify(const dval_t *dv)
+{
+    enum { MAX_SIMPLIFY_PASSES = 64 };
+    dval_t *cur;
+    unsigned pass;
+
+    if (!dv)
+        return NULL;
+
+    if (dv_simplify_is_current(dv)) {
+        dv_retain(dv);
+        return (dval_t *)dv;
+    }
+
+    cur = dv_simplify_once(dv);
+    if (!cur)
+        return NULL;
+
+    for (pass = 0u; pass < MAX_SIMPLIFY_PASSES; ++pass) {
+        dval_t *next;
+
+        if (dv_simplify_is_current(cur))
+            return cur;
+
+        next = dv_simplify_once(cur);
+        if (!next) {
+            dv_free(cur);
+            return NULL;
+        }
+
+        if (next == cur) {
+            dv_free(cur);
+            return dv_simplify_mark_current(next);
+        }
+
+        if (dv_struct_eq(next, cur)) {
+            dv_free(cur);
+            return dv_simplify_mark_current(next);
+        }
+
+        dv_free(cur);
+        cur = next;
+    }
+
+    return cur;
 }

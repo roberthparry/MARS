@@ -22,6 +22,7 @@ typedef enum mcomplex_constant_id_t {
     MCCONST_INF,
     MCCONST_NINF,
     MCCONST_I,
+    MCCONST_NEG_I,
     MCCONST_COUNT
 } mcomplex_constant_id_t;
 

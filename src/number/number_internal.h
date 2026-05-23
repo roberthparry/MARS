@@ -38,6 +38,7 @@ typedef struct number_vtable_t {
     number_t *(*const_prec)(const number_t *number, size_t precision_bits);
     char *(*to_string)(const number_t *number);
     bool (*is_immortal)(const number_t *number);
+    bool (*immortal_id)(const number_t *number, number_const_id_t *id_out);
     bool (*is_real)(const number_t *number);
     bool (*is_zero)(const number_t *number);
     bool (*is_one)(const number_t *number);
@@ -115,6 +116,7 @@ typedef enum number_const_id_t {
     NUMBER_CONST_PI,
     NUMBER_CONST_2PI,
     NUMBER_CONST_PI_2,
+    NUMBER_CONST_NEG_PI_2,
     NUMBER_CONST_PI_4,
     NUMBER_CONST_3PI_4,
     NUMBER_CONST_PI_6,
@@ -127,6 +129,8 @@ typedef enum number_const_id_t {
     NUMBER_CONST_SQRT3,
     NUMBER_CONST_SQRT2_OVER_TWO,
     NUMBER_CONST_SQRT3_OVER_TWO,
+    NUMBER_CONST_INF,
+    NUMBER_CONST_NINF,
     NUMBER_CONST_I,
     NUMBER_CONST_COUNT
 } number_const_id_t;
@@ -252,6 +256,8 @@ number_kind_t number_common_kind(const number_t *a, const number_t *b,
                                  number_binary_op_t op);
 number_t *number_coerce(const number_t *number, number_kind_t target_kind);
 bool number_matches_value(const number_t *reference, const number_t *target);
+bool number_const_id_from_immortal(const number_t *number,
+                                   number_const_id_t *id_out);
 qfloat_t number_const_qfloat(number_const_id_t id);
 const mfloat_t *number_const_mfloat_value(number_const_id_t id);
 qcomplex_t number_const_qcomplex(number_const_id_t id);

@@ -1,5 +1,6 @@
 #include <stddef.h>
 
+#include "dval_bindings_internal.h"
 #include "dval_math_internal.h"
 #include "internal/number_internal.h"
 
@@ -76,7 +77,53 @@ static dval_t *dv_const_neg_ratio_local(number_t numerator, number_t denominator
 
 number_t eval_sin(dval_t *dv) { return dv_eval_unary_num(dv, num_sin); }
 number_t eval_cos(dval_t *dv) { return dv_eval_unary_num(dv, num_cos); }
-number_t eval_tan(dval_t *dv) { return dv_eval_unary_num(dv, num_tan); }
+static bool binding_expr_is_number_long(const dv_binding_expr_t *expr,
+                                        long expected)
+{
+    number_t value;
+    number_t expected_value;
+    bool match;
+
+    if (!expr || expr->kind != DV_BINDING_EXPR_NUMBER)
+        return false;
+
+    value = dv_binding_expr_eval(expr);
+    expected_value = num_create_from_long(expected);
+    match = num_eq(value, expected_value);
+    num_destroy(&expected_value);
+    num_destroy(&value);
+    return match;
+}
+
+static int binding_expr_pi_over_two_sign(const dv_binding_expr_t *expr)
+{
+    if (!expr)
+        return 0;
+
+    if (expr->kind == DV_BINDING_EXPR_NEG)
+        return -binding_expr_pi_over_two_sign(expr->u.unary.child);
+
+    if (expr->kind == DV_BINDING_EXPR_DIV &&
+        expr->u.binary.left &&
+        expr->u.binary.left->kind == DV_BINDING_EXPR_CONST &&
+        expr->u.binary.left->u.const_id == DV_BINDING_CONST_PI &&
+        binding_expr_is_number_long(expr->u.binary.right, 2))
+        return 1;
+
+    return 0;
+}
+
+number_t eval_tan(dval_t *dv)
+{
+    int pole_sign = dv && dv->a && dv->a->binding_expr
+        ? binding_expr_pi_over_two_sign(dv->a->binding_expr) : 0;
+
+    if (pole_sign > 0)
+        return NUM_INF;
+    if (pole_sign < 0)
+        return NUM_NINF;
+    return dv_eval_unary_num(dv, num_tan);
+}
 
 number_t eval_sinh(dval_t *dv) { return dv_eval_unary_num(dv, num_sinh); }
 number_t eval_cosh(dval_t *dv) { return dv_eval_unary_num(dv, num_cosh); }

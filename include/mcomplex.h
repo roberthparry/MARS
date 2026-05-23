@@ -30,6 +30,7 @@ extern const mcomplex_t * const MC_NAN;
 extern const mcomplex_t * const MC_INF;
 extern const mcomplex_t * const MC_NINF;
 extern const mcomplex_t * const MC_I;
+extern const mcomplex_t * const MC_NEG_I;
 
 mcomplex_t *mc_new(void);
 mcomplex_t *mc_new_prec(size_t precision_bits);

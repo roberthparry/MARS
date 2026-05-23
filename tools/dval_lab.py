@@ -25,11 +25,17 @@ import tempfile
 import threading
 import urllib.parse
 import webbrowser
+import shutil
 
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_BIN = ROOT / "build" / "release" / "scratch" / "try_dval"
 STATE_FILE = ROOT / ".dval_lab_state.json"
+LAB_ICON_FILE = ROOT / "packaging" / "linux" / "mars-dval-lab.svg"
+LAB_FAVICON_FILE = LAB_ICON_FILE
+LAB_TOUCH_ICON_FILE = ROOT / "packaging" / "linux" / "icon-concepts" / "wizard-prism-180.png"
+LAB_ICON_192_FILE = ROOT / "packaging" / "linux" / "icon-concepts" / "wizard-prism-192.png"
+LAB_ICON_512_FILE = ROOT / "packaging" / "linux" / "icon-concepts" / "wizard-prism-512.png"
 DEFAULT_EXPRESSION = "{e^(sin(x))|x=pi/2}"
 MAX_VALUE_PRECISION_BITS = 1_048_576
 MAX_VALUE_PRECISION_DIGITS = math.ceil(MAX_VALUE_PRECISION_BITS * math.log10(2))
@@ -49,6 +55,12 @@ INDEX_HTML = r"""<!doctype html>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>MARS dval Lab</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#0b4f8a">
   <style>
     :root {
       color-scheme: light;
@@ -1383,7 +1395,7 @@ INDEX_HTML = r"""<!doctype html>
           const name = part.slice(0, eq).trim();
           const valueText = part.slice(eq + 1).trim();
           const compact = compactBindingValue(valueText);
-          if (name && valueText && valueText !== '?' && !/^NAN$/i.test(valueText)) {
+          if (name && valueText) {
             bindingValues.push({name, value: valueText, display: compact.display});
           }
           shortened = shortened || compact.shortened;
@@ -1410,6 +1422,11 @@ INDEX_HTML = r"""<!doctype html>
       variableValues.classList.add('hidden');
     }
 
+    function refreshVariableValuesFromEditor() {
+      const compact = compactExpressionForEditor(currentExpressionText());
+      renderVariableValues(compact.bindings || []);
+    }
+
     function renderVariableValues(bindings) {
       variableValues.replaceChildren();
       bindingValueCache = new Map();
@@ -1429,13 +1446,14 @@ INDEX_HTML = r"""<!doctype html>
 
         const text = document.createElement('code');
         text.className = 'variable-value-text';
-        text.textContent = binding.value;
+        const displayValue = (binding.value === '?' || /^NAN$/i.test(binding.value)) ? '' : binding.value;
+        text.textContent = displayValue;
         text.title = binding.value;
 
         const actions = document.createElement('div');
         actions.className = 'variable-value-actions';
 
-        if (binding.value.length > 96) {
+        if (displayValue.length > 96) {
           const expand = document.createElement('button');
           expand.className = 'card-action variable-expand';
           expand.type = 'button';
@@ -1455,7 +1473,7 @@ INDEX_HTML = r"""<!doctype html>
         copy.textContent = 'Copy';
         copy.addEventListener('click', async () => {
           try {
-            await writeClipboardText(binding.value);
+            await writeClipboardText(displayValue);
             flashCopyButton(copy, true);
             setStatus(`Copied ${binding.name}`);
             setTimeout(() => setStatus('Ready'), 1000);
@@ -1553,7 +1571,10 @@ INDEX_HTML = r"""<!doctype html>
       expr.dataset.fullExpression = fullExpressionText;
       expr.dataset.displayExpression = displayedExpressionText;
       expr.value = fullExpressionText;
-      renderVariableValues(evaluatedBindings || compact.bindings);
+      const bindings = (Array.isArray(evaluatedBindings) && evaluatedBindings.length)
+        ? evaluatedBindings
+        : compact.bindings;
+      renderVariableValues(bindings || []);
     }
 
     async function loadLastExpression() {
@@ -2111,7 +2132,7 @@ INDEX_HTML = r"""<!doctype html>
       if (expr.value.trim() === (expr.dataset.displayExpression || displayedExpressionText))
         return;
       clearExpressionSource();
-      clearVariableValues();
+      refreshVariableValuesFromEditor();
       updateHistoryButtons();
     });
 
@@ -2225,6 +2246,21 @@ INDEX_HTML = r"""<!doctype html>
 </html>
 """
 
+WEB_MANIFEST = {
+    "name": "MARS dval Lab",
+    "short_name": "dval Lab",
+    "description": "Explore MARS dval expressions with rendered TeX.",
+    "start_url": "/",
+    "scope": "/",
+    "display": "standalone",
+    "background_color": "#f6f0e5",
+    "theme_color": "#0b4f8a",
+    "icons": [
+        {"src": "/icon-192.png", "sizes": "192x192", "type": "image/png"},
+        {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png"}
+    ]
+}
+
 
 def load_state_expression() -> str:
     try:
@@ -2250,6 +2286,18 @@ def save_state_expression(expression: str) -> None:
 
 def expression_for_editor(expression: str) -> str:
     return re.sub(r"(=\s*)NAN\b", r"\1?", expression)
+
+
+def expression_for_display(expression: str) -> str:
+    return expression_for_editor(expression)
+
+
+def function_for_display(function: str) -> str:
+    return re.sub(r"(=\s*)NAN\b", r"\1?", str(function or ""))
+
+
+def tex_for_display(tex: str) -> str:
+    return re.sub(r"(=\s*)NAN\b", r"\1?", str(tex or ""))
 
 
 def _is_loopback_or_wildcard_host(host: str) -> bool:
@@ -3037,10 +3085,42 @@ class DvalLabHandler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def send_file(self, path: Path, content_type: str) -> None:
+        try:
+            data = path.read_bytes()
+        except OSError:
+            self.send_error(404)
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
     def do_GET(self) -> None:
         path = urllib.parse.urlparse(self.path).path
         if path == "/state":
             self.send_json(200, {"expression": load_state_expression()})
+            return
+
+        if path == "/favicon.svg":
+            self.send_file(LAB_FAVICON_FILE, "image/svg+xml")
+            return
+
+        if path == "/apple-touch-icon.png":
+            self.send_file(LAB_TOUCH_ICON_FILE, "image/png")
+            return
+
+        if path == "/icon-192.png":
+            self.send_file(LAB_ICON_192_FILE, "image/png")
+            return
+
+        if path == "/icon-512.png":
+            self.send_file(LAB_ICON_512_FILE, "image/png")
+            return
+
+        if path == "/manifest.webmanifest":
+            self.send_json(200, WEB_MANIFEST)
             return
 
         if path not in ("/", "/index.html"):
@@ -3138,9 +3218,9 @@ class DvalLabHandler(http.server.BaseHTTPRequestHandler):
                 fields["value"] = format_number_text_for_precision(fields["value"], precision)
             if fields.get("residual"):
                 fields["residual"] = format_number_text_for_precision(fields["residual"], precision)
-            fields["full_display_expression"] = fields.get("expression", "")
-            fields["full_display_tex"] = fields.get("tex", "")
-            fields["full_display_function"] = fields.get("function", "")
+            fields["full_display_expression"] = expression_for_display(fields.get("expression", ""))
+            fields["full_display_tex"] = tex_for_display(fields.get("tex", ""))
+            fields["full_display_function"] = function_for_display(fields.get("function", ""))
             fields["display_expression"] = compact_display_text(fields["full_display_expression"])
             fields["display_tex"] = compact_display_text(fields["full_display_tex"])
             fields["display_function"] = compact_function_text(fields["full_display_function"])
@@ -3214,9 +3294,9 @@ class DvalLabHandler(http.server.BaseHTTPRequestHandler):
         if fields.get("expression"):
             save_state_expression(expression_for_editor(fields["expression"]))
 
-        fields["full_display_expression"] = fields.get("expression", "")
-        fields["full_display_tex"] = fields.get("tex", "")
-        fields["full_display_function"] = fields.get("function", "")
+        fields["full_display_expression"] = expression_for_display(fields.get("expression", ""))
+        fields["full_display_tex"] = tex_for_display(fields.get("tex", ""))
+        fields["full_display_function"] = function_for_display(fields.get("function", ""))
         fields["display_expression"] = compact_display_text(fields["full_display_expression"])
         fields["display_tex"] = compact_display_text(fields["full_display_tex"])
         fields["display_function"] = compact_function_text(fields["full_display_function"])
@@ -3240,6 +3320,7 @@ def main() -> int:
     parser.add_argument("--host", default="0.0.0.0", help="host to bind")
     parser.add_argument("--port", type=int, default=0, help="port to bind, or 0 for auto")
     parser.add_argument("--no-browser", action="store_true", help="do not open the browser automatically")
+    parser.add_argument("--browser", default="", help="browser executable to open the lab URL")
     parser.add_argument("--binary", type=Path, default=DEFAULT_BIN, help="path to try_dval binary")
     args = parser.parse_args()
 
@@ -3264,7 +3345,25 @@ def main() -> int:
     print("Press Ctrl+C to stop.")
 
     if not args.no_browser:
-        threading.Timer(0.25, lambda: webbrowser.open(url)).start()
+        def open_lab_url() -> None:
+            if args.browser:
+                subprocess.Popen(
+                    [args.browser, url],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    close_fds=True,
+                )
+            elif shutil.which("xdg-open"):
+                subprocess.Popen(
+                    ["xdg-open", url],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    close_fds=True,
+                )
+            else:
+                webbrowser.open(url)
+
+        threading.Timer(0.25, open_lab_url).start()
 
     try:
         server.serve_forever()

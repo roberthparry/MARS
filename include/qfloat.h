@@ -92,6 +92,9 @@ extern const qfloat_t QF_2PI;
 /** @brief PI/2 */
 extern const qfloat_t QF_PI_2;
 
+/** @brief -PI/2 */
+extern const qfloat_t QF_NEG_PI_2;
+
 /** @brief PI/4 */
 extern const qfloat_t QF_PI_4;
 

@@ -2,6 +2,7 @@
 #define MRATIONAL_SHARED_INTERNAL_H
 
 #include <stddef.h>
+#include <gmp.h>
 
 #include "mrational.h"
 
@@ -15,5 +16,6 @@ extern mrational_t MR_ONE_TENTH_VALUE;
 
 size_t mr_bernoulli_even_term_count(void);
 const mrational_t *mr_bernoulli_even_term(size_t index);
+int mr_copy_mpq(mpq_ptr dst, const mrational_t *value);
 
 #endif
