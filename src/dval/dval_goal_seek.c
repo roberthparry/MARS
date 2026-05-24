@@ -353,39 +353,41 @@ static int goal_solve_real_one(dval_t *expr,
 
         iterations++;
         goal_set_var(var, left, digits);
-        if (goal_eval_residual(expr, target, &value, &fleft) == 0 &&
-            goal_residual_real(fleft)) {
+        if (goal_eval_residual(expr, target, &value, &fleft) == 0) {
             num_destroy(&value);
             value = (number_t){0};
-            if (goal_residual_close(fleft, tolerance)) {
-                num_destroy(&x0);
-                x0 = num_clone(left);
-                num_destroy(&fleft);
-                num_destroy(&fright);
-                num_destroy(&left);
-                num_destroy(&right);
-                rc = 0;
-                goto cleanup;
+            if (goal_residual_real(fleft)) {
+                if (goal_residual_close(fleft, tolerance)) {
+                    num_destroy(&x0);
+                    x0 = num_clone(left);
+                    num_destroy(&fleft);
+                    num_destroy(&fright);
+                    num_destroy(&left);
+                    num_destroy(&right);
+                    rc = 0;
+                    goto cleanup;
+                }
+                sl = num_get_sign(fleft);
             }
-            sl = num_get_sign(fleft);
         }
 
         goal_set_var(var, right, digits);
-        if (goal_eval_residual(expr, target, &value, &fright) == 0 &&
-            goal_residual_real(fright)) {
+        if (goal_eval_residual(expr, target, &value, &fright) == 0) {
             num_destroy(&value);
             value = (number_t){0};
-            if (goal_residual_close(fright, tolerance)) {
-                num_destroy(&x0);
-                x0 = num_clone(right);
-                num_destroy(&fleft);
-                num_destroy(&fright);
-                num_destroy(&left);
-                num_destroy(&right);
-                rc = 0;
-                goto cleanup;
+            if (goal_residual_real(fright)) {
+                if (goal_residual_close(fright, tolerance)) {
+                    num_destroy(&x0);
+                    x0 = num_clone(right);
+                    num_destroy(&fleft);
+                    num_destroy(&fright);
+                    num_destroy(&left);
+                    num_destroy(&right);
+                    rc = 0;
+                    goto cleanup;
+                }
+                sr = num_get_sign(fright);
             }
-            sr = num_get_sign(fright);
         }
 
         if (sl != 0 && s0 != 0 && sl != s0) {
@@ -430,13 +432,16 @@ static int goal_solve_real_one(dval_t *expr,
     for (size_t i = 0u; i < max_iterations * 4u; ++i) {
         number_t sum = num_add(lo, hi);
         number_t mid = num_div(sum, NUM_TWO);
-        number_t fmid;
+        number_t fmid = (number_t){0};
 
         iterations++;
         num_destroy(&sum);
         goal_set_var(var, mid, digits);
         if (goal_eval_residual(expr, target, &value, &fmid) != 0 ||
             !goal_residual_real(fmid)) {
+            num_destroy(&value);
+            value = (number_t){0};
+            num_destroy(&fmid);
             num_destroy(&mid);
             goto cleanup;
         }

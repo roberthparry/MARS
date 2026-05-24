@@ -1289,6 +1289,20 @@ static void test_from_string_bindings_with_implicit_builtin_constant(void)
     free(got);
     dval_bindings_free(bindings);
     dv_free(expr);
+
+    bindings = NULL;
+    expr = dval_from_string("{ exp(pi*sqrt(x)) | x = 163/1 }", &bindings);
+    got = expr ? dv_to_string(expr, style_EXPRESSION) : NULL;
+    if (expr && got && str_eq(got, expect))
+        to_string_pass("bindings suppress denominator-one fractions", got, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "bindings suppress denominator-one fractions",
+                       got ? got : "(null)", expect);
+
+    free(got);
+    dval_bindings_free(bindings);
+    dv_free(expr);
 }
 
 static void test_from_string_bindings_with_constant_expression_value(void)

@@ -2,7 +2,6 @@
 #include "number_internal.h"
 
 #include <ctype.h>
-#include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>

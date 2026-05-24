@@ -47,7 +47,6 @@
 #include "dval_internal.h"
 #include "dval_fromstring_internal.h"
 #include "dval.h"
-#include "internal/number_internal.h"
 
 /* ------------------------------------------------------------------ */
 /* Parser state                                                         */

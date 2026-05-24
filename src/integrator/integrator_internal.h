@@ -8,8 +8,6 @@
 #include "dval.h"
 #include "integrator.h"
 #include "internal/dval_internal.h"
-#include "internal/number_internal.h"
-#include "qcomplex.h"
 
 static inline dval_t *ig_dv_new_const_d(double x)
 {

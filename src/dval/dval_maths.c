@@ -2,7 +2,6 @@
 
 #include "dval_bindings_internal.h"
 #include "dval_math_internal.h"
-#include "internal/number_internal.h"
 
 static inline number_t dv_eval_unary_num(dval_t *dv, number_t (*fn)(const number_t))
 {

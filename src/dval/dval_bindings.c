@@ -2337,6 +2337,11 @@ static void emit_binding_number_text(const char *text, sbuf_t *b)
                                         &denom, &denom_len)) {
         if (negative)
             sbuf_putc(b, '-');
+        if (denom_len == 1u && denom[0] == '1') {
+            for (size_t i = 0u; i < numer_len; ++i)
+                sbuf_putc(b, numer[i]);
+            return;
+        }
         emit_binding_unicode_digits(b, numer, numer_len, s_binding_sup_digits);
         sbuf_puts(b, "⁄");
         emit_binding_unicode_digits(b, denom, denom_len, s_binding_sub_digits);

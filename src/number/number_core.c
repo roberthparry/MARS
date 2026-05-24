@@ -1280,23 +1280,26 @@ bool number_const_id_from_immortal(const number_t *number,
 
  bool number_value_is_immortal_mpz(const number_t *number)
 {
-    number_const_id_t id;
+    const number_mpz_t *value = number ? number_impl_const(number)->value.mpz : NULL;
 
-    return number_immortal_id_mpz(number, &id);
+    return value && value->immortal &&
+        value->constant_id != NUMBER_CONST_COUNT;
 }
 
  bool number_value_is_immortal_mpq(const number_t *number)
 {
-    number_const_id_t id;
+    const number_mpq_t *value = number ? number_impl_const(number)->value.mpq : NULL;
 
-    return number_immortal_id_mpq(number, &id);
+    return value && value->immortal &&
+        value->constant_id != NUMBER_CONST_COUNT;
 }
 
  bool number_value_is_immortal_mpfr(const number_t *number)
 {
-    number_const_id_t id;
+    const number_mpfr_t *value = number ? number_impl_const(number)->value.mpfr : NULL;
 
-    return number_immortal_id_mpfr(number, &id);
+    return value && value->immortal &&
+        value->constant_id != NUMBER_CONST_COUNT;
 }
 
 bool number_immortal_id_complex(const number_t *number,
@@ -1375,7 +1378,6 @@ bool number_eq_same_tol_with_precision(const number_t *a,
                                        const number_t *b,
                                        size_t precision_bits)
 {
-    NUM_SCOPE(scope);
     number_t delta;
     number_t diff;
     number_t one;
@@ -1394,7 +1396,12 @@ bool number_eq_same_tol_with_precision(const number_t *a,
     diff = num_abs(delta);
     one = number_create_exact_mpfr_long_prec(1, precision_bits);
     tolerance = num_ldexp(one, 4 - (int)precision_bits);
-    rc = num_cmp(diff, tolerance) <= 0;
+    rc = number_is_valid_value(&diff) && number_is_valid_value(&tolerance) &&
+        num_cmp(diff, tolerance) <= 0;
+    num_destroy(&tolerance);
+    num_destroy(&one);
+    num_destroy(&diff);
+    num_destroy(&delta);
     return rc;
 }
 
@@ -2224,6 +2231,8 @@ void num_scope_leave(num_scope_t **scope_ptr)
             if (record->payload != NULL)
                 number_scope_destroy_record(record);
         }
+        if (state && state->records == block)
+            state->records = next;
         free(block);
         block = next;
     }

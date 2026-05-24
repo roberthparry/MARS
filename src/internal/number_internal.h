@@ -11,7 +11,6 @@ bool num_get_small_rational(number_t number, long *numerator, long *denominator)
 number_t num_as_inexact_real_prec(number_t number, size_t precision_bits);
 number_t num_as_complex_prec(number_t number, size_t precision_bits);
 num_scope_t *number_scope_suspend(void);
-void number_scope_resume(num_scope_t *scope);
 void num_scope_resume_cleanup(num_scope_t **scope);
 
 #define NUM_SCOPE_SUSPEND(name) \

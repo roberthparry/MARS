@@ -1,7 +1,6 @@
 #include <stddef.h>
 #include "dval_bindings_internal.h"
 #include "dval_internal.h"
-#include "internal/number_internal.h"
 
 /* ------------------------------------------------------------------------- */
 /* EVALUATION FUNCTIONS                                                      */

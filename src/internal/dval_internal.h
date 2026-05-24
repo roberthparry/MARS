@@ -33,11 +33,6 @@ dval_t *dv_substitute(const dval_t *expr,
 /* Structural matchers                                                       */
 /* ------------------------------------------------------------------------- */
 
-bool dv_match_var_expr(const dval_t *expr,
-                       size_t nvars,
-                       dval_t *const *vars,
-                       size_t *index_out);
-
 bool dv_match_const_value(const dval_t *expr, number_t *value_out);
 
 bool dv_match_scaled_expr(const dval_t *expr,

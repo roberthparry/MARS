@@ -3,80 +3,55 @@
 
 #include "number_internal.h"
 
-#define NUMBER_MPZ_SOURCE(name, id) \
-    static number_mpz_t name = {    \
-        .constant_id = (id),        \
-        .immortal = true,           \
-        .initialised = false        \
-    }
+static number_mpz_t number_zero_mpz_value = { .constant_id = NUMBER_CONST_ZERO, .immortal = true, .initialised = false };
+static number_mpz_t number_one_mpz_value = { .constant_id = NUMBER_CONST_ONE, .immortal = true, .initialised = false };
+static number_mpz_t number_neg_one_mpz_value = { .constant_id = NUMBER_CONST_NEG_ONE, .immortal = true, .initialised = false };
+static number_mpz_t number_two_mpz_value = { .constant_id = NUMBER_CONST_TWO, .immortal = true, .initialised = false };
+static number_mpz_t number_ten_mpz_value = { .constant_id = NUMBER_CONST_TEN, .immortal = true, .initialised = false };
 
-#define NUMBER_MPFR_SOURCE(name, id) \
-    static number_mpfr_t name = {    \
-        .constant_id = (id),         \
-        .immortal = true,            \
-        .initialised = false         \
-    }
+static number_mpq_t number_half_mpq_value = { .constant_id = NUMBER_CONST_HALF, .immortal = true, .initialised = false };
+static number_mpq_t number_one_and_half_mpq_value = { .constant_id = NUMBER_CONST_ONE_AND_HALF, .immortal = true, .initialised = false };
+static number_mpq_t number_one_third_mpq_value = { .constant_id = NUMBER_CONST_ONE_THIRD, .immortal = true, .initialised = false };
+static number_mpq_t number_quarter_mpq_value = { .constant_id = NUMBER_CONST_QUARTER, .immortal = true, .initialised = false };
+static number_mpq_t number_one_sixth_mpq_value = { .constant_id = NUMBER_CONST_ONE_SIXTH, .immortal = true, .initialised = false };
+static number_mpq_t number_one_eighth_mpq_value = { .constant_id = NUMBER_CONST_ONE_EIGHTH, .immortal = true, .initialised = false };
+static number_mpq_t number_one_tenth_mpq_value = { .constant_id = NUMBER_CONST_ONE_TENTH, .immortal = true, .initialised = false };
 
-#define NUMBER_MPQ_SOURCE(name, id) \
-    static number_mpq_t name = {    \
-        .constant_id = (id),        \
-        .immortal = true,           \
-        .initialised = false        \
-    }
-
-NUMBER_MPZ_SOURCE(number_zero_mpz_value, NUMBER_CONST_ZERO);
-NUMBER_MPZ_SOURCE(number_one_mpz_value, NUMBER_CONST_ONE);
-NUMBER_MPZ_SOURCE(number_neg_one_mpz_value, NUMBER_CONST_NEG_ONE);
-NUMBER_MPZ_SOURCE(number_two_mpz_value, NUMBER_CONST_TWO);
-NUMBER_MPZ_SOURCE(number_ten_mpz_value, NUMBER_CONST_TEN);
-
-NUMBER_MPQ_SOURCE(number_half_mpq_value, NUMBER_CONST_HALF);
-NUMBER_MPQ_SOURCE(number_one_and_half_mpq_value, NUMBER_CONST_ONE_AND_HALF);
-NUMBER_MPQ_SOURCE(number_one_third_mpq_value, NUMBER_CONST_ONE_THIRD);
-NUMBER_MPQ_SOURCE(number_quarter_mpq_value, NUMBER_CONST_QUARTER);
-NUMBER_MPQ_SOURCE(number_one_sixth_mpq_value, NUMBER_CONST_ONE_SIXTH);
-NUMBER_MPQ_SOURCE(number_one_eighth_mpq_value, NUMBER_CONST_ONE_EIGHTH);
-NUMBER_MPQ_SOURCE(number_one_tenth_mpq_value, NUMBER_CONST_ONE_TENTH);
-
-NUMBER_MPFR_SOURCE(number_pi_mpfr_value, NUMBER_CONST_PI);
-NUMBER_MPFR_SOURCE(number_2pi_mpfr_value, NUMBER_CONST_2PI);
-NUMBER_MPFR_SOURCE(number_pi_2_mpfr_value, NUMBER_CONST_PI_2);
-NUMBER_MPFR_SOURCE(number_neg_pi_2_mpfr_value, NUMBER_CONST_NEG_PI_2);
-NUMBER_MPFR_SOURCE(number_pi_4_mpfr_value, NUMBER_CONST_PI_4);
-NUMBER_MPFR_SOURCE(number_3pi_4_mpfr_value, NUMBER_CONST_3PI_4);
-NUMBER_MPFR_SOURCE(number_pi_6_mpfr_value, NUMBER_CONST_PI_6);
-NUMBER_MPFR_SOURCE(number_pi_3_mpfr_value, NUMBER_CONST_PI_3);
-NUMBER_MPFR_SOURCE(number_2_pi_mpfr_value, NUMBER_CONST_2_PI);
-NUMBER_MPFR_SOURCE(number_e_mpfr_value, NUMBER_CONST_E);
-NUMBER_MPFR_SOURCE(number_inv_e_mpfr_value, NUMBER_CONST_INV_E);
-NUMBER_MPFR_SOURCE(number_ln2_mpfr_value, NUMBER_CONST_LN2);
-NUMBER_MPFR_SOURCE(number_ln10_mpfr_value, NUMBER_CONST_LN10);
-NUMBER_MPFR_SOURCE(number_invln2_mpfr_value, NUMBER_CONST_INVLN2);
-NUMBER_MPFR_SOURCE(number_euler_mascheroni_mpfr_value, NUMBER_CONST_EULER_MASCHERONI);
-NUMBER_MPFR_SOURCE(number_phi_mpfr_value, NUMBER_CONST_PHI);
-NUMBER_MPFR_SOURCE(number_sqrt_half_mpfr_value, NUMBER_CONST_SQRT_HALF);
-NUMBER_MPFR_SOURCE(number_sqrt2_mpfr_value, NUMBER_CONST_SQRT2);
-NUMBER_MPFR_SOURCE(number_sqrt3_mpfr_value, NUMBER_CONST_SQRT3);
-NUMBER_MPFR_SOURCE(number_sqrt2_over_two_mpfr_value, NUMBER_CONST_SQRT2_OVER_TWO);
-NUMBER_MPFR_SOURCE(number_sqrt3_over_two_mpfr_value, NUMBER_CONST_SQRT3_OVER_TWO);
-NUMBER_MPFR_SOURCE(number_sqrt_2pi_mpfr_value, NUMBER_CONST_SQRT_2PI);
-NUMBER_MPFR_SOURCE(number_sqrt_pi_mpfr_value, NUMBER_CONST_SQRT_PI);
-NUMBER_MPFR_SOURCE(number_sqrt_pi_over_two_mpfr_value, NUMBER_CONST_SQRT_PI_OVER_TWO);
-NUMBER_MPFR_SOURCE(number_sqrt1onpi_mpfr_value, NUMBER_CONST_SQRT1ONPI);
-NUMBER_MPFR_SOURCE(number_2_sqrtpi_mpfr_value, NUMBER_CONST_2_SQRTPI);
-NUMBER_MPFR_SOURCE(number_neg_two_over_sqrt_pi_mpfr_value, NUMBER_CONST_NEG_TWO_OVER_SQRT_PI);
-NUMBER_MPFR_SOURCE(number_inv_sqrt_2pi_mpfr_value, NUMBER_CONST_INV_SQRT_2PI);
-NUMBER_MPFR_SOURCE(number_log_sqrt_2pi_mpfr_value, NUMBER_CONST_LOG_SQRT_2PI);
-NUMBER_MPFR_SOURCE(number_ln_2pi_mpfr_value, NUMBER_CONST_LN_2PI);
-NUMBER_MPFR_SOURCE(number_pi_squared_mpfr_value, NUMBER_CONST_PI_SQUARED);
-NUMBER_MPFR_SOURCE(number_2pi_cubed_mpfr_value, NUMBER_CONST_2PI_CUBED);
-NUMBER_MPFR_SOURCE(number_nan_mpfr_value, NUMBER_CONST_NAN);
-NUMBER_MPFR_SOURCE(number_inf_mpfr_value, NUMBER_CONST_INF);
-NUMBER_MPFR_SOURCE(number_ninf_mpfr_value, NUMBER_CONST_NINF);
-
-#undef NUMBER_MPZ_SOURCE
-#undef NUMBER_MPFR_SOURCE
-#undef NUMBER_MPQ_SOURCE
+static number_mpfr_t number_pi_mpfr_value = { .constant_id = NUMBER_CONST_PI, .immortal = true, .initialised = false };
+static number_mpfr_t number_2pi_mpfr_value = { .constant_id = NUMBER_CONST_2PI, .immortal = true, .initialised = false };
+static number_mpfr_t number_pi_2_mpfr_value = { .constant_id = NUMBER_CONST_PI_2, .immortal = true, .initialised = false };
+static number_mpfr_t number_neg_pi_2_mpfr_value = { .constant_id = NUMBER_CONST_NEG_PI_2, .immortal = true, .initialised = false };
+static number_mpfr_t number_pi_4_mpfr_value = { .constant_id = NUMBER_CONST_PI_4, .immortal = true, .initialised = false };
+static number_mpfr_t number_3pi_4_mpfr_value = { .constant_id = NUMBER_CONST_3PI_4, .immortal = true, .initialised = false };
+static number_mpfr_t number_pi_6_mpfr_value = { .constant_id = NUMBER_CONST_PI_6, .immortal = true, .initialised = false };
+static number_mpfr_t number_pi_3_mpfr_value = { .constant_id = NUMBER_CONST_PI_3, .immortal = true, .initialised = false };
+static number_mpfr_t number_2_pi_mpfr_value = { .constant_id = NUMBER_CONST_2_PI, .immortal = true, .initialised = false };
+static number_mpfr_t number_e_mpfr_value = { .constant_id = NUMBER_CONST_E, .immortal = true, .initialised = false };
+static number_mpfr_t number_inv_e_mpfr_value = { .constant_id = NUMBER_CONST_INV_E, .immortal = true, .initialised = false };
+static number_mpfr_t number_ln2_mpfr_value = { .constant_id = NUMBER_CONST_LN2, .immortal = true, .initialised = false };
+static number_mpfr_t number_ln10_mpfr_value = { .constant_id = NUMBER_CONST_LN10, .immortal = true, .initialised = false };
+static number_mpfr_t number_invln2_mpfr_value = { .constant_id = NUMBER_CONST_INVLN2, .immortal = true, .initialised = false };
+static number_mpfr_t number_euler_mascheroni_mpfr_value = { .constant_id = NUMBER_CONST_EULER_MASCHERONI, .immortal = true, .initialised = false };
+static number_mpfr_t number_phi_mpfr_value = { .constant_id = NUMBER_CONST_PHI, .immortal = true, .initialised = false };
+static number_mpfr_t number_sqrt_half_mpfr_value = { .constant_id = NUMBER_CONST_SQRT_HALF, .immortal = true, .initialised = false };
+static number_mpfr_t number_sqrt2_mpfr_value = { .constant_id = NUMBER_CONST_SQRT2, .immortal = true, .initialised = false };
+static number_mpfr_t number_sqrt3_mpfr_value = { .constant_id = NUMBER_CONST_SQRT3, .immortal = true, .initialised = false };
+static number_mpfr_t number_sqrt2_over_two_mpfr_value = { .constant_id = NUMBER_CONST_SQRT2_OVER_TWO, .immortal = true, .initialised = false };
+static number_mpfr_t number_sqrt3_over_two_mpfr_value = { .constant_id = NUMBER_CONST_SQRT3_OVER_TWO, .immortal = true, .initialised = false };
+static number_mpfr_t number_sqrt_2pi_mpfr_value = { .constant_id = NUMBER_CONST_SQRT_2PI, .immortal = true, .initialised = false };
+static number_mpfr_t number_sqrt_pi_mpfr_value = { .constant_id = NUMBER_CONST_SQRT_PI, .immortal = true, .initialised = false };
+static number_mpfr_t number_sqrt_pi_over_two_mpfr_value = { .constant_id = NUMBER_CONST_SQRT_PI_OVER_TWO, .immortal = true, .initialised = false };
+static number_mpfr_t number_sqrt1onpi_mpfr_value = { .constant_id = NUMBER_CONST_SQRT1ONPI, .immortal = true, .initialised = false };
+static number_mpfr_t number_2_sqrtpi_mpfr_value = { .constant_id = NUMBER_CONST_2_SQRTPI, .immortal = true, .initialised = false };
+static number_mpfr_t number_neg_two_over_sqrt_pi_mpfr_value = { .constant_id = NUMBER_CONST_NEG_TWO_OVER_SQRT_PI, .immortal = true, .initialised = false };
+static number_mpfr_t number_inv_sqrt_2pi_mpfr_value = { .constant_id = NUMBER_CONST_INV_SQRT_2PI, .immortal = true, .initialised = false };
+static number_mpfr_t number_log_sqrt_2pi_mpfr_value = { .constant_id = NUMBER_CONST_LOG_SQRT_2PI, .immortal = true, .initialised = false };
+static number_mpfr_t number_ln_2pi_mpfr_value = { .constant_id = NUMBER_CONST_LN_2PI, .immortal = true, .initialised = false };
+static number_mpfr_t number_pi_squared_mpfr_value = { .constant_id = NUMBER_CONST_PI_SQUARED, .immortal = true, .initialised = false };
+static number_mpfr_t number_2pi_cubed_mpfr_value = { .constant_id = NUMBER_CONST_2PI_CUBED, .immortal = true, .initialised = false };
+static number_mpfr_t number_nan_mpfr_value = { .constant_id = NUMBER_CONST_NAN, .immortal = true, .initialised = false };
+static number_mpfr_t number_inf_mpfr_value = { .constant_id = NUMBER_CONST_INF, .immortal = true, .initialised = false };
+static number_mpfr_t number_ninf_mpfr_value = { .constant_id = NUMBER_CONST_NINF, .immortal = true, .initialised = false };
 
 static const number_private_t number_zero_value = {
     .kind = NUMBER_MPZ,

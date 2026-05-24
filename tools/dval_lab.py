@@ -10,6 +10,7 @@ GUI surface without adding a desktop toolkit dependency to the project.
 from __future__ import annotations
 
 import argparse
+import errno
 from decimal import Decimal, InvalidOperation, localcontext
 import html
 import http.server
@@ -827,12 +828,12 @@ INDEX_HTML = r"""<!doctype html>
         <summary>Mobile</summary>
         <div class="mobile-panel">
           <div class="mobile-copy">
-            <strong>Mobile access</strong>
-            <span>Scan from a phone on the same Wi-Fi.</span>
+            <strong id="mobileTitle">__MOBILE_TITLE__</strong>
+            <span id="mobileHint">__MOBILE_HINT__</span>
             <code id="mobileUrl">__MOBILE_URL__</code>
           </div>
           <div class="mobile-actions">
-            <div class="mobile-qr" aria-label="QR code for mobile access">__MOBILE_QR_SVG__</div>
+            <div class="mobile-qr" id="mobileQr" aria-label="QR code for mobile access">__MOBILE_QR_SVG__</div>
             <button class="card-action copy-result" type="button" data-copy-target="mobile">Copy URL</button>
           </div>
         </div>
@@ -1007,7 +1008,11 @@ INDEX_HTML = r"""<!doctype html>
     const morePrecision = document.getElementById('morePrecision');
     const derivativeButtons = document.getElementById('derivativeButtons');
     const variableValues = document.getElementById('variableValues');
+    const mobileAccess = document.getElementById('mobileAccess');
+    const mobileTitle = document.getElementById('mobileTitle');
+    const mobileHint = document.getElementById('mobileHint');
     const mobileUrl = document.getElementById('mobileUrl');
+    const mobileQr = document.getElementById('mobileQr');
     const statusEl = document.getElementById('status');
     const rightPaneTitle = document.getElementById('rightPaneTitle');
     const resultPane = document.getElementById('resultPane');
@@ -1760,6 +1765,28 @@ INDEX_HTML = r"""<!doctype html>
       return '';
     }
 
+    async function refreshMobileAccess() {
+      if (!mobileAccess || !mobileUrl || !mobileQr)
+        return;
+
+      try {
+        const response = await fetch('/mobile-access', {cache: 'no-store'});
+        if (!response.ok)
+          return;
+        const data = await response.json();
+        const url = String(data.url || '');
+        mobileAccess.classList.toggle('hidden', !url);
+        if (mobileTitle)
+          mobileTitle.textContent = String(data.title || 'Mobile access');
+        if (mobileHint)
+          mobileHint.textContent = String(data.hint || '');
+        mobileUrl.textContent = url;
+        mobileQr.innerHTML = String(data.qr || '');
+      } catch (err) {
+        // Network state changes are expected; keep the last known QR until the next poll.
+      }
+    }
+
     function resetMoreDigitsButton(button, canExpand) {
       button.classList.toggle('hidden', !canExpand);
       button.textContent = 'Show more digits';
@@ -2240,6 +2267,8 @@ INDEX_HTML = r"""<!doctype html>
     });
 
     setStatus('Ready');
+    refreshMobileAccess();
+    setInterval(refreshMobileAccess, 5000);
     loadLastExpression().finally(() => evaluateExpression());
   </script>
 </body>
@@ -2321,6 +2350,52 @@ def _host_from_header(host_header: str) -> str:
     return host_header.rsplit(":", 1)[0] if ":" in host_header else host_header
 
 
+def tailscale_ipv4() -> str:
+    try:
+        status = subprocess.run(
+            ["tailscale", "status"],
+            text=True,
+            capture_output=True,
+            timeout=2,
+            check=False,
+        )
+        if status.returncode != 0:
+            return ""
+
+        completed = subprocess.run(
+            ["tailscale", "ip", "-4"],
+            text=True,
+            capture_output=True,
+            timeout=2,
+            check=False,
+        )
+        for address in completed.stdout.split():
+            if address.startswith("100."):
+                return address
+    except Exception:
+        pass
+
+    try:
+        completed = subprocess.run(
+            ["hostname", "-I"],
+            text=True,
+            capture_output=True,
+            timeout=2,
+            check=False,
+        )
+        for address in completed.stdout.split():
+            if address.startswith("100."):
+                return address
+    except Exception:
+        pass
+
+    return ""
+
+
+def tailscale_magicdns_host() -> str:
+    return os.environ.get("MARS_DVAL_LAB_TAILSCALE_HOST", "mars").strip().strip(".")
+
+
 def local_lan_ipv4() -> str:
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
@@ -2370,21 +2445,61 @@ def local_lan_ipv4() -> str:
     return ""
 
 
+def local_mdns_host() -> str:
+    hostname = socket.gethostname().strip().strip(".")
+    if not hostname:
+        return ""
+
+    short_name = hostname.split(".", 1)[0]
+    if not short_name or _is_loopback_or_wildcard_host(short_name):
+        return ""
+    return f"{short_name}.local"
+
+
 def mobile_access_url(bind_host: str, port: int, host_header: str = "") -> str:
+    return mobile_access_details(bind_host, port, host_header)["url"]
+
+
+def mobile_access_details(bind_host: str, port: int, host_header: str = "") -> dict[str, str]:
     request_host = _host_from_header(host_header)
     if request_host and not _is_loopback_or_wildcard_host(request_host):
-        return f"http://{request_host}:{port}/"
+        title = "Internet access" if request_host.startswith("100.") else "WiFi access"
+        hint = "Scan from a phone connected to Tailscale." if request_host.startswith("100.") else "Scan from a phone on the same WiFi."
+        return {"url": f"http://{request_host}:{port}/", "title": title, "hint": hint}
 
     bind_host = bind_host.strip()
     if bind_host in ("0.0.0.0", "::", "::0"):
+        bind_host = tailscale_ipv4()
+        if bind_host:
+            tailscale_host = tailscale_magicdns_host() or bind_host
+            return {
+                "url": f"http://{tailscale_host}:{port}/",
+                "title": "Internet access",
+                "hint": "Tailscale is up. Scan from a phone connected to Tailscale.",
+            }
+        mdns_host = local_mdns_host()
+        if mdns_host:
+            return {
+                "url": f"http://{mdns_host}:{port}/",
+                "title": "WiFi access",
+                "hint": "Scan from a phone on the same WiFi.",
+            }
         bind_host = local_lan_ipv4()
+        if bind_host:
+            return {
+                "url": f"http://{bind_host}:{port}/",
+                "title": "WiFi access",
+                "hint": "Scan from a phone on the same WiFi.",
+            }
 
     if _is_loopback_or_wildcard_host(bind_host):
-        return ""
+        return {"url": "", "title": "Mobile access", "hint": "No mobile URL is available right now."}
 
     if ":" in bind_host and not bind_host.startswith("["):
         bind_host = f"[{bind_host}]"
-    return f"http://{bind_host}:{port}/"
+    title = "Internet access" if bind_host.startswith("100.") else "WiFi access"
+    hint = "Scan from a phone connected to Tailscale." if bind_host.startswith("100.") else "Scan from a phone on the same WiFi."
+    return {"url": f"http://{bind_host}:{port}/", "title": title, "hint": hint}
 
 
 def _qr_gf_tables() -> tuple[list[int], list[int]]:
@@ -3075,7 +3190,10 @@ class DvalLabHandler(http.server.BaseHTTPRequestHandler):
     mobile_url: str = ""
 
     def log_message(self, fmt: str, *args: object) -> None:
-        print(f"dval_lab: {fmt % args}", file=sys.stderr)
+        try:
+            print(f"dval_lab: {fmt % args}", file=sys.stderr)
+        except OSError:
+            pass
 
     def send_json(self, status: int, payload: dict[str, object]) -> None:
         data = json.dumps(payload).encode("utf-8")
@@ -3103,6 +3221,16 @@ class DvalLabHandler(http.server.BaseHTTPRequestHandler):
             self.send_json(200, {"expression": load_state_expression()})
             return
 
+        if path == "/mobile-access":
+            details = mobile_access_details(
+                self.server_host,
+                self.server_port,
+                self.headers.get("Host", ""),
+            )
+            details["qr"] = qr_svg(details["url"])
+            self.send_json(200, details)
+            return
+
         if path == "/favicon.svg":
             self.send_file(LAB_FAVICON_FILE, "image/svg+xml")
             return
@@ -3127,17 +3255,20 @@ class DvalLabHandler(http.server.BaseHTTPRequestHandler):
             self.send_error(404)
             return
 
-        mobile_url = mobile_access_url(
+        mobile_details = mobile_access_details(
             self.server_host,
             self.server_port,
             self.headers.get("Host", ""),
-        ) or self.mobile_url
+        )
+        mobile_url = mobile_details["url"]
         mobile_qr = qr_svg(mobile_url)
         page = (
             INDEX_HTML.replace(
                 "__INITIAL_EXPRESSION__",
                 html.escape(load_state_expression(), quote=False),
             )
+            .replace("__MOBILE_TITLE__", html.escape(mobile_details["title"], quote=False))
+            .replace("__MOBILE_HINT__", html.escape(mobile_details["hint"], quote=False))
             .replace("__MOBILE_URL__", html.escape(mobile_url, quote=False))
             .replace("__MOBILE_QR_SVG__", mobile_qr)
             .replace("__MOBILE_CARD_CLASS__", "" if mobile_url and mobile_qr else "hidden")
@@ -3315,6 +3446,25 @@ class DvalLabHandler(http.server.BaseHTTPRequestHandler):
         self.send_json(200, fields)
 
 
+def open_lab_url(url: str, browser: str = "") -> None:
+    if browser:
+        subprocess.Popen(
+            [browser, url],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            close_fds=True,
+        )
+    elif shutil.which("xdg-open"):
+        subprocess.Popen(
+            ["xdg-open", url],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            close_fds=True,
+        )
+    else:
+        webbrowser.open(url)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Launch the local MARS dval expression lab.")
     parser.add_argument("--host", default="0.0.0.0", help="host to bind")
@@ -3333,11 +3483,19 @@ def main() -> int:
     DvalLabHandler.server_host = args.host
     DvalLabHandler.server_port = port
     DvalLabHandler.mobile_url = mobile_access_url(args.host, port)
-    server = http.server.ThreadingHTTPServer((args.host, port), DvalLabHandler)
     browser_host = "127.0.0.1" if args.host in ("0.0.0.0", "::", "::0") else args.host
     if ":" in browser_host and not browser_host.startswith("["):
         browser_host = f"[{browser_host}]"
     url = f"http://{browser_host}:{port}/"
+    try:
+        server = http.server.ThreadingHTTPServer((args.host, port), DvalLabHandler)
+    except OSError as exc:
+        if exc.errno == errno.EADDRINUSE:
+            print(f"MARS dval Lab already running at {url}")
+            if not args.no_browser:
+                open_lab_url(url, args.browser)
+            return 0
+        raise
 
     print(f"MARS dval Lab running at {url}")
     if DvalLabHandler.mobile_url:
@@ -3345,25 +3503,7 @@ def main() -> int:
     print("Press Ctrl+C to stop.")
 
     if not args.no_browser:
-        def open_lab_url() -> None:
-            if args.browser:
-                subprocess.Popen(
-                    [args.browser, url],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    close_fds=True,
-                )
-            elif shutil.which("xdg-open"):
-                subprocess.Popen(
-                    ["xdg-open", url],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    close_fds=True,
-                )
-            else:
-                webbrowser.open(url)
-
-        threading.Timer(0.25, open_lab_url).start()
+        threading.Timer(0.25, open_lab_url, args=(url, args.browser)).start()
 
     try:
         server.serve_forever()

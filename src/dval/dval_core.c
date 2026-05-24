@@ -23,17 +23,11 @@
  */
 
 #include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <ctype.h>
-#include <strings.h>
 #include <limits.h>
-#include <math.h>
 #include "number.h"
 #include "dval_bindings_internal.h"
 #include "dval_internal.h"
 #include "dval.h"
-#include "internal/number_internal.h"
 
 /* Pointer to the variable being differentiated with respect to.
  * NULL = single-variable / "all variables" mode (original behaviour of

@@ -1,11 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <math.h>
 
 #include "matrix_internal.h"
 #include "internal/dval_internal.h"
-#include "number/number_internal.h"
 
 /* ============================================================
    Internal helpers

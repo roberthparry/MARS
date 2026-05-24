@@ -6,8 +6,6 @@
 #include "number.h"
 #include "matrix.h"
 #include "internal/dval_internal.h"
-#include "internal/number_internal.h"
-#include "number/number_internal.h"
 
 enum {
     MATRIX_HERMITIAN_JACOBI_MAX_SWEEPS = 50

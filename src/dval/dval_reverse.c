@@ -2,7 +2,6 @@
 #include <stdlib.h>
 
 #include "dval_internal.h"
-#include "internal/number_internal.h"
 
 static number_t dv_reverse_zero(void)
 {

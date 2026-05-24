@@ -1,4 +1,6 @@
 #include "integrator_internal.h"
+#include "internal/number_internal.h"
+#include "qcomplex.h"
 
 static qfloat_t integral_exp_affine_box(size_t ndim, const qfloat_t *coeffs,
                                         qfloat_t constant,

@@ -1,8 +1,6 @@
-#include <math.h>
 #include <stddef.h>
 
 #include "dval_internal.h"
-#include "internal/number_internal.h"
 
 static inline void dv_reverse_unary(number_t value, number_t *a_bar, number_t *b_bar)
 {

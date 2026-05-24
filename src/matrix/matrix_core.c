@@ -1,7 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include <math.h>
 #include "matrix_internal.h"
 #include "matrix_vtable_defs.h"
 #include "number.h"
@@ -9,8 +8,6 @@
 #include "qcomplex.h"
 #include "matrix.h"
 #include "internal/dval_internal.h"
-#include "internal/number_internal.h"
-#include "number/number_internal.h"
 
 /* ============================================================
    Internal matrix construction helpers (forward declarations)
