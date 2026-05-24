@@ -3,11 +3,7 @@
 
 #include <stddef.h>
 
-typedef struct _mfloat_t mfloat_t;
-
 #include "qfloat.h"
-
-int qf_to_mfloat_exact(mfloat_t *mfloat, qfloat_t value);
 
 extern const size_t QFI_FADDEEVA_TERM_COUNT;
 extern const size_t QFI_LANCZOS_COEFF_COUNT;

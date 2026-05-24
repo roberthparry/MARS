@@ -97,7 +97,7 @@ void run_number_readme_mersenne_prime_search(void)
     num_destroy(&one);
 }
 
-static void number_readme_mfloat_example(void)
+static void number_readme_multiprecision_example(void)
 {
     size_t saved_precision = num_get_default_prec_bits();
     const char *gamma_prefix =
@@ -155,6 +155,6 @@ void run_number_readme_example_tests(void)
 {
     number_readme_rational_basic();
     number_readme_binomial_cardinality();
-    number_readme_mfloat_example();
+    number_readme_multiprecision_example();
     number_readme_complex_example();
 }

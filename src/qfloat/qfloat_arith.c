@@ -40,7 +40,7 @@ qfloat_t qf_mul(qfloat_t a, qfloat_t b) {
         + (a.hi * b.lo + a.lo * b.hi)
         + (a.lo * b.lo);
 
-    /* Renormalize: (C + c) as double-double */
+    /* Renormalise: (C + c) as double-double */
     double hi, lo;
     qf_two_sum(C, c, &hi, &lo);
 

@@ -26,7 +26,7 @@ static string_t     *g_local_filename = NULL;
 typedef struct _test_value test_value_t;
 
 /* Forward declarations for path helpers used before their definitions. */
-static string_t *normalize_test_file_path(const char *file);
+static string_t *normalise_test_file_path(const char *file);
 static bool ensure_group_path(dictionary_t *dict, const char *path, test_value_t *out);
 
 /* string_t* key helpers */
@@ -131,19 +131,19 @@ static string_t *compute_global_path(void)
 
 static string_t *compute_local_path(const char *file)
 {
-    string_t *normalized = normalize_test_file_path(file);
-    const char *full = string_c_str(normalized);
+    string_t *normalised = normalise_test_file_path(file);
+    const char *full = string_c_str(normalised);
     const char *dot = strrchr(full, '.');
     size_t len = dot ? (size_t)(dot - full) : strlen(full);
 
     string_t *path = string_new();
     string_append_format(path, "%.*s.json", (int)len, full);
 
-    string_free(normalized);
+    string_free(normalised);
     return path;
 }
 
-static string_t *normalize_test_file_path(const char *file)
+static string_t *normalise_test_file_path(const char *file)
 {
     const char *tests = strstr(file, "tests/");
     string_t *path = string_new();
@@ -251,28 +251,28 @@ static dictionary_t *ensure_file_dict(const char *file)
 
     if (g_mode == TEST_CONFIG_GLOBAL) {
         /* g_root: key = string_t*, value = dictionary_t* */
-        string_t *normalized_key = normalize_test_file_path(file);
+        string_t *normalised_key = normalise_test_file_path(file);
         string_t *flattened_key = flattened_test_file_path(file);
         dictionary_t *file_dict = NULL;
 
-        if (!normalized_key || !flattened_key) {
-            if (normalized_key) string_free(normalized_key);
+        if (!normalised_key || !flattened_key) {
+            if (normalised_key) string_free(normalised_key);
             if (flattened_key) string_free(flattened_key);
             return NULL;
         }
 
         /* Prefer the canonical tests/... path for nested sources. */
-        if (dictionary_get(g_root, &normalized_key, &file_dict) && file_dict) {
+        if (dictionary_get(g_root, &normalised_key, &file_dict) && file_dict) {
             string_free(flattened_key);
-            string_free(normalized_key);
+            string_free(normalised_key);
             return file_dict;
         }
 
         /* Accept legacy flattened entries such as tests/test_dval.c. */
-        if (string_compare(normalized_key, flattened_key) != 0 &&
+        if (string_compare(normalised_key, flattened_key) != 0 &&
             dictionary_get(g_root, &flattened_key, &file_dict) && file_dict) {
             string_free(flattened_key);
-            string_free(normalized_key);
+            string_free(normalised_key);
             return file_dict;
         }
 
@@ -280,15 +280,15 @@ static dictionary_t *ensure_file_dict(const char *file)
         file_dict = create_file_dict();
         if (!file_dict) {
             string_free(flattened_key);
-            string_free(normalized_key);
+            string_free(normalised_key);
             return NULL;
         }
 
         /* Store under the canonical key; g_root clones both key and value. */
-        dictionary_set(g_root, &normalized_key, &file_dict);
+        dictionary_set(g_root, &normalised_key, &file_dict);
 
         string_free(flattened_key);
-        string_free(normalized_key);
+        string_free(normalised_key);
 
         return file_dict;
     }
@@ -305,25 +305,25 @@ static dictionary_t *ensure_seen_file_dict(const char *file)
     ensure_seen_root_created();
 
     if (g_mode == TEST_CONFIG_GLOBAL) {
-        string_t *normalized_key = normalize_test_file_path(file);
+        string_t *normalised_key = normalise_test_file_path(file);
         dictionary_t *file_dict = NULL;
 
-        if (!normalized_key)
+        if (!normalised_key)
             return NULL;
 
-        if (dictionary_get(g_seen_root, &normalized_key, &file_dict) && file_dict) {
-            string_free(normalized_key);
+        if (dictionary_get(g_seen_root, &normalised_key, &file_dict) && file_dict) {
+            string_free(normalised_key);
             return file_dict;
         }
 
         file_dict = create_file_dict();
         if (!file_dict) {
-            string_free(normalized_key);
+            string_free(normalised_key);
             return NULL;
         }
 
-        dictionary_set(g_seen_root, &normalized_key, &file_dict);
-        string_free(normalized_key);
+        dictionary_set(g_seen_root, &normalised_key, &file_dict);
+        string_free(normalised_key);
         return file_dict;
     }
 

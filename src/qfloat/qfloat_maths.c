@@ -1519,10 +1519,10 @@ static const int QF_DIGAMMA_N_8_20 = sizeof(QF_DIGAMMA_C_8_20) / sizeof(QF_DIGAM
 
 static qfloat_t qf_digamma_core_8_20(qfloat_t x)
 {
-    qfloat_t center = (qfloat_t){ 14.0, 0.0 };
+    qfloat_t centre = (qfloat_t){ 14.0, 0.0 };
     qfloat_t halfw  = (qfloat_t){  6.0, 0.0 };
 
-    qfloat_t t = qf_sub(x, center);
+    qfloat_t t = qf_sub(x, centre);
     qfloat_t y = qf_div(t, halfw);   /* y in [-1,1] */
 
     qfloat_t b1 = QF_ZERO;

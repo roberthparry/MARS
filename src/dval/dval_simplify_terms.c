@@ -45,7 +45,7 @@ static void *dv_terms_xrealloc(void *ptr, size_t size)
     abort();
 }
 
-static number_t dv_normalize_simple_rational_coeff(number_t coeff)
+static number_t dv_normalise_simple_rational_coeff(number_t coeff)
 {
     if (num_eq(coeff, NUM_HALF))
         return num_clone(NUM_HALF);
@@ -123,7 +123,7 @@ static int split_leading_real_scalar(const dval_t *term,
     return 0;
 }
 
-static dval_t *make_normalized_division_addend(const dval_t *num,
+static dval_t *make_normalised_division_addend(const dval_t *num,
                                                const dval_t *den)
 {
     dval_t *one;
@@ -339,11 +339,11 @@ dval_t *dv_make_scaled(number_t coeff, dval_t *base)
 
         return out;
     }
-    number_t normalized = dv_normalize_simple_rational_coeff(coeff);
-    dval_t *cn = dv_new_const(normalized);
+    number_t normalised = dv_normalise_simple_rational_coeff(coeff);
+    dval_t *cn = dv_new_const(normalised);
     dval_t *r = dv_mul(cn, base);
 
-    num_destroy(&normalized);
+    num_destroy(&normalised);
     dv_free(cn);
     dv_free(base);
     return r;
@@ -566,14 +566,14 @@ void dv_sort_addends(addend_t *terms, size_t n)
     }
 }
 
-static int dv_contains_addsub_normalized(const dval_t *dv)
+static int dv_contains_addsub_normalised(const dval_t *dv)
 {
     if (!dv)
         return 0;
     if (dv_is_addsub(dv))
         return 1;
-    return dv_contains_addsub_normalized(dv->a) ||
-           dv_contains_addsub_normalized(dv->b);
+    return dv_contains_addsub_normalised(dv->a) ||
+           dv_contains_addsub_normalised(dv->b);
 }
 
 void dv_collect_addends(dval_t *dv, number_t scale, number_t *c_const,
@@ -663,24 +663,24 @@ void dv_collect_addends(dval_t *dv, number_t scale, number_t *c_const,
         changed_den = split_leading_real_scalar(dv->b, &den_scalar, &den_rest);
 
         if (changed_num || changed_den) {
-            dval_t *normalized;
+            dval_t *normalised;
 
             ns = num_mul(scale, num_scalar);
             ns = num_div(ns, den_scalar);
-            normalized = make_normalized_division_addend(num_rest, den_rest);
-            if (normalized) {
+            normalised = make_normalised_division_addend(num_rest, den_rest);
+            if (normalised) {
                 if ((!num_rest && den_rest) ||
-                    !dv_contains_addsub_normalized(normalized) ||
-                    dv_struct_eq(normalized, dv)) {
+                    !dv_contains_addsub_normalised(normalised) ||
+                    dv_struct_eq(normalised, dv)) {
                     size_t i;
 
                     for (i = 0; i < *n; ++i) {
-                        if (dv_struct_eq((*terms)[i].base, normalized)) {
+                        if (dv_struct_eq((*terms)[i].base, normalised)) {
                             number_t sum = num_add((*terms)[i].coeff, ns);
 
                             num_destroy(&(*terms)[i].coeff);
                             (*terms)[i].coeff = num_scope_detach(sum);
-                            dv_free(normalized);
+                            dv_free(normalised);
                             return;
                         }
                     }
@@ -688,13 +688,13 @@ void dv_collect_addends(dval_t *dv, number_t scale, number_t *c_const,
                         *cap = *cap ? *cap * 2 : 8;
                         *terms = dv_terms_xrealloc(*terms, *cap * sizeof(addend_t));
                     }
-                    (*terms)[*n].base = normalized;
+                    (*terms)[*n].base = normalised;
                     (*terms)[*n].coeff = num_scope_detach(ns);
                     (*n)++;
                     return;
                 }
-                dv_collect_addends(normalized, ns, c_const, terms, n, cap);
-                dv_free(normalized);
+                dv_collect_addends(normalised, ns, c_const, terms, n, cap);
+                dv_free(normalised);
             } else {
                 number_t sum = num_add(*c_const, ns);
 
@@ -1299,10 +1299,10 @@ dval_t *dv_rebuild_product_chain(number_t c_acc, dval_t **terms, size_t nterms)
     dval_t *cur = NULL;
 
     if (!num_eq(c_acc, NUM_ONE)) {
-        number_t normalized = dv_normalize_simple_rational_coeff(c_acc);
+        number_t normalised = dv_normalise_simple_rational_coeff(c_acc);
 
-        cur = dv_new_const(normalized);
-        num_destroy(&normalized);
+        cur = dv_new_const(normalised);
+        num_destroy(&normalised);
     }
 
     for (size_t i = 0; i < nterms; ++i) {
@@ -1326,10 +1326,10 @@ dval_t *dv_rebuild_product_chain(number_t c_acc, dval_t **terms, size_t nterms)
 
     free(terms);
     if (!cur) {
-        number_t normalized = dv_normalize_simple_rational_coeff(c_acc);
+        number_t normalised = dv_normalise_simple_rational_coeff(c_acc);
 
-        cur = dv_new_const(normalized);
-        num_destroy(&normalized);
+        cur = dv_new_const(normalised);
+        num_destroy(&normalised);
     }
     return cur;
 }

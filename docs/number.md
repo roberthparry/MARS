@@ -502,9 +502,8 @@ The generic numeric layer has a matching benchmark target:
 make bench_number_maths
 ```
 
-It mirrors the legacy `mfloat` maths benchmark through the public `number_t`
-API, so it measures both backend maths cost and generic promotion/dispatch
-overhead on the same representative workload.
+It exercises the public `number_t` API across the representative arithmetic,
+elementary, and special-function workload used to track numeric performance.
 
 ## Benchmark Coverage
 
@@ -517,7 +516,7 @@ The dedicated `number_t` maths benchmark includes matching timing cases at:
 - `2048` bits
 - `4096` bits
 
-across the same broad slice used for the legacy `mfloat` benchmark.
+across the broad maths slice used to track the multiprecision backend.
 
 Benchmark source:
 
@@ -540,10 +539,10 @@ the fully manual path, while the "scope everything and destroy nothing until
 leave" pattern remained slower:
 
 ```text
-mfloat chain             manual= 129.082 ms  scoped= 125.772 ms  ratio= 1.026x
-mfloat scoped+roll       manual= 129.082 ms  scoped= 110.554 ms  ratio= 1.168x
-mcomplex chain           manual= 221.584 ms  scoped= 225.807 ms  ratio= 0.981x
-mcomplex scoped+roll     manual= 221.584 ms  scoped= 198.489 ms  ratio= 1.116x
+real chain               manual= 129.082 ms  scoped= 125.772 ms  ratio= 1.026x
+real scoped+roll         manual= 129.082 ms  scoped= 110.554 ms  ratio= 1.168x
+complex chain            manual= 221.584 ms  scoped= 225.807 ms  ratio= 0.981x
+complex scoped+roll      manual= 221.584 ms  scoped= 198.489 ms  ratio= 1.116x
 ```
 
 Run it from the repository root with:

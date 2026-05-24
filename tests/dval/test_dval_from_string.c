@@ -250,7 +250,7 @@ static void test_from_string_bracketed_names(void)
         99.0, __LINE__);
 }
 
-static void test_from_string_name_normalization(void)
+static void test_from_string_name_normalisation(void)
 {
     dval_t *a1 = test_dv_new_named_var_d(1.0, "a1");
     dval_t *a12 = test_dv_new_named_var_d(1.0, "a12");
@@ -266,37 +266,37 @@ static void test_from_string_name_normalization(void)
     char *parsed_pi1s = parsed_pi1 ? dv_to_string(parsed_pi1, style_EXPRESSION) : NULL;
 
     if (a1s && str_eq(a1s, "{ a₁ | a₁ = 1 }")) {
-        to_string_pass("normalize a1", a1s, "{ a₁ | a₁ = 1 }");
+        to_string_pass("normalise a1", a1s, "{ a₁ | a₁ = 1 }");
     } else {
-        to_string_fail(__FILE__, __LINE__, 1, "normalize a1",
+        to_string_fail(__FILE__, __LINE__, 1, "normalise a1",
                        a1s ? a1s : "(null)", "{ a₁ | a₁ = 1 }");
     }
 
     if (a12s && str_eq(a12s, "{ a₁₂ | a₁₂ = 1 }")) {
-        to_string_pass("normalize a12", a12s, "{ a₁₂ | a₁₂ = 1 }");
+        to_string_pass("normalise a12", a12s, "{ a₁₂ | a₁₂ = 1 }");
     } else {
-        to_string_fail(__FILE__, __LINE__, 1, "normalize a12",
+        to_string_fail(__FILE__, __LINE__, 1, "normalise a12",
                        a12s ? a12s : "(null)", "{ a₁₂ | a₁₂ = 1 }");
     }
 
     if (a123s && str_eq(a123s, "{ a₁₂₃ | a₁₂₃ = 1 }")) {
-        to_string_pass("normalize a123", a123s, "{ a₁₂₃ | a₁₂₃ = 1 }");
+        to_string_pass("normalise a123", a123s, "{ a₁₂₃ | a₁₂₃ = 1 }");
     } else {
-        to_string_fail(__FILE__, __LINE__, 1, "normalize a123",
+        to_string_fail(__FILE__, __LINE__, 1, "normalise a123",
                        a123s ? a123s : "(null)", "{ a₁₂₃ | a₁₂₃ = 1 }");
     }
 
     if (pi1s && str_eq(pi1s, "{ π₁ | π₁ = 1 }")) {
-        to_string_pass("normalize @pi1", pi1s, "{ π₁ | π₁ = 1 }");
+        to_string_pass("normalise @pi1", pi1s, "{ π₁ | π₁ = 1 }");
     } else {
-        to_string_fail(__FILE__, __LINE__, 1, "normalize @pi1",
+        to_string_fail(__FILE__, __LINE__, 1, "normalise @pi1",
                        pi1s ? pi1s : "(null)", "{ π₁ | π₁ = 1 }");
     }
 
     if (pi2s && str_eq(pi2s, "{ π₂ | π₂ = 1 }")) {
-        to_string_pass("normalize @pi_2", pi2s, "{ π₂ | π₂ = 1 }");
+        to_string_pass("normalise @pi_2", pi2s, "{ π₂ | π₂ = 1 }");
     } else {
-        to_string_fail(__FILE__, __LINE__, 1, "normalize @pi_2",
+        to_string_fail(__FILE__, __LINE__, 1, "normalise @pi_2",
                        pi2s ? pi2s : "(null)", "{ π₂ | π₂ = 1 }");
     }
 
@@ -1321,11 +1321,11 @@ static void test_from_string_bindings_with_constant_expression_value(void)
                      "{ x | x = (pi^2)/2 }",
                      "π²/2",
                      __LINE__);
-    check_parse_expr("pure numeric expression preserves full math tree",
+    check_parse_expr("pure numeric expression preserves full mathematical tree",
                      "{ phi - 1/2(1+sqrt(5)) }",
                      "φ - ¹⁄₂·(1 + √(5))",
                      __LINE__);
-    check_parse_expr("binding value preserves full math tree",
+    check_parse_expr("binding value preserves full mathematical tree",
                      "{ x | x = 1/2(1+sqrt(5)) }",
                      "¹⁄₂·(1 + √(5))",
                      __LINE__);
@@ -1333,7 +1333,7 @@ static void test_from_string_bindings_with_constant_expression_value(void)
                      "{ -x + phi | x = ½·(1 + √(5)) }",
                      "{ -x + φ | x = ½·(1 + √(5)) }",
                      __LINE__);
-    check_parse_expr("binding value preserves math notation functions",
+    check_parse_expr("binding value preserves mathematical notation functions",
                      "{ x | x = abs(-3)+floor(pi)+ceil(phi) }",
                      "|-3| + ⌊π⌋ + ⌈φ⌉",
                      __LINE__);
@@ -1658,7 +1658,7 @@ void test_dval_t_from_string(void)
     TEST_RUN_SUBTEST(test_from_string_named_consts, NULL);
     TEST_RUN_SUBTEST(test_from_string_bracketed_names, NULL);
     TEST_RUN_SUBTEST(test_from_string_number_literals, NULL);
-    TEST_RUN_SUBTEST(test_from_string_name_normalization, NULL);
+    TEST_RUN_SUBTEST(test_from_string_name_normalisation, NULL);
     TEST_RUN_SUBTEST(test_from_string_implicit_symbolic_bindings, NULL);
     TEST_RUN_SUBTEST(test_from_string_ascii_alternatives, NULL);
     TEST_RUN_SUBTEST(test_from_string_errors, NULL);

@@ -15,12 +15,10 @@ From the repository root:
 ```sh
 make bench_integrator
 make bench_matrix_dval
-make bench_mint_mul
-make bench_mint_div
-make bench_mrational_arith
-make bench_mfloat_maths
-make bench_mcomplex_maths
 make bench_number_maths
+make bench_number_scope
+make bench_qfloat_gamma_maths
+make bench_qcomplex_maths
 ```
 
 As with the test suites, prefer running benchmarks sequentially for now. The
@@ -117,73 +115,7 @@ These numbers are intended as a rough baseline for the current
 fraction-free symbolic elimination path rather than as a strict performance
 contract.
 
-## Integer and Multiprecision Benchmarks
-
-The repository also includes focused arithmetic benchmarks for the newer
-numeric cores.
-
-### `mint`
-
-Available benchmark targets include:
-
-```sh
-make bench_mint_arith
-make bench_mint_add
-make bench_mint_mul
-make bench_mint_div
-make bench_mint_gcd
-make bench_mint_combinatorics
-```
-
-These cover the main optimisation areas in the arbitrary-precision integer
-subsystem: small/native-word fast paths, wider multiply/divide behaviour,
-`gcd`/`lcm`/`modinv`, combinatorics helpers, and a banded operand-size matrix
-for the core binary arithmetic paths.
-
-### `mrational`
-
-Available benchmark target:
-
-```sh
-make bench_mrational_arith
-```
-
-This benchmark reports one combined timing table for:
-
-- `mr_add`
-- `mr_sub`
-- `mr_mul`
-- `mr_div`
-- `mr_inv`
-
-Rows are grouped by operation and numerator-bit band, columns by
-denominator-bit band, and each cell reports the average time per call.
-
-### `mfloat`
-
-The native multiprecision floating-point layer now has:
-
-```sh
-make bench_mfloat_maths
-```
-
-This benchmark reports direct timings for native `mfloat` math paths such as:
-
-- `exp`
-- `log`
-- `sin`
-- `cos`
-- `atan`
-- `pow`
-- `pi`, `e`, and Euler–Mascheroni construction at higher precision
-
-There is also a compare helper:
-
-```sh
-bench/mfloat/compare_mfloat_maths.sh <git-ref>
-```
-
-Use a reference that already contains the `mfloat` subsystem.
+## Numeric Benchmarks
 
 ### `number`
 
@@ -199,8 +131,7 @@ There is also a scope-focused benchmark target:
 make bench_number_scope
 ```
 
-This benchmark mirrors the `mfloat` maths coverage through the generic
-`number_t` API, including:
+This benchmark exercises the generic `number_t` API, including:
 
 - elementary functions such as `exp`, `log`, `sqrt`, `sin`, `cos`, `atan`,
   `sinh`, `tanh`, and `pow`
@@ -212,8 +143,8 @@ This benchmark mirrors the `mfloat` maths coverage through the generic
 
 Because `number_t` accepts exact integer and rational inputs as well as
 floating-point values, this benchmark is useful for measuring the combined cost
-of generic promotion, backend dispatch, and the underlying maths implementation
-on the same workloads used by `bench_mfloat_maths`.
+of generic promotion, backend dispatch, and the underlying maths
+implementation.
 
 The scope benchmark focuses specifically on temporary-lifetime management. It
 compares:
@@ -226,19 +157,14 @@ compares:
 Current sample timings on the benchmark machine for that scope benchmark:
 
 ```text
-mfloat chain             manual= 129.082 ms  scoped= 125.772 ms  ratio= 1.026x
-mfloat scoped+roll       manual= 129.082 ms  scoped= 110.554 ms  ratio= 1.168x
-mcomplex chain           manual= 221.584 ms  scoped= 225.807 ms  ratio= 0.981x
-mcomplex scoped+roll     manual= 221.584 ms  scoped= 198.489 ms  ratio= 1.116x
+real chain               manual= 129.082 ms  scoped= 125.772 ms  ratio= 1.026x
+real scoped+roll         manual= 129.082 ms  scoped= 110.554 ms  ratio= 1.168x
+complex chain            manual= 221.584 ms  scoped= 225.807 ms  ratio= 0.981x
+complex scoped+roll      manual= 221.584 ms  scoped= 198.489 ms  ratio= 1.116x
 ```
 
-Current sample timings on the benchmark machine:
-
-Use `MARS_BENCH_FORMAT=md` with the benchmark binaries when you want
-docs-ready tables instead of the ordinary line-by-line terminal output. The
-module-specific docs for [`mint`](mint.md), [`mrational`](mrational.md),
-[`mfloat`](mfloat.md), [`number`](number.md), and [`mcomplex`](mcomplex.md)
-include current sample tables captured that way.
+Use `MARS_BENCH_FORMAT=md` with benchmark binaries when you want docs-ready
+tables instead of the ordinary line-by-line terminal output.
 
 ### `qfloat`
 
@@ -315,40 +241,3 @@ e1_1_plus_1i                 avg_µs=    30.136 avg_ms=     0.030
 beta_1_5_0_5__2_-0_3         avg_µs=    26.146 avg_ms=     0.026
 logbeta_1_5_0_5__2_-0_3      avg_µs=    24.514 avg_ms=     0.025
 ```
-
-### `mcomplex`
-
-Available benchmark target:
-
-```sh
-make bench_mcomplex_maths
-```
-
-This benchmark mirrors the current `qcomplex` coverage and tracks the native
-`mcomplex` replacement work:
-
-- `mc_exp(1+i)` and `mc_log(1+i)`
-- `mc_erf(0.5+0.5i)` and `mc_erfc(0.5+0.5i)`
-- complex gamma-family calls including `mc_gamma`, `mc_lgamma`, `mc_digamma`,
-  `mc_trigamma`, and `mc_tetragamma`
-- pure-real `mc_gamma(2.3 + 0i)` and `mc_lgamma(2.3 + 0i)` for apples-to-apples
-  comparison with `mfloat`
-- real and genuinely complex `mc_gammainv` cases
-- `mc_productlog` and `mc_lambert_wm1`
-- `mc_ei`, `mc_e1`, `mc_beta`, and `mc_logbeta`
-
-Recent sample timings on this tree:
-
-```text
-exp_0_567_plus_0_321i_512    bits=512  avg_µs=    21.237 avg_ms=     0.021
-log_0_567_plus_0_321i_512    bits=512  avg_µs=    36.909 avg_ms=     0.037
-productlog_1_plus_1i_512     bits=512  avg_µs=   144.221 avg_ms=     0.144
-ei_1_plus_1i_512             bits=512  avg_µs=    31.214 avg_ms=     0.031
-e1_1_plus_1i_512             bits=512  avg_µs=    31.427 avg_ms=     0.031
-```
-
-The current `mcomplex` implementation still has remaining wrapper-era paths, so
-these numbers should be read as active optimisation checkpoints rather than
-final end-state timings. The bench target still covers the pure-real gamma and
-lgamma cases; this snapshot highlights the complex hot paths we tuned in this
-phase.

@@ -96,8 +96,8 @@ bool dv_match_affine_poly_deg4_times_unary_affine_kind(const dval_t *expr,
 /* Symbol normalisation / default constants                                  */
 /* ------------------------------------------------------------------------- */
 
-char *dv_normalize_name(const char *name);
-char *dv_normalize_binding_name(const char *name);
+char *dv_normalise_name(const char *name);
+char *dv_normalise_binding_name(const char *name);
 int dv_is_default_constant_name(const char *name);
 const char *dv_default_constant_canonical_name(const char *name);
 

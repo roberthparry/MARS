@@ -261,10 +261,10 @@ int main(void)
     double complex_scoped = bench_complex_scoped();
     double complex_scoped_rolling = bench_complex_scoped_rolling();
 
-    bench_report("mfloat chain", real_manual, real_scoped);
-    bench_report("mfloat scoped+roll", real_manual, real_scoped_rolling);
-    bench_report("mcomplex chain", complex_manual, complex_scoped);
-    bench_report("mcomplex scoped+roll", complex_manual, complex_scoped_rolling);
+    bench_report("real chain", real_manual, real_scoped);
+    bench_report("real scoped+roll", real_manual, real_scoped_rolling);
+    bench_report("complex chain", complex_manual, complex_scoped);
+    bench_report("complex scoped+roll", complex_manual, complex_scoped_rolling);
     printf("sink=%.17g\n", g_sink);
     return !isfinite(g_sink);
 }

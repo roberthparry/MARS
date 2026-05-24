@@ -10,11 +10,7 @@ This directory contains the longer module documentation for MARS.
 
 ## Modules
 
-- [`mint_t`](mint.md) — arbitrary-precision signed integers and number theory helpers
-- [`mrational_t`](mrational.md) — opaque exact rational arithmetic backed by `mint_t`
 - [`number_t`](number.md) — generic numeric value cluster over exact, fixed-precision, and multiprecision backends
-- [`mfloat_t`](mfloat.md) — opaque multiprecision floating-point arithmetic
-- [`mcomplex_t`](mcomplex.md) — opaque multiprecision complex arithmetic backed by `mfloat_t`
 - [`qfloat_t`](qfloat.md) — double-double arithmetic and special functions
 - [`qcomplex_t`](qcomplex.md) — double-double complex arithmetic and special functions
 - [`matrix_t`](matrix.md) — generic high-precision matrix with pluggable element types and storage kinds
@@ -35,8 +31,8 @@ This directory contains the longer module documentation for MARS.
 
 ## Acknowledgements
 
-The modern multiprecision numeric modules are wrappers around the GNU
-multiprecision libraries:
+`number_t` uses the GNU multiprecision libraries internally for its exact and
+multiprecision backends:
 
 - [GMP](https://gmplib.org/) for integer and rational arithmetic
 - [MPFR](https://www.mpfr.org/) for correctly rounded multiprecision floats

@@ -282,7 +282,7 @@ static char *mf_read_simple_name(const char **pp)
     *pp = p;
     if (!had_at)
         return mf_strdup(buf);
-    return dv_normalize_name(buf);
+    return dv_normalise_name(buf);
 }
 
 static char *mf_read_any_name(const char **pp)
@@ -1218,7 +1218,7 @@ dval_t *mat_bindings_get(mat_bindings_t *bindings, const char *name)
     if (!bindings || !name)
         return NULL;
 
-    norm = dv_normalize_binding_name(name);
+    norm = dv_normalise_binding_name(name);
     if (!norm)
         return NULL;
 

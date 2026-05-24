@@ -287,7 +287,7 @@ static const greek_entry_t *lookup_greek_name(const char *kw, size_t klen)
     return NULL;
 }
 
-char *dv_normalize_name(const char *name)
+char *dv_normalise_name(const char *name)
 {
     const char *s;
     const char *e;
@@ -413,7 +413,7 @@ char *dv_normalize_name(const char *name)
     return canon;
 }
 
-char *dv_normalize_binding_name(const char *name)
+char *dv_normalise_binding_name(const char *name)
 {
     const char *s;
     const char *e;
@@ -448,7 +448,7 @@ char *dv_normalize_binding_name(const char *name)
         abort();
     memcpy(trimmed, s, n);
     trimmed[n] = '\0';
-    out = dv_normalize_name(dv_default_constant_canonical_name(trimmed));
+    out = dv_normalise_name(dv_default_constant_canonical_name(trimmed));
     free(trimmed);
 
     return out;
@@ -649,7 +649,7 @@ dval_t *dv_new_var(number_t x)
 
 static dval_t *dv_attach_name(dval_t *dv, const char *name)
 {
-    dv->name = dv_normalize_name(name);
+    dv->name = dv_normalise_name(name);
     return dv;
 }
 

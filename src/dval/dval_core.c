@@ -8,7 +8,7 @@
  *   - Lazy primal evaluation (dv_eval) via vtable dispatch (ops->eval)
  *   - Lazy derivative construction (dv_get_deriv / dv_create_deriv) via
  *     vtable dispatch (ops->deriv), with the result cached in dval_t::dx_cache
- *   - All arithmetic and math operator constructors (dv_add, dv_sin, etc.)
+ *   - All arithmetic and mathematical operator constructors (dv_add, dv_sin, etc.)
  *   - dv_cmp, dv_print, and other accessors
  *
  * The operator implementations (eval/deriv bodies) live in the same file,
@@ -59,12 +59,12 @@ static struct _dval_t _DV_NAN_NODE = {
 
 static dval_t *dv_nan_const_shared(void)
 {
-    static int initialized = 0;
+    static int initialised = 0;
 
-    if (!initialized) {
+    if (!initialised) {
         _DV_NAN_NODE.c = NUM_NAN;
         _DV_NAN_NODE.x = NUM_NAN;
-        initialized = 1;
+        initialised = 1;
     }
     return &_DV_NAN_NODE;
 }
@@ -223,7 +223,7 @@ void dv_set_name(dval_t *dv, const char *name)
 {
     if (!dv) return;
     if (dv->name) free(dv->name);
-    dv->name = dv_normalize_name(name);
+    dv->name = dv_normalise_name(name);
     dv->epoch++;
     dv->simplified = false;
     dv->simplify_epoch = 0;

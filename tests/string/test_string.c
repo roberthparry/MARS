@@ -333,7 +333,7 @@ static void test_readme_example_Basic_UTF_8_Manipulation(void) {
     /* Insert at grapheme index */
     string_insert(s, 1, "🙂");
 
-    /* Normalize to NFC */
+    /* Normalise to NFC */
     string_normalize(s, STRING_NORM_NFC);
 
     printf("%s\n", string_c_str(s));
@@ -397,7 +397,7 @@ int tests_main(void)
     TEST_RUN_CASE(test_grapheme, NULL);
     TEST_RUN_CASE(test_grapheme_reverse_and_substr, NULL);
 
-    TEST_SECTION("Normalization");
+    TEST_SECTION("Normalisation");
     TEST_RUN_CASE(test_norm_ascii_inplace, NULL);
     TEST_RUN_CASE(test_norm_combining_inplace, NULL);
     TEST_RUN_CASE(test_norm_hangul_inplace, NULL);

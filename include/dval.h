@@ -13,7 +13,7 @@
  *   • Any function whose name begins with dv_new_* or dv_create_* returns
  *     an owning handle. The caller must call dv_free() exactly once.
  *
- *   • All arithmetic and math functions (dv_add, dv_mul, dv_sin, …) also
+ *   • All arithmetic and mathematical functions (dv_add, dv_mul, dv_sin, …) also
  *     return owning handles. The caller must dv_free() them.
  *
  *   • dv_get_deriv() returns a *borrowed* view. The caller must NOT free it.
@@ -420,7 +420,7 @@ dval_t *dv_simplify(const dval_t *dv);
  *                     or "{ 1 }" when no bindings are needed
  * style_FUNCTION    — C-like function notation, e.g.
  *                     "number expr(number x) { return sin(x); }"
- * style_TEX         — TeX math notation, e.g. "\left\{ x_{0} \;\middle|\; x_{0} = 1.0 \right\}"
+ * style_TEX         — TeX mathematical notation, e.g. "\left\{ x_{0} \;\middle|\; x_{0} = 1.0 \right\}"
  */
 typedef enum {
     style_FUNCTION,
@@ -429,7 +429,7 @@ typedef enum {
 } style_t;
 
 /**
- * @brief Serialize @p dv to a newly allocated string.
+ * @brief Serialise @p dv to a newly allocated string.
  *
  * The format is controlled by @p style (see style_t).
  * The expression style produces output that can be round-tripped through

@@ -17,16 +17,21 @@
  * may store exact, fixed-precision, or multiprecision numeric representations
  * internally while keeping one stable public API.
  *
- * Construction is explicit for typed inputs, while string parsing chooses the
- * most suitable representation by syntax:
+ * Construction is explicit for typed inputs. `num_create_from_double()` and
+ * `num_create_from_cdouble()` keep double precision; `num_create_from_qfloat()`
+ * and `num_create_from_qcomplex()` keep double-double precision. String
+ * parsing chooses the most suitable representation by syntax:
  *
  * - integer text -> an internal MPZ-backed exact integer
  * - `a/b` fraction text -> an internal MPQ-backed exact rational
  * - decimal / scientific real text -> an internal MPFR-backed real
- * - complex text -> an internal multiprecision complex representation
+ * - complex text -> an internal exact or multiprecision complex representation
  *
- * Unless a precision is specified explicitly, multiprecision construction
- * uses `1024` bits.
+ * Unless a precision is specified explicitly, multiprecision construction uses
+ * the current default precision (`1024` bits initially). Setter functions for
+ * inexact values preserve the destination precision policy, while exact
+ * setters such as `num_set_long()` and `num_set_frac()` replace the destination
+ * with exact storage.
  *
  * Ownership model:
  *

@@ -27,7 +27,7 @@ static int qc_has_imag_suffix(char c)
     return c == 'i' || c == 'j';
 }
 
-static void qc_normalize_unit_imag(char *text)
+static void qc_normalise_unit_imag(char *text)
 {
     if (strcmp(text, "") == 0 || strcmp(text, "+") == 0)
         strcpy(text, "1");
@@ -185,7 +185,7 @@ qcomplex_t qc_from_string(const char *s)
         size_t RL = strlen(right);
         if (RL > 0 && qc_has_imag_suffix(right[RL - 1])) {
             right[RL - 1] = '\0';
-            qc_normalize_unit_imag(right);
+            qc_normalise_unit_imag(right);
 
             if (qc_parse_real_imag_parts(left, right, &z) != 0)
                 return qc_parse_fail("invalid numbers in a±bi", s_original);
@@ -195,7 +195,7 @@ qcomplex_t qc_from_string(const char *s)
 
         if (split > 0 && qc_has_imag_suffix(left[split - 1])) {
             left[split - 1] = '\0';
-            qc_normalize_unit_imag(left);
+            qc_normalise_unit_imag(left);
 
             if (qc_parse_real_imag_parts(right, left, &z) != 0)
                 return qc_parse_fail("invalid numbers in bi±a", s_original);
@@ -214,7 +214,7 @@ qcomplex_t qc_from_string(const char *s)
 
         memcpy(tmp, buf, L2 - 1);
         tmp[L2 - 1] = '\0';
-        qc_normalize_unit_imag(tmp);
+        qc_normalise_unit_imag(tmp);
         if (qc_parse_real_imag_parts("0", tmp, &z) != 0)
             return qc_parse_fail("invalid imaginary number", s_original);
 

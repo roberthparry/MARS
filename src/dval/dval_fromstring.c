@@ -939,11 +939,11 @@ static dval_t *parse_atom(parser_t *p)
 
     dval_t *sym = symtab_lookup(p->syms, name);
     if (!sym) {
-        char *normalized = dv_normalize_name(dv_default_constant_canonical_name(name));
+        char *normalised = dv_normalise_name(dv_default_constant_canonical_name(name));
 
-        if (normalized) {
-            sym = symtab_lookup(p->syms, normalized);
-            free(normalized);
+        if (normalised) {
+            sym = symtab_lookup(p->syms, normalised);
+            free(normalised);
         }
     }
     if (!sym) {
@@ -1172,7 +1172,7 @@ static int parse_bindings(const char *s, const char *end,
         num_destroy(&val);
         node->binding_expr = binding_expr;
 
-        /* dv_new_named_* calls dv_normalize_name, which may transform the name
+        /* dv_new_named_* calls dv_normalise_name, which may transform the name
          * (e.g. "@pi" → "π").  Use the normalised form as the lookup key so it
          * matches what the expression text will contain after its own read_any_name. */
         const char *key = (node->name && *node->name) ? node->name : name;
@@ -1322,7 +1322,7 @@ static int collect_implicit_symbols(const char *start, const char *end,
                 : dv_new_named_var(NUM_NAN, name);
         }
 
-        key = dv_normalize_name(canonical_name);
+        key = dv_normalise_name(canonical_name);
         if (!key)
             key = strdup(canonical_name);
         if (!key) {
@@ -1578,7 +1578,7 @@ static dval_binding_entry_t *bnd_find_entry(dval_bindings_t *bnd,
     if (!bnd || !bnd->index || !name)
         return NULL;
 
-    norm = dv_normalize_binding_name(name);
+    norm = dv_normalise_binding_name(name);
     if (!norm)
         return NULL;
 

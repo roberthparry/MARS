@@ -316,8 +316,8 @@ static void test_mat_from_string_symbolic_math_conventions(void)
     number_t phi_sum = num_add(NUM_ONE, sqrt_five);
     number_t phi_expected = num_div(phi_sum, NUM_TWO);
 
-    check_bool("mat_from_string math-convention symbolic matrix non-null", A != NULL);
-    check_bool("mat_from_string math-convention symbolic matrix type",
+    check_bool("mat_from_string mathematical-convention symbolic matrix non-null", A != NULL);
+    check_bool("mat_from_string mathematical-convention symbolic matrix type",
                A && mat_typeof(A) == MAT_TYPE_DVAL);
 
     x_binding = mat_bindings_get(bindings, "x");
@@ -331,16 +331,16 @@ static void test_mat_from_string_symbolic_math_conventions(void)
     a_binding = mat_bindings_get(bindings, "a");
     d2_binding = mat_bindings_get(bindings, "d₂");
 
-    check_bool("math-convention x binding present", x_binding != NULL);
-    check_bool("math-convention e binding present", e_binding != NULL);
-    check_bool("math-convention π binding present", pi_binding != NULL);
-    check_bool("math-convention φ binding present", phi_binding != NULL);
-    check_bool("math-convention γ binding present", gamma_binding != NULL);
-    check_bool("math-convention τ binding present", tau_binding != NULL);
-    check_bool("math-convention radius binding present", radius_binding != NULL);
-    check_bool("math-convention c₁ binding present", c1_binding != NULL);
-    check_bool("math-convention a binding present", a_binding != NULL);
-    check_bool("math-convention d₂ binding present", d2_binding != NULL);
+    check_bool("mathematical-convention x binding present", x_binding != NULL);
+    check_bool("mathematical-convention e binding present", e_binding != NULL);
+    check_bool("mathematical-convention π binding present", pi_binding != NULL);
+    check_bool("mathematical-convention φ binding present", phi_binding != NULL);
+    check_bool("mathematical-convention γ binding present", gamma_binding != NULL);
+    check_bool("mathematical-convention τ binding present", tau_binding != NULL);
+    check_bool("mathematical-convention radius binding present", radius_binding != NULL);
+    check_bool("mathematical-convention c₁ binding present", c1_binding != NULL);
+    check_bool("mathematical-convention a binding present", a_binding != NULL);
+    check_bool("mathematical-convention d₂ binding present", d2_binding != NULL);
 
     if (e_binding)
         e_initial = dv_eval(e_binding);
@@ -353,29 +353,29 @@ static void test_mat_from_string_symbolic_math_conventions(void)
     if (tau_binding)
         tau_initial = dv_eval(tau_binding);
 
-    check_matrix_fromstring_dv_num("math-convention e built-in value",
+    check_matrix_fromstring_dv_num("mathematical-convention e built-in value",
                                    e_binding, NUM_E, 1e-30);
-    check_matrix_fromstring_dv_num("math-convention π built-in value",
+    check_matrix_fromstring_dv_num("mathematical-convention π built-in value",
                                    pi_binding, NUM_PI, 1e-30);
-    check_matrix_fromstring_dv_num("math-convention φ built-in value",
+    check_matrix_fromstring_dv_num("mathematical-convention φ built-in value",
                                    phi_binding, phi_expected, 1e-30);
-    check_matrix_fromstring_dv_num("math-convention γ built-in value",
+    check_matrix_fromstring_dv_num("mathematical-convention γ built-in value",
                                    gamma_binding, NUM_EULER_MASCHERONI, 1e-30);
-    check_bool("math-convention τ still starts as variable NaN",
+    check_bool("mathematical-convention τ still starts as variable NaN",
                tau_binding && num_is_nan(tau_initial));
 
     if (A) {
         mat_get(A, 0, 1, &dv);
-        check_matrix_fromstring_dv_num("math-convention matrix e entry",
+        check_matrix_fromstring_dv_num("mathematical-convention matrix e entry",
                                        dv, NUM_E, 1e-30);
         mat_get(A, 1, 0, &dv);
-        check_matrix_fromstring_dv_num("math-convention matrix π entry",
+        check_matrix_fromstring_dv_num("mathematical-convention matrix π entry",
                                        dv, NUM_PI, 1e-30);
         mat_get(A, 2, 0, &dv);
-        check_matrix_fromstring_dv_num("math-convention matrix φ entry",
+        check_matrix_fromstring_dv_num("mathematical-convention matrix φ entry",
                                        dv, phi_expected, 1e-30);
         mat_get(A, 2, 1, &dv);
-        check_matrix_fromstring_dv_num("math-convention matrix γ entry",
+        check_matrix_fromstring_dv_num("mathematical-convention matrix γ entry",
                                        dv, NUM_EULER_MASCHERONI, 1e-30);
     }
 

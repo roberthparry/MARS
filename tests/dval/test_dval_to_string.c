@@ -1517,9 +1517,9 @@ static void test_to_string_function_style_preserves_math_names(void)
                          "}";
 
     if (str_eq(got, expect))
-        to_string_pass("function style preserves math names (FUNC)", got, expect);
+        to_string_pass("function style preserves mathematical names (FUNC)", got, expect);
     else
-        to_string_fail(__FILE__, __LINE__, 1, "function style preserves math names (FUNC)", got, expect);
+        to_string_fail(__FILE__, __LINE__, 1, "function style preserves mathematical names (FUNC)", got, expect);
 
     free(got);
     dv_free(f);

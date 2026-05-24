@@ -951,7 +951,7 @@ static void sort_factors(dval_t **fac, int n)
 }
 
 /* ------------------------------------------------------------------------- */
-/* EXPRESSION MODE (pretty math)                                             */
+/* EXPRESSION MODE (pretty maths)                                            */
 /* ------------------------------------------------------------------------- */
 
 static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec);

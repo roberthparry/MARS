@@ -9,7 +9,7 @@
  *   Split/join   — string_split_views (zero-copy), string_split,
  *                  string_join, string_join_views
  *   Replace      — string_replace_first, string_replace_all
- *   Normalisation — string_normalize_nfc, string_normalize_nfd, etc.
+ *   Normalisation — string_normalize and related Unicode helpers.
  *                   (requires libunistring; no-op stubs otherwise)
  *
  * When compiled with -DHAVE_UNISTRING, the Unicode normalisation functions
@@ -154,7 +154,7 @@ int string_buffer_append_char(string_buffer_t *b, char c)
 
 /* Normalisation hook (stub) */
 
-static int utf8_normalize_external(const char *in, size_t in_len,
+static int utf8_normalise_external(const char *in, size_t in_len,
                                    char **out, size_t *out_len,
                                    string_norm_form_t form)
 {
@@ -201,7 +201,7 @@ int string_normalize(string_t *s, string_norm_form_t form)
     char *norm = NULL;
     size_t norm_len = 0;
 
-    if (utf8_normalize_external(s->data, s->len, &norm, &norm_len, form) != 0)
+    if (utf8_normalise_external(s->data, s->len, &norm, &norm_len, form) != 0)
         return -1;
 
     if (string_reserve(s, norm_len + 1) != 0) {

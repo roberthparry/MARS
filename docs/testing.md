@@ -28,11 +28,7 @@ tests/build/release/qfloat/test_qfloat
 ## Run Tests
 
 ```sh
-make test_mint
-make tests/build/release/mfloat/test_mfloat
-tests/build/release/mfloat/test_mfloat
-make tests/build/release/mcomplex/test_mcomplex
-tests/build/release/mcomplex/test_mcomplex
+make test_number
 make test_qfloat
 make test_qcomplex
 make test_dval
@@ -59,11 +55,7 @@ Before committing:
 
 ```sh
 make release
-make test_mint
-make tests/build/release/mfloat/test_mfloat
-tests/build/release/mfloat/test_mfloat
-make tests/build/release/mcomplex/test_mcomplex
-tests/build/release/mcomplex/test_mcomplex
+make test_number
 make test_qfloat
 make test_qcomplex
 make test_dval
@@ -109,7 +101,7 @@ In practice, the recommended pattern is:
    `TEST_RUN_OUTPUT(...)` or `TEST_RUN_OUTPUT_TAGS(...)`.
 7. Remove old suite-local comparison engines once the harness-backed validity
    path is established. Remaining helpers should be thin wrappers for
-   expected-value construction, labeling, or other domain-specific setup.
+   expected-value construction, labelling, or other domain-specific setup.
 
 Output examples still participate in config discovery, enable/disable
 selection, filtering, and machine-readable reporting, but they are counted
@@ -119,22 +111,18 @@ The current model suites are:
 
 - `qfloat`: suite-owned closeness contracts, including tolerance-aware variants
   for numerically sensitive regions.
-- `mfloat`: suite-owned absolute and relative validity modes.
-- `mcomplex`: a suite-owned default complex validity lane plus explicit
-  precision-bit-aware variants for branch-sensitive and numerically harder
-  regions, while keeping rich complex-value diagnostics local to the suite.
 - `number`: separate lanes for semantic value equality, exact string rendering,
   and prefix/presentation checks.
 - `matrix`: suite-owned double, mp-real, and complex validity lanes; output
   examples on the output lane; and no remaining parallel legacy comparison
   subsystem.
 
-Those five suites now show the intended end-state of the harness more clearly
+Those three suites now show the intended end-state of the harness more clearly
 than older compatibility-era suites.
 
 ## Recommended Authoring Pattern
 
-For a new or modernized suite, the preferred shape is:
+For a new or modernised suite, the preferred shape is:
 
 1. Put foundational readiness checks in `TEST_SUITE_SETUP(...)`.
 2. Register one or more named validity contracts there.
@@ -159,10 +147,8 @@ integrator work:
 ```sh
 make bench_integrator
 make bench_matrix_dval
-make bench_mint_mul
-make bench_mint_div
-make bench_mfloat_maths
-make bench_mcomplex_maths
+make bench_number_maths
+make bench_number_scope
 ```
 
 These benchmark targets track the numeric and symbolic hot paths we are

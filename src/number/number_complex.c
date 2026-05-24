@@ -538,7 +538,7 @@ static bool number_small_fraction_from_number(const number_t *value,
     return true;
 }
 
-static bool number_small_fraction_normalize(__int128 n,
+static bool number_small_fraction_normalise(__int128 n,
                                             __int128 d,
                                             number_small_fraction_t *out)
 {
@@ -567,7 +567,7 @@ static bool number_small_fraction_add(number_small_fraction_t a,
                                       number_small_fraction_t b,
                                       number_small_fraction_t *out)
 {
-    return number_small_fraction_normalize(
+    return number_small_fraction_normalise(
         (__int128)a.n * b.d + (__int128)b.n * a.d,
         (__int128)a.d * b.d,
         out);
@@ -577,7 +577,7 @@ static bool number_small_fraction_sub(number_small_fraction_t a,
                                       number_small_fraction_t b,
                                       number_small_fraction_t *out)
 {
-    return number_small_fraction_normalize(
+    return number_small_fraction_normalise(
         (__int128)a.n * b.d - (__int128)b.n * a.d,
         (__int128)a.d * b.d,
         out);
@@ -587,7 +587,7 @@ static bool number_small_fraction_mul(number_small_fraction_t a,
                                       number_small_fraction_t b,
                                       number_small_fraction_t *out)
 {
-    return number_small_fraction_normalize(
+    return number_small_fraction_normalise(
         (__int128)a.n * b.n,
         (__int128)a.d * b.d,
         out);
@@ -597,7 +597,7 @@ static bool number_small_fraction_div(number_small_fraction_t a,
                                       number_small_fraction_t b,
                                       number_small_fraction_t *out)
 {
-    return number_small_fraction_normalize(
+    return number_small_fraction_normalise(
         (__int128)a.n * b.d,
         (__int128)a.d * b.n,
         out);
@@ -695,11 +695,11 @@ static number_t *number_mul_same_complex_small_integer_values(
     number_small_fraction_t real;
     number_small_fraction_t imag;
 
-    if (!number_small_fraction_normalize(
+    if (!number_small_fraction_normalise(
             (__int128)ar * br - (__int128)ai * bi,
             1,
             &real) ||
-        !number_small_fraction_normalize(
+        !number_small_fraction_normalise(
             (__int128)ar * bi + (__int128)ai * br,
             1,
             &imag))
@@ -717,11 +717,11 @@ static number_t *number_div_same_complex_small_integer_values(
     number_small_fraction_t real;
     number_small_fraction_t imag;
 
-    if (!number_small_fraction_normalize(
+    if (!number_small_fraction_normalise(
             (__int128)ar * br + (__int128)ai * bi,
             denom,
             &real) ||
-        !number_small_fraction_normalize(
+        !number_small_fraction_normalise(
             (__int128)ai * br - (__int128)ar * bi,
             denom,
             &imag))
@@ -738,11 +738,11 @@ static number_t *number_mul_same_complex_small_integer_parts(
     number_small_fraction_t real;
     number_small_fraction_t imag;
 
-    if (!number_small_fraction_normalize(
+    if (!number_small_fraction_normalise(
             (__int128)ar.n * br.n - (__int128)ai.n * bi.n,
             1,
             &real) ||
-        !number_small_fraction_normalize(
+        !number_small_fraction_normalise(
             (__int128)ar.n * bi.n + (__int128)ai.n * br.n,
             1,
             &imag))
@@ -760,11 +760,11 @@ static number_t *number_div_same_complex_small_integer_parts(
     number_small_fraction_t real;
     number_small_fraction_t imag;
 
-    if (!number_small_fraction_normalize(
+    if (!number_small_fraction_normalise(
             (__int128)ar.n * br.n + (__int128)ai.n * bi.n,
             denom,
             &real) ||
-        !number_small_fraction_normalize(
+        !number_small_fraction_normalise(
             (__int128)ai.n * br.n - (__int128)ar.n * bi.n,
             denom,
             &imag))

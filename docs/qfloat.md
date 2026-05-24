@@ -300,7 +300,7 @@ Current sample results from that command on this tree, measured on:
 
 Markdown output uses the release benchmark with `51` timed batches per case,
 records the sample median for each row, and times only the actual `qfloat`
-math operation after argument parsing and warmup.
+mathematical operation after argument parsing and warmup.
 
 Results:
 
@@ -329,6 +329,5 @@ Results:
 
 For a broader benchmark overview, see
 [`docs/benchmarks.md`](benchmarks.md).
-
 
 

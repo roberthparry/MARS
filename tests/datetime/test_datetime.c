@@ -142,7 +142,7 @@ void test_datetime_jdn_and_getJulianDay(void) {
     datetime_dealloc(dt);
 }
 
-void test_datetime_year_initialized(void) {
+void test_datetime_year_initialised(void) {
     datetime_t *dt = datetime_init_ymd(datetime_alloc(), 2022, 5, 10);
     ASSERT_EQ_INT(datetime_year(dt), 2022);
     datetime_dealloc(dt);
@@ -224,7 +224,7 @@ void test_datetime_to_gmt_multiple_calls(void) {
     datetime_dealloc(copy);
 }
 
-void test_datetime_to_gmt_uninitialized(void) {
+void test_datetime_to_gmt_uninitialised(void) {
     datetime_t *dt = datetime_alloc();
     ASSERT_NOT_NULL(datetime_to_gmt(dt));
     datetime_dealloc(dt);
@@ -415,7 +415,7 @@ void test_dttm_computeTimeZoneOffset_null_pointer(void) {
     ASSERT_TRUE(datetime_tz_offset(NULL) == DBL_MAX);
 }
 
-void test_dttm_computeTimeZoneOffset_uninitialized(void) {
+void test_dttm_computeTimeZoneOffset_uninitialised(void) {
     datetime_t *dt = datetime_alloc();
     ASSERT_TRUE(datetime_tz_offset(dt) == DBL_MAX);
     datetime_dealloc(dt);
@@ -432,7 +432,7 @@ void test_dttm_julian_roundtrip(void) {
 
     double jd = datetime_jd(dt);
     datetime_t *copy = datetime_init_jd(datetime_alloc(), jd);
-    datetime_year(copy);  // force initialization
+    datetime_year(copy);  // force initialisation
 
     TEST_ASSERT_DATETIME_EQ(copy, dt);
 
@@ -549,7 +549,7 @@ int tests_main(void) {
     /* Basic Julian and date initialisation tests */
     TEST_RUN_CASE(test_datetime_init_jd, NULL);
     TEST_RUN_CASE(test_datetime_jdn_and_getJulianDay, NULL);
-    TEST_RUN_CASE(test_datetime_year_initialized, NULL);
+    TEST_RUN_CASE(test_datetime_year_initialised, NULL);
     TEST_RUN_CASE(test_datetime_init_now, NULL);
 
     /* GMT conversion tests */
@@ -557,7 +557,7 @@ int tests_main(void) {
     TEST_RUN_CASE(test_datetime_to_gmt_null_pointer, NULL);
     TEST_RUN_CASE(test_datetime_to_gmt_preserves_julian_values, NULL);
     TEST_RUN_CASE(test_datetime_to_gmt_multiple_calls, NULL);
-    TEST_RUN_CASE(test_datetime_to_gmt_uninitialized, NULL);
+    TEST_RUN_CASE(test_datetime_to_gmt_uninitialised, NULL);
     TEST_RUN_CASE(test_datetime_to_gmt_with_julian_values, NULL);
 
     /* Easter Sunday tests */
@@ -583,7 +583,7 @@ int tests_main(void) {
     /* Timezone offset tests */
     TEST_RUN_CASE(test_dttm_computeTimeZoneOffset_basic, NULL);
     TEST_RUN_CASE(test_dttm_computeTimeZoneOffset_null_pointer, NULL);
-    TEST_RUN_CASE(test_dttm_computeTimeZoneOffset_uninitialized, NULL);
+    TEST_RUN_CASE(test_dttm_computeTimeZoneOffset_uninitialised, NULL);
 
     /* Julian consistency, getters, comparisons, days-in-month */
     TEST_RUN_CASE(test_dttm_julian_roundtrip, NULL);

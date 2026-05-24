@@ -1,6 +1,6 @@
 # TeX Preview Experiment
 
-If your Markdown viewer supports math, the blocks below should render as
+If your Markdown viewer supports maths, the blocks below should render as
 typeset mathematics rather than raw TeX source.
 
 ## dval
@@ -81,8 +81,8 @@ $$
 
 ## layout experiments
 
-These are here to see whether the Markdown previewer honors any surrounding
-layout for display math.
+These are here to see whether the Markdown previewer honours any surrounding
+layout for display maths.
 
 ### blockquote
 
@@ -112,5 +112,5 @@ $$
 
 ### inline fallback
 
-This is inline math, so it should flow with the text rather than centering:
+This is inline maths, so it should flow with the text rather than centring:
 $\left\{ x_{0} \;\middle|\; x_{0} = 42 \right\}$.

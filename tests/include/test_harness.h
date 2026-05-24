@@ -65,7 +65,7 @@ extern test_post_summary_fn test_post_summary_hook;
  *    checks such as validity registration.
  * 8. Prefer removing suite-local comparison engines once the harness-backed
  *    validity path is established. Helpers that remain should be thin wrappers
- *    for expected-value construction, labeling, or other domain-specific
+ *    for expected-value construction, labelling, or other domain-specific
  *    setup, not parallel assertion subsystems.
  */
 

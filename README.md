@@ -1,7 +1,7 @@
 # MARS
 
 ![CI](https://github.com/rparry/MARS/actions/workflows/ci.yml/badge.svg)
-![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+![Licence: MIT](https://img.shields.io/badge/Licence-MIT-yellow.svg)
 ![C99/GNU C](https://img.shields.io/badge/C-C99%20%2B%20GNU%20extensions-blue.svg)
 
 Linux-focused C99/GNU C library for high-precision numerics, automatic
@@ -12,9 +12,9 @@ some GNU C extensions, so MSVC/Windows builds are not currently guaranteed.
 
 ## Highlights
 
-- **`mint_t`** — arbitrary-precision signed integers with number theory, combinatorics, and sequence helpers
-- **`mfloat_t`** — opaque multiprecision floating-point values with exact conversion, pretty/scientific formatting, and a growing native math layer
-- **`number_t`** — generic numeric value cluster spanning exact, fixed-precision, and multiprecision backends behind one by-value public handle
+- **`number_t`** — generic numeric value cluster spanning exact integer/rational,
+  fixed-precision, and multiprecision real/complex backends behind one by-value
+  public handle
 - **`qfloat_t`** — double-double arithmetic and special functions (~34 decimal digits of precision)
 - **`matrix_t`** — generic high-precision matrix over numeric `number_t` values or symbolic `dval_t *` entries, with string-based matrix parsing and formatting, symbolic linear algebra support including Schur complements, block inverse/solve, Jordan helpers, entrywise matrix derivatives, Jacobian helpers, first matrix-calculus helpers for trace, determinant, inverse, block inverse, solve, and block solve, and high-precision eigendecomposition and matrix functions through the numeric `number_t` layer
 - **`dval_t`** — differentiable expression DAGs with first/second derivatives, symbolic matrix integration, and structural matcher helpers for higher-level symbolic code
@@ -86,41 +86,39 @@ int main(void) {
 W0(1) = 0.5671432904097838729999686622103575
 ```
 
-**Multiprecision floating-point arithmetic with `mfloat_t`:**
+**Multiprecision arithmetic with `number_t`:**
 
 ```c
 #include <stdio.h>
-#include "mfloat.h"
+#include "number.h"
 
 int main(void) {
-    mfloat_t *x;
-    mfloat_t *y;
+    number_t x;
+    number_t gamma_x;
+    number_t lgamma_x;
     char buf[256];
 
-    mf_set_default_precision(256);
-    x = mf_create_string("2.3");
-    y = mf_create_string("2.3");
-    if (!x || !y)
-        return 1;
+    num_set_default_prec_bits(256);
+    x = num_create_from_string("2.345");
+    gamma_x = num_gamma(x);
+    lgamma_x = num_lgamma(x);
 
-    if (mf_gamma(x) != 0 || mf_lgamma(y) != 0)
-        return 1;
+    num_sprintf(buf, sizeof(buf), "%.77n", gamma_x);
+    printf("gamma(2.345)  = %s\n", buf);
 
-    mf_sprintf(buf, sizeof(buf), "%.77mf", x);
-    printf("gamma(2.3)  = %s\n", buf);
+    num_sprintf(buf, sizeof(buf), "%.77n", lgamma_x);
+    printf("lgamma(2.345) = %s\n", buf);
 
-    mf_sprintf(buf, sizeof(buf), "%.77mf", y);
-    printf("lgamma(2.3) = %s\n", buf);
-
-    mf_free(x);
-    mf_free(y);
+    num_destroy(&lgamma_x);
+    num_destroy(&gamma_x);
+    num_destroy(&x);
     return 0;
 }
 ```
 
 ```text
-gamma(2.3)  = 1.16671190519816034504188144120291793853399434971946889397020666387299161947176
-lgamma(2.3) = 0.15418945495963058108991791148922317269570397608961402272570768556406857691921
+gamma(2.345)  = 1.1992978294153192855268153358879569120923525584905703781289979370034378685904
+lgamma(2.345) = 0.18173624337757203797862933229995978550118791690492470651875093221924437275614
 ```
 
 **Generic numeric arithmetic with `number_t`:**
@@ -268,70 +266,6 @@ int main(void) {
 ) | Δ = 1.5, Ω = 0.25 }
 ```
 
-**Searching for Mersenne primes with `mint_t` up to `p = 4423`:**
-
-```c
-#include <stdio.h>
-#include "mint.h"
-
-int main(void) {
-    unsigned found = 0;
-    unsigned p;
-
-    for (p = 2; p <= 4423; ++p) {
-        mint_t *exp = mi_create_long((long)p);
-        mint_t *mersenne = NULL;
-        mint_t *minus_one = mi_create_long(-1);
-
-        if (!exp || !minus_one) {
-            mi_free(exp);
-            mi_free(mersenne);
-            mi_free(minus_one);
-            return 1;
-        }
-
-        if (mi_isprime(exp)) {
-            mersenne = mi_create_2pow(p);
-            if (!mersenne) {
-                mi_free(exp);
-                mi_free(minus_one);
-                return 1;
-            }
-
-            if (mi_add(mersenne, minus_one) != 0) {
-                mi_free(exp);
-                mi_free(mersenne);
-                mi_free(minus_one);
-                return 1;
-            }
-
-            if (mi_isprime(mersenne)) {
-                if ((found % 4) == 3)
-                    printf("M_%-4u is prime\n", p);
-                else
-                    printf("M_%-4u is prime    ", p);
-                found++;
-            }
-
-            mi_free(mersenne);
-        }
-
-        mi_free(exp);
-        mi_free(minus_one);
-    }
-
-    return 0;
-}
-```
-
-```text
-M_2    is prime    M_3    is prime    M_5    is prime    M_7    is prime
-M_13   is prime    M_17   is prime    M_19   is prime    M_31   is prime
-M_61   is prime    M_89   is prime    M_107  is prime    M_127  is prime
-M_521  is prime    M_607  is prime    M_1279 is prime    M_2203 is prime
-M_2281 is prime    M_3217 is prime    M_4253 is prime    M_4423 is prime
-```
-
 ## Modules
 
 | Module | Description | Docs |
@@ -342,13 +276,9 @@ M_2281 is prime    M_3217 is prime    M_4253 is prime    M_4423 is prime
 | `set_t` | Generic set storage with ownership models | [`docs/set.md`](docs/set.md) |
 | `array_t` | Generic array storage with ownership models | [`docs/array.md`](docs/array.md) |
 | `bitset_t` | Dynamic thread-safe bitset | [`docs/bitset.md`](docs/bitset.md) |
-| `mint_t` | Arbitrary-precision signed integers and number-theory helpers | [`docs/mint.md`](docs/mint.md) |
-| `mrational_t` | Opaque exact rational arithmetic backed by `mint_t` | [`docs/mrational.md`](docs/mrational.md) |
 | `number_t` | Generic numeric value cluster over exact, fixed-precision, and multiprecision backends | [`docs/number.md`](docs/number.md) |
 | `qfloat_t` | Double-double arithmetic and special functions | [`docs/qfloat.md`](docs/qfloat.md) |
 | `qcomplex_t` | Double-double complex arithmetic and special functions | [`docs/qcomplex.md`](docs/qcomplex.md) |
-| `mfloat_t` | Opaque multiprecision floating-point arithmetic | [`docs/mfloat.md`](docs/mfloat.md) |
-| `mcomplex_t` | Opaque multiprecision complex arithmetic backed by `mfloat_t` | [`docs/mcomplex.md`](docs/mcomplex.md) |
 | `matrix_t` | Generic high-precision matrix with numeric and symbolic element types | [`docs/matrix.md`](docs/matrix.md) |
 | `dval_t` | Differentiable expression DAGs with matrix integration | [`docs/dval.md`](docs/dval.md) |
 | `integrator_t` | Adaptive G7K15 numerical integrator | [`docs/integrator.md`](docs/integrator.md) |
@@ -395,10 +325,10 @@ See [`docs/testing.md`](docs/testing.md) for details on individual test suites.
 ```sh
 make bench_integrator
 make bench_matrix_dval
-make bench_mint_mul
-make bench_mint_div
-make bench_mfloat_maths
-make bench_mcomplex_maths
+make bench_number_maths
+make bench_number_scope
+make bench_qfloat_gamma_maths
+make bench_qcomplex_maths
 ```
 
 See [`docs/building.md`](docs/building.md) for benchmark and build details.
@@ -427,20 +357,20 @@ and are not intended as stable external API.
 
 ## Acknowledgements
 
-MARS's arbitrary-precision numeric layers build directly on the GNU
-multiprecision ecosystem:
+MARS's multiprecision numeric layer builds directly on the GNU multiprecision
+ecosystem:
 
-- [GMP](https://gmplib.org/) provides the arbitrary-precision integer and
-  rational arithmetic foundation used by `mint_t` and `mrational_t`.
+- [GMP](https://gmplib.org/) provides arbitrary-precision integer and rational
+  arithmetic.
 - [MPFR](https://www.mpfr.org/) provides correctly rounded multiprecision
-  floating-point arithmetic used by `mfloat_t`.
+  floating-point arithmetic.
 - [MPC](https://www.multiprecision.org/mpc/) provides multiprecision complex
-  arithmetic used by `mcomplex_t`.
+  arithmetic.
 
-These projects do the heavy mathematical lifting for the modern MARS
-multiprecision wrappers. MARS depends on their development headers and runtime
-libraries when those modules are built.
+These projects do the heavy mathematical lifting for `number_t`'s exact and
+multiprecision backends. MARS depends on their development headers and runtime
+libraries.
 
-## License
+## Licence
 
-MIT License. See [LICENSE](https://en.wikipedia.org/wiki/MIT_License).
+MIT Licence.

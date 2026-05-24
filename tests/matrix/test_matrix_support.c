@@ -138,8 +138,8 @@ static const char *number_precision_label(number_t z, char *buf, size_t buf_size
     case NUMBER_COMPLEX:
         snprintf(buf, buf_size, "complex-%zu", bits ? bits : num_get_default_prec_bits());
         return buf;
-    case NUMBER_MINT:
-    case NUMBER_MRATIONAL:
+    case NUMBER_MPZ:
+    case NUMBER_MPQ:
         return "exact";
     default:
         return "number";

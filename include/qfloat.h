@@ -473,7 +473,7 @@ int qf_printf(const char *fmt, ...);
 /**
  * @brief Add two qfloat_t values.
  *
- * Uses error‑free transformations (TwoSum + renormalization).
+ * Uses error-free transformations (TwoSum + renormalisation).
  *
  * @param a First operand.
  * @param b Second operand.

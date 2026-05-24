@@ -604,8 +604,8 @@ int tests_main(void)
     TEST_SECTION("_d variants");
     TEST_RUN_CASE(test_d_variants, NULL);
 
-    /* ---------------- Math functions ------------- */
-    TEST_SECTION("Math functions");
+    /* ---------------- Mathematical functions ----- */
+    TEST_SECTION("Mathematical functions");
     TEST_RUN_CASE(test_maths_functions, NULL);
 
     /* ---------------- First derivatives ---------- */
