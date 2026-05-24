@@ -1,7 +1,7 @@
 # MARS
 
 ![CI](https://github.com/rparry/MARS/actions/workflows/ci.yml/badge.svg)
-![Licence: MIT](https://img.shields.io/badge/Licence-MIT-yellow.svg)
+[![Licence: MIT](https://img.shields.io/badge/Licence-MIT-yellow.svg)](https://en.wikipedia.org/wiki/MIT_License)
 ![C99/GNU C](https://img.shields.io/badge/C-C99%20%2B%20GNU%20extensions-blue.svg)
 
 Linux-focused C99/GNU C library for high-precision numerics, automatic
@@ -373,4 +373,4 @@ libraries.
 
 ## Licence
 
-MIT Licence.
+MIT Licence. See [MIT Licence](https://en.wikipedia.org/wiki/MIT_License).
