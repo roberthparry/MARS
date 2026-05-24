@@ -532,7 +532,7 @@ static number_t number_make_cdouble(double _Complex value)
 {
     number_t number;
 
-    number.storage[0] = NUMBER_CPLX_DOUBLE;
+    number.storage[0] = NUMBER_CDOUBLE;
     number_impl(&number)->value.cd.value = value;
     number_impl(&number)->value.cd.constant_id = NUMBER_CONST_COUNT;
     number_impl(&number)->value.cd.immortal = false;
@@ -565,6 +565,30 @@ number_t number_take_mpfr(number_mpfr_t *value)
         return number_invalid();
     number.storage[0] = NUMBER_MPFR;
     number_impl(&number)->value.mpfr = value;
+    number_scope_register_value(&number);
+    return number;
+}
+
+number_t number_take_mpz(number_mpz_t *value)
+{
+    number_t number;
+
+    if (!value)
+        return number_invalid();
+    number.storage[0] = NUMBER_MPZ;
+    number_impl(&number)->value.mpz = value;
+    number_scope_register_value(&number);
+    return number;
+}
+
+number_t number_take_mpq(number_mpq_t *value)
+{
+    number_t number;
+
+    if (!value)
+        return number_invalid();
+    number.storage[0] = NUMBER_MPQ;
+    number_impl(&number)->value.mpq = value;
     number_scope_register_value(&number);
     return number;
 }
@@ -646,7 +670,7 @@ static bool number_is_decimal_text(const char *text)
 
 static bool number_kind_is_complex_component(number_kind_t kind)
 {
-    return kind == NUMBER_MINT || kind == NUMBER_MRATIONAL || kind == NUMBER_MPFR;
+    return kind == NUMBER_MPZ || kind == NUMBER_MPQ || kind == NUMBER_MPFR;
 }
 
 static bool number_is_mpfr_complex_components(const complex_t *value)
@@ -719,8 +743,8 @@ number_t number_complex_component_from_number(const number_t *value,
     if (!value || !number_is_valid_value(value))
         return out;
     switch (number_kind_value(value)) {
-    case NUMBER_MINT:
-    case NUMBER_MRATIONAL:
+    case NUMBER_MPZ:
+    case NUMBER_MPQ:
     case NUMBER_MPFR:
         return num_clone(*value);
     case NUMBER_DOUBLE:
@@ -1107,18 +1131,18 @@ void number_destroy_none(number_t *number)
     (void)number;
 }
 
-void number_destroy_mint(number_t *number)
+void number_destroy_mpz(number_t *number)
 {
     if (!number)
         return;
-    mi_free(number_impl(number)->value.mi);
+    number_mpz_free(number_impl(number)->value.mpz);
 }
 
-void number_destroy_mrational(number_t *number)
+void number_destroy_mpq(number_t *number)
 {
     if (!number)
         return;
-    mr_free(number_impl(number)->value.mr);
+    number_mpq_free(number_impl(number)->value.mpq);
 }
 
 void number_destroy_complex(number_t *number)
@@ -1134,14 +1158,14 @@ void *number_scope_payload_none(const number_t *number)
     return NULL;
 }
 
-void *number_scope_payload_mint(const number_t *number)
+void *number_scope_payload_mpz(const number_t *number)
 {
-    return number ? number_impl_const(number)->value.mi : NULL;
+    return number ? number_impl_const(number)->value.mpz : NULL;
 }
 
-void *number_scope_payload_mrational(const number_t *number)
+void *number_scope_payload_mpq(const number_t *number)
 {
-    return number ? number_impl_const(number)->value.mr : NULL;
+    return number ? number_impl_const(number)->value.mpq : NULL;
 }
 
 void *number_scope_payload_complex(const number_t *number)
@@ -1154,14 +1178,14 @@ void number_destroy_scope_none(void *payload)
     (void)payload;
 }
 
-void number_destroy_scope_mint(void *payload)
+void number_destroy_scope_mpz(void *payload)
 {
-    mi_free((mint_t *)payload);
+    number_mpz_free((number_mpz_t *)payload);
 }
 
-void number_destroy_scope_mrational(void *payload)
+void number_destroy_scope_mpq(void *payload)
 {
-    mr_free((mrational_t *)payload);
+    number_mpq_free((number_mpq_t *)payload);
 }
 
 void number_destroy_scope_complex(void *payload)
@@ -1170,7 +1194,7 @@ void number_destroy_scope_complex(void *payload)
 }
 
  number_t number_const_like_double(const number_t *like, number_const_id_t id);
- number_t number_const_like_cplx_double(const number_t *like, number_const_id_t id);
+ number_t number_const_like_cdouble(const number_t *like, number_const_id_t id);
  number_t number_const_like_qfloat(const number_t *like, number_const_id_t id);
  number_t number_const_like_qcomplex(const number_t *like, number_const_id_t id);
  number_t number_const_like_mexact(const number_t *like, number_const_id_t id);
@@ -1209,55 +1233,32 @@ static bool number_value_is_immortal(const number_t *number)
 
 #define NUMBER_ARRAY_LEN(array) (sizeof(array) / sizeof((array)[0]))
 
-typedef struct {
-    const mint_t * const *slot;
-    number_const_id_t id;
-} number_mint_const_slot_t;
-
-typedef struct {
-    const mrational_t * const *slot;
-    number_const_id_t id;
-} number_mrational_const_slot_t;
-
-static const number_mint_const_slot_t mint_const_map[] = {
-    { &MI_ZERO, NUMBER_CONST_ZERO },
-    { &MI_ONE, NUMBER_CONST_ONE },
-    { &MI_NEG_ONE, NUMBER_CONST_NEG_ONE },
-    { &MI_TWO, NUMBER_CONST_TWO }
-};
-
-static const number_mrational_const_slot_t mrational_const_map[] = {
-    { &MR_HALF, NUMBER_CONST_HALF },
-    { &MR_QUARTER, NUMBER_CONST_QUARTER },
-    { &MR_ONE_EIGHTH, NUMBER_CONST_ONE_EIGHTH }
-};
-
-#define NUMBER_DEFINE_IMMORTAL_ID_FN(suffix, type, field, map)              \
-bool number_immortal_id_##suffix(const number_t *number,                   \
-                                 number_const_id_t *id_out)                \
-{                                                                          \
-    const type *value = number ? number_impl_const(number)->value.field : NULL; \
-                                                                           \
-    if (!value || !id_out)                                                  \
-        return false;                                                       \
-    for (size_t i = 0u; i < NUMBER_ARRAY_LEN(map); ++i) {                   \
-        if (*(map)[i].slot == value) {                                      \
-            *id_out = (map)[i].id;                                          \
-            return true;                                                    \
-        }                                                                   \
-    }                                                                       \
-    return false;                                                           \
-}
-
-NUMBER_DEFINE_IMMORTAL_ID_FN(mint, mint_t, mi, mint_const_map)
-NUMBER_DEFINE_IMMORTAL_ID_FN(mrational, mrational_t, mr, mrational_const_map)
-
-#undef NUMBER_DEFINE_IMMORTAL_ID_FN
-
 bool number_immortal_id_mpfr(const number_t *number,
                                number_const_id_t *id_out)
 {
     const number_mpfr_t *value = number ? number_impl_const(number)->value.mpfr : NULL;
+
+    if (!value || !id_out || value->constant_id == NUMBER_CONST_COUNT)
+        return false;
+    *id_out = value->constant_id;
+    return true;
+}
+
+bool number_immortal_id_mpz(const number_t *number,
+                             number_const_id_t *id_out)
+{
+    const number_mpz_t *value = number ? number_impl_const(number)->value.mpz : NULL;
+
+    if (!value || !id_out || value->constant_id == NUMBER_CONST_COUNT)
+        return false;
+    *id_out = value->constant_id;
+    return true;
+}
+
+bool number_immortal_id_mpq(const number_t *number,
+                                  number_const_id_t *id_out)
+{
+    const number_mpq_t *value = number ? number_impl_const(number)->value.mpq : NULL;
 
     if (!value || !id_out || value->constant_id == NUMBER_CONST_COUNT)
         return false;
@@ -1277,18 +1278,18 @@ bool number_const_id_from_immortal(const number_t *number,
     return vt->immortal_id(number, id_out);
 }
 
- bool number_value_is_immortal_mint(const number_t *number)
+ bool number_value_is_immortal_mpz(const number_t *number)
 {
     number_const_id_t id;
 
-    return number_immortal_id_mint(number, &id);
+    return number_immortal_id_mpz(number, &id);
 }
 
- bool number_value_is_immortal_mrational(const number_t *number)
+ bool number_value_is_immortal_mpq(const number_t *number)
 {
     number_const_id_t id;
 
-    return number_immortal_id_mrational(number, &id);
+    return number_immortal_id_mpq(number, &id);
 }
 
  bool number_value_is_immortal_mpfr(const number_t *number)
@@ -1325,47 +1326,49 @@ bool number_value_is_immortal_complex(const number_t *number)
 
 const complex_t *number_complex_value(const number_t *number)
 {
-    return number ? number_impl_const(number)->value.cx : NULL;
+    return number && number_kind_value(number) == NUMBER_COMPLEX
+        ? number_impl_const(number)->value.cx : NULL;
 }
 
 bool number_eq_same_tol_with_precision(const number_t *a,
                                        const number_t *b,
                                        size_t precision_bits);
 
- bool number_is_zero_mint(const number_t *number)
+bool number_is_zero_mpz(const number_t *number)
 {
-    return number && mi_is_zero(number_impl_const(number)->value.mi);
+    return number && number_mpz_is_zero(number_impl_const(number)->value.mpz);
 }
 
- bool number_is_zero_mrational(const number_t *number)
+bool number_is_zero_mpq(const number_t *number)
 {
-    return number && mr_is_zero(number_impl_const(number)->value.mr);
+    return number && number_mpq_is_zero(number_impl_const(number)->value.mpq);
 }
 
- bool number_is_one_mint(const number_t *number)
+bool number_is_one_mpz(const number_t *number)
 {
-    return number && number_impl_const(number)->value.mi &&
-        mi_cmp(number_impl_const(number)->value.mi, MI_ONE) == 0;
+    mpz_srcptr value = number && number_impl_const(number)->value.mpz
+        ? number_mpz_value(number_impl_const(number)->value.mpz) : NULL;
+
+    return value && mpz_cmp_si(value, 1L) == 0;
 }
 
- bool number_is_one_mrational(const number_t *number)
+bool number_is_one_mpq(const number_t *number)
 {
-    if (!number || !number_impl_const(number)->value.mr)
-        return false;
-    return mr_is_integer(number_impl_const(number)->value.mr) &&
-        mi_cmp(mr_numerator(number_impl_const(number)->value.mr), MI_ONE) == 0;
+    return number && number_mpq_is_one(number_impl_const(number)->value.mpq);
 }
 
- bool number_eq_same_mint(const number_t *a, const number_t *b)
+bool number_eq_same_mpz(const number_t *a, const number_t *b)
 {
     return a && b &&
-        mi_cmp(number_impl_const(a)->value.mi, number_impl_const(b)->value.mi) == 0;
+        number_mpz_cmp(number_impl_const(a)->value.mpz,
+                       number_impl_const(b)->value.mpz) == 0;
 }
 
- bool number_eq_same_mrational(const number_t *a, const number_t *b)
+bool number_eq_same_mpq(const number_t *a, const number_t *b)
 {
     return a && b &&
-        mr_eq(number_impl_const(a)->value.mr, number_impl_const(b)->value.mr);
+        number_mpq_cmp(number_impl_const(a)->value.mpq,
+                       number_impl_const(b)->value.mpq) == 0;
 }
 
 bool number_eq_same_tol_with_precision(const number_t *a,
@@ -1395,369 +1398,394 @@ bool number_eq_same_tol_with_precision(const number_t *a,
     return rc;
 }
 
- bool number_eq_same_tol_mint(const number_t *a, const number_t *b)
+bool number_eq_same_tol_mpz(const number_t *a, const number_t *b)
 {
-    return number_eq_same_mint(a, b);
+    return number_eq_same_mpz(a, b);
 }
 
- bool number_eq_same_tol_mrational(const number_t *a, const number_t *b)
+bool number_eq_same_tol_mpq(const number_t *a, const number_t *b)
 {
-    return number_eq_same_mrational(a, b);
+    return number_eq_same_mpq(a, b);
 }
 
- bool number_is_finite_exact(const number_t *number)
+bool number_is_finite_exact(const number_t *number)
 {
     return number != NULL;
 }
 
- bool number_is_nan_exact(const number_t *number)
+bool number_is_nan_exact(const number_t *number)
 {
     (void)number;
     return false;
 }
 
- bool number_is_inf_exact(const number_t *number)
+bool number_is_inf_exact(const number_t *number)
 {
     (void)number;
     return false;
 }
 
- int number_cmp_same_mint(const number_t *a, const number_t *b)
+int number_cmp_same_mpz(const number_t *a, const number_t *b)
 {
-    return (a && b) ? mi_cmp(number_impl_const(a)->value.mi,
-                             number_impl_const(b)->value.mi) : 0;
+    return (a && b) ? number_mpz_cmp(number_impl_const(a)->value.mpz,
+                                     number_impl_const(b)->value.mpz) : 0;
 }
 
- int number_cmp_same_mrational(const number_t *a, const number_t *b)
+int number_cmp_same_mpq(const number_t *a, const number_t *b)
 {
-    return (a && b) ? mr_cmp(number_impl_const(a)->value.mr,
-                             number_impl_const(b)->value.mr) : 0;
+    return (a && b) ? number_mpq_cmp(number_impl_const(a)->value.mpq,
+                                     number_impl_const(b)->value.mpq) : 0;
 }
 
- long number_get_exponent2_zero(const number_t *number)
+long number_get_exponent2_zero(const number_t *number)
 {
     (void)number;
     return 0l;
 }
 
- long number_get_exponent2_mint(const number_t *number)
+long number_get_exponent2_mpz(const number_t *number)
 {
-    return number ? (long)mi_bit_length(number_impl_const(number)->value.mi) - 1l : 0l;
+    size_t bits = number ? number_mpz_bit_length(number_impl_const(number)->value.mpz) : 0u;
+
+    return bits ? (long)bits - 1l : 0l;
 }
 
- long number_get_exponent2_mrational(const number_t *number)
+long number_get_exponent2_mpq(const number_t *number)
 {
-    mint_t *num;
-    mint_t *den;
+    mpz_t num;
+    mpz_t den;
     long exp2 = 0l;
 
-    if (!number)
+    if (!number || number_mpq_ensure(number_impl_const(number)->value.mpq) != 0)
         return 0l;
-    num = mi_clone(mr_numerator(number_impl_const(number)->value.mr));
-    den = mi_clone(mr_denominator(number_impl_const(number)->value.mr));
-    if (!num || !den || mi_abs(num) != 0 || mi_is_zero(num) || mi_is_zero(den)) {
-        mi_free(num);
-        mi_free(den);
+    mpz_init(num);
+    mpz_init(den);
+    mpz_abs(num, mpq_numref(number_impl_const(number)->value.mpq->value));
+    mpz_set(den, mpq_denref(number_impl_const(number)->value.mpq->value));
+    if (mpz_sgn(num) == 0 || mpz_sgn(den) == 0) {
+        mpz_clear(num);
+        mpz_clear(den);
         return 0l;
     }
-    exp2 = (long)mi_bit_length(num) - (long)mi_bit_length(den);
+    exp2 = (long)mpz_sizeinbase(num, 2) - (long)mpz_sizeinbase(den, 2);
     if (exp2 >= 0) {
-        mint_t *scaled_den = mi_clone(den);
-        if (scaled_den && mi_shl(scaled_den, exp2) == 0 && mi_cmp(num, scaled_den) < 0)
+        mpz_t scaled_den;
+        mpz_init_set(scaled_den, den);
+        mpz_mul_2exp(scaled_den, scaled_den, (mp_bitcnt_t)exp2);
+        if (mpz_cmp(num, scaled_den) < 0)
             --exp2;
-        mi_free(scaled_den);
+        mpz_clear(scaled_den);
     }
     else {
-        mint_t *scaled_num = mi_clone(num);
         long shift = -exp2;
-        if (scaled_num && mi_shl(scaled_num, shift) == 0 && mi_cmp(scaled_num, den) < 0)
+        mpz_t scaled_num;
+        mpz_init_set(scaled_num, num);
+        mpz_mul_2exp(scaled_num, scaled_num, (mp_bitcnt_t)shift);
+        if (mpz_cmp(scaled_num, den) < 0)
             --exp2;
-        mi_free(scaled_num);
+        mpz_clear(scaled_num);
     }
-    mi_free(num);
-    mi_free(den);
+    mpz_clear(num);
+    mpz_clear(den);
     return exp2;
 }
 
- bool number_is_integer_mint(const number_t *number)
+bool number_is_integer_mpz(const number_t *number)
 {
     return number != NULL;
 }
 
- bool number_is_integer_mrational(const number_t *number)
+bool number_is_integer_mpq(const number_t *number)
 {
-    return number && mr_is_integer(number_impl_const(number)->value.mr);
+    return number && number_mpq_is_integer(number_impl_const(number)->value.mpq);
 }
 
- size_t number_get_mantissa_bits_zero(const number_t *number)
+size_t number_get_mantissa_bits_zero(const number_t *number)
 {
     (void)number;
     return 0u;
 }
 
- bool number_get_mantissa_u64_false(const number_t *number, uint64_t *out)
+bool number_get_mantissa_u64_false(const number_t *number, uint64_t *out)
 {
     (void)number;
     (void)out;
     return false;
 }
 
- int number_sign_zero(const number_t *number)
+int number_sign_zero(const number_t *number)
 {
     (void)number;
     return 0;
 }
 
- int number_sign_mint(const number_t *number)
+int number_sign_mpz(const number_t *number)
 {
-    return number && mi_is_negative(number_impl_const(number)->value.mi) ? -1 : 1;
+    return number && number_mpz_is_negative(number_impl_const(number)->value.mpz) ? -1 : 1;
 }
 
- int number_sign_mrational(const number_t *number)
+int number_sign_mpq(const number_t *number)
 {
-    return number && mi_is_negative(mr_numerator(number_impl_const(number)->value.mr)) ? -1 : 1;
+    return number && number_mpq_is_negative(number_impl_const(number)->value.mpq) ? -1 : 1;
 }
 
-char *number_to_string_mint(const number_t *number)
+char *number_to_string_mpz(const number_t *number)
 {
-    return number ? mi_to_string(number_impl_const(number)->value.mi) : NULL;
+    return number ? number_mpz_to_string(number_impl_const(number)->value.mpz) : NULL;
 }
 
-char *number_to_string_mrational(const number_t *number)
+char *number_to_string_mpq(const number_t *number)
 {
-    return number ? mr_to_string(number_impl_const(number)->value.mr) : NULL;
+    return number ? number_mpq_to_string(number_impl_const(number)->value.mpq) : NULL;
 }
 
-number_t *number_clone_mint(const number_t *number)
+number_t *number_clone_mpz(const number_t *number)
 {
-    mint_t *copy;
+    number_mpz_t *copy;
 
-    if (!number || !number_impl_const(number)->value.mi)
+    if (!number || !number_impl_const(number)->value.mpz)
         return NULL;
-    copy = mi_clone(number_impl_const(number)->value.mi);
-    return copy ? number_wrap_mint(copy) : NULL;
+    copy = number_mpz_clone(number_impl_const(number)->value.mpz);
+    return copy ? number_wrap_mpz(copy) : NULL;
 }
 
-number_t *number_clone_mrational(const number_t *number)
+number_t *number_clone_mpq(const number_t *number)
 {
-    mrational_t *copy;
+    number_mpq_t *copy;
 
-    if (!number || !number_impl_const(number)->value.mr)
+    if (!number || !number_impl_const(number)->value.mpq)
         return NULL;
-    copy = mr_clone(number_impl_const(number)->value.mr);
-    return copy ? number_wrap_mrational(copy) : NULL;
+    copy = number_mpq_clone(number_impl_const(number)->value.mpq);
+    return copy ? number_wrap_mpq(copy) : NULL;
 }
 
-number_t *number_neg_mint(const number_t *number)
-{
-    mint_t *copy;
+typedef void (*number_mpz_binary_core_fn)(mpz_ptr, mpz_srcptr, mpz_srcptr);
+typedef void (*number_mpq_binary_core_fn)(mpq_ptr, mpq_srcptr, mpq_srcptr);
 
-    if (!number || !number_impl_const(number)->value.mi)
-        return NULL;
-    copy = mi_clone(number_impl_const(number)->value.mi);
-    if (!copy || mi_neg(copy) != 0) {
-        mi_free(copy);
-        return NULL;
-    }
-    return number_wrap_mint(copy);
+static number_t number_make_mpz_binary(const number_t *a,
+                                       const number_t *b,
+                                       number_mpz_binary_core_fn op)
+{
+    number_mpz_t *out;
+
+    if (!a || !b || !op ||
+        number_mpz_ensure(number_impl_const(a)->value.mpz) != 0 ||
+        number_mpz_ensure(number_impl_const(b)->value.mpz) != 0)
+        return number_invalid();
+    out = number_mpz_new();
+    if (!out)
+        return number_invalid();
+    op(out->value,
+       number_impl_const(a)->value.mpz->value,
+       number_impl_const(b)->value.mpz->value);
+    return number_take_mpz(out);
 }
 
-number_t *number_neg_mrational(const number_t *number)
+static number_t number_make_mpq_binary(const number_t *a,
+                                       const number_t *b,
+                                       number_mpq_binary_core_fn op)
 {
-    mrational_t *copy;
+    number_mpq_t *out;
 
-    if (!number || !number_impl_const(number)->value.mr)
-        return NULL;
-    copy = mr_clone(number_impl_const(number)->value.mr);
-    if (!copy || mr_neg(copy) != 0) {
-        mr_free(copy);
-        return NULL;
-    }
-    return number_wrap_mrational(copy);
+    if (!a || !b || !op ||
+        number_mpq_ensure(number_impl_const(a)->value.mpq) != 0 ||
+        number_mpq_ensure(number_impl_const(b)->value.mpq) != 0)
+        return number_invalid();
+    out = number_mpq_new();
+    if (!out)
+        return number_invalid();
+    op(out->value,
+       number_impl_const(a)->value.mpq->value,
+       number_impl_const(b)->value.mpq->value);
+    return number_take_mpq(out);
 }
 
-number_t *number_inv_mrational(const number_t *number)
+number_t *number_neg_mpz(const number_t *number)
 {
-    mrational_t *copy;
+    number_mpz_t *out;
 
-    if (!number || !number_impl_const(number)->value.mr)
+    if (!number || !number_impl_const(number)->value.mpz ||
+        number_mpz_ensure(number_impl_const(number)->value.mpz) != 0)
         return NULL;
-    copy = mr_clone(number_impl_const(number)->value.mr);
-    if (!copy || mr_inv(copy) != 0) {
-        mr_free(copy);
+    out = number_mpz_new();
+    if (!out)
         return NULL;
-    }
-    return number_wrap_mrational(copy);
+    mpz_neg(out->value, number_impl_const(number)->value.mpz->value);
+    return number_box_value(number_take_mpz(out));
 }
 
-number_t *number_abs_mint(const number_t *number)
+number_t *number_neg_mpq(const number_t *number)
 {
-    mint_t *copy;
+    number_mpq_t *out;
 
-    if (!number)
+    if (!number || !number_impl_const(number)->value.mpq)
         return NULL;
-    copy = mi_clone(number_impl_const(number)->value.mi);
-    if (!copy || mi_abs(copy) != 0) {
-        mi_free(copy);
+    if (number_mpq_ensure(number_impl_const(number)->value.mpq) != 0)
         return NULL;
-    }
-    return number_wrap_mint(copy);
+    out = number_mpq_new();
+    if (!out)
+        return NULL;
+    mpq_neg(out->value, number_impl_const(number)->value.mpq->value);
+    return number_box_value(number_take_mpq(out));
 }
 
-number_t *number_abs_mrational(const number_t *number)
+static number_t number_make_inv_mpq(const number_t *number)
 {
-    mrational_t *copy;
+    number_mpq_t *out;
 
-    if (!number)
-        return NULL;
-    copy = mr_clone(number_impl_const(number)->value.mr);
-    if (!copy || mr_abs(copy) != 0) {
-        mr_free(copy);
-        return NULL;
-    }
-    return number_wrap_mrational(copy);
+    if (!number || !number_impl_const(number)->value.mpq ||
+        number_mpq_ensure(number_impl_const(number)->value.mpq) != 0 ||
+        mpq_sgn(number_impl_const(number)->value.mpq->value) == 0)
+        return number_invalid();
+    out = number_mpq_new();
+    if (!out)
+        return number_invalid();
+    mpq_inv(out->value, number_impl_const(number)->value.mpq->value);
+    return number_take_mpq(out);
 }
 
-number_t *number_imag_mint_zero(const number_t *number)
+number_t *number_inv_mpq(const number_t *number)
+{
+    number_t out = number_make_inv_mpq(number);
+
+    return num_is_nan(out) ? NULL : number_box_value(out);
+}
+
+number_t *number_abs_mpz(const number_t *number)
+{
+    number_mpz_t *out;
+
+    if (!number || !number_impl_const(number)->value.mpz ||
+        number_mpz_ensure(number_impl_const(number)->value.mpz) != 0)
+        return NULL;
+    out = number_mpz_new();
+    if (!out)
+        return NULL;
+    mpz_abs(out->value, number_impl_const(number)->value.mpz->value);
+    return number_box_value(number_take_mpz(out));
+}
+
+number_t *number_abs_mpq(const number_t *number)
+{
+    number_mpq_t *out;
+
+    if (!number || !number_impl_const(number)->value.mpq ||
+        number_mpq_ensure(number_impl_const(number)->value.mpq) != 0)
+        return NULL;
+    out = number_mpq_new();
+    if (!out)
+        return NULL;
+    mpq_abs(out->value, number_impl_const(number)->value.mpq->value);
+    return number_box_value(number_take_mpq(out));
+}
+
+number_t *number_imag_mpz_zero(const number_t *number)
 {
     (void)number;
-    return number_wrap_mint(mi_create_long(0L));
+    return number_box_value(number_take_mpz(number_mpz_from_long(0L)));
 }
 
-number_t *number_imag_mrational_zero(const number_t *number)
+number_t *number_imag_mpq_zero(const number_t *number)
 {
     (void)number;
-    return number_wrap_mrational(mr_create_mints(MI_ZERO, MI_ONE));
+    return number_box_value(number_take_mpq(number_mpq_from_frac_long(0L, 1L)));
 }
 
-number_t *number_pow_int_mint(const number_t *number, int exponent)
+number_t *number_pow_int_mpz(const number_t *number, int exponent)
 {
-    mint_t *copy;
+    number_mpz_t *out;
 
-    if (!number || exponent < 0)
+    if (!number || exponent < 0 ||
+        number_mpz_ensure(number_impl_const(number)->value.mpz) != 0)
         return NULL;
-    copy = mi_clone(number_impl_const(number)->value.mi);
-    if (!copy || mi_pow(copy, (unsigned long)exponent) != 0) {
-        mi_free(copy);
+    out = number_mpz_new();
+    if (!out)
         return NULL;
-    }
-    return number_wrap_mint(copy);
+    mpz_pow_ui(out->value,
+               number_impl_const(number)->value.mpz->value,
+               (unsigned long)exponent);
+    return number_box_value(number_take_mpz(out));
 }
 
-number_t *number_pow_int_mrational(const number_t *number, int exponent)
+number_t *number_pow_int_mpq(const number_t *number, int exponent)
 {
-    mrational_t *copy;
+    number_mpq_t *copy;
+    unsigned long mag;
 
     if (!number)
         return NULL;
-
-    copy = mr_clone(number_impl_const(number)->value.mr);
-    if (!copy)
-        return NULL;
-
-    if (mr_pow_int(copy, exponent) != 0) {
-        mr_free(copy);
+    copy = number_mpq_clone(number_impl_const(number)->value.mpq);
+    if (!copy || number_mpq_ensure(copy) != 0) {
+        number_mpq_free(copy);
         return NULL;
     }
-    return number_wrap_mrational(copy);
+    if (exponent < 0) {
+        if (mpq_sgn(copy->value) == 0) {
+            number_mpq_free(copy);
+            return NULL;
+        }
+        mpq_inv(copy->value, copy->value);
+        mag = (unsigned long)(-(exponent + 1)) + 1ul;
+    } else {
+        mag = (unsigned long)exponent;
+    }
+    mpz_pow_ui(mpq_numref(copy->value), mpq_numref(copy->value), mag);
+    mpz_pow_ui(mpq_denref(copy->value), mpq_denref(copy->value), mag);
+    mpq_canonicalize(copy->value);
+    return number_box_value(number_take_mpq(copy));
 }
 
-number_t *number_add_same_mint(const number_t *a, const number_t *b)
+number_t *number_add_same_mpz(const number_t *a, const number_t *b)
 {
-    mint_t *copy;
+    number_t out = number_make_mpz_binary(a, b, mpz_add);
 
-    if (!a || !b)
-        return NULL;
-    copy = mi_clone(number_impl_const(a)->value.mi);
-    if (!copy || mi_add(copy, number_impl_const(b)->value.mi) != 0) {
-        mi_free(copy);
-        return NULL;
-    }
-    return number_wrap_mint(copy);
+    return num_is_nan(out) ? NULL : number_box_value(out);
 }
 
-number_t *number_sub_same_mint(const number_t *a, const number_t *b)
+number_t *number_sub_same_mpz(const number_t *a, const number_t *b)
 {
-    mint_t *copy;
+    number_t out = number_make_mpz_binary(a, b, mpz_sub);
 
-    if (!a || !b)
-        return NULL;
-    copy = mi_clone(number_impl_const(a)->value.mi);
-    if (!copy || mi_sub(copy, number_impl_const(b)->value.mi) != 0) {
-        mi_free(copy);
-        return NULL;
-    }
-    return number_wrap_mint(copy);
+    return num_is_nan(out) ? NULL : number_box_value(out);
 }
 
-number_t *number_mul_same_mint(const number_t *a, const number_t *b)
+number_t *number_mul_same_mpz(const number_t *a, const number_t *b)
 {
-    mint_t *copy;
+    number_t out = number_make_mpz_binary(a, b, mpz_mul);
 
-    if (!a || !b)
-        return NULL;
-    copy = mi_clone(number_impl_const(a)->value.mi);
-    if (!copy || mi_mul(copy, number_impl_const(b)->value.mi) != 0) {
-        mi_free(copy);
-        return NULL;
-    }
-    return number_wrap_mint(copy);
+    return num_is_nan(out) ? NULL : number_box_value(out);
 }
 
-number_t *number_add_same_mrational(const number_t *a, const number_t *b)
+number_t *number_add_same_mpq(const number_t *a, const number_t *b)
 {
-    mrational_t *copy;
+    number_t out = number_make_mpq_binary(a, b, mpq_add);
 
-    if (!a || !b)
-        return NULL;
-    copy = mr_clone(number_impl_const(a)->value.mr);
-    if (!copy || mr_add(copy, number_impl_const(b)->value.mr) != 0) {
-        mr_free(copy);
-        return NULL;
-    }
-    return number_wrap_mrational(copy);
+    return num_is_nan(out) ? NULL : number_box_value(out);
 }
 
-number_t *number_sub_same_mrational(const number_t *a, const number_t *b)
+number_t *number_sub_same_mpq(const number_t *a, const number_t *b)
 {
-    mrational_t *copy;
+    number_t out = number_make_mpq_binary(a, b, mpq_sub);
 
-    if (!a || !b)
-        return NULL;
-    copy = mr_clone(number_impl_const(a)->value.mr);
-    if (!copy || mr_sub(copy, number_impl_const(b)->value.mr) != 0) {
-        mr_free(copy);
-        return NULL;
-    }
-    return number_wrap_mrational(copy);
+    return num_is_nan(out) ? NULL : number_box_value(out);
 }
 
-number_t *number_mul_same_mrational(const number_t *a, const number_t *b)
+number_t *number_mul_same_mpq(const number_t *a, const number_t *b)
 {
-    mrational_t *copy;
+    number_t out = number_make_mpq_binary(a, b, mpq_mul);
 
-    if (!a || !b)
-        return NULL;
-    copy = mr_clone(number_impl_const(a)->value.mr);
-    if (!copy || mr_mul(copy, number_impl_const(b)->value.mr) != 0) {
-        mr_free(copy);
-        return NULL;
-    }
-    return number_wrap_mrational(copy);
+    return num_is_nan(out) ? NULL : number_box_value(out);
 }
 
-number_t *number_div_same_mrational(const number_t *a, const number_t *b)
+number_t *number_div_same_mpq(const number_t *a, const number_t *b)
 {
-    mrational_t *copy;
+    number_t out;
 
-    if (!a || !b)
+    if (!b || number_mpq_ensure(number_impl_const(b)->value.mpq) != 0 ||
+        mpq_sgn(number_impl_const(b)->value.mpq->value) == 0)
         return NULL;
-    copy = mr_clone(number_impl_const(a)->value.mr);
-    if (!copy || mr_div(copy, number_impl_const(b)->value.mr) != 0) {
-        mr_free(copy);
-        return NULL;
-    }
-    return number_wrap_mrational(copy);
+    out = number_make_mpq_binary(a, b, mpq_div);
+    return num_is_nan(out) ? NULL : number_box_value(out);
 }
 
 void number_box_free(number_t *number)
@@ -1783,7 +1811,7 @@ number_t *number_wrap_double(double value)
 
 number_t *number_wrap_cdouble(double _Complex value)
 {
-    number_t *number = number_alloc(NUMBER_CPLX_DOUBLE);
+    number_t *number = number_alloc(NUMBER_CDOUBLE);
 
     if (number) {
         number_impl(number)->value.cd.value = value;
@@ -1811,33 +1839,33 @@ number_t *number_wrap_qcomplex(qcomplex_t value)
     return number;
 }
 
-number_t *number_wrap_mint(mint_t *value)
+number_t *number_wrap_mpz(number_mpz_t *value)
 {
     number_t *number;
 
     if (!value)
         return NULL;
-    number = number_alloc(NUMBER_MINT);
+    number = number_alloc(NUMBER_MPZ);
     if (!number) {
-        mi_free(value);
+        number_mpz_free(value);
         return NULL;
     }
-    number_impl(number)->value.mi = value;
+    number_impl(number)->value.mpz = value;
     return number;
 }
 
-number_t *number_wrap_mrational(mrational_t *value)
+number_t *number_wrap_mpq(number_mpq_t *value)
 {
     number_t *number;
 
     if (!value)
         return NULL;
-    number = number_alloc(NUMBER_MRATIONAL);
+    number = number_alloc(NUMBER_MPQ);
     if (!number) {
-        mr_free(value);
+        number_mpq_free(value);
         return NULL;
     }
-    number_impl(number)->value.mr = value;
+    number_impl(number)->value.mpq = value;
     return number;
 }
 
@@ -1996,16 +2024,6 @@ number_t num_create_from_qcomplex(qcomplex_t value)
     return number_make_qcomplex(value);
 }
 
-number_t num_create_from_mint(const mint_t *value)
-{
-    return value ? number_take(number_wrap_mint(mi_clone(value))) : number_invalid();
-}
-
-number_t num_create_from_mrational(const mrational_t *value)
-{
-    return value ? number_take(number_wrap_mrational(mr_clone(value))) : number_invalid();
-}
-
 number_t num_create_from_string(const char *text)
 {
     const char *trimmed = number_skip_ws(text);
@@ -2016,11 +2034,17 @@ number_t num_create_from_string(const char *text)
         return number_take(number_wrap_complex(
             number_complex_create_from_string(trimmed, number_default_precision_bits)));
     if (strchr(trimmed, '/') || number_has_unicode_fraction_text(trimmed))
-        return number_take(number_wrap_mrational(mr_create_string(trimmed)));
+        return number_take(number_wrap_mpq(number_mpq_from_string(trimmed)));
     if (number_is_decimal_text(trimmed))
         return number_take(number_wrap_mpfr(
             number_mpfr_from_string(trimmed, number_default_precision_bits)));
-    return number_take(number_wrap_mint(mi_create_string(trimmed)));
+    return number_take(number_wrap_mpz(number_mpz_from_string(trimmed)));
+}
+
+number_t num_create_from_frac(long numerator, long denominator)
+{
+    return number_take(number_wrap_mpq(
+        number_mpq_from_frac_long(numerator, denominator)));
 }
 
 number_t *number_const_prec_double(const number_t *number, size_t precision_bits)
@@ -2051,16 +2075,16 @@ number_t *number_const_prec_qcomplex(const number_t *number, size_t precision_bi
         number_impl_const(number)->value.qc, precision_bits)) : NULL;
 }
 
-number_t *number_const_prec_mint(const number_t *number, size_t precision_bits)
+number_t *number_const_prec_mpz(const number_t *number, size_t precision_bits)
 {
     (void)precision_bits;
-    return number_clone_mint(number);
+    return number_clone_mpz(number);
 }
 
-number_t *number_const_prec_mrational(const number_t *number, size_t precision_bits)
+number_t *number_const_prec_mpq(const number_t *number, size_t precision_bits)
 {
     (void)precision_bits;
-    return number_clone_mrational(number);
+    return number_clone_mpq(number);
 }
 
 number_t *number_const_prec_complex(const number_t *number, size_t precision_bits)
@@ -2145,7 +2169,7 @@ void num_destroy_slow(number_t *number)
         return;
     kind = number_impl_const(number)->kind;
     if (kind == NUMBER_INVALID || kind == NUMBER_DOUBLE ||
-        kind == NUMBER_CPLX_DOUBLE || kind == NUMBER_QFLOAT ||
+        kind == NUMBER_CDOUBLE || kind == NUMBER_QFLOAT ||
         kind == NUMBER_QCOMPLEX) {
         return;
     }
@@ -2311,28 +2335,24 @@ bool num_is_complex_backend(number_t number)
 bool num_get_small_rational(number_t number, long *numerator, long *denominator)
 {
     const number_private_t *impl = number_impl_const(&number);
-    const mint_t *num_mint;
-    const mint_t *den_mint;
     long n;
     long d;
 
     if (!numerator || !denominator || !num_is_real(number))
         return false;
 
-    if (impl->kind == NUMBER_MINT) {
-        if (!mi_get_long(impl->value.mi, &n))
+    if (impl->kind == NUMBER_MPZ) {
+        if (!number_mpz_get_long(impl->value.mpz, &n))
             return false;
         *numerator = n;
         *denominator = 1L;
         return true;
     }
 
-    if (impl->kind != NUMBER_MRATIONAL)
+    if (impl->kind != NUMBER_MPQ)
         return false;
 
-    num_mint = mr_numerator(impl->value.mr);
-    den_mint = mr_denominator(impl->value.mr);
-    if (!mi_get_long(num_mint, &n) || !mi_get_long(den_mint, &d) || d == 0L)
+    if (!number_mpq_get_small_fraction(impl->value.mpq, &n, &d) || d == 0L)
         return false;
     if (d < 0L) {
         n = -n;
@@ -2415,6 +2435,28 @@ number_t num_neg(const number_t number)
         return number_make_qfloat(qf_neg(number_impl_const(&number)->value.qf));
     if (kind == NUMBER_QCOMPLEX)
         return number_make_qcomplex(qc_neg(number_impl_const(&number)->value.qc));
+    if (kind == NUMBER_MPZ) {
+        number_mpz_t *out;
+
+        if (number_mpz_ensure(number_impl_const(&number)->value.mpz) != 0)
+            return number_invalid();
+        out = number_mpz_new();
+        if (!out)
+            return number_invalid();
+        mpz_neg(out->value, number_impl_const(&number)->value.mpz->value);
+        return number_take_mpz(out);
+    }
+    if (kind == NUMBER_MPQ) {
+        number_mpq_t *out;
+
+        if (number_mpq_ensure(number_impl_const(&number)->value.mpq) != 0)
+            return number_invalid();
+        out = number_mpq_new();
+        if (!out)
+            return number_invalid();
+        mpq_neg(out->value, number_impl_const(&number)->value.mpq->value);
+        return number_take_mpq(out);
+    }
     if (number_const_id_from_immortal(&number, &id)) {
         if (id == NUMBER_CONST_PI_2)
             return NUM_NEG_PI_2;
@@ -2441,15 +2483,27 @@ number_t num_inv(const number_t number)
     if (kind == NUMBER_QCOMPLEX)
         return number_make_qcomplex(qc_div(qc_make(QF_ONE, QF_ZERO),
             number_impl_const(&number)->value.qc));
+    if (kind == NUMBER_MPQ)
+        return number_make_inv_mpq(&number);
     vt = number_vt(&number);
     if (!vt)
         return number_invalid();
     if (vt->inv)
         return number_take(vt->inv(&number));
-    if (kind == NUMBER_MINT) {
-        mrational_t *value = mr_create_mints(MI_ONE, number_impl_const(&number)->value.mi);
+    if (kind == NUMBER_MPZ) {
+        number_mpq_t *value;
+        mpq_t tmp;
 
-        return value ? number_take(number_wrap_mrational(value)) : number_invalid();
+        if (number_mpz_ensure(number_impl_const(&number)->value.mpz) != 0 ||
+            mpz_sgn(number_impl_const(&number)->value.mpz->value) == 0)
+            return number_invalid();
+        mpq_init(tmp);
+        mpz_set_ui(mpq_numref(tmp), 1u);
+        mpz_set(mpq_denref(tmp), number_impl_const(&number)->value.mpz->value);
+        mpq_canonicalize(tmp);
+        value = number_mpq_from_mpq(tmp);
+        mpq_clear(tmp);
+        return value ? number_take_mpq(value) : number_invalid();
     }
     return number_invalid();
 }
@@ -2540,7 +2594,7 @@ number_t num_add_slow(const number_t a, const number_t b)
         if (kind == NUMBER_DOUBLE)
             return number_make_double(number_impl_const(&a)->value.d +
                 number_impl_const(&b)->value.d);
-        if (kind == NUMBER_CPLX_DOUBLE)
+        if (kind == NUMBER_CDOUBLE)
             return number_make_cdouble(number_impl_const(&a)->value.cd.value +
                 number_impl_const(&b)->value.cd.value);
         if (kind == NUMBER_QFLOAT)
@@ -2551,6 +2605,10 @@ number_t num_add_slow(const number_t a, const number_t b)
                 number_impl_const(&b)->value.qc));
         if (kind == NUMBER_MPFR)
             return number_apply_binary_mpfr_value(&a, &b, mpfr_add);
+        if (kind == NUMBER_MPZ)
+            return number_make_mpz_binary(&a, &b, mpz_add);
+        if (kind == NUMBER_MPQ)
+            return number_make_mpq_binary(&a, &b, mpq_add);
     }
     return number_take(number_apply_binary_generic(&a, &b, NUMBER_OP_ADD));
 }
@@ -2568,7 +2626,7 @@ number_t num_sub_slow(const number_t a, const number_t b)
         if (kind == NUMBER_DOUBLE)
             return number_make_double(number_impl_const(&a)->value.d -
                 number_impl_const(&b)->value.d);
-        if (kind == NUMBER_CPLX_DOUBLE)
+        if (kind == NUMBER_CDOUBLE)
             return number_make_cdouble(number_impl_const(&a)->value.cd.value -
                 number_impl_const(&b)->value.cd.value);
         if (kind == NUMBER_QFLOAT)
@@ -2579,6 +2637,10 @@ number_t num_sub_slow(const number_t a, const number_t b)
                 number_impl_const(&b)->value.qc));
         if (kind == NUMBER_MPFR)
             return number_apply_binary_mpfr_value(&a, &b, mpfr_sub);
+        if (kind == NUMBER_MPZ)
+            return number_make_mpz_binary(&a, &b, mpz_sub);
+        if (kind == NUMBER_MPQ)
+            return number_make_mpq_binary(&a, &b, mpq_sub);
     }
     return number_take(number_apply_binary_generic(&a, &b, NUMBER_OP_SUB));
 }
@@ -2597,7 +2659,7 @@ number_t num_mul_slow(const number_t a, const number_t b)
         if (kind == NUMBER_DOUBLE)
             return number_make_double(number_impl_const(&a)->value.d *
                 number_impl_const(&b)->value.d);
-        if (kind == NUMBER_CPLX_DOUBLE)
+        if (kind == NUMBER_CDOUBLE)
             return number_make_cdouble(number_impl_const(&a)->value.cd.value *
                 number_impl_const(&b)->value.cd.value);
         if (kind == NUMBER_QFLOAT)
@@ -2608,6 +2670,10 @@ number_t num_mul_slow(const number_t a, const number_t b)
                 number_impl_const(&b)->value.qc));
         if (kind == NUMBER_MPFR)
             return number_apply_binary_mpfr_value(&a, &b, mpfr_mul);
+        if (kind == NUMBER_MPZ)
+            return number_make_mpz_binary(&a, &b, mpz_mul);
+        if (kind == NUMBER_MPQ)
+            return number_make_mpq_binary(&a, &b, mpq_mul);
     }
     if (number_try_exact_immortal_binary(&a, &b, NUMBER_OP_MUL, &out))
         return out;
@@ -2628,7 +2694,7 @@ number_t num_div_slow(const number_t a, const number_t b)
         if (kind == NUMBER_DOUBLE)
             return number_make_double(number_impl_const(&a)->value.d /
                 number_impl_const(&b)->value.d);
-        if (kind == NUMBER_CPLX_DOUBLE)
+        if (kind == NUMBER_CDOUBLE)
             return number_make_cdouble(number_impl_const(&a)->value.cd.value /
                 number_impl_const(&b)->value.cd.value);
         if (kind == NUMBER_QFLOAT)
@@ -2639,6 +2705,12 @@ number_t num_div_slow(const number_t a, const number_t b)
                 number_impl_const(&b)->value.qc));
         if (kind == NUMBER_MPFR)
             return number_apply_binary_mpfr_value(&a, &b, mpfr_div);
+        if (kind == NUMBER_MPQ) {
+            if (number_mpq_ensure(number_impl_const(&b)->value.mpq) != 0 ||
+                mpq_sgn(number_impl_const(&b)->value.mpq->value) == 0)
+                return number_invalid();
+            return number_make_mpq_binary(&a, &b, mpq_div);
+        }
     }
     if (number_try_exact_immortal_binary(&a, &b, NUMBER_OP_DIV, &out))
         return out;
@@ -2757,7 +2829,7 @@ static number_t number_make_complex_from_real(number_t real, size_t precision_bi
 
     if (!number_is_valid_value(&real))
         return number_invalid();
-    imag = num_create_from_mint(MI_ZERO);
+    imag = num_create_from_long(0);
     complex_value = number_complex_create(real, imag);
     if (!complex_value) {
         num_destroy(&real);
@@ -2777,8 +2849,8 @@ static number_t number_make_complex_imag_unit(number_const_id_t id,
 
     if (id != NUMBER_CONST_I && id != NUMBER_CONST_NEG_I)
         return number_invalid();
-    real = num_create_from_mint(MI_ZERO);
-    imag = num_create_from_mint(id == NUMBER_CONST_I ? MI_ONE : MI_NEG_ONE);
+    real = num_create_from_long(0);
+    imag = num_create_from_long(id == NUMBER_CONST_I ? 1 : -1);
     out = number_complex_create(real, imag);
     if (!out) {
         num_destroy(&real);
@@ -2883,7 +2955,7 @@ number_t num_new_with_prec_bits(size_t precision_bits)
 
 number_t num_create_from_long(long value)
 {
-    return number_take(number_wrap_mint(mi_create_long(value)));
+    return number_take(number_wrap_mpz(number_mpz_from_long(value)));
 }
 
 int num_set_default_prec_bits(size_t precision_bits)
@@ -2926,6 +2998,14 @@ int num_set_long(number_t *number, long value)
     if (!number)
         return -1;
     number_assign(number, num_create_from_long(value));
+    return number_is_valid_value(number) ? 0 : -1;
+}
+
+int num_set_frac(number_t *number, long numerator, long denominator)
+{
+    if (!number)
+        return -1;
+    number_assign(number, num_create_from_frac(numerator, denominator));
     return number_is_valid_value(number) ? 0 : -1;
 }
 
@@ -3034,7 +3114,7 @@ int num_set_double(number_t *number, double value)
         replacement = number_create_mpfr_from_double_prec(value, precision_bits);
     } else if (kind == NUMBER_COMPLEX) {
         replacement = number_create_complex_from_double_prec(value, precision_bits);
-    } else if (kind == NUMBER_CPLX_DOUBLE) {
+    } else if (kind == NUMBER_CDOUBLE) {
         replacement = num_create_from_cdouble(value);
     } else if (kind == NUMBER_QFLOAT) {
         replacement = num_create_from_qfloat(qf_from_double(value));
@@ -3102,7 +3182,7 @@ int num_set_qfloat(number_t *number, qfloat_t value)
         replacement = number_create_mpfr_from_qfloat_prec(value, precision_bits);
     } else if (kind == NUMBER_COMPLEX) {
         replacement = number_create_complex_from_qfloat_prec(value, precision_bits);
-    } else if (kind == NUMBER_CPLX_DOUBLE) {
+    } else if (kind == NUMBER_CDOUBLE) {
         replacement = num_create_from_cdouble(qf_to_double(value));
     } else if (kind == NUMBER_DOUBLE) {
         replacement = num_create_from_double(qf_to_double(value));
@@ -3130,7 +3210,7 @@ int num_set_qcomplex(number_t *number, qcomplex_t value)
     if (kind == NUMBER_COMPLEX) {
         replacement = number_create_complex_from_qcomplex_prec(value,
                                                                precision_bits);
-    } else if (kind == NUMBER_CPLX_DOUBLE) {
+    } else if (kind == NUMBER_CDOUBLE) {
         replacement = num_create_from_cdouble(
             qf_to_double(qc_real(value)) + qf_to_double(qc_imag(value)) * I);
     } else {
@@ -3138,14 +3218,6 @@ int num_set_qcomplex(number_t *number, qcomplex_t value)
     }
 
     number_assign(number, replacement);
-    return number_is_valid_value(number) ? 0 : -1;
-}
-
-int num_set_mrational(number_t *number, const mrational_t *value)
-{
-    if (!number || !value)
-        return -1;
-    number_assign(number, num_create_from_mrational(value));
     return number_is_valid_value(number) ? 0 : -1;
 }
 
@@ -3360,16 +3432,8 @@ number_t num_arg(const number_t number)
         return number_take(vt->arg_value(&number));
     number_t zero = number_create_exact_mpfr_long_prec(
         0, num_get_prec_bits(number) ? num_get_prec_bits(number) : number_default_precision_bits);
-    number_t real = vt && vt->complex ? num_real_part(number) : num_clone(number);
+    number_t real = vt && vt->is_complex ? num_real_part(number) : num_clone(number);
     number_t result = num_atan2(zero, real);
-    return num_scope_detach(result);
-}
-
-number_t num_add_mrational(const number_t number, const mrational_t *value)
-{
-    NUM_SCOPE(scope);
-    number_t rhs = num_create_from_mrational(value);
-    number_t result = num_add(number, rhs);
     return num_scope_detach(result);
 }
 
@@ -3385,14 +3449,6 @@ number_t num_mul_long(const number_t number, long value)
 {
     NUM_SCOPE(scope);
     number_t rhs = num_create_from_long(value);
-    number_t result = num_mul(number, rhs);
-    return num_scope_detach(result);
-}
-
-number_t num_mul_mrational(const number_t number, const mrational_t *value)
-{
-    NUM_SCOPE(scope);
-    number_t rhs = num_create_from_mrational(value);
     number_t result = num_mul(number, rhs);
     return num_scope_detach(result);
 }

@@ -248,7 +248,7 @@ int num_vsprintf(char *out, size_t out_size, const char *fmt, va_list ap)
 
         if (spec == 'n' || spec == 'N') {
             number_t value = va_arg(ap_local, number_t);
-            core = (num_is_exact(value) && !number_vt(&value)->complex)
+            core = (num_is_exact(value) && !number_vt(&value)->is_complex)
                 ? num_to_string(value)
                 : number_format_inexact(&value, spec == 'N', precision);
         } else if (spec == 'd' || spec == 'i') {

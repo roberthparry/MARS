@@ -1,16 +1,91 @@
-#include "number.h"
-#include "number_internal.h"
-#include "internal/mrational_internal.h"
-
 #include <errno.h>
 #include <complex.h>
 #include <limits.h>
 #include <math.h>
 #include <stdlib.h>
 
+#include "number.h"
+#include "number_internal.h"
+
 enum {
-    NUMBER_LAMBERT_W_HALLEY_STEPS = 12
+    NUMBER_LAMBERT_W_HALLEY_STEPS = 12,
+    NUMBER_BERNOULLI_EVEN_TERM_COUNT = 260,
+    NUMBER_BERNOULLI_WORK_COUNT = (2 * NUMBER_BERNOULLI_EVEN_TERM_COUNT) + 1
 };
+
+static mpq_t number_bernoulli_even_terms[NUMBER_BERNOULLI_EVEN_TERM_COUNT];
+static bool number_bernoulli_even_term_ready[NUMBER_BERNOULLI_EVEN_TERM_COUNT];
+static bool number_bernoulli_even_terms_initialised;
+static mpq_t *number_bernoulli_work;
+static size_t number_bernoulli_next_degree;
+
+static int number_bernoulli_prepare(void)
+{
+    if (number_bernoulli_even_terms_initialised)
+        return 0;
+    number_bernoulli_work = calloc(NUMBER_BERNOULLI_WORK_COUNT,
+                                   sizeof(*number_bernoulli_work));
+    if (!number_bernoulli_work)
+        return -1;
+    for (size_t i = 0u; i < NUMBER_BERNOULLI_EVEN_TERM_COUNT; ++i)
+        mpq_init(number_bernoulli_even_terms[i]);
+    for (size_t i = 0u; i < NUMBER_BERNOULLI_WORK_COUNT; ++i)
+        mpq_init(number_bernoulli_work[i]);
+    number_bernoulli_next_degree = 0u;
+    number_bernoulli_even_terms_initialised = true;
+    return 0;
+}
+
+static void __attribute__((destructor)) number_bernoulli_shutdown(void)
+{
+    if (!number_bernoulli_even_terms_initialised)
+        return;
+    for (size_t i = 0u; i < NUMBER_BERNOULLI_EVEN_TERM_COUNT; ++i)
+        mpq_clear(number_bernoulli_even_terms[i]);
+    if (number_bernoulli_work) {
+        for (size_t i = 0u; i < NUMBER_BERNOULLI_WORK_COUNT; ++i)
+            mpq_clear(number_bernoulli_work[i]);
+        free(number_bernoulli_work);
+    }
+}
+
+static int number_bernoulli_even_ensure(size_t index)
+{
+    mpq_t scale;
+    size_t target_degree;
+
+    if (index == 0u || index > NUMBER_BERNOULLI_EVEN_TERM_COUNT)
+        return -1;
+    if (number_bernoulli_even_term_ready[index - 1u])
+        return 0;
+    if (number_bernoulli_prepare() != 0)
+        return -1;
+
+    target_degree = index * 2u;
+    mpq_init(scale);
+    for (size_t i = number_bernoulli_next_degree; i <= target_degree; ++i) {
+        mpq_set_ui(number_bernoulli_work[i], 1u, (unsigned long)i + 1u);
+        for (size_t j = i; j >= 1u; --j) {
+            mpq_sub(number_bernoulli_work[j - 1u],
+                    number_bernoulli_work[j - 1u],
+                    number_bernoulli_work[j]);
+            mpq_set_ui(scale, (unsigned long)j, 1u);
+            mpq_mul(number_bernoulli_work[j - 1u],
+                    number_bernoulli_work[j - 1u],
+                    scale);
+        }
+        if (i != 0u && (i % 2u) == 0u) {
+            size_t term_index = (i / 2u) - 1u;
+
+            mpq_set(number_bernoulli_even_terms[term_index],
+                    number_bernoulli_work[0]);
+            number_bernoulli_even_term_ready[term_index] = true;
+        }
+        number_bernoulli_next_degree = i + 1u;
+    }
+    mpq_clear(scale);
+    return 0;
+}
 
 typedef qfloat_t (*number_qfloat_unary_fn)(qfloat_t);
 typedef qcomplex_t (*number_qcomplex_unary_fn)(qcomplex_t);
@@ -265,7 +340,7 @@ static number_t number_double_cdouble_binary(double a,
 
 static bool number_is_cdouble_value(const number_t *number)
 {
-    return number_kind_value(number) == NUMBER_CPLX_DOUBLE;
+    return number_kind_value(number) == NUMBER_CDOUBLE;
 }
 
 static double _Complex number_cdouble_math_value(const number_t *number)
@@ -424,18 +499,10 @@ static int number_mpfr_erfcinv_mut(mpfr_t value)
 
 static int number_mpfr_set_bernoulli_even(mpfr_t value, size_t index)
 {
-    const mrational_t *bernoulli = mr_bernoulli_even_term(index);
-    mpq_t q;
-    int rc;
-
-    if (!bernoulli)
+    if (number_bernoulli_even_ensure(index) != 0)
         return -1;
-    mpq_init(q);
-    rc = mr_copy_mpq(q, bernoulli);
-    if (rc == 0)
-        mpfr_set_q(value, q, MPFR_RNDN);
-    mpq_clear(q);
-    return rc;
+    mpfr_set_q(value, number_bernoulli_even_terms[index - 1u], MPFR_RNDN);
+    return 0;
 }
 
 static int number_mpfr_trigamma_mut(mpfr_t value)
@@ -469,7 +536,7 @@ static int number_mpfr_trigamma_mut(mpfr_t value)
     mpfr_add(sum, sum, term, MPFR_RNDN);
     mpfr_mul(power, inv2, inv, MPFR_RNDN);
 
-    bernoulli_terms = mr_bernoulli_even_term_count();
+    bernoulli_terms = NUMBER_BERNOULLI_EVEN_TERM_COUNT;
     for (n = 1u; n <= bernoulli_terms; ++n) {
         if (number_mpfr_set_bernoulli_even(term, n) != 0) {
             mpfr_clears(y, inv, inv2, power, term, sum, (mpfr_ptr)0);
@@ -518,7 +585,7 @@ static int number_mpfr_tetragamma_mut(mpfr_t value)
     mpfr_sub(sum, sum, power, MPFR_RNDN);
     mpfr_mul(power, power, inv, MPFR_RNDN);
 
-    bernoulli_terms = mr_bernoulli_even_term_count();
+    bernoulli_terms = NUMBER_BERNOULLI_EVEN_TERM_COUNT;
     for (n = 1u; n <= bernoulli_terms; ++n) {
         if (number_mpfr_set_bernoulli_even(term, n) != 0) {
             mpfr_clears(y, inv, inv2, power, term, sum, (mpfr_ptr)0);
@@ -734,6 +801,58 @@ static int number_try_get_exact_int(const number_t number, int *out)
     free(text);
     *out = (int)parsed;
     return 1;
+}
+
+static bool number_get_exact_integer_mpz(const number_t number, mpz_t out)
+{
+    const number_private_t *impl;
+
+    if (!out || !num_is_exact(number) || !num_is_real(number) ||
+        !num_is_integer(number))
+        return false;
+
+    impl = number_impl_const(&number);
+    if (impl->kind == NUMBER_MPZ) {
+        if (number_mpz_ensure(impl->value.mpz) != 0)
+            return false;
+        mpz_set(out, impl->value.mpz->value);
+        return true;
+    }
+    if (impl->kind == NUMBER_MPQ) {
+        if (number_mpq_ensure(impl->value.mpq) != 0 ||
+            mpz_cmp_ui(mpq_denref(impl->value.mpq->value), 1u) != 0)
+            return false;
+        mpz_set(out, mpq_numref(impl->value.mpq->value));
+        return true;
+    }
+    return false;
+}
+
+static mpz_srcptr number_mpz_src_if_mpz(const number_t *number)
+{
+    const number_private_t *impl;
+
+    if (!number)
+        return NULL;
+    impl = number_impl_const(number);
+    if (impl->kind != NUMBER_MPZ || number_mpz_ensure(impl->value.mpz) != 0)
+        return NULL;
+    return impl->value.mpz->value;
+}
+
+static number_t number_from_mpz_value(mpz_srcptr value)
+{
+    number_mpz_t *out = value ? number_mpz_from_mpz(value) : NULL;
+
+    return out ? number_take_mpz(out) : NUM_NAN;
+}
+
+static void number_assign_take_mpz(number_t *dst, number_mpz_t *value)
+{
+    num_destroy(dst);
+    dst->storage[0] = NUMBER_MPZ;
+    number_impl(dst)->value.mpz = value;
+    number_scope_register_value(dst);
 }
 
 static number_t number_return_like_signed(const number_t *like,
@@ -1613,7 +1732,7 @@ number_t num_log(const number_t number)
         return d < 0.0 ? number_double_cdouble_unary(d, clog)
                        : num_create_from_double(log(d));
     }
-    if (kind == NUMBER_CPLX_DOUBLE)
+    if (kind == NUMBER_CDOUBLE)
         return number_apply_cdouble_unary(number, clog);
     if (kind == NUMBER_QFLOAT) {
         qf = number_impl_const(&number)->value.qf;
@@ -1673,7 +1792,7 @@ number_t num_log10(const number_t number)
         return d < 0.0 ? number_double_cdouble_unary(d, number_cdouble_log10)
                        : num_create_from_double(log10(d));
     }
-    if (kind == NUMBER_CPLX_DOUBLE)
+    if (kind == NUMBER_CDOUBLE)
         return number_apply_cdouble_unary(number, number_cdouble_log10);
     if (kind == NUMBER_QFLOAT) {
         qf = number_impl_const(&number)->value.qf;
@@ -1697,7 +1816,7 @@ number_t num_sqrt(const number_t number)
         return d < 0.0 ? number_double_cdouble_unary(d, csqrt)
                        : num_create_from_double(sqrt(d));
     }
-    if (kind == NUMBER_CPLX_DOUBLE)
+    if (kind == NUMBER_CDOUBLE)
         return number_apply_cdouble_unary(number, csqrt);
     if (kind == NUMBER_QFLOAT) {
         qf = number_impl_const(&number)->value.qf;
@@ -1747,8 +1866,8 @@ number_t num_pow(const number_t base, const number_t exponent)
             ? number_double_cdouble_binary(bd, ed, cpow)
             : num_create_from_double(rd);
     }
-    if (number_kind_value(&base) == NUMBER_CPLX_DOUBLE &&
-        number_kind_value(&exponent) == NUMBER_CPLX_DOUBLE)
+    if (number_kind_value(&base) == NUMBER_CDOUBLE &&
+        number_kind_value(&exponent) == NUMBER_CDOUBLE)
         return number_apply_cdouble_binary(base, exponent, cpow);
     if (number_kind_value(&base) == NUMBER_QFLOAT &&
         number_kind_value(&exponent) == NUMBER_QFLOAT) {
@@ -1910,6 +2029,650 @@ number_t num_mul_pow10(const number_t number, int exponent10)
     result = num_mul(number, scale);
     num_destroy(&scale);
     return result;
+}
+
+number_t num_factorial(unsigned long n)
+{
+    mpz_t value;
+    number_t out;
+
+    mpz_init(value);
+    mpz_fac_ui(value, n);
+    out = number_from_mpz_value(value);
+    mpz_clear(value);
+    return out;
+}
+
+number_t num_fibonacci(unsigned long n)
+{
+    mpz_t value;
+    number_t out;
+
+    mpz_init(value);
+    mpz_fib_ui(value, n);
+    out = number_from_mpz_value(value);
+    mpz_clear(value);
+    return out;
+}
+
+number_t num_isqrt(const number_t number)
+{
+    mpz_srcptr direct = number_mpz_src_if_mpz(&number);
+    mpz_t value;
+    number_t out = NUM_NAN;
+
+    if (direct) {
+        number_mpz_t *result;
+
+        if (mpz_sgn(direct) < 0)
+            return NUM_NAN;
+        result = number_mpz_new();
+        if (!result)
+            return NUM_NAN;
+        mpz_sqrt(result->value, direct);
+        return number_take_mpz(result);
+    }
+
+    mpz_init(value);
+    if (number_get_exact_integer_mpz(number, value) && mpz_sgn(value) >= 0) {
+        mpz_sqrt(value, value);
+        out = number_from_mpz_value(value);
+    }
+    mpz_clear(value);
+    return out;
+}
+
+number_t num_gcd(const number_t a, const number_t b)
+{
+    mpz_srcptr ad = number_mpz_src_if_mpz(&a);
+    mpz_srcptr bd = number_mpz_src_if_mpz(&b);
+    mpz_t av;
+    mpz_t bv;
+    mpz_t gv;
+    number_t out = NUM_NAN;
+
+    if (ad && bd) {
+        number_mpz_t *result = number_mpz_new();
+
+        if (!result)
+            return NUM_NAN;
+        mpz_gcd(result->value, ad, bd);
+        return number_take_mpz(result);
+    }
+
+    mpz_init(av);
+    mpz_init(bv);
+    mpz_init(gv);
+    if (number_get_exact_integer_mpz(a, av) &&
+        number_get_exact_integer_mpz(b, bv)) {
+        mpz_gcd(gv, av, bv);
+        out = number_from_mpz_value(gv);
+    }
+    mpz_clear(gv);
+    mpz_clear(bv);
+    mpz_clear(av);
+    return out;
+}
+
+number_t num_lcm(const number_t a, const number_t b)
+{
+    mpz_srcptr ad = number_mpz_src_if_mpz(&a);
+    mpz_srcptr bd = number_mpz_src_if_mpz(&b);
+    mpz_t av;
+    mpz_t bv;
+    mpz_t lv;
+    number_t out = NUM_NAN;
+
+    if (ad && bd) {
+        number_mpz_t *result = number_mpz_new();
+
+        if (!result)
+            return NUM_NAN;
+        mpz_lcm(result->value, ad, bd);
+        return number_take_mpz(result);
+    }
+
+    mpz_init(av);
+    mpz_init(bv);
+    mpz_init(lv);
+    if (number_get_exact_integer_mpz(a, av) &&
+        number_get_exact_integer_mpz(b, bv)) {
+        mpz_lcm(lv, av, bv);
+        out = number_from_mpz_value(lv);
+    }
+    mpz_clear(lv);
+    mpz_clear(bv);
+    mpz_clear(av);
+    return out;
+}
+
+number_t num_mod(const number_t number, const number_t modulus)
+{
+    mpz_srcptr nd = number_mpz_src_if_mpz(&number);
+    mpz_srcptr md = number_mpz_src_if_mpz(&modulus);
+    mpz_t nv;
+    mpz_t mv;
+    mpz_t rv;
+    number_t out = NUM_NAN;
+
+    if (nd && md) {
+        number_mpz_t *result;
+
+        if (mpz_sgn(md) == 0)
+            return NUM_NAN;
+        result = number_mpz_new();
+        if (!result)
+            return NUM_NAN;
+        mpz_tdiv_r(result->value, nd, md);
+        return number_take_mpz(result);
+    }
+
+    mpz_init(nv);
+    mpz_init(mv);
+    mpz_init(rv);
+    if (number_get_exact_integer_mpz(number, nv) &&
+        number_get_exact_integer_mpz(modulus, mv) &&
+        mpz_sgn(mv) != 0) {
+        mpz_tdiv_r(rv, nv, mv);
+        out = number_from_mpz_value(rv);
+    }
+    mpz_clear(rv);
+    mpz_clear(mv);
+    mpz_clear(nv);
+    return out;
+}
+
+int num_divmod(const number_t number,
+               const number_t divisor,
+               number_t *quotient,
+               number_t *remainder)
+{
+    mpz_srcptr nd = number_mpz_src_if_mpz(&number);
+    mpz_srcptr dd = number_mpz_src_if_mpz(&divisor);
+    mpz_t nv;
+    mpz_t dv;
+    mpz_t qv;
+    mpz_t rv;
+    int rc = -1;
+
+    if (!quotient || !remainder || quotient == remainder)
+        return -1;
+    if (nd && dd) {
+        number_mpz_t *q;
+        number_mpz_t *r;
+
+        if (mpz_sgn(dd) == 0)
+            return -1;
+        q = number_mpz_new();
+        r = number_mpz_new();
+        if (!q || !r) {
+            number_mpz_free(q);
+            number_mpz_free(r);
+            return -1;
+        }
+        mpz_tdiv_qr(q->value, r->value, nd, dd);
+        number_assign_take_mpz(quotient, q);
+        number_assign_take_mpz(remainder, r);
+        return 0;
+    }
+
+    mpz_init(nv);
+    mpz_init(dv);
+    mpz_init(qv);
+    mpz_init(rv);
+    if (number_get_exact_integer_mpz(number, nv) &&
+        number_get_exact_integer_mpz(divisor, dv) &&
+        mpz_sgn(dv) != 0) {
+        number_t q;
+        number_t r;
+
+        mpz_tdiv_qr(qv, rv, nv, dv);
+        q = number_from_mpz_value(qv);
+        r = number_from_mpz_value(rv);
+        if (!num_is_nan(q) && !num_is_nan(r)) {
+            number_assign(quotient, q);
+            number_assign(remainder, r);
+            rc = 0;
+        } else {
+            num_destroy(&q);
+            num_destroy(&r);
+        }
+    }
+    mpz_clear(rv);
+    mpz_clear(qv);
+    mpz_clear(dv);
+    mpz_clear(nv);
+    return rc;
+}
+
+int num_gcdext(const number_t a,
+               const number_t b,
+               number_t *gcd_out,
+               number_t *x_out,
+               number_t *y_out)
+{
+    mpz_t av;
+    mpz_t bv;
+    mpz_t gv;
+    mpz_t xv;
+    mpz_t yv;
+    int rc = -1;
+
+    mpz_init(av);
+    mpz_init(bv);
+    mpz_init(gv);
+    mpz_init(xv);
+    mpz_init(yv);
+    if (number_get_exact_integer_mpz(a, av) &&
+        number_get_exact_integer_mpz(b, bv)) {
+        number_t g;
+        number_t x;
+        number_t y;
+
+        mpz_gcdext(gv, xv, yv, av, bv);
+        g = number_from_mpz_value(gv);
+        x = number_from_mpz_value(xv);
+        y = number_from_mpz_value(yv);
+        if (!num_is_nan(g) && !num_is_nan(x) && !num_is_nan(y)) {
+            if (gcd_out)
+                number_assign(gcd_out, g);
+            else
+                num_destroy(&g);
+            if (x_out)
+                number_assign(x_out, x);
+            else
+                num_destroy(&x);
+            if (y_out)
+                number_assign(y_out, y);
+            else
+                num_destroy(&y);
+            rc = 0;
+        } else {
+            num_destroy(&g);
+            num_destroy(&x);
+            num_destroy(&y);
+        }
+    }
+    mpz_clear(yv);
+    mpz_clear(xv);
+    mpz_clear(gv);
+    mpz_clear(bv);
+    mpz_clear(av);
+    return rc;
+}
+
+number_t num_powmod(const number_t base,
+                    const number_t exponent,
+                    const number_t modulus)
+{
+    mpz_srcptr bd = number_mpz_src_if_mpz(&base);
+    mpz_srcptr ed = number_mpz_src_if_mpz(&exponent);
+    mpz_srcptr md = number_mpz_src_if_mpz(&modulus);
+    mpz_t bv;
+    mpz_t ev;
+    mpz_t mv;
+    mpz_t outv;
+    number_t out = NUM_NAN;
+
+    if (bd && ed && md) {
+        number_mpz_t *result;
+
+        if (mpz_sgn(ed) < 0 || mpz_sgn(md) <= 0)
+            return NUM_NAN;
+        result = number_mpz_new();
+        if (!result)
+            return NUM_NAN;
+        mpz_powm(result->value, bd, ed, md);
+        return number_take_mpz(result);
+    }
+
+    mpz_init(bv);
+    mpz_init(ev);
+    mpz_init(mv);
+    mpz_init(outv);
+    if (number_get_exact_integer_mpz(base, bv) &&
+        number_get_exact_integer_mpz(exponent, ev) &&
+        number_get_exact_integer_mpz(modulus, mv) &&
+        mpz_sgn(ev) >= 0 && mpz_sgn(mv) > 0) {
+        mpz_powm(outv, bv, ev, mv);
+        out = number_from_mpz_value(outv);
+    }
+    mpz_clear(outv);
+    mpz_clear(mv);
+    mpz_clear(ev);
+    mpz_clear(bv);
+    return out;
+}
+
+number_t num_modinv(const number_t number, const number_t modulus)
+{
+    mpz_t nv;
+    mpz_t mv;
+    mpz_t outv;
+    number_t out = NUM_NAN;
+
+    mpz_init(nv);
+    mpz_init(mv);
+    mpz_init(outv);
+    if (number_get_exact_integer_mpz(number, nv) &&
+        number_get_exact_integer_mpz(modulus, mv) &&
+        mpz_sgn(mv) > 0 &&
+        mpz_invert(outv, nv, mv) != 0) {
+        out = number_from_mpz_value(outv);
+    }
+    mpz_clear(outv);
+    mpz_clear(mv);
+    mpz_clear(nv);
+    return out;
+}
+
+bool num_is_prime(const number_t number)
+{
+    mpz_t value;
+    bool rc = false;
+
+    mpz_init(value);
+    if (number_get_exact_integer_mpz(number, value) && mpz_sgn(value) > 0)
+        rc = mpz_probab_prime_p(value, 25) > 0;
+    mpz_clear(value);
+    return rc;
+}
+
+number_primality_t num_prove_prime(const number_t number)
+{
+    mpz_t value;
+    number_primality_t rc = NUMBER_PRIMALITY_UNKNOWN;
+
+    mpz_init(value);
+    if (number_get_exact_integer_mpz(number, value)) {
+        if (mpz_sgn(value) <= 0)
+            rc = NUMBER_PRIMALITY_COMPOSITE;
+        else
+            rc = mpz_probab_prime_p(value, 50) == 0
+                ? NUMBER_PRIMALITY_COMPOSITE : NUMBER_PRIMALITY_PRIME;
+    }
+    mpz_clear(value);
+    return rc;
+}
+
+number_t num_next_prime(const number_t number)
+{
+    mpz_t value;
+    number_t out = NUM_NAN;
+
+    mpz_init(value);
+    if (number_get_exact_integer_mpz(number, value)) {
+        if (mpz_cmp_ui(value, 2u) < 0)
+            mpz_set_ui(value, 2u);
+        else
+            mpz_nextprime(value, value);
+        out = number_from_mpz_value(value);
+    }
+    mpz_clear(value);
+    return out;
+}
+
+number_t num_prev_prime(const number_t number)
+{
+    mpz_t value;
+    number_t out = NUM_NAN;
+
+    mpz_init(value);
+    if (number_get_exact_integer_mpz(number, value) &&
+        mpz_cmp_ui(value, 2u) >= 0) {
+        if (mpz_cmp_ui(value, 2u) != 0) {
+            mpz_sub_ui(value, value, 1u);
+            while (mpz_cmp_ui(value, 2u) >= 0 &&
+                   mpz_probab_prime_p(value, 25) == 0)
+                mpz_sub_ui(value, value, 1u);
+        }
+        if (mpz_cmp_ui(value, 2u) >= 0)
+            out = number_from_mpz_value(value);
+    }
+    mpz_clear(value);
+    return out;
+}
+
+static int number_factors_append(number_factors_t *factors,
+                                 mpz_srcptr prime,
+                                 unsigned long exponent)
+{
+    number_factor_t *grown;
+    number_t prime_number;
+
+    if (!factors || !prime || exponent == 0u)
+        return -1;
+    prime_number = number_from_mpz_value(prime);
+    if (num_is_nan(prime_number))
+        return -1;
+    grown = realloc(factors->items, (factors->count + 1u) * sizeof(*grown));
+    if (!grown) {
+        num_destroy(&prime_number);
+        return -1;
+    }
+    factors->items = grown;
+    factors->items[factors->count].prime = prime_number;
+    factors->items[factors->count].exponent = exponent;
+    factors->count++;
+    return 0;
+}
+
+number_factors_t *num_factors(const number_t number)
+{
+    number_factors_t *factors;
+    mpz_t work;
+    mpz_t prime;
+    mpz_t quotient;
+    mpz_t remainder;
+
+    mpz_init(work);
+    if (!number_get_exact_integer_mpz(number, work) || mpz_sgn(work) <= 0) {
+        mpz_clear(work);
+        return NULL;
+    }
+
+    factors = calloc(1u, sizeof(*factors));
+    if (!factors) {
+        mpz_clear(work);
+        return NULL;
+    }
+
+    mpz_init_set_ui(prime, 2u);
+    mpz_init(quotient);
+    mpz_init(remainder);
+    while (mpz_cmp_ui(work, 1u) > 0) {
+        unsigned long exponent = 0u;
+
+        if (mpz_probab_prime_p(work, 25) > 0) {
+            if (number_factors_append(factors, work, 1u) != 0) {
+                num_factors_free(factors);
+                factors = NULL;
+            }
+            break;
+        }
+
+        for (;;) {
+            mpz_tdiv_qr(quotient, remainder, work, prime);
+            if (mpz_sgn(remainder) != 0)
+                break;
+            exponent++;
+            mpz_set(work, quotient);
+        }
+        if (exponent > 0u &&
+            number_factors_append(factors, prime, exponent) != 0) {
+            num_factors_free(factors);
+            factors = NULL;
+            break;
+        }
+
+        if (mpz_cmp_ui(prime, 2u) == 0)
+            mpz_set_ui(prime, 3u);
+        else
+            mpz_nextprime(prime, prime);
+    }
+    mpz_clear(remainder);
+    mpz_clear(quotient);
+    mpz_clear(prime);
+    mpz_clear(work);
+    return factors;
+}
+
+void num_factors_free(number_factors_t *factors)
+{
+    if (!factors)
+        return;
+    for (size_t i = 0u; i < factors->count; ++i)
+        num_destroy(&factors->items[i].prime);
+    free(factors->items);
+    free(factors);
+}
+
+size_t num_bit_length(const number_t number)
+{
+    mpz_t value;
+    size_t bits = 0u;
+
+    mpz_init(value);
+    if (number_get_exact_integer_mpz(number, value) && mpz_sgn(value) != 0)
+        bits = mpz_sizeinbase(value, 2);
+    mpz_clear(value);
+    return bits;
+}
+
+bool num_test_bit(const number_t number, size_t bit_index)
+{
+    mpz_t value;
+    bool rc = false;
+
+    mpz_init(value);
+    if (number_get_exact_integer_mpz(number, value))
+        rc = mpz_tstbit(value, (mp_bitcnt_t)bit_index) != 0;
+    mpz_clear(value);
+    return rc;
+}
+
+number_t num_set_bit(const number_t number, size_t bit_index)
+{
+    mpz_t value;
+    number_t out = NUM_NAN;
+
+    mpz_init(value);
+    if (number_get_exact_integer_mpz(number, value)) {
+        mpz_setbit(value, (mp_bitcnt_t)bit_index);
+        out = number_from_mpz_value(value);
+    }
+    mpz_clear(value);
+    return out;
+}
+
+number_t num_clear_bit(const number_t number, size_t bit_index)
+{
+    mpz_t value;
+    number_t out = NUM_NAN;
+
+    mpz_init(value);
+    if (number_get_exact_integer_mpz(number, value)) {
+        mpz_clrbit(value, (mp_bitcnt_t)bit_index);
+        out = number_from_mpz_value(value);
+    }
+    mpz_clear(value);
+    return out;
+}
+
+number_t num_bit_not(const number_t number)
+{
+    mpz_t value;
+    mpz_t mask;
+    number_t out = NUM_NAN;
+
+    mpz_init(value);
+    mpz_init(mask);
+    if (number_get_exact_integer_mpz(number, value) && mpz_sgn(value) >= 0) {
+        mp_bitcnt_t bits = mpz_sizeinbase(value, 2);
+
+        if (mpz_sgn(value) == 0) {
+            mpz_set_ui(value, 1u);
+        } else {
+            mpz_set_ui(mask, 1u);
+            mpz_mul_2exp(mask, mask, bits);
+            mpz_sub_ui(mask, mask, 1u);
+            mpz_xor(value, value, mask);
+        }
+        out = number_from_mpz_value(value);
+    }
+    mpz_clear(mask);
+    mpz_clear(value);
+    return out;
+}
+
+static number_t number_apply_mpz_binary(const number_t a,
+                                        const number_t b,
+                                        void (*op)(mpz_ptr, mpz_srcptr, mpz_srcptr))
+{
+    mpz_t av;
+    mpz_t bv;
+    mpz_t outv;
+    number_t out = NUM_NAN;
+
+    mpz_init(av);
+    mpz_init(bv);
+    mpz_init(outv);
+    if (op && number_get_exact_integer_mpz(a, av) &&
+        number_get_exact_integer_mpz(b, bv)) {
+        op(outv, av, bv);
+        out = number_from_mpz_value(outv);
+    }
+    mpz_clear(outv);
+    mpz_clear(bv);
+    mpz_clear(av);
+    return out;
+}
+
+number_t num_bit_and(const number_t a, const number_t b)
+{
+    return number_apply_mpz_binary(a, b, mpz_and);
+}
+
+number_t num_bit_or(const number_t a, const number_t b)
+{
+    return number_apply_mpz_binary(a, b, mpz_ior);
+}
+
+number_t num_bit_xor(const number_t a, const number_t b)
+{
+    return number_apply_mpz_binary(a, b, mpz_xor);
+}
+
+number_t num_shl(const number_t number, long bits)
+{
+    mpz_t value;
+    number_t out = NUM_NAN;
+
+    if (bits < 0)
+        return num_shr(number, -bits);
+    mpz_init(value);
+    if (number_get_exact_integer_mpz(number, value)) {
+        mpz_mul_2exp(value, value, (mp_bitcnt_t)bits);
+        out = number_from_mpz_value(value);
+    }
+    mpz_clear(value);
+    return out;
+}
+
+number_t num_shr(const number_t number, long bits)
+{
+    mpz_t value;
+    number_t out = NUM_NAN;
+
+    if (bits < 0)
+        return num_shl(number, -bits);
+    mpz_init(value);
+    if (number_get_exact_integer_mpz(number, value)) {
+        mpz_tdiv_q_2exp(value, value, (mp_bitcnt_t)bits);
+        out = number_from_mpz_value(value);
+    }
+    mpz_clear(value);
+    return out;
 }
 
 number_t num_hypot(const number_t a, const number_t b)
@@ -2080,9 +2843,6 @@ number_t num_tan(const number_t number)
 
     if (number_is_cdouble_value(&number))
         return number_apply_cdouble_unary(number, ctan);
-    if (number_is_plain_inexact_value(&number))
-        return number_apply_nonreal_complex_unary_or_dispatch(number, tan,
-            qf_tan, qc_tan, number_mpfr_tan_mut, mpc_tan);
     if (num_is_real(number)) {
         if (number_tan_fastpath_by_const_id(&number, number_tan_fastpaths,
                 sizeof(number_tan_fastpaths) / sizeof(number_tan_fastpaths[0]), &out))
@@ -2091,6 +2851,9 @@ number_t num_tan(const number_t number)
                 sizeof(number_tan_fastpaths) / sizeof(number_tan_fastpaths[0]), &out))
             return out;
     }
+    if (number_is_plain_inexact_value(&number))
+        return number_apply_nonreal_complex_unary_or_dispatch(number, tan,
+            qf_tan, qc_tan, number_mpfr_tan_mut, mpc_tan);
     return number_apply_nonreal_complex_unary_or_dispatch(number, tan, qf_tan, qc_tan, number_mpfr_tan_mut, mpc_tan);
 }
 
@@ -2121,7 +2884,7 @@ number_t num_asin(const number_t number)
             ? number_double_cdouble_unary(d, casin)
             : num_create_from_double(asin(d));
     }
-    if (kind == NUMBER_CPLX_DOUBLE)
+    if (kind == NUMBER_CDOUBLE)
         return number_apply_cdouble_unary(number, casin);
     if (kind == NUMBER_QFLOAT) {
         qf = number_impl_const(&number)->value.qf;
@@ -2144,7 +2907,7 @@ number_t num_acos(const number_t number)
             ? number_double_cdouble_unary(d, cacos)
             : num_create_from_double(acos(d));
     }
-    if (kind == NUMBER_CPLX_DOUBLE)
+    if (kind == NUMBER_CDOUBLE)
         return number_apply_cdouble_unary(number, cacos);
     if (kind == NUMBER_QFLOAT) {
         qf = number_impl_const(&number)->value.qf;
@@ -2251,7 +3014,7 @@ number_t num_acosh(const number_t number)
         return d < 1.0 ? number_double_cdouble_unary(d, cacosh)
                        : num_create_from_double(acosh(d));
     }
-    if (kind == NUMBER_CPLX_DOUBLE)
+    if (kind == NUMBER_CDOUBLE)
         return number_apply_cdouble_unary(number, cacosh);
     if (kind == NUMBER_QFLOAT) {
         qf = number_impl_const(&number)->value.qf;
@@ -2274,7 +3037,7 @@ number_t num_atanh(const number_t number)
             ? number_double_cdouble_unary(d, catanh)
             : num_create_from_double(atanh(d));
     }
-    if (kind == NUMBER_CPLX_DOUBLE)
+    if (kind == NUMBER_CDOUBLE)
         return number_apply_cdouble_unary(number, catanh);
     if (kind == NUMBER_QFLOAT) {
         qf = number_impl_const(&number)->value.qf;
@@ -2363,22 +3126,26 @@ number_t num_logbeta(const number_t a, const number_t b)
 
 number_t num_binomial(const number_t a, const number_t b)
 {
-    int n;
-    int k;
-    mint_t *value;
+    mpz_t n;
+    mpz_t k;
+    mpz_t value;
+    number_t out = NUM_NAN;
 
-    if (number_try_get_exact_int(a, &n) &&
-        number_try_get_exact_int(b, &k) &&
-        n >= 0 && k >= 0) {
-        value = mi_new();
-        if (!value)
-            return number_invalid();
-        if (mi_binomial(value, (unsigned long)n, (unsigned long)k) != 0) {
-            mi_free(value);
-            return number_invalid();
-        }
-        return number_take(number_wrap_mint(value));
+    mpz_init(n);
+    mpz_init(k);
+    if (number_get_exact_integer_mpz(a, n) &&
+        number_get_exact_integer_mpz(b, k) &&
+        mpz_sgn(n) >= 0 && mpz_sgn(k) >= 0 &&
+        mpz_fits_ulong_p(n) && mpz_fits_ulong_p(k)) {
+        mpz_init(value);
+        mpz_bin_uiui(value, mpz_get_ui(n), mpz_get_ui(k));
+        out = number_from_mpz_value(value);
+        mpz_clear(value);
     }
+    mpz_clear(k);
+    mpz_clear(n);
+    if (!num_is_nan(out))
+        return out;
 
     return number_apply_binary_math_with_double(a, b, number_double_binomial,
         qf_binomial, qc_binomial, number_mpfr_binomial_mut, NULL);

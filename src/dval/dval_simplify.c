@@ -699,14 +699,7 @@ static number_t dv_number_from_small_rational_local(long numerator, long denomin
 {
     if (denominator == 1L)
         return num_create_from_long(numerator);
-    {
-        mrational_t *rational = mr_create_frac_long(numerator, denominator);
-        number_t value = rational ? num_create_from_mrational(rational)
-                                  : num_create_from_long(numerator);
-
-        mr_free(rational);
-        return value;
-    }
+    return num_create_from_frac(numerator, denominator);
 }
 
 static int dv_update_abs_coeff_gcd_local(number_t abs_coeff, long *gcd_value)

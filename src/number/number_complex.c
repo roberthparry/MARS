@@ -606,8 +606,8 @@ static bool number_small_fraction_div(number_small_fraction_t a,
 static number_t *number_wrap_small_fraction(number_small_fraction_t value)
 {
     if (value.d == 1)
-        return number_wrap_mint(mi_create_long(value.n));
-    return number_wrap_mrational(mr_create_frac_long(value.n, value.d));
+        return number_wrap_mpz(number_mpz_from_long(value.n));
+    return number_wrap_mpq(number_mpq_from_frac_long(value.n, value.d));
 }
 
 static number_t *number_wrap_complex_small_fraction_parts(
@@ -667,9 +667,9 @@ static bool number_small_fraction_components_are_integers(
 
 static bool number_small_integer_from_number(const number_t *value, long *out)
 {
-    if (!value || !out || number_kind_value(value) != NUMBER_MINT)
+    if (!value || !out || number_kind_value(value) != NUMBER_MPZ)
         return false;
-    return mi_get_long(number_impl_const(value)->value.mi, out);
+    return number_mpz_get_long(number_impl_const(value)->value.mpz, out);
 }
 
 static bool number_complex_small_integer_components(const complex_t *av,

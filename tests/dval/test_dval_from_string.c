@@ -997,7 +997,7 @@ static void test_from_string_number_literals(void)
     check_parse_num("rational atom expression", "{ 1/2 + 1/4 }", "3/4", __LINE__);
     check_parse_num("unicode rational atom expression", "{ ½ + ¼ }", "3/4", __LINE__);
     check_parse_num("stacked unicode rational atom", "{ ³⁵⁵⁄₁₁₃ }", "355/113", __LINE__);
-    check_parse_num("pure imaginary coefficient atom", "{ 3/2i }", "0 + 3/2i", __LINE__);
+    check_parse_num("pure imaginary coefficient atom", "{ 3/2i }", "3/2i", __LINE__);
     check_parse_num("pure const rational complex", "{ [z] = 1/2 - 3/2i }", "1/2 - 3/2i", __LINE__);
     check_parse_num("binding rational complex", "{ z | z = 1/2 - 3/2i }", "1/2 - 3/2i", __LINE__);
     check_parse_num("binding parenthesized imag coeff",

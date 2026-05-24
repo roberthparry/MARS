@@ -1,5 +1,7 @@
 #include "test_number.h"
 
+#include <stdio.h>
+
 static bool test_number_suite_setup(void);
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
@@ -44,6 +46,14 @@ int tests_main(void)
 
     TEST_SECTION("Public API");
     TEST_RUN_CASE(run_number_public_api_tests, "number,public-api");
+
+    /* README examples intentionally run last because they produce output. */
+    TEST_SECTION("README Output Examples");
+    printf(C_YELLOW "\nRunning number README-equivalent examples...\n" C_RESET);
+    TEST_RUN_OUTPUT_TAGS(run_number_readme_example_tests,
+                         "number,readme,output");
+    TEST_RUN_OUTPUT_TAGS(run_number_readme_mersenne_prime_search,
+                         "number,readme,mersenne,output");
 
     return TEST_EXIT_CODE();
 }

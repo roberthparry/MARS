@@ -5,8 +5,6 @@
 #include <stddef.h>
 #include <stdarg.h>
 #include <stdint.h>
-#include "mint.h"
-#include "mrational.h"
 #include "qcomplex.h"
 #include "qfloat.h"
 
@@ -22,8 +20,8 @@
  * Construction is explicit for typed inputs, while string parsing chooses the
  * most suitable representation by syntax:
  *
- * - integer text -> `mint_t`
- * - `a/b` fraction text -> `mrational_t`
+ * - integer text -> an internal MPZ-backed exact integer
+ * - `a/b` fraction text -> an internal MPQ-backed exact rational
  * - decimal / scientific real text -> an internal MPFR-backed real
  * - complex text -> an internal multiprecision complex representation
  *
@@ -63,6 +61,22 @@
 typedef struct _number_t {
     uint64_t storage[NUMBER_STORAGE_WORDS];
 } number_t;
+
+typedef enum number_primality_t {
+    NUMBER_PRIMALITY_UNKNOWN = -1,
+    NUMBER_PRIMALITY_COMPOSITE = 0,
+    NUMBER_PRIMALITY_PRIME = 1
+} number_primality_t;
+
+typedef struct number_factor_t {
+    number_t prime;
+    unsigned long exponent;
+} number_factor_t;
+
+typedef struct number_factors_t {
+    size_t count;
+    number_factor_t *items;
+} number_factors_t;
 
 #ifndef MARS_NUMBER_IMPLEMENTATION
 typedef union number_inline_qfloat_bits_t {
@@ -188,12 +202,11 @@ number_t num_new                   (void);
 number_t num_new_with_prec_bits    (size_t precision_bits);
 
 number_t num_create_from_long      (long value);
+number_t num_create_from_frac      (long numerator, long denominator);
 number_t num_create_from_double    (double value);
 number_t num_create_from_cdouble   (double _Complex value);
 number_t num_create_from_qfloat    (qfloat_t value);
 number_t num_create_from_qcomplex  (qcomplex_t value);
-number_t num_create_from_mint      (const mint_t *value);
-number_t num_create_from_mrational (const mrational_t *value);
 
 /**
  * @brief Parses text into the most suitable numeric representation.
@@ -451,11 +464,11 @@ size_t num_get_prec_digits (const number_t number);
 
 /** In-place value replacement helpers. */
 int num_set_long      (number_t *number, long value);
+int num_set_frac      (number_t *number, long numerator, long denominator);
 int num_set_double    (number_t *number, double value);
 int num_set_cdouble   (number_t *number, double _Complex value);
 int num_set_qfloat    (number_t *number, qfloat_t value);
 int num_set_qcomplex  (number_t *number, qcomplex_t value);
-int num_set_mrational (number_t *number, const mrational_t *value);
 
 /**
  * @brief Replaces a number by parsing the same literal forms as `num_create_from_string()`.
@@ -649,13 +662,58 @@ number_t num_sub_slow     (const number_t a, const number_t b);
 number_t num_mul_slow     (const number_t a, const number_t b);
 number_t num_div_slow     (const number_t a, const number_t b);
 #endif
-number_t num_add_mrational(const number_t number, const mrational_t *value);
 number_t num_add_long     (const number_t number, long value);
 number_t num_mul_long     (const number_t number, long value);
-number_t num_mul_mrational(const number_t number, const mrational_t *value);
 number_t num_pow          (const number_t base, const number_t exponent);
 number_t num_pow_int      (const number_t base, int exponent);
 number_t num_ldexp        (const number_t number, int exponent2);
+/** @} */
+
+/** @name Exact integer and number-theory helpers
+ * These helpers accept exact integer `number_t` inputs. Value-returning
+ * helpers return `NUM_NAN` when given unsupported inputs such as fractions,
+ * inexact values, negative factorial arguments, or zero moduli.
+ * @{
+ */
+number_t num_factorial(unsigned long n);
+number_t num_fibonacci(unsigned long n);
+number_t num_isqrt(const number_t number);
+
+number_t num_gcd(const number_t a, const number_t b);
+number_t num_lcm(const number_t a, const number_t b);
+number_t num_mod(const number_t number, const number_t modulus);
+int      num_divmod(const number_t number,
+                    const number_t divisor,
+                    number_t *quotient,
+                    number_t *remainder);
+int      num_gcdext(const number_t a,
+                    const number_t b,
+                    number_t *gcd_out,
+                    number_t *x_out,
+                    number_t *y_out);
+
+number_t num_powmod(const number_t base,
+                    const number_t exponent,
+                    const number_t modulus);
+number_t num_modinv(const number_t number, const number_t modulus);
+
+bool               num_is_prime(const number_t number);
+number_primality_t num_prove_prime(const number_t number);
+number_t           num_next_prime(const number_t number);
+number_t           num_prev_prime(const number_t number);
+number_factors_t  *num_factors(const number_t number);
+void               num_factors_free(number_factors_t *factors);
+
+size_t   num_bit_length(const number_t number);
+bool     num_test_bit(const number_t number, size_t bit_index);
+number_t num_set_bit(const number_t number, size_t bit_index);
+number_t num_clear_bit(const number_t number, size_t bit_index);
+number_t num_bit_not(const number_t number);
+number_t num_bit_and(const number_t a, const number_t b);
+number_t num_bit_or(const number_t a, const number_t b);
+number_t num_bit_xor(const number_t a, const number_t b);
+number_t num_shl(const number_t number, long bits);
+number_t num_shr(const number_t number, long bits);
 /** @} */
 
 /** @name Elementary functions

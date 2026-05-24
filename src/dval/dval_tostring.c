@@ -47,6 +47,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
+#include <gmp.h>
 
 #include "dval_bindings_internal.h"
 #include "dval_internal.h"
@@ -60,51 +61,30 @@
 
 static void dv_trim_decimal_display_artifacts_local(char *text);
 
-static bool dv_mint_factor_out_long(mint_t *value, long factor, size_t *count)
+static bool dv_mpz_factor_out_ulong(mpz_t value, unsigned long factor, size_t *count)
 {
-    long rem;
-
-    if (!value || !count)
+    if (!count || factor == 0u)
         return false;
 
-    for (;;) {
-        mint_t *trial;
-
-        if (mi_cmp_long(value, 1L) == 0)
+    while (true) {
+        if (mpz_cmp_ui(value, 1u) == 0)
             return true;
-        trial = mi_clone(value);
-        if (!trial)
-            return false;
-        if (mi_div_long(trial, factor, &rem) != 0) {
-            mi_free(trial);
-            return false;
-        }
-        if (rem != 0L) {
-            mi_free(trial);
+        if (!mpz_divisible_ui_p(value, factor))
             return true;
-        }
-        mi_clear(value);
-        if (mi_add(value, trial) != 0) {
-            mi_free(trial);
-            return false;
-        }
-        mi_free(trial);
+        mpz_divexact_ui(value, value, factor);
         ++*count;
     }
 }
 
-static int dv_mint_mul_small_power(mint_t *value, long factor, size_t exponent)
+static void dv_mpz_mul_small_power(mpz_t value, unsigned long factor, size_t exponent)
 {
-    for (size_t i = 0u; i < exponent; ++i) {
-        if (mi_mul_long(value, factor) != 0)
-            return -1;
-    }
-    return 0;
+    for (size_t i = 0u; i < exponent; ++i)
+        mpz_mul_ui(value, value, factor);
 }
 
-static char *dv_decimal_from_scaled_integer(mint_t *scaled, size_t scale)
+static char *dv_decimal_from_scaled_integer(mpz_t scaled, size_t scale)
 {
-    char *digits = mi_to_string(scaled);
+    char *digits = mpz_get_str(NULL, 10, scaled);
     char *out;
     const char *mag;
     bool negative;
@@ -270,8 +250,9 @@ static char *dv_decimal_string_from_rational_text_local(const char *text)
 {
     char *numer_text = NULL;
     char *denom_text = NULL;
-    mint_t *den = NULL;
-    mint_t *scaled = NULL;
+    mpz_t den;
+    mpz_t scaled;
+    bool mpz_ready = false;
     size_t twos = 0u;
     size_t fives = 0u;
     size_t scale;
@@ -280,14 +261,21 @@ static char *dv_decimal_string_from_rational_text_local(const char *text)
     if (!dv_split_rational_text_local(text, &numer_text, &denom_text))
         return NULL;
 
-    den = mi_create_string(denom_text);
-    scaled = mi_create_string(numer_text);
-    if (!den || !scaled)
+    mpz_init(den);
+    mpz_init(scaled);
+    mpz_ready = true;
+    if (mpz_set_str(den, denom_text, 10) != 0 ||
+        mpz_set_str(scaled, numer_text, 10) != 0 ||
+        mpz_sgn(den) == 0)
         goto done;
+    if (mpz_sgn(den) < 0) {
+        mpz_neg(den, den);
+        mpz_neg(scaled, scaled);
+    }
 
-    if (!dv_mint_factor_out_long(den, 2L, &twos) ||
-        !dv_mint_factor_out_long(den, 5L, &fives) ||
-        mi_cmp_long(den, 1L) != 0)
+    if (!dv_mpz_factor_out_ulong(den, 2u, &twos) ||
+        !dv_mpz_factor_out_ulong(den, 5u, &fives) ||
+        mpz_cmp_ui(den, 1u) != 0)
         goto done;
 
     scale = twos > fives ? twos : fives;
@@ -295,18 +283,18 @@ static char *dv_decimal_string_from_rational_text_local(const char *text)
         goto done;
 
     if (fives > twos) {
-        if (dv_mint_mul_small_power(scaled, 2L, fives - twos) != 0)
-            goto done;
+        dv_mpz_mul_small_power(scaled, 2u, fives - twos);
     } else if (twos > fives) {
-        if (dv_mint_mul_small_power(scaled, 5L, twos - fives) != 0)
-            goto done;
+        dv_mpz_mul_small_power(scaled, 5u, twos - fives);
     }
 
     out = dv_decimal_from_scaled_integer(scaled, scale);
 
 done:
-    mi_free(scaled);
-    mi_free(den);
+    if (mpz_ready) {
+        mpz_clear(scaled);
+        mpz_clear(den);
+    }
     free(denom_text);
     free(numer_text);
     return out;

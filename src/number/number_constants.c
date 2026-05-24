@@ -1,10 +1,14 @@
 #include <math.h>
+#include <complex.h>
 
 #include "number_internal.h"
-#include "internal/mint_internal.h"
-#include "internal/mrational_internal.h"
 
-#include <complex.h>
+#define NUMBER_MPZ_SOURCE(name, id) \
+    static number_mpz_t name = {    \
+        .constant_id = (id),        \
+        .immortal = true,           \
+        .initialised = false        \
+    }
 
 #define NUMBER_MPFR_SOURCE(name, id) \
     static number_mpfr_t name = {    \
@@ -12,6 +16,27 @@
         .immortal = true,            \
         .initialised = false         \
     }
+
+#define NUMBER_MPQ_SOURCE(name, id) \
+    static number_mpq_t name = {    \
+        .constant_id = (id),        \
+        .immortal = true,           \
+        .initialised = false        \
+    }
+
+NUMBER_MPZ_SOURCE(number_zero_mpz_value, NUMBER_CONST_ZERO);
+NUMBER_MPZ_SOURCE(number_one_mpz_value, NUMBER_CONST_ONE);
+NUMBER_MPZ_SOURCE(number_neg_one_mpz_value, NUMBER_CONST_NEG_ONE);
+NUMBER_MPZ_SOURCE(number_two_mpz_value, NUMBER_CONST_TWO);
+NUMBER_MPZ_SOURCE(number_ten_mpz_value, NUMBER_CONST_TEN);
+
+NUMBER_MPQ_SOURCE(number_half_mpq_value, NUMBER_CONST_HALF);
+NUMBER_MPQ_SOURCE(number_one_and_half_mpq_value, NUMBER_CONST_ONE_AND_HALF);
+NUMBER_MPQ_SOURCE(number_one_third_mpq_value, NUMBER_CONST_ONE_THIRD);
+NUMBER_MPQ_SOURCE(number_quarter_mpq_value, NUMBER_CONST_QUARTER);
+NUMBER_MPQ_SOURCE(number_one_sixth_mpq_value, NUMBER_CONST_ONE_SIXTH);
+NUMBER_MPQ_SOURCE(number_one_eighth_mpq_value, NUMBER_CONST_ONE_EIGHTH);
+NUMBER_MPQ_SOURCE(number_one_tenth_mpq_value, NUMBER_CONST_ONE_TENTH);
 
 NUMBER_MPFR_SOURCE(number_pi_mpfr_value, NUMBER_CONST_PI);
 NUMBER_MPFR_SOURCE(number_2pi_mpfr_value, NUMBER_CONST_2PI);
@@ -49,21 +74,23 @@ NUMBER_MPFR_SOURCE(number_nan_mpfr_value, NUMBER_CONST_NAN);
 NUMBER_MPFR_SOURCE(number_inf_mpfr_value, NUMBER_CONST_INF);
 NUMBER_MPFR_SOURCE(number_ninf_mpfr_value, NUMBER_CONST_NINF);
 
+#undef NUMBER_MPZ_SOURCE
 #undef NUMBER_MPFR_SOURCE
+#undef NUMBER_MPQ_SOURCE
 
 static const number_private_t number_zero_value = {
-    .kind = NUMBER_MINT,
-    .value.mi = (mint_t *)&MI_ZERO_VALUE
+    .kind = NUMBER_MPZ,
+    .value.mpz = &number_zero_mpz_value
 };
 
 static const number_private_t number_one_value = {
-    .kind = NUMBER_MINT,
-    .value.mi = (mint_t *)&MI_ONE_VALUE
+    .kind = NUMBER_MPZ,
+    .value.mpz = &number_one_mpz_value
 };
 
 static const number_private_t number_neg_one_value = {
-    .kind = NUMBER_MINT,
-    .value.mi = (mint_t *)&MI_NEG_ONE_VALUE
+    .kind = NUMBER_MPZ,
+    .value.mpz = &number_neg_one_mpz_value
 };
 
 static const number_private_t number_pi_value = {
@@ -227,48 +254,48 @@ static const number_private_t number_2pi_cubed_value = {
 };
 
 static const number_private_t number_half_value = {
-    .kind = NUMBER_MRATIONAL,
-    .value.mr = (mrational_t *)&MR_HALF_VALUE
+    .kind = NUMBER_MPQ,
+    .value.mpq = &number_half_mpq_value
 };
 
 static const number_private_t number_one_and_half_value = {
-    .kind = NUMBER_MRATIONAL,
-    .value.mr = (mrational_t *)&MR_ONE_AND_HALF_VALUE
+    .kind = NUMBER_MPQ,
+    .value.mpq = &number_one_and_half_mpq_value
 };
 
 static const number_private_t number_one_third_value = {
-    .kind = NUMBER_MRATIONAL,
-    .value.mr = (mrational_t *)&MR_ONE_THIRD_VALUE
+    .kind = NUMBER_MPQ,
+    .value.mpq = &number_one_third_mpq_value
 };
 
 static const number_private_t number_quarter_value = {
-    .kind = NUMBER_MRATIONAL,
-    .value.mr = (mrational_t *)&MR_QUARTER_VALUE
+    .kind = NUMBER_MPQ,
+    .value.mpq = &number_quarter_mpq_value
 };
 
 static const number_private_t number_one_sixth_value = {
-    .kind = NUMBER_MRATIONAL,
-    .value.mr = (mrational_t *)&MR_ONE_SIXTH_VALUE
+    .kind = NUMBER_MPQ,
+    .value.mpq = &number_one_sixth_mpq_value
 };
 
 static const number_private_t number_one_eighth_value = {
-    .kind = NUMBER_MRATIONAL,
-    .value.mr = (mrational_t *)&MR_ONE_EIGHTH_VALUE
+    .kind = NUMBER_MPQ,
+    .value.mpq = &number_one_eighth_mpq_value
 };
 
 static const number_private_t number_one_tenth_value = {
-    .kind = NUMBER_MRATIONAL,
-    .value.mr = (mrational_t *)&MR_ONE_TENTH_VALUE
+    .kind = NUMBER_MPQ,
+    .value.mpq = &number_one_tenth_mpq_value
 };
 
 static const number_private_t number_two_value = {
-    .kind = NUMBER_MINT,
-    .value.mi = (mint_t *)&MI_TWO_VALUE
+    .kind = NUMBER_MPZ,
+    .value.mpz = &number_two_mpz_value
 };
 
 static const number_private_t number_ten_value = {
-    .kind = NUMBER_MINT,
-    .value.mi = (mint_t *)&MI_TEN_VALUE
+    .kind = NUMBER_MPZ,
+    .value.mpz = &number_ten_mpz_value
 };
 
 static const number_private_t number_nan_value = {
@@ -436,9 +463,14 @@ static const qfloat_t *const number_const_qfloat_table[NUMBER_CONST_COUNT] = {
     [NUMBER_CONST_ONE] = &QF_ONE,
     [NUMBER_CONST_NEG_ONE] = &QF_NEG_ONE,
     [NUMBER_CONST_HALF] = &QF_HALF,
+    [NUMBER_CONST_ONE_AND_HALF] = &QF_ONE_AND_HALF,
+    [NUMBER_CONST_ONE_THIRD] = &QF_ONE_THIRD,
     [NUMBER_CONST_QUARTER] = &QF_QUARTER,
+    [NUMBER_CONST_ONE_SIXTH] = &QF_ONE_SIXTH,
     [NUMBER_CONST_ONE_EIGHTH] = &QF_ONE_EIGHTH,
+    [NUMBER_CONST_ONE_TENTH] = &QF_ONE_TENTH,
     [NUMBER_CONST_TWO] = &QF_TWO,
+    [NUMBER_CONST_TEN] = &QF_TEN,
     [NUMBER_CONST_PI] = &QF_PI,
     [NUMBER_CONST_2PI] = &QF_2PI,
     [NUMBER_CONST_PI_2] = &QF_PI_2,
@@ -493,9 +525,14 @@ static const number_t *const number_const_exact_table[NUMBER_CONST_COUNT] = {
     [NUMBER_CONST_ONE] = &NUM_ONE,
     [NUMBER_CONST_NEG_ONE] = &NUM_NEG_ONE,
     [NUMBER_CONST_HALF] = &NUM_HALF,
+    [NUMBER_CONST_ONE_AND_HALF] = &NUM_ONE_AND_HALF,
+    [NUMBER_CONST_ONE_THIRD] = &NUM_ONE_THIRD,
     [NUMBER_CONST_QUARTER] = &NUM_QUARTER,
+    [NUMBER_CONST_ONE_SIXTH] = &NUM_ONE_SIXTH,
     [NUMBER_CONST_ONE_EIGHTH] = &NUM_ONE_EIGHTH,
-    [NUMBER_CONST_TWO] = &NUM_TWO
+    [NUMBER_CONST_ONE_TENTH] = &NUM_ONE_TENTH,
+    [NUMBER_CONST_TWO] = &NUM_TWO,
+    [NUMBER_CONST_TEN] = &NUM_TEN
 };
 
 static const double number_const_double_table[NUMBER_CONST_COUNT] = {
@@ -503,9 +540,14 @@ static const double number_const_double_table[NUMBER_CONST_COUNT] = {
     [NUMBER_CONST_ONE] = 1.0,
     [NUMBER_CONST_NEG_ONE] = -1.0,
     [NUMBER_CONST_HALF] = 0.5,
+    [NUMBER_CONST_ONE_AND_HALF] = 1.5,
+    [NUMBER_CONST_ONE_THIRD] = 1.0 / 3.0,
     [NUMBER_CONST_QUARTER] = 0.25,
+    [NUMBER_CONST_ONE_SIXTH] = 1.0 / 6.0,
     [NUMBER_CONST_ONE_EIGHTH] = 0.125,
+    [NUMBER_CONST_ONE_TENTH] = 0.1,
     [NUMBER_CONST_TWO] = 2.0,
+    [NUMBER_CONST_TEN] = 10.0,
     [NUMBER_CONST_PI] = M_PI,
     [NUMBER_CONST_2PI] = 2.0 * M_PI,
     [NUMBER_CONST_PI_2] = M_PI_2,
@@ -531,9 +573,14 @@ static const double _Complex number_const_cdouble_table[NUMBER_CONST_COUNT] = {
     [NUMBER_CONST_ONE] = 1.0 + 0.0 * I,
     [NUMBER_CONST_NEG_ONE] = -1.0 + 0.0 * I,
     [NUMBER_CONST_HALF] = 0.5 + 0.0 * I,
+    [NUMBER_CONST_ONE_AND_HALF] = 1.5 + 0.0 * I,
+    [NUMBER_CONST_ONE_THIRD] = (1.0 / 3.0) + 0.0 * I,
     [NUMBER_CONST_QUARTER] = 0.25 + 0.0 * I,
+    [NUMBER_CONST_ONE_SIXTH] = (1.0 / 6.0) + 0.0 * I,
     [NUMBER_CONST_ONE_EIGHTH] = 0.125 + 0.0 * I,
+    [NUMBER_CONST_ONE_TENTH] = 0.1 + 0.0 * I,
     [NUMBER_CONST_TWO] = 2.0 + 0.0 * I,
+    [NUMBER_CONST_TEN] = 10.0 + 0.0 * I,
     [NUMBER_CONST_PI] = M_PI + 0.0 * I,
     [NUMBER_CONST_2PI] = 2.0 * M_PI + 0.0 * I,
     [NUMBER_CONST_PI_2] = M_PI_2 + 0.0 * I,
@@ -562,9 +609,14 @@ static const bool number_const_has_double_table[NUMBER_CONST_COUNT] = {
     [NUMBER_CONST_ONE] = true,
     [NUMBER_CONST_NEG_ONE] = true,
     [NUMBER_CONST_HALF] = true,
+    [NUMBER_CONST_ONE_AND_HALF] = true,
+    [NUMBER_CONST_ONE_THIRD] = true,
     [NUMBER_CONST_QUARTER] = true,
+    [NUMBER_CONST_ONE_SIXTH] = true,
     [NUMBER_CONST_ONE_EIGHTH] = true,
+    [NUMBER_CONST_ONE_TENTH] = true,
     [NUMBER_CONST_TWO] = true,
+    [NUMBER_CONST_TEN] = true,
     [NUMBER_CONST_PI] = true,
     [NUMBER_CONST_2PI] = true,
     [NUMBER_CONST_PI_2] = true,
@@ -590,9 +642,14 @@ static const bool number_const_has_cdouble_table[NUMBER_CONST_COUNT] = {
     [NUMBER_CONST_ONE] = true,
     [NUMBER_CONST_NEG_ONE] = true,
     [NUMBER_CONST_HALF] = true,
+    [NUMBER_CONST_ONE_AND_HALF] = true,
+    [NUMBER_CONST_ONE_THIRD] = true,
     [NUMBER_CONST_QUARTER] = true,
+    [NUMBER_CONST_ONE_SIXTH] = true,
     [NUMBER_CONST_ONE_EIGHTH] = true,
+    [NUMBER_CONST_ONE_TENTH] = true,
     [NUMBER_CONST_TWO] = true,
+    [NUMBER_CONST_TEN] = true,
     [NUMBER_CONST_PI] = true,
     [NUMBER_CONST_2PI] = true,
     [NUMBER_CONST_PI_2] = true,

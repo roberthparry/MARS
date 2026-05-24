@@ -1,7 +1,7 @@
+#include <stdlib.h>
+
 #include "number.h"
 #include "number_internal.h"
-
-#include <stdlib.h>
 
 bool number_is_zero_qfloat(const number_t *number)
 {

@@ -2,14 +2,15 @@
 
 `number_t` is MARS's generic numeric value cluster.
 
-It gives the library one by-value public numeric handle that can represent:
+It gives the library a single by-value public numeric handle that can represent:
 
-- exact integers via `mint_t`
-- exact rationals via `mrational_t`
+- exact integers via an internal MPZ-backed representation
+- exact rationals via an internal MPQ-backed representation
 - fixed-precision real values via `double` and `qfloat_t`
-- fixed-precision complex values via `qcomplex_t`
-- multiprecision real values via `mfloat_t`
-- multiprecision complex values via `mcomplex_t`
+- fixed-precision complex values via `double _Complex` and `qcomplex_t`
+- multiprecision real values via an internal MPFR-backed representation
+- multiprecision complex values via an internal `complex_t` with MPC-backed
+  acceleration for inexact complex operations
 
 The goal is to let callers work at the level of "a number" without having to
 manually pick a backend for every operation.
@@ -36,10 +37,12 @@ but must treat the storage as opaque.
 
 `num_create_from_string(...)` chooses the most suitable backend by syntax:
 
-- integer text -> `mint_t`
-- `a/b` fraction text, Unicode fraction glyphs, or stacked Unicode fractions -> `mrational_t`
-- decimal or scientific real text -> `mfloat_t`
-- complex text -> `mcomplex_t`
+- integer text -> exact integer
+- `a/b` fraction text, Unicode fraction glyphs, or stacked Unicode fractions
+  -> exact rational
+- decimal or scientific real text -> multiprecision real
+- complex text -> internal complex representation, preserving exact real and
+  imaginary parts where possible
 
 Examples:
 
@@ -75,16 +78,25 @@ For multiprecision construction, `number_t` uses a default working precision of
 
 This applies to:
 
-- `num_create_from_string(...)` for decimal/scientific real and complex input
-- `num_create_from_mfloat(...)`
-- `num_create_from_mcomplex(...)`
+- `num_create_from_string(...)` for decimal/scientific real input
+- inexact components of `num_create_from_string(...)` complex input
+- `num_new(...)`
+- `num_const(...)` when materialising inexact constants such as `NUM_PI`
+- promotion from exact values into multiprecision real or complex work
 
-Explicit precision constructors are also available:
+Fixed-precision constructors deliberately keep their fixed precision:
 
-- `num_create_from_mfloat_with_prec_bits(...)`
-- `num_create_from_mfloat_with_prec_digits(...)`
-- `num_create_from_mcomplex_with_prec_bits(...)`
-- `num_create_from_mcomplex_with_prec_digits(...)`
+- `num_create_from_double(...)` creates a double-precision value
+- `num_create_from_cdouble(...)` creates a double-complex value
+- `num_create_from_qfloat(...)` creates a `qfloat_t` precision value
+- `num_create_from_qcomplex(...)` creates a `qcomplex_t` precision value
+
+Explicit precision materialisation is available for constants and existing
+values:
+
+- `num_new_with_prec_bits(...)`
+- `num_const_prec(...)`
+- `num_const_prec_digits(...)`
 
 Precision control helpers use the same naming convention:
 
@@ -110,6 +122,16 @@ Return conventions in this area:
 
 Exact integer and rational values remain exact rather than being rounded to the
 default floating precision.
+
+Setter precision follows the current value where that makes sense:
+
+- `num_set_long(...)` and `num_set_frac(...)` replace the destination with exact
+  integer or rational storage.
+- `num_set_double(...)`, `num_set_cdouble(...)`, `num_set_qfloat(...)`, and
+  `num_set_qcomplex(...)` preserve an existing multiprecision destination's
+  precision instead of silently dropping it to the source precision.
+- If the destination is already fixed precision, the matching fixed-precision
+  setter keeps that fixed-precision backend.
 
 ## Ownership Model
 
@@ -141,7 +163,7 @@ Example with explicit precision:
 num_set_default_prec_bits(768);
 
 number_t x = num_create_from_string("1.25");
-number_t y = num_create_from_mfloat_with_prec_bits(MF_PI, 512);
+number_t y = num_const_prec(NUM_PI, 512);
 
 printf("default bits: %zu\n", num_get_default_prec_bits());
 printf("x bits: %zu\n", num_get_prec_bits(x));
@@ -184,17 +206,20 @@ Detaching behaves differently depending on how the scoped value is stored:
 Example with the public cleanup macro:
 
 ```c
-NUM_SCOPE(scope);
+number_t make_sum(void) {
+    NUM_SCOPE(scope);
 
-number_t a = num_create_from_string("1/3");
-number_t b = num_create_from_string("1/6");
-number_t sum = num_add(a, b);
-number_t kept = num_scope_detach(sum);
+    number_t a = num_create_from_string("1/3");
+    number_t b = num_create_from_string("1/6");
+    number_t sum = num_add(a, b);
+    return num_scope_detach(sum);
+}
 
-/* kept is still live here */
-num_destroy(&kept);
-num_destroy(&b);
-num_destroy(&a);
+int main(void) {
+    number_t kept = make_sum();
+    num_destroy(&kept);
+    return 0;
+}
 ```
 
 If you need a portable manual form instead of `NUM_SCOPE(...)`, the equivalent
@@ -275,7 +300,7 @@ Return conventions in this area:
   return the requested property directly
 - `num_cmp(...)` returns an integer ordering result for real values
 
-## Arithmetic And Functions
+## Arithmetic and Functions
 
 The generic layer exposes:
 
@@ -315,6 +340,32 @@ The generic layer exposes:
   - `num_normal_cdf`
   - `num_e1`
   - `num_ei`
+- exact integer and number-theory helpers:
+  - `num_factorial`
+  - `num_fibonacci`
+  - `num_gcd`
+  - `num_lcm`
+  - `num_mod`
+  - `num_divmod`
+  - `num_gcdext`
+  - `num_powmod`
+  - `num_modinv`
+  - `num_is_prime`
+  - `num_prove_prime`
+  - `num_next_prime`
+  - `num_prev_prime`
+  - `num_factors`
+  - `num_bit_length`
+  - `num_test_bit`
+  - `num_set_bit`
+  - `num_clear_bit`
+  - `num_bit_not`
+  - `num_bit_and`
+  - `num_bit_or`
+  - `num_bit_xor`
+  - `num_shl`
+  - `num_shr`
+  - `num_isqrt`
 
 Binary arithmetic mixes supported backends automatically by promoting to a
 common target representation before dispatch.
@@ -326,7 +377,9 @@ Return conventions in this area:
 - paired-output helpers such as `num_sincos(...)` and `num_sinhcosh(...)`
   return an `int` status code, with `0` for success and `-1` for invalid input
 
-## Example
+## Examples
+
+### Basic Arithmetic and Beta
 
 ```c
 #include <stdio.h>
@@ -364,6 +417,83 @@ int main(void) {
 beta(2, 3) = 0.083333333333333333333333333333333
 ```
 
+### Runnable README Output Examples
+
+These examples are mirrored by `tests/number/test_number_readme.c`, so the
+documented output stays tied to the public `number_t` API.
+
+### Exact Rational Arithmetic
+
+```c
+number_t a = num_create_from_frac(2, 3);
+number_t b = num_create_from_string("5/4");
+number_t product = num_mul(a, b);
+char *text = num_to_string(product);
+
+printf("(2/3) * (5/4) = %s\n", text);
+```
+
+```text
+(2/3) * (5/4) = ⅚
+```
+
+### Exact Combinatorics
+
+```c
+number_t n = num_create_from_long(52);
+number_t k = num_create_from_long(5);
+number_t c = num_binomial(n, k);
+char *text = num_to_string(c);
+
+printf("C(52, 5) = %s\n", text);
+```
+
+```text
+C(52, 5) = 2598960
+```
+
+### Multiprecision Special Functions
+
+```c
+num_set_default_prec_bits(256);
+
+number_t x = num_create_from_string("2.345");
+number_t gamma_x = num_gamma(x);
+number_t lgamma_x = num_lgamma(x);
+
+char gamma_text[256];
+char lgamma_text[256];
+
+num_sprintf(gamma_text, sizeof(gamma_text), "%.77n", gamma_x);
+num_sprintf(lgamma_text, sizeof(lgamma_text), "%.77n", lgamma_x);
+
+printf("gamma(2.345)  = %s\n", gamma_text);
+printf("lgamma(2.345) = %s\n", lgamma_text);
+```
+
+```text
+gamma(2.345)  = 1.1992978294153192855268153358879569120923525584905703781289979370034378685904
+lgamma(2.345) = 0.18173624337757203797862933229995978550118791690492470651875093221924437275614
+```
+
+### Multiprecision Complex Functions
+
+```c
+num_set_default_prec_digits(50);
+
+number_t z = num_create_from_string("1 + i");
+number_t exp_z = num_exp(z);
+
+char text[256];
+num_sprintf(text, sizeof(text), "%n", exp_z);
+
+printf("exp(1 + i) = %s\n", text);
+```
+
+```text
+exp(1 + i) = 1.468693939915885157138967597326604261326956736629 + 2.2873552871788423912081719067005018089555862566684i
+```
+
 ## Benchmarks
 
 The generic numeric layer has a matching benchmark target:
@@ -372,9 +502,9 @@ The generic numeric layer has a matching benchmark target:
 make bench_number_maths
 ```
 
-It mirrors the main `mfloat` maths benchmark through the public `number_t` API,
-so it measures both backend maths cost and generic promotion/dispatch overhead
-on the same representative workload.
+It mirrors the legacy `mfloat` maths benchmark through the public `number_t`
+API, so it measures both backend maths cost and generic promotion/dispatch
+overhead on the same representative workload.
 
 ## Benchmark Coverage
 
@@ -387,7 +517,7 @@ The dedicated `number_t` maths benchmark includes matching timing cases at:
 - `2048` bits
 - `4096` bits
 
-across the same broad slice used for the native `mfloat` benchmark.
+across the same broad slice used for the legacy `mfloat` benchmark.
 
 Benchmark source:
 
@@ -468,7 +598,3 @@ Results (microseconds per call):
 | `num_e1(5)` | `386.5 µs` | `630.2 µs` | `880.3 µs` | `1.124 ms` | `1.081 ms` | `1.481 ms` |
 
 For broader benchmark notes, see [`docs/benchmarks.md`](benchmarks.md).
-
-
-
-

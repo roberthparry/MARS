@@ -380,8 +380,3 @@ on the current native `mcomplex` implementation:
 | `mc_e1(1 + 1i)` | `58.6 µs` | `59.2 µs` | `58.3 µs` | `59.5 µs` | `60.0 µs` | `59.1 µs` |
 
 For broader benchmark notes, see [`docs/benchmarks.md`](benchmarks.md).
-
-
-
-
-

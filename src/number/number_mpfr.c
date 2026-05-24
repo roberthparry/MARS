@@ -95,6 +95,34 @@ static int number_mpfr_const_one_eighth(mpfr_t out)
     return 0;
 }
 
+static int number_mpfr_const_one_and_half(mpfr_t out)
+{
+    mpfr_set_ui(out, 3u, MPFR_RNDN);
+    mpfr_div_2ui(out, out, 1u, MPFR_RNDN);
+    return 0;
+}
+
+static int number_mpfr_const_one_third(mpfr_t out)
+{
+    mpfr_set_ui(out, 1u, MPFR_RNDN);
+    mpfr_div_ui(out, out, 3u, MPFR_RNDN);
+    return 0;
+}
+
+static int number_mpfr_const_one_sixth(mpfr_t out)
+{
+    mpfr_set_ui(out, 1u, MPFR_RNDN);
+    mpfr_div_ui(out, out, 6u, MPFR_RNDN);
+    return 0;
+}
+
+static int number_mpfr_const_one_tenth(mpfr_t out)
+{
+    mpfr_set_ui(out, 1u, MPFR_RNDN);
+    mpfr_div_ui(out, out, 10u, MPFR_RNDN);
+    return 0;
+}
+
 static int number_mpfr_const_2_pi(mpfr_t out)
 {
     mpfr_const_pi(out, MPFR_RNDN);
@@ -285,8 +313,12 @@ static const number_mpfr_const_set_fn number_mpfr_const_table[NUMBER_CONST_COUNT
     [NUMBER_CONST_ONE] = number_mpfr_const_one,
     [NUMBER_CONST_NEG_ONE] = number_mpfr_const_neg_one,
     [NUMBER_CONST_HALF] = number_mpfr_const_half,
+    [NUMBER_CONST_ONE_AND_HALF] = number_mpfr_const_one_and_half,
+    [NUMBER_CONST_ONE_THIRD] = number_mpfr_const_one_third,
     [NUMBER_CONST_QUARTER] = number_mpfr_const_quarter,
+    [NUMBER_CONST_ONE_SIXTH] = number_mpfr_const_one_sixth,
     [NUMBER_CONST_ONE_EIGHTH] = number_mpfr_const_one_eighth,
+    [NUMBER_CONST_ONE_TENTH] = number_mpfr_const_one_tenth,
     [NUMBER_CONST_TWO] = number_mpfr_const_two,
     [NUMBER_CONST_PI] = number_mpfr_const_pi,
     [NUMBER_CONST_2PI] = number_mpfr_const_2pi,

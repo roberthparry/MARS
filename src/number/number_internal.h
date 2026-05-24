@@ -12,10 +12,10 @@ typedef enum number_kind_t {
     NUMBER_DOUBLE,
     NUMBER_QFLOAT,
     NUMBER_QCOMPLEX,
-    NUMBER_MINT,
-    NUMBER_MRATIONAL,
+    NUMBER_MPZ,
+    NUMBER_MPQ,
     NUMBER_MPFR,
-    NUMBER_CPLX_DOUBLE,
+    NUMBER_CDOUBLE,
     NUMBER_COMPLEX
 } number_kind_t;
 
@@ -33,7 +33,7 @@ typedef struct number_vtable_t {
     number_kind_t kind;
     number_math_family_t math_family;
     bool exact;
-    bool complex;
+    bool is_complex;
     void (*destroy_payload)(number_t *number);
     void *(*scope_payload)(const number_t *number);
     void (*destroy_scope_payload)(void *payload);
@@ -88,23 +88,25 @@ typedef struct number_vtable_t {
 
 typedef number_t *(*number_coerce_fn)(const number_t *number);
 typedef struct complex_t complex_t;
+typedef struct number_mpz_t number_mpz_t;
+typedef struct number_mpq_t number_mpq_t;
 typedef struct number_mpfr_t number_mpfr_t;
 
-typedef struct number_cplx_double_t {
+typedef struct number_cdouble_t {
     double _Complex value;
     int constant_id;
     bool immortal;
-} number_cplx_double_t;
+} number_cdouble_t;
 
 typedef struct {
     number_kind_t kind;
     union {
         double d;
-        number_cplx_double_t cd;
+        number_cdouble_t cd;
         qfloat_t qf;
         qcomplex_t qc;
-        mint_t *mi;
-        mrational_t *mr;
+        number_mpz_t *mpz;
+        number_mpq_t *mpq;
         number_mpfr_t *mpfr;
         complex_t *cx;
     } value;
@@ -131,9 +133,14 @@ typedef enum number_const_id_t {
     NUMBER_CONST_ONE,
     NUMBER_CONST_NEG_ONE,
     NUMBER_CONST_HALF,
+    NUMBER_CONST_ONE_AND_HALF,
+    NUMBER_CONST_ONE_THIRD,
     NUMBER_CONST_QUARTER,
+    NUMBER_CONST_ONE_SIXTH,
     NUMBER_CONST_ONE_EIGHTH,
+    NUMBER_CONST_ONE_TENTH,
     NUMBER_CONST_TWO,
+    NUMBER_CONST_TEN,
     NUMBER_CONST_PI,
     NUMBER_CONST_2PI,
     NUMBER_CONST_PI_2,
@@ -181,16 +188,30 @@ struct number_mpfr_t {
     mpfr_t value;
 };
 
+struct number_mpz_t {
+    number_const_id_t constant_id;
+    bool immortal;
+    bool initialised;
+    mpz_t value;
+};
+
+struct number_mpq_t {
+    number_const_id_t constant_id;
+    bool immortal;
+    bool initialised;
+    mpq_t value;
+};
+
 extern const number_math_family_t number_math_family_binary_table[][NUMBER_MATH_COMPLEX + 1];
 extern const number_kind_t number_math_family_target_kind_table[];
 /* Concrete backend vtables (defined in number_vtables.c). */
 extern const number_vtable_t number_double_vt;
 extern const number_vtable_t number_qfloat_vt;
 extern const number_vtable_t number_qcomplex_vt;
-extern const number_vtable_t number_mint_vt;
-extern const number_vtable_t number_mrational_vt;
+extern const number_vtable_t number_mpz_vt;
+extern const number_vtable_t number_mpq_vt;
 extern const number_vtable_t number_mpfr_vt;
-extern const number_vtable_t number_cplx_double_vt;
+extern const number_vtable_t number_cdouble_vt;
 extern const number_vtable_t number_complex_vt;
 /* Backend vtable registry (defined in number_vtables.c). */
 extern const number_vtable_t *const number_dispatch[];
@@ -198,6 +219,8 @@ extern const size_t number_dispatch_count;
 extern size_t number_default_precision_bits;
 
 number_t *number_wrap_complex(complex_t *value);
+number_t number_take_mpz(number_mpz_t *value);
+number_t number_take_mpq(number_mpq_t *value);
 number_t number_take_mpfr(number_mpfr_t *value);
 number_t number_complex_component_from_number(const number_t *value,
                                               size_t precision_bits);
@@ -293,7 +316,7 @@ static inline qcomplex_t number_value_to_qcomplex(const number_t *number)
         return QC_NAN;
     if (number_kind_value(number) == NUMBER_QCOMPLEX)
         return number_impl_const(number)->value.qc;
-    if (number_kind_value(number) == NUMBER_CPLX_DOUBLE) {
+    if (number_kind_value(number) == NUMBER_CDOUBLE) {
         cd = number_impl_const(number)->value.cd.value;
         return qc_make(qf_from_double(__real__ cd), qf_from_double(__imag__ cd));
     }
@@ -325,7 +348,7 @@ void num_scope_resume_cleanup(num_scope_t **scope);
     __attribute__((cleanup(num_scope_resume_cleanup))) num_scope_t *(name) = number_scope_suspend()
 
 char *number_format_double(const number_t *number, bool scientific, int precision);
-char *number_format_cplx_double(const number_t *number, bool scientific, int precision);
+char *number_format_cdouble(const number_t *number, bool scientific, int precision);
 char *number_format_qfloat(const number_t *number, bool scientific, int precision);
 char *number_format_qcomplex(const number_t *number, bool scientific, int precision);
 char *number_format_mpfr(const number_t *number, bool scientific, int precision);
@@ -334,10 +357,43 @@ number_t *number_wrap_double(double value);
 number_t *number_wrap_cdouble(double _Complex value);
 number_t *number_wrap_qfloat(qfloat_t value);
 number_t *number_wrap_qcomplex(qcomplex_t value);
-number_t *number_wrap_mint(mint_t *value);
-number_t *number_wrap_mrational(mrational_t *value);
+number_t *number_wrap_mpz(number_mpz_t *value);
+number_t *number_wrap_mpq(number_mpq_t *value);
 number_t *number_wrap_mpfr(number_mpfr_t *value);
 number_t *number_wrap_complex_parts(number_t real, number_t imag);
+number_mpz_t *number_mpz_from_const_id(number_const_id_t id);
+number_mpz_t *number_mpz_new(void);
+number_mpz_t *number_mpz_from_long(long value);
+number_mpz_t *number_mpz_from_mpz(mpz_srcptr value);
+number_mpz_t *number_mpz_from_string(const char *text);
+number_mpz_t *number_mpz_clone(const number_mpz_t *value);
+void number_mpz_free(number_mpz_t *value);
+int number_mpz_ensure(const number_mpz_t *value);
+mpz_srcptr number_mpz_value(const number_mpz_t *value);
+char *number_mpz_to_string(const number_mpz_t *value);
+bool number_mpz_get_long(const number_mpz_t *value, long *out);
+size_t number_mpz_bit_length(const number_mpz_t *value);
+int number_mpz_cmp(const number_mpz_t *a, const number_mpz_t *b);
+bool number_mpz_is_zero(const number_mpz_t *value);
+bool number_mpz_is_negative(const number_mpz_t *value);
+number_mpq_t *number_mpq_from_const_id(number_const_id_t id);
+number_mpq_t *number_mpq_new(void);
+number_mpq_t *number_mpq_from_frac_long(long numerator, long denominator);
+number_mpq_t *number_mpq_from_mpq(mpq_srcptr value);
+number_mpq_t *number_mpq_from_string(const char *text);
+number_mpq_t *number_mpq_clone(const number_mpq_t *value);
+void number_mpq_free(number_mpq_t *value);
+int number_mpq_ensure(const number_mpq_t *value);
+mpq_srcptr number_mpq_value(const number_mpq_t *value);
+char *number_mpq_to_string(const number_mpq_t *value);
+bool number_mpq_get_small_fraction(const number_mpq_t *value,
+                                   long *numerator,
+                                   long *denominator);
+int number_mpq_cmp(const number_mpq_t *a, const number_mpq_t *b);
+bool number_mpq_is_zero(const number_mpq_t *value);
+bool number_mpq_is_one(const number_mpq_t *value);
+bool number_mpq_is_integer(const number_mpq_t *value);
+bool number_mpq_is_negative(const number_mpq_t *value);
 number_mpfr_t *number_mpfr_new_prec(size_t precision_bits);
 number_mpfr_t *number_mpfr_from_const_id(number_const_id_t id,
                                          size_t precision_bits);

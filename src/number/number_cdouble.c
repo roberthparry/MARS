@@ -44,7 +44,7 @@ static char *number_format_cdouble_value(double value,
     return out;
 }
 
-char *number_format_cplx_double(const number_t *number,
+char *number_format_cdouble(const number_t *number,
                                 bool scientific,
                                 int precision)
 {
@@ -97,60 +97,60 @@ done:
     return out;
 }
 
-char *number_to_string_cplx_double(const number_t *number)
+char *number_to_string_cdouble(const number_t *number)
 {
-    return number_format_cplx_double(number, false, -1);
+    return number_format_cdouble(number, false, -1);
 }
 
-bool number_is_zero_cplx_double(const number_t *number)
+bool number_is_zero_cdouble(const number_t *number)
 {
     return number && creal(number_cdouble_value(number)) == 0.0 &&
         cimag(number_cdouble_value(number)) == 0.0;
 }
 
-bool number_is_real_cplx_double(const number_t *number)
+bool number_is_real_cdouble(const number_t *number)
 {
     return number && cimag(number_cdouble_value(number)) == 0.0;
 }
 
-bool number_is_one_cplx_double(const number_t *number)
+bool number_is_one_cdouble(const number_t *number)
 {
     return number && creal(number_cdouble_value(number)) == 1.0 &&
         cimag(number_cdouble_value(number)) == 0.0;
 }
 
-bool number_eq_same_cplx_double(const number_t *a, const number_t *b)
+bool number_eq_same_cdouble(const number_t *a, const number_t *b)
 {
     return a && b && number_cdouble_value(a) == number_cdouble_value(b);
 }
 
-bool number_eq_same_tol_cplx_double(const number_t *a, const number_t *b)
+bool number_eq_same_tol_cdouble(const number_t *a, const number_t *b)
 {
     return number_eq_same_tol_with_precision(a, b, 53u);
 }
 
-bool number_is_finite_cplx_double(const number_t *number)
+bool number_is_finite_cdouble(const number_t *number)
 {
     double complex value = number_cdouble_value(number);
 
     return number && isfinite(creal(value)) && isfinite(cimag(value));
 }
 
-bool number_is_nan_cplx_double(const number_t *number)
+bool number_is_nan_cdouble(const number_t *number)
 {
     double complex value = number_cdouble_value(number);
 
     return !number || isnan(creal(value)) || isnan(cimag(value));
 }
 
-bool number_is_inf_cplx_double(const number_t *number)
+bool number_is_inf_cdouble(const number_t *number)
 {
     double complex value = number_cdouble_value(number);
 
     return number && (isinf(creal(value)) || isinf(cimag(value)));
 }
 
-int number_cmp_same_cplx_double(const number_t *a, const number_t *b)
+int number_cmp_same_cdouble(const number_t *a, const number_t *b)
 {
     double complex av;
     double complex bv;
@@ -170,7 +170,7 @@ int number_cmp_same_cplx_double(const number_t *a, const number_t *b)
     return 0;
 }
 
-bool number_is_integer_cplx_double(const number_t *number)
+bool number_is_integer_cdouble(const number_t *number)
 {
     double complex value = number_cdouble_value(number);
     double real = creal(value);
@@ -178,7 +178,7 @@ bool number_is_integer_cplx_double(const number_t *number)
     return number && cimag(value) == 0.0 && isfinite(real) && floor(real) == real;
 }
 
-number_t *number_clone_cplx_double(const number_t *number)
+number_t *number_clone_cdouble(const number_t *number)
 {
     number_t *copy;
 
@@ -190,49 +190,49 @@ number_t *number_clone_cplx_double(const number_t *number)
     return copy;
 }
 
-number_t *number_const_prec_cplx_double(const number_t *number,
+number_t *number_const_prec_cdouble(const number_t *number,
                                         size_t precision_bits)
 {
     (void)precision_bits;
-    return number_clone_cplx_double(number);
+    return number_clone_cdouble(number);
 }
 
-number_t *number_neg_cplx_double(const number_t *number)
+number_t *number_neg_cdouble(const number_t *number)
 {
     return number ? number_wrap_cdouble(-number_cdouble_value(number)) : NULL;
 }
 
-number_t *number_inv_cplx_double(const number_t *number)
+number_t *number_inv_cdouble(const number_t *number)
 {
     return number ? number_wrap_cdouble(1.0 / number_cdouble_value(number)) : NULL;
 }
 
-number_t *number_abs_cplx_double(const number_t *number)
+number_t *number_abs_cdouble(const number_t *number)
 {
     return number ? number_wrap_double(cabs(number_cdouble_value(number))) : NULL;
 }
 
-number_t *number_conj_cplx_double(const number_t *number)
+number_t *number_conj_cdouble(const number_t *number)
 {
     return number ? number_wrap_cdouble(conj(number_cdouble_value(number))) : NULL;
 }
 
-number_t *number_real_cplx_double(const number_t *number)
+number_t *number_real_cdouble(const number_t *number)
 {
     return number ? number_wrap_double(creal(number_cdouble_value(number))) : NULL;
 }
 
-number_t *number_imag_cplx_double(const number_t *number)
+number_t *number_imag_cdouble(const number_t *number)
 {
     return number ? number_wrap_double(cimag(number_cdouble_value(number))) : NULL;
 }
 
-number_t *number_arg_cplx_double(const number_t *number)
+number_t *number_arg_cdouble(const number_t *number)
 {
     return number ? number_wrap_double(carg(number_cdouble_value(number))) : NULL;
 }
 
-number_t *number_floor_cplx_double(const number_t *number)
+number_t *number_floor_cdouble(const number_t *number)
 {
     double complex value;
 
@@ -242,14 +242,14 @@ number_t *number_floor_cplx_double(const number_t *number)
     return number_wrap_cdouble(floor(creal(value)) + floor(cimag(value)) * I);
 }
 
-number_t *number_pow_int_cplx_double(const number_t *number, int exponent)
+number_t *number_pow_int_cdouble(const number_t *number, int exponent)
 {
     return number
         ? number_wrap_cdouble(cpow(number_cdouble_value(number), (double)exponent))
         : NULL;
 }
 
-number_t *number_mul_pow10_cplx_double(const number_t *number, int exponent10)
+number_t *number_mul_pow10_cdouble(const number_t *number, int exponent10)
 {
     return number
         ? number_wrap_cdouble(number_cdouble_value(number) *
@@ -257,7 +257,7 @@ number_t *number_mul_pow10_cplx_double(const number_t *number, int exponent10)
         : NULL;
 }
 
-number_t *number_ldexp_cplx_double(const number_t *number, int exponent2)
+number_t *number_ldexp_cdouble(const number_t *number, int exponent2)
 {
     double complex value;
 
@@ -268,46 +268,46 @@ number_t *number_ldexp_cplx_double(const number_t *number, int exponent2)
                                ldexp(cimag(value), exponent2) * I);
 }
 
-number_t *number_add_same_cplx_double(const number_t *a, const number_t *b)
+number_t *number_add_same_cdouble(const number_t *a, const number_t *b)
 {
     return (a && b) ? number_wrap_cdouble(number_cdouble_value(a) +
                                           number_cdouble_value(b)) : NULL;
 }
 
-number_t *number_sub_same_cplx_double(const number_t *a, const number_t *b)
+number_t *number_sub_same_cdouble(const number_t *a, const number_t *b)
 {
     return (a && b) ? number_wrap_cdouble(number_cdouble_value(a) -
                                           number_cdouble_value(b)) : NULL;
 }
 
-number_t *number_mul_same_cplx_double(const number_t *a, const number_t *b)
+number_t *number_mul_same_cdouble(const number_t *a, const number_t *b)
 {
     return (a && b) ? number_wrap_cdouble(number_cdouble_value(a) *
                                           number_cdouble_value(b)) : NULL;
 }
 
-number_t *number_div_same_cplx_double(const number_t *a, const number_t *b)
+number_t *number_div_same_cdouble(const number_t *a, const number_t *b)
 {
     return (a && b) ? number_wrap_cdouble(number_cdouble_value(a) /
                                           number_cdouble_value(b)) : NULL;
 }
 
-number_t *number_exp_same_cplx_double(const number_t *number)
+number_t *number_exp_same_cdouble(const number_t *number)
 {
     return number ? number_wrap_cdouble(cexp(number_cdouble_value(number))) : NULL;
 }
 
-number_t *number_log_same_cplx_double(const number_t *number)
+number_t *number_log_same_cdouble(const number_t *number)
 {
     return number ? number_wrap_cdouble(clog(number_cdouble_value(number))) : NULL;
 }
 
-number_t *number_sqrt_same_cplx_double(const number_t *number)
+number_t *number_sqrt_same_cdouble(const number_t *number)
 {
     return number ? number_wrap_cdouble(csqrt(number_cdouble_value(number))) : NULL;
 }
 
-number_t number_const_like_cplx_double(const number_t *like, number_const_id_t id)
+number_t number_const_like_cdouble(const number_t *like, number_const_id_t id)
 {
     (void)like;
     if (number_const_has_cdouble(id))
@@ -315,7 +315,7 @@ number_t number_const_like_cplx_double(const number_t *like, number_const_id_t i
     return number_invalid();
 }
 
-number_t number_imag_const_like_cplx_double(const number_t *like,
+number_t number_imag_const_like_cdouble(const number_t *like,
                                             number_const_id_t id)
 {
     (void)like;
@@ -330,16 +330,16 @@ number_t number_imag_const_like_cplx_double(const number_t *like,
     return number_invalid();
 }
 
-bool number_value_is_immortal_cplx_double(const number_t *number)
+bool number_value_is_immortal_cdouble(const number_t *number)
 {
     return number && number_impl_const(number)->value.cd.immortal &&
         number_impl_const(number)->value.cd.constant_id < NUMBER_CONST_COUNT;
 }
 
-bool number_immortal_id_cplx_double(const number_t *number,
+bool number_immortal_id_cdouble(const number_t *number,
                                     number_const_id_t *id_out)
 {
-    if (!number_value_is_immortal_cplx_double(number) || !id_out)
+    if (!number_value_is_immortal_cdouble(number) || !id_out)
         return false;
     *id_out = number_impl_const(number)->value.cd.constant_id;
     return true;
