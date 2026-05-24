@@ -8,7 +8,7 @@ void run_number_formatting_tests(void)
     printf(C_CYAN "Testing formatting and extended public operations...\n" C_RESET);
 
     {
-        char buf[256];
+        char buf[512];
         number_t dec = num_create_from_string("32.123");
         number_t rat = num_create_from_string("5/6");
         number_t one = num_create_from_string("1");

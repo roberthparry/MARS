@@ -522,8 +522,6 @@ static void test_number_det_and_inverse(void)
     }
 
     {
-        mfloat_t *a_base = mf_create_string("1.25");
-        mfloat_t *b_base = mf_create_string("2.5");
         number_t diag[2];
         number_t det = num_new();
         number_t expected;
@@ -531,10 +529,12 @@ static void test_number_det_and_inverse(void)
         matrix_t *A;
         matrix_t *Ai;
 
-        check_bool("number inverse/det mfloat base a non-null", a_base != NULL);
-        check_bool("number inverse/det mfloat base b non-null", b_base != NULL);
-        diag[0] = num_create_from_mfloat_with_prec_bits(a_base, 512u);
-        diag[1] = num_create_from_mfloat_with_prec_bits(b_base, 512u);
+        diag[0] = num_create_from_string("1.25");
+        diag[1] = num_create_from_string("2.5");
+        check_bool("number inverse/det mpfr diag[0] precision set",
+                   num_set_prec_bits(&diag[0], 512u) == 0);
+        check_bool("number inverse/det mpfr diag[1] precision set",
+                   num_set_prec_bits(&diag[1], 512u) == 0);
         A = mat_create_diagonal_num(2, diag);
 
         check_bool("mat_det(number mp diagonal) rc = 0", A && mat_det(A, &det) == 0);
@@ -565,8 +565,6 @@ static void test_number_det_and_inverse(void)
         mat_free(A);
         num_destroy(&diag[0]);
         num_destroy(&diag[1]);
-        mf_free(a_base);
-        mf_free(b_base);
     }
 }
 
@@ -575,21 +573,20 @@ static void test_mixed_number_backend_matrices(void)
     printf(C_CYAN "TEST: mixed number_t backend matrices\n" C_RESET);
 
     {
-        mfloat_t *real_base = mf_create_string("1.25");
-        mcomplex_t *complex_base = mc_create_string("1 + 2i");
         number_t vals[4];
         number_t doubled_expected;
         number_t got;
         matrix_t *A;
         matrix_t *B;
 
-        check_bool("mixed number matrix real base non-null", real_base != NULL);
-        check_bool("mixed number matrix complex base non-null", complex_base != NULL);
-
         vals[0] = num_create_from_long(2);
         vals[1] = num_create_from_string("1/3");
-        vals[2] = num_create_from_mfloat_with_prec_bits(real_base, 512u);
-        vals[3] = num_create_from_mcomplex_with_prec_bits(complex_base, 384u);
+        vals[2] = num_create_from_string("1.25");
+        vals[3] = num_create_from_string("1 + 2i");
+        check_bool("mixed number matrix mpfr precision set",
+                   num_set_prec_bits(&vals[2], 512u) == 0);
+        check_bool("mixed number matrix complex precision set",
+                   num_set_prec_bits(&vals[3], 384u) == 0);
 
         A = mat_create_num(2, 2, vals);
         check_bool("mixed number matrix create non-null", A != NULL);
@@ -604,13 +601,13 @@ static void test_mixed_number_backend_matrices(void)
         num_destroy(&got);
 
         got = mat_get_num(A, 1, 0);
-        check_bool("mixed number matrix mfloat entry", num_eq(got, vals[2]));
-        check_bool("mixed number matrix mfloat precision", num_get_prec_bits(got) == 512u);
+        check_bool("mixed number matrix mpfr entry", num_eq(got, vals[2]));
+        check_bool("mixed number matrix mpfr precision", num_get_prec_bits(got) == 512u);
         num_destroy(&got);
 
         got = mat_get_num(A, 1, 1);
-        check_bool("mixed number matrix mcomplex entry", num_eq(got, vals[3]));
-        check_bool("mixed number matrix mcomplex precision", num_get_prec_bits(got) == 384u);
+        check_bool("mixed number matrix complex entry", num_eq(got, vals[3]));
+        check_bool("mixed number matrix complex precision", num_get_prec_bits(got) == 384u);
         num_destroy(&got);
 
         B = mat_add(A, A);
@@ -631,8 +628,8 @@ static void test_mixed_number_backend_matrices(void)
 
         got = mat_get_num(B, 1, 0);
         doubled_expected = num_add(vals[2], vals[2]);
-        check_bool("mixed number add mfloat entry", num_eq(got, doubled_expected));
-        check_bool("mixed number add mfloat precision does not shrink",
+        check_bool("mixed number add mpfr entry", num_eq(got, doubled_expected));
+        check_bool("mixed number add mpfr precision does not shrink",
                    num_get_prec_bits(got) >= num_get_prec_bits(vals[2]));
         print_matrix_core_num_comparison("mixed add [1,0]", got, doubled_expected);
         num_destroy(&doubled_expected);
@@ -640,9 +637,9 @@ static void test_mixed_number_backend_matrices(void)
 
         got = mat_get_num(B, 1, 1);
         doubled_expected = num_add(vals[3], vals[3]);
-        check_bool("mixed number add mcomplex entry", num_eq(got, doubled_expected));
-        check_bool("mixed number add mcomplex precision does not shrink",
-                   num_get_prec_bits(got) >= num_get_prec_bits(vals[3]));
+        check_bool("mixed number add complex entry", num_eq(got, doubled_expected));
+        check_bool("mixed number add complex stays exact",
+                   num_get_prec_bits(got) == 0u);
         print_matrix_core_num_comparison("mixed add [1,1]", got, doubled_expected);
         num_destroy(&doubled_expected);
         num_destroy(&got);
@@ -651,13 +648,9 @@ static void test_mixed_number_backend_matrices(void)
         mat_free(A);
         for (size_t i = 0; i < 4u; ++i)
             num_destroy(&vals[i]);
-        mf_free(real_base);
-        mc_free(complex_base);
     }
 
     {
-        mfloat_t *real_base = mf_create_string("1.25");
-        mcomplex_t *complex_base = mc_create_string("1 + 2i");
         number_t diag[4];
         number_t det = num_new();
         number_t expected;
@@ -665,13 +658,14 @@ static void test_mixed_number_backend_matrices(void)
         matrix_t *A;
         matrix_t *Ai;
 
-        check_bool("mixed diagonal real base non-null", real_base != NULL);
-        check_bool("mixed diagonal complex base non-null", complex_base != NULL);
-
         diag[0] = num_create_from_long(2);
         diag[1] = num_create_from_string("1/3");
-        diag[2] = num_create_from_mfloat_with_prec_bits(real_base, 512u);
-        diag[3] = num_create_from_mcomplex_with_prec_bits(complex_base, 384u);
+        diag[2] = num_create_from_string("1.25");
+        diag[3] = num_create_from_string("1 + 2i");
+        check_bool("mixed diagonal mpfr precision set",
+                   num_set_prec_bits(&diag[2], 512u) == 0);
+        check_bool("mixed diagonal complex precision set",
+                   num_set_prec_bits(&diag[3], 384u) == 0);
 
         A = mat_create_diagonal_num(4, diag);
         check_bool("mixed diagonal create non-null", A != NULL);
@@ -698,16 +692,16 @@ static void test_mixed_number_backend_matrices(void)
 
         got = mat_get_num(Ai, 2, 2);
         expected = num_inv(diag[2]);
-        check_bool("mixed diagonal inverse mfloat entry", num_eq(got, expected));
-        check_bool("mixed diagonal inverse mfloat precision", num_get_prec_bits(got) == 512u);
+        check_bool("mixed diagonal inverse mpfr entry", num_eq(got, expected));
+        check_bool("mixed diagonal inverse mpfr precision", num_get_prec_bits(got) == 512u);
         print_matrix_core_num_comparison("mixed inverse [2,2]", got, expected);
         num_destroy(&expected);
         num_destroy(&got);
 
         got = mat_get_num(Ai, 3, 3);
         expected = num_inv(diag[3]);
-        check_bool("mixed diagonal inverse mcomplex entry", num_eq(got, expected));
-        check_bool("mixed diagonal inverse mcomplex precision", num_get_prec_bits(got) >= 384u);
+        check_bool("mixed diagonal inverse complex entry", num_eq(got, expected));
+        check_bool("mixed diagonal inverse complex stays exact", num_get_prec_bits(got) == 0u);
         print_matrix_core_num_comparison("mixed inverse [3,3]", got, expected);
         num_destroy(&expected);
         num_destroy(&got);
@@ -716,8 +710,6 @@ static void test_mixed_number_backend_matrices(void)
         mat_free(A);
         for (size_t i = 0; i < 4u; ++i)
             num_destroy(&diag[i]);
-        mf_free(real_base);
-        mc_free(complex_base);
     }
 }
 
@@ -4329,12 +4321,14 @@ static void test_evaluate_bridge(void)
             num_create_from_long(1),
             num_create_from_long(2),
             num_create_from_string("3.125"),
-            num_create_from_mfloat_with_prec_bits(MF_PI, 512)
+            num_const_prec(NUM_PI, 512u)
         };
-        matrix_t *A = mat_create_num(2, 2, vals);
-        matrix_t *N = mat_evaluate_num(A);
+        matrix_t *A;
+        matrix_t *N;
         number_t got;
 
+        A = mat_create_num(2, 2, vals);
+        N = mat_evaluate_num(A);
         check_bool("mat_evaluate_num(number) not NULL", N != NULL);
         check_bool("mat_evaluate_num(number) -> MAT_TYPE_NUMBER",
                    N != NULL && mat_typeof(N) == MAT_TYPE_NUMBER);

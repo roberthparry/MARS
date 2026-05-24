@@ -1,3 +1,4 @@
+#define MARS_QFLOAT_IMPLEMENTATION
 #include "qfloat_internal.h"
 
 #include <math.h>

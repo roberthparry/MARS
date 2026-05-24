@@ -24,6 +24,7 @@ void run_number_constant_tests(void);
 void run_number_public_api_tests(void);
 void run_number_formatting_tests(void);
 void run_number_special_function_tests(void);
+void run_number_backend_parity_tests(void);
 
 #define TEST_ASSERT_NUMBER_EQ(actual, expected) \
     do { \

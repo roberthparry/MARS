@@ -84,7 +84,7 @@ void run_number_constant_tests(void)
         ASSERT_TRUE(!num_is_exact(gamma));
         ASSERT_TRUE(!num_is_exact(phi));
         ASSERT_TRUE(num_get_prec_bits(pi) > 0u);
-        ASSERT_EQ_INT((int)num_get_prec_bits(phi), 1088);
+        ASSERT_EQ_INT((int)num_get_prec_bits(phi), (int)num_get_default_prec_bits());
         ASSERT_NUMBER_EQ(sin_pi_6, NUM_HALF);
         ASSERT_NUMBER_EQ(sin_pi_4, half_sqrt2);
         ASSERT_NUMBER_EQ(sin_pi_3, half_sqrt3);

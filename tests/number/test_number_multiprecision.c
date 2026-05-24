@@ -9,9 +9,6 @@ void run_number_multiprecision_tests(void)
     printf(C_CYAN "Testing multiprecision real and complex backends...\n" C_RESET);
 
     {
-        mfloat_t *base_real = mf_create_string("1.25");
-        mcomplex_t *base_complex = mc_create_string("1 + 2i");
-
         number_t default_real;
         number_t bits_real;
         number_t digits_real;
@@ -32,17 +29,19 @@ void run_number_multiprecision_tests(void)
         number_t log_real;
         number_t sqrt_complex;
         char *qcomplex_pi_e_text;
+        char *set_real_text;
+        char *set_complex_text;
+        char *set_qfloat_real_text;
+        char *set_qfloat_complex_text;
+        char *set_qcomplex_text;
 
-        ASSERT_NOT_NULL(base_real);
-        ASSERT_NOT_NULL(base_complex);
+        default_real = num_create_from_string("1.25");
+        bits_real = num_const_prec(default_real, 512u);
+        digits_real = num_const_prec_digits(default_real, 50u);
 
-        default_real = num_create_from_mfloat(base_real);
-        bits_real = num_create_from_mfloat_with_prec_bits(base_real, 512u);
-        digits_real = num_create_from_mfloat_with_prec_digits(base_real, 50u);
-
-        default_complex = num_create_from_mcomplex(base_complex);
-        bits_complex = num_create_from_mcomplex_with_prec_bits(base_complex, 384u);
-        digits_complex = num_create_from_mcomplex_with_prec_digits(base_complex, 40u);
+        default_complex = num_create_from_string("1 + 2i");
+        bits_complex = num_const_prec(default_complex, 384u);
+        digits_complex = num_const_prec_digits(default_complex, 40u);
 
         fixed_double = num_create_from_double(1.25);
         fixed_qfloat = num_create_from_qfloat(qf_from_double(1.25));
@@ -59,6 +58,11 @@ void run_number_multiprecision_tests(void)
         log_real = num_log(default_real);
         sqrt_complex = num_sqrt(default_complex);
         qcomplex_pi_e_text = num_to_string(qcomplex_pi_e_prec);
+        set_real_text = NULL;
+        set_complex_text = NULL;
+        set_qfloat_real_text = NULL;
+        set_qfloat_complex_text = NULL;
+        set_qcomplex_text = NULL;
 
         ASSERT_EQ_INT((int)num_get_prec_bits(default_real), 1024);
         ASSERT_EQ_INT((int)num_get_prec_bits(bits_real), 512);
@@ -66,6 +70,8 @@ void run_number_multiprecision_tests(void)
         ASSERT_EQ_INT((int)num_get_prec_bits(default_complex), 1024);
         ASSERT_EQ_INT((int)num_get_prec_bits(bits_complex), 384);
         ASSERT_EQ_INT((int)num_get_prec_bits(digits_complex), 133);
+        ASSERT_EQ_INT((int)num_get_prec_bits(fixed_qfloat), 106);
+        ASSERT_EQ_INT((int)num_get_prec_bits(fixed_qcomplex), 106);
         ASSERT_EQ_INT((int)num_get_prec_bits(double_prec), 512);
         ASSERT_EQ_INT((int)num_get_prec_bits(qfloat_prec), 640);
         ASSERT_EQ_INT((int)num_get_prec_bits(qcomplex_prec), 384);
@@ -84,11 +90,42 @@ void run_number_multiprecision_tests(void)
         ASSERT_TRUE(strstr(qcomplex_pi_e_text,
                            "3.1415926535897932384626433832795") != NULL);
         ASSERT_TRUE(strstr(qcomplex_pi_e_text,
-                           "2.7182818284590452353602874713527") != NULL);
+                           "2.7182818284590452353602874713526") != NULL);
 
         ASSERT_EQ_INT(num_set_prec_bits(&clone_real, 256u), 0);
         ASSERT_EQ_INT((int)num_get_prec_bits(default_real), 1024);
         ASSERT_EQ_INT((int)num_get_prec_bits(clone_real), 256);
+        ASSERT_EQ_INT(num_set_double(&clone_real, 2.5), 0);
+        ASSERT_EQ_INT((int)num_get_prec_bits(clone_real), 256);
+        set_real_text = num_to_string(clone_real);
+        ASSERT_NOT_NULL(set_real_text);
+        ASSERT_TRUE(strcmp(set_real_text, "2.5") == 0);
+
+        ASSERT_EQ_INT(num_set_double(&bits_complex, 2.5), 0);
+        ASSERT_EQ_INT((int)num_get_prec_bits(bits_complex), 384);
+        set_complex_text = num_to_string(bits_complex);
+        ASSERT_NOT_NULL(set_complex_text);
+        ASSERT_TRUE(strcmp(set_complex_text, "2.5") == 0);
+
+        ASSERT_EQ_INT(num_set_qfloat(&clone_real, qf_from_double(3.25)), 0);
+        ASSERT_EQ_INT((int)num_get_prec_bits(clone_real), 256);
+        set_qfloat_real_text = num_to_string(clone_real);
+        ASSERT_NOT_NULL(set_qfloat_real_text);
+        ASSERT_TRUE(strcmp(set_qfloat_real_text, "3.25") == 0);
+
+        ASSERT_EQ_INT(num_set_qfloat(&bits_complex, qf_from_double(3.25)), 0);
+        ASSERT_EQ_INT((int)num_get_prec_bits(bits_complex), 384);
+        set_qfloat_complex_text = num_to_string(bits_complex);
+        ASSERT_NOT_NULL(set_qfloat_complex_text);
+        ASSERT_TRUE(strcmp(set_qfloat_complex_text, "3.25") == 0);
+
+        ASSERT_EQ_INT(num_set_qcomplex(
+            &bits_complex,
+            qc_make(qf_from_double(1.5), qf_from_double(0.25))), 0);
+        ASSERT_EQ_INT((int)num_get_prec_bits(bits_complex), 384);
+        set_qcomplex_text = num_to_string(bits_complex);
+        ASSERT_NOT_NULL(set_qcomplex_text);
+        ASSERT_TRUE(strcmp(set_qcomplex_text, "1.5 + 0.25i") == 0);
 
         num_destroy(&default_real);
         num_destroy(&bits_real);
@@ -110,9 +147,11 @@ void run_number_multiprecision_tests(void)
         num_destroy(&log_real);
         num_destroy(&sqrt_complex);
         free(qcomplex_pi_e_text);
-
-        mf_free(base_real);
-        mc_free(base_complex);
+        free(set_real_text);
+        free(set_complex_text);
+        free(set_qfloat_real_text);
+        free(set_qfloat_complex_text);
+        free(set_qcomplex_text);
     }
 
     {
@@ -334,11 +373,11 @@ void run_number_multiprecision_tests(void)
         log_neg_one = num_log(NUM_NEG_ONE);
         neg_i = num_neg(NUM_I);
         log_neg_i = num_log(neg_i);
-        e_768 = num_create_from_mfloat_with_prec_bits(MF_E, 768u);
-        ln2_768 = num_create_from_mfloat_with_prec_bits(MF_LN2, 768u);
-        pi_768 = num_create_from_mfloat_with_prec_bits(MF_PI, 768u);
-        pi_2_768 = num_create_from_mfloat_with_prec_bits(MF_PI_2, 768u);
-        i_768 = num_create_from_mcomplex_with_prec_bits(MC_I, 768u);
+        e_768 = num_const_prec(NUM_E, 768u);
+        ln2_768 = num_const_prec(NUM_LN2, 768u);
+        pi_768 = num_const_prec(NUM_PI, 768u);
+        pi_2_768 = num_const_prec(NUM_PI_2, 768u);
+        i_768 = num_const_prec(NUM_I, 768u);
         neg_ln2 = num_neg(ln2_768);
         i_pi = num_mul(i_768, pi_768);
         three = num_create_from_long(3);

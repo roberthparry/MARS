@@ -167,6 +167,20 @@ mfloat_t *mf_create_from_mpfr_prec(mpfr_srcptr value, size_t precision_bits)
     return out;
 }
 
+int mf_set_mpfr_from_mfloat(mpfr_t out, const mfloat_t *value,
+                            size_t precision_bits)
+{
+    if (!out || !value)
+        return -1;
+    mfloat_prepare_constant(value, (mpfr_prec_t)(precision_bits
+        ? precision_bits : mf_get_precision(value)));
+    if (precision_bits != 0u &&
+        mpfr_get_prec(out) != (mpfr_prec_t)precision_bits)
+        mpfr_prec_round(out, (mpfr_prec_t)precision_bits, MPFR_RNDN);
+    mpfr_set(out, value->value, MPFR_RNDN);
+    return 0;
+}
+
 int mf_mpc_set_from_parts(mpc_t out, const mfloat_t *real,
                           const mfloat_t *imag)
 {

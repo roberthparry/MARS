@@ -480,8 +480,7 @@ static number_t *number_complex_binary_mpc(const complex_t *av,
         number_complex_get_mpc(b_mpc, bv, precision_bits) != 0)
         goto cleanup;
 
-    if (fn(out_mpc, a_mpc, b_mpc, MPC_RNDNN) != 0)
-        goto cleanup;
+    (void)fn(out_mpc, a_mpc, b_mpc, MPC_RNDNN);
     out = number_wrap_complex_mpc(out_mpc, precision_bits);
 
 cleanup:
@@ -993,39 +992,48 @@ number_t *number_div_same_complex(const number_t *a, const number_t *b)
 }
 
 static number_t *number_apply_complex_mpc_unary(const number_t *number,
-                                                int (*fn)(mcomplex_t *))
+                                                int (*fn)(mpc_ptr, mpc_srcptr, mpc_rnd_t))
 {
     const complex_t *value = number_complex_value(number);
     size_t precision_bits;
-    mcomplex_t *tmp;
-    complex_t *out;
+    mpc_t in;
+    mpc_t out;
+    number_t *boxed = NULL;
 
     if (!value || !fn)
         return NULL;
     precision_bits = num_get_prec_bits(*number);
     if (precision_bits == 0u)
         precision_bits = number_default_precision_bits;
-    tmp = number_complex_to_mcomplex(value, precision_bits);
-    if (!tmp || fn(tmp) != 0) {
-        mc_free(tmp);
-        return NULL;
-    }
-    out = number_complex_create_from_mcomplex(tmp, precision_bits);
-    mc_free(tmp);
-    return out ? number_wrap_complex(out) : NULL;
+    mpc_init2(in, (mpfr_prec_t)precision_bits);
+    mpc_init2(out, (mpfr_prec_t)precision_bits);
+    if (number_complex_get_mpc(in, value, precision_bits) != 0)
+        goto done;
+    (void)fn(out, in, MPC_RNDNN);
+    boxed = number_wrap_complex_mpc(out, precision_bits);
+
+done:
+    mpc_clear(out);
+    mpc_clear(in);
+    return boxed;
+}
+
+static int number_mpc_sqrt_adapter(mpc_ptr out, mpc_srcptr in, mpc_rnd_t rnd)
+{
+    return mpc_sqrt(out, in, rnd);
 }
 
 number_t *number_exp_same_complex(const number_t *number)
 {
-    return number_apply_complex_mpc_unary(number, mc_exp);
+    return number_apply_complex_mpc_unary(number, mpc_exp);
 }
 
 number_t *number_log_same_complex(const number_t *number)
 {
-    return number_apply_complex_mpc_unary(number, mc_log);
+    return number_apply_complex_mpc_unary(number, mpc_log);
 }
 
 number_t *number_sqrt_same_complex(const number_t *number)
 {
-    return number_apply_complex_mpc_unary(number, mc_sqrt);
+    return number_apply_complex_mpc_unary(number, number_mpc_sqrt_adapter);
 }

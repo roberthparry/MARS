@@ -243,8 +243,6 @@ static void test_mat_to_string_numeric_tex(void)
 
 static void test_mat_to_string_number_precision(void)
 {
-    mfloat_t *real_base = mf_create_string("1.25");
-    mcomplex_t *complex_base = mc_create_string("1 + 2i");
     number_t vals[4];
     matrix_t *A;
     char *inline_pretty;
@@ -252,11 +250,12 @@ static void test_mat_to_string_number_precision(void)
     char *expected_pretty;
     char *expected_scientific;
 
-    check_bool("mat_to_string number real base non-null", real_base != NULL);
-    check_bool("mat_to_string number complex base non-null", complex_base != NULL);
-
-    vals[0] = num_create_from_mfloat_with_prec_bits(real_base, 512u);
-    vals[1] = num_create_from_mcomplex_with_prec_bits(complex_base, 384u);
+    vals[0] = num_create_from_string("1.25");
+    vals[1] = num_create_from_string("1 + 2i");
+    check_bool("mat_to_string number real precision set",
+               num_set_prec_bits(&vals[0], 512u) == 0);
+    check_bool("mat_to_string number complex precision set",
+               num_set_prec_bits(&vals[1], 384u) == 0);
     vals[2] = num_create_from_string("1/2");
     vals[3] = num_create_from_long(3);
     A = mat_create(2, 2, vals);
@@ -305,8 +304,6 @@ static void test_mat_to_string_number_precision(void)
     mat_free(A);
     for (size_t i = 0; i < 4u; ++i)
         num_destroy(&vals[i]);
-    mf_free(real_base);
-    mc_free(complex_base);
 }
 
 static void test_mat_to_string_symbolic(void)

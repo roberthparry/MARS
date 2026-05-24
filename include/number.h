@@ -5,9 +5,6 @@
 #include <stddef.h>
 #include <stdarg.h>
 #include <stdint.h>
-
-#include "mcomplex.h"
-#include "mfloat.h"
 #include "mint.h"
 #include "mrational.h"
 #include "qcomplex.h"
@@ -27,7 +24,7 @@
  *
  * - integer text -> `mint_t`
  * - `a/b` fraction text -> `mrational_t`
- * - decimal / scientific real text -> `mfloat_t`
+ * - decimal / scientific real text -> an internal MPFR-backed real
  * - complex text -> an internal multiprecision complex representation
  *
  * Unless a precision is specified explicitly, multiprecision construction
@@ -67,6 +64,95 @@ typedef struct _number_t {
     uint64_t storage[NUMBER_STORAGE_WORDS];
 } number_t;
 
+#ifndef MARS_NUMBER_IMPLEMENTATION
+typedef union number_inline_qfloat_bits_t {
+    qfloat_t value;
+    uint64_t words[2];
+} number_inline_qfloat_bits_t;
+
+typedef union number_inline_qcomplex_bits_t {
+    qcomplex_t value;
+    uint64_t words[4];
+} number_inline_qcomplex_bits_t;
+
+static inline uint32_t number_inline_kind(number_t number)
+{
+    return (uint32_t)number.storage[0];
+}
+
+static inline qfloat_t number_inline_qfloat(number_t number)
+{
+    number_inline_qfloat_bits_t bits;
+
+    bits.words[0] = number.storage[1];
+    bits.words[1] = number.storage[2];
+    return bits.value;
+}
+
+static inline qcomplex_t number_inline_qcomplex(number_t number)
+{
+    number_inline_qcomplex_bits_t bits;
+
+    bits.words[0] = number.storage[1];
+    bits.words[1] = number.storage[2];
+    bits.words[2] = number.storage[3];
+    bits.words[3] = number.storage[4];
+    return bits.value;
+}
+
+static inline qfloat_t number_inline_qcomplex_real(number_t number)
+{
+    number_inline_qfloat_bits_t bits;
+
+    bits.words[0] = number.storage[1];
+    bits.words[1] = number.storage[2];
+    return bits.value;
+}
+
+static inline qfloat_t number_inline_qcomplex_imag(number_t number)
+{
+    number_inline_qfloat_bits_t bits;
+
+    bits.words[0] = number.storage[3];
+    bits.words[1] = number.storage[4];
+    return bits.value;
+}
+
+static inline number_t number_inline_make_qfloat(qfloat_t value)
+{
+    number_t number;
+    number_inline_qfloat_bits_t bits;
+
+    bits.value = value;
+    number.storage[0] = 2u;
+    number.storage[1] = bits.words[0];
+    number.storage[2] = bits.words[1];
+    return number;
+}
+
+static inline number_t number_inline_make_qcomplex_parts(qfloat_t real,
+                                                         qfloat_t imag)
+{
+    number_t number;
+    number_inline_qfloat_bits_t real_bits;
+    number_inline_qfloat_bits_t imag_bits;
+
+    real_bits.value = real;
+    imag_bits.value = imag;
+    number.storage[0] = 3u;
+    number.storage[1] = real_bits.words[0];
+    number.storage[2] = real_bits.words[1];
+    number.storage[3] = imag_bits.words[0];
+    number.storage[4] = imag_bits.words[1];
+    return number;
+}
+
+static inline number_t number_inline_make_qcomplex(qcomplex_t value)
+{
+    return number_inline_make_qcomplex_parts(value.re, value.im);
+}
+#endif
+
 /**
  * @brief Opaque temporary lifetime scope for heap-backed `number_t` results.
  *
@@ -103,24 +189,11 @@ number_t num_new_with_prec_bits    (size_t precision_bits);
 
 number_t num_create_from_long      (long value);
 number_t num_create_from_double    (double value);
+number_t num_create_from_cdouble   (double _Complex value);
 number_t num_create_from_qfloat    (qfloat_t value);
 number_t num_create_from_qcomplex  (qcomplex_t value);
 number_t num_create_from_mint      (const mint_t *value);
 number_t num_create_from_mrational (const mrational_t *value);
-
-/** @brief `mfloat_t` constructor family. */
-number_t num_create_from_mfloat                    (const mfloat_t *value);     /**< default working precision */
-number_t num_create_from_mfloat_with_prec_bits     (const mfloat_t *value,
-                                                    size_t precision_bits);     /**< explicit bit precision */
-number_t num_create_from_mfloat_with_prec_digits   (const mfloat_t *value,
-                                                    size_t significant_digits); /**< explicit decimal-digit precision */
-
-/** @brief Imports an `mcomplex_t` into the internal complex representation. */
-number_t num_create_from_mcomplex                  (const mcomplex_t *value);   /**< default working precision */
-number_t num_create_from_mcomplex_with_prec_bits   (const mcomplex_t *value,
-                                                    size_t precision_bits);     /**< explicit bit precision */
-number_t num_create_from_mcomplex_with_prec_digits (const mcomplex_t *value,
-                                                    size_t significant_digits); /**< explicit decimal-digit precision */
 
 /**
  * @brief Parses text into the most suitable numeric representation.
@@ -288,7 +361,23 @@ number_t num_const_prec_digits(number_t constant, size_t significant_digits);
  * multiple aliases of the same underlying payload unless they first made an
  * independent copy with `num_clone()`.
  */
+#ifndef MARS_NUMBER_IMPLEMENTATION
+void num_destroy_slow(number_t *number);
+static inline void num_destroy(number_t *number)
+{
+    uint32_t kind;
+
+    if (!number)
+        return;
+    kind = (uint32_t)number->storage[0];
+    if (kind <= 3u)
+        return;
+    num_destroy_slow(number);
+}
+#else
+void num_destroy_slow(number_t *number);
 void num_destroy(number_t *number);
+#endif
 /** @} */
 
 /** @name Temporary scopes
@@ -363,7 +452,9 @@ size_t num_get_prec_digits (const number_t number);
 /** In-place value replacement helpers. */
 int num_set_long      (number_t *number, long value);
 int num_set_double    (number_t *number, double value);
+int num_set_cdouble   (number_t *number, double _Complex value);
 int num_set_qfloat    (number_t *number, qfloat_t value);
+int num_set_qcomplex  (number_t *number, qcomplex_t value);
 int num_set_mrational (number_t *number, const mrational_t *value);
 
 /**
@@ -463,14 +554,105 @@ number_t num_conj         (const number_t number);
 number_t num_real_part    (const number_t number);
 number_t num_imag_part    (const number_t number);
 number_t num_arg          (const number_t number);
+#ifndef MARS_NUMBER_IMPLEMENTATION
+number_t num_add_slow     (const number_t a, const number_t b);
+number_t num_sub_slow     (const number_t a, const number_t b);
+number_t num_mul_slow     (const number_t a, const number_t b);
+number_t num_div_slow     (const number_t a, const number_t b);
+
+static inline number_t num_add(const number_t a, const number_t b)
+{
+    uint32_t kind = number_inline_kind(a);
+
+    if (kind == number_inline_kind(b)) {
+        if (kind == 2u)
+            return number_inline_make_qfloat(qf_add(number_inline_qfloat(a),
+                                                    number_inline_qfloat(b)));
+        if (kind == 3u)
+            return number_inline_make_qcomplex_parts(
+                qf_add(number_inline_qcomplex_real(a), number_inline_qcomplex_real(b)),
+                qf_add(number_inline_qcomplex_imag(a), number_inline_qcomplex_imag(b)));
+    }
+    return num_add_slow(a, b);
+}
+
+static inline number_t num_sub(const number_t a, const number_t b)
+{
+    uint32_t kind = number_inline_kind(a);
+
+    if (kind == number_inline_kind(b)) {
+        if (kind == 2u)
+            return number_inline_make_qfloat(qf_sub(number_inline_qfloat(a),
+                                                    number_inline_qfloat(b)));
+        if (kind == 3u)
+            return number_inline_make_qcomplex_parts(
+                qf_sub(number_inline_qcomplex_real(a), number_inline_qcomplex_real(b)),
+                qf_sub(number_inline_qcomplex_imag(a), number_inline_qcomplex_imag(b)));
+    }
+    return num_sub_slow(a, b);
+}
+
+static inline number_t num_mul(const number_t a, const number_t b)
+{
+    uint32_t kind = number_inline_kind(a);
+
+    if (kind == number_inline_kind(b)) {
+        if (kind == 2u)
+            return number_inline_make_qfloat(qf_mul(number_inline_qfloat(a),
+                                                    number_inline_qfloat(b)));
+        if (kind == 3u) {
+            qfloat_t ar = number_inline_qcomplex_real(a);
+            qfloat_t ai = number_inline_qcomplex_imag(a);
+            qfloat_t br = number_inline_qcomplex_real(b);
+            qfloat_t bi = number_inline_qcomplex_imag(b);
+
+            return number_inline_make_qcomplex_parts(
+                qf_sub(qf_mul(ar, br), qf_mul(ai, bi)),
+                qf_add(qf_mul(ar, bi), qf_mul(ai, br)));
+        }
+    }
+    return num_mul_slow(a, b);
+}
+
+static inline number_t num_div(const number_t a, const number_t b)
+{
+    uint32_t kind = number_inline_kind(a);
+
+    if (kind == number_inline_kind(b)) {
+        if (kind == 2u) {
+            qfloat_t av = number_inline_qfloat(a);
+            qfloat_t bv = number_inline_qfloat(b);
+
+            return number_inline_make_qfloat(qf_div(av, bv));
+        }
+        if (kind == 3u) {
+            qfloat_t ar = number_inline_qcomplex_real(a);
+            qfloat_t ai = number_inline_qcomplex_imag(a);
+            qfloat_t br = number_inline_qcomplex_real(b);
+            qfloat_t bi = number_inline_qcomplex_imag(b);
+            qfloat_t denom = qf_add(qf_mul(br, br), qf_mul(bi, bi));
+
+            return number_inline_make_qcomplex_parts(
+                qf_div(qf_add(qf_mul(ar, br), qf_mul(ai, bi)), denom),
+                qf_div(qf_sub(qf_mul(ai, br), qf_mul(ar, bi)), denom));
+        }
+    }
+    return num_div_slow(a, b);
+}
+#else
 number_t num_add          (const number_t a, const number_t b);
-number_t num_add_mrational(const number_t number, const mrational_t *value);
-number_t num_add_long     (const number_t number, long value);
 number_t num_sub          (const number_t a, const number_t b);
 number_t num_mul          (const number_t a, const number_t b);
+number_t num_div          (const number_t a, const number_t b);
+number_t num_add_slow     (const number_t a, const number_t b);
+number_t num_sub_slow     (const number_t a, const number_t b);
+number_t num_mul_slow     (const number_t a, const number_t b);
+number_t num_div_slow     (const number_t a, const number_t b);
+#endif
+number_t num_add_mrational(const number_t number, const mrational_t *value);
+number_t num_add_long     (const number_t number, long value);
 number_t num_mul_long     (const number_t number, long value);
 number_t num_mul_mrational(const number_t number, const mrational_t *value);
-number_t num_div          (const number_t a, const number_t b);
 number_t num_pow          (const number_t base, const number_t exponent);
 number_t num_pow_int      (const number_t base, int exponent);
 number_t num_ldexp        (const number_t number, int exponent2);

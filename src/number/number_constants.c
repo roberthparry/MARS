@@ -1,10 +1,55 @@
 #include <math.h>
 
 #include "number_internal.h"
-#include "internal/number_internal.h"
-#include "internal/mfloat_internal.h"
 #include "internal/mint_internal.h"
 #include "internal/mrational_internal.h"
+
+#include <complex.h>
+
+#define NUMBER_MPFR_SOURCE(name, id) \
+    static number_mpfr_t name = {    \
+        .constant_id = (id),         \
+        .immortal = true,            \
+        .initialised = false         \
+    }
+
+NUMBER_MPFR_SOURCE(number_pi_mpfr_value, NUMBER_CONST_PI);
+NUMBER_MPFR_SOURCE(number_2pi_mpfr_value, NUMBER_CONST_2PI);
+NUMBER_MPFR_SOURCE(number_pi_2_mpfr_value, NUMBER_CONST_PI_2);
+NUMBER_MPFR_SOURCE(number_neg_pi_2_mpfr_value, NUMBER_CONST_NEG_PI_2);
+NUMBER_MPFR_SOURCE(number_pi_4_mpfr_value, NUMBER_CONST_PI_4);
+NUMBER_MPFR_SOURCE(number_3pi_4_mpfr_value, NUMBER_CONST_3PI_4);
+NUMBER_MPFR_SOURCE(number_pi_6_mpfr_value, NUMBER_CONST_PI_6);
+NUMBER_MPFR_SOURCE(number_pi_3_mpfr_value, NUMBER_CONST_PI_3);
+NUMBER_MPFR_SOURCE(number_2_pi_mpfr_value, NUMBER_CONST_2_PI);
+NUMBER_MPFR_SOURCE(number_e_mpfr_value, NUMBER_CONST_E);
+NUMBER_MPFR_SOURCE(number_inv_e_mpfr_value, NUMBER_CONST_INV_E);
+NUMBER_MPFR_SOURCE(number_ln2_mpfr_value, NUMBER_CONST_LN2);
+NUMBER_MPFR_SOURCE(number_ln10_mpfr_value, NUMBER_CONST_LN10);
+NUMBER_MPFR_SOURCE(number_invln2_mpfr_value, NUMBER_CONST_INVLN2);
+NUMBER_MPFR_SOURCE(number_euler_mascheroni_mpfr_value, NUMBER_CONST_EULER_MASCHERONI);
+NUMBER_MPFR_SOURCE(number_phi_mpfr_value, NUMBER_CONST_PHI);
+NUMBER_MPFR_SOURCE(number_sqrt_half_mpfr_value, NUMBER_CONST_SQRT_HALF);
+NUMBER_MPFR_SOURCE(number_sqrt2_mpfr_value, NUMBER_CONST_SQRT2);
+NUMBER_MPFR_SOURCE(number_sqrt3_mpfr_value, NUMBER_CONST_SQRT3);
+NUMBER_MPFR_SOURCE(number_sqrt2_over_two_mpfr_value, NUMBER_CONST_SQRT2_OVER_TWO);
+NUMBER_MPFR_SOURCE(number_sqrt3_over_two_mpfr_value, NUMBER_CONST_SQRT3_OVER_TWO);
+NUMBER_MPFR_SOURCE(number_sqrt_2pi_mpfr_value, NUMBER_CONST_SQRT_2PI);
+NUMBER_MPFR_SOURCE(number_sqrt_pi_mpfr_value, NUMBER_CONST_SQRT_PI);
+NUMBER_MPFR_SOURCE(number_sqrt_pi_over_two_mpfr_value, NUMBER_CONST_SQRT_PI_OVER_TWO);
+NUMBER_MPFR_SOURCE(number_sqrt1onpi_mpfr_value, NUMBER_CONST_SQRT1ONPI);
+NUMBER_MPFR_SOURCE(number_2_sqrtpi_mpfr_value, NUMBER_CONST_2_SQRTPI);
+NUMBER_MPFR_SOURCE(number_neg_two_over_sqrt_pi_mpfr_value, NUMBER_CONST_NEG_TWO_OVER_SQRT_PI);
+NUMBER_MPFR_SOURCE(number_inv_sqrt_2pi_mpfr_value, NUMBER_CONST_INV_SQRT_2PI);
+NUMBER_MPFR_SOURCE(number_log_sqrt_2pi_mpfr_value, NUMBER_CONST_LOG_SQRT_2PI);
+NUMBER_MPFR_SOURCE(number_ln_2pi_mpfr_value, NUMBER_CONST_LN_2PI);
+NUMBER_MPFR_SOURCE(number_pi_squared_mpfr_value, NUMBER_CONST_PI_SQUARED);
+NUMBER_MPFR_SOURCE(number_2pi_cubed_mpfr_value, NUMBER_CONST_2PI_CUBED);
+NUMBER_MPFR_SOURCE(number_nan_mpfr_value, NUMBER_CONST_NAN);
+NUMBER_MPFR_SOURCE(number_inf_mpfr_value, NUMBER_CONST_INF);
+NUMBER_MPFR_SOURCE(number_ninf_mpfr_value, NUMBER_CONST_NINF);
+
+#undef NUMBER_MPFR_SOURCE
 
 static const number_private_t number_zero_value = {
     .kind = NUMBER_MINT,
@@ -22,163 +67,163 @@ static const number_private_t number_neg_one_value = {
 };
 
 static const number_private_t number_pi_value = {
-    .kind = NUMBER_MFLOAT,
-    .value.mf = (mfloat_t *)&MF_PI_VALUE
+    .kind = NUMBER_MPFR,
+    .value.mpfr = &number_pi_mpfr_value
 };
 
 static const number_private_t number_2pi_value = {
-    .kind = NUMBER_MFLOAT,
-    .value.mf = (mfloat_t *)&MF_2PI_VALUE
+    .kind = NUMBER_MPFR,
+    .value.mpfr = &number_2pi_mpfr_value
 };
 
 static const number_private_t number_pi_2_value = {
-    .kind = NUMBER_MFLOAT,
-    .value.mf = (mfloat_t *)&MF_PI_2_VALUE
+    .kind = NUMBER_MPFR,
+    .value.mpfr = &number_pi_2_mpfr_value
 };
 
 static const number_private_t number_neg_pi_2_value = {
-    .kind = NUMBER_MFLOAT,
-    .value.mf = (mfloat_t *)&MF_NEG_PI_2_VALUE
+    .kind = NUMBER_MPFR,
+    .value.mpfr = &number_neg_pi_2_mpfr_value
 };
 
 static const number_private_t number_pi_4_value = {
-    .kind = NUMBER_MFLOAT,
-    .value.mf = (mfloat_t *)&MF_PI_4_VALUE
+    .kind = NUMBER_MPFR,
+    .value.mpfr = &number_pi_4_mpfr_value
 };
 
 static const number_private_t number_3pi_4_value = {
-    .kind = NUMBER_MFLOAT,
-    .value.mf = (mfloat_t *)&MF_3PI_4_VALUE
+    .kind = NUMBER_MPFR,
+    .value.mpfr = &number_3pi_4_mpfr_value
 };
 
 static const number_private_t number_pi_6_value = {
-    .kind = NUMBER_MFLOAT,
-    .value.mf = (mfloat_t *)&MF_PI_6_VALUE
+    .kind = NUMBER_MPFR,
+    .value.mpfr = &number_pi_6_mpfr_value
 };
 
 static const number_private_t number_pi_3_value = {
-    .kind = NUMBER_MFLOAT,
-    .value.mf = (mfloat_t *)&MF_PI_3_VALUE
+    .kind = NUMBER_MPFR,
+    .value.mpfr = &number_pi_3_mpfr_value
 };
 
 static const number_private_t number_2_pi_value = {
-    .kind = NUMBER_MFLOAT,
-    .value.mf = (mfloat_t *)&MF_2_PI_VALUE
+    .kind = NUMBER_MPFR,
+    .value.mpfr = &number_2_pi_mpfr_value
 };
 
 static const number_private_t number_e_value = {
-    .kind = NUMBER_MFLOAT,
-    .value.mf = (mfloat_t *)&MF_E_VALUE
+    .kind = NUMBER_MPFR,
+    .value.mpfr = &number_e_mpfr_value
 };
 
 static const number_private_t number_inv_e_value = {
-    .kind = NUMBER_MFLOAT,
-    .value.mf = (mfloat_t *)&MF_INV_E_VALUE
+    .kind = NUMBER_MPFR,
+    .value.mpfr = &number_inv_e_mpfr_value
 };
 
 static const number_private_t number_ln2_value = {
-    .kind = NUMBER_MFLOAT,
-    .value.mf = (mfloat_t *)&MF_LN2_VALUE
+    .kind = NUMBER_MPFR,
+    .value.mpfr = &number_ln2_mpfr_value
 };
 
 static const number_private_t number_ln10_value = {
-    .kind = NUMBER_MFLOAT,
-    .value.mf = (mfloat_t *)&MF_LN10_VALUE
+    .kind = NUMBER_MPFR,
+    .value.mpfr = &number_ln10_mpfr_value
 };
 
 static const number_private_t number_invln2_value = {
-    .kind = NUMBER_MFLOAT,
-    .value.mf = (mfloat_t *)&MF_INVLN2_VALUE
+    .kind = NUMBER_MPFR,
+    .value.mpfr = &number_invln2_mpfr_value
 };
 
 static const number_private_t number_euler_mascheroni_value = {
-    .kind = NUMBER_MFLOAT,
-    .value.mf = (mfloat_t *)&MF_EULER_MASCHERONI_VALUE
+    .kind = NUMBER_MPFR,
+    .value.mpfr = &number_euler_mascheroni_mpfr_value
 };
 
 static const number_private_t number_phi_value = {
-    .kind = NUMBER_MFLOAT,
-    .value.mf = (mfloat_t *)&MF_PHI_VALUE
+    .kind = NUMBER_MPFR,
+    .value.mpfr = &number_phi_mpfr_value
 };
 
 static const number_private_t number_sqrt_half_value = {
-    .kind = NUMBER_MFLOAT,
-    .value.mf = (mfloat_t *)&MF_SQRT_HALF_VALUE
+    .kind = NUMBER_MPFR,
+    .value.mpfr = &number_sqrt_half_mpfr_value
 };
 
 static const number_private_t number_sqrt2_value = {
-    .kind = NUMBER_MFLOAT,
-    .value.mf = (mfloat_t *)&MF_SQRT2_VALUE
+    .kind = NUMBER_MPFR,
+    .value.mpfr = &number_sqrt2_mpfr_value
 };
 
 static const number_private_t number_sqrt3_value = {
-    .kind = NUMBER_MFLOAT,
-    .value.mf = (mfloat_t *)&MF_SQRT3_VALUE
+    .kind = NUMBER_MPFR,
+    .value.mpfr = &number_sqrt3_mpfr_value
 };
 
 static const number_private_t number_sqrt2_over_two_value = {
-    .kind = NUMBER_MFLOAT,
-    .value.mf = (mfloat_t *)&MF_SQRT2_OVER_TWO_VALUE
+    .kind = NUMBER_MPFR,
+    .value.mpfr = &number_sqrt2_over_two_mpfr_value
 };
 
 static const number_private_t number_sqrt3_over_two_value = {
-    .kind = NUMBER_MFLOAT,
-    .value.mf = (mfloat_t *)&MF_SQRT3_OVER_TWO_VALUE
+    .kind = NUMBER_MPFR,
+    .value.mpfr = &number_sqrt3_over_two_mpfr_value
 };
 
 static const number_private_t number_sqrt_2pi_value = {
-    .kind = NUMBER_MFLOAT,
-    .value.mf = (mfloat_t *)&MF_SQRT_2PI_VALUE
+    .kind = NUMBER_MPFR,
+    .value.mpfr = &number_sqrt_2pi_mpfr_value
 };
 
 static const number_private_t number_sqrt_pi_value = {
-    .kind = NUMBER_MFLOAT,
-    .value.mf = (mfloat_t *)&MF_SQRT_PI_VALUE
+    .kind = NUMBER_MPFR,
+    .value.mpfr = &number_sqrt_pi_mpfr_value
 };
 
 static const number_private_t number_sqrt_pi_over_two_value = {
-    .kind = NUMBER_MFLOAT,
-    .value.mf = (mfloat_t *)&MF_SQRT_PI_OVER_TWO_VALUE
+    .kind = NUMBER_MPFR,
+    .value.mpfr = &number_sqrt_pi_over_two_mpfr_value
 };
 
 static const number_private_t number_sqrt1onpi_value = {
-    .kind = NUMBER_MFLOAT,
-    .value.mf = (mfloat_t *)&MF_SQRT1ONPI_VALUE
+    .kind = NUMBER_MPFR,
+    .value.mpfr = &number_sqrt1onpi_mpfr_value
 };
 
 static const number_private_t number_2_sqrtpi_value = {
-    .kind = NUMBER_MFLOAT,
-    .value.mf = (mfloat_t *)&MF_2_SQRTPI_VALUE
+    .kind = NUMBER_MPFR,
+    .value.mpfr = &number_2_sqrtpi_mpfr_value
 };
 
 static const number_private_t number_neg_two_over_sqrt_pi_value = {
-    .kind = NUMBER_MFLOAT,
-    .value.mf = (mfloat_t *)&MF_NEG_TWO_OVER_SQRT_PI_VALUE
+    .kind = NUMBER_MPFR,
+    .value.mpfr = &number_neg_two_over_sqrt_pi_mpfr_value
 };
 
 static const number_private_t number_inv_sqrt_2pi_value = {
-    .kind = NUMBER_MFLOAT,
-    .value.mf = (mfloat_t *)&MF_INV_SQRT_2PI_VALUE
+    .kind = NUMBER_MPFR,
+    .value.mpfr = &number_inv_sqrt_2pi_mpfr_value
 };
 
 static const number_private_t number_log_sqrt_2pi_value = {
-    .kind = NUMBER_MFLOAT,
-    .value.mf = (mfloat_t *)&MF_LOG_SQRT_2PI_VALUE
+    .kind = NUMBER_MPFR,
+    .value.mpfr = &number_log_sqrt_2pi_mpfr_value
 };
 
 static const number_private_t number_ln_2pi_value = {
-    .kind = NUMBER_MFLOAT,
-    .value.mf = (mfloat_t *)&MF_LN_2PI_VALUE
+    .kind = NUMBER_MPFR,
+    .value.mpfr = &number_ln_2pi_mpfr_value
 };
 
 static const number_private_t number_pi_squared_value = {
-    .kind = NUMBER_MFLOAT,
-    .value.mf = (mfloat_t *)&MF_PI_SQUARED_VALUE
+    .kind = NUMBER_MPFR,
+    .value.mpfr = &number_pi_squared_mpfr_value
 };
 
 static const number_private_t number_2pi_cubed_value = {
-    .kind = NUMBER_MFLOAT,
-    .value.mf = (mfloat_t *)&MF_2PI_CUBED_VALUE
+    .kind = NUMBER_MPFR,
+    .value.mpfr = &number_2pi_cubed_mpfr_value
 };
 
 static const number_private_t number_half_value = {
@@ -227,18 +272,18 @@ static const number_private_t number_ten_value = {
 };
 
 static const number_private_t number_nan_value = {
-    .kind = NUMBER_MFLOAT,
-    .value.mf = (mfloat_t *)&MF_NAN_VALUE
+    .kind = NUMBER_MPFR,
+    .value.mpfr = &number_nan_mpfr_value
 };
 
 static const number_private_t number_inf_value = {
-    .kind = NUMBER_MFLOAT,
-    .value.mf = (mfloat_t *)&MF_INF_VALUE
+    .kind = NUMBER_MPFR,
+    .value.mpfr = &number_inf_mpfr_value
 };
 
 static const number_private_t number_ninf_value = {
-    .kind = NUMBER_MFLOAT,
-    .value.mf = (mfloat_t *)&MF_NINF_VALUE
+    .kind = NUMBER_MPFR,
+    .value.mpfr = &number_ninf_mpfr_value
 };
 
 static complex_t number_i_complex_value;
@@ -414,30 +459,6 @@ static const qfloat_t *const number_const_qfloat_table[NUMBER_CONST_COUNT] = {
     [NUMBER_CONST_NINF] = &QF_NINF
 };
 
-static const mfloat_t *const number_const_mfloat_table[NUMBER_CONST_COUNT] = {
-    [NUMBER_CONST_ZERO] = &MF_ZERO_VALUE,
-    [NUMBER_CONST_ONE] = &MF_ONE_VALUE,
-    [NUMBER_CONST_HALF] = &MF_HALF_VALUE,
-    [NUMBER_CONST_PI] = &MF_PI_VALUE,
-    [NUMBER_CONST_2PI] = &MF_2PI_VALUE,
-    [NUMBER_CONST_PI_2] = &MF_PI_2_VALUE,
-    [NUMBER_CONST_NEG_PI_2] = &MF_NEG_PI_2_VALUE,
-    [NUMBER_CONST_PI_4] = &MF_PI_4_VALUE,
-    [NUMBER_CONST_3PI_4] = &MF_3PI_4_VALUE,
-    [NUMBER_CONST_PI_6] = &MF_PI_6_VALUE,
-    [NUMBER_CONST_PI_3] = &MF_PI_3_VALUE,
-    [NUMBER_CONST_E] = &MF_E_VALUE,
-    [NUMBER_CONST_INV_E] = &MF_INV_E_VALUE,
-    [NUMBER_CONST_LN2] = &MF_LN2_VALUE,
-    [NUMBER_CONST_LN10] = &MF_LN10_VALUE,
-    [NUMBER_CONST_SQRT2] = &MF_SQRT2_VALUE,
-    [NUMBER_CONST_SQRT3] = &MF_SQRT3_VALUE,
-    [NUMBER_CONST_SQRT2_OVER_TWO] = &MF_SQRT2_OVER_TWO_VALUE,
-    [NUMBER_CONST_SQRT3_OVER_TWO] = &MF_SQRT3_OVER_TWO_VALUE,
-    [NUMBER_CONST_INF] = &MF_INF_VALUE,
-    [NUMBER_CONST_NINF] = &MF_NINF_VALUE
-};
-
 static const qcomplex_t *const number_const_qcomplex_table[NUMBER_CONST_COUNT] = {
     [NUMBER_CONST_ZERO] = &QC_ZERO,
     [NUMBER_CONST_ONE] = &QC_ONE,
@@ -505,6 +526,37 @@ static const double number_const_double_table[NUMBER_CONST_COUNT] = {
     [NUMBER_CONST_NINF] = -INFINITY
 };
 
+static const double _Complex number_const_cdouble_table[NUMBER_CONST_COUNT] = {
+    [NUMBER_CONST_ZERO] = 0.0 + 0.0 * I,
+    [NUMBER_CONST_ONE] = 1.0 + 0.0 * I,
+    [NUMBER_CONST_NEG_ONE] = -1.0 + 0.0 * I,
+    [NUMBER_CONST_HALF] = 0.5 + 0.0 * I,
+    [NUMBER_CONST_QUARTER] = 0.25 + 0.0 * I,
+    [NUMBER_CONST_ONE_EIGHTH] = 0.125 + 0.0 * I,
+    [NUMBER_CONST_TWO] = 2.0 + 0.0 * I,
+    [NUMBER_CONST_PI] = M_PI + 0.0 * I,
+    [NUMBER_CONST_2PI] = 2.0 * M_PI + 0.0 * I,
+    [NUMBER_CONST_PI_2] = M_PI_2 + 0.0 * I,
+    [NUMBER_CONST_NEG_PI_2] = -M_PI_2 + 0.0 * I,
+    [NUMBER_CONST_PI_4] = M_PI_4 + 0.0 * I,
+    [NUMBER_CONST_3PI_4] = 3.0 * M_PI_4 + 0.0 * I,
+    [NUMBER_CONST_PI_6] = M_PI / 6.0 + 0.0 * I,
+    [NUMBER_CONST_PI_3] = M_PI / 3.0 + 0.0 * I,
+    [NUMBER_CONST_E] = M_E + 0.0 * I,
+    [NUMBER_CONST_INV_E] = 1.0 / M_E + 0.0 * I,
+    [NUMBER_CONST_LN2] = M_LN2 + 0.0 * I,
+    [NUMBER_CONST_LN10] = M_LN10 + 0.0 * I,
+    [NUMBER_CONST_SQRT2] = M_SQRT2 + 0.0 * I,
+    [NUMBER_CONST_SQRT3] = 1.73205080756887729353 + 0.0 * I,
+    [NUMBER_CONST_SQRT2_OVER_TWO] = M_SQRT1_2 + 0.0 * I,
+    [NUMBER_CONST_SQRT3_OVER_TWO] = 0.86602540378443864676 + 0.0 * I,
+    [NUMBER_CONST_NAN] = NAN + 0.0 * I,
+    [NUMBER_CONST_INF] = INFINITY + 0.0 * I,
+    [NUMBER_CONST_NINF] = -INFINITY + 0.0 * I,
+    [NUMBER_CONST_I] = 0.0 + 1.0 * I,
+    [NUMBER_CONST_NEG_I] = 0.0 - 1.0 * I
+};
+
 static const bool number_const_has_double_table[NUMBER_CONST_COUNT] = {
     [NUMBER_CONST_ZERO] = true,
     [NUMBER_CONST_ONE] = true,
@@ -533,6 +585,37 @@ static const bool number_const_has_double_table[NUMBER_CONST_COUNT] = {
     [NUMBER_CONST_NINF] = true
 };
 
+static const bool number_const_has_cdouble_table[NUMBER_CONST_COUNT] = {
+    [NUMBER_CONST_ZERO] = true,
+    [NUMBER_CONST_ONE] = true,
+    [NUMBER_CONST_NEG_ONE] = true,
+    [NUMBER_CONST_HALF] = true,
+    [NUMBER_CONST_QUARTER] = true,
+    [NUMBER_CONST_ONE_EIGHTH] = true,
+    [NUMBER_CONST_TWO] = true,
+    [NUMBER_CONST_PI] = true,
+    [NUMBER_CONST_2PI] = true,
+    [NUMBER_CONST_PI_2] = true,
+    [NUMBER_CONST_NEG_PI_2] = true,
+    [NUMBER_CONST_PI_4] = true,
+    [NUMBER_CONST_3PI_4] = true,
+    [NUMBER_CONST_PI_6] = true,
+    [NUMBER_CONST_PI_3] = true,
+    [NUMBER_CONST_E] = true,
+    [NUMBER_CONST_INV_E] = true,
+    [NUMBER_CONST_LN2] = true,
+    [NUMBER_CONST_LN10] = true,
+    [NUMBER_CONST_SQRT2] = true,
+    [NUMBER_CONST_SQRT3] = true,
+    [NUMBER_CONST_SQRT2_OVER_TWO] = true,
+    [NUMBER_CONST_SQRT3_OVER_TWO] = true,
+    [NUMBER_CONST_NAN] = true,
+    [NUMBER_CONST_INF] = true,
+    [NUMBER_CONST_NINF] = true,
+    [NUMBER_CONST_I] = true,
+    [NUMBER_CONST_NEG_I] = true
+};
+
 static const bool number_const_has_ldexp_table[NUMBER_CONST_COUNT] = {
     [NUMBER_CONST_QUARTER] = true,
     [NUMBER_CONST_ONE_EIGHTH] = true,
@@ -555,11 +638,6 @@ qfloat_t number_const_qfloat(number_const_id_t id)
     return value ? *value : QF_NAN;
 }
 
-const mfloat_t *number_const_mfloat_value(number_const_id_t id)
-{
-    return (unsigned)id < NUMBER_CONST_COUNT ? number_const_mfloat_table[id] : NULL;
-}
-
 qcomplex_t number_const_qcomplex(number_const_id_t id)
 {
     const qcomplex_t *value;
@@ -572,7 +650,7 @@ qcomplex_t number_const_qcomplex(number_const_id_t id)
     return value ? *value : qc_make(number_const_qfloat(id), QF_ZERO);
 }
 
-number_t number_const_mreal_exact(number_const_id_t id)
+number_t number_const_mpfr_exact(number_const_id_t id)
 {
     const number_t *value;
 
@@ -592,6 +670,17 @@ double number_const_double_value(number_const_id_t id)
     return (unsigned)id < NUMBER_CONST_COUNT ? number_const_double_table[id] : 0.0;
 }
 
+bool number_const_has_cdouble(number_const_id_t id)
+{
+    return (unsigned)id < NUMBER_CONST_COUNT && number_const_has_cdouble_table[id];
+}
+
+double _Complex number_const_cdouble_value(number_const_id_t id)
+{
+    return (unsigned)id < NUMBER_CONST_COUNT
+        ? number_const_cdouble_table[id] : 0.0 + 0.0 * I;
+}
+
 bool number_const_has_ldexp(number_const_id_t id)
 {
     return (unsigned)id < NUMBER_CONST_COUNT && number_const_has_ldexp_table[id];
@@ -602,52 +691,49 @@ int number_const_ldexp_value(number_const_id_t id)
     return (unsigned)id < NUMBER_CONST_COUNT ? number_const_ldexp_table[id] : 0;
 }
 
-number_t number_create_exact_mfloat_long_prec(long value, size_t precision_bits)
+number_t number_create_exact_mpfr_long_prec(long value, size_t precision_bits)
 {
-    mfloat_t *mfloat;
+    number_mpfr_t *mpfr;
 
     if (precision_bits == 0u)
         return number_invalid();
-    mfloat = mf_new_prec(precision_bits);
-    if (!mfloat || mf_set_long(mfloat, value) != 0) {
-        mf_free(mfloat);
+    mpfr = number_mpfr_new_prec(precision_bits);
+    if (!mpfr) {
         return number_invalid();
     }
-    return number_take(number_wrap_mfloat(mfloat));
+    (void)mpfr_set_si(mpfr->value, value, MPFR_RNDN);
+    return number_take(number_wrap_mpfr(mpfr));
 }
 
-number_t number_create_exact_mfloat_dyadic_prec(long numerator,
+number_t number_create_exact_mpfr_dyadic_prec(long numerator,
                                                 int exponent2,
                                                 size_t precision_bits)
 {
-    mfloat_t *mfloat;
+    number_mpfr_t *mpfr;
 
     if (precision_bits == 0u)
         return number_invalid();
-    mfloat = mf_new_prec(precision_bits);
-    if (!mfloat || mf_set_long(mfloat, numerator) != 0 ||
-        mf_ldexp(mfloat, exponent2) != 0) {
-        mf_free(mfloat);
+    mpfr = number_mpfr_new_prec(precision_bits);
+    if (!mpfr)
         return number_invalid();
-    }
-    return number_take(number_wrap_mfloat(mfloat));
+    (void)mpfr_set_si(mpfr->value, numerator, MPFR_RNDN);
+    mpfr_mul_2si(mpfr->value, mpfr->value, exponent2, MPFR_RNDN);
+    return number_take(number_wrap_mpfr(mpfr));
 }
 
 static number_t number_const_imag_magnitude(number_const_id_t id,
                                             size_t precision_bits)
 {
-    const mfloat_t *mf_value;
+    number_mpfr_t *mpfr;
 
     if (id == NUMBER_CONST_NEG_ONE)
-        return number_create_exact_mfloat_long_prec(-1, precision_bits);
+        return number_create_exact_mpfr_long_prec(-1, precision_bits);
     if (number_const_has_ldexp(id))
-        return number_create_exact_mfloat_dyadic_prec(
+        return number_create_exact_mpfr_dyadic_prec(
             1, number_const_ldexp_value(id), precision_bits);
 
-    mf_value = number_const_mfloat_value(id);
-    return mf_value
-        ? num_create_from_mfloat_with_prec_bits(mf_value, precision_bits)
-        : number_invalid();
+    mpfr = number_mpfr_from_const_id(id, precision_bits);
+    return mpfr ? number_take(number_wrap_mpfr(mpfr)) : number_invalid();
 }
 
 number_t number_const_return_like(const number_t *like, number_const_id_t id)
@@ -676,7 +762,7 @@ number_t number_imag_const_like_qreal(const number_t *like, number_const_id_t id
         : num_create_from_qcomplex(qc_make(QF_ZERO, imag_qf));
 }
 
-number_t number_imag_const_like_mreal(const number_t *like, number_const_id_t id)
+number_t number_imag_const_like_mpfr(const number_t *like, number_const_id_t id)
 {
     const number_vtable_t *vt = number_vt(like);
     size_t precision_bits = vt && vt->get_precision ? vt->get_precision(like) : 0u;
@@ -690,7 +776,7 @@ number_t number_imag_const_like_mreal(const number_t *like, number_const_id_t id
     magnitude = number_const_imag_magnitude(id, precision_bits);
     if (!number_is_valid_value(&magnitude))
         return number_invalid();
-    real = number_create_exact_mfloat_long_prec(0, precision_bits);
+    real = number_create_exact_mpfr_long_prec(0, precision_bits);
     complex_value = number_complex_create(real, magnitude);
     if (complex_value)
         complex_value->precision_bits = precision_bits;

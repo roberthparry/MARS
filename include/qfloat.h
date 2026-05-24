@@ -49,6 +49,35 @@ typedef struct {
     double lo; /**< Trailing part (error term, ~53 bits).    */
 } qfloat_t;
 
+#ifndef QF_SPLIT
+#define QF_SPLIT 134217729.0
+#endif
+
+static inline void qf_inline_two_sum(double a, double b, double *s, double *e)
+{
+    double bb;
+
+    *s = a + b;
+    bb = *s - a;
+    *e = (a - (*s - bb)) + (b - bb);
+}
+
+static inline void qf_inline_quick_two_sum(double a, double b, double *s, double *e)
+{
+    double t = a + b;
+
+    *s = t;
+    *e = b - (t - a);
+}
+
+static inline qfloat_t qf_inline_renorm(double hi, double lo)
+{
+    qfloat_t r;
+
+    qf_inline_quick_two_sum(hi, lo, &r.hi, &r.lo);
+    return r;
+}
+
 /* -------------------------------------------------------------------------
    Constants
    ------------------------------------------------------------------------- */
@@ -450,7 +479,20 @@ int qf_printf(const char *fmt, ...);
  * @param b Second operand.
  * @return a + b (double‑double precision).
  */
+#ifndef MARS_QFLOAT_IMPLEMENTATION
+static inline qfloat_t qf_add(qfloat_t a, qfloat_t b)
+{
+    double s;
+    double e1;
+    double e2;
+
+    qf_inline_two_sum(a.hi, b.hi, &s, &e1);
+    e2 = a.lo + b.lo + e1;
+    return qf_inline_renorm(s, e2);
+}
+#else
 qfloat_t qf_add(qfloat_t a, qfloat_t b);
+#endif
 
 /**
  * @brief Add a double to a qfloat_t.
@@ -468,7 +510,20 @@ qfloat_t qf_add_double(qfloat_t x, double y);
  * @param b Subtrahend.
  * @return a - b (double‑double precision).
  */
+#ifndef MARS_QFLOAT_IMPLEMENTATION
+static inline qfloat_t qf_sub(qfloat_t a, qfloat_t b)
+{
+    double s;
+    double e1;
+    double e2;
+
+    qf_inline_two_sum(a.hi, -b.hi, &s, &e1);
+    e2 = a.lo - b.lo + e1;
+    return qf_inline_renorm(s, e2);
+}
+#else
 qfloat_t qf_sub(qfloat_t a, qfloat_t b);
+#endif
 
 /**
  * @brief Multiply two qfloat_t values.
@@ -479,7 +534,39 @@ qfloat_t qf_sub(qfloat_t a, qfloat_t b);
  * @param b Second operand.
  * @return a * b (double‑double precision).
  */
+#ifndef MARS_QFLOAT_IMPLEMENTATION
+static inline qfloat_t qf_mul(qfloat_t a, qfloat_t b)
+{
+    double hx;
+    double tx;
+    double hy;
+    double ty;
+    double C;
+    double c;
+    double d;
+    double hi;
+    double lo;
+
+    C = QF_SPLIT * a.hi;
+    hx = C - a.hi;
+    hx = C - hx;
+    tx = a.hi - hx;
+
+    d = QF_SPLIT * b.hi;
+    hy = d - b.hi;
+    hy = d - hy;
+    ty = b.hi - hy;
+
+    C = a.hi * b.hi;
+    c = ((((hx * hy - C) + hx * ty) + tx * hy) + tx * ty)
+        + (a.hi * b.lo + a.lo * b.hi)
+        + (a.lo * b.lo);
+    qf_inline_two_sum(C, c, &hi, &lo);
+    return (qfloat_t){ hi, lo };
+}
+#else
 qfloat_t qf_mul(qfloat_t a, qfloat_t b);
+#endif
 
 /**
  * @brief Multiply a qfloat_t by a double.
@@ -504,7 +591,32 @@ qfloat_t qf_mul_double(qfloat_t x, double a);
  * @param b Denominator.
  * @return a / b (double‑double precision).
  */
+#if !defined(MARS_QFLOAT_IMPLEMENTATION) && !defined(MARS_QFLOAT_NO_INLINE_DIV)
+static inline qfloat_t qf_div(qfloat_t a, qfloat_t b)
+{
+    double b_hi;
+    double q1;
+    double q2;
+    qfloat_t q1q;
+    qfloat_t qb;
+    qfloat_t r;
+    qfloat_t q2q;
+
+    if (b.hi == 0.0 && b.lo == 0.0)
+        return QF_NAN;
+
+    b_hi = b.hi;
+    q1 = a.hi / b_hi;
+    q1q = (qfloat_t){ q1, 0.0 };
+    qb = qf_mul(q1q, b);
+    r = qf_sub(a, qb);
+    q2 = r.hi / b_hi;
+    q2q = (qfloat_t){ q2, 0.0 };
+    return qf_add(q1q, q2q);
+}
+#else
 qfloat_t qf_div(qfloat_t a, qfloat_t b);
+#endif
 
 /**
  * @brief Raise a qfloat_t to an integer power.

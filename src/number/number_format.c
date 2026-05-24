@@ -91,25 +91,31 @@ char *number_format_qcomplex(const number_t *number, bool scientific, int precis
     return out;
 }
 
-char *number_format_mfloat(const number_t *number, bool scientific, int precision)
+char *number_format_mpfr(const number_t *number, bool scientific, int precision)
 {
+    mpfr_srcptr value = number ? number_mpfr_value(number_impl_const(number)->value.mpfr) : NULL;
     int needed;
     char *out;
     char fmt[32];
 
-    if (!number)
+    if (!value)
         return NULL;
     if (precision >= 0)
-        snprintf(fmt, sizeof(fmt), scientific ? "%%.%dMF" : "%%.%dmf", precision);
+        snprintf(fmt, sizeof(fmt), scientific ? "%%.%dRE" : "%%.%dRg", precision);
     else
-        snprintf(fmt, sizeof(fmt), scientific ? "%%MF" : "%%mf");
-    needed = mf_sprintf(NULL, 0u, fmt, number_impl_const(number)->value.mf);
+        snprintf(fmt, sizeof(fmt), scientific ? "%%.*RE" : "%%.*Rg");
+    needed = precision >= 0
+        ? mpfr_snprintf(NULL, 0u, fmt, value)
+        : mpfr_snprintf(NULL, 0u, fmt, (int)num_get_prec_digits(*number), value);
     if (needed < 0)
         return NULL;
     out = malloc((size_t)needed + 1u);
     if (!out)
         return NULL;
-    mf_sprintf(out, (size_t)needed + 1u, fmt, number_impl_const(number)->value.mf);
+    if (precision >= 0)
+        mpfr_snprintf(out, (size_t)needed + 1u, fmt, value);
+    else
+        mpfr_snprintf(out, (size_t)needed + 1u, fmt, (int)num_get_prec_digits(*number), value);
     return out;
 }
 
@@ -117,31 +123,54 @@ char *number_format_complex(const number_t *number, bool scientific, int precisi
 {
     const complex_t *value = number ? number_impl_const(number)->value.cx : NULL;
     size_t precision_bits = number ? num_get_prec_bits(*number) : 0u;
-    mcomplex_t *tmp;
-    int needed;
+    mpc_t tmp;
+    char *real = NULL;
+    char *imag = NULL;
+    char *out = NULL;
+    int real_needed;
+    int imag_needed;
+    int digits;
     char fmt[32];
-    char *out;
 
     if (!value)
         return NULL;
     if (precision_bits == 0u)
         precision_bits = number_default_precision_bits;
-    tmp = number_complex_to_mcomplex(value, precision_bits);
-    if (!tmp)
-        return NULL;
-    if (precision >= 0)
-        snprintf(fmt, sizeof(fmt), scientific ? "%%.%dMZ" : "%%.%dmz", precision);
-    else
-        snprintf(fmt, sizeof(fmt), scientific ? "%%MZ" : "%%mz");
-    needed = mc_sprintf(NULL, 0u, fmt, tmp);
-    if (needed < 0) {
-        mc_free(tmp);
+    digits = precision >= 0 ? precision : (int)num_get_prec_digits(*number);
+    if (digits <= 0)
+        digits = (int)num_get_default_prec_digits();
+    snprintf(fmt, sizeof(fmt), scientific ? "%%.%dRE" : "%%.%dRg", digits);
+    mpc_init2(tmp, (mpfr_prec_t)precision_bits);
+    if (number_complex_get_mpc(tmp, value, precision_bits) != 0) {
+        mpc_clear(tmp);
         return NULL;
     }
-    out = malloc((size_t)needed + 1u);
-    if (out)
-        mc_sprintf(out, (size_t)needed + 1u, fmt, tmp);
-    mc_free(tmp);
+    real_needed = mpfr_snprintf(NULL, 0u, fmt, mpc_realref(tmp));
+    imag_needed = mpfr_snprintf(NULL, 0u, fmt, mpc_imagref(tmp));
+    if (real_needed < 0 || imag_needed < 0)
+        goto done;
+    real = malloc((size_t)real_needed + 1u);
+    imag = malloc((size_t)imag_needed + 1u);
+    if (!real || !imag)
+        goto done;
+    mpfr_snprintf(real, (size_t)real_needed + 1u, fmt, mpc_realref(tmp));
+    mpfr_snprintf(imag, (size_t)imag_needed + 1u, fmt, mpc_imagref(tmp));
+    {
+        const char *sep = mpfr_sgn(mpc_imagref(tmp)) < 0 ? " - " : " + ";
+        const char *imag_mag = imag[0] == '-' ? imag + 1 : imag;
+        int needed = snprintf(NULL, 0, "%s%s%si", real, sep, imag_mag);
+
+        if (needed >= 0) {
+            out = malloc((size_t)needed + 1u);
+            if (out)
+                snprintf(out, (size_t)needed + 1u, "%s%s%si", real, sep, imag_mag);
+        }
+    }
+
+done:
+    free(real);
+    free(imag);
+    mpc_clear(tmp);
     return out;
 }
 

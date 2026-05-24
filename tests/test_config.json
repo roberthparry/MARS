@@ -682,6 +682,7 @@
     "run_number_constant_tests": true,
     "run_number_formatting_tests": true,
     "run_number_special_function_tests": true,
+    "run_number_backend_parity_tests": true,
     "run_number_public_api_tests": true
   },
   "tests/dval/test_dval.c": {
@@ -1107,6 +1108,18 @@
       "test_goal_seek_real_multi_variable": true,
       "test_goal_seek_default_tolerance_uses_precision_digits": true,
       "test_goal_seek_default_iterations_scale_with_precision": true
+    }
+  },
+  "tests/number/test_number_backend_parity.c": {
+    "run_number_backend_parity_tests": {
+      "enabled": true,
+      "test_number_real_arithmetic_parity": true,
+      "test_number_real_elementary_parity": true,
+      "test_number_real_special_parity": true,
+      "test_number_real_special_identities": true,
+      "test_number_complex_arithmetic_parity": true,
+      "test_number_complex_elementary_parity": true,
+      "test_number_complex_special_parity": true
     }
   }
 }

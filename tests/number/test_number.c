@@ -39,6 +39,9 @@ int tests_main(void)
     TEST_RUN_CASE(run_number_special_function_tests,
                   "number,special-functions");
 
+    TEST_SECTION("Backend Parity");
+    TEST_RUN_CASE(run_number_backend_parity_tests, "number,backend-parity");
+
     TEST_SECTION("Public API");
     TEST_RUN_CASE(run_number_public_api_tests, "number,public-api");
 

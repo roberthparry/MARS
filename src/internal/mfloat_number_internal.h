@@ -7,6 +7,8 @@
 #include "mfloat.h"
 
 mfloat_t *mf_create_from_mpfr_prec(mpfr_srcptr value, size_t precision_bits);
+int mf_set_mpfr_from_mfloat(mpfr_t out, const mfloat_t *value,
+                            size_t precision_bits);
 int mf_mpc_set_from_parts(mpc_t out, const mfloat_t *real,
                           const mfloat_t *imag);
 int mf_complex_mul_parts(const mfloat_t *ar, const mfloat_t *ai,

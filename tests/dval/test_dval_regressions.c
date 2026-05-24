@@ -235,31 +235,15 @@ static number_t num_from_qtext(const char *text)
     return num_create_from_qfloat(qf_from_number_text(text));
 }
 
-static number_t num_from_mfloat_text_bits(const char *text, size_t precision_bits)
+static number_t num_from_text_bits(const char *text, size_t precision_bits)
 {
-    mfloat_t *value = mf_create_string(text);
-    number_t out;
+    number_t out = num_create_from_string(text);
 
-    if (!value) {
-        test_mark_failure(__FILE__, __LINE__, "mf_create_string failed");
+    if (num_set_prec_bits(&out, precision_bits) != 0) {
+        num_destroy(&out);
+        test_mark_failure(__FILE__, __LINE__, "num_create_from_string/num_set_prec_bits failed");
         return num_create_from_double(NAN);
     }
-    out = num_create_from_mfloat_with_prec_bits(value, precision_bits);
-    mf_free(value);
-    return out;
-}
-
-static number_t num_from_mcomplex_text_bits(const char *text, size_t precision_bits)
-{
-    mcomplex_t *value = mc_create_string(text);
-    number_t out;
-
-    if (!value) {
-        test_mark_failure(__FILE__, __LINE__, "mc_create_string failed");
-        return num_create_from_double(NAN);
-    }
-    out = num_create_from_mcomplex_with_prec_bits(value, precision_bits);
-    mc_free(value);
     return out;
 }
 
@@ -462,8 +446,8 @@ static void check_high_precision_unary_value_case(const unary_eval_case_t *tc,
                                                   size_t value_bits,
                                                   size_t oracle_bits)
 {
-    number_t input = num_from_mfloat_text_bits(tc->input, value_bits);
-    number_t oracle_input = num_from_mfloat_text_bits(tc->input, oracle_bits);
+    number_t input = num_from_text_bits(tc->input, value_bits);
+    number_t oracle_input = num_from_text_bits(tc->input, oracle_bits);
     dval_t *x = dv_new_var(input);
     dval_t *oracle_x = dv_new_var(oracle_input);
     dval_t *expr = tc->dv_fn(x);
@@ -487,10 +471,10 @@ static void check_high_precision_binary_value_case(const binary_eval_case_t *tc,
                                                    size_t value_bits,
                                                    size_t oracle_bits)
 {
-    number_t lhs = num_from_mfloat_text_bits(tc->lhs, value_bits);
-    number_t rhs = num_from_mfloat_text_bits(tc->rhs, value_bits);
-    number_t oracle_lhs = num_from_mfloat_text_bits(tc->lhs, oracle_bits);
-    number_t oracle_rhs = num_from_mfloat_text_bits(tc->rhs, oracle_bits);
+    number_t lhs = num_from_text_bits(tc->lhs, value_bits);
+    number_t rhs = num_from_text_bits(tc->rhs, value_bits);
+    number_t oracle_lhs = num_from_text_bits(tc->lhs, oracle_bits);
+    number_t oracle_rhs = num_from_text_bits(tc->rhs, oracle_bits);
     dval_t *a = dv_new_var(lhs);
     dval_t *b = dv_new_var(rhs);
     dval_t *oracle_a = dv_new_var(oracle_lhs);
@@ -520,8 +504,8 @@ static void check_high_precision_unary_derivative_case(const unary_eval_case_t *
                                                        size_t value_bits,
                                                        size_t oracle_bits)
 {
-    number_t input = num_from_mfloat_text_bits(tc->input, value_bits);
-    number_t oracle_input = num_from_mfloat_text_bits(tc->input, oracle_bits);
+    number_t input = num_from_text_bits(tc->input, value_bits);
+    number_t oracle_input = num_from_text_bits(tc->input, oracle_bits);
     dval_t *x = dv_new_var(input);
     dval_t *oracle_x = dv_new_var(oracle_input);
     dval_t *expr = tc->dv_fn(x);
@@ -549,10 +533,10 @@ static void check_high_precision_binary_derivative_case(const binary_eval_case_t
                                                         size_t value_bits,
                                                         size_t oracle_bits)
 {
-    number_t lhs = num_from_mfloat_text_bits(tc->lhs, value_bits);
-    number_t rhs = num_from_mfloat_text_bits(tc->rhs, value_bits);
-    number_t oracle_lhs = num_from_mfloat_text_bits(tc->lhs, oracle_bits);
-    number_t oracle_rhs = num_from_mfloat_text_bits(tc->rhs, oracle_bits);
+    number_t lhs = num_from_text_bits(tc->lhs, value_bits);
+    number_t rhs = num_from_text_bits(tc->rhs, value_bits);
+    number_t oracle_lhs = num_from_text_bits(tc->lhs, oracle_bits);
+    number_t oracle_rhs = num_from_text_bits(tc->rhs, oracle_bits);
     dval_t *x = dv_new_var(lhs);
     dval_t *y = dv_new_var(rhs);
     dval_t *oracle_x = dv_new_var(oracle_lhs);
@@ -595,8 +579,8 @@ static void check_high_precision_complex_unary_value_case(const unary_eval_case_
                                                           size_t value_bits,
                                                           size_t oracle_bits)
 {
-    number_t input = num_from_mcomplex_text_bits(tc->input, value_bits);
-    number_t oracle_input = num_from_mcomplex_text_bits(tc->input, oracle_bits);
+    number_t input = num_from_text_bits(tc->input, value_bits);
+    number_t oracle_input = num_from_text_bits(tc->input, oracle_bits);
     dval_t *z = dv_new_var(input);
     dval_t *oracle_z = dv_new_var(oracle_input);
     dval_t *expr = tc->dv_fn(z);
@@ -620,10 +604,10 @@ static void check_high_precision_complex_binary_value_case(const binary_eval_cas
                                                            size_t value_bits,
                                                            size_t oracle_bits)
 {
-    number_t lhs = num_from_mcomplex_text_bits(tc->lhs, value_bits);
-    number_t rhs = num_from_mcomplex_text_bits(tc->rhs, value_bits);
-    number_t oracle_lhs = num_from_mcomplex_text_bits(tc->lhs, oracle_bits);
-    number_t oracle_rhs = num_from_mcomplex_text_bits(tc->rhs, oracle_bits);
+    number_t lhs = num_from_text_bits(tc->lhs, value_bits);
+    number_t rhs = num_from_text_bits(tc->rhs, value_bits);
+    number_t oracle_lhs = num_from_text_bits(tc->lhs, oracle_bits);
+    number_t oracle_rhs = num_from_text_bits(tc->rhs, oracle_bits);
     dval_t *a = dv_new_var(lhs);
     dval_t *b = dv_new_var(rhs);
     dval_t *oracle_a = dv_new_var(oracle_lhs);
@@ -668,16 +652,12 @@ static void test_cmp_qfloat_precision(void)
     dv_free(a);
 }
 
-static void test_new_const_num_preserves_mfloat_precision(void)
+static void test_new_const_num_preserves_mpfr_precision(void)
 {
-    mfloat_t *base = mf_create_string("1.25");
-    number_t n;
+    number_t n = num_from_text_bits("1.25", 512u);
     dval_t *dv;
     number_t got;
 
-    ASSERT_NOT_NULL(base);
-
-    n = num_create_from_mfloat_with_prec_bits(base, 512u);
     dv = dv_new_const(n);
     got = dv_eval(dv);
 
@@ -687,19 +667,14 @@ static void test_new_const_num_preserves_mfloat_precision(void)
     num_destroy(&got);
     dv_free(dv);
     num_destroy(&n);
-    mf_free(base);
 }
 
-static void test_set_val_num_preserves_mfloat_precision(void)
+static void test_set_val_num_preserves_mpfr_precision(void)
 {
-    mfloat_t *base = mf_create_string("1.25");
-    number_t n;
+    number_t n = num_from_text_bits("1.25", 640u);
     dval_t *dv = test_dv_new_var_d(0.0);
     number_t got;
 
-    ASSERT_NOT_NULL(base);
-
-    n = num_create_from_mfloat_with_prec_bits(base, 640u);
     dv_set_val(dv, n);
     got = dv_eval(dv);
 
@@ -709,19 +684,14 @@ static void test_set_val_num_preserves_mfloat_precision(void)
     num_destroy(&got);
     dv_free(dv);
     num_destroy(&n);
-    mf_free(base);
 }
 
-static void test_new_const_num_preserves_mcomplex_precision(void)
+static void test_new_const_num_preserves_complex_precision(void)
 {
-    mcomplex_t *base = mc_create_string("1 + 2i");
-    number_t n;
+    number_t n = num_from_text_bits("1 + 2i", 384u);
     dval_t *dv;
     number_t got;
 
-    ASSERT_NOT_NULL(base);
-
-    n = num_create_from_mcomplex_with_prec_bits(base, 384u);
     dv = dv_new_const(n);
     got = dv_eval(dv);
 
@@ -732,19 +702,14 @@ static void test_new_const_num_preserves_mcomplex_precision(void)
     num_destroy(&got);
     dv_free(dv);
     num_destroy(&n);
-    mc_free(base);
 }
 
-static void test_set_val_num_preserves_mcomplex_precision(void)
+static void test_set_val_num_preserves_complex_precision(void)
 {
-    mcomplex_t *base = mc_create_string("1 + 2i");
-    number_t n;
+    number_t n = num_from_text_bits("1 + 2i", 448u);
     dval_t *dv = test_dv_new_var_d(0.0);
     number_t got;
 
-    ASSERT_NOT_NULL(base);
-
-    n = num_create_from_mcomplex_with_prec_bits(base, 448u);
     dv_set_val(dv, n);
     got = dv_get_val(dv);
 
@@ -755,13 +720,11 @@ static void test_set_val_num_preserves_mcomplex_precision(void)
     num_destroy(&got);
     dv_free(dv);
     num_destroy(&n);
-    mc_free(base);
 }
 
-static void test_eval_expression_preserves_mfloat_precision(void)
+static void test_eval_expression_preserves_mpfr_precision(void)
 {
-    mfloat_t *base = mf_create_string("1.25");
-    number_t n;
+    number_t n = num_from_text_bits("1.25", 512u);
     dval_t *x;
     dval_t *sum;
     dval_t *root;
@@ -774,9 +737,6 @@ static void test_eval_expression_preserves_mfloat_precision(void)
     number_t expect_root;
     size_t oracle_bits;
 
-    ASSERT_NOT_NULL(base);
-
-    n = num_create_from_mfloat_with_prec_bits(base, 512u);
     x = dv_new_var(n);
     sum = dv_add(x, DV_ONE);
     root = dv_sqrt(x);
@@ -794,7 +754,7 @@ static void test_eval_expression_preserves_mfloat_precision(void)
         char *input_text = format_number_for_test_output(n);
 
         ASSERT_NOT_NULL(input_text);
-        printf(C_BOLD C_GREEN "PASS" C_RESET " high-precision mfloat dval evaluation\n");
+        printf(C_BOLD C_GREEN "PASS" C_RESET " high-precision mpfr dval evaluation\n");
         printf("    input    = %s\n", input_text);
         printf("    input precision: %zu bits, %zu significant digits\n",
                num_get_prec_bits(n), num_get_prec_digits(n));
@@ -820,13 +780,11 @@ static void test_eval_expression_preserves_mfloat_precision(void)
     dv_free(sum);
     dv_free(x);
     num_destroy(&n);
-    mf_free(base);
 }
 
-static void test_eval_expression_preserves_mcomplex_precision(void)
+static void test_eval_expression_preserves_complex_precision(void)
 {
-    mcomplex_t *base = mc_create_string("1 + 2i");
-    number_t n;
+    number_t n = num_from_text_bits("1 + 2i", 384u);
     dval_t *z;
     dval_t *sum;
     dval_t *exp_z;
@@ -839,9 +797,6 @@ static void test_eval_expression_preserves_mcomplex_precision(void)
     number_t expect_exp;
     size_t oracle_bits;
 
-    ASSERT_NOT_NULL(base);
-
-    n = num_create_from_mcomplex_with_prec_bits(base, 384u);
     z = dv_new_var(n);
     sum = dv_add(z, DV_ONE);
     exp_z = dv_exp(z);
@@ -859,7 +814,7 @@ static void test_eval_expression_preserves_mcomplex_precision(void)
         char *input_text = format_number_for_test_output(n);
 
         ASSERT_NOT_NULL(input_text);
-        printf(C_BOLD C_GREEN "PASS" C_RESET " high-precision mcomplex dval evaluation\n");
+        printf(C_BOLD C_GREEN "PASS" C_RESET " high-precision complex dval evaluation\n");
         printf("    input    = %s\n", input_text);
         printf("    input precision: %zu bits, %zu significant digits\n",
                num_get_prec_bits(n), num_get_prec_digits(n));
@@ -873,7 +828,7 @@ static void test_eval_expression_preserves_mcomplex_precision(void)
     ASSERT_TRUE(num_eq(got_exp, check_exp));
     ASSERT_TRUE(!num_is_real(got_sum));
     ASSERT_TRUE(!num_is_real(got_exp));
-    ASSERT_EQ_INT((int)num_get_prec_bits(got_sum), 384);
+    ASSERT_EQ_INT((int)num_get_prec_bits(got_sum), 0);
     ASSERT_EQ_INT((int)num_get_prec_bits(got_exp), 384);
 
     num_destroy(&check_exp);
@@ -887,7 +842,6 @@ static void test_eval_expression_preserves_mcomplex_precision(void)
     dv_free(sum);
     dv_free(z);
     num_destroy(&n);
-    mc_free(base);
 }
 
 static void test_new_const_num_preserves_qfloat_precision(void)
@@ -1189,7 +1143,7 @@ static void test_eval_num_function_derivatives(void)
         check_binary_derivative_case(&binary_cases[i]);
 }
 
-static void test_high_precision_mfloat_function_values(void)
+static void test_high_precision_mpfr_function_values(void)
 {
     static const unary_eval_case_t unary_cases[] = {
         UCASE("sin", "0.5", dv_sin, num_sin),
@@ -1240,7 +1194,7 @@ static void test_high_precision_mfloat_function_values(void)
         check_high_precision_binary_value_case(&binary_cases[i], 512u, 896u);
 }
 
-static void test_high_precision_mfloat_function_derivatives(void)
+static void test_high_precision_mpfr_function_derivatives(void)
 {
     static const unary_eval_case_t unary_cases[] = {
         UCASE("sin", "0.5", dv_sin, num_sin),
@@ -1287,7 +1241,7 @@ static void test_high_precision_mfloat_function_derivatives(void)
         check_high_precision_binary_derivative_case(&binary_cases[i], 512u, 896u);
 }
 
-static void test_high_precision_mcomplex_function_values(void)
+static void test_high_precision_complex_function_values(void)
 {
     static const unary_eval_case_t unary_cases[] = {
         UCASE("sin", "1 + 2i", dv_sin, num_sin),
@@ -2382,12 +2336,12 @@ static void test_goal_seek_large_target_uses_significant_digit_tolerance(void)
 void test_runtime_regressions(void)
 {
     TEST_RUN_SUBTEST(test_cmp_qfloat_precision, NULL);
-    TEST_RUN_SUBTEST(test_new_const_num_preserves_mfloat_precision, NULL);
-    TEST_RUN_SUBTEST(test_set_val_num_preserves_mfloat_precision, NULL);
-    TEST_RUN_SUBTEST(test_new_const_num_preserves_mcomplex_precision, NULL);
-    TEST_RUN_SUBTEST(test_set_val_num_preserves_mcomplex_precision, NULL);
-    TEST_RUN_SUBTEST(test_eval_expression_preserves_mfloat_precision, NULL);
-    TEST_RUN_SUBTEST(test_eval_expression_preserves_mcomplex_precision, NULL);
+    TEST_RUN_SUBTEST(test_new_const_num_preserves_mpfr_precision, NULL);
+    TEST_RUN_SUBTEST(test_set_val_num_preserves_mpfr_precision, NULL);
+    TEST_RUN_SUBTEST(test_new_const_num_preserves_complex_precision, NULL);
+    TEST_RUN_SUBTEST(test_set_val_num_preserves_complex_precision, NULL);
+    TEST_RUN_SUBTEST(test_eval_expression_preserves_mpfr_precision, NULL);
+    TEST_RUN_SUBTEST(test_eval_expression_preserves_complex_precision, NULL);
     TEST_RUN_SUBTEST(test_new_const_num_preserves_qfloat_precision, NULL);
     TEST_RUN_SUBTEST(test_set_val_num_preserves_qfloat_precision, NULL);
     TEST_RUN_SUBTEST(test_default_constants_preserve_builtin_precision, NULL);
@@ -2400,9 +2354,9 @@ void test_runtime_regressions(void)
     TEST_RUN_SUBTEST(test_eval_num_on_expression, NULL);
     TEST_RUN_SUBTEST(test_eval_num_function_values, NULL);
     TEST_RUN_SUBTEST(test_eval_num_function_derivatives, NULL);
-    TEST_RUN_SUBTEST(test_high_precision_mfloat_function_values, NULL);
-    TEST_RUN_SUBTEST(test_high_precision_mfloat_function_derivatives, NULL);
-    TEST_RUN_SUBTEST(test_high_precision_mcomplex_function_values, NULL);
+    TEST_RUN_SUBTEST(test_high_precision_mpfr_function_values, NULL);
+    TEST_RUN_SUBTEST(test_high_precision_mpfr_function_derivatives, NULL);
+    TEST_RUN_SUBTEST(test_high_precision_complex_function_values, NULL);
     TEST_RUN_SUBTEST(test_set_val_num_named_constant, NULL);
     TEST_RUN_SUBTEST(test_to_string_does_not_simplify_plain_expressions, NULL);
     TEST_RUN_SUBTEST(test_simplify_reuses_clean_nodes_and_dirty_mutations, NULL);

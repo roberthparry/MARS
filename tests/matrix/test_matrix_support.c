@@ -132,8 +132,8 @@ static const char *number_precision_label(number_t z, char *buf, size_t buf_size
         return "qfloat";
     case NUMBER_QCOMPLEX:
         return "qcomplex";
-    case NUMBER_MFLOAT:
-        snprintf(buf, buf_size, "mfloat-%zu", bits ? bits : num_get_default_prec_bits());
+    case NUMBER_MPFR:
+        snprintf(buf, buf_size, "mpfr-%zu", bits ? bits : num_get_default_prec_bits());
         return buf;
     case NUMBER_COMPLEX:
         snprintf(buf, buf_size, "complex-%zu", bits ? bits : num_get_default_prec_bits());

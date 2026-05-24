@@ -14,7 +14,8 @@ typedef enum number_kind_t {
     NUMBER_QCOMPLEX,
     NUMBER_MINT,
     NUMBER_MRATIONAL,
-    NUMBER_MFLOAT,
+    NUMBER_MPFR,
+    NUMBER_CPLX_DOUBLE,
     NUMBER_COMPLEX
 } number_kind_t;
 
@@ -22,7 +23,7 @@ typedef enum number_math_family_t {
     NUMBER_MATH_INVALID,
     NUMBER_MATH_QREAL,
     NUMBER_MATH_QCOMPLEX,
-    NUMBER_MATH_MREAL,
+    NUMBER_MATH_MPFR,
     NUMBER_MATH_COMPLEX
 } number_math_family_t;
 
@@ -87,16 +88,24 @@ typedef struct number_vtable_t {
 
 typedef number_t *(*number_coerce_fn)(const number_t *number);
 typedef struct complex_t complex_t;
+typedef struct number_mpfr_t number_mpfr_t;
+
+typedef struct number_cplx_double_t {
+    double _Complex value;
+    int constant_id;
+    bool immortal;
+} number_cplx_double_t;
 
 typedef struct {
     number_kind_t kind;
     union {
         double d;
+        number_cplx_double_t cd;
         qfloat_t qf;
         qcomplex_t qc;
         mint_t *mi;
         mrational_t *mr;
-        mfloat_t *mf;
+        number_mpfr_t *mpfr;
         complex_t *cx;
     } value;
 } number_private_t;
@@ -133,20 +142,44 @@ typedef enum number_const_id_t {
     NUMBER_CONST_3PI_4,
     NUMBER_CONST_PI_6,
     NUMBER_CONST_PI_3,
+    NUMBER_CONST_2_PI,
     NUMBER_CONST_E,
     NUMBER_CONST_INV_E,
     NUMBER_CONST_LN2,
     NUMBER_CONST_LN10,
+    NUMBER_CONST_INVLN2,
+    NUMBER_CONST_EULER_MASCHERONI,
+    NUMBER_CONST_PHI,
+    NUMBER_CONST_SQRT_HALF,
     NUMBER_CONST_SQRT2,
     NUMBER_CONST_SQRT3,
     NUMBER_CONST_SQRT2_OVER_TWO,
     NUMBER_CONST_SQRT3_OVER_TWO,
+    NUMBER_CONST_SQRT_2PI,
+    NUMBER_CONST_SQRT_PI,
+    NUMBER_CONST_SQRT_PI_OVER_TWO,
+    NUMBER_CONST_SQRT1ONPI,
+    NUMBER_CONST_2_SQRTPI,
+    NUMBER_CONST_NEG_TWO_OVER_SQRT_PI,
+    NUMBER_CONST_INV_SQRT_2PI,
+    NUMBER_CONST_LOG_SQRT_2PI,
+    NUMBER_CONST_LN_2PI,
+    NUMBER_CONST_PI_SQUARED,
+    NUMBER_CONST_2PI_CUBED,
+    NUMBER_CONST_NAN,
     NUMBER_CONST_INF,
     NUMBER_CONST_NINF,
     NUMBER_CONST_I,
     NUMBER_CONST_NEG_I,
     NUMBER_CONST_COUNT
 } number_const_id_t;
+
+struct number_mpfr_t {
+    number_const_id_t constant_id;
+    bool immortal;
+    bool initialised;
+    mpfr_t value;
+};
 
 extern const number_math_family_t number_math_family_binary_table[][NUMBER_MATH_COMPLEX + 1];
 extern const number_kind_t number_math_family_target_kind_table[];
@@ -156,7 +189,8 @@ extern const number_vtable_t number_qfloat_vt;
 extern const number_vtable_t number_qcomplex_vt;
 extern const number_vtable_t number_mint_vt;
 extern const number_vtable_t number_mrational_vt;
-extern const number_vtable_t number_mfloat_vt;
+extern const number_vtable_t number_mpfr_vt;
+extern const number_vtable_t number_cplx_double_vt;
 extern const number_vtable_t number_complex_vt;
 /* Backend vtable registry (defined in number_vtables.c). */
 extern const number_vtable_t *const number_dispatch[];
@@ -164,18 +198,15 @@ extern const size_t number_dispatch_count;
 extern size_t number_default_precision_bits;
 
 number_t *number_wrap_complex(complex_t *value);
+number_t number_take_mpfr(number_mpfr_t *value);
 number_t number_complex_component_from_number(const number_t *value,
                                               size_t precision_bits);
 complex_t *number_complex_create(number_t real, number_t imag);
 complex_t *number_complex_clone(const complex_t *value);
-complex_t *number_complex_create_from_mcomplex(const mcomplex_t *value,
-                                               size_t precision_bits);
 complex_t *number_complex_create_from_qcomplex(qcomplex_t value,
                                                size_t precision_bits);
 complex_t *number_complex_create_from_string(const char *text,
                                              size_t precision_bits);
-mcomplex_t *number_complex_to_mcomplex(const complex_t *value,
-                                       size_t precision_bits);
 const number_t *number_complex_real_ref(const complex_t *value);
 const number_t *number_complex_imag_ref(const complex_t *value);
 number_const_id_t number_complex_const_id(const complex_t *value);
@@ -248,14 +279,30 @@ static inline qfloat_t number_value_to_qfloat(const number_t *number)
 {
     const number_vtable_t *vt = number ? number_vt(number) : NULL;
 
-    return number && vt && vt->to_qfloat ? vt->to_qfloat(number) : QF_NAN;
+    if (!number)
+        return QF_NAN;
+    return vt && vt->to_qfloat ? vt->to_qfloat(number) : num_to_qfloat(*number);
 }
 
 static inline qcomplex_t number_value_to_qcomplex(const number_t *number)
 {
-    return number && number_math_family_value(number) == NUMBER_MATH_QCOMPLEX
-        ? number_impl_const(number)->value.qc
-        : qc_make(number_value_to_qfloat(number), QF_ZERO);
+    double _Complex cd;
+    const complex_t *cx;
+
+    if (!number)
+        return QC_NAN;
+    if (number_kind_value(number) == NUMBER_QCOMPLEX)
+        return number_impl_const(number)->value.qc;
+    if (number_kind_value(number) == NUMBER_CPLX_DOUBLE) {
+        cd = number_impl_const(number)->value.cd.value;
+        return qc_make(qf_from_double(__real__ cd), qf_from_double(__imag__ cd));
+    }
+    if (number_kind_value(number) == NUMBER_COMPLEX) {
+        cx = number_impl_const(number)->value.cx;
+        return cx ? qc_make(number_value_to_qfloat(&cx->real),
+                            number_value_to_qfloat(&cx->imag)) : QC_NAN;
+    }
+    return qc_make(number_value_to_qfloat(number), QF_ZERO);
 }
 
 number_t number_invalid(void);
@@ -272,20 +319,36 @@ void number_scope_register_value(const number_t *number);
 int number_scope_unregister_value(const number_t *number);
 num_scope_t *number_scope_suspend(void);
 void number_scope_resume(num_scope_t *scope);
+void num_scope_resume_cleanup(num_scope_t **scope);
+
+#define NUM_SCOPE_SUSPEND(name) \
+    __attribute__((cleanup(num_scope_resume_cleanup))) num_scope_t *(name) = number_scope_suspend()
+
 char *number_format_double(const number_t *number, bool scientific, int precision);
+char *number_format_cplx_double(const number_t *number, bool scientific, int precision);
 char *number_format_qfloat(const number_t *number, bool scientific, int precision);
 char *number_format_qcomplex(const number_t *number, bool scientific, int precision);
-char *number_format_mfloat(const number_t *number, bool scientific, int precision);
+char *number_format_mpfr(const number_t *number, bool scientific, int precision);
 char *number_format_complex(const number_t *number, bool scientific, int precision);
 number_t *number_wrap_double(double value);
+number_t *number_wrap_cdouble(double _Complex value);
 number_t *number_wrap_qfloat(qfloat_t value);
 number_t *number_wrap_qcomplex(qcomplex_t value);
 number_t *number_wrap_mint(mint_t *value);
 number_t *number_wrap_mrational(mrational_t *value);
-number_t *number_wrap_mfloat(mfloat_t *value);
+number_t *number_wrap_mpfr(number_mpfr_t *value);
 number_t *number_wrap_complex_parts(number_t real, number_t imag);
-number_t number_wrap_mfloat_borrowed(const mfloat_t *value);
-number_t number_wrap_mfloat_with_precision(mfloat_t *value, size_t precision_bits);
+number_mpfr_t *number_mpfr_new_prec(size_t precision_bits);
+number_mpfr_t *number_mpfr_from_const_id(number_const_id_t id,
+                                         size_t precision_bits);
+number_mpfr_t *number_mpfr_from_double(double value, size_t precision_bits);
+number_mpfr_t *number_mpfr_from_qfloat(qfloat_t value, size_t precision_bits);
+number_mpfr_t *number_mpfr_from_mpfr(mpfr_srcptr value, size_t precision_bits);
+number_mpfr_t *number_mpfr_from_string(const char *text, size_t precision_bits);
+number_mpfr_t *number_mpfr_clone(const number_mpfr_t *value);
+void number_mpfr_free(number_mpfr_t *value);
+int number_mpfr_ensure(const number_mpfr_t *value, size_t precision_bits);
+mpfr_srcptr number_mpfr_value(const number_mpfr_t *value);
 const complex_t *number_complex_value(const number_t *number);
 int number_complex_get_mpc(mpc_t out,
                            const complex_t *value,
@@ -305,15 +368,16 @@ bool number_matches_value(const number_t *reference, const number_t *target);
 bool number_const_id_from_immortal(const number_t *number,
                                    number_const_id_t *id_out);
 qfloat_t number_const_qfloat(number_const_id_t id);
-const mfloat_t *number_const_mfloat_value(number_const_id_t id);
 qcomplex_t number_const_qcomplex(number_const_id_t id);
-number_t number_const_mreal_exact(number_const_id_t id);
+number_t number_const_mpfr_exact(number_const_id_t id);
 bool number_const_has_double(number_const_id_t id);
 double number_const_double_value(number_const_id_t id);
+bool number_const_has_cdouble(number_const_id_t id);
+double _Complex number_const_cdouble_value(number_const_id_t id);
 bool number_const_has_ldexp(number_const_id_t id);
 int number_const_ldexp_value(number_const_id_t id);
-number_t number_create_exact_mfloat_long_prec(long value, size_t precision_bits);
-number_t number_create_exact_mfloat_dyadic_prec(long numerator,
+number_t number_create_exact_mpfr_long_prec(long value, size_t precision_bits);
+number_t number_create_exact_mpfr_dyadic_prec(long numerator,
                                                 int exponent2,
                                                 size_t precision_bits);
 number_t number_const_return_like(const number_t *like, number_const_id_t id);
