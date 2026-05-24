@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MARS dval Lab Style Concepts</title>
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: #17201d;
+      background:
+        radial-gradient(circle at 12% 4%, rgba(42, 116, 128, 0.26), transparent 24rem),
+        radial-gradient(circle at 86% 6%, rgba(196, 131, 48, 0.28), transparent 22rem),
+        radial-gradient(circle at 50% 100%, rgba(85, 112, 78, 0.22), transparent 30rem),
+        linear-gradient(135deg, #ece6d3, #dfe9df 52%, #e8dcc7);
+      font: 16px/1.45 "Trebuchet MS", "Segoe UI", sans-serif;
+    }
+
+    header {
+      padding: 2rem clamp(1rem, 4vw, 3rem) 0.6rem;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(2rem, 4.8vw, 4.6rem);
+      line-height: 0.94;
+      letter-spacing: -0.065em;
+    }
+
+    header p {
+      max-width: 70rem;
+      margin: 0.55rem 0 0;
+      color: #58675f;
+      font-size: 1.05rem;
+    }
+
+    .grid {
+      display: grid;
+      gap: 1.4rem;
+      padding: 1rem clamp(1rem, 4vw, 3rem) 3rem;
+    }
+
+    .concept {
+      --ink: #243238;
+      --stone: #d8d3c4;
+      --mist: #e9f4ef;
+      --woad: #1f5e86;
+      --deep-woad: #143c5c;
+      --torc: #c48330;
+      --oak: #516f3b;
+      --rowan: #a33f4e;
+      --heather: #6d557d;
+      position: relative;
+      overflow: hidden;
+      min-height: 37rem;
+      border-radius: 1.7rem;
+      border: 3px solid rgba(36, 50, 56, 0.82);
+      box-shadow: 0 2rem 4rem rgba(30, 43, 36, 0.22);
+    }
+
+    .concept::before,
+    .concept::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .concept::before {
+      opacity: 0.38;
+      background:
+        linear-gradient(90deg, transparent 0 18px, rgba(36, 50, 56, 0.18) 18px 20px, transparent 20px 40px),
+        linear-gradient(0deg, transparent 0 18px, rgba(36, 50, 56, 0.14) 18px 20px, transparent 20px 40px);
+      mask:
+        linear-gradient(#000 0 0) top / 100% 22px no-repeat,
+        linear-gradient(#000 0 0) bottom / 100% 22px no-repeat,
+        linear-gradient(#000 0 0) left / 22px 100% no-repeat,
+        linear-gradient(#000 0 0) right / 22px 100% no-repeat;
+    }
+
+    .concept-header {
+      position: relative;
+      z-index: 2;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 1rem;
+      align-items: end;
+      padding: 1.25rem 1.35rem 0.75rem;
+    }
+
+    .title-row {
+      display: flex;
+      gap: 0.95rem;
+      align-items: center;
+    }
+
+    .mini-icon {
+      width: 4.5rem;
+      height: 4.5rem;
+      flex: 0 0 auto;
+      filter: drop-shadow(0 0.55rem 0.45rem rgba(36, 50, 56, 0.26));
+    }
+
+    .mini-icon svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .concept h2,
+    .concept p {
+      margin: 0;
+    }
+
+    .concept h2 {
+      font-size: clamp(1.75rem, 3.8vw, 3.45rem);
+      line-height: 0.92;
+      letter-spacing: -0.06em;
+    }
+
+    .tagline {
+      max-width: 55rem;
+      margin-top: 0.4rem;
+      font-size: 0.98rem;
+    }
+
+    .badge {
+      white-space: nowrap;
+      border-radius: 999px;
+      padding: 0.48rem 0.8rem;
+      font: 900 0.72rem/1.1 "Trebuchet MS", "Segoe UI", sans-serif;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      border: 2px solid var(--ink);
+    }
+
+    .lab {
+      position: relative;
+      z-index: 2;
+      display: grid;
+      grid-template-columns: minmax(16rem, 0.92fr) minmax(20rem, 1.08fr);
+      gap: 1rem;
+      padding: 0.8rem 1.35rem 1.35rem;
+    }
+
+    .panel,
+    .card {
+      overflow: hidden;
+      border-radius: 1.15rem;
+      border: 2px solid rgba(36, 50, 56, 0.8);
+      box-shadow: 0 0.7rem 1.25rem rgba(36, 50, 56, 0.14);
+    }
+
+    .panel-title,
+    .card-title {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.8rem;
+      padding: 0.75rem 0.9rem;
+      font: 900 0.72rem/1.1 "Trebuchet MS", "Segoe UI", sans-serif;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      border-bottom: 2px solid rgba(36, 50, 56, 0.75);
+    }
+
+    .editor {
+      min-height: 11rem;
+      padding: 1rem;
+      white-space: pre-wrap;
+      font: 1rem/1.65 "Cascadia Code", "Fira Code", monospace;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.55rem;
+      padding: 0 0.9rem 1rem;
+    }
+
+    button {
+      border: 2px solid var(--ink);
+      border-radius: 999px;
+      padding: 0.58rem 0.86rem;
+      font-weight: 900;
+      box-shadow: 0 0.38rem 0 rgba(36, 50, 56, 0.16);
+    }
+
+    .results {
+      display: grid;
+      gap: 0.85rem;
+    }
+
+    .rendered {
+      min-height: 8.5rem;
+      display: grid;
+      place-items: center;
+      padding: 1rem;
+      font: clamp(1.65rem, 3.1vw, 2.65rem)/1.1 Georgia, "Times New Roman", serif;
+    }
+
+    pre {
+      margin: 0;
+      min-height: 3.7rem;
+      padding: 1rem;
+      overflow: hidden;
+      font: 0.95rem/1.45 "Cascadia Code", "Fira Code", monospace;
+    }
+
+    .motifs {
+      position: absolute;
+      z-index: 1;
+      inset: auto 1.4rem 1.2rem auto;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      justify-content: end;
+      width: min(28rem, 46%);
+      color: rgba(36, 50, 56, 0.4);
+      font: 900 1.05rem/1 Georgia, "Times New Roman", serif;
+      transform: rotate(-4deg);
+    }
+
+    .motifs span {
+      padding: 0.22rem 0.42rem;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.26);
+      border: 1px solid rgba(36, 50, 56, 0.18);
+    }
+
+    .stone {
+      position: absolute;
+      z-index: 0;
+      width: 5rem;
+      height: 14rem;
+      border-radius: 52% 48% 42% 46% / 14% 17% 8% 9%;
+      background: linear-gradient(135deg, rgba(218, 214, 199, 0.72), rgba(124, 139, 130, 0.32));
+      border: 2px solid rgba(36, 50, 56, 0.16);
+      transform: rotate(8deg);
+    }
+
+    .u {
+      color: #15211e;
+      background:
+        radial-gradient(circle at 16% 18%, rgba(31, 94, 134, 0.34), transparent 19rem),
+        radial-gradient(circle at 84% 14%, rgba(196, 131, 48, 0.52), transparent 18rem),
+        radial-gradient(circle at 52% 88%, rgba(81, 111, 59, 0.32), transparent 21rem),
+        linear-gradient(135deg, #eee7d4, #dce9df 49%, #d7dcc4);
+    }
+
+    .u::after {
+      opacity: 0.5;
+      background:
+        radial-gradient(circle at 74% 24%, transparent 0 3.8rem, rgba(196, 131, 48, 0.34) 3.86rem 4.05rem, transparent 4.16rem),
+        radial-gradient(circle at 28% 48%, transparent 0 6.2rem, rgba(31, 94, 134, 0.24) 6.28rem 6.45rem, transparent 6.56rem),
+        linear-gradient(30deg, transparent 0 48%, rgba(36, 50, 56, 0.18) 48.2% 48.7%, transparent 48.9%);
+    }
+
+    .u .stone.one { right: 11%; top: 16%; }
+    .u .stone.two { right: 18%; top: 20%; height: 11rem; transform: rotate(-9deg); opacity: 0.7; }
+    .u .tagline { color: #52645c; }
+    .u .badge, .u button { color: #f7f0da; background: var(--woad); }
+    .u .panel, .u .card { background: rgba(249, 244, 225, 0.78); }
+    .u .panel-title, .u .card-title { color: var(--deep-woad); background: rgba(31, 94, 134, 0.1); }
+    .u .editor, .u pre { color: #15211e; background: rgba(255, 255, 255, 0.32); }
+    .u .rendered { color: #8a4c19; }
+
+    .v {
+      color: #f3f8f2;
+      background:
+        radial-gradient(circle at 15% 18%, rgba(107, 176, 167, 0.24), transparent 18rem),
+        radial-gradient(circle at 83% 13%, rgba(196, 131, 48, 0.24), transparent 19rem),
+        linear-gradient(145deg, #061612, #123326 46%, #263920);
+    }
+
+    .v::after {
+      opacity: 0.38;
+      background:
+        radial-gradient(circle at 74% 22%, transparent 0 4.2rem, rgba(196, 131, 48, 0.36) 4.3rem 4.46rem, transparent 4.58rem),
+        radial-gradient(circle at 30% 54%, transparent 0 6.4rem, rgba(107, 176, 167, 0.3) 6.5rem 6.66rem, transparent 6.78rem),
+        repeating-linear-gradient(64deg, transparent 0 25px, rgba(233, 244, 239, 0.1) 26px 27px);
+    }
+
+    .v .stone.one { left: 8%; top: 18%; opacity: 0.28; }
+    .v .stone.two { right: 12%; top: 12%; height: 12rem; transform: rotate(-7deg); opacity: 0.24; }
+    .v .tagline { color: #bed3c0; }
+    .v .badge, .v button { color: #061612; background: #cfa052; }
+    .v .panel, .v .card { background: rgba(8, 29, 22, 0.78); border-color: rgba(233, 244, 239, 0.34); }
+    .v .panel-title, .v .card-title { color: #d7e7b7; background: rgba(196, 131, 48, 0.08); border-color: rgba(233, 244, 239, 0.28); }
+    .v .editor, .v pre { color: #f3f8f2; background: rgba(0, 0, 0, 0.14); }
+    .v .rendered { color: #f1d27a; text-shadow: 0 0 1rem rgba(107, 176, 167, 0.42); }
+
+    .w {
+      color: #241b17;
+      background:
+        radial-gradient(circle at 15% 18%, rgba(163, 63, 78, 0.35), transparent 17rem),
+        radial-gradient(circle at 86% 14%, rgba(42, 116, 128, 0.32), transparent 19rem),
+        radial-gradient(circle at 74% 84%, rgba(196, 131, 48, 0.42), transparent 18rem),
+        linear-gradient(135deg, #ead8bb, #fff3dc 46%, #e6cabd);
+    }
+
+    .w::after {
+      opacity: 0.45;
+      background:
+        radial-gradient(circle at 80% 20%, transparent 0 3.6rem, rgba(36, 50, 56, 0.16) 3.7rem 3.86rem, transparent 3.98rem),
+        repeating-linear-gradient(0deg, transparent 0 29px, rgba(126, 74, 33, 0.1) 30px 32px),
+        linear-gradient(125deg, transparent 0 62%, rgba(163, 63, 78, 0.2) 62.2% 62.8%, transparent 63%);
+    }
+
+    .w .tagline { color: #755747; }
+    .w .badge, .w button { color: white; background: var(--rowan); }
+    .w .panel, .w .card { background: rgba(255, 247, 224, 0.82); }
+    .w .panel-title, .w .card-title { color: #8d3541; background: rgba(163, 63, 78, 0.1); }
+    .w .editor, .w pre { color: #241b17; background: rgba(255, 255, 255, 0.32); }
+    .w .rendered { color: #145b70; }
+
+    .x {
+      color: #1b1d24;
+      background:
+        radial-gradient(circle at 12% 16%, rgba(42, 116, 128, 0.44), transparent 18rem),
+        radial-gradient(circle at 88% 16%, rgba(196, 131, 48, 0.58), transparent 17rem),
+        radial-gradient(circle at 60% 88%, rgba(109, 85, 125, 0.32), transparent 20rem),
+        linear-gradient(135deg, #f4e8ca, #e3f0e8 46%, #e9d8e6);
+    }
+
+    .x::after {
+      opacity: 0.44;
+      background:
+        radial-gradient(circle at 72% 20%, transparent 0 3.5rem, rgba(36, 50, 56, 0.18) 3.6rem 3.75rem, transparent 3.86rem),
+        radial-gradient(circle at 24% 46%, transparent 0 5.5rem, rgba(109, 85, 125, 0.22) 5.6rem 5.75rem, transparent 5.86rem),
+        linear-gradient(150deg, transparent 0 42%, rgba(81, 111, 59, 0.3) 42.2% 42.8%, transparent 43%);
+    }
+
+    .x .tagline { color: #66566f; }
+    .x .badge, .x button { color: white; background: var(--heather); }
+    .x .panel, .x .card { background: rgba(255, 250, 230, 0.82); }
+    .x .panel-title, .x .card-title { color: #59456d; background: rgba(109, 85, 125, 0.1); }
+    .x .editor, .x pre { color: #1b1d24; background: rgba(255, 255, 255, 0.36); }
+    .x .rendered { color: #145f6d; }
+
+    @media (max-width: 860px) {
+      .concept-header,
+      .lab {
+        display: grid;
+        grid-template-columns: 1fr;
+      }
+
+      .motifs,
+      .stone {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>MARS dval Lab Style Concepts</h1>
+    <p>Sixth pass: more explicitly Brittonic/Celtic in shape language. Stone circles, triskele spirals, knot borders, woad blue, torc gold, oak green, rowan red, heather purple, and mathematical inscriptions.</p>
+  </header>
+
+  <main class="grid">
+    <section class="concept u">
+      <div class="stone one"></div>
+      <div class="stone two"></div>
+      <div class="concept-header">
+        <div class="title-row">
+          <div class="mini-icon" aria-hidden="true">
+            <svg viewBox="0 0 128 128">
+              <path d="M64 12 105 86 64 114 23 86Z" fill="url(#uGlass)" stroke="#243238" stroke-width="5" stroke-linejoin="round"/>
+              <path d="M29 75c27-20 62-24 90-10" fill="none" stroke="#1f5e86" stroke-width="5" stroke-linecap="round"/>
+              <path d="M31 90c33-18 65-19 95-2" fill="none" stroke="#516f3b" stroke-width="4" stroke-linecap="round"/>
+              <path d="M39 45c25 11 49 12 72 1" fill="none" stroke="#c48330" stroke-width="5" stroke-linecap="round"/>
+              <path d="M64 28c12 6 11 18 0 18s-12 12 0 18 11 18 0 18" fill="none" stroke="#fff8df" stroke-width="4" stroke-linecap="round" opacity=".75"/>
+              <text x="64" y="80" text-anchor="middle" font-family="Georgia, serif" font-size="34" font-weight="900" fill="#fffef7" stroke="#243238" stroke-width="2.5" paint-order="stroke fill">∂x</text>
+              <defs><linearGradient id="uGlass" x1="22" y1="10" x2="106" y2="116"><stop offset="0" stop-color="#fff8df"/><stop offset=".36" stop-color="#5fb5bd"/><stop offset=".68" stop-color="#a33f4e"/><stop offset="1" stop-color="#c48330"/></linearGradient></defs>
+            </svg>
+          </div>
+          <div>
+            <h2>U. Woad Prism Circle</h2>
+            <p class="tagline">Stone circle, woad blue, torc gold, oak green, and prism maths. This is the closest to “Briton druid wizard lab”.</p>
+          </div>
+        </div>
+        <span class="badge">Woad Prism</span>
+      </div>
+      <div class="lab">
+        <div class="panel">
+          <div class="panel-title">Expression</div>
+          <div class="editor">{ exp(π·√(x)) | x = 163 }</div>
+          <div class="controls"><button>Evaluate</button><button>Goal seek</button><button>Clear</button></div>
+        </div>
+        <div class="results">
+          <div class="card"><div class="card-title">Rendered TeX</div><div class="rendered">e<sup>π√x</sup></div></div>
+          <div class="card"><div class="card-title">Value</div><pre>2.6253741264e+17</pre></div>
+        </div>
+      </div>
+      <div class="motifs"><span>∂x</span><span>π</span><span>triskele</span><span>√</span><span>γ</span><span>∞</span></div>
+    </section>
+
+    <section class="concept v">
+      <div class="stone one"></div>
+      <div class="stone two"></div>
+      <div class="concept-header">
+        <div class="title-row">
+          <div class="mini-icon" aria-hidden="true">
+            <svg viewBox="0 0 128 128">
+              <circle cx="64" cy="64" r="48" fill="url(#vCool)" stroke="#e9f4ef" stroke-width="5"/>
+              <circle cx="64" cy="64" r="33" fill="#fff" opacity=".13" stroke="#c48330" stroke-width="3"/>
+              <path d="M64 64c17-17 33-7 28 8-5 16-30 12-28-8Zm0 0c-23-5-23-24-8-28 16-5 28 18 8 28Zm0 0c6 22-11 31-22 20-12-12 4-30 22-20Z" fill="none" stroke="#cfa052" stroke-width="4" stroke-linecap="round"/>
+              <text x="64" y="79" text-anchor="middle" font-family="Georgia, serif" font-size="31" font-weight="900" fill="#fffef7" stroke="#071913" stroke-width="2.5" paint-order="stroke fill">∂x</text>
+              <defs><linearGradient id="vCool" x1="20" y1="16" x2="110" y2="112"><stop offset="0" stop-color="#173f32"/><stop offset=".55" stop-color="#1f5e43"/><stop offset="1" stop-color="#5fb5ad"/></linearGradient></defs>
+            </svg>
+          </div>
+          <div>
+            <h2>V. Moonwell Triskele</h2>
+            <p class="tagline">Dark grove, triskele geometry, gold moonwell rings, and luminous formulae carved into the night.</p>
+          </div>
+        </div>
+        <span class="badge">Moonwell</span>
+      </div>
+      <div class="lab">
+        <div class="panel">
+          <div class="panel-title">Expression</div>
+          <div class="editor">{ -i·sin(ix) | x = ? }</div>
+          <div class="controls"><button>Evaluate</button><button>Forward</button><button>Copy</button></div>
+        </div>
+        <div class="results">
+          <div class="card"><div class="card-title">Rendered TeX</div><div class="rendered">sinh(x)</div></div>
+          <div class="card"><div class="card-title">Expression</div><pre>{ sinh(x) | x = ? }</pre></div>
+        </div>
+      </div>
+      <div class="motifs"><span>i²</span><span>sinh</span><span>∂</span><span>∞</span><span>π</span></div>
+    </section>
+
+    <section class="concept w">
+      <div class="concept-header">
+        <div class="title-row">
+          <div class="mini-icon" aria-hidden="true">
+            <svg viewBox="0 0 128 128">
+              <path d="M29 22h70v84H29z" rx="12" fill="#fff0d2" stroke="#243238" stroke-width="5"/>
+              <path d="M40 35c14 12 34 12 48 0M40 93c14-12 34-12 48 0" fill="none" stroke="#c48330" stroke-width="4" stroke-linecap="round"/>
+              <path d="M42 50h44M42 64h30M42 78h40" stroke="#a33f4e" stroke-width="5" stroke-linecap="round"/>
+              <path d="M31 64c15-12 21-12 33 0s18 12 33 0" fill="none" stroke="#1f5e86" stroke-width="4" stroke-linecap="round" opacity=".85"/>
+              <text x="68" y="76" text-anchor="middle" font-family="Georgia, serif" font-size="30" font-weight="900" fill="#243238">∂x</text>
+            </svg>
+          </div>
+          <div>
+            <h2>W. Rowan Knot Scroll</h2>
+            <p class="tagline">A warmer Brittonic manuscript idea: rowan red, torc gold, woad flourishes, and knotwork-like borders.</p>
+          </div>
+        </div>
+        <span class="badge">Knot Scroll</span>
+      </div>
+      <div class="lab">
+        <div class="panel">
+          <div class="panel-title">Expression</div>
+          <div class="editor">{ tan(x*y*γ/2) | x = 3.299, y = 3.299 }</div>
+          <div class="controls"><button>Evaluate</button><button>x derivative</button><button>Help</button></div>
+        </div>
+        <div class="results">
+          <div class="card"><div class="card-title">Rendered TeX</div><div class="rendered">tan(xyγ / 2)</div></div>
+          <div class="card"><div class="card-title">Function</div><pre>variable expr(x, y, const c₀) { return tan(x*y*c₀/2); }</pre></div>
+        </div>
+      </div>
+      <div class="motifs"><span>tan</span><span>γ</span><span>spiral</span><span>φ</span><span>Σ</span></div>
+    </section>
+
+    <section class="concept x">
+      <div class="concept-header">
+        <div class="title-row">
+          <div class="mini-icon" aria-hidden="true">
+            <svg viewBox="0 0 128 128">
+              <path d="M64 15c22 0 38 12 38 30v43c0 15-17 24-38 24s-38-9-38-24V45c0-18 16-30 38-30Z" fill="#5fb5ad" stroke="#243238" stroke-width="5"/>
+              <path d="M35 48c17 12 41 12 58 0" fill="none" stroke="#fff7df" stroke-width="5" opacity=".84"/>
+              <path d="M43 34c14-8 30-8 43 0" fill="none" stroke="#6d557d" stroke-width="5" stroke-linecap="round"/>
+              <circle cx="48" cy="69" r="5" fill="#c48330"/><circle cx="80" cy="69" r="5" fill="#c48330"/>
+              <path d="M50 88c9-8 19-8 28 0" fill="none" stroke="#516f3b" stroke-width="4" stroke-linecap="round"/>
+              <text x="64" y="95" text-anchor="middle" font-family="Georgia, serif" font-size="28" font-weight="900" fill="#fffef7" stroke="#243238" stroke-width="2.5" paint-order="stroke fill">∂x</text>
+            </svg>
+          </div>
+          <div>
+            <h2>X. Oak Cauldron Lab</h2>
+            <p class="tagline">The friendliest option: oak green, heather purple, teal cauldron glass, gold sparks, and practical daily readability.</p>
+          </div>
+        </div>
+        <span class="badge">Oak Lab</span>
+      </div>
+      <div class="lab">
+        <div class="panel">
+          <div class="panel-title">Expression</div>
+          <div class="editor">{ (5+i)/(5-i) }</div>
+          <div class="controls"><button>Evaluate</button><button>Less precision</button><button>More precision</button></div>
+        </div>
+        <div class="results">
+          <div class="card"><div class="card-title">Rendered TeX</div><div class="rendered">12⁄13 + 5⁄13i</div></div>
+          <div class="card"><div class="card-title">Value</div><pre>12/13 + 5/13i</pre></div>
+        </div>
+      </div>
+      <div class="motifs"><span>ℂ</span><span>÷</span><span>i</span><span>13</span><span>oak</span></div>
+    </section>
+  </main>
+</body>
+</html>

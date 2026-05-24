@@ -61,32 +61,159 @@ INDEX_HTML = r"""<!doctype html>
   <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png">
   <link rel="manifest" href="/manifest.webmanifest">
-  <meta name="theme-color" content="#0b4f8a">
+  <meta name="theme-color" content="#071913">
   <style>
     :root {
       color-scheme: light;
-      --ink: #18211f;
-      --muted: #64716d;
-      --paper: #f6f0e5;
-      --panel: #fffaf0;
-      --line: #d9cdb9;
-      --accent: #0f766e;
-      --accent-2: #9a3412;
-      --code: #10201d;
-      --shadow: rgba(49, 38, 22, 0.12);
+      --ink: #f3f8f2;
+      --muted: #bed3c0;
+      --paper: #071913;
+      --panel: #091f17;
+      --line: rgba(233, 244, 239, 0.34);
+      --accent: #cfa052;
+      --accent-2: #71c6b4;
+      --code: #f3f8f2;
+      --stone: #173f32;
+      --mist: #e9f4ef;
+      --torc: #cfa052;
+      --oak: #263920;
+      --shadow: rgba(0, 0, 0, 0.28);
     }
 
     * { box-sizing: border-box; }
 
     body {
+      position: relative;
       margin: 0;
       min-height: 100vh;
       color: var(--ink);
       font: 16px/1.5 "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
       background:
-        radial-gradient(circle at 15% 10%, rgba(15, 118, 110, 0.18), transparent 28rem),
-        radial-gradient(circle at 86% 8%, rgba(154, 52, 18, 0.16), transparent 24rem),
-        linear-gradient(135deg, #f5ead6 0%, #f8f3e9 52%, #e8f1ed 100%);
+        radial-gradient(circle at 15% 18%, rgba(107, 176, 167, 0.24), transparent 18rem),
+        radial-gradient(circle at 83% 13%, rgba(196, 131, 48, 0.24), transparent 19rem),
+        linear-gradient(145deg, #061612, #123326 46%, #263920);
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.62;
+      background:
+        radial-gradient(ellipse at 34% 10%, rgba(180, 255, 219, 0.46) 0 6rem, transparent 18rem),
+        radial-gradient(ellipse at 66% 12%, rgba(142, 119, 255, 0.34) 0 5rem, transparent 17rem),
+        linear-gradient(108deg, transparent 0 3%, rgba(137, 255, 211, 0.78) 8%, rgba(113, 198, 180, 0.16) 18%, transparent 32%),
+        linear-gradient(116deg, transparent 0 12%, rgba(199, 151, 255, 0.58) 18%, rgba(137, 255, 211, 0.2) 30%, transparent 46%),
+        linear-gradient(126deg, transparent 0 24%, rgba(255, 218, 125, 0.42) 31%, rgba(137, 255, 211, 0.16) 44%, transparent 58%),
+        radial-gradient(ellipse at 50% 104%, rgba(0, 0, 0, 0.52) 0 4.8rem, transparent 5rem),
+        linear-gradient(180deg, transparent 0 68%, rgba(4, 18, 12, 0.44) 68%),
+        radial-gradient(circle at 74% 22%, transparent 0 4.2rem, rgba(196, 131, 48, 0.44) 4.3rem 4.46rem, transparent 4.58rem),
+        radial-gradient(circle at 30% 54%, transparent 0 6.4rem, rgba(107, 176, 167, 0.36) 6.5rem 6.66rem, transparent 6.78rem),
+        linear-gradient(102deg, transparent 0 8%, rgba(113, 198, 180, 0.64) 8.5% 11.6%, transparent 12.5%),
+        linear-gradient(112deg, transparent 0 16%, rgba(185, 136, 235, 0.48) 16.4% 19.2%, transparent 20%),
+        linear-gradient(124deg, transparent 0 25%, rgba(207, 160, 82, 0.34) 25.3% 27.5%, transparent 28.2%),
+        linear-gradient(98deg, transparent 0 34%, rgba(89, 184, 179, 0.42) 34.2% 36.6%, transparent 37.3%),
+        repeating-linear-gradient(64deg, transparent 0 25px, rgba(233, 244, 239, 0.13) 26px 27px),
+        radial-gradient(circle at 50% 50%, transparent 0 7rem, rgba(233, 244, 239, 0.22) 7.1rem 7.22rem, transparent 7.35rem);
+      mask:
+        linear-gradient(#000 0 0) top / 100% 24px no-repeat,
+        linear-gradient(#000 0 0) bottom / 100% 24px no-repeat,
+        linear-gradient(#000 0 0) left / 24px 100% no-repeat,
+        linear-gradient(#000 0 0) right / 24px 100% no-repeat,
+        linear-gradient(#000 0 0);
+    }
+
+    body::after {
+      content: "";
+      position: fixed;
+      inset: auto 0 0;
+      height: 12rem;
+      pointer-events: none;
+      opacity: 0.72;
+      background:
+        linear-gradient(82deg, transparent 0 8%, rgba(3, 13, 9, 0.95) 8.2% 10.9%, transparent 11.2%),
+        linear-gradient(96deg, transparent 0 17%, rgba(3, 13, 9, 0.92) 17.2% 20.3%, transparent 20.6%),
+        linear-gradient(76deg, transparent 0 27%, rgba(3, 13, 9, 0.9) 27.2% 30.1%, transparent 30.4%),
+        linear-gradient(101deg, transparent 0 38%, rgba(3, 13, 9, 0.92) 38.2% 41.6%, transparent 41.9%),
+        linear-gradient(88deg, transparent 0 53%, rgba(3, 13, 9, 0.94) 53.2% 56.3%, transparent 56.6%),
+        linear-gradient(94deg, transparent 0 67%, rgba(3, 13, 9, 0.9) 67.2% 70.1%, transparent 70.4%),
+        radial-gradient(circle at 77% 77%, transparent 0 1.75rem, rgba(3, 13, 9, 0.96) 1.84rem 2.04rem, transparent 2.16rem),
+        radial-gradient(circle at 83% 77%, transparent 0 1.75rem, rgba(3, 13, 9, 0.96) 1.84rem 2.04rem, transparent 2.16rem),
+        linear-gradient(8deg, transparent 0 75%, rgba(3, 13, 9, 0.88) 75.2% 77%, transparent 77.3%),
+        linear-gradient(0deg, rgba(3, 13, 9, 0.85), rgba(3, 13, 9, 0.38) 18%, transparent 65%);
+    }
+
+    .celtic-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    .aurora {
+      position: absolute;
+      left: -8vw;
+      right: -8vw;
+      top: 1.2rem;
+      height: 12rem;
+      opacity: 0.9;
+      background:
+        linear-gradient(105deg, transparent 0 7%, rgba(144, 255, 216, 0.82) 12%, rgba(144, 255, 216, 0.16) 24%, transparent 38%),
+        linear-gradient(118deg, transparent 0 17%, rgba(190, 143, 255, 0.58) 23%, rgba(144, 255, 216, 0.22) 36%, transparent 54%),
+        linear-gradient(130deg, transparent 0 34%, rgba(244, 207, 102, 0.42) 40%, rgba(144, 255, 216, 0.16) 53%, transparent 70%);
+      filter: blur(0.4px);
+      transform: skewY(-6deg);
+    }
+
+    .standing-stones {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 2.4rem;
+      height: 12rem;
+      opacity: 0.64;
+    }
+
+    .stone {
+      position: absolute;
+      bottom: 0;
+      width: clamp(2.6rem, 4vw, 4rem);
+      height: clamp(7rem, 13vw, 11rem);
+      border-radius: 54% 46% 40% 42% / 12% 14% 6% 8%;
+      background: linear-gradient(145deg, rgba(27, 40, 35, 0.94), rgba(89, 107, 95, 0.68));
+      border: 1px solid rgba(233, 244, 239, 0.14);
+      box-shadow: inset 0.6rem 0.4rem 1.1rem rgba(233, 244, 239, 0.08);
+    }
+
+    .stone:nth-child(1) { left: 6%; height: 8rem; transform: rotate(-6deg); }
+    .stone:nth-child(2) { left: 13%; height: 11rem; transform: rotate(4deg); }
+    .stone:nth-child(3) { left: 22%; height: 7.8rem; transform: rotate(-3deg); }
+    .stone:nth-child(4) { right: 24%; height: 8.5rem; transform: rotate(5deg); }
+    .stone:nth-child(5) { right: 14%; height: 11.5rem; transform: rotate(-5deg); }
+    .stone:nth-child(6) { right: 6%; height: 7.6rem; transform: rotate(7deg); }
+
+    .chariot-wheel {
+      position: absolute;
+      right: 7vw;
+      bottom: 3.3rem;
+      width: 6.2rem;
+      height: 6.2rem;
+      opacity: 0.48;
+      border: 0.32rem solid rgba(4, 13, 9, 0.9);
+      border-radius: 999px;
+      background:
+        linear-gradient(0deg, transparent 46%, rgba(4, 13, 9, 0.9) 47% 53%, transparent 54%),
+        linear-gradient(60deg, transparent 46%, rgba(4, 13, 9, 0.9) 47% 53%, transparent 54%),
+        linear-gradient(120deg, transparent 46%, rgba(4, 13, 9, 0.9) 47% 53%, transparent 54%);
+      box-shadow: 0 0 0 0.18rem rgba(196, 131, 48, 0.18);
+    }
+
+    header,
+    main {
+      position: relative;
+      z-index: 1;
     }
 
     header {
@@ -102,6 +229,8 @@ INDEX_HTML = r"""<!doctype html>
       font-size: clamp(1.8rem, 4vw, 3.2rem);
       line-height: 1;
       letter-spacing: -0.045em;
+      color: #f3f8f2;
+      text-shadow: 0 0 1rem rgba(113, 198, 180, 0.32);
     }
 
     .subtitle {
@@ -125,8 +254,8 @@ INDEX_HTML = r"""<!doctype html>
     }
 
     section {
-      background: color-mix(in srgb, var(--panel), white 20%);
-      border: 1px solid var(--line);
+      background: rgba(8, 29, 22, 0.78);
+      border: 2px solid rgba(233, 244, 239, 0.34);
       border-radius: 22px;
       box-shadow: 0 18px 55px var(--shadow);
       overflow: hidden;
@@ -138,8 +267,9 @@ INDEX_HTML = r"""<!doctype html>
       justify-content: space-between;
       gap: 1rem;
       padding: 0.9rem 1rem;
-      border-bottom: 1px solid var(--line);
-      background: rgba(255, 255, 255, 0.34);
+      border-bottom: 2px solid rgba(233, 244, 239, 0.28);
+      background:
+        linear-gradient(90deg, rgba(196, 131, 48, 0.08), rgba(113, 198, 180, 0.08));
     }
 
     h2 {
@@ -147,7 +277,7 @@ INDEX_HTML = r"""<!doctype html>
       font-size: 0.95rem;
       text-transform: uppercase;
       letter-spacing: 0.13em;
-      color: var(--muted);
+      color: #d7e7b7;
     }
 
     textarea {
@@ -171,7 +301,7 @@ INDEX_HTML = r"""<!doctype html>
     }
 
     .target-row label {
-      color: var(--muted);
+      color: #bed3c0;
       font: 0.78rem/1.2 "Cascadia Code", "DejaVu Sans Mono", monospace;
       letter-spacing: 0.1em;
       text-transform: uppercase;
@@ -179,18 +309,18 @@ INDEX_HTML = r"""<!doctype html>
 
     .target-row input {
       width: 100%;
-      border: 1px solid var(--line);
+      border: 1px solid rgba(233, 244, 239, 0.28);
       border-radius: 999px;
       outline: 0;
       padding: 0.65rem 0.9rem;
       color: var(--code);
-      background: rgba(255, 255, 255, 0.58);
+      background: rgba(0, 0, 0, 0.14);
       font: 0.95rem/1.25 "Cascadia Code", "Fira Code", "DejaVu Sans Mono", monospace;
     }
 
     .target-row input:focus {
-      border-color: color-mix(in srgb, var(--accent), var(--line) 35%);
-      box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
+      border-color: color-mix(in srgb, var(--accent), var(--line) 25%);
+      box-shadow: 0 0 0 3px rgba(113, 198, 180, 0.18);
     }
 
     .goal-start-fields {
@@ -215,12 +345,12 @@ INDEX_HTML = r"""<!doctype html>
       grid-template-columns: minmax(2.4rem, auto) minmax(0, 1fr) auto;
       align-items: start;
       gap: 0.7rem;
-      border: 1px solid var(--line);
+      border: 1px solid rgba(233, 244, 239, 0.28);
       border-radius: 18px;
       padding: 0.55rem;
       background:
-        linear-gradient(135deg, rgba(255, 255, 255, 0.72), rgba(255, 250, 240, 0.42));
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+        linear-gradient(135deg, rgba(6, 22, 18, 0.54), rgba(26, 61, 45, 0.52));
+      box-shadow: inset 0 1px 0 rgba(233, 244, 239, 0.18);
     }
 
     .variable-value-name {
@@ -229,8 +359,8 @@ INDEX_HTML = r"""<!doctype html>
       min-height: 2.15rem;
       place-items: center;
       border-radius: 999px;
-      color: #075e57;
-      background: rgba(15, 118, 110, 0.1);
+      color: #061612;
+      background: #cfa052;
       font-weight: 700;
       font-family: "Cascadia Code", "DejaVu Sans Mono", monospace;
     }
@@ -239,11 +369,11 @@ INDEX_HTML = r"""<!doctype html>
       min-width: 0;
       max-height: 4.6rem;
       overflow: hidden;
-      border: 1px solid rgba(217, 205, 185, 0.58);
+      border: 1px solid rgba(233, 244, 239, 0.22);
       border-radius: 14px;
       padding: 0.5rem 0.7rem;
-      color: #16312d;
-      background: rgba(255, 255, 255, 0.54);
+      color: #f3f8f2;
+      background: rgba(0, 0, 0, 0.14);
       overflow-wrap: anywhere;
       white-space: pre-wrap;
       font: 0.82rem/1.35 "Cascadia Code", "Fira Code", "DejaVu Sans Mono", monospace;
@@ -288,8 +418,8 @@ INDEX_HTML = r"""<!doctype html>
       list-style: none;
       border-radius: 999px;
       padding: 0.42rem 0.78rem;
-      color: var(--accent);
-      background: #e4f0ec;
+      color: #061612;
+      background: #cfa052;
       font: 0.76rem/1.1 "Cascadia Code", "DejaVu Sans Mono", monospace;
       font-weight: 700;
       letter-spacing: 0.04em;
@@ -307,8 +437,8 @@ INDEX_HTML = r"""<!doctype html>
       width: 0.48rem;
       height: 0.48rem;
       border-radius: 999px;
-      background: var(--accent);
-      box-shadow: 0 0 0 4px rgba(15, 118, 110, 0.12);
+      background: #71c6b4;
+      box-shadow: 0 0 0 4px rgba(113, 198, 180, 0.18);
     }
 
     .mobile-panel {
@@ -321,10 +451,10 @@ INDEX_HTML = r"""<!doctype html>
       gap: 1rem;
       width: min(31rem, calc(100vw - 2rem));
       padding: 0.75rem;
-      border: 1px solid var(--line);
+      border: 2px solid rgba(233, 244, 239, 0.34);
       border-radius: 18px;
       background:
-        linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(228, 240, 236, 0.9));
+        linear-gradient(135deg, rgba(8, 29, 22, 0.96), rgba(18, 51, 38, 0.92));
       box-shadow: 0 16px 44px rgba(49, 38, 22, 0.16);
     }
 
@@ -335,7 +465,7 @@ INDEX_HTML = r"""<!doctype html>
     }
 
     .mobile-copy strong {
-      color: #075e57;
+      color: #d7e7b7;
       font: 0.82rem/1.2 "Cascadia Code", "DejaVu Sans Mono", monospace;
       letter-spacing: 0.08em;
       text-transform: uppercase;
@@ -365,8 +495,8 @@ INDEX_HTML = r"""<!doctype html>
       height: 9rem;
       padding: 0.45rem;
       border-radius: 16px;
-      background: white;
-      border: 1px solid rgba(217, 205, 185, 0.72);
+      background: #fffdf4;
+      border: 2px solid rgba(233, 244, 239, 0.24);
     }
 
     .mobile-qr svg {
@@ -376,20 +506,20 @@ INDEX_HTML = r"""<!doctype html>
     }
 
     button {
-      border: 0;
+      border: 2px solid #243238;
       border-radius: 999px;
       padding: 0.7rem 1rem;
-      color: white;
+      color: #061612;
       background: var(--accent);
       font-weight: 700;
       cursor: pointer;
-      box-shadow: 0 10px 24px rgba(15, 118, 110, 0.2);
+      box-shadow: 0 0.38rem 0 rgba(0, 0, 0, 0.2), 0 10px 24px rgba(196, 131, 48, 0.16);
     }
 
     button.secondary {
-      color: var(--accent);
-      background: #e4f0ec;
-      box-shadow: none;
+      color: #d7e7b7;
+      background: rgba(113, 198, 180, 0.12);
+      box-shadow: 0 0.18rem 0 rgba(0, 0, 0, 0.18);
     }
 
     button:disabled {
@@ -404,9 +534,9 @@ INDEX_HTML = r"""<!doctype html>
     }
 
     .card {
-      border: 1px solid var(--line);
+      border: 2px solid rgba(233, 244, 239, 0.28);
       border-radius: 18px;
-      background: rgba(255, 255, 255, 0.5);
+      background: rgba(8, 29, 22, 0.62);
       overflow: hidden;
     }
 
@@ -417,8 +547,8 @@ INDEX_HTML = r"""<!doctype html>
       gap: 0.75rem;
       padding: 0.55rem 0.75rem;
       color: var(--muted);
-      background: rgba(255, 255, 255, 0.42);
-      border-bottom: 1px solid var(--line);
+      background: rgba(196, 131, 48, 0.08);
+      border-bottom: 2px solid rgba(233, 244, 239, 0.22);
       font: 0.78rem/1.2 "Cascadia Code", "DejaVu Sans Mono", monospace;
       text-transform: uppercase;
       letter-spacing: 0.1em;
@@ -426,8 +556,8 @@ INDEX_HTML = r"""<!doctype html>
 
     .card-action {
       padding: 0.38rem 0.65rem;
-      color: var(--accent);
-      background: #e4f0ec;
+      color: #d7e7b7;
+      background: rgba(113, 198, 180, 0.12);
       box-shadow: none;
       font: 0.72rem/1.1 "Cascadia Code", "DejaVu Sans Mono", monospace;
       letter-spacing: 0.04em;
@@ -437,7 +567,7 @@ INDEX_HTML = r"""<!doctype html>
     }
 
     .card-action.copied {
-      color: white;
+      color: #061612;
       background: var(--accent);
       transform: translateY(-1px);
     }
@@ -524,7 +654,7 @@ INDEX_HTML = r"""<!doctype html>
       transform: scale(2);
       transform-origin: left top;
       margin-bottom: 4rem;
-      filter: brightness(0) saturate(100%) invert(13%) sepia(78%) saturate(1567%) hue-rotate(198deg) brightness(88%) contrast(98%);
+      filter: brightness(0) saturate(100%) invert(82%) sepia(39%) saturate(540%) hue-rotate(354deg) brightness(98%) contrast(92%) drop-shadow(0 0 0.65rem rgba(113, 198, 180, 0.28));
     }
 
     .error {
@@ -539,9 +669,9 @@ INDEX_HTML = r"""<!doctype html>
 
     .help-card {
       padding: 1rem;
-      border: 1px solid var(--line);
+      border: 2px solid rgba(233, 244, 239, 0.24);
       border-radius: 18px;
-      background: rgba(255, 255, 255, 0.5);
+      background: rgba(8, 29, 22, 0.62);
     }
 
     .help-card + .help-card {
@@ -573,7 +703,7 @@ INDEX_HTML = r"""<!doctype html>
     .help-card code {
       color: var(--code);
       font: 0.92rem/1.35 "Cascadia Code", "DejaVu Sans Mono", monospace;
-      background: rgba(15, 118, 110, 0.08);
+      background: rgba(113, 198, 180, 0.12);
       border-radius: 6px;
       padding: 0.08rem 0.25rem;
     }
@@ -817,6 +947,18 @@ INDEX_HTML = r"""<!doctype html>
   </style>
 </head>
 <body>
+  <div class="celtic-backdrop" aria-hidden="true">
+    <div class="aurora"></div>
+    <div class="standing-stones">
+      <span class="stone"></span>
+      <span class="stone"></span>
+      <span class="stone"></span>
+      <span class="stone"></span>
+      <span class="stone"></span>
+      <span class="stone"></span>
+    </div>
+    <div class="chariot-wheel"></div>
+  </div>
   <header>
     <div>
       <h1>MARS dval Lab</h1>
