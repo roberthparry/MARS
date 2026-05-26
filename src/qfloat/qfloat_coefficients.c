@@ -2,11 +2,33 @@
 
 enum {
     QFI_FADDEEVA_TERM_COUNT_VALUE = 32,
-    QFI_LANCZOS_COEFF_COUNT_VALUE = 9
+    QFI_LANCZOS_COEFF_COUNT_VALUE = 9,
+    QFI_BERNOULLI_EVEN_TERM_COUNT_VALUE = 17
 };
 
 const size_t QFI_FADDEEVA_TERM_COUNT = QFI_FADDEEVA_TERM_COUNT_VALUE;
 const size_t QFI_LANCZOS_COEFF_COUNT = QFI_LANCZOS_COEFF_COUNT_VALUE;
+const size_t QFI_BERNOULLI_EVEN_TERM_COUNT = QFI_BERNOULLI_EVEN_TERM_COUNT_VALUE;
+
+const qfloat_bernoulli_even_term_t QFI_BERNOULLI_EVEN_TERMS[QFI_BERNOULLI_EVEN_TERM_COUNT_VALUE] = {
+    {         1.0,       6.0,  1},  /* B_2  =  1/6             */
+    {         1.0,      30.0, -1},  /* B_4  = -1/30            */
+    {         1.0,      42.0,  1},  /* B_6  =  1/42            */
+    {         1.0,      30.0, -1},  /* B_8  = -1/30            */
+    {         5.0,      66.0,  1},  /* B_10 =  5/66            */
+    {       691.0,    2730.0, -1},  /* B_12 = -691/2730        */
+    {         7.0,       6.0,  1},  /* B_14 =  7/6             */
+    {      3617.0,     510.0, -1},  /* B_16 = -3617/510        */
+    {     43867.0,     798.0,  1},  /* B_18 =  43867/798       */
+    {    174611.0,     330.0, -1},  /* B_20 = -174611/330      */
+    {    854513.0,     138.0,  1},  /* B_22 =  854513/138      */
+    { 236364091.0,    2730.0, -1},  /* B_24 = -236364091/2730  */
+    {   8553103.0,       6.0,  1},  /* B_26 =  8553103/6       */
+    {23749461029.0,    870.0, -1},  /* B_28 = -23749461029/870 */
+    {8615841276005.0, 14322.0, 1},  /* B_30 =  8615841276005/14322 */
+    {7709321041217.0,   510.0,-1},  /* B_32 = -7709321041217/510   */
+    {2577687858367.0,     6.0, 1},  /* B_34 =  2577687858367/6     */
+};
 
 const qfloat_t QFI_FADDEEVA_AK[QFI_FADDEEVA_TERM_COUNT_VALUE] = {
     { 0.27768018363489788, 9.0767120701630337e-18 },

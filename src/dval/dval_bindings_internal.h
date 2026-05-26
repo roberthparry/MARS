@@ -18,6 +18,7 @@ bool dv_binding_expr_split_leading_number(const dv_binding_expr_t *expr,
                                           dv_binding_expr_t **rest_out);
 dv_binding_expr_t *dv_binding_expr_simplify(dv_binding_expr_t *expr);
 char *dv_binding_expr_to_string(const dv_binding_expr_t *expr);
+char *dv_binding_expr_to_function_string(const dv_binding_expr_t *expr);
 char *dv_binding_expr_to_tex(const dv_binding_expr_t *expr);
 
 #endif

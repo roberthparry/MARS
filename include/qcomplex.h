@@ -129,6 +129,11 @@ extern const qcomplex_t QC_E;
 extern const qcomplex_t QC_INV_E;
 
 /**
+ * @brief -1/e + 0i constant
+ */
+extern const qcomplex_t QC_NEG_INV_E;
+
+/**
  * @brief ln(2) + 0i constant
  */
 extern const qcomplex_t QC_LN2;
@@ -304,6 +309,7 @@ qcomplex_t qc_lgamma(qcomplex_t z);              /**< log gamma */
 qcomplex_t qc_digamma(qcomplex_t z);             /**< digamma */
 qcomplex_t qc_trigamma(qcomplex_t z);            /**< trigamma */
 qcomplex_t qc_tetragamma(qcomplex_t z);          /**< tetragamma */
+qcomplex_t qc_polygamma(unsigned int order, qcomplex_t z); /**< polygamma ψ⁽ⁿ⁾ */
 qcomplex_t qc_gammainv(qcomplex_t z);            /**< inverse gamma */
 qcomplex_t qc_beta(qcomplex_t a, qcomplex_t b);  /**< beta function */
 qcomplex_t qc_logbeta(qcomplex_t a, qcomplex_t b); /**< log beta */

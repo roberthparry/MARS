@@ -1,4 +1,7 @@
+#include <errno.h>
+#include <limits.h>
 #include <stddef.h>
+#include <stdlib.h>
 
 #include "dval_bindings_internal.h"
 #include "dval_math_internal.h"
@@ -12,6 +15,77 @@ static inline number_t dv_eval_binary_num(
     dval_t *dv, number_t (*fn)(const number_t, const number_t))
 {
     return fn(dv_eval_num_internal(dv->a), dv_eval_num_internal(dv->b));
+}
+
+static int dv_number_to_polygamma_order(number_t value, unsigned int *order)
+{
+    char *text;
+    char *end = NULL;
+    unsigned long parsed;
+
+    if (!order || !num_is_real(value) || !num_is_integer(value) ||
+        num_get_sign(value) < 0)
+        return 0;
+
+    text = num_to_string(value);
+    if (!text)
+        return 0;
+    errno = 0;
+    parsed = strtoul(text, &end, 10);
+    if (errno != 0 || !end || *end != '\0' || parsed > UINT_MAX) {
+        free(text);
+        return 0;
+    }
+    free(text);
+    *order = (unsigned int)parsed;
+    return 1;
+}
+
+static int dv_number_to_unsigned_long(number_t value, unsigned long *out)
+{
+    char *text;
+    char *end = NULL;
+    unsigned long parsed;
+
+    if (!out || !num_is_real(value) || !num_is_integer(value) ||
+        num_get_sign(value) < 0)
+        return 0;
+
+    text = num_to_string(value);
+    if (!text)
+        return 0;
+    errno = 0;
+    parsed = strtoul(text, &end, 10);
+    if (errno != 0 || !end || *end != '\0') {
+        free(text);
+        return 0;
+    }
+    free(text);
+    *out = parsed;
+    return 1;
+}
+
+static int dv_number_to_long(number_t value, long *out)
+{
+    char *text;
+    char *end = NULL;
+    long parsed;
+
+    if (!out || !num_is_real(value) || !num_is_integer(value))
+        return 0;
+
+    text = num_to_string(value);
+    if (!text)
+        return 0;
+    errno = 0;
+    parsed = strtol(text, &end, 10);
+    if (errno != 0 || !end || *end != '\0') {
+        free(text);
+        return 0;
+    }
+    free(text);
+    *out = parsed;
+    return 1;
 }
 
 static dval_t *dv_chain_rule_with_factor(const dval_t *dv, dval_t *factor)
@@ -54,6 +128,19 @@ static dval_t *dv_const_num_local(number_t value)
 {
     NUM_SCOPE(scope);
     dval_t *dv = dv_new_const(value);
+    return dv;
+}
+
+static dval_t *dv_log10_scale_factor_local(void)
+{
+    NUM_SCOPE(scope);
+    number_t value = num_log(NUM_TEN);
+    dval_t *dv = dv_new_const(value);
+
+    if (dv)
+        dv->binding_expr =
+            dv_binding_expr_new_unary_op(&ops_log,
+                                         dv_binding_expr_new_number_text("10"));
     return dv;
 }
 
@@ -151,7 +238,17 @@ number_t eval_erfcinv(dval_t *dv) { return dv_eval_unary_num(dv, num_erfcinv); }
 number_t eval_gamma(dval_t *dv) { return dv_eval_unary_num(dv, num_gamma); }
 number_t eval_digamma(dval_t *dv) { return dv_eval_unary_num(dv, num_digamma); }
 number_t eval_trigamma(dval_t *dv) { return dv_eval_unary_num(dv, num_trigamma); }
+number_t eval_polygamma(dval_t *dv)
+{
+    number_t order_value = dv_eval_num_internal(dv->a);
+    unsigned int order;
+
+    if (!dv_number_to_polygamma_order(order_value, &order))
+        return NUM_NAN;
+    return num_polygamma(order, dv_eval_num_internal(dv->b));
+}
 number_t eval_gammainv(dval_t *dv) { return dv_eval_unary_num(dv, num_gammainv); }
+number_t eval_lambert_w(dval_t *dv) { return dv_eval_unary_num(dv, num_productlog); }
 number_t eval_lambert_w0(dval_t *dv) { return dv_eval_unary_num(dv, num_lambert_w0); }
 number_t eval_lambert_wm1(dval_t *dv) { return dv_eval_unary_num(dv, num_lambert_wm1); }
 number_t eval_normal_pdf(dval_t *dv) { return dv_eval_unary_num(dv, num_normal_pdf); }
@@ -173,6 +270,85 @@ number_t eval_beta(dval_t *dv)
 number_t eval_logbeta(dval_t *dv)
 {
     return dv_eval_binary_num(dv, num_logbeta);
+}
+
+number_t eval_gammainc_lower(dval_t *dv)
+{
+    return dv_eval_binary_num(dv, num_gammainc_lower);
+}
+
+number_t eval_gammainc_upper(dval_t *dv)
+{
+    return dv_eval_binary_num(dv, num_gammainc_upper);
+}
+
+number_t eval_gammainc_P(dval_t *dv)
+{
+    return dv_eval_binary_num(dv, num_gammainc_P);
+}
+
+number_t eval_gammainc_Q(dval_t *dv)
+{
+    return dv_eval_binary_num(dv, num_gammainc_Q);
+}
+
+number_t eval_factorial(dval_t *dv)
+{
+    number_t value = dv_eval_num_internal(dv->a);
+    unsigned long n;
+
+    return dv_number_to_unsigned_long(value, &n) ? num_factorial(n) : NUM_NAN;
+}
+
+number_t eval_fibonacci(dval_t *dv)
+{
+    number_t value = dv_eval_num_internal(dv->a);
+    unsigned long n;
+
+    return dv_number_to_unsigned_long(value, &n) ? num_fibonacci(n) : NUM_NAN;
+}
+
+number_t eval_partition(dval_t *dv) { return dv_eval_unary_num(dv, num_partition); }
+number_t eval_isqrt(dval_t *dv) { return dv_eval_unary_num(dv, num_isqrt); }
+number_t eval_gcd(dval_t *dv) { return dv_eval_binary_num(dv, num_gcd); }
+number_t eval_lcm(dval_t *dv) { return dv_eval_binary_num(dv, num_lcm); }
+number_t eval_mod(dval_t *dv) { return dv_eval_binary_num(dv, num_mod); }
+number_t eval_modinv(dval_t *dv) { return dv_eval_binary_num(dv, num_modinv); }
+
+number_t eval_is_prime(dval_t *dv)
+{
+    return num_create_from_long(num_is_prime(dv_eval_num_internal(dv->a)) ? 1L : 0L);
+}
+
+number_t eval_next_prime(dval_t *dv) { return dv_eval_unary_num(dv, num_next_prime); }
+number_t eval_prev_prime(dval_t *dv) { return dv_eval_unary_num(dv, num_prev_prime); }
+
+number_t eval_bit_and(dval_t *dv) { return dv_eval_binary_num(dv, num_bit_and); }
+number_t eval_bit_or(dval_t *dv) { return dv_eval_binary_num(dv, num_bit_or); }
+number_t eval_bit_xor(dval_t *dv) { return dv_eval_binary_num(dv, num_bit_xor); }
+number_t eval_bit_not(dval_t *dv) { return dv_eval_unary_num(dv, num_bit_not); }
+
+number_t eval_shl(dval_t *dv)
+{
+    number_t value = dv_eval_num_internal(dv->a);
+    number_t bits_value = dv_eval_num_internal(dv->b);
+    long bits;
+
+    return dv_number_to_long(bits_value, &bits) ? num_shl(value, bits) : NUM_NAN;
+}
+
+number_t eval_shr(dval_t *dv)
+{
+    number_t value = dv_eval_num_internal(dv->a);
+    number_t bits_value = dv_eval_num_internal(dv->b);
+    long bits;
+
+    return dv_number_to_long(bits_value, &bits) ? num_shr(value, bits) : NUM_NAN;
+}
+
+number_t eval_factors(dval_t *dv)
+{
+    return dv_eval_num_internal(dv->a);
 }
 
 number_t eval_atan2(dval_t *dv)
@@ -255,10 +431,12 @@ dval_t *deriv_log(dval_t *dv)
 dval_t *deriv_log10(dval_t *dv)
 {
     dval_t *da = dv_get_dx_internal(dv->a);
-    dval_t *den = dv_mul(dv->a, DV_LN10);
+    dval_t *ln10 = dv_log10_scale_factor_local();
+    dval_t *den = dv_mul(dv->a, ln10);
     dval_t *out = dv_div(da, den);
 
     dv_free(da);
+    dv_free(ln10);
     dv_free(den);
     return out;
 }
@@ -287,6 +465,12 @@ dval_t *deriv_ceil(dval_t *dv)
 {
     (void)dv;
     return dv_new_const(NUM_ZERO);
+}
+
+dval_t *deriv_not_differentiable(dval_t *dv)
+{
+    (void)dv;
+    return dv_new_const(NUM_NAN);
 }
 
 dval_t *deriv_asin(dval_t *dv)
@@ -528,12 +712,27 @@ dval_t *deriv_digamma(dval_t *dv)
 
 dval_t *deriv_trigamma(dval_t *dv)
 {
-    NUM_SCOPE(scope);
-    number_t t2   = num_tetragamma(dv_eval_num_internal(dv->a));
-    dval_t *da    = dv_get_dx_internal(dv->a);
-    dval_t *coeff = dv_new_const(t2);
-    dval_t *out   = dv_mul(coeff, da);
-    dv_free(da); dv_free(coeff);
+    dval_t *factor = dv_polygamma(2u, dv->a);
+
+    return dv_chain_rule_with_factor(dv, factor);
+}
+
+dval_t *deriv_polygamma(dval_t *dv)
+{
+    number_t order_value = dv_eval_num_internal(dv->a);
+    unsigned int order;
+    dval_t *factor;
+    dval_t *db;
+    dval_t *out;
+
+    if (!dv_number_to_polygamma_order(order_value, &order))
+        return dv_new_const(NUM_NAN);
+
+    factor = dv_polygamma(order + 1u, dv->b);
+    db = dv_get_dx_internal(dv->b);
+    out = dv_mul(factor, db);
+    dv_free(factor);
+    dv_free(db);
     return out;
 }
 
@@ -554,6 +753,18 @@ dval_t *deriv_lambert_w0(dval_t *dv)
 {
     dval_t *da  = dv_get_dx_internal(dv->a);
     dval_t *w   = dv_lambert_w0(dv->a);
+    dval_t *wp1 = dv_add_long_local(w, 1);
+    dval_t *den = dv_mul(dv->a, wp1);
+    dval_t *fac = dv_div(w, den);
+    dval_t *out = dv_mul(fac, da);
+    dv_free(da); dv_free(w); dv_free(wp1); dv_free(den); dv_free(fac);
+    return out;
+}
+
+dval_t *deriv_lambert_w(dval_t *dv)
+{
+    dval_t *da  = dv_get_dx_internal(dv->a);
+    dval_t *w   = dv_lambert_w(dv->a);
     dval_t *wp1 = dv_add_long_local(w, 1);
     dval_t *den = dv_mul(dv->a, wp1);
     dval_t *fac = dv_div(w, den);
@@ -657,4 +868,78 @@ dval_t *deriv_logbeta(dval_t *dv)
     dv_free(dg_a); dv_free(dg_b); dv_free(dg_ab);
     dv_free(diff_a); dv_free(diff_b); dv_free(ta); dv_free(tb);
     return out;
+}
+
+static dval_t *gammainc_x_density(const dval_t *s, const dval_t *x)
+{
+    dval_t *one = dv_new_const(NUM_ONE);
+    dval_t *s_minus_one = dv_sub(s, one);
+    dval_t *x_pow = dv_pow_dv(x, s_minus_one);
+    dval_t *neg_x = dv_neg(x);
+    dval_t *exp_neg_x = dv_exp(neg_x);
+    dval_t *density = dv_mul(x_pow, exp_neg_x);
+
+    dv_free(one);
+    dv_free(s_minus_one);
+    dv_free(x_pow);
+    dv_free(neg_x);
+    dv_free(exp_neg_x);
+    return density;
+}
+
+static dval_t *deriv_gammainc_x_only(dval_t *dv, int sign, int regularised)
+{
+    dval_t *ds = dv_get_dx_internal(dv->a);
+    dval_t *dx = dv_get_dx_internal(dv->b);
+    dval_t *density;
+    dval_t *factor;
+    dval_t *out;
+
+    if (!dv_const_is_zero(ds)) {
+        dv_free(ds);
+        dv_free(dx);
+        return dv_new_const(NUM_NAN);
+    }
+
+    density = gammainc_x_density(dv->a, dv->b);
+    factor = density;
+
+    if (regularised) {
+        dval_t *gamma_s = dv_gamma(dv->a);
+        factor = dv_div(density, gamma_s);
+        dv_free(density);
+        dv_free(gamma_s);
+    }
+
+    if (sign < 0) {
+        dval_t *neg = dv_neg(factor);
+        dv_free(factor);
+        factor = neg;
+    }
+
+    out = dv_mul(factor, dx);
+    dv_free(ds);
+    dv_free(dx);
+    dv_free(factor);
+    return out;
+}
+
+dval_t *deriv_gammainc_lower(dval_t *dv)
+{
+    return deriv_gammainc_x_only(dv, 1, 0);
+}
+
+dval_t *deriv_gammainc_upper(dval_t *dv)
+{
+    return deriv_gammainc_x_only(dv, -1, 0);
+}
+
+dval_t *deriv_gammainc_P(dval_t *dv)
+{
+    return deriv_gammainc_x_only(dv, 1, 1);
+}
+
+dval_t *deriv_gammainc_Q(dval_t *dv)
+{
+    return deriv_gammainc_x_only(dv, -1, 1);
 }

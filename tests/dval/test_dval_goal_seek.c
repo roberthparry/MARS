@@ -1,3 +1,5 @@
+#include <string.h>
+
 #include "test_dval.h"
 
 static void assert_residual_small(number_t residual, const char *tolerance_text)
@@ -96,6 +98,8 @@ static void test_goal_seek_complex_fallback_from_real_axis(void)
     dv_goal_seek_result_t result;
     number_t x_value;
     number_t x_real;
+    number_t x_imag;
+    number_t x_imag_abs;
     char *text;
 
     ASSERT_NOT_NULL(expr);
@@ -109,14 +113,19 @@ static void test_goal_seek_complex_fallback_from_real_axis(void)
     ASSERT_NOT_NULL(x);
     x_value = dv_eval(x);
     x_real = num_real_part(x_value);
+    x_imag = num_imag_part(x_value);
+    x_imag_abs = num_abs(x_imag);
     ASSERT_TRUE(num_is_zero(x_real));
-    ASSERT_DVAL_NUMBER_CLOSE(x_value, NUM_I);
+    ASSERT_DVAL_NUMBER_CLOSE(x_imag_abs, NUM_ONE);
+    num_destroy(&x_imag_abs);
+    num_destroy(&x_imag);
     num_destroy(&x_real);
     num_destroy(&x_value);
 
     text = dv_to_string(expr, style_EXPRESSION);
     ASSERT_NOT_NULL(text);
-    TEST_ASSERT_STR_EQ(text, "{ x² + 1 | x = i }");
+    ASSERT_TRUE(strcmp(text, "{ x² + 1 | x = i }") == 0 ||
+                strcmp(text, "{ x² + 1 | x = -i }") == 0);
     free(text);
 
     dv_goal_seek_result_clear(&result);
@@ -145,6 +154,31 @@ static void test_goal_seek_complex_uses_guard_precision(void)
     ASSERT_TRUE(result.converged);
     ASSERT_TRUE(result.used_complex);
     assert_residual_small(result.residual, "1.01e-8");
+
+    dv_goal_seek_result_clear(&result);
+    num_destroy(&target);
+    dval_bindings_free(bindings);
+    dv_free(expr);
+}
+
+static void test_goal_seek_complex_lgamma_imaginary_axis(void)
+{
+    dval_bindings_t *bindings = NULL;
+    dval_t *expr = dval_from_string("{ lgamma(ix) | x = NAN }", &bindings);
+    number_t target = num_create_from_long(24L);
+    dv_goal_seek_options_t options = {
+        .precision_digits = 64u,
+        .allow_complex = true,
+        .simplify_result = false
+    };
+    dv_goal_seek_result_t result;
+
+    ASSERT_NOT_NULL(expr);
+    ASSERT_NOT_NULL(bindings);
+    ASSERT_EQ_INT(dv_goal_seek(expr, bindings, target, &options, &result), 0);
+    ASSERT_TRUE(result.converged);
+    ASSERT_TRUE(result.used_complex);
+    assert_residual_small(result.residual, "1e-50");
 
     dv_goal_seek_result_clear(&result);
     num_destroy(&target);
@@ -240,6 +274,7 @@ void test_dval_t_goal_seek(void)
     TEST_RUN_SUBTEST(test_goal_seek_complex_fallback, NULL);
     TEST_RUN_SUBTEST(test_goal_seek_complex_fallback_from_real_axis, NULL);
     TEST_RUN_SUBTEST(test_goal_seek_complex_uses_guard_precision, NULL);
+    TEST_RUN_SUBTEST(test_goal_seek_complex_lgamma_imaginary_axis, NULL);
     TEST_RUN_SUBTEST(test_goal_seek_real_multi_variable, NULL);
     TEST_RUN_SUBTEST(test_goal_seek_default_tolerance_uses_precision_digits, NULL);
     TEST_RUN_SUBTEST(test_goal_seek_default_iterations_scale_with_precision, NULL);

@@ -25,7 +25,9 @@ static size_t goal_precision_digits(const dv_goal_seek_options_t *options)
 
 static size_t goal_work_digits(size_t digits)
 {
-    return digits > 0u ? digits + 8u : DV_GOAL_DEFAULT_DIGITS + 8u;
+    if (digits == 0u)
+        return DV_GOAL_DEFAULT_DIGITS * 2u;
+    return digits < 8u ? digits + 8u : digits * 2u;
 }
 
 static size_t goal_max_iterations(const dv_goal_seek_options_t *options)
@@ -497,31 +499,22 @@ cleanup:
     return rc;
 }
 
-static int goal_solve_complex_one(dval_t *expr,
-                                  dval_t *var,
-                                  number_t target,
-                                  number_t tolerance,
-                                  size_t digits,
-                                  size_t max_iterations,
-                                  size_t *iterations_out)
+static int goal_complex_newton_from(dval_t *expr,
+                                    dval_t *var,
+                                    number_t target,
+                                    number_t tolerance,
+                                    number_t start,
+                                    size_t digits,
+                                    size_t max_iterations,
+                                    size_t *iterations_out)
 {
-    number_t x = goal_start_value(var, digits);
+    number_t x = goal_work_value(start, digits);
+    number_t best_x = num_clone(x);
     number_t best_residual = num_clone(NUM_INF);
     number_t best_norm = num_clone(NUM_INF);
     int rc = -1;
     size_t iterations = 0u;
 
-    if (num_is_real(x)) {
-        number_t imag_seed = num_clone(NUM_I);
-        number_t seeded;
-
-        if (digits > 0u)
-            num_set_prec_digits(&imag_seed, digits);
-        seeded = num_add(x, imag_seed);
-        num_destroy(&x);
-        num_destroy(&imag_seed);
-        x = seeded;
-    }
     goal_set_var(var, x, digits);
 
     for (size_t i = 0u; i < max_iterations; ++i) {
@@ -541,7 +534,9 @@ static int goal_solve_complex_one(dval_t *expr,
         num_destroy(&value);
 
         if (goal_residual_close(residual, tolerance)) {
+            num_destroy(&best_x);
             num_destroy(&best_residual);
+            best_x = num_clone(x);
             best_residual = num_clone(residual);
             num_destroy(&derivative);
             num_destroy(&trial_value);
@@ -576,8 +571,10 @@ static int goal_solve_complex_one(dval_t *expr,
 
         trial_norm = num_abs(trial_residual);
         if (num_lt(trial_norm, best_norm)) {
+            num_destroy(&best_x);
             num_destroy(&best_norm);
             num_destroy(&best_residual);
+            best_x = num_clone(trial);
             best_norm = num_clone(trial_norm);
             best_residual = num_clone(trial_residual);
         }
@@ -601,17 +598,84 @@ loop_cleanup:
     if (rc != 0 && goal_residual_close(best_residual, tolerance))
         rc = 0;
 
-    {
-        number_t clean_x = goal_clean_negligible_complex_parts(x, tolerance, digits);
+    if (rc == 0) {
+        number_t clean_x = goal_clean_negligible_complex_parts(best_x, tolerance, digits);
 
         goal_set_var(var, clean_x, digits);
         num_destroy(&clean_x);
+    } else {
+        goal_set_var(var, start, digits);
     }
     if (iterations_out)
         *iterations_out = iterations;
     num_destroy(&best_norm);
     num_destroy(&best_residual);
+    num_destroy(&best_x);
     num_destroy(&x);
+    return rc;
+}
+
+static size_t goal_complex_probe_iteration_limit(size_t max_iterations)
+{
+    return max_iterations < 8u ? max_iterations : 8u;
+}
+
+static number_t goal_complex_offset_seed(number_t base,
+                                         number_t imag_offset,
+                                         size_t digits)
+{
+    number_t imag = goal_work_value(imag_offset, digits);
+    number_t seed = num_add(base, imag);
+
+    num_destroy(&imag);
+    return seed;
+}
+
+static int goal_solve_complex_one(dval_t *expr,
+                                  dval_t *var,
+                                  number_t target,
+                                  number_t tolerance,
+                                  size_t digits,
+                                  size_t max_iterations,
+                                  size_t *iterations_out)
+{
+    number_t base = goal_start_value(var, digits);
+    size_t iterations = 0u;
+    int rc = -1;
+
+    if (num_is_real(base)) {
+        number_t seeds[4];
+        size_t seed_count = sizeof(seeds) / sizeof(seeds[0]);
+        size_t probe_limit = goal_complex_probe_iteration_limit(max_iterations);
+
+        seeds[0] = goal_complex_offset_seed(base, NUM_NEG_I, digits);
+        seeds[1] = goal_complex_offset_seed(base, NUM_I, digits);
+        seeds[2] = goal_work_value(NUM_NEG_I, digits);
+        seeds[3] = goal_work_value(NUM_I, digits);
+
+        for (size_t i = 0u; i < seed_count; ++i) {
+            size_t attempt_iterations = 0u;
+            size_t attempt_limit = i < 2u ? probe_limit : max_iterations;
+
+            rc = goal_complex_newton_from(expr, var, target, tolerance,
+                                          seeds[i], digits, attempt_limit,
+                                          &attempt_iterations);
+            iterations += attempt_iterations;
+            if (rc == 0)
+                break;
+        }
+
+        for (size_t i = 0u; i < seed_count; ++i)
+            num_destroy(&seeds[i]);
+    } else {
+        rc = goal_complex_newton_from(expr, var, target, tolerance,
+                                      base, digits, max_iterations,
+                                      &iterations);
+    }
+
+    if (iterations_out)
+        *iterations_out = iterations;
+    num_destroy(&base);
     return rc;
 }
 

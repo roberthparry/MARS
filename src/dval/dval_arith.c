@@ -30,7 +30,9 @@ static number_t eval_sub(dval_t *dv)
 
 static bool is_lambert_expr(const dval_t *dv)
 {
-    return dv_is_op(dv, &ops_lambert_w0) || dv_is_op(dv, &ops_lambert_wm1);
+    return dv_is_op(dv, &ops_lambert_w) ||
+           dv_is_op(dv, &ops_lambert_w0) ||
+           dv_is_op(dv, &ops_lambert_wm1);
 }
 
 static dval_t *lambert_product_inner(dval_t *a, dval_t *b)

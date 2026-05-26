@@ -11,6 +11,15 @@ extern const qfloat_t QFI_FADDEEVA_AK[];
 extern const qfloat_t QFI_FADDEEVA_CK[];
 extern const qfloat_t QFI_LANCZOS_C[];
 
+typedef struct qfloat_bernoulli_even_term_t {
+    double num;
+    double den;
+    int sign;
+} qfloat_bernoulli_even_term_t;
+
+extern const size_t QFI_BERNOULLI_EVEN_TERM_COUNT;
+extern const qfloat_bernoulli_even_term_t QFI_BERNOULLI_EVEN_TERMS[];
+
 extern const qfloat_t QFI_LANCZOS_SHIFT;
 extern const qfloat_t QFI_ELEVEN_OVER_SEVENTY_TWO;
 extern const qfloat_t QFI_BERNOULLI_B2;

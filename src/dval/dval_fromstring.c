@@ -116,104 +116,124 @@ static void symtab_discard_storage(symtab_t *t);
 
 typedef dval_t *(*unary_fn)(const dval_t *);
 typedef dval_t *(*binary_fn)(const dval_t *, const dval_t *);
+typedef dval_t *(*ternary_fn)(const dval_t *, const dval_t *, const dval_t *);
 
 /* ------------------------------------------------------------------ */
 /* Function dispatch                                                   */
 /* ------------------------------------------------------------------ */
 
-/* Sorted function keyword table.
+/* Function keyword table.
  *
- * With only 42 supported keywords, a compact direct table plus displacement
- * is smaller and easier to maintain than a sparse direct-hash array.  A small
- * number of Unicode round-trip aliases are handled outside this table. */
-#define FUNC_TABLE_SIZE 43
+ * Fixed aliases live here too, so the parser has one source of truth for
+ * supported spellings.  The only function-like spelling handled separately is
+ * ψ⁽ⁿ⁾(...), whose order is encoded in the token itself. */
+#define FUNC_TABLE_SIZE 78
 
 typedef struct {
     const char *kw;
     size_t      klen;
-    bool        is_binary;
+    unsigned    arity;
     const dval_ops_t *ops;
     unary_fn    ufn;
     binary_fn   bfn;
+    ternary_fn  tfn;
 } func_entry_t;
 
 #define FUNC_ENTRY(name, is_bin, op, unary, binary) \
-    { (name), sizeof(name) - 1u, (is_bin), (op), (unary), (binary) }
+    { (name), sizeof(name) - 1u, (is_bin) ? 2u : 1u, (op), (unary), (binary), NULL }
+
+#define FUNC_TERNARY_ENTRY(name, ternary) \
+    { (name), sizeof(name) - 1u, 3u, NULL, NULL, NULL, (ternary) }
 
 static const unsigned char s_func_displacements[FUNC_TABLE_SIZE] = {
-    0, 0, 0, 0, 7, 0, 3, 0, 1, 0,
-    0, 2, 5, 0, 0, 4, 34, 0, 14, 0,
-    0, 0, 0, 3, 0, 0, 0, 0, 1, 0,
-    0, 9, 0, 3, 0, 8, 0, 0, 0, 2,
-    10, 0, 2
+    0, 6, 0, 2, 4, 0, 2, 0, 3, 0,
+    0, 0, 0, 0, 0, 1, 1, 0, 0, 0,
+    0, 3, 0, 1, 1, 0, 3, 11, 7, 0,
+    0, 0, 0, 2, 9, 14, 0, 10, 0, 10,
+    14, 0, 0, 0, 9, 6, 5, 0, 38, 31,
+    4, 47, 0
 };
 
 static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
-    FUNC_ENTRY("atan",          false, &ops_atan,          dv_atan,          NULL),
-    FUNC_ENTRY("normal_cdf",    false, &ops_normal_cdf,    dv_normal_cdf,    NULL),
-    FUNC_ENTRY("sinh",          false, &ops_sinh,          dv_sinh,          NULL),
-    FUNC_ENTRY("gamma",         false, &ops_gamma,         dv_gamma,         NULL),
-    FUNC_ENTRY("sqrt",          false, &ops_sqrt,          dv_sqrt,          NULL),
-    FUNC_ENTRY("pow",           true,  &ops_pow,           NULL,             dv_pow_dv),
-    FUNC_ENTRY("gammainv",      false, &ops_gammainv,      dv_gammainv,      NULL),
-    FUNC_ENTRY("productlog",    false, &ops_lambert_w0,    dv_lambert_w0,    NULL),
-    FUNC_ENTRY("erfinv",        false, &ops_erfinv,        dv_erfinv,        NULL),
-    FUNC_ENTRY("Ei",            false, &ops_ei,            dv_ei,            NULL),
-    FUNC_ENTRY("ceil",          false, &ops_ceil,          dv_ceil,          NULL),
-    FUNC_ENTRY("E1",            false, &ops_e1,            dv_e1,            NULL),
-    FUNC_ENTRY("cos",           false, &ops_cos,           dv_cos,           NULL),
-    FUNC_ENTRY("hypot",         true,  &ops_hypot,         NULL,             dv_hypot),
-    FUNC_ENTRY("tan",           false, &ops_tan,           dv_tan,           NULL),
-    FUNC_ENTRY("trigamma",      false, &ops_trigamma,      dv_trigamma,      NULL),
-    FUNC_ENTRY("beta",          true,  &ops_beta,          NULL,             dv_beta),
-    FUNC_ENTRY("abs",           false, &ops_abs,           dv_abs,           NULL),
-    FUNC_ENTRY("atan2",         true,  &ops_atan2,         NULL,             dv_atan2),
-    FUNC_ENTRY("normal_pdf",    false, &ops_normal_pdf,    dv_normal_pdf,    NULL),
     FUNC_ENTRY("asinh",         false, &ops_asinh,         dv_asinh,         NULL),
-    FUNC_ENTRY("lambert_wm1",   false, &ops_lambert_wm1,   dv_lambert_wm1,   NULL),
-    FUNC_ENTRY("asin",          false, &ops_asin,          dv_asin,          NULL),
-    FUNC_ENTRY("logbeta",       true,  &ops_logbeta,       NULL,             dv_logbeta),
-    FUNC_ENTRY("acos",          false, &ops_acos,          dv_acos,          NULL),
-    FUNC_ENTRY("lgamma",        false, &ops_lgamma,        dv_lgamma,        NULL),
-    FUNC_ENTRY("acosh",         false, &ops_acosh,         dv_acosh,         NULL),
-    FUNC_ENTRY("normal_logpdf", false, &ops_normal_logpdf, dv_normal_logpdf, NULL),
-    FUNC_ENTRY("erf",           false, &ops_erf,           dv_erf,           NULL),
-    FUNC_ENTRY("digamma",       false, &ops_digamma,       dv_digamma,       NULL),
-    { NULL, 0, false, NULL, NULL, NULL },
-    FUNC_ENTRY("cosh",          false, &ops_cosh,          dv_cosh,          NULL),
-    FUNC_ENTRY("log10",         false, &ops_log10,         dv_log10,         NULL),
-    FUNC_ENTRY("ln",            false, &ops_log,           dv_log,           NULL),
-    FUNC_ENTRY("exp",           false, &ops_exp,           dv_exp,           NULL),
-    FUNC_ENTRY("erfc",          false, &ops_erfc,          dv_erfc,          NULL),
-    FUNC_ENTRY("sin",           false, &ops_sin,           dv_sin,           NULL),
-    FUNC_ENTRY("tanh",          false, &ops_tanh,          dv_tanh,          NULL),
-    FUNC_ENTRY("lambert_w0",    false, &ops_lambert_w0,    dv_lambert_w0,    NULL),
-    FUNC_ENTRY("log",           false, &ops_log10,         dv_log10,         NULL),
-    FUNC_ENTRY("erfcinv",       false, &ops_erfcinv,       dv_erfcinv,       NULL),
-    FUNC_ENTRY("atanh",         false, &ops_atanh,         dv_atanh,         NULL),
+    FUNC_ENTRY("sqrt",          false, &ops_sqrt,          dv_sqrt,          NULL),
     FUNC_ENTRY("floor",         false, &ops_floor,         dv_floor,         NULL),
+    FUNC_ENTRY("trigamma",      false, &ops_trigamma,      dv_trigamma,      NULL),
+    FUNC_ENTRY("abs",           false, &ops_abs,           dv_abs,           NULL),
+    FUNC_ENTRY("W₋₁",           false, &ops_lambert_wm1,   dv_lambert_wm1,   NULL),
+    FUNC_ENTRY("acosh",         false, &ops_acosh,         dv_acosh,         NULL),
+    FUNC_ENTRY("productlog",    false, &ops_lambert_w,     dv_lambert_w,     NULL),
+    FUNC_ENTRY("hypot",         true,  &ops_hypot,         NULL,             dv_hypot),
+    FUNC_ENTRY("lgamma",        false, &ops_lgamma,        dv_lgamma,        NULL),
+    FUNC_ENTRY("polygamma",     true,  &ops_polygamma,     NULL,             dv_polygamma_dv),
+    FUNC_ENTRY("gammainv",      false, &ops_gammainv,      dv_gammainv,      NULL),
+    FUNC_ENTRY("E1",            false, &ops_e1,            dv_e1,            NULL),
+    FUNC_ENTRY("exp",           false, &ops_exp,           dv_exp,           NULL),
+    FUNC_ENTRY("tanh",          false, &ops_tanh,          dv_tanh,          NULL),
+    FUNC_ENTRY("logbeta",       true,  &ops_logbeta,       NULL,             dv_logbeta),
+    FUNC_ENTRY("gammainc_lower", true, &ops_gammainc_lower, NULL,            dv_gammainc_lower),
+    FUNC_ENTRY("gammainc_upper", true, &ops_gammainc_upper, NULL,            dv_gammainc_upper),
+    FUNC_ENTRY("gammainc_P",    true,  &ops_gammainc_P,    NULL,             dv_gammainc_P),
+    FUNC_ENTRY("gammainc_Q",    true,  &ops_gammainc_Q,    NULL,             dv_gammainc_Q),
+    FUNC_ENTRY("asin",          false, &ops_asin,          dv_asin,          NULL),
+    FUNC_ENTRY("beta",          true,  &ops_beta,          NULL,             dv_beta),
+    FUNC_ENTRY("W_0",           false, &ops_lambert_w0,    dv_lambert_w0,    NULL),
+    FUNC_ENTRY("sinh",          false, &ops_sinh,          dv_sinh,          NULL),
+    FUNC_ENTRY("Ei",            false, &ops_ei,            dv_ei,            NULL),
+    FUNC_ENTRY("erfinv",        false, &ops_erfinv,        dv_erfinv,        NULL),
+    FUNC_ENTRY("Γ",             false, &ops_gamma,         dv_gamma,         NULL),
+    FUNC_ENTRY("erf",           false, &ops_erf,           dv_erf,           NULL),
+    FUNC_ENTRY("normal_pdf",    false, &ops_normal_pdf,    dv_normal_pdf,    NULL),
+    FUNC_ENTRY("tan",           false, &ops_tan,           dv_tan,           NULL),
+    FUNC_ENTRY("normal_cdf",    false, &ops_normal_cdf,    dv_normal_cdf,    NULL),
+    FUNC_ENTRY("acos",          false, &ops_acos,          dv_acos,          NULL),
+    FUNC_ENTRY("W-1",           false, &ops_lambert_wm1,   dv_lambert_wm1,   NULL),
+    FUNC_ENTRY("ln",            false, &ops_log,           dv_log,           NULL),
+    FUNC_ENTRY("log10",         false, &ops_log10,         dv_log10,         NULL),
+    FUNC_ENTRY("atanh",         false, &ops_atanh,         dv_atanh,         NULL),
+    FUNC_ENTRY("lambert_wm1",   false, &ops_lambert_wm1,   dv_lambert_wm1,   NULL),
+    FUNC_ENTRY("cosh",          false, &ops_cosh,          dv_cosh,          NULL),
+    FUNC_ENTRY("sin",           false, &ops_sin,           dv_sin,           NULL),
+    FUNC_ENTRY("erfc",          false, &ops_erfc,          dv_erfc,          NULL),
+    FUNC_ENTRY("digamma",       false, &ops_digamma,       dv_digamma,       NULL),
+    FUNC_ENTRY("ψ⁽¹⁾",          false, &ops_trigamma,      dv_trigamma,      NULL),
+    FUNC_ENTRY("gamma",         false, &ops_gamma,         dv_gamma,         NULL),
+    FUNC_ENTRY("atan2",         true,  &ops_atan2,         NULL,             dv_atan2),
+    FUNC_ENTRY("ψ⁽⁰⁾",          false, &ops_digamma,       dv_digamma,       NULL),
+    FUNC_ENTRY("W",             false, &ops_lambert_w,     dv_lambert_w,     NULL),
+    FUNC_ENTRY("pow",           true,  &ops_pow,           NULL,             dv_pow_dv),
+    FUNC_ENTRY("normal_logpdf", false, &ops_normal_logpdf, dv_normal_logpdf, NULL),
+    FUNC_ENTRY("cos",           false, &ops_cos,           dv_cos,           NULL),
+    FUNC_ENTRY("log",           false, &ops_log10,         dv_log10,         NULL),
+    FUNC_ENTRY("lambert_w0",    false, &ops_lambert_w0,    dv_lambert_w0,    NULL),
+    FUNC_ENTRY("atan",          false, &ops_atan,          dv_atan,          NULL),
+    FUNC_ENTRY("W0",            false, &ops_lambert_w0,    dv_lambert_w0,    NULL),
+    FUNC_ENTRY("ceil",          false, &ops_ceil,          dv_ceil,          NULL),
+    FUNC_ENTRY("W_-1",          false, &ops_lambert_wm1,   dv_lambert_wm1,   NULL),
+    FUNC_ENTRY("erfcinv",       false, &ops_erfcinv,       dv_erfcinv,       NULL),
+    FUNC_ENTRY("W₀",            false, &ops_lambert_w0,    dv_lambert_w0,    NULL),
+    FUNC_ENTRY("factorial",     false, &ops_factorial,     dv_factorial,     NULL),
+    FUNC_ENTRY("fibonacci",     false, &ops_fibonacci,     dv_fibonacci,     NULL),
+    FUNC_ENTRY("partition",     false, &ops_partition,     dv_partition,     NULL),
+    FUNC_ENTRY("isqrt",         false, &ops_isqrt,         dv_isqrt,         NULL),
+    FUNC_ENTRY("gcd",           true,  &ops_gcd,           NULL,             dv_gcd),
+    FUNC_ENTRY("lcm",           true,  &ops_lcm,           NULL,             dv_lcm),
+    FUNC_ENTRY("mod",           true,  &ops_mod,           NULL,             dv_mod),
+    FUNC_ENTRY("modinv",        true,  &ops_modinv,        NULL,             dv_modinv),
+    FUNC_ENTRY("is_prime",      false, &ops_is_prime,      dv_is_prime,      NULL),
+    FUNC_ENTRY("next_prime",    false, &ops_next_prime,    dv_next_prime,    NULL),
+    FUNC_ENTRY("prev_prime",    false, &ops_prev_prime,    dv_prev_prime,    NULL),
+    FUNC_ENTRY("AND",           true,  &ops_bit_and,       NULL,             dv_bit_and),
+    FUNC_ENTRY("OR",            true,  &ops_bit_or,        NULL,             dv_bit_or),
+    FUNC_ENTRY("XOR",           true,  &ops_bit_xor,       NULL,             dv_bit_xor),
+    FUNC_ENTRY("NOT",           false, &ops_bit_not,       dv_bit_not,       NULL),
+    FUNC_ENTRY("SHL",           true,  &ops_shl,           NULL,             dv_shl),
+    FUNC_ENTRY("SHR",           true,  &ops_shr,           NULL,             dv_shr),
+    FUNC_ENTRY("factors",       false, &ops_factors,       dv_factors,       NULL),
+    FUNC_ENTRY("binomial",      true,  NULL,                NULL,             dv_binomial),
+    FUNC_TERNARY_ENTRY("beta_pdf",    dv_beta_pdf),
+    FUNC_TERNARY_ENTRY("logbeta_pdf", dv_logbeta_pdf),
 };
-
-static const func_entry_t s_func_alias_w0 =
-    FUNC_ENTRY("W₀", false, &ops_lambert_w0, dv_lambert_w0, NULL);
-
-static const func_entry_t s_func_alias_wm1 =
-    FUNC_ENTRY("W₋₁", false, &ops_lambert_wm1, dv_lambert_wm1, NULL);
-
-static const func_entry_t s_func_alias_ascii_w =
-    FUNC_ENTRY("W", false, &ops_lambert_w0, dv_lambert_w0, NULL);
-
-static const func_entry_t s_func_alias_ascii_w0 =
-    FUNC_ENTRY("W0", false, &ops_lambert_w0, dv_lambert_w0, NULL);
-
-static const func_entry_t s_func_alias_ascii_w0_sub =
-    FUNC_ENTRY("W_0", false, &ops_lambert_w0, dv_lambert_w0, NULL);
-
-static const func_entry_t s_func_alias_ascii_wm1 =
-    FUNC_ENTRY("W-1", false, &ops_lambert_wm1, dv_lambert_wm1, NULL);
-
-static const func_entry_t s_func_alias_ascii_wm1_sub =
-    FUNC_ENTRY("W_-1", false, &ops_lambert_wm1, dv_lambert_wm1, NULL);
 
 static unsigned func_bucket_hash(const char *kw, size_t klen)
 {
@@ -249,14 +269,6 @@ static const func_entry_t *lookup_func(const char *kw, size_t klen)
     if (entry->klen == klen && memcmp(kw, entry->kw, klen) == 0)
         return entry;
 
-    if (klen == s_func_alias_w0.klen &&
-        memcmp(kw, s_func_alias_w0.kw, klen) == 0)
-        return &s_func_alias_w0;
-
-    if (klen == s_func_alias_wm1.klen &&
-        memcmp(kw, s_func_alias_wm1.kw, klen) == 0)
-        return &s_func_alias_wm1;
-
     return NULL;
 }
 
@@ -286,6 +298,21 @@ static int is_superscript_digit_codepoint(unsigned int c)
 {
     return c == 0x00B2 || c == 0x00B3 || c == 0x00B9 || c == 0x2070 ||
            (c >= 0x2074 && c <= 0x2079);
+}
+
+static int superscript_digit_value(unsigned int c)
+{
+    if (c == 0x00B9)
+        return 1;
+    if (c == 0x00B2)
+        return 2;
+    if (c == 0x00B3)
+        return 3;
+    if (c == 0x2070)
+        return 0;
+    if (c >= 0x2074 && c <= 0x2079)
+        return (int)(c - 0x2070);
+    return -1;
 }
 
 static int is_subscript_digit_codepoint(unsigned int c)
@@ -342,52 +369,131 @@ static size_t scan_unicode_fraction_len(const char *s, const char *end)
  * immediately followed by '(' optionally preceded by a power marker.
  * Accepted power markers: Unicode superscripts (sin²) or ASCII ^N (sin^2).
  * Returns the position of the opening '(', or NULL if the pattern doesn't match. */
-static const char *func_call_start(const char *pos, const char *kw, size_t klen)
+static const char *func_call_start(const char *pos, const char *end,
+                                   const char *kw, size_t klen)
 {
+    if (pos + klen > end)
+        return NULL;
     if (strncmp(pos, kw, klen) != 0) return NULL;
     const char *after = pos + klen;
     /* Skip Unicode superscript digits (sin²(x) form) */
-    while (is_superscript_byte(after)) {
+    while (after < end && is_superscript_byte(after)) {
         unsigned int c;
         int len = fs_utf8_decode(after, &c);
         after += len;
     }
     /* Skip ASCII ^N (sin^2(x) form) */
-    if (*after == '^' && isdigit((unsigned char)after[1])) {
+    if (after + 1 < end && *after == '^' &&
+        isdigit((unsigned char)after[1])) {
         after++; /* skip '^' */
-        while (isdigit((unsigned char)*after)) after++;
+        while (after < end && isdigit((unsigned char)*after)) after++;
     }
-    return (*after == '(') ? after : NULL;
+    return (after < end && *after == '(') ? after : NULL;
 }
 
-static const func_entry_t *lookup_unicode_func_alias(const char *pos, const char **paren_out)
+static const func_entry_t *lookup_fixed_func_call(const char *pos,
+                                                  const char *end,
+                                                  const char **paren_out)
 {
-    static const func_entry_t *const aliases[] = {
-        &s_func_alias_w0,
-        &s_func_alias_wm1,
-        &s_func_alias_ascii_w,
-        &s_func_alias_ascii_w0,
-        &s_func_alias_ascii_w0_sub,
-        &s_func_alias_ascii_wm1,
-        &s_func_alias_ascii_wm1_sub,
-    };
-    size_t i;
+    const char *id = pos;
+    const char *id_end = id;
+    size_t id_len;
 
     if (paren_out)
         *paren_out = NULL;
 
-    for (i = 0u; i < sizeof(aliases) / sizeof(aliases[0]); ++i) {
-        const char *paren = func_call_start(pos, aliases[i]->kw, aliases[i]->klen);
+    while (id_end < end &&
+           (isalpha((unsigned char)*id_end) ||
+            isdigit((unsigned char)*id_end) ||
+            *id_end == '_'))
+        id_end++;
+    id_len = (size_t)(id_end - id);
 
+    if (id_len > 0u) {
+        const func_entry_t *entry = lookup_func(id, id_len);
+
+        if (entry) {
+            const char *paren = func_call_start(pos, end, entry->kw, entry->klen);
+
+            if (paren) {
+                if (paren_out)
+                    *paren_out = paren;
+                return entry;
+            }
+        }
+    }
+
+    for (size_t i = 0u; i < FUNC_TABLE_SIZE; ++i) {
+        const func_entry_t *entry = &s_funcs[i];
+        const char *paren;
+
+        if (!entry->kw)
+            continue;
+        paren = func_call_start(pos, end, entry->kw, entry->klen);
         if (!paren)
             continue;
 
         if (paren_out)
             *paren_out = paren;
-        return aliases[i];
+        return entry;
     }
 
     return NULL;
+}
+
+static int scan_polygamma_symbol_call(const char *pos, const char *end,
+                                      unsigned int *order_out,
+                                      const char **paren_out)
+{
+    const char *p = pos;
+    unsigned int c;
+    unsigned long order = 0ul;
+    int len;
+    int digits = 0;
+
+    if (order_out)
+        *order_out = 0u;
+    if (paren_out)
+        *paren_out = NULL;
+
+    len = scan_utf8_codepoint(p, end, &c);
+    if (len <= 0 || c != 0x03C8)
+        return 0;
+    p += len;
+
+    len = scan_utf8_codepoint(p, end, &c);
+    if (len <= 0 || c != 0x207D)
+        return 0;
+    p += len;
+
+    while ((len = scan_utf8_codepoint(p, end, &c)) > 0 &&
+           is_superscript_digit_codepoint(c)) {
+        int digit = superscript_digit_value(c);
+
+        if (digit < 0)
+            return 0;
+        if (order > (ULONG_MAX - (unsigned long)digit) / 10ul)
+            return 0;
+        order = order * 10ul + (unsigned long)digit;
+        p += len;
+        ++digits;
+    }
+    if (digits == 0 || order > UINT_MAX)
+        return 0;
+
+    len = scan_utf8_codepoint(p, end, &c);
+    if (len <= 0 || c != 0x207E)
+        return 0;
+    p += len;
+
+    if (p >= end || *p != '(')
+        return 0;
+
+    if (order_out)
+        *order_out = (unsigned int)order;
+    if (paren_out)
+        *paren_out = p;
+    return 1;
 }
 
 /* ------------------------------------------------------------------ */
@@ -412,6 +518,52 @@ static int parse_two_args(parser_t *p, dval_t **a_out, dval_t **b_out)
 
     *a_out = a;
     *b_out = b;
+    return 1;
+}
+
+static int parse_three_args(parser_t *p,
+                            dval_t **a_out,
+                            dval_t **b_out,
+                            dval_t **c_out)
+{
+    dval_t *a = parse_addexpr(p);
+    dval_t *b;
+    dval_t *c;
+
+    if (!a)
+        return 0;
+    if (p->p >= p->end || *p->p != ',') {
+        dv_free(a);
+        set_error(p, "expected ',' in ternary function");
+        return 0;
+    }
+    p->p++;
+    skip_spaces(&p->p, p->end);
+
+    b = parse_addexpr(p);
+    if (!b) {
+        dv_free(a);
+        return 0;
+    }
+    if (p->p >= p->end || *p->p != ',') {
+        dv_free(b);
+        dv_free(a);
+        set_error(p, "expected ',' in ternary function");
+        return 0;
+    }
+    p->p++;
+    skip_spaces(&p->p, p->end);
+
+    c = parse_addexpr(p);
+    if (!c) {
+        dv_free(b);
+        dv_free(a);
+        return 0;
+    }
+
+    *a_out = a;
+    *b_out = b;
+    *c_out = c;
     return 1;
 }
 
@@ -745,6 +897,23 @@ static dval_t *apply_integer_power_if_present(dval_t *value, int exponent)
     return powered;
 }
 
+static dval_t *apply_factorial_postfix(dval_t *value)
+{
+    dval_t *one = dv_new_const(NUM_ONE);
+    dval_t *incremented;
+
+    if (!one) {
+        dv_free(value);
+        return NULL;
+    }
+
+    one->binding_expr = dv_binding_expr_new_number_text("1");
+    incremented = apply_binary_preserving_constexpr(&ops_add, value, one, dv_add);
+    if (!incremented)
+        return NULL;
+    return apply_unary_preserving_constexpr(&ops_gamma, incremented, dv_gamma);
+}
+
 static dval_t *parse_enclosed_addexpr(parser_t *p, char closing, const char *errmsg)
 {
     dval_t *inner;
@@ -836,9 +1005,17 @@ static dval_t *parse_atom(parser_t *p)
         }
         p->p += len;
         node = dv_new_const(value);
-        text = (char *)fs_xmalloc(len + 1u);
-        memcpy(text, start, len);
-        text[len] = '\0';
+        if (num_is_exact(value)) {
+            text = num_to_string(value);
+            if (!text) {
+                text = (char *)fs_xmalloc(4u);
+                memcpy(text, "NAN", 4u);
+            }
+        } else {
+            text = (char *)fs_xmalloc(len + 1u);
+            memcpy(text, start, len);
+            text[len] = '\0';
+        }
         node->binding_expr = dv_binding_expr_new_number_text(text);
         free(text);
         return node;
@@ -861,71 +1038,87 @@ static dval_t *parse_atom(parser_t *p)
 
     {
         const char *paren = NULL;
-        const func_entry_t *fe = lookup_unicode_func_alias(p->p, &paren);
+        const func_entry_t *fe = lookup_fixed_func_call(p->p, p->end, &paren);
 
-        if (fe && paren) {
+        if (fe) {
             const char *after_kw = p->p + fe->klen;
             int sup = read_optional_display_exponent(&after_kw);
             (void)after_kw;
 
-            p->p = paren + 1;
+            p->p = paren + 1; /* skip past '(' */
+            if (fe->arity == 2u) {
+                dval_t *a = NULL;
+                dval_t *b = NULL;
+                dval_t *result;
 
-            dval_t *arg = parse_enclosed_addexpr(
-                p, ')', "expected ')' after function argument");
-            dval_t *result;
+                if (!parse_two_args(p, &a, &b))
+                    return NULL;
+                if (!parse_required_char(p, ')', "expected ')' after binary function")) {
+                    dv_free(a);
+                    dv_free(b);
+                    return NULL;
+                }
+                result = fe->ops
+                    ? apply_binary_preserving_constexpr(fe->ops, a, b, fe->bfn)
+                    : fe->bfn(a, b);
+                if (!fe->ops) {
+                    dv_free(a);
+                    dv_free(b);
+                }
+                return apply_integer_power_if_present(result, sup);
+            } else if (fe->arity == 3u) {
+                dval_t *a = NULL;
+                dval_t *b = NULL;
+                dval_t *c = NULL;
+                dval_t *result;
 
-            if (!arg)
-                return NULL;
-            result = apply_unary_preserving_constexpr(fe->ops, arg, fe->ufn);
-            return apply_integer_power_if_present(result, sup);
+                if (!parse_three_args(p, &a, &b, &c))
+                    return NULL;
+                if (!parse_required_char(p, ')', "expected ')' after ternary function")) {
+                    dv_free(a);
+                    dv_free(b);
+                    dv_free(c);
+                    return NULL;
+                }
+                result = fe->tfn(a, b, c);
+                dv_free(a);
+                dv_free(b);
+                dv_free(c);
+                return apply_integer_power_if_present(result, sup);
+            } else {
+                dval_t *arg = parse_enclosed_addexpr(
+                    p, ')', "expected ')' after function argument");
+                dval_t *result;
+
+                if (!arg)
+                    return NULL;
+                if (fe->ops == &ops_factors) {
+                    result = fe->ufn(arg);
+                    dv_free(arg);
+                } else {
+                    result = apply_unary_preserving_constexpr(fe->ops, arg, fe->ufn);
+                }
+                return apply_integer_power_if_present(result, sup);
+            }
         }
     }
 
-    /* Function keywords — O(1) hash lookup.  We read the ASCII identifier at
-     * the current position (letters, digits, underscores; stops before UTF-8
-     * superscripts and '^'), look it up in the hash table, then confirm that
-     * '(' (optionally preceded by a superscript) follows. */
-    const char *id = p->p;
-    const char *id_end = id;
-    while (id_end < p->end &&
-           (isalpha((unsigned char)*id_end) ||
-            isdigit((unsigned char)*id_end) ||
-            *id_end == '_'))
-        id_end++;
-    size_t id_len = (size_t)(id_end - id);
+    {
+        unsigned int order = 0u;
+        const char *paren = NULL;
 
-    if (id_len > 0) {
-        const func_entry_t *fe = lookup_func(id, id_len);
-        if (fe) {
-            const char *paren = func_call_start(p->p, fe->kw, fe->klen);
-            if (paren) {
-                const char *after_kw = p->p + fe->klen;
-                int sup = read_optional_display_exponent(&after_kw);
-                (void)after_kw;
+        if (scan_polygamma_symbol_call(p->p, p->end, &order, &paren)) {
+            dval_t *arg;
+            dval_t *result;
 
-                p->p = paren + 1; /* skip past '(' */
-
-                if (fe->is_binary) {
-                    dval_t *a = NULL, *b = NULL;
-                    if (!parse_two_args(p, &a, &b)) return NULL;
-                    if (!parse_required_char(p, ')', "expected ')' after binary function")) {
-                        dv_free(a);
-                        dv_free(b);
-                        return NULL;
-                    }
-                    dval_t *result =
-                        apply_binary_preserving_constexpr(fe->ops, a, b, fe->bfn);
-                    return apply_integer_power_if_present(result, sup);
-                } else {
-                    dval_t *arg = parse_enclosed_addexpr(
-                        p, ')', "expected ')' after function argument");
-                    dval_t *result;
-                    if (!arg)
-                        return NULL;
-                    result = apply_unary_preserving_constexpr(fe->ops, arg, fe->ufn);
-                    return apply_integer_power_if_present(result, sup);
-                }
-            }
+            p->p = paren + 1;
+            arg = parse_enclosed_addexpr(
+                p, ')', "expected ')' after polygamma argument");
+            if (!arg)
+                return NULL;
+            result = dv_polygamma(order, arg);
+            dv_free(arg);
+            return result;
         }
     }
 
@@ -968,6 +1161,13 @@ static dval_t *parse_power(parser_t *p)
 
     dval_t *base = parse_atom(p);
     if (!base) return NULL;
+
+    while (p->p < p->end && *p->p == '!') {
+        p->p++;
+        base = apply_factorial_postfix(base);
+        if (!base)
+            return NULL;
+    }
 
     /* Unicode superscript exponent: x² */
     int sup = read_superscript(&p->p);
@@ -1282,11 +1482,11 @@ static int collect_implicit_symbols(const char *start, const char *end,
                 *id_end == '_'))
             id_end++;
 
-        if (id_end > id) {
-            size_t id_len = (size_t)(id_end - id);
-            const func_entry_t *fe = lookup_func(id, id_len);
+        if (id_end > id || (unsigned char)*p >= 0x80) {
+            const char *paren = NULL;
+            const func_entry_t *fe = lookup_fixed_func_call(p, end, &paren);
 
-            if (fe && func_call_start(p, fe->kw, fe->klen)) {
+            if (fe && paren) {
                 p += fe->klen;
                 continue;
             }

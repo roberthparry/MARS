@@ -266,6 +266,96 @@ qcomplex_t qc_tetragamma(qcomplex_t z)
     return qc_add(result, accum);
 }
 
+static qfloat_t qc_factorial_uint(unsigned int n)
+{
+    qfloat_t out = QF_ONE;
+
+    for (unsigned int k = 2u; k <= n; ++k)
+        out = qf_mul_double(out, (double)k);
+    return out;
+}
+
+static qfloat_t qc_bernoulli_even_term(size_t index)
+{
+    qfloat_t coeff;
+
+    coeff = qf_div(qf_from_double(QFI_BERNOULLI_EVEN_TERMS[index].num),
+                   qf_from_double(QFI_BERNOULLI_EVEN_TERMS[index].den));
+    return QFI_BERNOULLI_EVEN_TERMS[index].sign < 0 ? qf_neg(coeff) : coeff;
+}
+
+static qcomplex_t qc_pow_uint(qcomplex_t z, unsigned int n)
+{
+    qcomplex_t result = QC_ONE;
+    qcomplex_t base = z;
+
+    while (n > 0u) {
+        if ((n & 1u) != 0u)
+            result = qc_mul(result, base);
+        n >>= 1u;
+        if (n != 0u)
+            base = qc_mul(base, base);
+    }
+    return result;
+}
+
+static qcomplex_t qc_polygamma_asymp(unsigned int order, qcomplex_t z)
+{
+    qcomplex_t inv = qc_div(QC_ONE, z);
+    qcomplex_t inv2 = qc_mul(inv, inv);
+    qcomplex_t sum = qc_mul(qc_make(qc_factorial_uint(order - 1u), QF_ZERO),
+        qc_pow_uint(inv, order));
+    qcomplex_t power = qc_pow_uint(inv, order + 1u);
+    qfloat_t order_fact = qc_factorial_uint(order);
+
+    sum = qc_add(sum, qc_mul(qc_make(qf_mul(order_fact, QF_HALF), QF_ZERO), power));
+    power = qc_mul(power, inv);
+
+    for (size_t k = 0u; k < QFI_BERNOULLI_EVEN_TERM_COUNT; ++k) {
+        unsigned int two_k = (unsigned int)(2u * (k + 1u));
+        qfloat_t coeff = qc_bernoulli_even_term(k);
+
+        for (unsigned int j = 1u; j < order; ++j)
+            coeff = qf_mul_double(coeff, (double)(two_k + j));
+        sum = qc_add(sum, qc_mul(qc_make(coeff, QF_ZERO), power));
+        power = qc_mul(power, inv2);
+    }
+
+    return (order % 2u) == 0u ? qc_neg(sum) : sum;
+}
+
+qcomplex_t qc_polygamma(unsigned int order, qcomplex_t z)
+{
+    qcomplex_t zz;
+    qcomplex_t accum;
+    qfloat_t fact;
+    int recurrence_sign;
+
+    if (order == 0u)
+        return qc_digamma(z);
+    if (order == 1u)
+        return qc_trigamma(z);
+    if (order == 2u)
+        return qc_tetragamma(z);
+    if (qf_eq(qc_imag(z), QF_ZERO))
+        return qc_make(qf_polygamma(order, qc_real(z)), QF_ZERO);
+
+    zz = z;
+    accum = QC_ZERO;
+    fact = qc_factorial_uint(order);
+    recurrence_sign = (order % 2u) == 0u ? 1 : -1;
+
+    while (qf_lt(qc_abs2_local(zz), qf_from_double(400.0))) {
+        qcomplex_t term = qc_mul(qc_make(fact, QF_ZERO),
+            qc_div(QC_ONE, qc_pow_uint(zz, order + 1u)));
+
+        accum = recurrence_sign > 0 ? qc_sub(accum, term) : qc_add(accum, term);
+        zz = qc_add(zz, QC_ONE);
+    }
+
+    return qc_add(qc_polygamma_asymp(order, zz), accum);
+}
+
 qcomplex_t qc_gammainv(qcomplex_t z)
 {
     if (qf_eq(qc_imag(z), qf_from_double(0.0)))
@@ -405,7 +495,9 @@ static qcomplex_t qc_lambert_wm1_complex(qcomplex_t z)
     if (qc_isnan(z))
         return qc_make(QF_NAN, QF_NAN);
 
-    if (qf_eq(qc_imag(z), qf_from_double(0.0)))
+    if (qf_eq(qc_imag(z), qf_from_double(0.0)) &&
+        qf_ge(qc_real(z), QF_NEG_INV_E) &&
+        qf_lt(qc_real(z), QF_ZERO))
         return qc_make(qf_lambert_wm1(qc_real(z)), QF_ZERO);
 
     if (qf_eq(qc_real(z), QF_ZERO) && qf_eq(qc_imag(z), QF_ZERO))
@@ -448,11 +540,16 @@ qcomplex_t qc_lambert_wm1(qcomplex_t z)
 
 qcomplex_t qc_productlog(qcomplex_t z)
 {
-    if (qf_eq(qc_imag(z), qf_from_double(0.0)))
+    if (qf_eq(qc_imag(z), qf_from_double(0.0)) &&
+        qf_ge(qc_real(z), QF_NEG_INV_E))
         return qc_make(qf_productlog(qc_real(z)), QF_ZERO);
 
-    /* Halley iteration on the principal branch: w e^w = z */
-    qcomplex_t w = qc_log(z);
+    /* Halley iteration on the principal branch: w e^w = z.
+     * Near zero the principal solution is near z itself; starting at log(z)
+     * can converge to a non-principal branch. */
+    qcomplex_t w = qf_lt(qc_abs2_local(z), qf_from_double(0.25))
+        ? z
+        : qc_log(z);
     for (int i = 0; i < QC_PRODUCTLOG_HALLEY_MAX_STEPS; i++) {
         qcomplex_t ew    = qc_exp(w);
         qcomplex_t wew   = qc_mul(w, ew);

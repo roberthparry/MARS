@@ -352,6 +352,7 @@ void test_gammainv(void);
 void test_lgamma(void);
 void test_digamma(void);
 void test_trigamma(void);
+void test_polygamma(void);
 void test_lambert_w0(void);
 void test_lambert_wm1(void);
 void test_normal_pdf(void);
@@ -361,6 +362,10 @@ void test_ei(void);
 void test_e1(void);
 void test_beta(void);
 void test_logbeta(void);
+void test_gammainc(void);
+void test_beta_pdf(void);
+void test_logbeta_pdf(void);
+void test_binomial(void);
 void test_deriv_trigamma(void);
 void test_second_deriv_digamma(void);
 

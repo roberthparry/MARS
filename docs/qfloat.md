@@ -19,7 +19,7 @@ maintained after every operation.
 - ~106 bits of precision (~31–32 decimal digits)
 - arithmetic: add, subtract, multiply, divide, power
 - elementary functions: exp, log, sqrt, sin, cos, tan, atan2, hypot, and inverses
-- special functions: gamma, erf, Lambert W, beta, incomplete gamma, exponential integrals, normal distribution
+- special functions: gamma, polygamma, erf, Lambert W, beta, incomplete gamma, exponential integrals, normal distribution
 - decimal parsing and formatting
 - `printf` support through `%q` and `%Q`
 
@@ -225,6 +225,7 @@ All declarations are in `include/qfloat.h`.
 - `qfloat_t qf_digamma(qfloat_t x)` — ψ(x) = d/dx ln Γ(x)
 - `qfloat_t qf_trigamma(qfloat_t x)` — ψ'(x); pole at non-positive integers
 - `qfloat_t qf_tetragamma(qfloat_t x)` — ψ''(x); pole at non-positive integers
+- `qfloat_t qf_polygamma(unsigned int order, qfloat_t x)` — ψ⁽ⁿ⁾(x)
 - `qfloat_t qf_gammainv(qfloat_t y)` — principal branch of Γ⁻¹(y)
 - `qfloat_t qf_gammainc_lower(qfloat_t s, qfloat_t x)` — lower incomplete γ(s, x)
 - `qfloat_t qf_gammainc_upper(qfloat_t s, qfloat_t x)` — upper incomplete Γ(s, x)
@@ -329,5 +330,4 @@ Results:
 
 For a broader benchmark overview, see
 [`docs/benchmarks.md`](benchmarks.md).
-
 

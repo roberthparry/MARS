@@ -1,4 +1,6 @@
 #include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #include "dval_math_internal.h"
 
@@ -267,23 +269,38 @@ const dval_ops_t ops_gamma = {
 const dval_ops_t ops_digamma = {
     .eval = eval_digamma, .deriv = deriv_digamma, .reverse = dv_reverse_digamma,
     .kind = DV_KIND_DIGAMMA, .arity = DV_OP_UNARY, .name = "digamma",
-    .tex_name = "\\psi",
+    .tex_name = "\\psi^{(0)}",
     .apply_unary = dv_digamma, .apply_binary = NULL,
     .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
 };
 const dval_ops_t ops_trigamma = {
     .eval = eval_trigamma, .deriv = deriv_trigamma, .reverse = dv_reverse_trigamma,
     .kind = DV_KIND_TRIGAMMA, .arity = DV_OP_UNARY, .name = "trigamma",
-    .tex_name = "\\operatorname{trigamma}",
+    .tex_name = "\\psi^{(1)}",
     .apply_unary = dv_trigamma, .apply_binary = NULL,
     .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
+};
+const dval_ops_t ops_polygamma = {
+    .eval = eval_polygamma, .deriv = deriv_polygamma, .reverse = dv_reverse_polygamma,
+    .kind = DV_KIND_POLYGAMMA, .arity = DV_OP_BINARY, .name = "polygamma",
+    .tex_name = "\\psi",
+    .apply_unary = NULL, .apply_binary = dv_polygamma_dv,
+    .simplify = dv_simplify_binary_operator, .fold_const_unary = NULL
 };
 const dval_ops_t ops_gammainv = {
     .eval = eval_gammainv, .deriv = deriv_gammainv, .reverse = dv_reverse_gammainv,
     .kind = DV_KIND_GAMMAINV, .arity = DV_OP_UNARY, .name = "gammainv",
-    .tex_name = "\\operatorname{gammainv}",
+    .tex_name = "\\Gamma^{-1}",
     .inverse_unary = dv_gamma,
     .apply_unary = dv_gammainv, .apply_binary = NULL,
+    .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
+};
+const dval_ops_t ops_lambert_w = {
+    .eval = eval_lambert_w, .deriv = deriv_lambert_w, .reverse = dv_reverse_lambert_w,
+    .kind = DV_KIND_LAMBERT_W, .arity = DV_OP_UNARY, .name = "W",
+    .tex_name = "W",
+    .inverse_unary = dv_inverse_lambert_internal,
+    .apply_unary = dv_lambert_w, .apply_binary = NULL,
     .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
 };
 const dval_ops_t ops_lambert_w0 = {
@@ -351,6 +368,178 @@ const dval_ops_t ops_logbeta = {
     .apply_unary = NULL, .apply_binary = dv_logbeta,
     .simplify = dv_simplify_binary_operator, .fold_const_unary = NULL
 };
+const dval_ops_t ops_gammainc_lower = {
+    .eval = eval_gammainc_lower, .deriv = deriv_gammainc_lower, .reverse = dv_reverse_gammainc_lower,
+    .kind = DV_KIND_GAMMAINC_LOWER, .arity = DV_OP_BINARY, .name = "gammainc_lower",
+    .tex_name = "\\gamma",
+    .apply_unary = NULL, .apply_binary = dv_gammainc_lower,
+    .simplify = dv_simplify_binary_operator, .fold_const_unary = NULL
+};
+const dval_ops_t ops_gammainc_upper = {
+    .eval = eval_gammainc_upper, .deriv = deriv_gammainc_upper, .reverse = dv_reverse_gammainc_upper,
+    .kind = DV_KIND_GAMMAINC_UPPER, .arity = DV_OP_BINARY, .name = "gammainc_upper",
+    .tex_name = "\\Gamma",
+    .apply_unary = NULL, .apply_binary = dv_gammainc_upper,
+    .simplify = dv_simplify_binary_operator, .fold_const_unary = NULL
+};
+const dval_ops_t ops_gammainc_P = {
+    .eval = eval_gammainc_P, .deriv = deriv_gammainc_P, .reverse = dv_reverse_gammainc_P,
+    .kind = DV_KIND_GAMMAINC_P, .arity = DV_OP_BINARY, .name = "gammainc_P",
+    .tex_name = "\\operatorname{P}",
+    .apply_unary = NULL, .apply_binary = dv_gammainc_P,
+    .simplify = dv_simplify_binary_operator, .fold_const_unary = NULL
+};
+const dval_ops_t ops_gammainc_Q = {
+    .eval = eval_gammainc_Q, .deriv = deriv_gammainc_Q, .reverse = dv_reverse_gammainc_Q,
+    .kind = DV_KIND_GAMMAINC_Q, .arity = DV_OP_BINARY, .name = "gammainc_Q",
+    .tex_name = "\\operatorname{Q}",
+    .apply_unary = NULL, .apply_binary = dv_gammainc_Q,
+    .simplify = dv_simplify_binary_operator, .fold_const_unary = NULL
+};
+const dval_ops_t ops_factorial = {
+    .eval = eval_factorial, .deriv = deriv_not_differentiable,
+    .reverse = dv_reverse_not_differentiable,
+    .kind = DV_KIND_FACTORIAL, .arity = DV_OP_UNARY, .diff_kind = DV_DIFF_NONE,
+    .name = "factorial", .tex_name = "\\operatorname{factorial}",
+    .apply_unary = dv_factorial, .apply_binary = NULL,
+    .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
+};
+const dval_ops_t ops_fibonacci = {
+    .eval = eval_fibonacci, .deriv = deriv_not_differentiable,
+    .reverse = dv_reverse_not_differentiable,
+    .kind = DV_KIND_FIBONACCI, .arity = DV_OP_UNARY, .diff_kind = DV_DIFF_NONE,
+    .name = "fibonacci", .tex_name = "\\operatorname{fibonacci}",
+    .apply_unary = dv_fibonacci, .apply_binary = NULL,
+    .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
+};
+const dval_ops_t ops_partition = {
+    .eval = eval_partition, .deriv = deriv_not_differentiable,
+    .reverse = dv_reverse_not_differentiable,
+    .kind = DV_KIND_PARTITION, .arity = DV_OP_UNARY, .diff_kind = DV_DIFF_NONE,
+    .name = "partition", .tex_name = "\\operatorname{partition}",
+    .apply_unary = dv_partition, .apply_binary = NULL,
+    .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
+};
+const dval_ops_t ops_isqrt = {
+    .eval = eval_isqrt, .deriv = deriv_not_differentiable,
+    .reverse = dv_reverse_not_differentiable,
+    .kind = DV_KIND_ISQRT, .arity = DV_OP_UNARY, .diff_kind = DV_DIFF_NONE,
+    .name = "isqrt", .tex_name = "\\operatorname{isqrt}",
+    .apply_unary = dv_isqrt, .apply_binary = NULL,
+    .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
+};
+const dval_ops_t ops_gcd = {
+    .eval = eval_gcd, .deriv = deriv_not_differentiable,
+    .reverse = dv_reverse_not_differentiable,
+    .kind = DV_KIND_GCD, .arity = DV_OP_BINARY, .diff_kind = DV_DIFF_NONE,
+    .name = "gcd", .tex_name = "\\gcd",
+    .apply_unary = NULL, .apply_binary = dv_gcd,
+    .simplify = dv_simplify_binary_operator, .fold_const_unary = NULL
+};
+const dval_ops_t ops_lcm = {
+    .eval = eval_lcm, .deriv = deriv_not_differentiable,
+    .reverse = dv_reverse_not_differentiable,
+    .kind = DV_KIND_LCM, .arity = DV_OP_BINARY, .diff_kind = DV_DIFF_NONE,
+    .name = "lcm", .tex_name = "\\operatorname{lcm}",
+    .apply_unary = NULL, .apply_binary = dv_lcm,
+    .simplify = dv_simplify_binary_operator, .fold_const_unary = NULL
+};
+const dval_ops_t ops_mod = {
+    .eval = eval_mod, .deriv = deriv_not_differentiable,
+    .reverse = dv_reverse_not_differentiable,
+    .kind = DV_KIND_MOD, .arity = DV_OP_BINARY, .diff_kind = DV_DIFF_NONE,
+    .name = "mod", .tex_name = "\\operatorname{mod}",
+    .apply_unary = NULL, .apply_binary = dv_mod,
+    .simplify = dv_simplify_binary_operator, .fold_const_unary = NULL
+};
+const dval_ops_t ops_modinv = {
+    .eval = eval_modinv, .deriv = deriv_not_differentiable,
+    .reverse = dv_reverse_not_differentiable,
+    .kind = DV_KIND_MODINV, .arity = DV_OP_BINARY, .diff_kind = DV_DIFF_NONE,
+    .name = "modinv", .tex_name = "\\operatorname{modinv}",
+    .apply_unary = NULL, .apply_binary = dv_modinv,
+    .simplify = dv_simplify_binary_operator, .fold_const_unary = NULL
+};
+const dval_ops_t ops_is_prime = {
+    .eval = eval_is_prime, .deriv = deriv_not_differentiable,
+    .reverse = dv_reverse_not_differentiable,
+    .kind = DV_KIND_IS_PRIME, .arity = DV_OP_UNARY, .diff_kind = DV_DIFF_NONE,
+    .name = "is_prime", .tex_name = "\\operatorname{is\\_prime}",
+    .apply_unary = dv_is_prime, .apply_binary = NULL,
+    .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
+};
+const dval_ops_t ops_next_prime = {
+    .eval = eval_next_prime, .deriv = deriv_not_differentiable,
+    .reverse = dv_reverse_not_differentiable,
+    .kind = DV_KIND_NEXT_PRIME, .arity = DV_OP_UNARY, .diff_kind = DV_DIFF_NONE,
+    .name = "next_prime", .tex_name = "\\operatorname{next\\_prime}",
+    .apply_unary = dv_next_prime, .apply_binary = NULL,
+    .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
+};
+const dval_ops_t ops_prev_prime = {
+    .eval = eval_prev_prime, .deriv = deriv_not_differentiable,
+    .reverse = dv_reverse_not_differentiable,
+    .kind = DV_KIND_PREV_PRIME, .arity = DV_OP_UNARY, .diff_kind = DV_DIFF_NONE,
+    .name = "prev_prime", .tex_name = "\\operatorname{prev\\_prime}",
+    .apply_unary = dv_prev_prime, .apply_binary = NULL,
+    .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
+};
+const dval_ops_t ops_bit_and = {
+    .eval = eval_bit_and, .deriv = deriv_not_differentiable,
+    .reverse = dv_reverse_not_differentiable,
+    .kind = DV_KIND_BIT_AND, .arity = DV_OP_BINARY, .diff_kind = DV_DIFF_NONE,
+    .name = "AND", .tex_name = "\\operatorname{AND}",
+    .apply_unary = NULL, .apply_binary = dv_bit_and,
+    .simplify = dv_simplify_binary_operator, .fold_const_unary = NULL
+};
+const dval_ops_t ops_bit_or = {
+    .eval = eval_bit_or, .deriv = deriv_not_differentiable,
+    .reverse = dv_reverse_not_differentiable,
+    .kind = DV_KIND_BIT_OR, .arity = DV_OP_BINARY, .diff_kind = DV_DIFF_NONE,
+    .name = "OR", .tex_name = "\\operatorname{OR}",
+    .apply_unary = NULL, .apply_binary = dv_bit_or,
+    .simplify = dv_simplify_binary_operator, .fold_const_unary = NULL
+};
+const dval_ops_t ops_bit_xor = {
+    .eval = eval_bit_xor, .deriv = deriv_not_differentiable,
+    .reverse = dv_reverse_not_differentiable,
+    .kind = DV_KIND_BIT_XOR, .arity = DV_OP_BINARY, .diff_kind = DV_DIFF_NONE,
+    .name = "XOR", .tex_name = "\\operatorname{XOR}",
+    .apply_unary = NULL, .apply_binary = dv_bit_xor,
+    .simplify = dv_simplify_binary_operator, .fold_const_unary = NULL
+};
+const dval_ops_t ops_bit_not = {
+    .eval = eval_bit_not, .deriv = deriv_not_differentiable,
+    .reverse = dv_reverse_not_differentiable,
+    .kind = DV_KIND_BIT_NOT, .arity = DV_OP_UNARY, .diff_kind = DV_DIFF_NONE,
+    .name = "NOT", .tex_name = "\\operatorname{NOT}",
+    .apply_unary = dv_bit_not, .apply_binary = NULL,
+    .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
+};
+const dval_ops_t ops_shl = {
+    .eval = eval_shl, .deriv = deriv_not_differentiable,
+    .reverse = dv_reverse_not_differentiable,
+    .kind = DV_KIND_SHL, .arity = DV_OP_BINARY, .diff_kind = DV_DIFF_NONE,
+    .name = "SHL", .tex_name = "\\operatorname{SHL}",
+    .apply_unary = NULL, .apply_binary = dv_shl,
+    .simplify = dv_simplify_binary_operator, .fold_const_unary = NULL
+};
+const dval_ops_t ops_shr = {
+    .eval = eval_shr, .deriv = deriv_not_differentiable,
+    .reverse = dv_reverse_not_differentiable,
+    .kind = DV_KIND_SHR, .arity = DV_OP_BINARY, .diff_kind = DV_DIFF_NONE,
+    .name = "SHR", .tex_name = "\\operatorname{SHR}",
+    .apply_unary = NULL, .apply_binary = dv_shr,
+    .simplify = dv_simplify_binary_operator, .fold_const_unary = NULL
+};
+const dval_ops_t ops_factors = {
+    .eval = eval_factors, .deriv = deriv_not_differentiable,
+    .reverse = dv_reverse_not_differentiable,
+    .kind = DV_KIND_FACTORS, .arity = DV_OP_UNARY, .diff_kind = DV_DIFF_NONE,
+    .name = "factors", .tex_name = "\\operatorname{factors}",
+    .apply_unary = dv_factors, .apply_binary = NULL,
+    .simplify = dv_simplify_unary_operator, .fold_const_unary = NULL
+};
 
 dval_t *dv_sqrt(const dval_t *a) { return dv_math_wrap_unary(&ops_sqrt, a); }
 dval_t *dv_exp(const dval_t *a) { return dv_math_wrap_unary(&ops_exp, a); }
@@ -381,7 +570,19 @@ dval_t *dv_erfcinv(const dval_t *a) { return dv_math_wrap_unary(&ops_erfcinv, a)
 dval_t *dv_gamma(const dval_t *a) { return dv_math_wrap_unary(&ops_gamma, a); }
 dval_t *dv_digamma(const dval_t *a) { return dv_math_wrap_unary(&ops_digamma, a); }
 dval_t *dv_trigamma(const dval_t *a) { return dv_math_wrap_unary(&ops_trigamma, a); }
+dval_t *dv_polygamma_dv(const dval_t *order, const dval_t *arg) { return dv_math_wrap_binary(&ops_polygamma, order, arg); }
+dval_t *dv_polygamma(unsigned int order, const dval_t *a)
+{
+    NUM_SCOPE(scope);
+    number_t order_value = num_create_from_long((long)order);
+    dval_t *order_dv = dv_new_const(order_value);
+    dval_t *out = dv_polygamma_dv(order_dv, a);
+
+    dv_free(order_dv);
+    return out;
+}
 dval_t *dv_gammainv(const dval_t *a) { return dv_math_wrap_unary(&ops_gammainv, a); }
+dval_t *dv_lambert_w(const dval_t *a) { return dv_math_wrap_unary(&ops_lambert_w, a); }
 dval_t *dv_lambert_w0(const dval_t *a) { return dv_math_wrap_unary(&ops_lambert_w0, a); }
 dval_t *dv_lambert_wm1(const dval_t *a) { return dv_math_wrap_unary(&ops_lambert_wm1, a); }
 dval_t *dv_normal_pdf(const dval_t *a) { return dv_math_wrap_unary(&ops_normal_pdf, a); }
@@ -391,3 +592,186 @@ dval_t *dv_ei(const dval_t *a) { return dv_math_wrap_unary(&ops_ei, a); }
 dval_t *dv_e1(const dval_t *a) { return dv_math_wrap_unary(&ops_e1, a); }
 dval_t *dv_beta(const dval_t *a, const dval_t *b) { return dv_math_wrap_binary(&ops_beta, a, b); }
 dval_t *dv_logbeta(const dval_t *a, const dval_t *b) { return dv_math_wrap_binary(&ops_logbeta, a, b); }
+dval_t *dv_gammainc_lower(const dval_t *a, const dval_t *b) { return dv_math_wrap_binary(&ops_gammainc_lower, a, b); }
+dval_t *dv_gammainc_upper(const dval_t *a, const dval_t *b) { return dv_math_wrap_binary(&ops_gammainc_upper, a, b); }
+dval_t *dv_gammainc_P(const dval_t *a, const dval_t *b) { return dv_math_wrap_binary(&ops_gammainc_P, a, b); }
+dval_t *dv_gammainc_Q(const dval_t *a, const dval_t *b) { return dv_math_wrap_binary(&ops_gammainc_Q, a, b); }
+dval_t *dv_factorial(const dval_t *a) { return dv_math_wrap_unary(&ops_factorial, a); }
+dval_t *dv_fibonacci(const dval_t *a) { return dv_math_wrap_unary(&ops_fibonacci, a); }
+dval_t *dv_partition(const dval_t *a) { return dv_math_wrap_unary(&ops_partition, a); }
+dval_t *dv_isqrt(const dval_t *a) { return dv_math_wrap_unary(&ops_isqrt, a); }
+dval_t *dv_gcd(const dval_t *a, const dval_t *b) { return dv_math_wrap_binary(&ops_gcd, a, b); }
+dval_t *dv_lcm(const dval_t *a, const dval_t *b) { return dv_math_wrap_binary(&ops_lcm, a, b); }
+dval_t *dv_mod(const dval_t *a, const dval_t *b) { return dv_math_wrap_binary(&ops_mod, a, b); }
+dval_t *dv_modinv(const dval_t *a, const dval_t *b) { return dv_math_wrap_binary(&ops_modinv, a, b); }
+dval_t *dv_is_prime(const dval_t *a) { return dv_math_wrap_unary(&ops_is_prime, a); }
+dval_t *dv_next_prime(const dval_t *a) { return dv_math_wrap_unary(&ops_next_prime, a); }
+dval_t *dv_prev_prime(const dval_t *a) { return dv_math_wrap_unary(&ops_prev_prime, a); }
+dval_t *dv_bit_and(const dval_t *a, const dval_t *b) { return dv_math_wrap_binary(&ops_bit_and, a, b); }
+dval_t *dv_bit_or(const dval_t *a, const dval_t *b) { return dv_math_wrap_binary(&ops_bit_or, a, b); }
+dval_t *dv_bit_xor(const dval_t *a, const dval_t *b) { return dv_math_wrap_binary(&ops_bit_xor, a, b); }
+dval_t *dv_bit_not(const dval_t *a) { return dv_math_wrap_unary(&ops_bit_not, a); }
+dval_t *dv_shl(const dval_t *a, const dval_t *b) { return dv_math_wrap_binary(&ops_shl, a, b); }
+dval_t *dv_shr(const dval_t *a, const dval_t *b) { return dv_math_wrap_binary(&ops_shr, a, b); }
+
+static dval_t *dv_factor_product_from_number(number_t value)
+{
+    enum { FACTOR_MAX_BITS = 1024 };
+    number_factors_t *factors;
+    dval_t *out = NULL;
+
+    if (!num_is_integer(value) || num_get_sign(value) <= 0 ||
+        num_bit_length(value) > FACTOR_MAX_BITS)
+        return NULL;
+
+    factors = num_factors(value);
+    if (!factors)
+        return NULL;
+
+    if (factors->count == 0u) {
+        num_factors_free(factors);
+        return dv_new_const(NUM_ONE);
+    }
+
+    for (size_t i = 0u; i < factors->count; ++i) {
+        char name[32];
+        dval_t *base;
+        dval_t *factor;
+
+        snprintf(name, sizeof(name), "a%zu", i);
+        base = dv_new_named_const(factors->items[i].prime, name);
+        {
+            char *prime_text = num_to_string(factors->items[i].prime);
+
+            base->binding_expr =
+                dv_binding_expr_new_number_text(prime_text ? prime_text : "NAN");
+            free(prime_text);
+        }
+        if (factors->items[i].exponent > 1u) {
+            number_t exponent = num_create_from_long((long)factors->items[i].exponent);
+
+            factor = dv_pow(base, &exponent);
+            num_destroy(&exponent);
+            dv_free(base);
+        } else {
+            factor = base;
+        }
+
+        if (out) {
+            dval_t *next = dv_mul(out, factor);
+
+            dv_free(out);
+            dv_free(factor);
+            out = next;
+        } else {
+            out = factor;
+        }
+    }
+
+    num_factors_free(factors);
+    return out;
+}
+
+dval_t *dv_factors(const dval_t *a)
+{
+    dval_t *product;
+
+    if (!a)
+        return NULL;
+
+    product = dv_factor_product_from_number(dv_eval_num_internal(a));
+    if (product)
+        return product;
+
+    return dv_math_wrap_unary(&ops_factors, a);
+}
+
+dval_t *dv_logbeta_pdf(const dval_t *x, const dval_t *a, const dval_t *b)
+{
+    dval_t *one;
+    dval_t *a_minus_one;
+    dval_t *b_minus_one;
+    dval_t *log_x;
+    dval_t *one_minus_x;
+    dval_t *log_one_minus_x;
+    dval_t *left;
+    dval_t *right;
+    dval_t *sum;
+    dval_t *log_beta;
+    dval_t *out;
+
+    if (!x || !a || !b)
+        return NULL;
+
+    one = dv_new_const(NUM_ONE);
+    a_minus_one = dv_sub(a, one);
+    b_minus_one = dv_sub(b, one);
+    log_x = dv_log(x);
+    one_minus_x = dv_sub(one, x);
+    log_one_minus_x = dv_log(one_minus_x);
+    left = dv_mul(a_minus_one, log_x);
+    right = dv_mul(b_minus_one, log_one_minus_x);
+    sum = dv_add(left, right);
+    log_beta = dv_logbeta(a, b);
+    out = dv_sub(sum, log_beta);
+
+    dv_free(log_beta);
+    dv_free(sum);
+    dv_free(right);
+    dv_free(left);
+    dv_free(log_one_minus_x);
+    dv_free(one_minus_x);
+    dv_free(log_x);
+    dv_free(b_minus_one);
+    dv_free(a_minus_one);
+    dv_free(one);
+    return out;
+}
+
+dval_t *dv_beta_pdf(const dval_t *x, const dval_t *a, const dval_t *b)
+{
+    dval_t *log_pdf = dv_logbeta_pdf(x, a, b);
+    dval_t *out = log_pdf ? dv_exp(log_pdf) : NULL;
+
+    dv_free(log_pdf);
+    return out;
+}
+
+dval_t *dv_binomial(const dval_t *n, const dval_t *k)
+{
+    dval_t *one;
+    dval_t *n_plus_one;
+    dval_t *k_plus_one;
+    dval_t *n_minus_k;
+    dval_t *n_minus_k_plus_one;
+    dval_t *gamma_n;
+    dval_t *gamma_k;
+    dval_t *gamma_n_minus_k;
+    dval_t *denominator;
+    dval_t *out;
+
+    if (!n || !k)
+        return NULL;
+
+    one = dv_new_const(NUM_ONE);
+    n_plus_one = dv_add(n, one);
+    k_plus_one = dv_add(k, one);
+    n_minus_k = dv_sub(n, k);
+    n_minus_k_plus_one = dv_add(n_minus_k, one);
+    gamma_n = dv_gamma(n_plus_one);
+    gamma_k = dv_gamma(k_plus_one);
+    gamma_n_minus_k = dv_gamma(n_minus_k_plus_one);
+    denominator = dv_mul(gamma_k, gamma_n_minus_k);
+    out = dv_div(gamma_n, denominator);
+
+    dv_free(denominator);
+    dv_free(gamma_n_minus_k);
+    dv_free(gamma_k);
+    dv_free(gamma_n);
+    dv_free(n_minus_k_plus_one);
+    dv_free(n_minus_k);
+    dv_free(k_plus_one);
+    dv_free(n_plus_one);
+    dv_free(one);
+    return out;
+}

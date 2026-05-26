@@ -1561,6 +1561,11 @@ static void test_simplify_trig_and_hyperbolic_identities(void)
             "¹²⁄₁₃ + ⁵⁄₁₃i",
             "exact complex division preserves rational parts",
         },
+        {
+            "{ a₀a₁a₂a₃a₄x | x = ?; a₀ = 1024, a₁ = 27, a₂ = 389017, a₃ = 241, a₄ = 1103863 }",
+            "{ a₀a₁a₂a₃a₄x | x = NAN; a₀ = 1024, a₁ = 27, a₂ = 389017, a₃ = 241, a₄ = 1103863 }",
+            "bound constants stay before variables in products",
+        },
     };
 
     for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i)
@@ -1611,6 +1616,63 @@ static void test_complex_coefficient_stays_grouped(void)
                        "complex coefficient remains grouped",
                        text ? text : "(null)", "{ (2 + 3i)x | x = 5 }");
 
+    free(text);
+    dval_bindings_free(bindings);
+    dv_free(expr);
+}
+
+static void test_pure_imaginary_addend_stays_ungrouped(void)
+{
+    dval_bindings_t *bindings = NULL;
+    dval_t *expr = dval_from_string(
+        "{ 1/13*exp(1/13*(x + 5i)) | x = ? }",
+        &bindings);
+    char *text = expr ? dv_to_string(expr, style_EXPRESSION) : NULL;
+    const char *expect =
+        "{ ¹⁄₁₃·exp(¹⁄₁₃·(x + 5i)) | x = NAN }";
+
+    if (str_eq(text, expect))
+        to_string_pass("pure imaginary addend stays ungrouped",
+                       text, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "pure imaginary addend stays ungrouped",
+                       text ? text : "(null)", expect);
+
+    free(text);
+    dval_bindings_free(bindings);
+    dv_free(expr);
+}
+
+static void test_preserved_complex_function_addend_stays_ungrouped(void)
+{
+    dval_bindings_t *bindings = NULL;
+    dval_t *expr = dval_from_string(
+        "{ -c*exp(c) + (W(-2)) | c = -2 }",
+        &bindings);
+    char *text = expr ? dv_to_string(expr, style_EXPRESSION) : NULL;
+    char *tex = expr ? dv_to_string(expr, style_TEX) : NULL;
+    const char *expect = "{ -c·exp(c) + W(-2) | c = -2 }";
+    const char *expect_tex =
+        "\\left\\{ -c \\cdot e^{c} + W(-2) \\;\\middle|\\; c = -2 \\right\\}";
+
+    if (str_eq(text, expect))
+        to_string_pass("preserved complex function addend stays ungrouped",
+                       text, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "preserved complex function addend stays ungrouped",
+                       text ? text : "(null)", expect);
+
+    if (str_eq(tex, expect_tex))
+        to_string_pass("preserved complex function addend TeX stays ungrouped",
+                       tex, expect_tex);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "preserved complex function addend TeX stays ungrouped",
+                       tex ? tex : "(null)", expect_tex);
+
+    free(tex);
     free(text);
     dval_bindings_free(bindings);
     dv_free(expr);
@@ -1769,6 +1831,259 @@ static void test_pow_derivative_preserves_literal_base_log(void)
                        deriv_text ? deriv_text : "(null)", expect);
 
     free(deriv_text);
+    dv_free(deriv);
+    dval_bindings_free(bindings);
+    dv_free(expr);
+}
+
+static void test_log_of_imaginary_product_derivative_cancels_i(void)
+{
+    dval_bindings_t *bindings = NULL;
+    dval_t *expr = dval_from_string("{ log(ix) | x = NAN }", &bindings);
+    dval_t *x = bindings ? dval_bindings_get(bindings, "x") : NULL;
+    dval_t *deriv = (expr && x) ? dv_create_deriv(expr, x) : NULL;
+    char *deriv_text = deriv ? dv_to_string(deriv, style_EXPRESSION) : NULL;
+    const char *expect = "{ 1/(x·ln(10)) | x = NAN }";
+
+    if (str_eq(deriv_text, expect))
+        to_string_pass("log(ix) derivative cancels imaginary unit",
+                       deriv_text, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "log(ix) derivative cancels imaginary unit",
+                       deriv_text ? deriv_text : "(null)", expect);
+
+    free(deriv_text);
+    dv_free(deriv);
+    dval_bindings_free(bindings);
+    dv_free(expr);
+}
+
+static void test_ln10_product_expression_round_trips(void)
+{
+    dval_bindings_t *bindings = NULL;
+    dval_t *expr = dval_from_string("{ 1/(x·ln(10)) | x = NAN }", &bindings);
+    char *text = expr ? dv_to_string(expr, style_EXPRESSION) : NULL;
+    const char *expect = "{ 1/(x·ln(10)) | x = NAN }";
+
+    if (str_eq(text, expect))
+        to_string_pass("ln(10) product expression round-trips",
+                       text, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "ln(10) product expression round-trips",
+                       text ? text : "(null)", expect);
+
+    free(text);
+    dval_bindings_free(bindings);
+    dv_free(expr);
+}
+
+static void test_lambert_inverse_argument_derivative_simplifies(void)
+{
+    dval_bindings_t *bindings = NULL;
+    dval_t *expr = dval_from_string("{ W₀(x*exp(x)) | x = 5 }", &bindings);
+    dval_t *x = bindings ? dval_bindings_get(bindings, "x") : NULL;
+    dval_t *deriv = (expr && x) ? dv_create_deriv(expr, x) : NULL;
+    char *deriv_text = deriv ? dv_to_string(deriv, style_EXPRESSION) : NULL;
+    const char *expect = "1";
+
+    if (str_eq(deriv_text, expect))
+        to_string_pass("W0(x*exp(x)) derivative simplifies",
+                       deriv_text, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "W0(x*exp(x)) derivative simplifies",
+                       deriv_text ? deriv_text : "(null)", expect);
+
+    free(deriv_text);
+    dv_free(deriv);
+    dval_bindings_free(bindings);
+    dv_free(expr);
+}
+
+static void test_lambert_inverse_branch_selection(void)
+{
+    dval_bindings_t *bindings_w0 = NULL;
+    dval_bindings_t *bindings_wm1 = NULL;
+    dval_bindings_t *bindings_w = NULL;
+    dval_bindings_t *bindings_productlog = NULL;
+    dval_t *w0 = dval_from_string("{ W₀(x*exp(x)) | x = -2 }", &bindings_w0);
+    dval_t *wm1 = dval_from_string("{ W-1(x*exp(x)) | x = -2 }", &bindings_wm1);
+    dval_t *w = dval_from_string("{ W(x*exp(x)) | x = -2 }", &bindings_w);
+    dval_t *productlog =
+        dval_from_string("{ productlog(x*exp(x)) | x = -2 }",
+                         &bindings_productlog);
+    dval_t *w_branch = dval_from_string("{ W(-1/e) }", NULL);
+    dval_t *productlog_branch =
+        dval_from_string("{ productlog(-1/e) }", NULL);
+    dval_t *w0_branch = dval_from_string("{ W₀(-1/e) }", NULL);
+    dval_t *wm1_branch = dval_from_string("{ W-1(-1/e) }", NULL);
+    dval_t *w_outside_real_domain = dval_from_string("{ W(-2) }", NULL);
+    number_t w_branch_value = w_branch ? dv_eval(w_branch) : NUM_NAN;
+    number_t productlog_branch_value =
+        productlog_branch ? dv_eval(productlog_branch) : NUM_NAN;
+    number_t w0_branch_value = w0_branch ? dv_eval(w0_branch) : NUM_NAN;
+    number_t wm1_branch_value = wm1_branch ? dv_eval(wm1_branch) : NUM_NAN;
+    number_t w_outside_value = w_outside_real_domain
+        ? dv_eval(w_outside_real_domain) : NUM_NAN;
+    number_t w_outside_exp = num_exp(w_outside_value);
+    number_t w_outside_check = num_mul(w_outside_value, w_outside_exp);
+    number_t neg_two = num_create_from_string("-2");
+    char *w0_text = w0 ? dv_to_string(w0, style_EXPRESSION) : NULL;
+    char *wm1_text = wm1 ? dv_to_string(wm1, style_EXPRESSION) : NULL;
+    char *w_text = w ? dv_to_string(w, style_EXPRESSION) : NULL;
+    char *productlog_text =
+        productlog ? dv_to_string(productlog, style_EXPRESSION) : NULL;
+    char *w_branch_text = num_to_string(w_branch_value);
+    char *productlog_branch_text = num_to_string(productlog_branch_value);
+    char *w0_branch_text = num_to_string(w0_branch_value);
+    char *wm1_branch_text = num_to_string(wm1_branch_value);
+    const char *expect_w0 = "{ W₀(x·exp(x)) | x = -2 }";
+    const char *expect_wm1 = "-2";
+    const char *expect_w = "-2";
+    const char *expect_branch = "-1";
+
+    if (str_eq(w0_text, expect_w0))
+        to_string_pass("W0(x*exp(x)) keeps principal branch for x=-2",
+                       w0_text, expect_w0);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "W0(x*exp(x)) keeps principal branch for x=-2",
+                       w0_text ? w0_text : "(null)", expect_w0);
+
+    if (str_eq(wm1_text, expect_wm1))
+        to_string_pass("W-1(x*exp(x)) resolves lower branch for x=-2",
+                       wm1_text, expect_wm1);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "W-1(x*exp(x)) resolves lower branch for x=-2",
+                       wm1_text ? wm1_text : "(null)", expect_wm1);
+
+    if (str_eq(w_text, expect_w))
+        to_string_pass("W(x*exp(x)) chooses lower branch for x=-2",
+                       w_text, expect_w);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "W(x*exp(x)) chooses lower branch for x=-2",
+                       w_text ? w_text : "(null)", expect_w);
+
+    if (str_eq(productlog_text, expect_w))
+        to_string_pass("productlog(x*exp(x)) chooses lower branch for x=-2",
+                       productlog_text, expect_w);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "productlog(x*exp(x)) chooses lower branch for x=-2",
+                       productlog_text ? productlog_text : "(null)", expect_w);
+
+    if (str_eq(w_branch_text, expect_branch))
+        to_string_pass("W(-1/e) resolves branch point exactly",
+                       w_branch_text, expect_branch);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "W(-1/e) resolves branch point exactly",
+                       w_branch_text ? w_branch_text : "(null)",
+                       expect_branch);
+
+    if (str_eq(productlog_branch_text, expect_branch))
+        to_string_pass("productlog(-1/e) resolves branch point exactly",
+                       productlog_branch_text, expect_branch);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "productlog(-1/e) resolves branch point exactly",
+                       productlog_branch_text ? productlog_branch_text : "(null)",
+                       expect_branch);
+
+    if (str_eq(w0_branch_text, expect_branch))
+        to_string_pass("W0(-1/e) resolves branch point exactly",
+                       w0_branch_text, expect_branch);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "W0(-1/e) resolves branch point exactly",
+                       w0_branch_text ? w0_branch_text : "(null)",
+                       expect_branch);
+
+    if (str_eq(wm1_branch_text, expect_branch))
+        to_string_pass("W-1(-1/e) resolves branch point exactly",
+                       wm1_branch_text, expect_branch);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "W-1(-1/e) resolves branch point exactly",
+                       wm1_branch_text ? wm1_branch_text : "(null)",
+                       expect_branch);
+
+    ASSERT_TRUE(!num_is_real(w_outside_value));
+    ASSERT_TRUE(number_close_with_tolerance_text(w_outside_check, neg_two,
+                                                "1e-25"));
+
+    num_destroy(&neg_two);
+    num_destroy(&w_outside_check);
+    num_destroy(&w_outside_exp);
+    num_destroy(&w_outside_value);
+    free(wm1_branch_text);
+    free(w0_branch_text);
+    free(productlog_branch_text);
+    free(w_branch_text);
+    num_destroy(&wm1_branch_value);
+    num_destroy(&w0_branch_value);
+    num_destroy(&productlog_branch_value);
+    num_destroy(&w_branch_value);
+    free(productlog_text);
+    free(w_text);
+    free(wm1_text);
+    free(w0_text);
+    dval_bindings_free(bindings_productlog);
+    dval_bindings_free(bindings_w);
+    dval_bindings_free(bindings_wm1);
+    dval_bindings_free(bindings_w0);
+    dv_free(wm1_branch);
+    dv_free(w0_branch);
+    dv_free(productlog_branch);
+    dv_free(w_branch);
+    dv_free(w_outside_real_domain);
+    dv_free(productlog);
+    dv_free(w);
+    dv_free(wm1);
+    dv_free(w0);
+}
+
+static void test_productlog_small_complex_inverse_uses_principal_branch(void)
+{
+    dval_t *expr = dval_from_string("{ productlog(1/13i*exp(1/13i)) }", NULL);
+    number_t value = expr ? dv_eval(expr) : NUM_NAN;
+    number_t expected = num_create_from_string("1/13i");
+
+    ASSERT_TRUE(number_close_with_tolerance_text(value, expected, "1e-30"));
+
+    num_destroy(&expected);
+    num_destroy(&value);
+    dv_free(expr);
+}
+
+static void test_factorial_postfix_lowers_to_differentiable_gamma(void)
+{
+    dval_bindings_t *bindings = NULL;
+    dval_t *expr = dval_from_string("{ x! | x = 5 }", &bindings);
+    dval_t *x = bindings ? dval_bindings_get(bindings, "x") : NULL;
+    dval_t *deriv = (expr && x) ? dv_create_deriv(expr, x) : NULL;
+    number_t value = expr ? dv_eval(expr) : NUM_NAN;
+    number_t deriv_value = deriv ? dv_eval(deriv) : NUM_NAN;
+    number_t six = num_create_from_long(6);
+    number_t expected_value = num_create_from_long(120);
+    number_t gamma_six = num_gamma(six);
+    number_t digamma_six = num_digamma(six);
+    number_t expected_deriv = num_mul(gamma_six, digamma_six);
+
+    ASSERT_TRUE(num_eq(value, expected_value));
+    ASSERT_TRUE(number_close_with_tolerance_text(deriv_value, expected_deriv, "1e-30"));
+
+    num_destroy(&expected_deriv);
+    num_destroy(&digamma_six);
+    num_destroy(&gamma_six);
+    num_destroy(&expected_value);
+    num_destroy(&six);
+    num_destroy(&deriv_value);
+    num_destroy(&value);
     dv_free(deriv);
     dval_bindings_free(bindings);
     dv_free(expr);
@@ -2297,6 +2612,103 @@ static void test_tan_poles_display_as_infinity(void)
     }
 }
 
+static void expect_sqrt_negative_text(const char *label,
+                                      const char *field,
+                                      const char *got,
+                                      const char *expected)
+{
+    char full_label[160];
+
+    snprintf(full_label, sizeof(full_label), "%s %s", label, field);
+    if (str_eq(got, expected))
+        to_string_pass(full_label, got, expected);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       full_label,
+                       got ? got : "(null)",
+                       expected);
+}
+
+static void test_sqrt_negative_exact_evaluates_to_i(void)
+{
+    const struct {
+        const char *label;
+        const char *input;
+        const char *value;
+        const char *expression;
+        const char *function;
+        const char *tex;
+    } cases[] = {
+        {
+            "sqrt(-1)",
+            "{ sqrt(-1) }",
+            "i",
+            "√(-1)",
+            "variable expr(void) {\n"
+            "    return sqrt(-1);\n"
+            "}\n\n"
+            "variable expr_eval() {\n"
+            "    return expr();\n"
+            "}",
+            "\\sqrt{-1}"
+        },
+        {
+            "sqrt(-4)",
+            "{ sqrt(-4) }",
+            "2i",
+            "√(-4)",
+            "variable expr(void) {\n"
+            "    return sqrt(-4);\n"
+            "}\n\n"
+            "variable expr_eval() {\n"
+            "    return expr();\n"
+            "}",
+            "\\sqrt{-4}"
+        },
+        {
+            "sqrt(x) with x = -1",
+            "{ sqrt(x) | x = -1 }",
+            "i",
+            "{ √(x) | x = -1 }",
+            "variable expr(x) {\n"
+            "    return sqrt(x);\n"
+            "}\n\n"
+            "variable expr_eval() {\n"
+            "    x = -1;\n"
+            "    return expr(x);\n"
+            "}",
+            "\\left\\{ \\sqrt{x} \\;\\middle|\\; x = -1 \\right\\}"
+        }
+    };
+
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+        dval_bindings_t *bindings = NULL;
+        dval_t *expr = dval_from_string(cases[i].input, &bindings);
+        char *expr_text = expr ? dv_to_string(expr, style_EXPRESSION) : NULL;
+        char *function_text = expr ? dv_to_string(expr, style_FUNCTION) : NULL;
+        char *tex_text = expr ? dv_to_string(expr, style_TEX) : NULL;
+        number_t value = expr ? dv_eval(expr) : num_clone(NUM_NAN);
+        char *value_text = num_to_string(value);
+
+        expect_sqrt_negative_text(cases[i].label, "value",
+                                  value_text, cases[i].value);
+        expect_sqrt_negative_text(cases[i].label, "expression",
+                                  expr_text, cases[i].expression);
+        expect_sqrt_negative_text(cases[i].label, "function",
+                                  function_text, cases[i].function);
+        expect_sqrt_negative_text(cases[i].label, "TeX",
+                                  tex_text, cases[i].tex);
+
+        free(value_text);
+        num_destroy(&value);
+        free(tex_text);
+        free(function_text);
+        free(expr_text);
+        dval_bindings_free(bindings);
+        dv_free(expr);
+    }
+}
+
 static void test_goal_seek_large_target_uses_significant_digit_tolerance(void)
 {
     dval_bindings_t *bindings = NULL;
@@ -2365,9 +2777,17 @@ void test_runtime_regressions(void)
     TEST_RUN_SUBTEST(test_simplify_trig_and_hyperbolic_identities, NULL);
     TEST_RUN_SUBTEST(test_to_string_imaginary_unit_omits_one, NULL);
     TEST_RUN_SUBTEST(test_complex_coefficient_stays_grouped, NULL);
+    TEST_RUN_SUBTEST(test_pure_imaginary_addend_stays_ungrouped, NULL);
+    TEST_RUN_SUBTEST(test_preserved_complex_function_addend_stays_ungrouped, NULL);
     TEST_RUN_SUBTEST(test_updated_decimal_binding_stays_decimal, NULL);
     TEST_RUN_SUBTEST(test_symbolic_negative_pi_derivative_stays_symbolic, NULL);
     TEST_RUN_SUBTEST(test_pow_derivative_preserves_literal_base_log, NULL);
+    TEST_RUN_SUBTEST(test_log_of_imaginary_product_derivative_cancels_i, NULL);
+    TEST_RUN_SUBTEST(test_ln10_product_expression_round_trips, NULL);
+    TEST_RUN_SUBTEST(test_lambert_inverse_argument_derivative_simplifies, NULL);
+    TEST_RUN_SUBTEST(test_lambert_inverse_branch_selection, NULL);
+    TEST_RUN_SUBTEST(test_productlog_small_complex_inverse_uses_principal_branch, NULL);
+    TEST_RUN_SUBTEST(test_factorial_postfix_lowers_to_differentiable_gamma, NULL);
     TEST_RUN_SUBTEST(test_repeated_preserved_log_factor_combines_as_power, NULL);
     TEST_RUN_SUBTEST(test_preserved_log_power_chain_combines_as_power, NULL);
     TEST_RUN_SUBTEST(test_unary_constants_preserve_user_literals_in_derivatives, NULL);
@@ -2381,6 +2801,7 @@ void test_runtime_regressions(void)
     TEST_RUN_SUBTEST(test_binding_lambert_inverse_numeric_expression_simplifies, NULL);
     TEST_RUN_SUBTEST(test_binding_exact_core_trig_values_simplify, NULL);
     TEST_RUN_SUBTEST(test_tan_poles_display_as_infinity, NULL);
+    TEST_RUN_SUBTEST(test_sqrt_negative_exact_evaluates_to_i, NULL);
     TEST_RUN_SUBTEST(test_goal_seek_large_target_uses_significant_digit_tolerance, NULL);
 }
 

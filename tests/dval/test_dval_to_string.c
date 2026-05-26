@@ -809,6 +809,88 @@ static void test_to_string_lambert_w_tex(void)
     dv_free(x1);
 }
 
+static void test_to_string_gammainv_tex(void)
+{
+    dval_t *f = dval_from_string("{ lgamma(x) - ln(5) | x = gammainv(5) }", NULL);
+    char *got = f ? dv_to_string(f, style_TEX) : NULL;
+
+    const char *expect =
+        "\\left\\{ \\log\\Gamma(x) - \\ln(5) \\;\\middle|\\; "
+        "x = \\Gamma^{-1}(5) \\right\\}";
+
+    tex_preview_emit_case(__FILE__, "gammainv inverse gamma (TEX)", got);
+
+    if (str_eq(got, expect))
+        to_string_pass("gammainv inverse gamma (TEX)", got, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "gammainv inverse gamma (TEX)", got, expect);
+
+    free(got);
+    dv_free(f);
+}
+
+static void test_to_string_gamma_polygamma_standard_names(void)
+{
+    dval_t *f = dval_from_string("{ gamma(x) + digamma(x) + trigamma(x) + polygamma(2, x) | x = 3 }", NULL);
+    dval_t *second = dval_from_string(
+        "{ gamma(x)*(trigamma(x)+digamma(x)^2) | x = 2 }", NULL);
+    char *got_expr = f ? dv_to_string(f, style_EXPRESSION) : NULL;
+    char *got_tex = f ? dv_to_string(f, style_TEX) : NULL;
+    char *got_func = f ? dv_to_string(f, style_FUNCTION) : NULL;
+    char *got_second_tex = second ? dv_to_string(second, style_TEX) : NULL;
+
+    const char *expect_expr = "{ Γ(x) + ψ⁽⁰⁾(x) + ψ⁽¹⁾(x) + ψ⁽²⁾(x) | x = 3 }";
+    const char *expect_tex =
+        "\\left\\{ \\Gamma(x) + \\psi^{(0)}(x) + \\psi^{(1)}(x) + \\psi^{(2)}(x) "
+        "\\;\\middle|\\; x = 3 \\right\\}";
+    const char *expect_func =
+        "variable expr(x) {\n"
+        "    return gamma(x) + digamma(x) + trigamma(x) + polygamma(2, x);\n"
+        "}\n"
+        "\n"
+        "variable expr_eval() {\n"
+        "    x = 3;\n"
+        "    return expr(x);\n"
+        "}";
+    const char *expect_second_tex =
+        "\\left\\{ \\Gamma(x) \\cdot \\left(\\psi^{(1)}(x) + "
+        "\\psi^{(0)}(x)^{2}\\right) \\;\\middle|\\; x = 2 \\right\\}";
+
+    if (str_eq(got_expr, expect_expr))
+        to_string_pass("gamma/polygamma standard names (EXPR)", got_expr, expect_expr);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "gamma/polygamma standard names (EXPR)", got_expr, expect_expr);
+
+    if (str_eq(got_tex, expect_tex))
+        to_string_pass("gamma/polygamma standard names (TEX)", got_tex, expect_tex);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "gamma/polygamma standard names (TEX)", got_tex, expect_tex);
+
+    if (str_eq(got_func, expect_func))
+        to_string_pass("gamma/polygamma standard names (FUNCTION)", got_func, expect_func);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "gamma/polygamma standard names (FUNCTION)", got_func, expect_func);
+
+    if (str_eq(got_second_tex, expect_second_tex))
+        to_string_pass("gamma second derivative polygamma power (TEX)",
+                       got_second_tex, expect_second_tex);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "gamma second derivative polygamma power (TEX)",
+                       got_second_tex, expect_second_tex);
+
+    free(got_expr);
+    free(got_tex);
+    free(got_func);
+    free(got_second_tex);
+    dv_free(f);
+    dv_free(second);
+}
+
 static void test_to_string_non_simple_var_bracketed_expr(void)
 {
     dval_t *v = test_dv_new_named_var_d(42.0, "a0b0");
@@ -1506,7 +1588,7 @@ static void test_to_string_function_style_preserves_math_names(void)
     char *got = dv_to_string(f, style_FUNCTION);
 
     const char *expect = "variable expr(x, y, const c₀) {\n"
-                         "    return tan(x * y * c₀ / 2);\n"
+                         "    return tan(c₀ * x * y / 2);\n"
                          "}\n"
                          "\n"
                          "variable expr_eval() {\n"
@@ -1658,6 +1740,8 @@ void test_to_string_all(void)
     TEST_RUN_SUBTEST(test_to_string_symbolic_constants_tex, NULL);
     TEST_RUN_SUBTEST(test_to_string_symbolic_constant_quotient_tex, NULL);
     TEST_RUN_SUBTEST(test_to_string_lambert_w_tex, NULL);
+    TEST_RUN_SUBTEST(test_to_string_gammainv_tex, NULL);
+    TEST_RUN_SUBTEST(test_to_string_gamma_polygamma_standard_names, NULL);
     TEST_RUN_SUBTEST(test_to_string_non_simple_var_bracketed, NULL);
     TEST_RUN_SUBTEST(test_to_string_addition, NULL);
     TEST_RUN_SUBTEST(test_to_string_negative_rhs_expr, NULL);

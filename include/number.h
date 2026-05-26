@@ -292,6 +292,7 @@ extern const number_t NUM_2_PI;          /**< 2/π */
  */
 extern const number_t NUM_E;                 /**< e */
 extern const number_t NUM_INV_E;             /**< 1/e */
+extern const number_t NUM_NEG_INV_E;         /**< -1/e */
 extern const number_t NUM_LN2;               /**< ln(2) */
 extern const number_t NUM_LN10;              /**< ln(10) */
 extern const number_t NUM_INVLN2;            /**< 1/ln(2) */
@@ -682,6 +683,15 @@ number_t num_ldexp        (const number_t number, int exponent2);
  */
 number_t num_factorial(unsigned long n);
 number_t num_fibonacci(unsigned long n);
+/**
+ * @brief Returns the integer partition count `p(n)` exactly.
+ *
+ * `p(n)` counts the ways to write non-negative integer `n` as a sum of
+ * positive integers, ignoring order. Negative exact integers return `0`;
+ * unsupported inputs, including fractions and inexact values, return
+ * `NUM_NAN`.
+ */
+number_t num_partition(const number_t number);
 number_t num_isqrt(const number_t number);
 
 number_t num_gcd(const number_t a, const number_t b);
@@ -784,6 +794,7 @@ number_t num_lgamma       (const number_t number);
 number_t num_digamma      (const number_t number);
 number_t num_trigamma     (const number_t number);
 number_t num_tetragamma   (const number_t number);
+number_t num_polygamma    (unsigned int order, const number_t number);
 number_t num_gammainv     (const number_t number);
 number_t num_erf          (const number_t number);
 number_t num_erfc         (const number_t number);

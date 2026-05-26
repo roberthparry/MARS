@@ -26,7 +26,7 @@ currently remains a transparent by-value struct.
 - magnitude and argument
 - elementary functions: exp, log, pow, sqrt
 - trigonometric and hyperbolic functions (and their inverses)
-- special functions: erf, gamma, digamma, beta, Lambert W, incomplete gamma, exponential integrals, normal distribution
+- special functions: erf, gamma, polygamma, beta, Lambert W, incomplete gamma, exponential integrals, normal distribution
 - polar form conversion
 - parsing from string
 - printf-style formatting and printing
@@ -149,6 +149,7 @@ All declarations are in `include/qcomplex.h`.
 | `qc_digamma(z)` | ψ(z) = Γ′(z)/Γ(z) |
 | `qc_trigamma(z)` | ψ₁(z) = ψ′(z) |
 | `qc_tetragamma(z)` | ψ₂(z) = −ψ^(2)(z) (positive, = +2Σ 1/(z+k)³) |
+| `qc_polygamma(n, z)` | ψ⁽ⁿ⁾(z) |
 | `qc_gammainv(z)` | inverse of the gamma function (principal branch, Re z ≥ 1.46) |
 | `qc_beta(a, b)` | B(a,b) = Γ(a)Γ(b)/Γ(a+b) |
 | `qc_logbeta(a, b)` | ln B(a,b) |
@@ -158,6 +159,7 @@ All declarations are in `include/qcomplex.h`.
 | `qc_normal_pdf(z)` | standard normal PDF φ(z) |
 | `qc_normal_cdf(z)` | standard normal CDF Φ(z) |
 | `qc_normal_logpdf(z)` | log standard normal PDF |
+| `qc_lambert_wm1(z)` | Lambert W branch W₋₁(z) |
 | `qc_productlog(z)` | principal Lambert W function W₀(z): W·e^W = z |
 | `qc_gammainc_lower(s, x)` | lower incomplete gamma γ(s,x) |
 | `qc_gammainc_upper(s, x)` | upper incomplete gamma Γ(s,x) |
@@ -212,7 +214,7 @@ All declarations are in `include/qcomplex.h`.
 ## Implementation Notes
 
 - **Precision:** All arithmetic and elementary functions operate at full `qfloat_t` precision (~31–32 decimal digits, ~106 bits), both for real and complex arguments, unless otherwise noted.
-- **Special functions:** For real arguments where `qc_imag(z) == 0`, all special functions use the corresponding `qf_` implementation, preserving full precision. For complex arguments, algorithms are chosen to maximize accuracy and stability, but some special functions may have slightly reduced precision due to the complexity of analytic continuation or series evaluation in the complex plane.
+- **Special functions:** For real arguments where `qc_imag(z) == 0`, all special functions use the corresponding `qf_` implementation, preserving full precision. For complex arguments, algorithms are chosen to maximise accuracy and stability, but some special functions may have slightly reduced precision due to the complexity of analytic continuation or series evaluation in the complex plane.
 - **Gamma and polygamma:** Implemented using high-precision algorithms (e.g., Lanczos, asymptotic expansions) to maintain as much precision as possible for both real and complex arguments.
 - **Lambert W, incomplete gamma, exponential integrals:** Use iterative or series/continued-fraction methods adapted for complex arguments, with careful attention to branch cuts and principal values.
 - **Parsing and formatting:** Parsing from string and printf-style formatting are supported for all complex numbers, with full control over decimal/scientific notation and alignment.
@@ -269,5 +271,4 @@ Results:
 
 For a broader benchmark overview, see
 [`docs/benchmarks.md`](benchmarks.md).
-
 

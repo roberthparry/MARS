@@ -938,6 +938,85 @@ void test_deriv_logbeta(void)
     dv_free(x);
 }
 
+void test_deriv_gammainc(void)
+{
+    dval_t *s = test_dv_new_const_d(1.0);
+    dval_t *x = test_dv_new_var_d(1.0);
+    dval_t *lower = dv_gammainc_lower(s, x);
+    dval_t *upper = dv_gammainc_upper(s, x);
+    dval_t *P = dv_gammainc_P(s, x);
+    dval_t *Q = dv_gammainc_Q(s, x);
+    qfloat_t exp_neg_one = qf_exp(qf_neg(qf_from_double(1.0)));
+
+    check_q_at(__FILE__, __LINE__, 1, "d/dx{gammainc_lower(1,x)} | x=1",
+               dv_eval_qf(dv_get_deriv(lower, x)), exp_neg_one);
+    check_q_at(__FILE__, __LINE__, 1, "d/dx{gammainc_upper(1,x)} | x=1",
+               dv_eval_qf(dv_get_deriv(upper, x)), qf_neg(exp_neg_one));
+    check_q_at(__FILE__, __LINE__, 1, "d/dx{gammainc_P(1,x)} | x=1",
+               dv_eval_qf(dv_get_deriv(P, x)), exp_neg_one);
+    check_q_at(__FILE__, __LINE__, 1, "d/dx{gammainc_Q(1,x)} | x=1",
+               dv_eval_qf(dv_get_deriv(Q, x)), qf_neg(exp_neg_one));
+
+    dv_free(Q);
+    dv_free(P);
+    dv_free(upper);
+    dv_free(lower);
+    dv_free(x);
+    dv_free(s);
+}
+
+void test_deriv_beta_pdf(void)
+{
+    dval_t *x = test_dv_new_var_d(0.5);
+    dval_t *a = test_dv_new_const_d(2.0);
+    dval_t *b = test_dv_new_const_d(3.0);
+    dval_t *f = dv_beta_pdf(x, a, b);
+    const dval_t *df = dv_get_deriv(f, x);
+
+    check_q_at(__FILE__, __LINE__, 1, "d/dx{beta_pdf(x,2,3)} | x=0.5",
+               dv_eval_qf(df), qf_from_double(-3.0));
+    print_expr_of(df);
+
+    dv_free(f);
+    dv_free(b);
+    dv_free(a);
+    dv_free(x);
+}
+
+void test_deriv_logbeta_pdf(void)
+{
+    dval_t *x = test_dv_new_var_d(0.5);
+    dval_t *a = test_dv_new_const_d(2.0);
+    dval_t *b = test_dv_new_const_d(3.0);
+    dval_t *f = dv_logbeta_pdf(x, a, b);
+    const dval_t *df = dv_get_deriv(f, x);
+
+    check_q_at(__FILE__, __LINE__, 1, "d/dx{logbeta_pdf(x,2,3)} | x=0.5",
+               dv_eval_qf(df), qf_from_double(-2.0));
+    print_expr_of(df);
+
+    dv_free(f);
+    dv_free(b);
+    dv_free(a);
+    dv_free(x);
+}
+
+void test_deriv_binomial(void)
+{
+    dval_t *n = test_dv_new_var_d(5.0);
+    dval_t *k = test_dv_new_const_d(2.0);
+    dval_t *f = dv_binomial(n, k);
+    const dval_t *df = dv_get_deriv(f, n);
+
+    check_q_at(__FILE__, __LINE__, 1, "d/dn{binomial(n,2)} | n=5",
+               dv_eval_qf(df), qf_from_double(4.5));
+    print_expr_of(df);
+
+    dv_free(f);
+    dv_free(k);
+    dv_free(n);
+}
+
 /* ------------------------------------------------------------------------- */
 /* Second derivative tests                                                    */
 /* ------------------------------------------------------------------------- */
@@ -999,4 +1078,8 @@ void test_first_derivatives(void)
     TEST_RUN_SUBTEST(test_deriv_e1, NULL);
     TEST_RUN_SUBTEST(test_deriv_beta, NULL);
     TEST_RUN_SUBTEST(test_deriv_logbeta, NULL);
+    TEST_RUN_SUBTEST(test_deriv_gammainc, NULL);
+    TEST_RUN_SUBTEST(test_deriv_beta_pdf, NULL);
+    TEST_RUN_SUBTEST(test_deriv_logbeta_pdf, NULL);
+    TEST_RUN_SUBTEST(test_deriv_binomial, NULL);
 }

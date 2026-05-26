@@ -382,6 +382,84 @@ void test_logbeta(void)
     check_q_at(__FILE__, __LINE__, 1, "logbeta(1.5,2.5) = lgamma(1.5)+lgamma(2.5)-lgamma(4)", lhs, rhs);
 }
 
+void test_gammainc(void)
+{
+    dval_t *s = test_dv_new_const_d(1.0);
+    dval_t *x = test_dv_new_var_d(1.0);
+    dval_t *lower = dv_gammainc_lower(s, x);
+    dval_t *upper = dv_gammainc_upper(s, x);
+    dval_t *P = dv_gammainc_P(s, x);
+    dval_t *Q = dv_gammainc_Q(s, x);
+    qfloat_t one = qf_from_double(1.0);
+    qfloat_t exp_neg_one = qf_exp(qf_neg(one));
+    qfloat_t one_minus_exp_neg_one = qf_sub(one, exp_neg_one);
+
+    check_q_at(__FILE__, __LINE__, 1, "gammainc_lower(1,1) = 1 - exp(-1)",
+               dv_eval_qf(lower), one_minus_exp_neg_one);
+    check_q_at(__FILE__, __LINE__, 1, "gammainc_upper(1,1) = exp(-1)",
+               dv_eval_qf(upper), exp_neg_one);
+    check_q_at(__FILE__, __LINE__, 1, "gammainc_P(1,1) = 1 - exp(-1)",
+               dv_eval_qf(P), one_minus_exp_neg_one);
+    check_q_at(__FILE__, __LINE__, 1, "gammainc_Q(1,1) = exp(-1)",
+               dv_eval_qf(Q), exp_neg_one);
+    print_expr_of(lower);
+
+    dv_free(Q);
+    dv_free(P);
+    dv_free(upper);
+    dv_free(lower);
+    dv_free(x);
+    dv_free(s);
+}
+
+void test_beta_pdf(void)
+{
+    dval_t *x = test_dv_new_var_d(0.5);
+    dval_t *a = test_dv_new_const_d(2.0);
+    dval_t *b = test_dv_new_const_d(3.0);
+    dval_t *f = dv_beta_pdf(x, a, b);
+    qfloat_t expect = qf_from_double(1.5);
+
+    check_q_at(__FILE__, __LINE__, 1, "beta_pdf(0.5,2,3) = 1.5", dv_eval_qf(f), expect);
+    print_expr_of(f);
+
+    dv_free(f);
+    dv_free(b);
+    dv_free(a);
+    dv_free(x);
+}
+
+void test_logbeta_pdf(void)
+{
+    dval_t *x = test_dv_new_var_d(0.5);
+    dval_t *a = test_dv_new_const_d(2.0);
+    dval_t *b = test_dv_new_const_d(3.0);
+    dval_t *f = dv_logbeta_pdf(x, a, b);
+    qfloat_t expect = qf_log(qf_from_double(1.5));
+
+    check_q_at(__FILE__, __LINE__, 1, "logbeta_pdf(0.5,2,3) = log(1.5)", dv_eval_qf(f), expect);
+    print_expr_of(f);
+
+    dv_free(f);
+    dv_free(b);
+    dv_free(a);
+    dv_free(x);
+}
+
+void test_binomial(void)
+{
+    dval_t *n = test_dv_new_var_d(5.0);
+    dval_t *k = test_dv_new_const_d(2.0);
+    dval_t *f = dv_binomial(n, k);
+
+    check_q_at(__FILE__, __LINE__, 1, "binomial(5,2) = 10", dv_eval_qf(f), qf_from_double(10.0));
+    print_expr_of(f);
+
+    dv_free(f);
+    dv_free(k);
+    dv_free(n);
+}
+
 void test_trigamma(void)
 {
     /* ψ'(1) = π²/6  — exact, classical result */
@@ -414,6 +492,31 @@ void test_trigamma(void)
     qfloat_t t4 = qf_trigamma(qf_from_double(4.0));
     check_q_at(__FILE__, __LINE__, 1, "trigamma(3) - trigamma(4) = 1/9",
                qf_sub(t3, t4), qf_div(qf_from_double(1.0), qf_from_double(9.0)));
+}
+
+void test_polygamma(void)
+{
+    dval_t *c = test_dv_new_var_d(2.0);
+    dval_t *f = dv_polygamma(3u, c);
+    qfloat_t expect = qf_sub(qf_div(qf_pow_int(QF_PI, 4), qf_from_double(15.0)),
+                             qf_from_double(6.0));
+
+    check_q_at(__FILE__, __LINE__, 1,
+               "polygamma(3, 2) = pi^4/15 - 6", dv_eval_qf(f), expect);
+    print_expr_of(f);
+
+    dv_free(f);
+    dv_free(c);
+
+    c = test_dv_new_var_qf(qf_from_string("-0.5"));
+    f = dv_polygamma(3u, c);
+    expect = qf_add(qf_pow_int(QF_PI, 4), qf_from_double(96.0));
+    check_q_at(__FILE__, __LINE__, 1,
+               "polygamma(3, -1/2) = pi^4 + 96", dv_eval_qf(f), expect);
+    print_expr_of(f);
+
+    dv_free(f);
+    dv_free(c);
 }
 
 void test_gammainv(void)

@@ -189,6 +189,16 @@ void dv_reverse_atom(const dval_t *dv, const number_t *out_bar, number_t *a_bar,
     *b_bar = dv_reverse_zero();
 }
 
+void dv_reverse_not_differentiable(const dval_t *dv,
+                                   const number_t *out_bar,
+                                   number_t *a_bar,
+                                   number_t *b_bar)
+{
+    (void)out_bar;
+    *a_bar = dv && dv->ops->arity != DV_OP_ATOM ? NUM_NAN : dv_reverse_zero();
+    *b_bar = dv && dv->ops->arity == DV_OP_BINARY ? NUM_NAN : dv_reverse_zero();
+}
+
 void dv_reverse_add(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
     (void)dv;

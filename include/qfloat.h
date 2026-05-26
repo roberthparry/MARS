@@ -145,6 +145,9 @@ extern const qfloat_t QF_E;
 /** @brief 1/e */
 extern const qfloat_t QF_INV_E;
 
+/** @brief -1/e */
+extern const qfloat_t QF_NEG_INV_E;
+
 /** @brief ln(2) */
 extern const qfloat_t QF_LN2;
 
@@ -995,6 +998,19 @@ qfloat_t qf_trigamma(qfloat_t x);
  * @return tetragamma(x) (double-double precision).
  */
 qfloat_t qf_tetragamma(qfloat_t x);
+
+/**
+ * @brief Compute the polygamma function ψ⁽ⁿ⁾(x).
+ *
+ * Orders 0, 1, and 2 dispatch to qf_digamma(), qf_trigamma(), and
+ * qf_tetragamma(). Higher orders use recurrence and a Bernoulli asymptotic
+ * expansion for non-pole positive arguments.
+ *
+ * @param order Derivative order n.
+ * @param x Input value. Must not be a non-positive integer pole.
+ * @return ψ⁽ⁿ⁾(x) (double-double precision).
+ */
+qfloat_t qf_polygamma(unsigned int order, qfloat_t x);
 
 /**
  * @brief Compute the main branch of the inverse of the gamma function.

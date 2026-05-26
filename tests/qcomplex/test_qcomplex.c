@@ -650,6 +650,30 @@ static void test_digamma(void)
                  qc_sub(qc_tetragamma(z3),
                         qc_div(qcr(2.0), qc_mul(z3, qc_mul(z3, z3)))), 1e-24);
     }
+
+    {
+        qcomplex_t z = qcz(2.0, 0.25);
+        qcomplex_t z4 = qc_mul(qc_mul(z, z), qc_mul(z, z));
+        check_qc("ψ₃(z) - ψ₃(z+1) = 6/z⁴",
+                 qc_sub(qc_polygamma(3, z),
+                        qc_polygamma(3, qc_add(z, qcr(1.0)))),
+                 qc_div(qcr(6.0), z4), 1e-22);
+    }
+
+    {
+        qfloat_t expect = qf_sub(qf_div(qf_pow_int(QF_PI, 4), qf_from_double(15.0)),
+                                 qf_from_double(6.0));
+        check_qc("ψ₃(2) real bridge",
+                 qc_polygamma(3, qcr(2.0)),
+                 qc_make(expect, QF_ZERO), 1e-23);
+    }
+
+    {
+        qfloat_t expect = qf_add(qf_pow_int(QF_PI, 4), qf_from_double(96.0));
+        check_qc("ψ₃(-1/2) real bridge",
+                 qc_polygamma(3, qcr(-0.5)),
+                 qc_make(expect, QF_ZERO), 1e-22);
+    }
 }
 
 static void test_gammainv(void)

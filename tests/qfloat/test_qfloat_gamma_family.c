@@ -144,6 +144,7 @@ void test_gamma_erf_erfc_erfinv_erfcinv_digamma(void) {
     TEST_RUN_SUBTEST(test_qf_gammainv, NULL);
     TEST_RUN_SUBTEST(test_qf_trigamma, NULL);
     TEST_RUN_SUBTEST(test_qf_tetragamma, NULL);
+    TEST_RUN_SUBTEST(test_qf_polygamma, NULL);
 }
 
 static void test_qf_gamma(void)

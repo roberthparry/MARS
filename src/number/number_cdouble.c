@@ -65,6 +65,10 @@ char *number_format_cdouble(const number_t *number,
     if (imag == 0.0)
         return number_format_cdouble_value(real, scientific, precision);
     if (real == 0.0) {
+        if (imag == 1.0)
+            return number_strdup("i");
+        if (imag == -1.0)
+            return number_strdup("-i");
         imag_text = number_format_cdouble_value(imag, scientific, precision);
         if (!imag_text)
             return NULL;
@@ -83,13 +87,17 @@ char *number_format_cdouble(const number_t *number,
     if (!real_text || !imag_text)
         goto done;
     sign = imag < 0.0 ? "-" : "+";
-    needed = snprintf(NULL, 0, "%s %s %si", real_text, sign, imag_text);
-    if (needed < 0)
-        goto done;
-    out = malloc((size_t)needed + 1u);
-    if (out)
-        snprintf(out, (size_t)needed + 1u, "%s %s %si",
-                 real_text, sign, imag_text);
+    {
+        const char *imag_coeff = fabs(imag) == 1.0 ? "" : imag_text;
+
+        needed = snprintf(NULL, 0, "%s %s %si", real_text, sign, imag_coeff);
+        if (needed < 0)
+            goto done;
+        out = malloc((size_t)needed + 1u);
+        if (out)
+            snprintf(out, (size_t)needed + 1u, "%s %s %si",
+                     real_text, sign, imag_coeff);
+    }
 
 done:
     free(real_text);

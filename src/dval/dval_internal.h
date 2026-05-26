@@ -89,6 +89,7 @@ typedef enum {
     DV_KIND_DIGAMMA,
     DV_KIND_TRIGAMMA,
     DV_KIND_GAMMAINV,
+    DV_KIND_LAMBERT_W,
     DV_KIND_LAMBERT_W0,
     DV_KIND_LAMBERT_WM1,
     DV_KIND_NORMAL_PDF,
@@ -97,8 +98,36 @@ typedef enum {
     DV_KIND_EI,
     DV_KIND_E1,
     DV_KIND_BETA,
-    DV_KIND_LOGBETA
+    DV_KIND_LOGBETA,
+    DV_KIND_GAMMAINC_LOWER,
+    DV_KIND_GAMMAINC_UPPER,
+    DV_KIND_GAMMAINC_P,
+    DV_KIND_GAMMAINC_Q,
+    DV_KIND_POLYGAMMA,
+    DV_KIND_FACTORIAL,
+    DV_KIND_FIBONACCI,
+    DV_KIND_PARTITION,
+    DV_KIND_ISQRT,
+    DV_KIND_GCD,
+    DV_KIND_LCM,
+    DV_KIND_MOD,
+    DV_KIND_MODINV,
+    DV_KIND_IS_PRIME,
+    DV_KIND_NEXT_PRIME,
+    DV_KIND_PREV_PRIME,
+    DV_KIND_BIT_AND,
+    DV_KIND_BIT_OR,
+    DV_KIND_BIT_XOR,
+    DV_KIND_BIT_NOT,
+    DV_KIND_SHL,
+    DV_KIND_SHR,
+    DV_KIND_FACTORS
 } dval_op_kind_t;
+
+typedef enum dval_diff_kind {
+    DV_DIFF_SMOOTH = 0,
+    DV_DIFF_NONE
+} dval_diff_kind_t;
 
 typedef dval_t *(*dval_apply_unary_fn)(const dval_t *arg);
 typedef dval_t *(*dval_apply_binary_fn)(const dval_t *left, const dval_t *right);
@@ -129,6 +158,9 @@ typedef struct dval_ops {
 
     /** Arity of the operator; determines which child pointers are used. */
     dval_arity_t arity;
+
+    /** Differentiability class used by UI and solver front-ends. */
+    dval_diff_kind_t diff_kind;
 
     /** Human-readable operator name used in debug output and dv_to_string(). */
     const char  *name;
@@ -364,15 +396,39 @@ extern const dval_ops_t ops_gamma;
 extern const dval_ops_t ops_lgamma;
 extern const dval_ops_t ops_digamma;
 extern const dval_ops_t ops_trigamma;
+extern const dval_ops_t ops_polygamma;
 extern const dval_ops_t ops_gammainv;
 
-/* Lambert W (principal and k=-1 branches) */
+/* Lambert W (auto, principal and k=-1 branches) */
+extern const dval_ops_t ops_lambert_w;
 extern const dval_ops_t ops_lambert_w0;
 extern const dval_ops_t ops_lambert_wm1;
 
 /* Beta */
 extern const dval_ops_t ops_beta;
 extern const dval_ops_t ops_logbeta;
+extern const dval_ops_t ops_gammainc_lower;
+extern const dval_ops_t ops_gammainc_upper;
+extern const dval_ops_t ops_gammainc_P;
+extern const dval_ops_t ops_gammainc_Q;
+extern const dval_ops_t ops_factorial;
+extern const dval_ops_t ops_fibonacci;
+extern const dval_ops_t ops_partition;
+extern const dval_ops_t ops_isqrt;
+extern const dval_ops_t ops_gcd;
+extern const dval_ops_t ops_lcm;
+extern const dval_ops_t ops_mod;
+extern const dval_ops_t ops_modinv;
+extern const dval_ops_t ops_is_prime;
+extern const dval_ops_t ops_next_prime;
+extern const dval_ops_t ops_prev_prime;
+extern const dval_ops_t ops_bit_and;
+extern const dval_ops_t ops_bit_or;
+extern const dval_ops_t ops_bit_xor;
+extern const dval_ops_t ops_bit_not;
+extern const dval_ops_t ops_shl;
+extern const dval_ops_t ops_shr;
+extern const dval_ops_t ops_factors;
 
 /* Normal distribution */
 extern const dval_ops_t ops_normal_pdf;
@@ -399,6 +455,7 @@ const dval_t *dv_current_wrt_internal(void);
 dval_t *dv_new_unary_internal(const dval_ops_t *ops, const dval_t *a);
 dval_t *dv_new_binary_internal(const dval_ops_t *ops, const dval_t *a, const dval_t *b);
 dval_t *dv_new_pow_const_internal(const dval_t *a, number_t exponent);
+dval_t *dv_polygamma_dv(const dval_t *order, const dval_t *arg);
 static inline int dv_const_is_zero(const dval_t *dv)
 {
     return dv && dv->ops == &ops_const && num_eq(dv->c, NUM_ZERO);
@@ -519,7 +576,9 @@ void dv_reverse_gamma(const dval_t *dv, const number_t *out_bar, number_t *a_bar
 void dv_reverse_lgamma(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void dv_reverse_digamma(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void dv_reverse_trigamma(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_polygamma(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void dv_reverse_gammainv(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_lambert_w(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void dv_reverse_lambert_w0(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void dv_reverse_lambert_wm1(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void dv_reverse_normal_pdf(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
@@ -529,6 +588,11 @@ void dv_reverse_ei(const dval_t *dv, const number_t *out_bar, number_t *a_bar, n
 void dv_reverse_e1(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void dv_reverse_beta(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void dv_reverse_logbeta(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_gammainc_lower(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_gammainc_upper(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_gammainc_P(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_gammainc_Q(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
+void dv_reverse_not_differentiable(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 
 dv_binding_expr_t *dv_binding_expr_new_number_text(const char *text);
 dv_binding_expr_t *dv_binding_expr_new_const(dv_binding_const_id_t const_id);

@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
@@ -198,8 +199,6 @@ static char *format_complex_number(number_t value, int precision)
     char *text = NULL;
     size_t len;
 
-    num_destroy(&value);
-
     if (format_is_negligible(imag, precision)) {
         num_destroy(&imag);
         return format_real_number(real, precision);
@@ -209,10 +208,16 @@ static char *format_complex_number(number_t value, int precision)
         num_destroy(&real);
         imag_text = format_real_number(num_clone(imag), precision);
         if (imag_text) {
-            len = strlen(imag_text) + 2u;
-            text = malloc(len);
-            if (text)
-                snprintf(text, len, "%si", imag_text);
+            if (strcmp(imag_text, "1") == 0) {
+                text = xstrdup_local("i");
+            } else if (strcmp(imag_text, "-1") == 0) {
+                text = xstrdup_local("-i");
+            } else {
+                len = strlen(imag_text) + 2u;
+                text = malloc(len);
+                if (text)
+                    snprintf(text, len, "%si", imag_text);
+            }
         }
         free(imag_text);
         num_destroy(&imag);
@@ -222,21 +227,29 @@ static char *format_complex_number(number_t value, int precision)
     real_text = format_real_number(real, precision);
     if (num_get_sign(imag) < 0) {
         number_t abs_imag = num_abs(imag);
+        bool imag_is_unit = num_eq(abs_imag, NUM_ONE);
 
         imag_text = format_real_number(abs_imag, precision);
         if (real_text && imag_text) {
-            len = strlen(real_text) + strlen(imag_text) + 6u;
+            const char *imag_coeff = imag_is_unit ? "" : imag_text;
+
+            len = strlen(real_text) + strlen(imag_coeff) + 6u;
             text = malloc(len);
             if (text)
-                snprintf(text, len, "%s - %si", real_text, imag_text);
+                snprintf(text, len, "%s - %si", real_text, imag_coeff);
         }
     } else {
-        imag_text = format_real_number(num_clone(imag), precision);
+        number_t abs_imag = num_clone(imag);
+        bool imag_is_unit = num_eq(imag, NUM_ONE);
+
+        imag_text = format_real_number(abs_imag, precision);
         if (real_text && imag_text) {
-            len = strlen(real_text) + strlen(imag_text) + 6u;
+            const char *imag_coeff = imag_is_unit ? "" : imag_text;
+
+            len = strlen(real_text) + strlen(imag_coeff) + 6u;
             text = malloc(len);
             if (text)
-                snprintf(text, len, "%s + %si", real_text, imag_text);
+                snprintf(text, len, "%s + %si", real_text, imag_coeff);
         }
     }
 
@@ -505,6 +518,7 @@ int main(int argc, char **argv)
     printf("expression  %s\n", expr_text ? expr_text : "(null)");
     printf("function    %s\n", func_text ? func_text : "(null)");
     printf("tex         %s\n", tex_text ? tex_text : "(null)");
+    printf("differentiable  %s\n", dv_is_differentiable(expr) ? "yes" : "no");
     print_owned_number("value", dv_eval(expr), precision);
 
     if (bindings)

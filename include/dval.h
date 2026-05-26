@@ -349,12 +349,18 @@ dval_t *dv_pow_dv(const dval_t *dv1, const dval_t *dv2);
  * Arguments are retained (not consumed).
  *
  * Error functions:   dv_erf, dv_erfc, dv_erfinv, dv_erfcinv
- * Gamma family:      dv_gamma (Γ), dv_lgamma (log Γ), dv_digamma (ψ),
- *                    dv_trigamma (ψ₁), dv_gammainv (Γ⁻¹)
+ * Gamma family:      dv_gamma (Γ), dv_lgamma (log Γ), dv_digamma (ψ⁽⁰⁾),
+ *                    dv_trigamma (ψ⁽¹⁾), dv_polygamma (ψ⁽ⁿ⁾),
+ *                    dv_gammainv (Γ⁻¹), dv_gammainc_lower,
+ *                    dv_gammainc_upper, dv_gammainc_P, dv_gammainc_Q
  * Lambert W:         dv_lambert_w0 (principal branch), dv_lambert_wm1 (k=-1)
- * Beta:              dv_beta (B), dv_logbeta (log B)
+ * Beta/binomial:     dv_beta (B), dv_logbeta (log B), dv_beta_pdf,
+ *                    dv_logbeta_pdf, dv_binomial
  * Normal dist.:      dv_normal_pdf, dv_normal_cdf, dv_normal_logpdf
  * Exponential int.:  dv_ei (Ei), dv_e1 (E₁)
+ *
+ * Exact/discrete helpers such as dv_partition and dv_gcd are value functions:
+ * they evaluate normally, but they are not differentiable.
  */
 dval_t *dv_abs(const dval_t *dv);
 dval_t *dv_hypot(const dval_t *dv1, const dval_t *dv2);
@@ -366,16 +372,52 @@ dval_t *dv_gamma(const dval_t *dv);
 dval_t *dv_lgamma(const dval_t *dv);
 dval_t *dv_digamma(const dval_t *dv);
 dval_t *dv_trigamma(const dval_t *dv);
+dval_t *dv_polygamma(unsigned int order, const dval_t *dv);
 dval_t *dv_gammainv(const dval_t *dv);
+dval_t *dv_gammainc_lower(const dval_t *s, const dval_t *x);
+dval_t *dv_gammainc_upper(const dval_t *s, const dval_t *x);
+dval_t *dv_gammainc_P(const dval_t *s, const dval_t *x);
+dval_t *dv_gammainc_Q(const dval_t *s, const dval_t *x);
+dval_t *dv_lambert_w(const dval_t *dv);
 dval_t *dv_lambert_w0(const dval_t *dv);
 dval_t *dv_lambert_wm1(const dval_t *dv);
 dval_t *dv_beta(const dval_t *dv1, const dval_t *dv2);
 dval_t *dv_logbeta(const dval_t *dv1, const dval_t *dv2);
+dval_t *dv_beta_pdf(const dval_t *x, const dval_t *a, const dval_t *b);
+dval_t *dv_logbeta_pdf(const dval_t *x, const dval_t *a, const dval_t *b);
+dval_t *dv_binomial(const dval_t *n, const dval_t *k);
+dval_t *dv_factorial(const dval_t *n);
+dval_t *dv_fibonacci(const dval_t *n);
+dval_t *dv_partition(const dval_t *n);
+dval_t *dv_isqrt(const dval_t *n);
+dval_t *dv_gcd(const dval_t *a, const dval_t *b);
+dval_t *dv_lcm(const dval_t *a, const dval_t *b);
+dval_t *dv_mod(const dval_t *a, const dval_t *b);
+dval_t *dv_modinv(const dval_t *a, const dval_t *b);
+dval_t *dv_is_prime(const dval_t *n);
+dval_t *dv_next_prime(const dval_t *n);
+dval_t *dv_prev_prime(const dval_t *n);
+dval_t *dv_bit_and(const dval_t *a, const dval_t *b);
+dval_t *dv_bit_or(const dval_t *a, const dval_t *b);
+dval_t *dv_bit_xor(const dval_t *a, const dval_t *b);
+dval_t *dv_bit_not(const dval_t *a);
+dval_t *dv_shl(const dval_t *a, const dval_t *bits);
+dval_t *dv_shr(const dval_t *a, const dval_t *bits);
+dval_t *dv_factors(const dval_t *n);
 dval_t *dv_normal_pdf(const dval_t *dv);
 dval_t *dv_normal_cdf(const dval_t *dv);
 dval_t *dv_normal_logpdf(const dval_t *dv);
 dval_t *dv_ei(const dval_t *dv);
 dval_t *dv_e1(const dval_t *dv);
+
+/**
+ * @brief Return true when every operation in @p dv is differentiable.
+ *
+ * This is intended for front-ends such as dval Lab, so they can hide
+ * derivative controls for value-only functions such as gcd(), partition(),
+ * factorial(), and primality helpers.
+ */
+bool dv_is_differentiable(const dval_t *dv);
 
 /* ------------------------------------------------------------------------- */
 /* Debug / lifetime                                                          */

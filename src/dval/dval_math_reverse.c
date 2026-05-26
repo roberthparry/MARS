@@ -1,4 +1,7 @@
+#include <errno.h>
+#include <limits.h>
 #include <stddef.h>
+#include <stdlib.h>
 
 #include "dval_internal.h"
 
@@ -6,6 +9,13 @@ static inline void dv_reverse_unary(number_t value, number_t *a_bar, number_t *b
 {
     *a_bar = value;
     *b_bar = NUM_ZERO;
+}
+
+static inline void dv_reverse_binary(number_t a_value, number_t b_value,
+                                     number_t *a_bar, number_t *b_bar)
+{
+    *a_bar = a_value;
+    *b_bar = b_value;
 }
 
 static inline number_t num_sq_local(const number_t value)
@@ -303,6 +313,34 @@ void dv_reverse_trigamma(const dval_t *dv, const number_t *out_bar, number_t *a_
     dv_reverse_unary(num_owned_clone_local(factor), a_bar, b_bar);
 }
 
+void dv_reverse_polygamma(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+{
+    number_t order_value = dv_eval_num_internal(dv->a);
+    number_t next;
+    number_t factor;
+    char *text;
+    char *end = NULL;
+    unsigned long order;
+
+    if (!num_is_real(order_value) || !num_is_integer(order_value) ||
+        num_get_sign(order_value) < 0 || !(text = num_to_string(order_value))) {
+        dv_reverse_binary(NUM_ZERO, NUM_ZERO, a_bar, b_bar);
+        return;
+    }
+    errno = 0;
+    order = strtoul(text, &end, 10);
+    if (errno != 0 || !end || *end != '\0' || order >= UINT_MAX) {
+        free(text);
+        dv_reverse_binary(NUM_ZERO, NUM_ZERO, a_bar, b_bar);
+        return;
+    }
+    free(text);
+
+    next = num_polygamma((unsigned int)order + 1u, dv_eval_num_internal(dv->b));
+    factor = num_mul(*out_bar, next);
+    dv_reverse_binary(NUM_ZERO, num_owned_clone_local(factor), a_bar, b_bar);
+}
+
 void dv_reverse_gammainv(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
     number_t y = dv_eval_num_internal(dv);
@@ -325,6 +363,13 @@ static number_t num_lambert_reverse_factor(const number_t z, const number_t w)
 }
 
 void dv_reverse_lambert_w0(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+{
+    number_t factor = num_lambert_reverse_factor(dv_eval_num_internal(dv->a), dv_eval_num_internal(dv));
+
+    dv_reverse_unary(num_owned_mul_local(*out_bar, factor), a_bar, b_bar);
+}
+
+void dv_reverse_lambert_w(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
 {
     number_t factor = num_lambert_reverse_factor(dv_eval_num_internal(dv->a), dv_eval_num_internal(dv));
 
@@ -406,4 +451,54 @@ void dv_reverse_logbeta(const dval_t *dv, const number_t *out_bar, number_t *a_b
 
     *a_bar = num_owned_mul_local(*out_bar, scale_a);
     *b_bar = num_owned_mul_local(*out_bar, scale_b);
+}
+
+static number_t gammainc_x_density_num(const dval_t *dv)
+{
+    number_t s_minus_one = num_sub(dv_eval_num_internal(dv->a), NUM_ONE);
+    number_t x_pow = num_pow(dv_eval_num_internal(dv->b), s_minus_one);
+    number_t neg_x = num_neg(dv_eval_num_internal(dv->b));
+    number_t exp_neg_x = num_exp(neg_x);
+
+    return num_mul(x_pow, exp_neg_x);
+}
+
+static void dv_reverse_gammainc_x_only(const dval_t *dv,
+                                       const number_t *out_bar,
+                                       number_t *a_bar,
+                                       number_t *b_bar,
+                                       int sign,
+                                       int regularised)
+{
+    number_t factor = gammainc_x_density_num(dv);
+
+    if (regularised) {
+        number_t gamma_s = num_gamma(dv_eval_num_internal(dv->a));
+        factor = num_div(factor, gamma_s);
+    }
+    if (sign < 0)
+        factor = num_neg(factor);
+
+    *a_bar = NUM_NAN;
+    *b_bar = num_owned_mul_local(*out_bar, factor);
+}
+
+void dv_reverse_gammainc_lower(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+{
+    dv_reverse_gammainc_x_only(dv, out_bar, a_bar, b_bar, 1, 0);
+}
+
+void dv_reverse_gammainc_upper(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+{
+    dv_reverse_gammainc_x_only(dv, out_bar, a_bar, b_bar, -1, 0);
+}
+
+void dv_reverse_gammainc_P(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+{
+    dv_reverse_gammainc_x_only(dv, out_bar, a_bar, b_bar, 1, 1);
+}
+
+void dv_reverse_gammainc_Q(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar)
+{
+    dv_reverse_gammainc_x_only(dv, out_bar, a_bar, b_bar, -1, 1);
 }

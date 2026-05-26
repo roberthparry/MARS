@@ -829,6 +829,43 @@ void test_qf_tetragamma(void) {
     printf("\n");
 }
 
+void test_qf_polygamma(void) {
+    printf(C_CYAN "TEST: qf_polygamma\n" C_RESET);
+
+    {
+        qfloat_t x = qf_from_string("2.5");
+
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_polygamma(0, x), qf_digamma(x), 1e-28);
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_polygamma(1, x), qf_trigamma(x), 1e-28);
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(qf_polygamma(2, x), qf_tetragamma(x), 1e-28);
+    }
+
+    {
+        qfloat_t psi3_1 = qf_polygamma(3, QF_ONE);
+        qfloat_t pi4_over_15 = qf_div(qf_pow_int(QF_PI, 4), qf_from_double(15.0));
+
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(psi3_1, pi4_over_15, 1e-23);
+    }
+
+    {
+        qfloat_t psi3_2 = qf_polygamma(3, qf_from_double(2.0));
+        qfloat_t expect = qf_sub(qf_div(qf_pow_int(QF_PI, 4), qf_from_double(15.0)),
+                                 qf_from_double(6.0));
+
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(psi3_2, expect, 1e-23);
+    }
+
+    {
+        qfloat_t psi3_neg_half = qf_polygamma(3, qf_from_string("-0.5"));
+        qfloat_t expect = qf_add(qf_pow_int(QF_PI, 4), qf_from_double(96.0));
+
+        TEST_ASSERT_QFLOAT_CLOSE_TOL(psi3_neg_half, expect, 1e-22);
+    }
+
+    printf("%s  OK: qf_polygamma aliases and ψ⁽³⁾ identities%s\n\n",
+           C_GREEN, C_RESET);
+}
+
 void test_arithmetic_extensions(void) {
     TEST_RUN_SUBTEST(test_qf_add_double, NULL);
     TEST_RUN_SUBTEST(test_qf_mul_double, NULL);

@@ -60,6 +60,7 @@ void test_readme_examples(void);
 void test_qf_productlog_all(void);
 void test_qf_trigamma(void);
 void test_qf_tetragamma(void);
+void test_qf_polygamma(void);
 void test_difficult_qfloat_cases(void);
 
 #endif

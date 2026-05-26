@@ -37,6 +37,8 @@ of these graphs.
 - evaluation of derivatives for scalar outputs
 - elementary and special functions exposed through the `dval` builder API and
   evaluated through `number_t`
+- value-only integer helpers such as `factorial`, `partition`, primality,
+  factorisation, and bit operations
 - expression parsing from and formatting to strings
 - integration as a symbolic matrix element type through `matrix_t`
 - public structural helper layers for sibling modules:
@@ -159,12 +161,12 @@ int main(void) {
 Example: Constructing an Expression
 f(x)    = { exp(sin(x)) + 3x² - 7 | x = 1.25 }
 f'(x)   = { 6x + cos(x)·exp(sin(x)) | x = 1.25 }
-f''(x)  = { cos²(x)·exp(sin(x)) - sin(x)·exp(sin(x)) + 6 | x = 1.25 }
+f''(x)  = { 0x + 61 + (1·cos(x)·cos(x)·exp(sin(x)) - 1·sin(x)·exp(sin(x))) | x = 1.25 }
 
 At x = 1.25 (384 bits, 115 significant digits):
-f(x)     = 2.705855122552273437029639300167354701622137229515609890757472472673785676415953638138922546147647793112211043900459E-1
-f'(x)    = 8.314504625993310996029399615209018784051045276485022598390329993996280767846549723245286494696734820203922652319368E+0
-f''(x)   = 3.805523101239629225822177640424432554942960462475668946332693568943904891124835742842098701664527021738133356606832E+0
+f(x)     = 2.705855122552273437029639300167354701622137229515609890757472472673785676415953638138922546147659851426132733903704E-01
+f'(x)    = 8.314504625993310996029399615209018784051045276485022598390329993996280767846549723245286494696735200429525881424219E+00
+f''(x)   = 3.805523101239629225822177640424432554942960462475668946332693568943904891124835742842098701664525997316324105458890E+00
 ```
 
 ## Example: Parsing from a String
@@ -235,12 +237,12 @@ int main(void) {
 Example: Parsing from a String
 f(x)    = { exp(sin(x)) + 3x² - 7 | x = 1.25 }
 f'(x)   = { 6x + cos(x)·exp(sin(x)) | x = 1.25 }
-f''(x)  = { cos²(x)·exp(sin(x)) - sin(x)·exp(sin(x)) + 6 | x = 1.25 }
+f''(x)  = { 0x + 61 + (1·cos(x)·cos(x)·exp(sin(x)) - 1·sin(x)·exp(sin(x))) | x = 1.25 }
 
 At x = 1.25 (384 bits, 115 significant digits):
-f(x)     = 2.705855122552273437029639300167354701622137229515609890757472472673785676415953638138922546147647793112211043900459E-1
-f'(x)    = 8.314504625993310996029399615209018784051045276485022598390329993996280767846549723245286494696734820203922652319368E+0
-f''(x)   = 3.805523101239629225822177640424432554942960462475668946332693568943904891124835742842098701664527021738133356606832E+0
+f(x)     = 2.705855122552273437029639300167354701622137229515609890757472472673785676415953638138922546147659851426132733903704E-01
+f'(x)    = 8.314504625993310996029399615209018784051045276485022598390329993996280767846549723245286494696735200429525881424219E+00
+f''(x)   = 3.805523101239629225822177640424432554942960462475668946332693568943904891124835742842098701664525997316324105458890E+00
 ```
 
 ## Example: Derivatives
@@ -312,15 +314,15 @@ int main(void) {
 ```
 
 ```text
-At x=1, y=2 (384 bits):
-f          = 7.00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-∂f/∂x      = 4.00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-∂f/∂y      = 5.00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-∂²f/∂x∂y   = 1.00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+At x=1, y=2 (384 bits, 115 significant digits):
+f        = 7.000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000E+00
+∂f/∂x = 4.00000000000000E+00
+∂f/∂y = 5.00000000000000E+00
+∂²f/∂x∂y = 1.00000000000000E+00
 
 After x=3:
-∂f/∂x      = 8.00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-∂f/∂y      = 7.00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+∂f/∂x = 8.00000000000000E+00
+∂f/∂y = 7.00000000000000E+00
 ```
 
 `dv_get_deriv` returns a *borrowed* pointer to the cached derivative — useful when
@@ -389,10 +391,10 @@ int main(void) {
 
 ```text
 Example: Evaluating Derivatives
-At x=1, y=2 (384 bits, 115 significant digits):
-f        = 3.175724908574945831917149463420104893478850175303443992754304840163843037995939274550553871648852083069014610380204E+0
-∂f/∂x = -1.373086555431723754562396899591396992661743594292079049199202945953125498212517447107943691791653817813070545990276E+0
-∂f/∂y = -5.331168679958345319898145105247867803686218643261671516599414777232595600911060813569035093940362526775360135054235E-1
+Evaluating derivatives at x=1, y=2 (384 bits, 115 significant digits):
+f        = 3.175724908574945831917149463420104893478850175303443992754304840163843037995939274550553871648852515239828467029229E+00
+∂f/∂x = -1.373086555431723754562396899591396992661743594292079049199202945953125498212517447107943691791654177506104614887117E+00
+∂f/∂y = -5.331168679958345319898145105247867803686218643261671516599414777232595600911060813569035093940364325240530479538437E-01
 ```
 
 ## Design Notes
@@ -519,47 +521,85 @@ All functions return owning handles.
 
 ### Elementary Functions (owning)
 
-- `dval_t *dv_sin(dval_t *dv)` — sin
-- `dval_t *dv_cos(dval_t *dv)` — cos
-- `dval_t *dv_tan(dval_t *dv)` — tan
-- `dval_t *dv_sinh(dval_t *dv)` — sinh
-- `dval_t *dv_cosh(dval_t *dv)` — cosh
-- `dval_t *dv_tanh(dval_t *dv)` — tanh
-- `dval_t *dv_asin(dval_t *dv)` — arcsin
-- `dval_t *dv_acos(dval_t *dv)` — arccos
-- `dval_t *dv_atan(dval_t *dv)` — arctan
-- `dval_t *dv_atan2(dval_t *dv1, dval_t *dv2)` — four-quadrant arctan2(dv1, dv2)
-- `dval_t *dv_asinh(dval_t *dv)` — inverse hyperbolic sine
-- `dval_t *dv_acosh(dval_t *dv)` — inverse hyperbolic cosine
-- `dval_t *dv_atanh(dval_t *dv)` — inverse hyperbolic tangent
-- `dval_t *dv_exp(dval_t *dv)` — natural exponential
-- `dval_t *dv_log(dval_t *dv)` — natural logarithm
-- `dval_t *dv_log10(dval_t *dv)` — common logarithm
-- `dval_t *dv_sqrt(dval_t *dv)` — square root
+- `dval_t *dv_sin(const dval_t *dv)` — sin
+- `dval_t *dv_cos(const dval_t *dv)` — cos
+- `dval_t *dv_tan(const dval_t *dv)` — tan
+- `dval_t *dv_sinh(const dval_t *dv)` — sinh
+- `dval_t *dv_cosh(const dval_t *dv)` — cosh
+- `dval_t *dv_tanh(const dval_t *dv)` — tanh
+- `dval_t *dv_asin(const dval_t *dv)` — arcsin
+- `dval_t *dv_acos(const dval_t *dv)` — arccos
+- `dval_t *dv_atan(const dval_t *dv)` — arctan
+- `dval_t *dv_atan2(const dval_t *dv1, const dval_t *dv2)` — four-quadrant arctan2(dv1, dv2)
+- `dval_t *dv_asinh(const dval_t *dv)` — inverse hyperbolic sine
+- `dval_t *dv_acosh(const dval_t *dv)` — inverse hyperbolic cosine
+- `dval_t *dv_atanh(const dval_t *dv)` — inverse hyperbolic tangent
+- `dval_t *dv_exp(const dval_t *dv)` — natural exponential
+- `dval_t *dv_log(const dval_t *dv)` — natural logarithm
+- `dval_t *dv_log10(const dval_t *dv)` — common logarithm
+- `dval_t *dv_sqrt(const dval_t *dv)` — square root
+- `dval_t *dv_floor(const dval_t *dv)` — floor
+- `dval_t *dv_ceil(const dval_t *dv)` — ceiling
 - `dval_t *dv_pow(const dval_t *dv, const number_t *exponent)` — `dv ^ exponent` (borrowed scalar numeric exponent)
 - `dval_t *dv_pow_dv(const dval_t *dv1, const dval_t *dv2)` — `dv1 ^ dv2`
 
 ### Special Functions (owning)
 
-- `dval_t *dv_abs(dval_t *dv)` — absolute value
-- `dval_t *dv_hypot(dval_t *dv1, dval_t *dv2)` — sqrt(dv1² + dv2²)
-- `dval_t *dv_erf(dval_t *dv)` — error function
-- `dval_t *dv_erfc(dval_t *dv)` — complementary error function
-- `dval_t *dv_erfinv(dval_t *dv)` — inverse error function
-- `dval_t *dv_erfcinv(dval_t *dv)` — inverse complementary error function
-- `dval_t *dv_gamma(dval_t *dv)` — Γ(x)
-- `dval_t *dv_lgamma(dval_t *dv)` — ln|Γ(x)|
-- `dval_t *dv_digamma(dval_t *dv)` — ψ(x) = d/dx ln Γ(x)
-- `dval_t *dv_trigamma(dval_t *dv)` — ψ'(x)
-- `dval_t *dv_lambert_w0(dval_t *dv)` — Lambert W principal branch W₀(x)
-- `dval_t *dv_lambert_wm1(dval_t *dv)` — Lambert W branch W₋₁(x)
-- `dval_t *dv_beta(dval_t *dv1, dval_t *dv2)` — B(a, b)
-- `dval_t *dv_logbeta(dval_t *dv1, dval_t *dv2)` — ln B(a, b)
-- `dval_t *dv_normal_pdf(dval_t *dv)` — standard normal PDF φ(x)
-- `dval_t *dv_normal_cdf(dval_t *dv)` — standard normal CDF Φ(x)
-- `dval_t *dv_normal_logpdf(dval_t *dv)` — ln φ(x)
-- `dval_t *dv_ei(dval_t *dv)` — Ei(x), exponential integral
-- `dval_t *dv_e1(dval_t *dv)` — E₁(x), exponential integral
+- `dval_t *dv_abs(const dval_t *dv)` — absolute value
+- `dval_t *dv_hypot(const dval_t *dv1, const dval_t *dv2)` — sqrt(dv1² + dv2²)
+- `dval_t *dv_erf(const dval_t *dv)` — error function
+- `dval_t *dv_erfc(const dval_t *dv)` — complementary error function
+- `dval_t *dv_erfinv(const dval_t *dv)` — inverse error function
+- `dval_t *dv_erfcinv(const dval_t *dv)` — inverse complementary error function
+- `dval_t *dv_gamma(const dval_t *dv)` — Γ(x)
+- `dval_t *dv_lgamma(const dval_t *dv)` — ln|Γ(x)|
+- `dval_t *dv_digamma(const dval_t *dv)` — ψ(x) = d/dx ln Γ(x)
+- `dval_t *dv_trigamma(const dval_t *dv)` — ψ'(x)
+- `dval_t *dv_polygamma(unsigned int order, const dval_t *dv)` — ψ⁽ⁿ⁾(x)
+- `dval_t *dv_gammainv(const dval_t *dv)` — principal Γ⁻¹(x)
+- `dval_t *dv_gammainc_lower(const dval_t *s, const dval_t *x)` — lower incomplete gamma γ(s, x)
+- `dval_t *dv_gammainc_upper(const dval_t *s, const dval_t *x)` — upper incomplete gamma Γ(s, x)
+- `dval_t *dv_gammainc_P(const dval_t *s, const dval_t *x)` — regularised lower incomplete gamma P(s, x)
+- `dval_t *dv_gammainc_Q(const dval_t *s, const dval_t *x)` — regularised upper incomplete gamma Q(s, x)
+- `dval_t *dv_lambert_w(const dval_t *dv)` — branch-choosing Lambert W/ProductLog helper
+- `dval_t *dv_lambert_w0(const dval_t *dv)` — Lambert W principal branch W₀(x)
+- `dval_t *dv_lambert_wm1(const dval_t *dv)` — Lambert W branch W₋₁(x)
+- `dval_t *dv_beta(const dval_t *dv1, const dval_t *dv2)` — B(a, b)
+- `dval_t *dv_logbeta(const dval_t *dv1, const dval_t *dv2)` — ln B(a, b)
+- `dval_t *dv_beta_pdf(const dval_t *x, const dval_t *a, const dval_t *b)` — beta distribution PDF
+- `dval_t *dv_logbeta_pdf(const dval_t *x, const dval_t *a, const dval_t *b)` — log beta distribution PDF
+- `dval_t *dv_binomial(const dval_t *n, const dval_t *k)` — binomial coefficient
+- `dval_t *dv_normal_pdf(const dval_t *dv)` — standard normal PDF φ(x)
+- `dval_t *dv_normal_cdf(const dval_t *dv)` — standard normal CDF Φ(x)
+- `dval_t *dv_normal_logpdf(const dval_t *dv)` — ln φ(x)
+- `dval_t *dv_ei(const dval_t *dv)` — Ei(x), exponential integral
+- `dval_t *dv_e1(const dval_t *dv)` — E₁(x), exponential integral
+
+### Value-Only Functions (owning)
+
+These functions evaluate through `number_t` and can be parsed by dval Lab, but
+they are not differentiable. Front-ends can call `dv_is_differentiable(...)` to
+decide whether derivative controls should be shown.
+
+- `dval_t *dv_factorial(const dval_t *n)` — exact factorial; parser shorthand `n!` lowers to `gamma(n + 1)` for differentiable symbolic inputs
+- `dval_t *dv_fibonacci(const dval_t *n)` — exact Fibonacci number
+- `dval_t *dv_partition(const dval_t *n)` — exact integer partition count p(n)
+- `dval_t *dv_isqrt(const dval_t *n)` — exact integer square root
+- `dval_t *dv_gcd(const dval_t *a, const dval_t *b)` — greatest common divisor
+- `dval_t *dv_lcm(const dval_t *a, const dval_t *b)` — least common multiple
+- `dval_t *dv_mod(const dval_t *a, const dval_t *b)` — exact integer remainder
+- `dval_t *dv_modinv(const dval_t *a, const dval_t *b)` — modular inverse
+- `dval_t *dv_is_prime(const dval_t *n)` — primality predicate as a numeric value
+- `dval_t *dv_next_prime(const dval_t *n)` — next prime
+- `dval_t *dv_prev_prime(const dval_t *n)` — previous prime
+- `dval_t *dv_bit_and(const dval_t *a, const dval_t *b)` — bitwise AND
+- `dval_t *dv_bit_or(const dval_t *a, const dval_t *b)` — bitwise OR
+- `dval_t *dv_bit_xor(const dval_t *a, const dval_t *b)` — bitwise XOR
+- `dval_t *dv_bit_not(const dval_t *a)` — bitwise NOT over the active bit width
+- `dval_t *dv_shl(const dval_t *a, const dval_t *bits)` — left shift
+- `dval_t *dv_shr(const dval_t *a, const dval_t *bits)` — right shift
+- `dval_t *dv_factors(const dval_t *n)` — factorise an exact integer and return
+  an expression DAG whose constant bindings hold the prime factors
 
 ### Lifetime Management
 
@@ -569,6 +609,23 @@ All functions return owning handles.
 
 - `char *dv_to_string(const dval_t *dv, style_t style)` — serialise the expression; `style` is `style_FUNCTION` or `style_EXPRESSION`. In expression style, `sqrt(...)` is printed as `√(...)` and `abs(...)` as `|...|`. Returns a newly allocated C string; the caller must free it.
 - `void dv_print(const dval_t *dv)` — print the expression to stdout in `style_EXPRESSION` format
+
+`style_FUNCTION` prints a small C-like evaluable sketch. Untyped parameters are
+treated as differentiable variables, while `const` parameters and bindings are
+displayed as non-differentiable constants:
+
+```text
+variable expr(x, y, const c₀) {
+    return tan(x * y * c₀ / 2);
+}
+
+variable expr_eval() {
+    x = 3.29929295579108949982756921421358070866178174810740656177232818327906094186165;
+    y = 3.29929295579108949982756921421358070866178174810740656177232818327906094186165;
+    const c₀ = γ;
+    return expr(x, y, c₀);
+}
+```
 
 ### Parsing
 
@@ -596,7 +653,17 @@ All functions return owning handles.
   - `*` for explicit multiplication
   - `^N` or `^1.5` for ASCII exponents after a variable, constant, or parenthesised sub-expression
   - `sin^2(x)` style ASCII exponents on function names
+  - postfix factorial `x!`, which lowers to `gamma(x + 1)` when it remains
+    symbolic and differentiable
   - `sqrt(x)` or `√(x)` for square roots
+  - `gamma(x)` and `Γ(x)` for the gamma function
+  - `digamma(x)`, `trigamma(x)`, and `polygamma(n, x)` for ψ⁽⁰⁾, ψ⁽¹⁾, and ψ⁽ⁿ⁾
+  - `W(x)`, `W0(x)`, `W_0(x)`, `W₀(x)`, `productlog(x)`, and `lambert_w0(x)` for W₀
+  - `W-1(x)`, `W_-1(x)`, `W₋₁(x)`, and `lambert_wm1(x)` for W₋₁
+  - exact value-only helpers such as `factorial(n)`, `fibonacci(n)`,
+    `partition(n)`, `factors(n)`, `next_prime(n)`, `prev_prime(n)`,
+    `AND(a, b)`, `OR(a, b)`, `XOR(a, b)`, `NOT(a)`, `SHL(a, n)`, and
+    `SHR(a, n)`
   - `[bracket names]` for identifiers that are not single-letter-plus-subscript
 
   In the no-binding form, the default inference rule is:

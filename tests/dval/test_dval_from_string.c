@@ -109,6 +109,10 @@ static void test_from_string_functions(void)
     check_parse_val("sqrt(x) at 4",      "{ sqrt(x) | x = 4 }",          2.0,          __LINE__);
     check_parse_val("floor(x) at 1.75",  "{ floor(x) | x = 1.75 }",      1.0,          __LINE__);
     check_parse_val("ceil(x) at 1.25",   "{ ceil(x) | x = 1.25 }",       2.0,          __LINE__);
+    check_parse_num("10! lowers to gamma(11)",
+        "{ 10! }", "3628800", __LINE__);
+    check_parse_num("x! lowers to gamma(x+1)",
+        "{ x! | x = 5 }", "120", __LINE__);
     check_parse_num("exp(pi*i/2) = i",   "{ exp(@pi*i/2) }",             "i",          __LINE__);
     check_parse_expr("1/pi stays symbolic", "{ 1/pi }",
         "1/π", __LINE__);
@@ -127,6 +131,9 @@ static void test_from_string_functions(void)
     check_parse_simplified_expr("W-1 identity resolves bound e",
         "{ W-1(x)*exp(W-1(x)) | x = e }",
         "e", __LINE__);
+    check_parse_expr("W identity recognises e power",
+        "{ W(2e^2) }",
+        "2", __LINE__);
     check_parse_val("√(x) at 4",         "{ √(x) | x = 4 }",             2.0,          __LINE__);
     /* Binary functions */
     check_parse_val("atan2(1, 1) = π/4",
@@ -164,9 +171,21 @@ static void test_from_string_special_functions(void)
     check_parse_val("erfinv(0) = 0",         "{ erfinv(x) | x = 0 }",        0.0,                     __LINE__);
     check_parse_val("erfcinv(1) = 0",        "{ erfcinv(x) | x = 1 }",       0.0,                     __LINE__);
     check_parse_val("gamma(3) = 2",          "{ gamma(x) | x = 3 }",         2.0,                     __LINE__);
+    check_parse_val("Γ(3) = 2",              "{ Γ(x) | x = 3 }",             2.0,                     __LINE__);
     check_parse_val("gammainv(gamma(2.5)) = 2.5", "{ gammainv(x) | x = 1.329340388179137 }", 2.5,   __LINE__);
     check_parse_val("lgamma(1) = 0",         "{ lgamma(x) | x = 1 }",        0.0,                     __LINE__);
     check_parse_val("digamma(1) = -gamma_E", "{ digamma(x) | x = 1 }",      -0.5772156649015329,       __LINE__);
+    check_parse_val("ψ⁽⁰⁾(1) = -gamma_E",    "{ ψ⁽⁰⁾(x) | x = 1 }",         -0.5772156649015329,       __LINE__);
+    check_parse_val("ψ⁽¹⁾(1) = pi²/6",       "{ ψ⁽¹⁾(x) | x = 1 }",          M_PI * M_PI / 6.0,        __LINE__);
+    check_parse_val("polygamma(3, 2) = pi^4/15 - 6",
+        "{ polygamma(3, x) | x = 2 }",
+        pow(M_PI, 4.0) / 15.0 - 6.0, __LINE__);
+    check_parse_val("ψ⁽³⁾(2) = pi^4/15 - 6",
+        "{ ψ⁽³⁾(x) | x = 2 }",
+        pow(M_PI, 4.0) / 15.0 - 6.0, __LINE__);
+    check_parse_expr("polygamma expression uses standard symbol",
+        "{ polygamma(2, x) | x = ? }",
+        "{ ψ⁽²⁾(x) | x = NAN }", __LINE__);
     check_parse_val("W₀(0) = 0 via lambert_w0", "{ lambert_w0(x) | x = 0 }", 0.0,                     __LINE__);
     check_parse_val("W₀(0) = 0 via productlog", "{ productlog(x) | x = 0 }", 0.0,                     __LINE__);
     check_parse_val("W₀(0) = 0",             "{ W₀(x) | x = 0 }",            0.0,                     __LINE__);
@@ -174,7 +193,7 @@ static void test_from_string_special_functions(void)
     check_parse_val("W₀(0) = 0 via W0",       "{ W0(x) | x = 0 }",            0.0,                     __LINE__);
     check_parse_val("W₀(0) = 0 via W_0",      "{ W_0(x) | x = 0 }",           0.0,                     __LINE__);
     check_parse_expr("W(x) infers x binding", "{ W(x) }",
-        "{ W₀(x) | x = NAN }", __LINE__);
+        "{ W(x) | x = NAN }", __LINE__);
     check_parse_expr("W_0(x) infers x binding", "{ W_0(x) }",
         "{ W₀(x) | x = NAN }", __LINE__);
     check_parse_val("W₋₁(-0.2) via lambert_wm1", "{ lambert_wm1(x) | x = -0.2 }", -2.5426413577735265, __LINE__);
@@ -192,7 +211,95 @@ static void test_from_string_special_functions(void)
     /* Binary functions */
     check_parse_val("beta(1,1) = 1",         "{ beta(x, y) | x = 1, y = 1 }", 1.0,                   __LINE__);
     check_parse_val("logbeta(1,1) = 0",      "{ logbeta(x, y) | x = 1, y = 1 }", 0.0,                __LINE__);
+    check_parse_val("gammainc_lower(1,1) = 1-exp(-1)",
+                    "{ gammainc_lower(s, x) | s = 1, x = 1 }", 1.0 - exp(-1.0),                    __LINE__);
+    check_parse_val("gammainc_upper(1,1) = exp(-1)",
+                    "{ gammainc_upper(s, x) | s = 1, x = 1 }", exp(-1.0),                          __LINE__);
+    check_parse_val("gammainc_P(1,1) = 1-exp(-1)",
+                    "{ gammainc_P(s, x) | s = 1, x = 1 }", 1.0 - exp(-1.0),                        __LINE__);
+    check_parse_val("gammainc_Q(1,1) = exp(-1)",
+                    "{ gammainc_Q(s, x) | s = 1, x = 1 }", exp(-1.0),                              __LINE__);
+    check_parse_val("beta_pdf(0.5,2,3) = 1.5",
+                    "{ beta_pdf(x, a, b) | x = 0.5, a = 2, b = 3 }", 1.5,                           __LINE__);
+    check_parse_val("logbeta_pdf(0.5,1,1) = 0",
+                    "{ logbeta_pdf(x, a, b) | x = 0.5, a = 1, b = 1 }", 0.0,                         __LINE__);
+    check_parse_val("binomial(5,2) = 10",    "{ binomial(n, k) | n = 5, k = 2 }", 10.0,              __LINE__);
     check_parse_val("hypot(3,4) = 5",        "{ hypot(x, y) | x = 3, y = 4 }", 5.0,                  __LINE__);
+}
+
+static void test_from_string_exact_value_functions(void)
+{
+    dval_bindings_t *bindings = NULL;
+    dval_t *expr = NULL;
+    dval_t *deriv = NULL;
+    number_t deriv_value;
+
+    check_parse_num("factorial(10) = 10!",
+        "{ factorial(n) | n = 10 }", "3628800", __LINE__);
+    check_parse_num("fibonacci(50)",
+        "{ fibonacci(n) | n = 50 }", "12586269025", __LINE__);
+    check_parse_num("partition(5)",
+        "{ partition(n) | n = 5 }", "7", __LINE__);
+    check_parse_num("isqrt(200)",
+        "{ isqrt(n) | n = 200 }", "14", __LINE__);
+    check_parse_num("gcd(84, 30)",
+        "{ gcd(a, b) | a = 84, b = 30 }", "6", __LINE__);
+    check_parse_num("lcm(-21, 6)",
+        "{ lcm(a, b) | a = -21, b = 6 }", "42", __LINE__);
+    check_parse_num("mod(29, 5)",
+        "{ mod(a, b) | a = 29, b = 5 }", "4", __LINE__);
+    check_parse_num("modinv(3, 11)",
+        "{ modinv(a, b) | a = 3, b = 11 }", "4", __LINE__);
+    check_parse_num("is_prime(97)",
+        "{ is_prime(n) | n = 97 }", "1", __LINE__);
+    check_parse_num("is_prime(221)",
+        "{ is_prime(n) | n = 221 }", "0", __LINE__);
+    check_parse_num("next_prime(14)",
+        "{ next_prime(n) | n = 14 }", "17", __LINE__);
+    check_parse_num("prev_prime(14)",
+        "{ prev_prime(n) | n = 14 }", "13", __LINE__);
+    check_parse_num("AND(13, 11)",
+        "{ AND(a, b) | a = 13, b = 11 }", "9", __LINE__);
+    check_parse_num("OR(13, 11)",
+        "{ OR(a, b) | a = 13, b = 11 }", "15", __LINE__);
+    check_parse_num("XOR(13, 8)",
+        "{ XOR(a, b) | a = 13, b = 8 }", "5", __LINE__);
+    check_parse_num("NOT(8)",
+        "{ NOT(a) | a = 8 }", "7", __LINE__);
+    check_parse_num("SHL(7, 3)",
+        "{ SHL(a, n) | a = 7, n = 3 }", "56", __LINE__);
+    check_parse_num("SHR(56, 3)",
+        "{ SHR(a, n) | a = 56, n = 3 }", "7", __LINE__);
+    check_parse_num("factors(360)",
+        "{ a₀³·a₁²·a₂ | ; a₀ = 2, a₁ = 3, a₂ = 5 }", "360", __LINE__);
+
+    expr = dval_from_string("{ gcd(x, y) | x = 84, y = 30 }", &bindings);
+    if (!expr || dv_is_differentiable(expr)) {
+        printf(C_BOLD C_RED "FAIL" C_RESET " gcd expression is marked non-differentiable %s:%d:1\n\n",
+               __FILE__, __LINE__);
+        TEST_FAIL();
+    } else {
+        printf(C_BOLD C_GREEN "PASS" C_RESET " gcd expression is marked non-differentiable\n\n");
+    }
+
+    if (expr && bindings) {
+        dval_t *x = dval_bindings_get(bindings, "x");
+
+        deriv = x ? dv_create_deriv(expr, x) : NULL;
+        deriv_value = deriv ? dv_eval(deriv) : NUM_ZERO;
+        if (deriv && num_is_nan(deriv_value)) {
+            printf(C_BOLD C_GREEN "PASS" C_RESET " non-differentiable derivative evaluates to NaN\n\n");
+        } else {
+            printf(C_BOLD C_RED "FAIL" C_RESET " non-differentiable derivative evaluates to NaN %s:%d:1\n\n",
+                   __FILE__, __LINE__);
+            TEST_FAIL();
+        }
+        num_destroy(&deriv_value);
+    }
+
+    dv_free(deriv);
+    dval_bindings_free(bindings);
+    dv_free(expr);
 }
 
 /* ---- Named constants (binding section) ---- */
@@ -997,6 +1104,14 @@ static void test_from_string_number_literals(void)
     check_parse_num("rational atom expression", "{ 1/2 + 1/4 }", "3/4", __LINE__);
     check_parse_num("unicode rational atom expression", "{ ½ + ¼ }", "3/4", __LINE__);
     check_parse_num("stacked unicode rational atom", "{ ³⁵⁵⁄₁₁₃ }", "355/113", __LINE__);
+    check_parse_expr("rational atom expression simplifies display",
+                     "{ 231/2310 }",
+                     "⅒",
+                     __LINE__);
+    check_parse_expr("stacked unicode rational atom simplifies display",
+                     "{ ²³¹⁄₂₃₁₀ }",
+                     "⅒",
+                     __LINE__);
     check_parse_num("pure imaginary coefficient atom", "{ 3/2i }", "3/2i", __LINE__);
     check_parse_num("pure const rational complex", "{ [z] = 1/2 - 3/2i }", "1/2 - 3/2i", __LINE__);
     check_parse_num("binding rational complex", "{ z | z = 1/2 - 3/2i }", "1/2 - 3/2i", __LINE__);
@@ -1337,7 +1452,7 @@ static void test_from_string_bindings_with_constant_expression_value(void)
                      __LINE__);
     check_parse_expr("pure numeric expression preserves full mathematical tree",
                      "{ phi - 1/2(1+sqrt(5)) }",
-                     "φ - ¹⁄₂·(1 + √(5))",
+                     "φ - ½·(1 + √(5))",
                      __LINE__);
     check_parse_expr("binding value preserves full mathematical tree",
                      "{ x | x = 1/2(1+sqrt(5)) }",
@@ -1359,13 +1474,17 @@ static void test_from_string_bindings_with_constant_expression_value(void)
                      "{ E - M - e·sin(E) | ; M = pi/1.234, e=0.0167 }",
                      "{ E - M - e·sin(E) | E = NAN; M = π/1.234, e = 0.0167 }",
                      __LINE__);
+    check_parse_expr("constant binding simplifies Lambert e power",
+                     "{ polygamma(9, x*y*c) | x = 7, y = 1; c = W(2e^2) }",
+                     "{ ψ⁽⁹⁾(cxy) | x = 7, y = 1; c = 2 }",
+                     __LINE__);
     check_parse_expr("simplified constants keep bindings",
                      "{ ax + yb + zc - 8 | a = NAN, b = NAN, c = NAN; x=1, y = 2, z = 3 }",
-                     "{ ax + by + cz - 8 | a = NAN, b = NAN, c = NAN; x = 1, y = 2, z = 3 }",
+                     "{ xa + yb + zc - 8 | a = NAN, b = NAN, c = NAN; x = 1, y = 2, z = 3 }",
                      __LINE__);
     check_parse_expr("constant bindings accept semicolon separators",
                      "{ ax + by + cz - 8 | a = NAN, b = NAN, c = NAN; x = 1; y = 2, z = 3 }",
-                     "{ ax + by + cz - 8 | a = NAN, b = NAN, c = NAN; x = 1, y = 2, z = 3 }",
+                     "{ xa + yb + zc - 8 | a = NAN, b = NAN, c = NAN; x = 1, y = 2, z = 3 }",
                      __LINE__);
     check_parse_expr("const-only binding preserves leading semicolon",
                      "{ exp(π·√(H)) | ;H = 163 }",
@@ -1541,15 +1660,15 @@ static void test_from_string_bindings_with_constant_expression_value(void)
 
     if (deriv_text &&
         strcmp(deriv_text,
-               "{ ⅛π·exp(π·√(x))·(3 - 3π·√(x) + x·π²)/x^⁵⁄₂ | x = ⅙π }") == 0) {
+               "{ ⅛π·exp(π·√(x))·(3 - 3π·√(x) + π²·x)/x^⁵⁄₂ | x = ⅙π }") == 0) {
         to_string_pass("symbolic coefficient folding happens in derivative DAG",
                        deriv_text,
-                       "{ ⅛π·exp(π·√(x))·(3 - 3π·√(x) + x·π²)/x^⁵⁄₂ | x = ⅙π }");
+                       "{ ⅛π·exp(π·√(x))·(3 - 3π·√(x) + π²·x)/x^⁵⁄₂ | x = ⅙π }");
     } else {
         to_string_fail(__FILE__, __LINE__, 1,
                        "symbolic coefficient folding happens in derivative DAG",
                        deriv_text ? deriv_text : "(null)",
-                       "{ ⅛π·exp(π·√(x))·(3 - 3π·√(x) + x·π²)/x^⁵⁄₂ | x = ⅙π }");
+                       "{ ⅛π·exp(π·√(x))·(3 - 3π·√(x) + π²·x)/x^⁵⁄₂ | x = ⅙π }");
     }
 
     free(deriv_text);
@@ -1567,15 +1686,15 @@ static void test_from_string_bindings_with_constant_expression_value(void)
 
     if (deriv_text &&
         strcmp(deriv_text,
-               "{ ⅛π·exp(π·√(x))·(3 - 3π·√(x) + x·π²)/x^⁵⁄₂ | x = 163 }") == 0) {
+               "{ ⅛π·exp(π·√(x))·(3 - 3π·√(x) + π²·x)/x^⁵⁄₂ | x = 163 }") == 0) {
         to_string_pass("nested symbolic pi derivative factors common terms",
                        deriv_text,
-                       "{ ⅛π·exp(π·√(x))·(3 - 3π·√(x) + x·π²)/x^⁵⁄₂ | x = 163 }");
+                       "{ ⅛π·exp(π·√(x))·(3 - 3π·√(x) + π²·x)/x^⁵⁄₂ | x = 163 }");
     } else {
         to_string_fail(__FILE__, __LINE__, 1,
                        "nested symbolic pi derivative factors common terms",
                        deriv_text ? deriv_text : "(null)",
-                       "{ ⅛π·exp(π·√(x))·(3 - 3π·√(x) + x·π²)/x^⁵⁄₂ | x = 163 }");
+                       "{ ⅛π·exp(π·√(x))·(3 - 3π·√(x) + π²·x)/x^⁵⁄₂ | x = 163 }");
     }
 
     free(deriv_text);
@@ -1669,6 +1788,7 @@ void test_dval_t_from_string(void)
     TEST_RUN_SUBTEST(test_from_string_arithmetic, NULL);
     TEST_RUN_SUBTEST(test_from_string_functions, NULL);
     TEST_RUN_SUBTEST(test_from_string_special_functions, NULL);
+    TEST_RUN_SUBTEST(test_from_string_exact_value_functions, NULL);
     TEST_RUN_SUBTEST(test_from_string_named_consts, NULL);
     TEST_RUN_SUBTEST(test_from_string_bracketed_names, NULL);
     TEST_RUN_SUBTEST(test_from_string_number_literals, NULL);

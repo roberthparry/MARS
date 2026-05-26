@@ -283,7 +283,8 @@
       "test_qf_digamma": true,
       "test_qf_gammainv": true,
       "test_qf_trigamma": true,
-      "test_qf_tetragamma": true
+      "test_qf_tetragamma": true,
+      "test_qf_polygamma": true
     }
   },
   "tests/qfloat/test_qfloat_probability.c": {
@@ -685,6 +686,7 @@
       "test_lgamma": true,
       "test_digamma": true,
       "test_trigamma": true,
+      "test_polygamma": true,
       "test_lambert_w0": true,
       "test_lambert_wm1": true,
       "test_normal_pdf": true,
@@ -693,7 +695,11 @@
       "test_ei": true,
       "test_e1": true,
       "test_beta": true,
-      "test_logbeta": true
+      "test_logbeta": true,
+      "test_gammainc": true,
+      "test_beta_pdf": true,
+      "test_logbeta_pdf": true,
+      "test_binomial": true
     }
   },
   "tests/dval/test_dval_first_derivatives.c": {
@@ -753,7 +759,11 @@
       "test_deriv_ei": true,
       "test_deriv_e1": true,
       "test_deriv_beta": true,
-      "test_deriv_logbeta": true
+      "test_deriv_logbeta": true,
+      "test_deriv_gammainc": true,
+      "test_deriv_beta_pdf": true,
+      "test_deriv_logbeta_pdf": true,
+      "test_deriv_binomial": true
     }
   },
   "tests/dval/test_dval_second_derivatives.c": {
@@ -842,6 +852,8 @@
         "test_to_string_symbolic_constants_tex": true,
         "test_to_string_symbolic_constant_quotient_tex": true,
         "test_to_string_lambert_w_tex": true,
+        "test_to_string_gammainv_tex": true,
+        "test_to_string_gamma_polygamma_standard_names": true,
         "test_to_string_non_simple_var_bracketed": {
           "enabled": true,
           "test_to_string_non_simple_var_bracketed_expr": true,
@@ -909,6 +921,7 @@
       "test_from_string_arithmetic": true,
       "test_from_string_functions": true,
       "test_from_string_special_functions": true,
+      "test_from_string_exact_value_functions": true,
       "test_from_string_named_consts": true,
       "test_from_string_bracketed_names": true,
       "test_from_string_number_literals": true,
@@ -1002,9 +1015,17 @@
       "test_simplify_trig_and_hyperbolic_identities": true,
       "test_to_string_imaginary_unit_omits_one": true,
       "test_complex_coefficient_stays_grouped": true,
+      "test_pure_imaginary_addend_stays_ungrouped": true,
+      "test_preserved_complex_function_addend_stays_ungrouped": true,
       "test_updated_decimal_binding_stays_decimal": true,
       "test_symbolic_negative_pi_derivative_stays_symbolic": true,
       "test_pow_derivative_preserves_literal_base_log": true,
+      "test_log_of_imaginary_product_derivative_cancels_i": true,
+      "test_ln10_product_expression_round_trips": true,
+      "test_lambert_inverse_argument_derivative_simplifies": true,
+      "test_lambert_inverse_branch_selection": true,
+      "test_productlog_small_complex_inverse_uses_principal_branch": true,
+      "test_factorial_postfix_lowers_to_differentiable_gamma": true,
       "test_repeated_preserved_log_factor_combines_as_power": true,
       "test_preserved_log_power_chain_combines_as_power": true,
       "test_unary_constants_preserve_user_literals_in_derivatives": true,
@@ -1018,6 +1039,7 @@
       "test_binding_lambert_inverse_numeric_expression_simplifies": true,
       "test_binding_exact_core_trig_values_simplify": true,
       "test_tan_poles_display_as_infinity": true,
+      "test_sqrt_negative_exact_evaluates_to_i": true,
       "test_goal_seek_large_target_uses_significant_digit_tolerance": true
     }
   },
@@ -1039,6 +1061,7 @@
       "test_goal_seek_complex_fallback": true,
       "test_goal_seek_complex_fallback_from_real_axis": true,
       "test_goal_seek_complex_uses_guard_precision": true,
+      "test_goal_seek_complex_lgamma_imaginary_axis": true,
       "test_goal_seek_real_multi_variable": true,
       "test_goal_seek_default_tolerance_uses_precision_digits": true,
       "test_goal_seek_default_iterations_scale_with_precision": true

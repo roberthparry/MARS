@@ -41,4 +41,13 @@ static inline int qf_to_int(qfloat_t x)
 
 qfloat_t qf_renorm(double hi, double lo);
 
+typedef struct qfloat_bernoulli_even_term_t {
+    double num;
+    double den;
+    int sign;
+} qfloat_bernoulli_even_term_t;
+
+extern const size_t QFI_BERNOULLI_EVEN_TERM_COUNT;
+extern const qfloat_bernoulli_even_term_t QFI_BERNOULLI_EVEN_TERMS[];
+
 #endif

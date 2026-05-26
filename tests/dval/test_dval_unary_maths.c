@@ -363,6 +363,7 @@ void test_maths_functions(void)
     TEST_RUN_SUBTEST(test_lgamma, NULL);
     TEST_RUN_SUBTEST(test_digamma, NULL);
     TEST_RUN_SUBTEST(test_trigamma, NULL);
+    TEST_RUN_SUBTEST(test_polygamma, NULL);
     TEST_RUN_SUBTEST(test_lambert_w0, NULL);
     TEST_RUN_SUBTEST(test_lambert_wm1, NULL);
     TEST_RUN_SUBTEST(test_normal_pdf, NULL);
@@ -372,4 +373,8 @@ void test_maths_functions(void)
     TEST_RUN_SUBTEST(test_e1, NULL);
     TEST_RUN_SUBTEST(test_beta, NULL);
     TEST_RUN_SUBTEST(test_logbeta, NULL);
+    TEST_RUN_SUBTEST(test_gammainc, NULL);
+    TEST_RUN_SUBTEST(test_beta_pdf, NULL);
+    TEST_RUN_SUBTEST(test_logbeta_pdf, NULL);
+    TEST_RUN_SUBTEST(test_binomial, NULL);
 }

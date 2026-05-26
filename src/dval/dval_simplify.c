@@ -182,6 +182,109 @@ static dval_t *dv_simplify_direct_inverse_pair_from_raw(const dval_t *outer,
     return arg;
 }
 
+static bool dv_inverse_unary_pattern_supported_local(const dval_ops_t *ops)
+{
+    return ops == &ops_lambert_w ||
+           ops == &ops_lambert_w0 ||
+           ops == &ops_lambert_wm1 ||
+           ops == &ops_log10;
+}
+
+static bool dv_inverse_unary_candidate_domain_ok_local(const dval_ops_t *ops,
+                                                       const dval_t *candidate)
+{
+    number_t value;
+    bool ok = true;
+
+    if (!ops || !candidate)
+        return false;
+
+    if (ops != &ops_lambert_w &&
+        ops != &ops_lambert_w0 &&
+        ops != &ops_lambert_wm1)
+        return true;
+
+    value = dv_eval(candidate);
+    ok = num_is_finite(value) && num_is_real(value) &&
+         (ops == &ops_lambert_w ||
+          (ops == &ops_lambert_w0 && num_ge(value, NUM_NEG_ONE)) ||
+          (ops == &ops_lambert_wm1 && num_le(value, NUM_NEG_ONE)));
+    num_destroy(&value);
+    return ok;
+}
+
+static dval_t *dv_try_simplify_vtable_inverse_candidate_local(
+    const dval_t *outer,
+    const dval_t *arg,
+    const dval_t *candidate)
+{
+    dval_t *inverse;
+    dval_t *simplified_inverse;
+    dval_t *out = NULL;
+
+    if (!outer || !outer->ops || !outer->ops->inverse_unary ||
+        !dv_inverse_unary_pattern_supported_local(outer->ops) ||
+        !arg || !candidate ||
+        !dv_inverse_unary_candidate_domain_ok_local(outer->ops, candidate))
+        return NULL;
+
+    inverse = outer->ops->inverse_unary(candidate);
+    if (!inverse)
+        return NULL;
+
+    simplified_inverse = dv_simplify(inverse);
+    dv_free(inverse);
+
+    if (dv_struct_eq(simplified_inverse, arg)) {
+        dv_retain((dval_t *)candidate);
+        out = (dval_t *)candidate;
+    }
+
+    dv_free(simplified_inverse);
+    return out;
+}
+
+static const dval_t *dv_extract_exp_product_argument_local(const dval_t *arg)
+{
+    if (!dv_is_op(arg, &ops_mul))
+        return NULL;
+
+    if (dv_is_exp_expr(arg->a) && dv_struct_eq(arg->a->a, arg->b))
+        return arg->b;
+
+    if (dv_is_exp_expr(arg->b) && dv_struct_eq(arg->b->a, arg->a))
+        return arg->a;
+
+    return NULL;
+}
+
+static dval_t *dv_try_simplify_vtable_inverse_argument_local(
+    const dval_t *outer,
+    const dval_t *arg)
+{
+    dval_t *out;
+    const dval_t *exp_product_arg;
+
+    if (!arg)
+        return NULL;
+
+    if (outer && (outer->ops == &ops_lambert_w ||
+                  outer->ops == &ops_lambert_w0 ||
+                  outer->ops == &ops_lambert_wm1)) {
+        exp_product_arg = dv_extract_exp_product_argument_local(arg);
+        out = dv_try_simplify_vtable_inverse_candidate_local(outer, arg,
+                                                             exp_product_arg);
+        if (out)
+            return out;
+    }
+
+    out = dv_try_simplify_vtable_inverse_candidate_local(outer, arg, arg);
+    if (out)
+        return out;
+
+    return NULL;
+}
+
 static dval_t *dv_simplify_atan_tan_sawtooth(dval_t *inner)
 {
     dval_t *arg;
@@ -878,7 +981,9 @@ static dval_t *dv_try_fold_numeric_arithmetic_local(
 
 static bool dv_is_lambert_expr_local(const dval_t *dv)
 {
-    return dv_is_op(dv, &ops_lambert_w0) || dv_is_op(dv, &ops_lambert_wm1);
+    return dv_is_op(dv, &ops_lambert_w) ||
+           dv_is_op(dv, &ops_lambert_w0) ||
+           dv_is_op(dv, &ops_lambert_wm1);
 }
 
 static bool dv_is_simplifiable_const_local(const dval_t *dv)
@@ -1660,16 +1765,6 @@ static dval_t *dv_simplify_flat_quotient_local(dval_t *a, dval_t *b)
     return out;
 }
 
-static int dv_contains_addsub_local(const dval_t *dv)
-{
-    if (!dv)
-        return 0;
-    if (dv_is_addsub(dv))
-        return 1;
-    return dv_contains_addsub_local(dv->a) ||
-           dv_contains_addsub_local(dv->b);
-}
-
 /* ========================================================================= */
 /* Unary function simplification                                             */
 /* ========================================================================= */
@@ -1714,6 +1809,12 @@ dval_t *dv_simplify_unary_operator(const dval_t *dv, dval_t *a, dval_t *b)
     direct_inverse = dv_simplify_direct_inverse_pair(dv, a);
     if (direct_inverse)
         return direct_inverse;
+
+    direct_inverse = dv_try_simplify_vtable_inverse_argument_local(dv, a);
+    if (direct_inverse) {
+        dv_free(a);
+        return direct_inverse;
+    }
 
     if (dv_is_op(dv, &ops_tan)) {
         dval_t *periodic = dv_try_simplify_tan_period_floor(a);
@@ -2289,8 +2390,7 @@ dval_t *dv_simplify_div_operator(const dval_t *dv, dval_t *a, dval_t *b)
 	div_fallback_2:
     if (!dv_is_addsub(a) &&
         (dv_is_op(a, &ops_mul) || dv_is_div(a) ||
-         dv_is_op(b, &ops_mul) || dv_is_div(b)) &&
-        (dv_contains_addsub_local(a) || dv_contains_addsub_local(b)))
+         dv_is_op(b, &ops_mul) || dv_is_div(b)))
         return dv_simplify_flat_quotient_local(a, b);
 
     if (dv_struct_eq(a, b)) {

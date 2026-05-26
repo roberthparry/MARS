@@ -146,6 +146,21 @@ static dval_t *dv_build_dx(dval_t *dv)
     return dx; /* borrowed */
 }
 
+bool dv_is_differentiable(const dval_t *dv)
+{
+    if (!dv)
+        return false;
+    if (dv->ops && dv->ops->diff_kind == DV_DIFF_NONE)
+        return false;
+    if (dv->ops && dv->ops->arity != DV_OP_ATOM &&
+        !dv_is_differentiable(dv->a))
+        return false;
+    if (dv->ops && dv->ops->arity == DV_OP_BINARY &&
+        !dv_is_differentiable(dv->b))
+        return false;
+    return true;
+}
+
 /* Return an owning reference to the derivative of dv w.r.t. tl_wrt.
  * Falls back to a zero constant when no derivative exists. */
 static dval_t *get_dx(const dval_t *dv)

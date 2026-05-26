@@ -773,6 +773,17 @@ static int pow_base_needs_visible_parens(const dval_t *base)
     number_t real;
     int has_real_part;
 
+    if (base && dv_is_const(base) &&
+        dv_tostring_should_emit_binding_expr(base) && base->binding_expr) {
+        if (base->binding_expr->kind == DV_BINDING_EXPR_ADD ||
+            base->binding_expr->kind == DV_BINDING_EXPR_SUB)
+            return 1;
+        if (base->binding_expr->kind == DV_BINDING_EXPR_UNARY_OP ||
+            base->binding_expr->kind == DV_BINDING_EXPR_BINARY_OP ||
+            base->binding_expr->kind == DV_BINDING_EXPR_POWI)
+            return 0;
+    }
+
     if (!base || !dv_is_const(base) || num_is_real(base->c))
         return 0;
     real = num_real_part(base->c);
@@ -786,6 +797,17 @@ static int mul_factor_needs_visible_parens(const dval_t *factor)
     number_t real;
     int has_real_part;
 
+    if (factor && dv_is_const(factor) &&
+        dv_tostring_should_emit_binding_expr(factor) && factor->binding_expr) {
+        if (factor->binding_expr->kind == DV_BINDING_EXPR_ADD ||
+            factor->binding_expr->kind == DV_BINDING_EXPR_SUB)
+            return 1;
+        if (factor->binding_expr->kind == DV_BINDING_EXPR_UNARY_OP ||
+            factor->binding_expr->kind == DV_BINDING_EXPR_BINARY_OP ||
+            factor->binding_expr->kind == DV_BINDING_EXPR_POWI)
+            return 0;
+    }
+
     if (!factor || !dv_is_const(factor) || num_is_real(factor->c))
         return 0;
 
@@ -797,10 +819,72 @@ static int mul_factor_needs_visible_parens(const dval_t *factor)
 
 static int add_rhs_needs_visible_parens(const dval_t *rhs)
 {
-    return (rhs && dv_is_const(rhs) && !num_is_real(rhs->c)) ||
+    if (rhs && dv_is_const(rhs) &&
+        dv_tostring_should_emit_binding_expr(rhs) && rhs->binding_expr) {
+        if (rhs->binding_expr->kind == DV_BINDING_EXPR_ADD ||
+            rhs->binding_expr->kind == DV_BINDING_EXPR_SUB)
+            return 1;
+        if (rhs->binding_expr->kind == DV_BINDING_EXPR_UNARY_OP ||
+            rhs->binding_expr->kind == DV_BINDING_EXPR_BINARY_OP ||
+            rhs->binding_expr->kind == DV_BINDING_EXPR_POWI)
+            return 0;
+    }
+
+    if (dv_is_neg(rhs) && rhs->a && dv_is_const(rhs->a) &&
+        dv_tostring_should_emit_binding_expr(rhs->a) && rhs->a->binding_expr) {
+        if (rhs->a->binding_expr->kind == DV_BINDING_EXPR_ADD ||
+            rhs->a->binding_expr->kind == DV_BINDING_EXPR_SUB)
+            return 1;
+        if (rhs->a->binding_expr->kind == DV_BINDING_EXPR_UNARY_OP ||
+            rhs->a->binding_expr->kind == DV_BINDING_EXPR_BINARY_OP ||
+            rhs->a->binding_expr->kind == DV_BINDING_EXPR_POWI)
+            return 0;
+    }
+
+    return (rhs && dv_is_const(rhs) && mul_factor_needs_visible_parens(rhs)) ||
            (dv_is_neg(rhs) && rhs->a &&
-            dv_is_const(rhs->a) && !num_is_real(rhs->a->c)) ||
+            dv_is_const(rhs->a) && mul_factor_needs_visible_parens(rhs->a)) ||
            dv_is_addsub(rhs);
+}
+
+static bool dv_binding_expr_is_number_text_local(const dv_binding_expr_t *expr,
+                                                 const char *text)
+{
+    return expr && expr->kind == DV_BINDING_EXPR_NUMBER &&
+           expr->u.text && strcmp(expr->u.text, text) == 0;
+}
+
+static bool dv_is_preserved_ln10_const_local(const dval_t *f)
+{
+    const dv_binding_expr_t *expr;
+
+    if (!f || !dv_is_const(f) || !f->binding_expr)
+        return false;
+
+    expr = f->binding_expr;
+    return expr->kind == DV_BINDING_EXPR_UNARY_OP &&
+           expr->u.unary_op.ops == &ops_log &&
+           dv_binding_expr_is_number_text_local(expr->u.unary_op.child, "10");
+}
+
+static bool dv_is_const_half_local(const dval_t *f)
+{
+    return f && dv_is_const(f) && num_eq(f->c, NUM_HALF);
+}
+
+static int is_atomic_for_mul(const dval_t *f);
+
+static void emit_expr_mul_separator_local(const dval_t *left,
+                                          const dval_t *right,
+                                          sbuf_t *b)
+{
+    int left_atomic;
+    int right_atomic;
+
+    left_atomic = is_atomic_for_mul(left);
+    right_atomic = is_atomic_for_mul(right);
+    if (!(left_atomic && right_atomic))
+        sbuf_puts(b, "·");
 }
 
 /* -------------------------------------------------------------
@@ -816,6 +900,8 @@ static int is_atomic_for_mul(const dval_t *f)
          * or letter + subscript digits).  Multi-char names like "pi" or "radius"
          * are non-atomic so that a middle-dot separator is inserted between adjacent
          * bracketed terms: [pi]·[radius]² instead of [pi][radius]². */
+        if (dv_is_preserved_ln10_const_local(f))
+            return 0;
         if (!f->name || !*f->name) return 1;
         return dv_tostring_is_simple_name(f->name);
     }
@@ -845,12 +931,18 @@ static void flatten_mul(dval_t *f, dval_t **buf, int *count, int max)
     }
 }
 
+static int dv_tostring_is_named_const_pow_d(const dval_t *f)
+{
+    return dv_is_pow_d_expr(f) && dv_is_const(f->a) &&
+           f->a->name && *f->a->name;
+}
+
 /* Sort group for multiplication factors:
  *   0 = unnamed numeric constant       (e.g. 6)
  *   1 = Greek immortal named constant  (e.g. π)
  *   2 = Latin/other immortal constant  (e.g. e)
- *   3 = variable or var^n              (e.g. x, x³)
- *   4 = explicit bound named constant  (e.g. H or x from the const bindings)
+ *   3 = explicit bound named constant  (e.g. H or x from the const bindings)
+ *   4 = variable or var^n              (e.g. x, x³)
  *   5 = everything else (unary/binary fns) — sort by primary arg var name,
  *       stable so same-arg functions keep their original tree order
  */
@@ -859,17 +951,22 @@ static int factor_group(const dval_t *f)
     if (dv_is_neg(f)) f = f->a;
 
     if (dv_is_const(f)) {
+        if (dv_is_preserved_ln10_const_local(f))
+            return 5;
         if (!f->name || !*f->name) return 0;
         if (f->binding_expr && !dv_is_immortal_default_const_local(f))
-            return 4;
+            return 3;
         /* Greek letters are UTF-8 multi-byte; first byte >= 0x80 */
         return ((unsigned char)f->name[0] >= 0x80) ? 1 : 2;
     }
 
     if (dv_is_var(f))
-        return 3;
+        return 4;
 
     if (dv_tostring_is_var_pow_d(f))
+        return 4;
+
+    if (dv_tostring_is_named_const_pow_d(f))
         return 3;
 
     return 5;
@@ -911,6 +1008,9 @@ static const char *factor_sort_name(const dval_t *f)
         return f->name ? f->name : "";
 
     if (dv_tostring_is_var_pow_d(f))
+        return f->a->name ? f->a->name : "";
+
+    if (dv_tostring_is_named_const_pow_d(f))
         return f->a->name ? f->a->name : "";
 
     /* Unary/binary functions: sort by the primary variable in the argument
@@ -1063,13 +1163,8 @@ static void emit_expr_abs(const dval_t *f, sbuf_t *b, int parent_prec)
         }
 
         for (int i = 0; i < n; ++i) {
-            if (i > 0) {
-                int left_atomic = is_atomic_for_mul(fac[i - 1]);
-                int right_atomic = is_atomic_for_mul(fac[i]);
-
-                if (!(left_atomic && right_atomic))
-                    sbuf_puts(b, "·");
-            }
+            if (i > 0)
+                emit_expr_mul_separator_local(fac[i - 1], fac[i], b);
             if (n > 1 && mul_factor_needs_visible_parens(fac[i]))
                 sbuf_putc(b, '(');
             emit_factor_abs(fac[i], b);
@@ -1201,6 +1296,76 @@ static const char *tex_unary_name(const dval_t *f)
     if (dv_is_sqrt_expr(f))
         return "\\sqrt";
     return f->ops->tex_name;
+}
+
+static const char *expr_unary_name(const dval_t *f)
+{
+    if (!f || !f->ops)
+        return "?";
+
+    if (dv_is_op(f, &ops_gamma))
+        return "Γ";
+    if (dv_is_op(f, &ops_digamma))
+        return "ψ⁽⁰⁾";
+    if (dv_is_op(f, &ops_trigamma))
+        return "ψ⁽¹⁾";
+    return f->ops->name ? f->ops->name : "?";
+}
+
+static int dv_polygamma_order(const dval_t *f, long *order)
+{
+    return f && dv_is_op(f, &ops_polygamma) && f->a && dv_is_const(f->a) &&
+           dv_try_get_small_integer_exponent(f->a->c, order) && *order >= 0;
+}
+
+static int dv_has_polygamma_order(const dval_t *f)
+{
+    long order;
+
+    return dv_polygamma_order(f, &order);
+}
+
+static void emit_expr_polygamma(const dval_t *f, sbuf_t *b)
+{
+    long order;
+
+    if (!dv_polygamma_order(f, &order))
+        return;
+    sbuf_puts(b, "ψ⁽");
+    emit_superscript_int(b, order);
+    sbuf_puts(b, "⁾(");
+    emit_expr(f->b, b, 0);
+    sbuf_putc(b, ')');
+}
+
+static void emit_tex_polygamma(const dval_t *f, sbuf_t *b)
+{
+    long order;
+    char buf[32];
+
+    if (!dv_polygamma_order(f, &order))
+        return;
+    sbuf_puts(b, "\\psi^{(");
+    snprintf(buf, sizeof(buf), "%ld", order);
+    sbuf_puts(b, buf);
+    sbuf_puts(b, ")}(");
+    emit_tex_expr(f->b, b, 0);
+    sbuf_putc(b, ')');
+}
+
+static void emit_func_polygamma(const dval_t *f, sbuf_t *b)
+{
+    long order;
+    char buf[32];
+
+    if (!dv_polygamma_order(f, &order))
+        return;
+    snprintf(buf, sizeof(buf), "%ld", order);
+    sbuf_puts(b, "polygamma(");
+    sbuf_puts(b, buf);
+    sbuf_puts(b, ", ");
+    emit_func(f->b, b, 0);
+    sbuf_putc(b, ')');
 }
 
 static int tex_exp_needs_parens(const dval_t *e)
@@ -1413,8 +1578,12 @@ static void emit_tex_expr(const dval_t *f, sbuf_t *b, int parent_prec)
         if (need)
             sbuf_puts(b, "\\left(");
 
-        if (f->a->ops->arity == DV_OP_UNARY && !dv_is_sqrt_expr(f->a) && !dv_is_op(f->a, &ops_abs)) {
-            const char *name = tex_unary_name(f->a);
+        const char *unary_name = f->a->ops->arity == DV_OP_UNARY
+            ? tex_unary_name(f->a) : NULL;
+        if (f->a->ops->arity == DV_OP_UNARY && !dv_is_sqrt_expr(f->a) &&
+            !dv_is_op(f->a, &ops_abs) &&
+            !strchr(unary_name ? unary_name : "", '^')) {
+            const char *name = unary_name;
             sbuf_puts(b, name ? name : "\\operatorname{f}");
             sbuf_puts(b, "^{");
             if (exponent_has_small_int) {
@@ -1591,6 +1760,10 @@ static void emit_tex_expr(const dval_t *f, sbuf_t *b, int parent_prec)
     }
 
     if (f->ops->arity == DV_OP_BINARY) {
+        if (dv_has_polygamma_order(f)) {
+            emit_tex_polygamma(f, b);
+            return;
+        }
         sbuf_puts(b, "\\operatorname{");
         sbuf_puts(b, f->ops->name);
         sbuf_puts(b, "}(");
@@ -1667,7 +1840,7 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
         if (dv_is_sqrt_expr(f))
             sbuf_puts(b, "√");
         else
-            sbuf_puts(b, f->ops->name);
+            sbuf_puts(b, expr_unary_name(f));
         sbuf_putc(b, '(');
         emit_expr(f->a, b, 0);
         sbuf_putc(b, ')');
@@ -1695,7 +1868,7 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
                 if (dv_is_sqrt_expr(inner))
                     sbuf_puts(b, "√");
                 else
-                    sbuf_puts(b, inner->ops->name);
+                    sbuf_puts(b, expr_unary_name(inner));
             }
 
             if (exponent_has_small_int)
@@ -1783,13 +1956,8 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
             sbuf_putc(b, '-');
 
         for (int i = 0; i < n; i++) {
-            if (i > 0) {
-                int left_atomic  = is_atomic_for_mul(fac[i - 1]);
-                int right_atomic = is_atomic_for_mul(fac[i]);
-
-                if (!(left_atomic && right_atomic))
-                    sbuf_puts(b, "·");
-            }
+            if (i > 0)
+                emit_expr_mul_separator_local(fac[i - 1], fac[i], b);
             if (n > 1 && mul_factor_needs_visible_parens(fac[i]))
                 sbuf_putc(b, '(');
             emit_factor_abs(fac[i], b);
@@ -1875,6 +2043,10 @@ static void emit_expr(const dval_t *f, sbuf_t *b, int parent_prec)
 
     /* Named binary functions (e.g. atan2) */
     if (f->ops->arity == DV_OP_BINARY) {
+        if (dv_has_polygamma_order(f)) {
+            emit_expr_polygamma(f, b);
+            return;
+        }
         sbuf_puts(b, f->ops->name);
         sbuf_putc(b, '(');
         emit_expr(f->a, b, 0);
@@ -1898,7 +2070,7 @@ static void emit_func(const dval_t *f, sbuf_t *b, int parent_prec)
 
     if (dv_is_const(f)) {
         if (dv_tostring_should_emit_binding_expr(f)) {
-            char *text = dv_binding_expr_to_string(f->binding_expr);
+            char *text = dv_binding_expr_to_function_string(f->binding_expr);
 
             if (text) {
                 sbuf_puts(b, text);
@@ -1956,22 +2128,33 @@ static void emit_func(const dval_t *f, sbuf_t *b, int parent_prec)
 
     if (dv_is_mul(f)) {
         int need = PREC_MUL < parent_prec;
+        bool leading_half_as_divisor = false;
+        bool emitted = false;
+
         if (need) sbuf_putc(b, '(');
 
         dval_t *fac[64];
         int n = 0;
         flatten_mul((dval_t *)f, fac, &n, 64);
         sort_factors(fac, n);
+        leading_half_as_divisor = n > 1 && dv_is_const_half_local(fac[0]);
 
         for (int i = 0; i < n; i++) {
-            if (i > 0)
+            if (leading_half_as_divisor && i == 0)
+                continue;
+
+            if (emitted)
                 sbuf_puts(b, " * ");
             if (n > 1 && mul_factor_needs_visible_parens(fac[i]))
                 sbuf_putc(b, '(');
             emit_func(fac[i], b, PREC_MUL);
             if (n > 1 && mul_factor_needs_visible_parens(fac[i]))
                 sbuf_putc(b, ')');
+            emitted = true;
         }
+
+        if (leading_half_as_divisor)
+            sbuf_puts(b, " / 2");
 
         if (need) sbuf_putc(b, ')');
         return;
@@ -2039,6 +2222,10 @@ static void emit_func(const dval_t *f, sbuf_t *b, int parent_prec)
 
     /* Named binary functions (e.g. atan2) */
     if (f->ops->arity == DV_OP_BINARY) {
+        if (dv_has_polygamma_order(f)) {
+            emit_func_polygamma(f, b);
+            return;
+        }
         sbuf_puts(b, f->ops->name);
         sbuf_putc(b, '(');
         emit_func(f->a, b, 0);
@@ -2154,7 +2341,9 @@ static char *binding_rhs_tex_string_local(const dval_t *dv)
 
 static char *binding_rhs_c_string_local(const dval_t *dv)
 {
-    return binding_rhs_expr_string_local(dv);
+    if (dv && dv->binding_expr)
+        return dv_binding_expr_to_function_string(dv->binding_expr);
+    return dv_const_to_string_local(dv);
 }
 
 static void emit_name_c(sbuf_t *b, const char *name)
@@ -2227,7 +2416,7 @@ static char *dv_to_string_function(const dval_t *f)
     sbuf_init(&b);
 
     if (f && f->binding_expr && !dv_is_const(f)) {
-        char *rhs = dv_binding_expr_to_string(f->binding_expr);
+        char *rhs = dv_binding_expr_to_function_string(f->binding_expr);
 
         if (rhs) {
             sbuf_puts(&b, "variable expr(void) {\n");

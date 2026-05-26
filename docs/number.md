@@ -55,8 +55,8 @@ Examples:
 
 Accepted examples:
 
-- `"1 + i"` -> parsed as `1 + 1i`
-- `"1 - i"` -> parsed as `1 - 1i`
+- `"1 + i"` -> parsed as `1 + i`
+- `"1 - i"` -> parsed as `1 - i`
 - `"1e-23 + 2.3e12i"` -> scientific notation in both parts is accepted
 - `"1e-23 + (2.3e12)i"` -> parenthesised imaginary coefficients are accepted
 - `"1/2 - 3/2i"` -> rational real and imaginary parts are accepted
@@ -330,19 +330,34 @@ The generic layer exposes:
   - `num_lgamma`
   - `num_digamma`
   - `num_trigamma`
+  - `num_tetragamma`
+  - `num_polygamma`
+  - `num_gammainv`
   - `num_erf`
   - `num_erfc`
+  - `num_erfinv`
+  - `num_erfcinv`
   - `num_lambert_w0`
+  - `num_lambert_wm1`
+  - `num_productlog`
   - `num_beta`
   - `num_logbeta`
   - `num_binomial`
+  - `num_beta_pdf`
+  - `num_logbeta_pdf`
   - `num_normal_pdf`
   - `num_normal_cdf`
+  - `num_normal_logpdf`
+  - `num_gammainc_lower`
+  - `num_gammainc_upper`
+  - `num_gammainc_P`
+  - `num_gammainc_Q`
   - `num_e1`
   - `num_ei`
 - exact integer and number-theory helpers:
   - `num_factorial`
   - `num_fibonacci`
+  - `num_partition`
   - `num_gcd`
   - `num_lcm`
   - `num_mod`

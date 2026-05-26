@@ -144,6 +144,13 @@ static int number_mpfr_const_inv_e(mpfr_t out)
     return 0;
 }
 
+static int number_mpfr_const_neg_inv_e(mpfr_t out)
+{
+    number_mpfr_const_inv_e(out);
+    mpfr_neg(out, out, MPFR_RNDN);
+    return 0;
+}
+
 static int number_mpfr_const_ln2(mpfr_t out)
 {
     mpfr_const_log2(out, MPFR_RNDN);
@@ -331,6 +338,7 @@ static const number_mpfr_const_set_fn number_mpfr_const_table[NUMBER_CONST_COUNT
     [NUMBER_CONST_2_PI] = number_mpfr_const_2_pi,
     [NUMBER_CONST_E] = number_mpfr_const_e,
     [NUMBER_CONST_INV_E] = number_mpfr_const_inv_e,
+    [NUMBER_CONST_NEG_INV_E] = number_mpfr_const_neg_inv_e,
     [NUMBER_CONST_LN2] = number_mpfr_const_ln2,
     [NUMBER_CONST_LN10] = number_mpfr_const_ln10,
     [NUMBER_CONST_INVLN2] = number_mpfr_const_invln2,

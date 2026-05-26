@@ -155,14 +155,29 @@ char *number_format_complex(const number_t *number, bool scientific, int precisi
     mpfr_snprintf(real, (size_t)real_needed + 1u, fmt, mpc_realref(tmp));
     mpfr_snprintf(imag, (size_t)imag_needed + 1u, fmt, mpc_imagref(tmp));
     {
-        const char *sep = mpfr_sgn(mpc_imagref(tmp)) < 0 ? " - " : " + ";
+        int imag_sign = mpfr_sgn(mpc_imagref(tmp));
+        bool real_zero = mpfr_zero_p(mpc_realref(tmp)) != 0;
+        bool imag_is_unit = mpfr_cmpabs_ui(mpc_imagref(tmp), 1u) == 0;
+        const char *sep = imag_sign < 0 ? " - " : " + ";
         const char *imag_mag = imag[0] == '-' ? imag + 1 : imag;
-        int needed = snprintf(NULL, 0, "%s%s%si", real, sep, imag_mag);
+        const char *imag_coeff = imag_is_unit ? "" : imag_mag;
+        int needed;
 
+        if (real_zero)
+            needed = snprintf(NULL, 0, "%s%si",
+                              imag_sign < 0 ? "-" : "", imag_coeff);
+        else
+            needed = snprintf(NULL, 0, "%s%s%si", real, sep, imag_coeff);
         if (needed >= 0) {
             out = malloc((size_t)needed + 1u);
-            if (out)
-                snprintf(out, (size_t)needed + 1u, "%s%s%si", real, sep, imag_mag);
+            if (out) {
+                if (real_zero)
+                    snprintf(out, (size_t)needed + 1u, "%s%si",
+                             imag_sign < 0 ? "-" : "", imag_coeff);
+                else
+                    snprintf(out, (size_t)needed + 1u, "%s%s%si",
+                             real, sep, imag_coeff);
+            }
         }
     }
 

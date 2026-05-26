@@ -28,6 +28,7 @@ static number_mpfr_t number_pi_3_mpfr_value = { .constant_id = NUMBER_CONST_PI_3
 static number_mpfr_t number_2_pi_mpfr_value = { .constant_id = NUMBER_CONST_2_PI, .immortal = true, .initialised = false };
 static number_mpfr_t number_e_mpfr_value = { .constant_id = NUMBER_CONST_E, .immortal = true, .initialised = false };
 static number_mpfr_t number_inv_e_mpfr_value = { .constant_id = NUMBER_CONST_INV_E, .immortal = true, .initialised = false };
+static number_mpfr_t number_neg_inv_e_mpfr_value = { .constant_id = NUMBER_CONST_NEG_INV_E, .immortal = true, .initialised = false };
 static number_mpfr_t number_ln2_mpfr_value = { .constant_id = NUMBER_CONST_LN2, .immortal = true, .initialised = false };
 static number_mpfr_t number_ln10_mpfr_value = { .constant_id = NUMBER_CONST_LN10, .immortal = true, .initialised = false };
 static number_mpfr_t number_invln2_mpfr_value = { .constant_id = NUMBER_CONST_INVLN2, .immortal = true, .initialised = false };
@@ -121,6 +122,11 @@ static const number_private_t number_e_value = {
 static const number_private_t number_inv_e_value = {
     .kind = NUMBER_MPFR,
     .value.mpfr = &number_inv_e_mpfr_value
+};
+
+static const number_private_t number_neg_inv_e_value = {
+    .kind = NUMBER_MPFR,
+    .value.mpfr = &number_neg_inv_e_mpfr_value
 };
 
 static const number_private_t number_ln2_value = {
@@ -332,6 +338,7 @@ static const number_const_u num_pi_3_storage = { .priv = number_pi_3_value };
 static const number_const_u num_2_pi_storage = { .priv = number_2_pi_value };
 static const number_const_u num_e_storage = { .priv = number_e_value };
 static const number_const_u num_inv_e_storage = { .priv = number_inv_e_value };
+static const number_const_u num_neg_inv_e_storage = { .priv = number_neg_inv_e_value };
 static const number_const_u num_ln2_storage = { .priv = number_ln2_value };
 static const number_const_u num_ln10_storage = { .priv = number_ln10_value };
 static const number_const_u num_invln2_storage = { .priv = number_invln2_value };
@@ -382,6 +389,7 @@ extern const number_t NUM_PI_3 __attribute__((alias("num_pi_3_storage")));
 extern const number_t NUM_2_PI __attribute__((alias("num_2_pi_storage")));
 extern const number_t NUM_E __attribute__((alias("num_e_storage")));
 extern const number_t NUM_INV_E __attribute__((alias("num_inv_e_storage")));
+extern const number_t NUM_NEG_INV_E __attribute__((alias("num_neg_inv_e_storage")));
 extern const number_t NUM_LN2 __attribute__((alias("num_ln2_storage")));
 extern const number_t NUM_LN10 __attribute__((alias("num_ln10_storage")));
 extern const number_t NUM_INVLN2 __attribute__((alias("num_invln2_storage")));
@@ -456,6 +464,7 @@ static const qfloat_t *const number_const_qfloat_table[NUMBER_CONST_COUNT] = {
     [NUMBER_CONST_PI_3] = &QF_PI_3,
     [NUMBER_CONST_E] = &QF_E,
     [NUMBER_CONST_INV_E] = &QF_INV_E,
+    [NUMBER_CONST_NEG_INV_E] = &QF_NEG_INV_E,
     [NUMBER_CONST_LN2] = &QF_LN2,
     [NUMBER_CONST_LN10] = &QF_LN10,
     [NUMBER_CONST_SQRT2] = &QF_SQRT2,
@@ -484,6 +493,7 @@ static const qcomplex_t *const number_const_qcomplex_table[NUMBER_CONST_COUNT] =
     [NUMBER_CONST_PI_3] = &QC_PI_3,
     [NUMBER_CONST_E] = &QC_E,
     [NUMBER_CONST_INV_E] = &QC_INV_E,
+    [NUMBER_CONST_NEG_INV_E] = &QC_NEG_INV_E,
     [NUMBER_CONST_LN2] = &QC_LN2,
     [NUMBER_CONST_LN10] = &QC_LN10,
     [NUMBER_CONST_SQRT2] = &QC_SQRT2,
@@ -533,6 +543,7 @@ static const double number_const_double_table[NUMBER_CONST_COUNT] = {
     [NUMBER_CONST_PI_3] = M_PI / 3.0,
     [NUMBER_CONST_E] = M_E,
     [NUMBER_CONST_INV_E] = 1.0 / M_E,
+    [NUMBER_CONST_NEG_INV_E] = -1.0 / M_E,
     [NUMBER_CONST_LN2] = M_LN2,
     [NUMBER_CONST_LN10] = M_LN10,
     [NUMBER_CONST_SQRT2] = M_SQRT2,
@@ -566,6 +577,7 @@ static const double _Complex number_const_cdouble_table[NUMBER_CONST_COUNT] = {
     [NUMBER_CONST_PI_3] = M_PI / 3.0 + 0.0 * I,
     [NUMBER_CONST_E] = M_E + 0.0 * I,
     [NUMBER_CONST_INV_E] = 1.0 / M_E + 0.0 * I,
+    [NUMBER_CONST_NEG_INV_E] = -1.0 / M_E + 0.0 * I,
     [NUMBER_CONST_LN2] = M_LN2 + 0.0 * I,
     [NUMBER_CONST_LN10] = M_LN10 + 0.0 * I,
     [NUMBER_CONST_SQRT2] = M_SQRT2 + 0.0 * I,
@@ -602,6 +614,7 @@ static const bool number_const_has_double_table[NUMBER_CONST_COUNT] = {
     [NUMBER_CONST_PI_3] = true,
     [NUMBER_CONST_E] = true,
     [NUMBER_CONST_INV_E] = true,
+    [NUMBER_CONST_NEG_INV_E] = true,
     [NUMBER_CONST_LN2] = true,
     [NUMBER_CONST_LN10] = true,
     [NUMBER_CONST_SQRT2] = true,
@@ -635,6 +648,7 @@ static const bool number_const_has_cdouble_table[NUMBER_CONST_COUNT] = {
     [NUMBER_CONST_PI_3] = true,
     [NUMBER_CONST_E] = true,
     [NUMBER_CONST_INV_E] = true,
+    [NUMBER_CONST_NEG_INV_E] = true,
     [NUMBER_CONST_LN2] = true,
     [NUMBER_CONST_LN10] = true,
     [NUMBER_CONST_SQRT2] = true,

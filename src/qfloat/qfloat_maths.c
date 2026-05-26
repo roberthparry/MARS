@@ -1623,27 +1623,6 @@ qfloat_t qf_digamma(qfloat_t x)
  */
 static qfloat_t qf_trigamma_asymp(qfloat_t x)
 {
-    static const struct { double num; double den; int sign; } B[] = {
-        {         1.0,       6.0,  1},  /* B_2  =  1/6             */
-        {         1.0,      30.0, -1},  /* B_4  = -1/30            */
-        {         1.0,      42.0,  1},  /* B_6  =  1/42            */
-        {         1.0,      30.0, -1},  /* B_8  = -1/30            */
-        {         5.0,      66.0,  1},  /* B_10 =  5/66            */
-        {       691.0,    2730.0, -1},  /* B_12 = -691/2730        */
-        {         7.0,       6.0,  1},  /* B_14 =  7/6             */
-        {      3617.0,     510.0, -1},  /* B_16 = -3617/510        */
-        {     43867.0,     798.0,  1},  /* B_18 =  43867/798       */
-        {    174611.0,     330.0, -1},  /* B_20 = -174611/330      */
-        {    854513.0,     138.0,  1},  /* B_22 =  854513/138      */
-        { 236364091.0,    2730.0, -1},  /* B_24 = -236364091/2730  */
-        {   8553103.0,       6.0,  1},  /* B_26 =  8553103/6       */
-        {23749461029.0,    870.0, -1},  /* B_28 = -23749461029/870 */
-        {8615841276005.0, 14322.0, 1},  /* B_30 =  8615841276005/14322 */
-        {7709321041217.0,   510.0,-1},  /* B_32 = -7709321041217/510   */
-        {2577687858367.0,     6.0, 1},  /* B_34 =  2577687858367/6     */
-    };
-    static const int N = (int)(sizeof B / sizeof B[0]);
-
     qfloat_t xi  = qf_div(QF_ONE, x);
     qfloat_t xi2 = qf_mul(xi, xi);
     qfloat_t xip = xi;
@@ -1652,9 +1631,11 @@ static qfloat_t qf_trigamma_asymp(qfloat_t x)
     sum = qf_add(sum, qf_mul(xip, QF_HALF)); /* 1/(2x^2) */
     xip = qf_mul(xip, xi);                              /* xi^3 */
 
-    for (int n = 0; n < N; n++) {
-        qfloat_t coeff = qf_div(qf_from_double(B[n].num), qf_from_double(B[n].den));
-        if (B[n].sign < 0) coeff = qf_neg(coeff);
+    for (size_t n = 0u; n < QFI_BERNOULLI_EVEN_TERM_COUNT; n++) {
+        qfloat_t coeff = qf_div(qf_from_double(QFI_BERNOULLI_EVEN_TERMS[n].num),
+                                qf_from_double(QFI_BERNOULLI_EVEN_TERMS[n].den));
+        if (QFI_BERNOULLI_EVEN_TERMS[n].sign < 0)
+            coeff = qf_neg(coeff);
         sum = qf_add(sum, qf_mul(coeff, xip));
         xip = qf_mul(xip, xi2);
     }
@@ -1700,28 +1681,6 @@ qfloat_t qf_trigamma(qfloat_t x)
 
 static qfloat_t qf_tetragamma_asymp(qfloat_t x)
 {
-    /* (2k+1) * B_{2k} for k = 1 .. 17 */
-    static const struct { double num; double den; int sign; double mult; } B[] = {
-        {         1.0,       6.0,  1,  3.0},  /* 3·B_2           */
-        {         1.0,      30.0, -1,  5.0},  /* 5·B_4           */
-        {         1.0,      42.0,  1,  7.0},  /* 7·B_6           */
-        {         1.0,      30.0, -1,  9.0},  /* 9·B_8           */
-        {         5.0,      66.0,  1, 11.0},  /* 11·B_10         */
-        {       691.0,    2730.0, -1, 13.0},  /* 13·B_12         */
-        {         7.0,       6.0,  1, 15.0},  /* 15·B_14         */
-        {      3617.0,     510.0, -1, 17.0},  /* 17·B_16         */
-        {     43867.0,     798.0,  1, 19.0},  /* 19·B_18         */
-        {    174611.0,     330.0, -1, 21.0},  /* 21·B_20         */
-        {    854513.0,     138.0,  1, 23.0},  /* 23·B_22         */
-        { 236364091.0,    2730.0, -1, 25.0},  /* 25·B_24         */
-        {   8553103.0,       6.0,  1, 27.0},  /* 27·B_26         */
-        {23749461029.0,    870.0, -1, 29.0},  /* 29·B_28         */
-        {8615841276005.0,14322.0,  1, 31.0},  /* 31·B_30         */
-        {7709321041217.0,  510.0, -1, 33.0},  /* 33·B_32         */
-        {2577687858367.0,    6.0,  1, 35.0},  /* 35·B_34         */
-    };
-    static const int N = (int)(sizeof B / sizeof B[0]);
-
     qfloat_t xi   = qf_div(QF_ONE, x);
     qfloat_t xi2  = qf_mul(xi, xi);
     qfloat_t xip  = xi2;           /* xi^2 = 1/x^2 */
@@ -1730,10 +1689,13 @@ static qfloat_t qf_tetragamma_asymp(qfloat_t x)
     sum = qf_add(sum, xip);      /* + 1/x^3 */
     xip = qf_mul(xip, xi);       /* xi^4 — start of Bernoulli terms */
 
-    for (int n = 0; n < N; n++) {
-        qfloat_t raw   = qf_div(qf_from_double(B[n].num), qf_from_double(B[n].den));
-        qfloat_t coeff = qf_mul(qf_from_double(B[n].mult), raw);
-        if (B[n].sign < 0) coeff = qf_neg(coeff);
+    for (size_t n = 0u; n < QFI_BERNOULLI_EVEN_TERM_COUNT; n++) {
+        double mult = (double)(2u * (n + 1u) + 1u);
+        qfloat_t raw = qf_div(qf_from_double(QFI_BERNOULLI_EVEN_TERMS[n].num),
+                              qf_from_double(QFI_BERNOULLI_EVEN_TERMS[n].den));
+        qfloat_t coeff = qf_mul(qf_from_double(mult), raw);
+        if (QFI_BERNOULLI_EVEN_TERMS[n].sign < 0)
+            coeff = qf_neg(coeff);
         sum = qf_add(sum, qf_mul(coeff, xip));
         xip = qf_mul(xip, xi2);
     }
@@ -1767,6 +1729,82 @@ qfloat_t qf_tetragamma(qfloat_t x)
     }
 
     return qf_tetragamma_asymp(x);
+}
+
+static qfloat_t qf_factorial_uint(unsigned int n)
+{
+    qfloat_t out = QF_ONE;
+
+    for (unsigned int k = 2u; k <= n; ++k)
+        out = qf_mul_double(out, (double)k);
+    return out;
+}
+
+static qfloat_t qf_bernoulli_even_term(size_t index)
+{
+    qfloat_t coeff;
+
+    coeff = qf_div(qf_from_double(QFI_BERNOULLI_EVEN_TERMS[index].num),
+                   qf_from_double(QFI_BERNOULLI_EVEN_TERMS[index].den));
+    return QFI_BERNOULLI_EVEN_TERMS[index].sign < 0 ? qf_neg(coeff) : coeff;
+}
+
+static qfloat_t qf_polygamma_asymp(unsigned int order, qfloat_t x)
+{
+    qfloat_t inv = qf_div(QF_ONE, x);
+    qfloat_t inv2 = qf_mul(inv, inv);
+    qfloat_t sum = qf_mul(qf_pow_int(inv, (int)order),
+                          qf_factorial_uint(order - 1u));
+    qfloat_t power = qf_pow_int(inv, (int)order + 1);
+    qfloat_t order_fact = qf_factorial_uint(order);
+
+    sum = qf_add(sum, qf_mul(qf_mul(power, QF_HALF), order_fact));
+    power = qf_mul(power, inv);
+
+    for (size_t k = 0u; k < QFI_BERNOULLI_EVEN_TERM_COUNT; ++k) {
+        unsigned int two_k = (unsigned int)(2u * (k + 1u));
+        qfloat_t coeff = qf_bernoulli_even_term(k);
+
+        for (unsigned int j = 1u; j < order; ++j)
+            coeff = qf_mul_double(coeff, (double)(two_k + j));
+        sum = qf_add(sum, qf_mul(power, coeff));
+        power = qf_mul(power, inv2);
+    }
+
+    return (order % 2u) == 0u ? qf_neg(sum) : sum;
+}
+
+qfloat_t qf_polygamma(unsigned int order, qfloat_t x)
+{
+    qfloat_t y;
+    qfloat_t accum;
+    qfloat_t fact;
+    int recurrence_sign;
+
+    if (order == 0u)
+        return qf_digamma(x);
+    if (order == 1u)
+        return qf_trigamma(x);
+    if (order == 2u)
+        return qf_tetragamma(x);
+    if (qf_isnan(x) || qf_isinf(x) ||
+        (qf_le(x, QF_ZERO) && qf_is_integer(x)))
+        return QF_NAN;
+
+    y = x;
+    accum = QF_ZERO;
+    fact = qf_factorial_uint(order);
+    recurrence_sign = (order % 2u) == 0u ? 1 : -1;
+
+    while (qf_lt(y, qf_from_double(20.0))) {
+        qfloat_t term = qf_mul(fact, qf_div(QF_ONE,
+            qf_pow_int(y, (int)order + 1)));
+
+        accum = recurrence_sign > 0 ? qf_sub(accum, term) : qf_add(accum, term);
+        y = qf_add(y, QF_ONE);
+    }
+
+    return qf_add(qf_polygamma_asymp(order, y), accum);
 }
 
 /* gammainv */

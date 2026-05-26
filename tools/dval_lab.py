@@ -353,6 +353,12 @@ INDEX_HTML = r"""<!doctype html>
       box-shadow: inset 0 1px 0 rgba(233, 244, 239, 0.18);
     }
 
+    .constant-value-box {
+      border-color: rgba(123, 211, 209, 0.38);
+      background:
+        linear-gradient(135deg, rgba(7, 31, 33, 0.58), rgba(19, 72, 68, 0.48));
+    }
+
     .variable-value-name {
       display: inline-grid;
       min-width: 2.15rem;
@@ -363,6 +369,11 @@ INDEX_HTML = r"""<!doctype html>
       background: #cfa052;
       font-weight: 700;
       font-family: "Cascadia Code", "DejaVu Sans Mono", monospace;
+    }
+
+    .constant-value-name {
+      color: #062022;
+      background: #7bd3d1;
     }
 
     .variable-value-text {
@@ -377,6 +388,21 @@ INDEX_HTML = r"""<!doctype html>
       overflow-wrap: anywhere;
       white-space: pre-wrap;
       font: 0.82rem/1.35 "Cascadia Code", "Fira Code", "DejaVu Sans Mono", monospace;
+    }
+
+    .binding-value-input {
+      width: 100%;
+      outline: none;
+    }
+
+    .binding-value-input:focus {
+      border-color: rgba(207, 160, 82, 0.72);
+      box-shadow: 0 0 0 3px rgba(207, 160, 82, 0.16);
+    }
+
+    .constant-value-box .binding-value-input:focus {
+      border-color: rgba(123, 211, 209, 0.76);
+      box-shadow: 0 0 0 3px rgba(123, 211, 209, 0.15);
     }
 
     .variable-value-box.expanded .variable-value-text {
@@ -641,7 +667,7 @@ INDEX_HTML = r"""<!doctype html>
     .rendered {
       margin: 0;
       min-height: 12rem;
-      padding: 2.1rem 1.6rem 1.4rem;
+      padding: 2.1rem 1.6rem 3rem;
       overflow-x: auto;
       overflow-y: visible;
       font-size: 1.78rem;
@@ -651,16 +677,30 @@ INDEX_HTML = r"""<!doctype html>
       display: block;
       max-width: 100%;
       height: auto;
+      overflow: visible;
       transform: scale(2);
       transform-origin: left top;
-      margin-bottom: 4rem;
+      margin-bottom: 5rem;
       filter: brightness(0) saturate(100%) invert(82%) sepia(39%) saturate(540%) hue-rotate(354deg) brightness(98%) contrast(92%) drop-shadow(0 0 0.65rem rgba(113, 198, 180, 0.28));
     }
 
-    .error {
-      color: #991b1b;
-      background: #fff1f1;
-      border-color: #fecaca;
+    .error,
+    .rendered.error,
+    #rendered.error {
+      color: #ffd99a !important;
+      background:
+        radial-gradient(circle at 14% 18%, rgba(229, 173, 87, 0.16), transparent 34%),
+        linear-gradient(135deg, rgba(73, 23, 25, 0.88), rgba(38, 12, 19, 0.78)) !important;
+      border-color: rgba(229, 173, 87, 0.42) !important;
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 232, 181, 0.07),
+        0 0 1.35rem rgba(153, 27, 27, 0.22) !important;
+      text-shadow: 0 0 0.7rem rgba(255, 204, 112, 0.16) !important;
+    }
+
+    .rendered.error,
+    #rendered.error {
+      font-family: Georgia, "Times New Roman", serif;
     }
 
     .help-pane {
@@ -838,13 +878,13 @@ INDEX_HTML = r"""<!doctype html>
 
       .rendered {
         min-height: 8rem;
-        padding: 1.35rem 1rem 0.8rem;
+        padding: 1.35rem 1rem 2rem;
         font-size: 1.3rem;
       }
 
       .rendered svg {
         transform: scale(1.35);
-        margin-bottom: 1.5rem;
+        margin-bottom: 2.5rem;
       }
 
       .mobile-panel {
@@ -927,13 +967,13 @@ INDEX_HTML = r"""<!doctype html>
 
       .rendered {
         min-height: 6.5rem;
-        padding: 1rem 0.75rem 0.65rem;
+        padding: 1rem 0.75rem 1.75rem;
         font-size: 1.12rem;
       }
 
       .rendered svg {
         transform: scale(1.12);
-        margin-bottom: 0.9rem;
+        margin-bottom: 2rem;
       }
 
       .help-pane {
@@ -1091,6 +1131,7 @@ INDEX_HTML = r"""<!doctype html>
             <li>Built-in constants include <code>pi</code>/<code>π</code>, <code>e</code>, <code>i</code>, <code>phi</code>/<code>φ</code>, and <code>gamma</code>/<code>γ</code>.</li>
             <li><code>ln(x)</code> is natural log; <code>log(x)</code> and <code>log10(x)</code> are base-10 log.</li>
             <li><code>W(x)</code>, <code>W0(x)</code>, and <code>W_0(x)</code> mean <code>W₀(x)</code>. Use <code>W-1(x)</code> for <code>W₋₁(x)</code>.</li>
+            <li>Standard gamma notation is supported in display: <code>gamma(x)</code> shows as <code>Γ(x)</code>, and polygamma shows as <code>ψ⁽ⁿ⁾(x)</code>.</li>
           </ul>
         </div>
         <div class="help-card">
@@ -1099,7 +1140,7 @@ INDEX_HTML = r"""<!doctype html>
             <li>Elementary: <code>abs(x)</code>, <code>floor(x)</code>, <code>ceil(x)</code>, <code>sqrt(x)</code>, <code>exp(x)</code>, <code>ln(x)</code>, <code>log(x)</code>, <code>log10(x)</code>.</li>
             <li>Trigonometric: <code>sin(x)</code>, <code>cos(x)</code>, <code>tan(x)</code>, <code>asin(x)</code>, <code>acos(x)</code>, <code>atan(x)</code>.</li>
             <li>Hyperbolic: <code>sinh(x)</code>, <code>cosh(x)</code>, <code>tanh(x)</code>, <code>asinh(x)</code>, <code>acosh(x)</code>, <code>atanh(x)</code>.</li>
-            <li>Gamma family: <code>gamma(x)</code>, <code>gammainv(x)</code>, <code>lgamma(x)</code>, <code>digamma(x)</code>, <code>trigamma(x)</code>.</li>
+            <li>Gamma family: <code>gamma(x)</code>, <code>gammainv(x)</code>, <code>lgamma(x)</code>, <code>digamma(x)</code>, <code>trigamma(x)</code>, <code>polygamma(n, x)</code>.</li>
             <li>Error functions: <code>erf(x)</code>, <code>erfc(x)</code>, <code>erfinv(x)</code>, <code>erfcinv(x)</code>.</li>
             <li>Exponential integrals: <code>Ei(x)</code>, <code>E1(x)</code>.</li>
           </ul>
@@ -1117,7 +1158,25 @@ INDEX_HTML = r"""<!doctype html>
           <ul>
             <li><code>pow(x, y)</code> is equivalent to <code>x^y</code>.</li>
             <li><code>atan2(y, x)</code>, <code>hypot(x, y)</code>.</li>
-            <li><code>beta(x, y)</code>, <code>logbeta(x, y)</code>.</li>
+            <li><code>beta(x, y)</code>, <code>logbeta(x, y)</code>, <code>binomial(n, k)</code>.</li>
+            <li>Incomplete gamma: <code>gammainc_lower(s, x)</code>, <code>gammainc_upper(s, x)</code>, <code>gammainc_P(s, x)</code>, <code>gammainc_Q(s, x)</code>.</li>
+            <li>Exact integer helpers: <code>gcd(a, b)</code>, <code>lcm(a, b)</code>, <code>mod(a, b)</code>, <code>modinv(a, b)</code>.</li>
+            <li>Bitwise helpers use function syntax: <code>AND(a, b)</code>, <code>OR(a, b)</code>, <code>XOR(a, b)</code>, <code>NOT(a)</code>, <code>SHL(a, n)</code>, <code>SHR(a, n)</code>.</li>
+          </ul>
+        </div>
+        <div class="help-card">
+          <h3>Value-Only Helpers</h3>
+          <ul>
+            <li>Discrete functions evaluate normally but are not differentiable, so derivative buttons are hidden when they control the expression.</li>
+            <li>Available helpers include <code>factorial(n)</code>, <code>n!</code>, <code>fibonacci(n)</code>, <code>partition(n)</code>, <code>isqrt(n)</code>, <code>is_prime(n)</code>, <code>next_prime(n)</code>, and <code>prev_prime(n)</code>.</li>
+            <li><code>factors(n)</code> returns the original value and shows its factorisation as constant bindings, for example <code>factors(360)</code> becomes <code>{ a₀³·a₁²·a₂ |; a₀ = 2, a₁ = 3, a₂ = 5 }</code>.</li>
+          </ul>
+        </div>
+        <div class="help-card">
+          <h3>Distribution Functions</h3>
+          <ul>
+            <li>Normal distribution: <code>normal_pdf(x)</code>, <code>normal_cdf(x)</code>, <code>normal_logpdf(x)</code>.</li>
+            <li>Beta distribution: <code>beta_pdf(x, a, b)</code>, <code>logbeta_pdf(x, a, b)</code>.</li>
           </ul>
         </div>
         <div class="help-card">
@@ -1127,7 +1186,7 @@ INDEX_HTML = r"""<!doctype html>
             <li>Derivative buttons appear from the current variable bindings.</li>
             <li>Enter the goal-seek target in the left pane's <code>Target</code> field.</li>
             <li>Use the per-variable start boxes when goal seek needs better initial guesses.</li>
-            <li><code>Goal seek</code> changes all variable bindings together to move the value toward that target.</li>
+            <li><code>Goal seek</code> changes all variable bindings together to move the value towards that target.</li>
             <li>More/Less precision changes the displayed value precision without changing the expression.</li>
           </ul>
         </div>
@@ -1172,6 +1231,7 @@ INDEX_HTML = r"""<!doctype html>
     let lastTex = '';
     let lastDerivativeExpression = '';
     let currentVariables = [];
+    let currentDifferentiable = true;
     let expressionHistory = [];
     let forwardHistory = [];
     let workingPrecisionBits = 256;
@@ -1533,27 +1593,32 @@ INDEX_HTML = r"""<!doctype html>
       let shortened = false;
       const body = compactLongNumericTokens(parts.body);
       shortened = shortened || body !== parts.body;
-      const variableAssignments = splitTopLevel(parts.variables, ',')
-        .map((part) => {
-          const eq = indexOfTopLevel(part, '=');
-          if (eq < 0)
-            return part.trim();
 
-          const name = part.slice(0, eq).trim();
-          const valueText = part.slice(eq + 1).trim();
-          const compact = compactBindingValue(valueText);
-          if (name && valueText) {
-            bindingValues.push({name, value: valueText, display: compact.display});
-          }
-          shortened = shortened || compact.shortened;
-          return `${name} = ${compact.display}`;
-        })
-        .filter(Boolean);
+      function compactAssignments(assignmentsText, kind) {
+        return splitTopLevel(assignmentsText, ',')
+          .map((part) => {
+            const eq = indexOfTopLevel(part, '=');
+            if (eq < 0)
+              return part.trim();
+
+            const name = part.slice(0, eq).trim();
+            const valueText = part.slice(eq + 1).trim();
+            const compact = compactBindingValue(valueText);
+            if (name) {
+              bindingValues.push({name, value: valueText, display: compact.display, kind});
+            }
+            shortened = shortened || compact.shortened;
+            return `${name} = ${compact.display}`;
+          })
+          .filter(Boolean);
+      }
+
+      const variableAssignments = compactAssignments(parts.variables, 'variable');
+      const constantAssignments = compactAssignments(parts.constants, 'constant');
 
       let bindingText = variableAssignments.join(', ');
-      if (parts.constants) {
-        const constants = compactLongNumericTokens(parts.constants);
-        shortened = shortened || constants !== parts.constants;
+      if (constantAssignments.length) {
+        const constants = constantAssignments.join(', ');
         bindingText = bindingText ? `${bindingText}; ${constants}` : `; ${constants}`;
       }
 
@@ -1562,6 +1627,76 @@ INDEX_HTML = r"""<!doctype html>
         bindings: bindingValues,
         shortened
       };
+    }
+
+    function replaceBindingValueInExpression(sourceExpression, kind, targetName, valueText) {
+      const parts = bindingParts(sourceExpression);
+      if (!parts || !targetName)
+        return sourceExpression;
+
+      let changed = false;
+      function replaceAssignments(assignmentsText, shouldReplace) {
+        return splitTopLevel(assignmentsText, ',')
+          .map((part) => {
+            const eq = indexOfTopLevel(part, '=');
+            if (eq < 0)
+              return part.trim();
+
+            const name = part.slice(0, eq).trim();
+            if (!shouldReplace || name !== targetName)
+              return part.trim();
+
+            changed = true;
+            return `${name} = ${valueText}`;
+          })
+          .filter(Boolean)
+          .join(', ');
+      }
+
+      const variables = replaceAssignments(parts.variables, kind !== 'constant');
+      const constants = replaceAssignments(parts.constants, kind === 'constant');
+      if (!changed)
+        return sourceExpression;
+
+      let bindingText = variables;
+      if (constants)
+        bindingText = bindingText ? `${bindingText}; ${constants}` : `; ${constants}`;
+      return `{ ${parts.body} | ${bindingText} }`;
+    }
+
+    function normalisedBindingInputValue(input) {
+      const text = String(input.value || '').trim();
+      return text || '?';
+    }
+
+    function commitBindingInput(input) {
+      const name = input.dataset.bindingName || '';
+      const kind = input.dataset.bindingKind || 'variable';
+      const valueText = normalisedBindingInputValue(input);
+      const current = currentExpressionText();
+      const updated = replaceBindingValueInExpression(current, kind, name, valueText);
+
+      input.value = (valueText === '?' || /^NAN$/i.test(valueText)) ? '' : valueText;
+      input.title = valueText;
+
+      if (updated === current)
+        return;
+
+      expr.value = updated;
+      clearExpressionSource();
+      refreshVariableValuesFromEditor();
+      updateHistoryButtons();
+      saveLastExpression(updated);
+    }
+
+    function displayValueForBinding(binding) {
+      const value = String(binding.value || binding.display || '').trim();
+      return (value === '?' || /^NAN$/i.test(value)) ? '' : value;
+    }
+
+    function fullValueForBinding(binding) {
+      const value = String(binding.value || binding.display || '').trim();
+      return (value === '?' || /^NAN$/i.test(value)) ? '' : value;
     }
 
     function clearVariableValues() {
@@ -1583,36 +1718,46 @@ INDEX_HTML = r"""<!doctype html>
       }
 
       bindings.forEach((binding) => {
-        bindingValueCache.set(binding.name, binding.value);
+        const kind = binding.kind || 'variable';
+        const displayValue = displayValueForBinding(binding);
+        const fullValue = fullValueForBinding(binding);
+        if (kind !== 'constant' && fullValue)
+          bindingValueCache.set(binding.name, fullValue);
+
         const box = document.createElement('div');
-        box.className = 'variable-value-box';
+        box.className = kind === 'constant'
+          ? 'variable-value-box constant-value-box'
+          : 'variable-value-box';
 
         const name = document.createElement('span');
-        name.className = 'variable-value-name';
+        name.className = kind === 'constant'
+          ? 'variable-value-name constant-value-name'
+          : 'variable-value-name';
         name.textContent = binding.name;
 
-        const text = document.createElement('code');
-        text.className = 'variable-value-text';
-        const displayValue = (binding.value === '?' || /^NAN$/i.test(binding.value)) ? '' : binding.value;
-        text.textContent = displayValue;
-        text.title = binding.value;
+        const text = document.createElement('input');
+        text.className = 'variable-value-text binding-value-input';
+        text.type = 'text';
+        text.value = displayValue;
+        text.title = fullValue || binding.value || '?';
+        text.dataset.bindingName = binding.name;
+        text.dataset.bindingKind = kind;
+        text.autocomplete = 'off';
+        text.spellcheck = false;
+        text.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            text.blur();
+          } else if (event.key === 'Escape') {
+            event.preventDefault();
+            text.value = displayValue;
+            text.blur();
+          }
+        });
+        text.addEventListener('change', () => commitBindingInput(text));
 
         const actions = document.createElement('div');
         actions.className = 'variable-value-actions';
-
-        if (displayValue.length > 96) {
-          const expand = document.createElement('button');
-          expand.className = 'card-action variable-expand';
-          expand.type = 'button';
-          expand.textContent = 'Expand';
-          expand.setAttribute('aria-expanded', 'false');
-          expand.addEventListener('click', () => {
-            const expanded = box.classList.toggle('expanded');
-            expand.textContent = expanded ? 'Collapse' : 'Expand';
-            expand.setAttribute('aria-expanded', String(expanded));
-          });
-          actions.appendChild(expand);
-        }
 
         const copy = document.createElement('button');
         copy.className = 'card-action variable-copy';
@@ -1620,7 +1765,7 @@ INDEX_HTML = r"""<!doctype html>
         copy.textContent = 'Copy';
         copy.addEventListener('click', async () => {
           try {
-            await writeClipboardText(displayValue);
+            await writeClipboardText(text.value);
             flashCopyButton(copy, true);
             setStatus(`Copied ${binding.name}`);
             setTimeout(() => setStatus('Ready'), 1000);
@@ -1803,6 +1948,9 @@ INDEX_HTML = r"""<!doctype html>
       Array.from(variableValues.querySelectorAll('button')).forEach((button) => {
         button.disabled = isBusy;
       });
+      Array.from(variableValues.querySelectorAll('input')).forEach((input) => {
+        input.disabled = isBusy;
+      });
       Array.from(derivativeButtons.querySelectorAll('button')).forEach((button) => {
         button.disabled = isBusy;
       });
@@ -1829,6 +1977,7 @@ INDEX_HTML = r"""<!doctype html>
 
     function renderDerivativeButtons(variables) {
       derivativeButtons.replaceChildren();
+      if (!currentDifferentiable) return;
       variables.forEach((name) => {
         const button = document.createElement('button');
         button.className = 'secondary';
@@ -1948,6 +2097,31 @@ INDEX_HTML = r"""<!doctype html>
       }
     }
 
+    function clearRenderedError() {
+      rendered.classList.remove('error');
+      rendered.style.color = '';
+      rendered.style.background = '';
+      rendered.style.borderColor = '';
+      rendered.style.boxShadow = '';
+      rendered.style.textShadow = '';
+      rendered.style.fontFamily = '';
+    }
+
+    function setRenderedError(message) {
+      rendered.replaceChildren();
+      rendered.textContent = message || 'Evaluation failed';
+      rendered.classList.add('error');
+      rendered.style.color = '#ffd99a';
+      rendered.style.background =
+        'radial-gradient(circle at 14% 18%, rgba(229, 173, 87, 0.16), transparent 34%), ' +
+        'linear-gradient(135deg, rgba(73, 23, 25, 0.88), rgba(38, 12, 19, 0.78))';
+      rendered.style.borderColor = 'rgba(229, 173, 87, 0.42)';
+      rendered.style.boxShadow =
+        'inset 0 0 0 1px rgba(255, 232, 181, 0.07), 0 0 1.35rem rgba(153, 27, 27, 0.22)';
+      rendered.style.textShadow = '0 0 0.7rem rgba(255, 204, 112, 0.16)';
+      rendered.style.fontFamily = 'Georgia, "Times New Roman", serif';
+    }
+
     function setExpandableText(element, button, displayText, fullText) {
       element.textContent = displayText || fullText || '';
       element.dataset.displayText = displayText || '';
@@ -1962,7 +2136,7 @@ INDEX_HTML = r"""<!doctype html>
       const displayTex = data.display_tex || data.tex || '';
       const fullDisplayTex = data.full_display_tex || data.tex || '';
 
-      rendered.classList.remove('error');
+      clearRenderedError();
       lastTex = data.tex || '';
       rendered.dataset.displayTex = displayTex;
       rendered.dataset.fullTex = fullDisplayTex;
@@ -2074,7 +2248,7 @@ INDEX_HTML = r"""<!doctype html>
     function clearResultPane() {
       rendered.replaceChildren();
       rendered.textContent = '';
-      rendered.classList.remove('error');
+      clearRenderedError();
       resetMoreDigitsButton(renderedMore, false);
       clearResultDetails();
     }
@@ -2092,6 +2266,7 @@ INDEX_HTML = r"""<!doctype html>
       lastTex = '';
       lastDerivativeExpression = '';
       currentVariables = [];
+      currentDifferentiable = true;
       renderDerivativeButtons(currentVariables);
       clearVariableValues();
     }
@@ -2108,8 +2283,7 @@ INDEX_HTML = r"""<!doctype html>
         const {response, data} = await fetchEvaluation(text);
 
         if (!response.ok || !data.ok) {
-          rendered.textContent = data.error || 'Evaluation failed';
-          rendered.classList.add('error');
+          setRenderedError(data.error || 'Evaluation failed');
           resetMoreDigitsButton(renderedMore, false);
           parsed.textContent = '';
           functionStyle.textContent = '';
@@ -2121,6 +2295,7 @@ INDEX_HTML = r"""<!doctype html>
           lastTex = '';
           lastDerivativeExpression = '';
           currentVariables = [];
+          currentDifferentiable = true;
           renderDerivativeButtons(currentVariables);
           clearVariableValues();
           setStatus('Error');
@@ -2147,11 +2322,11 @@ INDEX_HTML = r"""<!doctype html>
         saveLastExpression(lastEvaluationInputText || fullExpressionText || expr.value.trim());
         lastDerivativeExpression = derivativeExpressionFromLine(data.derivative);
         currentVariables = variablesFromExpression(data.expression || '');
+        currentDifferentiable = String(data.differentiable || 'yes').trim().toLowerCase() !== 'no';
         renderDerivativeButtons(currentVariables);
         setStatus('Ready');
       } catch (err) {
-        rendered.textContent = String(err);
-        rendered.classList.add('error');
+        setRenderedError(String(err));
         resetMoreDigitsButton(renderedMore, false);
         clearResultDetails();
         setStatus('Error');
@@ -2177,8 +2352,7 @@ INDEX_HTML = r"""<!doctype html>
       const data = await response.json();
 
       if (!response.ok || !data.ok) {
-        rendered.textContent = data.error || 'Goal seek failed';
-        rendered.classList.add('error');
+        setRenderedError(data.error || 'Goal seek failed');
         resetMoreDigitsButton(renderedMore, false);
         clearResultDetails();
         setStatus('Error');
@@ -2210,6 +2384,7 @@ INDEX_HTML = r"""<!doctype html>
       lastDerivativeExpression = '';
       setExpressionEditor(solvedExpression, data.binding_values || null);
       currentVariables = variablesFromExpression(solvedExpression);
+      currentDifferentiable = String(data.differentiable || 'yes').trim().toLowerCase() !== 'no';
       renderDerivativeButtons(currentVariables);
       expr.dataset.goalSeekSource = expressionForEditor(request.expression).trim();
       expr.dataset.goalSeekTarget = target;
@@ -2267,8 +2442,7 @@ INDEX_HTML = r"""<!doctype html>
         const derivativeExpression = derivativeExpressionFromLine(data.derivative);
 
         if (!response.ok || !data.ok || !derivativeExpression) {
-          rendered.textContent = data.error || data.raw || `No derivative for ${wrt}`;
-          rendered.classList.add('error');
+          setRenderedError(data.error || data.raw || `No derivative for ${wrt}`);
           resetMoreDigitsButton(renderedMore, false);
           setStatus('Error');
           return;
@@ -2280,8 +2454,7 @@ INDEX_HTML = r"""<!doctype html>
         clearVariableValues();
         await evaluateExpression();
       } catch (err) {
-        rendered.textContent = String(err);
-        rendered.classList.add('error');
+        setRenderedError(String(err));
         resetMoreDigitsButton(renderedMore, false);
         setStatus('Error');
       } finally {
@@ -2338,8 +2511,7 @@ INDEX_HTML = r"""<!doctype html>
         const start = goalStartValues();
         await runGoalSeek(text, target, start);
       } catch (err) {
-        rendered.textContent = String(err);
-        rendered.classList.add('error');
+        setRenderedError(String(err));
         resetMoreDigitsButton(renderedMore, false);
         clearResultDetails();
         setStatus('Error');
@@ -2970,6 +3142,7 @@ def parse_try_dval_output(output: str) -> dict[str, str]:
         "expression": r"^expression\s+(.*)$",
         "function": r"^function\s+(.*)$",
         "tex": r"^tex\s+(.*)$",
+        "differentiable": r"^differentiable\s+(.*)$",
         "value": r"^value\s+(.*)$",
         "residual": r"^residual\s+(.*)$",
         "iterations": r"^iterations\s+(.*)$",
@@ -3002,7 +3175,11 @@ def _trim_decimal_tail(text: str) -> str:
     return mantissa + (sep + exponent if sep else "")
 
 
-def format_number_text_for_precision(text: str, precision: int) -> str:
+def format_number_text_for_precision(
+    text: str,
+    precision: int,
+    zero_subprecision: bool = False,
+) -> str:
     text = str(text or "").strip()
     if not text:
         return text
@@ -3013,8 +3190,10 @@ def format_number_text_for_precision(text: str, precision: int) -> str:
 
     match = re.match(r"^(.+?)\s+([+-])\s+(.+)i$", text)
     if match:
-        real = format_number_text_for_precision(match.group(1), precision)
-        imag = format_number_text_for_precision(match.group(3), precision)
+        real = format_number_text_for_precision(
+            match.group(1), precision, zero_subprecision)
+        imag = format_number_text_for_precision(
+            match.group(3), precision, zero_subprecision)
         return f"{real} {match.group(2)} {imag}i"
 
     try:
@@ -3024,6 +3203,8 @@ def format_number_text_for_precision(text: str, precision: int) -> str:
     except (InvalidOperation, ValueError):
         return text
 
+    if zero_subprecision and rounded and rounded.copy_abs().adjusted() < -int(precision):
+        return "0"
     return _trim_decimal_tail(format(rounded, "g").replace("e", "E"))
 
 
@@ -3237,11 +3418,17 @@ def evaluated_variable_binding_values(
     expression: str,
     precision: int,
 ) -> list[dict[str, str]]:
-    _, var_text, _ = parse_expression_body(expression)
+    _, var_text, const_text = parse_expression_body(expression)
     values: list[dict[str, str]] = []
 
     for name, value in parse_binding_assignments(var_text):
         if not value or value == "?" or value.upper() == "NAN":
+            values.append({
+                "name": name,
+                "value": value or "?",
+                "display": "",
+                "kind": "variable",
+            })
             continue
 
         try:
@@ -3253,6 +3440,19 @@ def evaluated_variable_binding_values(
             "name": name,
             "value": numeric,
             "display": _compact_long_text_value(numeric),
+            "kind": "variable",
+        })
+
+    for name, value in parse_binding_assignments(const_text):
+        display_value = value or "?"
+        display = ""
+        if display_value != "?" and display_value.upper() != "NAN":
+            display = _compact_long_text_value(display_value)
+        values.append({
+            "name": name,
+            "value": display_value,
+            "display": display,
+            "kind": "constant",
         })
 
     return values
@@ -3262,11 +3462,17 @@ def expression_variable_binding_values(
     expression: str,
     precision: int | None = None,
 ) -> list[dict[str, str]]:
-    _, var_text, _ = parse_expression_body(expression)
+    _, var_text, const_text = parse_expression_body(expression)
     values: list[dict[str, str]] = []
 
     for name, value in parse_binding_assignments(var_text):
         if not value or value == "?" or value.upper() == "NAN":
+            values.append({
+                "name": name,
+                "value": value or "?",
+                "display": "",
+                "kind": "variable",
+            })
             continue
 
         display_value = precision_numeric_tokens(value, precision) if precision is not None else value
@@ -3274,6 +3480,19 @@ def expression_variable_binding_values(
             "name": name,
             "value": display_value,
             "display": _compact_long_text_value(display_value),
+            "kind": "variable",
+        })
+
+    for name, value in parse_binding_assignments(const_text):
+        display_value = value or "?"
+        display = ""
+        if display_value != "?" and display_value.upper() != "NAN":
+            display = _compact_long_text_value(display_value)
+        values.append({
+            "name": name,
+            "value": display_value,
+            "display": display,
+            "kind": "constant",
         })
 
     return values
@@ -3341,6 +3560,7 @@ class DvalLabHandler(http.server.BaseHTTPRequestHandler):
         data = json.dumps(payload).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)
@@ -3353,6 +3573,7 @@ class DvalLabHandler(http.server.BaseHTTPRequestHandler):
             return
         self.send_response(200)
         self.send_header("Content-Type", content_type)
+        self.send_header("Cache-Control", "no-store")
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)
@@ -3418,6 +3639,7 @@ class DvalLabHandler(http.server.BaseHTTPRequestHandler):
         data = page.encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)
@@ -3488,9 +3710,11 @@ class DvalLabHandler(http.server.BaseHTTPRequestHandler):
             precision_limit_result_fields(fields, precision)
             save_state_expression(expression_for_editor(fields["expression"]))
             if fields.get("value"):
-                fields["value"] = format_number_text_for_precision(fields["value"], precision)
+                fields["value"] = format_number_text_for_precision(
+                    fields["value"], precision, zero_subprecision=True)
             if fields.get("residual"):
-                fields["residual"] = format_number_text_for_precision(fields["residual"], precision)
+                fields["residual"] = format_number_text_for_precision(
+                    fields["residual"], precision, zero_subprecision=True)
             fields["full_display_expression"] = expression_for_display(fields.get("expression", ""))
             fields["full_display_tex"] = tex_for_display(fields.get("tex", ""))
             fields["full_display_function"] = function_for_display(fields.get("function", ""))
@@ -3518,7 +3742,7 @@ class DvalLabHandler(http.server.BaseHTTPRequestHandler):
             body = self.rfile.read(length)
             payload = json.loads(body.decode("utf-8"))
             expression = str(payload.get("expression", "")).strip()
-            wrt = str(payload.get("wrt", "")).strip()
+            wrt = str(payload.get("wrt", "")).strip() or "x"
             precision = int(payload.get("precision", 96))
         except Exception as exc:
             self.send_json(400, {"ok": False, "error": f"Bad request: {exc}"})
@@ -3557,10 +3781,11 @@ class DvalLabHandler(http.server.BaseHTTPRequestHandler):
             return
 
         if fields.get("value"):
-            fields["value"] = format_number_text_for_precision(fields["value"], precision)
+            fields["value"] = format_number_text_for_precision(
+                fields["value"], precision, zero_subprecision=True)
         if fields.get("derivative_value"):
             fields["derivative_value"] = format_number_text_for_precision(
-                fields["derivative_value"], precision
+                fields["derivative_value"], precision, zero_subprecision=True
             )
 
         precision_limit_result_fields(fields, precision)

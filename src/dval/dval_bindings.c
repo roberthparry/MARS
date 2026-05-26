@@ -49,6 +49,7 @@ typedef struct {
     bool  (*struct_eq)(const dv_binding_expr_t *left,
                        const dv_binding_expr_t *right);
     void  (*emit_expr)(const dv_binding_expr_t *expr, sbuf_t *b, int parent_prec);
+    void  (*emit_func)(const dv_binding_expr_t *expr, sbuf_t *b, int parent_prec);
     void  (*emit_tex)(const dv_binding_expr_t *expr, sbuf_t *b, int parent_prec);
 } binding_expr_ops_t;
 
@@ -169,6 +170,17 @@ static void emit_binding_expr_powi(const dv_binding_expr_t *expr, sbuf_t *b, int
 static void emit_binding_expr_unary_op(const dv_binding_expr_t *expr, sbuf_t *b, int parent_prec);
 static void emit_binding_expr_binary_op(const dv_binding_expr_t *expr, sbuf_t *b, int parent_prec);
 
+static void emit_binding_func_number(const dv_binding_expr_t *expr, sbuf_t *b, int parent_prec);
+static void emit_binding_func_const(const dv_binding_expr_t *expr, sbuf_t *b, int parent_prec);
+static void emit_binding_func_neg(const dv_binding_expr_t *expr, sbuf_t *b, int parent_prec);
+static void emit_binding_func_add(const dv_binding_expr_t *expr, sbuf_t *b, int parent_prec);
+static void emit_binding_func_sub(const dv_binding_expr_t *expr, sbuf_t *b, int parent_prec);
+static void emit_binding_func_mul_node(const dv_binding_expr_t *expr, sbuf_t *b, int parent_prec);
+static void emit_binding_func_div(const dv_binding_expr_t *expr, sbuf_t *b, int parent_prec);
+static void emit_binding_func_powi(const dv_binding_expr_t *expr, sbuf_t *b, int parent_prec);
+static void emit_binding_func_unary_op(const dv_binding_expr_t *expr, sbuf_t *b, int parent_prec);
+static void emit_binding_func_binary_op(const dv_binding_expr_t *expr, sbuf_t *b, int parent_prec);
+
 static void emit_binding_tex_number(const dv_binding_expr_t *expr, sbuf_t *b, int parent_prec);
 static void emit_binding_tex_const(const dv_binding_expr_t *expr, sbuf_t *b, int parent_prec);
 static void emit_binding_tex_neg(const dv_binding_expr_t *expr, sbuf_t *b, int parent_prec);
@@ -184,16 +196,16 @@ static bool binding_expr_struct_eq_local(const dv_binding_expr_t *left,
 static dv_binding_expr_t *binding_expr_simplify_owned(dv_binding_expr_t *expr);
 
 static const binding_expr_ops_t s_binding_expr_ops[BINDING_EXPR_KIND_COUNT] = {
-    [DV_BINDING_EXPR_NUMBER]    = { BIND_PREC_ATOM,  true,  binding_free_number,    binding_clone_number,    binding_eval_number,    binding_simplify_atom,      binding_struct_eq_number,    emit_binding_expr_number,    emit_binding_tex_number    },
-    [DV_BINDING_EXPR_CONST]     = { BIND_PREC_ATOM,  true,  binding_free_none,      binding_clone_const,     binding_eval_const,     binding_simplify_atom,      binding_struct_eq_const,     emit_binding_expr_const,     emit_binding_tex_const     },
-    [DV_BINDING_EXPR_NEG]       = { BIND_PREC_UNARY, false, binding_free_unary,     binding_clone_neg,       binding_eval_neg,       binding_simplify_neg,       binding_struct_eq_unary,     emit_binding_expr_neg,       emit_binding_tex_neg       },
-    [DV_BINDING_EXPR_ADD]       = { BIND_PREC_ADD,   false, binding_free_binary,    binding_clone_add,       binding_eval_add,       binding_simplify_addsub,    binding_struct_eq_binary,    emit_binding_expr_add,       emit_binding_tex_add       },
-    [DV_BINDING_EXPR_SUB]       = { BIND_PREC_ADD,   false, binding_free_binary,    binding_clone_sub,       binding_eval_sub,       binding_simplify_addsub,    binding_struct_eq_binary,    emit_binding_expr_sub,       emit_binding_tex_sub       },
-    [DV_BINDING_EXPR_MUL]       = { BIND_PREC_MUL,   false, binding_free_binary,    binding_clone_mul,       binding_eval_mul,       binding_simplify_mul,       binding_struct_eq_binary,    emit_binding_expr_mul_node,  emit_binding_tex_mul_node  },
-    [DV_BINDING_EXPR_DIV]       = { BIND_PREC_MUL,   false, binding_free_binary,    binding_clone_div,       binding_eval_div,       binding_simplify_div,       binding_struct_eq_binary,    emit_binding_expr_div,       emit_binding_tex_div       },
-    [DV_BINDING_EXPR_POWI]      = { BIND_PREC_POW,   true,  binding_free_powi,      binding_clone_powi,      binding_eval_powi,      binding_simplify_powi,      binding_struct_eq_powi,      emit_binding_expr_powi,      emit_binding_tex_powi      },
-    [DV_BINDING_EXPR_UNARY_OP]  = { BIND_PREC_UNARY, false, binding_free_unary_op,  binding_clone_unary_op,  binding_eval_unary_op,  binding_simplify_unary_op,  binding_struct_eq_unary_op,  emit_binding_expr_unary_op,  emit_binding_tex_unary_op  },
-    [DV_BINDING_EXPR_BINARY_OP] = { BIND_PREC_POW,   false, binding_free_binary_op, binding_clone_binary_op, binding_eval_binary_op, binding_simplify_binary_op, binding_struct_eq_binary_op, emit_binding_expr_binary_op, emit_binding_tex_binary_op }
+    [DV_BINDING_EXPR_NUMBER]    = { BIND_PREC_ATOM,  true,  binding_free_number,    binding_clone_number,    binding_eval_number,    binding_simplify_atom,      binding_struct_eq_number,    emit_binding_expr_number,    emit_binding_func_number,    emit_binding_tex_number    },
+    [DV_BINDING_EXPR_CONST]     = { BIND_PREC_ATOM,  true,  binding_free_none,      binding_clone_const,     binding_eval_const,     binding_simplify_atom,      binding_struct_eq_const,     emit_binding_expr_const,     emit_binding_func_const,     emit_binding_tex_const     },
+    [DV_BINDING_EXPR_NEG]       = { BIND_PREC_UNARY, false, binding_free_unary,     binding_clone_neg,       binding_eval_neg,       binding_simplify_neg,       binding_struct_eq_unary,     emit_binding_expr_neg,       emit_binding_func_neg,       emit_binding_tex_neg       },
+    [DV_BINDING_EXPR_ADD]       = { BIND_PREC_ADD,   false, binding_free_binary,    binding_clone_add,       binding_eval_add,       binding_simplify_addsub,    binding_struct_eq_binary,    emit_binding_expr_add,       emit_binding_func_add,       emit_binding_tex_add       },
+    [DV_BINDING_EXPR_SUB]       = { BIND_PREC_ADD,   false, binding_free_binary,    binding_clone_sub,       binding_eval_sub,       binding_simplify_addsub,    binding_struct_eq_binary,    emit_binding_expr_sub,       emit_binding_func_sub,       emit_binding_tex_sub       },
+    [DV_BINDING_EXPR_MUL]       = { BIND_PREC_MUL,   false, binding_free_binary,    binding_clone_mul,       binding_eval_mul,       binding_simplify_mul,       binding_struct_eq_binary,    emit_binding_expr_mul_node,  emit_binding_func_mul_node,  emit_binding_tex_mul_node  },
+    [DV_BINDING_EXPR_DIV]       = { BIND_PREC_MUL,   false, binding_free_binary,    binding_clone_div,       binding_eval_div,       binding_simplify_div,       binding_struct_eq_binary,    emit_binding_expr_div,       emit_binding_func_div,       emit_binding_tex_div       },
+    [DV_BINDING_EXPR_POWI]      = { BIND_PREC_POW,   true,  binding_free_powi,      binding_clone_powi,      binding_eval_powi,      binding_simplify_powi,      binding_struct_eq_powi,      emit_binding_expr_powi,      emit_binding_func_powi,      emit_binding_tex_powi      },
+    [DV_BINDING_EXPR_UNARY_OP]  = { BIND_PREC_UNARY, false, binding_free_unary_op,  binding_clone_unary_op,  binding_eval_unary_op,  binding_simplify_unary_op,  binding_struct_eq_unary_op,  emit_binding_expr_unary_op,  emit_binding_func_unary_op,  emit_binding_tex_unary_op  },
+    [DV_BINDING_EXPR_BINARY_OP] = { BIND_PREC_POW,   false, binding_free_binary_op, binding_clone_binary_op, binding_eval_binary_op, binding_simplify_binary_op, binding_struct_eq_binary_op, emit_binding_expr_binary_op, emit_binding_func_binary_op, emit_binding_tex_binary_op }
 };
 
 static const binding_number_value_rule_t s_binding_number_value_rules[] = {
@@ -1429,7 +1441,7 @@ typedef struct {
     const dval_ops_t *ops;
 } binding_func_entry_t;
 
-#define BINDING_FUNC_TABLE_SIZE 49u
+#define BINDING_FUNC_TABLE_SIZE 71u
 #define BINDING_FUNC_ENTRY(name, binary, op) \
     { (name), sizeof(name) - 1u, (binary), (op) }
 
@@ -1466,10 +1478,14 @@ static const binding_func_entry_t s_binding_funcs[BINDING_FUNC_TABLE_SIZE] = {
     BINDING_FUNC_ENTRY("sin",           false, &ops_sin),
     BINDING_FUNC_ENTRY("W₀",            false, &ops_lambert_w0),
     BINDING_FUNC_ENTRY("ceil",          false, &ops_ceil),
-    BINDING_FUNC_ENTRY("productlog",    false, &ops_lambert_w0),
+    BINDING_FUNC_ENTRY("productlog",    false, &ops_lambert_w),
     BINDING_FUNC_ENTRY("asinh",         false, &ops_asinh),
     BINDING_FUNC_ENTRY("log",           false, &ops_log10),
     BINDING_FUNC_ENTRY("gammainv",      false, &ops_gammainv),
+    BINDING_FUNC_ENTRY("gammainc_lower", true, &ops_gammainc_lower),
+    BINDING_FUNC_ENTRY("gammainc_upper", true, &ops_gammainc_upper),
+    BINDING_FUNC_ENTRY("gammainc_P",    true,  &ops_gammainc_P),
+    BINDING_FUNC_ENTRY("gammainc_Q",    true,  &ops_gammainc_Q),
     BINDING_FUNC_ENTRY("W_-1",          false, &ops_lambert_wm1),
     BINDING_FUNC_ENTRY("tanh",          false, &ops_tanh),
     BINDING_FUNC_ENTRY("logbeta",       true,  &ops_logbeta),
@@ -1487,10 +1503,28 @@ static const binding_func_entry_t s_binding_funcs[BINDING_FUNC_TABLE_SIZE] = {
     BINDING_FUNC_ENTRY("cosh",          false, &ops_cosh),
     BINDING_FUNC_ENTRY("sqrt",          false, &ops_sqrt),
     BINDING_FUNC_ENTRY("lgamma",        false, &ops_lgamma),
-    BINDING_FUNC_ENTRY("W",             false, &ops_lambert_w0),
+    BINDING_FUNC_ENTRY("W",             false, &ops_lambert_w),
     BINDING_FUNC_ENTRY("beta",          true,  &ops_beta),
     BINDING_FUNC_ENTRY("atan2",         true,  &ops_atan2),
-    BINDING_FUNC_ENTRY("normal_logpdf", false, &ops_normal_logpdf)
+    BINDING_FUNC_ENTRY("normal_logpdf", false, &ops_normal_logpdf),
+    BINDING_FUNC_ENTRY("factorial",     false, &ops_factorial),
+    BINDING_FUNC_ENTRY("fibonacci",     false, &ops_fibonacci),
+    BINDING_FUNC_ENTRY("partition",     false, &ops_partition),
+    BINDING_FUNC_ENTRY("isqrt",         false, &ops_isqrt),
+    BINDING_FUNC_ENTRY("gcd",           true,  &ops_gcd),
+    BINDING_FUNC_ENTRY("lcm",           true,  &ops_lcm),
+    BINDING_FUNC_ENTRY("mod",           true,  &ops_mod),
+    BINDING_FUNC_ENTRY("modinv",        true,  &ops_modinv),
+    BINDING_FUNC_ENTRY("is_prime",      false, &ops_is_prime),
+    BINDING_FUNC_ENTRY("next_prime",    false, &ops_next_prime),
+    BINDING_FUNC_ENTRY("prev_prime",    false, &ops_prev_prime),
+    BINDING_FUNC_ENTRY("AND",           true,  &ops_bit_and),
+    BINDING_FUNC_ENTRY("OR",            true,  &ops_bit_or),
+    BINDING_FUNC_ENTRY("XOR",           true,  &ops_bit_xor),
+    BINDING_FUNC_ENTRY("NOT",           false, &ops_bit_not),
+    BINDING_FUNC_ENTRY("SHL",           true,  &ops_shl),
+    BINDING_FUNC_ENTRY("SHR",           true,  &ops_shr),
+    BINDING_FUNC_ENTRY("factors",       false, &ops_factors)
 };
 
 static unsigned binding_func_bucket_hash(const char *kw, size_t klen)
@@ -1531,6 +1565,12 @@ static const binding_func_entry_t *binding_func_lookup(const char *kw, size_t kl
 
     if (entry->klen == klen && memcmp(entry->kw, kw, klen) == 0)
         return entry;
+
+    for (size_t i = 0u; i < BINDING_FUNC_TABLE_SIZE; ++i) {
+        entry = &s_binding_funcs[i];
+        if (entry->klen == klen && memcmp(entry->kw, kw, klen) == 0)
+            return entry;
+    }
 
     return NULL;
 }
@@ -3287,7 +3327,8 @@ static const dv_binding_expr_t *binding_expr_lambert_arg(const dv_binding_expr_t
 {
     if (!expr ||
         expr->kind != DV_BINDING_EXPR_UNARY_OP ||
-        (expr->u.unary_op.ops != &ops_lambert_w0 &&
+        (expr->u.unary_op.ops != &ops_lambert_w &&
+         expr->u.unary_op.ops != &ops_lambert_w0 &&
          expr->u.unary_op.ops != &ops_lambert_wm1))
         return NULL;
 
@@ -3314,13 +3355,48 @@ static bool binding_expr_lambert_args_match(const dv_binding_expr_t *left,
     return equal;
 }
 
+static bool binding_expr_extract_exp_arg(const dv_binding_expr_t *expr,
+                                         dv_binding_expr_t **arg_out)
+{
+    if (!expr || !arg_out)
+        return false;
+
+    *arg_out = NULL;
+
+    if (expr->kind == DV_BINDING_EXPR_UNARY_OP &&
+        expr->u.unary_op.ops == &ops_exp) {
+        *arg_out = dv_binding_expr_clone(expr->u.unary_op.child);
+        return *arg_out != NULL;
+    }
+
+    if (expr->kind == DV_BINDING_EXPR_POWI &&
+        binding_expr_is_const_id(expr->u.powi.base, DV_BINDING_CONST_E)) {
+        *arg_out = binding_expr_new_long(expr->u.powi.exponent);
+        return *arg_out != NULL;
+    }
+
+    if (expr->kind == DV_BINDING_EXPR_BINARY_OP &&
+        expr->u.binary_op.ops == &ops_pow &&
+        binding_expr_is_const_id(expr->u.binary_op.left, DV_BINDING_CONST_E)) {
+        *arg_out = dv_binding_expr_clone(expr->u.binary_op.right);
+        return *arg_out != NULL;
+    }
+
+    return false;
+}
+
 static bool binding_expr_is_exp_of_same_lambert(const dv_binding_expr_t *expr,
                                                 const dv_binding_expr_t *lambert_expr)
 {
-    return expr &&
-           expr->kind == DV_BINDING_EXPR_UNARY_OP &&
-           expr->u.unary_op.ops == &ops_exp &&
-           binding_expr_struct_eq_local(expr->u.unary_op.child, lambert_expr);
+    dv_binding_expr_t *arg = NULL;
+    bool match = false;
+
+    if (!binding_expr_extract_exp_arg(expr, &arg))
+        return false;
+
+    match = binding_expr_struct_eq_local(arg, lambert_expr);
+    dv_binding_expr_free(arg);
+    return match;
 }
 
 static dv_binding_expr_t *binding_expr_try_simplify_lambert_product(dv_binding_expr_t *expr)
@@ -3351,36 +3427,43 @@ static dv_binding_expr_t *binding_expr_try_simplify_lambert_product(dv_binding_e
 }
 
 static bool binding_expr_extract_exp_factor(const dv_binding_expr_t *expr,
-                                            const dv_binding_expr_t **exp_arg_out,
+                                            dv_binding_expr_t **exp_arg_out,
                                             dv_binding_expr_t **other_out)
 {
-    const dv_binding_expr_t *exp_arg = NULL;
+    dv_binding_expr_t *exp_arg = NULL;
     dv_binding_expr_t *other = NULL;
 
     if (!expr || !exp_arg_out || !other_out)
         return false;
 
-    if (expr->kind == DV_BINDING_EXPR_UNARY_OP &&
-        expr->u.unary_op.ops == &ops_exp) {
-        *exp_arg_out = expr->u.unary_op.child;
+    *exp_arg_out = NULL;
+    *other_out = NULL;
+
+    if (binding_expr_extract_exp_arg(expr, exp_arg_out)) {
         *other_out = binding_expr_new_long(1L);
-        return *other_out != NULL;
+        if (*other_out)
+            return true;
+        dv_binding_expr_free(*exp_arg_out);
+        *exp_arg_out = NULL;
+        return false;
     }
 
     if (expr->kind == DV_BINDING_EXPR_MUL) {
-        if (expr->u.binary.left &&
-            expr->u.binary.left->kind == DV_BINDING_EXPR_UNARY_OP &&
-            expr->u.binary.left->u.unary_op.ops == &ops_exp) {
-            *exp_arg_out = expr->u.binary.left->u.unary_op.child;
+        if (binding_expr_extract_exp_arg(expr->u.binary.left, exp_arg_out)) {
             *other_out = dv_binding_expr_clone(expr->u.binary.right);
-            return *other_out != NULL;
+            if (*other_out)
+                return true;
+            dv_binding_expr_free(*exp_arg_out);
+            *exp_arg_out = NULL;
+            return false;
         }
-        if (expr->u.binary.right &&
-            expr->u.binary.right->kind == DV_BINDING_EXPR_UNARY_OP &&
-            expr->u.binary.right->u.unary_op.ops == &ops_exp) {
-            *exp_arg_out = expr->u.binary.right->u.unary_op.child;
+        if (binding_expr_extract_exp_arg(expr->u.binary.right, exp_arg_out)) {
             *other_out = dv_binding_expr_clone(expr->u.binary.left);
-            return *other_out != NULL;
+            if (*other_out)
+                return true;
+            dv_binding_expr_free(*exp_arg_out);
+            *exp_arg_out = NULL;
+            return false;
         }
     }
 
@@ -3390,7 +3473,9 @@ static bool binding_expr_extract_exp_factor(const dv_binding_expr_t *expr,
         *other_out = dv_binding_expr_new_div(other,
                                              dv_binding_expr_clone(expr->u.binary.right));
         if (!*other_out) {
+            dv_binding_expr_free(exp_arg);
             dv_binding_expr_free(other);
+            *exp_arg_out = NULL;
             return false;
         }
         return true;
@@ -3399,19 +3484,24 @@ static bool binding_expr_extract_exp_factor(const dv_binding_expr_t *expr,
     return false;
 }
 
-static const dv_binding_expr_t *binding_expr_lambert_inverse_arg(const dv_binding_expr_t *expr)
+static dv_binding_expr_t *binding_expr_lambert_inverse_arg(const dv_binding_expr_t *expr)
 {
-    const dv_binding_expr_t *exp_arg = NULL;
+    dv_binding_expr_t *exp_arg = NULL;
     dv_binding_expr_t *other = NULL;
     bool match = false;
 
     if (!binding_expr_extract_exp_factor(expr, &exp_arg, &other))
         return NULL;
 
+    exp_arg = binding_expr_simplify_owned(exp_arg);
     other = binding_expr_simplify_owned(other);
     match = binding_expr_lambert_args_match(other, exp_arg);
     dv_binding_expr_free(other);
-    return match ? exp_arg : NULL;
+    if (match)
+        return exp_arg;
+
+    dv_binding_expr_free(exp_arg);
+    return NULL;
 }
 
 static bool binding_expr_lambert_inverse_domain_ok(const dval_ops_t *ops,
@@ -3425,7 +3515,9 @@ static bool binding_expr_lambert_inverse_domain_ok(const dval_ops_t *ops,
 
     value = dv_binding_expr_eval(arg);
     if (num_is_real(value)) {
-        if (ops == &ops_lambert_w0)
+        if (ops == &ops_lambert_w)
+            ok = true;
+        else if (ops == &ops_lambert_w0)
             ok = num_ge(value, NUM_NEG_ONE);
         else if (ops == &ops_lambert_wm1)
             ok = num_le(value, NUM_NEG_ONE);
@@ -3437,23 +3529,24 @@ static bool binding_expr_lambert_inverse_domain_ok(const dval_ops_t *ops,
 
 static dv_binding_expr_t *binding_expr_try_simplify_lambert_inverse(dv_binding_expr_t *expr)
 {
-    const dv_binding_expr_t *arg;
+    dv_binding_expr_t *arg;
     dv_binding_expr_t *out;
 
     if (!expr ||
         expr->kind != DV_BINDING_EXPR_UNARY_OP ||
-        (expr->u.unary_op.ops != &ops_lambert_w0 &&
+        (expr->u.unary_op.ops != &ops_lambert_w &&
+         expr->u.unary_op.ops != &ops_lambert_w0 &&
          expr->u.unary_op.ops != &ops_lambert_wm1))
         return expr;
 
     arg = binding_expr_lambert_inverse_arg(expr->u.unary_op.child);
     if (!arg ||
-        !binding_expr_lambert_inverse_domain_ok(expr->u.unary_op.ops, arg))
+        !binding_expr_lambert_inverse_domain_ok(expr->u.unary_op.ops, arg)) {
+        dv_binding_expr_free(arg);
         return expr;
+    }
 
-    out = dv_binding_expr_clone(arg);
-    if (!out)
-        return expr;
+    out = arg;
 
     dv_binding_expr_free(expr);
     return out;
@@ -4024,7 +4117,14 @@ static void emit_binding_expr_unary_call(const dval_ops_t *ops,
                                          const dv_binding_expr_t *child,
                                          sbuf_t *b)
 {
-    sbuf_puts(b, (ops && ops->name) ? ops->name : "?");
+    if (ops == &ops_gamma)
+        sbuf_puts(b, "Γ");
+    else if (ops == &ops_digamma)
+        sbuf_puts(b, "ψ⁽⁰⁾");
+    else if (ops == &ops_trigamma)
+        sbuf_puts(b, "ψ⁽¹⁾");
+    else
+        sbuf_puts(b, (ops && ops->name) ? ops->name : "?");
     sbuf_putc(b, '(');
     emit_binding_expr(child, b, BIND_PREC_LOWEST);
     sbuf_putc(b, ')');
@@ -4254,6 +4354,158 @@ static void emit_binding_expr_binary_op(const dv_binding_expr_t *expr, sbuf_t *b
     sbuf_putc(b, ')');
 }
 
+static void emit_binding_func_expr(const dv_binding_expr_t *expr, sbuf_t *b, int parent_prec);
+
+static void emit_binding_func_number(const dv_binding_expr_t *expr, sbuf_t *b, int parent_prec)
+{
+    emit_binding_expr_number(expr, b, parent_prec);
+}
+
+static void emit_binding_func_const(const dv_binding_expr_t *expr, sbuf_t *b, int parent_prec)
+{
+    emit_binding_expr_const(expr, b, parent_prec);
+}
+
+static void emit_binding_func_neg(const dv_binding_expr_t *expr, sbuf_t *b, int parent_prec)
+{
+    bool need = BIND_PREC_UNARY < parent_prec;
+
+    if (need)
+        sbuf_putc(b, '(');
+    sbuf_putc(b, '-');
+    emit_binding_func_expr(expr->u.unary.child, b, BIND_PREC_UNARY);
+    if (need)
+        sbuf_putc(b, ')');
+}
+
+static void emit_binding_func_addsub(const dv_binding_expr_t *expr,
+                                     sbuf_t *b,
+                                     int parent_prec,
+                                     const char *op,
+                                     int right_prec)
+{
+    bool need = BIND_PREC_ADD < parent_prec;
+
+    if (need)
+        sbuf_putc(b, '(');
+    emit_binding_func_expr(expr->u.binary.left, b, BIND_PREC_ADD);
+    sbuf_puts(b, op);
+    emit_binding_func_expr(expr->u.binary.right, b, right_prec);
+    if (need)
+        sbuf_putc(b, ')');
+}
+
+static void emit_binding_func_add(const dv_binding_expr_t *expr, sbuf_t *b, int parent_prec)
+{
+    emit_binding_func_addsub(expr, b, parent_prec, " + ", BIND_PREC_ADD);
+}
+
+static void emit_binding_func_sub(const dv_binding_expr_t *expr, sbuf_t *b, int parent_prec)
+{
+    emit_binding_func_addsub(expr, b, parent_prec, " - ", BIND_PREC_ADD + 1);
+}
+
+static void emit_binding_func_mul_node(const dv_binding_expr_t *expr, sbuf_t *b, int parent_prec)
+{
+    bool need = BIND_PREC_MUL < parent_prec;
+
+    if (need)
+        sbuf_putc(b, '(');
+    emit_binding_func_expr(expr->u.binary.left, b, BIND_PREC_MUL);
+    sbuf_puts(b, " * ");
+    emit_binding_func_expr(expr->u.binary.right, b, BIND_PREC_MUL);
+    if (need)
+        sbuf_putc(b, ')');
+}
+
+static void emit_binding_func_div(const dv_binding_expr_t *expr, sbuf_t *b, int parent_prec)
+{
+    bool need = BIND_PREC_MUL < parent_prec;
+
+    if (need)
+        sbuf_putc(b, '(');
+    emit_binding_func_expr(expr->u.binary.left, b, BIND_PREC_MUL);
+    sbuf_puts(b, " / ");
+    emit_binding_func_expr(expr->u.binary.right, b, BIND_PREC_POW);
+    if (need)
+        sbuf_putc(b, ')');
+}
+
+static void emit_binding_func_powi(const dv_binding_expr_t *expr, sbuf_t *b, int parent_prec)
+{
+    bool need = BIND_PREC_POW < parent_prec;
+    bool base_need = binding_expr_needs_pow_base_parens(expr->u.powi.base);
+    char expbuf[64];
+
+    if (need)
+        sbuf_putc(b, '(');
+    if (base_need)
+        sbuf_putc(b, '(');
+    emit_binding_func_expr(expr->u.powi.base, b, base_need ? BIND_PREC_LOWEST : BIND_PREC_POW);
+    if (base_need)
+        sbuf_putc(b, ')');
+    snprintf(expbuf, sizeof(expbuf), "%ld", expr->u.powi.exponent);
+    sbuf_putc(b, '^');
+    sbuf_puts(b, expbuf);
+    if (need)
+        sbuf_putc(b, ')');
+}
+
+static void emit_binding_func_unary_op(const dv_binding_expr_t *expr, sbuf_t *b, int parent_prec)
+{
+    const dval_ops_t *ops = expr->u.unary_op.ops;
+    bool need = BIND_PREC_UNARY < parent_prec;
+
+    if (need)
+        sbuf_putc(b, '(');
+    if (ops == &ops_neg) {
+        sbuf_putc(b, '-');
+        emit_binding_func_expr(expr->u.unary_op.child, b, BIND_PREC_UNARY);
+    } else {
+        sbuf_puts(b, (ops && ops->name) ? ops->name : "?");
+        sbuf_putc(b, '(');
+        emit_binding_func_expr(expr->u.unary_op.child, b, BIND_PREC_LOWEST);
+        sbuf_putc(b, ')');
+    }
+    if (need)
+        sbuf_putc(b, ')');
+}
+
+static void emit_binding_func_binary_op(const dv_binding_expr_t *expr, sbuf_t *b, int parent_prec)
+{
+    const dval_ops_t *ops = expr->u.binary_op.ops;
+
+    if (ops == &ops_pow) {
+        bool need = BIND_PREC_POW < parent_prec;
+        bool base_need = binding_expr_needs_pow_base_parens(expr->u.binary_op.left);
+        bool exp_need = !binding_expr_is_atomic(expr->u.binary_op.right);
+
+        if (need)
+            sbuf_putc(b, '(');
+        if (base_need)
+            sbuf_putc(b, '(');
+        emit_binding_func_expr(expr->u.binary_op.left, b, base_need ? BIND_PREC_LOWEST : BIND_PREC_POW);
+        if (base_need)
+            sbuf_putc(b, ')');
+        sbuf_puts(b, " ^ ");
+        if (exp_need)
+            sbuf_putc(b, '(');
+        emit_binding_func_expr(expr->u.binary_op.right, b, BIND_PREC_LOWEST);
+        if (exp_need)
+            sbuf_putc(b, ')');
+        if (need)
+            sbuf_putc(b, ')');
+        return;
+    }
+
+    sbuf_puts(b, (ops && ops->name) ? ops->name : "?");
+    sbuf_putc(b, '(');
+    emit_binding_func_expr(expr->u.binary_op.left, b, BIND_PREC_LOWEST);
+    sbuf_puts(b, ", ");
+    emit_binding_func_expr(expr->u.binary_op.right, b, BIND_PREC_LOWEST);
+    sbuf_putc(b, ')');
+}
+
 static void emit_binding_tex_binary_op(const dv_binding_expr_t *expr, sbuf_t *b, int parent_prec)
 {
     const dval_ops_t *ops = expr->u.binary_op.ops;
@@ -4305,6 +4557,24 @@ static void emit_binding_expr(const dv_binding_expr_t *expr, sbuf_t *b, int pare
     ops->emit_expr(expr, b, parent_prec);
 }
 
+static void emit_binding_func_expr(const dv_binding_expr_t *expr, sbuf_t *b, int parent_prec)
+{
+    const binding_expr_ops_t *ops;
+
+    if (!expr) {
+        sbuf_puts(b, "0");
+        return;
+    }
+
+    ops = binding_expr_ops_for_kind(expr->kind);
+    if (!ops || !ops->emit_func) {
+        sbuf_puts(b, "?");
+        return;
+    }
+
+    ops->emit_func(expr, b, parent_prec);
+}
+
 static void emit_binding_tex_expr(const dv_binding_expr_t *expr, sbuf_t *b, int parent_prec)
 {
     const binding_expr_ops_t *ops;
@@ -4329,6 +4599,19 @@ char *dv_binding_expr_to_string(const dv_binding_expr_t *expr)
 
     sbuf_init(&b);
     emit_binding_expr(expr, &b, BIND_PREC_LOWEST);
+    {
+        char *out = dv_tostring_xstrdup(b.data);
+        sbuf_free(&b);
+        return out;
+    }
+}
+
+char *dv_binding_expr_to_function_string(const dv_binding_expr_t *expr)
+{
+    sbuf_t b;
+
+    sbuf_init(&b);
+    emit_binding_func_expr(expr, &b, BIND_PREC_LOWEST);
     {
         char *out = dv_tostring_xstrdup(b.data);
         sbuf_free(&b);
