@@ -1096,16 +1096,16 @@ INDEX_HTML = r"""<!doctype html>
       <div class="help-pane hidden" id="helpPane">
         <div class="help-card">
           <h3>Expression Shape</h3>
-          <p>Use braces when you want bindings. Bare expressions are wrapped for you.</p>
+          <p>Type the expression body in the editor. Variable and constant bindings appear as editable boxes underneath.</p>
           <ul>
-            <li><code>x/pi</code> becomes <code>{ x/π | x = ? }</code></li>
-            <li><code>{ e^sin(x) | x = pi/2 }</code></li>
-            <li><code>{ exp(π·√(H₈)) - (5x)^3 | x = ?; H₈ = 163 }</code></li>
+            <li><code>x/pi</code> becomes <code>{ x/π | x = ? }</code>, but the editor keeps showing <code>x/pi</code>.</li>
+            <li>Set <code>x</code> to <code>pi/2</code> in the binding box instead of writing the binding into the editor.</li>
+            <li>Raw dval binding syntax still works when you paste it, but the lab keeps the large editor focused on the expression body.</li>
           </ul>
         </div>
         <div class="help-card">
           <h3>Bindings</h3>
-          <p>Bindings before <code>;</code> are variables. Bindings after <code>;</code> are constants.</p>
+          <p>Yellow boxes are variables and blue boxes are constants.</p>
           <ul>
             <li><code>x = ?</code> means unknown / <code>NAN</code>, so derivative buttons appear for <code>x</code>.</li>
             <li><code>; H = 163</code> marks <code>H</code> as a constant, so no derivative button is made for it.</li>
@@ -1116,12 +1116,12 @@ INDEX_HTML = r"""<!doctype html>
           <h3>Goal Seek</h3>
           <p>Goal seek changes variable bindings so the expression value reaches the value in the <code>Target</code> field.</p>
           <ul>
-            <li>Set unknowns with <code>?</code>, for example <code>{ x*y | x = ?, y = ? }</code>.</li>
-            <li>Constants after <code>;</code> are not changed, for example <code>{ exp(π·√(H₈)) - (5x)^3 | x = ?; H₈ = 163 }</code>.</li>
+            <li>Leave a variable binding box blank to mark it as unknown.</li>
+            <li>Constants are not changed by goal seek.</li>
             <li>If there is one variable, goal seek solves that variable directly.</li>
             <li>If there are several variables, goal seek moves them together by the smallest local step it can find.</li>
             <li>Optional start boxes appear for each variable. Enter numeric constant expressions only, such as <code>3</code>, <code>pi/4</code>, <code>-2.5</code>, or <code>1e-6</code>.</li>
-            <li>Use a start point when the solver needs a hint about which crossing or branch to search near, for example target <code>27</code> with expression <code>{ x^x | x = ? }</code> and start <code>3</code>.</li>
+            <li>Use a start point when the solver needs a hint about which crossing or branch to search near, for example target <code>27</code> with expression <code>x^x</code> and start <code>3</code>.</li>
             <li>For several variables, fill the start box beside each variable you want to seed. Blank start boxes keep their current binding value, or use <code>1</code> for unknowns.</li>
             <li>It only reports success when <code>abs(value - target)</code> is within the current working precision.</li>
           </ul>
@@ -1498,7 +1498,31 @@ INDEX_HTML = r"""<!doctype html>
         return full;
       if (text.includes('...'))
         return restoreCompactBindingValues(text);
-      return text;
+      return expressionWithEditorBody(text);
+    }
+
+    function expressionWithEditorBody(bodyText) {
+      const body = String(bodyText || '').trim();
+      if (!body)
+        return '';
+      if (bindingParts(body))
+        return body;
+
+      const full = expr.dataset.fullExpression || fullExpressionText;
+      const parts = bindingParts(full);
+      if (!parts)
+        return body;
+
+      let bindingText = parts.variables;
+      if (parts.constants)
+        bindingText = bindingText ? `${bindingText}; ${parts.constants}` : `; ${parts.constants}`;
+      return bindingText ? `{ ${body} | ${bindingText} }` : body;
+    }
+
+    function expressionBodyForEditor(fullText) {
+      const text = expressionForEditor(fullText).trim();
+      const parts = bindingParts(text);
+      return parts ? parts.body : text;
     }
 
     function clearExpressionSource() {
@@ -1683,8 +1707,7 @@ INDEX_HTML = r"""<!doctype html>
       if (updated === current)
         return;
 
-      expr.value = updated;
-      clearExpressionSource();
+      setExpressionEditor(updated);
       refreshVariableValuesFromEditor();
       updateHistoryButtons();
       saveLastExpression(updated);
@@ -1859,11 +1882,12 @@ INDEX_HTML = r"""<!doctype html>
 
     function setExpressionEditor(fullText, evaluatedBindings = null) {
       const compact = compactExpressionForEditor(fullText);
+      const editorBody = expressionBodyForEditor(fullText);
       fullExpressionText = expressionForEditor(fullText).trim();
-      displayedExpressionText = fullExpressionText;
+      displayedExpressionText = editorBody;
       expr.dataset.fullExpression = fullExpressionText;
       expr.dataset.displayExpression = displayedExpressionText;
-      expr.value = fullExpressionText;
+      expr.value = displayedExpressionText;
       const bindings = (Array.isArray(evaluatedBindings) && evaluatedBindings.length)
         ? evaluatedBindings
         : compact.bindings;
@@ -2304,6 +2328,8 @@ INDEX_HTML = r"""<!doctype html>
         }
 
         setRenderedResult(data);
+        if (data.expression)
+          setExpressionEditor(data.expression, data.binding_values || null);
         setExpandableText(
           parsed,
           parsedMore,
@@ -2318,8 +2344,6 @@ INDEX_HTML = r"""<!doctype html>
         );
         value.textContent = data.value || '';
         lastEvaluationInputText = data.expression || text;
-        if (data.expression)
-          setExpressionEditor(data.expression, data.binding_values || null);
         saveLastExpression(lastEvaluationInputText || fullExpressionText || expr.value.trim());
         lastDerivativeExpression = derivativeExpressionFromLine(data.derivative);
         currentVariables = variablesFromExpression(data.expression || '');
@@ -2368,6 +2392,7 @@ INDEX_HTML = r"""<!doctype html>
       const sourceWithoutNan = expressionForEditor(sourceText).trim();
       const unchanged = solvedWithoutNan === sourceWithoutNan;
       setRenderedResult(data);
+      setExpressionEditor(solvedExpression, data.binding_values || null);
       setExpandableText(
         parsed,
         parsedMore,
@@ -2383,7 +2408,6 @@ INDEX_HTML = r"""<!doctype html>
       value.textContent = data.value || '';
       lastEvaluationInputText = solvedExpression;
       lastDerivativeExpression = '';
-      setExpressionEditor(solvedExpression, data.binding_values || null);
       currentVariables = variablesFromExpression(solvedExpression);
       currentDifferentiable = String(data.differentiable || 'yes').trim().toLowerCase() !== 'no';
       renderDerivativeButtons(currentVariables);
@@ -2410,9 +2434,7 @@ INDEX_HTML = r"""<!doctype html>
 
       const current = currentExpressionText();
       if (current) forwardHistory.push(current);
-      expr.value = previous;
-      clearExpressionSource();
-      clearVariableValues();
+      setExpressionEditor(previous);
       evaluateExpression({skipHistoryUpdate: true});
     });
 
@@ -2425,9 +2447,7 @@ INDEX_HTML = r"""<!doctype html>
 
       const current = currentExpressionText();
       if (current) expressionHistory.push(current);
-      expr.value = next;
-      clearExpressionSource();
-      clearVariableValues();
+      setExpressionEditor(next);
       evaluateExpression({skipHistoryUpdate: true});
     });
 
@@ -2450,9 +2470,7 @@ INDEX_HTML = r"""<!doctype html>
         }
 
         pushExpressionHistory(text);
-        expr.value = derivativeExpression;
-        clearExpressionSource();
-        clearVariableValues();
+        setExpressionEditor(derivativeExpression);
         await evaluateExpression();
       } catch (err) {
         setRenderedError(String(err));

@@ -148,6 +148,19 @@ static void test_from_string_functions(void)
     check_parse_val("sin\xc2\xb2(x) at 0",
         "{ sin\xc2\xb2(x) | x = 0 }",
         0.0, __LINE__);
+    {
+        dval_t *expr = dval_from_string("{ x^2 | x = ? }", NULL);
+        if (expr && dv_is_differentiable(expr)) {
+            printf(C_BOLD C_GREEN "PASS" C_RESET
+                   " constant-exponent power keeps expression differentiable\n\n");
+        } else {
+            printf(C_BOLD C_RED "FAIL" C_RESET
+                   " constant-exponent power keeps expression differentiable %s:%d:1\n\n",
+                   __FILE__, __LINE__);
+            TEST_FAIL();
+        }
+        dv_free(expr);
+    }
     /* Nested function calls */
     check_parse_val("exp(sin(x)) at 0 = 1",
         "{ exp(sin(x)) | x = 0 }",
@@ -188,6 +201,21 @@ static void test_from_string_special_functions(void)
     check_parse_expr("polygamma expression uses standard symbol",
         "{ polygamma(2, x) | x = ? }",
         "{ ψ⁽²⁾(x) | x = NAN }", __LINE__);
+    {
+        dval_t *expr = dval_from_string(
+            "{ Γ(x + 1)·(ψ⁽¹⁾(x + 1) + ψ⁽⁰⁾²(x + 1)) | x = ? }",
+            NULL);
+        if (expr && dv_is_differentiable(expr)) {
+            printf(C_BOLD C_GREEN "PASS" C_RESET
+                   " polygamma order parameter keeps expression differentiable\n\n");
+        } else {
+            printf(C_BOLD C_RED "FAIL" C_RESET
+                   " polygamma order parameter keeps expression differentiable %s:%d:1\n\n",
+                   __FILE__, __LINE__);
+            TEST_FAIL();
+        }
+        dv_free(expr);
+    }
     check_parse_val("W₀(0) = 0 via lambert_w0", "{ lambert_w0(x) | x = 0 }", 0.0,                     __LINE__);
     check_parse_val("W₀(0) = 0 via productlog", "{ productlog(x) | x = 0 }", 0.0,                     __LINE__);
     check_parse_val("W₀(0) = 0",             "{ W₀(x) | x = 0 }",            0.0,                     __LINE__);
@@ -1149,6 +1177,10 @@ static void test_from_string_number_literals(void)
                     "{ ²³¹⁄₂₃₁₀ }",
                     "\\frac{1}{10}",
                     __LINE__);
+    check_parse_expr("repeated unary signs simplify",
+                     "{ --2x | x = ? }",
+                     "{ 2x | x = NAN }",
+                     __LINE__);
     check_parse_num("pure imaginary coefficient atom", "{ 3/2i }", "3/2i", __LINE__);
     check_parse_num("pure const rational complex", "{ [z] = 1/2 - 3/2i }", "1/2 - 3/2i", __LINE__);
     check_parse_num("binding rational complex", "{ z | z = 1/2 - 3/2i }", "1/2 - 3/2i", __LINE__);

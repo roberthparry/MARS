@@ -2930,9 +2930,9 @@ void test_expressions(void)
         {
             "sin(x)*cos(x)",
             make_expr_18,
-            "{ sin(x)·cos(x) | x = 1.25 }",
+            "{ ½·sin(2x) | x = 1.25 }",
             "x = 1.25\n"
-            "expr(x) = sin(x)*cos(x)\n"
+            "expr(x) = sin(2*x)/2\n"
             "return expr(x)",
             __LINE__
         },
@@ -3703,9 +3703,9 @@ void test_expressions_unnamed(void)
         {
             "sin(x)*cos(x) (unnamed)",
             make_expr_u05,
-            "{ sin(x₀)·cos(x₀) | x₀ = 1.25 }",
+            "{ ½·sin(2x₀) | x₀ = 1.25 }",
             "x₀ = 1.25\n"
-            "expr(x₀) = sin(x₀)*cos(x₀)\n"
+            "expr(x₀) = sin(2*x₀)/2\n"
             "return expr(x₀)",
             __LINE__
         },

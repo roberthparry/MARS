@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "dval_tostring_internal.h"
+#include "dval_tostring.h"
 
 void *dv_tostring_xmalloc(size_t n)
 {

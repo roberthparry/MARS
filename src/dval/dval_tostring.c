@@ -49,9 +49,9 @@
 #include <ctype.h>
 #include <gmp.h>
 
-#include "dval_bindings_internal.h"
+#include "dval_bindings.h"
 #include "dval_internal.h"
-#include "dval_tostring_internal.h"
+#include "dval_tostring.h"
 #include "dval.h"
 #include "internal/number_internal.h"
 

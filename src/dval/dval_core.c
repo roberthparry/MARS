@@ -25,7 +25,7 @@
 #include <stdlib.h>
 #include <limits.h>
 #include "number.h"
-#include "dval_bindings_internal.h"
+#include "dval_bindings.h"
 #include "dval_internal.h"
 #include "dval.h"
 
@@ -152,6 +152,10 @@ bool dv_is_differentiable(const dval_t *dv)
         return false;
     if (dv->ops && dv->ops->diff_kind == DV_DIFF_NONE)
         return false;
+    if (dv->ops == &ops_pow_d)
+        return dv_is_differentiable(dv->a);
+    if (dv->ops == &ops_polygamma)
+        return dv_is_differentiable(dv->b);
     if (dv->ops && dv->ops->arity != DV_OP_ATOM &&
         !dv_is_differentiable(dv->a))
         return false;

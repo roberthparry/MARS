@@ -1,5 +1,5 @@
-#ifndef DVAL_BINDINGS_INTERNAL_H
-#define DVAL_BINDINGS_INTERNAL_H
+#ifndef DVAL_BINDINGS_H
+#define DVAL_BINDINGS_H
 
 #include <stddef.h>
 

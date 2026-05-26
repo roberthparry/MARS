@@ -3,27 +3,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "dval_bindings_internal.h"
+#include "dval_bindings.h"
 #include "dval_internal.h"
 
 extern dval_t *dv_simplify(const dval_t *dv);
-
-static int dv_is_foldable_unnamed_real_const(const dval_t *dv)
-{
-    if (!dv_is_unnamed_const(dv) || !num_is_real(dv->c))
-        return 0;
-    if (dv->binding_expr && dv->binding_expr->kind != DV_BINDING_EXPR_NUMBER)
-        return 0;
-    return 1;
-}
-
-static int dv_try_get_unnamed_const_real_num(const dval_t *dv, number_t *out)
-{
-    if (!dv_is_foldable_unnamed_real_const(dv))
-        return 0;
-    *out = num_clone(dv->c);
-    return 1;
-}
 
 static int dv_is_i_squared_term(const dval_t *dv)
 {
@@ -45,43 +28,16 @@ static void *dv_terms_xrealloc(void *ptr, size_t size)
     abort();
 }
 
-static number_t dv_normalise_simple_rational_coeff(number_t coeff)
-{
-    if (num_eq(coeff, NUM_HALF))
-        return num_clone(NUM_HALF);
-    if (num_eq(coeff, NUM_QUARTER))
-        return num_clone(NUM_QUARTER);
-    if (num_eq(coeff, NUM_ONE_EIGHTH))
-        return num_clone(NUM_ONE_EIGHTH);
-    if (num_is_real(coeff)) {
-        double d = num_to_double(coeff);
-
-        if (d == 0.5)
-            return num_clone(NUM_HALF);
-        if (d == 0.25)
-            return num_clone(NUM_QUARTER);
-        if (d == 0.125)
-            return num_clone(NUM_ONE_EIGHTH);
-        if (d == -0.5)
-            return num_neg(NUM_HALF);
-        if (d == -0.25)
-            return num_neg(NUM_QUARTER);
-        if (d == -0.125)
-            return num_neg(NUM_ONE_EIGHTH);
-    }
-    return num_clone(coeff);
-}
-
 static int term_coeff(const dval_t *term, const dval_t **base, number_t *coeff_out)
 {
-    if (dv_is_foldable_unnamed_real_const(term)) {
+    if (dv_simplify_is_plain_real_const(term)) {
         *base = NULL;
         *coeff_out = num_clone(term->c);
         return 1;
     }
     if (dv_is_op(term, &ops_neg)) {
         if (dv_is_op(term->a, &ops_mul) &&
-            dv_is_foldable_unnamed_real_const(term->a->a)) {
+            dv_simplify_is_plain_real_const(term->a->a)) {
             *base = term->a->b;
             *coeff_out = num_neg(term->a->a->c);
             return 1;
@@ -91,7 +47,7 @@ static int term_coeff(const dval_t *term, const dval_t **base, number_t *coeff_o
         return 1;
     }
     if (dv_is_op(term, &ops_mul) &&
-        dv_is_foldable_unnamed_real_const(term->a)) {
+        dv_simplify_is_plain_real_const(term->a)) {
         *base = term->b;
         *coeff_out = num_clone(term->a->c);
         return 1;
@@ -105,14 +61,14 @@ static int split_leading_real_scalar(const dval_t *term,
                                      number_t *scalar_out,
                                      const dval_t **rest_out)
 {
-    if (dv_is_foldable_unnamed_real_const(term)) {
+    if (dv_simplify_is_plain_real_const(term)) {
         *scalar_out = num_clone(term->c);
         *rest_out = NULL;
         return 1;
     }
 
     if (dv_is_op(term, &ops_mul) &&
-        dv_is_foldable_unnamed_real_const(term->a)) {
+        dv_simplify_is_plain_real_const(term->a)) {
         *scalar_out = num_clone(term->a->c);
         *rest_out = term->b;
         return 1;
@@ -163,7 +119,7 @@ static dval_t *dv_try_fold_scaled_product(number_t coeff, dval_t *base)
         dval_t *scaled_right;
         dval_t *r;
 
-        if (dv_is_foldable_unnamed_real_const(left)) {
+        if (dv_simplify_is_plain_real_const(left)) {
             dv_retain(left);
             dv_retain(right);
             dv_free(base);
@@ -174,7 +130,7 @@ static dval_t *dv_try_fold_scaled_product(number_t coeff, dval_t *base)
             return r;
         }
 
-        if (dv_is_foldable_unnamed_real_const(right)) {
+        if (dv_simplify_is_plain_real_const(right)) {
             dv_retain(left);
             dv_retain(right);
             dv_free(base);
@@ -219,33 +175,11 @@ dval_t *dv_make_scaled(number_t coeff, dval_t *base)
     if (num_is_zero(coeff)) { dv_free(base); return dv_new_const(NUM_ZERO); }
     if (num_eq(coeff, NUM_ONE))  return base;
     if (num_eq(coeff, NUM_NEG_ONE)) {
-        if (dv_is_op(base, &ops_div) && dv_is_op(base->a, &ops_mul) &&
-            dv_is_foldable_unnamed_real_const(base->a->a) &&
-            num_lt(base->a->a->c, NUM_ZERO)) {
-            number_t pos_c = num_neg(base->a->a->c);
-            dval_t *rest = base->a->b;
-            dval_t *den = base->b;
+        dval_t *positive = dv_simplify_positive_part_if_negative(base);
 
-            dv_retain(rest);
-            dv_retain(den);
+        if (positive) {
             dv_free(base);
-            dval_t *new_num = dv_make_scaled(pos_c, rest);
-            dval_t *r = dv_div(new_num, den);
-
-            dv_free(new_num);
-            dv_free(den);
-            return r;
-        }
-        if (dv_is_op(base, &ops_div) && dv_is_op(base->a, &ops_neg)) {
-            dval_t *inner = base->a->a;
-            dval_t *den = base->b;
-            dv_retain(inner);
-            dv_retain(den);
-            dv_free(base);
-            dval_t *r = dv_div(inner, den);
-            dv_free(inner);
-            dv_free(den);
-            return r;
+            return positive;
         }
         dval_t *r = dv_neg(base);
         dv_free(base);
@@ -339,7 +273,7 @@ dval_t *dv_make_scaled(number_t coeff, dval_t *base)
 
         return out;
     }
-    number_t normalised = dv_normalise_simple_rational_coeff(coeff);
+    number_t normalised = dv_simplify_normalise_simple_rational_coeff(coeff);
     dval_t *cn = dv_new_const(normalised);
     dval_t *r = dv_mul(cn, base);
 
@@ -608,7 +542,7 @@ void dv_collect_addends(dval_t *dv, number_t scale, number_t *c_const,
             number_t coeff_num = num_new();
             number_t neg_scale = num_neg(scale);
 
-            if (dv_try_get_unnamed_const_real_num(dv->a->a, &coeff_num)) {
+            if (dv_simplify_try_get_plain_real_const(dv->a->a, &coeff_num)) {
                 ns = num_mul(neg_scale, coeff_num);
                 dv_collect_addends(dv->a->b, ns, c_const, terms, n, cap);
                 return;
@@ -621,7 +555,7 @@ void dv_collect_addends(dval_t *dv, number_t scale, number_t *c_const,
         number_t ns;
         number_t coeff_num = num_new();
 
-        if (dv_try_get_unnamed_const_real_num(dv->a, &coeff_num)) {
+        if (dv_simplify_try_get_plain_real_const(dv->a, &coeff_num)) {
             ns = num_mul(scale, coeff_num);
             dv_collect_addends(dv->b, ns, c_const, terms, n, cap);
             return;
@@ -635,7 +569,7 @@ void dv_collect_addends(dval_t *dv, number_t scale, number_t *c_const,
         dval_t *raw;
         dval_t *simp;
 
-        if (dv_try_get_unnamed_const_real_num(dv->a->a, &coeff_num)) {
+        if (dv_simplify_try_get_plain_real_const(dv->a->a, &coeff_num)) {
             ns = num_mul(scale, coeff_num);
 
             dv_retain(dv->a->b);
@@ -773,75 +707,6 @@ int dv_extract_common_addend_coeff(const addend_t *terms, size_t n,
     num_destroy(common_out);
     *common_out = num_scope_detach(common);
     return 1;
-}
-
-static int is_trig_square_of(const dval_t *dv, const dval_ops_t *op, const dval_t **arg_out)
-{
-    if (!dv_is_pow_d_expr(dv) || !num_eq(dv->c, NUM_TWO))
-        return 0;
-    if (!dv_is_op(dv->a, op))
-        return 0;
-
-    *arg_out = dv->a->a;
-    return 1;
-}
-
-dval_t *dv_try_trig_pythagorean_identity(const addend_t *terms, size_t n,
-                                         number_t c_const, number_t common_coeff)
-{
-    const dval_t *sin_arg = NULL;
-    const dval_t *cos_arg = NULL;
-    const dval_t *sinh_arg = NULL;
-    const dval_t *cosh_arg = NULL;
-    size_t nonzero_terms = 0;
-    int have_sin = 0;
-    int have_cos = 0;
-    int have_sinh = 0;
-    int have_cosh = 0;
-
-    if (!num_is_zero(c_const))
-        return NULL;
-
-    for (size_t i = 0; i < n; ++i) {
-        if (!terms[i].base || num_is_zero(terms[i].coeff))
-            continue;
-        nonzero_terms++;
-        if (nonzero_terms > 2)
-            return NULL;
-
-        if (num_is_one(terms[i].coeff) &&
-            is_trig_square_of(terms[i].base, &ops_sin, &sin_arg)) {
-            have_sin = 1;
-            continue;
-        }
-        if (num_is_one(terms[i].coeff) &&
-            is_trig_square_of(terms[i].base, &ops_cos, &cos_arg)) {
-            have_cos = 1;
-            continue;
-        }
-        if (num_is_one(terms[i].coeff) &&
-            is_trig_square_of(terms[i].base, &ops_cosh, &cosh_arg)) {
-            have_cosh = 1;
-            continue;
-        }
-        if (num_eq(terms[i].coeff, NUM_NEG_ONE) &&
-            is_trig_square_of(terms[i].base, &ops_sinh, &sinh_arg)) {
-            have_sinh = 1;
-            continue;
-        }
-        return NULL;
-    }
-
-    if (nonzero_terms == 2) {
-        if (have_sin && have_cos && sin_arg && cos_arg &&
-            dv_struct_eq(sin_arg, cos_arg))
-            return dv_new_const(common_coeff);
-        if (have_sinh && have_cosh && sinh_arg && cosh_arg &&
-            dv_struct_eq(sinh_arg, cosh_arg))
-            return dv_new_const(common_coeff);
-    }
-
-    return NULL;
 }
 
 static void flatten_add(dval_t *root, dval_t **addends, int *na, int max)
@@ -1299,7 +1164,7 @@ dval_t *dv_rebuild_product_chain(number_t c_acc, dval_t **terms, size_t nterms)
     dval_t *cur = NULL;
 
     if (!num_eq(c_acc, NUM_ONE)) {
-        number_t normalised = dv_normalise_simple_rational_coeff(c_acc);
+        number_t normalised = dv_simplify_normalise_simple_rational_coeff(c_acc);
 
         cur = dv_new_const(normalised);
         num_destroy(&normalised);
@@ -1326,7 +1191,7 @@ dval_t *dv_rebuild_product_chain(number_t c_acc, dval_t **terms, size_t nterms)
 
     free(terms);
     if (!cur) {
-        number_t normalised = dv_normalise_simple_rational_coeff(c_acc);
+        number_t normalised = dv_simplify_normalise_simple_rational_coeff(c_acc);
 
         cur = dv_new_const(normalised);
         num_destroy(&normalised);

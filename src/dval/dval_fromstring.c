@@ -43,9 +43,9 @@
 #include <limits.h>
 
 #include "qfloat.h"
-#include "dval_bindings_internal.h"
+#include "dval_bindings.h"
 #include "dval_internal.h"
-#include "dval_fromstring_internal.h"
+#include "dval_fromstring.h"
 #include "dval.h"
 
 /* ------------------------------------------------------------------ */
@@ -1218,14 +1218,21 @@ static dval_t *parse_power(parser_t *p)
 
 static dval_t *parse_signed_power(parser_t *p)
 {
+    int negate = 0;
+    dval_t *inner;
+
     if (p->error) return NULL;
-    if (p->p < p->end && *p->p == '-') {
+
+    while (p->p < p->end && (*p->p == '-' || *p->p == '+')) {
+        if (*p->p == '-')
+            negate = !negate;
         p->p++;
-        dval_t *inner = parse_power(p);
-        if (!inner) return NULL;
-        return apply_unary_preserving_constexpr(&ops_neg, inner, dv_neg);
+        skip_spaces(&p->p, p->end);
     }
-    return parse_power(p);
+
+    inner = parse_power(p);
+    if (!inner) return NULL;
+    return negate ? apply_unary_preserving_constexpr(&ops_neg, inner, dv_neg) : inner;
 }
 
 /* ------------------------------------------------------------------ */

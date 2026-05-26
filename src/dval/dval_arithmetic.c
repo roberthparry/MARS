@@ -1,5 +1,5 @@
 #include <stddef.h>
-#include "dval_bindings_internal.h"
+#include "dval_bindings.h"
 #include "dval_internal.h"
 
 /* ------------------------------------------------------------------------- */

@@ -1,5 +1,5 @@
-#ifndef DVAL_FROMSTRING_INTERNAL_H
-#define DVAL_FROMSTRING_INTERNAL_H
+#ifndef DVAL_FROMSTRING_H
+#define DVAL_FROMSTRING_H
 
 #include <stddef.h>
 

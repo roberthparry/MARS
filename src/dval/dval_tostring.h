@@ -1,5 +1,5 @@
-#ifndef DVAL_TOSTRING_INTERNAL_H
-#define DVAL_TOSTRING_INTERNAL_H
+#ifndef DVAL_TOSTRING_H
+#define DVAL_TOSTRING_H
 
 #include <stddef.h>
 

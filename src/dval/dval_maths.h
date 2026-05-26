@@ -1,5 +1,5 @@
-#ifndef DVAL_MATH_INTERNAL_H
-#define DVAL_MATH_INTERNAL_H
+#ifndef DVAL_MATHS_H
+#define DVAL_MATHS_H
 
 #include "dval_internal.h"
 

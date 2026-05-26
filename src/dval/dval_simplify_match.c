@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "dval_bindings_internal.h"
+#include "dval_bindings.h"
 #include "dval_internal.h"
 
 static int const_struct_eq(const dval_t *u, const dval_t *v)

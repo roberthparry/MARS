@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "dval_math_internal.h"
+#include "dval_maths.h"
 
 static inline dval_t *dv_math_wrap_unary(const dval_ops_t *ops, const dval_t *a)
 {

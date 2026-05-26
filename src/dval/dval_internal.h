@@ -503,6 +503,32 @@ dval_t *dv_simplify_div_operator(const dval_t *dv, dval_t *a, dval_t *b);
 dval_t *dv_simplify_pow_d_operator(const dval_t *dv, dval_t *a, dval_t *b);
 dval_t *dv_simplify_pow_operator(const dval_t *dv, dval_t *a, dval_t *b);
 dval_t *dv_simplify_hypot_operator(const dval_t *dv, dval_t *a, dval_t *b);
+bool dv_simplify_is_plain_real_const(const dval_t *dv);
+bool dv_simplify_try_get_plain_real_const(const dval_t *dv, number_t *out);
+bool dv_simplify_is_simplifiable_const(const dval_t *dv);
+bool dv_simplify_allows_const_identity_fold(const dval_t *dv);
+number_t dv_simplify_normalise_simple_rational_coeff(number_t coeff);
+dval_t *dv_simplify_positive_part_if_negative(dval_t *dv);
+dval_t *dv_simplify_try_log10_power_of_ten(dval_t *arg);
+dval_t *dv_simplify_try_floor_ceil_const(const dval_t *op, dval_t *arg);
+dval_t *dv_simplify_try_unary_const_fold(const dval_t *op, dval_t *arg);
+dval_t *dv_simplify_try_sqrt_scaled_square_const(dval_t *arg);
+dval_t *dv_simplify_direct_inverse_pair(const dval_t *outer, dval_t *inner);
+dval_t *dv_simplify_direct_inverse_pair_from_raw(const dval_t *outer,
+                                                 const dval_t *raw_inner,
+                                                 dval_t *simplified_inner);
+bool dv_lambert_candidate_on_selected_branch(const dval_ops_t *ops,
+                                             number_t value);
+dval_t *dv_simplify_try_vtable_inverse_argument(const dval_t *outer,
+                                                const dval_t *arg);
+dval_t *dv_simplify_try_basic_sum(dval_t *a, dval_t *b);
+dval_t *dv_simplify_try_basic_product(dval_t *a, dval_t *b);
+dval_t *dv_simplify_try_trig_product(dval_t *a, dval_t *b);
+dval_t *dv_simplify_try_lambert_product(dval_t *a, dval_t *b);
+dval_t *dv_simplify_try_i_unit_product(dval_t *a, dval_t *b);
+dval_t *dv_simplify_try_imag_trig_bridge(const dval_t *op, dval_t *arg);
+dval_t *dv_try_trig_pythagorean_identity(const addend_t *terms, size_t n,
+                                         number_t c_const, number_t common_coeff);
 
 int dv_struct_eq(const dval_t *u, const dval_t *v);
 dval_t *dv_make_scaled(number_t coeff, dval_t *base);
@@ -513,8 +539,6 @@ void dv_combine_common_denominator_addends(addend_t *terms, size_t n);
 void dv_sort_addends(addend_t *terms, size_t n);
 int dv_extract_common_addend_coeff(const addend_t *terms, size_t n,
                                    number_t c_const, number_t *common_out);
-dval_t *dv_try_trig_pythagorean_identity(const addend_t *terms, size_t n,
-                                         number_t c_const, number_t common_coeff);
 void dv_free_node_array(dval_t **nodes, size_t count);
 void dv_append_node(dval_t ***nodes, size_t *count, size_t *cap, dval_t *node);
 void dv_split_division_terms(number_t *c_acc, int *is_zero,

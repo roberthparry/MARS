@@ -1457,6 +1457,16 @@ static void test_simplify_trig_and_hyperbolic_identities(void)
             "sin^2(x)+cos^2(x) simplifies to 1",
         },
         {
+            "{ cos(x)^2 - sin(x)^2 | x = NAN }",
+            "{ cos(2x) | x = NAN }",
+            "cos^2(x)-sin^2(x) simplifies to cos(2x)",
+        },
+        {
+            "{ -sin(x)^2 + cos(x)^2 | x = NAN }",
+            "{ cos(2x) | x = NAN }",
+            "-sin^2(x)+cos^2(x) simplifies to cos(2x)",
+        },
+        {
             "{ sin(x)/cos(x) | x = NAN }",
             "{ tan(x) | x = NAN }",
             "sin(x)/cos(x) simplifies to tan(x)",
@@ -1492,9 +1502,29 @@ static void test_simplify_trig_and_hyperbolic_identities(void)
             "tan(x)*cos(x) simplifies to sin(x)",
         },
         {
+            "{ sin(x)*cos(x) | x = NAN }",
+            "{ ½·sin(2x) | x = NAN }",
+            "sin(x)*cos(x) simplifies to half sin double angle",
+        },
+        {
+            "{ cos(x)*sin(x) | x = NAN }",
+            "{ ½·sin(2x) | x = NAN }",
+            "cos(x)*sin(x) simplifies to half sin double angle",
+        },
+        {
             "{ cosh(x)^2 - sinh(x)^2 | x = NAN }",
             "1",
             "cosh^2(x)-sinh^2(x) simplifies to 1",
+        },
+        {
+            "{ sinh(x)^2 + cosh(x)^2 | x = NAN }",
+            "{ cosh(2x) | x = NAN }",
+            "sinh^2(x)+cosh^2(x) simplifies to cosh(2x)",
+        },
+        {
+            "{ cosh(x)^2 + sinh(x)^2 | x = NAN }",
+            "{ cosh(2x) | x = NAN }",
+            "cosh^2(x)+sinh^2(x) simplifies to cosh(2x)",
         },
         {
             "{ sinh(x)/cosh(x) | x = NAN }",
@@ -1510,6 +1540,16 @@ static void test_simplify_trig_and_hyperbolic_identities(void)
             "{ tanh(x)*cosh(x) | x = NAN }",
             "{ sinh(x) | x = NAN }",
             "tanh(x)*cosh(x) simplifies to sinh(x)",
+        },
+        {
+            "{ sinh(x)*cosh(x) | x = NAN }",
+            "{ ½·sinh(2x) | x = NAN }",
+            "sinh(x)*cosh(x) simplifies to half sinh double angle",
+        },
+        {
+            "{ cosh(x)*sinh(x) | x = NAN }",
+            "{ ½·sinh(2x) | x = NAN }",
+            "cosh(x)*sinh(x) simplifies to half sinh double angle",
         },
         {
             "{ sinh(i*x) | x = NAN }",
@@ -1790,6 +1830,87 @@ static void test_simplify_reuses_clean_nodes_and_dirty_mutations(void)
     dv_free(x);
 }
 
+static void test_gamma_successor_product_simplifies(void)
+{
+    dval_t *recurrence = dval_from_string("{ x*gamma(x) }", NULL);
+    dval_t *not_recurrence = dval_from_string("{ (x + 1)*gamma(x) }", NULL);
+    dval_t *recurrence_simp = recurrence ? dv_simplify(recurrence) : NULL;
+    dval_t *not_recurrence_simp =
+        not_recurrence ? dv_simplify(not_recurrence) : NULL;
+    char *recurrence_text =
+        recurrence_simp ? dv_to_string(recurrence_simp, style_EXPRESSION) : NULL;
+    char *not_recurrence_text =
+        not_recurrence_simp ? dv_to_string(not_recurrence_simp, style_EXPRESSION) : NULL;
+    const char *recurrence_expect = "{ Γ(x + 1) | x = NAN }";
+    const char *not_recurrence_expect = "{ (x + 1)·Γ(x) | x = NAN }";
+
+    if (str_eq(recurrence_text, recurrence_expect))
+        to_string_pass("x*gamma(x) simplifies by gamma recurrence",
+                       recurrence_text, recurrence_expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "x*gamma(x) simplifies by gamma recurrence",
+                       recurrence_text ? recurrence_text : "(null)",
+                       recurrence_expect);
+
+    if (str_eq(not_recurrence_text, not_recurrence_expect))
+        to_string_pass("(x+1)*gamma(x) is not the gamma recurrence",
+                       not_recurrence_text, not_recurrence_expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "(x+1)*gamma(x) is not the gamma recurrence",
+                       not_recurrence_text ? not_recurrence_text : "(null)",
+                       not_recurrence_expect);
+
+    free(not_recurrence_text);
+    free(recurrence_text);
+    dv_free(not_recurrence_simp);
+    dv_free(recurrence_simp);
+    dv_free(not_recurrence);
+    dv_free(recurrence);
+}
+
+static void test_lgamma_successor_sum_simplifies(void)
+{
+    dval_t *recurrence = dval_from_string("{ ln(x) + lgamma(x) }", NULL);
+    dval_t *not_recurrence =
+        dval_from_string("{ ln(x + 1) + lgamma(x) }", NULL);
+    dval_t *recurrence_simp = recurrence ? dv_simplify(recurrence) : NULL;
+    dval_t *not_recurrence_simp =
+        not_recurrence ? dv_simplify(not_recurrence) : NULL;
+    char *recurrence_text =
+        recurrence_simp ? dv_to_string(recurrence_simp, style_EXPRESSION) : NULL;
+    char *not_recurrence_text =
+        not_recurrence_simp ? dv_to_string(not_recurrence_simp, style_EXPRESSION) : NULL;
+    const char *recurrence_expect = "{ lgamma(x + 1) | x = NAN }";
+    const char *not_recurrence_expect = "{ ln(x + 1) + lgamma(x) | x = NAN }";
+
+    if (str_eq(recurrence_text, recurrence_expect))
+        to_string_pass("ln(x)+lgamma(x) simplifies by log-gamma recurrence",
+                       recurrence_text, recurrence_expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "ln(x)+lgamma(x) simplifies by log-gamma recurrence",
+                       recurrence_text ? recurrence_text : "(null)",
+                       recurrence_expect);
+
+    if (str_eq(not_recurrence_text, not_recurrence_expect))
+        to_string_pass("ln(x+1)+lgamma(x) is not the log-gamma recurrence",
+                       not_recurrence_text, not_recurrence_expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "ln(x+1)+lgamma(x) is not the log-gamma recurrence",
+                       not_recurrence_text ? not_recurrence_text : "(null)",
+                       not_recurrence_expect);
+
+    free(not_recurrence_text);
+    free(recurrence_text);
+    dv_free(not_recurrence_simp);
+    dv_free(recurrence_simp);
+    dv_free(not_recurrence);
+    dv_free(recurrence);
+}
+
 static void test_symbolic_negative_pi_derivative_stays_symbolic(void)
 {
     dval_bindings_t *bindings = NULL;
@@ -1859,6 +1980,32 @@ static void test_log_of_imaginary_product_derivative_cancels_i(void)
     dv_free(expr);
 }
 
+static void test_negative_quotient_derivative_has_single_sign(void)
+{
+    dval_bindings_t *bindings = NULL;
+    dval_t *expr = dval_from_string(
+        "{ -exp(tan(x))*(tan^2(x)+1)/(exp^2(tan(x))*(tan^2(x)+1)^2+y^2) | x = pi/2, y = pi/4 }",
+        &bindings);
+    dval_t *y = bindings ? dval_bindings_get(bindings, "y") : NULL;
+    dval_t *deriv = (expr && y) ? dv_create_deriv(expr, y) : NULL;
+    char *deriv_text = deriv ? dv_to_string(deriv, style_EXPRESSION) : NULL;
+    const char *expect =
+        "{ 2y·exp(tan(x))·(tan²(x) + 1)/(exp²(tan(x))·(tan²(x) + 1)² + y²)² | x = π/2, y = π/4 }";
+
+    if (str_eq(deriv_text, expect))
+        to_string_pass("negative quotient derivative has a single sign",
+                       deriv_text, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "negative quotient derivative has a single sign",
+                       deriv_text ? deriv_text : "(null)", expect);
+
+    free(deriv_text);
+    dv_free(deriv);
+    dval_bindings_free(bindings);
+    dv_free(expr);
+}
+
 static void test_ln10_product_expression_round_trips(void)
 {
     dval_bindings_t *bindings = NULL;
@@ -1882,11 +2029,26 @@ static void test_ln10_product_expression_round_trips(void)
 static void test_lambert_inverse_argument_derivative_simplifies(void)
 {
     dval_bindings_t *bindings = NULL;
+    dval_bindings_t *simplify_bindings = NULL;
+    dval_t *simplify_expr =
+        dval_from_string("{ W₀(x*exp(x)) | x = 5 }", &simplify_bindings);
     dval_t *expr = dval_from_string("{ W₀(x*exp(x)) | x = 5 }", &bindings);
     dval_t *x = bindings ? dval_bindings_get(bindings, "x") : NULL;
     dval_t *deriv = (expr && x) ? dv_create_deriv(expr, x) : NULL;
+    char *simplify_text =
+        simplify_expr ? dv_to_string(simplify_expr, style_EXPRESSION) : NULL;
     char *deriv_text = deriv ? dv_to_string(deriv, style_EXPRESSION) : NULL;
+    const char *expect_simplify = "5";
     const char *expect = "1";
+
+    if (str_eq(simplify_text, expect_simplify))
+        to_string_pass("W0(x*exp(x)) resolves principal branch for x=5",
+                       simplify_text, expect_simplify);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "W0(x*exp(x)) resolves principal branch for x=5",
+                       simplify_text ? simplify_text : "(null)",
+                       expect_simplify);
 
     if (str_eq(deriv_text, expect))
         to_string_pass("W0(x*exp(x)) derivative simplifies",
@@ -1897,8 +2059,11 @@ static void test_lambert_inverse_argument_derivative_simplifies(void)
                        deriv_text ? deriv_text : "(null)", expect);
 
     free(deriv_text);
+    free(simplify_text);
     dv_free(deriv);
+    dval_bindings_free(simplify_bindings);
     dval_bindings_free(bindings);
+    dv_free(simplify_expr);
     dv_free(expr);
 }
 
@@ -2052,9 +2217,20 @@ static void test_productlog_small_complex_inverse_uses_principal_branch(void)
     dval_t *expr = dval_from_string("{ productlog(1/13i*exp(1/13i)) }", NULL);
     number_t value = expr ? dv_eval(expr) : NUM_NAN;
     number_t expected = num_create_from_string("1/13i");
+    char *expr_text = expr ? dv_to_string(expr, style_EXPRESSION) : NULL;
+    const char *expect_text = "1/13i";
+
+    if (str_eq(expr_text, expect_text))
+        to_string_pass("productlog complex principal branch simplifies",
+                       expr_text, expect_text);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "productlog complex principal branch simplifies",
+                       expr_text ? expr_text : "(null)", expect_text);
 
     ASSERT_TRUE(number_close_with_tolerance_text(value, expected, "1e-30"));
 
+    free(expr_text);
     num_destroy(&expected);
     num_destroy(&value);
     dv_free(expr);
@@ -2473,6 +2649,11 @@ static void test_binding_lambert_inverse_numeric_expression_simplifies(void)
             "binding W(exp(a)*a)",
         },
         {
+            "{ x | x = W(1/13i*exp(1/13i)) }",
+            "1/13i",
+            "binding W complex principal branch inverse",
+        },
+        {
             "{ x | x = W-1(-2*exp(-2)) }",
             "-2",
             "binding W-1(a*exp(a))",
@@ -2772,6 +2953,8 @@ void test_runtime_regressions(void)
     TEST_RUN_SUBTEST(test_set_val_num_named_constant, NULL);
     TEST_RUN_SUBTEST(test_to_string_does_not_simplify_plain_expressions, NULL);
     TEST_RUN_SUBTEST(test_simplify_reuses_clean_nodes_and_dirty_mutations, NULL);
+    TEST_RUN_SUBTEST(test_gamma_successor_product_simplifies, NULL);
+    TEST_RUN_SUBTEST(test_lgamma_successor_sum_simplifies, NULL);
     TEST_RUN_SUBTEST(test_simplify_inverse_unary_pairs, NULL);
     TEST_RUN_SUBTEST(test_simplify_exp_quarter_turns, NULL);
     TEST_RUN_SUBTEST(test_simplify_trig_and_hyperbolic_identities, NULL);
@@ -2783,6 +2966,7 @@ void test_runtime_regressions(void)
     TEST_RUN_SUBTEST(test_symbolic_negative_pi_derivative_stays_symbolic, NULL);
     TEST_RUN_SUBTEST(test_pow_derivative_preserves_literal_base_log, NULL);
     TEST_RUN_SUBTEST(test_log_of_imaginary_product_derivative_cancels_i, NULL);
+    TEST_RUN_SUBTEST(test_negative_quotient_derivative_has_single_sign, NULL);
     TEST_RUN_SUBTEST(test_ln10_product_expression_round_trips, NULL);
     TEST_RUN_SUBTEST(test_lambert_inverse_argument_derivative_simplifies, NULL);
     TEST_RUN_SUBTEST(test_lambert_inverse_branch_selection, NULL);
