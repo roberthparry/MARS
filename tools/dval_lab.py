@@ -213,10 +213,10 @@ INDEX_HTML = r"""<!doctype html>
     header,
     main {
       position: relative;
-      z-index: 1;
     }
 
     header {
+      z-index: 20;
       padding: 1.5rem clamp(1rem, 3vw, 2rem) 0.75rem;
       display: flex;
       align-items: end;
@@ -247,6 +247,7 @@ INDEX_HTML = r"""<!doctype html>
     }
 
     main {
+      z-index: 1;
       display: grid;
       grid-template-columns: minmax(18rem, 0.92fr) minmax(22rem, 1.08fr);
       gap: 1rem;
@@ -433,7 +434,7 @@ INDEX_HTML = r"""<!doctype html>
 
     .mobile-card {
       position: relative;
-      z-index: 5;
+      z-index: 30;
       width: min(24rem, calc(100vw - 2rem));
     }
 
@@ -480,8 +481,8 @@ INDEX_HTML = r"""<!doctype html>
       border: 2px solid rgba(233, 244, 239, 0.34);
       border-radius: 18px;
       background:
-        linear-gradient(135deg, rgba(8, 29, 22, 0.96), rgba(18, 51, 38, 0.92));
-      box-shadow: 0 16px 44px rgba(49, 38, 22, 0.16);
+        linear-gradient(135deg, rgba(8, 29, 22, 0.99), rgba(18, 51, 38, 0.98));
+      box-shadow: 0 20px 58px rgba(0, 0, 0, 0.34);
     }
 
     .mobile-copy {
