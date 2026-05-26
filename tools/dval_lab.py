@@ -2770,6 +2770,15 @@ def local_mdns_host() -> str:
     return f"{short_name}.local"
 
 
+def browser_access_host(bind_host: str) -> str:
+    bind_host = bind_host.strip()
+    if bind_host in ("0.0.0.0", "::", "::0"):
+        if tailscale_ipv4():
+            return tailscale_magicdns_host() or "mars"
+        return local_mdns_host() or local_lan_ipv4() or "127.0.0.1"
+    return bind_host
+
+
 def mobile_access_url(bind_host: str, port: int, host_header: str = "") -> str:
     return mobile_access_details(bind_host, port, host_header)["url"]
 
@@ -3850,7 +3859,7 @@ def main() -> int:
     DvalLabHandler.server_host = args.host
     DvalLabHandler.server_port = port
     DvalLabHandler.mobile_url = mobile_access_url(args.host, port)
-    browser_host = "127.0.0.1" if args.host in ("0.0.0.0", "::", "::0") else args.host
+    browser_host = browser_access_host(args.host)
     if ":" in browser_host and not browser_host.startswith("["):
         browser_host = f"[{browser_host}]"
     url = f"http://{browser_host}:{port}/"
