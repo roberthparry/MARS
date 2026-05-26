@@ -4,6 +4,8 @@ static void check_parse_num(const char *label, const char *s,
                             const char *expect_text, int line);
 static void check_parse_expr(const char *label, const char *s,
                              const char *expect_expr, int line);
+static void check_parse_tex(const char *label, const char *s,
+                            const char *expect_tex, int line);
 static void check_parse_simplified_expr(const char *label, const char *s,
                                         const char *expect_expr, int line);
 
@@ -1063,6 +1065,37 @@ static void check_parse_expr(const char *label, const char *s,
     dv_free(expr);
 }
 
+static void check_parse_tex(const char *label, const char *s,
+                            const char *expect_tex, int line)
+{
+    dval_t *expr = dval_from_string(s, NULL);
+    char *tex_text;
+
+    if (!expr) {
+        printf(C_BOLD C_RED "FAIL" C_RESET " %s %s:%d:1\n", label, __FILE__, line);
+        printf(C_BOLD "  input  " C_RESET "%s\n", s);
+        printf(C_BOLD "  error  " C_RESET "parser returned NULL\n\n");
+        TEST_FAIL();
+        return;
+    }
+
+    tex_text = dv_to_string(expr, style_TEX);
+    if (tex_text && strcmp(tex_text, expect_tex) == 0) {
+        printf(C_BOLD C_GREEN "PASS" C_RESET " %s\n", label);
+        printf(C_BOLD "  input  " C_RESET "%s\n", s);
+        printf(C_BOLD "  tex    " C_RESET "%s\n\n", tex_text);
+    } else {
+        printf(C_BOLD C_RED "FAIL" C_RESET " %s %s:%d:1\n", label, __FILE__, line);
+        printf(C_BOLD "  input  " C_RESET "%s\n", s);
+        printf(C_BOLD "  got    " C_RESET "%s\n", tex_text ? tex_text : "(null)");
+        printf(C_BOLD "  expect " C_RESET "%s\n\n", expect_tex);
+        TEST_FAIL();
+    }
+
+    free(tex_text);
+    dv_free(expr);
+}
+
 static void check_parse_simplified_expr(const char *label, const char *s,
                                         const char *expect_expr, int line)
 {
@@ -1112,6 +1145,10 @@ static void test_from_string_number_literals(void)
                      "{ ²³¹⁄₂₃₁₀ }",
                      "⅒",
                      __LINE__);
+    check_parse_tex("stacked unicode rational atom renders TeX",
+                    "{ ²³¹⁄₂₃₁₀ }",
+                    "\\frac{1}{10}",
+                    __LINE__);
     check_parse_num("pure imaginary coefficient atom", "{ 3/2i }", "3/2i", __LINE__);
     check_parse_num("pure const rational complex", "{ [z] = 1/2 - 3/2i }", "1/2 - 3/2i", __LINE__);
     check_parse_num("binding rational complex", "{ z | z = 1/2 - 3/2i }", "1/2 - 3/2i", __LINE__);

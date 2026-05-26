@@ -234,7 +234,7 @@ typedef struct {
 } dv_tostring_tex_map_t;
 
 #define DV_TEX_HASH_GREEK_SIZE       19u
-#define DV_TEX_HASH_FRACTION_SIZE    15u
+#define DV_TEX_HASH_FRACTION_SIZE    21u
 #define DV_TEX_HASH_SYMBOL_SIZE      9u
 
 static const dv_tostring_tex_map_t dv_tostring_greek_tex_table[DV_TEX_HASH_GREEK_SIZE] = {
@@ -257,21 +257,24 @@ static const dv_tostring_tex_map_t dv_tostring_greek_tex_table[DV_TEX_HASH_GREEK
 };
 
 static const dv_tostring_tex_map_t dv_tostring_vulgar_fraction_tex_table[DV_TEX_HASH_FRACTION_SIZE] = {
-    [0]  = {0x2157, "\\frac{3}{5}"},
-    [1]  = {0x2158, "\\frac{4}{5}"},
-    [2]  = {0x2159, "\\frac{1}{6}"},
-    [3]  = {0x215A, "\\frac{5}{6}"},
-    [4]  = {0x215B, "\\frac{1}{8}"},
-    [5]  = {0x215C, "\\frac{3}{8}"},
-    [6]  = {0x215D, "\\frac{5}{8}"},
-    [7]  = {0x215E, "\\frac{7}{8}"},
-    [8]  = {0x00BC, "\\frac{1}{4}"},
-    [9]  = {0x00BD, "\\frac{1}{2}"},
-    [10] = {0x00BE, "\\frac{3}{4}"},
-    [11] = {0x2153, "\\frac{1}{3}"},
-    [12] = {0x2154, "\\frac{2}{3}"},
-    [13] = {0x2155, "\\frac{1}{5}"},
-    [14] = {0x2156, "\\frac{2}{5}"}
+    [0]  = {0x00BD, "\\frac{1}{2}"},
+    [1]  = {0x00BE, "\\frac{3}{4}"},
+    [2]  = {0x2150, "\\frac{1}{7}"},
+    [3]  = {0x2151, "\\frac{1}{9}"},
+    [4]  = {0x2152, "\\frac{1}{10}"},
+    [5]  = {0x2153, "\\frac{1}{3}"},
+    [6]  = {0x2154, "\\frac{2}{3}"},
+    [7]  = {0x2155, "\\frac{1}{5}"},
+    [8]  = {0x2156, "\\frac{2}{5}"},
+    [9]  = {0x2157, "\\frac{3}{5}"},
+    [10] = {0x2158, "\\frac{4}{5}"},
+    [11] = {0x2159, "\\frac{1}{6}"},
+    [12] = {0x215A, "\\frac{5}{6}"},
+    [13] = {0x215B, "\\frac{1}{8}"},
+    [14] = {0x215C, "\\frac{3}{8}"},
+    [15] = {0x215D, "\\frac{5}{8}"},
+    [16] = {0x215E, "\\frac{7}{8}"},
+    [20] = {0x00BC, "\\frac{1}{4}"}
 };
 
 static const dv_tostring_tex_map_t dv_tostring_symbol_tex_table[DV_TEX_HASH_SYMBOL_SIZE] = {
