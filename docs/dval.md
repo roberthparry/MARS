@@ -658,7 +658,8 @@ variable expr_eval() {
   - `sqrt(x)` or `√(x)` for square roots
   - `gamma(x)` and `Γ(x)` for the gamma function
   - `digamma(x)`, `trigamma(x)`, and `polygamma(n, x)` for ψ⁽⁰⁾, ψ⁽¹⁾, and ψ⁽ⁿ⁾
-  - `W(x)`, `W0(x)`, `W_0(x)`, `W₀(x)`, `productlog(x)`, and `lambert_w0(x)` for W₀
+  - `W(x)` and `productlog(x)` for branch-choosing Lambert W/ProductLog
+  - `W0(x)`, `W_0(x)`, `W₀(x)`, and `lambert_w0(x)` for W₀
   - `W-1(x)`, `W_-1(x)`, `W₋₁(x)`, and `lambert_wm1(x)` for W₋₁
   - exact value-only helpers such as `factorial(n)`, `fibonacci(n)`,
     `partition(n)`, `factors(n)`, `next_prime(n)`, `prev_prime(n)`,
