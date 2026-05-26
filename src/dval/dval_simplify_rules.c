@@ -82,7 +82,7 @@ dval_t *dv_simplify_try_floor_ceil_const(const dval_t *op, dval_t *arg)
     dval_t *out;
 
     if (!dv_is_op(arg, &ops_const) ||
-        (!dv_is_op(op, &ops_floor) && !dv_is_op(op, &ops_ceil)))
+        !dv_ops_is_floor_or_ceil(op ? op->ops : NULL))
         return NULL;
 
     folded = dv_is_op(op, &ops_floor) ? num_floor(arg->c) : num_ceil(arg->c);
@@ -152,7 +152,7 @@ dval_t *dv_simplify_direct_inverse_pair(const dval_t *outer, dval_t *inner)
     dval_t *arg;
 
     if (!outer || !inner || inner->ops->arity != DV_OP_UNARY ||
-        outer->ops->direct_inverse != inner->ops)
+        !dv_ops_are_direct_inverse_pair(outer->ops, inner->ops))
         return NULL;
 
     arg = inner->a;
@@ -168,94 +168,14 @@ dval_t *dv_simplify_direct_inverse_pair_from_raw(const dval_t *outer,
     dval_t *arg;
 
     if (!outer || !raw_inner || raw_inner->ops->arity != DV_OP_UNARY ||
-        outer->ops->direct_inverse != raw_inner->ops || !raw_inner->a)
+        !dv_ops_are_direct_inverse_pair(outer->ops, raw_inner->ops) ||
+        !raw_inner->a)
         return NULL;
 
     arg = dv_simplify(raw_inner->a);
     if (simplified_inner)
         dv_free(simplified_inner);
     return arg;
-}
-
-typedef bool (*dv_inverse_candidate_ok_fn)(number_t value);
-
-typedef struct dv_inverse_unary_rule {
-    const dval_ops_t *ops;
-    dv_inverse_candidate_ok_fn candidate_ok;
-} dv_inverse_unary_rule_t;
-
-static bool dv_lambert_w_candidate_ok(number_t value)
-{
-    number_t imag;
-    number_t neg_pi;
-    bool ok;
-
-    if (!num_is_finite(value))
-        return false;
-
-    if (num_is_real(value))
-        return true;
-
-    /* The branch-selecting W/productlog uses the principal complex strip. */
-    imag = num_imag_part(value);
-    neg_pi = num_neg(NUM_PI);
-    ok = num_gt(imag, neg_pi) && num_lt(imag, NUM_PI);
-    num_destroy(&neg_pi);
-    num_destroy(&imag);
-    return ok;
-}
-
-static bool dv_lambert_w0_candidate_ok(number_t value)
-{
-    return num_is_finite(value) &&
-           num_is_real(value) &&
-           num_ge(value, NUM_NEG_ONE);
-}
-
-static bool dv_lambert_wm1_candidate_ok(number_t value)
-{
-    return num_is_finite(value) &&
-           num_is_real(value) &&
-           num_le(value, NUM_NEG_ONE);
-}
-
-static const dv_inverse_unary_rule_t s_inverse_unary_rules[] = {
-    { &ops_lambert_w,   dv_lambert_w_candidate_ok },
-    { &ops_lambert_w0,  dv_lambert_w0_candidate_ok },
-    { &ops_lambert_wm1, dv_lambert_wm1_candidate_ok },
-    { &ops_log10,       NULL },
-};
-
-static const dv_inverse_unary_rule_t *
-dv_inverse_unary_rule_for(const dval_ops_t *ops)
-{
-    size_t i;
-
-    if (!ops)
-        return NULL;
-
-    for (i = 0; i < sizeof(s_inverse_unary_rules) /
-                    sizeof(s_inverse_unary_rules[0]); ++i) {
-        if (s_inverse_unary_rules[i].ops == ops)
-            return &s_inverse_unary_rules[i];
-    }
-    return NULL;
-}
-
-static bool dv_inverse_unary_pattern_supported(const dval_ops_t *ops)
-{
-    return dv_inverse_unary_rule_for(ops) != NULL;
-}
-
-bool dv_lambert_candidate_on_selected_branch(const dval_ops_t *ops,
-                                             number_t value)
-{
-    const dv_inverse_unary_rule_t *rule = dv_inverse_unary_rule_for(ops);
-
-    if (!rule || !rule->candidate_ok)
-        return false;
-
-    return rule->candidate_ok(value);
 }
 
 typedef dval_t *(*dv_binary_simplify_rule_fn)(dval_t *a, dval_t *b);
@@ -379,21 +299,14 @@ dval_t *dv_simplify_try_basic_product(dval_t *a, dval_t *b)
 static bool dv_inverse_unary_candidate_domain_ok(const dval_ops_t *ops,
                                                  const dval_t *candidate)
 {
-    const dv_inverse_unary_rule_t *rule;
     number_t value;
     bool ok = true;
 
     if (!ops || !candidate)
         return false;
 
-    rule = dv_inverse_unary_rule_for(ops);
-    if (!rule)
-        return false;
-    if (!rule->candidate_ok)
-        return true;
-
     value = dv_eval(candidate);
-    ok = rule->candidate_ok(value);
+    ok = dv_inverse_unary_candidate_value_ok(ops, value);
     num_destroy(&value);
     return ok;
 }
@@ -408,7 +321,7 @@ static dval_t *dv_try_simplify_vtable_inverse_candidate(
     dval_t *out = NULL;
 
     if (!outer || !outer->ops || !outer->ops->inverse_unary ||
-        !dv_inverse_unary_pattern_supported(outer->ops) ||
+        !dv_ops_has_inverse_unary_simplify_rule(outer->ops) ||
         !arg || !candidate ||
         !dv_inverse_unary_candidate_domain_ok(outer->ops, candidate))
         return NULL;
@@ -452,9 +365,7 @@ dval_t *dv_simplify_try_vtable_inverse_argument(const dval_t *outer,
     if (!arg)
         return NULL;
 
-    if (outer && (outer->ops == &ops_lambert_w ||
-                  outer->ops == &ops_lambert_w0 ||
-                  outer->ops == &ops_lambert_wm1)) {
+    if (outer && dv_ops_is_lambert(outer->ops)) {
         exp_product_arg = dv_extract_exp_product_argument(arg);
         out = dv_try_simplify_vtable_inverse_candidate(outer, arg,
                                                        exp_product_arg);
@@ -639,9 +550,7 @@ dval_t *dv_simplify_try_trig_product(dval_t *a, dval_t *b)
 
 static bool dv_is_lambert_expr(const dval_t *dv)
 {
-    return dv_is_op(dv, &ops_lambert_w) ||
-           dv_is_op(dv, &ops_lambert_w0) ||
-           dv_is_op(dv, &ops_lambert_wm1);
+    return dv && dv_ops_is_lambert(dv->ops);
 }
 
 dval_t *dv_simplify_try_lambert_product(dval_t *a, dval_t *b)

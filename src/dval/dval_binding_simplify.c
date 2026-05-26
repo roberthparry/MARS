@@ -67,7 +67,9 @@ static void binding_simplify_binary_op_children(dv_binding_expr_t *expr)
 
 static const binding_simplify_rule_t s_binding_addsub_rules[] = {
     { binding_expr_try_fold_exact_complex_owned },
-    { binding_expr_try_fold_number_owned }
+    { binding_expr_try_fold_number_owned },
+    { binding_expr_try_simplify_basic_sum },
+    { binding_expr_try_simplify_trig_sum }
 };
 
 static const binding_simplify_rule_t s_binding_neg_rules[] = {
@@ -79,13 +81,17 @@ static const binding_simplify_rule_t s_binding_mul_rules[] = {
     { binding_expr_try_fold_exact_complex_owned },
     { binding_expr_try_fold_number_owned },
     { binding_expr_try_fold_mul_leading_numbers },
+    { binding_expr_try_simplify_basic_product },
+    { binding_expr_try_simplify_i_unit_product },
     { binding_expr_try_simplify_lambert_product },
+    { binding_expr_try_simplify_trig_product },
     { binding_expr_try_combine_mul_powers }
 };
 
 static const binding_simplify_rule_t s_binding_div_rules[] = {
     { binding_expr_try_fold_exact_complex_owned },
     { binding_expr_try_fold_number_owned },
+    { binding_expr_try_simplify_basic_quotient },
     { binding_expr_try_fold_div_leading_number }
 };
 
@@ -95,6 +101,7 @@ static const binding_simplify_rule_t s_binding_unary_exact_rules[] = {
     { binding_expr_try_simplify_complex_floor_ceil },
     { binding_expr_try_simplify_log_e },
     { binding_expr_try_simplify_log10_power },
+    { binding_expr_try_simplify_imag_trig_bridge },
     { binding_expr_try_simplify_trig_exact }
 };
 

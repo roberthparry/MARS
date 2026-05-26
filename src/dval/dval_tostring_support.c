@@ -233,9 +233,16 @@ typedef struct {
     const char *text;
 } dv_tostring_tex_map_t;
 
+typedef struct {
+    unsigned int codepoint;
+    char ascii;
+} dv_tostring_ascii_map_t;
+
 #define DV_TEX_HASH_GREEK_SIZE       19u
 #define DV_TEX_HASH_FRACTION_SIZE    21u
 #define DV_TEX_HASH_SYMBOL_SIZE      9u
+#define DV_ASCII_HASH_SUPERSCRIPT_SIZE 28u
+#define DV_ASCII_SUBSCRIPT_BASE      0x2080u
 
 static const dv_tostring_tex_map_t dv_tostring_greek_tex_table[DV_TEX_HASH_GREEK_SIZE] = {
     [0]  = {0x03A6, "\\Phi"},
@@ -288,6 +295,31 @@ static const dv_tostring_tex_map_t dv_tostring_symbol_tex_table[DV_TEX_HASH_SYMB
     [8]  = {0x00D7, " \\times "}
 };
 
+static const dv_tostring_ascii_map_t
+dv_tostring_superscript_ascii_table[DV_ASCII_HASH_SUPERSCRIPT_SIZE] = {
+    [0]  = {0x207C, '='},
+    [1]  = {0x207D, '('},
+    [2]  = {0x207E, ')'},
+    [10] = {0x00B2, '2'},
+    [11] = {0x00B3, '3'},
+    [16] = {0x2070, '0'},
+    [17] = {0x00B9, '1'},
+    [20] = {0x2074, '4'},
+    [21] = {0x2075, '5'},
+    [22] = {0x2076, '6'},
+    [23] = {0x2077, '7'},
+    [24] = {0x2078, '8'},
+    [25] = {0x2079, '9'},
+    [26] = {0x207A, '+'},
+    [27] = {0x207B, '-'}
+};
+
+static const char dv_tostring_subscript_ascii_table[] = {
+    '0', '1', '2', '3', '4',
+    '5', '6', '7', '8', '9',
+    '+', '-', '=', '(', ')'
+};
+
 static size_t dv_tostring_greek_hash(unsigned int cp)
 {
     return (cp ^ (cp >> 2) ^ 37u) % DV_TEX_HASH_GREEK_SIZE;
@@ -303,6 +335,11 @@ static size_t dv_tostring_symbol_hash(unsigned int cp)
     return (cp ^ (cp >> 12)) % DV_TEX_HASH_SYMBOL_SIZE;
 }
 
+static size_t dv_tostring_superscript_ascii_hash(unsigned int cp)
+{
+    return cp % DV_ASCII_HASH_SUPERSCRIPT_SIZE;
+}
+
 static const char *dv_tostring_tex_lookup(const dv_tostring_tex_map_t *table,
                                           size_t idx,
                                           unsigned int cp)
@@ -310,38 +347,33 @@ static const char *dv_tostring_tex_lookup(const dv_tostring_tex_map_t *table,
     return table[idx].codepoint == cp ? table[idx].text : NULL;
 }
 
+static char dv_tostring_ascii_lookup(const dv_tostring_ascii_map_t *table,
+                                     size_t idx,
+                                     unsigned int cp)
+{
+    return table[idx].codepoint == cp ? table[idx].ascii : '\0';
+}
+
 static char dv_tostring_superscript_ascii(unsigned int c)
 {
-    if (c >= 0x2074 && c <= 0x2079)
-        return (char)('4' + (c - 0x2074));
-
-    switch (c) {
-        case 0x2070: return '0';
-        case 0x00B9: return '1';
-        case 0x00B2: return '2';
-        case 0x00B3: return '3';
-        case 0x207A: return '+';
-        case 0x207B: return '-';
-        case 0x207C: return '=';
-        case 0x207D: return '(';
-        case 0x207E: return ')';
-        default:     return '\0';
-    }
+    return dv_tostring_ascii_lookup(
+        dv_tostring_superscript_ascii_table,
+        dv_tostring_superscript_ascii_hash(c),
+        c);
 }
 
 static char dv_tostring_subscript_ascii(unsigned int c)
 {
-    if (c >= 0x2080 && c <= 0x2089)
-        return (char)('0' + (c - 0x2080));
+    unsigned int idx;
 
-    switch (c) {
-        case 0x208A: return '+';
-        case 0x208B: return '-';
-        case 0x208C: return '=';
-        case 0x208D: return '(';
-        case 0x208E: return ')';
-        default:     return '\0';
-    }
+    if (c < DV_ASCII_SUBSCRIPT_BASE)
+        return '\0';
+
+    idx = c - DV_ASCII_SUBSCRIPT_BASE;
+    if (idx >= sizeof(dv_tostring_subscript_ascii_table))
+        return '\0';
+
+    return dv_tostring_subscript_ascii_table[idx];
 }
 
 static int dv_tostring_utf8_encode(unsigned int cp, char out[5])

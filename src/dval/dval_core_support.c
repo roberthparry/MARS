@@ -116,6 +116,107 @@ void dv_store_value_num(dval_t *dv, number_t value)
     dv->x = num_scope_detach(value);
 }
 
+bool dv_ops_is_lambert(const dval_ops_t *ops)
+{
+    return ops == &ops_lambert_w ||
+           ops == &ops_lambert_w0 ||
+           ops == &ops_lambert_wm1;
+}
+
+bool dv_ops_is_floor_or_ceil(const dval_ops_t *ops)
+{
+    return ops == &ops_floor || ops == &ops_ceil;
+}
+
+bool dv_ops_are_direct_inverse_pair(const dval_ops_t *outer,
+                                    const dval_ops_t *inner)
+{
+    return outer && inner && outer->direct_inverse == inner;
+}
+
+typedef bool (*dv_inverse_candidate_ok_fn)(number_t value);
+
+typedef struct dv_inverse_unary_rule {
+    const dval_ops_t *ops;
+    dv_inverse_candidate_ok_fn candidate_ok;
+} dv_inverse_unary_rule_t;
+
+static bool dv_lambert_w_candidate_ok(number_t value)
+{
+    number_t imag;
+    number_t neg_pi;
+    bool ok;
+
+    if (!num_is_finite(value))
+        return false;
+
+    if (num_is_real(value))
+        return true;
+
+    /* The branch-selecting W/productlog uses the principal complex strip. */
+    imag = num_imag_part(value);
+    neg_pi = num_neg(NUM_PI);
+    ok = num_gt(imag, neg_pi) && num_lt(imag, NUM_PI);
+    num_destroy(&neg_pi);
+    num_destroy(&imag);
+    return ok;
+}
+
+static bool dv_lambert_w0_candidate_ok(number_t value)
+{
+    return num_is_finite(value) &&
+           num_is_real(value) &&
+           num_ge(value, NUM_NEG_ONE);
+}
+
+static bool dv_lambert_wm1_candidate_ok(number_t value)
+{
+    return num_is_finite(value) &&
+           num_is_real(value) &&
+           num_le(value, NUM_NEG_ONE);
+}
+
+static const dv_inverse_unary_rule_t s_inverse_unary_rules[] = {
+    { &ops_lambert_w,   dv_lambert_w_candidate_ok },
+    { &ops_lambert_w0,  dv_lambert_w0_candidate_ok },
+    { &ops_lambert_wm1, dv_lambert_wm1_candidate_ok },
+    { &ops_log10,       NULL },
+};
+
+static const dv_inverse_unary_rule_t *
+dv_inverse_unary_rule_for(const dval_ops_t *ops)
+{
+    size_t i;
+
+    if (!ops)
+        return NULL;
+
+    for (i = 0; i < sizeof(s_inverse_unary_rules) /
+                    sizeof(s_inverse_unary_rules[0]); ++i) {
+        if (s_inverse_unary_rules[i].ops == ops)
+            return &s_inverse_unary_rules[i];
+    }
+    return NULL;
+}
+
+bool dv_ops_has_inverse_unary_simplify_rule(const dval_ops_t *ops)
+{
+    return dv_inverse_unary_rule_for(ops) != NULL;
+}
+
+bool dv_inverse_unary_candidate_value_ok(const dval_ops_t *ops,
+                                         number_t value)
+{
+    const dv_inverse_unary_rule_t *rule = dv_inverse_unary_rule_for(ops);
+
+    if (!rule)
+        return false;
+    if (!rule->candidate_ok)
+        return true;
+
+    return rule->candidate_ok(value);
+}
+
 /* ------------------------------------------------------------------------- */
 /* Canonical singleton leaves                                                */
 /* ------------------------------------------------------------------------- */

@@ -9,11 +9,6 @@
 #include "dval_tostring.h"
 #include "internal/number_internal.h"
 
-typedef struct {
-    number_t real;
-    number_t imag;
-} binding_exact_complex_t;
-
 static bool binding_expr_positive_ulong_value(const dv_binding_expr_t *expr,
                                               unsigned long *out)
 {
@@ -404,219 +399,484 @@ static dv_binding_expr_t *binding_expr_fold_to_expr_owned(dv_binding_expr_t *exp
     return folded;
 }
 
-static void binding_exact_complex_clear(binding_exact_complex_t *value)
+static dv_binding_expr_t *binding_expr_add_one(const dv_binding_expr_t *arg)
 {
-    if (!value)
-        return;
-    num_destroy(&value->imag);
-    num_destroy(&value->real);
+    return dv_binding_expr_simplify(
+        dv_binding_expr_new_add(dv_binding_expr_clone(arg),
+                                binding_expr_new_long(1L)));
 }
 
-static void binding_exact_complex_set(binding_exact_complex_t *out,
-                                      number_t real,
-                                      number_t imag)
+static dv_binding_expr_t *binding_expr_double_arg_unary(
+    const dv_binding_expr_t *arg,
+    const dval_ops_t *ops)
 {
-    out->real = num_scope_detach(real);
-    out->imag = num_scope_detach(imag);
+    return dv_binding_expr_new_unary_op(
+        ops,
+        dv_binding_expr_simplify(
+            dv_binding_expr_new_mul(binding_expr_new_long(2L),
+                                    dv_binding_expr_clone(arg))));
 }
 
-static bool binding_number_text_exact_complex(const char *text,
-                                              binding_exact_complex_t *out)
+static bool binding_expr_is_unary_op(const dv_binding_expr_t *expr,
+                                     const dval_ops_t *ops)
 {
-    size_t len;
-    char *coeff_text = NULL;
-    number_t value;
+    return expr &&
+           expr->kind == DV_BINDING_EXPR_UNARY_OP &&
+           expr->u.unary_op.ops == ops;
+}
 
-    if (!text || !out)
+static const dv_binding_expr_t *binding_expr_matching_unary_args(
+    const dv_binding_expr_t *a,
+    const dv_binding_expr_t *b,
+    const dval_ops_t *left_ops,
+    const dval_ops_t *right_ops)
+{
+    if (binding_expr_is_unary_op(a, left_ops) &&
+        binding_expr_is_unary_op(b, right_ops) &&
+        dv_binding_expr_struct_eq(a->u.unary_op.child,
+                                  b->u.unary_op.child))
+        return a->u.unary_op.child;
+    if (binding_expr_is_unary_op(a, right_ops) &&
+        binding_expr_is_unary_op(b, left_ops) &&
+        dv_binding_expr_struct_eq(a->u.unary_op.child,
+                                  b->u.unary_op.child))
+        return a->u.unary_op.child;
+    return NULL;
+}
+
+static bool binding_expr_is_square_of_unary(const dv_binding_expr_t *expr,
+                                            const dval_ops_t *ops,
+                                            const dv_binding_expr_t **arg_out)
+{
+    if (!expr || !arg_out ||
+        expr->kind != DV_BINDING_EXPR_POWI ||
+        expr->u.powi.exponent != 2 ||
+        !binding_expr_is_unary_op(expr->u.powi.base, ops))
         return false;
 
-    len = strlen(text);
-    if (len > 0u && (text[len - 1u] == 'i' || text[len - 1u] == 'I')) {
-        if (len == 1u) {
-            value = num_clone(NUM_ONE);
-        } else {
-            coeff_text = dv_tostring_xstrdup(text);
-            coeff_text[len - 1u] = '\0';
-            if (strcmp(coeff_text, "+") == 0)
-                value = num_clone(NUM_ONE);
-            else if (strcmp(coeff_text, "-") == 0)
-                value = num_clone(NUM_NEG_ONE);
-            else
-                value = binding_number_from_text(coeff_text);
-            free(coeff_text);
-        }
-        if (!num_is_exact(value) || !num_is_real(value)) {
-            num_destroy(&value);
-            return false;
-        }
-        binding_exact_complex_set(out, num_clone(NUM_ZERO), value);
+    *arg_out = expr->u.powi.base->u.unary_op.child;
+    return true;
+}
+
+static bool binding_expr_is_neg_square_of_unary(
+    const dv_binding_expr_t *expr,
+    const dval_ops_t *ops,
+    const dv_binding_expr_t **arg_out)
+{
+    return expr &&
+           expr->kind == DV_BINDING_EXPR_NEG &&
+           binding_expr_is_square_of_unary(expr->u.unary.child, ops, arg_out);
+}
+
+static bool binding_expr_i_unit_sign(const dv_binding_expr_t *expr,
+                                     int *sign_out)
+{
+    int child_sign;
+
+    if (!expr || !sign_out)
+        return false;
+
+    if (binding_expr_is_const_id(expr, DV_BINDING_CONST_I)) {
+        *sign_out = 1;
         return true;
     }
 
-    value = binding_number_from_text(text);
-    if (!num_is_exact(value) || !num_is_real(value)) {
-        num_destroy(&value);
-        return false;
-    }
-    binding_exact_complex_set(out, value, num_clone(NUM_ZERO));
-    return true;
-}
-
-static bool binding_exact_complex_from_expr(const dv_binding_expr_t *expr,
-                                            binding_exact_complex_t *out);
-
-static bool binding_exact_complex_unary(const dv_binding_expr_t *expr,
-                                        binding_exact_complex_t *out)
-{
-    binding_exact_complex_t child;
-
-    if (!binding_exact_complex_from_expr(expr->u.unary.child, &child))
-        return false;
-
-    binding_exact_complex_set(out, num_neg(child.real), num_neg(child.imag));
-    binding_exact_complex_clear(&child);
-    return true;
-}
-
-static bool binding_exact_complex_addsub(const dv_binding_expr_t *expr,
-                                         binding_exact_complex_t *out)
-{
-    binding_exact_complex_t left;
-    binding_exact_complex_t right;
-    bool subtract = expr->kind == DV_BINDING_EXPR_SUB;
-
-    if (!binding_exact_complex_from_expr(expr->u.binary.left, &left))
-        return false;
-    if (!binding_exact_complex_from_expr(expr->u.binary.right, &right)) {
-        binding_exact_complex_clear(&left);
-        return false;
-    }
-
-    binding_exact_complex_set(out,
-                              subtract ? num_sub(left.real, right.real)
-                                       : num_add(left.real, right.real),
-                              subtract ? num_sub(left.imag, right.imag)
-                                       : num_add(left.imag, right.imag));
-    binding_exact_complex_clear(&right);
-    binding_exact_complex_clear(&left);
-    return true;
-}
-
-static bool binding_exact_complex_mul(const dv_binding_expr_t *expr,
-                                      binding_exact_complex_t *out)
-{
-    NUM_SCOPE(scope);
-    binding_exact_complex_t left;
-    binding_exact_complex_t right;
-
-    if (!binding_exact_complex_from_expr(expr->u.binary.left, &left))
-        return false;
-    if (!binding_exact_complex_from_expr(expr->u.binary.right, &right)) {
-        binding_exact_complex_clear(&left);
-        return false;
-    }
-
-    binding_exact_complex_set(out,
-        num_sub(num_mul(left.real, right.real), num_mul(left.imag, right.imag)),
-        num_add(num_mul(left.real, right.imag), num_mul(left.imag, right.real)));
-    binding_exact_complex_clear(&right);
-    binding_exact_complex_clear(&left);
-    return true;
-}
-
-static bool binding_exact_complex_div(const dv_binding_expr_t *expr,
-                                      binding_exact_complex_t *out)
-{
-    NUM_SCOPE(scope);
-    binding_exact_complex_t left;
-    binding_exact_complex_t right;
-    number_t denom;
-
-    if (!binding_exact_complex_from_expr(expr->u.binary.left, &left))
-        return false;
-    if (!binding_exact_complex_from_expr(expr->u.binary.right, &right)) {
-        binding_exact_complex_clear(&left);
-        return false;
-    }
-
-    denom = num_add(num_mul(right.real, right.real),
-                    num_mul(right.imag, right.imag));
-    if (num_is_zero(denom)) {
-        binding_exact_complex_clear(&right);
-        binding_exact_complex_clear(&left);
-        return false;
-    }
-
-    binding_exact_complex_set(out,
-        num_div(num_add(num_mul(left.real, right.real),
-                        num_mul(left.imag, right.imag)), denom),
-        num_div(num_sub(num_mul(left.imag, right.real),
-                        num_mul(left.real, right.imag)), denom));
-    binding_exact_complex_clear(&right);
-    binding_exact_complex_clear(&left);
-    return true;
-}
-
-static bool binding_exact_complex_powi(const dv_binding_expr_t *expr,
-                                       binding_exact_complex_t *out)
-{
-    binding_exact_complex_t result;
-    binding_exact_complex_t base;
-
-    if (expr->u.powi.exponent < 0 ||
-        !binding_exact_complex_from_expr(expr->u.powi.base, &base))
-        return false;
-
-    binding_exact_complex_set(&result, num_clone(NUM_ONE), num_clone(NUM_ZERO));
-    for (long i = 0; i < expr->u.powi.exponent; ++i) {
-        NUM_SCOPE(scope);
-        binding_exact_complex_t next;
-
-        binding_exact_complex_set(&next,
-            num_sub(num_mul(result.real, base.real),
-                    num_mul(result.imag, base.imag)),
-            num_add(num_mul(result.real, base.imag),
-                    num_mul(result.imag, base.real)));
-        binding_exact_complex_clear(&result);
-        result = next;
-    }
-
-    binding_exact_complex_clear(&base);
-    *out = result;
-    return true;
-}
-
-static bool binding_exact_complex_from_expr(const dv_binding_expr_t *expr,
-                                            binding_exact_complex_t *out)
-{
-    if (!expr || !out)
-        return false;
-
-    switch (expr->kind) {
-    case DV_BINDING_EXPR_NUMBER:
-        return binding_number_text_exact_complex(expr->u.text, out);
-    case DV_BINDING_EXPR_CONST:
-        if (expr->u.const_id != DV_BINDING_CONST_I)
-            return false;
-        binding_exact_complex_set(out, num_clone(NUM_ZERO), num_clone(NUM_ONE));
+    if (expr->kind == DV_BINDING_EXPR_NEG &&
+        binding_expr_i_unit_sign(expr->u.unary.child, &child_sign)) {
+        *sign_out = -child_sign;
         return true;
-    case DV_BINDING_EXPR_NEG:
-        return binding_exact_complex_unary(expr, out);
-    case DV_BINDING_EXPR_ADD:
-    case DV_BINDING_EXPR_SUB:
-        return binding_exact_complex_addsub(expr, out);
-    case DV_BINDING_EXPR_MUL:
-        return binding_exact_complex_mul(expr, out);
-    case DV_BINDING_EXPR_DIV:
-        return binding_exact_complex_div(expr, out);
-    case DV_BINDING_EXPR_POWI:
-        return binding_exact_complex_powi(expr, out);
-    case DV_BINDING_EXPR_UNARY_OP:
-    case DV_BINDING_EXPR_BINARY_OP:
-        return false;
     }
 
     return false;
+}
+
+static bool binding_expr_extract_i_unit_factor_owned(const dv_binding_expr_t *expr,
+                                                     int *sign_out,
+                                                     dv_binding_expr_t **rest_out)
+{
+    dv_binding_expr_t *child_rest = NULL;
+    int child_sign;
+
+    if (!expr || !sign_out || !rest_out)
+        return false;
+
+    *rest_out = NULL;
+
+    if (binding_expr_i_unit_sign(expr, sign_out)) {
+        return true;
+    }
+
+    if (expr->kind == DV_BINDING_EXPR_NEG &&
+        binding_expr_extract_i_unit_factor_owned(expr->u.unary.child,
+                                                 &child_sign,
+                                                 &child_rest)) {
+        *sign_out = -child_sign;
+        *rest_out = child_rest;
+        return true;
+    }
+
+    if (expr->kind == DV_BINDING_EXPR_MUL) {
+        if (binding_expr_extract_i_unit_factor_owned(expr->u.binary.left,
+                                                     sign_out,
+                                                     &child_rest)) {
+            *rest_out = binding_expr_product_owned(
+                child_rest,
+                dv_binding_expr_clone(expr->u.binary.right));
+            return true;
+        }
+        if (binding_expr_extract_i_unit_factor_owned(expr->u.binary.right,
+                                                     sign_out,
+                                                     &child_rest)) {
+            *rest_out = binding_expr_product_owned(
+                dv_binding_expr_clone(expr->u.binary.left),
+                child_rest);
+            return true;
+        }
+    }
+
+    if (expr->kind == DV_BINDING_EXPR_DIV &&
+        binding_expr_extract_i_unit_factor_owned(expr->u.binary.left,
+                                                 sign_out,
+                                                 &child_rest)) {
+        *rest_out = dv_binding_expr_new_div(
+            child_rest ? child_rest : binding_expr_new_long(1L),
+            dv_binding_expr_clone(expr->u.binary.right));
+            return true;
+    }
+
+    return false;
+}
+
+dv_binding_expr_t *binding_expr_try_simplify_i_unit_product(
+    dv_binding_expr_t *expr)
+{
+    dv_binding_expr_t *left_rest = NULL;
+    dv_binding_expr_t *right_rest = NULL;
+    dv_binding_expr_t *out;
+    int left_sign;
+    int right_sign;
+    int coeff_sign;
+
+    if (!expr || expr->kind != DV_BINDING_EXPR_MUL ||
+        !binding_expr_extract_i_unit_factor_owned(expr->u.binary.left,
+                                                  &left_sign,
+                                                  &left_rest))
+        return expr;
+    if (!binding_expr_extract_i_unit_factor_owned(expr->u.binary.right,
+                                                 &right_sign,
+                                                 &right_rest)) {
+        dv_binding_expr_free(left_rest);
+        return expr;
+    }
+
+    coeff_sign = -(left_sign * right_sign);
+    out = binding_expr_product_owned(left_rest, right_rest);
+    if (!out)
+        out = binding_expr_new_long(1L);
+    if (coeff_sign < 0)
+        out = dv_binding_expr_new_neg(out);
+
+    return binding_expr_fold_to_expr_owned(expr, dv_binding_expr_simplify(out));
+}
+
+static dv_binding_expr_t *binding_expr_imaginary_scaled_owned(
+    int sign,
+    dv_binding_expr_t *expr)
+{
+    dv_binding_expr_t *out = dv_binding_expr_new_mul(
+        dv_binding_expr_new_const(DV_BINDING_CONST_I),
+        expr);
+
+    return sign < 0 ? dv_binding_expr_new_neg(out) : out;
+}
+
+dv_binding_expr_t *binding_expr_try_simplify_imag_trig_bridge(
+    dv_binding_expr_t *expr)
+{
+    dv_binding_expr_t *arg = NULL;
+    const dval_ops_t *target_ops = NULL;
+    dv_binding_expr_t *out;
+    int sign;
+    bool multiply_i = false;
+
+    if (!expr ||
+        expr->kind != DV_BINDING_EXPR_UNARY_OP ||
+        !binding_expr_extract_i_unit_factor_owned(expr->u.unary_op.child,
+                                                  &sign,
+                                                  &arg))
+        return expr;
+
+    if (expr->u.unary_op.ops == &ops_cosh) {
+        target_ops = &ops_cos;
+    } else if (expr->u.unary_op.ops == &ops_cos) {
+        target_ops = &ops_cosh;
+    } else if (expr->u.unary_op.ops == &ops_sinh) {
+        target_ops = &ops_sin;
+        multiply_i = true;
+    } else if (expr->u.unary_op.ops == &ops_sin) {
+        target_ops = &ops_sinh;
+        multiply_i = true;
+    } else {
+        dv_binding_expr_free(arg);
+        return expr;
+    }
+
+    out = dv_binding_expr_new_unary_op(target_ops,
+                                       arg ? arg : binding_expr_new_long(1L));
+    if (multiply_i)
+        out = binding_expr_imaginary_scaled_owned(sign, out);
+
+    return binding_expr_fold_to_expr_owned(expr, dv_binding_expr_simplify(out));
+}
+
+dv_binding_expr_t *binding_expr_try_simplify_basic_sum(dv_binding_expr_t *expr)
+{
+    const dv_binding_expr_t *log = NULL;
+    const dv_binding_expr_t *lgamma = NULL;
+    dv_binding_expr_t *successor_arg;
+    dv_binding_expr_t *out;
+
+    if (!expr || expr->kind != DV_BINDING_EXPR_ADD)
+        return expr;
+
+    if (binding_expr_is_unary_op(expr->u.binary.left, &ops_log) &&
+        binding_expr_is_unary_op(expr->u.binary.right, &ops_lgamma)) {
+        log = expr->u.binary.left;
+        lgamma = expr->u.binary.right;
+    } else if (binding_expr_is_unary_op(expr->u.binary.left, &ops_lgamma) &&
+               binding_expr_is_unary_op(expr->u.binary.right, &ops_log)) {
+        lgamma = expr->u.binary.left;
+        log = expr->u.binary.right;
+    }
+
+    if (!log || !lgamma ||
+        !dv_binding_expr_struct_eq(log->u.unary_op.child,
+                                   lgamma->u.unary_op.child))
+        return expr;
+
+    successor_arg = binding_expr_add_one(lgamma->u.unary_op.child);
+    out = dv_binding_expr_new_unary_op(&ops_lgamma, successor_arg);
+    return binding_expr_fold_to_expr_owned(expr, out);
+}
+
+dv_binding_expr_t *binding_expr_try_simplify_basic_product(dv_binding_expr_t *expr)
+{
+    const dv_binding_expr_t *gamma = NULL;
+    const dv_binding_expr_t *factor = NULL;
+    dv_binding_expr_t *successor_arg;
+    dv_binding_expr_t *out;
+
+    if (!expr || expr->kind != DV_BINDING_EXPR_MUL)
+        return expr;
+
+    if (binding_expr_is_unary_op(expr->u.binary.left, &ops_gamma)) {
+        gamma = expr->u.binary.left;
+        factor = expr->u.binary.right;
+    } else if (binding_expr_is_unary_op(expr->u.binary.right, &ops_gamma)) {
+        gamma = expr->u.binary.right;
+        factor = expr->u.binary.left;
+    }
+
+    if (!gamma || !factor ||
+        !dv_binding_expr_struct_eq(factor, gamma->u.unary_op.child))
+        return expr;
+
+    successor_arg = binding_expr_add_one(gamma->u.unary_op.child);
+    out = dv_binding_expr_new_unary_op(&ops_gamma, successor_arg);
+    return binding_expr_fold_to_expr_owned(expr, out);
+}
+
+static bool binding_expr_scaled_gamma_product_parts(
+    const dv_binding_expr_t *expr,
+    const dv_binding_expr_t **scaled_arg_out,
+    const dv_binding_expr_t **gamma_out)
+{
+    if (!expr || expr->kind != DV_BINDING_EXPR_MUL ||
+        !scaled_arg_out || !gamma_out)
+        return false;
+
+    if (binding_expr_is_unary_op(expr->u.binary.left, &ops_gamma)) {
+        *gamma_out = expr->u.binary.left;
+        *scaled_arg_out = expr->u.binary.right;
+        return true;
+    }
+
+    if (binding_expr_is_unary_op(expr->u.binary.right, &ops_gamma)) {
+        *gamma_out = expr->u.binary.right;
+        *scaled_arg_out = expr->u.binary.left;
+        return true;
+    }
+
+    return false;
+}
+
+dv_binding_expr_t *binding_expr_try_simplify_basic_quotient(dv_binding_expr_t *expr)
+{
+    const dv_binding_expr_t *scaled_arg;
+    const dv_binding_expr_t *gamma;
+    dv_binding_expr_t *arg;
+    dv_binding_expr_t *successor_arg;
+    dv_binding_expr_t *out;
+
+    if (!expr || expr->kind != DV_BINDING_EXPR_DIV ||
+        !binding_expr_scaled_gamma_product_parts(expr->u.binary.left,
+                                                 &scaled_arg,
+                                                 &gamma))
+        return expr;
+
+    arg = dv_binding_expr_simplify(
+        dv_binding_expr_new_div(dv_binding_expr_clone(scaled_arg),
+                                dv_binding_expr_clone(expr->u.binary.right)));
+    if (!dv_binding_expr_struct_eq(arg, gamma->u.unary_op.child)) {
+        dv_binding_expr_free(arg);
+        return expr;
+    }
+
+    successor_arg = binding_expr_add_one(arg);
+    out = dv_binding_expr_new_unary_op(&ops_gamma, successor_arg);
+    dv_binding_expr_free(arg);
+    return binding_expr_fold_to_expr_owned(expr, out);
+}
+
+dv_binding_expr_t *binding_expr_try_simplify_trig_product(dv_binding_expr_t *expr)
+{
+    const dv_binding_expr_t *arg;
+    dv_binding_expr_t *out;
+
+    if (!expr || expr->kind != DV_BINDING_EXPR_MUL)
+        return expr;
+
+    arg = binding_expr_matching_unary_args(expr->u.binary.left,
+                                           expr->u.binary.right,
+                                           &ops_sin,
+                                           &ops_cos);
+    if (arg) {
+        out = dv_binding_expr_new_mul(
+            binding_expr_number_from_value(NUM_HALF),
+            binding_expr_double_arg_unary(arg, &ops_sin));
+        return binding_expr_fold_to_expr_owned(expr,
+                                               dv_binding_expr_simplify(out));
+    }
+
+    arg = binding_expr_matching_unary_args(expr->u.binary.left,
+                                           expr->u.binary.right,
+                                           &ops_sinh,
+                                           &ops_cosh);
+    if (arg) {
+        out = dv_binding_expr_new_mul(
+            binding_expr_number_from_value(NUM_HALF),
+            binding_expr_double_arg_unary(arg, &ops_sinh));
+        return binding_expr_fold_to_expr_owned(expr,
+                                               dv_binding_expr_simplify(out));
+    }
+
+    arg = binding_expr_matching_unary_args(expr->u.binary.left,
+                                           expr->u.binary.right,
+                                           &ops_cos,
+                                           &ops_tan);
+    if (arg) {
+        out = dv_binding_expr_new_unary_op(&ops_sin, dv_binding_expr_clone(arg));
+        return binding_expr_fold_to_expr_owned(expr, out);
+    }
+
+    arg = binding_expr_matching_unary_args(expr->u.binary.left,
+                                           expr->u.binary.right,
+                                           &ops_cosh,
+                                           &ops_tanh);
+    if (arg) {
+        out = dv_binding_expr_new_unary_op(&ops_sinh, dv_binding_expr_clone(arg));
+        return binding_expr_fold_to_expr_owned(expr, out);
+    }
+
+    return expr;
+}
+
+dv_binding_expr_t *binding_expr_try_simplify_trig_sum(dv_binding_expr_t *expr)
+{
+    const dv_binding_expr_t *left_arg = NULL;
+    const dv_binding_expr_t *right_arg = NULL;
+    bool subtract;
+
+    if (!expr || (expr->kind != DV_BINDING_EXPR_ADD &&
+                  expr->kind != DV_BINDING_EXPR_SUB))
+        return expr;
+
+    subtract = expr->kind == DV_BINDING_EXPR_SUB;
+
+    if (!subtract &&
+        binding_expr_is_square_of_unary(expr->u.binary.left, &ops_sin,
+                                        &left_arg) &&
+        binding_expr_is_square_of_unary(expr->u.binary.right, &ops_cos,
+                                        &right_arg) &&
+        dv_binding_expr_struct_eq(left_arg, right_arg))
+        return binding_expr_fold_to_number_owned(expr, num_clone(NUM_ONE));
+
+    if (!subtract &&
+        binding_expr_is_square_of_unary(expr->u.binary.left, &ops_cos,
+                                        &left_arg) &&
+        binding_expr_is_square_of_unary(expr->u.binary.right, &ops_sin,
+                                        &right_arg) &&
+        dv_binding_expr_struct_eq(left_arg, right_arg))
+        return binding_expr_fold_to_number_owned(expr, num_clone(NUM_ONE));
+
+    if (((subtract &&
+          binding_expr_is_square_of_unary(expr->u.binary.left, &ops_cos,
+                                          &left_arg) &&
+          binding_expr_is_square_of_unary(expr->u.binary.right, &ops_sin,
+                                          &right_arg)) ||
+         (!subtract &&
+          binding_expr_is_neg_square_of_unary(expr->u.binary.left, &ops_sin,
+                                              &left_arg) &&
+          binding_expr_is_square_of_unary(expr->u.binary.right, &ops_cos,
+                                          &right_arg))) &&
+        dv_binding_expr_struct_eq(left_arg, right_arg)) {
+        dv_binding_expr_t *out = binding_expr_double_arg_unary(left_arg,
+                                                               &ops_cos);
+
+        return binding_expr_fold_to_expr_owned(expr, out);
+    }
+
+    if (subtract &&
+        binding_expr_is_square_of_unary(expr->u.binary.left, &ops_cosh,
+                                        &left_arg) &&
+        binding_expr_is_square_of_unary(expr->u.binary.right, &ops_sinh,
+                                        &right_arg) &&
+        dv_binding_expr_struct_eq(left_arg, right_arg))
+        return binding_expr_fold_to_number_owned(expr, num_clone(NUM_ONE));
+
+    if (!subtract &&
+        binding_expr_is_neg_square_of_unary(expr->u.binary.left, &ops_sinh,
+                                            &left_arg) &&
+        binding_expr_is_square_of_unary(expr->u.binary.right, &ops_cosh,
+                                        &right_arg) &&
+        dv_binding_expr_struct_eq(left_arg, right_arg))
+        return binding_expr_fold_to_number_owned(expr, num_clone(NUM_ONE));
+
+    if (!subtract &&
+        binding_expr_is_square_of_unary(expr->u.binary.left, &ops_sinh,
+                                        &left_arg) &&
+        binding_expr_is_square_of_unary(expr->u.binary.right, &ops_cosh,
+                                        &right_arg) &&
+        dv_binding_expr_struct_eq(left_arg, right_arg)) {
+        dv_binding_expr_t *out = binding_expr_double_arg_unary(left_arg,
+                                                               &ops_cosh);
+
+        return binding_expr_fold_to_expr_owned(expr, out);
+    }
+
+    if (!subtract &&
+        binding_expr_is_square_of_unary(expr->u.binary.left, &ops_cosh,
+                                        &left_arg) &&
+        binding_expr_is_square_of_unary(expr->u.binary.right, &ops_sinh,
+                                        &right_arg) &&
+        dv_binding_expr_struct_eq(left_arg, right_arg)) {
+        dv_binding_expr_t *out = binding_expr_double_arg_unary(left_arg,
+                                                               &ops_cosh);
+
+        return binding_expr_fold_to_expr_owned(expr, out);
+    }
+
+    return expr;
 }
 
 static dv_binding_expr_t *binding_expr_from_exact_real(number_t value)
@@ -676,11 +936,11 @@ dv_binding_expr_t *binding_expr_try_fold_exact_complex_owned(
     binding_exact_complex_t value;
     dv_binding_expr_t *folded;
 
-    if (!binding_exact_complex_from_expr(expr, &value))
+    if (!dv_binding_expr_exact_complex(expr, &value))
         return expr;
 
     folded = binding_expr_from_exact_complex(&value);
-    binding_exact_complex_clear(&value);
+    dv_binding_exact_complex_clear(&value);
     return binding_expr_fold_to_expr_owned(expr, folded);
 }
 
@@ -1040,14 +1300,14 @@ dv_binding_expr_t *binding_expr_try_simplify_direct_inverse(dv_binding_expr_t *e
 
     if (!expr ||
         expr->kind != DV_BINDING_EXPR_UNARY_OP ||
-        !expr->u.unary_op.ops ||
-        !expr->u.unary_op.ops->direct_inverse)
+        !expr->u.unary_op.ops)
         return expr;
 
     inner = expr->u.unary_op.child;
     if (!inner ||
         inner->kind != DV_BINDING_EXPR_UNARY_OP ||
-        expr->u.unary_op.ops->direct_inverse != inner->u.unary_op.ops)
+        !dv_ops_are_direct_inverse_pair(expr->u.unary_op.ops,
+                                        inner->u.unary_op.ops))
         return expr;
 
     out = inner->u.unary_op.child;
@@ -1062,9 +1322,7 @@ static const dv_binding_expr_t *binding_expr_lambert_arg(const dv_binding_expr_t
 {
     if (!expr ||
         expr->kind != DV_BINDING_EXPR_UNARY_OP ||
-        (expr->u.unary_op.ops != &ops_lambert_w &&
-         expr->u.unary_op.ops != &ops_lambert_w0 &&
-         expr->u.unary_op.ops != &ops_lambert_wm1))
+        !dv_ops_is_lambert(expr->u.unary_op.ops))
         return NULL;
 
     return expr->u.unary_op.child;
@@ -1249,7 +1507,7 @@ static bool binding_expr_lambert_inverse_domain_ok(const dval_ops_t *ops,
         return false;
 
     value = dv_binding_expr_eval(arg);
-    ok = dv_lambert_candidate_on_selected_branch(ops, value);
+    ok = dv_inverse_unary_candidate_value_ok(ops, value);
     num_destroy(&value);
     return ok;
 }
@@ -1261,9 +1519,7 @@ dv_binding_expr_t *binding_expr_try_simplify_lambert_inverse(dv_binding_expr_t *
 
     if (!expr ||
         expr->kind != DV_BINDING_EXPR_UNARY_OP ||
-        (expr->u.unary_op.ops != &ops_lambert_w &&
-         expr->u.unary_op.ops != &ops_lambert_w0 &&
-         expr->u.unary_op.ops != &ops_lambert_wm1))
+        !dv_ops_is_lambert(expr->u.unary_op.ops))
         return expr;
 
     arg = binding_expr_lambert_inverse_arg(expr->u.unary_op.child);
@@ -1285,8 +1541,7 @@ dv_binding_expr_t *binding_expr_try_simplify_complex_floor_ceil(dv_binding_expr_
 
     if (!expr ||
         expr->kind != DV_BINDING_EXPR_UNARY_OP ||
-        (expr->u.unary_op.ops != &ops_floor &&
-         expr->u.unary_op.ops != &ops_ceil))
+        !dv_ops_is_floor_or_ceil(expr->u.unary_op.ops))
         return expr;
 
     value = dv_binding_expr_eval(expr);

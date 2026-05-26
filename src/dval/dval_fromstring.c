@@ -711,44 +711,6 @@ static int node_has_preserved_constexpr(const dval_t *node)
            value_matches_builtin;
 }
 
-static int binding_const_is_numeric_literal(dv_binding_const_id_t const_id)
-{
-    /*
-     * These constants are lexical numeric atoms rather than symbolic display
-     * constants.  Symbolic constants such as pi/gamma stay in the preserved
-     * expression tree even though they also have numeric values.
-     */
-    return const_id == DV_BINDING_CONST_I;
-}
-
-static int binding_expr_is_numeric_literal(const dv_binding_expr_t *expr)
-{
-    if (!expr)
-        return 0;
-
-    switch (expr->kind) {
-    case DV_BINDING_EXPR_NUMBER:
-        return 1;
-    case DV_BINDING_EXPR_CONST:
-        return binding_const_is_numeric_literal(expr->u.const_id);
-    case DV_BINDING_EXPR_NEG:
-        return binding_expr_is_numeric_literal(expr->u.unary.child);
-    case DV_BINDING_EXPR_ADD:
-    case DV_BINDING_EXPR_SUB:
-    case DV_BINDING_EXPR_MUL:
-    case DV_BINDING_EXPR_DIV:
-        return binding_expr_is_numeric_literal(expr->u.binary.left) &&
-               binding_expr_is_numeric_literal(expr->u.binary.right);
-    case DV_BINDING_EXPR_POWI:
-        return binding_expr_is_numeric_literal(expr->u.powi.base);
-    case DV_BINDING_EXPR_UNARY_OP:
-    case DV_BINDING_EXPR_BINARY_OP:
-        return 0;
-    }
-
-    return 0;
-}
-
 static dv_binding_expr_t *binding_expr_number_from_value_local(number_t value)
 {
     char *text = num_to_string(value);
@@ -785,7 +747,7 @@ static dval_t *const_node_from_binding_expr(dv_binding_expr_t *expr)
     }
     dv_binding_expr_free(original_expr);
     node = dv_new_const(value);
-    if (binding_expr_is_numeric_literal(expr) &&
+    if (dv_binding_expr_is_numeric_literal(expr) &&
         (num_is_exact(value) || num_is_real(value))) {
         dv_binding_expr_free(expr);
         expr = binding_expr_number_from_value_local(value);

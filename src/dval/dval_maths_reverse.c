@@ -215,15 +215,9 @@ void dv_reverse_abs(const dval_t *dv, const number_t *out_bar, number_t *a_bar, 
         return;
     }
     switch (num_cmp(dv_eval_num_internal(dv->a), NUM_ZERO)) {
-    case 1:
-        *a_bar = num_owned_clone_local(*out_bar);
-        break;
-    case -1:
-        *a_bar = num_owned_neg_local(*out_bar);
-        break;
-    default:
-        *a_bar = NUM_ZERO;
-        break;
+        case  1: *a_bar = num_owned_clone_local(*out_bar); break;
+        case -1: *a_bar = num_owned_neg_local  (*out_bar); break;
+        default: *a_bar = NUM_ZERO;                        break;
     }
     *b_bar = NUM_ZERO;
 }

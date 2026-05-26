@@ -42,8 +42,15 @@ dv_binding_expr_t *binding_expr_try_fold_neg_leading_number(dv_binding_expr_t *e
 dv_binding_expr_t *binding_expr_try_fold_mul_leading_numbers(dv_binding_expr_t *expr);
 dv_binding_expr_t *binding_expr_try_fold_div_leading_number(dv_binding_expr_t *expr);
 dv_binding_expr_t *binding_expr_try_combine_mul_powers(dv_binding_expr_t *expr);
+dv_binding_expr_t *binding_expr_try_simplify_basic_sum(dv_binding_expr_t *expr);
+dv_binding_expr_t *binding_expr_try_simplify_basic_product(dv_binding_expr_t *expr);
+dv_binding_expr_t *binding_expr_try_simplify_basic_quotient(dv_binding_expr_t *expr);
+dv_binding_expr_t *binding_expr_try_simplify_i_unit_product(dv_binding_expr_t *expr);
+dv_binding_expr_t *binding_expr_try_simplify_trig_product(dv_binding_expr_t *expr);
+dv_binding_expr_t *binding_expr_try_simplify_trig_sum(dv_binding_expr_t *expr);
 dv_binding_expr_t *binding_expr_try_simplify_principal_inverse(dv_binding_expr_t *expr);
 dv_binding_expr_t *binding_expr_try_simplify_direct_inverse(dv_binding_expr_t *expr);
+dv_binding_expr_t *binding_expr_try_simplify_imag_trig_bridge(dv_binding_expr_t *expr);
 dv_binding_expr_t *binding_expr_try_simplify_lambert_product(dv_binding_expr_t *expr);
 dv_binding_expr_t *binding_expr_try_simplify_lambert_inverse(dv_binding_expr_t *expr);
 dv_binding_expr_t *binding_expr_try_simplify_complex_floor_ceil(dv_binding_expr_t *expr);

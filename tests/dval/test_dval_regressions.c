@@ -2683,6 +2683,113 @@ static void test_binding_lambert_inverse_numeric_expression_simplifies(void)
     }
 }
 
+static void test_binding_successor_and_trig_shape_simplifies(void)
+{
+    struct {
+        const char *input;
+        const char *expect;
+        const char *label;
+    } cases[] = {
+        {
+            "{ x | x = pi/5*gamma(pi/5) }",
+            "Γ(π/5 + 1)",
+            "binding gamma successor simplifies",
+        },
+        {
+            "{ x | x = pi*gamma(pi/5)/5 }",
+            "Γ(π/5 + 1)",
+            "binding scaled gamma quotient successor simplifies",
+        },
+        {
+            "{ x | x = ln(pi/5) + lgamma(pi/5) }",
+            "lgamma(π/5 + 1)",
+            "binding log-gamma successor simplifies",
+        },
+        {
+            "{ x | x = sin(pi/5)^2 + cos(pi/5)^2 }",
+            "1",
+            "binding sin^2+cos^2 simplifies",
+        },
+        {
+            "{ x | x = cos(pi/5)^2 - sin(pi/5)^2 }",
+            "cos(⅖π)",
+            "binding cos^2-sin^2 simplifies",
+        },
+        {
+            "{ x | x = sinh(pi/5)^2 + cosh(pi/5)^2 }",
+            "cosh(⅖π)",
+            "binding sinh^2+cosh^2 simplifies",
+        },
+        {
+            "{ x | x = cosh(pi/5)^2 - sinh(pi/5)^2 }",
+            "1",
+            "binding cosh^2-sinh^2 simplifies",
+        },
+        {
+            "{ x | x = sin(pi/5)*cos(pi/5) }",
+            "½·sin(⅖π)",
+            "binding sin*cos simplifies",
+        },
+        {
+            "{ x | x = cos(pi/5)*tan(pi/5) }",
+            "sin(π/5)",
+            "binding cos*tan simplifies",
+        },
+        {
+            "{ x | x = sinh(pi/5)*cosh(pi/5) }",
+            "½·sinh(⅖π)",
+            "binding sinh*cosh simplifies",
+        },
+        {
+            "{ x | x = cosh(pi/5)*tanh(pi/5) }",
+            "sinh(π/5)",
+            "binding cosh*tanh simplifies",
+        },
+        {
+            "{ x | x = sinh(i*pi/5) }",
+            "i·sin(π/5)",
+            "binding sinh(i*pi/5) simplifies",
+        },
+        {
+            "{ x | x = cosh(i*pi/5) }",
+            "cos(π/5)",
+            "binding cosh(i*pi/5) simplifies",
+        },
+        {
+            "{ x | x = cos(i*pi/5) }",
+            "cosh(π/5)",
+            "binding cos(i*pi/5) simplifies",
+        },
+        {
+            "{ x | x = sin(i*pi/5) }",
+            "i·sinh(π/5)",
+            "binding sin(i*pi/5) simplifies",
+        },
+        {
+            "{ x | x = -i*sin(i*pi/5) }",
+            "sinh(π/5)",
+            "binding -i*sin(i*pi/5) simplifies",
+        },
+    };
+
+    for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+        dval_bindings_t *bindings = NULL;
+        dval_t *expr = dval_from_string(cases[i].input, &bindings);
+        char *expr_text = expr ? dv_to_string(expr, style_EXPRESSION) : NULL;
+
+        if (expr_text && str_eq(expr_text, cases[i].expect))
+            to_string_pass(cases[i].label, expr_text, cases[i].expect);
+        else
+            to_string_fail(__FILE__, __LINE__, 1, cases[i].label,
+                           expr_text ? expr_text : "(null)",
+                           cases[i].expect);
+
+        free(expr_text);
+        dval_bindings_free(bindings);
+        dv_free(expr);
+    }
+}
+
 static void test_binding_exact_core_trig_values_simplify(void)
 {
     struct {
@@ -2983,6 +3090,7 @@ void test_runtime_regressions(void)
     TEST_RUN_SUBTEST(test_binding_direct_inverse_numeric_expression_simplifies, NULL);
     TEST_RUN_SUBTEST(test_binding_principal_inverse_numeric_expression_simplifies, NULL);
     TEST_RUN_SUBTEST(test_binding_lambert_inverse_numeric_expression_simplifies, NULL);
+    TEST_RUN_SUBTEST(test_binding_successor_and_trig_shape_simplifies, NULL);
     TEST_RUN_SUBTEST(test_binding_exact_core_trig_values_simplify, NULL);
     TEST_RUN_SUBTEST(test_tan_poles_display_as_infinity, NULL);
     TEST_RUN_SUBTEST(test_sqrt_negative_exact_evaluates_to_i, NULL);

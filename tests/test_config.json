@@ -1040,6 +1040,7 @@
       "test_binding_direct_inverse_numeric_expression_simplifies": true,
       "test_binding_principal_inverse_numeric_expression_simplifies": true,
       "test_binding_lambert_inverse_numeric_expression_simplifies": true,
+      "test_binding_successor_and_trig_shape_simplifies": true,
       "test_binding_exact_core_trig_values_simplify": true,
       "test_tan_poles_display_as_infinity": true,
       "test_sqrt_negative_exact_evaluates_to_i": true,

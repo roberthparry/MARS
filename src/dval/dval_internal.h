@@ -517,8 +517,13 @@ dval_t *dv_simplify_direct_inverse_pair(const dval_t *outer, dval_t *inner);
 dval_t *dv_simplify_direct_inverse_pair_from_raw(const dval_t *outer,
                                                  const dval_t *raw_inner,
                                                  dval_t *simplified_inner);
-bool dv_lambert_candidate_on_selected_branch(const dval_ops_t *ops,
-                                             number_t value);
+bool dv_ops_is_lambert(const dval_ops_t *ops);
+bool dv_ops_is_floor_or_ceil(const dval_ops_t *ops);
+bool dv_ops_are_direct_inverse_pair(const dval_ops_t *outer,
+                                    const dval_ops_t *inner);
+bool dv_ops_has_inverse_unary_simplify_rule(const dval_ops_t *ops);
+bool dv_inverse_unary_candidate_value_ok(const dval_ops_t *ops,
+                                         number_t value);
 dval_t *dv_simplify_try_vtable_inverse_argument(const dval_t *outer,
                                                 const dval_t *arg);
 dval_t *dv_simplify_try_basic_sum(dval_t *a, dval_t *b);
@@ -618,6 +623,11 @@ void dv_reverse_gammainc_P(const dval_t *dv, const number_t *out_bar, number_t *
 void dv_reverse_gammainc_Q(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void dv_reverse_not_differentiable(const dval_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 
+typedef struct binding_exact_complex {
+    number_t real;
+    number_t imag;
+} binding_exact_complex_t;
+
 dv_binding_expr_t *dv_binding_expr_new_number_text(const char *text);
 dv_binding_expr_t *dv_binding_expr_new_const(dv_binding_const_id_t const_id);
 dv_binding_expr_t *dv_binding_expr_new_neg(dv_binding_expr_t *child);
@@ -631,6 +641,10 @@ dv_binding_expr_t *dv_binding_expr_new_binary_op(const dval_ops_t *ops, dv_bindi
 dv_binding_expr_t *dv_binding_expr_clone(const dv_binding_expr_t *expr);
 void dv_binding_expr_free(dv_binding_expr_t *expr);
 number_t dv_binding_expr_eval(const dv_binding_expr_t *expr);
+bool dv_binding_expr_is_numeric_literal(const dv_binding_expr_t *expr);
+bool dv_binding_expr_exact_complex(const dv_binding_expr_t *expr,
+                                   binding_exact_complex_t *out);
+void dv_binding_exact_complex_clear(binding_exact_complex_t *value);
 bool dv_binding_expr_eval_if_precision_increased(dv_binding_expr_t *expr,
                                                  number_t *value_out);
 
