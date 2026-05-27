@@ -5,7 +5,7 @@
 #include <ctype.h>
 
 #include "matrix_internal.h"
-#include "internal/dval_internal.h"
+#include "internal/expr_internal.h"
 
 typedef struct {
     char *data;
@@ -194,7 +194,7 @@ static void mt_collect_bindings(char ***var_bindings,
     }
 }
 
-static void mt_collect_dval_bindings(const dval_t *dv,
+static void mt_collect_expr_bindings(const expr_t *dv,
                                      char ***var_bindings,
                                      size_t *nvar_bindings,
                                      size_t *capvar_bindings,
@@ -203,7 +203,7 @@ static void mt_collect_dval_bindings(const dval_t *dv,
                                      size_t *capconst_bindings,
                                      const char *binding_text)
 {
-    if (dv && dv_is_named_const(dv) &&
+    if (dv && expr_is_named_const(dv) &&
         binding_text && *binding_text && !strchr(binding_text, ';')) {
         mt_append_binding(const_bindings, nconst_bindings, capconst_bindings,
                           strdup(binding_text));
@@ -436,7 +436,7 @@ static void mt_emit_cells_tex(mat_buf_t *out,
     mb_puts(out, "\\end{bmatrix}");
 }
 
-static int mt_split_dval_repr(const dval_t *dv, char **expr_out, char **bindings_out)
+static int mt_split_expr_repr(const expr_t *dv, char **expr_out, char **bindings_out)
 {
     char *tmp;
     char *body;
@@ -452,7 +452,7 @@ static int mt_split_dval_repr(const dval_t *dv, char **expr_out, char **bindings
         return (*expr_out && *bindings_out) ? 0 : -1;
     }
 
-    tmp = dv_to_string(dv, style_EXPRESSION);
+    tmp = expr_to_string(dv, style_EXPRESSION);
     if (!tmp)
         return -1;
 
@@ -478,7 +478,7 @@ static int mt_split_dval_repr(const dval_t *dv, char **expr_out, char **bindings
     return (*expr_out && *bindings_out) ? 0 : -1;
 }
 
-static void mt_pretty_dval_expr(char **expr_io,
+static void mt_pretty_expr_expr(char **expr_io,
                                 char **const_bindings,
                                 size_t nconst_bindings)
 {
@@ -541,7 +541,7 @@ static char *mt_texify_binding_list(char **bindings, size_t nbindings)
     mat_buf_t out = {0};
 
     for (size_t i = 0; i < nbindings; ++i) {
-        char *tex = dv_tostring_texify(bindings[i]);
+        char *tex = expr_tostring_texify(bindings[i]);
 
         if (i > 0)
             mb_puts(&out, ", ");
@@ -624,7 +624,7 @@ static char *mat_to_string_numeric(const matrix_t *A, mat_string_style_t style)
                 ok = 0;
                 break;
             }
-            cells[idx] = tex ? dv_tostring_texify(tmp) : strdup(tmp);
+            cells[idx] = tex ? expr_tostring_texify(tmp) : strdup(tmp);
             if (!cells[idx]) {
                 ok = 0;
                 break;
@@ -655,7 +655,7 @@ cleanup:
     return mb_take(&out);
 }
 
-static char *mat_to_string_dval(const matrix_t *A, mat_string_style_t style)
+static char *mat_to_string_expr(const matrix_t *A, mat_string_style_t style)
 {
     size_t n = A->rows * A->cols;
     char **exprs = calloc(n ? n : 1, sizeof(*exprs));
@@ -677,24 +677,24 @@ static char *mat_to_string_dval(const matrix_t *A, mat_string_style_t style)
         for (size_t j = 0; j < A->cols; ++j) {
             char *expr = NULL;
             char *binding_text = NULL;
-            dval_t *dv = NULL;
+            expr_t *dv = NULL;
             size_t idx = i * A->cols + j;
 
             mat_get(A, i, j, &dv);
-            if ((tex && dv_to_tex_parts(dv, &expr, &binding_text) != 0) ||
-                (!tex && mt_split_dval_repr(dv, &expr, &binding_text) != 0)) {
+            if ((tex && expr_to_tex_parts(dv, &expr, &binding_text) != 0) ||
+                (!tex && mt_split_expr_repr(dv, &expr, &binding_text) != 0)) {
                 free(expr);
                 free(binding_text);
                 ok = 0;
                 break;
             }
             exprs[idx] = expr;
-            mt_collect_dval_bindings(dv,
+            mt_collect_expr_bindings(dv,
                                      &var_bindings, &nvar_bindings, &capvar_bindings,
                                      &const_bindings, &nconst_bindings, &capconst_bindings,
                                      binding_text);
             if (!tex) {
-                mt_pretty_dval_expr(&exprs[idx], const_bindings, nconst_bindings);
+                mt_pretty_expr_expr(&exprs[idx], const_bindings, nconst_bindings);
             }
             if (strlen(exprs[idx]) > widths[j])
                 widths[j] = strlen(exprs[idx]);
@@ -704,7 +704,7 @@ static char *mat_to_string_dval(const matrix_t *A, mat_string_style_t style)
 
     if (!ok) {
         free(out.data);
-        out.data = strdup("<dval matrix>");
+        out.data = strdup("<expr matrix>");
     } else if (tex) {
         omit_wrapper = mt_all_bindings_are_nan(var_bindings, nvar_bindings,
                                                const_bindings, nconst_bindings);
@@ -773,6 +773,6 @@ char *mat_to_string(const matrix_t *A, mat_string_style_t style)
         return strdup("(null)");
 
     if (matrix_is_symbolic(A))
-        return mat_to_string_dval(A, style);
+        return mat_to_string_expr(A, style);
     return mat_to_string_numeric(A, style);
 }

@@ -5,8 +5,8 @@ matrix_t *mat_charpoly(const matrix_t *A)
     if (!A || A->rows != A->cols)
         return NULL;
 
-    if (A->elem == &dval_elem)
-        return mat_charpoly_dval(A);
+    if (A->elem == &expr_elem)
+        return mat_charpoly_expr(A);
 
     if (!elem_supports_numeric_algorithms(A->elem))
         return NULL;
@@ -19,8 +19,8 @@ matrix_t *mat_minpoly(const matrix_t *A)
     if (!A || A->rows != A->cols)
         return NULL;
 
-    if (A->elem == &dval_elem)
-        return mat_minpoly_dval(A);
+    if (A->elem == &expr_elem)
+        return mat_minpoly_expr(A);
 
     return NULL;
 }

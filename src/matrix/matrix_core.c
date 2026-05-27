@@ -7,7 +7,7 @@
 #include "qfloat.h"
 #include "qcomplex.h"
 #include "matrix.h"
-#include "internal/dval_internal.h"
+#include "internal/expr_internal.h"
 
 /* ============================================================
    Internal matrix construction helpers (forward declarations)
@@ -261,31 +261,31 @@ exact_update:
     }
 }
 
-static bool dval_node_is_exact_zero(const dval_t *dv)
+static bool expr_node_is_exact_zero(const expr_t *dv)
 {
-    return !dv || dv_is_exact_zero(dv);
+    return !dv || expr_is_exact_zero(dv);
 }
 
-dval_t *dval_clone_for_storage(const dval_t *dv)
+expr_t *expr_clone_for_storage(const expr_t *dv)
 {
     if (!dv)
         return NULL;
-    if (dv == DV_ZERO || dv == DV_ONE) {
-        number_t value = dv_get_val(dv);
-        dval_t *clone = dv_new_const(value);
+    if (dv == EXPR_ZERO || dv == EXPR_ONE) {
+        number_t value = expr_get_val(dv);
+        expr_t *clone = expr_new_const(value);
 
         num_destroy(&value);
         return clone;
     }
-    dv_retain(dv);
-    return (dval_t *)dv;
+    expr_retain(dv);
+    return (expr_t *)dv;
 }
 
 matrix_t *mat_finalize_symbolic_result(matrix_t *A)
 {
     matrix_t *simplified;
 
-    if (!A || A->elem != &dval_elem)
+    if (!A || A->elem != &expr_elem)
         return A;
 
     simplified = mat_simplify_symbolic(A);
@@ -385,11 +385,11 @@ number_t mat_raw_value_to_number(const struct elem_vtable *elem, const void *val
         return num_clone(number);
     }
 
-    if (elem == &dval_elem) {
-        dval_t *dv = NULL;
+    if (elem == &expr_elem) {
+        expr_t *dv = NULL;
 
         memcpy(&dv, value, sizeof(dv));
-        return dv ? dv_eval(dv) : NUM_ZERO;
+        return dv ? expr_eval(dv) : NUM_ZERO;
     }
 
     return NUM_ZERO;
@@ -405,8 +405,8 @@ void mat_raw_value_from_number(const struct elem_vtable *elem, void *out,
         return;
     }
 
-    if (elem == &dval_elem)
-        *(dval_t **)out = dv_new_const(*source);
+    if (elem == &expr_elem)
+        *(expr_t **)out = expr_new_const(*source);
 }
 
 static void mat_number_slot_take(struct matrix_t *A, void *slot, number_t *value)
@@ -577,43 +577,43 @@ void mat_set_num_owned(struct matrix_t *A, size_t i, size_t j, number_t *value)
     return !val || num_is_zero(*(const number_t *)val);
 }
 
- void dv_init_zero_slot(void *slot)
+ void expr_init_zero_slot(void *slot)
 {
-    *(dval_t **)slot = NULL;
+    *(expr_t **)slot = NULL;
 }
 
- void dv_copy_value(void *dst, const void *src)
+ void expr_copy_value(void *dst, const void *src)
 {
-    dval_t *dv = src ? *(dval_t *const *)src : NULL;
+    expr_t *dv = src ? *(expr_t *const *)src : NULL;
 
-    *(dval_t **)dst = dval_clone_for_storage(dv);
+    *(expr_t **)dst = expr_clone_for_storage(dv);
 }
 
- void dv_destroy_value(void *slot)
+ void expr_destroy_value(void *slot)
 {
-    dval_t *dv = *(dval_t **)slot;
+    expr_t *dv = *(expr_t **)slot;
 
     if (dv)
-        dv_free(dv);
-    *(dval_t **)slot = NULL;
+        expr_free(dv);
+    *(expr_t **)slot = NULL;
 }
 
- void dv_simplify_value(void *slot)
+ void expr_simplify_value(void *slot)
 {
-    dval_t *dv = *(dval_t **)slot;
-    dval_t *simp;
+    expr_t *dv = *(expr_t **)slot;
+    expr_t *simp;
 
     if (!dv)
         return;
 
-    simp = dv_simplify(dv);
-    dv_free(dv);
-    *(dval_t **)slot = simp;
+    simp = expr_simplify(dv);
+    expr_free(dv);
+    *(expr_t **)slot = simp;
 }
 
- bool dv_is_structural_zero(const void *val)
+ bool expr_is_structural_zero(const void *val)
 {
-    return dval_node_is_exact_zero(*(dval_t *const *)val);
+    return expr_node_is_exact_zero(*(expr_t *const *)val);
 }
 
  bool dense_alloc(struct matrix_t *A) {
@@ -1855,59 +1855,59 @@ static void num_replace_value(void *slot, number_t value)
 
 
 
-/* ---------- dval_t* ---------- */
+/* ---------- expr_t* ---------- */
 
- void dv_add_wrap(void *o, const void *a, const void *b)
+ void expr_add_wrap(void *o, const void *a, const void *b)
 {
-    const dval_t *lhs = (*(dval_t *const *)a) ? *(dval_t *const *)a : DV_ZERO;
-    const dval_t *rhs = (*(dval_t *const *)b) ? *(dval_t *const *)b : DV_ZERO;
-    dval_t *prev = *(dval_t **)o;
-    dval_t *res = dv_add(lhs, rhs);
+    const expr_t *lhs = (*(expr_t *const *)a) ? *(expr_t *const *)a : EXPR_ZERO;
+    const expr_t *rhs = (*(expr_t *const *)b) ? *(expr_t *const *)b : EXPR_ZERO;
+    expr_t *prev = *(expr_t **)o;
+    expr_t *res = expr_add(lhs, rhs);
 
     if (prev)
-        dv_free(prev);
-    *(dval_t **)o = res;
+        expr_free(prev);
+    *(expr_t **)o = res;
 }
 
- void dv_sub_wrap(void *o, const void *a, const void *b)
+ void expr_sub_wrap(void *o, const void *a, const void *b)
 {
-    const dval_t *lhs = (*(dval_t *const *)a) ? *(dval_t *const *)a : DV_ZERO;
-    const dval_t *rhs = (*(dval_t *const *)b) ? *(dval_t *const *)b : DV_ZERO;
-    dval_t *prev = *(dval_t **)o;
-    dval_t *res = dv_sub(lhs, rhs);
+    const expr_t *lhs = (*(expr_t *const *)a) ? *(expr_t *const *)a : EXPR_ZERO;
+    const expr_t *rhs = (*(expr_t *const *)b) ? *(expr_t *const *)b : EXPR_ZERO;
+    expr_t *prev = *(expr_t **)o;
+    expr_t *res = expr_sub(lhs, rhs);
 
     if (prev)
-        dv_free(prev);
-    *(dval_t **)o = res;
+        expr_free(prev);
+    *(expr_t **)o = res;
 }
 
- void dv_mul_wrap(void *o, const void *a, const void *b)
+ void expr_mul_wrap(void *o, const void *a, const void *b)
 {
-    const dval_t *lhs = (*(dval_t *const *)a) ? *(dval_t *const *)a : DV_ZERO;
-    const dval_t *rhs = (*(dval_t *const *)b) ? *(dval_t *const *)b : DV_ZERO;
-    dval_t *prev = *(dval_t **)o;
-    dval_t *res = dv_mul(lhs, rhs);
+    const expr_t *lhs = (*(expr_t *const *)a) ? *(expr_t *const *)a : EXPR_ZERO;
+    const expr_t *rhs = (*(expr_t *const *)b) ? *(expr_t *const *)b : EXPR_ZERO;
+    expr_t *prev = *(expr_t **)o;
+    expr_t *res = expr_mul(lhs, rhs);
 
     if (prev)
-        dv_free(prev);
-    *(dval_t **)o = res;
+        expr_free(prev);
+    *(expr_t **)o = res;
 }
 
- void dv_inv_wrap(void *o, const void *a)
+ void expr_inv_wrap(void *o, const void *a)
 {
-    dval_t *arg = *(dval_t *const *)a;
-    dval_t *prev = *(dval_t **)o;
-    dval_t *res = dv_num_div(&NUM_ONE, arg);
+    expr_t *arg = *(expr_t *const *)a;
+    expr_t *prev = *(expr_t **)o;
+    expr_t *res = expr_num_div(&NUM_ONE, arg);
 
     if (prev)
-        dv_free(prev);
-    *(dval_t **)o = res;
+        expr_free(prev);
+    *(expr_t **)o = res;
 }
 
- int dval_cmp_wrap(const void *a, const void *b)
+ int expr_cmp_wrap(const void *a, const void *b)
 {
-    dval_t *lhs = *(dval_t *const *)a;
-    dval_t *rhs = *(dval_t *const *)b;
+    expr_t *lhs = *(expr_t *const *)a;
+    expr_t *rhs = *(expr_t *const *)b;
 
     if (!lhs && !rhs)
         return 0;
@@ -1915,12 +1915,12 @@ static void num_replace_value(void *slot, number_t value)
         return -1;
     if (!rhs)
         return 1;
-    return dv_cmp(lhs, rhs);
+    return expr_cmp(lhs, rhs);
 }
 
- void dv_print_wrap(const void *v, char *buf, size_t n)
+ void expr_print_wrap(const void *v, char *buf, size_t n)
 {
-    dval_t *dv = *(dval_t *const *)v;
+    expr_t *dv = *(expr_t *const *)v;
     char *tmp;
     char *inner;
     char *sep;
@@ -1931,9 +1931,9 @@ static void num_replace_value(void *slot, number_t value)
         return;
     }
 
-    tmp = dv_to_string(dv, style_EXPRESSION);
+    tmp = expr_to_string(dv, style_EXPRESSION);
     if (!tmp) {
-        snprintf(buf, n, "<dval>");
+        snprintf(buf, n, "<expr>");
         return;
     }
 
@@ -1953,369 +1953,369 @@ static void num_replace_value(void *slot, number_t value)
     free(tmp);
 }
 
- void dv_conj_elem(void *o, const void *a)
+ void expr_conj_elem(void *o, const void *a)
 {
-    dval_t *arg = *(dval_t *const *)a;
-    dval_t *prev = *(dval_t **)o;
+    expr_t *arg = *(expr_t *const *)a;
+    expr_t *prev = *(expr_t **)o;
 
     if (prev)
-        dv_free(prev);
+        expr_free(prev);
     if (arg)
-        dv_retain(arg);
-    *(dval_t **)o = arg;
+        expr_retain(arg);
+    *(expr_t **)o = arg;
 }
 
- void dv_scalar_exp(void *out, const void *a)
+ void expr_scalar_exp(void *out, const void *a)
 {
-    dval_t *arg = *(dval_t *const *)a;
-    dval_t *prev = *(dval_t **)out;
-    dval_t *res = dv_exp(arg);
+    expr_t *arg = *(expr_t *const *)a;
+    expr_t *prev = *(expr_t **)out;
+    expr_t *res = expr_exp(arg);
 
     if (prev)
-        dv_free(prev);
-    *(dval_t **)out = res;
+        expr_free(prev);
+    *(expr_t **)out = res;
 }
 
- void dv_scalar_log(void *out, const void *a)
+ void expr_scalar_log(void *out, const void *a)
 {
-    dval_t *arg = *(dval_t *const *)a;
-    dval_t *prev = *(dval_t **)out;
-    dval_t *res = dv_log(arg);
+    expr_t *arg = *(expr_t *const *)a;
+    expr_t *prev = *(expr_t **)out;
+    expr_t *res = expr_log(arg);
 
     if (prev)
-        dv_free(prev);
-    *(dval_t **)out = res;
+        expr_free(prev);
+    *(expr_t **)out = res;
 }
 
- void dv_scalar_sin(void *out, const void *a)
+ void expr_scalar_sin(void *out, const void *a)
 {
-    dval_t *arg = *(dval_t *const *)a;
-    dval_t *prev = *(dval_t **)out;
-    dval_t *res = dv_sin(arg);
+    expr_t *arg = *(expr_t *const *)a;
+    expr_t *prev = *(expr_t **)out;
+    expr_t *res = expr_sin(arg);
 
     if (prev)
-        dv_free(prev);
-    *(dval_t **)out = res;
+        expr_free(prev);
+    *(expr_t **)out = res;
 }
 
- void dv_scalar_cos(void *out, const void *a)
+ void expr_scalar_cos(void *out, const void *a)
 {
-    dval_t *arg = *(dval_t *const *)a;
-    dval_t *prev = *(dval_t **)out;
-    dval_t *res = dv_cos(arg);
+    expr_t *arg = *(expr_t *const *)a;
+    expr_t *prev = *(expr_t **)out;
+    expr_t *res = expr_cos(arg);
 
     if (prev)
-        dv_free(prev);
-    *(dval_t **)out = res;
+        expr_free(prev);
+    *(expr_t **)out = res;
 }
 
- void dv_scalar_tan(void *out, const void *a)
+ void expr_scalar_tan(void *out, const void *a)
 {
-    dval_t *arg = *(dval_t *const *)a;
-    dval_t *prev = *(dval_t **)out;
-    dval_t *res = dv_tan(arg);
+    expr_t *arg = *(expr_t *const *)a;
+    expr_t *prev = *(expr_t **)out;
+    expr_t *res = expr_tan(arg);
 
     if (prev)
-        dv_free(prev);
-    *(dval_t **)out = res;
+        expr_free(prev);
+    *(expr_t **)out = res;
 }
 
- void dv_scalar_sinh(void *out, const void *a)
+ void expr_scalar_sinh(void *out, const void *a)
 {
-    dval_t *arg = *(dval_t *const *)a;
-    dval_t *prev = *(dval_t **)out;
-    dval_t *res = dv_sinh(arg);
+    expr_t *arg = *(expr_t *const *)a;
+    expr_t *prev = *(expr_t **)out;
+    expr_t *res = expr_sinh(arg);
 
     if (prev)
-        dv_free(prev);
-    *(dval_t **)out = res;
+        expr_free(prev);
+    *(expr_t **)out = res;
 }
 
- void dv_scalar_cosh(void *out, const void *a)
+ void expr_scalar_cosh(void *out, const void *a)
 {
-    dval_t *arg = *(dval_t *const *)a;
-    dval_t *prev = *(dval_t **)out;
-    dval_t *res = dv_cosh(arg);
+    expr_t *arg = *(expr_t *const *)a;
+    expr_t *prev = *(expr_t **)out;
+    expr_t *res = expr_cosh(arg);
 
     if (prev)
-        dv_free(prev);
-    *(dval_t **)out = res;
+        expr_free(prev);
+    *(expr_t **)out = res;
 }
 
- void dv_scalar_tanh(void *out, const void *a)
+ void expr_scalar_tanh(void *out, const void *a)
 {
-    dval_t *arg = *(dval_t *const *)a;
-    dval_t *prev = *(dval_t **)out;
-    dval_t *res = dv_tanh(arg);
+    expr_t *arg = *(expr_t *const *)a;
+    expr_t *prev = *(expr_t **)out;
+    expr_t *res = expr_tanh(arg);
 
     if (prev)
-        dv_free(prev);
-    *(dval_t **)out = res;
+        expr_free(prev);
+    *(expr_t **)out = res;
 }
 
- void dv_scalar_sqrt(void *out, const void *a)
+ void expr_scalar_sqrt(void *out, const void *a)
 {
-    dval_t *arg = *(dval_t *const *)a;
-    dval_t *prev = *(dval_t **)out;
-    dval_t *res = dv_sqrt(arg);
+    expr_t *arg = *(expr_t *const *)a;
+    expr_t *prev = *(expr_t **)out;
+    expr_t *res = expr_sqrt(arg);
 
     if (prev)
-        dv_free(prev);
-    *(dval_t **)out = res;
+        expr_free(prev);
+    *(expr_t **)out = res;
 }
 
- void dv_scalar_asin(void *out, const void *a)
+ void expr_scalar_asin(void *out, const void *a)
 {
-    dval_t *arg = *(dval_t *const *)a;
-    dval_t *prev = *(dval_t **)out;
-    dval_t *res = dv_asin(arg);
+    expr_t *arg = *(expr_t *const *)a;
+    expr_t *prev = *(expr_t **)out;
+    expr_t *res = expr_asin(arg);
 
     if (prev)
-        dv_free(prev);
-    *(dval_t **)out = res;
+        expr_free(prev);
+    *(expr_t **)out = res;
 }
 
- void dv_scalar_acos(void *out, const void *a)
+ void expr_scalar_acos(void *out, const void *a)
 {
-    dval_t *arg = *(dval_t *const *)a;
-    dval_t *prev = *(dval_t **)out;
-    dval_t *res = dv_acos(arg);
+    expr_t *arg = *(expr_t *const *)a;
+    expr_t *prev = *(expr_t **)out;
+    expr_t *res = expr_acos(arg);
 
     if (prev)
-        dv_free(prev);
-    *(dval_t **)out = res;
+        expr_free(prev);
+    *(expr_t **)out = res;
 }
 
- void dv_scalar_atan(void *out, const void *a)
+ void expr_scalar_atan(void *out, const void *a)
 {
-    dval_t *arg = *(dval_t *const *)a;
-    dval_t *prev = *(dval_t **)out;
-    dval_t *res = dv_atan(arg);
+    expr_t *arg = *(expr_t *const *)a;
+    expr_t *prev = *(expr_t **)out;
+    expr_t *res = expr_atan(arg);
 
     if (prev)
-        dv_free(prev);
-    *(dval_t **)out = res;
+        expr_free(prev);
+    *(expr_t **)out = res;
 }
 
- void dv_scalar_asinh(void *out, const void *a)
+ void expr_scalar_asinh(void *out, const void *a)
 {
-    dval_t *arg = *(dval_t *const *)a;
-    dval_t *prev = *(dval_t **)out;
-    dval_t *res = dv_asinh(arg);
+    expr_t *arg = *(expr_t *const *)a;
+    expr_t *prev = *(expr_t **)out;
+    expr_t *res = expr_asinh(arg);
 
     if (prev)
-        dv_free(prev);
-    *(dval_t **)out = res;
+        expr_free(prev);
+    *(expr_t **)out = res;
 }
 
- void dv_scalar_acosh(void *out, const void *a)
+ void expr_scalar_acosh(void *out, const void *a)
 {
-    dval_t *arg = *(dval_t *const *)a;
-    dval_t *prev = *(dval_t **)out;
-    dval_t *res = dv_acosh(arg);
+    expr_t *arg = *(expr_t *const *)a;
+    expr_t *prev = *(expr_t **)out;
+    expr_t *res = expr_acosh(arg);
 
     if (prev)
-        dv_free(prev);
-    *(dval_t **)out = res;
+        expr_free(prev);
+    *(expr_t **)out = res;
 }
 
- void dv_scalar_atanh(void *out, const void *a)
+ void expr_scalar_atanh(void *out, const void *a)
 {
-    dval_t *arg = *(dval_t *const *)a;
-    dval_t *prev = *(dval_t **)out;
-    dval_t *res = dv_atanh(arg);
+    expr_t *arg = *(expr_t *const *)a;
+    expr_t *prev = *(expr_t **)out;
+    expr_t *res = expr_atanh(arg);
 
     if (prev)
-        dv_free(prev);
-    *(dval_t **)out = res;
+        expr_free(prev);
+    *(expr_t **)out = res;
 }
 
- void dv_scalar_erf(void *out, const void *a)
+ void expr_scalar_erf(void *out, const void *a)
 {
-    dval_t *arg = *(dval_t *const *)a;
-    dval_t *prev = *(dval_t **)out;
-    dval_t *res = dv_erf(arg);
+    expr_t *arg = *(expr_t *const *)a;
+    expr_t *prev = *(expr_t **)out;
+    expr_t *res = expr_erf(arg);
 
     if (prev)
-        dv_free(prev);
-    *(dval_t **)out = res;
+        expr_free(prev);
+    *(expr_t **)out = res;
 }
 
- void dv_scalar_erfc(void *out, const void *a)
+ void expr_scalar_erfc(void *out, const void *a)
 {
-    dval_t *arg = *(dval_t *const *)a;
-    dval_t *prev = *(dval_t **)out;
-    dval_t *res = dv_erfc(arg);
+    expr_t *arg = *(expr_t *const *)a;
+    expr_t *prev = *(expr_t **)out;
+    expr_t *res = expr_erfc(arg);
 
     if (prev)
-        dv_free(prev);
-    *(dval_t **)out = res;
+        expr_free(prev);
+    *(expr_t **)out = res;
 }
 
- void dv_scalar_erfinv(void *out, const void *a)
+ void expr_scalar_erfinv(void *out, const void *a)
 {
-    dval_t *arg = *(dval_t *const *)a;
-    dval_t *prev = *(dval_t **)out;
-    dval_t *res = dv_erfinv(arg);
+    expr_t *arg = *(expr_t *const *)a;
+    expr_t *prev = *(expr_t **)out;
+    expr_t *res = expr_erfinv(arg);
 
     if (prev)
-        dv_free(prev);
-    *(dval_t **)out = res;
+        expr_free(prev);
+    *(expr_t **)out = res;
 }
 
- void dv_scalar_erfcinv(void *out, const void *a)
+ void expr_scalar_erfcinv(void *out, const void *a)
 {
-    dval_t *arg = *(dval_t *const *)a;
-    dval_t *prev = *(dval_t **)out;
-    dval_t *res = dv_erfcinv(arg);
+    expr_t *arg = *(expr_t *const *)a;
+    expr_t *prev = *(expr_t **)out;
+    expr_t *res = expr_erfcinv(arg);
 
     if (prev)
-        dv_free(prev);
-    *(dval_t **)out = res;
+        expr_free(prev);
+    *(expr_t **)out = res;
 }
 
- void dv_scalar_gamma(void *out, const void *a)
+ void expr_scalar_gamma(void *out, const void *a)
 {
-    dval_t *arg = *(dval_t *const *)a;
-    dval_t *prev = *(dval_t **)out;
-    dval_t *res = dv_gamma(arg);
+    expr_t *arg = *(expr_t *const *)a;
+    expr_t *prev = *(expr_t **)out;
+    expr_t *res = expr_gamma(arg);
 
     if (prev)
-        dv_free(prev);
-    *(dval_t **)out = res;
+        expr_free(prev);
+    *(expr_t **)out = res;
 }
 
- void dv_scalar_gammainv(void *out, const void *a)
+ void expr_scalar_gammainv(void *out, const void *a)
 {
-    dval_t *arg = *(dval_t *const *)a;
-    dval_t *prev = *(dval_t **)out;
-    dval_t *res = dv_gammainv(arg);
+    expr_t *arg = *(expr_t *const *)a;
+    expr_t *prev = *(expr_t **)out;
+    expr_t *res = expr_gammainv(arg);
 
     if (prev)
-        dv_free(prev);
-    *(dval_t **)out = res;
+        expr_free(prev);
+    *(expr_t **)out = res;
 }
 
- void dv_scalar_lgamma(void *out, const void *a)
+ void expr_scalar_lgamma(void *out, const void *a)
 {
-    dval_t *arg = *(dval_t *const *)a;
-    dval_t *prev = *(dval_t **)out;
-    dval_t *res = dv_lgamma(arg);
+    expr_t *arg = *(expr_t *const *)a;
+    expr_t *prev = *(expr_t **)out;
+    expr_t *res = expr_lgamma(arg);
 
     if (prev)
-        dv_free(prev);
-    *(dval_t **)out = res;
+        expr_free(prev);
+    *(expr_t **)out = res;
 }
 
- void dv_scalar_digamma(void *out, const void *a)
+ void expr_scalar_digamma(void *out, const void *a)
 {
-    dval_t *arg = *(dval_t *const *)a;
-    dval_t *prev = *(dval_t **)out;
-    dval_t *res = dv_digamma(arg);
+    expr_t *arg = *(expr_t *const *)a;
+    expr_t *prev = *(expr_t **)out;
+    expr_t *res = expr_digamma(arg);
 
     if (prev)
-        dv_free(prev);
-    *(dval_t **)out = res;
+        expr_free(prev);
+    *(expr_t **)out = res;
 }
 
- void dv_scalar_trigamma(void *out, const void *a)
+ void expr_scalar_trigamma(void *out, const void *a)
 {
-    dval_t *arg = *(dval_t *const *)a;
-    dval_t *prev = *(dval_t **)out;
-    dval_t *res = dv_trigamma(arg);
+    expr_t *arg = *(expr_t *const *)a;
+    expr_t *prev = *(expr_t **)out;
+    expr_t *res = expr_trigamma(arg);
 
     if (prev)
-        dv_free(prev);
-    *(dval_t **)out = res;
+        expr_free(prev);
+    *(expr_t **)out = res;
 }
 
- void dv_scalar_normal_pdf(void *out, const void *a)
+ void expr_scalar_normal_pdf(void *out, const void *a)
 {
-    dval_t *arg = *(dval_t *const *)a;
-    dval_t *prev = *(dval_t **)out;
-    dval_t *res = dv_normal_pdf(arg);
+    expr_t *arg = *(expr_t *const *)a;
+    expr_t *prev = *(expr_t **)out;
+    expr_t *res = expr_normal_pdf(arg);
 
     if (prev)
-        dv_free(prev);
-    *(dval_t **)out = res;
+        expr_free(prev);
+    *(expr_t **)out = res;
 }
 
- void dv_scalar_normal_cdf(void *out, const void *a)
+ void expr_scalar_normal_cdf(void *out, const void *a)
 {
-    dval_t *arg = *(dval_t *const *)a;
-    dval_t *prev = *(dval_t **)out;
-    dval_t *res = dv_normal_cdf(arg);
+    expr_t *arg = *(expr_t *const *)a;
+    expr_t *prev = *(expr_t **)out;
+    expr_t *res = expr_normal_cdf(arg);
 
     if (prev)
-        dv_free(prev);
-    *(dval_t **)out = res;
+        expr_free(prev);
+    *(expr_t **)out = res;
 }
 
- void dv_scalar_normal_logpdf(void *out, const void *a)
+ void expr_scalar_normal_logpdf(void *out, const void *a)
 {
-    dval_t *arg = *(dval_t *const *)a;
-    dval_t *prev = *(dval_t **)out;
-    dval_t *res = dv_normal_logpdf(arg);
+    expr_t *arg = *(expr_t *const *)a;
+    expr_t *prev = *(expr_t **)out;
+    expr_t *res = expr_normal_logpdf(arg);
 
     if (prev)
-        dv_free(prev);
-    *(dval_t **)out = res;
+        expr_free(prev);
+    *(expr_t **)out = res;
 }
 
- void dv_scalar_lambert_w0(void *out, const void *a)
+ void expr_scalar_lambert_w0(void *out, const void *a)
 {
-    dval_t *arg = *(dval_t *const *)a;
-    dval_t *prev = *(dval_t **)out;
-    dval_t *res = dv_lambert_w0(arg);
+    expr_t *arg = *(expr_t *const *)a;
+    expr_t *prev = *(expr_t **)out;
+    expr_t *res = expr_lambert_w0(arg);
 
     if (prev)
-        dv_free(prev);
-    *(dval_t **)out = res;
+        expr_free(prev);
+    *(expr_t **)out = res;
 }
 
- void dv_scalar_lambert_wm1(void *out, const void *a)
+ void expr_scalar_lambert_wm1(void *out, const void *a)
 {
-    dval_t *arg = *(dval_t *const *)a;
-    dval_t *prev = *(dval_t **)out;
-    dval_t *res = dv_lambert_wm1(arg);
+    expr_t *arg = *(expr_t *const *)a;
+    expr_t *prev = *(expr_t **)out;
+    expr_t *res = expr_lambert_wm1(arg);
 
     if (prev)
-        dv_free(prev);
-    *(dval_t **)out = res;
+        expr_free(prev);
+    *(expr_t **)out = res;
 }
 
- void dv_scalar_productlog(void *out, const void *a)
+ void expr_scalar_productlog(void *out, const void *a)
 {
-    dval_t *arg = *(dval_t *const *)a;
-    dval_t *prev = *(dval_t **)out;
+    expr_t *arg = *(expr_t *const *)a;
+    expr_t *prev = *(expr_t **)out;
     /* ProductLog is the principal Lambert W branch. */
-    dval_t *res = dv_lambert_w0(arg);
+    expr_t *res = expr_lambert_w0(arg);
 
     if (prev)
-        dv_free(prev);
-    *(dval_t **)out = res;
+        expr_free(prev);
+    *(expr_t **)out = res;
 }
 
- void dv_scalar_ei(void *out, const void *a)
+ void expr_scalar_ei(void *out, const void *a)
 {
-    dval_t *arg = *(dval_t *const *)a;
-    dval_t *prev = *(dval_t **)out;
-    dval_t *res = dv_ei(arg);
+    expr_t *arg = *(expr_t *const *)a;
+    expr_t *prev = *(expr_t **)out;
+    expr_t *res = expr_ei(arg);
 
     if (prev)
-        dv_free(prev);
-    *(dval_t **)out = res;
+        expr_free(prev);
+    *(expr_t **)out = res;
 }
 
- void dv_scalar_e1(void *out, const void *a)
+ void expr_scalar_e1(void *out, const void *a)
 {
-    dval_t *arg = *(dval_t *const *)a;
-    dval_t *prev = *(dval_t **)out;
-    dval_t *res = dv_e1(arg);
+    expr_t *arg = *(expr_t *const *)a;
+    expr_t *prev = *(expr_t **)out;
+    expr_t *res = expr_e1(arg);
 
     if (prev)
-        dv_free(prev);
-    *(dval_t **)out = res;
+        expr_free(prev);
+    *(expr_t **)out = res;
 }
 
 
@@ -2324,78 +2324,78 @@ static void num_replace_value(void *slot, number_t value)
    Conversion helpers for mixed-type arithmetic
    ============================================================ */
 
-static inline void num_as_dv(dval_t **out, const number_t *a) {
-    *out = dv_new_const(*a);
+static inline void num_as_expr(expr_t **out, const number_t *a) {
+    *out = expr_new_const(*a);
 }
 
-static inline void id_dv(dval_t **out, dval_t *const *a) {
-    *out = (dval_t *)((a && *a) ? *a : DV_ZERO);
+static inline void id_expr(expr_t **out, expr_t *const *a) {
+    *out = (expr_t *)((a && *a) ? *a : EXPR_ZERO);
 }
 
 /* ============================================================
    Cross-type arithmetic: add / sub / mul
    ============================================================ */
 
-/* ---- number <-> dval ---- */
+/* ---- number <-> expr ---- */
 
-static void add_num_dv(void *out, const void *a, const void *b)
+static void add_num_expr(void *out, const void *a, const void *b)
 {
-    dval_t *lhs = dv_new_const(*(const number_t *)a);
-    dval_t *rhs;
+    expr_t *lhs = expr_new_const(*(const number_t *)a);
+    expr_t *rhs;
 
-    id_dv(&rhs, (dval_t *const *)b);
-    *(dval_t **)out = dv_add(lhs, rhs);
-    dv_free(lhs);
+    id_expr(&rhs, (expr_t *const *)b);
+    *(expr_t **)out = expr_add(lhs, rhs);
+    expr_free(lhs);
 }
 
-static void add_dv_num(void *out, const void *a, const void *b)
+static void add_expr_num(void *out, const void *a, const void *b)
 {
-    dval_t *lhs;
-    dval_t *rhs = dv_new_const(*(const number_t *)b);
+    expr_t *lhs;
+    expr_t *rhs = expr_new_const(*(const number_t *)b);
 
-    id_dv(&lhs, (dval_t *const *)a);
-    *(dval_t **)out = dv_add(lhs, rhs);
-    dv_free(rhs);
+    id_expr(&lhs, (expr_t *const *)a);
+    *(expr_t **)out = expr_add(lhs, rhs);
+    expr_free(rhs);
 }
 
-static void sub_num_dv(void *out, const void *a, const void *b)
+static void sub_num_expr(void *out, const void *a, const void *b)
 {
-    dval_t *lhs = dv_new_const(*(const number_t *)a);
-    dval_t *rhs;
+    expr_t *lhs = expr_new_const(*(const number_t *)a);
+    expr_t *rhs;
 
-    id_dv(&rhs, (dval_t *const *)b);
-    *(dval_t **)out = dv_sub(lhs, rhs);
-    dv_free(lhs);
+    id_expr(&rhs, (expr_t *const *)b);
+    *(expr_t **)out = expr_sub(lhs, rhs);
+    expr_free(lhs);
 }
 
-static void sub_dv_num(void *out, const void *a, const void *b)
+static void sub_expr_num(void *out, const void *a, const void *b)
 {
-    dval_t *lhs;
-    dval_t *rhs = dv_new_const(*(const number_t *)b);
+    expr_t *lhs;
+    expr_t *rhs = expr_new_const(*(const number_t *)b);
 
-    id_dv(&lhs, (dval_t *const *)a);
-    *(dval_t **)out = dv_sub(lhs, rhs);
-    dv_free(rhs);
+    id_expr(&lhs, (expr_t *const *)a);
+    *(expr_t **)out = expr_sub(lhs, rhs);
+    expr_free(rhs);
 }
 
-static void mul_num_dv(void *out, const void *a, const void *b)
+static void mul_num_expr(void *out, const void *a, const void *b)
 {
-    dval_t *lhs = dv_new_const(*(const number_t *)a);
-    dval_t *rhs;
+    expr_t *lhs = expr_new_const(*(const number_t *)a);
+    expr_t *rhs;
 
-    id_dv(&rhs, (dval_t *const *)b);
-    *(dval_t **)out = dv_mul(lhs, rhs);
-    dv_free(lhs);
+    id_expr(&rhs, (expr_t *const *)b);
+    *(expr_t **)out = expr_mul(lhs, rhs);
+    expr_free(lhs);
 }
 
-static void mul_dv_num(void *out, const void *a, const void *b)
+static void mul_expr_num(void *out, const void *a, const void *b)
 {
-    dval_t *lhs;
-    dval_t *rhs = dv_new_const(*(const number_t *)b);
+    expr_t *lhs;
+    expr_t *rhs = expr_new_const(*(const number_t *)b);
 
-    id_dv(&lhs, (dval_t *const *)a);
-    *(dval_t **)out = dv_mul(lhs, rhs);
-    dv_free(rhs);
+    id_expr(&lhs, (expr_t *const *)a);
+    *(expr_t **)out = expr_mul(lhs, rhs);
+    expr_free(rhs);
 }
 
 /* ---- number <-> number ---- */
@@ -2415,27 +2415,27 @@ static void mul_num_num(void *out, const void *a, const void *b)
     *(number_t *)out = num_mul(*(const number_t *)a, *(const number_t *)b);
 }
 
-/* ---- dval <-> dval ---- */
+/* ---- expr <-> expr ---- */
 
-static void add_dv_dv(void *out, const void *a, const void *b)
+static void add_expr_expr(void *out, const void *a, const void *b)
 {
-    const dval_t *lhs = (*(dval_t *const *)a) ? *(dval_t *const *)a : DV_ZERO;
-    const dval_t *rhs = (*(dval_t *const *)b) ? *(dval_t *const *)b : DV_ZERO;
-    *(dval_t **)out = dv_add(lhs, rhs);
+    const expr_t *lhs = (*(expr_t *const *)a) ? *(expr_t *const *)a : EXPR_ZERO;
+    const expr_t *rhs = (*(expr_t *const *)b) ? *(expr_t *const *)b : EXPR_ZERO;
+    *(expr_t **)out = expr_add(lhs, rhs);
 }
 
-static void sub_dv_dv(void *out, const void *a, const void *b)
+static void sub_expr_expr(void *out, const void *a, const void *b)
 {
-    const dval_t *lhs = (*(dval_t *const *)a) ? *(dval_t *const *)a : DV_ZERO;
-    const dval_t *rhs = (*(dval_t *const *)b) ? *(dval_t *const *)b : DV_ZERO;
-    *(dval_t **)out = dv_sub(lhs, rhs);
+    const expr_t *lhs = (*(expr_t *const *)a) ? *(expr_t *const *)a : EXPR_ZERO;
+    const expr_t *rhs = (*(expr_t *const *)b) ? *(expr_t *const *)b : EXPR_ZERO;
+    *(expr_t **)out = expr_sub(lhs, rhs);
 }
 
-static void mul_dv_dv(void *out, const void *a, const void *b)
+static void mul_expr_expr(void *out, const void *a, const void *b)
 {
-    const dval_t *lhs = (*(dval_t *const *)a) ? *(dval_t *const *)a : DV_ZERO;
-    const dval_t *rhs = (*(dval_t *const *)b) ? *(dval_t *const *)b : DV_ZERO;
-    *(dval_t **)out = dv_mul(lhs, rhs);
+    const expr_t *lhs = (*(expr_t *const *)a) ? *(expr_t *const *)a : EXPR_ZERO;
+    const expr_t *rhs = (*(expr_t *const *)b) ? *(expr_t *const *)b : EXPR_ZERO;
+    *(expr_t **)out = expr_mul(lhs, rhs);
 }
 
 /* ============================================================
@@ -2452,7 +2452,7 @@ typedef struct {
 
 typedef enum {
     BIN_ELEM_NUMBER = 0,
-    BIN_ELEM_DVAL = 1,
+    BIN_ELEM_EXPR = 1,
     BIN_ELEM_MAX
 } binop_elem_kind;
 
@@ -2460,8 +2460,8 @@ static binop_elem_kind elem_binop_kind(const struct elem_vtable *elem)
 {
     if (elem == &number_elem)
         return BIN_ELEM_NUMBER;
-    if (elem == &dval_elem)
-        return BIN_ELEM_DVAL;
+    if (elem == &expr_elem)
+        return BIN_ELEM_EXPR;
     return BIN_ELEM_MAX;
 }
 
@@ -2473,28 +2473,28 @@ static const binop_vtable binops[BIN_ELEM_MAX][BIN_ELEM_MAX] = {
             .sub = sub_num_num,
             .mul = mul_num_num
         },
-        [BIN_ELEM_DVAL] = {
-            .result_elem = &dval_elem,
-            .add = add_num_dv,
-            .sub = sub_num_dv,
-            .mul = mul_num_dv
+        [BIN_ELEM_EXPR] = {
+            .result_elem = &expr_elem,
+            .add = add_num_expr,
+            .sub = sub_num_expr,
+            .mul = mul_num_expr
         }
     },
 
-    [BIN_ELEM_DVAL] = {
-        /* dval op number -> dval */
+    [BIN_ELEM_EXPR] = {
+        /* expr op number -> expr */
         [BIN_ELEM_NUMBER] = {
-            .result_elem = &dval_elem,
-            .add = add_dv_num,
-            .sub = sub_dv_num,
-            .mul = mul_dv_num
+            .result_elem = &expr_elem,
+            .add = add_expr_num,
+            .sub = sub_expr_num,
+            .mul = mul_expr_num
         },
-        /* dval op dval -> dval */
-        [BIN_ELEM_DVAL] = {
-            .result_elem = &dval_elem,
-            .add = add_dv_dv,
-            .sub = sub_dv_dv,
-            .mul = mul_dv_dv
+        /* expr op expr -> expr */
+        [BIN_ELEM_EXPR] = {
+            .result_elem = &expr_elem,
+            .add = add_expr_expr,
+            .sub = sub_expr_expr,
+            .mul = mul_expr_expr
         }
     }
 };
@@ -2791,7 +2791,7 @@ struct matrix_t *mat_mul(const struct matrix_t *A, const struct matrix_t *B) {
     if (!op->mul || !op->result_elem)
         return NULL;
 
-    if (mat_is_sparse_like(A) && mat_is_sparse_like(B) && op->result_elem != &dval_elem)
+    if (mat_is_sparse_like(A) && mat_is_sparse_like(B) && op->result_elem != &expr_elem)
         return mat_mul_sparse(A, B, op);
 
     const struct elem_vtable *re = op->result_elem;
@@ -2830,7 +2830,7 @@ struct matrix_t *mat_mul(const struct matrix_t *A, const struct matrix_t *B) {
     elem_destroy_value(re, sum);
     elem_destroy_value(re, next_sum);
 
-    if (re == &dval_elem && mat_simplify_symbolic_inplace(C) != 0) {
+    if (re == &expr_elem && mat_simplify_symbolic_inplace(C) != 0) {
         mat_free(C);
         return NULL;
     }

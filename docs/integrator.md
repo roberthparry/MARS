@@ -1,14 +1,14 @@
 # `integrator_t`
 
-`integrator_t` provides adaptive quadrature rules at full `qfloat_t` (~34 decimal digits) precision, integrating a function over a finite interval `[a, b]` with automatic subinterval bisection:
+`integrator_t` provides adaptive quadrature rules at full `qfloat_t` (~31-32 decimal digits) precision, integrating a function over a finite interval `[a, b]` with automatic subinterval bisection:
 
 | Function | Rule | Degree | Notes |
 |---|---|---|---|
 | `ig_integral` | G7K15 (Gauss-Kronrod) | 29 | Callback-based; works for any function; ~21-digit practical accuracy |
-| `ig_single_integral` | Turán T15/T4 | 31 | 1-D, `dval_t` expression, full qfloat_t precision |
+| `ig_single_integral` | Turán T15/T4 | 31 | 1-D, `expr_t` expression, full qfloat_t precision |
 | `ig_double_integral` | Turán T15/T4 | 31 | 2-D rectangular domain |
 | `ig_triple_integral` | Turán T15/T4 | 31 | 3-D rectangular domain |
-| `ig_integral_multi` | Turán T15/T4 | 31 | N-D rectangular domain, adaptive in outermost variable, with symbolic fast paths for recognised `dval_t` structure |
+| `ig_integral_multi` | Turán T15/T4 | 31 | N-D rectangular domain, adaptive in outermost variable, with symbolic fast paths for recognised `expr_t` structure |
 
 ---
 
@@ -20,7 +20,7 @@ Each subinterval is evaluated with a 15-point Kronrod rule (K15) containing an e
 
 ### Turán T15/T4 (`ig_single_integral`, `ig_double_integral`, `ig_triple_integral`)
 
-Uses both f(x) and f''(x) at 8 symmetric node positions per subinterval (Turán quadrature), achieving degree-31 polynomial exactness versus degree 29 for G7K15. The second derivative is computed automatically by differentiating the `dval_t` expression graph — no user-supplied derivative is needed. The nested T4 sub-rule (4 of the 8 positions) provides the error estimate.
+Uses both f(x) and f''(x) at 8 symmetric node positions per subinterval (Turán quadrature), achieving degree-31 polynomial exactness versus degree 29 for G7K15. The second derivative is computed automatically by differentiating the `expr_t` expression graph — no user-supplied derivative is needed. The nested T4 sub-rule (4 of the 8 positions) provides the error estimate.
 
 Because the rule exploits curvature information, smooth integrands typically converge in far fewer subintervals than G7K15. For example, `∫₀¹ exp(x) dx` takes 3 subintervals with Turán T15/T4 at the default 1e-27 tolerance versus 39 with G7K15 at 1e-21 — and the Turán result carries an extra 6 digits of accuracy.
 
@@ -37,7 +37,7 @@ or the maximum subinterval count is reached.
 ### Symbolic Fast Path (`ig_integral_multi`)
 
 Before falling back to general adaptive Turán evaluation, `ig_integral_multi`
-tries a symbolic plan for several important `dval_t` expression families:
+tries a symbolic plan for several important `expr_t` expression families:
 
 - constants and scaled sums/differences of recognised symbolic forms
 - affine unary families such as `exp(a)`, `sin(a)`, `cos(a)`, `sinh(a)`, and `cosh(a)`
@@ -92,21 +92,21 @@ int main(void) {
 
 ### Turán T15/T4 with automatic differentiation
 
-When the integrand can be expressed as a `dval_t` graph, `ig_single_integral` uses the second derivative automatically and typically needs far fewer subintervals.
+When the integrand can be expressed as an `expr_t` graph, `ig_single_integral` uses the second derivative automatically and typically needs far fewer subintervals.
 
 ```c
 #include <stdio.h>
 #include "qfloat.h"
 #include "integrator.h"
-#include "dval.h"
+#include "expression.h"
 #include "number.h"
 
 int main(void) {
     /* ∫₀¹ exp(x) dx = e - 1, at default 1e-27 tolerance */
     integrator_t *ig = ig_new();
     number_t x0  = num_create_from_double(0.0);
-    dval_t *x    = dv_new_var(x0);
-    dval_t *expr = dv_exp(x);
+    expr_t *x    = expr_new_var(x0);
+    expr_t *expr = expr_exp(x);
 
     qfloat_t result, err;
     ig_single_integral(ig, expr, x,
@@ -117,8 +117,8 @@ int main(void) {
     qf_printf("  error estimate   ≈ %q\n", err);
     printf("  subintervals used: %zu\n", ig_get_interval_count_used(ig));
 
-    dv_free(expr);
-    dv_free(x);
+    expr_free(expr);
+    expr_free(x);
     num_destroy(&x0);
     ig_free(ig);
     return 0;
@@ -140,7 +140,7 @@ multiple dimensions:
 #include <stdio.h>
 #include "qfloat.h"
 #include "integrator.h"
-#include "dval.h"
+#include "expression.h"
 
 int main(void) {
     integrator_t *ig = ig_new();
@@ -148,14 +148,14 @@ int main(void) {
     number_t y0 = num_create_from_double(0.0);
     number_t two = num_create_from_long(2);
     number_t three = num_create_from_long(3);
-    dval_t *x = dv_new_var(x0);
-    dval_t *y = dv_new_var(y0);
-    dval_t *two_y = dv_mul_num(y, &two);
-    dval_t *sum = dv_add(x, two_y);
-    dval_t *affine = dv_add_num(sum, &three);
-    dval_t *exp_affine = dv_exp(affine);
-    dval_t *expr = dv_mul(affine, exp_affine);
-    dval_t *vars[2] = { x, y };
+    expr_t *x = expr_new_var(x0);
+    expr_t *y = expr_new_var(y0);
+    expr_t *two_y = expr_mul_num(y, &two);
+    expr_t *sum = expr_add(x, two_y);
+    expr_t *affine = expr_add_num(sum, &three);
+    expr_t *exp_affine = expr_exp(affine);
+    expr_t *expr = expr_mul(affine, exp_affine);
+    expr_t *vars[2] = { x, y };
     qfloat_t lo[2] = { qf_from_double(0.0), qf_from_double(0.0) };
     qfloat_t hi[2] = { qf_from_double(1.0), qf_from_double(1.0) };
     qfloat_t result, err;
@@ -169,13 +169,13 @@ int main(void) {
     num_destroy(&two);
     num_destroy(&y0);
     num_destroy(&x0);
-    dv_free(expr);
-    dv_free(exp_affine);
-    dv_free(affine);
-    dv_free(sum);
-    dv_free(two_y);
-    dv_free(y);
-    dv_free(x);
+    expr_free(expr);
+    expr_free(exp_affine);
+    expr_free(affine);
+    expr_free(sum);
+    expr_free(two_y);
+    expr_free(y);
+    expr_free(x);
     ig_free(ig);
     return 0;
 }
@@ -248,19 +248,19 @@ All declarations are in `include/integrator.h`.
   - `error_est` may be NULL.
   - Reversed limits (`a > b`) are handled correctly.
 
-- `int ig_single_integral(integrator_t *ig, dval_t *expr, dval_t *x_var, qfloat_t a, qfloat_t b, qfloat_t *result, qfloat_t *error_est)` — integrate a `dval_t` expression over `[a, b]` using Turán T15/T4 (full qfloat_t precision).
-  - `expr` is the integrand expression; `x_var` is the variable node within it created with `dv_new_var()`.
+- `int ig_single_integral(integrator_t *ig, expr_t *expr, expr_t *x_var, qfloat_t a, qfloat_t b, qfloat_t *result, qfloat_t *error_est)` — integrate an `expr_t` expression over `[a, b]` using Turán T15/T4 (full qfloat_t precision).
+  - `expr` is the integrand expression; `x_var` is the variable node within it created with `expr_new_var()`.
   - The second derivative is computed automatically; the caller's graph is not permanently modified.
   - Returns `0` on convergence, `1` if `max_intervals` was reached, `-1` on NULL argument or allocation failure.
   - `error_est` may be NULL.
   - Reversed limits (`a > b`) are handled correctly.
-  - Requires `#include "dval.h"` (already included transitively via `integrator.h`).
+  - Requires `#include "expression.h"` (already included transitively via `integrator.h`).
 
-- `int ig_double_integral(integrator_t *ig, dval_t *expr, dval_t *x_var, qfloat_t ax, qfloat_t bx, dval_t *y_var, qfloat_t ay, qfloat_t by, qfloat_t *result, qfloat_t *error_est)` — 2-D Turán T15/T4 over `[ax,bx] × [ay,by]`.  Adapts in y; evaluates the inner x integral at fixed precision.
+- `int ig_double_integral(integrator_t *ig, expr_t *expr, expr_t *x_var, qfloat_t ax, qfloat_t bx, expr_t *y_var, qfloat_t ay, qfloat_t by, qfloat_t *result, qfloat_t *error_est)` — 2-D Turán T15/T4 over `[ax,bx] × [ay,by]`.  Adapts in y; evaluates the inner x integral at fixed precision.
 
-- `int ig_triple_integral(integrator_t *ig, dval_t *expr, dval_t *x_var, qfloat_t ax, qfloat_t bx, dval_t *y_var, qfloat_t ay, qfloat_t by, dval_t *z_var, qfloat_t az, qfloat_t bz, qfloat_t *result, qfloat_t *error_est)` — 3-D Turán T15/T4 over `[ax,bx] × [ay,by] × [az,bz]`.  Adapts in z.
+- `int ig_triple_integral(integrator_t *ig, expr_t *expr, expr_t *x_var, qfloat_t ax, qfloat_t bx, expr_t *y_var, qfloat_t ay, qfloat_t by, expr_t *z_var, qfloat_t az, qfloat_t bz, qfloat_t *result, qfloat_t *error_est)` — 3-D Turán T15/T4 over `[ax,bx] × [ay,by] × [az,bz]`.  Adapts in z.
 
-- `int ig_integral_multi(integrator_t *ig, dval_t *expr, size_t ndim, dval_t * const *vars, const qfloat_t *lo, const qfloat_t *hi, qfloat_t *result, qfloat_t *error_est)` — N-D Turán T15/T4 over a rectangular domain.
+- `int ig_integral_multi(integrator_t *ig, expr_t *expr, size_t ndim, expr_t * const *vars, const qfloat_t *lo, const qfloat_t *hi, qfloat_t *result, qfloat_t *error_est)` — N-D Turán T15/T4 over a rectangular domain.
   - `vars[0]` is the innermost variable, `vars[ndim-1]` the outermost (adapted by bisection).  `lo[i]` / `hi[i]` are the bounds for `vars[i]`.
   - All 2^N mixed second-derivative expressions are built automatically.
   - Returns `0` on convergence, `1` if `max_intervals` was reached, `-1` on null argument, `ndim == 0`, or allocation failure.
@@ -280,17 +280,17 @@ All declarations are in `include/integrator.h`.
 
 **Turán degree advantage** comes from incorporating f'' directly into the quadrature weights. For an 8-node symmetric rule this raises exactness from degree 15 (f only) to degree 31. The T4 nested sub-rule uses alternating node positions (not consecutive), which keeps all weights positive and the rule well-conditioned.
 
-**Cache coherence** in `ig_single_integral`: `dv_eval` detects variable changes automatically via epoch tracking — each call to `dv_set_val` advances the variable's epoch, and computed nodes recompute when they see a newer epoch from their inputs.
+**Cache coherence** in `ig_single_integral`: `expr_eval` detects variable changes automatically via epoch tracking — each call to `expr_set_val` advances the variable's epoch, and computed nodes recompute when they see a newer epoch from their inputs.
 
-**Threading:** the current `dval_t` and symbolic-integrator path are not yet
+**Threading:** the current `expr_t` and symbolic-integrator path are not yet
 internally synchronised. Prefer sequential test and benchmark runs, and do not
-share mutable integrator / `dval_t` state across threads without external
+share mutable integrator / `expr_t` state across threads without external
 locking.
 
 ## Tradeoffs
 
 - Only finite intervals `[a, b]` are supported directly. For improper integrals, apply a substitution before passing the transformed integrand.
-- `ig_single_integral` (and the multi-dimensional variants) require that the integrand be expressible as a `dval_t` graph. Functions with branches, loops, or external data are better served by `ig_integral`.
+- `ig_single_integral` (and the multi-dimensional variants) require that the integrand be expressible as an `expr_t` graph. Functions with branches, loops, or external data are better served by `ig_integral`.
 - Functions with endpoint singularities or sharp peaks may require many subdivisions. Increase the max interval count via `ig_set_interval_count_max` or apply a smoothing substitution.
 - The G7K15 rule evaluates the integrand at 15 points per subinterval; the Turán rule evaluates f and f'' at 8 points (16 evaluations equivalent). For expensive callbacks, the Turán rule's lower subinterval count usually wins despite the per-node overhead.
 

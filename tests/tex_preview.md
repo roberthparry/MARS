@@ -3,7 +3,7 @@
 If your Markdown viewer supports maths, the blocks below should render as
 typeset mathematics rather than raw TeX source.
 
-## dval
+## expr
 
 <table style="border-collapse: collapse; border: none;">
   <tr>

@@ -9,8 +9,8 @@
  * ------------------------------------------------------------------- */
 
 typedef struct {
-    dval_t    **deriv_exprs; /* 2^ndim entries indexed by derivative bitmask */
-    dval_t    **vars;        /* vars[0] = innermost variable                  */
+    expr_t    **deriv_exprs; /* 2^ndim entries indexed by derivative bitmask */
+    expr_t    **vars;        /* vars[0] = innermost variable                  */
     const qfloat_t *lo;
     const qfloat_t *hi;
     int        all_same;    /* all deriv_exprs[mask] are the same function   */
@@ -21,8 +21,8 @@ static qfloat_t eval_nd_t15(const multi_ctx_t *ctx, int dim, size_t dmask,
 {
     if (dim == 0) {
         qfloat_t t15, t4;
-        dval_t *e = ctx->deriv_exprs[dmask];
-        gturan_eval_dv(e, ctx->vars[0],
+        expr_t *e = ctx->deriv_exprs[dmask];
+        gturan_eval_expr(e, ctx->vars[0],
                        ctx->all_same ? e : ctx->deriv_exprs[dmask | 1],
                        a, b, &t15, &t4);
         return t15;
@@ -32,7 +32,7 @@ static qfloat_t eval_nd_t15(const multi_ctx_t *ctx, int dim, size_t dmask,
     qfloat_t h2  = qf_mul(h, h);
     size_t   bit = (size_t)1 << dim;
 
-    ig_dv_set_val_qf(ctx->vars[dim], c);
+    ig_expr_set_val_qf(ctx->vars[dim], c);
     qfloat_t F0   = eval_nd_t15(ctx, dim-1, dmask,       ctx->lo[dim-1], ctx->hi[dim-1]);
     qfloat_t Fpp0 = ctx->all_same ? F0
                   : eval_nd_t15(ctx, dim-1, dmask | bit, ctx->lo[dim-1], ctx->hi[dim-1]);
@@ -41,11 +41,11 @@ static qfloat_t eval_nd_t15(const multi_ctx_t *ctx, int dim, size_t dmask,
     qfloat_t Fpppos[TN_SYMMETRIC_PAIRS], Fppneg[TN_SYMMETRIC_PAIRS];
     for (int i = 0; i < TN_SYMMETRIC_PAIRS; i++) {
         qfloat_t ht = qf_mul(h, tn_node[i + 1]);
-        ig_dv_set_val_qf(ctx->vars[dim], qf_add(c, ht));
+        ig_expr_set_val_qf(ctx->vars[dim], qf_add(c, ht));
         Fpos[i]   = eval_nd_t15(ctx, dim-1, dmask,       ctx->lo[dim-1], ctx->hi[dim-1]);
         Fpppos[i] = ctx->all_same ? Fpos[i]
                   : eval_nd_t15(ctx, dim-1, dmask | bit, ctx->lo[dim-1], ctx->hi[dim-1]);
-        ig_dv_set_val_qf(ctx->vars[dim], qf_sub(c, ht));
+        ig_expr_set_val_qf(ctx->vars[dim], qf_sub(c, ht));
         Fneg[i]   = eval_nd_t15(ctx, dim-1, dmask,       ctx->lo[dim-1], ctx->hi[dim-1]);
         Fppneg[i] = ctx->all_same ? Fneg[i]
                   : eval_nd_t15(ctx, dim-1, dmask | bit, ctx->lo[dim-1], ctx->hi[dim-1]);
@@ -64,8 +64,8 @@ static void eval_nd_turan(const multi_ctx_t *ctx, int dim, size_t dmask,
                             qfloat_t *t15_out, qfloat_t *t4_out)
 {
     if (dim == 0) {
-        dval_t *e = ctx->deriv_exprs[dmask];
-        gturan_eval_dv(e, ctx->vars[0],
+        expr_t *e = ctx->deriv_exprs[dmask];
+        gturan_eval_expr(e, ctx->vars[0],
                        ctx->all_same ? e : ctx->deriv_exprs[dmask | 1],
                        a, b, t15_out, t4_out);
         return;
@@ -75,7 +75,7 @@ static void eval_nd_turan(const multi_ctx_t *ctx, int dim, size_t dmask,
     qfloat_t h2  = qf_mul(h, h);
     size_t   bit = (size_t)1 << dim;
 
-    ig_dv_set_val_qf(ctx->vars[dim], c);
+    ig_expr_set_val_qf(ctx->vars[dim], c);
     qfloat_t F0   = eval_nd_t15(ctx, dim-1, dmask,       ctx->lo[dim-1], ctx->hi[dim-1]);
     qfloat_t Fpp0 = ctx->all_same ? F0
                   : eval_nd_t15(ctx, dim-1, dmask | bit, ctx->lo[dim-1], ctx->hi[dim-1]);
@@ -84,11 +84,11 @@ static void eval_nd_turan(const multi_ctx_t *ctx, int dim, size_t dmask,
     qfloat_t Fpppos[TN_SYMMETRIC_PAIRS], Fppneg[TN_SYMMETRIC_PAIRS];
     for (int i = 0; i < TN_SYMMETRIC_PAIRS; i++) {
         qfloat_t ht = qf_mul(h, tn_node[i + 1]);
-        ig_dv_set_val_qf(ctx->vars[dim], qf_add(c, ht));
+        ig_expr_set_val_qf(ctx->vars[dim], qf_add(c, ht));
         Fpos[i]   = eval_nd_t15(ctx, dim-1, dmask,       ctx->lo[dim-1], ctx->hi[dim-1]);
         Fpppos[i] = ctx->all_same ? Fpos[i]
                   : eval_nd_t15(ctx, dim-1, dmask | bit, ctx->lo[dim-1], ctx->hi[dim-1]);
-        ig_dv_set_val_qf(ctx->vars[dim], qf_sub(c, ht));
+        ig_expr_set_val_qf(ctx->vars[dim], qf_sub(c, ht));
         Fneg[i]   = eval_nd_t15(ctx, dim-1, dmask,       ctx->lo[dim-1], ctx->hi[dim-1]);
         Fppneg[i] = ctx->all_same ? Fneg[i]
                   : eval_nd_t15(ctx, dim-1, dmask | bit, ctx->lo[dim-1], ctx->hi[dim-1]);
@@ -112,8 +112,8 @@ static void eval_nd_turan(const multi_ctx_t *ctx, int dim, size_t dmask,
 }
 
 
-int ig_integral_multi(integrator_t *ig, dval_t *expr,
-                      size_t ndim, dval_t * const *vars,
+int ig_integral_multi(integrator_t *ig, expr_t *expr,
+                      size_t ndim, expr_t * const *vars,
                       const qfloat_t *lo, const qfloat_t *hi,
                       qfloat_t *result, qfloat_t *error_est)
 {
@@ -127,44 +127,44 @@ int ig_integral_multi(integrator_t *ig, dval_t *expr,
         return fast_status > 0 ? 0 : -1;
 
     size_t nexprs = (size_t)1 << ndim;
-    dval_t **deriv_exprs = malloc(nexprs * sizeof(dval_t *));
+    expr_t **deriv_exprs = malloc(nexprs * sizeof(expr_t *));
     if (!deriv_exprs) return -1;
 
     deriv_exprs[0] = expr;
     for (size_t mask = 1; mask < nexprs; mask++) {
         int i = __builtin_ctz((unsigned int)mask);
         size_t prev = mask ^ ((size_t)1 << i);
-        deriv_exprs[mask] = dv_create_2nd_deriv(deriv_exprs[prev], vars[i], vars[i]);
+        deriv_exprs[mask] = expr_create_2nd_deriv(deriv_exprs[prev], vars[i], vars[i]);
         if (!deriv_exprs[mask]) {
-            for (size_t j = 1; j < mask; j++) dv_free(deriv_exprs[j]);
+            for (size_t j = 1; j < mask; j++) expr_free(deriv_exprs[j]);
             free(deriv_exprs);
             return -1;
         }
     }
 
     /* Detect if all deriv_exprs evaluate to the same function.
-     * If so, eval_nd_t15/turan skip redundant recursive calls, and gturan_eval_dv
+     * If so, eval_nd_t15/turan skip redundant recursive calls, and gturan_eval_expr
      * skips redundant evaluations. Uses two test points to distinguish functions. */
     int all_same = (nexprs > 1);
     if (all_same) {
         static const double tp[] = { 0.31415, 0.71828 };
         for (size_t t = 0; t < sizeof(tp) / sizeof(tp[0]) && all_same; t++) {
             for (size_t v = 0; v < ndim; v++)
-                ig_dv_set_val_qf(vars[v], qf_from_double(tp[t]));
-            qfloat_t ref = ig_dv_eval_qf(deriv_exprs[0]);
+                ig_expr_set_val_qf(vars[v], qf_from_double(tp[t]));
+            qfloat_t ref = ig_expr_eval_qf(deriv_exprs[0]);
             for (size_t mask = 1; mask < nexprs && all_same; mask++) {
-                if (!qf_eq(ref, ig_dv_eval_qf(deriv_exprs[mask])))
+                if (!qf_eq(ref, ig_expr_eval_qf(deriv_exprs[mask])))
                     all_same = 0;
             }
         }
     }
 
-    multi_ctx_t ctx = { deriv_exprs, (dval_t **)vars, lo, hi, all_same };
+    multi_ctx_t ctx = { deriv_exprs, (expr_t **)vars, lo, hi, all_same };
 
     size_t capacity = 64;
     subinterval_t *intervals = malloc(capacity * sizeof(subinterval_t));
     if (!intervals) {
-        for (size_t j = 1; j < nexprs; j++) dv_free(deriv_exprs[j]);
+        for (size_t j = 1; j < nexprs; j++) expr_free(deriv_exprs[j]);
         free(deriv_exprs);
         return -1;
     }
@@ -220,7 +220,7 @@ int ig_integral_multi(integrator_t *ig, dval_t *expr,
             subinterval_t *tmp = realloc(intervals, capacity * sizeof(subinterval_t));
             if (!tmp) {
                 free(intervals);
-                for (size_t j = 1; j < nexprs; j++) dv_free(deriv_exprs[j]);
+                for (size_t j = 1; j < nexprs; j++) expr_free(deriv_exprs[j]);
                 free(deriv_exprs);
                 return -1;
             }
@@ -236,7 +236,7 @@ int ig_integral_multi(integrator_t *ig, dval_t *expr,
     if (error_est) *error_est = qf_abs(total_err);
 
     free(intervals);
-    for (size_t j = 1; j < nexprs; j++) dv_free(deriv_exprs[j]);
+    for (size_t j = 1; j < nexprs; j++) expr_free(deriv_exprs[j]);
     free(deriv_exprs);
     return status;
 }

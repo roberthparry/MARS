@@ -278,9 +278,15 @@ qcomplex_t qc_sqrt(qcomplex_t z);                /**< sqrt(z) */
 qcomplex_t qc_sin(qcomplex_t z);                 /**< sin(z) */
 qcomplex_t qc_cos(qcomplex_t z);                 /**< cos(z) */
 qcomplex_t qc_tan(qcomplex_t z);                 /**< tan(z) */
+qcomplex_t qc_sec(qcomplex_t z);                 /**< sec(z) */
+qcomplex_t qc_cosec(qcomplex_t z);               /**< cosec(z) */
+qcomplex_t qc_cot(qcomplex_t z);                 /**< cot(z) */
 qcomplex_t qc_asin(qcomplex_t z);                /**< asin(z) */
 qcomplex_t qc_acos(qcomplex_t z);                /**< acos(z) */
 qcomplex_t qc_atan(qcomplex_t z);                /**< atan(z) */
+qcomplex_t qc_asec(qcomplex_t z);                /**< asec(z) */
+qcomplex_t qc_acosec(qcomplex_t z);              /**< acosec(z) */
+qcomplex_t qc_acot(qcomplex_t z);                /**< acot(z) */
 qcomplex_t qc_atan2(qcomplex_t y, qcomplex_t x); /**< atan2(y, x) */
 /** @} */
 
@@ -291,9 +297,15 @@ qcomplex_t qc_atan2(qcomplex_t y, qcomplex_t x); /**< atan2(y, x) */
 qcomplex_t qc_sinh(qcomplex_t z);                /**< sinh(z) */
 qcomplex_t qc_cosh(qcomplex_t z);                /**< cosh(z) */
 qcomplex_t qc_tanh(qcomplex_t z);                /**< tanh(z) */
+qcomplex_t qc_sech(qcomplex_t z);                /**< sech(z) */
+qcomplex_t qc_cosech(qcomplex_t z);              /**< cosech(z) */
+qcomplex_t qc_coth(qcomplex_t z);                /**< coth(z) */
 qcomplex_t qc_asinh(qcomplex_t z);               /**< asinh(z) */
 qcomplex_t qc_acosh(qcomplex_t z);               /**< acosh(z) */
 qcomplex_t qc_atanh(qcomplex_t z);               /**< atanh(z) */
+qcomplex_t qc_asech(qcomplex_t z);               /**< asech(z) */
+qcomplex_t qc_acosech(qcomplex_t z);             /**< acosech(z) */
+qcomplex_t qc_acoth(qcomplex_t z);               /**< acoth(z) */
 /** @} */
 
 /**

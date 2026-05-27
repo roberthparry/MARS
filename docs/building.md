@@ -116,7 +116,7 @@ make test
 Run a single test binary:
 
 ```sh
-make test_dval
+make test_expression
 make test_matrix
 make test_integrator
 ```
@@ -127,10 +127,10 @@ Run the integrator benchmark:
 make bench_integrator
 ```
 
-Run the symbolic `dval` matrix benchmark:
+Run the symbolic `expr` matrix benchmark:
 
 ```sh
-make bench_matrix_dval
+make bench_matrix_expr
 ```
 
 See [`benchmarks.md`](benchmarks.md) for notes on output units and current
@@ -156,7 +156,8 @@ make help
   through your OS package manager before building MARS.
 - Benchmarks are discovered automatically from `bench/bench_*.c`.
 - Current benchmark targets include `bench_integrator` and
-  `bench_matrix_dval`.
-- The build currently adds both `include/` and `include/internal/` to the
-  compiler search path so project modules and tests can share internal headers.
+  `bench_matrix_expr`.
+- The build currently adds `include/`, `src/`, `tests/`, and `tests/include/`
+  to the compiler search path so project modules and tests can share internal
+  headers.
   External consumers should treat only `include/` as public API.

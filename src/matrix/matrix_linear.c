@@ -4,7 +4,7 @@
 
 #include "matrix_internal.h"
 #include "matrix_vtable_defs.h"
-#include "internal/dval_internal.h"
+#include "internal/expr_internal.h"
 
 static bool mat_uses_sparse_like_storage(const matrix_t *A)
 {
@@ -529,35 +529,35 @@ matrix_t *mat_hermitian(const matrix_t *A)
     return H;
 }
 
-int mat_trace_dv(const matrix_t *A, dval_t **trace)
+int mat_trace_expr(const matrix_t *A, expr_t **trace)
 {
     if (!A || !trace)
         return -1;
     if (A->rows != A->cols)
         return -2;
-    if (A->elem != &dval_elem)
+    if (A->elem != &expr_elem)
         return -3;
-    dval_t *sum = dv_new_const(NUM_ZERO);
+    expr_t *sum = expr_new_const(NUM_ZERO);
 
     if (!sum)
         return -3;
 
     for (size_t i = 0; i < A->rows; ++i) {
-        dval_t *term = NULL;
-        dval_t *tmp = NULL;
+        expr_t *term = NULL;
+        expr_t *tmp = NULL;
 
         mat_get(A, i, i, &term);
         if (!term)
-            term = (dval_t *)DV_ZERO;
+            term = (expr_t *)EXPR_ZERO;
 
-        tmp = dv_add(sum, term);
-        dv_free(sum);
+        tmp = expr_add(sum, term);
+        expr_free(sum);
         sum = tmp;
         if (!sum)
             return -3;
     }
 
-    *trace = dval_simplify_owned(sum);
+    *trace = expr_simplify_owned(sum);
     return *trace ? 0 : -3;
 }
 
@@ -582,16 +582,16 @@ int mat_trace(const matrix_t *A, number_t *trace)
     return 0;
 }
 
-int mat_det_dv(const matrix_t *A, dval_t **determinant)
+int mat_det_expr(const matrix_t *A, expr_t **determinant)
 {
     if (!A || !determinant)
         return -1;
     if (A->rows != A->cols)
         return -2;
-    if (A->elem != &dval_elem)
+    if (A->elem != &expr_elem)
         return -3;
 
-    return mat_det_dval_exact(A, determinant);
+    return mat_det_expr_exact(A, determinant);
 }
 
 int mat_det(const matrix_t *A, number_t *determinant)
@@ -771,7 +771,7 @@ matrix_t *mat_inverse(const matrix_t *A)
     if (A->rows != A->cols)
         return NULL;
     if (matrix_is_symbolic(A))
-        return mat_inverse_dval_exact(A);
+        return mat_inverse_expr_exact(A);
     if (!elem_supports_numeric_algorithms(A->elem))
         return NULL;
 
@@ -936,7 +936,7 @@ matrix_t *mat_solve(const matrix_t *A, const matrix_t *B)
     if (!A || !B || A->rows != A->cols || A->rows != B->rows)
         return NULL;
     if (matrix_is_symbolic(A) && matrix_is_symbolic(B))
-        return mat_solve_dval_exact(A, B);
+        return mat_solve_expr_exact(A, B);
     if (!elem_supports_numeric_algorithms(A->elem) ||
         !elem_supports_numeric_algorithms(B->elem))
         return NULL;
@@ -1010,7 +1010,7 @@ matrix_t *mat_least_squares(const matrix_t *A, const matrix_t *B)
     if (!A || !B || A->rows != B->rows)
         return NULL;
     if (matrix_is_symbolic(A) && matrix_is_symbolic(B)) {
-        A_pinv = mat_pseudoinverse_dval_exact(A);
+        A_pinv = mat_pseudoinverse_expr_exact(A);
         X = A_pinv ? mat_mul(A_pinv, B) : NULL;
         mat_free(A_pinv);
         return mat_finalize_symbolic_result(X);

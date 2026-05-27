@@ -8,7 +8,7 @@
 
 #include "matrix.h"
 #include "number/number_internal.h"
-#include "../dval/test_dval.h"
+#include "../expression/test_expr.h"
 #include "test_harness.h"
 
 const test_validity_contract_t *matrix_validity_contract_double_default(void);
@@ -155,7 +155,7 @@ static inline void test_mat_set_complex(matrix_t *A, size_t i, size_t j, const q
     num_destroy(&n);
 }
 
-static inline void test_mat_set_dv_slot(matrix_t *A, size_t i, size_t j, dval_t *const *value)
+static inline void test_mat_set_expr_slot(matrix_t *A, size_t i, size_t j, expr_t *const *value)
 {
     mat_set(A, i, j, value);
 }
@@ -204,16 +204,16 @@ static inline void test_mat_get_complex(const matrix_t *A, size_t i, size_t j, q
     num_destroy(&n);
 }
 
-static inline void test_mat_get_dv_slot(const matrix_t *A, size_t i, size_t j, dval_t **out)
+static inline void test_mat_get_expr_slot(const matrix_t *A, size_t i, size_t j, expr_t **out)
 {
-    dval_t *borrowed = NULL;
+    expr_t *borrowed = NULL;
 
     if (!out)
         return;
     mat_get(A, i, j, &borrowed);
     *out = borrowed;
     if (*out)
-        dv_retain(*out);
+        expr_retain(*out);
 }
 
 static inline void test_mat_set_data_num_slot(matrix_t *A, const number_t *data)
@@ -221,9 +221,9 @@ static inline void test_mat_set_data_num_slot(matrix_t *A, const number_t *data)
     mat_set_data(A, data);
 }
 
-static inline void test_mat_set_data_dv_slot(matrix_t *A, dval_t *const *data)
+static inline void test_mat_set_data_expr_slot(matrix_t *A, expr_t *const *data)
 {
-    mat_set_data_dv(A, data);
+    mat_set_data_expr(A, data);
 }
 
 static inline void test_mat_set_data_d(matrix_t *A, const double *data)
@@ -300,9 +300,9 @@ static inline void test_mat_get_data_num_slot(const matrix_t *A, number_t *data)
     mat_get_data(A, data);
 }
 
-static inline void test_mat_get_data_dv_slot(const matrix_t *A, dval_t **data)
+static inline void test_mat_get_data_expr_slot(const matrix_t *A, expr_t **data)
 {
-    mat_get_data_dv(A, data);
+    mat_get_data_expr(A, data);
 }
 
 static inline void test_mat_get_data_d(const matrix_t *A, double *data)
@@ -449,37 +449,37 @@ static inline int test_mat_det_complex(const matrix_t *A, qcomplex_t *determinan
     return 0;
 }
 
-static inline int test_mat_det_dv_slot(const matrix_t *A, dval_t **determinant)
+static inline int test_mat_det_expr_slot(const matrix_t *A, expr_t **determinant)
 {
-    return mat_det_dv(A, determinant);
+    return mat_det_expr(A, determinant);
 }
 
-static inline matrix_t *test_mat_eigenspace_dv_slot(const matrix_t *A, dval_t **eigenvalue)
+static inline matrix_t *test_mat_eigenspace_expr_slot(const matrix_t *A, expr_t **eigenvalue)
 {
-    return (A && eigenvalue && *eigenvalue) ? mat_eigenspace_dv(A, *eigenvalue) : NULL;
+    return (A && eigenvalue && *eigenvalue) ? mat_eigenspace_expr(A, *eigenvalue) : NULL;
 }
 
-static inline matrix_t *test_mat_generalized_eigenspace_dv_slot(const matrix_t *A,
-                                                                 dval_t **eigenvalue,
+static inline matrix_t *test_mat_generalized_eigenspace_expr_slot(const matrix_t *A,
+                                                                 expr_t **eigenvalue,
                                                                  size_t order)
 {
     return (A && eigenvalue && *eigenvalue)
-             ? mat_generalized_eigenspace_dv(A, *eigenvalue, order)
+             ? mat_generalized_eigenspace_expr(A, *eigenvalue, order)
              : NULL;
 }
 
-static inline matrix_t *test_mat_jordan_chain_dv_slot(const matrix_t *A,
-                                                       dval_t **eigenvalue,
+static inline matrix_t *test_mat_jordan_chain_expr_slot(const matrix_t *A,
+                                                       expr_t **eigenvalue,
                                                        size_t order)
 {
     return (A && eigenvalue && *eigenvalue)
-             ? mat_jordan_chain_dv(A, *eigenvalue, order)
+             ? mat_jordan_chain_expr(A, *eigenvalue, order)
              : NULL;
 }
 
-static inline matrix_t *test_mat_jordan_profile_dv_slot(const matrix_t *A, dval_t **eigenvalue)
+static inline matrix_t *test_mat_jordan_profile_expr_slot(const matrix_t *A, expr_t **eigenvalue)
 {
-    return (A && eigenvalue && *eigenvalue) ? mat_jordan_profile_dv(A, *eigenvalue) : NULL;
+    return (A && eigenvalue && *eigenvalue) ? mat_jordan_profile_expr(A, *eigenvalue) : NULL;
 }
 
 static inline int test_mat_trace_mp_real(const matrix_t *A, qfloat_t *trace)
@@ -541,16 +541,16 @@ static inline matrix_t *matsq_new_num(size_t n)
     return mat_new(n, n);
 }
 
-static inline matrix_t *test_mat_square_dv(size_t n)
+static inline matrix_t *test_mat_square_expr(size_t n)
 {
-    return mat_new_dv(n, n);
+    return mat_new_expr(n, n);
 }
 
 static inline int test_mat_bindings_set_d(mat_bindings_t *bindings,
                                           const char *name,
                                           double value)
 {
-    dval_t *binding;
+    expr_t *binding;
     number_t n;
 
     if (!bindings || !name)
@@ -561,7 +561,7 @@ static inline int test_mat_bindings_set_d(mat_bindings_t *bindings,
         return -1;
 
     n = test_num_from_d(value);
-    dv_set_val(binding, n);
+    expr_set_val(binding, n);
     num_destroy(&n);
     return 0;
 }
@@ -594,7 +594,7 @@ void run_matrix_output_tests(void);
 #define mat_get(A, i, j, out) \
     _Generic((out), \
         number_t *: test_mat_get_num_slot, \
-        dval_t **: test_mat_get_dv_slot, \
+        expr_t **: test_mat_get_expr_slot, \
         double *: test_mat_get_d, \
         qfloat_t *: test_mat_get_mp_real, \
         qcomplex_t *: test_mat_get_complex \
@@ -604,8 +604,8 @@ void run_matrix_output_tests(void);
     _Generic((val), \
         const number_t *: test_mat_set_num_slot, \
         number_t *: test_mat_set_num_slot, \
-        dval_t *const *: test_mat_set_dv_slot, \
-        dval_t **: test_mat_set_dv_slot, \
+        expr_t *const *: test_mat_set_expr_slot, \
+        expr_t **: test_mat_set_expr_slot, \
         const double *: test_mat_set_d, \
         double *: test_mat_set_d, \
         const qfloat_t *: test_mat_set_mp_real, \
@@ -617,7 +617,7 @@ void run_matrix_output_tests(void);
 #define mat_get_data(A, data) \
     _Generic((data), \
         number_t *: test_mat_get_data_num_slot, \
-        dval_t **: test_mat_get_data_dv_slot, \
+        expr_t **: test_mat_get_data_expr_slot, \
         double *: test_mat_get_data_d, \
         qfloat_t *: test_mat_get_data_mp_real, \
         qcomplex_t *: test_mat_get_data_complex \
@@ -629,7 +629,7 @@ void run_matrix_output_tests(void);
         double *: test_mat_trace_d, \
         qfloat_t *: test_mat_trace_mp_real, \
         qcomplex_t *: test_mat_trace_complex, \
-        dval_t **: mat_trace_dv \
+        expr_t **: mat_trace_expr \
     )((A), (trace))
 
 #define mat_det(A, determinant) \
@@ -638,43 +638,43 @@ void run_matrix_output_tests(void);
         double *: test_mat_det_d, \
         qfloat_t *: test_mat_det_mp_real, \
         qcomplex_t *: test_mat_det_complex, \
-        dval_t **: test_mat_det_dv_slot \
+        expr_t **: test_mat_det_expr_slot \
     )((A), (determinant))
 
 #define mat_eigenspace(A, eigenvalue) \
     _Generic((eigenvalue), \
         const number_t *: mat_eigenspace, \
         number_t *: mat_eigenspace, \
-        const dval_t *: mat_eigenspace_dv, \
-        dval_t **: test_mat_eigenspace_dv_slot, \
-        dval_t *: mat_eigenspace_dv \
+        const expr_t *: mat_eigenspace_expr, \
+        expr_t **: test_mat_eigenspace_expr_slot, \
+        expr_t *: mat_eigenspace_expr \
     )((A), (eigenvalue))
 
 #define mat_generalized_eigenspace(A, eigenvalue, order) \
     _Generic((eigenvalue), \
         const number_t *: mat_generalized_eigenspace, \
         number_t *: mat_generalized_eigenspace, \
-        const dval_t *: mat_generalized_eigenspace_dv, \
-        dval_t **: test_mat_generalized_eigenspace_dv_slot, \
-        dval_t *: mat_generalized_eigenspace_dv \
+        const expr_t *: mat_generalized_eigenspace_expr, \
+        expr_t **: test_mat_generalized_eigenspace_expr_slot, \
+        expr_t *: mat_generalized_eigenspace_expr \
     )((A), (eigenvalue), (order))
 
 #define mat_jordan_chain(A, eigenvalue, order) \
     _Generic((eigenvalue), \
         const number_t *: mat_jordan_chain, \
         number_t *: mat_jordan_chain, \
-        const dval_t *: mat_jordan_chain_dv, \
-        dval_t **: test_mat_jordan_chain_dv_slot, \
-        dval_t *: mat_jordan_chain_dv \
+        const expr_t *: mat_jordan_chain_expr, \
+        expr_t **: test_mat_jordan_chain_expr_slot, \
+        expr_t *: mat_jordan_chain_expr \
     )((A), (eigenvalue), (order))
 
 #define mat_jordan_profile(A, eigenvalue) \
     _Generic((eigenvalue), \
         const number_t *: mat_jordan_profile, \
         number_t *: mat_jordan_profile, \
-        const dval_t *: mat_jordan_profile_dv, \
-        dval_t **: test_mat_jordan_profile_dv_slot, \
-        dval_t *: mat_jordan_profile_dv \
+        const expr_t *: mat_jordan_profile_expr, \
+        expr_t **: test_mat_jordan_profile_expr_slot, \
+        expr_t *: mat_jordan_profile_expr \
     )((A), (eigenvalue))
 
 #endif

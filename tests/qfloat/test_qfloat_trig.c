@@ -151,6 +151,26 @@ static void test_qf_trig()
     }
 }
 
+static void test_qf_reciprocal_trig(void)
+{
+    printf("\n== qf_sec / qf_cosec / qf_cot and inverses ==\n");
+
+    TEST_ASSERT_QFLOAT_CLOSE(qf_sec(QF_PI_3), qf_from_double(2.0));
+    TEST_ASSERT_QFLOAT_CLOSE(qf_cosec(QF_PI_6), qf_from_double(2.0));
+    TEST_ASSERT_QFLOAT_CLOSE(qf_cot(QF_PI_4), QF_ONE);
+
+    TEST_ASSERT_QFLOAT_CLOSE(qf_asec(qf_from_double(2.0)), QF_PI_3);
+    TEST_ASSERT_QFLOAT_CLOSE(qf_acosec(qf_from_double(2.0)), QF_PI_6);
+    TEST_ASSERT_QFLOAT_CLOSE(qf_acot(QF_ONE), QF_PI_4);
+    TEST_ASSERT_QFLOAT_CLOSE(qf_acot(QF_ZERO), QF_PI_2);
+    TEST_ASSERT_TRUE(qf_isnan(qf_asec(QF_ZERO)), "asec(0) is NaN");
+    TEST_ASSERT_TRUE(qf_isnan(qf_acosec(QF_ZERO)), "acosec(0) is NaN");
+    TEST_ASSERT_QFLOAT_CLOSE(qf_asec(QF_INF), QF_PI_2);
+    TEST_ASSERT_QFLOAT_CLOSE(qf_acosec(QF_INF), QF_ZERO);
+    TEST_ASSERT_QFLOAT_CLOSE(qf_acot(QF_INF), QF_ZERO);
+    TEST_ASSERT_QFLOAT_CLOSE(qf_acot(QF_NINF), QF_PI);
+}
+
 /* ============================================================
  *  Inverse Trigonometric Function Tests
  * ============================================================ */
@@ -379,6 +399,7 @@ static void test_qf_atan2(void)
 
 void test_trigonometric(void) {
     TEST_RUN_SUBTEST(test_qf_trig, NULL);
+    TEST_RUN_SUBTEST(test_qf_reciprocal_trig, NULL);
     TEST_RUN_SUBTEST(test_qf_atan, NULL);
     TEST_RUN_SUBTEST(test_qf_atan2, NULL);
     TEST_RUN_SUBTEST(test_qf_asin, NULL);

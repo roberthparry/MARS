@@ -182,7 +182,7 @@ typedef qfloat_t (*affine_unary_special_eval_fn)(size_t ndim,
                                                  const bool *active);
 
 typedef struct {
-    dv_pattern_unary_affine_kind_t unary_kind;
+    expr_pattern_unary_affine_kind_t unary_kind;
     affine_poly_special_kind_t special_kind;
     affine_unary_special_eval_fn unary_eval;
 } affine_special_dispatch_t;
@@ -293,11 +293,11 @@ static qfloat_t eval_box_affine_unary_cos(size_t ndim,
 }
 
 static const affine_special_dispatch_t affine_special_kinds[] = {
-    { DV_PATTERN_UNARY_EXP,  AFFINE_POLY_SPECIAL_EXP,  eval_box_affine_unary_exp  },
-    { DV_PATTERN_UNARY_SIN,  AFFINE_POLY_SPECIAL_SIN,  eval_box_affine_unary_sin  },
-    { DV_PATTERN_UNARY_COS,  AFFINE_POLY_SPECIAL_COS,  eval_box_affine_unary_cos  },
-    { DV_PATTERN_UNARY_SINH, AFFINE_POLY_SPECIAL_SINH, eval_box_affine_unary_sinh },
-    { DV_PATTERN_UNARY_COSH, AFFINE_POLY_SPECIAL_COSH, eval_box_affine_unary_cosh }
+    { EXPR_PATTERN_UNARY_EXP,  AFFINE_POLY_SPECIAL_EXP,  eval_box_affine_unary_exp  },
+    { EXPR_PATTERN_UNARY_SIN,  AFFINE_POLY_SPECIAL_SIN,  eval_box_affine_unary_sin  },
+    { EXPR_PATTERN_UNARY_COS,  AFFINE_POLY_SPECIAL_COS,  eval_box_affine_unary_cos  },
+    { EXPR_PATTERN_UNARY_SINH, AFFINE_POLY_SPECIAL_SINH, eval_box_affine_unary_sinh },
+    { EXPR_PATTERN_UNARY_COSH, AFFINE_POLY_SPECIAL_COSH, eval_box_affine_unary_cosh }
 };
 
 static const affine_special_dispatch_t *affine_special_dispatch(affine_poly_special_kind_t kind)
@@ -1015,22 +1015,22 @@ typedef struct {
     qfloat_t constant;
     qfloat_t poly[5];
     affine_poly_special_kind_t special_kind;
-    const dval_t *left;
-    const dval_t *right;
-    const dval_t *base;
+    const expr_t *left;
+    const expr_t *right;
+    const expr_t *base;
     bool is_sub;
 } symbolic_plan_t;
 
 typedef struct {
-    const dval_t *left;
-    const dval_t *right;
+    const expr_t *left;
+    const expr_t *right;
     bool *used_left;
     bool *used_right;
 } symbolic_binary_product_plan_t;
 
 typedef struct {
     size_t ngroups;
-    const dval_t **group_exprs;
+    const expr_t **group_exprs;
     bool *group_owned;
     bool **group_used;
 } symbolic_separable_product_plan_t;
@@ -1045,9 +1045,9 @@ static qfloat_t box_volume(size_t ndim, const qfloat_t *lo, const qfloat_t *hi,
     return v;
 }
 
-static bool try_eval_special_combination(const dval_t *expr,
+static bool try_eval_special_combination(const expr_t *expr,
                                          size_t ndim,
-                                         dval_t *const *vars,
+                                         expr_t *const *vars,
                                          const qfloat_t *lo,
                                          const qfloat_t *hi,
                                          const bool *active,
@@ -1090,7 +1090,7 @@ static void free_symbolic_separable_product_plan(symbolic_separable_product_plan
     if (plan->group_exprs && plan->group_owned) {
         for (size_t i = 0; i < plan->ngroups; ++i) {
             if (plan->group_owned[i] && plan->group_exprs[i])
-                dv_free((dval_t *)plan->group_exprs[i]);
+                expr_free((expr_t *)plan->group_exprs[i]);
         }
     }
 
@@ -1109,20 +1109,20 @@ static void free_symbolic_separable_product_plan(symbolic_separable_product_plan
     plan->group_used = NULL;
 }
 
-static bool append_product_factor(const dval_t *expr,
-                                  const dval_t ***factors_io,
+static bool append_product_factor(const expr_t *expr,
+                                  const expr_t ***factors_io,
                                   size_t *count_io,
                                   size_t *cap_io)
 {
-    const dval_t *left = NULL;
-    const dval_t *right = NULL;
-    const dval_t **grown;
+    const expr_t *left = NULL;
+    const expr_t *right = NULL;
+    const expr_t **grown;
     size_t new_cap;
 
     if (!expr || !factors_io || !count_io || !cap_io)
         return false;
 
-    if (dv_match_mul_expr(expr, &left, &right))
+    if (expr_match_mul_expr(expr, &left, &right))
         return append_product_factor(left, factors_io, count_io, cap_io) &&
                append_product_factor(right, factors_io, count_io, cap_io);
 
@@ -1148,9 +1148,9 @@ static bool usage_masks_overlap(size_t ndim, const bool *lhs, const bool *rhs)
     return false;
 }
 
-static bool build_direct_affine_plan(const dval_t *expr,
+static bool build_direct_affine_plan(const expr_t *expr,
                                      size_t ndim,
-                                     dval_t *const *vars,
+                                     expr_t *const *vars,
                                      symbolic_plan_t *plan,
                                      qfloat_t *coeffs_out)
 {
@@ -1171,7 +1171,7 @@ static bool build_direct_affine_plan(const dval_t *expr,
         poly_num[i] = number_invalid();
 
     for (size_t i = 0; i < sizeof(affine_special_kinds) / sizeof(affine_special_kinds[0]); ++i) {
-        if (!dv_match_affine_poly_deg4_times_unary_affine_kind(expr,
+        if (!expr_match_affine_poly_deg4_times_unary_affine_kind(expr,
                                                                affine_special_kinds[i].unary_kind,
                                                                ndim, vars, poly_num, &constant_num,
                                                                coeffs_num))
@@ -1189,7 +1189,7 @@ static bool build_direct_affine_plan(const dval_t *expr,
         goto done;
     }
 
-    if (dv_match_affine_poly_deg4(expr, ndim, vars, poly_num, &constant_num, coeffs_num)) {
+    if (expr_match_affine_poly_deg4(expr, ndim, vars, poly_num, &constant_num, coeffs_num)) {
         constant = num_to_qfloat(constant_num);
         num_destroy(&constant_num);
         plan->kind = SYMBOLIC_PLAN_AFFINE_POLY;
@@ -1203,7 +1203,7 @@ static bool build_direct_affine_plan(const dval_t *expr,
     }
 
     for (size_t i = 0; i < sizeof(affine_special_kinds) / sizeof(affine_special_kinds[0]); ++i) {
-        if (!dv_match_unary_affine_kind(expr, affine_special_kinds[i].unary_kind,
+        if (!expr_match_unary_affine_kind(expr, affine_special_kinds[i].unary_kind,
                                         ndim, vars, &constant_num, coeffs_num))
             continue;
         constant = num_to_qfloat(constant_num);
@@ -1259,18 +1259,18 @@ static bool eval_direct_affine_plan(const symbolic_plan_t *plan,
     }
 }
 
-static bool build_symbolic_plan(const dval_t *expr,
+static bool build_symbolic_plan(const expr_t *expr,
                                 size_t ndim,
-                                dval_t *const *vars,
+                                expr_t *const *vars,
                                 symbolic_plan_t *plan,
                                 qfloat_t *coeffs_out)
 {
     qfloat_t constant;
     qfloat_t scale;
     number_t matched_value = num_new();
-    const dval_t *base;
-    const dval_t *left;
-    const dval_t *right;
+    const expr_t *base;
+    const expr_t *left;
+    const expr_t *right;
     bool is_sub;
 
     if (!expr || !plan)
@@ -1278,7 +1278,7 @@ static bool build_symbolic_plan(const dval_t *expr,
 
     symbolic_plan_reset(plan);
 
-    if (dv_match_const_value(expr, &matched_value)) {
+    if (expr_match_const_value(expr, &matched_value)) {
         constant = num_to_qfloat(matched_value);
         num_destroy(&matched_value);
         plan->kind = SYMBOLIC_PLAN_CONST;
@@ -1291,7 +1291,7 @@ static bool build_symbolic_plan(const dval_t *expr,
         return true;
     }
 
-    if (dv_match_scaled_expr(expr, &matched_value, &base)) {
+    if (expr_match_scaled_expr(expr, &matched_value, &base)) {
         scale = num_to_qfloat(matched_value);
         num_destroy(&matched_value);
         plan->kind = SYMBOLIC_PLAN_SCALED;
@@ -1302,7 +1302,7 @@ static bool build_symbolic_plan(const dval_t *expr,
 
     num_destroy(&matched_value);
 
-    if (dv_match_add_sub_expr(expr, &left, &right, &is_sub)) {
+    if (expr_match_add_sub_expr(expr, &left, &right, &is_sub)) {
         plan->kind = SYMBOLIC_PLAN_ADD_SUB;
         plan->left = left;
         plan->right = right;
@@ -1310,7 +1310,7 @@ static bool build_symbolic_plan(const dval_t *expr,
         return true;
     }
 
-    if (dv_match_mul_expr(expr, &left, &right)) {
+    if (expr_match_mul_expr(expr, &left, &right)) {
         plan->kind = SYMBOLIC_PLAN_MUL;
         plan->left = left;
         plan->right = right;
@@ -1320,10 +1320,10 @@ static bool build_symbolic_plan(const dval_t *expr,
     return false;
 }
 
-static bool build_binary_product_plan(const dval_t *left,
-                                      const dval_t *right,
+static bool build_binary_product_plan(const expr_t *left,
+                                      const expr_t *right,
                                       size_t ndim,
-                                      dval_t *const *vars,
+                                      expr_t *const *vars,
                                       const bool *active,
                                       symbolic_binary_product_plan_t *plan)
 {
@@ -1340,8 +1340,8 @@ static bool build_binary_product_plan(const dval_t *left,
         free_symbolic_binary_product_plan(plan);
         return false;
     }
-    if (!dv_collect_var_usage(left, ndim, vars, plan->used_left) ||
-        !dv_collect_var_usage(right, ndim, vars, plan->used_right)) {
+    if (!expr_collect_var_usage(left, ndim, vars, plan->used_left) ||
+        !expr_collect_var_usage(right, ndim, vars, plan->used_right)) {
         free_symbolic_binary_product_plan(plan);
         return false;
     }
@@ -1365,7 +1365,7 @@ static bool build_binary_product_plan(const dval_t *left,
 
 static bool eval_binary_product_plan(const symbolic_binary_product_plan_t *plan,
                                      size_t ndim,
-                                     dval_t *const *vars,
+                                     expr_t *const *vars,
                                      const qfloat_t *lo,
                                      const qfloat_t *hi,
                                      int depth,
@@ -1387,13 +1387,13 @@ static bool eval_binary_product_plan(const symbolic_binary_product_plan_t *plan,
     return true;
 }
 
-static bool build_separable_product_plan(const dval_t *expr,
+static bool build_separable_product_plan(const expr_t *expr,
                                          size_t ndim,
-                                         dval_t *const *vars,
+                                         expr_t *const *vars,
                                          const bool *active,
                                          symbolic_separable_product_plan_t *plan)
 {
-    const dval_t **factors = NULL;
+    const expr_t **factors = NULL;
     bool **factor_used = NULL;
     size_t *component_ids = NULL;
     size_t factor_count = 0;
@@ -1421,7 +1421,7 @@ static bool build_separable_product_plan(const dval_t *expr,
         factor_used[i] = malloc(ndim * sizeof(*factor_used[i]));
         if ((ndim > 0) && !factor_used[i])
             goto cleanup;
-        if (!dv_collect_var_usage(factors[i], ndim, vars, factor_used[i]))
+        if (!expr_collect_var_usage(factors[i], ndim, vars, factor_used[i]))
             goto cleanup;
         for (size_t j = 0; j < ndim; ++j) {
             if (active && !active[j])
@@ -1463,7 +1463,7 @@ static bool build_separable_product_plan(const dval_t *expr,
         goto cleanup;
 
     for (size_t c = 0; c < component_count; ++c) {
-        dval_t *group_expr = NULL;
+        expr_t *group_expr = NULL;
         bool owned = false;
 
         plan->group_used[c] = calloc(ndim, sizeof(*plan->group_used[c]));
@@ -1471,7 +1471,7 @@ static bool build_separable_product_plan(const dval_t *expr,
             goto cleanup;
 
         for (size_t i = 0; i < factor_count; ++i) {
-            dval_t *next_expr;
+            expr_t *next_expr;
 
             if (component_ids[i] != c)
                 continue;
@@ -1480,18 +1480,18 @@ static bool build_separable_product_plan(const dval_t *expr,
                 plan->group_used[c][j] = plan->group_used[c][j] || factor_used[i][j];
 
             if (!group_expr) {
-                group_expr = (dval_t *)factors[i];
+                group_expr = (expr_t *)factors[i];
                 continue;
             }
 
-            next_expr = dv_mul(group_expr, (dval_t *)factors[i]);
+            next_expr = expr_mul(group_expr, (expr_t *)factors[i]);
             if (!next_expr) {
                 if (owned)
-                    dv_free(group_expr);
+                    expr_free(group_expr);
                 goto cleanup;
             }
             if (owned)
-                dv_free(group_expr);
+                expr_free(group_expr);
             group_expr = next_expr;
             owned = true;
         }
@@ -1521,7 +1521,7 @@ cleanup:
 
 static bool eval_separable_product_plan(const symbolic_separable_product_plan_t *plan,
                                         size_t ndim,
-                                        dval_t *const *vars,
+                                        expr_t *const *vars,
                                         const qfloat_t *lo,
                                         const qfloat_t *hi,
                                         int depth,
@@ -1544,9 +1544,9 @@ static bool eval_separable_product_plan(const symbolic_separable_product_plan_t 
     return true;
 }
 
-static bool try_eval_special_combination(const dval_t *expr,
+static bool try_eval_special_combination(const expr_t *expr,
                                          size_t ndim,
-                                         dval_t *const *vars,
+                                         expr_t *const *vars,
                                          const qfloat_t *lo,
                                          const qfloat_t *hi,
                                          const bool *active,
@@ -1626,8 +1626,8 @@ static bool try_eval_special_combination(const dval_t *expr,
     }
 }
 
-int try_integral_multi_special_affine(integrator_t *ig, dval_t *expr,
-                                      size_t ndim, dval_t *const *vars,
+int try_integral_multi_special_affine(integrator_t *ig, expr_t *expr,
+                                      size_t ndim, expr_t *const *vars,
                                       const qfloat_t *lo, const qfloat_t *hi,
                                       qfloat_t *result, qfloat_t *error_est)
 {

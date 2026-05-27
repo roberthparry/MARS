@@ -135,12 +135,12 @@ static void matrix_tex_preview_emit_case(const char *source_file,
     free(path);
 }
 
-static void check_matrix_tostring_dv_double(const char *label,
-                                            const dval_t *dv,
+static void check_matrix_tostring_expr_double(const char *label,
+                                            const expr_t *dv,
                                             double expected,
                                             double tol)
 {
-    number_t got = dv_eval(dv);
+    number_t got = expr_eval(dv);
     number_t want = num_create_from_double(expected);
     number_t diff = num_sub(got, want);
     number_t mag = num_abs(diff);
@@ -309,7 +309,7 @@ static void test_mat_to_string_number_precision(void)
 static void test_mat_to_string_symbolic(void)
 {
     mat_bindings_t *bindings = NULL;
-    matrix_t *A = mat_from_string_dv("{ (x, 1; 1, c1) | x = 2; c1 = 3 }",
+    matrix_t *A = mat_from_string_expr("{ (x, 1; 1, c1) | x = 2; c1 = 3 }",
                                   &bindings);
     char *inline_pretty = mat_to_string(A, MAT_STRING_INLINE_PRETTY);
     char *layout_pretty = mat_to_string(A, MAT_STRING_LAYOUT_PRETTY);
@@ -332,7 +332,7 @@ static void test_mat_to_string_symbolic(void)
 static void test_mat_to_string_symbolic_tex(void)
 {
     mat_bindings_t *bindings = NULL;
-    matrix_t *A = mat_from_string_dv("{ (x0, 1; 1, c1) | x0 = 2; c1 = 3 }",
+    matrix_t *A = mat_from_string_expr("{ (x0, 1; 1, c1) | x0 = 2; c1 = 3 }",
                                      &bindings);
     char *tex = mat_to_string(A, MAT_STRING_TEX);
 
@@ -356,7 +356,7 @@ static void test_mat_to_string_symbolic_tex(void)
 static void test_mat_to_string_symbolic_tex_exact(void)
 {
     mat_bindings_t *bindings = NULL;
-    matrix_t *A = mat_from_string_dv("{ (sin(x0), exp(c1); ln(x0), c1^2) | x0 = 2; c1 = 5 }",
+    matrix_t *A = mat_from_string_expr("{ (sin(x0), exp(c1); ln(x0), c1^2) | x0 = 2; c1 = 5 }",
                                      &bindings);
     char *tex = mat_to_string(A, MAT_STRING_TEX);
 
@@ -379,7 +379,7 @@ static void test_mat_to_string_symbolic_tex_exact(void)
 static void test_mat_to_string_symbolic_tex_no_bindings_exact(void)
 {
     mat_bindings_t *bindings = NULL;
-    matrix_t *A = mat_from_string_dv("(sin(x0), exp(c1); ln(x0), c1^2)",
+    matrix_t *A = mat_from_string_expr("(sin(x0), exp(c1); ln(x0), c1^2)",
                                      &bindings);
     char *tex = mat_to_string(A, MAT_STRING_TEX);
     const char *expect =
@@ -402,7 +402,7 @@ static void test_mat_to_string_symbolic_tex_no_bindings_exact(void)
 static void test_mat_to_string_symbolic_all_nan_elides_wrapper(void)
 {
     mat_bindings_t *bindings = NULL;
-    matrix_t *A = mat_from_string_dv("(x, c1)", &bindings);
+    matrix_t *A = mat_from_string_expr("(x, c1)", &bindings);
     char *inline_pretty = mat_to_string(A, MAT_STRING_INLINE_PRETTY);
     char *layout_pretty = mat_to_string(A, MAT_STRING_LAYOUT_PRETTY);
 
@@ -422,7 +422,7 @@ static void test_mat_to_string_symbolic_all_nan_elides_wrapper(void)
 static void test_mat_to_string_symbolic_all_nan_tex_elides_wrapper(void)
 {
     mat_bindings_t *bindings = NULL;
-    matrix_t *A = mat_from_string_dv("(x, c1)", &bindings);
+    matrix_t *A = mat_from_string_expr("(x, c1)", &bindings);
     char *tex = mat_to_string(A, MAT_STRING_TEX);
 
     matrix_tex_preview_emit_case(__FILE__, "symbolic all-NaN matrix without bindings (TEX)", tex);
@@ -441,11 +441,11 @@ static void test_mat_to_string_symbolic_all_nan_tex_elides_wrapper(void)
 static void test_mat_to_string_symbolic_roundtrip(void)
 {
     mat_bindings_t *bindings = NULL;
-    matrix_t *A = mat_from_string_dv("(x, c1; x*y, [radius])", &bindings);
+    matrix_t *A = mat_from_string_expr("(x, c1; x*y, [radius])", &bindings);
     char *inline_pretty = NULL;
     mat_bindings_t *roundtrip_bindings = NULL;
     matrix_t *roundtrip = NULL;
-    dval_t *dv = NULL;
+    expr_t *dv = NULL;
 
     check_bool("mat_to_string symbolic roundtrip source non-null", A != NULL);
     check_bool("mat_to_string symbolic roundtrip source bindings returned",
@@ -464,10 +464,10 @@ static void test_mat_to_string_symbolic_roundtrip(void)
     check_bool("mat_to_string symbolic roundtrip keeps wrapper",
                inline_pretty && strstr(inline_pretty, "{ (") != NULL);
 
-    roundtrip = mat_from_string_dv(inline_pretty, &roundtrip_bindings);
+    roundtrip = mat_from_string_expr(inline_pretty, &roundtrip_bindings);
     check_bool("mat_to_string symbolic roundtrip reparses", roundtrip != NULL);
     check_bool("mat_to_string symbolic roundtrip reparsed type",
-               roundtrip && mat_typeof(roundtrip) == MAT_TYPE_DVAL);
+               roundtrip && mat_typeof(roundtrip) == MAT_TYPE_EXPR);
     check_bool("mat_to_string symbolic roundtrip x binding present",
                mat_bindings_get(roundtrip_bindings, "x") != NULL);
     check_bool("mat_to_string symbolic roundtrip c₁ binding present",
@@ -477,16 +477,16 @@ static void test_mat_to_string_symbolic_roundtrip(void)
 
     if (roundtrip) {
         mat_get(roundtrip, 0, 0, &dv);
-        check_matrix_tostring_dv_double("mat_to_string symbolic roundtrip x entry",
+        check_matrix_tostring_expr_double("mat_to_string symbolic roundtrip x entry",
                                         dv, 2.0, 1e-18);
         mat_get(roundtrip, 0, 1, &dv);
-        check_matrix_tostring_dv_double("mat_to_string symbolic roundtrip c₁ entry",
+        check_matrix_tostring_expr_double("mat_to_string symbolic roundtrip c₁ entry",
                                         dv, 5.0, 1e-18);
         mat_get(roundtrip, 1, 0, &dv);
-        check_matrix_tostring_dv_double("mat_to_string symbolic roundtrip x*y entry",
+        check_matrix_tostring_expr_double("mat_to_string symbolic roundtrip x*y entry",
                                         dv, 6.0, 1e-18);
         mat_get(roundtrip, 1, 1, &dv);
-        check_matrix_tostring_dv_double("mat_to_string symbolic roundtrip [radius] entry",
+        check_matrix_tostring_expr_double("mat_to_string symbolic roundtrip [radius] entry",
                                         dv, 7.0, 1e-18);
     }
 
@@ -500,13 +500,13 @@ static void test_mat_to_string_symbolic_roundtrip(void)
 static void test_mat_to_string_symbolic_derivative_roundtrip(void)
 {
     mat_bindings_t *bindings = NULL;
-    matrix_t *A = mat_from_string_dv("(x, c1; x*y, y)", &bindings);
-    dval_t *x_binding = NULL;
+    matrix_t *A = mat_from_string_expr("(x, c1; x*y, y)", &bindings);
+    expr_t *x_binding = NULL;
     matrix_t *Dx = NULL;
     char *inline_pretty = NULL;
     mat_bindings_t *roundtrip_bindings = NULL;
     matrix_t *roundtrip = NULL;
-    dval_t *dv = NULL;
+    expr_t *dv = NULL;
 
     check_bool("mat_to_string symbolic derivative source non-null", A != NULL);
     x_binding = mat_bindings_get(bindings, "x");
@@ -527,10 +527,10 @@ static void test_mat_to_string_symbolic_derivative_roundtrip(void)
     check_bool("mat_to_string symbolic derivative keeps y binding value",
                inline_pretty && strstr(inline_pretty, "y = 4") != NULL);
 
-    roundtrip = mat_from_string_dv(inline_pretty, &roundtrip_bindings);
+    roundtrip = mat_from_string_expr(inline_pretty, &roundtrip_bindings);
     check_bool("mat_to_string symbolic derivative reparses", roundtrip != NULL);
     check_bool("mat_to_string symbolic derivative reparsed type",
-               roundtrip && mat_typeof(roundtrip) == MAT_TYPE_DVAL);
+               roundtrip && mat_typeof(roundtrip) == MAT_TYPE_EXPR);
     check_bool("mat_to_string symbolic derivative reparsed has y",
                mat_bindings_get(roundtrip_bindings, "y") != NULL);
     check_bool("mat_to_string symbolic derivative reparsed omits x",
@@ -540,16 +540,16 @@ static void test_mat_to_string_symbolic_derivative_roundtrip(void)
 
     if (roundtrip) {
         mat_get(roundtrip, 0, 0, &dv);
-        check_matrix_tostring_dv_double("mat_to_string symbolic derivative reparsed [0,0]",
+        check_matrix_tostring_expr_double("mat_to_string symbolic derivative reparsed [0,0]",
                                         dv, 1.0, 1e-18);
         mat_get(roundtrip, 0, 1, &dv);
-        check_matrix_tostring_dv_double("mat_to_string symbolic derivative reparsed [0,1]",
+        check_matrix_tostring_expr_double("mat_to_string symbolic derivative reparsed [0,1]",
                                         dv, 0.0, 1e-18);
         mat_get(roundtrip, 1, 0, &dv);
-        check_matrix_tostring_dv_double("mat_to_string symbolic derivative reparsed [1,0]",
+        check_matrix_tostring_expr_double("mat_to_string symbolic derivative reparsed [1,0]",
                                         dv, 4.0, 1e-18);
         mat_get(roundtrip, 1, 1, &dv);
-        check_matrix_tostring_dv_double("mat_to_string symbolic derivative reparsed [1,1]",
+        check_matrix_tostring_expr_double("mat_to_string symbolic derivative reparsed [1,1]",
                                         dv, 0.0, 1e-18);
     }
 

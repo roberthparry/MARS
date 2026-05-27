@@ -31,7 +31,7 @@ tests/build/release/qfloat/test_qfloat
 make test_number
 make test_qfloat
 make test_qcomplex
-make test_dval
+make test_expression
 make test_datetime
 make test_dictionary
 make test_set
@@ -58,7 +58,7 @@ make release
 make test_number
 make test_qfloat
 make test_qcomplex
-make test_dval
+make test_expression
 make test_datetime
 make test_dictionary
 make test_set
@@ -146,7 +146,7 @@ integrator work:
 
 ```sh
 make bench_integrator
-make bench_matrix_dval
+make bench_matrix_expr
 make bench_number_maths
 make bench_number_scope
 ```
@@ -189,7 +189,7 @@ Some tests are organised into groups. A group object has an `"enabled"` key for 
 
 ```json
 {
-  "tests/dval/test_dval.c": {
+  "tests/expression/test_expression.c": {
     "test_arithmetic": {
       "enabled": true,
       "test_add": true,

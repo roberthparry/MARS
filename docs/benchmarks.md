@@ -14,7 +14,7 @@ From the repository root:
 
 ```sh
 make bench_integrator
-make bench_matrix_dval
+make bench_matrix_expr
 make bench_number_maths
 make bench_number_scope
 make bench_qfloat_gamma_maths
@@ -89,7 +89,7 @@ shows how much work the symbolic shortcut is saving.
 
 ## Symbolic Matrix Benchmark
 
-`bench_matrix_dval` measures dense symbolic `MAT_TYPE_DVAL` linear algebra on
+`bench_matrix_expr` measures dense symbolic `MAT_TYPE_EXPR` linear algebra on
 representative exact cases.
 
 It currently covers:
@@ -102,11 +102,11 @@ Sample output:
 ```text
 iters=3
 
-Symbolic dval solve
+Symbolic expr solve
 solve_dense3x3_rhs2      avg_µs=  6000.421 avg_ms=     6.000
 solve_dense6x6_rhs2      avg_µs=566623.682 avg_ms=   566.624
 
-Symbolic dval inverse
+Symbolic expr inverse
 inverse_dense4x4         avg_µs= 40635.324 avg_ms=    40.635
 inverse_dense6x6         avg_µs=876341.423 avg_ms=   876.341
 ```

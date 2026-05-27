@@ -848,16 +848,16 @@ static void test_mat_fun_mp_real_complex(void)
 
     /* log: exp(log(A)) = A for positive-definite A */
     {
-        number_t pdvals[4];
+        number_t pexprs[4];
         matrix_t *PD;
         matrix_t *L;
-        pdvals[0] = num_create_from_double(2.0);
-        pdvals[1] = num_create_from_double(0.5);
-        pdvals[2] = num_create_from_double(0.5);
-        pdvals[3] = num_create_from_double(2.0);
-        PD = mat_create(2, 2, pdvals);
+        pexprs[0] = num_create_from_double(2.0);
+        pexprs[1] = num_create_from_double(0.5);
+        pexprs[2] = num_create_from_double(0.5);
+        pexprs[3] = num_create_from_double(2.0);
+        PD = mat_create(2, 2, pexprs);
         for (size_t i = 0; i < 4u; ++i)
-            num_destroy(&pdvals[i]);
+            num_destroy(&pexprs[i]);
         L = mat_log(PD);
         check_bool("num log(PD) not NULL", L != NULL);
         if (L)
@@ -901,17 +901,17 @@ static void test_mat_fun_mp_real_complex(void)
 
     /* pow_int for num: diag(2,3)^3 = diag(8,27) */
     {
-        number_t dvals[4];
+        number_t exprs[4];
         matrix_t *D;
         matrix_t *R;
         double r00, r11, r01, r10;
-        dvals[0] = num_create_from_double(2.0);
-        dvals[1] = NUM_ZERO;
-        dvals[2] = NUM_ZERO;
-        dvals[3] = num_create_from_double(3.0);
-        D = mat_create(2, 2, dvals);
-        num_destroy(&dvals[0]);
-        num_destroy(&dvals[3]);
+        exprs[0] = num_create_from_double(2.0);
+        exprs[1] = NUM_ZERO;
+        exprs[2] = NUM_ZERO;
+        exprs[3] = num_create_from_double(3.0);
+        D = mat_create(2, 2, exprs);
+        num_destroy(&exprs[0]);
+        num_destroy(&exprs[3]);
         R = mat_pow_int(D, 3);
         check_bool("num pow_int(diag(2,3),3) not NULL", R != NULL);
         if (R)

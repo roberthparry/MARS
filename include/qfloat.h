@@ -813,6 +813,36 @@ qfloat_t qf_cos(qfloat_t x);
 qfloat_t qf_tan(qfloat_t x);
 
 /**
+ * @brief High-precision secant.
+ *
+ * Computes sec(x) = 1 / cos(x) to full quad-double precision.
+ *
+ * @param x Angle in radians.
+ * @return sec(x) as a quad-double, or NaN at a pole.
+ */
+qfloat_t qf_sec(qfloat_t x);
+
+/**
+ * @brief High-precision cosecant.
+ *
+ * Computes cosec(x) = 1 / sin(x) to full quad-double precision.
+ *
+ * @param x Angle in radians.
+ * @return cosec(x) as a quad-double, or NaN at a pole.
+ */
+qfloat_t qf_cosec(qfloat_t x);
+
+/**
+ * @brief High-precision cotangent.
+ *
+ * Computes cot(x) = 1 / tan(x) to full quad-double precision.
+ *
+ * @param x Angle in radians.
+ * @return cot(x) as a quad-double, or NaN at a pole.
+ */
+qfloat_t qf_cot(qfloat_t x);
+
+/**
  * @brief Inverse tangent function.
  *
  * Computes atan(x) to full quad‑double precision using a 40‑term Taylor
@@ -857,6 +887,36 @@ qfloat_t qf_asin(qfloat_t x);
 qfloat_t qf_acos(qfloat_t x);
 
 /**
+ * @brief High-precision inverse secant.
+ *
+ * Computes asec(x) = acos(1 / x) to full quad-double precision.
+ *
+ * @param x Input value.
+ * @return asec(x) (double-double precision).
+ */
+qfloat_t qf_asec(qfloat_t x);
+
+/**
+ * @brief High-precision inverse cosecant.
+ *
+ * Computes acosec(x) = asin(1 / x) to full quad-double precision.
+ *
+ * @param x Input value.
+ * @return acosec(x) (double-double precision).
+ */
+qfloat_t qf_acosec(qfloat_t x);
+
+/**
+ * @brief High-precision inverse cotangent.
+ *
+ * Computes acot(x) with the principal real branch in [0, pi].
+ *
+ * @param x Input value.
+ * @return acot(x) (double-double precision).
+ */
+qfloat_t qf_acot(qfloat_t x);
+
+/**
  * @brief High-precision hyperbolic sine.
  *
  * computes sinh(x) to full quad-double precision.
@@ -887,6 +947,36 @@ qfloat_t qf_cosh(qfloat_t x);
 qfloat_t qf_tanh(qfloat_t x);
 
 /**
+ * @brief High-precision hyperbolic secant.
+ *
+ * Computes sech(x) = 1 / cosh(x) to full quad-double precision.
+ *
+ * @param x Input value.
+ * @return sech(x) (double-double precision).
+ */
+qfloat_t qf_sech(qfloat_t x);
+
+/**
+ * @brief High-precision hyperbolic cosecant.
+ *
+ * Computes cosech(x) = 1 / sinh(x) to full quad-double precision.
+ *
+ * @param x Input value.
+ * @return cosech(x) (double-double precision).
+ */
+qfloat_t qf_cosech(qfloat_t x);
+
+/**
+ * @brief High-precision hyperbolic cotangent.
+ *
+ * Computes coth(x) = 1 / tanh(x) to full quad-double precision.
+ *
+ * @param x Input value.
+ * @return coth(x) (double-double precision).
+ */
+qfloat_t qf_coth(qfloat_t x);
+
+/**
  * @brief High-precision inverse hyperbolic sine.
  *
  * computes asinh(x) to full quad-double precision.
@@ -915,6 +1005,36 @@ qfloat_t qf_acosh(qfloat_t x);
  * @return atanh(x) (double-double precision).
  */
 qfloat_t qf_atanh(qfloat_t x);
+
+/**
+ * @brief High-precision inverse hyperbolic secant.
+ *
+ * Computes asech(x) = acosh(1 / x) to full quad-double precision.
+ *
+ * @param x Input value.
+ * @return asech(x) (double-double precision).
+ */
+qfloat_t qf_asech(qfloat_t x);
+
+/**
+ * @brief High-precision inverse hyperbolic cosecant.
+ *
+ * Computes acosech(x) = asinh(1 / x) to full quad-double precision.
+ *
+ * @param x Input value.
+ * @return acosech(x) (double-double precision).
+ */
+qfloat_t qf_acosech(qfloat_t x);
+
+/**
+ * @brief High-precision inverse hyperbolic cotangent.
+ *
+ * Computes acoth(x) = atanh(1 / x) to full quad-double precision.
+ *
+ * @param x Input value.
+ * @return acoth(x) (double-double precision).
+ */
+qfloat_t qf_acoth(qfloat_t x);
 
 /**
  * @brief Compute the gamma function for a qfloat_t argument.

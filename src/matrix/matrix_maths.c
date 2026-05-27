@@ -3,7 +3,7 @@
 #include <string.h>
 
 #include "matrix_internal.h"
-#include "internal/dval_internal.h"
+#include "internal/expr_internal.h"
 
 /* ============================================================
    Internal helpers
@@ -54,23 +54,23 @@ static void mat_fun_cache_free_spectral_evals(number_t *values, size_t count)
 
 static matrix_t *mat_fun_apply(const matrix_t *A,
                                void (*number_f)(void *out, const void *a),
-                               void (*dval_f)(void *out, const void *a),
+                               void (*expr_f)(void *out, const void *a),
                                void (*native_f)(void *out, const void *a));
-static matrix_t *mat_fun_dval_structured(const matrix_t *A,
+static matrix_t *mat_fun_expr_structured(const matrix_t *A,
                                          void (*scalar_f)(void *out, const void *in));
 static matrix_t *mat_fun_elementwise_same_type(const matrix_t *A,
                                                void (*scalar_f)(void *out, const void *in));
-static matrix_t *mat_fun_dval_uniform_diag_offdiag(const matrix_t *A,
+static matrix_t *mat_fun_expr_uniform_diag_offdiag(const matrix_t *A,
                                                    void (*scalar_f)(void *out, const void *in));
-static matrix_t *mat_fun_dval_scalar_plus_rank_one(const matrix_t *A,
+static matrix_t *mat_fun_expr_scalar_plus_rank_one(const matrix_t *A,
                                                    void (*scalar_f)(void *out, const void *in));
-static matrix_t *mat_fun_dval_quartic_biquadratic_exact(const matrix_t *A,
+static matrix_t *mat_fun_expr_quartic_biquadratic_exact(const matrix_t *A,
                                                         void (*scalar_f)(void *out, const void *in));
-static int dval_fun_coeffs_up_to_second(dval_t **c0,
-                                        dval_t **c1,
-                                        dval_t **c2,
+static int expr_fun_coeffs_up_to_second(expr_t **c0,
+                                        expr_t **c1,
+                                        expr_t **c2,
                                         void (*scalar_f)(void *out, const void *in),
-                                        dval_t *lambda);
+                                        expr_t *lambda);
 static matrix_t *mat_exp_number_triangular_equal_diag(const matrix_t *A);
 static matrix_t *mat_log_number_triangular_equal_diag(const matrix_t *A);
 static matrix_t *mat_sqrt_number_triangular_equal_diag(const matrix_t *A);
@@ -106,10 +106,10 @@ static matrix_t *mat_e1_number_triangular_equal_diag(const matrix_t *A);
 
 static matrix_t *mat_apply_unary(const matrix_t *A,
                                  void (*number_f)(void *out, const void *a),
-                                 void (*dval_f)(void *out, const void *a),
+                                 void (*expr_f)(void *out, const void *a),
                                  void (*native_f)(void *out, const void *a))
 {
-    return mat_fun_apply(A, number_f, dval_elem.fun ? dval_f : NULL, native_f);
+    return mat_fun_apply(A, number_f, expr_elem.fun ? expr_f : NULL, native_f);
 }
 
 static int mat_elem_supports_numeric_algorithms(const matrix_t *A)
@@ -171,173 +171,173 @@ static matrix_t *mat_fun_elementwise_same_type(const matrix_t *A,
     return R;
 }
 
-static dval_t *dval_simplify_owned_local(dval_t *dv)
+static expr_t *expr_simplify_owned_local(expr_t *dv)
 {
-    dval_t *simp;
+    expr_t *simp;
 
     if (!dv)
         return NULL;
 
-    simp = dv_simplify(dv);
-    dv_free(dv);
+    simp = expr_simplify(dv);
+    expr_free(dv);
     return simp;
 }
 
-static dval_t *dval_const_zero_local(void)
+static expr_t *expr_const_zero_local(void)
 {
-    return dv_new_const(NUM_ZERO);
+    return expr_new_const(NUM_ZERO);
 }
 
-static dval_t *dval_const_one_local(void)
+static expr_t *expr_const_one_local(void)
 {
-    return dv_new_const(NUM_ONE);
+    return expr_new_const(NUM_ONE);
 }
 
-static dval_t *dval_const_long_local(long value)
+static expr_t *expr_const_long_local(long value)
 {
     number_t n = num_create_from_long(value);
-    dval_t *dv = dv_new_const(n);
+    expr_t *dv = expr_new_const(n);
 
     num_destroy(&n);
     return dv;
 }
 
-static dval_t *dval_div_simplify_local(const dval_t *num, const dval_t *den)
+static expr_t *expr_div_simplify_local(const expr_t *num, const expr_t *den)
 {
-    dval_t *raw;
+    expr_t *raw;
 
     if (!num || !den) {
-        dv_free((dval_t *)num);
-        dv_free((dval_t *)den);
+        expr_free((expr_t *)num);
+        expr_free((expr_t *)den);
         return NULL;
     }
 
-    raw = dv_div(num, den);
-    dv_free((dval_t *)num);
-    dv_free((dval_t *)den);
+    raw = expr_div(num, den);
+    expr_free((expr_t *)num);
+    expr_free((expr_t *)den);
     if (!raw)
         return NULL;
 
-    return dval_simplify_owned_local(raw);
+    return expr_simplify_owned_local(raw);
 }
 
-static dval_t *dval_mul_simplify_local(const dval_t *a, const dval_t *b)
+static expr_t *expr_mul_simplify_local(const expr_t *a, const expr_t *b)
 {
-    dval_t *raw;
+    expr_t *raw;
 
     if (!a || !b) {
-        dv_free((dval_t *)a);
-        dv_free((dval_t *)b);
+        expr_free((expr_t *)a);
+        expr_free((expr_t *)b);
         return NULL;
     }
 
-    raw = dv_mul(a, b);
-    dv_free((dval_t *)a);
-    dv_free((dval_t *)b);
+    raw = expr_mul(a, b);
+    expr_free((expr_t *)a);
+    expr_free((expr_t *)b);
     if (!raw)
         return NULL;
 
-    return dval_simplify_owned_local(raw);
+    return expr_simplify_owned_local(raw);
 }
 
-static dval_t *dval_add_simplify_local(const dval_t *a, const dval_t *b)
+static expr_t *expr_add_simplify_local(const expr_t *a, const expr_t *b)
 {
-    dval_t *raw;
+    expr_t *raw;
 
     if (!a || !b) {
-        dv_free((dval_t *)a);
-        dv_free((dval_t *)b);
+        expr_free((expr_t *)a);
+        expr_free((expr_t *)b);
         return NULL;
     }
 
-    raw = dv_add(a, b);
-    dv_free((dval_t *)a);
-    dv_free((dval_t *)b);
+    raw = expr_add(a, b);
+    expr_free((expr_t *)a);
+    expr_free((expr_t *)b);
     if (!raw)
         return NULL;
 
-    return dval_simplify_owned_local(raw);
+    return expr_simplify_owned_local(raw);
 }
 
-static dval_t *dval_sub_simplify_local(const dval_t *a, const dval_t *b)
+static expr_t *expr_sub_simplify_local(const expr_t *a, const expr_t *b)
 {
-    dval_t *raw;
+    expr_t *raw;
 
     if (!a || !b) {
-        dv_free((dval_t *)a);
-        dv_free((dval_t *)b);
+        expr_free((expr_t *)a);
+        expr_free((expr_t *)b);
         return NULL;
     }
 
-    raw = dv_sub(a, b);
-    dv_free((dval_t *)a);
-    dv_free((dval_t *)b);
+    raw = expr_sub(a, b);
+    expr_free((expr_t *)a);
+    expr_free((expr_t *)b);
     if (!raw)
         return NULL;
 
-    return dval_simplify_owned_local(raw);
+    return expr_simplify_owned_local(raw);
 }
 
-static bool dval_is_zero_local(const dval_t *dv)
+static bool expr_is_zero_local(const expr_t *dv)
 {
-    return !dv || dv_is_exact_zero(dv);
+    return !dv || expr_is_exact_zero(dv);
 }
 
-static dval_t *dval_fun_first_derivative_at_zero_local(
+static expr_t *expr_fun_first_derivative_at_zero_local(
     void (*scalar_f)(void *out, const void *in))
 {
-    dval_t *zero = NULL;
-    dval_t *c0 = NULL;
-    dval_t *c1 = NULL;
+    expr_t *zero = NULL;
+    expr_t *c0 = NULL;
+    expr_t *c1 = NULL;
 
     if (!scalar_f)
         return NULL;
 
-    zero = dval_const_zero_local();
+    zero = expr_const_zero_local();
     if (!zero)
         return NULL;
 
-    if (dval_fun_coeffs_up_to_second(&c0, &c1, NULL, scalar_f, zero) != 0) {
-        dv_free(zero);
+    if (expr_fun_coeffs_up_to_second(&c0, &c1, NULL, scalar_f, zero) != 0) {
+        expr_free(zero);
         return NULL;
     }
 
-    dv_free(zero);
-    dv_free(c0);
+    expr_free(zero);
+    expr_free(c0);
     return c1;
 }
 
-static bool dval_equal_exact_local(const dval_t *a, const dval_t *b)
+static bool expr_equal_exact_local(const expr_t *a, const expr_t *b)
 {
-    dval_t *diff;
+    expr_t *diff;
     bool equal;
 
     if (a == b)
         return true;
     if (!a)
-        return dval_is_zero_local(b);
+        return expr_is_zero_local(b);
     if (!b)
-        return dval_is_zero_local(a);
+        return expr_is_zero_local(a);
 
-    dv_retain((dval_t *)a);
-    dv_retain((dval_t *)b);
-    diff = dval_sub_simplify_local((dval_t *)a, (dval_t *)b);
+    expr_retain((expr_t *)a);
+    expr_retain((expr_t *)b);
+    diff = expr_sub_simplify_local((expr_t *)a, (expr_t *)b);
     if (!diff)
         return false;
 
-    equal = dv_is_exact_zero(diff);
-    dv_free(diff);
+    equal = expr_is_exact_zero(diff);
+    expr_free(diff);
     return equal;
 }
 
-static dval_t *dval_mul_or_zero_owned_local(const dval_t *a, const dval_t *b)
+static expr_t *expr_mul_or_zero_owned_local(const expr_t *a, const expr_t *b)
 {
-    if (dval_is_zero_local(a) || dval_is_zero_local(b))
-        return dval_const_zero_local();
+    if (expr_is_zero_local(a) || expr_is_zero_local(b))
+        return expr_const_zero_local();
 
-    dv_retain((dval_t *)a);
-    dv_retain((dval_t *)b);
-    return dval_mul_simplify_local((dval_t *)a, (dval_t *)b);
+    expr_retain((expr_t *)a);
+    expr_retain((expr_t *)b);
+    return expr_mul_simplify_local((expr_t *)a, (expr_t *)b);
 }
 
 static bool mat_number_diagonal_equal_local(const matrix_t *A)
@@ -659,17 +659,17 @@ static matrix_t *mat_number_series_from_scaled_strict_triangular(
     return F;
 }
 
-static matrix_t *mat_number_unary_taylor_from_dval_upper(
+static matrix_t *mat_number_unary_taylor_from_expr_upper(
     const matrix_t *A,
-    dval_t *(*build_expr)(const dval_t *))
+    expr_t *(*build_expr)(const expr_t *))
 {
     size_t n;
     matrix_t *F = NULL;
     matrix_t *N = NULL;
     matrix_t *Npower = NULL;
     number_t lambda;
-    dval_t *x = NULL;
-    dval_t **derivs = NULL;
+    expr_t *x = NULL;
+    expr_t **derivs = NULL;
 
     if (!A || !build_expr || A->rows != A->cols || A->elem != &number_elem ||
         !mat_is_upper_triangular(A))
@@ -680,7 +680,7 @@ static matrix_t *mat_number_unary_taylor_from_dval_upper(
         return mat_copy_preserving_store(A);
 
     lambda = mat_get_num(A, 0, 0);
-    x = dv_new_named_var(num_clone(lambda), "x");
+    x = expr_new_named_var(num_clone(lambda), "x");
     if (!x) {
         num_destroy(&lambda);
         return NULL;
@@ -688,7 +688,7 @@ static matrix_t *mat_number_unary_taylor_from_dval_upper(
 
     derivs = calloc(n, sizeof(*derivs));
     if (!derivs) {
-        dv_free(x);
+        expr_free(x);
         num_destroy(&lambda);
         return NULL;
     }
@@ -703,7 +703,7 @@ static matrix_t *mat_number_unary_taylor_from_dval_upper(
         goto fail;
 
     {
-        number_t diag_value = dv_eval(derivs[0]);
+        number_t diag_value = expr_eval(derivs[0]);
 
         for (size_t i = 0; i < n; ++i) {
             mat_set_num_clone(F, i, i, &diag_value);
@@ -713,7 +713,7 @@ static matrix_t *mat_number_unary_taylor_from_dval_upper(
 
     if (n == 1u) {
         free(derivs);
-        dv_free(x);
+        expr_free(x);
         mat_free(N);
         num_destroy(&lambda);
         return F;
@@ -726,7 +726,7 @@ static matrix_t *mat_number_unary_taylor_from_dval_upper(
         for (size_t k = 1; k < n; ++k) {
             number_t coeff;
 
-            derivs[k] = dv_create_deriv(derivs[k - 1u], x);
+            derivs[k] = expr_create_deriv(derivs[k - 1u], x);
             if (!derivs[k]) {
                 num_destroy(&factorial);
                 goto fail;
@@ -740,7 +740,7 @@ static matrix_t *mat_number_unary_taylor_from_dval_upper(
                 factorial = next_factorial;
             }
 
-            coeff = dv_eval(derivs[k]);
+            coeff = expr_eval(derivs[k]);
             if (k > 1u) {
                 number_t scaled = num_div(coeff, factorial);
                 num_destroy(&coeff);
@@ -769,9 +769,9 @@ static matrix_t *mat_number_unary_taylor_from_dval_upper(
     }
 
     for (size_t i = 0; i < n; ++i)
-        dv_free(derivs[i]);
+        expr_free(derivs[i]);
     free(derivs);
-    dv_free(x);
+    expr_free(x);
     mat_free_power_seed_pair(Npower, N);
     num_destroy(&lambda);
     return F;
@@ -779,19 +779,19 @@ static matrix_t *mat_number_unary_taylor_from_dval_upper(
 fail:
     if (derivs) {
         for (size_t i = 0; i < n; ++i)
-            dv_free(derivs[i]);
+            expr_free(derivs[i]);
         free(derivs);
     }
-    dv_free(x);
+    expr_free(x);
     mat_free_power_seed_pair(Npower, N);
     mat_free(F);
     num_destroy(&lambda);
     return NULL;
 }
 
-static matrix_t *mat_number_unary_taylor_from_dval(
+static matrix_t *mat_number_unary_taylor_from_expr(
     const matrix_t *A,
-    dval_t *(*build_expr)(const dval_t *))
+    expr_t *(*build_expr)(const expr_t *))
 {
     matrix_t *T = NULL;
     matrix_t *FT = NULL;
@@ -802,14 +802,14 @@ static matrix_t *mat_number_unary_taylor_from_dval(
         return NULL;
 
     if (mat_is_upper_triangular(A))
-        return mat_number_unary_taylor_from_dval_upper(A, build_expr);
+        return mat_number_unary_taylor_from_expr_upper(A, build_expr);
     if (!mat_is_lower_triangular(A))
         return NULL;
 
     T = mat_transpose(A);
     if (!T)
         return NULL;
-    FT = mat_number_unary_taylor_from_dval_upper(T, build_expr);
+    FT = mat_number_unary_taylor_from_expr_upper(T, build_expr);
     out = FT ? mat_transpose(FT) : NULL;
     mat_free(T);
     mat_free(FT);
@@ -967,17 +967,17 @@ static matrix_t *mat_sqrt_number_triangular_equal_diag(const matrix_t *A)
     return out;
 }
 
-static int dval_fun_coeffs_up_to_second(dval_t **c0,
-                                        dval_t **c1,
-                                        dval_t **c2,
+static int expr_fun_coeffs_up_to_second(expr_t **c0,
+                                        expr_t **c1,
+                                        expr_t **c2,
                                         void (*scalar_f)(void *out, const void *in),
-                                        dval_t *lambda)
+                                        expr_t *lambda)
 {
-    dval_t *u;
-    dval_t *f_u = NULL;
-    dval_t *df_u = NULL;
-    dval_t *d2f_u = NULL;
-    dval_t *tmp = NULL;
+    expr_t *u;
+    expr_t *f_u = NULL;
+    expr_t *df_u = NULL;
+    expr_t *d2f_u = NULL;
+    expr_t *tmp = NULL;
 
     if (!c0 || !scalar_f || !lambda)
         return -1;
@@ -989,9 +989,9 @@ static int dval_fun_coeffs_up_to_second(dval_t **c0,
         *c2 = NULL;
 
     {
-        number_t lambda_value = dv_eval(lambda);
+        number_t lambda_value = expr_eval(lambda);
 
-        u = dv_new_named_var(lambda_value, "u");
+        u = expr_new_named_var(lambda_value, "u");
         num_destroy(&lambda_value);
     }
     if (!u)
@@ -999,56 +999,56 @@ static int dval_fun_coeffs_up_to_second(dval_t **c0,
 
     scalar_f(&f_u, &u);
     if (!f_u) {
-        dv_free(u);
+        expr_free(u);
         return -1;
     }
 
-    *c0 = dv_substitute(f_u, u, lambda);
+    *c0 = expr_substitute(f_u, u, lambda);
     if (!*c0) {
-        dv_free(f_u);
-        dv_free(u);
+        expr_free(f_u);
+        expr_free(u);
         return -1;
     }
 
     if (c1) {
-        df_u = dv_create_deriv(f_u, u);
-        *c1 = dv_substitute(df_u, u, lambda);
+        df_u = expr_create_deriv(f_u, u);
+        *c1 = expr_substitute(df_u, u, lambda);
         if (!*c1) {
-            dv_free(df_u);
-            dv_free(f_u);
-            dv_free(u);
-            dv_free(*c0);
+            expr_free(df_u);
+            expr_free(f_u);
+            expr_free(u);
+            expr_free(*c0);
             *c0 = NULL;
             return -1;
         }
     }
 
     if (c2) {
-        d2f_u = dv_create_2nd_deriv(f_u, u, u);
-        tmp = dv_substitute(d2f_u, u, lambda);
+        d2f_u = expr_create_2nd_deriv(f_u, u, u);
+        tmp = expr_substitute(d2f_u, u, lambda);
         if (!tmp) {
-            dv_free(d2f_u);
-            dv_free(df_u);
-            dv_free(f_u);
-            dv_free(u);
-            dv_free(*c0);
+            expr_free(d2f_u);
+            expr_free(df_u);
+            expr_free(f_u);
+            expr_free(u);
+            expr_free(*c0);
             if (c1) {
-                dv_free(*c1);
+                expr_free(*c1);
                 *c1 = NULL;
             }
             *c0 = NULL;
             return -1;
         }
-        *c2 = dv_mul_num(tmp, &NUM_HALF);
-        dv_free(tmp);
+        *c2 = expr_mul_num(tmp, &NUM_HALF);
+        expr_free(tmp);
         if (!*c2) {
-            dv_free(d2f_u);
-            dv_free(df_u);
-            dv_free(f_u);
-            dv_free(u);
-            dv_free(*c0);
+            expr_free(d2f_u);
+            expr_free(df_u);
+            expr_free(f_u);
+            expr_free(u);
+            expr_free(*c0);
             if (c1) {
-                dv_free(*c1);
+                expr_free(*c1);
                 *c1 = NULL;
             }
             *c0 = NULL;
@@ -1056,23 +1056,23 @@ static int dval_fun_coeffs_up_to_second(dval_t **c0,
         }
     }
 
-    dv_free(d2f_u);
-    dv_free(df_u);
-    dv_free(f_u);
-    dv_free(u);
+    expr_free(d2f_u);
+    expr_free(df_u);
+    expr_free(f_u);
+    expr_free(u);
     return 0;
 }
 
-static matrix_t *mat_fun_triangular_equal_diag_dval(const matrix_t *T,
+static matrix_t *mat_fun_triangular_equal_diag_expr(const matrix_t *T,
                                                     void (*scalar_f)(void *out, const void *in))
 {
     size_t n = T->rows;
-    matrix_t *F = mat_create_upper_triangular_with_elem(n, n, &dval_elem);
-    matrix_t *N = mat_create_upper_triangular_with_elem(n, n, &dval_elem);
-    dval_t *lambda = NULL;
-    dval_t *c0 = NULL;
-    dval_t *c1 = NULL;
-    dval_t *c2 = NULL;
+    matrix_t *F = mat_create_upper_triangular_with_elem(n, n, &expr_elem);
+    matrix_t *N = mat_create_upper_triangular_with_elem(n, n, &expr_elem);
+    expr_t *lambda = NULL;
+    expr_t *c0 = NULL;
+    expr_t *c1 = NULL;
+    expr_t *c2 = NULL;
 
     if (!F || !N) {
         mat_free(F);
@@ -1081,7 +1081,7 @@ static matrix_t *mat_fun_triangular_equal_diag_dval(const matrix_t *T,
     }
 
     mat_get(T, 0, 0, &lambda);
-    if (dval_fun_coeffs_up_to_second(&c0, &c1, &c2, scalar_f, lambda) != 0) {
+    if (expr_fun_coeffs_up_to_second(&c0, &c1, &c2, scalar_f, lambda) != 0) {
         mat_free(F);
         mat_free(N);
         return NULL;
@@ -1090,8 +1090,8 @@ static matrix_t *mat_fun_triangular_equal_diag_dval(const matrix_t *T,
     for (size_t i = 0; i < n; ++i) {
         mat_set(F, i, i, &c0);
         for (size_t j = i; j < n; ++j) {
-            dval_t *tij = NULL;
-            const dval_t *zero = DV_ZERO;
+            expr_t *tij = NULL;
+            const expr_t *zero = EXPR_ZERO;
             mat_get(T, i, j, &tij);
             if (i == j)
                 mat_set(N, i, j, &zero);
@@ -1103,21 +1103,21 @@ static matrix_t *mat_fun_triangular_equal_diag_dval(const matrix_t *T,
     if (n >= 2) {
         for (size_t i = 0; i < n; ++i) {
             for (size_t j = i + 1; j < n; ++j) {
-                dval_t *nij = NULL;
-                dval_t *term = NULL;
+                expr_t *nij = NULL;
+                expr_t *term = NULL;
                 mat_get_owned(N, i, j, &nij);
-                term = dv_mul(c1, nij);
-                dv_free(nij);
+                term = expr_mul(c1, nij);
+                expr_free(nij);
                 if (!term) {
-                    dv_free(c0);
-                    dv_free(c1);
-                    dv_free(c2);
+                    expr_free(c0);
+                    expr_free(c1);
+                    expr_free(c2);
                     mat_free(F);
                     mat_free(N);
                     return NULL;
                 }
                 mat_set(F, i, j, &term);
-                dv_free(term);
+                expr_free(term);
             }
         }
     }
@@ -1125,9 +1125,9 @@ static matrix_t *mat_fun_triangular_equal_diag_dval(const matrix_t *T,
     if (n >= 3) {
         matrix_t *N2 = mat_mul(N, N);
         if (!N2) {
-            dv_free(c0);
-            dv_free(c1);
-            dv_free(c2);
+            expr_free(c0);
+            expr_free(c1);
+            expr_free(c2);
             mat_free(F);
             mat_free(N);
             return NULL;
@@ -1135,37 +1135,37 @@ static matrix_t *mat_fun_triangular_equal_diag_dval(const matrix_t *T,
 
         for (size_t i = 0; i < n; ++i) {
             for (size_t j = i + 2; j < n; ++j) {
-                dval_t *fij = NULL;
-                dval_t *n2ij = NULL;
-                dval_t *extra = NULL;
-                dval_t *sum = NULL;
+                expr_t *fij = NULL;
+                expr_t *n2ij = NULL;
+                expr_t *extra = NULL;
+                expr_t *sum = NULL;
                 mat_get_owned(F, i, j, &fij);
                 mat_get_owned(N2, i, j, &n2ij);
-                extra = dv_mul(c2, n2ij);
-                dv_free(n2ij);
-                sum = extra ? dv_add(fij, extra) : NULL;
-                dv_free(fij);
-                dv_free(extra);
+                extra = expr_mul(c2, n2ij);
+                expr_free(n2ij);
+                sum = extra ? expr_add(fij, extra) : NULL;
+                expr_free(fij);
+                expr_free(extra);
                 if (!sum) {
                     mat_free(N2);
-                    dv_free(c0);
-                    dv_free(c1);
-                    dv_free(c2);
+                    expr_free(c0);
+                    expr_free(c1);
+                    expr_free(c2);
                     mat_free(F);
                     mat_free(N);
                     return NULL;
                 }
                 mat_set(F, i, j, &sum);
-                dv_free(sum);
+                expr_free(sum);
             }
         }
 
         mat_free(N2);
     }
 
-    dv_free(c0);
-    dv_free(c1);
-    dv_free(c2);
+    expr_free(c0);
+    expr_free(c1);
+    expr_free(c2);
     mat_free(N);
     return F;
 }
@@ -1331,12 +1331,12 @@ static matrix_t *mat_asinh_number_triangular_equal_diag(const matrix_t *A)
 
 static matrix_t *mat_asin_number_triangular_equal_diag(const matrix_t *A)
 {
-    return mat_number_unary_taylor_from_dval(A, dv_asin);
+    return mat_number_unary_taylor_from_expr(A, expr_asin);
 }
 
 static matrix_t *mat_acos_number_triangular_equal_diag(const matrix_t *A)
 {
-    return mat_number_unary_taylor_from_dval(A, dv_acos);
+    return mat_number_unary_taylor_from_expr(A, expr_acos);
 }
 
 static matrix_t *mat_acosh_number_triangular_equal_diag(const matrix_t *A)
@@ -1587,94 +1587,94 @@ static matrix_t *mat_atanh_number_triangular_equal_diag(const matrix_t *A)
 
 static matrix_t *mat_erf_number_triangular_equal_diag(const matrix_t *A)
 {
-    return mat_number_unary_taylor_from_dval(A, dv_erf);
+    return mat_number_unary_taylor_from_expr(A, expr_erf);
 }
 
 static matrix_t *mat_erfc_number_triangular_equal_diag(const matrix_t *A)
 {
-    return mat_number_unary_taylor_from_dval(A, dv_erfc);
+    return mat_number_unary_taylor_from_expr(A, expr_erfc);
 }
 
 static matrix_t *mat_erfinv_number_triangular_equal_diag(const matrix_t *A)
 {
-    return mat_number_unary_taylor_from_dval(A, dv_erfinv);
+    return mat_number_unary_taylor_from_expr(A, expr_erfinv);
 }
 
 static matrix_t *mat_erfcinv_number_triangular_equal_diag(const matrix_t *A)
 {
-    return mat_number_unary_taylor_from_dval(A, dv_erfcinv);
+    return mat_number_unary_taylor_from_expr(A, expr_erfcinv);
 }
 
 static matrix_t *mat_gamma_number_triangular_equal_diag(const matrix_t *A)
 {
-    return mat_number_unary_taylor_from_dval(A, dv_gamma);
+    return mat_number_unary_taylor_from_expr(A, expr_gamma);
 }
 
 static matrix_t *mat_lgamma_number_triangular_equal_diag(const matrix_t *A)
 {
-    return mat_number_unary_taylor_from_dval(A, dv_lgamma);
+    return mat_number_unary_taylor_from_expr(A, expr_lgamma);
 }
 
 static matrix_t *mat_digamma_number_triangular_equal_diag(const matrix_t *A)
 {
-    return mat_number_unary_taylor_from_dval(A, dv_digamma);
+    return mat_number_unary_taylor_from_expr(A, expr_digamma);
 }
 
 static matrix_t *mat_trigamma_number_triangular_equal_diag(const matrix_t *A)
 {
-    return mat_number_unary_taylor_from_dval(A, dv_trigamma);
+    return mat_number_unary_taylor_from_expr(A, expr_trigamma);
 }
 
 static matrix_t *mat_gammainv_number_triangular_equal_diag(const matrix_t *A)
 {
-    return mat_number_unary_taylor_from_dval(A, dv_gammainv);
+    return mat_number_unary_taylor_from_expr(A, expr_gammainv);
 }
 
 static matrix_t *mat_normal_pdf_number_triangular_equal_diag(const matrix_t *A)
 {
-    return mat_number_unary_taylor_from_dval(A, dv_normal_pdf);
+    return mat_number_unary_taylor_from_expr(A, expr_normal_pdf);
 }
 
 static matrix_t *mat_normal_cdf_number_triangular_equal_diag(const matrix_t *A)
 {
-    return mat_number_unary_taylor_from_dval(A, dv_normal_cdf);
+    return mat_number_unary_taylor_from_expr(A, expr_normal_cdf);
 }
 
 static matrix_t *mat_normal_logpdf_number_triangular_equal_diag(const matrix_t *A)
 {
-    return mat_number_unary_taylor_from_dval(A, dv_normal_logpdf);
+    return mat_number_unary_taylor_from_expr(A, expr_normal_logpdf);
 }
 
 static matrix_t *mat_lambert_w0_number_triangular_equal_diag(const matrix_t *A)
 {
-    return mat_number_unary_taylor_from_dval(A, dv_lambert_w0);
+    return mat_number_unary_taylor_from_expr(A, expr_lambert_w0);
 }
 
 static matrix_t *mat_lambert_wm1_number_triangular_equal_diag(const matrix_t *A)
 {
-    return mat_number_unary_taylor_from_dval(A, dv_lambert_wm1);
+    return mat_number_unary_taylor_from_expr(A, expr_lambert_wm1);
 }
 
 static matrix_t *mat_productlog_number_triangular_equal_diag(const matrix_t *A)
 {
-    return mat_number_unary_taylor_from_dval(A, dv_lambert_w0);
+    return mat_number_unary_taylor_from_expr(A, expr_lambert_w0);
 }
 
 static matrix_t *mat_ei_number_triangular_equal_diag(const matrix_t *A)
 {
-    return mat_number_unary_taylor_from_dval(A, dv_ei);
+    return mat_number_unary_taylor_from_expr(A, expr_ei);
 }
 
 static matrix_t *mat_e1_number_triangular_equal_diag(const matrix_t *A)
 {
-    return mat_number_unary_taylor_from_dval(A, dv_e1);
+    return mat_number_unary_taylor_from_expr(A, expr_e1);
 }
 
-static matrix_t *mat_fun_dval_diagonalizable_2x2(const matrix_t *A,
+static matrix_t *mat_fun_expr_diagonalizable_2x2(const matrix_t *A,
                                                  void (*scalar_f)(void *out, const void *in))
 {
-    dval_t *eigenvalues[2] = {NULL, NULL};
-    dval_t *mapped[2] = {NULL, NULL};
+    expr_t *eigenvalues[2] = {NULL, NULL};
+    expr_t *mapped[2] = {NULL, NULL};
     matrix_t *V = NULL;
     matrix_t *FD = NULL;
     matrix_t *VF = NULL;
@@ -1684,10 +1684,10 @@ static matrix_t *mat_fun_dval_diagonalizable_2x2(const matrix_t *A,
     if (!A || !scalar_f || A->rows != 2 || A->cols != 2 || !matrix_is_symbolic(A))
         return NULL;
 
-    if (mat_eigendecompose_dv(A, eigenvalues, &V) != 0 || !V)
+    if (mat_eigendecompose_expr(A, eigenvalues, &V) != 0 || !V)
         goto fail;
 
-    FD = mat_create_diagonal_with_elem(2, &dval_elem);
+    FD = mat_create_diagonal_with_elem(2, &expr_elem);
     if (!FD)
         goto fail;
 
@@ -1710,8 +1710,8 @@ static matrix_t *mat_fun_dval_diagonalizable_2x2(const matrix_t *A,
 
 fail:
     for (size_t i = 0; i < 2; ++i) {
-        dv_free(eigenvalues[i]);
-        dv_free(mapped[i]);
+        expr_free(eigenvalues[i]);
+        expr_free(mapped[i]);
     }
     mat_free(V);
     mat_free(FD);
@@ -1720,16 +1720,16 @@ fail:
     return R;
 }
 
-static bool mat_dval_block_is_exact_zero(const matrix_t *A,
+static bool mat_expr_block_is_exact_zero(const matrix_t *A,
                                          size_t row0, size_t rows,
                                          size_t col0, size_t cols)
 {
     for (size_t i = 0; i < rows; ++i) {
         for (size_t j = 0; j < cols; ++j) {
-            dval_t *entry = NULL;
+            expr_t *entry = NULL;
 
             mat_get(A, row0 + i, col0 + j, &entry);
-            if (!dval_is_zero_local(entry))
+            if (!expr_is_zero_local(entry))
                 return false;
         }
     }
@@ -1737,7 +1737,7 @@ static bool mat_dval_block_is_exact_zero(const matrix_t *A,
     return true;
 }
 
-static matrix_t *mat_dval_permute_principal_local(const matrix_t *A,
+static matrix_t *mat_expr_permute_principal_local(const matrix_t *A,
                                                   const size_t *perm)
 {
     matrix_t *P;
@@ -1745,13 +1745,13 @@ static matrix_t *mat_dval_permute_principal_local(const matrix_t *A,
     if (!A || !perm || A->rows != A->cols)
         return NULL;
 
-    P = mat_create_dense_with_elem(A->rows, A->cols, &dval_elem);
+    P = mat_create_dense_with_elem(A->rows, A->cols, &expr_elem);
     if (!P)
         return NULL;
 
     for (size_t i = 0; i < A->rows; ++i) {
         for (size_t j = 0; j < A->cols; ++j) {
-            dval_t *entry = NULL;
+            expr_t *entry = NULL;
 
             mat_get(A, perm[i], perm[j], &entry);
             mat_set(P, i, j, &entry);
@@ -1761,7 +1761,7 @@ static matrix_t *mat_dval_permute_principal_local(const matrix_t *A,
     return P;
 }
 
-static matrix_t *mat_dval_extract_block_local(const matrix_t *A,
+static matrix_t *mat_expr_extract_block_local(const matrix_t *A,
                                               size_t row0, size_t rows,
                                               size_t col0, size_t cols)
 {
@@ -1770,13 +1770,13 @@ static matrix_t *mat_dval_extract_block_local(const matrix_t *A,
     if (!A || row0 + rows > A->rows || col0 + cols > A->cols)
         return NULL;
 
-    B = mat_create_dense_with_elem(rows, cols, &dval_elem);
+    B = mat_create_dense_with_elem(rows, cols, &expr_elem);
     if (!B)
         return NULL;
 
     for (size_t i = 0; i < rows; ++i) {
         for (size_t j = 0; j < cols; ++j) {
-            dval_t *entry = NULL;
+            expr_t *entry = NULL;
 
             mat_get(A, row0 + i, col0 + j, &entry);
             mat_set(B, i, j, &entry);
@@ -1786,7 +1786,7 @@ static matrix_t *mat_dval_extract_block_local(const matrix_t *A,
     return B;
 }
 
-static bool mat_dval_insert_block_local(matrix_t *A, size_t row0, size_t col0,
+static bool mat_expr_insert_block_local(matrix_t *A, size_t row0, size_t col0,
                                         const matrix_t *B)
 {
     if (!A || !B || row0 + B->rows > A->rows || col0 + B->cols > A->cols)
@@ -1794,7 +1794,7 @@ static bool mat_dval_insert_block_local(matrix_t *A, size_t row0, size_t col0,
 
     for (size_t i = 0; i < B->rows; ++i) {
         for (size_t j = 0; j < B->cols; ++j) {
-            dval_t *entry = NULL;
+            expr_t *entry = NULL;
 
             mat_get(B, i, j, &entry);
             mat_set(A, row0 + i, col0 + j, &entry);
@@ -1804,7 +1804,7 @@ static bool mat_dval_insert_block_local(matrix_t *A, size_t row0, size_t col0,
     return true;
 }
 
-static int mat_dval_component_partition(const matrix_t *A,
+static int mat_expr_component_partition(const matrix_t *A,
                                         size_t **perm_out,
                                         size_t *count_out)
 {
@@ -1849,8 +1849,8 @@ static int mat_dval_component_partition(const matrix_t *A,
 
             perm[perm_len++] = u;
             for (size_t v = 0; v < n; ++v) {
-                dval_t *uv = NULL;
-                dval_t *vu = NULL;
+                expr_t *uv = NULL;
+                expr_t *vu = NULL;
                 bool connected;
 
                 if (seen[v])
@@ -1858,7 +1858,7 @@ static int mat_dval_component_partition(const matrix_t *A,
 
                 mat_get(A, u, v, &uv);
                 mat_get(A, v, u, &vu);
-                connected = !dval_is_zero_local(uv) || !dval_is_zero_local(vu);
+                connected = !expr_is_zero_local(uv) || !expr_is_zero_local(vu);
                 if (!connected)
                     continue;
 
@@ -1882,7 +1882,7 @@ fail:
     return -1;
 }
 
-static matrix_t *mat_fun_dval_block_diagonal(const matrix_t *A,
+static matrix_t *mat_fun_expr_block_diagonal(const matrix_t *A,
                                              void (*scalar_f)(void *out, const void *in))
 {
     size_t n;
@@ -1900,26 +1900,26 @@ static matrix_t *mat_fun_dval_block_diagonal(const matrix_t *A,
         matrix_t *F22 = NULL;
         matrix_t *F = NULL;
 
-        if (!mat_dval_block_is_exact_zero(A, 0, split, split, n - split) ||
-            !mat_dval_block_is_exact_zero(A, split, n - split, 0, split))
+        if (!mat_expr_block_is_exact_zero(A, 0, split, split, n - split) ||
+            !mat_expr_block_is_exact_zero(A, split, n - split, 0, split))
             continue;
 
-        A11 = mat_dval_extract_block_local(A, 0, split, 0, split);
-        A22 = mat_dval_extract_block_local(A, split, n - split, split, n - split);
+        A11 = mat_expr_extract_block_local(A, 0, split, 0, split);
+        A22 = mat_expr_extract_block_local(A, split, n - split, split, n - split);
         if (!A11 || !A22)
             goto next_split;
 
-        F11 = mat_fun_dval_structured(A11, scalar_f);
-        F22 = mat_fun_dval_structured(A22, scalar_f);
+        F11 = mat_fun_expr_structured(A11, scalar_f);
+        F22 = mat_fun_expr_structured(A22, scalar_f);
         if (!F11 || !F22)
             goto next_split;
 
-        F = mat_create_dense_with_elem(n, n, &dval_elem);
+        F = mat_create_dense_with_elem(n, n, &expr_elem);
         if (!F)
             goto next_split;
 
-        if (!mat_dval_insert_block_local(F, 0, 0, F11) ||
-            !mat_dval_insert_block_local(F, split, split, F22)) {
+        if (!mat_expr_insert_block_local(F, 0, 0, F11) ||
+            !mat_expr_insert_block_local(F, split, split, F22)) {
             mat_free(F);
             F = NULL;
             goto next_split;
@@ -1941,7 +1941,7 @@ next_split:
     return NULL;
 }
 
-static matrix_t *mat_fun_dval_permuted_block_diagonal(const matrix_t *A,
+static matrix_t *mat_fun_expr_permuted_block_diagonal(const matrix_t *A,
                                                       void (*scalar_f)(void *out, const void *in))
 {
     size_t *perm = NULL;
@@ -1955,26 +1955,26 @@ static matrix_t *mat_fun_dval_permuted_block_diagonal(const matrix_t *A,
     if (A->rows != A->cols || A->rows < 2)
         return NULL;
 
-    if (mat_dval_component_partition(A, &perm, &comp_count) != 0)
+    if (mat_expr_component_partition(A, &perm, &comp_count) != 0)
         goto fail;
     if (comp_count <= 1)
         goto fail;
 
-    P = mat_dval_permute_principal_local(A, perm);
+    P = mat_expr_permute_principal_local(A, perm);
     if (!P)
         goto fail;
 
-    FP = mat_fun_dval_block_diagonal(P, scalar_f);
+    FP = mat_fun_expr_block_diagonal(P, scalar_f);
     if (!FP)
         goto fail;
 
-    F = mat_create_dense_with_elem(A->rows, A->cols, &dval_elem);
+    F = mat_create_dense_with_elem(A->rows, A->cols, &expr_elem);
     if (!F)
         goto fail;
 
     for (size_t i = 0; i < A->rows; ++i) {
         for (size_t j = 0; j < A->cols; ++j) {
-            dval_t *entry = NULL;
+            expr_t *entry = NULL;
 
             mat_get(FP, i, j, &entry);
             mat_set(F, perm[i], perm[j], &entry);
@@ -1988,17 +1988,17 @@ fail:
     return F;
 }
 
-static matrix_t *mat_fun_dval_uniform_diag_offdiag(const matrix_t *A,
+static matrix_t *mat_fun_expr_uniform_diag_offdiag(const matrix_t *A,
                                                    void (*scalar_f)(void *out, const void *in))
 {
     matrix_t *out = NULL;
-    dval_t *diag = NULL;
-    dval_t *offdiag = NULL;
-    dval_t *alpha = NULL;
-    dval_t *beta = NULL;
-    dval_t *fa = NULL;
-    dval_t *fb = NULL;
-    dval_t *delta = NULL;
+    expr_t *diag = NULL;
+    expr_t *offdiag = NULL;
+    expr_t *alpha = NULL;
+    expr_t *beta = NULL;
+    expr_t *fa = NULL;
+    expr_t *fb = NULL;
+    expr_t *delta = NULL;
     size_t n;
 
     if (!A || !scalar_f || !matrix_is_symbolic(A))
@@ -2012,34 +2012,34 @@ static matrix_t *mat_fun_dval_uniform_diag_offdiag(const matrix_t *A,
 
     for (size_t i = 0; i < n; ++i) {
         for (size_t j = 0; j < n; ++j) {
-            dval_t *entry = NULL;
+            expr_t *entry = NULL;
             bool same;
 
             mat_get(A, i, j, &entry);
             same = (i == j)
-                ? dval_equal_exact_local(diag, entry)
-                : dval_equal_exact_local(offdiag, entry);
+                ? expr_equal_exact_local(diag, entry)
+                : expr_equal_exact_local(offdiag, entry);
             if (!same)
                 goto fail;
         }
     }
 
-    dv_retain(diag ? diag : DV_ZERO);
-    dv_retain(offdiag ? offdiag : DV_ZERO);
-    alpha = dval_sub_simplify_local(diag ? diag : DV_ZERO, offdiag ? offdiag : DV_ZERO);
+    expr_retain(diag ? diag : EXPR_ZERO);
+    expr_retain(offdiag ? offdiag : EXPR_ZERO);
+    alpha = expr_sub_simplify_local(diag ? diag : EXPR_ZERO, offdiag ? offdiag : EXPR_ZERO);
     if (!alpha)
         goto fail;
 
-    dv_retain(diag ? diag : DV_ZERO);
-    dv_retain(offdiag ? offdiag : DV_ZERO);
+    expr_retain(diag ? diag : EXPR_ZERO);
+    expr_retain(offdiag ? offdiag : EXPR_ZERO);
     number_t n_minus_one = num_create_from_long((long)(n - 1));
-    dval_t *scaled_offdiag = dval_mul_simplify_local(
-        dv_new_const(n_minus_one),
-        offdiag ? offdiag : DV_ZERO);
+    expr_t *scaled_offdiag = expr_mul_simplify_local(
+        expr_new_const(n_minus_one),
+        offdiag ? offdiag : EXPR_ZERO);
     num_destroy(&n_minus_one);
     if (!scaled_offdiag)
         goto fail;
-    beta = dval_add_simplify_local(diag ? diag : DV_ZERO, scaled_offdiag);
+    beta = expr_add_simplify_local(diag ? diag : EXPR_ZERO, scaled_offdiag);
     scaled_offdiag = NULL;
     if (!beta)
         goto fail;
@@ -2049,72 +2049,72 @@ static matrix_t *mat_fun_dval_uniform_diag_offdiag(const matrix_t *A,
     if (!fa || !fb)
         goto fail;
 
-    dv_retain(fb);
-    dv_retain(fa);
-    delta = dval_sub_simplify_local(fb, fa);
+    expr_retain(fb);
+    expr_retain(fa);
+    delta = expr_sub_simplify_local(fb, fa);
     if (!delta)
         goto fail;
     number_t n_num = num_create_from_long((long)n);
-    dval_t *scaled_delta = dv_div_num(delta, &n_num);
+    expr_t *scaled_delta = expr_div_num(delta, &n_num);
     num_destroy(&n_num);
-    dv_free(delta);
-    delta = dval_simplify_owned_local(scaled_delta);
+    expr_free(delta);
+    delta = expr_simplify_owned_local(scaled_delta);
     if (!delta)
         goto fail;
 
-    out = mat_new_dv(n, n);
+    out = mat_new_expr(n, n);
     if (!out)
         goto fail;
 
     for (size_t i = 0; i < n; ++i) {
         for (size_t j = 0; j < n; ++j) {
-            dval_t *entry = NULL;
+            expr_t *entry = NULL;
 
             if (i == j) {
-                dv_retain(fa);
-                dv_retain(delta);
-                entry = dval_add_simplify_local(fa, delta);
+                expr_retain(fa);
+                expr_retain(delta);
+                entry = expr_add_simplify_local(fa, delta);
             } else {
-                dv_retain(delta);
-                entry = dval_simplify_owned_local(delta);
+                expr_retain(delta);
+                entry = expr_simplify_owned_local(delta);
             }
 
             if (!entry)
                 goto fail;
 
             mat_set(out, i, j, &entry);
-            dv_free(entry);
+            expr_free(entry);
         }
     }
 
-    dv_free(alpha);
-    dv_free(beta);
-    dv_free(fa);
-    dv_free(fb);
-    dv_free(delta);
+    expr_free(alpha);
+    expr_free(beta);
+    expr_free(fa);
+    expr_free(fb);
+    expr_free(delta);
     return out;
 
 fail:
     mat_free(out);
-    dv_free(alpha);
-    dv_free(beta);
-    dv_free(fa);
-    dv_free(fb);
-    dv_free(delta);
+    expr_free(alpha);
+    expr_free(beta);
+    expr_free(fa);
+    expr_free(fb);
+    expr_free(delta);
     return NULL;
 }
 
-static matrix_t *mat_fun_dval_scalar_plus_rank_one(const matrix_t *A,
+static matrix_t *mat_fun_expr_scalar_plus_rank_one(const matrix_t *A,
                                                    void (*scalar_f)(void *out, const void *in))
 {
     matrix_t *out = NULL;
-    dval_t **u = NULL;
-    dval_t **v = NULL;
-    dval_t *alpha = NULL;
-    dval_t *lambda = NULL;
-    dval_t *f_alpha = NULL;
-    dval_t *f_beta = NULL;
-    dval_t *coeff = NULL;
+    expr_t **u = NULL;
+    expr_t **v = NULL;
+    expr_t *alpha = NULL;
+    expr_t *lambda = NULL;
+    expr_t *f_alpha = NULL;
+    expr_t *f_beta = NULL;
+    expr_t *coeff = NULL;
     size_t n;
     size_t p = 0;
     size_t q = 0;
@@ -2135,12 +2135,12 @@ static matrix_t *mat_fun_dval_scalar_plus_rank_one(const matrix_t *A,
 
     for (size_t i = 0; i < n && !found_pivot; ++i) {
         for (size_t j = 0; j < n; ++j) {
-            dval_t *entry = NULL;
+            expr_t *entry = NULL;
 
             if (i == j)
                 continue;
             mat_get(A, i, j, &entry);
-            if (!dval_is_zero_local(entry)) {
+            if (!expr_is_zero_local(entry)) {
                 p = i;
                 q = j;
                 found_pivot = true;
@@ -2152,65 +2152,65 @@ static matrix_t *mat_fun_dval_scalar_plus_rank_one(const matrix_t *A,
         goto fail;
 
     for (size_t i = 0; i < n; ++i) {
-        dval_t *entry = NULL;
+        expr_t *entry = NULL;
 
         if (i == q)
             continue;
         mat_get(A, i, q, &entry);
-        if (!dval_is_zero_local(entry)) {
-            dv_retain(entry);
+        if (!expr_is_zero_local(entry)) {
+            expr_retain(entry);
             u[i] = entry;
         }
     }
 
-    v[q] = dval_const_one_local();
+    v[q] = expr_const_one_local();
     if (!v[q])
         goto fail;
 
     for (size_t j = 0; j < n; ++j) {
-        dval_t *apj = NULL;
-        dval_t *apq = NULL;
+        expr_t *apj = NULL;
+        expr_t *apq = NULL;
 
         if (j == p || j == q)
             continue;
         mat_get(A, p, j, &apj);
-        if (dval_is_zero_local(apj))
+        if (expr_is_zero_local(apj))
             continue;
         mat_get(A, p, q, &apq);
-        if (dval_is_zero_local(apq))
+        if (expr_is_zero_local(apq))
             goto fail;
 
-        dv_retain(apj);
-        dv_retain(apq);
-        v[j] = dval_div_simplify_local(apj, apq);
+        expr_retain(apj);
+        expr_retain(apq);
+        v[j] = expr_div_simplify_local(apj, apq);
         if (!v[j])
             goto fail;
     }
 
     for (size_t i = 0; i < n; ++i) {
-        dval_t *aii = NULL;
-        dval_t *diag_corr = NULL;
-        dval_t *cand = NULL;
+        expr_t *aii = NULL;
+        expr_t *diag_corr = NULL;
+        expr_t *cand = NULL;
         bool usable = (i != p && i != q);
 
         if (!usable)
             continue;
 
-        diag_corr = dval_mul_or_zero_owned_local(u[i], v[i]);
+        diag_corr = expr_mul_or_zero_owned_local(u[i], v[i]);
         if (!diag_corr)
             goto fail;
 
         mat_get(A, i, i, &aii);
-        dv_retain(aii ? aii : DV_ZERO);
-        cand = dval_sub_simplify_local(aii ? aii : DV_ZERO, diag_corr);
+        expr_retain(aii ? aii : EXPR_ZERO);
+        cand = expr_sub_simplify_local(aii ? aii : EXPR_ZERO, diag_corr);
         if (!cand)
             goto fail;
 
         if (!alpha) {
             alpha = cand;
         } else {
-            bool same = dval_equal_exact_local(alpha, cand);
-            dv_free(cand);
+            bool same = expr_equal_exact_local(alpha, cand);
+            expr_free(cand);
             if (!same)
                 goto fail;
         }
@@ -2218,207 +2218,207 @@ static matrix_t *mat_fun_dval_scalar_plus_rank_one(const matrix_t *A,
     if (!alpha)
         goto fail;
 
-    dval_t *app = NULL;
-    dval_t *diag_p = NULL;
-    dval_t *aqq = NULL;
-    dval_t *diag_q = NULL;
-    dval_t *apq = NULL;
+    expr_t *app = NULL;
+    expr_t *diag_p = NULL;
+    expr_t *aqq = NULL;
+    expr_t *diag_q = NULL;
+    expr_t *apq = NULL;
 
     mat_get(A, p, p, &app);
-    dv_retain(app ? app : DV_ZERO);
-    dv_retain(alpha);
-    diag_p = dval_sub_simplify_local(app ? app : DV_ZERO, alpha);
+    expr_retain(app ? app : EXPR_ZERO);
+    expr_retain(alpha);
+    diag_p = expr_sub_simplify_local(app ? app : EXPR_ZERO, alpha);
     if (!diag_p)
         goto fail;
 
     mat_get(A, p, q, &apq);
-    if (dval_is_zero_local(apq))
+    if (expr_is_zero_local(apq))
         goto fail;
-    dv_retain(diag_p);
-    dv_retain(apq);
-    v[p] = dval_div_simplify_local(diag_p, apq);
-    dv_free(diag_p);
+    expr_retain(diag_p);
+    expr_retain(apq);
+    v[p] = expr_div_simplify_local(diag_p, apq);
+    expr_free(diag_p);
     if (!v[p])
         goto fail;
 
     mat_get(A, q, q, &aqq);
-    dv_retain(aqq ? aqq : DV_ZERO);
-    dv_retain(alpha);
-    diag_q = dval_sub_simplify_local(aqq ? aqq : DV_ZERO, alpha);
+    expr_retain(aqq ? aqq : EXPR_ZERO);
+    expr_retain(alpha);
+    diag_q = expr_sub_simplify_local(aqq ? aqq : EXPR_ZERO, alpha);
     if (!diag_q)
         goto fail;
     u[q] = diag_q;
 
     for (size_t i = 0; i < n; ++i) {
         for (size_t j = 0; j < n; ++j) {
-            dval_t *aij = NULL;
-            dval_t *expected = NULL;
+            expr_t *aij = NULL;
+            expr_t *expected = NULL;
 
             mat_get(A, i, j, &aij);
             if (i == j) {
-                dval_t *diag_corr = dval_mul_or_zero_owned_local(u[i], v[i]);
+                expr_t *diag_corr = expr_mul_or_zero_owned_local(u[i], v[i]);
                 if (!diag_corr)
                     goto fail;
-                dv_retain(alpha);
-                expected = dval_add_simplify_local(alpha, diag_corr);
+                expr_retain(alpha);
+                expected = expr_add_simplify_local(alpha, diag_corr);
             } else {
-                expected = dval_mul_or_zero_owned_local(u[i], v[j]);
+                expected = expr_mul_or_zero_owned_local(u[i], v[j]);
             }
 
             if (!expected)
                 goto fail;
-            if (!dval_equal_exact_local(aij, expected)) {
-                dv_free(expected);
+            if (!expr_equal_exact_local(aij, expected)) {
+                expr_free(expected);
                 goto fail;
             }
-            dv_free(expected);
+            expr_free(expected);
         }
     }
 
-    lambda = dval_const_zero_local();
+    lambda = expr_const_zero_local();
     if (!lambda)
         goto fail;
     for (size_t i = 0; i < n; ++i) {
-        dval_t *term = dval_mul_or_zero_owned_local(u[i], v[i]);
-        dval_t *next;
+        expr_t *term = expr_mul_or_zero_owned_local(u[i], v[i]);
+        expr_t *next;
 
         if (!term)
             goto fail;
-        next = dval_add_simplify_local(lambda, term);
+        next = expr_add_simplify_local(lambda, term);
         if (!next)
             goto fail;
         lambda = next;
     }
 
-    if (dv_is_exact_zero(lambda)) {
-        if (dval_fun_coeffs_up_to_second(&f_alpha, &coeff, NULL, scalar_f, alpha) != 0)
+    if (expr_is_exact_zero(lambda)) {
+        if (expr_fun_coeffs_up_to_second(&f_alpha, &coeff, NULL, scalar_f, alpha) != 0)
             goto fail;
     } else {
-        dval_t *beta = NULL;
-        dval_t *num = NULL;
+        expr_t *beta = NULL;
+        expr_t *num = NULL;
 
-        dv_retain(alpha);
-        dv_retain(lambda);
-        beta = dval_add_simplify_local(alpha, lambda);
+        expr_retain(alpha);
+        expr_retain(lambda);
+        beta = expr_add_simplify_local(alpha, lambda);
         if (!beta)
             goto fail;
 
         scalar_f(&f_alpha, &alpha);
         scalar_f(&f_beta, &beta);
-        dv_free(beta);
+        expr_free(beta);
         if (!f_alpha || !f_beta)
             goto fail;
 
-        dv_retain(f_beta);
-        dv_retain(f_alpha);
-        num = dval_sub_simplify_local(f_beta, f_alpha);
+        expr_retain(f_beta);
+        expr_retain(f_alpha);
+        num = expr_sub_simplify_local(f_beta, f_alpha);
         if (!num)
             goto fail;
-        dv_retain(lambda);
-        coeff = dval_div_simplify_local(num, lambda);
+        expr_retain(lambda);
+        coeff = expr_div_simplify_local(num, lambda);
         if (!coeff)
             goto fail;
     }
 
-    out = mat_new_dv(n, n);
+    out = mat_new_expr(n, n);
     if (!out)
         goto fail;
 
     for (size_t i = 0; i < n; ++i) {
         for (size_t j = 0; j < n; ++j) {
-            dval_t *aij = NULL;
-            dval_t *entry = NULL;
+            expr_t *aij = NULL;
+            expr_t *entry = NULL;
 
             if (i == j) {
-                dval_t *diag_delta = NULL;
+                expr_t *diag_delta = NULL;
 
                 mat_get(A, i, i, &aij);
-                dv_retain(aij ? aij : DV_ZERO);
-                dv_retain(alpha);
-                diag_delta = dval_sub_simplify_local(aij ? aij : DV_ZERO, alpha);
+                expr_retain(aij ? aij : EXPR_ZERO);
+                expr_retain(alpha);
+                diag_delta = expr_sub_simplify_local(aij ? aij : EXPR_ZERO, alpha);
                 if (!diag_delta)
                     goto fail;
 
-                if (dval_is_zero_local(diag_delta)) {
-                    dv_free(diag_delta);
-                    entry = dval_clone_for_storage(f_alpha);
+                if (expr_is_zero_local(diag_delta)) {
+                    expr_free(diag_delta);
+                    entry = expr_clone_for_storage(f_alpha);
                 } else {
-                    dval_t *scaled = NULL;
+                    expr_t *scaled = NULL;
 
-                    dv_retain(coeff);
-                    dv_retain(diag_delta);
-                    scaled = dval_mul_simplify_local(coeff, diag_delta);
-                    dv_free(diag_delta);
+                    expr_retain(coeff);
+                    expr_retain(diag_delta);
+                    scaled = expr_mul_simplify_local(coeff, diag_delta);
+                    expr_free(diag_delta);
                     if (!scaled)
                         goto fail;
-                    dv_retain(f_alpha);
-                    entry = dval_add_simplify_local(f_alpha, scaled);
+                    expr_retain(f_alpha);
+                    entry = expr_add_simplify_local(f_alpha, scaled);
                 }
             } else {
                 mat_get(A, i, j, &aij);
-                if (dval_is_zero_local(aij)) {
-                    entry = dval_const_zero_local();
+                if (expr_is_zero_local(aij)) {
+                    entry = expr_const_zero_local();
                 } else {
-                    dv_retain(coeff);
-                    dv_retain(aij);
-                    entry = dval_mul_simplify_local(coeff, aij);
+                    expr_retain(coeff);
+                    expr_retain(aij);
+                    entry = expr_mul_simplify_local(coeff, aij);
                 }
             }
 
             if (!entry)
                 goto fail;
             mat_set(out, i, j, &entry);
-            dv_free(entry);
+            expr_free(entry);
         }
     }
 
     for (size_t i = 0; i < n; ++i) {
-        dv_free(u[i]);
-        dv_free(v[i]);
+        expr_free(u[i]);
+        expr_free(v[i]);
     }
     free(u);
     free(v);
-    dv_free(alpha);
-    dv_free(lambda);
-    dv_free(f_alpha);
-    dv_free(f_beta);
-    dv_free(coeff);
+    expr_free(alpha);
+    expr_free(lambda);
+    expr_free(f_alpha);
+    expr_free(f_beta);
+    expr_free(coeff);
     return out;
 
 fail:
     mat_free(out);
     if (u) {
         for (size_t i = 0; i < n; ++i)
-            dv_free(u[i]);
+            expr_free(u[i]);
     }
     if (v) {
         for (size_t i = 0; i < n; ++i)
-            dv_free(v[i]);
+            expr_free(v[i]);
     }
     free(u);
     free(v);
-    dv_free(alpha);
-    dv_free(lambda);
-    dv_free(f_alpha);
-    dv_free(f_beta);
-    dv_free(coeff);
+    expr_free(alpha);
+    expr_free(lambda);
+    expr_free(f_alpha);
+    expr_free(f_beta);
+    expr_free(coeff);
     return NULL;
 }
 
-static matrix_t *mat_fun_dval_cubic_linear_exact(const matrix_t *A,
+static matrix_t *mat_fun_expr_cubic_linear_exact(const matrix_t *A,
                                                  void (*scalar_f)(void *out, const void *in))
 {
     matrix_t *A2 = NULL;
     matrix_t *A3 = NULL;
     matrix_t *out = NULL;
-    dval_t *s = NULL;
-    dval_t *root = NULL;
-    dval_t *f0 = NULL;
-    dval_t *fp = NULL;
-    dval_t *fm = NULL;
-    dval_t *c0 = NULL;
-    dval_t *c1 = NULL;
-    dval_t *c2 = NULL;
+    expr_t *s = NULL;
+    expr_t *root = NULL;
+    expr_t *f0 = NULL;
+    expr_t *fp = NULL;
+    expr_t *fm = NULL;
+    expr_t *c0 = NULL;
+    expr_t *c1 = NULL;
+    expr_t *c2 = NULL;
     bool saw_nonzero = false;
 
     if (!A || !scalar_f || !matrix_is_symbolic(A))
@@ -2435,29 +2435,29 @@ static matrix_t *mat_fun_dval_cubic_linear_exact(const matrix_t *A,
 
     for (size_t i = 0; i < A->rows; ++i) {
         for (size_t j = 0; j < A->cols; ++j) {
-            dval_t *aij = NULL;
-            dval_t *a3ij = NULL;
+            expr_t *aij = NULL;
+            expr_t *a3ij = NULL;
 
             mat_get(A, i, j, &aij);
             mat_get(A3, i, j, &a3ij);
-            if (dval_is_zero_local(aij)) {
-                if (!dval_is_zero_local(a3ij))
+            if (expr_is_zero_local(aij)) {
+                if (!expr_is_zero_local(a3ij))
                     goto fail;
                 continue;
             }
 
             saw_nonzero = true;
-            dv_retain(a3ij);
-            dv_retain(aij);
-            dval_t *cand = dval_div_simplify_local(a3ij, aij);
+            expr_retain(a3ij);
+            expr_retain(aij);
+            expr_t *cand = expr_div_simplify_local(a3ij, aij);
             if (!cand)
                 goto fail;
 
             if (!s) {
                 s = cand;
             } else {
-                bool same = dval_equal_exact_local(s, cand);
-                dv_free(cand);
+                bool same = expr_equal_exact_local(s, cand);
+                expr_free(cand);
                 if (!same)
                     goto fail;
             }
@@ -2467,201 +2467,201 @@ static matrix_t *mat_fun_dval_cubic_linear_exact(const matrix_t *A,
     if (!saw_nonzero || !s)
         goto fail;
 
-    if (dv_is_exact_zero(s)) {
-        dval_t *zero = dval_const_zero_local();
+    if (expr_is_exact_zero(s)) {
+        expr_t *zero = expr_const_zero_local();
 
         if (!zero)
             goto fail;
-        if (dval_fun_coeffs_up_to_second(&c0, &c1, &c2, scalar_f, zero) != 0) {
-            dv_free(zero);
+        if (expr_fun_coeffs_up_to_second(&c0, &c1, &c2, scalar_f, zero) != 0) {
+            expr_free(zero);
             goto fail;
         }
-        dv_free(zero);
+        expr_free(zero);
     } else {
-        dval_t *zero = dval_const_zero_local();
-        dval_t *neg_root = NULL;
-        dval_t *two_root = NULL;
-        dval_t *two_s = NULL;
-        dval_t *sum = NULL;
-        dval_t *diff = NULL;
-        dval_t *tmp = NULL;
+        expr_t *zero = expr_const_zero_local();
+        expr_t *neg_root = NULL;
+        expr_t *two_root = NULL;
+        expr_t *two_s = NULL;
+        expr_t *sum = NULL;
+        expr_t *diff = NULL;
+        expr_t *tmp = NULL;
 
         if (!zero)
             goto fail;
 
-        root = dv_sqrt(s);
-        root = dval_simplify_owned_local(root);
+        root = expr_sqrt(s);
+        root = expr_simplify_owned_local(root);
         if (!root) {
-            dv_free(zero);
+            expr_free(zero);
             goto fail;
         }
 
-        dv_retain(root);
-        neg_root = dval_sub_simplify_local(dval_const_zero_local(), root);
+        expr_retain(root);
+        neg_root = expr_sub_simplify_local(expr_const_zero_local(), root);
         if (!neg_root) {
-            dv_free(zero);
+            expr_free(zero);
             goto fail;
         }
 
         scalar_f(&f0, &zero);
         scalar_f(&fp, &root);
         scalar_f(&fm, &neg_root);
-        dv_free(zero);
+        expr_free(zero);
         if (!f0 || !fp || !fm)
             goto fail;
 
-        c0 = dval_simplify_owned_local(f0);
+        c0 = expr_simplify_owned_local(f0);
         f0 = NULL;
         if (!c0)
             goto fail;
 
-        dv_retain(fp);
-        dv_retain(fm);
-        diff = dval_sub_simplify_local(fp, fm);
+        expr_retain(fp);
+        expr_retain(fm);
+        diff = expr_sub_simplify_local(fp, fm);
         if (!diff)
             goto fail;
 
-        dv_retain(root);
-        two_root = dval_mul_simplify_local(dval_const_long_local(2), root);
+        expr_retain(root);
+        two_root = expr_mul_simplify_local(expr_const_long_local(2), root);
         if (!two_root)
             goto fail;
-        c1 = dval_div_simplify_local(diff, two_root);
+        c1 = expr_div_simplify_local(diff, two_root);
         diff = NULL;
         two_root = NULL;
         if (!c1)
             goto fail;
 
-        dv_retain(fp);
-        dv_retain(fm);
-        sum = dval_add_simplify_local(fp, fm);
+        expr_retain(fp);
+        expr_retain(fm);
+        sum = expr_add_simplify_local(fp, fm);
         if (!sum)
             goto fail;
 
-        dv_retain(c0);
-        tmp = dval_mul_simplify_local(dval_const_long_local(2), c0);
+        expr_retain(c0);
+        tmp = expr_mul_simplify_local(expr_const_long_local(2), c0);
         if (!tmp)
             goto fail;
-        sum = dval_sub_simplify_local(sum, tmp);
+        sum = expr_sub_simplify_local(sum, tmp);
         tmp = NULL;
         if (!sum)
             goto fail;
 
-        dv_retain(s);
-        two_s = dval_mul_simplify_local(dval_const_long_local(2), s);
+        expr_retain(s);
+        two_s = expr_mul_simplify_local(expr_const_long_local(2), s);
         if (!two_s)
             goto fail;
-        c2 = dval_div_simplify_local(sum, two_s);
+        c2 = expr_div_simplify_local(sum, two_s);
         sum = NULL;
         two_s = NULL;
         if (!c2)
             goto fail;
 
-        dv_free(neg_root);
+        expr_free(neg_root);
     }
 
-    out = mat_new_dv(A->rows, A->cols);
+    out = mat_new_expr(A->rows, A->cols);
     if (!out)
         goto fail;
 
     for (size_t i = 0; i < A->rows; ++i) {
         for (size_t j = 0; j < A->cols; ++j) {
-            dval_t *aij = NULL;
-            dval_t *a2ij = NULL;
-            dval_t *term1 = NULL;
-            dval_t *term2 = NULL;
-            dval_t *entry = NULL;
+            expr_t *aij = NULL;
+            expr_t *a2ij = NULL;
+            expr_t *term1 = NULL;
+            expr_t *term2 = NULL;
+            expr_t *entry = NULL;
 
             mat_get(A, i, j, &aij);
             mat_get(A2, i, j, &a2ij);
 
-            dv_retain(c1);
-            dv_retain(aij ? aij : DV_ZERO);
-            term1 = dval_mul_simplify_local(c1, aij ? aij : DV_ZERO);
+            expr_retain(c1);
+            expr_retain(aij ? aij : EXPR_ZERO);
+            term1 = expr_mul_simplify_local(c1, aij ? aij : EXPR_ZERO);
             if (!term1)
                 goto fail;
 
-            dv_retain(c2);
-            dv_retain(a2ij ? a2ij : DV_ZERO);
-            term2 = dval_mul_simplify_local(c2, a2ij ? a2ij : DV_ZERO);
+            expr_retain(c2);
+            expr_retain(a2ij ? a2ij : EXPR_ZERO);
+            term2 = expr_mul_simplify_local(c2, a2ij ? a2ij : EXPR_ZERO);
             if (!term2)
                 goto fail;
 
-            entry = dval_add_simplify_local(term1, term2);
+            entry = expr_add_simplify_local(term1, term2);
             term1 = NULL;
             term2 = NULL;
             if (!entry)
                 goto fail;
 
             if (i == j) {
-                dv_retain(c0);
-                entry = dval_add_simplify_local(c0, entry);
+                expr_retain(c0);
+                entry = expr_add_simplify_local(c0, entry);
                 if (!entry)
                     goto fail;
             }
 
             mat_set(out, i, j, &entry);
-            dv_free(entry);
+            expr_free(entry);
         }
     }
 
     mat_free(A2);
     mat_free(A3);
-    dv_free(s);
-    dv_free(root);
-    dv_free(f0);
-    dv_free(fp);
-    dv_free(fm);
-    dv_free(c0);
-    dv_free(c1);
-    dv_free(c2);
+    expr_free(s);
+    expr_free(root);
+    expr_free(f0);
+    expr_free(fp);
+    expr_free(fm);
+    expr_free(c0);
+    expr_free(c1);
+    expr_free(c2);
     return out;
 
 fail:
     mat_free(A2);
     mat_free(A3);
     mat_free(out);
-    dv_free(s);
-    dv_free(root);
-    dv_free(f0);
-    dv_free(fp);
-    dv_free(fm);
-    dv_free(c0);
-    dv_free(c1);
-    dv_free(c2);
+    expr_free(s);
+    expr_free(root);
+    expr_free(f0);
+    expr_free(fp);
+    expr_free(fm);
+    expr_free(c0);
+    expr_free(c1);
+    expr_free(c2);
     return NULL;
 }
 
-static matrix_t *mat_fun_dval_quartic_biquadratic_exact(const matrix_t *A,
+static matrix_t *mat_fun_expr_quartic_biquadratic_exact(const matrix_t *A,
                                                         void (*scalar_f)(void *out, const void *in))
 {
     matrix_t *A2 = NULL;
     matrix_t *A3 = NULL;
     matrix_t *A4 = NULL;
     matrix_t *out = NULL;
-    dval_t *s = NULL;
-    dval_t *t = NULL;
-    dval_t *disc = NULL;
-    dval_t *root = NULL;
-    dval_t *mu1 = NULL;
-    dval_t *mu2 = NULL;
-    dval_t *r1 = NULL;
-    dval_t *r2 = NULL;
-    dval_t *nr1 = NULL;
-    dval_t *nr2 = NULL;
-    dval_t *fp1 = NULL;
-    dval_t *fm1 = NULL;
-    dval_t *fp2 = NULL;
-    dval_t *fm2 = NULL;
-    dval_t *g1 = NULL;
-    dval_t *g2 = NULL;
-    dval_t *h1 = NULL;
-    dval_t *h2 = NULL;
-    dval_t *e0 = NULL;
-    dval_t *e1 = NULL;
-    dval_t *o0 = NULL;
-    dval_t *o1 = NULL;
-    dval_t *step = NULL;
-    dval_t *step_sq = NULL;
+    expr_t *s = NULL;
+    expr_t *t = NULL;
+    expr_t *disc = NULL;
+    expr_t *root = NULL;
+    expr_t *mu1 = NULL;
+    expr_t *mu2 = NULL;
+    expr_t *r1 = NULL;
+    expr_t *r2 = NULL;
+    expr_t *nr1 = NULL;
+    expr_t *nr2 = NULL;
+    expr_t *fp1 = NULL;
+    expr_t *fm1 = NULL;
+    expr_t *fp2 = NULL;
+    expr_t *fm2 = NULL;
+    expr_t *g1 = NULL;
+    expr_t *g2 = NULL;
+    expr_t *h1 = NULL;
+    expr_t *h2 = NULL;
+    expr_t *e0 = NULL;
+    expr_t *e1 = NULL;
+    expr_t *o0 = NULL;
+    expr_t *o1 = NULL;
+    expr_t *step = NULL;
+    expr_t *step_sq = NULL;
 
     if (!A || !scalar_f || !matrix_is_symbolic(A))
         return NULL;
@@ -2678,26 +2678,26 @@ static matrix_t *mat_fun_dval_quartic_biquadratic_exact(const matrix_t *A,
 
     for (size_t i = 0; i < A->rows; ++i) {
         for (size_t j = 0; j < A->cols; ++j) {
-            dval_t *aij = NULL;
+            expr_t *aij = NULL;
             bool should_match_step = (i + 1 == j) || (j + 1 == i);
 
             mat_get(A, i, j, &aij);
             if (i == j) {
-                if (!dval_is_zero_local(aij))
+                if (!expr_is_zero_local(aij))
                     goto fail;
                 continue;
             }
 
             if (should_match_step) {
-                if (dval_is_zero_local(aij))
+                if (expr_is_zero_local(aij))
                     goto fail;
                 if (!step) {
-                    dv_retain(aij);
+                    expr_retain(aij);
                     step = aij;
-                } else if (!dval_equal_exact_local(step, aij)) {
+                } else if (!expr_equal_exact_local(step, aij)) {
                     goto fail;
                 }
-            } else if (!dval_is_zero_local(aij)) {
+            } else if (!expr_is_zero_local(aij)) {
                 goto fail;
             }
         }
@@ -2706,109 +2706,109 @@ static matrix_t *mat_fun_dval_quartic_biquadratic_exact(const matrix_t *A,
     if (!step)
         goto fail;
 
-    dv_retain(step);
-    dv_retain(step);
-    step_sq = dval_mul_simplify_local(step, step);
+    expr_retain(step);
+    expr_retain(step);
+    step_sq = expr_mul_simplify_local(step, step);
     if (!step_sq)
         goto fail;
-    dv_retain(step_sq);
-    s = dval_mul_simplify_local(dval_const_long_local(3), step_sq);
+    expr_retain(step_sq);
+    s = expr_mul_simplify_local(expr_const_long_local(3), step_sq);
     if (!s)
         goto fail;
 
-    dv_retain(step_sq);
-    dv_retain(step_sq);
-    dval_t *step_four = dval_mul_simplify_local(step_sq, step_sq);
+    expr_retain(step_sq);
+    expr_retain(step_sq);
+    expr_t *step_four = expr_mul_simplify_local(step_sq, step_sq);
     if (!step_four)
         goto fail;
-    t = dval_sub_simplify_local(dval_const_zero_local(), step_four);
+    t = expr_sub_simplify_local(expr_const_zero_local(), step_four);
     if (!t)
         goto fail;
 
     for (size_t i = 0; i < A->rows; ++i) {
         for (size_t j = 0; j < A->cols; ++j) {
-            dval_t *a2ij = NULL;
-            dval_t *a4ij = NULL;
-            dval_t *expected = NULL;
-            dval_t *scaled = NULL;
+            expr_t *a2ij = NULL;
+            expr_t *a4ij = NULL;
+            expr_t *expected = NULL;
+            expr_t *scaled = NULL;
 
             mat_get(A2, i, j, &a2ij);
             mat_get(A4, i, j, &a4ij);
-            dv_retain(s);
-            dv_retain(a2ij ? a2ij : DV_ZERO);
-            scaled = dval_mul_simplify_local(s, a2ij ? a2ij : DV_ZERO);
+            expr_retain(s);
+            expr_retain(a2ij ? a2ij : EXPR_ZERO);
+            scaled = expr_mul_simplify_local(s, a2ij ? a2ij : EXPR_ZERO);
             if (!scaled)
                 goto fail;
 
             if (i == j) {
-                dv_retain(t);
-                expected = dval_add_simplify_local(scaled, t);
+                expr_retain(t);
+                expected = expr_add_simplify_local(scaled, t);
             } else {
                 expected = scaled;
             }
 
             if (!expected)
                 goto fail;
-            if (!dval_equal_exact_local(a4ij, expected)) {
-                dv_free(expected);
+            if (!expr_equal_exact_local(a4ij, expected)) {
+                expr_free(expected);
                 goto fail;
             }
-            dv_free(expected);
+            expr_free(expected);
         }
     }
 
-    dv_retain(s);
-    dv_retain(s);
-    disc = dval_mul_simplify_local(s, s);
+    expr_retain(s);
+    expr_retain(s);
+    disc = expr_mul_simplify_local(s, s);
     if (!disc)
         goto fail;
 
-    dv_retain(t);
-    dval_t *four_t = dval_mul_simplify_local(dval_const_long_local(4), t);
+    expr_retain(t);
+    expr_t *four_t = expr_mul_simplify_local(expr_const_long_local(4), t);
     if (!four_t)
         goto fail;
-    disc = dval_add_simplify_local(disc, four_t);
-    if (!disc || dv_is_exact_zero(disc))
+    disc = expr_add_simplify_local(disc, four_t);
+    if (!disc || expr_is_exact_zero(disc))
         goto fail;
 
-    root = dv_sqrt(disc);
-    root = dval_simplify_owned_local(root);
+    root = expr_sqrt(disc);
+    root = expr_simplify_owned_local(root);
     if (!root)
         goto fail;
 
-    dv_retain(s);
-    dv_retain(root);
-    dval_t *sum = dval_add_simplify_local(s, root);
+    expr_retain(s);
+    expr_retain(root);
+    expr_t *sum = expr_add_simplify_local(s, root);
     if (!sum)
         goto fail;
-    mu1 = dval_div_simplify_local(sum, dval_const_long_local(2));
+    mu1 = expr_div_simplify_local(sum, expr_const_long_local(2));
     sum = NULL;
-    mu1 = dval_simplify_owned_local(mu1);
+    mu1 = expr_simplify_owned_local(mu1);
     if (!mu1)
         goto fail;
 
-    dv_retain(s);
-    dv_retain(root);
-    dval_t *diff = dval_sub_simplify_local(s, root);
+    expr_retain(s);
+    expr_retain(root);
+    expr_t *diff = expr_sub_simplify_local(s, root);
     if (!diff)
         goto fail;
-    mu2 = dval_div_simplify_local(diff, dval_const_long_local(2));
+    mu2 = expr_div_simplify_local(diff, expr_const_long_local(2));
     diff = NULL;
-    mu2 = dval_simplify_owned_local(mu2);
-    if (!mu2 || dval_equal_exact_local(mu1, mu2))
+    mu2 = expr_simplify_owned_local(mu2);
+    if (!mu2 || expr_equal_exact_local(mu1, mu2))
         goto fail;
 
-    r1 = dv_sqrt(mu1);
-    r1 = dval_simplify_owned_local(r1);
-    r2 = dv_sqrt(mu2);
-    r2 = dval_simplify_owned_local(r2);
+    r1 = expr_sqrt(mu1);
+    r1 = expr_simplify_owned_local(r1);
+    r2 = expr_sqrt(mu2);
+    r2 = expr_simplify_owned_local(r2);
     if (!r1 || !r2)
         goto fail;
 
-    dv_retain(r1);
-    nr1 = dval_sub_simplify_local(dval_const_zero_local(), r1);
-    dv_retain(r2);
-    nr2 = dval_sub_simplify_local(dval_const_zero_local(), r2);
+    expr_retain(r1);
+    nr1 = expr_sub_simplify_local(expr_const_zero_local(), r1);
+    expr_retain(r2);
+    nr2 = expr_sub_simplify_local(expr_const_zero_local(), r2);
     if (!nr1 || !nr2)
         goto fail;
 
@@ -2819,205 +2819,205 @@ static matrix_t *mat_fun_dval_quartic_biquadratic_exact(const matrix_t *A,
     if (!fp1 || !fm1 || !fp2 || !fm2)
         goto fail;
 
-    dv_retain(fp1);
-    dv_retain(fm1);
-    g1 = dval_add_simplify_local(fp1, fm1);
+    expr_retain(fp1);
+    expr_retain(fm1);
+    g1 = expr_add_simplify_local(fp1, fm1);
     if (g1) {
-        dval_t *half = dval_div_simplify_local(g1, dval_const_long_local(2));
+        expr_t *half = expr_div_simplify_local(g1, expr_const_long_local(2));
         g1 = NULL;
-        g1 = half ? dval_simplify_owned_local(half) : NULL;
+        g1 = half ? expr_simplify_owned_local(half) : NULL;
     }
     if (!g1)
         goto fail;
 
-    dv_retain(fp2);
-    dv_retain(fm2);
-    g2 = dval_add_simplify_local(fp2, fm2);
+    expr_retain(fp2);
+    expr_retain(fm2);
+    g2 = expr_add_simplify_local(fp2, fm2);
     if (g2) {
-        dval_t *half = dval_div_simplify_local(g2, dval_const_long_local(2));
+        expr_t *half = expr_div_simplify_local(g2, expr_const_long_local(2));
         g2 = NULL;
-        g2 = half ? dval_simplify_owned_local(half) : NULL;
+        g2 = half ? expr_simplify_owned_local(half) : NULL;
     }
     if (!g2)
         goto fail;
 
-    if (dv_is_exact_zero(mu1)) {
-        h1 = dval_fun_first_derivative_at_zero_local(scalar_f);
+    if (expr_is_exact_zero(mu1)) {
+        h1 = expr_fun_first_derivative_at_zero_local(scalar_f);
     } else {
-        dv_retain(fp1);
-        dv_retain(fm1);
-        dval_t *num = dval_sub_simplify_local(fp1, fm1);
-        dval_t *den = NULL;
+        expr_retain(fp1);
+        expr_retain(fm1);
+        expr_t *num = expr_sub_simplify_local(fp1, fm1);
+        expr_t *den = NULL;
 
         if (!num)
             goto fail;
-        dv_retain(r1);
-        den = dval_mul_simplify_local(dval_const_long_local(2), r1);
+        expr_retain(r1);
+        den = expr_mul_simplify_local(expr_const_long_local(2), r1);
         if (!den)
             goto fail;
-        h1 = dval_div_simplify_local(num, den);
+        h1 = expr_div_simplify_local(num, den);
     }
     if (!h1)
         goto fail;
 
-    if (dv_is_exact_zero(mu2)) {
-        h2 = dval_fun_first_derivative_at_zero_local(scalar_f);
+    if (expr_is_exact_zero(mu2)) {
+        h2 = expr_fun_first_derivative_at_zero_local(scalar_f);
     } else {
-        dv_retain(fp2);
-        dv_retain(fm2);
-        dval_t *num = dval_sub_simplify_local(fp2, fm2);
-        dval_t *den = NULL;
+        expr_retain(fp2);
+        expr_retain(fm2);
+        expr_t *num = expr_sub_simplify_local(fp2, fm2);
+        expr_t *den = NULL;
 
         if (!num)
             goto fail;
-        dv_retain(r2);
-        den = dval_mul_simplify_local(dval_const_long_local(2), r2);
+        expr_retain(r2);
+        den = expr_mul_simplify_local(expr_const_long_local(2), r2);
         if (!den)
             goto fail;
-        h2 = dval_div_simplify_local(num, den);
+        h2 = expr_div_simplify_local(num, den);
     }
     if (!h2)
         goto fail;
 
-    dval_t *num = NULL;
-    dval_t *den = NULL;
-    dval_t *e1mu;
+    expr_t *num = NULL;
+    expr_t *den = NULL;
+    expr_t *e1mu;
 
-    dv_retain(g1);
-    dv_retain(g2);
-    num = dval_sub_simplify_local(g1, g2);
-    dv_retain(mu1);
-    dv_retain(mu2);
-    den = dval_sub_simplify_local(mu1, mu2);
-    e1 = dval_div_simplify_local(num, den);
+    expr_retain(g1);
+    expr_retain(g2);
+    num = expr_sub_simplify_local(g1, g2);
+    expr_retain(mu1);
+    expr_retain(mu2);
+    den = expr_sub_simplify_local(mu1, mu2);
+    e1 = expr_div_simplify_local(num, den);
     if (!e1)
         goto fail;
 
-    dv_retain(e1);
-    dv_retain(mu1);
-    e1mu = dval_mul_simplify_local(e1, mu1);
+    expr_retain(e1);
+    expr_retain(mu1);
+    e1mu = expr_mul_simplify_local(e1, mu1);
     if (!e1mu)
         goto fail;
-    dv_retain(g1);
-    e0 = dval_sub_simplify_local(g1, e1mu);
+    expr_retain(g1);
+    e0 = expr_sub_simplify_local(g1, e1mu);
     if (!e0)
         goto fail;
 
-    dval_t *num2 = NULL;
-    dval_t *den2 = NULL;
-    dval_t *o1mu;
+    expr_t *num2 = NULL;
+    expr_t *den2 = NULL;
+    expr_t *o1mu;
 
-    dv_retain(h1);
-    dv_retain(h2);
-    num2 = dval_sub_simplify_local(h1, h2);
-    dv_retain(mu1);
-    dv_retain(mu2);
-    den2 = dval_sub_simplify_local(mu1, mu2);
-    o1 = dval_div_simplify_local(num2, den2);
+    expr_retain(h1);
+    expr_retain(h2);
+    num2 = expr_sub_simplify_local(h1, h2);
+    expr_retain(mu1);
+    expr_retain(mu2);
+    den2 = expr_sub_simplify_local(mu1, mu2);
+    o1 = expr_div_simplify_local(num2, den2);
     if (!o1)
         goto fail;
 
-    dv_retain(o1);
-    dv_retain(mu1);
-    o1mu = dval_mul_simplify_local(o1, mu1);
+    expr_retain(o1);
+    expr_retain(mu1);
+    o1mu = expr_mul_simplify_local(o1, mu1);
     if (!o1mu)
         goto fail;
-    dv_retain(h1);
-    o0 = dval_sub_simplify_local(h1, o1mu);
+    expr_retain(h1);
+    o0 = expr_sub_simplify_local(h1, o1mu);
     if (!o0)
         goto fail;
 
-    out = mat_new_dv(A->rows, A->cols);
+    out = mat_new_expr(A->rows, A->cols);
     if (!out)
         goto fail;
 
     for (size_t i = 0; i < A->rows; ++i) {
         for (size_t j = 0; j < A->cols; ++j) {
-            dval_t *aij = NULL;
-            dval_t *a2ij = NULL;
-            dval_t *a3ij = NULL;
-            dval_t *entry = NULL;
-            dval_t *term = NULL;
+            expr_t *aij = NULL;
+            expr_t *a2ij = NULL;
+            expr_t *a3ij = NULL;
+            expr_t *entry = NULL;
+            expr_t *term = NULL;
 
             if (i == j) {
-                dv_retain(e0);
-                entry = dval_simplify_owned_local(e0);
+                expr_retain(e0);
+                entry = expr_simplify_owned_local(e0);
                 if (!entry)
                     goto fail;
             } else {
-                entry = dval_const_zero_local();
+                entry = expr_const_zero_local();
                 if (!entry)
                     goto fail;
             }
 
             mat_get(A, i, j, &aij);
-            dv_retain(o0);
-            dv_retain(aij ? aij : DV_ZERO);
-            term = dval_mul_simplify_local(o0, aij ? aij : DV_ZERO);
+            expr_retain(o0);
+            expr_retain(aij ? aij : EXPR_ZERO);
+            term = expr_mul_simplify_local(o0, aij ? aij : EXPR_ZERO);
             if (!term) {
-                dv_free(entry);
+                expr_free(entry);
                 goto fail;
             }
-            entry = dval_add_simplify_local(entry, term);
+            entry = expr_add_simplify_local(entry, term);
             if (!entry)
                 goto fail;
 
             mat_get(A2, i, j, &a2ij);
-            dv_retain(e1);
-            dv_retain(a2ij ? a2ij : DV_ZERO);
-            term = dval_mul_simplify_local(e1, a2ij ? a2ij : DV_ZERO);
+            expr_retain(e1);
+            expr_retain(a2ij ? a2ij : EXPR_ZERO);
+            term = expr_mul_simplify_local(e1, a2ij ? a2ij : EXPR_ZERO);
             if (!term) {
-                dv_free(entry);
+                expr_free(entry);
                 goto fail;
             }
-            entry = dval_add_simplify_local(entry, term);
+            entry = expr_add_simplify_local(entry, term);
             if (!entry)
                 goto fail;
 
             mat_get(A3, i, j, &a3ij);
-            dv_retain(o1);
-            dv_retain(a3ij ? a3ij : DV_ZERO);
-            term = dval_mul_simplify_local(o1, a3ij ? a3ij : DV_ZERO);
+            expr_retain(o1);
+            expr_retain(a3ij ? a3ij : EXPR_ZERO);
+            term = expr_mul_simplify_local(o1, a3ij ? a3ij : EXPR_ZERO);
             if (!term) {
-                dv_free(entry);
+                expr_free(entry);
                 goto fail;
             }
-            entry = dval_add_simplify_local(entry, term);
+            entry = expr_add_simplify_local(entry, term);
             if (!entry)
                 goto fail;
 
             mat_set(out, i, j, &entry);
-            dv_free(entry);
+            expr_free(entry);
         }
     }
 
     mat_free(A2);
     mat_free(A3);
     mat_free(A4);
-    dv_free(s);
-    dv_free(t);
-    dv_free(step);
-    dv_free(step_sq);
-    dv_free(disc);
-    dv_free(root);
-    dv_free(mu1);
-    dv_free(mu2);
-    dv_free(r1);
-    dv_free(r2);
-    dv_free(nr1);
-    dv_free(nr2);
-    dv_free(fp1);
-    dv_free(fm1);
-    dv_free(fp2);
-    dv_free(fm2);
-    dv_free(g1);
-    dv_free(g2);
-    dv_free(h1);
-    dv_free(h2);
-    dv_free(e0);
-    dv_free(e1);
-    dv_free(o0);
-    dv_free(o1);
+    expr_free(s);
+    expr_free(t);
+    expr_free(step);
+    expr_free(step_sq);
+    expr_free(disc);
+    expr_free(root);
+    expr_free(mu1);
+    expr_free(mu2);
+    expr_free(r1);
+    expr_free(r2);
+    expr_free(nr1);
+    expr_free(nr2);
+    expr_free(fp1);
+    expr_free(fm1);
+    expr_free(fp2);
+    expr_free(fm2);
+    expr_free(g1);
+    expr_free(g2);
+    expr_free(h1);
+    expr_free(h2);
+    expr_free(e0);
+    expr_free(e1);
+    expr_free(o0);
+    expr_free(o1);
     return out;
 
 fail:
@@ -3025,48 +3025,48 @@ fail:
     mat_free(A3);
     mat_free(A4);
     mat_free(out);
-    dv_free(s);
-    dv_free(t);
-    dv_free(step);
-    dv_free(step_sq);
-    dv_free(disc);
-    dv_free(root);
-    dv_free(mu1);
-    dv_free(mu2);
-    dv_free(r1);
-    dv_free(r2);
-    dv_free(nr1);
-    dv_free(nr2);
-    dv_free(fp1);
-    dv_free(fm1);
-    dv_free(fp2);
-    dv_free(fm2);
-    dv_free(g1);
-    dv_free(g2);
-    dv_free(h1);
-    dv_free(h2);
-    dv_free(e0);
-    dv_free(e1);
-    dv_free(o0);
-    dv_free(o1);
+    expr_free(s);
+    expr_free(t);
+    expr_free(step);
+    expr_free(step_sq);
+    expr_free(disc);
+    expr_free(root);
+    expr_free(mu1);
+    expr_free(mu2);
+    expr_free(r1);
+    expr_free(r2);
+    expr_free(nr1);
+    expr_free(nr2);
+    expr_free(fp1);
+    expr_free(fm1);
+    expr_free(fp2);
+    expr_free(fm2);
+    expr_free(g1);
+    expr_free(g2);
+    expr_free(h1);
+    expr_free(h2);
+    expr_free(e0);
+    expr_free(e1);
+    expr_free(o0);
+    expr_free(o1);
     return NULL;
 }
 
-static matrix_t *mat_fun_dval_quadratic_exact(const matrix_t *A,
+static matrix_t *mat_fun_expr_quadratic_exact(const matrix_t *A,
                                               void (*scalar_f)(void *out, const void *in))
 {
     matrix_t *A2 = NULL;
     matrix_t *out = NULL;
-    dval_t *p = NULL;
-    dval_t *q = NULL;
-    dval_t *disc = NULL;
-    dval_t *root = NULL;
-    dval_t *lambda1 = NULL;
-    dval_t *lambda2 = NULL;
-    dval_t *f1 = NULL;
-    dval_t *f2 = NULL;
-    dval_t *c0 = NULL;
-    dval_t *c1 = NULL;
+    expr_t *p = NULL;
+    expr_t *q = NULL;
+    expr_t *disc = NULL;
+    expr_t *root = NULL;
+    expr_t *lambda1 = NULL;
+    expr_t *lambda2 = NULL;
+    expr_t *f1 = NULL;
+    expr_t *f2 = NULL;
+    expr_t *c0 = NULL;
+    expr_t *c1 = NULL;
     bool saw_offdiag = false;
 
     if (!A || !scalar_f || !matrix_is_symbolic(A))
@@ -3082,32 +3082,32 @@ static matrix_t *mat_fun_dval_quadratic_exact(const matrix_t *A,
 
     for (size_t i = 0; i < A->rows; ++i) {
         for (size_t j = 0; j < A->cols; ++j) {
-            dval_t *aij = NULL;
-            dval_t *a2ij = NULL;
+            expr_t *aij = NULL;
+            expr_t *a2ij = NULL;
 
             if (i == j)
                 continue;
 
             mat_get(A, i, j, &aij);
             mat_get(A2, i, j, &a2ij);
-            if (dval_is_zero_local(aij)) {
-                if (!dval_is_zero_local(a2ij))
+            if (expr_is_zero_local(aij)) {
+                if (!expr_is_zero_local(a2ij))
                     goto fail;
                 continue;
             }
 
             saw_offdiag = true;
-            dv_retain(a2ij);
-            dv_retain(aij);
-            dval_t *cand = dval_div_simplify_local(a2ij, aij);
+            expr_retain(a2ij);
+            expr_retain(aij);
+            expr_t *cand = expr_div_simplify_local(a2ij, aij);
             if (!cand)
                 goto fail;
 
             if (!p) {
                 p = cand;
             } else {
-                bool same = dval_equal_exact_local(p, cand);
-                dv_free(cand);
+                bool same = expr_equal_exact_local(p, cand);
+                expr_free(cand);
                 if (!same)
                     goto fail;
             }
@@ -3118,29 +3118,29 @@ static matrix_t *mat_fun_dval_quadratic_exact(const matrix_t *A,
         goto fail;
 
     for (size_t i = 0; i < A->rows; ++i) {
-        dval_t *aii = NULL;
-        dval_t *a2ii = NULL;
-        dval_t *p_aii = NULL;
-        dval_t *cand = NULL;
+        expr_t *aii = NULL;
+        expr_t *a2ii = NULL;
+        expr_t *p_aii = NULL;
+        expr_t *cand = NULL;
 
         mat_get(A, i, i, &aii);
         mat_get(A2, i, i, &a2ii);
-        dv_retain(p);
-        dv_retain(aii ? aii : DV_ZERO);
-        p_aii = dval_mul_simplify_local(p, aii ? aii : DV_ZERO);
+        expr_retain(p);
+        expr_retain(aii ? aii : EXPR_ZERO);
+        p_aii = expr_mul_simplify_local(p, aii ? aii : EXPR_ZERO);
         if (!p_aii)
             goto fail;
 
-        dv_retain(a2ii ? a2ii : DV_ZERO);
-        cand = dval_sub_simplify_local(a2ii ? a2ii : DV_ZERO, p_aii);
+        expr_retain(a2ii ? a2ii : EXPR_ZERO);
+        cand = expr_sub_simplify_local(a2ii ? a2ii : EXPR_ZERO, p_aii);
         if (!cand)
             goto fail;
 
         if (!q) {
             q = cand;
         } else {
-            bool same = dval_equal_exact_local(q, cand);
-            dv_free(cand);
+            bool same = expr_equal_exact_local(q, cand);
+            expr_free(cand);
             if (!same)
                 goto fail;
         }
@@ -3149,71 +3149,71 @@ static matrix_t *mat_fun_dval_quadratic_exact(const matrix_t *A,
     if (!q)
         goto fail;
 
-    dv_retain(p);
-    dv_retain(p);
-    disc = dval_mul_simplify_local(p, p);
+    expr_retain(p);
+    expr_retain(p);
+    disc = expr_mul_simplify_local(p, p);
     if (!disc)
         goto fail;
 
-    dv_retain(q);
-    dval_t *four_q = dval_mul_simplify_local(dval_const_long_local(4), q);
+    expr_retain(q);
+    expr_t *four_q = expr_mul_simplify_local(expr_const_long_local(4), q);
     if (!four_q)
         goto fail;
-    disc = dval_add_simplify_local(disc, four_q);
+    disc = expr_add_simplify_local(disc, four_q);
     if (!disc)
         goto fail;
 
-    if (dv_is_exact_zero(disc)) {
-        dval_t *lambda = NULL;
+    if (expr_is_exact_zero(disc)) {
+        expr_t *lambda = NULL;
 
-        dv_retain(p);
-        lambda = dval_div_simplify_local(p, dval_const_long_local(2));
-        lambda = dval_simplify_owned_local(lambda);
+        expr_retain(p);
+        lambda = expr_div_simplify_local(p, expr_const_long_local(2));
+        lambda = expr_simplify_owned_local(lambda);
         if (!lambda)
             goto fail;
 
-        if (dval_fun_coeffs_up_to_second(&f1, &c1, NULL, scalar_f, lambda) != 0)
+        if (expr_fun_coeffs_up_to_second(&f1, &c1, NULL, scalar_f, lambda) != 0)
             goto fail;
 
-        dv_retain(c1);
-        dv_retain(lambda);
-        dval_t *lambda_df = dval_mul_simplify_local(c1, lambda);
+        expr_retain(c1);
+        expr_retain(lambda);
+        expr_t *lambda_df = expr_mul_simplify_local(c1, lambda);
         if (!lambda_df)
             goto fail;
 
-        dv_retain(f1);
-        c0 = dval_sub_simplify_local(f1, lambda_df);
-        dv_free(lambda);
+        expr_retain(f1);
+        c0 = expr_sub_simplify_local(f1, lambda_df);
+        expr_free(lambda);
         if (!c0 || !c1)
             goto fail;
     } else {
-        dval_t *sum = NULL;
-        dval_t *diff = NULL;
-        dval_t *num = NULL;
-        dval_t *den = NULL;
+        expr_t *sum = NULL;
+        expr_t *diff = NULL;
+        expr_t *num = NULL;
+        expr_t *den = NULL;
 
-        root = dv_sqrt(disc);
-        root = dval_simplify_owned_local(root);
+        root = expr_sqrt(disc);
+        root = expr_simplify_owned_local(root);
         if (!root)
             goto fail;
 
-        dv_retain(p);
-        dv_retain(root);
-        sum = dval_add_simplify_local(p, root);
+        expr_retain(p);
+        expr_retain(root);
+        sum = expr_add_simplify_local(p, root);
         if (!sum)
             goto fail;
 
-        dv_retain(p);
-        dv_retain(root);
-        diff = dval_sub_simplify_local(p, root);
+        expr_retain(p);
+        expr_retain(root);
+        diff = expr_sub_simplify_local(p, root);
         if (!diff)
             goto fail;
 
-        lambda1 = dval_div_simplify_local(sum, dval_const_long_local(2));
-        lambda1 = dval_simplify_owned_local(lambda1);
+        lambda1 = expr_div_simplify_local(sum, expr_const_long_local(2));
+        lambda1 = expr_simplify_owned_local(lambda1);
         sum = NULL;
-        lambda2 = dval_div_simplify_local(diff, dval_const_long_local(2));
-        lambda2 = dval_simplify_owned_local(lambda2);
+        lambda2 = expr_div_simplify_local(diff, expr_const_long_local(2));
+        lambda2 = expr_simplify_owned_local(lambda2);
         diff = NULL;
         if (!lambda1 || !lambda2)
             goto fail;
@@ -3223,48 +3223,48 @@ static matrix_t *mat_fun_dval_quadratic_exact(const matrix_t *A,
         if (!f1 || !f2)
             goto fail;
 
-        dv_retain(f1);
-        dv_retain(f2);
-        num = dval_sub_simplify_local(f1, f2);
-        dv_retain(lambda1);
-        dv_retain(lambda2);
-        den = dval_sub_simplify_local(lambda1, lambda2);
-        c1 = dval_div_simplify_local(num, den);
+        expr_retain(f1);
+        expr_retain(f2);
+        num = expr_sub_simplify_local(f1, f2);
+        expr_retain(lambda1);
+        expr_retain(lambda2);
+        den = expr_sub_simplify_local(lambda1, lambda2);
+        c1 = expr_div_simplify_local(num, den);
         if (!c1)
             goto fail;
 
-        dv_retain(c1);
-        dv_retain(lambda1);
-        dval_t *c1_l1 = dval_mul_simplify_local(c1, lambda1);
+        expr_retain(c1);
+        expr_retain(lambda1);
+        expr_t *c1_l1 = expr_mul_simplify_local(c1, lambda1);
         if (!c1_l1)
             goto fail;
 
-        dv_retain(f1);
-        c0 = dval_sub_simplify_local(f1, c1_l1);
+        expr_retain(f1);
+        c0 = expr_sub_simplify_local(f1, c1_l1);
         if (!c0)
             goto fail;
     }
 
-    out = mat_new_dv(A->rows, A->cols);
+    out = mat_new_expr(A->rows, A->cols);
     if (!out)
         goto fail;
 
     for (size_t i = 0; i < A->rows; ++i) {
         for (size_t j = 0; j < A->cols; ++j) {
-            dval_t *aij = NULL;
-            dval_t *term = NULL;
-            dval_t *entry = NULL;
+            expr_t *aij = NULL;
+            expr_t *term = NULL;
+            expr_t *entry = NULL;
 
             mat_get(A, i, j, &aij);
-            dv_retain(c1);
-            dv_retain(aij ? aij : DV_ZERO);
-            term = dval_mul_simplify_local(c1, aij ? aij : DV_ZERO);
+            expr_retain(c1);
+            expr_retain(aij ? aij : EXPR_ZERO);
+            term = expr_mul_simplify_local(c1, aij ? aij : EXPR_ZERO);
             if (!term)
                 goto fail;
 
             if (i == j) {
-                dv_retain(c0);
-                entry = dval_add_simplify_local(c0, term);
+                expr_retain(c0);
+                entry = expr_add_simplify_local(c0, term);
             } else {
                 entry = term;
             }
@@ -3273,41 +3273,41 @@ static matrix_t *mat_fun_dval_quadratic_exact(const matrix_t *A,
                 goto fail;
 
             mat_set(out, i, j, &entry);
-            dv_free(entry);
+            expr_free(entry);
         }
     }
 
     mat_free(A2);
-    dv_free(p);
-    dv_free(q);
-    dv_free(disc);
-    dv_free(root);
-    dv_free(lambda1);
-    dv_free(lambda2);
-    dv_free(f1);
-    dv_free(f2);
-    dv_free(c0);
-    dv_free(c1);
+    expr_free(p);
+    expr_free(q);
+    expr_free(disc);
+    expr_free(root);
+    expr_free(lambda1);
+    expr_free(lambda2);
+    expr_free(f1);
+    expr_free(f2);
+    expr_free(c0);
+    expr_free(c1);
     return out;
 
 fail:
     mat_free(A2);
     if (out)
         mat_free(out);
-    dv_free(p);
-    dv_free(q);
-    dv_free(disc);
-    dv_free(root);
-    dv_free(lambda1);
-    dv_free(lambda2);
-    dv_free(f1);
-    dv_free(f2);
-    dv_free(c0);
-    dv_free(c1);
+    expr_free(p);
+    expr_free(q);
+    expr_free(disc);
+    expr_free(root);
+    expr_free(lambda1);
+    expr_free(lambda2);
+    expr_free(f1);
+    expr_free(f2);
+    expr_free(c0);
+    expr_free(c1);
     return NULL;
 }
 
-static matrix_t *mat_fun_dval_structured(const matrix_t *A,
+static matrix_t *mat_fun_expr_structured(const matrix_t *A,
                                          void (*scalar_f)(void *out, const void *in))
 {
     NUM_SCOPE(scope);
@@ -3315,7 +3315,7 @@ static matrix_t *mat_fun_dval_structured(const matrix_t *A,
     matrix_t *T;
     matrix_t *FT;
     matrix_t *out;
-    dval_t *diag0 = NULL;
+    expr_t *diag0 = NULL;
     number_t tol = num_create_from_double(1e-24);
 
     if (!A || !scalar_f || !matrix_is_symbolic(A))
@@ -3335,58 +3335,58 @@ static matrix_t *mat_fun_dval_structured(const matrix_t *A,
         mat_get_owned(A, 0, 0, &diag0);
         for (size_t i = 1; i < n; ++i) {
             NUM_SCOPE(iter_scope);
-            dval_t *diag_i = NULL;
+            expr_t *diag_i = NULL;
             number_t diag0_num;
             number_t diag_i_num;
             number_t diff_num;
             number_t absdiff;
             mat_get_owned(A, i, i, &diag_i);
-            diag0_num = dv_eval(diag0);
-            diag_i_num = dv_eval(diag_i);
+            diag0_num = expr_eval(diag0);
+            diag_i_num = expr_eval(diag_i);
             diff_num = num_sub(diag_i_num, diag0_num);
             absdiff = num_abs(diff_num);
-            dv_free(diag_i);
+            expr_free(diag_i);
             if (num_lt(tol, absdiff)) {
-                dv_free(diag0);
+                expr_free(diag0);
                 return (A->rows == 2 && A->cols == 2)
-                    ? mat_fun_dval_diagonalizable_2x2(A, scalar_f) : NULL;
+                    ? mat_fun_expr_diagonalizable_2x2(A, scalar_f) : NULL;
             }
         }
-        dv_free(diag0);
-        return mat_fun_triangular_equal_diag_dval(A, scalar_f);
+        expr_free(diag0);
+        return mat_fun_triangular_equal_diag_expr(A, scalar_f);
     }
 
     if (!mat_is_lower_triangular(A)) {
-        matrix_t *block_diag = mat_fun_dval_block_diagonal(A, scalar_f);
+        matrix_t *block_diag = mat_fun_expr_block_diagonal(A, scalar_f);
         if (block_diag)
             return block_diag;
-        matrix_t *perm_block_diag = mat_fun_dval_permuted_block_diagonal(A, scalar_f);
+        matrix_t *perm_block_diag = mat_fun_expr_permuted_block_diagonal(A, scalar_f);
         if (perm_block_diag)
             return perm_block_diag;
-        matrix_t *uniform = mat_fun_dval_uniform_diag_offdiag(A, scalar_f);
+        matrix_t *uniform = mat_fun_expr_uniform_diag_offdiag(A, scalar_f);
         if (uniform)
             return uniform;
-        matrix_t *rank_one = mat_fun_dval_scalar_plus_rank_one(A, scalar_f);
+        matrix_t *rank_one = mat_fun_expr_scalar_plus_rank_one(A, scalar_f);
         if (rank_one)
             return rank_one;
-        matrix_t *cubic_linear = mat_fun_dval_cubic_linear_exact(A, scalar_f);
+        matrix_t *cubic_linear = mat_fun_expr_cubic_linear_exact(A, scalar_f);
         if (cubic_linear)
             return cubic_linear;
-        matrix_t *quartic_biquadratic = mat_fun_dval_quartic_biquadratic_exact(A, scalar_f);
+        matrix_t *quartic_biquadratic = mat_fun_expr_quartic_biquadratic_exact(A, scalar_f);
         if (quartic_biquadratic)
             return quartic_biquadratic;
-        matrix_t *quadratic = mat_fun_dval_quadratic_exact(A, scalar_f);
+        matrix_t *quadratic = mat_fun_expr_quadratic_exact(A, scalar_f);
         if (quadratic)
             return quadratic;
         if (A->rows == 2 && A->cols == 2)
-            return mat_fun_dval_diagonalizable_2x2(A, scalar_f);
+            return mat_fun_expr_diagonalizable_2x2(A, scalar_f);
         return NULL;
     }
 
     T = mat_transpose(A);
     if (!T)
         return NULL;
-    FT = mat_fun_dval_structured(T, scalar_f);
+    FT = mat_fun_expr_structured(T, scalar_f);
     out = FT ? mat_transpose(FT) : NULL;
     mat_free(T);
     mat_free(FT);
@@ -3395,11 +3395,11 @@ static matrix_t *mat_fun_dval_structured(const matrix_t *A,
 
 static matrix_t *mat_fun_apply(const matrix_t *A,
                                void (*number_scalar_f)(void *out, const void *in),
-                               void (*dval_scalar_f)(void *out, const void *in),
+                               void (*expr_scalar_f)(void *out, const void *in),
                                void (*native_scalar_f)(void *out, const void *in))
 {
     if (matrix_is_symbolic(A))
-        return dval_scalar_f ? mat_fun_dval_structured(A, dval_scalar_f) : NULL;
+        return expr_scalar_f ? mat_fun_expr_structured(A, expr_scalar_f) : NULL;
     if (A && A->rows == A->cols && native_scalar_f && mat_is_diagonal(A))
         return mat_fun_elementwise_same_type(A, native_scalar_f);
     return mat_fun_schur(A, number_scalar_f);
@@ -3848,7 +3848,7 @@ matrix_t *mat_exp(const matrix_t *A)
                 return structured;
         }
     }
-    return mat_apply_unary(A, number_elem.fun->exp, dval_elem.fun->exp,
+    return mat_apply_unary(A, number_elem.fun->exp, expr_elem.fun->exp,
                            A && A->elem && A->elem->fun ? A->elem->fun->exp : NULL);
 }
 
@@ -3868,7 +3868,7 @@ matrix_t *mat_log(const matrix_t *A)
         }
     }
 
-    matrix_t *R = mat_apply_unary(A, number_elem.fun->log, dval_elem.fun->log,
+    matrix_t *R = mat_apply_unary(A, number_elem.fun->log, expr_elem.fun->log,
                                   A && A->elem && A->elem->fun ? A->elem->fun->log : NULL);
     if (R)
         mat_set_exp_preimage_cache(R, A);
@@ -3904,7 +3904,7 @@ matrix_t *mat_sin(const matrix_t *A)
         if (structured)
             return structured;
     }
-    return mat_apply_unary(A, number_elem.fun->sin, dval_elem.fun->sin,
+    return mat_apply_unary(A, number_elem.fun->sin, expr_elem.fun->sin,
                            A && A->elem && A->elem->fun ? A->elem->fun->sin : NULL);
 }
 
@@ -3919,7 +3919,7 @@ matrix_t *mat_cos(const matrix_t *A)
         if (structured)
             return structured;
     }
-    return mat_apply_unary(A, number_elem.fun->cos, dval_elem.fun->cos,
+    return mat_apply_unary(A, number_elem.fun->cos, expr_elem.fun->cos,
                            A && A->elem && A->elem->fun ? A->elem->fun->cos : NULL);
 }
 
@@ -3934,7 +3934,7 @@ matrix_t *mat_tan(const matrix_t *A)
         if (structured)
             return structured;
     }
-    return mat_apply_unary(A, number_elem.fun->tan, dval_elem.fun->tan,
+    return mat_apply_unary(A, number_elem.fun->tan, expr_elem.fun->tan,
                            A && A->elem && A->elem->fun ? A->elem->fun->tan : NULL);
 }
 
@@ -3949,7 +3949,7 @@ matrix_t *mat_sinh(const matrix_t *A)
         if (structured)
             return structured;
     }
-    return mat_apply_unary(A, number_elem.fun->sinh, dval_elem.fun->sinh,
+    return mat_apply_unary(A, number_elem.fun->sinh, expr_elem.fun->sinh,
                            A && A->elem && A->elem->fun ? A->elem->fun->sinh : NULL);
 }
 
@@ -3964,7 +3964,7 @@ matrix_t *mat_cosh(const matrix_t *A)
         if (structured)
             return structured;
     }
-    return mat_apply_unary(A, number_elem.fun->cosh, dval_elem.fun->cosh,
+    return mat_apply_unary(A, number_elem.fun->cosh, expr_elem.fun->cosh,
                            A && A->elem && A->elem->fun ? A->elem->fun->cosh : NULL);
 }
 
@@ -3979,7 +3979,7 @@ matrix_t *mat_tanh(const matrix_t *A)
         if (structured)
             return structured;
     }
-    return mat_apply_unary(A, number_elem.fun->tanh, dval_elem.fun->tanh,
+    return mat_apply_unary(A, number_elem.fun->tanh, expr_elem.fun->tanh,
                            A && A->elem && A->elem->fun ? A->elem->fun->tanh : NULL);
 }
 
@@ -3997,7 +3997,7 @@ matrix_t *mat_sqrt(const matrix_t *A)
             return structured;
     }
 
-    return mat_apply_unary(A, number_elem.fun->sqrt, dval_elem.fun->sqrt,
+    return mat_apply_unary(A, number_elem.fun->sqrt, expr_elem.fun->sqrt,
                            A && A->elem && A->elem->fun ? A->elem->fun->sqrt : NULL);
 }
 
@@ -4012,7 +4012,7 @@ matrix_t *mat_asin(const matrix_t *A)
         if (structured)
             return structured;
     }
-    return mat_apply_unary(A, number_elem.fun->asin, dval_elem.fun->asin,
+    return mat_apply_unary(A, number_elem.fun->asin, expr_elem.fun->asin,
                            A && A->elem && A->elem->fun ? A->elem->fun->asin : NULL);
 }
 
@@ -4027,7 +4027,7 @@ matrix_t *mat_acos(const matrix_t *A)
         if (structured)
             return structured;
     }
-    return mat_apply_unary(A, number_elem.fun->acos, dval_elem.fun->acos,
+    return mat_apply_unary(A, number_elem.fun->acos, expr_elem.fun->acos,
                            A && A->elem && A->elem->fun ? A->elem->fun->acos : NULL);
 }
 
@@ -4042,7 +4042,7 @@ matrix_t *mat_atan(const matrix_t *A)
         if (structured)
             return structured;
     }
-    return mat_apply_unary(A, number_elem.fun->atan, dval_elem.fun->atan,
+    return mat_apply_unary(A, number_elem.fun->atan, expr_elem.fun->atan,
                            A && A->elem && A->elem->fun ? A->elem->fun->atan : NULL);
 }
 
@@ -4057,7 +4057,7 @@ matrix_t *mat_asinh(const matrix_t *A)
         if (structured)
             return structured;
     }
-    return mat_apply_unary(A, number_elem.fun->asinh, dval_elem.fun->asinh,
+    return mat_apply_unary(A, number_elem.fun->asinh, expr_elem.fun->asinh,
                            A && A->elem && A->elem->fun ? A->elem->fun->asinh : NULL);
 }
 
@@ -4072,7 +4072,7 @@ matrix_t *mat_acosh(const matrix_t *A)
         if (structured)
             return structured;
     }
-    return mat_apply_unary(A, number_elem.fun->acosh, dval_elem.fun->acosh,
+    return mat_apply_unary(A, number_elem.fun->acosh, expr_elem.fun->acosh,
                            A && A->elem && A->elem->fun ? A->elem->fun->acosh : NULL);
 }
 
@@ -4087,7 +4087,7 @@ matrix_t *mat_atanh(const matrix_t *A)
         if (structured)
             return structured;
     }
-    return mat_apply_unary(A, number_elem.fun->atanh, dval_elem.fun->atanh,
+    return mat_apply_unary(A, number_elem.fun->atanh, expr_elem.fun->atanh,
                            A && A->elem && A->elem->fun ? A->elem->fun->atanh : NULL);
 }
 
@@ -4102,7 +4102,7 @@ matrix_t *mat_erf(const matrix_t *A)
         if (structured)
             return structured;
     }
-    return mat_apply_unary(A, number_elem.fun->erf, dval_elem.fun->erf,
+    return mat_apply_unary(A, number_elem.fun->erf, expr_elem.fun->erf,
                            A && A->elem && A->elem->fun ? A->elem->fun->erf : NULL);
 }
 
@@ -4117,7 +4117,7 @@ matrix_t *mat_erfc(const matrix_t *A)
         if (structured)
             return structured;
     }
-    return mat_apply_unary(A, number_elem.fun->erfc, dval_elem.fun->erfc,
+    return mat_apply_unary(A, number_elem.fun->erfc, expr_elem.fun->erfc,
                            A && A->elem && A->elem->fun ? A->elem->fun->erfc : NULL);
 }
 
@@ -4132,7 +4132,7 @@ matrix_t *mat_erfinv(const matrix_t *A)
         if (structured)
             return structured;
     }
-    return mat_apply_unary(A, number_elem.fun->erfinv, dval_elem.fun->erfinv,
+    return mat_apply_unary(A, number_elem.fun->erfinv, expr_elem.fun->erfinv,
                            A && A->elem && A->elem->fun ? A->elem->fun->erfinv : NULL);
 }
 
@@ -4147,7 +4147,7 @@ matrix_t *mat_erfcinv(const matrix_t *A)
         if (structured)
             return structured;
     }
-    return mat_apply_unary(A, number_elem.fun->erfcinv, dval_elem.fun->erfcinv,
+    return mat_apply_unary(A, number_elem.fun->erfcinv, expr_elem.fun->erfcinv,
                            A && A->elem && A->elem->fun ? A->elem->fun->erfcinv : NULL);
 }
 
@@ -4162,7 +4162,7 @@ matrix_t *mat_gamma(const matrix_t *A)
         if (structured)
             return structured;
     }
-    return mat_apply_unary(A, number_elem.fun->gamma, dval_elem.fun->gamma,
+    return mat_apply_unary(A, number_elem.fun->gamma, expr_elem.fun->gamma,
                            A && A->elem && A->elem->fun ? A->elem->fun->gamma : NULL);
 }
 
@@ -4177,7 +4177,7 @@ matrix_t *mat_lgamma(const matrix_t *A)
         if (structured)
             return structured;
     }
-    return mat_apply_unary(A, number_elem.fun->lgamma, dval_elem.fun->lgamma,
+    return mat_apply_unary(A, number_elem.fun->lgamma, expr_elem.fun->lgamma,
                            A && A->elem && A->elem->fun ? A->elem->fun->lgamma : NULL);
 }
 
@@ -4192,7 +4192,7 @@ matrix_t *mat_digamma(const matrix_t *A)
         if (structured)
             return structured;
     }
-    return mat_apply_unary(A, number_elem.fun->digamma, dval_elem.fun->digamma,
+    return mat_apply_unary(A, number_elem.fun->digamma, expr_elem.fun->digamma,
                            A && A->elem && A->elem->fun ? A->elem->fun->digamma : NULL);
 }
 
@@ -4207,13 +4207,13 @@ matrix_t *mat_trigamma(const matrix_t *A)
         if (structured)
             return structured;
     }
-    return mat_apply_unary(A, number_elem.fun->trigamma, dval_elem.fun->trigamma,
+    return mat_apply_unary(A, number_elem.fun->trigamma, expr_elem.fun->trigamma,
                            A && A->elem && A->elem->fun ? A->elem->fun->trigamma : NULL);
 }
 
 matrix_t *mat_tetragamma(const matrix_t *A)
 {
-    return mat_apply_unary(A, number_elem.fun->tetragamma, dval_elem.fun->tetragamma,
+    return mat_apply_unary(A, number_elem.fun->tetragamma, expr_elem.fun->tetragamma,
                            A && A->elem && A->elem->fun ? A->elem->fun->tetragamma : NULL);
 }
 
@@ -4228,7 +4228,7 @@ matrix_t *mat_gammainv(const matrix_t *A)
         if (structured)
             return structured;
     }
-    return mat_apply_unary(A, number_elem.fun->gammainv, dval_elem.fun->gammainv,
+    return mat_apply_unary(A, number_elem.fun->gammainv, expr_elem.fun->gammainv,
                            A && A->elem && A->elem->fun ? A->elem->fun->gammainv : NULL);
 }
 
@@ -4243,7 +4243,7 @@ matrix_t *mat_normal_pdf(const matrix_t *A)
         if (structured)
             return structured;
     }
-    return mat_apply_unary(A, number_elem.fun->normal_pdf, dval_elem.fun->normal_pdf,
+    return mat_apply_unary(A, number_elem.fun->normal_pdf, expr_elem.fun->normal_pdf,
                            A && A->elem && A->elem->fun ? A->elem->fun->normal_pdf : NULL);
 }
 
@@ -4258,7 +4258,7 @@ matrix_t *mat_normal_cdf(const matrix_t *A)
         if (structured)
             return structured;
     }
-    return mat_apply_unary(A, number_elem.fun->normal_cdf, dval_elem.fun->normal_cdf,
+    return mat_apply_unary(A, number_elem.fun->normal_cdf, expr_elem.fun->normal_cdf,
                            A && A->elem && A->elem->fun ? A->elem->fun->normal_cdf : NULL);
 }
 
@@ -4273,14 +4273,14 @@ matrix_t *mat_normal_logpdf(const matrix_t *A)
         if (structured)
             return structured;
     }
-    return mat_apply_unary(A, number_elem.fun->normal_logpdf, dval_elem.fun->normal_logpdf,
+    return mat_apply_unary(A, number_elem.fun->normal_logpdf, expr_elem.fun->normal_logpdf,
                            A && A->elem && A->elem->fun ? A->elem->fun->normal_logpdf : NULL);
 }
 
 matrix_t *mat_lambert_w0(const matrix_t *A)
 {
-    if (A && A->elem == &dval_elem && matrix_is_symbolic(A))
-        return mat_fun_elementwise_same_type(A, dval_elem.fun->lambert_w0);
+    if (A && A->elem == &expr_elem && matrix_is_symbolic(A))
+        return mat_fun_elementwise_same_type(A, expr_elem.fun->lambert_w0);
 
     if (A &&
         A->elem == &number_elem &&
@@ -4291,7 +4291,7 @@ matrix_t *mat_lambert_w0(const matrix_t *A)
         if (structured)
             return structured;
     }
-    return mat_apply_unary(A, number_elem.fun->lambert_w0, dval_elem.fun->lambert_w0,
+    return mat_apply_unary(A, number_elem.fun->lambert_w0, expr_elem.fun->lambert_w0,
                            A && A->elem && A->elem->fun ? A->elem->fun->lambert_w0 : NULL);
 }
 
@@ -4306,7 +4306,7 @@ matrix_t *mat_lambert_wm1(const matrix_t *A)
         if (structured)
             return structured;
     }
-    return mat_apply_unary(A, number_elem.fun->lambert_wm1, dval_elem.fun->lambert_wm1,
+    return mat_apply_unary(A, number_elem.fun->lambert_wm1, expr_elem.fun->lambert_wm1,
                            A && A->elem && A->elem->fun ? A->elem->fun->lambert_wm1 : NULL);
 }
 
@@ -4321,7 +4321,7 @@ matrix_t *mat_productlog(const matrix_t *A)
         if (structured)
             return structured;
     }
-    return mat_apply_unary(A, number_elem.fun->productlog, dval_elem.fun->productlog,
+    return mat_apply_unary(A, number_elem.fun->productlog, expr_elem.fun->productlog,
                            A && A->elem && A->elem->fun ? A->elem->fun->productlog : NULL);
 }
 
@@ -4336,7 +4336,7 @@ matrix_t *mat_ei(const matrix_t *A)
         if (structured)
             return structured;
     }
-    return mat_apply_unary(A, number_elem.fun->ei, dval_elem.fun->ei,
+    return mat_apply_unary(A, number_elem.fun->ei, expr_elem.fun->ei,
                            A && A->elem && A->elem->fun ? A->elem->fun->ei : NULL);
 }
 
@@ -4351,7 +4351,7 @@ matrix_t *mat_e1(const matrix_t *A)
         if (structured)
             return structured;
     }
-    return mat_apply_unary(A, number_elem.fun->e1, dval_elem.fun->e1,
+    return mat_apply_unary(A, number_elem.fun->e1, expr_elem.fun->e1,
                            A && A->elem && A->elem->fun ? A->elem->fun->e1 : NULL);
 }
 
@@ -4403,7 +4403,7 @@ matrix_t *mat_pow_int(const matrix_t *A, int n)
 
     mat_free(base);
 
-    if (result->elem != &dval_elem)
+    if (result->elem != &expr_elem)
         return result;
 
     simplified = mat_simplify_symbolic(result);

@@ -760,10 +760,16 @@ int      num_sincos   (const number_t x, number_t *sin_out, number_t *cos_out);
 number_t num_sin      (const number_t number);
 number_t num_cos      (const number_t number);
 number_t num_tan      (const number_t number);
+number_t num_sec      (const number_t number);
+number_t num_cosec    (const number_t number);
+number_t num_cot      (const number_t number);
 number_t num_atan     (const number_t number);
 number_t num_atan2    (const number_t y, const number_t x);
 number_t num_asin     (const number_t number);
 number_t num_acos     (const number_t number);
+number_t num_asec     (const number_t number);
+number_t num_acosec   (const number_t number);
+number_t num_acot     (const number_t number);
 number_t num_sinh     (const number_t number);
 number_t num_cosh     (const number_t number);
 /**
@@ -776,9 +782,15 @@ number_t num_cosh     (const number_t number);
  */
 int      num_sinhcosh (const number_t x, number_t *sinh_out, number_t *cosh_out);
 number_t num_tanh     (const number_t number);
+number_t num_sech     (const number_t number);
+number_t num_cosech   (const number_t number);
+number_t num_coth     (const number_t number);
 number_t num_asinh    (const number_t number);
 number_t num_acosh    (const number_t number);
 number_t num_atanh    (const number_t number);
+number_t num_asech    (const number_t number);
+number_t num_acosech  (const number_t number);
+number_t num_acoth    (const number_t number);
 /** @} */
 
 /** @name Special functions

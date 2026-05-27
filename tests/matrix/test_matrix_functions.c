@@ -4,12 +4,12 @@
     "1.329340388179137020473625612505858887098162092091790346160355842389683463443274136031212992553908499062170117718211927999677114649293316951893820282202090301346528273989828842137443879771713119671699071534450972100130979"
 
 /*
- * DV_ZERO / DV_ONE are read-only immortal nodes in the public API now.
- * These matrix test fixtures still pass them through mutable dval_t * arrays,
+ * EXPR_ZERO / EXPR_ONE are read-only immortal nodes in the public API now.
+ * These matrix test fixtures still pass them through mutable expr_t * arrays,
  * so cast locally here instead of weakening library constness.
  */
-#define DV_ZERO ((dval_t *)DV_ZERO)
-#define DV_ONE  ((dval_t *)DV_ONE)
+#define EXPR_ZERO ((expr_t *)EXPR_ZERO)
+#define EXPR_ONE  ((expr_t *)EXPR_ONE)
 
 static void check_num_close_local(const char *label,
                                   number_t got,
@@ -457,27 +457,27 @@ static void test_eigen_num_hermitian_high_precision(void)
     mat_free(V);
 }
 
-/* ------------------------------------------------------------------ eigenvalues: dval */
+/* ------------------------------------------------------------------ eigenvalues: expr */
 
-static void check_dval_eigen_relation(const char *label_prefix,
+static void check_expr_eigen_relation(const char *label_prefix,
                                       const matrix_t *A,
-                                      dval_t **ev,
+                                      expr_t **ev,
                                       const matrix_t *V,
                                       double tol)
 {
     size_t rows = mat_get_row_count(A);
     size_t cols = mat_get_col_count(A);
-    matrix_t *D = mat_create_diagonal_dv(rows, ev);
+    matrix_t *D = mat_create_diagonal_expr(rows, ev);
     matrix_t *AV = mat_mul(A, V);
     matrix_t *VD = mat_mul(V, D);
     matrix_t *AVq = test_mat_evaluate_mp_real(AV);
     matrix_t *VDq = test_mat_evaluate_mp_real(VD);
 
-    check_bool("dval eig relation D not NULL", D != NULL);
-    check_bool("dval eig relation AV not NULL", AV != NULL);
-    check_bool("dval eig relation VD not NULL", VD != NULL);
-    check_bool("dval eig relation AVq not NULL", AVq != NULL);
-    check_bool("dval eig relation VDq not NULL", VDq != NULL);
+    check_bool("expr eig relation D not NULL", D != NULL);
+    check_bool("expr eig relation AV not NULL", AV != NULL);
+    check_bool("expr eig relation VD not NULL", VD != NULL);
+    check_bool("expr eig relation AVq not NULL", AVq != NULL);
+    check_bool("expr eig relation VDq not NULL", VDq != NULL);
 
     if (AVq && VDq) {
         for (size_t i = 0; i < rows; ++i) {
@@ -502,15 +502,15 @@ static void check_dval_eigen_relation(const char *label_prefix,
     mat_free(VDq);
 }
 
-static void check_dval_eigenspace_relation(const char *label_prefix,
+static void check_expr_eigenspace_relation(const char *label_prefix,
                                            const matrix_t *A,
-                                           dval_t *lambda,
+                                           expr_t *lambda,
                                            const matrix_t *E,
                                            double tol)
 {
     size_t rows = mat_get_row_count(A);
     size_t cols = mat_get_col_count(E);
-    dval_t **diag_vals = NULL;
+    expr_t **diag_vals = NULL;
     matrix_t *D = NULL;
     matrix_t *AE = mat_mul(A, E);
     matrix_t *ED = NULL;
@@ -518,23 +518,23 @@ static void check_dval_eigenspace_relation(const char *label_prefix,
     matrix_t *EDq = NULL;
 
     diag_vals = cols ? malloc(cols * sizeof(*diag_vals)) : NULL;
-    check_bool("dval eigenspace diag alloc ok", cols == 0 || diag_vals != NULL);
+    check_bool("expr eigenspace diag alloc ok", cols == 0 || diag_vals != NULL);
     if (cols && !diag_vals)
         goto cleanup;
 
     for (size_t j = 0; j < cols; ++j)
         diag_vals[j] = lambda;
 
-    D = mat_create_diagonal_dv(cols, diag_vals);
+    D = mat_create_diagonal_expr(cols, diag_vals);
     ED = mat_mul(E, D);
     AEq = test_mat_evaluate_mp_real(AE);
     EDq = test_mat_evaluate_mp_real(ED);
 
-    check_bool("dval eigenspace D not NULL", D != NULL);
-    check_bool("dval eigenspace AE not NULL", AE != NULL);
-    check_bool("dval eigenspace ED not NULL", ED != NULL);
-    check_bool("dval eigenspace AEq not NULL", AEq != NULL);
-    check_bool("dval eigenspace EDq not NULL", EDq != NULL);
+    check_bool("expr eigenspace D not NULL", D != NULL);
+    check_bool("expr eigenspace AE not NULL", AE != NULL);
+    check_bool("expr eigenspace ED not NULL", ED != NULL);
+    check_bool("expr eigenspace AEq not NULL", AEq != NULL);
+    check_bool("expr eigenspace EDq not NULL", EDq != NULL);
 
     if (AEq && EDq) {
         for (size_t i = 0; i < rows; ++i) {
@@ -561,37 +561,37 @@ cleanup:
     mat_free(EDq);
 }
 
-static void check_dval_generalized_eigenspace_relation(const char *label_prefix,
+static void check_expr_generalized_eigenspace_relation(const char *label_prefix,
                                                        const matrix_t *A,
-                                                       dval_t *lambda,
+                                                       expr_t *lambda,
                                                        size_t order,
                                                        const matrix_t *E,
                                                        double tol)
 {
-    dval_t **diag_vals = NULL;
+    expr_t **diag_vals = NULL;
     matrix_t *D = NULL;
     matrix_t *Shifted = NULL;
     matrix_t *Power = NULL;
     matrix_t *Residual = NULL;
     matrix_t *Residual_mp_real = NULL;
 
-    check_bool("dval generalized eigenspace input not NULL",
+    check_bool("expr generalized eigenspace input not NULL",
                A != NULL && lambda != NULL && E != NULL);
     if (!A || !lambda || !E)
         return;
 
     diag_vals = malloc(mat_get_row_count(A) * sizeof(*diag_vals));
-    check_bool("dval generalized eigenspace diag alloc ok", diag_vals != NULL);
+    check_bool("expr generalized eigenspace diag alloc ok", diag_vals != NULL);
     if (!diag_vals)
         goto cleanup;
 
     for (size_t i = 0; i < mat_get_row_count(A); ++i)
         diag_vals[i] = lambda;
 
-    D = mat_create_diagonal_dv(mat_get_row_count(A), diag_vals);
+    D = mat_create_diagonal_expr(mat_get_row_count(A), diag_vals);
     Shifted = mat_sub(A, D);
-    check_bool("dval generalized eigenspace diag matrix ok", D != NULL);
-    check_bool("dval generalized eigenspace shifted ok", Shifted != NULL);
+    check_bool("expr generalized eigenspace diag matrix ok", D != NULL);
+    check_bool("expr generalized eigenspace shifted ok", Shifted != NULL);
     if (!D || !Shifted)
         goto cleanup;
 
@@ -599,9 +599,9 @@ static void check_dval_generalized_eigenspace_relation(const char *label_prefix,
     Residual = mat_mul(Power, E);
     Residual_mp_real = test_mat_evaluate_mp_real(Residual);
 
-    check_bool("dval generalized eigenspace power not NULL", Power != NULL);
-    check_bool("dval generalized eigenspace residual not NULL", Residual != NULL);
-    check_bool("dval generalized eigenspace residual_mp_real not NULL", Residual_mp_real != NULL);
+    check_bool("expr generalized eigenspace power not NULL", Power != NULL);
+    check_bool("expr generalized eigenspace residual not NULL", Residual != NULL);
+    check_bool("expr generalized eigenspace residual_mp_real not NULL", Residual_mp_real != NULL);
 
     if (Residual_mp_real) {
         for (size_t i = 0; i < mat_get_row_count(Residual_mp_real); ++i) {
@@ -626,19 +626,19 @@ cleanup:
     mat_free(Residual_mp_real);
 }
 
-static matrix_t *copy_dval_column(const matrix_t *A, size_t col)
+static matrix_t *copy_expr_column(const matrix_t *A, size_t col)
 {
     matrix_t *C;
 
     if (!A || col >= mat_get_col_count(A))
         return NULL;
 
-    C = mat_new_dv(mat_get_row_count(A), 1);
+    C = mat_new_expr(mat_get_row_count(A), 1);
     if (!C)
         return NULL;
 
     for (size_t i = 0; i < mat_get_row_count(A); ++i) {
-        dval_t *v = NULL;
+        expr_t *v = NULL;
         mat_get(A, i, col, &v);
         mat_set(C, i, 0, &v);
     }
@@ -646,15 +646,15 @@ static matrix_t *copy_dval_column(const matrix_t *A, size_t col)
     return C;
 }
 
-static void check_dval_jordan_chain_relation(const char *label_prefix,
+static void check_expr_jordan_chain_relation(const char *label_prefix,
                                              const matrix_t *A,
-                                             dval_t *lambda,
+                                             expr_t *lambda,
                                              const matrix_t *Chain,
                                              double tol)
 {
     size_t rows = mat_get_row_count(A);
     size_t cols = mat_get_col_count(Chain);
-    dval_t **diag_vals = NULL;
+    expr_t **diag_vals = NULL;
     matrix_t *D = NULL;
     matrix_t *Shifted = NULL;
     matrix_t *Prev = NULL;
@@ -662,29 +662,29 @@ static void check_dval_jordan_chain_relation(const char *label_prefix,
     matrix_t *SCq = NULL;
     matrix_t *Prevq = NULL;
 
-    check_bool("dval jordan chain input not NULL",
+    check_bool("expr jordan chain input not NULL",
                A != NULL && lambda != NULL && Chain != NULL);
     if (!A || !lambda || !Chain)
         return;
 
     diag_vals = malloc(rows * sizeof(*diag_vals));
-    check_bool("dval jordan chain diag alloc ok", diag_vals != NULL);
+    check_bool("expr jordan chain diag alloc ok", diag_vals != NULL);
     if (!diag_vals)
         goto cleanup;
 
     for (size_t i = 0; i < rows; ++i)
         diag_vals[i] = lambda;
 
-    D = mat_create_diagonal_dv(rows, diag_vals);
+    D = mat_create_diagonal_expr(rows, diag_vals);
     Shifted = mat_sub(A, D);
-    check_bool("dval jordan chain D not NULL", D != NULL);
-    check_bool("dval jordan chain shifted not NULL", Shifted != NULL);
+    check_bool("expr jordan chain D not NULL", D != NULL);
+    check_bool("expr jordan chain shifted not NULL", Shifted != NULL);
     if (!D || !Shifted)
         goto cleanup;
 
     for (size_t j = 0; j < cols; ++j) {
-        matrix_t *Col = copy_dval_column(Chain, j);
-        check_bool("dval jordan chain column copy ok", Col != NULL);
+        matrix_t *Col = copy_expr_column(Chain, j);
+        check_bool("expr jordan chain column copy ok", Col != NULL);
         if (!Col)
             goto cleanup;
 
@@ -692,8 +692,8 @@ static void check_dval_jordan_chain_relation(const char *label_prefix,
         mat_free(SCq);
         SC = mat_mul(Shifted, Col);
         SCq = test_mat_evaluate_mp_real(SC);
-        check_bool("dval jordan chain shifted col not NULL", SC != NULL);
-        check_bool("dval jordan chain shifted col qf not NULL", SCq != NULL);
+        check_bool("expr jordan chain shifted col not NULL", SC != NULL);
+        check_bool("expr jordan chain shifted col qf not NULL", SCq != NULL);
         if (!SC || !SCq) {
             mat_free(Col);
             goto cleanup;
@@ -711,10 +711,10 @@ static void check_dval_jordan_chain_relation(const char *label_prefix,
         } else {
             mat_free(Prev);
             mat_free(Prevq);
-            Prev = copy_dval_column(Chain, j - 1);
+            Prev = copy_expr_column(Chain, j - 1);
             Prevq = test_mat_evaluate_mp_real(Prev);
-            check_bool("dval jordan chain prev col not NULL", Prev != NULL);
-            check_bool("dval jordan chain prev col qf not NULL", Prevq != NULL);
+            check_bool("expr jordan chain prev col not NULL", Prev != NULL);
+            check_bool("expr jordan chain prev col qf not NULL", Prevq != NULL);
             if (!Prev || !Prevq) {
                 mat_free(Col);
                 goto cleanup;
@@ -746,286 +746,286 @@ cleanup:
     mat_free(Prevq);
 }
 
-static void test_eigen_dval(void)
+static void test_eigen_expr(void)
 {
-    printf(C_CYAN "TEST: eigendecomposition (dval)\n" C_RESET);
+    printf(C_CYAN "TEST: eigendecomposition (expr)\n" C_RESET);
 
     {
-        dval_t *x = test_dv_new_named_var_d(2.0, "x");
-        dval_t *y = test_dv_new_named_var_d(3.0, "y");
-        dval_t *one = test_dv_new_const_d(1.0);
-        dval_t *two = test_dv_new_const_d(2.0);
-        dval_t *five = test_dv_new_const_d(5.0);
-        dval_t *seven = test_dv_new_const_d(7.0);
-        dval_t *vals[16] = {
-            x,   one, two, DV_ZERO,
-            DV_ZERO, y, one, DV_ZERO,
-            DV_ZERO, DV_ZERO, five, one,
-            DV_ZERO, DV_ZERO, DV_ZERO, seven};
-        dval_t *ev[4] = {NULL, NULL, NULL, NULL};
-        dval_t *ev2[4] = {NULL, NULL, NULL, NULL};
-        matrix_t *A = mat_create_dv(4, 4, vals);
+        expr_t *x = test_expr_new_named_var_d(2.0, "x");
+        expr_t *y = test_expr_new_named_var_d(3.0, "y");
+        expr_t *one = test_expr_new_const_d(1.0);
+        expr_t *two = test_expr_new_const_d(2.0);
+        expr_t *five = test_expr_new_const_d(5.0);
+        expr_t *seven = test_expr_new_const_d(7.0);
+        expr_t *vals[16] = {
+            x,   one, two, EXPR_ZERO,
+            EXPR_ZERO, y, one, EXPR_ZERO,
+            EXPR_ZERO, EXPR_ZERO, five, one,
+            EXPR_ZERO, EXPR_ZERO, EXPR_ZERO, seven};
+        expr_t *ev[4] = {NULL, NULL, NULL, NULL};
+        expr_t *ev2[4] = {NULL, NULL, NULL, NULL};
+        matrix_t *A = mat_create_expr(4, 4, vals);
         matrix_t *V = NULL;
 
         print_mdv("A", A);
-        check_bool("mat_eigenvalues(dval triangular) rc = 0",
-                   mat_eigenvalues_dv(A, ev) == 0);
-        check_bool("dval triangular eigenvalue[0] non-null", ev[0] != NULL);
-        check_bool("dval triangular eigenvalue[1] non-null", ev[1] != NULL);
-        check_bool("dval triangular eigenvalue[2] non-null", ev[2] != NULL);
-        check_bool("dval triangular eigenvalue[3] non-null", ev[3] != NULL);
+        check_bool("mat_eigenvalues(expr triangular) rc = 0",
+                   mat_eigenvalues_expr(A, ev) == 0);
+        check_bool("expr triangular eigenvalue[0] non-null", ev[0] != NULL);
+        check_bool("expr triangular eigenvalue[1] non-null", ev[1] != NULL);
+        check_bool("expr triangular eigenvalue[2] non-null", ev[2] != NULL);
+        check_bool("expr triangular eigenvalue[3] non-null", ev[3] != NULL);
         if (ev[0] && ev[1] && ev[2] && ev[3]) {
-            check_d("dval triangular eigenvalue[0] = x", dv_eval_d(ev[0]), 2.0, 1e-12);
-            check_d("dval triangular eigenvalue[1] = y", dv_eval_d(ev[1]), 3.0, 1e-12);
-            check_d("dval triangular eigenvalue[2] = 5", dv_eval_d(ev[2]), 5.0, 1e-12);
-            check_d("dval triangular eigenvalue[3] = 7", dv_eval_d(ev[3]), 7.0, 1e-12);
-            test_dv_set_val_d(x, 11.0);
-            test_dv_set_val_d(y, 13.0);
-            check_d("dval triangular eigenvalue[0] tracks x", dv_eval_d(ev[0]), 11.0, 1e-12);
-            check_d("dval triangular eigenvalue[1] tracks y", dv_eval_d(ev[1]), 13.0, 1e-12);
+            check_d("expr triangular eigenvalue[0] = x", expr_eval_d(ev[0]), 2.0, 1e-12);
+            check_d("expr triangular eigenvalue[1] = y", expr_eval_d(ev[1]), 3.0, 1e-12);
+            check_d("expr triangular eigenvalue[2] = 5", expr_eval_d(ev[2]), 5.0, 1e-12);
+            check_d("expr triangular eigenvalue[3] = 7", expr_eval_d(ev[3]), 7.0, 1e-12);
+            test_expr_set_val_d(x, 11.0);
+            test_expr_set_val_d(y, 13.0);
+            check_d("expr triangular eigenvalue[0] tracks x", expr_eval_d(ev[0]), 11.0, 1e-12);
+            check_d("expr triangular eigenvalue[1] tracks y", expr_eval_d(ev[1]), 13.0, 1e-12);
         }
 
-        check_bool("mat_eigendecompose(dval triangular distinct) rc = 0",
-                   mat_eigendecompose_dv(A, ev2, &V) == 0);
-        check_bool("dval triangular eigenvectors not NULL", V != NULL);
+        check_bool("mat_eigendecompose(expr triangular distinct) rc = 0",
+                   mat_eigendecompose_expr(A, ev2, &V) == 0);
+        check_bool("expr triangular eigenvectors not NULL", V != NULL);
         if (V)
-            check_dval_eigen_relation("dval triangular", A, ev2, V, 1e-12);
+            check_expr_eigen_relation("expr triangular", A, ev2, V, 1e-12);
 
         for (size_t i = 0; i < 4; ++i)
-            dv_free(ev[i]);
+            expr_free(ev[i]);
         for (size_t i = 0; i < 4; ++i)
-            dv_free(ev2[i]);
+            expr_free(ev2[i]);
         mat_free(A);
         mat_free(V);
-        dv_free(x);
-        dv_free(y);
-        dv_free(one);
-        dv_free(two);
-        dv_free(five);
-        dv_free(seven);
+        expr_free(x);
+        expr_free(y);
+        expr_free(one);
+        expr_free(two);
+        expr_free(five);
+        expr_free(seven);
     }
 
     {
-        dval_t *x = test_dv_new_named_var_d(2.0, "x");
-        dval_t *y = test_dv_new_named_var_d(5.0, "y");
-        dval_t *one = test_dv_new_const_d(1.0);
-        dval_t *vals[9] = {
-            x, one, DV_ZERO,
-            DV_ZERO, y, DV_ZERO,
-            DV_ZERO, DV_ZERO, x};
-        dval_t *ev[3] = {NULL, NULL, NULL};
-        dval_t *ev2[3] = {NULL, NULL, NULL};
-        matrix_t *A = mat_create_dv(3, 3, vals);
+        expr_t *x = test_expr_new_named_var_d(2.0, "x");
+        expr_t *y = test_expr_new_named_var_d(5.0, "y");
+        expr_t *one = test_expr_new_const_d(1.0);
+        expr_t *vals[9] = {
+            x, one, EXPR_ZERO,
+            EXPR_ZERO, y, EXPR_ZERO,
+            EXPR_ZERO, EXPR_ZERO, x};
+        expr_t *ev[3] = {NULL, NULL, NULL};
+        expr_t *ev2[3] = {NULL, NULL, NULL};
+        matrix_t *A = mat_create_expr(3, 3, vals);
         matrix_t *V = NULL;
 
-        print_mdv("A (triangular repeated dval)", A);
-        check_bool("mat_eigenvalues(dval triangular repeated) rc = 0",
-                   mat_eigenvalues_dv(A, ev) == 0);
-        check_bool("mat_eigendecompose(dval triangular repeated diagonalizable) rc = 0",
-                   mat_eigendecompose_dv(A, ev2, &V) == 0);
-        check_bool("dval triangular repeated eigenvectors not NULL", V != NULL);
+        print_mdv("A (triangular repeated expr)", A);
+        check_bool("mat_eigenvalues(expr triangular repeated) rc = 0",
+                   mat_eigenvalues_expr(A, ev) == 0);
+        check_bool("mat_eigendecompose(expr triangular repeated diagonalizable) rc = 0",
+                   mat_eigendecompose_expr(A, ev2, &V) == 0);
+        check_bool("expr triangular repeated eigenvectors not NULL", V != NULL);
         if (V)
-            check_dval_eigen_relation("dval triangular repeated", A, ev2, V, 1e-12);
+            check_expr_eigen_relation("expr triangular repeated", A, ev2, V, 1e-12);
 
         for (size_t i = 0; i < 3; ++i)
-            dv_free(ev[i]);
+            expr_free(ev[i]);
         for (size_t i = 0; i < 3; ++i)
-            dv_free(ev2[i]);
+            expr_free(ev2[i]);
         mat_free(A);
         mat_free(V);
-        dv_free(x);
-        dv_free(y);
-        dv_free(one);
+        expr_free(x);
+        expr_free(y);
+        expr_free(one);
     }
 
     {
-        dval_t *x = test_dv_new_named_var_d(3.0, "x");
-        dval_t *one = test_dv_new_const_d(1.0);
-        dval_t *vals[4] = {x, one, one, x};
-        dval_t *ev[2] = {NULL, NULL};
-        dval_t *ev2[2] = {NULL, NULL};
-        matrix_t *A = mat_create_dv(2, 2, vals);
+        expr_t *x = test_expr_new_named_var_d(3.0, "x");
+        expr_t *one = test_expr_new_const_d(1.0);
+        expr_t *vals[4] = {x, one, one, x};
+        expr_t *ev[2] = {NULL, NULL};
+        expr_t *ev2[2] = {NULL, NULL};
+        matrix_t *A = mat_create_expr(2, 2, vals);
         double ev0, ev1;
         double lo, hi;
         matrix_t *V = NULL;
         matrix_t *V2 = NULL;
 
-        print_mdv("A (dense 2x2 dval)", A);
-        check_bool("mat_eigenvalues(dval dense 2x2) rc = 0",
-                   mat_eigenvalues_dv(A, ev) == 0);
-        check_bool("dval dense eigenvalue[0] non-null", ev[0] != NULL);
-        check_bool("dval dense eigenvalue[1] non-null", ev[1] != NULL);
+        print_mdv("A (dense 2x2 expr)", A);
+        check_bool("mat_eigenvalues(expr dense 2x2) rc = 0",
+                   mat_eigenvalues_expr(A, ev) == 0);
+        check_bool("expr dense eigenvalue[0] non-null", ev[0] != NULL);
+        check_bool("expr dense eigenvalue[1] non-null", ev[1] != NULL);
         if (ev[0] && ev[1]) {
-            ev0 = dv_eval_d(ev[0]);
-            ev1 = dv_eval_d(ev[1]);
+            ev0 = expr_eval_d(ev[0]);
+            ev1 = expr_eval_d(ev[1]);
             lo = fmin(ev0, ev1);
             hi = fmax(ev0, ev1);
-            check_d("dval dense 2x2 eigenvalue min = x-1", lo, 2.0, 1e-12);
-            check_d("dval dense 2x2 eigenvalue max = x+1", hi, 4.0, 1e-12);
+            check_d("expr dense 2x2 eigenvalue min = x-1", lo, 2.0, 1e-12);
+            check_d("expr dense 2x2 eigenvalue max = x+1", hi, 4.0, 1e-12);
 
-            test_dv_set_val_d(x, 10.0);
-            ev0 = dv_eval_d(ev[0]);
-            ev1 = dv_eval_d(ev[1]);
+            test_expr_set_val_d(x, 10.0);
+            ev0 = expr_eval_d(ev[0]);
+            ev1 = expr_eval_d(ev[1]);
             lo = fmin(ev0, ev1);
             hi = fmax(ev0, ev1);
-            check_d("dval dense 2x2 eigenvalue min tracks x", lo, 9.0, 1e-12);
-            check_d("dval dense 2x2 eigenvalue max tracks x", hi, 11.0, 1e-12);
+            check_d("expr dense 2x2 eigenvalue min tracks x", lo, 9.0, 1e-12);
+            check_d("expr dense 2x2 eigenvalue max tracks x", hi, 11.0, 1e-12);
         }
 
-        check_bool("mat_eigendecompose(dval dense 2x2) rc = 0",
-                   mat_eigendecompose_dv(A, ev2, &V) == 0);
-        check_bool("dval dense 2x2 eigenvectors not NULL", V != NULL);
+        check_bool("mat_eigendecompose(expr dense 2x2) rc = 0",
+                   mat_eigendecompose_expr(A, ev2, &V) == 0);
+        check_bool("expr dense 2x2 eigenvectors not NULL", V != NULL);
         if (V)
-            check_dval_eigen_relation("dval dense 2x2", A, ev2, V, 1e-20);
+            check_expr_eigen_relation("expr dense 2x2", A, ev2, V, 1e-20);
 
         V2 = mat_eigenvectors(A);
-        check_bool("mat_eigenvectors(dval dense 2x2) not NULL", V2 != NULL);
+        check_bool("mat_eigenvectors(expr dense 2x2) not NULL", V2 != NULL);
 
-        dv_free(ev[0]);
-        dv_free(ev[1]);
-        dv_free(ev2[0]);
-        dv_free(ev2[1]);
+        expr_free(ev[0]);
+        expr_free(ev[1]);
+        expr_free(ev2[0]);
+        expr_free(ev2[1]);
         mat_free(A);
         mat_free(V);
         mat_free(V2);
-        dv_free(x);
-        dv_free(one);
+        expr_free(x);
+        expr_free(one);
     }
 
     {
-        dval_t *x = test_dv_new_named_var_d(2.0, "x");
-        dval_t *one = test_dv_new_const_d(1.0);
-        dval_t *vals[4] = {x, one, DV_ZERO, x};
-        dval_t *ev[2] = {NULL, NULL};
-        dval_t *ev2[2] = {NULL, NULL};
-        matrix_t *A = mat_create_dv(2, 2, vals);
+        expr_t *x = test_expr_new_named_var_d(2.0, "x");
+        expr_t *one = test_expr_new_const_d(1.0);
+        expr_t *vals[4] = {x, one, EXPR_ZERO, x};
+        expr_t *ev[2] = {NULL, NULL};
+        expr_t *ev2[2] = {NULL, NULL};
+        matrix_t *A = mat_create_expr(2, 2, vals);
         matrix_t *V = NULL;
 
-        check_bool("mat_eigenvalues(dval Jordan 2x2) rc = 0",
-                   mat_eigenvalues_dv(A, ev) == 0);
-        check_bool("mat_eigendecompose(dval Jordan 2x2) remains unsupported",
-                   mat_eigendecompose_dv(A, ev2, &V) < 0 && V == NULL);
+        check_bool("mat_eigenvalues(expr Jordan 2x2) rc = 0",
+                   mat_eigenvalues_expr(A, ev) == 0);
+        check_bool("mat_eigendecompose(expr Jordan 2x2) remains unsupported",
+                   mat_eigendecompose_expr(A, ev2, &V) < 0 && V == NULL);
 
-        dv_free(ev[0]);
-        dv_free(ev[1]);
-        dv_free(ev2[0]);
-        dv_free(ev2[1]);
+        expr_free(ev[0]);
+        expr_free(ev[1]);
+        expr_free(ev2[0]);
+        expr_free(ev2[1]);
         mat_free(A);
-        dv_free(x);
-        dv_free(one);
+        expr_free(x);
+        expr_free(one);
     }
 }
 
-static void test_eigenspace_dval(void)
+static void test_eigenspace_expr(void)
 {
-    printf(C_CYAN "TEST: eigenspace (dval)\n" C_RESET);
+    printf(C_CYAN "TEST: eigenspace (expr)\n" C_RESET);
 
     {
-        dval_t *x = test_dv_new_named_var_d(2.0, "x");
-        dval_t *y = test_dv_new_named_var_d(5.0, "y");
-        dval_t *one = test_dv_new_const_d(1.0);
-        dval_t *vals[9] = {
-            x, one, DV_ZERO,
-            DV_ZERO, y, DV_ZERO,
-            DV_ZERO, DV_ZERO, x};
-        matrix_t *A = mat_create_dv(3, 3, vals);
+        expr_t *x = test_expr_new_named_var_d(2.0, "x");
+        expr_t *y = test_expr_new_named_var_d(5.0, "y");
+        expr_t *one = test_expr_new_const_d(1.0);
+        expr_t *vals[9] = {
+            x, one, EXPR_ZERO,
+            EXPR_ZERO, y, EXPR_ZERO,
+            EXPR_ZERO, EXPR_ZERO, x};
+        matrix_t *A = mat_create_expr(3, 3, vals);
         matrix_t *E = mat_eigenspace(A, &x);
 
-        print_mdv("A (eigenspace repeated dval)", A);
-        check_bool("mat_eigenspace(dval repeated triangular) not NULL", E != NULL);
+        print_mdv("A (eigenspace repeated expr)", A);
+        check_bool("mat_eigenspace(expr repeated triangular) not NULL", E != NULL);
         if (E) {
             print_mdv("eigenspace_x(A)", E);
             check_bool("eigenspace rows = 3", mat_get_row_count(E) == 3);
             check_bool("eigenspace cols = 2", mat_get_col_count(E) == 2);
-            check_dval_eigenspace_relation("dval repeated eigenspace", A, x, E, 1e-20);
-            test_dv_set_val_d(x, 11.0);
-            test_dv_set_val_d(y, 13.0);
-            check_dval_eigenspace_relation("dval repeated eigenspace tracks", A, x, E, 1e-20);
+            check_expr_eigenspace_relation("expr repeated eigenspace", A, x, E, 1e-20);
+            test_expr_set_val_d(x, 11.0);
+            test_expr_set_val_d(y, 13.0);
+            check_expr_eigenspace_relation("expr repeated eigenspace tracks", A, x, E, 1e-20);
         }
 
         mat_free(A);
         mat_free(E);
-        dv_free(x);
-        dv_free(y);
-        dv_free(one);
+        expr_free(x);
+        expr_free(y);
+        expr_free(one);
     }
 
     {
-        dval_t *x = test_dv_new_named_var_d(3.0, "x");
-        dval_t *one = test_dv_new_const_d(1.0);
-        dval_t *vals[4] = {x, one, DV_ZERO, x};
-        matrix_t *A = mat_create_dv(2, 2, vals);
+        expr_t *x = test_expr_new_named_var_d(3.0, "x");
+        expr_t *one = test_expr_new_const_d(1.0);
+        expr_t *vals[4] = {x, one, EXPR_ZERO, x};
+        matrix_t *A = mat_create_expr(2, 2, vals);
         matrix_t *E = mat_eigenspace(A, &x);
 
-        print_mdv("A (Jordan eigenspace dval)", A);
-        check_bool("mat_eigenspace(dval Jordan 2x2) not NULL", E != NULL);
+        print_mdv("A (Jordan eigenspace expr)", A);
+        check_bool("mat_eigenspace(expr Jordan 2x2) not NULL", E != NULL);
         if (E) {
             print_mdv("eigenspace_x(Jordan A)", E);
             check_bool("Jordan eigenspace rows = 2", mat_get_row_count(E) == 2);
             check_bool("Jordan eigenspace cols = 1", mat_get_col_count(E) == 1);
-            check_dval_eigenspace_relation("dval Jordan eigenspace", A, x, E, 1e-20);
-            test_dv_set_val_d(x, 9.0);
-            check_dval_eigenspace_relation("dval Jordan eigenspace tracks", A, x, E, 1e-20);
+            check_expr_eigenspace_relation("expr Jordan eigenspace", A, x, E, 1e-20);
+            test_expr_set_val_d(x, 9.0);
+            check_expr_eigenspace_relation("expr Jordan eigenspace tracks", A, x, E, 1e-20);
         }
 
         mat_free(A);
         mat_free(E);
-        dv_free(x);
-        dv_free(one);
+        expr_free(x);
+        expr_free(one);
     }
 }
 
-static void test_generalized_eigenspace_dval(void)
+static void test_generalized_eigenspace_expr(void)
 {
-    printf(C_CYAN "TEST: generalized eigenspace (dval)\n" C_RESET);
+    printf(C_CYAN "TEST: generalized eigenspace (expr)\n" C_RESET);
 
     {
-        dval_t *x = test_dv_new_named_var_d(3.0, "x");
-        dval_t *one = test_dv_new_const_d(1.0);
-        dval_t *vals[4] = {x, one, DV_ZERO, x};
-        matrix_t *A = mat_create_dv(2, 2, vals);
+        expr_t *x = test_expr_new_named_var_d(3.0, "x");
+        expr_t *one = test_expr_new_const_d(1.0);
+        expr_t *vals[4] = {x, one, EXPR_ZERO, x};
+        matrix_t *A = mat_create_expr(2, 2, vals);
         matrix_t *G = mat_generalized_eigenspace(A, &x, 2);
 
-        print_mdv("A (Jordan generalized eigenspace dval)", A);
-        check_bool("mat_generalized_eigenspace(dval Jordan 2x2,2) not NULL", G != NULL);
+        print_mdv("A (Jordan generalized eigenspace expr)", A);
+        check_bool("mat_generalized_eigenspace(expr Jordan 2x2,2) not NULL", G != NULL);
         if (G) {
             print_mdv("gen_eigenspace_x^2(A)", G);
             check_bool("Jordan generalized eigenspace rows = 2", mat_get_row_count(G) == 2);
             check_bool("Jordan generalized eigenspace cols = 2", mat_get_col_count(G) == 2);
-            check_dval_generalized_eigenspace_relation("dval Jordan generalized eigenspace",
+            check_expr_generalized_eigenspace_relation("expr Jordan generalized eigenspace",
                                                        A, x, 2, G, 1e-20);
-            test_dv_set_val_d(x, 9.0);
-            check_dval_generalized_eigenspace_relation("dval Jordan generalized eigenspace tracks",
+            test_expr_set_val_d(x, 9.0);
+            check_expr_generalized_eigenspace_relation("expr Jordan generalized eigenspace tracks",
                                                        A, x, 2, G, 1e-20);
         }
 
         mat_free(A);
         mat_free(G);
-        dv_free(x);
-        dv_free(one);
+        expr_free(x);
+        expr_free(one);
     }
 
     {
-        dval_t *x = test_dv_new_named_var_d(2.0, "x");
-        dval_t *one = test_dv_new_const_d(1.0);
-        dval_t *vals[9] = {
-            x, one, DV_ZERO,
-            DV_ZERO, x, one,
-            DV_ZERO, DV_ZERO, x};
-        matrix_t *A = mat_create_dv(3, 3, vals);
+        expr_t *x = test_expr_new_named_var_d(2.0, "x");
+        expr_t *one = test_expr_new_const_d(1.0);
+        expr_t *vals[9] = {
+            x, one, EXPR_ZERO,
+            EXPR_ZERO, x, one,
+            EXPR_ZERO, EXPR_ZERO, x};
+        matrix_t *A = mat_create_expr(3, 3, vals);
         matrix_t *G2 = mat_generalized_eigenspace(A, &x, 2);
         matrix_t *G3 = mat_generalized_eigenspace(A, &x, 3);
 
-        print_mdv("A (3x3 Jordan generalized eigenspace dval)", A);
-        check_bool("mat_generalized_eigenspace(dval Jordan 3x3,2) not NULL", G2 != NULL);
-        check_bool("mat_generalized_eigenspace(dval Jordan 3x3,3) not NULL", G3 != NULL);
+        print_mdv("A (3x3 Jordan generalized eigenspace expr)", A);
+        check_bool("mat_generalized_eigenspace(expr Jordan 3x3,2) not NULL", G2 != NULL);
+        check_bool("mat_generalized_eigenspace(expr Jordan 3x3,3) not NULL", G3 != NULL);
         if (G2) {
             print_mdv("gen_eigenspace_x^2(A)", G2);
             check_bool("3x3 Jordan generalized eigenspace order-2 rows = 3",
                        mat_get_row_count(G2) == 3);
             check_bool("3x3 Jordan generalized eigenspace order-2 cols = 2",
                        mat_get_col_count(G2) == 2);
-            check_dval_generalized_eigenspace_relation("dval 3x3 Jordan generalized eigenspace order-2",
+            check_expr_generalized_eigenspace_relation("expr 3x3 Jordan generalized eigenspace order-2",
                                                        A, x, 2, G2, 1e-20);
         }
         if (G3) {
@@ -1034,90 +1034,90 @@ static void test_generalized_eigenspace_dval(void)
                        mat_get_row_count(G3) == 3);
             check_bool("3x3 Jordan generalized eigenspace order-3 cols = 3",
                        mat_get_col_count(G3) == 3);
-            check_dval_generalized_eigenspace_relation("dval 3x3 Jordan generalized eigenspace order-3",
+            check_expr_generalized_eigenspace_relation("expr 3x3 Jordan generalized eigenspace order-3",
                                                        A, x, 3, G3, 1e-20);
-            test_dv_set_val_d(x, 5.0);
-            check_dval_generalized_eigenspace_relation("dval 3x3 Jordan generalized eigenspace order-3 tracks",
+            test_expr_set_val_d(x, 5.0);
+            check_expr_generalized_eigenspace_relation("expr 3x3 Jordan generalized eigenspace order-3 tracks",
                                                        A, x, 3, G3, 1e-20);
         }
 
         mat_free(A);
         mat_free(G2);
         mat_free(G3);
-        dv_free(x);
-        dv_free(one);
+        expr_free(x);
+        expr_free(one);
     }
 }
 
-static void test_jordan_chain_dval(void)
+static void test_jordan_chain_expr(void)
 {
-    printf(C_CYAN "TEST: Jordan chain (dval)\n" C_RESET);
+    printf(C_CYAN "TEST: Jordan chain (expr)\n" C_RESET);
 
     {
-        dval_t *x = test_dv_new_named_var_d(3.0, "x");
-        dval_t *one = test_dv_new_const_d(1.0);
-        dval_t *vals[4] = {x, one, DV_ZERO, x};
-        matrix_t *A = mat_create_dv(2, 2, vals);
+        expr_t *x = test_expr_new_named_var_d(3.0, "x");
+        expr_t *one = test_expr_new_const_d(1.0);
+        expr_t *vals[4] = {x, one, EXPR_ZERO, x};
+        matrix_t *A = mat_create_expr(2, 2, vals);
         matrix_t *J = mat_jordan_chain(A, &x, 2);
 
-        print_mdv("A (Jordan chain 2x2 dval)", A);
-        check_bool("mat_jordan_chain(dval Jordan 2x2,2) not NULL", J != NULL);
+        print_mdv("A (Jordan chain 2x2 expr)", A);
+        check_bool("mat_jordan_chain(expr Jordan 2x2,2) not NULL", J != NULL);
         if (J) {
             print_mdv("jordan_chain_x^2(A)", J);
             check_bool("Jordan chain 2x2 rows = 2", mat_get_row_count(J) == 2);
             check_bool("Jordan chain 2x2 cols = 2", mat_get_col_count(J) == 2);
-            check_dval_jordan_chain_relation("dval Jordan chain 2x2", A, x, J, 1e-20);
-            test_dv_set_val_d(x, 9.0);
-            check_dval_jordan_chain_relation("dval Jordan chain 2x2 tracks", A, x, J, 1e-20);
+            check_expr_jordan_chain_relation("expr Jordan chain 2x2", A, x, J, 1e-20);
+            test_expr_set_val_d(x, 9.0);
+            check_expr_jordan_chain_relation("expr Jordan chain 2x2 tracks", A, x, J, 1e-20);
         }
 
         mat_free(A);
         mat_free(J);
-        dv_free(x);
-        dv_free(one);
+        expr_free(x);
+        expr_free(one);
     }
 
     {
-        dval_t *x = test_dv_new_named_var_d(2.0, "x");
-        dval_t *one = test_dv_new_const_d(1.0);
-        dval_t *vals[9] = {
-            x, one, DV_ZERO,
-            DV_ZERO, x, one,
-            DV_ZERO, DV_ZERO, x};
-        matrix_t *A = mat_create_dv(3, 3, vals);
+        expr_t *x = test_expr_new_named_var_d(2.0, "x");
+        expr_t *one = test_expr_new_const_d(1.0);
+        expr_t *vals[9] = {
+            x, one, EXPR_ZERO,
+            EXPR_ZERO, x, one,
+            EXPR_ZERO, EXPR_ZERO, x};
+        matrix_t *A = mat_create_expr(3, 3, vals);
         matrix_t *J = mat_jordan_chain(A, &x, 3);
 
-        print_mdv("A (Jordan chain 3x3 dval)", A);
-        check_bool("mat_jordan_chain(dval Jordan 3x3,3) not NULL", J != NULL);
+        print_mdv("A (Jordan chain 3x3 expr)", A);
+        check_bool("mat_jordan_chain(expr Jordan 3x3,3) not NULL", J != NULL);
         if (J) {
             print_mdv("jordan_chain_x^3(A)", J);
             check_bool("Jordan chain 3x3 rows = 3", mat_get_row_count(J) == 3);
             check_bool("Jordan chain 3x3 cols = 3", mat_get_col_count(J) == 3);
-            check_dval_jordan_chain_relation("dval Jordan chain 3x3", A, x, J, 1e-20);
-            test_dv_set_val_d(x, 5.0);
-            check_dval_jordan_chain_relation("dval Jordan chain 3x3 tracks", A, x, J, 1e-20);
+            check_expr_jordan_chain_relation("expr Jordan chain 3x3", A, x, J, 1e-20);
+            test_expr_set_val_d(x, 5.0);
+            check_expr_jordan_chain_relation("expr Jordan chain 3x3 tracks", A, x, J, 1e-20);
         }
 
         mat_free(A);
         mat_free(J);
-        dv_free(x);
-        dv_free(one);
+        expr_free(x);
+        expr_free(one);
     }
 }
 
-static void test_jordan_profile_dval(void)
+static void test_jordan_profile_expr(void)
 {
-    printf(C_CYAN "TEST: Jordan profile (dval)\n" C_RESET);
+    printf(C_CYAN "TEST: Jordan profile (expr)\n" C_RESET);
 
     {
-        dval_t *x = test_dv_new_named_var_d(3.0, "x");
-        dval_t *one = test_dv_new_const_d(1.0);
-        dval_t *vals[4] = {x, one, DV_ZERO, x};
-        matrix_t *A = mat_create_dv(2, 2, vals);
+        expr_t *x = test_expr_new_named_var_d(3.0, "x");
+        expr_t *one = test_expr_new_const_d(1.0);
+        expr_t *vals[4] = {x, one, EXPR_ZERO, x};
+        matrix_t *A = mat_create_expr(2, 2, vals);
         matrix_t *P = mat_jordan_profile(A, &x);
 
-        print_mdv("A (Jordan profile 2x2 dval)", A);
-        check_bool("mat_jordan_profile(dval Jordan 2x2) not NULL", P != NULL);
+        print_mdv("A (Jordan profile 2x2 expr)", A);
+        check_bool("mat_jordan_profile(expr Jordan 2x2) not NULL", P != NULL);
         if (P) {
             double p0 = 0.0;
             print_md("jordan_profile_x(A)", P);
@@ -1129,22 +1129,22 @@ static void test_jordan_profile_dval(void)
 
         mat_free(A);
         mat_free(P);
-        dv_free(x);
-        dv_free(one);
+        expr_free(x);
+        expr_free(one);
     }
 
     {
-        dval_t *x = test_dv_new_named_var_d(2.0, "x");
-        dval_t *y = test_dv_new_named_var_d(5.0, "y");
-        dval_t *vals[9] = {
-            x, DV_ZERO, DV_ZERO,
-            DV_ZERO, x, DV_ZERO,
-            DV_ZERO, DV_ZERO, y};
-        matrix_t *A = mat_create_dv(3, 3, vals);
+        expr_t *x = test_expr_new_named_var_d(2.0, "x");
+        expr_t *y = test_expr_new_named_var_d(5.0, "y");
+        expr_t *vals[9] = {
+            x, EXPR_ZERO, EXPR_ZERO,
+            EXPR_ZERO, x, EXPR_ZERO,
+            EXPR_ZERO, EXPR_ZERO, y};
+        matrix_t *A = mat_create_expr(3, 3, vals);
         matrix_t *P = mat_jordan_profile(A, &x);
 
-        print_mdv("A (Jordan profile repeated diagonal dval)", A);
-        check_bool("mat_jordan_profile(repeated diagonal dval) not NULL", P != NULL);
+        print_mdv("A (Jordan profile repeated diagonal expr)", A);
+        check_bool("mat_jordan_profile(repeated diagonal expr) not NULL", P != NULL);
         if (P) {
             double p0 = 0.0;
             double p1 = 0.0;
@@ -1159,22 +1159,22 @@ static void test_jordan_profile_dval(void)
 
         mat_free(A);
         mat_free(P);
-        dv_free(x);
-        dv_free(y);
+        expr_free(x);
+        expr_free(y);
     }
 
     {
-        dval_t *x = test_dv_new_named_var_d(2.0, "x");
-        dval_t *one = test_dv_new_const_d(1.0);
-        dval_t *vals[9] = {
-            x, one, DV_ZERO,
-            DV_ZERO, x, DV_ZERO,
-            DV_ZERO, DV_ZERO, x};
-        matrix_t *A = mat_create_dv(3, 3, vals);
+        expr_t *x = test_expr_new_named_var_d(2.0, "x");
+        expr_t *one = test_expr_new_const_d(1.0);
+        expr_t *vals[9] = {
+            x, one, EXPR_ZERO,
+            EXPR_ZERO, x, EXPR_ZERO,
+            EXPR_ZERO, EXPR_ZERO, x};
+        matrix_t *A = mat_create_expr(3, 3, vals);
         matrix_t *P = mat_jordan_profile(A, &x);
 
-        print_mdv("A (Jordan profile mixed 3x3 dval)", A);
-        check_bool("mat_jordan_profile(mixed 3x3 dval) not NULL", P != NULL);
+        print_mdv("A (Jordan profile mixed 3x3 expr)", A);
+        check_bool("mat_jordan_profile(mixed 3x3 expr) not NULL", P != NULL);
         if (P) {
             double p0 = 0.0;
             double p1 = 0.0;
@@ -1189,8 +1189,8 @@ static void test_jordan_profile_dval(void)
 
         mat_free(A);
         mat_free(P);
-        dv_free(x);
-        dv_free(one);
+        expr_free(x);
+        expr_free(one);
     }
 }
 
@@ -3015,13 +3015,13 @@ static void test_eigen_general_num_high_precision(void)
 
 static void test_mat_simplify_symbolic_helper(void)
 {
-    dval_t *delta = test_dv_new_named_var_d(1.5, "Δ");
-    dval_t *omega = test_dv_new_named_var_d(0.25, "Ω");
-    dval_t *prod1 = NULL;
-    dval_t *prod2 = NULL;
-    dval_t *neg_prod1 = NULL;
-    dval_t *entry = NULL;
-    dval_t *vals[4] = {NULL, NULL, NULL, NULL};
+    expr_t *delta = test_expr_new_named_var_d(1.5, "Δ");
+    expr_t *omega = test_expr_new_named_var_d(0.25, "Ω");
+    expr_t *prod1 = NULL;
+    expr_t *prod2 = NULL;
+    expr_t *neg_prod1 = NULL;
+    expr_t *entry = NULL;
+    expr_t *vals[4] = {NULL, NULL, NULL, NULL};
     matrix_t *A = NULL;
     matrix_t *S = NULL;
     char *text = NULL;
@@ -3031,18 +3031,18 @@ static void test_mat_simplify_symbolic_helper(void)
     if (!delta || !omega)
         goto cleanup;
 
-    prod1 = dv_mul(delta, omega);
+    prod1 = expr_mul(delta, omega);
 
-    prod2 = dv_mul(delta, omega);
+    prod2 = expr_mul(delta, omega);
 
-    neg_prod1 = dv_neg(prod1);
-    entry = dv_add(neg_prod1, prod2);
+    neg_prod1 = expr_neg(prod1);
+    entry = expr_add(neg_prod1, prod2);
 
     vals[0] = entry;
     vals[1] = entry;
     vals[2] = entry;
     vals[3] = entry;
-    A = mat_create_dv(2, 2, vals);
+    A = mat_create_expr(2, 2, vals);
     check_bool("mat_simplify_symbolic helper source matrix non-null", A != NULL);
 
     S = mat_simplify_symbolic(A);
@@ -3055,12 +3055,12 @@ cleanup:
     free(text);
     mat_free(S);
     mat_free(A);
-    dv_free(entry);
-    dv_free(neg_prod1);
-    dv_free(prod2);
-    dv_free(prod1);
-    dv_free(omega);
-    dv_free(delta);
+    expr_free(entry);
+    expr_free(neg_prod1);
+    expr_free(prod2);
+    expr_free(prod1);
+    expr_free(omega);
+    expr_free(delta);
 }
 
 /* ------------------------------------------------------------------ generic matrix check (double) */
@@ -3950,9 +3950,9 @@ static void test_mat_neg_convenience(void)
 {
     printf(C_CYAN "TEST: mat_neg convenience wrapper\n" C_RESET);
 
-    double dvals[4] = {1.0, -2.0, 3.5, 0.0};
+    double exprs[4] = {1.0, -2.0, 3.5, 0.0};
     double dexp[4] = {-1.0, 2.0, -3.5, 0.0};
-    matrix_t *A = test_mat_create_d(2, 2, dvals);
+    matrix_t *A = test_mat_create_d(2, 2, exprs);
     matrix_t *E = test_mat_create_d(2, 2, dexp);
     check_bool("double neg input allocated", A != NULL);
     check_bool("double neg expected allocated", E != NULL);
@@ -4484,8 +4484,8 @@ static void test_mat_pow_int_d(void)
 
     /* diagonal matrix: diag(2,3)^4 = diag(16,81) */
     {
-        double dvals[4] = {2.0, 0.0, 0.0, 3.0};
-        matrix_t *D = test_mat_create_d(2, 2, dvals);
+        double exprs[4] = {2.0, 0.0, 0.0, 3.0};
+        matrix_t *D = test_mat_create_d(2, 2, exprs);
         print_md("D", D);
         matrix_t *R = mat_pow_int(D, 4);
         print_md("diag(2,3)^4", R);
@@ -4497,7 +4497,7 @@ static void test_mat_pow_int_d(void)
     /* symbolic Jordan block: [[x,1],[0,x]]^n */
     {
         mat_bindings_t *bindings = NULL;
-        matrix_t *J = mat_from_string_dv("(x, 1; 0, x)", &bindings);
+        matrix_t *J = mat_from_string_expr("(x, 1; 0, x)", &bindings);
         matrix_t *J2 = NULL;
         matrix_t *J3 = NULL;
         char *j2_text = NULL;
@@ -4723,10 +4723,10 @@ static void test_mat_typeof(void)
     printf(C_CYAN "TEST: mat_typeof\n" C_RESET);
 
     matrix_t *An = matsq_new_num(2);
-    matrix_t *Adv = test_mat_square_dv(2);
+    matrix_t *Adv = test_mat_square_expr(2);
 
     check_bool("mat_typeof(number)   = MAT_TYPE_NUMBER", An != NULL && mat_typeof(An) == MAT_TYPE_NUMBER);
-    check_bool("mat_typeof(dval)     = MAT_TYPE_DVAL", Adv != NULL && mat_typeof(Adv) == MAT_TYPE_DVAL);
+    check_bool("mat_typeof(expr)     = MAT_TYPE_EXPR", Adv != NULL && mat_typeof(Adv) == MAT_TYPE_EXPR);
 
     matrix_t *In = mat_create_identity_num(2);
 
@@ -4886,9 +4886,9 @@ static void print_matrix_precision_comparison(const char *label,
     free(expected_text);
 }
 
-static void check_number_upper_jordan_from_dval(const char *label,
+static void check_number_upper_jordan_from_expr(const char *label,
                                                 matrix_t *(*mat_fun)(const matrix_t *),
-                                                dval_t *(*build_expr)(const dval_t *),
+                                                expr_t *(*build_expr)(const expr_t *),
                                                 const char *lambda_text,
                                                 size_t prec_bits,
                                                 const char *tol_text)
@@ -4896,9 +4896,9 @@ static void check_number_upper_jordan_from_dval(const char *label,
     number_t jordan_data[4];
     matrix_t *A = NULL;
     matrix_t *R = NULL;
-    dval_t *x = NULL;
-    dval_t *expr = NULL;
-    dval_t *deriv = NULL;
+    expr_t *x = NULL;
+    expr_t *expr = NULL;
+    expr_t *deriv = NULL;
     number_t lambda;
     number_t expected_diag;
     number_t expected_offdiag;
@@ -4919,16 +4919,16 @@ static void check_number_upper_jordan_from_dval(const char *label,
     check_bool(label, R != NULL && mat_typeof(R) == MAT_TYPE_NUMBER);
 
     lambda = num_clone(jordan_data[0]);
-    x = dv_new_named_var(num_clone(lambda), "x");
+    x = expr_new_named_var(num_clone(lambda), "x");
     expr = x ? build_expr(x) : NULL;
-    deriv = expr ? dv_create_deriv(expr, x) : NULL;
-    check_bool("number upper Jordan dval helper expr allocated",
+    deriv = expr ? expr_create_deriv(expr, x) : NULL;
+    check_bool("number upper Jordan expr helper expr allocated",
                x != NULL && expr != NULL && deriv != NULL);
 
     if (R && expr && deriv) {
         tol = num_create_from_string(tol_text);
-        expected_diag = dv_eval(expr);
-        expected_offdiag = dv_eval(deriv);
+        expected_diag = expr_eval(expr);
+        expected_offdiag = expr_eval(deriv);
 
         got = mat_get_num(R, 0, 0);
         err = matrix_number_error_magnitude(got, expected_diag);
@@ -4958,9 +4958,9 @@ static void check_number_upper_jordan_from_dval(const char *label,
         num_destroy(&tol);
     }
 
-    dv_free(deriv);
-    dv_free(expr);
-    dv_free(x);
+    expr_free(deriv);
+    expr_free(expr);
+    expr_free(x);
     num_destroy(&lambda);
     mat_free(R);
     mat_free(A);
@@ -5109,7 +5109,7 @@ static void test_number_matrix_functions(void)
     }
 
     J_confluent = mat_from_string("(0, 1, 1; 0, 2, 1; 0, 0, 0)");
-    check_bool("mat_from_string_dv(number confluent upper triangular) not NULL",
+    check_bool("mat_from_string_expr(number confluent upper triangular) not NULL",
                J_confluent != NULL);
 
     J_confluent_exp = mat_exp(J_confluent);
@@ -5905,41 +5905,41 @@ static void test_number_matrix_functions(void)
         num_destroy(&deriv_expected);
     }
 
-    check_number_upper_jordan_from_dval("gamma(number upper Jordan)[0,0]",
-                                        mat_gamma, dv_gamma,
+    check_number_upper_jordan_from_expr("gamma(number upper Jordan)[0,0]",
+                                        mat_gamma, expr_gamma,
                                         "2.5", 512u, "1e-90");
-    check_number_upper_jordan_from_dval("erfinv(number upper Jordan)[0,0]",
-                                        mat_erfinv, dv_erfinv,
+    check_number_upper_jordan_from_expr("erfinv(number upper Jordan)[0,0]",
+                                        mat_erfinv, expr_erfinv,
                                         "0.5", 512u, "1e-90");
-    check_number_upper_jordan_from_dval("erfcinv(number upper Jordan)[0,0]",
-                                        mat_erfcinv, dv_erfcinv,
+    check_number_upper_jordan_from_expr("erfcinv(number upper Jordan)[0,0]",
+                                        mat_erfcinv, expr_erfcinv,
                                         "0.4", 512u, "1e-90");
-    check_number_upper_jordan_from_dval("lgamma(number upper Jordan)[0,0]",
-                                        mat_lgamma, dv_lgamma,
+    check_number_upper_jordan_from_expr("lgamma(number upper Jordan)[0,0]",
+                                        mat_lgamma, expr_lgamma,
                                         "2.5", 512u, "1e-90");
-    check_number_upper_jordan_from_dval("digamma(number upper Jordan)[0,0]",
-                                        mat_digamma, dv_digamma,
+    check_number_upper_jordan_from_expr("digamma(number upper Jordan)[0,0]",
+                                        mat_digamma, expr_digamma,
                                         "2.5", 512u, "1e-90");
-    check_number_upper_jordan_from_dval("trigamma(number upper Jordan)[0,0]",
-                                        mat_trigamma, dv_trigamma,
+    check_number_upper_jordan_from_expr("trigamma(number upper Jordan)[0,0]",
+                                        mat_trigamma, expr_trigamma,
                                         "2.5", 512u, "1e-90");
-    check_number_upper_jordan_from_dval("gammainv(number upper Jordan)[0,0]",
-                                        mat_gammainv, dv_gammainv,
+    check_number_upper_jordan_from_expr("gammainv(number upper Jordan)[0,0]",
+                                        mat_gammainv, expr_gammainv,
                                         GAMMAINV_HP_INPUT_TEXT, 512u, "1e-90");
-    check_number_upper_jordan_from_dval("lambert_w0(number upper Jordan)[0,0]",
-                                        mat_lambert_w0, dv_lambert_w0,
+    check_number_upper_jordan_from_expr("lambert_w0(number upper Jordan)[0,0]",
+                                        mat_lambert_w0, expr_lambert_w0,
                                         "0.2", 512u, "1e-90");
-    check_number_upper_jordan_from_dval("productlog(number upper Jordan)[0,0]",
-                                        mat_productlog, dv_lambert_w0,
+    check_number_upper_jordan_from_expr("productlog(number upper Jordan)[0,0]",
+                                        mat_productlog, expr_lambert_w0,
                                         "0.2", 512u, "1e-90");
-    check_number_upper_jordan_from_dval("lambert_wm1(number upper Jordan)[0,0]",
-                                        mat_lambert_wm1, dv_lambert_wm1,
+    check_number_upper_jordan_from_expr("lambert_wm1(number upper Jordan)[0,0]",
+                                        mat_lambert_wm1, expr_lambert_wm1,
                                         "-0.2", 512u, "1e-30");
-    check_number_upper_jordan_from_dval("ei(number upper Jordan)[0,0]",
-                                        mat_ei, dv_ei,
+    check_number_upper_jordan_from_expr("ei(number upper Jordan)[0,0]",
+                                        mat_ei, expr_ei,
                                         "0.5", 512u, "1e-90");
-    check_number_upper_jordan_from_dval("e1(number upper Jordan)[0,0]",
-                                        mat_e1, dv_e1,
+    check_number_upper_jordan_from_expr("e1(number upper Jordan)[0,0]",
+                                        mat_e1, expr_e1,
                                         "1.0", 512u, "1e-90");
 
     mat_free(A_real);
@@ -6020,68 +6020,68 @@ static void test_number_matrix_functions(void)
     num_destroy(&jordan_atanh_data[3]);
 }
 
-static void check_dval_expr_contains(const char *label,
-                                     dval_t *dv,
+static void check_expr_expr_contains(const char *label,
+                                     expr_t *dv,
                                      const char *needle)
 {
-    char *s = dv_to_string(dv, style_EXPRESSION);
+    char *s = expr_to_string(dv, style_EXPRESSION);
     check_bool(label, s != NULL && strstr(s, needle) != NULL);
     free(s);
 }
 
-static void test_dval_matrix_functions(void)
+static void test_expr_matrix_functions(void)
 {
-    printf(C_CYAN "TEST: dval matrix functions\n" C_RESET);
+    printf(C_CYAN "TEST: expr matrix functions\n" C_RESET);
 
-    dval_t *x = test_dv_new_named_var_d(2.0, "x");
-    dval_t *one = test_dv_new_const_d(1.0);
+    expr_t *x = test_expr_new_named_var_d(2.0, "x");
+    expr_t *one = test_expr_new_const_d(1.0);
 
     {
-        dval_t *diag_vals[4] = {x, DV_ZERO, DV_ZERO, one};
-        matrix_t *A = mat_create_dv(2, 2, diag_vals);
+        expr_t *diag_vals[4] = {x, EXPR_ZERO, EXPR_ZERO, one};
+        matrix_t *A = mat_create_expr(2, 2, diag_vals);
         matrix_t *E = mat_exp(A);
-        dval_t *e00 = NULL;
-        dval_t *e11 = NULL;
+        expr_t *e00 = NULL;
+        expr_t *e11 = NULL;
 
-        check_bool("mat_exp(dval diagonal) not NULL", E != NULL);
+        check_bool("mat_exp(expr diagonal) not NULL", E != NULL);
         print_mdv("A", A);
         if (E) {
             print_mdv("exp(A)", E);
             mat_get(E, 0, 0, &e00);
             mat_get(E, 1, 1, &e11);
-            check_d("exp(dval diag)[0,0] = exp(2)", dv_eval_d(e00), exp(2.0), 1e-12);
-            check_d("exp(dval diag)[1,1] = exp(1)", dv_eval_d(e11), exp(1.0), 1e-12);
-            test_dv_set_val_d(x, 3.0);
-            check_d("exp(dval diag)[0,0] tracks x", dv_eval_d(e00), exp(3.0), 1e-12);
+            check_d("exp(expr diag)[0,0] = exp(2)", expr_eval_d(e00), exp(2.0), 1e-12);
+            check_d("exp(expr diag)[1,1] = exp(1)", expr_eval_d(e11), exp(1.0), 1e-12);
+            test_expr_set_val_d(x, 3.0);
+            check_d("exp(expr diag)[0,0] tracks x", expr_eval_d(e00), exp(3.0), 1e-12);
         }
 
         mat_free(A);
         mat_free(E);
     }
 
-    test_dv_set_val_d(x, 2.0);
+    test_expr_set_val_d(x, 2.0);
 
     {
-        dval_t *tri_vals[4] = {x, one, DV_ZERO, x};
-        matrix_t *T = mat_create_dv(2, 2, tri_vals);
+        expr_t *tri_vals[4] = {x, one, EXPR_ZERO, x};
+        matrix_t *T = mat_create_expr(2, 2, tri_vals);
         matrix_t *E = mat_exp(T);
-        dval_t *e00 = NULL;
-        dval_t *e01 = NULL;
-        dval_t *e11 = NULL;
+        expr_t *e00 = NULL;
+        expr_t *e01 = NULL;
+        expr_t *e11 = NULL;
 
-        check_bool("mat_exp(dval Jordan block) not NULL", E != NULL);
+        check_bool("mat_exp(expr Jordan block) not NULL", E != NULL);
         print_mdv("T", T);
         if (E) {
             print_mdv("exp(T)", E);
             mat_get(E, 0, 0, &e00);
             mat_get(E, 0, 1, &e01);
             mat_get(E, 1, 1, &e11);
-            check_d("exp([[x,1],[0,x]])[0,0] = exp(2)", dv_eval_d(e00), exp(2.0), 1e-12);
-            check_d("exp([[x,1],[0,x]])[0,1] = exp(2)", dv_eval_d(e01), exp(2.0), 1e-12);
-            check_d("exp([[x,1],[0,x]])[1,1] = exp(2)", dv_eval_d(e11), exp(2.0), 1e-12);
-            test_dv_set_val_d(x, 3.0);
-            check_d("Jordan exp tracks x on diagonal", dv_eval_d(e00), exp(3.0), 1e-12);
-            check_d("Jordan exp tracks x on superdiag", dv_eval_d(e01), exp(3.0), 1e-12);
+            check_d("exp([[x,1],[0,x]])[0,0] = exp(2)", expr_eval_d(e00), exp(2.0), 1e-12);
+            check_d("exp([[x,1],[0,x]])[0,1] = exp(2)", expr_eval_d(e01), exp(2.0), 1e-12);
+            check_d("exp([[x,1],[0,x]])[1,1] = exp(2)", expr_eval_d(e11), exp(2.0), 1e-12);
+            test_expr_set_val_d(x, 3.0);
+            check_d("Jordan exp tracks x on diagonal", expr_eval_d(e00), exp(3.0), 1e-12);
+            check_d("Jordan exp tracks x on superdiag", expr_eval_d(e01), exp(3.0), 1e-12);
         }
 
         mat_free(T);
@@ -6089,64 +6089,64 @@ static void test_dval_matrix_functions(void)
     }
 
     {
-        dval_t *dense_vals[4] = {x, one, one, x};
-        matrix_t *A = mat_create_dv(2, 2, dense_vals);
+        expr_t *dense_vals[4] = {x, one, one, x};
+        matrix_t *A = mat_create_expr(2, 2, dense_vals);
         matrix_t *E = mat_exp(A);
         matrix_t *L = mat_log(A);
         matrix_t *S = mat_sin(A);
         matrix_t *Ai = mat_inverse(A);
         int rank = mat_rank(A);
-        dval_t *v = NULL;
+        expr_t *v = NULL;
 
-        test_dv_set_val_d(x, 2.0);
+        test_expr_set_val_d(x, 2.0);
         print_mdv("A", A);
-        check_bool("mat_exp(dval dense 2x2 diagonalizable) not NULL", E != NULL);
-        check_bool("mat_log(dval dense 2x2 diagonalizable) not NULL", L != NULL);
-        check_bool("mat_sin(dval dense 2x2 diagonalizable) not NULL", S != NULL);
-        check_bool("mat_inverse(dval 2x2) now supported", Ai != NULL);
+        check_bool("mat_exp(expr dense 2x2 diagonalizable) not NULL", E != NULL);
+        check_bool("mat_log(expr dense 2x2 diagonalizable) not NULL", L != NULL);
+        check_bool("mat_sin(expr dense 2x2 diagonalizable) not NULL", S != NULL);
+        check_bool("mat_inverse(expr 2x2) now supported", Ai != NULL);
         if (Ai)
             print_mdv("A^{-1}", Ai);
-        check_bool("mat_rank(dval 2x2) = 2", rank == 2);
+        check_bool("mat_rank(expr 2x2) = 2", rank == 2);
         if (E) {
             print_mdv("exp(A)", E);
             mat_get(E, 0, 0, &v);
-            check_d("exp(dval dense 2x2)[0,0]", dv_eval_d(v), exp(2.0) * cosh(1.0), 1e-12);
-            check_dval_expr_contains("exp(dval dense 2x2)[0,0] stays symbolic", v, "exp");
+            check_d("exp(expr dense 2x2)[0,0]", expr_eval_d(v), exp(2.0) * cosh(1.0), 1e-12);
+            check_expr_expr_contains("exp(expr dense 2x2)[0,0] stays symbolic", v, "exp");
             mat_get(E, 0, 1, &v);
-            check_d("exp(dval dense 2x2)[0,1]", dv_eval_d(v), exp(2.0) * sinh(1.0), 1e-12);
+            check_d("exp(expr dense 2x2)[0,1]", expr_eval_d(v), exp(2.0) * sinh(1.0), 1e-12);
         }
         if (L) {
             print_mdv("log(A)", L);
             mat_get(L, 0, 0, &v);
-            check_d("log(dval dense 2x2)[0,0]", dv_eval_d(v),
+            check_d("log(expr dense 2x2)[0,0]", expr_eval_d(v),
                     0.5 * (log(3.0) + log(1.0)), 1e-12);
-            check_dval_expr_contains("log(dval dense 2x2)[0,0] stays symbolic", v, "ln");
+            check_expr_expr_contains("log(expr dense 2x2)[0,0] stays symbolic", v, "ln");
             mat_get(L, 0, 1, &v);
-            check_d("log(dval dense 2x2)[0,1]", dv_eval_d(v),
+            check_d("log(expr dense 2x2)[0,1]", expr_eval_d(v),
                     0.5 * (log(3.0) - log(1.0)), 1e-12);
         }
         if (S) {
             print_mdv("sin(A)", S);
             mat_get(S, 0, 0, &v);
-            check_d("sin(dval dense 2x2)[0,0]", dv_eval_d(v), sin(2.0) * cos(1.0), 1e-12);
-            check_dval_expr_contains("sin(dval dense 2x2)[0,0] stays symbolic", v, "sin");
+            check_d("sin(expr dense 2x2)[0,0]", expr_eval_d(v), sin(2.0) * cos(1.0), 1e-12);
+            check_expr_expr_contains("sin(expr dense 2x2)[0,0] stays symbolic", v, "sin");
             mat_get(S, 0, 1, &v);
-            check_d("sin(dval dense 2x2)[0,1]", dv_eval_d(v), cos(2.0) * sin(1.0), 1e-12);
+            check_d("sin(expr dense 2x2)[0,1]", expr_eval_d(v), cos(2.0) * sin(1.0), 1e-12);
         }
 
-        test_dv_set_val_d(x, 3.0);
+        test_expr_set_val_d(x, 3.0);
         if (E) {
             mat_get(E, 0, 0, &v);
-            check_d("exp(dval dense 2x2)[0,0] tracks x", dv_eval_d(v), exp(3.0) * cosh(1.0), 1e-12);
+            check_d("exp(expr dense 2x2)[0,0] tracks x", expr_eval_d(v), exp(3.0) * cosh(1.0), 1e-12);
         }
         if (L) {
             mat_get(L, 0, 1, &v);
-            check_d("log(dval dense 2x2)[0,1] tracks x", dv_eval_d(v),
+            check_d("log(expr dense 2x2)[0,1] tracks x", expr_eval_d(v),
                     0.5 * (log(4.0) - log(2.0)), 1e-12);
         }
         if (S) {
             mat_get(S, 0, 1, &v);
-            check_d("sin(dval dense 2x2)[0,1] tracks x", dv_eval_d(v), cos(3.0) * sin(1.0), 1e-12);
+            check_d("sin(expr dense 2x2)[0,1] tracks x", expr_eval_d(v), cos(3.0) * sin(1.0), 1e-12);
         }
 
         mat_free(Ai);
@@ -6156,34 +6156,34 @@ static void test_dval_matrix_functions(void)
         mat_free(S);
     }
 
-    dv_free(one);
-    dv_free(x);
+    expr_free(one);
+    expr_free(x);
 }
 
-static void test_dval_matrix_functions_extended(void)
+static void test_expr_matrix_functions_extended(void)
 {
-    printf(C_CYAN "TEST: dval matrix functions (extended symbolic coverage)\n" C_RESET);
+    printf(C_CYAN "TEST: expr matrix functions (extended symbolic coverage)\n" C_RESET);
 
     {
-        dval_t *x = test_dv_new_named_var_d(0.2, "x");
-        dval_t *one = test_dv_new_const_d(1.0);
-        dval_t *vals[9] = {
-            x, DV_ZERO, DV_ZERO,
-            one, x, DV_ZERO,
-            DV_ZERO, one, x};
-        matrix_t *T = mat_create_dv(3, 3, vals);
+        expr_t *x = test_expr_new_named_var_d(0.2, "x");
+        expr_t *one = test_expr_new_const_d(1.0);
+        expr_t *vals[9] = {
+            x, EXPR_ZERO, EXPR_ZERO,
+            one, x, EXPR_ZERO,
+            EXPR_ZERO, one, x};
+        matrix_t *T = mat_create_expr(3, 3, vals);
         matrix_t *R = NULL;
         matrix_t *G = NULL;
         matrix_t *W = NULL;
-        dval_t *v = NULL;
+        expr_t *v = NULL;
 
         R = mat_erf(T);
         G = mat_gamma(T);
         W = mat_lambert_w0(T);
 
-        check_bool("mat_erf(dval 3x3 lower Jordan) not NULL", R != NULL);
-        check_bool("mat_gamma(dval 3x3 lower Jordan) not NULL", G != NULL);
-        check_bool("mat_lambert_w0(dval 3x3 lower Jordan) not NULL", W != NULL);
+        check_bool("mat_erf(expr 3x3 lower Jordan) not NULL", R != NULL);
+        check_bool("mat_gamma(expr 3x3 lower Jordan) not NULL", G != NULL);
+        check_bool("mat_lambert_w0(expr 3x3 lower Jordan) not NULL", W != NULL);
 
         if (T)
             print_mdv("T", T);
@@ -6198,48 +6198,48 @@ static void test_dval_matrix_functions_extended(void)
             check_bool("erf(T) preserves lower-triangular structure",
                        mat_is_lower_triangular(R));
             mat_get(R, 0, 0, &v);
-            check_dval_expr_contains("erf(T)[0,0] stays symbolic in x", v, "erf(x)");
-            test_dv_set_val_d(x, 0.3);
-            check_d("erf(T)[0,0] tracks x", dv_eval_d(v), erf(0.3), 1e-12);
+            check_expr_expr_contains("erf(T)[0,0] stays symbolic in x", v, "erf(x)");
+            test_expr_set_val_d(x, 0.3);
+            check_d("erf(T)[0,0] tracks x", expr_eval_d(v), erf(0.3), 1e-12);
         }
 
         if (G) {
             check_bool("gamma(T) preserves lower-triangular structure",
                        mat_is_lower_triangular(G));
             mat_get(G, 0, 0, &v);
-            test_dv_set_val_d(x, 3.0);
-            check_d("gamma(T)[0,0] tracks x", dv_eval_d(v), tgamma(3.0), 1e-12);
+            test_expr_set_val_d(x, 3.0);
+            check_d("gamma(T)[0,0] tracks x", expr_eval_d(v), tgamma(3.0), 1e-12);
         }
 
         if (W) {
             check_bool("lambert_w0(T) preserves lower-triangular structure",
                        mat_is_lower_triangular(W));
             mat_get(W, 0, 0, &v);
-            check_dval_expr_contains("lambert_w0(T)[0,0] stays symbolic in x", v, "W₀");
-            test_dv_set_val_d(x, 0.1);
-            check_bool("lambert_w0(T)[0,0] numerically finite", isfinite(dv_eval_d(v)));
+            check_expr_expr_contains("lambert_w0(T)[0,0] stays symbolic in x", v, "W₀");
+            test_expr_set_val_d(x, 0.1);
+            check_bool("lambert_w0(T)[0,0] numerically finite", isfinite(expr_eval_d(v)));
         }
 
         mat_free(T);
         mat_free(R);
         mat_free(G);
         mat_free(W);
-        dv_free(x);
-        dv_free(one);
+        expr_free(x);
+        expr_free(one);
     }
 
     {
-        dval_t *x = test_dv_new_named_var_d(1.5, "x");
-        dval_t *one = test_dv_new_const_d(1.0);
-        dval_t *vals[9] = {
-            x, DV_ZERO, DV_ZERO,
-            one, x, DV_ZERO,
-            DV_ZERO, one, x};
-        matrix_t *T = mat_create_dv(3, 3, vals);
+        expr_t *x = test_expr_new_named_var_d(1.5, "x");
+        expr_t *one = test_expr_new_const_d(1.0);
+        expr_t *vals[9] = {
+            x, EXPR_ZERO, EXPR_ZERO,
+            one, x, EXPR_ZERO,
+            EXPR_ZERO, one, x};
+        matrix_t *T = mat_create_expr(3, 3, vals);
         matrix_t *E = mat_exp(T);
-        dval_t *v = NULL;
+        expr_t *v = NULL;
 
-        check_bool("mat_exp(dval 3x3 lower Jordan) not NULL", E != NULL);
+        check_bool("mat_exp(expr 3x3 lower Jordan) not NULL", E != NULL);
         if (T)
             print_mdv("T", T);
         if (E)
@@ -6249,33 +6249,33 @@ static void test_dval_matrix_functions_extended(void)
             check_bool("exp(lower Jordan) preserves lower-triangular structure",
                        mat_is_lower_triangular(E));
             mat_get(E, 0, 0, &v);
-            check_d("exp(lower Jordan)[0,0] = exp(1.5)", dv_eval_d(v), exp(1.5), 1e-12);
+            check_d("exp(lower Jordan)[0,0] = exp(1.5)", expr_eval_d(v), exp(1.5), 1e-12);
             mat_get(E, 1, 0, &v);
-            check_d("exp(lower Jordan)[1,0] = exp(1.5)", dv_eval_d(v), exp(1.5), 1e-12);
+            check_d("exp(lower Jordan)[1,0] = exp(1.5)", expr_eval_d(v), exp(1.5), 1e-12);
             mat_get(E, 2, 0, &v);
-            check_d("exp(lower Jordan)[2,0] = exp(1.5)/2", dv_eval_d(v), 0.5 * exp(1.5), 1e-12);
+            check_d("exp(lower Jordan)[2,0] = exp(1.5)/2", expr_eval_d(v), 0.5 * exp(1.5), 1e-12);
             mat_get(E, 2, 0, &v);
-            check_dval_expr_contains("exp(lower Jordan)[2,0] stays symbolic in x", v, "exp(x)");
-            test_dv_set_val_d(x, 2.0);
+            check_expr_expr_contains("exp(lower Jordan)[2,0] stays symbolic in x", v, "exp(x)");
+            test_expr_set_val_d(x, 2.0);
             mat_get(E, 2, 0, &v);
-            check_d("exp(lower Jordan)[2,0] tracks x", dv_eval_d(v), 0.5 * exp(2.0), 1e-12);
+            check_d("exp(lower Jordan)[2,0] tracks x", expr_eval_d(v), 0.5 * exp(2.0), 1e-12);
         }
 
         mat_free(T);
         mat_free(E);
-        dv_free(x);
-        dv_free(one);
+        expr_free(x);
+        expr_free(one);
     }
 
     {
-        dval_t *x = test_dv_new_named_var_d(1.0, "x");
-        dval_t *one = test_dv_new_const_d(1.0);
-        dval_t *two = test_dv_new_const_d(2.0);
-        dval_t *vals[9] = {
-            x, one, DV_ZERO,
+        expr_t *x = test_expr_new_named_var_d(1.0, "x");
+        expr_t *one = test_expr_new_const_d(1.0);
+        expr_t *two = test_expr_new_const_d(2.0);
+        expr_t *vals[9] = {
+            x, one, EXPR_ZERO,
             one, two, one,
-            DV_ZERO, one, x};
-        matrix_t *A = mat_create_dv(3, 3, vals);
+            EXPR_ZERO, one, x};
+        matrix_t *A = mat_create_expr(3, 3, vals);
         matrix_t *Aqc = NULL;
         matrix_t *Eqc = NULL;
         matrix_t *Lqc = NULL;
@@ -6283,13 +6283,13 @@ static void test_dval_matrix_functions_extended(void)
         matrix_t *Gqc = NULL;
 
         print_mdv("A", A);
-        check_bool("mat_exp(dval dense 3x3) currently unsupported", mat_exp(A) == NULL);
-        check_bool("mat_log(dval dense 3x3) currently unsupported", mat_log(A) == NULL);
-        check_bool("mat_sin(dval dense 3x3) currently unsupported", mat_sin(A) == NULL);
-        check_bool("mat_gamma(dval dense 3x3) currently unsupported", mat_gamma(A) == NULL);
+        check_bool("mat_exp(expr dense 3x3) currently unsupported", mat_exp(A) == NULL);
+        check_bool("mat_log(expr dense 3x3) currently unsupported", mat_log(A) == NULL);
+        check_bool("mat_sin(expr dense 3x3) currently unsupported", mat_sin(A) == NULL);
+        check_bool("mat_gamma(expr dense 3x3) currently unsupported", mat_gamma(A) == NULL);
 
         Aqc = test_mat_evaluate_complex(A);
-        check_bool("test_mat_evaluate_complex(dval dense 3x3) not NULL", Aqc != NULL);
+        check_bool("test_mat_evaluate_complex(expr dense 3x3) not NULL", Aqc != NULL);
 
         if (Aqc) {
             Eqc = mat_exp(Aqc);
@@ -6298,18 +6298,18 @@ static void test_dval_matrix_functions_extended(void)
             Gqc = mat_gamma(Aqc);
         }
 
-        check_bool("manual qc exp(dval dense 3x3) not NULL", Eqc != NULL);
-        check_bool("manual qc log(dval dense 3x3) not NULL", Lqc != NULL);
-        check_bool("manual qc sin(dval dense 3x3) not NULL", Sqc != NULL);
-        check_bool("manual qc gamma(dval dense 3x3) not NULL", Gqc != NULL);
+        check_bool("manual qc exp(expr dense 3x3) not NULL", Eqc != NULL);
+        check_bool("manual qc log(expr dense 3x3) not NULL", Lqc != NULL);
+        check_bool("manual qc sin(expr dense 3x3) not NULL", Sqc != NULL);
+        check_bool("manual qc gamma(expr dense 3x3) not NULL", Gqc != NULL);
 
-        check_bool("manual qc exp(dval dense 3x3) -> MAT_TYPE_NUMBER",
+        check_bool("manual qc exp(expr dense 3x3) -> MAT_TYPE_NUMBER",
                    Eqc != NULL && mat_typeof(Eqc) == MAT_TYPE_NUMBER);
-        check_bool("manual qc log(dval dense 3x3) -> MAT_TYPE_NUMBER",
+        check_bool("manual qc log(expr dense 3x3) -> MAT_TYPE_NUMBER",
                    Lqc != NULL && mat_typeof(Lqc) == MAT_TYPE_NUMBER);
-        check_bool("manual qc sin(dval dense 3x3) -> MAT_TYPE_NUMBER",
+        check_bool("manual qc sin(expr dense 3x3) -> MAT_TYPE_NUMBER",
                    Sqc != NULL && mat_typeof(Sqc) == MAT_TYPE_NUMBER);
-        check_bool("manual qc gamma(dval dense 3x3) -> MAT_TYPE_NUMBER",
+        check_bool("manual qc gamma(expr dense 3x3) -> MAT_TYPE_NUMBER",
                    Gqc != NULL && mat_typeof(Gqc) == MAT_TYPE_NUMBER);
 
         mat_free(Aqc);
@@ -6318,61 +6318,61 @@ static void test_dval_matrix_functions_extended(void)
         mat_free(Sqc);
         mat_free(Gqc);
         mat_free(A);
-        dv_free(x);
-        dv_free(one);
-        dv_free(two);
+        expr_free(x);
+        expr_free(one);
+        expr_free(two);
     }
 
     {
         mat_bindings_t *bindings = NULL;
-        matrix_t *A = mat_from_string_dv(
+        matrix_t *A = mat_from_string_expr(
             "[[0 x 0][x 0 x][0 x 0]]",
             &bindings);
         matrix_t *E = NULL;
         matrix_t *S = NULL;
-        dval_t *v = NULL;
+        expr_t *v = NULL;
         double r;
 
-        check_bool("dense dval cubic-linear 3x3 input not NULL", A != NULL);
+        check_bool("dense expr cubic-linear 3x3 input not NULL", A != NULL);
         if (bindings) {
-            check_bool("dense dval cubic-linear 3x3 set x",
+            check_bool("dense expr cubic-linear 3x3 set x",
                        test_mat_bindings_set_d(bindings, "x", 2.0) == 0);
         }
 
         E = mat_exp(A);
         S = mat_sin(A);
-        check_bool("dense dval cubic-linear 3x3 exp not NULL", E != NULL);
-        check_bool("dense dval cubic-linear 3x3 sin not NULL", S != NULL);
+        check_bool("dense expr cubic-linear 3x3 exp not NULL", E != NULL);
+        check_bool("dense expr cubic-linear 3x3 sin not NULL", S != NULL);
 
         r = sqrt(8.0);
         if (E) {
             mat_get(E, 0, 0, &v);
             check_d("exp(dense cubic-linear 3x3)[0,0]",
-                    dv_eval_d(v), 0.5 * (cosh(r) + 1.0), 1e-12);
-            check_dval_expr_contains("exp(dense cubic-linear 3x3)[0,0] stays symbolic", v, "exp");
+                    expr_eval_d(v), 0.5 * (cosh(r) + 1.0), 1e-12);
+            check_expr_expr_contains("exp(dense cubic-linear 3x3)[0,0] stays symbolic", v, "exp");
             mat_get(E, 0, 1, &v);
             check_d("exp(dense cubic-linear 3x3)[0,1]",
-                    dv_eval_d(v), sinh(r) / r * 2.0, 1e-12);
+                    expr_eval_d(v), sinh(r) / r * 2.0, 1e-12);
             mat_get(E, 0, 2, &v);
             check_d("exp(dense cubic-linear 3x3)[0,2]",
-                    dv_eval_d(v), 0.5 * (cosh(r) - 1.0), 1e-12);
+                    expr_eval_d(v), 0.5 * (cosh(r) - 1.0), 1e-12);
         }
 
         if (S) {
             mat_get(S, 0, 0, &v);
             check_d("sin(dense cubic-linear 3x3)[0,0]",
-                    dv_eval_d(v), 0.0, 1e-12);
+                    expr_eval_d(v), 0.0, 1e-12);
             mat_get(S, 0, 1, &v);
             check_d("sin(dense cubic-linear 3x3)[0,1]",
-                    dv_eval_d(v), sin(r) / r * 2.0, 1e-12);
-            check_dval_expr_contains("sin(dense cubic-linear 3x3)[0,1] stays symbolic", v, "sin");
+                    expr_eval_d(v), sin(r) / r * 2.0, 1e-12);
+            check_expr_expr_contains("sin(dense cubic-linear 3x3)[0,1] stays symbolic", v, "sin");
             mat_get(S, 0, 2, &v);
             check_d("sin(dense cubic-linear 3x3)[0,2]",
-                    dv_eval_d(v), 0.0, 1e-12);
+                    expr_eval_d(v), 0.0, 1e-12);
         }
 
         if (bindings) {
-            check_bool("dense dval cubic-linear 3x3 update x",
+            check_bool("dense expr cubic-linear 3x3 update x",
                        test_mat_bindings_set_d(bindings, "x", 3.0) == 0);
         }
 
@@ -6380,12 +6380,12 @@ static void test_dval_matrix_functions_extended(void)
         if (E) {
             mat_get(E, 0, 1, &v);
             check_d("exp(dense cubic-linear 3x3)[0,1] tracks x",
-                    dv_eval_d(v), sinh(r) / r * 3.0, 1e-12);
+                    expr_eval_d(v), sinh(r) / r * 3.0, 1e-12);
         }
         if (S) {
             mat_get(S, 1, 0, &v);
             check_d("sin(dense cubic-linear 3x3)[1,0] tracks x",
-                    dv_eval_d(v), sin(r) / r * 3.0, 1e-12);
+                    expr_eval_d(v), sin(r) / r * 3.0, 1e-12);
         }
 
         mat_free(A);
@@ -6396,23 +6396,23 @@ static void test_dval_matrix_functions_extended(void)
 
     {
         mat_bindings_t *bindings = NULL;
-        matrix_t *A = mat_from_string_dv(
+        matrix_t *A = mat_from_string_expr(
             "[[0 x x][x 0 x][x x 0]]",
             &bindings);
         matrix_t *E = NULL;
         matrix_t *S = NULL;
-        dval_t *v = NULL;
+        expr_t *v = NULL;
 
-        check_bool("dense dval quadratic 3x3 input not NULL", A != NULL);
+        check_bool("dense expr quadratic 3x3 input not NULL", A != NULL);
         if (bindings) {
-            check_bool("dense dval quadratic 3x3 set x",
+            check_bool("dense expr quadratic 3x3 set x",
                        test_mat_bindings_set_d(bindings, "x", 2.0) == 0);
         }
 
         E = mat_exp(A);
         S = mat_sin(A);
-        check_bool("dense dval quadratic 3x3 exp not NULL", E != NULL);
-        check_bool("dense dval quadratic 3x3 sin not NULL", S != NULL);
+        check_bool("dense expr quadratic 3x3 exp not NULL", E != NULL);
+        check_bool("dense expr quadratic 3x3 sin not NULL", S != NULL);
 
         if (A)
             print_mdv("A (dense quadratic 3x3)", A);
@@ -6424,37 +6424,37 @@ static void test_dval_matrix_functions_extended(void)
         if (E) {
             mat_get(E, 0, 0, &v);
             check_d("exp(dense quadratic 3x3)[0,0]",
-                    dv_eval_d(v), (exp(4.0) + 2.0 * exp(-2.0)) / 3.0, 1e-12);
-            check_dval_expr_contains("exp(dense quadratic 3x3)[0,0] stays symbolic", v, "exp");
+                    expr_eval_d(v), (exp(4.0) + 2.0 * exp(-2.0)) / 3.0, 1e-12);
+            check_expr_expr_contains("exp(dense quadratic 3x3)[0,0] stays symbolic", v, "exp");
             mat_get(E, 0, 1, &v);
             check_d("exp(dense quadratic 3x3)[0,1]",
-                    dv_eval_d(v), (exp(4.0) - exp(-2.0)) / 3.0, 1e-12);
+                    expr_eval_d(v), (exp(4.0) - exp(-2.0)) / 3.0, 1e-12);
         }
 
         if (S) {
             mat_get(S, 0, 0, &v);
             check_d("sin(dense quadratic 3x3)[0,0]",
-                    dv_eval_d(v), (sin(4.0) - 2.0 * sin(2.0)) / 3.0, 1e-12);
-            check_dval_expr_contains("sin(dense quadratic 3x3)[0,0] stays symbolic", v, "sin");
+                    expr_eval_d(v), (sin(4.0) - 2.0 * sin(2.0)) / 3.0, 1e-12);
+            check_expr_expr_contains("sin(dense quadratic 3x3)[0,0] stays symbolic", v, "sin");
             mat_get(S, 0, 1, &v);
             check_d("sin(dense quadratic 3x3)[0,1]",
-                    dv_eval_d(v), (sin(4.0) + sin(2.0)) / 3.0, 1e-12);
+                    expr_eval_d(v), (sin(4.0) + sin(2.0)) / 3.0, 1e-12);
         }
 
         if (bindings) {
-            check_bool("dense dval quadratic 3x3 update x",
+            check_bool("dense expr quadratic 3x3 update x",
                        test_mat_bindings_set_d(bindings, "x", 3.0) == 0);
         }
 
         if (E) {
             mat_get(E, 0, 0, &v);
             check_d("exp(dense quadratic 3x3)[0,0] tracks x",
-                    dv_eval_d(v), (exp(6.0) + 2.0 * exp(-3.0)) / 3.0, 1e-12);
+                    expr_eval_d(v), (exp(6.0) + 2.0 * exp(-3.0)) / 3.0, 1e-12);
         }
         if (S) {
             mat_get(S, 0, 1, &v);
             check_d("sin(dense quadratic 3x3)[0,1] tracks x",
-                    dv_eval_d(v), (sin(6.0) + sin(3.0)) / 3.0, 1e-12);
+                    expr_eval_d(v), (sin(6.0) + sin(3.0)) / 3.0, 1e-12);
         }
 
         mat_free(A);
@@ -6465,7 +6465,7 @@ static void test_dval_matrix_functions_extended(void)
 
     {
         mat_bindings_t *bindings = NULL;
-        matrix_t *A = mat_from_string_dv(
+        matrix_t *A = mat_from_string_expr(
             "[[x 1 1 1 1]"
              "[1 x 1 1 1]"
              "[1 1 x 1 1]"
@@ -6474,56 +6474,56 @@ static void test_dval_matrix_functions_extended(void)
             &bindings);
         matrix_t *E = NULL;
         matrix_t *S = NULL;
-        dval_t *v = NULL;
+        expr_t *v = NULL;
 
-        check_bool("uniform dense dval 5x5 input not NULL", A != NULL);
+        check_bool("uniform dense expr 5x5 input not NULL", A != NULL);
         if (bindings) {
-            check_bool("uniform dense dval 5x5 set x",
+            check_bool("uniform dense expr 5x5 set x",
                        test_mat_bindings_set_d(bindings, "x", 2.0) == 0);
         }
 
         E = mat_exp(A);
         S = mat_sin(A);
-        check_bool("uniform dense dval 5x5 exp not NULL", E != NULL);
-        check_bool("uniform dense dval 5x5 sin not NULL", S != NULL);
+        check_bool("uniform dense expr 5x5 exp not NULL", E != NULL);
+        check_bool("uniform dense expr 5x5 sin not NULL", S != NULL);
 
         if (E) {
             mat_get(E, 0, 0, &v);
             check_d("exp(uniform dense 5x5)[0,0]",
-                    dv_eval_d(v), (4.0 * exp(1.0) + exp(6.0)) / 5.0, 1e-12);
-            check_dval_expr_contains("exp(uniform dense 5x5)[0,0] stays symbolic", v, "exp");
+                    expr_eval_d(v), (4.0 * exp(1.0) + exp(6.0)) / 5.0, 1e-12);
+            check_expr_expr_contains("exp(uniform dense 5x5)[0,0] stays symbolic", v, "exp");
             mat_get(E, 0, 1, &v);
             check_d("exp(uniform dense 5x5)[0,1]",
-                    dv_eval_d(v), (exp(6.0) - exp(1.0)) / 5.0, 1e-12);
+                    expr_eval_d(v), (exp(6.0) - exp(1.0)) / 5.0, 1e-12);
             mat_get(E, 3, 4, &v);
             check_d("exp(uniform dense 5x5)[3,4]",
-                    dv_eval_d(v), (exp(6.0) - exp(1.0)) / 5.0, 1e-12);
+                    expr_eval_d(v), (exp(6.0) - exp(1.0)) / 5.0, 1e-12);
         }
 
         if (S) {
             mat_get(S, 0, 0, &v);
             check_d("sin(uniform dense 5x5)[0,0]",
-                    dv_eval_d(v), (4.0 * sin(1.0) + sin(6.0)) / 5.0, 1e-12);
-            check_dval_expr_contains("sin(uniform dense 5x5)[0,0] stays symbolic", v, "sin");
+                    expr_eval_d(v), (4.0 * sin(1.0) + sin(6.0)) / 5.0, 1e-12);
+            check_expr_expr_contains("sin(uniform dense 5x5)[0,0] stays symbolic", v, "sin");
             mat_get(S, 0, 2, &v);
             check_d("sin(uniform dense 5x5)[0,2]",
-                    dv_eval_d(v), (sin(6.0) - sin(1.0)) / 5.0, 1e-12);
+                    expr_eval_d(v), (sin(6.0) - sin(1.0)) / 5.0, 1e-12);
         }
 
         if (bindings) {
-            check_bool("uniform dense dval 5x5 update x",
+            check_bool("uniform dense expr 5x5 update x",
                        test_mat_bindings_set_d(bindings, "x", 3.0) == 0);
         }
 
         if (E) {
             mat_get(E, 0, 1, &v);
             check_d("exp(uniform dense 5x5)[0,1] tracks x",
-                    dv_eval_d(v), (exp(7.0) - exp(2.0)) / 5.0, 1e-12);
+                    expr_eval_d(v), (exp(7.0) - exp(2.0)) / 5.0, 1e-12);
         }
         if (S) {
             mat_get(S, 0, 0, &v);
             check_d("sin(uniform dense 5x5)[0,0] tracks x",
-                    dv_eval_d(v), (4.0 * sin(2.0) + sin(7.0)) / 5.0, 1e-12);
+                    expr_eval_d(v), (4.0 * sin(2.0) + sin(7.0)) / 5.0, 1e-12);
         }
 
         mat_free(A);
@@ -6534,7 +6534,7 @@ static void test_dval_matrix_functions_extended(void)
 
     {
         mat_bindings_t *bindings = NULL;
-        matrix_t *A = mat_from_string_dv(
+        matrix_t *A = mat_from_string_expr(
             "(7, x, 2, 1;"
              " 10, 2*x + 2, 4, 2;"
              " 15, 3*x, 8, 3;"
@@ -6542,20 +6542,20 @@ static void test_dval_matrix_functions_extended(void)
             &bindings);
         matrix_t *E = NULL;
         matrix_t *S = NULL;
-        dval_t *v = NULL;
+        expr_t *v = NULL;
         double cexp;
         double csin;
 
-        check_bool("rank-one perturbation dense dval 4x4 input not NULL", A != NULL);
+        check_bool("rank-one perturbation dense expr 4x4 input not NULL", A != NULL);
         if (bindings) {
-            check_bool("rank-one perturbation dense dval 4x4 set x",
+            check_bool("rank-one perturbation dense expr 4x4 set x",
                        test_mat_bindings_set_d(bindings, "x", 3.0) == 0);
         }
 
         E = mat_exp(A);
         S = mat_sin(A);
-        check_bool("rank-one perturbation dense dval 4x4 exp not NULL", E != NULL);
-        check_bool("rank-one perturbation dense dval 4x4 sin not NULL", S != NULL);
+        check_bool("rank-one perturbation dense expr 4x4 exp not NULL", E != NULL);
+        check_bool("rank-one perturbation dense expr 4x4 sin not NULL", S != NULL);
 
         cexp = (exp(23.0) - exp(2.0)) / 21.0;
         csin = (sin(23.0) - sin(2.0)) / 21.0;
@@ -6563,31 +6563,31 @@ static void test_dval_matrix_functions_extended(void)
         if (E) {
             mat_get(E, 0, 0, &v);
             check_d("exp(rank-one perturbation 4x4)[0,0]",
-                    dv_eval_d(v), exp(2.0) + 5.0 * cexp, 1e-5);
-            check_dval_expr_contains("exp(rank-one perturbation 4x4)[0,0] stays symbolic", v, "exp");
+                    expr_eval_d(v), exp(2.0) + 5.0 * cexp, 1e-5);
+            check_expr_expr_contains("exp(rank-one perturbation 4x4)[0,0] stays symbolic", v, "exp");
             mat_get(E, 0, 1, &v);
             check_d("exp(rank-one perturbation 4x4)[0,1]",
-                    dv_eval_d(v), 3.0 * cexp, 1e-12);
+                    expr_eval_d(v), 3.0 * cexp, 1e-12);
             mat_get(E, 3, 2, &v);
             check_d("exp(rank-one perturbation 4x4)[3,2]",
-                    dv_eval_d(v), 8.0 * cexp, 1e-5);
+                    expr_eval_d(v), 8.0 * cexp, 1e-5);
         }
 
         if (S) {
             mat_get(S, 1, 1, &v);
             check_d("sin(rank-one perturbation 4x4)[1,1]",
-                    dv_eval_d(v), sin(2.0) + 6.0 * csin, 1e-12);
-            check_dval_expr_contains("sin(rank-one perturbation 4x4)[1,1] stays symbolic", v, "sin");
+                    expr_eval_d(v), sin(2.0) + 6.0 * csin, 1e-12);
+            check_expr_expr_contains("sin(rank-one perturbation 4x4)[1,1] stays symbolic", v, "sin");
             mat_get(S, 2, 0, &v);
             check_d("sin(rank-one perturbation 4x4)[2,0]",
-                    dv_eval_d(v), 15.0 * csin, 1e-12);
+                    expr_eval_d(v), 15.0 * csin, 1e-12);
             mat_get(S, 0, 3, &v);
             check_d("sin(rank-one perturbation 4x4)[0,3]",
-                    dv_eval_d(v), csin, 1e-12);
+                    expr_eval_d(v), csin, 1e-12);
         }
 
         if (bindings) {
-            check_bool("rank-one perturbation dense dval 4x4 update x",
+            check_bool("rank-one perturbation dense expr 4x4 update x",
                        test_mat_bindings_set_d(bindings, "x", 4.0) == 0);
         }
 
@@ -6597,12 +6597,12 @@ static void test_dval_matrix_functions_extended(void)
         if (E) {
             mat_get(E, 0, 1, &v);
             check_d("exp(rank-one perturbation 4x4)[0,1] tracks x",
-                    dv_eval_d(v), 4.0 * cexp, 1e-5);
+                    expr_eval_d(v), 4.0 * cexp, 1e-5);
         }
         if (S) {
             mat_get(S, 1, 1, &v);
             check_d("sin(rank-one perturbation 4x4)[1,1] tracks x",
-                    dv_eval_d(v), sin(2.0) + 8.0 * csin, 1e-12);
+                    expr_eval_d(v), sin(2.0) + 8.0 * csin, 1e-12);
         }
 
         mat_free(A);
@@ -6613,7 +6613,7 @@ static void test_dval_matrix_functions_extended(void)
 
     {
         mat_bindings_t *bindings = NULL;
-        matrix_t *A = mat_from_string_dv(
+        matrix_t *A = mat_from_string_expr(
             "[[0 x 0 0]"
              "[x 0 x 0]"
              "[0 x 0 x]"
@@ -6626,18 +6626,18 @@ static void test_dval_matrix_functions_extended(void)
         matrix_t *Eqc_expected = NULL;
         matrix_t *Sqc = NULL;
         matrix_t *Sqc_expected = NULL;
-        dval_t *v = NULL;
+        expr_t *v = NULL;
 
-        check_bool("dense dval biquadratic quartic 4x4 input not NULL", A != NULL);
+        check_bool("dense expr biquadratic quartic 4x4 input not NULL", A != NULL);
         if (bindings) {
-            check_bool("dense dval biquadratic quartic 4x4 set x",
+            check_bool("dense expr biquadratic quartic 4x4 set x",
                        test_mat_bindings_set_d(bindings, "x", 2.0) == 0);
         }
 
         E = mat_exp(A);
         S = mat_sin(A);
-        check_bool("dense dval biquadratic quartic 4x4 exp not NULL", E != NULL);
-        check_bool("dense dval biquadratic quartic 4x4 sin not NULL", S != NULL);
+        check_bool("dense expr biquadratic quartic 4x4 exp not NULL", E != NULL);
+        check_bool("dense expr biquadratic quartic 4x4 sin not NULL", S != NULL);
 
         if (E && S) {
             Aqc = test_mat_evaluate_complex(A);
@@ -6646,11 +6646,11 @@ static void test_dval_matrix_functions_extended(void)
             Eqc_expected = Aqc ? mat_exp(Aqc) : NULL;
             Sqc_expected = Aqc ? mat_sin(Aqc) : NULL;
 
-            check_bool("dense dval biquadratic quartic 4x4 evaluated exp not NULL", Eqc != NULL);
-            check_bool("dense dval biquadratic quartic 4x4 evaluated sin not NULL", Sqc != NULL);
-            check_bool("dense dval biquadratic quartic 4x4 numeric exp baseline not NULL",
+            check_bool("dense expr biquadratic quartic 4x4 evaluated exp not NULL", Eqc != NULL);
+            check_bool("dense expr biquadratic quartic 4x4 evaluated sin not NULL", Sqc != NULL);
+            check_bool("dense expr biquadratic quartic 4x4 numeric exp baseline not NULL",
                        Eqc_expected != NULL);
-            check_bool("dense dval biquadratic quartic 4x4 numeric sin baseline not NULL",
+            check_bool("dense expr biquadratic quartic 4x4 numeric sin baseline not NULL",
                        Sqc_expected != NULL);
             if (Eqc && Eqc_expected) {
                 bool ok = test_assert_matrix_complex_close(Eqc, Eqc_expected, 1e-12,
@@ -6688,11 +6688,11 @@ static void test_dval_matrix_functions_extended(void)
 
         if (E) {
             mat_get(E, 0, 0, &v);
-            check_dval_expr_contains("exp(biquadratic quartic 4x4)[0,0] stays symbolic", v, "exp");
+            check_expr_expr_contains("exp(biquadratic quartic 4x4)[0,0] stays symbolic", v, "exp");
         }
         if (S) {
             mat_get(S, 0, 1, &v);
-            check_dval_expr_contains("sin(biquadratic quartic 4x4)[0,1] stays symbolic", v, "sin");
+            check_expr_expr_contains("sin(biquadratic quartic 4x4)[0,1] stays symbolic", v, "sin");
         }
 
         mat_free(Aqc);
@@ -6707,7 +6707,7 @@ static void test_dval_matrix_functions_extended(void)
         Sqc_expected = NULL;
 
         if (bindings) {
-            check_bool("dense dval biquadratic quartic 4x4 update x",
+            check_bool("dense expr biquadratic quartic 4x4 update x",
                        test_mat_bindings_set_d(bindings, "x", 3.0) == 0);
         }
 
@@ -6765,25 +6765,25 @@ static void test_dval_matrix_functions_extended(void)
 
     {
         mat_bindings_t *bindings = NULL;
-        matrix_t *A = mat_from_string_dv(
+        matrix_t *A = mat_from_string_expr(
             "[[x 1 0 0][1 x 0 0][0 0 y 1][0 0 1 y]]",
             &bindings);
         matrix_t *E = NULL;
         matrix_t *S = NULL;
-        dval_t *v = NULL;
+        expr_t *v = NULL;
 
-        check_bool("block-diagonal dense dval 4x4 input not NULL", A != NULL);
+        check_bool("block-diagonal dense expr 4x4 input not NULL", A != NULL);
         if (bindings) {
-            check_bool("block-diagonal dense dval 4x4 set x",
+            check_bool("block-diagonal dense expr 4x4 set x",
                        test_mat_bindings_set_d(bindings, "x", 2.0) == 0);
-            check_bool("block-diagonal dense dval 4x4 set y",
+            check_bool("block-diagonal dense expr 4x4 set y",
                        test_mat_bindings_set_d(bindings, "y", 3.0) == 0);
         }
 
         E = mat_exp(A);
         S = mat_sin(A);
-        check_bool("block-diagonal dense dval 4x4 exp not NULL", E != NULL);
-        check_bool("block-diagonal dense dval 4x4 sin not NULL", S != NULL);
+        check_bool("block-diagonal dense expr 4x4 exp not NULL", E != NULL);
+        check_bool("block-diagonal dense expr 4x4 sin not NULL", S != NULL);
 
         if (A)
             print_mdv("A (block-diagonal dense 4x4)", A);
@@ -6795,48 +6795,48 @@ static void test_dval_matrix_functions_extended(void)
         if (E) {
             mat_get(E, 0, 0, &v);
             check_d("exp(block-diagonal 4x4)[0,0]",
-                    dv_eval_d(v), 0.5 * (exp(3.0) + exp(1.0)), 1e-12);
-            check_dval_expr_contains("exp(block-diagonal 4x4)[0,0] stays symbolic", v, "exp");
+                    expr_eval_d(v), 0.5 * (exp(3.0) + exp(1.0)), 1e-12);
+            check_expr_expr_contains("exp(block-diagonal 4x4)[0,0] stays symbolic", v, "exp");
             mat_get(E, 0, 1, &v);
             check_d("exp(block-diagonal 4x4)[0,1]",
-                    dv_eval_d(v), 0.5 * (exp(3.0) - exp(1.0)), 1e-12);
+                    expr_eval_d(v), 0.5 * (exp(3.0) - exp(1.0)), 1e-12);
             mat_get(E, 0, 2, &v);
             check_d("exp(block-diagonal 4x4)[0,2] stays zero",
-                    dv_eval_d(v), 0.0, 1e-12);
+                    expr_eval_d(v), 0.0, 1e-12);
             mat_get(E, 2, 2, &v);
             check_d("exp(block-diagonal 4x4)[2,2]",
-                    dv_eval_d(v), 0.5 * (exp(4.0) + exp(2.0)), 1e-12);
+                    expr_eval_d(v), 0.5 * (exp(4.0) + exp(2.0)), 1e-12);
         }
 
         if (S) {
             mat_get(S, 2, 2, &v);
             check_d("sin(block-diagonal 4x4)[2,2]",
-                    dv_eval_d(v), 0.5 * (sin(4.0) + sin(2.0)), 1e-12);
-            check_dval_expr_contains("sin(block-diagonal 4x4)[2,2] stays symbolic", v, "sin");
+                    expr_eval_d(v), 0.5 * (sin(4.0) + sin(2.0)), 1e-12);
+            check_expr_expr_contains("sin(block-diagonal 4x4)[2,2] stays symbolic", v, "sin");
             mat_get(S, 2, 3, &v);
             check_d("sin(block-diagonal 4x4)[2,3]",
-                    dv_eval_d(v), 0.5 * (sin(4.0) - sin(2.0)), 1e-12);
+                    expr_eval_d(v), 0.5 * (sin(4.0) - sin(2.0)), 1e-12);
             mat_get(S, 1, 3, &v);
             check_d("sin(block-diagonal 4x4)[1,3] stays zero",
-                    dv_eval_d(v), 0.0, 1e-12);
+                    expr_eval_d(v), 0.0, 1e-12);
         }
 
         if (bindings) {
-            check_bool("block-diagonal dense dval 4x4 update x",
+            check_bool("block-diagonal dense expr 4x4 update x",
                        test_mat_bindings_set_d(bindings, "x", 4.0) == 0);
-            check_bool("block-diagonal dense dval 4x4 update y",
+            check_bool("block-diagonal dense expr 4x4 update y",
                        test_mat_bindings_set_d(bindings, "y", 5.0) == 0);
         }
 
         if (E) {
             mat_get(E, 0, 0, &v);
             check_d("exp(block-diagonal 4x4)[0,0] tracks x",
-                    dv_eval_d(v), 0.5 * (exp(5.0) + exp(3.0)), 1e-12);
+                    expr_eval_d(v), 0.5 * (exp(5.0) + exp(3.0)), 1e-12);
         }
         if (S) {
             mat_get(S, 2, 3, &v);
             check_d("sin(block-diagonal 4x4)[2,3] tracks y",
-                    dv_eval_d(v), 0.5 * (sin(6.0) - sin(4.0)), 1e-12);
+                    expr_eval_d(v), 0.5 * (sin(6.0) - sin(4.0)), 1e-12);
         }
 
         mat_free(A);
@@ -6847,71 +6847,71 @@ static void test_dval_matrix_functions_extended(void)
 
     {
         mat_bindings_t *bindings = NULL;
-        matrix_t *A = mat_from_string_dv(
+        matrix_t *A = mat_from_string_expr(
             "[[x 0 1 0][0 y 0 1][1 0 x 0][0 1 0 y]]",
             &bindings);
         matrix_t *E = NULL;
         matrix_t *S = NULL;
-        dval_t *v = NULL;
+        expr_t *v = NULL;
 
-        check_bool("permuted block-diagonal dense dval 4x4 input not NULL", A != NULL);
+        check_bool("permuted block-diagonal dense expr 4x4 input not NULL", A != NULL);
         if (bindings) {
-            check_bool("permuted block-diagonal dense dval 4x4 set x",
+            check_bool("permuted block-diagonal dense expr 4x4 set x",
                        test_mat_bindings_set_d(bindings, "x", 2.0) == 0);
-            check_bool("permuted block-diagonal dense dval 4x4 set y",
+            check_bool("permuted block-diagonal dense expr 4x4 set y",
                        test_mat_bindings_set_d(bindings, "y", 3.0) == 0);
         }
 
         E = mat_exp(A);
         S = mat_sin(A);
-        check_bool("permuted block-diagonal dense dval 4x4 exp not NULL", E != NULL);
-        check_bool("permuted block-diagonal dense dval 4x4 sin not NULL", S != NULL);
+        check_bool("permuted block-diagonal dense expr 4x4 exp not NULL", E != NULL);
+        check_bool("permuted block-diagonal dense expr 4x4 sin not NULL", S != NULL);
 
         if (E) {
             mat_get(E, 0, 0, &v);
             check_d("exp(permuted block-diagonal 4x4)[0,0]",
-                    dv_eval_d(v), 0.5 * (exp(3.0) + exp(1.0)), 1e-12);
-            check_dval_expr_contains("exp(permuted block-diagonal 4x4)[0,0] stays symbolic", v, "exp");
+                    expr_eval_d(v), 0.5 * (exp(3.0) + exp(1.0)), 1e-12);
+            check_expr_expr_contains("exp(permuted block-diagonal 4x4)[0,0] stays symbolic", v, "exp");
             mat_get(E, 0, 2, &v);
             check_d("exp(permuted block-diagonal 4x4)[0,2]",
-                    dv_eval_d(v), 0.5 * (exp(3.0) - exp(1.0)), 1e-12);
+                    expr_eval_d(v), 0.5 * (exp(3.0) - exp(1.0)), 1e-12);
             mat_get(E, 0, 1, &v);
             check_d("exp(permuted block-diagonal 4x4)[0,1] stays zero",
-                    dv_eval_d(v), 0.0, 1e-12);
+                    expr_eval_d(v), 0.0, 1e-12);
             mat_get(E, 1, 3, &v);
             check_d("exp(permuted block-diagonal 4x4)[1,3]",
-                    dv_eval_d(v), 0.5 * (exp(4.0) - exp(2.0)), 1e-12);
+                    expr_eval_d(v), 0.5 * (exp(4.0) - exp(2.0)), 1e-12);
         }
 
         if (S) {
             mat_get(S, 1, 1, &v);
             check_d("sin(permuted block-diagonal 4x4)[1,1]",
-                    dv_eval_d(v), 0.5 * (sin(4.0) + sin(2.0)), 1e-12);
-            check_dval_expr_contains("sin(permuted block-diagonal 4x4)[1,1] stays symbolic", v, "sin");
+                    expr_eval_d(v), 0.5 * (sin(4.0) + sin(2.0)), 1e-12);
+            check_expr_expr_contains("sin(permuted block-diagonal 4x4)[1,1] stays symbolic", v, "sin");
             mat_get(S, 1, 3, &v);
             check_d("sin(permuted block-diagonal 4x4)[1,3]",
-                    dv_eval_d(v), 0.5 * (sin(4.0) - sin(2.0)), 1e-12);
+                    expr_eval_d(v), 0.5 * (sin(4.0) - sin(2.0)), 1e-12);
             mat_get(S, 2, 3, &v);
             check_d("sin(permuted block-diagonal 4x4)[2,3] stays zero",
-                    dv_eval_d(v), 0.0, 1e-12);
+                    expr_eval_d(v), 0.0, 1e-12);
         }
 
         if (bindings) {
-            check_bool("permuted block-diagonal dense dval 4x4 update x",
+            check_bool("permuted block-diagonal dense expr 4x4 update x",
                        test_mat_bindings_set_d(bindings, "x", 4.0) == 0);
-            check_bool("permuted block-diagonal dense dval 4x4 update y",
+            check_bool("permuted block-diagonal dense expr 4x4 update y",
                        test_mat_bindings_set_d(bindings, "y", 5.0) == 0);
         }
 
         if (E) {
             mat_get(E, 0, 2, &v);
             check_d("exp(permuted block-diagonal 4x4)[0,2] tracks x",
-                    dv_eval_d(v), 0.5 * (exp(5.0) - exp(3.0)), 1e-12);
+                    expr_eval_d(v), 0.5 * (exp(5.0) - exp(3.0)), 1e-12);
         }
         if (S) {
             mat_get(S, 1, 3, &v);
             check_d("sin(permuted block-diagonal 4x4)[1,3] tracks y",
-                    dv_eval_d(v), 0.5 * (sin(6.0) - sin(4.0)), 1e-12);
+                    expr_eval_d(v), 0.5 * (sin(6.0) - sin(4.0)), 1e-12);
         }
 
         mat_free(A);
@@ -6938,11 +6938,11 @@ void run_matrix_function_tests(void)
     TEST_RUN_CASE(test_eigen_complex, NULL);
     TEST_RUN_CASE(test_eigen_num_hermitian, NULL);
     TEST_RUN_CASE(test_eigen_num_hermitian_high_precision, NULL);
-    TEST_RUN_CASE(test_eigen_dval, NULL);
-    TEST_RUN_CASE(test_eigenspace_dval, NULL);
-    TEST_RUN_CASE(test_generalized_eigenspace_dval, NULL);
-    TEST_RUN_CASE(test_jordan_chain_dval, NULL);
-    TEST_RUN_CASE(test_jordan_profile_dval, NULL);
+    TEST_RUN_CASE(test_eigen_expr, NULL);
+    TEST_RUN_CASE(test_eigenspace_expr, NULL);
+    TEST_RUN_CASE(test_generalized_eigenspace_expr, NULL);
+    TEST_RUN_CASE(test_jordan_chain_expr, NULL);
+    TEST_RUN_CASE(test_jordan_profile_expr, NULL);
     TEST_RUN_CASE(test_mat_exp_d, NULL);
     TEST_RUN_CASE(test_mat_exp_mp_real, NULL);
     TEST_RUN_CASE(test_mat_exp_complex, NULL);
@@ -6986,7 +6986,7 @@ void run_matrix_function_tests(void)
     TEST_RUN_CASE(test_mat_special_unary_square_extensions, NULL);
     TEST_RUN_CASE(test_mat_typeof, NULL);
     TEST_RUN_CASE(test_number_matrix_functions, NULL);
-    TEST_RUN_CASE(test_dval_matrix_functions, NULL);
-    TEST_RUN_CASE(test_dval_matrix_functions_extended, NULL);
+    TEST_RUN_CASE(test_expr_matrix_functions, NULL);
+    TEST_RUN_CASE(test_expr_matrix_functions_extended, NULL);
     TEST_RUN_CASE(test_mat_simplify_symbolic_helper, NULL);
 }

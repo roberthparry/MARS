@@ -61,14 +61,14 @@ qfloat_t tn4_wd[TN_T4] = {
 };
 
 /* -------------------------------------------------------------------
- * Single-interval Turán T15/T4 evaluation via dval_t AD
+ * Single-interval Turán T15/T4 evaluation via expr_t AD
  *
  * T15 uses f and f'' at all 8 node positions (degree 31).
  * T4 reuses the evaluations at positions 0,2,4,6 (degree 15).
  * The change-of-variable g(t)=f(c+h*t) gives g''(t) = h²·f''(c+h*t).
  * ------------------------------------------------------------------- */
 
-void gturan_eval_dv(dval_t *expr, dval_t *x_var, dval_t *d2_expr,
+void gturan_eval_expr(expr_t *expr, expr_t *x_var, expr_t *d2_expr,
                     qfloat_t a, qfloat_t b,
                     qfloat_t *t15_out, qfloat_t *t4_out)
 {
@@ -81,9 +81,9 @@ void gturan_eval_dv(dval_t *expr, dval_t *x_var, dval_t *d2_expr,
     qfloat_t h2 = qf_mul(h, h);
 
     /* Centre node */
-    ig_dv_set_val_qf(x_var, c);
-    qfloat_t f0  = ig_dv_eval_qf(expr);
-    qfloat_t d20 = same ? f0 : ig_dv_eval_qf(d2_expr);
+    ig_expr_set_val_qf(x_var, c);
+    qfloat_t f0  = ig_expr_eval_qf(expr);
+    qfloat_t d20 = same ? f0 : ig_expr_eval_qf(d2_expr);
 
     /* Seven symmetric pairs */
     qfloat_t fpos[TN_SYMMETRIC_PAIRS], fneg[TN_SYMMETRIC_PAIRS];
@@ -91,13 +91,13 @@ void gturan_eval_dv(dval_t *expr, dval_t *x_var, dval_t *d2_expr,
     for (int i = 0; i < TN_SYMMETRIC_PAIRS; i++) {
         qfloat_t hi = qf_mul(h, tn_node[i + 1]);
 
-        ig_dv_set_val_qf(x_var, qf_add(c, hi));
-        fpos[i]  = ig_dv_eval_qf(expr);
-        d2pos[i] = same ? fpos[i] : ig_dv_eval_qf(d2_expr);
+        ig_expr_set_val_qf(x_var, qf_add(c, hi));
+        fpos[i]  = ig_expr_eval_qf(expr);
+        d2pos[i] = same ? fpos[i] : ig_expr_eval_qf(d2_expr);
 
-        ig_dv_set_val_qf(x_var, qf_sub(c, hi));
-        fneg[i]  = ig_dv_eval_qf(expr);
-        d2neg[i] = same ? fneg[i] : ig_dv_eval_qf(d2_expr);
+        ig_expr_set_val_qf(x_var, qf_sub(c, hi));
+        fneg[i]  = ig_expr_eval_qf(expr);
+        d2neg[i] = same ? fneg[i] : ig_expr_eval_qf(d2_expr);
     }
 
     /* T15 accumulation (all 8 positions) */
@@ -128,14 +128,14 @@ void gturan_eval_dv(dval_t *expr, dval_t *x_var, dval_t *d2_expr,
  *
  * Outer T15/T4 over [ay,by] in y; inner T15 over [ax,bx] in x.
  * At each outer y-node:
- *   F(y)   = ∫f(x,y)dx         via gturan_eval_dv(expr,   x_var, d2x_expr,    ...)
- *   F''(y) = ∫∂²f/∂y²(x,y)dx  via gturan_eval_dv(d2y_expr, x_var, d2x_d2y_expr, ...)
+ *   F(y)   = ∫f(x,y)dx         via gturan_eval_expr(expr,   x_var, d2x_expr,    ...)
+ *   F''(y) = ∫∂²f/∂y²(x,y)dx  via gturan_eval_expr(d2y_expr, x_var, d2x_d2y_expr, ...)
  * ------------------------------------------------------------------- */
 
-static void gturan_eval_dv_2d(
-    dval_t *expr,      dval_t *x_var, dval_t *d2x_expr,
-    dval_t *d2y_expr,  dval_t *d2x_d2y_expr,
-    dval_t *y_var,
+static void gturan_eval_expr_2d(
+    expr_t *expr,      expr_t *x_var, expr_t *d2x_expr,
+    expr_t *d2y_expr,  expr_t *d2x_d2y_expr,
+    expr_t *y_var,
     qfloat_t ax, qfloat_t bx,
     qfloat_t ay, qfloat_t by,
     qfloat_t *t15_out, qfloat_t *t4_out)
@@ -145,23 +145,23 @@ static void gturan_eval_dv_2d(
     qfloat_t hy2 = qf_mul(hy, hy);
     qfloat_t dummy;
 
-    ig_dv_set_val_qf(y_var, cy);
+    ig_expr_set_val_qf(y_var, cy);
     qfloat_t F0, Fpp0;
-    gturan_eval_dv(expr,    x_var, d2x_expr,     ax, bx, &F0,   &dummy);
-    gturan_eval_dv(d2y_expr, x_var, d2x_d2y_expr, ax, bx, &Fpp0, &dummy);
+    gturan_eval_expr(expr,    x_var, d2x_expr,     ax, bx, &F0,   &dummy);
+    gturan_eval_expr(d2y_expr, x_var, d2x_d2y_expr, ax, bx, &Fpp0, &dummy);
 
     qfloat_t Fpos[TN_SYMMETRIC_PAIRS], Fneg[TN_SYMMETRIC_PAIRS];
     qfloat_t Fpppos[TN_SYMMETRIC_PAIRS], Fppneg[TN_SYMMETRIC_PAIRS];
     for (int i = 0; i < TN_SYMMETRIC_PAIRS; i++) {
         qfloat_t hi = qf_mul(hy, tn_node[i + 1]);
 
-        ig_dv_set_val_qf(y_var, qf_add(cy, hi));
-        gturan_eval_dv(expr,    x_var, d2x_expr,     ax, bx, &Fpos[i],   &dummy);
-        gturan_eval_dv(d2y_expr, x_var, d2x_d2y_expr, ax, bx, &Fpppos[i], &dummy);
+        ig_expr_set_val_qf(y_var, qf_add(cy, hi));
+        gturan_eval_expr(expr,    x_var, d2x_expr,     ax, bx, &Fpos[i],   &dummy);
+        gturan_eval_expr(d2y_expr, x_var, d2x_d2y_expr, ax, bx, &Fpppos[i], &dummy);
 
-        ig_dv_set_val_qf(y_var, qf_sub(cy, hi));
-        gturan_eval_dv(expr,    x_var, d2x_expr,     ax, bx, &Fneg[i],   &dummy);
-        gturan_eval_dv(d2y_expr, x_var, d2x_d2y_expr, ax, bx, &Fppneg[i], &dummy);
+        ig_expr_set_val_qf(y_var, qf_sub(cy, hi));
+        gturan_eval_expr(expr,    x_var, d2x_expr,     ax, bx, &Fneg[i],   &dummy);
+        gturan_eval_expr(d2y_expr, x_var, d2x_d2y_expr, ax, bx, &Fppneg[i], &dummy);
     }
 
     qfloat_t t15 = qf_add(qf_mul(tn_wa[0], F0),
@@ -186,13 +186,13 @@ static void gturan_eval_dv_2d(
 
 /* Returns only T15 from a 2D Turán evaluation (used as inner call in 3D). */
 static qfloat_t eval_2d_t15(
-    dval_t *expr,      dval_t *x_var, dval_t *d2x_expr,
-    dval_t *d2y_expr,  dval_t *d2x_d2y_expr,
-    dval_t *y_var,
+    expr_t *expr,      expr_t *x_var, expr_t *d2x_expr,
+    expr_t *d2y_expr,  expr_t *d2x_d2y_expr,
+    expr_t *y_var,
     qfloat_t ax, qfloat_t bx, qfloat_t ay, qfloat_t by)
 {
     qfloat_t t15, t4;
-    gturan_eval_dv_2d(expr, x_var, d2x_expr, d2y_expr, d2x_d2y_expr, y_var,
+    gturan_eval_expr_2d(expr, x_var, d2x_expr, d2y_expr, d2x_d2y_expr, y_var,
                        ax, bx, ay, by, &t15, &t4);
     return t15;
 }
@@ -215,21 +215,21 @@ static qfloat_t eval_2d_t15(
  *   d2x_d2y_d2z_expr = ∂⁶f/∂x²∂y²∂z²
  * ------------------------------------------------------------------- */
 
-static void gturan_eval_dv_3d(
-    dval_t *expr,              dval_t *x_var, dval_t *d2x_expr,
-    dval_t *d2y_expr,          dval_t *d2x_d2y_expr,
-    dval_t *y_var,             qfloat_t ax, qfloat_t bx,
+static void gturan_eval_expr_3d(
+    expr_t *expr,              expr_t *x_var, expr_t *d2x_expr,
+    expr_t *d2y_expr,          expr_t *d2x_d2y_expr,
+    expr_t *y_var,             qfloat_t ax, qfloat_t bx,
                                qfloat_t ay, qfloat_t by,
-    dval_t *d2z_expr,          dval_t *d2x_d2z_expr,
-    dval_t *d2y_d2z_expr,      dval_t *d2x_d2y_d2z_expr,
-    dval_t *z_var,             qfloat_t az, qfloat_t bz,
+    expr_t *d2z_expr,          expr_t *d2x_d2z_expr,
+    expr_t *d2y_d2z_expr,      expr_t *d2x_d2y_d2z_expr,
+    expr_t *z_var,             qfloat_t az, qfloat_t bz,
     qfloat_t *t15_out, qfloat_t *t4_out)
 {
     qfloat_t cz  = qf_mul_double(qf_add(az, bz), 0.5);
     qfloat_t hz  = qf_mul_double(qf_sub(bz, az), 0.5);
     qfloat_t hz2 = qf_mul(hz, hz);
 
-    ig_dv_set_val_qf(z_var, cz);
+    ig_expr_set_val_qf(z_var, cz);
     qfloat_t F0   = eval_2d_t15(expr,    x_var, d2x_expr,     d2y_expr,     d2x_d2y_expr,
                                  y_var, ax, bx, ay, by);
     qfloat_t Fpp0 = eval_2d_t15(d2z_expr, x_var, d2x_d2z_expr, d2y_d2z_expr, d2x_d2y_d2z_expr,
@@ -240,13 +240,13 @@ static void gturan_eval_dv_3d(
     for (int i = 0; i < TN_SYMMETRIC_PAIRS; i++) {
         qfloat_t hi = qf_mul(hz, tn_node[i + 1]);
 
-        ig_dv_set_val_qf(z_var, qf_add(cz, hi));
+        ig_expr_set_val_qf(z_var, qf_add(cz, hi));
         Fpos[i]   = eval_2d_t15(expr,    x_var, d2x_expr,     d2y_expr,     d2x_d2y_expr,
                                  y_var, ax, bx, ay, by);
         Fpppos[i] = eval_2d_t15(d2z_expr, x_var, d2x_d2z_expr, d2y_d2z_expr, d2x_d2y_d2z_expr,
                                  y_var, ax, bx, ay, by);
 
-        ig_dv_set_val_qf(z_var, qf_sub(cz, hi));
+        ig_expr_set_val_qf(z_var, qf_sub(cz, hi));
         Fneg[i]   = eval_2d_t15(expr,    x_var, d2x_expr,     d2y_expr,     d2x_d2y_expr,
                                  y_var, ax, bx, ay, by);
         Fppneg[i] = eval_2d_t15(d2z_expr, x_var, d2x_d2z_expr, d2y_d2z_expr, d2x_d2y_d2z_expr,
@@ -273,32 +273,32 @@ static void gturan_eval_dv_3d(
     *t4_out  = qf_mul(hz, t4);
 }
 
-int ig_single_integral(integrator_t *ig, dval_t *expr, dval_t *x_var,
+int ig_single_integral(integrator_t *ig, expr_t *expr, expr_t *x_var,
                        qfloat_t a, qfloat_t b,
                        qfloat_t *result, qfloat_t *error_est)
 {
     if (!ig || !expr || !x_var || !result) return -1;
 
-    dval_t *d2_expr = dv_create_2nd_deriv(expr, x_var, x_var);
+    expr_t *d2_expr = expr_create_2nd_deriv(expr, x_var, x_var);
     if (!d2_expr) return -1;
 
-    /* If d²f/dx² == f (e.g. exp(x)), pass expr for both args so gturan_eval_dv
+    /* If d²f/dx² == f (e.g. exp(x)), pass expr for both args so gturan_eval_expr
      * can skip the redundant second evaluation at each quadrature point. */
     static const double tp[] = { 0.31415, 0.71828 };
     int d2_same = 1;
     for (size_t t = 0; t < sizeof(tp) / sizeof(tp[0]) && d2_same; t++) {
-        ig_dv_set_val_qf(x_var, qf_from_double(tp[t]));
-        if (!qf_eq(ig_dv_eval_qf(expr), ig_dv_eval_qf(d2_expr)))
+        ig_expr_set_val_qf(x_var, qf_from_double(tp[t]));
+        if (!qf_eq(ig_expr_eval_qf(expr), ig_expr_eval_qf(d2_expr)))
             d2_same = 0;
     }
-    dval_t *d2_use = d2_same ? expr : d2_expr;
+    expr_t *d2_use = d2_same ? expr : d2_expr;
 
     size_t capacity = 64;
     subinterval_t *intervals = malloc(capacity * sizeof(subinterval_t));
-    if (!intervals) { dv_free(d2_expr); return -1; }
+    if (!intervals) { expr_free(d2_expr); return -1; }
 
     qfloat_t t15, t4;
-    gturan_eval_dv(expr, x_var, d2_use, a, b, &t15, &t4);
+    gturan_eval_expr(expr, x_var, d2_use, a, b, &t15, &t4);
 
     intervals[0].a      = a;
     intervals[0].b      = b;
@@ -330,11 +330,11 @@ int ig_single_integral(integrator_t *ig, dval_t *expr, dval_t *x_var,
 
         subinterval_t left, right;
 
-        gturan_eval_dv(expr, x_var, d2_use, intervals[worst].a, mid, &t15, &t4);
+        gturan_eval_expr(expr, x_var, d2_use, intervals[worst].a, mid, &t15, &t4);
         left.a = intervals[worst].a;  left.b = mid;
         left.result = t15;  left.error = qf_abs(qf_sub(t15, t4));
 
-        gturan_eval_dv(expr, x_var, d2_use, mid, intervals[worst].b, &t15, &t4);
+        gturan_eval_expr(expr, x_var, d2_use, mid, intervals[worst].b, &t15, &t4);
         right.a = mid;  right.b = intervals[worst].b;
         right.result = t15;  right.error = qf_abs(qf_sub(t15, t4));
 
@@ -347,7 +347,7 @@ int ig_single_integral(integrator_t *ig, dval_t *expr, dval_t *x_var,
             capacity *= 2;
             subinterval_t *tmp = realloc(intervals,
                                          capacity * sizeof(subinterval_t));
-            if (!tmp) { free(intervals); dv_free(d2_expr); return -1; }
+            if (!tmp) { free(intervals); expr_free(d2_expr); return -1; }
             intervals = tmp;
         }
 
@@ -360,34 +360,34 @@ int ig_single_integral(integrator_t *ig, dval_t *expr, dval_t *x_var,
     if (error_est) *error_est = qf_abs(total_err);
 
     free(intervals);
-    dv_free(d2_expr);
+    expr_free(d2_expr);
     return status;
 }
 
-int ig_double_integral(integrator_t *ig, dval_t *expr,
-                       dval_t *x_var, qfloat_t ax, qfloat_t bx,
-                       dval_t *y_var, qfloat_t ay, qfloat_t by,
+int ig_double_integral(integrator_t *ig, expr_t *expr,
+                       expr_t *x_var, qfloat_t ax, qfloat_t bx,
+                       expr_t *y_var, qfloat_t ay, qfloat_t by,
                        qfloat_t *result, qfloat_t *error_est)
 {
     if (!ig || !expr || !x_var || !y_var || !result) return -1;
 
-    dval_t *d2x_expr     = dv_create_2nd_deriv(expr,    x_var, x_var);
-    dval_t *d2y_expr     = dv_create_2nd_deriv(expr,    y_var, y_var);
-    dval_t *d2x_d2y_expr = dv_create_2nd_deriv(d2y_expr, x_var, x_var);
+    expr_t *d2x_expr     = expr_create_2nd_deriv(expr,    x_var, x_var);
+    expr_t *d2y_expr     = expr_create_2nd_deriv(expr,    y_var, y_var);
+    expr_t *d2x_d2y_expr = expr_create_2nd_deriv(d2y_expr, x_var, x_var);
     if (!d2x_expr || !d2y_expr || !d2x_d2y_expr) {
-        dv_free(d2x_expr); dv_free(d2y_expr); dv_free(d2x_d2y_expr);
+        expr_free(d2x_expr); expr_free(d2y_expr); expr_free(d2x_d2y_expr);
         return -1;
     }
 
     size_t capacity = 64;
     subinterval_t *intervals = malloc(capacity * sizeof(subinterval_t));
     if (!intervals) {
-        dv_free(d2x_expr); dv_free(d2y_expr); dv_free(d2x_d2y_expr);
+        expr_free(d2x_expr); expr_free(d2y_expr); expr_free(d2x_d2y_expr);
         return -1;
     }
 
     qfloat_t t15, t4;
-    gturan_eval_dv_2d(expr, x_var, d2x_expr, d2y_expr, d2x_d2y_expr,
+    gturan_eval_expr_2d(expr, x_var, d2x_expr, d2y_expr, d2x_d2y_expr,
                        y_var, ax, bx, ay, by, &t15, &t4);
 
     intervals[0].a      = ay;
@@ -420,12 +420,12 @@ int ig_double_integral(integrator_t *ig, dval_t *expr,
 
         subinterval_t left, right;
 
-        gturan_eval_dv_2d(expr, x_var, d2x_expr, d2y_expr, d2x_d2y_expr,
+        gturan_eval_expr_2d(expr, x_var, d2x_expr, d2y_expr, d2x_d2y_expr,
                            y_var, ax, bx, intervals[worst].a, mid, &t15, &t4);
         left.a = intervals[worst].a;  left.b = mid;
         left.result = t15;  left.error = qf_abs(qf_sub(t15, t4));
 
-        gturan_eval_dv_2d(expr, x_var, d2x_expr, d2y_expr, d2x_d2y_expr,
+        gturan_eval_expr_2d(expr, x_var, d2x_expr, d2y_expr, d2x_d2y_expr,
                            y_var, ax, bx, mid, intervals[worst].b, &t15, &t4);
         right.a = mid;  right.b = intervals[worst].b;
         right.result = t15;  right.error = qf_abs(qf_sub(t15, t4));
@@ -440,7 +440,7 @@ int ig_double_integral(integrator_t *ig, dval_t *expr,
             subinterval_t *tmp = realloc(intervals, capacity * sizeof(subinterval_t));
             if (!tmp) {
                 free(intervals);
-                dv_free(d2x_expr); dv_free(d2y_expr); dv_free(d2x_d2y_expr);
+                expr_free(d2x_expr); expr_free(d2y_expr); expr_free(d2x_d2y_expr);
                 return -1;
             }
             intervals = tmp;
@@ -455,47 +455,47 @@ int ig_double_integral(integrator_t *ig, dval_t *expr,
     if (error_est) *error_est = qf_abs(total_err);
 
     free(intervals);
-    dv_free(d2x_expr);
-    dv_free(d2y_expr);
-    dv_free(d2x_d2y_expr);
+    expr_free(d2x_expr);
+    expr_free(d2y_expr);
+    expr_free(d2x_d2y_expr);
     return status;
 }
 
-int ig_triple_integral(integrator_t *ig, dval_t *expr,
-                       dval_t *x_var, qfloat_t ax, qfloat_t bx,
-                       dval_t *y_var, qfloat_t ay, qfloat_t by,
-                       dval_t *z_var, qfloat_t az, qfloat_t bz,
+int ig_triple_integral(integrator_t *ig, expr_t *expr,
+                       expr_t *x_var, qfloat_t ax, qfloat_t bx,
+                       expr_t *y_var, qfloat_t ay, qfloat_t by,
+                       expr_t *z_var, qfloat_t az, qfloat_t bz,
                        qfloat_t *result, qfloat_t *error_est)
 {
     if (!ig || !expr || !x_var || !y_var || !z_var || !result) return -1;
 
-    dval_t *d2x_expr         = dv_create_2nd_deriv(expr,         x_var, x_var);
-    dval_t *d2y_expr         = dv_create_2nd_deriv(expr,         y_var, y_var);
-    dval_t *d2z_expr         = dv_create_2nd_deriv(expr,         z_var, z_var);
-    dval_t *d2x_d2y_expr     = dv_create_2nd_deriv(d2y_expr,     x_var, x_var);
-    dval_t *d2x_d2z_expr     = dv_create_2nd_deriv(d2z_expr,     x_var, x_var);
-    dval_t *d2y_d2z_expr     = dv_create_2nd_deriv(d2z_expr,     y_var, y_var);
-    dval_t *d2x_d2y_d2z_expr = dv_create_2nd_deriv(d2y_d2z_expr, x_var, x_var);
+    expr_t *d2x_expr         = expr_create_2nd_deriv(expr,         x_var, x_var);
+    expr_t *d2y_expr         = expr_create_2nd_deriv(expr,         y_var, y_var);
+    expr_t *d2z_expr         = expr_create_2nd_deriv(expr,         z_var, z_var);
+    expr_t *d2x_d2y_expr     = expr_create_2nd_deriv(d2y_expr,     x_var, x_var);
+    expr_t *d2x_d2z_expr     = expr_create_2nd_deriv(d2z_expr,     x_var, x_var);
+    expr_t *d2y_d2z_expr     = expr_create_2nd_deriv(d2z_expr,     y_var, y_var);
+    expr_t *d2x_d2y_d2z_expr = expr_create_2nd_deriv(d2y_d2z_expr, x_var, x_var);
 
     if (!d2x_expr || !d2y_expr || !d2z_expr || !d2x_d2y_expr ||
         !d2x_d2z_expr || !d2y_d2z_expr || !d2x_d2y_d2z_expr) {
-        dv_free(d2x_expr);     dv_free(d2y_expr);         dv_free(d2z_expr);
-        dv_free(d2x_d2y_expr); dv_free(d2x_d2z_expr);
-        dv_free(d2y_d2z_expr); dv_free(d2x_d2y_d2z_expr);
+        expr_free(d2x_expr);     expr_free(d2y_expr);         expr_free(d2z_expr);
+        expr_free(d2x_d2y_expr); expr_free(d2x_d2z_expr);
+        expr_free(d2y_d2z_expr); expr_free(d2x_d2y_d2z_expr);
         return -1;
     }
 
     size_t capacity = 64;
     subinterval_t *intervals = malloc(capacity * sizeof(subinterval_t));
     if (!intervals) {
-        dv_free(d2x_expr);     dv_free(d2y_expr);         dv_free(d2z_expr);
-        dv_free(d2x_d2y_expr); dv_free(d2x_d2z_expr);
-        dv_free(d2y_d2z_expr); dv_free(d2x_d2y_d2z_expr);
+        expr_free(d2x_expr);     expr_free(d2y_expr);         expr_free(d2z_expr);
+        expr_free(d2x_d2y_expr); expr_free(d2x_d2z_expr);
+        expr_free(d2y_d2z_expr); expr_free(d2x_d2y_d2z_expr);
         return -1;
     }
 
     qfloat_t t15, t4;
-    gturan_eval_dv_3d(expr, x_var, d2x_expr,
+    gturan_eval_expr_3d(expr, x_var, d2x_expr,
                        d2y_expr, d2x_d2y_expr,
                        y_var, ax, bx, ay, by,
                        d2z_expr, d2x_d2z_expr, d2y_d2z_expr, d2x_d2y_d2z_expr,
@@ -531,7 +531,7 @@ int ig_triple_integral(integrator_t *ig, dval_t *expr,
 
         subinterval_t left, right;
 
-        gturan_eval_dv_3d(expr, x_var, d2x_expr,
+        gturan_eval_expr_3d(expr, x_var, d2x_expr,
                            d2y_expr, d2x_d2y_expr,
                            y_var, ax, bx, ay, by,
                            d2z_expr, d2x_d2z_expr, d2y_d2z_expr, d2x_d2y_d2z_expr,
@@ -539,7 +539,7 @@ int ig_triple_integral(integrator_t *ig, dval_t *expr,
         left.a = intervals[worst].a;  left.b = mid;
         left.result = t15;  left.error = qf_abs(qf_sub(t15, t4));
 
-        gturan_eval_dv_3d(expr, x_var, d2x_expr,
+        gturan_eval_expr_3d(expr, x_var, d2x_expr,
                            d2y_expr, d2x_d2y_expr,
                            y_var, ax, bx, ay, by,
                            d2z_expr, d2x_d2z_expr, d2y_d2z_expr, d2x_d2y_d2z_expr,
@@ -557,9 +557,9 @@ int ig_triple_integral(integrator_t *ig, dval_t *expr,
             subinterval_t *tmp = realloc(intervals, capacity * sizeof(subinterval_t));
             if (!tmp) {
                 free(intervals);
-                dv_free(d2x_expr);     dv_free(d2y_expr);         dv_free(d2z_expr);
-                dv_free(d2x_d2y_expr); dv_free(d2x_d2z_expr);
-                dv_free(d2y_d2z_expr); dv_free(d2x_d2y_d2z_expr);
+                expr_free(d2x_expr);     expr_free(d2y_expr);         expr_free(d2z_expr);
+                expr_free(d2x_d2y_expr); expr_free(d2x_d2z_expr);
+                expr_free(d2y_d2z_expr); expr_free(d2x_d2y_d2z_expr);
                 return -1;
             }
             intervals = tmp;
@@ -574,8 +574,8 @@ int ig_triple_integral(integrator_t *ig, dval_t *expr,
     if (error_est) *error_est = qf_abs(total_err);
 
     free(intervals);
-    dv_free(d2x_expr);     dv_free(d2y_expr);         dv_free(d2z_expr);
-    dv_free(d2x_d2y_expr); dv_free(d2x_d2z_expr);
-    dv_free(d2y_d2z_expr); dv_free(d2x_d2y_d2z_expr);
+    expr_free(d2x_expr);     expr_free(d2y_expr);         expr_free(d2z_expr);
+    expr_free(d2x_d2y_expr); expr_free(d2x_d2z_expr);
+    expr_free(d2y_d2z_expr); expr_free(d2x_d2y_d2z_expr);
     return status;
 }

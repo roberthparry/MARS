@@ -120,9 +120,15 @@ All declarations are in `include/qcomplex.h`.
 | `qc_sin(z)` | sine |
 | `qc_cos(z)` | cosine |
 | `qc_tan(z)` | tangent |
+| `qc_sec(z)` | secant `1/cos(z)` |
+| `qc_cosec(z)` | cosecant `1/sin(z)` |
+| `qc_cot(z)` | cotangent `1/tan(z)` |
 | `qc_asin(z)` | arcsine (principal branch) |
 | `qc_acos(z)` | arccosine (principal branch) |
 | `qc_atan(z)` | arctangent |
+| `qc_asec(z)` | arcsecant (principal branch) |
+| `qc_acosec(z)` | arccosecant (principal branch) |
+| `qc_acot(z)` | arccotangent (principal branch) |
 | `qc_atan2(y, x)` | four-quadrant arctangent |
 
 ### Hyperbolic Functions
@@ -132,9 +138,15 @@ All declarations are in `include/qcomplex.h`.
 | `qc_sinh(z)` | hyperbolic sine |
 | `qc_cosh(z)` | hyperbolic cosine |
 | `qc_tanh(z)` | hyperbolic tangent |
+| `qc_sech(z)` | hyperbolic secant `1/cosh(z)` |
+| `qc_cosech(z)` | hyperbolic cosecant `1/sinh(z)` |
+| `qc_coth(z)` | hyperbolic cotangent `1/tanh(z)` |
 | `qc_asinh(z)` | inverse hyperbolic sine |
 | `qc_acosh(z)` | inverse hyperbolic cosine (principal branch) |
 | `qc_atanh(z)` | inverse hyperbolic tangent |
+| `qc_asech(z)` | inverse hyperbolic secant (principal branch) |
+| `qc_acosech(z)` | inverse hyperbolic cosecant (principal branch) |
+| `qc_acoth(z)` | inverse hyperbolic cotangent (principal branch) |
 
 ### Special Functions
 
@@ -271,4 +283,3 @@ Results:
 
 For a broader benchmark overview, see
 [`docs/benchmarks.md`](benchmarks.md).
-

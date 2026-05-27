@@ -67,14 +67,14 @@ static int run_readme_string_quantum_example(void)
     mat_bindings_t *bindings = NULL;
     number_t delta = num_create_from_double(1.5);
     number_t omega = num_create_from_double(0.25);
-    matrix_t *H = mat_from_string_dv(
+    matrix_t *H = mat_from_string_expr(
         "(@DELTA, @OMEGA; @OMEGA, -@DELTA)",
         &bindings);
     matrix_t *H2 = NULL;
     matrix_t *P = NULL;
-    dval_t *evals[2] = {NULL, NULL};
-    dval_t *trace = NULL;
-    dval_t *c2 = NULL;
+    expr_t *evals[2] = {NULL, NULL};
+    expr_t *trace = NULL;
+    expr_t *c2 = NULL;
     char *trace_s = NULL;
     char *c2_s = NULL;
     char *eval0_s = NULL;
@@ -92,16 +92,16 @@ static int run_readme_string_quantum_example(void)
         return 1;
     }
 
-    dv_set_val(mat_bindings_get(bindings, "@DELTA"), delta);
-    dv_set_val(mat_bindings_get(bindings, "@OMEGA"), omega);
+    expr_set_val(mat_bindings_get(bindings, "@DELTA"), delta);
+    expr_set_val(mat_bindings_get(bindings, "@OMEGA"), omega);
 
     H2 = mat_pow_int(H, 2);
     P = mat_charpoly(H);
-    if (mat_eigenvalues_dv(H, evals) != 0 || !H2 || !P) {
+    if (mat_eigenvalues_expr(H, evals) != 0 || !H2 || !P) {
         num_destroy(&omega);
         num_destroy(&delta);
         for (size_t i = 0; i < 2; ++i)
-            dv_free(evals[i]);
+            expr_free(evals[i]);
         mat_free(P);
         mat_free(H2);
         mat_bindings_free(bindings);
@@ -109,11 +109,11 @@ static int run_readme_string_quantum_example(void)
         return 1;
     }
 
-    if (mat_trace_dv(H, &trace) != 0) {
+    if (mat_trace_expr(H, &trace) != 0) {
         num_destroy(&omega);
         num_destroy(&delta);
         for (size_t i = 0; i < 2; ++i)
-            dv_free(evals[i]);
+            expr_free(evals[i]);
         mat_bindings_free(bindings);
         mat_free(P);
         mat_free(H2);
@@ -125,9 +125,9 @@ static int run_readme_string_quantum_example(void)
     if (!trace || !c2 || !evals[0] || !evals[1]) {
         num_destroy(&omega);
         num_destroy(&delta);
-        dv_free(trace);
+        expr_free(trace);
         for (size_t i = 0; i < 2; ++i)
-            dv_free(evals[i]);
+            expr_free(evals[i]);
         mat_bindings_free(bindings);
         mat_free(P);
         mat_free(H2);
@@ -135,18 +135,18 @@ static int run_readme_string_quantum_example(void)
         return 1;
     }
 
-    trace_s = dv_to_string(trace, style_EXPRESSION);
-    c2_s = dv_to_string(c2, style_EXPRESSION);
-    eval0_s = dv_to_string(evals[0], style_EXPRESSION);
-    eval1_s = dv_to_string(evals[1], style_EXPRESSION);
+    trace_s = expr_to_string(trace, style_EXPRESSION);
+    c2_s = expr_to_string(c2, style_EXPRESSION);
+    eval0_s = expr_to_string(evals[0], style_EXPRESSION);
+    eval1_s = expr_to_string(evals[1], style_EXPRESSION);
     if (!trace_s || !c2_s || !eval0_s || !eval1_s) {
         free(trace_s);
         free(c2_s);
         free(eval0_s);
         free(eval1_s);
-        dv_free(trace);
+        expr_free(trace);
         for (size_t i = 0; i < 2; ++i)
-            dv_free(evals[i]);
+            expr_free(evals[i]);
         num_destroy(&omega);
         num_destroy(&delta);
         mat_bindings_free(bindings);
@@ -166,9 +166,9 @@ static int run_readme_string_quantum_example(void)
     free(c2_s);
     free(eval0_s);
     free(eval1_s);
-    dv_free(trace);
+    expr_free(trace);
     for (size_t i = 0; i < 2; ++i)
-        dv_free(evals[i]);
+        expr_free(evals[i]);
     num_destroy(&omega);
     num_destroy(&delta);
     mat_bindings_free(bindings);

@@ -118,6 +118,15 @@ qcomplex_t qc_cos(qcomplex_t z) {
 qcomplex_t qc_tan(qcomplex_t z) {
     return qc_div(qc_sin(z), qc_cos(z));
 }
+qcomplex_t qc_sec(qcomplex_t z) {
+    return qc_div(QC_ONE, qc_cos(z));
+}
+qcomplex_t qc_cosec(qcomplex_t z) {
+    return qc_div(QC_ONE, qc_sin(z));
+}
+qcomplex_t qc_cot(qcomplex_t z) {
+    return qc_div(qc_cos(z), qc_sin(z));
+}
 qcomplex_t qc_asin(qcomplex_t z) {
     /* asin(z) = -i log(iz + sqrt(1-z^2)) */
     /* -i*(a+bi) = b - ai, so re=qc_imag(ln), im=-qc_real(ln) */
@@ -143,6 +152,36 @@ qcomplex_t qc_atan(qcomplex_t z) {
     return qc_make(qf_mul_double(qf_neg(qc_imag(diff)), 0.5),
                    qf_mul_double(qc_real(diff), 0.5));
 }
+qcomplex_t qc_asec(qcomplex_t z) {
+    if (qc_eq(z, QC_ZERO))
+        return QC_NAN;
+    if (qf_isinf(qc_real(z)) && qf_eq(qc_imag(z), QF_ZERO))
+        return QC_PI_2;
+    return qc_acos(qc_div(QC_ONE, z));
+}
+qcomplex_t qc_acosec(qcomplex_t z) {
+    if (qc_eq(z, QC_ZERO))
+        return QC_NAN;
+    if (qf_isinf(qc_real(z)) && qf_eq(qc_imag(z), QF_ZERO))
+        return QC_ZERO;
+    return qc_asin(qc_div(QC_ONE, z));
+}
+qcomplex_t qc_acot(qcomplex_t z) {
+    if (qf_isposinf(qc_real(z)) && qf_eq(qc_imag(z), QF_ZERO))
+        return QC_ZERO;
+    if (qf_isneginf(qc_real(z)) && qf_eq(qc_imag(z), QF_ZERO))
+        return QC_PI;
+
+    /* acot(z) = (1 / 2i) * log((z + i) / (z - i)).
+     * This keeps the branch choice in acot itself rather than inheriting
+     * atan(1/z)'s singular behaviour at z = 0. */
+    qcomplex_t plus_i  = qc_add(z, QC_I);
+    qcomplex_t minus_i = qc_sub(z, QC_I);
+    qcomplex_t diff    = qc_sub(qc_log(plus_i), qc_log(minus_i));
+
+    return qc_make(qf_mul_double(qc_imag(diff), 0.5),
+                   qf_mul_double(qf_neg(qc_real(diff)), 0.5));
+}
 qcomplex_t qc_atan2(qcomplex_t y, qcomplex_t x) {
     if (qf_eq(qc_imag(y), qf_from_double(0.0)) && qf_eq(qc_imag(x), qf_from_double(0.0)))
         return qc_make(qf_atan2(qc_real(y), qc_real(x)), QF_ZERO);
@@ -163,6 +202,15 @@ qcomplex_t qc_cosh(qcomplex_t z) {
 qcomplex_t qc_tanh(qcomplex_t z) {
     return qc_div(qc_sinh(z), qc_cosh(z));
 }
+qcomplex_t qc_sech(qcomplex_t z) {
+    return qc_div(QC_ONE, qc_cosh(z));
+}
+qcomplex_t qc_cosech(qcomplex_t z) {
+    return qc_div(QC_ONE, qc_sinh(z));
+}
+qcomplex_t qc_coth(qcomplex_t z) {
+    return qc_div(qc_cosh(z), qc_sinh(z));
+}
 qcomplex_t qc_asinh(qcomplex_t z) {
     /* asinh(z) = log(z + sqrt(z^2 + 1)) */
     return qc_log(qc_add(z, qc_sqrt(qc_add(qc_mul(z, z), QC_ONE))));
@@ -176,4 +224,13 @@ qcomplex_t qc_atanh(qcomplex_t z) {
     /* atanh(z) = 0.5 * log((1+z)/(1-z)) */
     return qc_ldexp(qc_log(qc_div(qc_add(QC_ONE, z),
                                   qc_sub(QC_ONE, z))), -1);
+}
+qcomplex_t qc_asech(qcomplex_t z) {
+    return qc_acosh(qc_div(QC_ONE, z));
+}
+qcomplex_t qc_acosech(qcomplex_t z) {
+    return qc_asinh(qc_div(QC_ONE, z));
+}
+qcomplex_t qc_acoth(qcomplex_t z) {
+    return qc_atanh(qc_div(QC_ONE, z));
 }

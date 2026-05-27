@@ -14,7 +14,7 @@ This directory contains the longer module documentation for MARS.
 - [`qfloat_t`](qfloat.md) — double-double arithmetic and special functions
 - [`qcomplex_t`](qcomplex.md) — double-double complex arithmetic and special functions
 - [`matrix_t`](matrix.md) — generic high-precision matrix with pluggable element types and storage kinds
-- [`dval_t`](dval.md) — differentiable expression DAGs and symbolic helper APIs
+- [`expr_t`](expression.md) — differentiable expression DAGs and symbolic helper APIs
 - [`datetime_t`](datetime.md) — civil and astronomical date/time utilities
 - [`dictionary_t`](dictionary.md) — generic key/value storage
 - [`set_t`](set.md) — generic set storage
@@ -42,6 +42,6 @@ multiprecision backends:
 
 - The repository landing page is [`../README.md`](../README.md).
 - These documents focus on API shape, examples, and implementation notes.
-- Headers in `../include/` are the public surface. Headers in
-  `../include/internal/` are shared implementation headers for MARS itself and
-  are not intended as stable external API.
+- Headers in `../include/` are the public surface. Shared implementation
+  headers in `../src/internal/` are for MARS itself and are not intended as
+  stable external API.

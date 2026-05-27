@@ -179,6 +179,112 @@ NUMBER_MPFR_BINARY(number_mpfr_pow_mut, mpfr_pow)
 NUMBER_MPFR_BINARY(number_mpfr_hypot_mut, mpfr_hypot)
 NUMBER_MPFR_BINARY(number_mpfr_beta_mut, mpfr_beta)
 
+static int number_mpfr_recip_after_unary(mpfr_t value,
+                                         int (*op)(mpfr_ptr, mpfr_srcptr,
+                                                   mpfr_rnd_t))
+{
+    if (!op)
+        return -1;
+    op(value, value, MPFR_RNDN);
+    mpfr_ui_div(value, 1u, value, MPFR_RNDN);
+    return 0;
+}
+
+static int number_mpfr_unary_after_recip(mpfr_t value,
+                                         int (*op)(mpfr_ptr, mpfr_srcptr,
+                                                   mpfr_rnd_t))
+{
+    if (!op)
+        return -1;
+    if (mpfr_zero_p(value)) {
+        mpfr_set_nan(value);
+        return 0;
+    }
+    mpfr_ui_div(value, 1u, value, MPFR_RNDN);
+    op(value, value, MPFR_RNDN);
+    return 0;
+}
+
+static int number_mpfr_sec_mut(mpfr_t value)
+{
+    return number_mpfr_recip_after_unary(value, mpfr_cos);
+}
+
+static int number_mpfr_cosec_mut(mpfr_t value)
+{
+    return number_mpfr_recip_after_unary(value, mpfr_sin);
+}
+
+static int number_mpfr_cot_mut(mpfr_t value)
+{
+    mpfr_t cos_value;
+
+    mpfr_init2(cos_value, mpfr_get_prec(value));
+    mpfr_cos(cos_value, value, MPFR_RNDN);
+    mpfr_sin(value, value, MPFR_RNDN);
+    mpfr_div(value, cos_value, value, MPFR_RNDN);
+    mpfr_clear(cos_value);
+    return 0;
+}
+
+static int number_mpfr_sech_mut(mpfr_t value)
+{
+    return number_mpfr_recip_after_unary(value, mpfr_cosh);
+}
+
+static int number_mpfr_cosech_mut(mpfr_t value)
+{
+    return number_mpfr_recip_after_unary(value, mpfr_sinh);
+}
+
+static int number_mpfr_coth_mut(mpfr_t value)
+{
+    mpfr_t cosh_value;
+
+    mpfr_init2(cosh_value, mpfr_get_prec(value));
+    mpfr_cosh(cosh_value, value, MPFR_RNDN);
+    mpfr_sinh(value, value, MPFR_RNDN);
+    mpfr_div(value, cosh_value, value, MPFR_RNDN);
+    mpfr_clear(cosh_value);
+    return 0;
+}
+
+static int number_mpfr_asec_mut(mpfr_t value)
+{
+    return number_mpfr_unary_after_recip(value, mpfr_acos);
+}
+
+static int number_mpfr_acosec_mut(mpfr_t value)
+{
+    return number_mpfr_unary_after_recip(value, mpfr_asin);
+}
+
+static int number_mpfr_acot_mut(mpfr_t value)
+{
+    mpfr_t one;
+
+    mpfr_init2(one, mpfr_get_prec(value));
+    mpfr_set_ui(one, 1u, MPFR_RNDN);
+    mpfr_atan2(value, one, value, MPFR_RNDN);
+    mpfr_clear(one);
+    return 0;
+}
+
+static int number_mpfr_asech_mut(mpfr_t value)
+{
+    return number_mpfr_unary_after_recip(value, mpfr_acosh);
+}
+
+static int number_mpfr_acosech_mut(mpfr_t value)
+{
+    return number_mpfr_unary_after_recip(value, mpfr_asinh);
+}
+
+static int number_mpfr_acoth_mut(mpfr_t value)
+{
+    return number_mpfr_unary_after_recip(value, mpfr_atanh);
+}
+
 static int number_mpfr_sqr_mut(mpfr_t value)
 {
     mpfr_mul(value, value, value, MPFR_RNDN);
@@ -323,6 +429,247 @@ static double number_double_normal_logpdf(double x)
 static double _Complex number_cdouble_log10(double _Complex value)
 {
     return clog(value) / log(10.0);
+}
+
+static double number_double_sec(double value) { return 1.0 / cos(value); }
+static double number_double_cosec(double value) { return 1.0 / sin(value); }
+static double number_double_cot(double value) { return cos(value) / sin(value); }
+static double number_double_sech(double value) { return 1.0 / cosh(value); }
+static double number_double_cosech(double value) { return 1.0 / sinh(value); }
+static double number_double_coth(double value) { return cosh(value) / sinh(value); }
+static double number_double_asec(double value)
+{
+    return value == 0.0 ? NAN : acos(1.0 / value);
+}
+
+static double number_double_acosec(double value)
+{
+    return value == 0.0 ? NAN : asin(1.0 / value);
+}
+
+static double number_double_acot(double value) { return atan2(1.0, value); }
+static double number_double_asech(double value) { return acosh(1.0 / value); }
+static double number_double_acosech(double value) { return asinh(1.0 / value); }
+static double number_double_acoth(double value) { return atanh(1.0 / value); }
+
+static bool number_cdouble_is_zero(double _Complex value)
+{
+    return creal(value) == 0.0 && cimag(value) == 0.0;
+}
+
+static double _Complex number_cdouble_nan(void)
+{
+    return NAN + NAN * I;
+}
+
+static double _Complex number_cdouble_sec(double _Complex value)
+{
+    return 1.0 / ccos(value);
+}
+
+static double _Complex number_cdouble_cosec(double _Complex value)
+{
+    return 1.0 / csin(value);
+}
+
+static double _Complex number_cdouble_cot(double _Complex value)
+{
+    return ccos(value) / csin(value);
+}
+
+static double _Complex number_cdouble_sech(double _Complex value)
+{
+    return 1.0 / ccosh(value);
+}
+
+static double _Complex number_cdouble_cosech(double _Complex value)
+{
+    return 1.0 / csinh(value);
+}
+
+static double _Complex number_cdouble_coth(double _Complex value)
+{
+    return ccosh(value) / csinh(value);
+}
+
+static double _Complex number_cdouble_asec(double _Complex value)
+{
+    if (number_cdouble_is_zero(value))
+        return number_cdouble_nan();
+    return cacos(1.0 / value);
+}
+
+static double _Complex number_cdouble_acosec(double _Complex value)
+{
+    if (number_cdouble_is_zero(value))
+        return number_cdouble_nan();
+    return casin(1.0 / value);
+}
+
+static double _Complex number_cdouble_acot(double _Complex value)
+{
+    return (clog(value + I) - clog(value - I)) / (2.0 * I);
+}
+
+static double _Complex number_cdouble_asech(double _Complex value)
+{
+    return cacosh(1.0 / value);
+}
+
+static double _Complex number_cdouble_acosech(double _Complex value)
+{
+    return casinh(1.0 / value);
+}
+
+static double _Complex number_cdouble_acoth(double _Complex value)
+{
+    return catanh(1.0 / value);
+}
+
+static int number_mpc_recip_after_unary(mpc_ptr out,
+                                        mpc_srcptr in,
+                                        mpc_rnd_t rnd,
+                                        int (*op)(mpc_ptr, mpc_srcptr,
+                                                  mpc_rnd_t))
+{
+    mpc_t tmp;
+
+    if (!op)
+        return -1;
+    mpc_init2(tmp, mpc_get_prec(out));
+    op(tmp, in, rnd);
+    mpc_set_ui(out, 1u, rnd);
+    mpc_div(out, out, tmp, rnd);
+    mpc_clear(tmp);
+    return 0;
+}
+
+static int number_mpc_unary_after_recip(mpc_ptr out,
+                                        mpc_srcptr in,
+                                        mpc_rnd_t rnd,
+                                        int (*op)(mpc_ptr, mpc_srcptr,
+                                                  mpc_rnd_t))
+{
+    mpc_t tmp;
+
+    if (!op)
+        return -1;
+    if (mpfr_zero_p(mpc_realref(in)) && mpfr_zero_p(mpc_imagref(in))) {
+        mpfr_set_nan(mpc_realref(out));
+        mpfr_set_nan(mpc_imagref(out));
+        return 0;
+    }
+    mpc_init2(tmp, mpc_get_prec(out));
+    mpc_set_ui(tmp, 1u, rnd);
+    mpc_div(tmp, tmp, in, rnd);
+    op(out, tmp, rnd);
+    mpc_clear(tmp);
+    return 0;
+}
+
+static int number_mpc_sec(mpc_ptr out, mpc_srcptr in, mpc_rnd_t rnd)
+{
+    return number_mpc_recip_after_unary(out, in, rnd, mpc_cos);
+}
+
+static int number_mpc_cosec(mpc_ptr out, mpc_srcptr in, mpc_rnd_t rnd)
+{
+    return number_mpc_recip_after_unary(out, in, rnd, mpc_sin);
+}
+
+static int number_mpc_cot(mpc_ptr out, mpc_srcptr in, mpc_rnd_t rnd)
+{
+    mpc_t cos_value;
+    mpc_t sin_value;
+
+    mpc_init2(cos_value, mpc_get_prec(out));
+    mpc_init2(sin_value, mpc_get_prec(out));
+    mpc_cos(cos_value, in, rnd);
+    mpc_sin(sin_value, in, rnd);
+    mpc_div(out, cos_value, sin_value, rnd);
+    mpc_clear(sin_value);
+    mpc_clear(cos_value);
+    return 0;
+}
+
+static int number_mpc_sech(mpc_ptr out, mpc_srcptr in, mpc_rnd_t rnd)
+{
+    return number_mpc_recip_after_unary(out, in, rnd, mpc_cosh);
+}
+
+static int number_mpc_cosech(mpc_ptr out, mpc_srcptr in, mpc_rnd_t rnd)
+{
+    return number_mpc_recip_after_unary(out, in, rnd, mpc_sinh);
+}
+
+static int number_mpc_coth(mpc_ptr out, mpc_srcptr in, mpc_rnd_t rnd)
+{
+    mpc_t cosh_value;
+    mpc_t sinh_value;
+
+    mpc_init2(cosh_value, mpc_get_prec(out));
+    mpc_init2(sinh_value, mpc_get_prec(out));
+    mpc_cosh(cosh_value, in, rnd);
+    mpc_sinh(sinh_value, in, rnd);
+    mpc_div(out, cosh_value, sinh_value, rnd);
+    mpc_clear(sinh_value);
+    mpc_clear(cosh_value);
+    return 0;
+}
+
+static int number_mpc_asec(mpc_ptr out, mpc_srcptr in, mpc_rnd_t rnd)
+{
+    return number_mpc_unary_after_recip(out, in, rnd, mpc_acos);
+}
+
+static int number_mpc_acosec(mpc_ptr out, mpc_srcptr in, mpc_rnd_t rnd)
+{
+    return number_mpc_unary_after_recip(out, in, rnd, mpc_asin);
+}
+
+static int number_mpc_acot(mpc_ptr out, mpc_srcptr in, mpc_rnd_t rnd)
+{
+    mpc_t plus_i;
+    mpc_t minus_i;
+    mpc_t log_plus;
+    mpc_t log_minus;
+    mpc_t i_unit;
+    mpfr_prec_t prec = mpc_get_prec(out);
+
+    mpc_init2(plus_i, prec);
+    mpc_init2(minus_i, prec);
+    mpc_init2(log_plus, prec);
+    mpc_init2(log_minus, prec);
+    mpc_init2(i_unit, prec);
+    mpc_set_ui_ui(i_unit, 0u, 1u, rnd);
+    mpc_add(plus_i, in, i_unit, rnd);
+    mpc_sub(minus_i, in, i_unit, rnd);
+    mpc_log(log_plus, plus_i, rnd);
+    mpc_log(log_minus, minus_i, rnd);
+    mpc_sub(out, log_plus, log_minus, rnd);
+    mpc_mul_i(out, out, -1, rnd);
+    mpc_div_2ui(out, out, 1u, rnd);
+    mpc_clear(i_unit);
+    mpc_clear(log_minus);
+    mpc_clear(log_plus);
+    mpc_clear(minus_i);
+    mpc_clear(plus_i);
+    return 0;
+}
+
+static int number_mpc_asech(mpc_ptr out, mpc_srcptr in, mpc_rnd_t rnd)
+{
+    return number_mpc_unary_after_recip(out, in, rnd, mpc_acosh);
+}
+
+static int number_mpc_acosech(mpc_ptr out, mpc_srcptr in, mpc_rnd_t rnd)
+{
+    return number_mpc_unary_after_recip(out, in, rnd, mpc_asinh);
+}
+
+static int number_mpc_acoth(mpc_ptr out, mpc_srcptr in, mpc_rnd_t rnd)
+{
+    return number_mpc_unary_after_recip(out, in, rnd, mpc_atanh);
 }
 
 static number_t number_double_cdouble_unary(double value,
@@ -3249,11 +3596,95 @@ number_t num_tan(const number_t number)
     return number_apply_nonreal_complex_unary_or_dispatch(number, tan, qf_tan, qc_tan, number_mpfr_tan_mut, mpc_tan);
 }
 
+number_t num_sec(const number_t number)
+{
+    if (number_is_cdouble_value(&number))
+        return number_apply_cdouble_unary(number, number_cdouble_sec);
+    return number_apply_nonreal_complex_unary_or_dispatch(number,
+        number_double_sec, qf_sec, qc_sec, number_mpfr_sec_mut, number_mpc_sec);
+}
+
+number_t num_cosec(const number_t number)
+{
+    if (number_is_cdouble_value(&number))
+        return number_apply_cdouble_unary(number, number_cdouble_cosec);
+    return number_apply_nonreal_complex_unary_or_dispatch(number,
+        number_double_cosec, qf_cosec, qc_cosec, number_mpfr_cosec_mut,
+        number_mpc_cosec);
+}
+
+number_t num_cot(const number_t number)
+{
+    if (number_is_cdouble_value(&number))
+        return number_apply_cdouble_unary(number, number_cdouble_cot);
+    return number_apply_nonreal_complex_unary_or_dispatch(number,
+        number_double_cot, qf_cot, qc_cot, number_mpfr_cot_mut, number_mpc_cot);
+}
+
 number_t num_atan(const number_t number)
 {
     if (number_is_cdouble_value(&number))
         return number_apply_cdouble_unary(number, catan);
     return number_apply_nonreal_complex_unary_or_dispatch(number, atan, qf_atan, qc_atan, number_mpfr_atan_mut, mpc_atan);
+}
+
+number_t num_asec(const number_t number)
+{
+    number_kind_t kind = number_kind_value(&number);
+    double d;
+    qfloat_t qf;
+
+    if (kind == NUMBER_DOUBLE) {
+        d = number_impl_const(&number)->value.d;
+        return fabs(d) < 1.0
+            ? number_double_cdouble_unary(d, number_cdouble_asec)
+            : num_create_from_double(number_double_asec(d));
+    }
+    if (kind == NUMBER_CDOUBLE)
+        return number_apply_cdouble_unary(number, number_cdouble_asec);
+    if (kind == NUMBER_QFLOAT) {
+        qf = number_impl_const(&number)->value.qf;
+        return qf_lt(qf_abs(qf), QF_ONE)
+            ? number_qfloat_qcomplex_unary(qf, qc_asec)
+            : num_create_from_qfloat(qf_asec(qf));
+    }
+    return number_apply_nonreal_complex_unary_or_dispatch(number,
+        number_double_asec, qf_asec, qc_asec, number_mpfr_asec_mut,
+        number_mpc_asec);
+}
+
+number_t num_acosec(const number_t number)
+{
+    number_kind_t kind = number_kind_value(&number);
+    double d;
+    qfloat_t qf;
+
+    if (kind == NUMBER_DOUBLE) {
+        d = number_impl_const(&number)->value.d;
+        return fabs(d) < 1.0
+            ? number_double_cdouble_unary(d, number_cdouble_acosec)
+            : num_create_from_double(number_double_acosec(d));
+    }
+    if (kind == NUMBER_CDOUBLE)
+        return number_apply_cdouble_unary(number, number_cdouble_acosec);
+    if (kind == NUMBER_QFLOAT) {
+        qf = number_impl_const(&number)->value.qf;
+        return qf_lt(qf_abs(qf), QF_ONE)
+            ? number_qfloat_qcomplex_unary(qf, qc_acosec)
+            : num_create_from_qfloat(qf_acosec(qf));
+    }
+    return number_apply_nonreal_complex_unary_or_dispatch(number,
+        number_double_acosec, qf_acosec, qc_acosec, number_mpfr_acosec_mut,
+        number_mpc_acosec);
+}
+
+number_t num_acot(const number_t number)
+{
+    if (number_is_cdouble_value(&number))
+        return number_apply_cdouble_unary(number, number_cdouble_acot);
+    return number_apply_nonreal_complex_unary_or_dispatch(number,
+        number_double_acot, qf_acot, qc_acot, number_mpfr_acot_mut,
+        number_mpc_acot);
 }
 
 number_t num_atan2(const number_t y, const number_t x)
@@ -3388,6 +3819,33 @@ number_t num_tanh(const number_t number)
     return number_apply_nonreal_complex_unary_or_dispatch(number, tanh, qf_tanh, qc_tanh, number_mpfr_tanh_mut, mpc_tanh);
 }
 
+number_t num_sech(const number_t number)
+{
+    if (number_is_cdouble_value(&number))
+        return number_apply_cdouble_unary(number, number_cdouble_sech);
+    return number_apply_nonreal_complex_unary_or_dispatch(number,
+        number_double_sech, qf_sech, qc_sech, number_mpfr_sech_mut,
+        number_mpc_sech);
+}
+
+number_t num_cosech(const number_t number)
+{
+    if (number_is_cdouble_value(&number))
+        return number_apply_cdouble_unary(number, number_cdouble_cosech);
+    return number_apply_nonreal_complex_unary_or_dispatch(number,
+        number_double_cosech, qf_cosech, qc_cosech, number_mpfr_cosech_mut,
+        number_mpc_cosech);
+}
+
+number_t num_coth(const number_t number)
+{
+    if (number_is_cdouble_value(&number))
+        return number_apply_cdouble_unary(number, number_cdouble_coth);
+    return number_apply_nonreal_complex_unary_or_dispatch(number,
+        number_double_coth, qf_coth, qc_coth, number_mpfr_coth_mut,
+        number_mpc_coth);
+}
+
 number_t num_asinh(const number_t number)
 {
     if (number_is_cdouble_value(&number))
@@ -3438,6 +3896,65 @@ number_t num_atanh(const number_t number)
             : num_create_from_qfloat(qf_atanh(qf));
     }
     return number_apply_nonreal_complex_unary_or_dispatch(number, atanh, qf_atanh, qc_atanh, number_mpfr_atanh_mut, mpc_atanh);
+}
+
+number_t num_asech(const number_t number)
+{
+    number_kind_t kind = number_kind_value(&number);
+    double d;
+    qfloat_t qf;
+
+    if (kind == NUMBER_DOUBLE) {
+        d = number_impl_const(&number)->value.d;
+        return d <= 0.0 || d > 1.0
+            ? number_double_cdouble_unary(d, number_cdouble_asech)
+            : num_create_from_double(number_double_asech(d));
+    }
+    if (kind == NUMBER_CDOUBLE)
+        return number_apply_cdouble_unary(number, number_cdouble_asech);
+    if (kind == NUMBER_QFLOAT) {
+        qf = number_impl_const(&number)->value.qf;
+        return qf_le(qf, QF_ZERO) || qf_gt(qf, QF_ONE)
+            ? number_qfloat_qcomplex_unary(qf, qc_asech)
+            : num_create_from_qfloat(qf_asech(qf));
+    }
+    return number_apply_nonreal_complex_unary_or_dispatch(number,
+        number_double_asech, qf_asech, qc_asech, number_mpfr_asech_mut,
+        number_mpc_asech);
+}
+
+number_t num_acosech(const number_t number)
+{
+    if (number_is_cdouble_value(&number))
+        return number_apply_cdouble_unary(number, number_cdouble_acosech);
+    return number_apply_nonreal_complex_unary_or_dispatch(number,
+        number_double_acosech, qf_acosech, qc_acosech,
+        number_mpfr_acosech_mut, number_mpc_acosech);
+}
+
+number_t num_acoth(const number_t number)
+{
+    number_kind_t kind = number_kind_value(&number);
+    double d;
+    qfloat_t qf;
+
+    if (kind == NUMBER_DOUBLE) {
+        d = number_impl_const(&number)->value.d;
+        return fabs(d) <= 1.0
+            ? number_double_cdouble_unary(d, number_cdouble_acoth)
+            : num_create_from_double(number_double_acoth(d));
+    }
+    if (kind == NUMBER_CDOUBLE)
+        return number_apply_cdouble_unary(number, number_cdouble_acoth);
+    if (kind == NUMBER_QFLOAT) {
+        qf = number_impl_const(&number)->value.qf;
+        return qf_le(qf_abs(qf), QF_ONE)
+            ? number_qfloat_qcomplex_unary(qf, qc_acoth)
+            : num_create_from_qfloat(qf_acoth(qf));
+    }
+    return number_apply_nonreal_complex_unary_or_dispatch(number,
+        number_double_acoth, qf_acoth, qc_acoth, number_mpfr_acoth_mut,
+        number_mpc_acoth);
 }
 
 number_t num_gamma(const number_t number)

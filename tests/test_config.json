@@ -250,6 +250,7 @@
     "test_trigonometric": {
       "enabled": true,
       "test_qf_trig": true,
+      "test_qf_reciprocal_trig": true,
       "test_qf_atan": true,
       "test_qf_atan2": true,
       "test_qf_asin": true,
@@ -262,6 +263,7 @@
       "test_qf_cosh": true,
       "test_qf_sinh": true,
       "test_qf_tanh": true,
+      "test_qf_reciprocal_hyperbolic": true,
       "test_qf_asinh": true,
       "test_qf_acosh": true,
       "test_qf_atanh": true
@@ -364,10 +366,10 @@
     "test_set_tol": true,
     "test_max_intervals": true,
     "test_last_intervals": true,
-    "test_dv_sin": true,
-    "test_dv_exp": true,
-    "test_dv_arctan": true,
-    "test_dv_null_safety": true,
+    "test_expr_sin": true,
+    "test_expr_exp": true,
+    "test_expr_arctan": true,
+    "test_expr_null_safety": true,
     "test_double_polynomial": true,
     "test_double_exp": true,
     "test_double_nonunit_bounds": true,
@@ -419,7 +421,7 @@
     "test_multi_2d_quartic_affine_times_cosh_affine": true,
     "example_integrator": true,
     "example_ctx": true,
-    "example_integrator_dv": true
+    "example_integrator_expr": true
   },
   "tests/matrix/test_matrix_core.c": {
     "test_creation": true,
@@ -430,14 +432,14 @@
     "test_number_matrix_arithmetic": true,
     "test_number_det_and_inverse": true,
     "test_mixed_number_backend_matrices": true,
-    "test_dval_multiply": true,
-    "test_dval_symbolic_printing": true,
+    "test_expr_multiply": true,
+    "test_expr_symbolic_printing": true,
     "test_add_sub": true,
     "test_multiply": true,
     "test_transpose_conjugate": true,
     "test_identity_get": true,
     "test_identity_set": true,
-    "test_dval_storage_lifecycle_regressions": true,
+    "test_expr_storage_lifecycle_regressions": true,
     "test_owned_element_reads_and_transforms": true,
     "test_sparse_support": true,
     "test_structural_queries_and_diagonal_construction": true,
@@ -471,7 +473,7 @@
     "test_det_double": true,
     "test_det_qfloat": true,
     "test_det_qcomplex": true,
-    "test_det_dval": true,
+    "test_det_expr": true,
     "test_symbolic_linear_algebra_extensions": true,
     "test_trace": true,
     "test_deriv": true,
@@ -485,14 +487,14 @@
     "test_inverse_double": true,
     "test_inverse_qfloat": true,
     "test_inverse_qcomplex": true,
-    "test_inverse_dval_2x2": true,
-    "test_inverse_dval_rotation": true,
-    "test_inverse_dval_upper_triangular": true,
-    "test_inverse_dval_lower_triangular": true,
-    "test_inverse_dval_dense_3x3": true,
-    "test_inverse_dval_dense_4x4": true,
-    "test_inverse_dval_dense_6x6": true,
-    "test_inverse_dval_singular": true,
+    "test_inverse_expr_2x2": true,
+    "test_inverse_expr_rotation": true,
+    "test_inverse_expr_upper_triangular": true,
+    "test_inverse_expr_lower_triangular": true,
+    "test_inverse_expr_dense_3x3": true,
+    "test_inverse_expr_dense_4x4": true,
+    "test_inverse_expr_dense_6x6": true,
+    "test_inverse_expr_singular": true,
     "test_solve_and_lstsq": true,
     "test_factorisations": true,
     "test_rank_pinv_nullspace": true,
@@ -506,11 +508,11 @@
     "test_eigen_complex": true,
     "test_eigen_num_hermitian": true,
     "test_eigen_num_hermitian_high_precision": true,
-    "test_eigen_dval": true,
-    "test_eigenspace_dval": true,
-    "test_generalized_eigenspace_dval": true,
-    "test_jordan_chain_dval": true,
-    "test_jordan_profile_dval": true,
+    "test_eigen_expr": true,
+    "test_eigenspace_expr": true,
+    "test_generalized_eigenspace_expr": true,
+    "test_jordan_chain_expr": true,
+    "test_jordan_profile_expr": true,
     "test_mat_exp_d": true,
     "test_mat_exp_mp_real": true,
     "test_mat_exp_complex": true,
@@ -554,8 +556,8 @@
     "test_mat_special_unary_square_extensions": true,
     "test_mat_typeof": true,
     "test_number_matrix_functions": true,
-    "test_dval_matrix_functions": true,
-    "test_dval_matrix_functions_extended": true,
+    "test_expr_matrix_functions": true,
+    "test_expr_matrix_functions_extended": true,
     "test_mat_simplify_symbolic_helper": true
   },
   "tests/matrix/test_matrix_function_regressions.c": {
@@ -620,21 +622,21 @@
     "run_number_readme_example_tests": true,
     "run_number_readme_mersenne_prime_search": false
   },
-  "tests/dval/test_dval.c": {
+  "tests/expression/test_expression.c": {
     "test_arithmetic": true,
     "test_d_variants": true,
     "test_maths_functions": true,
     "test_first_derivatives": true,
     "test_second_derivatives": true,
-    "test_dval_t_to_string": true,
-    "test_dval_t_from_string": true,
-    "test_dval_t_goal_seek": true,
+    "test_expr_t_to_string": true,
+    "test_expr_t_from_string": true,
+    "test_expr_t_goal_seek": true,
     "test_partial_derivatives": true,
-    "test_dval_pattern_helpers": true,
+    "test_expr_pattern_helpers": true,
     "test_runtime_regressions": true,
     "test_reverse_mode": true
   },
-  "tests/dval/test_dval_arithmetic.c": {
+  "tests/expression/test_expr_arithmetic.c": {
     "test_arithmetic": {
       "enabled": true,
       "test_add": true,
@@ -650,7 +652,7 @@
       "test_div_num": true
     }
   },
-  "tests/dval/test_dval_unary_maths.c": {
+  "tests/expression/test_expr_unary_maths.c": {
     "test_maths_functions": {
       "enabled": true,
       "test_sin": true,
@@ -702,7 +704,7 @@
       "test_binomial": true
     }
   },
-  "tests/dval/test_dval_first_derivatives.c": {
+  "tests/expression/test_expr_first_derivatives.c": {
     "test_first_derivatives": {
       "enabled": true,
       "test_deriv_const": true,
@@ -766,7 +768,7 @@
       "test_deriv_binomial": true
     }
   },
-  "tests/dval/test_dval_second_derivatives.c": {
+  "tests/expression/test_expr_second_derivatives.c": {
     "test_second_derivatives": {
       "enabled": true,
       "test_second_deriv_var": true,
@@ -821,8 +823,8 @@
       "test_second_deriv_digamma": true
     }
   },
-  "tests/dval/test_dval_string_groups.c": {
-    "test_dval_t_to_string": {
+  "tests/expression/test_expr_string_groups.c": {
+    "test_expr_t_to_string": {
       "enabled": true,
       "test_to_string_all": true,
       "test_expressions": true,
@@ -830,8 +832,8 @@
       "test_expressions_longname": true
     }
   },
-  "tests/dval/test_dval_to_string.c": {
-    "test_dval_t_to_string": {
+  "tests/expression/test_expr_to_string.c": {
+    "test_expr_t_to_string": {
       "enabled": true,
       "test_to_string_all": {
         "enabled": true,
@@ -885,7 +887,10 @@
           "test_to_string_complex_const_pow_func": true,
           "test_to_string_complex_const_pow_tex": true,
           "test_to_string_parsed_complex_const_pow_tex": true,
-          "test_to_string_parsed_complex_const_pow_expr": true
+          "test_to_string_parsed_complex_const_pow_expr": true,
+          "test_to_string_power_base_is_grouped_tex": true,
+          "test_to_string_power_of_power_simplifies_expr": true,
+          "test_to_string_powered_exponent_tex": true
         },
         "test_to_string_unary_sin": {
           "enabled": true,
@@ -914,8 +919,8 @@
       }
     }
   },
-  "tests/dval/test_dval_from_string.c": {
-    "test_dval_t_from_string": {
+  "tests/expression/test_expr_from_string.c": {
+    "test_expr_t_from_string": {
       "enabled": true,
       "test_from_string_pure_const": true,
       "test_from_string_arithmetic": true,
@@ -945,7 +950,7 @@
       "test_from_string_deriv": true
     }
   },
-  "tests/dval/test_dval_partials.c": {
+  "tests/expression/test_expr_partials.c": {
     "test_partial_derivatives": {
       "enabled": true,
       "test_partial_xy_product": true,
@@ -959,8 +964,8 @@
       "test_partial_to_string_sin_xy": true
     }
   },
-  "tests/dval/test_dval_pattern.c": {
-    "test_dval_pattern_helpers": {
+  "tests/expression/test_expr_pattern.c": {
+    "test_expr_pattern_helpers": {
       "enabled": true,
       "test_match_affine_families": true,
       "test_generic_unary_affine_matchers": true,
@@ -982,7 +987,7 @@
       "test_generic_affine_poly_deg4_times_unary_matcher": true
     }
   },
-  "tests/dval/test_dval_regressions.c": {
+  "tests/expression/test_expr_regressions.c": {
     "test_runtime_regressions": {
       "enabled": true,
       "test_cmp_qfloat_precision": true,
@@ -995,7 +1000,7 @@
       "test_new_const_num_preserves_qfloat_precision": true,
       "test_set_val_num_preserves_qfloat_precision": true,
       "test_default_constants_preserve_builtin_precision": true,
-      "test_dv_ln10_singleton": true,
+      "test_expr_ln10_singleton": true,
       "test_get_val_updates_after_set": true,
       "test_new_const_num": true,
       "test_new_const_num_rational_complex": true,
@@ -1008,6 +1013,7 @@
       "test_high_precision_mpfr_function_derivatives": true,
       "test_high_precision_complex_function_values": true,
       "test_set_val_num_named_constant": true,
+      "test_to_string_unbound_omits_binding_wrapper": true,
       "test_to_string_does_not_simplify_plain_expressions": true,
       "test_simplify_reuses_clean_nodes_and_dirty_mutations": true,
       "test_gamma_successor_product_simplifies": true,
@@ -1047,7 +1053,7 @@
       "test_goal_seek_large_target_uses_significant_digit_tolerance": true
     }
   },
-  "tests/dval/test_dval_reverse_mode.c": {
+  "tests/expression/test_expr_reverse_mode.c": {
     "test_reverse_mode": {
       "enabled": true,
       "test_reverse_gradient_polynomial": true,
@@ -1058,8 +1064,8 @@
       "test_reverse_gradient_complex_number_t": true
     }
   },
-  "tests/dval/test_dval_goal_seek.c": {
-    "test_dval_t_goal_seek": {
+  "tests/expression/test_expr_goal_seek.c": {
+    "test_expr_t_goal_seek": {
       "enabled": true,
       "test_goal_seek_real_one_variable": true,
       "test_goal_seek_complex_fallback": true,

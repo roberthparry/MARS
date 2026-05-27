@@ -4,11 +4,11 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "dval.h"
+#include "expression.h"
 
 /**
  * @file matrix.h
- * @brief Generic high-precision matrix type over `number_t` and `dval_t`.
+ * @brief Generic high-precision matrix type over `number_t` and `expr_t`.
  *
  * This API exposes a uniform matrix abstraction while hiding all internal
  * details such as element type, storage representation, and vtables.
@@ -22,7 +22,7 @@
  *   - lower triangular
  *
  * Numeric matrices store `number_t` values and symbolic matrices store
- * retained `dval_t *` handles. All operations dispatch through internal
+ * retained `expr_t *` handles. All operations dispatch through internal
  * vtables. No type switches or storage switches appear in user code.
  */
 
@@ -45,7 +45,7 @@ typedef enum {
  */
 typedef enum {
     MAT_TYPE_NUMBER,
-    MAT_TYPE_DVAL
+    MAT_TYPE_EXPR
 } mat_type_t;
 
 /**
@@ -143,13 +143,13 @@ matrix_t *mat_new(size_t rows, size_t cols);
 matrix_t *mat_new_sparse(size_t rows, size_t cols);
 
 /**
- * @brief Allocate a new (incomplete) matrix of dval_t* handles.
+ * @brief Allocate a new (incomplete) matrix of expr_t* handles.
  *
  * Each stored handle is retained by the matrix. Callers remain responsible
- * for their own references after passing a value to mat_set() or mat_create_dv().
+ * for their own references after passing a value to mat_set() or mat_create_expr().
  */
-matrix_t *mat_new_dv(size_t rows, size_t cols);
-matrix_t *mat_new_sparse_dv(size_t rows, size_t cols);
+matrix_t *mat_new_expr(size_t rows, size_t cols);
+matrix_t *mat_new_sparse_expr(size_t rows, size_t cols);
 
 /**
  * @brief Allocate a new (incomplete) square matrix of number_t values.
@@ -168,9 +168,9 @@ matrix_t *matsq_new(size_t n);
 matrix_t *mat_create_identity(size_t n);
 
 /**
- * @brief Create a complete identity matrix of dval_t* handles.
+ * @brief Create a complete identity matrix of expr_t* handles.
  */
-matrix_t *mat_create_identity_dv(size_t n);
+matrix_t *mat_create_identity_expr(size_t n);
 
 /**
  * @brief Create a diagonal matrix of number_t values from its diagonal entries.
@@ -181,9 +181,9 @@ matrix_t *mat_create_identity_dv(size_t n);
 matrix_t *mat_create_diagonal(size_t n, const number_t *diagonal);
 
 /**
- * @brief Create a diagonal matrix of dval_t* handles from its diagonal entries.
+ * @brief Create a diagonal matrix of expr_t* handles from its diagonal entries.
  */
-matrix_t *mat_create_diagonal_dv(size_t n, dval_t *const *diagonal);
+matrix_t *mat_create_diagonal_expr(size_t n, expr_t *const *diagonal);
 
 /**
  * @brief Create a complete matrix of number_t values from a flat array.
@@ -197,11 +197,11 @@ matrix_t *mat_create_diagonal_dv(size_t n, dval_t *const *diagonal);
 matrix_t *mat_create(size_t rows, size_t cols, const number_t *data);
 
 /**
- * @brief Create a complete matrix of dval_t* handles from a flat array.
+ * @brief Create a complete matrix of expr_t* handles from a flat array.
  *
  * Each handle is retained by the created matrix.
  */
-matrix_t *mat_create_dv(size_t rows, size_t cols, dval_t *const *data);
+matrix_t *mat_create_expr(size_t rows, size_t cols, expr_t *const *data);
 
 /**
  * @brief Parse a matrix from a string and return a numeric matrix when fully resolvable.
@@ -220,7 +220,7 @@ matrix_t *mat_create_dv(size_t rows, size_t cols, dval_t *const *data);
  * `x`, or partially bound wrapped input), this function returns NULL.
  *
  * For symbolic parsing where callers need mutable bindings or symbolic output,
- * use mat_from_string_dv(...).
+ * use mat_from_string_expr(...).
  */
 matrix_t *mat_from_string(const char *s);
 
@@ -234,9 +234,9 @@ matrix_t *mat_from_string(const char *s);
  *
  * Purely numeric matrices become `number_t` matrices, preserving exact,
  * floating, or complex numeric entries through the generic number layer.
- * Symbolic matrices become dval matrices. For bare symbolic input without
+ * Symbolic matrices become expr matrices. For bare symbolic input without
  * outer braces, all discovered bindings start as NaN and symbol kind is
- * inferred from the name. The bare inference rule matches dval parsing:
+ * inferred from the name. The bare inference rule matches expr parsing:
  *   - built-in valued constants: `e`, `pi`, `π`, `@pi`, `@phi`, `@gamma`
  *   - constant placeholders: `a`, `b`, `c`, `d`, and indexed forms such as
  *     `c1`, `c_2`, and `d₃`
@@ -252,7 +252,7 @@ matrix_t *mat_from_string(const char *s);
  * mat_bindings_get() and later released with mat_bindings_free(). If bindings
  * are not needed, pass NULL.
  */
-matrix_t *mat_from_string_dv(const char *s, mat_bindings_t **bnd_out);
+matrix_t *mat_from_string_expr(const char *s, mat_bindings_t **bnd_out);
 
 /**
  * @brief Look up a parsed matrix binding by name.
@@ -263,15 +263,15 @@ matrix_t *mat_from_string_dv(const char *s, mat_bindings_t **bnd_out);
  * `@phi` or `φ`, `@gamma` or `γ`, `@tau` or `τ`, `@DELTA` or `Δ`, and
  * `@OMEGA` or `Ω`.
  *
- * The returned @ref dval_t pointer is borrowed from the parsed matrix and
+ * The returned @ref expr_t pointer is borrowed from the parsed matrix and
  * remains valid only while that matrix remains alive.
  *
  * @return Borrowed symbolic leaf on success, or NULL if not found.
  */
-dval_t *mat_bindings_get(mat_bindings_t *bnd, const char *name);
+expr_t *mat_bindings_get(mat_bindings_t *bnd, const char *name);
 
 /**
- * @brief Release a bindings object previously returned by mat_from_string_dv().
+ * @brief Release a bindings object previously returned by mat_from_string_expr().
  */
 void mat_bindings_free(mat_bindings_t *bnd);
 
@@ -283,7 +283,7 @@ void mat_bindings_free(mat_bindings_t *bnd);
  * aliases such as `@DELTA`, and bracketed identifiers such as `[radius]`.
  *
  * @param A         Matrix to differentiate.
- * @param bindings  Borrowed bindings previously returned by mat_from_string_dv().
+ * @param bindings  Borrowed bindings previously returned by mat_from_string_expr().
  * @param name      Binding name to differentiate with respect to.
  * @return          Newly allocated derivative matrix on success, or NULL if
  *                  the named binding is not present or inputs are invalid.
@@ -299,7 +299,7 @@ matrix_t *mat_deriv_by_name(const matrix_t *A, mat_bindings_t *bindings,
  *
  * @return Newly allocated symbolic derivative, or NULL on error.
  */
-dval_t *mat_deriv_trace_by_name(const matrix_t *A, mat_bindings_t *bindings,
+expr_t *mat_deriv_trace_by_name(const matrix_t *A, mat_bindings_t *bindings,
                                 const char *name);
 
 /**
@@ -310,7 +310,7 @@ dval_t *mat_deriv_trace_by_name(const matrix_t *A, mat_bindings_t *bindings,
  *
  * @return Newly allocated symbolic derivative, or NULL on error.
  */
-dval_t *mat_deriv_det_by_name(const matrix_t *A, mat_bindings_t *bindings,
+expr_t *mat_deriv_det_by_name(const matrix_t *A, mat_bindings_t *bindings,
                               const char *name);
 
 /**
@@ -321,7 +321,7 @@ dval_t *mat_deriv_det_by_name(const matrix_t *A, mat_bindings_t *bindings,
  * bindings.
  *
  * @param A       Matrix-valued symbolic output.
- * @param bindings Borrowed bindings previously returned by mat_from_string_dv().
+ * @param bindings Borrowed bindings previously returned by mat_from_string_expr().
  * @param names   Array of binding names to differentiate with respect to.
  * @param nnames  Number of names in @p names.
  * @return        Newly allocated Jacobian matrix on success, or NULL if any
@@ -350,8 +350,8 @@ void mat_free(matrix_t *A);
  * For numeric matrices, that means @p out should point to a `number_t` which
  * receives the stored numeric entry value directly.
  *
- * For dval matrices, the returned `dval_t *` handle is borrowed from the
- * matrix. Do not call `dv_free()` on it unless you first create or retain your
+ * For expr matrices, the returned `expr_t *` handle is borrowed from the
+ * matrix. Do not call `expr_free()` on it unless you first create or retain your
  * own owning reference by other means.
  *
  * If you want a uniform owning numeric result regardless of the matrix's
@@ -367,7 +367,7 @@ void mat_get(const matrix_t *A, size_t i, size_t j, void *out);
  *
  * For `MAT_TYPE_NUMBER`, this returns an independent live clone of the stored
  * value. For other numeric matrix types, the entry is converted into a new
- * `number_t`. For symbolic `MAT_TYPE_DVAL`, the current entry value is
+ * `number_t`. For symbolic `MAT_TYPE_EXPR`, the current entry value is
  * evaluated and returned as a new `number_t`.
  *
  * Call `num_destroy(&value)` when finished with the returned value.
@@ -377,7 +377,7 @@ number_t mat_get_num(const matrix_t *A, size_t i, size_t j);
 /**
  * @brief Store one matrix element from @p val.
  *
- * For dval matrices, the matrix retains the incoming dval_t* handle. The caller
+ * For expr matrices, the matrix retains the incoming expr_t* handle. The caller
  * still owns any reference it already held.
  */
 void mat_set(matrix_t *A, size_t i, size_t j, const void *val);
@@ -413,11 +413,11 @@ matrix_t *mat_to_dense(const matrix_t *A);
 /**
  * @brief Evaluate a matrix into number_t form.
  *
- * For dval matrices, each symbolic entry is evaluated at the current variable
+ * For expr matrices, each symbolic entry is evaluated at the current variable
  * values and copied into a newly allocated number-valued matrix. The result is
  * a numeric snapshot and does not continue to track later variable changes.
  *
- * For non-dval matrices, this returns a number-valued copy in the same shape.
+ * For non-expr matrices, this returns a number-valued copy in the same shape.
  * Existing number_t entries preserve their current backend and precision.
  *
  * @param A  Input matrix.
@@ -481,24 +481,24 @@ mat_type_t mat_typeof(const matrix_t *A);
 void mat_set_data(matrix_t *A, const number_t *data);
 
 /**
- * @brief Set all symbolic matrix elements from a flat row-major buffer of `dval_t *`.
+ * @brief Set all symbolic matrix elements from a flat row-major buffer of `expr_t *`.
  *
  * Each supplied handle is retained by the matrix.
  */
-void mat_set_data_dv(matrix_t *A, dval_t *const *data);
+void mat_set_data_expr(matrix_t *A, expr_t *const *data);
 
 /**
  * @brief Low-level bulk setter using the matrix's native stored element representation.
  *
  * This is the native/raw counterpart of `mat_set_data(...)` and
- * `mat_set_data_dv(...)`. The caller must supply a row-major buffer whose
+ * `mat_set_data_expr(...)`. The caller must supply a row-major buffer whose
  * element type already matches the matrix's public element family:
  * - `number_t[rows * cols]` for `MAT_TYPE_NUMBER`
- * - `dval_t *[rows * cols]` for `MAT_TYPE_DVAL`
+ * - `expr_t *[rows * cols]` for `MAT_TYPE_EXPR`
  *
  * In ordinary user code, prefer the typed entry points:
  * - `mat_set_data(...)` for numeric matrices
- * - `mat_set_data_dv(...)` for symbolic matrices
+ * - `mat_set_data_expr(...)` for symbolic matrices
  *
  * Use `mat_set_data_raw(...)` only when writing generic code that has already
  * inspected `mat_typeof(A)` and deliberately wants to feed the matrix its
@@ -519,24 +519,24 @@ void mat_set_data_raw(matrix_t *A, const void *data);
 void mat_get_data(const matrix_t *A, number_t *data);
 
 /**
- * @brief Get all symbolic matrix elements into a flat row-major `dval_t *` buffer.
+ * @brief Get all symbolic matrix elements into a flat row-major `expr_t *` buffer.
  *
  * Returned handles are borrowed from the matrix.
  */
-void mat_get_data_dv(const matrix_t *A, dval_t **data);
+void mat_get_data_expr(const matrix_t *A, expr_t **data);
 
 /**
  * @brief Low-level bulk getter using the matrix's native stored element representation.
  *
  * This is the native/raw counterpart of `mat_get_data(...)` and
- * `mat_get_data_dv(...)`. The destination buffer must already match the
+ * `mat_get_data_expr(...)`. The destination buffer must already match the
  * matrix's public element family:
  * - `number_t[rows * cols]` for `MAT_TYPE_NUMBER`
- * - `dval_t *[rows * cols]` for `MAT_TYPE_DVAL`
+ * - `expr_t *[rows * cols]` for `MAT_TYPE_EXPR`
  *
  * In ordinary user code, prefer:
  * - `mat_get_data(...)` when you want owning `number_t` results
- * - `mat_get_data_dv(...)` when you want borrowed symbolic handles
+ * - `mat_get_data_expr(...)` when you want borrowed symbolic handles
  *
  * Use `mat_get_data_raw(...)` only for generic code that has already branched
  * on `mat_typeof(A)` and wants one low-level bulk access path after making
@@ -572,7 +572,7 @@ matrix_t *mat_transpose(const matrix_t *A);
  * @brief Return the entrywise complex conjugate of a matrix.
  *
  * For real-valued element types this leaves the numeric values unchanged. For
- * symbolic `dval_t *` matrices, the operation applies the elementwise
+ * symbolic `expr_t *` matrices, the operation applies the elementwise
  * conjugation rule provided by the symbolic element layer.
  *
  * @param A  Matrix to conjugate.
@@ -594,53 +594,53 @@ matrix_t *mat_hermitian(const matrix_t *A);
  * @brief Differentiate a matrix entrywise with respect to a symbolic variable.
  *
  * Each output entry is the derivative of the corresponding input entry with
- * respect to `wrt`. For non-`dval` matrices the input is treated as constant,
+ * respect to `wrt`. For non-`expr` matrices the input is treated as constant,
  * so the result is a zero matrix of matching shape.
  *
  * @param A    Matrix to differentiate.
  * @param wrt  Symbolic differentiation variable.
  * @return     Newly allocated derivative matrix on success, or NULL on error.
  */
-matrix_t *mat_deriv(const matrix_t *A, dval_t *wrt);
+matrix_t *mat_deriv(const matrix_t *A, expr_t *wrt);
 
 /**
  * @brief Differentiate the trace of a matrix with respect to a symbolic variable.
  *
  * For symbolic matrices this returns the exact derivative of `tr(A)`. For
- * non-`dval` matrices the matrix is treated as constant and symbolic zero is
+ * non-`expr` matrices the matrix is treated as constant and symbolic zero is
  * returned.
  *
  * @param A    Matrix whose trace is to be differentiated.
  * @param wrt  Symbolic differentiation variable.
  * @return     Newly allocated symbolic derivative, or NULL on error.
  */
-dval_t   *mat_deriv_trace(const matrix_t *A, dval_t *wrt);
+expr_t   *mat_deriv_trace(const matrix_t *A, expr_t *wrt);
 
 /**
  * @brief Differentiate the determinant of a matrix with respect to a symbolic variable.
  *
  * For symbolic matrices this returns the exact derivative of `det(A)`. For
- * non-`dval` matrices the matrix is treated as constant and symbolic zero is
+ * non-`expr` matrices the matrix is treated as constant and symbolic zero is
  * returned.
  *
  * @param A    Matrix whose determinant is to be differentiated.
  * @param wrt  Symbolic differentiation variable.
  * @return     Newly allocated symbolic derivative, or NULL on error.
  */
-dval_t   *mat_deriv_det(const matrix_t *A, dval_t *wrt);
+expr_t   *mat_deriv_det(const matrix_t *A, expr_t *wrt);
 
 /**
  * @brief Differentiate the inverse of a matrix with respect to a symbolic variable.
  *
  * Symbolic matrices use the exact matrix-calculus identity
- * `d(A^{-1}) = -A^{-1}(dA)A^{-1}`. Non-`dval` matrices are treated as
+ * `d(A^{-1}) = -A^{-1}(dA)A^{-1}`. Non-`expr` matrices are treated as
  * constant, so a zero matrix of the appropriate shape is returned.
  *
  * @param A    Matrix whose inverse derivative is requested.
  * @param wrt  Symbolic differentiation variable.
  * @return     Newly allocated derivative matrix on success, or NULL on error.
  */
-matrix_t *mat_deriv_inverse(const matrix_t *A, dval_t *wrt);
+matrix_t *mat_deriv_inverse(const matrix_t *A, expr_t *wrt);
 
 /**
  * @brief Differentiate the inverse of a matrix with respect to a returned binding name.
@@ -658,7 +658,7 @@ matrix_t *mat_deriv_inverse_by_name(const matrix_t *A, mat_bindings_t *bindings,
  *
  * The matrix is partitioned using the same top-left `split × split` block as
  * `mat_block_inverse(...)`. Symbolic matrices use the block inverse path and
- * exact matrix-calculus rules; non-`dval` matrices are treated as constant and
+ * exact matrix-calculus rules; non-`expr` matrices are treated as constant and
  * yield a zero matrix.
  *
  * @param A     Matrix whose block inverse derivative is requested.
@@ -666,7 +666,7 @@ matrix_t *mat_deriv_inverse_by_name(const matrix_t *A, mat_bindings_t *bindings,
  * @param wrt   Symbolic differentiation variable.
  * @return      Newly allocated derivative matrix on success, or NULL on error.
  */
-matrix_t *mat_deriv_block_inverse(const matrix_t *A, size_t split, dval_t *wrt);
+matrix_t *mat_deriv_block_inverse(const matrix_t *A, size_t split, expr_t *wrt);
 
 /**
  * @brief Differentiate the block inverse of a matrix with respect to a returned binding name.
@@ -687,7 +687,7 @@ matrix_t *mat_deriv_block_inverse_by_name(const matrix_t *A, size_t split,
  * `rows(A) * cols(A)` rows and `nvars` columns, where row
  * `i * cols(A) + j` corresponds to entry `A[i,j]`.
  *
- * For non-`dval` matrices the input is treated as constant, so the returned
+ * For non-`expr` matrices the input is treated as constant, so the returned
  * Jacobian is symbolic zero throughout.
  *
  * @param A      Matrix-valued symbolic output.
@@ -695,7 +695,7 @@ matrix_t *mat_deriv_block_inverse_by_name(const matrix_t *A, size_t split,
  * @param nvars  Number of variables in `vars`.
  * @return       Newly allocated Jacobian matrix on success, or NULL on error.
  */
-matrix_t *mat_jacobian(const matrix_t *A, dval_t *const *vars, size_t nvars);
+matrix_t *mat_jacobian(const matrix_t *A, expr_t *const *vars, size_t nvars);
 
 /**
  * @brief Compute the trace of a square matrix as a `number_t`.
@@ -707,7 +707,7 @@ matrix_t *mat_jacobian(const matrix_t *A, dval_t *const *vars, size_t nvars);
 int       mat_trace(const matrix_t *A, number_t *trace);
 
 /**
- * @brief Compute the trace of a square symbolic matrix as a `dval_t *`.
+ * @brief Compute the trace of a square symbolic matrix as a `expr_t *`.
  *
  * A newly built symbolic value is written through @p trace.
  *
@@ -715,7 +715,7 @@ int       mat_trace(const matrix_t *A, number_t *trace);
  * @param trace  Output buffer for the trace value.
  * @return       0 on success, or a negative value on error.
  */
-int       mat_trace_dv(const matrix_t *A, dval_t **trace);
+int       mat_trace_expr(const matrix_t *A, expr_t **trace);
 
 /**
  * @brief Compute the determinant of a square matrix as a `number_t`.
@@ -727,15 +727,15 @@ int       mat_trace_dv(const matrix_t *A, dval_t **trace);
 int       mat_det(const matrix_t *A, number_t *determinant);
 
 /**
- * @brief Compute the determinant of a square symbolic matrix as a `dval_t *`.
+ * @brief Compute the determinant of a square symbolic matrix as a `expr_t *`.
  *
- * Symbolic `dval` matrices use the exact symbolic determinant path.
+ * Symbolic `expr` matrices use the exact symbolic determinant path.
  *
  * @param A            Matrix whose determinant is requested.
  * @param determinant  Output buffer for the determinant value.
  * @return             0 on success, or a negative value on error.
  */
-int       mat_det_dv(const matrix_t *A, dval_t **determinant);
+int       mat_det_expr(const matrix_t *A, expr_t **determinant);
 
 /**
  * @brief Compute the characteristic polynomial of a square matrix.
@@ -815,7 +815,7 @@ matrix_t *mat_block_inverse(const matrix_t *A, size_t split);
  * @brief Differentiate the block solution of `A X = B` with respect to a symbolic variable.
  *
  * Uses the same top-left block partition as `mat_block_solve(...)`. For
- * non-`dval` inputs the matrices are treated as constant and a zero matrix of
+ * non-`expr` inputs the matrices are treated as constant and a zero matrix of
  * the solution shape is returned.
  *
  * @param A      Coefficient matrix.
@@ -824,7 +824,7 @@ matrix_t *mat_block_inverse(const matrix_t *A, size_t split);
  * @param wrt    Symbolic differentiation variable.
  * @return       Newly allocated derivative matrix on success, or NULL on error.
  */
-matrix_t *mat_deriv_block_solve(const matrix_t *A, const matrix_t *B, size_t split, dval_t *wrt);
+matrix_t *mat_deriv_block_solve(const matrix_t *A, const matrix_t *B, size_t split, expr_t *wrt);
 
 /**
  * @brief Differentiate the block solution of `A X = B` with respect to a returned binding name.
@@ -841,7 +841,7 @@ matrix_t *mat_deriv_block_solve_by_name(const matrix_t *A, const matrix_t *B, si
 /**
  * @brief Compute the inverse of a square matrix.
  *
- * For symbolic `dval` matrices this uses the exact symbolic inverse path.
+ * For symbolic `expr` matrices this uses the exact symbolic inverse path.
  *
  * @param A  Matrix to invert.
  * @return   Newly allocated inverse on success, or NULL on error.
@@ -852,7 +852,7 @@ matrix_t *mat_inverse(const matrix_t *A);
  * @brief Differentiate the solution of `A X = B` with respect to a symbolic variable.
  *
  * For symbolic matrices this uses the exact matrix-calculus solve derivative.
- * For non-`dval` matrices both inputs are treated as constant and a zero matrix
+ * For non-`expr` matrices both inputs are treated as constant and a zero matrix
  * of the solution shape is returned.
  *
  * @param A    Coefficient matrix.
@@ -860,7 +860,7 @@ matrix_t *mat_inverse(const matrix_t *A);
  * @param wrt  Symbolic differentiation variable.
  * @return     Newly allocated derivative matrix on success, or NULL on error.
  */
-matrix_t *mat_deriv_solve(const matrix_t *A, const matrix_t *B, dval_t *wrt);
+matrix_t *mat_deriv_solve(const matrix_t *A, const matrix_t *B, expr_t *wrt);
 
 /**
  * @brief Differentiate the solution of `A X = B` with respect to a returned binding name.
@@ -899,7 +899,7 @@ matrix_t *mat_block_solve(const matrix_t *A, const matrix_t *B, size_t split);
  * minimises the residual norm ||A X - B||. Numeric matrix types use a QR-based
  * solve for full-column-rank overdetermined systems and fall back to the
  * Moore-Penrose pseudoinverse for underdetermined or rank-deficient cases.
- * MAT_TYPE_DVAL supports exact symbolic least-squares through exact symbolic
+ * MAT_TYPE_EXPR supports exact symbolic least-squares through exact symbolic
  * pseudoinverses, including rank-deficient rectangular systems.
  *
  * Example:
@@ -937,7 +937,7 @@ matrix_t *mat_least_squares(const matrix_t *A, const matrix_t *B);
  * @brief Compute the rank of a matrix.
  *
  * Numeric matrix types determine rank from the singular values of A using the
- * library's internal tolerance policy. MAT_TYPE_DVAL uses exact symbolic
+ * library's internal tolerance policy. MAT_TYPE_EXPR uses exact symbolic
  * elimination with exact-zero checks on reduced entries.
  *
  * @param A  Input matrix.
@@ -961,7 +961,7 @@ int       mat_rank(const matrix_t *A);
  * When A is square and nonsingular, the pseudoinverse coincides with the
  * ordinary inverse.
  *
- * Numeric matrix types compute the pseudoinverse via SVD. MAT_TYPE_DVAL
+ * Numeric matrix types compute the pseudoinverse via SVD. MAT_TYPE_EXPR
  * supports exact symbolic pseudoinverses for rectangular and rank-deficient
  * inputs through exact full-rank factorisation.
  *
@@ -974,7 +974,7 @@ matrix_t *mat_pseudoinverse(const matrix_t *A);
  * @brief Compute a basis for the right nullspace of a matrix.
  *
  * The returned matrix stores basis vectors as its columns. If the nullspace
- * is trivial, the result may have zero columns. MAT_TYPE_DVAL computes this
+ * is trivial, the result may have zero columns. MAT_TYPE_EXPR computes this
  * basis exactly by symbolic reduction.
  *
  * @param A  Input matrix.
@@ -1136,26 +1136,26 @@ void mat_schur_factor_free(mat_schur_factor_t *out);
    ------------------------------------------------------------------------- */
 
 int       mat_eigenvalues(const matrix_t *A, number_t *eigenvalues);
-int       mat_eigenvalues_dv(const matrix_t *A, dval_t **eigenvalues);
+int       mat_eigenvalues_expr(const matrix_t *A, expr_t **eigenvalues);
 int       mat_eigendecompose(const matrix_t *A, number_t *eigenvalues,
                              matrix_t **eigenvectors);
-int       mat_eigendecompose_dv(const matrix_t *A, dval_t **eigenvalues,
+int       mat_eigendecompose_expr(const matrix_t *A, expr_t **eigenvalues,
                                 matrix_t **eigenvectors);
 matrix_t *mat_eigenvectors(const matrix_t *A);
 matrix_t *mat_eigenspace(const matrix_t *A, const number_t *eigenvalue);
-matrix_t *mat_eigenspace_dv(const matrix_t *A, const dval_t *eigenvalue);
+matrix_t *mat_eigenspace_expr(const matrix_t *A, const expr_t *eigenvalue);
 matrix_t *mat_generalized_eigenspace(const matrix_t *A,
                                      const number_t *eigenvalue,
                                      size_t order);
-matrix_t *mat_generalized_eigenspace_dv(const matrix_t *A,
-                                        const dval_t *eigenvalue,
+matrix_t *mat_generalized_eigenspace_expr(const matrix_t *A,
+                                        const expr_t *eigenvalue,
                                         size_t order);
 matrix_t *mat_jordan_chain(const matrix_t *A, const number_t *eigenvalue,
                            size_t order);
-matrix_t *mat_jordan_chain_dv(const matrix_t *A, const dval_t *eigenvalue,
+matrix_t *mat_jordan_chain_expr(const matrix_t *A, const expr_t *eigenvalue,
                               size_t order);
 matrix_t *mat_jordan_profile(const matrix_t *A, const number_t *eigenvalue);
-matrix_t *mat_jordan_profile_dv(const matrix_t *A, const dval_t *eigenvalue);
+matrix_t *mat_jordan_profile_expr(const matrix_t *A, const expr_t *eigenvalue);
 
 /* -------------------------------------------------------------------------
    Matrix-function helpers
@@ -1204,7 +1204,7 @@ matrix_t *mat_e1(const matrix_t *A);
 /**
  * @brief Return a copy of a matrix with every symbolic entry simplified.
  *
- * For `MAT_TYPE_DVAL`, each entry is rewritten through the current `dval`
+ * For `MAT_TYPE_EXPR`, each entry is rewritten through the current `expr`
  * simplifier before being stored in the returned matrix. For non-symbolic
  * matrices this is equivalent to a plain copy.
  */

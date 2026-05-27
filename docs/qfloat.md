@@ -205,16 +205,28 @@ All declarations are in `include/qfloat.h`.
 - `qfloat_t qf_sin(qfloat_t x)` — sine (radians)
 - `qfloat_t qf_cos(qfloat_t x)` — cosine (radians)
 - `qfloat_t qf_tan(qfloat_t x)` — tangent; NaN at poles
+- `qfloat_t qf_sec(qfloat_t x)` — secant `1/cos(x)`
+- `qfloat_t qf_cosec(qfloat_t x)` — cosecant `1/sin(x)`
+- `qfloat_t qf_cot(qfloat_t x)` — cotangent `1/tan(x)`
 - `qfloat_t qf_asin(qfloat_t x)` — inverse sine
 - `qfloat_t qf_acos(qfloat_t x)` — inverse cosine
 - `qfloat_t qf_atan(qfloat_t x)` — inverse tangent
+- `qfloat_t qf_asec(qfloat_t x)` — inverse secant
+- `qfloat_t qf_acosec(qfloat_t x)` — inverse cosecant
+- `qfloat_t qf_acot(qfloat_t x)` — inverse cotangent
 - `qfloat_t qf_atan2(qfloat_t y, qfloat_t x)` — four-quadrant inverse tangent
 - `qfloat_t qf_sinh(qfloat_t x)` — hyperbolic sine
 - `qfloat_t qf_cosh(qfloat_t x)` — hyperbolic cosine
 - `qfloat_t qf_tanh(qfloat_t x)` — hyperbolic tangent
+- `qfloat_t qf_sech(qfloat_t x)` — hyperbolic secant `1/cosh(x)`
+- `qfloat_t qf_cosech(qfloat_t x)` — hyperbolic cosecant `1/sinh(x)`
+- `qfloat_t qf_coth(qfloat_t x)` — hyperbolic cotangent `1/tanh(x)`
 - `qfloat_t qf_asinh(qfloat_t x)` — inverse hyperbolic sine
 - `qfloat_t qf_acosh(qfloat_t x)` — inverse hyperbolic cosine
 - `qfloat_t qf_atanh(qfloat_t x)` — inverse hyperbolic tangent
+- `qfloat_t qf_asech(qfloat_t x)` — inverse hyperbolic secant
+- `qfloat_t qf_acosech(qfloat_t x)` — inverse hyperbolic cosecant
+- `qfloat_t qf_acoth(qfloat_t x)` — inverse hyperbolic cotangent
 
 ### Special Functions
 
@@ -274,8 +286,14 @@ Pass `qfloat_t` values **by value** to `%q`/`%Q` specifiers.
 
 ```c
 qfloat_t x = qf_from_string("1");
-qf_printf("W0(1) = %.34q\n", x);   // 34 significant digits
-qf_printf("W0(1) = %Q\n",   x);    // scientific notation
+qfloat_t w = qf_lambert_w0(x);
+qf_printf("W0(1) = %.34q\n", w);   // 34 significant digits
+qf_printf("W0(1) = %Q\n",   w);    // scientific notation
+```
+
+```text
+W0(1) = 0.5671432904097838729999686622103575
+W0(1) = 5.671432904097838729999686622103575E-01
 ```
 
 ---
@@ -330,4 +348,3 @@ Results:
 
 For a broader benchmark overview, see
 [`docs/benchmarks.md`](benchmarks.md).
-

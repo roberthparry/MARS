@@ -1,9 +1,9 @@
 #include <stdlib.h>
 
 #include "matrix_internal.h"
-#include "internal/dval_internal.h"
+#include "internal/expr_internal.h"
 
-matrix_t *mat_deriv(const matrix_t *A, dval_t *wrt)
+matrix_t *mat_deriv(const matrix_t *A, expr_t *wrt)
 {
     matrix_t *D = NULL;
 
@@ -15,37 +15,37 @@ matrix_t *mat_deriv(const matrix_t *A, dval_t *wrt)
     if (!matrix_is_symbolic(A))
         return mat_create_zero_with_elem(A->rows, A->cols, A->elem);
 
-    D = mat_create_zero_with_elem(A->rows, A->cols, &dval_elem);
+    D = mat_create_zero_with_elem(A->rows, A->cols, &expr_elem);
     if (!D)
         return NULL;
 
     for (size_t i = 0; i < A->rows; ++i) {
         for (size_t j = 0; j < A->cols; ++j) {
-            dval_t *entry = NULL;
-            dval_t *deriv = NULL;
+            expr_t *entry = NULL;
+            expr_t *deriv = NULL;
 
             mat_get(A, i, j, &entry);
             if (!entry)
-                entry = (dval_t *)DV_ZERO;
+                entry = (expr_t *)EXPR_ZERO;
 
-            deriv = dv_create_deriv(entry, wrt);
+            deriv = expr_create_deriv(entry, wrt);
             if (!deriv) {
                 mat_free(D);
                 return NULL;
             }
 
             mat_set(D, i, j, &deriv);
-            dv_free(deriv);
+            expr_free(deriv);
         }
     }
 
     return D;
 }
 
-dval_t *mat_deriv_trace_by_name(const matrix_t *A, mat_bindings_t *bindings,
+expr_t *mat_deriv_trace_by_name(const matrix_t *A, mat_bindings_t *bindings,
                                 const char *name)
 {
-    dval_t *binding;
+    expr_t *binding;
 
     if (!A || !bindings || !name)
         return NULL;
@@ -60,7 +60,7 @@ dval_t *mat_deriv_trace_by_name(const matrix_t *A, mat_bindings_t *bindings,
 matrix_t *mat_deriv_by_name(const matrix_t *A, mat_bindings_t *bindings,
                             const char *name)
 {
-    dval_t *binding;
+    expr_t *binding;
 
     if (!A || !bindings || !name)
         return NULL;
@@ -72,50 +72,50 @@ matrix_t *mat_deriv_by_name(const matrix_t *A, mat_bindings_t *bindings,
     return mat_deriv(A, binding);
 }
 
-dval_t *mat_deriv_trace(const matrix_t *A, dval_t *wrt)
+expr_t *mat_deriv_trace(const matrix_t *A, expr_t *wrt)
 {
-    dval_t *trace = NULL;
-    dval_t *deriv = NULL;
+    expr_t *trace = NULL;
+    expr_t *deriv = NULL;
 
     if (!A || !wrt)
         return NULL;
     if (!A->elem)
         return NULL;
     if (!matrix_is_symbolic(A))
-        return dv_new_const(NUM_ZERO);
+        return expr_new_const(NUM_ZERO);
 
-    if (mat_trace_dv(A, &trace) != 0 || !trace)
+    if (mat_trace_expr(A, &trace) != 0 || !trace)
         return NULL;
 
-    deriv = dv_create_deriv(trace, wrt);
-    dv_free(trace);
+    deriv = expr_create_deriv(trace, wrt);
+    expr_free(trace);
     return deriv;
 }
 
-dval_t *mat_deriv_det(const matrix_t *A, dval_t *wrt)
+expr_t *mat_deriv_det(const matrix_t *A, expr_t *wrt)
 {
-    dval_t *det = NULL;
-    dval_t *deriv = NULL;
+    expr_t *det = NULL;
+    expr_t *deriv = NULL;
 
     if (!A || !wrt)
         return NULL;
     if (!A->elem)
         return NULL;
     if (!matrix_is_symbolic(A))
-        return dv_new_const(NUM_ZERO);
+        return expr_new_const(NUM_ZERO);
 
-    if (mat_det_dv(A, &det) != 0 || !det)
+    if (mat_det_expr(A, &det) != 0 || !det)
         return NULL;
 
-    deriv = dv_create_deriv(det, wrt);
-    dv_free(det);
+    deriv = expr_create_deriv(det, wrt);
+    expr_free(det);
     return deriv;
 }
 
-dval_t *mat_deriv_det_by_name(const matrix_t *A, mat_bindings_t *bindings,
+expr_t *mat_deriv_det_by_name(const matrix_t *A, mat_bindings_t *bindings,
                               const char *name)
 {
-    dval_t *binding;
+    expr_t *binding;
 
     if (!A || !bindings || !name)
         return NULL;
@@ -127,7 +127,7 @@ dval_t *mat_deriv_det_by_name(const matrix_t *A, mat_bindings_t *bindings,
     return mat_deriv_det(A, binding);
 }
 
-matrix_t *mat_deriv_inverse(const matrix_t *A, dval_t *wrt)
+matrix_t *mat_deriv_inverse(const matrix_t *A, expr_t *wrt)
 {
     matrix_t *Ai = NULL;
     matrix_t *dA = NULL;
@@ -174,7 +174,7 @@ cleanup:
 matrix_t *mat_deriv_inverse_by_name(const matrix_t *A, mat_bindings_t *bindings,
                                     const char *name)
 {
-    dval_t *binding;
+    expr_t *binding;
 
     if (!A || !bindings || !name)
         return NULL;
@@ -186,7 +186,7 @@ matrix_t *mat_deriv_inverse_by_name(const matrix_t *A, mat_bindings_t *bindings,
     return mat_deriv_inverse(A, binding);
 }
 
-matrix_t *mat_deriv_block_inverse(const matrix_t *A, size_t split, dval_t *wrt)
+matrix_t *mat_deriv_block_inverse(const matrix_t *A, size_t split, expr_t *wrt)
 {
     matrix_t *Ai = NULL;
     matrix_t *dA = NULL;
@@ -236,7 +236,7 @@ matrix_t *mat_deriv_block_inverse_by_name(const matrix_t *A, size_t split,
                                           mat_bindings_t *bindings,
                                           const char *name)
 {
-    dval_t *binding;
+    expr_t *binding;
 
     if (!A || !bindings || !name)
         return NULL;
@@ -248,7 +248,7 @@ matrix_t *mat_deriv_block_inverse_by_name(const matrix_t *A, size_t split,
     return mat_deriv_block_inverse(A, split, binding);
 }
 
-matrix_t *mat_jacobian(const matrix_t *A, dval_t *const *vars, size_t nvars)
+matrix_t *mat_jacobian(const matrix_t *A, expr_t *const *vars, size_t nvars)
 {
     matrix_t *J = NULL;
 
@@ -257,37 +257,37 @@ matrix_t *mat_jacobian(const matrix_t *A, dval_t *const *vars, size_t nvars)
     if (!A->elem)
         return NULL;
     if (!matrix_is_symbolic(A))
-        return mat_create_zero_with_elem(A->rows * A->cols, nvars, &dval_elem);
+        return mat_create_zero_with_elem(A->rows * A->cols, nvars, &expr_elem);
 
-    J = mat_create_zero_with_elem(A->rows * A->cols, nvars, &dval_elem);
+    J = mat_create_zero_with_elem(A->rows * A->cols, nvars, &expr_elem);
     if (!J)
         return NULL;
 
     for (size_t i = 0; i < A->rows; ++i) {
         for (size_t j = 0; j < A->cols; ++j) {
-            dval_t *entry = NULL;
+            expr_t *entry = NULL;
             size_t row = i * A->cols + j;
 
             mat_get(A, i, j, &entry);
             if (!entry)
-                entry = (dval_t *)DV_ZERO;
+                entry = (expr_t *)EXPR_ZERO;
 
             for (size_t k = 0; k < nvars; ++k) {
-                dval_t *deriv = NULL;
+                expr_t *deriv = NULL;
 
                 if (!vars[k]) {
                     mat_free(J);
                     return NULL;
                 }
 
-                deriv = dv_create_deriv(entry, vars[k]);
+                deriv = expr_create_deriv(entry, vars[k]);
                 if (!deriv) {
                     mat_free(J);
                     return NULL;
                 }
 
                 mat_set(J, row, k, &deriv);
-                dv_free(deriv);
+                expr_free(deriv);
             }
         }
     }
@@ -298,7 +298,7 @@ matrix_t *mat_jacobian(const matrix_t *A, dval_t *const *vars, size_t nvars)
 matrix_t *mat_jacobian_by_names(const matrix_t *A, mat_bindings_t *bindings,
                                 const char *const *names, size_t nnames)
 {
-    dval_t **vars = NULL;
+    expr_t **vars = NULL;
     matrix_t *J = NULL;
 
     if (!A || !bindings || !names || nnames == 0)
@@ -309,7 +309,7 @@ matrix_t *mat_jacobian_by_names(const matrix_t *A, mat_bindings_t *bindings,
         return NULL;
 
     for (size_t i = 0; i < nnames; ++i) {
-        dval_t *binding;
+        expr_t *binding;
 
         if (!names[i]) {
             free(vars);
@@ -330,7 +330,7 @@ matrix_t *mat_jacobian_by_names(const matrix_t *A, mat_bindings_t *bindings,
     return J;
 }
 
-matrix_t *mat_deriv_block_solve(const matrix_t *A, const matrix_t *B, size_t split, dval_t *wrt)
+matrix_t *mat_deriv_block_solve(const matrix_t *A, const matrix_t *B, size_t split, expr_t *wrt)
 {
     matrix_t *X = NULL;
     matrix_t *dA = NULL;
@@ -385,7 +385,7 @@ matrix_t *mat_deriv_block_solve_by_name(const matrix_t *A, const matrix_t *B, si
                                         mat_bindings_t *bindings,
                                         const char *name)
 {
-    dval_t *binding;
+    expr_t *binding;
 
     if (!A || !B || !bindings || !name)
         return NULL;
@@ -397,7 +397,7 @@ matrix_t *mat_deriv_block_solve_by_name(const matrix_t *A, const matrix_t *B, si
     return mat_deriv_block_solve(A, B, split, binding);
 }
 
-matrix_t *mat_deriv_solve(const matrix_t *A, const matrix_t *B, dval_t *wrt)
+matrix_t *mat_deriv_solve(const matrix_t *A, const matrix_t *B, expr_t *wrt)
 {
     matrix_t *X = NULL;
     matrix_t *dA = NULL;
@@ -450,7 +450,7 @@ matrix_t *mat_deriv_solve_by_name(const matrix_t *A, const matrix_t *B,
                                   mat_bindings_t *bindings,
                                   const char *name)
 {
-    dval_t *binding;
+    expr_t *binding;
 
     if (!A || !B || !bindings || !name)
         return NULL;

@@ -1,5 +1,5 @@
 #include "test_matrix.h"
-#include "internal/dval_internal.h"
+#include "internal/expr_internal.h"
 
 char current_matrix_input_label[128];
 static matrix_t *current_matrix_input = NULL;
@@ -15,7 +15,7 @@ static matrix_t *clone_matrix_snapshot(const matrix_t *A)
         /* Numeric tests already print concrete matrices inline; avoid
          * retaining extra numeric snapshots in the harness. */
         return NULL;
-    case MAT_TYPE_DVAL:
+    case MAT_TYPE_EXPR:
         return mat_to_dense(A);
     }
 
@@ -488,7 +488,7 @@ static void collect_bindings(char ***var_bindings,
     }
 }
 
-static void collect_dval_bindings(const dval_t *dv,
+static void collect_expr_bindings(const expr_t *dv,
                                   char ***var_bindings,
                                   size_t *nvar_bindings,
                                   size_t *capvar_bindings,
@@ -497,7 +497,7 @@ static void collect_dval_bindings(const dval_t *dv,
                                   size_t *capconst_bindings,
                                   const char *binding_text)
 {
-    if (dv && dv_is_named_const(dv) &&
+    if (dv && expr_is_named_const(dv) &&
         binding_text && *binding_text && !strchr(binding_text, ';')) {
         append_binding(const_bindings, nconst_bindings, capconst_bindings,
                        strdup(binding_text));
@@ -629,7 +629,7 @@ static char *join_bindings(char **var_bindings,
     return out;
 }
 
-static int split_dval_repr(const dval_t *dv, char **expr_out, char **bindings_out)
+static int split_expr_repr(const expr_t *dv, char **expr_out, char **bindings_out)
 {
     char *tmp;
     char *body;
@@ -645,7 +645,7 @@ static int split_dval_repr(const dval_t *dv, char **expr_out, char **bindings_ou
         return *expr_out && *bindings_out ? 0 : -1;
     }
 
-    tmp = dv_to_string(dv, style_EXPRESSION);
+    tmp = expr_to_string(dv, style_EXPRESSION);
     if (!tmp)
         return -1;
 
@@ -671,7 +671,7 @@ static int split_dval_repr(const dval_t *dv, char **expr_out, char **bindings_ou
     return *expr_out && *bindings_out ? 0 : -1;
 }
 
-static void pretty_dval_expr(char **expr_io,
+static void pretty_expr_expr(char **expr_io,
                              char **const_bindings,
                              size_t nconst_bindings)
 {
@@ -842,7 +842,7 @@ void print_mqc(const char *label, matrix_t *A)
     print_mqc_raw(display_label, A);
 }
 
-static void print_mdv_raw(const char *label, matrix_t *A)
+static void print_mexpr_raw(const char *label, matrix_t *A)
 {
     size_t rows = mat_get_row_count(A);
     size_t cols = mat_get_col_count(A);
@@ -859,14 +859,14 @@ static void print_mdv_raw(const char *label, matrix_t *A)
     for (size_t i = 0; ok && i < rows; i++)
         for (size_t j = 0; j < cols; j++)
         {
-            dval_t *v;
+            expr_t *v;
             char *expr = NULL;
             char *binding_text = NULL;
             char buf[2048];
             size_t idx = i * cols + j;
 
             mat_get(A, i, j, &v);
-            if (split_dval_repr(v, &expr, &binding_text) != 0) {
+            if (split_expr_repr(v, &expr, &binding_text) != 0) {
                 free(expr);
                 free(binding_text);
                 ok = 0;
@@ -874,20 +874,20 @@ static void print_mdv_raw(const char *label, matrix_t *A)
             }
 
             exprs[idx] = expr;
-            collect_dval_bindings(v,
+            collect_expr_bindings(v,
                                   &var_bindings, &nvar_bindings, &capvar_bindings,
                                   &const_bindings, &nconst_bindings, &capconst_bindings,
                                   binding_text);
-            pretty_dval_expr(&exprs[idx], const_bindings, nconst_bindings);
+            pretty_expr_expr(&exprs[idx], const_bindings, nconst_bindings);
             snprintf(buf, sizeof(buf), C_WHITE "%s" C_RESET, exprs[idx]);
             if (visible_string_width(buf) > w[j])
                 w[j] = visible_string_width(buf);
             free(binding_text);
-            dv_free(v);
+            expr_free(v);
         }
 
     if (!ok) {
-        printf("      " C_WHITE "<dval matrix>" C_RESET "\n");
+        printf("      " C_WHITE "<expr matrix>" C_RESET "\n");
         printf("    " C_CYAN "] }" C_RESET "\n");
     } else {
         char *joined = join_bindings(var_bindings, nvar_bindings,
@@ -978,7 +978,7 @@ void print_mdv(const char *label, matrix_t *A)
     char display_label[160];
     remember_matrix_input(label, A);
     format_matrix_label(label, display_label, sizeof(display_label));
-    print_mdv_raw(display_label, A);
+    print_mexpr_raw(display_label, A);
 }
 
 void print_current_input_matrix(void)
@@ -991,8 +991,8 @@ void print_current_input_matrix(void)
     case MAT_TYPE_NUMBER:
         print_mnum_raw("input matrix", current_matrix_input);
         break;
-    case MAT_TYPE_DVAL:
-        print_mdv_raw("input matrix", current_matrix_input);
+    case MAT_TYPE_EXPR:
+        print_mexpr_raw("input matrix", current_matrix_input);
         break;
     default:
         break;

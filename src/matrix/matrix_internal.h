@@ -15,7 +15,7 @@
 
 typedef enum {
     ELEM_NUMBER = 0,
-    ELEM_DVAL = 1,
+    ELEM_EXPR = 1,
     ELEM_MAX
 } elem_kind;
 
@@ -164,7 +164,7 @@ struct matrix_t {
    ============================================================ */
 
 extern const struct elem_vtable number_elem;
-extern const struct elem_vtable dval_elem;
+extern const struct elem_vtable expr_elem;
 
 bool elem_supports_numeric_algorithms(const struct elem_vtable *elem);
 bool elem_is_structural_zero(const struct elem_vtable *elem, const void *val);
@@ -172,10 +172,10 @@ void elem_init_zero_value(const struct elem_vtable *elem, void *slot);
 void elem_copy_value(const struct elem_vtable *elem, void *dst, const void *src);
 void elem_destroy_value(const struct elem_vtable *elem, void *slot);
 void elem_simplify_value(const struct elem_vtable *elem, void *slot);
-dval_t *dval_sub_simplify(const dval_t *a, const dval_t *b);
-dval_t *dval_clone_for_storage(const dval_t *dv);
+expr_t *expr_sub_simplify(const expr_t *a, const expr_t *b);
+expr_t *expr_clone_for_storage(const expr_t *dv);
 matrix_t *mat_finalize_symbolic_result(matrix_t *A);
-dval_t *dval_simplify_owned(dval_t *dv);
+expr_t *expr_simplify_owned(expr_t *dv);
 int mat_simplify_symbolic_inplace(matrix_t *A);
 
 /* ============================================================
@@ -277,7 +277,7 @@ static inline const struct elem_vtable *elem_of(const struct matrix_t *A) {
 
 static inline bool elem_is_symbolic(const struct elem_vtable *elem)
 {
-    return elem && elem->kind == ELEM_DVAL;
+    return elem && elem->kind == ELEM_EXPR;
 }
 
 static inline bool matrix_is_symbolic(const struct matrix_t *A)
@@ -306,17 +306,17 @@ void mat_schur_factor_free(mat_schur_factor_t *S);
    Shared exact symbolic helpers for numeric decomposition glue
    ============================================================ */
 
-matrix_t *mat_nullspace_dval_exact(const matrix_t *A);
-int mat_rank_dval_exact(const matrix_t *A);
-matrix_t *mat_pseudoinverse_dval_exact(const matrix_t *A);
-int mat_eigendecompose_dval(const matrix_t *A, dval_t **eigenvalues,
+matrix_t *mat_nullspace_expr_exact(const matrix_t *A);
+int mat_rank_expr_exact(const matrix_t *A);
+matrix_t *mat_pseudoinverse_expr_exact(const matrix_t *A);
+int mat_eigendecompose_expr(const matrix_t *A, expr_t **eigenvalues,
                             matrix_t **eigenvectors);
-matrix_t *mat_solve_dval_exact(const matrix_t *A, const matrix_t *B);
-int mat_det_dval_exact(const matrix_t *A, dval_t **determinant);
-matrix_t *mat_inverse_dval_exact(const matrix_t *A);
+matrix_t *mat_solve_expr_exact(const matrix_t *A, const matrix_t *B);
+int mat_det_expr_exact(const matrix_t *A, expr_t **determinant);
+matrix_t *mat_inverse_expr_exact(const matrix_t *A);
 matrix_t *mat_charpoly_numeric(const matrix_t *A);
-matrix_t *mat_charpoly_dval(const matrix_t *A);
-matrix_t *mat_minpoly_dval(const matrix_t *A);
+matrix_t *mat_charpoly_expr(const matrix_t *A);
+matrix_t *mat_minpoly_expr(const matrix_t *A);
 matrix_t *mat_adjugate_exact(const matrix_t *A);
 
 /* ============================================================

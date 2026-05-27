@@ -14,12 +14,12 @@ struct matrix_t *mat_new_sparse(size_t rows, size_t cols) {
     return mat_create_sparse_with_elem(rows, cols, &number_elem);
 }
 
-struct matrix_t *mat_new_dv(size_t rows, size_t cols) {
-    return mat_create_dense_with_elem(rows, cols, &dval_elem);
+struct matrix_t *mat_new_expr(size_t rows, size_t cols) {
+    return mat_create_dense_with_elem(rows, cols, &expr_elem);
 }
 
-struct matrix_t *mat_new_sparse_dv(size_t rows, size_t cols) {
-    return mat_create_sparse_with_elem(rows, cols, &dval_elem);
+struct matrix_t *mat_new_sparse_expr(size_t rows, size_t cols) {
+    return mat_create_sparse_with_elem(rows, cols, &expr_elem);
 }
 
 struct matrix_t *matsq_new(size_t n) {
@@ -30,8 +30,8 @@ struct matrix_t *mat_create_identity(size_t n) {
     return mat_create_identity_with_elem(n, &number_elem);
 }
 
-struct matrix_t *mat_create_identity_dv(size_t n) {
-    return mat_create_identity_with_elem(n, &dval_elem);
+struct matrix_t *mat_create_identity_expr(size_t n) {
+    return mat_create_identity_with_elem(n, &expr_elem);
 }
 
 static matrix_t *mat_create_diagonal_from_array(size_t n,
@@ -61,9 +61,9 @@ matrix_t *mat_create_diagonal(size_t n, const number_t *diagonal)
     return mat_create_diagonal_from_array(n, diagonal, &number_elem);
 }
 
-matrix_t *mat_create_diagonal_dv(size_t n, dval_t *const *diagonal)
+matrix_t *mat_create_diagonal_expr(size_t n, expr_t *const *diagonal)
 {
-    return mat_create_diagonal_from_array(n, diagonal, &dval_elem);
+    return mat_create_diagonal_from_array(n, diagonal, &expr_elem);
 }
 
 matrix_t *mat_create(size_t rows, size_t cols, const number_t *data)
@@ -73,10 +73,10 @@ matrix_t *mat_create(size_t rows, size_t cols, const number_t *data)
     return A;
 }
 
-matrix_t *mat_create_dv(size_t rows, size_t cols, dval_t *const *data)
+matrix_t *mat_create_expr(size_t rows, size_t cols, expr_t *const *data)
 {
-    matrix_t *A = mat_new_dv(rows, cols);
-    mat_set_data_dv(A, data);
+    matrix_t *A = mat_new_expr(rows, cols);
+    mat_set_data_expr(A, data);
     return A;
 }
 
@@ -108,12 +108,12 @@ number_t mat_get_num(const struct matrix_t *A, size_t i, size_t j)
         return out;
     }
 
-    if (A->elem == &dval_elem) {
-        dval_t *dv = NULL;
+    if (A->elem == &expr_elem) {
+        expr_t *dv = NULL;
 
         mat_get(A, i, j, &dv);
         if (dv)
-            out = dv_eval(dv);
+            out = expr_eval(dv);
         return out;
     }
     return out;
@@ -201,9 +201,9 @@ void mat_set_data(matrix_t *A, const number_t *data)
     mat_set_data_raw(A, data);
 }
 
-void mat_set_data_dv(matrix_t *A, dval_t *const *data)
+void mat_set_data_expr(matrix_t *A, expr_t *const *data)
 {
-    if (!A || !data || A->elem != &dval_elem)
+    if (!A || !data || A->elem != &expr_elem)
         return;
 
     mat_set_data_raw(A, data);
@@ -221,9 +221,9 @@ void mat_get_data(const matrix_t *A, number_t *data)
             data[cursor++] = mat_get_num(A, i, j);
 }
 
-void mat_get_data_dv(const matrix_t *A, dval_t **data)
+void mat_get_data_expr(const matrix_t *A, expr_t **data)
 {
-    if (!A || !data || A->elem != &dval_elem)
+    if (!A || !data || A->elem != &expr_elem)
         return;
 
     mat_get_data_raw(A, data);

@@ -268,7 +268,7 @@ static dictionary_t *ensure_file_dict(const char *file)
             return file_dict;
         }
 
-        /* Accept legacy flattened entries such as tests/test_dval.c. */
+        /* Accept legacy flattened entries such as tests/test_expr.c. */
         if (string_compare(normalised_key, flattened_key) != 0 &&
             dictionary_get(g_root, &flattened_key, &file_dict) && file_dict) {
             string_free(flattened_key);

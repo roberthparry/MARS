@@ -6,11 +6,11 @@
 
 #include "matrix_internal.h"
 #include "dictionary.h"
-#include "internal/dval_internal.h"
+#include "internal/expr_internal.h"
 
 typedef struct {
     const char *name;
-    dval_t *dval;
+    expr_t *expr;
 } mat_binding_entry_t;
 
 struct mat_bindings_t {
@@ -27,7 +27,7 @@ typedef struct {
     bool used_in_expr;
     bool owns_symbol;
     number_t value;
-    dval_t *symbol;
+    expr_t *symbol;
 } matrix_symbol_t;
 
 typedef struct {
@@ -282,7 +282,7 @@ static char *mf_read_simple_name(const char **pp)
     *pp = p;
     if (!had_at)
         return mf_strdup(buf);
-    return dv_normalise_name(buf);
+    return expr_normalise_name(buf);
 }
 
 static char *mf_read_any_name(const char **pp)
@@ -364,7 +364,7 @@ static void symbol_vec_free(symbol_vec_t *v)
         free(v->items[i].name);
         num_destroy(&v->items[i].value);
         if (v->items[i].owns_symbol && v->items[i].symbol)
-            dv_free(v->items[i].symbol);
+            expr_free(v->items[i].symbol);
     }
     free(v->items);
     v->items = NULL;
@@ -581,12 +581,12 @@ static int mf_collect_expression_names(const char *expr, symbol_vec_t *symbols)
         if (!mf_is_function_name(p)) {
             ssize_t found = symbol_vec_find(symbols, name);
             number_t default_number = NUM_ZERO;
-            bool has_default_value = dv_get_default_constant_num(name, &default_number);
+            bool has_default_value = expr_get_default_constant_num(name, &default_number);
 
             if (found < 0) {
                 if (symbol_vec_add(symbols,
                                    name,
-                                   has_default_value || dv_is_default_constant_name(name),
+                                   has_default_value || expr_is_default_constant_name(name),
                                    has_default_value,
                                    default_number) != 0) {
                     free(name);
@@ -910,7 +910,7 @@ static int mf_parse_binding_section(const char *text, symbol_vec_t *symbols)
             num_destroy(&symbols->items[found].value);
             symbols->items[found].value = value;
             if (symbols->items[found].symbol) {
-                dv_set_val(symbols->items[found].symbol, value);
+                expr_set_val(symbols->items[found].symbol, value);
             }
             free(name);
         } else {
@@ -967,9 +967,9 @@ static int mf_build_symbolic_matrix(char **entries,
 {
     size_t n = rows * cols;
     size_t active_count = 0;
-    dval_t **nodes = calloc(n, sizeof(*nodes));
+    expr_t **nodes = calloc(n, sizeof(*nodes));
     const char **names = NULL;
-    dval_t **refs = NULL;
+    expr_t **refs = NULL;
     matrix_t *A = NULL;
     mat_bindings_t *bindings = NULL;
     int ok = nodes != NULL;
@@ -995,11 +995,11 @@ static int mf_build_symbolic_matrix(char **entries,
 
         if (!symbols->items[i].symbol) {
             symbols->items[i].symbol = symbols->items[i].is_constant
-                                     ? dv_new_named_const(init, symbols->items[i].name)
-                                     : dv_new_named_var(init, symbols->items[i].name);
+                                     ? expr_new_named_const(init, symbols->items[i].name)
+                                     : expr_new_named_var(init, symbols->items[i].name);
             symbols->items[i].owns_symbol = true;
         } else if (symbols->items[i].has_value) {
-            dv_set_val(symbols->items[i].symbol, init);
+            expr_set_val(symbols->items[i].symbol, init);
         }
 
         if (!symbols->items[i].has_value)
@@ -1019,14 +1019,14 @@ static int mf_build_symbolic_matrix(char **entries,
             ok = 0;
             continue;
         }
-        nodes[i] = dval_from_expression_string(normalised, names, refs, active_count);
+        nodes[i] = expr_from_expression_string(normalised, names, refs, active_count);
         free(normalised);
         if (!nodes[i])
             ok = 0;
     }
 
     if (ok)
-        A = mat_create_dv(rows, cols, nodes);
+        A = mat_create_expr(rows, cols, nodes);
     ok = ok && A;
 
     if (ok && bindings_out) {
@@ -1057,7 +1057,7 @@ static int mf_build_symbolic_matrix(char **entries,
                 name_len = strlen(symbols->items[i].name) + 1;
                 memcpy(name_store, symbols->items[i].name, name_len);
                 entry->name = name_store;
-                entry->dval = symbols->items[i].symbol;
+                entry->expr = symbols->items[i].symbol;
                 symbols->items[i].owns_symbol = false;
                 if (mf_bindings_index_entry(bindings, entry) != 0) {
                     ok = 0;
@@ -1077,7 +1077,7 @@ static int mf_build_symbolic_matrix(char **entries,
 
     for (size_t i = 0; i < n; ++i) {
         if (nodes && nodes[i])
-            dv_free(nodes[i]);
+            expr_free(nodes[i]);
     }
     free(nodes);
     free(names);
@@ -1210,7 +1210,7 @@ cleanup:
     goto cleanup_success;
 }
 
-dval_t *mat_bindings_get(mat_bindings_t *bindings, const char *name)
+expr_t *mat_bindings_get(mat_bindings_t *bindings, const char *name)
 {
     char *norm;
     mat_binding_entry_t *entry = NULL;
@@ -1218,13 +1218,13 @@ dval_t *mat_bindings_get(mat_bindings_t *bindings, const char *name)
     if (!bindings || !name)
         return NULL;
 
-    norm = dv_normalise_binding_name(name);
+    norm = expr_normalise_binding_name(name);
     if (!norm)
         return NULL;
 
     dictionary_get(bindings->index, &norm, &entry);
     free(norm);
-    return entry ? entry->dval : NULL;
+    return entry ? entry->expr : NULL;
 }
 
 void mat_bindings_free(mat_bindings_t *bindings)
@@ -1232,7 +1232,7 @@ void mat_bindings_free(mat_bindings_t *bindings)
     mf_bindings_destroy_partial(bindings);
 }
 
-matrix_t *mat_from_string_dv(const char *s, mat_bindings_t **bindings_out)
+matrix_t *mat_from_string_expr(const char *s, mat_bindings_t **bindings_out)
 {
     return mf_parse_matrix_string(s, bindings_out);
 }
@@ -1252,7 +1252,7 @@ matrix_t *mat_from_string(const char *s)
         return A;
     }
 
-    if (mat_typeof(A) != MAT_TYPE_DVAL) {
+    if (mat_typeof(A) != MAT_TYPE_EXPR) {
         mat_bindings_free(bindings);
         mat_free(A);
         return NULL;
@@ -1261,13 +1261,13 @@ matrix_t *mat_from_string(const char *s)
     for (size_t i = 0; i < bindings->count; ++i) {
         number_t value;
 
-        if (!bindings->entries[i].dval) {
+        if (!bindings->entries[i].expr) {
             mat_bindings_free(bindings);
             mat_free(A);
             return NULL;
         }
 
-        value = dv_eval(bindings->entries[i].dval);
+        value = expr_eval(bindings->entries[i].expr);
         if (num_is_nan(value)) {
             num_destroy(&value);
             mat_bindings_free(bindings);

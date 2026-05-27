@@ -5,7 +5,7 @@
 #include "matrix_internal.h"
 #include "number.h"
 #include "matrix.h"
-#include "internal/dval_internal.h"
+#include "internal/expr_internal.h"
 
 enum {
     MATRIX_HERMITIAN_JACOBI_MAX_SWEEPS = 50
@@ -1086,8 +1086,8 @@ int mat_rank(const matrix_t *A)
 
     if (!A)
         return -1;
-    if (A->elem == &dval_elem)
-        return mat_rank_dval_exact(A);
+    if (A->elem == &expr_elem)
+        return mat_rank_expr_exact(A);
     if (!elem_supports_numeric_algorithms(A->elem))
         return -2;
 
@@ -1132,8 +1132,8 @@ matrix_t *mat_pseudoinverse(const matrix_t *A)
 
     if (!A)
         return NULL;
-    if (A->elem == &dval_elem)
-        return mat_pseudoinverse_dval_exact(A);
+    if (A->elem == &expr_elem)
+        return mat_pseudoinverse_expr_exact(A);
     if (!elem_supports_numeric_algorithms(A->elem))
         return NULL;
 
@@ -1199,8 +1199,8 @@ matrix_t *mat_nullspace(const matrix_t *A)
 
     if (!A)
         return NULL;
-    if (A->elem == &dval_elem)
-        return mat_nullspace_dval_exact(A);
+    if (A->elem == &expr_elem)
+        return mat_nullspace_expr_exact(A);
     if (!elem_supports_numeric_algorithms(A->elem))
         return NULL;
 
@@ -1293,11 +1293,11 @@ static matrix_t *mat_shift_subtract_number(const matrix_t *A, const number_t *ei
     return Shifted;
 }
 
-static matrix_t *mat_shift_subtract_dv(const matrix_t *A, const dval_t *eigenvalue)
+static matrix_t *mat_shift_subtract_expr(const matrix_t *A, const expr_t *eigenvalue)
 {
     matrix_t *Shifted = NULL;
 
-    if (!A || !eigenvalue || A->rows != A->cols || A->elem != &dval_elem)
+    if (!A || !eigenvalue || A->rows != A->cols || A->elem != &expr_elem)
         return NULL;
 
     Shifted = mat_copy_as_dense(A);
@@ -1305,22 +1305,22 @@ static matrix_t *mat_shift_subtract_dv(const matrix_t *A, const dval_t *eigenval
         return NULL;
 
     for (size_t i = 0; i < A->rows; ++i) {
-        dval_t *diag = NULL;
-        dval_t *new_diag = NULL;
+        expr_t *diag = NULL;
+        expr_t *new_diag = NULL;
 
         mat_get(Shifted, i, i, &diag);
         if (!diag)
-            diag = (dval_t *)DV_ZERO;
+            diag = (expr_t *)EXPR_ZERO;
 
-        dv_retain(diag);
-        dv_retain((dval_t *)eigenvalue);
-        new_diag = dval_sub_simplify(diag, (dval_t *)eigenvalue);
+        expr_retain(diag);
+        expr_retain((expr_t *)eigenvalue);
+        new_diag = expr_sub_simplify(diag, (expr_t *)eigenvalue);
         if (!new_diag) {
             mat_free(Shifted);
             return NULL;
         }
         mat_set(Shifted, i, i, &new_diag);
-        dv_free(new_diag);
+        expr_free(new_diag);
     }
 
     return Shifted;
@@ -1403,12 +1403,12 @@ matrix_t *mat_eigenspace(const matrix_t *A, const number_t *eigenvalue)
     return E;
 }
 
-matrix_t *mat_eigenspace_dv(const matrix_t *A, const dval_t *eigenvalue)
+matrix_t *mat_eigenspace_expr(const matrix_t *A, const expr_t *eigenvalue)
 {
     matrix_t *Shifted = NULL;
     matrix_t *E = NULL;
 
-    Shifted = mat_shift_subtract_dv(A, eigenvalue);
+    Shifted = mat_shift_subtract_expr(A, eigenvalue);
     if (!Shifted)
         return NULL;
 
@@ -1446,7 +1446,7 @@ matrix_t *mat_generalized_eigenspace(const matrix_t *A, const number_t *eigenval
     return G;
 }
 
-matrix_t *mat_generalized_eigenspace_dv(const matrix_t *A, const dval_t *eigenvalue,
+matrix_t *mat_generalized_eigenspace_expr(const matrix_t *A, const expr_t *eigenvalue,
                                         size_t order)
 {
     matrix_t *Shifted = NULL;
@@ -1457,9 +1457,9 @@ matrix_t *mat_generalized_eigenspace_dv(const matrix_t *A, const dval_t *eigenva
         return NULL;
 
     if (order == 1)
-        return mat_eigenspace_dv(A, eigenvalue);
+        return mat_eigenspace_expr(A, eigenvalue);
 
-    Shifted = mat_shift_subtract_dv(A, eigenvalue);
+    Shifted = mat_shift_subtract_expr(A, eigenvalue);
     if (!Shifted)
         return NULL;
 
@@ -1566,7 +1566,7 @@ fail:
     return NULL;
 }
 
-matrix_t *mat_jordan_chain_dv(const matrix_t *A, const dval_t *eigenvalue,
+matrix_t *mat_jordan_chain_expr(const matrix_t *A, const expr_t *eigenvalue,
                               size_t order)
 {
     matrix_t *Shifted = NULL;
@@ -1580,11 +1580,11 @@ matrix_t *mat_jordan_chain_dv(const matrix_t *A, const dval_t *eigenvalue,
     if (!A || !eigenvalue || A->rows != A->cols || order == 0)
         return NULL;
 
-    Shifted = mat_shift_subtract_dv(A, eigenvalue);
+    Shifted = mat_shift_subtract_expr(A, eigenvalue);
     if (!Shifted)
         return NULL;
 
-    G = mat_generalized_eigenspace_dv(A, eigenvalue, order);
+    G = mat_generalized_eigenspace_expr(A, eigenvalue, order);
     if (!G)
         goto fail;
 
@@ -1720,7 +1720,7 @@ fail:
     return NULL;
 }
 
-matrix_t *mat_jordan_profile_dv(const matrix_t *A, const dval_t *eigenvalue)
+matrix_t *mat_jordan_profile_expr(const matrix_t *A, const expr_t *eigenvalue)
 {
     size_t *dims = NULL;
     matrix_t *G = NULL;
@@ -1731,7 +1731,7 @@ matrix_t *mat_jordan_profile_dv(const matrix_t *A, const dval_t *eigenvalue)
 
     if (!A || !eigenvalue || A->rows != A->cols)
         return NULL;
-    if (A->elem != &dval_elem)
+    if (A->elem != &expr_elem)
         return NULL;
 
     n = A->rows;
@@ -1740,7 +1740,7 @@ matrix_t *mat_jordan_profile_dv(const matrix_t *A, const dval_t *eigenvalue)
         return NULL;
 
     for (size_t k = 1; k <= n; ++k) {
-        G = mat_generalized_eigenspace_dv(A, eigenvalue, k);
+        G = mat_generalized_eigenspace_expr(A, eigenvalue, k);
         if (!G)
             goto fail;
         dims[k] = G->cols;
@@ -3143,7 +3143,7 @@ matrix_t *mat_eigenvectors(const matrix_t *A)
         return NULL;
 
     if (matrix_is_symbolic(A)) {
-        if (mat_eigendecompose_dv(A, NULL, &V) != 0)
+        if (mat_eigendecompose_expr(A, NULL, &V) != 0)
             return NULL;
         return V;
     }

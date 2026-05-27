@@ -15,14 +15,14 @@ some GNU C extensions, so MSVC/Windows builds are not currently guaranteed.
 - **`number_t`** — generic numeric value cluster spanning exact integer/rational,
   fixed-precision, and multiprecision real/complex backends behind one by-value
   public handle
-- **`qfloat_t`** — double-double arithmetic and special functions (~34 decimal digits of precision)
-- **`matrix_t`** — generic high-precision matrix over numeric `number_t` values or symbolic `dval_t *` entries, with string-based matrix parsing and formatting, symbolic linear algebra support including Schur complements, block inverse/solve, Jordan helpers, entrywise matrix derivatives, Jacobian helpers, first matrix-calculus helpers for trace, determinant, inverse, block inverse, solve, and block solve, and high-precision eigendecomposition and matrix functions through the numeric `number_t` layer
-- **`dval_t`** — differentiable expression DAGs with first/second derivatives, symbolic matrix integration, and structural matcher helpers for higher-level symbolic code
+- **`qfloat_t`** — double-double arithmetic and special functions (~31-32 decimal digits of precision)
+- **`matrix_t`** — generic high-precision matrix over numeric `number_t` values or symbolic `expr_t *` entries, with string-based matrix parsing and formatting, symbolic linear algebra support including Schur complements, block inverse/solve, Jordan helpers, entrywise matrix derivatives, Jacobian helpers, first matrix-calculus helpers for trace, determinant, inverse, block inverse, solve, and block solve, and high-precision eigendecomposition and matrix functions through the numeric `number_t` layer
+- **`expr_t`** — differentiable expression DAGs with first/second derivatives, symbolic matrix integration, and structural matcher helpers for higher-level symbolic code
 - **`datetime_t`** — civil and astronomical date/time helpers
 - **`dictionary_t` / `set_t` / `array_t`** — generic containers with user-defined ownership
 - **`string_t`** — UTF-8-aware dynamic strings and grapheme operations
 - **`bitset_t`** — dynamic thread-safe bitset with bitwise operations
-- **`integrator_t`** — adaptive G7K15 / Turan T15/T4 integration with symbolic fast paths for affine-family `dval_t` integrands
+- **`integrator_t`** — adaptive G7K15 / Turan T15/T4 integration with symbolic fast paths for affine-family `expr_t` integrands
 
 ## Requirements
 
@@ -50,9 +50,9 @@ Recent sample benchmarks on this tree show:
   `1647.171 µs`
 - `affine_times_exp` at about `77.678 µs` versus `near_miss_exp` at about
   `49084.036 µs`
-- symbolic `dval` matrix solve for a dense `3x3` / `2`-RHS case at about
+- symbolic `expr` matrix solve for a dense `3x3` / `2`-RHS case at about
   `6000.421 µs`
-- symbolic `dval` matrix inverse for a dense `4x4` case at about
+- symbolic `expr` matrix inverse for a dense `4x4` case at about
   `40635.324 µs`
 - `qfloat_t` `gamma(2.3)` at about `1.246 µs` and `lgamma(2.3)` at about
   `3.797 µs`
@@ -157,30 +157,30 @@ the active scope while keeping rolling or returned values as ordinary owned
 `number_t` results. See [`docs/number.md`](docs/number.md) for the scope
 semantics and the `bench_number_scope` benchmark notes.
 
-**Automatic differentiation with `dval_t`:**
+**Automatic differentiation with `expr_t`:**
 
 ```c
 #include <stdio.h>
-#include "dval.h"
+#include "expression.h"
 #include "number.h"
 
 /* f(x) = exp(sin(x)) + 3*x^2 - 7 */
-static dval_t *make_f(dval_t *x) {
+static expr_t *make_f(expr_t *x) {
     number_t two = num_create_from_long(2);
     number_t three = num_create_from_long(3);
     number_t seven = num_create_from_long(7);
-    dval_t *sinx   = dv_sin(x);
-    dval_t *exp_sx = dv_exp(sinx);
-    dval_t *x2     = dv_pow(x, &two);
-    dval_t *term2  = dv_mul_num(x2, &three);
-    dval_t *f0     = dv_add(exp_sx, term2);
-    dval_t *f      = dv_sub_num(f0, &seven);
+    expr_t *sinx   = expr_sin(x);
+    expr_t *exp_sx = expr_exp(sinx);
+    expr_t *x2     = expr_pow(x, &two);
+    expr_t *term2  = expr_mul_num(x2, &three);
+    expr_t *f0     = expr_add(exp_sx, term2);
+    expr_t *f      = expr_sub_num(f0, &seven);
 
-    dv_free(sinx);
-    dv_free(exp_sx);
-    dv_free(x2);
-    dv_free(term2);
-    dv_free(f0);
+    expr_free(sinx);
+    expr_free(exp_sx);
+    expr_free(x2);
+    expr_free(term2);
+    expr_free(f0);
     num_destroy(&two);
     num_destroy(&seven);
     num_destroy(&three);
@@ -190,40 +190,41 @@ static dval_t *make_f(dval_t *x) {
 
 int main(void) {
     number_t x0 = num_create_from_string("1.25");
-    dval_t *x;
-    dval_t *f;
-    dval_t *df_dx;
-    const dval_t *d2f_dx;
+    expr_t *x;
+    expr_t *f;
+    expr_t *df_dx;
+    const expr_t *d2f_dx;
     number_t f_val;
     number_t d1_val;
     number_t d2_val;
 
     num_set_default_prec_bits(384);
-    x = dv_new_named_var(x0, "x");
+    x = expr_new_named_var(x0, "x");
     num_destroy(&x0);
     f = make_f(x);
-    df_dx = dv_create_deriv(f, x);
-    d2f_dx = dv_get_deriv(df_dx, x);
+    df_dx = expr_create_deriv(f, x);
+    d2f_dx = expr_get_deriv(df_dx, x);
 
-    printf("f(x)    = "); dv_print(f);
-    printf("f'(x)   = "); dv_print(df_dx);
-    printf("f''(x)  = "); dv_print(d2f_dx);
+    printf("f(x)    = "); expr_print(f);
+    printf("f'(x)   = "); expr_print(df_dx);
+    printf("f''(x)  = "); expr_print(d2f_dx);
 
-    f_val = dv_eval(f);
-    d1_val = dv_eval(df_dx);
-    d2_val = dv_eval(d2f_dx);
+    f_val = expr_eval(f);
+    d1_val = expr_eval(df_dx);
+    d2_val = expr_eval(d2f_dx);
 
-    printf("\nAt x = 1.25 (384 bits):\n");
-    num_printf("f(x)    = %.101N\n", f_val);
-    num_printf("f'(x)   = %.101N\n", d1_val);
-    num_printf("f''(x)  = %.101N\n", d2_val);
+    printf("\nAt x = 1.25 (384 bits, %zu significant digits):\n",
+           num_get_prec_digits(f_val));
+    num_printf("f(x)     = %.114N\n", f_val);
+    num_printf("f'(x)    = %.114N\n", d1_val);
+    num_printf("f''(x)   = %.114N\n", d2_val);
 
     num_destroy(&d2_val);
     num_destroy(&d1_val);
     num_destroy(&f_val);
-    dv_free(df_dx);
-    dv_free(f);
-    dv_free(x);
+    expr_free(df_dx);
+    expr_free(f);
+    expr_free(x);
     return 0;
 }
 ```
@@ -231,12 +232,12 @@ int main(void) {
 ```text
 f(x)    = { exp(sin(x)) + 3x² - 7 | x = 1.25 }
 f'(x)   = { 6x + cos(x)·exp(sin(x)) | x = 1.25 }
-f''(x)  = { cos²(x)·exp(sin(x)) - sin(x)·exp(sin(x)) + 6 | x = 1.25 }
+f''(x)  = { 0x + 61 + (1·cos(x)·cos(x)·exp(sin(x)) - 1·sin(x)·exp(sin(x))) | x = 1.25 }
 
-At x = 1.25 (384 bits):
-f(x)    = 0.2705855122552273437029639300167490299999821513753709749690393836985059027675459135561625639872826338
-f'(x)   = 8.3145046259933109960293996152090642497796353985778106153481685326015106615810640203903619149909273414
-f''(x)  = 3.8055231012396292258221776404244179176545341348683796728986430836039145902039198837528977153587143970
+At x = 1.25 (384 bits, 115 significant digits):
+f(x)     = 2.705855122552273437029639300167354701622137229515609890757472472673785676415953638138922546147659851426132733903704E-01
+f'(x)    = 8.314504625993310996029399615209018784051045276485022598390329993996280767846549723245286494696735200429525881424219E+00
+f''(x)   = 3.805523101239629225822177640424432554942960462475668946332693568943904891124835742842098701664525997316324105458890E+00
 ```
 
 **Symbolic matrix from a string:**
@@ -280,7 +281,7 @@ int main(void) {
 | `qfloat_t` | Double-double arithmetic and special functions | [`docs/qfloat.md`](docs/qfloat.md) |
 | `qcomplex_t` | Double-double complex arithmetic and special functions | [`docs/qcomplex.md`](docs/qcomplex.md) |
 | `matrix_t` | Generic high-precision matrix with numeric and symbolic element types | [`docs/matrix.md`](docs/matrix.md) |
-| `dval_t` | Differentiable expression DAGs with matrix integration | [`docs/dval.md`](docs/dval.md) |
+| `expr_t` | Differentiable expression DAGs with matrix integration | [`docs/expression.md`](docs/expression.md) |
 | `integrator_t` | Adaptive G7K15 numerical integrator | [`docs/integrator.md`](docs/integrator.md) |
 
 ## Build
@@ -324,7 +325,7 @@ See [`docs/testing.md`](docs/testing.md) for details on individual test suites.
 
 ```sh
 make bench_integrator
-make bench_matrix_dval
+make bench_matrix_expr
 make bench_number_maths
 make bench_number_scope
 make bench_qfloat_gamma_maths
@@ -351,9 +352,9 @@ README.md    repository landing page
 Makefile     build and test entry points
 ```
 
-Public consumers should include headers from `include/`. Headers under
-`include/internal/` support communication between MARS subsystems and tests,
-and are not intended as stable external API.
+Public consumers should include headers from `include/`. Shared implementation
+headers under `src/internal/` support communication between MARS subsystems and
+tests, and are not intended as stable external API.
 
 ## Acknowledgements
 

@@ -434,11 +434,27 @@ static void test_trig(void)
         qcomplex_t z3 = qcz(0.5, 0.5);
         check_qc("tan(z) = sin(z)/cos(z)",
                  qc_tan(z3), qc_div(qc_sin(z3), qc_cos(z3)), 1e-29);
+        check_qc("sec(z) = 1/cos(z)",
+                 qc_sec(z3), qc_div(QC_ONE, qc_cos(z3)), 1e-29);
+        check_qc("cosec(z) = 1/sin(z)",
+                 qc_cosec(z3), qc_div(QC_ONE, qc_sin(z3)), 1e-29);
+        check_qc("cot(z) = cos(z)/sin(z)",
+                 qc_cot(z3), qc_div(qc_cos(z3), qc_sin(z3)), 1e-29);
     }
 
     check_qc("atan(i/2) = i*atanh(1/2)",
              qc_atan(qcz(0.0, 0.5)),
              qcis("0.54930614433405484569762261846126285232374527891137"), 1e-29);
+
+    check_qc("acot(0) = pi/2",
+             qc_acot(qcr(0.0)),
+             qcrs("1.57079632679489661923132169163975144209858469968755"), 1e-29);
+    check_bool("asec(0) is NaN", qc_isnan(qc_asec(QC_ZERO)));
+    check_bool("acosec(0) is NaN", qc_isnan(qc_acosec(QC_ZERO)));
+    check_qc("asec(inf) = pi/2", qc_asec(QC_INF), QC_PI_2, 1e-29);
+    check_qc("acosec(inf) = 0", qc_acosec(QC_INF), QC_ZERO, 1e-29);
+    check_qc("acot(inf) = 0", qc_acot(QC_INF), QC_ZERO, 1e-29);
+    check_qc("acot(-inf) = pi", qc_acot(QC_NINF), QC_PI, 1e-29);
 
     {
         qcomplex_t z4 = qcz(0.6, 0.4);
@@ -448,6 +464,13 @@ static void test_trig(void)
     {
         qcomplex_t z5 = qcz(0.4, 0.3);
         check_qc("acos(cos(z)) = z", qc_acos(qc_cos(z5)), z5, 1e-27);
+    }
+
+    {
+        qcomplex_t z6 = qcz(1.4, 0.3);
+        check_qc("sec(asec(z)) = z", qc_sec(qc_asec(z6)), z6, 1e-27);
+        check_qc("cosec(acosec(z)) = z", qc_cosec(qc_acosec(z6)), z6, 1e-27);
+        check_qc("cot(acot(z)) = z", qc_cot(qc_acot(z6)), z6, 1e-27);
     }
 
     check_qc("atan2(0,1) = 0",   qc_atan2(qcr(0.0), qcr( 1.0)), qcr(0.0),          1e-30);
@@ -490,6 +513,9 @@ static void test_hyperbolic(void)
         check_qc("cosh²(z)-sinh²(z) = 1",
                  qc_sub(qc_mul(ch, ch), qc_mul(sh, sh)), qcr(1.0), 1e-28);
         check_qc("tanh(z) = sinh(z)/cosh(z)", qc_tanh(z), qc_div(sh, ch), 1e-29);
+        check_qc("sech(z) = 1/cosh(z)", qc_sech(z), qc_div(QC_ONE, ch), 1e-29);
+        check_qc("cosech(z) = 1/sinh(z)", qc_cosech(z), qc_div(QC_ONE, sh), 1e-29);
+        check_qc("coth(z) = cosh(z)/sinh(z)", qc_coth(z), qc_div(ch, sh), 1e-29);
     }
 
     {
@@ -505,6 +531,13 @@ static void test_hyperbolic(void)
     {
         qcomplex_t z4 = qcz(0.3, 0.4);
         check_qc("atanh(tanh(z)) = z", qc_atanh(qc_tanh(z4)), z4, 1e-27);
+    }
+
+    {
+        qcomplex_t z5 = qcz(1.5, 0.2);
+        check_qc("sech(asech(z)) = z", qc_sech(qc_asech(z5)), z5, 1e-27);
+        check_qc("cosech(acosech(z)) = z", qc_cosech(qc_acosech(z5)), z5, 1e-27);
+        check_qc("coth(acoth(z)) = z", qc_coth(qc_acoth(z5)), z5, 1e-27);
     }
 
     check_qc("atanh(1/2) = (1/2)ln(3)",

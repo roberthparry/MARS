@@ -473,6 +473,21 @@ qfloat_t qf_tan(qfloat_t x)
     return qf_div(s, c);
 }
 
+qfloat_t qf_sec(qfloat_t x)
+{
+    return qf_div(QF_ONE, qf_cos(x));
+}
+
+qfloat_t qf_cosec(qfloat_t x)
+{
+    return qf_div(QF_ONE, qf_sin(x));
+}
+
+qfloat_t qf_cot(qfloat_t x)
+{
+    return qf_div(qf_cos(x), qf_sin(x));
+}
+
 /* Taylor tail: atan(t) = t + t^3 * P(t^2),
    P(u) = sum_{k=0}^34 (-1)^k / (2k+3) * u^k
 */
@@ -643,6 +658,33 @@ qfloat_t qf_acos(qfloat_t x)
     return qf_sub(half_pi, qf_asin(x));
 }
 
+qfloat_t qf_asec(qfloat_t x)
+{
+    if (qf_eq(x, QF_ZERO))
+        return QF_NAN;
+    if (qf_isinf(x))
+        return QF_PI_2;
+    return qf_acos(qf_div(QF_ONE, x));
+}
+
+qfloat_t qf_acosec(qfloat_t x)
+{
+    if (qf_eq(x, QF_ZERO))
+        return QF_NAN;
+    if (qf_isinf(x))
+        return QF_ZERO;
+    return qf_asin(qf_div(QF_ONE, x));
+}
+
+qfloat_t qf_acot(qfloat_t x)
+{
+    if (qf_isposinf(x))
+        return QF_ZERO;
+    if (qf_isneginf(x))
+        return QF_PI;
+    return qf_atan2(QF_ONE, x);
+}
+
 qfloat_t qf_sinh(qfloat_t x)
 {
     qfloat_t ex  = qf_exp(x);
@@ -674,6 +716,21 @@ qfloat_t qf_tanh(qfloat_t x)
     qfloat_t den = qf_add(t, QF_ONE);
 
     return qf_div(num, den);
+}
+
+qfloat_t qf_sech(qfloat_t x)
+{
+    return qf_div(QF_ONE, qf_cosh(x));
+}
+
+qfloat_t qf_cosech(qfloat_t x)
+{
+    return qf_div(QF_ONE, qf_sinh(x));
+}
+
+qfloat_t qf_coth(qfloat_t x)
+{
+    return qf_div(qf_cosh(x), qf_sinh(x));
 }
 
 qfloat_t qf_asinh(qfloat_t x)
@@ -725,6 +782,21 @@ qfloat_t qf_atanh(qfloat_t x)
     qfloat_t half = QF_HALF;
 
     return qf_mul(half, qf_log(frac));
+}
+
+qfloat_t qf_asech(qfloat_t x)
+{
+    return qf_acosh(qf_div(QF_ONE, x));
+}
+
+qfloat_t qf_acosech(qfloat_t x)
+{
+    return qf_asinh(qf_div(QF_ONE, x));
+}
+
+qfloat_t qf_acoth(qfloat_t x)
+{
+    return qf_atanh(qf_div(QF_ONE, x));
 }
 
 qfloat_t qf_gamma(qfloat_t x)

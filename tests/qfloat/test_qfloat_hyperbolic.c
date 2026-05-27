@@ -135,6 +135,23 @@ static void test_qf_tanh(void)
     }
 }
 
+static void test_qf_reciprocal_hyperbolic(void)
+{
+    qfloat_t half = qf_from_double(0.5);
+    qfloat_t one = QF_ONE;
+    qfloat_t two = qf_from_double(2.0);
+
+    printf("\n== qf_sech / qf_cosech / qf_coth and inverses ==\n");
+
+    TEST_ASSERT_QFLOAT_CLOSE(qf_mul(qf_sech(half), qf_cosh(half)), one);
+    TEST_ASSERT_QFLOAT_CLOSE(qf_mul(qf_cosech(half), qf_sinh(half)), one);
+    TEST_ASSERT_QFLOAT_CLOSE(qf_mul(qf_coth(half), qf_tanh(half)), one);
+
+    TEST_ASSERT_QFLOAT_CLOSE(qf_asech(qf_div(one, two)), qf_acosh(two));
+    TEST_ASSERT_QFLOAT_CLOSE(qf_acosech(one), qf_asinh(one));
+    TEST_ASSERT_QFLOAT_CLOSE(qf_acoth(two), qf_atanh(qf_div(one, two)));
+}
+
 static void test_qf_asinh(void)
 {
     struct {
@@ -232,6 +249,7 @@ void test_hyperbolic(void) {
     TEST_RUN_SUBTEST(test_qf_cosh, NULL);
     TEST_RUN_SUBTEST(test_qf_sinh, NULL);
     TEST_RUN_SUBTEST(test_qf_tanh, NULL);
+    TEST_RUN_SUBTEST(test_qf_reciprocal_hyperbolic, NULL);
     TEST_RUN_SUBTEST(test_qf_asinh, NULL);
     TEST_RUN_SUBTEST(test_qf_acosh, NULL);
     TEST_RUN_SUBTEST(test_qf_atanh, NULL);

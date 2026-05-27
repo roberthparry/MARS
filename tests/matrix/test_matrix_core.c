@@ -1,13 +1,13 @@
 #include "test_matrix.h"
 
 /*
- * The public API now exposes DV_ZERO / DV_ONE as read-only immortal nodes.
+ * The public API now exposes EXPR_ZERO / EXPR_ONE as read-only immortal nodes.
  * Matrix fixture builders in this file still pass borrowed symbolic constants
- * through mutable dval_t * slots, so cast locally in tests rather than
+ * through mutable expr_t * slots, so cast locally in tests rather than
  * weakening the API constness.
  */
-#define DV_ZERO ((dval_t *)DV_ZERO)
-#define DV_ONE  ((dval_t *)DV_ONE)
+#define EXPR_ZERO ((expr_t *)EXPR_ZERO)
+#define EXPR_ONE  ((expr_t *)EXPR_ONE)
 
 static void test_creation(void)
 {
@@ -15,11 +15,11 @@ static void test_creation(void)
 
     matrix_t *Ad = test_mat_dense_d(2, 3);
     matrix_t *An = mat_new(3, 4);
-    matrix_t *Adv = mat_new_dv(4, 5);
+    matrix_t *Adv = mat_new_expr(4, 5);
 
     check_bool("mat_new_d non-null", Ad != NULL);
     check_bool("mat_new non-null", An != NULL);
-    check_bool("mat_new_dv non-null", Adv != NULL);
+    check_bool("mat_new_expr non-null", Adv != NULL);
 
     print_md("Ad", Ad);
     print_mnum("An", An);
@@ -713,28 +713,28 @@ static void test_mixed_number_backend_matrices(void)
     }
 }
 
-static void test_dval_multiply(void)
+static void test_expr_multiply(void)
 {
-    printf(C_CYAN "TEST: dval matrix multiply\n" C_RESET);
+    printf(C_CYAN "TEST: expr matrix multiply\n" C_RESET);
 
-    dval_t *x = test_dv_new_named_var_d(2.0, "x");
-    dval_t *y = test_dv_new_named_var_d(4.0, "y");
-    dval_t *one = test_dv_new_const_d(1.0);
-    dval_t *three = test_dv_new_const_d(3.0);
+    expr_t *x = test_expr_new_named_var_d(2.0, "x");
+    expr_t *y = test_expr_new_named_var_d(4.0, "y");
+    expr_t *one = test_expr_new_const_d(1.0);
+    expr_t *three = test_expr_new_const_d(3.0);
 
-    dval_t *avals[2] = {x, one};
-    dval_t *bvals[2] = {three, y};
+    expr_t *avals[2] = {x, one};
+    expr_t *bvals[2] = {three, y};
 
-    matrix_t *A = mat_create_dv(1, 2, avals);
-    matrix_t *B = mat_create_dv(2, 1, bvals);
+    matrix_t *A = mat_create_expr(1, 2, avals);
+    matrix_t *B = mat_create_expr(2, 1, bvals);
     matrix_t *C = mat_mul(A, B);
-    dval_t *out = NULL;
+    expr_t *out = NULL;
 
-    check_bool("mat_create_dv(A) non-null", A != NULL);
-    check_bool("mat_create_dv(B) non-null", B != NULL);
-    check_bool("mat_mul(dval,dval) non-null", C != NULL);
-    check_bool("mat_mul(dval,dval) -> MAT_TYPE_DVAL",
-               C != NULL && mat_typeof(C) == MAT_TYPE_DVAL);
+    check_bool("mat_create_expr(A) non-null", A != NULL);
+    check_bool("mat_create_expr(B) non-null", B != NULL);
+    check_bool("mat_mul(expr,expr) non-null", C != NULL);
+    check_bool("mat_mul(expr,expr) -> MAT_TYPE_EXPR",
+               C != NULL && mat_typeof(C) == MAT_TYPE_EXPR);
 
     if (A)
         print_mdv("A", A);
@@ -745,52 +745,52 @@ static void test_dval_multiply(void)
 
     if (C) {
         mat_get(C, 0, 0, &out);
-        check_d("C[0,0] = 3*x + y at x=2,y=4", dv_eval_d(out), 10.0, 1e-12);
+        check_d("C[0,0] = 3*x + y at x=2,y=4", expr_eval_d(out), 10.0, 1e-12);
 
-        test_dv_set_val_d(x, 5.0);
-        test_dv_set_val_d(y, 7.0);
-        check_d("C[0,0] tracks updated variables", dv_eval_d(out), 22.0, 1e-12);
+        test_expr_set_val_d(x, 5.0);
+        test_expr_set_val_d(y, 7.0);
+        check_d("C[0,0] tracks updated variables", expr_eval_d(out), 22.0, 1e-12);
     }
 
     mat_free(A);
     mat_free(B);
     mat_free(C);
-    dv_free(x);
-    dv_free(y);
-    dv_free(one);
-    dv_free(three);
+    expr_free(x);
+    expr_free(y);
+    expr_free(one);
+    expr_free(three);
 }
 
-static void test_dval_symbolic_printing(void)
+static void test_expr_symbolic_printing(void)
 {
-    printf(C_CYAN "TEST: dval symbolic matrix printing\n" C_RESET);
+    printf(C_CYAN "TEST: expr symbolic matrix printing\n" C_RESET);
 
-    dval_t *x = test_dv_new_named_var_d(0.0, "x");
-    dval_t *y = test_dv_new_named_var_d(1.0, "y");
-    dval_t *z = test_dv_new_named_var_d(2.0, "z");
-    dval_t *pi = dv_new_named_const(NUM_PI, "@pi");
-    dval_t *tau = dv_new_named_const(NUM_2PI, "@tau");
-    dval_t *alpha = test_dv_new_named_const_d(3.1415926535897932384626433, "@alpha");
-    dval_t *cos_y = dv_cos(y);
+    expr_t *x = test_expr_new_named_var_d(0.0, "x");
+    expr_t *y = test_expr_new_named_var_d(1.0, "y");
+    expr_t *z = test_expr_new_named_var_d(2.0, "z");
+    expr_t *pi = expr_new_named_const(NUM_PI, "@pi");
+    expr_t *tau = expr_new_named_const(NUM_2PI, "@tau");
+    expr_t *alpha = test_expr_new_named_const_d(3.1415926535897932384626433, "@alpha");
+    expr_t *cos_y = expr_cos(y);
 
-    dval_t *a00 = dv_mul(pi, cos_y);
-    dval_t *a01 = DV_ONE;
-    dval_t *a10 = dv_tan(z);
-    dval_t *a11 = dv_exp(y);
+    expr_t *a00 = expr_mul(pi, cos_y);
+    expr_t *a01 = EXPR_ONE;
+    expr_t *a10 = expr_tan(z);
+    expr_t *a11 = expr_exp(y);
 
-    dval_t *b00 = alpha;
-    dval_t *b01 = tau;
-    dval_t *b10 = x;
-    dval_t *b11 = dv_add(alpha, x);
+    expr_t *b00 = alpha;
+    expr_t *b01 = tau;
+    expr_t *b10 = x;
+    expr_t *b11 = expr_add(alpha, x);
 
-    dval_t *avals[4] = {a00, a01, a10, a11};
-    dval_t *bvals[4] = {b00, b01, b10, b11};
+    expr_t *avals[4] = {a00, a01, a10, a11};
+    expr_t *bvals[4] = {b00, b01, b10, b11};
 
-    matrix_t *A = mat_create_dv(2, 2, avals);
-    matrix_t *B = mat_create_dv(2, 2, bvals);
+    matrix_t *A = mat_create_expr(2, 2, avals);
+    matrix_t *B = mat_create_expr(2, 2, bvals);
 
-    check_bool("mat_create_dv(symbolic A) non-null", A != NULL);
-    check_bool("mat_create_dv(symbolic B) non-null", B != NULL);
+    check_bool("mat_create_expr(symbolic A) non-null", A != NULL);
+    check_bool("mat_create_expr(symbolic B) non-null", B != NULL);
 
     if (A)
         print_mdv("A", A);
@@ -800,30 +800,30 @@ static void test_dval_symbolic_printing(void)
     mat_free(A);
     mat_free(B);
 
-    dv_free(a00);
-    dv_free(cos_y);
-    dv_free(a10);
-    dv_free(a11);
-    dv_free(a01);
-    dv_free(b11);
-    dv_free(x);
-    dv_free(y);
-    dv_free(z);
-    dv_free(pi);
-    dv_free(tau);
-    dv_free(alpha);
+    expr_free(a00);
+    expr_free(cos_y);
+    expr_free(a10);
+    expr_free(a11);
+    expr_free(a01);
+    expr_free(b11);
+    expr_free(x);
+    expr_free(y);
+    expr_free(z);
+    expr_free(pi);
+    expr_free(tau);
+    expr_free(alpha);
 }
 
-static void check_dval_text_contains(const char *label, dval_t *dv, const char *needle)
+static void check_expr_text_contains(const char *label, expr_t *dv, const char *needle)
 {
-    char *s = dv ? dv_to_string(dv, style_EXPRESSION) : NULL;
+    char *s = dv ? expr_to_string(dv, style_EXPRESSION) : NULL;
     check_bool(label, s && strstr(s, needle) != NULL);
     free(s);
 }
 
-static void print_det_dv(const char *label, dval_t *dv)
+static void print_det_expr(const char *label, expr_t *dv)
 {
-    char *s = dv ? dv_to_string(dv, style_EXPRESSION) : NULL;
+    char *s = dv ? expr_to_string(dv, style_EXPRESSION) : NULL;
     printf("      %s = %s\n", label, s ? s : "<null>");
     free(s);
 }
@@ -1003,17 +1003,17 @@ static void test_owned_element_reads_and_transforms(void)
     printf(C_CYAN "TEST: owned element reads and transforms\n" C_RESET);
 
     number_t x0 = num_create_from_double(2.0);
-    dval_t *x = dv_new_named_var(x0, "x");
-    dval_t *one = DV_ONE;
-    dval_t *owned_x = NULL;
-    dval_t *owned_one = NULL;
-    matrix_t *A = mat_new_dv(1, 2);
+    expr_t *x = expr_new_named_var(x0, "x");
+    expr_t *one = EXPR_ONE;
+    expr_t *owned_x = NULL;
+    expr_t *owned_one = NULL;
+    matrix_t *A = mat_new_expr(1, 2);
     matrix_t *T = NULL;
-    dval_t *t_entry = NULL;
+    expr_t *t_entry = NULL;
 
     num_destroy(&x0);
 
-    check_bool("mat_new_dv owned-read source non-null", A != NULL);
+    check_bool("mat_new_expr owned-read source non-null", A != NULL);
     if (!A || !x)
         goto cleanup;
 
@@ -1022,30 +1022,30 @@ static void test_owned_element_reads_and_transforms(void)
 
     mat_get(A, 0, 0, &owned_x);
     if (owned_x)
-        dv_retain(owned_x);
+        expr_retain(owned_x);
     mat_get(A, 0, 1, &owned_one);
     if (owned_one)
-        dv_retain(owned_one);
+        expr_retain(owned_one);
 
-    check_bool("public dval read variable non-null", owned_x != NULL);
-    check_bool("public dval read constant non-null", owned_one != NULL);
-    check_d("owned x read evaluates", dv_eval_d(owned_x), 2.0, 1e-30);
-    check_d("owned one read evaluates", dv_eval_d(owned_one), 1.0, 1e-30);
+    check_bool("public expr read variable non-null", owned_x != NULL);
+    check_bool("public expr read constant non-null", owned_one != NULL);
+    check_d("owned x read evaluates", expr_eval_d(owned_x), 2.0, 1e-30);
+    check_d("owned one read evaluates", expr_eval_d(owned_one), 1.0, 1e-30);
 
-    dv_free(owned_x);
+    expr_free(owned_x);
     owned_x = NULL;
-    dv_free(owned_one);
+    expr_free(owned_one);
     owned_one = NULL;
 
-    test_dv_set_val_d(x, 4.5);
+    test_expr_set_val_d(x, 4.5);
     {
-        dval_t *entry = NULL;
+        expr_t *entry = NULL;
         mat_get(A, 0, 0, &entry);
-        check_d("matrix entry survives owned read destruction", dv_eval_d(entry), 4.5, 1e-30);
+        check_d("matrix entry survives owned read destruction", expr_eval_d(entry), 4.5, 1e-30);
     }
 
     T = mat_transpose(A);
-    check_bool("mat_transpose(dval owned-read source) non-null", T != NULL);
+    check_bool("mat_transpose(expr owned-read source) non-null", T != NULL);
     mat_free(A);
     A = NULL;
 
@@ -1053,94 +1053,94 @@ static void test_owned_element_reads_and_transforms(void)
         goto cleanup;
 
     mat_get(T, 0, 0, &t_entry);
-    check_bool("transposed dval entry non-null", t_entry != NULL);
-    check_d("transposed dval entry tracks x after source free", dv_eval_d(t_entry), 4.5, 1e-30);
+    check_bool("transposed expr entry non-null", t_entry != NULL);
+    check_d("transposed expr entry tracks x after source free", expr_eval_d(t_entry), 4.5, 1e-30);
 
 cleanup:
     if (owned_x)
-        dv_free(owned_x);
+        expr_free(owned_x);
     if (owned_one)
-        dv_free(owned_one);
+        expr_free(owned_one);
     mat_free(T);
     mat_free(A);
-    dv_free(x);
+    expr_free(x);
 }
 
-static void test_dval_storage_lifecycle_regressions(void)
+static void test_expr_storage_lifecycle_regressions(void)
 {
-    printf(C_CYAN "TEST: dval storage lifecycle regressions\n" C_RESET);
+    printf(C_CYAN "TEST: expr storage lifecycle regressions\n" C_RESET);
 
     {
-        matrix_t *A = mat_new_dv(2, 2);
-        dval_t *x = test_dv_new_named_var_d(2.0, "x");
-        dval_t *entry = NULL;
+        matrix_t *A = mat_new_expr(2, 2);
+        expr_t *x = test_expr_new_named_var_d(2.0, "x");
+        expr_t *entry = NULL;
 
-        check_bool("mat_new_dv dense non-null", A != NULL);
+        check_bool("mat_new_expr dense non-null", A != NULL);
         if (A) {
             mat_set(A, 0, 0, &x);
             mat_get(A, 0, 0, &entry);
-            check_d("dense dval slot stores x", dv_eval_d(entry), 2.0, 1e-12);
+            check_d("dense expr slot stores x", expr_eval_d(entry), 2.0, 1e-12);
 
-            test_dv_set_val_d(x, 3.5);
-            check_d("dense dval slot tracks x", dv_eval_d(entry), 3.5, 1e-12);
+            test_expr_set_val_d(x, 3.5);
+            check_d("dense expr slot tracks x", expr_eval_d(entry), 3.5, 1e-12);
         }
 
         mat_free(A);
-        dv_free(x);
+        expr_free(x);
     }
 
     {
-        dval_t *diag_vals[2];
+        expr_t *diag_vals[2];
         matrix_t *D;
-        dval_t *x = test_dv_new_named_var_d(4.0, "x");
-        dval_t *y = test_dv_new_named_var_d(5.0, "y");
-        dval_t *one = test_dv_new_const_d(1.0);
-        dval_t *entry = NULL;
+        expr_t *x = test_expr_new_named_var_d(4.0, "x");
+        expr_t *y = test_expr_new_named_var_d(5.0, "y");
+        expr_t *one = test_expr_new_const_d(1.0);
+        expr_t *entry = NULL;
 
         diag_vals[0] = x;
         diag_vals[1] = y;
-        D = mat_create_diagonal_dv(2, diag_vals);
+        D = mat_create_diagonal_expr(2, diag_vals);
 
-        check_bool("mat_create_diagonal_dv non-null", D != NULL);
+        check_bool("mat_create_diagonal_expr non-null", D != NULL);
         if (D) {
             mat_set(D, 0, 1, &one);
 
             mat_get(D, 0, 0, &entry);
-            check_d("diagonal materialise preserves [0,0]", dv_eval_d(entry), 4.0, 1e-12);
+            check_d("diagonal materialise preserves [0,0]", expr_eval_d(entry), 4.0, 1e-12);
             mat_get(D, 1, 1, &entry);
-            check_d("diagonal materialise preserves [1,1]", dv_eval_d(entry), 5.0, 1e-12);
+            check_d("diagonal materialise preserves [1,1]", expr_eval_d(entry), 5.0, 1e-12);
             mat_get(D, 0, 1, &entry);
-            check_d("diagonal materialise sets off-diagonal", dv_eval_d(entry), 1.0, 1e-12);
+            check_d("diagonal materialise sets off-diagonal", expr_eval_d(entry), 1.0, 1e-12);
         }
 
         mat_free(D);
-        dv_free(x);
-        dv_free(y);
-        dv_free(one);
+        expr_free(x);
+        expr_free(y);
+        expr_free(one);
     }
 
     {
-        matrix_t *I = mat_create_identity_dv(2);
-        dval_t *x = test_dv_new_named_var_d(6.0, "x");
-        dval_t *entry = NULL;
+        matrix_t *I = mat_create_identity_expr(2);
+        expr_t *x = test_expr_new_named_var_d(6.0, "x");
+        expr_t *entry = NULL;
 
-        check_bool("mat_create_identity_dv non-null", I != NULL);
+        check_bool("mat_create_identity_expr non-null", I != NULL);
         if (I) {
             mat_set(I, 0, 1, &x);
 
             mat_get(I, 0, 0, &entry);
-            check_d("identity materialise preserves [0,0]", dv_eval_d(entry), 1.0, 1e-12);
+            check_d("identity materialise preserves [0,0]", expr_eval_d(entry), 1.0, 1e-12);
             mat_get(I, 1, 1, &entry);
-            check_d("identity materialise preserves [1,1]", dv_eval_d(entry), 1.0, 1e-12);
+            check_d("identity materialise preserves [1,1]", expr_eval_d(entry), 1.0, 1e-12);
             mat_get(I, 0, 1, &entry);
-            check_d("identity materialise sets off-diagonal", dv_eval_d(entry), 6.0, 1e-12);
+            check_d("identity materialise sets off-diagonal", expr_eval_d(entry), 6.0, 1e-12);
 
-            test_dv_set_val_d(x, 8.0);
-            check_d("identity materialise tracks x", dv_eval_d(entry), 8.0, 1e-12);
+            test_expr_set_val_d(x, 8.0);
+            check_d("identity materialise tracks x", expr_eval_d(entry), 8.0, 1e-12);
         }
 
         mat_free(I);
-        dv_free(x);
+        expr_free(x);
     }
 }
 
@@ -1434,79 +1434,79 @@ static void test_sparse_support(void)
     }
 
     {
-        dval_t *x = test_dv_new_named_var_d(2.0, "x");
-        dval_t *expr = dv_add(x, DV_ONE);
-        dval_t *zero = DV_ZERO;
-        dval_t *got = NULL;
-        matrix_t *S = mat_new_sparse_dv(2, 2);
+        expr_t *x = test_expr_new_named_var_d(2.0, "x");
+        expr_t *expr = expr_add(x, EXPR_ONE);
+        expr_t *zero = EXPR_ZERO;
+        expr_t *got = NULL;
+        matrix_t *S = mat_new_sparse_expr(2, 2);
         matrix_t *D = NULL;
 
-        check_bool("mat_new_sparse_dv non-null", S != NULL);
-        check_bool("mat_new_sparse_dv reports sparse", S && mat_is_sparse(S));
-        check_bool("new sparse dval matrix nnz = 0", S && mat_nonzero_count(S) == 0);
-        check_bool("mat_new_sparse_dv -> MAT_TYPE_DVAL",
-                   S != NULL && mat_typeof(S) == MAT_TYPE_DVAL);
+        check_bool("mat_new_sparse_expr non-null", S != NULL);
+        check_bool("mat_new_sparse_expr reports sparse", S && mat_is_sparse(S));
+        check_bool("new sparse expr matrix nnz = 0", S && mat_nonzero_count(S) == 0);
+        check_bool("mat_new_sparse_expr -> MAT_TYPE_EXPR",
+                   S != NULL && mat_typeof(S) == MAT_TYPE_EXPR);
 
         if (S) {
             mat_set(S, 0, 1, &expr);
-            check_bool("dval sparse nnz after insert = 1", mat_nonzero_count(S) == 1);
+            check_bool("expr sparse nnz after insert = 1", mat_nonzero_count(S) == 1);
 
             mat_get(S, 0, 1, &got);
             if (got)
-                dv_retain(got);
-            check_bool("dval sparse readback non-null", got != NULL);
+                expr_retain(got);
+            check_bool("expr sparse readback non-null", got != NULL);
             if (got) {
-                check_d("dval sparse readback evaluates", dv_eval_d(got), 3.0, 1e-12);
-                check_dval_text_contains("dval sparse readback keeps expression", got, "x + 1");
-                dv_free(got);
+                check_d("expr sparse readback evaluates", expr_eval_d(got), 3.0, 1e-12);
+                check_expr_text_contains("expr sparse readback keeps expression", got, "x + 1");
+                expr_free(got);
                 got = NULL;
             }
 
             mat_set(S, 1, 1, &zero);
-            check_bool("setting dval structural zero keeps nnz = 1", mat_nonzero_count(S) == 1);
+            check_bool("setting expr structural zero keeps nnz = 1", mat_nonzero_count(S) == 1);
 
             D = mat_to_dense(S);
-            check_bool("mat_to_dense(dval sparse) not NULL", D != NULL);
-            check_bool("dense(dval sparse) keeps MAT_TYPE_DVAL",
-                       D != NULL && mat_typeof(D) == MAT_TYPE_DVAL);
+            check_bool("mat_to_dense(expr sparse) not NULL", D != NULL);
+            check_bool("dense(expr sparse) keeps MAT_TYPE_EXPR",
+                       D != NULL && mat_typeof(D) == MAT_TYPE_EXPR);
             if (D) {
                 mat_get(D, 0, 0, &got);
                 if (got)
-                    dv_retain(got);
-                check_bool("dense(dval sparse) offdiag zero [0,0]", got != NULL && dv_eval_d(got) == 0.0);
-                dv_free(got);
+                    expr_retain(got);
+                check_bool("dense(expr sparse) offdiag zero [0,0]", got != NULL && expr_eval_d(got) == 0.0);
+                expr_free(got);
                 got = NULL;
 
                 mat_get(D, 0, 1, &got);
                 if (got)
-                    dv_retain(got);
-                check_bool("dense(dval sparse) expression slot non-null", got != NULL);
+                    expr_retain(got);
+                check_bool("dense(expr sparse) expression slot non-null", got != NULL);
                 if (got) {
-                    check_d("dense(dval sparse) expression evaluates", dv_eval_d(got), 3.0, 1e-12);
-                    dv_free(got);
+                    check_d("dense(expr sparse) expression evaluates", expr_eval_d(got), 3.0, 1e-12);
+                    expr_free(got);
                     got = NULL;
                 }
 
                 mat_get(D, 1, 0, &got);
                 if (got)
-                    dv_retain(got);
-                check_bool("dense(dval sparse) offdiag zero [1,0]", got != NULL && dv_eval_d(got) == 0.0);
-                dv_free(got);
+                    expr_retain(got);
+                check_bool("dense(expr sparse) offdiag zero [1,0]", got != NULL && expr_eval_d(got) == 0.0);
+                expr_free(got);
                 got = NULL;
 
                 mat_get(D, 1, 1, &got);
                 if (got)
-                    dv_retain(got);
-                check_bool("dense(dval sparse) offdiag zero [1,1]", got != NULL && dv_eval_d(got) == 0.0);
-                dv_free(got);
+                    expr_retain(got);
+                check_bool("dense(expr sparse) offdiag zero [1,1]", got != NULL && expr_eval_d(got) == 0.0);
+                expr_free(got);
                 got = NULL;
             }
         }
 
         mat_free(D);
         mat_free(S);
-        dv_free(expr);
-        dv_free(x);
+        expr_free(expr);
+        expr_free(x);
     }
 }
 
@@ -3192,38 +3192,38 @@ static void test_trace(void)
     }
 
     {
-        dval_t *x = test_dv_new_named_var_d(2.0, "x");
-        dval_t *y = test_dv_new_named_var_d(3.0, "y");
-        dval_t *one = test_dv_new_const_d(1.0);
-        dval_t *two = test_dv_new_const_d(2.0);
-        dval_t *xy = dv_mul(x, y);
-        dval_t *vals[9] = {
-            x,       one,     DV_ZERO,
-            DV_ZERO, xy,      two,
-            one,     DV_ZERO, y};
-        matrix_t *A = mat_create_dv(3, 3, vals);
-        dval_t *tr = NULL;
+        expr_t *x = test_expr_new_named_var_d(2.0, "x");
+        expr_t *y = test_expr_new_named_var_d(3.0, "y");
+        expr_t *one = test_expr_new_const_d(1.0);
+        expr_t *two = test_expr_new_const_d(2.0);
+        expr_t *xy = expr_mul(x, y);
+        expr_t *vals[9] = {
+            x,       one,     EXPR_ZERO,
+            EXPR_ZERO, xy,      two,
+            one,     EXPR_ZERO, y};
+        matrix_t *A = mat_create_expr(3, 3, vals);
+        expr_t *tr = NULL;
 
-        print_mdv("A (dval)", A);
-        check_bool("mat_trace(dval) rc = 0", mat_trace_dv(A, &tr) == 0);
-        check_bool("trace(dval) non-null", tr != NULL);
+        print_mdv("A (expr)", A);
+        check_bool("mat_trace(expr) rc = 0", mat_trace_expr(A, &tr) == 0);
+        check_bool("trace(expr) non-null", tr != NULL);
         if (tr) {
-            print_det_dv("trace(A)", tr);
-            check_d("trace(dval) at x=2,y=3 = 11", dv_eval_d(tr), 11.0, 1e-12);
-            check_dval_text_contains("trace(dval) contains x", tr, "x");
-            check_dval_text_contains("trace(dval) contains y", tr, "y");
-            test_dv_set_val_d(x, 5.0);
-            test_dv_set_val_d(y, 7.0);
-            check_d("trace(dval) tracks x,y", dv_eval_d(tr), 47.0, 1e-12);
+            print_det_expr("trace(A)", tr);
+            check_d("trace(expr) at x=2,y=3 = 11", expr_eval_d(tr), 11.0, 1e-12);
+            check_expr_text_contains("trace(expr) contains x", tr, "x");
+            check_expr_text_contains("trace(expr) contains y", tr, "y");
+            test_expr_set_val_d(x, 5.0);
+            test_expr_set_val_d(y, 7.0);
+            check_d("trace(expr) tracks x,y", expr_eval_d(tr), 47.0, 1e-12);
         }
 
-        dv_free(tr);
+        expr_free(tr);
         mat_free(A);
-        dv_free(x);
-        dv_free(y);
-        dv_free(one);
-        dv_free(two);
-        dv_free(xy);
+        expr_free(x);
+        expr_free(y);
+        expr_free(one);
+        expr_free(two);
+        expr_free(xy);
     }
 }
 
@@ -3232,23 +3232,23 @@ static void test_deriv(void)
     printf(C_CYAN "TEST: matrix derivative\n" C_RESET);
 
     {
-        dval_t *x = test_dv_new_named_var_d(2.0, "x");
-        dval_t *y = test_dv_new_named_var_d(3.0, "y");
-        dval_t *c = test_dv_new_named_const_d(11.0, "c");
-        dval_t *one = test_dv_new_const_d(1.0);
-        dval_t *xy = dv_mul(x, y);
-        dval_t *x2 = dv_mul(x, x);
-        dval_t *sum = dv_add(x2, y);
-        dval_t *vals[4] = {
+        expr_t *x = test_expr_new_named_var_d(2.0, "x");
+        expr_t *y = test_expr_new_named_var_d(3.0, "y");
+        expr_t *c = test_expr_new_named_const_d(11.0, "c");
+        expr_t *one = test_expr_new_const_d(1.0);
+        expr_t *xy = expr_mul(x, y);
+        expr_t *x2 = expr_mul(x, x);
+        expr_t *sum = expr_add(x2, y);
+        expr_t *vals[4] = {
             x,   xy,
             one, sum};
-        matrix_t *A = mat_create_dv(2, 2, vals);
+        matrix_t *A = mat_create_expr(2, 2, vals);
         matrix_t *Dx = mat_deriv(A, x);
         matrix_t *Dy = mat_deriv(A, y);
         matrix_t *Dc = mat_deriv(A, c);
-        dval_t *v = NULL;
+        expr_t *v = NULL;
 
-        print_mdv("A (dval deriv)", A);
+        print_mdv("A (expr deriv)", A);
         check_bool("mat_deriv(A, x) not NULL", Dx != NULL);
         check_bool("mat_deriv(A, y) not NULL", Dy != NULL);
         check_bool("mat_deriv(A, c) not NULL", Dc != NULL);
@@ -3256,76 +3256,76 @@ static void test_deriv(void)
         if (Dx) {
             print_mdv("dA/dx", Dx);
             mat_get(Dx, 0, 0, &v);
-            check_d("dA/dx[0,0] = 1", dv_eval_d(v), 1.0, 1e-12);
+            check_d("dA/dx[0,0] = 1", expr_eval_d(v), 1.0, 1e-12);
             mat_get(Dx, 0, 1, &v);
-            check_d("dA/dx[0,1] = y", dv_eval_d(v), 3.0, 1e-12);
+            check_d("dA/dx[0,1] = y", expr_eval_d(v), 3.0, 1e-12);
             mat_get(Dx, 1, 0, &v);
-            check_d("dA/dx[1,0] = 0", dv_eval_d(v), 0.0, 1e-12);
+            check_d("dA/dx[1,0] = 0", expr_eval_d(v), 0.0, 1e-12);
             mat_get(Dx, 1, 1, &v);
-            check_d("dA/dx[1,1] = 2x", dv_eval_d(v), 4.0, 1e-12);
+            check_d("dA/dx[1,1] = 2x", expr_eval_d(v), 4.0, 1e-12);
             mat_get(Dx, 0, 1, &v);
-            check_dval_text_contains("dA/dx[0,1] contains y", v, "y");
+            check_expr_text_contains("dA/dx[0,1] contains y", v, "y");
             mat_get(Dx, 1, 1, &v);
-            check_dval_text_contains("dA/dx[1,1] contains x", v, "x");
+            check_expr_text_contains("dA/dx[1,1] contains x", v, "x");
         }
 
         if (Dy) {
             print_mdv("dA/dy", Dy);
             mat_get(Dy, 0, 0, &v);
-            check_d("dA/dy[0,0] = 0", dv_eval_d(v), 0.0, 1e-12);
+            check_d("dA/dy[0,0] = 0", expr_eval_d(v), 0.0, 1e-12);
             mat_get(Dy, 0, 1, &v);
-            check_d("dA/dy[0,1] = x", dv_eval_d(v), 2.0, 1e-12);
+            check_d("dA/dy[0,1] = x", expr_eval_d(v), 2.0, 1e-12);
             mat_get(Dy, 1, 0, &v);
-            check_d("dA/dy[1,0] = 0", dv_eval_d(v), 0.0, 1e-12);
+            check_d("dA/dy[1,0] = 0", expr_eval_d(v), 0.0, 1e-12);
             mat_get(Dy, 1, 1, &v);
-            check_d("dA/dy[1,1] = 1", dv_eval_d(v), 1.0, 1e-12);
+            check_d("dA/dy[1,1] = 1", expr_eval_d(v), 1.0, 1e-12);
         }
 
         if (Dc) {
             print_mdv("dA/dc", Dc);
             mat_get(Dc, 0, 0, &v);
-            check_bool("dA/dc[0,0] = NaN", v && num_is_nan(dv_eval(v)));
+            check_bool("dA/dc[0,0] = NaN", v && num_is_nan(expr_eval(v)));
             mat_get(Dc, 0, 1, &v);
-            check_bool("dA/dc[0,1] = NaN", v && num_is_nan(dv_eval(v)));
+            check_bool("dA/dc[0,1] = NaN", v && num_is_nan(expr_eval(v)));
             mat_get(Dc, 1, 0, &v);
-            check_bool("dA/dc[1,0] = NaN", v && num_is_nan(dv_eval(v)));
+            check_bool("dA/dc[1,0] = NaN", v && num_is_nan(expr_eval(v)));
             mat_get(Dc, 1, 1, &v);
-            check_bool("dA/dc[1,1] = NaN", v && num_is_nan(dv_eval(v)));
+            check_bool("dA/dc[1,1] = NaN", v && num_is_nan(expr_eval(v)));
         }
 
-        test_dv_set_val_d(x, 5.0);
-        test_dv_set_val_d(y, 7.0);
+        test_expr_set_val_d(x, 5.0);
+        test_expr_set_val_d(y, 7.0);
         if (Dx) {
             mat_get(Dx, 0, 1, &v);
-            check_d("dA/dx[0,1] tracks y", dv_eval_d(v), 7.0, 1e-12);
+            check_d("dA/dx[0,1] tracks y", expr_eval_d(v), 7.0, 1e-12);
             mat_get(Dx, 1, 1, &v);
-            check_d("dA/dx[1,1] tracks x", dv_eval_d(v), 10.0, 1e-12);
+            check_d("dA/dx[1,1] tracks x", expr_eval_d(v), 10.0, 1e-12);
         }
         if (Dy) {
             mat_get(Dy, 0, 1, &v);
-            check_d("dA/dy[0,1] tracks x", dv_eval_d(v), 5.0, 1e-12);
+            check_d("dA/dy[0,1] tracks x", expr_eval_d(v), 5.0, 1e-12);
         }
 
         mat_free(Dx);
         mat_free(Dy);
         mat_free(Dc);
         mat_free(A);
-        dv_free(c);
-        dv_free(x);
-        dv_free(y);
-        dv_free(one);
-        dv_free(xy);
-        dv_free(x2);
-        dv_free(sum);
+        expr_free(c);
+        expr_free(x);
+        expr_free(y);
+        expr_free(one);
+        expr_free(xy);
+        expr_free(x2);
+        expr_free(sum);
     }
 
     {
-        dval_t *x = test_dv_new_named_var_d(2.0, "x");
+        expr_t *x = test_expr_new_named_var_d(2.0, "x");
         double vals[4] = {
             1.0, 2.0,
             3.0, 4.0};
         double rhs_vals[2] = {5.0, 6.0};
-        dval_t *vars[2] = {x, DV_ONE};
+        expr_t *vars[2] = {x, EXPR_ONE};
         matrix_t *A = test_mat_create_d(2, 2, vals);
         matrix_t *B = test_mat_create_d(2, 1, rhs_vals);
         matrix_t *Expected2 = test_mat_create_d(2, 2, (double[4]){
@@ -3333,14 +3333,14 @@ static void test_deriv(void)
             0.0, 0.0});
         matrix_t *Expected21 = test_mat_create_d(2, 1, (double[2]){
             0.0, 0.0});
-        matrix_t *ExpectedJ = mat_create_dv(4, 2, (dval_t *[8]){
-            DV_ZERO, DV_ZERO,
-            DV_ZERO, DV_ZERO,
-            DV_ZERO, DV_ZERO,
-            DV_ZERO, DV_ZERO});
+        matrix_t *ExpectedJ = mat_create_expr(4, 2, (expr_t *[8]){
+            EXPR_ZERO, EXPR_ZERO,
+            EXPR_ZERO, EXPR_ZERO,
+            EXPR_ZERO, EXPR_ZERO,
+            EXPR_ZERO, EXPR_ZERO});
         matrix_t *dA = mat_deriv(A, x);
-        dval_t *dtr = mat_deriv_trace(A, x);
-        dval_t *ddet = mat_deriv_det(A, x);
+        expr_t *dtr = mat_deriv_trace(A, x);
+        expr_t *ddet = mat_deriv_det(A, x);
         matrix_t *dAi = mat_deriv_inverse(A, x);
         matrix_t *dAbi = mat_deriv_block_inverse(A, 1, x);
         matrix_t *dX = mat_deriv_solve(A, B, x);
@@ -3365,22 +3365,22 @@ static void test_deriv(void)
                 mat_free(dX);
                 mat_free(dAbi);
                 mat_free(dAi);
-                dv_free(ddet);
-                dv_free(dtr);
+                expr_free(ddet);
+                expr_free(dtr);
                 mat_free(dA);
                 mat_free(ExpectedJ);
                 mat_free(Expected21);
                 mat_free(Expected2);
                 mat_free(B);
                 mat_free(A);
-                dv_free(x);
+                expr_free(x);
                 return;
             }
         }
         if (dtr)
-            check_d("numeric mat_deriv_trace(A, x) = 0", dv_eval_d(dtr), 0.0, 1e-12);
+            check_d("numeric mat_deriv_trace(A, x) = 0", expr_eval_d(dtr), 0.0, 1e-12);
         if (ddet)
-            check_d("numeric mat_deriv_det(A, x) = 0", dv_eval_d(ddet), 0.0, 1e-12);
+            check_d("numeric mat_deriv_det(A, x) = 0", expr_eval_d(ddet), 0.0, 1e-12);
         if (dAi) {
             bool ok = test_assert_matrix_d_close(dAi, Expected2, 1e-12,
                                                  __FILE__, __LINE__);
@@ -3390,15 +3390,15 @@ static void test_deriv(void)
                 mat_free(dX);
                 mat_free(dAbi);
                 mat_free(dAi);
-                dv_free(ddet);
-                dv_free(dtr);
+                expr_free(ddet);
+                expr_free(dtr);
                 mat_free(dA);
                 mat_free(ExpectedJ);
                 mat_free(Expected21);
                 mat_free(Expected2);
                 mat_free(B);
                 mat_free(A);
-                dv_free(x);
+                expr_free(x);
                 return;
             }
         }
@@ -3411,15 +3411,15 @@ static void test_deriv(void)
                 mat_free(dX);
                 mat_free(dAbi);
                 mat_free(dAi);
-                dv_free(ddet);
-                dv_free(dtr);
+                expr_free(ddet);
+                expr_free(dtr);
                 mat_free(dA);
                 mat_free(ExpectedJ);
                 mat_free(Expected21);
                 mat_free(Expected2);
                 mat_free(B);
                 mat_free(A);
-                dv_free(x);
+                expr_free(x);
                 return;
             }
         }
@@ -3432,15 +3432,15 @@ static void test_deriv(void)
                 mat_free(dX);
                 mat_free(dAbi);
                 mat_free(dAi);
-                dv_free(ddet);
-                dv_free(dtr);
+                expr_free(ddet);
+                expr_free(dtr);
                 mat_free(dA);
                 mat_free(ExpectedJ);
                 mat_free(Expected21);
                 mat_free(Expected2);
                 mat_free(B);
                 mat_free(A);
-                dv_free(x);
+                expr_free(x);
                 return;
             }
         }
@@ -3453,26 +3453,26 @@ static void test_deriv(void)
                 mat_free(dX);
                 mat_free(dAbi);
                 mat_free(dAi);
-                dv_free(ddet);
-                dv_free(dtr);
+                expr_free(ddet);
+                expr_free(dtr);
                 mat_free(dA);
                 mat_free(ExpectedJ);
                 mat_free(Expected21);
                 mat_free(Expected2);
                 mat_free(B);
                 mat_free(A);
-                dv_free(x);
+                expr_free(x);
                 return;
             }
         }
         if (J) {
-            dval_t *v = NULL;
+            expr_t *v = NULL;
             for (size_t i = 0; i < 4; ++i) {
                 for (size_t j = 0; j < 2; ++j) {
                     char label[64];
                     mat_get(J, i, j, &v);
                     snprintf(label, sizeof(label), "numeric Jacobian[%zu,%zu] = 0", i, j);
-                    check_d(label, dv_eval_d(v), 0.0, 1e-12);
+                    check_d(label, expr_eval_d(v), 0.0, 1e-12);
                 }
             }
             check_bool("numeric Jacobian shape is 4x2",
@@ -3488,15 +3488,15 @@ static void test_deriv(void)
         mat_free(dX);
         mat_free(dAbi);
         mat_free(dAi);
-        dv_free(ddet);
-        dv_free(dtr);
+        expr_free(ddet);
+        expr_free(dtr);
         mat_free(dA);
         mat_free(ExpectedJ);
         mat_free(Expected21);
         mat_free(Expected2);
         mat_free(B);
         mat_free(A);
-        dv_free(x);
+        expr_free(x);
     }
 }
 
@@ -3505,21 +3505,21 @@ static void test_matrix_calculus(void)
     printf(C_CYAN "TEST: matrix calculus helpers\n" C_RESET);
 
     {
-        dval_t *x = test_dv_new_named_var_d(2.0, "x");
-        dval_t *y = test_dv_new_named_var_d(3.0, "y");
-        dval_t *one = test_dv_new_const_d(1.0);
-        dval_t *two = test_dv_new_const_d(2.0);
-        dval_t *vals[4] = {
+        expr_t *x = test_expr_new_named_var_d(2.0, "x");
+        expr_t *y = test_expr_new_named_var_d(3.0, "y");
+        expr_t *one = test_expr_new_const_d(1.0);
+        expr_t *two = test_expr_new_const_d(2.0);
+        expr_t *vals[4] = {
             x,   one,
             y,   two};
-        matrix_t *A = mat_create_dv(2, 2, vals);
-        dval_t *dtr_dx = mat_deriv_trace(A, x);
-        dval_t *dtr_dy = mat_deriv_trace(A, y);
-        dval_t *ddet_dx = mat_deriv_det(A, x);
-        dval_t *ddet_dy = mat_deriv_det(A, y);
+        matrix_t *A = mat_create_expr(2, 2, vals);
+        expr_t *dtr_dx = mat_deriv_trace(A, x);
+        expr_t *dtr_dy = mat_deriv_trace(A, y);
+        expr_t *ddet_dx = mat_deriv_det(A, x);
+        expr_t *ddet_dy = mat_deriv_det(A, y);
         matrix_t *dAbi_dx = mat_deriv_block_inverse(A, 1, x);
         matrix_t *dAi_dx = mat_deriv_inverse(A, x);
-        dval_t *v = NULL;
+        expr_t *v = NULL;
 
         print_mdv("A (matrix calculus)", A);
         check_bool("mat_deriv_trace(A, x) not NULL", dtr_dx != NULL);
@@ -3530,77 +3530,77 @@ static void test_matrix_calculus(void)
         check_bool("mat_deriv_block_inverse(A, 1, x) not NULL", dAbi_dx != NULL);
 
         if (dtr_dx) {
-            print_det_dv("d/dx trace(A)", dtr_dx);
-            check_d("d/dx trace(A) = 1", dv_eval_d(dtr_dx), 1.0, 1e-12);
+            print_det_expr("d/dx trace(A)", dtr_dx);
+            check_d("d/dx trace(A) = 1", expr_eval_d(dtr_dx), 1.0, 1e-12);
         }
         if (dtr_dy) {
-            print_det_dv("d/dy trace(A)", dtr_dy);
-            check_d("d/dy trace(A) = 0", dv_eval_d(dtr_dy), 0.0, 1e-12);
+            print_det_expr("d/dy trace(A)", dtr_dy);
+            check_d("d/dy trace(A) = 0", expr_eval_d(dtr_dy), 0.0, 1e-12);
         }
         if (ddet_dx) {
-            print_det_dv("d/dx det(A)", ddet_dx);
-            check_d("d/dx det(A) = 2", dv_eval_d(ddet_dx), 2.0, 1e-12);
+            print_det_expr("d/dx det(A)", ddet_dx);
+            check_d("d/dx det(A) = 2", expr_eval_d(ddet_dx), 2.0, 1e-12);
         }
         if (ddet_dy) {
-            print_det_dv("d/dy det(A)", ddet_dy);
-            check_d("d/dy det(A) = -1", dv_eval_d(ddet_dy), -1.0, 1e-12);
+            print_det_expr("d/dy det(A)", ddet_dy);
+            check_d("d/dy det(A) = -1", expr_eval_d(ddet_dy), -1.0, 1e-12);
         }
 
         if (dAi_dx) {
             print_mdv("d/dx A^{-1} (helper)", dAi_dx);
             mat_get(dAi_dx, 0, 0, &v);
-            check_d("d/dx A^{-1}[0,0] = -4", dv_eval_d(v), -4.0, 1e-12);
+            check_d("d/dx A^{-1}[0,0] = -4", expr_eval_d(v), -4.0, 1e-12);
             mat_get(dAi_dx, 0, 1, &v);
-            check_d("d/dx A^{-1}[0,1] = 2", dv_eval_d(v), 2.0, 1e-12);
+            check_d("d/dx A^{-1}[0,1] = 2", expr_eval_d(v), 2.0, 1e-12);
             mat_get(dAi_dx, 1, 0, &v);
-            check_d("d/dx A^{-1}[1,0] = 6", dv_eval_d(v), 6.0, 1e-12);
+            check_d("d/dx A^{-1}[1,0] = 6", expr_eval_d(v), 6.0, 1e-12);
             mat_get(dAi_dx, 1, 1, &v);
-            check_d("d/dx A^{-1}[1,1] = -3", dv_eval_d(v), -3.0, 1e-12);
+            check_d("d/dx A^{-1}[1,1] = -3", expr_eval_d(v), -3.0, 1e-12);
         }
 
         if (dAbi_dx) {
             print_mdv("d/dx block_inverse(A, 1) (helper)", dAbi_dx);
             mat_get(dAbi_dx, 0, 0, &v);
-            check_d("d/dx block_inverse(A,1)[0,0] = -4", dv_eval_d(v), -4.0, 1e-12);
+            check_d("d/dx block_inverse(A,1)[0,0] = -4", expr_eval_d(v), -4.0, 1e-12);
             mat_get(dAbi_dx, 0, 1, &v);
-            check_d("d/dx block_inverse(A,1)[0,1] = 2", dv_eval_d(v), 2.0, 1e-12);
+            check_d("d/dx block_inverse(A,1)[0,1] = 2", expr_eval_d(v), 2.0, 1e-12);
             mat_get(dAbi_dx, 1, 0, &v);
-            check_d("d/dx block_inverse(A,1)[1,0] = 6", dv_eval_d(v), 6.0, 1e-12);
+            check_d("d/dx block_inverse(A,1)[1,0] = 6", expr_eval_d(v), 6.0, 1e-12);
             mat_get(dAbi_dx, 1, 1, &v);
-            check_d("d/dx block_inverse(A,1)[1,1] = -3", dv_eval_d(v), -3.0, 1e-12);
+            check_d("d/dx block_inverse(A,1)[1,1] = -3", expr_eval_d(v), -3.0, 1e-12);
         }
 
-        test_dv_set_val_d(x, 5.0);
-        test_dv_set_val_d(y, 7.0);
+        test_expr_set_val_d(x, 5.0);
+        test_expr_set_val_d(y, 7.0);
 
         if (ddet_dx)
-            check_d("d/dx det(A) tracks updated values", dv_eval_d(ddet_dx), 2.0, 1e-12);
+            check_d("d/dx det(A) tracks updated values", expr_eval_d(ddet_dx), 2.0, 1e-12);
         if (ddet_dy)
-            check_d("d/dy det(A) tracks updated values", dv_eval_d(ddet_dy), -1.0, 1e-12);
+            check_d("d/dy det(A) tracks updated values", expr_eval_d(ddet_dy), -1.0, 1e-12);
         if (dAi_dx) {
             mat_get(dAi_dx, 0, 0, &v);
-            check_d("d/dx A^{-1}[0,0] tracks updated values", dv_eval_d(v), -4.0 / 9.0, 1e-12);
+            check_d("d/dx A^{-1}[0,0] tracks updated values", expr_eval_d(v), -4.0 / 9.0, 1e-12);
             mat_get(dAi_dx, 1, 0, &v);
-            check_d("d/dx A^{-1}[1,0] tracks updated values", dv_eval_d(v), 14.0 / 9.0, 1e-12);
+            check_d("d/dx A^{-1}[1,0] tracks updated values", expr_eval_d(v), 14.0 / 9.0, 1e-12);
         }
         if (dAbi_dx) {
             mat_get(dAbi_dx, 0, 0, &v);
-            check_d("d/dx block_inverse(A,1)[0,0] tracks updated values", dv_eval_d(v), -4.0 / 9.0, 1e-12);
+            check_d("d/dx block_inverse(A,1)[0,0] tracks updated values", expr_eval_d(v), -4.0 / 9.0, 1e-12);
             mat_get(dAbi_dx, 1, 0, &v);
-            check_d("d/dx block_inverse(A,1)[1,0] tracks updated values", dv_eval_d(v), 14.0 / 9.0, 1e-12);
+            check_d("d/dx block_inverse(A,1)[1,0] tracks updated values", expr_eval_d(v), 14.0 / 9.0, 1e-12);
         }
 
         mat_free(dAbi_dx);
         mat_free(dAi_dx);
-        dv_free(ddet_dy);
-        dv_free(ddet_dx);
-        dv_free(dtr_dy);
-        dv_free(dtr_dx);
+        expr_free(ddet_dy);
+        expr_free(ddet_dx);
+        expr_free(dtr_dy);
+        expr_free(dtr_dx);
         mat_free(A);
-        dv_free(x);
-        dv_free(y);
-        dv_free(one);
-        dv_free(two);
+        expr_free(x);
+        expr_free(y);
+        expr_free(one);
+        expr_free(two);
     }
 }
 
@@ -3609,21 +3609,21 @@ static void test_deriv_solve(void)
     printf(C_CYAN "TEST: derivative of solve\n" C_RESET);
 
     {
-        dval_t *x = test_dv_new_named_var_d(4.0, "x");
-        dval_t *y = test_dv_new_named_var_d(6.0, "y");
-        dval_t *one = test_dv_new_const_d(1.0);
-        dval_t *two = test_dv_new_const_d(2.0);
-        dval_t *zero = DV_ZERO;
-        dval_t *A_vals[4] = {
+        expr_t *x = test_expr_new_named_var_d(4.0, "x");
+        expr_t *y = test_expr_new_named_var_d(6.0, "y");
+        expr_t *one = test_expr_new_const_d(1.0);
+        expr_t *two = test_expr_new_const_d(2.0);
+        expr_t *zero = EXPR_ZERO;
+        expr_t *A_vals[4] = {
             x,    one,
             zero, two
         };
-        dval_t *B_vals[2] = {
+        expr_t *B_vals[2] = {
             x,
             y
         };
-        matrix_t *A = mat_create_dv(2, 2, A_vals);
-        matrix_t *B = mat_create_dv(2, 1, B_vals);
+        matrix_t *A = mat_create_expr(2, 2, A_vals);
+        matrix_t *B = mat_create_expr(2, 1, B_vals);
         matrix_t *X = mat_solve(A, B);
         matrix_t *dX = mat_deriv_solve(A, B, x);
         matrix_t *dX_expected = NULL;
@@ -3632,8 +3632,8 @@ static void test_deriv_solve(void)
         matrix_t *AXd = NULL;
         matrix_t *dAX = NULL;
         matrix_t *Residual = NULL;
-        dval_t *v = NULL;
-        dval_t *w = NULL;
+        expr_t *v = NULL;
+        expr_t *w = NULL;
 
         print_mdv("A (deriv solve)", A);
         print_mdv("B (deriv solve)", B);
@@ -3648,10 +3648,10 @@ static void test_deriv_solve(void)
         if (dX) {
             print_mdv("d/dx solve(A,B)", dX);
             mat_get(dX, 0, 0, &v);
-            check_d("d/dx solve(A,B)[0,0] = 3/16", dv_eval_d(v), 3.0 / 16.0, 1e-12);
-            check_dval_text_contains("d/dx solve(A,B)[0,0] contains x", v, "x");
+            check_d("d/dx solve(A,B)[0,0] = 3/16", expr_eval_d(v), 3.0 / 16.0, 1e-12);
+            check_expr_text_contains("d/dx solve(A,B)[0,0] contains x", v, "x");
             mat_get(dX, 1, 0, &v);
-            check_d("d/dx solve(A,B)[1,0] = 0", dv_eval_d(v), 0.0, 1e-12);
+            check_d("d/dx solve(A,B)[1,0] = 0", expr_eval_d(v), 0.0, 1e-12);
         }
 
         if (dX && dX_expected) {
@@ -3660,7 +3660,7 @@ static void test_deriv_solve(void)
                 mat_get(dX, i, 0, &v);
                 mat_get(dX_expected, i, 0, &w);
                 snprintf(label, sizeof(label), "d/dx solve(A,B)[%zu,0] matches direct derivative", i);
-                check_d(label, dv_eval_d(v), dv_eval_d(w), 1e-12);
+                check_d(label, expr_eval_d(v), expr_eval_d(w), 1e-12);
             }
         }
 
@@ -3684,19 +3684,19 @@ static void test_deriv_solve(void)
                     char label[64];
                     mat_get(Residual, i, 0, &v);
                     snprintf(label, sizeof(label), "solve derivative residual[%zu,0]", i);
-                    check_d(label, dv_eval_d(v), 0.0, 1e-12);
+                    check_d(label, expr_eval_d(v), 0.0, 1e-12);
                 }
             }
         }
 
-        test_dv_set_val_d(x, 5.0);
-        test_dv_set_val_d(y, 8.0);
+        test_expr_set_val_d(x, 5.0);
+        test_expr_set_val_d(y, 8.0);
         if (dX && dX_expected) {
             mat_get(dX, 0, 0, &v);
             mat_get(dX_expected, 0, 0, &w);
-            check_d("d/dx solve(A,B)[0,0] tracks updates", dv_eval_d(v), dv_eval_d(w), 1e-12);
+            check_d("d/dx solve(A,B)[0,0] tracks updates", expr_eval_d(v), expr_eval_d(w), 1e-12);
             mat_get(dX, 1, 0, &v);
-            check_d("d/dx solve(A,B)[1,0] stays zero after updates", dv_eval_d(v), 0.0, 1e-12);
+            check_d("d/dx solve(A,B)[1,0] stays zero after updates", expr_eval_d(v), 0.0, 1e-12);
         }
 
         mat_free(Residual);
@@ -3709,10 +3709,10 @@ static void test_deriv_solve(void)
         mat_free(X);
         mat_free(B);
         mat_free(A);
-        dv_free(x);
-        dv_free(y);
-        dv_free(one);
-        dv_free(two);
+        expr_free(x);
+        expr_free(y);
+        expr_free(one);
+        expr_free(two);
     }
 }
 
@@ -3721,20 +3721,20 @@ static void test_deriv_block_solve(void)
     printf(C_CYAN "TEST: derivative of block solve\n" C_RESET);
 
     {
-        dval_t *x = test_dv_new_named_var_d(2.0, "x");
-        dval_t *y = test_dv_new_named_var_d(3.0, "y");
-        dval_t *one = test_dv_new_const_d(1.0);
-        dval_t *two = test_dv_new_const_d(2.0);
-        dval_t *three = test_dv_new_const_d(3.0);
-        dval_t *four = test_dv_new_const_d(4.0);
-        dval_t *five = test_dv_new_const_d(5.0);
-        dval_t *vals[9] = {
+        expr_t *x = test_expr_new_named_var_d(2.0, "x");
+        expr_t *y = test_expr_new_named_var_d(3.0, "y");
+        expr_t *one = test_expr_new_const_d(1.0);
+        expr_t *two = test_expr_new_const_d(2.0);
+        expr_t *three = test_expr_new_const_d(3.0);
+        expr_t *four = test_expr_new_const_d(4.0);
+        expr_t *five = test_expr_new_const_d(5.0);
+        expr_t *vals[9] = {
             x,     one,  two,
             three, y,    four,
             one,   two,  five};
-        dval_t *rhs_vals[3] = { x, two, one };
-        matrix_t *A = mat_create_dv(3, 3, vals);
-        matrix_t *B = mat_create_dv(3, 1, rhs_vals);
+        expr_t *rhs_vals[3] = { x, two, one };
+        matrix_t *A = mat_create_expr(3, 3, vals);
+        matrix_t *B = mat_create_expr(3, 1, rhs_vals);
         matrix_t *X = NULL;
         matrix_t *dX = NULL;
         matrix_t *dA = NULL;
@@ -3743,28 +3743,28 @@ static void test_deriv_block_solve(void)
         matrix_t *dAX = NULL;
         matrix_t *Residual = NULL;
         matrix_t *X_for_residual = NULL;
-        dval_t *v = NULL;
+        expr_t *v = NULL;
 
         X = mat_block_solve(A, B, 1);
         dX = mat_deriv_block_solve(A, B, 1, x);
 
-        print_mdv("A (dval block deriv)", A);
-        print_mdv("B (dval block deriv)", B);
+        print_mdv("A (expr block deriv)", A);
+        print_mdv("B (expr block deriv)", B);
         check_bool("mat_block_solve(A,B,1) not NULL", X != NULL);
         check_bool("mat_deriv_block_solve(A,B,1,x) not NULL", dX != NULL);
         if (dX) {
             print_mdv("d/dx block_solve(A,B)", dX);
 
             mat_get(dX, 0, 0, &v);
-            check_d("d(block solve)[0,0] = -7/81", dv_eval_d(v), -0.08641975308641975, 1e-12);
-            check_dval_text_contains("d(block solve)[0,0] contains x", v, "x");
-            dv_free(v);
+            check_d("d(block solve)[0,0] = -7/81", expr_eval_d(v), -0.08641975308641975, 1e-12);
+            check_expr_text_contains("d(block solve)[0,0] contains x", v, "x");
+            expr_free(v);
             mat_get(dX, 1, 0, &v);
-            check_d("d(block solve)[1,0] = 11/81", dv_eval_d(v), 0.1358024691358025, 1e-12);
-            dv_free(v);
+            check_d("d(block solve)[1,0] = 11/81", expr_eval_d(v), 0.1358024691358025, 1e-12);
+            expr_free(v);
             mat_get(dX, 2, 0, &v);
-            check_d("d(block solve)[2,0] = -1/27", dv_eval_d(v), -0.03703703703703703, 1e-12);
-            dv_free(v);
+            check_d("d(block solve)[2,0] = -1/27", expr_eval_d(v), -0.03703703703703703, 1e-12);
+            expr_free(v);
         }
 
         dA = mat_deriv(A, x);
@@ -3784,28 +3784,28 @@ static void test_deriv_block_solve(void)
         check_bool("A*dX + dA*X - dB not NULL", Residual != NULL);
         if (Residual) {
             mat_get(Residual, 0, 0, &v);
-            check_d("block solve derivative residual[0,0] = 0", dv_eval_d(v), 0.0, 1e-12);
-            dv_free(v);
+            check_d("block solve derivative residual[0,0] = 0", expr_eval_d(v), 0.0, 1e-12);
+            expr_free(v);
             mat_get(Residual, 1, 0, &v);
-            check_d("block solve derivative residual[1,0] = 0", dv_eval_d(v), 0.0, 1e-12);
-            dv_free(v);
+            check_d("block solve derivative residual[1,0] = 0", expr_eval_d(v), 0.0, 1e-12);
+            expr_free(v);
             mat_get(Residual, 2, 0, &v);
-            check_d("block solve derivative residual[2,0] = 0", dv_eval_d(v), 0.0, 1e-12);
-            dv_free(v);
+            check_d("block solve derivative residual[2,0] = 0", expr_eval_d(v), 0.0, 1e-12);
+            expr_free(v);
         }
 
-        test_dv_set_val_d(x, 5.0);
-        test_dv_set_val_d(y, 7.0);
+        test_expr_set_val_d(x, 5.0);
+        test_expr_set_val_d(y, 7.0);
         if (dX) {
             mat_get(dX, 0, 0, &v);
-            check_d("updated d(block solve)[0,0] = -0.001814028486965869", dv_eval_d(v), -0.001814028486965869, 1e-12);
-            dv_free(v);
+            check_d("updated d(block solve)[0,0] = -0.001814028486965869", expr_eval_d(v), -0.001814028486965869, 1e-12);
+            expr_free(v);
             mat_get(dX, 1, 0, &v);
-            check_d("updated d(block solve)[1,0] = 0.0007390486428379468", dv_eval_d(v), 0.0007390486428379468, 1e-12);
-            dv_free(v);
+            check_d("updated d(block solve)[1,0] = 0.0007390486428379468", expr_eval_d(v), 0.0007390486428379468, 1e-12);
+            expr_free(v);
             mat_get(dX, 2, 0, &v);
-            check_d("updated d(block solve)[2,0] = 6.718624025799516e-05", dv_eval_d(v), 6.718624025799516e-05, 1e-12);
-            dv_free(v);
+            check_d("updated d(block solve)[2,0] = 6.718624025799516e-05", expr_eval_d(v), 6.718624025799516e-05, 1e-12);
+            expr_free(v);
         }
 
         mat_free(Residual);
@@ -3818,13 +3818,13 @@ static void test_deriv_block_solve(void)
         mat_free(B);
         mat_free(X);
         mat_free(A);
-        dv_free(x);
-        dv_free(y);
-        dv_free(one);
-        dv_free(two);
-        dv_free(three);
-        dv_free(four);
-        dv_free(five);
+        expr_free(x);
+        expr_free(y);
+        expr_free(one);
+        expr_free(two);
+        expr_free(three);
+        expr_free(four);
+        expr_free(five);
     }
 }
 
@@ -3833,19 +3833,19 @@ static void test_jacobian(void)
     printf(C_CYAN "TEST: matrix Jacobian\n" C_RESET);
 
     {
-        dval_t *x = test_dv_new_named_var_d(2.0, "x");
-        dval_t *y = test_dv_new_named_var_d(3.0, "y");
-        dval_t *xy = dv_mul(x, y);
-        dval_t *x2 = dv_mul(x, x);
-        dval_t *sum = dv_add(x2, y);
-        dval_t *vals[4] = {
+        expr_t *x = test_expr_new_named_var_d(2.0, "x");
+        expr_t *y = test_expr_new_named_var_d(3.0, "y");
+        expr_t *xy = expr_mul(x, y);
+        expr_t *x2 = expr_mul(x, x);
+        expr_t *sum = expr_add(x2, y);
+        expr_t *vals[4] = {
             x,   xy,
-            DV_ONE, sum
+            EXPR_ONE, sum
         };
-        dval_t *vars[2] = {x, y};
-        matrix_t *A = mat_create_dv(2, 2, vals);
+        expr_t *vars[2] = {x, y};
+        matrix_t *A = mat_create_expr(2, 2, vals);
         matrix_t *J = mat_jacobian(A, vars, 2);
-        dval_t *v = NULL;
+        expr_t *v = NULL;
 
         print_mdv("A (Jacobian)", A);
         check_bool("mat_jacobian(A, [x,y]) not NULL", J != NULL);
@@ -3858,46 +3858,46 @@ static void test_jacobian(void)
             print_mdv("J(A; x,y)", J);
 
             mat_get(J, 0, 0, &v);
-            check_d("J[0,0] = dA[0,0]/dx = 1", dv_eval_d(v), 1.0, 1e-12);
+            check_d("J[0,0] = dA[0,0]/dx = 1", expr_eval_d(v), 1.0, 1e-12);
             mat_get(J, 0, 1, &v);
-            check_d("J[0,1] = dA[0,0]/dy = 0", dv_eval_d(v), 0.0, 1e-12);
+            check_d("J[0,1] = dA[0,0]/dy = 0", expr_eval_d(v), 0.0, 1e-12);
 
             mat_get(J, 1, 0, &v);
-            check_d("J[1,0] = dA[0,1]/dx = y", dv_eval_d(v), 3.0, 1e-12);
-            check_dval_text_contains("J[1,0] contains y", v, "y");
+            check_d("J[1,0] = dA[0,1]/dx = y", expr_eval_d(v), 3.0, 1e-12);
+            check_expr_text_contains("J[1,0] contains y", v, "y");
             mat_get(J, 1, 1, &v);
-            check_d("J[1,1] = dA[0,1]/dy = x", dv_eval_d(v), 2.0, 1e-12);
-            check_dval_text_contains("J[1,1] contains x", v, "x");
+            check_d("J[1,1] = dA[0,1]/dy = x", expr_eval_d(v), 2.0, 1e-12);
+            check_expr_text_contains("J[1,1] contains x", v, "x");
 
             mat_get(J, 2, 0, &v);
-            check_d("J[2,0] = dA[1,0]/dx = 0", dv_eval_d(v), 0.0, 1e-12);
+            check_d("J[2,0] = dA[1,0]/dx = 0", expr_eval_d(v), 0.0, 1e-12);
             mat_get(J, 2, 1, &v);
-            check_d("J[2,1] = dA[1,0]/dy = 0", dv_eval_d(v), 0.0, 1e-12);
+            check_d("J[2,1] = dA[1,0]/dy = 0", expr_eval_d(v), 0.0, 1e-12);
 
             mat_get(J, 3, 0, &v);
-            check_d("J[3,0] = dA[1,1]/dx = 2x", dv_eval_d(v), 4.0, 1e-12);
-            check_dval_text_contains("J[3,0] contains x", v, "x");
+            check_d("J[3,0] = dA[1,1]/dx = 2x", expr_eval_d(v), 4.0, 1e-12);
+            check_expr_text_contains("J[3,0] contains x", v, "x");
             mat_get(J, 3, 1, &v);
-            check_d("J[3,1] = dA[1,1]/dy = 1", dv_eval_d(v), 1.0, 1e-12);
+            check_d("J[3,1] = dA[1,1]/dy = 1", expr_eval_d(v), 1.0, 1e-12);
 
-            test_dv_set_val_d(x, 5.0);
-            test_dv_set_val_d(y, 7.0);
+            test_expr_set_val_d(x, 5.0);
+            test_expr_set_val_d(y, 7.0);
 
             mat_get(J, 1, 0, &v);
-            check_d("J[1,0] tracks updated y", dv_eval_d(v), 7.0, 1e-12);
+            check_d("J[1,0] tracks updated y", expr_eval_d(v), 7.0, 1e-12);
             mat_get(J, 1, 1, &v);
-            check_d("J[1,1] tracks updated x", dv_eval_d(v), 5.0, 1e-12);
+            check_d("J[1,1] tracks updated x", expr_eval_d(v), 5.0, 1e-12);
             mat_get(J, 3, 0, &v);
-            check_d("J[3,0] tracks updated x", dv_eval_d(v), 10.0, 1e-12);
+            check_d("J[3,0] tracks updated x", expr_eval_d(v), 10.0, 1e-12);
         }
 
         mat_free(J);
         mat_free(A);
-        dv_free(x);
-        dv_free(y);
-        dv_free(xy);
-        dv_free(x2);
-        dv_free(sum);
+        expr_free(x);
+        expr_free(y);
+        expr_free(xy);
+        expr_free(x2);
+        expr_free(sum);
     }
 }
 
@@ -3940,82 +3940,82 @@ static void test_schur_complement(void)
     }
 
     {
-        dval_t *x = test_dv_new_named_var_d(2.0, "x");
-        dval_t *y = test_dv_new_named_var_d(3.0, "y");
-        dval_t *one = test_dv_new_const_d(1.0);
-        dval_t *two = test_dv_new_const_d(2.0);
-        dval_t *three = test_dv_new_const_d(3.0);
-        dval_t *four = test_dv_new_const_d(4.0);
-        dval_t *five = test_dv_new_const_d(5.0);
-        dval_t *vals[9] = {
+        expr_t *x = test_expr_new_named_var_d(2.0, "x");
+        expr_t *y = test_expr_new_named_var_d(3.0, "y");
+        expr_t *one = test_expr_new_const_d(1.0);
+        expr_t *two = test_expr_new_const_d(2.0);
+        expr_t *three = test_expr_new_const_d(3.0);
+        expr_t *four = test_expr_new_const_d(4.0);
+        expr_t *five = test_expr_new_const_d(5.0);
+        expr_t *vals[9] = {
             x,     one,  two,
             three, y,    four,
             one,   two,  five};
-        matrix_t *A = mat_create_dv(3, 3, vals);
+        matrix_t *A = mat_create_expr(3, 3, vals);
         matrix_t *S = mat_schur_complement(A, 1);
-        dval_t *s00 = NULL, *s01 = NULL, *s10 = NULL, *s11 = NULL;
-        dval_t *detA = NULL, *detS = NULL;
-        dval_t *lhs = NULL, *rhs = NULL;
-        dval_t *raw = NULL;
+        expr_t *s00 = NULL, *s01 = NULL, *s10 = NULL, *s11 = NULL;
+        expr_t *detA = NULL, *detS = NULL;
+        expr_t *lhs = NULL, *rhs = NULL;
+        expr_t *raw = NULL;
 
-        print_mdv("A (dval Schur complement)", A);
-        check_bool("mat_schur_complement(dval) not NULL", S != NULL);
+        print_mdv("A (expr Schur complement)", A);
+        check_bool("mat_schur_complement(expr) not NULL", S != NULL);
         if (S) {
             print_mdv("S = A22 - A21 A11^{-1} A12", S);
-            check_bool("Schur complement(dval) rows = 2", mat_get_row_count(S) == 2);
-            check_bool("Schur complement(dval) cols = 2", mat_get_col_count(S) == 2);
+            check_bool("Schur complement(expr) rows = 2", mat_get_row_count(S) == 2);
+            check_bool("Schur complement(expr) cols = 2", mat_get_col_count(S) == 2);
 
             mat_get(S, 0, 0, &s00);
             mat_get(S, 0, 1, &s01);
             mat_get(S, 1, 0, &s10);
             mat_get(S, 1, 1, &s11);
-            check_d("S(dval)[0,0] at x=2,y=3", dv_eval_d(s00), 1.5, 1e-12);
-            check_d("S(dval)[0,1] at x=2", dv_eval_d(s01), 1.0, 1e-12);
-            check_d("S(dval)[1,0] at x=2", dv_eval_d(s10), 1.5, 1e-12);
-            check_d("S(dval)[1,1] at x=2", dv_eval_d(s11), 4.0, 1e-12);
-            check_dval_text_contains("S(dval)[0,0] contains x", s00, "x");
-            check_dval_text_contains("S(dval)[0,0] contains y", s00, "y");
+            check_d("S(expr)[0,0] at x=2,y=3", expr_eval_d(s00), 1.5, 1e-12);
+            check_d("S(expr)[0,1] at x=2", expr_eval_d(s01), 1.0, 1e-12);
+            check_d("S(expr)[1,0] at x=2", expr_eval_d(s10), 1.5, 1e-12);
+            check_d("S(expr)[1,1] at x=2", expr_eval_d(s11), 4.0, 1e-12);
+            check_expr_text_contains("S(expr)[0,0] contains x", s00, "x");
+            check_expr_text_contains("S(expr)[0,0] contains y", s00, "y");
 
-            check_bool("mat_det(dval A) rc = 0", mat_det(A, &detA) == 0);
-            check_bool("mat_det(dval S) rc = 0", mat_det(S, &detS) == 0);
+            check_bool("mat_det(expr A) rc = 0", mat_det(A, &detA) == 0);
+            check_bool("mat_det(expr S) rc = 0", mat_det(S, &detS) == 0);
             check_bool("det(A) not NULL", detA != NULL);
             check_bool("det(S) not NULL", detS != NULL);
             if (detA && detS) {
-                raw = dv_mul(x, detS);
-                lhs = dv_simplify(raw);
-                dv_free(raw);
+                raw = expr_mul(x, detS);
+                lhs = expr_simplify(raw);
+                expr_free(raw);
                 raw = NULL;
 
-                rhs = dv_simplify(detA);
+                rhs = expr_simplify(detA);
 
                 check_bool("det identity lhs not NULL", lhs != NULL);
                 check_bool("det identity rhs not NULL", rhs != NULL);
                 if (lhs && rhs)
-                    check_d("det(A) = x*det(S)", dv_eval_d(lhs), dv_eval_d(rhs), 1e-12);
+                    check_d("det(A) = x*det(S)", expr_eval_d(lhs), expr_eval_d(rhs), 1e-12);
             }
 
-            test_dv_set_val_d(x, 5.0);
-            test_dv_set_val_d(y, 7.0);
-            check_d("S(dval)[0,0] tracks x,y", dv_eval_d(s00), 6.4, 1e-12);
-            check_d("S(dval)[0,1] tracks x", dv_eval_d(s01), 2.8, 1e-12);
-            check_d("S(dval)[1,0] tracks x", dv_eval_d(s10), 1.8, 1e-12);
-            check_d("S(dval)[1,1] tracks x", dv_eval_d(s11), 4.6, 1e-12);
+            test_expr_set_val_d(x, 5.0);
+            test_expr_set_val_d(y, 7.0);
+            check_d("S(expr)[0,0] tracks x,y", expr_eval_d(s00), 6.4, 1e-12);
+            check_d("S(expr)[0,1] tracks x", expr_eval_d(s01), 2.8, 1e-12);
+            check_d("S(expr)[1,0] tracks x", expr_eval_d(s10), 1.8, 1e-12);
+            check_d("S(expr)[1,1] tracks x", expr_eval_d(s11), 4.6, 1e-12);
         }
 
-        dv_free(raw);
-        dv_free(lhs);
-        dv_free(rhs);
-        dv_free(detA);
-        dv_free(detS);
+        expr_free(raw);
+        expr_free(lhs);
+        expr_free(rhs);
+        expr_free(detA);
+        expr_free(detS);
         mat_free(S);
         mat_free(A);
-        dv_free(x);
-        dv_free(y);
-        dv_free(one);
-        dv_free(two);
-        dv_free(three);
-        dv_free(four);
-        dv_free(five);
+        expr_free(x);
+        expr_free(y);
+        expr_free(one);
+        expr_free(two);
+        expr_free(three);
+        expr_free(four);
+        expr_free(five);
     }
 }
 
@@ -4080,69 +4080,69 @@ static void test_block_linear_algebra(void)
     }
 
     {
-        dval_t *x = test_dv_new_named_var_d(2.0, "x");
-        dval_t *y = test_dv_new_named_var_d(3.0, "y");
-        dval_t *u = test_dv_new_named_var_d(5.0, "u");
-        dval_t *one = test_dv_new_const_d(1.0);
-        dval_t *two = test_dv_new_const_d(2.0);
-        dval_t *three = test_dv_new_const_d(3.0);
-        dval_t *four = test_dv_new_const_d(4.0);
-        dval_t *five = test_dv_new_const_d(5.0);
-        dval_t *xvals[9] = {
+        expr_t *x = test_expr_new_named_var_d(2.0, "x");
+        expr_t *y = test_expr_new_named_var_d(3.0, "y");
+        expr_t *u = test_expr_new_named_var_d(5.0, "u");
+        expr_t *one = test_expr_new_const_d(1.0);
+        expr_t *two = test_expr_new_const_d(2.0);
+        expr_t *three = test_expr_new_const_d(3.0);
+        expr_t *four = test_expr_new_const_d(4.0);
+        expr_t *five = test_expr_new_const_d(5.0);
+        expr_t *xvals[9] = {
             x,     one,  two,
             three, y,    four,
             one,   two,  five};
-        dval_t *rhs_vals[3] = { u, two, one };
-        matrix_t *A = mat_create_dv(3, 3, xvals);
-        matrix_t *Xexp = mat_create_dv(3, 1, rhs_vals);
+        expr_t *rhs_vals[3] = { u, two, one };
+        matrix_t *A = mat_create_expr(3, 3, xvals);
+        matrix_t *Xexp = mat_create_expr(3, 1, rhs_vals);
         matrix_t *B = mat_mul(A, Xexp);
         matrix_t *Ainv = mat_block_inverse(A, 1);
         matrix_t *I = mat_mul(A, Ainv);
         matrix_t *X = mat_block_solve(A, B, 1);
         matrix_t *AX = mat_mul(A, X);
-        dval_t *v = NULL;
+        expr_t *v = NULL;
 
-        print_mdv("A (dval block)", A);
-        check_bool("mat_block_inverse(dval) not NULL", Ainv != NULL);
-        check_bool("A * block_inverse(A) dval not NULL", I != NULL);
+        print_mdv("A (expr block)", A);
+        check_bool("mat_block_inverse(expr) not NULL", Ainv != NULL);
+        check_bool("A * block_inverse(A) expr not NULL", I != NULL);
         if (I) {
-            print_mdv("A * block_inverse(A) (dval)", I);
+            print_mdv("A * block_inverse(A) (expr)", I);
             mat_get(I, 0, 0, &v);
-            check_d("dval block inverse prod[0,0] = 1", dv_eval_d(v), 1.0, 1e-12);
+            check_d("expr block inverse prod[0,0] = 1", expr_eval_d(v), 1.0, 1e-12);
             mat_get(I, 1, 2, &v);
-            check_d("dval block inverse prod[1,2] = 0", dv_eval_d(v), 0.0, 1e-12);
+            check_d("expr block inverse prod[1,2] = 0", expr_eval_d(v), 0.0, 1e-12);
             mat_get(I, 2, 2, &v);
-            check_d("dval block inverse prod[2,2] = 1", dv_eval_d(v), 1.0, 1e-12);
+            check_d("expr block inverse prod[2,2] = 1", expr_eval_d(v), 1.0, 1e-12);
         }
 
-        check_bool("mat_block_solve(dval) not NULL", X != NULL);
-        check_bool("A * block_solve(A,B) dval not NULL", AX != NULL);
+        check_bool("mat_block_solve(expr) not NULL", X != NULL);
+        check_bool("A * block_solve(A,B) expr not NULL", AX != NULL);
         if (X) {
-            print_mdv("block solve X (dval)", X);
+            print_mdv("block solve X (expr)", X);
             mat_get(X, 0, 0, &v);
-            check_d("dval block solve X[0,0] = u", dv_eval_d(v), 5.0, 1e-12);
+            check_d("expr block solve X[0,0] = u", expr_eval_d(v), 5.0, 1e-12);
             mat_get(X, 1, 0, &v);
-            check_d("dval block solve X[1,0] = 2", dv_eval_d(v), 2.0, 1e-12);
+            check_d("expr block solve X[1,0] = 2", expr_eval_d(v), 2.0, 1e-12);
             mat_get(X, 2, 0, &v);
-            check_d("dval block solve X[2,0] = 1", dv_eval_d(v), 1.0, 1e-12);
+            check_d("expr block solve X[2,0] = 1", expr_eval_d(v), 1.0, 1e-12);
 
-            test_dv_set_val_d(x, 5.0);
-            test_dv_set_val_d(y, 7.0);
-            test_dv_set_val_d(u, 11.0);
+            test_expr_set_val_d(x, 5.0);
+            test_expr_set_val_d(y, 7.0);
+            test_expr_set_val_d(u, 11.0);
             mat_get(X, 0, 0, &v);
-            check_d("dval block solve X[0,0] tracks u", dv_eval_d(v), 11.0, 1e-12);
+            check_d("expr block solve X[0,0] tracks u", expr_eval_d(v), 11.0, 1e-12);
             mat_get(X, 1, 0, &v);
-            check_d("dval block solve X[1,0] remains 2", dv_eval_d(v), 2.0, 1e-12);
+            check_d("expr block solve X[1,0] remains 2", expr_eval_d(v), 2.0, 1e-12);
             mat_get(X, 2, 0, &v);
-            check_d("dval block solve X[2,0] remains 1", dv_eval_d(v), 1.0, 1e-12);
+            check_d("expr block solve X[2,0] remains 1", expr_eval_d(v), 1.0, 1e-12);
         }
         if (AX) {
             mat_get(AX, 0, 0, &v);
-            check_d("dval block solve residual[0,0]", dv_eval_d(v), 59.0, 1e-12);
+            check_d("expr block solve residual[0,0]", expr_eval_d(v), 59.0, 1e-12);
             mat_get(AX, 1, 0, &v);
-            check_d("dval block solve residual[1,0]", dv_eval_d(v), 51.0, 1e-12);
+            check_d("expr block solve residual[1,0]", expr_eval_d(v), 51.0, 1e-12);
             mat_get(AX, 2, 0, &v);
-            check_d("dval block solve residual[2,0]", dv_eval_d(v), 20.0, 1e-12);
+            check_d("expr block solve residual[2,0]", expr_eval_d(v), 20.0, 1e-12);
         }
 
         mat_free(AX);
@@ -4152,14 +4152,14 @@ static void test_block_linear_algebra(void)
         mat_free(B);
         mat_free(Xexp);
         mat_free(A);
-        dv_free(x);
-        dv_free(y);
-        dv_free(u);
-        dv_free(one);
-        dv_free(two);
-        dv_free(three);
-        dv_free(four);
-        dv_free(five);
+        expr_free(x);
+        expr_free(y);
+        expr_free(u);
+        expr_free(one);
+        expr_free(two);
+        expr_free(three);
+        expr_free(four);
+        expr_free(five);
     }
 }
 
@@ -4168,23 +4168,23 @@ static void test_evaluate_bridge(void)
     printf(C_CYAN "TEST: symbolic evaluation bridge\n" C_RESET);
 
     {
-        dval_t *x = test_dv_new_named_var_d(2.0, "x");
-        dval_t *y = test_dv_new_named_var_d(3.0, "y");
-        dval_t *one = test_dv_new_const_d(1.0);
-        dval_t *xy = dv_mul(x, y);
-        dval_t *vals[4] = {
+        expr_t *x = test_expr_new_named_var_d(2.0, "x");
+        expr_t *y = test_expr_new_named_var_d(3.0, "y");
+        expr_t *one = test_expr_new_const_d(1.0);
+        expr_t *xy = expr_mul(x, y);
+        expr_t *vals[4] = {
             x,  one,
             xy, y
         };
-        matrix_t *A = mat_create_dv(2, 2, vals);
+        matrix_t *A = mat_create_expr(2, 2, vals);
         matrix_t *N = mat_evaluate_num(A);
         number_t got;
         number_t two = num_create_from_long(2);
         number_t six = num_create_from_long(6);
 
-        print_mdv("A (dval)", A);
-        check_bool("mat_evaluate_num(dval) not NULL", N != NULL);
-        check_bool("mat_evaluate_num(dval) -> MAT_TYPE_NUMBER",
+        print_mdv("A (expr)", A);
+        check_bool("mat_evaluate_num(expr) not NULL", N != NULL);
+        check_bool("mat_evaluate_num(expr) -> MAT_TYPE_NUMBER",
                    N != NULL && mat_typeof(N) == MAT_TYPE_NUMBER);
         if (N) {
             print_mnum("evaluate_num(A)", N);
@@ -4196,8 +4196,8 @@ static void test_evaluate_bridge(void)
             check_bool("evaluate_num(A)[1,0] = x*y", num_eq(got, six));
             num_destroy(&got);
 
-            test_dv_set_val_d(x, 5.0);
-            test_dv_set_val_d(y, 7.0);
+            test_expr_set_val_d(x, 5.0);
+            test_expr_set_val_d(y, 7.0);
 
             got = mat_get_num(N, 0, 0);
             check_bool("evaluate_num(A) snapshot stays at old x", num_eq(got, two));
@@ -4211,48 +4211,48 @@ static void test_evaluate_bridge(void)
         num_destroy(&two);
         mat_free(N);
         mat_free(A);
-        dv_free(x);
-        dv_free(y);
-        dv_free(one);
-        dv_free(xy);
+        expr_free(x);
+        expr_free(y);
+        expr_free(one);
+        expr_free(xy);
     }
 
     {
-        dval_t *x = test_dv_new_named_var_d(2.0, "x");
-        dval_t *y = test_dv_new_named_var_d(3.0, "y");
-        dval_t *one = test_dv_new_const_d(1.0);
-        dval_t *xy = dv_mul(x, y);
+        expr_t *x = test_expr_new_named_var_d(2.0, "x");
+        expr_t *y = test_expr_new_named_var_d(3.0, "y");
+        expr_t *one = test_expr_new_const_d(1.0);
+        expr_t *xy = expr_mul(x, y);
         number_t two = num_create_from_long(2);
         number_t six = num_create_from_long(6);
-        dval_t *vals[4] = {
+        expr_t *vals[4] = {
             x,  one,
             xy, y
         };
-        matrix_t *A = mat_create_dv(2, 2, vals);
+        matrix_t *A = mat_create_expr(2, 2, vals);
         matrix_t *N = mat_evaluate_num(A);
         number_t got;
 
-        check_bool("mat_evaluate_num(dval) not NULL", N != NULL);
-        check_bool("mat_evaluate_num(dval) -> MAT_TYPE_NUMBER",
+        check_bool("mat_evaluate_num(expr) not NULL", N != NULL);
+        check_bool("mat_evaluate_num(expr) -> MAT_TYPE_NUMBER",
                    N != NULL && mat_typeof(N) == MAT_TYPE_NUMBER);
         if (N) {
             got = mat_get_num(N, 0, 0);
-            check_bool("mat_evaluate_num(dval)[0,0] = x", num_eq(got, two));
+            check_bool("mat_evaluate_num(expr)[0,0] = x", num_eq(got, two));
             num_destroy(&got);
 
             got = mat_get_num(N, 1, 0);
-            check_bool("mat_evaluate_num(dval)[1,0] = x*y", num_eq(got, six));
+            check_bool("mat_evaluate_num(expr)[1,0] = x*y", num_eq(got, six));
             num_destroy(&got);
 
-            test_dv_set_val_d(x, 5.0);
-            test_dv_set_val_d(y, 7.0);
+            test_expr_set_val_d(x, 5.0);
+            test_expr_set_val_d(y, 7.0);
 
             got = mat_get_num(N, 0, 0);
-            check_bool("mat_evaluate_num(dval) snapshot stays at old x", num_eq(got, two));
+            check_bool("mat_evaluate_num(expr) snapshot stays at old x", num_eq(got, two));
             num_destroy(&got);
 
             got = mat_get_num(N, 1, 0);
-            check_bool("mat_evaluate_num(dval) snapshot stays at old x*y", num_eq(got, six));
+            check_bool("mat_evaluate_num(expr) snapshot stays at old x*y", num_eq(got, six));
             num_destroy(&got);
         }
 
@@ -4260,29 +4260,29 @@ static void test_evaluate_bridge(void)
         mat_free(A);
         num_destroy(&six);
         num_destroy(&two);
-        dv_free(x);
-        dv_free(y);
-        dv_free(one);
-        dv_free(xy);
+        expr_free(x);
+        expr_free(y);
+        expr_free(one);
+        expr_free(xy);
     }
 
     {
-        dval_t *a = test_dv_new_named_var_d(4.0, "a");
-        dval_t *b = test_dv_new_named_var_d(5.0, "b");
-        dval_t *vals[4] = {
-            a, DV_ZERO,
-            DV_ONE, b
+        expr_t *a = test_expr_new_named_var_d(4.0, "a");
+        expr_t *b = test_expr_new_named_var_d(5.0, "b");
+        expr_t *vals[4] = {
+            a, EXPR_ZERO,
+            EXPR_ONE, b
         };
-        matrix_t *T = mat_create_dv(2, 2, vals);
+        matrix_t *T = mat_create_expr(2, 2, vals);
         matrix_t *N = mat_evaluate_num(T);
         number_t got;
         number_t four = num_create_from_long(4);
         number_t five = num_create_from_long(5);
         number_t one_num = num_create_from_long(1);
 
-        print_mdv("T (dval triangular)", T);
-        check_bool("mat_evaluate_num(dval triangular) not NULL", N != NULL);
-        check_bool("mat_evaluate_num(dval triangular) -> MAT_TYPE_NUMBER",
+        print_mdv("T (expr triangular)", T);
+        check_bool("mat_evaluate_num(expr triangular) not NULL", N != NULL);
+        check_bool("mat_evaluate_num(expr triangular) -> MAT_TYPE_NUMBER",
                    N != NULL && mat_typeof(N) == MAT_TYPE_NUMBER);
         check_bool("mat_evaluate_num preserves lower-triangular structure",
                    N != NULL && mat_is_lower_triangular(N));
@@ -4296,8 +4296,8 @@ static void test_evaluate_bridge(void)
             check_bool("evaluate_num(T)[1,0] = 1", num_eq(got, one_num));
             num_destroy(&got);
 
-            test_dv_set_val_d(a, 9.0);
-            test_dv_set_val_d(b, 11.0);
+            test_expr_set_val_d(a, 9.0);
+            test_expr_set_val_d(b, 11.0);
 
             got = mat_get_num(N, 0, 0);
             check_bool("evaluate_num(T) snapshot stays at old a", num_eq(got, four));
@@ -4312,8 +4312,8 @@ static void test_evaluate_bridge(void)
         num_destroy(&four);
         mat_free(N);
         mat_free(T);
-        dv_free(a);
-        dv_free(b);
+        expr_free(a);
+        expr_free(b);
     }
 
     {
@@ -4513,56 +4513,56 @@ static void test_inverse_qcomplex(void)
     mat_free(P);
 }
 
-static void test_inverse_dval_2x2(void)
+static void test_inverse_expr_2x2(void)
 {
-    printf(C_CYAN "TEST: matrix inverse (dval)\n" C_RESET);
+    printf(C_CYAN "TEST: matrix inverse (expr)\n" C_RESET);
 
-    dval_t *x = test_dv_new_named_var_d(3.0, "x");
-    dval_t *y = test_dv_new_named_var_d(4.0, "y");
-    dval_t *one = test_dv_new_const_d(1.0);
-    dval_t *two = test_dv_new_const_d(2.0);
-    dval_t *vals[4] = {x, one, y, two};
-    matrix_t *A = mat_create_dv(2, 2, vals);
+    expr_t *x = test_expr_new_named_var_d(3.0, "x");
+    expr_t *y = test_expr_new_named_var_d(4.0, "y");
+    expr_t *one = test_expr_new_const_d(1.0);
+    expr_t *two = test_expr_new_const_d(2.0);
+    expr_t *vals[4] = {x, one, y, two};
+    matrix_t *A = mat_create_expr(2, 2, vals);
     matrix_t *Ai = mat_inverse(A);
     matrix_t *P = NULL;
-    dval_t *v = NULL;
+    expr_t *v = NULL;
 
     print_mdv("A", A);
-    check_bool("inverse(dval 2x2) returned non-null", Ai != NULL);
+    check_bool("inverse(expr 2x2) returned non-null", Ai != NULL);
 
     if (Ai) {
         char *ai_text = mat_to_string(Ai, MAT_STRING_INLINE_PRETTY);
 
         print_mdv("A^{-1}", Ai);
-        check_bool("inverse(dval 2x2) exact text simplified",
+        check_bool("inverse(expr 2x2) exact text simplified",
                    ai_text && strcmp(ai_text,
                                      "{ (2/(2x - y), -1/(2x - y); -y/(2x - y), x/(2x - y)) | x = 3, y = 4 }") == 0);
         P = mat_mul(A, Ai);
-        check_bool("A * A^{-1} (dval) non-null", P != NULL);
+        check_bool("A * A^{-1} (expr) non-null", P != NULL);
         if (P) {
             print_mdv("A * A^{-1}", P);
 
             mat_get(P, 0, 0, &v);
-            check_d("dval prod[0,0] = 1", dv_eval_d(v), 1.0, 1e-12);
-            dv_free(v);
+            check_d("expr prod[0,0] = 1", expr_eval_d(v), 1.0, 1e-12);
+            expr_free(v);
             mat_get(P, 0, 1, &v);
-            check_d("dval prod[0,1] = 0", dv_eval_d(v), 0.0, 1e-12);
-            dv_free(v);
+            check_d("expr prod[0,1] = 0", expr_eval_d(v), 0.0, 1e-12);
+            expr_free(v);
             mat_get(P, 1, 0, &v);
-            check_d("dval prod[1,0] = 0", dv_eval_d(v), 0.0, 1e-12);
-            dv_free(v);
+            check_d("expr prod[1,0] = 0", expr_eval_d(v), 0.0, 1e-12);
+            expr_free(v);
             mat_get(P, 1, 1, &v);
-            check_d("dval prod[1,1] = 1", dv_eval_d(v), 1.0, 1e-12);
-            dv_free(v);
+            check_d("expr prod[1,1] = 1", expr_eval_d(v), 1.0, 1e-12);
+            expr_free(v);
 
-            test_dv_set_val_d(x, 5.0);
-            test_dv_set_val_d(y, 6.0);
+            test_expr_set_val_d(x, 5.0);
+            test_expr_set_val_d(y, 6.0);
             mat_get(P, 0, 0, &v);
-            check_d("dval inverse product tracks x,y on [0,0]", dv_eval_d(v), 1.0, 1e-12);
-            dv_free(v);
+            check_d("expr inverse product tracks x,y on [0,0]", expr_eval_d(v), 1.0, 1e-12);
+            expr_free(v);
             mat_get(P, 1, 1, &v);
-            check_d("dval inverse product tracks x,y on [1,1]", dv_eval_d(v), 1.0, 1e-12);
-            dv_free(v);
+            check_d("expr inverse product tracks x,y on [1,1]", expr_eval_d(v), 1.0, 1e-12);
+            expr_free(v);
         }
 
         free(ai_text);
@@ -4571,17 +4571,17 @@ static void test_inverse_dval_2x2(void)
     mat_free(P);
     mat_free(Ai);
     mat_free(A);
-    dv_free(x);
-    dv_free(y);
-    dv_free(one);
-    dv_free(two);
+    expr_free(x);
+    expr_free(y);
+    expr_free(one);
+    expr_free(two);
 }
 
-static void test_inverse_dval_rotation(void)
+static void test_inverse_expr_rotation(void)
 {
     {
         mat_bindings_t *bindings = NULL;
-        matrix_t *R = mat_from_string_dv("(cos(@theta), -sin(@theta); sin(@theta), cos(@theta))",
+        matrix_t *R = mat_from_string_expr("(cos(@theta), -sin(@theta); sin(@theta), cos(@theta))",
                                       &bindings);
         matrix_t *Ri = mat_inverse(R);
         char *ri_text = Ri ? mat_to_string(Ri, MAT_STRING_INLINE_PRETTY) : NULL;
@@ -4601,27 +4601,27 @@ static void test_inverse_dval_rotation(void)
     }
 }
 
-static void test_inverse_dval_upper_triangular(void)
+static void test_inverse_expr_upper_triangular(void)
 {
     {
-        dval_t *a = test_dv_new_named_var_d(2.0, "a");
-        dval_t *b = test_dv_new_named_var_d(3.0, "b");
-        dval_t *c = test_dv_new_named_var_d(5.0, "c");
-        dval_t *d = test_dv_new_named_var_d(7.0, "d");
-        dval_t *one_u = test_dv_new_const_d(1.0);
-        dval_t *zero = DV_ZERO;
-        dval_t *vals[16] = {
+        expr_t *a = test_expr_new_named_var_d(2.0, "a");
+        expr_t *b = test_expr_new_named_var_d(3.0, "b");
+        expr_t *c = test_expr_new_named_var_d(5.0, "c");
+        expr_t *d = test_expr_new_named_var_d(7.0, "d");
+        expr_t *one_u = test_expr_new_const_d(1.0);
+        expr_t *zero = EXPR_ZERO;
+        expr_t *vals[16] = {
             a, b, c, one_u,
             zero, d, one_u, c,
             zero, zero, a, b,
             zero, zero, zero, d
         };
-        matrix_t *U = mat_create_dv(4, 4, vals);
+        matrix_t *U = mat_create_expr(4, 4, vals);
         matrix_t *Ui = mat_inverse(U);
         matrix_t *P = NULL;
-        dval_t *v = NULL;
+        expr_t *v = NULL;
 
-        check_bool("inverse(upper triangular dval) returned non-null", Ui != NULL);
+        check_bool("inverse(upper triangular expr) returned non-null", Ui != NULL);
 
         if (Ui) {
             P = mat_mul(U, Ui);
@@ -4631,9 +4631,9 @@ static void test_inverse_dval_upper_triangular(void)
                     for (size_t j = 0; j < 4; ++j) {
                         char label[64];
                         mat_get(P, i, j, &v);
-                        snprintf(label, sizeof(label), "upper dval prod[%zu,%zu]", i, j);
-                        check_d(label, dv_eval_d(v), i == j ? 1.0 : 0.0, 1e-12);
-                        dv_free(v);
+                        snprintf(label, sizeof(label), "upper expr prod[%zu,%zu]", i, j);
+                        check_d(label, expr_eval_d(v), i == j ? 1.0 : 0.0, 1e-12);
+                        expr_free(v);
                     }
                 }
             }
@@ -4642,33 +4642,33 @@ static void test_inverse_dval_upper_triangular(void)
         mat_free(P);
         mat_free(Ui);
         mat_free(U);
-        dv_free(a);
-        dv_free(b);
-        dv_free(c);
-        dv_free(d);
-        dv_free(one_u);
+        expr_free(a);
+        expr_free(b);
+        expr_free(c);
+        expr_free(d);
+        expr_free(one_u);
     }
 }
 
-static void test_inverse_dval_lower_triangular(void)
+static void test_inverse_expr_lower_triangular(void)
 {
     {
-        dval_t *p = test_dv_new_named_var_d(2.0, "p");
-        dval_t *q = test_dv_new_named_var_d(4.0, "q");
-        dval_t *r = test_dv_new_named_var_d(6.0, "r");
-        dval_t *one_l = test_dv_new_const_d(1.0);
-        dval_t *two_l = test_dv_new_const_d(2.0);
-        dval_t *vals[9] = {
-            p,      DV_ZERO, DV_ZERO,
-            one_l,  q,       DV_ZERO,
+        expr_t *p = test_expr_new_named_var_d(2.0, "p");
+        expr_t *q = test_expr_new_named_var_d(4.0, "q");
+        expr_t *r = test_expr_new_named_var_d(6.0, "r");
+        expr_t *one_l = test_expr_new_const_d(1.0);
+        expr_t *two_l = test_expr_new_const_d(2.0);
+        expr_t *vals[9] = {
+            p,      EXPR_ZERO, EXPR_ZERO,
+            one_l,  q,       EXPR_ZERO,
             two_l,  one_l,   r
         };
-        matrix_t *L = mat_create_dv(3, 3, vals);
+        matrix_t *L = mat_create_expr(3, 3, vals);
         matrix_t *Li = mat_inverse(L);
         matrix_t *P = NULL;
-        dval_t *v = NULL;
+        expr_t *v = NULL;
 
-        check_bool("inverse(lower triangular dval) returned non-null", Li != NULL);
+        check_bool("inverse(lower triangular expr) returned non-null", Li != NULL);
 
         if (Li) {
             P = mat_mul(L, Li);
@@ -4678,9 +4678,9 @@ static void test_inverse_dval_lower_triangular(void)
                     for (size_t j = 0; j < 3; ++j) {
                         char label[64];
                         mat_get(P, i, j, &v);
-                        snprintf(label, sizeof(label), "lower dval prod[%zu,%zu]", i, j);
-                        check_d(label, dv_eval_d(v), i == j ? 1.0 : 0.0, 1e-12);
-                        dv_free(v);
+                        snprintf(label, sizeof(label), "lower expr prod[%zu,%zu]", i, j);
+                        check_d(label, expr_eval_d(v), i == j ? 1.0 : 0.0, 1e-12);
+                        expr_free(v);
                     }
                 }
             }
@@ -4689,45 +4689,45 @@ static void test_inverse_dval_lower_triangular(void)
         mat_free(P);
         mat_free(Li);
         mat_free(L);
-        dv_free(p);
-        dv_free(q);
-        dv_free(r);
-        dv_free(one_l);
-        dv_free(two_l);
+        expr_free(p);
+        expr_free(q);
+        expr_free(r);
+        expr_free(one_l);
+        expr_free(two_l);
     }
 }
 
-static void test_inverse_dval_dense_3x3(void)
+static void test_inverse_expr_dense_3x3(void)
 {
     {
-        dval_t *x3 = test_dv_new_named_var_d(4.0, "x");
-        dval_t *y3 = test_dv_new_named_var_d(3.0, "y");
-        dval_t *z3 = test_dv_new_named_var_d(5.0, "z");
-        dval_t *one3 = test_dv_new_const_d(1.0);
-        dval_t *two3 = test_dv_new_const_d(2.0);
-        dval_t *vals[9] = {
+        expr_t *x3 = test_expr_new_named_var_d(4.0, "x");
+        expr_t *y3 = test_expr_new_named_var_d(3.0, "y");
+        expr_t *z3 = test_expr_new_named_var_d(5.0, "z");
+        expr_t *one3 = test_expr_new_const_d(1.0);
+        expr_t *two3 = test_expr_new_const_d(2.0);
+        expr_t *vals[9] = {
             x3,   one3, two3,
             one3, y3,   z3,
             two3, one3, x3
         };
-        matrix_t *A3 = mat_create_dv(3, 3, vals);
+        matrix_t *A3 = mat_create_expr(3, 3, vals);
         matrix_t *A3i = mat_inverse(A3);
         matrix_t *P = NULL;
-        dval_t *v = NULL;
+        expr_t *v = NULL;
 
-        check_bool("inverse(dense 3x3 dval) returned non-null", A3i != NULL);
+        check_bool("inverse(dense 3x3 expr) returned non-null", A3i != NULL);
 
         if (A3i) {
             P = mat_mul(A3, A3i);
-            check_bool("A * A^{-1} (3x3 dval) non-null", P != NULL);
+            check_bool("A * A^{-1} (3x3 expr) non-null", P != NULL);
             if (P) {
                 for (size_t i = 0; i < 3; ++i) {
                     for (size_t j = 0; j < 3; ++j) {
                         char label[64];
                         mat_get(P, i, j, &v);
-                        snprintf(label, sizeof(label), "dense 3x3 dval prod[%zu,%zu]", i, j);
-                        check_d(label, dv_eval_d(v), i == j ? 1.0 : 0.0, 1e-10);
-                        dv_free(v);
+                        snprintf(label, sizeof(label), "dense 3x3 expr prod[%zu,%zu]", i, j);
+                        check_d(label, expr_eval_d(v), i == j ? 1.0 : 0.0, 1e-10);
+                        expr_free(v);
                     }
                 }
             }
@@ -4736,49 +4736,49 @@ static void test_inverse_dval_dense_3x3(void)
         mat_free(P);
         mat_free(A3i);
         mat_free(A3);
-        dv_free(x3);
-        dv_free(y3);
-        dv_free(z3);
-        dv_free(one3);
-        dv_free(two3);
+        expr_free(x3);
+        expr_free(y3);
+        expr_free(z3);
+        expr_free(one3);
+        expr_free(two3);
     }
 }
 
-static void test_inverse_dval_dense_4x4(void)
+static void test_inverse_expr_dense_4x4(void)
 {
     {
-        dval_t *u = test_dv_new_named_var_s("5", "u");
-        dval_t *v4 = test_dv_new_named_var_s("6", "v");
-        dval_t *w = test_dv_new_named_var_s("7", "w");
-        dval_t *t = test_dv_new_named_var_s("8", "t");
-        dval_t *one4 = test_dv_new_const_d(1.0);
-        dval_t *two4 = test_dv_new_const_d(2.0);
-        dval_t *zero4 = DV_ZERO;
-        dval_t *vals[16] = {
+        expr_t *u = test_expr_new_named_var_s("5", "u");
+        expr_t *v4 = test_expr_new_named_var_s("6", "v");
+        expr_t *w = test_expr_new_named_var_s("7", "w");
+        expr_t *t = test_expr_new_named_var_s("8", "t");
+        expr_t *one4 = test_expr_new_const_d(1.0);
+        expr_t *two4 = test_expr_new_const_d(2.0);
+        expr_t *zero4 = EXPR_ZERO;
+        expr_t *vals[16] = {
             u,    one4, zero4, two4,
             one4, v4,   one4,  zero4,
             zero4, one4, w,    one4,
             two4, zero4, one4, t
         };
-        matrix_t *A4 = mat_create_dv(4, 4, vals);
+        matrix_t *A4 = mat_create_expr(4, 4, vals);
         matrix_t *A4i = mat_inverse(A4);
         matrix_t *P = NULL;
-        dval_t *entry = NULL;
+        expr_t *entry = NULL;
 
-        check_bool("inverse(dense 4x4 dval) returned non-null", A4i != NULL);
+        check_bool("inverse(dense 4x4 expr) returned non-null", A4i != NULL);
 
         if (A4i) {
             P = mat_mul(A4, A4i);
-            check_bool("A * A^{-1} (4x4 dval) non-null", P != NULL);
+            check_bool("A * A^{-1} (4x4 expr) non-null", P != NULL);
             if (P) {
                 for (size_t i = 0; i < 4; ++i) {
                     for (size_t j = 0; j < 4; ++j) {
                         char label[64];
                         mat_get(P, i, j, &entry);
-                        snprintf(label, sizeof(label), "dense 4x4 dval prod[%zu,%zu]", i, j);
-                        check_d(label, dv_eval_d(entry),
+                        snprintf(label, sizeof(label), "dense 4x4 expr prod[%zu,%zu]", i, j);
+                        check_d(label, expr_eval_d(entry),
                                 i == j ? 1.0 : 0.0, 5e-2);
-                        dv_free(entry);
+                        expr_free(entry);
                     }
                 }
             }
@@ -4787,28 +4787,28 @@ static void test_inverse_dval_dense_4x4(void)
         mat_free(P);
         mat_free(A4i);
         mat_free(A4);
-        dv_free(u);
-        dv_free(v4);
-        dv_free(w);
-        dv_free(t);
-        dv_free(one4);
-        dv_free(two4);
+        expr_free(u);
+        expr_free(v4);
+        expr_free(w);
+        expr_free(t);
+        expr_free(one4);
+        expr_free(two4);
     }
 }
 
-static void test_inverse_dval_dense_6x6(void)
+static void test_inverse_expr_dense_6x6(void)
 {
     {
-        dval_t *a6 = test_dv_new_named_var_s("5", "a");
-        dval_t *b6 = test_dv_new_named_var_s("6", "b");
-        dval_t *c6 = test_dv_new_named_var_s("7", "c");
-        dval_t *d6 = test_dv_new_named_var_s("8", "d");
-        dval_t *e6 = test_dv_new_named_var_s("9", "e");
-        dval_t *f6 = test_dv_new_named_var_s("10", "f");
-        dval_t *one6 = test_dv_new_const_d(1.0);
-        dval_t *two6 = test_dv_new_const_d(2.0);
-        dval_t *zero6 = DV_ZERO;
-        dval_t *vals[36] = {
+        expr_t *a6 = test_expr_new_named_var_s("5", "a");
+        expr_t *b6 = test_expr_new_named_var_s("6", "b");
+        expr_t *c6 = test_expr_new_named_var_s("7", "c");
+        expr_t *d6 = test_expr_new_named_var_s("8", "d");
+        expr_t *e6 = test_expr_new_named_var_s("9", "e");
+        expr_t *f6 = test_expr_new_named_var_s("10", "f");
+        expr_t *one6 = test_expr_new_const_d(1.0);
+        expr_t *two6 = test_expr_new_const_d(2.0);
+        expr_t *zero6 = EXPR_ZERO;
+        expr_t *vals[36] = {
             a6,   one6, two6, zero6, zero6, zero6,
             one6, b6,   one6, zero6, zero6, zero6,
             two6, one6, c6,   one6, zero6, zero6,
@@ -4816,25 +4816,25 @@ static void test_inverse_dval_dense_6x6(void)
             zero6, zero6, zero6, one6, e6,   one6,
             zero6, zero6, zero6, two6, one6, f6
         };
-        matrix_t *A6 = mat_create_dv(6, 6, vals);
+        matrix_t *A6 = mat_create_expr(6, 6, vals);
         matrix_t *A6i = mat_inverse(A6);
         matrix_t *P = NULL;
-        dval_t *entry = NULL;
+        expr_t *entry = NULL;
 
-        check_bool("inverse(dense 6x6 dval) returned non-null", A6i != NULL);
+        check_bool("inverse(dense 6x6 expr) returned non-null", A6i != NULL);
 
         if (A6i) {
             P = mat_mul(A6, A6i);
-            check_bool("A * A^{-1} (6x6 dval) non-null", P != NULL);
+            check_bool("A * A^{-1} (6x6 expr) non-null", P != NULL);
             if (P) {
                 for (size_t i = 0; i < 6; ++i) {
                     for (size_t j = 0; j < 6; ++j) {
                         char label[64];
                         mat_get(P, i, j, &entry);
-                        snprintf(label, sizeof(label), "dense 6x6 dval prod[%zu,%zu]", i, j);
-                        check_d(label, dv_eval_d(entry),
+                        snprintf(label, sizeof(label), "dense 6x6 expr prod[%zu,%zu]", i, j);
+                        check_d(label, expr_eval_d(entry),
                                 i == j ? 1.0 : 0.0, 5e-2);
-                        dv_free(entry);
+                        expr_free(entry);
                     }
                 }
             }
@@ -4843,165 +4843,165 @@ static void test_inverse_dval_dense_6x6(void)
         mat_free(P);
         mat_free(A6i);
         mat_free(A6);
-        dv_free(a6);
-        dv_free(b6);
-        dv_free(c6);
-        dv_free(d6);
-        dv_free(e6);
-        dv_free(f6);
-        dv_free(one6);
-        dv_free(two6);
+        expr_free(a6);
+        expr_free(b6);
+        expr_free(c6);
+        expr_free(d6);
+        expr_free(e6);
+        expr_free(f6);
+        expr_free(one6);
+        expr_free(two6);
     }
 }
 
-static void test_inverse_dval_singular(void)
+static void test_inverse_expr_singular(void)
 {
     {
-        dval_t *one_s = test_dv_new_const_d(1.0);
-        dval_t *two_s = test_dv_new_const_d(2.0);
-        dval_t *four_s = test_dv_new_const_d(4.0);
-        dval_t *sing_vals[4] = {one_s, two_s, two_s, four_s};
-        matrix_t *S = mat_create_dv(2, 2, sing_vals);
+        expr_t *one_s = test_expr_new_const_d(1.0);
+        expr_t *two_s = test_expr_new_const_d(2.0);
+        expr_t *four_s = test_expr_new_const_d(4.0);
+        expr_t *sing_vals[4] = {one_s, two_s, two_s, four_s};
+        matrix_t *S = mat_create_expr(2, 2, sing_vals);
         matrix_t *Si = mat_inverse(S);
 
-        print_mdv("A (singular dval)", S);
-        check_bool("inverse(singular dval) = NULL", Si == NULL);
+        print_mdv("A (singular expr)", S);
+        check_bool("inverse(singular expr) = NULL", Si == NULL);
 
         mat_free(Si);
         mat_free(S);
-        dv_free(one_s);
-        dv_free(two_s);
-        dv_free(four_s);
+        expr_free(one_s);
+        expr_free(two_s);
+        expr_free(four_s);
     }
 }
 
-static void test_det_dval(void)
+static void test_det_expr(void)
 {
-    printf(C_CYAN "TEST: determinant (dval)\n" C_RESET);
+    printf(C_CYAN "TEST: determinant (expr)\n" C_RESET);
 
     {
-        dval_t *x = test_dv_new_named_var_d(3.0, "x");
-        dval_t *y = test_dv_new_named_var_d(4.0, "y");
-        dval_t *one = test_dv_new_const_d(1.0);
-        dval_t *two = test_dv_new_const_d(2.0);
-        dval_t *vals[4] = {x, one, y, two};
-        matrix_t *A = mat_create_dv(2, 2, vals);
-        dval_t *det = NULL;
+        expr_t *x = test_expr_new_named_var_d(3.0, "x");
+        expr_t *y = test_expr_new_named_var_d(4.0, "y");
+        expr_t *one = test_expr_new_const_d(1.0);
+        expr_t *two = test_expr_new_const_d(2.0);
+        expr_t *vals[4] = {x, one, y, two};
+        matrix_t *A = mat_create_expr(2, 2, vals);
+        expr_t *det = NULL;
 
-        print_mdv("A (2x2 dval)", A);
-        check_bool("mat_det(dval 2x2) rc = 0", mat_det(A, &det) == 0);
-        check_bool("det(dval 2x2) non-null", det != NULL);
+        print_mdv("A (2x2 expr)", A);
+        check_bool("mat_det(expr 2x2) rc = 0", mat_det(A, &det) == 0);
+        check_bool("det(expr 2x2) non-null", det != NULL);
 
         if (det) {
-            print_det_dv("det(A)", det);
-            check_d("det [[x,1],[y,2]] at x=3,y=4 = 2", dv_eval_d(det), 2.0, 1e-12);
-            check_dval_text_contains("det 2x2 contains x", det, "x");
-            check_dval_text_contains("det 2x2 contains y", det, "y");
+            print_det_expr("det(A)", det);
+            check_d("det [[x,1],[y,2]] at x=3,y=4 = 2", expr_eval_d(det), 2.0, 1e-12);
+            check_expr_text_contains("det 2x2 contains x", det, "x");
+            check_expr_text_contains("det 2x2 contains y", det, "y");
 
-            test_dv_set_val_d(x, 5.0);
-            test_dv_set_val_d(y, 6.0);
-            check_d("det [[x,1],[y,2]] tracks x,y", dv_eval_d(det), 4.0, 1e-12);
+            test_expr_set_val_d(x, 5.0);
+            test_expr_set_val_d(y, 6.0);
+            check_d("det [[x,1],[y,2]] tracks x,y", expr_eval_d(det), 4.0, 1e-12);
         }
 
-        dv_free(det);
+        expr_free(det);
         mat_free(A);
-        dv_free(x);
-        dv_free(y);
-        dv_free(one);
-        dv_free(two);
+        expr_free(x);
+        expr_free(y);
+        expr_free(one);
+        expr_free(two);
     }
 
     {
-        dval_t *x = test_dv_new_named_var_d(2.0, "x");
-        dval_t *y = test_dv_new_named_var_d(3.0, "y");
-        dval_t *z = test_dv_new_named_var_d(5.0, "z");
-        dval_t *one = test_dv_new_const_d(1.0);
-        dval_t *zero = DV_ZERO;
-        dval_t *vals[9] = {
+        expr_t *x = test_expr_new_named_var_d(2.0, "x");
+        expr_t *y = test_expr_new_named_var_d(3.0, "y");
+        expr_t *z = test_expr_new_named_var_d(5.0, "z");
+        expr_t *one = test_expr_new_const_d(1.0);
+        expr_t *zero = EXPR_ZERO;
+        expr_t *vals[9] = {
             x,    one,  zero,
             zero, y,    one,
             one,  zero, z};
-        matrix_t *A = mat_create_dv(3, 3, vals);
-        dval_t *det = NULL;
+        matrix_t *A = mat_create_expr(3, 3, vals);
+        expr_t *det = NULL;
 
-        print_mdv("A (dense 3x3 dval)", A);
-        check_bool("mat_det(dval dense 3x3) rc = 0", mat_det(A, &det) == 0);
-        check_bool("det(dval dense 3x3) non-null", det != NULL);
+        print_mdv("A (dense 3x3 expr)", A);
+        check_bool("mat_det(expr dense 3x3) rc = 0", mat_det(A, &det) == 0);
+        check_bool("det(expr dense 3x3) non-null", det != NULL);
 
         if (det) {
-            print_det_dv("det(A)", det);
-            check_d("det dense 3x3 at x=2,y=3,z=5 = 31", dv_eval_d(det), 31.0, 1e-12);
-            check_dval_text_contains("det 3x3 contains x", det, "x");
-            check_dval_text_contains("det 3x3 contains y", det, "y");
-            check_dval_text_contains("det 3x3 contains z", det, "z");
+            print_det_expr("det(A)", det);
+            check_d("det dense 3x3 at x=2,y=3,z=5 = 31", expr_eval_d(det), 31.0, 1e-12);
+            check_expr_text_contains("det 3x3 contains x", det, "x");
+            check_expr_text_contains("det 3x3 contains y", det, "y");
+            check_expr_text_contains("det 3x3 contains z", det, "z");
         }
 
-        dv_free(det);
+        expr_free(det);
         mat_free(A);
-        dv_free(x);
-        dv_free(y);
-        dv_free(z);
-        dv_free(one);
+        expr_free(x);
+        expr_free(y);
+        expr_free(z);
+        expr_free(one);
     }
 
     {
-        dval_t *a = test_dv_new_named_var_d(2.0, "a");
-        dval_t *b = test_dv_new_named_var_d(3.0, "b");
-        dval_t *c = test_dv_new_named_var_d(5.0, "c");
-        dval_t *d = test_dv_new_named_var_d(7.0, "d");
-        dval_t *one = test_dv_new_const_d(1.0);
-        dval_t *zero = DV_ZERO;
-        dval_t *vals[16] = {
+        expr_t *a = test_expr_new_named_var_d(2.0, "a");
+        expr_t *b = test_expr_new_named_var_d(3.0, "b");
+        expr_t *c = test_expr_new_named_var_d(5.0, "c");
+        expr_t *d = test_expr_new_named_var_d(7.0, "d");
+        expr_t *one = test_expr_new_const_d(1.0);
+        expr_t *zero = EXPR_ZERO;
+        expr_t *vals[16] = {
             a,    one,  zero, zero,
             zero, b,    one,  zero,
             zero, zero, c,    one,
             zero, zero, zero, d};
-        matrix_t *A = mat_create_dv(4, 4, vals);
-        dval_t *det = NULL;
+        matrix_t *A = mat_create_expr(4, 4, vals);
+        expr_t *det = NULL;
 
-        print_mdv("A (upper triangular 4x4 dval)", A);
-        check_bool("mat_det(dval triangular 4x4) rc = 0", mat_det(A, &det) == 0);
-        check_bool("det(dval triangular 4x4) non-null", det != NULL);
+        print_mdv("A (upper triangular 4x4 expr)", A);
+        check_bool("mat_det(expr triangular 4x4) rc = 0", mat_det(A, &det) == 0);
+        check_bool("det(expr triangular 4x4) non-null", det != NULL);
 
         if (det) {
-            print_det_dv("det(A)", det);
-            check_d("det triangular 4x4 = a*b*c*d at sample point", dv_eval_d(det), 210.0, 1e-12);
-            test_dv_set_val_d(a, 11.0);
-            test_dv_set_val_d(b, 13.0);
-            test_dv_set_val_d(c, 17.0);
-            test_dv_set_val_d(d, 19.0);
-            check_d("det triangular 4x4 tracks variables", dv_eval_d(det), 46189.0, 1e-9);
+            print_det_expr("det(A)", det);
+            check_d("det triangular 4x4 = a*b*c*d at sample point", expr_eval_d(det), 210.0, 1e-12);
+            test_expr_set_val_d(a, 11.0);
+            test_expr_set_val_d(b, 13.0);
+            test_expr_set_val_d(c, 17.0);
+            test_expr_set_val_d(d, 19.0);
+            check_d("det triangular 4x4 tracks variables", expr_eval_d(det), 46189.0, 1e-9);
         }
 
-        dv_free(det);
+        expr_free(det);
         mat_free(A);
-        dv_free(a);
-        dv_free(b);
-        dv_free(c);
-        dv_free(d);
-        dv_free(one);
+        expr_free(a);
+        expr_free(b);
+        expr_free(c);
+        expr_free(d);
+        expr_free(one);
     }
 
     {
-        dval_t *x = test_dv_new_named_var_d(1.0, "x");
-        dval_t *one = test_dv_new_const_d(1.0);
-        dval_t *vals[9] = {
-            x,    one,  DV_ZERO,
-            x,    one,  DV_ZERO,
-            DV_ZERO, DV_ZERO, one};
-        matrix_t *A = mat_create_dv(3, 3, vals);
-        dval_t *det = NULL;
+        expr_t *x = test_expr_new_named_var_d(1.0, "x");
+        expr_t *one = test_expr_new_const_d(1.0);
+        expr_t *vals[9] = {
+            x,    one,  EXPR_ZERO,
+            x,    one,  EXPR_ZERO,
+            EXPR_ZERO, EXPR_ZERO, one};
+        matrix_t *A = mat_create_expr(3, 3, vals);
+        expr_t *det = NULL;
 
-        print_mdv("A (singular dval)", A);
-        check_bool("mat_det(dval singular) rc = 0", mat_det(A, &det) == 0);
-        check_bool("det(dval singular) non-null", det != NULL);
+        print_mdv("A (singular expr)", A);
+        check_bool("mat_det(expr singular) rc = 0", mat_det(A, &det) == 0);
+        check_bool("det(expr singular) non-null", det != NULL);
         if (det)
-            check_d("det singular dval = 0", dv_eval_d(det), 0.0, 1e-12);
+            check_d("det singular expr = 0", expr_eval_d(det), 0.0, 1e-12);
 
-        dv_free(det);
+        expr_free(det);
         mat_free(A);
-        dv_free(x);
-        dv_free(one);
+        expr_free(x);
+        expr_free(one);
     }
 }
 
@@ -5010,18 +5010,18 @@ static void test_symbolic_linear_algebra_extensions(void)
     printf(C_CYAN "TEST: symbolic characteristic polynomial / minimal polynomial / adjugate / nullspace\n" C_RESET);
 
     {
-        dval_t *x = test_dv_new_named_var_d(2.0, "x");
-        dval_t *y = test_dv_new_named_var_d(3.0, "y");
-        dval_t *one = test_dv_new_const_d(1.0);
-        dval_t *vals[4] = {x, one, one, y};
-        matrix_t *A = mat_create_dv(2, 2, vals);
+        expr_t *x = test_expr_new_named_var_d(2.0, "x");
+        expr_t *y = test_expr_new_named_var_d(3.0, "y");
+        expr_t *one = test_expr_new_const_d(1.0);
+        expr_t *vals[4] = {x, one, one, y};
+        matrix_t *A = mat_create_expr(2, 2, vals);
         matrix_t *P = mat_charpoly(A);
-        dval_t *c0 = NULL;
-        dval_t *c1 = NULL;
-        dval_t *c2 = NULL;
+        expr_t *c0 = NULL;
+        expr_t *c1 = NULL;
+        expr_t *c2 = NULL;
 
-        print_mdv("A (charpoly dval)", A);
-        check_bool("mat_charpoly(dval) not NULL", P != NULL);
+        print_mdv("A (charpoly expr)", A);
+        check_bool("mat_charpoly(expr) not NULL", P != NULL);
         if (P) {
             check_bool("charpoly rows = n+1", mat_get_row_count(P) == 3);
             check_bool("charpoly cols = 1", mat_get_col_count(P) == 1);
@@ -5030,43 +5030,43 @@ static void test_symbolic_linear_algebra_extensions(void)
             mat_get(P, 0, 0, &c0);
             mat_get(P, 1, 0, &c1);
             mat_get(P, 2, 0, &c2);
-            check_d("charpoly coeff[0] = 1", dv_eval_d(c0), 1.0, 1e-12);
-            check_d("charpoly coeff[1] = -(x+y)", dv_eval_d(c1), -5.0, 1e-12);
-            check_d("charpoly coeff[2] = x*y-1", dv_eval_d(c2), 5.0, 1e-12);
-            check_dval_text_contains("charpoly coeff[1] contains x", c1, "x");
-            check_dval_text_contains("charpoly coeff[1] contains y", c1, "y");
-            check_dval_text_contains("charpoly coeff[2] contains x", c2, "x");
-            check_dval_text_contains("charpoly coeff[2] contains y", c2, "y");
+            check_d("charpoly coeff[0] = 1", expr_eval_d(c0), 1.0, 1e-12);
+            check_d("charpoly coeff[1] = -(x+y)", expr_eval_d(c1), -5.0, 1e-12);
+            check_d("charpoly coeff[2] = x*y-1", expr_eval_d(c2), 5.0, 1e-12);
+            check_expr_text_contains("charpoly coeff[1] contains x", c1, "x");
+            check_expr_text_contains("charpoly coeff[1] contains y", c1, "y");
+            check_expr_text_contains("charpoly coeff[2] contains x", c2, "x");
+            check_expr_text_contains("charpoly coeff[2] contains y", c2, "y");
 
-            test_dv_set_val_d(x, 5.0);
-            test_dv_set_val_d(y, 7.0);
-            check_d("charpoly coeff[1] tracks x,y", dv_eval_d(c1), -12.0, 1e-12);
-            check_d("charpoly coeff[2] tracks x,y", dv_eval_d(c2), 34.0, 1e-12);
+            test_expr_set_val_d(x, 5.0);
+            test_expr_set_val_d(y, 7.0);
+            check_d("charpoly coeff[1] tracks x,y", expr_eval_d(c1), -12.0, 1e-12);
+            check_d("charpoly coeff[2] tracks x,y", expr_eval_d(c2), 34.0, 1e-12);
         }
 
         mat_free(P);
         mat_free(A);
-        dv_free(x);
-        dv_free(y);
-        dv_free(one);
+        expr_free(x);
+        expr_free(y);
+        expr_free(one);
     }
 
     {
-        dval_t *x = test_dv_new_named_var_d(2.0, "x");
-        dval_t *y = test_dv_new_named_var_d(5.0, "y");
-        dval_t *vals[9] = {
-            x, DV_ZERO, DV_ZERO,
-            DV_ZERO, x, DV_ZERO,
-            DV_ZERO, DV_ZERO, y};
-        matrix_t *A = mat_create_dv(3, 3, vals);
+        expr_t *x = test_expr_new_named_var_d(2.0, "x");
+        expr_t *y = test_expr_new_named_var_d(5.0, "y");
+        expr_t *vals[9] = {
+            x, EXPR_ZERO, EXPR_ZERO,
+            EXPR_ZERO, x, EXPR_ZERO,
+            EXPR_ZERO, EXPR_ZERO, y};
+        matrix_t *A = mat_create_expr(3, 3, vals);
         matrix_t *M = mat_minpoly(A);
         matrix_t *Z = NULL;
-        dval_t *c0 = NULL;
-        dval_t *c1 = NULL;
-        dval_t *c2 = NULL;
+        expr_t *c0 = NULL;
+        expr_t *c1 = NULL;
+        expr_t *c2 = NULL;
 
-        print_mdv("A (minpoly repeated diagonal dval)", A);
-        check_bool("mat_minpoly(repeated diagonal dval) not NULL", M != NULL);
+        print_mdv("A (minpoly repeated diagonal expr)", A);
+        check_bool("mat_minpoly(repeated diagonal expr) not NULL", M != NULL);
         if (M) {
             check_bool("minpoly rows = 3", mat_get_row_count(M) == 3);
             check_bool("minpoly cols = 1", mat_get_col_count(M) == 1);
@@ -5074,25 +5074,25 @@ static void test_symbolic_linear_algebra_extensions(void)
             mat_get(M, 0, 0, &c0);
             mat_get(M, 1, 0, &c1);
             mat_get(M, 2, 0, &c2);
-            check_d("minpoly coeff[0] = 1", dv_eval_d(c0), 1.0, 1e-12);
-            check_d("minpoly coeff[1] = -(x+y)", dv_eval_d(c1), -7.0, 1e-12);
-            check_d("minpoly coeff[2] = x*y", dv_eval_d(c2), 10.0, 1e-12);
-            check_dval_text_contains("minpoly coeff[1] contains x", c1, "x");
-            check_dval_text_contains("minpoly coeff[1] contains y", c1, "y");
-            test_dv_set_val_d(x, 11.0);
-            test_dv_set_val_d(y, 13.0);
-            check_d("minpoly coeff[1] tracks x,y", dv_eval_d(c1), -24.0, 1e-12);
-            check_d("minpoly coeff[2] tracks x,y", dv_eval_d(c2), 143.0, 1e-12);
+            check_d("minpoly coeff[0] = 1", expr_eval_d(c0), 1.0, 1e-12);
+            check_d("minpoly coeff[1] = -(x+y)", expr_eval_d(c1), -7.0, 1e-12);
+            check_d("minpoly coeff[2] = x*y", expr_eval_d(c2), 10.0, 1e-12);
+            check_expr_text_contains("minpoly coeff[1] contains x", c1, "x");
+            check_expr_text_contains("minpoly coeff[1] contains y", c1, "y");
+            test_expr_set_val_d(x, 11.0);
+            test_expr_set_val_d(y, 13.0);
+            check_d("minpoly coeff[1] tracks x,y", expr_eval_d(c1), -24.0, 1e-12);
+            check_d("minpoly coeff[2] tracks x,y", expr_eval_d(c2), 143.0, 1e-12);
 
             Z = mat_apply_poly(A, M);
-            check_bool("mat_apply_poly(repeated diagonal dval) not NULL", Z != NULL);
+            check_bool("mat_apply_poly(repeated diagonal expr) not NULL", Z != NULL);
             if (Z) {
                 for (size_t i = 0; i < 3; ++i) {
-                    dval_t *z = NULL;
+                    expr_t *z = NULL;
                     char label[80];
                     mat_get(Z, i, i, &z);
                     snprintf(label, sizeof(label), "minpoly(A)(repeated diag)[%zu,%zu]", i, i);
-                    check_d(label, dv_eval_d(z), 0.0, 1e-12);
+                    check_d(label, expr_eval_d(z), 0.0, 1e-12);
                 }
             }
         }
@@ -5100,27 +5100,27 @@ static void test_symbolic_linear_algebra_extensions(void)
         mat_free(Z);
         mat_free(M);
         mat_free(A);
-        dv_free(x);
-        dv_free(y);
+        expr_free(x);
+        expr_free(y);
     }
 
     {
-        dval_t *x = test_dv_new_named_var_d(3.0, "x");
-        dval_t *one = test_dv_new_const_d(1.0);
-        dval_t *vals[9] = {
-            x, one, DV_ZERO,
-            DV_ZERO, x, one,
-            DV_ZERO, DV_ZERO, x};
-        matrix_t *A = mat_create_dv(3, 3, vals);
+        expr_t *x = test_expr_new_named_var_d(3.0, "x");
+        expr_t *one = test_expr_new_const_d(1.0);
+        expr_t *vals[9] = {
+            x, one, EXPR_ZERO,
+            EXPR_ZERO, x, one,
+            EXPR_ZERO, EXPR_ZERO, x};
+        matrix_t *A = mat_create_expr(3, 3, vals);
         matrix_t *M = mat_minpoly(A);
         matrix_t *Z = NULL;
-        dval_t *c0 = NULL;
-        dval_t *c1 = NULL;
-        dval_t *c2 = NULL;
-        dval_t *c3 = NULL;
+        expr_t *c0 = NULL;
+        expr_t *c1 = NULL;
+        expr_t *c2 = NULL;
+        expr_t *c3 = NULL;
 
-        print_mdv("A (minpoly Jordan dval)", A);
-        check_bool("mat_minpoly(Jordan 3x3 dval) not NULL", M != NULL);
+        print_mdv("A (minpoly Jordan expr)", A);
+        check_bool("mat_minpoly(Jordan 3x3 expr) not NULL", M != NULL);
         if (M) {
             check_bool("Jordan minpoly rows = 4", mat_get_row_count(M) == 4);
             check_bool("Jordan minpoly cols = 1", mat_get_col_count(M) == 1);
@@ -5129,26 +5129,26 @@ static void test_symbolic_linear_algebra_extensions(void)
             mat_get(M, 1, 0, &c1);
             mat_get(M, 2, 0, &c2);
             mat_get(M, 3, 0, &c3);
-            check_d("Jordan minpoly coeff[0] = 1", dv_eval_d(c0), 1.0, 1e-12);
-            check_d("Jordan minpoly coeff[1] = -3x", dv_eval_d(c1), -9.0, 1e-12);
-            check_d("Jordan minpoly coeff[2] = 3x^2", dv_eval_d(c2), 27.0, 1e-12);
-            check_d("Jordan minpoly coeff[3] = -x^3", dv_eval_d(c3), -27.0, 1e-12);
-            check_dval_text_contains("Jordan minpoly coeff[1] contains x", c1, "x");
-            test_dv_set_val_d(x, 5.0);
-            check_d("Jordan minpoly coeff[1] tracks x", dv_eval_d(c1), -15.0, 1e-12);
-            check_d("Jordan minpoly coeff[2] tracks x", dv_eval_d(c2), 75.0, 1e-12);
-            check_d("Jordan minpoly coeff[3] tracks x", dv_eval_d(c3), -125.0, 1e-12);
+            check_d("Jordan minpoly coeff[0] = 1", expr_eval_d(c0), 1.0, 1e-12);
+            check_d("Jordan minpoly coeff[1] = -3x", expr_eval_d(c1), -9.0, 1e-12);
+            check_d("Jordan minpoly coeff[2] = 3x^2", expr_eval_d(c2), 27.0, 1e-12);
+            check_d("Jordan minpoly coeff[3] = -x^3", expr_eval_d(c3), -27.0, 1e-12);
+            check_expr_text_contains("Jordan minpoly coeff[1] contains x", c1, "x");
+            test_expr_set_val_d(x, 5.0);
+            check_d("Jordan minpoly coeff[1] tracks x", expr_eval_d(c1), -15.0, 1e-12);
+            check_d("Jordan minpoly coeff[2] tracks x", expr_eval_d(c2), 75.0, 1e-12);
+            check_d("Jordan minpoly coeff[3] tracks x", expr_eval_d(c3), -125.0, 1e-12);
 
             Z = mat_apply_poly(A, M);
-            check_bool("mat_apply_poly(Jordan 3x3 dval) not NULL", Z != NULL);
+            check_bool("mat_apply_poly(Jordan 3x3 expr) not NULL", Z != NULL);
             if (Z) {
                 for (size_t i = 0; i < 3; ++i) {
                     for (size_t j = 0; j < 3; ++j) {
-                        dval_t *z = NULL;
+                        expr_t *z = NULL;
                         char label[80];
                         mat_get(Z, i, j, &z);
                         snprintf(label, sizeof(label), "minpoly(A)(Jordan)[%zu,%zu]", i, j);
-                        check_d(label, dv_eval_d(z), 0.0, 1e-12);
+                        check_d(label, expr_eval_d(z), 0.0, 1e-12);
                     }
                 }
             }
@@ -5157,24 +5157,24 @@ static void test_symbolic_linear_algebra_extensions(void)
         mat_free(Z);
         mat_free(M);
         mat_free(A);
-        dv_free(x);
-        dv_free(one);
+        expr_free(x);
+        expr_free(one);
     }
 
     {
-        dval_t *x = test_dv_new_named_var_d(2.0, "x");
-        dval_t *y = test_dv_new_named_var_d(3.0, "y");
-        dval_t *one = test_dv_new_const_d(1.0);
-        dval_t *vals[4] = {x, one, one, y};
-        matrix_t *A = mat_create_dv(2, 2, vals);
+        expr_t *x = test_expr_new_named_var_d(2.0, "x");
+        expr_t *y = test_expr_new_named_var_d(3.0, "y");
+        expr_t *one = test_expr_new_const_d(1.0);
+        expr_t *vals[4] = {x, one, one, y};
+        matrix_t *A = mat_create_expr(2, 2, vals);
         matrix_t *M = mat_minpoly(A);
         matrix_t *Z = NULL;
-        dval_t *c0 = NULL;
-        dval_t *c1 = NULL;
-        dval_t *c2 = NULL;
+        expr_t *c0 = NULL;
+        expr_t *c1 = NULL;
+        expr_t *c2 = NULL;
 
-        print_mdv("A (minpoly dense 2x2 dval)", A);
-        check_bool("mat_minpoly(dense 2x2 dval) not NULL", M != NULL);
+        print_mdv("A (minpoly dense 2x2 expr)", A);
+        check_bool("mat_minpoly(dense 2x2 expr) not NULL", M != NULL);
         if (M) {
             check_bool("dense 2x2 minpoly rows = 3", mat_get_row_count(M) == 3);
             check_bool("dense 2x2 minpoly cols = 1", mat_get_col_count(M) == 1);
@@ -5182,20 +5182,20 @@ static void test_symbolic_linear_algebra_extensions(void)
             mat_get(M, 0, 0, &c0);
             mat_get(M, 1, 0, &c1);
             mat_get(M, 2, 0, &c2);
-            check_d("dense 2x2 minpoly coeff[0] = 1", dv_eval_d(c0), 1.0, 1e-12);
-            check_d("dense 2x2 minpoly coeff[1] = -(x+y)", dv_eval_d(c1), -5.0, 1e-12);
-            check_d("dense 2x2 minpoly coeff[2] = x*y-1", dv_eval_d(c2), 5.0, 1e-12);
+            check_d("dense 2x2 minpoly coeff[0] = 1", expr_eval_d(c0), 1.0, 1e-12);
+            check_d("dense 2x2 minpoly coeff[1] = -(x+y)", expr_eval_d(c1), -5.0, 1e-12);
+            check_d("dense 2x2 minpoly coeff[2] = x*y-1", expr_eval_d(c2), 5.0, 1e-12);
 
             Z = mat_apply_poly(A, M);
-            check_bool("mat_apply_poly(dense 2x2 dval) not NULL", Z != NULL);
+            check_bool("mat_apply_poly(dense 2x2 expr) not NULL", Z != NULL);
             if (Z) {
                 for (size_t i = 0; i < 2; ++i) {
                     for (size_t j = 0; j < 2; ++j) {
-                        dval_t *z = NULL;
+                        expr_t *z = NULL;
                         char label[80];
                         mat_get(Z, i, j, &z);
                         snprintf(label, sizeof(label), "minpoly(A)(dense 2x2)[%zu,%zu]", i, j);
-                        check_d(label, dv_eval_d(z), 0.0, 1e-12);
+                        check_d(label, expr_eval_d(z), 0.0, 1e-12);
                     }
                 }
             }
@@ -5204,65 +5204,65 @@ static void test_symbolic_linear_algebra_extensions(void)
         mat_free(Z);
         mat_free(M);
         mat_free(A);
-        dv_free(x);
-        dv_free(y);
-        dv_free(one);
+        expr_free(x);
+        expr_free(y);
+        expr_free(one);
     }
 
     {
-        dval_t *x = test_dv_new_named_var_d(2.0, "x");
-        dval_t *y = test_dv_new_named_var_d(3.0, "y");
-        dval_t *one = test_dv_new_const_d(1.0);
-        dval_t *vals[4] = {x, one, one, y};
-        matrix_t *A = mat_create_dv(2, 2, vals);
+        expr_t *x = test_expr_new_named_var_d(2.0, "x");
+        expr_t *y = test_expr_new_named_var_d(3.0, "y");
+        expr_t *one = test_expr_new_const_d(1.0);
+        expr_t *vals[4] = {x, one, one, y};
+        matrix_t *A = mat_create_expr(2, 2, vals);
         matrix_t *Adj = mat_adjugate(A);
-        dval_t *e00 = NULL;
-        dval_t *e01 = NULL;
-        dval_t *e10 = NULL;
-        dval_t *e11 = NULL;
+        expr_t *e00 = NULL;
+        expr_t *e01 = NULL;
+        expr_t *e10 = NULL;
+        expr_t *e11 = NULL;
 
-        print_mdv("A (adjugate dval)", A);
-        check_bool("mat_adjugate(dval 2x2) not NULL", Adj != NULL);
+        print_mdv("A (adjugate expr)", A);
+        check_bool("mat_adjugate(expr 2x2) not NULL", Adj != NULL);
         if (Adj) {
             print_mdv("adj(A)", Adj);
             mat_get(Adj, 0, 0, &e00);
             mat_get(Adj, 0, 1, &e01);
             mat_get(Adj, 1, 0, &e10);
             mat_get(Adj, 1, 1, &e11);
-            check_d("adj[0,0] = y", dv_eval_d(e00), 3.0, 1e-12);
-            check_d("adj[0,1] = -1", dv_eval_d(e01), -1.0, 1e-12);
-            check_d("adj[1,0] = -1", dv_eval_d(e10), -1.0, 1e-12);
-            check_d("adj[1,1] = x", dv_eval_d(e11), 2.0, 1e-12);
+            check_d("adj[0,0] = y", expr_eval_d(e00), 3.0, 1e-12);
+            check_d("adj[0,1] = -1", expr_eval_d(e01), -1.0, 1e-12);
+            check_d("adj[1,0] = -1", expr_eval_d(e10), -1.0, 1e-12);
+            check_d("adj[1,1] = x", expr_eval_d(e11), 2.0, 1e-12);
         }
 
         mat_free(Adj);
         mat_free(A);
-        dv_free(x);
-        dv_free(y);
-        dv_free(one);
+        expr_free(x);
+        expr_free(y);
+        expr_free(one);
     }
 
     {
-        dval_t *one = test_dv_new_const_d(1.0);
-        dval_t *two = test_dv_new_const_d(2.0);
-        dval_t *four = test_dv_new_const_d(4.0);
-        dval_t *vals[4] = {one, two, two, four};
-        matrix_t *A = mat_create_dv(2, 2, vals);
+        expr_t *one = test_expr_new_const_d(1.0);
+        expr_t *two = test_expr_new_const_d(2.0);
+        expr_t *four = test_expr_new_const_d(4.0);
+        expr_t *vals[4] = {one, two, two, four};
+        matrix_t *A = mat_create_expr(2, 2, vals);
         matrix_t *Adj = mat_adjugate(A);
         matrix_t *Z = NULL;
 
-        check_bool("mat_adjugate(singular dval 2x2) not NULL", Adj != NULL);
+        check_bool("mat_adjugate(singular expr 2x2) not NULL", Adj != NULL);
         if (Adj) {
             Z = mat_mul(A, Adj);
-            check_bool("A*adj(A) for singular dval not NULL", Z != NULL);
+            check_bool("A*adj(A) for singular expr not NULL", Z != NULL);
             if (Z) {
-                dval_t *entry = NULL;
+                expr_t *entry = NULL;
                 for (size_t i = 0; i < 2; ++i) {
                     for (size_t j = 0; j < 2; ++j) {
                         char label[64];
                         mat_get(Z, i, j, &entry);
-                        snprintf(label, sizeof(label), "singular dval A*adj(A)[%zu,%zu]", i, j);
-                        check_d(label, dv_eval_d(entry), 0.0, 1e-12);
+                        snprintf(label, sizeof(label), "singular expr A*adj(A)[%zu,%zu]", i, j);
+                        check_d(label, expr_eval_d(entry), 0.0, 1e-12);
                     }
                 }
             }
@@ -5271,111 +5271,111 @@ static void test_symbolic_linear_algebra_extensions(void)
         mat_free(Z);
         mat_free(Adj);
         mat_free(A);
-        dv_free(one);
-        dv_free(two);
-        dv_free(four);
+        expr_free(one);
+        expr_free(two);
+        expr_free(four);
     }
 
     {
-        dval_t *x = test_dv_new_named_var_d(2.0, "x");
-        dval_t *y = test_dv_new_named_var_d(3.0, "y");
-        dval_t *one = test_dv_new_const_d(1.0);
-        dval_t *zero = DV_ZERO;
-        dval_t *neg_x = dv_neg(x);
-        dval_t *neg_y = dv_neg(y);
-        dval_t *vals[6] = {one, zero, neg_x,
+        expr_t *x = test_expr_new_named_var_d(2.0, "x");
+        expr_t *y = test_expr_new_named_var_d(3.0, "y");
+        expr_t *one = test_expr_new_const_d(1.0);
+        expr_t *zero = EXPR_ZERO;
+        expr_t *neg_x = expr_neg(x);
+        expr_t *neg_y = expr_neg(y);
+        expr_t *vals[6] = {one, zero, neg_x,
                            zero, one, neg_y};
-        matrix_t *A = mat_create_dv(2, 3, vals);
+        matrix_t *A = mat_create_expr(2, 3, vals);
         matrix_t *N = mat_nullspace(A);
         matrix_t *AN = NULL;
-        dval_t *n0 = NULL;
-        dval_t *n1 = NULL;
-        dval_t *n2 = NULL;
+        expr_t *n0 = NULL;
+        expr_t *n1 = NULL;
+        expr_t *n2 = NULL;
 
-        print_mdv("A (nullspace dval)", A);
-        check_bool("mat_nullspace(dval) not NULL", N != NULL);
+        print_mdv("A (nullspace expr)", A);
+        check_bool("mat_nullspace(expr) not NULL", N != NULL);
         if (N) {
-            check_bool("dval nullspace rows = 3", mat_get_row_count(N) == 3);
-            check_bool("dval nullspace cols = 1", mat_get_col_count(N) == 1);
+            check_bool("expr nullspace rows = 3", mat_get_row_count(N) == 3);
+            check_bool("expr nullspace cols = 1", mat_get_col_count(N) == 1);
             print_mdv("nullspace(A)", N);
 
             mat_get(N, 0, 0, &n0);
             mat_get(N, 1, 0, &n1);
             mat_get(N, 2, 0, &n2);
-            check_d("nullspace basis[0] = x", dv_eval_d(n0), 2.0, 1e-12);
-            check_d("nullspace basis[1] = y", dv_eval_d(n1), 3.0, 1e-12);
-            check_d("nullspace basis[2] = 1", dv_eval_d(n2), 1.0, 1e-12);
+            check_d("nullspace basis[0] = x", expr_eval_d(n0), 2.0, 1e-12);
+            check_d("nullspace basis[1] = y", expr_eval_d(n1), 3.0, 1e-12);
+            check_d("nullspace basis[2] = 1", expr_eval_d(n2), 1.0, 1e-12);
 
             AN = mat_mul(A, N);
-            check_bool("A*nullspace(dval) not NULL", AN != NULL);
+            check_bool("A*nullspace(expr) not NULL", AN != NULL);
             if (AN) {
-                dval_t *entry = NULL;
+                expr_t *entry = NULL;
                 for (size_t i = 0; i < 2; ++i) {
                     char label[64];
                     mat_get(AN, i, 0, &entry);
-                    snprintf(label, sizeof(label), "A*nullspace(dval)[%zu,0]", i);
-                    check_d(label, dv_eval_d(entry), 0.0, 1e-12);
+                    snprintf(label, sizeof(label), "A*nullspace(expr)[%zu,0]", i);
+                    check_d(label, expr_eval_d(entry), 0.0, 1e-12);
                 }
             }
 
-            test_dv_set_val_d(x, 11.0);
-            test_dv_set_val_d(y, 13.0);
-            check_d("nullspace basis[0] tracks x", dv_eval_d(n0), 11.0, 1e-12);
-            check_d("nullspace basis[1] tracks y", dv_eval_d(n1), 13.0, 1e-12);
-            check_d("nullspace basis[2] remains 1", dv_eval_d(n2), 1.0, 1e-12);
+            test_expr_set_val_d(x, 11.0);
+            test_expr_set_val_d(y, 13.0);
+            check_d("nullspace basis[0] tracks x", expr_eval_d(n0), 11.0, 1e-12);
+            check_d("nullspace basis[1] tracks y", expr_eval_d(n1), 13.0, 1e-12);
+            check_d("nullspace basis[2] remains 1", expr_eval_d(n2), 1.0, 1e-12);
         }
 
         mat_free(AN);
         mat_free(N);
         mat_free(A);
-        dv_free(neg_x);
-        dv_free(neg_y);
-        dv_free(x);
-        dv_free(y);
-        dv_free(one);
+        expr_free(neg_x);
+        expr_free(neg_y);
+        expr_free(x);
+        expr_free(y);
+        expr_free(one);
     }
 
     {
-        dval_t *x = test_dv_new_named_var_d(2.0, "x");
-        dval_t *y = test_dv_new_named_var_d(3.0, "y");
-        dval_t *one = test_dv_new_const_d(1.0);
-        dval_t *vals[6] = {
+        expr_t *x = test_expr_new_named_var_d(2.0, "x");
+        expr_t *y = test_expr_new_named_var_d(3.0, "y");
+        expr_t *one = test_expr_new_const_d(1.0);
+        expr_t *vals[6] = {
             one, one, x,
             one, one, y
         };
-        matrix_t *A = mat_create_dv(2, 3, vals);
+        matrix_t *A = mat_create_expr(2, 3, vals);
 
-        print_mdv("A (rank dval)", A);
-        check_bool("mat_rank(dval rectangular dependent) = 2", mat_rank(A) == 2);
+        print_mdv("A (rank expr)", A);
+        check_bool("mat_rank(expr rectangular dependent) = 2", mat_rank(A) == 2);
 
-        test_dv_set_val_d(x, 5.0);
-        test_dv_set_val_d(y, 5.0);
-        check_bool("mat_rank(dval rectangular remains exact-symbolic 2)", mat_rank(A) == 2);
+        test_expr_set_val_d(x, 5.0);
+        test_expr_set_val_d(y, 5.0);
+        check_bool("mat_rank(expr rectangular remains exact-symbolic 2)", mat_rank(A) == 2);
 
         mat_free(A);
-        dv_free(x);
-        dv_free(y);
-        dv_free(one);
+        expr_free(x);
+        expr_free(y);
+        expr_free(one);
     }
 
     {
-        dval_t *x = test_dv_new_named_var_d(2.0, "x");
-        dval_t *one = test_dv_new_const_d(1.0);
-        dval_t *vals[6] = {
+        expr_t *x = test_expr_new_named_var_d(2.0, "x");
+        expr_t *one = test_expr_new_const_d(1.0);
+        expr_t *vals[6] = {
             one, one, x,
             one, one, x
         };
-        matrix_t *A = mat_create_dv(2, 3, vals);
+        matrix_t *A = mat_create_expr(2, 3, vals);
 
-        print_mdv("A (rank dval dependent)", A);
-        check_bool("mat_rank(dval structurally dependent) = 1", mat_rank(A) == 1);
+        print_mdv("A (rank expr dependent)", A);
+        check_bool("mat_rank(expr structurally dependent) = 1", mat_rank(A) == 1);
 
-        test_dv_set_val_d(x, 5.0);
-        check_bool("mat_rank(dval structurally dependent stays 1)", mat_rank(A) == 1);
+        test_expr_set_val_d(x, 5.0);
+        check_bool("mat_rank(expr structurally dependent stays 1)", mat_rank(A) == 1);
 
         mat_free(A);
-        dv_free(x);
-        dv_free(one);
+        expr_free(x);
+        expr_free(one);
     }
 }
 
@@ -5828,53 +5828,53 @@ static void test_solve_and_lstsq(void)
 
     /* Exact symbolic least-squares recovery for a full-column-rank system. */
     {
-        dval_t *p = test_dv_new_named_var_d(3.0, "p");
-        dval_t *q = test_dv_new_named_var_d(4.0, "q");
-        dval_t *u = test_dv_new_named_var_d(5.0, "u");
-        dval_t *two = test_dv_new_const_d(2.0);
-        dval_t *A_vals[6] = {
-            p,       DV_ZERO,
-            DV_ZERO, q,
-            DV_ONE,  DV_ONE
+        expr_t *p = test_expr_new_named_var_d(3.0, "p");
+        expr_t *q = test_expr_new_named_var_d(4.0, "q");
+        expr_t *u = test_expr_new_named_var_d(5.0, "u");
+        expr_t *two = test_expr_new_const_d(2.0);
+        expr_t *A_vals[6] = {
+            p,       EXPR_ZERO,
+            EXPR_ZERO, q,
+            EXPR_ONE,  EXPR_ONE
         };
-        dval_t *X_vals[2] = {u, two};
-        matrix_t *A = mat_create_dv(3, 2, A_vals);
-        matrix_t *X_expected = mat_create_dv(2, 1, X_vals);
+        expr_t *X_vals[2] = {u, two};
+        matrix_t *A = mat_create_expr(3, 2, A_vals);
+        matrix_t *X_expected = mat_create_expr(2, 1, X_vals);
         matrix_t *B = mat_mul(A, X_expected);
         matrix_t *X = NULL;
         matrix_t *AX = NULL;
 
-        print_mdv("A (least-squares dval)", A);
+        print_mdv("A (least-squares expr)", A);
         print_mdv("B = A*X", B);
 
         X = mat_least_squares(A, B);
-        check_bool("mat_least_squares(dval full-column-rank) not NULL", X != NULL);
-        check_bool("mat_least_squares(dval full-column-rank) -> MAT_TYPE_DVAL",
-                   X != NULL && mat_typeof(X) == MAT_TYPE_DVAL);
+        check_bool("mat_least_squares(expr full-column-rank) not NULL", X != NULL);
+        check_bool("mat_least_squares(expr full-column-rank) -> MAT_TYPE_EXPR",
+                   X != NULL && mat_typeof(X) == MAT_TYPE_EXPR);
         if (X) {
-            dval_t *x00 = NULL, *x10 = NULL;
+            expr_t *x00 = NULL, *x10 = NULL;
 
-            print_mdv("X least-squares result (dval)", X);
+            print_mdv("X least-squares result (expr)", X);
             mat_get(X, 0, 0, &x00);
             mat_get(X, 1, 0, &x10);
-            check_d("lstsq(A,B)[0,0] = u", dv_eval_d(x00), 5.0, 1e-12);
-            check_d("lstsq(A,B)[1,0] = 2", dv_eval_d(x10), 2.0, 1e-12);
+            check_d("lstsq(A,B)[0,0] = u", expr_eval_d(x00), 5.0, 1e-12);
+            check_d("lstsq(A,B)[1,0] = 2", expr_eval_d(x10), 2.0, 1e-12);
 
-            test_dv_set_val_d(p, 7.0);
-            test_dv_set_val_d(q, 11.0);
-            test_dv_set_val_d(u, 13.0);
-            check_d("lstsq(A,B)[0,0] tracks u", dv_eval_d(x00), 13.0, 1e-12);
-            check_d("lstsq(A,B)[1,0] remains 2", dv_eval_d(x10), 2.0, 1e-12);
+            test_expr_set_val_d(p, 7.0);
+            test_expr_set_val_d(q, 11.0);
+            test_expr_set_val_d(u, 13.0);
+            check_d("lstsq(A,B)[0,0] tracks u", expr_eval_d(x00), 13.0, 1e-12);
+            check_d("lstsq(A,B)[1,0] remains 2", expr_eval_d(x10), 2.0, 1e-12);
 
             AX = mat_mul(A, X);
             check_bool("A*lstsq(A,B) not NULL", AX != NULL);
             if (AX) {
-                dval_t *got = NULL, *expect = NULL;
+                expr_t *got = NULL, *expect = NULL;
                 for (size_t i = 0; i < 3; ++i) {
                     mat_get(AX, i, 0, &got);
                     mat_get(B, i, 0, &expect);
-                    check_d("dval least-squares residual entry",
-                            dv_eval_d(got), dv_eval_d(expect), 1e-10);
+                    check_d("expr least-squares residual entry",
+                            expr_eval_d(got), expr_eval_d(expect), 1e-10);
                 }
             }
         }
@@ -5884,56 +5884,56 @@ static void test_solve_and_lstsq(void)
         mat_free(B);
         mat_free(X);
         mat_free(AX);
-        dv_free(p);
-        dv_free(q);
-        dv_free(u);
-        dv_free(two);
+        expr_free(p);
+        expr_free(q);
+        expr_free(u);
+        expr_free(two);
     }
 
     /* Exact symbolic least-squares for a rank-deficient rectangular system. */
     {
-        dval_t *p = test_dv_new_named_var_d(3.0, "p");
-        dval_t *A_vals[6] = {
+        expr_t *p = test_expr_new_named_var_d(3.0, "p");
+        expr_t *A_vals[6] = {
             p,      p,
-            DV_ZERO, DV_ZERO,
-            DV_ZERO, DV_ZERO
+            EXPR_ZERO, EXPR_ZERO,
+            EXPR_ZERO, EXPR_ZERO
         };
-        dval_t *X_expected_vals[2] = {DV_ONE, DV_ONE};
-        matrix_t *A = mat_create_dv(3, 2, A_vals);
-        matrix_t *X_expected = mat_create_dv(2, 1, X_expected_vals);
+        expr_t *X_expected_vals[2] = {EXPR_ONE, EXPR_ONE};
+        matrix_t *A = mat_create_expr(3, 2, A_vals);
+        matrix_t *X_expected = mat_create_expr(2, 1, X_expected_vals);
         matrix_t *B = mat_mul(A, X_expected);
         matrix_t *X = NULL;
         matrix_t *AX = NULL;
 
-        print_mdv("A (rank-deficient least-squares dval)", A);
+        print_mdv("A (rank-deficient least-squares expr)", A);
         print_mdv("B = A*X", B);
 
         X = mat_least_squares(A, B);
-        check_bool("mat_least_squares(dval rank-deficient) not NULL", X != NULL);
-        check_bool("mat_least_squares(dval rank-deficient) -> MAT_TYPE_DVAL",
-                   X != NULL && mat_typeof(X) == MAT_TYPE_DVAL);
+        check_bool("mat_least_squares(expr rank-deficient) not NULL", X != NULL);
+        check_bool("mat_least_squares(expr rank-deficient) -> MAT_TYPE_EXPR",
+                   X != NULL && mat_typeof(X) == MAT_TYPE_EXPR);
         if (X) {
-            dval_t *x00 = NULL, *x10 = NULL;
+            expr_t *x00 = NULL, *x10 = NULL;
 
-            print_mdv("X least-squares result (rank-deficient dval)", X);
+            print_mdv("X least-squares result (rank-deficient expr)", X);
             mat_get(X, 0, 0, &x00);
             mat_get(X, 1, 0, &x10);
-            check_d("rank-deficient lstsq(A,B)[0,0] = 1", dv_eval_d(x00), 1.0, 1e-12);
-            check_d("rank-deficient lstsq(A,B)[1,0] = 1", dv_eval_d(x10), 1.0, 1e-12);
+            check_d("rank-deficient lstsq(A,B)[0,0] = 1", expr_eval_d(x00), 1.0, 1e-12);
+            check_d("rank-deficient lstsq(A,B)[1,0] = 1", expr_eval_d(x10), 1.0, 1e-12);
 
-            test_dv_set_val_d(p, 7.0);
-            check_d("rank-deficient lstsq(A,B)[0,0] stays 1", dv_eval_d(x00), 1.0, 1e-12);
-            check_d("rank-deficient lstsq(A,B)[1,0] stays 1", dv_eval_d(x10), 1.0, 1e-12);
+            test_expr_set_val_d(p, 7.0);
+            check_d("rank-deficient lstsq(A,B)[0,0] stays 1", expr_eval_d(x00), 1.0, 1e-12);
+            check_d("rank-deficient lstsq(A,B)[1,0] stays 1", expr_eval_d(x10), 1.0, 1e-12);
 
             AX = mat_mul(A, X);
-            check_bool("A*lstsq(A,B) for rank-deficient dval not NULL", AX != NULL);
+            check_bool("A*lstsq(A,B) for rank-deficient expr not NULL", AX != NULL);
             if (AX) {
-                dval_t *got = NULL, *expect = NULL;
+                expr_t *got = NULL, *expect = NULL;
                 for (size_t i = 0; i < 3; ++i) {
                     mat_get(AX, i, 0, &got);
                     mat_get(B, i, 0, &expect);
-                    check_d("rank-deficient dval least-squares residual entry",
-                            dv_eval_d(got), dv_eval_d(expect), 1e-10);
+                    check_d("rank-deficient expr least-squares residual entry",
+                            expr_eval_d(got), expr_eval_d(expect), 1e-10);
                 }
             }
         }
@@ -5943,7 +5943,7 @@ static void test_solve_and_lstsq(void)
         mat_free(B);
         mat_free(X);
         mat_free(AX);
-        dv_free(p);
+        expr_free(p);
     }
 
 
@@ -5996,36 +5996,36 @@ static void test_solve_and_lstsq(void)
 
     /* Symbolic lower-triangular solve. */
     {
-        dval_t *x = test_dv_new_named_var_d(2.0, "x");
-        dval_t *y = test_dv_new_named_var_d(3.0, "y");
-        dval_t *z = test_dv_new_named_var_d(4.0, "z");
-        dval_t *s = test_dv_new_named_var_d(5.0, "s");
-        dval_t *one = test_dv_new_const_d(1.0);
-        dval_t *two = test_dv_new_const_d(2.0);
-        dval_t *three = test_dv_new_const_d(3.0);
-        dval_t *X_vals[3] = {s, two, one};
-        dval_t *L_vals[9] = {
-            x,       DV_ZERO, DV_ZERO,
-            one,     y,       DV_ZERO,
+        expr_t *x = test_expr_new_named_var_d(2.0, "x");
+        expr_t *y = test_expr_new_named_var_d(3.0, "y");
+        expr_t *z = test_expr_new_named_var_d(4.0, "z");
+        expr_t *s = test_expr_new_named_var_d(5.0, "s");
+        expr_t *one = test_expr_new_const_d(1.0);
+        expr_t *two = test_expr_new_const_d(2.0);
+        expr_t *three = test_expr_new_const_d(3.0);
+        expr_t *X_vals[3] = {s, two, one};
+        expr_t *L_vals[9] = {
+            x,       EXPR_ZERO, EXPR_ZERO,
+            one,     y,       EXPR_ZERO,
             two,     three,   z
         };
-        matrix_t *L = mat_create_dv(3, 3, L_vals);
-        matrix_t *X_expected = mat_create_dv(3, 1, X_vals);
+        matrix_t *L = mat_create_expr(3, 3, L_vals);
+        matrix_t *X_expected = mat_create_expr(3, 1, X_vals);
         matrix_t *B = mat_mul(L, X_expected);
         matrix_t *X = NULL;
         matrix_t *LB = NULL;
 
-        print_mdv("L (lower triangular dval)", L);
+        print_mdv("L (lower triangular expr)", L);
         print_mdv("X expected", X_expected);
         print_mdv("B = L*X", B);
 
         X = mat_solve(L, B);
-        check_bool("mat_solve(lower triangular dval) not NULL", X != NULL);
-        check_bool("mat_solve(lower triangular dval) -> MAT_TYPE_DVAL",
-                   X != NULL && mat_typeof(X) == MAT_TYPE_DVAL);
+        check_bool("mat_solve(lower triangular expr) not NULL", X != NULL);
+        check_bool("mat_solve(lower triangular expr) -> MAT_TYPE_EXPR",
+                   X != NULL && mat_typeof(X) == MAT_TYPE_EXPR);
         if (X) {
             char *x_text = mat_to_string(X, MAT_STRING_INLINE_PRETTY);
-            dval_t *x00 = NULL, *x10 = NULL, *x20 = NULL;
+            expr_t *x00 = NULL, *x10 = NULL, *x20 = NULL;
 
             print_mdv("X solve result", X);
             check_bool("solve(L,B) exact text simplified",
@@ -6033,26 +6033,26 @@ static void test_solve_and_lstsq(void)
             mat_get(X, 0, 0, &x00);
             mat_get(X, 1, 0, &x10);
             mat_get(X, 2, 0, &x20);
-            check_d("solve(L,B)[0,0] = s", dv_eval_d(x00), 5.0, 1e-12);
-            check_d("solve(L,B)[1,0] = 2", dv_eval_d(x10), 2.0, 1e-12);
-            check_d("solve(L,B)[2,0] = 1", dv_eval_d(x20), 1.0, 1e-12);
+            check_d("solve(L,B)[0,0] = s", expr_eval_d(x00), 5.0, 1e-12);
+            check_d("solve(L,B)[1,0] = 2", expr_eval_d(x10), 2.0, 1e-12);
+            check_d("solve(L,B)[2,0] = 1", expr_eval_d(x20), 1.0, 1e-12);
 
-            test_dv_set_val_d(x, 7.0);
-            test_dv_set_val_d(y, 11.0);
-            test_dv_set_val_d(z, 13.0);
-            test_dv_set_val_d(s, 17.0);
-            check_d("solve(L,B)[0,0] tracks s only", dv_eval_d(x00), 17.0, 1e-12);
-            check_d("solve(L,B)[1,0] remains 2", dv_eval_d(x10), 2.0, 1e-12);
-            check_d("solve(L,B)[2,0] remains 1", dv_eval_d(x20), 1.0, 1e-12);
+            test_expr_set_val_d(x, 7.0);
+            test_expr_set_val_d(y, 11.0);
+            test_expr_set_val_d(z, 13.0);
+            test_expr_set_val_d(s, 17.0);
+            check_d("solve(L,B)[0,0] tracks s only", expr_eval_d(x00), 17.0, 1e-12);
+            check_d("solve(L,B)[1,0] remains 2", expr_eval_d(x10), 2.0, 1e-12);
+            check_d("solve(L,B)[2,0] remains 1", expr_eval_d(x20), 1.0, 1e-12);
 
             LB = mat_mul(L, X);
             check_bool("L*solve(L,B) not NULL", LB != NULL);
             if (LB) {
-                dval_t *got = NULL, *expect = NULL;
+                expr_t *got = NULL, *expect = NULL;
                 for (size_t i = 0; i < 3; ++i) {
                     mat_get(LB, i, 0, &got);
                     mat_get(B, i, 0, &expect);
-                    check_d("lower triangular dval residual row", dv_eval_d(got), dv_eval_d(expect), 1e-10);
+                    check_d("lower triangular expr residual row", expr_eval_d(got), expr_eval_d(expect), 1e-10);
                 }
             }
 
@@ -6064,82 +6064,82 @@ static void test_solve_and_lstsq(void)
         mat_free(B);
         mat_free(X);
         mat_free(LB);
-        dv_free(x);
-        dv_free(y);
-        dv_free(z);
-        dv_free(s);
-        dv_free(one);
-        dv_free(two);
-        dv_free(three);
+        expr_free(x);
+        expr_free(y);
+        expr_free(z);
+        expr_free(s);
+        expr_free(one);
+        expr_free(two);
+        expr_free(three);
     }
 
     /* General dense symbolic solve with multiple right-hand sides. */
     {
-        dval_t *a = test_dv_new_named_var_d(4.0, "a");
-        dval_t *b = test_dv_new_named_var_d(5.0, "b");
-        dval_t *c = test_dv_new_named_var_d(6.0, "c");
-        dval_t *u = test_dv_new_named_var_d(2.0, "u");
-        dval_t *v = test_dv_new_named_var_d(3.0, "v");
-        dval_t *one = test_dv_new_const_d(1.0);
-        dval_t *two = test_dv_new_const_d(2.0);
-        dval_t *three = test_dv_new_const_d(3.0);
-        dval_t *four = test_dv_new_const_d(4.0);
-        dval_t *A_vals[9] = {
-            a,    one,  DV_ZERO,
+        expr_t *a = test_expr_new_named_var_d(4.0, "a");
+        expr_t *b = test_expr_new_named_var_d(5.0, "b");
+        expr_t *c = test_expr_new_named_var_d(6.0, "c");
+        expr_t *u = test_expr_new_named_var_d(2.0, "u");
+        expr_t *v = test_expr_new_named_var_d(3.0, "v");
+        expr_t *one = test_expr_new_const_d(1.0);
+        expr_t *two = test_expr_new_const_d(2.0);
+        expr_t *three = test_expr_new_const_d(3.0);
+        expr_t *four = test_expr_new_const_d(4.0);
+        expr_t *A_vals[9] = {
+            a,    one,  EXPR_ZERO,
             one,  b,    one,
-            DV_ZERO, one, c
+            EXPR_ZERO, one, c
         };
-        dval_t *X_vals[6] = {
+        expr_t *X_vals[6] = {
             u,    one,
             two,  v,
             three, four
         };
-        matrix_t *A = mat_create_dv(3, 3, A_vals);
-        matrix_t *X_expected = mat_create_dv(3, 2, X_vals);
+        matrix_t *A = mat_create_expr(3, 3, A_vals);
+        matrix_t *X_expected = mat_create_expr(3, 2, X_vals);
         matrix_t *B = mat_mul(A, X_expected);
         matrix_t *X = NULL;
         matrix_t *AX = NULL;
 
-        print_mdv("A (dense dval)", A);
+        print_mdv("A (dense expr)", A);
         print_mdv("X expected", X_expected);
         print_mdv("B = A*X", B);
 
         X = mat_solve(A, B);
-        check_bool("mat_solve(dense dval) not NULL", X != NULL);
-        check_bool("mat_solve(dense dval) -> MAT_TYPE_DVAL",
-                   X != NULL && mat_typeof(X) == MAT_TYPE_DVAL);
+        check_bool("mat_solve(dense expr) not NULL", X != NULL);
+        check_bool("mat_solve(dense expr) -> MAT_TYPE_EXPR",
+                   X != NULL && mat_typeof(X) == MAT_TYPE_EXPR);
         if (X) {
-            dval_t *x00 = NULL, *x01 = NULL, *x11 = NULL, *x20 = NULL;
+            expr_t *x00 = NULL, *x01 = NULL, *x11 = NULL, *x20 = NULL;
 
-            print_mdv("X solve result (dense dval)", X);
+            print_mdv("X solve result (dense expr)", X);
             mat_get(X, 0, 0, &x00);
             mat_get(X, 0, 1, &x01);
             mat_get(X, 1, 1, &x11);
             mat_get(X, 2, 0, &x20);
-            check_d("solve(A,B)[0,0] = u", dv_eval_d(x00), 2.0, 1e-12);
-            check_d("solve(A,B)[0,1] = 1", dv_eval_d(x01), 1.0, 1e-12);
-            check_d("solve(A,B)[1,1] = v", dv_eval_d(x11), 3.0, 1e-12);
-            check_d("solve(A,B)[2,0] = 3", dv_eval_d(x20), 3.0, 1e-12);
+            check_d("solve(A,B)[0,0] = u", expr_eval_d(x00), 2.0, 1e-12);
+            check_d("solve(A,B)[0,1] = 1", expr_eval_d(x01), 1.0, 1e-12);
+            check_d("solve(A,B)[1,1] = v", expr_eval_d(x11), 3.0, 1e-12);
+            check_d("solve(A,B)[2,0] = 3", expr_eval_d(x20), 3.0, 1e-12);
 
-            test_dv_set_val_d(a, 7.0);
-            test_dv_set_val_d(b, 8.0);
-            test_dv_set_val_d(c, 9.0);
-            test_dv_set_val_d(u, 11.0);
-            test_dv_set_val_d(v, 13.0);
-            check_d("solve(A,B)[0,0] tracks u", dv_eval_d(x00), 11.0, 1e-12);
-            check_d("solve(A,B)[0,1] remains 1", dv_eval_d(x01), 1.0, 1e-12);
-            check_d("solve(A,B)[1,1] tracks v", dv_eval_d(x11), 13.0, 1e-12);
-            check_d("solve(A,B)[2,0] remains 3", dv_eval_d(x20), 3.0, 1e-12);
+            test_expr_set_val_d(a, 7.0);
+            test_expr_set_val_d(b, 8.0);
+            test_expr_set_val_d(c, 9.0);
+            test_expr_set_val_d(u, 11.0);
+            test_expr_set_val_d(v, 13.0);
+            check_d("solve(A,B)[0,0] tracks u", expr_eval_d(x00), 11.0, 1e-12);
+            check_d("solve(A,B)[0,1] remains 1", expr_eval_d(x01), 1.0, 1e-12);
+            check_d("solve(A,B)[1,1] tracks v", expr_eval_d(x11), 13.0, 1e-12);
+            check_d("solve(A,B)[2,0] remains 3", expr_eval_d(x20), 3.0, 1e-12);
 
             AX = mat_mul(A, X);
             check_bool("A*solve(A,B) not NULL", AX != NULL);
             if (AX) {
-                dval_t *got = NULL, *expect = NULL;
+                expr_t *got = NULL, *expect = NULL;
                 for (size_t i = 0; i < 3; ++i) {
                     for (size_t j = 0; j < 2; ++j) {
                         mat_get(AX, i, j, &got);
                         mat_get(B, i, j, &expect);
-                        check_d("dense dval residual entry", dv_eval_d(got), dv_eval_d(expect), 1e-10);
+                        check_d("dense expr residual entry", expr_eval_d(got), expr_eval_d(expect), 1e-10);
                     }
                 }
             }
@@ -6150,43 +6150,43 @@ static void test_solve_and_lstsq(void)
         mat_free(B);
         mat_free(X);
         mat_free(AX);
-        dv_free(a);
-        dv_free(b);
-        dv_free(c);
-        dv_free(u);
-        dv_free(v);
-        dv_free(one);
-        dv_free(two);
-        dv_free(three);
-        dv_free(four);
+        expr_free(a);
+        expr_free(b);
+        expr_free(c);
+        expr_free(u);
+        expr_free(v);
+        expr_free(one);
+        expr_free(two);
+        expr_free(three);
+        expr_free(four);
     }
 
     /* Larger dense symbolic solve with multiple right-hand sides. */
     {
-        dval_t *a = test_dv_new_named_var_d(5.0, "a");
-        dval_t *b = test_dv_new_named_var_d(6.0, "b");
-        dval_t *c = test_dv_new_named_var_d(7.0, "c");
-        dval_t *d = test_dv_new_named_var_d(8.0, "d");
-        dval_t *e = test_dv_new_named_var_d(9.0, "e");
-        dval_t *f = test_dv_new_named_var_d(10.0, "f");
-        dval_t *u = test_dv_new_named_var_d(11.0, "u");
-        dval_t *v = test_dv_new_named_var_d(13.0, "v");
-        dval_t *one = test_dv_new_const_d(1.0);
-        dval_t *two = test_dv_new_const_d(2.0);
-        dval_t *three = test_dv_new_const_d(3.0);
-        dval_t *four = test_dv_new_const_d(4.0);
-        dval_t *five = test_dv_new_const_d(5.0);
-        dval_t *six = test_dv_new_const_d(6.0);
-        dval_t *seven = test_dv_new_const_d(7.0);
-        dval_t *A_vals[36] = {
-            a,    one,  two,  DV_ZERO, DV_ZERO, DV_ZERO,
-            one,  b,    one,  DV_ZERO, DV_ZERO, DV_ZERO,
-            two,  one,  c,    one,     DV_ZERO, DV_ZERO,
-            DV_ZERO, DV_ZERO, one,  d,    one,  two,
-            DV_ZERO, DV_ZERO, DV_ZERO, one,  e,    one,
-            DV_ZERO, DV_ZERO, DV_ZERO, two,  one,  f
+        expr_t *a = test_expr_new_named_var_d(5.0, "a");
+        expr_t *b = test_expr_new_named_var_d(6.0, "b");
+        expr_t *c = test_expr_new_named_var_d(7.0, "c");
+        expr_t *d = test_expr_new_named_var_d(8.0, "d");
+        expr_t *e = test_expr_new_named_var_d(9.0, "e");
+        expr_t *f = test_expr_new_named_var_d(10.0, "f");
+        expr_t *u = test_expr_new_named_var_d(11.0, "u");
+        expr_t *v = test_expr_new_named_var_d(13.0, "v");
+        expr_t *one = test_expr_new_const_d(1.0);
+        expr_t *two = test_expr_new_const_d(2.0);
+        expr_t *three = test_expr_new_const_d(3.0);
+        expr_t *four = test_expr_new_const_d(4.0);
+        expr_t *five = test_expr_new_const_d(5.0);
+        expr_t *six = test_expr_new_const_d(6.0);
+        expr_t *seven = test_expr_new_const_d(7.0);
+        expr_t *A_vals[36] = {
+            a,    one,  two,  EXPR_ZERO, EXPR_ZERO, EXPR_ZERO,
+            one,  b,    one,  EXPR_ZERO, EXPR_ZERO, EXPR_ZERO,
+            two,  one,  c,    one,     EXPR_ZERO, EXPR_ZERO,
+            EXPR_ZERO, EXPR_ZERO, one,  d,    one,  two,
+            EXPR_ZERO, EXPR_ZERO, EXPR_ZERO, one,  e,    one,
+            EXPR_ZERO, EXPR_ZERO, EXPR_ZERO, two,  one,  f
         };
-        dval_t *X_vals[12] = {
+        expr_t *X_vals[12] = {
             u,     one,
             two,   v,
             three, four,
@@ -6194,51 +6194,51 @@ static void test_solve_and_lstsq(void)
             five,  six,
             six,   seven
         };
-        matrix_t *A = mat_create_dv(6, 6, A_vals);
-        matrix_t *X_expected = mat_create_dv(6, 2, X_vals);
+        matrix_t *A = mat_create_expr(6, 6, A_vals);
+        matrix_t *X_expected = mat_create_expr(6, 2, X_vals);
         matrix_t *B = mat_mul(A, X_expected);
         matrix_t *X = NULL;
         matrix_t *AX = NULL;
 
-        print_mdv("A (dense 6x6 dval)", A);
+        print_mdv("A (dense 6x6 expr)", A);
         print_mdv("B = A*X", B);
 
         X = mat_solve(A, B);
-        check_bool("mat_solve(dense 6x6 dval) not NULL", X != NULL);
-        check_bool("mat_solve(dense 6x6 dval) -> MAT_TYPE_DVAL",
-                   X != NULL && mat_typeof(X) == MAT_TYPE_DVAL);
+        check_bool("mat_solve(dense 6x6 expr) not NULL", X != NULL);
+        check_bool("mat_solve(dense 6x6 expr) -> MAT_TYPE_EXPR",
+                   X != NULL && mat_typeof(X) == MAT_TYPE_EXPR);
         if (X) {
-            dval_t *x00 = NULL, *x11 = NULL, *x32 = NULL;
+            expr_t *x00 = NULL, *x11 = NULL, *x32 = NULL;
 
             mat_get(X, 0, 0, &x00);
             mat_get(X, 1, 1, &x11);
             mat_get(X, 5, 1, &x32);
-            check_d("solve(A,B)[0,0] = u", dv_eval_d(x00), 11.0, 1e-12);
-            check_d("solve(A,B)[1,1] = v", dv_eval_d(x11), 13.0, 1e-12);
-            check_d("solve(A,B)[5,1] = 7", dv_eval_d(x32), 7.0, 1e-12);
+            check_d("solve(A,B)[0,0] = u", expr_eval_d(x00), 11.0, 1e-12);
+            check_d("solve(A,B)[1,1] = v", expr_eval_d(x11), 13.0, 1e-12);
+            check_d("solve(A,B)[5,1] = 7", expr_eval_d(x32), 7.0, 1e-12);
 
-            test_dv_set_val_d(a, 15.0);
-            test_dv_set_val_d(b, 16.0);
-            test_dv_set_val_d(c, 17.0);
-            test_dv_set_val_d(d, 18.0);
-            test_dv_set_val_d(e, 19.0);
-            test_dv_set_val_d(f, 20.0);
-            test_dv_set_val_d(u, 23.0);
-            test_dv_set_val_d(v, 29.0);
-            check_d("solve(A,B)[0,0] tracks u on 6x6", dv_eval_d(x00), 23.0, 1e-12);
-            check_d("solve(A,B)[1,1] tracks v on 6x6", dv_eval_d(x11), 29.0, 1e-12);
-            check_d("solve(A,B)[5,1] remains 7 on 6x6", dv_eval_d(x32), 7.0, 1e-12);
+            test_expr_set_val_d(a, 15.0);
+            test_expr_set_val_d(b, 16.0);
+            test_expr_set_val_d(c, 17.0);
+            test_expr_set_val_d(d, 18.0);
+            test_expr_set_val_d(e, 19.0);
+            test_expr_set_val_d(f, 20.0);
+            test_expr_set_val_d(u, 23.0);
+            test_expr_set_val_d(v, 29.0);
+            check_d("solve(A,B)[0,0] tracks u on 6x6", expr_eval_d(x00), 23.0, 1e-12);
+            check_d("solve(A,B)[1,1] tracks v on 6x6", expr_eval_d(x11), 29.0, 1e-12);
+            check_d("solve(A,B)[5,1] remains 7 on 6x6", expr_eval_d(x32), 7.0, 1e-12);
 
             AX = mat_mul(A, X);
             check_bool("A*solve(A,B) 6x6 not NULL", AX != NULL);
             if (AX) {
-                dval_t *got = NULL, *expect = NULL;
+                expr_t *got = NULL, *expect = NULL;
                 for (size_t i = 0; i < 6; ++i) {
                     for (size_t j = 0; j < 2; ++j) {
                         mat_get(AX, i, j, &got);
                         mat_get(B, i, j, &expect);
-                        check_d("dense 6x6 dval solve residual entry",
-                                dv_eval_d(got), dv_eval_d(expect), 1e-10);
+                        check_d("dense 6x6 expr solve residual entry",
+                                expr_eval_d(got), expr_eval_d(expect), 1e-10);
                     }
                 }
             }
@@ -6249,21 +6249,21 @@ static void test_solve_and_lstsq(void)
         mat_free(B);
         mat_free(X);
         mat_free(AX);
-        dv_free(a);
-        dv_free(b);
-        dv_free(c);
-        dv_free(d);
-        dv_free(e);
-        dv_free(f);
-        dv_free(u);
-        dv_free(v);
-        dv_free(one);
-        dv_free(two);
-        dv_free(three);
-        dv_free(four);
-        dv_free(five);
-        dv_free(six);
-        dv_free(seven);
+        expr_free(a);
+        expr_free(b);
+        expr_free(c);
+        expr_free(d);
+        expr_free(e);
+        expr_free(f);
+        expr_free(u);
+        expr_free(v);
+        expr_free(one);
+        expr_free(two);
+        expr_free(three);
+        expr_free(four);
+        expr_free(five);
+        expr_free(six);
+        expr_free(seven);
     }
 }
 
@@ -7330,83 +7330,83 @@ static void test_rank_pinv_nullspace(void)
     }
 
     {
-        dval_t *p = test_dv_new_named_var_d(2.0, "p");
-        dval_t *q = test_dv_new_named_var_d(3.0, "q");
-        dval_t *A_vals[6] = {
-            p,       DV_ZERO, DV_ONE,
-            DV_ZERO, q,       DV_ONE
+        expr_t *p = test_expr_new_named_var_d(2.0, "p");
+        expr_t *q = test_expr_new_named_var_d(3.0, "q");
+        expr_t *A_vals[6] = {
+            p,       EXPR_ZERO, EXPR_ONE,
+            EXPR_ZERO, q,       EXPR_ONE
         };
-        matrix_t *A = mat_create_dv(2, 3, A_vals);
+        matrix_t *A = mat_create_expr(2, 3, A_vals);
         matrix_t *A_pinv = NULL;
         matrix_t *AAp = NULL, *AApA = NULL;
         matrix_t *ApA = NULL, *ApAAp = NULL;
 
-        print_mdv("A (wide dval)", A);
-        check_bool("mat_rank(wide dval)=2", mat_rank(A) == 2);
+        print_mdv("A (wide expr)", A);
+        check_bool("mat_rank(wide expr)=2", mat_rank(A) == 2);
 
         A_pinv = mat_pseudoinverse(A);
-        check_bool("mat_pseudoinverse(wide dval) not NULL", A_pinv != NULL);
-        check_bool("mat_pseudoinverse(wide dval) -> MAT_TYPE_DVAL",
-                   A_pinv != NULL && mat_typeof(A_pinv) == MAT_TYPE_DVAL);
+        check_bool("mat_pseudoinverse(wide expr) not NULL", A_pinv != NULL);
+        check_bool("mat_pseudoinverse(wide expr) -> MAT_TYPE_EXPR",
+                   A_pinv != NULL && mat_typeof(A_pinv) == MAT_TYPE_EXPR);
         if (A_pinv) {
-            dval_t *entry = NULL;
+            expr_t *entry = NULL;
 
-            print_mdv("pinv(A dval)", A_pinv);
+            print_mdv("pinv(A expr)", A_pinv);
             mat_get(A_pinv, 0, 0, &entry);
-            check_d("pinv(dval)[0,0] initial", dv_eval_d(entry), 20.0 / 49.0, 1e-12);
+            check_d("pinv(expr)[0,0] initial", expr_eval_d(entry), 20.0 / 49.0, 1e-12);
 
             AAp = mat_mul(A, A_pinv);
             AApA = AAp ? mat_mul(AAp, A) : NULL;
             ApA = mat_mul(A_pinv, A);
             ApAAp = ApA ? mat_mul(ApA, A_pinv) : NULL;
-            check_bool("A*A+ for wide dval not NULL", AAp != NULL);
-            check_bool("A*A+*A for wide dval not NULL", AApA != NULL);
-            check_bool("A+*A*A+ for wide dval not NULL", ApAAp != NULL);
+            check_bool("A*A+ for wide expr not NULL", AAp != NULL);
+            check_bool("A*A+*A for wide expr not NULL", AApA != NULL);
+            check_bool("A+*A*A+ for wide expr not NULL", ApAAp != NULL);
             if (AAp) {
-                dval_t *got = NULL;
+                expr_t *got = NULL;
                 for (size_t i = 0; i < 2; ++i) {
                     for (size_t j = 0; j < 2; ++j) {
                         double expect = (i == j) ? 1.0 : 0.0;
                         mat_get(AAp, i, j, &got);
-                        check_d("wide dval A*A+ identity entry",
-                                dv_eval_d(got), expect, 1e-10);
+                        check_d("wide expr A*A+ identity entry",
+                                expr_eval_d(got), expect, 1e-10);
                     }
                 }
             }
             if (AApA) {
-                dval_t *got = NULL, *expect = NULL;
+                expr_t *got = NULL, *expect = NULL;
                 for (size_t i = 0; i < 2; ++i) {
                     for (size_t j = 0; j < 3; ++j) {
                         mat_get(AApA, i, j, &got);
                         mat_get(A, i, j, &expect);
-                        check_d("wide dval A*A+*A = A entry",
-                                dv_eval_d(got), dv_eval_d(expect), 1e-10);
+                        check_d("wide expr A*A+*A = A entry",
+                                expr_eval_d(got), expr_eval_d(expect), 1e-10);
                     }
                 }
             }
             if (ApAAp) {
-                dval_t *got = NULL, *expect = NULL;
+                expr_t *got = NULL, *expect = NULL;
                 for (size_t i = 0; i < 3; ++i) {
                     for (size_t j = 0; j < 2; ++j) {
                         mat_get(ApAAp, i, j, &got);
                         mat_get(A_pinv, i, j, &expect);
-                        check_d("wide dval A+*A*A+ = A+ entry",
-                                dv_eval_d(got), dv_eval_d(expect), 1e-10);
+                        check_d("wide expr A+*A*A+ = A+ entry",
+                                expr_eval_d(got), expr_eval_d(expect), 1e-10);
                     }
                 }
             }
 
-            test_dv_set_val_d(p, 5.0);
-            test_dv_set_val_d(q, 7.0);
-            check_d("pinv(dval)[0,0] tracks p,q", dv_eval_d(entry), 250.0 / 1299.0, 1e-12);
+            test_expr_set_val_d(p, 5.0);
+            test_expr_set_val_d(q, 7.0);
+            check_d("pinv(expr)[0,0] tracks p,q", expr_eval_d(entry), 250.0 / 1299.0, 1e-12);
             if (AAp) {
-                dval_t *got = NULL;
+                expr_t *got = NULL;
                 for (size_t i = 0; i < 2; ++i) {
                     for (size_t j = 0; j < 2; ++j) {
                         double expect = (i == j) ? 1.0 : 0.0;
                         mat_get(AAp, i, j, &got);
-                        check_d("wide dval A*A+ identity entry tracks updates",
-                                dv_eval_d(got), expect, 1e-10);
+                        check_d("wide expr A*A+ identity entry tracks updates",
+                                expr_eval_d(got), expect, 1e-10);
                     }
                 }
             }
@@ -7418,71 +7418,71 @@ static void test_rank_pinv_nullspace(void)
         mat_free(ApAAp);
         mat_free(A_pinv);
         mat_free(A);
-        dv_free(p);
-        dv_free(q);
+        expr_free(p);
+        expr_free(q);
     }
 
     {
-        dval_t *p = test_dv_new_named_var_d(2.0, "p");
-        dval_t *A_vals[6] = {
-            p,       DV_ZERO, p,
-            DV_ZERO, DV_ZERO, DV_ZERO
+        expr_t *p = test_expr_new_named_var_d(2.0, "p");
+        expr_t *A_vals[6] = {
+            p,       EXPR_ZERO, p,
+            EXPR_ZERO, EXPR_ZERO, EXPR_ZERO
         };
-        matrix_t *A = mat_create_dv(2, 3, A_vals);
+        matrix_t *A = mat_create_expr(2, 3, A_vals);
         matrix_t *A_pinv = NULL;
         matrix_t *AAp = NULL;
         matrix_t *AApA = NULL;
         matrix_t *ApA = NULL;
         matrix_t *ApAAp = NULL;
 
-        print_mdv("A (rank-deficient wide dval)", A);
-        check_bool("mat_rank(rank-deficient wide dval)=1", mat_rank(A) == 1);
+        print_mdv("A (rank-deficient wide expr)", A);
+        check_bool("mat_rank(rank-deficient wide expr)=1", mat_rank(A) == 1);
 
         A_pinv = mat_pseudoinverse(A);
-        check_bool("mat_pseudoinverse(rank-deficient wide dval) not NULL", A_pinv != NULL);
-        check_bool("mat_pseudoinverse(rank-deficient wide dval) -> MAT_TYPE_DVAL",
-                   A_pinv != NULL && mat_typeof(A_pinv) == MAT_TYPE_DVAL);
+        check_bool("mat_pseudoinverse(rank-deficient wide expr) not NULL", A_pinv != NULL);
+        check_bool("mat_pseudoinverse(rank-deficient wide expr) -> MAT_TYPE_EXPR",
+                   A_pinv != NULL && mat_typeof(A_pinv) == MAT_TYPE_EXPR);
         if (A_pinv) {
-            dval_t *entry = NULL;
-            dval_t *zero_entry = NULL;
+            expr_t *entry = NULL;
+            expr_t *zero_entry = NULL;
 
-            print_mdv("pinv(rank-deficient wide dval)", A_pinv);
+            print_mdv("pinv(rank-deficient wide expr)", A_pinv);
             mat_get(A_pinv, 0, 0, &entry);
             mat_get(A_pinv, 1, 0, &zero_entry);
-            check_d("rank-deficient pinv(dval)[0,0] initial", dv_eval_d(entry), 0.25, 1e-12);
-            check_d("rank-deficient pinv(dval)[1,0] initial", dv_eval_d(zero_entry), 0.0, 1e-12);
+            check_d("rank-deficient pinv(expr)[0,0] initial", expr_eval_d(entry), 0.25, 1e-12);
+            check_d("rank-deficient pinv(expr)[1,0] initial", expr_eval_d(zero_entry), 0.0, 1e-12);
 
             AAp = mat_mul(A, A_pinv);
             AApA = AAp ? mat_mul(AAp, A) : NULL;
             ApA = mat_mul(A_pinv, A);
             ApAAp = ApA ? mat_mul(ApA, A_pinv) : NULL;
-            check_bool("rank-deficient dval A*A+*A not NULL", AApA != NULL);
-            check_bool("rank-deficient dval A+*A*A+ not NULL", ApAAp != NULL);
+            check_bool("rank-deficient expr A*A+*A not NULL", AApA != NULL);
+            check_bool("rank-deficient expr A+*A*A+ not NULL", ApAAp != NULL);
             if (AApA) {
-                dval_t *got = NULL, *expect = NULL;
+                expr_t *got = NULL, *expect = NULL;
                 for (size_t i = 0; i < 2; ++i) {
                     for (size_t j = 0; j < 3; ++j) {
                         mat_get(AApA, i, j, &got);
                         mat_get(A, i, j, &expect);
-                        check_d("rank-deficient wide dval A*A+*A = A entry",
-                                dv_eval_d(got), dv_eval_d(expect), 1e-10);
+                        check_d("rank-deficient wide expr A*A+*A = A entry",
+                                expr_eval_d(got), expr_eval_d(expect), 1e-10);
                     }
                 }
             }
             if (ApAAp) {
-                dval_t *got = NULL, *expect = NULL;
+                expr_t *got = NULL, *expect = NULL;
                 for (size_t i = 0; i < 3; ++i) {
                     for (size_t j = 0; j < 2; ++j) {
                         mat_get(ApAAp, i, j, &got);
                         mat_get(A_pinv, i, j, &expect);
-                        check_d("rank-deficient wide dval A+*A*A+ = A+ entry",
-                                dv_eval_d(got), dv_eval_d(expect), 1e-10);
+                        check_d("rank-deficient wide expr A+*A*A+ = A+ entry",
+                                expr_eval_d(got), expr_eval_d(expect), 1e-10);
                     }
                 }
             }
 
-            test_dv_set_val_d(p, 5.0);
-            check_d("rank-deficient pinv(dval)[0,0] tracks p", dv_eval_d(entry), 0.1, 1e-12);
+            test_expr_set_val_d(p, 5.0);
+            check_d("rank-deficient pinv(expr)[0,0] tracks p", expr_eval_d(entry), 0.1, 1e-12);
         }
 
         mat_free(AAp);
@@ -7491,7 +7491,7 @@ static void test_rank_pinv_nullspace(void)
         mat_free(ApAAp);
         mat_free(A_pinv);
         mat_free(A);
-        dv_free(p);
+        expr_free(p);
     }
 
 }
@@ -7731,14 +7731,14 @@ void run_matrix_core_tests(void)
     TEST_RUN_CASE(test_number_matrix_arithmetic, NULL);
     TEST_RUN_CASE(test_number_det_and_inverse, NULL);
     TEST_RUN_CASE(test_mixed_number_backend_matrices, NULL);
-    TEST_RUN_CASE(test_dval_multiply, NULL);
-    TEST_RUN_CASE(test_dval_symbolic_printing, NULL);
+    TEST_RUN_CASE(test_expr_multiply, NULL);
+    TEST_RUN_CASE(test_expr_symbolic_printing, NULL);
     TEST_RUN_CASE(test_add_sub, NULL);
     TEST_RUN_CASE(test_multiply, NULL);
     TEST_RUN_CASE(test_transpose_conjugate, NULL);
     TEST_RUN_CASE(test_identity_get, NULL);
     TEST_RUN_CASE(test_identity_set, NULL);
-    TEST_RUN_CASE(test_dval_storage_lifecycle_regressions, NULL);
+    TEST_RUN_CASE(test_expr_storage_lifecycle_regressions, NULL);
     TEST_RUN_CASE(test_owned_element_reads_and_transforms, NULL);
     TEST_RUN_CASE(test_sparse_support, NULL);
     TEST_RUN_CASE(test_structural_queries_and_diagonal_construction, NULL);
@@ -7772,7 +7772,7 @@ void run_matrix_core_tests(void)
     TEST_RUN_CASE(test_det_double, NULL);
     TEST_RUN_CASE(test_det_qfloat, NULL);
     TEST_RUN_CASE(test_det_qcomplex, NULL);
-    TEST_RUN_CASE(test_det_dval, NULL);
+    TEST_RUN_CASE(test_det_expr, NULL);
     TEST_RUN_CASE(test_symbolic_linear_algebra_extensions, NULL);
     TEST_RUN_CASE(test_trace, NULL);
     TEST_RUN_CASE(test_deriv, NULL);
@@ -7786,14 +7786,14 @@ void run_matrix_core_tests(void)
     TEST_RUN_CASE(test_inverse_double, NULL);
     TEST_RUN_CASE(test_inverse_qfloat, NULL);
     TEST_RUN_CASE(test_inverse_qcomplex, NULL);
-    TEST_RUN_CASE(test_inverse_dval_2x2, NULL);
-    TEST_RUN_CASE(test_inverse_dval_rotation, NULL);
-    TEST_RUN_CASE(test_inverse_dval_upper_triangular, NULL);
-    TEST_RUN_CASE(test_inverse_dval_lower_triangular, NULL);
-    TEST_RUN_CASE(test_inverse_dval_dense_3x3, NULL);
-    TEST_RUN_CASE(test_inverse_dval_dense_4x4, NULL);
-    TEST_RUN_CASE(test_inverse_dval_dense_6x6, NULL);
-    TEST_RUN_CASE(test_inverse_dval_singular, NULL);
+    TEST_RUN_CASE(test_inverse_expr_2x2, NULL);
+    TEST_RUN_CASE(test_inverse_expr_rotation, NULL);
+    TEST_RUN_CASE(test_inverse_expr_upper_triangular, NULL);
+    TEST_RUN_CASE(test_inverse_expr_lower_triangular, NULL);
+    TEST_RUN_CASE(test_inverse_expr_dense_3x3, NULL);
+    TEST_RUN_CASE(test_inverse_expr_dense_4x4, NULL);
+    TEST_RUN_CASE(test_inverse_expr_dense_6x6, NULL);
+    TEST_RUN_CASE(test_inverse_expr_singular, NULL);
     TEST_RUN_CASE(test_solve_and_lstsq, NULL);
     TEST_RUN_CASE(test_factorisations, NULL);
     TEST_RUN_CASE(test_rank_pinv_nullspace, NULL);
