@@ -1028,6 +1028,8 @@
       "test_updated_decimal_binding_stays_decimal": true,
       "test_symbolic_negative_pi_derivative_stays_symbolic": true,
       "test_pow_derivative_preserves_literal_base_log": true,
+      "test_symbolic_complex_power_derivative_keeps_base_log": true,
+      "test_bound_euler_symbol_survives_derivative_simplify": true,
       "test_log_of_imaginary_product_derivative_cancels_i": true,
       "test_negative_quotient_derivative_has_single_sign": true,
       "test_ln10_product_expression_round_trips": true,

@@ -171,8 +171,11 @@ f''(x)   = 3.8055231012396292258221776404244325549429604624756689463326935689439
 ## Example: Parsing from a String
 
 `expr_from_string` parses an expression and its variable bindings from a single
-string. Use it when you need to evaluate the expression; for differentiation,
-hold an explicit variable pointer so you can pass it to the derivative API.
+string. It preserves the expression shape while canonicalising notation, so
+`pi` is displayed as `π` and `e` remains symbolic rather than forcing
+`e^x` into `exp(x)`. Use `expr_simplify()` explicitly when you want the
+simplified equivalent. For differentiation, hold an explicit variable pointer
+so you can pass it to the derivative API.
 
 ```c
 #include <stdio.h>
@@ -641,7 +644,7 @@ variable expr_eval() {
 
 ### Parsing
 
-- `expr_t *expr_from_string(const char *s, expr_bindings_t **bnd_out)` — construct an `expr_t` from a string in the format produced by `expr_to_string(..., style_EXPRESSION)`. When `bnd_out` is non-NULL and the parse is symbolic, the parser also returns an opaque bindings object.
+- `expr_t *expr_from_string(const char *s, expr_bindings_t **bnd_out)` — construct an `expr_t` from a string in the format produced by `expr_to_string(..., style_EXPRESSION)`. The parser preserves the written expression shape while canonicalising notation; call `expr_simplify(...)` explicitly for algebraic simplification. When `bnd_out` is non-NULL and the parse is symbolic, the parser also returns an opaque bindings object.
 - `expr_t *expr_bindings_get(expr_bindings_t *bnd, const char *name)` — find a returned symbolic binding by name; lookup accepts the same normalisation rules as parsing, so aliases like `@pi`/`π`, `@phi`/`φ`, `@gamma`/`γ`, and `@tau`/`τ` all resolve to the same binding
 - `void expr_bindings_free(expr_bindings_t *bnd)` — destroy a bindings object returned by `expr_from_string(...)`
 
@@ -668,6 +671,7 @@ variable expr_eval() {
   - postfix factorial `x!`, which lowers to `gamma(x + 1)` when it remains
     symbolic and differentiable
   - `sqrt(x)` or `√(x)` for square roots
+  - `ln(x)` for natural logarithm; `log(x)`, `lg(x)`, and `log10(x)` for common logarithm
   - `gamma(x)` and `Γ(x)` for the gamma function
   - `digamma(x)`, `trigamma(x)`, and `polygamma(n, x)` for ψ⁽⁰⁾, ψ⁽¹⁾, and ψ⁽ⁿ⁾
   - `W(x)` and `productlog(x)` for branch-choosing Lambert W/ProductLog

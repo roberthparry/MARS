@@ -1163,7 +1163,7 @@ INDEX_HTML = r"""<!doctype html>
           <h3>Constants And Functions</h3>
           <ul>
             <li>Built-in constants include <code>pi</code>/<code>π</code>, <code>e</code>, <code>i</code>, <code>phi</code>/<code>φ</code>, and <code>gamma</code>/<code>γ</code>.</li>
-            <li><code>ln(x)</code> is natural log; <code>log(x)</code> and <code>log10(x)</code> are base-10 log.</li>
+            <li><code>ln(x)</code> is natural log; <code>log(x)</code>, <code>lg(x)</code>, and <code>log10(x)</code> are base-10 log.</li>
             <li><code>W(x)</code>, <code>W0(x)</code>, and <code>W_0(x)</code> mean <code>W₀(x)</code>. Use <code>W-1(x)</code> for <code>W₋₁(x)</code>.</li>
             <li>Standard gamma notation is supported in display: <code>gamma(x)</code> shows as <code>Γ(x)</code>, and polygamma shows as <code>ψ⁽ⁿ⁾(x)</code>.</li>
           </ul>
@@ -1171,7 +1171,7 @@ INDEX_HTML = r"""<!doctype html>
         <div class="help-card">
           <h3>Unary Functions</h3>
           <ul>
-            <li>Elementary: <code>abs(x)</code>, <code>floor(x)</code>, <code>ceil(x)</code>, <code>sqrt(x)</code>, <code>exp(x)</code>, <code>ln(x)</code>, <code>log(x)</code>, <code>log10(x)</code>.</li>
+            <li>Elementary: <code>abs(x)</code>, <code>floor(x)</code>, <code>ceil(x)</code>, <code>sqrt(x)</code>, <code>exp(x)</code>, <code>ln(x)</code>, <code>log(x)</code>, <code>lg(x)</code>, <code>log10(x)</code>.</li>
             <li>Trigonometric: <code>sin(x)</code>, <code>cos(x)</code>, <code>tan(x)</code>, <code>asin(x)</code>, <code>acos(x)</code>, <code>atan(x)</code>.</li>
             <li>Hyperbolic: <code>sinh(x)</code>, <code>cosh(x)</code>, <code>tanh(x)</code>, <code>asinh(x)</code>, <code>acosh(x)</code>, <code>atanh(x)</code>.</li>
             <li>Gamma family: <code>gamma(x)</code>, <code>gammainv(x)</code>, <code>lgamma(x)</code>, <code>digamma(x)</code>, <code>trigamma(x)</code>, <code>polygamma(n, x)</code>.</li>
@@ -2574,7 +2574,14 @@ INDEX_HTML = r"""<!doctype html>
     expr.addEventListener('input', () => {
       if (expr.value.trim() === (expr.dataset.displayExpression || displayedExpressionText))
         return;
-      clearExpressionSource();
+      /*
+       * Keep the previous full { body | bindings } expression while the body is
+       * edited.  The parser will drop bindings for symbols that disappear, but
+       * carrying the old source forward lets newly edited bodies keep existing
+       * values such as x = π/4 or a = e.
+       */
+      clearGoalSeekRequest();
+      lastEvaluationInputText = '';
       refreshVariableValuesFromEditor();
       updateHistoryButtons();
     });
@@ -3392,6 +3399,19 @@ def qr_svg(text: str) -> str:
     )
 
 
+def mobile_qr_svg(url: str, include_control_token: bool) -> str:
+    url = str(url or "").strip()
+    if not url:
+        return ""
+
+    if include_control_token:
+        svg = qr_svg(_control_url(url))
+        if svg:
+            return svg
+
+    return qr_svg(url)
+
+
 def _compact_long_text_value(
     value: str,
     limit: int = COMPACT_BINDING_VALUE_LIMIT,
@@ -3812,60 +3832,6 @@ def run_mars_lab_fields(
     return parse_mars_lab_output(raw), raw, completed.returncode
 
 
-def evaluate_value_text(binary: Path, text: str, precision: int) -> str:
-    fields, raw, rc = run_mars_lab_fields(binary, f"{{ {text} }}", precision)
-
-    if rc != 0:
-        raise ValueError(raw or f"mars_lab exited with {rc}")
-
-    return format_number_text_for_precision(fields.get("value", ""), precision)
-
-
-def evaluated_variable_binding_values(
-    binary: Path,
-    expression: str,
-    precision: int,
-) -> list[dict[str, str]]:
-    _, var_text, const_text = parse_expression_body(expression)
-    values: list[dict[str, str]] = []
-
-    for name, value in parse_binding_assignments(var_text):
-        if not value or value == "?" or value.upper() == "NAN":
-            values.append({
-                "name": name,
-                "value": value or "?",
-                "display": "",
-                "kind": "variable",
-            })
-            continue
-
-        try:
-            numeric = evaluate_value_text(binary, value, precision)
-        except Exception:
-            continue
-
-        values.append({
-            "name": name,
-            "value": numeric,
-            "display": _compact_long_text_value(numeric),
-            "kind": "variable",
-        })
-
-    for name, value in parse_binding_assignments(const_text):
-        display_value = value or "?"
-        display = ""
-        if display_value != "?" and display_value.upper() != "NAN":
-            display = _compact_long_text_value(display_value)
-        values.append({
-            "name": name,
-            "value": display_value,
-            "display": display,
-            "kind": "constant",
-        })
-
-    return values
-
-
 def expression_variable_binding_values(
     expression: str,
     precision: int | None = None,
@@ -3958,6 +3924,7 @@ def prepare_evaluation_fields(
     expression: str,
     precision: int,
     save_expression: bool,
+    wrt: str = "x",
 ) -> dict[str, object]:
     if fields.get("value"):
         fields["value"] = format_number_text_for_precision(
@@ -3978,8 +3945,7 @@ def prepare_evaluation_fields(
     fields["display_expression"] = compact_display_text(str(fields["full_display_expression"]))
     fields["display_tex"] = compact_display_text(str(fields["full_display_tex"]))
     fields["display_function"] = compact_function_text(str(fields["full_display_function"]))
-    fields["binding_values"] = evaluated_variable_binding_values(
-        binary,
+    fields["binding_values"] = expression_variable_binding_values(
         fields.get("expression", "") or expression,
         precision,
     )
@@ -4046,7 +4012,10 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 self.headers.get("Host", ""),
                 control_allowed,
             )
-            details["qr"] = qr_svg(_control_url(str(details["url"]))) if details.get("control") else ""
+            details["qr"] = mobile_qr_svg(
+                str(details["url"]),
+                bool(details.get("control")),
+            ) if details.get("control") else ""
             self.send_json(200, details)
             return
 
@@ -4086,7 +4055,10 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
             control_allowed,
         )
         mobile_url = str(mobile_details["url"])
-        mobile_qr = qr_svg(_control_url(mobile_url)) if mobile_details.get("control") else ""
+        mobile_qr = mobile_qr_svg(
+            mobile_url,
+            bool(mobile_details.get("control")),
+        ) if mobile_details.get("control") else ""
         page = (
             INDEX_HTML.replace(
                 "__INITIAL_EXPRESSION__",
@@ -4135,7 +4107,10 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 control_allowed,
             )
             details["ok"] = ok
-            details["qr"] = qr_svg(_control_url(str(details.get("url", "")))) if details.get("control") else ""
+            details["qr"] = mobile_qr_svg(
+                str(details.get("url", "")),
+                bool(details.get("control")),
+            ) if details.get("control") else ""
             self.send_json(200 if ok else 502, details)
             return
 
@@ -4292,6 +4267,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                             fallback_expression,
                             precision,
                             save_expression=False,
+                            wrt=wrt,
                         )
                         fallback_fields["binding_values"] = expression_variable_binding_values(
                             expression,
@@ -4311,6 +4287,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
             expression,
             precision,
             save_expression=True,
+            wrt=wrt,
         )
 
         self.send_json(200, fields)

@@ -549,6 +549,11 @@ void expr_print(const expr_t *dv);
  * expr_bindings_get() and later released with expr_bindings_free(). If bindings are not needed,
  * pass NULL.
  *
+ * Parsing is source-preserving: it canonicalises notation such as @p pi to
+ * @p π and @p e to @p e, but it does not run a whole-expression algebraic
+ * simplification pass. Call expr_simplify() explicitly when the simplified
+ * equivalent is wanted.
+ *
  * Returns an owning handle on success, or NULL on error (details written to
  * stderr). The caller must call expr_free() on the returned pointer exactly
  * once.

@@ -1384,7 +1384,8 @@ static void test_to_string_power_base_is_grouped_tex(void)
 static void test_to_string_power_of_power_simplifies_expr(void)
 {
     expr_t *f = expr_from_string("{ (a^(-x))² | x = NAN; a = NAN }", NULL);
-    char *got = f ? expr_to_string(f, style_EXPRESSION) : NULL;
+    expr_t *simp = f ? expr_simplify(f) : NULL;
+    char *got = simp ? expr_to_string(simp, style_EXPRESSION) : NULL;
     const char *expect = "{ a^(-2x) | x = NAN; a = NAN }";
 
     if (str_eq(got, expect))
@@ -1394,6 +1395,7 @@ static void test_to_string_power_of_power_simplifies_expr(void)
                        got, expect);
 
     free(got);
+    expr_free(simp);
     expr_free(f);
 }
 

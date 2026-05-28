@@ -30,6 +30,17 @@ bool expr_simplify_allows_const_identity_fold(const expr_t *dv)
         return false;
     if (!dv->binding_expr)
         return true;
+    if (dv->name && *dv->name) {
+        number_t value;
+        bool is_default;
+        int has_default;
+
+        has_default = expr_get_default_constant_num(dv->name, &value);
+        is_default = has_default && num_eq(dv->c, value);
+        if (has_default)
+            num_destroy(&value);
+        return is_default;
+    }
     return dv->binding_expr->kind == EXPR_BINDING_EXPR_NUMBER ||
            dv->binding_expr->kind == EXPR_BINDING_EXPR_CONST;
 }

@@ -77,19 +77,19 @@ static void test_from_string_arithmetic(void)
     check_parse_val("(x\xe2\x82\x80 + x\xe2\x82\x81)\xc2\xb2 = 25",
         "{ (x\xe2\x82\x80 + x\xe2\x82\x81)\xc2\xb2 | x\xe2\x82\x80 = 2, x\xe2\x82\x81 = 3 }",
         25.0, __LINE__);
-    check_parse_expr("parenthesised exponent can itself be powered",
+    check_parse_simplified_expr("parenthesised exponent can itself be powered",
         "{ a^(ix)\xc2\xb2 | x = NAN; a = NAN }",
         "{ a^(2ix) | x = NAN; a = NAN }", __LINE__);
-    check_parse_expr("ASCII parenthesised exponent can itself be powered",
+    check_parse_simplified_expr("ASCII parenthesised exponent can itself be powered",
         "{ a^(ix)^2 | x = NAN; a = NAN }",
         "{ a^(2ix) | x = NAN; a = NAN }", __LINE__);
-    check_parse_expr("unparenthesised chained powers are left associative",
+    check_parse_simplified_expr("unparenthesised chained powers are left associative",
         "{ a^x^2 | x = NAN; a = NAN }",
         "{ a^(2x) | x = NAN; a = NAN }", __LINE__);
-    check_parse_expr("explicit exponent power stays inside exponent",
+    check_parse_simplified_expr("explicit exponent power stays inside exponent",
         "{ a^((ix)^2) | x = NAN; a = NAN }",
         "{ a^(-x\xc2\xb2) | x = NAN; a = NAN }", __LINE__);
-    check_parse_expr("power of symbolic power folds integer exponent",
+    check_parse_simplified_expr("power of symbolic power folds integer exponent",
         "{ (a^(-x))\xc2\xb2 | x = NAN; a = NAN }",
         "{ a^(-2x) | x = NAN; a = NAN }", __LINE__);
     /* Chained addition */
@@ -147,6 +147,7 @@ static void test_from_string_functions(void)
     check_parse_val("ln(x) at 1",        "{ ln(x) | x = 1 }",            0.0,          __LINE__);
     check_parse_val("log(x) at 1000",    "{ log(x) | x = 1000 }",        3.0,          __LINE__);
     check_parse_val("log10(x) at 1000",  "{ log10(x) | x = 1000 }",      3.0,          __LINE__);
+    check_parse_val("lg(x) at 1000",     "{ lg(x) | x = 1000 }",         3.0,          __LINE__);
     check_parse_val("sqrt(x) at 4",      "{ sqrt(x) | x = 4 }",          2.0,          __LINE__);
     check_parse_val("floor(x) at 1.75",  "{ floor(x) | x = 1.75 }",      1.0,          __LINE__);
     check_parse_val("ceil(x) at 1.25",   "{ ceil(x) | x = 1.25 }",       2.0,          __LINE__);
@@ -611,13 +612,13 @@ static void test_from_string_implicit_symbolic_bindings(void)
                        tau_as ? tau_as : "(null)", "{ τ | τ = NAN }");
     }
 
-    if (f && fs && str_eq(fs, "{ c₁ + e + π + [radius]² | [radius] = NAN; c₁ = NAN }")) {
+    if (f && fs && str_eq(fs, "{ [radius]² + c₁ + π + e | [radius] = NAN; c₁ = NAN }")) {
         to_string_pass("implicit mixed symbolic inference", fs,
-                       "{ c₁ + e + π + [radius]² | [radius] = NAN; c₁ = NAN }");
+                       "{ [radius]² + c₁ + π + e | [radius] = NAN; c₁ = NAN }");
     } else {
         to_string_fail(__FILE__, __LINE__, 1, "implicit mixed symbolic inference",
                        fs ? fs : "(null)",
-                       "{ c₁ + e + π + [radius]² | [radius] = NAN; c₁ = NAN }");
+                       "{ [radius]² + c₁ + π + e | [radius] = NAN; c₁ = NAN }");
     }
 
     if (x && qf_isnan(expr_eval_qf(x))) {
@@ -994,19 +995,21 @@ static void test_from_string_composed(void)
 static void test_from_string_simplified_identity_text(void)
 {
     expr_t *expr = expr_from_string("{ sin^2(x) + cos^2(x) | x = 1.234 }", NULL);
-    char *text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
+    expr_t *simp = expr ? expr_simplify(expr) : NULL;
+    char *text = simp ? expr_to_string(simp, style_EXPRESSION) : NULL;
 
     if (!(text && strcmp(text, "1") == 0)) {
-        printf(C_BOLD C_RED "FAIL" C_RESET " from_string simplifies sin^2(x) + cos^2(x) exact text to 1 %s:%d:1\n",
+        printf(C_BOLD C_RED "FAIL" C_RESET " parsed sin^2(x) + cos^2(x) simplifies explicitly to 1 %s:%d:1\n",
                __FILE__, __LINE__);
         printf("  got:      %s\n", text ? text : "<null>");
         printf("  expected: 1\n\n");
         TEST_FAIL();
     } else {
-        printf(C_BOLD C_GREEN "PASS" C_RESET " from_string simplifies sin^2(x) + cos^2(x) exact text to 1\n\n");
+        printf(C_BOLD C_GREEN "PASS" C_RESET " parsed sin^2(x) + cos^2(x) simplifies explicitly to 1\n\n");
     }
 
     free(text);
+    expr_free(simp);
     expr_free(expr);
 }
 
@@ -1216,6 +1219,14 @@ static void test_from_string_number_literals(void)
                     "{ ²³¹⁄₂₃₁₀ }",
                     "\\frac{1}{10}",
                     __LINE__);
+    check_parse_expr("NAN is a numeric placeholder, not a variable name",
+                     "{ NAN }",
+                     "NAN",
+                     __LINE__);
+    check_parse_expr("lowercase nan is a numeric placeholder",
+                     "{ nan }",
+                     "NAN",
+                     __LINE__);
     check_parse_expr("repeated unary signs simplify",
                      "{ --2x | x = ? }",
                      "{ 2x | x = NAN }",
@@ -1556,11 +1567,11 @@ static void test_from_string_bindings_with_constant_expression_value(void)
                     __LINE__);
     check_parse_expr("binding value preserves symbolic pi/2",
                      "{ e^(sin(x)) | x = pi/2 }",
-                     "{ exp(sin(x)) | x = π/2 }",
+                     "{ e^sin(x) | x = π/2 }",
                      __LINE__);
     check_parse_expr("binding value preserves symbolic 3/2*pi",
                      "{ e^(sin(x)) | x = 3/2*pi }",
-                     "{ exp(sin(x)) | x = ³⁄₂π }",
+                     "{ e^sin(x) | x = ³⁄₂π }",
                      __LINE__);
     check_parse_expr("binding value preserves symbolic pi^2/2",
                      "{ x | x = (pi^2)/2 }",
@@ -1622,11 +1633,11 @@ static void test_from_string_bindings_with_constant_expression_value(void)
                      "{ pi/pi^2 }",
                      "π/π²",
                      __LINE__);
-    check_parse_expr("generated derivative with NaN bindings simplifies on parse",
+    check_parse_simplified_expr("generated derivative with NaN bindings simplifies explicitly",
                      "{ -y²z²·sin(xyz)·exp(sin(xyz)) + y²z²·cos²(xyz)·exp(sin(xyz)) | y = NAN, z = NAN, x = NAN }",
                      "{ y²z²·exp(sin(xyz))·(-sin(xyz) + cos²(xyz)) | y = NAN, z = NAN, x = NAN }",
                      __LINE__);
-    check_parse_expr("reparsed symbolic pi derivative simplifies on parse",
+    check_parse_simplified_expr("reparsed symbolic pi derivative simplifies explicitly",
                      "{ (-2π·exp(π·√(x)) + 2·π²·√(x)·exp(π·√(x)))/(2·√(x))/(2·√(x))² | x = 163 }",
                      "{ (-π + π^2·√(x))·exp(π·√(x))/(4x^³⁄₂) | x = 163 }",
                      __LINE__);

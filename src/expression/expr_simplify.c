@@ -66,6 +66,33 @@ static inline expr_t *expr_make_pow_like_owned_local(expr_t *base, number_t expo
     return out;
 }
 
+static bool expr_simplify_is_literal_euler_const_local(const expr_t *dv)
+{
+    const char *canon;
+
+    if (!expr_is_op(dv, &ops_const) || !num_eq(dv->c, NUM_E))
+        return false;
+
+    if (!dv->binding_expr)
+        return true;
+
+    if (!dv->name || !*dv->name)
+        return false;
+
+    canon = expr_default_constant_canonical_name(dv->name);
+    return canon && strcmp(canon, "e") == 0;
+}
+
+static bool expr_simplify_is_literal_ten_const_local(const expr_t *dv)
+{
+    if (!expr_is_op(dv, &ops_const) || !num_eq(dv->c, NUM_TEN))
+        return false;
+    if (dv->name && *dv->name)
+        return false;
+    return !dv->binding_expr ||
+           dv->binding_expr->kind == EXPR_BINDING_EXPR_NUMBER;
+}
+
 static bool expr_simplify_is_i_const_local(const expr_t *dv)
 {
     return dv && expr_is_op(dv, &ops_const) && num_eq(dv->c, NUM_I);
@@ -159,15 +186,15 @@ static expr_t *expr_simplify_try_euler_square_local(expr_t *base)
     return out;
 }
 
-typedef struct {
-    expr_t *base;
-    number_t exponent;
-} expr_factor_t;
-
 static int binding_expr_integer_power_base_local(const expr_binding_expr_t *expr,
                                                  expr_binding_expr_t **base_out,
                                                  number_t *exponent_out);
 static expr_t *expr_from_preserved_binding_expr_local(expr_binding_expr_t *expr);
+
+typedef struct {
+    expr_t *base;
+    number_t exponent;
+} expr_factor_t;
 
 static void expr_free_factors_local(expr_factor_t *factors, size_t n)
 {
@@ -521,9 +548,10 @@ static void expr_keep_common_factors_local(expr_factor_t *common, size_t *ncommo
             break;
         }
 
-        if (!found)
-            num_destroy(&common[i].exponent),
+        if (!found) {
+            num_destroy(&common[i].exponent);
             common[i].exponent = num_clone(NUM_ZERO);
+        }
     }
 }
 
@@ -583,6 +611,69 @@ static expr_t *expr_reduce_by_common_factors_local(const expr_t *base,
     }
 
     return expr_rebuild_factors_local(factors, n);
+}
+
+static int expr_factor_values_close_local(number_t before, number_t after)
+{
+    number_t delta;
+    number_t abs_delta;
+    number_t abs_before;
+    number_t abs_after;
+    number_t scale;
+    number_t tolerance;
+    number_t scaled_tolerance;
+    int ok;
+
+    if (num_is_nan(before) && num_is_nan(after))
+        return 1;
+    if (num_is_nan(before) || num_is_nan(after))
+        return 0;
+    if (num_eq(before, after))
+        return 1;
+    if (!num_is_finite(before) || !num_is_finite(after))
+        return 0;
+
+    delta = num_sub(before, after);
+    abs_delta = num_abs(delta);
+    abs_before = num_abs(before);
+    abs_after = num_abs(after);
+    scale = num_clone(NUM_ONE);
+    if (num_gt(abs_before, scale)) {
+        num_destroy(&scale);
+        scale = num_clone(abs_before);
+    }
+    if (num_gt(abs_after, scale)) {
+        num_destroy(&scale);
+        scale = num_clone(abs_after);
+    }
+    tolerance = num_create_from_string("1e-24");
+    scaled_tolerance = num_mul(tolerance, scale);
+    ok = num_le(abs_delta, scaled_tolerance);
+
+    num_destroy(&scaled_tolerance);
+    num_destroy(&tolerance);
+    num_destroy(&scale);
+    num_destroy(&abs_after);
+    num_destroy(&abs_before);
+    num_destroy(&abs_delta);
+    num_destroy(&delta);
+    return ok;
+}
+
+static int expr_factor_candidate_preserves_value_local(const expr_t *before,
+                                                       const expr_t *after)
+{
+    number_t before_value;
+    number_t after_value;
+    int ok;
+
+    if (!before || !after)
+        return 0;
+
+    before_value = expr_eval_num_internal(before);
+    after_value = expr_eval_num_internal(after);
+    ok = expr_factor_values_close_local(before_value, after_value);
+    return ok;
 }
 
 static expr_t *expr_try_factor_common_symbolic_product_local(expr_t *sum)
@@ -691,6 +782,10 @@ static expr_t *expr_try_factor_common_symbolic_product_local(expr_t *sum)
     factored = expr_mul(common_factor, inner);
     expr_free(common_factor);
     expr_free(inner);
+    if (!expr_factor_candidate_preserves_value_local(sum, factored)) {
+        expr_free(factored);
+        return NULL;
+    }
     return factored;
 
 no_factor:
@@ -2344,7 +2439,7 @@ expr_t *expr_simplify_pow_operator(const expr_t *dv, expr_t *a, expr_t *b)
         }
     }
 
-    if (expr_is_op(a, &ops_const) && num_eq(a->c, NUM_E)) {
+    if (expr_simplify_is_literal_euler_const_local(a)) {
         expr_t *raw;
         expr_t *out;
 
@@ -2355,7 +2450,7 @@ expr_t *expr_simplify_pow_operator(const expr_t *dv, expr_t *a, expr_t *b)
         expr_free(b);
         return out;
     }
-    if (expr_is_op(a, &ops_const) && num_eq(a->c, NUM_TEN) && expr_is_op(b, &ops_log10)) {
+    if (expr_simplify_is_literal_ten_const_local(a) && expr_is_op(b, &ops_log10)) {
         expr_t *inner = b->a;
         expr_retain(inner);
         expr_free(a);

@@ -2076,6 +2076,59 @@ static void test_pow_derivative_preserves_literal_base_log(void)
     expr_free(expr);
 }
 
+static void test_symbolic_complex_power_derivative_keeps_base_log(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = expr_from_string("{ a^(ix) | x = NAN; a = NAN }", &bindings);
+    expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    expr_t *deriv = (expr && x) ? expr_create_deriv(expr, x) : NULL;
+    char *deriv_text = deriv ? expr_to_string(deriv, style_EXPRESSION) : NULL;
+
+    if (deriv_text &&
+        strstr(deriv_text, "ln(a)") &&
+        strstr(deriv_text, "a^(ix)") &&
+        !strstr(deriv_text, "AN²"))
+        to_string_pass("a^(ix) derivative keeps ln(a)", deriv_text, deriv_text);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "a^(ix) derivative keeps ln(a)",
+                       deriv_text ? deriv_text : "(null)",
+                       "{ i·ln(a)·a^(ix) | x = NAN; a = NAN }");
+
+    free(deriv_text);
+    expr_free(deriv);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+}
+
+static void test_bound_euler_symbol_survives_derivative_simplify(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = expr_from_string("{ a^(ix) | x = pi/4; a = e }", &bindings);
+    expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    expr_t *deriv = (expr && x) ? expr_create_deriv(expr, x) : NULL;
+    char *deriv_text = deriv ? expr_to_string(deriv, style_EXPRESSION) : NULL;
+
+    if (deriv_text &&
+        strstr(deriv_text, "ln(a)") &&
+        strstr(deriv_text, "a^(ix)") &&
+        strstr(deriv_text, "x = π/4") &&
+        strstr(deriv_text, "a = e") &&
+        !strstr(deriv_text, "exp(ix)"))
+        to_string_pass("a=e binding survives derivative simplify",
+                       deriv_text, deriv_text);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "a=e binding survives derivative simplify",
+                       deriv_text ? deriv_text : "(null)",
+                       "{ i·ln(a)·a^(ix) | x = π/4; a = e }");
+
+    free(deriv_text);
+    expr_free(deriv);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+}
+
 static void test_log_of_imaginary_product_derivative_cancels_i(void)
 {
     expr_bindings_t *bindings = NULL;
@@ -2151,11 +2204,12 @@ static void test_lambert_inverse_argument_derivative_simplifies(void)
     expr_bindings_t *simplify_bindings = NULL;
     expr_t *simplify_expr =
         expr_from_string("{ W₀(x*exp(x)) | x = 5 }", &simplify_bindings);
+    expr_t *simplified_expr = simplify_expr ? expr_simplify(simplify_expr) : NULL;
     expr_t *expr = expr_from_string("{ W₀(x*exp(x)) | x = 5 }", &bindings);
     expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
     expr_t *deriv = (expr && x) ? expr_create_deriv(expr, x) : NULL;
     char *simplify_text =
-        simplify_expr ? expr_to_string(simplify_expr, style_EXPRESSION) : NULL;
+        simplified_expr ? expr_to_string(simplified_expr, style_EXPRESSION) : NULL;
     char *deriv_text = deriv ? expr_to_string(deriv, style_EXPRESSION) : NULL;
     const char *expect_simplify = "5";
     const char *expect = "1";
@@ -2180,6 +2234,7 @@ static void test_lambert_inverse_argument_derivative_simplifies(void)
     free(deriv_text);
     free(simplify_text);
     expr_free(deriv);
+    expr_free(simplified_expr);
     expr_bindings_free(simplify_bindings);
     expr_bindings_free(bindings);
     expr_free(simplify_expr);
@@ -2198,6 +2253,10 @@ static void test_lambert_inverse_branch_selection(void)
     expr_t *productlog =
         expr_from_string("{ productlog(x*exp(x)) | x = -2 }",
                          &bindings_productlog);
+    expr_t *wm1_simplified = wm1 ? expr_simplify(wm1) : NULL;
+    expr_t *w_simplified = w ? expr_simplify(w) : NULL;
+    expr_t *productlog_simplified =
+        productlog ? expr_simplify(productlog) : NULL;
     expr_t *w_branch = expr_from_string("{ W(-1/e) }", NULL);
     expr_t *productlog_branch =
         expr_from_string("{ productlog(-1/e) }", NULL);
@@ -2215,10 +2274,14 @@ static void test_lambert_inverse_branch_selection(void)
     number_t w_outside_check = num_mul(w_outside_value, w_outside_exp);
     number_t neg_two = num_create_from_string("-2");
     char *w0_text = w0 ? expr_to_string(w0, style_EXPRESSION) : NULL;
-    char *wm1_text = wm1 ? expr_to_string(wm1, style_EXPRESSION) : NULL;
-    char *w_text = w ? expr_to_string(w, style_EXPRESSION) : NULL;
+    char *wm1_text =
+        wm1_simplified ? expr_to_string(wm1_simplified, style_EXPRESSION) : NULL;
+    char *w_text =
+        w_simplified ? expr_to_string(w_simplified, style_EXPRESSION) : NULL;
     char *productlog_text =
-        productlog ? expr_to_string(productlog, style_EXPRESSION) : NULL;
+        productlog_simplified
+            ? expr_to_string(productlog_simplified, style_EXPRESSION)
+            : NULL;
     char *w_branch_text = num_to_string(w_branch_value);
     char *productlog_branch_text = num_to_string(productlog_branch_value);
     char *w0_branch_text = num_to_string(w0_branch_value);
@@ -2325,6 +2388,9 @@ static void test_lambert_inverse_branch_selection(void)
     expr_free(productlog_branch);
     expr_free(w_branch);
     expr_free(w_outside_real_domain);
+    expr_free(productlog_simplified);
+    expr_free(w_simplified);
+    expr_free(wm1_simplified);
     expr_free(productlog);
     expr_free(w);
     expr_free(wm1);
@@ -2482,36 +2548,42 @@ static void test_binary_constants_preserve_user_literals_in_derivatives(void)
         const char *expr_expect;
         const char *deriv_expect;
         const char *label;
+        bool simplify_expr;
     } cases[] = {
         {
             "{ atan2(1,2)*x | x = NAN }",
             "{ atan2(1, 2)x | x = NAN }",
             "atan2(1, 2)",
-            "atan2(1,2)*x preserves atan2(1,2)"
+            "atan2(1,2)*x preserves atan2(1,2)",
+            false
         },
         {
             "{ hypot(3,4)*x | x = NAN }",
             "{ hypot(3, 4)x | x = NAN }",
             "hypot(3, 4)",
-            "hypot(3,4)*x preserves hypot(3,4)"
+            "hypot(3,4)*x preserves hypot(3,4)",
+            false
         },
         {
             "{ beta(2,3)*x | x = NAN }",
             "{ beta(2, 3)x | x = NAN }",
             "beta(2, 3)",
-            "beta(2,3)*x preserves beta(2,3)"
+            "beta(2,3)*x preserves beta(2,3)",
+            false
         },
         {
             "{ logbeta(2,3)*x | x = NAN }",
             "{ -ln(12)x | x = NAN }",
             "-ln(12)",
-            "logbeta(2,3)*x rewrites exactly to -ln(12)"
+            "logbeta(2,3)*x rewrites exactly to -ln(12)",
+            true
         },
         {
             "{ logbeta(1,1)*x | x = NAN }",
             "0",
             "0",
-            "logbeta(1,1)*x rewrites exactly to zero"
+            "logbeta(1,1)*x rewrites exactly to zero",
+            true
         },
     };
 
@@ -2519,8 +2591,14 @@ static void test_binary_constants_preserve_user_literals_in_derivatives(void)
         expr_bindings_t *bindings = NULL;
         expr_t *expr = expr_from_string(cases[i].input, &bindings);
         expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+        expr_t *expr_for_text = cases[i].simplify_expr && expr
+            ? expr_simplify(expr)
+            : NULL;
         expr_t *deriv = (expr && x) ? expr_create_deriv(expr, x) : NULL;
-        char *expr_text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
+        char *expr_text = expr
+            ? expr_to_string(expr_for_text ? expr_for_text : expr,
+                             style_EXPRESSION)
+            : NULL;
         char *deriv_text = deriv ? expr_to_string(deriv, style_EXPRESSION) : NULL;
         char deriv_label[128];
 
@@ -2543,6 +2621,7 @@ static void test_binary_constants_preserve_user_literals_in_derivatives(void)
         free(deriv_text);
         free(expr_text);
         expr_free(deriv);
+        expr_free(expr_for_text);
         expr_bindings_free(bindings);
         expr_free(expr);
     }
@@ -3282,6 +3361,8 @@ void test_runtime_regressions(void)
     TEST_RUN_SUBTEST(test_updated_decimal_binding_stays_decimal, NULL);
     TEST_RUN_SUBTEST(test_symbolic_negative_pi_derivative_stays_symbolic, NULL);
     TEST_RUN_SUBTEST(test_pow_derivative_preserves_literal_base_log, NULL);
+    TEST_RUN_SUBTEST(test_symbolic_complex_power_derivative_keeps_base_log, NULL);
+    TEST_RUN_SUBTEST(test_bound_euler_symbol_survives_derivative_simplify, NULL);
     TEST_RUN_SUBTEST(test_log_of_imaginary_product_derivative_cancels_i, NULL);
     TEST_RUN_SUBTEST(test_negative_quotient_derivative_has_single_sign, NULL);
     TEST_RUN_SUBTEST(test_ln10_product_expression_round_trips, NULL);

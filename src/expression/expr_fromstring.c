@@ -61,6 +61,7 @@ typedef struct {
 } parser_t;
 
 static size_t scan_unicode_fraction_len(const char *s, const char *end);
+static size_t scan_special_number_literal_len(const char *s, const char *end);
 
 static void set_error(parser_t *p, const char *msg)
 {
@@ -89,6 +90,7 @@ static int can_start_factor(const parser_t *p)
     if (c == '[' || c == '(' || c == '@') return 1;
     if (at_middle_dot(p)) return 1;
     if (scan_unicode_fraction_len(p->p, p->end) > 0u) return 1;
+    if (scan_special_number_literal_len(p->p, p->end) > 0u) return 1;
     unsigned int uc;
     int len = fs_utf8_decode(p->p, &uc);
     if (len > 0 && (fs_is_letter(uc) || uc == 0x230A || uc == 0x2308))
@@ -157,7 +159,7 @@ static const unsigned char s_func_displacements[FUNC_TABLE_SIZE] = {
       2,   3,   0,   3,   1,   0,   0,   0,   0,   0,
       6,   0,   1,   0,  24,  13,   0,   4,  16,   0,
       5,   0,   0,   0,   5,   5,   0,  13,   0,  43,
-      0,   0,   0,  25,  33,  74,   0
+      0,   0,  53,  25,  33,  74,   0
 };
 
 static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
@@ -187,6 +189,7 @@ static const func_entry_t s_funcs[FUNC_TABLE_SIZE] = {
     [ 23] = FUNC_ENTRY("asinh",         false, &ops_asinh,         expr_asinh,         NULL),
     [ 24] = FUNC_ENTRY("sec",           false, &ops_sec,           expr_sec,           NULL),
     [ 25] = FUNC_ENTRY("next_prime",    false, &ops_next_prime,    expr_next_prime,    NULL),
+    [ 26] = FUNC_ENTRY("lg",            false, &ops_log10,         expr_log10,         NULL),
     [ 28] = FUNC_ENTRY("isqrt",         false, &ops_isqrt,         expr_isqrt,         NULL),
     [ 29] = FUNC_ENTRY("Γ",             false, &ops_gamma,         expr_gamma,         NULL),
     [ 30] = FUNC_ENTRY("gammainc_Q",    true,  &ops_gammainc_Q,    NULL,             expr_gammainc_Q),
@@ -627,6 +630,40 @@ static size_t scan_number_atom_len(const char *s, const char *end)
     return (size_t)(p - s);
 }
 
+static int ascii_region_eq_ci(const char *s, const char *end, const char *kw)
+{
+    size_t len = strlen(kw);
+
+    if ((size_t)(end - s) < len)
+        return 0;
+    for (size_t i = 0u; i < len; ++i) {
+        if (tolower((unsigned char)s[i]) != tolower((unsigned char)kw[i]))
+            return 0;
+    }
+    return 1;
+}
+
+static int special_number_literal_boundary(const char *p, const char *end)
+{
+    if (p >= end)
+        return 1;
+    return !isalnum((unsigned char)*p) && *p != '_';
+}
+
+static size_t scan_special_number_literal_len(const char *s, const char *end)
+{
+    static const char *const specials[] = { "infinity", "nan", "inf" };
+
+    for (size_t i = 0u; i < sizeof(specials) / sizeof(specials[0]); ++i) {
+        size_t len = strlen(specials[i]);
+
+        if (ascii_region_eq_ci(s, end, specials[i]) &&
+            special_number_literal_boundary(s + len, end))
+            return len;
+    }
+    return 0u;
+}
+
 static int parse_number_region(const char *start, const char *end, number_t *out)
 {
     char *buf;
@@ -644,6 +681,8 @@ static int parse_number_region(const char *start, const char *end, number_t *out
 
     len = (size_t)(end - start);
     atom_len = scan_number_atom_len(start, end);
+    if (atom_len == 0u)
+        atom_len = scan_special_number_literal_len(start, end);
     if (atom_len != len)
         return 0;
 
@@ -984,20 +1023,27 @@ static expr_t *parse_atom(parser_t *p)
 
     /* Numeric atom (integer/decimal/rational, optionally with trailing i) */
     if (isdigit((unsigned char)*p->p) || *p->p == '.' ||
-        scan_unicode_fraction_len(p->p, p->end) > 0u) {
+        scan_unicode_fraction_len(p->p, p->end) > 0u ||
+        scan_special_number_literal_len(p->p, p->end) > 0u) {
         size_t len = scan_number_atom_len(p->p, p->end);
+        size_t special_len = scan_special_number_literal_len(p->p, p->end);
         const char *start = p->p;
         number_t value;
         expr_t *node;
         char *text;
 
+        if (len == 0u)
+            len = special_len;
         if (len == 0 || !parse_number_region(p->p, p->p + len, &value)) {
             set_error(p, "expected numeric literal");
             return NULL;
         }
         p->p += len;
         node = expr_new_const(value);
-        if (num_is_exact(value)) {
+        if (special_len > 0u && ascii_region_eq_ci(start, start + special_len, "nan")) {
+            text = (char *)fs_xmalloc(4u);
+            memcpy(text, "NAN", 4u);
+        } else if (num_is_exact(value)) {
             text = num_to_string(value);
             if (!text) {
                 text = (char *)fs_xmalloc(4u);
@@ -1544,6 +1590,12 @@ static int collect_implicit_symbols(const char *start, const char *end,
     while (p < end) {
         const char *id = p;
         const char *id_end = id;
+        size_t special_len = scan_special_number_literal_len(p, end);
+
+        if (special_len > 0u) {
+            p += special_len;
+            continue;
+        }
 
         while (id_end < end &&
                (isalpha((unsigned char)*id_end) ||
@@ -1759,7 +1811,6 @@ static expr_t *expr_from_string_impl(const char *s,
                                                  "expr_from_string", 0);
 
         if (result) {
-            result = simplify_parsed_result(result);
             if (bindings_out)
                 *bindings_out = single_binding_from_node(result);
             return result;
@@ -1779,7 +1830,6 @@ static expr_t *expr_from_string_impl(const char *s,
             else
                 symtab_free(&syms);
             if (result) {
-                result = simplify_parsed_result(result);
                 if (bindings_out)
                     *bindings_out = bindings;
                 return result;
@@ -1791,7 +1841,6 @@ static expr_t *expr_from_string_impl(const char *s,
         if (!result)
             fprintf(stderr, "%s\n", errmsg);
         else {
-            result = simplify_parsed_result(result);
             if (bindings_out)
                 *bindings_out = single_binding_from_node(result);
         }
@@ -1848,8 +1897,6 @@ static expr_t *expr_from_string_impl(const char *s,
     } else {
         symtab_free(&syms);
     }
-    if (result)
-        result = simplify_parsed_result(result);
     if (result && bindings_out)
         *bindings_out = bindings;
     return result;

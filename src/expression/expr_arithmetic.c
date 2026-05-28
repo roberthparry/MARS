@@ -773,7 +773,8 @@ static expr_t *expr_unary_constexpr_from_preserved_arg(const expr_ops_t *ops,
     number_t value;
     expr_t *node;
 
-    if (!arg || !expr_is_const(arg) || !arg->binding_expr)
+    if (!arg || !expr_is_const(arg) || !arg->binding_expr ||
+        (arg->name && *arg->name))
         return NULL;
 
     expr = expr_binding_expr_new_unary_op(ops,

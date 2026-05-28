@@ -4,8 +4,35 @@
 #include "expr_bindings.h"
 #include "expr_internal.h"
 
+static int const_is_protected_bound_symbol(const expr_t *dv)
+{
+    number_t value;
+    int has_default;
+    int is_default;
+
+    if (!dv || !expr_is_const(dv) || !dv->binding_expr ||
+        !dv->name || !*dv->name)
+        return 0;
+
+    has_default = expr_get_default_constant_num(dv->name, &value);
+    is_default = has_default && num_eq(dv->c, value);
+    if (has_default)
+        num_destroy(&value);
+
+    return !is_default;
+}
+
 static int const_struct_eq(const expr_t *u, const expr_t *v)
 {
+    if (const_is_protected_bound_symbol(u) ||
+        const_is_protected_bound_symbol(v)) {
+        return const_is_protected_bound_symbol(u) &&
+               const_is_protected_bound_symbol(v) &&
+               u->name && v->name &&
+               strcmp(u->name, v->name) == 0 &&
+               expr_binding_expr_struct_eq(u->binding_expr, v->binding_expr);
+    }
+
     if (u->binding_expr || v->binding_expr) {
         if (expr_binding_expr_struct_eq(u->binding_expr, v->binding_expr))
             return 1;

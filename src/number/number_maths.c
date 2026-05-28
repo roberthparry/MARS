@@ -2440,6 +2440,9 @@ number_t num_log(const number_t number)
 number_t num_log10(const number_t number)
 {
     number_kind_t kind = number_kind_value(&number);
+    number_t log_value;
+    number_t ln10;
+    number_t out;
     double d;
     qfloat_t qf;
 
@@ -2454,6 +2457,14 @@ number_t num_log10(const number_t number)
         qf = number_impl_const(&number)->value.qf;
         return qf_lt(qf, QF_ZERO) ? number_qfloat_qcomplex_unary(qf, qc_log10)
                                   : num_create_from_qfloat(qf_log10(qf));
+    }
+    if (num_is_real(number) && num_lt(number, NUM_ZERO)) {
+        log_value = num_log(number);
+        ln10 = number_const_like(&number, NUMBER_CONST_LN10);
+        out = num_div(log_value, ln10);
+        num_destroy(&ln10);
+        num_destroy(&log_value);
+        return out;
     }
     return number_apply_unary_math_with_double(number, log10, qf_log10, qc_log10, number_mpfr_log10_mut, mpc_log10);
 }

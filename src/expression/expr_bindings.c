@@ -1481,6 +1481,7 @@ static const binding_func_entry_t s_binding_funcs[BINDING_FUNC_TABLE_SIZE] = {
 
 static const binding_func_entry_t s_extra_binding_funcs[] = {
     BINDING_FUNC_ENTRY("sec",           false, &ops_sec),
+    BINDING_FUNC_ENTRY("lg",            false, &ops_log10),
     BINDING_FUNC_ENTRY("cosec",         false, &ops_cosec),
     BINDING_FUNC_ENTRY("csc",           false, &ops_cosec),
     BINDING_FUNC_ENTRY("cot",           false, &ops_cot),
