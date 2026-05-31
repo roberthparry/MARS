@@ -568,13 +568,15 @@ static matrix_t *mat_eigenvectors_expr_2x2(const matrix_t *A, expr_t **eigenvalu
         }
 
         if (!expr_is_exact_zero(p) || !expr_is_exact_zero(q)) {
-            v0 = expr_neg_simplify(q);
+            v0 = q;
             q = NULL;
-            v1 = p;
-            p = NULL;
+            expr_retain(lambda);
+            expr_retain(a);
+            v1 = expr_sub_simplify(lambda, a);
         } else if (!expr_is_exact_zero(r) || !expr_is_exact_zero(s)) {
-            v0 = expr_neg_simplify(s);
-            s = NULL;
+            expr_retain(lambda);
+            expr_retain(d);
+            v0 = expr_sub_simplify(lambda, d);
             v1 = r;
             r = NULL;
         } else if (k == 0) {
@@ -1061,6 +1063,82 @@ fail:
     return NULL;
 }
 
+static matrix_t *mat_solve_expr_2x2_exact(const matrix_t *A, const matrix_t *B)
+{
+    const expr_t *a;
+    const expr_t *b;
+    const expr_t *c;
+    const expr_t *d;
+    expr_t *det = NULL;
+    matrix_t *X = NULL;
+
+    if (!A || !B || A->rows != 2 || A->cols != 2 || B->rows != 2)
+        return NULL;
+
+    a = mat_get_expr_or_zero(A, 0, 0);
+    b = mat_get_expr_or_zero(A, 0, 1);
+    c = mat_get_expr_or_zero(A, 1, 0);
+    d = mat_get_expr_or_zero(A, 1, 1);
+
+    det = expr_det2_simplify((expr_t *)a, (expr_t *)b,
+                             (expr_t *)c, (expr_t *)d);
+    if (!det || expr_node_is_exact_zero(det))
+        goto fail;
+
+    X = mat_create_dense_with_elem(2, B->cols, &expr_elem);
+    if (!X)
+        goto fail;
+
+    for (size_t j = 0; j < B->cols; ++j) {
+        const expr_t *r0 = mat_get_expr_or_zero(B, 0, j);
+        const expr_t *r1 = mat_get_expr_or_zero(B, 1, j);
+        expr_t *x0_left = NULL;
+        expr_t *x0_right = NULL;
+        expr_t *x0_num = NULL;
+        expr_t *x0 = NULL;
+        expr_t *x1_left = NULL;
+        expr_t *x1_right = NULL;
+        expr_t *x1_num = NULL;
+        expr_t *x1 = NULL;
+
+        expr_retain((expr_t *)d);
+        expr_retain((expr_t *)r0);
+        x0_left = expr_mul_simplify(d, r0);
+        expr_retain((expr_t *)b);
+        expr_retain((expr_t *)r1);
+        x0_right = expr_mul_simplify(b, r1);
+        x0_num = expr_sub_simplify(x0_left, x0_right);
+        expr_retain(det);
+        x0 = expr_div_simplify(x0_num, det);
+        if (!x0)
+            goto fail;
+        mat_set(X, 0, j, &x0);
+        expr_free(x0);
+
+        expr_retain((expr_t *)a);
+        expr_retain((expr_t *)r1);
+        x1_left = expr_mul_simplify(a, r1);
+        expr_retain((expr_t *)c);
+        expr_retain((expr_t *)r0);
+        x1_right = expr_mul_simplify(c, r0);
+        x1_num = expr_sub_simplify(x1_left, x1_right);
+        expr_retain(det);
+        x1 = expr_div_simplify(x1_num, det);
+        if (!x1)
+            goto fail;
+        mat_set(X, 1, j, &x1);
+        expr_free(x1);
+    }
+
+    expr_free(det);
+    return X;
+
+fail:
+    expr_free(det);
+    mat_free(X);
+    return NULL;
+}
+
 matrix_t *mat_solve_expr_exact(const matrix_t *A, const matrix_t *B)
 {
     matrix_t *X = NULL;
@@ -1068,7 +1146,9 @@ matrix_t *mat_solve_expr_exact(const matrix_t *A, const matrix_t *B)
     if (!A || !B || A->rows != A->cols || A->rows != B->rows)
         return NULL;
 
-    if (mat_has_diagonal_structure(A))
+    if (A->rows == 2 && A->cols == 2)
+        X = mat_solve_expr_2x2_exact(A, B);
+    else if (mat_has_diagonal_structure(A))
         X = mat_solve_expr_diagonal_exact(A, B);
     else if (mat_has_lower_triangular_structure(A))
         X = mat_forward_substitute_expr_exact(A, B);
@@ -2077,7 +2157,7 @@ static int mat_expr_rref_exact(const matrix_t *A, expr_rref_info_t *out)
 
         {
             expr_t *pivot = NULL;
-            mat_get(R, row, col, &pivot);
+            mat_get_owned(R, row, col, &pivot);
 
             for (size_t j = col; j < A->cols; ++j) {
                 expr_t *entry = NULL;
@@ -2087,11 +2167,14 @@ static int mat_expr_rref_exact(const matrix_t *A, expr_rref_info_t *out)
                 expr_retain(entry);
                 expr_retain(pivot);
                 new_entry = expr_div_simplify(entry, pivot);
-                if (!new_entry)
+                if (!new_entry) {
+                    expr_free(pivot);
                     goto fail;
+                }
                 mat_set(R, row, j, &new_entry);
                 expr_free(new_entry);
             }
+            expr_free(pivot);
         }
 
         for (size_t i = 0; i < A->rows; ++i) {

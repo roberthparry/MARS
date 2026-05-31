@@ -3,8 +3,9 @@
 Small local GUI for experimenting with MARS mathematics.
 
 The app serves a single browser page on localhost and evaluates expressions by
-delegating to build/release/scratch/mars_lab.  The browser gives us a proper
-GUI surface without adding a desktop toolkit dependency to the project.
+delegating to a scratch binary such as build/release/scratch/mars_lab. The
+browser gives us a proper GUI surface without adding a desktop toolkit
+dependency to the project.
 """
 
 from __future__ import annotations
@@ -32,27 +33,268 @@ import shutil
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_BIN = ROOT / "build" / "release" / "scratch" / "mars_lab"
-STATE_FILE = ROOT / ".mars_lab_state.json"
+LAB_APP_NAME = os.environ.get("MARS_LAB_APP_NAME", "MARS Lab").strip() or "MARS Lab"
+LAB_SHORT_NAME = os.environ.get("MARS_LAB_SHORT_NAME", LAB_APP_NAME).strip() or LAB_APP_NAME
+LAB_DESCRIPTION = os.environ.get(
+    "MARS_LAB_DESCRIPTION",
+    "Explore MARS mathematics with rendered TeX.",
+).strip() or "Explore MARS mathematics with rendered TeX."
+LAB_SUBTITLE = os.environ.get(
+    "MARS_LAB_SUBTITLE",
+    "Switch between expression, matrix, and integrator experiments. Each mode runs through a local MARS scratch binary and shows the result on the right.",
+).strip() or "Switch between expression, matrix, and integrator experiments. Each mode runs through a local MARS scratch binary and shows the result on the right."
+LAB_THEME = os.environ.get("MARS_LAB_THEME", "mars").strip().lower() or "mars"
+DEFAULT_SCRATCH_TARGET = os.environ.get("MARS_LAB_SCRATCH_TARGET", "scratch/mars_lab").strip() or "scratch/mars_lab"
+DEFAULT_BIN = ROOT / os.environ.get("MARS_LAB_BINARY", "build/release/scratch/mars_lab")
+DEFAULT_MATRIX_BIN = ROOT / "build" / "release" / "scratch" / "matrix_lab"
+DEFAULT_INTEGRATOR_BIN = ROOT / "build" / "release" / "scratch" / "integrator_lab"
+STATE_FILE = ROOT / os.environ.get("MARS_LAB_STATE_FILE", ".mars_lab_state.json")
 LAB_ICON_FILE = ROOT / "packaging" / "linux" / "mars-lab.svg"
 LAB_FAVICON_FILE = LAB_ICON_FILE
 LAB_TOUCH_ICON_FILE = ROOT / "packaging" / "linux" / "icon-concepts" / "wizard-prism-180.png"
 LAB_ICON_192_FILE = ROOT / "packaging" / "linux" / "icon-concepts" / "wizard-prism-192.png"
 LAB_ICON_512_FILE = ROOT / "packaging" / "linux" / "icon-concepts" / "wizard-prism-512.png"
 DEFAULT_EXPRESSION = "{e^(sin(x))|x=pi/2}"
+DEFAULT_MATRIX = "(1, 2; 3, 4)"
+DEFAULT_MATRIX_OPERATION = "inverse"
+DEFAULT_INTEGRATOR_EXPRESSION = "{ exp(-x^2) | x = ? }"
+DEFAULT_INTEGRATOR_BOUNDS = "x = 0 .. 1"
+DEFAULT_INTEGRATOR_INTERVAL_CAP = 5000
+MIN_INTEGRATOR_INTERVAL_CAP = 500
+MAX_INTEGRATOR_INTERVAL_CAP = 100000
+INTEGRATOR_INTERVAL_CAP_CHOICES = (500, 5000, 20000, 50000, 100000)
 MAX_VALUE_PRECISION_BITS = 1_048_576
 MAX_VALUE_PRECISION_DIGITS = math.ceil(MAX_VALUE_PRECISION_BITS * math.log10(2))
+INTEGRATOR_ERROR_DISPLAY_DIGITS = 4
 COMPACT_BINDING_VALUE_LIMIT = 20
 COMPACT_BINDING_VALUE_KEEP = 16
-QR_VERSION = 4
+QR_VERSION = 5
 QR_SIZE = 17 + 4 * QR_VERSION
-QR_DATA_CODEWORDS = 80
-QR_EC_CODEWORDS = 20
+QR_DATA_CODEWORDS = 108
+QR_EC_CODEWORDS = 26
 QR_EC_LEVEL_L = 1
 QR_MASK_PATTERN = 0
 CONTROL_TOKEN = os.environ.get("MARS_LAB_CONTROL_TOKEN") or secrets.token_urlsafe(24)
-CONTROL_QUERY_PARAM = "mars_lab_control"
-CONTROL_COOKIE = "mars_lab_control"
+CONTROL_QUERY_PARAM = os.environ.get("MARS_LAB_CONTROL_QUERY_PARAM", "mars_lab_control")
+CONTROL_COOKIE = os.environ.get("MARS_LAB_CONTROL_COOKIE", "mars_lab_control")
+
+LAB_THEME_COLOR = "#071913"
+LAB_MANIFEST_BACKGROUND = "#f6f0e5"
+LAB_MANIFEST_THEME = "#0b4f8a"
+LAB_BODY_CLASS = ""
+LAB_THEME_OVERRIDES = ""
+
+if LAB_THEME == "ophelia":
+    LAB_THEME_COLOR = "#f7a8d9"
+    LAB_MANIFEST_BACKGROUND = "#fff5fb"
+    LAB_MANIFEST_THEME = "#f7a8d9"
+    LAB_BODY_CLASS = "theme-ophelia"
+    LAB_THEME_OVERRIDES = r"""
+    body.theme-ophelia {
+      color: #31143d;
+      font-family: "Georgia", "Iowan Old Style", "Palatino Linotype", serif;
+      background:
+        radial-gradient(circle at 18% 18%, rgba(255, 255, 255, 0.92), transparent 12rem),
+        radial-gradient(circle at 84% 14%, rgba(255, 214, 244, 0.78), transparent 15rem),
+        radial-gradient(circle at 76% 78%, rgba(190, 240, 255, 0.54), transparent 20rem),
+        linear-gradient(160deg, #fff7fd 0%, #ffe6f5 26%, #f6e6ff 52%, #dbf6ff 74%, #fff4cf 100%);
+    }
+
+    body.theme-ophelia::before {
+      opacity: 1;
+      background:
+        radial-gradient(circle at 14% 16%, rgba(255, 255, 255, 0.96) 0 3.5rem, transparent 6rem),
+        radial-gradient(circle at 84% 18%, rgba(255, 255, 255, 0.88) 0 3rem, transparent 5.2rem),
+        radial-gradient(circle at 26% 68%, rgba(255, 255, 255, 0.86) 0 2.4rem, transparent 4.2rem),
+        radial-gradient(circle at 72% 62%, rgba(255, 255, 255, 0.82) 0 2.8rem, transparent 4.6rem),
+        radial-gradient(circle at 50% 10%, rgba(255, 255, 255, 0.7) 0 2.2rem, transparent 4rem),
+        radial-gradient(circle at 10% 82%, rgba(255, 222, 245, 0.52) 0 9rem, transparent 14rem),
+        radial-gradient(circle at 88% 72%, rgba(195, 241, 255, 0.48) 0 10rem, transparent 16rem),
+        repeating-radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.28) 0 2px, transparent 2px 16px);
+      mask: none;
+    }
+
+    body.theme-ophelia::after {
+      height: 14rem;
+      opacity: 0.94;
+      background:
+        radial-gradient(circle at 20% 82%, rgba(255, 186, 227, 0.56) 0 6rem, transparent 8rem),
+        radial-gradient(circle at 80% 74%, rgba(187, 237, 255, 0.58) 0 6.4rem, transparent 8.8rem),
+        linear-gradient(0deg, rgba(255, 224, 244, 0.82), rgba(255, 255, 255, 0.12) 54%, transparent 90%);
+    }
+
+    body.theme-ophelia .celtic-backdrop {
+      overflow: visible;
+    }
+
+    body.theme-ophelia .aurora {
+      top: 0.4rem;
+      height: 16rem;
+      opacity: 0.94;
+      background:
+        radial-gradient(circle at 22% 52%, rgba(255, 255, 255, 0.84) 0 1.5rem, transparent 1.7rem),
+        radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.7) 0 1rem, transparent 1.2rem),
+        radial-gradient(circle at 66% 38%, rgba(255, 255, 255, 0.76) 0 1.15rem, transparent 1.35rem),
+        linear-gradient(104deg, transparent 0 8%, rgba(255, 175, 223, 0.78) 12%, rgba(255, 226, 248, 0.36) 24%, transparent 40%),
+        linear-gradient(116deg, transparent 0 22%, rgba(203, 184, 255, 0.64) 28%, rgba(188, 244, 255, 0.32) 42%, transparent 58%),
+        linear-gradient(128deg, transparent 0 36%, rgba(255, 236, 174, 0.58) 42%, rgba(255, 212, 234, 0.24) 54%, transparent 70%);
+      filter: blur(0.2px);
+      transform: skewY(-4deg);
+    }
+
+    body.theme-ophelia .standing-stones {
+      bottom: 1.4rem;
+      height: 13rem;
+      opacity: 0.92;
+    }
+
+    body.theme-ophelia .stone {
+      width: clamp(3.6rem, 5vw, 4.8rem);
+      height: clamp(7.2rem, 14vw, 11rem);
+      border-radius: 58% 42% 48% 52% / 14% 14% 8% 8%;
+      background:
+        linear-gradient(160deg, rgba(255, 255, 255, 0.9), rgba(255, 211, 240, 0.88) 34%, rgba(204, 242, 255, 0.88) 70%, rgba(255, 246, 196, 0.86));
+      border: 1px solid rgba(255, 255, 255, 0.84);
+      box-shadow:
+        0 0.8rem 1.6rem rgba(182, 120, 188, 0.18),
+        inset 0.55rem 0.35rem 1rem rgba(255, 255, 255, 0.72);
+    }
+
+    body.theme-ophelia .stone:nth-child(2),
+    body.theme-ophelia .stone:nth-child(5) {
+      height: 12.2rem;
+    }
+
+    body.theme-ophelia .stone:nth-child(1)::before,
+    body.theme-ophelia .stone:nth-child(2)::before,
+    body.theme-ophelia .stone:nth-child(3)::before,
+    body.theme-ophelia .stone:nth-child(4)::before,
+    body.theme-ophelia .stone:nth-child(5)::before,
+    body.theme-ophelia .stone:nth-child(6)::before {
+      content: "";
+      position: absolute;
+      inset: 18% 22%;
+      border-radius: 999px 999px 28% 28%;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.94), rgba(255,184,221,0.86) 52%, rgba(173, 234, 255, 0.78));
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,0.7),
+        0 0 1.1rem rgba(255, 170, 221, 0.34);
+      clip-path: polygon(46% 0%, 62% 17%, 88% 18%, 69% 36%, 76% 62%, 50% 48%, 24% 62%, 31% 36%, 12% 18%, 38% 17%);
+      opacity: 0.96;
+    }
+
+    body.theme-ophelia .chariot-wheel {
+      right: 5vw;
+      bottom: 2rem;
+      width: 8rem;
+      height: 8rem;
+      opacity: 0.9;
+      border: none;
+      background:
+        radial-gradient(circle at 50% 50%, rgba(255,255,255,0.95) 0 0.72rem, transparent 0.9rem),
+        radial-gradient(circle at 50% 50%, transparent 0 2rem, rgba(255, 188, 227, 0.8) 2.06rem 2.26rem, transparent 2.34rem),
+        radial-gradient(circle at 50% 50%, transparent 0 3.42rem, rgba(181, 234, 255, 0.86) 3.5rem 3.72rem, transparent 3.84rem),
+        conic-gradient(from 0deg,
+          rgba(255, 188, 227, 0.86) 0deg 18deg,
+          transparent 18deg 42deg,
+          rgba(188, 244, 255, 0.84) 42deg 60deg,
+          transparent 60deg 84deg,
+          rgba(255, 235, 170, 0.88) 84deg 102deg,
+          transparent 102deg 126deg,
+          rgba(212, 190, 255, 0.84) 126deg 144deg,
+          transparent 144deg 168deg,
+          rgba(255, 188, 227, 0.86) 168deg 186deg,
+          transparent 186deg 210deg,
+          rgba(188, 244, 255, 0.84) 210deg 228deg,
+          transparent 228deg 252deg,
+          rgba(255, 235, 170, 0.88) 252deg 270deg,
+          transparent 270deg 294deg,
+          rgba(212, 190, 255, 0.84) 294deg 312deg,
+          transparent 312deg 336deg,
+          rgba(255, 188, 227, 0.86) 336deg 360deg);
+      box-shadow:
+        0 0 1.4rem rgba(240, 148, 210, 0.32),
+        inset 0 0 1rem rgba(255,255,255,0.6);
+    }
+
+    body.theme-ophelia h1 {
+      color: #8a2b74;
+      text-shadow:
+        0 0 1.2rem rgba(255, 198, 231, 0.92),
+        0 0 2rem rgba(199, 236, 255, 0.52);
+    }
+
+    body.theme-ophelia .subtitle,
+    body.theme-ophelia .status,
+    body.theme-ophelia .precision-label,
+    body.theme-ophelia label,
+    body.theme-ophelia .help-card,
+    body.theme-ophelia .mobile-panel {
+      color: #5d2b67;
+    }
+
+    body.theme-ophelia .status {
+      background: rgba(255,255,255,0.64);
+      border-color: rgba(247, 168, 217, 0.56);
+      box-shadow: 0 0.5rem 1.2rem rgba(191, 132, 188, 0.16);
+    }
+
+    body.theme-ophelia .lab-topbar,
+    body.theme-ophelia #workspacePanel,
+    body.theme-ophelia #resultPanel,
+    body.theme-ophelia .help-card,
+    body.theme-ophelia .mobile-panel,
+    body.theme-ophelia .mode-panel,
+    body.theme-ophelia .value-card,
+    body.theme-ophelia .rendered,
+    body.theme-ophelia .raw-block,
+    body.theme-ophelia textarea,
+    body.theme-ophelia select {
+      background: linear-gradient(180deg, rgba(255,255,255,0.82), rgba(255,247,253,0.66));
+      border-color: rgba(230, 167, 216, 0.44);
+      box-shadow: 0 0.9rem 2rem rgba(179, 129, 179, 0.12);
+      color: #421c4f;
+    }
+
+    body.theme-ophelia textarea,
+    body.theme-ophelia select,
+    body.theme-ophelia .raw-block,
+    body.theme-ophelia code {
+      color: #51245e;
+    }
+
+    body.theme-ophelia .mode-tab,
+    body.theme-ophelia .card-action,
+    body.theme-ophelia button {
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.92), rgba(255,226,246,0.92));
+      border-color: rgba(234, 154, 214, 0.62);
+      color: #7d2d7b;
+      box-shadow: 0 0.4rem 1rem rgba(198, 144, 194, 0.16);
+    }
+
+    body.theme-ophelia .mode-tab.active,
+    body.theme-ophelia .card-action:hover,
+    body.theme-ophelia button:hover {
+      background:
+        linear-gradient(180deg, rgba(255, 238, 248, 0.98), rgba(213, 244, 255, 0.96));
+      color: #5b2081;
+      transform: translateY(-1px);
+    }
+
+    body.theme-ophelia .mode-tab.active {
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,0.84),
+        0 0.7rem 1.5rem rgba(171, 214, 255, 0.26);
+    }
+
+    body.theme-ophelia .rendered {
+      background:
+        radial-gradient(circle at top right, rgba(255,255,255,0.8), transparent 8rem),
+        linear-gradient(180deg, rgba(255,255,255,0.92), rgba(255,245,252,0.82));
+    }
+    """
 
 
 INDEX_HTML = r"""<!doctype html>
@@ -60,13 +302,13 @@ INDEX_HTML = r"""<!doctype html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>MARS Lab</title>
+  <title>__LAB_NAME__</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png">
   <link rel="manifest" href="/manifest.webmanifest">
-  <meta name="theme-color" content="#071913">
+  <meta name="theme-color" content="__THEME_COLOR__">
   <style>
     :root {
       color-scheme: light;
@@ -259,6 +501,78 @@ INDEX_HTML = r"""<!doctype html>
       padding: 0.75rem clamp(1rem, 3vw, 2rem) 2rem;
     }
 
+    .lab-topbar {
+      grid-column: 1 / -1;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.8rem;
+      padding: 0.35rem 0 0.2rem;
+    }
+
+    .lab-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.7rem;
+      align-items: center;
+    }
+
+    .precision-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 0.45rem;
+      padding: 0.35rem 0 0.2rem;
+    }
+
+    .precision-label {
+      color: var(--muted);
+      font: 0.72rem/1.1 "Cascadia Code", "Fira Code", "DejaVu Sans Mono", monospace;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .mode-tab {
+      border: 1px solid rgba(233, 244, 239, 0.24);
+      border-radius: 999px;
+      padding: 0.78rem 1.15rem;
+      color: #d9ead6;
+      background:
+        linear-gradient(180deg, rgba(12, 41, 31, 0.82), rgba(7, 23, 18, 0.82));
+      font: 0.86rem/1.1 "Cascadia Code", "Fira Code", "DejaVu Sans Mono", monospace;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition:
+        transform 160ms ease,
+        border-color 160ms ease,
+        background 160ms ease,
+        box-shadow 160ms ease,
+        color 160ms ease;
+    }
+
+    .mode-tab:hover {
+      transform: translateY(-1px);
+      border-color: rgba(233, 244, 239, 0.38);
+      color: #f7fff1;
+    }
+
+    .mode-tab:focus-visible {
+      outline: 0;
+      border-color: color-mix(in srgb, var(--accent), var(--line) 25%);
+      box-shadow: 0 0 0 3px rgba(113, 198, 180, 0.18);
+    }
+
+    .mode-tab.active {
+      border-color: rgba(227, 180, 87, 0.76);
+      color: #10190f;
+      background:
+        linear-gradient(135deg, rgba(233, 187, 90, 0.96), rgba(140, 216, 184, 0.94));
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.22);
+    }
+
     section {
       background: rgba(8, 29, 22, 0.78);
       border: 2px solid rgba(233, 244, 239, 0.34);
@@ -296,6 +610,64 @@ INDEX_HTML = r"""<!doctype html>
       color: var(--code);
       background: transparent;
       font: 1.05rem/1.5 "Cascadia Code", "Fira Code", "DejaVu Sans Mono", monospace;
+    }
+
+    .secondary-editor {
+      min-height: 6.5rem;
+      border-top: 1px solid rgba(233, 244, 239, 0.12);
+      border-bottom: 1px solid rgba(233, 244, 239, 0.12);
+      background: rgba(0, 0, 0, 0.08);
+    }
+
+    .mode-panel {
+      display: grid;
+      gap: 0.55rem;
+      padding: 0 1rem 1rem;
+    }
+
+    .mode-panel label {
+      color: #bed3c0;
+      font: 0.78rem/1.2 "Cascadia Code", "DejaVu Sans Mono", monospace;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .mode-panel select {
+      width: 100%;
+      border: 1px solid rgba(233, 244, 239, 0.28);
+      border-radius: 999px;
+      outline: 0;
+      padding: 0.65rem 0.9rem;
+      color: #f8fff8;
+      background: linear-gradient(180deg, rgba(16, 51, 38, 0.96), rgba(9, 28, 21, 0.96));
+      font: 0.95rem/1.25 "Cascadia Code", "Fira Code", "DejaVu Sans Mono", monospace;
+      appearance: none;
+      -webkit-appearance: none;
+      background-image:
+        linear-gradient(45deg, transparent 50%, rgba(233, 244, 239, 0.88) 50%),
+        linear-gradient(135deg, rgba(233, 244, 239, 0.88) 50%, transparent 50%);
+      background-position:
+        calc(100% - 1.25rem) calc(50% - 0.12rem),
+        calc(100% - 0.9rem) calc(50% - 0.12rem);
+      background-size: 0.38rem 0.38rem, 0.38rem 0.38rem;
+      background-repeat: no-repeat;
+      padding-right: 2.4rem;
+    }
+
+    .mode-panel select:focus {
+      border-color: color-mix(in srgb, var(--accent), var(--line) 25%);
+      box-shadow: 0 0 0 3px rgba(113, 198, 180, 0.18);
+    }
+
+    .mode-panel select option {
+      color: #081b14;
+      background: #f3f8f2;
+    }
+
+    .mode-hint {
+      margin: -0.15rem 0 0;
+      color: var(--muted);
+      font-size: 0.88rem;
     }
 
     .target-row {
@@ -577,6 +949,27 @@ INDEX_HTML = r"""<!doctype html>
       overflow: hidden;
     }
 
+    .output-grid.card-expanded {
+      min-height: clamp(26rem, 68vh, 54rem);
+      grid-template-rows: minmax(0, 1fr);
+    }
+
+    .output-grid.card-expanded .card:not(.expanded-card) {
+      display: none;
+    }
+
+    .card.expanded-card {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .card.expanded-card > pre,
+    .card.expanded-card > .rendered {
+      flex: 1 1 auto;
+      min-height: 0;
+    }
+
     .card-title {
       display: flex;
       align-items: center;
@@ -638,6 +1031,11 @@ INDEX_HTML = r"""<!doctype html>
       grid-column: 3;
     }
 
+    .top-card-actions {
+      justify-self: end;
+      grid-column: 3;
+    }
+
     .value-title {
       display: grid;
       grid-template-columns: 1fr auto 1fr;
@@ -654,11 +1052,56 @@ INDEX_HTML = r"""<!doctype html>
       grid-column: 3;
     }
 
+    .value-card-actions {
+      justify-self: end;
+      grid-column: 3;
+    }
+
     pre {
       margin: 0;
       padding: 0.9rem;
       overflow: auto;
       min-height: 2.75rem;
+    }
+
+    .card pre,
+    .card .rendered,
+    .matrix-pretty {
+      scrollbar-width: thin;
+      scrollbar-color: rgba(227, 180, 87, 0.72) rgba(8, 29, 22, 0.62);
+    }
+
+    .card pre::-webkit-scrollbar,
+    .card .rendered::-webkit-scrollbar,
+    .matrix-pretty::-webkit-scrollbar {
+      width: 0.72rem;
+      height: 0.72rem;
+    }
+
+    .card pre::-webkit-scrollbar-track,
+    .card .rendered::-webkit-scrollbar-track,
+    .matrix-pretty::-webkit-scrollbar-track {
+      border-radius: 999px;
+      background:
+        linear-gradient(180deg, rgba(8, 29, 22, 0.76), rgba(18, 53, 39, 0.58));
+      box-shadow: inset 0 0 0 1px rgba(233, 244, 239, 0.12);
+    }
+
+    .card pre::-webkit-scrollbar-thumb,
+    .card .rendered::-webkit-scrollbar-thumb,
+    .matrix-pretty::-webkit-scrollbar-thumb {
+      border: 2px solid rgba(8, 29, 22, 0.82);
+      border-radius: 999px;
+      background:
+        linear-gradient(135deg, rgba(227, 180, 87, 0.94), rgba(113, 198, 180, 0.82));
+      box-shadow: inset 0 0 0 1px rgba(255, 250, 220, 0.18);
+    }
+
+    .card pre::-webkit-scrollbar-thumb:hover,
+    .card .rendered::-webkit-scrollbar-thumb:hover,
+    .matrix-pretty::-webkit-scrollbar-thumb:hover {
+      background:
+        linear-gradient(135deg, rgba(247, 205, 112, 0.98), rgba(139, 222, 195, 0.92));
     }
 
     pre {
@@ -673,6 +1116,51 @@ INDEX_HTML = r"""<!doctype html>
       white-space: pre-wrap;
       overflow-wrap: anywhere;
       word-break: break-all;
+    }
+
+    .matrix-pretty {
+      overflow-x: auto;
+      overflow-y: visible;
+      white-space: pre-wrap;
+      font: 1.05rem/1.5 "Cascadia Code", "DejaVu Sans Mono", monospace;
+    }
+
+    .matrix-display {
+      display: inline-grid;
+      grid-template-columns: auto auto auto;
+      align-items: stretch;
+      gap: 0.45rem;
+      color: var(--code);
+      font-variant-ligatures: none;
+    }
+
+    .matrix-bracket {
+      display: flex;
+      align-items: center;
+      color: #f0f5d6;
+      font: 2.7rem/1 Georgia, "Times New Roman", serif;
+      transform: scaleY(1.18);
+    }
+
+    .matrix-grid {
+      display: grid;
+      align-items: center;
+      gap: 0.3rem 1.25rem;
+      padding: 0.35rem 0.1rem;
+    }
+
+    .matrix-cell {
+      min-width: 2.5rem;
+      text-align: right;
+      white-space: nowrap;
+      font: 1.22rem/1.45 "Cascadia Code", "DejaVu Sans Mono", monospace;
+    }
+
+    .matrix-section-heading {
+      color: var(--cream);
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: lowercase;
     }
 
     .rendered {
@@ -763,6 +1251,10 @@ INDEX_HTML = r"""<!doctype html>
       display: none;
     }
 
+    .card.hidden {
+      display: none !important;
+    }
+
     @media (max-width: 900px) {
       body {
         font-size: 15px;
@@ -786,6 +1278,14 @@ INDEX_HTML = r"""<!doctype html>
         grid-template-columns: 1fr;
         gap: 0.75rem;
         padding: 0.5rem 0.75rem 1.25rem;
+      }
+
+      .lab-topbar {
+        align-items: stretch;
+      }
+
+      .precision-toolbar {
+        justify-content: flex-start;
       }
 
       section {
@@ -1017,9 +1517,10 @@ INDEX_HTML = r"""<!doctype html>
         padding: 0.8rem;
       }
     }
+__THEME_OVERRIDES__
   </style>
 </head>
-<body>
+<body class="__BODY_CLASS__">
   <div class="celtic-backdrop" aria-hidden="true">
     <div class="aurora"></div>
     <div class="standing-stones">
@@ -1034,8 +1535,8 @@ INDEX_HTML = r"""<!doctype html>
   </div>
   <header>
     <div>
-      <h1>MARS Lab</h1>
-      <p class="subtitle">Type a MARS expression on the left. The tool evaluates it through your built scratch binary and renders the generated TeX on the right.</p>
+      <h1>__LAB_NAME__</h1>
+      <p class="subtitle" id="subtitle">__LAB_SUBTITLE__</p>
     </div>
     <div class="header-side">
       <div class="status" id="status">Ready</div>
@@ -1057,11 +1558,53 @@ INDEX_HTML = r"""<!doctype html>
     </div>
   </header>
   <main>
-    <section>
-      <div class="panel-head">
-        <h2>Expression</h2>
+    <div class="lab-topbar">
+      <div class="lab-tabs" role="tablist" aria-label="__LAB_NAME__ mode selector">
+        <button class="mode-tab active" id="modeTabExpression" type="button" role="tab" aria-selected="true" aria-controls="workspacePanel" data-mode="expression">Expression</button>
+        <button class="mode-tab" id="modeTabMatrix" type="button" role="tab" aria-selected="false" aria-controls="workspacePanel" data-mode="matrix">Matrix</button>
+        <button class="mode-tab" id="modeTabIntegrator" type="button" role="tab" aria-selected="false" aria-controls="workspacePanel" data-mode="integrator">Integrator</button>
       </div>
-      <textarea id="expr" spellcheck="false">__INITIAL_EXPRESSION__</textarea>
+      <div class="precision-toolbar" aria-label="Precision controls">
+        <span class="precision-label">Precision</span>
+        <button class="card-action" id="lessPrecision" type="button">Less precision</button>
+        <button class="card-action" id="morePrecision" type="button">More precision</button>
+      </div>
+    </div>
+    <section id="workspacePanel">
+      <div class="panel-head">
+        <h2 id="leftPaneTitle">Workspace</h2>
+      </div>
+      <textarea id="expr" spellcheck="false" aria-labelledby="leftPaneTitle">__INITIAL_EXPRESSION__</textarea>
+      <div class="mode-panel hidden" id="matrixControls">
+        <label for="matrixOperation">Matrix operation</label>
+        <select id="matrixOperation">
+          <option value="eval">Evaluate</option>
+          <option value="inverse" selected>Inverse</option>
+          <option value="eigenvalues">Eigenvalues</option>
+          <option value="eigendecompose">Eigendecompose</option>
+          <option value="charpoly">Characteristic polynomial</option>
+          <option value="det">Determinant</option>
+          <option value="trace">Trace</option>
+          <option value="rank">Rank</option>
+          <option value="simplify">Simplify symbolic</option>
+          <option value="solve">Solve A X = B</option>
+        </select>
+        <label class="hidden" for="matrixOperand" id="matrixOperandLabel">Right-hand side matrix</label>
+        <textarea class="hidden secondary-editor" id="matrixOperand" spellcheck="false" placeholder="(1; 0)"></textarea>
+      </div>
+      <div class="mode-panel hidden" id="integratorControls">
+        <label for="integratorBounds">Bounds</label>
+        <textarea class="secondary-editor" id="integratorBounds" spellcheck="false">x = 0 .. 1</textarea>
+        <label for="integratorIntervalCap">Work budget ceiling</label>
+        <select id="integratorIntervalCap">
+          <option value="500">Up to 500</option>
+          <option value="5000" selected>Up to 5,000</option>
+          <option value="20000">Up to 20,000</option>
+          <option value="50000">Up to 50,000</option>
+          <option value="100000">Up to 100,000</option>
+        </select>
+        <p class="mode-hint">One bound per line, for example <code>x = 0 .. pi</code> or <code>y = -1 .. 1</code>. The integrator stops early only after the working precision is reached; otherwise it keeps going until this ceiling.</p>
+      </div>
       <div class="target-row hidden" id="targetRow">
         <label for="goalTarget">Target</label>
         <input id="goalTarget" spellcheck="false" value="0">
@@ -1084,44 +1627,52 @@ INDEX_HTML = r"""<!doctype html>
         <h2 id="rightPaneTitle">Result</h2>
       </div>
       <div class="output-grid" id="resultPane">
-        <div class="card">
+        <div class="card result-card">
           <div class="card-title expandable-title">
-            <span>Rendered TeX</span>
+            <span id="renderedTitle">Rendered TeX</span>
             <span class="card-actions digit-actions">
               <button class="card-action more-digits hidden" id="renderedMore">Show more digits</button>
             </span>
-            <button class="card-action copy-result top-card-copy" id="renderedCopy" data-copy-target="rendered">Copy</button>
+            <span class="card-actions top-card-actions">
+              <button class="card-action expand-card" data-expand-card>Expand</button>
+              <button class="card-action copy-result" id="renderedCopy" data-copy-target="rendered">Copy</button>
+            </span>
           </div>
           <div class="rendered" id="rendered"></div>
         </div>
-        <div class="card mobile-result-extra">
+        <div class="card result-card mobile-result-extra">
           <div class="card-title expandable-title">
-            <span>Expression</span>
+            <span id="parsedTitle">Expression</span>
             <span class="card-actions digit-actions">
               <button class="card-action more-digits hidden" id="parsedMore">Show more digits</button>
             </span>
-            <button class="card-action copy-result top-card-copy" data-copy-target="expression">Copy</button>
+            <span class="card-actions top-card-actions">
+              <button class="card-action expand-card" data-expand-card>Expand</button>
+              <button class="card-action copy-result" data-copy-target="expression">Copy</button>
+            </span>
           </div>
           <pre id="parsed"></pre>
         </div>
-        <div class="card mobile-result-extra">
+        <div class="card result-card mobile-result-extra">
           <div class="card-title expandable-title">
-            <span>Function</span>
+            <span id="functionTitle">Function</span>
             <span class="card-actions digit-actions">
               <button class="card-action more-digits hidden" id="functionMore">Show more digits</button>
             </span>
-            <button class="card-action copy-result top-card-copy" data-copy-target="function">Copy</button>
+            <span class="card-actions top-card-actions">
+              <button class="card-action expand-card" data-expand-card>Expand</button>
+              <button class="card-action copy-result" data-copy-target="function">Copy</button>
+            </span>
           </div>
           <pre id="functionStyle"></pre>
         </div>
-        <div class="card">
+        <div class="card result-card" id="valueCard">
           <div class="card-title value-title">
-            <span>Value</span>
-            <span class="card-actions precision-actions">
-              <button class="card-action" id="lessPrecision">Less precision</button>
-              <button class="card-action" id="morePrecision">More precision</button>
+            <span id="valueTitle">Value</span>
+            <span class="card-actions value-card-actions">
+              <button class="card-action expand-card" data-expand-card>Expand</button>
+              <button class="card-action copy-result" data-copy-target="value">Copy</button>
             </span>
-            <button class="card-action copy-result value-copy" data-copy-target="value">Copy</button>
           </div>
           <pre id="value"></pre>
         </div>
@@ -1230,6 +1781,16 @@ INDEX_HTML = r"""<!doctype html>
 
   <script>
     const expr = document.getElementById('expr');
+    const subtitle = document.getElementById('subtitle');
+    const leftPaneTitle = document.getElementById('leftPaneTitle');
+    const modeTabs = Array.from(document.querySelectorAll('.mode-tab'));
+    const matrixControls = document.getElementById('matrixControls');
+    const matrixOperation = document.getElementById('matrixOperation');
+    const matrixOperand = document.getElementById('matrixOperand');
+    const matrixOperandLabel = document.getElementById('matrixOperandLabel');
+    const integratorControls = document.getElementById('integratorControls');
+    const integratorBounds = document.getElementById('integratorBounds');
+    const integratorIntervalCap = document.getElementById('integratorIntervalCap');
     const run = document.getElementById('run');
     const back = document.getElementById('back');
     const forward = document.getElementById('forward');
@@ -1255,18 +1816,25 @@ INDEX_HTML = r"""<!doctype html>
     const resultPane = document.getElementById('resultPane');
     const helpPane = document.getElementById('helpPane');
     const rendered = document.getElementById('rendered');
+    const renderedTitle = document.getElementById('renderedTitle');
     const renderedCopy = document.getElementById('renderedCopy');
     const renderedMore = document.getElementById('renderedMore');
     const parsed = document.getElementById('parsed');
+    const parsedTitle = document.getElementById('parsedTitle');
     const parsedMore = document.getElementById('parsedMore');
     const functionStyle = document.getElementById('functionStyle');
+    const functionTitle = document.getElementById('functionTitle');
     const functionMore = document.getElementById('functionMore');
+    const valueCard = document.getElementById('valueCard');
     const value = document.getElementById('value');
+    const valueTitle = document.getElementById('valueTitle');
     const copyButtons = Array.from(document.querySelectorAll('.copy-result'));
     const moreDigitButtons = Array.from(document.querySelectorAll('.more-digits'));
+    const expandCardButtons = Array.from(document.querySelectorAll('[data-expand-card]'));
     let lastTex = '';
     let lastDerivativeExpression = '';
     let currentVariables = [];
+    let currentBindingKinds = new Map();
     let currentDifferentiable = true;
     let expressionHistory = [];
     let forwardHistory = [];
@@ -1274,7 +1842,7 @@ INDEX_HTML = r"""<!doctype html>
     let fullExpressionText = '';
     let displayedExpressionText = '';
 
-    if (controlToken && window.location.search.includes('mars_lab_control=')) {
+    if (controlToken && window.location.search.includes('__CONTROL_QUERY_PREFIX__')) {
       window.history.replaceState(null, '', window.location.pathname + window.location.hash);
     }
     let lastEvaluationInputText = '';
@@ -1283,9 +1851,30 @@ INDEX_HTML = r"""<!doctype html>
     const DOUBLE_PRECISION_DIGITS = 17;
     const QFLOAT_PRECISION_BITS = 106;
     const MAX_PRECISION_BITS = 1048576;
+    const MODE_DEFAULT_PRECISION_BITS = {
+      expression: 256,
+      matrix: 256,
+      integrator: DOUBLE_PRECISION_BITS
+    };
+    const modePrecisionBits = {
+      expression: MODE_DEFAULT_PRECISION_BITS.expression,
+      matrix: MODE_DEFAULT_PRECISION_BITS.matrix,
+      integrator: MODE_DEFAULT_PRECISION_BITS.integrator
+    };
     const START_FORBIDDEN_PATTERN = /[=,;|{}]/;
     const COMPACT_BINDING_VALUE_LIMIT = 20;
     const COMPACT_BINDING_VALUE_KEEP = 16;
+    const DEFAULT_EXPRESSION_TEXT = __DEFAULT_EXPRESSION__;
+    const DEFAULT_MATRIX_TEXT = __DEFAULT_MATRIX__;
+    const DEFAULT_INTEGRATOR_TEXT = __DEFAULT_INTEGRATOR__;
+    const DEFAULT_INTEGRATOR_BOUNDS_TEXT = __DEFAULT_INTEGRATOR_BOUNDS__;
+    const DEFAULT_INTEGRATOR_INTERVAL_CAP = __DEFAULT_INTEGRATOR_INTERVAL_CAP__;
+    let currentLabMode = 'expression';
+    const modeEditorText = {
+      expression: DEFAULT_EXPRESSION_TEXT,
+      matrix: DEFAULT_MATRIX_TEXT,
+      integrator: DEFAULT_INTEGRATOR_TEXT
+    };
 
     function precisionDigitsForBits(bits) {
       if (bits <= DOUBLE_PRECISION_BITS)
@@ -1294,7 +1883,9 @@ INDEX_HTML = r"""<!doctype html>
     }
 
     function requestedPrecisionBits() {
-      return Math.max(DOUBLE_PRECISION_BITS, Math.min(MAX_PRECISION_BITS, workingPrecisionBits));
+      const mode = currentMode();
+      const bits = modePrecisionBits[mode] ?? workingPrecisionBits;
+      return Math.max(DOUBLE_PRECISION_BITS, Math.min(MAX_PRECISION_BITS, bits));
     }
 
     function precisionStatusText() {
@@ -1305,6 +1896,108 @@ INDEX_HTML = r"""<!doctype html>
 
     function setStatus(text) {
       statusEl.textContent = `${text} · ${precisionStatusText()}`;
+    }
+
+    function currentMode() {
+      return currentLabMode;
+    }
+
+    function syncModeTabs() {
+      modeTabs.forEach((tab) => {
+        const active = tab.dataset.mode === currentLabMode;
+        tab.classList.toggle('active', active);
+        tab.setAttribute('aria-selected', active ? 'true' : 'false');
+        tab.tabIndex = active ? 0 : -1;
+      });
+    }
+
+    function setMode(mode, options = {}) {
+      const nextMode = mode === 'matrix' || mode === 'integrator' ? mode : 'expression';
+      const changed = nextMode !== currentLabMode;
+      currentLabMode = nextMode;
+      workingPrecisionBits = modePrecisionBits[currentLabMode] || workingPrecisionBits;
+      syncModeTabs();
+      if (!changed && !options.force)
+        return false;
+      return true;
+    }
+
+    function captureCurrentModeEditor() {
+      const mode = currentMode();
+      if (mode === 'expression')
+        modeEditorText.expression = currentExpressionText() || expr.value.trim() || modeEditorText.expression;
+      else if (mode === 'matrix') {
+        modeEditorText.matrix = expr.value.trim() || modeEditorText.matrix;
+        saveLastMatrixState();
+      } else {
+        modeEditorText.integrator = expr.value.trim() || modeEditorText.integrator;
+      }
+    }
+
+    function restoreModeEditor(mode) {
+      if (mode === 'expression') {
+        setExpressionEditor(modeEditorText.expression || DEFAULT_EXPRESSION_TEXT);
+      } else if (mode === 'matrix') {
+        expr.value = modeEditorText.matrix || DEFAULT_MATRIX_TEXT;
+        clearExpressionSource();
+      } else {
+        expr.value = modeEditorText.integrator || DEFAULT_INTEGRATOR_TEXT;
+        clearExpressionSource();
+      }
+    }
+
+    function setResultTitles(renderedText, parsedText, functionText, valueText) {
+      renderedTitle.textContent = renderedText;
+      parsedTitle.textContent = parsedText;
+      functionTitle.textContent = functionText;
+      valueTitle.textContent = valueText;
+    }
+
+    function setValueCardVisible(visible) {
+      if (!valueCard)
+        return;
+      if (!visible && valueCard.classList.contains('expanded-card'))
+        collapseResultCards();
+      valueCard.classList.toggle('hidden', !visible);
+    }
+
+    function syncMatrixControls() {
+      const needsOperand = currentMode() === 'matrix' && matrixOperation.value === 'solve';
+      matrixOperand.classList.toggle('hidden', !needsOperand);
+      matrixOperandLabel.classList.toggle('hidden', !needsOperand);
+    }
+
+    function syncModeUI() {
+      const mode = currentMode();
+      const expressionMode = mode === 'expression';
+      const matrixMode = mode === 'matrix';
+      const integratorMode = mode === 'integrator';
+
+      matrixControls.classList.toggle('hidden', !matrixMode);
+      integratorControls.classList.toggle('hidden', !integratorMode);
+      targetRow.classList.toggle('hidden', !expressionMode || targetRow.classList.contains('hidden'));
+      derivativeButtons.classList.toggle('hidden', !expressionMode);
+      goalSeek.classList.toggle('hidden', !expressionMode);
+
+      if (expressionMode) {
+        leftPaneTitle.textContent = 'Expression';
+        subtitle.textContent = 'Switch between expression, matrix, and integrator experiments. Each mode runs through a local MARS scratch binary and shows the result on the right.';
+        setResultTitles('Rendered TeX', 'Expression', 'Function', 'Value');
+        setValueCardVisible(true);
+      } else if (matrixMode) {
+        leftPaneTitle.textContent = 'Matrix';
+        subtitle.textContent = 'Enter a matrix expression on the left, choose an operation, and inspect both the formatted result and the raw matrix output.';
+        setResultTitles('Rendered TeX', 'Result', 'Layout', 'Summary');
+        setValueCardVisible(false);
+      } else {
+        leftPaneTitle.textContent = 'Integrator';
+        subtitle.textContent = 'Enter an integrand expression on the left and add one bound per line, such as x = 0 .. pi. The work ceiling is spent unless the requested working precision is reached first.';
+        setResultTitles('Rendered TeX', 'Integrand', 'Domain', 'Integral');
+        setValueCardVisible(true);
+      }
+
+      syncMatrixControls();
+      updateHistoryButtons();
     }
 
     function showResults() {
@@ -1331,8 +2024,15 @@ INDEX_HTML = r"""<!doctype html>
       }
     }
 
+    function variableNamesFromBindings(bindings) {
+      return (Array.isArray(bindings) ? bindings : [])
+        .filter((binding) => String(binding.kind || 'variable') !== 'constant')
+        .map((binding) => String(binding.name || '').trim())
+        .filter(Boolean);
+    }
+
     function showTargetEntry() {
-      const variables = variablesFromExpression(currentExpressionText());
+      const variables = currentVariables.slice();
       renderGoalStartFields(variables);
       targetRow.classList.remove('hidden');
       goalSeek.textContent = 'Run goal seek';
@@ -1454,7 +2154,7 @@ INDEX_HTML = r"""<!doctype html>
     }
 
     function canGoalSeek() {
-      return variablesFromExpression(currentExpressionText()).length > 0;
+      return currentVariables.length > 0;
     }
 
     function derivativeExpressionFromLine(line) {
@@ -1765,6 +2465,7 @@ INDEX_HTML = r"""<!doctype html>
     function clearVariableValues() {
       variableValues.replaceChildren();
       variableValues.classList.add('hidden');
+      currentBindingKinds = new Map();
     }
 
     function refreshVariableValuesFromEditor() {
@@ -1775,6 +2476,7 @@ INDEX_HTML = r"""<!doctype html>
     function renderVariableValues(bindings) {
       variableValues.replaceChildren();
       bindingValueCache = new Map();
+      currentBindingKinds = new Map();
       if (!bindings.length) {
         variableValues.classList.add('hidden');
         return;
@@ -1782,6 +2484,7 @@ INDEX_HTML = r"""<!doctype html>
 
       bindings.forEach((binding) => {
         const kind = binding.kind || 'variable';
+        currentBindingKinds.set(binding.name, kind);
         const displayValue = displayValueForBinding(binding);
         const fullValue = fullValueForBinding(binding);
         if (kind !== 'constant' && fullValue)
@@ -1937,25 +2640,82 @@ INDEX_HTML = r"""<!doctype html>
         ? evaluatedBindings
         : compact.bindings;
       renderVariableValues(bindings || []);
+      currentVariables = variableNamesFromBindings(bindings || []);
+      renderDerivativeButtons(currentVariables);
     }
 
-    async function loadLastExpression() {
+    function validPrecisionBits(bits, fallback) {
+      const parsed = parseInt(String(bits), 10);
+      if (!Number.isFinite(parsed))
+        return fallback;
+      return Math.max(DOUBLE_PRECISION_DIGITS, Math.min(MAX_PRECISION_BITS, parsed));
+    }
+
+    function validIntegratorIntervalCap(value) {
+      const parsed = parseInt(String(value), 10);
+      if (!Number.isFinite(parsed))
+        return DEFAULT_INTEGRATOR_INTERVAL_CAP;
+      const allowed = [500, 5000, 20000, 50000, 100000];
+      return allowed.includes(parsed) ? parsed : DEFAULT_INTEGRATOR_INTERVAL_CAP;
+    }
+
+    function validMatrixOperation(value) {
+      const operation = String(value || '').trim();
+      const allowed = Array.from(matrixOperation.options).map((option) => option.value);
+      return allowed.includes(operation) ? operation : 'inverse';
+    }
+
+    function applySavedState(data) {
+      const saved = String(data.expression || '').trim();
+      if (saved && !saved.includes('...')) {
+        modeEditorText.expression = saved;
+        setExpressionEditor(saved);
+      }
+
+      const savedMatrix = String(data.matrix || '').trim();
+      if (savedMatrix && !savedMatrix.includes('...'))
+        modeEditorText.matrix = savedMatrix;
+
+      const savedMatrixOperation = validMatrixOperation(data.matrix_operation);
+      if (matrixOperation)
+        matrixOperation.value = savedMatrixOperation;
+
+      const savedMatrixOperand = String(data.matrix_operand || '').trim();
+      if (matrixOperand)
+        matrixOperand.value = savedMatrixOperand;
+
+      const savedIntegrator = String(data.integrator_expression || '').trim();
+      if (savedIntegrator && !savedIntegrator.includes('...')) {
+        modeEditorText.integrator = savedIntegrator;
+        expr.dataset.savedIntegratorExpression = savedIntegrator;
+      }
+
+      const savedBounds = String(data.integrator_bounds || '').trim();
+      if (savedBounds)
+        integratorBounds.value = savedBounds;
+
+      const savedCap = validIntegratorIntervalCap(data.integrator_interval_cap);
+      if (integratorIntervalCap)
+        integratorIntervalCap.value = String(savedCap);
+
+      if (data.precision_bits && typeof data.precision_bits === 'object') {
+        Object.entries(data.precision_bits).forEach(([mode, bits]) => {
+          if (modePrecisionBits[mode] !== undefined)
+            modePrecisionBits[mode] = validPrecisionBits(bits, modePrecisionBits[mode]);
+        });
+      } else if (data.precision_bits !== undefined) {
+        modePrecisionBits.expression = validPrecisionBits(data.precision_bits, modePrecisionBits.expression);
+      }
+      workingPrecisionBits = modePrecisionBits[currentMode()] || workingPrecisionBits;
+    }
+
+    async function loadLastState() {
       try {
         const response = await fetch('/state');
         const data = await response.json();
-        const saved = String(data.expression || '').trim();
-        if (saved) {
-          if (!saved.includes('...')) {
-            setExpressionEditor(saved);
-            return;
-          }
-          const localSaved = localStorage.getItem('mars.exprLab.lastExpression');
-          if (localSaved && !localSaved.includes('...')) {
-            setExpressionEditor(localSaved);
-            return;
-          }
+        applySavedState(data || {});
+        if (String(data.expression || '').trim())
           return;
-        }
       } catch (_) {
         // Fall back to localStorage below.
       }
@@ -1964,9 +2724,42 @@ INDEX_HTML = r"""<!doctype html>
         const saved = localStorage.getItem('mars.exprLab.lastExpression');
         if (saved && !saved.includes('...'))
           setExpressionEditor(saved);
+        const matrixText = localStorage.getItem('mars.exprLab.lastMatrix');
+        if (matrixText && !matrixText.includes('...'))
+          modeEditorText.matrix = matrixText;
+        const matrixOperationText = localStorage.getItem('mars.exprLab.lastMatrixOperation');
+        if (matrixOperation && matrixOperationText)
+          matrixOperation.value = validMatrixOperation(matrixOperationText);
+        const matrixOperandText = localStorage.getItem('mars.exprLab.lastMatrixOperand');
+        if (matrixOperand && matrixOperandText !== null)
+          matrixOperand.value = matrixOperandText;
+        const integratorExpression = localStorage.getItem('mars.exprLab.lastIntegratorExpression');
+        if (integratorExpression && !integratorExpression.includes('...'))
+          modeEditorText.integrator = integratorExpression;
+        const integratorBoundsText = localStorage.getItem('mars.exprLab.lastIntegratorBounds');
+        if (integratorBoundsText)
+          integratorBounds.value = integratorBoundsText;
+        const integratorCap = localStorage.getItem('mars.exprLab.lastIntegratorIntervalCap');
+        if (integratorIntervalCap && integratorCap)
+          integratorIntervalCap.value = String(validIntegratorIntervalCap(integratorCap));
       } catch (_) {
         // Private browsing or locked-down webviews can disable localStorage.
       }
+    }
+
+    function saveLabState(patch) {
+      const payload = {...patch};
+      fetch('/state', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+      }).catch(() => {
+        // Persistence is helpful, not essential.
+      });
+    }
+
+    function savePrecisionState() {
+      saveLabState({precision_bits: modePrecisionBits});
     }
 
     function saveLastExpression(text) {
@@ -1986,21 +2779,68 @@ INDEX_HTML = r"""<!doctype html>
       if (!text)
         return;
 
-      fetch('/state', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({expression: text})
-      }).catch(() => {
-        // Persistence is helpful, not essential.
+      saveLabState({
+        expression: text,
+        precision_bits: modePrecisionBits
+      });
+    }
+
+    function saveLastMatrixState() {
+      const text = String(expr.value || '').trim();
+      const operation = validMatrixOperation(matrixOperation && matrixOperation.value);
+      const operand = String(matrixOperand && matrixOperand.value || '').trim();
+      if (text)
+        modeEditorText.matrix = text;
+
+      try {
+        if (text)
+          localStorage.setItem('mars.exprLab.lastMatrix', text);
+        localStorage.setItem('mars.exprLab.lastMatrixOperation', operation);
+        localStorage.setItem('mars.exprLab.lastMatrixOperand', operand);
+      } catch (_) {
+        // The lab still works fine without persistence.
+      }
+
+      saveLabState({
+        matrix: text,
+        matrix_operation: operation,
+        matrix_operand: operand,
+        precision_bits: modePrecisionBits
+      });
+    }
+
+    function saveLastIntegratorState() {
+      const text = String(expr.value || '').trim();
+      const bounds = String(integratorBounds.value || '').trim();
+      const cap = requestedIntegratorIntervalCap();
+      if (text)
+        modeEditorText.integrator = text;
+
+      try {
+        if (text)
+          localStorage.setItem('mars.exprLab.lastIntegratorExpression', text);
+        if (bounds)
+          localStorage.setItem('mars.exprLab.lastIntegratorBounds', bounds);
+        localStorage.setItem('mars.exprLab.lastIntegratorIntervalCap', String(cap));
+      } catch (_) {
+        // The lab still works fine without persistence.
+      }
+
+      saveLabState({
+        integrator_expression: text,
+        integrator_bounds: bounds,
+        integrator_interval_cap: cap,
+        precision_bits: modePrecisionBits
       });
     }
 
     function setBusy(isBusy) {
+      const expressionMode = currentMode() === 'expression';
       run.disabled = isBusy;
-      back.disabled = isBusy || expressionHistory.length === 0;
-      forward.disabled = isBusy || forwardHistory.length === 0;
-      goalSeek.disabled = isBusy || !canGoalSeek();
-      goalSeek.title = goalSeek.disabled && !isBusy
+      back.disabled = isBusy || !expressionMode || expressionHistory.length === 0;
+      forward.disabled = isBusy || !expressionMode || forwardHistory.length === 0;
+      goalSeek.disabled = isBusy || !expressionMode || !canGoalSeek();
+      goalSeek.title = goalSeek.disabled && !isBusy && expressionMode
         ? 'Goal seek needs at least one variable binding'
         : '';
       goalTarget.disabled = isBusy;
@@ -2008,7 +2848,12 @@ INDEX_HTML = r"""<!doctype html>
         input.disabled = isBusy;
       });
       lessPrecision.disabled = isBusy || atMinimumPrecision();
-      morePrecision.disabled = isBusy;
+      morePrecision.disabled = isBusy || atMaximumPrecision();
+      morePrecision.title = !isBusy && atMaximumPrecision()
+        ? 'Already at the current maximum precision setting'
+        : '';
+      if (integratorIntervalCap)
+        integratorIntervalCap.disabled = isBusy;
       copyButtons.forEach((button) => {
         button.disabled = isBusy;
       });
@@ -2027,12 +2872,17 @@ INDEX_HTML = r"""<!doctype html>
     }
 
     function updateHistoryButtons() {
-      back.disabled = expressionHistory.length === 0;
-      forward.disabled = forwardHistory.length === 0;
+      const expressionMode = currentMode() === 'expression';
+      back.disabled = !expressionMode || expressionHistory.length === 0;
+      forward.disabled = !expressionMode || forwardHistory.length === 0;
       lessPrecision.disabled = atMinimumPrecision();
-      goalSeek.disabled = !canGoalSeek();
-      goalSeek.title = goalSeek.disabled
+      morePrecision.disabled = atMaximumPrecision();
+      goalSeek.disabled = !expressionMode || !canGoalSeek();
+      goalSeek.title = goalSeek.disabled && expressionMode
         ? 'Goal seek needs at least one variable binding'
+        : '';
+      morePrecision.title = atMaximumPrecision()
+        ? 'Already at the current maximum precision setting'
         : '';
     }
 
@@ -2069,6 +2919,66 @@ INDEX_HTML = r"""<!doctype html>
       return {response, data};
     }
 
+    function parseIntegratorBoundsText(text) {
+      const bounds = [];
+      for (const rawLine of String(text || '').split(/\n+/)) {
+        const line = rawLine.trim();
+        if (!line)
+          continue;
+        const match = line.match(/^([^:=]+?)\s*(?:=|:)\s*(.+?)\s*\.\.\s*(.+)$/);
+        if (!match)
+          throw new Error(`Bad bound line: ${line}`);
+        bounds.push({
+          name: match[1].trim(),
+          lo: match[2].trim(),
+          hi: match[3].trim(),
+        });
+      }
+      if (bounds.length === 0)
+        throw new Error('Add at least one bound like x = 0 .. pi');
+      return bounds;
+    }
+
+    function requestedIntegratorIntervalCap() {
+      const raw = parseInt(String(integratorIntervalCap && integratorIntervalCap.value || DEFAULT_INTEGRATOR_INTERVAL_CAP), 10);
+      if (!Number.isFinite(raw))
+        return DEFAULT_INTEGRATOR_INTERVAL_CAP;
+      return raw;
+    }
+
+    async function fetchMatrixEvaluation() {
+      saveLastMatrixState();
+      const response = await fetch('/matrix-eval', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          matrix: expr.value.trim(),
+          operation: matrixOperation.value,
+          operand: matrixOperand.value.trim(),
+          precision: requestedValuePrecision()
+        })
+      });
+      const data = await response.json();
+      return {response, data};
+    }
+
+    async function fetchIntegratorEvaluation() {
+      const bounds = parseIntegratorBoundsText(integratorBounds.value);
+      saveLastIntegratorState();
+      const response = await fetch('/integrator-eval', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          expression: expr.value.trim(),
+          bounds,
+          precision: requestedValuePrecision(),
+          max_intervals: requestedIntegratorIntervalCap()
+        })
+      });
+      const data = await response.json();
+      return {response, data};
+    }
+
     function estimateValuePrecision() {
       const style = getComputedStyle(value);
       const canvas = estimateValuePrecision.canvas || document.createElement('canvas');
@@ -2097,8 +3007,15 @@ INDEX_HTML = r"""<!doctype html>
       return requestedPrecisionBits() <= DOUBLE_PRECISION_BITS;
     }
 
+    function atMaximumPrecision() {
+      return requestedPrecisionBits() >= MAX_PRECISION_BITS;
+    }
+
     function setRequestedPrecisionBits(bits) {
-      workingPrecisionBits = Math.max(DOUBLE_PRECISION_BITS, Math.min(MAX_PRECISION_BITS, bits));
+      const mode = currentMode();
+      const clamped = Math.max(DOUBLE_PRECISION_BITS, Math.min(MAX_PRECISION_BITS, bits));
+      modePrecisionBits[mode] = clamped;
+      workingPrecisionBits = clamped;
     }
 
     function nextPrecisionStepBits(current) {
@@ -2119,10 +3036,13 @@ INDEX_HTML = r"""<!doctype html>
 
     function copyTextForTarget(target) {
       if (target === 'rendered') return rendered.classList.contains('error') ? rendered.textContent : lastTex;
-      if (target === 'expression') return fullExpressionText || parsed.textContent;
+      if (target === 'expression') return currentMode() === 'expression' ? (fullExpressionText || parsed.textContent) : parsed.textContent;
       if (target === 'function') return functionStyle.dataset.fullText || functionStyle.textContent;
       if (target === 'value') return value.textContent;
-      if (target === 'mobile') return mobileUrl ? mobileUrl.textContent.trim() : '';
+      if (target === 'mobile') {
+        const url = mobileUrl ? mobileUrl.textContent.trim() : '';
+        return /^https?:\/\//.test(url) ? url : '';
+      }
       return '';
     }
 
@@ -2138,16 +3058,19 @@ INDEX_HTML = r"""<!doctype html>
         const data = await response.json();
         const url = String(data.url || '');
         const canControl = Boolean(data.control);
-        mobileAccess.classList.toggle('hidden', !url || !canControl);
+        mobileAccess.classList.remove('hidden');
         if (mobileTitle)
           mobileTitle.textContent = String(data.title || 'Mobile access');
         if (mobileHint)
           mobileHint.textContent = String(data.hint || '');
-        mobileUrl.textContent = url;
-        mobileQr.innerHTML = canControl ? String(data.qr || '') : '';
+        mobileUrl.textContent = url || 'Unavailable';
+        mobileQr.innerHTML = String(data.qr || '');
         if (funnelToggleButton) {
-          funnelToggleButton.classList.toggle('hidden', !canControl || !Boolean(data.tailscale));
-          funnelToggleButton.textContent = data.funnel ? 'Make private' : 'Make public';
+          const isTailscale = Boolean(data.tailscale);
+          funnelToggleButton.classList.toggle('hidden', !isTailscale);
+          funnelToggleButton.disabled = isTailscale && !canControl;
+          funnelToggleButton.title = isTailscale && !canControl ? 'Restart __LAB_NAME__ from this machine to enable local Funnel control.' : '';
+          funnelToggleButton.textContent = canControl ? (data.funnel ? 'Make private' : 'Make public') : 'Local control only';
         }
       } catch (err) {
         // Network state changes are expected; keep the last known QR until the next poll.
@@ -2166,7 +3089,7 @@ INDEX_HTML = r"""<!doctype html>
             throw new Error('Funnel switch failed');
           await refreshMobileAccess();
         } catch (err) {
-          funnelToggleButton.textContent = 'Could not switch';
+          funnelToggleButton.textContent = wasPublic ? 'Made private' : 'Could not switch';
           setTimeout(() => {
             refreshMobileAccess();
           }, 1600);
@@ -2184,6 +3107,32 @@ INDEX_HTML = r"""<!doctype html>
 
     function hasAbbreviatedValue(text) {
       return String(text || '').includes('...');
+    }
+
+    function collapseResultCards() {
+      resultPane.classList.remove('card-expanded');
+      document.querySelectorAll('.result-card.expanded-card')
+        .forEach((card) => card.classList.remove('expanded-card'));
+      expandCardButtons.forEach((button) => {
+        button.textContent = 'Expand';
+        button.setAttribute('aria-expanded', 'false');
+      });
+    }
+
+    function toggleResultCardExpansion(button) {
+      const card = button.closest('.result-card');
+      if (!card)
+        return;
+
+      const isExpanded = card.classList.contains('expanded-card');
+      collapseResultCards();
+      if (isExpanded)
+        return;
+
+      resultPane.classList.add('card-expanded');
+      card.classList.add('expanded-card');
+      button.textContent = 'Collapse';
+      button.setAttribute('aria-expanded', 'true');
     }
 
     function setRenderedContent(svg, fallbackText = '') {
@@ -2220,14 +3169,103 @@ INDEX_HTML = r"""<!doctype html>
       rendered.style.fontFamily = 'Georgia, "Times New Roman", serif';
     }
 
+    function renderMatrixSectionHeadings(element, text) {
+      const source = String(text || '');
+      const lines = source.split('\n');
+      const hasHeadings = lines.some((line) => /^(?:\s*)(eigenvalues|eigenvectors)(?:\s*)$/i.test(line));
+      if (!hasHeadings) {
+        element.textContent = source;
+        return;
+      }
+
+      element.replaceChildren();
+      lines.forEach((line, index) => {
+        const match = line.match(/^(\s*)(eigenvalues|eigenvectors)(\s*)$/i);
+        if (match) {
+          element.appendChild(document.createTextNode(match[1]));
+          const heading = document.createElement('span');
+          heading.className = 'matrix-section-heading';
+          heading.textContent = match[2].toLowerCase();
+          element.appendChild(heading);
+          element.appendChild(document.createTextNode(match[3]));
+        } else {
+          element.appendChild(document.createTextNode(line));
+        }
+        if (index + 1 < lines.length)
+          element.appendChild(document.createTextNode('\n'));
+      });
+    }
+
     function setExpandableText(element, button, displayText, fullText) {
-      element.textContent = displayText || fullText || '';
+      renderMatrixSectionHeadings(element, displayText || fullText || '');
       element.dataset.displayText = displayText || '';
       element.dataset.fullText = fullText || '';
       resetMoreDigitsButton(
         button,
         !!fullText && !!displayText && fullText !== displayText && hasAbbreviatedValue(displayText)
       );
+    }
+
+    function parseMatrixResultText(text) {
+      const source = String(text || '').trim();
+      if (!source.startsWith('(') || !source.endsWith(')'))
+        return null;
+
+      const body = source.slice(1, -1).trim();
+      if (!body)
+        return [[]];
+
+      const rows = splitTopLevel(body, ';')
+        .map((row) => splitTopLevel(row, ',').map((cell) => cell.trim()));
+      if (!rows.length)
+        return null;
+
+      const cols = rows[0].length;
+      if (!cols || rows.some((row) => row.length !== cols))
+        return null;
+      return rows;
+    }
+
+    function setMatrixPrettyResult(resultText, prettyText) {
+      const rows = parseMatrixResultText(resultText);
+      functionStyle.classList.add('matrix-pretty');
+      functionStyle.dataset.displayText = prettyText || resultText || '';
+      functionStyle.dataset.fullText = prettyText || resultText || '';
+      resetMoreDigitsButton(functionMore, false);
+
+      if (!rows) {
+        renderMatrixSectionHeadings(functionStyle, prettyText || resultText || '');
+        return;
+      }
+
+      functionStyle.replaceChildren();
+      const display = document.createElement('span');
+      display.className = 'matrix-display';
+
+      const left = document.createElement('span');
+      left.className = 'matrix-bracket';
+      left.textContent = '(';
+      display.appendChild(left);
+
+      const grid = document.createElement('span');
+      grid.className = 'matrix-grid';
+      grid.style.gridTemplateColumns = `repeat(${rows[0].length}, max-content)`;
+      rows.forEach((row) => {
+        row.forEach((cellText) => {
+          const cell = document.createElement('span');
+          cell.className = 'matrix-cell';
+          cell.textContent = cellText;
+          grid.appendChild(cell);
+        });
+      });
+      display.appendChild(grid);
+
+      const right = document.createElement('span');
+      right.className = 'matrix-bracket';
+      right.textContent = ')';
+      display.appendChild(right);
+
+      functionStyle.appendChild(display);
     }
 
     function setRenderedResult(data) {
@@ -2266,11 +3304,11 @@ INDEX_HTML = r"""<!doctype html>
     function toggleTextDigits(element, button) {
       const expanded = button.dataset.expanded === 'true';
       if (expanded) {
-        element.textContent = element.dataset.displayText || element.textContent;
+        renderMatrixSectionHeadings(element, element.dataset.displayText || element.textContent);
         button.textContent = 'Show more digits';
         button.dataset.expanded = 'false';
       } else {
-        element.textContent = element.dataset.fullText || element.textContent;
+        renderMatrixSectionHeadings(element, element.dataset.fullText || element.textContent);
         button.textContent = 'Show fewer digits';
         button.dataset.expanded = 'true';
       }
@@ -2344,6 +3382,7 @@ INDEX_HTML = r"""<!doctype html>
     }
 
     function clearResultPane() {
+      collapseResultCards();
       rendered.replaceChildren();
       rendered.textContent = '';
       clearRenderedError();
@@ -2352,6 +3391,9 @@ INDEX_HTML = r"""<!doctype html>
     }
 
     function clearResultDetails(options = {}) {
+      parsed.classList.remove('matrix-pretty');
+      functionStyle.classList.remove('matrix-pretty');
+      value.classList.remove('matrix-pretty');
       parsed.textContent = '';
       functionStyle.textContent = '';
       resetMoreDigitsButton(parsedMore, false);
@@ -2420,7 +3462,12 @@ INDEX_HTML = r"""<!doctype html>
         if (!data.partial_error)
           saveLastExpression(lastEvaluationInputText || fullExpressionText || expr.value.trim());
         lastDerivativeExpression = derivativeExpressionFromLine(data.derivative);
-        currentVariables = variablesFromExpression(data.expression || '');
+        {
+          const variableBindings = variableNamesFromBindings(data.binding_values || []);
+          currentVariables = variableBindings.length
+            ? variableBindings
+            : variablesFromExpression(data.expression || '');
+        }
         currentDifferentiable = String(data.differentiable || 'yes').trim().toLowerCase() !== 'no';
         renderDerivativeButtons(currentVariables);
         setStatus(data.partial_error ? 'Error' : 'Ready');
@@ -2433,6 +3480,112 @@ INDEX_HTML = r"""<!doctype html>
         setBusy(false);
         if (!options.skipHistoryUpdate)
           updateHistoryButtons();
+      }
+    }
+
+    async function evaluateMatrix() {
+      const text = expr.value.trim();
+      if (!text)
+        return;
+      showResults();
+      setBusy(true);
+      setStatus('Evaluating matrix...');
+      try {
+        const {response, data} = await fetchMatrixEvaluation();
+        if (!response.ok || !data.ok) {
+          setRenderedError(data.error || 'Matrix evaluation failed');
+          resetMoreDigitsButton(renderedMore, false);
+          clearResultDetails({keepBindings: true});
+          setStatus('Error');
+          return;
+        }
+
+        clearResultDetails({keepBindings: true});
+        clearRenderedError();
+        lastTex = data.tex || '';
+        rendered.dataset.displayTex = data.tex || '';
+        rendered.dataset.fullTex = data.tex || '';
+        rendered.dataset.displaySvg = data.svg || '';
+        rendered.dataset.fullSvg = '';
+        rendered.dataset.renderError = data.render_error || '';
+        setRenderedContent(data.svg || '', data.render_error || (data.tex || 'No rendered TeX available'));
+        resetMoreDigitsButton(renderedMore, false);
+        setExpandableText(parsed, parsedMore, data.result || '', data.result || '');
+        setMatrixPrettyResult(data.result || '', data.pretty || '');
+        value.textContent = '';
+        setValueCardVisible(false);
+        modeEditorText.matrix = text;
+        saveLastMatrixState();
+        currentVariables = [];
+        currentDifferentiable = false;
+        renderDerivativeButtons(currentVariables);
+        clearVariableValues();
+        setStatus('Ready');
+      } catch (err) {
+        setRenderedError(String(err));
+        resetMoreDigitsButton(renderedMore, false);
+        clearResultDetails({keepBindings: true});
+        setStatus('Error');
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    async function evaluateIntegrator() {
+      const text = expr.value.trim();
+      if (!text)
+        return;
+      showResults();
+      setBusy(true);
+      setStatus('Integrating...');
+      try {
+        const {response, data} = await fetchIntegratorEvaluation();
+        if (!response.ok || !data.ok) {
+          setRenderedError(data.error || 'Integration failed');
+          resetMoreDigitsButton(renderedMore, false);
+          clearResultDetails({keepBindings: true});
+          setStatus('Error');
+          return;
+        }
+
+        clearResultDetails({keepBindings: true});
+        clearRenderedError();
+        lastTex = data.tex || '';
+        rendered.dataset.displayTex = data.tex || '';
+        rendered.dataset.fullTex = data.tex || '';
+        rendered.dataset.displaySvg = data.svg || '';
+        rendered.dataset.fullSvg = '';
+        rendered.dataset.renderError = data.render_error || '';
+        setRenderedContent(data.svg || '', data.render_error || (data.tex || 'No rendered TeX available'));
+        resetMoreDigitsButton(renderedMore, false);
+        setExpandableText(parsed, parsedMore, data.expression || '', data.expression || '');
+        const workUnits = data.work_units || data.intervals || '';
+        const workCap = data.work_cap || data.max_intervals || '';
+        const stoppedEarly = workUnits && workCap && String(workUnits) !== String(workCap);
+        const workText = workUnits && workCap
+          ? `work used: ${workUnits} / ${workCap}${stoppedEarly ? ' (precision reached)' : ''}`
+          : (workUnits ? `work used: ${workUnits}` : '');
+        const domainText = [data.bound, data.status ? `status: ${data.status}` : '', workText]
+          .filter(Boolean)
+          .join('\n');
+        setExpandableText(functionStyle, functionMore, domainText, domainText);
+        value.textContent = data.error
+          ? `${data.value || ''}\nerror ≈ ${data.error}`
+          : (data.value || '');
+        modeEditorText.integrator = text;
+        saveLastIntegratorState();
+        currentVariables = [];
+        currentDifferentiable = false;
+        renderDerivativeButtons(currentVariables);
+        clearVariableValues();
+        setStatus('Ready');
+      } catch (err) {
+        setRenderedError(String(err));
+        resetMoreDigitsButton(renderedMore, false);
+        clearResultDetails({keepBindings: true});
+        setStatus('Error');
+      } finally {
+        setBusy(false);
       }
     }
 
@@ -2486,7 +3639,12 @@ INDEX_HTML = r"""<!doctype html>
       value.textContent = data.value || '';
       lastEvaluationInputText = solvedExpression;
       lastDerivativeExpression = '';
-      currentVariables = variablesFromExpression(solvedExpression);
+      {
+        const variableBindings = variableNamesFromBindings(data.binding_values || []);
+        currentVariables = variableBindings.length
+          ? variableBindings
+          : variablesFromExpression(solvedExpression);
+      }
       currentDifferentiable = String(data.differentiable || 'yes').trim().toLowerCase() !== 'no';
       renderDerivativeButtons(currentVariables);
       expr.dataset.goalSeekSource = expressionForEditor(request.expression).trim();
@@ -2497,10 +3655,16 @@ INDEX_HTML = r"""<!doctype html>
     }
 
     run.addEventListener('click', () => {
-      forwardHistory = [];
-      clearGoalSeekRequest();
-      hideTargetEntry();
-      evaluateExpression();
+      if (currentMode() === 'expression') {
+        forwardHistory = [];
+        clearGoalSeekRequest();
+        hideTargetEntry();
+        evaluateExpression();
+      } else if (currentMode() === 'matrix') {
+        evaluateMatrix();
+      } else {
+        evaluateIntegrator();
+      }
     });
 
     back.addEventListener('click', () => {
@@ -2567,11 +3731,20 @@ INDEX_HTML = r"""<!doctype html>
     expr.addEventListener('keydown', (event) => {
       if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
         event.preventDefault();
-        evaluateFromKeyboard();
+        if (currentMode() === 'expression')
+          evaluateFromKeyboard();
+        else if (currentMode() === 'matrix')
+          evaluateMatrix();
+        else
+          evaluateIntegrator();
       }
     });
 
     expr.addEventListener('input', () => {
+      if (currentMode() !== 'expression') {
+        updateHistoryButtons();
+        return;
+      }
       if (expr.value.trim() === (expr.dataset.displayExpression || displayedExpressionText))
         return;
       /*
@@ -2587,11 +3760,23 @@ INDEX_HTML = r"""<!doctype html>
     });
 
     clear.addEventListener('click', () => {
-      const current = currentExpressionText();
-      if (current)
-        expressionHistory.push(current);
-      forwardHistory = [];
+      if (currentMode() === 'expression') {
+        const current = currentExpressionText();
+        if (current)
+          expressionHistory.push(current);
+        forwardHistory = [];
+      }
       expr.value = '';
+      if (currentMode() === 'matrix') {
+        matrixOperand.value = '';
+        matrixOperation.value = 'inverse';
+      }
+      if (currentMode() === 'integrator') {
+        integratorBounds.value = DEFAULT_INTEGRATOR_BOUNDS_TEXT;
+        if (integratorIntervalCap)
+          integratorIntervalCap.value = String(DEFAULT_INTEGRATOR_INTERVAL_CAP);
+      }
+      captureCurrentModeEditor();
       clearExpressionSource();
       hideTargetEntry();
       clearResultPane();
@@ -2603,6 +3788,8 @@ INDEX_HTML = r"""<!doctype html>
     help.addEventListener('click', toggleHelp);
 
     goalSeek.addEventListener('click', async () => {
+      if (currentMode() !== 'expression')
+        return;
       const text = currentExpressionText();
       if (!text) return;
 
@@ -2628,6 +3815,41 @@ INDEX_HTML = r"""<!doctype html>
       }
     });
 
+    if (modeTabs.length) {
+      modeTabs.forEach((tab) => tab.addEventListener('click', () => {
+        captureCurrentModeEditor();
+        if (!setMode(tab.dataset.mode))
+          return;
+        hideTargetEntry();
+        clearResultPane();
+        restoreModeEditor(currentMode());
+        syncModeUI();
+        if (currentMode() === 'integrator' && !integratorBounds.value.trim()) {
+          integratorBounds.value = DEFAULT_INTEGRATOR_BOUNDS_TEXT;
+        }
+        if (currentMode() === 'integrator') {
+          if (integratorIntervalCap)
+            integratorIntervalCap.value = String(validIntegratorIntervalCap(integratorIntervalCap.value));
+        }
+        expr.focus();
+      }));
+    }
+
+    if (matrixOperation)
+      matrixOperation.addEventListener('change', () => {
+        matrixOperation.value = validMatrixOperation(matrixOperation.value);
+        syncMatrixControls();
+        if (currentMode() === 'matrix')
+          saveLastMatrixState();
+      });
+
+    if (integratorIntervalCap)
+      integratorIntervalCap.addEventListener('change', () => {
+        integratorIntervalCap.value = String(validIntegratorIntervalCap(integratorIntervalCap.value));
+        if (currentMode() === 'integrator')
+          saveLastIntegratorState();
+      });
+
     goalTarget.addEventListener('keydown', (event) => {
       if (event.key === 'Enter') {
         event.preventDefault();
@@ -2642,9 +3864,15 @@ INDEX_HTML = r"""<!doctype html>
 
     morePrecision.addEventListener('click', async () => {
       setRequestedPrecisionBits(nextPrecisionStepBits(requestedPrecisionBits()));
+      savePrecisionState();
       setStatus('Precision changed');
       try {
-        await evaluateExpression({skipHistoryUpdate: true, reuseLastInput: true});
+        if (currentMode() === 'expression')
+          await evaluateExpression({skipHistoryUpdate: true, reuseLastInput: true});
+        else if (currentMode() === 'matrix')
+          await evaluateMatrix();
+        else
+          await evaluateIntegrator();
       } finally {
         updateHistoryButtons();
       }
@@ -2652,9 +3880,15 @@ INDEX_HTML = r"""<!doctype html>
 
     lessPrecision.addEventListener('click', async () => {
       setRequestedPrecisionBits(previousPrecisionStepBits(requestedPrecisionBits()));
+      savePrecisionState();
       setStatus('Precision changed');
       try {
-        await evaluateExpression({skipHistoryUpdate: true, reuseLastInput: true});
+        if (currentMode() === 'expression')
+          await evaluateExpression({skipHistoryUpdate: true, reuseLastInput: true});
+        else if (currentMode() === 'matrix')
+          await evaluateMatrix();
+        else
+          await evaluateIntegrator();
       } finally {
         updateHistoryButtons();
       }
@@ -2688,24 +3922,41 @@ INDEX_HTML = r"""<!doctype html>
       });
     });
 
+    expandCardButtons.forEach((button) => {
+      button.setAttribute('aria-expanded', 'false');
+      button.addEventListener('click', () => toggleResultCardExpansion(button));
+    });
+
+    syncModeTabs();
+    syncModeUI();
     setStatus('Ready');
     refreshMobileAccess();
     setInterval(refreshMobileAccess, 5000);
-    loadLastExpression().finally(() => evaluateExpression());
+    loadLastState().finally(() => evaluateExpression());
   </script>
 </body>
 </html>
-"""
+""".replace("__LAB_NAME__", LAB_APP_NAME).replace(
+    "__CONTROL_QUERY_PREFIX__", f"{CONTROL_QUERY_PARAM}="
+).replace(
+    "__THEME_COLOR__", LAB_THEME_COLOR
+).replace(
+    "__THEME_OVERRIDES__", LAB_THEME_OVERRIDES
+).replace(
+    "__BODY_CLASS__", LAB_BODY_CLASS
+).replace(
+    "__LAB_SUBTITLE__", LAB_SUBTITLE
+)
 
 WEB_MANIFEST = {
-    "name": "MARS Lab",
-    "short_name": "MARS Lab",
-    "description": "Explore MARS mathematics with rendered TeX.",
+    "name": LAB_APP_NAME,
+    "short_name": LAB_SHORT_NAME,
+    "description": LAB_DESCRIPTION,
     "start_url": "/",
     "scope": "/",
     "display": "standalone",
-    "background_color": "#f6f0e5",
-    "theme_color": "#0b4f8a",
+    "background_color": LAB_MANIFEST_BACKGROUND,
+    "theme_color": LAB_MANIFEST_THEME,
     "icons": [
         {"src": "/icon-192.png", "sizes": "192x192", "type": "image/png"},
         {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png"}
@@ -2713,11 +3964,73 @@ WEB_MANIFEST = {
 }
 
 
-def load_state_expression() -> str:
+def default_state() -> dict[str, object]:
+    return {
+        "expression": DEFAULT_EXPRESSION,
+        "matrix": DEFAULT_MATRIX,
+        "matrix_operation": DEFAULT_MATRIX_OPERATION,
+        "matrix_operand": "",
+        "integrator_expression": DEFAULT_INTEGRATOR_EXPRESSION,
+        "integrator_bounds": DEFAULT_INTEGRATOR_BOUNDS,
+        "integrator_interval_cap": DEFAULT_INTEGRATOR_INTERVAL_CAP,
+        "precision_bits": {
+            "expression": 256,
+            "matrix": 256,
+            "integrator": 17,
+        },
+    }
+
+
+def load_state_data() -> dict[str, object]:
+    state = default_state()
     try:
         data = json.loads(STATE_FILE.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
-        return DEFAULT_EXPRESSION
+        return state
+
+    if not isinstance(data, dict):
+        return state
+
+    state.update(data)
+    expression = str(state.get("expression", "")).strip()
+    if "..." in expression:
+        state["expression"] = DEFAULT_EXPRESSION
+
+    matrix = str(state.get("matrix", "")).strip()
+    if "..." in matrix:
+        state["matrix"] = DEFAULT_MATRIX
+
+    matrix_operation = str(state.get("matrix_operation", "")).strip()
+    if matrix_operation not in {
+        "eval",
+        "inverse",
+        "eigenvalues",
+        "eigendecompose",
+        "charpoly",
+        "det",
+        "trace",
+        "rank",
+        "simplify",
+        "solve",
+    }:
+        state["matrix_operation"] = DEFAULT_MATRIX_OPERATION
+
+    integrator_expression = str(state.get("integrator_expression", "")).strip()
+    if "..." in integrator_expression:
+        state["integrator_expression"] = DEFAULT_INTEGRATOR_EXPRESSION
+
+    try:
+        cap = int(state.get("integrator_interval_cap", DEFAULT_INTEGRATOR_INTERVAL_CAP))
+    except (TypeError, ValueError):
+        cap = DEFAULT_INTEGRATOR_INTERVAL_CAP
+    if cap not in INTEGRATOR_INTERVAL_CAP_CHOICES:
+        cap = DEFAULT_INTEGRATOR_INTERVAL_CAP
+    state["integrator_interval_cap"] = cap
+    return state
+
+
+def load_state_expression() -> str:
+    data = load_state_data()
 
     expression = str(data.get("expression", "")).strip()
     if "..." in expression:
@@ -2725,14 +4038,19 @@ def load_state_expression() -> str:
     return expression or DEFAULT_EXPRESSION
 
 
+def save_state_data(updates: dict[str, object]) -> None:
+    state = load_state_data()
+    state.update(updates)
+    STATE_FILE.write_text(
+        json.dumps(state, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+
 def save_state_expression(expression: str) -> None:
     if "..." in expression:
         return
-
-    STATE_FILE.write_text(
-        json.dumps({"expression": expression}, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
+    save_state_data({"expression": expression})
 
 
 def expression_for_editor(expression: str) -> str:
@@ -2813,11 +4131,6 @@ def _control_url(url: str) -> str:
     return f"{url}{separator}{token}"
 
 
-def _request_looks_like_iphone(headers: http.client.HTTPMessage) -> bool:
-    user_agent = headers.get("User-Agent", "").lower()
-    return "iphone" in user_agent or "ipod" in user_agent
-
-
 def request_allows_funnel_control(headers: http.client.HTTPMessage,
                                   client_host: str,
                                   request_token: str = "") -> bool:
@@ -2829,16 +4142,6 @@ def request_allows_funnel_control(headers: http.client.HTTPMessage,
         return True
 
     request_host = _host_from_header(headers.get("Host", "")).strip().lower()
-    iphone_trusted_hosts = {
-        host for host in (
-            tailscale_https_host().strip().lower(),
-            tailscale_magicdns_host().strip().lower(),
-            local_mdns_host().strip().lower(),
-        ) if host
-    }
-    if _request_looks_like_iphone(headers) and request_host in iphone_trusted_hosts:
-        return True
-
     tailscale_hosts = {
         host for host in (
             tailscale_https_host().strip().lower(),
@@ -3072,8 +4375,13 @@ def browser_access_host(bind_host: str) -> str:
 
 def browser_access_url(bind_host: str, port: int) -> str:
     bind_host = bind_host.strip()
-    if bind_host in ("0.0.0.0", "::", "::0"):
-        return f"http://127.0.0.1:{port}/"
+    bind_address = _ip_address_from_text(bind_host)
+    bind_is_tailscale = bool(bind_address and bind_address in ipaddress.ip_network("100.64.0.0/10"))
+    if (bind_host in ("0.0.0.0", "::", "::0") and tailscale_ipv4()) or bind_is_tailscale:
+        tailscale_host = tailscale_https_host()
+        if tailscale_host:
+            return f"https://{tailscale_host}/"
+
     browser_host = browser_access_host(bind_host)
     if ":" in browser_host and not browser_host.startswith("["):
         browser_host = f"[{browser_host}]"
@@ -3313,7 +4621,7 @@ def _qr_make_matrix(text: str) -> list[list[int]]:
     add_finder(0, 0)
     add_finder(size - 7, 0)
     add_finder(0, size - 7)
-    add_alignment(26, 26)
+    add_alignment(30, 30)
 
     for i in range(size):
         if not reserved[6][i]:
@@ -3507,19 +4815,59 @@ def ensure_mars_lab(binary: Path) -> None:
         return
 
     subprocess.run(
-        ["make", "scratch/mars_lab"],
+        ["make", DEFAULT_SCRATCH_TARGET],
         cwd=ROOT,
         check=True,
         text=True,
     )
 
     if not binary.exists():
-        raise RuntimeError(f"mars_lab binary was not created at {binary}")
+        raise RuntimeError(f"scratch binary was not created at {binary}")
+
+
+def ensure_scratch_binary(binary: Path, target: str) -> None:
+    if binary.exists() and os.access(binary, os.X_OK):
+        return
+
+    subprocess.run(
+        ["make", target],
+        cwd=ROOT,
+        check=True,
+        text=True,
+    )
+
+    if not binary.exists():
+        raise RuntimeError(f"{target} binary was not created at {binary}")
+
+
+def parse_keyed_output(
+    output: str,
+    patterns: dict[str, str],
+    multiline_fields: set[str] | None = None,
+) -> dict[str, str]:
+    fields: dict[str, str] = {}
+    current_multiline_key: str | None = None
+    multiline_fields = multiline_fields or set()
+
+    for line in output.splitlines():
+        matched = False
+        for key, pattern in patterns.items():
+            match = re.match(pattern, line)
+            if match:
+                value = match.group(1).rstrip()
+                if key in fields and key not in multiline_fields:
+                    fields[key] = fields[key] + "\n" + value
+                else:
+                    fields[key] = value
+                current_multiline_key = key if key in multiline_fields else None
+                matched = True
+                break
+        if not matched and current_multiline_key:
+            fields[current_multiline_key] += "\n" + line.rstrip()
+    return fields
 
 
 def parse_mars_lab_output(output: str) -> dict[str, str]:
-    fields: dict[str, str] = {}
-    current_multiline_key: str | None = None
     patterns = {
         "input": r"^input\s+(.*)$",
         "expression": r"^expression\s+(.*)$",
@@ -3534,19 +4882,46 @@ def parse_mars_lab_output(output: str) -> dict[str, str]:
         "derivative": r"^derivative\s+(.*)$",
         "derivative_value": r"^d value\s+(.*)$",
     }
+    return parse_keyed_output(output, patterns, {"function"})
 
-    for line in output.splitlines():
-        matched = False
-        for key, pattern in patterns.items():
-            match = re.match(pattern, line)
-            if match:
-                fields[key] = match.group(1).rstrip()
-                current_multiline_key = key if key == "function" else None
-                matched = True
-                break
-        if not matched and current_multiline_key:
-            fields[current_multiline_key] += "\n" + line.rstrip()
-    return fields
+
+def parse_matrix_lab_output(output: str) -> dict[str, str]:
+    return parse_keyed_output(
+        output,
+        {
+            "input": r"^input\s+(.*)$",
+            "operation": r"^operation\s+(.*)$",
+            "operand": r"^operand\s+(.*)$",
+            "kind": r"^kind\s+(.*)$",
+            "rows": r"^rows\s+(.*)$",
+            "cols": r"^cols\s+(.*)$",
+            "result": r"^result\s+(.*)$",
+            "pretty": r"^pretty\s+(.*)$",
+            "tex": r"^tex\s+(.*)$",
+            "value": r"^value\s+(.*)$",
+        },
+        {"pretty"},
+    )
+
+
+def parse_integrator_lab_output(output: str) -> dict[str, str]:
+    return parse_keyed_output(
+        output,
+        {
+            "input": r"^input\s+(.*)$",
+            "expression": r"^expression\s+(.*)$",
+            "dimensions": r"^dimensions\s+(.*)$",
+            "bound": r"^bound\s+(.*)$",
+            "tex": r"^tex\s+(.*)$",
+            "value": r"^value\s+(.*)$",
+            "error": r"^error\s+(.*)$",
+            "work_units": r"^work_units\s+(.*)$",
+            "work_cap": r"^work_cap\s+(.*)$",
+            "intervals": r"^intervals\s+(.*)$",
+            "max_intervals": r"^max_intervals\s+(.*)$",
+            "status": r"^status\s+(.*)$",
+        },
+    )
 
 
 def _trim_decimal_tail(text: str) -> str:
@@ -3832,6 +5207,186 @@ def run_mars_lab_fields(
     return parse_mars_lab_output(raw), raw, completed.returncode
 
 
+def run_matrix_lab_fields(
+    binary: Path,
+    matrix_text: str,
+    operation: str,
+    precision: int,
+    operand: str = "",
+) -> tuple[dict[str, str], str, int]:
+    command = [str(binary), matrix_text, operation, str(max(17, precision))]
+    operand = str(operand or "").strip()
+    if operand:
+        command.append(operand)
+
+    completed = subprocess.run(
+        command,
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        timeout=10,
+    )
+    raw = completed.stdout
+    if completed.stderr:
+        raw = raw + ("\n" if raw else "") + completed.stderr
+    return parse_matrix_lab_output(raw), raw, completed.returncode
+
+
+def run_integrator_lab_fields(
+    binary: Path,
+    expression: str,
+    bounds: list[dict[str, str]],
+    precision: int,
+    max_intervals: int | None = None,
+) -> tuple[dict[str, str], str, int]:
+    effective_cap = max(MIN_INTEGRATOR_INTERVAL_CAP, min(MAX_INTEGRATOR_INTERVAL_CAP, int(max_intervals))) if max_intervals is not None else DEFAULT_INTEGRATOR_INTERVAL_CAP
+    command = [str(binary)]
+    if max_intervals is not None:
+        command.extend(["--max-intervals", str(effective_cap)])
+    command.extend([expression, str(max(17, precision))])
+    for bound in bounds:
+        command.extend([
+            str(bound.get("name", "")).strip(),
+            str(bound.get("lo", "")).strip(),
+            str(bound.get("hi", "")).strip(),
+        ])
+
+    completed = subprocess.run(
+        command,
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        timeout=min(120, max(10, effective_cap // 500)),
+    )
+    raw = completed.stdout
+    if completed.stderr:
+        raw = raw + ("\n" if raw else "") + completed.stderr
+    if completed.returncode == 0:
+        return parse_integrator_lab_output(raw), raw, completed.returncode
+
+    fallback = integrator_endpoint_log_fallback(expression, bounds, precision, max_intervals)
+    if fallback is not None:
+        fields = fallback
+        return fields, "Integration recovered via analytic endpoint-limit fallback", 0
+
+    return parse_integrator_lab_output(raw), raw, completed.returncode
+
+
+def _parse_decimal_bound(text: str) -> Decimal | None:
+    try:
+        return Decimal(str(text).strip())
+    except (InvalidOperation, ValueError):
+        return None
+
+
+def integrator_endpoint_log_fallback(
+    expression: str,
+    bounds: list[dict[str, str]],
+    precision: int,
+    max_intervals: int | None = None,
+) -> dict[str, str] | None:
+    if len(bounds) != 1:
+        return None
+
+    expr_text = str(expression or "").strip()
+    match = re.fullmatch(r"(ln|log|lg|log10)\(\s*([A-Za-z][A-Za-z0-9_]*)\s*\)", expr_text)
+    if not match:
+        return None
+
+    func_name, var_name = match.groups()
+    bound = bounds[0]
+    if str(bound.get("name", "")).strip() != var_name:
+        return None
+
+    lo_text = str(bound.get("lo", "")).strip()
+    hi_text = str(bound.get("hi", "")).strip()
+    lo = _parse_decimal_bound(lo_text)
+    hi = _parse_decimal_bound(hi_text)
+    if lo is None or hi is None:
+        return None
+
+    if lo == hi:
+        value = Decimal(0)
+    else:
+        with localcontext() as ctx:
+            ctx.prec = max(precision + 20, 60)
+
+            def zero_endpoint_log_integral(upper: Decimal) -> Decimal | None:
+                if upper <= 0:
+                    return None
+                value_out = upper * upper.ln() - upper
+                if func_name != "ln":
+                    value_out /= Decimal(10).ln()
+                return +value_out
+
+            if lo.is_zero() and hi > 0:
+                computed = zero_endpoint_log_integral(hi)
+            elif hi.is_zero() and lo > 0:
+                computed = zero_endpoint_log_integral(lo)
+                computed = -computed if computed is not None else None
+            else:
+                return None
+
+            if computed is None:
+                return None
+            value = +computed
+
+    log_tex = "\\ln" if func_name == "ln" else "\\log"
+    return {
+        "input": expr_text,
+        "expression": expr_text,
+        "dimensions": "1",
+        "bound": f"{var_name} in [{lo_text}, {hi_text}]",
+        "tex": rf"\int_{{{lo_text}}}^{{{hi_text}}} {log_tex}({var_name})\, d{var_name}",
+        "value": str(value),
+        "error": "0",
+        "intervals": "0",
+        "max_intervals": str(max_intervals or DEFAULT_INTEGRATOR_INTERVAL_CAP),
+        "status": "analytic endpoint limit",
+    }
+
+
+def matrix_failure_hint(
+    binary: Path,
+    matrix_text: str,
+    operation: str,
+    precision: int,
+    operand: str = "",
+) -> str:
+    if operation != "inverse":
+        return ""
+
+    try:
+        eval_fields, _, eval_rc = run_matrix_lab_fields(
+            binary, matrix_text, "eval", precision, ""
+        )
+    except Exception:
+        return ""
+
+    if eval_rc != 0:
+        return "This matrix still has unresolved symbolic entries. Bind variables first or use Evaluate."
+
+    rows = str(eval_fields.get("rows", "")).strip()
+    cols = str(eval_fields.get("cols", "")).strip()
+    if rows and cols and rows != cols:
+        return (
+            f"This matrix is {rows}x{cols}, so it has no inverse. "
+            "Only square n x n matrices can be inverted."
+        )
+
+    try:
+        det_fields, _, det_rc = run_matrix_lab_fields(
+            binary, matrix_text, "det", precision, ""
+        )
+    except Exception:
+        return ""
+
+    if det_rc == 0 and str(det_fields.get("value", "")).strip() == "0":
+        return "This matrix is singular: det(A) = 0, so it has no inverse. Equivalently, 0 is an eigenvalue."
+
+    return "The inverse operation failed for this matrix."
+
+
 def expression_variable_binding_values(
     expression: str,
     precision: int | None = None,
@@ -3959,8 +5514,116 @@ def prepare_evaluation_fields(
     return fields
 
 
+def prepare_matrix_fields(fields: dict[str, str]) -> dict[str, object]:
+    result_text = str(fields.get("result") or fields.get("value") or "").strip()
+    pretty_text = str(fields.get("pretty") or "").strip()
+    tex = str(fields.get("tex") or "").strip()
+    operation = str(fields.get("operation") or "eval").strip()
+    kind = str(fields.get("kind") or "").strip()
+    rows = str(fields.get("rows") or "").strip()
+    cols = str(fields.get("cols") or "").strip()
+
+    svg = None
+    render_error = None
+    if tex and tex != "(null)":
+        svg, render_error = render_tex_to_svg(tex)
+
+    summary_parts = []
+    if kind:
+        summary_parts.append(kind)
+    if rows and cols:
+        summary_parts.append(f"{rows}x{cols}")
+    if operation:
+        summary_parts.append(operation)
+
+    payload: dict[str, object] = {
+        "ok": True,
+        "mode": "matrix",
+        "operation": operation,
+        "result": result_text,
+        "pretty": pretty_text,
+        "tex": "" if tex == "(null)" else tex,
+        "summary": " · ".join(summary_parts),
+    }
+    if svg:
+        payload["svg"] = svg
+    elif render_error:
+        payload["render_error"] = render_error
+    return payload
+
+
+def prepare_integrator_fields(fields: dict[str, str], precision: int) -> dict[str, object]:
+    if fields.get("value"):
+        fields["value"] = format_number_text_for_precision(
+            str(fields["value"]), precision, zero_subprecision=True)
+    if fields.get("error"):
+        fields["error"] = format_number_text_for_precision(
+            str(fields["error"]),
+            min(int(precision), INTEGRATOR_ERROR_DISPLAY_DIGITS),
+            zero_subprecision=False,
+        )
+    precision_limit_result_fields(fields, precision)
+
+    tex = str(fields.get("tex") or "").strip()
+    bounds = str(fields.get("bound") or "").strip()
+    tex = integrator_tex_for_display(tex)
+
+    svg = None
+    render_error = None
+    if tex and tex != "(null)":
+        svg, render_error = render_tex_to_svg(tex)
+
+    payload: dict[str, object] = {
+        "ok": True,
+        "mode": "integrator",
+        "expression": str(fields.get("expression") or "").strip(),
+        "tex": "" if tex == "(null)" else tex,
+        "value": str(fields.get("value") or "").strip(),
+        "error": str(fields.get("error") or "").strip(),
+        "intervals": str(fields.get("intervals") or "").strip(),
+        "max_intervals": str(fields.get("max_intervals") or "").strip(),
+        "work_units": str(fields.get("work_units") or fields.get("intervals") or "").strip(),
+        "work_cap": str(fields.get("work_cap") or fields.get("max_intervals") or "").strip(),
+        "status": str(fields.get("status") or "").strip(),
+        "dimensions": str(fields.get("dimensions") or "").strip(),
+        "bound": bounds,
+    }
+    if svg:
+        payload["svg"] = svg
+    elif render_error:
+        payload["render_error"] = render_error
+    return payload
+
+
+def integrator_tex_for_display(tex: str) -> str:
+    tex = str(tex or "").strip()
+    if not tex:
+        return ""
+    middle = r"\;\middle|\;"
+    left = r"\left\{"
+    right = r"\right\}"
+
+    if left not in tex or middle not in tex or right not in tex:
+        return tex
+
+    left_index = tex.find(left)
+    middle_index = tex.find(middle, left_index + len(left))
+    right_index = tex.rfind(right)
+    if middle_index < 0 or right_index < 0 or middle_index >= right_index:
+        return tex
+
+    prefix = tex[:left_index]
+    body = tex[left_index + len(left):middle_index].strip()
+    suffix = tex[right_index + len(right):]
+    if not body:
+        return tex
+    return f"{prefix}{body}{suffix}"
+
+
 class MarsLabHandler(http.server.BaseHTTPRequestHandler):
     binary: Path = DEFAULT_BIN
+    matrix_binary: Path = DEFAULT_MATRIX_BIN
+    integrator_binary: Path = DEFAULT_INTEGRATOR_BIN
     server_host: str = "127.0.0.1"
     server_port: int = 0
     mobile_url: str = ""
@@ -3997,7 +5660,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
         parsed_path = urllib.parse.urlparse(self.path)
         path = parsed_path.path
         if path == "/state":
-            self.send_json(200, {"expression": load_state_expression()})
+            self.send_json(200, load_state_data())
             return
 
         if path == "/mobile-access":
@@ -4015,7 +5678,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
             details["qr"] = mobile_qr_svg(
                 str(details["url"]),
                 bool(details.get("control")),
-            ) if details.get("control") else ""
+            ) if details.get("url") else ""
             self.send_json(200, details)
             return
 
@@ -4058,7 +5721,7 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
         mobile_qr = mobile_qr_svg(
             mobile_url,
             bool(mobile_details.get("control")),
-        ) if mobile_details.get("control") else ""
+        ) if mobile_url else ""
         page = (
             INDEX_HTML.replace(
                 "__INITIAL_EXPRESSION__",
@@ -4068,8 +5731,13 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
             .replace("__MOBILE_HINT__", html.escape(mobile_details["hint"], quote=False))
             .replace("__MOBILE_URL__", html.escape(mobile_url, quote=False))
             .replace("__MOBILE_QR_SVG__", mobile_qr)
-            .replace("__MOBILE_CARD_CLASS__", "" if mobile_url and mobile_qr and mobile_details.get("control") else "hidden")
-            .replace("__MOBILE_TAILSCALE_CLASS__", "" if mobile_details.get("control") and mobile_details.get("tailscale") else "hidden")
+            .replace("__MOBILE_CARD_CLASS__", "")
+            .replace("__MOBILE_TAILSCALE_CLASS__", "" if mobile_details.get("tailscale") else "hidden")
+            .replace("__DEFAULT_EXPRESSION__", json.dumps(DEFAULT_EXPRESSION))
+            .replace("__DEFAULT_MATRIX__", json.dumps(DEFAULT_MATRIX))
+            .replace("__DEFAULT_INTEGRATOR__", json.dumps(DEFAULT_INTEGRATOR_EXPRESSION))
+            .replace("__DEFAULT_INTEGRATOR_BOUNDS__", json.dumps(DEFAULT_INTEGRATOR_BOUNDS))
+            .replace("__DEFAULT_INTEGRATOR_INTERVAL_CAP__", json.dumps(DEFAULT_INTEGRATOR_INTERVAL_CAP))
             .replace("__CONTROL_TOKEN__", json.dumps(CONTROL_TOKEN if control_allowed else ""))
         )
         data = page.encode("utf-8")
@@ -4096,10 +5764,10 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
             if not control_allowed:
                 self.send_json(403, {"ok": False, "error": "Funnel control is only available from trusted devices."})
                 return
-            ok = set_tailscale_funnel_enabled(
-                self.server_port,
-                not tailscale_funnel_enabled(),
-            )
+            target_enabled = not tailscale_funnel_enabled()
+            command_ok = set_tailscale_funnel_enabled(self.server_port, target_enabled)
+            current_enabled = tailscale_funnel_enabled()
+            ok = command_ok or current_enabled == target_enabled
             details = mobile_access_details(
                 self.server_host,
                 self.server_port,
@@ -4107,10 +5775,11 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 control_allowed,
             )
             details["ok"] = ok
+            details["funnel"] = current_enabled
             details["qr"] = mobile_qr_svg(
                 str(details.get("url", "")),
                 bool(details.get("control")),
-            ) if details.get("control") else ""
+            ) if details.get("url") else ""
             self.send_json(200 if ok else 502, details)
             return
 
@@ -4119,9 +5788,66 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 length = int(self.headers.get("Content-Length", "0"))
                 body = self.rfile.read(length)
                 payload = json.loads(body.decode("utf-8"))
+                updates: dict[str, object] = {}
+
                 expression = str(payload.get("expression", "")).strip()
                 if expression and "..." not in expression:
-                    save_state_expression(expression)
+                    updates["expression"] = expression
+
+                matrix = str(payload.get("matrix", "")).strip()
+                if matrix and "..." not in matrix:
+                    updates["matrix"] = matrix
+
+                matrix_operation = str(payload.get("matrix_operation", "")).strip()
+                if matrix_operation in {
+                    "eval",
+                    "inverse",
+                    "eigenvalues",
+                    "eigendecompose",
+                    "charpoly",
+                    "det",
+                    "trace",
+                    "rank",
+                    "simplify",
+                    "solve",
+                }:
+                    updates["matrix_operation"] = matrix_operation
+
+                if "matrix_operand" in payload:
+                    updates["matrix_operand"] = str(payload.get("matrix_operand", "")).strip()
+
+                integrator_expression = str(payload.get("integrator_expression", "")).strip()
+                if integrator_expression and "..." not in integrator_expression:
+                    updates["integrator_expression"] = integrator_expression
+
+                integrator_bounds = str(payload.get("integrator_bounds", "")).strip()
+                if integrator_bounds:
+                    updates["integrator_bounds"] = integrator_bounds
+
+                if "integrator_interval_cap" in payload:
+                    cap = int(payload.get("integrator_interval_cap", DEFAULT_INTEGRATOR_INTERVAL_CAP))
+                    cap = max(MIN_INTEGRATOR_INTERVAL_CAP, min(MAX_INTEGRATOR_INTERVAL_CAP, cap))
+                    if cap in INTEGRATOR_INTERVAL_CAP_CHOICES:
+                        updates["integrator_interval_cap"] = cap
+
+                if isinstance(payload.get("precision_bits"), dict):
+                    saved_precision = load_state_data().get("precision_bits", {})
+                    precision_bits = dict(saved_precision) if isinstance(saved_precision, dict) else {}
+                    for mode in ("expression", "matrix", "integrator"):
+                        if mode in payload["precision_bits"]:
+                            bits = int(payload["precision_bits"][mode])
+                            precision_bits[mode] = max(17, min(MAX_VALUE_PRECISION_BITS, bits))
+                    updates["precision_bits"] = precision_bits
+                elif "precision_bits" in payload:
+                    bits = int(payload["precision_bits"])
+                    updates["precision_bits"] = {
+                        "expression": max(17, min(MAX_VALUE_PRECISION_BITS, bits)),
+                        "matrix": 256,
+                        "integrator": 17,
+                    }
+
+                if updates:
+                    save_state_data(updates)
                 self.send_json(200, {"ok": True})
             except Exception as exc:
                 self.send_json(400, {"ok": False, "error": f"Bad request: {exc}"})
@@ -4145,6 +5871,121 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                     "ok": False,
                     "error": render_error or "Could not render TeX",
                 })
+            return
+
+        if path == "/matrix-eval":
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                body = self.rfile.read(length)
+                payload = json.loads(body.decode("utf-8"))
+                matrix_text = str(payload.get("matrix", "")).strip()
+                operation = str(payload.get("operation", "eval")).strip() or "eval"
+                operand = str(payload.get("operand", "")).strip()
+                precision = int(payload.get("precision", 96))
+            except Exception as exc:
+                self.send_json(400, {"ok": False, "error": f"Bad request: {exc}"})
+                return
+
+            if not matrix_text:
+                self.send_json(400, {"ok": False, "error": "Matrix input is empty"})
+                return
+
+            try:
+                precision = max(17, min(MAX_VALUE_PRECISION_DIGITS, precision))
+                ensure_scratch_binary(self.matrix_binary, "scratch/matrix_lab")
+                fields, raw, returncode = run_matrix_lab_fields(
+                    self.matrix_binary,
+                    matrix_text,
+                    operation,
+                    precision,
+                    operand,
+                )
+            except Exception as exc:
+                self.send_json(422, {"ok": False, "error": str(exc)})
+                return
+
+            if returncode != 0:
+                hint = matrix_failure_hint(
+                    self.matrix_binary,
+                    matrix_text,
+                    operation,
+                    precision,
+                    operand,
+                )
+                message = hint or raw or "Matrix evaluation failed"
+                self.send_json(422, {"ok": False, "error": message})
+                return
+
+            save_state_data({
+                "matrix": matrix_text,
+                "matrix_operation": operation,
+                "matrix_operand": operand,
+            })
+            self.send_json(200, prepare_matrix_fields(fields))
+            return
+
+        if path == "/integrator-eval":
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                body = self.rfile.read(length)
+                payload = json.loads(body.decode("utf-8"))
+                expression = str(payload.get("expression", "")).strip()
+                bounds = payload.get("bounds", [])
+                precision = int(payload.get("precision", 96))
+                max_intervals = int(payload.get("max_intervals", DEFAULT_INTEGRATOR_INTERVAL_CAP))
+            except Exception as exc:
+                self.send_json(400, {"ok": False, "error": f"Bad request: {exc}"})
+                return
+
+            if not expression:
+                self.send_json(400, {"ok": False, "error": "Integrand expression is empty"})
+                return
+            if not isinstance(bounds, list) or not bounds:
+                self.send_json(400, {"ok": False, "error": "Add at least one variable bound"})
+                return
+
+            cleaned_bounds: list[dict[str, str]] = []
+            for item in bounds:
+                if not isinstance(item, dict):
+                    self.send_json(400, {"ok": False, "error": "Bounds must be name/lo/hi objects"})
+                    return
+                name = str(item.get("name", "")).strip()
+                lo_text = str(item.get("lo", "")).strip()
+                hi_text = str(item.get("hi", "")).strip()
+                if not name or not lo_text or not hi_text:
+                    self.send_json(400, {"ok": False, "error": "Every bound needs a variable, lower bound, and upper bound"})
+                    return
+                cleaned_bounds.append({"name": name, "lo": lo_text, "hi": hi_text})
+
+            try:
+                precision = max(17, min(MAX_VALUE_PRECISION_DIGITS, precision))
+                max_intervals = max(MIN_INTEGRATOR_INTERVAL_CAP, min(MAX_INTEGRATOR_INTERVAL_CAP, max_intervals))
+                ensure_scratch_binary(self.integrator_binary, "scratch/integrator_lab")
+                fields, raw, returncode = run_integrator_lab_fields(
+                    self.integrator_binary,
+                    expression,
+                    cleaned_bounds,
+                    precision,
+                    max_intervals,
+                )
+            except Exception as exc:
+                self.send_json(422, {"ok": False, "error": str(exc)})
+                return
+
+            if returncode != 0:
+                self.send_json(422, {"ok": False, "error": raw or "Integration failed"})
+                return
+
+            bounds_text = "\n".join(
+                f"{item['name']} = {item['lo']} .. {item['hi']}"
+                for item in cleaned_bounds
+            )
+            save_state_data({
+                "integrator_expression": expression,
+                "integrator_bounds": bounds_text,
+                "integrator_interval_cap": max_intervals,
+            })
+            self.send_json(200, prepare_integrator_fields(fields, precision))
             return
 
         if path == "/goal_seek":
@@ -4313,12 +6154,12 @@ def open_lab_url(url: str, browser: str = "") -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Launch the local MARS Lab.")
+    parser = argparse.ArgumentParser(description=f"Launch the local {LAB_APP_NAME}.")
     parser.add_argument("--host", default="0.0.0.0", help="host to bind")
     parser.add_argument("--port", type=int, default=0, help="port to bind, or 0 for auto")
     parser.add_argument("--no-browser", action="store_true", help="do not open the browser automatically")
     parser.add_argument("--browser", default="", help="browser executable to open the lab URL")
-    parser.add_argument("--binary", type=Path, default=DEFAULT_BIN, help="path to mars_lab binary")
+    parser.add_argument("--binary", type=Path, default=DEFAULT_BIN, help="path to the scratch lab binary")
     args = parser.parse_args()
 
     binary = args.binary if args.binary.is_absolute() else ROOT / args.binary
@@ -4336,27 +6177,27 @@ def main() -> int:
             ensure_tailscale_serve(args.host, port)
             MarsLabHandler.mobile_url = mobile_access_url(args.host, port)
             url = browser_access_url(args.host, port)
-            print(f"MARS Lab already running at {url}")
+            print(f"{LAB_APP_NAME} already running at {url}")
             if not args.no_browser:
-                open_lab_url(url, args.browser)
+                open_lab_url(_control_url(url), args.browser)
             return 0
         raise
 
     ensure_tailscale_serve(args.host, port)
     MarsLabHandler.mobile_url = mobile_access_url(args.host, port)
     url = browser_access_url(args.host, port)
-    print(f"MARS Lab running at {url}")
+    print(f"{LAB_APP_NAME} running at {url}")
     if MarsLabHandler.mobile_url:
         print(f"Mobile access: {MarsLabHandler.mobile_url}")
     print("Press Ctrl+C to stop.")
 
     if not args.no_browser:
-        threading.Timer(0.25, open_lab_url, args=(url, args.browser)).start()
+        threading.Timer(0.25, open_lab_url, args=(_control_url(url), args.browser)).start()
 
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        print("\nStopping MARS Lab.")
+        print(f"\nStopping {LAB_APP_NAME}.")
     finally:
         server.server_close()
     return 0

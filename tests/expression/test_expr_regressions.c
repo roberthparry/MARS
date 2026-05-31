@@ -2101,6 +2101,112 @@ static void test_symbolic_complex_power_derivative_keeps_base_log(void)
     expr_free(expr);
 }
 
+static void test_symbolic_power_derivative_uses_n_minus_one_form(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = expr_from_string("{ x^n | x = NAN, n = NAN }", &bindings);
+    expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    expr_t *deriv = (expr && x) ? expr_create_deriv(expr, x) : NULL;
+    char *deriv_text = deriv ? expr_to_string(deriv, style_EXPRESSION) : NULL;
+    const char *expect = "{ n·x^(n - 1) | n = NAN, x = NAN }";
+
+    if (str_eq(deriv_text, expect))
+        to_string_pass("x^n derivative simplifies to n*x^(n-1)",
+                       deriv_text, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "x^n derivative simplifies to n*x^(n-1)",
+                       deriv_text ? deriv_text : "(null)", expect);
+
+    free(deriv_text);
+    expr_free(deriv);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+}
+
+static void test_symbolic_function_power_matches_parenthesized_power(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = expr_from_string("{ sin^n(x) }", &bindings);
+    expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    expr_t *deriv = (expr && x) ? expr_create_deriv(expr, x) : NULL;
+    char *expr_text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
+    char *deriv_text = deriv ? expr_to_string(deriv, style_EXPRESSION) : NULL;
+    const char *expr_expect = "{ sin(x)^n | x = NAN; n = NAN }";
+    const char *deriv_expect = "{ n·cos(x)·sin(x)^(n - 1) | x = NAN; n = NAN }";
+
+    if (str_eq(expr_text, expr_expect))
+        to_string_pass("sin^n(x) parses as sin(x)^n", expr_text, expr_expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "sin^n(x) parses as sin(x)^n",
+                       expr_text ? expr_text : "(null)", expr_expect);
+
+    if (str_eq(deriv_text, deriv_expect))
+        to_string_pass("sin^n(x) derivative matches sin(x)^n",
+                       deriv_text, deriv_expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "sin^n(x) derivative matches sin(x)^n",
+                       deriv_text ? deriv_text : "(null)", deriv_expect);
+
+    free(deriv_text);
+    free(expr_text);
+    expr_free(deriv);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+}
+
+static void test_inverse_power_function_notation_uses_supported_inverses_only(void)
+{
+    expr_t *asin_expr = expr_from_string("{ sin^-1(x) }", NULL);
+    expr_t *log_expr = expr_from_string("{ log^-1(x) }", NULL);
+    expr_t *sqrt_expr = expr_from_string("{ sqrt^-1(x) }", NULL);
+    expr_t *sqrt_power_expr = expr_from_string("{ sqrt(x)^-1 }", NULL);
+    char *asin_text = asin_expr ? expr_to_string(asin_expr, style_EXPRESSION) : NULL;
+    char *sqrt_power_text = sqrt_power_expr
+        ? expr_to_string(sqrt_power_expr, style_EXPRESSION) : NULL;
+
+    if (str_eq(asin_text, "{ asin(x) | x = NAN }"))
+        to_string_pass("sin^-1(x) parses as asin(x)",
+                       asin_text, "{ asin(x) | x = NAN }");
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "sin^-1(x) parses as asin(x)",
+                       asin_text ? asin_text : "(null)",
+                       "{ asin(x) | x = NAN }");
+
+    if (log_expr == NULL)
+        to_string_pass("log^-1(x) is rejected", "(null)", "(null)");
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "log^-1(x) is rejected",
+                       "(non-null)", "(null)");
+
+    if (sqrt_expr == NULL)
+        to_string_pass("sqrt^-1(x) is rejected", "(null)", "(null)");
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "sqrt^-1(x) is rejected",
+                       "(non-null)", "(null)");
+
+    if (str_eq(sqrt_power_text, "{ √⁻¹(x) | x = NAN }"))
+        to_string_pass("sqrt(x)^-1 remains valid", sqrt_power_text,
+                       "{ √⁻¹(x) | x = NAN }");
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "sqrt(x)^-1 remains valid",
+                       sqrt_power_text ? sqrt_power_text : "(null)",
+                       "{ √⁻¹(x) | x = NAN }");
+
+    free(sqrt_power_text);
+    free(asin_text);
+    expr_free(sqrt_power_expr);
+    expr_free(sqrt_expr);
+    expr_free(log_expr);
+    expr_free(asin_expr);
+}
+
 static void test_bound_euler_symbol_survives_derivative_simplify(void)
 {
     expr_bindings_t *bindings = NULL;
@@ -2162,7 +2268,7 @@ static void test_negative_quotient_derivative_has_single_sign(void)
     expr_t *deriv = (expr && y) ? expr_create_deriv(expr, y) : NULL;
     char *deriv_text = deriv ? expr_to_string(deriv, style_EXPRESSION) : NULL;
     const char *expect =
-        "{ 2y·exp(tan(x))·(tan²(x) + 1)/((tan²(x) + 1)²·exp(2·tan(x)) + y²)² | x = π/2, y = π/4 }";
+        "{ 2y·exp(tan(x))·(tan²(x) + 1)/((tan²(x) + 1)²·exp(2·tan(x)) + y²)² | y = π/4, x = π/2 }";
 
     if (str_eq(deriv_text, expect))
         to_string_pass("negative quotient derivative has a single sign",
@@ -3375,6 +3481,9 @@ void test_runtime_regressions(void)
     TEST_RUN_SUBTEST(test_unary_constants_preserve_user_literals_in_derivatives, NULL);
     TEST_RUN_SUBTEST(test_binary_constants_preserve_user_literals_in_derivatives, NULL);
     TEST_RUN_SUBTEST(test_symbolic_negative_pi_quotient_stays_symbolic, NULL);
+    TEST_RUN_SUBTEST(test_symbolic_power_derivative_uses_n_minus_one_form, NULL);
+    TEST_RUN_SUBTEST(test_symbolic_function_power_matches_parenthesized_power, NULL);
+    TEST_RUN_SUBTEST(test_inverse_power_function_notation_uses_supported_inverses_only, NULL);
     TEST_RUN_SUBTEST(test_nested_symbolic_pi_derivative_has_no_decimalized_coefficients, NULL);
     TEST_RUN_SUBTEST(test_binding_exact_unary_numeric_expression_simplifies, NULL);
     TEST_RUN_SUBTEST(test_binding_exact_trig_numeric_expression_simplifies, NULL);

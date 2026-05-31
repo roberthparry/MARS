@@ -511,6 +511,7 @@ static void test_from_string_name_normalisation(void)
 static void test_from_string_implicit_symbolic_bindings(void)
 {
     expr_t *x = expr_from_string("{ x }", NULL);
+    expr_t *x_pow_n = expr_from_string("{ x^n }", NULL);
     expr_t *e = expr_from_string("{ e }", NULL);
     expr_t *i_unit = expr_from_string("{ i }", NULL);
     expr_t *pi_ascii = expr_from_string("{ pi }", NULL);
@@ -523,6 +524,7 @@ static void test_from_string_implicit_symbolic_bindings(void)
     expr_t *tau_alias = expr_from_string("{ @tau }", NULL);
     expr_t *f = expr_from_string("{ [radius]^2 + c_1 + π + e }", NULL);
     char *xs = x ? expr_to_string(x, style_EXPRESSION) : NULL;
+    char *x_pow_ns = x_pow_n ? expr_to_string(x_pow_n, style_EXPRESSION) : NULL;
     char *es = e ? expr_to_string(e, style_EXPRESSION) : NULL;
     char *is = i_unit ? expr_to_string(i_unit, style_EXPRESSION) : NULL;
     char *pi_as = pi_ascii ? expr_to_string(pi_ascii, style_EXPRESSION) : NULL;
@@ -540,6 +542,17 @@ static void test_from_string_implicit_symbolic_bindings(void)
     } else {
         to_string_fail(__FILE__, __LINE__, 1, "implicit symbolic var inference",
                        xs ? xs : "(null)", "{ x | x = NAN }");
+    }
+
+    if (x_pow_n && x_pow_ns &&
+        str_eq(x_pow_ns, "{ x^n | x = NAN; n = NAN }")) {
+        to_string_pass("implicit symbolic constant inference", x_pow_ns,
+                       "{ x^n | x = NAN; n = NAN }");
+    } else {
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "implicit symbolic constant inference",
+                       x_pow_ns ? x_pow_ns : "(null)",
+                       "{ x^n | x = NAN; n = NAN }");
     }
 
     if (e && es && str_eq(es, "e")) {
@@ -753,6 +766,7 @@ static void test_from_string_implicit_symbolic_bindings(void)
     free(pi_as);
     free(is);
     free(es);
+    free(x_pow_ns);
     free(xs);
     expr_free(f);
     expr_free(tau_alias);
@@ -765,6 +779,7 @@ static void test_from_string_implicit_symbolic_bindings(void)
     expr_free(pi_ascii);
     expr_free(i_unit);
     expr_free(e);
+    expr_free(x_pow_n);
     expr_free(x);
 }
 
@@ -1337,7 +1352,7 @@ static void test_from_string_errors(void)
         "{ x | x = 1; x = 2 }", __LINE__);
     /* Missing '=' in binding */
     check_parse_null_stderr_contains("missing '=' in binding",
-        "{ x | x 1 }", "=", __LINE__);
+        "{ x | x 1 }", "trailing input", __LINE__);
     /* Missing numeric value after '=' in binding */
     check_parse_null_stderr_contains("missing value in binding",
         "{ x | x = }", "incorrect syntax for x:", __LINE__);
@@ -1607,11 +1622,11 @@ static void test_from_string_bindings_with_constant_expression_value(void)
                      __LINE__);
     check_parse_expr("simplified constants keep bindings",
                      "{ ax + yb + zc - 8 | a = NAN, b = NAN, c = NAN; x=1, y = 2, z = 3 }",
-                     "{ xa + yb + zc - 8 | a = NAN, b = NAN, c = NAN; x = 1, y = 2, z = 3 }",
+                     "{ ax + by + cz - 8 | a = NAN, b = NAN, c = NAN; x = 1, y = 2, z = 3 }",
                      __LINE__);
     check_parse_expr("constant bindings accept semicolon separators",
                      "{ ax + by + cz - 8 | a = NAN, b = NAN, c = NAN; x = 1; y = 2, z = 3 }",
-                     "{ xa + yb + zc - 8 | a = NAN, b = NAN, c = NAN; x = 1, y = 2, z = 3 }",
+                     "{ ax + by + cz - 8 | a = NAN, b = NAN, c = NAN; x = 1, y = 2, z = 3 }",
                      __LINE__);
     check_parse_expr("const-only binding preserves leading semicolon",
                      "{ exp(π·√(H)) | ;H = 163 }",
@@ -1635,11 +1650,11 @@ static void test_from_string_bindings_with_constant_expression_value(void)
                      __LINE__);
     check_parse_simplified_expr("generated derivative with NaN bindings simplifies explicitly",
                      "{ -y²z²·sin(xyz)·exp(sin(xyz)) + y²z²·cos²(xyz)·exp(sin(xyz)) | y = NAN, z = NAN, x = NAN }",
-                     "{ y²z²·exp(sin(xyz))·(-sin(xyz) + cos²(xyz)) | y = NAN, z = NAN, x = NAN }",
+                     "{ y²z²·exp(sin(xyz))·(cos²(xyz) - sin(xyz)) | y = NAN, z = NAN, x = NAN }",
                      __LINE__);
     check_parse_simplified_expr("reparsed symbolic pi derivative simplifies explicitly",
                      "{ (-2π·exp(π·√(x)) + 2·π²·√(x)·exp(π·√(x)))/(2·√(x))/(2·√(x))² | x = 163 }",
-                     "{ (-π + π^2·√(x))·exp(π·√(x))/(4x^³⁄₂) | x = 163 }",
+                     "{ exp(π·√(x))·(π^2·√(x) - π)/(4x^³⁄₂) | x = 163 }",
                      __LINE__);
 
     old_precision_bits = num_get_default_prec_bits();

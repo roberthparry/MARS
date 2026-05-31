@@ -561,7 +561,9 @@ int expr_is_default_constant_name(const char *name)
 
     if (!name || !*name)
         return 0;
-    if (*name != 'a' && *name != 'b' && *name != 'c' && *name != 'd')
+    if (*name != 'a' && *name != 'b' && *name != 'c' && *name != 'd' &&
+        *name != 'j' && *name != 'k' && *name != 'l' && *name != 'm' &&
+        *name != 'n')
         return 0;
 
     p++;
