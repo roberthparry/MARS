@@ -221,9 +221,9 @@ $(BUILD_DIR)/bench/%: $(BUILD_DIR)/bench/%.o $(STATIC_LIB) $(SHARED_LIB)
 	@mkdir -p $(dir $@)
 	$(CC) -o $@ $< $(STATIC_LIB) $(LDLIBS)
 
-$(BUILD_DIR)/scratch/%: $(BUILD_DIR)/scratch/%.o $(SHARED_LIB)
+$(BUILD_DIR)/scratch/%: $(BUILD_DIR)/scratch/%.o $(STATIC_LIB) $(SHARED_LIB)
 	@mkdir -p $(dir $@)
-	$(CC) -o $@ $< -L$(BUILD_DIR) -lmars -Wl,-rpath,'$$ORIGIN/..' $(LDLIBS)
+	$(CC) -o $@ $< $(STATIC_LIB) $(LDLIBS)
 
 $(QFLOAT_TOOL_BIN): tools/qfloat/gen_qfloat_tables.c $(STATIC_LIB)
 	@mkdir -p $(dir $@)

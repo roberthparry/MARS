@@ -80,6 +80,7 @@ packaging/linux/*.png
 
 .codex
 .dval_lab_state.json
+.mars_lab_state.json
 .ophelia_lab_state.json
 .ophelia_uploads/
 tools/mars-dval-lab

@@ -1,4 +1,5 @@
 #include <stdbool.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -129,11 +130,19 @@ static char *ophelia_series_date_text(const timeseries_t *series, size_t index)
 static char *ophelia_series_value_text(const timeseries_t *series, size_t index)
 {
     number_t value = NUM_ZERO;
+    char buf[64];
+    double d;
     char *text;
 
     if (!series || ts_get_value(series, index, &value) != 0)
         return NULL;
-    text = num_to_string(value);
+    d = num_to_double(value);
+    if (isfinite(d)) {
+        snprintf(buf, sizeof(buf), "%.2f", d);
+        text = strdup(buf);
+    } else {
+        text = num_to_string(value);
+    }
     num_destroy(&value);
     return text;
 }
@@ -391,14 +400,34 @@ static int ophelia_parse_criterion(const char *text, ts_information_criterion_t 
 
 static void ophelia_advance_datetime(datetime_t *dt, ts_frequency_t frequency)
 {
+    int preserve_month_end;
+
     if (!dt)
         return;
+    preserve_month_end = datetime_day(dt) == datetime_days_in_month(datetime_year(dt), datetime_month(dt));
     switch (frequency) {
-    case TS_FREQ_DAILY: datetime_add_days(dt, 1L); break;
-    case TS_FREQ_MONTHLY: datetime_add_months(dt, 1); break;
-    case TS_FREQ_QUARTERLY: datetime_add_months(dt, 3); break;
-    case TS_FREQ_YEARLY: datetime_add_years(dt, 1); break;
-    default: break;
+    case TS_FREQ_DAILY:
+        datetime_add_days(dt, 1L);
+        break;
+    case TS_FREQ_MONTHLY:
+        datetime_add_months(dt, 1);
+        break;
+    case TS_FREQ_QUARTERLY:
+        datetime_add_months(dt, 3);
+        break;
+    case TS_FREQ_YEARLY:
+        datetime_add_years(dt, 1);
+        break;
+    default:
+        return;
+    }
+    if (preserve_month_end) {
+        short year = datetime_year(dt);
+        month_t month = datetime_month(dt);
+        uint8_t last_day = (uint8_t)datetime_days_in_month(year, month);
+
+        datetime_init_ymdt(dt, year, month, last_day,
+                           datetime_hour(dt), datetime_minute(dt), datetime_second(dt));
     }
 }
 
@@ -603,10 +632,13 @@ static int ophelia_run(const ophelia_config_t *cfg)
         return ophelia_fail("This model needs at least one exogenous regressor column.");
     }
     level = num_create_from_double(cfg->level);
-    if (future_x)
-        effective_horizon = mat_get_row_count(future_x);
-    else
-        effective_horizon = cfg->horizon;
+    effective_horizon = cfg->horizon;
+    if (future_x) {
+        size_t future_rows = mat_get_row_count(future_x);
+
+        if (effective_horizon == 0u || future_rows < effective_horizon)
+            effective_horizon = future_rows;
+    }
 
     if (cfg->model == OPHELIA_MODEL_REGRESSION) {
         ts_regression_result_t fit = {0};
