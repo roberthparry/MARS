@@ -1101,6 +1101,9 @@
     "test_output_and_write_file": true,
     "test_regression_and_forecast": true,
     "test_arima_smoke": true,
+    "test_arimax_with_moving_average_terms": true,
+    "test_arimax_differences_exogenous_regressors": true,
+    "test_auto_arima_preserves_selected_model_and_scale": true,
     "test_exogenous_alignment_for_future_forecasts": true
   }
 }
