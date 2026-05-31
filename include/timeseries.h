@@ -27,7 +27,7 @@
  * frequencies are left for future expansion.
  */
 
-typedef struct _timeseries_t timeseries_t;
+typedef struct timeseries_t timeseries_t;
 
 /**
  * @brief Supported time-series sampling frequencies.
