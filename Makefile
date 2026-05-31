@@ -297,7 +297,24 @@ ophelia-lab: $(BUILD_DIR)/scratch/ophelia_lab
 install-mars-lab: tools/mars-lab packaging/linux/mars-lab.desktop.in packaging/linux/mars-lab.svg $(MARS_LAB_ICON_CONCEPTS)
 	$(INSTALL) -d "$(MARS_LAB_BINDIR)" "$(MARS_LAB_APPDIR)" "$(MARS_LAB_ICONDIR)"
 	rm -f "$(MARS_LAB_BINDIR)/mars-expr-lab" "$(MARS_LAB_APPDIR)/mars-expr-lab.desktop" "$(MARS_LAB_ICONDIR)/mars-expr-lab.svg" "$(MARS_LAB_ICONDIR)"/mars-expr-lab-*.svg
-	@printf '%s\n' '#!/bin/sh' 'export MARS_ROOT="$(CURDIR)"' 'exec "$(CURDIR)/tools/mars-lab" --host 0.0.0.0 --port 8765 "$$@"' > "$(MARS_LAB_LAUNCHER)"
+	@printf '%s\n' \
+		'#!/bin/sh' \
+		'export MARS_ROOT="$(CURDIR)"' \
+		'log_dir="$${XDG_STATE_HOME:-$$HOME/.local/state}/mars-lab"' \
+		'mkdir -p "$$log_dir"' \
+		'printf "[%s] launch %s\n" "$$(date "+%Y-%m-%d %H:%M:%S")" "$$0 $$*" >> "$$log_dir/launcher.log" 2>&1' \
+		'open_browser=1' \
+		'for arg in "$$@"; do [ "$$arg" = "--no-browser" ] && open_browser=0; done' \
+		'unit="mars-lab-$$(date +%s%N)"' \
+		'systemd-run --user --collect --unit="$$unit" --setenv=MARS_ROOT="$(CURDIR)" "$(CURDIR)/tools/mars-lab" --host 0.0.0.0 --port 8765 --no-browser "$$@" >> "$$log_dir/launcher.log" 2>&1' \
+		'status=$$?' \
+		'printf "[%s] systemd-run exit %s unit %s\n" "$$(date "+%Y-%m-%d %H:%M:%S")" "$$status" "$$unit" >> "$$log_dir/launcher.log" 2>&1' \
+		'if [ "$$status" -eq 0 ] && [ "$$open_browser" -eq 1 ]; then' \
+		'  sleep 0.8' \
+		'  if command -v xdg-open >/dev/null 2>&1; then xdg-open "http://127.0.0.1:8765/" >/dev/null 2>&1 & elif command -v gio >/dev/null 2>&1; then gio open "http://127.0.0.1:8765/" >/dev/null 2>&1 & fi' \
+		'fi' \
+		'exit "$$status"' \
+		> "$(MARS_LAB_LAUNCHER)"
 	chmod 755 "$(MARS_LAB_LAUNCHER)"
 	$(INSTALL) -m 644 packaging/linux/mars-lab.svg "$(MARS_LAB_ICON)"
 	@for icon in $(MARS_LAB_ICON_CONCEPTS); do \
@@ -305,7 +322,7 @@ install-mars-lab: tools/mars-lab packaging/linux/mars-lab.desktop.in packaging/l
 		$(INSTALL) -m 644 "$$icon" "$(MARS_LAB_ICONDIR)/mars-lab-$$name.svg"; \
 	done
 	@sed -e 's|@MARS_LAUNCHER@|$(MARS_LAB_LAUNCHER)|g' packaging/linux/mars-lab.desktop.in > "$(MARS_LAB_DESKTOP)"
-	chmod 644 "$(MARS_LAB_DESKTOP)"
+	chmod 755 "$(MARS_LAB_DESKTOP)"
 	@if command -v update-desktop-database >/dev/null 2>&1; then update-desktop-database "$(MARS_LAB_APPDIR)" >/dev/null 2>&1 || true; fi
 	@if command -v gtk-update-icon-cache >/dev/null 2>&1; then gtk-update-icon-cache "$(MARS_LAB_INSTALL_PREFIX)/share/icons/hicolor" >/dev/null 2>&1 || true; fi
 	@if command -v kbuildsycoca6 >/dev/null 2>&1; then kbuildsycoca6 >/dev/null 2>&1 || true; elif command -v kbuildsycoca5 >/dev/null 2>&1; then kbuildsycoca5 >/dev/null 2>&1 || true; fi
@@ -314,11 +331,28 @@ install-mars-lab: tools/mars-lab packaging/linux/mars-lab.desktop.in packaging/l
 
 install-ophelia-lab: tools/ophelia-lab packaging/linux/ophelia-lab.desktop.in packaging/linux/ophelia-lab.svg
 	$(INSTALL) -d "$(MARS_LAB_BINDIR)" "$(MARS_LAB_APPDIR)" "$(MARS_LAB_ICONDIR)"
-	@printf '%s\n' '#!/bin/sh' 'export MARS_ROOT="$(CURDIR)"' 'exec "$(CURDIR)/tools/ophelia-lab" --host 127.0.0.1 --port 8766 "$$@"' > "$(OPHELIA_LAB_LAUNCHER)"
+	@printf '%s\n' \
+		'#!/bin/sh' \
+		'export MARS_ROOT="$(CURDIR)"' \
+		'log_dir="$${XDG_STATE_HOME:-$$HOME/.local/state}/ophelia-lab"' \
+		'mkdir -p "$$log_dir"' \
+		'printf "[%s] launch %s\n" "$$(date "+%Y-%m-%d %H:%M:%S")" "$$0 $$*" >> "$$log_dir/launcher.log" 2>&1' \
+		'open_browser=1' \
+		'for arg in "$$@"; do [ "$$arg" = "--no-browser" ] && open_browser=0; done' \
+		'unit="ophelia-lab-$$(date +%s%N)"' \
+		'systemd-run --user --collect --unit="$$unit" --setenv=MARS_ROOT="$(CURDIR)" "$(CURDIR)/tools/ophelia-lab" --host 0.0.0.0 --port 8766 --no-browser "$$@" >> "$$log_dir/launcher.log" 2>&1' \
+		'status=$$?' \
+		'printf "[%s] systemd-run exit %s unit %s\n" "$$(date "+%Y-%m-%d %H:%M:%S")" "$$status" "$$unit" >> "$$log_dir/launcher.log" 2>&1' \
+		'if [ "$$status" -eq 0 ] && [ "$$open_browser" -eq 1 ]; then' \
+		'  sleep 0.8' \
+		'  if command -v xdg-open >/dev/null 2>&1; then xdg-open "http://127.0.0.1:8766/ophelia/" >/dev/null 2>&1 & elif command -v gio >/dev/null 2>&1; then gio open "http://127.0.0.1:8766/ophelia/" >/dev/null 2>&1 & fi' \
+		'fi' \
+		'exit "$$status"' \
+		> "$(OPHELIA_LAB_LAUNCHER)"
 	chmod 755 "$(OPHELIA_LAB_LAUNCHER)"
 	$(INSTALL) -m 644 packaging/linux/ophelia-lab.svg "$(OPHELIA_LAB_ICON)"
 	@sed -e 's|@OPHELIA_LAUNCHER@|$(OPHELIA_LAB_LAUNCHER)|g' packaging/linux/ophelia-lab.desktop.in > "$(OPHELIA_LAB_DESKTOP)"
-	chmod 644 "$(OPHELIA_LAB_DESKTOP)"
+	chmod 755 "$(OPHELIA_LAB_DESKTOP)"
 	@if command -v update-desktop-database >/dev/null 2>&1; then update-desktop-database "$(MARS_LAB_APPDIR)" >/dev/null 2>&1 || true; fi
 	@if command -v gtk-update-icon-cache >/dev/null 2>&1; then gtk-update-icon-cache "$(MARS_LAB_INSTALL_PREFIX)/share/icons/hicolor" >/dev/null 2>&1 || true; fi
 	@if command -v kbuildsycoca6 >/dev/null 2>&1; then kbuildsycoca6 >/dev/null 2>&1 || true; elif command -v kbuildsycoca5 >/dev/null 2>&1; then kbuildsycoca5 >/dev/null 2>&1 || true; fi

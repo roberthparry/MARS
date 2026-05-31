@@ -97,6 +97,90 @@ static void test_csv_load_and_slice(void)
     ts_free(y);
 }
 
+static void test_in_memory_constructors_and_builder(void)
+{
+    const double plain_values[4] = { 1.25, 2.50, NAN, 4.75 };
+    const double regular_values[3] = { 10.0, 11.5, 13.0 };
+    const double indexed_values[2] = { 21.0, 23.5 };
+    timeseries_t *plain = NULL;
+    timeseries_t *regular = NULL;
+    timeseries_t *indexed = NULL;
+    timeseries_t *built = NULL;
+    ts_builder_t *builder = NULL;
+    datetime_t *start = NULL;
+    datetime_t *idx0 = NULL;
+    datetime_t *idx1 = NULL;
+    const datetime_t *index[2] = { NULL, NULL };
+    datetime_t *observed = NULL;
+    number_t value = NUM_ZERO;
+
+    plain = ts_new_from_doubles(plain_values, 4u);
+    TEST_ASSERT_NOT_NULL(plain);
+    TEST_ASSERT_TRUE(ts_length(plain) == 4u, "plain double constructor length");
+    TEST_ASSERT_TRUE(!ts_index_info(plain).has_datetimes, "plain double constructor has no date index");
+    TEST_ASSERT_TRUE(ts_has_missing(plain), "plain double constructor records NaN as missing");
+    TEST_ASSERT_TRUE(ts_get_value(plain, 1u, &value) == 0, "plain double value available");
+    TEST_ASSERT_TRUE(fabs(num_to_double(value) - 2.5) < 1e-9, "plain double value retained");
+    num_destroy(&value);
+
+    start = datetime_init_ymd(datetime_alloc(), 2024, DT_January, 15u);
+    regular = ts_new_regular_from_doubles(regular_values, 3u, start,
+                                          TS_FREQ_DAILY, TS_YEAR_CALENDAR);
+    TEST_ASSERT_NOT_NULL(regular);
+    TEST_ASSERT_TRUE(ts_is_regular(regular), "regular double constructor records regular index");
+    TEST_ASSERT_TRUE(ts_frequency(regular) == TS_FREQ_DAILY, "regular double constructor records frequency");
+    observed = datetime_alloc();
+    TEST_ASSERT_TRUE(ts_get_datetime(regular, 2u, observed) == 0, "regular double date available");
+    TEST_ASSERT_TRUE(datetime_year(observed) == 2024 &&
+                     datetime_month(observed) == DT_January &&
+                     datetime_day(observed) == 17u,
+                     "regular double constructor advances dates");
+    datetime_dealloc(observed);
+    observed = NULL;
+
+    idx0 = datetime_init_ymd(datetime_alloc(), 2025, DT_March, 31u);
+    idx1 = datetime_init_ymd(datetime_alloc(), 2025, DT_June, 30u);
+    index[0] = idx0;
+    index[1] = idx1;
+    indexed = ts_new_indexed_from_doubles(indexed_values, index,
+                                          2u, TS_FREQ_QUARTERLY,
+                                          TS_YEAR_FISCAL_UK_APR);
+    TEST_ASSERT_NOT_NULL(indexed);
+    TEST_ASSERT_TRUE(ts_index_info(indexed).has_datetimes, "indexed double constructor has dates");
+    TEST_ASSERT_TRUE(ts_frequency(indexed) == TS_FREQ_QUARTERLY, "indexed double constructor records frequency");
+    observed = ts_end_datetime(indexed);
+    TEST_ASSERT_NOT_NULL(observed);
+    TEST_ASSERT_TRUE(datetime_compare(observed, idx1) == 0, "indexed double constructor keeps explicit dates");
+    datetime_dealloc(observed);
+    observed = NULL;
+
+    builder = ts_builder_new(TS_FREQ_MONTHLY, TS_YEAR_CALENDAR);
+    TEST_ASSERT_NOT_NULL(builder);
+    TEST_ASSERT_TRUE(ts_builder_append_date_string_double(builder, "31/01/2026", 31.0) == 0,
+                     "builder accepts first dated double");
+    TEST_ASSERT_TRUE(ts_builder_append_date_string_double(builder, "28/02/2026", 32.5) == 0,
+                     "builder accepts second dated double");
+    TEST_ASSERT_TRUE(ts_builder_append_date_string_double(builder, "31/03/2026", NAN) == 0,
+                     "builder accepts missing dated double");
+    built = ts_builder_build(builder);
+    TEST_ASSERT_NOT_NULL(built);
+    TEST_ASSERT_TRUE(ts_length(built) == 3u, "builder output length");
+    TEST_ASSERT_TRUE(ts_index_info(built).has_datetimes, "builder output has date index");
+    TEST_ASSERT_TRUE(ts_has_missing(built), "builder output records NaN as missing");
+    TEST_ASSERT_TRUE(ts_get_value(built, 1u, &value) == 0, "builder value available");
+    TEST_ASSERT_TRUE(fabs(num_to_double(value) - 32.5) < 1e-9, "builder value retained");
+    num_destroy(&value);
+
+    ts_builder_destroy(builder);
+    ts_free(built);
+    datetime_dealloc(idx0);
+    datetime_dealloc(idx1);
+    datetime_dealloc(start);
+    ts_free(indexed);
+    ts_free(regular);
+    ts_free(plain);
+}
+
 static void test_transforms_and_aggregation(void)
 {
     number_t vals[6] = {
@@ -567,6 +651,7 @@ static void test_auto_arima_preserves_selected_model_and_scale(void)
 void run_timeseries_core_tests(void)
 {
     TEST_RUN_CASE(test_csv_load_and_slice, NULL);
+    TEST_RUN_CASE(test_in_memory_constructors_and_builder, NULL);
     TEST_RUN_CASE(test_transforms_and_aggregation, NULL);
 }
 

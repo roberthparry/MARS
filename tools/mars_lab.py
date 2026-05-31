@@ -894,11 +894,6 @@ INDEX_HTML = r"""<!doctype html>
       gap: 0.55rem;
     }
 
-    .mobile-funnel-toggle {
-      width: 100%;
-      min-width: 7.75rem;
-    }
-
     .mobile-qr {
       width: 9rem;
       height: 9rem;
@@ -1441,10 +1436,6 @@ INDEX_HTML = r"""<!doctype html>
         display: none;
       }
 
-      .mobile-funnel-toggle {
-        width: auto;
-      }
-
       main {
         padding: 0.45rem 0.5rem 1rem;
       }
@@ -1551,7 +1542,6 @@ __THEME_OVERRIDES__
           <div class="mobile-actions">
             <div class="mobile-qr" id="mobileQr" aria-label="QR code for mobile access">__MOBILE_QR_SVG__</div>
             <button class="card-action copy-result" type="button" data-copy-target="mobile">Copy URL</button>
-            <button class="card-action mobile-funnel-toggle __MOBILE_TAILSCALE_CLASS__" id="funnelToggleButton" type="button">Make private</button>
           </div>
         </div>
       </details>
@@ -1809,7 +1799,6 @@ __THEME_OVERRIDES__
     const mobileHint = document.getElementById('mobileHint');
     const mobileUrl = document.getElementById('mobileUrl');
     const mobileQr = document.getElementById('mobileQr');
-    const funnelToggleButton = document.getElementById('funnelToggleButton');
     const controlToken = __CONTROL_TOKEN__;
     const statusEl = document.getElementById('status');
     const rightPaneTitle = document.getElementById('rightPaneTitle');
@@ -3065,38 +3054,9 @@ __THEME_OVERRIDES__
           mobileHint.textContent = String(data.hint || '');
         mobileUrl.textContent = url || 'Unavailable';
         mobileQr.innerHTML = String(data.qr || '');
-        if (funnelToggleButton) {
-          const isTailscale = Boolean(data.tailscale);
-          funnelToggleButton.classList.toggle('hidden', !isTailscale);
-          funnelToggleButton.disabled = isTailscale && !canControl;
-          funnelToggleButton.title = isTailscale && !canControl ? 'Restart __LAB_NAME__ from this machine to enable local Funnel control.' : '';
-          funnelToggleButton.textContent = canControl ? (data.funnel ? 'Make private' : 'Make public') : 'Local control only';
-        }
       } catch (err) {
         // Network state changes are expected; keep the last known QR until the next poll.
       }
-    }
-
-    if (funnelToggleButton) {
-      funnelToggleButton.addEventListener('click', async () => {
-        const wasPublic = funnelToggleButton.textContent.toLowerCase().includes('private');
-        funnelToggleButton.disabled = true;
-        funnelToggleButton.textContent = wasPublic ? 'Making private...' : 'Making public...';
-        try {
-          const headers = controlToken ? {'X-Dval-Lab-Control': controlToken} : {};
-          const response = await fetch('/funnel-toggle', {method: 'POST', headers});
-          if (!response.ok)
-            throw new Error('Funnel switch failed');
-          await refreshMobileAccess();
-        } catch (err) {
-          funnelToggleButton.textContent = wasPublic ? 'Made private' : 'Could not switch';
-          setTimeout(() => {
-            refreshMobileAccess();
-          }, 1600);
-        } finally {
-          funnelToggleButton.disabled = false;
-        }
-      });
     }
 
     function resetMoreDigitsButton(button, canExpand) {
@@ -4111,6 +4071,41 @@ def _ip_address_from_text(text: str) -> ipaddress._BaseAddress | None:
         return None
 
 
+def request_allows_lab_access(client_host: str) -> bool:
+    client_address = _ip_address_from_text(client_host)
+    allowed_ipv4 = (
+        ipaddress.ip_network("127.0.0.0/8"),
+        ipaddress.ip_network("10.0.0.0/8"),
+        ipaddress.ip_network("172.16.0.0/12"),
+        ipaddress.ip_network("192.168.0.0/16"),
+        ipaddress.ip_network("169.254.0.0/16"),
+        ipaddress.ip_network("100.64.0.0/10"),
+    )
+    allowed_ipv6 = (
+        ipaddress.ip_network("::1/128"),
+        ipaddress.ip_network("fc00::/7"),
+        ipaddress.ip_network("fe80::/10"),
+    )
+
+    if not client_address:
+        return False
+    if isinstance(client_address, ipaddress.IPv6Address) and client_address.ipv4_mapped:
+        client_address = client_address.ipv4_mapped
+    if isinstance(client_address, ipaddress.IPv4Address):
+        return any(client_address in network for network in allowed_ipv4)
+    return any(client_address in network for network in allowed_ipv6)
+
+
+def request_uses_public_funnel_host(host_header: str) -> bool:
+    request_host = _host_from_header(host_header).strip().lower()
+
+    if not request_host.endswith(".ts.net"):
+        return False
+    tailscale_host = tailscale_https_host().strip().lower()
+    return bool(request_host and tailscale_host and request_host == tailscale_host and
+                tailscale_funnel_enabled())
+
+
 def _control_token_from_query(path: str) -> str:
     query = urllib.parse.urlparse(path).query
     values = urllib.parse.parse_qs(query).get(CONTROL_QUERY_PARAM, [])
@@ -4251,11 +4246,6 @@ def tailscale_funnel_enabled() -> bool:
     return completed.returncode == 0 and "Funnel on" in completed.stdout
 
 
-def tailscale_public_mode() -> bool:
-    mode = os.environ.get("MARS_LAB_TAILSCALE_MODE", "private").strip().lower()
-    return mode in ("1", "true", "yes", "on", "funnel", "public")
-
-
 def set_tailscale_funnel_enabled(port: int, enabled: bool) -> bool:
     if not tailscale_https_host():
         return False
@@ -4301,7 +4291,9 @@ def ensure_tailscale_serve(bind_host: str, port: int) -> None:
     if not tailscale_https_host():
         return
 
-    set_tailscale_funnel_enabled(port, tailscale_public_mode())
+    # Privacy first: MARS Lab may be shared on local WiFi or the private
+    # tailnet, but it should not publish itself to the public internet.
+    set_tailscale_funnel_enabled(port, False)
 
 
 def local_lan_ipv4() -> str:
@@ -4367,9 +4359,7 @@ def local_mdns_host() -> str:
 def browser_access_host(bind_host: str) -> str:
     bind_host = bind_host.strip()
     if bind_host in ("0.0.0.0", "::", "::0"):
-        if tailscale_ipv4():
-            return tailscale_magicdns_host() or "mars"
-        return local_mdns_host() or local_lan_ipv4() or "127.0.0.1"
+        return "127.0.0.1"
     return bind_host
 
 
@@ -4388,6 +4378,31 @@ def browser_access_url(bind_host: str, port: int) -> str:
     return f"http://{browser_host}:{port}/"
 
 
+def tailscale_access_url(bind_host: str, port: int, path: str = "/") -> str:
+    path = path if path.startswith("/") else f"/{path}"
+    tailscale_ip = tailscale_ipv4()
+    if not tailscale_ip:
+        return ""
+
+    tailscale_host = tailscale_https_host()
+    if tailscale_host:
+        return f"https://{tailscale_host}{path}"
+
+    bind_host = bind_host.strip()
+    bind_address = _ip_address_from_text(bind_host)
+    bind_accepts_tailscale = (
+        bind_host in ("0.0.0.0", "::", "::0") or
+        bool(bind_address and bind_address in ipaddress.ip_network("100.64.0.0/10"))
+    )
+    if not bind_accepts_tailscale:
+        return ""
+
+    url_host = tailscale_magicdns_host() or tailscale_ip
+    if ":" in url_host and not url_host.startswith("["):
+        url_host = f"[{url_host}]"
+    return f"http://{url_host}:{port}{path}"
+
+
 def mobile_access_url(bind_host: str, port: int, host_header: str = "") -> str:
     return str(mobile_access_details(bind_host, port, host_header)["url"])
 
@@ -4395,6 +4410,17 @@ def mobile_access_url(bind_host: str, port: int, host_header: str = "") -> str:
 def mobile_access_details(bind_host: str, port: int, host_header: str = "",
                           control_allowed: bool = False) -> dict[str, object]:
     funnel = tailscale_funnel_enabled()
+    tailscale_url = tailscale_access_url(bind_host, port)
+    if tailscale_url:
+        return {
+            "url": tailscale_url,
+            "title": "Tailscale access",
+            "hint": "Scan from a device connected to Tailscale.",
+            "funnel": funnel,
+            "tailscale": True,
+            "control": control_allowed,
+        }
+
     request_host = _host_from_header(host_header)
     if request_host and not _is_loopback_or_wildcard_host(request_host):
         tailscale_host = tailscale_https_host()
@@ -4410,12 +4436,8 @@ def mobile_access_details(bind_host: str, port: int, host_header: str = "",
             url_port = "" if tailscale_host else f":{port}"
             return {
                 "url": f"{scheme}://{url_host}{url_port}/",
-                "title": "Internet access" if funnel else "Tailscale access",
-                "hint": (
-                    "Funnel is on. Scan from any device."
-                    if funnel
-                    else "Funnel is off. Scan from a device connected to Tailscale."
-                ),
+                "title": "Tailscale access",
+                "hint": "Scan from a device connected to Tailscale.",
                 "funnel": funnel,
                 "tailscale": True,
                 "control": control_allowed,
@@ -4439,30 +4461,16 @@ def mobile_access_details(bind_host: str, port: int, host_header: str = "",
             url_port = "" if scheme == "https" else f":{port}"
             return {
                 "url": f"{scheme}://{tailscale_host}{url_port}/",
-                "title": "Internet access" if funnel else "Tailscale access",
-                "hint": (
-                    "Funnel is on. Scan from any device."
-                    if funnel
-                    else "Funnel is off. Scan from a device connected to Tailscale."
-                ),
+                "title": "Tailscale access",
+                "hint": "Scan from a device connected to Tailscale.",
                 "funnel": funnel,
                 "tailscale": True,
                 "control": control_allowed,
             }
-        mdns_host = local_mdns_host()
-        if mdns_host:
+        lan_host = local_mdns_host() or local_lan_ipv4()
+        if lan_host:
             return {
-                "url": f"http://{mdns_host}:{port}/",
-                "title": "WiFi access",
-                "hint": "Scan from a phone on the same WiFi.",
-                "funnel": False,
-                "tailscale": False,
-                "control": False,
-            }
-        bind_host = local_lan_ipv4()
-        if bind_host:
-            return {
-                "url": f"http://{bind_host}:{port}/",
+                "url": f"http://{lan_host}:{port}/",
                 "title": "WiFi access",
                 "hint": "Scan from a phone on the same WiFi.",
                 "funnel": False,
@@ -4482,7 +4490,7 @@ def mobile_access_details(bind_host: str, port: int, host_header: str = "",
 
     if ":" in bind_host and not bind_host.startswith("["):
         bind_host = f"[{bind_host}]"
-    title = "Internet access" if bind_host.startswith("100.") else "WiFi access"
+    title = "Tailscale access" if bind_host.startswith("100.") else "WiFi access"
     hint = "Scan from a phone connected to Tailscale." if bind_host.startswith("100.") else "Scan from a phone on the same WiFi."
     return {
         "url": f"http://{bind_host}:{port}/",
@@ -5656,7 +5664,18 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def request_allowed(self) -> bool:
+        if request_uses_public_funnel_host(self.headers.get("Host", "")):
+            self.send_error(403, f"{LAB_APP_NAME} is private. Use WiFi or Tailscale.")
+            return False
+        if request_allows_lab_access(str(self.client_address[0])):
+            return True
+        self.send_error(403, f"{LAB_APP_NAME} is only available on this machine, local WiFi, or Tailscale.")
+        return False
+
     def do_GET(self) -> None:
+        if not self.request_allowed():
+            return
         parsed_path = urllib.parse.urlparse(self.path)
         path = parsed_path.path
         if path == "/state":
@@ -5754,33 +5773,11 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def do_POST(self) -> None:
+        if not self.request_allowed():
+            return
         path = urllib.parse.urlparse(self.path).path
         if path == "/funnel-toggle":
-            control_allowed = request_allows_funnel_control(
-                self.headers,
-                str(self.client_address[0]),
-                _control_token_from_query(self.path),
-            )
-            if not control_allowed:
-                self.send_json(403, {"ok": False, "error": "Funnel control is only available from trusted devices."})
-                return
-            target_enabled = not tailscale_funnel_enabled()
-            command_ok = set_tailscale_funnel_enabled(self.server_port, target_enabled)
-            current_enabled = tailscale_funnel_enabled()
-            ok = command_ok or current_enabled == target_enabled
-            details = mobile_access_details(
-                self.server_host,
-                self.server_port,
-                self.headers.get("Host", ""),
-                control_allowed,
-            )
-            details["ok"] = ok
-            details["funnel"] = current_enabled
-            details["qr"] = mobile_qr_svg(
-                str(details.get("url", "")),
-                bool(details.get("control")),
-            ) if details.get("url") else ""
-            self.send_json(200 if ok else 502, details)
+            self.send_json(410, {"ok": False, "error": "Public access switching is disabled in MARS Lab."})
             return
 
         if path == "/state":
@@ -6136,13 +6133,20 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
 
 def open_lab_url(url: str, browser: str = "") -> None:
     if browser:
-        subprocess.Popen(
-            [browser, url],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            close_fds=True,
-        )
-        return
+        try:
+            process = subprocess.Popen(
+                [browser, url],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                close_fds=True,
+            )
+            try:
+                if process.wait(timeout=0.5) == 0:
+                    return
+            except subprocess.TimeoutExpired:
+                return
+        except OSError:
+            pass
 
     # Prefer desktop URI openers so the user's configured default browser is
     # used.  Drop BROWSER for these commands because some environments set it

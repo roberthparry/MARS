@@ -2429,7 +2429,7 @@ INDEX_HTML = """<!doctype html>
             <ul>
               <li><code>Download summary.txt</code> gives you the readable model summary.</li>
               <li><code>Download forecast.csv</code> gives you <code>date</code>, <code>actual</code>, and the forecast columns. With one model, it includes <code>mean</code>, <code>stderr</code>, <code>lower</code>, and <code>upper</code>. With several models, it gives each model's <code>mean</code> and <code>stderr</code> side by side.</li>
-              <li>The QR/mobile card in the header points to this same lab, including the separate <code>/ophelia/</code> public path.</li>
+              <li>The QR/mobile card in the header points to this same lab, including the separate <code>/ophelia/</code> path.</li>
             </ul>
           </div>
         </div>
@@ -6816,8 +6816,19 @@ def ophelia_browser_access_url(bind_host: str, port: int) -> str:
 def ophelia_mobile_access_details(bind_host: str, port: int, host_header: str = "",
                                   control_allowed: bool = False) -> dict[str, object]:
     funnel = ophelia_tailscale_funnel_enabled()
-    tailscale_host = shared.tailscale_https_host()
-    tailscale_url = f"https://{tailscale_host}{app_url('/')}" if tailscale_host else ""
+    tailscale_ip = shared.tailscale_ipv4()
+    tailscale_host = shared.tailscale_https_host() if tailscale_ip else ""
+    tailscale_url = shared.tailscale_access_url(bind_host, port, app_url('/'))
+    if tailscale_url:
+        return {
+            "url": tailscale_url,
+            "title": "Tailscale access",
+            "hint": "Scan from a device connected to Tailscale.",
+            "funnel": funnel,
+            "tailscale": True,
+            "control": control_allowed,
+        }
+
     request_host = shared._host_from_header(host_header)
     if request_host and not shared._is_loopback_or_wildcard_host(request_host):
         magicdns_host = shared.tailscale_magicdns_host()
@@ -6832,44 +6843,48 @@ def ophelia_mobile_access_details(bind_host: str, port: int, host_header: str = 
             url_port = "" if tailscale_host else f":{port}"
             return {
                 "url": f"{scheme}://{url_host}{url_port}{app_url('/')}",
-                "title": "Internet access" if funnel else "Tailscale access",
-                "hint": (
-                    "Funnel is on. Scan from any device."
-                    if funnel
-                    else "Funnel is off. Scan from a device connected to Tailscale."
-                ),
+                "title": "Tailscale access",
+                "hint": "Scan from a device connected to Tailscale.",
                 "funnel": funnel,
                 "tailscale": True,
                 "control": control_allowed,
             }
         return {
-            "url": tailscale_url,
-            "title": "Tailscale only",
-            "hint": "Connect this device to your Tailscale tailnet to use Ophelia.",
+            "url": f"http://{request_host}:{port}{app_url('/')}",
+            "title": "WiFi access",
+            "hint": "Scan from a phone on the same WiFi.",
             "funnel": False,
-            "tailscale": bool(tailscale_host),
+            "tailscale": False,
             "control": False,
         }
 
     bind_host = bind_host.strip()
     if bind_host in ("127.0.0.1", "localhost", "::1", "0.0.0.0", "::", "::0"):
-        tailscale_ip = shared.tailscale_ipv4()
         if tailscale_ip:
             scheme = "https" if tailscale_host else "http"
             tailscale_display_host = tailscale_host or shared.tailscale_magicdns_host() or tailscale_ip
             url_port = "" if scheme == "https" else f":{port}"
             return {
                 "url": f"{scheme}://{tailscale_display_host}{url_port}{app_url('/')}",
-                "title": "Internet access" if funnel else "Tailscale access",
-                "hint": (
-                    "Funnel is on. Scan from any device."
-                    if funnel
-                    else "Funnel is off. Scan from a device connected to Tailscale."
-                ),
+                "title": "Tailscale access",
+                "hint": "Scan from a device connected to Tailscale.",
                 "funnel": funnel,
                 "tailscale": True,
                 "control": control_allowed,
             }
+        if bind_host in ("0.0.0.0", "::", "::0"):
+            wifi_host = shared.local_mdns_host() or shared.local_lan_ipv4()
+            if wifi_host:
+                if ":" in wifi_host and not wifi_host.startswith("["):
+                    wifi_host = f"[{wifi_host}]"
+                return {
+                    "url": f"http://{wifi_host}:{port}{app_url('/')}",
+                    "title": "WiFi access",
+                    "hint": "Scan from a phone on the same WiFi.",
+                    "funnel": False,
+                    "tailscale": False,
+                    "control": False,
+                }
     browser_host = shared.browser_access_host(bind_host)
     if ":" in browser_host and not browser_host.startswith("["):
         browser_host = f"[{browser_host}]"
@@ -7335,7 +7350,18 @@ class OpheliaLabHandler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(page)
 
+    def request_allowed(self) -> bool:
+        if shared.request_uses_public_funnel_host(self.headers.get("Host", "")):
+            self.send_error(403, f"{LAB_APP_NAME} is private. Use WiFi or Tailscale.")
+            return False
+        if shared.request_allows_lab_access(str(self.client_address[0])):
+            return True
+        self.send_error(403, f"{LAB_APP_NAME} is only available on this machine, local WiFi, or Tailscale.")
+        return False
+
     def do_GET(self) -> None:
+        if not self.request_allowed():
+            return
         parsed = urllib.parse.urlparse(self.path)
         path = request_path(parsed.path)
         if path == "/state":
@@ -7431,6 +7457,8 @@ class OpheliaLabHandler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(page)
 
     def do_POST(self) -> None:
+        if not self.request_allowed():
+            return
         path = request_path(urllib.parse.urlparse(self.path).path)
         if path == "/forecast-form":
             try:
@@ -7510,7 +7538,7 @@ class OpheliaLabHandler(http.server.BaseHTTPRequestHandler):
             return
 
         if path == "/funnel-toggle":
-            self.send_json(410, {"ok": False, "error": "Public Funnel control is disabled in Ophelia Lab."})
+            self.send_json(410, {"ok": False, "error": "Public access switching is disabled in Ophelia Lab."})
             return
 
         if path != "/forecast":
@@ -7537,7 +7565,7 @@ class OpheliaLabHandler(http.server.BaseHTTPRequestHandler):
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Launch the local Ophelia Lab forecasting app.")
-    parser.add_argument("--host", default="127.0.0.1", help="host to bind")
+    parser.add_argument("--host", default="0.0.0.0", help="host to bind")
     parser.add_argument("--port", type=int, default=0, help="port to bind, or 0 for auto")
     parser.add_argument("--no-browser", action="store_true", help="do not open the browser automatically")
     parser.add_argument("--browser", default="", help="browser executable to open the lab URL")
