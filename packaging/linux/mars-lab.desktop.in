@@ -2,9 +2,8 @@
 Type=Application
 Name=MARS Lab
 Comment=Explore MARS mathematics with rendered TeX
-TryExec=@MARS_LAUNCHER@
-Exec=@MARS_LAUNCHER@ --browser /snap/bin/brave
+Exec=@MARS_LAUNCHER@
 Terminal=false
 Categories=Development;Science;Math;
-StartupNotify=true
+StartupNotify=false
 Icon=mars-lab

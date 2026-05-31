@@ -2,9 +2,8 @@
 Type=Application
 Name=Ophelia Lab
 Comment=Explore MARS mathematics in a magical Wonderland lab
-TryExec=@OPHELIA_LAUNCHER@
-Exec=@OPHELIA_LAUNCHER@ --browser /snap/bin/brave
+Exec=@OPHELIA_LAUNCHER@
 Terminal=false
 Categories=Development;Science;Math;
-StartupNotify=true
+StartupNotify=false
 Icon=ophelia-lab

@@ -1097,6 +1097,7 @@
   },
   "tests/timeseries/test_timeseries.c": {
     "test_csv_load_and_slice": true,
+    "test_in_memory_constructors_and_builder": true,
     "test_transforms_and_aggregation": true,
     "test_output_and_write_file": true,
     "test_regression_and_forecast": true,

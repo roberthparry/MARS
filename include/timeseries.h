@@ -28,6 +28,7 @@
  */
 
 typedef struct timeseries_t timeseries_t;
+typedef struct ts_builder_t ts_builder_t;
 
 /**
  * @brief Supported time-series sampling frequencies.
@@ -247,8 +248,60 @@ timeseries_t *ts_new_indexed(const number_t *values, const datetime_t *const *in
                              size_t length, ts_frequency_t frequency,
                              ts_year_type_t year_type);
 
+/**
+ * @brief Convenience constructor from ordinary C doubles.
+ *
+ * This is equivalent to converting each value with `num_create_from_double()`
+ * and then calling `ts_new()`.
+ */
+timeseries_t *ts_new_from_doubles(const double *values, size_t length);
+
+/**
+ * @brief Convenience constructor for a regular dated series from C doubles.
+ *
+ * The datetime index is generated from @p start and @p frequency.
+ */
+timeseries_t *ts_new_regular_from_doubles(const double *values, size_t length,
+                                          const datetime_t *start,
+                                          ts_frequency_t frequency,
+                                          ts_year_type_t year_type);
+
+/**
+ * @brief Convenience constructor for an explicitly dated series from C doubles.
+ */
+timeseries_t *ts_new_indexed_from_doubles(const double *values,
+                                          const datetime_t *const *index,
+                                          size_t length,
+                                          ts_frequency_t frequency,
+                                          ts_year_type_t year_type);
+
 timeseries_t *ts_clone(const timeseries_t *series);
 void          ts_free(timeseries_t *series);
+
+/**
+ * @brief Create a row-at-a-time timeseries builder.
+ *
+ * Builders are useful when the final row count is not known up front, such as
+ * data arriving from a UI, database cursor, or parser. Appended datetimes are
+ * cloned, and appended values are copied into the builder.
+ */
+ts_builder_t *ts_builder_new(ts_frequency_t frequency,
+                             ts_year_type_t year_type);
+
+int ts_builder_append(ts_builder_t *builder,
+                      const datetime_t *datetime,
+                      const number_t *value);
+
+int ts_builder_append_double(ts_builder_t *builder,
+                             const datetime_t *datetime,
+                             double value);
+
+int ts_builder_append_date_string_double(ts_builder_t *builder,
+                                         const char *date_text,
+                                         double value);
+
+timeseries_t *ts_builder_build(const ts_builder_t *builder);
+void          ts_builder_destroy(ts_builder_t *builder);
 
 /* -------------------------------------------------------------------------
    CSV loading
