@@ -369,6 +369,7 @@
     "test_expr_sin": true,
     "test_expr_exp": true,
     "test_expr_arctan": true,
+    "test_single_integral_num_high_precision_log": true,
     "test_expr_null_safety": true,
     "test_double_polynomial": true,
     "test_double_exp": true,
@@ -1042,6 +1043,9 @@
       "test_unary_constants_preserve_user_literals_in_derivatives": true,
       "test_binary_constants_preserve_user_literals_in_derivatives": true,
       "test_symbolic_negative_pi_quotient_stays_symbolic": true,
+      "test_symbolic_power_derivative_uses_n_minus_one_form": true,
+      "test_symbolic_function_power_matches_parenthesized_power": true,
+      "test_inverse_power_function_notation_uses_supported_inverses_only": true,
       "test_nested_symbolic_pi_derivative_has_no_decimalized_coefficients": true,
       "test_binding_exact_unary_numeric_expression_simplifies": true,
       "test_binding_exact_trig_numeric_expression_simplifies": true,
@@ -1090,5 +1094,13 @@
       "test_number_complex_elementary_parity": true,
       "test_number_complex_special_parity": true
     }
+  },
+  "tests/timeseries/test_timeseries.c": {
+    "test_csv_load_and_slice": true,
+    "test_transforms_and_aggregation": true,
+    "test_output_and_write_file": true,
+    "test_regression_and_forecast": true,
+    "test_arima_smoke": true,
+    "test_exogenous_alignment_for_future_forecasts": true
   }
 }

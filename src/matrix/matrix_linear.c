@@ -935,8 +935,16 @@ matrix_t *mat_solve(const matrix_t *A, const matrix_t *B)
 
     if (!A || !B || A->rows != A->cols || A->rows != B->rows)
         return NULL;
-    if (matrix_is_symbolic(A) && matrix_is_symbolic(B))
-        return mat_solve_expr_exact(A, B);
+    if (matrix_is_symbolic(A) || matrix_is_symbolic(B)) {
+        Ac = mat_convert_preserving_store(A, &expr_elem);
+        Bc = mat_convert_preserving_store(B, &expr_elem);
+        if (!Ac || !Bc)
+            goto fail;
+        X = mat_solve_expr_exact(Ac, Bc);
+        mat_free(Ac);
+        mat_free(Bc);
+        return X;
+    }
     if (!elem_supports_numeric_algorithms(A->elem) ||
         !elem_supports_numeric_algorithms(B->elem))
         return NULL;

@@ -1546,6 +1546,44 @@ static expr_t *expr_simplify_flat_quotient_local(expr_t *a, expr_t *b)
     expr_combine_like_powers(terms, nterms);
     expr_combine_like_powers(den_terms, nden_terms);
     expr_cancel_common_powers(terms, nterms, den_terms, nden_terms);
+    for (size_t i = 0u; i < nterms; ++i) {
+        expr_t *term = terms[i];
+
+        if (!term || !expr_is_op(term, &ops_pow) || !term->a || !term->b)
+            continue;
+
+        for (size_t j = 0u; j < nden_terms; ++j) {
+            expr_t *den = den_terms[j];
+            expr_t *base;
+            expr_t *exponent;
+            expr_t *one;
+            expr_t *shifted;
+            expr_t *replacement;
+
+            if (!den || !expr_struct_eq(term->a, den))
+                continue;
+
+            expr_retain(term->a);
+            expr_retain(term->b);
+            base = term->a;
+            exponent = term->b;
+            expr_free(term);
+            expr_free(den);
+
+            one = expr_new_const(NUM_ONE);
+            shifted = expr_sub(exponent, one);
+            expr_free(exponent);
+            expr_free(one);
+
+            replacement = shifted ? expr_pow_xp(base, shifted) : NULL;
+            expr_free(base);
+            expr_free(shifted);
+
+            terms[i] = replacement;
+            den_terms[j] = NULL;
+            break;
+        }
+    }
     expr_combine_exp_terms(terms, nterms);
     expr_merge_sqrt_terms(terms, nterms);
     expr_merge_sqrt_terms(den_terms, nden_terms);
@@ -1801,7 +1839,25 @@ expr_t *expr_simplify_add_sub_operator(const expr_t *dv, expr_t *a, expr_t *b)
         const_emitted = 1;
     }
 
+    size_t preferred_positive = n;
+    if (!const_emitted && leading_neg) {
+        for (size_t i = 0; i < n; ++i) {
+            if (!num_is_zero(terms[i].coeff) && num_gt(terms[i].coeff, NUM_ZERO)) {
+                preferred_positive = i;
+                break;
+            }
+        }
+    }
+
+    if (preferred_positive < n) {
+        number_t scaled_coeff = num_div(terms[preferred_positive].coeff, common_coeff);
+        cur = expr_make_scaled(scaled_coeff, terms[preferred_positive].base);
+        num_destroy(&terms[preferred_positive].coeff);
+    }
+
     for (size_t i = 0; i < n; ++i) {
+        if (i == preferred_positive)
+            continue;
         if (num_is_zero(terms[i].coeff)) {
             expr_free(terms[i].base);
             num_destroy(&terms[i].coeff);
@@ -2125,6 +2181,34 @@ expr_t *expr_simplify_div_operator(const expr_t *dv, expr_t *a, expr_t *b)
         expr_free(a);
         expr_free(b);
         return expr_make_pow_like_owned_local(base, exponent);
+    }
+    if (expr_is_op(a, &ops_pow) && expr_struct_eq(a->a, b)) {
+        expr_t *base;
+        expr_t *exponent;
+        expr_t *one;
+        expr_t *shifted;
+        expr_t *out;
+
+        expr_retain(a->a);
+        expr_retain(a->b);
+        base = a->a;
+        exponent = a->b;
+        expr_free(a);
+        expr_free(b);
+
+        one = expr_new_const(NUM_ONE);
+        shifted = expr_sub(exponent, one);
+        expr_free(exponent);
+        expr_free(one);
+        if (!shifted) {
+            expr_free(base);
+            return NULL;
+        }
+
+        out = expr_pow_xp(base, shifted);
+        expr_free(base);
+        expr_free(shifted);
+        return out;
     }
     if (expr_is_op(a, &ops_mul) && expr_struct_eq(a->a, b)) {
         expr_t *rest;

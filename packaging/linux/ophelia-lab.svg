@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="Ophelia Lab unicorn wonderland icon">
+  <defs>
+    <linearGradient id="sky" x1="30" y1="26" x2="220" y2="230" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff7fd"/>
+      <stop offset="0.34" stop-color="#ffd9ef"/>
+      <stop offset="0.68" stop-color="#d9f6ff"/>
+      <stop offset="1" stop-color="#fff1bf"/>
+    </linearGradient>
+    <linearGradient id="mane" x1="72" y1="62" x2="188" y2="196" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ff9fd5"/>
+      <stop offset="0.33" stop-color="#d3a3ff"/>
+      <stop offset="0.66" stop-color="#9be9ff"/>
+      <stop offset="1" stop-color="#ffe08a"/>
+    </linearGradient>
+    <linearGradient id="horn" x1="118" y1="44" x2="152" y2="106" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fffce9"/>
+      <stop offset="0.45" stop-color="#ffd56b"/>
+      <stop offset="1" stop-color="#ff9ad0"/>
+    </linearGradient>
+    <filter id="shadow" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="10" stdDeviation="8" flood-color="#8a4c7c" flood-opacity="0.24"/>
+    </filter>
+  </defs>
+  <rect width="256" height="256" rx="64" fill="url(#sky)"/>
+  <g opacity="0.68">
+    <circle cx="56" cy="54" r="14" fill="#ffffff"/>
+    <circle cx="196" cy="62" r="11" fill="#ffffff"/>
+    <circle cx="212" cy="180" r="10" fill="#ffffff" opacity="0.75"/>
+    <circle cx="40" cy="182" r="8" fill="#ffffff" opacity="0.72"/>
+  </g>
+  <g filter="url(#shadow)">
+    <path d="M71 184c14-36 39-61 70-72 21-8 36-6 51 0-10-18-16-35-16-49 0-17 6-30 18-39-23-2-39 2-53 14-12 11-18 24-21 39-19 2-34 11-44 26-12 19-15 40-10 61 2 8 4 15 5 20z"
+          fill="url(#mane)"/>
+    <path d="M131 46 149 98 120 91Z" fill="url(#horn)" stroke="#c48939" stroke-width="4" stroke-linejoin="round"/>
+    <path d="M119 54c4 8 10 12 18 12" fill="none" stroke="#fff8d9" stroke-width="4" stroke-linecap="round" opacity="0.8"/>
+    <path d="M79 183c-2-24 3-49 20-70 18-22 44-36 69-38 17-1 34 4 46 16-4 11-12 23-23 34-7 7-15 13-24 18 7 4 13 10 18 18-16 13-36 23-57 28-17 4-34 3-49-6z"
+          fill="#fffdfd" stroke="#a35a92" stroke-width="6" stroke-linejoin="round"/>
+    <path d="M155 90c-19 2-41 16-55 34-11 14-16 31-15 50"
+          fill="none" stroke="#ffd4ec" stroke-width="10" stroke-linecap="round"/>
+    <path d="M156 90c19 8 33 25 39 45" fill="none" stroke="#d6f7ff" stroke-width="9" stroke-linecap="round"/>
+    <path d="M113 110c15-7 28-9 40-7-3 13-13 22-28 27-8 2-16 3-24 2 3-9 7-16 12-22z"
+          fill="#fff2fb" stroke="#a35a92" stroke-width="5" stroke-linejoin="round"/>
+    <circle cx="144" cy="119" r="5.6" fill="#532450"/>
+    <circle cx="146" cy="117" r="1.7" fill="#ffffff"/>
+    <path d="M162 144c-12 9-27 13-42 12" fill="none" stroke="#a35a92" stroke-width="5" stroke-linecap="round"/>
+    <path d="M154 145c5 8 8 17 8 27" fill="none" stroke="#9be9ff" stroke-width="7" stroke-linecap="round"/>
+    <path d="M165 147c10 6 19 15 24 27" fill="none" stroke="#ffd98b" stroke-width="6" stroke-linecap="round"/>
+  </g>
+  <g fill="#ffffff" opacity="0.92">
+    <path d="M56 116l4 10 10 4-10 4-4 10-4-10-10-4 10-4z"/>
+    <path d="M201 112l3 8 8 3-8 3-3 8-3-8-8-3 8-3z"/>
+    <path d="M184 42l2 6 6 2-6 2-2 6-2-6-6-2 6-2z"/>
+  </g>
+  <text x="128" y="220" text-anchor="middle"
+        font-family="Georgia, 'Palatino Linotype', serif"
+        font-size="30" font-weight="700"
+        fill="#8a2b74" opacity="0.94">Ophelia</text>
+</svg>

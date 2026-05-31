@@ -1,0 +1,29 @@
+#!/bin/sh
+set -eu
+
+if [ "${MARS_ROOT:-}" ]; then
+    root=$MARS_ROOT
+else
+    script_dir=$(CDPATH= cd "$(dirname "$0")" && pwd)
+    root=$(CDPATH= cd "$script_dir/.." && pwd)
+fi
+
+cd "$root"
+
+export MARS_LAB_APP_NAME="Ophelia Lab"
+export MARS_LAB_SHORT_NAME="Ophelia"
+export MARS_LAB_DESCRIPTION="Forecast in Ophelia Lab with time-series and exogenous data."
+export MARS_LAB_SUBTITLE="Forecasting-first unicorn Wonderland lab for regression, ARIMA, ARIMAX, SARIMA, and SARIMAX experiments."
+export MARS_LAB_THEME="ophelia"
+export MARS_LAB_BINARY="build/release/scratch/ophelia_lab"
+export MARS_LAB_SCRATCH_TARGET="scratch/ophelia_lab"
+export MARS_LAB_STATE_FILE=".ophelia_lab_state.json"
+export MARS_LAB_CONTROL_QUERY_PARAM="ophelia_lab_control"
+export MARS_LAB_CONTROL_COOKIE="ophelia_lab_control"
+export MARS_LAB_PUBLIC_PATH="/ophelia"
+
+if [ ! -x build/release/scratch/ophelia_lab ]; then
+    make scratch/ophelia_lab
+fi
+
+exec python3 tools/ophelia_lab.py "$@"

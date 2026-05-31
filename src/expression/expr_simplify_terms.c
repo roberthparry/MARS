@@ -17,6 +17,82 @@ static int expr_is_i_squared_term(const expr_t *dv)
            num_eq(dv->c, NUM_TWO);
 }
 
+static const expr_t *product_factor_base(const expr_t *dv)
+{
+    if (!dv)
+        return NULL;
+    if (expr_is_pow_d_expr(dv) && dv->a)
+        return dv->a;
+    if (expr_is_op(dv, &ops_pow) && dv->a)
+        return dv->a;
+    return dv;
+}
+
+static int is_unicode_subscript_byte(unsigned char c)
+{
+    return c == 0xE2u || c == 0x82u ||
+           (c >= 0x80u && c <= 0x89u);
+}
+
+static int product_factor_is_primary_variable_name(const char *name)
+{
+    const unsigned char *p = (const unsigned char *)name;
+
+    if (!p || (*p != 'x' && *p != 'y' && *p != 'z'))
+        return 0;
+    ++p;
+    if (!*p)
+        return 1;
+    if (*p == '_')
+        ++p;
+    while (*p) {
+        if ((*p >= '0' && *p <= '9') || is_unicode_subscript_byte(*p)) {
+            ++p;
+            continue;
+        }
+        return 0;
+    }
+    return 1;
+}
+
+static int product_factor_group(const expr_t *dv)
+{
+    const expr_t *base = product_factor_base(dv);
+
+    if (!base)
+        return 3;
+    if ((expr_is_op(base, &ops_const) || expr_is_op(base, &ops_var)) &&
+        base->name && *base->name) {
+        if (expr_is_op(base, &ops_var) &&
+            product_factor_is_primary_variable_name(base->name))
+            return 1;
+        return 0;
+    }
+    return 2;
+}
+
+static int compare_product_factors(const expr_t *lhs, const expr_t *rhs)
+{
+    int lg = product_factor_group(lhs);
+    int rg = product_factor_group(rhs);
+
+    return lg - rg;
+}
+
+static void expr_sort_product_factors(expr_t **terms, size_t nterms)
+{
+    for (size_t i = 1; i < nterms; ++i) {
+        expr_t *key = terms[i];
+        size_t j = i;
+
+        while (j > 0 && compare_product_factors(terms[j - 1], key) > 0) {
+            terms[j] = terms[j - 1];
+            --j;
+        }
+        terms[j] = key;
+    }
+}
+
 static void *expr_terms_xrealloc(void *ptr, size_t size)
 {
     void *grown = realloc(ptr, size);
@@ -1162,6 +1238,8 @@ expr_t *expr_try_expand_shallow_product(number_t c_acc,
 expr_t *expr_rebuild_product_chain(number_t c_acc, expr_t **terms, size_t nterms)
 {
     expr_t *cur = NULL;
+
+    expr_sort_product_factors(terms, nterms);
 
     if (!num_eq(c_acc, NUM_ONE)) {
         number_t normalised = expr_simplify_normalise_simple_rational_coeff(c_acc);

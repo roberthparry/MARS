@@ -106,6 +106,7 @@ static int can_start_factor(const parser_t *p)
 static expr_t *parse_addexpr(parser_t *p);
 static expr_t *parse_signed_power(parser_t *p);
 static expr_t *parse_signed_power_operand(parser_t *p);
+static const char *scan_function_power_marker(const char *pos, const char *end);
 static expr_t *parse_expression_region(const char *start,
                                        const char *end,
                                        symtab_t *syms,
@@ -405,22 +406,14 @@ static size_t scan_unicode_fraction_len(const char *s, const char *end)
 static const char *func_call_start(const char *pos, const char *end,
                                    const char *kw, size_t klen)
 {
+    const char *after;
+
     if (pos + klen > end)
         return NULL;
     if (strncmp(pos, kw, klen) != 0) return NULL;
-    const char *after = pos + klen;
-    /* Skip Unicode superscript digits (sin²(x) form) */
-    while (after < end && is_superscript_byte(after)) {
-        unsigned int c;
-        int len = fs_utf8_decode(after, &c);
-        after += len;
-    }
-    /* Skip ASCII ^N (sin^2(x) form) */
-    if (after + 1 < end && *after == '^' &&
-        isdigit((unsigned char)after[1])) {
-        after++; /* skip '^' */
-        while (after < end && isdigit((unsigned char)*after)) after++;
-    }
+    after = scan_function_power_marker(pos + klen, end);
+    if (!after)
+        return NULL;
     return (after < end && *after == '(') ? after : NULL;
 }
 
@@ -745,6 +738,100 @@ static int read_optional_display_exponent(const char **p_in)
 
     *p_in = p;
     return exponent;
+}
+
+static const char *scan_function_power_marker(const char *pos, const char *end)
+{
+    const char *after = pos;
+    unsigned int c = 0;
+    int len = 0;
+
+    while (after < end && is_superscript_byte(after)) {
+        len = fs_utf8_decode(after, &c);
+        after += len;
+    }
+
+    len = fs_utf8_decode(after, &c);
+    if (len > 0 && c == 0x207B) {
+        const char *scan = after + len;
+        unsigned int next = 0;
+        int next_len = fs_utf8_decode(scan, &next);
+
+        if (next_len > 0 && next == 0x00B9)
+            return scan + next_len;
+    }
+
+    if (after + 1 < end && *after == '^' &&
+        isdigit((unsigned char)after[1])) {
+        after++;
+        while (after < end && isdigit((unsigned char)*after))
+            after++;
+        return after;
+    }
+
+    if (after + 2 < end && after[0] == '^' &&
+        after[1] == '-' && after[2] == '1')
+        return after + 3;
+
+    if (after < end && *after == '^') {
+        const char *scan = after + 1;
+        char *name = read_any_name(&scan);
+
+        if (!name)
+            return NULL;
+        free(name);
+        return scan;
+    }
+
+    return after;
+}
+
+static bool function_power_marker_is_inverse(const char *start, const char *end)
+{
+    unsigned int c = 0;
+    int len = 0;
+
+    if (!start || !end || start >= end)
+        return false;
+    if ((size_t)(end - start) == 3u &&
+        start[0] == '^' && start[1] == '-' && start[2] == '1')
+        return true;
+
+    len = fs_utf8_decode(start, &c);
+    if (len > 0 && c == 0x207B) {
+        const char *next = start + len;
+        unsigned int one = 0;
+        int one_len = fs_utf8_decode(next, &one);
+
+        if (one_len > 0 && one == 0x00B9 && next + one_len == end)
+            return true;
+    }
+
+    return false;
+}
+
+static bool function_supports_inverse_power_notation(const func_entry_t *fe)
+{
+    if (!fe || !fe->ops)
+        return false;
+
+    switch (fe->ops->kind) {
+        case EXPR_KIND_SIN:
+        case EXPR_KIND_COS:
+        case EXPR_KIND_TAN:
+        case EXPR_KIND_SEC:
+        case EXPR_KIND_COSEC:
+        case EXPR_KIND_COT:
+        case EXPR_KIND_SINH:
+        case EXPR_KIND_COSH:
+        case EXPR_KIND_TANH:
+        case EXPR_KIND_SECH:
+        case EXPR_KIND_COSECH:
+        case EXPR_KIND_COTH:
+            return true;
+        default:
+            return false;
+    }
 }
 
 static int parse_required_char(parser_t *p, char expected, const char *errmsg)
@@ -1080,14 +1167,27 @@ static expr_t *parse_atom(parser_t *p)
 
         if (fe) {
             const char *after_kw = p->p + fe->klen;
+            const char *symbolic_exp_start = NULL;
+            const char *symbolic_exp_end = NULL;
+            bool inverse_power = false;
             int sup = read_optional_display_exponent(&after_kw);
-            (void)after_kw;
+            expr_t *symbolic_exponent = NULL;
+
+            if (sup < 0 && after_kw < paren) {
+                if (function_power_marker_is_inverse(after_kw, paren)) {
+                    inverse_power = true;
+                } else if (*after_kw == '^') {
+                    symbolic_exp_start = after_kw + 1;
+                    symbolic_exp_end = paren;
+                }
+            }
 
             p->p = paren + 1; /* skip past '(' */
             if (fe->arity == 2u) {
                 expr_t *a = NULL;
                 expr_t *b = NULL;
                 expr_t *result;
+                number_t minus_one;
 
                 if (!parse_two_args(p, &a, &b))
                     return NULL;
@@ -1103,12 +1203,28 @@ static expr_t *parse_atom(parser_t *p)
                     expr_free(a);
                     expr_free(b);
                 }
+                if (symbolic_exp_start) {
+                    symbolic_exponent = parse_expression_region(
+                        symbolic_exp_start, symbolic_exp_end, p->syms,
+                        "expr_from_string", 1);
+                    if (!symbolic_exponent) {
+                        expr_free(result);
+                        return NULL;
+                    }
+                    return apply_binary_preserving_constexpr(
+                        &ops_pow, result, symbolic_exponent, expr_pow_xp);
+                }
+                if (inverse_power) {
+                    minus_one = num_create_from_long(-1);
+                    return apply_pow_const_preserving_constexpr(result, &minus_one);
+                }
                 return apply_integer_power_if_present(result, sup);
             } else if (fe->arity == 3u) {
                 expr_t *a = NULL;
                 expr_t *b = NULL;
                 expr_t *c = NULL;
                 expr_t *result;
+                number_t minus_one;
 
                 if (!parse_three_args(p, &a, &b, &c))
                     return NULL;
@@ -1122,19 +1238,61 @@ static expr_t *parse_atom(parser_t *p)
                 expr_free(a);
                 expr_free(b);
                 expr_free(c);
+                if (symbolic_exp_start) {
+                    symbolic_exponent = parse_expression_region(
+                        symbolic_exp_start, symbolic_exp_end, p->syms,
+                        "expr_from_string", 1);
+                    if (!symbolic_exponent) {
+                        expr_free(result);
+                        return NULL;
+                    }
+                    return apply_binary_preserving_constexpr(
+                        &ops_pow, result, symbolic_exponent, expr_pow_xp);
+                }
+                if (inverse_power) {
+                    minus_one = num_create_from_long(-1);
+                    return apply_pow_const_preserving_constexpr(result, &minus_one);
+                }
                 return apply_integer_power_if_present(result, sup);
             } else {
                 expr_t *arg = parse_enclosed_addexpr(
                     p, ')', "expected ')' after function argument");
                 expr_t *result;
+                bool inverse_applied = false;
+                number_t minus_one;
 
                 if (!arg)
                     return NULL;
-                if (fe->ops == &ops_factors) {
+                if (inverse_power && !function_supports_inverse_power_notation(fe)) {
+                    expr_free(arg);
+                    set_error(p, "unsupported inverse-function notation");
+                    return NULL;
+                }
+                if (inverse_power && function_supports_inverse_power_notation(fe) &&
+                    fe->ops && fe->ops->inverse_unary) {
+                    result = fe->ops->inverse_unary(arg);
+                    expr_free(arg);
+                    inverse_applied = true;
+                } else if (fe->ops == &ops_factors) {
                     result = fe->ufn(arg);
                     expr_free(arg);
                 } else {
                     result = apply_unary_preserving_constexpr(fe->ops, arg, fe->ufn);
+                }
+                if (symbolic_exp_start) {
+                    symbolic_exponent = parse_expression_region(
+                        symbolic_exp_start, symbolic_exp_end, p->syms,
+                        "expr_from_string", 1);
+                    if (!symbolic_exponent) {
+                        expr_free(result);
+                        return NULL;
+                    }
+                    return apply_binary_preserving_constexpr(
+                        &ops_pow, result, symbolic_exponent, expr_pow_xp);
+                }
+                if (inverse_power && !inverse_applied) {
+                    minus_one = num_create_from_long(-1);
+                    return apply_pow_const_preserving_constexpr(result, &minus_one);
                 }
                 return apply_integer_power_if_present(result, sup);
             }
@@ -1803,9 +1961,11 @@ static expr_t *expr_from_string_impl(const char *s,
     /* ---- No bindings: either { expr } or legacy { name = val } ---- */
     if (!pipe_pos) {
         const char *content_end = close_pos;
+        int content_has_top_level_equals;
         symtab_t syms;
         while (content_end > s && isspace((unsigned char)content_end[-1]))
             content_end--;
+        content_has_top_level_equals = has_top_level_equals(s, content_end);
 
         expr_t *result = parse_expression_region(s, content_end, NULL,
                                                  "expr_from_string", 0);
@@ -1816,7 +1976,7 @@ static expr_t *expr_from_string_impl(const char *s,
             return result;
         }
 
-        if (!has_top_level_equals(s, content_end)) {
+        if (!content_has_top_level_equals) {
             symtab_init(&syms);
             if (collect_implicit_symbols(s, content_end, &syms) == 0 &&
                 syms.count > 0) {
@@ -1834,6 +1994,8 @@ static expr_t *expr_from_string_impl(const char *s,
                     *bindings_out = bindings;
                 return result;
             }
+
+            return NULL;
         }
 
         errmsg[0] = '\0';

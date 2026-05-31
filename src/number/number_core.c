@@ -581,6 +581,49 @@ number_t number_take_mpz(number_mpz_t *value)
     return number;
 }
 
+static bool number_mpq_exceeds_working_precision_budget(const number_mpq_t *value)
+{
+    size_t precision_bits;
+    size_t numerator_bits;
+    size_t denominator_bits;
+    mpq_srcptr q;
+
+    if (!value || number_mpq_ensure(value) != 0)
+        return false;
+
+    precision_bits = number_default_precision_bits;
+    if (precision_bits == 0u)
+        return false;
+
+    q = value->value;
+    numerator_bits = mpz_sizeinbase(mpq_numref(q), 2);
+    denominator_bits = mpz_sizeinbase(mpq_denref(q), 2);
+
+    return denominator_bits > precision_bits ||
+           numerator_bits + denominator_bits > 2u * precision_bits;
+}
+
+static number_t number_take_mpq_budgeted(number_t number)
+{
+    number_t converted;
+    number_mpq_t *value = number_impl(&number)->value.mpq;
+
+    if (!value || !number_mpq_exceeds_working_precision_budget(value)) {
+        number_scope_register_value(&number);
+        return number;
+    }
+
+    converted = num_as_inexact_real_prec(number, number_default_precision_bits);
+    if (num_is_nan(converted)) {
+        number_scope_register_value(&number);
+        return number;
+    }
+
+    number_mpq_free(value);
+    number_scope_register_value(&converted);
+    return converted;
+}
+
 number_t number_take_mpq(number_mpq_t *value)
 {
     number_t number;
@@ -589,8 +632,7 @@ number_t number_take_mpq(number_mpq_t *value)
         return number_invalid();
     number.storage[0] = NUMBER_MPQ;
     number_impl(&number)->value.mpq = value;
-    number_scope_register_value(&number);
-    return number;
+    return number_take_mpq_budgeted(number);
 }
 
 number_t number_take(number_t *boxed_number)
@@ -601,6 +643,8 @@ number_t number_take(number_t *boxed_number)
         return number_invalid();
     memcpy(&value, boxed_number, sizeof(value));
     free(boxed_number);
+    if (number_kind_value(&value) == NUMBER_MPQ)
+        return number_take_mpq_budgeted(value);
     number_scope_register_value(&value);
     return value;
 }

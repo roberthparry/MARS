@@ -312,10 +312,10 @@ static void test_partial_to_string_log_r2(void)
     free(s);
 
     s = expr_to_string(d2f_dx2, style_EXPRESSION);
-    if (str_eq(s, "{ 2·(-x² + y²)/(x² + y²)² | x = 1, y = 2 }"))
-        to_string_pass("∂²log(x²+y²)/∂x² (EXPR)", s, "{ 2·(-x² + y²)/(x² + y²)² | x = 1, y = 2 }");
+    if (str_eq(s, "{ 2·(y² - x²)/(x² + y²)² | y = 2, x = 1 }"))
+        to_string_pass("∂²log(x²+y²)/∂x² (EXPR)", s, "{ 2·(y² - x²)/(x² + y²)² | y = 2, x = 1 }");
     else
-        to_string_fail(__FILE__, __LINE__, 1, "∂²log(x²+y²)/∂x² (EXPR)", s, "{ 2·(-x² + y²)/(x² + y²)² | x = 1, y = 2 }");
+        to_string_fail(__FILE__, __LINE__, 1, "∂²log(x²+y²)/∂x² (EXPR)", s, "{ 2·(y² - x²)/(x² + y²)² | y = 2, x = 1 }");
     free(s);
 
     s = expr_to_string(d2f_dxdy, style_EXPRESSION);
@@ -372,10 +372,10 @@ static void test_partial_to_string_sin_xy(void)
     free(s);
 
     s = expr_to_string(d2f_dx2, style_EXPRESSION);
-    if (str_eq(s, "{ -y²·sin(xy) | x = 1, y = 2 }"))
-        to_string_pass("∂²(sin(xy)+x·ln(y))/∂x² (EXPR)", s, "{ -y²·sin(xy) | x = 1, y = 2 }");
+    if (str_eq(s, "{ -y²·sin(xy) | y = 2, x = 1 }"))
+        to_string_pass("∂²(sin(xy)+x·ln(y))/∂x² (EXPR)", s, "{ -y²·sin(xy) | y = 2, x = 1 }");
     else
-        to_string_fail(__FILE__, __LINE__, 1, "∂²(sin(xy)+x·ln(y))/∂x² (EXPR)", s, "{ -y²·sin(xy) | x = 1, y = 2 }");
+        to_string_fail(__FILE__, __LINE__, 1, "∂²(sin(xy)+x·ln(y))/∂x² (EXPR)", s, "{ -y²·sin(xy) | y = 2, x = 1 }");
     free(s);
 
     s = expr_to_string(d2f_dxdy, style_EXPRESSION);

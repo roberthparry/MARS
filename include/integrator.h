@@ -1,18 +1,11 @@
 /**
  * @file integrator.h
- * @brief Adaptive numerical integrators at qfloat_t precision.
+ * @brief Adaptive number_t-based numerical integrators.
  *
- * Two adaptive quadrature rules are provided:
- *
- *   ig_integral()         — G7K15 (Gauss-Kronrod), callback-based, degree 29.
- *                           Works for any integrand; tops out at ~21 digits.
- *
- *   ig_single_integral()  — Turán T15/T4, expr_t expression-based, degree 31.
- *   ig_double_integral()  — 2-D Turán, adapts in the outer variable.
- *   ig_triple_integral()  — 3-D Turán, adapts in the outermost variable.
- *
- * All rules apply adaptive bisection of the subinterval with the largest
- * error estimate.  Iteration stops when:
+ * All public integration entry points operate on number_t bounds, tolerances,
+ * and results. The current runtime uses adaptive recursive subdivision with
+ * midpoint/Simpson-style error control and bisects the subinterval with the
+ * largest estimated error. Iteration stops when:
  *
  *      total_error <= max(abs_tol, rel_tol * |result|)
  *
@@ -23,17 +16,7 @@
 #define INTEGRATOR_H
 
 #include <stddef.h>
-#include "qfloat.h"
 #include "expression.h"
-
-/**
- * @brief Integrand callback for ig_integral().
- *
- * @param x   Evaluation point.
- * @param ctx User context pointer (may be NULL).
- * @return    f(x).
- */
-typedef qfloat_t (*integrand_fn)(qfloat_t x, void *ctx);
 
 /** Opaque integrator handle. */
 typedef struct _integrator_t integrator_t;
@@ -42,16 +25,16 @@ typedef struct _integrator_t integrator_t;
  * @brief Create an integrator with default tolerances.
  *
  * Default absolute and relative tolerances are both 1e-27.
- * Default maximum subinterval count is 500.
+ * Default maximum subinterval count is 5000.
  *
  * @return New integrator, or NULL on allocation failure.
  */
-integrator_t *ig_new(void);
+integrator_t *intg_new(void);
 
 /**
  * @brief Free an integrator.  Safe to call with NULL.
  */
-void ig_free(integrator_t *ig);
+void intg_free(integrator_t *ig);
 
 /**
  * @brief Override convergence tolerances.
@@ -62,7 +45,7 @@ void ig_free(integrator_t *ig);
  * @param abs_tol  Absolute tolerance.
  * @param rel_tol  Relative tolerance.
  */
-void ig_set_tolerance(integrator_t *ig, qfloat_t abs_tol, qfloat_t rel_tol);
+void intg_set_tolerance(integrator_t *ig, number_t abs_tol, number_t rel_tol);
 
 /**
  * @brief Override the maximum number of subintervals.
@@ -70,62 +53,26 @@ void ig_set_tolerance(integrator_t *ig, qfloat_t abs_tol, qfloat_t rel_tol);
  * @param ig             Integrator handle.
  * @param max_intervals  Upper bound on the subinterval count.
  */
-void ig_set_interval_count_max(integrator_t *ig, size_t max_intervals);
+void intg_set_interval_count_max(integrator_t *ig, size_t max_intervals);
 
 /**
- * @brief Integrate f over [a, b] using the G7K15 rule (lower precision).
+ * @brief Integrate an expr_t expression over [a, b].
  *
- * Uses adaptive Gauss-Kronrod G7K15 with a callback integrand.
- * Degree-29 polynomial exactness; practical accuracy tops out near 21 digits.
- * For full qfloat_t precision use ig_single_integral() with a expr_t expression.
- *
- * @param ig         Integrator handle.
- * @param f          Integrand callback.
- * @param ctx        User context forwarded to f (may be NULL).
- * @param a          Lower bound.
- * @param b          Upper bound.
- * @param result     Receives the integral estimate.
- * @param error_est  If non-NULL, receives the final total error estimate.
- *
- * @return  0  Converged within tolerance.
- * @return  1  Maximum subintervals reached before convergence.
- * @return -1  Internal allocation failure.
- */
-int ig_integral(integrator_t *ig, integrand_fn f, void *ctx,
-                qfloat_t a, qfloat_t b, qfloat_t *result, qfloat_t *error_est);
-
-/**
- * @brief Number of subintervals used in the most recent integration call.
- */
-size_t ig_get_interval_count_used(const integrator_t *ig);
-
-/**
- * @brief Integrate a expr_t expression over [a, b] using adaptive Turán T15/T4.
- *
- * Applies an adaptive Turán quadrature rule that uses both f(x) and f''(x) at
- * 8 symmetric node positions on each subinterval, achieving degree-31 polynomial
- * exactness (versus degree 29 for G7K15).  The second derivative is computed
- * automatically via the expr_t expression graph — no user-supplied derivative is
- * needed.
- *
- * The nested T4 rule (4 of the 8 positions, degree 15) provides the error
- * estimate; the adaptive bisection strategy is identical to ig_integral().
- *
- * @p x_var must be the variable node in @p expr that represents the integration
- * variable.  Both @p expr and any derivative graph built from it are invalidated
- * and re-evaluated at each quadrature node; the caller's graph is not modified
- * permanently.
+ * Uses the shared number_t adaptive engine and evaluates an
+ * expr_t graph by rebinding @p x_var at each quadrature node.
  *
  * Example:
  * @code
- *   integrator_t *ig = ig_new();
+ *   integrator_t *ig = intg_new();
  *   number_t x0  = num_create_from_double(0.0);
  *   expr_t *x    = expr_new_var(x0);
  *   expr_t *expr = expr_sin(x);
- *   qfloat_t result, err;
- *   ig_single_integral(ig, expr, x, qf_from_double(0.0), QF_PI, &result, &err);
+ *   number_t result = num_new();
+ *   number_t err = num_new();
+ *   intg_single_integral(ig, expr, x, num_create_from_double(0.0), NUM_PI, &result, &err);
  *   // result ≈ 2.0
- *   expr_free(expr); expr_free(x); num_destroy(&x0); ig_free(ig);
+ *   num_destroy(&err); num_destroy(&result);
+ *   expr_free(expr); expr_free(x); num_destroy(&x0); intg_free(ig);
  * @endcode
  *
  * @param ig         Integrator handle.
@@ -141,17 +88,21 @@ size_t ig_get_interval_count_used(const integrator_t *ig);
  * @return  1  Maximum subintervals reached before convergence.
  * @return -1  Null argument or internal allocation failure.
  */
-int ig_single_integral(integrator_t *ig, expr_t *expr, expr_t *x_var,
-                       qfloat_t a, qfloat_t b,
-                       qfloat_t *result, qfloat_t *error_est);
+int intg_single_integral(integrator_t *ig, expr_t *expr, expr_t *x_var,
+                       number_t a, number_t b,
+                       number_t *result, number_t *error_est);
 
 /**
- * @brief Integrate a expr_t expression over [ax,bx] × [ay,by] using Turán T15/T4.
+ * @brief Number of subintervals used in the most recent integration call.
+ */
+size_t intg_get_interval_count_used(const integrator_t *ig);
+
+/**
+ * @brief Integrate an expr_t expression over [ax,bx] × [ay,by].
  *
- * Applies the same adaptive Turán T15/T4 strategy as ig_single_integral(), but
- * over a 2-D rectangular domain.  The outer integral adapts in y; the inner
- * integral is evaluated at fixed precision in x.  Both second derivatives
- * ∂²f/∂x² and ∂²f/∂y² are computed automatically.
+ * Uses recursive applications of the shared number_t adaptive engine over a
+ * rectangular 2-D domain. The outer integral adapts in y; the inner integral
+ * reuses the same engine in x.
  *
  * @param ig         Integrator handle.
  * @param expr       expr_t expression representing f(x, y).
@@ -168,17 +119,16 @@ int ig_single_integral(integrator_t *ig, expr_t *expr, expr_t *x_var,
  * @return  1  Maximum subintervals reached before convergence.
  * @return -1  Null argument or internal allocation failure.
  */
-int ig_double_integral(integrator_t *ig, expr_t *expr,
-                       expr_t *x_var, qfloat_t ax, qfloat_t bx,
-                       expr_t *y_var, qfloat_t ay, qfloat_t by,
-                       qfloat_t *result, qfloat_t *error_est);
+int intg_double_integral(integrator_t *ig, expr_t *expr,
+                       expr_t *x_var, number_t ax, number_t bx,
+                       expr_t *y_var, number_t ay, number_t by,
+                       number_t *result, number_t *error_est);
 
 /**
- * @brief Integrate a expr_t expression over [ax,bx] × [ay,by] × [az,bz].
+ * @brief Integrate an expr_t expression over [ax,bx] × [ay,by] × [az,bz].
  *
- * Extends ig_double_integral() to 3-D rectangular domains.  The outermost
- * integral adapts in z; the inner 2-D integral is evaluated at fixed precision.
- * All required second derivatives are computed automatically.
+ * Extends intg_double_integral() to 3-D rectangular domains by recursively
+ * applying the same number_t adaptive engine.
  *
  * @param ig         Integrator handle.
  * @param expr       expr_t expression representing f(x, y, z).
@@ -198,39 +148,42 @@ int ig_double_integral(integrator_t *ig, expr_t *expr,
  * @return  1  Maximum subintervals reached before convergence.
  * @return -1  Null argument or internal allocation failure.
  */
-int ig_triple_integral(integrator_t *ig, expr_t *expr,
-                       expr_t *x_var, qfloat_t ax, qfloat_t bx,
-                       expr_t *y_var, qfloat_t ay, qfloat_t by,
-                       expr_t *z_var, qfloat_t az, qfloat_t bz,
-                       qfloat_t *result, qfloat_t *error_est);
+int intg_triple_integral(integrator_t *ig, expr_t *expr,
+                       expr_t *x_var, number_t ax, number_t bx,
+                       expr_t *y_var, number_t ay, number_t by,
+                       expr_t *z_var, number_t az, number_t bz,
+                       number_t *result, number_t *error_est);
 
 /**
  * @brief Integrate a expr_t expression over an N-dimensional rectangular domain.
  *
- * Generalises ig_single_integral() to arbitrary dimension N using the same
- * adaptive Turán T15/T4 strategy.  All 2^N mixed second-derivative expressions
- * are built automatically.  The outermost variable (vars[ndim-1]) is adapted
- * by bisection; all inner variables use fixed bounds.
+ * Generalises intg_single_integral() to arbitrary dimension N using recursive
+ * applications of the same number_t adaptive engine. The outermost variable
+ * (vars[ndim-1]) is adapted by bisection; all inner variables use fixed bounds.
  *
  * Variable ordering: vars[0] is the innermost integration variable, vars[ndim-1]
  * the outermost.  lo[i] and hi[i] are the bounds for vars[i].
  *
  * Example — ∫₀¹ ∫₀¹ (x+y) dx dy = 1:
  * @code
- *   integrator_t *ig = ig_new();
+ *   integrator_t *ig = intg_new();
  *   number_t x0 = num_create_from_double(0.0);
  *   number_t y0 = num_create_from_double(0.0);
  *   expr_t *x = expr_new_var(x0);
  *   expr_t *y = expr_new_var(y0);
  *   expr_t *expr = expr_add(x, y);
  *   expr_t *vars[2] = { x, y };
- *   qfloat_t lo[2] = { qf_from_double(0.0), qf_from_double(0.0) };
- *   qfloat_t hi[2] = { qf_from_double(1.0), qf_from_double(1.0) };
- *   qfloat_t result, err;
- *   ig_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
+ *   number_t lo[2] = { num_create_from_double(0.0), num_create_from_double(0.0) };
+ *   number_t hi[2] = { num_create_from_double(1.0), num_create_from_double(1.0) };
+ *   number_t result = num_new();
+ *   number_t err = num_new();
+ *   intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err);
  *   // result ≈ 1.0
  *   expr_free(expr); expr_free(y); expr_free(x);
- *   num_destroy(&y0); num_destroy(&x0); ig_free(ig);
+ *   num_destroy(&err); num_destroy(&result);
+ *   num_destroy(&hi[1]); num_destroy(&hi[0]);
+ *   num_destroy(&lo[1]); num_destroy(&lo[0]);
+ *   num_destroy(&y0); num_destroy(&x0); intg_free(ig);
  * @endcode
  *
  * @param ig         Integrator handle.
@@ -246,9 +199,9 @@ int ig_triple_integral(integrator_t *ig, expr_t *expr,
  * @return  1  Maximum subintervals reached before convergence.
  * @return -1  Null argument, ndim == 0, or internal allocation failure.
  */
-int ig_integral_multi(integrator_t *ig, expr_t *expr,
+int intg_integral_multi(integrator_t *ig, expr_t *expr,
                       size_t ndim, expr_t * const *vars,
-                      const qfloat_t *lo, const qfloat_t *hi,
-                      qfloat_t *result, qfloat_t *error_est);
+                      const number_t *lo, const number_t *hi,
+                      number_t *result, number_t *error_est);
 
 #endif /* INTEGRATOR_H */

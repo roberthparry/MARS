@@ -944,11 +944,46 @@ static int expr_tostring_is_named_const_pow_d(const expr_t *f)
            f->a->name && *f->a->name;
 }
 
+static int expr_tostring_is_primary_variable_name(const char *name)
+{
+    const unsigned char *p = (const unsigned char *)name;
+
+    if (!p || (*p != 'x' && *p != 'y' && *p != 'z'))
+        return 0;
+    ++p;
+    if (!*p)
+        return 1;
+    if (*p == '_')
+        ++p;
+    while (*p) {
+        if ((*p >= '0' && *p <= '9') ||
+            *p == 0xE2u || *p == 0x82u ||
+            (*p >= 0x80u && *p <= 0x89u)) {
+            ++p;
+            continue;
+        }
+        return 0;
+    }
+    return 1;
+}
+
+static int expr_tostring_is_coefficient_var(const expr_t *f)
+{
+    return expr_is_var(f) && f->name && *f->name &&
+           !expr_tostring_is_primary_variable_name(f->name);
+}
+
+static int expr_tostring_is_coefficient_var_pow_d(const expr_t *f)
+{
+    return expr_is_pow_d_expr(f) && f->a &&
+           expr_tostring_is_coefficient_var(f->a);
+}
+
 /* Sort group for multiplication factors:
  *   0 = unnamed numeric constant       (e.g. 6)
  *   1 = Greek immortal named constant  (e.g. π)
  *   2 = Latin/other immortal constant  (e.g. e)
- *   3 = explicit bound named constant  (e.g. H or x from the const bindings)
+ *   3 = coefficient-like symbolic factor (e.g. H, δ, α²)
  *   4 = variable or var^n              (e.g. x, x³)
  *   5 = everything else (unary/binary fns) — sort by primary arg var name,
  *       stable so same-arg functions keep their original tree order
@@ -966,6 +1001,12 @@ static int factor_group(const expr_t *f)
         /* Greek letters are UTF-8 multi-byte; first byte >= 0x80 */
         return ((unsigned char)f->name[0] >= 0x80) ? 1 : 2;
     }
+
+    if (expr_tostring_is_coefficient_var(f))
+        return 3;
+
+    if (expr_tostring_is_coefficient_var_pow_d(f))
+        return 3;
 
     if (expr_is_var(f))
         return 4;

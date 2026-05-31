@@ -16,6 +16,7 @@ This directory contains the longer module documentation for MARS.
 - [`matrix_t`](matrix.md) — generic high-precision matrix with pluggable element types and storage kinds
 - [`expr_t`](expression.md) — differentiable expression DAGs and symbolic helper APIs
 - [`datetime_t`](datetime.md) — civil and astronomical date/time utilities
+- [`timeseries_t`](timeseries.md) — datetime-indexed forecasting and time-series analysis
 - [`dictionary_t`](dictionary.md) — generic key/value storage
 - [`set_t`](set.md) — generic set storage
 - [`array_t`](array.md) — generic array storage

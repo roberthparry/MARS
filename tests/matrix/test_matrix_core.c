@@ -6161,6 +6161,78 @@ static void test_solve_and_lstsq(void)
         expr_free(four);
     }
 
+    /* Symbolic coefficient matrix with a numeric RHS should promote RHS to expr. */
+    {
+        expr_t *a = test_expr_new_named_var_d(3.0, "a");
+        expr_t *one = test_expr_new_const_d(1.0);
+        expr_t *two = test_expr_new_const_d(2.0);
+        expr_t *A_vals[4] = {
+            one, a,
+            EXPR_ZERO, two
+        };
+        number_t B_vals[2] = {
+            test_num_from_d(5.0),
+            test_num_from_d(4.0)
+        };
+        matrix_t *A = mat_create_expr(2, 2, A_vals);
+        matrix_t *B = mat_create_num(2, 1, B_vals);
+        matrix_t *X = mat_solve(A, B);
+
+        check_bool("mat_solve(symbolic A, numeric B) not NULL", X != NULL);
+        check_bool("mat_solve(symbolic A, numeric B) -> MAT_TYPE_EXPR",
+                   X != NULL && mat_typeof(X) == MAT_TYPE_EXPR);
+        if (X) {
+            expr_t *x0 = NULL, *x1 = NULL;
+
+            mat_get(X, 0, 0, &x0);
+            mat_get(X, 1, 0, &x1);
+            check_d("mixed solve X[0,0] = -1", expr_eval_d(x0), -1.0, 1e-12);
+            check_d("mixed solve X[1,0] = 2", expr_eval_d(x1), 2.0, 1e-12);
+
+            test_expr_set_val_d(a, 7.0);
+            check_d("mixed solve X[0,0] tracks symbolic A", expr_eval_d(x0), -9.0, 1e-12);
+            check_d("mixed solve X[1,0] remains 2", expr_eval_d(x1), 2.0, 1e-12);
+        }
+
+        mat_free(A);
+        mat_free(B);
+        mat_free(X);
+        num_destroy(&B_vals[0]);
+        num_destroy(&B_vals[1]);
+        expr_free(a);
+        expr_free(one);
+        expr_free(two);
+    }
+
+    /* Exact 2x2 symbolic solve should keep Cramer's-rule fractions readable. */
+    {
+        matrix_t *A = mat_from_string_expr("(θ, γ; μ, λ)", NULL);
+        matrix_t *B = mat_from_string_expr("(x; y)", NULL);
+        matrix_t *X = mat_solve(A, B);
+
+        check_bool("mat_solve(2x2 symbolic) not NULL", X != NULL);
+        check_bool("mat_solve(2x2 symbolic) -> MAT_TYPE_EXPR",
+                   X != NULL && mat_typeof(X) == MAT_TYPE_EXPR);
+        if (X) {
+            expr_t *x0 = NULL, *x1 = NULL;
+
+            mat_get(X, 0, 0, &x0);
+            mat_get(X, 1, 0, &x1);
+            check_expr_text_contains("2x2 symbolic solve X[0] numerator simplified",
+                                     x0, "λx - γy");
+            check_expr_text_contains("2x2 symbolic solve X[0] denominator simplified",
+                                     x0, "θλ - γμ");
+            check_expr_text_contains("2x2 symbolic solve X[1] numerator simplified",
+                                     x1, "θy - μx");
+            check_expr_text_contains("2x2 symbolic solve X[1] denominator simplified",
+                                     x1, "θλ - γμ");
+        }
+
+        mat_free(A);
+        mat_free(B);
+        mat_free(X);
+    }
+
     /* Larger dense symbolic solve with multiple right-hand sides. */
     {
         expr_t *a = test_expr_new_named_var_d(5.0, "a");

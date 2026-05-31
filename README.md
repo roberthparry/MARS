@@ -19,6 +19,7 @@ some GNU C extensions, so MSVC/Windows builds are not currently guaranteed.
 - **`matrix_t`** — generic high-precision matrix over numeric `number_t` values or symbolic `expr_t *` entries, with string-based matrix parsing and formatting, symbolic linear algebra support including Schur complements, block inverse/solve, Jordan helpers, entrywise matrix derivatives, Jacobian helpers, first matrix-calculus helpers for trace, determinant, inverse, block inverse, solve, and block solve, and high-precision eigendecomposition and matrix functions through the numeric `number_t` layer
 - **`expr_t`** — differentiable expression DAGs with first/second derivatives, symbolic matrix integration, and structural matcher helpers for higher-level symbolic code
 - **`datetime_t`** — civil and astronomical date/time helpers
+- **`timeseries_t`** — datetime-indexed forecasting and time-series analysis for regression and ARIMA-family models
 - **`dictionary_t` / `set_t` / `array_t`** — generic containers with user-defined ownership
 - **`string_t`** — UTF-8-aware dynamic strings and grapheme operations
 - **`bitset_t`** — dynamic thread-safe bitset with bitwise operations
@@ -272,6 +273,7 @@ int main(void) {
 | Module | Description | Docs |
 |---|---|---|
 | `datetime_t` | Civil and astronomical date/time utilities | [`docs/datetime.md`](docs/datetime.md) |
+| `timeseries_t` | Datetime-indexed forecasting and time-series analysis | [`docs/timeseries.md`](docs/timeseries.md) |
 | `string_t` | UTF-8-aware dynamic strings | [`docs/string.md`](docs/string.md) |
 | `dictionary_t` | Generic key/value storage with ownership models | [`docs/dictionary.md`](docs/dictionary.md) |
 | `set_t` | Generic set storage with ownership models | [`docs/set.md`](docs/set.md) |

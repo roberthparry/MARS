@@ -5,7 +5,6 @@
 
 #include "expression.h"
 #include "integrator.h"
-#include "qfloat.h"
 
 static uint64_t now_ns(void)
 {
@@ -39,9 +38,9 @@ static int bench_read_bool(const char *name)
 
 typedef expr_t *(*build_fn)(expr_t **x_out, expr_t **y_out);
 
-static expr_t *bench_expr_new_var_qf(qfloat_t x)
+static expr_t *bench_expr_new_var_num(double x)
 {
-    number_t n = num_create_from_qfloat(x);
+    number_t n = num_create_from_double(x);
     expr_t *dv = expr_new_var(n);
 
     num_destroy(&n);
@@ -92,8 +91,8 @@ static expr_t *build_affine(expr_t *x, expr_t *y, double constant)
 
 static expr_t *build_affine_exp(expr_t **x_out, expr_t **y_out)
 {
-    expr_t *x = bench_expr_new_var_qf(qf_from_double(0.0));
-    expr_t *y = bench_expr_new_var_qf(qf_from_double(0.0));
+    expr_t *x = bench_expr_new_var_num(0.0);
+    expr_t *y = bench_expr_new_var_num(0.0);
     expr_t *affine = build_affine(x, y, 3.0);
     expr_t *expr = expr_exp(affine);
 
@@ -105,8 +104,8 @@ static expr_t *build_affine_exp(expr_t **x_out, expr_t **y_out)
 
 static expr_t *build_affine_square(expr_t **x_out, expr_t **y_out)
 {
-    expr_t *x = bench_expr_new_var_qf(qf_from_double(0.0));
-    expr_t *y = bench_expr_new_var_qf(qf_from_double(0.0));
+    expr_t *x = bench_expr_new_var_num(0.0);
+    expr_t *y = bench_expr_new_var_num(0.0);
     expr_t *affine = build_affine(x, y, 3.0);
     expr_t *expr = expr_mul(affine, affine);
 
@@ -118,8 +117,8 @@ static expr_t *build_affine_square(expr_t **x_out, expr_t **y_out)
 
 static expr_t *build_affine_quartic(expr_t **x_out, expr_t **y_out)
 {
-    expr_t *x = bench_expr_new_var_qf(qf_from_double(0.0));
-    expr_t *y = bench_expr_new_var_qf(qf_from_double(0.0));
+    expr_t *x = bench_expr_new_var_num(0.0);
+    expr_t *y = bench_expr_new_var_num(0.0);
     expr_t *affine = build_affine(x, y, 3.0);
     expr_t *expr = expr_mul(expr_mul(affine, affine), expr_mul(affine, affine));
 
@@ -131,8 +130,8 @@ static expr_t *build_affine_quartic(expr_t **x_out, expr_t **y_out)
 
 static expr_t *build_affine_cube_times_exp(expr_t **x_out, expr_t **y_out)
 {
-    expr_t *x = bench_expr_new_var_qf(qf_from_double(0.0));
-    expr_t *y = bench_expr_new_var_qf(qf_from_double(0.0));
+    expr_t *x = bench_expr_new_var_num(0.0);
+    expr_t *y = bench_expr_new_var_num(0.0);
     expr_t *affine = build_affine(x, y, 3.0);
     expr_t *cube = expr_pow_d(affine, 3.0);
     expr_t *exp_affine = expr_exp(affine);
@@ -148,8 +147,8 @@ static expr_t *build_affine_cube_times_exp(expr_t **x_out, expr_t **y_out)
 
 static expr_t *build_affine_cube_times_sin(expr_t **x_out, expr_t **y_out)
 {
-    expr_t *x = bench_expr_new_var_qf(qf_from_double(0.0));
-    expr_t *y = bench_expr_new_var_qf(qf_from_double(0.0));
+    expr_t *x = bench_expr_new_var_num(0.0);
+    expr_t *y = bench_expr_new_var_num(0.0);
     expr_t *affine = build_affine(x, y, 3.0);
     expr_t *cube = expr_pow_d(affine, 3.0);
     expr_t *sin_affine = expr_sin(affine);
@@ -165,8 +164,8 @@ static expr_t *build_affine_cube_times_sin(expr_t **x_out, expr_t **y_out)
 
 static expr_t *build_affine_cube_times_sinh(expr_t **x_out, expr_t **y_out)
 {
-    expr_t *x = bench_expr_new_var_qf(qf_from_double(0.0));
-    expr_t *y = bench_expr_new_var_qf(qf_from_double(0.0));
+    expr_t *x = bench_expr_new_var_num(0.0);
+    expr_t *y = bench_expr_new_var_num(0.0);
     expr_t *affine = build_affine(x, y, 3.0);
     expr_t *cube = expr_pow_d(affine, 3.0);
     expr_t *sinh_affine = expr_sinh(affine);
@@ -182,8 +181,8 @@ static expr_t *build_affine_cube_times_sinh(expr_t **x_out, expr_t **y_out)
 
 static expr_t *build_affine_times_exp(expr_t **x_out, expr_t **y_out)
 {
-    expr_t *x = bench_expr_new_var_qf(qf_from_double(0.0));
-    expr_t *y = bench_expr_new_var_qf(qf_from_double(0.0));
+    expr_t *x = bench_expr_new_var_num(0.0);
+    expr_t *y = bench_expr_new_var_num(0.0);
     expr_t *affine = build_affine(x, y, 3.0);
     expr_t *exp_affine = expr_exp(affine);
     expr_t *expr = expr_mul(affine, exp_affine);
@@ -197,8 +196,8 @@ static expr_t *build_affine_times_exp(expr_t **x_out, expr_t **y_out)
 
 static expr_t *build_affine_times_sin(expr_t **x_out, expr_t **y_out)
 {
-    expr_t *x = bench_expr_new_var_qf(qf_from_double(0.0));
-    expr_t *y = bench_expr_new_var_qf(qf_from_double(0.0));
+    expr_t *x = bench_expr_new_var_num(0.0);
+    expr_t *y = bench_expr_new_var_num(0.0);
     expr_t *affine = build_affine(x, y, 3.0);
     expr_t *sin_affine = expr_sin(affine);
     expr_t *expr = expr_mul(affine, sin_affine);
@@ -212,8 +211,8 @@ static expr_t *build_affine_times_sin(expr_t **x_out, expr_t **y_out)
 
 static expr_t *build_affine_times_sinh(expr_t **x_out, expr_t **y_out)
 {
-    expr_t *x = bench_expr_new_var_qf(qf_from_double(0.0));
-    expr_t *y = bench_expr_new_var_qf(qf_from_double(0.0));
+    expr_t *x = bench_expr_new_var_num(0.0);
+    expr_t *y = bench_expr_new_var_num(0.0);
     expr_t *affine = build_affine(x, y, 3.0);
     expr_t *sinh_affine = expr_sinh(affine);
     expr_t *expr = expr_mul(affine, sinh_affine);
@@ -227,8 +226,8 @@ static expr_t *build_affine_times_sinh(expr_t **x_out, expr_t **y_out)
 
 static expr_t *build_near_miss_square(expr_t **x_out, expr_t **y_out)
 {
-    expr_t *x = bench_expr_new_var_qf(qf_from_double(0.0));
-    expr_t *y = bench_expr_new_var_qf(qf_from_double(0.0));
+    expr_t *x = bench_expr_new_var_num(0.0);
+    expr_t *y = bench_expr_new_var_num(0.0);
     expr_t *left = build_affine(x, y, 3.0);
     expr_t *right = build_affine(x, y, 4.0);
     expr_t *expr = expr_mul(left, right);
@@ -242,8 +241,8 @@ static expr_t *build_near_miss_square(expr_t **x_out, expr_t **y_out)
 
 static expr_t *build_near_miss_quartic(expr_t **x_out, expr_t **y_out)
 {
-    expr_t *x = bench_expr_new_var_qf(qf_from_double(0.0));
-    expr_t *y = bench_expr_new_var_qf(qf_from_double(0.0));
+    expr_t *x = bench_expr_new_var_num(0.0);
+    expr_t *y = bench_expr_new_var_num(0.0);
     expr_t *a3 = build_affine(x, y, 3.0);
     expr_t *a4 = build_affine(x, y, 4.0);
     expr_t *expr = expr_mul(expr_mul(a3, a3), expr_mul(a3, a4));
@@ -257,8 +256,8 @@ static expr_t *build_near_miss_quartic(expr_t **x_out, expr_t **y_out)
 
 static expr_t *build_near_miss_times_exp(expr_t **x_out, expr_t **y_out)
 {
-    expr_t *x = bench_expr_new_var_qf(qf_from_double(0.0));
-    expr_t *y = bench_expr_new_var_qf(qf_from_double(0.0));
+    expr_t *x = bench_expr_new_var_num(0.0);
+    expr_t *y = bench_expr_new_var_num(0.0);
     expr_t *factor = build_affine(x, y, 4.0);
     expr_t *arg = build_affine(x, y, 3.0);
     expr_t *exp_affine = expr_exp(arg);
@@ -274,8 +273,8 @@ static expr_t *build_near_miss_times_exp(expr_t **x_out, expr_t **y_out)
 
 static expr_t *build_near_miss_times_sin(expr_t **x_out, expr_t **y_out)
 {
-    expr_t *x = bench_expr_new_var_qf(qf_from_double(0.0));
-    expr_t *y = bench_expr_new_var_qf(qf_from_double(0.0));
+    expr_t *x = bench_expr_new_var_num(0.0);
+    expr_t *y = bench_expr_new_var_num(0.0);
     expr_t *factor = build_affine(x, y, 4.0);
     expr_t *arg = build_affine(x, y, 3.0);
     expr_t *sin_affine = expr_sin(arg);
@@ -291,8 +290,8 @@ static expr_t *build_near_miss_times_sin(expr_t **x_out, expr_t **y_out)
 
 static expr_t *build_near_miss_times_sinh(expr_t **x_out, expr_t **y_out)
 {
-    expr_t *x = bench_expr_new_var_qf(qf_from_double(0.0));
-    expr_t *y = bench_expr_new_var_qf(qf_from_double(0.0));
+    expr_t *x = bench_expr_new_var_num(0.0);
+    expr_t *y = bench_expr_new_var_num(0.0);
     expr_t *factor = build_affine(x, y, 4.0);
     expr_t *arg = build_affine(x, y, 3.0);
     expr_t *sinh_affine = expr_sinh(arg);
@@ -308,8 +307,8 @@ static expr_t *build_near_miss_times_sinh(expr_t **x_out, expr_t **y_out)
 
 static expr_t *build_near_miss_cube_times_exp(expr_t **x_out, expr_t **y_out)
 {
-    expr_t *x = bench_expr_new_var_qf(qf_from_double(0.0));
-    expr_t *y = bench_expr_new_var_qf(qf_from_double(0.0));
+    expr_t *x = bench_expr_new_var_num(0.0);
+    expr_t *y = bench_expr_new_var_num(0.0);
     expr_t *a3 = build_affine(x, y, 3.0);
     expr_t *a4 = build_affine(x, y, 4.0);
     expr_t *cube = expr_mul(expr_mul(a3, a3), a4);
@@ -327,8 +326,8 @@ static expr_t *build_near_miss_cube_times_exp(expr_t **x_out, expr_t **y_out)
 
 static expr_t *build_near_miss_cube_times_sin(expr_t **x_out, expr_t **y_out)
 {
-    expr_t *x = bench_expr_new_var_qf(qf_from_double(0.0));
-    expr_t *y = bench_expr_new_var_qf(qf_from_double(0.0));
+    expr_t *x = bench_expr_new_var_num(0.0);
+    expr_t *y = bench_expr_new_var_num(0.0);
     expr_t *a3 = build_affine(x, y, 3.0);
     expr_t *a4 = build_affine(x, y, 4.0);
     expr_t *cube = expr_mul(expr_mul(a3, a3), a4);
@@ -346,8 +345,8 @@ static expr_t *build_near_miss_cube_times_sin(expr_t **x_out, expr_t **y_out)
 
 static expr_t *build_near_miss_cube_times_sinh(expr_t **x_out, expr_t **y_out)
 {
-    expr_t *x = bench_expr_new_var_qf(qf_from_double(0.0));
-    expr_t *y = bench_expr_new_var_qf(qf_from_double(0.0));
+    expr_t *x = bench_expr_new_var_num(0.0);
+    expr_t *y = bench_expr_new_var_num(0.0);
     expr_t *a3 = build_affine(x, y, 3.0);
     expr_t *a4 = build_affine(x, y, 4.0);
     expr_t *cube = expr_mul(expr_mul(a3, a3), a4);
@@ -365,37 +364,49 @@ static expr_t *build_near_miss_cube_times_sinh(expr_t **x_out, expr_t **y_out)
 
 static void run_case(const char *label, build_fn builder, int iters)
 {
-    integrator_t *ig = ig_new();
+    integrator_t *ig = intg_new();
     expr_t *x = NULL;
     expr_t *y = NULL;
     expr_t *expr = builder(&x, &y);
     expr_t *vars[2] = { x, y };
-    qfloat_t lo[2] = { qf_from_double(0.0), qf_from_double(0.0) };
-    qfloat_t hi[2] = { qf_from_double(1.0), qf_from_double(1.0) };
-    qfloat_t result;
-    qfloat_t err;
+    number_t lo[2] = { num_create_from_double(0.0), num_create_from_double(0.0) };
+    number_t hi[2] = { num_create_from_double(1.0), num_create_from_double(1.0) };
+    number_t abs_tol = num_create_from_string("1e-21");
+    number_t rel_tol = num_create_from_string("1e-21");
+    number_t result;
+    number_t err;
     size_t first_intervals;
     uint64_t start;
     uint64_t end;
     double avg_us;
 
-    ig_set_tolerance(ig, qf_from_string("1e-21"), qf_from_string("1e-21"));
-    if (ig_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err) != 0) {
+    intg_set_tolerance(ig, abs_tol, rel_tol);
+    num_destroy(&rel_tol);
+    num_destroy(&abs_tol);
+    if (intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err) != 0) {
         fprintf(stderr, "%s failed on warmup\n", label);
+        num_destroy(&hi[1]);
+        num_destroy(&hi[0]);
+        num_destroy(&lo[1]);
+        num_destroy(&lo[0]);
         expr_free(expr);
         expr_free(y);
         expr_free(x);
-        ig_free(ig);
+        intg_free(ig);
         return;
     }
 
-    first_intervals = ig_get_interval_count_used(ig);
+    first_intervals = intg_get_interval_count_used(ig);
+    num_destroy(&err);
+    num_destroy(&result);
     start = now_ns();
     for (int i = 0; i < iters; ++i) {
-        if (ig_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err) != 0) {
+        if (intg_integral_multi(ig, expr, 2, vars, lo, hi, &result, &err) != 0) {
             fprintf(stderr, "%s failed during timed run\n", label);
             break;
         }
+        num_destroy(&err);
+        num_destroy(&result);
     }
     end = now_ns();
     avg_us = ((double)(end - start) / (double)iters) / 1000.0;
@@ -407,10 +418,14 @@ static void run_case(const char *label, build_fn builder, int iters)
            avg_us / 1000.0);
     fflush(stdout);
 
+    num_destroy(&hi[1]);
+    num_destroy(&hi[0]);
+    num_destroy(&lo[1]);
+    num_destroy(&lo[0]);
     expr_free(expr);
     expr_free(y);
     expr_free(x);
-    ig_free(ig);
+    intg_free(ig);
 }
 
 int main(void)
