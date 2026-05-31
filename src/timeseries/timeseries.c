@@ -1,5 +1,3 @@
-#include "timeseries.h"
-
 #include <errno.h>
 #include <math.h>
 #include <stdarg.h>
@@ -8,6 +6,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "timeseries.h"
 
 struct timeseries_t {
     size_t length;
