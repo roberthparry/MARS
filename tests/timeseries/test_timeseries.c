@@ -2,6 +2,9 @@
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 
+#define TEST_TARGET_CSV "test_data/test_series.csv"
+#define TEST_DRIVER_CSV "test_data/test_drivers.csv"
+
 static matrix_t *test_submatrix_rows_local(const matrix_t *A, size_t start_row, size_t row_count)
 {
     size_t cols, r, c;
@@ -65,8 +68,8 @@ fail:
 
 static void test_csv_load_and_slice(void)
 {
-    timeseries_t *y = ts_from_csv("sample_data/Monthly Target Numbers.csv",
-                                  "", "18-24 LD No Health contrib Tot.",
+    timeseries_t *y = ts_from_csv(TEST_TARGET_CSV,
+                                  "", "test1",
                                   TS_FREQ_MONTHLY, TS_YEAR_FISCAL_UK_APR,
                                   TS_MISSING_DROP);
     datetime_t *start = NULL;
@@ -139,8 +142,8 @@ static void test_transforms_and_aggregation(void)
 
 static void test_output_and_write_file(void)
 {
-    timeseries_t *y = ts_from_csv("sample_data/Monthly Target Numbers.csv",
-                                  "", "18-24 LD No Health contrib Tot.",
+    timeseries_t *y = ts_from_csv(TEST_TARGET_CSV,
+                                  "", "test1",
                                   TS_FREQ_MONTHLY, TS_YEAR_FISCAL_UK_APR,
                                   TS_MISSING_DROP);
     char *text = NULL;
@@ -148,7 +151,7 @@ static void test_output_and_write_file(void)
     FILE *f = NULL;
     char buf[128] = {0};
     size_t used = 0u;
-    const char *cols[] = { "All" };
+    const char *cols[] = { "test3" };
     matrix_t *x = NULL;
     ts_regression_result_t fit = {0};
     char *summary = NULL;
@@ -168,7 +171,7 @@ static void test_output_and_write_file(void)
     fclose(f);
     TEST_ASSERT_TRUE(strstr(buf, "date,value") != NULL, "written csv header");
 
-    x = ts_matrix_from_csv("sample_data/Monthly Population.csv",
+    x = ts_matrix_from_csv(TEST_DRIVER_CSV,
                            "DATE", cols, 1u,
                            TS_FREQ_MONTHLY, TS_MISSING_DROP);
     TEST_ASSERT_NOT_NULL(x);
@@ -194,12 +197,12 @@ static void test_output_and_write_file(void)
 
 static void test_regression_and_forecast(void)
 {
-    timeseries_t *y = ts_from_csv("sample_data/Monthly Target Numbers.csv",
-                                  "", "18-24 LD No Health contrib Tot.",
+    timeseries_t *y = ts_from_csv(TEST_TARGET_CSV,
+                                  "", "test1",
                                   TS_FREQ_MONTHLY, TS_YEAR_FISCAL_UK_APR,
                                   TS_MISSING_DROP);
-    const char *cols[] = { "All" };
-    matrix_t *x = ts_matrix_from_csv("sample_data/Monthly Population.csv",
+    const char *cols[] = { "test3" };
+    matrix_t *x = ts_matrix_from_csv(TEST_DRIVER_CSV,
                                      "DATE", cols, 1u,
                                      TS_FREQ_MONTHLY, TS_MISSING_DROP);
     ts_regression_result_t fit = {0};
@@ -232,8 +235,8 @@ static void test_regression_and_forecast(void)
 
 static void test_arima_smoke(void)
 {
-    timeseries_t *y = ts_from_csv("sample_data/Monthly Target Numbers.csv",
-                                  "", "18-24 LD No Health contrib Tot.",
+    timeseries_t *y = ts_from_csv(TEST_TARGET_CSV,
+                                  "", "test1",
                                   TS_FREQ_MONTHLY, TS_YEAR_FISCAL_UK_APR,
                                   TS_MISSING_DROP);
     ts_arima_spec_t spec = {0};
@@ -312,12 +315,12 @@ static void test_arima_smoke(void)
 
 static void test_exogenous_alignment_for_future_forecasts(void)
 {
-    timeseries_t *y = ts_from_csv("sample_data/Monthly Target Numbers.csv",
-                                  "", "18-24 LD No Health contrib Tot.",
+    timeseries_t *y = ts_from_csv(TEST_TARGET_CSV,
+                                  "", "test1",
                                   TS_FREQ_MONTHLY, TS_YEAR_FISCAL_UK_APR,
                                   TS_MISSING_DROP);
-    timeseries_t *x = ts_from_csv("sample_data/Monthly Population.csv",
-                                  "DATE", "All",
+    timeseries_t *x = ts_from_csv(TEST_DRIVER_CSV,
+                                  "DATE", "test3",
                                   TS_FREQ_MONTHLY, TS_YEAR_FISCAL_UK_APR,
                                   TS_MISSING_DROP);
     timeseries_t *y_aligned = NULL;
@@ -370,13 +373,13 @@ static void test_exogenous_alignment_for_future_forecasts(void)
 
 static void test_arimax_with_moving_average_terms(void)
 {
-    timeseries_t *y = ts_from_csv("sample_data/Monthly Target Numbers.csv",
-                                  "", "18-24 LD No Health contrib Tot.",
+    timeseries_t *y = ts_from_csv(TEST_TARGET_CSV,
+                                  "", "test1",
                                   TS_FREQ_MONTHLY, TS_YEAR_FISCAL_UK_APR,
                                   TS_MISSING_DROP);
-    const char *cols[] = { "18", "19", "21" };
+    const char *cols[] = { "test3", "test4", "test5" };
     matrix_t *x = test_aligned_xreg_from_columns(y,
-                                                 "sample_data/Monthly Population.csv",
+                                                 TEST_DRIVER_CSV,
                                                  "DATE", cols, 3u);
     ts_arima_spec_t spec = {0};
     ts_arima_result_t fit = {0};
@@ -503,13 +506,13 @@ static void test_arimax_differences_exogenous_regressors(void)
 
 static void test_auto_arima_preserves_selected_model_and_scale(void)
 {
-    timeseries_t *y = ts_from_csv("sample_data/Monthly Target Numbers.csv",
-                                  "", "65+ LD Supp Liv",
+    timeseries_t *y = ts_from_csv(TEST_TARGET_CSV,
+                                  "", "test2",
                                   TS_FREQ_MONTHLY, TS_YEAR_FISCAL_UK_APR,
                                   TS_MISSING_DROP);
-    const char *cols[] = { "20", "21", "22", "23", "24" };
+    const char *cols[] = { "test4", "test5", "test6", "test7", "test8" };
     matrix_t *x = test_aligned_xreg_from_columns(y,
-                                                 "sample_data/Monthly Population.csv",
+                                                 TEST_DRIVER_CSV,
                                                  "DATE", cols, 5u);
     ts_arima_spec_t best_spec = {0};
     ts_arima_result_t fit = {0};
