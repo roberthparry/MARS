@@ -6142,15 +6142,30 @@ def open_lab_url(url: str, browser: str = "") -> None:
             stderr=subprocess.DEVNULL,
             close_fds=True,
         )
-    elif shutil.which("xdg-open"):
-        subprocess.Popen(
-            ["xdg-open", url],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            close_fds=True,
-        )
-    else:
-        webbrowser.open(url)
+        return
+
+    # Prefer desktop URI openers so the user's configured default browser is
+    # used.  Drop BROWSER for these commands because some environments set it
+    # to a stale Firefox path, which makes xdg-open look non-default and fail.
+    opener_env = os.environ.copy()
+    opener_env.pop("BROWSER", None)
+    for command in (
+        ("gio", "open", url),
+        ("kde-open6", url),
+        ("kde-open5", url),
+        ("xdg-open", url),
+    ):
+        if shutil.which(command[0]):
+            subprocess.Popen(
+                list(command),
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                close_fds=True,
+                env=opener_env,
+            )
+            return
+
+    webbrowser.open(url)
 
 
 def main() -> int:

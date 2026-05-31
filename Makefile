@@ -314,7 +314,7 @@ install-mars-lab: tools/mars-lab packaging/linux/mars-lab.desktop.in packaging/l
 
 install-ophelia-lab: tools/ophelia-lab packaging/linux/ophelia-lab.desktop.in packaging/linux/ophelia-lab.svg
 	$(INSTALL) -d "$(MARS_LAB_BINDIR)" "$(MARS_LAB_APPDIR)" "$(MARS_LAB_ICONDIR)"
-	@printf '%s\n' '#!/bin/sh' 'export MARS_ROOT="$(CURDIR)"' 'exec "$(CURDIR)/tools/ophelia-lab" --host 0.0.0.0 --port 8766 "$$@"' > "$(OPHELIA_LAB_LAUNCHER)"
+	@printf '%s\n' '#!/bin/sh' 'export MARS_ROOT="$(CURDIR)"' 'exec "$(CURDIR)/tools/ophelia-lab" --host 127.0.0.1 --port 8766 "$$@"' > "$(OPHELIA_LAB_LAUNCHER)"
 	chmod 755 "$(OPHELIA_LAB_LAUNCHER)"
 	$(INSTALL) -m 644 packaging/linux/ophelia-lab.svg "$(OPHELIA_LAB_ICON)"
 	@sed -e 's|@OPHELIA_LAUNCHER@|$(OPHELIA_LAB_LAUNCHER)|g' packaging/linux/ophelia-lab.desktop.in > "$(OPHELIA_LAB_DESKTOP)"

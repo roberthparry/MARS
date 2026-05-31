@@ -80,8 +80,8 @@ WEB_MANIFEST = {
     "start_url": f"{APP_BASE_PATH}/" if APP_BASE_PATH else "/",
     "scope": f"{APP_BASE_PATH}/" if APP_BASE_PATH else "/",
     "display": "standalone",
-    "background_color": "#fff7fd",
-    "theme_color": "#f7a8d9",
+    "background_color": "#f6f0e5",
+    "theme_color": "#0b4f8a",
     "icons": [
         {"src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml"},
         {"src": "/icon-192.png", "sizes": "192x192", "type": "image/png"},
@@ -95,29 +95,34 @@ INDEX_HTML = """<!doctype html>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Ophelia Lab</title>
-  <meta name="theme-color" content="#f7a8d9">
+  <meta name="theme-color" content="#071913">
   <meta name="description" content="Forecasting and time-series workbench for MARS.">
   <link rel="manifest" href="__BASE_PATH__/manifest.webmanifest">
   <link rel="icon" href="__BASE_PATH__/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" sizes="180x180" href="__BASE_PATH__/apple-touch-icon.png">
   <style>
     :root {
-      --ink: #31143d;
-      --muted: #73526d;
-      --rose: #f7a8d9;
-      --lilac: #d8b8ff;
-      --sky: #b7ecff;
-      --butter: #ffe69e;
-      --paper: rgba(255, 255, 255, 0.86);
-      --panel: rgba(255, 255, 255, 0.72);
-      --line: rgba(125, 78, 132, 0.16);
-      --shadow: 0 22px 60px rgba(125, 78, 132, 0.18);
-      --accent: #d454a3;
-      --accent-2: #4a96c7;
-      --ok: #2c8a68;
-      --danger: #c54a6f;
-      --font-display: "Georgia", "Iowan Old Style", "Palatino Linotype", serif;
-      --font-body: "Avenir Next", "Trebuchet MS", "Segoe UI", sans-serif;
+      color-scheme: dark;
+      --ink: #f3f8f2;
+      --muted: #bed3c0;
+      --rose: #cfa052;
+      --lilac: #71c6b4;
+      --sky: #71c6b4;
+      --butter: #cfa052;
+      --paper: #071913;
+      --panel: rgba(8, 29, 22, 0.82);
+      --line: rgba(233, 244, 239, 0.34);
+      --shadow: 0 22px 60px rgba(0, 0, 0, 0.32);
+      --accent: #cfa052;
+      --accent-2: #71c6b4;
+      --ok: #71c6b4;
+      --danger: #e99075;
+      --stone: #173f32;
+      --mist: #e9f4ef;
+      --torc: #cfa052;
+      --oak: #263920;
+      --font-display: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+      --font-body: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
     }
 
     * { box-sizing: border-box; }
@@ -127,10 +132,9 @@ INDEX_HTML = """<!doctype html>
       color: var(--ink);
       font-family: var(--font-body);
       background:
-        radial-gradient(circle at top left, rgba(255,255,255,0.96), transparent 18rem),
-        radial-gradient(circle at top right, rgba(255,222,245,0.72), transparent 22rem),
-        radial-gradient(circle at 75% 70%, rgba(183,236,255,0.58), transparent 20rem),
-        linear-gradient(160deg, #fff7fd 0%, #ffe6f5 28%, #f3e8ff 58%, #daf4ff 78%, #fff6d7 100%);
+        radial-gradient(circle at 15% 18%, rgba(107, 176, 167, 0.24), transparent 18rem),
+        radial-gradient(circle at 83% 13%, rgba(196, 131, 48, 0.24), transparent 19rem),
+        linear-gradient(145deg, #061612, #123326 46%, #263920);
     }
 
     body::before {
@@ -138,13 +142,32 @@ INDEX_HTML = """<!doctype html>
       position: fixed;
       inset: 0;
       pointer-events: none;
+      opacity: 0.62;
       background:
-        radial-gradient(circle at 14% 20%, rgba(255,255,255,0.95) 0 2rem, transparent 2.1rem),
-        radial-gradient(circle at 84% 18%, rgba(255,255,255,0.8) 0 1.6rem, transparent 1.7rem),
-        radial-gradient(circle at 72% 34%, rgba(255,255,255,0.66) 0 0.7rem, transparent 0.8rem),
-        radial-gradient(circle at 28% 68%, rgba(255,255,255,0.72) 0 0.8rem, transparent 0.9rem),
-        radial-gradient(circle at 62% 76%, rgba(255,255,255,0.54) 0 0.8rem, transparent 0.9rem);
-      opacity: 0.8;
+        radial-gradient(ellipse at 34% 10%, rgba(180, 255, 219, 0.46) 0 6rem, transparent 18rem),
+        radial-gradient(ellipse at 66% 12%, rgba(142, 119, 255, 0.34) 0 5rem, transparent 17rem),
+        linear-gradient(108deg, transparent 0 3%, rgba(137, 255, 211, 0.78) 8%, rgba(113, 198, 180, 0.16) 18%, transparent 32%),
+        linear-gradient(116deg, transparent 0 12%, rgba(199, 151, 255, 0.58) 18%, rgba(137, 255, 211, 0.2) 30%, transparent 46%),
+        linear-gradient(126deg, transparent 0 24%, rgba(255, 218, 125, 0.42) 31%, rgba(137, 255, 211, 0.16) 44%, transparent 58%),
+        radial-gradient(ellipse at 50% 104%, rgba(0, 0, 0, 0.52) 0 4.8rem, transparent 5rem),
+        linear-gradient(180deg, transparent 0 68%, rgba(4, 18, 12, 0.44) 68%),
+        repeating-linear-gradient(64deg, transparent 0 25px, rgba(233, 244, 239, 0.13) 26px 27px);
+    }
+
+    body::after {
+      content: "";
+      position: fixed;
+      inset: auto 0 0;
+      height: 12rem;
+      pointer-events: none;
+      opacity: 0.72;
+      background:
+        linear-gradient(82deg, transparent 0 8%, rgba(3, 13, 9, 0.95) 8.2% 10.9%, transparent 11.2%),
+        linear-gradient(96deg, transparent 0 17%, rgba(3, 13, 9, 0.92) 17.2% 20.3%, transparent 20.6%),
+        linear-gradient(76deg, transparent 0 27%, rgba(3, 13, 9, 0.9) 27.2% 30.1%, transparent 30.4%),
+        radial-gradient(circle at 77% 77%, transparent 0 1.75rem, rgba(3, 13, 9, 0.96) 1.84rem 2.04rem, transparent 2.16rem),
+        radial-gradient(circle at 83% 77%, transparent 0 1.75rem, rgba(3, 13, 9, 0.96) 1.84rem 2.04rem, transparent 2.16rem),
+        linear-gradient(0deg, rgba(3, 13, 9, 0.85), rgba(3, 13, 9, 0.38) 18%, transparent 65%);
     }
 
     .shell {
@@ -158,9 +181,9 @@ INDEX_HTML = """<!doctype html>
       display: grid;
       gap: 1rem;
       padding: 1.4rem;
-      border: 1px solid rgba(255,255,255,0.7);
+      border: 2px solid var(--line);
       border-radius: 30px;
-      background: linear-gradient(145deg, rgba(255,255,255,0.76), rgba(255,245,252,0.76));
+      background: linear-gradient(145deg, rgba(8, 29, 22, 0.86), rgba(18, 51, 38, 0.78));
       box-shadow: var(--shadow);
       overflow: visible;
       position: relative;
@@ -174,11 +197,11 @@ INDEX_HTML = """<!doctype html>
       height: 18rem;
       border-radius: 50%;
       background:
-        radial-gradient(circle at 50% 50%, rgba(255,255,255,0.94) 0 1rem, transparent 1.05rem),
-        radial-gradient(circle at 50% 50%, transparent 0 4.2rem, rgba(255,184,221,0.86) 4.3rem 4.7rem, transparent 4.8rem),
-        conic-gradient(from 0deg, rgba(255,184,221,0.92) 0deg 30deg, transparent 30deg 60deg, rgba(183,236,255,0.92) 60deg 90deg, transparent 90deg 120deg, rgba(255,230,158,0.9) 120deg 150deg, transparent 150deg 180deg, rgba(216,184,255,0.9) 180deg 210deg, transparent 210deg 240deg, rgba(255,184,221,0.92) 240deg 270deg, transparent 270deg 300deg, rgba(183,236,255,0.92) 300deg 330deg, transparent 330deg 360deg);
-      opacity: 0.88;
-      filter: drop-shadow(0 1rem 2rem rgba(212, 84, 163, 0.18));
+        radial-gradient(circle at 50% 50%, rgba(233, 244, 239, 0.95) 0 0.72rem, transparent 0.9rem),
+        radial-gradient(circle at 50% 50%, transparent 0 4.2rem, rgba(207, 160, 82, 0.62) 4.3rem 4.55rem, transparent 4.7rem),
+        conic-gradient(from 0deg, rgba(207, 160, 82, 0.74) 0deg 18deg, transparent 18deg 42deg, rgba(113, 198, 180, 0.7) 42deg 60deg, transparent 60deg 84deg, rgba(244, 207, 102, 0.54) 84deg 102deg, transparent 102deg 126deg, rgba(190, 143, 255, 0.5) 126deg 144deg, transparent 144deg 168deg, rgba(207, 160, 82, 0.74) 168deg 186deg, transparent 186deg 210deg, rgba(113, 198, 180, 0.7) 210deg 228deg, transparent 228deg 252deg, rgba(244, 207, 102, 0.54) 252deg 270deg, transparent 270deg 294deg, rgba(190, 143, 255, 0.5) 294deg 312deg, transparent 312deg 336deg, rgba(207, 160, 82, 0.74) 336deg 360deg);
+      opacity: 0.62;
+      filter: drop-shadow(0 1rem 2rem rgba(0, 0, 0, 0.28));
     }
 
     .hero h1 {
@@ -322,11 +345,6 @@ INDEX_HTML = """<!doctype html>
       flex-direction: column;
       align-items: center;
       gap: 0.55rem;
-    }
-
-    .mobile-funnel-toggle {
-      width: 100%;
-      min-width: 7.75rem;
     }
 
     .mobile-qr {
@@ -1674,6 +1692,258 @@ INDEX_HTML = """<!doctype html>
       font-size: 0.95rem;
     }
 
+    /* MARS theme layer: keep Ophelia's layout, use the MARS visual system. */
+    .hero h1,
+    .panel-head h2,
+    .help-card h3,
+    .chart-head h3 {
+      color: var(--mist);
+      text-shadow: 0 0 1rem rgba(113, 198, 180, 0.32);
+    }
+
+    .badge,
+    .mobile-panel,
+    .panel,
+    .metric,
+    .result-box,
+    .help-card,
+    .detected-meta,
+    .setup-advisory,
+    .summary-metric-card,
+    .summary-driver-table-wrap,
+    .summary-coeff-card,
+    .comparison-run,
+    .comparison-metric,
+    .comparison-tab-list,
+    .comparison-tab-panel,
+    .forecast-chart-box,
+    .forecast-chart-body,
+    .table-wrap {
+      color: var(--ink);
+      border-color: var(--line);
+      background: linear-gradient(145deg, rgba(8, 29, 22, 0.86), rgba(18, 51, 38, 0.72));
+      box-shadow: 0 18px 55px rgba(0, 0, 0, 0.26);
+    }
+
+    .summary-line,
+    .summary-overall,
+    .summary-guidance,
+    .summary-driver-list,
+    .summary-driver-row,
+    .summary-driver-table-wrap,
+    .summary-metric-card,
+    .summary-coeff-card,
+    .comparison-run,
+    .comparison-metric,
+    .forecast-chart-body,
+    .table-wrap {
+      color: var(--ink);
+      border-color: rgba(233, 244, 239, 0.22);
+      background: linear-gradient(145deg, rgba(9, 31, 23, 0.96), rgba(19, 55, 41, 0.9));
+      box-shadow:
+        inset 0 1px 0 rgba(233, 244, 239, 0.12),
+        0 14px 34px rgba(0, 0, 0, 0.24);
+    }
+
+    .panel-head,
+    .chart-head,
+    .comparison-run-head,
+    .summary-line.title-line,
+    .summary-line.section-line,
+    .summary-driver-table th,
+    .summary-driver-head,
+    th {
+      color: var(--ink);
+      border-color: rgba(233, 244, 239, 0.24);
+      background: linear-gradient(90deg, rgba(196, 131, 48, 0.12), rgba(113, 198, 180, 0.1));
+    }
+
+    .summary-line.note-line,
+    .summary-line.rating-comparison {
+      color: var(--ink);
+      border-color: rgba(113, 198, 180, 0.28);
+      background: linear-gradient(145deg, rgba(14, 45, 35, 0.96), rgba(21, 67, 52, 0.9));
+    }
+
+    .summary-line.rating-exceptional,
+    .summary-driver-row.rating-exceptional,
+    .summary-metric-card.rating-exceptional,
+    .summary-coeff-card.rating-exceptional {
+      color: #eefdf0;
+      border-color: rgba(113, 198, 180, 0.48);
+      background: linear-gradient(135deg, rgba(28, 92, 60, 0.96), rgba(24, 124, 84, 0.88));
+    }
+
+    .summary-line.rating-excellent,
+    .summary-driver-row.rating-excellent,
+    .summary-metric-card.rating-excellent,
+    .summary-coeff-card.rating-excellent {
+      color: #eefdf0;
+      border-color: rgba(113, 198, 180, 0.42);
+      background: linear-gradient(135deg, rgba(29, 82, 54, 0.96), rgba(43, 126, 74, 0.86));
+    }
+
+    .summary-line.rating-very-good,
+    .summary-driver-row.rating-very-good,
+    .summary-metric-card.rating-very-good,
+    .summary-coeff-card.rating-very-good {
+      color: #f7ffe8;
+      border-color: rgba(207, 160, 82, 0.42);
+      background: linear-gradient(135deg, rgba(75, 92, 39, 0.96), rgba(111, 122, 47, 0.86));
+    }
+
+    .summary-line.rating-good,
+    .summary-driver-row.rating-good,
+    .summary-metric-card.rating-good,
+    .summary-coeff-card.rating-good {
+      color: #fff7df;
+      border-color: rgba(207, 160, 82, 0.52);
+      background: linear-gradient(135deg, rgba(103, 78, 29, 0.96), rgba(151, 112, 42, 0.88));
+    }
+
+    .summary-line.rating-mediocre,
+    .summary-driver-row.rating-mediocre,
+    .summary-metric-card.rating-mediocre,
+    .summary-coeff-card.rating-mediocre {
+      color: #fff3e8;
+      border-color: rgba(233, 146, 91, 0.5);
+      background: linear-gradient(135deg, rgba(104, 62, 27, 0.96), rgba(156, 91, 44, 0.88));
+    }
+
+    .summary-line.rating-poor,
+    .summary-driver-row.rating-poor,
+    .summary-metric-card.rating-poor,
+    .summary-coeff-card.rating-poor {
+      color: #fff1ec;
+      border-color: rgba(233, 144, 117, 0.5);
+      background: linear-gradient(135deg, rgba(104, 39, 31, 0.96), rgba(153, 61, 51, 0.9));
+    }
+
+    .hero p,
+    .panel-head p,
+    label,
+    .field-block,
+    .field-hint,
+    .picker-status,
+    .upload-filename,
+    .table-caption,
+    .help-card p,
+    .help-card li,
+    .summary-line,
+    .summary-section-title,
+    .chart-head p,
+    .chart-axis-label {
+      color: var(--muted);
+    }
+
+    .field-title,
+    .detected-meta strong,
+    .multi-select-summary strong,
+    .metric strong,
+    .comparison-metric strong,
+    .summary-metric-value,
+    .summary-k,
+    .summary-driver-name,
+    .summary-driver-number,
+    .summary-driver-impact,
+    .summary-overall p,
+    .summary-guidance p,
+    .summary-guidance li,
+    .summary-driver-row strong,
+    .chart-legend-item {
+      color: var(--ink);
+    }
+
+    input,
+    select,
+    textarea,
+    .path-readout,
+    .multi-select-list-frame,
+    .multi-select-placeholder,
+    .multi-select-item,
+    .outlier-list .multi-select-item {
+      color: var(--ink);
+      border-color: rgba(233, 244, 239, 0.28);
+      background: linear-gradient(180deg, rgba(16, 51, 38, 0.96), rgba(9, 28, 21, 0.96));
+    }
+
+    select option {
+      color: #071913;
+      background: var(--mist);
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      border-color: color-mix(in srgb, var(--accent), var(--line) 25%);
+      box-shadow: 0 0 0 4px rgba(113, 198, 180, 0.18);
+    }
+
+    button,
+    .mobile-card summary {
+      color: #10190f;
+      background: linear-gradient(135deg, rgba(233, 187, 90, 0.96), rgba(140, 216, 184, 0.94));
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.22);
+    }
+
+    button.secondary,
+    .button-link.secondary,
+    .upload-trigger,
+    .comparison-tab {
+      color: #d9ead6;
+      border: 1px solid rgba(233, 244, 239, 0.24);
+      background: linear-gradient(180deg, rgba(12, 41, 31, 0.82), rgba(7, 23, 18, 0.82));
+      box-shadow: none;
+    }
+
+    button.secondary:hover,
+    .button-link.secondary:hover,
+    .upload-trigger:hover,
+    .comparison-tab:hover {
+      color: #f7fff1;
+      border-color: rgba(233, 244, 239, 0.38);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+    }
+
+    .comparison-tab.is-active,
+    .seasonality-badge,
+    .comparison-primary-badge,
+    .chart-legend-title {
+      color: #10190f;
+      border-color: rgba(227, 180, 87, 0.76);
+      background: linear-gradient(135deg, rgba(233, 187, 90, 0.96), rgba(140, 216, 184, 0.94));
+    }
+
+    .status.ok,
+    .summary-line.rating-excellent,
+    .summary-line.rating-good {
+      color: var(--ok);
+    }
+
+    .status.error,
+    .summary-line.rating-poor {
+      color: var(--danger);
+    }
+
+    td,
+    th {
+      border-bottom-color: rgba(233, 244, 239, 0.16);
+    }
+
+    .chart-grid-line {
+      stroke: rgba(233, 244, 239, 0.16);
+    }
+
+    .chart-axis {
+      stroke: rgba(233, 244, 239, 0.34);
+    }
+
+    .chart-tooltip {
+      color: var(--ink);
+      border-color: rgba(233, 244, 239, 0.28);
+      background: rgba(8, 29, 22, 0.96);
+    }
+
     .hidden { display: none !important; }
 
     @media (max-width: 1020px) {
@@ -1761,7 +2031,6 @@ INDEX_HTML = """<!doctype html>
               <div class="mobile-actions">
                 <div class="mobile-qr" id="qr-box" aria-label="QR code for mobile access">__MOBILE_QR_SVG__</div>
                 <button id="refresh-mobile" class="secondary" type="button">Copy URL</button>
-                <button id="funnel-toggle" class="secondary mobile-funnel-toggle" type="button">Make public</button>
               </div>
             </div>
           </details>
@@ -1770,7 +2039,7 @@ INDEX_HTML = """<!doctype html>
       <div class="hero-badges">
         <span class="badge">Forecasting-first scratch app</span>
         <span class="badge">Phone-ready with QR access</span>
-        <span class="badge">Public/private toggle preserved</span>
+        <span class="badge">Private by default</span>
         <span class="badge">Suggested settings available</span>
       </div>
     </section>
@@ -2280,7 +2549,6 @@ INDEX_HTML = """<!doctype html>
     const mobileUrl = document.getElementById('mobile-url');
     const mobileHint = document.getElementById('mobile-hint');
     const qrBox = document.getElementById('qr-box');
-    const funnelToggle = document.getElementById('funnel-toggle');
     const refreshMobile = document.getElementById('refresh-mobile');
     const targetUpload = document.getElementById('target-upload');
     const targetUploadName = document.getElementById('target-upload-name');
@@ -4026,7 +4294,7 @@ INDEX_HTML = """<!doctype html>
       forecastChartBody.innerHTML = (
         legend
         + `<svg class="forecast-chart-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Actual and forecast chart">`
-        + `<rect x="0" y="0" width="${width}" height="${height}" fill="rgba(255,255,255,0.42)"></rect>`
+        + `<rect x="0" y="0" width="${width}" height="${height}" fill="rgba(8,29,22,0.52)"></rect>`
         + yGrid
         + xTicks
         + `<line class="chart-axis" x1="${margin.left}" y1="${height - margin.bottom}" x2="${width - margin.right}" y2="${height - margin.bottom}"></line>`
@@ -4302,12 +4570,6 @@ INDEX_HTML = """<!doctype html>
         mobileUrl.textContent = data.url || '';
         mobileUrl.href = data.url || '#';
         qrBox.innerHTML = data.qr || '';
-        const canControl = Boolean(data.control);
-        const isTailscale = Boolean(data.tailscale);
-        funnelToggle.classList.toggle('hidden', !isTailscale);
-        funnelToggle.disabled = isTailscale && !canControl;
-        funnelToggle.title = isTailscale && !canControl ? 'Restart Ophelia Lab from this machine to enable local Funnel control.' : '';
-        funnelToggle.textContent = canControl ? (data.funnel ? 'Make private' : 'Make public') : 'Local control only';
       } catch (error) {
         mobileStatus.textContent = error.message || String(error);
       }
@@ -4321,23 +4583,6 @@ INDEX_HTML = """<!doctype html>
         mobileStatus.textContent = 'Copied phone URL.';
       } catch (error) {
         mobileStatus.textContent = error.message || String(error);
-      }
-    }
-
-    async function toggleFunnel() {
-      funnelToggle.disabled = true;
-      try {
-        const headers = controlToken ? {'X-Dval-Lab-Control': controlToken} : {};
-        const response = await fetch(`${basePath}/funnel-toggle`, { method: 'POST', headers });
-        const data = await response.json();
-        if (!response.ok || !data.ok) {
-          throw new Error(data.error || 'Could not change public access');
-        }
-        await refreshMobileDetails();
-      } catch (error) {
-        mobileStatus.textContent = error.message || String(error);
-      } finally {
-        funnelToggle.disabled = false;
       }
     }
 
@@ -4449,7 +4694,6 @@ INDEX_HTML = """<!doctype html>
     });
 
     refreshMobile.addEventListener('click', copyMobileUrl);
-    funnelToggle.addEventListener('click', toggleFunnel);
     applyState(defaults);
     renderModelChecksFromState(
       form.elements.namedItem('models').value
@@ -6473,9 +6717,7 @@ def ophelia_tailscale_target(port: int) -> str:
     return f"http://127.0.0.1:{port}"
 
 
-def ophelia_tailscale_funnel_enabled() -> bool:
-    if not APP_BASE_PATH:
-        return shared.tailscale_funnel_enabled()
+def ophelia_tailscale_status() -> dict[str, object]:
     try:
         completed = subprocess.run(
             ["tailscale", "funnel", "status", "--json"],
@@ -6485,20 +6727,27 @@ def ophelia_tailscale_funnel_enabled() -> bool:
             check=False,
         )
     except Exception:
-        return False
+        return {}
     if completed.returncode != 0:
-        return False
+        return {}
     try:
         status = json.loads(completed.stdout)
-        web = status.get("Web", {}) if isinstance(status, dict) else {}
-        allowed = status.get("AllowFunnel", {}) if isinstance(status, dict) else {}
-        for host_key, config in web.items():
-            handlers = (config or {}).get("Handlers", {}) if isinstance(config, dict) else {}
-            if APP_BASE_PATH in handlers and bool(allowed.get(host_key)):
-                return True
+        return status if isinstance(status, dict) else {}
     except Exception:
-        pass
-    return APP_BASE_PATH in completed.stdout
+        return {}
+
+
+def ophelia_tailscale_funnel_enabled() -> bool:
+    if not APP_BASE_PATH:
+        return shared.tailscale_funnel_enabled()
+    status = ophelia_tailscale_status()
+    web = status.get("Web", {}) if isinstance(status, dict) else {}
+    allowed = status.get("AllowFunnel", {}) if isinstance(status, dict) else {}
+    for host_key, config in web.items():
+        handlers = (config or {}).get("Handlers", {}) if isinstance(config, dict) else {}
+        if APP_BASE_PATH in handlers and bool(allowed.get(host_key)):
+            return True
+    return False
 
 
 def ophelia_set_tailscale_funnel_enabled(port: int, enabled: bool) -> bool:
@@ -6539,19 +6788,22 @@ def ophelia_set_tailscale_funnel_enabled(port: int, enabled: bool) -> bool:
 def ophelia_ensure_tailscale_serve(bind_host: str, port: int) -> None:
     if os.environ.get("MARS_LAB_TAILSCALE_SERVE", "1").strip() in ("0", "false", "False", "no", "NO"):
         return
-    if bind_host.strip() not in ("0.0.0.0", "::", "::0") or not shared.tailscale_ipv4():
+    bind_host = bind_host.strip()
+    if bind_host not in ("127.0.0.1", "localhost", "::1", "0.0.0.0", "::", "::0") or not shared.tailscale_ipv4():
         return
     if not shared.tailscale_https_host():
         return
-    should_be_public = shared.tailscale_public_mode() or ophelia_tailscale_funnel_enabled()
-    ophelia_set_tailscale_funnel_enabled(port, should_be_public)
+    # Privacy first: Ophelia is private tailnet-only. It should not publish
+    # itself to the public internet or expose a LAN URL on startup.
+    ophelia_set_tailscale_funnel_enabled(port, False)
 
 
 def ophelia_browser_access_url(bind_host: str, port: int) -> str:
     bind_host = bind_host.strip()
     bind_address = shared._ip_address_from_text(bind_host)
     bind_is_tailscale = bool(bind_address and bind_address in shared.ipaddress.ip_network("100.64.0.0/10"))
-    if (bind_host in ("0.0.0.0", "::", "::0") and shared.tailscale_ipv4()) or bind_is_tailscale:
+    bind_is_private_backend = bind_host in ("127.0.0.1", "localhost", "::1", "0.0.0.0", "::", "::0")
+    if (bind_is_private_backend and shared.tailscale_ipv4()) or bind_is_tailscale:
         tailscale_host = shared.tailscale_https_host()
         if tailscale_host:
             return f"https://{tailscale_host}{app_url('/')}"
@@ -6564,9 +6816,10 @@ def ophelia_browser_access_url(bind_host: str, port: int) -> str:
 def ophelia_mobile_access_details(bind_host: str, port: int, host_header: str = "",
                                   control_allowed: bool = False) -> dict[str, object]:
     funnel = ophelia_tailscale_funnel_enabled()
+    tailscale_host = shared.tailscale_https_host()
+    tailscale_url = f"https://{tailscale_host}{app_url('/')}" if tailscale_host else ""
     request_host = shared._host_from_header(host_header)
     if request_host and not shared._is_loopback_or_wildcard_host(request_host):
-        tailscale_host = shared.tailscale_https_host()
         magicdns_host = shared.tailscale_magicdns_host()
         request_is_tailscale = (
             request_host.startswith("100.") or
@@ -6590,24 +6843,23 @@ def ophelia_mobile_access_details(bind_host: str, port: int, host_header: str = 
                 "control": control_allowed,
             }
         return {
-            "url": f"http://{request_host}:{port}{app_url('/')}",
-            "title": "WiFi access",
-            "hint": "Scan from a phone on the same WiFi.",
+            "url": tailscale_url,
+            "title": "Tailscale only",
+            "hint": "Connect this device to your Tailscale tailnet to use Ophelia.",
             "funnel": False,
-            "tailscale": False,
+            "tailscale": bool(tailscale_host),
             "control": False,
         }
 
     bind_host = bind_host.strip()
-    if bind_host in ("0.0.0.0", "::", "::0"):
-        bind_host = shared.tailscale_ipv4()
-        if bind_host:
-            tailscale_host = shared.tailscale_https_host()
+    if bind_host in ("127.0.0.1", "localhost", "::1", "0.0.0.0", "::", "::0"):
+        tailscale_ip = shared.tailscale_ipv4()
+        if tailscale_ip:
             scheme = "https" if tailscale_host else "http"
-            tailscale_host = tailscale_host or shared.tailscale_magicdns_host() or bind_host
+            tailscale_display_host = tailscale_host or shared.tailscale_magicdns_host() or tailscale_ip
             url_port = "" if scheme == "https" else f":{port}"
             return {
-                "url": f"{scheme}://{tailscale_host}{url_port}{app_url('/')}",
+                "url": f"{scheme}://{tailscale_display_host}{url_port}{app_url('/')}",
                 "title": "Internet access" if funnel else "Tailscale access",
                 "hint": (
                     "Funnel is on. Scan from any device."
@@ -6618,33 +6870,13 @@ def ophelia_mobile_access_details(bind_host: str, port: int, host_header: str = 
                 "tailscale": True,
                 "control": control_allowed,
             }
-        mdns_host = shared.local_mdns_host()
-        if mdns_host:
-            return {
-                "url": f"http://{mdns_host}:{port}{app_url('/')}",
-                "title": "WiFi access",
-                "hint": "Scan from a phone on the same WiFi.",
-                "funnel": False,
-                "tailscale": False,
-                "control": False,
-            }
-        lan_host = shared.local_lan_ipv4()
-        if lan_host:
-            return {
-                "url": f"http://{lan_host}:{port}{app_url('/')}",
-                "title": "WiFi access",
-                "hint": "Scan from a phone on the same WiFi.",
-                "funnel": False,
-                "tailscale": False,
-                "control": False,
-            }
     browser_host = shared.browser_access_host(bind_host)
     if ":" in browser_host and not browser_host.startswith("["):
         browser_host = f"[{browser_host}]"
     return {
         "url": f"http://{browser_host}:{port}{app_url('/')}",
         "title": "Local access",
-        "hint": "Open this from the same device or the same network.",
+        "hint": "Open this from this machine, or use the Tailscale URL when connected.",
         "funnel": False,
         "tailscale": False,
         "control": False,
@@ -7278,28 +7510,7 @@ class OpheliaLabHandler(http.server.BaseHTTPRequestHandler):
             return
 
         if path == "/funnel-toggle":
-            control_allowed = shared.request_allows_funnel_control(
-                self.headers,
-                str(self.client_address[0]),
-                shared._control_token_from_query(self.path),
-            )
-            if not control_allowed:
-                self.send_json(403, {"ok": False, "error": "Funnel control is only available from trusted devices."})
-                return
-            target_enabled = not ophelia_tailscale_funnel_enabled()
-            command_ok = ophelia_set_tailscale_funnel_enabled(self.server_port, target_enabled)
-            current_enabled = ophelia_tailscale_funnel_enabled()
-            ok = command_ok or current_enabled == target_enabled
-            details = ophelia_mobile_access_details(
-                self.server_host,
-                self.server_port,
-                self.headers.get("Host", ""),
-                control_allowed,
-            )
-            details["ok"] = ok
-            details["funnel"] = current_enabled
-            details["qr"] = shared.mobile_qr_svg(str(details.get("url", "")), bool(details.get("control"))) if details.get("url") else ""
-            self.send_json(200 if ok else 502, details)
+            self.send_json(410, {"ok": False, "error": "Public Funnel control is disabled in Ophelia Lab."})
             return
 
         if path != "/forecast":
@@ -7326,7 +7537,7 @@ class OpheliaLabHandler(http.server.BaseHTTPRequestHandler):
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Launch the local Ophelia Lab forecasting app.")
-    parser.add_argument("--host", default="0.0.0.0", help="host to bind")
+    parser.add_argument("--host", default="127.0.0.1", help="host to bind")
     parser.add_argument("--port", type=int, default=0, help="port to bind, or 0 for auto")
     parser.add_argument("--no-browser", action="store_true", help="do not open the browser automatically")
     parser.add_argument("--browser", default="", help="browser executable to open the lab URL")
