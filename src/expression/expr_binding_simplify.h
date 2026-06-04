@@ -37,6 +37,7 @@ bool binding_expr_is_const_id(const expr_binding_expr_t *expr,
 expr_binding_expr_t *binding_expr_fold_to_number_owned(expr_binding_expr_t *expr,
                                                      number_t value);
 expr_binding_expr_t *binding_expr_try_fold_exact_complex_owned(expr_binding_expr_t *expr);
+expr_binding_expr_t *binding_expr_try_preserve_negated_decimal_owned(expr_binding_expr_t *expr);
 expr_binding_expr_t *binding_expr_try_fold_number_owned(expr_binding_expr_t *expr);
 expr_binding_expr_t *binding_expr_try_fold_neg_leading_number(expr_binding_expr_t *expr);
 expr_binding_expr_t *binding_expr_try_fold_mul_leading_numbers(expr_binding_expr_t *expr);
@@ -46,6 +47,7 @@ expr_binding_expr_t *binding_expr_try_simplify_nested_power(expr_binding_expr_t 
 expr_binding_expr_t *binding_expr_try_simplify_integer_exp_power(expr_binding_expr_t *expr);
 expr_binding_expr_t *binding_expr_try_simplify_exp_product(expr_binding_expr_t *expr);
 expr_binding_expr_t *binding_expr_try_simplify_euler_square(expr_binding_expr_t *expr);
+expr_binding_expr_t *binding_expr_try_simplify_log_difference(expr_binding_expr_t *expr);
 expr_binding_expr_t *binding_expr_try_simplify_basic_sum(expr_binding_expr_t *expr);
 expr_binding_expr_t *binding_expr_try_simplify_basic_product(expr_binding_expr_t *expr);
 expr_binding_expr_t *binding_expr_try_simplify_basic_quotient(expr_binding_expr_t *expr);

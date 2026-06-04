@@ -266,6 +266,24 @@ expr_t *expr_create_3rd_deriv(const expr_t *expr, const expr_t *wrt1, const expr
 expr_t *expr_create_nth_deriv(unsigned int n, const expr_t *expr, const expr_t *wrt);
 
 /* ------------------------------------------------------------------------- */
+/* Symbolic integration (owning)                                             */
+/* ------------------------------------------------------------------------- */
+
+/**
+ * @brief Try to build a symbolic antiderivative of @p expr with respect to @p wrt.
+ *
+ * Returns an owning expression @c F such that dF/d(@p wrt) equals @p expr for
+ * the currently supported rule set, or NULL when no safe symbolic rule is
+ * known. Unsupported inputs are expected; callers may fall back to numerical
+ * integration when NULL is returned.
+ *
+ * The first rule set intentionally covers simple, reliable cases: constants,
+ * sums/differences, constant multiples, powers of the integration variable,
+ * reciprocal 1/x, log(x), and affine exp/sin/cos/tan/sinh/cosh/tanh terms.
+ */
+expr_t *expr_integrate(const expr_t *expr, const expr_t *wrt);
+
+/* ------------------------------------------------------------------------- */
 /* Arithmetic (graph-building, owning)                                       */
 /* ------------------------------------------------------------------------- */
 
@@ -419,6 +437,9 @@ expr_t *expr_factors(const expr_t *n);
 expr_t *expr_normal_pdf(const expr_t *dv);
 expr_t *expr_normal_cdf(const expr_t *dv);
 expr_t *expr_normal_logpdf(const expr_t *dv);
+expr_t *expr_pdf(const expr_t *dv);
+expr_t *expr_cdf(const expr_t *dv);
+expr_t *expr_logpdf(const expr_t *dv);
 expr_t *expr_ei(const expr_t *dv);
 expr_t *expr_e1(const expr_t *dv);
 

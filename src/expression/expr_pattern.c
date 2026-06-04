@@ -306,8 +306,10 @@ static bool expr_pattern_unary_kind_to_op(expr_pattern_unary_affine_kind_t kind,
         EXPR_KIND_EXP,
         EXPR_KIND_SIN,
         EXPR_KIND_COS,
+        EXPR_KIND_TAN,
         EXPR_KIND_SINH,
-        EXPR_KIND_COSH
+        EXPR_KIND_COSH,
+        EXPR_KIND_TANH
     };
 
     if (!op_kind_out)

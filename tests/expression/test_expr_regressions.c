@@ -1874,6 +1874,41 @@ static void test_updated_decimal_binding_stays_decimal(void)
     expr_free(expr);
 }
 
+static void test_negative_decimal_function_argument_stays_decimal(void)
+{
+    const char *input = "{ normal_cdf(1.96) - normal_cdf(-1.96) }";
+    const char *expect = "normal_cdf(1.96) - normal_cdf(-1.96)";
+    expr_t *expr = expr_from_string(input, NULL);
+    char *text = expr ? expr_to_string(expr, style_EXPRESSION) : NULL;
+    char *tex = expr ? expr_to_string(expr, style_TEX) : NULL;
+    int text_ok = str_eq(text, expect);
+    int tex_ok = tex &&
+                 strstr(tex, "-1.96") != NULL &&
+                 strstr(tex, "\\frac{49}{25}") == NULL;
+
+    if (text_ok)
+        to_string_pass("negative decimal function argument stays decimal",
+                       text, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "negative decimal function argument stays decimal",
+                       text ? text : "(null)", expect);
+
+    if (tex_ok)
+        to_string_pass("negative decimal function argument TeX stays decimal",
+                       tex, "TeX contains -1.96");
+    else {
+        printf(C_RED "  FAIL: negative decimal function argument TeX stays decimal\n"
+               C_RESET);
+        printf("    tex = %s\n", tex ? tex : "(null)");
+        TEST_FAIL();
+    }
+
+    free(tex);
+    free(text);
+    expr_free(expr);
+}
+
 static void test_to_string_does_not_simplify_plain_expressions(void)
 {
     expr_t *x = test_expr_new_named_var_d(3.0, "x");
@@ -2028,6 +2063,21 @@ static void test_lgamma_successor_sum_simplifies(void)
     expr_free(recurrence_simp);
     expr_free(not_recurrence);
     expr_free(recurrence);
+}
+
+static void test_log_constant_difference_simplifies_to_quotient(void)
+{
+    expr_t *expr = expr_from_string("{ ln(6) - ln(3) }", NULL);
+    expr_t *simp = expr ? expr_simplify(expr) : NULL;
+    char *text = simp ? expr_to_string(simp, style_EXPRESSION) : NULL;
+
+    ASSERT_NOT_NULL(expr);
+    ASSERT_NOT_NULL(simp);
+    TEST_ASSERT_STR_EQ(text, "ln(2)");
+
+    free(text);
+    expr_free(simp);
+    expr_free(expr);
 }
 
 static void test_symbolic_negative_pi_derivative_stays_symbolic(void)
@@ -2645,6 +2695,57 @@ static void test_unary_constants_preserve_user_literals_in_derivatives(void)
         expr_bindings_free(bindings);
         expr_free(expr);
     }
+}
+
+static void test_preserved_reciprocal_constant_derivative_round_trips(void)
+{
+    size_t old_precision = num_get_default_prec_digits();
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = NULL;
+    expr_t *x = NULL;
+    expr_t *deriv = NULL;
+    char *deriv_text = NULL;
+    char *deriv_tex = NULL;
+    int derivative_is_parse_safe;
+    int tex_keeps_symbolic_pi;
+    const char *deriv_expect = "{ -2x·exp(-x²)/√(π) | x = NAN }";
+
+    num_set_default_prec_digits(100u);
+    expr = expr_from_string("{ 1/sqrt(pi)*exp(-x^2) | x = NAN }", &bindings);
+    x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    deriv = (expr && x) ? expr_create_deriv(expr, x) : NULL;
+    deriv_text = deriv ? expr_to_string(deriv, style_EXPRESSION) : NULL;
+    deriv_tex = deriv ? expr_to_string(deriv, style_TEX) : NULL;
+    derivative_is_parse_safe =
+        deriv_text &&
+        strcmp(deriv_text, deriv_expect) == 0 &&
+        !strstr(deriv_text, "-21/√(π)");
+    tex_keeps_symbolic_pi =
+        deriv_tex &&
+        strstr(deriv_tex, "\\sqrt{\\pi}") &&
+        strstr(deriv_tex, "\\frac{") &&
+        !strstr(deriv_tex, "1.128379");
+
+    if (derivative_is_parse_safe && tex_keeps_symbolic_pi) {
+        to_string_pass("preserved reciprocal derivative round-trips safely",
+                       deriv_text, "symbolic reciprocal coefficient");
+    } else {
+        printf(C_RED "  FAIL: preserved reciprocal derivative round-trips safely\n"
+               C_RESET);
+        printf("    derivative = %s\n", deriv_text ? deriv_text : "(null)");
+        printf("    tex        = %s\n", deriv_tex ? deriv_tex : "(null)");
+        printf("    expected   = %s, with TeX keeping sqrt(pi) as a fraction\n",
+               deriv_expect);
+        num_set_default_prec_digits(old_precision);
+        TEST_FAIL();
+    }
+
+    free(deriv_tex);
+    free(deriv_text);
+    expr_free(deriv);
+    expr_bindings_free(bindings);
+    expr_free(expr);
+    num_set_default_prec_digits(old_precision);
 }
 
 static void test_binary_constants_preserve_user_literals_in_derivatives(void)
@@ -3457,6 +3558,7 @@ void test_runtime_regressions(void)
     TEST_RUN_SUBTEST(test_simplify_reuses_clean_nodes_and_dirty_mutations, NULL);
     TEST_RUN_SUBTEST(test_gamma_successor_product_simplifies, NULL);
     TEST_RUN_SUBTEST(test_lgamma_successor_sum_simplifies, NULL);
+    TEST_RUN_SUBTEST(test_log_constant_difference_simplifies_to_quotient, NULL);
     TEST_RUN_SUBTEST(test_simplify_inverse_unary_pairs, NULL);
     TEST_RUN_SUBTEST(test_simplify_exp_quarter_turns, NULL);
     TEST_RUN_SUBTEST(test_simplify_trig_and_hyperbolic_identities, NULL);
@@ -3465,6 +3567,7 @@ void test_runtime_regressions(void)
     TEST_RUN_SUBTEST(test_pure_imaginary_addend_stays_ungrouped, NULL);
     TEST_RUN_SUBTEST(test_preserved_complex_function_addend_stays_ungrouped, NULL);
     TEST_RUN_SUBTEST(test_updated_decimal_binding_stays_decimal, NULL);
+    TEST_RUN_SUBTEST(test_negative_decimal_function_argument_stays_decimal, NULL);
     TEST_RUN_SUBTEST(test_symbolic_negative_pi_derivative_stays_symbolic, NULL);
     TEST_RUN_SUBTEST(test_pow_derivative_preserves_literal_base_log, NULL);
     TEST_RUN_SUBTEST(test_symbolic_complex_power_derivative_keeps_base_log, NULL);
@@ -3479,6 +3582,7 @@ void test_runtime_regressions(void)
     TEST_RUN_SUBTEST(test_repeated_preserved_log_factor_combines_as_power, NULL);
     TEST_RUN_SUBTEST(test_preserved_log_power_chain_combines_as_power, NULL);
     TEST_RUN_SUBTEST(test_unary_constants_preserve_user_literals_in_derivatives, NULL);
+    TEST_RUN_SUBTEST(test_preserved_reciprocal_constant_derivative_round_trips, NULL);
     TEST_RUN_SUBTEST(test_binary_constants_preserve_user_literals_in_derivatives, NULL);
     TEST_RUN_SUBTEST(test_symbolic_negative_pi_quotient_stays_symbolic, NULL);
     TEST_RUN_SUBTEST(test_symbolic_power_derivative_uses_n_minus_one_form, NULL);

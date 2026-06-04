@@ -458,6 +458,9 @@ extern const expr_ops_t ops_factors;
 extern const expr_ops_t ops_normal_pdf;
 extern const expr_ops_t ops_normal_cdf;
 extern const expr_ops_t ops_normal_logpdf;
+extern const expr_ops_t ops_pdf;
+extern const expr_ops_t ops_cdf;
+extern const expr_ops_t ops_logpdf;
 
 /* Exponential integrals */
 extern const expr_ops_t ops_ei;

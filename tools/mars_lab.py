@@ -632,6 +632,92 @@ INDEX_HTML = r"""<!doctype html>
       text-transform: uppercase;
     }
 
+    .integrator-bound-grid {
+      display: grid;
+      grid-template-columns: minmax(5.5rem, 0.7fr) repeat(2, minmax(0, 1fr));
+      gap: 0.7rem;
+      align-items: end;
+    }
+
+    .integrator-bound-field {
+      display: grid;
+      gap: 0.4rem;
+    }
+
+    .mode-panel input {
+      width: 100%;
+      border: 1px solid rgba(233, 244, 239, 0.28);
+      border-radius: 999px;
+      outline: 0;
+      padding: 0.65rem 0.9rem;
+      color: var(--code);
+      background: rgba(0, 0, 0, 0.14);
+      font: 0.95rem/1.25 "Cascadia Code", "Fira Code", "DejaVu Sans Mono", monospace;
+    }
+
+    .integrator-bound-field input {
+      color: var(--code);
+      background: rgba(0, 0, 0, 0.14);
+      box-shadow: 0 0 0 1000px rgba(0, 0, 0, 0.14) inset;
+      caret-color: var(--code);
+      color-scheme: dark;
+    }
+
+    .integrator-bound-field input:-webkit-autofill,
+    .integrator-bound-field input:-webkit-autofill:hover,
+    .integrator-bound-field input:-webkit-autofill:focus {
+      -webkit-text-fill-color: var(--code);
+      box-shadow: 0 0 0 1000px rgba(0, 0, 0, 0.14) inset;
+    }
+
+    .mode-panel input:focus {
+      border-color: color-mix(in srgb, var(--accent), var(--line) 25%);
+      box-shadow: 0 0 0 3px rgba(113, 198, 180, 0.18);
+    }
+
+    .mode-panel input::placeholder {
+      color: rgba(233, 244, 239, 0.14);
+      opacity: 1;
+    }
+
+    .mode-panel input::-webkit-input-placeholder {
+      color: rgba(233, 244, 239, 0.14);
+    }
+
+    .integrator-bound-field input::placeholder {
+      color: rgba(233, 244, 239, 0.10) !important;
+      opacity: 1;
+    }
+
+    .integrator-bound-field input::-webkit-input-placeholder {
+      color: rgba(233, 244, 239, 0.10) !important;
+      -webkit-text-fill-color: rgba(233, 244, 239, 0.10) !important;
+    }
+
+    .integrator-bound-field input:placeholder-shown {
+      color: rgba(233, 244, 239, 0.10) !important;
+      -webkit-text-fill-color: rgba(233, 244, 239, 0.10) !important;
+    }
+
+    #integratorLowerBound::placeholder,
+    #integratorUpperBound::placeholder,
+    #integratorLowerBound::-webkit-input-placeholder,
+    #integratorUpperBound::-webkit-input-placeholder {
+      color: rgba(233, 244, 239, 0.08) !important;
+      -webkit-text-fill-color: rgba(233, 244, 239, 0.08) !important;
+    }
+
+    .integrator-bound-field input:focus {
+      color: var(--code);
+      -webkit-text-fill-color: var(--code);
+    }
+
+    .integrator-bound-field input:-webkit-autofill:focus {
+      box-shadow:
+        0 0 0 1000px rgba(0, 0, 0, 0.14) inset,
+        0 0 0 3px rgba(113, 198, 180, 0.18);
+    }
+
     .mode-panel select {
       width: 100%;
       border: 1px solid rgba(233, 244, 239, 0.28);
@@ -1302,6 +1388,10 @@ INDEX_HTML = r"""<!doctype html>
         line-height: 1.45;
       }
 
+      .integrator-bound-grid {
+        grid-template-columns: 1fr;
+      }
+
       .target-row {
         padding: 0 0.75rem 0.75rem;
       }
@@ -1583,8 +1673,20 @@ __THEME_OVERRIDES__
         <textarea class="hidden secondary-editor" id="matrixOperand" spellcheck="false" placeholder="(1; 0)"></textarea>
       </div>
       <div class="mode-panel hidden" id="integratorControls">
-        <label for="integratorBounds">Bounds</label>
-        <textarea class="secondary-editor" id="integratorBounds" spellcheck="false">x = 0 .. 1</textarea>
+        <div class="integrator-bound-grid">
+          <div class="integrator-bound-field integrator-var-field">
+            <label for="integratorVariable">Variable</label>
+            <input id="integratorVariable" spellcheck="false" autocomplete="off" value="x">
+          </div>
+          <div class="integrator-bound-field">
+            <label for="integratorLowerBound">Lower bound</label>
+            <input id="integratorLowerBound" spellcheck="false" autocomplete="off" value="0" placeholder="blank for none">
+          </div>
+          <div class="integrator-bound-field">
+            <label for="integratorUpperBound">Upper bound</label>
+            <input id="integratorUpperBound" spellcheck="false" autocomplete="off" value="1" placeholder="blank for none">
+          </div>
+        </div>
         <label for="integratorIntervalCap">Work budget ceiling</label>
         <select id="integratorIntervalCap">
           <option value="500">Up to 500</option>
@@ -1593,7 +1695,7 @@ __THEME_OVERRIDES__
           <option value="50000">Up to 50,000</option>
           <option value="100000">Up to 100,000</option>
         </select>
-        <p class="mode-hint">One bound per line, for example <code>x = 0 .. pi</code> or <code>y = -1 .. 1</code>. The integrator stops early only after the working precision is reached; otherwise it keeps going until this ceiling.</p>
+        <p class="mode-hint">Leave both bounds blank for an antiderivative. Fill only the upper bound to evaluate the antiderivative there, or fill both bounds for a definite integral. Bounds can be numbers or symbols.</p>
       </div>
       <div class="target-row hidden" id="targetRow">
         <label for="goalTarget">Target</label>
@@ -1779,7 +1881,9 @@ __THEME_OVERRIDES__
     const matrixOperand = document.getElementById('matrixOperand');
     const matrixOperandLabel = document.getElementById('matrixOperandLabel');
     const integratorControls = document.getElementById('integratorControls');
-    const integratorBounds = document.getElementById('integratorBounds');
+    const integratorVariable = document.getElementById('integratorVariable');
+    const integratorLowerBound = document.getElementById('integratorLowerBound');
+    const integratorUpperBound = document.getElementById('integratorUpperBound');
     const integratorIntervalCap = document.getElementById('integratorIntervalCap');
     const run = document.getElementById('run');
     const back = document.getElementById('back');
@@ -1858,6 +1962,7 @@ __THEME_OVERRIDES__
     const DEFAULT_INTEGRATOR_TEXT = __DEFAULT_INTEGRATOR__;
     const DEFAULT_INTEGRATOR_BOUNDS_TEXT = __DEFAULT_INTEGRATOR_BOUNDS__;
     const DEFAULT_INTEGRATOR_INTERVAL_CAP = __DEFAULT_INTEGRATOR_INTERVAL_CAP__;
+    const LAB_MODE_STORAGE_KEY = 'mars.exprLab.lastMode';
     let currentLabMode = 'expression';
     const modeEditorText = {
       expression: DEFAULT_EXPRESSION_TEXT,
@@ -1920,6 +2025,7 @@ __THEME_OVERRIDES__
         saveLastMatrixState();
       } else {
         modeEditorText.integrator = expr.value.trim() || modeEditorText.integrator;
+        saveLastIntegratorState();
       }
     }
 
@@ -1980,13 +2086,23 @@ __THEME_OVERRIDES__
         setValueCardVisible(false);
       } else {
         leftPaneTitle.textContent = 'Integrator';
-        subtitle.textContent = 'Enter an integrand expression on the left and add one bound per line, such as x = 0 .. pi. The work ceiling is spent unless the requested working precision is reached first.';
-        setResultTitles('Rendered TeX', 'Integrand', 'Domain', 'Integral');
+        subtitle.textContent = 'Enter an integrand expression on the left, then type the lower and upper bounds separately. Leave both blank for an antiderivative, or leave lower blank and fill upper to evaluate the antiderivative there.';
+        setResultTitles('Rendered TeX', 'Integrand', 'Exact result', 'Integral');
         setValueCardVisible(true);
       }
 
       syncMatrixControls();
       updateHistoryButtons();
+    }
+
+    function applyLabMode(mode) {
+      setMode(validLabMode(mode), {force: true});
+      restoreModeEditor(currentMode());
+      syncModeUI();
+      if (currentMode() === 'integrator' && !currentIntegratorBound().name)
+        resetIntegratorBoundsToDefault();
+      if (currentMode() === 'integrator' && integratorIntervalCap)
+        integratorIntervalCap.value = String(validIntegratorIntervalCap(integratorIntervalCap.value));
     }
 
     function showResults() {
@@ -2654,6 +2770,11 @@ __THEME_OVERRIDES__
       return allowed.includes(operation) ? operation : 'inverse';
     }
 
+    function validLabMode(value) {
+      const mode = String(value || '').trim();
+      return mode === 'matrix' || mode === 'integrator' ? mode : 'expression';
+    }
+
     function applySavedState(data) {
       const saved = String(data.expression || '').trim();
       if (saved && !saved.includes('...')) {
@@ -2681,7 +2802,7 @@ __THEME_OVERRIDES__
 
       const savedBounds = String(data.integrator_bounds || '').trim();
       if (savedBounds)
-        integratorBounds.value = savedBounds;
+        restoreIntegratorBoundsText(savedBounds);
 
       const savedCap = validIntegratorIntervalCap(data.integrator_interval_cap);
       if (integratorIntervalCap)
@@ -2696,6 +2817,8 @@ __THEME_OVERRIDES__
         modePrecisionBits.expression = validPrecisionBits(data.precision_bits, modePrecisionBits.expression);
       }
       workingPrecisionBits = modePrecisionBits[currentMode()] || workingPrecisionBits;
+
+      applyLabMode(validLabMode(data.lab_mode));
     }
 
     async function loadLastState() {
@@ -2727,10 +2850,13 @@ __THEME_OVERRIDES__
           modeEditorText.integrator = integratorExpression;
         const integratorBoundsText = localStorage.getItem('mars.exprLab.lastIntegratorBounds');
         if (integratorBoundsText)
-          integratorBounds.value = integratorBoundsText;
+          restoreIntegratorBoundsText(integratorBoundsText);
         const integratorCap = localStorage.getItem('mars.exprLab.lastIntegratorIntervalCap');
         if (integratorIntervalCap && integratorCap)
           integratorIntervalCap.value = String(validIntegratorIntervalCap(integratorCap));
+        const labMode = localStorage.getItem(LAB_MODE_STORAGE_KEY);
+        if (labMode)
+          applyLabMode(labMode);
       } catch (_) {
         // Private browsing or locked-down webviews can disable localStorage.
       }
@@ -2749,6 +2875,16 @@ __THEME_OVERRIDES__
 
     function savePrecisionState() {
       saveLabState({precision_bits: modePrecisionBits});
+    }
+
+    function saveLastLabMode(mode = currentMode()) {
+      const labMode = validLabMode(mode);
+      try {
+        localStorage.setItem(LAB_MODE_STORAGE_KEY, labMode);
+      } catch (_) {
+        // The lab still works fine without persistence.
+      }
+      saveLabState({lab_mode: labMode});
     }
 
     function saveLastExpression(text) {
@@ -2800,7 +2936,7 @@ __THEME_OVERRIDES__
 
     function saveLastIntegratorState() {
       const text = String(expr.value || '').trim();
-      const bounds = String(integratorBounds.value || '').trim();
+      const bounds = currentIntegratorBoundsText();
       const cap = requestedIntegratorIntervalCap();
       if (text)
         modeEditorText.integrator = text;
@@ -2841,6 +2977,10 @@ __THEME_OVERRIDES__
       morePrecision.title = !isBusy && atMaximumPrecision()
         ? 'Already at the current maximum precision setting'
         : '';
+      [integratorVariable, integratorLowerBound, integratorUpperBound].forEach((input) => {
+        if (input)
+          input.disabled = isBusy;
+      });
       if (integratorIntervalCap)
         integratorIntervalCap.disabled = isBusy;
       copyButtons.forEach((button) => {
@@ -2914,18 +3054,122 @@ __THEME_OVERRIDES__
         const line = rawLine.trim();
         if (!line)
           continue;
-        const match = line.match(/^([^:=]+?)\s*(?:=|:)\s*(.+?)\s*\.\.\s*(.+)$/);
-        if (!match)
-          throw new Error(`Bad bound line: ${line}`);
-        bounds.push({
-          name: match[1].trim(),
-          lo: match[2].trim(),
-          hi: match[3].trim(),
-        });
+        let match = line.match(/^([^:=]+?)\s*(?:=|:)\s*(.+?)\s*\.\.\s*(.+)$/);
+        if (match) {
+          bounds.push({
+            name: match[1].trim(),
+            lo: match[2].trim(),
+            hi: match[3].trim(),
+          });
+          continue;
+        }
+        match = line.match(/^([^:=]+?)\s*(?:=|:)\s*(.+)$/);
+        if (match) {
+          bounds.push({
+            name: match[1].trim(),
+            lo: '',
+            hi: match[2].trim(),
+          });
+          continue;
+        }
+        if (!/[=:]/.test(line) && !line.includes('..')) {
+          bounds.push({
+            name: line.trim(),
+            lo: '',
+            hi: '',
+          });
+          continue;
+        }
+        throw new Error(`Bad bound line: ${line}`);
       }
       if (bounds.length === 0)
-        throw new Error('Add at least one bound like x = 0 .. pi');
+        bounds.push({name: 'x', lo: '', hi: ''});
       return bounds;
+    }
+
+    function firstIntegratorBoundFromText(text) {
+      try {
+        const bounds = parseIntegratorBoundsText(text);
+        return bounds[0] || {name: 'x', lo: '', hi: ''};
+      } catch (_) {
+        return {name: 'x', lo: '0', hi: '1'};
+      }
+    }
+
+    function setIntegratorBoundInputs(bound) {
+      const safeBound = bound || {name: 'x', lo: '', hi: ''};
+      if (integratorVariable)
+        integratorVariable.value = String(safeBound.name || 'x').trim() || 'x';
+      if (integratorLowerBound)
+        integratorLowerBound.value = cleanIntegratorBoundValue(safeBound.lo);
+      if (integratorUpperBound)
+        integratorUpperBound.value = cleanIntegratorBoundValue(safeBound.hi);
+    }
+
+    function cleanIntegratorBoundValue(value) {
+      const text = String(value || '').trim();
+      return /^blank\s+for\s+(none|antiderivative)$/i.test(text) ? '' : text;
+    }
+
+    function cleanIntegratorBoundInput(input) {
+      if (!input)
+        return;
+      const cleaned = cleanIntegratorBoundValue(input.value);
+      if (cleaned !== String(input.value || '').trim())
+        input.value = cleaned;
+    }
+
+    function cleanIntegratorBoundInputs() {
+      cleanIntegratorBoundInput(integratorLowerBound);
+      cleanIntegratorBoundInput(integratorUpperBound);
+    }
+
+    function applyIntegratorResultBound(data) {
+      if (!data)
+        return;
+      if (!Object.prototype.hasOwnProperty.call(data, 'bound_var') &&
+          !Object.prototype.hasOwnProperty.call(data, 'bound_lower') &&
+          !Object.prototype.hasOwnProperty.call(data, 'bound_upper'))
+        return;
+      const currentBound = currentIntegratorBound();
+      const nextBound = {
+        name: String(data.bound_var || currentBound.name || 'x').trim() || 'x',
+        lo: currentBound.lo || String(data.bound_lower || '').trim(),
+        hi: currentBound.hi || String(data.bound_upper || '').trim(),
+      };
+      setIntegratorBoundInputs(nextBound);
+    }
+
+    function restoreIntegratorBoundsText(text) {
+      setIntegratorBoundInputs(firstIntegratorBoundFromText(text || DEFAULT_INTEGRATOR_BOUNDS_TEXT));
+    }
+
+    function currentIntegratorBound() {
+      cleanIntegratorBoundInputs();
+      return {
+        name: String(integratorVariable && integratorVariable.value || 'x').trim() || 'x',
+        lo: cleanIntegratorBoundValue(integratorLowerBound && integratorLowerBound.value),
+        hi: cleanIntegratorBoundValue(integratorUpperBound && integratorUpperBound.value),
+      };
+    }
+
+    function integratorBoundsTextFromBound(bound) {
+      const name = String(bound.name || 'x').trim() || 'x';
+      const lo = String(bound.lo || '').trim();
+      const hi = String(bound.hi || '').trim();
+      if (lo && hi)
+        return `${name} = ${lo} .. ${hi}`;
+      if (hi)
+        return `${name} = ${hi}`;
+      return name;
+    }
+
+    function currentIntegratorBoundsText() {
+      return integratorBoundsTextFromBound(currentIntegratorBound());
+    }
+
+    function resetIntegratorBoundsToDefault() {
+      restoreIntegratorBoundsText(DEFAULT_INTEGRATOR_BOUNDS_TEXT);
     }
 
     function requestedIntegratorIntervalCap() {
@@ -2952,7 +3196,10 @@ __THEME_OVERRIDES__
     }
 
     async function fetchIntegratorEvaluation() {
-      const bounds = parseIntegratorBoundsText(integratorBounds.value);
+      const bound = currentIntegratorBound();
+      if (bound.lo && !bound.hi)
+        throw new Error('A one-sided bound should be entered as an upper bound. Leave lower blank and put the value in upper.');
+      const bounds = [bound];
       saveLastIntegratorState();
       const response = await fetch('/integrator-eval', {
         method: 'POST',
@@ -3521,18 +3768,40 @@ __THEME_OVERRIDES__
         setExpandableText(parsed, parsedMore, data.expression || '', data.expression || '');
         const workUnits = data.work_units || data.intervals || '';
         const workCap = data.work_cap || data.max_intervals || '';
-        const stoppedEarly = workUnits && workCap && String(workUnits) !== String(workCap);
+        const statusText = String(data.status || '');
+        const symbolicStatus = /symbolic|antiderivative/i.test(statusText);
+        const antiderivativeStatus = /antiderivative/i.test(statusText);
+        const stoppedEarly = !symbolicStatus && workUnits && workCap && String(workUnits) !== String(workCap);
         const workText = workUnits && workCap
           ? `work used: ${workUnits} / ${workCap}${stoppedEarly ? ' (precision reached)' : ''}`
           : (workUnits ? `work used: ${workUnits}` : '');
-        const domainText = [data.bound, data.status ? `status: ${data.status}` : '', workText]
+        const detailLines = [];
+        if (data.antiderivative)
+          detailLines.push(`Antiderivative:\n${data.antiderivative}`);
+        if (data.symbolic && !antiderivativeStatus)
+          detailLines.push(`Definite result:\n${data.symbolic}`);
+        const domainText = [data.bound, data.status ? `status: ${data.status}` : '', symbolicStatus ? '' : workText]
           .filter(Boolean)
           .join('\n');
-        setExpandableText(functionStyle, functionMore, domainText, domainText);
-        value.textContent = data.error
-          ? `${data.value || ''}\nerror ≈ ${data.error}`
-          : (data.value || '');
+        if (domainText)
+          detailLines.push(domainText);
+        const detailText = detailLines.join('\n\n');
+        setExpandableText(functionStyle, functionMore, detailText, detailText);
+        {
+          const valueLines = [];
+          const exactText = data.symbolic && antiderivativeStatus ? `${data.symbolic} + C` : data.symbolic;
+          if (exactText)
+            valueLines.push(`exact: ${exactText}`);
+          if (data.value)
+            valueLines.push(`${data.symbolic ? 'numeric: ' : ''}${data.value}`);
+          if (data.error)
+            valueLines.push(`error ≈ ${data.error}`);
+          if (!valueLines.length && data.status)
+            valueLines.push(data.status);
+          value.textContent = valueLines.join('\n');
+        }
         modeEditorText.integrator = text;
+        applyIntegratorResultBound(data);
         saveLastIntegratorState();
         currentVariables = [];
         currentDifferentiable = false;
@@ -3663,6 +3932,8 @@ __THEME_OVERRIDES__
       try {
         const {response, data} = await fetchEvaluation(text, wrt);
         const derivativeExpression = derivativeExpressionFromLine(data.derivative);
+        const derivativeTex = data.derivative_tex || '';
+        const derivativeSvg = data.derivative_svg || '';
 
         if (!response.ok || !data.ok || !derivativeExpression) {
           setRenderedError(data.error || data.raw || `No derivative for ${wrt}`);
@@ -3674,6 +3945,20 @@ __THEME_OVERRIDES__
         pushExpressionHistory(text);
         setExpressionEditor(derivativeExpression);
         await evaluateExpression();
+        if (derivativeTex) {
+          clearRenderedError();
+          lastTex = derivativeTex;
+          rendered.dataset.displayTex = derivativeTex;
+          rendered.dataset.fullTex = derivativeTex;
+          rendered.dataset.displaySvg = derivativeSvg;
+          rendered.dataset.fullSvg = '';
+          rendered.dataset.renderError = data.derivative_render_error || '';
+          setRenderedContent(
+            derivativeSvg,
+            data.derivative_render_error || derivativeTex
+          );
+          resetMoreDigitsButton(renderedMore, false);
+        }
       } catch (err) {
         setRenderedError(String(err));
         resetMoreDigitsButton(renderedMore, false);
@@ -3732,7 +4017,7 @@ __THEME_OVERRIDES__
         matrixOperation.value = 'inverse';
       }
       if (currentMode() === 'integrator') {
-        integratorBounds.value = DEFAULT_INTEGRATOR_BOUNDS_TEXT;
+        resetIntegratorBoundsToDefault();
         if (integratorIntervalCap)
           integratorIntervalCap.value = String(DEFAULT_INTEGRATOR_INTERVAL_CAP);
       }
@@ -3780,13 +4065,13 @@ __THEME_OVERRIDES__
         captureCurrentModeEditor();
         if (!setMode(tab.dataset.mode))
           return;
+        saveLastLabMode(currentMode());
         hideTargetEntry();
         clearResultPane();
         restoreModeEditor(currentMode());
         syncModeUI();
-        if (currentMode() === 'integrator' && !integratorBounds.value.trim()) {
-          integratorBounds.value = DEFAULT_INTEGRATOR_BOUNDS_TEXT;
-        }
+        if (currentMode() === 'integrator' && !currentIntegratorBound().name)
+          resetIntegratorBoundsToDefault();
         if (currentMode() === 'integrator') {
           if (integratorIntervalCap)
             integratorIntervalCap.value = String(validIntegratorIntervalCap(integratorIntervalCap.value));
@@ -3809,6 +4094,21 @@ __THEME_OVERRIDES__
         if (currentMode() === 'integrator')
           saveLastIntegratorState();
       });
+
+    [integratorVariable, integratorLowerBound, integratorUpperBound].forEach((input) => {
+      if (!input)
+        return;
+      input.addEventListener('focus', () => {
+        if (input === integratorLowerBound || input === integratorUpperBound)
+          cleanIntegratorBoundInput(input);
+      });
+      input.addEventListener('change', () => {
+        if (input === integratorLowerBound || input === integratorUpperBound)
+          cleanIntegratorBoundInput(input);
+        if (currentMode() === 'integrator')
+          saveLastIntegratorState();
+      });
+    });
 
     goalTarget.addEventListener('keydown', (event) => {
       if (event.key === 'Enter') {
@@ -3889,6 +4189,8 @@ __THEME_OVERRIDES__
 
     syncModeTabs();
     syncModeUI();
+    cleanIntegratorBoundInputs();
+    requestAnimationFrame(cleanIntegratorBoundInputs);
     setStatus('Ready');
     refreshMobileAccess();
     setInterval(refreshMobileAccess, 5000);
@@ -3928,6 +4230,7 @@ def default_state() -> dict[str, object]:
     return {
         "expression": DEFAULT_EXPRESSION,
         "matrix": DEFAULT_MATRIX,
+        "lab_mode": "expression",
         "matrix_operation": DEFAULT_MATRIX_OPERATION,
         "matrix_operand": "",
         "integrator_expression": DEFAULT_INTEGRATOR_EXPRESSION,
@@ -3959,6 +4262,10 @@ def load_state_data() -> dict[str, object]:
     matrix = str(state.get("matrix", "")).strip()
     if "..." in matrix:
         state["matrix"] = DEFAULT_MATRIX
+
+    lab_mode = str(state.get("lab_mode", "")).strip()
+    if lab_mode not in {"expression", "matrix", "integrator"}:
+        state["lab_mode"] = "expression"
 
     matrix_operation = str(state.get("matrix_operation", "")).strip()
     if matrix_operation not in {
@@ -4353,13 +4660,54 @@ def local_mdns_host() -> str:
     short_name = hostname.split(".", 1)[0]
     if not short_name or _is_loopback_or_wildcard_host(short_name):
         return ""
-    return f"{short_name}.local"
+    return f"{short_name.lower()}.local"
 
 
-def browser_access_host(bind_host: str) -> str:
+def host_port_reachable(host: str, port: int, timeout: float = 0.35) -> bool:
+    host = host.strip().strip("[]")
+    if not host or port <= 0:
+        return False
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
+def _host_is_ipv6(host: str) -> bool:
+    address = _ip_address_from_text(host)
+    return isinstance(address, ipaddress.IPv6Address)
+
+
+class DualStackThreadingHTTPServer(http.server.ThreadingHTTPServer):
+    address_family = socket.AF_INET6
+
+    def server_bind(self) -> None:
+        if hasattr(socket, "IPV6_V6ONLY"):
+            try:
+                self.socket.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+            except OSError:
+                # Some platforms do not allow changing this.  IPv6 access still
+                # works; IPv4 may need a separate bind on those systems.
+                pass
+        super().server_bind()
+
+
+def create_threading_http_server(host: str, port: int,
+                                 handler: type[http.server.BaseHTTPRequestHandler]
+                                 ) -> http.server.ThreadingHTTPServer:
+    host = host.strip() or "127.0.0.1"
+    if host == "::0":
+        host = "::"
+    if _host_is_ipv6(host):
+        return DualStackThreadingHTTPServer((host, port), handler)
+    return http.server.ThreadingHTTPServer((host, port), handler)
+
+
+def browser_access_host(bind_host: str, port: int = 0) -> str:
     bind_host = bind_host.strip()
     if bind_host in ("0.0.0.0", "::", "::0"):
-        return "127.0.0.1"
+        return local_mdns_host() or local_lan_ipv4() or "127.0.0.1"
     return bind_host
 
 
@@ -4372,7 +4720,7 @@ def browser_access_url(bind_host: str, port: int) -> str:
         if tailscale_host:
             return f"https://{tailscale_host}/"
 
-    browser_host = browser_access_host(bind_host)
+    browser_host = browser_access_host(bind_host, port)
     if ":" in browser_host and not browser_host.startswith("["):
         browser_host = f"[{browser_host}]"
     return f"http://{browser_host}:{port}/"
@@ -4813,8 +5161,15 @@ def compact_function_text(text: str) -> str:
 
 
 def find_free_port(host: str) -> int:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.bind((host, 0))
+    family = socket.AF_INET6 if _host_is_ipv6(host) else socket.AF_INET
+    bind_host = "::" if host.strip() == "::0" else host
+    with socket.socket(family, socket.SOCK_STREAM) as sock:
+        if family == socket.AF_INET6 and hasattr(socket, "IPV6_V6ONLY"):
+            try:
+                sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+            except OSError:
+                pass
+        sock.bind((bind_host, 0))
         return int(sock.getsockname()[1])
 
 
@@ -4888,6 +5243,7 @@ def parse_mars_lab_output(output: str) -> dict[str, str]:
         "iterations": r"^iterations\s+(.*)$",
         "complex": r"^complex\s+(.*)$",
         "derivative": r"^derivative\s+(.*)$",
+        "derivative_tex": r"^derivative_tex\s*(.*)$",
         "derivative_value": r"^d value\s+(.*)$",
     }
     return parse_keyed_output(output, patterns, {"function"})
@@ -4920,7 +5276,15 @@ def parse_integrator_lab_output(output: str) -> dict[str, str]:
             "expression": r"^expression\s+(.*)$",
             "dimensions": r"^dimensions\s+(.*)$",
             "bound": r"^bound\s+(.*)$",
+            "bound_var": r"^bound_var\s+(.*)$",
+            "bound_lower": r"^bound_lower\s*(.*)$",
+            "bound_upper": r"^bound_upper\s*(.*)$",
             "tex": r"^tex\s+(.*)$",
+            "symbolic_tex": r"^symbolic_tex\s*(.*)$",
+            "symbolic_value": r"^symbolic_value\s*(.*)$",
+            "antiderivative_tex": r"^antiderivative_tex\s*(.*)$",
+            "antiderivative": r"^antiderivative\s+(.*)$",
+            "symbolic": r"^symbolic\s+(.*)$",
             "value": r"^value\s+(.*)$",
             "error": r"^error\s+(.*)$",
             "work_units": r"^work_units\s+(.*)$",
@@ -5508,6 +5872,14 @@ def prepare_evaluation_fields(
     fields["display_expression"] = compact_display_text(str(fields["full_display_expression"]))
     fields["display_tex"] = compact_display_text(str(fields["full_display_tex"]))
     fields["display_function"] = compact_function_text(str(fields["full_display_function"]))
+    derivative_tex = tex_for_display(str(fields.get("derivative_tex") or ""))
+    fields["derivative_tex"] = derivative_tex
+    if derivative_tex:
+        derivative_svg, derivative_render_error = render_tex_to_svg(derivative_tex)
+        if derivative_svg:
+            fields["derivative_svg"] = derivative_svg
+        elif derivative_render_error:
+            fields["derivative_render_error"] = derivative_render_error
     fields["binding_values"] = expression_variable_binding_values(
         fields.get("expression", "") or expression,
         precision,
@@ -5564,6 +5936,9 @@ def prepare_integrator_fields(fields: dict[str, str], precision: int) -> dict[st
     if fields.get("value"):
         fields["value"] = format_number_text_for_precision(
             str(fields["value"]), precision, zero_subprecision=True)
+    if fields.get("symbolic_value"):
+        fields["symbolic_value"] = format_number_text_for_precision(
+            str(fields["symbolic_value"]), precision, zero_subprecision=True)
     if fields.get("error"):
         fields["error"] = format_number_text_for_precision(
             str(fields["error"]),
@@ -5586,6 +5961,11 @@ def prepare_integrator_fields(fields: dict[str, str], precision: int) -> dict[st
         "mode": "integrator",
         "expression": str(fields.get("expression") or "").strip(),
         "tex": "" if tex == "(null)" else tex,
+        "antiderivative": str(fields.get("antiderivative") or "").strip(),
+        "antiderivative_tex": str(fields.get("antiderivative_tex") or "").strip(),
+        "symbolic": str(fields.get("symbolic") or "").strip(),
+        "symbolic_tex": str(fields.get("symbolic_tex") or "").strip(),
+        "symbolic_value": str(fields.get("symbolic_value") or "").strip(),
         "value": str(fields.get("value") or "").strip(),
         "error": str(fields.get("error") or "").strip(),
         "intervals": str(fields.get("intervals") or "").strip(),
@@ -5595,6 +5975,9 @@ def prepare_integrator_fields(fields: dict[str, str], precision: int) -> dict[st
         "status": str(fields.get("status") or "").strip(),
         "dimensions": str(fields.get("dimensions") or "").strip(),
         "bound": bounds,
+        "bound_var": str(fields.get("bound_var") or "").strip().splitlines()[0] if str(fields.get("bound_var") or "").strip() else "",
+        "bound_lower": str(fields.get("bound_lower") or "").strip().splitlines()[0] if str(fields.get("bound_lower") or "").strip() else "",
+        "bound_upper": str(fields.get("bound_upper") or "").strip().splitlines()[0] if str(fields.get("bound_upper") or "").strip() else "",
     }
     if svg:
         payload["svg"] = svg
@@ -5607,25 +5990,20 @@ def integrator_tex_for_display(tex: str) -> str:
     tex = str(tex or "").strip()
     if not tex:
         return ""
-    middle = r"\;\middle|\;"
-    left = r"\left\{"
-    right = r"\right\}"
 
-    if left not in tex or middle not in tex or right not in tex:
-        return tex
+    binding_wrapper = re.compile(
+        r"\\left\\\{\s*(.*?)\s*\\;\\middle\|\\;.*?\\right\\\}"
+    )
 
-    left_index = tex.find(left)
-    middle_index = tex.find(middle, left_index + len(left))
-    right_index = tex.rfind(right)
-    if middle_index < 0 or right_index < 0 or middle_index >= right_index:
-        return tex
+    def replace_wrapper(match: re.Match[str]) -> str:
+        body = match.group(1).strip()
+        return body or match.group(0)
 
-    prefix = tex[:left_index]
-    body = tex[left_index + len(left):middle_index].strip()
-    suffix = tex[right_index + len(right):]
-    if not body:
-        return tex
-    return f"{prefix}{body}{suffix}"
+    previous = None
+    while previous != tex:
+        previous = tex
+        tex = binding_wrapper.sub(replace_wrapper, tex)
+    return tex
 
 
 class MarsLabHandler(http.server.BaseHTTPRequestHandler):
@@ -5795,6 +6173,10 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 if matrix and "..." not in matrix:
                     updates["matrix"] = matrix
 
+                lab_mode = str(payload.get("lab_mode", "")).strip()
+                if lab_mode in {"expression", "matrix", "integrator"}:
+                    updates["lab_mode"] = lab_mode
+
                 matrix_operation = str(payload.get("matrix_operation", "")).strip()
                 if matrix_operation in {
                     "eval",
@@ -5937,9 +6319,11 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
             if not expression:
                 self.send_json(400, {"ok": False, "error": "Integrand expression is empty"})
                 return
-            if not isinstance(bounds, list) or not bounds:
-                self.send_json(400, {"ok": False, "error": "Add at least one variable bound"})
+            if not isinstance(bounds, list):
+                self.send_json(400, {"ok": False, "error": "Bounds must be a list"})
                 return
+            if not bounds:
+                bounds = [{"name": "x", "lo": "", "hi": ""}]
 
             cleaned_bounds: list[dict[str, str]] = []
             for item in bounds:
@@ -5949,8 +6333,11 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
                 name = str(item.get("name", "")).strip()
                 lo_text = str(item.get("lo", "")).strip()
                 hi_text = str(item.get("hi", "")).strip()
-                if not name or not lo_text or not hi_text:
-                    self.send_json(400, {"ok": False, "error": "Every bound needs a variable, lower bound, and upper bound"})
+                if not name:
+                    self.send_json(400, {"ok": False, "error": "Every bound needs a variable name"})
+                    return
+                if lo_text and not hi_text:
+                    self.send_json(400, {"ok": False, "error": "A one-sided bound should be entered as an upper value"})
                     return
                 cleaned_bounds.append({"name": name, "lo": lo_text, "hi": hi_text})
 
@@ -5975,6 +6362,8 @@ class MarsLabHandler(http.server.BaseHTTPRequestHandler):
 
             bounds_text = "\n".join(
                 f"{item['name']} = {item['lo']} .. {item['hi']}"
+                if item["lo"] and item["hi"]
+                else (f"{item['name']} = {item['hi']}" if item["hi"] else item["name"])
                 for item in cleaned_bounds
             )
             save_state_data({
@@ -6174,7 +6563,7 @@ def open_lab_url(url: str, browser: str = "") -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=f"Launch the local {LAB_APP_NAME}.")
-    parser.add_argument("--host", default="0.0.0.0", help="host to bind")
+    parser.add_argument("--host", default="::", help="host to bind")
     parser.add_argument("--port", type=int, default=0, help="port to bind, or 0 for auto")
     parser.add_argument("--no-browser", action="store_true", help="do not open the browser automatically")
     parser.add_argument("--browser", default="", help="browser executable to open the lab URL")
@@ -6190,7 +6579,7 @@ def main() -> int:
     MarsLabHandler.server_host = args.host
     MarsLabHandler.server_port = port
     try:
-        server = http.server.ThreadingHTTPServer((args.host, port), MarsLabHandler)
+        server = create_threading_http_server(args.host, port, MarsLabHandler)
     except OSError as exc:
         if exc.errno == errno.EADDRINUSE:
             ensure_tailscale_serve(args.host, port)

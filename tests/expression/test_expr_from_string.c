@@ -276,6 +276,41 @@ static void test_from_string_special_functions(void)
     check_parse_val("normal_pdf(0)",         "{ normal_pdf(x) | x = 0 }",    1.0/sqrt(2.0*M_PI),      __LINE__);
     check_parse_val("normal_cdf(0) = 0.5",   "{ normal_cdf(x) | x = 0 }",    0.5,                     __LINE__);
     check_parse_val("normal_logpdf(0)",      "{ normal_logpdf(x) | x = 0 }", -0.5*log(2.0*M_PI),      __LINE__);
+    check_parse_val("pdf(0) aliases normal_pdf",
+                    "{ pdf(x) | x = 0 }", 1.0/sqrt(2.0*M_PI), __LINE__);
+    check_parse_val("cdf(0) aliases normal_cdf",
+                    "{ cdf(x) | x = 0 }", 0.5, __LINE__);
+    check_parse_val("logpdf(0) aliases normal_logpdf",
+                    "{ logpdf(x) | x = 0 }", -0.5*log(2.0*M_PI), __LINE__);
+    check_parse_expr("cdf alias keeps user spelling",
+                     "{ cdf(1.96) - cdf(-1.96) }",
+                     "cdf(1.96) - cdf(-1.96)", __LINE__);
+    check_parse_expr("pdf and logpdf aliases keep user spelling",
+                     "{ pdf(0) + logpdf(0) }",
+                     "pdf(0) + logpdf(0)", __LINE__);
+    {
+        expr_bindings_t *bindings = NULL;
+        expr_t *expr = expr_from_string("{ cdf(x) | x = ? }", &bindings);
+        expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+        expr_t *deriv = (expr && x) ? expr_create_deriv(expr, x) : NULL;
+        char *text = deriv ? expr_to_string(deriv, style_EXPRESSION) : NULL;
+
+        if (text && strstr(text, "pdf(x)") && !strstr(text, "normal_pdf")) {
+            printf(C_BOLD C_GREEN "PASS" C_RESET " cdf alias derivative keeps short pdf spelling\n");
+            printf(C_BOLD "  expr   " C_RESET "%s\n\n", text);
+        } else {
+            printf(C_BOLD C_RED "FAIL" C_RESET
+                   " cdf alias derivative keeps short pdf spelling %s:%d:1\n",
+                   __FILE__, __LINE__);
+            printf(C_BOLD "  got    " C_RESET "%s\n\n", text ? text : "(null)");
+            TEST_FAIL();
+        }
+
+        free(text);
+        expr_free(deriv);
+        expr_free(expr);
+        expr_bindings_free(bindings);
+    }
     check_parse_val("Ei(1)",                 "{ Ei(x) | x = 1 }",            1.8951178163559367,       __LINE__);
     check_parse_val("E1(1)",                 "{ E1(x) | x = 1 }",            0.21938393439552029,      __LINE__);
     /* Binary functions */

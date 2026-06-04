@@ -442,6 +442,27 @@ const expr_ops_t ops_normal_logpdf = {
     .apply_unary = expr_normal_logpdf, .apply_binary = NULL,
     .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
 };
+const expr_ops_t ops_pdf = {
+    .eval = eval_normal_pdf, .deriv = deriv_pdf, .reverse = expr_reverse_normal_pdf,
+    .kind = EXPR_KIND_NORMAL_PDF, .arity = EXPR_OP_UNARY, .name = "pdf",
+    .tex_name = "\\operatorname{pdf}",
+    .apply_unary = expr_pdf, .apply_binary = NULL,
+    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
+};
+const expr_ops_t ops_cdf = {
+    .eval = eval_normal_cdf, .deriv = deriv_cdf, .reverse = expr_reverse_normal_cdf,
+    .kind = EXPR_KIND_NORMAL_CDF, .arity = EXPR_OP_UNARY, .name = "cdf",
+    .tex_name = "\\operatorname{cdf}",
+    .apply_unary = expr_cdf, .apply_binary = NULL,
+    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
+};
+const expr_ops_t ops_logpdf = {
+    .eval = eval_normal_logpdf, .deriv = deriv_logpdf, .reverse = expr_reverse_normal_logpdf,
+    .kind = EXPR_KIND_NORMAL_LOGPDF, .arity = EXPR_OP_UNARY, .name = "logpdf",
+    .tex_name = "\\operatorname{logpdf}",
+    .apply_unary = expr_logpdf, .apply_binary = NULL,
+    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
+};
 const expr_ops_t ops_ei = {
     .eval = eval_ei, .deriv = deriv_ei, .reverse = expr_reverse_ei,
     .kind = EXPR_KIND_EI, .arity = EXPR_OP_UNARY, .name = "Ei",
@@ -702,6 +723,9 @@ expr_t *expr_lambert_wm1(const expr_t *a) { return expr_math_wrap_unary(&ops_lam
 expr_t *expr_normal_pdf(const expr_t *a) { return expr_math_wrap_unary(&ops_normal_pdf, a); }
 expr_t *expr_normal_cdf(const expr_t *a) { return expr_math_wrap_unary(&ops_normal_cdf, a); }
 expr_t *expr_normal_logpdf(const expr_t *a) { return expr_math_wrap_unary(&ops_normal_logpdf, a); }
+expr_t *expr_pdf(const expr_t *a) { return expr_math_wrap_unary(&ops_pdf, a); }
+expr_t *expr_cdf(const expr_t *a) { return expr_math_wrap_unary(&ops_cdf, a); }
+expr_t *expr_logpdf(const expr_t *a) { return expr_math_wrap_unary(&ops_logpdf, a); }
 expr_t *expr_ei(const expr_t *a) { return expr_math_wrap_unary(&ops_ei, a); }
 expr_t *expr_e1(const expr_t *a) { return expr_math_wrap_unary(&ops_e1, a); }
 expr_t *expr_beta(const expr_t *a, const expr_t *b) { return expr_math_wrap_binary(&ops_beta, a, b); }

@@ -6807,7 +6807,7 @@ def ophelia_browser_access_url(bind_host: str, port: int) -> str:
         tailscale_host = shared.tailscale_https_host()
         if tailscale_host:
             return f"https://{tailscale_host}{app_url('/')}"
-    browser_host = shared.browser_access_host(bind_host)
+    browser_host = shared.browser_access_host(bind_host, port)
     if ":" in browser_host and not browser_host.startswith("["):
         browser_host = f"[{browser_host}]"
     return f"http://{browser_host}:{port}{app_url('/')}"
@@ -6885,7 +6885,7 @@ def ophelia_mobile_access_details(bind_host: str, port: int, host_header: str = 
                     "tailscale": False,
                     "control": False,
                 }
-    browser_host = shared.browser_access_host(bind_host)
+    browser_host = shared.browser_access_host(bind_host, port)
     if ":" in browser_host and not browser_host.startswith("["):
         browser_host = f"[{browser_host}]"
     return {
@@ -7565,7 +7565,7 @@ class OpheliaLabHandler(http.server.BaseHTTPRequestHandler):
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Launch the local Ophelia Lab forecasting app.")
-    parser.add_argument("--host", default="0.0.0.0", help="host to bind")
+    parser.add_argument("--host", default="::", help="host to bind")
     parser.add_argument("--port", type=int, default=0, help="port to bind, or 0 for auto")
     parser.add_argument("--no-browser", action="store_true", help="do not open the browser automatically")
     parser.add_argument("--browser", default="", help="browser executable to open the lab URL")
@@ -7581,7 +7581,7 @@ def main() -> int:
     OpheliaLabHandler.server_port = port
 
     try:
-        server = http.server.ThreadingHTTPServer((args.host, port), OpheliaLabHandler)
+        server = shared.create_threading_http_server(args.host, port, OpheliaLabHandler)
     except OSError as exc:
         if exc.errno == errno.EADDRINUSE:
             ophelia_ensure_tailscale_serve(args.host, port)

@@ -1186,6 +1186,17 @@ static void collect_mul_flat(
         num_scope_leave(&(scope));
         return;
     }
+    if (expr_is_unnamed_const(dv) && dv->binding_expr &&
+        dv->binding_expr->kind == EXPR_BINDING_EXPR_DIV) {
+        expr_t *expanded = expr_binding_expr_eval_expr(dv->binding_expr);
+
+        if (expanded) {
+            collect_mul_flat(expanded, c_acc, is_zero, terms, nterms, cap);
+            expr_free(expanded);
+            num_scope_leave(&(scope));
+            return;
+        }
+    }
     if (expr_is_unnamed_const(dv) && dv->binding_expr) {
         expr_binding_expr_t *base_expr = NULL;
         number_t exponent;
@@ -1766,6 +1777,53 @@ expr_t *expr_simplify_neg_operator(const expr_t *dv, expr_t *a, expr_t *b)
 
 /* --- */
 
+static expr_t *expr_try_simplify_log_const_difference_local(expr_t *a,
+                                                            expr_t *b)
+{
+    number_t left = NUM_ZERO;
+    number_t right = NUM_ZERO;
+    number_t quotient = NUM_ZERO;
+    expr_t *quotient_expr;
+    expr_t *raw_log;
+    expr_t *out;
+
+    if (!expr_is_op(a, &ops_log) || !expr_is_op(b, &ops_log))
+        return NULL;
+
+    if (!expr_simplify_try_get_plain_real_const(a->a, &left))
+        return NULL;
+    if (!num_gt(left, NUM_ZERO)) {
+        num_destroy(&left);
+        return NULL;
+    }
+
+    if (!expr_simplify_try_get_plain_real_const(b->a, &right)) {
+        num_destroy(&left);
+        return NULL;
+    }
+    if (!num_gt(right, NUM_ZERO)) {
+        num_destroy(&right);
+        num_destroy(&left);
+        return NULL;
+    }
+
+    quotient = num_div(left, right);
+    num_destroy(&right);
+    num_destroy(&left);
+    if (!num_is_finite(quotient) || !num_gt(quotient, NUM_ZERO)) {
+        num_destroy(&quotient);
+        return NULL;
+    }
+
+    quotient_expr = expr_new_const_owned_local(quotient);
+    num_destroy(&quotient);
+    raw_log = expr_log(quotient_expr);
+    expr_free(quotient_expr);
+    out = expr_simplify(raw_log);
+    expr_free(raw_log);
+    return out;
+}
+
 expr_t *expr_simplify_add_sub_operator(const expr_t *dv, expr_t *a, expr_t *b)
 {
     NUM_SCOPE(scope);
@@ -1792,6 +1850,37 @@ expr_t *expr_simplify_add_sub_operator(const expr_t *dv, expr_t *a, expr_t *b)
             num_destroy(&c_const);
             num_destroy(&common_coeff);
             return basic_sum;
+        }
+    }
+
+    if (expr_is_op(dv, &ops_sub)) {
+        expr_t *log_difference =
+            expr_try_simplify_log_const_difference_local(a, b);
+
+        if (log_difference) {
+            expr_free(a);
+            expr_free(b);
+            num_destroy(&c_const);
+            num_destroy(&common_coeff);
+            return log_difference;
+        }
+    }
+    if (expr_is_op(dv, &ops_add)) {
+        expr_t *log_difference = NULL;
+
+        if (expr_is_op(a, &ops_neg))
+            log_difference =
+                expr_try_simplify_log_const_difference_local(b, a->a);
+        else if (expr_is_op(b, &ops_neg))
+            log_difference =
+                expr_try_simplify_log_const_difference_local(a, b->a);
+
+        if (log_difference) {
+            expr_free(a);
+            expr_free(b);
+            num_destroy(&c_const);
+            num_destroy(&common_coeff);
+            return log_difference;
         }
     }
 

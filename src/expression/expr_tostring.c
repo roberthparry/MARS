@@ -667,6 +667,33 @@ static int expr_tostring_should_emit_binding_expr(const expr_t *f)
     return is_builtin_const && value_matches_builtin;
 }
 
+static int expr_binding_expr_needs_explicit_mul_separator(const expr_binding_expr_t *expr)
+{
+    if (!expr)
+        return 0;
+
+    switch (expr->kind) {
+    case EXPR_BINDING_EXPR_NUMBER:
+        return 0;
+    case EXPR_BINDING_EXPR_DIV:
+        return 1;
+    case EXPR_BINDING_EXPR_NEG:
+        return expr_binding_expr_needs_explicit_mul_separator(expr->u.unary.child);
+    case EXPR_BINDING_EXPR_MUL:
+        return expr_binding_expr_needs_explicit_mul_separator(expr->u.binary.left);
+    case EXPR_BINDING_EXPR_POWI:
+        return expr_binding_expr_needs_explicit_mul_separator(expr->u.powi.base);
+    case EXPR_BINDING_EXPR_CONST:
+    case EXPR_BINDING_EXPR_ADD:
+    case EXPR_BINDING_EXPR_SUB:
+    case EXPR_BINDING_EXPR_UNARY_OP:
+    case EXPR_BINDING_EXPR_BINARY_OP:
+        return 0;
+    }
+
+    return 0;
+}
+
 static void emit_atom(expr_t *f, sbuf_t *b)
 {
     if (expr_is_const(f)) {
@@ -908,6 +935,9 @@ static int is_atomic_for_mul(const expr_t *f)
          * are non-atomic so that a middle-dot separator is inserted between adjacent
          * bracketed terms: [pi]·[radius]² instead of [pi][radius]². */
         if (expr_is_preserved_ln10_const_local(f))
+            return 0;
+        if (f->binding_expr &&
+            expr_binding_expr_needs_explicit_mul_separator(f->binding_expr))
             return 0;
         if (!f->name || !*f->name) return 1;
         return expr_tostring_is_simple_name(f->name);
@@ -1179,6 +1209,11 @@ static void emit_expr_abs(const expr_t *f, sbuf_t *b, int parent_prec)
     if (expr_is_const(f) && expr_renders_negative(f)) {
         char *text;
         number_t pos_value = num_neg(f->c);
+
+        if (emit_negative_const_binding_expr_abs(f, b, false)) {
+            num_destroy(&pos_value);
+            return;
+        }
 
         text = expr_number_to_string_local(pos_value);
         if (text) {
@@ -1454,6 +1489,8 @@ static void emit_tex_expr_abs(const expr_t *f, sbuf_t *b, int parent_prec)
     }
 
     if (expr_is_const(f) && expr_renders_negative(f)) {
+        if (emit_negative_const_binding_expr_abs(f, b, true))
+            return;
         emit_tex_number_value(b, num_neg(f->c));
         return;
     }

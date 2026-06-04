@@ -631,6 +631,9 @@ int tests_main(void)
     TEST_SECTION("expr_pattern helpers");
     TEST_RUN_CASE(test_expr_pattern_helpers, NULL);
 
+    TEST_SECTION("Symbolic integration");
+    TEST_RUN_CASE(test_symbolic_integration, NULL);
+
     TEST_SECTION("Runtime regressions");
     TEST_RUN_CASE(test_runtime_regressions, NULL);
 

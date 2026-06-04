@@ -399,6 +399,97 @@ static expr_binding_expr_t *binding_expr_number_from_value(number_t value)
     return expr;
 }
 
+static bool binding_text_is_decimal_literal(const char *text)
+{
+    const char *p = text;
+    bool have_digit = false;
+    bool have_decimal_marker = false;
+    bool have_exp_digit = false;
+
+    if (!p || !*p)
+        return false;
+
+    if (*p == '+' || *p == '-')
+        p++;
+
+    while (*p >= '0' && *p <= '9') {
+        have_digit = true;
+        p++;
+    }
+
+    if (*p == '.') {
+        have_decimal_marker = true;
+        p++;
+        while (*p >= '0' && *p <= '9') {
+            have_digit = true;
+            p++;
+        }
+    }
+
+    if (*p == 'e' || *p == 'E') {
+        have_decimal_marker = true;
+        p++;
+        if (*p == '+' || *p == '-')
+            p++;
+        while (*p >= '0' && *p <= '9') {
+            have_exp_digit = true;
+            p++;
+        }
+        if (!have_exp_digit)
+            return false;
+    }
+
+    return have_digit && have_decimal_marker && *p == '\0';
+}
+
+static char *binding_negated_decimal_text(const char *text)
+{
+    char *out;
+    size_t len;
+
+    if (!binding_text_is_decimal_literal(text))
+        return NULL;
+
+    if (text[0] == '-') {
+        return expr_tostring_xstrdup(text + 1u);
+    }
+
+    if (text[0] == '+')
+        text++;
+
+    len = strlen(text);
+    out = (char *)malloc(len + 2u);
+    if (!out)
+        abort();
+    out[0] = '-';
+    memcpy(out + 1u, text, len + 1u);
+    return out;
+}
+
+expr_binding_expr_t *binding_expr_try_preserve_negated_decimal_owned(
+    expr_binding_expr_t *expr)
+{
+    expr_binding_expr_t *child;
+    expr_binding_expr_t *folded;
+    char *text;
+
+    if (!expr || expr->kind != EXPR_BINDING_EXPR_NEG)
+        return expr;
+
+    child = expr->u.unary.child;
+    if (!child || child->kind != EXPR_BINDING_EXPR_NUMBER)
+        return expr;
+
+    text = binding_negated_decimal_text(child->u.text);
+    if (!text)
+        return expr;
+
+    folded = expr_binding_expr_new_number_text(text);
+    free(text);
+    expr_binding_expr_free(expr);
+    return folded;
+}
+
 static expr_binding_expr_t *binding_expr_product_owned(expr_binding_expr_t *left,
                                                      expr_binding_expr_t *right)
 {
@@ -811,6 +902,85 @@ expr_binding_expr_t *binding_expr_try_simplify_basic_sum(expr_binding_expr_t *ex
     successor_arg = binding_expr_add_one(lgamma->u.unary_op.child);
     out = expr_binding_expr_new_unary_op(&ops_lgamma, successor_arg);
     return binding_expr_fold_to_expr_owned(expr, out);
+}
+
+static bool binding_expr_positive_log_argument_value(
+    const expr_binding_expr_t *expr,
+    number_t *out)
+{
+    if (!binding_expr_is_unary_op(expr, &ops_log) ||
+        !expr_binding_expr_number_value(expr->u.unary_op.child, out))
+        return false;
+
+    if (!num_is_real(*out) || !num_gt(*out, NUM_ZERO)) {
+        num_destroy(out);
+        return false;
+    }
+    return true;
+}
+
+static expr_binding_expr_t *binding_expr_make_log_difference_owned(
+    expr_binding_expr_t *expr,
+    const expr_binding_expr_t *left_log,
+    const expr_binding_expr_t *right_log)
+{
+    number_t left = NUM_ZERO;
+    number_t right = NUM_ZERO;
+    number_t quotient = NUM_ZERO;
+    expr_binding_expr_t *quotient_expr;
+    expr_binding_expr_t *out;
+
+    if (!binding_expr_positive_log_argument_value(left_log, &left))
+        return expr;
+    if (!binding_expr_positive_log_argument_value(right_log, &right)) {
+        num_destroy(&left);
+        return expr;
+    }
+
+    quotient = num_scope_detach(num_div(left, right));
+    num_destroy(&right);
+    num_destroy(&left);
+    if (!num_is_finite(quotient) || !num_gt(quotient, NUM_ZERO)) {
+        num_destroy(&quotient);
+        return expr;
+    }
+
+    if (num_eq(quotient, NUM_ONE)) {
+        num_destroy(&quotient);
+        return binding_expr_fold_to_expr_owned(
+            expr, expr_binding_expr_new_number_text("0"));
+    }
+
+    quotient_expr = binding_expr_number_from_value(quotient);
+    num_destroy(&quotient);
+    out = expr_binding_expr_new_unary_op(&ops_log, quotient_expr);
+    return binding_expr_fold_to_expr_owned(expr,
+                                        expr_binding_expr_simplify(out));
+}
+
+expr_binding_expr_t *binding_expr_try_simplify_log_difference(
+    expr_binding_expr_t *expr)
+{
+    if (!expr ||
+        (expr->kind != EXPR_BINDING_EXPR_SUB &&
+         expr->kind != EXPR_BINDING_EXPR_ADD))
+        return expr;
+
+    if (expr->kind == EXPR_BINDING_EXPR_SUB)
+        return binding_expr_make_log_difference_owned(
+            expr, expr->u.binary.left, expr->u.binary.right);
+
+    if (expr->u.binary.left &&
+        expr->u.binary.left->kind == EXPR_BINDING_EXPR_NEG)
+        return binding_expr_make_log_difference_owned(
+            expr, expr->u.binary.right, expr->u.binary.left->u.unary.child);
+
+    if (expr->u.binary.right &&
+        expr->u.binary.right->kind == EXPR_BINDING_EXPR_NEG)
+        return binding_expr_make_log_difference_owned(
+            expr, expr->u.binary.left, expr->u.binary.right->u.unary.child);
+
+    return expr;
 }
 
 expr_binding_expr_t *binding_expr_try_simplify_basic_product(expr_binding_expr_t *expr)

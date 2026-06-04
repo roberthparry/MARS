@@ -935,6 +935,27 @@ expr_t *deriv_normal_logpdf(expr_t *dv)
     return expr_chain_rule_with_factor(dv, expr_neg(dv->a));
 }
 
+expr_t *deriv_pdf(expr_t *dv)
+{
+    expr_t *da    = expr_get_dx_internal(dv->a);
+    expr_t *neg_a = expr_neg(dv->a);
+    expr_t *phi   = expr_pdf(dv->a);
+    expr_t *fac   = expr_mul(neg_a, phi);
+    expr_t *out   = expr_mul(fac, da);
+    expr_free(da); expr_free(neg_a); expr_free(phi); expr_free(fac);
+    return out;
+}
+
+expr_t *deriv_cdf(expr_t *dv)
+{
+    return expr_chain_rule_with_factor(dv, expr_pdf(dv->a));
+}
+
+expr_t *deriv_logpdf(expr_t *dv)
+{
+    return deriv_normal_logpdf(dv);
+}
+
 expr_t *deriv_ei(expr_t *dv)
 {
     expr_t *da  = expr_get_dx_internal(dv->a);
