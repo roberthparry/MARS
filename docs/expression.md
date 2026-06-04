@@ -34,6 +34,7 @@ of these graphs.
 - expression construction from constants, variables, and operators
 - lazy evaluation with result caching
 - symbolic differentiation to arbitrary order
+- first-cut symbolic antiderivatives for simple, reliable expression families
 - evaluation of derivatives for scalar outputs
 - elementary and special functions exposed through the `expr` builder API and
   evaluated through `number_t`
@@ -82,6 +83,38 @@ higher-level symbolic code:
 
 These APIs are intended for sibling library modules rather than ordinary
 end-user arithmetic code.
+
+## Symbolic Integration
+
+`expr_integrate(expr, wrt)` tries to build an owning antiderivative expression
+with respect to the explicit variable node `wrt`. It returns NULL when no safe
+symbolic rule is known, which lets callers fall back to the numerical
+`integrator_t` path without guessing.
+
+The current rule set is intentionally conservative. It covers constants,
+sums/differences, constant multiples, powers of the integration variable,
+`1/x`, `log(x)`, and affine `exp`, `sin`, `cos`, `tan`, `sinh`, `cosh`, and `tanh` terms such
+as `sin(3*x - 1)`.
+
+```c
+number_t x0 = num_create_from_double(0.0);
+number_t two = num_create_from_long(2);
+expr_t *x = expr_new_named_var(x0, "x");
+expr_t *two_x = expr_mul_num(x, &two);
+expr_t *f = expr_exp(two_x);
+expr_t *F = expr_integrate(f, x);  /* exp(2*x) / 2, or NULL if unsupported */
+
+expr_free(F);
+expr_free(f);
+expr_free(two_x);
+expr_free(x);
+num_destroy(&two);
+num_destroy(&x0);
+```
+
+For production code, verify a returned antiderivative the same way the tests
+do: differentiate it with `expr_create_deriv(F, wrt)` and compare it with the
+original expression at representative points.
 
 ## Example: Constructing an Expression
 

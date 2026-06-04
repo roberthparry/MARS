@@ -634,6 +634,7 @@
     "test_expr_t_goal_seek": true,
     "test_partial_derivatives": true,
     "test_expr_pattern_helpers": true,
+    "test_symbolic_integration": true,
     "test_runtime_regressions": true,
     "test_reverse_mode": true
   },
@@ -1019,6 +1020,7 @@
       "test_simplify_reuses_clean_nodes_and_dirty_mutations": true,
       "test_gamma_successor_product_simplifies": true,
       "test_lgamma_successor_sum_simplifies": true,
+      "test_log_constant_difference_simplifies_to_quotient": true,
       "test_simplify_inverse_unary_pairs": true,
       "test_simplify_exp_quarter_turns": true,
       "test_simplify_trig_and_hyperbolic_identities": true,
@@ -1027,6 +1029,7 @@
       "test_pure_imaginary_addend_stays_ungrouped": true,
       "test_preserved_complex_function_addend_stays_ungrouped": true,
       "test_updated_decimal_binding_stays_decimal": true,
+      "test_negative_decimal_function_argument_stays_decimal": true,
       "test_symbolic_negative_pi_derivative_stays_symbolic": true,
       "test_pow_derivative_preserves_literal_base_log": true,
       "test_symbolic_complex_power_derivative_keeps_base_log": true,
@@ -1041,6 +1044,7 @@
       "test_repeated_preserved_log_factor_combines_as_power": true,
       "test_preserved_log_power_chain_combines_as_power": true,
       "test_unary_constants_preserve_user_literals_in_derivatives": true,
+      "test_preserved_reciprocal_constant_derivative_round_trips": true,
       "test_binary_constants_preserve_user_literals_in_derivatives": true,
       "test_symbolic_negative_pi_quotient_stays_symbolic": true,
       "test_symbolic_power_derivative_uses_n_minus_one_form": true,
@@ -1106,5 +1110,17 @@
     "test_arimax_differences_exogenous_regressors": true,
     "test_auto_arima_preserves_selected_model_and_scale": true,
     "test_exogenous_alignment_for_future_forecasts": true
+  },
+  "tests/expression/test_expr_integrate.c": {
+    "test_symbolic_integration": {
+      "enabled": true,
+      "test_integrate_polynomial_sum": true,
+      "test_integrate_reciprocal_and_log": true,
+      "test_integrate_affine_elementary": true,
+      "test_integrate_affine_tangent": true,
+      "test_integrate_other_variable_as_constant": true,
+      "test_integrate_definite_symbolic_bounds": true,
+      "test_integrate_unsupported_product_returns_null": true
+    }
   }
 }

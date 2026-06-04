@@ -494,6 +494,7 @@ int main(int argc, char **argv)
     char *func_text = NULL;
     char *tex_text = NULL;
     char *deriv_text = NULL;
+    char *deriv_tex_text = NULL;
     int rc = 0;
 
     if (argc > 1 && strcmp(argv[1], "--goal-seek") == 0)
@@ -536,9 +537,11 @@ int main(int argc, char **argv)
             goto cleanup;
         }
         deriv_text = expr_to_string(deriv, style_EXPRESSION);
+        deriv_tex_text = expr_to_string(deriv, style_TEX);
         printf("derivative  d/d%s = %s\n",
                wrt_name,
                deriv_text ? deriv_text : "(null)");
+        printf("derivative_tex  %s\n", deriv_tex_text ? deriv_tex_text : "");
         print_owned_number("d value", expr_eval(deriv), precision);
     } else {
         printf("derivative  no binding named '%s'\n", wrt_name);
@@ -546,6 +549,7 @@ int main(int argc, char **argv)
 
 cleanup:
     free(wrapped_input);
+    free(deriv_tex_text);
     free(deriv_text);
     free(tex_text);
     free(func_text);

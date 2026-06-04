@@ -336,6 +336,7 @@ void test_expr_t_from_string(void);
 void test_expr_t_goal_seek(void);
 void test_partial_derivatives(void);
 void test_expr_pattern_helpers(void);
+void test_symbolic_integration(void);
 void test_runtime_regressions(void);
 void test_reverse_mode(void);
 

@@ -1480,6 +1480,9 @@ static const binding_func_entry_t s_binding_funcs[BINDING_FUNC_TABLE_SIZE] = {
 };
 
 static const binding_func_entry_t s_extra_binding_funcs[] = {
+    BINDING_FUNC_ENTRY("pdf",           false, &ops_pdf),
+    BINDING_FUNC_ENTRY("cdf",           false, &ops_cdf),
+    BINDING_FUNC_ENTRY("logpdf",        false, &ops_logpdf),
     BINDING_FUNC_ENTRY("sec",           false, &ops_sec),
     BINDING_FUNC_ENTRY("lg",            false, &ops_log10),
     BINDING_FUNC_ENTRY("cosec",         false, &ops_cosec),

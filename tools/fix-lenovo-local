@@ -1,0 +1,46 @@
+#!/bin/sh
+set -eu
+
+host_name="Lenovo"
+mdns_name="lenovo"
+mdns_fqdn="${mdns_name}.local"
+stamp="$(date +%Y%m%d-%H%M%S)"
+
+if [ "$(id -u)" -ne 0 ]; then
+    echo "Please run this helper with sudo:" >&2
+    echo "  sudo tools/fix-lenovo-local" >&2
+    exit 1
+fi
+
+cp /etc/hosts "/etc/hosts.mars-lab-${stamp}.bak"
+
+if grep -Eq '^[[:space:]]*127\.0\.1\.1[[:space:]]+' /etc/hosts; then
+    if ! grep -Eq '^[[:space:]]*127\.0\.1\.1[[:space:]].*[[:space:]]lenovo\.local([[:space:]]|$)' /etc/hosts; then
+        sed -i -E '/^[[:space:]]*127\.0\.1\.1[[:space:]]+/ s/$/ lenovo.local/' /etc/hosts
+    fi
+else
+    printf '127.0.1.1  %s %s\n' "$host_name" "$mdns_fqdn" >> /etc/hosts
+fi
+
+avahi_conf=/etc/avahi/avahi-daemon.conf
+if [ -f "$avahi_conf" ]; then
+    cp "$avahi_conf" "${avahi_conf}.mars-lab-${stamp}.bak"
+
+    if grep -Eq '^[#[:space:]]*host-name=' "$avahi_conf"; then
+        sed -i -E "s/^[#[:space:]]*host-name=.*/host-name=${mdns_name}/" "$avahi_conf"
+    else
+        sed -i "/^\[server\]/a host-name=${mdns_name}" "$avahi_conf"
+    fi
+
+    if grep -Eq '^[#[:space:]]*publish-addresses=' "$avahi_conf"; then
+        sed -i -E 's/^[#[:space:]]*publish-addresses=.*/publish-addresses=yes/' "$avahi_conf"
+    else
+        sed -i '/^\[publish\]/a publish-addresses=yes' "$avahi_conf"
+    fi
+
+    systemctl restart avahi-daemon
+fi
+
+echo "Configured ${mdns_fqdn} for local desktop lookup and Avahi/mDNS publication."
+echo "Try:"
+echo "  http://${mdns_fqdn}:8765/"

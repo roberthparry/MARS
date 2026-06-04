@@ -61,8 +61,10 @@ typedef enum {
     EXPR_PATTERN_UNARY_EXP,
     EXPR_PATTERN_UNARY_SIN,
     EXPR_PATTERN_UNARY_COS,
+    EXPR_PATTERN_UNARY_TAN,
     EXPR_PATTERN_UNARY_SINH,
-    EXPR_PATTERN_UNARY_COSH
+    EXPR_PATTERN_UNARY_COSH,
+    EXPR_PATTERN_UNARY_TANH
 } expr_pattern_unary_affine_kind_t;
 
 bool expr_match_unary_affine_kind(const expr_t *expr,
