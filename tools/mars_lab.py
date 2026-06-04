@@ -3818,6 +3818,18 @@ __THEME_OVERRIDES__
       }
     }
 
+    function evaluateActiveModeOnLoad() {
+      if (currentMode() === 'matrix') {
+        evaluateMatrix();
+        return;
+      }
+      if (currentMode() === 'integrator') {
+        evaluateIntegrator();
+        return;
+      }
+      evaluateExpression();
+    }
+
     async function runGoalSeek(sourceText, target, start, options = {}) {
       const request = goalSeekExpressionAndStarts(sourceText, start);
       const response = await fetch('/goal_seek', {
@@ -4194,7 +4206,7 @@ __THEME_OVERRIDES__
     setStatus('Ready');
     refreshMobileAccess();
     setInterval(refreshMobileAccess, 5000);
-    loadLastState().finally(() => evaluateExpression());
+    loadLastState().finally(() => evaluateActiveModeOnLoad());
   </script>
 </body>
 </html>
