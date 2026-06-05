@@ -815,26 +815,26 @@ static bool function_power_marker_is_inverse(const char *start, const char *end)
 
 static bool function_supports_inverse_power_notation(const func_entry_t *fe)
 {
+    static const bool inverse_power_supported[EXPR_KIND_COUNT] = {
+        [EXPR_KIND_SIN] = true,
+        [EXPR_KIND_COS] = true,
+        [EXPR_KIND_TAN] = true,
+        [EXPR_KIND_SEC] = true,
+        [EXPR_KIND_COSEC] = true,
+        [EXPR_KIND_COT] = true,
+        [EXPR_KIND_SINH] = true,
+        [EXPR_KIND_COSH] = true,
+        [EXPR_KIND_TANH] = true,
+        [EXPR_KIND_SECH] = true,
+        [EXPR_KIND_COSECH] = true,
+        [EXPR_KIND_COTH] = true
+    };
+
     if (!fe || !fe->ops)
         return false;
-
-    switch (fe->ops->kind) {
-        case EXPR_KIND_SIN:
-        case EXPR_KIND_COS:
-        case EXPR_KIND_TAN:
-        case EXPR_KIND_SEC:
-        case EXPR_KIND_COSEC:
-        case EXPR_KIND_COT:
-        case EXPR_KIND_SINH:
-        case EXPR_KIND_COSH:
-        case EXPR_KIND_TANH:
-        case EXPR_KIND_SECH:
-        case EXPR_KIND_COSECH:
-        case EXPR_KIND_COTH:
-            return true;
-        default:
-            return false;
-    }
+    if ((unsigned)fe->ops->kind >= (unsigned)EXPR_KIND_COUNT)
+        return false;
+    return inverse_power_supported[fe->ops->kind];
 }
 
 static int parse_required_char(parser_t *p, char expected, const char *errmsg)

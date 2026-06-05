@@ -134,10 +134,32 @@ bool expr_ops_are_direct_inverse_pair(const expr_ops_t *outer,
     return outer && inner && outer->direct_inverse == inner;
 }
 
+const expr_ops_t *expr_ops_reciprocal_unary(const expr_ops_t *ops)
+{
+    static const expr_ops_t *reciprocal_unary_ops[EXPR_KIND_COUNT] = {
+        [EXPR_KIND_COS] = &ops_sec,
+        [EXPR_KIND_SIN] = &ops_cosec,
+        [EXPR_KIND_TAN] = &ops_cot,
+        [EXPR_KIND_SEC] = &ops_cos,
+        [EXPR_KIND_COSEC] = &ops_sin,
+        [EXPR_KIND_COT] = &ops_tan,
+        [EXPR_KIND_COSH] = &ops_sech,
+        [EXPR_KIND_SINH] = &ops_cosech,
+        [EXPR_KIND_TANH] = &ops_coth,
+        [EXPR_KIND_SECH] = &ops_cosh,
+        [EXPR_KIND_COSECH] = &ops_sinh,
+        [EXPR_KIND_COTH] = &ops_tanh
+    };
+
+    if (!ops || (unsigned)ops->kind >= (unsigned)EXPR_KIND_COUNT)
+        return NULL;
+    return reciprocal_unary_ops[ops->kind];
+}
+
 typedef bool (*expr_inverse_candidate_ok_fn)(number_t value);
 
 typedef struct expr_inverse_unary_rule {
-    const expr_ops_t *ops;
+    bool supported;
     expr_inverse_candidate_ok_fn candidate_ok;
 } expr_inverse_unary_rule_t;
 
@@ -176,27 +198,23 @@ static bool expr_lambert_wm1_candidate_ok(number_t value)
            num_le(value, NUM_NEG_ONE);
 }
 
-static const expr_inverse_unary_rule_t s_inverse_unary_rules[] = {
-    { &ops_lambert_w,   expr_lambert_w_candidate_ok },
-    { &ops_lambert_w0,  expr_lambert_w0_candidate_ok },
-    { &ops_lambert_wm1, expr_lambert_wm1_candidate_ok },
-    { &ops_log10,       NULL },
+static const expr_inverse_unary_rule_t s_inverse_unary_rules[EXPR_KIND_COUNT] = {
+    [EXPR_KIND_LAMBERT_W] = { true, expr_lambert_w_candidate_ok },
+    [EXPR_KIND_LAMBERT_W0] = { true, expr_lambert_w0_candidate_ok },
+    [EXPR_KIND_LAMBERT_WM1] = { true, expr_lambert_wm1_candidate_ok },
+    [EXPR_KIND_LOG10] = { true, NULL },
 };
 
 static const expr_inverse_unary_rule_t *
 expr_inverse_unary_rule_for(const expr_ops_t *ops)
 {
-    size_t i;
-
     if (!ops)
         return NULL;
-
-    for (i = 0; i < sizeof(s_inverse_unary_rules) /
-                    sizeof(s_inverse_unary_rules[0]); ++i) {
-        if (s_inverse_unary_rules[i].ops == ops)
-            return &s_inverse_unary_rules[i];
-    }
-    return NULL;
+    if ((unsigned)ops->kind >= (unsigned)EXPR_KIND_COUNT)
+        return NULL;
+    return s_inverse_unary_rules[ops->kind].supported
+               ? &s_inverse_unary_rules[ops->kind]
+               : NULL;
 }
 
 bool expr_ops_has_inverse_unary_simplify_rule(const expr_ops_t *ops)

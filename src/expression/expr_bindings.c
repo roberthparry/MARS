@@ -3105,27 +3105,27 @@ typedef void (*binding_unary_emit_fn)(const expr_ops_t *ops,
                                       sbuf_t *b);
 
 typedef struct {
-    const expr_ops_t        *ops;
     binding_unary_emit_fn   emit_expr;
     binding_unary_emit_fn   emit_tex;
 } binding_unary_render_t;
 
-static const binding_unary_render_t s_binding_unary_renderers[] = {
-    { &ops_neg,   emit_binding_expr_unary_neg_op, emit_binding_tex_unary_neg_op },
-    { &ops_sqrt,  emit_binding_expr_unary_sqrt,  emit_binding_tex_unary_sqrt  },
-    { &ops_abs,   emit_binding_expr_unary_abs,   emit_binding_tex_unary_abs   },
-    { &ops_floor, emit_binding_expr_unary_floor, emit_binding_tex_unary_floor },
-    { &ops_ceil,  emit_binding_expr_unary_ceil,  emit_binding_tex_unary_ceil  },
-    { &ops_exp,   emit_binding_expr_unary_call,  emit_binding_tex_unary_exp   }
+static const binding_unary_render_t s_binding_unary_renderers[EXPR_KIND_COUNT] = {
+    [EXPR_KIND_NEG] = { emit_binding_expr_unary_neg_op, emit_binding_tex_unary_neg_op },
+    [EXPR_KIND_SQRT] = { emit_binding_expr_unary_sqrt, emit_binding_tex_unary_sqrt },
+    [EXPR_KIND_ABS] = { emit_binding_expr_unary_abs, emit_binding_tex_unary_abs },
+    [EXPR_KIND_FLOOR] = { emit_binding_expr_unary_floor, emit_binding_tex_unary_floor },
+    [EXPR_KIND_CEIL] = { emit_binding_expr_unary_ceil, emit_binding_tex_unary_ceil },
+    [EXPR_KIND_EXP] = { emit_binding_expr_unary_call, emit_binding_tex_unary_exp }
 };
 
 static const binding_unary_render_t *binding_unary_renderer_for_ops(const expr_ops_t *ops)
 {
-    for (size_t i = 0u; i < sizeof(s_binding_unary_renderers) / sizeof(s_binding_unary_renderers[0]); ++i)
-        if (s_binding_unary_renderers[i].ops == ops)
-            return &s_binding_unary_renderers[i];
+    const binding_unary_render_t *renderer;
 
-    return NULL;
+    if (!ops || (unsigned)ops->kind >= (unsigned)EXPR_KIND_COUNT)
+        return NULL;
+    renderer = &s_binding_unary_renderers[ops->kind];
+    return renderer->emit_expr ? renderer : NULL;
 }
 
 static void emit_binding_expr_unary_op(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec)

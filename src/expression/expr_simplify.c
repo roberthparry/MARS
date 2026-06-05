@@ -2169,49 +2169,29 @@ expr_t *expr_simplify_mul_operator(const expr_t *dv, expr_t *a, expr_t *b)
 
 /* --- */
 
-typedef expr_t *(*expr_simplify_unary_ctor_t)(const expr_t *arg);
-
-typedef struct {
-    const expr_ops_t *denominator_ops;
-    expr_simplify_unary_ctor_t replacement;
-} expr_reciprocal_unary_rule_t;
-
 static expr_t *expr_simplify_try_reciprocal_unary(expr_t *numerator,
                                                 expr_t *denominator)
 {
-    static const expr_reciprocal_unary_rule_t rules[] = {
-        { &ops_cos,    expr_sec    },
-        { &ops_sin,    expr_cosec  },
-        { &ops_tan,    expr_cot    },
-        { &ops_sec,    expr_cos    },
-        { &ops_cosec,  expr_sin    },
-        { &ops_cot,    expr_tan    },
-        { &ops_cosh,   expr_sech   },
-        { &ops_sinh,   expr_cosech },
-        { &ops_tanh,   expr_coth   },
-        { &ops_sech,   expr_cosh   },
-        { &ops_cosech, expr_sinh   },
-        { &ops_coth,   expr_tanh   }
-    };
+    const expr_ops_t *replacement_ops;
 
     if (!expr_simplify_is_simplifiable_const(numerator) ||
         !expr_const_is_one(numerator) ||
         !denominator ||
+        !denominator->ops ||
         !denominator->a)
         return NULL;
 
-    for (size_t i = 0u; i < sizeof(rules) / sizeof(rules[0]); ++i) {
-        if (expr_is_op(denominator, rules[i].denominator_ops)) {
-            expr_t *arg = denominator->a;
-            expr_t *out;
+    replacement_ops = expr_ops_reciprocal_unary(denominator->ops);
+    if (replacement_ops && replacement_ops->apply_unary) {
+        expr_t *arg = denominator->a;
+        expr_t *out;
 
-            expr_retain(arg);
-            out = rules[i].replacement(arg);
-            expr_free(arg);
-            expr_free(numerator);
-            expr_free(denominator);
-            return out;
-        }
+        expr_retain(arg);
+        out = replacement_ops->apply_unary(arg);
+        expr_free(arg);
+        expr_free(numerator);
+        expr_free(denominator);
+        return out;
     }
 
     return NULL;

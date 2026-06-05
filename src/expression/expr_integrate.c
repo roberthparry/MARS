@@ -6,6 +6,11 @@
 
 typedef expr_t *(*expr_integrate_rule_fn)(const expr_t *expr, const expr_t *wrt);
 
+typedef struct expr_integrate_dispatch_rule {
+    expr_integrate_rule_fn structural;
+    expr_integrate_rule_fn primitive;
+} expr_integrate_dispatch_rule_t;
+
 static expr_t *integrate_dispatch(const expr_t *expr, const expr_t *wrt);
 static expr_t *integrate_poly_times_unary_affine_kind(
     const expr_t *expr,
@@ -1424,19 +1429,155 @@ static expr_t *integrate_poly_over_matching_affine(const expr_t *expr, const exp
     return div_number_owned_consuming(raw, &denom_coeff);
 }
 
+typedef expr_t *(*expr_binary_build_fn)(const expr_t *left, const expr_t *right);
+typedef expr_t *(*squared_unary_raw_fn)(const expr_t *u);
+
+typedef struct squared_unary_rule {
+    squared_unary_raw_fn build_raw;
+    long divisor_factor;
+} squared_unary_rule_t;
+
+static expr_t *build_double_angle_squared_raw(const expr_t *u,
+                                              expr_apply_unary_fn oscillation_fn,
+                                              bool scaled_first,
+                                              expr_binary_build_fn combine)
+{
+    expr_t *two_u = u ? expr_mul_num(u, &NUM_TWO) : NULL;
+    expr_t *oscillation = (two_u && oscillation_fn) ? oscillation_fn(two_u) : NULL;
+    expr_t *scaled_u = u ? expr_mul_num(u, &NUM_TWO) : NULL;
+    expr_t *raw = NULL;
+
+    if (scaled_u && oscillation)
+        raw = scaled_first ? combine(scaled_u, oscillation) : combine(oscillation, scaled_u);
+    expr_free(scaled_u);
+    expr_free(oscillation);
+    expr_free(two_u);
+    return raw;
+}
+
+static expr_t *build_sin_squared_raw(const expr_t *u)
+{
+    return build_double_angle_squared_raw(u, expr_sin, true, expr_sub);
+}
+
+static expr_t *build_cos_squared_raw(const expr_t *u)
+{
+    return build_double_angle_squared_raw(u, expr_sin, true, expr_add);
+}
+
+static expr_t *build_sinh_squared_raw(const expr_t *u)
+{
+    return build_double_angle_squared_raw(u, expr_sinh, false, expr_sub);
+}
+
+static expr_t *build_cosh_squared_raw(const expr_t *u)
+{
+    return build_double_angle_squared_raw(u, expr_sinh, false, expr_add);
+}
+
+static expr_t *build_unary_raw(const expr_t *u, expr_apply_unary_fn unary_fn)
+{
+    return (u && unary_fn) ? unary_fn(u) : NULL;
+}
+
+static expr_t *build_unary_minus_u_raw(const expr_t *u, expr_apply_unary_fn unary_fn)
+{
+    expr_t *term = build_unary_raw(u, unary_fn);
+    expr_t *raw = (term && u) ? expr_sub(term, u) : NULL;
+
+    expr_free(term);
+    return raw;
+}
+
+static expr_t *build_u_minus_unary_raw(const expr_t *u, expr_apply_unary_fn unary_fn)
+{
+    expr_t *term = build_unary_raw(u, unary_fn);
+    expr_t *raw = (u && term) ? expr_sub(u, term) : NULL;
+
+    expr_free(term);
+    return raw;
+}
+
+static expr_t *build_neg_unary_raw(const expr_t *u, expr_apply_unary_fn unary_fn)
+{
+    expr_t *term = build_unary_raw(u, unary_fn);
+    expr_t *raw = term ? expr_neg(term) : NULL;
+
+    expr_free(term);
+    return raw;
+}
+
+static expr_t *build_tan_squared_raw(const expr_t *u)
+{
+    return build_unary_minus_u_raw(u, expr_tan);
+}
+
+static expr_t *build_sec_squared_raw(const expr_t *u)
+{
+    return build_unary_raw(u, expr_tan);
+}
+
+static expr_t *build_cosec_squared_raw(const expr_t *u)
+{
+    return build_neg_unary_raw(u, expr_cot);
+}
+
+static expr_t *build_sech_squared_raw(const expr_t *u)
+{
+    return build_unary_raw(u, expr_tanh);
+}
+
+static expr_t *build_cosech_squared_raw(const expr_t *u)
+{
+    return build_neg_unary_raw(u, expr_coth);
+}
+
+static expr_t *build_tanh_squared_raw(const expr_t *u)
+{
+    return build_u_minus_unary_raw(u, expr_tanh);
+}
+
+static expr_t *build_coth_squared_raw(const expr_t *u)
+{
+    return build_u_minus_unary_raw(u, expr_coth);
+}
+
+static const squared_unary_rule_t squared_unary_rules[EXPR_PATTERN_UNARY_COUNT] = {
+    [EXPR_PATTERN_UNARY_SIN] = { build_sin_squared_raw, 4 },
+    [EXPR_PATTERN_UNARY_COS] = { build_cos_squared_raw, 4 },
+    [EXPR_PATTERN_UNARY_SINH] = { build_sinh_squared_raw, 4 },
+    [EXPR_PATTERN_UNARY_COSH] = { build_cosh_squared_raw, 4 },
+    [EXPR_PATTERN_UNARY_TAN] = { build_tan_squared_raw, 1 },
+    [EXPR_PATTERN_UNARY_SEC] = { build_sec_squared_raw, 1 },
+    [EXPR_PATTERN_UNARY_COSEC] = { build_cosec_squared_raw, 1 },
+    [EXPR_PATTERN_UNARY_SECH] = { build_sech_squared_raw, 1 },
+    [EXPR_PATTERN_UNARY_COSECH] = { build_cosech_squared_raw, 1 },
+    [EXPR_PATTERN_UNARY_TANH] = { build_tanh_squared_raw, 1 },
+    [EXPR_PATTERN_UNARY_COTH] = { build_coth_squared_raw, 1 }
+};
+
+static const squared_unary_rule_t *find_squared_unary_rule(expr_pattern_unary_affine_kind_t kind)
+{
+    const squared_unary_rule_t *rule;
+
+    if ((unsigned)kind >= (unsigned)EXPR_PATTERN_UNARY_COUNT)
+        return NULL;
+    rule = &squared_unary_rules[kind];
+    return rule->build_raw ? rule : NULL;
+}
+
 static expr_t *integrate_squared_unary_affine(const expr_t *expr,
                                               const expr_t *wrt,
                                               expr_pattern_unary_affine_kind_t kind)
 {
+    const squared_unary_rule_t *rule = find_squared_unary_rule(kind);
     number_t constant = num_new();
     number_t coeff = num_new();
     expr_t *u;
-    expr_t *two_u;
-    expr_t *oscillation = NULL;
-    expr_t *scaled_u;
     expr_t *raw = NULL;
 
-    if (!expr || !expr->a || !num_eq(expr->c, NUM_TWO) ||
+    if (!rule ||
+        !expr || !expr->a || !num_eq(expr->c, NUM_TWO) ||
         !match_affine_unary_data(expr->a, wrt, kind, &constant, &coeff)) {
         num_destroy(&coeff);
         num_destroy(&constant);
@@ -1444,104 +1585,12 @@ static expr_t *integrate_squared_unary_affine(const expr_t *expr,
     }
 
     u = build_affine_from_match(wrt, constant, coeff);
-    two_u = u ? expr_mul_num(u, &NUM_TWO) : NULL;
-    scaled_u = u ? expr_mul_num(u, &NUM_TWO) : NULL;
-
-    if (kind == EXPR_PATTERN_UNARY_SIN || kind == EXPR_PATTERN_UNARY_COS) {
-        oscillation = two_u ? expr_sin(two_u) : NULL;
-        raw = (scaled_u && oscillation)
-                  ? ((kind == EXPR_PATTERN_UNARY_SIN)
-                         ? expr_sub(scaled_u, oscillation)
-                         : expr_add(scaled_u, oscillation))
-                  : NULL;
-    } else if (kind == EXPR_PATTERN_UNARY_SINH || kind == EXPR_PATTERN_UNARY_COSH) {
-        oscillation = two_u ? expr_sinh(two_u) : NULL;
-        raw = (scaled_u && oscillation)
-                  ? ((kind == EXPR_PATTERN_UNARY_SINH)
-                         ? expr_sub(oscillation, scaled_u)
-                         : expr_add(oscillation, scaled_u))
-                  : NULL;
-    } else if (kind == EXPR_PATTERN_UNARY_TAN) {
-        expr_t *tan_u = u ? expr_tan(u) : NULL;
-
-        raw = (tan_u && u) ? expr_sub(tan_u, u) : NULL;
-        expr_free(tan_u);
-        expr_free(scaled_u);
-        expr_free(oscillation);
-        expr_free(two_u);
-        expr_free(u);
-        num_destroy(&constant);
-        return div_number_owned_consuming(raw, &coeff);
-    } else if (kind == EXPR_PATTERN_UNARY_SEC) {
-        raw = u ? expr_tan(u) : NULL;
-        expr_free(scaled_u);
-        expr_free(oscillation);
-        expr_free(two_u);
-        expr_free(u);
-        num_destroy(&constant);
-        return div_number_owned_consuming(raw, &coeff);
-    } else if (kind == EXPR_PATTERN_UNARY_COSEC) {
-        expr_t *cot_u = u ? expr_cot(u) : NULL;
-
-        raw = cot_u ? expr_neg(cot_u) : NULL;
-        expr_free(cot_u);
-        expr_free(scaled_u);
-        expr_free(oscillation);
-        expr_free(two_u);
-        expr_free(u);
-        num_destroy(&constant);
-        return div_number_owned_consuming(raw, &coeff);
-    } else if (kind == EXPR_PATTERN_UNARY_SECH) {
-        raw = u ? expr_tanh(u) : NULL;
-        expr_free(scaled_u);
-        expr_free(oscillation);
-        expr_free(two_u);
-        expr_free(u);
-        num_destroy(&constant);
-        return div_number_owned_consuming(raw, &coeff);
-    } else if (kind == EXPR_PATTERN_UNARY_COSECH) {
-        expr_t *coth_u = u ? expr_coth(u) : NULL;
-
-        raw = coth_u ? expr_neg(coth_u) : NULL;
-        expr_free(coth_u);
-        expr_free(scaled_u);
-        expr_free(oscillation);
-        expr_free(two_u);
-        expr_free(u);
-        num_destroy(&constant);
-        return div_number_owned_consuming(raw, &coeff);
-    } else if (kind == EXPR_PATTERN_UNARY_TANH) {
-        expr_t *tanh_u = u ? expr_tanh(u) : NULL;
-
-        raw = (u && tanh_u) ? expr_sub(u, tanh_u) : NULL;
-        expr_free(tanh_u);
-        expr_free(scaled_u);
-        expr_free(oscillation);
-        expr_free(two_u);
-        expr_free(u);
-        num_destroy(&constant);
-        return div_number_owned_consuming(raw, &coeff);
-    } else if (kind == EXPR_PATTERN_UNARY_COTH) {
-        expr_t *coth_u = u ? expr_coth(u) : NULL;
-
-        raw = (u && coth_u) ? expr_sub(u, coth_u) : NULL;
-        expr_free(coth_u);
-        expr_free(scaled_u);
-        expr_free(oscillation);
-        expr_free(two_u);
-        expr_free(u);
-        num_destroy(&constant);
-        return div_number_owned_consuming(raw, &coeff);
-    } else {
-        oscillation = NULL;
-    }
-
-    expr_free(scaled_u);
-    expr_free(oscillation);
-    expr_free(two_u);
+    raw = u ? rule->build_raw(u) : NULL;
     expr_free(u);
     num_destroy(&constant);
-    raw = div_number_owned_by_long_product(raw, 4, coeff);
+    if (rule->divisor_factor == 1)
+        return div_number_owned_consuming(raw, &coeff);
+    raw = div_number_owned_by_long_product(raw, rule->divisor_factor, coeff);
     num_destroy(&coeff);
     return raw;
 }
@@ -1803,88 +1852,84 @@ static expr_t *integrate_same_affine_special_product(const expr_t *expr, const e
     return out;
 }
 
+static const expr_integrate_dispatch_rule_t integrate_dispatch_rules[EXPR_KIND_COUNT] = {
+    [EXPR_KIND_CONST] = { .structural = integrate_constant_rule },
+    [EXPR_KIND_VAR] = { .structural = integrate_var_rule },
+    [EXPR_KIND_ADD] = { .structural = integrate_add_rule },
+    [EXPR_KIND_SUB] = { .structural = integrate_sub_rule },
+    [EXPR_KIND_NEG] = { .structural = integrate_neg_rule },
+    [EXPR_KIND_MUL] = { .structural = integrate_mul_rule },
+    [EXPR_KIND_DIV] = { .structural = integrate_div_rule },
+    [EXPR_KIND_POW] = { .structural = integrate_pow_rule },
+    [EXPR_KIND_POW_D] = { .structural = integrate_pow_d_rule },
+    [EXPR_KIND_SQRT] = { .primitive = integrate_sqrt_rule },
+    [EXPR_KIND_LOG] = { .primitive = integrate_log_rule },
+    [EXPR_KIND_LOG10] = { .primitive = integrate_log10_rule },
+    [EXPR_KIND_EXP] = { .primitive = integrate_exp_rule },
+    [EXPR_KIND_SIN] = { .primitive = integrate_sin_rule },
+    [EXPR_KIND_COS] = { .primitive = integrate_cos_rule },
+    [EXPR_KIND_TAN] = { .primitive = integrate_tan_rule },
+    [EXPR_KIND_SEC] = { .primitive = integrate_sec_rule },
+    [EXPR_KIND_COSEC] = { .primitive = integrate_cosec_rule },
+    [EXPR_KIND_COT] = { .primitive = integrate_cot_rule },
+    [EXPR_KIND_SINH] = { .primitive = integrate_sinh_rule },
+    [EXPR_KIND_COSH] = { .primitive = integrate_cosh_rule },
+    [EXPR_KIND_COSECH] = { .primitive = integrate_cosech_rule },
+    [EXPR_KIND_TANH] = { .primitive = integrate_tanh_rule },
+    [EXPR_KIND_SECH] = { .primitive = integrate_sech_rule },
+    [EXPR_KIND_COTH] = { .primitive = integrate_coth_rule },
+    [EXPR_KIND_ASIN] = { .primitive = integrate_asin_rule },
+    [EXPR_KIND_ACOS] = { .primitive = integrate_acos_rule },
+    [EXPR_KIND_ATAN] = { .primitive = integrate_atan_rule },
+    [EXPR_KIND_ASEC] = { .primitive = integrate_asec_rule },
+    [EXPR_KIND_ACOSEC] = { .primitive = integrate_acosec_rule },
+    [EXPR_KIND_ACOT] = { .primitive = integrate_acot_rule },
+    [EXPR_KIND_ASINH] = { .primitive = integrate_asinh_rule },
+    [EXPR_KIND_ACOSH] = { .primitive = integrate_acosh_rule },
+    [EXPR_KIND_ATANH] = { .primitive = integrate_atanh_rule },
+    [EXPR_KIND_ASECH] = { .primitive = integrate_asech_rule },
+    [EXPR_KIND_ACOSECH] = { .primitive = integrate_acosech_rule },
+    [EXPR_KIND_ACOTH] = { .primitive = integrate_acoth_rule },
+    [EXPR_KIND_ERF] = { .primitive = integrate_erf_rule },
+    [EXPR_KIND_ERFC] = { .primitive = integrate_erfc_rule },
+    [EXPR_KIND_NORMAL_PDF] = { .primitive = integrate_normal_pdf_rule },
+    [EXPR_KIND_NORMAL_CDF] = { .primitive = integrate_normal_cdf_rule },
+    [EXPR_KIND_NORMAL_LOGPDF] = { .primitive = integrate_normal_logpdf_rule },
+    [EXPR_KIND_EI] = { .primitive = integrate_ei_rule },
+    [EXPR_KIND_E1] = { .primitive = integrate_e1_rule }
+};
+
+static const expr_integrate_dispatch_rule_t *integrate_dispatch_rule_for_kind(expr_op_kind_t kind)
+{
+    if ((unsigned)kind >= (unsigned)EXPR_KIND_COUNT)
+        return NULL;
+    return &integrate_dispatch_rules[kind];
+}
+
 expr_t *expr_integrate_dispatch_primitive(const expr_t *expr, const expr_t *wrt)
 {
-    typedef struct {
-        expr_op_kind_t kind;
-        expr_integrate_rule_fn integrate;
-    } expr_integrate_primitive_rule_t;
-    static const expr_integrate_primitive_rule_t primitive_rules[] = {
-        { EXPR_KIND_SQRT,          integrate_sqrt_rule },
-        { EXPR_KIND_LOG,           integrate_log_rule },
-        { EXPR_KIND_LOG10,         integrate_log10_rule },
-        { EXPR_KIND_EXP,           integrate_exp_rule },
-        { EXPR_KIND_SIN,           integrate_sin_rule },
-        { EXPR_KIND_COS,           integrate_cos_rule },
-        { EXPR_KIND_TAN,           integrate_tan_rule },
-        { EXPR_KIND_SEC,           integrate_sec_rule },
-        { EXPR_KIND_COSEC,         integrate_cosec_rule },
-        { EXPR_KIND_COT,           integrate_cot_rule },
-        { EXPR_KIND_SINH,          integrate_sinh_rule },
-        { EXPR_KIND_COSH,          integrate_cosh_rule },
-        { EXPR_KIND_COSECH,        integrate_cosech_rule },
-        { EXPR_KIND_TANH,          integrate_tanh_rule },
-        { EXPR_KIND_SECH,          integrate_sech_rule },
-        { EXPR_KIND_COTH,          integrate_coth_rule },
-        { EXPR_KIND_ASIN,          integrate_asin_rule },
-        { EXPR_KIND_ACOS,          integrate_acos_rule },
-        { EXPR_KIND_ATAN,          integrate_atan_rule },
-        { EXPR_KIND_ASEC,          integrate_asec_rule },
-        { EXPR_KIND_ACOSEC,        integrate_acosec_rule },
-        { EXPR_KIND_ACOT,          integrate_acot_rule },
-        { EXPR_KIND_ASINH,         integrate_asinh_rule },
-        { EXPR_KIND_ACOSH,         integrate_acosh_rule },
-        { EXPR_KIND_ATANH,         integrate_atanh_rule },
-        { EXPR_KIND_ASECH,         integrate_asech_rule },
-        { EXPR_KIND_ACOSECH,       integrate_acosech_rule },
-        { EXPR_KIND_ACOTH,         integrate_acoth_rule },
-        { EXPR_KIND_ERF,           integrate_erf_rule },
-        { EXPR_KIND_ERFC,          integrate_erfc_rule },
-        { EXPR_KIND_NORMAL_PDF,    integrate_normal_pdf_rule },
-        { EXPR_KIND_NORMAL_CDF,    integrate_normal_cdf_rule },
-        { EXPR_KIND_NORMAL_LOGPDF, integrate_normal_logpdf_rule },
-        { EXPR_KIND_EI,            integrate_ei_rule },
-        { EXPR_KIND_E1,            integrate_e1_rule }
-    };
+    const expr_integrate_dispatch_rule_t *rule;
 
     if (!expr || !expr->ops)
         return NULL;
 
-    for (size_t i = 0; i < sizeof(primitive_rules) / sizeof(primitive_rules[0]); ++i) {
-        if (primitive_rules[i].kind == expr->ops->kind)
-            return primitive_rules[i].integrate(expr, wrt);
-    }
-    return NULL;
+    rule = integrate_dispatch_rule_for_kind(expr->ops->kind);
+    return (rule && rule->primitive) ? rule->primitive(expr, wrt) : NULL;
 }
-
-typedef struct expr_integrate_rule {
-    expr_op_kind_t kind;
-    expr_integrate_rule_fn integrate;
-} expr_integrate_rule_t;
-
-static const expr_integrate_rule_t rules[] = {
-    { EXPR_KIND_CONST, integrate_constant_rule },
-    { EXPR_KIND_VAR,   integrate_var_rule },
-    { EXPR_KIND_ADD,   integrate_add_rule },
-    { EXPR_KIND_SUB,   integrate_sub_rule },
-    { EXPR_KIND_NEG,   integrate_neg_rule },
-    { EXPR_KIND_MUL,   integrate_mul_rule },
-    { EXPR_KIND_DIV,   integrate_div_rule },
-    { EXPR_KIND_POW,   integrate_pow_rule },
-    { EXPR_KIND_POW_D, integrate_pow_d_rule }
-};
 
 static expr_t *integrate_dispatch(const expr_t *expr, const expr_t *wrt)
 {
+    const expr_integrate_dispatch_rule_t *rule;
+
     if (!expr || !wrt)
         return NULL;
 
     if (!depends_on_wrt(expr, wrt))
         return integrate_as_constant(expr, wrt);
 
-    for (size_t i = 0; i < sizeof(rules) / sizeof(rules[0]); ++i)
-        if (expr->ops->kind == rules[i].kind)
-            return rules[i].integrate(expr, wrt);
+    rule = integrate_dispatch_rule_for_kind(expr->ops->kind);
+    if (rule && rule->structural)
+        return rule->structural(expr, wrt);
 
     if (expr->ops->integrate)
         return expr->ops->integrate(expr, wrt);
