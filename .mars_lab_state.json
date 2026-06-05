@@ -1,7 +1,7 @@
 {
   "expression": "{ cdf(x) - cdf(-x) | x = 1.95996398454005423552459443052055152795555007786954839847695264636163527414489 }",
   "matrix": "(1, 2; 3, 4)",
-  "lab_mode": "expression",
+  "lab_mode": "integrator",
   "matrix_operation": "inverse",
   "matrix_operand": "",
   "integrator_expression": "1/√(2π)·exp(-x²/2)",
