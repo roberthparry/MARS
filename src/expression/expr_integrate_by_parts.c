@@ -13,54 +13,12 @@ typedef struct {
     inverse_affine_term_builder_fn build_quadratic_term;
 } inverse_affine_rule_t;
 
-static expr_t *clone_expr_local_by_parts(const expr_t *expr)
+static expr_t *retain_expr_local_by_parts(const expr_t *expr)
 {
-    expr_t *left = NULL;
-    expr_t *right = NULL;
-    expr_t *out = NULL;
-
-    if (!expr || !expr->ops)
+    if (!expr)
         return NULL;
-    if (expr->ops->kind == EXPR_KIND_CONST) {
-        if (expr->name && *expr->name)
-            return expr_new_named_const(expr->c, expr->name);
-        return expr_new_const(expr->c);
-    }
-    if (expr->ops->kind == EXPR_KIND_VAR) {
-        if (expr->name && *expr->name)
-            return expr_new_named_var(expr->x, expr->name);
-        return expr_new_var(expr->x);
-    }
-    if (expr->ops->kind == EXPR_KIND_POW_D && expr->a) {
-        left = clone_expr_local_by_parts(expr->a);
-        if (!left)
-            return NULL;
-        out = expr_pow(left, &expr->c);
-        expr_free(left);
-        return out;
-    }
-    if (expr->ops->arity == EXPR_OP_UNARY && expr->ops->apply_unary) {
-        left = clone_expr_local_by_parts(expr->a);
-        if (!left)
-            return NULL;
-        out = expr->ops->apply_unary(left);
-        expr_free(left);
-        return out;
-    }
-    if (expr->ops->arity == EXPR_OP_BINARY && expr->ops->apply_binary) {
-        left = clone_expr_local_by_parts(expr->a);
-        right = clone_expr_local_by_parts(expr->b);
-        if (!left || !right) {
-            expr_free(left);
-            expr_free(right);
-            return NULL;
-        }
-        out = expr->ops->apply_binary(left, right);
-        expr_free(right);
-        expr_free(left);
-        return out;
-    }
-    return NULL;
+    expr_retain(expr);
+    return (expr_t *)expr;
 }
 
 static expr_t *combine_binary_owned(expr_t *left, expr_t *right, bool is_add)
@@ -76,13 +34,16 @@ static expr_t *combine_binary_owned(expr_t *left, expr_t *right, bool is_add)
 
 static expr_t *scale_owned_by_ratio(expr_t *expr, number_t numer, long denom)
 {
+    number_t denom_num;
     number_t scale;
 
     if (!expr)
         return NULL;
-    scale = num_div(numer, num_create_from_long(denom));
+    denom_num = num_create_from_long(denom);
+    scale = num_div(numer, denom_num);
     expr = mul_number_owned(expr, scale);
     num_destroy(&scale);
+    num_destroy(&denom_num);
     return expr;
 }
 
@@ -243,7 +204,7 @@ static expr_t *build_base_normal_pdf_term(const expr_t *u, expr_t *inverse_u, co
 {
     (void)u;
     (void)u_sq;
-    return inverse_u ? mul_number_owned(clone_expr_local_by_parts(inverse_u), poly_coeff) : NULL;
+    return inverse_u ? mul_number_owned(retain_expr_local_by_parts(inverse_u), poly_coeff) : NULL;
 }
 
 static expr_t *build_base_normal_cdf_term(const expr_t *u, expr_t *inverse_u, const expr_t *u_sq, number_t poly_coeff)
@@ -289,6 +250,7 @@ static expr_t *build_linear_quarter_asin_acos_term(const expr_t *u,
     expr_t *root_part = (u && root) ? expr_mul(u, root) : NULL;
     expr_t *term = combine_binary_owned(inverse_part, root_part, is_add);
 
+    expr_free(root);
     expr_free(twice_u_sq);
     expr_free(two_u_sq_minus_one);
     return scale_owned_by_ratio(term, poly_coeff, 4);
@@ -303,7 +265,7 @@ static expr_t *build_linear_half_shifted_inverse_term(const expr_t *u,
 {
     expr_t *shifted = u_sq ? expr_add_num(u_sq, &constant) : NULL;
     expr_t *inverse_part = (shifted && inverse_u) ? expr_mul(shifted, inverse_u) : NULL;
-    expr_t *term = combine_binary_owned(inverse_part, u ? clone_expr_local_by_parts(u) : NULL, add_u);
+    expr_t *term = combine_binary_owned(inverse_part, u ? retain_expr_local_by_parts(u) : NULL, add_u);
 
     expr_free(shifted);
     return scale_owned_by_ratio(term, poly_coeff, 2);
@@ -317,7 +279,7 @@ static expr_t *build_linear_half_root_inverse_term(const expr_t *u,
                                                    bool add_root,
                                                    bool subtract_one_from_u_sq)
 {
-    expr_t *leading = subtract_one_from_u_sq ? expr_sub_num(u_sq, &NUM_ONE) : clone_expr_local_by_parts(u_sq);
+    expr_t *leading = subtract_one_from_u_sq ? expr_sub_num(u_sq, &NUM_ONE) : retain_expr_local_by_parts(u_sq);
     expr_t *inverse_part = (leading && inverse_u) ? expr_mul(leading, inverse_u) : NULL;
     expr_t *term = combine_binary_owned(inverse_part, root, add_root);
 
@@ -335,6 +297,7 @@ static expr_t *build_linear_asinh_term(const expr_t *u, expr_t *inverse_u, const
     expr_t *root_part = (u && root) ? expr_mul(u, root) : NULL;
     expr_t *term = combine_binary_owned(inverse_part, root_part, false);
 
+    expr_free(root);
     expr_free(twice_u_sq);
     expr_free(two_u_sq_plus_one);
     return scale_owned_by_ratio(term, poly_coeff, 4);
@@ -349,6 +312,7 @@ static expr_t *build_linear_acosh_term(const expr_t *u, expr_t *inverse_u, const
     expr_t *root_part = (u && root) ? expr_mul(u, root) : NULL;
     expr_t *term = combine_binary_owned(inverse_part, root_part, false);
 
+    expr_free(root);
     expr_free(twice_u_sq);
     expr_free(two_u_sq_minus_one);
     return scale_owned_by_ratio(term, poly_coeff, 4);
@@ -385,10 +349,12 @@ static expr_t *build_linear_normal_pdf_term(const expr_t *u, expr_t *inverse_u, 
 {
     expr_t *phi = u ? expr_normal_pdf(u) : NULL;
     expr_t *term = phi ? expr_neg(phi) : NULL;
+    expr_t *out = term ? mul_number_owned(term, poly_coeff) : NULL;
 
     (void)inverse_u;
     (void)u_sq;
-    return term ? mul_number_owned(term, poly_coeff) : NULL;
+    expr_free(phi);
+    return out;
 }
 
 static expr_t *build_linear_erf_term(const expr_t *u, expr_t *inverse_u, const expr_t *u_sq, number_t poly_coeff)
@@ -419,7 +385,7 @@ static expr_t *build_linear_ei_term(const expr_t *u, expr_t *inverse_u, const ex
     expr_t *u_sq_inverse = (u_sq && inverse_u) ? expr_mul(u_sq, inverse_u) : NULL;
     expr_t *exp_u = u ? expr_exp(u) : NULL;
     expr_t *u_exp_u = (u && exp_u) ? expr_mul(u, exp_u) : NULL;
-    expr_t *correction = combine_binary_owned(u_exp_u, exp_u ? clone_expr_local_by_parts(exp_u) : NULL, false);
+    expr_t *correction = combine_binary_owned(u_exp_u, exp_u ? retain_expr_local_by_parts(exp_u) : NULL, false);
     expr_t *term = combine_binary_owned(u_sq_inverse, correction, false);
 
     expr_free(exp_u);
@@ -624,7 +590,7 @@ expr_t *integrate_linear_poly_times_inverse_affine(
     expr_free(u);
     number_array_clear_local(poly, 5);
     num_destroy(&constant);
-    return div_number_owned(sum, coeff);
+    return div_number_owned_consuming(sum, &coeff);
 }
 
 expr_t *integrate_linear_poly_times_normal_logpdf_affine(const expr_t *expr,
@@ -720,5 +686,5 @@ expr_t *integrate_linear_poly_times_normal_logpdf_affine(const expr_t *expr,
     num_destroy(&neg_log_sqrt_2pi);
     num_destroy(&neg_one_sixth);
     num_destroy(&constant);
-    return div_number_owned(sum, coeff);
+    return div_number_owned_consuming(sum, &coeff);
 }

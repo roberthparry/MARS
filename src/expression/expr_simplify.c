@@ -574,6 +574,8 @@ static int expr_common_factors_useful_local(const expr_factor_t *factors, size_t
     for (i = 0u; i < n; ++i) {
         if (num_is_zero(factors[i].exponent))
             continue;
+        if (num_lt(factors[i].exponent, NUM_ZERO))
+            return 0;
         if (!expr_is_op(factors[i].base, &ops_var))
             return 1;
     }
@@ -711,6 +713,12 @@ static expr_t *expr_try_factor_common_symbolic_product_local(expr_t *sum)
             continue;
 
         expr_split_product_factors_local(terms[i].base, &factors, &nfactors, &fcap);
+        for (size_t j = 0u; j < nfactors; ++j) {
+            if (num_lt(factors[j].exponent, NUM_ZERO)) {
+                expr_free_factors_local(factors, nfactors);
+                goto no_factor;
+            }
+        }
         if (!common) {
             common = factors;
             ncommon = nfactors;
@@ -764,13 +772,6 @@ static expr_t *expr_try_factor_common_symbolic_product_local(expr_t *sum)
     if (!inner) {
         expr_free_factors_local(common, ncommon);
         return NULL;
-    }
-
-    {
-        expr_t *simplified_inner = expr_simplify(inner);
-
-        expr_free(inner);
-        inner = simplified_inner;
     }
 
     common_factor = expr_rebuild_factors_local(common, ncommon);

@@ -80,7 +80,12 @@ static bool match_affine_linear_expr(const expr_t *expr,
         return false;
     }
 
-    affine_constant = num_add(poly[0], num_mul(poly[1], basis_constant));
+    {
+        number_t constant_offset = num_mul(poly[1], basis_constant);
+
+        affine_constant = num_add(poly[0], constant_offset);
+        num_destroy(&constant_offset);
+    }
     affine_coeff = num_mul(poly[1], basis_coeffs[0]);
 
     num_destroy(constant_out);
@@ -372,6 +377,17 @@ expr_t *mul_number_owned(expr_t *expr, number_t factor)
     return simplify_owned(scaled);
 }
 
+expr_t *mul_number_owned_consuming(expr_t *expr, number_t *factor)
+{
+    expr_t *out;
+
+    if (!factor)
+        return NULL;
+    out = mul_number_owned(expr, *factor);
+    num_destroy(factor);
+    return out;
+}
+
 expr_t *div_number_owned(expr_t *expr, number_t denom)
 {
     expr_t *scaled;
@@ -382,7 +398,27 @@ expr_t *div_number_owned(expr_t *expr, number_t denom)
         expr_free(expr);
         return NULL;
     }
-    scaled = expr_div_num(expr, &denom);
-    expr_free(expr);
-    return simplify_owned(scaled);
+    if (num_eq(denom, NUM_ONE))
+        return simplify_owned(expr);
+    if (num_eq(denom, NUM_NEG_ONE)) {
+        scaled = expr_neg(expr);
+        expr_free(expr);
+        return simplify_owned(scaled);
+    }
+    {
+        number_t reciprocal = num_div(NUM_ONE, denom);
+
+        return mul_number_owned_consuming(expr, &reciprocal);
+    }
+}
+
+expr_t *div_number_owned_consuming(expr_t *expr, number_t *denom)
+{
+    expr_t *out;
+
+    if (!denom)
+        return NULL;
+    out = div_number_owned(expr, *denom);
+    num_destroy(denom);
+    return out;
 }

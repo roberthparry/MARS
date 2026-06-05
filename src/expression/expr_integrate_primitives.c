@@ -276,7 +276,7 @@ expr_t *integrate_asec_rule(const expr_t *expr, const expr_t *wrt)
     expr_free(acosh_u);
     expr_free(u_asec_u);
     num_destroy(&constant);
-    return div_number_owned(raw, coeff);
+    return div_number_owned_consuming(raw, &coeff);
 }
 
 expr_t *integrate_acosec_rule(const expr_t *expr, const expr_t *wrt)
@@ -301,7 +301,7 @@ expr_t *integrate_acosec_rule(const expr_t *expr, const expr_t *wrt)
     expr_free(acosh_u);
     expr_free(u_acosec_u);
     num_destroy(&constant);
-    return div_number_owned(raw, coeff);
+    return div_number_owned_consuming(raw, &coeff);
 }
 
 expr_t *integrate_acot_rule(const expr_t *expr, const expr_t *wrt)
@@ -335,7 +335,7 @@ expr_t *integrate_acot_rule(const expr_t *expr, const expr_t *wrt)
     expr_free(u_sq);
     expr_free(u_acot_u);
     num_destroy(&constant);
-    return div_number_owned(raw, coeff);
+    return div_number_owned_consuming(raw, &coeff);
 }
 
 expr_t *integrate_asin_rule(const expr_t *expr, const expr_t *wrt)
@@ -371,7 +371,7 @@ expr_t *integrate_asin_rule(const expr_t *expr, const expr_t *wrt)
     expr_free(u_sq);
     expr_free(u_asin_u);
     num_destroy(&constant);
-    return div_number_owned(raw, coeff);
+    return div_number_owned_consuming(raw, &coeff);
 }
 
 expr_t *integrate_acos_rule(const expr_t *expr, const expr_t *wrt)
@@ -407,7 +407,7 @@ expr_t *integrate_acos_rule(const expr_t *expr, const expr_t *wrt)
     expr_free(u_sq);
     expr_free(u_acos_u);
     num_destroy(&constant);
-    return div_number_owned(raw, coeff);
+    return div_number_owned_consuming(raw, &coeff);
 }
 
 expr_t *integrate_atan_rule(const expr_t *expr, const expr_t *wrt)
@@ -441,7 +441,7 @@ expr_t *integrate_atan_rule(const expr_t *expr, const expr_t *wrt)
     expr_free(u_sq);
     expr_free(u_atan_u);
     num_destroy(&constant);
-    return div_number_owned(raw, coeff);
+    return div_number_owned_consuming(raw, &coeff);
 }
 
 expr_t *integrate_coth_rule(const expr_t *expr, const expr_t *wrt)
@@ -501,7 +501,7 @@ expr_t *integrate_asinh_rule(const expr_t *expr, const expr_t *wrt)
     expr_free(u_sq);
     expr_free(u_asinh_u);
     num_destroy(&constant);
-    return div_number_owned(raw, coeff);
+    return div_number_owned_consuming(raw, &coeff);
 }
 
 expr_t *integrate_acosh_rule(const expr_t *expr, const expr_t *wrt)
@@ -538,7 +538,7 @@ expr_t *integrate_acosh_rule(const expr_t *expr, const expr_t *wrt)
     expr_free(u_minus_one);
     expr_free(u_acosh_u);
     num_destroy(&constant);
-    return div_number_owned(raw, coeff);
+    return div_number_owned_consuming(raw, &coeff);
 }
 
 expr_t *integrate_atanh_rule(const expr_t *expr, const expr_t *wrt)
@@ -577,7 +577,7 @@ expr_t *integrate_atanh_rule(const expr_t *expr, const expr_t *wrt)
     expr_free(u_sq);
     expr_free(u_atanh_u);
     num_destroy(&constant);
-    return div_number_owned(raw, coeff);
+    return div_number_owned_consuming(raw, &coeff);
 }
 
 expr_t *integrate_asech_rule(const expr_t *expr, const expr_t *wrt)
@@ -602,7 +602,7 @@ expr_t *integrate_asech_rule(const expr_t *expr, const expr_t *wrt)
     expr_free(asin_u);
     expr_free(u_asech_u);
     num_destroy(&constant);
-    return div_number_owned(raw, coeff);
+    return div_number_owned_consuming(raw, &coeff);
 }
 
 expr_t *integrate_acosech_rule(const expr_t *expr, const expr_t *wrt)
@@ -627,7 +627,7 @@ expr_t *integrate_acosech_rule(const expr_t *expr, const expr_t *wrt)
     expr_free(asinh_u);
     expr_free(u_acosech_u);
     num_destroy(&constant);
-    return div_number_owned(raw, coeff);
+    return div_number_owned_consuming(raw, &coeff);
 }
 
 expr_t *integrate_acoth_rule(const expr_t *expr, const expr_t *wrt)
@@ -666,7 +666,7 @@ expr_t *integrate_acoth_rule(const expr_t *expr, const expr_t *wrt)
     expr_free(u_sq);
     expr_free(u_acoth_u);
     num_destroy(&constant);
-    return div_number_owned(raw, coeff);
+    return div_number_owned_consuming(raw, &coeff);
 }
 
 expr_t *integrate_erf_rule(const expr_t *expr, const expr_t *wrt)
@@ -700,7 +700,7 @@ expr_t *integrate_erf_rule(const expr_t *expr, const expr_t *wrt)
     expr_free(u_sq);
     expr_free(u_erf_u);
     num_destroy(&constant);
-    return div_number_owned(raw, coeff);
+    return div_number_owned_consuming(raw, &coeff);
 }
 
 expr_t *integrate_erfc_rule(const expr_t *expr, const expr_t *wrt)
@@ -734,7 +734,7 @@ expr_t *integrate_erfc_rule(const expr_t *expr, const expr_t *wrt)
     expr_free(u_sq);
     expr_free(u_erfc_u);
     num_destroy(&constant);
-    return div_number_owned(raw, coeff);
+    return div_number_owned_consuming(raw, &coeff);
 }
 
 expr_t *integrate_normal_pdf_rule(const expr_t *expr, const expr_t *wrt)
@@ -812,7 +812,7 @@ expr_t *integrate_normal_logpdf_rule(const expr_t *expr, const expr_t *wrt)
     num_destroy(&neg_log_sqrt_2pi);
     num_destroy(&neg_one_sixth);
     num_destroy(&constant);
-    return div_number_owned(raw, coeff);
+    return div_number_owned_consuming(raw, &coeff);
 }
 
 expr_t *integrate_ei_rule(const expr_t *expr, const expr_t *wrt)
@@ -837,7 +837,7 @@ expr_t *integrate_ei_rule(const expr_t *expr, const expr_t *wrt)
     expr_free(exp_u);
     expr_free(u_ei_u);
     num_destroy(&constant);
-    return div_number_owned(raw, coeff);
+    return div_number_owned_consuming(raw, &coeff);
 }
 
 expr_t *integrate_e1_rule(const expr_t *expr, const expr_t *wrt)
@@ -865,6 +865,6 @@ expr_t *integrate_e1_rule(const expr_t *expr, const expr_t *wrt)
     expr_free(neg_u);
     expr_free(u_e1_u);
     num_destroy(&constant);
-    return div_number_owned(raw, coeff);
+    return div_number_owned_consuming(raw, &coeff);
 }
 

@@ -179,10 +179,10 @@ static bool poly_match_direct_deg4_rec(const expr_t *expr,
     number_t exponent = num_new();
     number_t lhs[5];
     number_t rhs[5];
+    bool lhs_ready = false;
+    bool rhs_ready = false;
     bool ok = false;
 
-    number_array_zero_local(lhs, 5);
-    number_array_zero_local(rhs, 5);
     number_array_zero_local(coeffs, 5);
 
     if (!expr) {
@@ -207,6 +207,7 @@ static bool poly_match_direct_deg4_rec(const expr_t *expr,
     if (expr->ops && expr->ops->kind == EXPR_KIND_NEG) {
         if (!poly_match_direct_deg4_rec(expr->a, wrt, lhs))
             goto cleanup;
+        lhs_ready = true;
         for (size_t i = 0; i < 5u; ++i) {
             num_destroy(&coeffs[i]);
             coeffs[i] = num_neg(lhs[i]);
@@ -217,10 +218,14 @@ static bool poly_match_direct_deg4_rec(const expr_t *expr,
 
     if (expr->ops &&
         (expr->ops->kind == EXPR_KIND_ADD || expr->ops->kind == EXPR_KIND_SUB)) {
-        if (!poly_match_direct_deg4_rec(expr->a, wrt, lhs) ||
-            !poly_match_direct_deg4_rec(expr->b, wrt, rhs)) {
+        if (!poly_match_direct_deg4_rec(expr->a, wrt, lhs)) {
             goto cleanup;
         }
+        lhs_ready = true;
+        if (!poly_match_direct_deg4_rec(expr->b, wrt, rhs)) {
+            goto cleanup;
+        }
+        rhs_ready = true;
         for (size_t i = 0; i < 5u; ++i) {
             number_t next = (expr->ops->kind == EXPR_KIND_ADD)
                                 ? num_add(lhs[i], rhs[i])
@@ -234,10 +239,14 @@ static bool poly_match_direct_deg4_rec(const expr_t *expr,
     }
 
     if (expr->ops && expr->ops->kind == EXPR_KIND_MUL) {
-        if (!poly_match_direct_deg4_rec(expr->a, wrt, lhs) ||
-            !poly_match_direct_deg4_rec(expr->b, wrt, rhs)) {
+        if (!poly_match_direct_deg4_rec(expr->a, wrt, lhs)) {
             goto cleanup;
         }
+        lhs_ready = true;
+        if (!poly_match_direct_deg4_rec(expr->b, wrt, rhs)) {
+            goto cleanup;
+        }
+        rhs_ready = true;
         for (size_t i = 0; i < 5u; ++i) {
             for (size_t j = 0; i + j < 5u; ++j) {
                 number_t term = num_mul(lhs[i], rhs[j]);
@@ -255,10 +264,12 @@ static bool poly_match_direct_deg4_rec(const expr_t *expr,
     }
 
     if (expr->ops && expr->ops->kind == EXPR_KIND_DIV &&
-        poly_match_direct_deg4_rec(expr->a, wrt, lhs) &&
         expr_match_const_value(expr->b, &constant) &&
         num_is_real(constant) &&
         !num_eq(constant, NUM_ZERO)) {
+        if (!poly_match_direct_deg4_rec(expr->a, wrt, lhs))
+            goto cleanup;
+        lhs_ready = true;
         for (size_t i = 0; i < 5u; ++i) {
             number_t next = num_div(lhs[i], constant);
 
@@ -276,6 +287,7 @@ static bool poly_match_direct_deg4_rec(const expr_t *expr,
             !poly_match_direct_deg4_rec(expr->a, wrt, lhs)) {
             goto cleanup;
         }
+        lhs_ready = true;
 
         num_destroy(&coeffs[0]);
         coeffs[0] = num_clone(NUM_ONE);
@@ -312,6 +324,7 @@ static bool poly_match_direct_deg4_rec(const expr_t *expr,
             !poly_match_direct_deg4_rec(expr->a, wrt, lhs)) {
             goto cleanup;
         }
+        lhs_ready = true;
 
         num_destroy(&coeffs[0]);
         coeffs[0] = num_clone(NUM_ONE);
@@ -341,8 +354,10 @@ static bool poly_match_direct_deg4_rec(const expr_t *expr,
     }
 
 cleanup:
-    number_array_clear_local(rhs, 5);
-    number_array_clear_local(lhs, 5);
+    if (rhs_ready)
+        number_array_clear_local(rhs, 5);
+    if (lhs_ready)
+        number_array_clear_local(lhs, 5);
     num_destroy(&exponent);
     num_destroy(&constant);
     if (!ok)
@@ -435,15 +450,19 @@ static bool partial_fraction_factor_poly_coeffs(const number_t *coeffs,
         number_t minus_b = num_neg(coeffs[1]);
         number_t two_a = num_mul(two, coeffs[2]);
         number_t disc_left = num_mul(coeffs[1], coeffs[1]);
-        number_t disc_right = num_mul(four, num_mul(coeffs[2], coeffs[0]));
+        number_t disc_product = num_mul(coeffs[2], coeffs[0]);
+        number_t disc_right = num_mul(four, disc_product);
         number_t disc = num_sub(disc_left, disc_right);
         number_t sqrt_disc = num_sqrt(disc);
+        number_t sqrt_disc_sq = num_mul(sqrt_disc, sqrt_disc);
         bool exact_square = num_is_real(sqrt_disc) &&
-                            num_eq(num_mul(sqrt_disc, sqrt_disc), disc);
+                            num_eq(sqrt_disc_sq, disc);
 
         if (exact_square) {
-            number_t root1 = num_div(num_add(minus_b, sqrt_disc), two_a);
-            number_t root2 = num_div(num_sub(minus_b, sqrt_disc), two_a);
+            number_t root1_numer = num_add(minus_b, sqrt_disc);
+            number_t root2_numer = num_sub(minus_b, sqrt_disc);
+            number_t root1 = num_div(root1_numer, two_a);
+            number_t root2 = num_div(root2_numer, two_a);
             number_t shift1 = num_neg(root1);
             number_t shift2 = num_neg(root2);
             bool ok = partial_fraction_scale_mul(out, coeffs[2], 1u) &&
@@ -454,9 +473,13 @@ static bool partial_fraction_factor_poly_coeffs(const number_t *coeffs,
             num_destroy(&shift1);
             num_destroy(&root2);
             num_destroy(&root1);
+            num_destroy(&root2_numer);
+            num_destroy(&root1_numer);
+            num_destroy(&sqrt_disc_sq);
             num_destroy(&sqrt_disc);
             num_destroy(&disc);
             num_destroy(&disc_right);
+            num_destroy(&disc_product);
             num_destroy(&disc_left);
             num_destroy(&two_a);
             num_destroy(&minus_b);
@@ -465,9 +488,11 @@ static bool partial_fraction_factor_poly_coeffs(const number_t *coeffs,
             return ok;
         }
 
+        num_destroy(&sqrt_disc_sq);
         num_destroy(&sqrt_disc);
         num_destroy(&disc);
         num_destroy(&disc_right);
+        num_destroy(&disc_product);
         num_destroy(&disc_left);
         num_destroy(&two_a);
         num_destroy(&minus_b);
@@ -503,9 +528,8 @@ static bool partial_fraction_collect_linear_factors(const expr_t *expr,
     number_t exponent = num_new();
     number_t poly[5];
     size_t degree = 0u;
+    bool poly_ready = false;
     bool ok = false;
-
-    number_array_zero_local(poly, 5);
 
     if (!expr) {
         ok = false;
@@ -590,11 +614,13 @@ static bool partial_fraction_collect_linear_factors(const expr_t *expr,
     }
 
     if (poly_match_direct_deg4(expr, wrt, poly, &degree)) {
+        poly_ready = true;
         ok = partial_fraction_factor_poly_coeffs(poly, degree, out);
     }
 
 cleanup:
-    number_array_clear_local(poly, 5);
+    if (poly_ready)
+        number_array_clear_local(poly, 5);
     num_destroy(&exponent);
     num_destroy(&coeff);
     num_destroy(&constant);
@@ -862,16 +888,16 @@ expr_t *integrate_rational_partial_fractions(const expr_t *expr, const expr_t *w
     expr_t *poly_part = NULL;
     expr_t *frac_part = NULL;
     expr_t *sum = NULL;
+    bool numerator_ready = false;
+    bool denominator_ready = false;
+    bool quotient_ready = false;
+    bool remainder_ready = false;
     bool ok = false;
 
     if (!expr || !expr->a || !expr->b)
         return NULL;
 
     partial_fraction_factorization_init(&factors);
-    number_array_zero_local(numerator, 5);
-    number_array_zero_local(denominator, 5);
-    number_array_zero_local(quotient, 5);
-    number_array_zero_local(remainder, 5);
     number_array_zero_local(rhs, 4);
     number_array_zero_local(solution, 4);
     for (size_t row = 0; row < 4u; ++row)
@@ -879,10 +905,20 @@ expr_t *integrate_rational_partial_fractions(const expr_t *expr, const expr_t *w
 
     {
         bool num_ok = poly_match_direct_deg4(expr->a, wrt, numerator, &num_degree);
-        bool factor_ok = num_ok && partial_fraction_collect_linear_factors(expr->b, wrt, &factors);
-        bool total_ok = factor_ok && factors.total_multiplicity > 0u && factors.total_multiplicity <= 4u;
-        bool scale_ok = total_ok && !num_eq(factors.scale, NUM_ZERO);
-        bool denom_ok = scale_ok && build_normalized_denominator_poly(&factors, denominator);
+        bool factor_ok;
+        bool total_ok;
+        bool scale_ok;
+        bool denom_ok;
+
+        numerator_ready = num_ok;
+        factor_ok = num_ok && partial_fraction_collect_linear_factors(expr->b, wrt, &factors);
+        total_ok = factor_ok && factors.total_multiplicity > 0u && factors.total_multiplicity <= 4u;
+        scale_ok = total_ok && !num_eq(factors.scale, NUM_ZERO);
+        denom_ok = false;
+        if (scale_ok) {
+            denom_ok = build_normalized_denominator_poly(&factors, denominator);
+            denominator_ready = true;
+        }
 
         if (!denom_ok)
             goto cleanup;
@@ -896,6 +932,8 @@ expr_t *integrate_rational_partial_fractions(const expr_t *expr, const expr_t *w
         goto cleanup;
     if (!poly_divide_local(numerator, num_degree, denominator, den_degree, quotient, remainder))
         goto cleanup;
+    quotient_ready = true;
+    remainder_ready = true;
 
     poly_part = build_polynomial_antiderivative(wrt, quotient);
     if (!poly_part && !num_eq(quotient[0], NUM_ZERO))
@@ -916,7 +954,6 @@ expr_t *integrate_rational_partial_fractions(const expr_t *expr, const expr_t *w
             for (size_t power = 1u; power <= factors.factors[i].multiplicity; ++power, ++col) {
                 number_t basis[5];
 
-                number_array_zero_local(basis, 5);
                 build_partial_fraction_basis_poly(&factors, i, power, basis);
                 for (size_t row = 0; row < unknown_count; ++row) {
                     num_destroy(&matrix_storage[row][col]);
@@ -958,10 +995,14 @@ cleanup:
         number_array_clear_local(matrix_storage[row], 5);
     number_array_clear_local(solution, 4);
     number_array_clear_local(rhs, 4);
-    number_array_clear_local(remainder, 5);
-    number_array_clear_local(quotient, 5);
-    number_array_clear_local(denominator, 5);
-    number_array_clear_local(numerator, 5);
+    if (remainder_ready)
+        number_array_clear_local(remainder, 5);
+    if (quotient_ready)
+        number_array_clear_local(quotient, 5);
+    if (denominator_ready)
+        number_array_clear_local(denominator, 5);
+    if (numerator_ready)
+        number_array_clear_local(numerator, 5);
 
     return ok ? simplify_owned(sum) : (expr_free(sum), NULL);
 }

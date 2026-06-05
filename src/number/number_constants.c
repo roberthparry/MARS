@@ -297,6 +297,63 @@ static const number_private_t number_ninf_value = {
 static complex_t number_i_complex_value;
 static complex_t number_neg_i_complex_value;
 
+static number_mpz_t *const number_immortal_mpz_values[] = {
+    &number_zero_mpz_value,
+    &number_one_mpz_value,
+    &number_neg_one_mpz_value,
+    &number_two_mpz_value,
+    &number_ten_mpz_value
+};
+
+static number_mpq_t *const number_immortal_mpq_values[] = {
+    &number_half_mpq_value,
+    &number_one_and_half_mpq_value,
+    &number_one_third_mpq_value,
+    &number_quarter_mpq_value,
+    &number_one_sixth_mpq_value,
+    &number_one_eighth_mpq_value,
+    &number_one_tenth_mpq_value
+};
+
+static number_mpfr_t *const number_immortal_mpfr_values[] = {
+    &number_pi_mpfr_value,
+    &number_2pi_mpfr_value,
+    &number_pi_2_mpfr_value,
+    &number_neg_pi_2_mpfr_value,
+    &number_pi_4_mpfr_value,
+    &number_3pi_4_mpfr_value,
+    &number_pi_6_mpfr_value,
+    &number_pi_3_mpfr_value,
+    &number_2_pi_mpfr_value,
+    &number_e_mpfr_value,
+    &number_inv_e_mpfr_value,
+    &number_neg_inv_e_mpfr_value,
+    &number_ln2_mpfr_value,
+    &number_ln10_mpfr_value,
+    &number_invln2_mpfr_value,
+    &number_euler_mascheroni_mpfr_value,
+    &number_phi_mpfr_value,
+    &number_sqrt_half_mpfr_value,
+    &number_sqrt2_mpfr_value,
+    &number_sqrt3_mpfr_value,
+    &number_sqrt2_over_two_mpfr_value,
+    &number_sqrt3_over_two_mpfr_value,
+    &number_sqrt_2pi_mpfr_value,
+    &number_sqrt_pi_mpfr_value,
+    &number_sqrt_pi_over_two_mpfr_value,
+    &number_sqrt1onpi_mpfr_value,
+    &number_2_sqrtpi_mpfr_value,
+    &number_neg_two_over_sqrt_pi_mpfr_value,
+    &number_inv_sqrt_2pi_mpfr_value,
+    &number_log_sqrt_2pi_mpfr_value,
+    &number_ln_2pi_mpfr_value,
+    &number_pi_squared_mpfr_value,
+    &number_2pi_cubed_mpfr_value,
+    &number_nan_mpfr_value,
+    &number_inf_mpfr_value,
+    &number_ninf_mpfr_value
+};
+
 static const number_private_t number_i_value = {
     .kind = NUMBER_COMPLEX,
     .value.cx = &number_i_complex_value
@@ -439,6 +496,49 @@ static void number_init_complex_constants(void)
         NUMBER_CONST_NEG_I,
         NUM_ZERO,
         NUM_NEG_ONE);
+}
+
+static void number_clear_immortal_mpz(number_mpz_t *value)
+{
+    if (!value || !value->initialised)
+        return;
+    mpz_clear(value->value);
+    value->initialised = false;
+}
+
+static void number_clear_immortal_mpq(number_mpq_t *value)
+{
+    if (!value || !value->initialised)
+        return;
+    mpq_clear(value->value);
+    value->initialised = false;
+}
+
+static void number_clear_immortal_mpfr(number_mpfr_t *value)
+{
+    if (!value || !value->initialised)
+        return;
+    mpfr_clear(value->value);
+    value->initialised = false;
+}
+
+void number_constants_shutdown(void)
+{
+    number_complex_clear_mpc_cache(&number_neg_i_complex_value);
+    number_complex_clear_mpc_cache(&number_i_complex_value);
+
+    for (size_t i = 0u;
+         i < sizeof(number_immortal_mpfr_values) / sizeof(number_immortal_mpfr_values[0]);
+         ++i)
+        number_clear_immortal_mpfr(number_immortal_mpfr_values[i]);
+    for (size_t i = 0u;
+         i < sizeof(number_immortal_mpq_values) / sizeof(number_immortal_mpq_values[0]);
+         ++i)
+        number_clear_immortal_mpq(number_immortal_mpq_values[i]);
+    for (size_t i = 0u;
+         i < sizeof(number_immortal_mpz_values) / sizeof(number_immortal_mpz_values[0]);
+         ++i)
+        number_clear_immortal_mpz(number_immortal_mpz_values[i]);
 }
 
 static const qfloat_t *const number_const_qfloat_table[NUMBER_CONST_COUNT] = {
