@@ -59,6 +59,7 @@ const expr_ops_t ops_sin = {
     .direct_inverse = &ops_asin,
     .inverse_unary = expr_asin,
     .apply_unary = expr_sin, .apply_binary = NULL,
+    .integrate = expr_integrate_dispatch_primitive,
     .simplify = expr_simplify_unary_operator, .fold_const_unary = expr_fold_zero_to_zero
 };
 const expr_ops_t ops_cos = {
@@ -68,6 +69,7 @@ const expr_ops_t ops_cos = {
     .direct_inverse = &ops_acos,
     .inverse_unary = expr_acos,
     .apply_unary = expr_cos, .apply_binary = NULL,
+    .integrate = expr_integrate_dispatch_primitive,
     .simplify = expr_simplify_unary_operator, .fold_const_unary = expr_fold_cos_const
 };
 const expr_ops_t ops_tan = {
@@ -77,6 +79,7 @@ const expr_ops_t ops_tan = {
     .direct_inverse = &ops_atan,
     .inverse_unary = expr_atan,
     .apply_unary = expr_tan, .apply_binary = NULL,
+    .integrate = expr_integrate_dispatch_primitive,
     .simplify = expr_simplify_unary_operator, .fold_const_unary = expr_fold_zero_to_zero
 };
 const expr_ops_t ops_sec = {
@@ -86,6 +89,7 @@ const expr_ops_t ops_sec = {
     .direct_inverse = &ops_asec,
     .inverse_unary = expr_asec,
     .apply_unary = expr_sec, .apply_binary = NULL,
+    .integrate = expr_integrate_dispatch_primitive,
     .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
 };
 const expr_ops_t ops_cosec = {
@@ -95,6 +99,7 @@ const expr_ops_t ops_cosec = {
     .direct_inverse = &ops_acosec,
     .inverse_unary = expr_acosec,
     .apply_unary = expr_cosec, .apply_binary = NULL,
+    .integrate = expr_integrate_dispatch_primitive,
     .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
 };
 const expr_ops_t ops_cot = {
@@ -104,6 +109,7 @@ const expr_ops_t ops_cot = {
     .direct_inverse = &ops_acot,
     .inverse_unary = expr_acot,
     .apply_unary = expr_cot, .apply_binary = NULL,
+    .integrate = expr_integrate_dispatch_primitive,
     .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
 };
 const expr_ops_t ops_sinh = {
@@ -113,6 +119,7 @@ const expr_ops_t ops_sinh = {
     .direct_inverse = &ops_asinh,
     .inverse_unary = expr_asinh,
     .apply_unary = expr_sinh, .apply_binary = NULL,
+    .integrate = expr_integrate_dispatch_primitive,
     .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
 };
 const expr_ops_t ops_cosh = {
@@ -122,6 +129,7 @@ const expr_ops_t ops_cosh = {
     .direct_inverse = &ops_acosh,
     .inverse_unary = expr_acosh,
     .apply_unary = expr_cosh, .apply_binary = NULL,
+    .integrate = expr_integrate_dispatch_primitive,
     .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
 };
 const expr_ops_t ops_tanh = {
@@ -131,6 +139,7 @@ const expr_ops_t ops_tanh = {
     .direct_inverse = &ops_atanh,
     .inverse_unary = expr_atanh,
     .apply_unary = expr_tanh, .apply_binary = NULL,
+    .integrate = expr_integrate_dispatch_primitive,
     .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
 };
 const expr_ops_t ops_sech = {
@@ -140,6 +149,7 @@ const expr_ops_t ops_sech = {
     .direct_inverse = &ops_asech,
     .inverse_unary = expr_asech,
     .apply_unary = expr_sech, .apply_binary = NULL,
+    .integrate = expr_integrate_dispatch_primitive,
     .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
 };
 const expr_ops_t ops_cosech = {
@@ -149,6 +159,7 @@ const expr_ops_t ops_cosech = {
     .direct_inverse = &ops_acosech,
     .inverse_unary = expr_acosech,
     .apply_unary = expr_cosech, .apply_binary = NULL,
+    .integrate = expr_integrate_dispatch_primitive,
     .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
 };
 const expr_ops_t ops_coth = {
@@ -158,6 +169,7 @@ const expr_ops_t ops_coth = {
     .direct_inverse = &ops_acoth,
     .inverse_unary = expr_acoth,
     .apply_unary = expr_coth, .apply_binary = NULL,
+    .integrate = expr_integrate_dispatch_primitive,
     .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
 };
 const expr_ops_t ops_asin = {
@@ -166,6 +178,7 @@ const expr_ops_t ops_asin = {
     .tex_name = "\\arcsin",
     .inverse_unary = expr_sin,
     .apply_unary = expr_asin, .apply_binary = NULL,
+    .integrate = expr_integrate_dispatch_primitive,
     .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
 };
 const expr_ops_t ops_acos = {
@@ -174,6 +187,7 @@ const expr_ops_t ops_acos = {
     .tex_name = "\\arccos",
     .inverse_unary = expr_cos,
     .apply_unary = expr_acos, .apply_binary = NULL,
+    .integrate = expr_integrate_dispatch_primitive,
     .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
 };
 const expr_ops_t ops_atan = {
@@ -182,6 +196,7 @@ const expr_ops_t ops_atan = {
     .tex_name = "\\arctan",
     .inverse_unary = expr_tan,
     .apply_unary = expr_atan, .apply_binary = NULL,
+    .integrate = expr_integrate_dispatch_primitive,
     .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
 };
 const expr_ops_t ops_asec = {
@@ -190,6 +205,7 @@ const expr_ops_t ops_asec = {
     .tex_name = "\\operatorname{arcsec}",
     .inverse_unary = expr_sec,
     .apply_unary = expr_asec, .apply_binary = NULL,
+    .integrate = expr_integrate_dispatch_primitive,
     .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
 };
 const expr_ops_t ops_acosec = {
@@ -198,6 +214,7 @@ const expr_ops_t ops_acosec = {
     .tex_name = "\\operatorname{arccosec}",
     .inverse_unary = expr_cosec,
     .apply_unary = expr_acosec, .apply_binary = NULL,
+    .integrate = expr_integrate_dispatch_primitive,
     .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
 };
 const expr_ops_t ops_acot = {
@@ -206,6 +223,7 @@ const expr_ops_t ops_acot = {
     .tex_name = "\\operatorname{arccot}",
     .inverse_unary = expr_cot,
     .apply_unary = expr_acot, .apply_binary = NULL,
+    .integrate = expr_integrate_dispatch_primitive,
     .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
 };
 const expr_ops_t ops_asinh = {
@@ -214,6 +232,7 @@ const expr_ops_t ops_asinh = {
     .tex_name = "\\operatorname{asinh}",
     .inverse_unary = expr_sinh,
     .apply_unary = expr_asinh, .apply_binary = NULL,
+    .integrate = expr_integrate_dispatch_primitive,
     .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
 };
 const expr_ops_t ops_acosh = {
@@ -222,6 +241,7 @@ const expr_ops_t ops_acosh = {
     .tex_name = "\\operatorname{acosh}",
     .inverse_unary = expr_cosh,
     .apply_unary = expr_acosh, .apply_binary = NULL,
+    .integrate = expr_integrate_dispatch_primitive,
     .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
 };
 const expr_ops_t ops_atanh = {
@@ -230,6 +250,7 @@ const expr_ops_t ops_atanh = {
     .tex_name = "\\operatorname{atanh}",
     .inverse_unary = expr_tanh,
     .apply_unary = expr_atanh, .apply_binary = NULL,
+    .integrate = expr_integrate_dispatch_primitive,
     .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
 };
 const expr_ops_t ops_asech = {
@@ -238,6 +259,7 @@ const expr_ops_t ops_asech = {
     .tex_name = "\\operatorname{arsech}",
     .inverse_unary = expr_sech,
     .apply_unary = expr_asech, .apply_binary = NULL,
+    .integrate = expr_integrate_dispatch_primitive,
     .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
 };
 const expr_ops_t ops_acosech = {
@@ -246,6 +268,7 @@ const expr_ops_t ops_acosech = {
     .tex_name = "\\operatorname{arcosech}",
     .inverse_unary = expr_cosech,
     .apply_unary = expr_acosech, .apply_binary = NULL,
+    .integrate = expr_integrate_dispatch_primitive,
     .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
 };
 const expr_ops_t ops_acoth = {
@@ -254,6 +277,7 @@ const expr_ops_t ops_acoth = {
     .tex_name = "\\operatorname{arcoth}",
     .inverse_unary = expr_coth,
     .apply_unary = expr_acoth, .apply_binary = NULL,
+    .integrate = expr_integrate_dispatch_primitive,
     .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
 };
 const expr_ops_t ops_exp = {
@@ -263,6 +287,7 @@ const expr_ops_t ops_exp = {
     .direct_inverse = &ops_log,
     .inverse_unary = expr_log,
     .apply_unary = expr_exp, .apply_binary = NULL,
+    .integrate = expr_integrate_dispatch_primitive,
     .simplify = expr_simplify_unary_operator, .fold_const_unary = expr_fold_exp_const
 };
 const expr_ops_t ops_log = {
@@ -272,6 +297,7 @@ const expr_ops_t ops_log = {
     .direct_inverse = &ops_exp,
     .inverse_unary = expr_exp,
     .apply_unary = expr_log, .apply_binary = NULL,
+    .integrate = expr_integrate_dispatch_primitive,
     .simplify = expr_simplify_unary_operator, .fold_const_unary = expr_fold_log_const
 };
 const expr_ops_t ops_log10 = {
@@ -280,6 +306,7 @@ const expr_ops_t ops_log10 = {
     .tex_name = "\\log",
     .inverse_unary = expr_inverse_log10_internal,
     .apply_unary = expr_log10, .apply_binary = NULL,
+    .integrate = expr_integrate_dispatch_primitive,
     .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
 };
 const expr_ops_t ops_sqrt = {
@@ -288,6 +315,7 @@ const expr_ops_t ops_sqrt = {
     .tex_name = "\\sqrt",
     .inverse_unary = expr_inverse_sqrt_internal,
     .apply_unary = expr_sqrt, .apply_binary = NULL,
+    .integrate = expr_integrate_dispatch_primitive,
     .simplify = expr_simplify_unary_operator, .fold_const_unary = expr_fold_sqrt_const
 };
 const expr_ops_t ops_floor = {
@@ -318,6 +346,7 @@ const expr_ops_t ops_erf = {
     .direct_inverse = &ops_erfinv,
     .inverse_unary = expr_erfinv,
     .apply_unary = expr_erf, .apply_binary = NULL,
+    .integrate = expr_integrate_dispatch_primitive,
     .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
 };
 const expr_ops_t ops_erfc = {
@@ -327,6 +356,7 @@ const expr_ops_t ops_erfc = {
     .direct_inverse = &ops_erfcinv,
     .inverse_unary = expr_erfcinv,
     .apply_unary = expr_erfc, .apply_binary = NULL,
+    .integrate = expr_integrate_dispatch_primitive,
     .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
 };
 const expr_ops_t ops_lgamma = {
@@ -426,6 +456,7 @@ const expr_ops_t ops_normal_pdf = {
     .kind = EXPR_KIND_NORMAL_PDF, .arity = EXPR_OP_UNARY, .name = "normal_pdf",
     .tex_name = "\\operatorname{normal\\_pdf}",
     .apply_unary = expr_normal_pdf, .apply_binary = NULL,
+    .integrate = expr_integrate_dispatch_primitive,
     .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
 };
 const expr_ops_t ops_normal_cdf = {
@@ -433,6 +464,7 @@ const expr_ops_t ops_normal_cdf = {
     .kind = EXPR_KIND_NORMAL_CDF, .arity = EXPR_OP_UNARY, .name = "normal_cdf",
     .tex_name = "\\operatorname{normal\\_cdf}",
     .apply_unary = expr_normal_cdf, .apply_binary = NULL,
+    .integrate = expr_integrate_dispatch_primitive,
     .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
 };
 const expr_ops_t ops_normal_logpdf = {
@@ -440,6 +472,7 @@ const expr_ops_t ops_normal_logpdf = {
     .kind = EXPR_KIND_NORMAL_LOGPDF, .arity = EXPR_OP_UNARY, .name = "normal_logpdf",
     .tex_name = "\\operatorname{normal\\_logpdf}",
     .apply_unary = expr_normal_logpdf, .apply_binary = NULL,
+    .integrate = expr_integrate_dispatch_primitive,
     .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
 };
 const expr_ops_t ops_pdf = {
@@ -447,6 +480,7 @@ const expr_ops_t ops_pdf = {
     .kind = EXPR_KIND_NORMAL_PDF, .arity = EXPR_OP_UNARY, .name = "pdf",
     .tex_name = "\\operatorname{pdf}",
     .apply_unary = expr_pdf, .apply_binary = NULL,
+    .integrate = expr_integrate_dispatch_primitive,
     .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
 };
 const expr_ops_t ops_cdf = {
@@ -454,6 +488,7 @@ const expr_ops_t ops_cdf = {
     .kind = EXPR_KIND_NORMAL_CDF, .arity = EXPR_OP_UNARY, .name = "cdf",
     .tex_name = "\\operatorname{cdf}",
     .apply_unary = expr_cdf, .apply_binary = NULL,
+    .integrate = expr_integrate_dispatch_primitive,
     .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
 };
 const expr_ops_t ops_logpdf = {
@@ -461,6 +496,7 @@ const expr_ops_t ops_logpdf = {
     .kind = EXPR_KIND_NORMAL_LOGPDF, .arity = EXPR_OP_UNARY, .name = "logpdf",
     .tex_name = "\\operatorname{logpdf}",
     .apply_unary = expr_logpdf, .apply_binary = NULL,
+    .integrate = expr_integrate_dispatch_primitive,
     .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
 };
 const expr_ops_t ops_ei = {
@@ -468,6 +504,7 @@ const expr_ops_t ops_ei = {
     .kind = EXPR_KIND_EI, .arity = EXPR_OP_UNARY, .name = "Ei",
     .tex_name = "\\operatorname{Ei}",
     .apply_unary = expr_ei, .apply_binary = NULL,
+    .integrate = expr_integrate_dispatch_primitive,
     .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
 };
 const expr_ops_t ops_e1 = {
@@ -475,6 +512,7 @@ const expr_ops_t ops_e1 = {
     .kind = EXPR_KIND_E1, .arity = EXPR_OP_UNARY, .name = "E1",
     .tex_name = "\\operatorname{E1}",
     .apply_unary = expr_e1, .apply_binary = NULL,
+    .integrate = expr_integrate_dispatch_primitive,
     .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
 };
 const expr_ops_t ops_beta = {

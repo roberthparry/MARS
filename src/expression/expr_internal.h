@@ -146,6 +146,7 @@ typedef expr_t *(*expr_apply_binary_fn)(const expr_t *left, const expr_t *right)
 typedef expr_t *(*expr_simplify_fn)(const expr_t *tmpl, expr_t *a, expr_t *b);
 typedef int (*expr_fold_const_unary_fn)(const number_t *in, number_t *out);
 typedef expr_t *(*expr_inverse_unary_fn)(const expr_t *arg);
+typedef expr_t *(*expr_integrate_fn)(const expr_t *expr, const expr_t *wrt);
 typedef void (*expr_reverse_fn)(const expr_t *dv, const number_t *out_bar,
                                 number_t *a_bar, number_t *b_bar);
 
@@ -205,6 +206,15 @@ typedef struct expr_ops {
      * (refcount=1).
      */
     expr_apply_binary_fn apply_binary;
+
+    /**
+     * Optional local symbolic antiderivative hook.
+     *
+     * This is intended for operators whose primitives depend only on the node
+     * and a directly matched affine child. Structural multi-node rules still
+     * belong in the central integration dispatcher.
+     */
+    expr_integrate_fn integrate;
 
     /**
      * Simplification hook for this operator.
@@ -547,7 +557,9 @@ expr_t *expr_simplify_direct_inverse_pair_from_raw(const expr_t *outer,
 bool expr_ops_is_lambert(const expr_ops_t *ops);
 bool expr_ops_is_floor_or_ceil(const expr_ops_t *ops);
 bool expr_ops_are_direct_inverse_pair(const expr_ops_t *outer,
-                                    const expr_ops_t *inner);
+                                      const expr_ops_t *inner);
+
+expr_t *expr_integrate_dispatch_primitive(const expr_t *expr, const expr_t *wrt);
 bool expr_ops_has_inverse_unary_simplify_rule(const expr_ops_t *ops);
 bool expr_inverse_unary_candidate_value_ok(const expr_ops_t *ops,
                                          number_t value);
