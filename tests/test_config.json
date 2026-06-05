@@ -1118,8 +1118,14 @@
       "test_integrate_reciprocal_and_log": true,
       "test_integrate_affine_elementary": true,
       "test_integrate_affine_tangent": true,
+      "test_integrate_affine_more_trig_and_stats": true,
+      "test_integrate_affine_logs_inverse_and_specials": true,
+      "test_integrate_affine_powers_and_remaining_inverse_families": true,
+      "test_integrate_affine_poly_times_specials": true,
       "test_integrate_other_variable_as_constant": true,
       "test_integrate_definite_symbolic_bounds": true,
+      "test_integrate_more_by_parts": true,
+      "test_integrate_partial_fractions": true,
       "test_integrate_unsupported_product_returns_null": true
     }
   }

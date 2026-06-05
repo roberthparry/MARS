@@ -50,9 +50,19 @@ static void test_integrate_polynomial_sum(void)
 static void test_integrate_reciprocal_and_log(void)
 {
     static const double points[] = { 0.25, 0.75, 1.5, 4.0 };
+    static const double bounded_points[] = { -0.6, -0.2, 0.1, 0.5 };
     expr_t *x = test_expr_new_named_var_d(1.0, "x");
     expr_t *one_over_x = test_expr_d_div(1.0, x);
     expr_t *log_x = expr_log(x);
+    expr_t *x2 = test_expr_pow_d(x, 2.0);
+    expr_t *one_plus_x2 = test_expr_add_d(x2, 1.0);
+    expr_t *one_minus_x2 = test_expr_d_sub(1.0, x2);
+    expr_t *x2_plus_one = test_expr_add_d(test_expr_pow_d(x, 2.0), 1.0);
+    expr_t *inv_one_plus_x2 = one_plus_x2 ? expr_div(test_expr_new_const_d(1.0), one_plus_x2) : NULL;
+    expr_t *inv_sqrt_one_plus_x2 = one_plus_x2 ? expr_div(test_expr_new_const_d(1.0), expr_sqrt(one_plus_x2)) : NULL;
+    expr_t *inv_one_minus_x2 = one_minus_x2 ? expr_div(test_expr_new_const_d(1.0), one_minus_x2) : NULL;
+    expr_t *inv_sqrt_one_minus_x2 = one_minus_x2 ? expr_div(test_expr_new_const_d(1.0), expr_sqrt(one_minus_x2)) : NULL;
+    expr_t *inv_sqrt_x2_plus_one = x2_plus_one ? expr_div(test_expr_new_const_d(1.0), expr_sqrt(x2_plus_one)) : NULL;
 
     assert_antiderivative_matches("integral derivative of 1/x",
                                   one_over_x, x, points,
@@ -60,7 +70,31 @@ static void test_integrate_reciprocal_and_log(void)
     assert_antiderivative_matches("integral derivative of log(x)",
                                   log_x, x, points,
                                   sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of 1/(1 + x^2)",
+                                  inv_one_plus_x2, x, bounded_points,
+                                  sizeof(bounded_points) / sizeof(bounded_points[0]));
+    assert_antiderivative_matches("integral derivative of 1/sqrt(1 + x^2)",
+                                  inv_sqrt_one_plus_x2, x, bounded_points,
+                                  sizeof(bounded_points) / sizeof(bounded_points[0]));
+    assert_antiderivative_matches("integral derivative of 1/(1 - x^2)",
+                                  inv_one_minus_x2, x, bounded_points,
+                                  sizeof(bounded_points) / sizeof(bounded_points[0]));
+    assert_antiderivative_matches("integral derivative of 1/sqrt(1 - x^2)",
+                                  inv_sqrt_one_minus_x2, x, bounded_points,
+                                  sizeof(bounded_points) / sizeof(bounded_points[0]));
+    assert_antiderivative_matches("integral derivative of 1/sqrt(x^2 + 1)",
+                                  inv_sqrt_x2_plus_one, x, bounded_points,
+                                  sizeof(bounded_points) / sizeof(bounded_points[0]));
 
+    expr_free(inv_sqrt_x2_plus_one);
+    expr_free(inv_sqrt_one_minus_x2);
+    expr_free(inv_one_minus_x2);
+    expr_free(inv_sqrt_one_plus_x2);
+    expr_free(inv_one_plus_x2);
+    expr_free(x2_plus_one);
+    expr_free(one_minus_x2);
+    expr_free(one_plus_x2);
+    expr_free(x2);
     expr_free(log_x);
     expr_free(one_over_x);
     expr_free(x);
@@ -129,6 +163,573 @@ static void test_integrate_affine_tangent(void)
     expr_free(x);
 }
 
+static void test_integrate_affine_more_trig_and_stats(void)
+{
+    static const double trig_points[] = { 0.3, 0.8, 1.1, 1.7 };
+    static const double hyper_points[] = { -1.25, -0.4, 0.2, 1.0 };
+    static const double stat_points[] = { -1.5, -0.25, 0.5, 1.75 };
+    expr_t *x = test_expr_new_named_var_d(0.0, "x");
+    expr_t *two_x = test_expr_mul_d(x, 2.0);
+    expr_t *sec_arg = test_expr_sub_d(two_x, 0.5);
+    expr_t *sec_term = expr_sec(sec_arg);
+    expr_t *three_x = test_expr_mul_d(x, 3.0);
+    expr_t *cosec_arg = test_expr_add_d(three_x, 0.2);
+    expr_t *cosec_term = expr_cosec(cosec_arg);
+    expr_t *cot_arg = test_expr_sub_d(x, 0.4);
+    expr_t *cot_term = expr_cot(cot_arg);
+    expr_t *sech_arg = test_expr_add_d(two_x, 0.25);
+    expr_t *sech_term = expr_sech(sech_arg);
+    expr_t *coth_arg = test_expr_sub_d(x, 1.5);
+    expr_t *coth_term = expr_coth(coth_arg);
+    expr_t *pdf_arg = test_expr_sub_d(two_x, 1.0);
+    expr_t *pdf_term = expr_normal_pdf(pdf_arg);
+    expr_t *cdf_arg = test_expr_add_d(x, 0.75);
+    expr_t *cdf_term = expr_normal_cdf(cdf_arg);
+    expr_t *logpdf_arg = test_expr_sub_d(two_x, 1.0);
+    expr_t *logpdf_term = expr_normal_logpdf(logpdf_arg);
+
+    assert_antiderivative_matches("integral derivative of sec(2*x - 1/2)",
+                                  sec_term, x, trig_points,
+                                  sizeof(trig_points) / sizeof(trig_points[0]));
+    assert_antiderivative_matches("integral derivative of cosec(3*x + 0.2)",
+                                  cosec_term, x, trig_points,
+                                  sizeof(trig_points) / sizeof(trig_points[0]));
+    assert_antiderivative_matches("integral derivative of cot(x - 0.4)",
+                                  cot_term, x, trig_points,
+                                  sizeof(trig_points) / sizeof(trig_points[0]));
+    assert_antiderivative_matches("integral derivative of sech(2*x + 0.25)",
+                                  sech_term, x, hyper_points,
+                                  sizeof(hyper_points) / sizeof(hyper_points[0]));
+    assert_antiderivative_matches("integral derivative of coth(x - 1.5)",
+                                  coth_term, x, hyper_points,
+                                  sizeof(hyper_points) / sizeof(hyper_points[0]));
+    assert_antiderivative_matches("integral derivative of normal_pdf(2*x - 1)",
+                                  pdf_term, x, stat_points,
+                                  sizeof(stat_points) / sizeof(stat_points[0]));
+    assert_antiderivative_matches("integral derivative of normal_cdf(x + 0.75)",
+                                  cdf_term, x, stat_points,
+                                  sizeof(stat_points) / sizeof(stat_points[0]));
+    assert_antiderivative_matches("integral derivative of normal_logpdf(2*x - 1)",
+                                  logpdf_term, x, stat_points,
+                                  sizeof(stat_points) / sizeof(stat_points[0]));
+
+    expr_free(logpdf_term);
+    expr_free(logpdf_arg);
+    expr_free(cdf_term);
+    expr_free(cdf_arg);
+    expr_free(pdf_term);
+    expr_free(pdf_arg);
+    expr_free(coth_term);
+    expr_free(coth_arg);
+    expr_free(sech_term);
+    expr_free(sech_arg);
+    expr_free(cot_term);
+    expr_free(cot_arg);
+    expr_free(cosec_term);
+    expr_free(cosec_arg);
+    expr_free(three_x);
+    expr_free(sec_term);
+    expr_free(sec_arg);
+    expr_free(two_x);
+    expr_free(x);
+}
+
+static void test_integrate_affine_logs_inverse_and_specials(void)
+{
+    static const double positive_points[] = { 0.4, 0.8, 1.2, 2.0 };
+    static const double bounded_points[] = { -0.6, -0.2, 0.1, 0.5 };
+    static const double mixed_points[] = { -1.1, -0.3, 0.4, 1.3 };
+    expr_t *x = test_expr_new_named_var_d(0.0, "x");
+    expr_t *two_x = test_expr_mul_d(x, 2.0);
+    expr_t *log_arg = test_expr_add_d(two_x, 3.0);
+    expr_t *log_term = expr_log(log_arg);
+    expr_t *log10_arg = test_expr_add_d(x, 2.5);
+    expr_t *log10_term = expr_log10(log10_arg);
+    expr_t *atan_arg = test_expr_sub_d(two_x, 0.3);
+    expr_t *atan_term = expr_atan(atan_arg);
+    expr_t *asin_arg = test_expr_sub_d(x, 0.1);
+    expr_t *asin_term = expr_asin(asin_arg);
+    expr_t *acos_arg = test_expr_add_d(x, 0.2);
+    expr_t *acos_term = expr_acos(acos_arg);
+    expr_t *asinh_arg = test_expr_sub_d(two_x, 1.0);
+    expr_t *asinh_term = expr_asinh(asinh_arg);
+    expr_t *atanh_arg = test_expr_div_d(x, 2.0);
+    expr_t *atanh_term = expr_atanh(atanh_arg);
+    expr_t *erf_arg = test_expr_sub_d(x, 0.25);
+    expr_t *erf_term = expr_erf(erf_arg);
+    expr_t *erfc_arg = test_expr_add_d(x, 0.75);
+    expr_t *erfc_term = expr_erfc(erfc_arg);
+    expr_t *ei_arg = test_expr_add_d(x, 2.0);
+    expr_t *ei_term = expr_ei(ei_arg);
+    expr_t *e1_arg = test_expr_add_d(x, 1.5);
+    expr_t *e1_term = expr_e1(e1_arg);
+
+    assert_antiderivative_matches("integral derivative of log(2*x + 3)",
+                                  log_term, x, positive_points,
+                                  sizeof(positive_points) / sizeof(positive_points[0]));
+    assert_antiderivative_matches("integral derivative of log10(x + 2.5)",
+                                  log10_term, x, positive_points,
+                                  sizeof(positive_points) / sizeof(positive_points[0]));
+    assert_antiderivative_matches("integral derivative of atan(2*x - 0.3)",
+                                  atan_term, x, mixed_points,
+                                  sizeof(mixed_points) / sizeof(mixed_points[0]));
+    assert_antiderivative_matches("integral derivative of asin(x - 0.1)",
+                                  asin_term, x, bounded_points,
+                                  sizeof(bounded_points) / sizeof(bounded_points[0]));
+    assert_antiderivative_matches("integral derivative of acos(x + 0.2)",
+                                  acos_term, x, bounded_points,
+                                  sizeof(bounded_points) / sizeof(bounded_points[0]));
+    assert_antiderivative_matches("integral derivative of asinh(2*x - 1)",
+                                  asinh_term, x, mixed_points,
+                                  sizeof(mixed_points) / sizeof(mixed_points[0]));
+    assert_antiderivative_matches("integral derivative of atanh(x / 2)",
+                                  atanh_term, x, bounded_points,
+                                  sizeof(bounded_points) / sizeof(bounded_points[0]));
+    assert_antiderivative_matches("integral derivative of erf(x - 0.25)",
+                                  erf_term, x, mixed_points,
+                                  sizeof(mixed_points) / sizeof(mixed_points[0]));
+    assert_antiderivative_matches("integral derivative of erfc(x + 0.75)",
+                                  erfc_term, x, mixed_points,
+                                  sizeof(mixed_points) / sizeof(mixed_points[0]));
+    assert_antiderivative_matches("integral derivative of Ei(x + 2)",
+                                  ei_term, x, positive_points,
+                                  sizeof(positive_points) / sizeof(positive_points[0]));
+    assert_antiderivative_matches("integral derivative of E1(x + 1.5)",
+                                  e1_term, x, positive_points,
+                                  sizeof(positive_points) / sizeof(positive_points[0]));
+
+    expr_free(e1_term);
+    expr_free(e1_arg);
+    expr_free(ei_term);
+    expr_free(ei_arg);
+    expr_free(erfc_term);
+    expr_free(erfc_arg);
+    expr_free(erf_term);
+    expr_free(erf_arg);
+    expr_free(atanh_term);
+    expr_free(atanh_arg);
+    expr_free(asinh_term);
+    expr_free(asinh_arg);
+    expr_free(acos_term);
+    expr_free(acos_arg);
+    expr_free(asin_term);
+    expr_free(asin_arg);
+    expr_free(atan_term);
+    expr_free(atan_arg);
+    expr_free(log10_term);
+    expr_free(log10_arg);
+    expr_free(log_term);
+    expr_free(log_arg);
+    expr_free(two_x);
+    expr_free(x);
+}
+
+static void test_integrate_affine_powers_and_remaining_inverse_families(void)
+{
+    static const double positive_points[] = { 0.3, 0.8, 1.4, 2.0 };
+    static const double asech_points[] = { 0.15, 0.3, 0.6, 0.9 };
+    static const double outer_points[] = { 1.3, 1.7, 2.1, 2.8 };
+    expr_t *x = test_expr_new_named_var_d(0.0, "x");
+    expr_t *two_x = test_expr_mul_d(x, 2.0);
+    expr_t *affine = test_expr_add_d(two_x, 1.0);
+    expr_t *reciprocal = test_expr_d_div(1.0, affine);
+    expr_t *affine_pow3 = test_expr_pow_d(affine, 3.0);
+    expr_t *affine_sqrt = expr_sqrt(affine);
+    expr_t *cosech_arg = test_expr_add_d(x, 2.0);
+    expr_t *cosech_term = expr_cosech(cosech_arg);
+    expr_t *asec_arg = test_expr_add_d(x, 2.5);
+    expr_t *asec_term = expr_asec(asec_arg);
+    expr_t *acosec_arg = test_expr_add_d(x, 2.25);
+    expr_t *acosec_term = expr_acosec(acosec_arg);
+    expr_t *acot_arg = test_expr_sub_d(x, 0.3);
+    expr_t *acot_term = expr_acot(acot_arg);
+    expr_t *acosh_arg = test_expr_add_d(x, 2.0);
+    expr_t *acosh_term = expr_acosh(acosh_arg);
+    expr_t *asech_arg = test_expr_div_d(x, 3.0);
+    expr_t *asech_term = expr_asech(asech_arg);
+    expr_t *acosech_arg = test_expr_add_d(x, 1.25);
+    expr_t *acosech_term = expr_acosech(acosech_arg);
+    expr_t *acoth_arg = test_expr_add_d(x, 2.4);
+    expr_t *acoth_term = expr_acoth(acoth_arg);
+
+    assert_antiderivative_matches("integral derivative of 1/(2*x + 1)",
+                                  reciprocal, x, positive_points,
+                                  sizeof(positive_points) / sizeof(positive_points[0]));
+    assert_antiderivative_matches("integral derivative of (2*x + 1)^3",
+                                  affine_pow3, x, positive_points,
+                                  sizeof(positive_points) / sizeof(positive_points[0]));
+    assert_antiderivative_matches("integral derivative of sqrt(2*x + 1)",
+                                  affine_sqrt, x, positive_points,
+                                  sizeof(positive_points) / sizeof(positive_points[0]));
+    assert_antiderivative_matches("integral derivative of cosech(x + 2)",
+                                  cosech_term, x, positive_points,
+                                  sizeof(positive_points) / sizeof(positive_points[0]));
+    assert_antiderivative_matches("integral derivative of asec(x + 2.5)",
+                                  asec_term, x, positive_points,
+                                  sizeof(positive_points) / sizeof(positive_points[0]));
+    assert_antiderivative_matches("integral derivative of acosec(x + 2.25)",
+                                  acosec_term, x, positive_points,
+                                  sizeof(positive_points) / sizeof(positive_points[0]));
+    assert_antiderivative_matches("integral derivative of acot(x - 0.3)",
+                                  acot_term, x, outer_points,
+                                  sizeof(outer_points) / sizeof(outer_points[0]));
+    assert_antiderivative_matches("integral derivative of acosh(x + 2)",
+                                  acosh_term, x, positive_points,
+                                  sizeof(positive_points) / sizeof(positive_points[0]));
+    assert_antiderivative_matches("integral derivative of asech(x / 3)",
+                                  asech_term, x, asech_points,
+                                  sizeof(asech_points) / sizeof(asech_points[0]));
+    assert_antiderivative_matches("integral derivative of acosech(x + 1.25)",
+                                  acosech_term, x, positive_points,
+                                  sizeof(positive_points) / sizeof(positive_points[0]));
+    assert_antiderivative_matches("integral derivative of acoth(x + 2.4)",
+                                  acoth_term, x, positive_points,
+                                  sizeof(positive_points) / sizeof(positive_points[0]));
+
+    expr_free(acoth_term);
+    expr_free(acoth_arg);
+    expr_free(acosech_term);
+    expr_free(acosech_arg);
+    expr_free(asech_term);
+    expr_free(asech_arg);
+    expr_free(acosh_term);
+    expr_free(acosh_arg);
+    expr_free(acot_term);
+    expr_free(acot_arg);
+    expr_free(acosec_term);
+    expr_free(acosec_arg);
+    expr_free(asec_term);
+    expr_free(asec_arg);
+    expr_free(cosech_term);
+    expr_free(cosech_arg);
+    expr_free(affine_sqrt);
+    expr_free(affine_pow3);
+    expr_free(reciprocal);
+    expr_free(affine);
+    expr_free(two_x);
+    expr_free(x);
+}
+
+static void test_integrate_affine_poly_times_specials(void)
+{
+    static const double points[] = { -0.6, -0.1, 0.4, 1.1 };
+    static const double bounded_points[] = { -0.6, -0.1, 0.4, 0.8 };
+    static const double positive_points[] = { 0.4, 0.9, 1.6, 2.5 };
+    static const double atanh_points[] = { -0.6, -0.1, 0.4, 0.7 };
+    static const double outer_points[] = { 1.3, 1.7, 2.1, 2.8 };
+    static const double asech_points[] = { 0.15, 0.3, 0.6, 0.9 };
+    expr_t *x = test_expr_new_named_var_d(0.0, "x");
+    expr_t *sin_x = expr_sin(x);
+    expr_t *cos_x = expr_cos(x);
+    expr_t *exp_x = expr_exp(x);
+    expr_t *tan_x = expr_tan(x);
+    expr_t *sec_x = expr_sec(x);
+    expr_t *cosec_x = expr_cosec(x);
+    expr_t *cot_x = expr_cot(x);
+    expr_t *sinh_x = expr_sinh(x);
+    expr_t *cosh_x = expr_cosh(x);
+    expr_t *tanh_x = expr_tanh(x);
+    expr_t *sech_x = expr_sech(x);
+    expr_t *cosech_x = expr_cosech(x);
+    expr_t *coth_x = expr_coth(x);
+    expr_t *log_x = expr_log(x);
+    expr_t *atan_x = expr_atan(x);
+    expr_t *asin_x = expr_asin(x);
+    expr_t *acos_x = expr_acos(x);
+    expr_t *acot_x = expr_acot(x);
+    expr_t *asinh_x = expr_asinh(x);
+    expr_t *atanh_x = expr_atanh(x);
+    expr_t *x_plus_two = test_expr_add_d(x, 2.0);
+    expr_t *asec_x_plus_two = expr_asec(x_plus_two);
+    expr_t *acosec_x_plus_two = expr_acosec(x_plus_two);
+    expr_t *acosh_x_plus_two = expr_acosh(x_plus_two);
+    expr_t *x_over_three = test_expr_div_d(x, 3.0);
+    expr_t *asech_x_over_three = expr_asech(x_over_three);
+    expr_t *acosech_x_plus_two = expr_acosech(x_plus_two);
+    expr_t *acoth_x_plus_two = expr_acoth(x_plus_two);
+    expr_t *x_sin_x = expr_mul(x, sin_x);
+    expr_t *x_cos_x = expr_mul(x, cos_x);
+    expr_t *x_exp_x = expr_mul(x, exp_x);
+    expr_t *x_sinh_x = expr_mul(x, sinh_x);
+    expr_t *x_cosh_x = expr_mul(x, cosh_x);
+    expr_t *x_log_x = expr_mul(x, log_x);
+    expr_t *x_atan_x = expr_mul(x, atan_x);
+    expr_t *x_asin_x = expr_mul(x, asin_x);
+    expr_t *x_acos_x = expr_mul(x, acos_x);
+    expr_t *shifted_asec_product = expr_mul(x_plus_two, asec_x_plus_two);
+    expr_t *shifted_acosec_product = expr_mul(x_plus_two, acosec_x_plus_two);
+    expr_t *x_acot_x = expr_mul(x, acot_x);
+    expr_t *x_asinh_x = expr_mul(x, asinh_x);
+    expr_t *x_atanh_x = expr_mul(x, atanh_x);
+    expr_t *shifted_acosh_product = expr_mul(x_plus_two, acosh_x_plus_two);
+    expr_t *scaled_asech_product = expr_mul(x_over_three, asech_x_over_three);
+    expr_t *shifted_acosech_product = expr_mul(x_plus_two, acosech_x_plus_two);
+    expr_t *shifted_acoth_product = expr_mul(x_plus_two, acoth_x_plus_two);
+    expr_t *erf_x = expr_erf(x);
+    expr_t *erfc_x = expr_erfc(x);
+    expr_t *x_erf_x = expr_mul(x, erf_x);
+    expr_t *x_erfc_x = expr_mul(x, erfc_x);
+    expr_t *erf_x_plus_two = expr_erf(x_plus_two);
+    expr_t *erfc_x_plus_two = expr_erfc(x_plus_two);
+    expr_t *shifted_erf_product = expr_mul(x_plus_two, erf_x_plus_two);
+    expr_t *shifted_erfc_product = expr_mul(x_plus_two, erfc_x_plus_two);
+    expr_t *normal_pdf_x = expr_normal_pdf(x);
+    expr_t *normal_cdf_x = expr_normal_cdf(x);
+    expr_t *x_normal_pdf_x = expr_mul(x, normal_pdf_x);
+    expr_t *x_normal_cdf_x = expr_mul(x, normal_cdf_x);
+    expr_t *normal_pdf_x_plus_two = expr_normal_pdf(x_plus_two);
+    expr_t *normal_cdf_x_plus_two = expr_normal_cdf(x_plus_two);
+    expr_t *normal_logpdf_x = expr_normal_logpdf(x);
+    expr_t *normal_logpdf_x_plus_two = expr_normal_logpdf(x_plus_two);
+    expr_t *shifted_normal_pdf_product = expr_mul(x_plus_two, normal_pdf_x_plus_two);
+    expr_t *shifted_normal_cdf_product = expr_mul(x_plus_two, normal_cdf_x_plus_two);
+    expr_t *x_normal_logpdf_x = expr_mul(x, normal_logpdf_x);
+    expr_t *shifted_normal_logpdf_product = expr_mul(x_plus_two, normal_logpdf_x_plus_two);
+    expr_t *ei_x_plus_two = expr_ei(x_plus_two);
+    expr_t *e1_x_plus_two = expr_e1(x_plus_two);
+    expr_t *shifted_ei_product = expr_mul(x_plus_two, ei_x_plus_two);
+    expr_t *shifted_e1_product = expr_mul(x_plus_two, e1_x_plus_two);
+    expr_t *exp_x_sin_x = expr_mul(exp_x, sin_x);
+    expr_t *exp_x_cos_x = expr_mul(exp_x, cos_x);
+    expr_t *exp_x_sinh_x = expr_mul(exp_x, sinh_x);
+    expr_t *exp_x_cosh_x = expr_mul(exp_x, cosh_x);
+    expr_t *sin_x_sq = expr_mul(sin_x, sin_x);
+    expr_t *cos_x_sq = expr_mul(cos_x, cos_x);
+    expr_t *tan_x_sq = expr_mul(tan_x, tan_x);
+    expr_t *sec_x_sq = expr_mul(sec_x, sec_x);
+    expr_t *cosec_x_sq = expr_mul(cosec_x, cosec_x);
+    expr_t *sec_x_tan_x = expr_mul(sec_x, tan_x);
+    expr_t *cosec_x_cot_x = expr_mul(cosec_x, cot_x);
+    expr_t *sin_x_cos_x = expr_mul(sin_x, cos_x);
+    expr_t *sinh_x_sq = expr_mul(sinh_x, sinh_x);
+    expr_t *cosh_x_sq = expr_mul(cosh_x, cosh_x);
+    expr_t *tanh_x_sq = expr_mul(tanh_x, tanh_x);
+    expr_t *sech_x_sq = expr_mul(sech_x, sech_x);
+    expr_t *cosech_x_sq = expr_mul(cosech_x, cosech_x);
+    expr_t *coth_x_sq = expr_mul(coth_x, coth_x);
+    expr_t *sech_x_tanh_x = expr_mul(sech_x, tanh_x);
+    expr_t *cosech_x_coth_x = expr_mul(cosech_x, coth_x);
+    expr_t *sinh_x_cosh_x = expr_mul(sinh_x, cosh_x);
+    expr_t *x_plus_one = test_expr_add_d(x, 1.0);
+    expr_t *x_over_x_plus_one = expr_div(x, x_plus_one);
+
+    assert_antiderivative_matches("integral derivative of x*sin(x)",
+                                  x_sin_x, x, points, sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of x*cos(x)",
+                                  x_cos_x, x, points, sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of x*exp(x)",
+                                  x_exp_x, x, points, sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of x*sinh(x)",
+                                  x_sinh_x, x, points, sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of x*cosh(x)",
+                                  x_cosh_x, x, points, sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of x*log(x)",
+                                  x_log_x, x, positive_points,
+                                  sizeof(positive_points) / sizeof(positive_points[0]));
+    assert_antiderivative_matches("integral derivative of x*atan(x)",
+                                  x_atan_x, x, points, sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of x*asin(x)",
+                                  x_asin_x, x, bounded_points,
+                                  sizeof(bounded_points) / sizeof(bounded_points[0]));
+    assert_antiderivative_matches("integral derivative of x*acos(x)",
+                                  x_acos_x, x, bounded_points,
+                                  sizeof(bounded_points) / sizeof(bounded_points[0]));
+    assert_antiderivative_matches("integral derivative of (x + 2)*asec(x + 2)",
+                                  shifted_asec_product, x, positive_points,
+                                  sizeof(positive_points) / sizeof(positive_points[0]));
+    assert_antiderivative_matches("integral derivative of (x + 2)*acosec(x + 2)",
+                                  shifted_acosec_product, x, positive_points,
+                                  sizeof(positive_points) / sizeof(positive_points[0]));
+    assert_antiderivative_matches("integral derivative of x*acot(x)",
+                                  x_acot_x, x, outer_points,
+                                  sizeof(outer_points) / sizeof(outer_points[0]));
+    assert_antiderivative_matches("integral derivative of x*asinh(x)",
+                                  x_asinh_x, x, points, sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of x*atanh(x)",
+                                  x_atanh_x, x, atanh_points,
+                                  sizeof(atanh_points) / sizeof(atanh_points[0]));
+    assert_antiderivative_matches("integral derivative of (x + 2)*acosh(x + 2)",
+                                  shifted_acosh_product, x, positive_points,
+                                  sizeof(positive_points) / sizeof(positive_points[0]));
+    assert_antiderivative_matches("integral derivative of (x / 3)*asech(x / 3)",
+                                  scaled_asech_product, x, asech_points,
+                                  sizeof(asech_points) / sizeof(asech_points[0]));
+    assert_antiderivative_matches("integral derivative of (x + 2)*acosech(x + 2)",
+                                  shifted_acosech_product, x, positive_points,
+                                  sizeof(positive_points) / sizeof(positive_points[0]));
+    assert_antiderivative_matches("integral derivative of (x + 2)*acoth(x + 2)",
+                                  shifted_acoth_product, x, positive_points,
+                                  sizeof(positive_points) / sizeof(positive_points[0]));
+    assert_antiderivative_matches("integral derivative of x*erf(x)",
+                                  x_erf_x, x, points, sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of x*erfc(x)",
+                                  x_erfc_x, x, points, sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of (x + 2)*erf(x + 2)",
+                                  shifted_erf_product, x, points, sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of (x + 2)*erfc(x + 2)",
+                                  shifted_erfc_product, x, points, sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of x*normal_pdf(x)",
+                                  x_normal_pdf_x, x, points, sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of x*normal_cdf(x)",
+                                  x_normal_cdf_x, x, points, sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of (x + 2)*normal_pdf(x + 2)",
+                                  shifted_normal_pdf_product, x, points,
+                                  sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of (x + 2)*normal_cdf(x + 2)",
+                                  shifted_normal_cdf_product, x, points,
+                                  sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of x*normal_logpdf(x)",
+                                  x_normal_logpdf_x, x, points, sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of (x + 2)*normal_logpdf(x + 2)",
+                                  shifted_normal_logpdf_product, x, points,
+                                  sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of (x + 2)*Ei(x + 2)",
+                                  shifted_ei_product, x, positive_points,
+                                  sizeof(positive_points) / sizeof(positive_points[0]));
+    assert_antiderivative_matches("integral derivative of (x + 2)*E1(x + 2)",
+                                  shifted_e1_product, x, positive_points,
+                                  sizeof(positive_points) / sizeof(positive_points[0]));
+    assert_antiderivative_matches("integral derivative of exp(x)*sin(x)",
+                                  exp_x_sin_x, x, points, sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of exp(x)*cos(x)",
+                                  exp_x_cos_x, x, points, sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of exp(x)*sinh(x)",
+                                  exp_x_sinh_x, x, points, sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of exp(x)*cosh(x)",
+                                  exp_x_cosh_x, x, points, sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of sin(x)^2",
+                                  sin_x_sq, x, points, sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of cos(x)^2",
+                                  cos_x_sq, x, points, sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of tan(x)^2",
+                                  tan_x_sq, x, points, sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of sec(x)^2",
+                                  sec_x_sq, x, points, sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of cosec(x)^2",
+                                  cosec_x_sq, x, points, sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of sec(x)*tan(x)",
+                                  sec_x_tan_x, x, points, sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of cosec(x)*cot(x)",
+                                  cosec_x_cot_x, x, points, sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of sin(x)*cos(x)",
+                                  sin_x_cos_x, x, points, sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of sinh(x)^2",
+                                  sinh_x_sq, x, points, sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of cosh(x)^2",
+                                  cosh_x_sq, x, points, sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of tanh(x)^2",
+                                  tanh_x_sq, x, points, sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of sech(x)^2",
+                                  sech_x_sq, x, points, sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of cosech(x)^2",
+                                  cosech_x_sq, x, points, sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of coth(x)^2",
+                                  coth_x_sq, x, positive_points,
+                                  sizeof(positive_points) / sizeof(positive_points[0]));
+    assert_antiderivative_matches("integral derivative of sech(x)*tanh(x)",
+                                  sech_x_tanh_x, x, points, sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of cosech(x)*coth(x)",
+                                  cosech_x_coth_x, x, points, sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of sinh(x)*cosh(x)",
+                                  sinh_x_cosh_x, x, points, sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of x/(x + 1)",
+                                  x_over_x_plus_one, x, positive_points,
+                                  sizeof(positive_points) / sizeof(positive_points[0]));
+
+    expr_free(x_over_x_plus_one);
+    expr_free(x_plus_one);
+    expr_free(sinh_x_cosh_x);
+    expr_free(coth_x_sq);
+    expr_free(cosech_x_sq);
+    expr_free(sech_x_sq);
+    expr_free(tanh_x_sq);
+    expr_free(cosh_x_sq);
+    expr_free(sinh_x_sq);
+    expr_free(sin_x_cos_x);
+    expr_free(cosec_x_sq);
+    expr_free(sec_x_sq);
+    expr_free(tan_x_sq);
+    expr_free(cosec_x_cot_x);
+    expr_free(sec_x_tan_x);
+    expr_free(cos_x_sq);
+    expr_free(sin_x_sq);
+    expr_free(exp_x_cosh_x);
+    expr_free(exp_x_sinh_x);
+    expr_free(exp_x_cos_x);
+    expr_free(exp_x_sin_x);
+    expr_free(shifted_e1_product);
+    expr_free(shifted_ei_product);
+    expr_free(e1_x_plus_two);
+    expr_free(ei_x_plus_two);
+    expr_free(shifted_erfc_product);
+    expr_free(shifted_erf_product);
+    expr_free(erfc_x_plus_two);
+    expr_free(erf_x_plus_two);
+    expr_free(shifted_normal_cdf_product);
+    expr_free(shifted_normal_pdf_product);
+    expr_free(shifted_normal_logpdf_product);
+    expr_free(x_normal_logpdf_x);
+    expr_free(normal_logpdf_x_plus_two);
+    expr_free(normal_logpdf_x);
+    expr_free(normal_cdf_x_plus_two);
+    expr_free(normal_pdf_x_plus_two);
+    expr_free(x_normal_cdf_x);
+    expr_free(x_normal_pdf_x);
+    expr_free(normal_cdf_x);
+    expr_free(normal_pdf_x);
+    expr_free(x_erfc_x);
+    expr_free(x_erf_x);
+    expr_free(erfc_x);
+    expr_free(erf_x);
+    expr_free(shifted_acoth_product);
+    expr_free(shifted_acosech_product);
+    expr_free(scaled_asech_product);
+    expr_free(shifted_acosh_product);
+    expr_free(x_atanh_x);
+    expr_free(x_asinh_x);
+    expr_free(x_acot_x);
+    expr_free(shifted_acosec_product);
+    expr_free(shifted_asec_product);
+    expr_free(x_acos_x);
+    expr_free(x_asin_x);
+    expr_free(x_atan_x);
+    expr_free(x_log_x);
+    expr_free(x_cosh_x);
+    expr_free(x_sinh_x);
+    expr_free(x_exp_x);
+    expr_free(x_cos_x);
+    expr_free(x_sin_x);
+    expr_free(acosh_x_plus_two);
+    expr_free(x_plus_two);
+    expr_free(acoth_x_plus_two);
+    expr_free(acosech_x_plus_two);
+    expr_free(asech_x_over_three);
+    expr_free(x_over_three);
+    expr_free(atanh_x);
+    expr_free(asinh_x);
+    expr_free(acot_x);
+    expr_free(acosec_x_plus_two);
+    expr_free(asec_x_plus_two);
+    expr_free(acos_x);
+    expr_free(asin_x);
+    expr_free(atan_x);
+    expr_free(log_x);
+    expr_free(coth_x);
+    expr_free(cosech_x);
+    expr_free(sech_x);
+    expr_free(tanh_x);
+    expr_free(cot_x);
+    expr_free(cosh_x);
+    expr_free(sinh_x);
+    expr_free(cosec_x);
+    expr_free(sec_x);
+    expr_free(tan_x);
+    expr_free(exp_x);
+    expr_free(cos_x);
+    expr_free(sin_x);
+    expr_free(x);
+}
+
 static void test_integrate_other_variable_as_constant(void)
 {
     static const double points[] = { -1.0, 0.0, 2.0 };
@@ -186,18 +787,93 @@ static void test_integrate_definite_symbolic_bounds(void)
     expr_free(x);
 }
 
+static void test_integrate_more_by_parts(void)
+{
+    static const double points[] = { 0.25, 0.8, 1.5, 3.0 };
+    static const double outer_points[] = { 1.3, 1.8, 2.4, 3.5 };
+    expr_t *x = test_expr_new_named_var_d(0.0, "x");
+    expr_t *x_sq = test_expr_pow_d(x, 2.0);
+    expr_t *x_sq_atan_x = x_sq ? expr_mul(x_sq, expr_atan(x)) : NULL;
+    expr_t *x_sq_acot_x = x_sq ? expr_mul(x_sq, expr_acot(x)) : NULL;
+
+    assert_antiderivative_matches("integral derivative of x^2*atan(x)",
+                                  x_sq_atan_x, x, points,
+                                  sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of x^2*acot(x)",
+                                  x_sq_acot_x, x, outer_points,
+                                  sizeof(outer_points) / sizeof(outer_points[0]));
+
+    expr_free(x_sq_acot_x);
+    expr_free(x_sq_atan_x);
+    expr_free(x_sq);
+    expr_free(x);
+}
+
+static void test_integrate_partial_fractions(void)
+{
+    static const double points[] = { -2.5, -0.5, 0.5, 1.5 };
+    static const double positive_points[] = { 0.25, 0.75, 1.5, 2.5 };
+    number_t three_num = num_create_from_long(3);
+    expr_t *x = test_expr_new_named_var_d(0.0, "x");
+    expr_t *x_plus_one_a = expr_add_num(x, &NUM_ONE);
+    expr_t *x_plus_two_a = expr_add_num(x, &NUM_TWO);
+    expr_t *denom_distinct_a = (x_plus_one_a && x_plus_two_a) ? expr_mul(x_plus_one_a, x_plus_two_a)
+                                                              : NULL;
+    expr_t *recip_distinct = denom_distinct_a ? expr_num_div(&NUM_ONE, denom_distinct_a) : NULL;
+
+    expr_t *two_x = expr_mul_num(x, &NUM_TWO);
+    expr_t *three = expr_new_const(three_num);
+    expr_t *linear_numer = (two_x && three) ? expr_add(two_x, three) : NULL;
+    expr_t *x_plus_one_b = expr_add_num(x, &NUM_ONE);
+    expr_t *x_plus_two_b = expr_add_num(x, &NUM_TWO);
+    expr_t *denom_distinct_b = (x_plus_one_b && x_plus_two_b) ? expr_mul(x_plus_one_b, x_plus_two_b)
+                                                              : NULL;
+    expr_t *linear_over_distinct = (linear_numer && denom_distinct_b) ? expr_div(linear_numer, denom_distinct_b)
+                                                                       : NULL;
+
+    expr_t *x_sq_den = test_expr_pow_d(x, 2.0);
+    expr_t *x_sq_minus_one = x_sq_den ? expr_sub_num(x_sq_den, &NUM_ONE) : NULL;
+    expr_t *quadratic_recip = x_sq_minus_one ? expr_num_div(&NUM_ONE, x_sq_minus_one) : NULL;
+
+    assert_antiderivative_matches("integral derivative of 1/((x + 1)(x + 2))",
+                                  recip_distinct, x, points, sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of (2x + 3)/((x + 1)(x + 2))",
+                                  linear_over_distinct, x, points,
+                                  sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of 1/(x^2 - 1)",
+                                  quadratic_recip, x, positive_points,
+                                  sizeof(positive_points) / sizeof(positive_points[0]));
+
+    expr_free(quadratic_recip);
+    expr_free(x_sq_minus_one);
+    expr_free(x_sq_den);
+    expr_free(linear_over_distinct);
+    expr_free(denom_distinct_b);
+    expr_free(x_plus_two_b);
+    expr_free(x_plus_one_b);
+    expr_free(linear_numer);
+    expr_free(recip_distinct);
+    expr_free(denom_distinct_a);
+    expr_free(x_plus_two_a);
+    expr_free(x_plus_one_a);
+    expr_free(three);
+    expr_free(two_x);
+    expr_free(x);
+    num_destroy(&three_num);
+}
+
 static void test_integrate_unsupported_product_returns_null(void)
 {
     expr_t *x = test_expr_new_named_var_d(0.5, "x");
-    expr_t *sin_x = expr_sin(x);
-    expr_t *x_sin_x = expr_mul(x, sin_x);
-    expr_t *anti = expr_integrate(x_sin_x, x);
+    expr_t *w0_x = expr_lambert_w0(x);
+    expr_t *x_w0_x = expr_mul(x, w0_x);
+    expr_t *anti = expr_integrate(x_w0_x, x);
 
     ASSERT_TRUE(anti == NULL);
 
     expr_free(anti);
-    expr_free(x_sin_x);
-    expr_free(sin_x);
+    expr_free(x_w0_x);
+    expr_free(w0_x);
     expr_free(x);
 }
 
@@ -207,7 +883,13 @@ void test_symbolic_integration(void)
     TEST_RUN_SUBTEST(test_integrate_reciprocal_and_log, NULL);
     TEST_RUN_SUBTEST(test_integrate_affine_elementary, NULL);
     TEST_RUN_SUBTEST(test_integrate_affine_tangent, NULL);
+    TEST_RUN_SUBTEST(test_integrate_affine_more_trig_and_stats, NULL);
+    TEST_RUN_SUBTEST(test_integrate_affine_logs_inverse_and_specials, NULL);
+    TEST_RUN_SUBTEST(test_integrate_affine_powers_and_remaining_inverse_families, NULL);
+    TEST_RUN_SUBTEST(test_integrate_affine_poly_times_specials, NULL);
     TEST_RUN_SUBTEST(test_integrate_other_variable_as_constant, NULL);
     TEST_RUN_SUBTEST(test_integrate_definite_symbolic_bounds, NULL);
+    TEST_RUN_SUBTEST(test_integrate_more_by_parts, NULL);
+    TEST_RUN_SUBTEST(test_integrate_partial_fractions, NULL);
     TEST_RUN_SUBTEST(test_integrate_unsupported_product_returns_null, NULL);
 }
