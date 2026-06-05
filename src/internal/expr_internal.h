@@ -91,7 +91,8 @@ typedef enum {
     EXPR_PATTERN_UNARY_NORMAL_CDF,
     EXPR_PATTERN_UNARY_NORMAL_LOGPDF,
     EXPR_PATTERN_UNARY_EI,
-    EXPR_PATTERN_UNARY_E1
+    EXPR_PATTERN_UNARY_E1,
+    EXPR_PATTERN_UNARY_COUNT
 } expr_pattern_unary_affine_kind_t;
 
 bool expr_match_unary_affine_kind(const expr_t *expr,

@@ -490,34 +490,58 @@ static expr_t *build_quadratic_acot_term(const expr_t *u, expr_t *inverse_u, con
     return build_quadratic_atan_acot_term(u, inverse_u, u_sq, poly_coeff, false);
 }
 
-static const inverse_affine_rule_t inverse_affine_rules[] = {
-    { EXPR_PATTERN_UNARY_ASIN,        expr_asin,        build_base_asin_term,        build_linear_asin_term,              NULL },
-    { EXPR_PATTERN_UNARY_ACOS,        expr_acos,        build_base_acos_term,        build_linear_acos_term,              NULL },
-    { EXPR_PATTERN_UNARY_ATAN,        expr_atan,        build_base_atan_term,        build_linear_atan_term,              build_quadratic_atan_term },
-    { EXPR_PATTERN_UNARY_ASEC,        expr_asec,        build_base_asec_term,        build_linear_asec_term,              NULL },
-    { EXPR_PATTERN_UNARY_ACOSEC,      expr_acosec,      build_base_acosec_term,      build_linear_acosec_term,            NULL },
-    { EXPR_PATTERN_UNARY_ACOT,        expr_acot,        build_base_acot_term,        build_linear_acot_term,              build_quadratic_acot_term },
-    { EXPR_PATTERN_UNARY_ASINH,       expr_asinh,       build_base_asinh_term,       build_linear_asinh_term,             NULL },
-    { EXPR_PATTERN_UNARY_ACOSH,       expr_acosh,       build_base_acosh_term,       build_linear_acosh_term,             NULL },
-    { EXPR_PATTERN_UNARY_ATANH,       expr_atanh,       build_base_atanh_term,       build_linear_atanh_term,             NULL },
-    { EXPR_PATTERN_UNARY_ASECH,       expr_asech,       build_base_asech_term,       build_linear_asech_term,             NULL },
-    { EXPR_PATTERN_UNARY_ACOSECH,     expr_acosech,     build_base_acosech_term,     build_linear_acosech_term,           NULL },
-    { EXPR_PATTERN_UNARY_ACOTH,       expr_acoth,       build_base_acoth_term,       build_linear_acoth_term,             NULL },
-    { EXPR_PATTERN_UNARY_ERF,         expr_erf,         build_base_erf_term,         build_linear_erf_term,               NULL },
-    { EXPR_PATTERN_UNARY_ERFC,        expr_erfc,        build_base_erfc_term,        build_linear_erfc_term,              NULL },
-    { EXPR_PATTERN_UNARY_NORMAL_PDF,  expr_normal_cdf,  build_base_normal_pdf_term,  build_linear_normal_pdf_term,         NULL },
-    { EXPR_PATTERN_UNARY_NORMAL_CDF,  expr_normal_cdf,  build_base_normal_cdf_term,  build_linear_normal_cdf_term,         NULL },
-    { EXPR_PATTERN_UNARY_EI,          expr_ei,          build_base_ei_term,          build_linear_ei_term,                NULL },
-    { EXPR_PATTERN_UNARY_E1,          expr_e1,          build_base_e1_term,          build_linear_e1_term,                NULL }
+#define INVERSE_AFFINE_RULE_FIRST EXPR_PATTERN_UNARY_ASIN
+#define INVERSE_AFFINE_RULE_LAST EXPR_PATTERN_UNARY_E1
+#define INVERSE_AFFINE_RULE_COUNT (INVERSE_AFFINE_RULE_LAST - INVERSE_AFFINE_RULE_FIRST + 1)
+#define INVERSE_AFFINE_RULE_INDEX(kind) ((kind) - INVERSE_AFFINE_RULE_FIRST)
+
+static const inverse_affine_rule_t inverse_affine_rules[INVERSE_AFFINE_RULE_COUNT] = {
+    [INVERSE_AFFINE_RULE_INDEX(EXPR_PATTERN_UNARY_ASIN)] =
+        { EXPR_PATTERN_UNARY_ASIN,        expr_asin,        build_base_asin_term,        build_linear_asin_term,              NULL },
+    [INVERSE_AFFINE_RULE_INDEX(EXPR_PATTERN_UNARY_ACOS)] =
+        { EXPR_PATTERN_UNARY_ACOS,        expr_acos,        build_base_acos_term,        build_linear_acos_term,              NULL },
+    [INVERSE_AFFINE_RULE_INDEX(EXPR_PATTERN_UNARY_ATAN)] =
+        { EXPR_PATTERN_UNARY_ATAN,        expr_atan,        build_base_atan_term,        build_linear_atan_term,              build_quadratic_atan_term },
+    [INVERSE_AFFINE_RULE_INDEX(EXPR_PATTERN_UNARY_ASEC)] =
+        { EXPR_PATTERN_UNARY_ASEC,        expr_asec,        build_base_asec_term,        build_linear_asec_term,              NULL },
+    [INVERSE_AFFINE_RULE_INDEX(EXPR_PATTERN_UNARY_ACOSEC)] =
+        { EXPR_PATTERN_UNARY_ACOSEC,      expr_acosec,      build_base_acosec_term,      build_linear_acosec_term,            NULL },
+    [INVERSE_AFFINE_RULE_INDEX(EXPR_PATTERN_UNARY_ACOT)] =
+        { EXPR_PATTERN_UNARY_ACOT,        expr_acot,        build_base_acot_term,        build_linear_acot_term,              build_quadratic_acot_term },
+    [INVERSE_AFFINE_RULE_INDEX(EXPR_PATTERN_UNARY_ASINH)] =
+        { EXPR_PATTERN_UNARY_ASINH,       expr_asinh,       build_base_asinh_term,       build_linear_asinh_term,             NULL },
+    [INVERSE_AFFINE_RULE_INDEX(EXPR_PATTERN_UNARY_ACOSH)] =
+        { EXPR_PATTERN_UNARY_ACOSH,       expr_acosh,       build_base_acosh_term,       build_linear_acosh_term,             NULL },
+    [INVERSE_AFFINE_RULE_INDEX(EXPR_PATTERN_UNARY_ATANH)] =
+        { EXPR_PATTERN_UNARY_ATANH,       expr_atanh,       build_base_atanh_term,       build_linear_atanh_term,             NULL },
+    [INVERSE_AFFINE_RULE_INDEX(EXPR_PATTERN_UNARY_ASECH)] =
+        { EXPR_PATTERN_UNARY_ASECH,       expr_asech,       build_base_asech_term,       build_linear_asech_term,             NULL },
+    [INVERSE_AFFINE_RULE_INDEX(EXPR_PATTERN_UNARY_ACOSECH)] =
+        { EXPR_PATTERN_UNARY_ACOSECH,     expr_acosech,     build_base_acosech_term,     build_linear_acosech_term,           NULL },
+    [INVERSE_AFFINE_RULE_INDEX(EXPR_PATTERN_UNARY_ACOTH)] =
+        { EXPR_PATTERN_UNARY_ACOTH,       expr_acoth,       build_base_acoth_term,       build_linear_acoth_term,             NULL },
+    [INVERSE_AFFINE_RULE_INDEX(EXPR_PATTERN_UNARY_ERF)] =
+        { EXPR_PATTERN_UNARY_ERF,         expr_erf,         build_base_erf_term,         build_linear_erf_term,               NULL },
+    [INVERSE_AFFINE_RULE_INDEX(EXPR_PATTERN_UNARY_ERFC)] =
+        { EXPR_PATTERN_UNARY_ERFC,        expr_erfc,        build_base_erfc_term,        build_linear_erfc_term,              NULL },
+    [INVERSE_AFFINE_RULE_INDEX(EXPR_PATTERN_UNARY_NORMAL_PDF)] =
+        { EXPR_PATTERN_UNARY_NORMAL_PDF,  expr_normal_cdf,  build_base_normal_pdf_term,  build_linear_normal_pdf_term,         NULL },
+    [INVERSE_AFFINE_RULE_INDEX(EXPR_PATTERN_UNARY_NORMAL_CDF)] =
+        { EXPR_PATTERN_UNARY_NORMAL_CDF,  expr_normal_cdf,  build_base_normal_cdf_term,  build_linear_normal_cdf_term,         NULL },
+    [INVERSE_AFFINE_RULE_INDEX(EXPR_PATTERN_UNARY_EI)] =
+        { EXPR_PATTERN_UNARY_EI,          expr_ei,          build_base_ei_term,          build_linear_ei_term,                NULL },
+    [INVERSE_AFFINE_RULE_INDEX(EXPR_PATTERN_UNARY_E1)] =
+        { EXPR_PATTERN_UNARY_E1,          expr_e1,          build_base_e1_term,          build_linear_e1_term,                NULL }
 };
 
 static const inverse_affine_rule_t *find_inverse_affine_rule(expr_pattern_unary_affine_kind_t kind)
 {
-    for (size_t i = 0; i < sizeof(inverse_affine_rules) / sizeof(inverse_affine_rules[0]); ++i) {
-        if (inverse_affine_rules[i].kind == kind)
-            return &inverse_affine_rules[i];
-    }
-    return NULL;
+    const inverse_affine_rule_t *rule;
+
+    if (kind < INVERSE_AFFINE_RULE_FIRST || kind > INVERSE_AFFINE_RULE_LAST)
+        return NULL;
+    rule = &inverse_affine_rules[INVERSE_AFFINE_RULE_INDEX(kind)];
+    return rule->build_base_term ? rule : NULL;
 }
 
 expr_t *integrate_linear_poly_times_inverse_affine(

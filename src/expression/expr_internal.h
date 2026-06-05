@@ -133,7 +133,8 @@ typedef enum {
     EXPR_KIND_BIT_NOT,
     EXPR_KIND_SHL,
     EXPR_KIND_SHR,
-    EXPR_KIND_FACTORS
+    EXPR_KIND_FACTORS,
+    EXPR_KIND_COUNT
 } expr_op_kind_t;
 
 typedef enum expr_diff_kind {
@@ -558,6 +559,7 @@ bool expr_ops_is_lambert(const expr_ops_t *ops);
 bool expr_ops_is_floor_or_ceil(const expr_ops_t *ops);
 bool expr_ops_are_direct_inverse_pair(const expr_ops_t *outer,
                                       const expr_ops_t *inner);
+const expr_ops_t *expr_ops_reciprocal_unary(const expr_ops_t *ops);
 
 expr_t *expr_integrate_dispatch_primitive(const expr_t *expr, const expr_t *wrt);
 bool expr_ops_has_inverse_unary_simplify_rule(const expr_ops_t *ops);

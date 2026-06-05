@@ -1064,24 +1064,8 @@ expr_binding_expr_t *binding_expr_try_simplify_basic_quotient(expr_binding_expr_
 
 expr_binding_expr_t *binding_expr_try_simplify_reciprocal_unary(expr_binding_expr_t *expr)
 {
-    static const struct {
-        const expr_ops_t *denominator_ops;
-        const expr_ops_t *replacement_ops;
-    } rules[] = {
-        { &ops_cos,    &ops_sec    },
-        { &ops_sin,    &ops_cosec  },
-        { &ops_tan,    &ops_cot    },
-        { &ops_sec,    &ops_cos    },
-        { &ops_cosec,  &ops_sin    },
-        { &ops_cot,    &ops_tan    },
-        { &ops_cosh,   &ops_sech   },
-        { &ops_sinh,   &ops_cosech },
-        { &ops_tanh,   &ops_coth   },
-        { &ops_sech,   &ops_cosh   },
-        { &ops_cosech, &ops_sinh   },
-        { &ops_coth,   &ops_tanh   }
-    };
     expr_binding_expr_t *denominator;
+    const expr_ops_t *replacement_ops;
 
     if (!expr ||
         expr->kind != EXPR_BINDING_EXPR_DIV ||
@@ -1089,18 +1073,19 @@ expr_binding_expr_t *binding_expr_try_simplify_reciprocal_unary(expr_binding_exp
         return expr;
 
     denominator = expr->u.binary.right;
-    if (!denominator || denominator->kind != EXPR_BINDING_EXPR_UNARY_OP)
+    if (!denominator ||
+        denominator->kind != EXPR_BINDING_EXPR_UNARY_OP ||
+        !denominator->u.unary_op.ops)
         return expr;
 
-    for (size_t i = 0u; i < sizeof(rules) / sizeof(rules[0]); ++i) {
-        if (denominator->u.unary_op.ops == rules[i].denominator_ops) {
-            expr_binding_expr_t *out = expr_binding_expr_new_unary_op(
-                rules[i].replacement_ops,
-                expr_binding_expr_clone(denominator->u.unary_op.child));
+    replacement_ops = expr_ops_reciprocal_unary(denominator->u.unary_op.ops);
+    if (replacement_ops) {
+        expr_binding_expr_t *out = expr_binding_expr_new_unary_op(
+            replacement_ops,
+            expr_binding_expr_clone(denominator->u.unary_op.child));
 
-            return binding_expr_fold_to_expr_owned(expr,
-                                                   expr_binding_expr_simplify(out));
-        }
+        return binding_expr_fold_to_expr_owned(expr,
+                                               expr_binding_expr_simplify(out));
     }
 
     return expr;
