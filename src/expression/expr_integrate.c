@@ -20,6 +20,22 @@ static expr_t *integrate_same_affine_special_product(const expr_t *expr, const e
 static __attribute__((unused)) expr_t *integrate_by_exact_substitution(const expr_t *expr, const expr_t *wrt);
 static expr_t *clone_expr_local(const expr_t *expr);
 
+static expr_t *div_number_owned_by_product(expr_t *expr, number_t left, number_t right)
+{
+    number_t denom = num_mul(left, right);
+
+    return div_number_owned_consuming(expr, &denom);
+}
+
+static expr_t *div_number_owned_by_long_product(expr_t *expr, long left, number_t right)
+{
+    number_t factor = num_create_from_long(left);
+    expr_t *out = div_number_owned_by_product(expr, factor, right);
+
+    num_destroy(&factor);
+    return out;
+}
+
 typedef struct {
     expr_t *base;
     number_t exponent;
@@ -578,7 +594,7 @@ static expr_t *integrate_power_of_affine(const expr_t *base,
         expr_t *log_base = expr_log(base);
 
         num_destroy(&constant);
-        return div_number_owned(log_base, coeff);
+        return div_number_owned_consuming(log_base, &coeff);
     }
 
     next_exponent = num_add(exponent, NUM_ONE);
@@ -590,7 +606,7 @@ static expr_t *integrate_power_of_affine(const expr_t *base,
     }
 
     power = expr_pow(base, &next_exponent);
-    out = power ? div_number_owned(power, num_mul(coeff, next_exponent)) : NULL;
+    out = power ? div_number_owned_by_product(power, coeff, next_exponent) : NULL;
 
     num_destroy(&next_exponent);
     num_destroy(&coeff);
@@ -875,10 +891,6 @@ static expr_t *integrate_div_rule(const expr_t *expr, const expr_t *wrt)
     expr_t *quotient;
     expr_t *inverse_term;
     expr_t *u;
-    number_t constant = num_new();
-    number_t coeff = num_new();
-    number_t numer_constant = num_new();
-    number_t numer_coeff = num_new();
     bool is_plus_square = false;
 
     if (scaled)
@@ -899,18 +911,27 @@ static expr_t *integrate_div_rule(const expr_t *expr, const expr_t *wrt)
         return simplify_owned(quotient);
     }
 
+    number_t constant = num_new();
+    number_t coeff = num_new();
+    number_t numer_constant = num_new();
+    number_t numer_coeff = num_new();
+
     if (!depends_on_wrt(expr->a, wrt) && expr_match_const_value(expr->a, &numer_constant) &&
         num_eq(numer_constant, NUM_ONE) &&
         match_one_plus_minus_affine_square(expr->b, wrt, &is_plus_square, &constant, &coeff) &&
         num_eq(constant, NUM_ZERO) && !num_eq(coeff, NUM_ZERO)) {
+        expr_t *out;
+
         u = build_affine_from_match(wrt, constant, coeff);
 
         inverse_term = u ? (is_plus_square ? expr_atan(u) : expr_atanh(u)) : NULL;
         expr_free(u);
+        out = div_number_owned(inverse_term, coeff);
+        num_destroy(&coeff);
         num_destroy(&numer_coeff);
         num_destroy(&numer_constant);
         num_destroy(&constant);
-        return div_number_owned(inverse_term, coeff);
+        return out;
     }
 
     if (!depends_on_wrt(expr->a, wrt) && expr_match_const_value(expr->a, &numer_constant) &&
@@ -918,25 +939,32 @@ static expr_t *integrate_div_rule(const expr_t *expr, const expr_t *wrt)
         expr->b && expr->b->ops && expr->b->ops->kind == EXPR_KIND_SQRT &&
         match_one_plus_minus_affine_square(expr->b->a, wrt, &is_plus_square, &constant, &coeff) &&
         num_eq(constant, NUM_ZERO) && !num_eq(coeff, NUM_ZERO)) {
+        expr_t *out;
+
         u = build_affine_from_match(wrt, constant, coeff);
         inverse_term = u ? (is_plus_square ? expr_asinh(u) : expr_asin(u)) : NULL;
         expr_free(u);
+        out = div_number_owned(inverse_term, coeff);
+        num_destroy(&coeff);
         num_destroy(&numer_coeff);
         num_destroy(&numer_constant);
         num_destroy(&constant);
-        return div_number_owned(inverse_term, coeff);
+        return out;
     }
 
     if (!depends_on_wrt(expr->a, wrt) &&
         match_nonconstant_affine_linear_expr(expr->b, wrt, &constant, &coeff)) {
         expr_t *log_denom = expr_log(expr->b);
         expr_t *scaled_log = log_denom ? expr_mul(expr->a, log_denom) : NULL;
+        expr_t *out;
 
         expr_free(log_denom);
+        out = div_number_owned(scaled_log, coeff);
+        num_destroy(&coeff);
         num_destroy(&numer_coeff);
         num_destroy(&numer_constant);
         num_destroy(&constant);
-        return div_number_owned(scaled_log, coeff);
+        return out;
     }
 
     if (match_nonconstant_affine_linear_expr(expr->a, wrt, &numer_constant, &numer_coeff) &&
@@ -950,6 +978,7 @@ static expr_t *integrate_div_rule(const expr_t *expr, const expr_t *wrt)
         expr_t *log_term = log_denom ? expr_mul_num(log_denom, &remainder) : NULL;
         expr_t *sum = (linear_term && log_term) ? expr_add(linear_term, log_term)
                                                 : (linear_term ? linear_term : log_term);
+        expr_t *out;
 
         if (sum == linear_term)
             linear_term = NULL;
@@ -960,10 +989,13 @@ static expr_t *integrate_div_rule(const expr_t *expr, const expr_t *wrt)
         expr_free(linear_term);
         num_destroy(&remainder);
         num_destroy(&scaled_denom_const);
+        out = div_number_owned(sum, coeff);
+        num_destroy(&linear_scale);
+        num_destroy(&coeff);
         num_destroy(&numer_coeff);
         num_destroy(&numer_constant);
         num_destroy(&constant);
-        return div_number_owned(sum, coeff);
+        return out;
     }
 
     inner = integrate_poly_over_matching_affine(expr, wrt);
@@ -1050,7 +1082,7 @@ static expr_t *integrate_sqrt_rule(const expr_t *expr, const expr_t *wrt)
         inverse_term = u ? (is_plus_square ? expr_asinh(u) : expr_asin(u)) : NULL;
         expr_free(u);
         num_destroy(&constant);
-        return div_number_owned(inverse_term, coeff);
+        return div_number_owned_consuming(inverse_term, &coeff);
     }
     num_destroy(&coeff);
     num_destroy(&constant);
@@ -1090,7 +1122,7 @@ static expr_t *integrate_log_rule(const expr_t *expr, const expr_t *wrt)
     raw = x_log_x ? expr_sub(x_log_x, expr->a) : NULL;
     expr_free(x_log_x);
     num_destroy(&constant);
-    return div_number_owned(raw, coeff);
+    return div_number_owned_consuming(raw, &coeff);
 }
 
 static expr_t *integrate_log10_rule(const expr_t *expr, const expr_t *wrt)
@@ -1115,7 +1147,7 @@ static expr_t *integrate_log10_rule(const expr_t *expr, const expr_t *wrt)
     expr_free(u_over_ln10);
     expr_free(u_log10_u);
     num_destroy(&constant);
-    return div_number_owned(raw, coeff);
+    return div_number_owned_consuming(raw, &coeff);
 }
 
 expr_t *integrate_affine_unary_kind(const expr_t *expr,
@@ -1147,8 +1179,7 @@ expr_t *integrate_affine_unary_kind(const expr_t *expr,
         anti = negated;
     }
 
-    out = div_number_owned(anti, coeffs[0]);
-    num_destroy(&coeffs[0]);
+    out = div_number_owned_consuming(anti, &coeffs[0]);
     num_destroy(&constant);
     return out;
 }
@@ -1188,7 +1219,6 @@ static expr_t *integrate_poly_times_unary_affine_kind(const expr_t *expr,
         expr_t *poly_expr;
         expr_t *exp_u;
 
-        number_array_zero_local(anti, 5);
         exp_antiderivative_once_local(poly, 5u, anti);
         poly_expr = build_polynomial_expr(u, anti, 5u);
         exp_u = expr_exp(u);
@@ -1254,7 +1284,7 @@ static expr_t *integrate_poly_times_unary_affine_kind(const expr_t *expr,
     expr_free(u);
     number_array_clear_local(poly, 5);
     num_destroy(&constant);
-    return div_number_owned(out, coeff);
+    return div_number_owned_consuming(out, &coeff);
 }
 
 static expr_t *integrate_poly_times_log_affine(const expr_t *expr, const expr_t *wrt)
@@ -1320,7 +1350,7 @@ static expr_t *integrate_poly_times_log_affine(const expr_t *expr, const expr_t 
     number_array_clear_local(q, 6);
     number_array_clear_local(poly, 5);
     num_destroy(&constant);
-    return div_number_owned(raw, coeff);
+    return div_number_owned_consuming(raw, &coeff);
 }
 
 static expr_t *integrate_poly_over_matching_affine(const expr_t *expr, const expr_t *wrt)
@@ -1391,7 +1421,7 @@ static expr_t *integrate_poly_over_matching_affine(const expr_t *expr, const exp
     num_destroy(&numer_coeff);
     num_destroy(&numer_constant);
     num_destroy(&denom_constant);
-    return div_number_owned(raw, denom_coeff);
+    return div_number_owned_consuming(raw, &denom_coeff);
 }
 
 static expr_t *integrate_squared_unary_affine(const expr_t *expr,
@@ -1441,7 +1471,7 @@ static expr_t *integrate_squared_unary_affine(const expr_t *expr,
         expr_free(two_u);
         expr_free(u);
         num_destroy(&constant);
-        return div_number_owned(raw, coeff);
+        return div_number_owned_consuming(raw, &coeff);
     } else if (kind == EXPR_PATTERN_UNARY_SEC) {
         raw = u ? expr_tan(u) : NULL;
         expr_free(scaled_u);
@@ -1449,7 +1479,7 @@ static expr_t *integrate_squared_unary_affine(const expr_t *expr,
         expr_free(two_u);
         expr_free(u);
         num_destroy(&constant);
-        return div_number_owned(raw, coeff);
+        return div_number_owned_consuming(raw, &coeff);
     } else if (kind == EXPR_PATTERN_UNARY_COSEC) {
         expr_t *cot_u = u ? expr_cot(u) : NULL;
 
@@ -1460,7 +1490,7 @@ static expr_t *integrate_squared_unary_affine(const expr_t *expr,
         expr_free(two_u);
         expr_free(u);
         num_destroy(&constant);
-        return div_number_owned(raw, coeff);
+        return div_number_owned_consuming(raw, &coeff);
     } else if (kind == EXPR_PATTERN_UNARY_SECH) {
         raw = u ? expr_tanh(u) : NULL;
         expr_free(scaled_u);
@@ -1468,7 +1498,7 @@ static expr_t *integrate_squared_unary_affine(const expr_t *expr,
         expr_free(two_u);
         expr_free(u);
         num_destroy(&constant);
-        return div_number_owned(raw, coeff);
+        return div_number_owned_consuming(raw, &coeff);
     } else if (kind == EXPR_PATTERN_UNARY_COSECH) {
         expr_t *coth_u = u ? expr_coth(u) : NULL;
 
@@ -1479,7 +1509,7 @@ static expr_t *integrate_squared_unary_affine(const expr_t *expr,
         expr_free(two_u);
         expr_free(u);
         num_destroy(&constant);
-        return div_number_owned(raw, coeff);
+        return div_number_owned_consuming(raw, &coeff);
     } else if (kind == EXPR_PATTERN_UNARY_TANH) {
         expr_t *tanh_u = u ? expr_tanh(u) : NULL;
 
@@ -1490,7 +1520,7 @@ static expr_t *integrate_squared_unary_affine(const expr_t *expr,
         expr_free(two_u);
         expr_free(u);
         num_destroy(&constant);
-        return div_number_owned(raw, coeff);
+        return div_number_owned_consuming(raw, &coeff);
     } else if (kind == EXPR_PATTERN_UNARY_COTH) {
         expr_t *coth_u = u ? expr_coth(u) : NULL;
 
@@ -1501,7 +1531,7 @@ static expr_t *integrate_squared_unary_affine(const expr_t *expr,
         expr_free(two_u);
         expr_free(u);
         num_destroy(&constant);
-        return div_number_owned(raw, coeff);
+        return div_number_owned_consuming(raw, &coeff);
     } else {
         oscillation = NULL;
     }
@@ -1511,7 +1541,9 @@ static expr_t *integrate_squared_unary_affine(const expr_t *expr,
     expr_free(two_u);
     expr_free(u);
     num_destroy(&constant);
-    return div_number_owned(raw, num_mul(num_create_from_long(4), coeff));
+    raw = div_number_owned_by_long_product(raw, 4, coeff);
+    num_destroy(&coeff);
+    return raw;
 }
 
 static expr_t *integrate_same_affine_special_product(const expr_t *expr, const expr_t *wrt)
@@ -1526,7 +1558,31 @@ static expr_t *integrate_same_affine_special_product(const expr_t *expr, const e
     if (!expr || !expr->a || !expr->b)
         return NULL;
 
-    if (match_affine_unary_data(expr->a, wrt, EXPR_PATTERN_UNARY_EXP, &c1, &k1) &&
+    if (match_affine_unary_data(expr->a, wrt, EXPR_PATTERN_UNARY_SIN, &c1, &k1) &&
+        match_affine_unary_data(expr->b, wrt, EXPR_PATTERN_UNARY_COS, &c2, &k2) &&
+        affine_linear_match_eq(c1, k1, c2, k2)) {
+        expr_t *sin_u;
+        expr_t *sin_sq;
+
+        u = build_affine_from_match(wrt, c1, k1);
+        sin_u = u ? expr_sin(u) : NULL;
+        sin_sq = sin_u ? expr_pow(sin_u, &NUM_TWO) : NULL;
+        expr_free(sin_u);
+        expr_free(u);
+        out = div_number_owned_by_product(sin_sq, NUM_TWO, k1);
+    } else if (match_affine_unary_data(expr->a, wrt, EXPR_PATTERN_UNARY_COS, &c1, &k1) &&
+               match_affine_unary_data(expr->b, wrt, EXPR_PATTERN_UNARY_SIN, &c2, &k2) &&
+               affine_linear_match_eq(c1, k1, c2, k2)) {
+        expr_t *sin_u;
+        expr_t *sin_sq;
+
+        u = build_affine_from_match(wrt, c1, k1);
+        sin_u = u ? expr_sin(u) : NULL;
+        sin_sq = sin_u ? expr_pow(sin_u, &NUM_TWO) : NULL;
+        expr_free(sin_u);
+        expr_free(u);
+        out = div_number_owned_by_product(sin_sq, NUM_TWO, k1);
+    } else if (match_affine_unary_data(expr->a, wrt, EXPR_PATTERN_UNARY_EXP, &c1, &k1) &&
         match_affine_unary_data(expr->b, wrt, EXPR_PATTERN_UNARY_SIN, &c2, &k2) &&
         affine_linear_match_eq(c1, k1, c2, k2)) {
         expr_t *exp_u;
@@ -1545,7 +1601,7 @@ static expr_t *integrate_same_affine_special_product(const expr_t *expr, const e
         expr_free(sin_u);
         expr_free(exp_u);
         expr_free(u);
-        out = div_number_owned(out, num_mul(NUM_TWO, k1));
+        out = div_number_owned_by_product(out, NUM_TWO, k1);
     } else if (match_affine_unary_data(expr->a, wrt, EXPR_PATTERN_UNARY_EXP, &c1, &k1) &&
                match_affine_unary_data(expr->b, wrt, EXPR_PATTERN_UNARY_COS, &c2, &k2) &&
                affine_linear_match_eq(c1, k1, c2, k2)) {
@@ -1565,7 +1621,7 @@ static expr_t *integrate_same_affine_special_product(const expr_t *expr, const e
         expr_free(sin_u);
         expr_free(exp_u);
         expr_free(u);
-        out = div_number_owned(out, num_mul(NUM_TWO, k1));
+        out = div_number_owned_by_product(out, NUM_TWO, k1);
     } else if (match_affine_unary_data(expr->a, wrt, EXPR_PATTERN_UNARY_EXP, &c1, &k1) &&
                match_affine_unary_data(expr->b, wrt, EXPR_PATTERN_UNARY_SINH, &c2, &k2) &&
                affine_linear_match_eq(c1, k1, c2, k2)) {
@@ -1583,7 +1639,7 @@ static expr_t *integrate_same_affine_special_product(const expr_t *expr, const e
         expr_free(exp_two_u);
         expr_free(two_u);
         expr_free(u);
-        out = div_number_owned(diff, num_mul(num_create_from_long(4), k1));
+        out = div_number_owned_by_long_product(diff, 4, k1);
     } else if (match_affine_unary_data(expr->a, wrt, EXPR_PATTERN_UNARY_EXP, &c1, &k1) &&
                match_affine_unary_data(expr->b, wrt, EXPR_PATTERN_UNARY_COSH, &c2, &k2) &&
                affine_linear_match_eq(c1, k1, c2, k2)) {
@@ -1601,7 +1657,7 @@ static expr_t *integrate_same_affine_special_product(const expr_t *expr, const e
         expr_free(exp_two_u);
         expr_free(two_u);
         expr_free(u);
-        out = div_number_owned(sum, num_mul(num_create_from_long(4), k1));
+        out = div_number_owned_by_long_product(sum, 4, k1);
     } else if (match_affine_unary_data(expr->a, wrt, EXPR_PATTERN_UNARY_SIN, &c1, &k1) &&
                match_affine_unary_data(expr->b, wrt, EXPR_PATTERN_UNARY_COS, &c2, &k2) &&
                affine_linear_match_eq(c1, k1, c2, k2)) {
@@ -1613,7 +1669,7 @@ static expr_t *integrate_same_affine_special_product(const expr_t *expr, const e
         sin_sq = sin_u ? expr_pow(sin_u, &NUM_TWO) : NULL;
         expr_free(sin_u);
         expr_free(u);
-        out = div_number_owned(sin_sq, num_mul(NUM_TWO, k1));
+        out = div_number_owned_by_product(sin_sq, NUM_TWO, k1);
     } else if (match_affine_unary_data(expr->a, wrt, EXPR_PATTERN_UNARY_SEC, &c1, &k1) &&
                match_affine_unary_data(expr->b, wrt, EXPR_PATTERN_UNARY_TAN, &c2, &k2) &&
                affine_linear_match_eq(c1, k1, c2, k2)) {
@@ -1649,7 +1705,7 @@ static expr_t *integrate_same_affine_special_product(const expr_t *expr, const e
         expr_free(sin_two_u);
         expr_free(two_u);
         expr_free(u);
-        out = div_number_owned(diff, num_mul(num_create_from_long(4), k1));
+        out = div_number_owned_by_long_product(diff, 4, k1);
     } else if (match_affine_unary_data(expr->a, wrt, EXPR_PATTERN_UNARY_COS, &c1, &k1) &&
                match_affine_unary_data(expr->b, wrt, EXPR_PATTERN_UNARY_COS, &c2, &k2) &&
                affine_linear_match_eq(c1, k1, c2, k2)) {
@@ -1667,7 +1723,7 @@ static expr_t *integrate_same_affine_special_product(const expr_t *expr, const e
         expr_free(sin_two_u);
         expr_free(two_u);
         expr_free(u);
-        out = div_number_owned(sum, num_mul(num_create_from_long(4), k1));
+        out = div_number_owned_by_long_product(sum, 4, k1);
     } else if (match_affine_unary_data(expr->a, wrt, EXPR_PATTERN_UNARY_SINH, &c1, &k1) &&
                match_affine_unary_data(expr->b, wrt, EXPR_PATTERN_UNARY_COSH, &c2, &k2) &&
                affine_linear_match_eq(c1, k1, c2, k2)) {
@@ -1679,7 +1735,7 @@ static expr_t *integrate_same_affine_special_product(const expr_t *expr, const e
         sinh_sq = sinh_u ? expr_pow(sinh_u, &NUM_TWO) : NULL;
         expr_free(sinh_u);
         expr_free(u);
-        out = div_number_owned(sinh_sq, num_mul(NUM_TWO, k1));
+        out = div_number_owned_by_product(sinh_sq, NUM_TWO, k1);
     } else if (match_affine_unary_data(expr->a, wrt, EXPR_PATTERN_UNARY_SECH, &c1, &k1) &&
                match_affine_unary_data(expr->b, wrt, EXPR_PATTERN_UNARY_TANH, &c2, &k2) &&
                affine_linear_match_eq(c1, k1, c2, k2)) {
@@ -1719,7 +1775,7 @@ static expr_t *integrate_same_affine_special_product(const expr_t *expr, const e
         expr_free(sinh_two_u);
         expr_free(two_u);
         expr_free(u);
-        out = div_number_owned(diff, num_mul(num_create_from_long(4), k1));
+        out = div_number_owned_by_long_product(diff, 4, k1);
     } else if (match_affine_unary_data(expr->a, wrt, EXPR_PATTERN_UNARY_COSH, &c1, &k1) &&
                match_affine_unary_data(expr->b, wrt, EXPR_PATTERN_UNARY_COSH, &c2, &k2) &&
                affine_linear_match_eq(c1, k1, c2, k2)) {
@@ -1737,7 +1793,7 @@ static expr_t *integrate_same_affine_special_product(const expr_t *expr, const e
         expr_free(sinh_two_u);
         expr_free(two_u);
         expr_free(u);
-        out = div_number_owned(sum, num_mul(num_create_from_long(4), k1));
+        out = div_number_owned_by_long_product(sum, 4, k1);
     }
 
     num_destroy(&k2);

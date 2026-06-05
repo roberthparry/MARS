@@ -15,6 +15,25 @@ It gives the library a single by-value public numeric handle that can represent:
 The goal is to let callers work at the level of "a number" without having to
 manually pick a backend for every operation.
 
+## Process Shutdown
+
+Most `number_t` values are ordinary owning values and should be released with
+`num_destroy(...)` when the caller is finished with them. Built-in constants
+such as `NUM_ZERO`, `NUM_HALF`, `NUM_PI`, `NUM_INF`, `NUM_I`, and their related
+tables are intentionally immortal during normal execution so shared constants
+cannot be cleared accidentally by ordinary value destruction.
+
+At process shutdown, the number layer now runs an automatic destructor that:
+
+- clears the Bernoulli cache used by higher special functions
+- clears any initialised GMP/MPFR backing storage owned by immortal `NUM_*`
+  constants
+- clears MPC cache state attached to the immortal imaginary constants
+- calls `mpfr_free_cache()` to release MPFR's process-local cache allocations
+
+This keeps normal ownership simple while allowing Valgrind to report that the
+test process exits with no reachable heap blocks left behind.
+
 ## Public Representation
 
 `number_t` is a fixed-size public storage envelope:

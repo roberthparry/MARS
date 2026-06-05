@@ -34,7 +34,7 @@ of these graphs.
 - expression construction from constants, variables, and operators
 - lazy evaluation with result caching
 - symbolic differentiation to arbitrary order
-- first-cut symbolic antiderivatives for simple, reliable expression families
+- symbolic antiderivatives for conservative, reliable expression families
 - evaluation of derivatives for scalar outputs
 - elementary and special functions exposed through the `expr` builder API and
   evaluated through `number_t`
@@ -80,6 +80,7 @@ higher-level symbolic code:
   - unary-affine matching like `exp(a)` and `sin(a)`
   - degree-4 affine polynomial matching `P(a)`
   - degree-4 affine-polynomial times unary-affine matching `P(a) * special(a)`
+  - rational affine-factor matching used by the partial-fraction layer
 
 These APIs are intended for sibling library modules rather than ordinary
 end-user arithmetic code.
@@ -93,8 +94,23 @@ symbolic rule is known, which lets callers fall back to the numerical
 
 The current rule set is intentionally conservative. It covers constants,
 sums/differences, constant multiples, powers of the integration variable,
-`1/x`, `log(x)`, and affine `exp`, `sin`, `cos`, `tan`, `sinh`, `cosh`, and `tanh` terms such
-as `sin(3*x - 1)`.
+`1/x`, `log(x)`, affine elementary and inverse-family primitives, selected
+u-substitutions, integration-by-parts families such as `x * sin(x)`,
+`x * exp(x)`, `x * log(x)`, and `x * atan(x)`, plus a focused partial-fraction
+layer for rational functions whose denominator factors into supported affine
+linear terms. Affine `exp`, `sin`, `cos`, `tan`, `sinh`, `cosh`, and `tanh`
+terms such as `sin(3*x - 1)` are part of that fast path.
+
+The implementation is split into logical integration modules:
+
+- `expr_integrate.c` owns the public orchestration and dispatch.
+- `expr_integrate_primitives.c` holds local primitive antiderivatives.
+- `expr_integrate_by_parts.c` holds integration-by-parts rules.
+- `expr_integrate_rational.c` holds rational factoring and partial fractions.
+- `expr_integrate_support.c` holds shared affine and ownership helpers.
+
+Rules are dispatched through tables where that keeps the code readable; more
+specialised pattern code remains local to the module that owns the rule family.
 
 ```c
 number_t x0 = num_create_from_double(0.0);
@@ -115,6 +131,11 @@ num_destroy(&x0);
 For production code, verify a returned antiderivative the same way the tests
 do: differentiate it with `expr_create_deriv(F, wrt)` and compare it with the
 original expression at representative points.
+
+The integration tests include round-trip checks of the form
+`expr -> antiderivative -> derivative -> expr` at representative numeric
+points. Unsupported expressions deliberately return `NULL` rather than an
+unsafe symbolic guess.
 
 ## Example: Constructing an Expression
 

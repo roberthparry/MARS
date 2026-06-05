@@ -17,7 +17,7 @@ some GNU C extensions, so MSVC/Windows builds are not currently guaranteed.
   public handle
 - **`qfloat_t`** — double-double arithmetic and special functions (~31-32 decimal digits of precision)
 - **`matrix_t`** — generic high-precision matrix over numeric `number_t` values or symbolic `expr_t *` entries, with string-based matrix parsing and formatting, symbolic linear algebra support including Schur complements, block inverse/solve, Jordan helpers, entrywise matrix derivatives, Jacobian helpers, first matrix-calculus helpers for trace, determinant, inverse, block inverse, solve, and block solve, and high-precision eigendecomposition and matrix functions through the numeric `number_t` layer
-- **`expr_t`** — differentiable expression DAGs with first/second derivatives, first-cut symbolic antiderivatives, symbolic matrix integration, and structural matcher helpers for higher-level symbolic code
+- **`expr_t`** — differentiable expression DAGs with first/second derivatives, symbolic antiderivatives for conservative rule families, symbolic matrix integration, and structural matcher helpers for higher-level symbolic code
 - **`datetime_t`** — civil and astronomical date/time helpers
 - **`timeseries_t`** — datetime-indexed forecasting and time-series analysis for regression and ARIMA-family models
 - **`dictionary_t` / `set_t` / `array_t`** — generic containers with user-defined ownership
@@ -45,8 +45,9 @@ libraries before building or installing.
 
 Recent sample benchmarks on this tree show:
 
-- symbolic integrator shortcuts reducing affine-family cases from fallback-style
-  tens of milliseconds to low-hundreds of microseconds
+- symbolic integrator shortcuts and antiderivative rules reducing supported
+  affine-family cases from fallback-style tens of milliseconds to
+  low-hundreds of microseconds
 - `affine_square` at about `233.723 µs` versus `near_miss_square` at about
   `1647.171 µs`
 - `affine_times_exp` at about `77.678 µs` versus `near_miss_exp` at about
@@ -283,7 +284,7 @@ int main(void) {
 | `qfloat_t` | Double-double arithmetic and special functions | [`docs/qfloat.md`](docs/qfloat.md) |
 | `qcomplex_t` | Double-double complex arithmetic and special functions | [`docs/qcomplex.md`](docs/qcomplex.md) |
 | `matrix_t` | Generic high-precision matrix with numeric and symbolic element types | [`docs/matrix.md`](docs/matrix.md) |
-| `expr_t` | Differentiable expression DAGs with symbolic differentiation and first-cut antiderivatives | [`docs/expression.md`](docs/expression.md) |
+| `expr_t` | Differentiable expression DAGs with symbolic differentiation and conservative symbolic antiderivatives | [`docs/expression.md`](docs/expression.md) |
 | `integrator_t` | Adaptive G7K15 numerical integrator | [`docs/integrator.md`](docs/integrator.md) |
 
 ## Build

@@ -433,6 +433,7 @@ bool number_const_has_cdouble(number_const_id_t id);
 double _Complex number_const_cdouble_value(number_const_id_t id);
 bool number_const_has_ldexp(number_const_id_t id);
 int number_const_ldexp_value(number_const_id_t id);
+void number_constants_shutdown(void);
 number_t number_create_exact_mpfr_long_prec(long value, size_t precision_bits);
 number_t number_create_exact_mpfr_dyadic_prec(long numerator,
                                                 int exponent2,

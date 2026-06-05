@@ -69,6 +69,19 @@ make test_matrix
 make test_integrator
 ```
 
+For memory checks on the expression suite, use the normal release binary under
+Valgrind:
+
+```sh
+valgrind --leak-check=full --show-leak-kinds=all --error-exitcode=99 \
+    tests/build/release/expression/test_expression
+```
+
+The full `test_expression` suite is expected to finish with all heap blocks
+freed and `ERROR SUMMARY: 0 errors from 0 contexts`. If a Valgrind failure needs
+to be narrowed, prefer temporarily filtering cases in `tests/test_config.json`
+over adding diagnostic instrumentation to the code under test.
+
 ## Notes
 
 - Run commands from the repository root.

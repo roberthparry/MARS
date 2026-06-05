@@ -57,12 +57,21 @@ static void test_integrate_reciprocal_and_log(void)
     expr_t *x2 = test_expr_pow_d(x, 2.0);
     expr_t *one_plus_x2 = test_expr_add_d(x2, 1.0);
     expr_t *one_minus_x2 = test_expr_d_sub(1.0, x2);
-    expr_t *x2_plus_one = test_expr_add_d(test_expr_pow_d(x, 2.0), 1.0);
-    expr_t *inv_one_plus_x2 = one_plus_x2 ? expr_div(test_expr_new_const_d(1.0), one_plus_x2) : NULL;
-    expr_t *inv_sqrt_one_plus_x2 = one_plus_x2 ? expr_div(test_expr_new_const_d(1.0), expr_sqrt(one_plus_x2)) : NULL;
-    expr_t *inv_one_minus_x2 = one_minus_x2 ? expr_div(test_expr_new_const_d(1.0), one_minus_x2) : NULL;
-    expr_t *inv_sqrt_one_minus_x2 = one_minus_x2 ? expr_div(test_expr_new_const_d(1.0), expr_sqrt(one_minus_x2)) : NULL;
-    expr_t *inv_sqrt_x2_plus_one = x2_plus_one ? expr_div(test_expr_new_const_d(1.0), expr_sqrt(x2_plus_one)) : NULL;
+    expr_t *x2_for_plus = test_expr_pow_d(x, 2.0);
+    expr_t *x2_plus_one = test_expr_add_d(x2_for_plus, 1.0);
+    expr_t *one_a = test_expr_new_const_d(1.0);
+    expr_t *one_b = test_expr_new_const_d(1.0);
+    expr_t *one_c = test_expr_new_const_d(1.0);
+    expr_t *one_d = test_expr_new_const_d(1.0);
+    expr_t *one_e = test_expr_new_const_d(1.0);
+    expr_t *sqrt_one_plus_x2 = one_plus_x2 ? expr_sqrt(one_plus_x2) : NULL;
+    expr_t *sqrt_one_minus_x2 = one_minus_x2 ? expr_sqrt(one_minus_x2) : NULL;
+    expr_t *sqrt_x2_plus_one = x2_plus_one ? expr_sqrt(x2_plus_one) : NULL;
+    expr_t *inv_one_plus_x2 = (one_a && one_plus_x2) ? expr_div(one_a, one_plus_x2) : NULL;
+    expr_t *inv_sqrt_one_plus_x2 = (one_b && sqrt_one_plus_x2) ? expr_div(one_b, sqrt_one_plus_x2) : NULL;
+    expr_t *inv_one_minus_x2 = (one_c && one_minus_x2) ? expr_div(one_c, one_minus_x2) : NULL;
+    expr_t *inv_sqrt_one_minus_x2 = (one_d && sqrt_one_minus_x2) ? expr_div(one_d, sqrt_one_minus_x2) : NULL;
+    expr_t *inv_sqrt_x2_plus_one = (one_e && sqrt_x2_plus_one) ? expr_div(one_e, sqrt_x2_plus_one) : NULL;
 
     assert_antiderivative_matches("integral derivative of 1/x",
                                   one_over_x, x, points,
@@ -91,7 +100,16 @@ static void test_integrate_reciprocal_and_log(void)
     expr_free(inv_one_minus_x2);
     expr_free(inv_sqrt_one_plus_x2);
     expr_free(inv_one_plus_x2);
+    expr_free(sqrt_x2_plus_one);
+    expr_free(sqrt_one_minus_x2);
+    expr_free(sqrt_one_plus_x2);
+    expr_free(one_e);
+    expr_free(one_d);
+    expr_free(one_c);
+    expr_free(one_b);
+    expr_free(one_a);
     expr_free(x2_plus_one);
+    expr_free(x2_for_plus);
     expr_free(one_minus_x2);
     expr_free(one_plus_x2);
     expr_free(x2);
@@ -639,6 +657,8 @@ static void test_integrate_affine_poly_times_specials(void)
     expr_free(x_over_x_plus_one);
     expr_free(x_plus_one);
     expr_free(sinh_x_cosh_x);
+    expr_free(cosech_x_coth_x);
+    expr_free(sech_x_tanh_x);
     expr_free(coth_x_sq);
     expr_free(cosech_x_sq);
     expr_free(sech_x_sq);
@@ -793,8 +813,10 @@ static void test_integrate_more_by_parts(void)
     static const double outer_points[] = { 1.3, 1.8, 2.4, 3.5 };
     expr_t *x = test_expr_new_named_var_d(0.0, "x");
     expr_t *x_sq = test_expr_pow_d(x, 2.0);
-    expr_t *x_sq_atan_x = x_sq ? expr_mul(x_sq, expr_atan(x)) : NULL;
-    expr_t *x_sq_acot_x = x_sq ? expr_mul(x_sq, expr_acot(x)) : NULL;
+    expr_t *atan_x = expr_atan(x);
+    expr_t *acot_x = expr_acot(x);
+    expr_t *x_sq_atan_x = (x_sq && atan_x) ? expr_mul(x_sq, atan_x) : NULL;
+    expr_t *x_sq_acot_x = (x_sq && acot_x) ? expr_mul(x_sq, acot_x) : NULL;
 
     assert_antiderivative_matches("integral derivative of x^2*atan(x)",
                                   x_sq_atan_x, x, points,
@@ -805,6 +827,8 @@ static void test_integrate_more_by_parts(void)
 
     expr_free(x_sq_acot_x);
     expr_free(x_sq_atan_x);
+    expr_free(acot_x);
+    expr_free(atan_x);
     expr_free(x_sq);
     expr_free(x);
 }

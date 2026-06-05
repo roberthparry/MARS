@@ -14,7 +14,9 @@ bool match_nonconstant_affine_linear_expr(const expr_t *expr,
 void number_array_zero_local(number_t *values, size_t count);
 void number_array_clear_local(number_t *values, size_t count);
 expr_t *div_number_owned(expr_t *expr, number_t denom);
+expr_t *div_number_owned_consuming(expr_t *expr, number_t *denom);
 expr_t *mul_number_owned(expr_t *expr, number_t factor);
+expr_t *mul_number_owned_consuming(expr_t *expr, number_t *factor);
 expr_t *build_affine_from_match(const expr_t *wrt,
                                 number_t constant,
                                 number_t coeff);

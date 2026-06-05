@@ -38,17 +38,19 @@ static int number_bernoulli_prepare(void)
     return 0;
 }
 
-static void __attribute__((destructor)) number_bernoulli_shutdown(void)
+static void __attribute__((destructor)) number_shutdown(void)
 {
-    if (!number_bernoulli_even_terms_initialised)
-        return;
-    for (size_t i = 0u; i < NUMBER_BERNOULLI_EVEN_TERM_COUNT; ++i)
-        mpq_clear(number_bernoulli_even_terms[i]);
-    if (number_bernoulli_work) {
-        for (size_t i = 0u; i < NUMBER_BERNOULLI_WORK_COUNT; ++i)
-            mpq_clear(number_bernoulli_work[i]);
-        free(number_bernoulli_work);
+    if (number_bernoulli_even_terms_initialised) {
+        for (size_t i = 0u; i < NUMBER_BERNOULLI_EVEN_TERM_COUNT; ++i)
+            mpq_clear(number_bernoulli_even_terms[i]);
+        if (number_bernoulli_work) {
+            for (size_t i = 0u; i < NUMBER_BERNOULLI_WORK_COUNT; ++i)
+                mpq_clear(number_bernoulli_work[i]);
+            free(number_bernoulli_work);
+        }
     }
+    number_constants_shutdown();
+    mpfr_free_cache();
 }
 
 static int number_bernoulli_even_ensure(size_t index)
