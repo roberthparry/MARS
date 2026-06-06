@@ -55,6 +55,8 @@ expr_t *integrate_linear_poly_times_normal_logpdf_affine(const expr_t *expr,
                                                          const expr_t *wrt);
 expr_t *integrate_rational_partial_fractions(const expr_t *expr, const expr_t *wrt);
 expr_t *integrate_linear_over_symbolic_quadratic(const expr_t *expr, const expr_t *wrt);
+expr_t *integrate_log_of_symbolic_quadratic(const expr_t *expr, const expr_t *wrt);
+expr_t *integrate_exp_of_negative_quadratic(const expr_t *expr, const expr_t *wrt);
 expr_t *integrate_squared_unary_affine(const expr_t *expr,
                                        const expr_t *wrt,
                                        expr_pattern_unary_affine_kind_t kind);

@@ -1764,7 +1764,7 @@ static expr_t *integrate_log_rule(const expr_t *expr, const expr_t *wrt)
                             &constant, &coeff)) {
         num_destroy(&coeff);
         num_destroy(&constant);
-        return NULL;
+        return integrate_log_of_symbolic_quadratic(expr, wrt);
     }
 
     x_log_x = expr_mul(expr->a, expr);

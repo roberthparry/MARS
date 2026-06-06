@@ -550,7 +550,9 @@ expr_t *expr_simplify_positive_part_if_negative(expr_t *dv);
 expr_t *expr_simplify_try_log10_power_of_ten(expr_t *arg);
 expr_t *expr_simplify_try_floor_ceil_const(const expr_t *op, expr_t *arg);
 expr_t *expr_simplify_try_unary_const_fold(const expr_t *op, expr_t *arg);
+expr_t *expr_simplify_try_unary_const_value_fold(const expr_t *op, expr_t *arg);
 expr_t *expr_simplify_try_sqrt_scaled_square_const(expr_t *arg);
+expr_t *expr_simplify_try_sqrt_quotient(expr_t *num, expr_t *den);
 expr_t *expr_simplify_direct_inverse_pair(const expr_t *outer, expr_t *inner);
 expr_t *expr_simplify_direct_inverse_pair_from_raw(const expr_t *outer,
                                                  const expr_t *raw_inner,
@@ -596,6 +598,8 @@ void expr_cancel_common_powers(expr_t **terms, size_t nterms,
                              expr_t **den_terms, size_t nden_terms);
 void expr_combine_exp_terms(expr_t **terms, size_t nterms);
 void expr_merge_sqrt_terms(expr_t **terms, size_t nterms);
+void expr_merge_sqrt_quotient_terms(expr_t **terms, size_t nterms,
+                                  expr_t **den_terms, size_t nden_terms);
 expr_t *expr_try_expand_shallow_product(number_t c_acc,
                                       expr_t **terms, size_t nterms,
                                       expr_t **den_terms, size_t nden_terms);
@@ -608,6 +612,8 @@ int expr_fold_exp_const(const number_t *in, number_t *out);
 int expr_fold_log_const(const number_t *in, number_t *out);
 int expr_fold_sqrt_const(const number_t *in, number_t *out);
 int expr_fold_floor_const(const number_t *in, number_t *out);
+int expr_fold_erf_const(const number_t *in, number_t *out);
+int expr_fold_erfc_const(const number_t *in, number_t *out);
 
 void expr_reverse_atom(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);
 void expr_reverse_add(const expr_t *dv, const number_t *out_bar, number_t *a_bar, number_t *b_bar);

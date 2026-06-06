@@ -1169,6 +1169,41 @@ void expr_merge_sqrt_terms(expr_t **terms, size_t nterms)
     }
 }
 
+void expr_merge_sqrt_quotient_terms(expr_t **terms, size_t nterms,
+                                  expr_t **den_terms, size_t nden_terms)
+{
+    for (size_t i = 0; i < nterms; ++i) {
+        if (!expr_is_sqrt_expr(terms[i]) || !terms[i]->a)
+            continue;
+
+        for (size_t j = 0; j < nden_terms; ++j) {
+            expr_t *quotient;
+            expr_t *simp_arg;
+            expr_t *raw;
+
+            if (!expr_is_sqrt_expr(den_terms[j]) || !den_terms[j]->a ||
+                !expr_is_const(den_terms[j]->a) ||
+                !num_is_real(den_terms[j]->a->c) ||
+                !num_gt(den_terms[j]->a->c, NUM_ZERO))
+                continue;
+
+            quotient = expr_div(terms[i]->a, den_terms[j]->a);
+            simp_arg = quotient ? expr_simplify(quotient) : NULL;
+            raw = simp_arg ? expr_sqrt(simp_arg) : NULL;
+            if (raw) {
+                expr_free(terms[i]);
+                expr_free(den_terms[j]);
+                terms[i] = expr_simplify(raw);
+                den_terms[j] = NULL;
+            }
+            expr_free(raw);
+            expr_free(simp_arg);
+            expr_free(quotient);
+            break;
+        }
+    }
+}
+
 expr_t *expr_try_expand_shallow_product(number_t c_acc,
                                       expr_t **terms, size_t nterms,
                                       expr_t **den_terms, size_t nden_terms)

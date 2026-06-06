@@ -4,12 +4,12 @@
   "lab_mode": "integrator",
   "matrix_operation": "inverse",
   "matrix_operand": "",
-  "integrator_expression": "x/(ax^2+bx+c)",
-  "integrator_bounds": "x",
+  "integrator_expression": "exp(-2x^2-5x-3)",
+  "integrator_bounds": "x = -inf .. inf",
   "integrator_interval_cap": 20000,
   "precision_bits": {
     "expression": 256,
     "matrix": 256,
-    "integrator": 384
+    "integrator": 512
   }
 }

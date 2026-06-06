@@ -2855,6 +2855,34 @@ static void test_symbolic_negative_pi_quotient_stays_symbolic(void)
     expr_free(expr);
 }
 
+static void test_sqrt_quotient_combines_positive_real_denominator(void)
+{
+    expr_t *pi = expr_new_named_const(NUM_PI, "@pi");
+    expr_t *two = expr_new_const(NUM_TWO);
+    expr_t *sqrt_pi = expr_sqrt(pi);
+    expr_t *sqrt_two = expr_sqrt(two);
+    expr_t *quotient = expr_div(sqrt_pi, sqrt_two);
+    expr_t *simp = expr_simplify(quotient);
+    char *text = simp ? expr_to_string(simp, style_UNBOUND) : NULL;
+    const char *expect = "√(π/2)";
+
+    if (str_eq(text, expect))
+        to_string_pass("sqrt quotient combines positive real denominator",
+                       text, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "sqrt quotient combines positive real denominator",
+                       text ? text : "(null)", expect);
+
+    free(text);
+    expr_free(simp);
+    expr_free(quotient);
+    expr_free(sqrt_two);
+    expr_free(sqrt_pi);
+    expr_free(two);
+    expr_free(pi);
+}
+
 static void test_nested_symbolic_pi_derivative_has_no_decimalized_coefficients(void)
 {
     expr_bindings_t *bindings = NULL;
@@ -3585,6 +3613,7 @@ void test_runtime_regressions(void)
     TEST_RUN_SUBTEST(test_preserved_reciprocal_constant_derivative_round_trips, NULL);
     TEST_RUN_SUBTEST(test_binary_constants_preserve_user_literals_in_derivatives, NULL);
     TEST_RUN_SUBTEST(test_symbolic_negative_pi_quotient_stays_symbolic, NULL);
+    TEST_RUN_SUBTEST(test_sqrt_quotient_combines_positive_real_denominator, NULL);
     TEST_RUN_SUBTEST(test_symbolic_power_derivative_uses_n_minus_one_form, NULL);
     TEST_RUN_SUBTEST(test_symbolic_function_power_matches_parenthesized_power, NULL);
     TEST_RUN_SUBTEST(test_inverse_power_function_notation_uses_supported_inverses_only, NULL);

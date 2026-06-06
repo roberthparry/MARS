@@ -347,7 +347,7 @@ const expr_ops_t ops_erf = {
     .inverse_unary = expr_erfinv,
     .apply_unary = expr_erf, .apply_binary = NULL,
     .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
+    .simplify = expr_simplify_unary_operator, .fold_const_unary = expr_fold_erf_const
 };
 const expr_ops_t ops_erfc = {
     .eval = eval_erfc, .deriv = deriv_erfc, .reverse = expr_reverse_erfc,
@@ -357,7 +357,7 @@ const expr_ops_t ops_erfc = {
     .inverse_unary = expr_erfcinv,
     .apply_unary = expr_erfc, .apply_binary = NULL,
     .integrate = expr_integrate_dispatch_primitive,
-    .simplify = expr_simplify_unary_operator, .fold_const_unary = NULL
+    .simplify = expr_simplify_unary_operator, .fold_const_unary = expr_fold_erfc_const
 };
 const expr_ops_t ops_lgamma = {
     .eval = eval_lgamma, .deriv = deriv_lgamma, .reverse = expr_reverse_lgamma,
