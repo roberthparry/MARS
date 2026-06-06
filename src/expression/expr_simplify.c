@@ -1405,6 +1405,29 @@ static expr_t *expr_from_preserved_binding_expr_local(expr_binding_expr_t *expr)
     return node;
 }
 
+static expr_t *expr_try_simplify_preserved_integer_power_local(expr_t *base,
+                                                              number_t exponent)
+{
+    long numerator;
+    long denominator;
+    expr_binding_expr_t *pow_expr;
+    expr_t *out;
+
+    if (!expr_is_unnamed_const(base) ||
+        !base->binding_expr ||
+        base->binding_expr->kind == EXPR_BINDING_EXPR_NUMBER ||
+        !num_get_small_rational(exponent, &numerator, &denominator) ||
+        denominator != 1L)
+        return NULL;
+
+    pow_expr = expr_binding_expr_new_powi(
+        expr_binding_expr_clone(base->binding_expr),
+        numerator);
+    out = expr_from_preserved_binding_expr_local(pow_expr);
+    expr_free(base);
+    return out;
+}
+
 static expr_t *expr_try_simplify_preserved_i_power_local(
     const expr_binding_expr_t *base_expr, number_t exponent)
 {
@@ -2504,6 +2527,14 @@ expr_t *expr_simplify_pow_d_operator(const expr_t *dv, expr_t *a, expr_t *b)
             return i_power;
     }
 
+    {
+        expr_t *preserved_power =
+            expr_try_simplify_preserved_integer_power_local(a, exponent);
+
+        if (preserved_power)
+            return preserved_power;
+    }
+
     if (expr_simplify_is_plain_real_const(a)) {
         number_t v = num_pow(a->c, exponent);
 
@@ -2582,6 +2613,11 @@ expr_t *expr_simplify_pow_operator(const expr_t *dv, expr_t *a, expr_t *b)
     if (expr_is_op(b, &ops_const) && expr_const_is_one(b)) { expr_free(b); return a; }
     if (expr_is_op(b, &ops_const) && expr_const_is_zero(b)) {
         expr_free(a); expr_free(b); return expr_new_const(NUM_ONE);
+    }
+    if (expr_simplify_is_simplifiable_const(a) && expr_const_is_one(a)) {
+        expr_free(a);
+        expr_free(b);
+        return expr_new_const(NUM_ONE);
     }
 
     if (expr_is_op(b, &ops_const)) {

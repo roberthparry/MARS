@@ -110,6 +110,7 @@ static const binding_simplify_rule_t s_binding_unary_exact_rules[] = {
 };
 
 static const binding_simplify_rule_t s_binding_binary_op_rules[] = {
+    { binding_expr_try_simplify_sqrt_square },
     { binding_expr_try_simplify_e_power },
     { binding_expr_try_simplify_logbeta_integers }
 };
@@ -195,6 +196,9 @@ expr_binding_expr_t *expr_binding_simplify_powi(expr_binding_expr_t *expr)
         binding_expr_is_const_id(expr->u.powi.base, EXPR_BINDING_CONST_I))
         return binding_expr_fold_to_number_owned(expr, num_clone(NUM_NEG_ONE));
     expr = binding_expr_try_simplify_nested_power(expr);
+    if (!expr || expr->kind != EXPR_BINDING_EXPR_POWI)
+        return expr;
+    expr = binding_expr_try_simplify_sqrt_square(expr);
     if (!expr || expr->kind != EXPR_BINDING_EXPR_POWI)
         return expr;
     expr = binding_expr_try_simplify_integer_exp_power(expr);

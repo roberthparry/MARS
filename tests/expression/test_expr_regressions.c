@@ -2240,14 +2240,14 @@ static void test_inverse_power_function_notation_uses_supported_inverses_only(vo
                        "sqrt^-1(x) is rejected",
                        "(non-null)", "(null)");
 
-    if (str_eq(sqrt_power_text, "{ √⁻¹(x) | x = NAN }"))
+    if (str_eq(sqrt_power_text, "{ 1/√(x) | x = NAN }"))
         to_string_pass("sqrt(x)^-1 remains valid", sqrt_power_text,
-                       "{ √⁻¹(x) | x = NAN }");
+                       "{ 1/√(x) | x = NAN }");
     else
         to_string_fail(__FILE__, __LINE__, 1,
                        "sqrt(x)^-1 remains valid",
                        sqrt_power_text ? sqrt_power_text : "(null)",
-                       "{ √⁻¹(x) | x = NAN }");
+                       "{ 1/√(x) | x = NAN }");
 
     free(sqrt_power_text);
     free(asin_text);

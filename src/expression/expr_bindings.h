@@ -16,6 +16,7 @@ bool expr_binding_expr_struct_eq(const expr_binding_expr_t *left,
 bool expr_binding_expr_split_leading_number(const expr_binding_expr_t *expr,
                                           number_t *coeff_out,
                                           expr_binding_expr_t **rest_out);
+bool expr_binding_expr_needs_explicit_mul_separator(const expr_binding_expr_t *expr);
 expr_binding_expr_t *expr_binding_expr_simplify(expr_binding_expr_t *expr);
 char *expr_binding_expr_to_string(const expr_binding_expr_t *expr);
 char *expr_binding_expr_to_function_string(const expr_binding_expr_t *expr);

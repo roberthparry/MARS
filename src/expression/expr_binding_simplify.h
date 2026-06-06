@@ -44,6 +44,7 @@ expr_binding_expr_t *binding_expr_try_fold_mul_leading_numbers(expr_binding_expr
 expr_binding_expr_t *binding_expr_try_fold_div_leading_number(expr_binding_expr_t *expr);
 expr_binding_expr_t *binding_expr_try_combine_mul_powers(expr_binding_expr_t *expr);
 expr_binding_expr_t *binding_expr_try_simplify_nested_power(expr_binding_expr_t *expr);
+expr_binding_expr_t *binding_expr_try_simplify_sqrt_square(expr_binding_expr_t *expr);
 expr_binding_expr_t *binding_expr_try_simplify_integer_exp_power(expr_binding_expr_t *expr);
 expr_binding_expr_t *binding_expr_try_simplify_exp_product(expr_binding_expr_t *expr);
 expr_binding_expr_t *binding_expr_try_simplify_euler_square(expr_binding_expr_t *expr);

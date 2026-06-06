@@ -1,8 +1,10 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "expr_internal.h"
+#include "expr_bindings.h"
 #include "expression.h"
 #include "internal/expr_internal.h"
 #include "internal/number_internal.h"
@@ -48,6 +50,35 @@ static bool expr_match_var_leaf(const expr_t *expr, number_t *value_out, const c
     if (name_out)
         *name_out = (expr->name && *expr->name) ? expr->name : NULL;
     return true;
+}
+
+static bool expr_is_named_leaf(const expr_t *expr)
+{
+    return expr &&
+           (expr_is_var(expr) || expr_is_const(expr)) &&
+           expr->name &&
+           *expr->name;
+}
+
+static bool expr_has_composite_preserved_binding_leaf(const expr_t *expr)
+{
+    return expr_is_const(expr) &&
+           expr->binding_expr &&
+           expr->binding_expr->kind != EXPR_BINDING_EXPR_NUMBER &&
+           expr->binding_expr->kind != EXPR_BINDING_EXPR_CONST;
+}
+
+static bool expr_is_same_named_leaf_for_substitution(const expr_t *expr,
+                                                     const expr_t *needle)
+{
+    return expr &&
+           needle &&
+           expr != needle &&
+           expr_is_var(needle) &&
+           expr_is_named_leaf(expr) &&
+           needle->name &&
+           *needle->name &&
+           strcmp(expr->name, needle->name) == 0;
 }
 
 static bool expr_match_unnamed_const_leaf(const expr_t *expr, number_t *value_out)
@@ -886,6 +917,86 @@ bool expr_match_affine_poly_deg4(const expr_t *expr,
                                                poly_coeffs_out, constant_out, coeffs_out);
 }
 
+static number_t expr_pow_small_number(number_t base, size_t exponent)
+{
+    number_t out = num_clone(NUM_ONE);
+
+    for (size_t i = 0; i < exponent; ++i) {
+        number_t next = num_mul(out, base);
+
+        num_destroy(&out);
+        out = next;
+    }
+    return out;
+}
+
+static bool expr_rewrite_poly_deg4_basis(number_t *poly_coeffs,
+                                       size_t nvars,
+                                       number_t from_constant,
+                                       const number_t *from_coeffs,
+                                       number_t to_constant,
+                                       const number_t *to_coeffs)
+{
+    static const long binomial[5][5] = {
+        { 1, 0, 0, 0, 0 },
+        { 1, 1, 0, 0, 0 },
+        { 1, 2, 1, 0, 0 },
+        { 1, 3, 3, 1, 0 },
+        { 1, 4, 6, 4, 1 }
+    };
+    number_t alpha;
+    number_t scaled_to_constant;
+    number_t beta;
+    number_t rewritten[5];
+
+    if (!poly_coeffs || !from_coeffs || !to_coeffs)
+        return false;
+    if (expr_affine_is_zero(nvars, from_constant, from_coeffs) ||
+        expr_affine_equal(nvars, from_constant, from_coeffs, to_constant, to_coeffs))
+        return true;
+    if (nvars != 1u || num_is_zero(to_coeffs[0]))
+        return false;
+
+    alpha = num_div(from_coeffs[0], to_coeffs[0]);
+    scaled_to_constant = num_mul(alpha, to_constant);
+    beta = num_sub(from_constant, scaled_to_constant);
+    expr_zero_number_array(rewritten, 5);
+
+    for (size_t i = 0; i < 5u; ++i) {
+        if (num_is_zero(poly_coeffs[i]))
+            continue;
+
+        for (size_t j = 0; j <= i; ++j) {
+            number_t alpha_power = expr_pow_small_number(alpha, j);
+            number_t beta_power = expr_pow_small_number(beta, i - j);
+            number_t power_product = num_mul(alpha_power, beta_power);
+            number_t choose = num_create_from_long(binomial[i][j]);
+            number_t scale = num_mul(power_product, choose);
+            number_t term = num_mul(poly_coeffs[i], scale);
+            number_t next = num_add(rewritten[j], term);
+
+            num_destroy(&rewritten[j]);
+            rewritten[j] = next;
+            num_destroy(&term);
+            num_destroy(&scale);
+            num_destroy(&choose);
+            num_destroy(&power_product);
+            num_destroy(&beta_power);
+            num_destroy(&alpha_power);
+        }
+    }
+
+    for (size_t i = 0; i < 5u; ++i) {
+        num_destroy(&poly_coeffs[i]);
+        poly_coeffs[i] = rewritten[i];
+    }
+
+    num_destroy(&beta);
+    num_destroy(&scaled_to_constant);
+    num_destroy(&alpha);
+    return true;
+}
+
 static bool expr_match_affine_poly_deg4_times_unary_affine_op(const expr_t *expr,
                                                             expr_op_kind_t kind,
                                                             size_t nvars,
@@ -924,16 +1035,16 @@ static bool expr_match_affine_poly_deg4_times_unary_affine_op(const expr_t *expr
 
     if (expr_match_unary_affine_op(right, kind, nvars, vars, &unary_constant, unary_coeffs) &&
         expr_match_affine_poly_deg4_num_local(left, nvars, vars, poly_terms, &poly_constant, poly_coeffs) &&
-        (expr_affine_is_zero(nvars, poly_constant, poly_coeffs) ||
-         expr_affine_equal(nvars, poly_constant, poly_coeffs, unary_constant, unary_coeffs))) {
+        expr_rewrite_poly_deg4_basis(poly_terms, nvars, poly_constant, poly_coeffs,
+                                     unary_constant, unary_coeffs)) {
         matched = true;
     }
 
     if (!matched &&
         expr_match_unary_affine_op(left, kind, nvars, vars, &unary_constant, unary_coeffs) &&
         expr_match_affine_poly_deg4_num_local(right, nvars, vars, poly_terms, &poly_constant, poly_coeffs) &&
-        (expr_affine_is_zero(nvars, poly_constant, poly_coeffs) ||
-         expr_affine_equal(nvars, poly_constant, poly_coeffs, unary_constant, unary_coeffs))) {
+        expr_rewrite_poly_deg4_basis(poly_terms, nvars, poly_constant, poly_coeffs,
+                                     unary_constant, unary_coeffs)) {
         matched = true;
     }
 
@@ -1120,9 +1231,19 @@ expr_t *expr_substitute(const expr_t *expr,
     if (!expr)
         return NULL;
 
-    if (expr == needle) {
+    if (expr == needle || expr_is_same_named_leaf_for_substitution(expr, needle)) {
         expr_retain(replacement);
         return replacement;
+    }
+
+    if (expr_has_composite_preserved_binding_leaf(expr)) {
+        expr_t *expanded = expr_binding_expr_eval_expr(expr->binding_expr);
+
+        if (!expanded)
+            return NULL;
+        out = expr_substitute(expanded, needle, replacement);
+        expr_free(expanded);
+        return out;
     }
 
     if (expr_match_const_leaf(expr, NULL, &name)) {
