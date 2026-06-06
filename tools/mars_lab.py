@@ -4476,6 +4476,9 @@ def request_allows_funnel_control(headers: http.client.HTTPMessage,
 
 
 def tailscale_ipv4() -> str:
+    if not shutil.which("tailscale"):
+        return ""
+
     try:
         status = subprocess.run(
             ["tailscale", "status"],
@@ -4500,28 +4503,19 @@ def tailscale_ipv4() -> str:
     except Exception:
         pass
 
-    try:
-        completed = subprocess.run(
-            ["hostname", "-I"],
-            text=True,
-            capture_output=True,
-            timeout=2,
-            check=False,
-        )
-        for address in completed.stdout.split():
-            if address.startswith("100."):
-                return address
-    except Exception:
-        pass
-
     return ""
 
 
 def tailscale_magicdns_host() -> str:
+    if not tailscale_ipv4():
+        return ""
     return os.environ.get("MARS_LAB_TAILSCALE_HOST", "mars").strip().strip(".")
 
 
 def tailscale_https_host() -> str:
+    if not tailscale_ipv4():
+        return ""
+
     env_host = os.environ.get("MARS_LAB_TAILSCALE_HTTPS_HOST", "").strip().strip(".")
     if env_host:
         return env_host

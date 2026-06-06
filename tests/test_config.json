@@ -874,7 +874,8 @@
         "test_to_string_nested_mul_add": {
           "enabled": true,
           "test_to_string_nested_mul_add_expr": true,
-          "test_to_string_nested_mul_add_func": true
+          "test_to_string_nested_mul_add_func": true,
+          "test_to_string_polynomial_degree_order_expr": true
         },
         "test_to_string_atan2": {
           "enabled": true,
@@ -1130,6 +1131,7 @@
       "test_integrate_symbolic_shifted_sqrt": true,
       "test_integrate_poly_times_affine_power": true,
       "test_integrate_poly_over_centered_quadratic": true,
+      "test_integrate_symbolic_general_quadratic_denominator": true,
       "test_integrate_centered_quadratic_roots": true,
       "test_integrate_trig_power_products": true,
       "test_integrate_mixed_frequency_exp_unary": true,

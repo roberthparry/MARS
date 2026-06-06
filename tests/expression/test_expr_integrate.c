@@ -1268,6 +1268,16 @@ static void test_integrate_poly_over_centered_quadratic(void)
                                                 sizeof(points) / sizeof(points[0]));
 }
 
+static void test_integrate_symbolic_general_quadratic_denominator(void)
+{
+    assert_string_antiderivative_contains("{ 1/(a*x^2+b*x+c) }",
+                                          "2·atan((2ax + b)/√(4ac - b²))/√(4ac - b²)");
+    assert_string_antiderivative_contains("{ x/(a*x^2+b*x+c) }",
+                                          "ln(ax² + bx + c)/a");
+    assert_string_antiderivative_contains("{ x/(a*x^2+b*x+c) }",
+                                          "atan((2ax + b)/√(4ac - b²))");
+}
+
 static void test_integrate_centered_quadratic_roots(void)
 {
     static const double points[] = { -1.5, -0.4, 0.6, 1.8 };
@@ -1470,6 +1480,7 @@ void test_symbolic_integration(void)
     TEST_RUN_SUBTEST(test_integrate_symbolic_shifted_sqrt, NULL);
     TEST_RUN_SUBTEST(test_integrate_poly_times_affine_power, NULL);
     TEST_RUN_SUBTEST(test_integrate_poly_over_centered_quadratic, NULL);
+    TEST_RUN_SUBTEST(test_integrate_symbolic_general_quadratic_denominator, NULL);
     TEST_RUN_SUBTEST(test_integrate_centered_quadratic_roots, NULL);
     TEST_RUN_SUBTEST(test_integrate_trig_power_products, NULL);
     TEST_RUN_SUBTEST(test_integrate_mixed_frequency_exp_unary, NULL);

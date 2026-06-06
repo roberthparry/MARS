@@ -4,7 +4,7 @@
   "lab_mode": "integrator",
   "matrix_operation": "inverse",
   "matrix_operand": "",
-  "integrator_expression": "1/(x^2+4)",
+  "integrator_expression": "x/(ax^2+bx+c)",
   "integrator_bounds": "x",
   "integrator_interval_cap": 20000,
   "precision_bits": {

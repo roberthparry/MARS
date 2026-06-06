@@ -1092,7 +1092,7 @@ static void test_to_string_nested_mul_add_expr(void)
     expr_t *simp = expr_simplify(f);
 
     char *got = expr_to_string(simp, style_EXPRESSION);
-    const char *expect = "{ z + xy | z = 4, x = 2, y = 3 }";
+    const char *expect = "{ xy + z | z = 4, x = 2, y = 3 }";
 
     if (str_eq(got, expect))
         to_string_pass("nested mul+add (EXPR)", got, expect);
@@ -1144,10 +1144,50 @@ static void test_to_string_nested_mul_add_func(void)
     expr_free(f);
 }
 
+static void test_to_string_polynomial_degree_order_expr(void)
+{
+    struct {
+        const char *label;
+        const char *source;
+        const char *expected;
+    } cases[] = {
+        {
+            "polynomial terms sort by degree in x then y",
+            "{ y^2+x*y+x^2 | x = NAN, y = NAN }",
+            "{ x² + xy + y² | y = NAN, x = NAN }"
+        },
+        {
+            "polynomial terms sort lexicographically across variables",
+            "{ c*y^3+b*x*y^2+a*x*y+x^2 | x = NAN, y = NAN; a = NAN, b = NAN, c = NAN }",
+            "{ x² + bxy² + axy + cy³ | y = NAN, x = NAN; c = NAN, b = NAN, a = NAN }"
+        },
+        {
+            "polynomial terms sort by x then y then z",
+            "{ y*z^2+x*z+x*y^2+x^2 | x = NAN, y = NAN, z = NAN }",
+            "{ x² + xy² + xz + yz² | y = NAN, z = NAN, x = NAN }"
+        }
+    };
+
+    for (size_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+        expr_t *f = expr_from_string(cases[i].source, NULL);
+        char *got = f ? expr_to_string(f, style_EXPRESSION) : NULL;
+
+        if (got && str_eq(got, cases[i].expected))
+            to_string_pass(cases[i].label, got, cases[i].expected);
+        else
+            to_string_fail(__FILE__, __LINE__, 1,
+                           cases[i].label, got, cases[i].expected);
+
+        free(got);
+        expr_free(f);
+    }
+}
+
 void test_to_string_nested_mul_add(void)
 {
     TEST_RUN_SUBTEST(test_to_string_nested_mul_add_expr, NULL);
     TEST_RUN_SUBTEST(test_to_string_nested_mul_add_func, NULL);
+    TEST_RUN_SUBTEST(test_to_string_polynomial_degree_order_expr, NULL);
 }
 
 static void test_to_string_atan2_expr(void)
@@ -3316,7 +3356,7 @@ void test_expressions(void)
         {
             "x*y + π*x + τ*y + e",
             make_expr_46,
-            "{ e + πx + τy + xy | x = 1.25, y = 1.25; τ = 6.283185307179586476925286766559011 }",
+            "{ xy + πx + τy + e | x = 1.25, y = 1.25; τ = 6.283185307179586476925286766559011 }",
             "x = 1.25\n"
             "y = 1.25\n"
             "τ = 6.283185307179586476925286766559011\n"
@@ -3829,7 +3869,7 @@ void test_expressions_unnamed(void)
         {
             "c₀*x₀ + c₁ (two named consts, unnamed var)",
             make_expr_c04,
-            "{ c₁ + c₀x₀ | x₀ = 1.25; c₁ = 2.718281828459045235360287471352664, c₀ = 3.141592653589793238462643383279505 }",
+            "{ c₀x₀ + c₁ | x₀ = 1.25; c₁ = 2.718281828459045235360287471352664, c₀ = 3.141592653589793238462643383279505 }",
             "x₀ = 1.25\n"
             "c₁ = 2.718281828459045235360287471352664\n"
             "c₀ = 3.141592653589793238462643383279505\n"
