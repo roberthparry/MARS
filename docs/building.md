@@ -47,6 +47,14 @@ make check-deps
 If a required dependency is missing, the check prints the Debian/Ubuntu package
 name to install, for example `sudo apt install libmpfr-dev`.
 
+MARS Lab uses server-side TeX rendering, so the desktop Lab also needs `latex`
+and `dvisvgm`:
+
+```sh
+sudo apt install texlive-latex-base dvisvgm
+make check-lab-deps
+```
+
 ## Common Targets
 
 Default release build, shared library, tests, and any registered benchmarks:
@@ -83,6 +91,12 @@ Check required development libraries before building or installing:
 
 ```sh
 make check-deps
+```
+
+Check the development libraries and MARS Lab TeX rendering tools:
+
+```sh
+make check-lab-deps
 ```
 
 By default, installation uses:

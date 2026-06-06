@@ -4713,7 +4713,7 @@ def create_threading_http_server(host: str, port: int,
 def browser_access_host(bind_host: str, port: int = 0) -> str:
     bind_host = bind_host.strip()
     if bind_host in ("0.0.0.0", "::", "::0"):
-        return local_mdns_host() or local_lan_ipv4() or "127.0.0.1"
+        return "localhost"
     return bind_host
 
 
@@ -4721,7 +4721,7 @@ def browser_access_url(bind_host: str, port: int) -> str:
     bind_host = bind_host.strip()
     bind_address = _ip_address_from_text(bind_host)
     bind_is_tailscale = bool(bind_address and bind_address in ipaddress.ip_network("100.64.0.0/10"))
-    if (bind_host in ("0.0.0.0", "::", "::0") and tailscale_ipv4()) or bind_is_tailscale:
+    if bind_is_tailscale:
         tailscale_host = tailscale_https_host()
         if tailscale_host:
             return f"https://{tailscale_host}/"
@@ -4764,17 +4764,6 @@ def mobile_access_url(bind_host: str, port: int, host_header: str = "") -> str:
 def mobile_access_details(bind_host: str, port: int, host_header: str = "",
                           control_allowed: bool = False) -> dict[str, object]:
     funnel = tailscale_funnel_enabled()
-    tailscale_url = tailscale_access_url(bind_host, port)
-    if tailscale_url:
-        return {
-            "url": tailscale_url,
-            "title": "Tailscale access",
-            "hint": "Scan from a device connected to Tailscale.",
-            "funnel": funnel,
-            "tailscale": True,
-            "control": control_allowed,
-        }
-
     request_host = _host_from_header(host_header)
     if request_host and not _is_loopback_or_wildcard_host(request_host):
         tailscale_host = tailscale_https_host()
@@ -4807,6 +4796,16 @@ def mobile_access_details(bind_host: str, port: int, host_header: str = "",
 
     bind_host = bind_host.strip()
     if bind_host in ("0.0.0.0", "::", "::0"):
+        lan_host = local_mdns_host() or local_lan_ipv4()
+        if lan_host:
+            return {
+                "url": f"http://{lan_host}:{port}/",
+                "title": "WiFi access",
+                "hint": "Scan from a phone on the same WiFi.",
+                "funnel": False,
+                "tailscale": False,
+                "control": False,
+            }
         bind_host = tailscale_ipv4()
         if bind_host:
             tailscale_host = tailscale_https_host()
@@ -4820,16 +4819,6 @@ def mobile_access_details(bind_host: str, port: int, host_header: str = "",
                 "funnel": funnel,
                 "tailscale": True,
                 "control": control_allowed,
-            }
-        lan_host = local_mdns_host() or local_lan_ipv4()
-        if lan_host:
-            return {
-                "url": f"http://{lan_host}:{port}/",
-                "title": "WiFi access",
-                "hint": "Scan from a phone on the same WiFi.",
-                "funnel": False,
-                "tailscale": False,
-                "control": False,
             }
 
     if _is_loopback_or_wildcard_host(bind_host):
@@ -5348,6 +5337,18 @@ def format_number_text_for_precision(
 def render_tex_to_svg(tex: str) -> tuple[str | None, str | None]:
     if not tex:
         return None, None
+
+    missing_tools = [
+        command for command in ("latex", "dvisvgm")
+        if shutil.which(command) is None
+    ]
+    if missing_tools:
+        return (
+            None,
+            "Missing TeX rendering tool(s): "
+            + ", ".join(missing_tools)
+            + ". On Debian/Ubuntu, install: sudo apt install texlive-latex-base dvisvgm",
+        )
 
     document = rf"""\documentclass{{article}}
 \pagestyle{{empty}}

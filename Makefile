@@ -98,7 +98,7 @@ TEST_BINS  := $(patsubst tests/%.c,$(TEST_BUILD_DIR)/%,$(TEST_SRCS))
 # ------------------------------------------------------------
 # Default target
 # ------------------------------------------------------------
-.PHONY: all clean test memtest debug release check-deps install uninstall mars-lab ophelia-lab install-mars-lab uninstall-mars-lab help
+.PHONY: all clean test memtest debug release check-deps check-lab-deps install uninstall mars-lab ophelia-lab install-mars-lab uninstall-mars-lab help
 
 all: $(STATIC_LIB) $(SHARED_LIB) $(TEST_BINS) $(BENCH_BINS) $(SCRATCH_BINS)
 
@@ -113,12 +113,14 @@ release:
 # ------------------------------------------------------------
 check-deps:
 	@missing=0; \
+	packages=""; \
 	check_dep() { \
 	    name="$$1"; header="$$2"; lib="$$3"; package="$$4"; body="$$5"; \
 	    if ! printf '%s\n' "#include <stdint.h>" "#include <$$header>" "int main(void) { $$body; return 0; }" \
 	        | $(CC) -x c - -o /tmp/mars-check-dep $$lib >/dev/null 2>&1; then \
 	        echo "Missing $$name development files."; \
 	        echo "  Debian/Ubuntu: sudo apt install $$package"; \
+	        packages="$$packages $$package"; \
 	        missing=1; \
 	    fi; \
 	    rm -f /tmp/mars-check-dep; \
@@ -132,12 +134,30 @@ check-deps:
 	if [ "$$missing" -ne 0 ]; then \
 	    echo; \
 	    echo "Install the missing development package(s), then rerun make."; \
-	    echo "For a typical Debian/Ubuntu setup:"; \
-	    if [ "$(ENABLE_UNISTRING)" = "1" ]; then \
-	        echo "  sudo apt install build-essential libgmp-dev libmpfr-dev libmpc-dev libunistring-dev"; \
-	    else \
-	        echo "  sudo apt install build-essential libgmp-dev libmpfr-dev libmpc-dev"; \
+	    echo "Debian/Ubuntu command:"; \
+	    echo "  sudo apt install$$packages"; \
+	    exit 1; \
+	fi
+
+check-lab-deps: check-deps
+	@missing=0; \
+	packages=""; \
+	check_tool() { \
+	    name="$$1"; command="$$2"; package="$$3"; \
+	    if ! command -v "$$command" >/dev/null 2>&1; then \
+	        echo "Missing $$name for MARS Lab TeX rendering."; \
+	        echo "  Debian/Ubuntu: sudo apt install $$package"; \
+	        packages="$$packages $$package"; \
+	        missing=1; \
 	    fi; \
+	}; \
+	check_tool "LaTeX" "latex" "texlive-latex-base"; \
+	check_tool "dvisvgm" "dvisvgm" "dvisvgm"; \
+	if [ "$$missing" -ne 0 ]; then \
+	    echo; \
+	    echo "Install the missing MARS Lab runtime tool(s), then rerun make."; \
+	    echo "Debian/Ubuntu command:"; \
+	    echo "  sudo apt install$$packages"; \
 	    exit 1; \
 	fi
 
@@ -287,14 +307,14 @@ $(foreach bin,$(SCRATCH_BINS),$(eval $(call SCRATCH_ALIAS_RULES,$(notdir $(bin))
 scratch: $(SCRATCH_BINS)
 
 .PHONY: mars-lab ophelia-lab install-mars-lab uninstall-mars-lab install-ophelia-lab uninstall-ophelia-lab
-mars-lab: $(BUILD_DIR)/scratch/mars_lab
+mars-lab: check-lab-deps $(BUILD_DIR)/scratch/mars_lab
 	@tools/mars-lab
 
 .PHONY: ophelia-lab
 ophelia-lab: $(BUILD_DIR)/scratch/ophelia_lab
 	@tools/ophelia-lab
 
-install-mars-lab: tools/mars-lab packaging/linux/mars-lab.desktop.in packaging/linux/mars-lab.svg $(MARS_LAB_ICON_CONCEPTS)
+install-mars-lab: check-lab-deps tools/mars-lab packaging/linux/mars-lab.desktop.in packaging/linux/mars-lab.svg $(MARS_LAB_ICON_CONCEPTS)
 	$(INSTALL) -d "$(MARS_LAB_BINDIR)" "$(MARS_LAB_APPDIR)" "$(MARS_LAB_ICONDIR)"
 	rm -f "$(MARS_LAB_BINDIR)/mars-expr-lab" "$(MARS_LAB_APPDIR)/mars-expr-lab.desktop" "$(MARS_LAB_ICONDIR)/mars-expr-lab.svg" "$(MARS_LAB_ICONDIR)"/mars-expr-lab-*.svg
 	@printf '%s\n' \
@@ -312,7 +332,7 @@ install-mars-lab: tools/mars-lab packaging/linux/mars-lab.desktop.in packaging/l
 		'if [ "$$status" -eq 0 ] && [ "$$open_browser" -eq 1 ]; then' \
 		'  sleep 0.8' \
 		'  lab_url="$$(cd "$(CURDIR)" && python3 -c "import sys; sys.path.insert(0, \"tools\"); import mars_lab as m; print(m.browser_access_url(\"::\", 8765))" 2>/dev/null || true)"' \
-		'  if [ -z "$$lab_url" ]; then lab_host="$$(hostname -s 2>/dev/null | tr "[:upper:]" "[:lower:]")"; [ -n "$$lab_host" ] || lab_host="lenovo"; lab_url="http://$$lab_host.local:8765/"; fi' \
+		'  if [ -z "$$lab_url" ]; then lab_url="http://localhost:8765/"; fi' \
 		'  if command -v xdg-open >/dev/null 2>&1; then xdg-open "$$lab_url" >/dev/null 2>&1 & elif command -v gio >/dev/null 2>&1; then gio open "$$lab_url" >/dev/null 2>&1 & fi' \
 		'fi' \
 		'exit "$$status"' \
@@ -411,6 +431,7 @@ help:
 	@echo "  make install-ophelia-lab    Install a user desktop launcher for Ophelia Lab"
 	@echo "  make uninstall-ophelia-lab  Remove the user desktop launcher for Ophelia Lab"
 	@echo "  make check-deps             Check required external development libraries"
+	@echo "  make check-lab-deps         Check development libraries and MARS Lab TeX tools"
 	@echo "  make install                Install libraries and headers under PREFIX (default /usr/local)"
 	@echo "  make uninstall              Remove installed libraries and headers from PREFIX"
 	@echo "  make clean                  Remove all build artifacts"
