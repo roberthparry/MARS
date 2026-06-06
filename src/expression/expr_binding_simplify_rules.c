@@ -384,6 +384,41 @@ expr_binding_expr_t *binding_expr_try_simplify_nested_power(expr_binding_expr_t 
         expr_binding_expr_new_binary_op(&ops_pow, base, scaled_exponent));
 }
 
+expr_binding_expr_t *binding_expr_try_simplify_sqrt_square(expr_binding_expr_t *expr)
+{
+    expr_binding_expr_t *sqrt_expr;
+    expr_binding_expr_t *inner;
+
+    if (!expr)
+        return expr;
+
+    if (expr->kind == EXPR_BINDING_EXPR_POWI &&
+        expr->u.powi.exponent == 2L &&
+        expr->u.powi.base &&
+        expr->u.powi.base->kind == EXPR_BINDING_EXPR_UNARY_OP &&
+        expr->u.powi.base->u.unary_op.ops == &ops_sqrt) {
+        sqrt_expr = expr->u.powi.base;
+        expr->u.powi.base = NULL;
+    } else if (expr->kind == EXPR_BINDING_EXPR_BINARY_OP &&
+               expr->u.binary_op.ops == &ops_pow &&
+               binding_number_text_eq_long(expr->u.binary_op.right, 2L) &&
+               expr->u.binary_op.left &&
+               expr->u.binary_op.left->kind == EXPR_BINDING_EXPR_UNARY_OP &&
+               expr->u.binary_op.left->u.unary_op.ops == &ops_sqrt) {
+        sqrt_expr = expr->u.binary_op.left;
+        expr->u.binary_op.left = NULL;
+    } else {
+        return expr;
+    }
+
+    inner = sqrt_expr->u.unary_op.child;
+    sqrt_expr->u.unary_op.child = NULL;
+
+    expr_binding_expr_free(expr);
+    expr_binding_expr_free(sqrt_expr);
+    return expr_binding_expr_simplify(inner);
+}
+
 static expr_binding_expr_t *binding_expr_number_from_value(number_t value)
 {
     char *text;

@@ -100,6 +100,22 @@ cleanup:
     return simplified;
 }
 
+static expr_t *binding_or_synthetic_var(expr_bindings_t *bindings,
+                                        const char *name,
+                                        int *owned)
+{
+    expr_t *var = bindings ? expr_bindings_get(bindings, name) : NULL;
+
+    if (owned)
+        *owned = 0;
+    if (var)
+        return var;
+
+    if (owned)
+        *owned = 1;
+    return expr_new_named_var(NUM_NAN, name);
+}
+
 static char *number_text(number_t value)
 {
     return num_to_string(value);
@@ -180,7 +196,34 @@ static char *bound_tex_input(const char *raw_input, const expr_t *expr)
 {
     if (is_plain_decimal_bound(raw_input))
         return dup_string(raw_input);
+    if (expr) {
+        char *body = NULL;
+        char *bindings = NULL;
+
+        if (expr_to_tex_parts(expr, &body, &bindings) == 0) {
+            free(bindings);
+            return body;
+        }
+        free(body);
+        free(bindings);
+    }
     return expr ? expr_to_string(expr, style_TEX) : dup_string(raw_input);
+}
+
+static char *expr_tex_body(const expr_t *expr)
+{
+    char *body = NULL;
+    char *bindings = NULL;
+
+    if (!expr)
+        return NULL;
+    if (expr_to_tex_parts(expr, &body, &bindings) == 0) {
+        free(bindings);
+        return body;
+    }
+    free(body);
+    free(bindings);
+    return expr_to_string(expr, style_TEX);
 }
 
 static char *combine_equation_tex(const char *lhs, const char *rhs)
@@ -391,6 +434,7 @@ int main(int argc, char **argv)
     expr_t *expr = NULL;
     integrator_t *ig = NULL;
     expr_t **vars = NULL;
+    int *owned_vars = NULL;
     const char **var_names = NULL;
     const char **lo_inputs = NULL;
     const char **hi_inputs = NULL;
@@ -469,12 +513,13 @@ int main(int argc, char **argv)
         input = wrapped_input;
 
     expr = expr_from_string(input, &bindings);
-    if (!expr || !bindings) {
+    if (!expr) {
         fprintf(stderr, "Could not parse integrand expression\n");
         goto cleanup;
     }
 
     vars = calloc(ndim, sizeof(*vars));
+    owned_vars = calloc(ndim, sizeof(*owned_vars));
     var_names = calloc(ndim, sizeof(*var_names));
     lo_inputs = calloc(ndim, sizeof(*lo_inputs));
     hi_inputs = calloc(ndim, sizeof(*hi_inputs));
@@ -487,13 +532,15 @@ int main(int argc, char **argv)
     hi_display_inputs = calloc(ndim, sizeof(*hi_display_inputs));
     lo_tex_inputs = calloc(ndim, sizeof(*lo_tex_inputs));
     hi_tex_inputs = calloc(ndim, sizeof(*hi_tex_inputs));
-    if (!vars || !var_names || !lo_inputs || !hi_inputs || !bound_kinds ||
+    if (!vars || !owned_vars || !var_names || !lo_inputs || !hi_inputs || !bound_kinds ||
         !lo_num || !hi_num || !lo_expr || !hi_expr ||
         !lo_display_inputs || !hi_display_inputs || !lo_tex_inputs || !hi_tex_inputs)
         goto cleanup;
 
     if (argi + 2 >= argc) {
-        vars[0] = expr_bindings_get(bindings, "x");
+        vars[0] = binding_or_synthetic_var(bindings, "x", &owned_vars[0]);
+        if (!vars[0])
+            goto cleanup;
         var_names[0] = "x";
         lo_inputs[0] = "0";
         hi_inputs[0] = "pi";
@@ -513,9 +560,9 @@ int main(int argc, char **argv)
             int has_lo;
             int has_hi;
 
-            vars[i] = expr_bindings_get(bindings, name);
+            vars[i] = binding_or_synthetic_var(bindings, name, &owned_vars[i]);
             if (!vars[i]) {
-                fprintf(stderr, "No binding named '%s'\n", name);
+                fprintf(stderr, "Could not create binding named '%s'\n", name);
                 goto cleanup;
             }
             has_lo = lo_text_in && lo_text_in[0] != '\0';
@@ -592,17 +639,17 @@ int main(int argc, char **argv)
         display_input = wrap_expression(expr_text);
         display_expr = expr_from_string(display_input ? display_input : expr_text, NULL);
     }
-    integrand_tex = display_expr ? expr_to_string(display_expr, style_TEX) : NULL;
+    integrand_tex = expr_tex_body(display_expr);
 
     symbolic_result = symbolic_integral(expr, ndim, vars, bound_kinds, lo_expr, hi_expr,
                                         &first_antiderivative);
     if (first_antiderivative) {
         antiderivative_text = expr_to_string(first_antiderivative, style_UNBOUND);
-        antiderivative_tex = expr_to_string(first_antiderivative, style_TEX);
+        antiderivative_tex = expr_tex_body(first_antiderivative);
     }
     if (symbolic_result) {
         symbolic_text = expr_to_string(symbolic_result, style_UNBOUND);
-        symbolic_tex = expr_to_string(symbolic_result, style_TEX);
+        symbolic_tex = expr_tex_body(symbolic_result);
         symbolic_num = expr_eval(symbolic_result);
         if (!num_is_nan(symbolic_num) && num_is_finite(symbolic_num) && num_is_real(symbolic_num))
             symbolic_value_text = number_text(symbolic_num);
@@ -610,6 +657,8 @@ int main(int argc, char **argv)
 
     if (all_bounds_numeric && symbolic_value_text) {
         used_symbolic_numeric_result = 1;
+        intg_rc = 0;
+    } else if (symbolic_result) {
         intg_rc = 0;
     } else if (all_bounds_numeric && ndim == 1u) {
         intg_rc = intg_single_integral(ig, expr, vars[0], lo_num[0], hi_num[0],
@@ -619,8 +668,6 @@ int main(int argc, char **argv)
         intg_rc = intg_integral_multi(ig, expr, ndim, vars, lo_num, hi_num,
                                   &value_num, &error_num);
         ran_numeric_integrator = 1;
-    } else if (symbolic_result) {
-        intg_rc = 0;
     } else {
         fprintf(stderr, "Symbolic bounds need an integrand with a supported symbolic antiderivative\n");
         goto cleanup;
@@ -759,6 +806,13 @@ cleanup:
     free(hi_inputs);
     free(lo_inputs);
     free(var_names);
+    if (owned_vars && vars) {
+        for (size_t i = 0; i < ndim; ++i) {
+            if (owned_vars[i])
+                expr_free(vars[i]);
+        }
+    }
+    free(owned_vars);
     free(vars);
     intg_free(ig);
     expr_free(display_expr);

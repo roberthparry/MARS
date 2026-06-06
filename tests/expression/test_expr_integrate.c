@@ -26,6 +26,84 @@ static void assert_antiderivative_matches(const char *label,
     expr_free(anti);
 }
 
+static void assert_string_antiderivative_matches(const char *input,
+                                                 const double *points,
+                                                 size_t npoints)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = expr_from_string(input, &bindings);
+    expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    expr_t *simplified = expr ? expr_simplify(expr) : NULL;
+
+    ASSERT_NOT_NULL(simplified);
+    ASSERT_NOT_NULL(x);
+    assert_antiderivative_matches(input, simplified, x, points, npoints);
+
+    expr_free(simplified);
+    expr_free(expr);
+    expr_bindings_free(bindings);
+}
+
+static void assert_string_antiderivative_contains(const char *input,
+                                                  const char *expected)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = expr_from_string(input, &bindings);
+    expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    expr_t *simplified = expr ? expr_simplify(expr) : NULL;
+    expr_t *anti = simplified ? expr_integrate(simplified, x) : NULL;
+    char *text = anti ? expr_to_string(anti, style_UNBOUND) : NULL;
+
+    ASSERT_NOT_NULL(simplified);
+    ASSERT_NOT_NULL(x);
+    ASSERT_NOT_NULL(anti);
+    ASSERT_NOT_NULL(text);
+    ASSERT_TRUE(strstr(text, expected) != NULL);
+
+    free(text);
+    expr_free(anti);
+    expr_free(simplified);
+    expr_free(expr);
+    expr_bindings_free(bindings);
+}
+
+static void assert_string_antiderivative_matches_with_a(const char *input,
+                                                        double a_value,
+                                                        const double *points,
+                                                        size_t npoints)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *expr = expr_from_string(input, &bindings);
+    expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    expr_t *a = bindings ? expr_bindings_get(bindings, "a") : NULL;
+    expr_t *simplified = expr ? expr_simplify(expr) : NULL;
+    expr_t *anti = simplified ? expr_integrate(simplified, x) : NULL;
+    expr_t *deriv = anti ? expr_create_deriv(anti, x) : NULL;
+
+    ASSERT_NOT_NULL(simplified);
+    ASSERT_NOT_NULL(x);
+    ASSERT_NOT_NULL(a);
+    ASSERT_NOT_NULL(anti);
+    ASSERT_NOT_NULL(deriv);
+
+    test_expr_set_val_d(a, a_value);
+    for (size_t i = 0; i < npoints; ++i) {
+        char point_label[160];
+
+        test_expr_set_val_d(x, points[i]);
+        snprintf(point_label, sizeof(point_label), "%s at x=%g, a=%g",
+                 input, points[i], a_value);
+        check_q_at(__FILE__, __LINE__, 1, point_label,
+                   expr_eval_qf(deriv), expr_eval_qf(simplified));
+    }
+
+    expr_free(deriv);
+    expr_free(anti);
+    expr_free(simplified);
+    expr_free(expr);
+    expr_bindings_free(bindings);
+}
+
 static void test_integrate_polynomial_sum(void)
 {
     static const double points[] = { -2.0, -0.5, 0.0, 1.25, 3.0 };
@@ -54,6 +132,8 @@ static void test_integrate_reciprocal_and_log(void)
     expr_t *x = test_expr_new_named_var_d(1.0, "x");
     expr_t *one_over_x = test_expr_d_div(1.0, x);
     expr_t *log_x = expr_log(x);
+    expr_t *x2_recip = test_expr_pow_d(x, 2.0);
+    expr_t *one_over_x2 = test_expr_d_div(1.0, x2_recip);
     expr_t *x2 = test_expr_pow_d(x, 2.0);
     expr_t *one_plus_x2 = test_expr_add_d(x2, 1.0);
     expr_t *one_minus_x2 = test_expr_d_sub(1.0, x2);
@@ -75,6 +155,9 @@ static void test_integrate_reciprocal_and_log(void)
 
     assert_antiderivative_matches("integral derivative of 1/x",
                                   one_over_x, x, points,
+                                  sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of 1/x^2",
+                                  one_over_x2, x, points,
                                   sizeof(points) / sizeof(points[0]));
     assert_antiderivative_matches("integral derivative of log(x)",
                                   log_x, x, points,
@@ -113,6 +196,8 @@ static void test_integrate_reciprocal_and_log(void)
     expr_free(one_minus_x2);
     expr_free(one_plus_x2);
     expr_free(x2);
+    expr_free(one_over_x2);
+    expr_free(x2_recip);
     expr_free(log_x);
     expr_free(one_over_x);
     expr_free(x);
@@ -511,6 +596,20 @@ static void test_integrate_affine_poly_times_specials(void)
     expr_t *exp_x_cos_x = expr_mul(exp_x, cos_x);
     expr_t *exp_x_sinh_x = expr_mul(exp_x, sinh_x);
     expr_t *exp_x_cosh_x = expr_mul(exp_x, cosh_x);
+    expr_t *two_x = test_expr_mul_d(x, 2.0);
+    expr_t *exp_2x = expr_exp(two_x);
+    expr_t *sin_2x = expr_sin(two_x);
+    expr_t *cos_2x = expr_cos(two_x);
+    expr_t *ln_2x = expr_log(two_x);
+    expr_t *x2_for_scaled = test_expr_pow_d(x, 2.0);
+    expr_t *x3_for_scaled = test_expr_pow_d(x, 3.0);
+    expr_t *x_exp_2x = expr_mul(x, exp_2x);
+    expr_t *x2_exp_2x = expr_mul(x2_for_scaled, exp_2x);
+    expr_t *x_sin_2x = expr_mul(x, sin_2x);
+    expr_t *x3_sin_2x = expr_mul(x3_for_scaled, sin_2x);
+    expr_t *x_cos_2x = expr_mul(x, cos_2x);
+    expr_t *x2_cos_2x = expr_mul(x2_for_scaled, cos_2x);
+    expr_t *ln_2x_over_x = expr_div(ln_2x, x);
     expr_t *sin_x_sq = expr_mul(sin_x, sin_x);
     expr_t *cos_x_sq = expr_mul(cos_x, cos_x);
     expr_t *tan_x_sq = expr_mul(tan_x, tan_x);
@@ -615,6 +714,21 @@ static void test_integrate_affine_poly_times_specials(void)
                                   exp_x_sinh_x, x, points, sizeof(points) / sizeof(points[0]));
     assert_antiderivative_matches("integral derivative of exp(x)*cosh(x)",
                                   exp_x_cosh_x, x, points, sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of x*exp(2*x)",
+                                  x_exp_2x, x, points, sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of x^2*exp(2*x)",
+                                  x2_exp_2x, x, points, sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of x*sin(2*x)",
+                                  x_sin_2x, x, points, sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of x^3*sin(2*x)",
+                                  x3_sin_2x, x, points, sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of x*cos(2*x)",
+                                  x_cos_2x, x, points, sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of x^2*cos(2*x)",
+                                  x2_cos_2x, x, points, sizeof(points) / sizeof(points[0]));
+    assert_antiderivative_matches("integral derivative of ln(2*x)/x",
+                                  ln_2x_over_x, x, positive_points,
+                                  sizeof(positive_points) / sizeof(positive_points[0]));
     assert_antiderivative_matches("integral derivative of sin(x)^2",
                                   sin_x_sq, x, points, sizeof(points) / sizeof(points[0]));
     assert_antiderivative_matches("integral derivative of cos(x)^2",
@@ -677,6 +791,20 @@ static void test_integrate_affine_poly_times_specials(void)
     expr_free(exp_x_sinh_x);
     expr_free(exp_x_cos_x);
     expr_free(exp_x_sin_x);
+    expr_free(ln_2x_over_x);
+    expr_free(x2_cos_2x);
+    expr_free(x_cos_2x);
+    expr_free(x3_sin_2x);
+    expr_free(x_sin_2x);
+    expr_free(x2_exp_2x);
+    expr_free(x_exp_2x);
+    expr_free(x3_for_scaled);
+    expr_free(x2_for_scaled);
+    expr_free(ln_2x);
+    expr_free(cos_2x);
+    expr_free(sin_2x);
+    expr_free(exp_2x);
+    expr_free(two_x);
     expr_free(shifted_e1_product);
     expr_free(shifted_ei_product);
     expr_free(e1_x_plus_two);
@@ -807,6 +935,429 @@ static void test_integrate_definite_symbolic_bounds(void)
     expr_free(x);
 }
 
+static void test_integrate_inverse_square_with_exact_bound(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *one_over_x2 = expr_from_string("{ 1/x^2 }", &bindings);
+    expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    expr_t *simplified_integrand = one_over_x2 ? expr_simplify(one_over_x2) : NULL;
+    expr_t *one_raw = expr_from_string("{ 1 }", NULL);
+    expr_t *sqrt_three_raw = expr_from_string("{ sqrt(3) }", NULL);
+    expr_t *one = one_raw ? expr_simplify(one_raw) : NULL;
+    expr_t *sqrt_three = sqrt_three_raw ? expr_simplify(sqrt_three_raw) : NULL;
+    expr_t *anti = simplified_integrand ? expr_integrate(simplified_integrand, x) : NULL;
+    expr_t *upper = (anti && sqrt_three) ? expr_substitute(anti, x, sqrt_three) : NULL;
+    expr_t *lower = (anti && one) ? expr_substitute(anti, x, one) : NULL;
+    expr_t *diff = (upper && lower) ? expr_sub(upper, lower) : NULL;
+    expr_t *simplified = diff ? expr_simplify(diff) : NULL;
+    number_t value = simplified ? expr_eval(simplified) : num_new();
+
+    ASSERT_NOT_NULL(anti);
+    ASSERT_NOT_NULL(upper);
+    ASSERT_NOT_NULL(lower);
+    ASSERT_NOT_NULL(diff);
+    ASSERT_NOT_NULL(simplified);
+    ASSERT_FALSE(num_is_nan(value));
+    check_q_at(__FILE__, __LINE__, 1, "definite integral 1/x^2 from 1 to sqrt(3)",
+               expr_eval_qf(simplified), qf_from_double(1.0 - 1.0 / sqrt(3.0)));
+
+    num_destroy(&value);
+    expr_free(simplified);
+    expr_free(diff);
+    expr_free(lower);
+    expr_free(upper);
+    expr_free(anti);
+    expr_free(sqrt_three);
+    expr_free(one);
+    expr_free(sqrt_three_raw);
+    expr_free(one_raw);
+    expr_free(simplified_integrand);
+    expr_free(one_over_x2);
+    expr_bindings_free(bindings);
+}
+
+static void assert_symbolic_shifted_inverse_square(const char *input,
+                                                   const char *first_term,
+                                                   const char *second_term)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *integrand = expr_from_string(input, &bindings);
+    expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    expr_t *simplified_integrand = integrand ? expr_simplify(integrand) : NULL;
+    expr_t *one_raw = expr_from_string("{ 1 }", NULL);
+    expr_t *sqrt_three_raw = expr_from_string("{ sqrt(3) }", NULL);
+    expr_t *one = one_raw ? expr_simplify(one_raw) : NULL;
+    expr_t *sqrt_three = sqrt_three_raw ? expr_simplify(sqrt_three_raw) : NULL;
+    expr_t *anti = simplified_integrand ? expr_integrate(simplified_integrand, x) : NULL;
+    expr_t *upper = (anti && sqrt_three) ? expr_substitute(anti, x, sqrt_three) : NULL;
+    expr_t *lower = (anti && one) ? expr_substitute(anti, x, one) : NULL;
+    expr_t *diff = (upper && lower) ? expr_sub(upper, lower) : NULL;
+    expr_t *simplified = diff ? expr_simplify(diff) : NULL;
+    char *text = simplified ? expr_to_string(simplified, style_UNBOUND) : NULL;
+
+    ASSERT_NOT_NULL(anti);
+    ASSERT_NOT_NULL(upper);
+    ASSERT_NOT_NULL(lower);
+    ASSERT_NOT_NULL(diff);
+    ASSERT_NOT_NULL(simplified);
+    ASSERT_NOT_NULL(text);
+    ASSERT_TRUE(strstr(text, first_term) != NULL);
+    ASSERT_TRUE(strstr(text, second_term) != NULL);
+
+    free(text);
+    expr_free(simplified);
+    expr_free(diff);
+    expr_free(lower);
+    expr_free(upper);
+    expr_free(anti);
+    expr_free(sqrt_three);
+    expr_free(one);
+    expr_free(sqrt_three_raw);
+    expr_free(one_raw);
+    expr_free(simplified_integrand);
+    expr_free(integrand);
+    expr_bindings_free(bindings);
+}
+
+static void test_integrate_shifted_inverse_square_with_symbolic_constant(void)
+{
+    assert_symbolic_shifted_inverse_square("{ 1/(x+c)^2 }",
+                                           "1/(c + 1)",
+                                           "1/(c + √(3))");
+    assert_symbolic_shifted_inverse_square("{ 1/(c-x)^2 }",
+                                           "1/(c - √(3))",
+                                           "1/(c - 1)");
+}
+
+static void test_integrate_symbolic_power_exponent(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *integrand = expr_from_string("{ x^n }", &bindings);
+    expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    expr_t *simplified_integrand = integrand ? expr_simplify(integrand) : NULL;
+    expr_t *one_raw = expr_from_string("{ 1 }", NULL);
+    expr_t *sqrt_three_raw = expr_from_string("{ sqrt(3) }", NULL);
+    expr_t *one = one_raw ? expr_simplify(one_raw) : NULL;
+    expr_t *sqrt_three = sqrt_three_raw ? expr_simplify(sqrt_three_raw) : NULL;
+    expr_t *anti = simplified_integrand ? expr_integrate(simplified_integrand, x) : NULL;
+    expr_t *upper = (anti && sqrt_three) ? expr_substitute(anti, x, sqrt_three) : NULL;
+    expr_t *lower = (anti && one) ? expr_substitute(anti, x, one) : NULL;
+    expr_t *diff = (upper && lower) ? expr_sub(upper, lower) : NULL;
+    expr_t *simplified = diff ? expr_simplify(diff) : NULL;
+    char *anti_text = anti ? expr_to_string(anti, style_UNBOUND) : NULL;
+    char *text = simplified ? expr_to_string(simplified, style_UNBOUND) : NULL;
+
+    ASSERT_NOT_NULL(anti);
+    ASSERT_NOT_NULL(anti_text);
+    ASSERT_TRUE(strstr(anti_text, "x^(n + 1)/(n + 1)") != NULL);
+    ASSERT_NOT_NULL(upper);
+    ASSERT_NOT_NULL(lower);
+    ASSERT_NOT_NULL(diff);
+    ASSERT_NOT_NULL(simplified);
+    ASSERT_NOT_NULL(text);
+    ASSERT_TRUE(strstr(text, "√(3)^(n + 1)/(n + 1)") != NULL);
+    ASSERT_TRUE(strstr(text, "1/(n + 1)") != NULL);
+    ASSERT_TRUE(strstr(text, "1^") == NULL);
+
+    free(text);
+    free(anti_text);
+    expr_free(simplified);
+    expr_free(diff);
+    expr_free(lower);
+    expr_free(upper);
+    expr_free(anti);
+    expr_free(sqrt_three);
+    expr_free(one);
+    expr_free(sqrt_three_raw);
+    expr_free(one_raw);
+    expr_free(simplified_integrand);
+    expr_free(integrand);
+    expr_bindings_free(bindings);
+}
+
+static void test_integrate_symbolic_shifted_sqrt(void)
+{
+    expr_bindings_t *bindings = NULL;
+    expr_t *integrand = expr_from_string("{ sqrt(x-a) }", &bindings);
+    expr_t *x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    expr_t *simplified_integrand = integrand ? expr_simplify(integrand) : NULL;
+    expr_t *anti = simplified_integrand ? expr_integrate(simplified_integrand, x) : NULL;
+    char *text = anti ? expr_to_string(anti, style_UNBOUND) : NULL;
+
+    ASSERT_NOT_NULL(anti);
+    ASSERT_NOT_NULL(text);
+    ASSERT_TRUE(strstr(text, "⅔·(x - a)^³⁄₂") != NULL);
+
+    free(text);
+    expr_free(anti);
+    expr_free(simplified_integrand);
+    expr_free(integrand);
+    expr_bindings_free(bindings);
+
+    bindings = NULL;
+    integrand = expr_from_string("{ sqrt(x+a) }", &bindings);
+    x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    simplified_integrand = integrand ? expr_simplify(integrand) : NULL;
+    anti = simplified_integrand ? expr_integrate(simplified_integrand, x) : NULL;
+    text = anti ? expr_to_string(anti, style_UNBOUND) : NULL;
+
+    ASSERT_NOT_NULL(anti);
+    ASSERT_NOT_NULL(text);
+    ASSERT_TRUE(strstr(text, "⅔·(x + a)^³⁄₂") != NULL);
+
+    free(text);
+    expr_free(anti);
+    expr_free(simplified_integrand);
+    expr_free(integrand);
+    expr_bindings_free(bindings);
+
+    bindings = NULL;
+    integrand = expr_from_string("{ sqrt(a+x) }", &bindings);
+    x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    simplified_integrand = integrand ? expr_simplify(integrand) : NULL;
+    anti = simplified_integrand ? expr_integrate(simplified_integrand, x) : NULL;
+    text = anti ? expr_to_string(anti, style_UNBOUND) : NULL;
+
+    ASSERT_NOT_NULL(anti);
+    ASSERT_NOT_NULL(text);
+    ASSERT_TRUE(strstr(text, "⅔·(x + a)^³⁄₂") != NULL);
+
+    free(text);
+    expr_free(anti);
+    expr_free(simplified_integrand);
+    expr_free(integrand);
+    expr_bindings_free(bindings);
+
+    bindings = NULL;
+    integrand = expr_from_string("{ sqrt(a-x) }", &bindings);
+    x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    simplified_integrand = integrand ? expr_simplify(integrand) : NULL;
+    anti = simplified_integrand ? expr_integrate(simplified_integrand, x) : NULL;
+    text = anti ? expr_to_string(anti, style_UNBOUND) : NULL;
+
+    ASSERT_NOT_NULL(anti);
+    ASSERT_NOT_NULL(text);
+    ASSERT_TRUE(strstr(text, "-⅔·(a - x)^³⁄₂") != NULL);
+
+    free(text);
+    expr_free(anti);
+    expr_free(simplified_integrand);
+    expr_free(integrand);
+    expr_bindings_free(bindings);
+
+    bindings = NULL;
+    integrand = expr_from_string("{ 1/sqrt(x-a) }", &bindings);
+    x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    simplified_integrand = integrand ? expr_simplify(integrand) : NULL;
+    anti = simplified_integrand ? expr_integrate(simplified_integrand, x) : NULL;
+    text = anti ? expr_to_string(anti, style_UNBOUND) : NULL;
+
+    ASSERT_NOT_NULL(anti);
+    ASSERT_NOT_NULL(text);
+    ASSERT_TRUE(strstr(text, "2·(x - a)^½") != NULL);
+
+    free(text);
+    expr_free(anti);
+    expr_free(simplified_integrand);
+    expr_free(integrand);
+    expr_bindings_free(bindings);
+
+    bindings = NULL;
+    integrand = expr_from_string("{ 1/sqrt(x+a) }", &bindings);
+    x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    simplified_integrand = integrand ? expr_simplify(integrand) : NULL;
+    anti = simplified_integrand ? expr_integrate(simplified_integrand, x) : NULL;
+    text = anti ? expr_to_string(anti, style_UNBOUND) : NULL;
+
+    ASSERT_NOT_NULL(anti);
+    ASSERT_NOT_NULL(text);
+    ASSERT_TRUE(strstr(text, "2·(x + a)^½") != NULL);
+
+    free(text);
+    expr_free(anti);
+    expr_free(simplified_integrand);
+    expr_free(integrand);
+    expr_bindings_free(bindings);
+
+    bindings = NULL;
+    integrand = expr_from_string("{ 1/sqrt(a+x) }", &bindings);
+    x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    simplified_integrand = integrand ? expr_simplify(integrand) : NULL;
+    anti = simplified_integrand ? expr_integrate(simplified_integrand, x) : NULL;
+    text = anti ? expr_to_string(anti, style_UNBOUND) : NULL;
+
+    ASSERT_NOT_NULL(anti);
+    ASSERT_NOT_NULL(text);
+    ASSERT_TRUE(strstr(text, "2·(x + a)^½") != NULL);
+
+    free(text);
+    expr_free(anti);
+    expr_free(simplified_integrand);
+    expr_free(integrand);
+    expr_bindings_free(bindings);
+
+    bindings = NULL;
+    integrand = expr_from_string("{ 1/sqrt(a-x) }", &bindings);
+    x = bindings ? expr_bindings_get(bindings, "x") : NULL;
+    simplified_integrand = integrand ? expr_simplify(integrand) : NULL;
+    anti = simplified_integrand ? expr_integrate(simplified_integrand, x) : NULL;
+    text = anti ? expr_to_string(anti, style_UNBOUND) : NULL;
+
+    ASSERT_NOT_NULL(anti);
+    ASSERT_NOT_NULL(text);
+    ASSERT_TRUE(strstr(text, "-2·(a - x)^½") != NULL);
+
+    free(text);
+    expr_free(anti);
+    expr_free(simplified_integrand);
+    expr_free(integrand);
+    expr_bindings_free(bindings);
+}
+
+static void test_integrate_poly_times_affine_power(void)
+{
+    static const double positive_points[] = { 0.5, 1.0, 1.7, 2.5 };
+    static const double shifted_positive_points[] = { 2.5, 3.0, 3.7, 4.5 };
+    static const double reflected_points[] = { -1.5, -0.5, 0.25, 1.0 };
+
+    assert_string_antiderivative_matches("{ x*(x+2)^3 }",
+                                         positive_points,
+                                         sizeof(positive_points) / sizeof(positive_points[0]));
+    assert_string_antiderivative_matches("{ x/(x+2)^2 }",
+                                         positive_points,
+                                         sizeof(positive_points) / sizeof(positive_points[0]));
+    assert_string_antiderivative_matches("{ x*sqrt(x-2) }",
+                                         shifted_positive_points,
+                                         sizeof(shifted_positive_points) /
+                                             sizeof(shifted_positive_points[0]));
+    assert_string_antiderivative_matches("{ x/sqrt(x+2) }",
+                                         positive_points,
+                                         sizeof(positive_points) / sizeof(positive_points[0]));
+    assert_string_antiderivative_matches("{ x/sqrt(2-x) }",
+                                         reflected_points,
+                                         sizeof(reflected_points) / sizeof(reflected_points[0]));
+    assert_string_antiderivative_matches("{ x*sqrt(x+2) }",
+                                         positive_points,
+                                         sizeof(positive_points) / sizeof(positive_points[0]));
+    assert_string_antiderivative_matches("{ x*sqrt(2*x+3) }",
+                                         positive_points,
+                                         sizeof(positive_points) / sizeof(positive_points[0]));
+}
+
+static void test_integrate_poly_over_centered_quadratic(void)
+{
+    static const double points[] = { -1.5, -0.4, 0.6, 1.8 };
+
+    assert_string_antiderivative_matches("{ 1/(4+x^2) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ x/(4+x^2) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ x^2/(4+x^2) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ x^3/(4+x^2) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ 1/(9+4*x^2) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_contains("{ 1/(x^2+2) }",
+                                          "1/√(2)·atan(x/√(2))");
+    assert_string_antiderivative_matches_with_a("{ 1/(x^2+a^2) }",
+                                                2.0, points,
+                                                sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches_with_a("{ 1/(a^2+x^2) }",
+                                                2.0, points,
+                                                sizeof(points) / sizeof(points[0]));
+}
+
+static void test_integrate_centered_quadratic_roots(void)
+{
+    static const double points[] = { -1.5, -0.4, 0.6, 1.8 };
+    static const double bounded_points[] = { -1.5, -0.4, 0.6, 1.5 };
+    static const double outer_points[] = { 2.3, 2.8, 3.4, 4.2 };
+
+    assert_string_antiderivative_matches("{ sqrt(1+x^2) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ sqrt(1+(x+1)^2) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ sqrt(4+x^2) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ 1/sqrt(4+x^2) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ x/sqrt(4+x^2) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ x*sqrt(4+x^2) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ sqrt(4-x^2) }",
+                                         bounded_points,
+                                         sizeof(bounded_points) / sizeof(bounded_points[0]));
+    assert_string_antiderivative_matches("{ 1/sqrt(4-x^2) }",
+                                         bounded_points,
+                                         sizeof(bounded_points) / sizeof(bounded_points[0]));
+    assert_string_antiderivative_matches("{ x/sqrt(4-x^2) }",
+                                         bounded_points,
+                                         sizeof(bounded_points) / sizeof(bounded_points[0]));
+    assert_string_antiderivative_matches("{ x*sqrt(4-x^2) }",
+                                         bounded_points,
+                                         sizeof(bounded_points) / sizeof(bounded_points[0]));
+    assert_string_antiderivative_matches("{ sqrt(x^2-4) }",
+                                         outer_points, sizeof(outer_points) / sizeof(outer_points[0]));
+    assert_string_antiderivative_matches("{ 1/sqrt(x^2-4) }",
+                                         outer_points, sizeof(outer_points) / sizeof(outer_points[0]));
+    assert_string_antiderivative_matches("{ x/sqrt(x^2-4) }",
+                                         outer_points, sizeof(outer_points) / sizeof(outer_points[0]));
+    assert_string_antiderivative_matches("{ x*sqrt(x^2-4) }",
+                                         outer_points, sizeof(outer_points) / sizeof(outer_points[0]));
+}
+
+static void test_integrate_trig_power_products(void)
+{
+    static const double points[] = { 0.25, 0.55, 0.9, 1.2 };
+
+    assert_string_antiderivative_matches("{ sin(x)^3 }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ cos(x)^3 }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ tan(x)^3 }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ sec(x)^3 }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ cosec(x)^3 }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ sec(x)^2*tan(x) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ cosec(x)^2*cot(x) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ sec(x)*cosec(x) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ sin(x)^2*cos(x)^2 }",
+                                         points, sizeof(points) / sizeof(points[0]));
+}
+
+static void test_integrate_mixed_frequency_exp_unary(void)
+{
+    static const double points[] = { -0.6, -0.1, 0.4, 1.1 };
+
+    assert_string_antiderivative_matches("{ exp(3*x)*sin(2*x) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ exp(3*x)*cos(2*x) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ sin(2*x)*exp(3*x) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ cos(2*x)*exp(3*x) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ exp(2*x)*sinh(3*x) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ exp(2*x)*cosh(3*x) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ sinh(3*x)*exp(2*x) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ cosh(3*x)*exp(2*x) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ sinh(2*x)*cosh(3*x) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ cosh(3*x)*sinh(2*x) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+}
+
 static void test_integrate_more_by_parts(void)
 {
     static const double points[] = { 0.25, 0.8, 1.5, 3.0 };
@@ -913,6 +1464,15 @@ void test_symbolic_integration(void)
     TEST_RUN_SUBTEST(test_integrate_affine_poly_times_specials, NULL);
     TEST_RUN_SUBTEST(test_integrate_other_variable_as_constant, NULL);
     TEST_RUN_SUBTEST(test_integrate_definite_symbolic_bounds, NULL);
+    TEST_RUN_SUBTEST(test_integrate_inverse_square_with_exact_bound, NULL);
+    TEST_RUN_SUBTEST(test_integrate_shifted_inverse_square_with_symbolic_constant, NULL);
+    TEST_RUN_SUBTEST(test_integrate_symbolic_power_exponent, NULL);
+    TEST_RUN_SUBTEST(test_integrate_symbolic_shifted_sqrt, NULL);
+    TEST_RUN_SUBTEST(test_integrate_poly_times_affine_power, NULL);
+    TEST_RUN_SUBTEST(test_integrate_poly_over_centered_quadratic, NULL);
+    TEST_RUN_SUBTEST(test_integrate_centered_quadratic_roots, NULL);
+    TEST_RUN_SUBTEST(test_integrate_trig_power_products, NULL);
+    TEST_RUN_SUBTEST(test_integrate_mixed_frequency_exp_unary, NULL);
     TEST_RUN_SUBTEST(test_integrate_more_by_parts, NULL);
     TEST_RUN_SUBTEST(test_integrate_partial_fractions, NULL);
     TEST_RUN_SUBTEST(test_integrate_unsupported_product_returns_null, NULL);

@@ -667,33 +667,6 @@ static int expr_tostring_should_emit_binding_expr(const expr_t *f)
     return is_builtin_const && value_matches_builtin;
 }
 
-static int expr_binding_expr_needs_explicit_mul_separator(const expr_binding_expr_t *expr)
-{
-    if (!expr)
-        return 0;
-
-    switch (expr->kind) {
-    case EXPR_BINDING_EXPR_NUMBER:
-        return 0;
-    case EXPR_BINDING_EXPR_DIV:
-        return 1;
-    case EXPR_BINDING_EXPR_NEG:
-        return expr_binding_expr_needs_explicit_mul_separator(expr->u.unary.child);
-    case EXPR_BINDING_EXPR_MUL:
-        return expr_binding_expr_needs_explicit_mul_separator(expr->u.binary.left);
-    case EXPR_BINDING_EXPR_POWI:
-        return expr_binding_expr_needs_explicit_mul_separator(expr->u.powi.base);
-    case EXPR_BINDING_EXPR_CONST:
-    case EXPR_BINDING_EXPR_ADD:
-    case EXPR_BINDING_EXPR_SUB:
-    case EXPR_BINDING_EXPR_UNARY_OP:
-    case EXPR_BINDING_EXPR_BINARY_OP:
-        return 0;
-    }
-
-    return 0;
-}
-
 static void emit_atom(expr_t *f, sbuf_t *b)
 {
     if (expr_is_const(f)) {
@@ -1140,6 +1113,29 @@ static void emit_tex_expr_abs(const expr_t *f, sbuf_t *b, int parent_prec);
 static void emit_func(const expr_t *f, sbuf_t *b, int parent_prec);
 static void emit_func_abs(const expr_t *f, sbuf_t *b, int parent_prec);
 static void emit_name_c(sbuf_t *b, const char *name);
+
+static bool match_atan_over_argument_denominator(const expr_t *expr,
+                                                 const expr_t **atan_expr_out,
+                                                 const expr_t **denominator_out)
+{
+    if (!expr ||
+        !expr_is_op(expr, &ops_div) ||
+        !expr->a ||
+        !expr->b ||
+        !expr_is_op(expr->a, &ops_atan) ||
+        !expr->a->a ||
+        !expr_is_op(expr->a->a, &ops_div) ||
+        !expr->a->a->a ||
+        !expr->a->a->b ||
+        !expr_struct_eq(expr->a->a->b, expr->b))
+        return false;
+
+    if (atan_expr_out)
+        *atan_expr_out = expr->a;
+    if (denominator_out)
+        *denominator_out = expr->b;
+    return true;
+}
 
 static int expr_is_negative(const expr_t *f)
 {
@@ -1660,6 +1656,28 @@ static void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec)
         long ei = 0;
         int exponent_has_small_int = expr_try_get_small_integer_exponent(f->c, &ei);
 
+        if (exponent_has_small_int && ei < 0) {
+            int recip_need = PREC_MUL < parent_prec;
+            long positive_exponent = -ei;
+
+            if (recip_need)
+                sbuf_puts(b, "\\left(");
+            sbuf_puts(b, "\\frac{1}{");
+            emit_tex_expr(f->a, b, positive_exponent == 1L ? PREC_LOWEST : PREC_POW);
+            if (positive_exponent != 1L) {
+                char buf[64];
+
+                snprintf(buf, sizeof(buf), "%ld", positive_exponent);
+                sbuf_puts(b, "^{");
+                sbuf_puts(b, buf);
+                sbuf_putc(b, '}');
+            }
+            sbuf_putc(b, '}');
+            if (recip_need)
+                sbuf_puts(b, "\\right)");
+            return;
+        }
+
         if (need)
             sbuf_puts(b, "\\left(");
 
@@ -1800,6 +1818,21 @@ static void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec)
         int need = PREC_MUL < parent_prec;
         bool neg_num = expr_is_negative(f->a);
         bool neg_den = expr_is_negative(f->b);
+        const expr_t *atan_expr = NULL;
+        const expr_t *denominator = NULL;
+
+        if (match_atan_over_argument_denominator(f, &atan_expr, &denominator) &&
+            !expr_is_negative(denominator)) {
+            if (need)
+                sbuf_puts(b, "\\left(");
+            sbuf_puts(b, "\\frac{1}{");
+            emit_tex_expr(denominator, b, PREC_LOWEST);
+            sbuf_puts(b, "} ");
+            emit_tex_expr(atan_expr, b, PREC_MUL);
+            if (need)
+                sbuf_puts(b, "\\right)");
+            return;
+        }
 
         if (need)
             sbuf_puts(b, "\\left(");
@@ -1940,6 +1973,29 @@ static void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
         int need = PREC_POW < parent_prec;
         long ei = 0;
         int exponent_has_small_int = expr_try_get_small_integer_exponent(f->c, &ei);
+
+        if (exponent_has_small_int && ei < 0) {
+            int recip_need = PREC_MUL < parent_prec;
+            int base_needs_parens = pow_base_needs_visible_parens(f->a);
+            long positive_exponent = -ei;
+
+            if (recip_need)
+                sbuf_putc(b, '(');
+            sbuf_puts(b, "1/");
+            if (positive_exponent == 1L) {
+                emit_expr(f->a, b, PREC_POW);
+            } else {
+                if (base_needs_parens)
+                    sbuf_putc(b, '(');
+                emit_expr(f->a, b, base_needs_parens ? PREC_LOWEST : PREC_POW);
+                if (base_needs_parens)
+                    sbuf_putc(b, ')');
+                emit_superscript_int(b, positive_exponent);
+            }
+            if (recip_need)
+                sbuf_putc(b, ')');
+            return;
+        }
 
         if (need) sbuf_putc(b, '(');
 
@@ -2092,6 +2148,19 @@ static void emit_expr(const expr_t *f, sbuf_t *b, int parent_prec)
         bool neg_num = expr_is_negative(f->a);
         bool neg_den = expr_is_negative(f->b);
         bool neg = neg_num ^ neg_den;
+        const expr_t *atan_expr = NULL;
+        const expr_t *denominator = NULL;
+
+        if (match_atan_over_argument_denominator(f, &atan_expr, &denominator) &&
+            !expr_is_negative(denominator)) {
+            if (need) sbuf_putc(b, '(');
+            sbuf_puts(b, "1/");
+            emit_expr(denominator, b, PREC_POW);
+            sbuf_puts(b, "·");
+            emit_expr(atan_expr, b, PREC_MUL);
+            if (need) sbuf_putc(b, ')');
+            return;
+        }
 
         if (need) sbuf_putc(b, '(');
         if (neg) sbuf_putc(b, '-');
@@ -2195,6 +2264,34 @@ static void emit_func(const expr_t *f, sbuf_t *b, int parent_prec)
     if (expr_is_pow_d_expr(f)) {
         int need = PREC_POW < parent_prec;
         int base_needs_parens = pow_base_needs_visible_parens(f->a);
+        long ei = 0;
+        int exponent_has_small_int = expr_try_get_small_integer_exponent(f->c, &ei);
+
+        if (exponent_has_small_int && ei < 0) {
+            int recip_need = PREC_MUL < parent_prec;
+            long positive_exponent = -ei;
+
+            if (recip_need)
+                sbuf_putc(b, '(');
+            sbuf_puts(b, "1 / ");
+            if (positive_exponent == 1L) {
+                emit_func(f->a, b, PREC_POW);
+            } else {
+                if (base_needs_parens)
+                    sbuf_putc(b, '(');
+                emit_func(f->a, b, base_needs_parens ? PREC_LOWEST : PREC_POW);
+                if (base_needs_parens)
+                    sbuf_putc(b, ')');
+                sbuf_putc(b, '^');
+                char buf[64];
+                snprintf(buf, sizeof(buf), "%ld", positive_exponent);
+                sbuf_puts(b, buf);
+            }
+            if (recip_need)
+                sbuf_putc(b, ')');
+            return;
+        }
+
         if (need) sbuf_putc(b, '(');
 
         if (base_needs_parens) sbuf_putc(b, '(');

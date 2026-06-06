@@ -53,6 +53,7 @@ typedef struct {
     bool  (*numeric_literal)(const expr_binding_expr_t *expr);
     bool  (*exact_complex)(const expr_binding_expr_t *expr,
                            binding_exact_complex_t *out);
+    bool  (*explicit_mul_separator)(const expr_binding_expr_t *expr);
     void  (*emit_expr)(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
     void  (*emit_func)(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
     void  (*emit_tex)(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
@@ -183,6 +184,12 @@ static bool binding_exact_complex_div(const expr_binding_expr_t *expr,
 static bool binding_exact_complex_powi(const expr_binding_expr_t *expr,
                                        binding_exact_complex_t *out);
 
+static bool binding_explicit_mul_separator_false(const expr_binding_expr_t *expr);
+static bool binding_explicit_mul_separator_true(const expr_binding_expr_t *expr);
+static bool binding_explicit_mul_separator_unary(const expr_binding_expr_t *expr);
+static bool binding_explicit_mul_separator_mul(const expr_binding_expr_t *expr);
+static bool binding_explicit_mul_separator_powi(const expr_binding_expr_t *expr);
+
 static void emit_binding_expr_number(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
 static void emit_binding_expr_const(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
 static void emit_binding_expr_neg(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
@@ -216,16 +223,16 @@ static void emit_binding_tex_powi(const expr_binding_expr_t *expr, sbuf_t *b, in
 static void emit_binding_tex_unary_op(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
 static void emit_binding_tex_binary_op(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec);
 static const binding_expr_ops_t s_binding_expr_ops[BINDING_EXPR_KIND_COUNT] = {
-    [EXPR_BINDING_EXPR_NUMBER]    = { BIND_PREC_ATOM,  true,  binding_free_number,    binding_clone_number,    binding_eval_number,    binding_number_value_number, expr_binding_simplify_atom,      binding_struct_eq_number,    binding_numeric_literal_true,   binding_exact_complex_number, emit_binding_expr_number,    emit_binding_func_number,    emit_binding_tex_number    },
-    [EXPR_BINDING_EXPR_CONST]     = { BIND_PREC_ATOM,  true,  binding_free_none,      binding_clone_const,     binding_eval_const,     binding_number_value_false,  expr_binding_simplify_atom,      binding_struct_eq_const,     binding_numeric_literal_const,  binding_exact_complex_const,  emit_binding_expr_const,     emit_binding_func_const,     emit_binding_tex_const     },
-    [EXPR_BINDING_EXPR_NEG]       = { BIND_PREC_UNARY, false, binding_free_unary,     binding_clone_neg,       binding_eval_neg,       binding_number_value_neg,    expr_binding_simplify_neg,       binding_struct_eq_unary,     binding_numeric_literal_unary,  binding_exact_complex_unary,  emit_binding_expr_neg,       emit_binding_func_neg,       emit_binding_tex_neg       },
-    [EXPR_BINDING_EXPR_ADD]       = { BIND_PREC_ADD,   false, binding_free_binary,    binding_clone_add,       binding_eval_add,       binding_number_value_add,    expr_binding_simplify_addsub,    binding_struct_eq_binary,    binding_numeric_literal_binary, binding_exact_complex_addsub, emit_binding_expr_add,       emit_binding_func_add,       emit_binding_tex_add       },
-    [EXPR_BINDING_EXPR_SUB]       = { BIND_PREC_ADD,   false, binding_free_binary,    binding_clone_sub,       binding_eval_sub,       binding_number_value_sub,    expr_binding_simplify_addsub,    binding_struct_eq_binary,    binding_numeric_literal_binary, binding_exact_complex_addsub, emit_binding_expr_sub,       emit_binding_func_sub,       emit_binding_tex_sub       },
-    [EXPR_BINDING_EXPR_MUL]       = { BIND_PREC_MUL,   false, binding_free_binary,    binding_clone_mul,       binding_eval_mul,       binding_number_value_mul,    expr_binding_simplify_mul,       binding_struct_eq_binary,    binding_numeric_literal_binary, binding_exact_complex_mul,    emit_binding_expr_mul_node,  emit_binding_func_mul_node,  emit_binding_tex_mul_node  },
-    [EXPR_BINDING_EXPR_DIV]       = { BIND_PREC_MUL,   false, binding_free_binary,    binding_clone_div,       binding_eval_div,       binding_number_value_div,    expr_binding_simplify_div,       binding_struct_eq_binary,    binding_numeric_literal_binary, binding_exact_complex_div,    emit_binding_expr_div,       emit_binding_func_div,       emit_binding_tex_div       },
-    [EXPR_BINDING_EXPR_POWI]      = { BIND_PREC_POW,   true,  binding_free_powi,      binding_clone_powi,      binding_eval_powi,      binding_number_value_powi,   expr_binding_simplify_powi,      binding_struct_eq_powi,      binding_numeric_literal_powi,   binding_exact_complex_powi,   emit_binding_expr_powi,      emit_binding_func_powi,      emit_binding_tex_powi      },
-    [EXPR_BINDING_EXPR_UNARY_OP]  = { BIND_PREC_UNARY, false, binding_free_unary_op,  binding_clone_unary_op,  binding_eval_unary_op,  binding_number_value_false,  expr_binding_simplify_unary_op,  binding_struct_eq_unary_op,  binding_numeric_literal_false,  NULL,                         emit_binding_expr_unary_op,  emit_binding_func_unary_op,  emit_binding_tex_unary_op  },
-    [EXPR_BINDING_EXPR_BINARY_OP] = { BIND_PREC_POW,   false, binding_free_binary_op, binding_clone_binary_op, binding_eval_binary_op, binding_number_value_false,  expr_binding_simplify_binary_op, binding_struct_eq_binary_op, binding_numeric_literal_false,  NULL,                         emit_binding_expr_binary_op, emit_binding_func_binary_op, emit_binding_tex_binary_op }
+    [EXPR_BINDING_EXPR_NUMBER]    = { BIND_PREC_ATOM,  true,  binding_free_number,    binding_clone_number,    binding_eval_number,    binding_number_value_number, expr_binding_simplify_atom,      binding_struct_eq_number,    binding_numeric_literal_true,   binding_exact_complex_number, binding_explicit_mul_separator_false, emit_binding_expr_number,    emit_binding_func_number,    emit_binding_tex_number    },
+    [EXPR_BINDING_EXPR_CONST]     = { BIND_PREC_ATOM,  true,  binding_free_none,      binding_clone_const,     binding_eval_const,     binding_number_value_false,  expr_binding_simplify_atom,      binding_struct_eq_const,     binding_numeric_literal_const,  binding_exact_complex_const,  binding_explicit_mul_separator_false, emit_binding_expr_const,     emit_binding_func_const,     emit_binding_tex_const     },
+    [EXPR_BINDING_EXPR_NEG]       = { BIND_PREC_UNARY, false, binding_free_unary,     binding_clone_neg,       binding_eval_neg,       binding_number_value_neg,    expr_binding_simplify_neg,       binding_struct_eq_unary,     binding_numeric_literal_unary,  binding_exact_complex_unary,  binding_explicit_mul_separator_unary, emit_binding_expr_neg,       emit_binding_func_neg,       emit_binding_tex_neg       },
+    [EXPR_BINDING_EXPR_ADD]       = { BIND_PREC_ADD,   false, binding_free_binary,    binding_clone_add,       binding_eval_add,       binding_number_value_add,    expr_binding_simplify_addsub,    binding_struct_eq_binary,    binding_numeric_literal_binary, binding_exact_complex_addsub, binding_explicit_mul_separator_false, emit_binding_expr_add,       emit_binding_func_add,       emit_binding_tex_add       },
+    [EXPR_BINDING_EXPR_SUB]       = { BIND_PREC_ADD,   false, binding_free_binary,    binding_clone_sub,       binding_eval_sub,       binding_number_value_sub,    expr_binding_simplify_addsub,    binding_struct_eq_binary,    binding_numeric_literal_binary, binding_exact_complex_addsub, binding_explicit_mul_separator_false, emit_binding_expr_sub,       emit_binding_func_sub,       emit_binding_tex_sub       },
+    [EXPR_BINDING_EXPR_MUL]       = { BIND_PREC_MUL,   false, binding_free_binary,    binding_clone_mul,       binding_eval_mul,       binding_number_value_mul,    expr_binding_simplify_mul,       binding_struct_eq_binary,    binding_numeric_literal_binary, binding_exact_complex_mul,    binding_explicit_mul_separator_mul, emit_binding_expr_mul_node,  emit_binding_func_mul_node,  emit_binding_tex_mul_node  },
+    [EXPR_BINDING_EXPR_DIV]       = { BIND_PREC_MUL,   false, binding_free_binary,    binding_clone_div,       binding_eval_div,       binding_number_value_div,    expr_binding_simplify_div,       binding_struct_eq_binary,    binding_numeric_literal_binary, binding_exact_complex_div,    binding_explicit_mul_separator_true, emit_binding_expr_div,       emit_binding_func_div,       emit_binding_tex_div       },
+    [EXPR_BINDING_EXPR_POWI]      = { BIND_PREC_POW,   true,  binding_free_powi,      binding_clone_powi,      binding_eval_powi,      binding_number_value_powi,   expr_binding_simplify_powi,      binding_struct_eq_powi,      binding_numeric_literal_powi,   binding_exact_complex_powi,   binding_explicit_mul_separator_powi, emit_binding_expr_powi,      emit_binding_func_powi,      emit_binding_tex_powi      },
+    [EXPR_BINDING_EXPR_UNARY_OP]  = { BIND_PREC_UNARY, false, binding_free_unary_op,  binding_clone_unary_op,  binding_eval_unary_op,  binding_number_value_false,  expr_binding_simplify_unary_op,  binding_struct_eq_unary_op,  binding_numeric_literal_false,  NULL,                         binding_explicit_mul_separator_false, emit_binding_expr_unary_op,  emit_binding_func_unary_op,  emit_binding_tex_unary_op  },
+    [EXPR_BINDING_EXPR_BINARY_OP] = { BIND_PREC_POW,   false, binding_free_binary_op, binding_clone_binary_op, binding_eval_binary_op, binding_number_value_false,  expr_binding_simplify_binary_op, binding_struct_eq_binary_op, binding_numeric_literal_false,  NULL,                         binding_explicit_mul_separator_false, emit_binding_expr_binary_op, emit_binding_func_binary_op, emit_binding_tex_binary_op }
 };
 
 static const binding_expr_ops_t *binding_expr_ops_for_kind(expr_binding_expr_kind_t kind)
@@ -809,6 +816,36 @@ static bool binding_numeric_literal_false(const expr_binding_expr_t *expr)
     return false;
 }
 
+static bool binding_explicit_mul_separator_false(const expr_binding_expr_t *expr)
+{
+    (void)expr;
+    return false;
+}
+
+static bool binding_explicit_mul_separator_true(const expr_binding_expr_t *expr)
+{
+    (void)expr;
+    return true;
+}
+
+static bool binding_explicit_mul_separator_unary(const expr_binding_expr_t *expr)
+{
+    return expr &&
+           expr_binding_expr_needs_explicit_mul_separator(expr->u.unary.child);
+}
+
+static bool binding_explicit_mul_separator_mul(const expr_binding_expr_t *expr)
+{
+    return expr &&
+           expr_binding_expr_needs_explicit_mul_separator(expr->u.binary.left);
+}
+
+static bool binding_explicit_mul_separator_powi(const expr_binding_expr_t *expr)
+{
+    return expr &&
+           expr_binding_expr_needs_explicit_mul_separator(expr->u.powi.base);
+}
+
 bool expr_binding_expr_is_numeric_literal(const expr_binding_expr_t *expr)
 {
     const binding_expr_ops_t *ops;
@@ -818,6 +855,19 @@ bool expr_binding_expr_is_numeric_literal(const expr_binding_expr_t *expr)
 
     ops = binding_expr_ops_for_kind(expr->kind);
     return ops && ops->numeric_literal ? ops->numeric_literal(expr) : false;
+}
+
+bool expr_binding_expr_needs_explicit_mul_separator(const expr_binding_expr_t *expr)
+{
+    const binding_expr_ops_t *ops;
+
+    if (!expr)
+        return false;
+
+    ops = binding_expr_ops_for_kind(expr->kind);
+    return ops && ops->explicit_mul_separator
+               ? ops->explicit_mul_separator(expr)
+               : false;
 }
 
 void expr_binding_exact_complex_clear(binding_exact_complex_t *value)
@@ -2778,13 +2828,37 @@ static void emit_binding_expr_div(const expr_binding_expr_t *expr, sbuf_t *b, in
 
 static void emit_binding_expr_powi(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec)
 {
-    bool need = binding_expr_needs_pow_base_parens(expr->u.powi.base);
+    bool base_need = binding_expr_needs_pow_base_parens(expr->u.powi.base);
+
+    if (expr->u.powi.exponent < 0) {
+        bool need = BIND_PREC_MUL < parent_prec;
+        long positive_exponent = -expr->u.powi.exponent;
+
+        if (need)
+            sbuf_putc(b, '(');
+        sbuf_puts(b, "1/");
+        if (positive_exponent == 1L) {
+            emit_binding_expr(expr->u.powi.base, b, BIND_PREC_POW);
+        } else {
+            if (base_need)
+                sbuf_putc(b, '(');
+            emit_binding_expr(expr->u.powi.base, b,
+                              base_need ? BIND_PREC_LOWEST : BIND_PREC_POW);
+            if (base_need)
+                sbuf_putc(b, ')');
+            emit_binding_superscript_int(b, positive_exponent);
+        }
+        if (need)
+            sbuf_putc(b, ')');
+        return;
+    }
 
     (void)parent_prec;
-    if (need)
+    if (base_need)
         sbuf_putc(b, '(');
-    emit_binding_expr(expr->u.powi.base, b, need ? BIND_PREC_LOWEST : BIND_PREC_POW);
-    if (need)
+    emit_binding_expr(expr->u.powi.base, b,
+                      base_need ? BIND_PREC_LOWEST : BIND_PREC_POW);
+    if (base_need)
         sbuf_putc(b, ')');
     emit_binding_superscript_int(b, expr->u.powi.exponent);
 }
@@ -2942,14 +3016,37 @@ static void emit_binding_tex_div(const expr_binding_expr_t *expr, sbuf_t *b, int
 
 static void emit_binding_tex_powi(const expr_binding_expr_t *expr, sbuf_t *b, int parent_prec)
 {
-    bool need = binding_expr_needs_pow_base_parens(expr->u.powi.base);
+    bool base_need = binding_expr_needs_pow_base_parens(expr->u.powi.base);
     char expbuf[64];
 
     (void)parent_prec;
-    if (need)
+    if (expr->u.powi.exponent < 0) {
+        long positive_exponent = -expr->u.powi.exponent;
+
+        sbuf_puts(b, "\\frac{1}{");
+        if (positive_exponent == 1L) {
+            emit_binding_tex_expr(expr->u.powi.base, b, BIND_PREC_LOWEST);
+        } else {
+            if (base_need)
+                sbuf_puts(b, "\\left(");
+            emit_binding_tex_expr(expr->u.powi.base, b,
+                                  base_need ? BIND_PREC_LOWEST : BIND_PREC_POW);
+            if (base_need)
+                sbuf_puts(b, "\\right)");
+            snprintf(expbuf, sizeof(expbuf), "%ld", positive_exponent);
+            sbuf_puts(b, "^{");
+            sbuf_puts(b, expbuf);
+            sbuf_putc(b, '}');
+        }
+        sbuf_putc(b, '}');
+        return;
+    }
+
+    if (base_need)
         sbuf_puts(b, "\\left(");
-    emit_binding_tex_expr(expr->u.powi.base, b, need ? BIND_PREC_LOWEST : BIND_PREC_POW);
-    if (need)
+    emit_binding_tex_expr(expr->u.powi.base, b,
+                          base_need ? BIND_PREC_LOWEST : BIND_PREC_POW);
+    if (base_need)
         sbuf_puts(b, "\\right)");
     snprintf(expbuf, sizeof(expbuf), "%ld", expr->u.powi.exponent);
     sbuf_puts(b, "^{");
@@ -3280,6 +3377,31 @@ static void emit_binding_func_powi(const expr_binding_expr_t *expr, sbuf_t *b, i
     bool need = BIND_PREC_POW < parent_prec;
     bool base_need = binding_expr_needs_pow_base_parens(expr->u.powi.base);
     char expbuf[64];
+
+    if (expr->u.powi.exponent < 0) {
+        bool recip_need = BIND_PREC_MUL < parent_prec;
+        long positive_exponent = -expr->u.powi.exponent;
+
+        if (recip_need)
+            sbuf_putc(b, '(');
+        sbuf_puts(b, "1 / ");
+        if (positive_exponent == 1L) {
+            emit_binding_func_expr(expr->u.powi.base, b, BIND_PREC_POW);
+        } else {
+            if (base_need)
+                sbuf_putc(b, '(');
+            emit_binding_func_expr(expr->u.powi.base, b,
+                                   base_need ? BIND_PREC_LOWEST : BIND_PREC_POW);
+            if (base_need)
+                sbuf_putc(b, ')');
+            snprintf(expbuf, sizeof(expbuf), "%ld", positive_exponent);
+            sbuf_putc(b, '^');
+            sbuf_puts(b, expbuf);
+        }
+        if (recip_need)
+            sbuf_putc(b, ')');
+        return;
+    }
 
     if (need)
         sbuf_putc(b, '(');
