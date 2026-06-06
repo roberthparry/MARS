@@ -54,6 +54,14 @@ expr_t *integrate_linear_poly_times_inverse_affine(
 expr_t *integrate_linear_poly_times_normal_logpdf_affine(const expr_t *expr,
                                                          const expr_t *wrt);
 expr_t *integrate_rational_partial_fractions(const expr_t *expr, const expr_t *wrt);
+expr_t *integrate_linear_over_symbolic_quadratic(const expr_t *expr, const expr_t *wrt);
+expr_t *integrate_squared_unary_affine(const expr_t *expr,
+                                       const expr_t *wrt,
+                                       expr_pattern_unary_affine_kind_t kind);
+expr_t *integrate_cubed_unary_affine(const expr_t *expr,
+                                     const expr_t *wrt,
+                                     expr_pattern_unary_affine_kind_t kind);
+expr_t *integrate_same_affine_special_product(const expr_t *expr, const expr_t *wrt);
 void exp_antiderivative_once_local(const number_t *src, size_t count, number_t *dst);
 void trig_antiderivative_once_local(const number_t *a_src,
                                     const number_t *b_src,
