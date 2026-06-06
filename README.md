@@ -41,6 +41,14 @@ sudo apt install build-essential libgmp-dev libmpfr-dev libmpc-dev libunistring-
 Use `make check-deps` to check for required development headers and link
 libraries before building or installing.
 
+MARS Lab also renders TeX through `latex` and `dvisvgm`. For the desktop Lab,
+install the rendering tools and check them with:
+
+```sh
+sudo apt install texlive-latex-base dvisvgm
+make check-lab-deps
+```
+
 ## Benchmark Highlights
 
 Recent sample benchmarks on this tree show:
