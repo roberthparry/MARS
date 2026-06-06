@@ -853,6 +853,8 @@
         "test_to_string_nested_transcendental_tex": true,
         "test_to_string_nested_quotient_pow_tex": true,
         "test_to_string_log10_tex": true,
+        "test_to_string_exp_unit_fraction_root_tex": true,
+        "test_to_string_parsed_exp_unit_fraction_root_tex": true,
         "test_to_string_symbolic_constants_tex": true,
         "test_to_string_symbolic_constant_quotient_tex": true,
         "test_to_string_lambert_w_tex": true,

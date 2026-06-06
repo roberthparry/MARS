@@ -736,6 +736,43 @@ static void test_to_string_log10_tex(void)
     expr_free(x);
 }
 
+static void test_to_string_exp_unit_fraction_root_tex(void)
+{
+    expr_t *eighth = expr_new_const(NUM_ONE_EIGHTH);
+    expr_t *f = expr_exp(eighth);
+    char *got = f ? expr_to_string(f, style_TEX) : NULL;
+    const char *expect = "\\sqrt[8]{e}";
+
+    if (str_eq(got, expect))
+        to_string_pass("exp unit fraction renders as TeX root", got, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "exp unit fraction renders as TeX root",
+                       got ? got : "(null)", expect);
+
+    free(got);
+    expr_free(f);
+    expr_free(eighth);
+}
+
+static void test_to_string_parsed_exp_unit_fraction_root_tex(void)
+{
+    expr_t *f = expr_from_string("{ exp(1/8) }", NULL);
+    char *got = f ? expr_to_string(f, style_TEX) : NULL;
+    const char *expect = "\\sqrt[8]{e}";
+
+    if (str_eq(got, expect))
+        to_string_pass("parsed exp unit fraction renders as TeX root",
+                       got, expect);
+    else
+        to_string_fail(__FILE__, __LINE__, 1,
+                       "parsed exp unit fraction renders as TeX root",
+                       got ? got : "(null)", expect);
+
+    free(got);
+    expr_free(f);
+}
+
 static void test_to_string_symbolic_constants_tex(void)
 {
     expr_t *f = expr_from_string("{ exp(@pi*i*3/2*x) }", NULL);
@@ -1844,6 +1881,8 @@ void test_to_string_all(void)
     TEST_RUN_SUBTEST(test_to_string_nested_transcendental_tex, NULL);
     TEST_RUN_SUBTEST(test_to_string_nested_quotient_pow_tex, NULL);
     TEST_RUN_SUBTEST(test_to_string_log10_tex, NULL);
+    TEST_RUN_SUBTEST(test_to_string_exp_unit_fraction_root_tex, NULL);
+    TEST_RUN_SUBTEST(test_to_string_parsed_exp_unit_fraction_root_tex, NULL);
     TEST_RUN_SUBTEST(test_to_string_symbolic_constants_tex, NULL);
     TEST_RUN_SUBTEST(test_to_string_symbolic_constant_quotient_tex, NULL);
     TEST_RUN_SUBTEST(test_to_string_lambert_w_tex, NULL);

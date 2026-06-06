@@ -1272,6 +1272,30 @@ static void emit_tex_const_value(sbuf_t *b, const expr_t *dv)
     free(text);
 }
 
+static bool emit_tex_exp_unit_fraction_root(const expr_t *arg, sbuf_t *b)
+{
+    long numerator;
+    long denominator;
+
+    if (!expr_is_const(arg) ||
+        !num_get_small_rational(arg->c, &numerator, &denominator) ||
+        numerator != 1L ||
+        denominator <= 1L)
+        return false;
+
+    if (denominator == 2L) {
+        sbuf_puts(b, "\\sqrt{e}");
+    } else {
+        char index_text[32];
+
+        snprintf(index_text, sizeof(index_text), "%ld", denominator);
+        sbuf_puts(b, "\\sqrt[");
+        sbuf_puts(b, index_text);
+        sbuf_puts(b, "]{e}");
+    }
+    return true;
+}
+
 static void emit_tex_atom(const expr_t *f, sbuf_t *b)
 {
     if (expr_is_const(f)) {
@@ -1581,9 +1605,11 @@ void emit_tex_expr(const expr_t *f, sbuf_t *b, int parent_prec)
             emit_tex_expr(f->a, b, 0);
             sbuf_putc(b, '}');
         } else if (expr_is_op(f, &ops_exp)) {
-            sbuf_puts(b, "e^{");
-            emit_tex_expr(f->a, b, 0);
-            sbuf_putc(b, '}');
+            if (!emit_tex_exp_unit_fraction_root(f->a, b)) {
+                sbuf_puts(b, "e^{");
+                emit_tex_expr(f->a, b, 0);
+                sbuf_putc(b, '}');
+            }
         } else {
             sbuf_puts(b, name ? name : "\\operatorname{f}");
             sbuf_putc(b, '(');
