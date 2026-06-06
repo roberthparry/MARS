@@ -125,6 +125,40 @@ expr_t *expr_simplify_try_unary_const_fold(const expr_t *op, expr_t *arg)
     return out;
 }
 
+static bool expr_contains_var_for_value_fold(const expr_t *dv)
+{
+    if (!dv)
+        return false;
+    if (expr_is_var(dv))
+        return true;
+    return expr_contains_var_for_value_fold(dv->a) ||
+           expr_contains_var_for_value_fold(dv->b);
+}
+
+expr_t *expr_simplify_try_unary_const_value_fold(const expr_t *op, expr_t *arg)
+{
+    number_t value;
+    number_t folded;
+    expr_t *out = NULL;
+
+    if (!arg || !op || !op->ops->fold_const_unary ||
+        expr_contains_var_for_value_fold(arg))
+        return NULL;
+
+    value = expr_eval(arg);
+    folded = num_new();
+    if (!num_is_finite(value) &&
+        op->ops->fold_const_unary(&value, &folded) &&
+        num_is_finite(folded)) {
+        out = expr_new_const(folded);
+        expr_free(arg);
+    }
+
+    num_destroy(&folded);
+    num_destroy(&value);
+    return out;
+}
+
 expr_t *expr_simplify_try_sqrt_scaled_square_const(expr_t *arg)
 {
     number_t coeff_root;
@@ -155,6 +189,35 @@ expr_t *expr_simplify_try_sqrt_scaled_square_const(expr_t *arg)
     expr_free(arg);
     out = expr_make_scaled(coeff_root, simp);
     num_destroy(&coeff_root);
+    return out;
+}
+
+expr_t *expr_simplify_try_sqrt_quotient(expr_t *num, expr_t *den)
+{
+    expr_t *quotient;
+    expr_t *simplified_quotient;
+    expr_t *root;
+    expr_t *out;
+
+    if (!expr_is_sqrt_expr(num) || !expr_is_sqrt_expr(den) ||
+        !num->a || !den->a ||
+        !expr_is_const(den->a) ||
+        !num_is_real(den->a->c) ||
+        !num_gt(den->a->c, NUM_ZERO))
+        return NULL;
+
+    quotient = expr_div(num->a, den->a);
+    simplified_quotient = quotient ? expr_simplify(quotient) : NULL;
+    root = simplified_quotient ? expr_sqrt(simplified_quotient) : NULL;
+    out = root ? expr_simplify(root) : NULL;
+
+    expr_free(root);
+    expr_free(simplified_quotient);
+    expr_free(quotient);
+    if (out) {
+        expr_free(num);
+        expr_free(den);
+    }
     return out;
 }
 

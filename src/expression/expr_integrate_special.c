@@ -550,6 +550,350 @@ static bool match_sinh_cosh_affine_product(const expr_t *expr,
                                    cosh_constant, cosh_coeff);
 }
 
+static bool match_affine_unary_pair_product(const expr_t *expr,
+                                            const expr_t *wrt,
+                                            expr_pattern_unary_affine_kind_t first_kind,
+                                            expr_pattern_unary_affine_kind_t second_kind,
+                                            number_t *first_constant,
+                                            number_t *first_coeff,
+                                            number_t *second_constant,
+                                            number_t *second_coeff)
+{
+    if (!expr || !expr->a || !expr->b)
+        return false;
+
+    if (match_affine_unary_data(expr->a, wrt, first_kind, first_constant, first_coeff) &&
+        match_affine_unary_data(expr->b, wrt, second_kind, second_constant, second_coeff))
+        return true;
+
+    return match_affine_unary_data(expr->b, wrt, first_kind, first_constant, first_coeff) &&
+           match_affine_unary_data(expr->a, wrt, second_kind, second_constant, second_coeff);
+}
+
+static expr_t *integrate_unary_affine_argument(const expr_t *arg,
+                                               const number_t *coeff,
+                                               const expr_t *wrt,
+                                               expr_apply_unary_fn integrand_fn,
+                                               expr_apply_unary_fn antiderivative_fn,
+                                               bool negate_antiderivative)
+{
+    expr_t *primitive = NULL;
+    expr_t *scaled = NULL;
+
+    if (!arg || !coeff || !wrt || !integrand_fn || !antiderivative_fn)
+        return NULL;
+
+    if (num_eq(*coeff, NUM_ZERO)) {
+        expr_t *constant = integrand_fn(arg);
+
+        scaled = constant ? expr_mul(constant, wrt) : NULL;
+        expr_free(constant);
+        return scaled;
+    }
+
+    primitive = antiderivative_fn(arg);
+    if (negate_antiderivative) {
+        expr_t *negated = primitive ? expr_neg(primitive) : NULL;
+
+        expr_free(primitive);
+        primitive = negated;
+    }
+    return div_number_owned(primitive, *coeff);
+}
+
+static expr_t *integrate_cos_affine_argument(const expr_t *arg,
+                                             const number_t *coeff,
+                                             const expr_t *wrt)
+{
+    return integrate_unary_affine_argument(arg, coeff, wrt, expr_cos, expr_sin, false);
+}
+
+static expr_t *integrate_sin_affine_argument(const expr_t *arg,
+                                             const number_t *coeff,
+                                             const expr_t *wrt)
+{
+    return integrate_unary_affine_argument(arg, coeff, wrt, expr_sin, expr_cos, true);
+}
+
+static expr_t *integrate_cosh_affine_argument(const expr_t *arg,
+                                              const number_t *coeff,
+                                              const expr_t *wrt)
+{
+    return integrate_unary_affine_argument(arg, coeff, wrt, expr_cosh, expr_sinh, false);
+}
+
+static expr_t *integrate_sinh_affine_argument(const expr_t *arg,
+                                              const number_t *coeff,
+                                              const expr_t *wrt)
+{
+    return integrate_unary_affine_argument(arg, coeff, wrt, expr_sinh, expr_cosh, false);
+}
+
+static expr_t *combine_half_sum_difference(expr_t *left, expr_t *right, bool subtract)
+{
+    expr_t *combined = NULL;
+    expr_t *out = NULL;
+
+    if (left && right)
+        combined = subtract ? expr_sub(left, right) : expr_add(left, right);
+    expr_free(right);
+    expr_free(left);
+    out = combined ? mul_number_owned(combined, NUM_HALF) : NULL;
+    return out;
+}
+
+static expr_t *integrate_trig_affine_product(const expr_t *expr,
+                                             const expr_t *wrt,
+                                             expr_pattern_unary_affine_kind_t first_kind,
+                                             expr_pattern_unary_affine_kind_t second_kind)
+{
+    number_t first_constant = num_new();
+    number_t first_coeff = num_new();
+    number_t second_constant = num_new();
+    number_t second_coeff = num_new();
+    number_t sum_coeff = num_new();
+    number_t diff_coeff = num_new();
+    expr_t *u = NULL;
+    expr_t *v = NULL;
+    expr_t *sum_arg = NULL;
+    expr_t *diff_arg = NULL;
+    expr_t *sum_term = NULL;
+    expr_t *diff_term = NULL;
+    expr_t *out = NULL;
+
+    if (!match_affine_unary_pair_product(expr, wrt, first_kind, second_kind,
+                                         &first_constant, &first_coeff,
+                                         &second_constant, &second_coeff))
+        goto cleanup;
+
+    num_destroy(&sum_coeff);
+    sum_coeff = num_add(first_coeff, second_coeff);
+    num_destroy(&diff_coeff);
+    diff_coeff = num_sub(first_coeff, second_coeff);
+
+    u = build_affine_from_match(wrt, first_constant, first_coeff);
+    v = build_affine_from_match(wrt, second_constant, second_coeff);
+    sum_arg = (u && v) ? expr_add(u, v) : NULL;
+    diff_arg = (u && v) ? expr_sub(u, v) : NULL;
+    if (!sum_arg || !diff_arg)
+        goto cleanup;
+
+    if (first_kind == EXPR_PATTERN_UNARY_SIN &&
+        second_kind == EXPR_PATTERN_UNARY_SIN) {
+        diff_term = integrate_cos_affine_argument(diff_arg, &diff_coeff, wrt);
+        sum_term = integrate_cos_affine_argument(sum_arg, &sum_coeff, wrt);
+        out = combine_half_sum_difference(diff_term, sum_term, true);
+        diff_term = NULL;
+        sum_term = NULL;
+    } else if (first_kind == EXPR_PATTERN_UNARY_COS &&
+               second_kind == EXPR_PATTERN_UNARY_COS) {
+        sum_term = integrate_cos_affine_argument(sum_arg, &sum_coeff, wrt);
+        diff_term = integrate_cos_affine_argument(diff_arg, &diff_coeff, wrt);
+        out = combine_half_sum_difference(sum_term, diff_term, false);
+        sum_term = NULL;
+        diff_term = NULL;
+    } else if (first_kind == EXPR_PATTERN_UNARY_SIN &&
+               second_kind == EXPR_PATTERN_UNARY_COS) {
+        sum_term = integrate_sin_affine_argument(sum_arg, &sum_coeff, wrt);
+        diff_term = integrate_sin_affine_argument(diff_arg, &diff_coeff, wrt);
+        out = combine_half_sum_difference(sum_term, diff_term, false);
+        sum_term = NULL;
+        diff_term = NULL;
+    }
+
+cleanup:
+    expr_free(diff_term);
+    expr_free(sum_term);
+    expr_free(diff_arg);
+    expr_free(sum_arg);
+    expr_free(v);
+    expr_free(u);
+    num_destroy(&diff_coeff);
+    num_destroy(&sum_coeff);
+    num_destroy(&second_coeff);
+    num_destroy(&second_constant);
+    num_destroy(&first_coeff);
+    num_destroy(&first_constant);
+    return out;
+}
+
+static expr_t *integrate_hyperbolic_affine_product(const expr_t *expr,
+                                                   const expr_t *wrt,
+                                                   expr_pattern_unary_affine_kind_t first_kind,
+                                                   expr_pattern_unary_affine_kind_t second_kind)
+{
+    number_t first_constant = num_new();
+    number_t first_coeff = num_new();
+    number_t second_constant = num_new();
+    number_t second_coeff = num_new();
+    number_t sum_coeff = num_new();
+    number_t diff_coeff = num_new();
+    expr_t *u = NULL;
+    expr_t *v = NULL;
+    expr_t *sum_arg = NULL;
+    expr_t *diff_arg = NULL;
+    expr_t *sum_term = NULL;
+    expr_t *diff_term = NULL;
+    expr_t *out = NULL;
+
+    if (!match_affine_unary_pair_product(expr, wrt, first_kind, second_kind,
+                                         &first_constant, &first_coeff,
+                                         &second_constant, &second_coeff))
+        goto cleanup;
+
+    num_destroy(&sum_coeff);
+    sum_coeff = num_add(first_coeff, second_coeff);
+    num_destroy(&diff_coeff);
+    diff_coeff = num_sub(first_coeff, second_coeff);
+
+    u = build_affine_from_match(wrt, first_constant, first_coeff);
+    v = build_affine_from_match(wrt, second_constant, second_coeff);
+    sum_arg = (u && v) ? expr_add(u, v) : NULL;
+    diff_arg = (u && v) ? expr_sub(u, v) : NULL;
+    if (!sum_arg || !diff_arg)
+        goto cleanup;
+
+    if (first_kind == EXPR_PATTERN_UNARY_SINH &&
+        second_kind == EXPR_PATTERN_UNARY_SINH) {
+        sum_term = integrate_cosh_affine_argument(sum_arg, &sum_coeff, wrt);
+        diff_term = integrate_cosh_affine_argument(diff_arg, &diff_coeff, wrt);
+        out = combine_half_sum_difference(sum_term, diff_term, true);
+        sum_term = NULL;
+        diff_term = NULL;
+    } else if (first_kind == EXPR_PATTERN_UNARY_COSH &&
+               second_kind == EXPR_PATTERN_UNARY_COSH) {
+        sum_term = integrate_cosh_affine_argument(sum_arg, &sum_coeff, wrt);
+        diff_term = integrate_cosh_affine_argument(diff_arg, &diff_coeff, wrt);
+        out = combine_half_sum_difference(sum_term, diff_term, false);
+        sum_term = NULL;
+        diff_term = NULL;
+    } else if (first_kind == EXPR_PATTERN_UNARY_SINH &&
+               second_kind == EXPR_PATTERN_UNARY_COSH) {
+        sum_term = integrate_sinh_affine_argument(sum_arg, &sum_coeff, wrt);
+        diff_term = integrate_sinh_affine_argument(diff_arg, &diff_coeff, wrt);
+        out = combine_half_sum_difference(sum_term, diff_term, false);
+        sum_term = NULL;
+        diff_term = NULL;
+    }
+
+cleanup:
+    expr_free(diff_term);
+    expr_free(sum_term);
+    expr_free(diff_arg);
+    expr_free(sum_arg);
+    expr_free(v);
+    expr_free(u);
+    num_destroy(&diff_coeff);
+    num_destroy(&sum_coeff);
+    num_destroy(&second_coeff);
+    num_destroy(&second_constant);
+    num_destroy(&first_coeff);
+    num_destroy(&first_constant);
+    return out;
+}
+
+static expr_t *integrate_trig_hyperbolic_affine_product(
+    const expr_t *expr,
+    const expr_t *wrt,
+    expr_pattern_unary_affine_kind_t trig_kind,
+    expr_pattern_unary_affine_kind_t hyper_kind)
+{
+    number_t trig_constant = num_new();
+    number_t trig_coeff = num_new();
+    number_t hyper_constant = num_new();
+    number_t hyper_coeff = num_new();
+    number_t trig_coeff_sq = num_new();
+    number_t hyper_coeff_sq = num_new();
+    number_t denom = num_new();
+    expr_t *u = NULL;
+    expr_t *v = NULL;
+    expr_t *sin_u = NULL;
+    expr_t *cos_u = NULL;
+    expr_t *sinh_v = NULL;
+    expr_t *cosh_v = NULL;
+    expr_t *left_factor = NULL;
+    expr_t *right_factor = NULL;
+    expr_t *left = NULL;
+    expr_t *right = NULL;
+    expr_t *combined = NULL;
+    expr_t *out = NULL;
+    bool subtract = false;
+
+    if (!match_affine_unary_pair_product(expr, wrt, trig_kind, hyper_kind,
+                                         &trig_constant, &trig_coeff,
+                                         &hyper_constant, &hyper_coeff))
+        goto cleanup;
+
+    num_destroy(&trig_coeff_sq);
+    trig_coeff_sq = num_mul(trig_coeff, trig_coeff);
+    num_destroy(&hyper_coeff_sq);
+    hyper_coeff_sq = num_mul(hyper_coeff, hyper_coeff);
+    num_destroy(&denom);
+    denom = num_add(trig_coeff_sq, hyper_coeff_sq);
+    if (num_eq(denom, NUM_ZERO))
+        goto cleanup;
+
+    u = build_affine_from_match(wrt, trig_constant, trig_coeff);
+    v = build_affine_from_match(wrt, hyper_constant, hyper_coeff);
+    sin_u = u ? expr_sin(u) : NULL;
+    cos_u = u ? expr_cos(u) : NULL;
+    sinh_v = v ? expr_sinh(v) : NULL;
+    cosh_v = v ? expr_cosh(v) : NULL;
+
+    if (trig_kind == EXPR_PATTERN_UNARY_COS &&
+        hyper_kind == EXPR_PATTERN_UNARY_COSH) {
+        left_factor = (sin_u && cosh_v) ? expr_mul(sin_u, cosh_v) : NULL;
+        right_factor = (cos_u && sinh_v) ? expr_mul(cos_u, sinh_v) : NULL;
+        left = left_factor ? expr_mul_num(left_factor, &trig_coeff) : NULL;
+        right = right_factor ? expr_mul_num(right_factor, &hyper_coeff) : NULL;
+    } else if (trig_kind == EXPR_PATTERN_UNARY_COS &&
+               hyper_kind == EXPR_PATTERN_UNARY_SINH) {
+        left_factor = (cos_u && cosh_v) ? expr_mul(cos_u, cosh_v) : NULL;
+        right_factor = (sin_u && sinh_v) ? expr_mul(sin_u, sinh_v) : NULL;
+        left = left_factor ? expr_mul_num(left_factor, &hyper_coeff) : NULL;
+        right = right_factor ? expr_mul_num(right_factor, &trig_coeff) : NULL;
+    } else if (trig_kind == EXPR_PATTERN_UNARY_SIN &&
+               hyper_kind == EXPR_PATTERN_UNARY_COSH) {
+        left_factor = (sin_u && sinh_v) ? expr_mul(sin_u, sinh_v) : NULL;
+        right_factor = (cos_u && cosh_v) ? expr_mul(cos_u, cosh_v) : NULL;
+        left = left_factor ? expr_mul_num(left_factor, &hyper_coeff) : NULL;
+        right = right_factor ? expr_mul_num(right_factor, &trig_coeff) : NULL;
+        subtract = true;
+    } else if (trig_kind == EXPR_PATTERN_UNARY_SIN &&
+               hyper_kind == EXPR_PATTERN_UNARY_SINH) {
+        left_factor = (sin_u && cosh_v) ? expr_mul(sin_u, cosh_v) : NULL;
+        right_factor = (cos_u && sinh_v) ? expr_mul(cos_u, sinh_v) : NULL;
+        left = left_factor ? expr_mul_num(left_factor, &hyper_coeff) : NULL;
+        right = right_factor ? expr_mul_num(right_factor, &trig_coeff) : NULL;
+        subtract = true;
+    }
+
+    combined = (left && right) ? (subtract ? expr_sub(left, right) : expr_add(left, right)) : NULL;
+    out = div_number_owned(combined, denom);
+    combined = NULL;
+
+cleanup:
+    expr_free(combined);
+    expr_free(right);
+    expr_free(left);
+    expr_free(right_factor);
+    expr_free(left_factor);
+    expr_free(cosh_v);
+    expr_free(sinh_v);
+    expr_free(cos_u);
+    expr_free(sin_u);
+    expr_free(v);
+    expr_free(u);
+    num_destroy(&denom);
+    num_destroy(&hyper_coeff_sq);
+    num_destroy(&trig_coeff_sq);
+    num_destroy(&hyper_coeff);
+    num_destroy(&hyper_constant);
+    num_destroy(&trig_coeff);
+    num_destroy(&trig_constant);
+    return out;
+}
+
 static expr_t *integrate_sinh_cosh_affine_product(const expr_t *expr,
                                                   const expr_t *wrt)
 {
@@ -640,6 +984,56 @@ expr_t *integrate_same_affine_special_product(const expr_t *expr, const expr_t *
         goto cleanup;
 
     out = integrate_exp_times_hyperbolic_affine_product(expr, wrt, EXPR_PATTERN_UNARY_COSH);
+    if (out)
+        goto cleanup;
+
+    out = integrate_trig_affine_product(expr, wrt, EXPR_PATTERN_UNARY_SIN,
+                                        EXPR_PATTERN_UNARY_SIN);
+    if (out)
+        goto cleanup;
+
+    out = integrate_trig_affine_product(expr, wrt, EXPR_PATTERN_UNARY_COS,
+                                        EXPR_PATTERN_UNARY_COS);
+    if (out)
+        goto cleanup;
+
+    out = integrate_trig_affine_product(expr, wrt, EXPR_PATTERN_UNARY_SIN,
+                                        EXPR_PATTERN_UNARY_COS);
+    if (out)
+        goto cleanup;
+
+    out = integrate_hyperbolic_affine_product(expr, wrt, EXPR_PATTERN_UNARY_SINH,
+                                              EXPR_PATTERN_UNARY_SINH);
+    if (out)
+        goto cleanup;
+
+    out = integrate_hyperbolic_affine_product(expr, wrt, EXPR_PATTERN_UNARY_COSH,
+                                              EXPR_PATTERN_UNARY_COSH);
+    if (out)
+        goto cleanup;
+
+    out = integrate_hyperbolic_affine_product(expr, wrt, EXPR_PATTERN_UNARY_SINH,
+                                              EXPR_PATTERN_UNARY_COSH);
+    if (out)
+        goto cleanup;
+
+    out = integrate_trig_hyperbolic_affine_product(expr, wrt, EXPR_PATTERN_UNARY_COS,
+                                                   EXPR_PATTERN_UNARY_COSH);
+    if (out)
+        goto cleanup;
+
+    out = integrate_trig_hyperbolic_affine_product(expr, wrt, EXPR_PATTERN_UNARY_COS,
+                                                   EXPR_PATTERN_UNARY_SINH);
+    if (out)
+        goto cleanup;
+
+    out = integrate_trig_hyperbolic_affine_product(expr, wrt, EXPR_PATTERN_UNARY_SIN,
+                                                   EXPR_PATTERN_UNARY_COSH);
+    if (out)
+        goto cleanup;
+
+    out = integrate_trig_hyperbolic_affine_product(expr, wrt, EXPR_PATTERN_UNARY_SIN,
+                                                   EXPR_PATTERN_UNARY_SINH);
     if (out)
         goto cleanup;
 
@@ -966,4 +1360,3 @@ cleanup:
     num_destroy(&c1);
     return out;
 }
-

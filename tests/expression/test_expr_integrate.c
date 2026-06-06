@@ -1278,6 +1278,30 @@ static void test_integrate_symbolic_general_quadratic_denominator(void)
                                           "atan((2ax + b)/√(4ac - b²))");
 }
 
+static void test_integrate_log_quadratic(void)
+{
+    static const double points[] = { -1.5, -0.4, 0.6, 1.8 };
+
+    assert_string_antiderivative_matches("{ ln(x^2+1) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ ln(2*x^2+3*x+5) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ ln(a*x^2+b*x+c) | a=2; b=3; c=5 }",
+                                         points, sizeof(points) / sizeof(points[0]));
+}
+
+static void test_integrate_negative_quadratic_exponential(void)
+{
+    static const double points[] = { -1.5, -0.4, 0.6, 1.8 };
+
+    assert_string_antiderivative_matches("{ exp(-x^2) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ exp(-2*x^2-5*x-3) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ exp(-3*(2*x+1)^2+5) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+}
+
 static void test_integrate_centered_quadratic_roots(void)
 {
     static const double points[] = { -1.5, -0.4, 0.6, 1.8 };
@@ -1365,6 +1389,54 @@ static void test_integrate_mixed_frequency_exp_unary(void)
     assert_string_antiderivative_matches("{ sinh(2*x)*cosh(3*x) }",
                                          points, sizeof(points) / sizeof(points[0]));
     assert_string_antiderivative_matches("{ cosh(3*x)*sinh(2*x) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+}
+
+static void test_integrate_frequency_product_families(void)
+{
+    static const double points[] = { -0.6, -0.1, 0.4, 1.1 };
+
+    assert_string_antiderivative_matches("{ sin(2*x)*sin(3*x) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ cos(2*x)*cos(3*x) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ sin(2*x)*cos(3*x) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ sin(2*x+1)*sin(3*x-2) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ cos(2*x+1)*cos(3*x-2) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ sin(2*x+1)*cos(3*x-2) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+
+    assert_string_antiderivative_matches("{ sinh(2*x)*sinh(3*x) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ cosh(2*x)*cosh(3*x) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ sinh(2*x)*cosh(3*x) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ sinh(2*x+1)*sinh(3*x-2) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ cosh(2*x+1)*cosh(3*x-2) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ sinh(2*x+1)*cosh(3*x-2) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+
+    assert_string_antiderivative_matches("{ cos(2*x)*cosh(3*x) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ cos(2*x)*sinh(3*x) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ sin(2*x)*cosh(3*x) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ sin(2*x)*sinh(3*x) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ cos(2*x+1)*cosh(3*x-2) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ cos(2*x+1)*sinh(3*x-2) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ sin(2*x+1)*cosh(3*x-2) }",
+                                         points, sizeof(points) / sizeof(points[0]));
+    assert_string_antiderivative_matches("{ sin(2*x+1)*sinh(3*x-2) }",
                                          points, sizeof(points) / sizeof(points[0]));
 }
 
@@ -1481,9 +1553,12 @@ void test_symbolic_integration(void)
     TEST_RUN_SUBTEST(test_integrate_poly_times_affine_power, NULL);
     TEST_RUN_SUBTEST(test_integrate_poly_over_centered_quadratic, NULL);
     TEST_RUN_SUBTEST(test_integrate_symbolic_general_quadratic_denominator, NULL);
+    TEST_RUN_SUBTEST(test_integrate_log_quadratic, NULL);
+    TEST_RUN_SUBTEST(test_integrate_negative_quadratic_exponential, NULL);
     TEST_RUN_SUBTEST(test_integrate_centered_quadratic_roots, NULL);
     TEST_RUN_SUBTEST(test_integrate_trig_power_products, NULL);
     TEST_RUN_SUBTEST(test_integrate_mixed_frequency_exp_unary, NULL);
+    TEST_RUN_SUBTEST(test_integrate_frequency_product_families, NULL);
     TEST_RUN_SUBTEST(test_integrate_more_by_parts, NULL);
     TEST_RUN_SUBTEST(test_integrate_partial_fractions, NULL);
     TEST_RUN_SUBTEST(test_integrate_unsupported_product_returns_null, NULL);

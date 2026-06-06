@@ -1138,6 +1138,22 @@ int expr_fold_floor_const(const number_t *in, number_t *out)
     return 1;
 }
 
+int expr_fold_erf_const(const number_t *in, number_t *out)
+{
+    if (!in || !out || !num_is_inf(*in))
+        return 0;
+    *out = num_get_sign(*in) < 0 ? NUM_NEG_ONE : NUM_ONE;
+    return 1;
+}
+
+int expr_fold_erfc_const(const number_t *in, number_t *out)
+{
+    if (!in || !out || !num_is_inf(*in))
+        return 0;
+    *out = num_get_sign(*in) < 0 ? NUM_TWO : NUM_ZERO;
+    return 1;
+}
+
 static expr_t *expr_try_simplify_preserved_i_power_local(
     const expr_binding_expr_t *base_expr, number_t exponent);
 
@@ -1622,6 +1638,7 @@ static expr_t *expr_simplify_flat_quotient_local(expr_t *a, expr_t *b)
     expr_combine_exp_terms(terms, nterms);
     expr_merge_sqrt_terms(terms, nterms);
     expr_merge_sqrt_terms(den_terms, nden_terms);
+    expr_merge_sqrt_quotient_terms(terms, nterms, den_terms, nden_terms);
 
     {
         number_t four = num_create_from_long(4L);
@@ -1737,6 +1754,13 @@ expr_t *expr_simplify_unary_operator(const expr_t *dv, expr_t *a, expr_t *b)
 
         if (const_fold)
             return const_fold;
+    }
+
+    {
+        expr_t *value_fold = expr_simplify_try_unary_const_value_fold(dv, a);
+
+        if (value_fold)
+            return value_fold;
     }
 
     if (expr_is_op(dv, &ops_sqrt)) {
@@ -2164,6 +2188,7 @@ expr_t *expr_simplify_mul_operator(const expr_t *dv, expr_t *a, expr_t *b)
     expr_combine_exp_terms(terms, nterms);
     expr_merge_sqrt_terms(terms, nterms);
     expr_merge_sqrt_terms(den_terms, nden_terms);
+    expr_merge_sqrt_quotient_terms(terms, nterms, den_terms, nden_terms);
 
     expanded = expr_try_expand_shallow_product(c_acc, terms, nterms,
                                              den_terms, nden_terms);
@@ -2235,6 +2260,12 @@ expr_t *expr_simplify_div_operator(const expr_t *dv, expr_t *a, expr_t *b)
     }
 
     if (expr_is_op(b, &ops_const) && expr_const_is_one(b)) { expr_free(b); return a; }
+    {
+        expr_t *sqrt_quotient = expr_simplify_try_sqrt_quotient(a, b);
+
+        if (sqrt_quotient)
+            return sqrt_quotient;
+    }
     {
         expr_t *reciprocal = expr_simplify_try_reciprocal_unary(a, b);
 

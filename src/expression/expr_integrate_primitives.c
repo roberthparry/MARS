@@ -2,8 +2,12 @@
 
 expr_t *integrate_exp_rule(const expr_t *expr, const expr_t *wrt)
 {
-    return integrate_affine_unary_kind(expr, wrt, EXPR_PATTERN_UNARY_EXP,
-                                      expr_exp, NUM_ONE);
+    expr_t *out = integrate_affine_unary_kind(expr, wrt, EXPR_PATTERN_UNARY_EXP,
+                                             expr_exp, NUM_ONE);
+
+    if (out)
+        return out;
+    return integrate_exp_of_negative_quadratic(expr, wrt);
 }
 
 expr_t *integrate_sin_rule(const expr_t *expr, const expr_t *wrt)
@@ -867,4 +871,3 @@ expr_t *integrate_e1_rule(const expr_t *expr, const expr_t *wrt)
     num_destroy(&constant);
     return div_number_owned_consuming(raw, &coeff);
 }
-

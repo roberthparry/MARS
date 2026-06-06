@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
 #include "expression.h"
 #include "integrator.h"
@@ -56,6 +57,58 @@ cleanup:
     return rc;
 }
 
+static int text_is_ci_literal(const char *text, const char *literal)
+{
+    while (*text && *literal) {
+        if (tolower((unsigned char)*text) != tolower((unsigned char)*literal))
+            return 0;
+        ++text;
+        ++literal;
+    }
+    return *text == '\0' && *literal == '\0';
+}
+
+static int parse_infinity_bound(const char *text, number_t *out)
+{
+    int sign = 1;
+    size_t len;
+    char *copy;
+    char *p;
+    char *end;
+    int ok;
+
+    if (!text || !out)
+        return 1;
+
+    len = strlen(text);
+    copy = malloc(len + 1u);
+    if (!copy)
+        return 1;
+    memcpy(copy, text, len + 1u);
+
+    p = copy;
+    while (isspace((unsigned char)*p))
+        ++p;
+    end = p + strlen(p);
+    while (end > p && isspace((unsigned char)end[-1]))
+        *--end = '\0';
+
+    if (*p == '+' || *p == '-') {
+        if (*p == '-')
+            sign = -1;
+        ++p;
+    }
+
+    ok = text_is_ci_literal(p, "inf") ||
+         text_is_ci_literal(p, "infinity") ||
+         strcmp(p, "∞") == 0;
+    if (ok)
+        *out = num_clone(sign < 0 ? NUM_NINF : NUM_INF);
+
+    free(copy);
+    return ok ? 0 : 1;
+}
+
 static int parse_number_bound(const char *text, int precision, number_t *out)
 {
     int rc;
@@ -63,6 +116,8 @@ static int parse_number_bound(const char *text, int precision, number_t *out)
     if (!out)
         return 1;
     *out = num_new();
+    if (parse_infinity_bound(text, out) == 0)
+        return 0;
     rc = parse_number_expression(text, precision, out);
     if (rc != 0)
         return rc;
@@ -77,9 +132,19 @@ static expr_t *parse_bound_expression(const char *text, int precision)
     char *wrapped_input = NULL;
     expr_t *expr = NULL;
     expr_t *simplified = NULL;
+    number_t value = num_new();
 
-    if (!text)
+    if (!text) {
+        num_destroy(&value);
         return NULL;
+    }
+
+    if (parse_infinity_bound(text, &value) == 0) {
+        simplified = expr_new_const(value);
+        num_destroy(&value);
+        return simplified;
+    }
+    num_destroy(&value);
 
     if (precision > 0)
         num_set_default_prec_digits((size_t)precision + 8u);
