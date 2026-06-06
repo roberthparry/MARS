@@ -3169,11 +3169,45 @@ static void emit_binding_tex_unary_ceil(const expr_ops_t *ops,
     sbuf_puts(b, " \\right\\rceil");
 }
 
+static bool emit_binding_tex_exp_unit_fraction_root(
+    const expr_binding_expr_t *child, sbuf_t *b)
+{
+    number_t value;
+    long numerator;
+    long denominator;
+
+    if (!expr_binding_expr_number_value(child, &value))
+        return false;
+
+    if (!num_get_small_rational(value, &numerator, &denominator) ||
+        numerator != 1L ||
+        denominator <= 1L) {
+        num_destroy(&value);
+        return false;
+    }
+
+    if (denominator == 2L) {
+        sbuf_puts(b, "\\sqrt{e}");
+    } else {
+        char index_text[32];
+
+        snprintf(index_text, sizeof(index_text), "%ld", denominator);
+        sbuf_puts(b, "\\sqrt[");
+        sbuf_puts(b, index_text);
+        sbuf_puts(b, "]{e}");
+    }
+    num_destroy(&value);
+    return true;
+}
+
 static void emit_binding_tex_unary_exp(const expr_ops_t *ops,
                                        const expr_binding_expr_t *child,
                                        sbuf_t *b)
 {
     (void)ops;
+    if (emit_binding_tex_exp_unit_fraction_root(child, b))
+        return;
+
     sbuf_puts(b, "e^{");
     emit_binding_tex_expr(child, b, BIND_PREC_LOWEST);
     sbuf_putc(b, '}');
