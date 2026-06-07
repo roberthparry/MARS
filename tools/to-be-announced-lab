@@ -1,0 +1,29 @@
+#!/bin/sh
+set -eu
+
+if [ "${MARS_ROOT:-}" ]; then
+    root=$MARS_ROOT
+else
+    script_dir=$(CDPATH= cd "$(dirname "$0")" && pwd)
+    root=$(CDPATH= cd "$script_dir/.." && pwd)
+fi
+
+cd "$root"
+
+export MARS_LAB_APP_NAME="To-Be-Announced Lab"
+export MARS_LAB_SHORT_NAME="TBA"
+export MARS_LAB_DESCRIPTION="Forecast in To-Be-Announced Lab with time-series and exogenous data."
+export MARS_LAB_SUBTITLE="Forecasting-first unicorn Wonderland lab for regression, ARIMA, ARIMAX, SARIMA, and SARIMAX experiments."
+export MARS_LAB_THEME="to-be-announced"
+export MARS_LAB_BINARY="build/release/scratch/to-be-announced_lab"
+export MARS_LAB_SCRATCH_TARGET="scratch/to-be-announced_lab"
+export MARS_LAB_STATE_FILE=".to_be_announced_lab_state.json"
+export MARS_LAB_CONTROL_QUERY_PARAM="to_be_announced_lab_control"
+export MARS_LAB_CONTROL_COOKIE="to_be_announced_lab_control"
+export MARS_LAB_PUBLIC_PATH="/to-be-announced"
+
+if [ ! -x build/release/scratch/to-be-announced_lab ]; then
+    make scratch/to-be-announced_lab
+fi
+
+exec python3 tools/to_be_announced_lab.py "$@"

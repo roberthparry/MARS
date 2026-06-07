@@ -14,7 +14,7 @@
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
 static int datetime_validity_equal(const void *actual, const void *expected, void *ctx);
-static void datetime_validity_format(const void *value, char *buf, size_t buf_size, void *ctx);
+static int datetime_validity_format(const void *value, string_t *out, void *ctx);
 static bool test_datetime_suite_setup(void);
 
 static const test_validity_contract_t datetime_exact_contract =
@@ -48,22 +48,22 @@ static int datetime_validity_equal(const void *actual, const void *expected, voi
         && fabs(datetime_second(*got) - datetime_second(*want)) < 1e-4;
 }
 
-static void datetime_validity_format(const void *value, char *buf, size_t buf_size, void *ctx)
+static int datetime_validity_format(const void *value, string_t *out, void *ctx)
 {
     const datetime_t *const *dt = (const datetime_t *const *)value;
 
     (void)ctx;
-    if (!buf || buf_size == 0)
-        return;
+    if (!out)
+        return -1;
 
-    snprintf(buf, buf_size,
-             "%04d-%02d-%02d %02d:%02d:%09.6f",
-             datetime_year(*dt),
-             (int)datetime_month(*dt),
-             (int)datetime_day(*dt),
-             datetime_hour(*dt),
-             datetime_minute(*dt),
-             datetime_second(*dt));
+    return string_append_format(out,
+                                "%04d-%02d-%02d %02d:%02d:%09.6f",
+                                datetime_year(*dt),
+                                (int)datetime_month(*dt),
+                                (int)datetime_day(*dt),
+                                datetime_hour(*dt),
+                                datetime_minute(*dt),
+                                datetime_second(*dt));
 }
 
 static bool test_datetime_suite_setup(void)
@@ -502,6 +502,21 @@ void test_datetime_days_in_month(void) {
     ASSERT_EQ_INT(datetime_days_in_month(2024, DT_January),  31);
 }
 
+void test_datetime_format_uses_string_builder(void) {
+    datetime_t *dt = datetime_init_ymdt(
+        datetime_alloc(), 2024, DT_June, 15, 13, 5, 9.0
+    );
+    char *formatted = datetime_format(dt,
+                                      "%Dddd %d%o %Mmmm %yyyy @hh:@mm:@ss @p %% @@");
+
+    ASSERT_NOT_NULL(formatted);
+    TEST_ASSERT_STR_EQ(formatted,
+                       "Saturday 15th June 2024 01:05:09 pm % @");
+
+    free(formatted);
+    datetime_dealloc(dt);
+}
+
 static void example_chinese_new_years(void) {
     struct {
         int year;
@@ -592,6 +607,7 @@ int tests_main(void) {
     TEST_RUN_CASE(test_datetime_compare_less, NULL);
     TEST_RUN_CASE(test_datetime_compare_greater, NULL);
     TEST_RUN_CASE(test_datetime_days_in_month, NULL);
+    TEST_RUN_CASE(test_datetime_format_uses_string_builder, NULL);
 
     printf(C_YELLOW "\nRunning README examples...\n" C_RESET);
     TEST_RUN_OUTPUT_TAGS(example_chinese_new_years, "datetime,readme,output");

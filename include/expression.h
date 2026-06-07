@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include "number.h"
+#include "ustring.h"
 
 /**
  * @file expression.h
@@ -57,7 +58,7 @@ expr_t *expr_new_const(number_t x);
  * @brief Create a named constant node from a `number_t` value.
  *
  * Behaves like `expr_new_const()` but attaches a symbolic name used in
- * expr_to_string() output and debug printing. @p name is copied.
+ * expr_to_text() output and debug printing. @p name is copied.
  * Returns an owning handle; caller must call expr_free() exactly once.
  */
 expr_t *expr_new_named_const(number_t x, const char *name);
@@ -79,7 +80,7 @@ expr_t *expr_new_var(number_t x);
  * @brief Create a named variable node from a `number_t` value.
  *
  * Behaves like `expr_new_var()` but attaches a symbolic name used in
- * expr_to_string() output and debug printing. @p name is copied.
+ * expr_to_text() output and debug printing. @p name is copied.
  * Returns an owning handle; caller must call expr_free() exactly once.
  */
 expr_t *expr_new_named_var(number_t x, const char *name);
@@ -92,22 +93,22 @@ expr_t *expr_new_named_var(number_t x, const char *name);
  * @brief Update the value of a variable or named-constant node.
  *
  * Sets the node's value and advances the node's internal epoch counter.
- * The next call to expr_eval() on any expression that depends on @p dv will
+ * The next call to expr_eval() on any expression that depends on @p expr will
  * automatically detect the change and recompute. Calling expr_invalidate()
  * before expr_eval() is no longer required.
  *
- * @p dv must be a variable node (created with `expr_new_var()` or
+ * @p expr must be a variable node (created with `expr_new_var()` or
  * `expr_new_named_var()`) or a named constant node created with
  * `expr_new_named_const()`.
  */
-void expr_set_val(expr_t *dv, number_t value);
+void expr_set_val(expr_t *expr, number_t value);
 
 /**
  * @brief Attach or replace the symbolic name of a node.
  *
  * @p name is copied. Passing NULL removes any existing name.
  */
-void expr_set_name(expr_t *dv, const char *name);
+void expr_set_name(expr_t *expr, const char *name);
 
 /* ------------------------------------------------------------------------- */
 /* Accessors                                                                 */
@@ -122,7 +123,7 @@ void expr_set_name(expr_t *dv, const char *name);
  * `number_t`. The returned value does not alias internal node storage; the
  * caller owns it and must later release it with num_destroy().
  */
-number_t expr_get_val(const expr_t *dv);
+number_t expr_get_val(const expr_t *expr);
 
 /**
  * @brief Get the derivative ∂expr/∂wrt (borrowed).
@@ -144,7 +145,7 @@ const expr_t *expr_get_deriv(const expr_t *expr, const expr_t *wrt);
  * stale. The result is stored in the node's cache and also returned as an
  * owning `number_t` value for the caller.
  */
-number_t expr_eval(const expr_t *dv);
+number_t expr_eval(const expr_t *expr);
 
 /**
  * @brief Evaluate a scalar expression and compute derivatives with respect to
@@ -295,20 +296,20 @@ expr_t *expr_integrate(const expr_t *expr, const expr_t *wrt);
  * Scalar helpers whose names end in `_num` borrow a constant `number_t`
  * pointer and do not consume or modify the pointed-to value; `expr_num_sub()`
  * and `expr_num_div()` treat the scalar as the left-hand operand
- * (`value - dv` and `value / dv`).
+ * (`value - expr` and `value / expr`).
  */
-expr_t *expr_neg(const expr_t *dv);
-expr_t *expr_add(const expr_t *dv1, const expr_t *dv2);
-expr_t *expr_sub(const expr_t *dv1, const expr_t *dv2);
-expr_t *expr_mul(const expr_t *dv1, const expr_t *dv2);
-expr_t *expr_div(const expr_t *dv1, const expr_t *dv2);
+expr_t *expr_neg(const expr_t *expr);
+expr_t *expr_add(const expr_t *expr1, const expr_t *expr2);
+expr_t *expr_sub(const expr_t *expr1, const expr_t *expr2);
+expr_t *expr_mul(const expr_t *expr1, const expr_t *expr2);
+expr_t *expr_div(const expr_t *expr1, const expr_t *expr2);
 
-expr_t *expr_add_num(const expr_t *dv, const number_t *value);
-expr_t *expr_sub_num(const expr_t *dv, const number_t *value);
-expr_t *expr_num_sub(const number_t *value, const expr_t *dv);
-expr_t *expr_mul_num(const expr_t *dv, const number_t *value);
-expr_t *expr_div_num(const expr_t *dv, const number_t *value);
-expr_t *expr_num_div(const number_t *value, const expr_t *dv);
+expr_t *expr_add_num(const expr_t *expr, const number_t *value);
+expr_t *expr_sub_num(const expr_t *expr, const number_t *value);
+expr_t *expr_num_sub(const number_t *value, const expr_t *expr);
+expr_t *expr_mul_num(const expr_t *expr, const number_t *value);
+expr_t *expr_div_num(const expr_t *expr, const number_t *value);
+expr_t *expr_num_div(const number_t *value, const expr_t *expr);
 
 /* ------------------------------------------------------------------------- */
 /* Comparison                                                                */
@@ -319,9 +320,9 @@ expr_t *expr_num_div(const number_t *value, const expr_t *dv);
  *
  * Forces evaluation of both nodes, then compares their primal values
  * lexicographically: real part first, then imaginary part.
- * Returns -1 if dv1 < dv2, 0 if equal, +1 if dv1 > dv2.
+ * Returns -1 if expr1 < expr2, 0 if equal, +1 if expr1 > expr2.
  */
-int expr_cmp(const expr_t *dv1, const expr_t *dv2);
+int expr_cmp(const expr_t *expr1, const expr_t *expr2);
 
 /* ------------------------------------------------------------------------- */
 /* Elementary functions (owning)                                             */
@@ -331,44 +332,44 @@ int expr_cmp(const expr_t *dv1, const expr_t *dv2);
  * All elementary functions build a new DAG node and return an owning handle.
  * Arguments are retained (not consumed).
  *
- * `expr_pow(dv, exponent)` computes dv^exponent for a constant numeric
+ * `expr_pow(expr, exponent)` computes expr^exponent for a constant numeric
  * exponent supplied as a borrowed `number_t`.
  * `expr_pow_xp(base, exponent)` computes base^exponent where both operands
  * are differentiable expressions.
  */
-expr_t *expr_sin(const expr_t *dv);
-expr_t *expr_cos(const expr_t *dv);
-expr_t *expr_tan(const expr_t *dv);
-expr_t *expr_sec(const expr_t *dv);
-expr_t *expr_cosec(const expr_t *dv);
-expr_t *expr_cot(const expr_t *dv);
-expr_t *expr_sinh(const expr_t *dv);
-expr_t *expr_cosh(const expr_t *dv);
-expr_t *expr_tanh(const expr_t *dv);
-expr_t *expr_sech(const expr_t *dv);
-expr_t *expr_cosech(const expr_t *dv);
-expr_t *expr_coth(const expr_t *dv);
-expr_t *expr_asin(const expr_t *dv);
-expr_t *expr_acos(const expr_t *dv);
-expr_t *expr_atan(const expr_t *dv);
-expr_t *expr_asec(const expr_t *dv);
-expr_t *expr_acosec(const expr_t *dv);
-expr_t *expr_acot(const expr_t *dv);
-expr_t *expr_atan2(const expr_t *dv1, const expr_t *dv2);
-expr_t *expr_asinh(const expr_t *dv);
-expr_t *expr_acosh(const expr_t *dv);
-expr_t *expr_atanh(const expr_t *dv);
-expr_t *expr_asech(const expr_t *dv);
-expr_t *expr_acosech(const expr_t *dv);
-expr_t *expr_acoth(const expr_t *dv);
-expr_t *expr_exp(const expr_t *dv);
-expr_t *expr_log(const expr_t *dv);
-expr_t *expr_log10(const expr_t *dv);
-expr_t *expr_sqrt(const expr_t *dv);
-expr_t *expr_floor(const expr_t *dv);
-expr_t *expr_ceil(const expr_t *dv);
-expr_t *expr_pow(const expr_t *dv, const number_t *exponent);
-expr_t *expr_pow_xp(const expr_t *dv1, const expr_t *dv2);
+expr_t *expr_sin(const expr_t *expr);
+expr_t *expr_cos(const expr_t *expr);
+expr_t *expr_tan(const expr_t *expr);
+expr_t *expr_sec(const expr_t *expr);
+expr_t *expr_cosec(const expr_t *expr);
+expr_t *expr_cot(const expr_t *expr);
+expr_t *expr_sinh(const expr_t *expr);
+expr_t *expr_cosh(const expr_t *expr);
+expr_t *expr_tanh(const expr_t *expr);
+expr_t *expr_sech(const expr_t *expr);
+expr_t *expr_cosech(const expr_t *expr);
+expr_t *expr_coth(const expr_t *expr);
+expr_t *expr_asin(const expr_t *expr);
+expr_t *expr_acos(const expr_t *expr);
+expr_t *expr_atan(const expr_t *expr);
+expr_t *expr_asec(const expr_t *expr);
+expr_t *expr_acosec(const expr_t *expr);
+expr_t *expr_acot(const expr_t *expr);
+expr_t *expr_atan2(const expr_t *expr1, const expr_t *expr2);
+expr_t *expr_asinh(const expr_t *expr);
+expr_t *expr_acosh(const expr_t *expr);
+expr_t *expr_atanh(const expr_t *expr);
+expr_t *expr_asech(const expr_t *expr);
+expr_t *expr_acosech(const expr_t *expr);
+expr_t *expr_acoth(const expr_t *expr);
+expr_t *expr_exp(const expr_t *expr);
+expr_t *expr_log(const expr_t *expr);
+expr_t *expr_log10(const expr_t *expr);
+expr_t *expr_sqrt(const expr_t *expr);
+expr_t *expr_floor(const expr_t *expr);
+expr_t *expr_ceil(const expr_t *expr);
+expr_t *expr_pow(const expr_t *expr, const number_t *exponent);
+expr_t *expr_pow_xp(const expr_t *expr1, const expr_t *expr2);
 
 /* ------------------------------------------------------------------------- */
 /* Special functions (owning)                                                */
@@ -392,27 +393,27 @@ expr_t *expr_pow_xp(const expr_t *dv1, const expr_t *dv2);
  * Exact/discrete helpers such as expr_partition and expr_gcd are value functions:
  * they evaluate normally, but they are not differentiable.
  */
-expr_t *expr_abs(const expr_t *dv);
-expr_t *expr_hypot(const expr_t *dv1, const expr_t *dv2);
-expr_t *expr_erf(const expr_t *dv);
-expr_t *expr_erfc(const expr_t *dv);
-expr_t *expr_erfinv(const expr_t *dv);
-expr_t *expr_erfcinv(const expr_t *dv);
-expr_t *expr_gamma(const expr_t *dv);
-expr_t *expr_lgamma(const expr_t *dv);
-expr_t *expr_digamma(const expr_t *dv);
-expr_t *expr_trigamma(const expr_t *dv);
-expr_t *expr_polygamma(unsigned int order, const expr_t *dv);
-expr_t *expr_gammainv(const expr_t *dv);
+expr_t *expr_abs(const expr_t *expr);
+expr_t *expr_hypot(const expr_t *expr1, const expr_t *expr2);
+expr_t *expr_erf(const expr_t *expr);
+expr_t *expr_erfc(const expr_t *expr);
+expr_t *expr_erfinv(const expr_t *expr);
+expr_t *expr_erfcinv(const expr_t *expr);
+expr_t *expr_gamma(const expr_t *expr);
+expr_t *expr_lgamma(const expr_t *expr);
+expr_t *expr_digamma(const expr_t *expr);
+expr_t *expr_trigamma(const expr_t *expr);
+expr_t *expr_polygamma(unsigned int order, const expr_t *expr);
+expr_t *expr_gammainv(const expr_t *expr);
 expr_t *expr_gammainc_lower(const expr_t *s, const expr_t *x);
 expr_t *expr_gammainc_upper(const expr_t *s, const expr_t *x);
 expr_t *expr_gammainc_P(const expr_t *s, const expr_t *x);
 expr_t *expr_gammainc_Q(const expr_t *s, const expr_t *x);
-expr_t *expr_lambert_w(const expr_t *dv);
-expr_t *expr_lambert_w0(const expr_t *dv);
-expr_t *expr_lambert_wm1(const expr_t *dv);
-expr_t *expr_beta(const expr_t *dv1, const expr_t *dv2);
-expr_t *expr_logbeta(const expr_t *dv1, const expr_t *dv2);
+expr_t *expr_lambert_w(const expr_t *expr);
+expr_t *expr_lambert_w0(const expr_t *expr);
+expr_t *expr_lambert_wm1(const expr_t *expr);
+expr_t *expr_beta(const expr_t *expr1, const expr_t *expr2);
+expr_t *expr_logbeta(const expr_t *expr1, const expr_t *expr2);
 expr_t *expr_beta_pdf(const expr_t *x, const expr_t *a, const expr_t *b);
 expr_t *expr_logbeta_pdf(const expr_t *x, const expr_t *a, const expr_t *b);
 expr_t *expr_binomial(const expr_t *n, const expr_t *k);
@@ -434,23 +435,23 @@ expr_t *expr_bit_not(const expr_t *a);
 expr_t *expr_shl(const expr_t *a, const expr_t *bits);
 expr_t *expr_shr(const expr_t *a, const expr_t *bits);
 expr_t *expr_factors(const expr_t *n);
-expr_t *expr_normal_pdf(const expr_t *dv);
-expr_t *expr_normal_cdf(const expr_t *dv);
-expr_t *expr_normal_logpdf(const expr_t *dv);
-expr_t *expr_pdf(const expr_t *dv);
-expr_t *expr_cdf(const expr_t *dv);
-expr_t *expr_logpdf(const expr_t *dv);
-expr_t *expr_ei(const expr_t *dv);
-expr_t *expr_e1(const expr_t *dv);
+expr_t *expr_normal_pdf(const expr_t *expr);
+expr_t *expr_normal_cdf(const expr_t *expr);
+expr_t *expr_normal_logpdf(const expr_t *expr);
+expr_t *expr_pdf(const expr_t *expr);
+expr_t *expr_cdf(const expr_t *expr);
+expr_t *expr_logpdf(const expr_t *expr);
+expr_t *expr_ei(const expr_t *expr);
+expr_t *expr_e1(const expr_t *expr);
 
 /**
- * @brief Return true when every operation in @p dv is differentiable.
+ * @brief Return true when every operation in @p expr is differentiable.
  *
  * This is intended for front-ends such as MARS Lab, so they can hide
  * derivative controls for value-only functions such as gcd(), partition(),
  * factorial(), and primality helpers.
  */
-bool expr_is_differentiable(const expr_t *dv);
+bool expr_is_differentiable(const expr_t *expr);
 
 /* ------------------------------------------------------------------------- */
 /* Debug / lifetime                                                          */
@@ -463,7 +464,7 @@ bool expr_is_differentiable(const expr_t *dv);
  * keep an owning handle beyond the borrowed lifetime. Pair the retained handle
  * with one later call to expr_free().
  */
-void expr_retain(const expr_t *dv);
+void expr_retain(const expr_t *expr);
 
 /**
  * @brief Decrement the reference count and free if it reaches zero.
@@ -473,15 +474,15 @@ void expr_retain(const expr_t *dv);
  *   - expr_create_*
  *   - expr_add, expr_mul, expr_sin, etc.
  */
-void expr_free(expr_t *dv);
+void expr_free(expr_t *expr);
 
 /**
- * @brief Return a simplified owning handle for @p dv.
+ * @brief Return a simplified owning handle for @p expr.
  *
  * The input handle is not consumed. The caller owns the returned handle and
  * must call expr_free() on it.
  */
-expr_t *expr_simplify(const expr_t *dv);
+expr_t *expr_simplify(const expr_t *expr);
 
 
 /* ------------------------------------------------------------------------- */
@@ -489,10 +490,10 @@ expr_t *expr_simplify(const expr_t *dv);
 /* ------------------------------------------------------------------------- */
 
 /**
- * @brief Output style for expr_to_string().
+ * @brief Output style for expr_to_text().
  *
  * style_FUNCTION    — C-like function notation, e.g.
- *                     "number expr(number x) { return sin(x); }"
+ *                     "expression expr(x) { return sin(x); }"
  * style_EXPRESSION  — round-trip infix notation, e.g.
  *                     "{ sin(x₀) | x₀ = 1.0 }"
  * style_TEX         — TeX mathematical notation, e.g. "\left\{ x_{0} \;\middle|\; x_{0} = 1.0 \right\}"
@@ -507,22 +508,22 @@ typedef enum {
 } style_t;
 
 /**
- * @brief Serialise @p dv to a newly allocated string.
+ * @brief Serialise @p expr to newly allocated text.
  *
  * The format is controlled by @p style (see style_t).
  * The expression style produces output that can be round-tripped through
- * expr_from_string(). The returned string is heap-allocated; the caller
- * must free() it.
+ * expr_from_string(). The returned string is owned by the caller and must be
+ * released with string_free().
  */
-char *expr_to_string(const expr_t *dv, style_t style);
+string_t *expr_to_text(const expr_t *expr, style_t style);
 
 /**
- * @brief Print the expression-style string representation of @p dv to stdout.
+ * @brief Print the expression-style string representation of @p expr to stdout.
  *
- * Equivalent to calling expr_to_string(dv, style_EXPRESSION) and printing
+ * Equivalent to calling expr_to_text(expr, style_EXPRESSION) and printing
  * the result, followed by a newline.
  */
-void expr_print(const expr_t *dv);
+void expr_print(const expr_t *expr);
 
 /* ------------------------------------------------------------------------- */
 /* Parsing                                                                   */
@@ -531,7 +532,7 @@ void expr_print(const expr_t *dv);
 /**
  * @brief Construct a expr_t from an expression-style string.
  *
- * Accepts strings in the format produced by expr_to_string(f, style_EXPRESSION):
+ * Accepts strings in the format produced by expr_to_text(f, style_EXPRESSION):
  *
  *   { expr }
  *   { expr | x₀ = val, ...; [name] = val, ... }
@@ -580,6 +581,19 @@ void expr_print(const expr_t *dv);
  * once.
  */
 expr_t *expr_from_string(const char *s, expr_bindings_t **bnd_out);
+
+/**
+ * @brief Construct a expr_t from text stored in a string.
+ *
+ * This accepts the same grammar as expr_from_string(), but takes a @c string_t
+ * so callers can enter the expression parser without exposing the parser to
+ * raw C-string ownership or lifetime details.
+ *
+ * Returns an owning handle on success, or NULL on error (details written to
+ * stderr). The caller must call expr_free() on the returned pointer exactly
+ * once.
+ */
+expr_t *expr_from_text(const string_t *text, expr_bindings_t **bnd_out);
 
 /**
  * @brief Look up a parsed binding by name.

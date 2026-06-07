@@ -17,11 +17,13 @@
  *
  * Typical call sequence (handled automatically by test_harness.h):
  *   test_config_set_mode(mode);   // called once at startup
- *   test_enabled(file, name, parent);  // called per test
+ *   test_config_is_enabled(file, name, parent);  // called per test
  *   test_config_shutdown();       // free resources
  */
 
 #include <stdbool.h>
+
+#include "ustring.h"
 
 /* ------------------------------------------------------------------------- */
 /* Configuration mode                                                        */
@@ -35,7 +37,7 @@
  *
  * ### TEST_CONFIG_NONE
  * No JSON file is read or written. All tests default to enabled, and
- * test_config_has_key() always reports false.
+ * test_config_has_key_for() always reports false.
  *
  * ### TEST_CONFIG_GLOBAL
  * A single shared JSON file is used for all test translation units:
@@ -93,8 +95,9 @@ typedef enum {
  * @brief Set the active configuration mode for this test process.
  *
  * This function does not load or parse any JSON. It simply records the mode
- * so that subsequent calls to test_enabled(), test_config_has_key(), and
- * test_config_save() know which file to consult.
+ * so that subsequent calls to test_config_is_enabled(),
+ * test_config_has_key_for(), and test_config_save() know which file to
+ * consult.
  *
  * It must be called before any other test_config_* function.
  *
@@ -120,7 +123,7 @@ void test_config_shutdown(void);
 /* ------------------------------------------------------------------------- */
 
 /**
- * @brief Query whether a test is enabled.
+ * @brief Query whether a test is enabled using string_t inputs.
  *
  * This function loads (on first use) the appropriate JSON file based on the
  * active configuration mode, then resolves the enable/disable state for the
@@ -135,30 +138,37 @@ void test_config_shutdown(void);
  * If a parent group is provided, the test inherits the effective enabled state
  * of all ancestors.
  *
- * @param file   The source filename of the test (use `__FILE__`).
- * @param func   The test function name (use `__func__` or `#func`).
+ * This is the preferred form for harness code that already owns string_t
+ * objects.
+ *
+ * @param file   The source filename of the test.
+ * @param func   The test function name.
  * @param parent Optional parent group name (may be NULL). This should be a
  *               test/group identifier or a dot-separated chain of identifiers
  *               for nested groups, not an arbitrary free-form string.
  *
- * @return 1 if enabled, 0 if disabled.
+ * @return true if enabled, false if disabled.
  */
-int test_enabled(const char *file, const char *func, const char *parent);
+bool test_config_is_enabled(const string_t *file,
+                            const string_t *func,
+                            const string_t *parent);
 
 /**
- * @brief Check whether a configuration key exists in the JSON file.
+ * @brief Check whether a configuration key exists using string_t inputs.
  *
  * This checks only for explicit presence — it does *not* imply enabled or
  * disabled state. A missing key still behaves as "enabled" when queried via
- * test_enabled().
+ * test_config_is_enabled().
  *
  * @param file   The source filename of the test.
  * @param func   The test function name.
- * @param parent Optional parent group name.
+ * @param parent Optional parent group name (may be NULL).
  *
  * @return true if the key exists, false otherwise.
  */
-bool test_config_has_key(const char *file, const char *func, const char *parent);
+bool test_config_has_key_for(const string_t *file,
+                             const string_t *func,
+                             const string_t *parent);
 
 /**
  * @brief Persist the in-memory configuration to disk.

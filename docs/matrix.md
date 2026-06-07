@@ -145,25 +145,25 @@ int main(void)
     expr_t *ddet_dDelta = mat_deriv_det(H, delta);
     char *H_text;
     char *p_text;
-    char *det_text;
-    char *ddet_text;
+    string_t *det_text;
+    string_t *ddet_text;
 
     mat_get(charpoly, 2, 0, &detH);
 
     H_text = mat_to_string(H, MAT_STRING_LAYOUT_PRETTY);
     p_text = mat_to_string(charpoly, MAT_STRING_INLINE_PRETTY);
-    det_text = expr_to_string(detH, style_EXPRESSION);
-    ddet_text = expr_to_string(ddet_dDelta, style_EXPRESSION);
+    det_text = expr_to_text(detH, style_EXPRESSION);
+    ddet_text = expr_to_text(ddet_dDelta, style_EXPRESSION);
 
     puts(H_text);
     printf("characteristic polynomial coefficients = %s\n", p_text);
-    printf("det(H) = %s\n", det_text);
-    printf("d/dΔ det(H) = %s\n", ddet_text);
+    printf("det(H) = %s\n", string_c_str(det_text));
+    printf("d/dΔ det(H) = %s\n", string_c_str(ddet_text));
 
     free(H_text);
     free(p_text);
-    free(det_text);
-    free(ddet_text);
+    string_free(det_text);
+    string_free(ddet_text);
     mat_bindings_free(bindings);
     expr_free(ddet_dDelta);
     mat_free(charpoly);
@@ -225,6 +225,10 @@ int main(void)
     expr_t *evals[2] = {NULL, NULL};
     expr_t *trace = NULL;
     expr_t *c2 = NULL;
+    string_t *trace_text = NULL;
+    string_t *c2_text = NULL;
+    string_t *eval0_text = NULL;
+    string_t *eval1_text = NULL;
 
     expr_set_val(mat_bindings_get(bindings, "@DELTA"), delta);
     expr_set_val(mat_bindings_get(bindings, "@OMEGA"), omega);
@@ -232,15 +236,23 @@ int main(void)
     mat_eigenvalues(H, evals);
     mat_trace(H, &trace);
     mat_get(P, 2, 0, &c2);
+    trace_text = expr_to_text(trace, style_EXPRESSION);
+    c2_text = expr_to_text(c2, style_EXPRESSION);
+    eval0_text = expr_to_text(evals[0], style_EXPRESSION);
+    eval1_text = expr_to_text(evals[1], style_EXPRESSION);
 
     mat_printf("H = %ml\n", H);
     mat_printf("H² = %m\n", H2);
-    printf("tr(H) = %s\n", expr_to_string(trace, style_EXPRESSION));
-    printf("charpoly constant term = %s\n", expr_to_string(c2, style_EXPRESSION));
+    printf("tr(H) = %s\n", string_c_str(trace_text));
+    printf("charpoly constant term = %s\n", string_c_str(c2_text));
     printf("eigenvalues = %s, %s\n",
-           expr_to_string(evals[0], style_EXPRESSION),
-           expr_to_string(evals[1], style_EXPRESSION));
+           string_c_str(eval0_text),
+           string_c_str(eval1_text));
 
+    string_free(eval1_text);
+    string_free(eval0_text);
+    string_free(c2_text);
+    string_free(trace_text);
     num_destroy(&omega);
     num_destroy(&delta);
     mat_bindings_free(bindings);

@@ -79,12 +79,12 @@ char *expr_to_string_function(const expr_t *f)
         char *rhs = expr_binding_expr_to_function_string(f->binding_expr);
 
         if (rhs) {
-            sbuf_puts(&b, "variable expr(void) {\n");
+            sbuf_puts(&b, "expression expr(void) {\n");
             sbuf_puts(&b, "    return ");
             sbuf_puts(&b, rhs);
             sbuf_puts(&b, ";\n");
             sbuf_puts(&b, "}\n\n");
-            sbuf_puts(&b, "variable expr_eval() {\n");
+            sbuf_puts(&b, "expression expr_eval() {\n");
             sbuf_puts(&b, "    return expr();\n");
             sbuf_puts(&b, "}");
             free(rhs);
@@ -105,7 +105,7 @@ char *expr_to_string_function(const expr_t *f)
     find_explicit_named_consts_dfs(f, &cl);
     find_named_consts_dfs(g, &cl);
 
-    sbuf_puts(&b, "variable ");
+    sbuf_puts(&b, "expression ");
     sbuf_puts(&b, fname);
     sbuf_putc(&b, '(');
     emit_function_param_list(&b, &vl, &cl);
@@ -115,7 +115,7 @@ char *expr_to_string_function(const expr_t *f)
     sbuf_puts(&b, ";\n");
     sbuf_puts(&b, "}\n\n");
 
-    sbuf_puts(&b, "variable expr_eval() {\n");
+    sbuf_puts(&b, "expression expr_eval() {\n");
     for (size_t i = 0u; i < vl.count; ++i) {
         expr_t *v = vl.vars[i];
 

@@ -19,14 +19,7 @@ typedef struct {
 } symtab_t;
 
 void *fs_xmalloc(size_t n);
-int fs_utf8_decode(const char *s, unsigned int *out);
 int fs_is_letter(unsigned int c);
-void skip_spaces(const char **pp, const char *end);
-size_t scan_decimal_len(const char *s, const char *end);
-int read_superscript(const char **pp);
-char *read_simple_name(const char **pp);
-char *read_bracketed_name(const char **pp);
-char *read_any_name(const char **pp);
 
 void symtab_init(symtab_t *t);
 int symtab_has(const symtab_t *t, const char *name);

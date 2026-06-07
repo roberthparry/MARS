@@ -28,6 +28,7 @@
 #include <ctype.h>
 
 #include "datetime.h"
+#include "ustring.h"
 
 /**
  * @brief the datetime type - this is the internal structure definition for the datetime type. It is not intended to be used
@@ -1082,98 +1083,34 @@ static void str_to_upper(char *s)
         *s = (char)toupper((unsigned char)*s);
 }
 
-typedef char *string_t;
-
-#define STR_CHUNK 32  /* allocation granularity for string_t growth */
-
-/* Return the stored length of a string_t (bytes before the data pointer). */
-static inline size_t string_length(const string_t string) {
-    return *(size_t *)&string[ -sizeof(size_t) ];
-}
-
-/* Return the stored capacity of a string_t. */
-static inline size_t string_capacity(const string_t string) {
-    return *(size_t *)&string[ -sizeof(size_t) - sizeof(size_t) ];
-}
-
-size_t size_max(size_t a, size_t b) {
-    return (a < b) ? b : a;
-}
-
-/* Allocate a new string_t initialised with value. */
-static string_t string_create(const char *value) {
-    size_t len = strlen(value);
-    size_t capacity = size_max(STR_CHUNK, STR_CHUNK*((len + STR_CHUNK)/STR_CHUNK));
-    char *string = (char *)malloc(sizeof(size_t) + sizeof(size_t) + capacity);
-    *(size_t *)string = capacity;
-    string += sizeof(size_t);
-    *(size_t *)string = len;
-    string += sizeof(size_t);
-    memcpy(string, value, len + 1);
-    return (string_t)string;
-}
-
-/* Return a deep copy of string. */
-[[maybe_unused]] static string_t string_clone(const string_t string) {
-    size_t len = string_length(string);
-    size_t capacity = string_capacity(string);
-    char *clone = (char *)malloc(sizeof(size_t) + sizeof(size_t) + capacity);
-    *(size_t *)clone = capacity;
-    clone += sizeof(size_t);
-    *(size_t *)clone = len;
-    clone += sizeof(size_t);
-    memcpy(clone, string, len + 1);
-    return (string_t)clone;
-}
-
-/* Grow string_t to accommodate newlen bytes, doubling in STR_CHUNK increments. */
-static string_t string_realloc(string_t string, size_t newlen)
+static char *datetime_format_export(const string_t *text)
 {
-   size_t capacity = string_capacity(string);
+   const char *raw = string_c_str(text);
+   size_t len = strlen(raw) + 1u;
+   char *out = malloc(len);
 
-   if (newlen >= capacity) {
-      capacity = STR_CHUNK*((newlen + STR_CHUNK)/STR_CHUNK);
-      string = (char *)realloc(&string[ -sizeof(size_t) - sizeof(size_t) ], sizeof(size_t) + sizeof(size_t) + capacity);
-      *(size_t *)string = capacity;
-      string += sizeof(size_t) + sizeof(size_t);
-   }
-   *(size_t *)&string[ -sizeof(size_t) ] = newlen;
-   return (string_t)string;
+   if (!out)
+      return NULL;
+   memcpy(out, raw, len);
+   return out;
 }
 
-/* Free a string_t. Use free() instead after string_finalize(). */
-[[maybe_unused]] static void string_destroy(string_t string) {
-   if (string != NULL) {
-      free(&string[ -sizeof(size_t) - sizeof(size_t) ]);
-   }
-}
-
-/* Append null-terminated str to string. May reallocate; returns new pointer. */
-string_t string_append(string_t string, const char *str)
+static void datetime_format_append_text(string_t *out,
+                                        int *failed,
+                                        const char *text)
 {
-   size_t len = string_length(string);
-   size_t newlen = len + strlen(str);
-   string = string_realloc(string, newlen);
-   memcpy(string + len, str, newlen - len + 1);
-   return (string_t)string;
+   if (*failed)
+      return;
+   if (string_append_cstr(out, text) != 0)
+      *failed = 1;
 }
 
-/* Append a single character to string. May reallocate; returns new pointer. */
-static string_t string_append_char(string_t string, char chr)
+static void datetime_format_append_char(string_t *out, int *failed, char ch)
 {
-   size_t len = string_length(string);
-   size_t newlen = len + 1;
-   string = string_realloc(string, newlen);
-   string[ len ] = chr;
-   string[ len + 1 ] = '\0';
-   return (string_t)string;
-}
-
-/* Strip the length/capacity header and return a plain malloc'd C string. */
-static char *string_finalize(string_t string)
-{
-   size_t len = string_length(string);
-   return (char *)realloc(memmove(&string[ -sizeof(size_t) - sizeof(size_t) ], string, len + 1), len + 1);
+   if (*failed)
+      return;
+   if (string_append_char(out, ch) != 0)
+      *failed = 1;
 }
 
 char *datetime_format(const datetime_t *dttm, const char *format)
@@ -1190,23 +1127,27 @@ char *datetime_format(const datetime_t *dttm, const char *format)
         }
     }
 
-   string_t formattedString = string_create("");
+   string_t *formattedString = string_new();
+
+   if (!formattedString)
+      return NULL;
 
    char  buffer[ 32 ];
 
-   char *formatPtr = (char *)format;
+   const char *formatPtr = format;
+   int append_failed = 0;
 
    while ( *formatPtr ) {
       if ( *formatPtr == '%' ) {
          formatPtr ++;
          if ( *formatPtr == '\0' ) {
-            formattedString = string_append_char(formattedString, '%');
+            datetime_format_append_char(formattedString, &append_failed, '%');
             break;
          }
 
          switch ( *formatPtr ) {
             case '%':
-               formattedString = string_append_char(formattedString, '%');
+               datetime_format_append_char(formattedString, &append_failed, '%');
                formatPtr ++;
                break;
 
@@ -1215,12 +1156,12 @@ char *datetime_format(const datetime_t *dttm, const char *format)
                switch ( strspn( formatPtr, "Dd" ) ) {
                   case 1:
                      sprintf(buffer, "%i", (int) dttm->day);
-                     formattedString = string_append(formattedString, buffer);
+                     datetime_format_append_text(formattedString, &append_failed, buffer);
                      formatPtr ++;
                      break;
                   case 2:
                      sprintf(buffer, "%02i", (int) dttm->day);
-                     formattedString = string_append(formattedString, buffer);
+                     datetime_format_append_text(formattedString, &append_failed, buffer);
                      formatPtr += 2;
                      break;
                   case 3:
@@ -1232,7 +1173,7 @@ char *datetime_format(const datetime_t *dttm, const char *format)
                         else
                            buffer[ 0 ] = (char)toupper((int) buffer[ 0 ]);
                      }
-                     formattedString = string_append(formattedString, buffer);
+                     datetime_format_append_text(formattedString, &append_failed, buffer);
                      formatPtr += 3;
                      break;
                   case 4:
@@ -1244,7 +1185,7 @@ char *datetime_format(const datetime_t *dttm, const char *format)
                         else
                            buffer[ 0 ] = (char) toupper( (int) buffer[ 0 ] );
                      }
-                     formattedString = string_append(formattedString, buffer);
+                     datetime_format_append_text(formattedString, &append_failed, buffer);
                      formatPtr += 4;
                      break;
                }
@@ -1273,7 +1214,7 @@ char *datetime_format(const datetime_t *dttm, const char *format)
                }
                if (*formatPtr == 'O')
                   str_to_upper(buffer);
-               formattedString = string_append(formattedString, buffer);
+               datetime_format_append_text(formattedString, &append_failed, buffer);
                formatPtr ++;
                break;
 
@@ -1282,12 +1223,12 @@ char *datetime_format(const datetime_t *dttm, const char *format)
                switch ( strspn(formatPtr, "Mm")) {
                   case 1:
                      sprintf(buffer, "%i", (int)dttm->month);
-                     formattedString = string_append(formattedString, buffer);
+                     datetime_format_append_text(formattedString, &append_failed, buffer);
                      formatPtr ++;
                      break;
                   case 2:
                      sprintf( buffer, "%02i", (int) dttm->month );
-                     formattedString = string_append(formattedString, buffer);
+                     datetime_format_append_text(formattedString, &append_failed, buffer);
                      formatPtr += 2;
                      break;
                   case 3:
@@ -1299,7 +1240,7 @@ char *datetime_format(const datetime_t *dttm, const char *format)
                         else
                            buffer[ 0 ] = (char)toupper((int)buffer[ 0 ]);
                      }
-                     formattedString = string_append(formattedString, buffer);
+                     datetime_format_append_text(formattedString, &append_failed, buffer);
                      formatPtr += 3;
                      break;
                   case 4:
@@ -1311,7 +1252,7 @@ char *datetime_format(const datetime_t *dttm, const char *format)
                         else
                            buffer[ 0 ] = (char) toupper( (int) buffer[ 0 ] );
                      }
-                     formattedString = string_append(formattedString, buffer);
+                     datetime_format_append_text(formattedString, &append_failed, buffer);
                      formatPtr += 4;
                      break;
                }
@@ -1324,26 +1265,26 @@ char *datetime_format(const datetime_t *dttm, const char *format)
                if (Y_count < 4) {
                   int year = dttm->year - 100 * (dttm->year / 100);
                   sprintf(buffer, "%02i", year);
-                  formattedString = string_append(formattedString, buffer);
+                  datetime_format_append_text(formattedString, &append_failed, buffer);
                   formatPtr += Y_count;
                }
                else {
                   sprintf(buffer, "%i", dttm->year);
-                  formattedString = string_append(formattedString, buffer);
+                  datetime_format_append_text(formattedString, &append_failed, buffer);
                   formatPtr += 4;
                }
                break;
             }
 
             default:
-               formattedString = string_append_char(formattedString, '%');
+               datetime_format_append_char(formattedString, &append_failed, '%');
                break;
          }
       }
       else if ( *formatPtr == '@' ) {
          formatPtr ++;
          if ( *formatPtr == '\0' ) {
-            formattedString = string_append_char(formattedString, '%');
+            datetime_format_append_char(formattedString, &append_failed, '%');
             break;
          }
 
@@ -1356,12 +1297,12 @@ char *datetime_format(const datetime_t *dttm, const char *format)
                formatPtr ++;
                if (toupper(*formatPtr) == 'H') {
                   sprintf(buffer, "%02i", hour);
-                  formattedString = string_append(formattedString, buffer);
+                  datetime_format_append_text(formattedString, &append_failed, buffer);
                   formatPtr ++;
                }
                else {
                   sprintf( buffer, "%i", hour);
-                  formattedString = string_append(formattedString, buffer);
+                  datetime_format_append_text(formattedString, &append_failed, buffer);
                }
                break;
             }
@@ -1371,12 +1312,12 @@ char *datetime_format(const datetime_t *dttm, const char *format)
                formatPtr ++;
                if (toupper(*formatPtr) == 'M') {
                   sprintf(buffer, "%02i", (int)dttm->minute);
-                  formattedString = string_append(formattedString, buffer);
+                  datetime_format_append_text(formattedString, &append_failed, buffer);
                   formatPtr ++;
                }
                else {
                   sprintf(buffer, "%i", (int)dttm->minute);
-                  formattedString = string_append(formattedString, buffer);
+                  datetime_format_append_text(formattedString, &append_failed, buffer);
                }
                break;
 
@@ -1385,38 +1326,38 @@ char *datetime_format(const datetime_t *dttm, const char *format)
                formatPtr ++;
                if (toupper(*formatPtr) == 'S') {
                   sprintf( buffer, "%02i", (int)dttm->second);
-                  formattedString = string_append(formattedString, buffer);
+                  datetime_format_append_text(formattedString, &append_failed, buffer);
                   formatPtr ++;
                }
                else {
                   sprintf( buffer, "%i", (int)dttm->second);
-                  formattedString = string_append(formattedString, buffer);
+                  datetime_format_append_text(formattedString, &append_failed, buffer);
                }
                break;
 
             case 'P':
                if ( dttm->hour >= 12 )
-                  formattedString = string_append(formattedString, "PM");
+                  datetime_format_append_text(formattedString, &append_failed, "PM");
                else
-                  formattedString = string_append(formattedString, "AM");
+                  datetime_format_append_text(formattedString, &append_failed, "AM");
                formatPtr ++;
                break;
 
             case 'p':
                if ( dttm->hour >= 12 )
-                  formattedString = string_append(formattedString, "pm");
+                  datetime_format_append_text(formattedString, &append_failed, "pm");
                else
-                  formattedString = string_append(formattedString, "am");
+                  datetime_format_append_text(formattedString, &append_failed, "am");
                formatPtr ++;
                break;
 
             case '@':
-               formattedString = string_append_char(formattedString, '@');
+               datetime_format_append_char(formattedString, &append_failed, '@');
                formatPtr ++;
                break;
 
             default:
-               formattedString = string_append_char(formattedString, '@');
+               datetime_format_append_char(formattedString, &append_failed, '@');
                break;
          }
       }
@@ -1424,13 +1365,23 @@ char *datetime_format(const datetime_t *dttm, const char *format)
          if ( *formatPtr == '^' )
             formatPtr ++;
          else {
-            formattedString = string_append_char(formattedString, *formatPtr);
+            datetime_format_append_char(formattedString, &append_failed, *formatPtr);
             formatPtr ++;
          }
       }
    }
 
-   return string_finalize(formattedString);
+   if (append_failed)
+      goto error;
+
+   char *result = datetime_format_export(formattedString);
+   string_free(formattedString);
+   return result;
+
+error:
+   string_free(formattedString);
+   return NULL;
+
 }
 
 double datetime_sun_time(long julianDayNumber, double latitude, double longitude, bool isSunrise)

@@ -10,6 +10,27 @@
 #include "qfloat.h"
 #include "test_harness.h"
 
+static inline char *test_expr_to_string(const expr_t *expr, style_t style)
+{
+    string_t *text = expr_to_text(expr, style);
+    const char *src;
+    size_t len;
+    char *copy;
+
+    if (!text)
+        return NULL;
+
+    src = string_c_str(text);
+    len = strlen(src) + 1u;
+    copy = malloc(len);
+    if (copy)
+        memcpy(copy, src, len);
+    string_free(text);
+    return copy;
+}
+
+#define expr_to_string(expr, style) test_expr_to_string((expr), (style))
+
 static inline expr_t *test_expr_new_const_d(double x)
 {
     number_t n = num_create_from_qfloat(qf_from_double(x));

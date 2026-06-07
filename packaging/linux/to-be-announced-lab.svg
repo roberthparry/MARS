@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="Ophelia Lab unicorn wonderland icon">
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="To-Be-Announced Lab unicorn wonderland icon">
   <defs>
     <linearGradient id="sky" x1="30" y1="26" x2="220" y2="230" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#fff7fd"/>
@@ -55,5 +55,5 @@
   <text x="128" y="220" text-anchor="middle"
         font-family="Georgia, 'Palatino Linotype', serif"
         font-size="30" font-weight="700"
-        fill="#8a2b74" opacity="0.94">Ophelia</text>
+        fill="#8a2b74" opacity="0.94">TBA</text>
 </svg>

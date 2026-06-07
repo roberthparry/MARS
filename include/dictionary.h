@@ -120,9 +120,9 @@ typedef enum {
  *
  * @return A new dictionary, or NULL on allocation failure.
  *
- * Keys and values are copied into the dictionary using the provided clone
- * functions (or shallow copies if clone is NULL). The dictionary owns all
- * stored elements and will destroy them when appropriate.
+ * Keys and values are copied into dictionary storage using the provided clone
+ * functions (or shallow byte copies if clone is NULL). Destroy callbacks are
+ * applied only to those stored copies.
  */
 dictionary_t *dictionary_create(size_t key_size,
                                 size_t value_size,

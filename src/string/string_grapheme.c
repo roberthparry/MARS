@@ -23,6 +23,7 @@
 #include <unictype.h>
 #endif
 
+#define MARS_STRING_INTERNAL_ACCESS
 #include "string_internal.h"
 
 #define ARRAY_COUNT(a) (sizeof(a) / sizeof((a)[0]))
@@ -298,7 +299,7 @@ size_t string_grapheme_count(const string_t *s)
     return count;
 }
 
-size_t string_count(const string_t *s)
+size_t string_length(const string_t *s)
 {
     return string_grapheme_count(s);
 }
@@ -480,6 +481,11 @@ rune_t string_at(const string_t *s, size_t index)
 bool rune_is_empty(rune_t rune)
 {
     return !rune_is_inline_ascii(rune) && !rune_data(rune);
+}
+
+bool rune_is_none(rune_t rune)
+{
+    return rune_is_empty(rune);
 }
 
 rune_t rune_from_ascii(char c)

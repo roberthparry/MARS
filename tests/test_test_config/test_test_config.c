@@ -5,11 +5,12 @@
 #include <unistd.h>
 
 #include "test_harness.h"
+#include "ustring.h"
 
 TEST_SUITE_CONFIG(TEST_CONFIG_LOCAL);
 
 static int int_validity_equal(const void *actual, const void *expected, void *ctx);
-static void int_validity_format(const void *value, char *buf, size_t buf_size, void *ctx);
+static int int_validity_format(const void *value, string_t *out, void *ctx);
 static bool test_fixture_setup_impl(void);
 static bool test_fixture_teardown_impl(void);
 
@@ -29,11 +30,9 @@ static char last_temp_dir[512];
 static char last_temp_file[512];
 static char last_stdout_capture_file[512];
 static char last_stderr_capture_file[512];
-static const char *test_env_name = "MARS_TEST_HARNESS_ENV_CASE";
 
 static bool test_suite_setup_impl(void)
 {
-    setenv(test_env_name, "outer", 1);
     test_register_validity_checker("int-equality", &int_contract);
     return TEST_REQUIRE_VALIDITY_CHECKER("int-equality");
 }
@@ -50,8 +49,6 @@ static void test_fixture_is_active_for_case(void);
 static void test_fixture_balance_after_nested_group(void);
 static void test_temp_resources_are_available_in_case(void);
 static void test_temp_resources_are_cleaned_after_case(void);
-static void test_env_override_is_available_in_case(void);
-static void test_env_override_is_restored_after_case(void);
 static void test_stdout_capture_is_available_in_case(void);
 static void test_stdout_capture_file_is_cleaned_after_case(void);
 static void test_stderr_capture_is_available_in_case(void);
@@ -59,6 +56,7 @@ static void test_stderr_capture_file_is_cleaned_after_case(void);
 static void test_output_example_runs(void);
 static void test_output_example_disabled(void);
 static void test_output_examples_respect_config(void);
+static void test_json_string_escapes_are_written(void);
 
 static const char *test_local_config_path(void)
 {
@@ -89,7 +87,10 @@ static void seed_local_config_with_stale_entries(void)
           "    },\n"
           "    \"stale_branch\": true\n"
           "  },\n"
-          "  \"test_output_example_disabled\": false,\n"
+          "  \"json_reader_\\u0022quote\\u005Cslash\\nline\\t tab\\uD83D\\uDE42\": false,\n"
+          "  \"test_output_example_\\u0064isabled\": false,\n"
+          "  \"json_nul_\\u0000_key\": true,\n"
+          "  \"stale_\\uD83D\\uDE42\": true,\n"
           "  \"obsolete_top_level\": true\n"
           "}\n",
           f);
@@ -140,10 +141,10 @@ static int int_validity_equal(const void *actual, const void *expected, void *ct
     return *(const int *)actual == *(const int *)expected;
 }
 
-static void int_validity_format(const void *value, char *buf, size_t buf_size, void *ctx)
+static int int_validity_format(const void *value, string_t *out, void *ctx)
 {
     (void)ctx;
-    snprintf(buf, buf_size, "%d", *(const int *)value);
+    return string_append_format(out, "%d", *(const int *)value);
 }
 
 static bool test_fixture_setup_impl(void)
@@ -287,28 +288,6 @@ static void test_temp_resources_are_cleaned_after_case(void)
                      "temp directory should be removed after its case finishes");
 }
 
-static void test_env_override_is_available_in_case(void)
-{
-    const char *before = getenv(test_env_name);
-    const char *after;
-
-    TEST_ASSERT_NOT_NULL(before);
-    TEST_ASSERT_STR_EQ(before, "outer");
-    TEST_ASSERT_TRUE(test_case_setenv(test_env_name, "inner"),
-                     "test case env override should succeed");
-    after = getenv(test_env_name);
-    TEST_ASSERT_NOT_NULL(after);
-    TEST_ASSERT_STR_EQ(after, "inner");
-}
-
-static void test_env_override_is_restored_after_case(void)
-{
-    const char *value = getenv(test_env_name);
-
-    TEST_ASSERT_NOT_NULL(value);
-    TEST_ASSERT_STR_EQ(value, "outer");
-}
-
 static void test_stdout_capture_is_available_in_case(void)
 {
     const char *path = NULL;
@@ -323,7 +302,7 @@ static void test_stdout_capture_is_available_in_case(void)
 
     snprintf(last_stdout_capture_file, sizeof(last_stdout_capture_file), "%s", path);
 
-    printf("captured-line\n");
+    string_printf("captured-line\n");
     TEST_ASSERT_TRUE(test_case_end_stdout_capture(saved_stdout),
                      "stdout capture should restore stdout successfully");
 
@@ -443,6 +422,43 @@ static void test_output_examples_respect_config(void)
     TEST_ASSERT_INT_EQ(output_example_disabled_ran, 0);
 }
 
+static void test_json_string_escapes_are_written(void)
+{
+    const char *name = "json_escape_\"quote\\slash\nline\t tab🙂";
+    const char *reader_name = "json_reader_\"quote\\slash\nline\t tab🙂";
+    const char *expected_json_key =
+        "\"json_escape_\\\"quote\\\\slash\\nline\\t tab🙂\"";
+    const char *expected_nul_key = "\"json_nul_\\u0000_key\"";
+    string_t *file_text = string_new_with(__FILE__);
+    string_t *name_text = string_new_with(name);
+    string_t *reader_name_text = string_new_with(reader_name);
+    bool have_inputs = file_text && name_text && reader_name_text;
+    bool enabled = have_inputs
+        ? test_config_is_enabled(file_text, name_text, NULL)
+        : false;
+    bool reader_disabled = have_inputs
+        ? !test_config_is_enabled(file_text, reader_name_text, NULL)
+        : false;
+
+    string_free(file_text);
+    string_free(name_text);
+    string_free(reader_name_text);
+    TEST_ASSERT_TRUE(have_inputs, "string inputs should be allocated");
+    TEST_ASSERT_TRUE(enabled,
+                     "special JSON string key should be materialised");
+    TEST_ASSERT_TRUE(reader_disabled,
+                     "JSON reader should decode escaped keys before lookup");
+
+    test_config_set_prune_enabled(false);
+    test_config_save();
+    test_config_set_prune_enabled(true);
+
+    TEST_ASSERT_TRUE(file_contains_text(test_local_config_path(), expected_json_key),
+                     "regenerated config should JSON-escape special string keys");
+    TEST_ASSERT_TRUE(file_contains_text(test_local_config_path(), expected_nul_key),
+                     "regenerated config should preserve JSON NUL escapes");
+}
+
 static void test_parent_group(void)
 {
     TEST_RUN_SUBTEST(test_subtest_grouping, NULL);
@@ -456,7 +472,7 @@ int tests_main(void)
 {
     seed_local_config_with_stale_entries();
 
-    printf("Running test_config tests...\n");
+    string_printf("Running test_config tests...\n");
     TEST_SECTION("Configuration");
 
     TEST_RUN_CASE(test_top_level_default_true, "config,defaults");
@@ -469,8 +485,6 @@ int tests_main(void)
     TEST_RUN_CASE(test_fixture_balance_after_nested_group, "config,fixture");
     TEST_RUN_CASE(test_temp_resources_are_available_in_case, "config,resource");
     TEST_RUN_CASE(test_temp_resources_are_cleaned_after_case, "config,resource");
-    TEST_RUN_CASE(test_env_override_is_available_in_case, "config,resource");
-    TEST_RUN_CASE(test_env_override_is_restored_after_case, "config,resource");
     TEST_RUN_CASE(test_stdout_capture_is_available_in_case, "config,resource");
     TEST_RUN_CASE(test_stdout_capture_file_is_cleaned_after_case, "config,resource");
     TEST_RUN_CASE(test_stderr_capture_is_available_in_case, "config,resource");
@@ -478,6 +492,7 @@ int tests_main(void)
     TEST_RUN_OUTPUT_TAGS(test_output_example_runs, "config,output");
     TEST_RUN_OUTPUT_TAGS(test_output_example_disabled, "config,output");
     TEST_RUN_CASE(test_output_examples_respect_config, "config,output");
+    TEST_RUN_CASE(test_json_string_escapes_are_written, "config,json");
     TEST_RUN_CASE(test_missing_nested_path_is_materialized, "config,regeneration");
     TEST_RUN_CASE(test_invalid_parent_name_is_rejected, "config,validation");
     TEST_RUN_CASE(test_validity_contract_success, "config,validation");

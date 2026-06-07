@@ -74,15 +74,13 @@ tests/**/*.log
 tests/**/*.pdf
 tests/**/*.synctex.gz
 
-# Local desktop launcher/icon byproducts for MARS dval Lab
+# Local desktop launcher/icon byproducts for MARS labs
 packaging/linux/*.desktop
 packaging/linux/*.png
 
 .codex
 .mars_lab_state.json
-.ophelia_lab_state.json
-.ophelia_uploads/
-tools/mars-dval-lab
-tools/ophelia-lab
+.to_be_announced_lab_state.json
+.to_be_announced_uploads/
 
-
+test_data/

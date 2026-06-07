@@ -4,22 +4,13 @@ The project provides per-module test targets.
 
 ## Machine-Readable Reports
 
-The harness can emit machine-readable reports for any suite binary:
+The harness emits JUnit-style XML beside each suite source file by default.
+For example, the qfloat suite writes `tests/qfloat/test_qfloat.junit.xml`.
 
 ```sh
 make test_qfloat
-
-MARS_TEST_REPORT_JUNIT=build/test-results/test_qfloat.xml \
-tests/build/release/qfloat/test_qfloat
-
-MARS_TEST_REPORT_JSON=build/test-results/test_qfloat.json \
-tests/build/release/qfloat/test_qfloat
 ```
 
-- By default, suites emit JUnit-style XML beside their source file, for
-  example `tests/qfloat/test_qfloat.junit.xml`.
-- `MARS_TEST_REPORT_JUNIT` overrides that default path explicitly.
-- `MARS_TEST_REPORT_JSON` writes the harness's richer JSON report.
 - Because report emission lives in the shared harness runtime, every suite gets
   it automatically.
 - Output examples are included in machine-readable reports, but remain separate
@@ -173,11 +164,14 @@ specific notes and sample results.
 ## Enabling and Disabling Tests
 
 Individual tests and whole groups can be skipped without recompilation by
-editing `tests/test_config.json`. The harness reads this file at startup and
-regenerates missing keys in the enabled state during a full discovery run, so
-new tests automatically appear as `true` on first run.
+editing `tests/test_config.json`. The harness reads this file at startup
+through the `json_t` parser and regenerates missing keys in the enabled state
+during a full discovery run, so new tests automatically appear as `true` on
+first run.
 
-A missing key always means **enabled**. Set a value to `false` to skip it.
+A missing key always means **enabled**. Set a value to `false` to skip it. The
+configuration file is ordinary JSON, so strings, escapes, booleans, arrays and
+objects follow JSON syntax rather than a hand-written test-harness subset.
 
 ### Flat tests
 

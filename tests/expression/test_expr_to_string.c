@@ -492,12 +492,12 @@ static char *test_legacy_function_expect_to_c(const char *legacy)
     if (!body_c)
         goto fail;
 
-    if (!test_sbuf_puts(&out, "variable expr(") ||
+    if (!test_sbuf_puts(&out, "expression expr(") ||
         !test_emit_c_arg_list(&out, args, 1, bindings, nbindings) ||
         !test_sbuf_puts(&out, ") {\n") ||
         !test_sbuf_puts(&out, "    return ") ||
         !test_sbuf_puts(&out, body_c) ||
-        !test_sbuf_puts(&out, ";\n}\n\nvariable expr_eval() {\n"))
+        !test_sbuf_puts(&out, ";\n}\n\nexpression expr_eval() {\n"))
         goto fail;
 
     for (size_t i = 0; i < nbindings; ++i) {
@@ -557,11 +557,11 @@ static void test_to_string_basic_const_func(void)
     expr_t *c = test_expr_new_const_d(3.5);
     char *got = expr_to_string(c, style_FUNCTION);
 
-    const char *expect = "variable expr(void) {\n"
+    const char *expect = "expression expr(void) {\n"
                          "    return 3.5;\n"
                          "}\n"
                          "\n"
-                         "variable expr_eval() {\n"
+                         "expression expr_eval() {\n"
                          "    return expr();\n"
                          "}";
 
@@ -605,11 +605,11 @@ static void test_to_string_basic_var_func(void)
     expr_t *x = test_expr_new_named_var_d(42.0, "x");
     char *got = expr_to_string(x, style_FUNCTION);
 
-    const char *expect = "variable expr(x) {\n"
+    const char *expect = "expression expr(x) {\n"
                          "    return x;\n"
                          "}\n"
                          "\n"
-                         "variable expr_eval() {\n"
+                         "expression expr_eval() {\n"
                          "    x = 42;\n"
                          "    return expr(x);\n"
                          "}";
@@ -882,11 +882,11 @@ static void test_to_string_gamma_polygamma_standard_names(void)
         "\\left\\{ \\Gamma(x) + \\psi^{(0)}(x) + \\psi^{(1)}(x) + \\psi^{(2)}(x) "
         "\\;\\middle|\\; x = 3 \\right\\}";
     const char *expect_func =
-        "variable expr(x) {\n"
+        "expression expr(x) {\n"
         "    return gamma(x) + digamma(x) + trigamma(x) + polygamma(2, x);\n"
         "}\n"
         "\n"
-        "variable expr_eval() {\n"
+        "expression expr_eval() {\n"
         "    x = 3;\n"
         "    return expr(x);\n"
         "}";
@@ -949,11 +949,11 @@ static void test_to_string_non_simple_var_bracketed_func(void)
     expr_t *v = test_expr_new_named_var_d(42.0, "a0b0");
     char *got = expr_to_string(v, style_FUNCTION);
 
-    const char *expect = "variable expr([a0b₀]) {\n"
+    const char *expect = "expression expr([a0b₀]) {\n"
                          "    return [a0b₀];\n"
                          "}\n"
                          "\n"
-                         "variable expr_eval() {\n"
+                         "expression expr_eval() {\n"
                          "    [a0b₀] = 42;\n"
                          "    return expr([a0b₀]);\n"
                          "}";
@@ -1004,11 +1004,11 @@ static void test_to_string_addition_func(void)
     expr_t *f = expr_add(x, y);
 
     char *got = expr_to_string(f, style_FUNCTION);
-    const char *expect = "variable expr(x, y) {\n"
+    const char *expect = "expression expr(x, y) {\n"
                          "    return x + y;\n"
                          "}\n"
                          "\n"
-                         "variable expr_eval() {\n"
+                         "expression expr_eval() {\n"
                          "    x = 1;\n"
                          "    y = 2;\n"
                          "    return expr(x, y);\n"
@@ -1156,11 +1156,11 @@ static void test_to_string_nested_mul_add_func(void)
     expr_t *simp = expr_simplify(f);
 
     char *got = expr_to_string(simp, style_FUNCTION);
-    const char *expect = "variable expr(z, x, y) {\n"
+    const char *expect = "expression expr(z, x, y) {\n"
                          "    return z + x * y;\n"
                          "}\n"
                          "\n"
-                         "variable expr_eval() {\n"
+                         "expression expr_eval() {\n"
                          "    z = 4;\n"
                          "    x = 2;\n"
                          "    y = 3;\n"
@@ -1256,11 +1256,11 @@ static void test_to_string_atan2_func(void)
     expr_t *f = expr_atan2(x, y);
 
     char *got = expr_to_string(f, style_FUNCTION);
-    const char *expect = "variable expr(x, y) {\n"
+    const char *expect = "expression expr(x, y) {\n"
                          "    return atan2(x, y);\n"
                          "}\n"
                          "\n"
-                         "variable expr_eval() {\n"
+                         "expression expr_eval() {\n"
                          "    x = 2;\n"
                          "    y = 3;\n"
                          "    return expr(x, y);\n"
@@ -1311,11 +1311,11 @@ static void test_to_string_pow_superscript_func(void)
     expr_t *f = expr_pow_d(x, 3);
 
     char *got = expr_to_string(f, style_FUNCTION);
-    const char *expect = "variable expr(x) {\n"
+    const char *expect = "expression expr(x) {\n"
                          "    return x^3;\n"
                          "}\n"
                          "\n"
-                         "variable expr_eval() {\n"
+                         "expression expr_eval() {\n"
                          "    x = 2;\n"
                          "    return expr(x);\n"
                          "}";
@@ -1359,11 +1359,11 @@ static void test_to_string_complex_const_pow_func(void)
     expr_t *f = expr_add_d(pow, 1.0);
     char *got = expr_to_string(f, style_FUNCTION);
     const char *expect =
-        "variable expr(void) {\n"
+        "expression expr(void) {\n"
         "    return (1 + 2i)^6 + 1;\n"
         "}\n"
         "\n"
-        "variable expr_eval() {\n"
+        "expression expr_eval() {\n"
         "    return expr();\n"
         "}";
 
@@ -1538,11 +1538,11 @@ static void test_to_string_unary_sin_func(void)
     expr_t *f = expr_sin(x);
 
     char *got = expr_to_string(f, style_FUNCTION);
-    const char *expect = "variable expr(x) {\n"
+    const char *expect = "expression expr(x) {\n"
                          "    return sin(x);\n"
                          "}\n"
                          "\n"
-                         "variable expr_eval() {\n"
+                         "expression expr_eval() {\n"
                          "    x = 0.5;\n"
                          "    return expr(x);\n"
                          "}";
@@ -1585,11 +1585,11 @@ static void test_to_string_unary_sqrt_func(void)
     expr_t *x = test_expr_new_named_var_d(4.0, "x");
     expr_t *f = expr_sqrt(x);
     char *got = expr_to_string(f, style_FUNCTION);
-    const char *expect = "variable expr(x) {\n"
+    const char *expect = "expression expr(x) {\n"
                          "    return sqrt(x);\n"
                          "}\n"
                          "\n"
-                         "variable expr_eval() {\n"
+                         "expression expr_eval() {\n"
                          "    x = 4;\n"
                          "    return expr(x);\n"
                          "}";
@@ -1635,11 +1635,11 @@ static void test_to_string_function_style_func(void)
     expr_t *x = test_expr_new_named_var_d(10, "x");
     char *got = expr_to_string(x, style_FUNCTION);
 
-    const char *expect = "variable expr(x) {\n"
+    const char *expect = "expression expr(x) {\n"
                          "    return x;\n"
                          "}\n"
                          "\n"
-                         "variable expr_eval() {\n"
+                         "expression expr_eval() {\n"
                          "    x = 10;\n"
                          "    return expr(x);\n"
                          "}";
@@ -1667,11 +1667,11 @@ static void test_to_string_function_style_signed_sum(void)
     expr_t *simp = expr_simplify(f);
     char *got = expr_to_string(simp, style_FUNCTION);
 
-    const char *expect = "variable expr(x) {\n"
+    const char *expect = "expression expr(x) {\n"
                          "    return exp(sin(x)) + 3 * x^2 - 7;\n"
                          "}\n"
                          "\n"
-                         "variable expr_eval() {\n"
+                         "expression expr_eval() {\n"
                          "    x = 1;\n"
                          "    return expr(x);\n"
                          "}";
@@ -1703,11 +1703,11 @@ static void test_to_string_function_style_sub_negative_product(void)
     expr_t *f = expr_sub(E, ecc_sin_E);
     char *got = expr_to_string(f, style_FUNCTION);
 
-    const char *expect = "variable expr(E, e) {\n"
+    const char *expect = "expression expr(E, e) {\n"
                          "    return E - e * sin(E);\n"
                          "}\n"
                          "\n"
-                         "variable expr_eval() {\n"
+                         "expression expr_eval() {\n"
                          "    E = 0.8000000000000000444089209850062616;\n"
                          "    e = 0.01669999999999999956701302039618894;\n"
                          "    return expr(E, e);\n"
@@ -1731,11 +1731,11 @@ static void test_to_string_function_style_preserves_math_names(void)
     expr_t *f = expr_from_string("{ tan(x*y*c0/2) | x = 3.25, y = 4.5; c0 = gamma }", NULL);
     char *got = expr_to_string(f, style_FUNCTION);
 
-    const char *expect = "variable expr(x, y, const c₀) {\n"
+    const char *expect = "expression expr(x, y, const c₀) {\n"
                          "    return tan(c₀ * x * y / 2);\n"
                          "}\n"
                          "\n"
-                         "variable expr_eval() {\n"
+                         "expression expr_eval() {\n"
                          "    x = 3.25;\n"
                          "    y = 4.5;\n"
                          "    const c₀ = γ;\n"
@@ -1791,11 +1791,11 @@ static void test_to_string_floor_ceil_func(void)
     expr_t *ceil_y = expr_ceil(y);
     expr_t *f = expr_add(floor_x, ceil_y);
     char *got = expr_to_string(f, style_FUNCTION);
-    const char *expect = "variable expr(x, y) {\n"
+    const char *expect = "expression expr(x, y) {\n"
                          "    return floor(x) + ceil(y);\n"
                          "}\n"
                          "\n"
-                         "variable expr_eval() {\n"
+                         "expression expr_eval() {\n"
                          "    x = 1.5;\n"
                          "    y = -1.5;\n"
                          "    return expr(x, y);\n"

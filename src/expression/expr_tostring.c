@@ -1,7 +1,7 @@
 /* expr_tostring.c - symbolic/string conversion for expr_t
  *
  * Produces human-readable string representations of a expr_t DAG via
- * expr_to_string(dv, style).  Four styles are supported:
+ * expr_to_text(dv, style).  Four styles are supported:
  *
  *   style_EXPRESSION  — infix notation, e.g.
  *                         { sin(x)·cos(y) | x = 1, y = ½π }
@@ -15,11 +15,11 @@
  *                         sin(x)·cos(y)
  *
  *   style_FUNCTION    — C-like function notation, e.g.
- *                         variable expr(x, y, const c₀) {
+ *                         expression expr(x, y, const c₀) {
  *                             return sin(x) * cos(y);
  *                         }
  *
- *                         variable expr_eval() {
+ *                         expression expr_eval() {
  *                             x = 1;
  *                             y = π/2;
  *                             const c₀ = γ;
@@ -2498,7 +2498,7 @@ static void strip_trailing_newline(char *s)
         s[--len] = '\0';
 }
 
-char *expr_to_string(const expr_t *dv, style_t style)
+static char *expr_to_c_string(const expr_t *dv, style_t style)
 {
     char *out;
     char *expr = NULL;
@@ -2542,10 +2542,20 @@ char *expr_to_string(const expr_t *dv, style_t style)
     return out;
 }
 
+string_t *expr_to_text(const expr_t *dv, style_t style)
+{
+    char *raw = expr_to_c_string(dv, style);
+    string_t *text = raw ? string_new_with(raw) : NULL;
+
+    free(raw);
+    return text;
+}
+
 void expr_print(const expr_t *dv)
 {
-    char *s = expr_to_string(dv, style_EXPRESSION);
-    fputs(s, stdout);
+    string_t *s = expr_to_text(dv, style_EXPRESSION);
+
+    fputs(s ? string_c_str(s) : "NULL", stdout);
     fputc('\n', stdout);
-    free(s);
+    string_free(s);
 }

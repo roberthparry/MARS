@@ -1,6 +1,7 @@
 # `array_t`, `array_slice_t`, and `stack_t`
 
-Generic, opaque containers with dense element storage and caller-defined ownership rules.
+Generic, opaque containers with dense element storage and caller-defined
+copy/cleanup rules for the stored element slots.
 
 ---
 
@@ -8,11 +9,14 @@ Generic, opaque containers with dense element storage and caller-defined ownersh
 
 An appendable, sortable array. Elements are stored inline in a contiguous arena; iteration is cache-friendly and access by index is O(1). Inserting or removing elements may shift others, so pointers returned by `array_get` are invalidated by any mutation.
 
-### Ownership Models
+### Copying And Cleanup
 
-Pass `NULL` for both callbacks to use shallow (memcpy) ownership — suitable for POD types or borrowed pointers. Supply `clone_fn` and `destroy_fn` to have the array deep-copy elements on insert and free them on remove or destroy.
+Pass `NULL` for both callbacks to copy element bytes with `memcpy` and perform
+no per-element cleanup. Supply `clone_fn` and `destroy_fn` to have the array
+deep-copy each inserted element into its own storage and clean up those stored
+copies on removal or destruction.
 
-#### Shallow ownership
+#### Plain Byte Copies
 
 ```c
 #include <stdio.h>
@@ -38,7 +42,7 @@ int main(void) {
 5 2 9 1
 ```
 
-#### Deep ownership
+#### Deep Stored Copies
 
 ```c
 #include <stdio.h>

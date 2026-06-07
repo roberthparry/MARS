@@ -676,7 +676,7 @@ decide whether derivative controls should be shown.
 
 ### String Conversion
 
-- `char *expr_to_string(const expr_t *expr, style_t style)` — serialise the expression; `style` is `style_FUNCTION`, `style_EXPRESSION`, `style_TEX`, or `style_UNBOUND`. In expression style, `sqrt(...)` is printed as `√(...)` and `abs(...)` as `|...|`. `style_UNBOUND` returns the expression body before the `{ body | bindings }` wrapper is added. Returns a newly allocated C string; the caller must free it.
+- `string_t *expr_to_text(const expr_t *expr, style_t style)` — serialise the expression; `style` is `style_FUNCTION`, `style_EXPRESSION`, `style_TEX`, or `style_UNBOUND`. In expression style, `sqrt(...)` is printed as `√(...)` and `abs(...)` as `|...|`. `style_UNBOUND` returns the expression body before the `{ body | bindings }` wrapper is added. Returns a newly allocated string; the caller must release it with `string_free(...)`.
 - `void expr_print(const expr_t *expr)` — print the expression to stdout in `style_EXPRESSION` format
 
 `style_FUNCTION` prints a small C-like evaluable sketch. Untyped parameters are
@@ -684,11 +684,11 @@ treated as differentiable variables, while `const` parameters and bindings are
 displayed as non-differentiable constants:
 
 ```text
-variable expr(x, y, const c₀) {
+expression expr(x, y, const c₀) {
     return tan(x * y * c₀ / 2);
 }
 
-variable expr_eval() {
+expression expr_eval() {
     x = 3.29929295579108949982756921421358070866178174810740656177232818327906094186165;
     y = 3.29929295579108949982756921421358070866178174810740656177232818327906094186165;
     const c₀ = γ;
@@ -698,7 +698,7 @@ variable expr_eval() {
 
 ### Parsing
 
-- `expr_t *expr_from_string(const char *s, expr_bindings_t **bnd_out)` — construct an `expr_t` from a string in the format produced by `expr_to_string(..., style_EXPRESSION)`. The parser preserves the written expression shape while canonicalising notation; call `expr_simplify(...)` explicitly for algebraic simplification. When `bnd_out` is non-NULL and the parse is symbolic, the parser also returns an opaque bindings object.
+- `expr_t *expr_from_string(const char *s, expr_bindings_t **bnd_out)` — construct an `expr_t` from a string in the format produced by `expr_to_text(..., style_EXPRESSION)`. The parser preserves the written expression shape while canonicalising notation; call `expr_simplify(...)` explicitly for algebraic simplification. When `bnd_out` is non-NULL and the parse is symbolic, the parser also returns an opaque bindings object.
 - `expr_t *expr_bindings_get(expr_bindings_t *bnd, const char *name)` — find a returned symbolic binding by name; lookup accepts the same normalisation rules as parsing, so aliases like `@pi`/`π`, `@phi`/`φ`, `@gamma`/`γ`, and `@tau`/`τ` all resolve to the same binding
 - `void expr_bindings_free(expr_bindings_t *bnd)` — destroy a bindings object returned by `expr_from_string(...)`
 

@@ -17,6 +17,7 @@
  * Continuation bytes match 10xxxxxx (0x80–0xBF).
  */
 
+#define MARS_STRING_INTERNAL_ACCESS
 #include "string_internal.h"
 
 /* UTF‑8 codepoint utilities */

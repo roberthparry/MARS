@@ -25,6 +25,7 @@
 #include <ctype.h>
 #include <stdarg.h>
 
+#define MARS_STRING_INTERNAL_ACCESS
 #include "string_internal.h"
 #include "ustring.h"
 
@@ -121,8 +122,8 @@ string_view_t string_view_empty(void)
     return string_view_make(NULL, 0u);
 }
 
-bool string_view_peek_storage(string_view_t view, size_t pos,
-                              unsigned char *out)
+static bool string_view_peek_storage(string_view_t view, size_t pos,
+                                     unsigned char *out)
 {
     const char *data = string_view_data(view);
 
@@ -133,10 +134,23 @@ bool string_view_peek_storage(string_view_t view, size_t pos,
     return true;
 }
 
-bool string_view_peek_codepoint(string_view_t view,
-                                size_t pos,
-                                uint32_t *out,
-                                size_t *width_out)
+bool string_view_peek_ascii(string_view_t view,
+                            string_pos_t pos,
+                            unsigned char *out)
+{
+    unsigned char c = 0u;
+
+    if (!string_view_peek_storage(view, pos, &c) || c >= 0x80u)
+        return false;
+    if (out)
+        *out = c;
+    return true;
+}
+
+bool string_view_peek_rune_value(string_view_t view,
+                                 string_pos_t pos,
+                                 uint32_t *out,
+                                 string_pos_t *next_pos_out)
 {
     const char *data = string_view_data(view);
     size_t width = 0u;
@@ -151,12 +165,12 @@ bool string_view_peek_codepoint(string_view_t view,
 
     if (out)
         *out = cp;
-    if (width_out)
-        *width_out = width;
+    if (next_pos_out)
+        *next_pos_out = pos + width;
     return true;
 }
 
-static bool string_codepoint_is_space(uint32_t cp)
+static bool string_rune_value_is_space(uint32_t cp)
 {
     return (cp >= 0x09u && cp <= 0x0du) ||
            cp == 0x20u ||
@@ -176,12 +190,12 @@ string_view_t string_view_trim(string_view_t view)
     size_t start = 0u;
     size_t end = string_view_length(view);
     uint32_t cp = 0u;
-    size_t width = 0u;
+    string_pos_t next = 0u;
 
     while (start < end &&
-           string_view_peek_codepoint(view, start, &cp, &width) &&
-           string_codepoint_is_space(cp)) {
-        start += width;
+           string_view_peek_rune_value(view, start, &cp, &next) &&
+           string_rune_value_is_space(cp)) {
+        start = next;
     }
 
     while (end > start) {
@@ -189,14 +203,14 @@ string_view_t string_view_trim(string_view_t view)
         size_t scan = start;
 
         while (scan < end &&
-               string_view_peek_codepoint(view, scan, &cp, &width) &&
-               scan + width <= end) {
+               string_view_peek_rune_value(view, scan, &cp, &next) &&
+               next <= end) {
             prev = scan;
-            scan += width;
+            scan = next;
         }
         if (prev >= end ||
-            !string_view_peek_codepoint(view, prev, &cp, &width) ||
-            !string_codepoint_is_space(cp)) {
+            !string_view_peek_rune_value(view, prev, &cp, &next) ||
+            !string_rune_value_is_space(cp)) {
             break;
         }
         end = prev;
@@ -269,7 +283,7 @@ string_view_t string_view(const string_t *s, size_t pos, size_t len)
 
 string_view_t string_view_all(const string_t *s)
 {
-    return string_view(s, 0u, string_length(s));
+    return string_view(s, 0u, string_encoded_len(s));
 }
 
 /* Cursor parsing */
@@ -467,13 +481,13 @@ bool string_cursor_peek_ascii_at(const string_cursor_t *cursor,
     return true;
 }
 
-bool string_cursor_skip(string_cursor_t *cursor, size_t length)
+bool string_cursor_skip(string_cursor_t *cursor, string_pos_t span)
 {
     if (!cursor || !cursor->source ||
-        length > cursor->source->len - cursor->pos)
+        span > cursor->source->len - cursor->pos)
         return false;
 
-    cursor->pos += length;
+    cursor->pos += span;
     return true;
 }
 
@@ -485,16 +499,16 @@ void string_cursor_skip_spaces(string_cursor_t *cursor)
     while (!string_cursor_done(cursor)) {
         rune = string_cursor_peek(cursor);
         cp = rune_value(rune);
-        if (!string_codepoint_is_space(cp))
+        if (!string_rune_value_is_space(cp))
             break;
         if (string_cursor_next(cursor) != 0)
             break;
     }
 }
 
-string_t *string_cursor_slice(const string_cursor_t *cursor,
-                              string_pos_t start,
-                              string_pos_t end)
+string_t *string_cursor_slice_between(string_pos_t start,
+                                      string_pos_t end,
+                                      const string_cursor_t *cursor)
 {
     string_t *out;
 
@@ -518,10 +532,17 @@ string_t *string_cursor_slice(const string_cursor_t *cursor,
     return out;
 }
 
-int string_cursor_append_slice(string_t *out,
-                               const string_cursor_t *cursor,
-                               string_pos_t start,
-                               string_pos_t end)
+string_t *string_cursor_extract(string_pos_t start,
+                                const string_cursor_t *cursor)
+{
+    return cursor ? string_cursor_slice_between(start, cursor->pos, cursor)
+                  : NULL;
+}
+
+int string_cursor_append_slice_between(string_t *out,
+                                       string_pos_t start,
+                                       string_pos_t end,
+                                       const string_cursor_t *cursor)
 {
     string_t *copy;
     int rc;
@@ -529,7 +550,7 @@ int string_cursor_append_slice(string_t *out,
     if (!out || !cursor)
         return -1;
 
-    copy = string_cursor_slice(cursor, start, end);
+    copy = string_cursor_slice_between(start, end, cursor);
     if (!copy)
         return -1;
 
@@ -538,9 +559,9 @@ int string_cursor_append_slice(string_t *out,
     return rc;
 }
 
-string_view_t string_cursor_view(const string_cursor_t *cursor,
-                                 string_pos_t start,
-                                 string_pos_t end)
+string_view_t string_cursor_view_between(string_pos_t start,
+                                         string_pos_t end,
+                                         const string_cursor_t *cursor)
 {
     if (!cursor || !cursor->source ||
         start > end || end > cursor->source->len)
@@ -549,16 +570,10 @@ string_view_t string_cursor_view(const string_cursor_t *cursor,
     return string_view(cursor->source, start, end - start);
 }
 
-string_t *string_cursor_slice_since(const string_cursor_t *cursor,
-                                    string_pos_t start)
+string_view_t string_cursor_view_extract(string_pos_t start,
+                                         const string_cursor_t *cursor)
 {
-    return cursor ? string_cursor_slice(cursor, start, cursor->pos) : NULL;
-}
-
-string_view_t string_cursor_view_since(const string_cursor_t *cursor,
-                                       string_pos_t start)
-{
-    return cursor ? string_cursor_view(cursor, start, cursor->pos)
+    return cursor ? string_cursor_view_between(start, cursor->pos, cursor)
                   : string_view_empty();
 }
 

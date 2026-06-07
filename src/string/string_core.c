@@ -10,8 +10,8 @@
  *   Insert/remove    — string_insert, string_remove
  *   Accessors        — string_c_str, string_length, string_is_empty
  *
- * All functions that accept or produce C strings assume valid UTF-8.
- * No transcoding is performed; bytes are copied as-is.
+ * Most C-string boundary helpers accept UTF-8. string_new_wide() is the
+ * explicit wide-string boundary and converts wchar_t input into UTF-8.
  */
 
 #include <stdbool.h>
@@ -23,9 +23,45 @@
 
 #include <ctype.h>
 #include <stdio.h>
+#include <wchar.h>
 
+#define MARS_STRING_INTERNAL_ACCESS
 #include "string_internal.h"
 #include "ustring.h"
+
+static int string_append_utf8_scalar(string_t *s, uint32_t value)
+{
+    char bytes[4];
+    size_t count;
+
+    if (!s)
+        return -1;
+
+    if (value > 0x10FFFFu || (value >= 0xD800u && value <= 0xDFFFu))
+        value = 0xFFFDu;
+
+    if (value <= 0x7Fu) {
+        bytes[0] = (char)value;
+        count = 1u;
+    } else if (value <= 0x7FFu) {
+        bytes[0] = (char)(0xC0u | (value >> 6));
+        bytes[1] = (char)(0x80u | (value & 0x3Fu));
+        count = 2u;
+    } else if (value <= 0xFFFFu) {
+        bytes[0] = (char)(0xE0u | (value >> 12));
+        bytes[1] = (char)(0x80u | ((value >> 6) & 0x3Fu));
+        bytes[2] = (char)(0x80u | (value & 0x3Fu));
+        count = 3u;
+    } else {
+        bytes[0] = (char)(0xF0u | (value >> 18));
+        bytes[1] = (char)(0x80u | ((value >> 12) & 0x3Fu));
+        bytes[2] = (char)(0x80u | ((value >> 6) & 0x3Fu));
+        bytes[3] = (char)(0x80u | (value & 0x3Fu));
+        count = 4u;
+    }
+
+    return string_append_chars(s, bytes, count);
+}
 
 /* Grow the internal buffer to hold at least `needed` bytes. No-op if capacity
    is already sufficient. Returns 0 on success, -1 on allocation failure. */
@@ -76,14 +112,65 @@ string_t *string_new_with(const char *init)
     return s;
 }
 
+string_t *string_new_wide(const wchar_t *init)
+{
+    string_t *s;
+    size_t i;
+
+    if (!init)
+        return NULL;
+
+    s = string_new();
+    if (!s)
+        return NULL;
+
+    for (i = 0u; init[i] != L'\0'; ++i) {
+        uint32_t value = (uint32_t)init[i];
+
+        if (sizeof(wchar_t) == 2u &&
+            value >= 0xD800u && value <= 0xDBFFu) {
+            uint32_t next = (uint32_t)init[i + 1u];
+
+            if (next >= 0xDC00u && next <= 0xDFFFu) {
+                value = 0x10000u +
+                        (((value - 0xD800u) << 10) | (next - 0xDC00u));
+                ++i;
+            } else {
+                value = 0xFFFDu;
+            }
+        } else if (sizeof(wchar_t) == 2u &&
+                   value >= 0xDC00u && value <= 0xDFFFu) {
+            value = 0xFFFDu;
+        }
+
+        if (string_append_utf8_scalar(s, value) != 0) {
+            string_free(s);
+            return NULL;
+        }
+    }
+
+    return s;
+}
+
 /* Return a deep copy of `src`, or NULL if src is NULL or allocation fails. */
 
 string_t *string_clone(const string_t *src)
 {
+    string_t *clone;
+
     if (!src)
         return NULL;
 
-    return string_new_with(string_c_str(src));
+    clone = string_new();
+    if (!clone)
+        return NULL;
+
+    if (string_append_string(clone, src) != 0) {
+        string_free(clone);
+        return NULL;
+    }
+
+    return clone;
 }
 
 /* Free the string and its internal buffer. No-op if s is NULL. */
@@ -103,9 +190,9 @@ const char *string_c_str(const string_t *s)
     return s ? s->data : "";
 }
 
-/* Return the number of bytes in the string. Returns 0 if s is NULL. */
+/* Return the encoded length of the string. Returns 0 if s is NULL. */
 
-size_t string_length(const string_t *s)
+size_t string_encoded_len(const string_t *s)
 {
     return s ? s->len : 0;
 }
@@ -553,7 +640,7 @@ static int string_append_vformat_with_string_module_objects(string_t *s,
                 : string_append_cstr(s, "(null)");
             if (appended != 0)
                 return -1;
-            total += value ? (int)string_length(value) : 6;
+            total += value ? (int)string_encoded_len(value) : 6;
         } else if (conv == 'W') {
             string_view_t value;
             size_t before;
@@ -565,10 +652,10 @@ static int string_append_vformat_with_string_module_objects(string_t *s,
             if (length[0] != '\0')
                 return -1;
             value = va_arg(ap, string_view_t);
-            before = string_length(s);
+            before = string_encoded_len(s);
             if (string_append_view(s, value) != 0)
                 return -1;
-            total += (int)(string_length(s) - before);
+            total += (int)(string_encoded_len(s) - before);
         } else if (conv == 'R') {
             rune_t value;
             size_t before;
@@ -583,10 +670,10 @@ static int string_append_vformat_with_string_module_objects(string_t *s,
             if (rune_is_empty(value))
                 appended = 0;
             else {
-                before = string_length(s);
+                before = string_encoded_len(s);
                 if (string_append_rune(s, value) != 0)
                     return -1;
-                appended = (int)(string_length(s) - before);
+                appended = (int)(string_encoded_len(s) - before);
             }
             total += appended;
         } else if (conv == 'n') {
@@ -704,31 +791,53 @@ string_t *string_sprintf(const char *fmt, ...)
     return out;
 }
 
-int string_printf(const char *fmt, ...)
+static int string_vfprintf_stream(FILE *stream, const char *fmt, va_list ap)
 {
     string_t *out;
     size_t len;
-    va_list ap;
 
-    va_start(ap, fmt);
     out = string_vsprintf(fmt, ap);
-    va_end(ap);
     if (!out)
         return -1;
 
-    len = string_length(out);
+    len = string_encoded_len(out);
     if (len > (size_t)INT_MAX) {
         string_free(out);
         return -1;
     }
 
-    if (fputs(string_c_str(out), stdout) == EOF) {
+    if (fwrite(string_c_str(out), 1u, len, stream) != len) {
         string_free(out);
         return -1;
     }
 
     string_free(out);
     return (int)len;
+}
+
+int string_printf(const char *fmt, ...)
+{
+    int written;
+    va_list ap;
+
+    va_start(ap, fmt);
+    written = string_vfprintf_stream(stdout, fmt, ap);
+    va_end(ap);
+    return written;
+}
+
+int string_fprintf(FILE *stream, const char *fmt, ...)
+{
+    int written;
+    va_list ap;
+
+    if (!stream)
+        return -1;
+
+    va_start(ap, fmt);
+    written = string_vfprintf_stream(stream, fmt, ap);
+    va_end(ap);
+    return written;
 }
 
 /* Return the byte offset of the first occurrence of `needle` in s, or -1 if
@@ -785,10 +894,22 @@ string_offset_t string_find_view(const string_t *s, string_view_t needle)
 
 int string_compare(const string_t *a, const string_t *b)
 {
+    size_t min_len;
+    int cmp;
+
     if (!a && !b) return 0;
     if (!a) return -1;
     if (!b) return 1;
-    return strcmp(a->data, b->data);
+
+    min_len = a->len < b->len ? a->len : b->len;
+    cmp = min_len > 0u ? memcmp(a->data, b->data, min_len) : 0;
+    if (cmp != 0)
+        return cmp;
+    if (a->len < b->len)
+        return -1;
+    if (a->len > b->len)
+        return 1;
+    return 0;
 }
 
 /* Return true if s begins with `prefix`. */

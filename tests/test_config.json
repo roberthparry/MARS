@@ -33,6 +33,7 @@
     "test_datetime_compare_less": true,
     "test_datetime_compare_greater": true,
     "test_datetime_days_in_month": true,
+    "test_datetime_format_uses_string_builder": true,
     "example_chinese_new_years": true
   },
   "tests/array/test_array.c": {
@@ -930,6 +931,7 @@
       "test_from_string_pure_const": true,
       "test_from_string_arithmetic": true,
       "test_from_string_functions": true,
+      "test_from_text_api": true,
       "test_from_string_special_functions": true,
       "test_from_string_exact_value_functions": true,
       "test_from_string_named_consts": true,
@@ -1145,5 +1147,13 @@
       "test_integrate_partial_fractions": true,
       "test_integrate_unsupported_product_returns_null": true
     }
+  },
+  "tests/json/test_json.c": {
+    "test_parse_object_array_and_escapes": true,
+    "test_rejects_non_json_number_forms": true,
+    "test_number_t_extension_round_trip": true,
+    "test_number_t_constants_use_math_spelling": true,
+    "test_serialise_round_trip": true,
+    "test_file_round_trip": true
   }
 }

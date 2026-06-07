@@ -8,10 +8,9 @@ static int expr_number_exact_equal(const void *actual,
 static int expr_number_close_equal(const void *actual,
                                    const void *expected,
                                    void *ctx);
-static void expr_number_format(const void *value,
-                               char *buf,
-                               size_t buf_size,
-                               void *ctx);
+static int expr_number_format(const void *value,
+                              string_t *out,
+                              void *ctx);
 static number_t expr_error_magnitude(number_t got, number_t expected);
 
 TEST_SUITE_CONFIG(TEST_CONFIG_GLOBAL);
@@ -98,23 +97,24 @@ static int expr_number_close_equal(const void *actual,
     return ok;
 }
 
-static void expr_number_format(const void *value,
-                               char *buf,
-                               size_t buf_size,
-                               void *ctx)
+static int expr_number_format(const void *value,
+                              string_t *out,
+                              void *ctx)
 {
     char *text;
 
     (void)ctx;
-    if (!buf || buf_size == 0u)
-        return;
+    if (!out)
+        return -1;
     text = num_to_string(*(const number_t *)value);
-    if (!text) {
-        snprintf(buf, buf_size, "<num_to_string failed>");
-        return;
+    if (!text)
+        return string_append_cstr(out, "<num_to_string failed>");
+    if (string_append_cstr(out, text) != 0) {
+        free(text);
+        return -1;
     }
-    snprintf(buf, buf_size, "%s", text);
     free(text);
+    return 0;
 }
 
 const test_validity_contract_t *expr_validity_contract_number_exact(void)
