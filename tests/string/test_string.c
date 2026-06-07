@@ -1,6 +1,7 @@
 #include "ustring.h"
 #include "test_string.h"
 #include <stdio.h>
+#include <stdarg.h>
 
 TEST_SUITE_CONFIG(TEST_CONFIG_NONE);
 
@@ -95,9 +96,24 @@ static void test_string_replace(void)
     string_free(s);
 }
 
+static string_t *test_string_vsprintf_helper(const char *fmt, ...)
+{
+    string_t *out;
+    va_list ap;
+
+    va_start(ap, fmt);
+    out = string_vsprintf(fmt, ap);
+    va_end(ap);
+    return out;
+}
+
 static void test_append_format(void)
 {
     string_t *s = string_new_with("Hello");
+    string_t *name = string_new_with("MARS");
+    string_t *greek = string_new_with("αβ");
+    string_t *created;
+    string_view_t name_view = string_view(name, 1u, 2u);
 
     string_append_char(s, ' ');
     string_append_cstr(s, "world");
@@ -108,6 +124,28 @@ static void test_append_format(void)
     string_replace(s, "world", "universe");
     ASSERT_STREQ(string_c_str(s), "Hello universe 2 + 3 = 5");
 
+    string_clear(s);
+    string_append_format(s,
+                         "%S:%W:%R:%04d:%s",
+                         name,
+                         name_view,
+                         string_at(greek, 0u),
+                         7,
+                         "ready");
+    ASSERT_STREQ(string_c_str(s), "MARS:AR:α:0007:ready");
+
+    created = string_sprintf("%S/%W/%R", name, name_view, string_at(greek, 1u));
+    ASSERT_NOT_NULL(created);
+    ASSERT_STREQ(string_c_str(created), "MARS/AR/β");
+    string_free(created);
+
+    created = test_string_vsprintf_helper("%S/%d", name, 42);
+    ASSERT_NOT_NULL(created);
+    ASSERT_STREQ(string_c_str(created), "MARS/42");
+    string_free(created);
+
+    string_free(greek);
+    string_free(name);
     string_free(s);
 }
 
@@ -147,23 +185,205 @@ static void test_to_upper_and_to_lower(void)
     string_free(s);
 }
 
+typedef struct {
+    string_builder_t *out;
+    size_t count;
+} each_char_state_t;
+
+static int collect_character(rune_t rune, size_t index, void *user)
+{
+    each_char_state_t *state = user;
+
+    (void)index;
+    state->count++;
+    return string_append_rune(state->out, rune);
+}
+
+static void test_text_character_api(void)
+{
+    string_t *s = string_new_with("👨‍👩‍👧‍👦 café 🇬🇧");
+    rune_t family = string_at(s, 0);
+    rune_t missing = string_at(s, 99);
+    string_t *word = string_substring(s, 2, 4);
+    string_t *family_copy = rune_to_string(family);
+    string_builder_t *collected = string_builder_new();
+    each_char_state_t state = { collected, 0u };
+
+    ASSERT_EQ((long)string_count(s), 8L);
+    ASSERT_FALSE(rune_is_empty(family));
+    ASSERT_TRUE(rune_is_empty(missing));
+    ASSERT_STREQ(string_c_str(family_copy), "👨‍👩‍👧‍👦");
+    ASSERT_STREQ(string_c_str(word), "café");
+
+    string_reverse(s);
+    string_reverse(s);
+    ASSERT_STREQ(string_c_str(s), "👨‍👩‍👧‍👦 café 🇬🇧");
+
+    ASSERT_EQ(string_each(s, collect_character, &state), 0);
+    ASSERT_EQ((long)state.count, 8L);
+    ASSERT_STREQ(string_c_str(collected), "👨‍👩‍👧‍👦 café 🇬🇧");
+
+    string_builder_free(collected);
+    string_free(family_copy);
+    string_free(word);
+    string_free(s);
+}
+
 static void test_string_view(void)
 {
     string_t *s = string_new_with("Hello Universe");
+    string_t *expected = string_new_with("Universe");
+    string_t *lower_prefix = string_new_with("uni");
+    string_t *exact_prefix = string_new_with("Uni");
 
     string_reverse(s);
     string_reverse(s); /* restore */
 
     string_view_t v = string_view(s, 6, 8);
+    string_view_t expected_view = string_view_all(expected);
+    string_view_t lower_prefix_view = string_view_all(lower_prefix);
     string_t *sub = string_from_view(&v);
 
     ASSERT_STREQ(string_c_str(sub), "Universe");
 
-    ASSERT_TRUE(string_view_equals(&v, "Universe"));
+    ASSERT_TRUE(string_view_equals_view(v, expected_view));
+    ASSERT_TRUE(string_view_starts_with(v, exact_prefix, false));
+    ASSERT_FALSE(string_view_starts_with(v, lower_prefix, false));
+    ASSERT_TRUE(string_view_starts_with(v, lower_prefix, true));
+    ASSERT_TRUE(string_view_starts_with_view(v, lower_prefix_view, true));
 
+    string_free(exact_prefix);
+    string_free(lower_prefix);
+    string_free(expected);
     string_free(s);
     string_free(sub);
 
+}
+
+static void test_string_cursor_view_rune_values(void)
+{
+    string_t *s = string_new_with("Aπ🙂");
+    string_view_t view = string_view(s, 0, string_length(s));
+    string_cursor_t *cursor = string_cursor_new_view(view);
+    string_pos_t start;
+    string_pos_t end;
+    rune_t rune;
+
+    ASSERT_TRUE(cursor != NULL);
+
+    start = string_cursor_position(cursor);
+    rune = string_cursor_peek(cursor);
+    ASSERT_EQ(rune_value(rune), 'A');
+    ASSERT_EQ(string_cursor_next(cursor), 0);
+    end = string_cursor_position(cursor);
+    ASSERT_EQ(end - start, 1);
+
+    start = string_cursor_position(cursor);
+    rune = string_cursor_peek(cursor);
+    ASSERT_EQ(rune_value(rune), 0x03C0u);
+    ASSERT_EQ(string_cursor_next(cursor), 0);
+    end = string_cursor_position(cursor);
+    ASSERT_EQ(end - start, 2);
+
+    rune = string_cursor_peek(cursor);
+    ASSERT_EQ(rune_value(rune), 0x1F642u);
+    ASSERT_EQ(string_cursor_next(cursor), 0);
+    ASSERT_TRUE(string_cursor_done(cursor));
+
+    string_cursor_free(cursor);
+    string_free(s);
+}
+
+static void test_string_cursor_parsing_api(void)
+{
+    string_t *s = string_new_with("sqrt(α)+1");
+    string_cursor_t *cursor = string_cursor_new(s);
+    string_pos_t start;
+    string_t *name;
+    string_t *rune_text;
+    rune_t rune;
+
+    ASSERT_NOT_NULL(cursor);
+    ASSERT_TRUE(string_cursor_match(cursor, "sqrt"));
+    ASSERT_TRUE(string_cursor_consume(cursor, "sqrt"));
+    ASSERT_TRUE(string_cursor_consume(cursor, "("));
+
+    start = string_cursor_position(cursor);
+    rune = string_cursor_peek(cursor);
+    ASSERT_FALSE(rune_is_empty(rune));
+    rune_text = rune_to_string(rune);
+    ASSERT_NOT_NULL(rune_text);
+    ASSERT_STREQ(string_c_str(rune_text), "α");
+    ASSERT_EQ(string_cursor_next(cursor), 0);
+
+    name = string_cursor_slice_since(cursor, start);
+    ASSERT_NOT_NULL(name);
+    ASSERT_STREQ(string_c_str(name), "α");
+
+    ASSERT_TRUE(string_cursor_consume(cursor, ")"));
+    ASSERT_TRUE(string_cursor_consume(cursor, "+"));
+    ASSERT_TRUE(string_cursor_consume(cursor, "1"));
+    ASSERT_TRUE(string_cursor_done(cursor));
+
+    string_free(rune_text);
+    string_free(name);
+    string_cursor_free(cursor);
+    string_free(s);
+}
+
+static void test_string_object_first_api(void)
+{
+    string_t *s = string_new_with("alpha");
+    string_t *suffix = string_new_with("gamma");
+    string_t *middle = string_new_with(",beta,");
+    string_t *needle = string_new_with("beta");
+    string_t *replacement = string_new_with("BETA");
+    string_t *comma = string_new_with(",");
+    string_t *prefix = string_new_with("alpha");
+    size_t n = 0u;
+
+    ASSERT_EQ(string_append_string(s, suffix), 0);
+    ASSERT_STREQ(string_c_str(s), "alphagamma");
+
+    ASSERT_EQ(string_insert_string(s, 5u, middle), 0);
+    ASSERT_STREQ(string_c_str(s), "alpha,beta,gamma");
+
+    ASSERT_TRUE(string_starts_with_string(s, prefix));
+    ASSERT_TRUE(string_ends_with_string(s, suffix));
+    ASSERT_EQ(string_find_string(s, needle), 6);
+
+    ASSERT_EQ(string_replace_string(s, needle, replacement), 0);
+    ASSERT_STREQ(string_c_str(s), "alpha,BETA,gamma");
+
+    string_t **parts = string_split_string(s, comma, &n);
+    ASSERT_EQ(n, 3);
+    ASSERT_STREQ(string_c_str(parts[0]), "alpha");
+    ASSERT_STREQ(string_c_str(parts[1]), "BETA");
+    ASSERT_STREQ(string_c_str(parts[2]), "gamma");
+
+    string_t *joined = string_join_string(parts, n, comma);
+    ASSERT_STREQ(string_c_str(joined), "alpha,BETA,gamma");
+
+    string_builder_t *builder = string_builder_new();
+    ASSERT_EQ(string_builder_append_string(builder, joined), 0);
+    ASSERT_STREQ(string_c_str(builder), "alpha,BETA,gamma");
+
+    char buf[64];
+    string_buffer_t sb;
+    string_buffer_init(&sb, buf, sizeof(buf));
+    ASSERT_EQ(string_buffer_append_string(&sb, joined), 0);
+    ASSERT_STREQ(string_buffer_c_str(&sb), "alpha,BETA,gamma");
+
+    string_builder_free(builder);
+    string_free(joined);
+    string_split_free(parts, n);
+    string_free(comma);
+    string_free(prefix);
+    string_free(replacement);
+    string_free(needle);
+    string_free(middle);
+    string_free(suffix);
+    string_free(s);
 }
 
 static void test_string_builder(void)
@@ -171,11 +391,11 @@ static void test_string_builder(void)
     string_t *s = string_new_with("alpha,beta,gamma,delta");
 
     size_t n;
-    string_view_t *views = string_split_view(s, ",", &n);
+    string_t **parts = string_split(s, ",", &n);
 
     ASSERT_EQ(n, 4);
 
-    string_split_view_free(views);
+    string_split_free(parts, n);
 
     char buf[64];
     string_buffer_t sb;
@@ -183,13 +403,21 @@ static void test_string_builder(void)
     string_buffer_append(&sb, "Hello");
     string_buffer_append_char(&sb, '!');
 
-    ASSERT_STREQ(sb.data, "Hello!");
+    ASSERT_STREQ(string_buffer_c_str(&sb), "Hello!");
+    ASSERT_EQ((long)string_buffer_length(&sb), 6L);
 
     string_builder_t *b = string_builder_new();
+    string_t *label = string_new_with("Builder");
+
     string_builder_format(b, "Pi approx = %.3f", 3.14159);
 
     ASSERT_STREQ(string_c_str(b), "Pi approx = 3.142");
 
+    string_clear(b);
+    string_builder_format(b, "%S says %s", label, "hello");
+    ASSERT_STREQ(string_c_str(b), "Builder says hello");
+
+    string_free(label);
     string_builder_free(b);
     string_free(s);
 }
@@ -198,68 +426,60 @@ static void test_utf8_stuff(void)
 {
     string_t *s = string_new_with("Héllo 🌍");
 
-    ASSERT_EQ(string_utf8_length(s), 7);
+    ASSERT_EQ((long)string_count(s), 7L);
 
-    string_utf8_reverse(s);
-    string_utf8_to_upper(s);
-
-    string_free(s);
-}
-
-static void test_grapheme(void)
-{
-    string_t *s = string_new_with("👩‍👩‍👧‍👦 café 🇬🇧");
-
-    ASSERT_TRUE(string_grapheme_count(s) > 0);
-
-    string_grapheme_reverse(s);
+    string_reverse(s);
+    string_to_upper(s);
 
     string_free(s);
 }
 
-static void test_grapheme_reverse_and_substr(void)
+static void test_character_count_and_reverse(void)
 {
     string_t *s = string_new_with("👩‍👩‍👧‍👦 café 🇬🇧");
 
-    size_t g = string_grapheme_count(s);
+    ASSERT_TRUE(string_count(s) > 0);
+
+    string_reverse(s);
+
+    string_free(s);
+}
+
+static void test_character_reverse_and_substring(void)
+{
+    string_t *s = string_new_with("👩‍👩‍👧‍👦 café 🇬🇧");
+
+    size_t g = string_count(s);
     ASSERT_TRUE(g > 0);
 
-    string_grapheme_reverse(s);
+    string_reverse(s);
 
-    string_t *sub = string_grapheme_substr(s, 1, 3);
+    string_t *sub = string_substring(s, 1, 3);
     ASSERT_TRUE(sub != NULL);
 
     string_free(sub);
     string_free(s);
 }
 
-static void test_norm_ascii_inplace(void)
+static void test_text_ascii_stays_stable(void)
 {
     string_t *s = string_new_with("Hello World");
 
-    int r = string_normalize(s, STRING_NORM_NFC);
-    ASSERT_EQ(r, 0);
     ASSERT_STREQ(string_c_str(s), "Hello World");
 
     string_free(s);
 }
 
-static void test_norm_combining_inplace(void)
+static void test_text_construction_canonicalises_combining_marks(void)
 {
-    string_t *s1 = string_new_with("é");   // NFD
-    string_t *s2 = string_new_with("é");    // NFC
-
-    int r1 = string_normalize(s1, STRING_NORM_NFC);
-    int r2 = string_normalize(s2, STRING_NORM_NFD);
-
-    ASSERT_EQ(r1, 0);
-    ASSERT_EQ(r2, 0);
+    string_t *s1 = string_new_with("é");
+    string_t *s2 = string_new_with("é");
 
 #ifdef HAVE_UNISTRING
-    ASSERT_STREQ(string_c_str(s1), "é");    // NFD → NFC
-    ASSERT_STREQ(string_c_str(s2), "é");   // NFC → NFD
+    ASSERT_STREQ(string_c_str(s1), "é");
+    ASSERT_STREQ(string_c_str(s2), "é");
 #else
-    ASSERT_STREQ(string_c_str(s1), "é");   // no-op fallback
+    ASSERT_STREQ(string_c_str(s1), "é");
     ASSERT_STREQ(string_c_str(s2), "é");
 #endif
 
@@ -267,20 +487,14 @@ static void test_norm_combining_inplace(void)
     string_free(s2);
 }
 
-static void test_norm_hangul_inplace(void)
+static void test_text_construction_canonicalises_hangul(void)
 {
-    string_t *s1 = string_new_with("가");  // NFD
-    string_t *s2 = string_new_with("가");  // NFC
-
-    int r1 = string_normalize(s1, STRING_NORM_NFC);
-    int r2 = string_normalize(s2, STRING_NORM_NFD);
-
-    ASSERT_EQ(r1, 0);
-    ASSERT_EQ(r2, 0);
+    string_t *s1 = string_new_with("가");
+    string_t *s2 = string_new_with("가");
 
 #ifdef HAVE_UNISTRING
     ASSERT_STREQ(string_c_str(s1), "가");
-    ASSERT_STREQ(string_c_str(s2), "가");
+    ASSERT_STREQ(string_c_str(s2), "가");
 #else
     ASSERT_STREQ(string_c_str(s1), "가");
     ASSERT_STREQ(string_c_str(s2), "가");
@@ -290,38 +504,43 @@ static void test_norm_hangul_inplace(void)
     string_free(s2);
 }
 
-static void test_norm_emoji_inplace(void)
+static void test_text_emoji_stays_stable(void)
 {
     const char *emoji = "👩‍👩‍👧‍👦 🌍 🇬🇧";
     string_t *s = string_new_with(emoji);
 
-    int r = string_normalize(s, STRING_NORM_NFC);
-    ASSERT_EQ(r, 0);
     ASSERT_STREQ(string_c_str(s), emoji);
 
     string_free(s);
 }
 
-static void test_norm_empty_inplace(void)
+static void test_text_empty_stays_stable(void)
 {
     string_t *s = string_new_with("");
 
-    int r = string_normalize(s, STRING_NORM_NFC);
-    ASSERT_EQ(r, 0);
     ASSERT_STREQ(string_c_str(s), "");
 
     string_free(s);
 }
 
-static void test_norm_invalid_form_inplace(void)
+static void test_text_mutation_canonicalises_when_needed(void)
 {
-    string_t *s = string_new_with("test");
+    string_t *append = string_new_with("e");
+    string_t *insert = string_new_with("caf");
 
-    int r = string_normalize(s, (string_norm_form_t)999);
-    ASSERT_EQ(r, -1);
-    ASSERT_STREQ(string_c_str(s), "test");
+    string_append_cstr(append, "́");
+    string_insert(insert, 3, "é");
 
-    string_free(s);
+#ifdef HAVE_UNISTRING
+    ASSERT_STREQ(string_c_str(append), "é");
+    ASSERT_STREQ(string_c_str(insert), "café");
+#else
+    ASSERT_STREQ(string_c_str(append), "é");
+    ASSERT_STREQ(string_c_str(insert), "café");
+#endif
+
+    string_free(insert);
+    string_free(append);
 }
 
 static void test_readme_example_Basic_UTF_8_Manipulation(void) {
@@ -330,11 +549,8 @@ static void test_readme_example_Basic_UTF_8_Manipulation(void) {
     /* Append UTF‑8 text */
     string_append_cstr(s, " 🌍");
 
-    /* Insert at grapheme index */
+    /* Insert at character index */
     string_insert(s, 1, "🙂");
-
-    /* Normalise to NFC */
-    string_normalize(s, STRING_NORM_NFC);
 
     printf("%s\n", string_c_str(s));
 
@@ -342,18 +558,20 @@ static void test_readme_example_Basic_UTF_8_Manipulation(void) {
 
 }
 
-static void test_readme_example_Grapheme_Iteration(void) {
+static int print_character(rune_t rune, size_t index, void *user)
+{
+    (void)user;
+    return string_printf("[%zu] %R\n", index, rune) < 0 ? -1 : 0;
+}
+
+static void test_readme_example_Character_Iteration(void) {
     string_t *s = string_new_with("👨‍👩‍👧‍👦 family");
 
-    size_t count = string_grapheme_count(s);
+    size_t count = string_count(s);
 
-    printf("Graphemes: %zu\n", count);
+    printf("Characters: %zu\n", count);
 
-    for (size_t i = 0; i < count; i++) {
-        string_t *g = string_grapheme_at(s, i);
-        printf("[%zu] %s\n", i, string_c_str(g));
-        string_free(g);
-    }
+    string_each(s, print_character, NULL);
 
     string_free(s);
 }
@@ -374,7 +592,7 @@ static void test_readme_example_Using_the_Builder_API(void) {
 
 static void example_readme_examples(void) {
     test_readme_example_Basic_UTF_8_Manipulation();
-    test_readme_example_Grapheme_Iteration();
+    test_readme_example_Character_Iteration();
     test_readme_example_Using_the_Builder_API();
 }
 
@@ -391,19 +609,23 @@ int tests_main(void)
     TEST_RUN_CASE(test_append_format, NULL);
     TEST_RUN_CASE(test_starts_with_ends_with, NULL);
     TEST_RUN_CASE(test_to_upper_and_to_lower, NULL);
+    TEST_RUN_CASE(test_text_character_api, NULL);
     TEST_RUN_CASE(test_string_view, NULL);
+    TEST_RUN_CASE(test_string_cursor_view_rune_values, NULL);
+    TEST_RUN_CASE(test_string_cursor_parsing_api, NULL);
+    TEST_RUN_CASE(test_string_object_first_api, NULL);
     TEST_RUN_CASE(test_string_builder, NULL);
     TEST_RUN_CASE(test_utf8_stuff, NULL);
-    TEST_RUN_CASE(test_grapheme, NULL);
-    TEST_RUN_CASE(test_grapheme_reverse_and_substr, NULL);
+    TEST_RUN_CASE(test_character_count_and_reverse, NULL);
+    TEST_RUN_CASE(test_character_reverse_and_substring, NULL);
 
-    TEST_SECTION("Normalisation");
-    TEST_RUN_CASE(test_norm_ascii_inplace, NULL);
-    TEST_RUN_CASE(test_norm_combining_inplace, NULL);
-    TEST_RUN_CASE(test_norm_hangul_inplace, NULL);
-    TEST_RUN_CASE(test_norm_emoji_inplace, NULL);
-    TEST_RUN_CASE(test_norm_empty_inplace, NULL);
-    TEST_RUN_CASE(test_norm_invalid_form_inplace, NULL);
+    TEST_SECTION("Text Intelligence");
+    TEST_RUN_CASE(test_text_ascii_stays_stable, NULL);
+    TEST_RUN_CASE(test_text_construction_canonicalises_combining_marks, NULL);
+    TEST_RUN_CASE(test_text_construction_canonicalises_hangul, NULL);
+    TEST_RUN_CASE(test_text_emoji_stays_stable, NULL);
+    TEST_RUN_CASE(test_text_empty_stays_stable, NULL);
+    TEST_RUN_CASE(test_text_mutation_canonicalises_when_needed, NULL);
 
     TEST_SECTION("README");
     TEST_RUN_OUTPUT_TAGS(example_readme_examples, "string,readme,output");

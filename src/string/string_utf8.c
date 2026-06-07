@@ -88,38 +88,12 @@ void string_utf8_reverse(string_t *s)
 
 void string_utf8_to_upper(string_t *s)
 {
-    if (!s) return;
-
-    size_t i = 0;
-    while (i < s->len) {
-        size_t clen = utf8_char_len((unsigned char)s->data[i]);
-
-        if (clen == 1) {
-            unsigned char c = s->data[i];
-            if (c >= 'a' && c <= 'z')
-                s->data[i] = (char)(c - 32);
-        }
-
-        i += clen;
-    }
+    string_to_upper(s);
 }
 
 void string_utf8_to_lower(string_t *s)
 {
-    if (!s) return;
-
-    size_t i = 0;
-    while (i < s->len) {
-        size_t clen = utf8_char_len((unsigned char)s->data[i]);
-
-        if (clen == 1) {
-            unsigned char c = s->data[i];
-            if (c >= 'A' && c <= 'Z')
-                s->data[i] = (char)(c + 32);
-        }
-
-        i += clen;
-    }
+    string_to_lower(s);
 }
 
 uint32_t utf8_decode(const char *s, size_t len, size_t *adv)
